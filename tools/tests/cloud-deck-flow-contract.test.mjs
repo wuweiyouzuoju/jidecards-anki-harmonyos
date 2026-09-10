@@ -217,11 +217,15 @@ test('home sequences the dismissible-with-confirmation cloud onboarding before w
   assert.match(source, /if \(this\.显示云端牌组弹窗\) \{/);
   assert.match(source, /云端牌组弹窗按主按钮出口\(\);/);
   assert.doesNotMatch(source, /if \(this\.显示云端牌组弹窗\) \{\s*return true;/);
-  // 引导态跳过必须二次确认，且确认前后都不写完成标记。
+  // 引导态跳过必须二次确认；确认后持久化完成标记，但不消耗下载配额。
   assert.match(source, /private async 跳过云端牌组引导/);
   assert.match(source, /cloud_deck_skip_confirm_title/);
   const skipMethod = source.match(/private async 跳过云端牌组引导\(\): Promise<void> \{[\s\S]*?\n  private 取本地化文本/)?.[0] ?? '';
-  assert.doesNotMatch(skipMethod, /标记已完成云端牌组引导/);
+  assert.match(
+    skipMethod,
+    /if \(result\.index !== 1\)[\s\S]*const 已保存: boolean = await 标记已完成云端牌组引导\(\)/,
+  );
+  assert.match(skipMethod, /if \(!已保存\)[\s\S]*cloud_deck_save_failed/);
   assert.doesNotMatch(skipMethod, /标记已用尽云端牌组下载配额/);
   assert.doesNotMatch(source, /关闭云端牌组弹窗/);
 });
