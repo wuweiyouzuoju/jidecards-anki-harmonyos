@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { 应用尺寸 } from '../utils/应用尺寸';
-import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时长';
-import { SHOW_AI_AGENT_CHANNELS } from '../model/ReleaseFeatures';
+import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../model/ReleaseFeatures';
 
 // ========================================================
 // @块ID COMP-HOME-ACTION-001
@@ -21,7 +20,7 @@ import { SHOW_AI_AGENT_CHANNELS } from '../model/ReleaseFeatures';
 //
 // @业务规则
 // 不加遮罩：透明层仅承接点击关闭，不遮暗不模糊。
-// 入场过渡参考华为官方 TransitionEffect 示例（向下轻推）。
+// 入场只使用轻微缩放与淡入，不位移、不阻塞菜单操作。
 //
 // @副作用
 // 无。点击事件通过回调上抛，由父级处理实际跳转。
@@ -38,6 +37,7 @@ export struct 主页操作面板 {
   获取直链牌组回调: () => void = (): void => {};
   关闭回调: () => void = (): void => {};
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
+  @StorageLink(AI_AGENT_CHANNELS_APP_STORAGE_KEY) private Agent入口已启用: boolean = false;
 
   build() {
     Stack() {
@@ -68,7 +68,7 @@ export struct 主页操作面板 {
           .height(应用尺寸.行动按钮高度)
           .textAlign(TextAlign.Center)
           .onClick((): void => this.导入牌组回调())
-        if (SHOW_AI_AGENT_CHANNELS) {
+        if (this.Agent入口已启用) {
           Divider()
             .color($r('app.color.border_subtle'))
             .strokeWidth(应用尺寸.卡片边框)
@@ -117,12 +117,13 @@ export struct 主页操作面板 {
       .onClick(() => {
         // 阻断点击穿透到遮罩
       })
-      // 淡入淡出过渡（评价要求：禁止上下位移，改为纯 OPACITY）
+      // 小菜单统一使用 150ms EaseOut：入场轻缩放，退场只淡出，保持克制稳定。
       .transition(TransitionEffect.asymmetric(
         TransitionEffect.opacity(0)
-          .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }),
+          .combine(TransitionEffect.scale({ x: 0.98, y: 0.98 }))
+          .animation({ curve: Curve.EaseOut, duration: 150 }),
         TransitionEffect.opacity(0)
-          .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() })
+          .animation({ curve: Curve.EaseOut, duration: 150 })
       ))
     }
     .width('100%')

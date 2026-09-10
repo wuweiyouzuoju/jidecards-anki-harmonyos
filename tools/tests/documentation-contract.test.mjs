@@ -82,10 +82,14 @@ test('current capability documentation follows release gates and runtime constan
   const gitignore = read('.gitignore');
   const ci = read('.github/workflows/ci.yml');
 
-  assert.match(releaseFeatures, /SHOW_AI_AGENT_CHANNELS:\s*boolean\s*=\s*false/);
+  assert.match(releaseFeatures,
+    /AI_AGENT_CHANNELS_APP_STORAGE_KEY:\s*string\s*=\s*'aiAgentChannelsEnabled'/);
+  assert.match(releaseFeatures, /enableAiAgentChannels/);
   assert.match(agentPage, /searchMode:\s*'off'/);
-  assert.match(readme, /暂时隐藏的功能/);
-  assert.match(agentDesign, /关闭[\s\S]*全部 Agent 入口/);
+  assert.match(readme, /默认隐藏的功能/);
+  assert.match(readme, /开发者调试[\s\S]*AppStorage 运行时开关/);
+  assert.match(agentDesign, /默认关闭[\s\S]*全部 Agent 入口/);
+  assert.match(agentDesign, /持久化[\s\S]*AppStorage/);
   assert.match(cardHtml, /https:\/\/jidecards-media\.local\//);
   assert.match(architecture, /https:\/\/jidecards-media\.local\//);
   assert.match(architecture, /当前不检查 `protoc`、`cargo-zigbuild`、`zig`、Anki checkout 或签名材料/);

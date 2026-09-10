@@ -64,7 +64,7 @@ import {
   loadAgentSettings
 } from '../backend/agent/AgentSettingsStore';
 import { loadAgentSecret } from '../backend/agent/AgentSecretStore';
-import { SHOW_AI_AGENT_CHANNELS } from '../model/ReleaseFeatures';
+import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../model/ReleaseFeatures';
 
 /** 与上游 buildNextLearnMsg 一致：下一张学习卡 >=1 天后到期时，完成页不再提示学习卡 */
 const SECONDS_PER_DAY: number = 86400;
@@ -138,6 +138,7 @@ export struct 学习页 {
   @StorageLink(简洁模式AppStorage键) private 简洁模式: boolean = true;
   /** Tap Zones 开关：answer 阶段把屏幕划成 2×2 象限直接评分；question 阶段不拦截 */
   @StorageLink(TapZones开关AppStorage键) private TapZones开关: boolean = false;
+  @StorageLink(AI_AGENT_CHANNELS_APP_STORAGE_KEY) private Agent入口已启用: boolean = false;
   /** 手写模式：用户点「更多」菜单「手写」进入后置 true，关闭白板层后置 false（常驻入口，无开关） */
   @State private 手写模式: boolean = false;
   /** Agent 改卡写入成功后 AI制卡页 广播本键（Date.now()），本页据此重渲染当前卡。
@@ -490,7 +491,7 @@ export struct 学习页 {
     ];
     // 「手写」入口：常驻显示（question/answer 阶段），无开关，进入后叠加 Canvas 笔迹层
     if (this.阶段 === 'question' || this.阶段 === 'answer') {
-      if (SHOW_AI_AGENT_CHANNELS) {
+      if (this.Agent入口已启用) {
         菜单.push({
           value: this.取文案($r('app.string.ai_card_edit')),
           action: () => { this.打开AI改卡(); },

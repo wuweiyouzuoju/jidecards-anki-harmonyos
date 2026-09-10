@@ -33,10 +33,11 @@
 
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 颜色键 } from '../../model/颜色主题';
-import { SHOW_AI_AGENT_CHANNELS } from '../../model/ReleaseFeatures';
+import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../../model/ReleaseFeatures';
 
 @Component
 export struct 批量操作栏 {
+  @StorageLink(AI_AGENT_CHANNELS_APP_STORAGE_KEY) private Agent入口已启用: boolean = false;
   @Prop isDark: boolean = false;
   @Prop busy: boolean = false;
   @Prop 选中数: number = 0;
@@ -87,6 +88,7 @@ export struct 批量操作栏 {
           .fontColor($r('app.color.text_primary'))
           .backgroundColor(this.按钮背景(0))
           .borderRadius(应用尺寸.圆角_胶囊)
+          .animation({ duration: 80, curve: Curve.EaseOut })
           .enabled(!this.busy)
           .onTouch((e: TouchEvent): void => {
             if (e.type === TouchType.Down) { this.已按下 = 0; }
@@ -102,6 +104,7 @@ export struct 批量操作栏 {
           .fontColor($r('app.color.text_primary'))
           .backgroundColor(this.按钮背景(1))
           .borderRadius(应用尺寸.圆角_胶囊)
+          .animation({ duration: 80, curve: Curve.EaseOut })
           .enabled(!this.busy)
           .onTouch((e: TouchEvent): void => {
             if (e.type === TouchType.Down) { this.已按下 = 1; }
@@ -117,6 +120,7 @@ export struct 批量操作栏 {
           .fontColor($r('app.color.text_primary'))
           .backgroundColor(this.按钮背景(2))
           .borderRadius(应用尺寸.圆角_胶囊)
+          .animation({ duration: 80, curve: Curve.EaseOut })
           .enabled(!this.busy)
           .onTouch((e: TouchEvent): void => {
             if (e.type === TouchType.Down) { this.已按下 = 2; }
@@ -132,6 +136,7 @@ export struct 批量操作栏 {
           .fontColor($r('app.color.text_primary'))
           .backgroundColor(this.按钮背景(3))
           .borderRadius(应用尺寸.圆角_胶囊)
+          .animation({ duration: 80, curve: Curve.EaseOut })
           .enabled(!this.busy)
           .onTouch((e: TouchEvent): void => {
             if (e.type === TouchType.Down) { this.已按下 = 3; }
@@ -153,6 +158,7 @@ export struct 批量操作栏 {
           .fontColor($r('app.color.error_text'))
           .backgroundColor(this.按钮背景(4))
           .borderRadius(应用尺寸.圆角_胶囊)
+          .animation({ duration: 80, curve: Curve.EaseOut })
           .enabled(!this.busy)
           .onTouch((e: TouchEvent): void => {
             if (e.type === TouchType.Down) { this.已按下 = 4; }
@@ -168,6 +174,7 @@ export struct 批量操作栏 {
           .fontColor($r('app.color.text_primary'))
           .backgroundColor(this.按钮背景(5))
           .borderRadius(应用尺寸.圆角_胶囊)
+          .animation({ duration: 80, curve: Curve.EaseOut })
           .enabled(!this.busy)
           .onTouch((e: TouchEvent): void => {
             if (e.type === TouchType.Down) { this.已按下 = 5; }
@@ -183,6 +190,7 @@ export struct 批量操作栏 {
           .fontColor($r('app.color.text_primary'))
           .backgroundColor(this.按钮背景(6))
           .borderRadius(应用尺寸.圆角_胶囊)
+          .animation({ duration: 80, curve: Curve.EaseOut })
           .enabled(!this.busy)
           .onTouch((e: TouchEvent): void => {
             if (e.type === TouchType.Down) { this.已按下 = 6; }
@@ -198,6 +206,7 @@ export struct 批量操作栏 {
           .fontColor($r('app.color.text_primary'))
           .backgroundColor(this.按钮背景(7))
           .borderRadius(应用尺寸.圆角_胶囊)
+          .animation({ duration: 80, curve: Curve.EaseOut })
           .enabled(!this.busy)
           .onTouch((e: TouchEvent): void => {
             if (e.type === TouchType.Down) { this.已按下 = 7; }
@@ -207,15 +216,21 @@ export struct 批量操作栏 {
       }
       .width('100%')
 
-      if (SHOW_AI_AGENT_CHANNELS) {
+      if (this.Agent入口已启用) {
         Button($r('app.string.ai_card_edit'))
           .width('100%')
           .height(应用尺寸.按钮高度)
           .fontSize(应用尺寸.字号_正文_小)
           .fontColor($r('app.color.text_primary'))
           .backgroundColor($r('app.color.surface_card'))
+          .opacity(this.已按下 === 8 ? 0.82 : 1)
           .borderRadius(应用尺寸.圆角_胶囊)
+          .animation({ duration: 80, curve: Curve.EaseOut })
           .enabled(!this.busy)
+          .onTouch((e: TouchEvent): void => {
+            if (e.type === TouchType.Down) { this.已按下 = 8; }
+            else if (e.type === TouchType.Up || e.type === TouchType.Cancel) { this.已按下 = -1; }
+          })
           .onClick((): void => { this.onAI改卡(); })
       }
     }

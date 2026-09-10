@@ -18,6 +18,7 @@ import { 应用颜色主题 } from '../utils/颜色主题管理器';
 import { 颜色主题, 默认颜色主题, 规范化颜色主题 } from '../model/颜色主题';
 import { 刷新桌面卡片数据 } from '../model/FSRS控制器';
 import { 刷新学习提醒 } from '../model/学习提醒服务';
+import { AI_AGENT_CHANNELS_APP_STORAGE_KEY, initializeAiAgentChannels } from '../model/ReleaseFeatures';
 
 const DOMAIN: number = 0x4342;
 
@@ -55,6 +56,10 @@ export default class EntryAbility extends UIAbility {
 
   onCreate(want: Want, _launchParam: AbilityConstant.LaunchParam): void {
     AppStorage.setOrCreate<common.UIAbilityContext>('abilityContext', this.context);
+    AppStorage.setOrCreate<boolean>(AI_AGENT_CHANNELS_APP_STORAGE_KEY, false);
+    initializeAiAgentChannels().catch((_error: Object): void => {
+      // 读取失败保持关闭；开发者可在设置页重新输入密钥。
+    });
     this.refreshSystemDarkMode();
     // 存系统语言供纯函数层做本地化（如默认牌组名）
     try {

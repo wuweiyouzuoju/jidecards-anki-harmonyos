@@ -9,9 +9,37 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
 
-test('2.3.3 release hides every user-visible Agent channel behind one disabled gate', () => {
+test('developer debug key persistently unlocks every hidden Agent channel through one runtime gate', () => {
   const features = read('entry/src/main/ets/model/ReleaseFeatures.ets');
-  assert.match(features, /SHOW_AI_AGENT_CHANNELS:\s*boolean\s*=\s*false/);
+  const entryAbility = read('entry/src/main/ets/entryability/EntryAbility.ets');
+  const settings = read('entry/src/main/ets/components/设置面板.ets');
+  const developerGroup = read('entry/src/main/ets/components/settings/开发者调试分组.ets');
+  assert.match(features, /AI_AGENT_CHANNELS_APP_STORAGE_KEY:\s*string\s*=\s*'aiAgentChannelsEnabled'/);
+  assert.match(features, /DEVELOPER_DEBUG_KEY_NORMALIZED:\s*string\s*=\s*'jidecardsdeveloperdebug3\.0\.0'/);
+  assert.match(features, /isDeveloperDebugKeyValid/);
+  assert.match(features, /store\.put\(AI_AGENT_CHANNELS_PREFERENCE_KEY, true\)/);
+  assert.match(features, /await store\.flush\(\)/);
+  assert.match(features, /AppStorage\.setOrCreate<boolean>\(AI_AGENT_CHANNELS_APP_STORAGE_KEY, true\)/);
+  assert.match(entryAbility, /initializeAiAgentChannels\(\)/);
+  assert.match(developerGroup, /InputType\.Password/);
+  assert.match(developerGroup, /enableAiAgentChannels\(this\.开发者密钥\)/);
+  assert.match(developerGroup, /app\.string\.settings_developer_debug_qq_hint/);
+  assert.match(developerGroup,
+    /if \(this\.Agent入口已启用\) \{[\s\S]*?settings_developer_debug_enabled[\s\S]*?\.maxLines\(1\)/);
+  assert.doesNotMatch(developerGroup, /settings_developer_debug_enabled_hint|settings_developer_debug_success/,
+    'successful activation must use the existing single-line settings status style');
+  assert.match(settings, /开发者调试分组\(/);
+  assert.match(settings,
+    /启用成功回调:[\s\S]*?this\.开发者调试分组展开 = false;[\s\S]*?this\.AIAgent分组展开 = true;/,
+    'successful activation must collapse developer debug and reveal the Agent settings group');
+  const zh = JSON.parse(read('entry/src/main/resources/base/element/string.json')).string;
+  const en = JSON.parse(read('entry/src/main/resources/en_US/element/string.json')).string;
+  assert.equal(zh.find((item) => item.name === 'settings_developer_debug_enable')?.value, '启用开发者功能');
+  assert.equal(en.find((item) => item.name === 'settings_developer_debug_enable')?.value, 'Enable Developer Features');
+  assert.equal(zh.find((item) => item.name === 'settings_developer_debug_qq_hint')?.value,
+    '加入官方 QQ 群 726837065，获取开发者调试资格。');
+  assert.equal(en.find((item) => item.name === 'settings_developer_debug_qq_hint')?.value,
+    'Join the official QQ group 726837065 to request developer debug access.');
 
   for (const relative of [
     'entry/src/main/ets/components/主页操作面板.ets',
@@ -20,8 +48,10 @@ test('2.3.3 release hides every user-visible Agent channel behind one disabled g
     'entry/src/main/ets/components/设置面板.ets',
   ]) {
     const source = read(relative);
-    assert.match(source, /import \{ SHOW_AI_AGENT_CHANNELS \} from/);
-    assert.match(source, /if \(SHOW_AI_AGENT_CHANNELS\) \{/);
+    assert.match(source, /AI_AGENT_CHANNELS_APP_STORAGE_KEY/);
+    assert.match(source,
+      /@StorageLink\(AI_AGENT_CHANNELS_APP_STORAGE_KEY\)[^\n]*Agent入口已启用:\s*boolean\s*=\s*false/);
+    assert.match(source, /if \(this\.Agent入口已启用\) \{/);
   }
 });
 

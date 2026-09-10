@@ -31,6 +31,7 @@ import { 查找重复对话框 } from './settings/查找重复对话框';
 import { 笔记类型管理面板 } from './settings/笔记类型管理面板';
 import { 笔记类型编辑器 } from './settings/笔记类型编辑器';
 import { AIAgent设置分组 } from './settings/AIAgent设置分组';
+import { 开发者调试分组 } from './settings/开发者调试分组';
 import { 设置分组卡片 } from './settings/设置分组卡片';
 import { 简洁模式AppStorage键, 加载简洁模式, 保存简洁模式 } from '../model/简洁模式存储';
 import {
@@ -42,7 +43,7 @@ import { 字段帮助面板 } from './字段帮助面板';
 import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时长';
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { 按下态按钮 } from './common/按下态按钮';
-import { SHOW_AI_AGENT_CHANNELS } from '../model/ReleaseFeatures';
+import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../model/ReleaseFeatures';
 
 // ========================================================
 // @块ID UI-SETTINGS-PANEL-001
@@ -135,6 +136,7 @@ export struct 设置面板 {
   // AnkiWeb 云同步分组默认折叠：与 FSRS 一致，按需展开
   @State private 同步分组展开: boolean = false;
   @State private AIAgent分组展开: boolean = false;
+  @State private 开发者调试分组展开: boolean = false;
   // 关于分组内部两个子项展开状态（反馈/赞助）。
   @State private 反馈子项展开: boolean = false;
   @State private 赞助子项展开: boolean = false;
@@ -164,6 +166,8 @@ export struct 设置面板 {
   @StorageLink(简洁模式AppStorage键) private 简洁模式: boolean = true;
   // 实验性功能：仅「实验版」模式下设置页可见；学习页生效前会再校验当前为实验版
   @StorageLink(TapZones开关AppStorage键) private TapZones开关: boolean = false;
+  // 输入开发者密钥后即时显示隐藏的 Agent 设置与各页面入口。
+  @StorageLink(AI_AGENT_CHANNELS_APP_STORAGE_KEY) private Agent入口已启用: boolean = false;
   // 清除未用标签状态：数据管理分组入口 → 确认对话框 → 调后端
   @State private 清除标签忙碌: boolean = false;
   // 内容 List 滚动器：openAiSettings 跳转进来时无动画直接定位到 AI 智能体分组
@@ -564,11 +568,12 @@ export struct 设置面板 {
             .fontSize(11)
             .fontColor(设置面板色板_取(this.是否深色).弱化文字)
             .rotate({ angle: this.反馈子项展开 ? 0 : -90 })
+            .animation({ duration: 150, curve: Curve.EaseOut })
         }
         .width('100%')
         .height(48)
         .onClick(() => {
-          this.getUIContext().animateTo({ duration: 150, curve: Curve.EaseOut }, () => { this.反馈子项展开 = !this.反馈子项展开; });
+          this.反馈子项展开 = !this.反馈子项展开;
         })
 
         if (this.反馈子项展开) {
@@ -604,11 +609,12 @@ export struct 设置面板 {
             .fontSize(11)
             .fontColor(设置面板色板_取(this.是否深色).弱化文字)
             .rotate({ angle: this.赞助子项展开 ? 0 : -90 })
+            .animation({ duration: 150, curve: Curve.EaseOut })
         }
         .width('100%')
         .height(48)
         .onClick(() => {
-          this.getUIContext().animateTo({ duration: 150, curve: Curve.EaseOut }, () => { this.赞助子项展开 = !this.赞助子项展开; });
+          this.赞助子项展开 = !this.赞助子项展开;
         })
 
         if (this.赞助子项展开) {
@@ -896,7 +902,7 @@ export struct 设置面板 {
           })
         }
 
-        if (SHOW_AI_AGENT_CHANNELS) {
+        if (this.Agent入口已启用) {
           ListItem() {
             AIAgent设置分组({
               是否深色: this.是否深色,
@@ -1009,6 +1015,24 @@ export struct 设置面板 {
           }) {
             this.关于分组内容();
           }
+        }
+
+        // 开发者调试始终可见；正确密钥只持久化布尔解锁状态，不保存输入内容。
+        ListItem() {
+          开发者调试分组({
+            是否深色: this.是否深色,
+            已展开: this.开发者调试分组展开,
+            切换展开回调: (): void => {
+              this.开发者调试分组展开 = !this.开发者调试分组展开;
+            },
+            启用成功回调: (): void => {
+              this.开发者调试分组展开 = false;
+              this.AIAgent分组展开 = true;
+              setTimeout((): void => {
+                this.内容滚动器.scrollToIndex(this.AIAgent分组索引());
+              }, 50);
+            }
+          })
         }
 
         // 9. 实验性功能分组：仅「实验版」模式下可见；包含 Tap Zones 快速答题。
