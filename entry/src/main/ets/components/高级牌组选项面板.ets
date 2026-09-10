@@ -43,7 +43,7 @@ interface 牌组下拉选项 { value: string; }
 
 /**
  * 高级设置 section 折叠标题：独立子组件（非 @Builder），expanded 用 @Prop 保证响应式，
- * animateTo 才能捕获 rotate 属性变化触发旋转动画。
+ * 只让箭头旋转，内容显隐立即生效，避免布局动画拖慢操作。
  */
 @Component
 struct 段落标题 {
@@ -59,8 +59,9 @@ struct 段落标题 {
           .fontSize(应用尺寸.字号_正文)
           .fontColor($r('app.color.text_secondary'))
           .rotate({ angle: this.expanded ? 0 : -90 })
+          .animation({ duration: 150, curve: Curve.EaseOut })
       }.width('100%').onClick(() => {
-        this.getUIContext().animateTo({ duration: 150, curve: Curve.EaseOut }, () => { this.onToggle(); });
+        this.onToggle();
       })
     }.width('100%').padding(应用尺寸.间距_10).backgroundColor($r('app.color.surface_page')).borderRadius(应用尺寸.圆角_面板)
   }

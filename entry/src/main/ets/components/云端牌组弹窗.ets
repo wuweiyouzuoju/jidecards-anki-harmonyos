@@ -296,7 +296,7 @@ export struct 云端牌组弹窗 {
       .transition(TransitionEffect.asymmetric(
         TransitionEffect.opacity(0).combine(TransitionEffect.scale({ x: 0.96, y: 0.96 }))
           .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }),
-        TransitionEffect.opacity(0).combine(TransitionEffect.scale({ x: 0.96, y: 0.96 }))
+        TransitionEffect.opacity(0)
           .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() })
       ))
     }

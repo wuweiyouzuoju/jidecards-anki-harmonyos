@@ -16,7 +16,7 @@
 // 渲染一个全屏 Stack：透明承接层 + 左上角下拉的 3 个动作条目。
 //
 // @Invariants
-// - 与 主页操作面板 同布局/同过渡：opacity 淡入淡出，禁止上下位移
+// - 与 主页操作面板 同布局/同过渡：150ms 淡入 + 0.98 轻缩放，禁止位移
 // - 锚定 TopStart（左上角），与 主页操作面板 的 TopEnd（右上角）对称
 //
 // @Extension Points
@@ -27,7 +27,6 @@
 // ========================================================
 
 import { 应用尺寸 } from '../../utils/应用尺寸';
-import { 取全屏转场时长, 取全屏转场曲线 } from '../../utils/转场时长';
 
 @Component
 export struct 主页更多面板 {
@@ -101,12 +100,13 @@ export struct 主页更多面板 {
       .onClick(() => {
         // 阻断点击穿透到遮罩
       })
-      // 淡入淡出过渡（评价要求：禁止上下位移，改为纯 OPACITY）
+      // 小菜单统一使用 150ms EaseOut：入场轻缩放，退场只淡出。
       .transition(TransitionEffect.asymmetric(
         TransitionEffect.opacity(0)
-          .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }),
+          .combine(TransitionEffect.scale({ x: 0.98, y: 0.98 }))
+          .animation({ curve: Curve.EaseOut, duration: 150 }),
         TransitionEffect.opacity(0)
-          .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() })
+          .animation({ curve: Curve.EaseOut, duration: 150 })
       ))
     }
     .width('100%')

@@ -112,14 +112,22 @@ export struct 设置页 {
   @StorageLink(颜色键.页面底色微染) private 页面底色微染值: string = '#F5F7FA';
 
   async aboutToAppear(): Promise<void> {
+    // 先注册再做异步加载，确保首帧入场也能接到统一淡入淡出回调。
+    CustomTransition.getInstance().注册NavParam('SettingsPage',
+      (isPush: boolean, isExit: boolean): void => {
+        this.转场透明度 = isExit ? 1 : 0;
+      },
+      (isPush: boolean, isExit: boolean): void => {
+        this.转场透明度 = isExit ? 0 : 1;
+      }
+    );
     this.主题模式值 = await 加载主题模式();
     this.颜色主题值 = await 加载颜色主题();
     await this.加载牌组列表();
-    // 注册转场回调
-    CustomTransition.getInstance().注册NavParam('SettingsPage',
-      (): void => { this.转场透明度 = 0; },
-      (): void => { this.转场透明度 = 1; }
-    );
+  }
+
+  aboutToDisappear(): void {
+    CustomTransition.getInstance().注销NavParam('SettingsPage');
   }
 
   private 是否深色(): boolean {

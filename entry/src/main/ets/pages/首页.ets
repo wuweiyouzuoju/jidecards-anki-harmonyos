@@ -1483,8 +1483,8 @@ struct 首页 {
 
   /**
    * 「稍后再说」/ 菜单态「关闭」的统一出口。
-   * Invariants: 开机引导态必须二次确认，且确认前后都不写任何标记——用户还没拿到牌组，
-   * 下次冷启动仍要继续引导，菜单里的「获取直链牌组」也必须继续可见。
+   * Invariants: 开机引导态必须二次确认并持久化完成标记，后续冷启动不再自动弹出；
+   * 跳过不消耗下载配额，菜单里的「获取直链牌组」仍保持可见。
    */
   private async 跳过云端牌组引导(): Promise<void> {
     if (this.云端牌组从菜单打开) {
@@ -1507,6 +1507,11 @@ struct 首页 {
       }
     } catch (error) {
       // 弹窗失败不阻断：留在原弹窗上，用户可以重新点「稍后再说」。
+      return;
+    }
+    const 已保存: boolean = await 标记已完成云端牌组引导();
+    if (!已保存) {
+      this.显示提示($r('app.string.cloud_deck_save_failed'));
       return;
     }
     this.显示云端牌组弹窗 = false;
@@ -2099,8 +2104,8 @@ struct 首页 {
   // operation: PUSH / POP
   //
   // @输出
-  // 返回 NavigationAnimatedTransition 让系统执行自定义动画；
-  // from/to 任一 index=-1（首页）返回 undefined 走系统默认。
+  // 返回 NavigationAnimatedTransition 让系统执行自定义动画；首页没有注册透明度回调时，
+  // 仅动画 NavDestination 一侧，仍保持同一套淡入淡出而不回退到横向平移。
   //
   // @业务规则
   // 通过 CustomTransition 单例查找 from/to 注册的 opacity 设置回调，
@@ -2108,7 +2113,7 @@ struct 首页 {
   // 动画结束后必须调 proxy.finishTransition()，否则 timeout(1200ms) 后系统强制结束。
   //
   // @Invariants
-  // - 首页推栈（from.index === -1）必须返回 undefined，避免与系统首页转场冲突
+  // - 首页与各 NavDestination 之间也必须走本回调，禁止回退到系统横向平移
   // - 时长与曲线必须取自 取全屏转场时长/曲线，保证按设备尺寸分档
   //
   // @副作用
@@ -2116,10 +2121,6 @@ struct 首页 {
   // ========================================================
   private 自定义转场回调(from: NavContentInfo, to: NavContentInfo,
     operation: NavigationOperation): NavigationAnimatedTransition | undefined {
-    // 首页推栈走系统默认转场
-    if (from.index === -1 || to.index === -1) {
-      return undefined;
-    }
     const isPush: boolean = operation === NavigationOperation.PUSH;
     const 转场时长: number = 取全屏转场时长();
     const 转场曲线: ICurve = 取全屏转场曲线();
@@ -2138,7 +2139,12 @@ struct 首页 {
         if (to起点 !== null) {
           to起点(isPush, false);
         }
-        this.getUIContext()?.animateTo({
+        const context: UIContext | undefined = this.getUIContext();
+        if (context === undefined) {
+          transitionProxy.finishTransition();
+          return;
+        }
+        context.animateTo({
           duration: 转场时长,
           curve: 转场曲线,
           onFinish: (): void => {

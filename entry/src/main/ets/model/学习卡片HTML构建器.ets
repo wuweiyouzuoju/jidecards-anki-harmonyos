@@ -427,7 +427,6 @@ const 可折叠字段样式: string = `
   padding: 8px 12px;
   background: rgba(128, 128, 128, 0.06);
   border-radius: 8px;
-  transition: max-height 0.25s ease;
 }
 .anki-collapsible.expanded { max-height: none; }
 .anki-collapsible-toggle {
@@ -439,8 +438,13 @@ const 可折叠字段样式: string = `
   font-size: 0.85em;
   user-select: none;
 }
-.anki-collapsible-toggle::before { content: '▼'; margin-right: 4px; }
-.anki-collapsible-toggle.expanded::before { content: '▲'; }
+.anki-collapsible-toggle::before {
+  content: '▶';
+  display: inline-block;
+  margin-right: 4px;
+  transition: transform 150ms ease-out;
+}
+.anki-collapsible-toggle.expanded::before { transform: rotate(90deg); }
 details {
   margin: 8px 0;
   padding: 8px 12px;
@@ -457,7 +461,7 @@ details > summary::before {
   content: '▶';
   display: inline-block;
   margin-right: 6px;
-  transition: transform 0.2s;
+  transition: transform 150ms ease-out;
 }
 details[open] > summary::before { transform: rotate(90deg); }
 `;

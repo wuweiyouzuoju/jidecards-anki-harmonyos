@@ -240,7 +240,7 @@ export struct 月历卡 {
           .margin({ left: 应用尺寸.间距_8 })
           .padding({ left: 应用尺寸.间距_4, right: 应用尺寸.间距_4, top: 应用尺寸.间距_4, bottom: 应用尺寸.间距_4 })
           .rotate({ angle: this.已折叠 ? -90 : 0 })
-          .animation({ duration: 300, curve: Curve.EaseOut })
+          .animation({ duration: 150, curve: Curve.EaseOut })
       }
       .width('100%')
 
@@ -282,7 +282,6 @@ export struct 月历卡 {
     .width('100%')
     // B12-Y2 2026-07-22：折叠态高度与 今日摘要卡 对齐（82），展开态保持动态 卡片高度
     .height(this.已折叠 ? 82 : this.卡片高度())
-    .animation({ duration: 300, curve: Curve.EaseOut })
     .padding(应用尺寸.间距_14)
     .backgroundColor($r('app.color.surface_card'))
     .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })

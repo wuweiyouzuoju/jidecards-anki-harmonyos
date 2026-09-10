@@ -299,6 +299,7 @@ export struct 卡片信息 {
           .fontColor($r('app.color.text_primary'))
           .backgroundColor(this.已按下关闭 ? $r('app.color.surface_page') : $r('app.color.surface_card'))
           .borderRadius(应用尺寸.圆角_胶囊)
+          .animation({ duration: 80, curve: Curve.EaseOut })
           .onTouch((e: TouchEvent): void => {
             if (e.type === TouchType.Down) {
               this.已按下关闭 = true;

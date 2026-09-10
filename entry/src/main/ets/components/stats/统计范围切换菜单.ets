@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { 应用尺寸 } from '../../utils/应用尺寸';
-import { 取全屏转场时长, 取全屏转场曲线 } from '../../utils/转场时长';
 
 // ========================================================
 // @名称 统计范围切换菜单
@@ -9,7 +8,7 @@ import { 取全屏转场时长, 取全屏转场曲线 } from '../../utils/转场
 // @作用
 // 统计页顶栏右上角「近一年/全部」按钮触发的下拉选择菜单。
 // 视觉与交互完全对齐设置页的 模式切换菜单：透明承接层、右上角双项菜单、
-// 当前项主色高亮、菜单外点击关闭，以及纯透明度淡入淡出。
+// 当前项主色高亮、菜单外点击关闭，以及 150ms 淡入 + 0.98 轻缩放。
 // ========================================================
 
 @Component
@@ -62,9 +61,10 @@ export struct 统计范围切换菜单 {
       })
       .transition(TransitionEffect.asymmetric(
         TransitionEffect.opacity(0)
-          .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }),
+          .combine(TransitionEffect.scale({ x: 0.98, y: 0.98 }))
+          .animation({ curve: Curve.EaseOut, duration: 150 }),
         TransitionEffect.opacity(0)
-          .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() })
+          .animation({ curve: Curve.EaseOut, duration: 150 })
       ))
     }
     .width('100%')
