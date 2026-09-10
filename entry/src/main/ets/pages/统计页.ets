@@ -7,7 +7,7 @@
 // @作用
 // 全库统计图表页（对标 Anki Stats）。展示今日计数、预测、卡片状态分布、
 // 小时分布、难度分布、间隔分布、真实保留率、记忆率等完整统计信息。
-// 手机端单栏布局：顶部条（返回 + 牌组下拉 + 统计天数两档「近 1 年/全部」）+ 滚动统计内容。
+// 手机端单栏布局：顶部条（返回 + 统计天数两档「近 1 年/全部」）+ 滚动统计内容。
 // 图表偏好无集中弹窗（对齐 Anki：偏好控件内嵌各图即时落库）——积压/分离复选框在图内、
 // 周首日点日历星期标签切换；Anki 官方 GraphsOverview 无偏好弹窗，autoSavingPrefs 即时保存。
 //
@@ -89,7 +89,7 @@ export struct 统计页 {
   @State private 图表偏好: GraphPreferences = 默认偏好();
   @State private 统计天数: number = 365;
   @State private 显示统计范围菜单: boolean = false;
-  // 牌组选择（顶部条内嵌下拉）：索引 0 = 全部牌组（搜索串空），>0 对应 牌组名列表[索引-1]
+  // 牌组选择（统计内容首行左侧下拉）：索引 0 = 全部牌组（搜索串空），>0 对应 牌组名列表[索引-1]
   @State private 牌组选项: SelectOption[] = [];
   @State private 选中牌组索引: number = 0;
   private 牌组名列表: string[] = [];
@@ -139,6 +139,10 @@ export struct 统计页 {
     this.统计天数 = await 加载统计天数();
     this.加载牌组列表();
     await this.加载统计数据();
+  }
+
+  aboutToDisappear(): void {
+    CustomTransition.getInstance().注销NavParam('StatsPage');
   }
 
   /** 顶部条牌组下拉选项：全部牌组 + 全库牌组全名（平铺牌组树前序） */
@@ -363,21 +367,8 @@ export struct 统计页 {
   @Builder
   private 顶部条() {
     // 与浏览页顶部条同款：左返回按钮（按下态胶囊样式 + 淡色边框）。
-    // 中间为牌组选择下拉（对齐 Anki RangeBox 的牌组选择；索引 0=全部牌组）；
-    // 牌组列表未加载完成 / 仅全库无牌组时回退显示「统计」标题。
-    // Invariants:
-    // - 标题 Text（铺满宽度）必须声明在 Row 之前的下层，避免盖住左右按钮点击
-    // - Select 声明在 Row 之后的上层（Stack 后声明者在上），限宽 50% 居中不挡左右按钮
+    // 牌组选择位于统计内容首行，与 FSRS 状态左右排列。
     Stack() {
-      if (this.牌组选项.length <= 1) {
-        Text($r('app.string.stats_page_title'))
-          .fontSize(应用尺寸.字号_面板标题)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.text_primary'))
-          .width('100%')
-          .textAlign(TextAlign.Center)
-      }
-
       Row() {
         按下态按钮({
           文案: $r('app.string.study_back'),
@@ -402,23 +393,6 @@ export struct 统计页 {
       .height('100%')
       .alignItems(VerticalAlign.Center)
 
-      if (this.牌组选项.length > 1) {
-        Select(this.牌组选项)
-          .selected(this.选中牌组索引)
-          .value(this.选中牌组索引 === 0
-            ? (this.牌组选项[0].value as ResourceStr)
-            : (this.牌组选项[this.选中牌组索引].value as ResourceStr))
-          .fontColor($r('app.color.text_primary'))
-          .font({ size: 应用尺寸.字号_正文_小 })
-          .selectedOptionFontColor($r('app.color.text_primary'))
-          .optionFontColor($r('app.color.text_primary'))
-          .backgroundColor(this.主色容器色)
-          .borderRadius(应用尺寸.圆角_进度条)
-          .constraintSize({ maxWidth: '45%' })
-          .onSelect((索引: number) => {
-            this.on牌组切换(索引);
-          })
-      }
     }
     .width('100%')
     .height(应用尺寸.工具栏高度 + this.状态栏高度)
@@ -436,18 +410,44 @@ export struct 统计页 {
   private 统计内容() {
     Scroll() {
       Column({ space: 应用尺寸.间距_12 }) {
-        // FSRS 标志
-        if (this.图表数据 !== null) {
-          Text(this.图表数据.fsrs ? $r('app.string.stats_fsrs_enabled') : $r('app.string.stats_fsrs_disabled'))
-            .fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_secondary'))
-            .padding({
-              left: 应用尺寸.间距_8, right: 应用尺寸.间距_8,
-              top: 应用尺寸.间距_4, bottom: 应用尺寸.间距_4
-            })
-            .backgroundColor(this.主色容器色)
-            .borderRadius(应用尺寸.间距_8)
+        // 统计口径行：牌组选择在左，FSRS 状态在右。
+        Row() {
+          if (this.牌组选项.length > 1) {
+            Select(this.牌组选项)
+              .selected(this.选中牌组索引)
+              .value(this.选中牌组索引 === 0
+                ? (this.牌组选项[0].value as ResourceStr)
+                : (this.牌组选项[this.选中牌组索引].value as ResourceStr))
+              .fontColor($r('app.color.text_primary'))
+              .font({ size: 应用尺寸.字号_正文_小 })
+              .selectedOptionFontColor($r('app.color.text_primary'))
+              .optionFontColor($r('app.color.text_primary'))
+              .backgroundColor(this.主色容器色)
+              .borderRadius(应用尺寸.圆角_进度条)
+              .constraintSize({ maxWidth: '58%' })
+              .onSelect((索引: number) => {
+                this.on牌组切换(索引);
+              })
+          }
+
+          Blank()
+
+          if (this.图表数据 !== null) {
+            Text(this.图表数据.fsrs
+              ? $r('app.string.stats_fsrs_enabled')
+              : $r('app.string.stats_fsrs_disabled'))
+              .fontSize(应用尺寸.字号_正文_小)
+              .fontColor($r('app.color.text_secondary'))
+              .padding({
+                left: 应用尺寸.间距_8, right: 应用尺寸.间距_8,
+                top: 应用尺寸.间距_4, bottom: 应用尺寸.间距_4
+              })
+              .backgroundColor(this.主色容器色)
+              .borderRadius(应用尺寸.间距_8)
+          }
         }
+        .width('100%')
+        .alignItems(VerticalAlign.Center)
 
         // 1. 今日计数（Anki TodayStats）
         统计图表分区({

@@ -221,6 +221,20 @@ test('hour histogram range is shared by stats page, home card and widget', () =>
   assert.doesNotMatch(summary, /layoutWeight\(3\)/);
 });
 
+test('stats deck selector shares the first content row with the FSRS status', () => {
+  const stats = read('entry/src/main/ets/pages/统计页.ets');
+  const topBar = stats.match(/private 顶部条\(\)[\s\S]*?@Builder\s+private 统计内容/)?.[0] ?? '';
+  const scopeRow = stats.match(/\/\/ 统计口径行[\s\S]*?\/\/ 1\. 今日计数/)?.[0] ?? '';
+
+  assert.doesNotMatch(topBar, /Text\(\$r\('app\.string\.stats_page_title'\)\)/,
+    'the toolbar center must not show the page title');
+  assert.doesNotMatch(topBar, /Select\(this\.牌组选项\)/,
+    'the deck selector must no longer occupy the toolbar center');
+  assert.match(scopeRow,
+    /Row\(\)[\s\S]*?Select\(this\.牌组选项\)[\s\S]*?Blank\(\)[\s\S]*?stats_fsrs_enabled/,
+    'the deck selector and FSRS status must share one left-right row');
+});
+
 test('difficulty percent values are used as-is, never divided by 10', () => {
   // 后端 eases.rs：SM-2 键 = ease_factor/10、平均 = median/10；FSRS 键 = percent_to_bin(D×100)、平均 = median×100
   // —— 两种模式的键与平均都已是百分比，前端直接显示，不得再 /10
