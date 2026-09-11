@@ -8,6 +8,7 @@ import { 解析是否深色, 主题模式 } from '../model/主题设置';
 import { 提醒编辑面板 } from '../components/提醒编辑面板';
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { 按下态按钮 } from '../components/common/按下态按钮';
+import { 统一空态 } from '../components/common/统一空态';
 
 // ========================================================
 // @块ID UI-STUDY-REMINDER-PAGE-001
@@ -317,18 +318,10 @@ export struct 学习提醒页 {
 
   @Builder
   private 空状态() {
-    Column() {
-      Text($r('app.string.reminder_list_empty'))
-        .fontSize(16)
-        .fontColor(设置面板色板_取(this.是否深色).次文字)
-        .margin({ bottom: 8 })
-      Text($r('app.string.reminder_list_empty_hint'))
-        .fontSize(13)
-        .fontColor(设置面板色板_取(this.是否深色).弱化文字)
-    }
-    .width('100%')
-    .padding({ top: 120 })
-    .justifyContent(FlexAlign.Center)
+    统一空态({
+      标题: $r('app.string.reminder_list_empty'),
+      副标题: $r('app.string.reminder_list_empty_hint')
+    })
   }
 
   build() {
@@ -354,11 +347,17 @@ export struct 学习提醒页 {
                     .fontSize(12)
                     .fontColor(设置面板色板_取(this.是否深色).错误色)
                     .width('100%')
-                    .padding({ left: 16, right: 16, top: 8 })
+                    .padding({ top: 应用尺寸.间距_8 })
                 }
               }
               .width('100%')
-              .padding({ left: 16, right: 16, top: 8, bottom: this.导航条高度 })
+              .height('100%')
+              .padding({
+                left: 应用尺寸.页面内边距_水平,
+                right: 应用尺寸.页面内边距_水平,
+                top: 应用尺寸.间距_8,
+                bottom: this.导航条高度
+              })
             }
             .layoutWeight(1)
             .align(Alignment.Top)

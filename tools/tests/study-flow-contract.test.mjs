@@ -188,6 +188,25 @@ test('sound player wraps AVPlayer as a serial queue player', () => {
   assert.match(player, /状态 === 'completed' \|\| 状态 === 'error'/, 'completed advances the queue');
 });
 
+test('study audio uses a shared mix-with-others audio session', () => {
+  const coordinator = read('entry/src/main/ets/utils/AudioFocusCoordinator.ets');
+  const soundPlayer = read('entry/src/main/ets/utils/声音播放器.ets');
+  const ttsPlayer = read('entry/src/main/ets/utils/TTS播放器.ets');
+
+  assert.match(coordinator, /CONCURRENCY_MIX_WITH_OTHERS/,
+    'short study audio must not permanently stop background audio');
+  assert.match(coordinator, /activateAudioSession\(strategy\)/, 'session activates before playback');
+  assert.match(coordinator, /deactivateAudioSession\(\)/, 'session releases after all playback ends');
+  assert.match(soundPlayer, /audioInterruptMode = audio\.InterruptMode\.SHARE_MODE/,
+    'same-app audio streams share focus');
+  assert.match(soundPlayer, /INTERRUPT_HINT_RESUME[\s\S]*?\.play\(\)/,
+    'AVPlayer actively resumes after a temporary focus interruption');
+  assert.match(soundPlayer, /音频焦点协调器\.beginPlayback\(this\)/);
+  assert.match(soundPlayer, /音频焦点协调器\.endPlayback\(this\)/);
+  assert.match(ttsPlayer, /音频焦点协调器\.beginPlayback\(this\)/);
+  assert.match(ttsPlayer, /音频焦点协调器\.endPlayback\(this\)/);
+});
+
 test('study page plays card audio through native SoundPlayer', () => {
   const page = read(STUDY_PAGE);
   assert.match(page, /import \{ 声音播放器 \} from '..\/utils\/声音播放器'/);
@@ -295,7 +314,7 @@ test('study strings are resourced', () => {
   assert.match(page, /app\.string\.study_load_error/);
 });
 
-test('study page re-renders the current card after an Agent edit', () => {
+test('study page reconciles the current card and queue after an Agent edit', () => {
   // 回归：改卡返回学习页后仍显示旧卡片。根因是刷新只挂在 NavPathStack.onPop 上，
   // 而 onPop 在本项目已知偶发不触发（BUG-006 同类）。现在要求双通道：
   // AI 页广播 cardContentChangedTick + NavDestination.onShown 消费。
@@ -319,12 +338,20 @@ test('study page re-renders the current card after an Agent edit', () => {
   assert.equal((page.match(/this\.刷新AI改卡后当前卡\(\)/g) ?? []).length, 1,
     'only 消费待重渲染 may fire the re-render; double firing wastes a render RPC');
 
-  // 重渲染只换当前卡内容：不重新取队列、不评分、不埋藏、不暂停。
+  // 返回后先核对真实队首：普通改字段保留当前阶段；删除/移走当前卡则加载新队首。
   const refresh = page.match(/private async 刷新AI改卡后当前卡\(\)[\s\S]*?\n  \}/)?.[0] ?? '';
+  assert.match(refresh, /const currentCardId: number = this\.当前卡片\.cardId/);
+  assert.match(refresh, /await this\.调度器服务实例\.获取队首卡片\(this\.牌组ID\)/);
+  assert.match(refresh, /this\.新卡剩余 = queued\.newCount/);
+  assert.match(refresh, /this\.学习中剩余 = queued\.learningCount/);
+  assert.match(refresh, /this\.复习剩余 = queued\.reviewCount/);
+  assert.match(refresh,
+    /queued\.cards\.length === 0 \|\| queued\.cards\[0\]\.cardId !== currentCardId[\s\S]{0,120}?await this\.加载下一张卡\(\)/,
+    'a deleted or moved current card must advance to the real queue head');
   assert.match(refresh, /渲染既有卡片\(this\.当前卡片\.cardId\)/);
   assert.match(refresh, /loadData\(html, 'text\/html', 'UTF-8', 媒体基地址, ' '\)/);
-  assert.doesNotMatch(refresh, /加载下一张卡\(|this\.评分\(|埋藏或暂停/,
-    'refresh must only re-render the current card');
+  assert.doesNotMatch(refresh, /this\.评分\(|埋藏或暂停/,
+    'queue reconciliation must not answer, bury, or suspend a card');
 });
 
 test('counts for deck today decodes new and review tallies', () => {

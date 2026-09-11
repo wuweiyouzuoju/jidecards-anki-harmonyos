@@ -221,10 +221,11 @@ test('hour histogram range is shared by stats page, home card and widget', () =>
   assert.doesNotMatch(summary, /layoutWeight\(3\)/);
 });
 
-test('stats deck selector shares the first content row with the FSRS status', () => {
+test('stats deck selector uses a normal compact select beside the aligned FSRS status', () => {
   const stats = read('entry/src/main/ets/pages/统计页.ets');
   const topBar = stats.match(/private 顶部条\(\)[\s\S]*?@Builder\s+private 统计内容/)?.[0] ?? '';
   const scopeRow = stats.match(/\/\/ 统计口径行[\s\S]*?\/\/ 1\. 今日计数/)?.[0] ?? '';
+  const deckSelect = scopeRow.match(/Select\(this\.牌组选项\)[\s\S]*?\.onSelect/)?.[0] ?? '';
 
   assert.doesNotMatch(topBar, /Text\(\$r\('app\.string\.stats_page_title'\)\)/,
     'the toolbar center must not show the page title');
@@ -233,6 +234,69 @@ test('stats deck selector shares the first content row with the FSRS status', ()
   assert.match(scopeRow,
     /Row\(\)[\s\S]*?Select\(this\.牌组选项\)[\s\S]*?Blank\(\)[\s\S]*?stats_fsrs_enabled/,
     'the deck selector and FSRS status must share one left-right row');
+  assert.equal((scopeRow.match(/\.height\(应用尺寸\.紧凑控件高度\)/g) ?? []).length, 2,
+    'the deck selector and FSRS status must use the same compact control height');
+  assert.match(deckSelect, /\.controlSize\(ControlSize\.SMALL\)/,
+    'the deck selector must use the standard compact Select appearance');
+  assert.doesNotMatch(deckSelect, /\.backgroundColor\(|\.borderRadius\(/,
+    'the deck selector must not be rendered as a theme-colored block');
+  assert.doesNotMatch(scopeRow, /\.backgroundColor\(|\.borderRadius\(/,
+    'the FSRS status must be plain text without a background container');
+  assert.equal((scopeRow.match(/应用尺寸\.字号_正文_小/g) ?? []).length, 2,
+    'the deck selector and FSRS status must use the same font size');
+  assert.doesNotMatch(scopeRow, /app\.color\.text_secondary/,
+    'the FSRS status must use the same primary text color as the deck selector');
+});
+
+test('primary pages share one shell gutter and common visual primitives', () => {
+  const settingsPage = read('entry/src/main/ets/pages/设置页.ets');
+  const settingsPanel = read('entry/src/main/ets/components/设置面板.ets');
+  const settingsCard = read('entry/src/main/ets/components/settings/设置分组卡片.ets');
+  const appearance = read('entry/src/main/ets/components/settings/外观分组.ets');
+  const agentSettings = read('entry/src/main/ets/components/settings/AIAgent设置分组.ets');
+  const syncSettings = read('entry/src/main/ets/components/settings/同步分组.ets');
+  const stats = read('entry/src/main/ets/pages/统计页.ets');
+  const browser = read('entry/src/main/ets/pages/浏览页.ets');
+  const reminders = read('entry/src/main/ets/pages/学习提醒页.ets');
+  const addNote = read('entry/src/main/ets/pages/添加笔记页.ets');
+  const agentPage = read('entry/src/main/ets/pages/AI制卡页.ets');
+
+  const settingsList = settingsPanel.match(/List\(\{ space: 12[\s\S]*?\.scrollBar\(BarState\.Off\)/)?.[0] ?? '';
+  assert.match(settingsList, /left:\s*应用尺寸\.页面内边距_水平/,
+    'settings cards must align with the toolbar left gutter');
+  assert.match(settingsList, /right:\s*应用尺寸\.页面内边距_水平/,
+    'settings cards must align with the toolbar right gutter');
+  assert.match(stats,
+    /private 统计内容\(\)[\s\S]*?left: 应用尺寸\.页面内边距_水平,[\s\S]*?right: 应用尺寸\.页面内边距_水平/);
+  assert.match(browser,
+    /搜索框\(\{[\s\S]*?\.padding\(\{\s*left:\s*应用尺寸\.页面内边距_水平,\s*right:\s*应用尺寸\.页面内边距_水平/);
+  assert.match(reminders,
+    /Scroll\(\)[\s\S]*?\.padding\(\{\s*left:\s*应用尺寸\.页面内边距_水平,\s*right:\s*应用尺寸\.页面内边距_水平/);
+  assert.match(addNote,
+    /\.scrollBar\(BarState\.Auto\)[\s\S]*?\.padding\(\{\s*left:\s*应用尺寸\.页面内边距_水平,\s*right:\s*应用尺寸\.页面内边距_水平/);
+  assert.match(agentPage,
+    /private 消息流\(\)[\s\S]*?left: 应用尺寸\.页面内边距_水平,[\s\S]*?right: 应用尺寸\.页面内边距_水平/);
+
+  assert.match(settingsPanel, /文案: \$r\('app\.string\.study_back'\)/,
+    'instant-save settings must use the same back navigation wording as other pages');
+  assert.match(settingsPanel,
+    /文案: \$r\('app\.string\.study_back'\),\s*选中态背景: \$r\('app\.color\.surface_sidebar'\),\s*字色: \$r\('app\.color\.text_primary'\)/,
+    'settings back action must remain neutral instead of following the selected color theme');
+  assert.doesNotMatch(settingsPage, /private 顶部条\(\)/,
+    'settings must not keep an unused second toolbar implementation');
+  assert.match(settingsCard, /borderRadius\(应用尺寸\.圆角_卡片\)/,
+    'settings group cards must use the same page-card radius');
+  assert.match(reminders, /统一空态\(\{[\s\S]*?reminder_list_empty[\s\S]*?reminder_list_empty_hint/,
+    'reminders must use the common empty-state component');
+
+  assert.equal((appearance.match(/controlSize\(ControlSize\.SMALL\)/g) ?? []).length, 3);
+  assert.equal((agentSettings.match(/controlSize\(ControlSize\.SMALL\)/g) ?? []).length, 3,
+    'all Agent settings selects must match the other settings selects');
+  assert.equal((syncSettings.match(/borderRadius\(应用尺寸\.圆角_面板\)/g) ?? []).length >= 2, true,
+    'sync inputs must use the same form-field radius as Agent settings');
+  assert.match(addNote, /按下态按钮\(\{[\s\S]*?app\.string\.study_back/,
+    'add-note toolbar back action must use the common pressed button');
+  assert.match(reminders, /统一空态/);
 });
 
 test('difficulty percent values are used as-is, never divided by 10', () => {

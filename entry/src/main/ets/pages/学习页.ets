@@ -45,6 +45,7 @@ import { 应用尺寸 } from '../utils/应用尺寸';
 import { 学习浮动工具栏 } from '../components/学习浮动工具栏';
 import { 学习手写白板层 } from '../components/学习手写白板层';
 import { StudyActionButton } from '../components/StudyActionButton';
+import { 按下态按钮 } from '../components/common/按下态按钮';
 import { 学习阶段 } from '../utils/吸附计算器';
 import { 加载学习布局模式, 学习布局模式 } from '../model/学习布局存储';
 import { 简洁模式AppStorage键, 加载简洁模式 } from '../model/简洁模式存储';
@@ -141,7 +142,7 @@ export struct 学习页 {
   @StorageLink(AI_AGENT_CHANNELS_APP_STORAGE_KEY) private Agent入口已启用: boolean = false;
   /** 手写模式：用户点「更多」菜单「手写」进入后置 true，关闭白板层后置 false（常驻入口，无开关） */
   @State private 手写模式: boolean = false;
-  /** Agent 改卡写入成功后 AI制卡页 广播本键（Date.now()），本页据此重渲染当前卡。
+  /** Agent 改卡写入成功后 AI制卡页 广播本键（Date.now()），本页据此协调当前卡与队列。
    *  双通道之一：NavPathStack.onPop 在本项目已知偶发不触发（BUG-006 同类），
    *  只挂 onPop 时改卡返回学习页会停在旧卡片上。与 onShown 并存，两者只消费一次。 */
   @StorageLink('cardContentChangedTick') @Watch('卡片内容变更_回调') private 卡片内容变更信号: number = 0;
@@ -567,10 +568,20 @@ export struct 学习页 {
     this.刷新AI改卡后当前卡();
   }
 
-  /** 只重渲染同一张卡；不重新取队列、不评分、不埋藏或暂停。 */
+  /** 核对 Agent 写入后的队首；同卡原地重渲染，当前卡失效时进入真实新队首。 */
   private async 刷新AI改卡后当前卡(): Promise<void> {
     if (this.当前卡片 === null || (this.阶段 !== 'question' && this.阶段 !== 'answer')) { return; }
+    const currentCardId: number = this.当前卡片.cardId;
     try {
+      const queued = await this.调度器服务实例.获取队首卡片(this.牌组ID);
+      if (queued.cards.length === 0 || queued.cards[0].cardId !== currentCardId) {
+        await this.加载下一张卡();
+        return;
+      }
+      this.新卡剩余 = queued.newCount;
+      this.学习中剩余 = queued.learningCount;
+      this.复习剩余 = queued.reviewCount;
+      this.当前卡片 = queued.cards[0];
       this.已渲染 = await this.卡片渲染服务实例.渲染既有卡片(this.当前卡片.cardId);
       this.正面HTML = 剥除拼写标记(构建卡片HTML(this.已渲染, 'question'));
       this.背面HTML = 构建卡片HTML(this.已渲染, 'answer');
@@ -578,10 +589,9 @@ export struct 学习页 {
       this.网页控制器.loadData(html, 'text/html', 'UTF-8', 媒体基地址, ' ');
       hilog.info(0x4342, '学习页', `Agent 改卡后已重渲染当前卡 cardId=${this.当前卡片.cardId}`);
     } catch (error) {
-      // 改卡草稿可能把当前卡移出牌组或删除，重渲染失败时保留原画面，不打断学习；
-      // 错误详情只在 error 阶段渲染，这里写它用户看不到，只落 hilog。
+      // 协调查询或重渲染失败时保留当前画面，不把一次返回刷新失败升级为学习页错误态。
       hilog.error(0x4342, '学习页',
-        `Agent 改卡后重渲染当前卡失败: ${error instanceof Error ? error.message : `${error}`}`);
+        `Agent 改卡后协调学习队列失败: ${error instanceof Error ? error.message : `${error}`}`);
     }
   }
 
@@ -1126,18 +1136,12 @@ export struct 学习页 {
       // 避免左侧两按钮叠加宽度覆盖居中牌组名。
       Row() {
         // 左侧：返回
-        Button($r('app.string.study_back'))
-          .height(应用尺寸.按钮高度)
-          .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
-          .constraintSize({ minWidth: 0 })
-          .fontSize(应用尺寸.字号_按钮)
-          .fontColor($r('app.color.text_primary'))
-          .backgroundColor($r('app.color.surface_card'))
-          .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
-          .borderRadius(应用尺寸.圆角_胶囊)
-          .onClick(() => {
-            this.返回();
-          })
+        按下态按钮({
+          文案: $r('app.string.study_back'),
+          选中态背景: this.主色容器色,
+          字色: $r('app.color.text_primary'),
+          点击回调: (): void => { this.返回(); }
+        })
 
         // 中间空白撑开：让左侧按钮靠左、右侧按钮靠右
         Blank()

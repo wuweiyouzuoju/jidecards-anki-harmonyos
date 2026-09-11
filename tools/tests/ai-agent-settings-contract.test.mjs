@@ -62,8 +62,8 @@ test('all main settings groups share one card shell and rotating header', () => 
   const shell = read('entry/src/main/ets/components/settings/设置分组卡片.ets');
   assert.match(shell, /@BuilderParam\s+内容/);
   assert.match(shell, /设置面板色板_取\(this\.是否深色\)\.背景/);
-  assert.match(shell, /\.padding\(16\)/);
-  assert.match(shell, /\.borderRadius\(12\)/);
+  assert.match(shell, /\.padding\(应用尺寸\.卡片内边距\)/);
+  assert.match(shell, /\.borderRadius\(应用尺寸\.圆角_卡片\)/);
   assert.match(shell, /Text\('▼'\)/);
   assert.match(shell,
     /\.rotate\(\{ angle: this\.是否展开 \? 0 : -90 \}\)\s*\.animation\(\{ duration: 150, curve: Curve\.EaseOut \}\)/);

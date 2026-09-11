@@ -15,6 +15,7 @@ import {
 import type { 同步凭证信息 } from '../../model/同步凭证存储';
 import { 分类同步错误 } from '../../model/同步流程';
 import { 设置面板色板, 设置面板色板_取 } from '../../utils/设置面板配色';
+import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 颜色键 } from '../../model/颜色主题';
 import { 设置分组卡片 } from './设置分组卡片';
 
@@ -290,7 +291,7 @@ export struct 同步分组 {
       .fontColor(色板.主文字)
       .placeholderColor(色板.弱化文字)
       .backgroundColor(色板.标签背景)
-      .borderRadius(8)
+      .borderRadius(应用尺寸.圆角_面板)
       .padding({ left: 12, right: 12 })
       .enabled(!this.登录中)
       .onChange((值: string) => {
@@ -303,7 +304,7 @@ export struct 同步分组 {
       .fontColor(色板.主文字)
       .placeholderColor(色板.弱化文字)
       .backgroundColor(色板.标签背景)
-      .borderRadius(8)
+      .borderRadius(应用尺寸.圆角_面板)
       .padding({ left: 12, right: 12 })
       .type(InputType.Password)
       .enabled(!this.登录中)

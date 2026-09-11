@@ -163,7 +163,7 @@ test('unconfigured browser and study AI edit entries route to the same AI settin
     'the unconfigured jump must not exit multi-select; it is only exited on the real edit push');
 });
 
-test('study current-card entry passes stable context and rerenders only that card on return', () => {
+test('study current-card entry passes stable context and reconciles the queue on return', () => {
   const study = read('entry/src/main/ets/pages/学习页.ets');
   assert.match(study, /ai_card_edit/);
   assert.match(study, /cardIds:\s*\[this\.当前卡片\.cardId\]/);
@@ -171,8 +171,9 @@ test('study current-card entry passes stable context and rerenders only that car
   assert.match(study, /templateIdx:\s*this\.当前卡片\.templateIdx/);
   assert.match(study, /刷新AI改卡后当前卡/);
   const refresh = study.match(/private async 刷新AI改卡后当前卡\(\): Promise<void> \{([\s\S]*?)\n  \}/)?.[1] ?? '';
+  assert.match(refresh, /获取队首卡片/);
   assert.match(refresh, /渲染既有卡片/);
-  assert.doesNotMatch(refresh, /获取队首卡片|回答卡片|埋藏|暂停/);
+  assert.doesNotMatch(refresh, /回答卡片|埋藏|暂停/);
 });
 
 test('browser edit entry passes selected IDs and preserves the active search', () => {

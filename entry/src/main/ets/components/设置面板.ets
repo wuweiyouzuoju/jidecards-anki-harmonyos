@@ -51,7 +51,7 @@ import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../model/ReleaseFeatures';
 //
 // @作用
 // 设置面板主壳：Stack 遮罩 + List 列出各分组 ListItem + 根 Stack 顶层浮层。
-// 顶栏布局：左「当前模式名」按钮（弹出 模式切换菜单 选 简洁版/实验版）+ 中标题 + 右「确认」（关闭设置页），
+// 顶栏布局：左「返回」（关闭设置页）+ 右「当前模式名」（弹出 模式切换菜单 选 简洁版/实验版），
 // 替代原底部「当前模式」分组，该分组已于 2026-08-29 删除）。
 // 5 个分组（外观/调度器/布局/数据/术语表）+ 模式切换菜单 已抽到 components/settings/ 子组件；
 // 数据库检查分组与关于分组保留在主壳中：
@@ -807,13 +807,13 @@ export struct 设置面板 {
   build() {
     Stack() {
       Column() {
-        // 顶部条：左确认（关闭设置页）+ 右当前模式按钮（弹出 简洁版/实验版 菜单）
+        // 顶部条：左返回（关闭设置页）+ 右当前模式按钮（弹出 简洁版/实验版 菜单）
         Stack() {
           Row() {
             按下态按钮({
-              文案: $r('app.string.settings_confirm'),
-              选中态背景: this.主色容器色,
-              字色: this.动作主色链接,
+              文案: $r('app.string.study_back'),
+              选中态背景: $r('app.color.surface_sidebar'),
+              字色: $r('app.color.text_primary'),
               点击回调: (): void => { this.关闭回调(); }
             })
             Blank()
@@ -1082,7 +1082,12 @@ export struct 设置面板 {
         }
         .layoutWeight(1)
         .width('100%')
-        .padding({ left: 16, right: 16, top: 8, bottom: 16 + this.导航条高度 })
+        .padding({
+          left: 应用尺寸.页面内边距_水平,
+          right: 应用尺寸.页面内边距_水平,
+          top: 应用尺寸.间距_8,
+          bottom: 应用尺寸.卡片内边距 + this.导航条高度
+        })
         .scrollBar(BarState.Off)
         .edgeEffect(EdgeEffect.Spring)
         .alignListItem(ListItemAlign.Center)

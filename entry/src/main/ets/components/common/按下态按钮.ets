@@ -14,6 +14,7 @@
 // 选中态背景：必填，按下时背景色
 // 字号：可选，默认 应用尺寸.字号_按钮
 // 字色：可选，默认 text_primary
+// 是否启用：可选，默认 true
 // 点击回调：必填回调
 //
 // @输出
@@ -32,6 +33,7 @@ export struct 按下态按钮 {
   @Prop 选中态背景: ResourceColor;
   @Prop 字号: number = 应用尺寸.字号_按钮;
   @Prop 字色: ResourceColor = $r('app.color.text_primary');
+  @Prop 是否启用: boolean = true;
   点击回调: () => void = (): void => {};
   @State private 按下中: boolean = false;
 
@@ -54,6 +56,7 @@ export struct 按下态按钮 {
     .backgroundColor(this.按下中 ? this.选中态背景 : $r('app.color.surface_card'))
     .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
     .borderRadius(应用尺寸.圆角_胶囊)
+    .enabled(this.是否启用)
     .animation({ duration: 80, curve: Curve.EaseOut })
     .onTouch((event: TouchEvent): void => {
       if (event.type === TouchType.Down) { this.按下中 = true; }

@@ -73,6 +73,7 @@ export class 应用尺寸 {
   // ---- 页面骨架 ----
   static readonly 页面内边距_水平: number = 12;
   static readonly 工具栏高度: number = 60;
+  static readonly 紧凑控件高度: number = 36;
   static readonly 按钮高度: number = 44;
   static readonly 行动按钮高度: number = 52;
 

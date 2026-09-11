@@ -13,8 +13,8 @@
 // 主路径：从指定位置开始 主动调 prepare/play；兜底：状态变更处理 回调里按状态推进；
 //        超时：3s 未进入 playing 跳下一首。
 //
-// 音频焦点：audioInterruptMode=SHARE_MODE 不抢占其他应用；
-//          on('audioInterrupt') 仅记录日志不主动停播。
+// 音频焦点：AudioSession 使用 MIX_WITH_OTHERS 与其他应用并发；
+//          audioInterruptMode=SHARE_MODE 让本应用内多路音频共享焦点；收到 RESUME 时主动续播。
 //
 // 诊断：全链路 hilog 输出（tag=SoundPlayer），平板上
 //      `hdc shell hilog | grep SoundPlayer` 即可看到每一步状态/文件/错误细节。
@@ -37,6 +37,7 @@ import { media } from '@kit.MediaKit';
 import { audio } from '@kit.AudioKit';
 import { fileIo as fs } from '@kit.CoreFileKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
+import { AudioFocusCoordinator } from './AudioFocusCoordinator';
 
 const 域: number = 0x0001;
 const 标签: string = 'SoundPlayer';
@@ -71,6 +72,7 @@ function 错误文本(e: object | undefined): string {
 }
 
 export class 声音播放器 {
+  private readonly 音频焦点协调器: AudioFocusCoordinator = AudioFocusCoordinator.getInstance();
   private 播放器实例: media.AVPlayer | null = null;
   private 队列: string[] = [];
   private 当前索引: number = 0;
@@ -108,7 +110,10 @@ export class 声音播放器 {
     }
     await this.停止播放器();
     if (路径列表.length > 0) {
+      await this.音频焦点协调器.beginPlayback(this);
       await this.从指定位置开始(0, this.代次);
+    } else {
+      await this.音频焦点协调器.endPlayback(this);
     }
   }
 
@@ -164,6 +169,7 @@ export class 声音播放器 {
     记录信息('stop: gen=%{public}d', this.代次);
     this.队列 = [];
     await this.停止播放器();
+    await this.音频焦点协调器.endPlayback(this);
   }
 
   /**
@@ -265,9 +271,8 @@ export class 声音播放器 {
    *
    * @作用
    * 挂载状态机/错误/音频焦点三类监听器。
-   * - audioInterruptMode=SHARE_MODE：不抢占其他应用音频焦点，避免被系统强制暂停后无声
-   *   （参考腾讯云 https://cloud.tencent.com/developer/article/2474687 与官方文档）
-   * - on('audioInterrupt')：仅记录日志，SHARE_MODE 下系统不强制打断，让 AVPlayer 自处理
+   * - audioInterruptMode=SHARE_MODE：同应用内的 AVPlayer 与 TTS 共享焦点。
+   * - on('audioInterrupt')：系统强制暂停后，收到 RESUME 提示时主动调用 play 恢复。
    *
    * @输入
    * player: AVPlayer 实例
@@ -295,6 +300,14 @@ export class 声音播放器 {
     播放器.on('audioInterrupt', (信息: audio.InterruptEvent): void => {
       记录信息('onAudioInterrupt: eventType=%{public}d forceType=%{public}d hintType=%{public}d',
         信息.eventType, 信息.forceType, 信息.hintType);
+      if (信息.hintType === audio.InterruptHint.INTERRUPT_HINT_RESUME && this.队列.length > 0
+        && this.播放器实例 !== null && this.播放器实例.state === 'paused') {
+        this.播放器实例.play().then((): void => {
+          记录信息('onAudioInterrupt: resumed playback');
+        }).catch((错误: Object): void => {
+          记录错误('onAudioInterrupt: resume failed %{public}s', 错误文本(错误 as object | undefined));
+        });
+      }
     });
   }
 
@@ -329,6 +342,7 @@ export class 声音播放器 {
     }
     if (索引 >= this.队列.length) {
       记录信息('startAt[%{public}d]: end of queue', 索引);
+      await this.音频焦点协调器.endPlayback(this);
       return;
     }
     this.当前索引 = 索引;

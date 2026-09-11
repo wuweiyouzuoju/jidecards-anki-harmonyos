@@ -36,6 +36,7 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 import { util } from '@kit.ArkTS';
 import type { TtsItem } from '../proto/messages/CardRenderingMessages';
 import { 加载语音人物, 获取语音版本号 } from '../model/TTS语音存储';
+import { AudioFocusCoordinator } from './AudioFocusCoordinator';
 
 const 域: number = 0x0001;
 const 标签: string = 'TtsPlayer';
@@ -134,6 +135,7 @@ function 音色是否已安装(音色: textToSpeech.VoiceInfo, 语种: string): 
 }
 
 export class TTS播放器 {
+  private readonly 音频焦点协调器: AudioFocusCoordinator = AudioFocusCoordinator.getInstance();
   private 引擎: textToSpeech.TextToSpeechEngine | null = null;
   private 引擎语言: string = '';
   // 引擎缓存 key 必须包含 person，否则用户在设置页切换同语种音色后（如 zh-CN 聆小珊→凌飞哲）
@@ -156,7 +158,10 @@ export class TTS播放器 {
     }
     await this.内部停止();
     if (条目列表.length > 0) {
+      await this.音频焦点协调器.beginPlayback(this);
       await this.从指定位置开始(0, this.代次);
+    } else {
+      await this.音频焦点协调器.endPlayback(this);
     }
   }
 
@@ -178,6 +183,7 @@ export class TTS播放器 {
     记录信息('stop: gen=%{public}d', this.代次);
     this.队列 = [];
     await this.内部停止();
+    await this.音频焦点协调器.endPlayback(this);
   }
 
   /** 页面销毁时释放引擎 */
@@ -334,6 +340,7 @@ export class TTS播放器 {
     }
     if (位置 >= this.队列.length) {
       记录信息('startAt[%{public}d]: end of queue', 位置);
+      await this.音频焦点协调器.endPlayback(this);
       return;
     }
     this.索引 = 位置;

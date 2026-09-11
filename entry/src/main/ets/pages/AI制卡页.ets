@@ -1986,7 +1986,12 @@ export struct AI制卡页 {
     }
     .width('100%')
     .layoutWeight(1)
-    .padding(应用尺寸.卡片内边距)
+    .padding({
+      left: 应用尺寸.页面内边距_水平,
+      right: 应用尺寸.页面内边距_水平,
+      top: 应用尺寸.卡片内边距,
+      bottom: 应用尺寸.卡片内边距
+    })
     .backgroundColor(this.页面底色微染值)
   }
 
@@ -2454,8 +2459,8 @@ export struct AI制卡页 {
       }
       .width('100%')
       .padding({
-        left: 应用尺寸.卡片内边距,
-        right: 应用尺寸.卡片内边距,
+        left: 应用尺寸.页面内边距_水平,
+        right: 应用尺寸.页面内边距_水平,
         top: 应用尺寸.间距_8,
         bottom: 应用尺寸.间距_8
       })
@@ -2576,8 +2581,8 @@ export struct AI制卡页 {
     }
     .width('100%')
     .padding({
-      left: 应用尺寸.卡片内边距,
-      right: 应用尺寸.卡片内边距,
+      left: 应用尺寸.页面内边距_水平,
+      right: 应用尺寸.页面内边距_水平,
       top: 应用尺寸.间距_8,
       bottom: 应用尺寸.间距_8 + this.导航条高度
     })
@@ -2603,7 +2608,10 @@ export struct AI制卡页 {
               .fontColor($r('app.color.error_text'))
               .width('100%')
               .maxLines(3)
-              .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
+              .padding({
+                left: 应用尺寸.页面内边距_水平,
+                right: 应用尺寸.页面内边距_水平
+              })
           }
           this.输入区()
         }

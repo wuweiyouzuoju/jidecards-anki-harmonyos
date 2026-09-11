@@ -2,6 +2,7 @@
 
 // 设置页所有可折叠主分组的统一外壳：标题、可选帮助按钮、旋转箭头、色板与卡片尺寸只在此维护。
 import { 设置面板色板_取 } from '../../utils/设置面板配色';
+import { 应用尺寸 } from '../../utils/应用尺寸';
 
 @Component
 export struct 设置分组卡片 {
@@ -56,8 +57,8 @@ export struct 设置分组卡片 {
       }
     }
     .width('100%')
-    .padding(16)
+    .padding(应用尺寸.卡片内边距)
     .backgroundColor(设置面板色板_取(this.是否深色).背景)
-    .borderRadius(12)
+    .borderRadius(应用尺寸.圆角_卡片)
   }
 }

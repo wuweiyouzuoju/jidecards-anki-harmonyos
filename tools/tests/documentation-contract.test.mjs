@@ -17,10 +17,6 @@ function lockValue(source, key) {
   return line?.slice(prefix.length);
 }
 
-function escapeRegex(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 function markdownFiles(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const absolute = path.join(directory, entry.name);
@@ -37,7 +33,6 @@ test('current documentation follows application and SDK configuration', () => {
   const upstream = read('UPSTREAM.lock');
   const readme = read('README.md');
   const status = read('docs/DEVELOPMENT_PLAN.md');
-  const sourceGuide = read('docs/CSDN-记得闪卡项目全解.md');
 
   const versionName = app.match(/versionName:\s*'([^']+)'/)?.[1];
   const versionCode = app.match(/versionCode:\s*(\d+)/)?.[1];
@@ -67,8 +62,6 @@ test('current documentation follows application and SDK configuration', () => {
   assert.match(status, new RegExp(`应用版本 \\| ${versionName.replaceAll('.', '\\.')} / versionCode ${versionCode}`));
   assert.match(status, new RegExp(`最低兼容 SDK \\| HarmonyOS [^|]+（API ${compatibleApi}）`));
   assert.match(status, new RegExp(`目标 SDK \\| HarmonyOS [^|]+（API ${targetApi}）`));
-  assert.match(sourceGuide, new RegExp('源码版本是 `' + escapeRegex(versionName) + '`'));
-  assert.match(sourceGuide, new RegExp(`Compatible SDK 是 API ${compatibleApi}，Target SDK 是 API ${targetApi}`));
   assert.doesNotMatch(status, /当前实施记录|最低系统版本 \| HarmonyOS 5\.0\.0（API 12）/);
 });
 

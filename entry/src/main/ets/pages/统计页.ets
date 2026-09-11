@@ -422,8 +422,8 @@ export struct 统计页 {
               .font({ size: 应用尺寸.字号_正文_小 })
               .selectedOptionFontColor($r('app.color.text_primary'))
               .optionFontColor($r('app.color.text_primary'))
-              .backgroundColor(this.主色容器色)
-              .borderRadius(应用尺寸.圆角_进度条)
+              .controlSize(ControlSize.SMALL)
+              .height(应用尺寸.紧凑控件高度)
               .constraintSize({ maxWidth: '58%' })
               .onSelect((索引: number) => {
                 this.on牌组切换(索引);
@@ -433,17 +433,15 @@ export struct 统计页 {
           Blank()
 
           if (this.图表数据 !== null) {
-            Text(this.图表数据.fsrs
-              ? $r('app.string.stats_fsrs_enabled')
-              : $r('app.string.stats_fsrs_disabled'))
-              .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_secondary'))
-              .padding({
-                left: 应用尺寸.间距_8, right: 应用尺寸.间距_8,
-                top: 应用尺寸.间距_4, bottom: 应用尺寸.间距_4
-              })
-              .backgroundColor(this.主色容器色)
-              .borderRadius(应用尺寸.间距_8)
+            Row() {
+              Text(this.图表数据.fsrs
+                ? $r('app.string.stats_fsrs_enabled')
+                : $r('app.string.stats_fsrs_disabled'))
+                .fontSize(应用尺寸.字号_正文_小)
+                .fontColor($r('app.color.text_primary'))
+            }
+            .height(应用尺寸.紧凑控件高度)
+            .alignItems(VerticalAlign.Center)
           }
         }
         .width('100%')
@@ -657,8 +655,8 @@ export struct 统计页 {
       }
       .width('100%')
       .padding({
-        left: 应用尺寸.间距_16,
-        right: 应用尺寸.间距_16,
+        left: 应用尺寸.页面内边距_水平,
+        right: 应用尺寸.页面内边距_水平,
         top: 应用尺寸.间距_12,
         // 抬高避让手势导航条（AppGallery 导航栏适配要求）
         bottom: 应用尺寸.间距_12 + this.导航条高度

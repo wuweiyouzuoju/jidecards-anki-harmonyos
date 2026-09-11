@@ -1616,7 +1616,8 @@ export struct 浏览页 {
             onSearch: (文本: string): void => { this.提交搜索(文本); },
             onModeChange: (模式: string): void => { this.切换模式(模式 as 浏览模式); }
           })
-            .padding({ left: 应用尺寸.间距_16, right: 应用尺寸.间距_16, top: 应用尺寸.间距_8,
+            .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平,
+              top: 应用尺寸.间距_8,
               bottom: 应用尺寸.间距_8 })
 
           if (this.阶段 === 'loading') {

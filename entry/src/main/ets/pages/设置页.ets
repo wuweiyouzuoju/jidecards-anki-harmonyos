@@ -14,14 +14,13 @@ import { 后端会话 } from '../backend/后端会话';
 import { 导出集合, 导出牌组, 完成导出, 执行牌组导入, 暂存导入文件, 替换集合 } from '../backend/数据迁移服务';
 import { 解析是否深色, 主题模式 } from '../model/主题设置';
 import { 加载主题模式, 保存主题模式 } from '../model/主题存储';
-import { 颜色主题, 颜色键, 默认颜色主题 } from '../model/颜色主题';
+import { 颜色主题, 默认颜色主题 } from '../model/颜色主题';
 import { 加载颜色主题, 保存颜色主题 } from '../model/颜色主题存储';
 import { 应用颜色主题 } from '../utils/颜色主题管理器';
 import { 应用主题 } from '../utils/主题控制器';
 import { 加载已隐藏牌组ID列表, 取消隐藏全部牌组 } from '../model/隐藏牌组存储';
 import { 加载FSRS开启状态, 设置FSRS开启状态, 刷新桌面卡片数据 } from '../model/FSRS控制器';
 import { 选取数据文件 } from '../utils/文件导入助手';
-import { 应用尺寸 } from '../utils/应用尺寸';
 import { 平铺牌组树 } from '../model/牌组层级';
 import { 牌组汇总 } from '../model/主页模型';
 import type { DeckTreeNode } from '../proto/messages/DeckMessages';
@@ -63,53 +62,6 @@ export struct 设置页 {
 
   // 牌组列表（用于导出选项）
   @State private 牌组列表: 导出牌组选项[] = [];
-
-  @StorageProp('状态栏高度') private 状态栏高度: number = 0;
-
-  @Builder
-  private 顶部条() {
-    Stack() {
-      Row() {
-        Button($r('app.string.study_back'))
-          .type(ButtonType.Normal)
-          .backgroundColor(Color.Transparent)
-          .fontSize(15)
-          .fontColor(this.主色按钮背景色)
-          .onClick((): void => { this.返回(); })
-        Blank()
-          .hitTestBehavior(HitTestMode.Transparent)
-        // 右侧占位：原不可见的「+」占位按钮已移除（无功能、无文案），
-        // 用 Column 占位保持标题视觉居中，i18n 契约不扫描 Column。
-        Column()
-          .width(40)
-          .height(40)
-          .backgroundColor(Color.Transparent)
-      }
-      .width('100%')
-      .height('100%')
-      .padding({ left: 12, right: 12 })
-      .hitTestBehavior(HitTestMode.Transparent)
-
-      Text($r('app.string.settings_title'))
-        .fontSize(应用尺寸.字号_面板标题)
-        .fontWeight(FontWeight.Bold)
-        .fontColor($r('app.color.text_primary'))
-        .width('100%')
-        .textAlign(TextAlign.Center)
-        .hitTestBehavior(HitTestMode.Transparent)
-    }
-    .width('100%')
-    .height(60 + this.状态栏高度)
-    .padding({
-      top: this.状态栏高度 + 8,
-      bottom: 8
-    })
-    .backgroundColor(this.页面底色微染值)
-    .alignContent(Alignment.Center)
-  }
-
-  @StorageLink(颜色键.主色按钮背景) private 主色按钮背景色: string = '#2F5FD0';
-  @StorageLink(颜色键.页面底色微染) private 页面底色微染值: string = '#F5F7FA';
 
   async aboutToAppear(): Promise<void> {
     // 先注册再做异步加载，确保首帧入场也能接到统一淡入淡出回调。

@@ -7,7 +7,7 @@
 
 | 项目 | 当前值 | 事实来源 |
 | --- | --- | --- |
-| 应用版本 | 2.3.3 / versionCode 2303 | `AppScope/app.json5` |
+| 应用版本 | 2.3.6 / versionCode 2306 | `AppScope/app.json5` |
 | 最低兼容 SDK | HarmonyOS 6.0.1（API 21） | `build-profile.json5` 的 `compatibleSdkVersion` |
 | 目标 SDK | HarmonyOS 6.1.0（API 23） | `build-profile.json5` 的 `targetSdkVersion` |
 | 编译 SDK | DevEco Studio 当前配套 6.1.0.105（API 23） | 本机 SDK 与 `UPSTREAM.lock` |
@@ -38,8 +38,8 @@ Core”或“兼容常用 Anki 数据与学习流程”，不要使用未经差�
 
 ## 当前发布开关与限制
 
-- 2.3.3 的 AI 制卡、AI 改卡及设置入口由
-  `entry/src/main/ets/model/ReleaseFeatures.ets` 统一关闭；实现没有删除。
+- 2.3.6 的 AI 制卡、AI 改卡及设置入口默认关闭，可通过设置页的开发者调试功能统一解锁；
+  实现没有删除，运行时开关由 `entry/src/main/ets/model/ReleaseFeatures.ets` 管理。
 - Agent 页面当前固定使用 `searchMode: 'off'`。Provider 搜索协议仍在，但产品
   界面没有启用联网搜索。
 - `docs/releases/3.0.0.md` 是未发布历史草案，不代表仓库或商店当前版本。

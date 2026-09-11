@@ -115,6 +115,7 @@ export struct AIAgent设置分组 {
               .selected(this.providerIndex())
               .value(this.provider === 'custom' ?
                 this.getString($r('app.string.ai_agent_provider_custom')) : 'DeepSeek')
+              .controlSize(ControlSize.SMALL)
               .onSelect((index: number): void => { this.switchProvider(index); })
           }.width('100%')
           if (this.provider !== 'custom') {
@@ -122,6 +123,7 @@ export struct AIAgent设置分组 {
               Text($r('app.string.ai_card_model')).layoutWeight(1)
               Select(this.modelOptions()).selected(this.modelIndex())
                 .value(this.deepseekModel)
+                .controlSize(ControlSize.SMALL)
                 .onSelect((index: number): void => {
                   this.deepseekModel = DEEPSEEK_PROVIDER.models[index];
                 })
@@ -160,6 +162,7 @@ export struct AIAgent设置分组 {
             Text($r('app.string.ai_agent_batch_limit')).layoutWeight(1)
             Select([{ value: '100' }, { value: '250' }, { value: '500' }, { value: '1000' }])
               .selected(this.batchLimit === 100 ? 0 : (this.batchLimit === 250 ? 1 : (this.batchLimit === 500 ? 2 : 3)))
+              .controlSize(ControlSize.SMALL)
               .onSelect((index: number): void => { this.batchLimit = [100, 250, 500, 1000][index]; })
           }.width('100%')
           // 按钮规格与 同步分组 AnkiWeb 登录按钮统一（44 高 / 15 号字 / 白字 / 圆角 22 / 忙态 0.6 透明度）。

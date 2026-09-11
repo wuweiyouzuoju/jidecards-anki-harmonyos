@@ -20,6 +20,7 @@ import { 加载主题模式 } from '../model/主题存储';
 import { 解析是否深色, 主题模式 } from '../model/主题设置';
 import { 字段帮助面板 } from '../components/字段帮助面板';
 import { 图片遮罩编辑器 } from '../components/图片遮罩编辑器';
+import { 按下态按钮 } from '../components/common/按下态按钮';
 import { 从图库选取图片 } from '../utils/文件导入助手';
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { 颜色键 } from '../model/颜色主题';
@@ -984,21 +985,17 @@ export struct 添加笔记页 {
         .padding({ left: 应用尺寸.间距_12, right: 应用尺寸.间距_12 })
 
       Row() {
-        Button($r('app.string.study_back'))
-          .height(应用尺寸.按钮高度)
-          .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
-          .constraintSize({ minWidth: 0 })
-          .fontSize(应用尺寸.字号_按钮)
-          .fontColor($r('app.color.text_primary'))
-          .backgroundColor($r('app.color.surface_card'))
-          .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
-          .borderRadius(应用尺寸.圆角_胶囊)
-          .enabled(!this.处理中)
-          .onClick(() => {
+        按下态按钮({
+          文案: $r('app.string.study_back'),
+          选中态背景: this.主色容器色,
+          字色: $r('app.color.text_primary'),
+          是否启用: !this.处理中,
+          点击回调: (): void => {
             if (!this.处理中) {
               this.pathStack.pop();
             }
-          })
+          }
+        })
         Blank()
       }
       .width('100%')
@@ -1233,7 +1230,11 @@ export struct 添加笔记页 {
         .scrollBar(BarState.Auto)
         .edgeEffect(EdgeEffect.Spring)
         .align(Alignment.TopStart)
-        .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距, top: 应用尺寸.间距_8 })
+        .padding({
+          left: 应用尺寸.页面内边距_水平,
+          right: 应用尺寸.页面内边距_水平,
+          top: 应用尺寸.间距_8
+        })
 
         // 错误信息固定在按钮上方，避免软键盘或字段多时被裁剪
         if (this.错误信息 !== '') {
@@ -1242,7 +1243,10 @@ export struct 添加笔记页 {
             .fontColor($r('app.color.error_text'))
             .width('100%')
             .maxLines(3)
-            .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
+            .padding({
+              left: 应用尺寸.页面内边距_水平,
+              right: 应用尺寸.页面内边距_水平
+            })
         }
 
         Row({ space: 应用尺寸.间距_10 }) {
@@ -1281,8 +1285,8 @@ export struct 添加笔记页 {
         }
         .width('100%')
         .padding({
-          left: 应用尺寸.卡片内边距,
-          right: 应用尺寸.卡片内边距,
+          left: 应用尺寸.页面内边距_水平,
+          right: 应用尺寸.页面内边距_水平,
           top: 应用尺寸.间距_8,
           // 抬高避让手势导航条（AppGallery 导航栏适配要求）
           bottom: 应用尺寸.间距_8 + this.导航条高度

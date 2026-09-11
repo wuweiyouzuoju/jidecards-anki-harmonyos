@@ -1,17 +1,17 @@
 {
   "schemaVersion": 1,
   "announcement": {
-    "id": "20260829-v2.3.3-release",
+    "id": "20260911-v2.3.6-release",
     "enabled": true,
-    "titleZh": "记得闪卡 v2.3.3 更新",
-    "contentZh": "【新增】首次加入云端牌组下载。进入软件即可选择并下载 6 套牌组：CET四六级词汇、高考英语词汇、中考英语词汇、AI机器学习、IT计算机和中国法律专业版；下载完成后会自动导入，不用再手动找文件。更多、更全的牌组可加入官方 QQ 群 726837065 获取。\n\n【新增】新增官方公告。以后重要更新和通知会在首页及时送达，点击“我知道了”后，同一条公告不会重复打扰。\n\n【新增】云端牌组会显示卡片数量、版本和文件大小，支持多选、下载进度和逐个导入；失败项目可以重试，已经成功导入的不会重复处理。\n\n【优化】AnkiWeb 同步页新增账号说明和免费注册链接，第一次使用同步更容易上手。\n\n【修复】修复部分图片在创建图片遮罩卡片时无法读取或格式识别失败的问题。",
-    "titleEn": "What's new in jidecards v2.3.3",
-    "contentEn": "[New] Cloud deck downloads are here for the first time. Choose from six decks when entering the app: CET-4/6 Vocabulary, Gaokao English Vocabulary, Zhongkao English Vocabulary, AI Machine Learning, IT & Computer, and Chinese Law Professional. Downloads are imported automatically. For more complete deck collections, join the official QQ group 726837065.\n\n[New] Official announcements are now available. Important updates and notices will arrive on Home. After you tap “Got it,” the same announcement will not appear again.\n\n[New] Cloud decks show card count, version, and file size, with multi-select, download progress, and sequential import. Failed items can be retried without processing successful imports again.\n\n[Improved] The AnkiWeb sync page now explains account requirements and links to free registration, making first-time setup easier.\n\n[Fixed] Fixed cases where images could not be read or correctly recognized when creating image occlusion cards.",
-    "publishedAt": "2026-08-29T00:00:00+08:00",
-    "startsAt": "2026-08-29T00:00:00+08:00",
+    "titleZh": "记得闪卡 v2.3.6 更新",
+    "contentZh": "【优化】优化页面转场、菜单、弹窗和折叠区域的动画效果，并调整统计页等界面布局，操作更顺滑、信息更清晰。\n\n【开发者测试】AI 制卡与改卡能力面向开发者测试，可前往「设置 → 开发者调试」查看申请方式并获取调试资格。",
+    "titleEn": "What's new in jidecards v2.3.6",
+    "contentEn": "[Improved] Refined page transitions, menus, dialogs, disclosure animations, and selected layouts, including the Statistics page, for a smoother and clearer experience.\n\n[Developer Preview] AI card creation and editing are available for developer testing. Open Settings → Developer Debug and follow the instructions to request access.",
+    "publishedAt": "2026-09-11T00:00:00+08:00",
+    "startsAt": "2026-09-11T00:00:00+08:00",
     "expiresAt": "2099-12-31T23:59:59+08:00",
-    "minimumAppVersion": "2.3.3",
-    "maximumAppVersion": "2.3.3",
+    "minimumAppVersion": "2.3.6",
+    "maximumAppVersion": "2.3.6",
     "actionUrl": ""
   }
 }

@@ -33,12 +33,12 @@ import { preferences } from '@kit.ArkData';
 const 存储名: string = 'jidecards_settings';
 const 欢迎已展示键: string = 'welcome_shown';
 const 上下文键: string = 'abilityContext';
-// 当前应用版本号：发版时同步修改此处与 welcome_title 的 vX.Y.Z
-const 当前版本: string = '2.0.1';
+// 当前应用版本号：与 AppScope/app.json5 保持一致。
+const 当前版本: string = '2.3.6';
 // 静默版本：这些版本不弹欢迎弹窗（无更新日志内容的过渡版本，用户决策 2026-08-24）。
 // 直接视为已展示且不写 preferences——下个非静默版本对比旧存储值仍会正常弹。
-// 2.0.1 为静默过渡版本（用户决策 2026-08-27）：仅同步分组加注册引导与版本号，无开屏文案。
-const 静默版本: string = '2.0.1';
+// 2.3.6 的更新内容由官方公告承载，避免同一次启动连续展示两份更新说明。
+const 静默版本: string = '2.3.6';
 
 function 取上下文(): common.UIAbilityContext | null {
   const 上下文: common.UIAbilityContext | undefined =
