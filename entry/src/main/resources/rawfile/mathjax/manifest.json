@@ -1,0 +1,11 @@
+{
+  "version": "3.2.2",
+  "source": "https://registry.npmjs.org/mathjax/-/mathjax-3.2.2.tgz",
+  "integrity": "sha512-Bt+SSVU8eBG27zChVewOicYs7Xsdt40qm4+UpHyX7k0/O9NliPc+x77k1/FEsPsjKPZGJvtRZM1vO+geW0OhGw==",
+  "files": {
+    "tex-svg-full.js": "a4354ff94fd868aea0cc6eaaa79a57fda0588646fc46ee3700a349ee0a11cbe6",
+    "input/mml.js": "65c93277d980860f34341112c59520b9d2745cd46280d9c2fe036718b826624d",
+    "input/mml/entities.js": "90ef0fcf002a37cb6cb3d1f1148cea4bfcbe77f9b298262b260c872a066ef974",
+    "LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+  }
+}

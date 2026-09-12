@@ -42,6 +42,7 @@
 // ========================================================
 
 import type { RenderedCard, TemplateNode } from '../proto/messages/CardRenderingMessages';
+import { MATH_SCRIPTS } from './MathRendering';
 
 // ========================================================
 // @块ID MODEL-STUDY-HTML-002
@@ -103,6 +104,8 @@ a { color: #2E6BE6; }
 hr { opacity: 0.3; }
 .sound-flag { color: #2E6BE6; font-size: 0.75em; }
 .nightMode body, body.nightMode { color: #E6E6E6; }
+mjx-container[jax="SVG"][display="true"] { overflow-x: auto; overflow-y: hidden; max-width: 100%; padding: 2px 0; }
+.latex-missing { display: inline-block; max-width: 100%; overflow-wrap: anywhere; border: 1px dashed currentColor; padding: 4px; }
 #typeans { white-space: pre-wrap; font-family: monospace; display: inline-block; text-align: left; }
 .typeGood { color: #0a7d20; }
 .typeBad { color: #c62828; }
@@ -351,45 +354,6 @@ const 图片遮罩渲染脚本: string = `<script>
 </script>`;
 
 // ========================================================
-// @块ID MODEL-STUDY-HTML-013
-// @名称 数学公式渲染脚本（MathJax）
-//
-// @作用
-// 在 <head> 注入 MathJax 3.x 配置 + 异步加载脚本，让 webview 自动渲染
-// \(...\) \[...\] $...$ $$...$$ 四类 LaTeX 公式分隔符。
-//
-// @输入
-// 无（自包含脚本，由 构建卡片HTML 拼到 <head> 末尾）
-//
-// @输出
-// string：以 <script>...</script> 包裹的 JS 文本
-//
-// @业务规则
-// - 仅在 RenderedCard.latexSvg=false 时注入：latexSvg=true 表示后端已把 LaTeX
-//   编译成 SVG 嵌入正文（如安装了 TeX Live 的桌面端导出的卡片），前端再注入
-//   MathJax 会重复处理已渲染的 SVG，浪费性能。
-// - CDN 走 jsdelivr（应用已申请 ohos.permission.INTERNET）；async 异步加载，
-//   网络失败时降级为原始 LaTeX 文本展示，不阻塞卡片渲染。
-// - skipHtmlTags 避免 MathJax 扫描 <script>/<pre>/<code> 等代码块内的反斜杠。
-// - inlineMath/displayMath 同时配置 \(...\) 与 $...$ 两套分隔符，覆盖 Anki 桌面端
-//   reviewer 默认配置 + 社区牌组常见写法。
-//
-// @副作用
-// 无（脚本在 webview 内执行，操作 DOM）
-// ========================================================
-const 数学公式脚本: string = `<script>
-window.MathJax = {
-  tex: {
-    inlineMath: [['\\\\(', '\\\\)'], ['$', '$']],
-    displayMath: [['\\\\[', '\\\\]'], ['$$', '$$']]
-  },
-  svg: { fontCache: 'global' },
-  options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'] }
-};
-</script>
-<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>`;
-
-// ========================================================
 // @块ID MODEL-STUDY-HTML-014
 // @名称 可折叠字段样式与脚本
 //
@@ -524,13 +488,10 @@ const 可折叠字段脚本: string = `<script>
 // @副作用
 // 无
 // ========================================================
-export function 构建卡片HTML(渲染结果: RenderedCard, 侧面: 卡片正反面): string {
+export function 构建卡片HTML(渲染结果: RenderedCard, 侧面: 卡片正反面, isDark: boolean = false): string {
   const 正文: string = 剥除音频标签(重写媒体地址(原始侧HTML(渲染结果, 侧面)));
   const 样式: string = `${渲染结果.css}\n${基础样式}\n${图片遮罩渲染样式}\n${可折叠字段样式}`;
-  // latexSvg=true：后端已把 LaTeX 编译成 SVG 嵌入正文，前端不再注入 MathJax 避免重复处理。
-  // latexSvg=false：注入 MathJax（async 异步加载）扫描 \(...\) \[...\] $...$ $$...$$ 公式；
-  // 加载失败降级为原始 LaTeX 文本，不阻塞卡片渲染。
-  const 数学脚本: string = 渲染结果.latexSvg ? '' : 数学公式脚本;
+  // latexSvg 只决定传统 LaTeX 图片后缀，不能关闭同一卡片中的 MathJax。
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -538,10 +499,10 @@ export function 构建卡片HTML(渲染结果: RenderedCard, 侧面: 卡片正�
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>${样式}</style>
 ${图片遮罩渲染脚本}
-${数学脚本}
+${MATH_SCRIPTS}
 ${可折叠字段脚本}
 </head>
-<body class="card">${正文}</body>
+<body class="card${isDark ? ' nightMode' : ''}">${正文}</body>
 </html>`;
 }
 

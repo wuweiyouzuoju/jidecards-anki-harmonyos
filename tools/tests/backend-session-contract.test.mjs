@@ -54,7 +54,7 @@ test('method ids match the generated backend.rs dispatch table', () => {
     描述下一档状态: 24, 自定义学习: 27, 自定义学习默认值: 28,
     重新定位默认值: 29
   });
-  assert.deepEqual({ ...卡片渲染方法 }, { 提取音视频标签: 3, 获取空卡: 5, 渲染既有卡片: 6 });
+  assert.deepEqual({ ...卡片渲染方法 }, { 提取音视频标签: 3, extractLatex: 4, 获取空卡: 5, 渲染既有卡片: 6 });
   assert.deepEqual({ ...导入导出方法 }, {
     导入集合包: 0, 导出集合包: 1,
     导入Anki包: 2, 导出Anki包: 4

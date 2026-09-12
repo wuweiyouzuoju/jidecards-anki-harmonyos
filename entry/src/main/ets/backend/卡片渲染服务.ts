@@ -30,12 +30,14 @@
 
 import { 后端会话 } from './后端会话';
 import { 卡片渲染方法, 服务号 } from './服务索引';
-import type { RenderedCard, 空卡报告 } from '../proto/messages/CardRenderingMessages';
+import type { RenderedCard, TemplateNode, 空卡报告 } from '../proto/messages/CardRenderingMessages';
 import {
   decodeExtractAvTagsResponse,
+  decodeExtractLatexResponse,
   decodeRenderCardResponse,
   decode空卡报告,
   encodeExtractAvTagsRequest,
+  encodeExtractLatexRequest,
   encodeRenderExistingCardRequest,
   encode空请求
 } from '../proto/messages/CardRenderingMessages';
@@ -53,7 +55,32 @@ export class 卡片渲染服务 {
     const 请求字节: Uint8Array = encodeRenderExistingCardRequest(卡片ID);
     const 响应字节: Uint8Array = await this.会话.调用(
       服务号.后端卡片渲染, 卡片渲染方法.渲染既有卡片, 请求字节);
-    return decodeRenderCardResponse(响应字节);
+    const rendered: RenderedCard = decodeRenderCardResponse(响应字节);
+    await this.resolveLatexImages(rendered.questionNodes, rendered.latexSvg);
+    await this.resolveLatexImages(rendered.answerNodes, rendered.latexSvg);
+    return rendered;
+  }
+
+  /**
+   * 将传统 LaTeX 标签解析为牌组已有的媒体引用，不生成图片、不改笔记字段。
+   * Invariants: 普通 MathJax 卡片不增加 RPC；保留节点、拼写标记和正反面挖空语义。
+   */
+  private async resolveLatexImages(nodes: TemplateNode[], svg: boolean): Promise<void> {
+    const legacyLatex: RegExp = new RegExp('\\[(?:latex|\\$\\$?)\\]', 'i');
+    for (const node of nodes) {
+      const text: string = node.text !== null ? node.text : (node.replacement?.currentText ?? '');
+      if (!legacyLatex.test(text)) {
+        continue;
+      }
+      const response: Uint8Array = await this.会话.调用(
+        服务号.后端卡片渲染, 卡片渲染方法.extractLatex, encodeExtractLatexRequest(text, svg));
+      const html: string = decodeExtractLatexResponse(response);
+      if (node.text !== null) {
+        node.text = html;
+      } else if (node.replacement !== null) {
+        node.replacement.currentText = html;
+      }
+    }
   }
 
   /**

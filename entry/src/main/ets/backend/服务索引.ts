@@ -113,6 +113,7 @@ export const 调度器方法 = {
 /** 后端卡片渲染服务方法索引（backend.rs run_backend_card_rendering_service_method 分支） */
 export const 卡片渲染方法 = {
   提取音视频标签: 3,
+  extractLatex: 4,
   获取空卡: 5,
   渲染既有卡片: 6
 } as const;

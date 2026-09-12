@@ -7,3 +7,8 @@ native/napi_bridge/oh-package.json5 text eol=lf
 native/napi_bridge/index.d.ts text eol=lf
 entry/src/main/cpp/types/libjidecards/oh-package.json5 text eol=lf
 entry/src/main/cpp/types/libjidecards/index.d.ts text eol=lf
+
+# 保留上游资源字节，避免 Windows checkout 改行尾后破坏 manifest 校验。
+entry/src/main/resources/rawfile/mathjax/tex-svg-full.js -text
+entry/src/main/resources/rawfile/mathjax/input/** -text
+entry/src/main/resources/rawfile/mathjax/LICENSE -text

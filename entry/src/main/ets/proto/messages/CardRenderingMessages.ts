@@ -51,6 +51,33 @@ export function encodeExtractAvTagsRequest(text: string, questionSide: boolean):
   return w.转为字节();
 }
 
+/** ExtractLatexRequest：1=text, 2=svg；内容已经过模板挖空处理，不启用 expand_clozes。 */
+export function encodeExtractLatexRequest(text: string, svg: boolean): Uint8Array {
+  const w = new 协议写入器();
+  if (text !== '') {
+    w.写入字符串(1, text);
+  }
+  if (svg) {
+    w.写入布尔(2, true);
+  }
+  return w.转为字节();
+}
+
+/** 仅消费上游替换后的 HTML；图片文件名与 HTML 转义由 Anki Core 负责。 */
+export function decodeExtractLatexResponse(bytes: Uint8Array): string {
+  const r = new 协议读取器(bytes);
+  let text: string = '';
+  let tag;
+  while ((tag = r.读取标签()) !== null) {
+    if (tag.字段号 === 1) {
+      text = r.读取字符串();
+    } else {
+      r.跳过字段(tag.线类型);
+    }
+  }
+  return text;
+}
+
 /** ExtractAvTagsResponse 的解码结果：
  *  - soundFiles: [sound:xxx.mp3] 标签文件名（AVPlayer 播放）
  *  - ttsItems: [anki:tts lang=xxx]text[/anki:tts] 标签内容（CoreSpeechKit 朗读）

@@ -9,6 +9,7 @@
 import { common } from '@kit.AbilityKit';
 import { LengthMetrics } from '@kit.ArkUI';
 import { webview } from '@kit.ArkWeb';
+import { interceptMathAsset } from '../utils/MathAssetResponse';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { 后端会话 } from '../backend/后端会话';
 import { 调度器服务 } from '../backend/调度器服务';
@@ -357,12 +358,12 @@ export struct 学习页 {
         this.拼写卡片序号 = this.当前卡片.templateIdx;
       }
       // 正面始终剥除标记（不在 Web 中显示输入框占位）。
-      this.正面HTML = 剥除拼写标记(构建卡片HTML(this.已渲染, 'question'));
+      this.正面HTML = 剥除拼写标记(构建卡片HTML(this.已渲染, 'question', this.是否深色()));
       // 背面：有 type 标记时保留原始标记，翻面时 注入拼写结果 替换为比对结果；
       //       无标记时 剥除拼写标记 为 no-op。
       this.背面HTML = this.拼写字段名 !== ''
-        ? 构建卡片HTML(this.已渲染, 'answer')
-        : 剥除拼写标记(构建卡片HTML(this.已渲染, 'answer'));
+        ? 构建卡片HTML(this.已渲染, 'answer', this.是否深色())
+        : 剥除拼写标记(构建卡片HTML(this.已渲染, 'answer', this.是否深色()));
       const rawQuestionHtml: string = 原始侧HTML(this.已渲染, 'question');
       const questionSounds: string[] = await this.安全提取音频(rawQuestionHtml, true);
       const questionTtsItems: TtsItem[] = await this.安全提取TTS项(rawQuestionHtml, true);
@@ -583,8 +584,8 @@ export struct 学习页 {
       this.复习剩余 = queued.reviewCount;
       this.当前卡片 = queued.cards[0];
       this.已渲染 = await this.卡片渲染服务实例.渲染既有卡片(this.当前卡片.cardId);
-      this.正面HTML = 剥除拼写标记(构建卡片HTML(this.已渲染, 'question'));
-      this.背面HTML = 构建卡片HTML(this.已渲染, 'answer');
+      this.正面HTML = 剥除拼写标记(构建卡片HTML(this.已渲染, 'question', this.是否深色()));
+      this.背面HTML = 构建卡片HTML(this.已渲染, 'answer', this.是否深色());
       const html: string = this.阶段 === 'answer' ? this.背面HTML : this.正面HTML;
       this.网页控制器.loadData(html, 'text/html', 'UTF-8', 媒体基地址, ' ');
       hilog.info(0x4342, '学习页', `Agent 改卡后已重渲染当前卡 cardId=${this.当前卡片.cardId}`);
@@ -1202,7 +1203,7 @@ export struct 学习页 {
           this.网页控制器.registerJavaScriptProxy(代理, 'ankiTapZone', ['onTap']);
         })
         .onInterceptRequest((event: OnInterceptRequestEvent): WebResourceResponse | null => {
-          return this.拦截媒体(event);
+          return interceptMathAsset(event.request.getRequestUrl()) ?? this.拦截媒体(event);
         })
         // onPageEnd 兜底（BUG-001）：ArkWeb 对 qfmt/afmt 模板内联 <script> 的执行时序存在抖动，
         // 极少数情况下 anki.imageOcclusion.setup() 未被调用导致遮罩未绘制。
@@ -1224,10 +1225,10 @@ export struct 学习页 {
             + '},true); })();'
           );
           // 翻面后自动滚动到答案区（<hr id=answer> 或底部），避免用户手动下滑（2026-07-28 加）。
-          // setTimeout 100ms 等图片加载完，避免 scrollIntoView 位置算错。
+          // 先等待公式排版再给图片留 100ms，避免公式撑高后滚动位置偏移。
           if (this.阶段 === 'answer') {
             this.网页控制器.runJavaScript(
-              'setTimeout(function(){ var a=document.getElementById("answer"); if(a){ a.scrollIntoView({block:"start"}); } else { window.scrollTo(0, document.body.scrollHeight); } }, 100);'
+              '(function(){ var ready=window.MathJax && MathJax.startup ? MathJax.startup.promise : Promise.resolve(); ready.catch(function(){}).then(function(){ setTimeout(function(){ var a=document.getElementById("answer"); if(a){ a.scrollIntoView({block:"start"}); } else { window.scrollTo(0, document.body.scrollHeight); } }, 100); }); })();'
             );
           }
         })

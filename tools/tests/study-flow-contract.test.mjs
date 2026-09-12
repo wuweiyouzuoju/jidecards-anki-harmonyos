@@ -244,8 +244,8 @@ test('study page wires the full review loop', () => {
   assert.match(page, /调度器服务实例\.获取队首卡片\(this\.牌组ID\)/);
   assert.match(page, /卡片渲染服务实例\.渲染既有卡片\(this\.当前卡片\.cardId\)/);
   assert.match(page, /调度器服务实例\.描述下一档状态\(this\.当前卡片\.states\)/);
-  assert.match(page, /构建卡片HTML\(this\.已渲染, 'question'\)/);
-  assert.match(page, /构建卡片HTML\(this\.已渲染, 'answer'\)/);
+  assert.match(page, /构建卡片HTML\(this\.已渲染, 'question', this\.是否深色\(\)\)/);
+  assert.match(page, /构建卡片HTML\(this\.已渲染, 'answer', this\.是否深色\(\)\)/);
   assert.match(page, /调度器服务实例\.提交评分\(/);
   assert.match(page, /currentState: states\.current/, 'raw state passthrough on answer');
   assert.match(page, /queued\.cards\.length === 0[\s\S]*?阶段 = 'done'/, 'empty queue reaches done phase');

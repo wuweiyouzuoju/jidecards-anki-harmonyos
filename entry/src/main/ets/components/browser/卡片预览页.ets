@@ -36,6 +36,7 @@
 // ========================================================
 
 import { webview } from '@kit.ArkWeb';
+import { interceptMathAsset } from '../../utils/MathAssetResponse';
 import { 卡片渲染服务 } from '../../backend/卡片渲染服务';
 import type { RenderedCard } from '../../proto/messages/CardRenderingMessages';
 import {
@@ -145,8 +146,8 @@ export struct 卡片预览页 {
     try {
       this.已渲染 = await this.卡片渲染服务实例.渲染既有卡片(卡片ID);
       // 预览正反面都剥除拼写标记（不收集输入，不渲染输入框占位）
-      this.正面HTML = 剥除拼写标记(构建卡片HTML(this.已渲染, 'question'));
-      this.背面HTML = 剥除拼写标记(构建卡片HTML(this.已渲染, 'answer'));
+      this.正面HTML = 剥除拼写标记(构建卡片HTML(this.已渲染, 'question', this.isDark));
+      this.背面HTML = 剥除拼写标记(构建卡片HTML(this.已渲染, 'answer', this.isDark));
       this.应用HTML(this.正面HTML);
     } catch (错误) {
       this.错误详情 = this.取本地化文案($r('app.string.browser_preview_load_error'));
@@ -359,7 +360,7 @@ export struct 卡片预览页 {
         .focusable(false)
         .onControllerAttached((): void => { this.onControllerAttached回调(); })
         .onInterceptRequest((event: OnInterceptRequestEvent): WebResourceResponse | null => {
-          return this.拦截媒体(event);
+          return interceptMathAsset(event.request.getRequestUrl()) ?? this.拦截媒体(event);
         })
         .onPageEnd((event: OnPageEndEvent) => {
           // ImageOcclusion 兜底（与 学习页 同款）：setup() 内部幂等，无 canvas 直接返回。
