@@ -38,6 +38,9 @@ import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 
+import { 解析生效同步端点 } from './同步流程';
+import type { 自定义同步服务器决策信息 } from './同步流程';
+
 const 存储名: string = 'jidecards_sync';
 const HKEY键: string = 'sync_hkey';
 const 端点键: string = 'sync_endpoint';
@@ -362,4 +365,103 @@ export function 加载媒体同步开关(): boolean {
   } catch (错误) {
     return true;
   }
+}
+
+// ========================================================
+// @块ID MODEL-SYNC-CUSTOM-001
+// @名称 自定义同步服务器配置
+//
+// @作用
+// 持久化用户设置的自定义同步服务器（对齐 AnkiDroid Custom Sync Server：
+// syncBaseUrl + 启用开关 + customSyncCertificate 三件套）。
+// 自建 ankisyncd 等兼容服务器的用户填写地址后，登录与同步都走该端点。
+//
+// @输入
+// 无（读取）；自定义同步配置（保存）。
+//
+// @输出
+// 加载自定义同步配置(): 自定义同步配置
+// 保存自定义同步配置(配置): void
+// 生效同步端点(): string
+//
+// @业务规则
+// 保存自定义配置时同时清除 服务器下发端点（sync_endpoint）——
+// 对齐 AnkiDroid CustomSyncServerSettingsFragment 的 preferenceChangeListener
+// （改动 syncBaseUrl/开关 时 remove(CURRENT_SYNC_URI)）：
+// 服务端迁移端点基于旧服务器，切换自定义服务器后必须重新解析。
+// 端点优先级见 同步流程.解析生效同步端点：服务器下发端点 > 启用中的自定义地址 > 官方。
+// 地址合法性由 UI 层用 同步流程.校验同步服务器地址 把关（空串 = 未设置）。
+//
+// @副作用
+// 读写 preferences 的 jidecards_sync store
+// （custom_sync_enabled / custom_sync_base_url / custom_sync_certificate）。
+//
+// @注意
+// preferences 键（'custom_sync_enabled' / 'custom_sync_base_url' /
+// 'custom_sync_certificate'）属持久化协议字段，保留英文，不可中文化。
+// ========================================================
+
+const 自定义开关键: string = 'custom_sync_enabled';
+const 自定义地址键: string = 'custom_sync_base_url';
+const 自定义证书键: string = 'custom_sync_certificate';
+
+/** 自定义同步服务器配置（地址/证书为空串 = 未设置） */
+export interface 自定义同步配置 {
+  /** 是否启用自定义同步服务器 */
+  启用: boolean;
+  /** 同步服务器地址（http(s)://…）；空串 = 未填写 */
+  地址: string;
+  /** 自定义根证书 PEM 文本（自签名 HTTPS 服务器用）；空串 = 未设置 */
+  证书: string;
+}
+
+/** 读取自定义同步服务器配置；偏好不可用时返回默认（未启用、空地址、空证书）。 */
+export function 加载自定义同步配置(): 自定义同步配置 {
+  const 存储: preferences.Preferences | null = 打开存储();
+  const 默认配置: 自定义同步配置 = { 启用: false, 地址: '', 证书: '' };
+  if (存储 === null) {
+    return 默认配置;
+  }
+  try {
+    const 启用值: preferences.ValueType = 存储.getSync(自定义开关键, '0');
+    return {
+      启用: 启用值 === '1' || 启用值 === true,
+      地址: 读取字符串(存储, 自定义地址键),
+      证书: 读取字符串(存储, 自定义证书键)
+    };
+  } catch (错误) {
+    return 默认配置;
+  }
+}
+
+/**
+ * 保存自定义同步服务器配置；同时清除服务器下发端点（语义对齐 AnkiDroid：
+ * 自定义服务器变化后旧的服务器迁移端点失效，下次登录/同步按新配置解析）。
+ */
+export function 保存自定义同步配置(配置: 自定义同步配置): void {
+  const 存储: preferences.Preferences | null = 打开存储();
+  if (存储 === null) {
+    return;
+  }
+  try {
+    存储.putSync(自定义开关键, 配置.启用 ? '1' : '0');
+    存储.putSync(自定义地址键, 配置.地址);
+    存储.putSync(自定义证书键, 配置.证书);
+    存储.deleteSync(端点键);
+    静默落盘(存储);
+  } catch (错误) {
+    // 偏好不可用时仅丢失持久化。
+  }
+}
+
+/**
+ * 解析当前生效的同步端点：服务器下发端点 > 启用中的自定义地址 > 空串（官方 AnkiWeb）。
+ * 决策逻辑在 同步流程.解析生效同步端点（纯函数，可单测）；本函数负责取数。
+ */
+export function 生效同步端点(): string {
+  const 凭证: 同步凭证信息 | null = 加载同步凭证();
+  const 服务器下发端点: string = 凭证 === null ? '' : 凭证.endpoint;
+  const 配置: 自定义同步配置 = 加载自定义同步配置();
+  const 自定义: 自定义同步服务器决策信息 = { 启用: 配置.启用, 地址: 配置.地址 };
+  return 解析生效同步端点(服务器下发端点, 自定义);
 }
