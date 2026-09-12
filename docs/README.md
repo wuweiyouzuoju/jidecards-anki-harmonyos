@@ -4,6 +4,7 @@
 
 - [项目 README](../README.md)：产品、当前源码版本、构建入口。
 - [开发状态与后续工作](DEVELOPMENT_PLAN.md)：SDK/上游基线、发布限制、验证门和真实后续项。
+- [离线公式渲染](math-chemistry-rendering.md)：数学、化学和旧式 LaTeX 导入兼容计划与验收。
 - [当前架构](architecture.md)：模块边界、主要数据流和稳定不变量。
 - [Agent 设计](agent-2-design.md)：源码中保留的 Agent 能力、安全边界与 2.3.6 发布状态。
 - [云端牌组托管](cloud-deck-hosting.md)：公开目录协议和发布操作。
