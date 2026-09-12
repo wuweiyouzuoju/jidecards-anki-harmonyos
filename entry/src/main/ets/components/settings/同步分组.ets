@@ -10,10 +10,13 @@ import {
   加载同步凭证,
   保存同步凭证,
   加载媒体同步开关,
-  设置媒体同步开关
+  设置媒体同步开关,
+  加载自定义同步配置,
+  保存自定义同步配置,
+  生效同步端点
 } from '../../model/同步凭证存储';
-import type { 同步凭证信息 } from '../../model/同步凭证存储';
-import { 分类同步错误 } from '../../model/同步流程';
+import type { 同步凭证信息, 自定义同步配置 } from '../../model/同步凭证存储';
+import { 分类同步错误, 校验同步服务器地址 } from '../../model/同步流程';
 import { 设置面板色板, 设置面板色板_取 } from '../../utils/设置面板配色';
 import { 颜色键 } from '../../model/颜色主题';
 import { 设置分组卡片 } from './设置分组卡片';
@@ -78,6 +81,13 @@ export struct 同步分组 {
   @State private 错误文本: string = '';
   /** 媒体同步开关（对齐 Anki 桌面端 Preferences → Sync → "Sync media"）。 */
   @State private 媒体同步开启: boolean = true;
+  /** 自定义同步服务器（对齐 AnkiDroid Custom Sync Server：开关 + 地址 + 根证书）。 */
+  @State private 自定义同步启用: boolean = false;
+  @State private 自定义同步地址: string = '';
+  @State private 自定义地址错误: string = '';
+  @State private 自定义证书输入: string = '';
+  @State private 自定义证书状态: string = '';
+  @State private 证书应用中: boolean = false;
 
   // ---- 内部（非 @State，不参与 UI 刷新） ----
   /** 登录成功后持有的会话凭证（hkey + endpoint） */
@@ -104,6 +114,11 @@ export struct 同步分组 {
     }
     // 读取媒体同步开关（默认 true）
     this.媒体同步开启 = 加载媒体同步开关();
+    // 读取自定义同步服务器配置（对齐 AnkiDroid：syncBaseUrl + 开关 + 证书）
+    const 自定义: 自定义同步配置 = 加载自定义同步配置();
+    this.自定义同步启用 = 自定义.启用;
+    this.自定义同步地址 = 自定义.地址;
+    this.自定义证书输入 = 自定义.证书;
   }
 
   private 取本地化文本(资源: Resource): string {
@@ -163,7 +178,12 @@ export struct 同步分组 {
     this.登录中 = true;
     this.错误文本 = '';
     try {
-      const 凭证: SyncAuth = await this.同步服务实例.同步登录(this.用户名输入, this.密码输入);
+      // 登录前应用自定义根证书（对齐 AnkiDroid syncAuth() 先 updateCustomCertificate；
+      // 空串 = 取消自定义证书，自签名服务器登录同样需要证书校验通过）。
+      await this.应用自定义证书();
+      // 端点解析对齐 AnkiDroid LoginFragment：getEndpoint() 结果传给 syncLogin
+      const 端点: string = 生效同步端点();
+      const 凭证: SyncAuth = await this.同步服务实例.同步登录(this.用户名输入, this.密码输入, 端点);
       const 信息: 同步凭证信息 = {
         hkey: 凭证.hkey,
         username: this.用户名输入,
@@ -228,22 +248,196 @@ export struct 同步分组 {
   /**
    * 立即同步：加载同步凭证 拿最新凭证（端点可能被上次 SyncPanel 更新过），
    * 上抛 打开同步弹窗回调 给 Index 挂载 SyncPanel 弹窗。
+   * 端点经 生效同步端点 解析（服务器下发端点 > 自定义服务器地址 > 官方），
+   * 同步前应用自定义根证书（对齐 AnkiDroid syncAuth() 的 updateCustomCertificate）。
    */
-  private 点击立即同步(): void {
+  private async 点击立即同步(): Promise<void> {
     const 信息: 同步凭证信息 | null = 加载同步凭证();
     if (信息 === null) {
       this.错误文本 = this.取本地化文本($r('app.string.sync_error_session_expired'));
       this.当前状态 = '未登录';
       return;
     }
+    await this.应用自定义证书();
     const 凭证: SyncAuth = {
       hkey: 信息.hkey,
-      endpoint: 信息.endpoint,
+      endpoint: 生效同步端点(),
       ioTimeoutSecs: 0
     };
     this.鉴权凭证 = 凭证;
     this.错误文本 = '';
     this.打开同步弹窗回调(凭证, this.账号名);
+  }
+
+  // ========================================================
+  // @块ID UI-SYNC-GROUP-005
+  // @名称 自定义同步服务器内容
+  //
+  // @作用
+  // 渲染自定义同步服务器配置（对齐 AnkiDroid Custom Sync Server 设置屏：
+  // 启用开关 + 同步地址 + 自定义根证书 PEM）。自建 ankisyncd 等兼容服务器时使用。
+  //
+  // @输入
+  // 色板：当前色板。
+  //
+  // @输出
+  // 渲染配置区；开关/地址/证书变化即时持久化（地址非法时不落盘并红字提示）。
+  //
+  // @业务规则
+  // 地址校验用 同步流程.校验同步服务器地址（空串合法 = 未设置）。
+  // 保存自定义配置会清除服务器下发端点（对齐 AnkiDroid：切换服务器后旧迁移端点失效）。
+  // 证书经后端 设置自定义证书 校验生效；空串 = 取消自定义证书。
+  //
+  // @副作用
+  // 调用 保存自定义同步配置 写偏好；点击应用证书调用 同步服务.设置自定义证书。
+  // ========================================================
+
+  /** 持久化当前自定义同步服务器配置（三键一次落盘）。 */
+  private 保存当前自定义配置(): void {
+    保存自定义同步配置({
+      启用: this.自定义同步启用,
+      地址: this.自定义同步地址,
+      证书: this.自定义证书输入.trim()
+    });
+  }
+
+  /** 地址输入变化：trim 后校验，合法（或空）才落盘，非法只提示不落盘。 */
+  private 校验并保存地址(原始输入: string): void {
+    const 地址: string = 原始输入.trim();
+    this.自定义同步地址 = 地址;
+    if (!校验同步服务器地址(地址)) {
+      this.自定义地址错误 = this.取本地化文本($r('app.string.settings_sync_custom_server_url_invalid'));
+      return;
+    }
+    this.自定义地址错误 = '';
+    this.保存当前自定义配置();
+  }
+
+  /** 证书输入变化：文本总是可保存（是否可用由后端校验决定），立即落盘。 */
+  private 更新自定义证书(值: string): void {
+    this.自定义证书输入 = 值;
+    this.保存当前自定义配置();
+  }
+
+  /**
+   * 把当前证书文本注入后端（空串 = 取消自定义证书）。
+   * 后端不可用或证书无法解析时返回 false；调用方决定是否提示。
+   */
+  private async 应用自定义证书(): Promise<boolean> {
+    try {
+      return await this.同步服务实例.设置自定义证书(this.自定义证书输入.trim());
+    } catch (错误) {
+      // 后端异常静默：登录/同步流程自身会报出更具体的错误
+      return false;
+    }
+  }
+
+  /** 手动应用证书：展示后端校验结果（生效 / 无法解析）。 */
+  private async 点击应用证书(): Promise<void> {
+    if (this.证书应用中) {
+      return;
+    }
+    this.证书应用中 = true;
+    const 生效: boolean = await this.应用自定义证书();
+    this.自定义证书状态 = this.取本地化文本(生效
+      ? $r('app.string.settings_sync_custom_certificate_updated')
+      : $r('app.string.settings_sync_custom_certificate_invalid'));
+    this.证书应用中 = false;
+  }
+
+  @Builder
+  private 自定义同步服务器内容(色板: 设置面板色板) {
+    Divider()
+      .color(色板.分隔线)
+      .strokeWidth(1)
+      .margin({ top: 4, bottom: 4 })
+    Text($r('app.string.settings_sync_custom_server_title'))
+      .fontSize(13)
+      .fontWeight(FontWeight.Medium)
+      .fontColor(色板.次文字)
+      .width('100%')
+    Text($r('app.string.settings_sync_custom_server_toggle_hint'))
+      .fontSize(12)
+      .fontColor(色板.三级文字)
+      .width('100%')
+    Row() {
+      Text($r('app.string.settings_sync_custom_server_toggle'))
+        .fontSize(15)
+        .fontColor(色板.主文字)
+        .layoutWeight(1)
+      Toggle({ type: ToggleType.Switch, isOn: this.自定义同步启用 })
+        .selectedColor(this.解析主色按钮背景())
+        .onChange((值: boolean): void => {
+          this.自定义同步启用 = 值;
+          this.保存当前自定义配置();
+        })
+    }
+    .width('100%')
+    .padding({ top: 2, bottom: 2 })
+    TextInput({ placeholder: $r('app.string.settings_sync_custom_server_url_hint'), text: this.自定义同步地址 })
+      .width('100%')
+      .height(44)
+      .fontSize(14)
+      .fontColor(色板.主文字)
+      .placeholderColor(色板.弱化文字)
+      .backgroundColor(色板.输入框背景)
+      .borderRadius(8)
+      .padding({ left: 12, right: 12 })
+      .onChange((值: string) => {
+        this.校验并保存地址(值);
+      })
+    if (this.自定义地址错误 !== '') {
+      Text(this.自定义地址错误)
+        .fontSize(12)
+        .fontColor(色板.错误色)
+        .width('100%')
+    }
+    Text($r('app.string.settings_sync_custom_certificate_label'))
+      .fontSize(13)
+      .fontWeight(FontWeight.Medium)
+      .fontColor(色板.次文字)
+      .width('100%')
+    Text($r('app.string.settings_sync_custom_certificate_hint'))
+      .fontSize(12)
+      .fontColor(色板.三级文字)
+      .width('100%')
+    TextArea({ placeholder: $r('app.string.settings_sync_custom_certificate_hint'), text: this.自定义证书输入 })
+      .width('100%')
+      .height(72)
+      .fontSize(12)
+      .fontColor(色板.主文字)
+      .placeholderColor(色板.弱化文字)
+      .backgroundColor(色板.输入框背景)
+      .borderRadius(8)
+      .padding(8)
+      .onChange((值: string) => {
+        this.更新自定义证书(值);
+      })
+    Row({ space: 8 }) {
+      Button($r('app.string.settings_sync_custom_certificate_apply'))
+        .height(32)
+        .fontSize(12)
+        .padding({ left: 12, right: 12 })
+        .fontColor(色板.主文字)
+        .backgroundColor(色板.标签背景)
+        .borderRadius(16)
+        .enabled(!this.证书应用中)
+        .onClick((): void => {
+          this.点击应用证书();
+        })
+      if (this.自定义证书状态 !== '') {
+        Text(this.自定义证书状态)
+          .fontSize(12)
+          .fontColor(色板.三级文字)
+          .layoutWeight(1)
+          .maxLines(2)
+      }
+    }
+    .width('100%')
+    Text($r('app.string.settings_sync_custom_server_section_hint'))
+      .fontSize(12)
+      .fontColor(色板.弱化文字)
+      .width('100%')
   }
 
   // ========================================================
@@ -445,6 +639,7 @@ export struct 同步分组 {
         } else {
           this.已登录内容(设置面板色板_取(this.是否深色))
         }
+        this.自定义同步服务器内容(设置面板色板_取(this.是否深色))
       }
       .width('100%')
     }
