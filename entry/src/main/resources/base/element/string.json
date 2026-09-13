@@ -1,5 +1,8 @@
 {
   "string": [
+    { "name": "ai_agent_history_timeline_truncated", "value": "部分过长的历史过程已省略。" },
+    { "name": "ai_agent_draft_streaming", "value": "正在制作或修改卡片 · 内容实时更新" },
+    { "name": "ai_agent_preview_only", "value": "过程预览 · 尚未保存" },
     {
       "name": "module_desc",
       "value": "Local-first card learning for HarmonyOS"

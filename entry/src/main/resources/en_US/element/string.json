@@ -1,5 +1,8 @@
 {
   "string": [
+    { "name": "ai_agent_history_timeline_truncated", "value": "Some lengthy history details have been omitted." },
+    { "name": "ai_agent_draft_streaming", "value": "Creating or editing cards · Updating live" },
+    { "name": "ai_agent_preview_only", "value": "Progress preview · Not saved" },
     { "name": "module_desc", "value": "Offline-first flashcard learning for HarmonyOS" },
     { "name": "entry_ability_desc", "value": "Main jidecards ability" },
     { "name": "stats_form_ability_desc", "value": "JiDe Flashcards stats desktop widget" },

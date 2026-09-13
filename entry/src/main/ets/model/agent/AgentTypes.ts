@@ -89,7 +89,7 @@ export interface AgentToolTrace {
 
 export type AgentEventKind =
   'status' | 'text_delta' | 'reasoning_delta' | 'reasoning_summary' |
-  'tool_call' | 'tool_started' | 'tool_completed' | 'tool_failed' |
+  'tool_call' | 'tool_progress' | 'tool_started' | 'tool_completed' | 'tool_failed' |
   'search_source' | 'continuation_item' | 'completed' | 'error';
 
 /** 固定对象布局，避免 ArkTS 动态对象。未使用字段保持空串/null。 */

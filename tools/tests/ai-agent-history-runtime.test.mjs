@@ -56,6 +56,45 @@ test('legacy history does not invent missing reasoning or tool ownership', async
   assert.equal(restored.audits[0].messageId, undefined);
 });
 
+test('history retains interleaved timeline and read-only draft snapshots without live write references', async () => {
+  state.value = '[]';
+  const reply = message(8, 'BeforeAfter', 'Check');
+  const block = (id, kind, text, refId = '') => ({id, kind, text, refId, index:0,
+    indexes:[0,1], toolName:'create_flashcards', images:['data:image/png;base64,abc']});
+  reply.timeline = [block(0, 'text', 'Before'), block(1, 'tool', '', 'call-8'),
+    block(2, 'draft', 'Question\nAnswer sk-abcdefghijk', 'draft-8'),
+    block(3, 'reasoning', 'Check'), block(4, 'text', 'After')];
+  await saveAgentConversation(conversation([reply], [audit(8, 'create_flashcards')]));
+  const [restored] = await loadAgentConversations();
+  const timeline = restored.messages[0].timeline;
+  assert.deepEqual(timeline.map(b => b.kind), ['text', 'tool', 'draft', 'reasoning', 'text']);
+  assert.equal(timeline[1].refId, restored.audits[0].callId);
+  assert.match(timeline[2].text, /Question\nAnswer/);
+  assert.doesNotMatch(JSON.stringify(timeline), /sk-abcdefghijk|data:image/);
+  assert.ok(timeline.every(b => b.index === -1 && b.indexes.length === 0 && b.images.length === 0));
+});
+
+test('history bounds total timeline text while preserving existing legacy fallback', async () => {
+  state.value = '[]';
+  const reply = message(1, 'body');
+  reply.timeline = Array.from({length:1200}, (_, id) => ({id, kind:'text', text:'x'.repeat(1000)}));
+  await saveAgentConversation(conversation([reply]));
+  const [restored] = await loadAgentConversations();
+  assert.equal(restored.messages[0].timeline.length, 1000);
+  assert.equal(restored.messages[0].timeline.reduce((sum,b) => sum + b.text.length, 0), 20000);
+  assert.equal(restored.messages[0].timelineTruncated, true);
+});
+
+test('lengthy reasoning does not consume the later answer and draft history budgets', async () => {
+  state.value = '[]';
+  const reply = message(1, 'Answer');
+  reply.timeline = [{kind:'reasoning',text:'x'.repeat(30000)}, {kind:'draft',text:'Draft'}, {kind:'text',text:'Answer'}];
+  await saveAgentConversation(conversation([reply]));
+  const [restored] = await loadAgentConversations();
+  assert.deepEqual(restored.messages[0].timeline.map(b => b.text.length), [20000,5,6]);
+  assert.equal(restored.messages[0].timelineTruncated, true);
+});
+
 test('reasoning history is bounded and redacted while retaining truncation disclosure', async () => {
   state.value = '[]';
   await saveAgentConversation(conversation([message(1, 'reply', 'Bearer abc-secret sk-abcdefghijk data:image/png;base64,aaaa'),

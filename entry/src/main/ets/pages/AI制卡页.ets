@@ -20,6 +20,9 @@ import { 牌组服务 } from '../backend/牌组服务';
 import type { DeckTreeNode } from '../proto/messages/DeckMessages';
 import { buildAgentSessionInstructions } from '../model/agent/AgentSessionContext';
 import { parseAgentBoldRuns } from '../model/agent/AgentTextFormatting';
+import type { AgentTimelineBlock, AgentContentPart } from '../model/agent/AgentTimeline';
+import { appendAgentTimelineText, appendAgentTimelineReference,
+  cloneAgentTimeline, agentDraftProgressText, agentContentParts, agentDraftOperationImages } from '../model/agent/AgentTimeline';
 import type { AgentTextRun } from '../model/agent/AgentTextFormatting';
 import { canAnswerClarification } from '../model/agent/AgentClarification';
 import { KeyboardAvoidMode } from '@kit.ArkUI';
@@ -174,6 +177,9 @@ interface 卡片草稿 {
 
 /** 一条聊天消息。 */
 interface 聊天消息 {
+  timeline: AgentTimelineBlock[];
+  timelineTruncated: boolean;
+  streaming: boolean;
   action: AgentAction | null;
   reasoningIsSummary: boolean;
   reasoningTruncated: boolean;
@@ -228,6 +234,8 @@ export struct AI制卡页 {
   private readonly 笔记类型服务实例: 笔记类型服务 = new 笔记类型服务();
   private readonly 卡片服务实例: 卡片服务 = new 卡片服务();
   private readonly 聊天滚动器: Scroller = new Scroller();
+  private followAgentTail: boolean = true;
+  private agentScrollTimer: number = -1;
   private readonly agentScope: AgentScope = new AgentScope();
   private readonly agentExecutor: AgentDraftExecutor = new AgentDraftExecutor();
   private agentRunner: AgentRunner | null = null;
@@ -325,6 +333,7 @@ export struct AI制卡页 {
   }
 
   aboutToDisappear(): void {
+    if (this.agentScrollTimer >= 0) { clearTimeout(this.agentScrollTimer); this.agentScrollTimer = -1; }
     if (this.agentRunner !== null) { this.agentRunner.cancel(); }
     this.getUIContext().setKeyboardAvoidMode(this.上一键盘避让模式);
     CustomTransition.getInstance().注销NavParam('AiCardPage');
@@ -741,7 +750,7 @@ export struct AI制卡页 {
     return {
       id: this.下一个消息ID(), 角色: 角色, 正文: 正文, 是否错误: 是否错误,
       卡片列表: [], 字段名列表: [], 批次结果: '', 批次保存中: false,
-      变更草稿列表: [], 工具过程: [], 来源列表: [], 推理摘要: '',
+      变更草稿列表: [], 工具过程: [], 来源列表: [], 推理摘要: '', timeline: [], timelineTruncated: false, streaming: false,
       action: null, reasoningIsSummary: false, reasoningTruncated: false, draftDeckId: 0, draftNotetypeId: 0, draftTargetLabel: '',
       kind: 'normal', clarification: null, expanded: false, taskStatus: '',
       answerMessageId: 0, providerText: 正文
@@ -787,6 +796,9 @@ export struct AI制卡页 {
 
   private 克隆消息(消息: 聊天消息): 聊天消息 {
     return {
+      timeline: cloneAgentTimeline(消息.timeline),
+      timelineTruncated: 消息.timelineTruncated,
+      streaming: 消息.streaming,
       action: 消息.action, reasoningIsSummary: 消息.reasoningIsSummary, reasoningTruncated: 消息.reasoningTruncated,
       draftDeckId: 消息.draftDeckId, draftNotetypeId: 消息.draftNotetypeId, draftTargetLabel: 消息.draftTargetLabel,
       id: 消息.id,
@@ -843,7 +855,16 @@ export struct AI制卡页 {
   }
 
   private 滚动到底部(): void {
-    setTimeout(() => {
+    this.followAgentTail = true;
+    this.queueAgentTimelineScroll();
+  }
+
+  /** 合并密集的流式布局更新；用户向上阅读后取消待执行的跟随滚动。 */
+  private queueAgentTimelineScroll(): void {
+    if (!this.followAgentTail || this.agentScrollTimer >= 0) { return; }
+    this.agentScrollTimer = setTimeout(() => {
+      this.agentScrollTimer = -1;
+      if (!this.followAgentTail) { return; }
       try {
         this.聊天滚动器.scrollEdge(Edge.Bottom);
       } catch (错误) {
@@ -1049,6 +1070,7 @@ export struct AI制卡页 {
     this.storeClarificationAnswerMessageId(userMessageId);
     this.处理中 = true;
     const aiMessage: 聊天消息 = this.空消息('ai', '', false);
+    aiMessage.streaming = true;
     this.追加消息(aiMessage);
     const aiIndex: number = this.消息列表.length - 1;
     try {
@@ -1092,11 +1114,16 @@ export struct AI制卡页 {
       const 错误文案: string = this.取Agent错误文案(异常);
       this.更新消息(aiIndex, (message: 聊天消息): void => {
         message.正文 = message.正文.length > 0 ? `${message.正文}\n\n${错误文案}` : 错误文案;
+        appendAgentTimelineText(message.timeline, 'text', 错误文案);
+        for (const block of message.timeline) {
+          if (block.kind === 'draft') { block.index = -1; block.indexes = []; }
+        }
         message.是否错误 = true;
         message.kind = message.providerText.length > 0 ? 'normal' : 'error';
       });
       return null;
     } finally {
+      this.更新消息(aiIndex, (message: 聊天消息): void => { message.streaming = false; });
       this.处理中 = false;
       await this.保存当前会话历史();
     }
@@ -1222,10 +1249,18 @@ export struct AI制卡页 {
       if (event.kind === 'text_delta') {
         message.正文 += event.text;
         message.providerText += event.text;
+        appendAgentTimelineText(message.timeline, 'text', event.text);
       }
       if (event.kind === 'reasoning_delta' || event.kind === 'reasoning_summary') {
         message.推理摘要 += event.text;
+        appendAgentTimelineText(message.timeline,
+          event.kind === 'reasoning_summary' ? 'summary' : 'reasoning', event.text);
         if (event.kind === 'reasoning_summary') { message.reasoningIsSummary = true; }
+      }
+      if ((event.kind === 'tool_progress' || event.kind === 'tool_call') && event.toolCall !== null) {
+        const block: AgentTimelineBlock = appendAgentTimelineReference(message.timeline, 'tool', event.toolCall.id);
+        block.toolName = event.toolCall.name;
+        block.text = agentDraftProgressText(event.toolCall.name, event.toolCall.argumentsJson);
       }
       if ((event.kind === 'tool_started' || event.kind === 'tool_completed' || event.kind === 'tool_failed') &&
         event.toolTrace !== null) {
@@ -1239,19 +1274,48 @@ export struct AI制卡页 {
           trace.expanded = message.工具过程[existingIndex].expanded;
           message.工具过程[existingIndex] = trace;
         }
+        const block: AgentTimelineBlock = appendAgentTimelineReference(message.timeline, 'tool', trace.callId);
+        block.toolName = trace.toolName;
+        block.index = existingIndex < 0 ? message.工具过程.length - 1 : existingIndex;
+        if (event.kind === 'tool_completed') { block.text = ''; }
       }
       if (event.kind === 'search_source' && event.source !== null) {
         message.来源列表.push({ url: event.source.url, title: event.source.title });
+        const block: AgentTimelineBlock = appendAgentTimelineReference(message.timeline, 'source', event.source.url);
+        block.text = `${event.source.title}\n${event.source.url}`;
       }
       if (event.kind === 'error') { message.是否错误 = true; }
+    });
+    if (event.kind === 'tool_completed' && this.agentRunner !== null) {
+      this.showAgentDraftProgress(messageIndex, this.agentRunner.getPartialDrafts());
+    }
+  }
+
+  /** 每个工具校验出草稿后立即显示内容；运行中仅预览，最终接收时开放编辑和确认。 */
+  private showAgentDraftProgress(messageIndex: number, drafts: ChangeDraft[]): void {
+    this.更新消息(messageIndex, (message: 聊天消息): void => {
+      for (const draft of drafts) {
+        const block: AgentTimelineBlock = appendAgentTimelineReference(message.timeline, 'draft', draft.id);
+        block.text = draft.summary + '\n\n' + draft.operations.map((operation: DraftOperation, index: number): string => {
+          const text: string = operation.before.length > 0 ?
+            this.取本地化格式($r('app.string.ai_agent_operation_diff'), [operation.before, operation.after]) : operation.after;
+          return text + agentDraftOperationImages(draft, index).map((url: string): string => `\n\n![](${url})`).join('');
+        }).join('\n\n');
+        block.images = agentDraftOperationImages(draft, -1);
+      }
     });
   }
 
   private 接收Agent草稿(messageIndex: number, drafts: ChangeDraft[]): void {
     if (drafts.length === 0) { return; }
+    this.showAgentDraftProgress(messageIndex, drafts);
     const cards: 卡片草稿[] = [];
     const changes: ChangeDraft[] = [];
+    const timeline: AgentTimelineBlock[] = cloneAgentTimeline(this.消息列表[messageIndex].timeline);
     for (const draft of drafts) {
+      const block: AgentTimelineBlock = appendAgentTimelineReference(timeline, 'draft', draft.id);
+      block.indexes = [];
+      block.index = -1;
       const createOnly: boolean = draft.operations.length > 0 &&
         draft.operations.every((operation: DraftOperation): boolean => operation.kind === 'create_note') &&
         (draft.imageAttachments ?? []).length === 0;
@@ -1268,11 +1332,13 @@ export struct AI制卡页 {
           }
         }
         for (const fields of groupedFields.values()) {
+          block.indexes.push(cards.length);
           cards.push({ fields: fields, 已选中: true, 状态: 'draft', 失败提示: '' });
         }
-      } else { changes.push(draft); }
+      } else { block.index = changes.length; changes.push(draft); }
     }
     this.更新消息(messageIndex, (message: 聊天消息): void => {
+      message.timeline = timeline;
       message.卡片列表 = cards;
       message.draftDeckId = this.牌组ID;
       message.draftNotetypeId = this.已选笔记类型ID;
@@ -1283,9 +1349,10 @@ export struct AI制卡页 {
         message.正文 = cards.length > 0 ?
           this.取本地化格式($r('app.string.ai_card_generated_summary'), [`${cards.length}`]) :
           this.取本地化格式($r('app.string.ai_agent_changes_generated'), [changes.length]);
+        appendAgentTimelineText(message.timeline, 'text', message.正文);
       }
     });
-    this.滚动到底部();
+    this.queueAgentTimelineScroll();
   }
 
   private 影响范围(draft: ChangeDraft): string {
@@ -1527,10 +1594,12 @@ export struct AI制卡页 {
         $r('app.string.ai_agent_history_create_title') : $r('app.string.ai_agent_history_edit_title'));
       let title: string = defaultTitle;
       for (const message of this.消息列表) {
-        if ((message.正文.length > 0 || message.推理摘要.length > 0 || message.工具过程.length > 0 ||
+        if ((message.timeline.length > 0 || message.正文.length > 0 || message.推理摘要.length > 0 || message.工具过程.length > 0 ||
           message.action !== null) && (message.kind === 'normal' || message.kind === 'clarification')) {
           messages.push({
             id: message.id, reasoning: message.推理摘要, reasoningIsSummary: message.reasoningIsSummary,
+            timeline: cloneAgentTimeline(message.timeline),
+            timelineTruncated: message.timelineTruncated,
             reasoningTruncated: message.reasoningTruncated,
             role: message.角色 === 'user' ? 'user' : 'assistant',
             text: message.角色 === 'ai' && message.providerText.length > 0 ?
@@ -1603,6 +1672,8 @@ export struct AI制卡页 {
       message.推理摘要 = item.reasoning ?? '';
       message.reasoningIsSummary = item.reasoningIsSummary === true;
       message.reasoningTruncated = item.reasoningTruncated === true;
+      message.timeline = cloneAgentTimeline(item.timeline ?? []);
+      message.timelineTruncated = item.timelineTruncated === true;
       if (item.id !== undefined) { messagePositions.set(item.id, restored.length); }
       restored.push(message);
     }
@@ -1620,6 +1691,13 @@ export struct AI制卡页 {
       const trace: AgentToolTrace = this.克隆工具追踪(audit);
       trace.expanded = !this.simpleMode;
       restored[auditTarget].工具过程.push(trace);
+    }
+    for (const message of restored) {
+      for (const block of message.timeline) {
+        if (block.kind === 'tool') {
+          block.index = message.工具过程.findIndex((trace: AgentToolTrace): boolean => trace.callId === block.refId);
+        }
+      }
     }
     this.conversationId = selected.id;
     this.历史执行结果 = selected.results.slice();
@@ -2131,6 +2209,9 @@ export struct AI制卡页 {
                 .fontSize(应用尺寸.字号_正文_小).maxLines(6)
                 .textOverflow({ overflow: TextOverflow.Ellipsis }).width('100%')
             }
+            ForEach(agentDraftOperationImages(this.消息列表[消息索引].变更草稿列表[草稿索引], operationIndex), (url: string) => {
+              Image(url).width('100%').height(180).objectFit(ImageFit.Contain)
+            }, (url: string): string => url)
           }.width('100%')
         }, (_operation: DraftOperation, operationIndex: number): string => `op-${operationIndex}`)
       Button($r('app.string.ai_agent_draft_apply'))
@@ -2276,17 +2357,93 @@ export struct AI制卡页 {
 
   /** 有真实思考、工具或正文时保留回复；澄清工具与下一条问题消息分别呈现。 */
   private hasVisibleAssistantContent(message: 聊天消息): boolean {
-    return message.正文.length > 0 || message.推理摘要.length > 0 ||
+    return message.timeline.length > 0 || message.正文.length > 0 || message.推理摘要.length > 0 ||
       message.来源列表.length > 0 || message.卡片列表.length > 0 ||
       message.变更草稿列表.length > 0 || message.action !== null ||
       message.taskStatus === 'paused' || message.批次结果.length > 0 ||
       message.工具过程.length > 0;
   }
 
+  /** 图片和文字按正文中的位置交替展示。 */
+  @Builder
+  private orderedAgentText(text: string) {
+    ForEach(agentContentParts(text), (part: AgentContentPart) => {
+      if (part.kind === 'image') {
+        Image(part.text).width('100%').height(180).objectFit(ImageFit.Contain)
+      } else {
+        Text() {
+          ForEach(parseAgentBoldRuns(part.text), (run: AgentTextRun) => {
+            Span(run.text).fontWeight(run.bold ? FontWeight.Bold : FontWeight.Normal)
+          })
+        }.width('100%').fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary'))
+      }
+    }, (part: AgentContentPart, index: number): string => `${index}-${part.kind}-${part.text.length}`)
+  }
+
+  /** 引用当前消息状态，工具状态变化不会把工具或后续内容挪到另一组。 */
+  @Builder
+  private agentTimelineItem(messageIndex: number, blockIndex: number) {
+    Column({ space: 应用尺寸.间距_8 }) {
+      if (this.消息列表[messageIndex].timeline[blockIndex].kind === 'tool') {
+        if (this.消息列表[messageIndex].timeline[blockIndex].index >= 0) {
+          this.工具过程项(messageIndex, this.消息列表[messageIndex].timeline[blockIndex].index)
+        } else {
+          Text(this.工具显示名(this.消息列表[messageIndex].timeline[blockIndex].toolName))
+            .fontWeight(FontWeight.Medium).width('100%')
+          Text(this.消息列表[messageIndex].streaming ? $r('app.string.ai_agent_draft_streaming') : $r('app.string.ai_agent_preview_only'))
+            .fontColor($r('app.color.text_secondary')).width('100%')
+        }
+        if (this.消息列表[messageIndex].timeline[blockIndex].text.length > 0) {
+          this.orderedAgentText(this.消息列表[messageIndex].timeline[blockIndex].text)
+        }
+      } else if (this.消息列表[messageIndex].timeline[blockIndex].kind === 'draft') {
+        if (this.消息列表[messageIndex].timeline[blockIndex].indexes.length > 0) {
+          Text(this.消息列表[messageIndex].draftTargetLabel).fontColor($r('app.color.text_secondary'))
+          ForEach(this.消息列表[messageIndex].timeline[blockIndex].indexes, (cardIndex: number) => {
+            this.卡片项(messageIndex, cardIndex)
+          }, (cardIndex: number): string => `card-${cardIndex}`)
+        } else if (this.消息列表[messageIndex].timeline[blockIndex].index >= 0) {
+          this.变更草稿项(messageIndex, this.消息列表[messageIndex].timeline[blockIndex].index)
+        } else {
+          Text(this.消息列表[messageIndex].streaming ? $r('app.string.ai_agent_draft_streaming') : $r('app.string.ai_agent_preview_only'))
+            .fontColor($r('app.color.text_secondary')).width('100%')
+          this.orderedAgentText(this.消息列表[messageIndex].timeline[blockIndex].text)
+        }
+        ForEach(this.消息列表[messageIndex].timeline[blockIndex].images, (url: string) => {
+          Image(url).width('100%').height(180).objectFit(ImageFit.Contain)
+        }, (url: string): string => url)
+      } else if (this.消息列表[messageIndex].timeline[blockIndex].kind === 'reasoning' ||
+        this.消息列表[messageIndex].timeline[blockIndex].kind === 'summary') {
+        Text(this.消息列表[messageIndex].timeline[blockIndex].kind === 'summary' ?
+          $r('app.string.ai_agent_reasoning_summary') : $r('app.string.ai_agent_reasoning_process'))
+          .fontWeight(FontWeight.Medium).width('100%')
+        this.orderedAgentText(this.消息列表[messageIndex].timeline[blockIndex].text)
+      } else {
+        this.orderedAgentText(this.消息列表[messageIndex].timeline[blockIndex].text)
+      }
+    }.width('100%').alignItems(HorizontalAlign.Start)
+  }
+
+  /** 流式预览按版本刷新，已定稿的可编辑卡片保持稳定身份。 */
+  private agentTimelineKey(messageIndex: number, block: AgentTimelineBlock): string {
+    const trace: AgentToolTrace | undefined = block.kind === 'tool' && block.index >= 0 ?
+      this.消息列表[messageIndex].工具过程[block.index] : undefined;
+    return `${block.id}-${block.text.length}-${block.index}-${block.indexes.length}-${block.images.length}-${this.消息列表[messageIndex].streaming}-` +
+      (trace === undefined ? '' : `${trace.status}-${trace.expanded}`);
+  }
+
   @Builder
   private AI气泡(消息索引: number) {
     Row() {
       Column({ space: 应用尺寸.间距_10 }) {
+        ForEach(this.消息列表[消息索引].timeline, (_block: AgentTimelineBlock, index: number) => {
+          this.agentTimelineItem(消息索引, index)
+        }, (block: AgentTimelineBlock): string => this.agentTimelineKey(消息索引, block))
+        if (this.消息列表[消息索引].timelineTruncated) {
+          Text($r('app.string.ai_agent_history_timeline_truncated'))
+            .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_tertiary')).width('100%')
+        }
+        if (this.消息列表[消息索引].timeline.length === 0) {
         if (this.消息列表[消息索引].推理摘要 !== '') {
           Text(this.消息列表[消息索引].reasoningIsSummary ? $r('app.string.ai_agent_reasoning_summary') : $r('app.string.ai_agent_reasoning_process'))
             .fontSize(应用尺寸.字号_正文_小).fontWeight(FontWeight.Medium)
@@ -2324,6 +2481,7 @@ export struct AI制卡页 {
               .fontColor(this.动作主色).width('100%')
           }, (source: SearchSource): string => source.url)
         }
+        }
 
         if (this.消息列表[消息索引].action !== null) {
           AgentActionCard({ action: this.消息列表[消息索引].action!, disabled: this.处理中,
@@ -2338,18 +2496,17 @@ export struct AI制卡页 {
             .borderRadius(应用尺寸.圆角_胶囊)
             .onClick((): void => { this.resumePausedTask(消息索引); })
         }
-        if (this.消息列表[消息索引].卡片列表.length > 0) {
+        if (this.消息列表[消息索引].timeline.length === 0 && this.消息列表[消息索引].卡片列表.length > 0) {
           Text(this.消息列表[消息索引].draftTargetLabel).fontColor($r('app.color.text_secondary'))
         }
-        // 草稿是本轮 Agent 的最终产物，始终位于思考、工具过程和来源之后。
-        if (this.消息列表[消息索引].卡片列表.length > 0) {
+        if (this.消息列表[消息索引].timeline.length === 0 && this.消息列表[消息索引].卡片列表.length > 0) {
           ForEach(this.消息列表[消息索引].卡片列表,
             (卡: 卡片草稿, 卡片索引: number) => {
               this.卡片项(消息索引, 卡片索引)
             }, (卡: 卡片草稿, 卡片索引: number): string => `card-${卡片索引}`)
         }
 
-        if (this.消息列表[消息索引].变更草稿列表.length > 0) {
+        if (this.消息列表[消息索引].timeline.length === 0 && this.消息列表[消息索引].变更草稿列表.length > 0) {
           ForEach(this.消息列表[消息索引].变更草稿列表,
             (_draft: ChangeDraft, draftIndex: number) => {
               this.变更草稿项(消息索引, draftIndex)
@@ -2458,6 +2615,9 @@ export struct AI制卡页 {
         }, (消息: 聊天消息): string => `msg-${消息.id}`)
       }
       .width('100%')
+      .onAreaChange((oldArea: Area, newArea: Area): void => {
+        if (oldArea.height !== newArea.height) { this.queueAgentTimelineScroll(); }
+      })
       .padding({
         left: 应用尺寸.页面内边距_水平,
         right: 应用尺寸.页面内边距_水平,
@@ -2470,6 +2630,12 @@ export struct AI制卡页 {
     .scrollBar(BarState.Auto)
     .edgeEffect(EdgeEffect.Spring)
     .align(Alignment.Top)
+    .onDidScroll((_xOffset: number, yOffset: number, state: ScrollState): void => {
+      if (state !== ScrollState.Idle) {
+        if (yOffset < 0) { this.followAgentTail = false; }
+        else if (this.聊天滚动器.isAtEnd()) { this.followAgentTail = true; }
+      }
+    })
   }
 
   @Builder

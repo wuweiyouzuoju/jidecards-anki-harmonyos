@@ -225,6 +225,8 @@ class RoundCollector implements AgentStreamObserver {
     if (event.kind === 'tool_call' && event.toolCall !== null) {
       this.receivedOutput = true;
       this.toolCalls.push(event.toolCall);
+    } else if (event.kind === 'tool_progress') {
+      this.receivedOutput = true;
     } else if (event.kind === 'text_delta') {
       this.receivedOutput = true;
       this.text += event.text;

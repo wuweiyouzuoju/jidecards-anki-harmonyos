@@ -144,11 +144,15 @@ export class ResponsesEventNormalizer {
     }
     if (type === 'response.output_item.added' && raw.item !== undefined) {
       this.rememberFunctionCall(raw.item);
-      return this.sourcesFromItem(raw.item);
+      const events: AgentEvent[] = this.sourcesFromItem(raw.item);
+      const progress: AgentEvent | null = this.functionProgress(raw.item.id);
+      if (progress !== null) { events.push(progress); }
+      return events;
     }
     if (type === 'response.function_call_arguments.delta') {
       this.appendFunctionArguments(raw);
-      return [];
+      const progress: AgentEvent | null = this.functionProgress(raw.item_id);
+      return progress === null ? [] : [progress];
     }
     if (type === 'response.function_call_arguments.done') {
       const call: AgentToolCall | null = this.completeFunctionArguments(raw);
@@ -216,6 +220,18 @@ export class ResponsesEventNormalizer {
       name: typeof item.name === 'string' ? item.name : '',
       argumentsJson: typeof item.arguments === 'string' ? item.arguments : ''
     });
+  }
+
+  /** 流式参数仅用于展示，完整 tool_call 仍是唯一执行入口。 */
+  private functionProgress(itemId: string | undefined): AgentEvent | null {
+    if (itemId === undefined || this.emittedCallItems.has(itemId)) { return null; }
+    const current: PendingFunctionCall | undefined = this.pendingCalls.get(itemId);
+    if (current === undefined || (current.name !== 'create_flashcards' &&
+      !current.name.startsWith('propose_'))) { return null; }
+    const event: AgentEvent = emptyEvent('tool_progress');
+    event.toolCall = { id: current.callId.length > 0 ? current.callId : itemId,
+      name: current.name, argumentsJson: current.argumentsJson };
+    return event;
   }
 
   private appendFunctionArguments(raw: RawResponseEvent): void {

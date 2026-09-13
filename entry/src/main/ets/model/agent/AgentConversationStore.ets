@@ -9,6 +9,7 @@ import type { AgentClarificationState, AgentClarificationView } from './AgentCla
 import { cloneAgentClarificationView } from './AgentClarification';
 import { safeAgentAction } from './AgentSessionState';
 import type { AgentAction } from './AgentAction';
+import type { AgentTimelineBlock } from './AgentTimeline';
 
 const STORE_NAME: string = 'jidecards_ai_agent_history';
 const HISTORY_KEY: string = 'conversations_v1';
@@ -30,6 +31,8 @@ function historyAction(action: AgentAction): AgentAction {
 
 /** 保存接口实际返回的可见思考及其类型；不从正文生成或反推思考。 */
 export interface AgentHistoryMessage {
+  timeline?: AgentTimelineBlock[];
+  timelineTruncated?: boolean;
   id?: number;
   reasoning?: string;
   reasoningIsSummary?: boolean;
@@ -202,6 +205,37 @@ function safeAudit(audit: AgentHistoryAudit): AgentHistoryAudit {
   };
 }
 
+interface SafeHistoryTimeline { blocks: AgentTimelineBlock[]; truncated: boolean; }
+
+/** 各类可见文本分别限额，长思考不能挤掉随后正文和草稿；不恢复写入能力。 */
+function safeTimeline(value: AgentTimelineBlock[] | undefined): SafeHistoryTimeline {
+  if (!Array.isArray(value)) { return { blocks: [], truncated: false }; }
+  const blocks: AgentTimelineBlock[] = [];
+  let remainingText: number = MAX_TEXT_LENGTH;
+  let remainingReasoning: number = MAX_TEXT_LENGTH;
+  let remainingDraft: number = MAX_TEXT_LENGTH;
+  let truncated: boolean = value.length > 1000;
+  for (const block of value.slice(0, 1000)) {
+    if (block === null || typeof block !== 'object' ||
+      !['text', 'reasoning', 'summary', 'tool', 'source', 'draft'].includes(block.kind)) { continue; }
+    const isReasoning: boolean = block.kind === 'reasoning' || block.kind === 'summary';
+    const isDraft: boolean = block.kind === 'draft' || block.kind === 'tool';
+    const remaining: number = isReasoning ? remainingReasoning : (isDraft ? remainingDraft : remainingText);
+    const rawText: string = typeof block.text === 'string' ? block.text : '';
+    const safeText: string = sanitizeHistoryText(rawText);
+    const text: string = safeText.slice(0, remaining);
+    truncated = truncated || rawText.length > MAX_TEXT_LENGTH || safeText.length > text.length;
+    if (isReasoning) { remainingReasoning -= text.length; }
+    else if (isDraft) { remainingDraft -= text.length; }
+    else { remainingText -= text.length; }
+    blocks.push({ id: blocks.length, kind: block.kind, text: text,
+      refId: sanitizeHistoryText(typeof block.refId === 'string' ? block.refId : ''),
+      toolName: sanitizeHistoryText(typeof block.toolName === 'string' ? block.toolName : ''),
+      index: -1, indexes: [], images: [] });
+  }
+  return { blocks: blocks, truncated: truncated };
+}
+
 function safeConversation(value: AgentConversation): AgentConversation {
   const messages: AgentHistoryMessage[] = [];
   let reasoningTotal: number = 0;
@@ -211,7 +245,10 @@ function safeConversation(value: AgentConversation): AgentConversation {
       const rawReasoning: string = typeof message.reasoning === 'string' ? message.reasoning : '';
       const reasoning: string = sanitizeHistoryText(rawReasoning).slice(0, MAX_REASONING_TEXT_TOTAL - reasoningTotal);
       reasoningTotal += reasoning.length;
+      const timeline: SafeHistoryTimeline = safeTimeline(message.timeline);
       messages.push({
+        timeline: timeline.blocks,
+        timelineTruncated: message.timelineTruncated === true || timeline.truncated,
         id: typeof message.id === 'number' && Number.isFinite(message.id) ? message.id : undefined,
         reasoning: reasoning, reasoningIsSummary: message.reasoningIsSummary === true,
         reasoningTruncated: message.reasoningTruncated === true || rawReasoning.length > MAX_TEXT_LENGTH ||
