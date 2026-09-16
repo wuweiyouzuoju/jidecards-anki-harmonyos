@@ -7,8 +7,7 @@ import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
 // 由 首页.ets 通过 Navigation pathStack 以 NavDestination 形式入栈（与 学习页 同机制），
 // 取代原 添加笔记面板 弹层。Cloze 笔记类型下提供 c1-c5 快捷挖空按钮与保存前预校验。
 // Task 10：笔记类型加载失败时 try/catch 捕获，错误信息在 错误信息 显示，不静默 rejection。
-// T3：Image Occlusion 笔记类型下切换为图片遮盖建卡专属布局（选图 → 编辑遮罩 → Header/Back Extra → Tags），
-// 首次进入时若无 ImageOcclusion 笔记类型则自动调后端添加并重新拉取列表。
+// 图片遮盖卡的学习与预览仍受支持；添加笔记页暂不开放图片遮盖建卡入口。
 
 import { common } from '@kit.AbilityKit';
 import { fileIo as fs } from '@kit.CoreFileKit';
@@ -220,8 +219,8 @@ export struct 添加笔记页 {
   // @业务规则
   // context 不可用时直接报错，不进入后端调用。
   // 笔记类型名列表映射为下拉候选结构（id + name）。
-  // T3.2：若列表中无 'Image Occlusion'，调一次 图片遮罩服务.添加图片遮罩笔记类型() 后重新拉取列表；
-  //   该调用失败时记录到 错误信息，但不阻断主流程（用户仍能选其他类型）。
+  // 图片遮盖建卡入口已关闭：不自动补建该笔记类型，并且不在下拉列表展示它。
+  // 已导入的图片遮盖卡仍由学习和预览页面正常渲染。
   //
   // @副作用
   // 调后端 确保已打开 / 获取添加默认值 / 获取笔记类型名列表；读写 处理中 状态
@@ -239,8 +238,8 @@ export struct 添加笔记页 {
       await 后端会话.获取实例().确保已打开(上下文.filesDir);
       const 默认值 = await this.笔记服务实例.获取添加默认值();
       let 名称列表: NotetypeNameId[] = await this.笔记类型服务实例.获取笔记类型名列表();
-      // 兜底恢复缺失的标准笔记类型：Basic / Cloze / 3 个 Basic 变种 / ImageOcclusion。
-      // Anki 26.05 默认 collection 预置 Basic + 3 变种 + Cloze，不预置 ImageOcclusion；
+      // 兜底恢复缺失的标准笔记类型：Basic / Cloze / 3 个 Basic 变种。
+      // Anki 26.05 默认 collection 预置 Basic + 3 个 Basic 变种 + Cloze；
       // 但云同步替换 collection 后，云端可能缺这些标准类型（如账号曾被清理）。
       // 走 Anki 桌面版「管理笔记类型 → 添加 → 选择基础类型」同款流程：
       //   1. GetStockNotetypeLegacy(kind) 拿到 JSON
@@ -292,29 +291,27 @@ export struct 添加笔记页 {
           this.错误信息 = e instanceof Error ? e.message : `${e}`;
         }
       }
-      // Anki 26.05 默认 collection 不预置 ImageOcclusion，单独兜底（用专用 RPC）。
-      // 注意：后端返回的笔记类型名是本地化的（中文环境下为「图片遮盖」），用 是图片遮盖笔记类型名 识别。
-      if (!名称列表.some((项: NotetypeNameId): boolean => this.是图片遮盖笔记类型名(项.name))) {
-        try {
-          await this.图片遮罩服务实例.添加图片遮罩笔记类型();
-          类型缺失 = true;
-        } catch (图片遮罩添加错误) {
-          // 不抛出，主流程继续用现有 名称列表（无 Image Occlusion 选项）。
-          // 仅在 错误信息 中追加提示，方便用户感知后端问题。
-          this.错误信息 = 图片遮罩添加错误 instanceof Error
-            ? 图片遮罩添加错误.message : `${图片遮罩添加错误}`;
-        }
-      }
       if (类型缺失) {
         名称列表 = await this.笔记类型服务实例.获取笔记类型名列表();
       }
-      // 用户决策 2026-08-29：Basic 变种（附翻转卡片 / 可选附翻转卡片 / 输入答案）与其它类型
-      // 一并展示，对齐 Anki 桌面端下拉列表；调度与多模板卡片生成均由后端原生处理。
-      this.笔记类型选项 = 名称列表.map((项: NotetypeNameId): 添加笔记笔记类型选项 => ({
+      // 保留全部通用笔记类型；仅关闭图片遮盖建卡入口。
+      const 可建卡类型: NotetypeNameId[] = 名称列表.filter(
+        (项: NotetypeNameId): boolean => !this.是图片遮盖笔记类型名(项.name));
+      this.笔记类型选项 = 可建卡类型.map((项: NotetypeNameId): 添加笔记笔记类型选项 => ({
         id: 项.id, name: 项.name
       }));
-      // 后端 defaults_for_adding 保证返回有效的笔记类型 ID（失效配置自动回退首个可用类型）。
-      await this.加载笔记类型(默认值.notetypeId);
+      if (this.笔记类型选项.length === 0) {
+        this.错误信息 = this.取本地化文案($r('app.string.add_note_notetype_load_failed'));
+        return;
+      }
+      // 默认类型可能是已关闭入口的图片遮盖；此时回退到第一个可见类型。
+      let 默认笔记类型ID: number = 默认值.notetypeId;
+      const 默认ID可见: boolean = this.笔记类型选项.some(
+        (项: 添加笔记笔记类型选项): boolean => 项.id === 默认笔记类型ID);
+      if (!默认ID可见) {
+        默认笔记类型ID = this.笔记类型选项[0].id;
+      }
+      await this.加载笔记类型(默认笔记类型ID);
     } catch (错误) {
       this.已选笔记类型ID = 0;
       this.字段名列表 = [];
