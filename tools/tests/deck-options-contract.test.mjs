@@ -27,7 +27,7 @@ test('deck options remain presentation-only and organize complete settings progr
   assert.match(panel, /@State private showAdvanced: boolean = false/);
   for (const group of ['newExpanded', 'lapsesExpanded', 'buryingExpanded', 'audioExpanded', 'timerExpanded', 'fsrsExpanded', 'advancedExpanded']) assert.match(advanced, new RegExp(group));
   for (const group of ['@State private newExpanded', '@State private fsrsExpanded', '@State private advancedExpanded']) assert.match(advanced, new RegExp(group));
-  assert.match(panel, /Button\(\$r\('app\.string\.field_help_button'\)\)/);
+  assert.match(panel, /Button\(\) \{\s*Text\(\) \{ ThemeTextSpans\(\$r\('app\.string\.field_help_button'\)/);
   assert.doesNotMatch(panel, /Button\(\$r\('app\.string\.deck_options_title'\)\)/);
   assert.doesNotMatch(panel, /learnStepsHint/);
   assert.doesNotMatch(panel, /后端会话|牌组配置服务|libjidecards\.so/);

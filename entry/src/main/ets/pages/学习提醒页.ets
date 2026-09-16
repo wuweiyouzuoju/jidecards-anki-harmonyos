@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { CustomTransition } from '../utils/自定义转场';
+import { ThemeTextSpans } from '../components/common/ThemeText';
+import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
 
 import { 加载学习提醒设置, 保存学习提醒设置, 提醒项, 生成提醒项ID } from '../model/学习提醒存储';
 import { 刷新学习提醒, 首次引导通知设置 } from '../model/学习提醒服务';
@@ -27,10 +30,11 @@ import { 统一空态 } from '../components/common/统一空态';
 
 @Component
 export struct 学习提醒页 {
+  @State private 转场透明度: number = 1;
   private pathStack?: NavPathStack;
 
   @StorageLink(颜色键.主色按钮背景) private 主色按钮背景链接: string = '';
-  @StorageLink(颜色键.页面底色微染) private 页面底色微染值: string = '#F5F7FA';
+  @StorageLink(PAGE_SURFACE_KEY) private 页面底色微染值: string = '#F5F7FA';
   @StorageProp(颜色键.主色容器) private 主色容器色: string = '#E8EEFC';
   @StorageProp(颜色键.动作主色) private 动作主色: string = '#2F5FD0';
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
@@ -56,6 +60,10 @@ export struct 学习提醒页 {
   @State private 面板错误: string = '';
 
   async aboutToAppear(): Promise<void> {
+    CustomTransition.getInstance().注册NavParam('ReminderPage',
+      (isPush: boolean, isExit: boolean): void => { this.转场透明度 = isExit ? 1 : 0; },
+      (isPush: boolean, isExit: boolean): void => { this.转场透明度 = isExit ? 0 : 1; }
+    );
     this.是否深色 = 解析是否深色(this.主题模式值, this.系统暗黑模式);
     await this.加载列表();
   }
@@ -64,6 +72,10 @@ export struct 学习提醒页 {
     const 设置 = await 加载学习提醒设置();
     this.提醒项列表 = 设置.提醒项列表;
     this.已加载 = true;
+  }
+
+  aboutToDisappear(): void {
+    CustomTransition.getInstance().注销NavParam('ReminderPage');
   }
 
   private 解析主色按钮背景(): string {
@@ -229,7 +241,6 @@ export struct 学习提醒页 {
       Row() {
         按下态按钮({
           文案: $r('app.string.study_back'),
-          选中态背景: this.主色容器色,
           字色: $r('app.color.text_primary'),
           点击回调: (): void => { this.返回(); }
         })
@@ -237,8 +248,8 @@ export struct 学习提醒页 {
           .hitTestBehavior(HitTestMode.Transparent)
         按下态按钮({
           文案: $r('app.string.reminder_list_create_button'),
-          选中态背景: this.主色容器色,
           字色: this.动作主色,
+          themeText: true,
           点击回调: (): void => { this.新建提醒(); }
         })
       }
@@ -252,8 +263,8 @@ export struct 学习提醒页 {
     .padding({
       left: 应用尺寸.页面内边距_水平,
       right: 应用尺寸.页面内边距_水平,
-      top: this.状态栏高度 + 应用尺寸.间距_8,
-      bottom: 应用尺寸.间距_8
+      top: this.状态栏高度 + 应用尺寸.toolbarVerticalInset,
+      bottom: 应用尺寸.toolbarVerticalInset
     })
     .backgroundColor(this.页面底色微染值)
     .alignContent(Alignment.Center)
@@ -266,7 +277,7 @@ export struct 学习提醒页 {
       Row() {
         // 左侧时间大字
         Column() {
-          Text(this.格式化时间(项.小时, 项.分钟))
+          Text() { ThemeTextSpans(this.格式化时间(项.小时, 项.分钟), [], this.getUIContext()) }
             .fontSize(28)
             .fontWeight(FontWeight.Bold)
             .fontColor(项.开启 ? this.解析主色按钮背景() : 设置面板色板_取(this.是否深色).弱化文字)
@@ -313,7 +324,6 @@ export struct 学习提醒页 {
     .backgroundColor($r('app.color.surface_card'))
     .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
     .borderRadius(应用尺寸.圆角_卡片)
-    .margin({ bottom: 应用尺寸.间距_8 })
   }
 
   @Builder
@@ -333,7 +343,7 @@ export struct 学习提醒页 {
 
           if (this.已加载) {
             Scroll() {
-              Column() {
+              Column({ space: 应用尺寸.pageSectionGap }) {
                 if (this.提醒项列表.length === 0) {
                   this.空状态()
                 } else {
@@ -351,12 +361,11 @@ export struct 学习提醒页 {
                 }
               }
               .width('100%')
-              .height('100%')
               .padding({
                 left: 应用尺寸.页面内边距_水平,
                 right: 应用尺寸.页面内边距_水平,
-                top: 应用尺寸.间距_8,
-                bottom: this.导航条高度
+                top: 应用尺寸.pageContentTopInset,
+                bottom: 应用尺寸.pageBottomInset + this.导航条高度
               })
             }
             .layoutWeight(1)
@@ -397,6 +406,8 @@ export struct 学习提醒页 {
       .alignContent(Alignment.Center)
     }
     .hideTitleBar(true)
+    .backgroundColor(Color.Transparent)
+    .opacity(this.转场透明度)
     // 从编辑页 pop 返回时刷新列表。onPageShow 只对 @Entry 路由页生效，NavDestination 必须用 onShown。
     .onShown((): void => {
       this.加载列表();

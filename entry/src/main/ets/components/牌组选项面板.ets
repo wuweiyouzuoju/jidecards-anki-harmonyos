@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeTextSpans } from './common/ThemeText';
+import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
+import { DialogHeader } from './common/DialogHeader';
 // ========================================================
 // @块ID UI-DECK-OPTIONS-001
 // @名称 牌组选项面板
@@ -46,6 +49,7 @@ interface 牌组枚举选项 { value: Resource; numericValue: number; }
 
 @Component
 export struct 牌组选项面板 {
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
   @Prop deckName: string = '';
   @ObjectLink form: 牌组配置表单;
@@ -264,7 +268,9 @@ export struct 牌组选项面板 {
     Column({ space: 应用尺寸.间距_5 }) {
       Row() {
         Text(label).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).layoutWeight(1)
-        Button($r('app.string.field_help_button')).type(ButtonType.Normal).backgroundColor(Color.Transparent).fontColor(this.动作主色).onClick(() => this.openHelp(label, info))
+        Button() {
+          Text() { ThemeTextSpans($r('app.string.field_help_button'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.动作主色)
+        }.type(ButtonType.Normal).backgroundColor(Color.Transparent).fontColor(this.动作主色).onClick(() => this.openHelp(label, info))
       }.width('100%')
       TextInput({ text }).width('100%').height(应用尺寸.按钮高度).fontSize(应用尺寸.字号_正文)
         .backgroundColor($r('app.color.surface_card')).border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') }).borderRadius(应用尺寸.圆角_面板).enabled(!this.busy).onChange(onChange)
@@ -315,7 +321,9 @@ export struct 牌组选项面板 {
               if (this.form !== null) this.form.设置数值字段('reviewOrder', this.selectedReviewOrder.toString());
             }
           })
-        Button($r('app.string.field_help_button'))
+        Button() {
+          Text() { ThemeTextSpans($r('app.string.field_help_button'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.动作主色)
+        }
           .type(ButtonType.Normal)
           .backgroundColor(Color.Transparent)
           .fontColor(this.动作主色)
@@ -395,7 +403,15 @@ export struct 牌组选项面板 {
         .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
 
       Column({ space: 应用尺寸.间距_12 }) {
-        Text($r('app.string.deck_options_title')).fontSize(应用尺寸.字号_面板标题).fontWeight(FontWeight.Bold).width('100%')
+        DialogHeader({
+          title: $r('app.string.deck_options_title'),
+          actionLabel: this.busy ? $r('app.string.deck_options_saving') : $r('app.string.deck_options_save'),
+          actionEnabled: this.canSubmit(),
+          closeLabel: $r('app.string.create_deck_cancel'),
+          closeEnabled: !this.busy,
+          onClose: () => this.onCancel(),
+          onAction: () => this.submit()
+        })
         Text(this.deckName).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
         Scroll() {
           // 2026-07-28：原 space=间距_8 + 下方 Blank(间距_16) 导致 reviewOrderSelector
@@ -418,35 +434,6 @@ export struct 牌组选项面板 {
 
         if (this.errorMessage !== '' || this.submitError !== '') Text(this.errorMessage !== '' ? this.errorMessage : this.submitError).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.error_text')).width('100%')
 
-        Row({ space: 应用尺寸.间距_10 }) {
-          Button($r('app.string.create_deck_cancel'))
-            .layoutWeight(1)
-            .height(应用尺寸.按钮高度)
-            .fontSize(应用尺寸.字号_按钮)
-            .fontColor($r('app.color.text_primary'))
-            .backgroundColor($r('app.color.surface_page'))
-            .borderRadius(应用尺寸.圆角_胶囊)
-            .enabled(!this.busy)
-            .onClick(() => this.onCancel())
-          Button(this.busy ? $r('app.string.deck_options_saving') : $r('app.string.deck_options_save'))
-            .layoutWeight(1)
-            .height(应用尺寸.按钮高度)
-            .fontSize(应用尺寸.字号_按钮)
-            .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.action_on_primary'))
-            .backgroundColor(this.savePressed ? this.主色按钮按下 : this.主色按钮背景)
-            .borderRadius(应用尺寸.圆角_胶囊)
-            .animation({ duration: 80, curve: Curve.EaseOut })
-            .enabled(this.canSubmit())
-            .onTouch((event: TouchEvent): void => {
-              if (event.type === TouchType.Down) {
-                this.savePressed = true;
-              } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-                this.savePressed = false;
-              }
-            })
-            .onClick(() => this.submit())
-        }.width('100%')
       }
       .width('88%')
       .constraintSize({ maxWidth: 480, maxHeight: '88%' })

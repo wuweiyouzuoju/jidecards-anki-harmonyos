@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeDefinition, themeDefinition, THEME_VISUALS_KEY } from '../model/ThemeCatalog';
+import { themeProgressGradient } from '../utils/ThemeVisuals';
 
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { 颜色键 } from '../model/颜色主题';
@@ -29,6 +31,7 @@ import { 颜色键 } from '../model/颜色主题';
 // ========================================================
 @Component
 export struct 今日摘要卡 {
+  @StorageProp(THEME_VISUALS_KEY) private visual: ThemeDefinition = themeDefinition('aurora');
   @Prop 已完成数: number = 0;
   @Prop 待学数: number = 0;
   @Prop 牌组数: number = 0;
@@ -129,7 +132,7 @@ export struct 今日摘要卡 {
       } else {
         Progress({ value: this.进度值(), total: 100, type: ProgressType.Linear })
           .height(应用尺寸.进度条高度)
-          .color(this.动作主色)
+          .color(this.visual.progressColors.length > 0 ? themeProgressGradient(this.visual.progressColors) : this.动作主色)
           .backgroundColor(this.主色容器色)
           .borderRadius(应用尺寸.圆角_进度条)
 

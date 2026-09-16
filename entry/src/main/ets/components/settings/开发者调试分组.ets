@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeTextSpans } from '../common/ThemeText';
+import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
 import { 颜色键 } from '../../model/颜色主题';
 import {
@@ -11,6 +13,7 @@ import { 设置分组卡片 } from './设置分组卡片';
 
 @Component
 export struct 开发者调试分组 {
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop 是否深色: boolean = false;
   @Prop 已展开: boolean = false;
   切换展开回调: () => void = (): void => {};
@@ -60,7 +63,7 @@ export struct 开发者调试分组 {
     }) {
       Column({ space: 应用尺寸.间距_10 }) {
         if (this.Agent入口已启用) {
-          Text($r('app.string.settings_developer_debug_enabled'))
+          Text() { ThemeTextSpans($r('app.string.settings_developer_debug_enabled'), this.themeAccentColors, this.getUIContext()) }
             .width('100%')
             .fontSize(应用尺寸.字号_正文_小)
             .fontColor(设置面板色板_取(this.是否深色).主色)
@@ -71,7 +74,7 @@ export struct 开发者调试分组 {
             .width('100%')
             .fontSize(应用尺寸.字号_正文_小)
             .fontColor(设置面板色板_取(this.是否深色).次文字)
-          Text($r('app.string.settings_developer_debug_qq_hint'))
+          Text() { ThemeTextSpans($r('app.string.settings_developer_debug_qq_hint'), this.themeAccentColors, this.getUIContext()) }
             .width('100%')
             .fontSize(应用尺寸.字号_正文_小)
             .fontColor(设置面板色板_取(this.是否深色).主色)

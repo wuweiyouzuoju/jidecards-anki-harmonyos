@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeTextSpans } from '../common/ThemeText';
 
 // ========================================================
 // @块ID UI-HOME-SUMMARY-001
@@ -195,7 +196,7 @@ export struct 主页摘要分页 {
 
       if (this.图表快照!.fsrs已启用) {
         Row() {
-          Text(`${Math.round(this.图表快照!.记忆率)}%`)
+          Text() { ThemeTextSpans(`${Math.round(this.图表快照!.记忆率)}%`, [], this.getUIContext()) }
             .fontSize(32)
             .fontWeight(FontWeight.Bold)
             .fontColor(this.动作主色)

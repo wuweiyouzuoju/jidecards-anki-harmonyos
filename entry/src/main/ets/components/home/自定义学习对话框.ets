@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeTextSpans } from '../common/ThemeText';
+import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
+import { DialogHeader } from '../common/DialogHeader';
 // ========================================================
 // @块ID UI-CUSTOM-STUDY-001
 // @名称 自定义学习对话框
@@ -52,6 +55,7 @@ interface 预设选项 {
 
 @Component
 export struct 自定义学习对话框 {
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
   @Prop deckId: string = '';
   @Prop deckName: string = '';
@@ -209,7 +213,7 @@ export struct 自定义学习对话框 {
     Row({ space: 应用尺寸.间距_8 }) {
       Row() {
         Column({ space: 2 }) {
-          Text(预设.标题资源)
+          Text() { ThemeTextSpans(预设.标题资源, (this.选中预设 === 预设.字段号) ? this.themeAccentColors : [], this.getUIContext()) }
             .fontSize(应用尺寸.字号_正文)
             .fontColor(this.选中预设 === 预设.字段号 ?
               设置面板色板_取(this.isDark).主色 : 设置面板色板_取(this.isDark).主文字)
@@ -262,23 +266,16 @@ export struct 自定义学习对话框 {
         .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
 
       Column({ space: 应用尺寸.间距_16 }) {
-        Row() {
-          Text($r('app.string.custom_study_title'))
-            .fontSize(应用尺寸.字号_面板标题)
-            .fontColor($r('app.color.text_primary'))
-            .fontWeight(FontWeight.Bold)
-            .layoutWeight(1)
-          if (!this.处理中) {
-            Text('×')
-              .fontSize(24)
-              .fontColor($r('app.color.text_secondary'))
-              .width(32)
-              .height(32)
-              .textAlign(TextAlign.Center)
-              .onClick(() => { this.onClose(); })
-          }
-        }
-        .width('100%')
+        DialogHeader({
+          title: $r('app.string.custom_study_title'),
+          actionLabel: this.处理中 ?
+            $r('app.string.custom_study_running') : $r('app.string.custom_study_confirm'),
+          actionEnabled: this.可提交(),
+          closeLabel: $r('app.string.custom_study_cancel'),
+          closeEnabled: !this.处理中,
+          onClose: () => { this.onClose(); },
+          onAction: () => { this.执行提交(); }
+        })
 
         if (this.deckName !== '') {
           Text(this.deckName)
@@ -355,31 +352,6 @@ export struct 自定义学习对话框 {
             .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
 
-        Row({ space: 应用尺寸.间距_10 }) {
-          Button($r('app.string.custom_study_cancel'))
-            .height(应用尺寸.按钮高度)
-            .layoutWeight(1)
-            .fontSize(应用尺寸.字号_按钮)
-            .fontColor($r('app.color.text_primary'))
-            .backgroundColor($r('app.color.surface_page'))
-            .borderRadius(应用尺寸.圆角_胶囊)
-            .enabled(!this.处理中)
-            .onClick(() => { this.onClose(); })
-
-          Button(this.处理中 ?
-            $r('app.string.custom_study_running') : $r('app.string.custom_study_confirm'))
-            .height(应用尺寸.按钮高度)
-            .layoutWeight(1)
-            .fontSize(应用尺寸.字号_按钮)
-            .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.action_on_primary'))
-            .backgroundColor(this.主色按钮背景)
-            .borderRadius(应用尺寸.圆角_胶囊)
-            .opacity(this.可提交() ? 1 : 0.5)
-            .enabled(this.可提交())
-            .onClick(() => { this.执行提交(); })
-        }
-        .width('100%')
       }
       .width('88%')
       .constraintSize({ maxWidth: 480, maxHeight: '88%' })

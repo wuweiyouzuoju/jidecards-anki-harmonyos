@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeTextSpans } from './common/ThemeText';
+import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
+import { DialogHeader } from './common/DialogHeader';
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { 颜色键 } from '../model/颜色主题';
 import { 云端牌组目录项, 格式化云端牌组大小 } from '../model/云端牌组模型';
@@ -8,11 +11,12 @@ import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时
 /**
  * 云端牌组目录、选择、进度和结果的纯展示弹窗。
  *
- * Invariants: 两种打开来源共用同一套目录与下载逻辑，只有「首次说明文案」和「右下角主按钮」
+ * Invariants: 两种打开来源共用同一套目录与下载逻辑，只有「首次说明文案」和「退出按钮」
  * 不同——开机引导要留住用户选牌组，菜单入口只是回到首页后补下。
  */
 @Component
 export struct 云端牌组弹窗 {
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
   /** true 表示从首页右上角菜单进入，此时主按钮为「关闭」，不再显示首次引导说明。 */
   @Prop 从菜单打开: boolean = false;
@@ -52,7 +56,7 @@ export struct 云端牌组弹窗 {
     return this.failedIds.indexOf(id) >= 0;
   }
 
-  /** 右下角主按钮文案：菜单入口只关闭，引导态无成果时是「稍后再说」，有成果才是「进入软件」。 */
+  /** 退出按钮文案：菜单入口只关闭，引导态无成果时是「稍后再说」，有成果才是「进入软件」。 */
   private 主按钮文案(): Resource {
     if (this.从菜单打开) {
       return $r('app.string.close');
@@ -168,11 +172,15 @@ export struct 云端牌组弹窗 {
         }))
 
       Column({ space: 应用尺寸.间距_12 }) {
-        Text($r('app.string.cloud_deck_title'))
-          .fontSize(应用尺寸.字号_面板标题)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.text_primary'))
-          .width('100%')
+        DialogHeader({
+          title: $r('app.string.cloud_deck_title'),
+          actionLabel: $r('app.string.cloud_deck_download', this.selectedIds.length),
+          actionEnabled: !this.busy && !this.loading && this.errorMessage.length === 0 && this.selectedIds.length > 0,
+          closeLabel: this.主按钮文案(),
+          closeEnabled: !this.busy,
+          onClose: (): void => { this.触发主按钮(); },
+          onAction: (): void => { this.onDownload(); }
+        })
 
         // 首次说明只在开机引导态出现：文案含「首次进入…机会仅有一次」，菜单入口下不成立。
         if (!this.从菜单打开) {
@@ -188,7 +196,7 @@ export struct 云端牌组弹窗 {
             .width('100%')
         }
 
-        Text($r('app.string.cloud_deck_qq_group_entry', '726837065'))
+        Text() { ThemeTextSpans($r('app.string.cloud_deck_qq_group_entry', '726837065'), [], this.getUIContext()) }
           .fontSize(应用尺寸.字号_说明)
           .fontColor(this.动作主色)
           .width('100%')
@@ -212,7 +220,9 @@ export struct 云端牌组弹窗 {
               .fontSize(应用尺寸.字号_正文_小)
               .fontColor($r('app.color.error_text'))
               .textAlign(TextAlign.Center)
-            Button($r('app.string.cloud_deck_retry'))
+            Button() {
+              Text() { ThemeTextSpans($r('app.string.cloud_deck_retry'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.动作主色)
+            }
               .type(ButtonType.Normal)
               .fontColor(this.动作主色)
               .backgroundColor($r('app.color.surface_page'))
@@ -262,30 +272,6 @@ export struct 云端牌组弹窗 {
           .width('100%')
         }
 
-        Row({ space: 应用尺寸.间距_12 }) {
-          Button(this.主按钮文案())
-            .type(ButtonType.Normal)
-            .layoutWeight(1)
-            .height(应用尺寸.按钮高度)
-            .fontSize(应用尺寸.字号_正文)
-            .fontColor($r('app.color.action_on_primary'))
-            .backgroundColor(this.主色按钮背景)
-            .borderRadius(应用尺寸.圆角_面板)
-            .enabled(!this.busy)
-            .onClick((): void => { this.触发主按钮(); })
-
-          Button($r('app.string.cloud_deck_download', this.selectedIds.length))
-            .type(ButtonType.Normal)
-            .layoutWeight(1)
-            .height(应用尺寸.按钮高度)
-            .fontSize(应用尺寸.字号_正文)
-            .fontColor($r('app.color.action_on_primary'))
-            .backgroundColor(this.主色按钮背景)
-            .borderRadius(应用尺寸.圆角_面板)
-            .enabled(!this.busy && !this.loading && this.errorMessage.length === 0 && this.selectedIds.length > 0)
-            .onClick((): void => { this.onDownload(); })
-        }
-        .width('100%')
       }
       .width('90%')
       .constraintSize({ maxWidth: 560, maxHeight: '72%' })

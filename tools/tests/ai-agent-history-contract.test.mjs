@@ -78,7 +78,7 @@ test('history mode has its own toolbar, returns to chat, and marks selection wit
   assert.match(top, /this\.显示历史区 \? \$r\('app\.string\.ai_agent_history_title'\)/);
   assert.match(top, /if \(this\.显示历史区\)[\s\S]*this\.显示历史区 = false;[\s\S]*this\.pathStack\.pop\(\)/);
   assert.match(top,
-    /ai_agent_history_new'[\s\S]*选中态背景: this\.主色容器色[\s\S]*字色: this\.动作主色/);
+    /ai_agent_history_new'[\s\S]*字色: this\.动作主色[\s\S]*themeText: true/);
   assert.match(top, /ai_agent_history_new'[\s\S]*this\.开始新会话\(\)/);
   assert.doesNotMatch(history, /ai_agent_history_current/);
   assert.match(history, /item\.id === this\.conversationId \?[\s\S]*this\.选中背景色/);

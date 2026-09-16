@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeTextSpans } from './common/ThemeText';
+import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
+import { DialogHeader } from './common/DialogHeader';
 // ========================================================
 // @块ID UI-ADV-DECK-OPTIONS-001
 // @名称 高级牌组选项面板
@@ -69,6 +72,7 @@ struct 段落标题 {
 
 @Component
 export struct 高级牌组选项面板 {
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
   @ObjectLink form: 牌组配置表单;
   @ObjectLink options: 牌组选项编辑;
@@ -92,7 +96,6 @@ export struct 高级牌组选项面板 {
   // 2.1.4.1 对比度：按钮背景专用档（配 #FFFFFF 文字 ≥ 4.5:1）
   @StorageProp(颜色键.主色按钮背景) private 主色按钮背景: string = '#2F5FD0';
   @StorageProp(颜色键.主色按钮按下) private 主色按钮按下: string = '#1E4FB8';
-  @State private donePressed: boolean = false;
 
   // ========================================================
   // @块ID UI-ADV-DECK-OPTIONS-002
@@ -180,7 +183,9 @@ export struct 高级牌组选项面板 {
           .controlSize(ControlSize.SMALL)
           .enabled(!this.busy)
           .onSelect((index: number) => onChange(values[index].numericValue))
-        Button($r('app.string.field_help_button'))
+        Button() {
+          Text() { ThemeTextSpans($r('app.string.field_help_button'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.动作主色)
+        }
           .type(ButtonType.Normal)
           .backgroundColor(Color.Transparent)
           .fontColor(this.动作主色)
@@ -215,7 +220,9 @@ export struct 高级牌组选项面板 {
     Column({ space: 应用尺寸.间距_5 }) {
       Row() {
         Text(label).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).layoutWeight(1)
-        Button($r('app.string.field_help_button')).type(ButtonType.Normal).backgroundColor(Color.Transparent).fontColor(this.动作主色).onClick(() => this.openHelp(label, info))
+        Button() {
+          Text() { ThemeTextSpans($r('app.string.field_help_button'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.动作主色)
+        }.type(ButtonType.Normal).backgroundColor(Color.Transparent).fontColor(this.动作主色).onClick(() => this.openHelp(label, info))
       }.width('100%')
       TextInput({ text }).width('100%').height(应用尺寸.按钮高度).fontSize(应用尺寸.字号_正文)
         .backgroundColor($r('app.color.surface_card')).border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') }).borderRadius(应用尺寸.圆角_面板).enabled(!this.busy).onChange(onChange)
@@ -265,11 +272,13 @@ export struct 高级牌组选项面板 {
         .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
 
       Column({ space: 应用尺寸.间距_12 }) {
-        Text($r('app.string.deck_group_advanced_hub'))
-          .fontSize(应用尺寸.字号_面板标题)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.text_primary'))
-          .width('100%')
+        DialogHeader({
+          title: $r('app.string.deck_group_advanced_hub'),
+          actionLabel: $r('app.string.done'),
+          actionEnabled: !this.busy,
+          showClose: false,
+          onAction: () => this.onClose()
+        })
 
         Scroll() {
           Column({ space: 应用尺寸.间距_8 }) {
@@ -330,23 +339,6 @@ export struct 高级牌组选项面板 {
           }.width('100%')
         }.constraintSize({ maxHeight: '60%' }).width('100%').scrollBar(BarState.Auto).edgeEffect(EdgeEffect.Spring)
 
-        Button($r('app.string.done'))
-          .width('100%')
-          .height(应用尺寸.按钮高度)
-          .fontSize(应用尺寸.字号_按钮)
-          .fontColor($r('app.color.action_on_primary'))
-          .backgroundColor(this.donePressed ? this.主色按钮按下 : this.主色按钮背景)
-          .borderRadius(应用尺寸.圆角_胶囊)
-          .animation({ duration: 80, curve: Curve.EaseOut })
-          .enabled(!this.busy)
-          .onTouch((event: TouchEvent): void => {
-            if (event.type === TouchType.Down) {
-              this.donePressed = true;
-            } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-              this.donePressed = false;
-            }
-          })
-          .onClick(() => this.onClose())
       }
       .width('88%')
       .constraintSize({ maxWidth: 480, maxHeight: '88%' })

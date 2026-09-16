@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import type { ThemeId } from './ThemeCatalog';
+import { themeDefinition } from './ThemeCatalog';
 
 // ========================================================
 // @块ID MODEL-COLOR-THEME-001
@@ -150,7 +152,7 @@ function 软化浅色选中背景(容器hex: string): string {
 }
 
 /** 7 个颜色主题枚举值，与 preferences 持久化字符串一一对应。 */
-export type 颜色主题 = 'aurora' | 'forest' | 'midnight' | 'lagoon' | 'sunset' | 'lemon' | 'minimal_gray';
+export type 颜色主题 = ThemeId;
 
 export const 默认颜色主题: 颜色主题 = 'aurora';
 
@@ -161,24 +163,7 @@ export const 默认颜色主题: 颜色主题 = 'aurora';
  * 用函数而非 Record 避免 ArkTS 的 arkts-no-untyped-obj-literals 限制。
  */
 function 取主题种子色(主题: 颜色主题): string {
-  switch (主题) {
-    case 'aurora':
-      return '#2F5FD0';   // ArcoDesign Blue 6
-    case 'forest':
-      return '#00B42A';   // ArcoDesign Green 6
-    case 'midnight':
-      return '#722ED1';   // ArcoDesign Purple 6
-    case 'lagoon':
-      return '#14C9C9';   // ArcoDesign Cyan 6
-    case 'sunset':
-      return '#FF7D00';   // ArcoDesign Orange 6
-    case 'lemon':
-      return '#F7BA1E';   // ArcoDesign Yellow 6
-    case 'minimal_gray':
-      return '#595959';   // 中性灰（用于 chip 预览渐变档，实际调色板由 极简灰色板 硬编码）
-    default:
-      return '#2F5FD0';
-  }
+  return themeDefinition(主题).seed;
 }
 
 /**
@@ -258,11 +243,7 @@ export interface 主题色板 {
 
 /** 把持久化的字符串值安全转回 颜色主题；非法/未设置时返回默认主题。 */
 export function 规范化颜色主题(值: string): 颜色主题 {
-  if (值 === 'forest' || 值 === 'midnight' || 值 === 'lagoon'
-    || 值 === 'sunset' || 值 === 'lemon' || 值 === 'minimal_gray') {
-    return 值;
-  }
-  return 'aurora';
+  return themeDefinition(值).id;
 }
 
 // ========================================================
@@ -435,7 +416,8 @@ export function 解析主题色板(主题: 颜色主题, 是否深色: boolean):
     热力3: 是否深色 ? 混合十六进制色(深色卡片底色, 语义.按钮背景主色, 0.63) : 色阶.色阶[热力3档索引浅色],
     热力4: 语义.按钮背景主色,
     // 页面背景极淡主题色：浅色 6% / 深色 3% 主色 混入静态页面底色
-    页面底色微染: 混合十六进制色(是否深色 ? 深色页面底色 : 浅色页面底色, 语义.主色, 是否深色 ? 0.03 : 0.06)
+    页面底色微染: (是否深色 ? themeDefinition(主题).darkPage : themeDefinition(主题).lightPage) ||
+      混合十六进制色(是否深色 ? 深色页面底色 : 浅色页面底色, 语义.主色, 是否深色 ? 0.03 : 0.06)
   };
 }
 
@@ -451,6 +433,8 @@ export function 颜色主题色块(主题: 颜色主题): string {
  * 而非单一纯色——蓝紫等冷色主题与暖色主题都能通过渐变看出"颜色丰富度"差异。
  */
 export function 颜色主题渐变档(主题: 颜色主题): string[] {
+  const preview: string[] = themeDefinition(主题).previewColors;
+  if (preview.length > 0) return preview;
   const 种子: string = 取主题种子色(主题);
   const 色阶 = 构建完整色阶(种子, false);
   // shades[0]=shade 1 极浅，shades[3]=shade 4 中浅，shades[5]=shade 6 种子色（= primary）

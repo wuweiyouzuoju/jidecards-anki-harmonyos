@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { DialogHeader } from '../common/DialogHeader';
 // ========================================================
 // @名称 查找替换对话框
 //
@@ -150,12 +151,21 @@ export struct 查找替换对话框 {
       // 主面板
       Column({ space: 应用尺寸.间距_14 }) {
         // 标题行：标题 + Blank + ⓘ 帮助按钮（点击上抛 onHelp，由父组件统一弹 字段帮助面板）
-        Row() {
-          Text($r('app.string.browser_find_title'))
-            .fontSize(应用尺寸.字号_面板标题)
-            .fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.text_primary'))
-          Blank()
+        DialogHeader({
+          title: $r('app.string.browser_find_title'),
+          actionLabel: this.busy
+            ? $r('app.string.browser_find_running')
+            : $r('app.string.browser_find_execute'),
+          actionEnabled: !this.busy,
+          closeLabel: $r('app.string.browser_find_cancel'),
+          closeEnabled: !this.busy,
+          onClose: (): void => {
+            this.onCancel();
+          },
+          onAction: (): void => {
+            this.提交();
+          }
+        })
           Text($r('app.string.field_help_button'))
             .fontSize(应用尺寸.字号_面板标题)
             .fontColor($r('app.color.text_secondary'))
@@ -163,8 +173,6 @@ export struct 查找替换对话框 {
             .onClick((): void => {
               this.onHelp();
             })
-        }
-        .width('100%')
 
         // 查找内容
         Column({ space: 应用尺寸.间距_5 }) {
@@ -318,41 +326,6 @@ export struct 查找替换对话框 {
             .maxLines(3)
         }
 
-        Row({ space: 应用尺寸.间距_10 }) {
-          Button($r('app.string.browser_find_cancel'))
-            .height(应用尺寸.按钮高度)
-            .layoutWeight(1)
-            .fontSize(应用尺寸.字号_按钮)
-            .fontColor($r('app.color.text_primary'))
-            .backgroundColor($r('app.color.surface_page'))
-            .borderRadius(应用尺寸.圆角_胶囊)
-            .enabled(!this.busy)
-            .onClick((): void => {
-              this.onCancel();
-            })
-          Button(this.busy
-            ? $r('app.string.browser_find_running')
-            : $r('app.string.browser_find_execute'))
-            .height(应用尺寸.按钮高度)
-            .layoutWeight(1)
-            .fontSize(应用尺寸.字号_按钮)
-            .fontColor($r('app.color.action_on_primary'))
-            .backgroundColor(this.已按下执行 ? this.主色按钮按下 : this.主色按钮背景)
-            .borderRadius(应用尺寸.圆角_胶囊)
-            .animation({ duration: 80, curve: Curve.EaseOut })
-            .enabled(!this.busy)
-            .onTouch((event: TouchEvent): void => {
-              if (event.type === TouchType.Down) {
-                this.已按下执行 = true;
-              } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-                this.已按下执行 = false;
-              }
-            })
-            .onClick((): void => {
-              this.提交();
-            })
-        }
-        .width('100%')
       }
       .width('88%')
       .constraintSize({ maxWidth: 480, maxHeight: '88%' })

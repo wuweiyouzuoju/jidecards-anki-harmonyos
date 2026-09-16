@@ -14,14 +14,13 @@
 // 卡片ID / 单侧 HTML文本 / 是否正面 / 无（空卡报告）
 //
 // @输出
-// Promise<RenderedCard> / Promise<string[]>（音频文件名）/ Promise<TtsItem[]> / Promise<空卡报告>
+// Promise<RenderedCard> / Promise<AvTagsResult> / Promise<空卡报告>
 //
 // @业务规则
 // 编号来源：backend.rs run_backend_card_rendering_service_method 分支
 //   3 提取音视频标签 / 5 获取空卡 / 6 渲染既有卡片
 // 渲染既有卡片：browser=false / partial_render=false（学习页语义，非浏览页）；isEmpty=true 表示卡片内容为空（如字段缺失），调用方可跳过展示。
-// 提取音频文件：仅取 [sound:] 文件名，保持出现顺序；TTS 标签由后端一并返回，本端不支持，忽略。
-// 提取TTS项：取 [anki:tts lang=xxx]text[/anki:tts] 标签内容，保持出现顺序；返回的 TTS items 由 TtsPlayer 用 HarmonyOS CoreSpeechKit 本地朗读，与 SoundPlayer 分轨并行。
+// extractAudioTags 一次返回声音文件名与 TTS 项，分别保持各自出现顺序。
 // 获取空卡报告：请求为 generic.Empty（空字节）；返回 EmptyCardsReport，UI 自绘列表展示，不直接渲染后端 HTML 报告。
 //
 // @副作用
@@ -41,7 +40,7 @@ import {
   encodeRenderExistingCardRequest,
   encode空请求
 } from '../proto/messages/CardRenderingMessages';
-import type { TtsItem } from '../proto/messages/CardRenderingMessages';
+import type { AvTagsResult } from '../proto/messages/CardRenderingMessages';
 
 export class 卡片渲染服务 {
   private readonly 会话: 后端会话 = 后端会话.获取实例();
@@ -95,25 +94,11 @@ export class 卡片渲染服务 {
     return decode空卡报告(响应字节);
   }
 
-  /**
-   * 从一侧卡片 HTML 中提取 [sound:] 音频文件名（保持出现顺序）。
-   * TTS 标签由后端一并返回，本端不支持，忽略。
-   */
-  async 提取音频文件(HTML文本: string, 是否正面: boolean): Promise<string[]> {
-    const 请求字节: Uint8Array = encodeExtractAvTagsRequest(HTML文本, 是否正面);
-    const 响应字节: Uint8Array = await this.会话.调用(
-      服务号.后端卡片渲染, 卡片渲染方法.提取音视频标签, 请求字节);
-    return decodeExtractAvTagsResponse(响应字节).soundFiles;
-  }
-
-  /**
-   * 从一侧卡片 HTML 中提取 [anki:tts lang=xxx]text[/anki:tts] 标签内容（保持出现顺序）。
-   * 返回的 TTS items 由 TtsPlayer 用 HarmonyOS CoreSpeechKit 本地朗读，与 SoundPlayer 分轨并行。
-   */
-  async 提取TTS项(HTML文本: string, 是否正面: boolean): Promise<TtsItem[]> {
-    const 请求字节: Uint8Array = encodeExtractAvTagsRequest(HTML文本, 是否正面);
-    const 响应字节: Uint8Array = await this.会话.调用(
-      服务号.后端卡片渲染, 卡片渲染方法.提取音视频标签, 请求字节);
-    return decodeExtractAvTagsResponse(响应字节).ttsItems;
+  /** 一次解析同一卡面的声音与 TTS，避免重复 RPC 和 HTML 解析。 */
+  async extractAudioTags(html: string, question: boolean): Promise<AvTagsResult> {
+    const request: Uint8Array = encodeExtractAvTagsRequest(html, question);
+    const response: Uint8Array = await this.会话.调用(
+      服务号.后端卡片渲染, 卡片渲染方法.提取音视频标签, request);
+    return decodeExtractAvTagsResponse(response);
   }
 }

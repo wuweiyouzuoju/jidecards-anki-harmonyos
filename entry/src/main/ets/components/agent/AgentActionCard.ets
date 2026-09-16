@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeTextSpans } from '../common/ThemeText';
+import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
 import type { AgentAction } from '../../model/agent/AgentAction';
 import type { AgentExtensionArguments } from '../../model/agent/AgentExtensionTools';
@@ -11,6 +13,7 @@ interface AnalysisPreview { query: string; totalMatched: number; alreadyRead: nu
 /** 用户确认的是可见提案内容，技术参数不进入默认确认界面。 */
 @Component
 export struct AgentActionCard {
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop action: AgentAction;
   @Prop disabled: boolean = false;
   @StorageProp(颜色键.主色按钮背景) private primaryBackground: string = '#2F5FD0';
@@ -69,7 +72,9 @@ export struct AgentActionCard {
       this.preview()
       if (this.action.status === 'pending') {
         Row({ space: 12 }) {
-          Button($r('app.string.ai_agent_action_cancel')).enabled(!this.disabled).onClick(this.onCancel)
+          Button() {
+            Text() { ThemeTextSpans($r('app.string.ai_agent_action_cancel'), this.themeAccentColors, this.getUIContext()) }.fontSize(应用尺寸.字号_按钮).fontColor(this.actionColor)
+          }.enabled(!this.disabled).onClick(this.onCancel)
             .height(应用尺寸.按钮高度).fontSize(应用尺寸.字号_按钮)
             .backgroundColor($r('app.color.surface_card')).fontColor(this.actionColor)
             .borderRadius(应用尺寸.圆角_胶囊)

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-
+import { DialogHeader } from './common/DialogHeader';
 // ========================================================
 // @名称 欢迎弹窗 — 首次启动欢迎+更新日志+作者的话
 //
@@ -37,10 +37,10 @@ interface 更新条目 {
 
 @Component
 export struct 欢迎弹窗 {
+  @StorageProp(颜色键.动作主色) private 动作主色: string = '#2F5FD0';
   onClose: () => void = () => {};
   @Prop 是否深色: boolean = false;
   // 跟随用户选择的颜色主题（与首页"创建牌组"按钮同款绑定）
-  @StorageProp(颜色键.主色按钮背景) private 主色按钮背景色: string = '#2F5FD0';
 
   // 同系列应用 + 本应用包名（用于跳转应用市场详情页）
   private static readonly 包名_记得卡片: string = 'com.jide.kapian';
@@ -79,21 +79,13 @@ export struct 欢迎弹窗 {
       // 内容卡（居中，最大宽度 380）
       Column() {
         // 标题栏：标题居中 + × 右上角
-        Stack({ alignContent: Alignment.End }) {
-          Text($r('app.string.welcome_title'))
-            .fontSize(应用尺寸.字号_分区标题)
-            .fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.text_primary'))
-            .width('100%')
-            .textAlign(TextAlign.Center)
-          Text('×')
-            .fontSize(应用尺寸.字号_卡片标题)
-            .fontColor($r('app.color.text_secondary'))
-            .padding({ left: 8, top: 4, right: 4, bottom: 4 })
-            .onClick(() => this.onClose())
-        }
-        .width('100%')
-        .padding({ left: 12, right: 12, top: 20, bottom: 12 })
+        DialogHeader({
+          title: $r('app.string.welcome_title'),
+          actionLabel: $r('app.string.welcome_btn_start'),
+          showClose: false,
+          onAction: (): void => { this.onClose(); }
+        })
+        .padding({ left: 20, right: 20, top: 12 })
 
         Divider().color($r('app.color.surface_card')).strokeWidth(1)
 
@@ -138,7 +130,7 @@ export struct 欢迎弹窗 {
             Span($r('app.string.welcome_section2_way1_label'))
             Span($r('app.string.welcome_section2_body'))
             Span('ankiweb.net/shared/decks')
-              .fontColor($r('app.color.action_primary'))
+              .fontColor(this.动作主色)
               .fontWeight(FontWeight.Medium)
               .onClick(() => this.跳转网页(欢迎弹窗.网址_获取牌组))
             Span($r('app.string.welcome_section2_way1_tail'))
@@ -151,7 +143,7 @@ export struct 欢迎弹窗 {
             Span($r('app.string.welcome_section2_way2_label'))
             Span($r('app.string.welcome_section2_qq_prefix'))
             Span(欢迎弹窗.QQ群号)
-              .fontColor($r('app.color.action_primary'))
+              .fontColor(this.动作主色)
               .fontWeight(FontWeight.Bold)
             Span($r('app.string.welcome_section2_qq_suffix'))
           }
@@ -181,7 +173,7 @@ export struct 欢迎弹窗 {
           Text() {
             Span('本应用后端复用开源项目Anki，因此具备极其成熟的闪卡算法。有任何建议可以在应用市场直接')
             Span('评论')
-              .fontColor($r('app.color.action_primary'))
+              .fontColor(this.动作主色)
               .fontWeight(FontWeight.Medium)
               .onClick(() => this.跳转应用(欢迎弹窗.包名_记得卡片))
             Span('或在QQ群反馈')
@@ -203,19 +195,7 @@ export struct 欢迎弹窗 {
         .edgeEffect(EdgeEffect.Spring)
 
         // 底部「开始体验」按钮
-        Row() {
-          Button($r('app.string.welcome_btn_start'))
-            .type(ButtonType.Capsule)
-            .layoutWeight(1)
-            .height(应用尺寸.按钮高度)
-            .fontSize(应用尺寸.字号_按钮)
-            .fontWeight(FontWeight.Medium)
-            .backgroundColor(this.主色按钮背景色)
-            .fontColor($r('app.color.action_on_primary'))
-            .onClick(() => this.onClose())
-        }
-        .width('100%')
-        .padding({ left: 20, right: 20, top: 4, bottom: 32 })
+
       }
       .width('88%')
       // 高度完全自适应：Scroll 已按数字上限封顶（88% 屏高 - 固定区），卡片不再设

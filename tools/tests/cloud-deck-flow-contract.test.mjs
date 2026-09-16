@@ -133,7 +133,8 @@ test('cloud deck modal presents selectable public decks, locked future decks and
   assert.doesNotMatch(source, /cloud_deck_reopen_hint/);
   assert.match(source, /cloud_deck_offline_notice/);
   assert.doesNotMatch(source, /cloud_deck_manual_message/);
-  assert.doesNotMatch(source, /onClose/);
+  assert.doesNotMatch(source, /^  onClose:/m);
+  assert.match(source, /onClose: \(\): void => \{ this\.触发主按钮\(\); \}/);
 });
 
 test('each cloud deck tap uses exactly one toggle path', () => {

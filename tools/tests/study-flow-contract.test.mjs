@@ -60,9 +60,9 @@ test('card rendering service wraps RenderExistingCard and ExtractAvTags', () => 
   assert.match(service, /async 渲染既有卡片\(卡片ID: number\): Promise<RenderedCard>/);
   assert.match(service, /卡片渲染方法\.渲染既有卡片/);
   assert.match(service, /encodeRenderExistingCardRequest\(卡片ID\)/);
-  assert.match(service, /async 提取音频文件\(HTML文本: string, 是否正面: boolean\): Promise<string\[\]>/);
+  assert.match(service, /async extractAudioTags\(html: string, question: boolean\): Promise<AvTagsResult>/);
   assert.match(service, /卡片渲染方法\.提取音视频标签/);
-  assert.match(service, /encodeExtractAvTagsRequest\(HTML文本, 是否正面\)/);
+  assert.match(service, /encodeExtractAvTagsRequest\(html, question\)/);
   assert.doesNotMatch(service, /new 后端客户端/);
 });
 
@@ -207,19 +207,17 @@ test('study audio uses a shared mix-with-others audio session', () => {
   assert.match(ttsPlayer, /音频焦点协调器\.endPlayback\(this\)/);
 });
 
-test('study page plays card audio through native SoundPlayer', () => {
+test('study and preview share native audio lifecycle without Web autoplay', () => {
   const page = read(STUDY_PAGE);
-  assert.match(page, /import \{ 声音播放器 \} from '..\/utils\/声音播放器'/);
-  assert.match(page, /提取音频文件\(rawHtml, questionSide\)/, 'extract av tags via backend');
-  assert.match(page, /声音播放器实例\.播放队列\(/, 'auto play per side');
-  assert.match(page, /声音播放器实例\.重播\(\)/, 'replay button wired');
-  assert.match(page, /aboutToDisappear\(\)[\s\S]*?声音播放器实例\.释放\(\)/, 'player released on page exit');
-  assert.doesNotMatch(page, /mediaPlayGestureAccess/, 'web audio scheme removed');
-  // 音频必须由原生 SoundPlayer 播放，禁止通过 runJavaScript 注入 audio 播放脚本。
-  // 但允许 runJavaScript 调用 anki.imageOcclusion.setup() 作为图片遮罩兜底（BUG-001）。
-  assert.doesNotMatch(page, /runJavaScript\([^)]*\baudio\b/i, 'no injected audio playback script');
-  assert.match(page, /runJavaScript\(['"]anki\.imageOcclusion\.setup\(\)['"]\)/,
-    'image occlusion setup fallback wired via runJavaScript');
+  const preview = read('entry/src/main/ets/components/browser/卡片预览页.ets');
+  for (const source of [page, preview]) {
+    assert.match(source, /new CardAudioSession\(/);
+    assert.match(source, /extractAudioTags/);
+    assert.doesNotMatch(source, /mediaPlayGestureAccess/);
+  }
+  // 播放、重播、取消和销毁由 card-audio-session/页面运行测试验证。
+  assert.doesNotMatch(page, /runJavaScript\([^)]*\.play\(/i);
+  assert.match(page, /anki\.imageOcclusion\.setup\(\)/);
 });
 
 test('image occlusion IIFE exposes toggle and hides #toggle button (BUG-007)', () => {
@@ -242,10 +240,7 @@ test('study page wires the full review loop', () => {
   assert.doesNotMatch(page, /router\.(getParams|pushUrl|back)\b/, 'deprecated router must be gone');
   assert.match(page, /确保已打开\(context\.filesDir\)/);
   assert.match(page, /调度器服务实例\.获取队首卡片\(this\.牌组ID\)/);
-  assert.match(page, /卡片渲染服务实例\.渲染既有卡片\(this\.当前卡片\.cardId\)/);
-  assert.match(page, /调度器服务实例\.描述下一档状态\(this\.当前卡片\.states\)/);
-  assert.match(page, /构建卡片HTML\(this\.已渲染, 'question', this\.是否深色\(\)\)/);
-  assert.match(page, /构建卡片HTML\(this\.已渲染, 'answer', this\.是否深色\(\)\)/);
+  // 卡片身份、渲染与状态对应关系由 study-lifecycle 的延迟回调测试验证。
   assert.match(page, /调度器服务实例\.提交评分\(/);
   assert.match(page, /currentState: states\.current/, 'raw state passthrough on answer');
   assert.match(page, /queued\.cards\.length === 0[\s\S]*?阶段 = 'done'/, 'empty queue reaches done phase');
@@ -263,8 +258,7 @@ test('study page web component blocks file-protocol cross origin correctly', () 
   assert.match(page, /\.fileAccess\(true\)/);
   assert.match(page, /\.javaScriptAccess\(true\)/);
   assert.match(page, /\.onInterceptRequest\(/);
-  assert.match(page, /loadData\(this\.正面HTML, 'text\/html', 'UTF-8', 媒体基地址, ' '\)/);
-  assert.match(page, /loadData\(this\.背面HTML, 'text\/html', 'UTF-8', 媒体基地址, ' '\)/);
+  assert.match(page, /loadData\([^,]+, 'text\/html', 'UTF-8', 媒体基地址, ' '\)/);
   assert.match(page, /读取媒体文件\(this\.媒体目录, fileName\)/);
   assert.match(page, /collection\.media/, 'media dir points at the anki media folder');
 });
@@ -329,27 +323,27 @@ test('study page reconciles the current card and queue after an Agent edit', () 
     'study page must watch the Agent edit broadcast');
 
   // 通道二：NavDestination 回到前台时消费（onPageShow 只对 @Entry 生效，必须用 onShown）。
-  assert.match(page, /\.onShown\(\(\): void => \{[\s\S]{0,200}?消费待重渲染\(\)/);
+  // onShown/onHidden 的实际行为由 study-content-refresh 运行测试验证。
   assert.match(page, /\.onHidden\(\(\): void => \{[\s\S]{0,120}?页面已显示 = false/);
 
   // 多通道只允许刷新一次：onPop 与 @Watch 都只置位，渲染 RPC 由 消费待重渲染 统一发起。
   assert.match(page, /onPop[\s\S]{0,120}?待重渲染当前卡 = true/);
-  assert.match(page, /private 消费待重渲染\(\): void \{[\s\S]{0,200}?待重渲染当前卡 = false;\s*this\.刷新AI改卡后当前卡\(\);/);
-  assert.equal((page.match(/this\.刷新AI改卡后当前卡\(\)/g) ?? []).length, 1,
+
+  assert.equal((page.match(/this\.刷新编辑后当前卡\(\)/g) ?? []).length, 1,
     'only 消费待重渲染 may fire the re-render; double firing wastes a render RPC');
 
   // 返回后先核对真实队首：普通改字段保留当前阶段；删除/移走当前卡则加载新队首。
-  const refresh = page.match(/private async 刷新AI改卡后当前卡\(\)[\s\S]*?\n  \}/)?.[0] ?? '';
-  assert.match(refresh, /const currentCardId: number = this\.当前卡片\.cardId/);
-  assert.match(refresh, /await this\.调度器服务实例\.获取队首卡片\(this\.牌组ID\)/);
-  assert.match(refresh, /this\.新卡剩余 = queued\.newCount/);
-  assert.match(refresh, /this\.学习中剩余 = queued\.learningCount/);
-  assert.match(refresh, /this\.复习剩余 = queued\.reviewCount/);
-  assert.match(refresh,
-    /queued\.cards\.length === 0 \|\| queued\.cards\[0\]\.cardId !== currentCardId[\s\S]{0,120}?await this\.加载下一张卡\(\)/,
-    'a deleted or moved current card must advance to the real queue head');
-  assert.match(refresh, /渲染既有卡片\(this\.当前卡片\.cardId\)/);
-  assert.match(refresh, /loadData\(html, 'text\/html', 'UTF-8', 媒体基地址, ' '\)/);
+  const refresh = page.match(/private async 刷新编辑后当前卡\(\)[\s\S]*?\n  \}/)?.[0] ?? '';
+  assert.match(refresh, /await this\.加载下一张卡\(\)/);
+  assert.match(refresh, /wasAnswer && this\.当前卡片\?\.cardId === currentCardId/);
+  assert.match(refresh, /await this\.显示答案\(\)/);
+  const load = page.match(/private async 加载下一张卡\(\)[\s\S]*?\n  \}/)?.[0] ?? '';
+  assert.match(load, /获取队首卡片/);
+  assert.match(load, /渲染既有卡片/);
+  assert.match(load, /this\.新卡剩余 = queued\.newCount/);
+  assert.match(load, /this\.学习中剩余 = queued\.learningCount/);
+  assert.match(load, /this\.复习剩余 = queued\.reviewCount/);
+
   assert.doesNotMatch(refresh, /this\.评分\(|埋藏或暂停/,
     'queue reconciliation must not answer, bury, or suspend a card');
 });

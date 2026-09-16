@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeTextSpans } from './common/ThemeText';
+import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
 
 import { common, Want } from '@kit.AbilityKit';
 import { pasteboard, BusinessError } from '@kit.BasicServicesKit';
@@ -18,6 +20,7 @@ import { 链接服务 } from '../backend/链接服务';
 import { HelpPage } from '../proto/messages/LinksMessages';
 import { 设置面板色板_取 } from '../utils/设置面板配色';
 import type { SyncAuth } from '../proto/messages/SyncMessages';
+import { RedemptionPanel } from './settings/RedemptionPanel';
 import { 外观分组 } from './settings/外观分组';
 import { 调度器分组 } from './settings/调度器分组';
 import { 布局分组 } from './settings/布局分组';
@@ -81,7 +84,7 @@ export struct 设置面板 {
   // 让 @Builder 内的主色按钮（右上角完成、数据库检查）在颜色主题切换瞬间同步更新（与 外观分组 同款机制）。
   @StorageLink(颜色键.动作主色) private 动作主色链接: string = '';
   @StorageLink(颜色键.主色按钮背景) private 主色按钮背景链接: string = '';
-  @StorageProp(颜色键.页面底色微染) private 页面底色微染值: string = '#F5F7FA';
+  @StorageProp(PAGE_SURFACE_KEY) private 页面底色微染值: string = '#F5F7FA';
   @StorageProp(颜色键.主色容器) private 主色容器色: string = '#E8EEFC';
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
   // 手势导航条高度（列表滚到底时最后分组需完整滚出导航条区域）
@@ -710,7 +713,7 @@ export struct 设置面板 {
             Text($r('app.string.about_qq_group_number_label'))
               .fontSize(12)
               .fontColor(设置面板色板_取(this.是否深色).弱化文字)
-            Text(this.QQ群号)
+            Text() { ThemeTextSpans(this.QQ群号, [], this.getUIContext()) }
               .fontSize(12)
               .fontColor(this.解析主色())
               .fontWeight(FontWeight.Medium)
@@ -812,7 +815,6 @@ export struct 设置面板 {
           Row() {
             按下态按钮({
               文案: $r('app.string.study_back'),
-              选中态背景: $r('app.color.surface_sidebar'),
               字色: $r('app.color.text_primary'),
               点击回调: (): void => { this.关闭回调(); }
             })
@@ -820,7 +822,6 @@ export struct 设置面板 {
             按下态按钮({
               文案: this.简洁模式 ? $r('app.string.settings_simple_mode_simple')
                 : $r('app.string.settings_simple_mode_full'),
-              选中态背景: this.主色容器色,
               字色: $r('app.color.text_primary'),
               点击回调: (): void => { this.显示模式菜单 = true; }
             })
@@ -833,14 +834,14 @@ export struct 设置面板 {
         .width('100%')
         .height(应用尺寸.工具栏高度 + this.状态栏高度)
         .padding({
-          top: this.状态栏高度 + 应用尺寸.间距_8,
-          bottom: 应用尺寸.间距_8
+          top: this.状态栏高度 + 应用尺寸.toolbarVerticalInset,
+          bottom: 应用尺寸.toolbarVerticalInset
         })
         .backgroundColor(this.页面底色微染值)
         .alignContent(Alignment.Center)
 
         // 内容区
-        List({ space: 12, scroller: this.内容滚动器 }) {
+        List({ space: 应用尺寸.pageSectionGap, scroller: this.内容滚动器 }) {
         // 1. 外观与语言分组
         ListItem() {
           外观分组({
@@ -1079,14 +1080,20 @@ export struct 设置面板 {
           }
         }
 
+        ListItem() {
+          RedemptionPanel({
+            developerGroup: this.QQ群号,
+            onUseTheme: (theme: 颜色主题): void => { this.颜色主题切换回调(theme); }
+          })
+        }
         }
         .layoutWeight(1)
         .width('100%')
         .padding({
           left: 应用尺寸.页面内边距_水平,
           right: 应用尺寸.页面内边距_水平,
-          top: 应用尺寸.间距_8,
-          bottom: 应用尺寸.卡片内边距 + this.导航条高度
+          top: 应用尺寸.pageContentTopInset,
+          bottom: 应用尺寸.pageBottomInset + this.导航条高度
         })
         .scrollBar(BarState.Off)
         .edgeEffect(EdgeEffect.Spring)
@@ -1111,7 +1118,7 @@ export struct 设置面板 {
         模式切换菜单({
           当前简洁模式: this.简洁模式,
           主色: this.解析主色(),
-          顶部偏移: 应用尺寸.工具栏高度 + this.状态栏高度 + 应用尺寸.间距_8,
+          顶部偏移: 应用尺寸.工具栏高度 + this.状态栏高度 + 应用尺寸.pageContentTopInset,
           选择回调: (简洁: boolean): void => {
             this.显示模式菜单 = false;
             if (简洁 !== this.简洁模式) {
@@ -1173,7 +1180,10 @@ export struct 设置面板 {
           isDark: this.是否深色,
           notetypeId: this.编辑笔记类型ID,
           notetypeName: this.编辑笔记类型名,
-          onClose: (): void => { this.显示笔记类型编辑器 = false; },
+          onClose: (): void => {
+            this.显示笔记类型编辑器 = false;
+            this.显示笔记类型管理 = true;
+          },
           onSaved: (): void => {}
         })
           .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))

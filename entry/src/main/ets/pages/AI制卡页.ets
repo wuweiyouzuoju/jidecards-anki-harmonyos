@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeTextSpans } from '../components/common/ThemeText';
+import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
+import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
 
 // AI 制卡/改卡共享页：带结构化工具、可编辑草稿与显式确认的轻量 Agent。
 // 由 首页.ets 通过 Navigation pathStack 以 NavDestination 形式入栈（与 添加笔记页 同机制）。
@@ -219,6 +222,7 @@ class 页面Agent观察者 implements AgentRunObserver {
 
 @Component
 export struct AI制卡页 {
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   /** Navigation 入栈参数 */
   pageDeckId: string = '';
   pageDeckName: string = '';
@@ -280,7 +284,7 @@ export struct AI制卡页 {
   @StorageProp(颜色键.主色容器) private 主色容器色: string = '#E8EEFC';
   @StorageProp(颜色键.主色按钮背景) private 主色按钮背景色: string = '#2F5FD0';
   @StorageProp(颜色键.主色按钮按下) private 主色按钮按下色: string = '#1E4FB8';
-  @StorageProp(颜色键.页面底色微染) private 页面底色微染值: string = '#F5F7FA';
+  @StorageProp(PAGE_SURFACE_KEY) private 页面底色微染值: string = '#F5F7FA';
   @StorageProp('导航条高度') private 导航条高度: number = 0;
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
   /** NavDestination 透明度（由 customNavContentTransition 回调控制，实现淡入淡出转场）。 */
@@ -1952,7 +1956,6 @@ export struct AI制卡页 {
       Row() {
         按下态按钮({
           文案: $r('app.string.study_back'),
-          选中态背景: this.主色容器色,
           字色: $r('app.color.text_primary'),
           点击回调: (): void => {
             if (this.显示历史区) {
@@ -1977,14 +1980,13 @@ export struct AI制卡页 {
         if (this.显示历史区) {
           按下态按钮({
             文案: $r('app.string.ai_agent_history_new'),
-            选中态背景: this.主色容器色,
             字色: this.动作主色,
+          themeText: true,
             点击回调: (): void => { this.开始新会话(); }
           })
         } else {
           按下态按钮({
             文案: $r('app.string.ai_agent_history'),
-            选中态背景: this.主色容器色,
             字色: $r('app.color.text_primary'),
             点击回调: (): void => {
               if (!this.处理中) { this.打开历史会话(); }
@@ -2000,8 +2002,8 @@ export struct AI制卡页 {
     .padding({
       left: 应用尺寸.页面内边距_水平,
       right: 应用尺寸.页面内边距_水平,
-      top: this.状态栏高度 + 应用尺寸.间距_8,
-      bottom: 应用尺寸.间距_8
+      top: this.状态栏高度 + 应用尺寸.toolbarVerticalInset,
+      bottom: 应用尺寸.toolbarVerticalInset
     })
     .backgroundColor(this.页面底色微染值)
   }
@@ -2067,8 +2069,8 @@ export struct AI制卡页 {
     .padding({
       left: 应用尺寸.页面内边距_水平,
       right: 应用尺寸.页面内边距_水平,
-      top: 应用尺寸.卡片内边距,
-      bottom: 应用尺寸.卡片内边距
+      top: 应用尺寸.pageContentTopInset,
+      bottom: 应用尺寸.pageBottomInset
     })
     .backgroundColor(this.页面底色微染值)
   }
@@ -2128,7 +2130,7 @@ export struct AI制卡页 {
           .opacity(this.消息列表[消息索引].卡片列表[卡片索引].已选中 ? 1 : 0.5)
 
         if (this.消息列表[消息索引].卡片列表[卡片索引].状态 === 'saved') {
-          Text($r('app.string.ai_card_saved'))
+          Text() { ThemeTextSpans($r('app.string.ai_card_saved'), this.themeAccentColors, this.getUIContext()) }
             .fontSize(应用尺寸.字号_正文_小)
             .fontColor(this.动作主色)
         } else if (this.消息列表[消息索引].卡片列表[卡片索引].状态 === 'failed') {
@@ -2477,7 +2479,7 @@ export struct AI制卡页 {
         if (this.消息列表[消息索引].来源列表.length > 0) {
           Text($r('app.string.ai_agent_sources')).fontSize(应用尺寸.字号_正文_小).fontWeight(FontWeight.Medium)
           ForEach(this.消息列表[消息索引].来源列表, (source: SearchSource) => {
-            Text(`${source.title}\n${source.url}`).fontSize(应用尺寸.字号_正文_小)
+            Text() { ThemeTextSpans(`${source.title}\n${source.url}`, this.themeAccentColors, this.getUIContext()) }.fontSize(应用尺寸.字号_正文_小)
               .fontColor(this.动作主色).width('100%')
           }, (source: SearchSource): string => source.url)
         }
@@ -2534,7 +2536,7 @@ export struct AI制卡页 {
         }
 
         if (this.消息列表[消息索引].批次结果 !== '') {
-          Text(this.消息列表[消息索引].批次结果)
+          Text() { ThemeTextSpans(this.消息列表[消息索引].批次结果, this.themeAccentColors, this.getUIContext()) }
             .fontSize(应用尺寸.字号_正文_小)
             .fontColor(this.动作主色)
             .width('100%')
@@ -2577,7 +2579,7 @@ export struct AI制卡页 {
   @Builder
   private 消息流() {
     Scroll(this.聊天滚动器) {
-      Column({ space: 应用尺寸.间距_12 }) {
+      Column({ space: 应用尺寸.pageSectionGap }) {
         if (this.hasFixedEditSelection()) {
           if (this.消息列表.length === 0) {
             Text(this.selectedEditContext())
@@ -2621,8 +2623,8 @@ export struct AI制卡页 {
       .padding({
         left: 应用尺寸.页面内边距_水平,
         right: 应用尺寸.页面内边距_水平,
-        top: 应用尺寸.间距_8,
-        bottom: 应用尺寸.间距_8
+        top: 应用尺寸.pageContentTopInset,
+        bottom: 应用尺寸.pageBottomInset
       })
     }
     .layoutWeight(1)
@@ -2662,7 +2664,9 @@ export struct AI制卡页 {
                 }
                 .layoutWeight(1)
                 .alignItems(HorizontalAlign.Start)
-                Button($r('app.string.ai_agent_file_remove'))
+                Button() {
+                  Text() { ThemeTextSpans($r('app.string.ai_agent_file_remove'), this.themeAccentColors, this.getUIContext()) }.fontSize(应用尺寸.字号_正文_小).fontColor(this.动作主色)
+                }
                   .height(32)
                   .fontSize(应用尺寸.字号_正文_小)
                   .fontColor(this.动作主色)
@@ -2707,11 +2711,11 @@ export struct AI制卡页 {
             Stack() {
               // 两条文案都常驻布局、只切透明度：解析态显示「…」（窄于「导入」），
               // 按钮宽度恒为「导入」两字，与右侧发送按钮等宽，解析切换不抖动。
-              Text($r('app.string.ai_agent_import_files'))
+              Text() { ThemeTextSpans($r('app.string.ai_agent_import_files'), this.themeAccentColors, this.getUIContext()) }
                 .fontSize(应用尺寸.字号_按钮)
                 .fontColor(this.动作主色)
                 .opacity(this.文件解析中 ? 0 : 1)
-              Text($r('app.string.ai_agent_file_parsing'))
+              Text() { ThemeTextSpans($r('app.string.ai_agent_file_parsing'), this.themeAccentColors, this.getUIContext()) }
                 .fontSize(应用尺寸.字号_按钮)
                 .fontColor(this.动作主色)
                 .opacity(this.文件解析中 ? 1 : 0)
@@ -2759,14 +2763,8 @@ export struct AI制卡页 {
       Column() {
         this.顶部条()
         if (this.显示历史区) {
-          Divider()
-            .color($r('app.color.border_subtle'))
-            .strokeWidth(应用尺寸.卡片边框)
           this.历史区()
         } else {
-          Divider()
-            .color($r('app.color.border_subtle'))
-            .strokeWidth(应用尺寸.卡片边框)
           this.消息流()
           if (this.错误信息 !== '') {
             Text(this.错误信息)
@@ -2787,6 +2785,7 @@ export struct AI制卡页 {
       .backgroundColor(this.页面底色微染值)
     }
     .hideTitleBar(true)
+    .backgroundColor(Color.Transparent)
     .opacity(this.转场透明度)
   }
 }

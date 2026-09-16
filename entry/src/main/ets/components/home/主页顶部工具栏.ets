@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeDefinition, themeDefinition, THEME_VISUALS_KEY } from '../../model/ThemeCatalog';
 
 // ========================================================
 // @名称 主页顶部工具栏
@@ -36,6 +37,7 @@ import { 按下态按钮 } from '../common/按下态按钮';
 
 @Component
 export struct 主页顶部工具栏 {
+  @StorageProp(THEME_VISUALS_KEY) private visual: ThemeDefinition = themeDefinition('aurora');
   @Prop 排序模式中: boolean = false;
   on更多点击: () => void = (): void => {};
   on创建牌组点击: () => void = (): void => {};
@@ -51,7 +53,6 @@ export struct 主页顶部工具栏 {
       if (this.排序模式中) {
         按下态按钮({
           文案: $r('app.string.deck_reorder_exit'),
-          选中态背景: this.主色容器色,
           字色: $r('app.color.text_primary'),
           点击回调: (): void => { this.on排序退出(); }
         })
@@ -60,14 +61,13 @@ export struct 主页顶部工具栏 {
 
         按下态按钮({
           文案: $r('app.string.deck_reorder_done'),
-          选中态背景: this.主色容器色,
           字色: this.动作主色,
+          themeText: true,
           点击回调: (): void => { this.on排序完成(); }
         })
       } else {
         按下态按钮({
           文案: $r('app.string.study_more'),
-          选中态背景: this.主色容器色,
           字色: $r('app.color.text_primary'),
           点击回调: (): void => { this.on更多点击(); }
         })
@@ -76,8 +76,8 @@ export struct 主页顶部工具栏 {
 
         按下态按钮({
           文案: $r('app.string.create_deck'),
-          选中态背景: this.主色容器色,
           字色: this.动作主色,
+          themeText: true,
           点击回调: (): void => { this.on创建牌组点击(); }
         })
       }
@@ -87,8 +87,8 @@ export struct 主页顶部工具栏 {
     .padding({
       left: 应用尺寸.页面内边距_水平,
       right: 应用尺寸.页面内边距_水平,
-      top: this.状态栏高度 + 应用尺寸.间距_8,
-      bottom: 应用尺寸.间距_8
+      top: this.状态栏高度 + 应用尺寸.toolbarVerticalInset,
+      bottom: 应用尺寸.toolbarVerticalInset
     })
     .backgroundColor(this.页面底色微染值)
   }

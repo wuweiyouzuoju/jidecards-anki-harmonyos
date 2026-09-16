@@ -38,6 +38,7 @@ import { audio } from '@kit.AudioKit';
 import { fileIo as fs } from '@kit.CoreFileKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { AudioFocusCoordinator } from './AudioFocusCoordinator';
+import { AudioQueuePlayer } from '../model/CardAudioSession';
 
 const 域: number = 0x0001;
 const 标签: string = 'SoundPlayer';
@@ -71,7 +72,7 @@ function 错误文本(e: object | undefined): string {
   return `${e}`;
 }
 
-export class 声音播放器 {
+export class 声音播放器 implements AudioQueuePlayer<string> {
   private readonly 音频焦点协调器: AudioFocusCoordinator = AudioFocusCoordinator.getInstance();
   private 播放器实例: media.AVPlayer | null = null;
   private 队列: string[] = [];
@@ -92,7 +93,7 @@ export class 声音播放器 {
    * paths: 一组音频的沙箱绝对路径
    *
    * @输出
-   * Promise<void>：播完或被中断后 resolve
+   * Promise<void>：首项启动流程结束后 resolve；后续队列由 completed 事件推进。
    *
    * @业务规则
    * 代次+1 让旧回调失效；先停后播避免并发。

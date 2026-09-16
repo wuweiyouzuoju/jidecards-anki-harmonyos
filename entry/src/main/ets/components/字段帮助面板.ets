@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { DialogHeader } from './common/DialogHeader';
 // ========================================================
 // @块ID UI-FIELD-HELP-001
 // @名称 字段帮助面板
@@ -52,7 +53,13 @@ export struct 字段帮助面板 {
         .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
         .onClick(() => this.onClose())
       Column({ space: 应用尺寸.间距_12 }) {
-        Text(this.标题).fontSize(应用尺寸.字号_面板标题).fontWeight(FontWeight.Bold).width('100%')
+        DialogHeader({
+          title: this.标题,
+          actionLabel: $r('app.string.done'),
+          actionEnabled: true,
+          showClose: false,
+          onAction: () => this.onClose()
+        })
         Scroll() {
           Text(this.正文).fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_secondary')).width('100%')
         }
@@ -60,14 +67,7 @@ export struct 字段帮助面板 {
         .constraintSize({ maxHeight: '55%' })
         .scrollBar(BarState.Auto)
         .edgeEffect(EdgeEffect.Spring)
-        Button($r('app.string.done'))
-          .width('100%')
-          .height(应用尺寸.按钮高度)
-          .fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.action_on_primary'))
-          .backgroundColor(this.主色按钮背景)
-          .borderRadius(应用尺寸.圆角_面板)
-          .onClick(() => this.onClose())
+
       }
       .width('88%').constraintSize({ maxWidth: 480, maxHeight: '75%' }).padding(应用尺寸.卡片内边距)
       .backgroundColor($r('app.color.surface_card')).borderRadius(应用尺寸.圆角_卡片)

@@ -7,13 +7,14 @@
 // @作用
 // 浏览页 T5 全屏卡片预览弹层：纯展示层，用 Web 组件复用 学习页 的渲染链路
 // （卡片渲染服务.渲染既有卡片 + 学习卡片HTML构建器）渲染卡片正反面。
-// 支持点击翻面、左右滑切换上下张卡（基于父级下发的卡片ID列表），
-// 底部「编辑字段」按钮经 onEditField 回调上抛，由父级打开 浏览编辑区。
+// 与 Anki 浏览器预览一致：先显示题目，点击卡片看答案，之后才切下一张；一次只加载一面，
+// 背面模板自身含 {{FrontSide}}，所以答案面天然带正面内容，不拼接、不重复。
+// 上下张切换遍历父级下发的卡片ID列表，顶部编辑入口经 onEditField 回调上抛。
 //
 // @输入
 // isDark: 是否深色主题
 // 卡片ID列表: 当前搜索结果对应的卡片ID数组（左右滑遍历此数组）
-// 初始索引: 打开时聚焦的卡片在 列表 中的位置
+// 打开时聚焦的卡片在 列表 中的位置（预览始终从题目面开始，与 Anki 预览一致）
 // 媒体目录: 沙箱 collection.media 绝对路径（onInterceptRequest 映射用）
 //
 // @输出
@@ -28,8 +29,7 @@
 // - 媒体经 媒体基地址 自建域名 + onInterceptRequest 映射到沙箱 collection.media/
 //
 // @Extension Points
-// - 后续可扩展键盘快捷键（左右方向键切卡、空格翻面）
-// - 后续可扩展双指缩放卡片内容
+// - 卡面交互脚本统一维护点击排除规则、左右滑与键盘动作，不接入评分。
 //
 // @副作用
 // 通过 卡片渲染服务 间接调用 NAPI 桥读 Anki collection（只读渲染）。
@@ -38,37 +38,69 @@
 import { webview } from '@kit.ArkWeb';
 import { interceptMathAsset } from '../../utils/MathAssetResponse';
 import { 卡片渲染服务 } from '../../backend/卡片渲染服务';
-import type { RenderedCard } from '../../proto/messages/CardRenderingMessages';
+import type { RenderedCard, AvTagsResult } from '../../proto/messages/CardRenderingMessages';
 import {
   构建卡片HTML,
   媒体基地址,
   剥除拼写标记,
-  type 卡片正反面
+  原始侧HTML
 } from '../../model/学习卡片HTML构建器';
 import { 解码文件名, 取MIME类型, 读取媒体文件 } from '../../utils/媒体响应助手';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 取全屏转场曲线, 取全屏转场时长 } from '../../utils/转场时长';
 import { 颜色键 } from '../../model/颜色主题';
 import { 按下态按钮 } from '../common/按下态按钮';
+import { 声音播放器 } from '../../utils/声音播放器';
+import { TTS播放器 } from '../../utils/TTS播放器';
+import { CardAudioSession } from '../../model/CardAudioSession';
+import { APP_FOREGROUND_KEY } from '../../model/Redemption';
+import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../../model/ReleaseFeatures';
+import { buildPreviewInteractionScript } from '../../model/PreviewInteraction';
 
-/** 预览阶段：正面 / 背面 */
+/** 仅向预览转发显示操作，文档版本由组件校验。 */
+class PreviewActionProxy {
+  dispatch: (action: string, version: number) => void = (): void => {};
+  onAction(action: string, version: number): void {
+    this.dispatch(action, version);
+  }
+}
+
+/** 预览面：题目 / 答案（与 Anki Previewer._state 同义）。 */
 type 预览面 = 'question' | 'answer';
 
 @Component
 export struct 卡片预览页 {
+  @StorageProp('cardTextSizePercent') private cardTextSizePercent: number = 100;
   @Prop isDark: boolean = false;
   @Prop 卡片ID列表: number[] = [];
   @Prop 初始索引: number = 0;
   @Prop 媒体目录: string = '';
   @Prop @Watch('预览刷新版本变化') 刷新版本: number = 0;
+  @Prop @Watch('updateActivity') interactionEnabled: boolean = true;
+  @StorageProp(APP_FOREGROUND_KEY) @Watch('updateActivity') private foreground: boolean = true;
+  @StorageProp(AI_AGENT_CHANNELS_APP_STORAGE_KEY) private agentEnabled: boolean = false;
+  onPositionChanged: (index: number) => void = (_index: number): void => {};
   onClose: () => void = (): void => {};
   onEditField: (卡片ID: number) => void = (_卡片ID: number): void => {};
+  onCreateWithAgent: () => void = (): void => {};
 
   private readonly 网页控制器: webview.WebviewController = new webview.WebviewController();
   private readonly 卡片渲染服务实例: 卡片渲染服务 = new 卡片渲染服务();
   private 已渲染: RenderedCard | null = null;
   /** 控制器未 attach 时缓存的待加载 HTML（规避 aboutToAppear 异步链白屏时序坑）。 */
   private 待加载HTML: string = '';
+  private readonly soundPlayer: 声音播放器 = new 声音播放器();
+  private readonly ttsPlayer: TTS播放器 = new TTS播放器();
+  private mounted: boolean = false;
+  private loadVersion: number = 0;
+  private documentVersion: number = 0;
+  private bridgeReady: boolean = false;
+  private readonly audioSession: CardAudioSession = new CardAudioSession(this.soundPlayer, this.ttsPlayer,
+    (html: string, question: boolean): Promise<AvTagsResult> => this.卡片渲染服务实例.extractAudioTags(html, question));
+  private audioRefreshPending: boolean = false;
+  @State private previewIds: number[] = [];
+  @State private hasAudio: boolean = false;
+  @State private audioError: string = '';
 
   @State private 当前索引值: number = 0;
   @State private 当前面: 预览面 = 'question';
@@ -84,11 +116,66 @@ export struct 卡片预览页 {
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
   // 手势导航条高度（底部固定操作区需整体抬高，避免按钮落入系统手势区域）
   @StorageProp('导航条高度') private 导航条高度: number = 0;
-  @State private 已按下编辑: boolean = false;
 
   aboutToAppear(): void {
-    this.当前索引值 = this.初始索引;
+    this.mounted = true;
+    // 固定本次预览的 ID 顺序；字段编辑后的搜索重排不能把当前卡换成另一张。
+    this.previewIds = this.卡片ID列表.slice();
+    this.当前索引值 = Math.max(0, Math.min(this.初始索引, this.previewIds.length - 1));
     this.加载当前卡();
+  }
+
+  aboutToDisappear(): void {
+    this.mounted = false;
+    this.loadVersion += 1;
+    this.documentVersion += 1;
+    this.audioSession.release();
+    this.控制器已挂载 = false;
+    this.待加载HTML = '';
+  }
+
+  /** 编辑或后台期间停止所有声音；返回后由用户重播，不自动打断其他音频。 */
+  private updateActivity(): void {
+    if (!this.interactionEnabled || !this.foreground) {
+      this.audioRefreshPending = this.已渲染 !== null;
+      this.stopAudio();
+      if (this.控制器已挂载) {
+        this.网页控制器.runJavaScript('document.querySelectorAll("audio,video").forEach(function(m){m.pause();});')
+          .catch((error: Object): void => { console.info(`Preview media pause: ${error}`); });
+      }
+    } else if (this.audioRefreshPending) {
+      this.playCurrentAudio(false);
+    }
+  }
+
+  /** 学习与预览共用取消及原生初始化清理规则。 */
+  private stopAudio(): void {
+    this.audioSession.stop();
+  }
+
+  /** 音频失败只影响重播入口，卡片仍可浏览。 */
+  private async playCurrentAudio(autoplay: boolean = true): Promise<void> {
+    const rendered: RenderedCard | null = this.已渲染;
+    if (rendered === null || !this.mounted || this.错误详情 !== '') return;
+    if (!this.interactionEnabled || !this.foreground) {
+      this.audioRefreshPending = true;
+      return;
+    }
+    this.audioRefreshPending = false;
+    const version: number = this.documentVersion;
+    this.hasAudio = false;
+    this.audioError = '';
+    try {
+      const hasAudio: boolean | null = await this.audioSession.play(
+        原始侧HTML(rendered, this.当前面), this.当前面 === 'question', this.媒体目录, autoplay);
+      if (hasAudio !== null && this.mounted && version === this.documentVersion) {
+        this.hasAudio = hasAudio;
+      }
+    } catch (error) {
+      if (!this.mounted || version !== this.documentVersion) return;
+      this.audioError = this.取本地化文案($r('app.string.browser_preview_audio_error'));
+      console.info(`Preview audio: ${error}`);
+    }
   }
 
   /** 字段保存后父级递增刷新版本，重新渲染当前仍在预览中的卡片。 */
@@ -98,62 +185,73 @@ export struct 卡片预览页 {
 
   /** 取当前预览的卡片ID（基于 当前索引值 从 卡片ID列表 取）。 */
   private 取当前卡片ID(): number {
-    if (this.卡片ID列表.length === 0) {
+    if (this.previewIds.length === 0) {
       return 0;
     }
     const 索引: number = this.当前索引值;
-    if (索引 < 0 || 索引 >= this.卡片ID列表.length) {
+    if (索引 < 0 || 索引 >= this.previewIds.length) {
       return 0;
     }
-    return this.卡片ID列表[索引];
+    return this.previewIds[索引];
   }
 
   // ========================================================
   // @名称 加载当前卡
   //
   // @作用
-  // 调 卡片渲染服务.渲染既有卡片 渲染当前卡片，组装正反面 HTML 并加载到 Web。
-  // 切换卡片或首次打开时调用；加载期间显示 loading 覆盖层。
+  // 调 卡片渲染服务.渲染既有卡片 渲染当前卡片，缓存正反面 HTML 并加载题目面到 Web。
+  // 与 Anki 预览一致：选中新卡后状态回到题目面，答案面按需加载（不预拼两面）。
   //
   // @输入
   // 无（使用 当前索引值 + 卡片ID列表）
   //
   // @输出
-  // 成功 → 设 正面HTML / 背面HTML / 当前面='question'，加载正面到 Web
+  // 成功 → 设 正面HTML / 背面HTML，当前面='question'，加载正面到 Web
   // 失败 → 设 错误详情，显示错误覆盖层
   //
   // @业务规则
-  // - 正面始终剥除拼写标记（预览不渲染输入框占位，与学习页同语义）
-  // - 背面也剥除拼写标记（预览不收集用户输入，无需比对结果）
+  // - 正反面都剥除拼写标记（预览不渲染输入框占位，与学习页 type 预览过滤同语义）
+  // - 背面模板自身含 {{FrontSide}}，答案面因此带正面内容，不额外拼接
   // - 控制器未 attach 时缓存 HTML，onControllerAttached 回调消费
   //
   // @副作用
   // 调后端 渲染既有卡片；调 Web 控制器 loadData
   // ========================================================
   private async 加载当前卡(): Promise<void> {
+    if (!this.mounted) return;
+    const version: number = ++this.loadVersion;
+    this.documentVersion += 1;
+    this.stopAudio();
+    this.hasAudio = false;
+    this.audioError = '';
     const 卡片ID: number = this.取当前卡片ID();
     if (卡片ID === 0) {
+      this.忙碌 = false;
       this.错误详情 = this.取本地化文案($r('app.string.browser_preview_load_error'));
       return;
     }
     this.忙碌 = true;
     this.错误详情 = '';
     this.当前面 = 'question';
+    this.onPositionChanged(this.当前索引值);
     this.正面HTML = '';
     this.背面HTML = '';
     this.已渲染 = null;
     this.待加载HTML = '';
     try {
-      this.已渲染 = await this.卡片渲染服务实例.渲染既有卡片(卡片ID);
+      const rendered: RenderedCard = await this.卡片渲染服务实例.渲染既有卡片(卡片ID);
+      if (!this.mounted || version !== this.loadVersion) return;
+      this.已渲染 = rendered;
       // 预览正反面都剥除拼写标记（不收集输入，不渲染输入框占位）
       this.正面HTML = 剥除拼写标记(构建卡片HTML(this.已渲染, 'question', this.isDark));
       this.背面HTML = 剥除拼写标记(构建卡片HTML(this.已渲染, 'answer', this.isDark));
-      this.应用HTML(this.正面HTML);
+      this.应用HTML(this.当前面 === 'question' ? this.正面HTML : this.背面HTML);
     } catch (错误) {
+      if (!this.mounted || version !== this.loadVersion) return;
       this.错误详情 = this.取本地化文案($r('app.string.browser_preview_load_error'));
       console.info(`卡片预览页: 加载卡片失败 cid=${卡片ID} 错误=${错误}`);
     } finally {
-      this.忙碌 = false;
+      if (this.mounted && version === this.loadVersion) this.忙碌 = false;
     }
   }
 
@@ -163,78 +261,128 @@ export struct 卡片预览页 {
    * Web 未 attach 的白屏时序坑（PROJECT_CONTEXT.md「Web 组件 attach 时序」）。
    */
   private 应用HTML(html: string): void {
+    const version: number = ++this.documentVersion;
+    const document: string = html.replace('</body>',
+      `<script>${buildPreviewInteractionScript(version)}</script></body>`);
     if (this.控制器已挂载) {
       try {
-        this.网页控制器.loadData(html, 'text/html', 'UTF-8', 媒体基地址, ' ');
+        this.installActionBridge();
+        this.网页控制器.loadData(document, 'text/html', 'UTF-8', 媒体基地址, ' ');
+        this.playCurrentAudio();
       } catch (错误) {
+        this.错误详情 = this.取本地化文案($r('app.string.browser_preview_load_error'));
+        this.stopAudio();
         console.info(`卡片预览页: loadData 失败 错误=${错误}`);
       }
     } else {
-      this.待加载HTML = html;
+      this.待加载HTML = document;
     }
+  }
+
+  /** 仅主文档/渲染进程失败进入可恢复错误态；缺失的单个媒体不遮挡整张卡。 */
+  private webFailed(): void {
+    if (!this.mounted) return;
+    this.loadVersion += 1;
+    this.documentVersion += 1;
+    this.忙碌 = false;
+    this.错误详情 = this.取本地化文案($r('app.string.browser_preview_load_error'));
+    this.stopAudio();
+  }
+
+  /** 控制器可用后安装只读交互桥；失败时下一次重试会再次安装。 */
+  private installActionBridge(): void {
+    if (this.bridgeReady) return;
+    const proxy: PreviewActionProxy = new PreviewActionProxy();
+    proxy.dispatch = (action: string, version: number): void => {
+      if (version !== this.documentVersion || !this.mounted || !this.interactionEnabled || !this.foreground) return;
+      if (action === 'flip') this.翻面();
+      if (action === 'previous') this.上一张();
+      if (action === 'next') this.下一张();
+      if (action === 'replay') this.playCurrentAudio();
+    };
+    this.网页控制器.registerJavaScriptProxy(proxy, 'jidePreview', ['onAction']);
+    this.bridgeReady = true;
   }
 
   /** Web 控制器 attach 回调：消费缓存的待加载 HTML。 */
   private onControllerAttached回调(): void {
+    if (!this.mounted) return;
     this.控制器已挂载 = true;
     if (this.待加载HTML !== '') {
       const 缓存: string = this.待加载HTML;
       this.待加载HTML = '';
       try {
+        this.installActionBridge();
         this.网页控制器.loadData(缓存, 'text/html', 'UTF-8', 媒体基地址, ' ');
+        this.playCurrentAudio();
       } catch (错误) {
+        this.错误详情 = this.取本地化文案($r('app.string.browser_preview_load_error'));
         console.info(`卡片预览页: onControllerAttached loadData 失败 错误=${错误}`);
       }
     }
   }
 
-  /** 翻面：正面↔背面，加载对应 HTML 到 Web。 */
+  /**
+   * 翻面：题目 → 答案（Anki 预览里点击卡片或按“下一步”在题目态做的事）。
+   * 答案 → 题目只由 上一张 负责，与 Anki Previewer._on_prev/_on_next 的按键语义一致。
+   */
   private 翻面(): void {
-    if (this.忙碌 || this.错误详情 !== '') {
+    if (!this.interactionEnabled || !this.foreground || this.忙碌
+      || this.错误详情 !== '' || this.当前面 === 'answer') {
       return;
     }
-    this.当前面 = this.当前面 === 'question' ? 'answer' : 'question';
-    const html: string = this.当前面 === 'question' ? this.正面HTML : this.背面HTML;
-    this.应用HTML(html);
+    this.当前面 = 'answer';
+    this.onPositionChanged(this.当前索引值);
+    this.应用HTML(this.背面HTML);
   }
 
-  /** 上一张：索引 -1，边界处不回绕。 */
+  /**
+   * 上一张（Anki 预览的 "<" / 左方向键）：答案态先回题目；题目态切上一张卡，边界不回绕。
+   * 加载中或错误态直接切卡，保留“坏卡/慢卡可跳过”的既有行为。
+   */
   private 上一张(): void {
-    if (this.忙碌 || this.当前索引值 <= 0) {
+    if (!this.interactionEnabled) {
+      return;
+    }
+    if (!this.忙碌 && this.错误详情 === '' && this.当前面 === 'answer') {
+      this.当前面 = 'question';
+      this.onPositionChanged(this.当前索引值);
+      this.应用HTML(this.正面HTML);
+      return;
+    }
+    if (this.当前索引值 <= 0) {
       return;
     }
     this.当前索引值 -= 1;
     this.加载当前卡();
   }
 
-  /** 下一张：索引 +1，边界处不回绕。 */
+  /**
+   * 下一张（Anki 预览的 ">" / 右方向键 / 回车）：题目态先显示答案；答案态才切下一张卡。
+   * 加载中或错误态直接切卡，保留“坏卡/慢卡可跳过”的既有行为。
+   */
   private 下一张(): void {
-    if (this.忙碌 || this.当前索引值 >= this.卡片ID列表.length - 1) {
+    if (!this.interactionEnabled) {
+      return;
+    }
+    if (!this.忙碌 && this.错误详情 === '' && this.当前面 === 'question') {
+      this.翻面();
+      return;
+    }
+    if (this.当前索引值 >= this.previewIds.length - 1) {
       return;
     }
     this.当前索引值 += 1;
     this.加载当前卡();
   }
 
-  /** 处理左右滑手势：基于角度判断方向，左滑=下一张，右滑=上一张。 */
-  private 处理滑动手势(角度: number): void {
-    // ArkUI GestureEvent.angle：屏幕坐标系（y 轴朝下），0°=右，90°=下，180°=左，270°=上。
-    // 已通过 SwipeDirection.Horizontal 过滤，只需区分左右：
-    // 规范到 [0, 360)，<90 或 >270 视为右滑 → 上一张；其余视为左滑 → 下一张。
-    const 正向角: number = ((角度 % 360) + 360) % 360;
-    if (正向角 < 90 || 正向角 > 270) {
-      this.上一张();
-    } else {
-      this.下一张();
-    }
-  }
-
   /** 编辑字段：经 onEditField 回调上抛当前卡片ID，由父级打开 浏览编辑区。 */
   private 请求编辑字段(): void {
     const 卡片ID: number = this.取当前卡片ID();
-    if (卡片ID === 0) {
+    if (卡片ID === 0 || this.忙碌 || !this.interactionEnabled || this.错误详情 !== '') {
       return;
     }
+    this.stopAudio();
     this.onEditField(卡片ID);
   }
 
@@ -249,13 +397,13 @@ export struct 卡片预览页 {
 
   /** 取位置计数文案（"3 / 45"）。 */
   private 取位置文案(): string {
-    if (this.卡片ID列表.length === 0) {
+    if (this.previewIds.length === 0) {
       return '';
     }
     const 模板: string = this.取本地化文案($r('app.string.browser_preview_position'));
     return 模板
       .replace('%d', String(this.当前索引值 + 1))
-      .replace('%d', String(this.卡片ID列表.length));
+      .replace('%d', String(this.previewIds.length));
   }
 
   // ========================================================
@@ -279,7 +427,7 @@ export struct 卡片预览页 {
     if (!url.startsWith(媒体基地址)) {
       return null;
     }
-    const fileName: string = decodeURIComponent(url.substring(媒体基地址.length));
+    const fileName: string = 解码文件名(url.substring(媒体基地址.length));
     if (fileName.length === 0) {
       const blank: WebResourceResponse = new WebResourceResponse();
       blank.setResponseData('<!DOCTYPE html><html><body></body></html>');
@@ -307,46 +455,64 @@ export struct 卡片预览页 {
     return response;
   }
 
+  /** 预览更多菜单：只保留编辑和 Agent 制卡，不做任何学习状态操作。 */
+  private 预览更多菜单(): MenuElement[] {
+    const items: MenuElement[] = [
+      {
+        value: this.取本地化文案($r('app.string.study_edit_note')),
+        action: (): void => { this.请求编辑字段(); },
+        enabled: !this.忙碌 && this.错误详情 === ''
+      }
+    ];
+    if (this.agentEnabled) {
+      items.push({
+        value: this.取本地化文案($r('app.string.ai_card_title')),
+        action: (): void => { this.onCreateWithAgent(); }
+      });
+    }
+    return items;
+  }
+
   @Builder
-  private 顶部条() {
-    Row() {
+  private 预览顶部条() {
+    Stack() {
+      Text(this.取位置文案())
+        .fontSize(应用尺寸.字号_标题)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.text_primary'))
+        .maxLines(1)
+        .textAlign(TextAlign.Center)
+        .hitTestBehavior(HitTestMode.None)
       Row() {
-        Text(this.取位置文案())
-          .fontSize(应用尺寸.字号_正文_中)
-          .fontColor($r('app.color.text_primary'))
-          .fontWeight(FontWeight.Medium)
-          .maxLines(1)
-      }
-      .width('35%')
-      .justifyContent(FlexAlign.Start)
-
-      Row() {
-        Text($r('app.string.browser_preview_title'))
-          .fontSize(应用尺寸.字号_正文_中)
-          .fontColor($r('app.color.text_secondary'))
-          .textAlign(TextAlign.Center)
-          .maxLines(1)
-      }
-      .width('30%')
-      .justifyContent(FlexAlign.Center)
-
-      Row() {
-        // 与主页“更多”复用同一按下态按钮，保持尺寸、描边和反馈一致。
         按下态按钮({
           文案: $r('app.string.browser_preview_close'),
-          选中态背景: this.主色容器色,
           字色: $r('app.color.text_primary'),
           点击回调: (): void => { this.onClose(); }
         })
+        Blank()
+        Button($r('app.string.study_more'))
+          .height(应用尺寸.按钮高度)
+          .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
+          .constraintSize({ minWidth: 0 })
+          .fontSize(应用尺寸.字号_按钮)
+          .fontColor($r('app.color.text_primary'))
+          .backgroundColor($r('app.color.surface_card'))
+          .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+          .borderRadius(应用尺寸.圆角_胶囊)
+          .bindMenu(this.预览更多菜单())
       }
-      .width('35%')
-      .justifyContent(FlexAlign.End)
+      .width('100%')
+      .height('100%')
+      .alignItems(VerticalAlign.Center)
     }
     .width('100%')
     .height(应用尺寸.工具栏高度 + this.状态栏高度)
-    .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平,
-      top: this.状态栏高度 + 应用尺寸.间距_8, bottom: 应用尺寸.间距_8 })
-    .alignItems(VerticalAlign.Center)
+    .padding({
+      left: 应用尺寸.页面内边距_水平,
+      right: 应用尺寸.页面内边距_水平,
+      top: this.状态栏高度 + 应用尺寸.toolbarVerticalInset,
+      bottom: 应用尺寸.toolbarVerticalInset
+    })
   }
 
   @Builder
@@ -354,33 +520,33 @@ export struct 卡片预览页 {
     Stack() {
       // Web 组件：src 必须为空字符串（BUG-008 修复），baseUrl=媒体基地址 由 loadData 传入。
       Web({ src: '', controller: this.网页控制器 })
+        .textZoomRatio(this.cardTextSizePercent)
         .javaScriptAccess(true)
         .fileAccess(true)
         .domStorageAccess(true)
-        .focusable(false)
+        .zoomAccess(true)
+        .focusable(true)
         .onControllerAttached((): void => { this.onControllerAttached回调(); })
         .onInterceptRequest((event: OnInterceptRequestEvent): WebResourceResponse | null => {
           return interceptMathAsset(event.request.getRequestUrl()) ?? this.拦截媒体(event);
         })
+        .onErrorReceive((event: OnErrorReceiveEvent): void => {
+          if (event.request.isMainFrame() && event.request.getRequestUrl() !== 'about:blank') this.webFailed();
+        })
+        .onRenderExited((): void => { this.webFailed(); })
         .onPageEnd((event: OnPageEndEvent) => {
           // ImageOcclusion 兜底（与 学习页 同款）：setup() 内部幂等，无 canvas 直接返回。
           try {
-            this.网页控制器.runJavaScript('anki.imageOcclusion.setup()');
+            this.网页控制器.runJavaScript('anki.imageOcclusion.setup()')
+              .catch((error: Object): void => { console.info(`Preview occlusion: ${error}`); });
           } catch (_错误) {
             // 预览场景 setup 失败不影响主流程
           }
         })
         .width('100%')
         .height('100%')
-        // 点击翻面：onClick 在轻触时触发，垂直滚动不触发（滚动有 move 事件）
-        .onClick((): void => { this.翻面(); })
-        // 左右滑切换上下张卡： SwipeGesture 与 Web 内部垂直滚动不冲突
-        .gesture(
-          SwipeGesture({ direction: SwipeDirection.Horizontal })
-            .onAction((event: GestureEvent): void => {
-              this.处理滑动手势(event.angle);
-            })
-        )
+        // 左右滑切卡在文档内监听判断，保留链接、媒体、遮罩和表单的原生交互。
+        // 不在 Web 上挂 ArkUI 手势：ArkWeb 先消费触摸，SwipeGesture 收不到左右滑。
 
       // Loading 覆盖层
       if (this.忙碌) {
@@ -403,15 +569,8 @@ export struct 卡片预览页 {
           Text(this.错误详情)
             .fontSize(应用尺寸.字号_正文)
             .fontColor($r('app.color.error_text'))
-          Button($r('app.string.browser_preview_close'))
-            .height(应用尺寸.按钮高度)
-            .fontSize(应用尺寸.字号_按钮)
-            .fontColor($r('app.color.text_primary'))
-            .backgroundColor($r('app.color.surface_card'))
-            .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
-            .borderRadius(应用尺寸.圆角_胶囊)
-            .margin({ top: 应用尺寸.间距_8 })
-            .onClick((): void => { this.onClose(); })
+          Button($r('app.string.browser_preview_retry'))
+            .onClick((): void => { this.加载当前卡(); })
         }
         .width('100%')
         .height('100%')
@@ -428,43 +587,28 @@ export struct 卡片预览页 {
   @Builder
   private 底部条() {
     Column({ space: 应用尺寸.间距_8 }) {
-      // 翻面提示 + 当前侧（正面/背面）
-      Text($r('app.string.browser_preview_flip_hint'))
+      Text(this.当前面 === 'question' ? $r('app.string.browser_preview_front') : $r('app.string.browser_preview_back'))
         .fontSize(应用尺寸.字号_正文_小)
         .fontColor($r('app.color.text_secondary'))
-
-      Row({ space: 应用尺寸.间距_10 }) {
-        // 编辑字段按钮：经 onEditField 回调上抛，父级打开 浏览编辑区
-        Button($r('app.string.browser_preview_edit_fields'))
-          .layoutWeight(1)
-          .height(应用尺寸.按钮高度)
-          .fontSize(应用尺寸.字号_按钮)
-          .fontColor($r('app.color.action_on_primary'))
-          .backgroundColor(this.已按下编辑 ? this.主色容器色 : this.主色按钮背景)
-          .borderRadius(应用尺寸.圆角_胶囊)
-          .animation({ duration: 80, curve: Curve.EaseOut })
-          .enabled(!this.忙碌 && this.错误详情 === '')
-          .onTouch((event: TouchEvent): void => {
-            if (event.type === TouchType.Down) {
-              this.已按下编辑 = true;
-            } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-              this.已按下编辑 = false;
-            }
-          })
-          .onClick((): void => { this.请求编辑字段(); })
-
-        // 关闭按钮
-        Button($r('app.string.browser_preview_close'))
-          .layoutWeight(1)
+      // 不放按钮：点击卡片看答案、左右滑上一步/下一步（Anki 预览 "<" ">" 的等价语义，见 PreviewInteraction 注入脚本）。
+      if (this.hasAudio || this.audioError !== '') {
+        Button($r('app.string.study_replay_sound'))
           .height(应用尺寸.按钮高度)
           .fontSize(应用尺寸.字号_按钮)
           .fontColor($r('app.color.text_primary'))
           .backgroundColor($r('app.color.surface_card'))
-          .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
-          .borderRadius(应用尺寸.圆角_胶囊)
-          .onClick((): void => { this.onClose(); })
+          .enabled(!this.忙碌 && this.错误详情 === '' && this.interactionEnabled)
+          .onClick((): void => { this.playCurrentAudio(); })
       }
-      .width('100%')
+      if (this.audioError !== '') {
+        Text(this.audioError)
+          .fontSize(应用尺寸.字号_正文_小)
+          .fontColor($r('app.color.error_text'))
+      }
+      Text($r('app.string.browser_preview_hint'))
+        .fontSize(应用尺寸.字号_正文_小)
+        .fontColor($r('app.color.text_secondary'))
+
     }
     .width('100%')
     .padding({
@@ -492,7 +636,7 @@ export struct 卡片预览页 {
 
       // 主面板：全屏卡片预览（OPACITY 转场，禁止左右平移）
       Column() {
-        this.顶部条()
+        this.预览顶部条()
         this.卡片区()
         this.底部条()
       }

@@ -61,15 +61,18 @@ function read(relativePath) {
   return readFileSync(projectUrl(relativePath), 'utf8');
 }
 
-test('card preview keeps its title centered and preserves preview while editing fields', () => {
+test('card preview keeps its position header and preserves preview while editing fields', () => {
   const preview = read('entry/src/main/ets/components/browser/卡片预览页.ets');
   const page = read('entry/src/main/ets/pages/浏览页.ets');
   const openEditorMethod = page.match(
     /private\s+打开编辑区For\([^)]*\):\s*void\s*\{[^}]*\}/
   )?.[0] ?? '';
-  assert.match(preview, /import\s+\{\s*按下态按钮\s*\}/);
-  assert.match(preview, /\.width\('35%'\)[\s\S]*\.width\('30%'\)[\s\S]*\.width\('35%'\)/);
-  assert.match(preview, /文案:\s*\$r\('app\.string\.browser_preview_close'\)/);
+  // 顶部条统一为「关闭 / N/N / 更多」，更多菜单里是编辑 + Agent 改卡（浏览页与牌组预览同一套）
+  assert.match(preview, /Text\(this\.取位置文案\(\)\)/);
+  assert.match(preview, /文案: \$r\('app\.string\.browser_preview_close'\)/);
+  assert.match(preview, /Button\(\$r\('app\.string\.study_more'\)\)/);
+  assert.match(preview, /bindMenu\(this\.预览更多菜单\(\)\)/);
+  assert.doesNotMatch(preview, /DialogHeader\(/);
   assert.match(preview, /@Prop\s+@Watch\('预览刷新版本变化'\)\s+刷新版本:\s*number/);
   assert.match(preview,
     /@StorageProp\('导航条高度'\)\s+private\s+导航条高度:\s*number\s*=\s*0/);
@@ -604,6 +607,21 @@ test('BrowserPage has T8 batch action methods', () => {
   assert.match(page, /this\.卡片服务实例\.删除卡片\s*\(/);
 });
 
+test('Browser suspend follows Anki card and note semantics and refreshes real search state', () => {
+  const page = read('entry/src/main/ets/pages/浏览页.ets');
+  assert.match(page,
+    /if \(this\.浏览模式值 === 'notes'\) \{[\s\S]*?批量埋藏或暂停笔记\([\s\S]*?BURY_SUSPEND_MODE_SUSPEND[\s\S]*?\} else \{[\s\S]*?批量埋藏或暂停卡片\([\s\S]*?BURY_SUSPEND_MODE_SUSPEND/);
+  const suspendBody = page.match(/private async 执行批量挂起\(\): Promise<void> \{[\s\S]*?\n  \}/)?.[0] ?? '';
+  assert.match(suspendBody, /this\.退出多选\(\);[\s\S]*?await this\.执行搜索\(\);/);
+  assert.doesNotMatch(suspendBody, /本地移除选中行\(/);
+
+  assert.match(page,
+    /this\.浏览模式值 === 'cards' \?[\s\S]*?this\.选中ID列表\.slice\(\) : await this\.解析选中笔记的卡片ID\(\)/);
+  assert.match(page, /private async 解析选中笔记的卡片ID\(\): Promise<number\[\]>/);
+  assert.match(page, /this\.笔记服务实例\.获取笔记的卡片\(笔记ID\)/);
+  assert.match(page, /Set<number>[\s\S]*?!已添加\.has\(卡片ID\)/);
+});
+
 test('BrowserPage build renders 批量操作栏 conditionally on 多选模式值 + 选中ID列表', () => {
   const page = read('entry/src/main/ets/pages/浏览页.ets');
   assert.match(page, /if\s*\(this\.多选模式值\s*&&\s*this\.选中ID列表\.length\s*>\s*0\)/);
@@ -675,6 +693,19 @@ test('调度器服务 exposes 批量埋藏或暂停卡片 method (T8 batch suspe
   const svc = read('entry/src/main/ets/backend/调度器服务.ts');
   assert.match(svc, /async\s+批量埋藏或暂停卡片\s*\(\s*卡片ID列表:\s*number\[\],\s*模式:\s*number\s*\)/);
   assert.match(svc, /this\.会话\.调用\s*\(\s*服务号\.后端调度器,\s*调度器方法\.埋藏或暂停/);
+  assert.match(svc, /async\s+批量埋藏或暂停笔记\s*\(\s*笔记ID列表:\s*number\[\],\s*模式:\s*number\s*\)/);
+  assert.match(svc, /encodeBuryOrSuspendCardsRequest\(\[\],\s*笔记ID列表,\s*模式\)/);
+});
+
+test('Browser suspension copy matches the implemented Anki semantics', () => {
+  const zh = JSON.parse(read('entry/src/main/resources/base/element/string.json')).string;
+  const byName = new Map(zh.map((item) => [item.name, item.value]));
+  assert.equal(byName.get('browser_action_suspend'), '暂停');
+  assert.equal(byName.get('browser_action_unsuspend'), '取消暂停');
+  assert.match(byName.get('browser_action_suspend_confirm'), /笔记模式.*全部卡片/);
+  assert.match(byName.get('glossary_suspend_help'), /浏览页选中卡片后使用「恢复卡片」/);
+  assert.doesNotMatch(byName.get('browser_help_batch_body'), /没有 noteId|RPC/);
+  assert.match(byName.get('browser_help_batch_body'), /暂停和恢复卡片可在卡片、笔记两种模式中使用/);
 });
 
 test('T8 i18n keys exist in both base and en_US string.json', () => {

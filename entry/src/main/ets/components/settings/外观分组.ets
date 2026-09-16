@@ -4,6 +4,9 @@ import { 主题模式 } from '../../model/主题设置';
 import { 当前语言模式, 语言模式, 设置语言模式 } from '../../model/语言存储';
 import { 设置面板色板_取 } from '../../utils/设置面板配色';
 import { 设置分组卡片 } from './设置分组卡片';
+import { UNLOCKED_CONTENTS_KEY, availableThemes, themeDefinition } from '../../model/ThemeCatalog';
+import { ThemeMotionControl } from './ThemeMotionControl';
+import { CardTextSizeControl } from './CardTextSizeControl';
 import {
   颜色主题,
   颜色主题渐变档
@@ -33,6 +36,7 @@ import {
 // ========================================================
 @Component
 export struct 外观分组 {
+  @StorageProp(UNLOCKED_CONTENTS_KEY) private unlockedContents: string[] = [];
   @Prop 是否深色: boolean = false;
   @Prop 当前主题模式: 主题模式 = 'system';
   @Prop 当前颜色主题: 颜色主题 = 'aurora';
@@ -95,14 +99,19 @@ export struct 外观分组 {
     return 0;
   }
 
+  /** 已验证的权益决定可选主题，所有索引共用同一列表。 */
+  private availableThemes(): 颜色主题[] {
+    return availableThemes(this.unlockedContents);
+  }
+
   // ---- 颜色主题 Select 选项 / 索引 ----
   private 颜色主题选项(): SelectOption[] {
-    const 主题列表: 颜色主题[] = ['aurora', 'forest', 'midnight', 'lagoon', 'sunset', 'lemon', 'minimal_gray'];
+    const 主题列表: 颜色主题[] = this.availableThemes();
     return 主题列表.map((主题: 颜色主题): SelectOption => ({ value: this.颜色主题展示名文本(主题) }));
   }
 
   private 颜色主题索引(): number {
-    const 主题列表: 颜色主题[] = ['aurora', 'forest', 'midnight', 'lagoon', 'sunset', 'lemon', 'minimal_gray'];
+    const 主题列表: 颜色主题[] = this.availableThemes();
     const 索引 = 主题列表.indexOf(this.当前颜色主题);
     return 索引 >= 0 ? 索引 : 0;
   }
@@ -176,7 +185,7 @@ export struct 外观分组 {
               .controlSize(ControlSize.SMALL)
               .margin({ left: 8 })
               .onSelect((索引: number): void => {
-                const 主题列表: 颜色主题[] = ['aurora', 'forest', 'midnight', 'lagoon', 'sunset', 'lemon', 'minimal_gray'];
+                const 主题列表: 颜色主题[] = this.availableThemes();
                 this.颜色主题切换回调(主题列表[索引]);
               })
           }
@@ -200,6 +209,10 @@ export struct 外观分组 {
           }
           .width('100%')
           .height(48)
+          if (themeDefinition(this.当前颜色主题).backgroundTextures.length > 0) {
+            ThemeMotionControl()
+          }
+          CardTextSizeControl()
       }
       .width('100%')
     }

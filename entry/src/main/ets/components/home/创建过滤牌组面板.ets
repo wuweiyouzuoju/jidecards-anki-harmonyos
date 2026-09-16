@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { DialogHeader } from '../common/DialogHeader';
 // ========================================================
 // @块ID UI-FILTERED-DECK-001
 // @名称 创建过滤牌组面板
@@ -142,23 +143,16 @@ export struct 创建过滤牌组面板 {
         .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
 
       Column({ space: 应用尺寸.间距_16 }) {
-        Row() {
-          Text($r('app.string.filtered_deck_title'))
-            .fontSize(应用尺寸.字号_面板标题)
-            .fontColor($r('app.color.text_primary'))
-            .fontWeight(FontWeight.Bold)
-            .layoutWeight(1)
-          if (!this.处理中) {
-            Text('×')
-              .fontSize(24)
-              .fontColor($r('app.color.text_secondary'))
-              .width(32)
-              .height(32)
-              .textAlign(TextAlign.Center)
-              .onClick(() => { this.onClose(); })
-          }
-        }
-        .width('100%')
+        DialogHeader({
+          title: $r('app.string.filtered_deck_title'),
+          actionLabel: this.处理中 ?
+            $r('app.string.filtered_deck_creating') : $r('app.string.filtered_deck_confirm'),
+          actionEnabled: this.可提交(),
+          closeLabel: $r('app.string.filtered_deck_cancel'),
+          closeEnabled: !this.处理中,
+          onClose: () => { this.onClose(); },
+          onAction: () => { this.执行创建(); }
+        })
 
         // 搜索条件
         Column({ space: 应用尺寸.间距_5 }) {
@@ -264,31 +258,6 @@ export struct 创建过滤牌组面板 {
             .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
 
-        Row({ space: 应用尺寸.间距_10 }) {
-          Button($r('app.string.filtered_deck_cancel'))
-            .height(应用尺寸.按钮高度)
-            .layoutWeight(1)
-            .fontSize(应用尺寸.字号_按钮)
-            .fontColor($r('app.color.text_primary'))
-            .backgroundColor($r('app.color.surface_page'))
-            .borderRadius(应用尺寸.圆角_胶囊)
-            .enabled(!this.处理中)
-            .onClick(() => { this.onClose(); })
-
-          Button(this.处理中 ?
-            $r('app.string.filtered_deck_creating') : $r('app.string.filtered_deck_confirm'))
-            .height(应用尺寸.按钮高度)
-            .layoutWeight(1)
-            .fontSize(应用尺寸.字号_按钮)
-            .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.action_on_primary'))
-            .backgroundColor(this.主色按钮背景)
-            .borderRadius(应用尺寸.圆角_胶囊)
-            .opacity(this.可提交() ? 1 : 0.5)
-            .enabled(this.可提交())
-            .onClick(() => { this.执行创建(); })
-        }
-        .width('100%')
       }
       .width('88%')
       .constraintSize({ maxWidth: 480, maxHeight: '88%' })

@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeTextSpans } from './common/ThemeText';
+import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
+import { DialogHeader } from './common/DialogHeader';
 // ========================================================
 // @块ID UI-ANKIWEB-GUIDE-001
 // @名称 AnkiWeb 资源引导对话框
@@ -44,6 +47,7 @@ import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时
 
 @Component
 export struct AnkiWeb引导对话框 {
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   isDark: boolean = false;
   @StorageProp(颜色键.主色按钮背景) private 主色按钮背景: string = '#2F5FD0';
   onClose: () => void = (): void => {};
@@ -92,11 +96,13 @@ export struct AnkiWeb引导对话框 {
         .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
 
       Column({ space: 应用尺寸.间距_12 }) {
-        Text($r('app.string.ankiweb_guide_title'))
-          .fontSize(应用尺寸.字号_面板标题)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.text_primary'))
-          .width('100%')
+        DialogHeader({
+          title: $r('app.string.ankiweb_guide_title'),
+          actionLabel: $r('app.string.ankiweb_guide_button_ok'),
+          actionEnabled: true,
+          showClose: false,
+          onAction: () => { this.onClose(); }
+        })
 
         Text($r('app.string.ankiweb_guide_message'))
           .fontSize(应用尺寸.字号_正文_小)
@@ -111,7 +117,7 @@ export struct AnkiWeb引导对话框 {
           .margin({ top: 应用尺寸.间距_4 })
 
         // 网址：可长按选中复制（Text.copyOption）
-        Text(this.网址)
+        Text() { ThemeTextSpans(this.网址, this.themeAccentColors, this.getUIContext()) }
           .fontSize(应用尺寸.字号_正文_小)
           .fontColor($r('app.color.action_primary'))
           .width('100%')
@@ -124,26 +130,18 @@ export struct AnkiWeb引导对话框 {
           .margin({ top: 应用尺寸.间距_4 })
 
         Row({ space: 应用尺寸.间距_12 }) {
-          Button($r('app.string.ankiweb_guide_button_open'))
+          Button() {
+            Text() { ThemeTextSpans($r('app.string.ankiweb_guide_button_open'), this.themeAccentColors, this.getUIContext()) }.fontSize(应用尺寸.字号_正文).fontColor($r('app.color.action_primary'))
+          }
             .type(ButtonType.Normal)
             .layoutWeight(1)
             .height(应用尺寸.按钮高度)
             .fontSize(应用尺寸.字号_正文)
             .fontColor($r('app.color.action_primary'))
-            .backgroundColor($r('app.color.surface_page'))
-            .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+            .backgroundColor(Color.Transparent)
             .borderRadius(应用尺寸.圆角_面板)
             .onClick(() => { this.前往AnkiWeb(); })
 
-          Button($r('app.string.ankiweb_guide_button_ok'))
-            .type(ButtonType.Normal)
-            .layoutWeight(1)
-            .height(应用尺寸.按钮高度)
-            .fontSize(应用尺寸.字号_正文)
-            .fontColor($r('app.color.action_on_primary'))
-            .backgroundColor(this.主色按钮背景)
-            .borderRadius(应用尺寸.圆角_面板)
-            .onClick(() => { this.onClose(); })
         }
         .width('100%')
         .margin({ top: 应用尺寸.间距_8 })

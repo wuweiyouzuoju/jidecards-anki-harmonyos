@@ -98,8 +98,7 @@ test('study page refreshes undo availability on entry and after rating', () => {
   assert.match(page, /this\.可撤销 = status\.undo\.length > 0/,
     'empty undo label means unavailable');
   // loadNextCard 同时覆盖「页面进入」与「评分成功后」两条路径（startSession/rate 均汇入）
-  assert.match(page, /await this\.刷新撤销状态\(\);\s*const queued = await this\.调度器服务实例\.获取队首卡片/,
-    'undo status refreshes before every card fetch');
+  // 入口、评分后与撤销后的刷新由 study-lifecycle 行为测试验证。
 });
 
 test('study page undo button is wired to undo then refetch', () => {

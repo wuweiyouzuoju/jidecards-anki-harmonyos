@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeTextSpans } from '../components/common/ThemeText';
+import { 按下态按钮 } from '../components/common/按下态按钮';
+import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
+import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
 
 import { bundleManager, common } from '@kit.AbilityKit';
 import { pasteboard } from '@kit.BasicServicesKit';
@@ -7,8 +11,16 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 import { 后端会话 } from '../backend/后端会话';
 import { 牌组服务 } from '../backend/牌组服务';
 import { 统计服务 } from '../backend/统计服务';
+import { 搜索服务 } from '../backend/搜索服务';
+import { 卡片预览页 } from '../components/browser/卡片预览页';
+import { deckHistorySearch } from '../model/DeckStudyHistory';
+import { makeParsableTextNode } from '../proto/messages/SearchMessages';
+import type { SearchRequest, SortOrder } from '../proto/messages/SearchMessages';
 import { 导出集合, 导出牌组, 完成导出, 执行牌组导入, 暂存导入文件, 替换集合 } from '../backend/数据迁移服务';
 import { 云端牌组服务, 云端牌组服务错误 } from '../backend/云端牌组服务';
+import { initializeRedemption } from '../utils/RedemptionStore';
+import { UNLOCKED_CONTENTS_KEY, isThemeAvailable } from '../model/ThemeCatalog';
+import { ThemeBackground } from '../components/common/ThemeBackground';
 import { 设置面板 } from '../components/设置面板';
 import { 牌组详情面板 } from '../components/牌组详情面板';
 import { 许可证面板 } from '../components/许可证面板';
@@ -24,6 +36,9 @@ import { 添加笔记页, 添加笔记页参数, 添加笔记牌组选项 } from
 import { AI制卡页, AI制卡页参数, AI制卡牌组选项 } from './AI制卡页';
 import { 数据迁移意图, 数据迁移模式, 导出牌组选项 } from '../components/数据迁移面板';
 import { 同步面板 } from '../components/同步面板';
+import { syncActivity } from '../model/SyncSettings';
+import { 加载同步凭证, 同步凭证信息, loadAutoSyncEnabled } from '../model/同步凭证存储';
+import { APP_FOREGROUND_KEY } from '../model/Redemption';
 import { 主页顶部工具栏 } from '../components/home/主页顶部工具栏';
 import { 主页更多面板 } from '../components/home/主页更多面板';
 import { 学习提醒页 } from './学习提醒页';
@@ -108,11 +123,13 @@ const 云端牌组最多选择数量: number = 3;
 @Entry
 @Component
 struct 首页 {
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   private readonly 牌组列表滚动器: Scroller = new Scroller();
   private readonly 页面栈: NavPathStack = new NavPathStack();
   private readonly 牌组数据源: 牌组列表数据源 = new 牌组列表数据源([]);
   private readonly 牌组服务实例: 牌组服务 = new 牌组服务();
   private readonly 统计服务实例: 统计服务 = new 统计服务();
+  private readonly 搜索服务实例: 搜索服务 = new 搜索服务();
   private readonly 牌组配置服务实例: 牌组配置服务 = new 牌组配置服务();
   private readonly 云端牌组服务实例: 云端牌组服务 = new 云端牌组服务();
   private readonly 官方公告服务实例: 官方公告服务 = new 官方公告服务();
@@ -146,18 +163,21 @@ struct 首页 {
   // 改用 @Provide/@Consume 让 牌组详情面板 内部根据 选中的牌组ID 自查 主页快照，
   @Provide('selectedDeckId') private 选中的牌组ID: string = '';
   @Provide('snapshot') private 主页快照数据: 主页快照 = 空主页快照;
+  @State private historyRefreshToken: number = 0;
+  @State private backgroundTransitionActive: boolean = false;
+  private backgroundTransitionGeneration: number = 0;
   // 图表快照：静默加载图表 后用 提取卡片数据 转成纯基础类型，传给 主页摘要分页 渲染 Swiper 多页统计
   @State private 图表快照: 桌面卡片数据 | null = null;
   @State private 加载状态: 主页加载状态 = 'loading';
   @State private 当前断点: string = 'xs';
   @State private 主题模式值: 主题模式 = 'system';
-  @State private 颜色主题值: 颜色主题 = 默认颜色主题;
+  @StorageLink('colorTheme') private 颜色主题值: 颜色主题 = 默认颜色主题;
   // 跟随用户选择的颜色主题（极光蓝/仙野绿/暗夜紫/碧涛青/活力橙/柠檬金）
   @StorageProp(颜色键.动作主色) private 动作主色: string = '#2F5FD0';
   // 2.1.4.1 对比度：按钮背景专用档（配 #FFFFFF 文字 ≥ 4.5:1）
   @StorageProp(颜色键.主色按钮背景) private 主色按钮背景色: string = '#2F5FD0';
   @StorageProp(颜色键.主色容器) private 主色容器色: string = '#E8EEFC';
-  @StorageProp(颜色键.页面底色微染) private 页面底色微染值: string = '#F5F7FA';
+  @StorageProp(PAGE_SURFACE_KEY) private 页面底色微染值: string = '#F5F7FA';
   // 状态栏高度（沉浸式全屏下，牌组详情覆盖层顶部条需让出状态栏区域，避免按钮叠在状态栏上）
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
   // 顶部 设置/创建牌组 两按钮共用一个 pressed 状态：0=无，1=设置，2=创建牌组
@@ -193,6 +213,10 @@ struct 首页 {
   @State private 显示同步面板: boolean = false;
   @State private 同步面板认证: SyncAuth | null = null;
   @State private 同步面板账号名: string = '';
+  @StorageProp(APP_FOREGROUND_KEY) @Watch('syncForegroundChanged') private syncForeground: boolean = false;
+  private autoSyncPending: boolean = false;
+  private autoSyncTimer: number = -1;
+  private autoSyncStartupReady: boolean = false;
   @State private 显示牌组定制: boolean = false;
   @State private 定制牌组ID: string = '';
   @State private 定制牌组中: boolean = false;
@@ -245,14 +269,84 @@ struct 首页 {
   @State private 节流奖励文案: string = '';
   // 窄屏详情显隐（方案 C 2026-07-25）：点牌组后 true，根 Stack 内 牌组详情面板 盖住列表，替代推栈 NavDestination
   @State private 显示牌组详情: boolean = false;
+  @State private 显示卡片预览: boolean = false;
+  @State private 预览卡片ID列表: number[] = [];
+  @State private 预览初始索引: number = 0;
+  @State private 预览媒体目录: string = '';
+  private 预览加载中: boolean = false;
 
   aboutToAppear(): void {
+    this.requestAutoSync();
     this.恢复主题();
     this.恢复颜色主题();
     this.恢复今日进度卡开关();
     // 首次进入先完成云端牌组选择与导入，再展示版本欢迎内容，避免两个全屏弹窗叠加。
-    this.显示首次弹窗序列();
+    this.显示首次弹窗序列().finally((): void => { this.autoSyncStartupReady = true; });
     this.刷新云端牌组配额状态();
+  }
+
+  aboutToDisappear(): void {
+    this.stopAutoSyncTimer();
+  }
+
+  /** 前台恢复时排队；在编辑或学习中恢复时，等待真正返回首页。 */
+  private syncForegroundChanged(): void {
+    if (this.syncForeground) {
+      this.requestAutoSync();
+    } else {
+      this.stopAutoSyncTimer();
+    }
+  }
+
+  /** 将重复生命周期通知合并为一次请求，不丢弃冷却窗口内的学习结果。 */
+  private requestAutoSync(): void {
+    if (this.显示同步面板) return;
+    this.autoSyncPending = true;
+    if (this.autoSyncTimer >= 0) return;
+    this.autoSyncTimer = setTimeout((): void => {
+      this.autoSyncTimer = -1;
+      this.tryAutoSync();
+      if (this.autoSyncPending && this.syncForeground) this.requestAutoSync();
+    }, 1000);
+  }
+
+  /** 停止待执行检查；后台不轮询，也不在后台新建同步任务。 */
+  private stopAutoSyncTimer(): void {
+    if (this.autoSyncTimer >= 0) clearTimeout(this.autoSyncTimer);
+    this.autoSyncTimer = -1;
+  }
+
+  /**
+   * 仅在首页安全空闲时挂载既有同步流程，避免远端数据覆盖正在编辑的页面快照。
+   * Invariants: 集合已打开、前台、无导航子页、无导入/编辑/启动弹窗；手动自动共用互斥。
+   */
+  private tryAutoSync(): void {
+    if (!this.autoSyncPending || !loadAutoSyncEnabled() || 加载同步凭证() === null) {
+      this.autoSyncPending = false;
+      this.stopAutoSyncTimer();
+      return;
+    }
+    if (!this.syncForeground || this.页面栈.size() > 0) {
+      this.autoSyncPending = false;
+      this.stopAutoSyncTimer();
+      return;
+    }
+    if (!this.autoSyncStartupReady || !this.syncForeground || this.页面栈.size() > 0 || !后端会话.获取实例().是否就绪() ||
+      this.加载状态 === 'loading' || this.加载状态 === 'error' || this.刷新中 ||
+      this.官方公告检查中 || this.显示官方公告 || this.显示欢迎弹窗 || this.显示云端牌组弹窗 ||
+      this.显示数据迁移 || this.数据迁移中 || this.显示牌组定制 || this.显示自定义学习 ||
+      this.显示过滤牌组面板 || this.显示牌组选项 || this.牌组选项加载中 || this.牌组选项中 ||
+      this.显示创建牌组 || this.显示主页操作 || this.显示更多菜单 || this.显示节流奖励 || this.排序模式中 ||
+      this.显示许可证 || this.云端牌组忙碌 || this.显示卡片预览 || this.预览加载中 ||
+      this.显示同步面板 || !syncActivity.canAutoSync(Date.now())) return;
+    const info: 同步凭证信息 | null = 加载同步凭证();
+    if (info === null) return;
+    const auth: SyncAuth = { hkey: info.hkey, endpoint: info.endpoint, ioTimeoutSecs: 0 };
+    this.autoSyncPending = false;
+    this.stopAutoSyncTimer();
+    this.同步面板认证 = auth;
+    this.同步面板账号名 = info.username;
+    this.显示同步面板 = true;
   }
 
   /** 官方公告优先于首次云端牌组引导，云端牌组引导优先于版本欢迎弹窗。 */
@@ -338,6 +432,7 @@ struct 首页 {
     this.主页允许公告检查 = true;
     this.加载主页数据();
     this.请求主页官方公告检查();
+    this.requestAutoSync();
   }
 
   private async 继续首次弹窗序列(): Promise<void> {
@@ -423,6 +518,7 @@ struct 首页 {
   /** 进入后台：取消尚未执行的公告延迟检查，返回前台由 onPageShow 重新协调。 */
   onPageHide(): void {
     this.暂停主页官方公告检查();
+    this.stopAutoSyncTimer();
   }
 
   /**
@@ -432,6 +528,8 @@ struct 首页 {
    * Extension Points: 新增弹窗时在此链中按层级插入对应 @State 判断。
    */
   onBackPress(): boolean {
+    if (this.显示卡片预览) { this.显示卡片预览 = false; return true; }
+    if (this.显示同步面板) return true;
     if (this.显示官方公告) {
       return true;
     }
@@ -601,6 +699,7 @@ struct 首页 {
         }
       }
       this.主页快照数据 = snapshot;
+      this.historyRefreshToken++;
       // 首次加载时默认展开所有含子节点的父牌组；用 已初始化 标记而非 size 判断，避免用户全折叠后被刷新重置
       if (!this.牌组展开已初始化) {
         this.牌组展开已初始化 = true;
@@ -841,7 +940,11 @@ struct 首页 {
 
   /** 加载持久化的颜色主题并应用到 AppStorage；启动时调用一次。 */
   private async 恢复颜色主题(): Promise<void> {
-    const restored: 颜色主题 = await 加载颜色主题();
+    try { await initializeRedemption(); } catch (error) {
+      hilog.warn(0x0000, '首页', 'Redemption initialization unavailable; settings can retry');
+    }
+    let restored: 颜色主题 = await 加载颜色主题();
+    if (!isThemeAvailable(restored, AppStorage.get<string[]>(UNLOCKED_CONTENTS_KEY) ?? [])) restored = 'aurora';
     this.颜色主题值 = restored;
     AppStorage.setOrCreate<颜色主题>('colorTheme', restored);
     应用颜色主题(restored, this.是否深色());
@@ -899,6 +1002,7 @@ struct 首页 {
 
   /** 切换颜色主题：写入 AppStorage 触发全局 @StorageProp 重渲染 + 持久化。 */
   private 切换颜色主题(theme: 颜色主题): void {
+    if (!isThemeAvailable(theme, AppStorage.get<string[]>(UNLOCKED_CONTENTS_KEY) ?? [])) return;
     this.颜色主题值 = theme;
     AppStorage.setOrCreate<颜色主题>('colorTheme', theme);
     应用颜色主题(theme, this.是否深色());
@@ -977,6 +1081,45 @@ struct 首页 {
     });
   }
 
+  /**
+   * 打开当前牌组全部卡片的只读预览。
+   * 只做搜索与渲染，不调用调度器，不写学习记录。
+   */
+  private async 打开牌组预览(): Promise<void> {
+    const deck: 牌组汇总 = this.选中牌组();
+    if (deck.id === '' || this.预览加载中) return;
+    const context: common.UIAbilityContext | null = this.取能力上下文();
+    if (context === null) return;
+    const scope: string = deckHistorySearch(deck.id, this.主页快照数据.decks);
+    if (scope === '') {
+      this.显示提示($r('app.string.deck_preview_empty'));
+      return;
+    }
+    this.预览加载中 = true;
+    try {
+      await 后端会话.获取实例().确保已打开(context.filesDir);
+      const search: string = await this.搜索服务实例.构建搜索串(makeParsableTextNode(scope));
+      const order: SortOrder = { kind: 'none' };
+      const request: SearchRequest = { search: search, order: order };
+      const ids: number[] = await this.搜索服务实例.搜索卡片(request);
+      if (ids.length === 0) {
+        this.显示提示($r('app.string.deck_preview_empty'));
+        return;
+      }
+      ids.sort((a: number, b: number): number => a - b);
+      this.预览卡片ID列表 = ids;
+      this.预览初始索引 = 0;
+      this.预览媒体目录 = `${context.filesDir}/collection.media`;
+      this.显示卡片预览 = true;
+    } catch (error) {
+      console.info(`首页: 打开牌组预览失败 deck=${deck.id} 错误=${error}`);
+      this.显示提示($r('app.string.deck_preview_error'));
+    } finally {
+      this.预览加载中 = false;
+    }
+  }
+
+
   /** 打开浏览页（全库浏览，不限定牌组）。浏览页可改卡/删卡/改到期，pop 回主页必须刷新。 */
   private 打开浏览页(): void {
     const params: 浏览页参数 = {};
@@ -988,6 +1131,30 @@ struct 首页 {
         this.返回主页后刷新();
       }
     });
+  }
+
+  /** 预览更多菜单“编辑”：关闭预览并打开浏览页编辑当前卡片。 */
+  private 关闭预览并编辑(卡片ID: number): void {
+    this.显示卡片预览 = false;
+    this.暂停主页官方公告检查();
+    const params: 浏览页参数 = {
+      initialSearch: `cid:${卡片ID}`,
+      editCardId: 卡片ID
+    };
+    this.页面栈.pushPath({
+      name: 'BrowserPage',
+      param: params,
+      onPop: (): void => {
+        this.返回主页后刷新();
+        this.显示卡片预览 = true;
+      }
+    });
+  }
+
+  /** 预览更多菜单“Agent 制卡”：关闭预览并进入 AI 制卡页。 */
+  private 关闭预览并进入Agent制卡(): void {
+    this.显示卡片预览 = false;
+    this.打开AI制卡();
   }
 
   /** 打开浏览页并预填搜索串（查找重复对话框跳转用）。 */
@@ -2096,7 +2263,7 @@ struct 首页 {
   // @作用
   // 配合 .customNavContentTransition 实现 NavDestination 推栈的淡入淡出转场，
   // 替代系统默认左右平移（AppGallery 评价要求：禁止左右平移，使用淡入淡出）。
-  // 时长按设备物理英寸分档（200/250/300ms），曲线用弹簧曲线。
+  // 时长按设备物理英寸分档（200/250/300ms），透明度使用不回弹的 EaseOut。
   //
   // @输入
   // from: 转场起始页 NavContentInfo
@@ -2114,7 +2281,7 @@ struct 首页 {
   //
   // @Invariants
   // - 首页与各 NavDestination 之间也必须走本回调，禁止回退到系统横向平移
-  // - 时长与曲线必须取自 取全屏转场时长/曲线，保证按设备尺寸分档
+  // - 时长取自 取全屏转场时长，透明度避免弹簧过冲与限幅停顿
   //
   // @副作用
   // 调用 from/to NavDestination 注册的 opacity 设置回调（修改其 @State 透明度）。
@@ -2123,12 +2290,21 @@ struct 首页 {
     operation: NavigationOperation): NavigationAnimatedTransition | undefined {
     const isPush: boolean = operation === NavigationOperation.PUSH;
     const 转场时长: number = 取全屏转场时长();
-    const 转场曲线: ICurve = 取全屏转场曲线();
+    const 转场曲线: Curve = Curve.EaseOut;
     const fromName: string = from.name ?? '';
     const toName: string = to.name ?? '';
+    let backgroundGeneration: number = 0;
     return {
       timeout: 1200,
+      onTransitionEnd: (): void => {
+        if (backgroundGeneration === this.backgroundTransitionGeneration) {
+          this.backgroundTransitionActive = false;
+        }
+      },
       transition: (transitionProxy: NavigationTransitionProxy): void => {
+        // 转场期间冻结当前彩雾；旧转场结束不能恢复新转场暂停的背景。
+        backgroundGeneration = ++this.backgroundTransitionGeneration;
+        this.backgroundTransitionActive = true;
         const from起点 = CustomTransition.getInstance().取起点回调(fromName);
         const from终点 = CustomTransition.getInstance().取终点回调(fromName);
         const to起点 = CustomTransition.getInstance().取起点回调(toName);
@@ -2147,6 +2323,7 @@ struct 首页 {
         context.animateTo({
           duration: 转场时长,
           curve: 转场曲线,
+          expectedFrameRateRange: { min: 60, max: 120, expected: 60 },
           onFinish: (): void => {
             transitionProxy.finishTransition();
           }
@@ -2195,6 +2372,7 @@ struct 首页 {
         pageDeckId: (param as 浏览页参数).deckId ?? '',
         pageInitialSearch: (param as 浏览页参数).initialSearch ?? '',
         pageSelectForAgentEdit: (param as 浏览页参数).selectForAgentEdit ?? false,
+        pageEditCardId: (param as 浏览页参数).editCardId ?? -1,
         pathStack: this.页面栈
       })
     } else if (name === 'StatsPage') {
@@ -2232,6 +2410,8 @@ struct 首页 {
   }
 
   build() {
+    Stack() {
+      ThemeBackground({ transitionActive: this.backgroundTransitionActive })
     Navigation(this.页面栈) {
       Stack() {
         Column() {
@@ -2266,7 +2446,7 @@ struct 首页 {
               // 牌组列表右端 = 左 GridCol 右端 = 牌组详情面板 左端，紧贴无空白。
               // 用 主页摘要分页 + 主页牌组列表 两个积木组件替代原 主面板 @Builder，
               // 由 首页.ets 保留对数据状态的控制权（业务契约要求）。
-              Column({ space: 应用尺寸.间距_12 }) {
+              Column({ space: 应用尺寸.pageSectionGap }) {
                 if (this.显示今日进度卡) {
                   主页摘要分页({
                     主页快照数据: this.主页快照数据,
@@ -2333,20 +2513,22 @@ struct 首页 {
               .padding({
                 left: 应用尺寸.页面内边距_水平,
                 right: 应用尺寸.页面内边距_水平,
-                top: 应用尺寸.间距_4,
-                bottom: 应用尺寸.页面内边距_水平
+                top: 应用尺寸.pageContentTopInset,
+                bottom: 应用尺寸.pageBottomInset
               })
               .backgroundColor(this.页面底色微染值)
             }
             if (this.当前断点 !== 'xs') {
               GridCol({ span: { xs: 0, sm: 3, md: 4 } }) {
                 牌组详情面板({
+                  historyRefreshToken: this.historyRefreshToken,
                   是否深色: this.是否深色(),
                   牌组选项加载中: this.牌组选项加载中,
                   牌组选项错误: this.牌组选项错误,
                   开始学习: (): void => {
                     this.开始学习();
                   },
+                  预览: (): void => { this.打开牌组预览(); },
                   添加卡片: (): void => { this.打开添加笔记(); },
                   创建子牌组: (): void => {
                     this.创建父牌组ID = this.选中的牌组ID;
@@ -2462,24 +2644,34 @@ struct 首页 {
                   this.显示牌组详情 = false;
                   this.加载主页数据();
                 })
+              Blank()
+              按下态按钮({
+                文案: $r('app.string.deck_add_card'),
+                字色: this.动作主色,
+                themeText: true,
+                点击回调: (): void => { this.打开添加笔记(); }
+              })
             }
             .width('100%')
             .height(应用尺寸.工具栏高度 + this.状态栏高度)
             .padding({
               left: 应用尺寸.页面内边距_水平,
               right: 应用尺寸.页面内边距_水平,
-              top: this.状态栏高度 + 应用尺寸.间距_8,
-              bottom: 应用尺寸.间距_8
+              top: this.状态栏高度 + 应用尺寸.toolbarVerticalInset,
+              bottom: 应用尺寸.toolbarVerticalInset
             })
             .backgroundColor(this.页面底色微染值)
 
             牌组详情面板({
+              historyRefreshToken: this.historyRefreshToken,
+              showAddCard: false,
               是否深色: this.是否深色(),
               牌组选项加载中: this.牌组选项加载中,
               牌组选项错误: this.牌组选项错误,
               开始学习: (): void => {
                 this.开始学习();
               },
+              预览: (): void => { this.打开牌组预览(); },
               添加卡片: (): void => {
                 this.打开添加笔记();
               },
@@ -2650,9 +2842,42 @@ struct 首页 {
           })
         }
 
+        if (this.显示同步面板) {
+          同步面板({
+            是否深色: this.是否深色(),
+            账号名: this.同步面板账号名,
+            初始鉴权: this.同步面板认证,
+            automatic: true,
+            同步完成回调: (): void => {
+              this.加载主页数据();
+              this.同步后检查FSRS();
+            },
+            关闭回调: (): void => {
+              this.显示同步面板 = false;
+              this.同步面板认证 = null;
+              this.同步面板账号名 = '';
+            }
+          })
+        }
+
         // 首次启动欢迎弹窗：放最顶层，确保覆盖所有浮层
         //   关闭时调 标记已展示欢迎弹窗 持久化（已在 显示欢迎弹窗一次 中提前标记，
         //   这里仅关闭状态；即使弹窗未显示也已标记，保证「只弹一次」语义）
+        if (this.显示卡片预览) {
+          卡片预览页({
+            isDark: this.是否深色(),
+            卡片ID列表: this.预览卡片ID列表,
+            初始索引: this.预览初始索引,
+            媒体目录: this.预览媒体目录,
+            onPositionChanged: (index: number): void => {
+              this.预览初始索引 = index;
+            },
+            onEditField: (卡片ID: number): void => { this.关闭预览并编辑(卡片ID); },
+            onCreateWithAgent: (): void => { this.关闭预览并进入Agent制卡(); },
+            onClose: (): void => { this.显示卡片预览 = false; }
+          })
+        }
+
         if (this.显示欢迎弹窗) {
           欢迎弹窗({
             是否深色: this.是否深色(),
@@ -2675,15 +2900,21 @@ struct 首页 {
               .onClick(() => { this.显示节流奖励 = false; })
 
             Column() {
-              Stack({ alignContent: Alignment.End }) {
-                Text('×')
-                  .fontSize(应用尺寸.字号_卡片标题)
-                  .fontColor($r('app.color.text_secondary'))
-                  .padding({ left: 8, top: 4, right: 4, bottom: 4 })
+              Row() {
+                Button() {
+                  Text() { ThemeTextSpans($r('app.string.easter_egg_got_it'), this.themeAccentColors, this.getUIContext()) }.fontSize(应用尺寸.字号_按钮).fontWeight(FontWeight.Medium).fontColor(this.动作主色)
+                }
+                  .type(ButtonType.Capsule)
+                  .height(应用尺寸.按钮高度)
+                  .fontSize(应用尺寸.字号_按钮)
+                  .fontWeight(FontWeight.Medium)
+                  .backgroundColor(Color.Transparent)
+                  .fontColor(this.动作主色)
                   .onClick(() => { this.显示节流奖励 = false; })
               }
               .width('100%')
-              .padding({ left: 12, right: 12, top: 12, bottom: 8 })
+              .justifyContent(FlexAlign.End)
+              .padding({ left: 20, right: 20, top: 12 })
 
               Text(this.节流奖励文案)
                 .fontSize(应用尺寸.字号_彩蛋文案)
@@ -2693,20 +2924,7 @@ struct 首页 {
                 .textAlign(TextAlign.Center)
                 .padding({ top: 24, bottom: 32 })
 
-              Row() {
-                Button($r('app.string.easter_egg_got_it'))
-                  .type(ButtonType.Capsule)
-                  .layoutWeight(1)
-                  .height(应用尺寸.按钮高度)
-                  .fontSize(应用尺寸.字号_按钮)
-                  .fontWeight(FontWeight.Medium)
-                  // 主色背景+白字需 ≥4.5:1，用已搜索达标的 主色按钮背景 档（高明度主题下 动作主色 配白字不达标）
-                  .backgroundColor(this.主色按钮背景色)
-                  .fontColor('#FFFFFF')
-                  .onClick(() => { this.显示节流奖励 = false; })
-              }
-              .width('100%')
-              .padding({ left: 20, right: 20, bottom: 20 })
+
             }
             .width('88%')
             .constraintSize({ maxWidth: 380 })
@@ -2730,5 +2948,9 @@ struct 首页 {
     .navDestination(this.页面映射)
     // 用箭头函数包裹，避免方法引用丢失 this 绑定后 transition 回调内 this 为 undefined（BUG：从二级页面 push 三级页面时崩溃 "Cannot read property getUIContext of undefined"）。
     .customNavContentTransition((from: NavContentInfo, to: NavContentInfo, op: NavigationOperation): NavigationAnimatedTransition | undefined => this.自定义转场回调(from, to, op))
+    .backgroundColor(Color.Transparent)
+    }
+    .width('100%').height('100%')
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
   }
 }

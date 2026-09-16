@@ -45,7 +45,7 @@ test('study actions use isolated component state', () => {
   assert.ok(existsSync(buttonUrl), 'isolated StudyActionButton component must exist');
   const button = read('entry/src/main/ets/components/StudyActionButton.ets');
   assert.doesNotMatch(page, /按下评分|BURY_RATING_TAG|SUSPEND_RATING_TAG/);
-  assert.equal((page.match(/StudyActionButton\(\{/g) ?? []).length, 6);
+  assert.equal((page.match(/StudyActionButton\(\{/g) ?? []).length, 4);
   assert.match(button, /@State private isPressed: boolean = false/);
   assert.match(button, /TouchType\.Down[\s\S]*?this\.isPressed = true/);
   assert.match(button, /TouchType\.Up[\s\S]*?TouchType\.Cancel[\s\S]*?this\.isPressed = false/);

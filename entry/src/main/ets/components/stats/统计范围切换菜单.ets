@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeTextSpans } from '../common/ThemeText';
+import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
 import { 应用尺寸 } from '../../utils/应用尺寸';
 
@@ -13,6 +15,7 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 
 @Component
 export struct 统计范围切换菜单 {
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop 当前全部范围: boolean = false;
   @Prop 主色: ResourceColor = $r('app.color.action_primary');
   @Prop 顶部偏移: number = 68;
@@ -30,7 +33,7 @@ export struct 统计范围切换菜单 {
         .onClick((): void => this.关闭回调())
 
       Column() {
-        Text($r('app.string.stats_hours_range_1y'))
+        Text() { ThemeTextSpans($r('app.string.stats_hours_range_1y'), (!this.当前全部范围) ? this.themeAccentColors : [], this.getUIContext()) }
           .fontSize(应用尺寸.字号_正文)
           .fontColor(!this.当前全部范围 ? this.主色 : $r('app.color.text_primary'))
           .width('100%')
@@ -43,7 +46,7 @@ export struct 统计范围切换菜单 {
           .strokeWidth(应用尺寸.卡片边框)
           .margin({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
 
-        Text($r('app.string.stats_hours_range_all'))
+        Text() { ThemeTextSpans($r('app.string.stats_hours_range_all'), (this.当前全部范围) ? this.themeAccentColors : [], this.getUIContext()) }
           .fontSize(应用尺寸.字号_正文)
           .fontColor(this.当前全部范围 ? this.主色 : $r('app.color.text_primary'))
           .width('100%')

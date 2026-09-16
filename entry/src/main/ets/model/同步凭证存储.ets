@@ -37,6 +37,7 @@
 import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
 import { hilog } from '@kit.PerformanceAnalysisKit';
+import { normalizeSyncServer } from './SyncSettings';
 
 const 存储名: string = 'jidecards_sync';
 const HKEY键: string = 'sync_hkey';
@@ -51,6 +52,60 @@ const 媒体待同步键: string = 'media_sync_pending';
 // 默认 true（保持既有行为）。用户关闭后 syncCollection 传 syncMedia=false，
 // rslib 不会挂起媒体同步任务，同步面板也不进媒体阶段。
 const 媒体同步开关键: string = 'sync_media_enabled';
+const CUSTOM_SERVER_KEY: string = 'custom_sync_server';
+const AUTO_SYNC_KEY: string = 'auto_sync_enabled';
+
+/** 用户配置独立于服务器重定向，注销后仍可用同一地址重新登录。 */
+export function loadCustomSyncServer(): string {
+  const store: preferences.Preferences | null = 打开存储();
+  return store === null ? '' : 读取字符串(store, CUSTOM_SERVER_KEY);
+}
+
+/**
+ * 保存基础地址并撤销旧服务器会话；写盘失败恢复内存缓存并上抛给设置页。
+ * Invariants: 新服务器不得收到旧服务器 hkey；不保存密码。
+ */
+export async function saveCustomSyncServer(input: string): Promise<string> {
+  const endpoint: string = normalizeSyncServer(input);
+  const store: preferences.Preferences | null = 打开存储();
+  if (store === null) throw new Error('Sync preferences unavailable');
+  const previous: string = 读取字符串(store, CUSTOM_SERVER_KEY);
+  if (endpoint === previous) return endpoint;
+  const keys: string[] = [CUSTOM_SERVER_KEY, HKEY键, 端点键, 用户名键, 媒体待同步键];
+  const values: string[] = keys.map((key: string): string => 读取字符串(store, key));
+  try {
+    store.putSync(CUSTOM_SERVER_KEY, endpoint);
+    store.deleteSync(HKEY键);
+    store.deleteSync(端点键);
+    store.deleteSync(用户名键);
+    store.deleteSync(媒体待同步键);
+    await store.flush();
+  } catch (error) {
+    for (let index: number = 0; index < keys.length; index++) store.putSync(keys[index], values[index]);
+    throw error instanceof Error ? error : new Error('Could not save sync server');
+  }
+  return endpoint;
+}
+
+/** 自动同步默认开启，保留用户明确保存的关闭选择。 */
+export function loadAutoSyncEnabled(): boolean {
+  const store: preferences.Preferences | null = 打开存储();
+  return store === null || store.getSync(AUTO_SYNC_KEY, true) === true;
+}
+
+/** 等待开关落盘，失败时 UI 保留原值。 */
+export async function saveAutoSyncEnabled(enabled: boolean): Promise<void> {
+  const store: preferences.Preferences | null = 打开存储();
+  if (store === null) throw new Error('Sync preferences unavailable');
+  const previous: boolean = store.getSync(AUTO_SYNC_KEY, true) === true;
+  try {
+    store.putSync(AUTO_SYNC_KEY, enabled);
+    await store.flush();
+  } catch (error) {
+    store.putSync(AUTO_SYNC_KEY, previous);
+    throw error instanceof Error ? error : new Error('Could not save automatic sync setting');
+  }
+}
 
 // ========================================================
 // @块ID MODEL-SYNC-AUTH-002

@@ -119,7 +119,7 @@ AI 页面
 
 模型不能访问裸 RPC、数据库、文件系统或 shell。工具目录是模型可见契约的唯一
 来源，稳定 ID 的读权限不自动转化为写权限，真正写入前必须重新核对 baseline。
-2.3.6 默认关闭所有 Agent UI 入口，开发者调试可统一解锁；页面仍固定 `searchMode: 'off'`。详细现状见
+2.4.0 默认关闭所有 Agent UI 入口，开发者调试可统一解锁；页面仍固定 `searchMode: 'off'`。详细现状见
 [agent-2-design.md](agent-2-design.md)。
 
 ## 6. 状态、主题与本地化

@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeTextSpans } from './common/ThemeText';
+import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
+import { DialogHeader } from './common/DialogHeader';
 // ========================================================
 // @块ID UI-CREATE-DECK-001
 // @名称 新建牌组弹层
@@ -37,6 +40,7 @@ import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时
 
 @Component
 export struct 创建牌组面板 {
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
   @Prop busy: boolean = false;
   @Prop errorMessage: string = '';
@@ -105,6 +109,11 @@ export struct 创建牌组面板 {
   // ========================================================
   private 取本地化文本(resource: Resource): string {
     return this.getUIContext().getHostContext()!.resourceManager.getStringSync(resource.id);
+  }
+
+  /** 先格式化牌组名，再交给主题文字渲染，避免资源参数在 Builder 中丢失。 */
+  private formatPreview(resource: Resource, ...names: string[]): string {
+    return this.getUIContext().getHostContext()!.resourceManager.getStringSync(resource.id, ...names);
   }
 
   // ========================================================
@@ -227,7 +236,7 @@ export struct 创建牌组面板 {
   private 父牌组候选行(id: string, label: string, depth: number) {
     Row() {
       Row() {
-        Text(label)
+        Text() { ThemeTextSpans(label, (this.parentId === id) ? this.themeAccentColors : [], this.getUIContext()) }
           .fontSize(应用尺寸.字号_正文)
           .fontColor(this.parentId === id ? this.动作主色 : $r('app.color.text_primary'))
           .fontWeight(this.parentId === id ? FontWeight.Bold : FontWeight.Medium)
@@ -282,14 +291,19 @@ export struct 创建牌组面板 {
 
       Column({ space: 应用尺寸.间距_16 }) {
         // 标题行
-        Row() {
-          Text($r('app.string.create_deck_title'))
-            .fontSize(应用尺寸.字号_面板标题)
-            .fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.text_primary'))
-            .layoutWeight(1)
-        }
-        .width('100%')
+        DialogHeader({
+          title: $r('app.string.create_deck_title'),
+          actionLabel: this.busy ? $r('app.string.create_deck_creating') : $r('app.string.create_deck_confirm'),
+          actionEnabled: this.canSubmit(),
+          closeLabel: $r('app.string.create_deck_cancel'),
+          closeEnabled: !this.busy,
+          onClose: () => {
+            this.onCancel();
+          },
+          onAction: () => {
+            this.提交();
+          }
+        })
 
         // 牌组名称输入框上移到标题下方（先填名称 → 再选父牌组 → 看预览 → 提交）
         TextInput({ placeholder: $r('app.string.deck_name_placeholder'), text: this.deckName })
@@ -311,7 +325,7 @@ export struct 创建牌组面板 {
           })
 
         if (this.预览父路径() !== '' && this.预览叶节点() !== '') {
-          Text($r('app.string.create_deck_preview_child', this.预览父路径(), this.预览叶节点()))
+          Text(this.formatPreview($r('app.string.create_deck_preview_child'), this.预览父路径(), this.预览叶节点()))
             .fontSize(应用尺寸.字号_正文_小)
             .fontColor(this.动作主色)
             .fontWeight(FontWeight.Medium)
@@ -319,7 +333,7 @@ export struct 创建牌组面板 {
             .maxLines(2)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
         } else if (this.预览父路径() !== '') {
-          Text($r('app.string.create_deck_preview_child_pending', this.预览父路径()))
+          Text(this.formatPreview($r('app.string.create_deck_preview_child_pending'), this.预览父路径()))
             .fontSize(应用尺寸.字号_正文_小)
             .fontColor(this.动作主色)
             .fontWeight(FontWeight.Medium)
@@ -327,7 +341,7 @@ export struct 创建牌组面板 {
             .maxLines(2)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
         } else if (this.预览叶节点() !== '') {
-          Text($r('app.string.create_deck_preview_top', this.预览叶节点()))
+          Text(this.formatPreview($r('app.string.create_deck_preview_top'), this.预览叶节点()))
             .fontSize(应用尺寸.字号_正文_小)
             .fontColor(this.动作主色)
             .fontWeight(FontWeight.Medium)
@@ -360,42 +374,6 @@ export struct 创建牌组面板 {
             .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
 
-        Row({ space: 应用尺寸.间距_10 }) {
-          Button($r('app.string.create_deck_cancel'))
-            .height(应用尺寸.按钮高度)
-            .layoutWeight(1)
-            .fontSize(应用尺寸.字号_按钮)
-            .fontColor($r('app.color.text_primary'))
-            .backgroundColor($r('app.color.surface_page'))
-            .borderRadius(应用尺寸.圆角_胶囊)
-            .enabled(!this.busy)
-            .onClick(() => {
-              this.onCancel();
-            })
-
-          Button(this.busy ? $r('app.string.create_deck_creating') : $r('app.string.create_deck_confirm'))
-            .height(应用尺寸.按钮高度)
-            .layoutWeight(1)
-            .fontSize(应用尺寸.字号_按钮)
-            .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.action_on_primary'))
-            .backgroundColor(this.已按下确认 ? this.主色按钮按下 : this.主色按钮背景)
-            .borderRadius(应用尺寸.圆角_胶囊)
-            .animation({ duration: 80, curve: Curve.EaseOut })
-            .opacity(this.canSubmit() ? 1 : 0.5)
-            .enabled(this.canSubmit())
-            .onTouch((event: TouchEvent): void => {
-              if (event.type === TouchType.Down) {
-                this.已按下确认 = true;
-              } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-                this.已按下确认 = false;
-              }
-            })
-            .onClick(() => {
-              this.提交();
-            })
-        }
-        .width('100%')
       }
       .width('88%')
       .constraintSize({ maxWidth: 480, minHeight: '65%' })

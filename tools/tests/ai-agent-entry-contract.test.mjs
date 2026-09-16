@@ -76,7 +76,7 @@ test('Agent create and edit labels and page background use the themed shell', ()
   const byName = new Map(zh.map((item) => [item.name, item.value]));
   assert.equal(byName.get('ai_card_title'), 'Agent 制卡');
   assert.equal(byName.get('ai_card_edit'), 'Agent 改卡');
-  assert.match(page, /@StorageProp\(颜色键\.页面底色微染\)[^\n]*页面底色微染值/);
+  assert.match(page, /@StorageProp\(PAGE_SURFACE_KEY\)[^\n]*页面底色微染值/);
   assert.match(page, /private 顶部条\(\)[\s\S]*?backgroundColor\(this\.页面底色微染值\)/);
   assert.match(page, /build\(\)[\s\S]*?height\('100%'\)[\s\S]*?backgroundColor\(this\.页面底色微染值\)/);
 });
@@ -169,10 +169,10 @@ test('study current-card entry passes stable context and reconciles the queue on
   assert.match(study, /cardIds:\s*\[this\.当前卡片\.cardId\]/);
   assert.match(study, /noteIds:\s*\[this\.当前卡片\.noteId\]/);
   assert.match(study, /templateIdx:\s*this\.当前卡片\.templateIdx/);
-  assert.match(study, /刷新AI改卡后当前卡/);
-  const refresh = study.match(/private async 刷新AI改卡后当前卡\(\): Promise<void> \{([\s\S]*?)\n  \}/)?.[1] ?? '';
-  assert.match(refresh, /获取队首卡片/);
-  assert.match(refresh, /渲染既有卡片/);
+  assert.match(study, /刷新编辑后当前卡/);
+  const refresh = study.match(/private async 刷新编辑后当前卡\(\): Promise<void> \{([\s\S]*?)\n  \}/)?.[1] ?? '';
+  assert.match(refresh, /await this\.加载下一张卡\(\)/);
+  assert.match(refresh, /await this\.显示答案\(\)/);
   assert.doesNotMatch(refresh, /回答卡片|埋藏|暂停/);
 });
 

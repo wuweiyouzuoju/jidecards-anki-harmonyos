@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { THEME_VISUALS_KEY, THEME_TEXT_COLORS_KEY, PAGE_SURFACE_KEY, themeDefinition } from '../model/ThemeCatalog';
+import { GLASS_COLORS_KEY, GLASS_HIGHLIGHT_COLORS, GLASS_DARK_COLORS } from '../model/ThemeCatalog';
+import { PRIMARY_GLASS_KEY, themePrimaryGlass } from '../model/ThemeCatalog';
 
 // ========================================================
 // @块ID UTIL-COLOR-THEME-MGR
@@ -35,6 +38,12 @@ import { 应用系统栏样式 } from './主题控制器';
 
 export function 应用颜色主题(主题: 颜色主题, 是否深色: boolean): void {
   const 色板 = 解析主题色板(主题, 是否深色);
+  const visual = themeDefinition(主题);
+  AppStorage.setOrCreate(THEME_VISUALS_KEY, visual);
+  AppStorage.setOrCreate(PRIMARY_GLASS_KEY, themePrimaryGlass(visual, 是否深色));
+  AppStorage.setOrCreate<string[]>(THEME_TEXT_COLORS_KEY, 是否深色 ? visual.darkActionColors : visual.lightActionColors);
+  AppStorage.setOrCreate<string[]>(GLASS_COLORS_KEY, 是否深色 ? GLASS_DARK_COLORS : GLASS_HIGHLIGHT_COLORS);
+  AppStorage.setOrCreate<string>(PAGE_SURFACE_KEY, visual.backgroundTextures.length > 0 ? '#00000000' : 色板.页面底色微染);
   // 主色系（8 个）
   AppStorage.setOrCreate<string>(颜色键.动作主色, 色板.动作主色);
   AppStorage.setOrCreate<string>(颜色键.动作主色悬停, 色板.动作主色悬停);

@@ -1,4 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeTextSpans } from './common/ThemeText';
+import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
+import { ThemeDefinition, themeDefinition, THEME_VISUALS_KEY, themeDeckColors } from '../model/ThemeCatalog';
+import { themeGradient } from '../utils/ThemeVisuals';
+import { GLASS_COLORS_KEY, GLASS_HIGHLIGHT_COLORS } from '../model/ThemeCatalog';
 
 import { 牌组汇总, 牌组色调, 牌组显示名 } from '../model/主页模型';
 import { 应用尺寸 } from '../utils/应用尺寸';
@@ -52,6 +57,9 @@ interface 色条选项 {
 
 @Component
 export struct 牌组列表项 {
+  @StorageProp(GLASS_COLORS_KEY) private glassColors: string[] = GLASS_HIGHLIGHT_COLORS;
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
+  @StorageProp(THEME_VISUALS_KEY) private visual: ThemeDefinition = themeDefinition('aurora');
   // 注：deck / expanded / onToggle 保留英文名以兼容 deck-hierarchy-contract.test.mjs 阶段 6 前的断言。
   @Prop deck: 牌组汇总 = {
     id: '', name: '', fullName: '', depth: 0, parentId: '', hasChildren: false, ancestorIds: [],
@@ -254,7 +262,8 @@ export struct 牌组列表项 {
           .fontColor($r('app.color.text_secondary'))
       }
       .width('100%')
-      .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+      .constraintSize({ minHeight: 应用尺寸.menuItemHeight })
+      .padding({ left: 应用尺寸.menuHorizontalPadding, right: 应用尺寸.menuHorizontalPadding, top: 10, bottom: 10 })
       .onClick(() => {
         this.菜单模式 = 'tone';
       })
@@ -265,7 +274,8 @@ export struct 牌组列表项 {
           .layoutWeight(1)
       }
       .width('100%')
-      .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+      .constraintSize({ minHeight: 应用尺寸.menuItemHeight })
+      .padding({ left: 应用尺寸.menuHorizontalPadding, right: 应用尺寸.menuHorizontalPadding, top: 10, bottom: 10 })
       .onClick(() => {
         this.显示牌组菜单 = false;
         this.onEnterReorder(this.deck.id);
@@ -277,7 +287,8 @@ export struct 牌组列表项 {
           .layoutWeight(1)
       }
       .width('100%')
-      .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+      .constraintSize({ minHeight: 应用尺寸.menuItemHeight })
+      .padding({ left: 应用尺寸.menuHorizontalPadding, right: 应用尺寸.menuHorizontalPadding, top: 10, bottom: 10 })
       .onClick(() => {
         this.显示牌组菜单 = false;
         this.onCustomizeDeck(this.deck.id);
@@ -291,7 +302,8 @@ export struct 牌组列表项 {
             .layoutWeight(1)
         }
         .width('100%')
-        .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+        .constraintSize({ minHeight: 应用尺寸.menuItemHeight })
+        .padding({ left: 应用尺寸.menuHorizontalPadding, right: 应用尺寸.menuHorizontalPadding, top: 10, bottom: 10 })
         .onClick(() => {
           this.显示牌组菜单 = false;
           this.onCustomStudy(this.deck.id);
@@ -303,7 +315,8 @@ export struct 牌组列表项 {
             .layoutWeight(1)
         }
         .width('100%')
-        .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+        .constraintSize({ minHeight: 应用尺寸.menuItemHeight })
+        .padding({ left: 应用尺寸.menuHorizontalPadding, right: 应用尺寸.menuHorizontalPadding, top: 10, bottom: 10 })
         .onClick(() => {
           this.显示牌组菜单 = false;
           this.onCreateFilteredDeck();
@@ -316,7 +329,8 @@ export struct 牌组列表项 {
           .layoutWeight(1)
       }
       .width('100%')
-      .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+      .constraintSize({ minHeight: 应用尺寸.menuItemHeight })
+      .padding({ left: 应用尺寸.menuHorizontalPadding, right: 应用尺寸.menuHorizontalPadding, top: 10, bottom: 10 })
       .onClick(() => {
         this.显示牌组菜单 = false;
         this.onHideDeck(this.deck.id);
@@ -328,13 +342,14 @@ export struct 牌组列表项 {
           .layoutWeight(1)
       }
       .width('100%')
-      .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+      .constraintSize({ minHeight: 应用尺寸.menuItemHeight })
+      .padding({ left: 应用尺寸.menuHorizontalPadding, right: 应用尺寸.menuHorizontalPadding, top: 10, bottom: 10 })
       .onClick(() => {
         this.显示牌组菜单 = false;
         this.onDeleteDeck(this.deck.id);
       })
     }
-    .width(180)
+    .width(应用尺寸.contextMenuWidth)
     .backgroundColor($r('app.color.surface_card'))
     .borderRadius(应用尺寸.圆角_面板)
   }
@@ -356,13 +371,14 @@ export struct 牌组列表项 {
         .fontColor($r('app.color.text_primary'))
         .layoutWeight(1)
       if (this.deck.tone === 选项.tone) {
-        Text('✓')
+        Text() { ThemeTextSpans('✓', this.themeAccentColors, this.getUIContext()) }
           .fontSize(应用尺寸.字号_正文)
           .fontColor(this.动作主色)
       }
     }
     .width('100%')
-    .padding({ left: 16, right: 16, top: 10, bottom: 10 })
+    .constraintSize({ minHeight: 应用尺寸.menuItemHeight })
+    .padding({ left: 应用尺寸.menuHorizontalPadding, right: 应用尺寸.menuHorizontalPadding, top: 10, bottom: 10 })
     .onClick(() => {
       this.显示牌组菜单 = false;
       this.onToneChange(this.deck.id, 选项.tone);
@@ -379,7 +395,8 @@ export struct 牌组列表项 {
           .fontColor($r('app.color.text_secondary'))
       }
       .width('100%')
-      .padding({ left: 16, right: 16, top: 8, bottom: 8 })
+      .constraintSize({ minHeight: 应用尺寸.menuItemHeight })
+      .padding({ left: 应用尺寸.menuHorizontalPadding, right: 应用尺寸.menuHorizontalPadding, top: 8, bottom: 8 })
       .onClick(() => {
         this.菜单模式 = 'main';
       })
@@ -387,7 +404,7 @@ export struct 牌组列表项 {
         this.单行色条选项(选项);
       }, (选项: 色条选项) => 选项.tone.toString())
     }
-    .width(180)
+    .width(应用尺寸.contextMenuWidth)
     .backgroundColor($r('app.color.surface_card'))
     .borderRadius(应用尺寸.圆角_面板)
   }
@@ -473,6 +490,10 @@ export struct 牌组列表项 {
         })
         // 色条：tone===None 时不渲染色块，但保留 Column 占位以维持行内对齐。
         Column()
+          .linearGradient({ angle: 180,
+            colors: this.visual.deckColors.length > 0 && this.deck.tone === 牌组色调.None
+              ? themeGradient(themeDeckColors(this.visual, this.deck.id))
+              : [[Color.Transparent, 0], [Color.Transparent, 1]] })
           .width(应用尺寸.色条宽度)
           .height(应用尺寸.色条高度)
           .backgroundColor(
@@ -560,14 +581,22 @@ export struct 牌组列表项 {
     .height(应用尺寸.牌组行高度)
     .clip(true)
     .borderRadius(应用尺寸.圆角_牌组行)
-    .backgroundColor(this.selected ? this.选中背景色 : $r('app.color.surface_card'))
+    .linearGradient({ angle: 110, colors: this.visual.selectedColors.length > 0 && this.selected
+      ? themeGradient(this.glassColors)
+      : [[Color.Transparent, 0], [Color.Transparent, 1]] })
+    // 背景已经是柔化彩雾，透明底与高光形成玻璃感，无需列表逐项实时模糊。
+    .backgroundColor(this.selected
+      ? (this.visual.selectedColors.length > 0 ? Color.Transparent : this.选中背景色)
+      : $r('app.color.surface_card'))
+    .shadow({ radius: this.selected && this.visual.selectedColors.length > 0 ? 8 : 0,
+      color: '#140F2350', offsetY: 2 })
     .border({
       width: 应用尺寸.卡片边框,
       // 排序模式下行描边用 动作主色 高亮，让用户感知「现在可拖」；
       // 选中态用 主色边框色（比 动作主色 浅，避免选中行视觉过重）
       color: this.reorderMode
         ? this.动作主色 : (this.selected ?
-          this.主色边框色 : $r('app.color.border_subtle'))
+          (this.visual.selectedColors.length > 0 ? '#80FFFFFF' : this.主色边框色) : $r('app.color.border_subtle'))
     })
   }
 }

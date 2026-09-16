@@ -26,6 +26,7 @@
 // 偏好不可用时保留当前内存状态，不中断学习入口（catch 静默）。
 // ========================================================
 
+import { UNLOCKED_CONTENTS_KEY, isThemeAvailable } from './ThemeCatalog';
 import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
 import { 默认颜色主题, 规范化颜色主题, 颜色主题 } from './颜色主题';
@@ -49,7 +50,8 @@ export async function 加载颜色主题(): Promise<颜色主题> {
   try {
     const 存储: preferences.Preferences = await preferences.getPreferences(上下文, 存储名);
     const 值: preferences.ValueType = await 存储.get(颜色主题键, 默认颜色主题);
-    return typeof 值 === 'string' ? 规范化颜色主题(值) : 默认颜色主题;
+    const theme: 颜色主题 = typeof 值 === 'string' ? 规范化颜色主题(值) : 默认颜色主题;
+    return !isThemeAvailable(theme, AppStorage.get<string[]>(UNLOCKED_CONTENTS_KEY) ?? []) ? 默认颜色主题 : theme;
   } catch (错误) {
     return 默认颜色主题;
   }
@@ -57,6 +59,7 @@ export async function 加载颜色主题(): Promise<颜色主题> {
 
 /** 把颜色主题写入 preferences 并 flush；上下文缺失或写入失败时静默跳过。 */
 export async function 保存颜色主题(主题: 颜色主题): Promise<void> {
+  if (!isThemeAvailable(主题, AppStorage.get<string[]>(UNLOCKED_CONTENTS_KEY) ?? [])) return;
   const 上下文: common.UIAbilityContext | null = 取能力上下文();
   if (上下文 === null) {
     return;

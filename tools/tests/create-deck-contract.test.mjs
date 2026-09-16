@@ -20,6 +20,17 @@ const PANEL = 'entry/src/main/ets/components/创建牌组面板.ets';
 const PAGE = 'entry/src/main/ets/pages/首页.ets';
 const SERVICE = 'entry/src/main/ets/backend/牌组服务.ts';
 
+test('dynamic deck previews bind formatted text directly instead of passing value snapshots through a span builder', () => {
+  const panel = read(PANEL);
+  for (const key of ['child', 'child_pending', 'top']) {
+    assert.ok(panel.includes(`Text(this.formatPreview($r('app.string.create_deck_preview_${key}'),`));
+  }
+  assert.doesNotMatch(panel, /ThemeTextSpans\(this\.formatPreview/);
+  assert.match(panel, /getStringSync\(resource\.id, \.\.\.names\)/);
+  assert.match(panel, /@State private deckName: string/);
+  assert.match(panel, /this\.deckName = value/);
+});
+
 test('create deck panel exists as a pure UI building block', () => {
   assert.equal(existsSync(projectUrl(PANEL)), true, `${PANEL} must exist`);
   const panel = read(PANEL);
@@ -38,7 +49,9 @@ test('create deck panel guards submission and reflects busy/error props', () => 
   assert.match(panel, /@Prop busy: boolean/);
   assert.match(panel, /@Prop errorMessage: string/);
   assert.match(panel, /deckName\.trim\(\)\.length > 0/);
-  assert.match(panel, /\.enabled\(this\.canSubmit\(\)\)/);
+  assert.match(panel, /actionEnabled: this\.canSubmit\(\)/);
+  const header = read('entry/src/main/ets/components/common/DialogHeader.ets');
+  assert.match(header, /\.enabled\(this\.actionEnabled\)/);
   assert.match(panel, /app\.color\.error_text/);
   assert.match(panel, /TextInput\(/);
 });

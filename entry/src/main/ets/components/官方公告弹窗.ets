@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeTextSpans } from './common/ThemeText';
+import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
+import { DialogHeader } from './common/DialogHeader';
 import type { 官方公告展示项 } from '../model/官方公告模型';
 import { 颜色键 } from '../model/颜色主题';
 import { 应用尺寸 } from '../utils/应用尺寸';
@@ -8,6 +11,7 @@ import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时
 /** 官方启动公告弹窗：纯展示层；确认与详情动作经回调上抛，返回键与遮罩点击不关闭。 */
 @Component
 export struct 官方公告弹窗 {
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop announcement: 官方公告展示项;
   @Prop isDark: boolean = false;
   @Prop acknowledging: boolean = false;
@@ -41,11 +45,13 @@ export struct 官方公告弹窗 {
         }))
 
       Column({ space: 应用尺寸.间距_12 }) {
-        Text(this.announcement.title)
-          .fontSize(应用尺寸.字号_面板标题)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.text_primary'))
-          .width('100%')
+        DialogHeader({
+          title: this.announcement.title,
+          actionLabel: $r('app.string.official_announcement_acknowledge'),
+          actionEnabled: !this.acknowledging,
+          showClose: false,
+          onAction: (): void => { this.onAcknowledge(); }
+        })
 
         Text(this.本地化发布时间())
           .fontSize(应用尺寸.字号_说明)
@@ -65,25 +71,18 @@ export struct 官方公告弹窗 {
 
         Row({ space: 应用尺寸.间距_12 }) {
           if (this.announcement.actionUrl.length > 0) {
-            Button($r('app.string.official_announcement_details'))
+            Button() {
+              Text() { ThemeTextSpans($r('app.string.official_announcement_details'), this.themeAccentColors, this.getUIContext()) }.fontColor($r('app.color.action_primary'))
+            }
               .type(ButtonType.Normal)
               .layoutWeight(1)
               .height(应用尺寸.按钮高度)
               .fontColor($r('app.color.action_primary'))
-              .backgroundColor($r('app.color.surface_page'))
-              .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+              .backgroundColor(Color.Transparent)
               .borderRadius(应用尺寸.圆角_面板)
               .onClick((): void => { this.onOpenDetails(); })
           }
-          Button($r('app.string.official_announcement_acknowledge'))
-            .type(ButtonType.Normal)
-            .layoutWeight(1)
-            .height(应用尺寸.按钮高度)
-            .enabled(!this.acknowledging)
-            .fontColor($r('app.color.action_on_primary'))
-            .backgroundColor(this.主色按钮背景)
-            .borderRadius(应用尺寸.圆角_面板)
-            .onClick((): void => { this.onAcknowledge(); })
+
         }
         .width('100%')
       }

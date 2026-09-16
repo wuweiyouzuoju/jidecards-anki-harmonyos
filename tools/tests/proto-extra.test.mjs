@@ -134,6 +134,11 @@ test('BuryOrSuspendCardsRequest encodes card_ids/note_ids/mode', () => {
   w.写入打包64位整数(1, [10, 20]);
   w.写入变长整数(3, BURY_SUSPEND_MODE_BURY_SCHED);
   assert.equal(hex(bytes), hex(w.转为字节()));
+
+  const noteBytes = encodeBuryOrSuspendCardsRequest([], [30, 40], 0);
+  const noteWriter = new 协议写入器();
+  noteWriter.写入打包64位整数(2, [30, 40]);
+  assert.equal(hex(noteBytes), hex(noteWriter.转为字节()));
 });
 
 test('UnburyDeckRequest encodes deck_id and mode', () => {

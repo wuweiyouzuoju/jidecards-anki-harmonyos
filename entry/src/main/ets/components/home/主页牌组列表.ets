@@ -104,7 +104,7 @@ export struct 主页牌组列表 {
       // 下拉刷新容器：onRefreshing 触发后调 onRefresh；
       // 父组件加载完毕置 刷新中=false → @Watch 同步 刷新指示器开关=false 收起指示器。
       Refresh({ refreshing: $$this.刷新指示器开关 }) {
-        List({ scroller: this.牌组列表滚动器, space: 应用尺寸.列表间距 }) {
+        List({ scroller: this.牌组列表滚动器, space: 应用尺寸.pageSectionGap }) {
           LazyForEach(this.牌组数据源, (deck: 牌组汇总) => {
             ListItem() {
               牌组列表项({

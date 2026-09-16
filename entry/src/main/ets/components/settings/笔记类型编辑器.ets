@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeTextSpans } from '../common/ThemeText';
+import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
+import { DialogHeader } from '../common/DialogHeader';
 // ========================================================
 // @块ID UI-NOTETYPE-EDITOR-001
 // @名称 笔记类型编辑器
@@ -51,6 +54,7 @@ interface 模板项 {
 
 @Component
 export struct 笔记类型编辑器 {
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
   @Prop notetypeId: number = 0;
   @Prop notetypeName: string = '';
@@ -66,6 +70,9 @@ export struct 笔记类型编辑器 {
   @State private 模板列表: 模板项[] = [];
   @State private 当前模板索引: number = 0;
   @State private CSS文本: string = '';
+  @State private fieldsExpanded: boolean = false;
+  @State private templatesExpanded: boolean = false;
+  @State private stylesExpanded: boolean = false;
   @State private 原始JSON: string = '';
 
   private readonly 服务: 笔记类型服务 = new 笔记类型服务();
@@ -307,7 +314,7 @@ export struct 笔记类型编辑器 {
         .layoutWeight(1)
         .onChange((值: string) => { this.更新字段名(索引, 值); })
       // 上移
-      Text('↑')
+      Text() { ThemeTextSpans('↑', (索引 > 0) ? this.themeAccentColors : [], this.getUIContext()) }
         .fontSize(16)
         .fontColor(索引 > 0 ? this.主色按钮背景 : 设置面板色板_取(this.isDark).弱化文字)
         .width(28)
@@ -315,7 +322,7 @@ export struct 笔记类型编辑器 {
         .textAlign(TextAlign.Center)
         .onClick(() => { this.上移字段(索引); })
       // 下移
-      Text('↓')
+      Text() { ThemeTextSpans('↓', (索引 < this.字段列表.length - 1) ? this.themeAccentColors : [], this.getUIContext()) }
         .fontSize(16)
         .fontColor(索引 < this.字段列表.length - 1 ? this.主色按钮背景 : 设置面板色板_取(this.isDark).弱化文字)
         .width(28)
@@ -336,7 +343,7 @@ export struct 笔记类型编辑器 {
 
   @Builder
   private 字段令牌行(字段名: string) {
-    Text(`{{${字段名}}}`)
+    Text() { ThemeTextSpans(`{{${字段名}}}`, this.themeAccentColors, this.getUIContext()) }
       .fontSize(应用尺寸.字号_正文_小)
       .fontColor(this.主色按钮背景)
       .backgroundColor(设置面板色板_取(this.isDark).标签背景)
@@ -369,27 +376,20 @@ export struct 笔记类型编辑器 {
         })
         .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
 
-      Scroll() {
-        Column({ space: 应用尺寸.间距_16 }) {
-          // Header：标题 + 右上角 ×
-          Row() {
-            Text($r('app.string.notetype_editor_title'))
-              .fontSize(应用尺寸.字号_面板标题)
-              .fontColor($r('app.color.text_primary'))
-              .fontWeight(FontWeight.Bold)
-              .layoutWeight(1)
-            if (!this.加载中 && !this.保存中) {
-              Text('×')
-                .fontSize(24)
-                .fontColor($r('app.color.text_secondary'))
-                .width(32)
-                .height(32)
-                .textAlign(TextAlign.Center)
-                .onClick(() => { this.onClose(); })
-            }
-          }
-          .width('100%')
+      Column({ space: 应用尺寸.间距_16 }) {
+          // 固定标题操作栏
+          DialogHeader({
+            title: $r('app.string.notetype_editor_title'),
+            actionLabel: this.保存中 ? $r('app.string.notetype_editor_saving') : $r('app.string.notetype_editor_save'),
+            actionEnabled: !this.加载中 && !this.保存中,
+            closeLabel: $r('app.string.create_deck_cancel'),
+            closeEnabled: !this.保存中,
+            onClose: (): void => { this.onClose(); },
+            onAction: () => { this.保存(); }
+          })
 
+        Scroll() {
+        Column({ space: 应用尺寸.间距_16 }) {
           // 加载中
           if (this.加载中) {
             Row({ space: 应用尺寸.间距_8 }) {
@@ -430,6 +430,23 @@ export struct 笔记类型编辑器 {
             }
             .width('100%')
 
+            Button() {
+              Row() {
+                Text($r('app.string.notetype_editor_fields'))
+                  .fontSize(应用尺寸.字号_正文)
+                  .fontColor($r('app.color.text_primary'))
+                  .layoutWeight(1)
+                Text(this.fieldsExpanded ? '⌃' : '⌄')
+                  .fontColor($r('app.color.text_secondary'))
+              }
+              .width('100%')
+            }
+            .type(ButtonType.Normal)
+            .width('100%')
+            .height(应用尺寸.按钮高度)
+            .backgroundColor($r('app.color.surface_card'))
+            .onClick((): void => { this.fieldsExpanded = !this.fieldsExpanded; })
+            if (this.fieldsExpanded) {
             // === 字段区 ===
             Column({ space: 应用尺寸.间距_5 }) {
               Row() {
@@ -438,7 +455,7 @@ export struct 笔记类型编辑器 {
                   .fontColor($r('app.color.text_primary'))
                   .fontWeight(FontWeight.Medium)
                   .layoutWeight(1)
-                Text($r('app.string.notetype_editor_add_field'))
+                Text() { ThemeTextSpans($r('app.string.notetype_editor_add_field'), this.themeAccentColors, this.getUIContext()) }
                   .fontSize(应用尺寸.字号_正文_小)
                   .fontColor(this.主色按钮背景)
                   .onClick(() => { this.添加字段(); })
@@ -451,6 +468,25 @@ export struct 笔记类型编辑器 {
             }
             .width('100%')
 
+            }
+
+            Button() {
+              Row() {
+                Text($r('app.string.notetype_editor_templates'))
+                  .fontSize(应用尺寸.字号_正文)
+                  .fontColor($r('app.color.text_primary'))
+                  .layoutWeight(1)
+                Text(this.templatesExpanded ? '⌃' : '⌄')
+                  .fontColor($r('app.color.text_secondary'))
+              }
+              .width('100%')
+            }
+            .type(ButtonType.Normal)
+            .width('100%')
+            .height(应用尺寸.按钮高度)
+            .backgroundColor($r('app.color.surface_card'))
+            .onClick((): void => { this.templatesExpanded = !this.templatesExpanded; })
+            if (this.templatesExpanded) {
             // === 模板区 ===
             Column({ space: 应用尺寸.间距_5 }) {
               Text($r('app.string.notetype_editor_templates'))
@@ -535,6 +571,25 @@ export struct 笔记类型编辑器 {
             }
             .width('100%')
 
+            }
+
+            Button() {
+              Row() {
+                Text($r('app.string.notetype_editor_css'))
+                  .fontSize(应用尺寸.字号_正文)
+                  .fontColor($r('app.color.text_primary'))
+                  .layoutWeight(1)
+                Text(this.stylesExpanded ? '⌃' : '⌄')
+                  .fontColor($r('app.color.text_secondary'))
+              }
+              .width('100%')
+            }
+            .type(ButtonType.Normal)
+            .width('100%')
+            .height(应用尺寸.按钮高度)
+            .backgroundColor($r('app.color.surface_card'))
+            .onClick((): void => { this.stylesExpanded = !this.stylesExpanded; })
+            if (this.stylesExpanded) {
             // === CSS 区 ===
             Column({ space: 应用尺寸.间距_5 }) {
               Text($r('app.string.notetype_editor_css'))
@@ -553,18 +608,9 @@ export struct 笔记类型编辑器 {
             }
             .width('100%')
 
+            }
+
             // === 保存按钮 ===
-            Button(this.保存中 ? $r('app.string.notetype_editor_saving') : $r('app.string.notetype_editor_save'))
-              .type(ButtonType.Normal)
-              .width('100%')
-              .height(应用尺寸.按钮高度)
-              .fontSize(应用尺寸.字号_按钮)
-              .fontColor($r('app.color.action_on_primary'))
-              .backgroundColor(this.主色按钮背景)
-              .borderRadius(应用尺寸.圆角_胶囊)
-              .enabled(!this.保存中)
-              .opacity(this.保存中 ? 0.6 : 1)
-              .onClick(() => { this.保存(); })
 
             if (this.保存中) {
               Row({ space: 应用尺寸.间距_8 }) {
@@ -581,7 +627,16 @@ export struct 笔记类型编辑器 {
             }
           }
         }
+        .width('100%')
+        }
+        .width('100%')
+        .layoutWeight(1)
+        .scrollBar(BarState.Auto)
+        .align(Alignment.TopStart)
+        .edgeEffect(EdgeEffect.Spring)
+      }
         .width('88%')
+        .height('80%')
         .constraintSize({ maxWidth: 480 })
         .padding(应用尺寸.面板内边距)
         .backgroundColor($r('app.color.surface_card'))
@@ -594,11 +649,6 @@ export struct 笔记类型编辑器 {
           TransitionEffect.opacity(0)
             .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() })
         ))
-      }
-      .width('100%')
-      .height('100%')
-      .scrollBar(BarState.Auto)
-      .edgeEffect(EdgeEffect.Spring)
     }
     .width('100%')
     .height('100%')

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { DialogHeader } from '../common/DialogHeader';
 // ========================================================
 // @块ID UI-BROWSER-EDIT-001
 // @名称 浏览编辑区
@@ -57,7 +58,6 @@ export struct 浏览编辑区 {
 
   @StorageProp(颜色键.主色按钮背景) private 主色按钮背景: string = '#2F5FD0';
   @StorageProp(颜色键.主色按钮按下) private 主色按钮按下: string = '#1E4FB8';
-  @State private 已按下保存: boolean = false;
 
   aboutToAppear(): void {
     // 从父级传入的初始值拷贝到内部状态（仅初始化，后续编辑不影响 initialFieldValues）
@@ -115,13 +115,21 @@ export struct 浏览编辑区 {
 
       // 主面板
       Column({ space: 应用尺寸.间距_14 }) {
+        DialogHeader({
+          title: $r('app.string.browser_detail_title'),
+          actionLabel: this.busy ? $r('app.string.browser_detail_saving') : $r('app.string.browser_detail_save'),
+          actionEnabled: !this.busy && this.fieldNames.length > 0,
+          closeLabel: $r('app.string.browser_detail_cancel'),
+          closeEnabled: !this.busy,
+          onClose: (): void => {
+            this.onCancel();
+          },
+          onAction: (): void => {
+            this.提交();
+          }
+        })
         Scroll() {
           Column({ space: 应用尺寸.间距_14 }) {
-            Text($r('app.string.browser_detail_title'))
-              .fontSize(应用尺寸.字号_面板标题)
-              .fontWeight(FontWeight.Bold)
-              .fontColor($r('app.color.text_primary'))
-              .width('100%')
 
             ForEach(this.fieldNames, (字段名: string, index: number) => {
               Column({ space: 应用尺寸.间距_5 }) {
@@ -187,39 +195,6 @@ export struct 浏览编辑区 {
             .maxLines(3)
         }
 
-        Row({ space: 应用尺寸.间距_10 }) {
-          Button($r('app.string.browser_detail_cancel'))
-            .height(应用尺寸.按钮高度)
-            .layoutWeight(1)
-            .fontSize(应用尺寸.字号_按钮)
-            .fontColor($r('app.color.text_primary'))
-            .backgroundColor($r('app.color.surface_page'))
-            .borderRadius(应用尺寸.圆角_胶囊)
-            .enabled(!this.busy)
-            .onClick((): void => {
-              this.onCancel();
-            })
-          Button(this.busy ? $r('app.string.browser_detail_saving') : $r('app.string.browser_detail_save'))
-            .height(应用尺寸.按钮高度)
-            .layoutWeight(1)
-            .fontSize(应用尺寸.字号_按钮)
-            .fontColor($r('app.color.action_on_primary'))
-            .backgroundColor(this.已按下保存 ? this.主色按钮按下 : this.主色按钮背景)
-            .borderRadius(应用尺寸.圆角_胶囊)
-            .animation({ duration: 80, curve: Curve.EaseOut })
-            .enabled(!this.busy && this.fieldNames.length > 0)
-            .onTouch((event: TouchEvent): void => {
-              if (event.type === TouchType.Down) {
-                this.已按下保存 = true;
-              } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-                this.已按下保存 = false;
-              }
-            })
-            .onClick((): void => {
-              this.提交();
-            })
-        }
-        .width('100%')
       }
       .width('88%')
       .constraintSize({ maxWidth: 520, maxHeight: '88%' })

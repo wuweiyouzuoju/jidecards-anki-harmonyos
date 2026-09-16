@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeTextSpans } from '../components/common/ThemeText';
+import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
+import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
 
 // 添加笔记页：独立全屏建卡页（Task 9）。
 // 由 首页.ets 通过 Navigation pathStack 以 NavDestination 形式入栈（与 学习页 同机制），
@@ -55,6 +58,8 @@ export interface 添加笔记页参数 {
 
 @Component
 export struct 添加笔记页 {
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
+  @StorageProp(PAGE_SURFACE_KEY) private pageSurface: string = '#F5F7FA';
   /** Navigation 入栈参数 */
   pageDeckId: string = '';
   pageDeckName: string = '';
@@ -910,7 +915,9 @@ export struct 添加笔记页 {
       // 注：帮助文案用回调 取帮助: () => Resource 而非直接传 Resource。
       // 直接传 Resource 时 @Builder 在调用时求值快照，后续 @State 笔记类型帮助 变化不会更新到弹层；
       // 回调在点击时执行，读取的是 this.笔记类型帮助 的最新值，确保切换笔记类型后 i 弹出对应说明。
-      Button($r('app.string.field_help_button'))
+      Button() {
+        Text() { ThemeTextSpans($r('app.string.field_help_button'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.动作主色)
+      }
         .type(ButtonType.Normal)
         .backgroundColor(Color.Transparent)
         .fontColor(this.动作主色)
@@ -954,9 +961,13 @@ export struct 添加笔记页 {
   // 抽 @Builder 消除两个分支的高级设置代码重复（BUG-004 修复）。
   @Builder
   private 高级设置折叠区() {
-    Button(this.高级已展开 ? $r('app.string.add_note_advanced_hide') : $r('app.string.add_note_advanced'))
+    Button() {
+      Text() { ThemeTextSpans(this.高级已展开 ? $r('app.string.add_note_advanced_hide') : $r('app.string.add_note_advanced'), this.themeAccentColors, this.getUIContext()) }.fontSize(应用尺寸.字号_按钮).fontColor(this.动作主色)
+    }
       .width('100%')
-      .fontSize(应用尺寸.字号_正文_小)
+      .height(应用尺寸.按钮高度)
+      .flexShrink(0)
+      .fontSize(应用尺寸.字号_按钮)
       .fontColor(this.动作主色)
       .backgroundColor($r('app.color.surface_page'))
       .borderRadius(应用尺寸.圆角_面板)
@@ -987,7 +998,6 @@ export struct 添加笔记页 {
       Row() {
         按下态按钮({
           文案: $r('app.string.study_back'),
-          选中态背景: this.主色容器色,
           字色: $r('app.color.text_primary'),
           是否启用: !this.处理中,
           点击回调: (): void => {
@@ -1007,10 +1017,10 @@ export struct 添加笔记页 {
     .padding({
       left: 应用尺寸.页面内边距_水平,
       right: 应用尺寸.页面内边距_水平,
-      top: this.状态栏高度 + 应用尺寸.间距_8,
-      bottom: 应用尺寸.间距_8
+      top: this.状态栏高度 + 应用尺寸.toolbarVerticalInset,
+      bottom: 应用尺寸.toolbarVerticalInset
     })
-    .backgroundColor($r('app.color.surface_page'))
+    .backgroundColor(Color.Transparent)
   }
 
   @Builder
@@ -1057,7 +1067,9 @@ export struct 添加笔记页 {
                 .onSelect((索引: number): void => {
                   this.加载笔记类型(this.笔记类型选项[索引].id);
                 })
-              Button($r('app.string.field_help_button'))
+              Button() {
+                Text() { ThemeTextSpans($r('app.string.field_help_button'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.动作主色)
+              }
                 .type(ButtonType.Normal)
                 .backgroundColor(Color.Transparent)
                 .fontColor(this.动作主色)
@@ -1094,7 +1106,9 @@ export struct 添加笔记页 {
                   .borderRadius(应用尺寸.圆角_面板)
                   .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
 
-                Button($r('app.string.add_note_image_occlusion_edit_masks'))
+                Button() {
+                  Text() { ThemeTextSpans($r('app.string.add_note_image_occlusion_edit_masks'), this.themeAccentColors, this.getUIContext()) }.fontSize(应用尺寸.字号_按钮).fontColor(this.动作主色)
+                }
                   .width('100%')
                   .height(应用尺寸.按钮高度)
                   .fontSize(应用尺寸.字号_按钮)
@@ -1233,7 +1247,7 @@ export struct 添加笔记页 {
         .padding({
           left: 应用尺寸.页面内边距_水平,
           right: 应用尺寸.页面内边距_水平,
-          top: 应用尺寸.间距_8
+          top: 应用尺寸.pageContentTopInset
         })
 
         // 错误信息固定在按钮上方，避免软键盘或字段多时被裁剪
@@ -1294,7 +1308,7 @@ export struct 添加笔记页 {
       }
       .width('100%')
       .height('100%')
-      .backgroundColor($r('app.color.surface_page'))
+      .backgroundColor(this.pageSurface)
 
       if (this.显示帮助) {
         字段帮助面板({
@@ -1328,8 +1342,8 @@ export struct 添加笔记页 {
         .padding({
           left: 应用尺寸.页面内边距_水平,
           right: 应用尺寸.页面内边距_水平,
-          top: this.状态栏高度 + 应用尺寸.间距_8,
-          bottom: 应用尺寸.间距_8 + this.导航条高度
+          top: this.状态栏高度 + 应用尺寸.toolbarVerticalInset,
+          bottom: 应用尺寸.toolbarVerticalInset + this.导航条高度
         })
       }
     }
@@ -1337,6 +1351,7 @@ export struct 添加笔记页 {
     .height('100%')
     }
     .hideTitleBar(true)
+    .backgroundColor(Color.Transparent)
     .opacity(this.转场透明度)
   }
 

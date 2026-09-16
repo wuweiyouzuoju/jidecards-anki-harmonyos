@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeTextSpans } from '../common/ThemeText';
+import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
 // 统计图表分区：统计页内每个图表区块的统一外壳（标题 + 内容 + 卡片样式）。
 // 用 @BuilderParam 槽位接收内容，visible=false 时不渲染（由偏好面板控制）。
@@ -10,6 +12,7 @@ import { 颜色键 } from '../../model/颜色主题';
 
 @Component
 export struct 统计图表分区 {
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop 标题: Resource = $r('app.string.stats_no_data');
   @Prop 有数据: boolean = true;
   @Prop 帮助标题: Resource | null = null;
@@ -29,7 +32,9 @@ export struct 统计图表分区 {
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.text_primary'))
         if (this.帮助标题 !== null && this.帮助正文 !== null) {
-          Button($r('app.string.field_help_button'))
+          Button() {
+            Text() { ThemeTextSpans($r('app.string.field_help_button'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.主色).fontSize(应用尺寸.字号_正文)
+          }
             .type(ButtonType.Normal)
             .backgroundColor(Color.Transparent)
             .fontColor(this.主色)

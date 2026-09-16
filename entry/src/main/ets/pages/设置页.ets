@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { initializeRedemption } from '../utils/RedemptionStore';
+import { UNLOCKED_CONTENTS_KEY, isThemeAvailable } from '../model/ThemeCatalog';
 import { common } from '@kit.AbilityKit';
 import { promptAction } from '@kit.ArkUI';
 import { hilog } from '@kit.PerformanceAnalysisKit';
@@ -41,7 +43,7 @@ export struct 设置页 {
 
   @StorageLink('systemDarkMode') private 系统暗黑模式: boolean = false;
   @State private 主题模式值: 主题模式 = 'system';
-  @State private 颜色主题值: 颜色主题 = 默认颜色主题;
+  @StorageLink('colorTheme') private 颜色主题值: 颜色主题 = 默认颜色主题;
   @State private 转场透明度: number = 1;
 
   // 弹层状态
@@ -74,6 +76,9 @@ export struct 设置页 {
       }
     );
     this.主题模式值 = await 加载主题模式();
+    try { await initializeRedemption(); } catch (error) {
+      hilog.warn(0x0000, '设置页', 'Redemption initialization unavailable; fingerprint panel can retry');
+    }
     this.颜色主题值 = await 加载颜色主题();
     await this.加载牌组列表();
   }
@@ -119,6 +124,7 @@ export struct 设置页 {
   }
 
   private 切换颜色主题(theme: 颜色主题): void {
+    if (!isThemeAvailable(theme, AppStorage.get<string[]>(UNLOCKED_CONTENTS_KEY) ?? [])) return;
     this.颜色主题值 = theme;
     AppStorage.setOrCreate<颜色主题>('colorTheme', theme);
     应用颜色主题(theme, this.是否深色());
@@ -334,6 +340,7 @@ export struct 设置页 {
   }
 
   private 返回(): void {
+    if (this.显示同步面板) return;
     if (this.pathStack !== undefined && this.pathStack.size() > 0) {
       this.pathStack.pop();
     }
@@ -435,7 +442,8 @@ export struct 设置页 {
       .alignContent(Alignment.Center)
     }
     .hideTitleBar(true)
-    .backgroundColor($r('app.color.surface_page'))
+    .backgroundColor(Color.Transparent)
+    .onBackPressed((): boolean => this.显示同步面板)
     .opacity(this.转场透明度)
   }
 }

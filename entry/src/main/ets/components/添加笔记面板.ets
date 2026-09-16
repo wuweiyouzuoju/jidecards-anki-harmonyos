@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeTextSpans } from './common/ThemeText';
+import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
+import { DialogHeader } from './common/DialogHeader';
 // ========================================================
 // @块ID UI-ADD-NOTE-001
 // @名称 添加笔记面板
@@ -54,6 +57,7 @@ interface 添加笔记下拉选项 {
 
 @Component
 export struct 添加笔记面板 {
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
   @Prop busy: boolean = false;
   @Prop errorMessage: string = '';
@@ -87,7 +91,6 @@ export struct 添加笔记面板 {
   // 2.1.4.1 对比度：按钮背景专用档（配 #FFFFFF 文字 ≥ 4.5:1）
   @StorageProp(颜色键.主色按钮背景) private 主色按钮背景: string = '#2F5FD0';
   @StorageProp(颜色键.主色按钮按下) private 主色按钮按下: string = '#1E4FB8';
-  @State private 已按下保存: boolean = false;
 
   // ========================================================
   // @块ID UI-ADD-NOTE-002
@@ -326,7 +329,9 @@ export struct 添加笔记面板 {
         .fontSize(应用尺寸.字号_正文_小)
         .fontColor($r('app.color.text_secondary'))
         .layoutWeight(1)
-      Button($r('app.string.field_help_button'))
+      Button() {
+        Text() { ThemeTextSpans($r('app.string.field_help_button'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.动作主色)
+      }
         .type(ButtonType.Normal)
         .backgroundColor(Color.Transparent)
         .fontColor(this.动作主色)
@@ -354,13 +359,21 @@ export struct 添加笔记面板 {
       Column({ space: 应用尺寸.间距_14 }) {
         // B12-Y2 2026-07-22：内容用 Scroll 包裹，fieldName 多或高级设置展开时可滚动，按钮固定底部
         // 避免 TextArea 越出面板边界、按钮 Row 被挤出面板外显示成"下面多出一个框"
+        DialogHeader({
+          title: $r('app.string.add_note_title'),
+          actionLabel: this.busy ? $r('app.string.add_note_saving') : $r('app.string.add_note_save'),
+          actionEnabled: !this.busy && this.fieldNames.length > 0,
+          closeLabel: $r('app.string.add_note_cancel'),
+          closeEnabled: !this.busy,
+          onClose: (): void => {
+            this.onCancel();
+          },
+          onAction: (): void => {
+            this.提交();
+          }
+        })
         Scroll() {
           Column({ space: 应用尺寸.间距_14 }) {
-            Text($r('app.string.add_note_title'))
-              .fontSize(应用尺寸.字号_面板标题)
-              .fontWeight(FontWeight.Bold)
-              .fontColor($r('app.color.text_primary'))
-              .width('100%')
 
             this.带帮助的标签($r('app.string.add_note_deck'), $r('app.string.add_note_deck_help'))
             Select(this.牌组下拉选项())
@@ -407,9 +420,13 @@ export struct 添加笔记面板 {
               .width('100%')
             }, (字段名: string, index: number): string => `${index}-${字段名}`)
 
-            Button(this.高级已展开 ? $r('app.string.add_note_advanced_hide') : $r('app.string.add_note_advanced'))
+            Button() {
+              Text() { ThemeTextSpans(this.高级已展开 ? $r('app.string.add_note_advanced_hide') : $r('app.string.add_note_advanced'), this.themeAccentColors, this.getUIContext()) }.fontSize(应用尺寸.字号_按钮).fontColor(this.动作主色)
+            }
               .width('100%')
-              .fontSize(应用尺寸.字号_正文_小)
+              .height(应用尺寸.按钮高度)
+              .flexShrink(0)
+              .fontSize(应用尺寸.字号_按钮)
               .fontColor(this.动作主色)
               .backgroundColor($r('app.color.surface_page'))
               .borderRadius(应用尺寸.圆角_面板)
@@ -461,39 +478,6 @@ export struct 添加笔记面板 {
             .maxLines(3)
         }
 
-        Row({ space: 应用尺寸.间距_10 }) {
-          Button($r('app.string.add_note_cancel'))
-            .height(应用尺寸.按钮高度)
-            .layoutWeight(1)
-            .fontSize(应用尺寸.字号_按钮)
-            .fontColor($r('app.color.text_primary'))
-            .backgroundColor($r('app.color.surface_page'))
-            .borderRadius(应用尺寸.圆角_胶囊)
-            .enabled(!this.busy)
-            .onClick((): void => {
-              this.onCancel();
-            })
-          Button(this.busy ? $r('app.string.add_note_saving') : $r('app.string.add_note_save'))
-            .height(应用尺寸.按钮高度)
-            .layoutWeight(1)
-            .fontSize(应用尺寸.字号_按钮)
-            .fontColor($r('app.color.action_on_primary'))
-            .backgroundColor(this.已按下保存 ? this.主色按钮按下 : this.主色按钮背景)
-            .borderRadius(应用尺寸.圆角_胶囊)
-            .animation({ duration: 80, curve: Curve.EaseOut })
-            .enabled(!this.busy && this.fieldNames.length > 0)
-            .onTouch((event: TouchEvent): void => {
-              if (event.type === TouchType.Down) {
-                this.已按下保存 = true;
-              } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-                this.已按下保存 = false;
-              }
-            })
-            .onClick((): void => {
-              this.提交();
-            })
-        }
-        .width('100%')
       }
       .width('88%')
       // B12-Y2 2026-07-22：maxHeight 88% + Scroll 让内容可滚动，按钮固定底部

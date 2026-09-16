@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { DialogHeader } from './common/DialogHeader';
 // ========================================================
 // @块ID COMP-IMAGEOCCLUSION-EDITOR-001
 // @名称 图片遮罩编辑器
@@ -23,8 +24,7 @@
 // 坐标全部归一化 0-1（与 Anki 后端协议一致），调用 生成Occlusions字符串 时
 // 由该函数负责格式化为 {{cN::image-occlusion:rect:left=..:top=..:width=..:height=..}}。
 // 编号 c1-c5 由顶部按钮组切换，越界值由调用方保证（编辑器不强校验）。
-// 画布与图片同尺寸（Stack 用 aspectRatio 锁定为图片宽高比），保证归一化
-// 坐标与图片像素一一对应，无 letterbox 误差。
+// 图片完整居中显示；绘制和触摸均以 Contain 后的图像区域换算，排除留白。
 // 删除遮罩走顶部"撤销/清空"按钮，不在遮罩右上角画 × 删除按钮（2026-07-28 改）。
 //
 // @副作用
@@ -33,6 +33,14 @@
 
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { 遮罩描述, 编号颜色 } from '../model/图片遮罩模型';
+
+/** 图片在画布中的实际显示区域，单位为 vp。 */
+interface ImageContentRect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
 
 @Component
 export struct 图片遮罩编辑器 {
@@ -45,9 +53,9 @@ export struct 图片遮罩编辑器 {
   @State 遮罩列表: 遮罩描述[] = [];
   // 当前选中编号 1-5，决定新画矩形的 ordinal
   @State 当前选中编号: number = 1;
-  // 图片原始宽高比（onComplete 回调写入），用于锁定 Stack 的 aspectRatio
-  @State 图片宽高比: number = 1.5;
-  // 画布实际 vp 尺寸（onAreaChange 写入），用于归一化坐标 ↔ 像素坐标 转换
+  // 图片加载前不允许绘制，避免用占位比例保存错误坐标。
+  @State 图片宽高比: number = 0;
+  // onReady 读取实际画布尺寸，初始化和尺寸变化均同步重绘。
   @State 画布宽: number = 0;
   @State 画布高: number = 0;
   @State 画布就绪: boolean = false;
@@ -64,6 +72,37 @@ export struct 图片遮罩编辑器 {
   private 上下文: CanvasRenderingContext2D = new CanvasRenderingContext2D(new RenderingContextSettings(true));
   // 矩形最小有效尺寸（归一化），小于此值视为误触不落定
   private readonly 最小拖动距离: number = 0.005;
+
+  /** 与居中 ImageFit.Contain 共用同一缩放和留白，不改变已保存的归一化坐标。 */
+  private imageContentRect(): ImageContentRect {
+    if (this.画布宽 <= 0 || this.画布高 <= 0 || this.图片宽高比 <= 0) {
+      return { left: 0, top: 0, width: 0, height: 0 };
+    }
+    const width: number = Math.min(this.画布宽, this.画布高 * this.图片宽高比);
+    const height: number = width / this.图片宽高比;
+    return {
+      left: (this.画布宽 - width) / 2,
+      top: (this.画布高 - height) / 2,
+      width: width,
+      height: height
+    };
+  }
+
+  /** 手势取消或窗口改变时丢弃未完成的矩形，保留已落定遮罩。 */
+  private cancelDrag(): void {
+    this.拖动模式 = 0;
+    this.创建中矩形 = null;
+    this.移动中索引 = -1;
+    this.重绘();
+  }
+
+  /** Canvas 在初始化和大小变化后清空；使用同一时刻的实际尺寸恢复遮罩。 */
+  private refreshCanvas(): void {
+    this.画布宽 = this.上下文.width;
+    this.画布高 = this.上下文.height;
+    this.画布就绪 = true;
+    this.cancelDrag();
+  }
 
   // ========================================================
   // @块ID COMP-IMAGEOCCLUSION-EDITOR-002
@@ -103,17 +142,19 @@ export struct 图片遮罩编辑器 {
   // 无。
   // ========================================================
   private 归一化X(vp: number): number {
-    if (this.画布宽 <= 0) {
+    const rect: ImageContentRect = this.imageContentRect();
+    if (rect.width <= 0) {
       return 0;
     }
-    return vp / this.画布宽;
+    return (vp - rect.left) / rect.width;
   }
 
   private 归一化Y(vp: number): number {
-    if (this.画布高 <= 0) {
+    const rect: ImageContentRect = this.imageContentRect();
+    if (rect.height <= 0) {
       return 0;
     }
-    return vp / this.画布高;
+    return (vp - rect.top) / rect.height;
   }
 
   // ========================================================
@@ -166,11 +207,15 @@ export struct 图片遮罩编辑器 {
   // 2026-07-28 起遮罩右上方不再画 × 删除按钮，删除走顶部"撤销/清空"按钮。
   // ========================================================
   private 拖动开始(event: GestureEvent): void {
-    if (this.画布宽 <= 0 || this.画布高 <= 0) {
+    if (!this.画布就绪 || this.画布宽 <= 0 || this.画布高 <= 0
+      || this.图片宽高比 <= 0 || event.fingerList.length === 0) {
       return;
     }
     const x: number = this.归一化X(event.fingerList[0].localX);
     const y: number = this.归一化Y(event.fingerList[0].localY);
+    if (x < 0 || x > 1 || y < 0 || y > 1) {
+      return;
+    }
 
     // 1. 命中已有遮罩 → 移动
     const 命中索引: number = this.命中遮罩(x, y);
@@ -219,7 +264,7 @@ export struct 图片遮罩编辑器 {
   // 无。
   // ========================================================
   private 拖动更新(event: GestureEvent): void {
-    if (this.拖动模式 === 0) {
+    if (this.拖动模式 === 0 || event.fingerList.length === 0) {
       return;
     }
     const x: number = Math.max(0, Math.min(1, this.归一化X(event.fingerList[0].localX)));
@@ -303,7 +348,7 @@ export struct 图片遮罩编辑器 {
   //
   // @作用
   // 清空画布并按顺序绘制：所有已落定遮罩 → 创建中矩形（半透明）。
-  // 由 onReady / onAreaChange / 拖动三阶段 / 撤销 / 清空 显式调用。
+  // 由 onReady / 图片加载 / 拖动三阶段 / 撤销 / 清空 显式调用。
   // Canvas 不会随 @State 变更自动重绘，必须手动调本方法。
   //
   // @输入
@@ -358,10 +403,11 @@ export struct 图片遮罩编辑器 {
   // ========================================================
   private 绘制遮罩(遮罩: 遮罩描述, 创建中: boolean): void {
     const ctx: CanvasRenderingContext2D = this.上下文;
-    const 像素左: number = 遮罩.左 * this.画布宽;
-    const 像素顶: number = 遮罩.顶 * this.画布高;
-    const 像素宽: number = 遮罩.宽 * this.画布宽;
-    const 像素高: number = 遮罩.高 * this.画布高;
+    const rect: ImageContentRect = this.imageContentRect();
+    const 像素左: number = rect.left + 遮罩.左 * rect.width;
+    const 像素顶: number = rect.top + 遮罩.顶 * rect.height;
+    const 像素宽: number = 遮罩.宽 * rect.width;
+    const 像素高: number = 遮罩.高 * rect.height;
     const 颜色: string = 编号颜色(遮罩.编号);
 
     // 半透明填充：创建中态更淡
@@ -428,13 +474,21 @@ export struct 图片遮罩编辑器 {
 
   build() {
     Column({ space: 应用尺寸.间距_12 }) {
-      // ---- 顶部按钮组：c1-c5（layoutWeight 平分）+ 撤销 + 清空 ----
-      // c1-c5 用 layoutWeight(1) 平分剩余宽度，避免窄屏下撤销/清空被挤出屏幕（2026-07-28 修）。
+      DialogHeader({
+        title: $r('app.string.add_note_image_occlusion_edit_masks'),
+        actionLabel: $r('app.string.image_occlusion_confirm'),
+        actionEnabled: this.遮罩列表.length > 0,
+        closeLabel: $r('app.string.image_occlusion_cancel'),
+        onClose: (): void => { this.onCancel(); },
+        onAction: (): void => { this.onConfirm(this.遮罩列表); }
+      })
+      // 编号与操作分行，避免窄屏及英文按钮的固有宽度挤出清空按钮。
       Row({ space: 应用尺寸.间距_8 }) {
         ForEach(this.编号候选列表(), (编号: number) => {
           Button(`c${编号}`)
             .type(ButtonType.Normal)
             .layoutWeight(1)
+            .padding({ left: 0, right: 0 })
             .height(应用尺寸.按钮高度)
             .fontSize(应用尺寸.字号_按钮)
             .fontColor('#FFFFFF')
@@ -448,9 +502,13 @@ export struct 图片遮罩编辑器 {
               this.当前选中编号 = 编号;
             })
         }, (编号: number): string => `ordinal-btn-${编号}`)
+      }
+      .width('100%')
 
+      Row({ space: 应用尺寸.间距_8 }) {
         Button($r('app.string.image_occlusion_undo'))
           .type(ButtonType.Normal)
+          .layoutWeight(1)
           .height(应用尺寸.按钮高度)
           .fontSize(应用尺寸.字号_按钮)
           .fontColor($r('app.color.text_primary'))
@@ -462,6 +520,7 @@ export struct 图片遮罩编辑器 {
 
         Button($r('app.string.image_occlusion_clear'))
           .type(ButtonType.Normal)
+          .layoutWeight(1)
           .height(应用尺寸.按钮高度)
           .fontSize(应用尺寸.字号_按钮)
           .fontColor($r('app.color.error_text'))
@@ -480,8 +539,7 @@ export struct 图片遮罩编辑器 {
         .width('100%')
 
       // ---- 图片底图 + Canvas 覆盖层 ----
-      // 用 layoutWeight(1) + aspectRatio：高度由父容器剩余空间决定，宽度按图片宽高比反推。
-      // 这样在折叠屏展开（宽屏）下图片不会撑爆把底部按钮挤出屏幕（2026-07-28 修）。
+      // 宽高同时受剩余可视区域约束，横图、长图均完整显示。
       Stack() {
         Image(this.源图Uri)
           .width('100%')
@@ -490,6 +548,7 @@ export struct 图片遮罩编辑器 {
           .onComplete((e: ImageLoadResult) => {
             if (e.width > 0 && e.height > 0) {
               this.图片宽高比 = e.width / e.height;
+              this.重绘();
             }
           })
 
@@ -497,58 +556,25 @@ export struct 图片遮罩编辑器 {
           .width('100%')
           .height('100%')
           .onReady((): void => {
-            this.画布就绪 = true;
-            this.重绘();
-          })
-          .onAreaChange((_旧: Area, 新区域: Area) => {
-            const 宽: number = typeof 新区域.width === 'number'
-              ? 新区域.width : parseInt(新区域.width as string, 10);
-            const 高: number = typeof 新区域.height === 'number'
-              ? 新区域.height : parseInt(新区域.height as string, 10);
-            if (!Number.isNaN(宽) && !Number.isNaN(高) && (宽 !== this.画布宽 || 高 !== this.画布高)) {
-              this.画布宽 = 宽;
-              this.画布高 = 高;
-              this.重绘();
-            }
+            this.refreshCanvas();
           })
           .gesture(
             PanGesture()
               .onActionStart((event: GestureEvent): void => { this.拖动开始(event); })
               .onActionUpdate((event: GestureEvent): void => { this.拖动更新(event); })
-              .onActionEnd((): void => { this.拖动结束(); })
+              .onActionEnd((event: GestureEvent): void => {
+                this.拖动更新(event);
+                this.拖动结束();
+              })
+              .onActionCancel((): void => { this.cancelDrag(); })
           )
       }
       .layoutWeight(1)
-      .aspectRatio(this.图片宽高比)
+      .width('100%')
       .backgroundColor(this.是否深色 ? '#000000' : '#F5F5F5')
       .borderRadius(应用尺寸.圆角_面板)
       .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
 
-      // ---- 底部操作 ----
-      Row({ space: 应用尺寸.间距_8 }) {
-        Button($r('app.string.image_occlusion_cancel'))
-          .type(ButtonType.Normal)
-          .layoutWeight(1)
-          .height(应用尺寸.按钮高度)
-          .fontSize(应用尺寸.字号_按钮)
-          .fontColor($r('app.color.text_primary'))
-          .backgroundColor($r('app.color.surface_card'))
-          .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
-          .borderRadius(应用尺寸.圆角_胶囊)
-          .onClick((): void => { this.onCancel(); })
-
-        Button($r('app.string.image_occlusion_confirm'))
-          .type(ButtonType.Normal)
-          .layoutWeight(1)
-          .height(应用尺寸.按钮高度)
-          .fontSize(应用尺寸.字号_按钮)
-          .fontColor('#FFFFFF')
-          .backgroundColor(编号颜色(this.当前选中编号))
-          .borderRadius(应用尺寸.圆角_胶囊)
-          .enabled(this.遮罩列表.length > 0)
-          .onClick((): void => { this.onConfirm(this.遮罩列表); })
-      }
-      .width('100%')
     }
     .width('100%')
     .height('100%')

@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
 
+import { DialogHeader } from '../components/common/DialogHeader';
 // ========================================================
 // @块ID UI-PAGE-BROWSER-001
 // @名称 浏览页
@@ -105,6 +107,8 @@ export interface 浏览页参数 {
   initialSearch?: string;
   /** 可选：从主页 Agent 改卡进入时，列表加载后直接进入多选。 */
   selectForAgentEdit?: boolean;
+  /** 可选：打开搜索结果后直接进入指定卡片的浏览编辑区。 */
+  editCardId?: number;
 }
 
 /** T8 改牌组选择器列表项（扁平化后的牌组树节点）。 */
@@ -121,6 +125,8 @@ export struct 浏览页 {
   pageInitialSearch: string = '';
   /** Navigation 入栈参数：是否为 Agent 改卡直接进入多选。 */
   pageSelectForAgentEdit: boolean = false;
+  /** Navigation 入栈参数：搜索完成后直接进入指定卡片的编辑区（-1=不自动打开）。 */
+  pageEditCardId: number = -1;
   /** 页面栈：返回主页时 pop */
   pathStack: NavPathStack = new NavPathStack();
   private readonly 搜索服务实例: 搜索服务 = new 搜索服务();
@@ -234,7 +240,7 @@ export struct 浏览页 {
 
   @StorageProp(颜色键.主色按钮背景) private 主色按钮背景色: string = '#2F5FD0';
   @StorageProp(颜色键.主色容器) private 主色容器色: string = '#E8EEFC';
-  @StorageProp(颜色键.页面底色微染) private 页面底色微染值: string = '#F5F7FA';
+  @StorageProp(PAGE_SURFACE_KEY) private 页面底色微染值: string = '#F5F7FA';
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
 
   async aboutToAppear(): Promise<void> {
@@ -263,6 +269,9 @@ export struct 浏览页 {
       this.多选模式值 = true;
     }
     await this.执行搜索();
+    if (this.pageEditCardId > 0) {
+      this.打开编辑区For(this.pageEditCardId);
+    }
     // 顶部牌组选择器：加载牌组树（失败不阻塞搜索，Select 仅显示"全部"）
     this.加载牌组树().catch((错误: ESObject): void => {
       console.info(`BrowserPage: aboutToAppear 加载牌组树失败 错误=${错误}`);
@@ -798,18 +807,22 @@ export struct 浏览页 {
     }
   }
 
-  /** 执行批量挂起：调 批量埋藏或暂停卡片(SUSPEND)。仅 cards 模式。 */
+  /** Cards 模式暂停所选卡片；Notes 模式由 Anki Core 暂停所选笔记生成的全部卡片。 */
   private async 执行批量挂起(): Promise<void> {
     this.显示挂起确认 = false;
     this.批量忙碌 = true;
     this.批量错误 = '';
     try {
-      const 卡片IDs: number[] = await this.解析选中为卡片ID();
-      await this.调度器服务实例.批量埋藏或暂停卡片(卡片IDs, BURY_SUSPEND_MODE_SUSPEND);
-      // 挂起后本地移除选中行（不调 执行搜索：空搜索仍返回 suspended 卡，
-      // 用户期望挂起即从列表消失，与删除 UX 一致）
-      this.本地移除选中行();
+      if (this.浏览模式值 === 'notes') {
+        await this.调度器服务实例.批量埋藏或暂停笔记(
+          this.选中ID列表.slice(), BURY_SUSPEND_MODE_SUSPEND);
+      } else {
+        await this.调度器服务实例.批量埋藏或暂停卡片(
+          this.选中ID列表.slice(), BURY_SUSPEND_MODE_SUSPEND);
+      }
       this.退出多选();
+      // 让当前搜索条件决定暂停卡是否保留在列表中，并刷新后端返回的真实状态。
+      await this.执行搜索();
     } catch (错误) {
       this.批量错误 = this.取本地化文案($r('app.string.browser_action_suspend_error'));
       console.info(`BrowserPage: 批量挂起失败 错误=${错误}`);
@@ -818,12 +831,13 @@ export struct 浏览页 {
     }
   }
 
-  /** 执行批量恢复：调 恢复埋藏与暂停的卡片(选中ID)。仅 cards 模式。恢复后重新搜索以反映最新状态。 */
+  /** 恢复所选卡片；Notes 模式先解析每条笔记实际生成的全部卡片。 */
   private async 执行批量恢复(): Promise<void> {
     this.批量忙碌 = true;
     this.批量错误 = '';
     try {
-      const 卡片IDs: number[] = await this.解析选中为卡片ID();
+      const 卡片IDs: number[] = this.浏览模式值 === 'cards' ?
+        this.选中ID列表.slice() : await this.解析选中笔记的卡片ID();
       if (卡片IDs.length === 0) {
         return;
       }
@@ -836,6 +850,22 @@ export struct 浏览页 {
     } finally {
       this.批量忙碌 = false;
     }
+  }
+
+  /** 将所选笔记展开为全部兄弟卡 ID，并去重供取消暂停/埋藏使用。 */
+  private async 解析选中笔记的卡片ID(): Promise<number[]> {
+    const 结果: number[] = [];
+    const 已添加: Set<number> = new Set<number>();
+    for (const 笔记ID of this.选中ID列表) {
+      const 卡片IDs: number[] = await this.笔记服务实例.获取笔记的卡片(笔记ID);
+      for (const 卡片ID of 卡片IDs) {
+        if (!已添加.has(卡片ID)) {
+          已添加.add(卡片ID);
+          结果.push(卡片ID);
+        }
+      }
+    }
+    return 结果;
   }
 
   /**
@@ -1075,7 +1105,7 @@ export struct 浏览页 {
   /**
    * 解析选中ID为卡片ID：cards 模式直接返回，notes 模式需查每条笔记的所有卡片。
    * notes 模式下一条笔记可能有多张卡片，全部删除/改牌组/设标志。
-   * 挂起操作在 notes 模式下也经此转换（卡片维度挂起）。
+   * 暂停/恢复有独立的 Anki Core 语义，不经此方法。
    */
   private async 解析选中为卡片ID(): Promise<number[]> {
     if (this.浏览模式值 === 'cards') {
@@ -1546,7 +1576,6 @@ export struct 浏览页 {
     Row() {
       按下态按钮({
         文案: $r('app.string.study_back'),
-        选中态背景: this.主色容器色,
         字色: $r('app.color.text_primary'),
         点击回调: (): void => this.返回()
       })
@@ -1555,14 +1584,12 @@ export struct 浏览页 {
         Blank()
         按下态按钮({
           文案: this.取选中计数文案(),
-          选中态背景: this.主色容器色,
           字色: $r('app.color.text_primary'),
           点击回调: (): void => this.退出多选()
         })
       } else {
         按下态按钮({
           文案: $r('app.string.browser_action_sidebar'),
-          选中态背景: this.主色容器色,
           字色: $r('app.color.text_primary'),
           点击回调: (): void => {
             if (this.阶段 !== 'list') {
@@ -1578,7 +1605,6 @@ export struct 浏览页 {
         // T9 查找替换入口：点击弹出对话框，帮助说明在弹窗标题旁的 ⓘ 内
         按下态按钮({
           文案: $r('app.string.browser_action_find_replace'),
-          选中态背景: this.主色容器色,
           字色: $r('app.color.text_primary'),
           点击回调: (): void => {
             if (this.阶段 !== 'list') {
@@ -1595,8 +1621,8 @@ export struct 浏览页 {
     .padding({
       left: 应用尺寸.页面内边距_水平,
       right: 应用尺寸.页面内边距_水平,
-      top: this.状态栏高度 + 应用尺寸.间距_8,
-      bottom: 应用尺寸.间距_8
+      top: this.状态栏高度 + 应用尺寸.toolbarVerticalInset,
+      bottom: 应用尺寸.toolbarVerticalInset
     })
     .backgroundColor(this.页面底色微染值)
     .alignItems(VerticalAlign.Center)
@@ -1617,7 +1643,7 @@ export struct 浏览页 {
             onModeChange: (模式: string): void => { this.切换模式(模式 as 浏览模式); }
           })
             .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平,
-              top: 应用尺寸.间距_8,
+              top: 应用尺寸.pageContentTopInset,
               bottom: 应用尺寸.间距_8 })
 
           if (this.阶段 === 'loading') {
@@ -1706,6 +1732,7 @@ export struct 浏览页 {
             初始索引: this.预览初始索引,
             媒体目录: this.预览媒体目录,
             刷新版本: this.预览刷新版本,
+            interactionEnabled: !this.显示编辑区 && !this.编辑区忙碌,
             onClose: (): void => {
               this.显示预览 = false;
             },
@@ -1823,11 +1850,19 @@ export struct 浏览页 {
               })
 
             Column({ space: 应用尺寸.间距_14 }) {
-              Text($r('app.string.browser_tag_rename_title'))
-                .fontSize(应用尺寸.字号_面板标题)
-                .fontWeight(FontWeight.Bold)
-                .fontColor($r('app.color.text_primary'))
-                .width('100%')
+              DialogHeader({
+                title: $r('app.string.browser_tag_rename_title'),
+                closeLabel: $r('app.string.browser_detail_cancel'),
+                closeEnabled: !this.标签重命名忙碌,
+                onClose: (): void => {
+                  this.显示标签重命名 = false;
+                },
+                actionLabel: this.标签重命名忙碌 ? $r('app.string.browser_tag_rename_running') : $r('app.string.browser_detail_confirm'),
+                actionEnabled: !this.标签重命名忙碌,
+                onAction: (): void => {
+                  this.执行重命名标签();
+                }
+              })
 
               Column({ space: 应用尺寸.间距_4 }) {
                 Text($r('app.string.browser_tag_rename_current'))
@@ -1867,32 +1902,6 @@ export struct 浏览页 {
                   .width('100%')
               }
 
-              Row({ space: 应用尺寸.间距_12 }) {
-                Button($r('app.string.browser_detail_cancel'))
-                  .layoutWeight(1)
-                  .height(应用尺寸.按钮高度)
-                  .fontSize(应用尺寸.字号_按钮)
-                  .fontColor($r('app.color.text_primary'))
-                  .backgroundColor($r('app.color.surface_page'))
-                  .borderRadius(应用尺寸.圆角_胶囊)
-                  .enabled(!this.标签重命名忙碌)
-                  .onClick((): void => {
-                    this.显示标签重命名 = false;
-                  })
-
-                Button(this.标签重命名忙碌 ? $r('app.string.browser_tag_rename_running') : $r('app.string.browser_detail_confirm'))
-                  .layoutWeight(1)
-                  .height(应用尺寸.按钮高度)
-                  .fontSize(应用尺寸.字号_按钮)
-                  .fontColor($r('app.color.action_on_primary'))
-                  .backgroundColor(this.主色按钮背景色)
-                  .borderRadius(应用尺寸.圆角_胶囊)
-                  .enabled(!this.标签重命名忙碌)
-                  .onClick((): void => {
-                    this.执行重命名标签();
-                  })
-              }
-              .width('100%')
             }
             .width('85%')
             .constraintSize({ maxWidth: 460 })
@@ -1914,11 +1923,13 @@ export struct 浏览页 {
               })
 
             Column({ space: 应用尺寸.间距_14 }) {
-              Text($r('app.string.browser_action_change_deck'))
-                .fontSize(应用尺寸.字号_面板标题)
-                .fontWeight(FontWeight.Bold)
-                .fontColor($r('app.color.text_primary'))
-                .width('100%')
+              DialogHeader({
+                title: $r('app.string.browser_action_change_deck'),
+                showClose: false,
+                actionLabel: $r('app.string.browser_detail_cancel'),
+                actionEnabled: !this.批量忙碌,
+                onAction: (): void => { this.显示改牌组弹层 = false; }
+              })
 
               Scroll() {
                 Column({ space: 应用尺寸.间距_4 }) {
@@ -1943,15 +1954,6 @@ export struct 浏览页 {
               .scrollBar(BarState.Auto)
               .edgeEffect(EdgeEffect.Spring)
 
-              Button($r('app.string.browser_detail_cancel'))
-                .width('100%')
-                .height(应用尺寸.按钮高度)
-                .fontSize(应用尺寸.字号_按钮)
-                .fontColor($r('app.color.text_primary'))
-                .backgroundColor($r('app.color.surface_page'))
-                .borderRadius(应用尺寸.圆角_胶囊)
-                .enabled(!this.批量忙碌)
-                .onClick((): void => { this.显示改牌组弹层 = false; })
             }
             .width('88%')
             .constraintSize({ maxWidth: 520, maxHeight: '80%' })
@@ -1973,11 +1975,13 @@ export struct 浏览页 {
               })
 
             Column({ space: 应用尺寸.间距_14 }) {
-              Text($r('app.string.browser_action_set_flag'))
-                .fontSize(应用尺寸.字号_面板标题)
-                .fontWeight(FontWeight.Bold)
-                .fontColor($r('app.color.text_primary'))
-                .width('100%')
+              DialogHeader({
+                title: $r('app.string.browser_action_set_flag'),
+                showClose: false,
+                actionLabel: $r('app.string.browser_detail_cancel'),
+                actionEnabled: !this.批量忙碌,
+                onAction: (): void => { this.显示标志弹层 = false; }
+              })
 
               ForEach([0, 1, 2, 3, 4], (flag: number) => {
                 Row({ space: 应用尺寸.间距_12 }) {
@@ -2002,15 +2006,6 @@ export struct 浏览页 {
                 .onClick((): void => { this.执行批量设置标志(flag); })
               }, (flag: number): string => `${flag}`)
 
-              Button($r('app.string.browser_detail_cancel'))
-                .width('100%')
-                .height(应用尺寸.按钮高度)
-                .fontSize(应用尺寸.字号_按钮)
-                .fontColor($r('app.color.text_primary'))
-                .backgroundColor($r('app.color.surface_page'))
-                .borderRadius(应用尺寸.圆角_胶囊)
-                .enabled(!this.批量忙碌)
-                .onClick((): void => { this.显示标志弹层 = false; })
             }
             .width('78%')
             .constraintSize({ maxWidth: 420 })
@@ -2032,32 +2027,21 @@ export struct 浏览页 {
               })
 
             Column({ space: 应用尺寸.间距_14 }) {
+              DialogHeader({
+                title: $r('app.string.browser_action_suspend'),
+                closeLabel: $r('app.string.browser_detail_cancel'),
+                closeEnabled: !this.批量忙碌,
+                onClose: (): void => { this.显示挂起确认 = false; },
+                actionLabel: $r('app.string.browser_detail_confirm'),
+                actionEnabled: !this.批量忙碌,
+                onAction: (): void => { this.执行批量挂起(); },
+                destructive: false
+              })
               Text($r('app.string.browser_action_suspend_confirm'))
                 .fontSize(应用尺寸.字号_正文)
                 .fontColor($r('app.color.text_primary'))
                 .width('100%')
 
-              Row({ space: 应用尺寸.间距_10 }) {
-                Button($r('app.string.browser_detail_cancel'))
-                  .layoutWeight(1)
-                  .height(应用尺寸.按钮高度)
-                  .fontSize(应用尺寸.字号_按钮)
-                  .fontColor($r('app.color.text_primary'))
-                  .backgroundColor($r('app.color.surface_page'))
-                  .borderRadius(应用尺寸.圆角_胶囊)
-                  .enabled(!this.批量忙碌)
-                  .onClick((): void => { this.显示挂起确认 = false; })
-                Button($r('app.string.browser_detail_confirm'))
-                  .layoutWeight(1)
-                  .height(应用尺寸.按钮高度)
-                  .fontSize(应用尺寸.字号_按钮)
-                  .fontColor($r('app.color.action_on_primary'))
-                  .backgroundColor(this.主色按钮背景色)
-                  .borderRadius(应用尺寸.圆角_胶囊)
-                  .enabled(!this.批量忙碌)
-                  .onClick((): void => { this.执行批量挂起(); })
-              }
-              .width('100%')
             }
             .width('78%')
             .constraintSize({ maxWidth: 420 })
@@ -2079,32 +2063,21 @@ export struct 浏览页 {
               })
 
             Column({ space: 应用尺寸.间距_14 }) {
+              DialogHeader({
+                title: $r('app.string.browser_action_delete'),
+                closeLabel: $r('app.string.browser_detail_cancel'),
+                closeEnabled: !this.批量忙碌,
+                onClose: (): void => { this.显示删除确认 = false; },
+                actionLabel: $r('app.string.browser_detail_confirm'),
+                actionEnabled: !this.批量忙碌,
+                onAction: (): void => { this.执行批量删除(); },
+                destructive: true
+              })
               Text($r('app.string.browser_action_delete_confirm'))
                 .fontSize(应用尺寸.字号_正文)
                 .fontColor($r('app.color.text_primary'))
                 .width('100%')
 
-              Row({ space: 应用尺寸.间距_10 }) {
-                Button($r('app.string.browser_detail_cancel'))
-                  .layoutWeight(1)
-                  .height(应用尺寸.按钮高度)
-                  .fontSize(应用尺寸.字号_按钮)
-                  .fontColor($r('app.color.text_primary'))
-                  .backgroundColor($r('app.color.surface_page'))
-                  .borderRadius(应用尺寸.圆角_胶囊)
-                  .enabled(!this.批量忙碌)
-                  .onClick((): void => { this.显示删除确认 = false; })
-                Button($r('app.string.browser_detail_confirm'))
-                  .layoutWeight(1)
-                  .height(应用尺寸.按钮高度)
-                  .fontSize(应用尺寸.字号_按钮)
-                  .fontColor($r('app.color.action_on_primary'))
-                  .backgroundColor(this.主色按钮背景色)
-                  .borderRadius(应用尺寸.圆角_胶囊)
-                  .enabled(!this.批量忙碌)
-                  .onClick((): void => { this.执行批量删除(); })
-              }
-              .width('100%')
             }
             .width('78%')
             .constraintSize({ maxWidth: 420 })
@@ -2126,11 +2099,15 @@ export struct 浏览页 {
               })
 
             Column({ space: 应用尺寸.间距_14 }) {
-              Text($r('app.string.browser_action_set_due'))
-                .fontSize(应用尺寸.字号_面板标题)
-                .fontWeight(FontWeight.Bold)
-                .fontColor($r('app.color.text_primary'))
-                .width('100%')
+              DialogHeader({
+                title: $r('app.string.browser_action_set_due'),
+                closeLabel: $r('app.string.browser_detail_cancel'),
+                closeEnabled: !this.批量忙碌,
+                onClose: (): void => { this.显示到期日弹层 = false; },
+                actionLabel: $r('app.string.browser_detail_confirm'),
+                actionEnabled: !this.批量忙碌 && this.到期日输入.trim() !== '',
+                onAction: (): void => { this.执行批量设置到期日(); }
+              })
 
               Text($r('app.string.browser_action_set_due_hint'))
                 .fontSize(应用尺寸.字号_正文_小)
@@ -2147,27 +2124,6 @@ export struct 浏览页 {
                 .enabled(!this.批量忙碌)
                 .onChange((值: string): void => { this.到期日输入 = 值; })
 
-              Row({ space: 应用尺寸.间距_10 }) {
-                Button($r('app.string.browser_detail_cancel'))
-                  .layoutWeight(1)
-                  .height(应用尺寸.按钮高度)
-                  .fontSize(应用尺寸.字号_按钮)
-                  .fontColor($r('app.color.text_primary'))
-                  .backgroundColor($r('app.color.surface_page'))
-                  .borderRadius(应用尺寸.圆角_胶囊)
-                  .enabled(!this.批量忙碌)
-                  .onClick((): void => { this.显示到期日弹层 = false; })
-                Button($r('app.string.browser_detail_confirm'))
-                  .layoutWeight(1)
-                  .height(应用尺寸.按钮高度)
-                  .fontSize(应用尺寸.字号_按钮)
-                  .fontColor($r('app.color.action_on_primary'))
-                  .backgroundColor(this.主色按钮背景色)
-                  .borderRadius(应用尺寸.圆角_胶囊)
-                  .enabled(!this.批量忙碌 && this.到期日输入.trim() !== '')
-                  .onClick((): void => { this.执行批量设置到期日(); })
-              }
-              .width('100%')
             }
             .width('78%')
             .constraintSize({ maxWidth: 420 })
@@ -2189,11 +2145,15 @@ export struct 浏览页 {
               })
 
             Column({ space: 应用尺寸.间距_14 }) {
-              Text($r('app.string.browser_action_reposition'))
-                .fontSize(应用尺寸.字号_面板标题)
-                .fontWeight(FontWeight.Bold)
-                .fontColor($r('app.color.text_primary'))
-                .width('100%')
+              DialogHeader({
+                title: $r('app.string.browser_action_reposition'),
+                closeLabel: $r('app.string.browser_detail_cancel'),
+                closeEnabled: !this.批量忙碌,
+                onClose: (): void => { this.显示重新定位弹层 = false; },
+                actionLabel: $r('app.string.browser_detail_confirm'),
+                actionEnabled: !this.批量忙碌,
+                onAction: (): void => { this.执行批量重新定位(); }
+              })
 
               Row({ space: 应用尺寸.间距_12 }) {
                 Text($r('app.string.browser_action_reposition_start'))
@@ -2259,27 +2219,6 @@ export struct 浏览页 {
               }
               .width('100%')
 
-              Row({ space: 应用尺寸.间距_10 }) {
-                Button($r('app.string.browser_detail_cancel'))
-                  .layoutWeight(1)
-                  .height(应用尺寸.按钮高度)
-                  .fontSize(应用尺寸.字号_按钮)
-                  .fontColor($r('app.color.text_primary'))
-                  .backgroundColor($r('app.color.surface_page'))
-                  .borderRadius(应用尺寸.圆角_胶囊)
-                  .enabled(!this.批量忙碌)
-                  .onClick((): void => { this.显示重新定位弹层 = false; })
-                Button($r('app.string.browser_detail_confirm'))
-                  .layoutWeight(1)
-                  .height(应用尺寸.按钮高度)
-                  .fontSize(应用尺寸.字号_按钮)
-                  .fontColor($r('app.color.action_on_primary'))
-                  .backgroundColor(this.主色按钮背景色)
-                  .borderRadius(应用尺寸.圆角_胶囊)
-                  .enabled(!this.批量忙碌)
-                  .onClick((): void => { this.执行批量重新定位(); })
-              }
-              .width('100%')
             }
             .width('78%')
             .constraintSize({ maxWidth: 420 })
@@ -2301,11 +2240,15 @@ export struct 浏览页 {
               })
 
             Column({ space: 应用尺寸.间距_14 }) {
-              Text($r('app.string.browser_action_change_notetype'))
-                .fontSize(应用尺寸.字号_面板标题)
-                .fontWeight(FontWeight.Bold)
-                .fontColor($r('app.color.text_primary'))
-                .width('100%')
+              DialogHeader({
+                title: $r('app.string.browser_action_change_notetype'),
+                closeLabel: $r('app.string.browser_detail_cancel'),
+                closeEnabled: !this.批量忙碌 && !this.笔记类型弹层忙碌,
+                onClose: (): void => { this.显示笔记类型弹层 = false; },
+                actionLabel: $r('app.string.browser_detail_confirm'),
+                actionEnabled: !this.批量忙碌 && !this.笔记类型弹层忙碌 && this.变更笔记类型信息数据 !== null,
+                onAction: (): void => { this.执行批量更改笔记类型(); }
+              })
 
               if (this.笔记类型弹层忙碌) {
                 Text($r('app.string.browser_action_change_notetype_loading'))
@@ -2402,27 +2345,6 @@ export struct 浏览页 {
                 }
               }
 
-              Row({ space: 应用尺寸.间距_10 }) {
-                Button($r('app.string.browser_detail_cancel'))
-                  .layoutWeight(1)
-                  .height(应用尺寸.按钮高度)
-                  .fontSize(应用尺寸.字号_按钮)
-                  .fontColor($r('app.color.text_primary'))
-                  .backgroundColor($r('app.color.surface_page'))
-                  .borderRadius(应用尺寸.圆角_胶囊)
-                  .enabled(!this.批量忙碌 && !this.笔记类型弹层忙碌)
-                  .onClick((): void => { this.显示笔记类型弹层 = false; })
-                Button($r('app.string.browser_detail_confirm'))
-                  .layoutWeight(1)
-                  .height(应用尺寸.按钮高度)
-                  .fontSize(应用尺寸.字号_按钮)
-                  .fontColor($r('app.color.action_on_primary'))
-                  .backgroundColor(this.主色按钮背景色)
-                  .borderRadius(应用尺寸.圆角_胶囊)
-                  .enabled(!this.批量忙碌 && !this.笔记类型弹层忙碌 && this.变更笔记类型信息数据 !== null)
-                  .onClick((): void => { this.执行批量更改笔记类型(); })
-              }
-              .width('100%')
             }
             .width('88%')
             .constraintSize({ maxWidth: 520, maxHeight: '80%' })
@@ -2445,6 +2367,7 @@ export struct 浏览页 {
       .height('100%')
     }
     .hideTitleBar(true)
+    .backgroundColor(Color.Transparent)
     .onBackPressed((): boolean => this.onBackPress())
     .opacity(this.转场透明度)
   }

@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeTextSpans } from '../common/ThemeText';
+import { DialogHeader } from '../common/DialogHeader';
+import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
 import { common } from '@kit.AbilityKit';
 import { pasteboard } from '@kit.BasicServicesKit';
@@ -10,10 +13,15 @@ import {
   加载同步凭证,
   保存同步凭证,
   加载媒体同步开关,
-  设置媒体同步开关
+  设置媒体同步开关,
+  loadCustomSyncServer,
+  saveCustomSyncServer,
+  loadAutoSyncEnabled,
+  saveAutoSyncEnabled
 } from '../../model/同步凭证存储';
 import type { 同步凭证信息 } from '../../model/同步凭证存储';
 import { 分类同步错误 } from '../../model/同步流程';
+import { normalizeSyncServer } from '../../model/SyncSettings';
 import { 设置面板色板, 设置面板色板_取 } from '../../utils/设置面板配色';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 颜色键 } from '../../model/颜色主题';
@@ -47,6 +55,7 @@ import { 设置分组卡片 } from './设置分组卡片';
 // ========================================================
 @Component
 export struct 同步分组 {
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop 是否深色: boolean = false;
   @Prop 是否展开: boolean = false;
   切换展开回调: () => void = (): void => {};
@@ -79,12 +88,41 @@ export struct 同步分组 {
   @State private 错误文本: string = '';
   /** 媒体同步开关（对齐 Anki 桌面端 Preferences → Sync → "Sync media"）。 */
   @State private 媒体同步开启: boolean = true;
+  @State private serverInput: string = '';
+  @State private savedServer: string = '';
+  @State private settingsSaving: boolean = false;
+  @State private autoSyncEnabled: boolean = true;
+  @State private serverError: string = '';
 
   // ---- 内部（非 @State，不参与 UI 刷新） ----
   /** 登录成功后持有的会话凭证（hkey + endpoint） */
   private 鉴权凭证: SyncAuth | null = null;
 
   private readonly 同步服务实例: 同步服务 = new 同步服务();
+  /** 居中弹窗控制器：手机窗口宽度 < 600vp 时 bindSheet 只能底部弹出，改用 CustomDialog 保证居中。 */
+  private serverDialogController: CustomDialogController = new CustomDialogController({
+    builder: 自定义服务器弹窗({
+      serverInput: this.serverInput,
+      serverError: this.serverError,
+      当前状态: this.当前状态,
+      登录中: this.登录中,
+      settingsSaving: this.settingsSaving,
+      是否深色: this.是否深色,
+      onSave: (): void => { this.saveServer(); },
+      onClose: (): void => { this.closeServerDialog(); }
+    }),
+    autoCancel: false,
+    alignment: DialogAlignment.Center,
+    customStyle: true,
+    onWillDismiss: (dismiss: DismissDialogAction): void => {
+      if (this.settingsSaving) {
+        return;
+      }
+      this.serverInput = this.savedServer;
+      this.serverError = '';
+      dismiss.dismiss();
+    }
+  });
   // AnkiWeb 注册页（外部网址保留原文，与 设置面板.AnkiWeb网址 同款约定）
   private readonly 注册网址: string = 'https://ankiweb.net/account/signup';
 
@@ -105,6 +143,65 @@ export struct 同步分组 {
     }
     // 读取媒体同步开关（默认 true）
     this.媒体同步开启 = 加载媒体同步开关();
+    this.savedServer = loadCustomSyncServer();
+    this.serverInput = this.savedServer;
+    this.autoSyncEnabled = loadAutoSyncEnabled();
+  }
+
+  /** 先校验并保存目标，再允许登录，避免未保存地址和实际登录目标不一致。 */
+  private async saveServer(): Promise<void> {
+    if (this.登录中 || this.settingsSaving || this.当前状态 === '已登录') return;
+    this.serverError = '';
+    try {
+      normalizeSyncServer(this.serverInput);
+    } catch (error) {
+      this.serverError = this.取本地化文本($r('app.string.sync_server_invalid'));
+      return;
+    }
+    this.settingsSaving = true;
+    try {
+      this.savedServer = await saveCustomSyncServer(this.serverInput);
+      this.serverInput = this.savedServer;
+      this.密码输入 = '';
+      this.serverDialogController.close();
+    } catch (error) {
+      this.serverError = this.取本地化文本($r('app.string.sync_settings_save_failed'));
+    } finally {
+      this.settingsSaving = false;
+    }
+  }
+
+  /** 每次打开都从已保存地址开始，取消的草稿不会影响账号登录。 */
+  private openServerDialog(): void {
+    if (this.登录中 || this.settingsSaving) return;
+    this.serverInput = this.savedServer;
+    this.serverError = '';
+    this.serverDialogController.open();
+  }
+
+  /** 保存中不可关闭；取消时丢弃草稿和表单错误。 */
+  private closeServerDialog(): void {
+    if (this.settingsSaving) return;
+    this.serverInput = this.savedServer;
+    this.serverError = '';
+    this.serverDialogController.close();
+  }
+
+  /** 只有持久化成功才接受自动同步开关；失败可在面板内重试。 */
+  private async changeAutoSync(enabled: boolean): Promise<void> {
+    if (this.settingsSaving) return;
+    this.settingsSaving = true;
+    this.错误文本 = '';
+    const previous: boolean = this.autoSyncEnabled;
+    this.autoSyncEnabled = enabled;
+    try {
+      await saveAutoSyncEnabled(enabled);
+    } catch (error) {
+      this.autoSyncEnabled = previous;
+      this.错误文本 = this.取本地化文本($r('app.string.sync_settings_save_failed'));
+    } finally {
+      this.settingsSaving = false;
+    }
   }
 
   private 取本地化文本(资源: Resource): string {
@@ -158,13 +255,14 @@ export struct 同步分组 {
   // 成功后调用 保存同步凭证 持久化凭证（密码绝不落盘）。
   // ========================================================
   private async 点击登录(): Promise<void> {
-    if (this.登录中) {
+    if (this.登录中 || this.settingsSaving || this.serverInput !== this.savedServer) {
       return;
     }
     this.登录中 = true;
     this.错误文本 = '';
     try {
-      const 凭证: SyncAuth = await this.同步服务实例.同步登录(this.用户名输入, this.密码输入);
+      const 凭证: SyncAuth = await this.同步服务实例.同步登录(
+        this.用户名输入, this.密码输入, this.savedServer);
       const 信息: 同步凭证信息 = {
         hkey: 凭证.hkey,
         username: this.用户名输入,
@@ -265,26 +363,29 @@ export struct 同步分组 {
   // ========================================================
   @Builder
   private 未登录内容(色板: 设置面板色板) {
-    Text($r('app.string.sync_subtitle_logged_out'))
+    Text(this.savedServer === '' ? $r('app.string.sync_subtitle_logged_out') : $r('app.string.sync_custom_account_hint'))
       .fontSize(12)
       .fontColor(色板.次文字)
       .width('100%')
     // 账号前置说明：同步需先有 Anki 账号，右侧「前往注册」拉起系统浏览器打开 AnkiWeb 注册页
-    Row({ space: 6 }) {
-      Text($r('app.string.sync_account_required_hint'))
-        .fontSize(12)
-        .fontColor(色板.三级文字)
-        .layoutWeight(1)
-      Text($r('app.string.sync_register_link'))
-        .fontSize(12)
-        .fontWeight(FontWeight.Medium)
-        .fontColor(this.解析主色按钮背景())
-        .onClick((): void => {
-          this.打开注册页();
-        })
+    if (this.savedServer === '') {
+      Row({ space: 6 }) {
+        Text($r('app.string.sync_account_required_hint'))
+          .fontSize(12)
+          .fontColor(色板.三级文字)
+          .layoutWeight(1)
+        Text() { ThemeTextSpans($r('app.string.sync_register_link'), this.themeAccentColors, this.getUIContext()) }
+          .fontSize(12)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(this.解析主色按钮背景())
+          .onClick((): void => {
+            this.打开注册页();
+          })
+      }
+      .width('100%')
     }
-    .width('100%')
-    TextInput({ placeholder: $r('app.string.sync_username_hint'), text: this.用户名输入 })
+    TextInput({ placeholder: this.savedServer === '' ? $r('app.string.sync_username_hint') :
+      $r('app.string.sync_custom_username_hint'), text: this.用户名输入 })
       .width('100%')
       .height(44)
       .fontSize(14)
@@ -321,8 +422,8 @@ export struct 同步分组 {
       .fontColor('#FFFFFF')
       .backgroundColor(this.解析主色按钮背景())
       .borderRadius(22)
-      .enabled(!this.登录中)
-      .opacity(this.登录中 ? 0.6 : 1)
+      .enabled(!this.登录中 && !this.settingsSaving && this.serverInput === this.savedServer)
+      .opacity(this.登录中 || this.settingsSaving || this.serverInput !== this.savedServer ? 0.6 : 1)
       .onClick((): void => {
         this.点击登录();
       })
@@ -431,23 +532,149 @@ export struct 同步分组 {
   }
 
   build() {
-    设置分组卡片({
-      标题: $r('app.string.settings_sync_group'),
-      是否深色: this.是否深色,
-      是否展开: this.是否展开,
-      帮助标题: $r('app.string.settings_sync_group'),
-      帮助正文: $r('app.string.sync_help_text'),
-      切换展开回调: this.切换展开回调,
-      打开说明回调: this.打开说明回调
-    }) {
-      Column({ space: 10 }) {
-        if (this.当前状态 === '未登录') {
-          this.未登录内容(设置面板色板_取(this.是否深色))
-        } else {
-          this.已登录内容(设置面板色板_取(this.是否深色))
+    Column({ space: 2 }) {
+      设置分组卡片({
+        标题: $r('app.string.settings_sync_group'),
+        是否深色: this.是否深色,
+        是否展开: this.是否展开,
+        帮助标题: $r('app.string.settings_sync_group'),
+        帮助正文: $r('app.string.sync_help_text'),
+        切换展开回调: this.切换展开回调,
+        打开说明回调: this.打开说明回调
+      }) {
+        Column({ space: 10 }) {
+          this.autoSyncSetting(设置面板色板_取(this.是否深色))
+          if (this.当前状态 === '未登录') {
+            this.未登录内容(设置面板色板_取(this.是否深色))
+          } else {
+            this.已登录内容(设置面板色板_取(this.是否深色))
+          }
+          Row() {
+            Button() {
+              Text($r('app.string.sync_custom_server_entry'))
+                .fontSize(12)
+                .fontColor(设置面板色板_取(this.是否深色).次文字)
+            }
+            .type(ButtonType.Normal)
+            .backgroundColor(Color.Transparent)
+            .height(32)
+            .padding(0)
+            .enabled(!this.登录中 && !this.settingsSaving)
+            .onClick((): void => { this.openServerDialog(); })
+          }
+          .width('100%')
+          .justifyContent(FlexAlign.Start)
+        }
+        .width('100%')
+      }
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  /** 自动同步开关保留在同步分组内，不随服务器弹窗隐藏。 */
+  @Builder
+  private autoSyncSetting(色板: 设置面板色板) {
+    Row({ space: 10 }) {
+      Column({ space: 2 }) {
+        Text($r('app.string.sync_auto_label')).fontSize(15).fontColor(色板.主文字)
+        Text($r('app.string.sync_auto_hint')).fontSize(12).fontColor(色板.次文字)
+      }
+      .alignItems(HorizontalAlign.Start)
+      .layoutWeight(1)
+      Toggle({ type: ToggleType.Switch, isOn: this.autoSyncEnabled })
+        .selectedColor(this.解析主色按钮背景())
+        .enabled(!this.settingsSaving && !this.登录中)
+        .onChange((enabled: boolean): void => { this.changeAutoSync(enabled); })
+    }
+    .width('100%')
+  }
+}
+
+// ========================================================
+// @块ID UI-SYNC-GROUP-005
+// @名称 自定义同步服务器居中弹窗
+//
+// @作用
+// 编辑自建同步服务器基础地址。手机窗口宽度 < 600vp 时 bindSheet 只支持底部弹出
+// （SheetType.CENTER 被忽略），改用 CustomDialogController 保证屏幕居中，
+// 且不受设置页滚动容器裁剪。
+//
+// @输入
+// serverInput / serverError：地址草稿与校验错误（与父组件 @State 双向同步）。
+// 当前状态 / 登录中 / settingsSaving：控制表单可编辑性与关闭守卫。
+// 是否深色：AppStorage 未就绪时的色板兜底值。
+// onSave / onClose：父组件的保存与取消回调。
+//
+// @输出
+// 渲染「同步服务器」弹窗；保存/取消时回调父组件。
+//
+// @业务规则
+// 保存中不可关闭；取消时草稿回滚由父组件 closeServerDialog 完成。
+//
+// @副作用
+// 无（偏好持久化由父组件完成）。
+// ========================================================
+@CustomDialog
+struct 自定义服务器弹窗 {
+  controller?: CustomDialogController;
+  @Link serverInput: string;
+  @Link serverError: string;
+  @Link 当前状态: '未登录' | '已登录';
+  @Link 登录中: boolean;
+  @Link settingsSaving: boolean;
+  @Prop 是否深色: boolean = false;
+  // 主题模式变化时重渲染，让 设置面板色板_取 重新读 AppStorage（与 同步分组 同款机制）。
+  @StorageProp('themeMode') private 主题模式监听: string = 'system';
+  onSave: () => void = (): void => {};
+  onClose: () => void = (): void => {};
+
+  build() {
+    // 外层占满窗口，卡片再取 88%：与 AnkiWeb引导对话框 / 云端牌组弹窗 同结构，
+    // 百分比宽度才有确定的参照物。
+    Column() {
+      Column({ space: 应用尺寸.间距_12 }) {
+        DialogHeader({
+          title: $r('app.string.sync_server_label'),
+          actionLabel: $r('app.string.sync_server_save'),
+          actionEnabled: this.当前状态 === '未登录' && !this.登录中 && !this.settingsSaving,
+          closeEnabled: !this.settingsSaving,
+          onAction: (): void => { this.onSave(); },
+          onClose: (): void => { this.onClose(); }
+        })
+        this.服务器表单(设置面板色板_取(this.是否深色))
+        if (this.serverError !== '') {
+          Text(this.serverError)
+            .fontSize(12)
+            .fontColor(设置面板色板_取(this.是否深色).错误色)
+            .width('100%')
         }
       }
-      .width('100%')
+      .width('88%')
+      .constraintSize({ maxWidth: 480, maxHeight: '88%' })
+      .padding(应用尺寸.间距_16)
+      .backgroundColor($r('app.color.surface_card'))
+      .borderRadius(应用尺寸.圆角_卡片)
+      .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
     }
+    .width('100%')
+    .alignItems(HorizontalAlign.Center)
+  }
+
+  @Builder
+  private 服务器表单(色板: 设置面板色板) {
+    Text(this.当前状态 === '已登录' ? $r('app.string.sync_server_logout_hint') : $r('app.string.sync_server_hint'))
+      .fontSize(12)
+      .fontColor(色板.次文字)
+      .width('100%')
+    TextInput({ text: this.serverInput, placeholder: $r('app.string.sync_server_placeholder') })
+      .fontSize(14)
+      .fontColor(色板.主文字)
+      .placeholderColor(色板.弱化文字)
+      .backgroundColor(色板.标签背景)
+      .borderRadius(应用尺寸.圆角_面板)
+      .height(44)
+      .enabled(this.当前状态 === '未登录' && !this.登录中 && !this.settingsSaving)
+      .onChange((value: string): void => { this.serverInput = value; })
   }
 }

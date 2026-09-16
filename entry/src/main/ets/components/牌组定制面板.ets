@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { DialogHeader } from './common/DialogHeader';
 // ========================================================
 // @块ID UI-DECK-CUSTOMIZE-001
 // @名称 牌组定制面板
@@ -98,7 +99,6 @@ export struct 牌组定制面板 {
   // 2.1.4.1 对比度：按钮背景专用档（配 #FFFFFF 文字 ≥ 4.5:1）
   @StorageProp(颜色键.主色按钮背景) private 主色按钮背景: string = '#2F5FD0';
   @StorageProp(颜色键.主色按钮按下) private 主色按钮按下: string = '#1E4FB8';
-  @State private 已按下保存: boolean = false;
 
   aboutToAppear(): void {
     this.编辑中名称 = 牌组显示名(this.deck);
@@ -256,11 +256,15 @@ export struct 牌组定制面板 {
 
       // ---- 主面板 ----
       Column({ space: 应用尺寸.间距_12 }) {
-        Text($r('app.string.deck_customize_title'))
-          .fontSize(应用尺寸.字号_面板标题)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.text_primary'))
-          .width('100%')
+        DialogHeader({
+          title: $r('app.string.deck_customize_title'),
+          actionLabel: $r('app.string.deck_customize_save'),
+          actionEnabled: this.可提交(),
+          closeLabel: $r('app.string.create_deck_cancel'),
+          closeEnabled: !this.busy,
+          onClose: (): void => { this.onClose(); },
+          onAction: () => { this.提交带像素图(); }
+        })
 
         // 牌组名输入：保留原 fullName（含 ::）以编辑层级
         Column({ space: 应用尺寸.间距_5 }) {
@@ -424,24 +428,6 @@ export struct 牌组定制面板 {
 
         Blank()
 
-        Button($r('app.string.deck_customize_save'))
-          .type(ButtonType.Normal)
-          .width('100%')
-          .height(应用尺寸.按钮高度)
-          .fontSize(应用尺寸.字号_按钮)
-          .fontColor($r('app.color.action_on_primary'))
-          .backgroundColor(this.已按下保存 ? this.主色按钮按下 : this.主色按钮背景)
-          .borderRadius(应用尺寸.圆角_胶囊)
-          .animation({ duration: 80, curve: Curve.EaseOut })
-          .enabled(this.可提交())
-          .onTouch((事件: TouchEvent): void => {
-            if (事件.type === TouchType.Down) {
-              this.已按下保存 = true;
-            } else if (事件.type === TouchType.Up || 事件.type === TouchType.Cancel) {
-              this.已按下保存 = false;
-            }
-          })
-          .onClick(() => { this.提交带像素图(); })
       }
       .width('88%')
       .height('88%')
@@ -468,11 +454,15 @@ export struct 牌组定制面板 {
           .backgroundColor('rgba(0,0,0,0.85)')
           .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
         Column({ space: 应用尺寸.间距_12 }) {
-          Text($r('app.string.deck_customize_background_crop_title'))
-            .fontSize(应用尺寸.字号_面板标题)
-            .fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.text_primary'))
-            .width('100%')
+          DialogHeader({
+            title: $r('app.string.deck_customize_background_crop_title'),
+            actionLabel: $r('app.string.deck_customize_background_crop_confirm'),
+            actionEnabled: true,
+            closeLabel: $r('app.string.deck_customize_background_crop_cancel'),
+            closeEnabled: true,
+            onClose: () => { this.取消裁剪(); },
+            onAction: () => { this.应用裁剪(); }
+          })
           Text($r('app.string.deck_customize_background_crop_hint'))
             .fontSize(应用尺寸.字号_正文_小)
             .fontColor($r('app.color.text_secondary'))
@@ -500,28 +490,6 @@ export struct 牌组定制面板 {
             .height(this.预览高度 * 3)
           }
 
-          Row({ space: 应用尺寸.间距_8 }) {
-            Button($r('app.string.deck_customize_background_crop_cancel'))
-              .type(ButtonType.Normal)
-              .layoutWeight(1)
-              .height(应用尺寸.按钮高度)
-              .fontSize(应用尺寸.字号_按钮)
-              .fontColor($r('app.color.text_primary'))
-              .backgroundColor($r('app.color.surface_card'))
-              .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
-              .borderRadius(应用尺寸.圆角_胶囊)
-              .onClick(() => { this.取消裁剪(); })
-            Button($r('app.string.deck_customize_background_crop_confirm'))
-              .type(ButtonType.Normal)
-              .layoutWeight(1)
-              .height(应用尺寸.按钮高度)
-              .fontSize(应用尺寸.字号_按钮)
-              .fontColor($r('app.color.action_on_primary'))
-              .backgroundColor(this.主色按钮背景)
-              .borderRadius(应用尺寸.圆角_胶囊)
-              .onClick(() => { this.应用裁剪(); })
-          }
-          .width('100%')
         }
         .width('92%')
         .height('88%')

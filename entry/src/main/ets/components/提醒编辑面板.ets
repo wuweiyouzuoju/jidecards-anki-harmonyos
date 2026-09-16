@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeTextSpans } from './common/ThemeText';
+import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
+import { DialogHeader } from './common/DialogHeader';
 // ========================================================
 // @块ID UI-REMINDER-EDIT-001
 // @名称 提醒编辑弹层（新建/编辑共用）
@@ -36,6 +39,7 @@ import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时
 
 @Component
 export struct 提醒编辑面板 {
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
   @Prop busy: boolean = false;
   @Prop errorMessage: string = '';
@@ -125,11 +129,19 @@ export struct 提醒编辑面板 {
         .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
 
       Column({ space: 应用尺寸.间距_16 }) {
-        Text(this.是否新建 ? $r('app.string.reminder_edit_title_create') : $r('app.string.reminder_edit_title_edit'))
-          .fontSize(应用尺寸.字号_面板标题)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.text_primary'))
-          .width('100%')
+        DialogHeader({
+          title: this.是否新建 ? $r('app.string.reminder_edit_title_create') : $r('app.string.reminder_edit_title_edit'),
+          actionLabel: this.是否新建 ? $r('app.string.create_deck_confirm') : $r('app.string.deck_customize_save'),
+          actionEnabled: !this.busy,
+          closeLabel: $r('app.string.create_deck_cancel'),
+          closeEnabled: !this.busy,
+          onClose: () => {
+            this.onCancel();
+          },
+          onAction: () => {
+            this.onConfirm(this.小时, this.分钟, this.标题, this.内容);
+          }
+        })
 
         // 表单主体：高度随内容自适应；超过上限（屏高 88% - 固定区）时封顶并在内部滚动。
         // constraintSize 必须传数字（见字段声明处注释）。
@@ -209,7 +221,7 @@ export struct 提醒编辑面板 {
 
             // 快捷插入标签：点一下把占位符追加到内容末尾
             Row({ space: 应用尺寸.间距_8 }) {
-              Text($r('app.string.reminder_edit_insert_new'))
+              Text() { ThemeTextSpans($r('app.string.reminder_edit_insert_new'), this.themeAccentColors, this.getUIContext()) }
                 .fontSize(应用尺寸.字号_正文_小)
                 .fontColor(this.主色按钮背景)
                 .padding({ left: 应用尺寸.间距_12, right: 应用尺寸.间距_12, top: 6, bottom: 6 })
@@ -218,7 +230,7 @@ export struct 提醒编辑面板 {
                 .onClick((): void => {
                   this.插入占位符($r('app.string.reminder_edit_token_new'));
                 })
-              Text($r('app.string.reminder_edit_insert_review'))
+              Text() { ThemeTextSpans($r('app.string.reminder_edit_insert_review'), this.themeAccentColors, this.getUIContext()) }
                 .fontSize(应用尺寸.字号_正文_小)
                 .fontColor(this.主色按钮背景)
                 .padding({ left: 应用尺寸.间距_12, right: 应用尺寸.间距_12, top: 6, bottom: 6 })
@@ -254,11 +266,11 @@ export struct 提醒编辑面板 {
         if (!this.是否新建) {
           Button($r('app.string.reminder_edit_delete'))
             .type(ButtonType.Normal)
-            .width('100%')
+            .alignSelf(ItemAlign.End)
             .height(应用尺寸.按钮高度)
             .fontSize(应用尺寸.字号_按钮)
             .fontColor($r('app.color.error_text'))
-            .backgroundColor($r('app.color.surface_page'))
+            .backgroundColor(Color.Transparent)
             .borderRadius(应用尺寸.圆角_胶囊)
             .enabled(!this.busy)
             .onClick(() => {
@@ -266,41 +278,6 @@ export struct 提醒编辑面板 {
             })
         }
 
-        Row({ space: 应用尺寸.间距_10 }) {
-          Button($r('app.string.create_deck_cancel'))
-            .height(应用尺寸.按钮高度)
-            .layoutWeight(1)
-            .fontSize(应用尺寸.字号_按钮)
-            .fontColor($r('app.color.text_primary'))
-            .backgroundColor($r('app.color.surface_page'))
-            .borderRadius(应用尺寸.圆角_胶囊)
-            .enabled(!this.busy)
-            .onClick(() => {
-              this.onCancel();
-            })
-
-          Button(this.是否新建 ? $r('app.string.create_deck_confirm') : $r('app.string.deck_customize_save'))
-            .height(应用尺寸.按钮高度)
-            .layoutWeight(1)
-            .fontSize(应用尺寸.字号_按钮)
-            .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.action_on_primary'))
-            .backgroundColor(this.已按下确认 ? this.主色按钮按下 : this.主色按钮背景)
-            .borderRadius(应用尺寸.圆角_胶囊)
-            .animation({ duration: 80, curve: Curve.EaseOut })
-            .enabled(!this.busy)
-            .onTouch((event: TouchEvent): void => {
-              if (event.type === TouchType.Down) {
-                this.已按下确认 = true;
-              } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-                this.已按下确认 = false;
-              }
-            })
-            .onClick(() => {
-              this.onConfirm(this.小时, this.分钟, this.标题, this.内容);
-            })
-        }
-        .width('100%')
       }
       .width('88%')
       // 高度完全自适应：Scroll 已按数字上限封顶（88% 屏高 - 固定区），卡片无需再设

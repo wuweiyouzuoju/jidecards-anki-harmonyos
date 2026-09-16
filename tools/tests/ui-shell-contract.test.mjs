@@ -4,6 +4,43 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 
+test('home and settings keep the same gap below their toolbar buttons', () => {
+  const sizes = read('entry/src/main/ets/utils/应用尺寸.ets');
+  const inset = Number(sizes.match(/pageContentTopInset: number = (\d+)/)[1]);
+  const toolbar = Number(sizes.match(/工具栏高度: number = (\d+)/)[1]);
+  const button = Number(sizes.match(/按钮高度: number = (\d+)/)[1]);
+  assert.equal((toolbar - button) / 2 + inset, 16);
+  for (const path of ['entry/src/main/ets/pages/首页.ets', 'entry/src/main/ets/components/设置面板.ets']) {
+    assert.match(read(path), /left: 应用尺寸\.页面内边距_水平,\s*right: 应用尺寸\.页面内边距_水平,\s*top: 应用尺寸\.pageContentTopInset/, path);
+  }
+});
+
+test('every primary page consumes the shared first-content and toolbar spacing', () => {
+  for (const name of ['首页', '统计页', '学习提醒页', '浏览页', '学习页', '添加笔记页', 'AI制卡页']) {
+    const page = read(`entry/src/main/ets/pages/${name}.ets`);
+    assert.match(page, /top: 应用尺寸\.pageContentTopInset/, name);
+    assert.match(page, /top: this\.状态栏高度 \+ 应用尺寸\.toolbarVerticalInset/, name);
+    assert.match(page, /bottom: 应用尺寸\.toolbarVerticalInset/, name);
+  }
+  const settings = read('entry/src/main/ets/components/设置面板.ets');
+  assert.match(settings, /top: 应用尺寸\.pageContentTopInset/);
+  assert.match(settings, /top: this\.状态栏高度 \+ 应用尺寸\.toolbarVerticalInset/);
+  const agent = read('entry/src/main/ets/pages/AI制卡页.ets');
+  assert.doesNotMatch(agent.slice(agent.lastIndexOf('  build() {')), /Divider\(/,
+    'a second divider must not add an extra offset below the Agent toolbar');
+});
+
+test('peer cards share one gap and reminder scrolling does not fix the content height', () => {
+  for (const path of ['components/home/主页牌组列表.ets', 'components/设置面板.ets', 'components/牌组详情面板.ets', 'pages/首页.ets', 'pages/统计页.ets', 'pages/学习提醒页.ets']) {
+    assert.match(read('entry/src/main/ets/' + path), /space: 应用尺寸\.pageSectionGap/, path);
+  }
+  const reminder = read('entry/src/main/ets/pages/学习提醒页.ets');
+  const scroll = reminder.slice(reminder.indexOf('Scroll() {'), reminder.indexOf('.layoutWeight(1)', reminder.indexOf('Scroll() {')));
+  assert.doesNotMatch(scroll, /\.height\('100%'\)/);
+  assert.match(scroll, /bottom: 应用尺寸\.pageBottomInset \+ this\.导航条高度/);
+  assert.doesNotMatch(reminder.slice(reminder.indexOf('private 提醒项卡片'), reminder.indexOf('private 空状态')), /\.margin\(\{ bottom:/);
+});
+
 function projectUrl(relativePath) {
   return new URL(`../../${relativePath}`, import.meta.url);
 }
@@ -22,7 +59,7 @@ test('home popup menus start below the status-aware toolbar', () => {
   for (const menu of [moreMenu, actionMenu]) {
     assert.match(menu, /@StorageProp\('状态栏高度'\)\s+private\s+状态栏高度:\s*number\s*=\s*0/);
     assert.match(menu,
-      /top:\s*应用尺寸\.工具栏高度\s*\+\s*this\.状态栏高度\s*\+\s*应用尺寸\.间距_4/);
+      /top:\s*应用尺寸\.工具栏高度\s*\+\s*this\.状态栏高度\s*\+\s*应用尺寸\.pageContentTopInset/);
     assert.doesNotMatch(menu, /margin\(\{\s*top:\s*64/);
   }
 });
@@ -261,7 +298,7 @@ test('primary pages share one shell gutter and common visual primitives', () => 
   const addNote = read('entry/src/main/ets/pages/添加笔记页.ets');
   const agentPage = read('entry/src/main/ets/pages/AI制卡页.ets');
 
-  const settingsList = settingsPanel.match(/List\(\{ space: 12[\s\S]*?\.scrollBar\(BarState\.Off\)/)?.[0] ?? '';
+  const settingsList = settingsPanel.match(/List\(\{ space: 应用尺寸\.pageSectionGap[\s\S]*?\.scrollBar\(BarState\.Off\)/)?.[0] ?? '';
   assert.match(settingsList, /left:\s*应用尺寸\.页面内边距_水平/,
     'settings cards must align with the toolbar left gutter');
   assert.match(settingsList, /right:\s*应用尺寸\.页面内边距_水平/,
@@ -280,7 +317,7 @@ test('primary pages share one shell gutter and common visual primitives', () => 
   assert.match(settingsPanel, /文案: \$r\('app\.string\.study_back'\)/,
     'instant-save settings must use the same back navigation wording as other pages');
   assert.match(settingsPanel,
-    /文案: \$r\('app\.string\.study_back'\),\s*选中态背景: \$r\('app\.color\.surface_sidebar'\),\s*字色: \$r\('app\.color\.text_primary'\)/,
+    /文案: \$r\('app\.string\.study_back'\),\s*字色: \$r\('app\.color\.text_primary'\)/,
     'settings back action must remain neutral instead of following the selected color theme');
   assert.doesNotMatch(settingsPage, /private 顶部条\(\)/,
     'settings must not keep an unused second toolbar implementation');
@@ -674,7 +711,7 @@ test('Schulte-style settings keep the approved full-screen page architecture and
   const panel = read(panelPath);
   assert.match(panel, /Stack\(\)/);
   // 内容 List 挂滚动器：openAiSettings 跳转进来时 scrollToIndex 直接定位到 AI 智能体分组
-  assert.match(panel, /List\(\{ space: 12, scroller: this\.内容滚动器 \}\)/);
+  assert.match(panel, /List\(\{ space: 应用尺寸\.pageSectionGap, scroller: this\.内容滚动器 \}\)/);
   assert.match(panel, /外观分组展开/);
   assert.match(panel, /数据分组展开/);
   assert.match(panel, /数据库分组展开/);

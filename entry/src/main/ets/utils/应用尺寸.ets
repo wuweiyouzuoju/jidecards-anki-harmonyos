@@ -73,9 +73,20 @@ export class 应用尺寸 {
   // ---- 页面骨架 ----
   static readonly 页面内边距_水平: number = 12;
   static readonly 工具栏高度: number = 60;
+  /** 顶部工具栏与首张内容卡片之间的共用留白。 */
+  static readonly pageContentTopInset: number = 8;
+  static readonly toolbarVerticalInset: number = 8;
+  static readonly pageSectionGap: number = 12;
+  static readonly pageBottomInset: number = 12;
   static readonly 紧凑控件高度: number = 36;
   static readonly 按钮高度: number = 44;
   static readonly 行动按钮高度: number = 52;
+  // 下拉菜单与长按菜单共用紧凑尺寸，长文案入口使用较宽档。
+  static readonly compactMenuWidth: number = 112;
+  static readonly extendedMenuWidth: number = 160;
+  static readonly contextMenuWidth: number = 144;
+  static readonly menuItemHeight: number = 44;
+  static readonly menuHorizontalPadding: number = 12;
 
   // ---- 宽屏限宽 ----
   static readonly 内容最大宽度: number = 1200; // 首页超宽屏内容限宽，超出居中留白
@@ -92,7 +103,6 @@ export class 应用尺寸 {
   static readonly 色条高度: number = 50;
   static readonly 箭头槽位宽度: number = 36; // 父牌组展开箭头槽位宽（视觉+热区，无子牌组的行也占位对齐）
   static readonly 箭头槽位高度: number = 48; // 父牌组展开箭头热区高
-  static readonly 列表间距: number = 9;
   static readonly 空态垂直内边距: number = 28;
   static readonly 加载指示器尺寸: number = 36; // 列表加载指示器
   // 牌组行实机高度：padding(13+13) + 计数 Column(字号_强调+间距_5+字号_正文_小+间距_5+Row 字号_正文_小 ≈ 66)

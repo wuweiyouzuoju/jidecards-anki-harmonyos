@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeTextSpans } from '../common/ThemeText';
+import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
+import { DialogHeader } from '../common/DialogHeader';
 // ========================================================
 // @块ID UI-NOTETYPE-MGMT-001
 // @名称 笔记类型管理面板
@@ -37,6 +40,7 @@ import { promptAction } from '@kit.ArkUI';
 
 @Component
 export struct 笔记类型管理面板 {
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
   onClose: () => void = (): void => {};
   onEdit: (id: number, name: string) => void = (id: number, name: string): void => {};
@@ -83,7 +87,10 @@ export struct 笔记类型管理面板 {
           message: this.取本地化文本($r('app.string.notetype_mgmt_created')),
           duration: 2000
         });
-        await this.刷新列表();
+        const types: NotetypeNameId[] = await this.服务.获取笔记类型名列表();
+        this.类型列表 = types;
+        const created: NotetypeNameId | undefined = types.find((type: NotetypeNameId): boolean => type.id === newId);
+        this.onEdit(newId, created === undefined ? '' : created.name);
       }
     } catch (error) {
       this.错误信息 = error instanceof Error ? error.message : `${error}`;
@@ -140,15 +147,12 @@ export struct 笔记类型管理面板 {
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .layoutWeight(1)
-        Text(`ID: ${类型.id}`)
-          .fontSize(应用尺寸.字号_正文_小)
-          .fontColor(设置面板色板_取(this.isDark).弱化文字)
       }
       .alignItems(HorizontalAlign.Start)
       .layoutWeight(1)
 
       // 编辑按钮
-      Text($r('app.string.notetype_mgmt_edit'))
+      Text() { ThemeTextSpans($r('app.string.notetype_mgmt_edit'), this.themeAccentColors, this.getUIContext()) }
         .fontSize(应用尺寸.字号_正文_小)
         .fontColor(this.主色按钮背景)
         .padding({ left: 12, right: 12, top: 6, bottom: 6 })
@@ -189,24 +193,16 @@ export struct 笔记类型管理面板 {
         .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
 
       Column({ space: 应用尺寸.间距_16 }) {
-        // Header：标题 + 右上角 ×
-        Row() {
-          Text($r('app.string.notetype_mgmt_title'))
-            .fontSize(应用尺寸.字号_面板标题)
-            .fontColor($r('app.color.text_primary'))
-            .fontWeight(FontWeight.Bold)
-            .layoutWeight(1)
-          if (!this.加载中 && !this.处理中) {
-            Text('×')
-              .fontSize(24)
-              .fontColor($r('app.color.text_secondary'))
-              .width(32)
-              .height(32)
-              .textAlign(TextAlign.Center)
-              .onClick(() => { this.onClose(); })
-          }
-        }
-        .width('100%')
+        // 固定标题操作栏
+        DialogHeader({
+          title: $r('app.string.notetype_mgmt_title'),
+          actionLabel: $r('app.string.notetype_mgmt_add'),
+          actionEnabled: !this.处理中 && !this.加载中,
+          closeLabel: $r('app.string.close'),
+          closeEnabled: !this.加载中 && !this.处理中,
+          onClose: () => { this.onClose(); },
+          onAction: () => { this.新建笔记类型(); }
+        })
 
         // 说明文案
         Text($r('app.string.notetype_mgmt_description'))
@@ -215,17 +211,6 @@ export struct 笔记类型管理面板 {
           .width('100%')
 
         // 新建按钮
-        Button($r('app.string.notetype_mgmt_add'))
-          .type(ButtonType.Normal)
-          .width('100%')
-          .height(应用尺寸.按钮高度)
-          .fontSize(应用尺寸.字号_按钮)
-          .fontColor($r('app.color.action_on_primary'))
-          .backgroundColor(this.主色按钮背景)
-          .borderRadius(应用尺寸.圆角_胶囊)
-          .enabled(!this.处理中 && !this.加载中)
-          .opacity(this.处理中 ? 0.6 : 1)
-          .onClick(() => { this.新建笔记类型(); })
 
         // busy 指示
         if (this.加载中 || this.处理中) {
@@ -268,10 +253,12 @@ export struct 笔记类型管理面板 {
         .width('100%')
         .layoutWeight(1)
         .scrollBar(BarState.Auto)
+        .align(Alignment.TopStart)
         .edgeEffect(EdgeEffect.Spring)
       }
       .width('88%')
-      .constraintSize({ maxWidth: 480, maxHeight: '88%' })
+      .height('80%')
+      .constraintSize({ maxWidth: 480 })
       .padding(应用尺寸.面板内边距)
       .backgroundColor($r('app.color.surface_card'))
       .borderRadius(应用尺寸.圆角_卡片)

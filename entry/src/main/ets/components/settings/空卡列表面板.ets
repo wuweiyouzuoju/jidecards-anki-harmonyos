@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeTextSpans } from '../common/ThemeText';
+import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
+import { DialogHeader } from '../common/DialogHeader';
 // ========================================================
 // @块ID UI-EMPTY-CARDS-001
 // @名称 空卡列表面板
@@ -38,6 +41,7 @@ import type { 笔记空卡 } from '../../proto/messages/CardRenderingMessages';
 
 @Component
 export struct 空卡列表面板 {
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
   onClose: () => void = (): void => {};
 
@@ -220,24 +224,16 @@ export struct 空卡列表面板 {
         .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
 
       Column({ space: 应用尺寸.间距_16 }) {
-        // Header：标题 + 右上角 ×
-        Row() {
-          Text($r('app.string.empty_cards_title'))
-            .fontSize(应用尺寸.字号_面板标题)
-            .fontColor($r('app.color.text_primary'))
-            .fontWeight(FontWeight.Bold)
-            .layoutWeight(1)
-          if (!this.检查中 && !this.处理中) {
-            Text('×')
-              .fontSize(24)
-              .fontColor($r('app.color.text_secondary'))
-              .width(32)
-              .height(32)
-              .textAlign(TextAlign.Center)
-              .onClick(() => { this.onClose(); })
-          }
-        }
-        .width('100%')
+        // 固定标题操作栏
+        DialogHeader({
+          title: $r('app.string.empty_cards_title'),
+          actionLabel: this.检查中 ? $r('app.string.empty_cards_checking') : $r('app.string.empty_cards_refresh'),
+          actionEnabled: !this.检查中 && !this.处理中,
+          closeLabel: $r('app.string.close'),
+          closeEnabled: !this.检查中 && !this.处理中,
+          onClose: () => { this.onClose(); },
+          onAction: () => { this.执行检查(); }
+        })
 
         // 说明文案
         Text($r('app.string.empty_cards_description'))
@@ -246,17 +242,6 @@ export struct 空卡列表面板 {
           .width('100%')
 
         // 刷新按钮
-        Button(this.检查中 ? $r('app.string.empty_cards_checking') : $r('app.string.empty_cards_refresh'))
-          .type(ButtonType.Normal)
-          .width('100%')
-          .height(应用尺寸.按钮高度)
-          .fontSize(应用尺寸.字号_按钮)
-          .fontColor($r('app.color.action_on_primary'))
-          .backgroundColor(this.主色按钮背景)
-          .borderRadius(应用尺寸.圆角_胶囊)
-          .enabled(!this.检查中 && !this.处理中)
-          .opacity(this.检查中 ? 0.6 : 1)
-          .onClick(() => { this.执行检查(); })
 
         // busy 指示
         if (this.检查中) {
@@ -292,7 +277,9 @@ export struct 空卡列表面板 {
                   .fontWeight(FontWeight.Medium)
                   .layoutWeight(1)
                 if (this.笔记列表.length > 0) {
-                  Button(this.全选状态() ? $r('app.string.empty_cards_deselect_all') : $r('app.string.empty_cards_select_all'))
+                  Button() {
+                    Text() { ThemeTextSpans(this.全选状态() ? $r('app.string.empty_cards_deselect_all') : $r('app.string.empty_cards_select_all'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.主色按钮背景).fontSize(应用尺寸.字号_正文_小)
+                  }
                     .type(ButtonType.Normal)
                     .backgroundColor(Color.Transparent)
                     .fontColor(this.主色按钮背景)
@@ -323,11 +310,11 @@ export struct 空卡列表面板 {
           // 删除按钮
           Button($r('app.string.empty_cards_delete'))
             .type(ButtonType.Normal)
-            .width('100%')
+            .alignSelf(ItemAlign.End)
             .height(应用尺寸.按钮高度)
             .fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.action_on_primary'))
-            .backgroundColor($r('app.color.error_text'))
+            .fontColor($r('app.color.error_text'))
+            .backgroundColor(Color.Transparent)
             .borderRadius(应用尺寸.圆角_胶囊)
             .enabled(this.选中数量() > 0 && !this.处理中)
             .opacity(this.选中数量() > 0 && !this.处理中 ? 1 : 0.4)

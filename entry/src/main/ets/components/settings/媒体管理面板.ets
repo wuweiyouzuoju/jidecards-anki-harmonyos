@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeTextSpans } from '../common/ThemeText';
+import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
+import { DialogHeader } from '../common/DialogHeader';
 // ========================================================
 // @块ID UI-MEDIA-MGMT-001
 // @名称 媒体管理面板
@@ -36,6 +39,8 @@ import type { CheckMediaResponse } from '../../proto/messages/MediaMessages';
 
 @Component
 export struct 媒体管理面板 {
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
+  @StorageProp(颜色键.动作主色) private dialogActionColor: string = '#2F5FD0';
   @Prop isDark: boolean = false;
   onClose: () => void = (): void => {};
 
@@ -289,24 +294,16 @@ export struct 媒体管理面板 {
         .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
 
       Column({ space: 应用尺寸.间距_16 }) {
-        // Header：标题 + 右上角 ×
-        Row() {
-          Text($r('app.string.settings_media_management'))
-            .fontSize(应用尺寸.字号_面板标题)
-            .fontColor($r('app.color.text_primary'))
-            .fontWeight(FontWeight.Bold)
-            .layoutWeight(1)
-          if (!this.检查中 && !this.处理中) {
-            Text('×')
-              .fontSize(24)
-              .fontColor($r('app.color.text_secondary'))
-              .width(32)
-              .height(32)
-              .textAlign(TextAlign.Center)
-              .onClick(() => { this.onClose(); })
-          }
-        }
-        .width('100%')
+        // 固定标题操作栏
+        DialogHeader({
+          title: $r('app.string.settings_media_management'),
+          actionLabel: this.检查中 ? $r('app.string.media_checking') : $r('app.string.media_check'),
+          actionEnabled: !this.检查中 && !this.处理中,
+          closeLabel: $r('app.string.close'),
+          closeEnabled: !this.检查中 && !this.处理中,
+          onClose: () => { this.onClose(); },
+          onAction: () => { this.执行检查媒体(); }
+        })
 
         // 媒体同步进行中警告条
         if (this.媒体同步中) {
@@ -332,16 +329,6 @@ export struct 媒体管理面板 {
         }
 
         // 检查按钮
-        Button(this.检查中 ? $r('app.string.media_checking') : $r('app.string.media_check'))
-          .width('100%')
-          .height(应用尺寸.按钮高度)
-          .fontSize(应用尺寸.字号_按钮)
-          .fontColor($r('app.color.action_on_primary'))
-          .backgroundColor(this.主色按钮背景)
-          .borderRadius(应用尺寸.圆角_胶囊)
-          .enabled(!this.检查中 && !this.处理中)
-          .opacity(this.检查中 ? 0.6 : 1)
-          .onClick(() => { this.执行检查媒体(); })
 
         // busy 指示
         if (this.检查中) {
@@ -379,7 +366,9 @@ export struct 媒体管理面板 {
                     .fontWeight(FontWeight.Medium)
                     .layoutWeight(1)
                   if (this.未使用列表.length > 0) {
-                    Button(this.全选状态() ? $r('app.string.media_deselect_all') : $r('app.string.media_select_all'))
+                    Button() {
+                      Text() { ThemeTextSpans(this.全选状态() ? $r('app.string.media_deselect_all') : $r('app.string.media_select_all'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.主色按钮背景).fontSize(应用尺寸.字号_正文_小)
+                    }
                       .type(ButtonType.Normal)
                       .backgroundColor(Color.Transparent)
                       .fontColor(this.主色按钮背景)
@@ -404,9 +393,27 @@ export struct 媒体管理面板 {
                   this.未使用项行(索引)
                 // keyItem 纳入选中状态：选中变化时让 ForEach 重建该项，Toggle 拿到最新 isOn
                 }, (文件名: string, 索引: number): string => `${文件名}|${this.选中状态[索引] ? 1 : 0}`)
+
+                Button($r('app.string.media_trash_selected'))
+                  .type(ButtonType.Normal)
+                  .alignSelf(ItemAlign.End)
+                  .height(40)
+                  .fontSize(14)
+                  .fontColor(this.选中数量() > 0 && !this.处理中 ?
+                    $r('app.color.error_text') : $r('app.color.text_secondary'))
+                  .backgroundColor($r('app.color.surface_card'))
+                  .border({ width: 0.5, color: $r('app.color.border_input') })
+                  .borderRadius(10)
+                  .enabled(this.选中数量() > 0 && !this.处理中)
+                  .stateStyles({ disabled: { .opacity(1) } })
+                  .margin({ top: 8 })
+                  .onClick(() => { this.执行进回收站(); })
               }
               .width('100%')
               .alignItems(HorizontalAlign.Start)
+              .padding(12)
+              .backgroundColor($r('app.color.surface_page'))
+              .borderRadius(12)
 
               // 缺失媒体区
               Column({ space: 应用尺寸.间距_4 }) {
@@ -427,67 +434,67 @@ export struct 媒体管理面板 {
               }
               .width('100%')
               .alignItems(HorizontalAlign.Start)
+              .padding(12)
+              .backgroundColor($r('app.color.surface_page'))
+              .borderRadius(12)
 
               // 回收站状态
-              Row() {
-                Text($r('app.string.media_trash_status'))
-                  .fontSize(应用尺寸.字号_正文)
-                  .fontColor($r('app.color.text_primary'))
-                  .layoutWeight(1)
-                Text(this.回收站有内容 ? $r('app.string.media_trash_has_items') : $r('app.string.media_trash_empty'))
-                  .fontSize(应用尺寸.字号_正文_小)
-                  .fontColor(this.回收站有内容 ? $r('app.color.error_text') : $r('app.color.text_secondary'))
+              Column({ space: 12 }) {
+                Row() {
+                  Text($r('app.string.media_trash_status'))
+                    .fontSize(应用尺寸.字号_正文)
+                    .fontColor($r('app.color.text_primary'))
+                    .layoutWeight(1)
+                  Text(this.回收站有内容 ? $r('app.string.media_trash_has_items') : $r('app.string.media_trash_empty'))
+                    .fontSize(应用尺寸.字号_正文_小)
+                    .fontColor(this.回收站有内容 ? $r('app.color.error_text') : $r('app.color.text_secondary'))
+                }
+                .width('100%')
+                Row({ space: 8 }) {
+                  Button() {
+                    Text() { ThemeTextSpans($r('app.string.media_restore_trash'), (this.回收站有内容 && !this.处理中) ? this.themeAccentColors : [], this.getUIContext()) }.fontSize(14).fontColor(this.回收站有内容 && !this.处理中 ?
+                      this.dialogActionColor : $r('app.color.text_secondary'))
+                  }
+                    .type(ButtonType.Normal)
+                    .layoutWeight(1)
+                    .height(40)
+                    .fontSize(14)
+                    .fontColor(this.回收站有内容 && !this.处理中 ?
+                      this.dialogActionColor : $r('app.color.text_secondary'))
+                    .backgroundColor($r('app.color.surface_card'))
+                    .border({ width: 0.5, color: $r('app.color.border_input') })
+                    .borderRadius(10)
+                    .enabled(this.回收站有内容 && !this.处理中)
+                    .stateStyles({ disabled: { .opacity(1) } })
+                    .onClick(() => { this.执行恢复回收站(); })
+
+                  Button($r('app.string.media_empty_trash'))
+                    .type(ButtonType.Normal)
+                    .layoutWeight(1)
+                    .height(40)
+                    .fontSize(14)
+                    .fontColor(this.回收站有内容 && !this.处理中 ?
+                      $r('app.color.error_text') : $r('app.color.text_secondary'))
+                    .backgroundColor($r('app.color.surface_card'))
+                    .border({ width: 0.5, color: $r('app.color.border_input') })
+                    .borderRadius(10)
+                    .enabled(this.回收站有内容 && !this.处理中)
+                    .stateStyles({ disabled: { .opacity(1) } })
+                    .onClick(() => { this.确认清空回收站(); })
+                }
+                .width('100%')
               }
               .width('100%')
+              .padding(12)
+              .backgroundColor($r('app.color.surface_page'))
+              .borderRadius(12)
             }
             .width('100%')
           }
           .width('100%')
-          .constraintSize({ maxHeight: 280 })
+          .constraintSize({ maxHeight: 420 })
           .scrollBar(BarState.Auto)
           .edgeEffect(EdgeEffect.Spring)
-
-          // 操作按钮区：全选后「放入回收站」即可处理全部选中文件，不再单列「全部放入回收站」
-          Button($r('app.string.media_trash_selected'))
-            .type(ButtonType.Normal)
-            .width('100%')
-            .height(应用尺寸.按钮高度)
-            .fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.action_on_primary'))
-            .backgroundColor(this.主色按钮背景)
-            .borderRadius(应用尺寸.圆角_胶囊)
-            .enabled(this.选中数量() > 0 && !this.处理中)
-            .opacity(this.选中数量() > 0 && !this.处理中 ? 1 : 0.4)
-            .onClick(() => { this.执行进回收站(); })
-
-          Row({ space: 应用尺寸.间距_8 }) {
-            Button($r('app.string.media_restore_trash'))
-              .type(ButtonType.Normal)
-              .layoutWeight(1)
-              .height(应用尺寸.按钮高度)
-              .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_primary'))
-              .backgroundColor($r('app.color.surface_card'))
-              .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
-              .borderRadius(应用尺寸.圆角_胶囊)
-              .enabled(this.回收站有内容 && !this.处理中)
-              .opacity(this.回收站有内容 && !this.处理中 ? 1 : 0.4)
-              .onClick(() => { this.执行恢复回收站(); })
-
-            Button($r('app.string.media_empty_trash'))
-              .type(ButtonType.Normal)
-              .layoutWeight(1)
-              .height(应用尺寸.按钮高度)
-              .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.error_text'))
-              .backgroundColor($r('app.color.surface_card'))
-              .border({ width: 应用尺寸.卡片边框, color: $r('app.color.error_text') })
-              .borderRadius(应用尺寸.圆角_胶囊)
-              .enabled(this.回收站有内容 && !this.处理中)
-              .opacity(this.回收站有内容 && !this.处理中 ? 1 : 0.4)
-              .onClick(() => { this.确认清空回收站(); })
-          }
-          .width('100%')
 
           // 处理中指示
           if (this.处理中) {

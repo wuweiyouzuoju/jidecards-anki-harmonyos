@@ -25,6 +25,7 @@
 // ========================================================
 
 import { 后端会话 } from './后端会话';
+import { decodeOpChangesWithId } from '../proto/messages/CollectionMessages';
 import { 笔记类型方法, 服务号 } from './服务索引';
 import type {
   NotetypeCapabilities,
@@ -104,10 +105,12 @@ export class 笔记类型服务 {
   async 添加笔记类型旧版(json: string): Promise<number> {
     const 响应字节 = await this.会话.调用(
       服务号.后端笔记类型, 笔记类型方法.添加笔记类型旧版, encodeJsonString(json));
-    // 旧版 add 返回 generic.Json，其字段 1 为新笔记类型 id 的 JSON 字符串（如 "1"）。
-    const idText = decodeJsonString(响应字节);
-    const id = Number.parseInt(idText, 10);
-    return Number.isFinite(id) ? id : 0;
+    // Anki 返回 OpChangesWithId，字段 2 才是新类型 ID。
+    const id: number = decodeOpChangesWithId(响应字节);
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      throw new Error('Invalid note type ID in backend response');
+    }
+    return id;
   }
 
   /**

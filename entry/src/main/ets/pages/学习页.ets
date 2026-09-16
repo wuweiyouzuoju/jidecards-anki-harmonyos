@@ -1,4 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeTextSpans } from '../components/common/ThemeText';
+import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
+import { PAGE_SURFACE_KEY, themeDefinition } from '../model/ThemeCatalog';
+import { PrimaryGlassSurface } from '../utils/PrimaryGlassSurface';
+import { PRIMARY_GLASS_KEY, PrimaryGlassStyle, themePrimaryGlass } from '../model/ThemeCatalog';
 
 // 学习页：复习流程页（M7）。
 // 链路：确保已打开 → SetCurrentDeck+GetQueuedCards → RenderExistingCard →
@@ -18,9 +23,11 @@ import { 卡片服务 } from '../backend/卡片服务';
 import { 集合服务 } from '../backend/集合服务';
 import { 笔记服务 } from '../backend/笔记服务';
 import { 笔记类型服务 } from '../backend/笔记类型服务';
+import { EditableNote } from '../proto/messages/NoteMessages';
+import { 浏览编辑区 } from '../components/browser/浏览编辑区';
 import { 比对答案 } from '../model/拼写比对器';
 import { 提取拼写填空内容 } from '../model/填空解析器';
-import type { RenderedCard, TtsItem } from '../proto/messages/CardRenderingMessages';
+import type { RenderedCard, AvTagsResult } from '../proto/messages/CardRenderingMessages';
 import {
   BURY_SUSPEND_MODE_BURY_USER,
   BURY_SUSPEND_MODE_SUSPEND,
@@ -42,10 +49,13 @@ import {
 import { 解码文件名, 取MIME类型, 读取媒体文件 } from '../utils/媒体响应助手';
 import { 声音播放器 } from '../utils/声音播放器';
 import { TTS播放器 } from '../utils/TTS播放器';
+import { CardAudioSession } from '../model/CardAudioSession';
+import { APP_FOREGROUND_KEY } from '../model/Redemption';
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { 学习浮动工具栏 } from '../components/学习浮动工具栏';
 import { 学习手写白板层 } from '../components/学习手写白板层';
 import { StudyActionButton } from '../components/StudyActionButton';
+import { isStudyGuideCompleted, completeStudyGuide } from '../utils/StudyGuideStore';
 import { 按下态按钮 } from '../components/common/按下态按钮';
 import { 学习阶段 } from '../utils/吸附计算器';
 import { 加载学习布局模式, 学习布局模式 } from '../model/学习布局存储';
@@ -93,6 +103,8 @@ class TapZone代理 {
 
 @Component
 export struct 学习页 {
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
+  @StorageProp('cardTextSizePercent') private cardTextSizePercent: number = 100;
   /** Navigation 入栈参数（替代原路由取参方式） */
   pageDeckId: string = '';
   pageDeckName: string = '';
@@ -107,6 +119,16 @@ export struct 学习页 {
   private readonly 网页控制器: webview.WebviewController = new webview.WebviewController();
   private readonly 声音播放器实例: 声音播放器 = new 声音播放器();
   private readonly TTS播放器实例: TTS播放器 = new TTS播放器();
+  private readonly audioSession: CardAudioSession = new CardAudioSession(this.声音播放器实例, this.TTS播放器实例,
+    (html: string, question: boolean): Promise<AvTagsResult> => this.卡片渲染服务实例.extractAudioTags(html, question));
+  private mounted: boolean = false;
+  private sessionReady: boolean = false;
+  private requestVersion: number = 0;
+  private loadingVersion: number = -1;
+  private flipPending: boolean = false;
+  private controllerReady: boolean = false;
+  private pendingHtml: string = '';
+  @StorageProp(APP_FOREGROUND_KEY) @Watch('studyActivityChanged') private foreground: boolean = true;
   private 当前卡片: StudyCard | null = null;
   private 已渲染: RenderedCard | null = null;
   private 正面HTML: string = '';
@@ -114,7 +136,14 @@ export struct 学习页 {
   private 展示时刻毫秒: number = 0;
   private 评分中: boolean = false;
   private 媒体目录: string = '';
-  private 兜底文案: string[] = [];
+  private studyGuideChecked: boolean = false;
+  private studyGuideVisible: boolean = false;
+  @State private noteEditorVisible: boolean = false;
+  @State private noteEditorBusy: boolean = false;
+  @State private noteEditorError: string = '';
+  private editingNote: EditableNote | null = null;
+  private editingFieldNames: string[] = [];
+  private editStartedAt: number = 0;
   @State private 牌组ID: number = 0;
   @State private 牌组名: string = '';
   @State private 阶段: 学习阶段 = 'loading';
@@ -131,7 +160,7 @@ export struct 学习页 {
   @State private 完成页复习受限: boolean = false;
   @State private 完成页新卡受限: boolean = false;
   @State private 完成页有埋藏: boolean = false;
-  /** 复习页布局模式：bottom=底部固定（默认）；float=浮动可拖动两个工具栏。
+  /** 复习页布局模式：bottom=底部固定（默认）；float=浮动可拖动答案与评分工具栏。
    *  aboutToAppear 时从 preferences 加载，与 设置面板 切换联动（通过 AppStorage 同步）。 */
   @State private 学习布局模式值: 学习布局模式 = 'bottom';
   /** 主题模式 + 系统暗黑，用于浮动工具栏底色判断（与 首页.ets 同套机制）。 */
@@ -149,21 +178,21 @@ export struct 学习页 {
   @StorageLink('cardContentChangedTick') @Watch('卡片内容变更_回调') private 卡片内容变更信号: number = 0;
   /** 已收到变更信号但尚未重渲染；页面隐藏时先累积，回到前台由 onShown 统一消费。 */
   private 待重渲染当前卡: boolean = false;
+  private contentRefreshInFlight: boolean = false;
   /** 本 NavDestination 是否在前台（onShown / onHidden 维护）；隐藏时不向 Web 推数据。 */
-  private 页面已显示: boolean = false;
+  @State private 页面已显示: boolean = false;
   @State private 主题模式值: 主题模式 = 'system';
   @StorageProp(颜色键.动作主色) private 动作主色: string = '#2F5FD0';
   @StorageProp(颜色键.动作主色按下) private 动作主色按下色: string = '#1E4FB8';
   // 2.1.4.1 对比度：按钮背景专用档（配 #FFFFFF 文字 ≥ 4.5:1）
-  @StorageProp(颜色键.主色按钮背景) private 主色按钮背景色: string = '#2F5FD0';
-  @StorageProp(颜色键.主色按钮按下) private 主色按钮按下色: string = '#1E4FB8';
   @StorageProp(颜色键.主色容器) private 主色容器色: string = '#E8EEFC';
-  @StorageProp(颜色键.页面底色微染) private 页面底色微染值: string = '#F5F7FA';
+  @StorageProp(PAGE_SURFACE_KEY) private 页面底色微染值: string = '#F5F7FA';
   // 状态栏高度（沉浸式全屏下，顶部条需让出状态栏区域，避免按钮叠在状态栏上）
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
   // 手势导航条高度（bottom 布局下答案条贴底，需抬高避让导航条）
   @StorageProp('导航条高度') private 导航条高度: number = 0;
   @State private 显示答案按下: boolean = false;
+  @StorageProp(PRIMARY_GLASS_KEY) private primaryGlass: PrimaryGlassStyle = themePrimaryGlass(themeDefinition('aurora'), false);
   // Type-in-the-Answer：拼写字段名 为空串表示当前卡无 {{type:FieldName}} 标记，
   // 不渲染 TextInput、翻面时不注入比对结果。
   // 拼写填空=true 时翻面用 提取拼写填空内容 提取当前 cardOrd 的预期答案。
@@ -176,6 +205,7 @@ export struct 学习页 {
   @State private 转场透明度: number = 1;
 
   async aboutToAppear(): Promise<void> {
+    this.mounted = true;
     this.牌组ID = this.pageDeckId === '' ? 0 : parseInt(this.pageDeckId);
     this.牌组名 = this.pageDeckName;
     // 注册自定义转场回调：首页 Navigation.customNavContentTransition 通过此 name 查找回调，
@@ -191,7 +221,7 @@ export struct 学习页 {
         this.转场透明度 = isExit ? 0 : 1;
       }
     );
-    // 布局模式与主题并行加载，避免阻塞 启动会话；任一失败回退默认值。
+    // 恢复显示偏好后启动会话；失败使用默认值。
     try {
       this.主题模式值 = await 加载主题模式();
     } catch (error) {
@@ -215,8 +245,7 @@ export struct 学习页 {
     } catch (error) {
       // 加载失败保留默认值 false（关闭）
     }
-    this.加载兜底文案();
-    this.启动会话();
+    if (this.mounted) { this.启动会话(); }
   }
 
   /** 暗色模式判断：主题模式值=system 时跟随系统，否则按显式选择。与 首页.ets 同语义。 */
@@ -225,9 +254,12 @@ export struct 学习页 {
   }
 
   aboutToDisappear(): void {
-    // 页面销毁释放原生播放器与 TTS 引擎（fire-and-forget，不等释放完成）
-    this.声音播放器实例.释放();
-    this.TTS播放器实例.释放();
+    this.mounted = false;
+    this.页面已显示 = false;
+    this.invalidateCardWork();
+    this.待重渲染当前卡 = false;
+    this.controllerReady = false;
+    this.audioSession.release();
     // 注销自定义转场回调，避免内存泄漏与野回调
     CustomTransition.getInstance().注销NavParam('StudyPage');
     // 评分已写入后端，pop 离开学习页时异步刷新桌面卡片数据（拉最新 Graphs + 牌组树 → 推送所有桌面卡片）。
@@ -242,24 +274,66 @@ export struct 学习页 {
     AppStorage.setOrCreate<number>('需要刷新主页', Date.now());
   }
 
-  /** 评分按钮兜底文案（后端 DescribeNextStates 异常时可用），启动时从资源读一次 */
-  private 加载兜底文案(): void {
-    const context: common.UIAbilityContext | null = this.取能力上下文();
-    if (context === null) {
-      return;
-    }
-    this.兜底文案 = [
-      context.resourceManager.getStringSync($r('app.string.rating_again').id),
-      context.resourceManager.getStringSync($r('app.string.rating_hard').id),
-      context.resourceManager.getStringSync($r('app.string.rating_good').id),
-      context.resourceManager.getStringSync($r('app.string.rating_easy').id)
-    ];
-  }
-
   private 取能力上下文(): common.UIAbilityContext | null {
     const context: common.UIAbilityContext | undefined =
       AppStorage.get<common.UIAbilityContext>('abilityContext');
     return context === undefined ? null : context;
+  }
+
+  /** 等待可见页面和首张卡片，空牌组不消耗首次教学机会。 */
+  private maybeShowStudyGuide(): void {
+    if (this.studyGuideChecked || !this.页面已显示 || !this.controllerReady || this.pendingHtml !== '' ||
+      this.评分中 || this.阶段 !== 'question') {
+      return;
+    }
+    this.studyGuideChecked = true;
+    try {
+      if (isStudyGuideCompleted()) {
+        return;
+      }
+    } catch (error) {
+      hilog.warn(0x4342, '学习页', 'Study guide preference could not be loaded');
+    }
+    this.showStudyGuide();
+  }
+
+  /** 初次与手动重看共用教学；阅读期间不计入当前卡答题时长。 */
+  private showStudyGuide(): void {
+    if (this.studyGuideVisible || !this.页面已显示 || this.阶段 === 'loading' || this.评分中) {
+      return;
+    }
+    this.studyGuideVisible = true;
+    this.Ctrl按下 = false;
+    const openedAt: number = Date.now();
+    const card: StudyCard | null = this.当前卡片;
+    const closeGuide = (): void => {
+      if (this.studyGuideVisible && card !== null && card === this.当前卡片) {
+        this.展示时刻毫秒 += Date.now() - openedAt;
+      }
+      this.studyGuideVisible = false;
+    };
+    this.getUIContext().showAlertDialog({
+      title: $r('app.string.study_guide_title'),
+      message: $r('app.string.study_guide_message'),
+      autoCancel: false,
+      alignment: DialogAlignment.Center,
+      onWillDismiss: (action: DismissDialogAction): void => {
+        closeGuide();
+        action.dismiss();
+      },
+      confirm: {
+        value: $r('app.string.study_guide_start'),
+        action: (): void => {
+          closeGuide();
+          completeStudyGuide().catch((error: Object): void => {
+            hilog.warn(0x4342, '学习页', 'Study guide preference could not be saved');
+            this.getUIContext().getPromptAction().showToast({
+              message: this.取文案($r('app.string.study_guide_save_failed'))
+            });
+          });
+        }
+      }
+    });
   }
 
   // ========================================================
@@ -291,39 +365,28 @@ export struct 学习页 {
     this.媒体目录 = `${context.filesDir}/collection.media`;
     try {
       await 后端会话.获取实例().确保已打开(context.filesDir);
+      if (!this.mounted) { return; }
+      this.sessionReady = true;
       await this.加载下一张卡();
     } catch (error) {
+      if (!this.mounted) { return; }
       this.阶段 = 'error';
       this.错误详情 = error instanceof Error ? error.message : `${error}`;
     }
   }
 
-  // ========================================================
-  // @块ID UI-PAGE-STUDY-002
-  // @名称 加载下一张卡
-  //
-  // @作用
-  // 取队首卡片并渲染正面；队列为空进入完成态。进入页面与评分后都会走到这里，顺带刷新撤销状态。
-  //
-  // @输入
-  // 无（使用 牌组ID）
-  //
-  // @输出
-  // 更新 阶段 / 当前卡片 / 已渲染 / 正面HTML / 背面HTML / 按钮文案 / 剩余计数 等
-  //
-  // @业务规则
-  // 重置 Type-in-the-Answer 状态：上一张的输入与标记不带到下一张。
-  // 检测 {{type:FieldName}} / {{type:cloze:FieldName}} 标记（后端渲染为 [[type:...]]）。
-  // 标记通常在背面模板，先查 answerNodes 再查 questionNodes。
-  // 正面始终剥除标记；背面有标记时保留，翻面时 注入拼写结果 替换。
-  //
-  // @副作用
-  // 调后端 获取队首卡片 / 渲染既有卡片 / 描述下一档状态；播放音频/TTS
-  // ========================================================
+  /** 取队首并原子提交卡片/渲染/调度状态；过期请求不更新页面。 */
   private async 加载下一张卡(): Promise<void> {
+    if (!this.mounted) { return; }
+    if (!this.页面已显示 || !this.foreground) {
+      this.待重渲染当前卡 = true;
+      return;
+    }
+    this.invalidateCardWork();
+    const version: number = this.requestVersion;
+    this.loadingVersion = version;
     this.阶段 = 'loading';
     this.完成页数据已加载 = false;
-    // 重置 Type-in-the-Answer 状态：上一张的输入与标记不带到下一张。
     this.已输入答案 = '';
     this.拼写字段名 = '';
     this.拼写组合 = true;
@@ -331,92 +394,140 @@ export struct 学习页 {
     this.拼写卡片序号 = 0;
     try {
       await this.刷新撤销状态();
+      if (!this.isCurrentRequest(version)) { return; }
       const queued = await this.调度器服务实例.获取队首卡片(this.牌组ID);
+      if (!this.isCurrentRequest(version)) { return; }
       this.新卡剩余 = queued.newCount;
       this.学习中剩余 = queued.learningCount;
       this.复习剩余 = queued.reviewCount;
       if (queued.cards.length === 0) {
         this.当前卡片 = null;
-        this.有音频 = false;
-        await this.声音播放器实例.停止();
-        await this.TTS播放器实例.停止();
+        this.已渲染 = null;
+        this.正面HTML = '';
+        this.背面HTML = '';
+        this.按钮文案 = [];
+        this.手写模式 = false;
         this.阶段 = 'done';
+        this.applyStudyHtml('<!DOCTYPE html><html><body></body></html>');
         await this.加载完成页信息();
         return;
       }
-      this.当前卡片 = queued.cards[0];
-      this.已渲染 = await this.卡片渲染服务实例.渲染既有卡片(this.当前卡片.cardId);
-      this.按钮文案 = await this.调度器服务实例.描述下一档状态(this.当前卡片.states);
-      // 检测 {{type:FieldName}} / {{type:cloze:FieldName}} 标记（后端渲染为 [[type:...]]）。
-      // 标记通常在背面模板，先查 answerNodes 再查 questionNodes。
-      const marker = 提取拼写标记(this.已渲染.answerNodes)
-        ?? 提取拼写标记(this.已渲染.questionNodes);
+      const card: StudyCard = queued.cards[0];
+      const rendered: RenderedCard = await this.卡片渲染服务实例.渲染既有卡片(card.cardId);
+      if (!this.isCurrentRequest(version)) { return; }
+      const labels: string[] = await this.调度器服务实例.描述下一档状态(card.states);
+      if (!this.isCurrentRequest(version)) { return; }
+      // 卡片身份、调度状态与渲染结果一起提交，异步期间不暴露半张新卡。
+      this.当前卡片 = card;
+      this.已渲染 = rendered;
+      this.按钮文案 = labels;
+      const marker = 提取拼写标记(rendered.answerNodes) ?? 提取拼写标记(rendered.questionNodes);
       if (marker !== null) {
         this.拼写字段名 = marker.fieldName;
         this.拼写组合 = marker.combining;
         this.拼写填空 = marker.cloze;
-        this.拼写卡片序号 = this.当前卡片.templateIdx;
+        this.拼写卡片序号 = card.templateIdx;
       }
-      // 正面始终剥除标记（不在 Web 中显示输入框占位）。
-      this.正面HTML = 剥除拼写标记(构建卡片HTML(this.已渲染, 'question', this.是否深色()));
-      // 背面：有 type 标记时保留原始标记，翻面时 注入拼写结果 替换为比对结果；
-      //       无标记时 剥除拼写标记 为 no-op。
+      this.正面HTML = 剥除拼写标记(构建卡片HTML(rendered, 'question', this.是否深色()));
       this.背面HTML = this.拼写字段名 !== ''
-        ? 构建卡片HTML(this.已渲染, 'answer', this.是否深色())
-        : 剥除拼写标记(构建卡片HTML(this.已渲染, 'answer', this.是否深色()));
-      const rawQuestionHtml: string = 原始侧HTML(this.已渲染, 'question');
-      const questionSounds: string[] = await this.安全提取音频(rawQuestionHtml, true);
-      const questionTtsItems: TtsItem[] = await this.安全提取TTS项(rawQuestionHtml, true);
-      this.网页控制器.loadData(this.正面HTML, 'text/html', 'UTF-8', 媒体基地址, ' ');
-      this.展示时刻毫秒 = Date.now();
+        ? 构建卡片HTML(rendered, 'answer', this.是否深色())
+        : 剥除拼写标记(构建卡片HTML(rendered, 'answer', this.是否深色()));
       this.阶段 = 'question';
-      this.有音频 = questionSounds.length > 0 || questionTtsItems.length > 0;
-      await this.声音播放器实例.播放队列(this.转音频路径(questionSounds));
-      await this.TTS播放器实例.播放队列(questionTtsItems);
+      this.applyStudyHtml(this.正面HTML);
     } catch (error) {
-      this.有音频 = false;
-      await this.声音播放器实例.停止();
-      await this.TTS播放器实例.停止();
+      if (!this.isCurrentRequest(version)) { return; }
+      this.audioSession.stop();
       this.阶段 = 'error';
       this.错误详情 = error instanceof Error ? error.message : `${error}`;
+    } finally {
+      if (this.loadingVersion === version) { this.loadingVersion = -1; }
+      this.消费待重渲染();
     }
   }
 
-  /** 提取一侧音频文件名；失败降级为静音，不阻断学习流程 */
-  private async 安全提取音频(rawHtml: string, questionSide: boolean): Promise<string[]> {
+  /** 统一使旧卡面请求失效；不撤回已经提交给 Anki 的写入。 */
+  private invalidateCardWork(): void {
+    this.requestVersion += 1;
+    this.flipPending = false;
+    this.pendingHtml = '';
+    this.有音频 = false;
+    this.audioSession.stop();
+  }
+
+  private isCurrentRequest(version: number): boolean {
+    return this.mounted && this.页面已显示 && this.foreground && version === this.requestVersion;
+  }
+
+  /** 隐藏和系统后台共用取消规则；回来后重新读取队列，不能继续评旧卡。 */
+  private studyActivityChanged(): void {
+    if (!this.mounted) { return; }
+    if (!this.页面已显示 || !this.foreground) {
+      this.invalidateCardWork();
+      this.Ctrl按下 = false;
+      this.待重渲染当前卡 = true;
+      if (this.controllerReady) {
+        this.网页控制器.runJavaScript('document.querySelectorAll("audio,video").forEach(function(m){m.pause();});')
+          .catch((error: Object): void => { console.info(`Study media pause: ${error}`); });
+      }
+      return;
+    }
+    this.消费待重渲染();
+  }
+
+  /** 首卡可以早于 Web attach；只在可见且控制器就绪时推送当前文档。 */
+  private applyStudyHtml(html: string): void {
+    if (!this.isCurrentRequest(this.requestVersion)) { return; }
+    if (!this.controllerReady) { this.pendingHtml = html; return; }
+    this.pendingHtml = '';
+    this.网页控制器.loadData(html, 'text/html', 'UTF-8', 媒体基地址, ' ');
+    if (this.阶段 === 'question') { this.展示时刻毫秒 = Date.now(); }
+    this.maybeShowStudyGuide();
+    this.playStudyAudio();
+  }
+
+  /** 消费晚到的控制器；加载失败保持可见错误，不遗留可评分的空白卡面。 */
+  private studyWebAttached(): void {
+    if (!this.mounted) { return; }
+    this.controllerReady = true;
+    if (this.pendingHtml === '') { return; }
     try {
-      return await this.卡片渲染服务实例.提取音频文件(rawHtml, questionSide);
+      this.applyStudyHtml(this.pendingHtml);
     } catch (error) {
-      return [];
+      this.阶段 = 'error';
+      this.错误详情 = error instanceof Error ? error.message : `${error}`;
+      this.audioSession.stop();
     }
   }
 
-  /** 提取一侧 TTS 朗读项；失败降级为不朗读，不阻断学习流程 */
-  private async 安全提取TTS项(rawHtml: string, questionSide: boolean): Promise<TtsItem[]> {
+  /** 原生音频失败不阻断评分；重播会重新解析，允许失败后恢复。 */
+  private async playStudyAudio(autoplay: boolean = true): Promise<void> {
+    const rendered: RenderedCard | null = this.已渲染;
+    if (!this.isCurrentRequest(this.requestVersion) || !this.controllerReady || rendered === null ||
+      this.noteEditorVisible || this.noteEditorBusy || (this.阶段 !== 'question' && this.阶段 !== 'answer')) { return; }
+    const version: number = this.requestVersion;
     try {
-      return await this.卡片渲染服务实例.提取TTS项(rawHtml, questionSide);
+      const hasAudio: boolean | null = await this.audioSession.play(
+        原始侧HTML(rendered, this.阶段 === 'answer' ? 'answer' : 'question'), this.阶段 === 'question', this.媒体目录, autoplay);
+      if (hasAudio !== null && this.isCurrentRequest(version)) { this.有音频 = hasAudio; }
     } catch (error) {
-      return [];
+      if (!this.isCurrentRequest(version)) { return; }
+      this.有音频 = true;
+      console.info(`Study audio: ${error}`);
+      this.getUIContext().getPromptAction().showToast({
+        message: this.取文案($r('app.string.browser_preview_audio_error'))
+      });
     }
-  }
-
-  /**
-   * 媒体文件名 → 沙箱 collection.media/ 绝对路径。
-   * 文件名经 decodeURIComponent 还原（Anki 卡片中可能写作 [sound:%E4%B8%AD.mp3]，
-   * 后端 extract_av_tags 提取的是字面字符串，需解码才能匹配磁盘上的中文文件名）；
-   * 与 ArkWeb 图片拦截器（interceptMedia 中已调 decodeURIComponent）行为对齐。
-   * 解码失败（如含非编码 %）时回退原字面名，避免抛错中断播放。
-   */
-  private 转音频路径(files: string[]): string[] {
-    return files.map((name: string): string => `${this.媒体目录}/${解码文件名(name)}`);
   }
 
   /** 刷新撤销可用状态；查询失败不阻断学习流程，仅关闭撤销入口。 */
   private async 刷新撤销状态(): Promise<void> {
+    const version: number = this.requestVersion;
     try {
       const status = await this.集合服务实例.获取撤销状态();
+      if (!this.isCurrentRequest(version)) { return; }
       this.可撤销 = status.undo.length > 0;
     } catch (error) {
+      if (!this.isCurrentRequest(version)) { return; }
       this.可撤销 = false;
     }
   }
@@ -444,15 +555,21 @@ export struct 学习页 {
     if (this.评分中 || !this.可撤销) {
       return;
     }
+    if (!this.isCurrentRequest(this.requestVersion)) { return; }
     this.评分中 = true;
+    this.invalidateCardWork();
+    const version: number = this.requestVersion;
     try {
       await this.集合服务实例.撤销();
       await this.加载下一张卡();
     } catch (error) {
+      if (!this.isCurrentRequest(version)) { return; }
       this.阶段 = 'error';
       this.错误详情 = error instanceof Error ? error.message : `${error}`;
     } finally {
       this.评分中 = false;
+      this.消费待重渲染();
+      this.maybeShowStudyGuide();
     }
   }
 
@@ -487,8 +604,22 @@ export struct 学习页 {
   }
 
   private 更多菜单(): MenuElement[] {
+    const canManageCard: boolean = !this.评分中 && this.当前卡片 !== null &&
+      (this.阶段 === 'question' || this.阶段 === 'answer');
     const 菜单: MenuElement[] = [
+      { value: this.取文案($r('app.string.study_edit_note')), action: () => { this.openNoteEditor(); }, enabled: canManageCard },
+      { value: this.取文案($r('app.string.study_guide_title')), action: () => { this.showStudyGuide(); }, enabled: this.阶段 !== 'loading' && !this.评分中 },
       { value: this.取文案($r('app.string.study_undo')), action: () => { this.撤销上次(); }, enabled: this.可撤销 },
+      {
+        value: this.取文案($r('app.string.study_bury')),
+        action: () => { this.埋藏或暂停当前卡(BURY_SUSPEND_MODE_BURY_USER); },
+        enabled: canManageCard
+      },
+      {
+        value: this.取文案($r('app.string.study_suspend')),
+        action: () => { this.埋藏或暂停当前卡(BURY_SUSPEND_MODE_SUSPEND); },
+        enabled: canManageCard
+      },
       { value: this.取文案($r('app.string.study_delete_card')), action: () => { this.请求删除当前卡(); }, enabled: this.阶段 === 'question' || this.阶段 === 'answer' }
     ];
     // 「手写」入口：常驻显示（question/answer 阶段），无开关，进入后叠加 Canvas 笔迹层
@@ -507,6 +638,92 @@ export struct 学习页 {
       });
     }
     return 菜单;
+  }
+
+  /** 从当前学习卡读取笔记；字段就绪后才挂载编辑器，避免初始化为空草稿。 */
+  private async openNoteEditor(): Promise<void> {
+    if (this.评分中 || this.studyGuideVisible || this.当前卡片 === null ||
+      (this.阶段 !== 'question' && this.阶段 !== 'answer')) { return; }
+    if (!this.isCurrentRequest(this.requestVersion)) { return; }
+    this.评分中 = true;
+    this.noteEditorBusy = true;
+    this.noteEditorError = '';
+    this.editStartedAt = Date.now();
+    this.Ctrl按下 = false;
+    const card: StudyCard = this.当前卡片;
+    this.invalidateCardWork();
+    const version: number = this.requestVersion;
+    try {
+      const note: EditableNote = await this.笔记服务实例.获取笔记(card.noteId);
+      if (!this.isCurrentRequest(version)) { return; }
+      const notetype = await this.笔记类型服务实例.获取笔记类型(note.notetypeId);
+      if (!this.isCurrentRequest(version)) { return; }
+      this.editingNote = note;
+      this.editingFieldNames = notetype.fieldNames;
+      this.noteEditorVisible = true;
+    } catch (error) {
+      if (!this.isCurrentRequest(version)) { return; }
+      this.展示时刻毫秒 += Date.now() - this.editStartedAt;
+      this.editingNote = null;
+      this.评分中 = false;
+      this.getUIContext().getPromptAction().showToast({
+        message: this.取文案($r('app.string.browser_detail_load_error'))
+      });
+    } finally {
+      this.noteEditorBusy = false;
+      if (!this.noteEditorVisible) {
+        this.评分中 = false;
+        this.消费待重渲染();
+      }
+    }
+  }
+
+  /** 取消不重载卡片，并扣除编辑占用的答题时间。 */
+  private closeNoteEditor(): void {
+    if (this.noteEditorBusy || !this.noteEditorVisible) { return; }
+    this.展示时刻毫秒 += Date.now() - this.editStartedAt;
+    this.noteEditorVisible = false;
+    this.editingNote = null;
+    this.评分中 = false;
+    this.Ctrl按下 = false;
+    this.消费待重渲染();
+    this.playStudyAudio(false);
+  }
+
+  /** 保存原笔记并保留撤销记录；从后端重新获取队首、调度状态和题面。 */
+  private async saveNoteEdits(fields: string[], tags: string[]): Promise<boolean> {
+    const note: EditableNote | null = this.editingNote;
+    if (this.noteEditorBusy || !this.noteEditorVisible || note === null) { return false; }
+    this.noteEditorBusy = true;
+    this.noteEditorError = '';
+    try {
+      const updated: EditableNote = {
+        id: note.id,
+        guid: note.guid,
+        notetypeId: note.notetypeId,
+        mtimeSecs: note.mtimeSecs,
+        usn: note.usn,
+        fields: fields.slice(),
+        tags: tags.slice()
+      };
+      await this.笔记服务实例.更新笔记([updated], false);
+      if (!this.mounted) { return true; }
+      await this.加载下一张卡();
+      if (!this.mounted) { return true; }
+      this.noteEditorVisible = false;
+      this.editingNote = null;
+      this.评分中 = false;
+      this.Ctrl按下 = false;
+      return true;
+    } catch (error) {
+      if (!this.mounted) { return false; }
+      this.noteEditorError = this.取文案($r('app.string.browser_detail_save_error'));
+      return false;
+    } finally {
+      this.noteEditorBusy = false;
+      this.消费待重渲染();
+      if (!this.noteEditorVisible) { this.playStudyAudio(); }
+    }
   }
 
   /** 当前卡只作为本地入口上下文；打开页面不会触发任何 AI 网络请求。
@@ -562,37 +779,35 @@ export struct 学习页 {
     }
   }
 
-  /** 消费一次待重渲染标记。onShown 与 @Watch 共用，保证多通道命中只刷新一次。 */
+  /** 返回与写入通知共用刷新入口；加载或编辑期间保留标记，不并发覆盖卡面。 */
   private 消费待重渲染(): void {
-    if (!this.待重渲染当前卡) { return; }
+    if (!this.mounted || !this.sessionReady || !this.foreground || !this.待重渲染当前卡 ||
+      !this.页面已显示 || this.contentRefreshInFlight || this.评分中 || this.noteEditorVisible || this.noteEditorBusy ||
+      (this.阶段 === 'loading' && this.loadingVersion === this.requestVersion)) { return; }
     this.待重渲染当前卡 = false;
-    this.刷新AI改卡后当前卡();
+    this.刷新编辑后当前卡();
   }
 
-  /** 核对 Agent 写入后的队首；同卡原地重渲染，当前卡失效时进入真实新队首。 */
-  private async 刷新AI改卡后当前卡(): Promise<void> {
-    if (this.当前卡片 === null || (this.阶段 !== 'question' && this.阶段 !== 'answer')) { return; }
-    const currentCardId: number = this.当前卡片.cardId;
+  /** 复用完整加载链更新模板、字段、拼写和音频；同一张卡保留正反面，失效时使用真实队首。 */
+  private async 刷新编辑后当前卡(): Promise<void> {
+    const currentCardId: number = this.当前卡片?.cardId ?? 0;
+    const wasAnswer: boolean = this.阶段 === 'answer';
+    this.contentRefreshInFlight = true;
+    this.评分中 = true;
     try {
-      const queued = await this.调度器服务实例.获取队首卡片(this.牌组ID);
-      if (queued.cards.length === 0 || queued.cards[0].cardId !== currentCardId) {
-        await this.加载下一张卡();
-        return;
+      this.invalidateCardWork();
+      await this.加载下一张卡();
+      if (this.页面已显示 && wasAnswer && this.当前卡片?.cardId === currentCardId) {
+        await this.显示答案();
       }
-      this.新卡剩余 = queued.newCount;
-      this.学习中剩余 = queued.learningCount;
-      this.复习剩余 = queued.reviewCount;
-      this.当前卡片 = queued.cards[0];
-      this.已渲染 = await this.卡片渲染服务实例.渲染既有卡片(this.当前卡片.cardId);
-      this.正面HTML = 剥除拼写标记(构建卡片HTML(this.已渲染, 'question', this.是否深色()));
-      this.背面HTML = 构建卡片HTML(this.已渲染, 'answer', this.是否深色());
-      const html: string = this.阶段 === 'answer' ? this.背面HTML : this.正面HTML;
-      this.网页控制器.loadData(html, 'text/html', 'UTF-8', 媒体基地址, ' ');
-      hilog.info(0x4342, '学习页', `Agent 改卡后已重渲染当前卡 cardId=${this.当前卡片.cardId}`);
     } catch (error) {
-      // 协调查询或重渲染失败时保留当前画面，不把一次返回刷新失败升级为学习页错误态。
-      hilog.error(0x4342, '学习页',
-        `Agent 改卡后协调学习队列失败: ${error instanceof Error ? error.message : `${error}`}`);
+      this.阶段 = 'error';
+      this.错误详情 = error instanceof Error ? error.message : `${error}`;
+    } finally {
+      this.contentRefreshInFlight = false;
+      this.评分中 = false;
+      this.消费待重渲染();
+      this.maybeShowStudyGuide();
     }
   }
 
@@ -624,15 +839,21 @@ export struct 学习页 {
     if (this.阶段 !== 'question' && this.阶段 !== 'answer') {
       return;
     }
+    if (!this.isCurrentRequest(this.requestVersion)) { return; }
     this.评分中 = true;
+    this.invalidateCardWork();
+    const version: number = this.requestVersion;
     try {
       await this.调度器服务实例.埋藏或暂停卡片(this.当前卡片.cardId, mode);
       await this.加载下一张卡();
     } catch (error) {
+      if (!this.isCurrentRequest(version)) { return; }
       this.阶段 = 'error';
       this.错误详情 = error instanceof Error ? error.message : `${error}`;
     } finally {
       this.评分中 = false;
+      this.消费待重渲染();
+      this.maybeShowStudyGuide();
     }
   }
 
@@ -691,11 +912,15 @@ export struct 学习页 {
     if (this.当前卡片 === null) {
       return;
     }
+    if (!this.isCurrentRequest(this.requestVersion)) { return; }
     this.评分中 = true;
+    this.invalidateCardWork();
+    const version: number = this.requestVersion;
     try {
       await this.卡片服务实例.删除卡片([this.当前卡片.cardId]);
       await this.加载下一张卡();
     } catch (error) {
+      if (!this.isCurrentRequest(version)) { return; }
       this.阶段 = 'error';
       const reason: string = error instanceof Error ? error.message : `${error}`;
       this.错误详情 = this.getUIContext().getHostContext()!.resourceManager
@@ -703,13 +928,17 @@ export struct 学习页 {
         .replace('%s', reason);
     } finally {
       this.评分中 = false;
+      this.消费待重渲染();
+      this.maybeShowStudyGuide();
     }
   }
 
   /** 完成页真实数据；拉取失败降级为静态完成文案（完成页数据已加载=false），不进入错误态。 */
   private async 加载完成页信息(): Promise<void> {
+    const version: number = this.requestVersion;
     try {
       const info = await this.调度器服务实例.获取完成页信息();
+      if (!this.isCurrentRequest(version)) { return; }
       // 上游 buildNextLearnMsg：下一张学习卡 >=1 天后到期时不再提示
       this.完成页学习剩余 = info.secsUntilNextLearn < SECONDS_PER_DAY ? info.learnRemaining : 0;
       this.完成页下张学习分钟 = Math.max(1, Math.ceil(info.secsUntilNextLearn / 60));
@@ -718,6 +947,7 @@ export struct 学习页 {
       this.完成页有埋藏 = info.haveSchedBuried || info.haveUserBuried;
       this.完成页数据已加载 = true;
     } catch (error) {
+      if (!this.isCurrentRequest(version)) { return; }
       this.完成页数据已加载 = false;
     }
   }
@@ -730,109 +960,76 @@ export struct 学习页 {
     if (this.评分中) {
       return;
     }
+    if (!this.isCurrentRequest(this.requestVersion)) { return; }
     this.评分中 = true;
+    this.invalidateCardWork();
+    const version: number = this.requestVersion;
     try {
       await this.调度器服务实例.按牌组恢复埋藏(this.牌组ID, UNBURY_MODE_ALL);
       await this.加载下一张卡();
     } catch (error) {
+      if (!this.isCurrentRequest(version)) { return; }
       this.阶段 = 'error';
       this.错误详情 = error instanceof Error ? error.message : `${error}`;
     } finally {
       this.评分中 = false;
+      this.消费待重渲染();
+      this.maybeShowStudyGuide();
     }
   }
 
-  // ========================================================
-  // @块ID UI-PAGE-STUDY-006
-  // @名称 显示答案
-  //
-  // @作用
-  // 翻面：背面 HTML 注入 拼写比对结果（如有 type 标记）后加载到 Web，并播放背面音频/TTS。
-  //
-  // @输入
-  // 无（使用 已渲染 / 背面HTML / 拼写字段名）
-  //
-  // @输出
-  // 阶段 切换为 'answer'；背面 HTML 渲染到 Web
-  //
-  // @业务规则
-  // Type-in-the-Answer：翻面前拉取笔记字段值，生成比对 HTML，替换 背面HTML 中的 [[type:...]] 标记。
-  // getNote/getNotetype 失败时降级为剥除标记（不阻断翻面，用户仍可评分）。
-  // 重赋值 this.背面HTML（而非局部变量）以保持 loadData 契约；加载下一张卡 会重建该字段。
-  //
-  // @副作用
-  // 调 Web 控制器 loadData；播放音频/TTS
-  // ========================================================
+  /** 翻面只提交当前请求结果；拼写请求期间切卡会使本次结果失效。 */
   private async 显示答案(): Promise<void> {
-    if (this.阶段 !== 'question' || this.已渲染 === null) {
-      return;
-    }
+    if (this.noteEditorVisible || this.noteEditorBusy || this.studyGuideVisible || this.flipPending ||
+      (this.评分中 && !this.contentRefreshInFlight)) { return; }
+    if (!this.isCurrentRequest(this.requestVersion) || !this.controllerReady || this.pendingHtml !== '' ||
+      this.阶段 !== 'question' || this.已渲染 === null) { return; }
+    const version: number = this.requestVersion;
+    this.flipPending = true;
     try {
-      // Type-in-the-Answer：翻面前拉取笔记字段值，生成比对 HTML，替换 背面HTML 中的 [[type:...]] 标记。
-      // getNote/getNotetype 失败时降级为剥除标记（不阻断翻面，用户仍可评分）。
-      // 重赋值 this.背面HTML（而非局部变量）以保持 loadData 契约；加载下一张卡 会重建该字段。
-      if (this.拼写字段名 !== '') {
-        this.背面HTML = await this.构建拼写答案HTML(this.背面HTML);
-      }
-      this.网页控制器.loadData(this.背面HTML, 'text/html', 'UTF-8', 媒体基地址, ' ');
+      const html: string = this.拼写字段名 !== ''
+        ? await this.构建拼写答案HTML(this.背面HTML) : this.背面HTML;
+      if (!this.isCurrentRequest(version)) { return; }
+      this.背面HTML = html;
       this.阶段 = 'answer';
-      const rawAnswerHtml: string = 原始侧HTML(this.已渲染, 'answer');
-      const answerSounds: string[] = await this.安全提取音频(rawAnswerHtml, false);
-      const answerTtsItems: TtsItem[] = await this.安全提取TTS项(rawAnswerHtml, false);
-      this.有音频 = answerSounds.length > 0 || answerTtsItems.length > 0;
-      await this.声音播放器实例.播放队列(this.转音频路径(answerSounds));
-      await this.TTS播放器实例.播放队列(answerTtsItems);
+      this.applyStudyHtml(html);
     } catch (error) {
+      if (!this.isCurrentRequest(version)) { return; }
+      this.audioSession.stop();
       this.阶段 = 'error';
       this.错误详情 = error instanceof Error ? error.message : `${error}`;
+    } finally {
+      if (version === this.requestVersion) { this.flipPending = false; }
     }
   }
 
-  // ========================================================
-  // @块ID UI-PAGE-STUDY-007
-  // @名称 构建拼写答案HTML
-  //
-  // @作用
-  // 拉取当前卡笔记的对应字段值，调 拼写比对器 生成字符级 diff HTML，
-  // 用 注入拼写结果 替换 背面HTML 中的 [[type:FieldName]] 标记。
-  //
-  // @输入
-  // answerHtml: 待注入的背面 HTML
-  //
-  // @输出
-  // 注入比对结果后的 HTML；任一步失败时降级为 剥除拼写标记
-  //
-  // @业务规则
-  // Cloze 卡（拼写填空=true）：用 提取拼写填空内容 从字段值中提取当前
-  //   cardOrd 的预期答案；无匹配 cloze 时降级为 剥除拼写标记 不渲染输入框。
-  // 若 answerHtml 不含 [[type:...]] 占位符（标记仅在 questionNodes），在末尾追加
-  //   <hr> + 比对结果，与 Anki 桌面端行为一致。
-  // 已输入答案 为空时 比对答案 返回纯预期答案（无 diff），与 Anki 行为一致。
-  // 任一后端调用失败时降级为 剥除拼写标记（剥除标记，不显示比对结果），不阻断翻面。
-  //
-  // @副作用
-  // 调后端 获取笔记 / 获取笔记类型
-  // ========================================================
+  /** 根据翻面时的拼写快照生成比对结果；字段读取失败时仍显示答案。 */
   private async 构建拼写答案HTML(answerHtml: string): Promise<string> {
     if (this.当前卡片 === null) {
       return 剥除拼写标记(answerHtml);
     }
+    const noteId: number = this.当前卡片.noteId;
+    const fieldName: string = this.拼写字段名;
+    const cloze: boolean = this.拼写填空;
+    const ordinal: number = this.拼写卡片序号;
+    const input: string = this.已输入答案;
+    const combining: boolean = this.拼写组合;
     try {
-      const note = await this.笔记服务实例.获取笔记(this.当前卡片.noteId);
+      const note = await this.笔记服务实例.获取笔记(noteId);
       const notetype = await this.笔记类型服务实例.获取笔记类型(note.notetypeId);
-      const fieldIdx = notetype.fieldNames.indexOf(this.拼写字段名);
+      const fieldIdx = notetype.fieldNames.indexOf(fieldName);
       const fieldValue = fieldIdx >= 0 && fieldIdx < note.fields.length ? note.fields[fieldIdx] : '';
       // Cloze 卡：从字段值中提取当前 cardOrd 的预期答案；无匹配则降级为剥除标记。
       let expected: string;
-      if (this.拼写填空) {
-        expected = 提取拼写填空内容(fieldValue, this.拼写卡片序号 + 1);
+      if (cloze) {
+        expected = 提取拼写填空内容(fieldValue, ordinal + 1);
         if (expected === '') {
           return 剥除拼写标记(answerHtml);
         }
       } else {
         expected = fieldValue;
       }
-      const resultHtml = 比对答案(expected, this.已输入答案, this.拼写组合);
+      const resultHtml = 比对答案(expected, input, combining);
       // 注入比对结果；若 answerHtml 不含 [[type:...]] 占位符（标记仅在 questionNodes），
       // 在末尾追加 <hr> + 比对结果，与 Anki 桌面端行为一致。
       const injected = 注入拼写结果(answerHtml, resultHtml);
@@ -860,6 +1057,7 @@ export struct 学习页 {
   // 仅 TapZones 开关开启且非简洁模式时生效；loading/error/done 阶段忽略。
   // ========================================================
   private 处理TapZone点击(nx: number, ny: number): void {
+    if (this.studyGuideVisible) { return; }
     if (!this.TapZones开关 || this.简洁模式) {
       return;
     }
@@ -898,10 +1096,14 @@ export struct 学习页 {
   // 调后端 提交评分
   // ========================================================
   private async 评分(rating: number): Promise<void> {
+    if (this.studyGuideVisible) { return; }
     if (this.评分中 || this.阶段 !== 'answer' || this.当前卡片 === null) {
       return;
     }
+    if (!this.isCurrentRequest(this.requestVersion)) { return; }
     this.评分中 = true;
+    this.invalidateCardWork();
+    const version: number = this.requestVersion;
     try {
       const states: SchedulingStatesRaw = this.当前卡片.states;
       const newStates: Uint8Array[] = [states.again, states.hard, states.good, states.easy];
@@ -915,10 +1117,13 @@ export struct 学习页 {
       });
       await this.加载下一张卡();
     } catch (error) {
+      if (!this.isCurrentRequest(version)) { return; }
       this.阶段 = 'error';
       this.错误详情 = error instanceof Error ? error.message : `${error}`;
     } finally {
       this.评分中 = false;
+      this.消费待重渲染();
+      this.maybeShowStudyGuide();
     }
   }
 
@@ -980,13 +1185,12 @@ export struct 学习页 {
     if (index < this.按钮文案.length && this.按钮文案[index].length > 0) {
       return this.按钮文案[index];
     }
-    if (index < this.兜底文案.length) {
-      return this.兜底文案[index];
-    }
     return '';
   }
 
   private 返回(): void {
+    if (this.noteEditorBusy) { return; }
+    if (this.noteEditorVisible) { this.closeNoteEditor(); return; }
     this.pathStack.pop();
   }
 
@@ -1026,6 +1230,11 @@ export struct 学习页 {
   // 无（触发其他块副作用）
   // ========================================================
   private 处理按键(event: KeyEvent): boolean {
+    if (this.noteEditorVisible || this.noteEditorBusy) {
+      this.Ctrl按下 = false;
+      return false;
+    }
+    if (this.studyGuideVisible) { return false; }
     // KeyType.Up：仅更新 Ctrl 松开状态，不执行业务
     if (event.type !== KeyType.Down) {
       if (event.keyCode === KeyCode.KEYCODE_CTRL_LEFT || event.keyCode === KeyCode.KEYCODE_CTRL_RIGHT) {
@@ -1069,8 +1278,7 @@ export struct 学习页 {
     }
     // `R` 重放音频（question/answer 阶段均生效，与 Anki 桌面端一致；无音频时 重播 静默无副作用）
     if (event.keyCode === KeyCode.KEYCODE_R) {
-      this.声音播放器实例.重播();
-      this.TTS播放器实例.重播();
+      this.playStudyAudio();
       return true;
     }
     // question 阶段：Space/Enter 显示答案
@@ -1139,7 +1347,6 @@ export struct 学习页 {
         // 左侧：返回
         按下态按钮({
           文案: $r('app.string.study_back'),
-          选中态背景: this.主色容器色,
           字色: $r('app.color.text_primary'),
           点击回调: (): void => { this.返回(); }
         })
@@ -1169,8 +1376,8 @@ export struct 学习页 {
     .padding({
       left: 应用尺寸.页面内边距_水平,
       right: 应用尺寸.页面内边距_水平,
-      top: this.状态栏高度 + 应用尺寸.间距_8,
-      bottom: 应用尺寸.间距_8
+      top: this.状态栏高度 + 应用尺寸.toolbarVerticalInset,
+      bottom: 应用尺寸.toolbarVerticalInset
     })
     .backgroundColor(this.页面底色微染值)
   }
@@ -1188,6 +1395,7 @@ export struct 学习页 {
         // 改为空字符串避免自动加载；loadData 的 baseUrl 仍是 媒体基地址，
         // 相对路径资源解析与 onInterceptRequest 媒体拦截不受影响。
         Web({ src: '', controller: this.网页控制器 })
+        .textZoomRatio(this.cardTextSizePercent)
         .javaScriptAccess(true)
         .fileAccess(true)
         .domStorageAccess(true)
@@ -1201,6 +1409,7 @@ export struct 学习页 {
             this.处理TapZone点击(nx, ny);
           };
           this.网页控制器.registerJavaScriptProxy(代理, 'ankiTapZone', ['onTap']);
+          this.studyWebAttached();
         })
         .onInterceptRequest((event: OnInterceptRequestEvent): WebResourceResponse | null => {
           return interceptMathAsset(event.request.getRequestUrl()) ?? this.拦截媒体(event);
@@ -1210,6 +1419,7 @@ export struct 学习页 {
         // 页面加载完成后显式再调一次，setup() 内部幂等（无 #image-occlusion-canvas 直接返回），
         // 对 Basic/Cloze 卡片零影响。
         .onPageEnd((event: OnPageEndEvent) => {
+          if (this.阶段 !== 'question' && this.阶段 !== 'answer') return;
           this.网页控制器.runJavaScript('anki.imageOcclusion.setup()');
           // Tap Zones：注入 click 监听（幂等）。判定在 Web 内部完成——
           // 点击目标上溯命中 A/BUTTON/INPUT/TEXTAREA/SELECT/CANVAS/AUDIO/VIDEO/IFRAME
@@ -1234,6 +1444,8 @@ export struct 学习页 {
         })
         .width('100%')
         .height('100%')
+        // 保留控制器供撤销/恢复埋藏复用；加载、完成及错误态均不透出旧卡。
+        .visibility(this.阶段 === 'question' || this.阶段 === 'answer' ? Visibility.Visible : Visibility.Hidden)
 
       // Tap Zones（实验性功能，仅「实验版」模式下且开关开启时生效）：
       // 点击判定在卡片 Web 内部完成（onPageEnd 注入的 click 监听 + javaScriptProxy 回调），
@@ -1241,8 +1453,10 @@ export struct 学习页 {
       // 且会与 Web 的触摸/滚动互相干扰。Web 内判定天然排除 A/INPUT/CANVAS 等交互标签，
       // 顶部条（返回/更多）与答案条/浮动工具栏（埋藏/暂停/评分按钮）在 ArkUI 层，不受影响。
 
-      if (this.有音频) {
-        Button($r('app.string.study_replay_sound'))
+      if (this.有音频 && (this.阶段 === 'question' || this.阶段 === 'answer')) {
+        Button() {
+          Text() { ThemeTextSpans($r('app.string.study_replay_sound'), this.themeAccentColors, this.getUIContext()) }.fontSize(应用尺寸.字号_按钮).fontColor(this.动作主色)
+        }
           .height(应用尺寸.按钮高度)
           .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
           .margin(应用尺寸.间距_12)
@@ -1252,8 +1466,7 @@ export struct 学习页 {
           .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
           .borderRadius(应用尺寸.圆角_胶囊)
           .onClick(() => {
-            this.声音播放器实例.重播();
-            this.TTS播放器实例.重播();
+            this.playStudyAudio();
           })
       }
 
@@ -1280,8 +1493,11 @@ export struct 学习页 {
             .fontSize(应用尺寸.字号_正文_中)
             .fontColor($r('app.color.text_secondary'))
             .textAlign(TextAlign.Center)
-          Button($r('app.string.study_back'))
+          Button() {
+            Text() { ThemeTextSpans($r('app.string.study_back'), this.themeAccentColors, this.getUIContext()) }.fontSize(应用尺寸.字号_按钮).fontColor(this.动作主色)
+          }
             .height(应用尺寸.按钮高度)
+            .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
             .fontSize(应用尺寸.字号_按钮)
             .fontColor(this.动作主色)
             .backgroundColor($r('app.color.surface_card'))
@@ -1324,8 +1540,11 @@ export struct 学习页 {
                 .textAlign(TextAlign.Center)
             }
             if (this.完成页有埋藏) {
-              Button($r('app.string.study_unbury'))
+              Button() {
+                Text() { ThemeTextSpans($r('app.string.study_unbury'), this.themeAccentColors, this.getUIContext()) }.fontSize(应用尺寸.字号_按钮).fontColor(this.动作主色)
+              }
                 .height(应用尺寸.按钮高度)
+                .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
                 .fontSize(应用尺寸.字号_按钮)
                 .fontColor(this.动作主色)
                 .backgroundColor($r('app.color.surface_card'))
@@ -1342,17 +1561,6 @@ export struct 学习页 {
               .fontColor($r('app.color.text_secondary'))
               .textAlign(TextAlign.Center)
           }
-          Button($r('app.string.study_back'))
-            .height(应用尺寸.按钮高度)
-            .fontSize(应用尺寸.字号_按钮)
-            .fontColor(this.动作主色)
-            .backgroundColor($r('app.color.surface_card'))
-            .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
-            .borderRadius(应用尺寸.圆角_胶囊)
-            .margin({ top: 应用尺寸.间距_12 })
-            .onClick(() => {
-              this.返回();
-            })
         }
         .width('100%')
         .height('100%')
@@ -1367,7 +1575,7 @@ export struct 学习页 {
 
       // Type-in-the-Answer：正面阶段在 Web 下方渲染输入框，翻面后比对用户输入与笔记字段值。
       // Enter 提交翻面（对齐 Anki 桌面端输入框回车显示答案）。
-      // 左右内边距与 答案条 的埋藏/暂停行同款（输入框总宽 = 埋藏+暂停两键之和）；
+      // 输入框与答案条使用相同的左右内边距；
       // float 模式下 答案条 不渲染、输入框是卡片区最后元素贴屏底，
       // 底部抬高避让手势导航条（与 答案条 bottom padding 同公式）。
       if (this.阶段 === 'question' && this.拼写字段名 !== '') {
@@ -1430,25 +1638,24 @@ export struct 学习页 {
     }
     .width('100%')
     .layoutWeight(1)
+    .padding({ top: 应用尺寸.pageContentTopInset })
   }
 
   @Builder
   private 答案条() {
     Column() {
       if (this.阶段 === 'question') {
-        Button($r('app.string.study_show_answer'))
+        Button() {
+          Text() { ThemeTextSpans($r('app.string.study_show_answer'), this.themeAccentColors, this.getUIContext()) }
+            .fontSize(应用尺寸.字号_标题).fontWeight(FontWeight.Medium).fontColor(this.动作主色)
+        }
           .width('100%')
           .height(应用尺寸.行动按钮高度)
           .fontSize(应用尺寸.字号_标题)
           .fontWeight(FontWeight.Medium)
-          .fontColor(Color.White)
-          // 渐变方案：默认 primary→primaryActive（凸起），按下纯 primaryActive（凹陷）
-          .linearGradient({
-              angle: 180,
-              colors: this.显示答案按下
-                ? [[this.主色按钮按下色 as ResourceColor, 0.0], [this.主色按钮按下色 as ResourceColor, 1.0]]
-                : [[this.主色按钮背景色 as ResourceColor, 0.0], [this.主色按钮按下色 as ResourceColor, 1.0]]
-            })
+          .fontColor(this.动作主色)
+          .attributeModifier(new PrimaryGlassSurface(this.显示答案按下, this.primaryGlass))
+          .stateEffect(false)
           .borderRadius(应用尺寸.圆角_行动按钮)
           .animation({ duration: 80, curve: Curve.EaseOut })
           .onTouch((event: TouchEvent): void => {
@@ -1462,61 +1669,34 @@ export struct 学习页 {
             this.显示答案();
           })
       }
-      if (this.阶段 === 'question' || this.阶段 === 'answer') {
-        Row({ space: 应用尺寸.间距_8 }) {
-          StudyActionButton({
-            label: $r('app.string.study_bury'),
-            buttonHeight: 应用尺寸.按钮高度,
-            labelFontSize: 应用尺寸.字号_正文_中,
-            labelColor: $r('app.color.text_secondary'),
-            pressedBackground: this.主色容器色,
-            onActivate: (): void => {
-              this.埋藏或暂停当前卡(BURY_SUSPEND_MODE_BURY_USER);
-            }
-          })
-          StudyActionButton({
-            label: $r('app.string.study_suspend'),
-            buttonHeight: 应用尺寸.按钮高度,
-            labelFontSize: 应用尺寸.字号_正文_中,
-            labelColor: $r('app.color.text_secondary'),
-            pressedBackground: this.主色容器色,
-            onActivate: (): void => {
-              this.埋藏或暂停当前卡(BURY_SUSPEND_MODE_SUSPEND);
-            }
-          })
-        }
-        .width('100%')
-        .margin({ top: 应用尺寸.间距_8 })
-      }
       if (this.阶段 === 'answer') {
         Row({ space: 应用尺寸.间距_8 }) {
           StudyActionButton({
-            label: this.按钮文案位(RATING_AGAIN),
+            label: $r('app.string.rating_again'),
+            subtitle: this.按钮文案位(RATING_AGAIN),
             labelColor: $r('app.color.error_text'),
-            pressedBackground: this.主色容器色,
             onActivate: (): void => {
               this.评分(RATING_AGAIN);
             }
           })
           StudyActionButton({
-            label: this.按钮文案位(RATING_HARD),
-            pressedBackground: this.主色容器色,
+            label: $r('app.string.rating_hard'),
+            subtitle: this.按钮文案位(RATING_HARD),
             onActivate: (): void => {
               this.评分(RATING_HARD);
             }
           })
           StudyActionButton({
-            label: this.按钮文案位(RATING_GOOD),
+            label: $r('app.string.rating_good'),
+            subtitle: this.按钮文案位(RATING_GOOD),
             labelColor: this.动作主色,
-            pressedBackground: this.主色容器色,
-            pressedBorderColor: this.动作主色,
             onActivate: (): void => {
               this.评分(RATING_GOOD);
             }
           })
           StudyActionButton({
-            label: this.按钮文案位(RATING_EASY),
-            pressedBackground: this.主色容器色,
+            label: $r('app.string.rating_easy'),
+            subtitle: this.按钮文案位(RATING_EASY),
             onActivate: (): void => {
               this.评分(RATING_EASY);
             }
@@ -1539,7 +1719,7 @@ export struct 学习页 {
   build() {
     NavDestination() {
       // 外层 Stack：浮层工具栏用 position 绝对定位，需要全屏父容器；底层是限宽居中的内容列。
-      // bottom 模式下 答案条 在内容列内，与原体验一致；float 模式下 答案条 不渲染，两个浮动工具栏叠加在 Stack 上层。
+      // bottom 模式下 答案条 在内容列内，与原体验一致；float 模式下 答案条 不渲染，答案与评分浮动工具栏叠加在 Stack 上层。
       Stack() {
         Column() {
           Column() {
@@ -1556,44 +1736,16 @@ export struct 学习页 {
         .width('100%')
         .height('100%')
         .alignItems(HorizontalAlign.Center)
-        .backgroundColor(this.页面底色微染值)
+        .backgroundColor(Color.Transparent)
 
         if (this.学习布局模式值 === 'float') {
           // 主操作浮动工具栏：question 阶段显示「显示答案」，answer 阶段切换为 4 个评分按钮。
           学习浮动工具栏({
-            工具栏类型: 'main',
             当前阶段: this.阶段,
             评分按钮文案: this.按钮文案,
-            兜底文案: this.兜底文案,
             是否深色: this.是否深色(),
             显示答案回调: (): void => {
               this.显示答案();
-            },
-            埋藏回调: (): void => {
-              this.埋藏或暂停当前卡(BURY_SUSPEND_MODE_BURY_USER);
-            },
-            暂停回调: (): void => {
-              this.埋藏或暂停当前卡(BURY_SUSPEND_MODE_SUSPEND);
-            },
-            评分回调: (rating: number): void => {
-              this.评分(rating);
-            }
-          })
-          // 辅助操作浮动工具栏：question/answer 阶段都显示「埋藏 + 暂停」。
-          学习浮动工具栏({
-            工具栏类型: 'aux',
-            当前阶段: this.阶段,
-            评分按钮文案: this.按钮文案,
-            兜底文案: this.兜底文案,
-            是否深色: this.是否深色(),
-            显示答案回调: (): void => {
-              this.显示答案();
-            },
-            埋藏回调: (): void => {
-              this.埋藏或暂停当前卡(BURY_SUSPEND_MODE_BURY_USER);
-            },
-            暂停回调: (): void => {
-              this.埋藏或暂停当前卡(BURY_SUSPEND_MODE_SUSPEND);
             },
             评分回调: (rating: number): void => {
               this.评分(rating);
@@ -1611,6 +1763,20 @@ export struct 学习页 {
             }
           })
         }
+        if (this.noteEditorVisible && this.editingNote !== null) {
+          浏览编辑区({
+            isDark: this.是否深色(),
+            busy: this.noteEditorBusy,
+            errorMessage: this.noteEditorError,
+            fieldNames: this.editingFieldNames,
+            initialFieldValues: this.editingNote.fields,
+            initialTags: this.editingNote.tags.join(' '),
+            onCancel: (): void => { this.closeNoteEditor(); },
+            onSave: (fields: string[], tags: string[]): Promise<boolean> => {
+              return this.saveNoteEdits(fields, tags);
+            }
+          })
+        }
       }
       .width('100%')
       .height('100%')
@@ -1625,15 +1791,23 @@ export struct 学习页 {
       })
     }
     .hideTitleBar(true)
+    .backgroundColor(Color.Transparent)
+    .onBackPressed((): boolean => {
+      if (this.noteEditorBusy) { return true; }
+      if (this.noteEditorVisible) { this.closeNoteEditor(); return true; }
+      return false;
+    })
     .opacity(this.转场透明度)
-    // 从 AI 改卡页 pop 返回时重渲染当前卡。onPageShow 只对 @Entry 路由页生效，
+    // 从任何编辑/设置页返回都重新读取卡面。onPageShow 只对 @Entry 路由页生效，
     // NavDestination 必须用 onShown（与 学习提醒页 同款）；这是比 onPop 可靠的通道。
     .onShown((): void => {
       this.页面已显示 = true;
-      this.消费待重渲染();
+      this.studyActivityChanged();
+      this.maybeShowStudyGuide();
     })
     .onHidden((): void => {
       this.页面已显示 = false;
+      this.studyActivityChanged();
     })
   }
 }

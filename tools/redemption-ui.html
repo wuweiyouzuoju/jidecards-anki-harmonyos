@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Jidecards · 兑换码工具</title>
+<style>
+:root{font-family:Inter,"Segoe UI","Microsoft YaHei",sans-serif;color:#222637;background:#f4f5f8;font-synthesis:none}
+*{box-sizing:border-box}body{margin:0}button,input,select,textarea{font:inherit}button{cursor:pointer}button:disabled{cursor:default;opacity:.45}
+.page{max-width:1060px;margin:auto;padding:52px 32px}header{display:flex;justify-content:space-between;align-items:center;margin-bottom:50px}
+.brand{display:flex;gap:12px;align-items:center;font-size:20px;font-weight:650;letter-spacing:-.5px}.mark{display:grid;place-items:center;width:40px;height:40px;background:linear-gradient(140deg,#496de8,#8650c6);color:white;border-radius:12px;font-size:23px}
+.status{font-size:12px;color:#557360;border:1px solid #d9e5dc;background:#f5fbf6;border-radius:20px;padding:8px 13px}.status:before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:#58a978;margin-right:7px}
+.eyebrow{font-size:11px;letter-spacing:2px;color:#747b90;margin-bottom:10px}h1{font-size:32px;letter-spacing:-1px;margin:0 0 12px}p{font-size:14px;color:#777e8e;line-height:1.8;margin:0}
+.workspace{display:grid;grid-template-columns:1.08fr 1fr;margin-top:30px;border:1px solid #e0e3eb;border-radius:22px;background:#fff;box-shadow:0 12px 40px #252b4910;overflow:hidden}
+.form{padding:32px;border-right:1px solid #e8eaf0}.result{padding:32px;background:linear-gradient(155deg,#fbfcff,#f7f5fc);display:flex;flex-direction:column}
+.step{font-size:11px;letter-spacing:1px;color:#8c92a2;margin-bottom:25px}.field{margin-bottom:25px}label,.label{font-size:14px;display:block;font-weight:600;margin-bottom:11px}.input-wrap{position:relative}
+textarea,select{width:100%;border:1px solid #dfe2eb;background:#fff;border-radius:12px;color:#30384f;outline:none;transition:border-color .15s,box-shadow .15s}
+textarea:focus,select:focus{border-color:#6574ce;box-shadow:0 0 0 3px #6574ce15}textarea{height:99px;padding:14px;font-family:Consolas,monospace;font-size:14px;line-height:1.7;resize:vertical;word-break:break-all}
+textarea::placeholder{font-family:"Microsoft YaHei",sans-serif;color:#a0a6b4;font-size:13px}.helper{font-size:12px;color:#949bad;margin-top:8px;min-height:20px}.helper.valid{color:#448067}.helper.error{color:#b04b5a}
+select{height:48px;padding:0 12px}.swatch{height:3px;background:linear-gradient(90deg,#3974e8,#7951cf,#b04491);margin-top:12px;border-radius:4px;width:65px}
+.primary{width:100%;border:0;border-radius:12px;padding:14px 18px;background:#535fbc;color:#fff;font-weight:600;font-size:14px;box-shadow:0 4px 8px #535fbc12}.primary:hover{background:#4552ad}
+.secondary{border:1px solid #dce0ed;background:#fff;color:#535fbc;border-radius:10px;padding:10px 16px;font-size:13px}.secondary:hover{background:#f3f5fc}
+.result-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}.result-head h2{font-size:16px;margin:0}.pill{font-size:11px;color:#8985a4;background:#eeecf6;border-radius:6px;padding:5px 8px}
+.empty{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;min-height:240px}.empty-icon{height:58px;width:48px;border:1px solid #ced3e4;border-radius:9px;transform:rotate(-8deg);margin-bottom:25px;background:#fff;box-shadow:6px 5px 0 #eeedf7}.empty-icon:after{content:"";display:block;width:24px;height:3px;background:#b5bde1;margin:18px auto;box-shadow:0 8px #e1e4f1}.empty b{font-size:14px;font-weight:500;color:#7d8396;margin-bottom:7px}.empty p{font-size:12px;color:#a1a6b5}
+.output{display:none;flex:1}.output textarea{height:177px;background:#ffffffb0;font-size:12px;line-height:1.9;resize:none;margin:12px 0 16px}.recipient{font-family:Consolas,monospace;font-size:12px;color:#747b90;overflow-wrap:anywhere}.success{color:#448067;font-size:13px;margin-bottom:10px}.result-foot{border-top:1px solid #e4e6ef;padding-top:17px;margin-top:25px;font-size:12px;color:#9298a8;line-height:1.8}
+.error-message{min-height:22px;color:#b04b5a;font-size:12px;margin-top:12px}footer{margin-top:24px;display:flex;justify-content:space-between;gap:20px;font-size:12px;color:#969cac}.foot-link{color:#79829d}
+@media(max-width:720px){.page{padding:24px 18px}header{margin-bottom:32px}.workspace{grid-template-columns:1fr}.form{border-right:0;border-bottom:1px solid #e8eaf0;padding:24px}.result{padding:24px}.empty{min-height:170px}footer{flex-direction:column;gap:6px}h1{font-size:28px}}
+</style>
+<div class="page">
+ <header><div class="brand"><span class="mark">J</span>Jidecards</div><span class="status" id="status">正在连接</span></header>
+ <div class="eyebrow">EXCLUSIVE CONTENT</div><h1>为一个人，解锁一份专属。</h1><p>输入对方的应用指纹，选择赠送内容，生成专属兑换码。</p>
+ <main class="workspace">
+  <form class="form" id="form"><div class="step">01 / 选择兑换对象与内容</div>
+   <div class="field"><label for="fingerprint">应用指纹</label><textarea id="fingerprint" placeholder="粘贴用户发来的完整应用指纹" spellcheck="false" maxlength="128" autocomplete="off"></textarea><div class="helper" id="fingerprint-hint">在应用「设置」最下方复制，支持带分隔符的完整指纹。</div></div>
+   <div class="field"><label for="content">兑换内容</label><select id="content" aria-label="兑换内容"></select><div class="swatch"></div><div class="helper">永久解锁 · 仅对当前指纹有效</div></div>
+   <button class="primary" id="generate" disabled>生成专属兑换码 <span aria-hidden="true">↗</span></button><div class="error-message" id="error" role="alert"></div>
+  </form>
+  <section class="result"><div class="result-head"><h2>兑换码</h2><span class="pill">一人一码</span></div>
+   <div class="empty" id="empty"><div class="empty-icon"></div><b>专属兑换码将在这里显示</b><p>生成后复制并发送给对方即可</p></div>
+   <div class="output" id="output"><div class="success" role="status">✓ 已生成专属兑换码</div><div class="recipient" id="recipient"></div><label for="code" class="label" style="margin-top:20px">完整兑换码</label><textarea id="code" readonly spellcheck="false"></textarea><button class="secondary" id="copy">复制兑换码</button></div>
+   <div class="result-foot">对方在应用内打开「设置 → 兑换内容」，粘贴兑换码即可解锁。</div>
+  </section>
+ </main><footer><span>生成过程在本机完成，指纹不会上传。</span><span class="foot-link">请安全备份发行私钥，勿与兑换码一同发送。</span></footer>
+</div>
+<script>
+const token=location.hash.slice(1);const $=id=>document.getElementById(id);let ready=false,busy=false;
+const normalize=value=>value.trim().toUpperCase().replace(/^JCF1-/,'').replace(/[-\s]/g,'');
+function refresh(){const value=normalize($('fingerprint').value),valid=/^[0-9A-F]{32}$/.test(value);$('generate').disabled=!ready||busy||!valid;$('fingerprint-hint').className='helper'+(valid?' valid':value?' error':'');$('fingerprint-hint').textContent=valid?'✓ 指纹完整，可以生成兑换码':value?'请粘贴完整指纹：32 个十六进制字符。':'在应用「设置」最下方复制，支持带分隔符的完整指纹。';}
+function clearOutput(){$('output').style.display='none';$('empty').style.display='flex';$('code').value='';$('error').textContent='';$('copy').textContent='复制兑换码';}
+async function request(path,body){const response=await fetch(path,{method:body?'POST':'GET',headers:{'X-Issuer-Token':token,...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined});const result=await response.json();if(!response.ok)throw Error(result.error||'操作失败');return result;}
+$('fingerprint').addEventListener('input',()=>{clearOutput();refresh()});$('content').addEventListener('change',clearOutput);
+$('form').addEventListener('submit',async event=>{event.preventDefault();if(busy||$('generate').disabled)return;busy=true;refresh();$('error').textContent='';try{const fp=normalize($('fingerprint').value);const result=await request('/issue',{fingerprint:fp,contentId:$('content').value});$('code').value=result.code;$('recipient').textContent='指纹 · '+fp.match(/.{4}/g).join(' ');$('empty').style.display='none';$('output').style.display='block';$('copy').textContent='复制兑换码';}catch(error){$('error').textContent=error.message}finally{busy=false;refresh()}});
+$('copy').addEventListener('click',async()=>{try{await navigator.clipboard.writeText($('code').value);$('copy').textContent='✓ 已复制'}catch(error){$('code').focus();$('code').select();$('error').textContent='请按 Ctrl+C 复制已选中的兑换码。'}});
+request('/contents').then(data=>{for(const item of data.contents){const option=document.createElement('option');option.value=item.id;option.textContent=item.name;$('content').append(option)}ready=true;$('status').textContent='发行工具已就绪';refresh()}).catch(error=>{$('status').textContent='连接未就绪';$('error').textContent=error.message});
+</script>
+</html>

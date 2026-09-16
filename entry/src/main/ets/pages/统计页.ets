@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
 
 // ========================================================
 // @块ID UI-PAGE-STATS-001
@@ -107,7 +108,7 @@ export struct 统计页 {
 
   @StorageProp(颜色键.主色按钮背景) private 主色按钮背景色: string = '#2F5FD0';
   @StorageProp(颜色键.主色容器) private 主色容器色: string = '#E8EEFC';
-  @StorageProp(颜色键.页面底色微染) private 页面底色微染值: string = '#F5F7FA';
+  @StorageProp(PAGE_SURFACE_KEY) private 页面底色微染值: string = '#F5F7FA';
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
   // 手势导航条高度（统计内容滚到底时需完整滚出导航条区域）
   @StorageProp('导航条高度') private 导航条高度: number = 0;
@@ -372,7 +373,6 @@ export struct 统计页 {
       Row() {
         按下态按钮({
           文案: $r('app.string.study_back'),
-          选中态背景: this.主色容器色,
           字色: $r('app.color.text_primary'),
           点击回调: (): void => this.返回()
         })
@@ -384,7 +384,6 @@ export struct 统计页 {
           文案: this.统计天数 === 0
             ? $r('app.string.stats_hours_range_all')
             : $r('app.string.stats_hours_range_1y'),
-          选中态背景: this.主色容器色,
           字色: $r('app.color.text_primary'),
           点击回调: (): void => { this.显示统计范围菜单 = true; }
         })
@@ -400,8 +399,8 @@ export struct 统计页 {
     .padding({
       left: 应用尺寸.页面内边距_水平,
       right: 应用尺寸.页面内边距_水平,
-      top: this.状态栏高度 + 应用尺寸.间距_8,
-      bottom: 应用尺寸.间距_8
+      top: this.状态栏高度 + 应用尺寸.toolbarVerticalInset,
+      bottom: 应用尺寸.toolbarVerticalInset
     })
     .backgroundColor(this.页面底色微染值)
   }
@@ -409,7 +408,7 @@ export struct 统计页 {
   @Builder
   private 统计内容() {
     Scroll() {
-      Column({ space: 应用尺寸.间距_12 }) {
+      Column({ space: 应用尺寸.pageSectionGap }) {
         // 统计口径行：牌组选择在左，FSRS 状态在右。
         Row() {
           if (this.牌组选项.length > 1) {
@@ -442,6 +441,7 @@ export struct 统计页 {
             }
             .height(应用尺寸.紧凑控件高度)
             .alignItems(VerticalAlign.Center)
+            .padding({ right: 应用尺寸.卡片内边距 })
           }
         }
         .width('100%')
@@ -657,9 +657,9 @@ export struct 统计页 {
       .padding({
         left: 应用尺寸.页面内边距_水平,
         right: 应用尺寸.页面内边距_水平,
-        top: 应用尺寸.间距_12,
+        top: 应用尺寸.pageContentTopInset,
         // 抬高避让手势导航条（AppGallery 导航栏适配要求）
-        bottom: 应用尺寸.间距_12 + this.导航条高度
+        bottom: 应用尺寸.pageBottomInset + this.导航条高度
       })
     }
     .width('100%')
@@ -720,7 +720,7 @@ export struct 统计页 {
           统计范围切换菜单({
             当前全部范围: this.统计天数 === 0,
             主色: this.主色按钮背景色,
-            顶部偏移: 应用尺寸.工具栏高度 + this.状态栏高度 + 应用尺寸.间距_8,
+            顶部偏移: 应用尺寸.工具栏高度 + this.状态栏高度 + 应用尺寸.pageContentTopInset,
             选择回调: (全部范围: boolean): void => {
               this.显示统计范围菜单 = false;
               this.on天数切换(全部范围 ? 0 : 365);
@@ -733,6 +733,7 @@ export struct 统计页 {
       .height('100%')
     }
     .hideTitleBar(true)
+    .backgroundColor(Color.Transparent)
     .opacity(this.转场透明度)
   }
 }

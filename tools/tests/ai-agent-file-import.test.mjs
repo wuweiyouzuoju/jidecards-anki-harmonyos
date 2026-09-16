@@ -103,7 +103,7 @@ test('Agent composer shows per-file results and sends only successful parsed tex
   const composer = page.match(/private 输入区\(\)[\s\S]*?\n  build\(\)/)?.[0] ?? '';
   assert.match(composer, /Column\(\{ space: 应用尺寸\.间距_8 \}\) \{[\s\S]*?ai_agent_import_files[\s\S]*?ai_card_send/);
   assert.match(composer, /height\(应用尺寸\.按钮高度 \* 2 \+ 应用尺寸\.间距_8\)/);
-  assert.match(composer, /Text\(\$r\('app\.string\.ai_agent_file_parsing'\)\)/);
+  assert.match(composer, /ThemeTextSpans\(\$r\('app\.string\.ai_agent_file_parsing'\), this\.themeAccentColors/);
   assert.match(composer, /opacity\(this\.文件解析中 \? 0 : 1\)/);
   assert.match(composer, /opacity\(this\.文件解析中 \? 1 : 0\)/);
   assert.match(composer, /\.alignItems\(VerticalAlign\.Top\)/);

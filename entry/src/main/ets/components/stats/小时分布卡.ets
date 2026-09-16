@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeTextSpans } from '../common/ThemeText';
+import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
 // 小时分布卡：渲染 GraphsView.hours 为 24 小时垂直柱状图。
 // 支持 4 个时间段切换（1月/3月/1年/全部）；窗口选择持久化并由统计页管理，
@@ -21,6 +23,7 @@ import { 纵轴刻度, 纵轴宽 } from './图表轴';
 
 @Component
 export struct 小时分布卡 {
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop 小时数据: Hours | null = null;
   @Link 时间段索引: number;
   /** 是否深色主题（正确率面积叠加色对齐 Anki CumulativeOverlay 深浅两套） */
@@ -123,7 +126,7 @@ export struct 小时分布卡 {
           // 时间段切换
           Row({ space: 应用尺寸.间距_4 }) {
             ForEach(this.时间段标签, (标签: Resource, 索引: number) => {
-              Text(标签)
+              Text() { ThemeTextSpans(标签, (索引 === this.时间段索引) ? this.themeAccentColors : [], this.getUIContext()) }
                 .fontSize(应用尺寸.字号_正文_小)
                 .fontColor(索引 === this.时间段索引 ? this.主色 : $r('app.color.text_secondary'))
                 .fontWeight(索引 === this.时间段索引 ? FontWeight.Bold : FontWeight.Normal)

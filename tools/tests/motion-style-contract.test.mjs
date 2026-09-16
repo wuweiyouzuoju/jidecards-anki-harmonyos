@@ -40,10 +40,21 @@ test('navigation applies one fade transition including the home boundary', () =>
   assert.doesNotMatch(home, /from\.index === -1 \|\| to\.index === -1/);
   assert.match(home, /const context: UIContext \| undefined = this\.getUIContext\(\)/);
   assert.match(home, /if \(context === undefined\) \{\s*transitionProxy\.finishTransition\(\);/);
+  const fade = home.slice(home.indexOf('private 自定义转场回调('), home.indexOf('// @名称 页面映射'));
+  assert.match(fade, /const 转场曲线: Curve = Curve\.EaseOut/);
+  assert.match(fade, /expectedFrameRateRange: \{ min: 60, max: 120, expected: 60 \}/);
+  assert.match(fade, /onFinish:[\s\S]*?transitionProxy\.finishTransition\(\)/);
+  assert.match(read('entry/src/main/ets/components/common/ThemeBackground.ets'),
+    /expectedFrameRateRange: \{ min: 30, max: 60, expected: 60 \}/);
 
   for (const [path, name] of [
     ['entry/src/main/ets/pages/设置页.ets', 'SettingsPage'],
     ['entry/src/main/ets/pages/统计页.ets', 'StatsPage'],
+    ['entry/src/main/ets/pages/学习提醒页.ets', 'ReminderPage'],
+    ['entry/src/main/ets/pages/浏览页.ets', 'BrowserPage'],
+    ['entry/src/main/ets/pages/添加笔记页.ets', 'AddNotePage'],
+    ['entry/src/main/ets/pages/学习页.ets', 'StudyPage'],
+    ['entry/src/main/ets/pages/AI制卡页.ets', 'AiCardPage'],
   ]) {
     const source = read(path);
     assert.match(source, new RegExp(`注销NavParam\\('${name}'\\)`), path);
@@ -58,7 +69,9 @@ test('press and disclosure feedback use the shared fast rhythm', () => {
   assert.match(batch, /backgroundColor\(\$r\('app\.color\.surface_card'\)\)[\s\S]*?opacity\(this\.已按下 === 8 \? 0\.82 : 1\)[\s\S]*?this\.已按下 = 8/);
 
   const info = read('entry/src/main/ets/components/browser/卡片信息.ets');
-  assert.match(info, /backgroundColor\(this\.已按下关闭[\s\S]*?\.animation\(\{ duration: 80, curve: Curve\.EaseOut \}\)/);
+  assert.match(info, /DialogHeader\(\{/);
+  const header = read('entry/src/main/ets/components/common/DialogHeader.ets');
+  assert.match(header, /scale\(\{ x: this\.actionPressed[\s\S]*?\.animation\(\{ duration: 80, curve: Curve\.EaseOut \}\)/);
 
   const calendar = read('entry/src/main/ets/components/月历卡.ets');
   assert.equal((calendar.match(/duration: 150, curve: Curve\.EaseOut/g) ?? []).length, 1);

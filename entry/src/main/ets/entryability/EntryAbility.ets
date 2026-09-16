@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { APP_FOREGROUND_KEY } from '../model/Redemption';
 import {
   AbilityConstant,
   common,
@@ -19,6 +20,7 @@ import { 颜色主题, 默认颜色主题, 规范化颜色主题 } from '../mode
 import { 刷新桌面卡片数据 } from '../model/FSRS控制器';
 import { 刷新学习提醒 } from '../model/学习提醒服务';
 import { AI_AGENT_CHANNELS_APP_STORAGE_KEY, initializeAiAgentChannels } from '../model/ReleaseFeatures';
+import { initializeCardTextSize } from '../utils/CardTextSizeStore';
 
 const DOMAIN: number = 0x4342;
 
@@ -56,6 +58,7 @@ export default class EntryAbility extends UIAbility {
 
   onCreate(want: Want, _launchParam: AbilityConstant.LaunchParam): void {
     AppStorage.setOrCreate<common.UIAbilityContext>('abilityContext', this.context);
+    initializeCardTextSize();
     AppStorage.setOrCreate<boolean>(AI_AGENT_CHANNELS_APP_STORAGE_KEY, false);
     initializeAiAgentChannels().catch((_error: Object): void => {
       // 读取失败保持关闭；开发者可在设置页重新输入密钥。
@@ -199,6 +202,7 @@ export default class EntryAbility extends UIAbility {
   }
 
   onForeground(): void {
+    AppStorage.setOrCreate<boolean>(APP_FOREGROUND_KEY, true);
     this.refreshSystemDarkMode();
     // 回前台时重同步规避区（分屏/折叠/悬浮窗等场景规避区可能已变化且事件未送达）
     this.同步规避区高度();
@@ -213,6 +217,7 @@ export default class EntryAbility extends UIAbility {
   // 短时任务不需要权限申请，任务完成后必须主动 cancelSuspendDelay 否则消耗配额。
   // 失败不阻塞退出，静默跳过保留上次的提醒快照与卡片数据。
   onBackground(): void {
+    AppStorage.setOrCreate<boolean>(APP_FOREGROUND_KEY, false);
     hilog.info(DOMAIN, 'jidecards', 'Application moved to background');
     this.刷新桌面卡片到后台();
     this.刷新学习提醒到后台();

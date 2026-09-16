@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { DialogHeader } from '../common/DialogHeader';
 // ========================================================
 // @块ID UI-FIND-DUPES-001
 // @名称 查找重复对话框
@@ -283,24 +284,16 @@ export struct 查找重复对话框 {
         .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
 
       Column({ space: 应用尺寸.间距_16 }) {
-        // Header：标题 + 右上角 ×
-        Row() {
-          Text($r('app.string.find_dupes_title'))
-            .fontSize(应用尺寸.字号_面板标题)
-            .fontColor($r('app.color.text_primary'))
-            .fontWeight(FontWeight.Bold)
-            .layoutWeight(1)
-          if (!this.加载中) {
-            Text('×')
-              .fontSize(24)
-              .fontColor($r('app.color.text_secondary'))
-              .width(32)
-              .height(32)
-              .textAlign(TextAlign.Center)
-              .onClick(() => { this.onClose(); })
-          }
-        }
-        .width('100%')
+        // 固定标题操作栏
+        DialogHeader({
+          title: $r('app.string.find_dupes_title'),
+          actionLabel: $r('app.string.find_dupes_search'),
+          actionEnabled: !this.加载中 && this.笔记类型列表.length > 0,
+          closeLabel: $r('app.string.close'),
+          closeEnabled: !this.加载中,
+          onClose: () => { this.onClose(); },
+          onAction: () => { this.执行查找(); }
+        })
 
         // 笔记类型选择
         if (this.笔记类型列表.length > 0) {
@@ -324,17 +317,6 @@ export struct 查找重复对话框 {
         }
 
         // 查找按钮
-        Button($r('app.string.find_dupes_search'))
-          .type(ButtonType.Normal)
-          .width('100%')
-          .height(应用尺寸.按钮高度)
-          .fontSize(应用尺寸.字号_按钮)
-          .fontColor($r('app.color.action_on_primary'))
-          .backgroundColor(this.主色按钮背景)
-          .borderRadius(应用尺寸.圆角_胶囊)
-          .enabled(!this.加载中 && this.笔记类型列表.length > 0)
-          .opacity(this.加载中 ? 0.6 : 1)
-          .onClick(() => { this.执行查找(); })
 
         // busy 指示 + 进度
         if (this.加载中) {

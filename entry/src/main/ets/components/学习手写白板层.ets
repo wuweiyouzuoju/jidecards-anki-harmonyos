@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeTextSpans } from './common/ThemeText';
+import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
 // 学习页手写白板层：实验性功能。
 // 用户在「更多」菜单点「手写」进入；按下后在学习页卡片区 Stack 顶层叠加本层。
@@ -16,6 +18,7 @@ interface 坐标点 {
 
 @Component
 export struct 学习手写白板层 {
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop 是否深色: boolean = false;
   onClose: () => void = (): void => {};
   @StorageProp(颜色键.动作主色) private 动作主色: string = '#2F5FD0';
@@ -141,7 +144,9 @@ export struct 学习手写白板层 {
 
         Blank()
 
-        Button($r('app.string.study_undo'))
+        Button() {
+          Text() { ThemeTextSpans($r('app.string.image_occlusion_undo'), this.themeAccentColors, this.getUIContext()) }.fontSize(应用尺寸.字号_按钮).fontColor(this.动作主色)
+        }
           .height(应用尺寸.按钮高度)
           .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
           .fontSize(应用尺寸.字号_按钮)
@@ -157,7 +162,9 @@ export struct 学习手写白板层 {
           })
           .margin({ right: 应用尺寸.间距_8 })
 
-        Button($r('app.string.study_whiteboard_clear'))
+        Button() {
+          Text() { ThemeTextSpans($r('app.string.study_whiteboard_clear'), this.themeAccentColors, this.getUIContext()) }.fontSize(应用尺寸.字号_按钮).fontColor(this.动作主色)
+        }
           .height(应用尺寸.按钮高度)
           .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
           .fontSize(应用尺寸.字号_按钮)

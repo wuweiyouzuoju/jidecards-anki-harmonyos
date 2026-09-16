@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeTextSpans } from '../common/ThemeText';
+import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
 import { 应用尺寸 } from '../../utils/应用尺寸';
 
@@ -30,6 +32,7 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 
 @Component
 export struct 模式切换菜单 {
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop 当前简洁模式: boolean = true;
   @Prop 主色: ResourceColor = $r('app.color.action_primary');
   @Prop 顶部偏移: number = 68;
@@ -48,7 +51,7 @@ export struct 模式切换菜单 {
 
       Column() {
         // 简洁版（当前项文字高亮主色，无勾选标记）
-        Text($r('app.string.settings_simple_mode_simple'))
+        Text() { ThemeTextSpans($r('app.string.settings_simple_mode_simple'), (this.当前简洁模式) ? this.themeAccentColors : [], this.getUIContext()) }
           .fontSize(应用尺寸.字号_正文)
           .fontColor(this.当前简洁模式 ? this.主色 : $r('app.color.text_primary'))
           .width('100%')
@@ -62,7 +65,7 @@ export struct 模式切换菜单 {
           .margin({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
 
         // 实验版（当前项文字高亮主色，无勾选标记）
-        Text($r('app.string.settings_simple_mode_full'))
+        Text() { ThemeTextSpans($r('app.string.settings_simple_mode_full'), (!this.当前简洁模式) ? this.themeAccentColors : [], this.getUIContext()) }
           .fontSize(应用尺寸.字号_正文)
           .fontColor(!this.当前简洁模式 ? this.主色 : $r('app.color.text_primary'))
           .width('100%')

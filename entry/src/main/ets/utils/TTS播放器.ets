@@ -37,6 +37,7 @@ import { util } from '@kit.ArkTS';
 import type { TtsItem } from '../proto/messages/CardRenderingMessages';
 import { 加载语音人物, 获取语音版本号 } from '../model/TTS语音存储';
 import { AudioFocusCoordinator } from './AudioFocusCoordinator';
+import { AudioQueuePlayer } from '../model/CardAudioSession';
 
 const 域: number = 0x0001;
 const 标签: string = 'TtsPlayer';
@@ -134,7 +135,7 @@ function 音色是否已安装(音色: textToSpeech.VoiceInfo, 语种: string): 
   return 归一化音色 === 语种 && 音色状态 === 'INSTALLED';
 }
 
-export class TTS播放器 {
+export class TTS播放器 implements AudioQueuePlayer<TtsItem> {
   private readonly 音频焦点协调器: AudioFocusCoordinator = AudioFocusCoordinator.getInstance();
   private 引擎: textToSpeech.TextToSpeechEngine | null = null;
   private 引擎语言: string = '';

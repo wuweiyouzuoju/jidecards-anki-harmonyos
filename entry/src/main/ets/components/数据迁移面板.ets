@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeTextSpans } from './common/ThemeText';
+import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
+import { DialogHeader } from './common/DialogHeader';
 // ========================================================
 // @块ID UI-DATA-TRANSFER-001
 // @名称 数据迁移面板
@@ -88,6 +91,7 @@ const 迁移模式列表: 数据迁移模式[] = ['exportDeck', 'exportPersonalD
 /** Presentation-only data management panel. File and backend work stay with its owner. */
 @Component
 export struct 数据迁移面板 {
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop deckId: number = 0;
   @Prop initialMode: 数据迁移模式 = 'exportDeck';
   @Prop deckOptions: 导出牌组选项[] = [];
@@ -287,32 +291,20 @@ export struct 数据迁移面板 {
 
       Column({ space: 应用尺寸.间距_12 }) {
       // === Header：标题 + 副标题 + 右上角 × ===
-      Row() {
-        Column() {
-          Text(this.解析文本($r('app.string.transfer_panel_title')))
-            .fontSize(应用尺寸.字号_面板标题)
-            .fontColor($r('app.color.text_primary'))
-            .fontWeight(FontWeight.Bold)
+      DialogHeader({
+        title: this.解析文本($r('app.string.transfer_panel_title')),
+        actionLabel: this.主按钮文案(),
+        actionEnabled: !this.busy && (this.模式 !== 'exportDeck' || this.已选导出牌组Id > 0) &&
+            (this.模式 !== 'importPersonalData' || this.已确认替换个人数据),
+        closeLabel: $r('app.string.create_deck_cancel'),
+        closeEnabled: !this.busy,
+        onClose: (): void => { this.onClose(); },
+        onAction: () => this.提交()
+      })
           Text(this.副标题())
             .fontSize(应用尺寸.字号_正文_中)
             .fontColor($r('app.color.text_secondary'))
             .margin({ top: 应用尺寸.间距_4 })
-        }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
-
-        // B13 2026-07-22：busy 期间隐藏右上角 ×，避免误触；标题列 layoutWeight 自动撑满
-        if (!this.busy) {
-          Text('×')
-            .fontSize(24)
-            .fontColor($r('app.color.text_secondary'))
-            .width(32)
-            .height(32)
-            .textAlign(TextAlign.Center)
-            .onClick(() => { this.onClose(); })
-        }
-      }
-      .width('100%')
 
       // === 模式选择下拉（单 Select 替代原 4 个横排 Tab，避免宽屏越界）===
       Select(this.模式下拉选项())
@@ -360,7 +352,9 @@ export struct 数据迁移面板 {
               .fontSize(应用尺寸.字号_正文)
               .fontColor($r('app.color.text_primary'))
               .layoutWeight(1)
-            Button($r('app.string.field_help_button'))
+            Button() {
+              Text() { ThemeTextSpans($r('app.string.field_help_button'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.主色按钮背景).fontSize(应用尺寸.字号_正文)
+            }
               .type(ButtonType.Normal)
               .backgroundColor(Color.Transparent)
               .fontColor(this.主色按钮背景)
@@ -414,17 +408,7 @@ export struct 数据迁移面板 {
           .width('100%')
       }
 
-      // === 主按钮（primary 色）===
-      Button(this.主按钮文案())
-        .width('100%')
-        .height(应用尺寸.按钮高度)
-        .fontSize(应用尺寸.字号_按钮)
-        .fontColor($r('app.color.action_on_primary'))
-        .backgroundColor(this.主色按钮背景)
-        .borderRadius(应用尺寸.圆角_胶囊)
-        .enabled(!this.busy && (this.模式 !== 'exportDeck' || this.已选导出牌组Id > 0) &&
-          (this.模式 !== 'importPersonalData' || this.已确认替换个人数据))
-        .onClick(() => this.提交())
+      // 取消与执行并排，执行期间保持原有禁用条件。
 
       // === busy LoadingProgress + 文案 ===
       if (this.busy) {

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { DialogHeader } from '../common/DialogHeader';
 // ========================================================
 // @名称 卡片信息
 //
@@ -39,7 +40,6 @@ export struct 卡片信息 {
   onClose: () => void = (): void => {};
 
   @StorageProp(颜色键.主色按钮背景) private 主色按钮背景: string = '#2F5FD0';
-  @State private 已按下关闭: boolean = false;
 
   /** Unix 时间戳（秒）转本地可读日期串。 */
   private 格式化时间(时间戳: number): string {
@@ -161,6 +161,12 @@ export struct 卡片信息 {
 
       // 主面板
       Column({ space: 应用尺寸.间距_14 }) {
+        DialogHeader({
+          title: $r('app.string.browser_info_title'),
+          actionLabel: $r('app.string.browser_info_close'),
+          showClose: false,
+          onAction: (): void => { this.onClose(); }
+        })
         if (this.stats === null) {
           // 加载/错误态
           Text(this.errorMessage !== '' ? this.errorMessage : '...')
@@ -171,11 +177,6 @@ export struct 卡片信息 {
           Scroll() {
             Column({ space: 应用尺寸.间距_14 }) {
               // 标题
-              Text($r('app.string.browser_info_title'))
-                .fontSize(应用尺寸.字号_面板标题)
-                .fontWeight(FontWeight.Bold)
-                .fontColor($r('app.color.text_primary'))
-                .width('100%')
 
               // 调度信息区
               Column({ space: 应用尺寸.间距_8 }) {
@@ -292,24 +293,7 @@ export struct 卡片信息 {
         }
 
         // 关闭按钮
-        Button($r('app.string.browser_info_close'))
-          .width('100%')
-          .height(应用尺寸.按钮高度)
-          .fontSize(应用尺寸.字号_按钮)
-          .fontColor($r('app.color.text_primary'))
-          .backgroundColor(this.已按下关闭 ? $r('app.color.surface_page') : $r('app.color.surface_card'))
-          .borderRadius(应用尺寸.圆角_胶囊)
-          .animation({ duration: 80, curve: Curve.EaseOut })
-          .onTouch((e: TouchEvent): void => {
-            if (e.type === TouchType.Down) {
-              this.已按下关闭 = true;
-            } else if (e.type === TouchType.Up || e.type === TouchType.Cancel) {
-              this.已按下关闭 = false;
-            }
-          })
-          .onClick((): void => {
-            this.onClose();
-          })
+
       }
       .width('90%')
       .constraintSize({ maxHeight: '85%' })

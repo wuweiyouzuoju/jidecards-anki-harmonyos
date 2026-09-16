@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeTextSpans } from './common/ThemeText';
+import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
 // ========================================================
 // @块ID UI-LICENSES-001
@@ -36,6 +38,7 @@ import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时
 
 @Component
 export struct 许可证面板 {
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
   onClose: () => void = (): void => {
   };
@@ -92,7 +95,7 @@ export struct 许可证面板 {
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.text_primary'))
           Blank()
-          Text($r('app.string.licenses_confirm'))
+          Text() { ThemeTextSpans($r('app.string.licenses_confirm'), this.themeAccentColors, this.getUIContext()) }
             .fontSize(应用尺寸.字号_强调)
             .fontWeight(FontWeight.Medium)
             .fontColor(this.动作主色)

@@ -1,21 +1,25 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { themeDefinition } from '../model/ThemeCatalog';
+import { PrimaryGlassSurface } from '../utils/PrimaryGlassSurface';
+import { PRIMARY_GLASS_KEY, PrimaryGlassStyle, themePrimaryGlass } from '../model/ThemeCatalog';
 
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { 颜色键 } from '../model/颜色主题';
+import { ThemeTextSpans } from './common/ThemeText';
+import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
 // ========================================================
 // @块ID UI-START-STUDY-BUTTON-001
-// @名称 开始学习按钮 组件主体字段与提亮色方法
+// @名称 开始学习按钮 主题玻璃与组件字段
 //
 // @作用
 // 开始学习主按钮：主屏窄屏底部与详情 pane 共用。
-// B 方案（2026-07-22）：按下时用 主色按钮按下（深一档）给出视觉反馈。
-// 渐变方案（2026-07-22）：默认状态用 linearGradient 从 主色按钮背景（顶部）到 主色按钮按下（底部），
-// 让主操作按钮有"立体凸起"质感；按下时整体切到 主色按钮按下 纯色（linearGradient 两端同色 = 纯色），
-// 视觉上按钮"被按下凹陷"。渐变方向 180°（从上到下）模拟自然光源。
+// 主操作使用带当前主题轻染色的玻璃表面，默认也保留玻璃质感。
+// 普通主题由种子色派生材料，幻彩使用多色材料；深浅模式由主题管理器发布。
+// 按下加厚色层，抬起恢复；共用 PrimaryGlassSurface，不逐帧模糊。
+// 文案沿用主题强调色，幻彩逐字配色。
 //
 // @输入
-// @Prop 待学数：待学卡数（用于按钮内文案）。
 // 开始学习回调：用户点击按钮时上抛。
 //
 // @输出
@@ -23,79 +27,43 @@ import { 颜色键 } from '../model/颜色主题';
 //
 // @业务规则
 // 跟随用户选择的颜色主题（极光蓝/仙野绿/暗夜紫/碧涛青/活力橙/柠檬金）。
-// 2.1.4.1 对比度：按钮背景用 主色按钮背景 专用档（配 #FFFFFF 文字 ≥ 4.5:1），
-// 高明度主题（lemon/sunset）下比 动作主色 更深，但白字可读性达标。
-// 提亮色：往白色混合 20% 让按钮色偏淡（用户决策 2026-07-22：10% 不够，加到 20%），
-// 只作用于本按钮渲染，不改主题色定义，不影响其他 primary 场景。
+// 玻璃底上使用主题文字，不再叠加白字实体按钮。
+// 深浅外观分别派生材料与文字色。
+// 玻璃透明度统一由主题材料函数控制，按钮自身不额外提亮。
+// 开始学习与固定/浮动显示答案共同使用此材料。
 //
 // @副作用
 // 无。仅渲染与上抛回调。
 // ========================================================
 @Component
 export struct 开始学习按钮 {
-  @Prop 待学数: number = 0;
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
+  @StorageProp(颜色键.动作主色) private primaryLabel: string = '#2F5FD0';
+  @StorageProp(PRIMARY_GLASS_KEY) private primaryGlass: PrimaryGlassStyle = themePrimaryGlass(themeDefinition('aurora'), false);
   开始学习回调: () => void = (): void => {
   };
   // 跟随用户选择的颜色主题（极光蓝/仙野绿/暗夜紫/碧涛青/活力橙/柠檬金）
-  // 2.1.4.1 对比度：按钮背景用 主色按钮背景 专用档（配 #FFFFFF 文字 ≥ 4.5:1），
-  // 高明度主题（lemon/sunset）下比 动作主色 更深，但白字可读性达标
-  @StorageProp(颜色键.主色按钮背景) private 主色按钮背景色: string = '#2F5FD0';
-  @StorageProp(颜色键.主色按钮按下) private 主色按钮按下色: string = '#1E4FB8';
+  // 玻璃底上使用主题文字，不再叠加白字实体按钮。
+  // 色板变化由 AppStorage 绑定更新。
   @State private 已按下: boolean = false;
-
-  // ========================================================
-  // @块ID UI-START-STUDY-BUTTON-002
-  // @名称 提亮色
-  //
-  // @作用
-  // 把传入 hex 色往白色混合 20%，让按钮色偏淡。
-  //
-  // @输入
-  // 十六进制色：#RRGGBB 或 RRGGBB。
-  //
-  // @输出
-  // 提亮后的 #RRGGBB 字符串。
-  //
-  // @业务规则
-  // 用户决策 2026-07-22：10% 不够，加到 20%。只作用于本按钮渲染，不改主题色定义。
-  //
-  // @副作用
-  // 无。
-  // ========================================================
-  private 提亮色(十六进制色: string): string {
-    const s: string = 十六进制色.startsWith('#') ? 十六进制色.slice(1) : 十六进制色;
-    const r0: number = parseInt(s.slice(0, 2), 16);
-    const g0: number = parseInt(s.slice(2, 4), 16);
-    const b0: number = parseInt(s.slice(4, 6), 16);
-    const alpha: number = 0.20;
-    const r: number = Math.round(r0 * (1 - alpha) + 255 * alpha);
-    const g: number = Math.round(g0 * (1 - alpha) + 255 * alpha);
-    const b: number = Math.round(b0 * (1 - alpha) + 255 * alpha);
-    const 转十六进制 = (n: number): string => {
-      const 限定: number = Math.max(0, Math.min(255, n));
-      const h: string = 限定.toString(16);
-      return h.length === 1 ? '0' + h : h;
-    };
-    return '#' + 转十六进制(r) + 转十六进制(g) + 转十六进制(b);
-  }
 
   // ========================================================
   // @块ID UI-START-STUDY-BUTTON-003
   // @名称 开始学习按钮主渲染
   //
   // @作用
-  // 渲染开始学习按钮：渐变背景 + "开始学习"标题 + 待学卡数小字。
+  // 渲染主题玻璃按钮，仅显示居中的“开始学习”。
   //
   // @输入
-  // @Prop 待学数 + @StorageProp 主色按钮背景色 / 主色按钮按下色 + @State 已按下。
+  // @StorageProp primaryGlass / themeAccentColors + @State 已按下。
   //
   // @输出
-  // 主操作按钮视觉；Touch Down 切深色按下态、Up/Cancel 回渐变凸起态；点击上抛 开始学习回调。
+  // Touch Down 加厚玻璃、Up/Cancel 恢复；点击上抛 开始学习回调。
   //
   // @业务规则
-  // 按下时整体切到 主色按钮按下色（深一档）模拟"凹陷"，
-  // 抬起/取消回到 主色按钮背景色 → 主色按钮按下色 渐变模拟"凸起"。
-  // 提亮色 应用在两端颜色上，让按钮整体偏淡。
+  // 按下时读取玻璃材料的 pressedColors，
+  // 抬起/取消恢复材料的 colors。
+  // 不改变文字不透明度或按钮布局。
   //
   // @副作用
   // 无。仅上抛回调。
@@ -103,31 +71,25 @@ export struct 开始学习按钮 {
   build() {
     Button() {
       Row() {
-        Text($r('app.string.start_study'))
-          .fontSize(应用尺寸.字号_标题)
+        Text() { ThemeTextSpans($r('app.string.start_study'), this.themeAccentColors, this.getUIContext()) }
+          .fontSize(应用尺寸.字号_卡片标题)
           .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.action_on_primary'))
-        Blank()
-        Text($r('app.string.card_pending_short', this.待学数))
-          .fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.action_on_primary'))
+          .fontColor(this.primaryLabel)
       }
       .width('100%')
+      .justifyContent(FlexAlign.Center)
       .padding({ left: 应用尺寸.间距_8, right: 应用尺寸.间距_8 })
     }
     .width('100%')
     .height(应用尺寸.行动按钮高度)
     .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
-    .linearGradient({
-      angle: 180,
-      colors: this.已按下
-        ? [[this.提亮色(this.主色按钮按下色) as ResourceColor, 0.0], [this.提亮色(this.主色按钮按下色) as ResourceColor, 1.0]]
-        : [[this.提亮色(this.主色按钮背景色) as ResourceColor, 0.0], [this.提亮色(this.主色按钮按下色) as ResourceColor, 1.0]]
-    })
+    .attributeModifier(new PrimaryGlassSurface(this.已按下, this.primaryGlass))
+    .border({ width: 1, color: '#66' + this.primaryLabel.substring(1) })
+    .stateEffect(false)
     .borderRadius(应用尺寸.圆角_行动按钮)
     .animation({ duration: 80, curve: Curve.EaseOut })
     .onTouch((event: TouchEvent): void => {
-      // 按下时整体切到 主色按钮按下色（深一档）模拟"凹陷"，抬起/取消回到 主色按钮背景色→主色按钮按下色 渐变模拟"凸起"
+      // 按下加厚玻璃，抬起或取消恢复正常材料。
       if (event.type === TouchType.Down) {
         this.已按下 = true;
       } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {

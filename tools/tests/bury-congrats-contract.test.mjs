@@ -72,9 +72,9 @@ test('scheduler service wraps bury/suspend, unbury, restore and congrats through
 test('study page bury/suspend entries use upstream reviewer semantics and refetch next card', () => {
   const page = read(STUDY_PAGE);
 
-  // 次级操作行：问题/答案两态均可见
-  assert.match(page, /if \(this\.阶段 === 'question' \|\| this\.阶段 === 'answer'\) \{[\s\S]*?app\.string\.study_bury[\s\S]*?app\.string\.study_suspend/,
-    'bury/suspend row visible in both question and answer phases');
+  const menu = page.slice(page.indexOf('  private 更多菜单()'), page.indexOf('  private async 打开AI改卡()'));
+  assert.match(menu, /app\.string\.study_bury[\s\S]*?app\.string\.study_suspend/,
+    'bury/suspend are available in the reviewer menu');
   assert.match(page, /this\.埋藏或暂停当前卡\(BURY_SUSPEND_MODE_BURY_USER\)/,
     'manual bury maps to BURY_USER (see you tomorrow)');
   assert.match(page, /this\.埋藏或暂停当前卡\(BURY_SUSPEND_MODE_SUSPEND\)/,
@@ -104,8 +104,7 @@ test('done page fetches congrats info when queue empties and degrades silently o
   assert.match(body[0], /info\.secsUntilNextLearn < SECONDS_PER_DAY/,
     'learn-remaining hint suppressed when next learn card is >=1 day away (upstream buildNextLearnMsg)');
   assert.match(body[0], /this\.完成页有埋藏 = info\.haveSchedBuried \|\| info\.haveUserBuried/);
-  assert.match(body[0], /catch \(error\) \{\s*this\.完成页数据已加载 = false;/,
-    'failure degrades to static finish copy');
+  // 静态完成文案和迟到失败由 study-lifecycle 行为测试验证。
   assert.doesNotMatch(body[0], /this\.阶段 = 'error'/,
     'congrats failure must not surface as error page');
 });
@@ -116,7 +115,7 @@ test('done page renders real congrats data and deck-scoped unbury entry', () => 
   assert.match(page, /\$r\('app\.string\.study_congrats_learn_remaining', this\.完成页学习剩余, this\.完成页下张学习分钟\)/);
   assert.match(page, /if \(this\.完成页复习受限\) \{[\s\S]*?study_congrats_review_limit/);
   assert.match(page, /if \(this\.完成页新卡受限\) \{[\s\S]*?study_congrats_new_limit/);
-  assert.match(page, /if \(this\.完成页有埋藏\) \{[\s\S]*?Button\(\$r\('app\.string\.study_unbury'\)\)/);
+  assert.match(page, /if \(this\.完成页有埋藏\) \{[\s\S]*?Button\(\) \{\s*Text\(\) \{ ThemeTextSpans\(\$r\('app\.string\.study_unbury'\)/);
   assert.match(page, /this\.恢复埋藏\(\);/);
 
   const body = page.match(/恢复埋藏\(\): Promise<void> \{[\s\S]*?\n  \}/);
@@ -127,6 +126,32 @@ test('done page renders real congrats data and deck-scoped unbury entry', () => 
 
   assert.doesNotMatch(page, /恢复埋藏与暂停的卡片\(/,
     'id-based restore is not usable from the congrats page (no ids available)');
+});
+
+test('finished and error pages leave neither the previous card nor the floating rating frame behind', () => {
+  const page = read(STUDY_PAGE);
+  const toolbar = read('entry/src/main/ets/components/学习浮动工具栏.ets');
+
+  // 完成/错误页背景可透明，但卡片 Web 必须在非学习阶段彻底不可见，避免旧卡透出。
+  assert.match(page,
+    /\.visibility\(this\.阶段 === 'question' \|\| this\.阶段 === 'answer' \? Visibility\.Visible : Visibility\.Hidden\)/,
+    'the card Web must be hidden outside question/answer so no finished card stays visible');
+
+  // 空队列清空画面与停止音频由 study-content-refresh/study-lifecycle 行为测试验证。
+
+  // 浮动评分栏只在 question/answer 渲染；其余阶段零尺寸占位，保留实例与位置但不留空框。
+  assert.match(toolbar,
+    /if \(!this\.位置已加载 \|\| \(this\.当前阶段 !== 'question' && this\.当前阶段 !== 'answer'\)\) \{[\s\S]*?\.width\(0\)\s*\.height\(0\)/,
+    'the floating toolbar must collapse to zero size outside question/answer');
+
+  // 错误页保留退出按钮；完成页仅使用顶部返回入口。
+  const backButtons = page.match(
+    /ThemeTextSpans\(\$r\('app\.string\.study_back'\), this\.themeAccentColors, this\.getUIContext\(\)\)[\s\S]{0,320}?\.padding\(\{ left: 应用尺寸\.卡片内边距, right: 应用尺寸\.卡片内边距 \}\)/g
+  ) ?? [];
+  assert.equal(backButtons.length, 1,
+    'only the error page retains an inline back button with horizontal padding');
+  const done = page.slice(page.indexOf("if (this.阶段 === 'done')"), page.indexOf('// Type-in-the-Answer：正面阶段'));
+  assert.doesNotMatch(done, /study_back/);
 });
 
 test('bury/suspend/congrats strings are resourced', () => {

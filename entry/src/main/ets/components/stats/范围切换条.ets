@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ThemeTextSpans } from '../common/ThemeText';
+import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
 // 范围切换条：Anki 统计图表卡内的范围单选（如 1月/3月/1年/全部）。
 // 胶囊样式与 小时分布卡 的时间段切换一致；当前索引由父组件持有（@Link），
@@ -10,6 +12,7 @@ import { 颜色键 } from '../../model/颜色主题';
 
 @Component
 export struct 范围切换条 {
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Link 当前索引: number;
   标签集: Resource[] = [];
   onRangeChange: (索引: number) => void = (): void => {};
@@ -19,7 +22,7 @@ export struct 范围切换条 {
   build() {
     Row({ space: 应用尺寸.间距_4 }) {
       ForEach(this.标签集, (标签: Resource, 索引: number) => {
-        Text(标签)
+        Text() { ThemeTextSpans(标签, (索引 === this.当前索引) ? this.themeAccentColors : [], this.getUIContext()) }
           .fontSize(应用尺寸.字号_正文_小)
           .fontColor(索引 === this.当前索引 ? this.主色 : $r('app.color.text_secondary'))
           .fontWeight(索引 === this.当前索引 ? FontWeight.Bold : FontWeight.Normal)

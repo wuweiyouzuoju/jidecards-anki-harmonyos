@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { GlassSurface } from '../utils/GlassSurface';
+import { GLASS_COLORS_KEY, GLASS_HIGHLIGHT_COLORS } from '../model/ThemeCatalog';
 //
 // 复习页浮动工具栏：可拖动，松手吸附到最近侧边（竖版贴左/右）。
 // 工具栏只有竖版一种形态（按钮纵向排列），拖动与吸附过程不切换布局，
 // 避免形态跳变（曾实现拖动中横版/吸附后竖版双形态，已砍掉）。
 // 主工具栏（main）：question 阶段显示「显示答案」；answer 阶段显示 4 个评分按钮。
-// 辅助工具栏（aux）：question/answer 阶段都显示「埋藏 + 暂停」。
-// 位置以 vp 为单位持久化（StudyLayoutStore），未持久化时使用默认位置（main 右侧居中、aux 左侧居中）。
+// 位置以 vp 为单位持久化（StudyLayoutStore），未持久化时使用默认位置（右侧居中）。
 // 监听 display.on('change') 自动适配屏幕尺寸变化与横竖屏切换。
 
 import { display } from '@kit.ArkUI';
@@ -26,7 +27,6 @@ import {
   边缘留白,
   工具栏宽度,
   工具栏高度,
-  工具栏标识,
   吸附侧
 } from '../utils/工具栏尺寸';
 import {
@@ -38,11 +38,14 @@ import {
   推断吸附侧
 } from '../utils/吸附计算器';
 import { 颜色键 } from '../model/颜色主题';
+import { ThemeTextSpans } from './common/ThemeText';
+import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
+import { themeDefinition } from '../model/ThemeCatalog';
+import { PrimaryGlassSurface } from '../utils/PrimaryGlassSurface';
+import { PRIMARY_GLASS_KEY, PrimaryGlassStyle, themePrimaryGlass } from '../model/ThemeCatalog';
 
 // 按下的评分 用的辅助 tag（避免与 RATING_AGAIN/HARD/GOOD/EASY 冲突）
 const 显示答案标签: number = 100;
-const 埋藏标签: number = 101;
-const 暂停标签: number = 102;
 
 // ========================================================
 // @块ID COMP-STUDY-TOOLBAR-001
@@ -52,23 +55,22 @@ const 暂停标签: number = 102;
 // 复习页可拖动浮动工具栏组件主体。维护工具栏位置（vp）、当前吸附侧、
 // 按下的评分 等响应式状态；持有屏幕宽高与拖动起点等非响应式内部状态。
 // 主工具栏（main）按 学习阶段 切换「显示答案」与 4 个评分按钮；
-// 辅助工具栏（aux）始终显示「埋藏 + 暂停」。
 //
 // @输入
-// 工具栏类型（main/aux）/ 当前阶段（loading/question/answer/done/error）/
-// 评分按钮文案 / 兜底文案 / 是否深色 / 显示答案回调 / 埋藏回调 / 暂停回调 / 评分回调。
+// 当前阶段（loading/question/answer/done/error）/
+// 评分按钮文案 / 是否深色 / 显示答案回调 / 评分回调。
 //
 // @输出
 // 一个可拖动的浮动浮卡（Stack 容器，position 绝对定位），竖版布局。
 //
 // @业务规则
-// 字符串值 'main' / 'aux' / 'left' / 'right' /
+// 字符串值 'main' / 'left' / 'right' /
 // 'loading' / 'question' / 'answer' / 'done' / 'error' 保留英文
 // （作为持久化与跨模块约定值）。
 // @StorageProp 绑定 颜色键.* 全局主题色键，跟随用户选择的主题即时刷新。
 // 2.1.4.1 对比度：按钮背景专用档（配 #FFFFFF 文字 ≥ 4.5:1）。
 // 单状态 按下的评分：按下记 rating/tag，松开恢复 -1。
-// 评分按钮用 RATING_AGAIN/HARD/GOOD/EASY（0/1/2/3）；显示答案用 显示答案标签；aux 用 埋藏标签/暂停标签。
+// 评分按钮用 RATING_AGAIN/HARD/GOOD/EASY（0/1/2/3）；显示答案用 显示答案标签。
 //
 // @副作用
 // aboutToAppear 读取屏幕尺寸 / 加载位置 / 注册监听；aboutToDisappear 注销监听。
@@ -76,22 +78,20 @@ const 暂停标签: number = 102;
 
 @Component
 export struct 学习浮动工具栏 {
-  /** 工具栏标识：main=主操作；aux=辅助操作。决定默认位置和按钮内容。 */
-  @Prop 工具栏类型: 学习工具栏标识 = 'main';
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
+  @StorageProp(GLASS_COLORS_KEY) private glassColors: string[] = GLASS_HIGHLIGHT_COLORS;
+  /** 沿用主工具栏的位置键，保留用户保存的拖动位置。 */
+  private 工具栏类型: 学习工具栏标识 = 'main';
   /** 复习阶段：决定主工具栏显示「显示答案」还是 4 个评分按钮。
    *  高度按阶段区分（question 80 / answer 360），阶段切换后位置需重夹紧防溢出。 */
   @Prop @Watch('阶段变化') 当前阶段: 学习阶段 = 'question';
-  /** 评分按钮文案（DescribeNextStates 返回）；为空时用兜底文案。 */
+  /** 评分间隔（DescribeNextStates 返回）；缺失时只显示评分名称。 */
   @Prop 评分按钮文案: string[] = [];
-  /** 评分按钮兜底文案（兜底文案 同长度 4）。 */
-  @Prop 兜底文案: string[] = [];
   /** 暗色模式：与 StudyPage 同步，决定浮卡底色。 */
   @Prop 是否深色: boolean = false;
 
   /** 按钮回调：与 StudyPage 同名方法一一对应。 */
   显示答案回调: () => void = (): void => {};
-  埋藏回调: () => void = (): void => {};
-  暂停回调: () => void = (): void => {};
   评分回调: (评分: number) => void = (评分: number): void => {};
 
   /** 浮动工具栏当前位置（vp，左上角坐标）。拖动时实时更新。 */
@@ -118,12 +118,11 @@ export struct 学习浮动工具栏 {
   @StorageProp(颜色键.动作主色) private 动作主色: string = '#2F5FD0';
   @StorageProp(颜色键.动作主色按下) private 动作主色按下: string = '#1E4FB8';
   // 2.1.4.1 对比度：按钮背景专用档（配 #FFFFFF 文字 ≥ 4.5:1）
-  @StorageProp(颜色键.主色按钮背景) private 主色按钮背景: string = '#2F5FD0';
-  @StorageProp(颜色键.主色按钮按下) private 主色按钮按下: string = '#1E4FB8';
+  @StorageProp(PRIMARY_GLASS_KEY) private primaryGlass: PrimaryGlassStyle = themePrimaryGlass(themeDefinition('aurora'), false);
   @StorageProp(颜色键.主色容器) private 主色容器: string = '#E8EEFC';
   @StorageProp(颜色键.主色边框) private 主色边框: string = '#B8CEFA';
   // 与 StudyPage 同款单状态 按下的评分：按下记 rating，松开恢复 -1。
-  // 评分按钮用 RATING_AGAIN/HARD/GOOD/EASY（0/1/2/3）；显示答案用 显示答案标签；aux 用 埋藏标签/暂停标签。
+  // 评分按钮用 RATING_AGAIN/HARD/GOOD/EASY（0/1/2/3）；显示答案用 显示答案标签。
   @State private 按下的评分: number = -1;
 
   async aboutToAppear(): Promise<void> {
@@ -221,7 +220,7 @@ export struct 学习浮动工具栏 {
   // @名称 初始位置加载与持久化
   //
   // @作用
-  // 加载已保存的工具栏位置（preferences），无保存时用默认位置（main 右侧居中、aux 左侧居中）；
+  // 加载已保存的工具栏位置（preferences），无保存时用默认位置（右侧居中）；
   // 推断吸附侧时按中心点 X 判断贴左还是贴右。提供持久化当前位置的辅助方法。
   //
   // @输入
@@ -235,14 +234,14 @@ export struct 学习浮动工具栏 {
   // 持久化位置：写 preferences。
   //
   // @业务规则
-  // 默认位置即吸附态：main 贴右侧垂直居中；aux 贴左侧垂直居中。
+  // 默认位置即吸附态：贴右侧垂直居中。
   // 持久化为 fire-and-forget。
   //
   // @副作用
   // 加载/保存位置经 model/学习布局存储 读写 preferences；写响应式字段触发重 build。
   // ========================================================
 
-  /** 加载已保存位置；没有则用默认位置（main 右侧居中、aux 左侧居中）。
+  /** 加载已保存位置；没有则用默认位置（右侧居中）。
    *  推断 当前吸附侧 时按中心点 X 判断贴左还是贴右。 */
   private async 加载初始位置(): Promise<void> {
     const 已保存位置: 工具栏位置 | null = await 加载工具栏位置(this.工具栏类型);
@@ -259,24 +258,17 @@ export struct 学习浮动工具栏 {
       const 默认位置值: 工具栏位置 = this.默认位置();
       this.位置X = 默认位置值.x;
       this.位置Y = 默认位置值.y;
-      this.当前吸附侧 = this.工具栏类型 === 'main' ? 'right' : 'left';
+      this.当前吸附侧 = 'right';
     }
     this.位置已加载 = true;
   }
 
-  /** 默认位置：main 贴右侧垂直居中、aux 贴左侧垂直居中。 */
+  /** 默认位置：贴右侧垂直居中。 */
   private 默认位置(): 工具栏位置 {
     const 宽: number = 工具栏宽度(this.工具栏类型);
     const 高: number = 工具栏高度(this.工具栏类型, this.当前阶段);
-    if (this.工具栏类型 === 'main') {
-      const 位置: 工具栏位置 = {
-        x: 夹紧X方向(this.屏幕宽vp - 宽 - 边缘留白, this.屏幕宽vp, this.工具栏类型),
-        y: 夹紧Y方向((this.屏幕高vp - 高) / 2, this.屏幕高vp, this.工具栏类型, this.当前阶段)
-      };
-      return 位置;
-    }
     const 位置: 工具栏位置 = {
-      x: 夹紧X方向(边缘留白, this.屏幕宽vp, this.工具栏类型),
+      x: 夹紧X方向(this.屏幕宽vp - 宽 - 边缘留白, this.屏幕宽vp, this.工具栏类型),
       y: 夹紧Y方向((this.屏幕高vp - 高) / 2, this.屏幕高vp, this.工具栏类型, this.当前阶段)
     };
     return 位置;
@@ -360,7 +352,7 @@ export struct 学习浮动工具栏 {
   //
   // @作用
   // 三个无状态小辅助：
-  // - 取评分按钮文案：优先用后端返回的 评分按钮文案，否则用 兜底文案，再否则空串；
+  // - 取评分按钮文案：展示后端返回的间隔，缺失时返回空串；
   // - 浮卡底色：暗色用深蓝灰，亮色用白；
   // - 阴影样式：返回 OUTER_DEFAULT_MD（拖动与静止共用，预留接口）。
   //
@@ -371,19 +363,16 @@ export struct 学习浮动工具栏 {
   // 取评分按钮文案：string；浮卡底色：色值字符串；阴影样式：ShadowStyle。
   //
   // @业务规则
-  // 索引越界或对应文案为空时回退到 兜底文案；兜底文案 也越界时返回空串。
+  // 索引越界或对应文案为空时返回空串，评分名称始终可见。
   //
   // @副作用
   // 无。
   // ========================================================
 
-  /** 取评分按钮文案：优先用后端返回的 评分按钮文案，否则用 兜底文案。 */
+  /** 读取后端间隔，不用评分名称替代缺失的时间。 */
   private 取评分按钮文案(索引: number): string {
     if (索引 < this.评分按钮文案.length && this.评分按钮文案[索引].length > 0) {
       return this.评分按钮文案[索引];
-    }
-    if (索引 < this.兜底文案.length) {
-      return this.兜底文案[索引];
     }
     return '';
   }
@@ -406,7 +395,6 @@ export struct 学习浮动工具栏 {
   // 竖版布局的 4 个 @Builder：
   // - 竖版显示答案按钮：main 在 question 阶段，文字允许 maxLines=2 跨行；
   // - 竖版评分按钮 / 竖版评分按钮列：main 在 answer 阶段，4 个评分按钮纵向排列；
-  // - 竖版辅助按钮：aux 始终显示「埋藏 + 暂停」纵向排列。
   //
   // @输入
   // 竖版评分按钮：评分（number）/ 文字色（ResourceColor）。
@@ -415,30 +403,31 @@ export struct 学习浮动工具栏 {
   // 渲染 Button / Column 竖版组合，layoutWeight 平均分配高度。
   //
   // @业务规则
-  // 按下态：背景切到 主色容器/主色按钮按下（评分用 主色容器；显示答案用 主色按钮按下）；
+  // 按下态：评分使用共用玻璃反馈，显示答案使用带主题染色的主操作玻璃；
   // GOOD 评分按下时边框高亮 动作主色。
   // 触摸事件：Down 记 按下的评分；Up/Cancel 恢复 -1。
   // 按钮内 Text 用 maxLines=2 + Ellipsis，允许跨行展示完整文案。
   //
   // @副作用
-  // 无（仅渲染；点击通过 显示答案回调 / 评分回调 / 埋藏回调 / 暂停回调 上抛）。
+  // 无（仅渲染；点击通过 显示答案回调 / 评分回调 上抛）。
   // ========================================================
 
   @Builder
   private 竖版显示答案按钮() {
     Button({ type: ButtonType.Normal }) {
-      Text($r('app.string.study_show_answer'))
+      Text() { ThemeTextSpans($r('app.string.study_show_answer'), this.themeAccentColors, this.getUIContext()) }
         .maxLines(2)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
         .textAlign(TextAlign.Center)
         .fontSize(应用尺寸.字号_按钮)
         .fontWeight(FontWeight.Medium)
-        .fontColor(Color.White)
+        .fontColor(this.动作主色)
     }
     .width('100%')
     .height('100%')
     .padding({ left: 4, right: 4 })
-    .backgroundColor(this.按下的评分 === 显示答案标签 ? this.主色按钮按下 : this.主色按钮背景)
+    .attributeModifier(new PrimaryGlassSurface(this.按下的评分 === 显示答案标签, this.primaryGlass))
+    .stateEffect(false)
     .borderRadius(应用尺寸.圆角_面板)
     .animation({ duration: 80, curve: Curve.EaseOut })
     .onTouch((event: TouchEvent): void => {
@@ -451,19 +440,30 @@ export struct 学习浮动工具栏 {
   }
 
   @Builder
-  private 竖版评分按钮(评分: number, 文字色: ResourceColor) {
+  private 竖版评分按钮(评分: number, 标签: ResourceStr, 文字色: ResourceColor) {
     Button({ type: ButtonType.Normal }) {
-      Text(this.取评分按钮文案(评分))
-        .maxLines(2)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-        .textAlign(TextAlign.Center)
-        .fontSize(应用尺寸.字号_按钮)
-        .fontColor(文字色)
+      Column({ space: 2 }) {
+        Text(标签)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .fontSize(应用尺寸.字号_按钮)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(文字色)
+        if (this.取评分按钮文案(评分).length > 0) {
+          Text(this.取评分按钮文案(评分))
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .fontSize(12)
+            .fontColor($r('app.color.text_secondary'))
+        }
+      }
+      .width('100%')
     }
     .width('100%')
+    .padding({ left: 4, right: 4 })
     .layoutWeight(1)
-    .backgroundColor(this.按下的评分 === 评分 ? this.主色容器 : $r('app.color.surface_card'))
-    .border({ width: 应用尺寸.卡片边框, color: 评分 === RATING_GOOD && this.按下的评分 === 评分 ? this.动作主色 : $r('app.color.border_subtle') })
+    .attributeModifier(new GlassSurface(this.按下的评分 === 评分, this.glassColors))
+    .stateEffect(false)
     .borderRadius(应用尺寸.圆角_面板)
     .animation({ duration: 80, curve: Curve.EaseOut })
     .onTouch((event: TouchEvent): void => {
@@ -478,60 +478,10 @@ export struct 学习浮动工具栏 {
   @Builder
   private 竖版评分按钮列() {
     Column({ space: 应用尺寸.间距_8 }) {
-      this.竖版评分按钮(RATING_AGAIN, $r('app.color.error_text'))
-      this.竖版评分按钮(RATING_HARD, $r('app.color.text_primary'))
-      this.竖版评分按钮(RATING_GOOD, this.动作主色)
-      this.竖版评分按钮(RATING_EASY, $r('app.color.text_primary'))
-    }
-    .width('100%')
-    .height('100%')
-  }
-
-  @Builder
-  private 竖版辅助按钮() {
-    Column({ space: 应用尺寸.间距_8 }) {
-      Button({ type: ButtonType.Normal }) {
-        Text($r('app.string.study_bury'))
-          .maxLines(2)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .textAlign(TextAlign.Center)
-          .fontSize(应用尺寸.字号_按钮)
-          .fontColor($r('app.color.text_secondary'))
-      }
-      .width('100%')
-      .layoutWeight(1)
-      .backgroundColor(this.按下的评分 === 埋藏标签 ? this.主色容器 : $r('app.color.surface_card'))
-      .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
-      .borderRadius(应用尺寸.圆角_面板)
-      .animation({ duration: 80, curve: Curve.EaseOut })
-      .onTouch((event: TouchEvent): void => {
-        if (event.type === TouchType.Down) { this.按下的评分 = 埋藏标签; }
-        else if (event.type === TouchType.Up || event.type === TouchType.Cancel) { this.按下的评分 = -1; }
-      })
-      .onClick(() => {
-        this.埋藏回调();
-      })
-      Button({ type: ButtonType.Normal }) {
-        Text($r('app.string.study_suspend'))
-          .maxLines(2)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .textAlign(TextAlign.Center)
-          .fontSize(应用尺寸.字号_按钮)
-          .fontColor($r('app.color.text_secondary'))
-      }
-      .width('100%')
-      .layoutWeight(1)
-      .backgroundColor(this.按下的评分 === 暂停标签 ? this.主色容器 : $r('app.color.surface_card'))
-      .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
-      .borderRadius(应用尺寸.圆角_面板)
-      .animation({ duration: 80, curve: Curve.EaseOut })
-      .onTouch((event: TouchEvent): void => {
-        if (event.type === TouchType.Down) { this.按下的评分 = 暂停标签; }
-        else if (event.type === TouchType.Up || event.type === TouchType.Cancel) { this.按下的评分 = -1; }
-      })
-      .onClick(() => {
-        this.暂停回调();
-      })
+      this.竖版评分按钮(RATING_AGAIN, $r('app.string.rating_again'), $r('app.color.error_text'))
+      this.竖版评分按钮(RATING_HARD, $r('app.string.rating_hard'), $r('app.color.text_primary'))
+      this.竖版评分按钮(RATING_GOOD, $r('app.string.rating_good'), this.动作主色)
+      this.竖版评分按钮(RATING_EASY, $r('app.string.rating_easy'), $r('app.color.text_primary'))
     }
     .width('100%')
     .height('100%')
@@ -560,8 +510,8 @@ export struct 学习浮动工具栏 {
   // ========================================================
 
   build() {
-    if (!this.位置已加载) {
-      // 位置未加载完前不渲染，避免位置闪一下默认值
+    if (!this.位置已加载 || (this.当前阶段 !== 'question' && this.当前阶段 !== 'answer')) {
+      // 非学习阶段连外框与拖动热区一起隐藏，保留组件的位置状态供继续学习复用。
       Stack() {
       }
       .width(0)
@@ -570,16 +520,10 @@ export struct 学习浮动工具栏 {
       Stack() {
         // 竖版布局：按钮纵向排列（唯一形态，拖动与吸附不切换）
         Column() {
-          if (this.工具栏类型 === 'main') {
-            if (this.当前阶段 === 'question') {
-              this.竖版显示答案按钮()
-            } else if (this.当前阶段 === 'answer') {
-              this.竖版评分按钮列()
-            }
-          } else {
-            if (this.当前阶段 === 'question' || this.当前阶段 === 'answer') {
-              this.竖版辅助按钮()
-            }
+          if (this.当前阶段 === 'question') {
+            this.竖版显示答案按钮()
+          } else if (this.当前阶段 === 'answer') {
+            this.竖版评分按钮列()
           }
         }
         .width('100%')
