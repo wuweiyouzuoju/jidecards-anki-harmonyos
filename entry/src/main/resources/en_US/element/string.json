@@ -552,6 +552,7 @@
     { "name": "sync_fsrs_disabled_message", "value": "Cloud FSRS settings overwrote local. Re-enable FSRS algorithm?\n\nChoose \"Re-enable\" to write FSRS=on back to local; choose \"Keep Disabled\" to keep the cloud state." },
     { "name": "sync_fsrs_disabled_reenable", "value": "Re-enable" },
     { "name": "sync_fsrs_disabled_keep", "value": "Keep Disabled" },
+    { "name": "sync_fsrs_reenable_error", "value": "Could not confirm that FSRS was re-enabled. Check its status in Settings and try again." },
     { "name": "transfer_panel_title", "value": "Export / Import" },
     { "name": "transfer_subtitle_export_deck", "value": "Export deck to .apkg file" },
     { "name": "transfer_subtitle_export_personal", "value": "Export all data to .colpkg file" },

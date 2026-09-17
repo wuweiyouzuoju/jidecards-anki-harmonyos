@@ -29,6 +29,7 @@ import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时
 import { 颜色键 } from '../model/颜色主题';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { syncActivity } from '../model/SyncSettings';
+import { 加载FSRS开启状态, notifyFsrsStateChanged } from '../model/FSRS控制器';
 
 // 同步流程诊断日志：DOMAIN 0x4342 与 EntryAbility 一致，tag 用 jidecards 便于过滤
 const 同步日志域: number = 0x4342;
@@ -79,7 +80,7 @@ export struct 同步面板 {
   @Prop automatic: boolean = false;
   // 初始鉴权 由 Index 在挂载本组件时传入（来自 SyncGroup 上抛）
   初始鉴权: SyncAuth | null = null;
-  同步完成回调: () => void = (): void => {};
+  同步完成回调: (fsrsDisabledBySync: boolean) => void = (_fsrsDisabledBySync: boolean): void => {};
   关闭回调: () => void = (): void => {};
 
   // @StorageProp 触发颜色主题切换时重 build，让 设置面板色板_取(isDark).主色 即时变化
@@ -108,6 +109,9 @@ export struct 同步面板 {
   private ownsSync: boolean = false;
   private disposed: boolean = false;
   private mediaPollInFlight: boolean = false;
+  private fsrsBeforeSync: boolean | null = null;
+  private fsrsDisabledBySync: boolean = false;
+  private collectionResultNotified: boolean = false;
 
   aboutToAppear(): void {
     this.disposed = false;
@@ -129,10 +133,27 @@ export struct 同步面板 {
 
   /** 自动同步仅在成功完成后收起；媒体失败和全量覆盖冲突必须继续可见。 */
   private notifySyncResult(): void {
-    this.同步完成回调();
+    if (this.disposed) return;
+    this.notifyCollectionResult();
     if (this.automatic && this.当前阶段 === 'done' && this.错误文案 === '' && !this.是否请求中止) {
       this.关闭回调();
     }
+  }
+
+  /** 集合成功提交后立即取样，避免媒体阶段影响变化判定；未知值不推断为关闭。 */
+  private async captureFsrsAfterSync(): Promise<void> {
+    const after: boolean | null = await 加载FSRS开启状态();
+    this.fsrsDisabledBySync = this.fsrsBeforeSync === true && after === false;
+    hilog.info(同步日志域, 同步日志标签, 'sync: FSRS before=%{public}s after=%{public}s disabledBySync=%{public}s',
+      `${this.fsrsBeforeSync}`, `${after}`, `${this.fsrsDisabledBySync}`);
+    notifyFsrsStateChanged();
+  }
+
+  /** 媒体成功、失败或中止共用一次集合结果通知。 */
+  private notifyCollectionResult(): void {
+    if (this.disposed || this.collectionResultNotified) return;
+    this.collectionResultNotified = true;
+    this.同步完成回调(this.fsrsDisabledBySync);
   }
 
   // ========================================================
@@ -216,7 +237,7 @@ export struct 同步面板 {
     // 否则用户看不到刚同步的牌组，再点同步又显示「已最新」但 UI 不更新。
     if (集合是否已同步) {
       hilog.info(同步日志域, 同步日志标签, 'sync: aborted after collection synced, refreshing deck list');
-      this.同步完成回调();
+      this.notifyCollectionResult();
     }
   }
 
@@ -253,7 +274,7 @@ export struct 同步面板 {
     // 媒体阶段出错时集合同步已完成（数据已入 DB），仍需刷新牌组列表让用户看到已同步的牌组。
     if (集合是否已同步) {
       hilog.info(同步日志域, 同步日志标签, 'sync: error after collection synced, refreshing deck list');
-      this.同步完成回调();
+      this.notifyCollectionResult();
     }
   }
 
@@ -293,6 +314,9 @@ export struct 同步面板 {
     this.媒体进度文案 = '';
     this.是否请求中止 = false;
     this.集合已同步 = false;
+    this.fsrsBeforeSync = null;
+    this.fsrsDisabledBySync = false;
+    this.collectionResultNotified = false;
     this.当前阶段 = 'syncing';
     try {
       let 鉴权: SyncAuth = 当前鉴权;
@@ -306,13 +330,15 @@ export struct 同步面板 {
       // 读取媒体同步开关（对齐 Anki 桌面端 Preferences → Sync → "Sync media"）。
       // 关闭时 syncMedia=false（rslib 不挂起媒体同步任务），同步面板跳过媒体阶段。
       const 媒体同步开启: boolean = 加载媒体同步开关();
-      hilog.info(同步日志域, 同步日志标签, 'sync: calling syncCollection syncMedia=%{public}s',
-        媒体同步开启 ? 'true' : 'false');
-      const 集合响应: SyncCollectionResponse = await this.同步服务实例.同步集合(鉴权, 媒体同步开启);
+      this.fsrsBeforeSync = await 加载FSRS开启状态();
+      if (this.disposed) return;
       if (this.是否请求中止) {
         this.完成中止();
         return;
       }
+      hilog.info(同步日志域, 同步日志标签, 'sync: calling syncCollection syncMedia=%{public}s',
+        媒体同步开启 ? 'true' : 'false');
+      const 集合响应: SyncCollectionResponse = await this.同步服务实例.同步集合(鉴权, 媒体同步开启);
       const 集合端点: string = 提取新端点(集合响应);
       if (集合端点 !== '') {
         鉴权 = 应用新端点(鉴权, 集合端点);
@@ -326,6 +352,12 @@ export struct 同步面板 {
       if (走向 === 'done') {
         // outcome=done = 集合已原子提交到本地 DB；标记以便后续中止时刷新牌组列表。
         this.集合已同步 = true;
+        await this.captureFsrsAfterSync();
+        if (this.disposed) return;
+        if (this.是否请求中止) {
+          this.完成中止();
+          return;
+        }
         // 媒体同步开关关闭（对齐 Anki 桌面端 "Sync media" 开关）：不进媒体阶段，直接完成。
         if (!媒体同步开启) {
           hilog.info(同步日志域, 同步日志标签, 'sync: syncCollection done, media sync disabled, skipping media phase');
@@ -342,6 +374,11 @@ export struct 同步面板 {
         return;
       }
 
+      if (this.disposed) return;
+      if (this.是否请求中止) {
+        this.完成中止();
+        return;
+      }
       // 全量冲突：进 conflict 阶段，等待用户选方向（不弹 CustomDialog，内联到本弹窗）
       this.待定服务器USN = 集合响应.serverMediaUsn;
       this.当前冲突类型 = 走向;
@@ -392,9 +429,15 @@ export struct 同步面板 {
       'sync: calling fullUploadOrDownload upload=%{public}s serverUsn=%{public}s mediaEnabled=%{public}s',
       是否上传 ? 'true' : 'false', 服务器USN === null ? 'null' : `${服务器USN}`, 媒体同步开启 ? 'true' : 'false');
     this.同步服务实例.全量上传或下载(鉴权, 是否上传, 服务器USN)
-      .then((): void => {
+      .then(async (): Promise<void> => {
         // 全量上传/下载完成 = 集合已写入本地 DB；标记以便后续中止时刷新牌组列表。
         this.集合已同步 = true;
+        await this.captureFsrsAfterSync();
+        if (this.disposed) return;
+        if (this.是否请求中止) {
+          this.完成中止();
+          return;
+        }
         // 媒体同步开关关闭：不进媒体阶段，直接完成。
         if (!媒体同步开启) {
           hilog.info(同步日志域, 同步日志标签, 'sync: fullUploadOrDownload done, media sync disabled, skipping media phase');

@@ -86,7 +86,7 @@ import { 加载牌组别名映射, 加载牌组色调映射, 保存牌组别名,
 import { 加载全部牌组顺序, 保存牌组顺序 } from '../model/牌组顺序存储';
 import { 加载已隐藏牌组ID列表, 隐藏牌组, 取消隐藏全部牌组 } from '../model/隐藏牌组存储';
 import { 加载上次牌组ID, 保存上次牌组ID, 清除上次牌组ID } from '../model/上次牌组存储';
-import { 确保FSRS已开启一次, 加载FSRS开启状态, 设置FSRS开启状态, 刷新桌面卡片数据 } from '../model/FSRS控制器';
+import { 确保FSRS已开启一次, 加载FSRS开启状态, 设置FSRS开启状态, 刷新桌面卡片数据, notifyFsrsStateChanged } from '../model/FSRS控制器';
 import { 加载显示今日进度卡, 主页今日进度卡AppStorage键 } from '../model/主页偏好';
 import { 提取卡片数据, 保存卡片数据, 加载小时分布窗口, 加载统计天数, 加载分离暂停偏好, 桌面卡片数据 } from '../model/桌面卡片数据存储';
 import { 应用主题 } from '../utils/主题控制器';
@@ -338,7 +338,7 @@ struct 首页 {
       this.显示过滤牌组面板 || this.显示牌组选项 || this.牌组选项加载中 || this.牌组选项中 ||
       this.显示创建牌组 || this.显示主页操作 || this.显示更多菜单 || this.显示节流奖励 || this.排序模式中 ||
       this.显示许可证 || this.云端牌组忙碌 || this.显示卡片预览 || this.预览加载中 ||
-      this.显示同步面板 || !syncActivity.canAutoSync(Date.now())) return;
+      this.显示同步面板 || this.fsrsPromptActive || !syncActivity.canAutoSync(Date.now())) return;
     const info: 同步凭证信息 | null = 加载同步凭证();
     if (info === null) return;
     const auth: SyncAuth = { hkey: info.hkey, endpoint: info.endpoint, ioTimeoutSecs: 0 };
@@ -815,7 +815,7 @@ struct 首页 {
   // 同步完成后检查 FSRS 状态：若云端 collection 的 fsrs=false 覆盖了本地，弹窗让用户决策。
   //
   // @输入
-  // 无（读取本地 FSRS 开启状态）
+  // 本次同步是否已确认 FSRS 从开启变为关闭；弹窗前再次读取实际状态。
   //
   // @输出
   // 用户选「重新开启」时回写 fsrs=true
@@ -829,11 +829,15 @@ struct 首页 {
   // @副作用
   // 写本地 FSRS 状态（用户选「重新开启」时）
   // ========================================================
-  private async 同步后检查FSRS(): Promise<void> {
+  private fsrsPromptActive: boolean = false;
+
+  private async 同步后检查FSRS(fsrsDisabledBySync: boolean): Promise<void> {
+    if (!fsrsDisabledBySync || this.fsrsPromptActive) return;
+    this.fsrsPromptActive = true;
     try {
       const fsrsEnabled: boolean | null = await 加载FSRS开启状态();
       if (fsrsEnabled === false) {
-        await this.getUIContext().getPromptAction().showDialog({
+        const result: promptAction.ShowDialogSuccessResponse = await this.getUIContext().getPromptAction().showDialog({
           title: this.getUIContext().getHostContext()!.resourceManager.getStringSync($r('app.string.sync_fsrs_disabled_title').id),
           message: this.getUIContext().getHostContext()!.resourceManager.getStringSync($r('app.string.sync_fsrs_disabled_message').id),
           buttons: [
@@ -846,15 +850,21 @@ struct 首页 {
               color: '#666666'
             }
           ]
-        }).then((result: promptAction.ShowDialogSuccessResponse): void => {
-          if (result.index === 0) {
-            // 选「重新开启」：回写 fsrs=true；失败静默降级（用户可在设置页手动重开）
-            设置FSRS开启状态(true).catch((): void => {});
-          }
         });
+        if (result.index === 0) {
+          try {
+            await 设置FSRS开启状态(true);
+          } catch (error) {
+            this.getUIContext().getPromptAction().showToast({
+              message: this.getUIContext().getHostContext()!.resourceManager.getStringSync($r('app.string.sync_fsrs_reenable_error').id)
+            });
+          }
+        }
       }
     } catch (error) {
       // 拉取 FSRS 状态失败或弹窗失败都不阻断，静默降级
+    } finally {
+      this.fsrsPromptActive = false;
     }
   }
 
@@ -2244,6 +2254,7 @@ struct 首页 {
         fsrsHealthCheck: edited.fsrsHealthCheck
       };
       await this.牌组配置服务实例.更新牌组配置(request);
+      notifyFsrsStateChanged();
       this.关闭牌组选项();
       await this.加载主页数据();
     } catch (error) {
@@ -2848,9 +2859,9 @@ struct 首页 {
             账号名: this.同步面板账号名,
             初始鉴权: this.同步面板认证,
             automatic: true,
-            同步完成回调: (): void => {
+            同步完成回调: (fsrsDisabledBySync: boolean): void => {
               this.加载主页数据();
-              this.同步后检查FSRS();
+              this.同步后检查FSRS(fsrsDisabledBySync);
             },
             关闭回调: (): void => {
               this.显示同步面板 = false;

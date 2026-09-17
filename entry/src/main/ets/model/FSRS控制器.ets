@@ -64,6 +64,14 @@ const FSRS已初始化键: string = 'fsrs_initialized';
 const 上下文键: string = 'abilityContext';
 const 默认牌组ID: number = 1;
 
+export const FSRS_STATE_REVISION_KEY: string = 'fsrsStateRevision';
+
+/** 通知已挂载页面重新读取全局开关；通知值不承载 FSRS 状态。 */
+export function notifyFsrsStateChanged(): void {
+  const revision: number = AppStorage.get<number>(FSRS_STATE_REVISION_KEY) ?? 0;
+  AppStorage.setOrCreate<number>(FSRS_STATE_REVISION_KEY, revision + 1);
+}
+
 function 取上下文(): common.UIAbilityContext | null {
   const 上下文: common.UIAbilityContext | undefined =
     AppStorage.get<common.UIAbilityContext>(上下文键);
@@ -151,6 +159,7 @@ export async function 确保FSRS已开启一次(): Promise<void> {
     if (!视图.fsrs) {
       const 请求: UpdateDeckConfigsInput = 构造请求(视图, true, true);
       await 服务.更新牌组配置(请求);
+      notifyFsrsStateChanged();
     }
   } catch (错误) {
     // 后端不可用时不写 initialized 标记，下次启动重试。
@@ -180,7 +189,16 @@ export async function 设置FSRS开启状态(开启: boolean): Promise<boolean> 
   const 服务: 牌组配置服务 = new 牌组配置服务();
   const 视图: DeckConfigsForUpdateView = await 服务.获取牌组配置编辑视图(默认牌组ID);
   const 请求: UpdateDeckConfigsInput = 构造请求(视图, 开启, 开启);
-  await 服务.更新牌组配置(请求);
+  try {
+    await 服务.更新牌组配置(请求);
+    const saved: DeckConfigsForUpdateView = await 服务.获取牌组配置编辑视图(默认牌组ID);
+    if (saved.fsrs !== 开启) {
+      throw new Error('FSRS state verification failed');
+    }
+  } finally {
+    // 写入或读回失败也刷新，避免界面继续展示未经确认的乐观状态。
+    notifyFsrsStateChanged();
+  }
   // FSRS 状态变更后主动刷新桌面卡片数据：用户在设置页开/关 FSRS 后，
   // 桌面卡片的"记忆率/难度分布"页需立即反映新状态，否则会一直显示
   // "未启用 FSRS"（仅靠首页加载触发推送，用户不回首页就不会刷新）。

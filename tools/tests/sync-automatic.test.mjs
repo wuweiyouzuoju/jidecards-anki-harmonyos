@@ -82,7 +82,7 @@ test('auto sync does not poll during study/background and resumes on the next fo
 test('editing, import, sorting, startup prompts and manual sync defer automatic work', () => {
   for (const field of ['显示创建牌组', '显示牌组选项', '显示自定义学习', '显示过滤牌组面板',
     '显示数据迁移', '数据迁移中', '显示牌组定制', '官方公告检查中', '显示官方公告', '显示云端牌组弹窗',
-    '显示欢迎弹窗', '显示主页操作', '显示更多菜单', '排序模式中', '刷新中', '云端牌组忙碌']) {
+    '显示欢迎弹窗', '显示主页操作', '显示更多菜单', '排序模式中', '刷新中', '云端牌组忙碌', 'fsrsPromptActive']) {
     const { page, tick } = homeHarness();
     page[field] = true; page.requestAutoSync(); tick();
     assert.equal(page.显示同步面板, false, field);
@@ -108,14 +108,17 @@ test('disabled sync and logged-out state stop queued work without a network requ
 
 async function settle() { for (let i = 0; i < 8; i++) await new Promise(resolve => setImmediate(resolve)); }
 
-function panelHarness({ required = 1, media = false, automatic = true } = {}) {
+function panelHarness({ required = 1, media = false, automatic = true, fsrsBefore = true, fsrsAfter = true } = {}) {
   const state = { closed: 0, refreshed: 0, media, pending: false, cleared: false, endpoint: '', calls: [], timers: new Map(),
+    fsrsValues: [fsrsBefore, fsrsAfter], fsrsReads: 0, fsrsNotifications: 0, fsrsResults: [],
     response: { required, newEndpoint: '', hostNumber: 0, serverMediaUsn: 3, serverMessage: '' } };
   class BackendError extends Error {}
   const gate = new SyncActivity();
   const Panel = componentMethods(read('components/同步面板.ets'), ['aboutToAppear', 'aboutToDisappear', '启动同步',
-    'notifySyncResult', '处理同步错误', '完成中止', '冲突确认', '启动媒体阶段', '开始媒体轮询', '清理轮询定时器', '是否允许关闭'], {
+    'notifySyncResult', 'notifyCollectionResult', 'captureFsrsAfterSync', '处理同步错误', '完成中止', '冲突确认', '启动媒体阶段', '开始媒体轮询', '清理轮询定时器', '是否允许关闭'], {
     ...flow, syncActivity: gate, 后端错误: BackendError,
+    加载FSRS开启状态: async () => state.fsrsValues[state.fsrsReads++],
+    notifyFsrsStateChanged: () => { state.fsrsNotifications++; },
     加载媒体同步开关: () => state.media, 加载媒体待同步: () => state.pending,
     设置媒体待同步: value => { state.pending = value; }, 保存同步端点: value => { state.endpoint = value; },
     清除同步凭证: () => { state.cleared = true; },
@@ -126,7 +129,8 @@ function panelHarness({ required = 1, media = false, automatic = true } = {}) {
   const auth = { hkey: 'test-key', endpoint: 'https://custom.example/anki/', ioTimeoutSecs: 0 };
   Object.assign(panel, { syncOwner: {}, automatic, 初始鉴权: auth, 当前阶段: 'syncing', 错误文案: '', 是否请求中止: false,
     轮询定时器: -1, 集合已同步: false, 是否在媒体阶段: false,
-    取本地化文案: key => key, 关闭回调: () => { state.closed++; }, 同步完成回调: () => { state.refreshed++; },
+    取本地化文案: key => key, 关闭回调: () => { state.closed++; },
+    同步完成回调: value => { state.refreshed++; state.fsrsResults.push(value); },
     同步服务实例: {
       中止媒体同步: async () => {},
       同步状态检查: async a => { state.calls.push(['status', a]); return { required: required === 0 ? 0 : 1, newEndpoint: '' }; },
@@ -151,6 +155,46 @@ test('automatic incremental sync uses custom endpoint, refreshes and closes; man
     panel.aboutToDisappear();
     assert.equal(gate.canAutoSync(Date.now() + 31000), true);
   }
+});
+
+test('FSRS warning describes only a confirmed on-to-off transition for normal and full sync', async () => {
+  for (const required of [0, 1, 2, 3, 4]) {
+    for (const before of [true, false, null]) {
+      for (const after of [true, false, null]) {
+        const { panel, state } = panelHarness({ required, fsrsBefore: before, fsrsAfter: after });
+        panel.aboutToAppear(); await settle();
+        if (required >= 2) {
+          assert.equal(state.fsrsReads, 1, 'conflict has not applied cloud data yet');
+          assert.deepEqual(state.fsrsResults, []);
+          panel.冲突确认(required === 4); await settle();
+        }
+        assert.equal(state.fsrsReads, 2);
+        assert.equal(state.fsrsNotifications, 1);
+        assert.deepEqual(state.fsrsResults, [before === true && after === false]);
+        panel.notifyCollectionResult();
+        assert.equal(state.refreshed, 1, 'collection completion is delivered once');
+      }
+    }
+  }
+});
+
+test('FSRS transition survives media failure or abort, but a collection failure never reports it', async () => {
+  for (const outcome of ['media-failure', 'abort', 'collection-failure']) {
+    const { panel, state } = panelHarness({ media: true, fsrsAfter: false });
+    if (outcome === 'collection-failure') panel.同步服务实例.同步集合 = async () => { throw new Error('network'); };
+    if (outcome === 'media-failure') panel.同步服务实例.同步媒体 = async () => { throw new Error('network'); };
+    panel.aboutToAppear(); await settle();
+    if (outcome === 'abort') panel.完成中止();
+    assert.deepEqual(state.fsrsResults, outcome === 'collection-failure' ? [] : [true]);
+    assert.equal(state.fsrsNotifications, outcome === 'collection-failure' ? 0 : 1);
+  }
+});
+
+test('removing a panel while FSRS reads are pending cannot start sync or deliver a late result', async () => {
+  const { panel, state } = panelHarness();
+  panel.aboutToAppear(); panel.aboutToDisappear(); await settle();
+  assert.equal(state.calls.length, 0);
+  assert.deepEqual(state.fsrsResults, []);
 });
 
 test('media-only sync runs even with unchanged collection and closes only after media completes', async () => {

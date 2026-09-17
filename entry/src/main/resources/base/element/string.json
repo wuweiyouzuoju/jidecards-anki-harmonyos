@@ -1161,6 +1161,7 @@
     { "name": "sync_fsrs_disabled_message", "value": "云端的 FSRS 设置覆盖了本地。是否重新开启 FSRS 算法？\n\n选「重新开启」会立即回写本地 FSRS 状态为开；选「保持关闭」则维持云端的状态。" },
     { "name": "sync_fsrs_disabled_reenable", "value": "重新开启" },
     { "name": "sync_fsrs_disabled_keep", "value": "保持关闭" },
+    { "name": "sync_fsrs_reenable_error", "value": "未能确认 FSRS 重新开启成功，请在设置中检查状态并重试。" },
     { "name": "transfer_panel_title", "value": "导出 / 导入" },
     { "name": "transfer_subtitle_export_deck", "value": "导出牌组到 .apkg 文件" },
     { "name": "transfer_subtitle_export_personal", "value": "导出全部数据到 .colpkg 文件" },

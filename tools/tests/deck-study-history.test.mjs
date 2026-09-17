@@ -180,7 +180,10 @@ test('editing a deck waits for metadata writes then refreshes even when its ID i
 test('saving deck options refreshes only after backend changes finish', async () => {
   const events = [];
   const saved = deferred();
-  const state = homeSaveHarness('保存牌组选项', { UPDATE_DECK_CONFIGS_MODE_NORMAL: 0 });
+  const state = homeSaveHarness('保存牌组选项', {
+    UPDATE_DECK_CONFIGS_MODE_NORMAL: 0,
+    notifyFsrsStateChanged: () => { events.push('fsrs'); }
+  });
   Object.assign(state, {
     牌组选项中: false, 牌组选项牌组ID: 10,
     编辑视图: { cardStateCustomizer: '' }, 编辑配置: { config: {} },
@@ -195,6 +198,6 @@ test('saving deck options refreshes only after backend changes finish', async ()
   });
   assert.deepEqual(events, ['save']);
   saved.resolve(); await pending;
-  assert.deepEqual(events, ['save', 'close', 'refresh']);
+  assert.deepEqual(events, ['save', 'fsrs', 'close', 'refresh']);
   assert.equal(state.牌组选项中, false);
 });

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { 加载FSRS开启状态, 设置FSRS开启状态 } from '../../model/FSRS控制器';
+import { 加载FSRS开启状态, 设置FSRS开启状态, FSRS_STATE_REVISION_KEY } from '../../model/FSRS控制器';
 import { 设置面板色板_取, 设置面板色板 } from '../../utils/设置面板配色';
 import { 颜色键 } from '../../model/颜色主题';
 import { 设置分组卡片 } from './设置分组卡片';
@@ -44,17 +44,33 @@ export struct 调度器分组 {
   @State private 是否启用FSRS: boolean | null = null;
   @State private FSRS操作中: boolean = false;
   @State private FSRS错误信息: string = '';
+  @StorageProp(FSRS_STATE_REVISION_KEY) @Watch('onFsrsStateChanged') private fsrsRevision: number = 0;
+  private fsrsReadSequence: number = 0;
+  private disposed: boolean = false;
 
   /** 面板打开时拉取 FSRS 当前状态与后端同步。失败时保留 null，UI 显示"读取失败"。 */
   async aboutToAppear(): Promise<void> {
+    this.disposed = false;
     await this.刷新FSRS状态();
   }
 
-  private async 刷新FSRS状态(): Promise<void> {
-    this.FSRS错误信息 = '';
+  aboutToDisappear(): void {
+    this.disposed = true;
+    this.fsrsReadSequence++;
+  }
+
+  /** 同步或其他入口写入后重新读取；当前保存完成后会补一次读取。 */
+  private onFsrsStateChanged(): void {
+    if (!this.disposed && !this.FSRS操作中) this.刷新FSRS状态();
+  }
+
+  private async 刷新FSRS状态(clearError: boolean = true): Promise<void> {
+    const sequence: number = ++this.fsrsReadSequence;
+    if (clearError) this.FSRS错误信息 = '';
     const 值: boolean | null = await 加载FSRS开启状态();
+    if (this.disposed || sequence !== this.fsrsReadSequence) return;
     this.是否启用FSRS = 值;
-    if (值 === null) {
+    if (值 === null && this.FSRS错误信息 === '') {
       this.FSRS错误信息 = this.取本地化文本($r('app.string.settings_fsrs_load_error'));
     }
   }
@@ -80,6 +96,7 @@ export struct 调度器分组 {
       return;
     }
     const 先前值: boolean = this.是否启用FSRS;
+    this.fsrsReadSequence++;
     this.FSRS操作中 = true;
     this.是否启用FSRS = 值;
     this.FSRS错误信息 = '';
@@ -90,6 +107,7 @@ export struct 调度器分组 {
       this.FSRS错误信息 = error instanceof Error ? error.message : `${error}`;
     } finally {
       this.FSRS操作中 = false;
+      if (!this.disposed) await this.刷新FSRS状态(false);
     }
   }
 

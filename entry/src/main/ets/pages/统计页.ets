@@ -64,6 +64,7 @@ import type { 牌组汇总 } from '../model/主页模型';
 import type { DeckTreeNode } from '../proto/messages/DeckMessages';
 import type { GraphsView, GraphPreferences, ReviewKindCounts } from '../proto/messages/StatsMessages';
 import { Weekday } from '../proto/messages/StatsMessages';
+import { FSRS_STATE_REVISION_KEY } from '../model/FSRS控制器';
 
 /** 统计页阶段状态机：loading=加载中，content=展示数据，error=出错 */
 type 统计阶段 = 'loading' | 'content' | 'error';
@@ -97,6 +98,8 @@ export struct 统计页 {
   // 加载竞态防护：每次 加载统计数据 递增；旧的未完成请求返回后发现序号不匹配即丢弃，
   // 防止快速切换牌组/天数时慢的旧请求后完成覆盖新数据（与首页 加载链串行 同族问题，2026-08-28 修复）。
   private 请求序号: number = 0;
+  @StorageProp(FSRS_STATE_REVISION_KEY) @Watch('onFsrsStateChanged') private fsrsRevision: number = 0;
+  private fsrsRefreshReady: boolean = false;
   // 小时分布时间段（0=近1月 1=近3月 2=近1年 3=全部）：与首页卡片/桌面卡片共用同一偏好
   @State private 小时分布窗口: number = 0;
   // 分区帮助浮层：点击各分区 i 时由 onHelp 回调设置标题/正文，页面级 Stack 统一弹字段帮助面板
@@ -139,11 +142,19 @@ export struct 统计页 {
     // 恢复统计天数（近 1 年/全部两档，首页/FSRS控制器拉 GraphsView 前加载同一偏好）
     this.统计天数 = await 加载统计天数();
     this.加载牌组列表();
+    this.fsrsRefreshReady = true;
     await this.加载统计数据();
   }
 
   aboutToDisappear(): void {
+    this.fsrsRefreshReady = false;
+    this.请求序号++;
     CustomTransition.getInstance().注销NavParam('StatsPage');
+  }
+
+  /** 全局开关变化后重取统计快照，使状态标签和图表使用同一次后端结果。 */
+  private onFsrsStateChanged(): void {
+    if (this.fsrsRefreshReady) this.加载统计数据();
   }
 
   /** 顶部条牌组下拉选项：全部牌组 + 全库牌组全名（平铺牌组树前序） */

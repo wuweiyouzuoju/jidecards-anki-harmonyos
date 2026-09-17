@@ -311,11 +311,15 @@ export struct 设置页 {
     });
   }
 
-  private async 同步后检查FSRS(): Promise<void> {
+  private fsrsPromptActive: boolean = false;
+
+  private async 同步后检查FSRS(fsrsDisabledBySync: boolean): Promise<void> {
+    if (!fsrsDisabledBySync || this.fsrsPromptActive) return;
+    this.fsrsPromptActive = true;
     try {
       const fsrsEnabled: boolean | null = await 加载FSRS开启状态();
       if (fsrsEnabled === false) {
-        await this.getUIContext().getPromptAction().showDialog({
+        const result: promptAction.ShowDialogSuccessResponse = await this.getUIContext().getPromptAction().showDialog({
           title: this.getUIContext().getHostContext()!.resourceManager.getStringSync($r('app.string.sync_fsrs_disabled_title').id),
           message: this.getUIContext().getHostContext()!.resourceManager.getStringSync($r('app.string.sync_fsrs_disabled_message').id),
           buttons: [
@@ -328,14 +332,21 @@ export struct 设置页 {
               color: '#666666'
             }
           ]
-        }).then((result: promptAction.ShowDialogSuccessResponse): void => {
-          if (result.index === 0) {
-            设置FSRS开启状态(true).catch((): void => {});
-          }
         });
+        if (result.index === 0) {
+          try {
+            await 设置FSRS开启状态(true);
+          } catch (error) {
+            this.getUIContext().getPromptAction().showToast({
+              message: this.getUIContext().getHostContext()!.resourceManager.getStringSync($r('app.string.sync_fsrs_reenable_error').id)
+            });
+          }
+        }
       }
     } catch (error) {
       // 拉取 FSRS 状态失败或弹窗失败都不阻断，静默降级
+    } finally {
+      this.fsrsPromptActive = false;
     }
   }
 
@@ -402,10 +413,10 @@ export struct 设置页 {
             是否深色: this.是否深色(),
             账号名: this.同步面板账号名,
             初始鉴权: this.同步面板认证,
-            同步完成回调: (): void => {
+            同步完成回调: (fsrsDisabledBySync: boolean): void => {
               // 通知首页刷新数据
               AppStorage.setOrCreate<number>('需要刷新主页', Date.now());
-              this.同步后检查FSRS();
+              this.同步后检查FSRS(fsrsDisabledBySync);
             },
             关闭回调: (): void => {
               this.显示同步面板 = false;
