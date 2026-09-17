@@ -1010,10 +1010,10 @@ test('BrowserPage has T9 state + methods', () => {
   assert.match(page, /this\.搜索服务实例\.查找并替换\s*\(/);
 });
 
-test('BrowserPage top bar has T9 find&replace entry button', () => {
+test('BrowserPage more menu keeps the find&replace entry', () => {
   const page = read('entry/src/main/ets/pages/浏览页.ets');
-  // 顶部条含 查找替换 按钮（i18n key 复用 browser_action_find_replace），与主页同款 按下态按钮
-  assert.match(page, /按下态按钮\s*\(\s*\{[^]*文案:\s*\$r\('app\.string\.browser_action_find_replace'\)/);
+  assert.match(page, /\.bindMenu\(this\.browserMoreMenu\(\)\)/);
+  assert.match(page, /private browserMoreMenu\(\)[\s\S]*?app\.string\.browser_action_find_replace/);
   // 点击设 显示查找替换 = true
   assert.match(page, /this\.显示查找替换\s*=\s*true/);
 });
@@ -1145,8 +1145,8 @@ test('BrowserPage has T6 sidebar methods', () => {
 
 test('BrowserPage top bar has T6 sidebar entry button', () => {
   const page = read('entry/src/main/ets/pages/浏览页.ets');
-  // 顶部条含 筛选 按钮（i18n key browser_action_sidebar），与主页顶部工具栏同款 按下态按钮
-  assert.match(page, /按下态按钮\s*\(\s*\{[^]*文案:\s*\$r\('app\.string\.browser_action_sidebar'\)/);
+  // 沿用筛选入口，并区分已提交搜索与全库状态。
+  assert.match(page, /文案: this\.搜索文本\.trim\(\) === '' \? \$r\('app\.string\.browser_action_sidebar'\)[\s\S]*?app\.string\.browser_filter_active/);
   // 点击调用 打开侧边栏
   assert.match(page, /this\.打开侧边栏\s*\(/);
 });

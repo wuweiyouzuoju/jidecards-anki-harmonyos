@@ -55,7 +55,7 @@ import type {
   SearchRequest,
   SortOrder
 } from '../proto/messages/SearchMessages';
-import { BrowserRowColor } from '../proto/messages/SearchMessages';
+import { BrowserColumnSorting, SearchNodeCardState, makeCardStateNode } from '../proto/messages/SearchMessages';
 import {
   makeParsableTextNode
 } from '../proto/messages/SearchMessages';
@@ -146,6 +146,12 @@ export struct 浏览页 {
   @State private 结果ID列表: number[] = [];
   @State private 行列表: 浏览行数据[] = [];
   @State private 列定义: BrowserColumn[] = [];
+  @State private subtitleIndex: number = 1;
+  @State private sortColumn: string = '';
+  @State private sortReverse: boolean = false;
+  private suspendedRowIds: Set<number> = new Set<number>();
+  private searchVersion: number = 0;
+  private loadingMore: boolean = false;
   /** NavDestination 透明度（由 customNavContentTransition 回调控制，实现淡入淡出转场）。 */
   @State private 转场透明度: number = 1;
 
@@ -383,6 +389,8 @@ export struct 浏览页 {
   // 调后端 构建搜索串 / 搜索卡片 / 搜索笔记 / 全部浏览器列 / 浏览器行按ID
   // ========================================================
   private async 执行搜索(): Promise<void> {
+    const version: number = ++this.searchVersion;
+    const notesMode: boolean = this.浏览模式值 === 'notes';
     this.阶段 = 'loading';
     try {
       const context: common.UIAbilityContext | null = this.取能力上下文();
@@ -393,41 +401,62 @@ export struct 浏览页 {
         return;
       }
       await 后端会话.获取实例().确保已打开(context.filesDir);
+      if (version !== this.searchVersion) { return; }
+      await this.配置服务实例.设置配置布尔({
+        key: ConfigKeyBool.BROWSER_TABLE_SHOW_NOTES_MODE, value: notesMode, undoable: false
+      });
+      if (version !== this.searchVersion) { return; }
 
       // 首次搜索时拉取列定义并设置激活列（后端 browser_row_for_id 要求 active_browser_columns 已设置）
       if (this.列定义.length === 0) {
         const cols = await this.搜索服务实例.全部浏览器列();
-        this.列定义 = cols.columns;
-        // 手机端默认激活 Question + Deck + Due + Flags 四列（与 Anki 桌面端一致，cells 顺序按激活列顺序）
+        if (version !== this.searchVersion) { return; }
+        // 单元格顺序固定；副标题选择只切换展示，不反复请求整批行。
         // 列 key 来自 Anki 后端 strum camelCase 序列化（browser_table.rs）：Question→"question" 等
         // 未设置则 browser_row_for_id 报 "Active browser columns not set."
-        const 默认列键: string[] = ['question', 'deck', 'cardDue', 'flags'];
+        const 默认列键: string[] = ['question', 'deck', 'cardDue', 'flags', 'answer'];
         await this.搜索服务实例.设置激活浏览器列(默认列键);
+        if (version !== this.searchVersion) { return; }
+        this.列定义 = cols.columns;
         console.info(`BrowserPage: 列定义=${cols.columns.length} 列，激活列=${默认列键.join(',')}`);
       }
+      if (version !== this.searchVersion) { return; }
 
       // 构建搜索串（后端构建，前端不拼字符串）
       const searchNode = makeParsableTextNode(this.搜索文本);
       const searchStr = await this.搜索服务实例.构建搜索串(searchNode);
+      if (version !== this.searchVersion) { return; }
       console.info(`BrowserPage: 搜索文本="${this.搜索文本}" 搜索串="${searchStr}"`);
 
       // 按模式搜索卡片或笔记
-      const order: SortOrder = { kind: 'none' };
+      const order: SortOrder = this.sortColumn === '' ? { kind: 'none' } :
+        { kind: 'builtin', column: this.sortColumn, reverse: this.sortReverse };
       const request: SearchRequest = { search: searchStr, order };
-      const ids = this.浏览模式值 === 'cards'
-        ? await this.搜索服务实例.搜索卡片(request)
-        : await this.搜索服务实例.搜索笔记(request);
+      const ids = notesMode ? await this.搜索服务实例.搜索笔记(request) :
+        await this.搜索服务实例.搜索卡片(request);
+      if (version !== this.searchVersion) { return; }
+      // 行颜色优先显示旗标/标记，不能据此判断暂停；笔记搜索返回含暂停卡的笔记 ID。
+      const suspendedSearch: string = await this.搜索服务实例.构建搜索串(
+        makeCardStateNode(SearchNodeCardState.CARD_STATE_SUSPENDED));
+      if (version !== this.searchVersion) { return; }
+      const suspendedRequest: SearchRequest = { search: suspendedSearch, order: { kind: 'none' } };
+      const suspendedIds: number[] = notesMode ? await this.搜索服务实例.搜索笔记(suspendedRequest) :
+        await this.搜索服务实例.搜索卡片(suspendedRequest);
+      if (version !== this.searchVersion) { return; }
+      this.suspendedRowIds = new Set<number>(suspendedIds);
       console.info(`BrowserPage: 模式=${this.浏览模式值} 搜索返回 ${ids.length} 个 ID`);
 
       this.结果ID列表 = ids;
       this.行列表 = [];
 
       // 预加载前 200 行（避免首屏空白；后端 browser_row_for_id 是单 ID 查询，无批量接口）
-      await this.预加载行(ids.slice(0, 200));
+      await this.预加载行(ids.slice(0, 200), version);
+      if (version !== this.searchVersion) { return; }
       console.info(`BrowserPage: 预加载完成 行列表=${this.行列表.length} 行`);
 
       this.阶段 = 'list';
     } catch (error) {
+      if (version !== this.searchVersion) { return; }
       this.阶段 = 'error';
       this.错误详情 = error instanceof Error ? error.message : `${error}`;
     }
@@ -438,23 +467,30 @@ export struct 浏览页 {
    * 由 卡片表格.onReachEnd 触发；批次大小 100，并发 10。
    */
   private async 加载更多(): Promise<void> {
+    if (this.loadingMore || this.阶段 !== 'list') { return; }
     const 已加载数: number = this.行列表.length;
     if (已加载数 >= this.结果ID列表.length) {
       return;
     }
     const 下一批: number[] = this.结果ID列表.slice(已加载数, 已加载数 + 100);
     console.info(`BrowserPage: 加载更多 已加载=${已加载数} 本批=${下一批.length} 总=${this.结果ID列表.length}`);
-    await this.预加载行(下一批);
+    this.loadingMore = true;
+    try {
+      await this.预加载行(下一批, this.searchVersion);
+    } finally {
+      this.loadingMore = false;
+    }
     console.info(`BrowserPage: 加载更多完成 行列表=${this.行列表.length} 行`);
   }
 
   /** 预加载行数据：并行拉取（每批 20 个），累积后一次性赋值触发 UI 刷新。 */
-  private async 预加载行(ids: number[]): Promise<void> {
+  private async 预加载行(ids: number[], version: number): Promise<void> {
     const 批次大小: number = 20;
     let 成功数: number = 0;
     let 失败数: number = 0;
     const 累积新增: 浏览行数据[] = [];
     for (let i = 0; i < ids.length; i += 批次大小) {
+      if (version !== this.searchVersion) { return; }
       const 批次: number[] = ids.slice(i, i + 批次大小);
       const 行们: (BrowserRow | null)[] = await Promise.all(
         批次.map((id: number): Promise<BrowserRow | null> => {
@@ -473,12 +509,13 @@ export struct 浏览页 {
       批次.forEach((id: number, idx: number): void => {
         const row: BrowserRow | null = 行们[idx];
         if (row !== null) {
-          累积新增.push({ id, cells: row.cells, color: row.color });
+          累积新增.push({ id, cells: row.cells, color: row.color,
+            hasSuspendedCards: this.suspendedRowIds.has(id) });
         }
       });
     }
     // 累积所有批次后一次性赋值，避免循环内多次 concat 导致 @State 更新丢失
-    if (累积新增.length > 0) {
+    if (version === this.searchVersion && 累积新增.length > 0) {
       this.行列表 = this.行列表.concat(累积新增);
     }
     console.info(`BrowserPage: 预加载统计 成功=${成功数} 失败=${失败数}`);
@@ -490,6 +527,11 @@ export struct 浏览页 {
       return;
     }
     this.浏览模式值 = 模式;
+    if (!this.sortableColumns().some((column: BrowserColumn): boolean => column.key === this.sortColumn)) {
+      this.sortColumn = '';
+      this.sortReverse = false;
+    }
+    this.退出多选();
     this.执行搜索();
   }
 
@@ -794,11 +836,8 @@ export struct 浏览页 {
     try {
       const 卡片IDs: number[] = await this.解析选中为卡片ID();
       await this.卡片服务实例.设置标志(卡片IDs, 标志);
-      // 本地更新选中行 color（flag→BrowserRowColor 映射：0→DEFAULT, 1→RED(3), 2→ORANGE(4), 3→GREEN(5), 4→BLUE(6)）
-      const 目标色: BrowserRowColor = 标志 === 0 ? BrowserRowColor.COLOR_DEFAULT
-        : (标志 + 2) as BrowserRowColor;
-      this.本地更新选中行颜色(目标色);
       this.退出多选();
+      await this.执行搜索();
     } catch (错误) {
       this.批量错误 = this.取本地化文案($r('app.string.browser_action_flag_error'));
       console.info(`BrowserPage: 批量设置标志失败 错误=${错误}`);
@@ -1070,17 +1109,6 @@ export struct 浏览页 {
     const 选中集合: Set<number> = new Set<number>(this.选中ID列表);
     this.结果ID列表 = this.结果ID列表.filter((id: number): boolean => !选中集合.has(id));
     this.行列表 = this.行列表.filter((行: 浏览行数据): boolean => !选中集合.has(行.id));
-  }
-
-  /** 本地更新选中行的 color（设置标志后用，让色条立即显示，不重新搜索避免 loading 闪烁）。 */
-  private 本地更新选中行颜色(色: BrowserRowColor): void {
-    const 选中集合: Set<number> = new Set<number>(this.选中ID列表);
-    this.行列表 = this.行列表.map((行: 浏览行数据): 浏览行数据 => {
-      if (选中集合.has(行.id)) {
-        return { id: 行.id, cells: 行.cells, color: 色 };
-      }
-      return 行;
-    });
   }
 
   /** 执行批量删除：cards 模式直接 删除卡片(选中ID)；notes 模式先查每条笔记的所有卡片再删。 */
@@ -1570,9 +1598,73 @@ export struct 浏览页 {
     return `${模板.replace('%d', `${this.选中ID列表.length}`)} ×`;
   }
 
+  /** 只提供当前卡片/笔记模式下后端支持的排序。 */
+  private sortableColumns(): BrowserColumn[] {
+    return this.列定义.filter((column: BrowserColumn): boolean =>
+      (this.浏览模式值 === 'notes' ? column.sortingNotes : column.sortingCards) !==
+        BrowserColumnSorting.SORTING_NONE);
+  }
+
+  /** 排序列名随模式切换，箭头反映后端默认方向及反转状态。 */
+  private sortLabel(): string {
+    const column: BrowserColumn | undefined = this.sortableColumns().find(
+      (item: BrowserColumn): boolean => item.key === this.sortColumn);
+    if (column === undefined) { return this.取本地化文案($r('app.string.browser_sort_default')); }
+    const direction: BrowserColumnSorting = this.浏览模式值 === 'notes' ? column.sortingNotes : column.sortingCards;
+    const descending: boolean = (direction === BrowserColumnSorting.SORTING_DESCENDING) !== this.sortReverse;
+    return `${this.浏览模式值 === 'notes' ? column.notesModeLabel : column.cardsModeLabel} ${descending ? '↓' : '↑'}`;
+  }
+
+  /** 排序应用于完整搜索结果，保留后端列的默认方向。 */
+  private sortMenu(): MenuElement[] {
+    const items: MenuElement[] = [{
+      value: this.取本地化文案($r('app.string.browser_sort_default')),
+      action: (): void => { this.sortColumn = ''; this.sortReverse = false; this.执行搜索(); }
+    }, {
+      value: this.取本地化文案($r('app.string.browser_sort_reverse')),
+      enabled: this.sortColumn !== '',
+      action: (): void => { this.sortReverse = !this.sortReverse; this.执行搜索(); }
+    }];
+    for (const column of this.sortableColumns()) {
+      items.push({
+        value: `${this.浏览模式值 === 'notes' ? column.notesModeLabel : column.cardsModeLabel}${
+          this.sortColumn === column.key ? ' ✓' : ''}`,
+        action: (): void => { this.sortColumn = column.key; this.sortReverse = false; this.执行搜索(); }
+      });
+    }
+    return items;
+  }
+
+  /** 复用查找替换入口，并提供三种副标题显示方式。 */
+  private browserMoreMenu(): MenuElement[] {
+    const items: MenuElement[] = [{
+      value: this.取本地化文案($r('app.string.browser_action_find_replace')),
+      enabled: this.阶段 === 'list',
+      action: (): void => { this.查找替换错误 = ''; this.显示查找替换 = true; }
+    }];
+    const indices: number[] = [1, 4, 2];
+    const labels: Resource[] = [$r('app.string.browser_subtitle_deck'),
+      $r('app.string.browser_subtitle_answer'), $r('app.string.browser_subtitle_due')];
+    for (let index = 0; index < indices.length; index++) {
+      const cellIndex: number = indices[index];
+      items.push({
+        value: `${this.取本地化文案(labels[index])}${this.subtitleIndex === cellIndex ? ' ✓' : ''}`,
+        action: (): void => { this.subtitleIndex = cellIndex; }
+      });
+    }
+    return items;
+  }
+
+  /** 数量使用完整 ID 结果，区分卡片与笔记。 */
+  private resultCountLabel(): string {
+    const resource: Resource = this.浏览模式值 === 'cards' ? $r('app.string.browser_result_cards') :
+      $r('app.string.browser_result_notes');
+    return this.取本地化文案(resource).replace('%d', `${this.结果ID列表.length}`);
+  }
+
   @Builder
   private 顶部条() {
-    // 普通模式沿用返回/筛选/查找替换；多选模式只显示返回与可变宽的选中计数退出按钮。
+    // 普通模式提供返回、筛选和更多；多选模式沿用选中计数退出按钮。
     Row() {
       按下态按钮({
         文案: $r('app.string.study_back'),
@@ -1589,7 +1681,8 @@ export struct 浏览页 {
         })
       } else {
         按下态按钮({
-          文案: $r('app.string.browser_action_sidebar'),
+          文案: this.搜索文本.trim() === '' ? $r('app.string.browser_action_sidebar') :
+            $r('app.string.browser_filter_active'),
           字色: $r('app.color.text_primary'),
           点击回调: (): void => {
             if (this.阶段 !== 'list') {
@@ -1602,18 +1695,15 @@ export struct 浏览页 {
 
         Blank()
 
-        // T9 查找替换入口：点击弹出对话框，帮助说明在弹窗标题旁的 ⓘ 内
-        按下态按钮({
-          文案: $r('app.string.browser_action_find_replace'),
-          字色: $r('app.color.text_primary'),
-          点击回调: (): void => {
-            if (this.阶段 !== 'list') {
-              return;
-            }
-            this.查找替换错误 = '';
-            this.显示查找替换 = true;
-          }
-        })
+        Button($r('app.string.study_more'))
+          .height(应用尺寸.按钮高度)
+          .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
+          .fontSize(应用尺寸.字号_按钮)
+          .fontColor($r('app.color.text_primary'))
+          .backgroundColor($r('app.color.surface_card'))
+          .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+          .borderRadius(应用尺寸.圆角_胶囊)
+          .bindMenu(this.browserMoreMenu())
       }
     }
     .width('100%')
@@ -1658,9 +1748,28 @@ export struct 浏览页 {
             })
           }
           if (this.阶段 === 'list') {
+            Row({ space: 应用尺寸.间距_8 }) {
+              Text(this.resultCountLabel())
+                .fontSize(应用尺寸.字号_正文_小)
+                .fontColor($r('app.color.text_secondary'))
+                .layoutWeight(1)
+              Button(this.sortLabel())
+                .fontSize(应用尺寸.字号_正文_小)
+                .fontColor($r('app.color.text_primary'))
+                .backgroundColor($r('app.color.surface_card'))
+                .height(36)
+                .constraintSize({ maxWidth: '65%' })
+                .enabled(!this.多选模式值)
+                .bindMenu(this.sortMenu())
+            }
+            .width('100%')
+            .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平,
+              bottom: 应用尺寸.间距_8 })
             // 卡片表格组件（扁平列表 + 多选 + 空态 + 懒加载）
             卡片表格({
               行列表: this.行列表,
+              subtitleIndex: this.subtitleIndex,
+              notesMode: this.浏览模式值 === 'notes',
               结果总数: this.结果ID列表.length,
               已加载行数: this.行列表.length,
               初始多选模式: this.pageSelectForAgentEdit,
