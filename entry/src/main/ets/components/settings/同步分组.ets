@@ -43,8 +43,7 @@ import { 设置分组卡片 } from './设置分组卡片';
 //
 // @输入
 // 是否深色：当前是否深色模式（影响色板取值）。
-// 是否展开：本分组是否展开。
-// 切换展开回调 / 打开同步弹窗回调 / 点击导出数据回调 / 打开说明回调：父组件注入。
+// 打开同步弹窗回调 / 点击导出数据回调 / 打开说明回调：父组件注入。
 //
 // @输出
 // 渲染同步分组卡片；用户登录/注销/同步时分别上抛对应回调。
@@ -55,10 +54,9 @@ import { 设置分组卡片 } from './设置分组卡片';
 // ========================================================
 @Component
 export struct 同步分组 {
+  @Prop 简洁模式: boolean = true;
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop 是否深色: boolean = false;
-  @Prop 是否展开: boolean = false;
-  切换展开回调: () => void = (): void => {};
   // 用户点「立即同步」：上抛当前凭证 + 账号名给 Index，Index 挂载 SyncPanel 弹窗
   打开同步弹窗回调: (凭证: SyncAuth, 账号名: string) => void = (_凭证: SyncAuth, _账号名: string): void => {};
   // 用户选「先备份后同步」：上抛给 Index 打开 DataTransferPanel 导出 collection
@@ -548,10 +546,10 @@ export struct 同步分组 {
       设置分组卡片({
         标题: $r('app.string.settings_sync_group'),
         是否深色: this.是否深色,
-        是否展开: this.是否展开,
+
         帮助标题: $r('app.string.settings_sync_group'),
         帮助正文: $r('app.string.sync_help_text'),
-        切换展开回调: this.切换展开回调,
+
         打开说明回调: this.打开说明回调
       }) {
         Column({ space: 10 }) {
@@ -561,6 +559,7 @@ export struct 同步分组 {
           } else {
             this.已登录内容(设置面板色板_取(this.是否深色))
           }
+          if (!this.简洁模式 || this.savedServer !== '') {
           Row() {
             Button() {
               Text($r('app.string.sync_custom_server_entry'))
@@ -576,6 +575,7 @@ export struct 同步分组 {
           }
           .width('100%')
           .justifyContent(FlexAlign.Start)
+          }
         }
         .width('100%')
       }

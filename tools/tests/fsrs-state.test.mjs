@@ -30,6 +30,7 @@ function dialogHarness(path, { current = false, choice = 0, save = async () => t
   });
   const page = new Page();
   page.fsrsPromptActive = false;
+  page.homeActivityChanged = () => {};
   page.getUIContext = () => ({
     getHostContext: () => ({ resourceManager: { getStringSync: key => key } }),
     getPromptAction: () => ({

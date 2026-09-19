@@ -14,7 +14,7 @@ import { PRIMARY_GLASS_KEY, PrimaryGlassStyle, themePrimaryGlass } from '../mode
 import { common } from '@kit.AbilityKit';
 import { LengthMetrics } from '@kit.ArkUI';
 import { webview } from '@kit.ArkWeb';
-import { interceptMathAsset } from '../utils/MathAssetResponse';
+import { interceptCardAsset } from '../utils/CardAssetResponse';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { 后端会话 } from '../backend/后端会话';
 import { AnkiStudySessionBackend } from '../backend/StudySessionBackend';
@@ -1503,7 +1503,7 @@ export struct 学习页 {
           this.studyWebAttached();
         })
         .onInterceptRequest((event: OnInterceptRequestEvent): WebResourceResponse | null => {
-          return interceptMathAsset(event.request.getRequestUrl()) ?? this.拦截媒体(event);
+          return interceptCardAsset(event.request.getRequestUrl()) ?? this.拦截媒体(event);
         })
         // onPageEnd 兜底（BUG-001）：ArkWeb 对 qfmt/afmt 模板内联 <script> 的执行时序存在抖动，
         // 极少数情况下 anki.imageOcclusion.setup() 未被调用导致遮罩未绘制。

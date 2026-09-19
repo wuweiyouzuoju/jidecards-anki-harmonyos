@@ -24,7 +24,7 @@ function harness(selected = 'child', saved = selected) {
     选中的牌组ID: selected, deckDeletionBusy: false,
     主页快照数据: { decks: [{ id: 'parent', ancestorIds: [] }, { id: 'child', ancestorIds: ['parent'] },
       { id: 'grandchild', ancestorIds: ['parent', 'child'] }, { id: 'other', ancestorIds: [] }, { id: '1', ancestorIds: [] }] },
-    deferForSync: () => false,
+    deferForSync: () => false, homeActivityChanged() {},
     牌组服务实例: { 删除牌组: async () => { events.push('delete committed'); return 3; } },
     requestAutoSync: () => { assert.equal(page.deckDeletionBusy, true); scheduler.request(); events.push('sync requested'); },
     scheduleAutoSyncCheck: () => { assert.equal(page.deckDeletionBusy, false); events.push('sync check'); },

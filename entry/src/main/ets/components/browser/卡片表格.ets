@@ -96,7 +96,10 @@ export struct 卡片表格 {
   /** 按选择读取副标题；牌组仅展示末级名称，完整路径仍保留在详情。 */
   private 取行副文案(行: 浏览行数据): string {
     const text: string = 行.cells[this.subtitleIndex]?.text ?? '';
-    return this.subtitleIndex === 1 ? text.split('::').pop() ?? text : text;
+    if (this.subtitleIndex !== 1) return text;
+    const deck: string = text.split('::').pop() ?? text;
+    const due: string = this.notesMode ? '' : (行.cells[2]?.text ?? '');
+    return due === '' ? deck : `${deck} · ${due}`;
   }
 
   /** 行标志色：根据 BrowserRowColor 返回色条颜色，无标志返回透明。 */
@@ -209,6 +212,7 @@ export struct 卡片表格 {
                 // hitTestBehavior(Block) 阻止点击事件冒泡到行 onClick（ClickEvent 无 stopPropagation）
                 if (!this.多选模式) {
                   Text('ⓘ')
+                    .accessibilityText($r('app.string.browser_card_info'))
                     .fontSize(应用尺寸.字号_正文)
                     .fontColor($r('app.color.text_secondary'))
                     .padding({
@@ -230,7 +234,7 @@ export struct 卡片表格 {
                 top: 应用尺寸.间距_8,
                 bottom: 应用尺寸.间距_8
               })
-              .backgroundColor(this.是否挂起行(行) ? $r('app.color.surface_card') : $r('app.color.surface_page'))
+              .backgroundColor($r('app.color.surface_card'))
               // 有标志时加 4px 左边框作色条（不增加子元素，不影响布局高度）
               .border(this.取行标志色(行) !== 'transparent' ? {
                 width: { left: 4 },

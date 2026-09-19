@@ -119,7 +119,7 @@ test('all ratings vibrate once after guards, never wait for haptics, and reject 
 });
 
 test('existing settings toggle saves once and restores display on failure', async () => {
-  const layout = read(root + 'components/settings/布局分组.ets');
+  const layout = read(root + 'components/settings/ReviewControlsSettings.ets');
   let release, writes = 0;
   const gate = new Promise(resolve => { release = resolve; });
   const Control = new Function('saveStudyHaptics', stripTypeScriptTypes(`class Control { ${method(layout, 'changeStudyHaptics')} }`) + '; return Control;')(
@@ -140,7 +140,7 @@ test('startup, permission and existing settings row are wired', () => {
   const ability = read(root + 'entryability/EntryAbility.ets');
   assert.match(ability, /initializeStudyHaptics\(\);/);
   assert.match(read('entry/src/main/module.json5'), /ohos\.permission\.VIBRATE/);
-  const layout = read(root + 'components/settings/布局分组.ets');
+  const layout = read(root + 'components/settings/ReviewControlsSettings.ets');
   assert.match(layout, /settings_study_haptics/);
   assert.match(layout, /this\.changeStudyHaptics\(enabled\)/);
 });

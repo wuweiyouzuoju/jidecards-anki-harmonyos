@@ -51,7 +51,7 @@ test('shared label renderer ramps between two catalog colors with readable light
   }
   assert.match(read('utils/颜色主题管理器.ets'), /THEME_TEXT_COLORS_KEY, 是否深色 \? visual.darkActionColors : visual.lightActionColors/);
   assert.match(read('components/common/DialogHeader.ets'), /!this.destructive && this.themeAccentColors.length > 0/);
-  assert.match(read('components/stats/范围切换条.ets'), /索引 === this.当前索引\) \? this.themeAccentColors : \[\]/);
+  assert.match(read('components/stats/范围切换条.ets'), /Select\(this\.options\(\)\)/);
 });
 
 test('theme text identity changes with its color and create-deck draws spans in its owning component', () => {

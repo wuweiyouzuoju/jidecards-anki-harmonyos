@@ -212,6 +212,6 @@ test('exclusive content information uses the existing developer group and stated
   assert.match(source, /this\.contentInfo\(\)/);
   assert.match(source, /pasteboard\.MIMETYPE_TEXT_PLAIN, this\.developerGroup/);
   const strings = JSON.parse(readFileSync(new URL('../../entry/src/main/resources/base/element/string.json', import.meta.url))).string;
-  assert.equal(strings.find(item => item.name === 'redemption_fingerprint_hint').value, '用于兑换专属内容');
+  assert.equal(strings.find(item => item.name === 'redemption_fingerprint_hint').value, '用于领取 JideCards 主题');
   assert.match(strings.find(item => item.name === 'redemption_contents_eligibility').value, /3\.0\.0 版本之前/);
 });

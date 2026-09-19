@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { BrowserOperationContext, BrowserOperationController } from '../model/BrowserOperationController';
+import { autoSyncScheduler } from '../model/AutoSyncScheduler';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
 
 import { DialogHeader } from '../components/common/DialogHeader';
@@ -39,6 +41,7 @@ import { DialogHeader } from '../components/common/DialogHeader';
 
 import { common } from '@kit.AbilityKit';
 import { 后端会话 } from '../backend/后端会话';
+import { BROWSER_QUICK_FILTERS, BrowserQuickFilter, browserFilterNode } from '../model/BrowserQuickFilter';
 import { 搜索服务 } from '../backend/搜索服务';
 import { 笔记服务 } from '../backend/笔记服务';
 import { 笔记类型服务 } from '../backend/笔记类型服务';
@@ -142,6 +145,7 @@ export struct 浏览页 {
   @State private 阶段: 浏览阶段 = 'loading';
   @State private 错误详情: string = '';
   @State private 搜索文本: string = '';
+  @State private quickFilter: string = 'all';
   @State private 浏览模式值: 浏览模式 = 'cards';
   @State private 结果ID列表: number[] = [];
   @State private 行列表: 浏览行数据[] = [];
@@ -151,6 +155,13 @@ export struct 浏览页 {
   @State private sortReverse: boolean = false;
   private suspendedRowIds: Set<number> = new Set<number>();
   private searchVersion: number = 0;
+  private selectionVersion: number = 0;
+  private editorVersion: number = 0;
+  private infoVersion: number = 0;
+  private mappingVersion: number = 0;
+  private consumedRowCount: number = 0;
+  private readonly operations: BrowserOperationController = new BrowserOperationController();
+  @State private mutationBusy: boolean = false;
   private loadingMore: boolean = false;
   /** NavDestination 透明度（由 customNavContentTransition 回调控制，实现淡入淡出转场）。 */
   @State private 转场透明度: number = 1;
@@ -161,7 +172,7 @@ export struct 浏览页 {
   @State private 说明正文: Resource = $r('app.string.browser_help_sidebar_body');
 
   // T7 浏览编辑区状态：行点击后懒加载笔记 + 字段名，弹层内编辑字段/标签，保存调 更新笔记
-  @State private 显示编辑区: boolean = false;
+  @State @Watch('editorVisibilityChanged') private 显示编辑区: boolean = false;
   @State private 编辑区字段名列表: string[] = [];
   @State private 编辑区初始字段值: string[] = [];
   @State private 编辑区初始标签: string = '';
@@ -201,7 +212,7 @@ export struct 浏览页 {
   @State private 重新定位顺移: boolean = false;
 
   // T8 更改笔记类型弹层状态：旧/新笔记类型 + 字段/模板映射
-  @State private 显示笔记类型弹层: boolean = false;
+  @State @Watch('mappingVisibilityChanged') private 显示笔记类型弹层: boolean = false;
   @State private 笔记类型列表: NotetypeNameId[] = [];
   @State private 选中新笔记类型ID: number = 0;
   @State private 变更笔记类型信息数据: 变更笔记类型信息 | null = null;
@@ -236,6 +247,7 @@ export struct 浏览页 {
 
   // T5 卡片预览状态：Cards 模式下点击行 → 弹全屏预览；底部「编辑字段」→ 在预览上方打开 浏览编辑区
   @State private 显示预览: boolean = false;
+  @State private previewCardIds: number[] = [];
   @State private 预览初始索引: number = 0;
   @State private 预览媒体目录: string = '';
   @State private 预览刷新版本: number = 0;
@@ -267,6 +279,7 @@ export struct 浏览页 {
     } catch (_错误) {
       this.主题模式值 = 'system';
     }
+    if (!this.operations.isAlive()) return;
     // 应用入栈传入的初始搜索串（如查找重复对话框跳转时），再触发搜索
     if (this.pageInitialSearch !== '') {
       this.搜索文本 = this.pageInitialSearch;
@@ -275,6 +288,7 @@ export struct 浏览页 {
       this.多选模式值 = true;
     }
     await this.执行搜索();
+    if (!this.operations.isAlive()) return;
     if (this.pageEditCardId > 0) {
       this.打开编辑区For(this.pageEditCardId);
     }
@@ -330,6 +344,11 @@ export struct 浏览页 {
   }
 
   aboutToDisappear(): void {
+    this.operations.dispose();
+    this.searchVersion++;
+    this.editorVersion++;
+    this.infoVersion++;
+    this.mappingVersion++;
     CustomTransition.getInstance().注销NavParam('BrowserPage');
     // 通知首页刷新牌组计数：页内删除/改牌组/挂起/重置到期等写操作分散在多个方法，
     // 统一在离页时广播（幂等，纯浏览未改数据时多刷一次无副作用）；onPop 偶发不触发时仍能刷新。
@@ -355,7 +374,7 @@ export struct 浏览页 {
     if (this.显示改牌组弹层) { this.显示改牌组弹层 = false; return true; }
     if (this.显示标志弹层) { this.显示标志弹层 = false; return true; }
     if (this.显示编辑区) { this.显示编辑区 = false; return true; }
-    if (this.显示卡片信息) { this.显示卡片信息 = false; return true; }
+    if (this.显示卡片信息) { this.关闭卡片信息(); return true; }
     if (this.显示说明浮层) { this.显示说明浮层 = false; return true; }
     if (this.多选模式值) { this.退出多选(); return true; }
     return false;
@@ -389,8 +408,15 @@ export struct 浏览页 {
   // 调后端 构建搜索串 / 搜索卡片 / 搜索笔记 / 全部浏览器列 / 浏览器行按ID
   // ========================================================
   private async 执行搜索(): Promise<void> {
+    if (!this.operations.isAlive()) return;
     const version: number = ++this.searchVersion;
     const notesMode: boolean = this.浏览模式值 === 'notes';
+    const text: string = this.搜索文本;
+    const filter: string = this.quickFilter;
+    const sortColumn: string = this.sortColumn;
+    const sortReverse: boolean = this.sortReverse;
+    this.loadingMore = false;
+    this.consumedRowCount = 0;
     this.阶段 = 'loading';
     try {
       const context: common.UIAbilityContext | null = this.取能力上下文();
@@ -423,14 +449,14 @@ export struct 浏览页 {
       if (version !== this.searchVersion) { return; }
 
       // 构建搜索串（后端构建，前端不拼字符串）
-      const searchNode = makeParsableTextNode(this.搜索文本);
+      const searchNode = browserFilterNode(text, filter);
       const searchStr = await this.搜索服务实例.构建搜索串(searchNode);
       if (version !== this.searchVersion) { return; }
       console.info(`BrowserPage: 搜索文本="${this.搜索文本}" 搜索串="${searchStr}"`);
 
       // 按模式搜索卡片或笔记
-      const order: SortOrder = this.sortColumn === '' ? { kind: 'none' } :
-        { kind: 'builtin', column: this.sortColumn, reverse: this.sortReverse };
+      const order: SortOrder = sortColumn === '' ? { kind: 'none' } :
+        { kind: 'builtin', column: sortColumn, reverse: sortReverse };
       const request: SearchRequest = { search: searchStr, order };
       const ids = notesMode ? await this.搜索服务实例.搜索笔记(request) :
         await this.搜索服务实例.搜索卡片(request);
@@ -454,6 +480,7 @@ export struct 浏览页 {
       if (version !== this.searchVersion) { return; }
       console.info(`BrowserPage: 预加载完成 行列表=${this.行列表.length} 行`);
 
+      this.consumedRowCount = Math.min(200, ids.length);
       this.阶段 = 'list';
     } catch (error) {
       if (version !== this.searchVersion) { return; }
@@ -468,17 +495,19 @@ export struct 浏览页 {
    */
   private async 加载更多(): Promise<void> {
     if (this.loadingMore || this.阶段 !== 'list') { return; }
-    const 已加载数: number = this.行列表.length;
+    const 已加载数: number = this.consumedRowCount;
     if (已加载数 >= this.结果ID列表.length) {
       return;
     }
     const 下一批: number[] = this.结果ID列表.slice(已加载数, 已加载数 + 100);
     console.info(`BrowserPage: 加载更多 已加载=${已加载数} 本批=${下一批.length} 总=${this.结果ID列表.length}`);
+    const version: number = this.searchVersion;
     this.loadingMore = true;
     try {
-      await this.预加载行(下一批, this.searchVersion);
+      await this.预加载行(下一批, version);
+      if (version === this.searchVersion) this.consumedRowCount += 下一批.length;
     } finally {
-      this.loadingMore = false;
+      if (version === this.searchVersion) this.loadingMore = false;
     }
     console.info(`BrowserPage: 加载更多完成 行列表=${this.行列表.length} 行`);
   }
@@ -526,6 +555,17 @@ export struct 浏览页 {
     if (this.浏览模式值 === 模式) {
       return;
     }
+    this.显示改牌组弹层 = false;
+    this.显示标志弹层 = false;
+    this.显示删除确认 = false;
+    this.显示挂起确认 = false;
+    this.显示到期日弹层 = false;
+    this.显示重新定位弹层 = false;
+    this.显示编辑区 = false;
+    this.editorVersion++;
+    this.mappingVersion++;
+    this.显示笔记类型弹层 = false;
+    this.关闭卡片信息();
     this.浏览模式值 = 模式;
     if (!this.sortableColumns().some((column: BrowserColumn): boolean => column.key === this.sortColumn)) {
       this.sortColumn = '';
@@ -565,6 +605,9 @@ export struct 浏览页 {
   // 调后端 获取卡片 / 获取笔记 / 获取笔记类型；读 Anki collection。
   // ========================================================
   private async 行点击(行ID: number): Promise<void> {
+    if (!this.operations.isAlive() || this.mutationBusy) return;
+    const version: number = ++this.editorVersion;
+    const mode: 浏览模式 = this.浏览模式值;
     this.编辑区忙碌 = true;
     this.编辑区错误 = '';
     this.编辑区当前笔记 = null;
@@ -575,22 +618,24 @@ export struct 浏览页 {
     try {
       // 1. 拿到 noteId：Notes 模式直接用，Cards 模式经卡片查询
       let noteId: number = 行ID;
-      if (this.浏览模式值 === 'cards') {
+      if (mode === 'cards') {
         const card: Card = await this.卡片服务实例.获取卡片(行ID);
         noteId = card.noteId;
       }
       // 2. 拉笔记（必须先拿到 notetypeId 才能查字段名）
       const note: EditableNote = await this.笔记服务实例.获取笔记(noteId);
       const notetypeView = await this.笔记类型服务实例.获取笔记类型(note.notetypeId);
+      if (!this.operations.isAlive() || version !== this.editorVersion || !this.显示编辑区) return;
       this.编辑区当前笔记 = note;
       this.编辑区字段名列表 = notetypeView.fieldNames;
       this.编辑区初始字段值 = note.fields.slice();
       this.编辑区初始标签 = note.tags.join(' ');
     } catch (错误) {
+      if (!this.operations.isAlive() || version !== this.editorVersion) return;
       this.编辑区错误 = this.取本地化文案($r('app.string.browser_detail_load_error'));
       console.info(`BrowserPage: 行点击加载笔记失败 行ID=${行ID} 模式=${this.浏览模式值} 错误=${错误}`);
     } finally {
-      this.编辑区忙碌 = false;
+      if (this.operations.isAlive() && version === this.editorVersion) this.编辑区忙碌 = false;
     }
   }
 
@@ -645,6 +690,7 @@ export struct 浏览页 {
     if (上下文 === null) {
       return;
     }
+    this.previewCardIds = this.结果ID列表.slice();
     this.预览初始索引 = 索引;
     this.预览媒体目录 = `${上下文.filesDir}/collection.media`;
     this.显示预览 = true;
@@ -680,44 +726,27 @@ export struct 浏览页 {
   // 调后端 更新笔记；成功后调 执行搜索 重新加载列表。
   // ========================================================
   private async 保存编辑(fields: string[], tags: string[]): Promise<boolean> {
-    const 原笔记: EditableNote | null = this.编辑区当前笔记;
-    if (原笔记 === null) {
-      return false;
-    }
+    const note: EditableNote | null = this.编辑区当前笔记;
+    if (note === null || this.operations.isBusy()) return false;
+    const version: number = this.editorVersion;
+    const values: string[] = fields.slice();
+    while (values.length < this.编辑区字段名列表.length) values.push('');
+    const updated: EditableNote = { id: note.id, guid: note.guid, notetypeId: note.notetypeId,
+      mtimeSecs: note.mtimeSecs, usn: note.usn, tags: tags.slice(), fields: values };
     this.编辑区忙碌 = true;
     this.编辑区错误 = '';
-    try {
-      // 字段值长度对齐字段名（防御性：弹层未填齐时补空串）
-      const 字段数: number = this.编辑区字段名列表.length;
-      const 字段值: string[] = fields.slice();
-      while (字段值.length < 字段数) {
-        字段值.push('');
+    const saved: boolean = await this.runBrowserOperation(async (_selection: BrowserOperationContext): Promise<void> => {
+      await this.笔记服务实例.更新笔记([updated], false);
+      if (this.operations.isAlive() && version === this.editorVersion) {
+        this.显示编辑区 = false;
+        this.编辑区当前笔记 = null;
+        if (this.显示预览) this.预览刷新版本 += 1;
       }
-      const 更新后: EditableNote = {
-        id: 原笔记.id,
-        guid: 原笔记.guid,
-        notetypeId: 原笔记.notetypeId,
-        mtimeSecs: 原笔记.mtimeSecs,
-        usn: 原笔记.usn,
-        tags,
-        fields: 字段值
-      };
-      await this.笔记服务实例.更新笔记([更新后], false);
-      // 关闭弹层 + 刷新列表（让用户看到新字段值）
-      this.显示编辑区 = false;
-      this.编辑区当前笔记 = null;
-      await this.执行搜索();
-      if (this.显示预览) {
-        this.预览刷新版本 += 1;
-      }
-      return true;
-    } catch (错误) {
-      this.编辑区错误 = this.取本地化文案($r('app.string.browser_detail_save_error'));
-      console.info(`BrowserPage: 保存笔记失败 noteId=${原笔记.id} 错误=${错误}`);
-      return false;
-    } finally {
-      this.编辑区忙碌 = false;
-    }
+    }, (_error: Error): void => {
+      if (version === this.editorVersion) this.编辑区错误 = this.取本地化文案($r('app.string.browser_detail_save_error'));
+    }, false);
+    if (this.operations.isAlive() && version === this.editorVersion) this.编辑区忙碌 = false;
+    return saved;
   }
 
   // ========================================================
@@ -794,108 +823,133 @@ export struct 浏览页 {
 
   /** 打开改牌组弹层：先加载牌组树再显示。 */
   private async 打开改牌组弹层(): Promise<void> {
-    if (this.选中ID列表.length === 0) {
+    if (this.operations.isBusy() || this.批量忙碌 || this.选中ID列表.length === 0) {
       return;
     }
+    const selection: BrowserOperationContext = this.captureBrowserSelection();
     this.批量忙碌 = true;
     this.批量错误 = '';
     try {
-      this.牌组树 = await this.牌组服务实例.获取牌组树();
+      const tree: DeckTreeNode = await this.牌组服务实例.获取牌组树();
+      if (!this.isBrowserSelectionCurrent(selection)) return;
+      this.牌组树 = tree;
       this.显示改牌组弹层 = true;
     } catch (错误) {
+      if (!this.isBrowserSelectionCurrent(selection)) return;
       this.批量错误 = this.取本地化文案($r('app.string.browser_action_deck_load_error'));
       console.info(`BrowserPage: 加载牌组树失败 错误=${错误}`);
     } finally {
-      this.批量忙碌 = false;
+      if (this.operations.isAlive()) this.批量忙碌 = false;
+    }
+  }
+
+  private editorVisibilityChanged(): void {
+    if (!this.显示编辑区) { this.editorVersion++; this.编辑区忙碌 = false; }
+  }
+
+  private mappingVisibilityChanged(): void {
+    if (!this.显示笔记类型弹层) { this.mappingVersion++; this.笔记类型弹层忙碌 = false; }
+  }
+
+  private isBrowserSelectionCurrent(selection: BrowserOperationContext): boolean {
+    return this.operations.isAlive() && selection.mode === this.浏览模式值 &&
+      selection.viewVersion === this.searchVersion && selection.selectionVersion === this.selectionVersion &&
+      selection.ids.length === this.选中ID列表.length &&
+      selection.ids.every((id: number, index: number): boolean => id === this.选中ID列表[index]);
+  }
+
+  private captureBrowserSelection(): BrowserOperationContext {
+    return { mode: this.浏览模式值, ids: this.选中ID列表.slice(),
+      viewVersion: this.searchVersion, selectionVersion: this.selectionVersion };
+  }
+
+  /** 写入占用一直保持到刷新结束；退出页面后只广播数据变化，不回写旧组件。 */
+  private async runBrowserOperation(action: (selection: BrowserOperationContext) => Promise<void>,
+    onFailure: (error: Error) => void, clearSelection: boolean): Promise<boolean> {
+    const selection: BrowserOperationContext | null = this.operations.begin(
+      this.浏览模式值, this.选中ID列表, this.searchVersion, this.selectionVersion);
+    if (selection === null) return false;
+    this.mutationBusy = true;
+    autoSyncScheduler.beginOperation(selection);
+    let committed: boolean = false;
+    try {
+      await action(selection);
+      committed = true;
+      if (!this.operations.isAlive()) return true;
+      if (clearSelection && this.operations.isCurrent(selection, this.浏览模式值, this.选中ID列表,
+        this.searchVersion, this.selectionVersion)) this.退出多选();
+      await this.执行搜索();
+      return true;
+    } catch (error) {
+      if (this.operations.isAlive()) onFailure(error instanceof Error ? error : new Error(`${error}`));
+      return false;
+    } finally {
+      if (committed) {
+        AppStorage.setOrCreate<number>('需要刷新主页', Date.now());
+        autoSyncScheduler.request();
+      }
+      this.operations.finish(selection);
+      if (this.operations.isAlive()) this.mutationBusy = false;
+      autoSyncScheduler.endOperation(selection);
+    }
+  }
+
+  private async runBatchOperation(action: (selection: BrowserOperationContext) => Promise<void>,
+    errorResource: Resource): Promise<void> {
+    if (this.operations.isBusy() || this.选中ID列表.length === 0) return;
+    const initial: BrowserOperationContext = this.captureBrowserSelection();
+    this.批量忙碌 = true;
+    this.批量错误 = '';
+    try {
+      await this.runBrowserOperation(action, (error: Error): void => {
+        if (this.isBrowserSelectionCurrent(initial)) this.批量错误 = this.取本地化文案(errorResource);
+        console.info(`BrowserPage: batch failed: ${error.message}`);
+      }, true);
+    } finally {
+      if (this.operations.isAlive()) this.批量忙碌 = false;
     }
   }
 
   /** 执行批量改牌组：cards 模式直接用选中ID，notes 模式先查每条笔记的所有卡片。 */
   private async 执行批量改牌组(牌组ID: number): Promise<void> {
     this.显示改牌组弹层 = false;
-    this.批量忙碌 = true;
-    this.批量错误 = '';
-    try {
-      const 卡片IDs: number[] = await this.解析选中为卡片ID();
-      if (卡片IDs.length > 0) { await this.卡片服务实例.设置牌组(卡片IDs, 牌组ID); }
-      this.退出多选();
-      await this.执行搜索();
-    } catch (错误) {
-      this.批量错误 = this.取本地化文案($r('app.string.browser_action_deck_error'));
-      console.info(`BrowserPage: 批量改牌组失败 错误=${错误}`);
-    } finally {
-      this.批量忙碌 = false;
-    }
+    await this.runBatchOperation(async (selection: BrowserOperationContext): Promise<void> => {
+      const 卡片IDs: number[] = await this.解析选中为卡片ID(selection);
+      if (卡片IDs.length > 0) await this.卡片服务实例.设置牌组(卡片IDs, 牌组ID);
+    }, $r('app.string.browser_action_deck_error'));
   }
 
   /** 执行批量设置标志：flag 取值 0=无/1=红/2=橙/3=绿/4=蓝。 */
   private async 执行批量设置标志(标志: number): Promise<void> {
     this.显示标志弹层 = false;
-    this.批量忙碌 = true;
-    this.批量错误 = '';
-    try {
-      const 卡片IDs: number[] = await this.解析选中为卡片ID();
-      if (卡片IDs.length > 0) { await this.卡片服务实例.设置标志(卡片IDs, 标志); }
-      this.退出多选();
-      await this.执行搜索();
-    } catch (错误) {
-      this.批量错误 = this.取本地化文案($r('app.string.browser_action_flag_error'));
-      console.info(`BrowserPage: 批量设置标志失败 错误=${错误}`);
-    } finally {
-      this.批量忙碌 = false;
-    }
+    await this.runBatchOperation(async (selection: BrowserOperationContext): Promise<void> => {
+      const 卡片IDs: number[] = await this.解析选中为卡片ID(selection);
+      if (卡片IDs.length > 0) await this.卡片服务实例.设置标志(卡片IDs, 标志);
+    }, $r('app.string.browser_action_flag_error'));
   }
 
   /** Cards 模式暂停所选卡片；Notes 模式由 Anki Core 暂停所选笔记生成的全部卡片。 */
   private async 执行批量挂起(): Promise<void> {
     this.显示挂起确认 = false;
-    this.批量忙碌 = true;
-    this.批量错误 = '';
-    try {
-      if (this.浏览模式值 === 'notes') {
-        await this.调度器服务实例.批量埋藏或暂停笔记(
-          this.选中ID列表.slice(), BURY_SUSPEND_MODE_SUSPEND);
-      } else {
-        await this.调度器服务实例.批量埋藏或暂停卡片(
-          this.选中ID列表.slice(), BURY_SUSPEND_MODE_SUSPEND);
-      }
-      this.退出多选();
-      // 让当前搜索条件决定暂停卡是否保留在列表中，并刷新后端返回的真实状态。
-      await this.执行搜索();
-    } catch (错误) {
-      this.批量错误 = this.取本地化文案($r('app.string.browser_action_suspend_error'));
-      console.info(`BrowserPage: 批量挂起失败 错误=${错误}`);
-    } finally {
-      this.批量忙碌 = false;
-    }
+    await this.runBatchOperation(async (selection: BrowserOperationContext): Promise<void> => {
+      if (selection.mode === 'notes') await this.调度器服务实例.批量埋藏或暂停笔记(selection.ids, BURY_SUSPEND_MODE_SUSPEND);
+      else await this.调度器服务实例.批量埋藏或暂停卡片(selection.ids, BURY_SUSPEND_MODE_SUSPEND);
+    }, $r('app.string.browser_action_suspend_error'));
   }
 
   /** 恢复所选卡片；Notes 模式先解析每条笔记实际生成的全部卡片。 */
   private async 执行批量恢复(): Promise<void> {
-    this.批量忙碌 = true;
-    this.批量错误 = '';
-    try {
-      const 卡片IDs: number[] = this.浏览模式值 === 'cards' ?
-        this.选中ID列表.slice() : await this.解析选中笔记的卡片ID();
-      if (卡片IDs.length === 0) {
-        return;
-      }
-      await this.调度器服务实例.恢复埋藏与暂停的卡片(卡片IDs);
-      this.退出多选();
-      await this.执行搜索();
-    } catch (错误) {
-      this.批量错误 = this.取本地化文案($r('app.string.browser_action_restore_error'));
-      console.info(`BrowserPage: 批量恢复失败 错误=${错误}`);
-    } finally {
-      this.批量忙碌 = false;
-    }
+    await this.runBatchOperation(async (selection: BrowserOperationContext): Promise<void> => {
+      const ids: number[] = await this.解析选中为卡片ID(selection);
+      if (ids.length > 0) await this.调度器服务实例.恢复埋藏与暂停的卡片(ids);
+    }, $r('app.string.browser_action_restore_error'));
   }
 
   /** 将所选笔记展开为全部兄弟卡 ID，并去重供批量操作使用。 */
-  private async 解析选中笔记的卡片ID(): Promise<number[]> {
+  private async 解析选中笔记的卡片ID(selection: BrowserOperationContext = this.captureBrowserSelection()): Promise<number[]> {
     const 结果: number[] = [];
     const 已添加: Set<number> = new Set<number>();
-    for (const 笔记ID of this.选中ID列表.slice()) {
+    for (const 笔记ID of selection.ids.slice()) {
       const 卡片IDs: number[] = await this.笔记服务实例.获取笔记的卡片(笔记ID);
       for (const 卡片ID of 卡片IDs) {
         if (!已添加.has(卡片ID)) {
@@ -923,27 +977,13 @@ export struct 浏览页 {
 
   /** 执行批量设置到期日：days 字符串格式与 Anki 桌面端一致（"0"/"5"/"1-3"）。 */
   private async 执行批量设置到期日(): Promise<void> {
-    const 输入: string = this.到期日输入.trim();
-    if (输入 === '') {
-      return;
-    }
+    const days: string = this.到期日输入.trim();
+    if (days === '') return;
     this.显示到期日弹层 = false;
-    this.批量忙碌 = true;
-    this.批量错误 = '';
-    try {
-      const 卡片IDs: number[] = await this.解析选中为卡片ID();
-      if (卡片IDs.length === 0) {
-        return;
-      }
-      await this.调度器服务实例.设置到期日(卡片IDs, 输入);
-      this.退出多选();
-      await this.执行搜索();
-    } catch (错误) {
-      this.批量错误 = this.取本地化文案($r('app.string.browser_action_set_due_error'));
-      console.info(`BrowserPage: 批量设置到期日失败 错误=${错误}`);
-    } finally {
-      this.批量忙碌 = false;
-    }
+    await this.runBatchOperation(async (selection: BrowserOperationContext): Promise<void> => {
+      const ids: number[] = await this.解析选中为卡片ID(selection);
+      if (ids.length > 0) await this.调度器服务实例.设置到期日(ids, days);
+    }, $r('app.string.browser_action_set_due_error'));
   }
 
   /**
@@ -951,6 +991,8 @@ export struct 浏览页 {
    * Anki collection 配置中保存了用户上次使用的 random/shift 状态，用作弹层初始值。
    */
   private async 打开重新定位弹层(): Promise<void> {
+    if (this.operations.isBusy() || this.批量忙碌) return;
+    const selection: BrowserOperationContext = this.captureBrowserSelection();
     if (this.浏览模式值 !== 'cards') {
       this.批量错误 = this.取本地化文案($r('app.string.browser_action_notes_mode_hint'));
       return;
@@ -962,39 +1004,31 @@ export struct 浏览页 {
     this.批量忙碌 = true;
     try {
       const 默认值 = await this.调度器服务实例.获取重新定位默认值();
+      if (!this.isBrowserSelectionCurrent(selection) || !this.显示重新定位弹层) return;
       this.重新定位随机 = 默认值.random;
       this.重新定位顺移 = 默认值.shift;
     } catch (错误) {
+      if (!this.isBrowserSelectionCurrent(selection) || !this.显示重新定位弹层) return;
       // 取默认值失败时用 false 兜底，不阻塞弹层
       this.重新定位随机 = false;
       this.重新定位顺移 = false;
       console.info(`BrowserPage: 获取重新定位默认值失败 错误=${错误}`);
     } finally {
-      this.批量忙碌 = false;
+      if (this.operations.isAlive()) this.批量忙碌 = false;
     }
   }
 
   /** 执行批量重新定位：调 排序卡片(选中ID, 起始, 步长, 随机, 顺移)。 */
   private async 执行批量重新定位(): Promise<void> {
+    const start: number = this.重新定位起始;
+    const step: number = this.重新定位步长;
+    const random: boolean = this.重新定位随机;
+    const shift: boolean = this.重新定位顺移;
     this.显示重新定位弹层 = false;
-    this.批量忙碌 = true;
-    this.批量错误 = '';
-    try {
-      const 卡片IDs: number[] = await this.解析选中为卡片ID();
-      if (卡片IDs.length === 0) {
-        return;
-      }
-      await this.调度器服务实例.排序卡片(
-        卡片IDs, this.重新定位起始, this.重新定位步长,
-        this.重新定位随机, this.重新定位顺移);
-      this.退出多选();
-      await this.执行搜索();
-    } catch (错误) {
-      this.批量错误 = this.取本地化文案($r('app.string.browser_action_reposition_error'));
-      console.info(`BrowserPage: 批量重新定位失败 错误=${错误}`);
-    } finally {
-      this.批量忙碌 = false;
-    }
+    await this.runBatchOperation(async (selection: BrowserOperationContext): Promise<void> => {
+      const ids: number[] = await this.解析选中为卡片ID(selection);
+      if (ids.length > 0) await this.调度器服务实例.排序卡片(ids, start, step, random, shift);
+    }, $r('app.string.browser_action_reposition_error'));
   }
 
   /**
@@ -1004,6 +1038,9 @@ export struct 浏览页 {
    * Invariants: 同一批选中必须同属一个笔记类型（Anki 后端 GetChangeNotetypeInfo 入参只接受单个 old_notetype_id）。
    */
   private async 打开更改笔记类型弹层(): Promise<void> {
+    if (this.operations.isBusy()) return;
+    const version: number = ++this.mappingVersion;
+    const selection: BrowserOperationContext = this.captureBrowserSelection();
     if (this.选中ID列表.length === 0) {
       return;
     }
@@ -1025,14 +1062,17 @@ export struct 浏览页 {
         首个笔记ID = 首张卡片.noteId;
       }
       const 首条笔记: EditableNote = await this.笔记服务实例.获取笔记(首个笔记ID);
+      const names: NotetypeNameId[] = await this.笔记类型服务实例.获取笔记类型名列表();
+      if (version !== this.mappingVersion || !this.isBrowserSelectionCurrent(selection) || !this.显示笔记类型弹层) return;
       this.旧笔记类型ID缓存 = 首条笔记.notetypeId;
-      this.笔记类型列表 = await this.笔记类型服务实例.获取笔记类型名列表();
+      this.笔记类型列表 = names;
     } catch (错误) {
+      if (version !== this.mappingVersion || !this.isBrowserSelectionCurrent(selection)) return;
       this.批量错误 = this.取本地化文案($r('app.string.browser_action_change_notetype_error'));
       console.info(`BrowserPage: 加载笔记类型列表失败 错误=${错误}`);
       this.显示笔记类型弹层 = false;
     } finally {
-      this.笔记类型弹层忙碌 = false;
+      if (this.operations.isAlive() && version === this.mappingVersion) this.笔记类型弹层忙碌 = false;
     }
   }
 
@@ -1041,7 +1081,10 @@ export struct 浏览页 {
    * 调 获取变更笔记类型信息(旧ID, 新ID)，把后端给的 input.newFields / newTemplates 复制到可编辑的 字段映射 / 模板映射。
    */
   private async 加载变更笔记类型信息(新笔记类型ID: number): Promise<void> {
+    const version: number = ++this.mappingVersion;
+    const selection: BrowserOperationContext = this.captureBrowserSelection();
     if (新笔记类型ID === 0 || this.旧笔记类型ID缓存 === 0) {
+      this.笔记类型弹层忙碌 = false;
       this.变更笔记类型信息数据 = null;
       this.字段映射 = [];
       this.模板映射 = [];
@@ -1051,17 +1094,19 @@ export struct 浏览页 {
     try {
       const 信息 = await this.笔记类型服务实例.获取变更笔记类型信息(
         this.旧笔记类型ID缓存, 新笔记类型ID);
+      if (version !== this.mappingVersion || !this.isBrowserSelectionCurrent(selection) || !this.显示笔记类型弹层) return;
       this.变更笔记类型信息数据 = 信息;
       this.字段映射 = 信息.input.newFields.slice();
       this.模板映射 = 信息.input.newTemplates.slice();
     } catch (错误) {
+      if (version !== this.mappingVersion || !this.isBrowserSelectionCurrent(selection)) return;
       this.批量错误 = this.取本地化文案($r('app.string.browser_action_change_notetype_error'));
       console.info(`BrowserPage: 加载变更笔记类型信息失败 错误=${错误}`);
       this.变更笔记类型信息数据 = null;
       this.字段映射 = [];
       this.模板映射 = [];
     } finally {
-      this.笔记类型弹层忙碌 = false;
+      if (this.operations.isAlive() && version === this.mappingVersion) this.笔记类型弹层忙碌 = false;
     }
   }
 
@@ -1070,57 +1115,26 @@ export struct 浏览页 {
    * noteIds 在 cards 模式需把 cardId→noteId 转换（每张卡都查 noteId），notes 模式直接用选中ID。
    */
   private async 执行批量更改笔记类型(): Promise<void> {
-    const 信息 = this.变更笔记类型信息数据;
-    if (信息 === null || this.选中新笔记类型ID === 0) {
-      return;
-    }
+    const info: 变更笔记类型信息 | null = this.变更笔记类型信息数据;
+    if (info === null || this.选中新笔记类型ID === 0 || this.笔记类型弹层忙碌 || this.operations.isBusy()) return;
+    const fields: number[] = this.字段映射.slice();
+    const templates: number[] = this.模板映射.slice();
     this.显示笔记类型弹层 = false;
-    this.批量忙碌 = true;
-    this.批量错误 = '';
-    try {
-      // 取 noteIds：cards 模式逐卡查 noteId，notes 模式直接用选中ID
-      let 笔记IDs: number[];
-      if (this.浏览模式值 === 'notes') {
-        笔记IDs = this.选中ID列表.slice();
-      } else {
-        笔记IDs = [];
-        for (const 卡片ID of this.选中ID列表) {
-          const 卡: Card = await this.卡片服务实例.获取卡片(卡片ID);
-          笔记IDs.push(卡.noteId);
-        }
-      }
-      // 回写可编辑字段到 input，其余字段（oldNotetypeId/newNotetypeId/currentSchema/oldNotetypeName/isCloze）原样保留
-      信息.input.noteIds = 笔记IDs;
-      信息.input.newFields = this.字段映射.slice();
-      信息.input.newTemplates = this.模板映射.slice();
-      await this.笔记类型服务实例.变更笔记类型(信息.input);
-      this.退出多选();
-      await this.执行搜索();
-    } catch (错误) {
-      this.批量错误 = this.取本地化文案($r('app.string.browser_action_change_notetype_error'));
-      console.info(`BrowserPage: 批量更改笔记类型失败 错误=${错误}`);
-    } finally {
-      this.批量忙碌 = false;
-    }
+    await this.runBatchOperation(async (selection: BrowserOperationContext): Promise<void> => {
+      info.input.noteIds = await this.解析选中为笔记ID(selection);
+      info.input.newFields = fields;
+      info.input.newTemplates = templates;
+      await this.笔记类型服务实例.变更笔记类型(info.input);
+    }, $r('app.string.browser_action_change_notetype_error'));
   }
 
   /** 执行批量删除：cards 模式直接 删除卡片(选中ID)；notes 模式先查每条笔记的所有卡片再删。 */
   private async 执行批量删除(): Promise<void> {
     this.显示删除确认 = false;
-    this.批量忙碌 = true;
-    this.批量错误 = '';
-    try {
-      const 卡片IDs: number[] = await this.解析选中为卡片ID();
-      if (卡片IDs.length > 0) { await this.卡片服务实例.删除卡片(卡片IDs); }
-      this.退出多选();
-      // 重新查询真实结果，零删除或外部变更都不能被显示为本地“删除成功”。
-      await this.执行搜索();
-    } catch (错误) {
-      this.批量错误 = this.取本地化文案($r('app.string.browser_action_delete_error'));
-      console.info(`BrowserPage: 批量删除失败 错误=${错误}`);
-    } finally {
-      this.批量忙碌 = false;
-    }
+    await this.runBatchOperation(async (selection: BrowserOperationContext): Promise<void> => {
+      const 卡片IDs: number[] = await this.解析选中为卡片ID(selection);
+      if (卡片IDs.length > 0) await this.卡片服务实例.删除卡片(卡片IDs);
+    }, $r('app.string.browser_action_delete_error'));
   }
 
   /**
@@ -1128,15 +1142,16 @@ export struct 浏览页 {
    * notes 模式下一条笔记可能有多张卡片，全部删除/改牌组/设标志。
    * 暂停/恢复有独立的 Anki Core 语义，不经此方法。
    */
-  private async 解析选中为卡片ID(): Promise<number[]> {
-    if (this.浏览模式值 === 'cards') {
-      return this.选中ID列表.slice();
+  private async 解析选中为卡片ID(selection: BrowserOperationContext = this.captureBrowserSelection()): Promise<number[]> {
+    if (selection.mode === 'cards') {
+      return selection.ids.slice();
     }
-    return this.解析选中笔记的卡片ID();
+    return this.解析选中笔记的卡片ID(selection);
   }
 
   /** 退出多选模式：清空选中 + 多选模式值 + 翻转信号触发 卡片表格 清内部状态。 */
   private 退出多选(): void {
+    this.selectionVersion++;
     this.选中ID列表 = [];
     this.多选模式值 = false;
     this.pageSelectForAgentEdit = false;
@@ -1145,25 +1160,29 @@ export struct 浏览页 {
 
   /** 打开卡片信息弹层：调 统计服务.获取卡片统计 懒加载该卡的 CardStatsView。 */
   private async 打开卡片信息(卡片ID: number): Promise<void> {
-    if (this.卡片信息忙碌) {
-      return;
-    }
+    if (!this.operations.isAlive()) return;
+    const version: number = ++this.infoVersion;
     this.卡片信息数据 = null;
     this.卡片信息错误 = '';
     this.卡片信息忙碌 = true;
     this.显示卡片信息 = true;
     try {
-      this.卡片信息数据 = await this.统计服务实例.获取卡片统计(卡片ID);
+      const stats: CardStatsView = await this.统计服务实例.获取卡片统计(卡片ID);
+      if (!this.operations.isAlive() || version !== this.infoVersion) return;
+      this.卡片信息数据 = stats;
     } catch (错误) {
+      if (!this.operations.isAlive() || version !== this.infoVersion) return;
       this.卡片信息错误 = this.取本地化文案($r('app.string.browser_info_load_error'));
       console.info(`BrowserPage: 加载卡片信息失败 cid=${卡片ID} 错误=${错误}`);
     } finally {
-      this.卡片信息忙碌 = false;
+      if (this.operations.isAlive() && version === this.infoVersion) this.卡片信息忙碌 = false;
     }
   }
 
   /** 关闭卡片信息弹层。 */
   private 关闭卡片信息(): void {
+    this.infoVersion++;
+    this.卡片信息忙碌 = false;
     this.显示卡片信息 = false;
     this.卡片信息数据 = null;
     this.卡片信息错误 = '';
@@ -1177,70 +1196,48 @@ export struct 浏览页 {
    * 成功后关闭弹层 + toast 提示替换数 + 重新搜索刷新列表。
    */
   private async 执行查找替换(
-    查找: string,
-    替换: string,
-    字段名: string,
-    正则: boolean,
-    区分大小写: boolean,
-    仅选中: boolean
+    查找: string, 替换: string, 字段名: string, 正则: boolean, 区分大小写: boolean, 仅选中: boolean
   ): Promise<boolean> {
+    if (this.operations.isBusy()) return false;
     this.查找替换忙碌 = true;
     this.查找替换错误 = '';
-    try {
-      let nids: number[] = [];
-      if (仅选中) {
-        nids = await this.解析选中为笔记ID();
-        if (nids.length === 0) {
-          this.查找替换错误 = this.取本地化文案($r('app.string.browser_find_no_notes_error'));
-          return false;
-        }
-      }
-      const 请求: FindAndReplaceRequest = {
-        nids,
-        search: 查找,
-        replacement: 替换,
-        regex: 正则,
-        matchCase: 区分大小写,
-        fieldName: 字段名
+    let count: number = 0;
+    const done: boolean = await this.runBrowserOperation(async (selection: BrowserOperationContext): Promise<void> => {
+      const nids: number[] = 仅选中 ? await this.解析选中为笔记ID(selection) : [];
+      if (仅选中 && nids.length === 0) throw new Error(this.取本地化文案($r('app.string.browser_find_no_notes_error')));
+      const request: FindAndReplaceRequest = {
+        nids, search: 查找, replacement: 替换, regex: 正则, matchCase: 区分大小写, fieldName: 字段名
       };
-      const 替换数 = await this.搜索服务实例.查找并替换(请求);
-      this.显示查找替换 = false;
-      // 刷新列表以反映替换后的字段变化
-      await this.执行搜索();
-      // 成功提示（%d 替换为实际数）
-      const 模板 = this.取本地化文案($r('app.string.browser_find_success'));
-      const 消息 = 模板.replace('%d', String(替换数));
-      try {
-        this.getUIContext().getPromptAction().showToast({ message: 消息 });
-      } catch (_错误) {
-        // toast 失败不影响主流程
-      }
-      return true;
-    } catch (错误) {
+      count = await this.搜索服务实例.查找并替换(request);
+      if (this.operations.isAlive()) this.显示查找替换 = false;
+    }, (_error: Error): void => {
       this.查找替换错误 = this.取本地化文案($r('app.string.browser_find_error'));
-      console.info(`BrowserPage: 查找替换失败 错误=${错误}`);
-      return false;
-    } finally {
+    }, false);
+    if (this.operations.isAlive()) {
       this.查找替换忙碌 = false;
+      if (done) this.getUIContext().getPromptAction().showToast({
+        message: this.取本地化文案($r('app.string.browser_find_success')).replace('%d', String(count))
+      });
     }
+    return done;
   }
 
   /**
    * 解析选中ID为笔记ID：notes 模式直接返回，cards 模式逐个调 卡片服务.获取卡片 取 noteId 后去重。
    * 供 T9 查找替换"仅选中笔记"范围使用。
    */
-  private async 解析选中为笔记ID(): Promise<number[]> {
-    if (this.浏览模式值 === 'notes') {
-      return this.选中ID列表.slice();
+  private async 解析选中为笔记ID(selection: BrowserOperationContext = this.captureBrowserSelection()): Promise<number[]> {
+    if (selection.mode === 'notes') {
+      return selection.ids.slice();
     }
     // cards 模式：逐个 cardId → card.noteId，去重
     const noteIdSet: Set<number> = new Set<number>();
-    for (const 卡片ID of this.选中ID列表) {
+    for (const 卡片ID of selection.ids) {
       try {
         const card: Card = await this.卡片服务实例.获取卡片(卡片ID);
         noteIdSet.add(card.noteId);
       } catch (错误) {
-        console.info(`BrowserPage: 解析笔记ID失败 cardId=${卡片ID} 错误=${错误}`);
+        throw new Error(`Cannot resolve selected card ${卡片ID}: ${错误}`);
       }
     }
     return Array.from(noteIdSet);
@@ -1441,6 +1438,7 @@ export struct 浏览页 {
 
   /** 标签菜单「重命名」→ 打开重命名对话框。 */
   private 请求重命名标签(标签名: string): void {
+    if (this.operations.isBusy()) return;
     this.重命名原标签名 = 标签名;
     this.重命名新标签名 = 标签名;
     this.标签重命名错误 = '';
@@ -1450,29 +1448,31 @@ export struct 浏览页 {
 
   /** 执行重命名标签：调后端 RenameTags，成功后刷新标签树。 */
   private async 执行重命名标签(): Promise<void> {
-    if (this.重命名新标签名 === '' || this.重命名新标签名 === this.重命名原标签名) {
+    if (this.operations.isBusy()) return;
+    const original: string = this.重命名原标签名;
+    const name: string = this.重命名新标签名;
+    if (name === '' || name === original) {
       this.标签重命名错误 = this.取本地化文案($r('app.string.browser_tag_rename_empty'));
       return;
     }
     this.标签重命名忙碌 = true;
     this.标签重命名错误 = '';
-    try {
-      const count: number = await this.标签服务实例.重命名标签({
-        currentPrefix: this.重命名原标签名,
-        newPrefix: this.重命名新标签名
-      });
-      this.显示标签重命名 = false;
-      this.显示侧边栏 = false;
-      this.getUIContext().getPromptAction().showToast({
-        message: this.取本地化文案($r('app.string.browser_tag_rename_success')).replace('%d', String(count))
-      });
-      // 刷新标签树（侧边栏下次打开时获取最新数据）
-      this.标签树 = null;
-    } catch (错误) {
-      console.info(`BrowserPage: 重命名标签失败 错误=${错误}`);
+    let count: number = 0;
+    const done: boolean = await this.runBrowserOperation(async (_selection: BrowserOperationContext): Promise<void> => {
+      count = await this.标签服务实例.重命名标签({ currentPrefix: original, newPrefix: name });
+      if (this.operations.isAlive()) {
+        this.显示标签重命名 = false;
+        this.显示侧边栏 = false;
+        this.标签树 = null;
+      }
+    }, (_error: Error): void => {
       this.标签重命名错误 = this.取本地化文案($r('app.string.browser_tag_rename_error'));
-    }
+    }, false);
+    if (!this.operations.isAlive()) return;
     this.标签重命名忙碌 = false;
+    if (done) this.getUIContext().getPromptAction().showToast({
+      message: this.取本地化文案($r('app.string.browser_tag_rename_success')).replace('%d', String(count))
+    });
   }
 
   /** 标签菜单「删除」→ 弹 AlertDialog 二次确认。 */
@@ -1498,21 +1498,22 @@ export struct 浏览页 {
 
   /** 执行删除标签：调后端 RemoveTags，成功后刷新标签树。 */
   private async 执行删除标签(标签名: string): Promise<void> {
+    if (this.operations.isBusy()) return;
     this.标签操作忙碌 = true;
-    try {
-      const count: number = await this.标签服务实例.移除标签(标签名);
-      this.显示侧边栏 = false;
-      this.getUIContext().getPromptAction().showToast({
-        message: this.取本地化文案($r('app.string.browser_tag_delete_success')).replace('%d', String(count))
-      });
-      this.标签树 = null;
-    } catch (错误) {
-      console.info(`BrowserPage: 删除标签失败 错误=${错误}`);
+    let count: number = 0;
+    const done: boolean = await this.runBrowserOperation(async (_selection: BrowserOperationContext): Promise<void> => {
+      count = await this.标签服务实例.移除标签(标签名);
+      if (this.operations.isAlive()) { this.显示侧边栏 = false; this.标签树 = null; }
+    }, (_error: Error): void => {
       this.getUIContext().getPromptAction().showToast({
         message: this.取本地化文案($r('app.string.browser_tag_delete_error'))
       });
-    }
+    }, false);
+    if (!this.operations.isAlive()) return;
     this.标签操作忙碌 = false;
+    if (done) this.getUIContext().getPromptAction().showToast({
+      message: this.取本地化文案($r('app.string.browser_tag_delete_success')).replace('%d', String(count))
+    });
   }
 
   /** 标签菜单「补全」→ 调后端 CompleteTag，toast 显示匹配结果。 */
@@ -1546,15 +1547,18 @@ export struct 浏览页 {
    *  未配置 AI 时与首页同款跳转：直接进入设置并展开 AI 智能体分组；
    *  不退出多选，配置完成返回后可原样再点 AI 改卡。 */
   private async 打开AI改卡(): Promise<void> {
-    if (this.选中ID列表.length === 0) { return; }
-    if (!await this.isAIConfigured()) {
+    if (this.operations.isBusy() || this.选中ID列表.length === 0) { return; }
+    const selection: BrowserOperationContext = this.captureBrowserSelection();
+    const configured: boolean = await this.isAIConfigured();
+    if (!this.isBrowserSelectionCurrent(selection)) return;
+    if (!configured) {
       this.openAISettings();
       return;
     }
     const params: AI制卡页参数 = {
       mode: 'edit', deckId: this.pageDeckId, deckName: '', deckOptions: [], templateIdx: -1,
-      cardIds: this.浏览模式值 === 'cards' ? this.选中ID列表.slice() : [],
-      noteIds: this.浏览模式值 === 'cards' ? [] : this.选中ID列表.slice()
+      cardIds: selection.mode === 'cards' ? selection.ids : [],
+      noteIds: selection.mode === 'cards' ? [] : selection.ids
     };
     this.退出多选();
     this.pathStack.pushPath({
@@ -1603,24 +1607,39 @@ export struct 浏览页 {
     return `${this.浏览模式值 === 'notes' ? column.notesModeLabel : column.cardsModeLabel} ${descending ? '↓' : '↑'}`;
   }
 
-  /** 排序应用于完整搜索结果，保留后端列的默认方向。 */
-  private sortMenu(): MenuElement[] {
-    const items: MenuElement[] = [{
-      value: this.取本地化文案($r('app.string.browser_sort_default')),
-      action: (): void => { this.sortColumn = ''; this.sortReverse = false; this.执行搜索(); }
-    }, {
-      value: this.取本地化文案($r('app.string.browser_sort_reverse')),
-      enabled: this.sortColumn !== '',
-      action: (): void => { this.sortReverse = !this.sortReverse; this.执行搜索(); }
-    }];
+  /** 选择框直接列出两个方向，避免二级菜单向侧边展开。 */
+  private sortOptions(): SelectOption[] {
+    const items: SelectOption[] = [{ value: this.取本地化文案($r('app.string.browser_sort_default')) }];
     for (const column of this.sortableColumns()) {
-      items.push({
-        value: `${this.浏览模式值 === 'notes' ? column.notesModeLabel : column.cardsModeLabel}${
-          this.sortColumn === column.key ? ' ✓' : ''}`,
-        action: (): void => { this.sortColumn = column.key; this.sortReverse = false; this.执行搜索(); }
-      });
+      const label: string = this.浏览模式值 === 'notes' ? column.notesModeLabel : column.cardsModeLabel;
+      items.push({ value: `${label} ↑` });
+      items.push({ value: `${label} ↓` });
     }
     return items;
+  }
+
+  private sortIndex(): number {
+    const columns: BrowserColumn[] = this.sortableColumns();
+    const index: number = columns.findIndex((column: BrowserColumn): boolean => column.key === this.sortColumn);
+    if (index < 0) { return 0; }
+    const direction: BrowserColumnSorting = this.浏览模式值 === 'notes' ? columns[index].sortingNotes : columns[index].sortingCards;
+    const descending: boolean = (direction === BrowserColumnSorting.SORTING_DESCENDING) !== this.sortReverse;
+    return 1 + index * 2 + (descending ? 1 : 0);
+  }
+
+  /** 把用户选择的升降序转换成 Core 列默认方向的反转标志。 */
+  private selectSort(index: number): void {
+    if (index === 0) {
+      this.sortColumn = '';
+      this.sortReverse = false;
+    } else {
+      const column: BrowserColumn | undefined = this.sortableColumns()[Math.floor((index - 1) / 2)];
+      if (column === undefined) { return; }
+      const direction: BrowserColumnSorting = this.浏览模式值 === 'notes' ? column.sortingNotes : column.sortingCards;
+      this.sortColumn = column.key;
+      this.sortReverse = (direction === BrowserColumnSorting.SORTING_DESCENDING) !== (index % 2 === 0);
+    }
+    this.执行搜索();
   }
 
   /** 复用查找替换入口，并提供三种副标题显示方式。 */
@@ -1637,7 +1656,7 @@ export struct 浏览页 {
     }, {
       value: this.取本地化文案($r('app.string.browser_action_find_replace')),
       enabled: this.阶段 === 'list',
-      action: (): void => { this.查找替换错误 = ''; this.显示查找替换 = true; }
+      action: (): void => { if (this.operations.isBusy()) return; this.查找替换错误 = ''; this.显示查找替换 = true; }
     }];
     const indices: number[] = [1, 4, 2];
     const labels: Resource[] = [$r('app.string.browser_subtitle_deck'),
@@ -1662,22 +1681,28 @@ export struct 浏览页 {
   @Builder
   private 顶部条() {
     // 普通模式提供返回和更多；多选模式沿用选中计数退出按钮。
-    Row() {
+    Stack({ alignContent: Alignment.Center }) {
+      Text($r('app.string.browser_title'))
+        .fontSize(应用尺寸.字号_标题).fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.text_primary')).width('44%').textAlign(TextAlign.Center)
+        .maxLines(1).hitTestBehavior(HitTestMode.None)
+      Row() {
       按下态按钮({
         文案: $r('app.string.study_back'),
         字色: $r('app.color.text_primary'),
         点击回调: (): void => this.返回()
       })
 
+      Blank()
       if (this.多选模式值) {
-        Blank()
+
         按下态按钮({
           文案: this.取选中计数文案(),
           字色: $r('app.color.text_primary'),
           点击回调: (): void => this.退出多选()
         })
       } else {
-        Blank()
+
 
         Button($r('app.string.study_more'))
           .height(应用尺寸.按钮高度)
@@ -1689,6 +1714,7 @@ export struct 浏览页 {
           .borderRadius(应用尺寸.圆角_胶囊)
           .bindMenu(this.browserMoreMenu())
       }
+      }.width('100%').height('100%').alignItems(VerticalAlign.Center)
     }
     .width('100%')
     .height(应用尺寸.工具栏高度 + this.状态栏高度)
@@ -1699,7 +1725,45 @@ export struct 浏览页 {
       bottom: 应用尺寸.toolbarVerticalInset
     })
     .backgroundColor(this.页面底色微染值)
-    .alignItems(VerticalAlign.Center)
+    .alignContent(Alignment.Center)
+  }
+
+  /** 状态筛选保留原始搜索，放入选择框以留出列表空间。 */
+  private quickFilterOptions(): SelectOption[] {
+    return BROWSER_QUICK_FILTERS.map((filter: BrowserQuickFilter): SelectOption => ({
+      value: this.getUIContext().getHostContext()!.resourceManager.getStringByNameSync(filter.labelKey)
+    }));
+  }
+
+  private quickFilterIndex(): number {
+    return Math.max(0, BROWSER_QUICK_FILTERS.findIndex((filter: BrowserQuickFilter): boolean =>
+      filter.id === this.quickFilter));
+  }
+
+  @Builder
+  private browserControls() {
+    Row({ space: 8 }) {
+      Select(this.quickFilterOptions())
+        .selected(this.quickFilterIndex()).value(this.quickFilterOptions()[this.quickFilterIndex()].value)
+        .controlSize(ControlSize.SMALL).font({ size: 应用尺寸.字号_正文 })
+        .menuAlign(MenuAlignType.START)
+        .height(40).enabled(!this.多选模式值)
+        .onSelect((index: number): void => {
+          this.quickFilter = BROWSER_QUICK_FILTERS[index].id;
+          this.执行搜索();
+        })
+      Text(this.阶段 === 'loading' ? $r('app.string.browser_loading') : this.resultCountLabel())
+        .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
+        .layoutWeight(1).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+      Select(this.sortOptions())
+        .selected(this.sortIndex()).value(this.sortLabel())
+        .controlSize(ControlSize.SMALL).font({ size: 应用尺寸.字号_正文 })
+        .menuAlign(MenuAlignType.END)
+        .height(40).constraintSize({ maxWidth: '42%' })
+        .enabled(!this.多选模式值 && this.阶段 === 'list')
+        .onSelect((index: number): void => { this.selectSort(index); })
+    }.width('100%')
+      .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平, bottom: 6 })
   }
 
   build() {
@@ -1712,13 +1776,14 @@ export struct 浏览页 {
           搜索框({
             搜索文本: this.搜索文本,
             浏览模式值: this.浏览模式值,
-            主色按钮背景色: this.主色按钮背景色,
             onSearch: (文本: string): void => { this.提交搜索(文本); },
             onModeChange: (模式: string): void => { this.切换模式(模式 as 浏览模式); }
           })
             .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平,
               top: 应用尺寸.pageContentTopInset,
               bottom: 应用尺寸.间距_8 })
+
+          this.browserControls()
 
           if (this.阶段 === 'loading') {
             统一加载态({
@@ -1732,36 +1797,19 @@ export struct 浏览页 {
             })
           }
           if (this.阶段 === 'list') {
-            Row({ space: 应用尺寸.间距_8 }) {
-              Text(this.resultCountLabel())
-                .fontSize(应用尺寸.字号_正文_小)
-                .fontColor($r('app.color.text_secondary'))
-                .layoutWeight(1)
-              Button(this.sortLabel())
-                .fontSize(应用尺寸.字号_正文_小)
-                .fontColor($r('app.color.text_primary'))
-                .backgroundColor($r('app.color.surface_card'))
-                .height(36)
-                .constraintSize({ maxWidth: '65%' })
-                .enabled(!this.多选模式值)
-                .bindMenu(this.sortMenu())
-            }
-            .width('100%')
-            .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平,
-              bottom: 应用尺寸.间距_8 })
             // 卡片表格组件（扁平列表 + 多选 + 空态 + 懒加载）
             卡片表格({
               行列表: this.行列表,
               subtitleIndex: this.subtitleIndex,
               notesMode: this.浏览模式值 === 'notes',
               结果总数: this.结果ID列表.length,
-              已加载行数: this.行列表.length,
+              已加载行数: this.consumedRowCount,
               初始多选模式: this.pageSelectForAgentEdit,
               onRowClick: (行ID: number): void => { this.行点击处理(行ID); },
               onLongPress: (): void => {},
               onLoadMore: (): void => { this.加载更多(); },
               onInfoClick: (行ID: number): void => { this.打开卡片信息(行ID); },
-              onSelectionChange: (选中IDs: number[]): void => { this.选中ID列表 = 选中IDs; },
+              onSelectionChange: (选中IDs: number[]): void => { this.selectionVersion++; this.选中ID列表 = 选中IDs.slice(); },
               onMultiSelectChange: (多选: boolean): void => { this.多选模式值 = 多选; },
               退出多选信号: this.退出多选信号
             })
@@ -1771,7 +1819,7 @@ export struct 浏览页 {
           if (this.多选模式值 && this.选中ID列表.length > 0) {
             批量操作栏({
               isDark: this.是否深色(),
-              busy: this.批量忙碌,
+              busy: this.批量忙碌 || this.mutationBusy,
               选中数: this.选中ID列表.length,
               on改牌组: (): void => { this.打开改牌组弹层(); },
               on设置标志: (): void => {
@@ -1821,7 +1869,7 @@ export struct 浏览页 {
         if (this.显示预览) {
           卡片预览页({
             isDark: this.是否深色(),
-            卡片ID列表: this.结果ID列表,
+            卡片ID列表: this.previewCardIds,
             初始索引: this.预览初始索引,
             媒体目录: this.预览媒体目录,
             刷新版本: this.预览刷新版本,
@@ -1839,7 +1887,7 @@ export struct 浏览页 {
         if (this.显示编辑区) {
           浏览编辑区({
             isDark: this.是否深色(),
-            busy: this.编辑区忙碌,
+            busy: this.编辑区忙碌 || this.mutationBusy,
             errorMessage: this.编辑区错误,
             fieldNames: this.编辑区字段名列表,
             initialFieldValues: this.编辑区初始字段值,
@@ -1872,7 +1920,7 @@ export struct 浏览页 {
         if (this.显示查找替换) {
           查找替换对话框({
             isDark: this.是否深色(),
-            busy: this.查找替换忙碌,
+            busy: this.查找替换忙碌 || this.mutationBusy,
             errorMessage: this.查找替换错误,
             有选中笔记: this.选中ID列表.length > 0,
             onCancel: (): void => {

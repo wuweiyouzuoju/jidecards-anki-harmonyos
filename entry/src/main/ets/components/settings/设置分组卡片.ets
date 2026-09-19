@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// 设置页所有可折叠主分组的统一外壳：标题、可选帮助按钮、旋转箭头、色板与卡片尺寸只在此维护。
+// 二级设置页的静态分区：选项直接呈现，帮助按钮仍打开页面级说明。
 import { 设置面板色板_取 } from '../../utils/设置面板配色';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 
@@ -8,10 +8,8 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 export struct 设置分组卡片 {
   @Prop 标题: Resource = $r('app.string.settings_about');
   @Prop 是否深色: boolean = false;
-  @Prop 是否展开: boolean = false;
   @Prop 帮助标题: Resource | null = null;
   @Prop 帮助正文: Resource | null = null;
-  切换展开回调: () => void = (): void => {};
   打开说明回调: (标题: Resource, 正文: Resource) => void =
     (_标题: Resource, _正文: Resource): void => {};
   @BuilderParam 内容: () => void = this.默认内容;
@@ -26,7 +24,7 @@ export struct 设置分组卡片 {
           .fontSize(14)
           .fontWeight(FontWeight.Medium)
           .fontColor(设置面板色板_取(this.是否深色).次文字)
-        if (this.是否展开 && this.帮助标题 !== null && this.帮助正文 !== null) {
+        if (this.帮助标题 !== null && this.帮助正文 !== null) {
           Button($r('app.string.field_help_button'))
             .type(ButtonType.Normal)
             .backgroundColor(Color.Transparent)
@@ -39,26 +37,15 @@ export struct 设置分组卡片 {
               this.打开说明回调(this.帮助标题 as Resource, this.帮助正文 as Resource);
             })
         }
-        Blank()
-        Text('▼')
-          .fontSize(11)
-          .fontColor(设置面板色板_取(this.是否深色).弱化文字)
-          .rotate({ angle: this.是否展开 ? 0 : -90 })
-          .animation({ duration: 150, curve: Curve.EaseOut })
       }
       .width('100%')
-      .height(40)
-      .onClick((): void => {
-        this.切换展开回调();
-      })
+      .height(36)
 
-      if (this.是否展开) {
-        this.内容()
-      }
+      this.内容()
     }
     .width('100%')
-    .padding(应用尺寸.卡片内边距)
+    .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距, top: 8, bottom: 8 })
     .backgroundColor(设置面板色板_取(this.是否深色).背景)
-    .borderRadius(应用尺寸.圆角_卡片)
+    .borderRadius(16)
   }
 }

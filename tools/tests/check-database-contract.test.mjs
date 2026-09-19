@@ -22,6 +22,7 @@ function read(relativePath) {
 
 const COLLECTION_SERVICE = 'entry/src/main/ets/backend/集合服务.ts';
 const SETTINGS_PANEL = 'entry/src/main/ets/components/设置面板.ets';
+const DATA_GROUP = 'entry/src/main/ets/components/settings/数据分组.ets';
 const STRINGS = 'entry/src/main/resources/base/element/string.json';
 
 test('check database uses collection service id 3 and method index 6', () => {
@@ -57,30 +58,36 @@ test('settings panel wires check database entry to the service with busy guard',
   assert.match(panel, /import \{ 集合服务 \} from '\.\.\/backend\/集合服务'/);
   assert.match(panel, /await this\.集合服务实例\.检查数据库\(\)/,
     'entry really calls the service');
-  assert.match(panel, /this\.执行数据库检查\(\);/, 'row taps into the handler');
+  assert.match(panel, /onCheckDatabase:.*this\.执行数据库检查\(\);/, 'row taps into the handler');
+  for (const [prop, state] of [['databaseBusy', '数据库检查中'], ['databaseChecked', '数据库检查完成'], ['databaseError', '数据库错误信息'], ['databaseProblems', '数据库问题列表']]) {
+    assert.ok(panel.includes(`${prop}: this.${state}`), `${prop} receives the parent state`);
+  }
+  assert.match(read(DATA_GROUP), /this\.onCheckDatabase\(\)/);
 
   assert.match(panel, /if \(this\.数据库检查中\) \{[\s\S]*?return;/, 'reentrancy guard in handler');
-  assert.match(panel, /\.enabled\(!this\.数据库检查中\)/, 'row disabled while busy');
-  assert.match(panel, /this\.数据库检查中 \? \$r\('app\.string\.check_db_running'\)/,
+  const group = read(DATA_GROUP);
+  assert.match(group, /\.enabled\(!this\.databaseBusy\)/, 'row disabled while busy');
+  assert.match(group, /this\.databaseBusy \? \$r\('app\.string\.check_db_running'\)/,
     'busy state visible on the row');
 });
 
 test('settings panel renders pass, problems and error outcomes', () => {
   const panel = read(SETTINGS_PANEL);
 
-  assert.match(panel, /if \(this\.数据库错误信息 !== ''\)/, 'error branch first');
-  assert.match(panel, /Text\(this\.数据库错误信息\)/, 'error message passed through');
+  const group = read(DATA_GROUP);
+  assert.match(group, /if \(this\.databaseError !== ''\)/, 'error branch first');
+  assert.match(group, /Text\(this\.databaseError\)/, 'error message passed through');
   const handler = panel.match(/执行数据库检查\(\): Promise<void> \{[\s\S]*?\n  \}/);
   assert.notEqual(handler, null);
   assert.match(handler[0], /this\.数据库错误信息 = error instanceof Error \? error\.message : `\$\{error\}`;/,
     'failure surfaces raw backend message');
   assert.match(handler[0], /finally \{\s*this\.数据库检查中 = false;/, 'busy always released');
 
-  assert.match(panel, /this\.数据库问题列表\.length === 0/);
-  assert.match(panel, /\$r\('app\.string\.check_db_passed'\)/, 'empty problems means pass');
-  assert.match(panel, /\$r\('app\.string\.check_db_problems', this\.数据库问题列表\.length\)/,
+  assert.match(group, /this\.databaseProblems\.length === 0/);
+  assert.match(group, /\$r\('app\.string\.check_db_passed'\)/, 'empty problems means pass');
+  assert.match(group, /\$r\('app\.string\.check_db_problems', this\.databaseProblems\.length\)/,
     'problem count listed');
-  assert.match(panel, /ForEach\(this\.数据库问题列表\.slice\(0, 3\)/,
+  assert.match(group, /ForEach\(this\.databaseProblems\.slice\(0, 3\)/,
     'problem content summary capped at first entries');
 });
 

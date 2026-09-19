@@ -251,9 +251,9 @@ test('home reopens the cloud deck modal from the deck menu until the download qu
 
 test('home downloads and imports selected cloud decks sequentially through the existing backend', () => {
   const source = read('../../entry/src/main/ets/pages/首页.ets');
-  assert.match(source, /for \(const deck of selectedDecks\)/);
-  assert.match(source, /await this\.云端牌组服务实例\.下载牌组/);
-  assert.match(source, /await 执行牌组导入\(downloadedPath\)/);
+  assert.match(source, /cloudImportController\.run/);
+  assert.match(source, /this\.云端牌组服务实例\.下载牌组/);
+  assert.match(source, /await 执行牌组导入\(path\)/);
   assert.match(source, /await this\.加载主页数据\(\)/);
   assert.match(source, /展开新导入牌组/);
   assert.match(source, /successIds/);
@@ -284,8 +284,8 @@ test('home owns QQ group clipboard copy and wires it to the cloud deck modal', (
 test('cloud deck retries preserve earlier successful imports and select only failures', () => {
   const source = read('../../entry/src/main/ets/pages/首页.ets');
   const downloadMethod = source.match(/private async 下载选中云端牌组\(\)[\s\S]*?\n  private async 从选择器导入牌组/)?.[0] ?? '';
-  assert.match(downloadMethod, /const successIds: string\[\] = this\.云端牌组成功ID列表\.concat\(\[\]\)/);
-  assert.match(downloadMethod, /if \(successIds\.indexOf\(deck\.id\) < 0\) \{/);
+  assert.match(downloadMethod, /const successIds: string\[\] = result\.successIds/);
+  assert.match(downloadMethod, /selectedDecks, this\.云端牌组成功ID列表, backend/);
   assert.match(downloadMethod, /this\.云端牌组选中ID列表 = failedIds\.concat\(\[\]\)/);
 });
 

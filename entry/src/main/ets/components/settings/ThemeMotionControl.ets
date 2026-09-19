@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { 颜色键 } from '../../model/颜色主题';
 import { THEME_MOTION_KEY } from '../../model/Redemption';
 import { saveThemeMotion } from '../../utils/RedemptionStore';
 
@@ -6,6 +7,7 @@ import { saveThemeMotion } from '../../utils/RedemptionStore';
 @Component
 export struct ThemeMotionControl {
   @StorageProp(THEME_MOTION_KEY) private motionEnabled: boolean = true;
+  @StorageProp(颜色键.主色按钮背景) private actionColor: string = '#2F5FD0';
   @State private saving: boolean = false;
   @State private failed: boolean = false;
 
@@ -24,6 +26,7 @@ export struct ThemeMotionControl {
         Text($r('app.string.iridescent_motion'))
           .fontSize(15).fontColor($r('app.color.text_primary')).layoutWeight(1)
         Toggle({ type: ToggleType.Switch, isOn: this.motionEnabled }).enabled(!this.saving)
+          .selectedColor(this.actionColor)
           .onChange((value: boolean): void => { this.save(value); })
       }.height(48).width('100%')
       Text($r('app.string.iridescent_motion_hint'))

@@ -36,7 +36,7 @@
 // ========================================================
 
 import { webview } from '@kit.ArkWeb';
-import { interceptMathAsset } from '../../utils/MathAssetResponse';
+import { interceptCardAsset } from '../../utils/CardAssetResponse';
 import { 卡片渲染服务 } from '../../backend/卡片渲染服务';
 import type { RenderedCard, AvTagsResult } from '../../proto/messages/CardRenderingMessages';
 import {
@@ -531,7 +531,7 @@ export struct 卡片预览页 {
         .focusable(true)
         .onControllerAttached((): void => { this.onControllerAttached回调(); })
         .onInterceptRequest((event: OnInterceptRequestEvent): WebResourceResponse | null => {
-          return interceptMathAsset(event.request.getRequestUrl()) ?? this.拦截媒体(event);
+          return interceptCardAsset(event.request.getRequestUrl()) ?? this.拦截媒体(event);
         })
         .onErrorReceive((event: OnErrorReceiveEvent): void => {
           if (event.request.isMainFrame() && event.request.getRequestUrl() !== 'about:blank') this.webFailed();

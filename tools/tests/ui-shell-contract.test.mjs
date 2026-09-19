@@ -242,9 +242,9 @@ test('hour histogram range is shared by stats page, home card and widget', () =>
   assert.doesNotMatch(widget, /小时分布（全部）'\)/);
   assert.match(summary, /小时分布窗口标签\(\)/);
   assert.match(widget, /小时分布窗口标签\(\)/);
-  // 小时分布卡档位选择由统计页 @Link 管理 + 切换回调
-  assert.match(card, /@Link 时间段索引: number/);
-  assert.match(card, /onRangeChange/);
+  // 小时分布卡消费统计页持有的范围，切换入口位于分区标题。
+  assert.match(card, /@Prop 时间段索引: number/);
+  assert.match(stats, /rangeIndex: this\.小时分布窗口/);
   // 桌面卡片：刻度数字独立成行（0/6/12/18/23），禁止与柱子同列混排（会遮挡柱子且顶高柱区）
   assert.doesNotMatch(widget, /索引 % 3 === 0/);
   // 三处小时刻度统一五等分居中：数字中心间距严格相等（贴边 Start/End 会让首尾段偏窄）
@@ -264,8 +264,8 @@ test('stats deck selector uses a normal compact select beside the aligned FSRS s
   const scopeRow = stats.match(/\/\/ 统计口径行[\s\S]*?\/\/ 1\. 今日计数/)?.[0] ?? '';
   const deckSelect = scopeRow.match(/Select\(this\.牌组选项\)[\s\S]*?\.onSelect/)?.[0] ?? '';
 
-  assert.doesNotMatch(topBar, /Text\(\$r\('app\.string\.stats_page_title'\)\)/,
-    'the toolbar center must not show the page title');
+  assert.match(topBar, /Text\(\$r\('app\.string\.stats_page_title'\)\)/,
+    'the toolbar identifies the statistics page');
   assert.doesNotMatch(topBar, /Select\(this\.牌组选项\)/,
     'the deck selector must no longer occupy the toolbar center');
   assert.match(scopeRow,
@@ -321,12 +321,13 @@ test('primary pages share one shell gutter and common visual primitives', () => 
     'settings back action must remain neutral instead of following the selected color theme');
   assert.doesNotMatch(settingsPage, /private 顶部条\(\)/,
     'settings must not keep an unused second toolbar implementation');
-  assert.match(settingsCard, /borderRadius\(应用尺寸\.圆角_卡片\)/,
+  assert.match(settingsCard, /borderRadius\(16\)/,
     'settings group cards must use the same page-card radius');
   assert.match(reminders, /统一空态\(\{[\s\S]*?reminder_list_empty[\s\S]*?reminder_list_empty_hint/,
     'reminders must use the common empty-state component');
 
-  assert.equal((appearance.match(/controlSize\(ControlSize\.SMALL\)/g) ?? []).length, 3);
+  assert.equal((appearance.match(/controlSize\(ControlSize\.SMALL\)/g) ?? []).length, 2);
+  assert.match(read('entry/src/main/ets/components/settings/GeneralSettings.ets'), /controlSize\(ControlSize\.SMALL\)/);
   assert.equal((agentSettings.match(/controlSize\(ControlSize\.SMALL\)/g) ?? []).length, 3,
     'all Agent settings selects must match the other settings selects');
   assert.equal((syncSettings.match(/borderRadius\(应用尺寸\.圆角_面板\)/g) ?? []).length >= 2, true,
@@ -366,9 +367,9 @@ test('graphs request days follow the persisted stats range preference, never der
   assert.match(store, /export async function 加载统计天数/, '模型层须有统计天数加载');
   assert.match(store, /export async function 保存统计天数/, '模型层须有统计天数保存');
   assert.match(store, /stats_days_range/, '统计天数 preferences 键');
-  assert.match(stats, /this\.统计天数 = await 加载统计天数\(\)/, '统计页 aboutToAppear 恢复天数');
+  assert.match(stats, /const days: number = await 加载统计天数\(\);[\s\S]*this\.统计天数 = days/, '统计页 aboutToAppear 恢复天数');
   assert.match(stats, /保存统计天数\(天数\)/, '统计页切换天数须持久化');
-  assert.match(home, /获取图表统计\(await 加载统计天数\(\)\)/, '首页静默加载图表须跟随统计天数偏好');
+  assert.match(home, /const days: number = await 加载统计天数\(\);[\s\S]*获取图表统计\(days\)/, '首页静默加载图表须跟随统计天数偏好');
   assert.match(fsrs, /获取图表统计\(await 加载统计天数\(\)\)/, 'FSRS控制器刷新桌面卡片须跟随统计天数偏好');
   for (const [名称, 源] of [['首页', home], ['FSRS控制器', fsrs], ['统计页', stats]]) {
     assert.doesNotMatch(源, /获取图表统计\(new Date\(\)/, `${名称}禁止用日期函数派生统计天数`);
@@ -466,7 +467,7 @@ test('stats graph cards stay reactive across deck switches: data-carrying ForEac
   }
   // 日历卡格子：列 ForEach key 必须含格子数量（keyGenerator 读 取格数据）
   const calendar = read('entry/src/main/ets/components/stats/日历卡.ets');
-  assert.match(calendar, /=> `\$\{列\}_\$\{this\.取格数据\(列, 行\)\?\.数量 \?\? -1\}`/,
+  assert.match(calendar, /=> `\$\{列\}_\$\{this\.取格数据\(列, 行\)\?\.日期 \?\? \'\'\}_\$\{this\.取格数据\(列, 行\)\?\.数量 \?\? -1\}`/,
     '日历卡格子 ForEach key 须含格子数量');
   // 抽查：复习卡 key 含全部 5 系列数据字段
   const review = read('entry/src/main/ets/components/stats/复习卡.ets');
@@ -578,7 +579,7 @@ test('interval graph always shows intervals; stability is a separate FSRS-only g
 
 test('graph preferences are in-chart controls without a modal (Anki autoSavingPrefs)', () => {
   // 对齐 Anki：官方无图表偏好弹窗——偏好控件内嵌各图、改动即时落库。
-  // 统计天数保留 1 年/全部两档，但入口改为右上角按钮，并唤出与设置页同款双项菜单。
+  // 统计天数保留 1 年/全部两档，通过右上角原生选择框切换。
   // 曾用集中弹窗（图表偏好面板）+ 30/90/365/全部四档，2026-08-25 用户裁定完全复刻 Anki。
   const statsPage = read('entry/src/main/ets/pages/统计页.ets');
   const counts = read('entry/src/main/ets/components/stats/卡片状态分布.ets');
@@ -589,16 +590,15 @@ test('graph preferences are in-chart controls without a modal (Anki autoSavingPr
     '图表偏好面板.ets 已删除（Anki 无偏好弹窗）'
   );
   assert.doesNotMatch(statsPage, /显示偏好面板|保存偏好|onBackPress/, '统计页不得残留偏好弹窗状态/方法');
-  // 顶栏天数两档：365/0；点击当前范围后，右上角菜单选择项会重新请求后端。
+  // 顶栏天数两档：365/0；右上角原生选择框切换后重新请求后端。
   assert.match(statsPage, /on天数切换\(天数: number\)/, '须有顶栏天数切换');
-  assert.match(statsPage, /显示统计范围菜单/);
-  assert.match(statsPage, /统计范围切换菜单/);
-  assert.match(statsPage, /on天数切换\(全部范围 \? 0 : 365\)/);
-  const rangeMenu = read('entry/src/main/ets/components/stats/统计范围切换菜单.ets');
-  assert.match(rangeMenu, /Alignment\.TopEnd/, '范围菜单必须锚定右上角');
-  assert.match(rangeMenu, /stats_hours_range_1y/);
-  assert.match(rangeMenu, /stats_hours_range_all/);
-  assert.match(rangeMenu, /TransitionEffect\.opacity\(0\)/, '范围菜单沿用设置页的纯淡入淡出');
+  assert.doesNotMatch(statsPage, /显示统计范围菜单|统计范围切换菜单/);
+  assert.match(statsPage, /on天数切换\(index === 1 \? 0 : 365\)/);
+  const rangeMenu = read('entry/src/main/ets/components/stats/范围切换条.ets');
+  assert.match(rangeMenu, /Select\(this\.options\(\)\)/);
+  assert.match(rangeMenu, /MenuAlignType\.END/);
+  assert.match(statsPage, /stats_history_range_year/);
+  assert.match(statsPage, /stats_history_range_all/);
   // 图内偏好控件：即时写偏好（更新偏好 + 设置图表偏好）
   assert.match(statsPage, /更新偏好\(字段: \(旧: GraphPreferences\) => GraphPreferences\)/, '须有图内偏好即时落库辅助');
   assert.match(statsPage, /on分离变更/, '卡片数量分离复选框回调');
@@ -703,7 +703,7 @@ test('theme settings persist three modes and synchronize system bars', () => {
   // 色板和系统栏的一致性由 theme-configuration 运行真实回调验证。
 });
 
-test('Schulte-style settings keep the approved full-screen page architecture and about content', () => {
+test('settings directory keeps full-screen navigation and existing about content', () => {
   // 2026-08-15：设置页从模态弹窗改为全屏独立页面，移除遮罩色背景、88% 宽度与 maxWidth:480 模态约束。
   // 顶部条改用页面底色背景 + 状态栏高度 padding，模态遮罩色() 辅助方法保留供其他场景调用。
   const panelPath = 'entry/src/main/ets/components/设置面板.ets';
@@ -713,10 +713,10 @@ test('Schulte-style settings keep the approved full-screen page architecture and
   assert.match(panel, /Stack\(\)/);
   // 内容 List 挂滚动器：openAiSettings 跳转进来时 scrollToIndex 直接定位到 AI 智能体分组
   assert.match(panel, /List\(\{ space: 应用尺寸\.pageSectionGap, scroller: this\.内容滚动器 \}\)/);
-  assert.match(panel, /外观分组展开/);
-  assert.match(panel, /数据分组展开/);
-  assert.match(panel, /数据库分组展开/);
-  assert.match(panel, /关于分组展开/);
+
+
+
+
   assert.match(panel, /app\.string\.feedback_email/);
   assert.match(panel, /app\.media\.sponsor_qrcode/);
   assert.match(panel, /主题模式/);

@@ -93,8 +93,8 @@ test('home page wires the create button through the full flow', () => {
 
   // 创建牌组面板 现在挂在 创建牌组协调器 积木组件里
   assert.match(createCoord, /创建牌组面板/);
-  assert.match(page, /@State private 显示创建牌组: boolean/);
-  assert.match(page, /@State private 创建牌组中: boolean/);
+  assert.match(page, /@State(?: @Watch\('[^']+'\))? private 显示创建牌组: boolean/);
+  assert.match(page, /@State(?: @Watch\('[^']+'\))? private 创建牌组中: boolean/);
   assert.match(page, /@State private 创建牌组错误: string/);
   assert.match(page, /async 创建牌组\(name: string\)/);
   assert.match(page, /确保已打开\(context\.filesDir\)/);

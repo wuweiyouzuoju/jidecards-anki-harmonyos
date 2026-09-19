@@ -318,5 +318,8 @@ test('preview wiring stays read-only, handles web errors, and preserves home/edi
   assert.match(editor, /onPop:[\s\S]*this\.显示卡片预览 = true/);
   assert.match(home, /onPositionChanged:[\s\S]*this\.预览初始索引 = index/);
   const autoSync = home.match(/private tryAutoSync[\s\S]*?\n  }/)[0];
-  assert.match(autoSync, /this\.显示卡片预览 \|\| this\.预览加载中/);
+  assert.match(autoSync, /canStartHomeAutoSync\(this\.homeActivity\(\)\)/);
+  const activity = home.match(/private homeActivity[\s\S]*?\n  }/)[0];
+  assert.match(activity, /this\.显示卡片预览/);
+  assert.match(activity, /this\.预览加载中/);
 });

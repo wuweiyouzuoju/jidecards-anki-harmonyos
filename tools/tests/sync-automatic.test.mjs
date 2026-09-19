@@ -1,3 +1,5 @@
+import { canStartHomeAutoSync } from '../../entry/src/main/ets/model/HomeActivityPolicy.ts';
+import { HomeAnnouncementController } from '../../entry/src/main/ets/model/HomeAnnouncementController.ts';
 import { AutoSyncScheduler } from '../../entry/src/main/ets/model/AutoSyncScheduler.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
@@ -15,7 +17,7 @@ test('automatic execution is wired to startup/foreground/home return and manual 
   assert.match(home, /@StorageProp\(APP_FOREGROUND_KEY\) @Watch\('syncForegroundChanged'\)/);
   assert.match(home, /private 返回主页后刷新\(\)[\s\S]*?this\.requestAutoSync\(\)/);
   assert.match(home, /同步面板\(\{[\s\S]*?automatic: true/);
-  assert.match(settings, /\.onBackPressed\(\(\): boolean => this\.显示同步面板\)/);
+  assert.match(settings, /\.onBackPressed\(\(\): boolean => \{\s*if \(this\.显示同步面板\) return true;/);
   assert.match(settings, /private 返回\(\): void \{\s*if \(this\.显示同步面板\) return;/);
 });
 
@@ -34,7 +36,8 @@ function componentMethods(source, names, dependencies) {
 function homeHarness() {
   const state = { enabled: true, ready: true, auth: { hkey: 'test-key', endpoint: 'http://lan:8080/', username: 'u' }, timers: new Map(), seq: 0, navigation: [], toasts: 0 };
   const gate = new SyncActivity();
-  const Page = componentMethods(read('pages/首页.ets'), ['requestAutoSync', 'scheduleAutoSyncCheck', 'isAutoSyncLocationSafe', 'stopAutoSyncTimer', 'tryAutoSync', 'syncForegroundChanged', 'onPageHide', 'onBackPress', 'deferForSync', 'flushSyncAction', 'autoSyncCollectionFinished', 'autoSyncStateChanged', '选择牌组', '开始学习', 'openCreateDeck', 'openSettings', 'openReminders'], {
+  const Page = componentMethods(read('pages/首页.ets'), ['homeActivity', 'requestAutoSync', 'scheduleAutoSyncCheck', 'isAutoSyncLocationSafe', 'stopAutoSyncTimer', 'tryAutoSync', 'syncForegroundChanged', 'onPageHide', 'onBackPress', 'deferForSync', 'flushSyncAction', 'autoSyncCollectionFinished', 'autoSyncStateChanged', '选择牌组', '开始学习', 'openCreateDeck', 'openSettings', 'openReminders'], {
+    canStartHomeAutoSync,
     AppStorage: { get() {}, setOrCreate() {} },
     loadAutoSyncEnabled: () => state.enabled, 加载同步凭证: () => state.auth,
     $r: key => key, 牌组显示名: deck => deck.name, 保存上次牌组ID: async () => {},
@@ -43,7 +46,7 @@ function homeHarness() {
     clearTimeout: id => state.timers.delete(id)
   });
   const page = new Page();
-  Object.assign(page, { syncForeground: true, autoSyncStartupReady: true, syncScheduler: new AutoSyncScheduler(), autoSyncTimer: -1,
+  Object.assign(page, { announcementController: new HomeAnnouncementController(), homeActivityChanged() {}, syncForeground: true, autoSyncStartupReady: true, syncScheduler: new AutoSyncScheduler(), autoSyncTimer: -1,
     页面栈: { size: () => 0, pushPath: path => state.navigation.push(path) }, 加载状态: 'ready', 显示同步面板: false,
     autoSyncCollectionBusy: false, autoSyncRefreshing: false, autoSyncModal: false, pendingSyncAction: null,
     显示提示: () => { state.toasts++; }, 已选中牌组: () => true, 选中牌组: () => ({ id: 'deck', name: 'deck' }), 展开牌组路径() {}, 当前断点: 'xs',

@@ -473,6 +473,8 @@ const 可折叠字段脚本: string = `<script>
 //
 // @业务规则
 // 默认配色在模板 CSS 前，避免夜间字色覆盖模板文字却保留白底；布局与媒体兜底在后。
+// 与 Anki TemplateRenderOutput 一样独立包装模板样式：部分牌组用 </style><script>
+// 在样式字段加载脚本，不能让提前闭合的标签把应用兜底 CSS 暴露成正文。
 // 字段中的 [sound:xxx] 标签剥除为小标记，
 // 音频由原生 SoundPlayer 播放（真机 Web 自动播放无声）。
 // ImageOcclusion 渲染样式追加在 <style> 末尾；IIFE 脚本放在 <head> 末尾，
@@ -488,13 +490,16 @@ const 可折叠字段脚本: string = `<script>
 export function 构建卡片HTML(渲染结果: RenderedCard, 侧面: 卡片正反面, isDark: boolean = false): string {
   const 正文: string = 剥除音频标签(重写媒体地址(原始侧HTML(渲染结果, 侧面)));
   const 默认配色: string = `body { color: ${isDark ? '#E6E6E6' : '#1A1A1A'}; background: transparent; }`;
-  const 样式: string = `${默认配色}\n${渲染结果.css}\n${基础样式}\n${图片遮罩渲染样式}\n${可折叠字段样式}`;
+  const 样式: string = `${基础样式}\n${图片遮罩渲染样式}\n${可折叠字段样式}`;
   // latexSvg 只决定传统 LaTeX 图片后缀，不能关闭同一卡片中的 MathJax。
   return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://jidecards-render.local/jquery/3.7.1/jquery.min.js"></script>
+<style>${默认配色}</style>
+<style>${渲染结果.css}</style>
 <style>${样式}</style>
 ${图片遮罩渲染脚本}
 ${MATH_SCRIPTS}

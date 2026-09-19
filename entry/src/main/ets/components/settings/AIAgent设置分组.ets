@@ -20,8 +20,6 @@ interface SelectItem { value: string; }
 @Component
 export struct AIAgent设置分组 {
   @Prop 是否深色: boolean = false;
-  @Prop 已展开: boolean = false;
-  切换展开回调: () => void = (): void => {};
 
   @State private provider: ProviderId = 'deepseek';
   @State private deepseekModel: string = DEEPSEEK_PROVIDER.defaultModel;
@@ -103,9 +101,7 @@ export struct AIAgent设置分组 {
   build() {
     设置分组卡片({
       标题: $r('app.string.ai_agent_settings_title'),
-      是否深色: this.是否深色,
-      是否展开: this.已展开,
-      切换展开回调: this.切换展开回调
+      是否深色: this.是否深色
     }) {
       Column({ space: 应用尺寸.间距_10 }) {
           Row() {

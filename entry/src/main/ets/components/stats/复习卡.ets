@@ -15,7 +15,6 @@ import { 颜色键 } from '../../model/颜色主题';
 import { 取复习系列色 } from '../../model/统计色板';
 import { 取轴域 } from '../../model/统计分箱';
 import type { 轴域 } from '../../model/统计分箱';
-import { 范围切换条 } from './范围切换条';
 import { 纵轴刻度, 横轴日期条, 纵轴宽 } from './图表轴';
 
 /** 单柱数据：5 系列计数（下→上：成熟/年轻/重学/学习/过滤） */
@@ -33,16 +32,10 @@ export struct 复习卡 {
   /** 每日答题用时（毫秒）：「时间」模式数据源（Anki ReviewsGraph reviewTime） */
   @Prop @Watch('更新缓存') 复习时间: Map<number, ReviewKindCounts> | null = null;
   @Prop 是否显示全部: boolean = false;
-  @State private 范围索引: number = 0;
+  @Prop @Watch('更新缓存') 范围索引: number = 0;
   @State private 显示时间: boolean = false;
   @State private 柱缓存: 复习柱[] = [];
   private readonly 柱区高度: number = 110;
-  private readonly 范围标签: Resource[] = [
-    $r('app.string.stats_hours_range_1m'),
-    $r('app.string.stats_hours_range_3m'),
-    $r('app.string.stats_hours_range_1y'),
-    $r('app.string.stats_hours_range_all')
-  ];
   @StorageProp(颜色键.主色按钮背景) private 主色按钮背景: string = '#2F5FD0';
 
   aboutToAppear(): void {
@@ -255,14 +248,6 @@ export struct 复习卡 {
 
   build() {
     Column({ space: 应用尺寸.间距_8 }) {
-      范围切换条({
-        当前索引: this.范围索引,
-        标签集: this.是否显示全部 ? this.范围标签 : this.范围标签.slice(0, 3),
-        onRangeChange: (): void => {
-          this.更新缓存();
-        }
-      })
-
       // 「时间」复选框（Anki ReviewsGraph showTime）：切换次数 ↔ 答题用时
       Row({ space: 应用尺寸.间距_7 }) {
         Checkbox()

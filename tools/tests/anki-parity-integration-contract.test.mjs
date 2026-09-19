@@ -31,11 +31,12 @@ test('home wires the Anki deck tree, action menu, and selected-deck flows', () =
 
 test('settings owns only language, data, database check, and about entry points', () => {
   const settings = read('entry/src/main/ets/components/设置面板.ets');
-  assert.match(settings, /设置语言模式/);
+  assert.match(read('entry/src/main/ets/components/settings/GeneralSettings.ets'), /设置语言模式/);
   assert.match(settings, /导入数据回调/);
   assert.match(settings, /导出数据回调/);
-  const dataGroup = settings.slice(settings.indexOf('settings_data_management'), settings.indexOf('settings_database_check'));
-  assert.doesNotMatch(dataGroup, /check_db_title/);
+  const dataGroup = read('entry/src/main/ets/components/settings/数据分组.ets');
+  assert.match(dataGroup, /check_db_title/);
+  assert.match(settings, /onCheckDatabase:.*this\.执行数据库检查\(\)/);
   assert.doesNotMatch(settings, /backup_sync_title/);
   assert.doesNotMatch(settings, /onUnavailable/);
   assert.doesNotMatch(settings, /onImport:\s*\(/);

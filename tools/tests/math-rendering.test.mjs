@@ -62,21 +62,28 @@ test('rawfile response only serves fixed assets and never falls through to user 
     setResponseMimeType(value) { this.mime = value; }
     setReasonMessage(value) { this.reason = value; }
   }
-  const source = read('entry/src/main/ets/utils/MathAssetResponse.ets')
+  const source = read('entry/src/main/ets/utils/CardAssetResponse.ets')
     .replace(/^import .*;\r?\n/gm, '').replace('export function', 'function');
   const context = { MATH_ASSET_BASE, WebResourceResponse: Response, $rawfile: (name) => name };
   vm.createContext(context);
   vm.runInContext(stripTypeScriptTypes(source), context);
+  const jqueryUrl = 'https://jidecards-render.local/jquery/3.7.1/jquery.min.js';
+  const jquery = context.interceptCardAsset(jqueryUrl);
+  assert.equal(jquery.code, 200);
+  assert.equal(jquery.data, 'jquery/jquery-3.7.1.min.js');
+  assert.equal(jquery.mime, 'text/javascript');
+  assert.equal(context.interceptCardAsset(jqueryUrl + '/private.js').code, 404);
+  assert.equal(context.interceptCardAsset(jqueryUrl.replace('3.7.1', '0.0.0')).code, 404);
   for (const name of ['card-math.js', 'tex-svg-full.js', 'input/mml.js', 'input/mml/entities.js']) {
-    const result = context.interceptMathAsset(MATH_ASSET_BASE + name);
+    const result = context.interceptCardAsset(MATH_ASSET_BASE + name);
     assert.equal(result.code, 200);
     assert.equal(result.data, 'mathjax/' + name);
     assert.equal(result.mime, 'text/javascript');
   }
-  assert.equal(context.interceptMathAsset(MATH_ASSET_BASE + '../private.js').code, 404);
-  assert.equal(context.interceptMathAsset('https://jidecards-media.local/x.svg'), null);
+  assert.equal(context.interceptCardAsset(MATH_ASSET_BASE + '../private.js').code, 404);
+  assert.equal(context.interceptCardAsset('https://jidecards-media.local/x.svg'), null);
   for (const path of ['pages/学习页.ets', 'components/browser/卡片预览页.ets']) {
-    assert.match(read('entry/src/main/ets/' + path), /return interceptMathAsset\(event\.request\.getRequestUrl\(\)\) \?\? this\.拦截媒体\(event\)/);
+    assert.match(read('entry/src/main/ets/' + path), /return interceptCardAsset\(event\.request\.getRequestUrl\(\)\) \?\? this\.拦截媒体\(event\)/);
   }
 });
 

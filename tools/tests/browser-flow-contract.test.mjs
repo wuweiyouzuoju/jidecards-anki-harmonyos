@@ -607,19 +607,16 @@ test('BrowserPage has T8 batch action methods', () => {
   assert.match(page, /this\.卡片服务实例\.删除卡片\s*\(/);
 });
 
-test('Browser suspend follows Anki card and note semantics and refreshes real search state', () => {
+test('Browser suspend and restore use captured selection and the common completion boundary', () => {
   const page = read('entry/src/main/ets/pages/浏览页.ets');
-  assert.match(page,
-    /if \(this\.浏览模式值 === 'notes'\) \{[\s\S]*?批量埋藏或暂停笔记\([\s\S]*?BURY_SUSPEND_MODE_SUSPEND[\s\S]*?\} else \{[\s\S]*?批量埋藏或暂停卡片\([\s\S]*?BURY_SUSPEND_MODE_SUSPEND/);
-  const suspendBody = page.match(/private async 执行批量挂起\(\): Promise<void> \{[\s\S]*?\n  \}/)?.[0] ?? '';
-  assert.match(suspendBody, /this\.退出多选\(\);[\s\S]*?await this\.执行搜索\(\);/);
-  assert.doesNotMatch(suspendBody, /本地移除选中行\(/);
-
-  assert.match(page,
-    /this\.浏览模式值 === 'cards' \?[\s\S]*?this\.选中ID列表\.slice\(\) : await this\.解析选中笔记的卡片ID\(\)/);
-  assert.match(page, /private async 解析选中笔记的卡片ID\(\): Promise<number\[\]>/);
+  const body = page.match(/private async 执行批量挂起[\s\S]*?\n  \}/)[0];
+  assert.match(body, /selection\.mode === 'notes'/);
+  assert.match(body, /批量埋藏或暂停笔记\(selection\.ids/);
+  assert.match(body, /批量埋藏或暂停卡片\(selection\.ids/);
+  assert.match(body, /runBatchOperation/);
+  assert.match(page, /operations\.isCurrent[\s\S]*?this\.退出多选\(\)/);
   assert.match(page, /this\.笔记服务实例\.获取笔记的卡片\(笔记ID\)/);
-  assert.match(page, /Set<number>[\s\S]*?!已添加\.has\(卡片ID\)/);
+  assert.match(page, /!已添加\.has\(卡片ID\)/);
 });
 
 test('BrowserPage build renders 批量操作栏 conditionally on 多选模式值 + 选中ID列表', () => {
@@ -1005,7 +1002,7 @@ test('BrowserPage has T9 state + methods', () => {
   assert.match(page, /@State\s+private\s+查找替换错误:\s*string/);
   // 2 个方法：执行查找替换 + 解析选中为笔记ID
   assert.match(page, /private\s+async\s+执行查找替换\s*\(/);
-  assert.match(page, /private\s+async\s+解析选中为笔记ID\s*\(\s*\):\s*Promise<number\[\]>/);
+  assert.match(page, /private\s+async\s+解析选中为笔记ID\s*\([^\n]*\):\s*Promise<number\[\]>/);
   // 执行查找替换调用 搜索服务.查找并替换
   assert.match(page, /this\.搜索服务实例\.查找并替换\s*\(/);
 });

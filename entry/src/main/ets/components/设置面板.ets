@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { ThemeTextSpans } from './common/ThemeText';
+import { SettingsEntry, filterSettingsEntries, SETTINGS_ENTRIES } from '../model/SettingsNavigation';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
 
 import { common, Want } from '@kit.AbilityKit';
@@ -8,12 +9,6 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 import { commentManager } from '@kit.AppGalleryKit';
 import { 主题模式 } from '../model/主题设置';
 import { 颜色主题, 颜色键 } from '../model/颜色主题';
-// 以下两个 imports 为契约测试硬约束锚点，不可移除：
-// - 设置语言模式：契约测试 anki-parity-integration-contract 要求设置面板含此标识符；
-//   实际调用在子组件 外观分组 中，此处保留 import 以维持契约。
-// - 集合服务：契约测试 check-database-contract 要求主壳直接持有 service 实例并调 检查数据库；
-//   数据库检查逻辑因此保留在主壳内联，未抽到子组件。
-import { 设置语言模式 } from '../model/语言存储';
 import { 集合服务 } from '../backend/集合服务';
 import { 标签服务 } from '../backend/标签服务';
 import { 链接服务 } from '../backend/链接服务';
@@ -21,6 +16,8 @@ import { HelpPage } from '../proto/messages/LinksMessages';
 import { 设置面板色板_取 } from '../utils/设置面板配色';
 import type { SyncAuth } from '../proto/messages/SyncMessages';
 import { RedemptionPanel } from './settings/RedemptionPanel';
+import { GeneralSettings } from './settings/GeneralSettings';
+import { ReviewControlsSettings } from './settings/ReviewControlsSettings';
 import { 外观分组 } from './settings/外观分组';
 import { 调度器分组 } from './settings/调度器分组';
 import { 布局分组 } from './settings/布局分组';
@@ -39,8 +36,7 @@ import { 设置分组卡片 } from './settings/设置分组卡片';
 import { 简洁模式AppStorage键, 加载简洁模式, 保存简洁模式 } from '../model/简洁模式存储';
 import {
   TapZones开关AppStorage键,
-  加载TapZones开关,
-  保存TapZones开关
+  加载TapZones开关
 } from '../model/实验性功能存储';
 import { 字段帮助面板 } from './字段帮助面板';
 import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时长';
@@ -60,8 +56,6 @@ import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../model/ReleaseFeatures';
 // 数据库检查分组与关于分组保留在主壳中：
 //   - 数据库检查：契约测试 check-database-contract 要求主壳直接持有 集合服务 并调 检查数据库；
 //   - 关于分组：契约测试要求 feedback_email / sponsor_qrcode 资源引用留在主壳。
-// 4 个 分组展开 变量（外观/数据/数据库/关于）保留为父组件 @State，
-// 通过 @Prop + 切换展开回调 下放给子组件。
 //
 // @输入
 // 当前主题模式 / 是否深色 / 当前颜色主题：父页面注入；
@@ -76,6 +70,8 @@ import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../model/ReleaseFeatures';
 // ========================================================
 @Component
 export struct 设置面板 {
+  @Link activeSection: string;
+  @State private settingsQuery: string = '';
   @Prop openAiSettings: boolean = false;
   @Prop 当前主题模式: 主题模式 = 'system';
   @Prop 是否深色: boolean = false;
@@ -122,25 +118,9 @@ export struct 设置面板 {
   关闭回调: () => void = (): void => {
   };
 
-  // 4 个契约测试要求保留的分组开关变量名；通过 @Prop 传给对应子组件。
-  @State private 外观分组展开: boolean = true;
-  @State private 数据分组展开: boolean = false;
-  @State private 数据库分组展开: boolean = false;
-  @State private 关于分组展开: boolean = false;
   // 右上角模式切换菜单：顶栏「当前模式」按钮触发，弹出 简洁版/实验版 选择
   @State private 显示模式菜单: boolean = false;
-  // 实验性功能分组（仅实验版可见）：Tap Zones 开关，默认折叠（手写白板已移除开关，常驻学习页更多菜单）
-  @State private 实验性分组展开: boolean = false;
   // 不在契约要求中但保持父组件统一管理，便于后续按分组排序。
-  // FSRS 分组默认折叠：减少设置页首屏信息密度，用户按需展开。
-  @State private 调度器分组展开: boolean = false;
-  @State private 布局分组展开: boolean = false;
-  @State private 术语分组展开: boolean = false;
-  // AnkiWeb 云同步分组默认折叠：与 FSRS 一致，按需展开
-  @State private 同步分组展开: boolean = false;
-  @State private AIAgent分组展开: boolean = false;
-  @State private 开发者调试分组展开: boolean = false;
-  // 关于分组内部两个子项展开状态（反馈/赞助）。
   @State private 反馈子项展开: boolean = false;
   @State private 赞助子项展开: boolean = false;
   // 数据库检查状态：契约测试 check-database-contract 要求主壳持有这些字段。
@@ -167,8 +147,6 @@ export struct 设置面板 {
   @State private 编辑笔记类型名: string = '';
   // 简洁模式：默认 true，隐藏调度分组/术语分组等高级功能
   @StorageLink(简洁模式AppStorage键) private 简洁模式: boolean = true;
-  // 实验性功能：仅「实验版」模式下设置页可见；学习页生效前会再校验当前为实验版
-  @StorageLink(TapZones开关AppStorage键) private TapZones开关: boolean = false;
   // 输入开发者密钥后即时显示隐藏的 Agent 设置与各页面入口。
   @StorageLink(AI_AGENT_CHANNELS_APP_STORAGE_KEY) private Agent入口已启用: boolean = false;
   // 清除未用标签状态：数据管理分组入口 → 确认对话框 → 调后端
@@ -181,7 +159,7 @@ export struct 设置面板 {
   private readonly 链接服务实例: 链接服务 = new 链接服务();
 
   async aboutToAppear(): Promise<void> {
-    if (this.openAiSettings) { this.AIAgent分组展开 = true; }
+    if (this.openAiSettings) { this.openSection('ai'); }
     // 加载持久化的简洁模式值到 AppStorage，让 @StorageLink 跨重启保持一致
     const 持久化值: boolean = await 加载简洁模式();
     AppStorage.setOrCreate<boolean>(简洁模式AppStorage键, 持久化值);
@@ -195,19 +173,71 @@ export struct 设置面板 {
       });
       // 等简洁模式恢复与内容 List 首帧布局完成后无动画定位；转场动画内完成，打开即在分组处
       setTimeout((): void => {
-        this.内容滚动器.scrollToIndex(this.AIAgent分组索引());
+        this.内容滚动器.scrollToIndex(0);
       }, 50);
     }
   }
 
-  /** AI 智能体分组在内容 List 中的索引：外观/布局/同步恒显，调度器仅实验版渲染（须与 build 分组顺序一致）。 */
-  private AIAgent分组索引(): number {
-    let index: number = 0;
-    index += 1; // 1. 外观与语言分组
-    if (!this.简洁模式) { index += 1; } // 2. FSRS 调度器分组（简洁模式下隐藏）
-    index += 1; // 3. 学习布局分组
-    index += 1; // 4. AnkiWeb 云同步分组
-    return index;
+  /** 目录导航只改变展示位置，设置的保存仍交给原有组件。 */
+  private openSection(id: string): void {
+    this.activeSection = id;
+
+    this.内容滚动器.scrollToIndex(0);
+  }
+
+  private sectionText(key: string): string {
+    return this.getUIContext().getHostContext()!.resourceManager.getStringByNameSync(key);
+  }
+
+  private directoryEntries(): SettingsEntry[] {
+    return filterSettingsEntries(this.settingsQuery, this.简洁模式, this.Agent入口已启用,
+      (key: string): string => this.sectionText(key));
+  }
+
+  private pageTitle(): string {
+    const entry: SettingsEntry | undefined = SETTINGS_ENTRIES.find((item: SettingsEntry): boolean =>
+      item.id === this.activeSection);
+    return this.sectionText(entry === undefined ? 'settings_title' : entry.titleKey);
+  }
+
+  private navigateBack(): void {
+    if (this.activeSection !== '') { this.activeSection = ''; }
+    else { this.关闭回调(); }
+  }
+
+  @Builder
+  private settingsDirectory() {
+    Column({ space: 12 }) {
+      TextInput({ text: this.settingsQuery, placeholder: $r('app.string.settings_search_placeholder') })
+        .height(44)
+        .fontSize(应用尺寸.字号_正文)
+        .backgroundColor($r('app.color.surface_card'))
+        .onChange((value: string): void => { this.settingsQuery = value; })
+      Column() {
+        ForEach(this.directoryEntries(), (entry: SettingsEntry) => {
+          Button() {
+            Row({ space: 12 }) {
+              Column({ space: 4 }) {
+                Text(this.sectionText(entry.titleKey))
+                  .fontSize(应用尺寸.字号_正文).fontWeight(FontWeight.Medium)
+                  .fontColor($r('app.color.text_primary')).width('100%')
+                Text(this.sectionText(this.简洁模式 ? (entry.simpleDescriptionKey ?? entry.descriptionKey) : entry.descriptionKey))
+                  .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
+                  .width('100%')
+              }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+              Text('›').fontSize(22).fontColor($r('app.color.text_secondary'))
+            }.width('100%').padding({ left: 16, right: 16, top: 14, bottom: 14 })
+          }
+          .type(ButtonType.Normal).width('100%').backgroundColor(Color.Transparent)
+          .onClick((): void => { this.openSection(entry.id); })
+          Divider().color($r('app.color.border_subtle')).margin({ left: 16, right: 16 })
+        }, (entry: SettingsEntry): string => entry.id)
+        if (this.directoryEntries().length === 0) {
+          Text($r('app.string.settings_search_empty')).fontSize(应用尺寸.字号_正文)
+            .fontColor($r('app.color.text_secondary')).padding(20)
+        }
+      }.width('100%').backgroundColor($r('app.color.surface_card')).borderRadius(16).clip(true)
+    }.width('100%')
   }
 
   private 取本地化文本(资源: Resource): string {
@@ -328,7 +358,6 @@ export struct 设置面板 {
   // @名称 关于分组内容构建器
   //
   // @作用
-  // 渲染关于分组展开后的内容：应用介绍 + 反馈子项（可折叠）+ 赞助子项（可折叠）
   // + AnkiWeb 资源入口 + 许可证入口 + Anki 官方文档入口。
   // 反馈子项含 app.string.feedback_email 资源引用；赞助子项含 app.media.sponsor_qrcode 资源引用。
   //
@@ -336,7 +365,6 @@ export struct 设置面板 {
   // 直接读 @State 反馈子项展开 / 赞助子项展开 与 打开许可证回调。
   //
   // @输出
-  // 渲染关于分组展开内容；用户点击反馈/赞助子项时切换其展开状态；
   // 点 AnkiWeb 资源入口时调 打开AnkiWeb网址 方法；点许可证入口时上抛 打开许可证回调。
   //
   // @业务规则
@@ -794,7 +822,7 @@ export struct 设置面板 {
   // @名称 设置面板主构建
   //
   // @作用
-  // 渲染整页设置面板：Stack 遮罩 + List 7 个分组 ListItem + 字段帮助浮层。
+  // 设置目录及详情共用主壳；状态和说明浮层在页面级保留。
   // 分组顺序：标题栏 → 外观 → 调度器 → 布局 → 同步 → 数据库检查 → 术语表 → 数据管理 → 关于。
   // 数据库检查与关于分组内联在主壳（见 UI-SETTINGS-PANEL-001 / UI-SETTINGS-PANEL-002 / UI-SETTINGS-PANEL-004）。
   //
@@ -810,13 +838,18 @@ export struct 设置面板 {
   build() {
     Stack() {
       Column() {
-        // 顶部条：左返回（关闭设置页）+ 右当前模式按钮（弹出 简洁版/实验版 菜单）
-        Stack() {
+        // 返回先退回目录，模式切换入口保留在右侧。
+        Stack({ alignContent: Alignment.Center }) {
+          Text(this.pageTitle())
+            .fontSize(应用尺寸.字号_标题).fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.text_primary')).width('44%')
+            .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).textAlign(TextAlign.Center)
+            .hitTestBehavior(HitTestMode.None)
           Row() {
             按下态按钮({
               文案: $r('app.string.study_back'),
               字色: $r('app.color.text_primary'),
-              点击回调: (): void => { this.关闭回调(); }
+              点击回调: (): void => { this.navigateBack(); }
             })
             Blank()
             按下态按钮({
@@ -842,250 +875,174 @@ export struct 设置面板 {
 
         // 内容区
         List({ space: 应用尺寸.pageSectionGap, scroller: this.内容滚动器 }) {
-        // 1. 外观与语言分组
-        ListItem() {
-          外观分组({
-            是否深色: this.是否深色,
-            当前主题模式: this.当前主题模式,
-            当前颜色主题: this.当前颜色主题,
-            是否展开: this.外观分组展开,
-            切换展开回调: (): void => { this.外观分组展开 = !this.外观分组展开; },
-            主题模式切换回调: (模式: 主题模式): void => { this.主题模式切换回调(模式); },
-            颜色主题切换回调: (主题: 颜色主题): void => { this.颜色主题切换回调(主题); }
-          })
-        }
-
-        // 2. FSRS 调度器分组（简洁模式下隐藏）
-        if (!this.简洁模式) {
-          ListItem() {
-            调度器分组({
-              是否深色: this.是否深色,
-              是否展开: this.调度器分组展开,
-              切换展开回调: (): void => { this.调度器分组展开 = !this.调度器分组展开; },
-              打开说明回调: (标题: Resource, 正文: Resource): void => {
-                this.说明标题 = 标题;
-                this.说明正文 = 正文;
-                this.显示说明浮层 = true;
-              }
-            })
+          if (this.activeSection === '') {
+            ListItem() { this.settingsDirectory() }
           }
-        }
-
-        // 3. 学习布局分组（原「复习页布局」分组更名；展开后含复习页布局 Select + 今日进度卡开关）
-        ListItem() {
-          布局分组({
-            是否深色: this.是否深色,
-            是否展开: this.布局分组展开,
-            切换展开回调: (): void => { this.布局分组展开 = !this.布局分组展开; },
-            打开说明回调: (标题: Resource, 正文: Resource): void => {
-              this.说明标题 = 标题;
-              this.说明正文 = 正文;
-              this.显示说明浮层 = true;
-            }
-          })
-        }
-
-        // 4. AnkiWeb 云同步分组（M10-T14：登录/同步/冲突全在 同步分组 内部状态机完成）
-        // 2026-07-22 上移两格：用户反馈云同步常用，原位于数据管理之后太靠下
-        // 2026-07-28：语音朗读分组已删除（用户决策），同步分组从原 5 号位上移到 4 号位
-        ListItem() {
-          同步分组({
-            是否深色: this.是否深色,
-            是否展开: this.同步分组展开,
-            切换展开回调: (): void => { this.同步分组展开 = !this.同步分组展开; },
-            打开同步弹窗回调: (凭证: SyncAuth, 账号名: string): void => { this.打开同步弹窗回调(凭证, 账号名); },
-            点击导出数据回调: (): void => { this.先备份后同步回调(); },
-            打开说明回调: (标题: Resource, 正文: Resource): void => {
-              this.说明标题 = 标题;
-              this.说明正文 = 正文;
-              this.显示说明浮层 = true;
-            }
-          })
-        }
-
-        if (this.Agent入口已启用) {
-          ListItem() {
-            AIAgent设置分组({
-              是否深色: this.是否深色,
-              已展开: this.AIAgent分组展开,
-              切换展开回调: (): void => { this.AIAgent分组展开 = !this.AIAgent分组展开; }
-            })
-          }
-        }
-
-        // 6. 数据库检查分组（内联：契约测试要求 import 集合服务 / 检查数据库 / 数据库检查中 等保留在主壳）
-        // 头部内联带 ⓘ 按钮：与其他子分组（调度器分组/语音分组/术语分组）一致，
-        // 点击 ⓘ 上抛到主壳根 Stack 的 字段帮助面板 浮层显示「数据库检查」官方说明。
-        // 2026-07-22 上移两格：与云同步相邻，便于同步后顺手检查数据库
-        ListItem() {
-          设置分组卡片({
-            标题: $r('app.string.settings_database_check'),
-            是否深色: this.是否深色,
-            是否展开: this.数据库分组展开,
-            帮助标题: $r('app.string.check_db_title'),
-            帮助正文: $r('app.string.check_db_help'),
-            切换展开回调: (): void => { this.数据库分组展开 = !this.数据库分组展开; },
-            打开说明回调: (标题: Resource, 正文: Resource): void => {
-              this.说明标题 = 标题;
-              this.说明正文 = 正文;
-              this.显示说明浮层 = true;
-            }
-          }) {
-            Column() {
-              Button(this.数据库检查中 ? $r('app.string.check_db_running') : $r('app.string.check_db_title'))
-                .width('100%')
-                .height(40)
-                .fontSize(12)
-                .padding({ left: 4, right: 4 })
-                .fontColor(设置面板色板_取(this.是否深色).主文字)
-                .backgroundColor(设置面板色板_取(this.是否深色).标签背景)
-                .borderRadius(20)
-                .enabled(!this.数据库检查中)
-                .opacity(this.数据库检查中 ? 0.6 : 1)
-                .onClick((): void => { this.执行数据库检查(); })
-              if (this.数据库错误信息 !== '') {
-                Text(this.数据库错误信息)
-                  .fontSize(12)
-                  .fontColor(设置面板色板_取(this.是否深色).错误色)
-                  .width('100%')
-                  .margin({ top: 10 })
-              } else if (this.数据库检查完成) {
-                Text(this.数据库问题列表.length === 0 ? $r('app.string.check_db_passed') :
-                  $r('app.string.check_db_problems', this.数据库问题列表.length))
-                  .fontSize(12)
-                  .fontColor(设置面板色板_取(this.是否深色).次文字)
-                  .width('100%')
-                  .margin({ top: 10 })
-                if (this.数据库问题列表.length > 0) {
-                  ForEach(this.数据库问题列表.slice(0, 3), (问题: string) => {
-                    Text(问题)
-                      .fontSize(12)
-                      .fontColor(设置面板色板_取(this.是否深色).次文字)
-                      .maxLines(2)
-                      .textOverflow({ overflow: TextOverflow.Ellipsis })
-                      .width('100%')
-                  }, (问题: string): string => 问题)
+          if (this.activeSection === 'general') {
+            ListItem() {
+              GeneralSettings({
+                是否深色: this.是否深色,
+                打开说明回调: (标题: Resource, 正文: Resource): void => {
+                  this.说明标题 = 标题;
+                  this.说明正文 = 正文;
+                  this.显示说明浮层 = true;
                 }
-              }
+              })
             }
-            .width('100%')
           }
-        }
-
-        // 7. 术语表分组（简洁模式下隐藏）
-        if (!this.简洁模式) {
-          ListItem() {
-            术语分组({
-              是否深色: this.是否深色,
-              是否展开: this.术语分组展开,
-              切换展开回调: (): void => { this.术语分组展开 = !this.术语分组展开; },
-              打开说明回调: (标题: Resource, 正文: Resource): void => {
-                this.说明标题 = 标题;
-                this.说明正文 = 正文;
-                this.显示说明浮层 = true;
-              }
-            })
-          }
-        }
-
-        // 8. 数据管理分组（入口字符串 app.string.settings_data_management 由子组件 数据分组 持有；
-        //    此注释保留主壳对入口字符串的引用，满足 import-flow-contract 契约测试）
-        ListItem() {
-          数据分组({
-            是否深色: this.是否深色,
-            是否展开: this.数据分组展开,
-            简洁模式: this.简洁模式,
-            切换展开回调: (): void => { this.数据分组展开 = !this.数据分组展开; },
-            点击导出导入回调: (): void => { this.导出数据回调(); },
-            点击笔记类型回调: (): void => { this.显示笔记类型管理 = true; },
-            点击已隐藏牌组回调: (): void => { this.点击已隐藏牌组回调(); },
-            点击媒体管理回调: (): void => { this.显示媒体管理 = true; },
-            点击空卡回调: (): void => { this.显示空卡列表 = true; },
-            点击查找重复回调: (): void => { this.显示查找重复 = true; },
-            点击清除未用标签回调: (): void => { this.请求清除未用标签(); }
-          })
-        }
-
-        // 8. 关于分组（保留内联：含 feedback_email / sponsor_qrcode 资源引用）
-        ListItem() {
-          设置分组卡片({
-            标题: $r('app.string.settings_about'),
-            是否深色: this.是否深色,
-            是否展开: this.关于分组展开,
-            切换展开回调: (): void => { this.关于分组展开 = !this.关于分组展开; }
-          }) {
-            this.关于分组内容();
-          }
-        }
-
-        // 开发者调试始终可见；正确密钥只持久化布尔解锁状态，不保存输入内容。
-        ListItem() {
-          开发者调试分组({
-            是否深色: this.是否深色,
-            已展开: this.开发者调试分组展开,
-            切换展开回调: (): void => {
-              this.开发者调试分组展开 = !this.开发者调试分组展开;
-            },
-            启用成功回调: (): void => {
-              this.开发者调试分组展开 = false;
-              this.AIAgent分组展开 = true;
-              setTimeout((): void => {
-                this.内容滚动器.scrollToIndex(this.AIAgent分组索引());
-              }, 50);
+          if (this.activeSection === 'controls') {
+            ListItem() {
+              ReviewControlsSettings({
+                是否深色: this.是否深色,
+                简洁模式: this.简洁模式,
+                打开说明回调: (标题: Resource, 正文: Resource): void => {
+                  this.说明标题 = 标题;
+                  this.说明正文 = 正文;
+                  this.显示说明浮层 = true;
+                }
+              })
             }
-          })
-        }
-
-        // 9. 实验性功能分组：仅「实验版」模式下可见；包含 Tap Zones 快速答题。
-        // 分组头部与其他分组同款（无 ⓘ）；开关行旁的 ⓘ 保留说明用法。
-        if (!this.简洁模式) {
-          ListItem() {
-            设置分组卡片({
-              标题: $r('app.string.settings_experimental_group'),
-              是否深色: this.是否深色,
-              是否展开: this.实验性分组展开,
-              切换展开回调: (): void => { this.实验性分组展开 = !this.实验性分组展开; }
-            }) {
-              Column({ space: 12 }) {
-                  // Tap Zones：点击屏幕区域快速答题
-                  Row() {
-                    Text(this.取本地化文本($r('app.string.settings_tap_zones_label')))
-                      .fontSize(15)
-                      .fontColor(设置面板色板_取(this.是否深色).主文字)
-                    Button($r('app.string.field_help_button'))
-                      .type(ButtonType.Normal)
-                      .backgroundColor(Color.Transparent)
-                      .fontSize(14)
-                      .fontColor(设置面板色板_取(this.是否深色).三级文字)
-                      .width(28)
-                      .height(28)
-                      .padding(0)
-                      .margin({ left: 6 })
-                      .onClick(() => {
-                        this.说明标题 = $r('app.string.settings_tap_zones_label');
-                        this.说明正文 = $r('app.string.settings_tap_zones_hint');
-                        this.显示说明浮层 = true;
-                      })
-                    Blank()
-                    Toggle({ type: ToggleType.Switch, isOn: this.TapZones开关 })
-                      .onChange((开启: boolean): void => {
-                        保存TapZones开关(开启);
-                      })
+          }
+          // 1. 外观与语言分组
+          if (this.activeSection === 'appearance') {
+            ListItem() {
+              外观分组({
+                是否深色: this.是否深色,
+                简洁模式: this.简洁模式,
+                当前主题模式: this.当前主题模式,
+                当前颜色主题: this.当前颜色主题,
+                主题模式切换回调: (模式: 主题模式): void => { this.主题模式切换回调(模式); },
+                颜色主题切换回调: (主题: 颜色主题): void => { this.颜色主题切换回调(主题); }
+              })
+            }
+          }
+          // 2. FSRS 调度器分组（简洁模式下隐藏）
+          if (!this.简洁模式) {
+            if (this.activeSection === 'scheduler') {
+              ListItem() {
+                调度器分组({
+                  是否深色: this.是否深色,
+                  打开说明回调: (标题: Resource, 正文: Resource): void => {
+                    this.说明标题 = 标题;
+                    this.说明正文 = 正文;
+                    this.显示说明浮层 = true;
                   }
-                  .width('100%')
-                  .height(48)
+                })
               }
-              .width('100%')
             }
           }
-        }
-
-        ListItem() {
-          RedemptionPanel({
-            developerGroup: this.QQ群号,
-            onUseTheme: (theme: 颜色主题): void => { this.颜色主题切换回调(theme); }
-          })
-        }
+          // 实验版在外观页提供复习布局细调，切换模式不改已保存的布局。
+          if (this.activeSection === 'appearance' && !this.简洁模式) {
+            ListItem() {
+              布局分组({
+                是否深色: this.是否深色,
+                打开说明回调: (标题: Resource, 正文: Resource): void => {
+                  this.说明标题 = 标题;
+                  this.说明正文 = 正文;
+                  this.显示说明浮层 = true;
+                }
+              })
+            }
+          }
+          // 4. AnkiWeb 云同步分组（M10-T14：登录/同步/冲突全在 同步分组 内部状态机完成）
+          // 2026-07-22 上移两格：用户反馈云同步常用，原位于数据管理之后太靠下
+          // 2026-07-28：语音朗读分组已删除（用户决策），同步分组从原 5 号位上移到 4 号位
+          if (this.activeSection === 'sync') {
+            ListItem() {
+              同步分组({
+                是否深色: this.是否深色,
+                简洁模式: this.简洁模式,
+                打开同步弹窗回调: (凭证: SyncAuth, 账号名: string): void => { this.打开同步弹窗回调(凭证, 账号名); },
+                点击导出数据回调: (): void => { this.先备份后同步回调(); },
+                打开说明回调: (标题: Resource, 正文: Resource): void => {
+                  this.说明标题 = 标题;
+                  this.说明正文 = 正文;
+                  this.显示说明浮层 = true;
+                }
+              })
+            }
+          }
+          if (this.Agent入口已启用) {
+            if (this.activeSection === 'ai') {
+              ListItem() {
+                AIAgent设置分组({
+                  是否深色: this.是否深色,
+                })
+              }
+            }
+          }
+          // 新手帮助在两种模式下都可访问。
+            if (this.activeSection === 'help') {
+              ListItem() {
+                术语分组({
+                  是否深色: this.是否深色,
+                  打开说明回调: (标题: Resource, 正文: Resource): void => {
+                    this.说明标题 = 标题;
+                    this.说明正文 = 正文;
+                    this.显示说明浮层 = true;
+                  }
+                })
+              }
+            }
+          // 数据管理：维护入口合并在同一列表，检查状态仍由主壳管理。
+          if (this.activeSection === 'data') {
+            ListItem() {
+              数据分组({
+                是否深色: this.是否深色,
+                简洁模式: this.简洁模式,
+                databaseBusy: this.数据库检查中,
+                databaseChecked: this.数据库检查完成,
+                databaseError: this.数据库错误信息,
+                databaseProblems: this.数据库问题列表,
+                onCheckDatabase: (): void => { this.执行数据库检查(); },
+                onDatabaseHelp: (): void => {
+                  this.说明标题 = $r('app.string.check_db_title');
+                  this.说明正文 = $r('app.string.check_db_help');
+                  this.显示说明浮层 = true;
+                },
+                点击导出导入回调: (): void => { this.导出数据回调(); },
+                点击笔记类型回调: (): void => { this.显示笔记类型管理 = true; },
+                点击已隐藏牌组回调: (): void => { this.点击已隐藏牌组回调(); },
+                点击媒体管理回调: (): void => { this.显示媒体管理 = true; },
+                点击空卡回调: (): void => { this.显示空卡列表 = true; },
+                点击查找重复回调: (): void => { this.显示查找重复 = true; },
+                点击清除未用标签回调: (): void => { this.请求清除未用标签(); }
+              })
+            }
+          }
+          // 8. 关于分组（保留内联：含 feedback_email / sponsor_qrcode 资源引用）
+          if (this.activeSection === 'about') {
+            ListItem() {
+              设置分组卡片({
+                标题: $r('app.string.settings_about'),
+                是否深色: this.是否深色,
+              }) {
+                this.关于分组内容();
+              }
+            }
+          }
+          // 开发者调试始终可见；正确密钥只持久化布尔解锁状态，不保存输入内容。
+          if (this.activeSection === 'advanced') {
+            ListItem() {
+              开发者调试分组({
+                是否深色: this.是否深色,
+                启用成功回调: (): void => {
+                  this.openSection('ai');
+                  setTimeout((): void => {
+                    this.内容滚动器.scrollToIndex(0);
+                  }, 50);
+                }
+              })
+            }
+          }
+          if (this.activeSection === 'about') {
+            ListItem() {
+              RedemptionPanel({
+                developerGroup: this.QQ群号,
+                onUseTheme: (theme: 颜色主题): void => { this.颜色主题切换回调(theme); }
+              })
+            }
+          }
         }
         .layoutWeight(1)
         .width('100%')
@@ -1095,6 +1052,7 @@ export struct 设置面板 {
           top: 应用尺寸.pageContentTopInset,
           bottom: 应用尺寸.pageBottomInset + this.导航条高度
         })
+        .backgroundColor($r('app.color.surface_page'))
         .scrollBar(BarState.Off)
         .edgeEffect(EdgeEffect.Spring)
         .alignListItem(ListItemAlign.Center)
@@ -1123,6 +1081,7 @@ export struct 设置面板 {
             this.显示模式菜单 = false;
             if (简洁 !== this.简洁模式) {
               保存简洁模式(简洁);
+              this.activeSection = '';
             }
           },
           关闭回调: (): void => { this.显示模式菜单 = false; }

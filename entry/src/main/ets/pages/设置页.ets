@@ -37,6 +37,7 @@ export interface 设置页参数 {
 
 @Component
 export struct 设置页 {
+  @State private activeSection: string = '';
   pathStack?: NavPathStack;
   openAiSettings: boolean = false;
   private readonly 牌组服务实例: 牌组服务 = new 牌组服务();
@@ -361,6 +362,7 @@ export struct 设置页 {
     NavDestination() {
       Stack() {
         设置面板({
+          activeSection: this.activeSection,
           openAiSettings: this.openAiSettings,
           当前主题模式: this.主题模式值,
           是否深色: this.是否深色(),
@@ -454,7 +456,11 @@ export struct 设置页 {
     }
     .hideTitleBar(true)
     .backgroundColor(Color.Transparent)
-    .onBackPressed((): boolean => this.显示同步面板)
+    .onBackPressed((): boolean => {
+      if (this.显示同步面板) return true;
+      if (this.activeSection !== '') { this.activeSection = ''; return true; }
+      return false;
+    })
     .opacity(this.转场透明度)
   }
 }

@@ -1,30 +1,32 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { BrowserOperationController } from '../../entry/src/main/ets/model/BrowserOperationController.ts';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import test from 'node:test';
 import { BrowserColumnSorting, SearchNodeCardState, makeCardStateNode, makeParsableTextNode }
   from '../../entry/src/main/ets/proto/messages/SearchMessages.ts';
+import { browserFilterNode } from '../../entry/src/main/ets/model/BrowserQuickFilter.ts';
 import { ConfigKeyBool } from '../../entry/src/main/ets/proto/messages/ConfigMessages.ts';
 
 const source = readFileSync(new URL('../../entry/src/main/ets/pages/浏览页.ets', import.meta.url), 'utf8');
-const names = ['执行搜索', '预加载行', 'sortableColumns', 'sortLabel', 'sortMenu', '切换模式', 'resultCountLabel'];
+const names = ['执行搜索', '预加载行', 'sortableColumns', 'sortLabel', 'sortOptions', 'sortIndex', 'selectSort', '切换模式', 'resultCountLabel'];
 const methods = names.map(name => {
   const start = source.search(new RegExp(`  private (?:async )?${name}\\(`));
   assert.ok(start >= 0, name);
   return source.slice(start, source.indexOf('\n  }', start) + 4);
 });
 const Page = new Function('后端会话', 'BrowserColumnSorting', 'SearchNodeCardState', 'makeCardStateNode',
-  'makeParsableTextNode', 'ConfigKeyBool', '$r', 'console',
+  'makeParsableTextNode', 'browserFilterNode', 'ConfigKeyBool', '$r', 'console',
   stripTypeScriptTypes(`class Page { ${methods.join('\n')} }`, { mode: 'transform' }) + '; return Page;')(
   { 获取实例: () => ({ 确保已打开: async () => {} }) }, BrowserColumnSorting,
-  SearchNodeCardState, makeCardStateNode, makeParsableTextNode, ConfigKeyBool, key => key, { info() {} });
+  SearchNodeCardState, makeCardStateNode, makeParsableTextNode, browserFilterNode, ConfigKeyBool, key => key, { info() {} });
 
 function harness(notes = false) {
   const page = new Page();
   const calls = [];
   Object.assign(page, {
-    searchVersion: 0, 浏览模式值: notes ? 'notes' : 'cards', 搜索文本: '',
+    operations: new BrowserOperationController(), 关闭卡片信息() {}, editorVersion: 0, mappingVersion: 0, searchVersion: 0, 浏览模式值: notes ? 'notes' : 'cards', 搜索文本: '',
     sortColumn: '', sortReverse: false, 列定义: [], 行列表: [], 结果ID列表: [],
     suspendedRowIds: new Set(), 取能力上下文: () => ({ filesDir: '/collection' }),
     取本地化文案: key => key, 退出多选() {},
@@ -88,6 +90,35 @@ test('old pagination cannot append rows after a new search starts', async () => 
   resolveRow({ cells: [], color: 0 });
   await oldLoad;
   assert.deepEqual(page.行列表, [{ id: 21 }]);
+});
+
+test('sort dropdown roundtrips both directions in cards and notes modes and restores default', async () => {
+  for (const notes of [false, true]) {
+    const { page } = harness(notes);
+    await page.执行搜索();
+    let searches = 0;
+    page.执行搜索 = () => { searches++; };
+    const options = page.sortOptions();
+    const columns = page.sortableColumns();
+    assert.equal(options.length, 1 + columns.length * 2);
+    assert.equal(page.sortIndex(), 0);
+    columns.forEach((column, index) => {
+      for (const descending of [false, true]) {
+        const selected = 1 + index * 2 + Number(descending);
+        page.selectSort(selected);
+        assert.equal(page.sortColumn, column.key);
+        assert.equal(page.sortReverse,
+          ((notes ? column.sortingNotes : column.sortingCards) === BrowserColumnSorting.SORTING_DESCENDING) !== descending);
+        assert.equal(page.sortIndex(), selected);
+        assert.equal(page.sortLabel(), options[selected].value);
+      }
+    });
+    page.selectSort(0);
+    assert.equal(page.sortColumn, '');
+    assert.equal(page.sortReverse, false);
+    assert.equal(page.sortIndex(), 0);
+    assert.equal(searches, options.length);
+  }
 });
 
 test('suspension lookup failure is visible instead of falsely labelling all cards active', async () => {

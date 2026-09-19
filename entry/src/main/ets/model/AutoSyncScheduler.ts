@@ -4,6 +4,7 @@
 export class AutoSyncScheduler {
   private pending: boolean = false;
   private studies: Map<Object, boolean> = new Map<Object, boolean>();
+  private operations: Set<Object> = new Set<Object>();
   private listener: (() => void) | null = null;
 
   setListener(listener: (() => void) | null): void {
@@ -32,10 +33,19 @@ export class AutoSyncScheduler {
   }
 
   canSync(): boolean {
+    if (this.operations.size > 0) return false;
     for (const active of this.studies.values()) {
       if (active) return false;
     }
     return true;
+  }
+
+  /** 离页仍在执行的数据操作独立占用，不影响学习完成页的身份判断。 */
+  beginOperation(owner: Object): void { this.operations.add(owner); }
+
+  endOperation(owner: Object): void {
+    this.operations.delete(owner);
+    this.wake();
   }
 
   isStudyComplete(): boolean {

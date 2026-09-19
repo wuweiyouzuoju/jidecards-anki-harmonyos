@@ -10,22 +10,15 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 取间隔柱色 } from '../../model/统计色板';
 import { 展开为序列, 取序列分位, 取轴域 } from '../../model/统计分箱';
 import type { 轴域 } from '../../model/统计分箱';
-import { 范围切换条 } from './范围切换条';
 import { 纵轴刻度, 纵轴宽 } from './图表轴';
 
 @Component
 export struct 稳定度分布卡 {
   @Prop @Watch('更新缓存') 稳定度数据: Intervals | null = null;
-  @State private 范围索引: number = 2;
+  @Prop @Watch('更新缓存') 范围索引: number = 2;
   @State private 柱缓存: number[] = [];
   @State private 显示上限: number = 0;
   private readonly 柱区高度: number = 108;
-  private readonly 范围标签: Resource[] = [
-    $r('app.string.stats_hours_range_1m'),
-    $r('app.string.stats_range_p50'),
-    $r('app.string.stats_range_p95'),
-    $r('app.string.stats_hours_range_all')
-  ];
 
   aboutToAppear(): void {
     this.更新缓存();
@@ -109,14 +102,6 @@ export struct 稳定度分布卡 {
 
   build() {
     Column({ space: 应用尺寸.间距_8 }) {
-      范围切换条({
-        当前索引: this.范围索引,
-        标签集: this.范围标签,
-        onRangeChange: (): void => {
-          this.更新缓存();
-        }
-      })
-
       if (this.数据为空()) {
         Text($r('app.string.stats_empty_section'))
           .fontSize(应用尺寸.字号_正文)

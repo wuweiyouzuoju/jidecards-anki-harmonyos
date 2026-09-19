@@ -984,16 +984,16 @@ export struct 添加笔记页 {
 
   @Builder
   private 顶部条() {
-    // Stack 叠层：底层 Text(牌组名) 居中铺满，上层 Row(返回按钮 + Blank) 让返回按钮在左。
-    // 这样牌组名在视觉上真正居中，而不是被返回按钮挤到右边。
+    // 页面标题独立居中，牌组选择保留在表单内。
     Stack({ alignContent: Alignment.Center }) {
-      Text(this.牌组名)
+      Text($r('app.string.add_note_title'))
         .fontSize(应用尺寸.字号_标题)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.text_primary'))
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
         .textAlign(TextAlign.Center)
+        .width('44%').hitTestBehavior(HitTestMode.None)
         .padding({ left: 应用尺寸.间距_12, right: 应用尺寸.间距_12 })
 
       Row() {

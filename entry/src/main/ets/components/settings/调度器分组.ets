@@ -16,8 +16,7 @@ import { 设置分组卡片 } from './设置分组卡片';
 //
 // @输入
 // 是否深色：当前是否深色模式（影响色板取值）。
-// 是否展开：本分组是否展开。
-// 切换展开回调 / 打开说明回调：父组件注入；打开说明回调 上抛 标题 + 正文 Resource。
+// 打开说明回调：父组件注入；打开说明回调 上抛 标题 + 正文 Resource。
 //
 // @输出
 // 渲染 FSRS 调度器分组卡片；用户切换开关时持久化并更新状态。
@@ -29,8 +28,6 @@ import { 设置分组卡片 } from './设置分组卡片';
 @Component
 export struct 调度器分组 {
   @Prop 是否深色: boolean = false;
-  @Prop 是否展开: boolean = false;
-  切换展开回调: () => void = (): void => {};
   // ⓘ 按钮上抛：由父组件 SettingsPanel 统一渲染 FieldHelpPanel 浮层，避免嵌在分组卡片内
   打开说明回调: (标题: Resource, 正文: Resource) => void = (_标题: Resource, _正文: Resource): void => {};
 
@@ -124,13 +121,17 @@ export struct 调度器分组 {
     设置分组卡片({
       标题: $r('app.string.settings_scheduler'),
       是否深色: this.是否深色,
-      是否展开: this.是否展开,
+
       帮助标题: $r('app.string.settings_fsrs_label'),
       帮助正文: $r('app.string.settings_fsrs_help'),
-      切换展开回调: this.切换展开回调,
+
       打开说明回调: this.打开说明回调
     }) {
-      Column() {
+      Column({ space: 8 }) {
+          Text($r('app.string.settings_algorithm_scope'))
+            .fontSize(13).fontColor(设置面板色板_取(this.是否深色).次文字).width('100%')
+          Text($r('app.string.settings_algorithm_deck_options'))
+            .fontSize(13).fontColor(设置面板色板_取(this.是否深色).次文字).width('100%')
           // FSRS 开关行：label + Toggle。说明文字已移到 分组头部 的 ⓘ 按钮弹层中。
           // 注意：Toggle 的 isOn 必须用 $$ 双向绑定到 @State，否则开关不响应点击。
           // 但本场景需要乐观更新 + 失败回滚，所以改用单向绑定 + onChange 手动控制。

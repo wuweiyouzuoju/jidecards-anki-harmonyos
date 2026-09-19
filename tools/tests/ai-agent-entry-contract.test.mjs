@@ -30,7 +30,7 @@ test('developer debug key persistently unlocks every hidden Agent channel throug
     'successful activation must use the existing single-line settings status style');
   assert.match(settings, /开发者调试分组\(/);
   assert.match(settings,
-    /启用成功回调:[\s\S]*?this\.开发者调试分组展开 = false;[\s\S]*?this\.AIAgent分组展开 = true;/,
+    /启用成功回调:[\s\S]*?this\.openSection\('ai'\);/,
     'successful activation must collapse developer debug and reveal the Agent settings group');
   const zh = JSON.parse(read('entry/src/main/resources/base/element/string.json')).string;
   const en = JSON.parse(read('entry/src/main/resources/en_US/element/string.json')).string;
@@ -123,8 +123,8 @@ test('unconfigured home AI entries route to the expanded AI settings group', () 
   assert.doesNotMatch(page, /openAISettings\(|name:\s*'SettingsPage'/);
   const createEntry = home.match(/private async 打开AI制卡\(\)[\s\S]*?\n  \}/)?.[0] ?? '';
   const editEntry = home.match(/private async 打开AI改卡\(\)[\s\S]*?\n  \}/)?.[0] ?? '';
-  assert.match(createEntry, /if \(!await this\.isAIConfigured\(\)\)[\s\S]*?this\.openAISettings\(\)/);
-  assert.match(editEntry, /if \(!await this\.isAIConfigured\(\)\)[\s\S]*?this\.openAISettings\(\)/);
+  assert.match(createEntry, /if \(!(?:await this\.isAIConfigured\(\)|configured)\)[\s\S]*?this\.openAISettings\(\)/);
+  assert.match(editEntry, /if \(!(?:await this\.isAIConfigured\(\)|configured)\)[\s\S]*?this\.openAISettings\(\)/);
   assert.match(home, /设置页参数\s*=\s*\{ openAiSettings:\s*true \}/);
   assert.match(home, /name:\s*'SettingsPage'/);
   assert.match(home,
@@ -132,12 +132,12 @@ test('unconfigured home AI entries route to the expanded AI settings group', () 
   assert.match(settingsPage,
     /设置面板\(\{[\s\S]*?openAiSettings:\s*this\.openAiSettings/);
   assert.match(settingsPanel,
-    /if \(this\.openAiSettings\) \{ this\.AIAgent分组展开 = true; \}/);
+    /if \(this\.openAiSettings\) \{ this\.openSection\('ai'\); \}/);
   // 跳转后必须直接定位到 AI 智能体分组（无动画），并弹悬浮 Toast「请先完善AI配置」
   assert.match(settingsPanel, /scroller:\s*this\.内容滚动器/);
-  assert.match(settingsPanel, /scrollToIndex\(this\.AIAgent分组索引\(\)\)/);
+  assert.match(settingsPanel, /scrollToIndex\(0\)/);
   assert.match(settingsPanel,
-    /private AIAgent分组索引\(\): number[\s\S]*?if \(!this\.简洁模式\) \{ index \+= 1; \}[\s\S]*?return index;/);
+    /private openSection\(id: string\): void[\s\S]*?this\.activeSection = id;/);
   const aiToast = settingsPanel.match(/if \(this\.openAiSettings\) \{([\s\S]*?)\n    \}/)?.[1] ?? '';
   assert.match(aiToast, /showToast\(\{[\s\S]*?ai_agent_config_required[\s\S]*?\}\)/,
     'the hint must be a floating toast, not inline layout copy');
@@ -156,7 +156,7 @@ test('unconfigured browser and study AI edit entries route to the same AI settin
   const study = read('entry/src/main/ets/pages/学习页.ets');
   for (const [name, source] of [['browser', browser], ['study', study]]) {
     const entry = source.match(/private async 打开AI改卡\(\)[\s\S]*?\n  \}/)?.[0] ?? '';
-    assert.match(entry, /if \(!await this\.isAIConfigured\(\)\)[\s\S]*?this\.openAISettings\(\)/,
+    assert.match(entry, /if \(!(?:await this\.isAIConfigured\(\)|configured)\)[\s\S]*?this\.openAISettings\(\)/,
       `${name} edit entry must gate on AI configuration before pushing AiCardPage`);
     assert.match(source, /设置页参数\s*=\s*\{ openAiSettings:\s*true \}/, name);
     assert.match(source, /name:\s*'SettingsPage'/, name);
