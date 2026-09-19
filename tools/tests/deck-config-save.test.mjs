@@ -171,12 +171,15 @@ test('editing or discarding drafts without saving leaves collection data untouch
   assert.deepEqual(encodeDeckConfig(original), before);
 });
 
-test('UI displays default scope, explicit shared count and a separate global group', () => {
+test('deck scope is available from the header help and global controls stay separate', () => {
   const home = read('entry/src/main/ets/pages/首页.ets');
   const panel = read('entry/src/main/ets/components/牌组选项面板.ets');
   const advanced = read('entry/src/main/ets/components/高级牌组选项面板.ets');
   assert.match(home, /sharedDeckCount = deckConfigUseCount\(view, config.id\)/);
-  assert.match(panel, /options.applyToSharedDecks \? \$r\('app.string.deck_save_scope_shared', this.options.sharedDeckCount\)/);
+  assert.match(panel, /private openScopeHelp\(\): void \{[\s\S]*?this\.options\.applyToSharedDecks[\s\S]*?deck_save_scope_shared/);
+  assert.match(panel, /deck_options_scope_help_title', this\.deckName/);
+  assert.match(panel, /DialogHeader\(\{[\s\S]*?showHelp: true[\s\S]*?onHelp: \(\) => this\.openScopeHelp\(\)/);
+  assert.doesNotMatch(panel, /Text\(this\.deckName\)/);
   assert.match(advanced, /if \(this.options.sharedDeckCount > 1\)/);
   const start = advanced.indexOf('if (this.globalExpanded)');
   const end = advanced.indexOf("app.string.deck_group_advanced'", start);

@@ -4,6 +4,7 @@
     {"name": "settings_study_haptics_save_failed", "value": "Unable to save haptic settings. Please try again."},
     { "name": "deck_save_scope_current", "value": "Changes apply only to this deck. Global settings are marked separately." },
     { "name": "deck_save_scope_shared", "value": "Changes will affect all %d decks sharing these settings. Deck and today limits still apply only to this deck." },
+    { "name": "deck_options_scope_help_title", "value": "Current deck: %s" },
     { "name": "deck_apply_shared_label", "value": "Also update all %d decks sharing these settings" },
     { "name": "deck_apply_shared_help", "value": "Off by default: changes are saved only to this deck, leaving other decks unchanged. When enabled, this save updates every deck sharing these settings.\nDeck limits, today limits, and the desired retention override still apply only to this deck. Global settings always affect all decks. If these are the default settings, future decks will also use the updated values. This switch resets to off whenever you open deck options." },
     { "name": "deck_group_global", "value": "Global settings (all decks)" },

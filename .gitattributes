@@ -12,3 +12,6 @@ entry/src/main/cpp/types/libjidecards/index.d.ts text eol=lf
 entry/src/main/resources/rawfile/mathjax/tex-svg-full.js -text
 entry/src/main/resources/rawfile/mathjax/input/** -text
 entry/src/main/resources/rawfile/mathjax/LICENSE -text
+
+# jQuery 的上游哈希也依赖原始 LF 字节；不要随 Windows checkout 改写。
+entry/src/main/resources/rawfile/jquery/jquery-3.7.1.min.js -text

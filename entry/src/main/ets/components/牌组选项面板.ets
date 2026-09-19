@@ -61,8 +61,8 @@ export struct 牌组选项面板 {
 
   @State private showAdvanced: boolean = false;
   @State private showHelp: boolean = false;
-  @State private helpTitle: Resource = $r('app.string.deck_learn_steps');
-  @State private helpBody: Resource = $r('app.string.deck_learn_steps_help');
+  @State private helpTitle: ResourceStr = $r('app.string.deck_learn_steps');
+  @State private helpBody: ResourceStr = $r('app.string.deck_learn_steps_help');
   @State private submitError: string = '';
   // 简洁模式：true 时不显示「高级设置」入口，仅保留常用 4 项
   @StorageLink(简洁模式AppStorage键) private 简洁模式: boolean = true;
@@ -99,7 +99,19 @@ export struct 牌组选项面板 {
   // @副作用
   // 无。
   // ========================================================
-  private openHelp(title: Resource, body: Resource): void { this.helpTitle = title; this.helpBody = body; this.showHelp = true; }
+  private openHelp(title: ResourceStr, body: ResourceStr): void {
+    this.helpTitle = title;
+    this.helpBody = body;
+    this.showHelp = true;
+  }
+
+  /** 标题栏说明同时交代当前牌组与保存作用范围，避免表单前额外占用两行。 */
+  private openScopeHelp(): void {
+    const scope: ResourceStr = this.options.applyToSharedDecks
+      ? $r('app.string.deck_save_scope_shared', this.options.sharedDeckCount)
+      : $r('app.string.deck_save_scope_current');
+    this.openHelp($r('app.string.deck_options_scope_help_title', this.deckName), scope);
+  }
 
   // ========================================================
   // @块ID UI-DECK-OPTIONS-003
@@ -409,12 +421,12 @@ export struct 牌组选项面板 {
           actionEnabled: this.canSubmit(),
           closeLabel: $r('app.string.create_deck_cancel'),
           closeEnabled: !this.busy,
+          showHelp: true,
+          helpEnabled: !this.busy,
           onClose: () => this.onCancel(),
+          onHelp: () => this.openScopeHelp(),
           onAction: () => this.submit()
         })
-        Text(this.deckName).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
-        Text(this.options.applyToSharedDecks ? $r('app.string.deck_save_scope_shared', this.options.sharedDeckCount) : $r('app.string.deck_save_scope_current'))
-          .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
         Scroll() {
           // 2026-07-28：原 space=间距_8 + 下方 Blank(间距_16) 导致 reviewOrderSelector
           // 上方仅 8px、下方却达 8+16+8=32px，上下比例 1:4 视觉失衡。

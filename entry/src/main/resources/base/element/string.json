@@ -4,6 +4,7 @@
     {"name": "settings_study_haptics_save_failed", "value": "未能保存震动设置，请重试"},
     { "name": "deck_save_scope_current", "value": "保存仅修改本牌组的选项；全局设置另有标注。" },
     { "name": "deck_save_scope_shared", "value": "将同时修改共用设置的 %d 个牌组；本牌组与今日上限仍仅影响当前牌组。" },
+    { "name": "deck_options_scope_help_title", "value": "当前牌组：%s" },
     { "name": "deck_apply_shared_label", "value": "同时修改共用设置的 %d 个牌组" },
     { "name": "deck_apply_shared_help", "value": "默认关闭：修改后只保存到当前牌组，其他牌组保持原值。开启后，本次修改会同时应用于共用这份设置的所有牌组。\n本牌组上限、今日上限和目标记忆保持率覆盖仍仅影响当前牌组；全局设置始终影响所有牌组。若共用的是默认设置，之后新建的牌组也会使用修改后的值。此开关每次打开选项时恢复关闭。" },
     { "name": "deck_group_global", "value": "全局设置（所有牌组）" },
