@@ -10,7 +10,7 @@ const read = path => readFileSync(new URL('../../entry/src/main/ets/' + path, im
 const source = read('components/common/ThemeText.ets');
 const js = stripTypeScriptTypes(source.replace(/^import .*$/gm, '').replace(/^@Builder$/gm, '').replace(/^export /gm, ''), { mode: 'transform' });
 const spans = [];
-const api = new Function('Span', 'ForEach', js + '\nreturn { themeLabelCharacters, themeAccentRampColor, ThemeTextSpans };')(
+const api = new Function('Span', 'ForEach', js + '\nreturn { themeLabelCharacters, themeAccentRampColor, themeLabelGlyphs, ThemeTextSpans };')(
   text => { const item = { text }; spans.push(item); return { fontColor: color => { item.color = color; } }; },
   (items, build) => items.forEach(build)
 );
@@ -50,15 +50,17 @@ test('shared label renderer ramps between two catalog colors with readable light
     assert.equal(api.themeAccentRampColor(3, 4, colors), colors[1]);
   }
   assert.match(read('utils/颜色主题管理器.ets'), /THEME_TEXT_COLORS_KEY, 是否深色 \? visual.darkActionColors : visual.lightActionColors/);
-  assert.match(read('components/common/DialogHeader.ets'), /this.destructive\) \? \[\] : this.themeAccentColors/);
-  assert.match(read('components/stats/范围切换条.ets'), /索引 === this.当前索引\) \? this.themeAccentColors : \[\]/);
+  assert.match(read('components/common/DialogHeader.ets'), /!this.destructive && this.themeAccentColors.length > 0/);
+  assert.match(read('components/stats/范围切换条.ets'), /Select\(this\.options\(\)\)/);
 });
 
 test('theme text identity changes with its color and create-deck draws spans in its owning component', () => {
   assert.doesNotMatch(source, /colors\[index % colors\.length\]/, 'per-character palette cycling must not come back');
   assert.match(source, /\$\{index\}-\$\{glyph\.letter\}-\$\{glyph\.color\}/);
   const button = read('components/common/按下态按钮.ets');
-  assert.match(button, /ThemeTextSpans\(this\.文案, this\.themeAccentColors, this\.getUIContext\(\)\)/);
+  assert.match(button, /ForEach\(themeLabelGlyphs\(this\.文案, this\.themeAccentColors, this\.getUIContext\(\)\)/);
+  assert.doesNotMatch(button, /ThemeTextSpans\(/, 'button colors must not be snapshotted by a value-parameter builder');
+  assert.match(read('components/common/DialogHeader.ets'), /ForEach\(themeLabelGlyphs\(this\.actionLabel, this\.themeAccentColors/);
   assert.doesNotMatch(button, /index % this\.themeAccentColors\.length/);
   assert.match(read('components/home/主页顶部工具栏.ets'), /create_deck'[\s\S]*?themeText: true/);
 });

@@ -82,7 +82,7 @@ test('home page converts through 牌组配置表单 before submitting preserved 
   assert.match(pane, /options\.校验\(\)/);
   assert.match(pane, /form\.应用到配置\(config\.config\)/);
   assert.match(pane, /options\.应用\(\)/);
-  assert.match(pane, /configs: \[config\]/);
+  assert.match(pane, /configs: \[prepareDeckConfigForSave\(view, original, config, options\.applyToSharedDecks\)\]/);
   assert.match(pane, /options\.转换为请求字段\(\)/);
   assert.match(pane, /limits: edited\.limits/);
   assert.match(pane, /newCardsIgnoreReviewLimit: edited\.newCardsIgnoreReviewLimit/);

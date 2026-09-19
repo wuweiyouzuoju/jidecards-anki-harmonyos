@@ -8,21 +8,14 @@
 import type { Buttons, ButtonCounts } from '../../proto/messages/StatsMessages';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 取按钮色 } from '../../model/统计色板';
-import { 范围切换条 } from './范围切换条';
 
 @Component
 export struct 回答按钮卡 {
   @Prop @Watch('更新缓存') 按钮数据: Buttons | null = null;
   @Prop 是否显示全部: boolean = false;
-  @State private 范围索引: number = 2;
+  @Prop @Watch('更新缓存') 范围索引: number = 2;
   @State private 组缓存: ButtonCounts[] = [];
   private readonly 柱区高度: number = 110;
-  private readonly 范围标签: Resource[] = [
-    $r('app.string.stats_hours_range_1m'),
-    $r('app.string.stats_hours_range_3m'),
-    $r('app.string.stats_hours_range_1y'),
-    $r('app.string.stats_hours_range_all')
-  ];
 
   aboutToAppear(): void {
     this.更新缓存();
@@ -108,14 +101,6 @@ export struct 回答按钮卡 {
 
   build() {
     Column({ space: 应用尺寸.间距_8 }) {
-      范围切换条({
-        当前索引: this.范围索引,
-        标签集: this.是否显示全部 ? this.范围标签 : this.范围标签.slice(0, 3),
-        onRangeChange: (): void => {
-          this.更新缓存();
-        }
-      })
-
       if (this.数据为空()) {
         Text($r('app.string.stats_empty_section'))
           .fontSize(应用尺寸.字号_正文)

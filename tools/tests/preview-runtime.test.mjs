@@ -49,9 +49,9 @@ function harness() {
     interactionEnabled: true, foreground: true, isDark: false, 媒体目录: '/media',
     onPositionChanged: index => events.push(['position', index]),
     onEditField: id => events.push(['edit', id]), 取本地化文案: key => key,
-    soundPlayer: { 停止: async () => events.push('sound stop'), 释放: async () => events.push('sound release'),
+    soundPlayer: { waitForCompletion: async () => {}, 停止: async () => events.push('sound stop'), 释放: async () => events.push('sound release'),
       播放队列: async paths => sounds.push(paths) },
-    ttsPlayer: { 停止: async () => events.push('tts stop'), 释放: async () => events.push('tts release'),
+    ttsPlayer: { waitForCompletion: async () => {}, 停止: async () => events.push('tts stop'), 释放: async () => events.push('tts release'),
       播放队列: async items => tts.push(items) },
     卡片渲染服务实例: new Proxy(service, { get(target, key) {
       assert.ok(key in target, `unexpected service call: ${String(key)}`); return target[key];
@@ -318,5 +318,8 @@ test('preview wiring stays read-only, handles web errors, and preserves home/edi
   assert.match(editor, /onPop:[\s\S]*this\.显示卡片预览 = true/);
   assert.match(home, /onPositionChanged:[\s\S]*this\.预览初始索引 = index/);
   const autoSync = home.match(/private tryAutoSync[\s\S]*?\n  }/)[0];
-  assert.match(autoSync, /this\.显示卡片预览 \|\| this\.预览加载中/);
+  assert.match(autoSync, /canStartHomeAutoSync\(this\.homeActivity\(\)\)/);
+  const activity = home.match(/private homeActivity[\s\S]*?\n  }/)[0];
+  assert.match(activity, /this\.显示卡片预览/);
+  assert.match(activity, /this\.预览加载中/);
 });

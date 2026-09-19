@@ -10,22 +10,15 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 取新增柱色 } from '../../model/统计色板';
 import { 取轴域 } from '../../model/统计分箱';
 import type { 轴域 } from '../../model/统计分箱';
-import { 范围切换条 } from './范围切换条';
 import { 纵轴刻度, 横轴日期条, 纵轴宽 } from './图表轴';
 
 @Component
 export struct 新增卡 {
   @Prop @Watch('更新缓存') 新增数据: Added | null = null;
   @Prop 是否显示全部: boolean = false;
-  @State private 范围索引: number = 0;
+  @Prop @Watch('更新缓存') 范围索引: number = 0;
   @State private 柱缓存: number[] = [];
   private readonly 柱区高度: number = 108;
-  private readonly 范围标签: Resource[] = [
-    $r('app.string.stats_hours_range_1m'),
-    $r('app.string.stats_hours_range_3m'),
-    $r('app.string.stats_hours_range_1y'),
-    $r('app.string.stats_hours_range_all')
-  ];
 
   aboutToAppear(): void {
     this.更新缓存();
@@ -121,14 +114,6 @@ export struct 新增卡 {
 
   build() {
     Column({ space: 应用尺寸.间距_8 }) {
-      范围切换条({
-        当前索引: this.范围索引,
-        标签集: this.是否显示全部 ? this.范围标签 : this.范围标签.slice(0, 3),
-        onRangeChange: (): void => {
-          this.更新缓存();
-        }
-      })
-
       if (this.数据为空()) {
         Text($r('app.string.stats_empty_section'))
           .fontSize(应用尺寸.字号_正文)

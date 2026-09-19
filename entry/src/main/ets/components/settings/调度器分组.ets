@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { 加载FSRS开启状态, 设置FSRS开启状态 } from '../../model/FSRS控制器';
+import { 加载FSRS开启状态, 设置FSRS开启状态, FSRS_STATE_REVISION_KEY } from '../../model/FSRS控制器';
 import { 设置面板色板_取, 设置面板色板 } from '../../utils/设置面板配色';
 import { 颜色键 } from '../../model/颜色主题';
 import { 设置分组卡片 } from './设置分组卡片';
@@ -16,8 +16,7 @@ import { 设置分组卡片 } from './设置分组卡片';
 //
 // @输入
 // 是否深色：当前是否深色模式（影响色板取值）。
-// 是否展开：本分组是否展开。
-// 切换展开回调 / 打开说明回调：父组件注入；打开说明回调 上抛 标题 + 正文 Resource。
+// 打开说明回调：父组件注入；打开说明回调 上抛 标题 + 正文 Resource。
 //
 // @输出
 // 渲染 FSRS 调度器分组卡片；用户切换开关时持久化并更新状态。
@@ -29,8 +28,6 @@ import { 设置分组卡片 } from './设置分组卡片';
 @Component
 export struct 调度器分组 {
   @Prop 是否深色: boolean = false;
-  @Prop 是否展开: boolean = false;
-  切换展开回调: () => void = (): void => {};
   // ⓘ 按钮上抛：由父组件 SettingsPanel 统一渲染 FieldHelpPanel 浮层，避免嵌在分组卡片内
   打开说明回调: (标题: Resource, 正文: Resource) => void = (_标题: Resource, _正文: Resource): void => {};
 
@@ -44,17 +41,33 @@ export struct 调度器分组 {
   @State private 是否启用FSRS: boolean | null = null;
   @State private FSRS操作中: boolean = false;
   @State private FSRS错误信息: string = '';
+  @StorageProp(FSRS_STATE_REVISION_KEY) @Watch('onFsrsStateChanged') private fsrsRevision: number = 0;
+  private fsrsReadSequence: number = 0;
+  private disposed: boolean = false;
 
   /** 面板打开时拉取 FSRS 当前状态与后端同步。失败时保留 null，UI 显示"读取失败"。 */
   async aboutToAppear(): Promise<void> {
+    this.disposed = false;
     await this.刷新FSRS状态();
   }
 
-  private async 刷新FSRS状态(): Promise<void> {
-    this.FSRS错误信息 = '';
+  aboutToDisappear(): void {
+    this.disposed = true;
+    this.fsrsReadSequence++;
+  }
+
+  /** 同步或其他入口写入后重新读取；当前保存完成后会补一次读取。 */
+  private onFsrsStateChanged(): void {
+    if (!this.disposed && !this.FSRS操作中) this.刷新FSRS状态();
+  }
+
+  private async 刷新FSRS状态(clearError: boolean = true): Promise<void> {
+    const sequence: number = ++this.fsrsReadSequence;
+    if (clearError) this.FSRS错误信息 = '';
     const 值: boolean | null = await 加载FSRS开启状态();
+    if (this.disposed || sequence !== this.fsrsReadSequence) return;
     this.是否启用FSRS = 值;
-    if (值 === null) {
+    if (值 === null && this.FSRS错误信息 === '') {
       this.FSRS错误信息 = this.取本地化文本($r('app.string.settings_fsrs_load_error'));
     }
   }
@@ -80,6 +93,7 @@ export struct 调度器分组 {
       return;
     }
     const 先前值: boolean = this.是否启用FSRS;
+    this.fsrsReadSequence++;
     this.FSRS操作中 = true;
     this.是否启用FSRS = 值;
     this.FSRS错误信息 = '';
@@ -90,6 +104,7 @@ export struct 调度器分组 {
       this.FSRS错误信息 = error instanceof Error ? error.message : `${error}`;
     } finally {
       this.FSRS操作中 = false;
+      if (!this.disposed) await this.刷新FSRS状态(false);
     }
   }
 
@@ -106,13 +121,17 @@ export struct 调度器分组 {
     设置分组卡片({
       标题: $r('app.string.settings_scheduler'),
       是否深色: this.是否深色,
-      是否展开: this.是否展开,
+
       帮助标题: $r('app.string.settings_fsrs_label'),
       帮助正文: $r('app.string.settings_fsrs_help'),
-      切换展开回调: this.切换展开回调,
+
       打开说明回调: this.打开说明回调
     }) {
-      Column() {
+      Column({ space: 8 }) {
+          Text($r('app.string.settings_algorithm_scope'))
+            .fontSize(13).fontColor(设置面板色板_取(this.是否深色).次文字).width('100%')
+          Text($r('app.string.settings_algorithm_deck_options'))
+            .fontSize(13).fontColor(设置面板色板_取(this.是否深色).次文字).width('100%')
           // FSRS 开关行：label + Toggle。说明文字已移到 分组头部 的 ⓘ 按钮弹层中。
           // 注意：Toggle 的 isOn 必须用 $$ 双向绑定到 @State，否则开关不响应点击。
           // 但本场景需要乐观更新 + 失败回滚，所以改用单向绑定 + onChange 手动控制。

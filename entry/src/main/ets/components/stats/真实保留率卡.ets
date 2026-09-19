@@ -10,7 +10,6 @@
 import type { TrueRetention, TrueRetentionStats } from '../../proto/messages/StatsMessages';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 色保留率_年轻, 色保留率_成熟 } from '../../model/统计色板';
-import { 范围切换条 } from './范围切换条';
 
 /** 单行数据 */
 interface 保留率行 {
@@ -26,12 +25,7 @@ export struct 真实保留率卡 {
   /** 统计天数=0（全部）时显示"全部时间"行 */
   @Prop 是否显示全部: boolean = false;
   /** 视图：0=年轻单列 1=成熟单列 2=汇总（Anki 默认 Summary） */
-  @State private 视图索引: number = 2;
-  private readonly 视图标签: Resource[] = [
-    $r('app.string.stats_retention_view_young'),
-    $r('app.string.stats_retention_view_mature'),
-    $r('app.string.stats_retention_view_summary')
-  ];
+  @Prop 视图索引: number = 2;
 
   private 取率(通过: number, 未通过: number): string {
     const 总: number = 通过 + 未通过;
@@ -80,14 +74,6 @@ export struct 真实保留率卡 {
 
   build() {
     Column({ space: 应用尺寸.间距_8 }) {
-      范围切换条({
-        当前索引: this.视图索引,
-        标签集: this.视图标签,
-        onRangeChange: (索引: number): void => {
-          this.视图索引 = 索引;
-        }
-      })
-
       if (this.保留率数据 === null) {
         Text($r('app.string.stats_empty_section'))
           .fontSize(应用尺寸.字号_正文)

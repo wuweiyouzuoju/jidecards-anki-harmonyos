@@ -13,7 +13,6 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 取难度柱色, 取红黄绿 } from '../../model/统计色板';
 import { 加权分位, 取轴域 } from '../../model/统计分箱';
 import type { 轴域 } from '../../model/统计分箱';
-import { 范围切换条 } from './范围切换条';
 import { 纵轴刻度, 纵轴宽 } from './图表轴';
 
 /** 单柱：区间右端（百分比口径）+ 卡数 */
@@ -27,18 +26,12 @@ export struct 难度分布卡 {
   @Prop @Watch('更新缓存') 难度数据: Eases | null = null;
   @Prop @Watch('更新缓存') FSRS难度: Eases | null = null;
   @Prop @Watch('更新缓存') 是否FSRS: boolean = false;
-  @State private 范围索引: number = 0;
+  @Prop @Watch('更新缓存') 范围索引: number = 0;
   @State private 柱缓存: 难度柱[] = [];
   @State private 域下限: number = 0;
   @State private 域上限: number = 100;
   private readonly 柱区高度: number = 108;
   private readonly 柱数上限: number = 20;
-  private readonly 范围标签: Resource[] = [
-    $r('app.string.stats_hours_range_all'),
-    $r('app.string.stats_range_p100'),
-    $r('app.string.stats_range_p95'),
-    $r('app.string.stats_range_p50')
-  ];
 
   aboutToAppear(): void {
     this.更新缓存();
@@ -153,17 +146,6 @@ export struct 难度分布卡 {
 
   build() {
     Column({ space: 应用尺寸.间距_8 }) {
-      // FSRS 范围切换（Anki DifficultyGraph PercentageRange，默认全部）；SM-2 无范围切换
-      if (this.是否FSRS) {
-        范围切换条({
-          当前索引: this.范围索引,
-          标签集: this.范围标签,
-          onRangeChange: (): void => {
-            this.更新缓存();
-          }
-        })
-      }
-
       if (this.数据为空()) {
         Text($r('app.string.stats_empty_section'))
           .fontSize(应用尺寸.字号_正文)

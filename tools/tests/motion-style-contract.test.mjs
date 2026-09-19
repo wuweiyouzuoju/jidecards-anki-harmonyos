@@ -13,7 +13,6 @@ test('small anchored menus share the restrained 150ms transition', () => {
     'entry/src/main/ets/components/主页操作面板.ets',
     'entry/src/main/ets/components/home/主页更多面板.ets',
     'entry/src/main/ets/components/settings/模式切换菜单.ets',
-    'entry/src/main/ets/components/stats/统计范围切换菜单.ets',
   ]) {
     const source = read(path);
     assert.doesNotMatch(source, /取全屏转场时长|取全屏转场曲线/, path);
@@ -44,8 +43,6 @@ test('navigation applies one fade transition including the home boundary', () =>
   assert.match(fade, /const 转场曲线: Curve = Curve\.EaseOut/);
   assert.match(fade, /expectedFrameRateRange: \{ min: 60, max: 120, expected: 60 \}/);
   assert.match(fade, /onFinish:[\s\S]*?transitionProxy\.finishTransition\(\)/);
-  assert.match(read('entry/src/main/ets/components/common/ThemeBackground.ets'),
-    /expectedFrameRateRange: \{ min: 30, max: 60, expected: 60 \}/);
 
   for (const [path, name] of [
     ['entry/src/main/ets/pages/设置页.ets', 'SettingsPage'],

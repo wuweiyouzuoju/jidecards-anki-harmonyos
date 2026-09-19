@@ -47,6 +47,9 @@ await context.route('**/*', async (route) => {
   if (url === 'https://jidecards-media.local/test') {
     return route.fulfill({ contentType: 'text/html', body: html });
   }
+  if (url === 'https://jidecards-render.local/jquery/3.7.1/jquery.min.js') {
+    return route.fulfill({ contentType: 'text/javascript', body: await readFile(new URL('../entry/src/main/resources/rawfile/jquery/jquery-3.7.1.min.js', import.meta.url)) });
+  }
   for (const name of ['card-math.js', 'tex-svg-full.js', 'input/mml.js', 'input/mml/entities.js']) {
     if (url === MATH_ASSET_BASE + name) {
       return route.fulfill({ contentType: 'text/javascript', body: await readFile(new URL('../entry/src/main/resources/rawfile/mathjax/' + name, import.meta.url)) });

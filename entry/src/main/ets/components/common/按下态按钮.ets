@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 import { GLASS_COLORS_KEY, GLASS_HIGHLIGHT_COLORS } from '../../model/ThemeCatalog';
-import { ThemeTextSpans } from './ThemeText';
+import { ThemeLabelGlyph, themeLabelGlyphs } from './ThemeText';
 import { GlassSurface } from '../../utils/GlassSurface';
 
 // ========================================================
@@ -50,7 +50,12 @@ export struct 按下态按钮 {
           Image(this.图标).width(16).height(16)
         }
         if (this.themeText && this.themeAccentColors.length > 0) {
-          Text() { ThemeTextSpans(this.文案, this.themeAccentColors, this.getUIContext()) }
+          // 在组件 build 内读取色板，避免按值 Builder 留下旧的深浅色字形。
+          Text() {
+            ForEach(themeLabelGlyphs(this.文案, this.themeAccentColors, this.getUIContext()), (glyph: ThemeLabelGlyph) => {
+              Span(glyph.letter).fontColor(glyph.color)
+            }, (glyph: ThemeLabelGlyph, index: number): string => `${index}-${glyph.letter}-${glyph.color}`)
+          }
             .fontSize(this.字号)
         } else {
           Text(this.文案)

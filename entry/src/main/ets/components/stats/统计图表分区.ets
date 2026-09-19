@@ -9,6 +9,7 @@ import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 颜色键 } from '../../model/颜色主题';
+import { 范围切换条 } from './范围切换条';
 
 @Component
 export struct 统计图表分区 {
@@ -17,6 +18,9 @@ export struct 统计图表分区 {
   @Prop 有数据: boolean = true;
   @Prop 帮助标题: Resource | null = null;
   @Prop 帮助正文: Resource | null = null;
+  @Prop rangeLabels: Resource[] = [];
+  @Prop rangeIndex: number = 0;
+  onRangeChange: (index: number) => void = (): void => {};
   @StorageProp(颜色键.动作主色) private 主色: string = '#2F5FD0';
   onHelp: (标题: Resource, 正文: Resource) => void = (): void => {};
   @BuilderParam 内容: () => void = this.默认内容;
@@ -27,21 +31,32 @@ export struct 统计图表分区 {
   build() {
     Column({ space: 应用尺寸.间距_8 }) {
       Row({ space: 应用尺寸.间距_4 }) {
-        Text(this.标题)
-          .fontSize(应用尺寸.字号_分区标题)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.text_primary'))
-        if (this.帮助标题 !== null && this.帮助正文 !== null) {
-          Button() {
-            Text() { ThemeTextSpans($r('app.string.field_help_button'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.主色).fontSize(应用尺寸.字号_正文)
+        Row({ space: 应用尺寸.间距_4 }) {
+          Text(this.标题)
+            .fontSize(18)
+            .maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis }).flexShrink(1)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.text_primary'))
+          if (this.帮助标题 !== null && this.帮助正文 !== null) {
+            Button() {
+              Text() { ThemeTextSpans($r('app.string.field_help_button'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.主色).fontSize(应用尺寸.字号_正文)
+            }
+              .type(ButtonType.Normal)
+              .backgroundColor(Color.Transparent)
+              .width(28).height(28).padding(0)
+              .fontColor(this.主色)
+              .fontSize(应用尺寸.字号_正文)
+              .onClick((): void => {
+                this.onHelp(this.帮助标题 as Resource, this.帮助正文 as Resource);
+              })
           }
-            .type(ButtonType.Normal)
-            .backgroundColor(Color.Transparent)
-            .fontColor(this.主色)
-            .fontSize(应用尺寸.字号_正文)
-            .onClick((): void => {
-              this.onHelp(this.帮助标题 as Resource, this.帮助正文 as Resource);
-            })
+          }.layoutWeight(1)
+        if (this.rangeLabels.length > 0) {
+          范围切换条({
+            当前索引: this.rangeIndex,
+            标签集: this.rangeLabels,
+            onRangeChange: (index: number): void => { this.onRangeChange(index); }
+          }).constraintSize({ maxWidth: '48%' })
         }
       }
       .width('100%')
@@ -61,6 +76,6 @@ export struct 统计图表分区 {
     .padding(应用尺寸.卡片内边距)
     .backgroundColor($r('app.color.surface_card'))
     .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
-    .borderRadius(应用尺寸.圆角_卡片)
+    .borderRadius(16)
   }
 }

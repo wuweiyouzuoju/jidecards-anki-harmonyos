@@ -10,7 +10,7 @@ import {
   buildResponsesPayload,
   buildResponsesUrl,
 } from '../../entry/src/main/ets/model/agent/ProviderProtocol.ts';
-import { DEEPSEEK_PROVIDER } from '../../entry/src/main/ets/model/agent/ProviderCatalog.ts';
+import { DEEPSEEK_PROVIDER, normalizeDeepSeekModel } from '../../entry/src/main/ets/model/agent/ProviderCatalog.ts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '../..');
@@ -23,7 +23,7 @@ function baseRequest(searchMode = 'auto') {
   return {
     apiKey: 'must-not-enter-body',
     baseUrl: 'https://api.deepseek.com/',
-    model: 'deepseek-v4-flash',
+    model: 'deepseek-flash',
     instructions: 'Only use declared tools.',
     input: [{
       kind: 'message', role: 'user', content: 'make cards',
@@ -47,11 +47,18 @@ function baseRequest(searchMode = 'auto') {
 
 test('DeepSeek exposes all current models while keeping Flash as default', () => {
   assert.deepEqual(DEEPSEEK_PROVIDER.models, [
-    'deepseek-v4-flash',
+    'deepseek-flash',
     'deepseek-v4-pro',
-    'deepseek-v4-flash-vision-exp',
   ]);
-  assert.equal(DEEPSEEK_PROVIDER.defaultModel, 'deepseek-v4-flash');
+  assert.equal(DEEPSEEK_PROVIDER.defaultModel, 'deepseek-flash');
+});
+
+test('retired DeepSeek selections use current Flash while valid Pro selection is preserved', () => {
+  for (const model of ['deepseek-v4-flash', 'deepseek-v4-flash-vision-exp', 'deepseek-chat', 'deepseek-reasoner', '']) {
+    assert.equal(normalizeDeepSeekModel(model), 'deepseek-flash', model);
+  }
+  assert.equal(normalizeDeepSeekModel(' deepseek-flash '), 'deepseek-flash');
+  assert.equal(normalizeDeepSeekModel(' deepseek-v4-pro '), 'deepseek-v4-pro');
 });
 
 test('Responses URL normalization preserves fixed provider prefixes', () => {
@@ -65,7 +72,7 @@ test('Responses payload includes semantic function tools and auto web search wit
   const text = buildResponsesPayload(request);
   const body = JSON.parse(text);
 
-  assert.equal(body.model, 'deepseek-v4-flash');
+  assert.equal(body.model, 'deepseek-flash');
   assert.equal(body.stream, true);
   assert.equal(body.store, false);
   assert.deepEqual(body.include, ['web_search_call.action.sources']);

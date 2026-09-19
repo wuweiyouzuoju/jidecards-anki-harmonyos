@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { ThemeTextSpans } from './common/ThemeText';
-import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
-import { ThemeDefinition, themeDefinition, THEME_VISUALS_KEY, themeDeckColors } from '../model/ThemeCatalog';
+import { ThemeDefinition, themeDefinition, THEME_VISUALS_KEY } from '../model/ThemeCatalog';
 import { themeGradient } from '../utils/ThemeVisuals';
 import { GLASS_COLORS_KEY, GLASS_HIGHLIGHT_COLORS } from '../model/ThemeCatalog';
 
@@ -48,17 +46,15 @@ interface 弹层状态事件 {
   isVisible: boolean;
 }
 
-/** 色条子菜单选项：tone + 颜色资源 + 标签资源；colorResource=null 表示无色块（None 项）。 */
+/** 色条选择项：持久化色调与本地化名称。 */
 interface 色条选项 {
   tone: 牌组色调;
-  colorResource: Resource | null;
   labelResource: Resource;
 }
 
 @Component
 export struct 牌组列表项 {
   @StorageProp(GLASS_COLORS_KEY) private glassColors: string[] = GLASS_HIGHLIGHT_COLORS;
-  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @StorageProp(THEME_VISUALS_KEY) private visual: ThemeDefinition = themeDefinition('aurora');
   // 注：deck / expanded / onToggle 保留英文名以兼容 deck-hierarchy-contract.test.mjs 阶段 6 前的断言。
   @Prop deck: 牌组汇总 = {
@@ -75,7 +71,6 @@ export struct 牌组列表项 {
   // 用户通过 牌组列表项 长按菜单的「拖动排序」项进入；Index.ets 顶部 Bar 上的「完成」退出。
   @Prop reorderMode: boolean = false;
   @State private 显示牌组菜单: boolean = false;
-  @State private 菜单模式: 'main' | 'tone' = 'main';
   // 沙盒背景图异步加载的 PixelMap。
   // 必须用 PixelMap 而不是直接传文件路径给 Image——ArkUI Image 对沙盒绝对路径解析不稳定，
   // 标准方式是 fileIo.openSync → image.createImageSource → createPixelMap → Image(pixelMap)。
@@ -208,16 +203,35 @@ export struct 牌组列表项 {
     }
   }
 
-  /** 色条子菜单的 7 个选项（6 色 + None），顺序与原硬编码一致；None 项 colorResource=null 跳过色块。 */
+  /** 六种颜色与无色条，顺序同时用于 Select 索引和回调映射。 */
   private readonly 色条选项列表: 色条选项[] = [
-    { tone: 牌组色调.Blue, colorResource: $r('app.color.deck_blue'), labelResource: $r('app.string.deck_tone_blue') },
-    { tone: 牌组色调.Purple, colorResource: $r('app.color.deck_purple'), labelResource: $r('app.string.deck_tone_purple') },
-    { tone: 牌组色调.Mint, colorResource: $r('app.color.deck_mint'), labelResource: $r('app.string.deck_tone_mint') },
-    { tone: 牌组色调.Amber, colorResource: $r('app.color.deck_amber'), labelResource: $r('app.string.deck_tone_amber') },
-    { tone: 牌组色调.Black, colorResource: $r('app.color.deck_black'), labelResource: $r('app.string.deck_tone_black') },
-    { tone: 牌组色调.Red, colorResource: $r('app.color.deck_red'), labelResource: $r('app.string.deck_tone_red') },
-    { tone: 牌组色调.None, colorResource: null, labelResource: $r('app.string.deck_tone_none') }
+    { tone: 牌组色调.Blue, labelResource: $r('app.string.deck_tone_blue') },
+    { tone: 牌组色调.Purple, labelResource: $r('app.string.deck_tone_purple') },
+    { tone: 牌组色调.Mint, labelResource: $r('app.string.deck_tone_mint') },
+    { tone: 牌组色调.Amber, labelResource: $r('app.string.deck_tone_amber') },
+    { tone: 牌组色调.Black, labelResource: $r('app.string.deck_tone_black') },
+    { tone: 牌组色调.Red, labelResource: $r('app.string.deck_tone_red') },
+    { tone: 牌组色调.None, labelResource: $r('app.string.deck_tone_none') }
   ];
+
+  /** 原生选择框使用本地化名称，不修改持久化色调值。 */
+  private toneOptions(): SelectOption[] {
+    return this.色条选项列表.map((option: 色条选项): SelectOption => ({
+      value: this.getUIContext().getHostContext()!.resourceManager.getStringSync(option.labelResource.id)
+    }));
+  }
+
+  /** 未识别的色调与色条渲染一致，回退蓝色。 */
+  private toneIndex(): number {
+    return Math.max(0, this.色条选项列表.findIndex((option: 色条选项): boolean => option.tone === this.deck.tone));
+  }
+
+  /** 选择后关闭菜单，由首页保存并刷新当前牌组。 */
+  private selectTone(index: number): void {
+    if (index < 0 || index >= this.色条选项列表.length) return;
+    this.显示牌组菜单 = false;
+    this.onToneChange(this.deck.id, this.色条选项列表[index].tone);
+  }
 
   // 注意：三个计数不能用 @Builder 方法渲染——ArkUI 的 @Builder 在首次渲染时
   // 捕获 this.deck 字段值后不响应 @Prop 后续变化，会导致学完卡后列表项的"新/学/复"
@@ -230,25 +244,23 @@ export struct 牌组列表项 {
   // @名称 长按弹层菜单构建器
   //
   // @作用
-  // 渲染长按弹出的主菜单与色条子菜单，并上抛用户选择。
+  // 渲染长按弹出的菜单与色条选择框，并上抛用户选择。
   //
   // @输入
-  // this.菜单模式：'main' 主菜单 / 'tone' 色条子菜单。
   // this.色条选项列表：7 个色条候选项。
   //
   // @输出
   // 通过 onEnterReorder / onCustomizeDeck / onHideDeck / onDeleteDeck / onToneChange 上抛用户操作；
-  // 切换 this.菜单模式 主↔色条子；关 Popup 时置 this.显示牌组菜单=false。
+  // 关 Popup 时置 this.显示牌组菜单=false。
   //
   // @业务规则
-  // 点「切换色条」不关 Popup，切到 tone 子菜单；其余选项点击后关 Popup 再上抛回调。
-  // 单行色条选项：色块（None 跳过）+ 标签 + 选中态勾选。
+  // 色条通过原生 Select 展示当前值；选择后关 Popup 再上抛回调。
   //
   // @副作用
   // 无。仅修改内部 @State 与上抛回调。
   // ========================================================
 
-  /** 主菜单：切换色条 / 拖动排序 / 自定义牌组。点「切换色条」不关 Popup，切到 tone 子菜单。 */
+  /** 主菜单：色条选择框与牌组操作入口。 */
   @Builder
   private 主菜单() {
     Column({ space: 0 }) {
@@ -257,16 +269,18 @@ export struct 牌组列表项 {
           .fontSize(应用尺寸.字号_正文)
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1)
-        Text('›')
-          .fontSize(应用尺寸.字号_标题)
-          .fontColor($r('app.color.text_secondary'))
+        Select(this.toneOptions())
+          .selected(this.toneIndex())
+          .value(this.toneOptions()[this.toneIndex()].value)
+          .controlSize(ControlSize.SMALL)
+          .font({ size: 应用尺寸.字号_正文 })
+          .height(40)
+          .constraintSize({ maxWidth: '60%' })
+          .onSelect((index: number): void => { this.selectTone(index); })
       }
       .width('100%')
       .constraintSize({ minHeight: 应用尺寸.menuItemHeight })
       .padding({ left: 应用尺寸.menuHorizontalPadding, right: 应用尺寸.menuHorizontalPadding, top: 10, bottom: 10 })
-      .onClick(() => {
-        this.菜单模式 = 'tone';
-      })
       Row() {
         Text($r('app.string.deck_menu_reorder'))
           .fontSize(应用尺寸.字号_正文)
@@ -354,70 +368,11 @@ export struct 牌组列表项 {
     .borderRadius(应用尺寸.圆角_面板)
   }
 
-  /** 单行色条选项：色块（None 项跳过）+ 标签 + 选中态勾选；点击上抛 onToneChange 并关 Popup。 */
-  @Builder
-  private 单行色条选项(选项: 色条选项) {
-    Row() {
-      if (选项.colorResource !== null) {
-        Row()
-          .width(12)
-          .height(12)
-          .backgroundColor(选项.colorResource)
-          .borderRadius(应用尺寸.圆角_色条)
-          .margin({ right: 10 })
-      }
-      Text(选项.labelResource)
-        .fontSize(应用尺寸.字号_正文)
-        .fontColor($r('app.color.text_primary'))
-        .layoutWeight(1)
-      if (this.deck.tone === 选项.tone) {
-        Text() { ThemeTextSpans('✓', this.themeAccentColors, this.getUIContext()) }
-          .fontSize(应用尺寸.字号_正文)
-          .fontColor(this.动作主色)
-      }
-    }
-    .width('100%')
-    .constraintSize({ minHeight: 应用尺寸.menuItemHeight })
-    .padding({ left: 应用尺寸.menuHorizontalPadding, right: 应用尺寸.menuHorizontalPadding, top: 10, bottom: 10 })
-    .onClick(() => {
-      this.显示牌组菜单 = false;
-      this.onToneChange(this.deck.id, 选项.tone);
-    })
-  }
-
-  /** 色条子菜单：返回按钮 + 7 个色条选项（6 色 + None），用 ForEach 遍历 色条选项列表。 */
-  @Builder
-  private 色条子菜单() {
-    Column({ space: 0 }) {
-      Row() {
-        Text($r('app.string.deck_menu_back'))
-          .fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_secondary'))
-      }
-      .width('100%')
-      .constraintSize({ minHeight: 应用尺寸.menuItemHeight })
-      .padding({ left: 应用尺寸.menuHorizontalPadding, right: 应用尺寸.menuHorizontalPadding, top: 8, bottom: 8 })
-      .onClick(() => {
-        this.菜单模式 = 'main';
-      })
-      ForEach(this.色条选项列表, (选项: 色条选项) => {
-        this.单行色条选项(选项);
-      }, (选项: 色条选项) => 选项.tone.toString())
-    }
-    .width(应用尺寸.contextMenuWidth)
-    .backgroundColor($r('app.color.surface_card'))
-    .borderRadius(应用尺寸.圆角_面板)
-  }
-
-  /** Popup 内容：根据 菜单模式 切换主菜单 / 色条子菜单。 */
+  /** Popup 内容与页面其他菜单保持相同容器。 */
   @Builder
   private 弹层内容() {
     Column() {
-      if (this.菜单模式 === 'main') {
-        this.主菜单();
-      } else {
-        this.色条子菜单();
-      }
+      this.主菜单();
     }
   }
 
@@ -431,7 +386,7 @@ export struct 牌组列表项 {
   //
   // @输入
   // @Prop deck / selected / expanded / reorderMode；
-  // @State 背景像素图 / 显示牌组菜单 / 菜单模式；
+  // @State 背景像素图 / 显示牌组菜单；
   // @StorageProp 6 个颜色键。
   //
   // @输出
@@ -490,10 +445,6 @@ export struct 牌组列表项 {
         })
         // 色条：tone===None 时不渲染色块，但保留 Column 占位以维持行内对齐。
         Column()
-          .linearGradient({ angle: 180,
-            colors: this.visual.deckColors.length > 0 && this.deck.tone === 牌组色调.None
-              ? themeGradient(themeDeckColors(this.visual, this.deck.id))
-              : [[Color.Transparent, 0], [Color.Transparent, 1]] })
           .width(应用尺寸.色条宽度)
           .height(应用尺寸.色条高度)
           .backgroundColor(
@@ -561,7 +512,6 @@ export struct 牌组列表项 {
             if (this.reorderMode) {
               return;
             }
-            this.菜单模式 = 'main';
             this.显示牌组菜单 = true;
           })
       )

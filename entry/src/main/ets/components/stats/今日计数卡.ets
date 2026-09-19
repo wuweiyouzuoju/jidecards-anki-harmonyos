@@ -3,10 +3,11 @@
 // 今日计数卡：渲染 GraphsView.today 为 4 行文字列表（对齐 Anki TodayStats）。
 // 行 1 今天学习了 N 张，用时 X（Y 秒/张）；行 2 重来次数 N (P%)；
 // 行 3 学习/复习/重学/过滤 计数；行 4 成熟卡正确率（无成熟卡时提示）。
-// Invariants: build 单根 Column；未答题时仅显示"今天还没有学习卡片"一行。
+// Invariants: 摘要始终可见；详细答题统计按需展开，缺失字段不当作零。
 
 import { common } from '@kit.AbilityKit';
-import type { TodayCounts } from '../../proto/messages/StatsMessages';
+import { dueOverview } from '../../model/StatsOverview';
+import type { FutureDue, TodayCounts } from '../../proto/messages/StatsMessages';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 
 @Component
@@ -14,6 +15,8 @@ export struct 今日计数卡 {
   @Prop @Watch('数据已变') 今日数据: TodayCounts | null = null;
   /** 渲染哨兵：@Prop 变化经 @Watch 递增，驱动本组件重新渲染
    *  （@Prop 直连 UI 在统计图表分区尾闭包内不触发刷新，实测 2026-08-29） */
+  @Prop @Watch('数据已变') 预测数据: FutureDue | null = null;
+  @State private showDetails: boolean = false;
   @State private 渲染指纹: number = 0;
 
   private 数据已变(): void {
@@ -75,19 +78,61 @@ export struct 今日计数卡 {
     return `${(数据.matureCorrect / 数据.matureCount * 100).toFixed(2)}%`;
   }
 
+  /** 缺失数据保留未知态，不能显示为零。 */
+  private dueLabel(overdue: boolean): ResourceStr {
+    const counts = dueOverview(this.预测数据);
+    return counts === null ? '—' : $r('app.string.stats_summary_cards', overdue ? counts.overdue : counts.due);
+  }
+
   build() {
     Column() {
       // 渲染哨兵：读 渲染指纹 建立依赖，@Prop 变化 → @Watch → 指纹变化 → 本组件重新渲染
       Text(`${this.渲染指纹}`).fontSize(1).opacity(0).height(0)
 
-      if (this.今日数据 === null || this.今日数据.answerCount === 0) {
-        Text($r('app.string.stats_today_no_cards'))
-          .fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_secondary'))
-          .width('100%')
-          .textAlign(TextAlign.Center)
-          .padding({ top: 应用尺寸.间距_16, bottom: 应用尺寸.间距_16 })
-      } else {
+      Row({ space: 8 }) {
+        Column({ space: 4 }) {
+          Text(this.今日数据 === null ? '—' : $r('app.string.stats_summary_answers', this.今日数据.answerCount))
+            .fontSize(应用尺寸.字号_指标).fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.text_primary')).maxLines(1)
+            .minFontSize(12).maxFontSize(应用尺寸.字号_指标).height(32)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+          Text($r('app.string.stats_summary_studied')).fontSize(应用尺寸.字号_正文_小)
+            .fontColor($r('app.color.text_secondary')).maxLines(2)
+        }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+        Column({ space: 4 }) {
+          Text(this.dueLabel(false))
+            .fontSize(应用尺寸.字号_指标).fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.text_primary')).maxLines(1)
+            .minFontSize(12).maxFontSize(应用尺寸.字号_指标).height(32)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+          Text($r('app.string.stats_summary_due')).fontSize(应用尺寸.字号_正文_小)
+            .fontColor($r('app.color.text_secondary')).maxLines(2)
+        }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+        Column({ space: 4 }) {
+          Text(this.dueLabel(true))
+            .fontSize(应用尺寸.字号_指标).fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.text_primary')).maxLines(1)
+            .minFontSize(12).maxFontSize(应用尺寸.字号_指标).height(32)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+          Text($r('app.string.stats_summary_overdue')).fontSize(应用尺寸.字号_正文_小)
+            .fontColor($r('app.color.text_secondary')).maxLines(2)
+        }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+        Column({ space: 4 }) {
+          Text(this.今日数据 === null ? '—' : this.格式化用时(this.今日数据.answerMillis))
+            .fontSize(应用尺寸.字号_指标).fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.text_primary')).maxLines(1)
+            .minFontSize(12).maxFontSize(应用尺寸.字号_指标).height(32)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+          Text($r('app.string.stats_summary_time')).fontSize(应用尺寸.字号_正文_小)
+            .fontColor($r('app.color.text_secondary')).maxLines(2)
+        }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+      }.width('100%').alignItems(VerticalAlign.Top)
+      if (this.今日数据 !== null && this.今日数据.answerCount > 0) {
+        Button($r('app.string.stats_today_details'))
+          .backgroundColor(Color.Transparent).fontColor($r('app.color.text_secondary'))
+          .height(36).onClick((): void => { this.showDetails = !this.showDetails; })
+      }
+      if (this.showDetails && this.今日数据 !== null && this.今日数据.answerCount > 0) {
         // 内容内联（原 @Builder 值传参参数被固化，牌组切换后数字不更新，2026-08-29 修复）
         Column({ space: 应用尺寸.间距_10 }) {
           Text($r('app.string.stats_today_studied', (this.今日数据 as TodayCounts).answerCount,

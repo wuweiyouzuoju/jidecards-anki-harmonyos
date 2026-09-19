@@ -413,6 +413,8 @@ export struct 牌组选项面板 {
           onAction: () => this.submit()
         })
         Text(this.deckName).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+        Text(this.options.applyToSharedDecks ? $r('app.string.deck_save_scope_shared', this.options.sharedDeckCount) : $r('app.string.deck_save_scope_current'))
+          .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
         Scroll() {
           // 2026-07-28：原 space=间距_8 + 下方 Blank(间距_16) 导致 reviewOrderSelector
           // 上方仅 8px、下方却达 8+16+8=32px，上下比例 1:4 视觉失衡。

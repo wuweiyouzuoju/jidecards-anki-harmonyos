@@ -35,10 +35,11 @@ import { 协议读取器 } from '../core/ProtoReader';
 export { decodeOpChanges } from './CollectionMessages';
 
 /**
- * anki.config.ConfigKey.Bool 枚举（仅列出 T6 侧边栏折叠状态相关项）。
+ * anki.config.ConfigKey.Bool 枚举（按需暴露浏览模式和侧边栏折叠状态）。
  * 完整枚举见 config.proto ConfigKey.Bool（29 项），此处按需暴露。
  */
 export enum ConfigKeyBool {
+  BROWSER_TABLE_SHOW_NOTES_MODE = 0,
   COLLAPSE_TAGS = 4,
   COLLAPSE_DECKS = 6,
   COLLAPSE_SAVED_SEARCHES = 7

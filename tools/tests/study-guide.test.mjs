@@ -39,6 +39,7 @@ function pageHarness(completed = false) {
     DialogAlignment: { Center: 0 },
     hilog: { warn: () => {} },
     isStudyGuideCompleted: () => completed,
+    playStudyHaptic: () => {},
     completeStudyGuide: async () => { saves++; completed = true; }
   });
   const methods = ['maybeShowStudyGuide', 'showStudyGuide', '处理按键', '处理TapZone点击', '评分'].map(name => {
@@ -49,7 +50,7 @@ function pageHarness(completed = false) {
   vm.runInContext(stripTypeScriptTypes(`globalThis.Harness = class { ${methods.join('\n')} }`), context);
   const page = new context.Harness();
   Object.assign(page, {
-    studyGuideChecked: false, studyGuideVisible: false, controllerReady: true, pendingHtml: '',
+    studyGuideChecked: false, studyGuideVisible: false, stopStudyTimers() {}, startStudyTimers() {}, controllerReady: true, pendingHtml: '',
     页面已显示: false, 阶段: 'loading', 当前卡片: {}, 展示时刻毫秒: 500,
     getUIContext: () => ({ showAlertDialog: options => dialogs.push(options) })
   });
@@ -156,7 +157,8 @@ test('both review layouts preserve rating identity while displaying backend inte
   assert.match(button, /Text\(this.label\)[\s\S]*Text\(this.subtitle\)/);
   assert.match(toolbar, /Text\(标签\)[\s\S]*Text\(this.取评分按钮文案\(评分\)\)/);
   assert.doesNotMatch(pageSource + toolbar, /兜底文案/);
-  assert.match(pageSource, /描述下一档状态/);
+  assert.match(read('entry/src/main/ets/backend/StudySessionBackend.ts'), /描述下一档状态/);
+  assert.match(pageSource, /this\.按钮文案 = snapshot\.labels/);
 });
 
 test('first-use guide and settings use the same rating, interval, bury and suspend explanations', () => {

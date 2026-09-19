@@ -2,8 +2,8 @@
   app: {
     "bundleName": "com.jide.kapian",
     vendor: 'jidecards contributors',
-    versionCode: 2600,
-    versionName: '2.6.0',
+    versionCode: 2700,
+    versionName: '2.7.0',
     icon: '$media:app_icon',
     label: '$string:app_name'
   }

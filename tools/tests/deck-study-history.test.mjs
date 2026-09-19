@@ -4,6 +4,8 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { buildDeckStudyHistory, deckHistorySearch, historyStudyDayKey } from '../../entry/src/main/ets/model/DeckStudyHistory.ts';
+import { copyDeckConfig, prepareDeckConfigForSave } from '../../entry/src/main/ets/model/DeckConfigSave.ts';
+import { emptyDeckConfigSettings } from '../../entry/src/main/ets/proto/messages/DeckConfigMessages.ts';
 
 const kinds = (learn = 0, relearn = 0, young = 0, mature = 0, filtered = 0) => ({ learn, relearn, young, mature, filtered });
 const graphs = (count = 0) => ({
@@ -180,10 +182,15 @@ test('editing a deck waits for metadata writes then refreshes even when its ID i
 test('saving deck options refreshes only after backend changes finish', async () => {
   const events = [];
   const saved = deferred();
-  const state = homeSaveHarness('保存牌组选项', { UPDATE_DECK_CONFIGS_MODE_NORMAL: 0 });
+  const state = homeSaveHarness('保存牌组选项', {
+    copyDeckConfig, prepareDeckConfigForSave,
+    UPDATE_DECK_CONFIGS_MODE_NORMAL: 0,
+    notifyFsrsStateChanged: () => { events.push('fsrs'); }
+  });
   Object.assign(state, {
     牌组选项中: false, 牌组选项牌组ID: 10,
-    编辑视图: { cardStateCustomizer: '' }, 编辑配置: { config: {} },
+    编辑视图: { cardStateCustomizer: '', allConfigs: [] },
+    编辑配置: { id: 1, name: 'Default', mtimeSecs: 0, usn: 0, config: emptyDeckConfigSettings() },
     牌组配置服务实例: { 更新牌组配置: async request => {
       assert.equal(request.targetDeckId, 10); events.push('save'); await saved.promise;
     } },
@@ -195,6 +202,6 @@ test('saving deck options refreshes only after backend changes finish', async ()
   });
   assert.deepEqual(events, ['save']);
   saved.resolve(); await pending;
-  assert.deepEqual(events, ['save', 'close', 'refresh']);
+  assert.deepEqual(events, ['save', 'fsrs', 'close', 'refresh']);
   assert.equal(state.牌组选项中, false);
 });

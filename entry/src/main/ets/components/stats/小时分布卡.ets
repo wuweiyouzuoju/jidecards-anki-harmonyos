@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { ThemeTextSpans } from '../common/ThemeText';
-import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
 // 小时分布卡：渲染 GraphsView.hours 为 24 小时垂直柱状图。
 // 支持 4 个时间段切换（1月/3月/1年/全部）；窗口选择持久化并由统计页管理，
@@ -11,7 +9,6 @@ import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
 import type { Hours, HourBucket } from '../../proto/messages/StatsMessages';
 import { 应用尺寸 } from '../../utils/应用尺寸';
-import { 颜色键 } from '../../model/颜色主题';
 import { 取小时柱色 } from '../../model/统计色板';
 import { 取轴域 } from '../../model/统计分箱';
 import type { 轴域 } from '../../model/统计分箱';
@@ -23,24 +20,15 @@ import { 纵轴刻度, 纵轴宽 } from './图表轴';
 
 @Component
 export struct 小时分布卡 {
-  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop 小时数据: Hours | null = null;
-  @Link 时间段索引: number;
+  @Prop 时间段索引: number = 0;
   /** 是否深色主题（正确率面积叠加色对齐 Anki CumulativeOverlay 深浅两套） */
   @Prop 是否深色: boolean = false;
-  @StorageProp(颜色键.动作主色) private 主色: string = '#2F5FD0';
-  @StorageProp(颜色键.主色容器) private 容器色: string = '#E8EEFC';
   /** 图区实际宽度（onAreaChange 更新）：正确率面积路径点坐标用 */
   @State private 图宽: number = 320;
   private readonly 图表高度: number = 100;
-  private onRangeChange?: (索引: number) => void;
 
-  private readonly 时间段标签: Resource[] = [
-    $r('app.string.stats_hours_range_1m'),
-    $r('app.string.stats_hours_range_3m'),
-    $r('app.string.stats_hours_range_1y'),
-    $r('app.string.stats_hours_range_all')
-  ];
+
 
   private 取数据(): HourBucket[] {
     if (this.小时数据 === null) {
@@ -123,27 +111,6 @@ export struct 小时分布卡 {
       } else {
         // 图表内联（原 @Builder 值传参参数被固化，牌组切换后柱子不更新，2026-08-29 修复）
         Column({ space: 应用尺寸.间距_8 }) {
-          // 时间段切换
-          Row({ space: 应用尺寸.间距_4 }) {
-            ForEach(this.时间段标签, (标签: Resource, 索引: number) => {
-              Text() { ThemeTextSpans(标签, (索引 === this.时间段索引) ? this.themeAccentColors : [], this.getUIContext()) }
-                .fontSize(应用尺寸.字号_正文_小)
-                .fontColor(索引 === this.时间段索引 ? this.主色 : $r('app.color.text_secondary'))
-                .fontWeight(索引 === this.时间段索引 ? FontWeight.Bold : FontWeight.Normal)
-                .padding({ left: 应用尺寸.间距_8, right: 应用尺寸.间距_8,
-                  top: 应用尺寸.间距_4, bottom: 应用尺寸.间距_4 })
-                .backgroundColor(索引 === this.时间段索引 ? this.容器色 : Color.Transparent)
-                .borderRadius(应用尺寸.圆角_进度条)
-                .onClick(() => {
-                  this.时间段索引 = 索引;
-                  if (this.onRangeChange !== undefined) {
-                    this.onRangeChange(索引);
-                  }
-                })
-            }, (标签: Resource, 索引: number) => `${索引}`)
-          }
-          .width('100%')
-
           // 柱状图（Anki HourGraph 的柱部分）：
           // 左轴=复习次数、底轴=小时；柱=复习数量；柱色对齐 Anki：Blues(0.1+0.7×归一化计数)，
           // 无复习浅蓝、峰值深蓝。

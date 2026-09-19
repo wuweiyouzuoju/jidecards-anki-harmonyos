@@ -21,6 +21,8 @@ import { 刷新桌面卡片数据 } from '../model/FSRS控制器';
 import { 刷新学习提醒 } from '../model/学习提醒服务';
 import { AI_AGENT_CHANNELS_APP_STORAGE_KEY, initializeAiAgentChannels } from '../model/ReleaseFeatures';
 import { initializeCardTextSize } from '../utils/CardTextSizeStore';
+import { initializeStudyHaptics } from '../utils/StudyHaptics';
+import { syncActivity } from '../model/SyncSettings';
 
 const DOMAIN: number = 0x4342;
 
@@ -40,7 +42,8 @@ export default class EntryAbility extends UIAbility {
         configuration.colorMode === resourceManager.ColorMode.DARK
       );
     } catch (error) {
-      this.publishSystemDarkMode(false);
+      // 暂时读取失败保留已知状态，避免返回前台时闪成浅色。
+      this.publishSystemDarkMode(AppStorage.get<boolean>('systemDarkMode') ?? false);
     }
   }
 
@@ -56,9 +59,18 @@ export default class EntryAbility extends UIAbility {
     return systemDark;
   }
 
+  /** 系统事件与回前台使用应用最终模式，避免显式浅色页面拿到深色色板。 */
+  private refreshThemeColors(): void {
+    const storedTheme: string | undefined = AppStorage.get<string>('colorTheme');
+    const theme: 颜色主题 = storedTheme === undefined ? 默认颜色主题 : 规范化颜色主题(storedTheme);
+    const isDark: boolean = this.effectiveDarkMode();
+    应用颜色主题(theme, isDark);
+  }
+
   onCreate(want: Want, _launchParam: AbilityConstant.LaunchParam): void {
     AppStorage.setOrCreate<common.UIAbilityContext>('abilityContext', this.context);
     initializeCardTextSize();
+    initializeStudyHaptics();
     AppStorage.setOrCreate<boolean>(AI_AGENT_CHANNELS_APP_STORAGE_KEY, false);
     initializeAiAgentChannels().catch((_error: Object): void => {
       // 读取失败保持关闭；开发者可在设置页重新输入密钥。
@@ -98,9 +110,12 @@ export default class EntryAbility extends UIAbility {
   }
 
   onConfigurationUpdate(configuration: Configuration): void {
-    const isDark: boolean =
-      configuration.colorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK;
-    this.publishSystemDarkMode(isDark);
+    // 语言/窗口等配置通知可能没有指定颜色模式，不能把它当成浅色切换。
+    if (configuration.colorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK) {
+      this.publishSystemDarkMode(true);
+    } else if (configuration.colorMode === ConfigurationConstant.ColorMode.COLOR_MODE_LIGHT) {
+      this.publishSystemDarkMode(false);
+    }
     // 系统语言变化时同步刷新 AppStorage，否则组件读到的还是上次启动时的旧值，
     // 主页摘要卡、桌面卡片注入的语言字段全部不会跟随系统切换。
     // language 字段为空时回退到 i18n.System.getAppPreferredLanguage() 兜底。
@@ -112,18 +127,7 @@ export default class EntryAbility extends UIAbility {
     } catch (_e) {
       // 读取失败保留旧值，不阻塞其他配置更新流程
     }
-    const activeThemeMode: string | undefined = AppStorage.get<string>('themeMode');
-    if (activeThemeMode === undefined || activeThemeMode === 'system') {
-      应用系统栏样式(this.context, isDark);
-    }
-    // 系统深浅色变化时颜色主题的浅色/深色套也要同步刷新。
-    // AppStorage 中 colorTheme 由 首页.恢复颜色主题 在启动时写入；
-    // 若 首页 尚未挂载（极端时序），用默认主题兜底。
-    const storedTheme: string | undefined = AppStorage.get<string>('colorTheme');
-    const theme: 颜色主题 = storedTheme === undefined
-      ? 默认颜色主题
-      : 规范化颜色主题(storedTheme);
-    应用颜色主题(theme, isDark);
+    this.refreshThemeColors();
     // 系统深浅色变化时桌面卡片也需刷新（卡片在独立进程，无法感知 AppStorage 变化）
     刷新桌面卡片数据().catch((错误: Object): void => {
       hilog.error(DOMAIN, 'jidecards', `系统主题变化后刷新桌面卡片数据失败: ${错误}`);
@@ -204,6 +208,7 @@ export default class EntryAbility extends UIAbility {
   onForeground(): void {
     AppStorage.setOrCreate<boolean>(APP_FOREGROUND_KEY, true);
     this.refreshSystemDarkMode();
+    this.refreshThemeColors();
     // 回前台时重同步规避区（分屏/折叠/悬浮窗等场景规避区可能已变化且事件未送达）
     this.同步规避区高度();
   }
@@ -217,6 +222,7 @@ export default class EntryAbility extends UIAbility {
   // 短时任务不需要权限申请，任务完成后必须主动 cancelSuspendDelay 否则消耗配额。
   // 失败不阻塞退出，静默跳过保留上次的提醒快照与卡片数据。
   onBackground(): void {
+    syncActivity.continueInBackground();
     AppStorage.setOrCreate<boolean>(APP_FOREGROUND_KEY, false);
     hilog.info(DOMAIN, 'jidecards', 'Application moved to background');
     this.刷新桌面卡片到后台();

@@ -127,21 +127,22 @@ export async function 保存上次牌组ID(牌组ID: string): Promise<void> {
 // 无
 //
 // @输出
-// Promise<void>
+// Promise<boolean>：是否成功清除并落盘。
 //
 // @副作用
 // 删除 preferences 中的 last_selected_deck 键并 flush 落盘。
 // ========================================================
-export async function 清除上次牌组ID(): Promise<void> {
+export async function 清除上次牌组ID(): Promise<boolean> {
   const 上下文: common.UIAbilityContext | null = 取上下文();
   if (上下文 === null) {
-    return;
+    return false;
   }
   try {
     const 存储: preferences.Preferences = await preferences.getPreferences(上下文, 存储名);
     await 存储.delete(上次牌组键);
     await 存储.flush();
+    return true;
   } catch (错误) {
-    // 清空失败不阻塞 UI。
+    return false;
   }
 }

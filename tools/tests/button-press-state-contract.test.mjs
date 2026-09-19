@@ -32,11 +32,10 @@ test('focus theme is scoped to the type-answer input instead of the Ability', ()
   assert.match(page, /\.focusBox\(\{/);
 });
 
-test('settings expansion animates only the arrow', () => {
+test('settings detail content stays visible without accordion state', () => {
   const shell = read('entry/src/main/ets/components/settings/设置分组卡片.ets');
-  assert.match(shell, /\.rotate\(\{ angle: this\.是否展开 \? 0 : -90 \}\)\s*\.animation\(\{ duration: 150, curve: Curve\.EaseOut \}\)/);
-  assert.doesNotMatch(shell, /animateTo\([\s\S]*?this\.切换展开回调/);
-  assert.match(shell, /\.onClick\(\(\): void => \{\s*this\.切换展开回调\(\);\s*\}\)/);
+  assert.doesNotMatch(shell, /是否展开|切换展开回调|\.rotate\(/);
+  assert.match(shell, /this\.内容\(\)/);
 });
 
 test('study actions use isolated component state', () => {
@@ -57,7 +56,8 @@ test('help buttons do not carry the disproven native-effect workaround', () => {
     'entry/src/main/ets/components/settings/设置分组卡片.ets',
     'entry/src/main/ets/components/settings/布局分组.ets',
     'entry/src/main/ets/components/settings/术语分组.ets',
-    'entry/src/main/ets/components/设置面板.ets',
+    'entry/src/main/ets/components/settings/GeneralSettings.ets',
+    'entry/src/main/ets/components/settings/ReviewControlsSettings.ets',
   ]) {
     const source = read(path);
     const blocks = source.split("Button($r('app.string.field_help_button'))").slice(1);

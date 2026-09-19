@@ -83,9 +83,12 @@ test('visibility notifications do not restart animations and stale completions c
 test('each completed cycle submits only one new target, while disabling motion freezes the scene', () => {
   const { background, animations, advance } = createBackground();
   background.updatePlayback();
+  assert.equal(animations[0].duration, 6000, 'lower frame budget preserves the existing motion speed');
+  assert.deepEqual(animations[0].expectedFrameRateRange, { min: 15, max: 30, expected: 30 });
   advance(6000);
   animations[0].onFinish();
   assert.equal(animations.length, 2);
+  assert.deepEqual(animations[1].expectedFrameRateRange, animations[0].expectedFrameRateRange);
   background.motion = false;
   background.updatePlayback();
   assert.equal(animations.length, 3);
@@ -149,6 +152,7 @@ test('push and pop freeze the current cloud pose and resume only after navigatio
     const to = background.toPoses;
     advance(2100);
     navigation.startTransition(operation);
+    assert.equal(navigation.fades[0].expectedFrameRateRange.expected, 60, 'navigation retains its own frame budget');
     const frozen = style.sampleThemeBackgroundPoses(from, to, 2100);
     assert.equal(background.running, false);
     assert.deepEqual(background.poses, frozen);
@@ -160,6 +164,8 @@ test('push and pop freeze the current cloud pose and resume only after navigatio
     assert.equal(background.running, true);
     assert.deepEqual(background.fromPoses, frozen, 'resume from the visible pose, not the old animation target');
     assert.equal(animations.length, 3);
+    assert.deepEqual(animations[2].expectedFrameRateRange, { min: 15, max: 30, expected: 30 },
+      'resumed background returns to the reduced frame budget');
   }
 });
 

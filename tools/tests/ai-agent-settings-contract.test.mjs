@@ -2,11 +2,51 @@
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { stripTypeScriptTypes } from 'node:module';
 import test from 'node:test';
+import { DEEPSEEK_PROVIDER, OPENAI_PROVIDER, normalizeDeepSeekModel } from '../../entry/src/main/ets/model/agent/ProviderCatalog.ts';
+import { normalizeBatchLimit } from '../../entry/src/main/ets/model/agent/AgentPolicy.ts';
 
 function read(path) {
   return readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 }
+
+test('settings load and save retire old DeepSeek models without altering other provider preferences', async () => {
+  const values = new Map([
+    ['ai_agent_provider', 'custom'],
+    ['ai_agent_custom_base_url', 'https://gateway.example/v1'],
+    ['ai_agent_custom_model', 'custom-model'],
+    ['ai_agent_openai_model', 'gpt-5.6-sol'],
+  ]);
+  const store = {
+    get: async (key, fallback) => values.get(key) ?? fallback,
+    put: async (key, value) => values.set(key, value),
+    flush: async () => {},
+  };
+  const source = stripTypeScriptTypes(read('entry/src/main/ets/backend/agent/AgentSettingsStore.ets')
+    .replace(/^import .*;\r?\n/gm, '').replace(/^export /gm, ''));
+  const settingsApi = new Function('preferences', 'AppStorage', 'DEEPSEEK_PROVIDER', 'OPENAI_PROVIDER',
+    'normalizeDeepSeekModel', 'normalizeBatchLimit', `${source}\nreturn { loadAgentSettings, saveAgentSettings };`)(
+    { getPreferences: async () => store }, { get: () => ({}) }, DEEPSEEK_PROVIDER, OPENAI_PROVIDER,
+    normalizeDeepSeekModel, normalizeBatchLimit);
+  for (const oldModel of ['deepseek-v4-flash', 'deepseek-v4-flash-vision-exp', 'deepseek-chat', '']) {
+    values.set('ai_agent_deepseek_model', oldModel);
+    const loaded = await settingsApi.loadAgentSettings();
+    assert.equal(loaded.deepseekModel, 'deepseek-flash');
+    assert.equal(loaded.selectedProvider, 'custom');
+    assert.equal(loaded.customBaseUrl, 'https://gateway.example/v1');
+    assert.equal(loaded.customModel, 'custom-model');
+    assert.equal(loaded.openaiModel, 'gpt-5.6-sol');
+    loaded.deepseekModel = oldModel;
+    await settingsApi.saveAgentSettings(loaded);
+    assert.equal(values.get('ai_agent_deepseek_model'), 'deepseek-flash');
+  }
+  values.set('ai_agent_deepseek_model', 'deepseek-v4-pro');
+  const pro = await settingsApi.loadAgentSettings();
+  assert.equal(pro.deepseekModel, 'deepseek-v4-pro');
+  await settingsApi.saveAgentSettings(pro);
+  assert.equal(values.get('ai_agent_deepseek_model'), 'deepseek-v4-pro');
+});
 
 test('agent settings remember provider models, custom coordinates, and batch limit', () => {
   const store = read('entry/src/main/ets/backend/agent/AgentSettingsStore.ets');
@@ -58,21 +98,19 @@ test('legacy compatibility facade resolves built-in URLs from provider catalog',
   assert.match(legacy, /saveAgentSettings/);
 });
 
-test('all main settings groups share one card shell and rotating header', () => {
+test('detail settings use static sections and the data page keeps a single action list', () => {
   const shell = read('entry/src/main/ets/components/settings/设置分组卡片.ets');
   assert.match(shell, /@BuilderParam\s+内容/);
   assert.match(shell, /设置面板色板_取\(this\.是否深色\)\.背景/);
-  assert.match(shell, /\.padding\(应用尺寸\.卡片内边距\)/);
-  assert.match(shell, /\.borderRadius\(应用尺寸\.圆角_卡片\)/);
-  assert.match(shell, /Text\('▼'\)/);
-  assert.match(shell,
-    /\.rotate\(\{ angle: this\.是否展开 \? 0 : -90 \}\)\s*\.animation\(\{ duration: 150, curve: Curve\.EaseOut \}\)/);
-  assert.doesNotMatch(shell, /animateTo\([\s\S]*?this\.切换展开回调/);
-  assert.match(shell, /\.onClick\(\(\): void => \{\s*this\.切换展开回调\(\);\s*\}\)/);
+  assert.match(shell, /\.padding\(\{ left: 应用尺寸\.卡片内边距, right: 应用尺寸\.卡片内边距, top: 8, bottom: 8 \}\)/);
+  assert.match(shell, /\.borderRadius\(16\)/);
+  assert.doesNotMatch(shell, /是否展开|切换展开回调|\.rotate\(/);
+  assert.match(shell, /this\.内容\(\)/);
+  assert.match(shell, /this\.打开说明回调\(this\.帮助标题/);
 
   for (const name of [
     '外观分组.ets', '调度器分组.ets', '布局分组.ets', '同步分组.ets',
-    'AIAgent设置分组.ets', '术语分组.ets', '数据分组.ets',
+    'AIAgent设置分组.ets', '术语分组.ets', 'GeneralSettings.ets', 'ReviewControlsSettings.ets',
   ]) {
     const source = read(`entry/src/main/ets/components/settings/${name}`);
     assert.match(source, /设置分组卡片\(/, name);
@@ -81,6 +119,10 @@ test('all main settings groups share one card shell and rotating header', () => 
 
   const settings = read('entry/src/main/ets/components/设置面板.ets');
   assert.match(settings, /AIAgent设置分组\(\{[\s\S]*?是否深色:\s*this\.是否深色/);
-  assert.ok((settings.match(/设置分组卡片\(/g) ?? []).length >= 3,
-    'database, about, and experimental inline groups must use the shared shell');
+  assert.ok((settings.match(/设置分组卡片\(/g) ?? []).length >= 1,
+    'about uses the shared shell');
+  const data = read('entry/src/main/ets/components/settings/数据分组.ets');
+  assert.doesNotMatch(data, /设置分组卡片\(|settings_data_management/,
+    'data actions do not repeat the page title or create a separate maintenance card');
+  assert.match(data, /this\.onCheckDatabase\(\)/);
 });

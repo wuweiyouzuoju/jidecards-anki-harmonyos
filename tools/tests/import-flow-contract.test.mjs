@@ -52,7 +52,8 @@ test('settings opens the unified data-management entry instead of a direct impor
 
   assert.match(settings, /导入数据回调: \(\) => void/);
   assert.match(settings, /导出数据回调: \(\) => void/);
-  assert.match(dataGroup, /app\.string\.settings_data_management/);
+  assert.match(dataGroup, /app\.string\.settings_export_import_data/);
+  assert.match(settings, /点击导出导入回调:.*this\.导出数据回调\(\)/);
   assert.doesNotMatch(settings, /backup_sync_title/);
 });
 

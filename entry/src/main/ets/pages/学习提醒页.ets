@@ -236,7 +236,11 @@ export struct 学习提醒页 {
 
   @Builder
   private 顶部条() {
-    Stack() {
+    Stack({ alignContent: Alignment.Center }) {
+      Text($r('app.string.reminder_list_title'))
+        .fontSize(应用尺寸.字号_标题).fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.text_primary')).width('44%')
+        .textAlign(TextAlign.Center).maxLines(1).hitTestBehavior(HitTestMode.None)
       // 左返回 + 右新建按钮，铺满
       Row() {
         按下态按钮({

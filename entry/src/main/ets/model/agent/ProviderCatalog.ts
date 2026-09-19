@@ -19,11 +19,10 @@ export const DEEPSEEK_PROVIDER: ProviderCatalogEntry = {
   displayName: 'DeepSeek',
   baseUrl: 'https://api.deepseek.com',
   models: [
-    'deepseek-v4-flash',
-    'deepseek-v4-pro',
-    'deepseek-v4-flash-vision-exp'
+    'deepseek-flash',
+    'deepseek-v4-pro'
   ],
-  defaultModel: 'deepseek-v4-flash',
+  defaultModel: 'deepseek-flash',
   isDefault: true,
   baseUrlEditable: false,
   modelEditable: false,
@@ -37,6 +36,12 @@ export const DEEPSEEK_PROVIDER: ProviderCatalogEntry = {
     webSearch: true
   }
 };
+
+/** 内置模型仅接受当前目录选项，已退役或空配置恢复为最新默认模型。 */
+export function normalizeDeepSeekModel(model: string): string {
+  const normalized: string = model.trim();
+  return DEEPSEEK_PROVIDER.models.includes(normalized) ? normalized : DEEPSEEK_PROVIDER.defaultModel;
+}
 
 export const OPENAI_PROVIDER: ProviderCatalogEntry = {
   id: 'openai',

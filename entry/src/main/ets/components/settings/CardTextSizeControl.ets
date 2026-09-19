@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { 颜色键 } from '../../model/颜色主题';
 
 import { CARD_TEXT_SIZE_KEY, DEFAULT_CARD_TEXT_SIZE, MIN_CARD_TEXT_SIZE, MAX_CARD_TEXT_SIZE } from '../../model/CardTextSize';
 import { saveCardTextSize } from '../../utils/CardTextSizeStore';
@@ -8,6 +9,7 @@ import { saveCardTextSize } from '../../utils/CardTextSizeStore';
 export struct CardTextSizeControl {
   @StorageProp(CARD_TEXT_SIZE_KEY) private savedSize: number = DEFAULT_CARD_TEXT_SIZE;
   @State private selectedSize: number = DEFAULT_CARD_TEXT_SIZE;
+  @StorageProp(颜色键.主色按钮背景) private actionColor: string = '#2F5FD0';
   @State private saving: boolean = false;
   @State private saveFailed: boolean = false;
 
@@ -44,8 +46,10 @@ export struct CardTextSizeControl {
       }
       .width('100%')
       Slider({ value: this.selectedSize, min: MIN_CARD_TEXT_SIZE, max: MAX_CARD_TEXT_SIZE, step: 10 })
+        .selectedColor(this.actionColor)
         .width('100%')
         .enabled(!this.saving)
+        .selectedColor(this.actionColor)
         .onChange((value: number, mode: SliderChangeMode): void => {
           this.selectedSize = value;
           if (mode === SliderChangeMode.End || mode === SliderChangeMode.Click) {

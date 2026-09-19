@@ -607,19 +607,16 @@ test('BrowserPage has T8 batch action methods', () => {
   assert.match(page, /this\.卡片服务实例\.删除卡片\s*\(/);
 });
 
-test('Browser suspend follows Anki card and note semantics and refreshes real search state', () => {
+test('Browser suspend and restore use captured selection and the common completion boundary', () => {
   const page = read('entry/src/main/ets/pages/浏览页.ets');
-  assert.match(page,
-    /if \(this\.浏览模式值 === 'notes'\) \{[\s\S]*?批量埋藏或暂停笔记\([\s\S]*?BURY_SUSPEND_MODE_SUSPEND[\s\S]*?\} else \{[\s\S]*?批量埋藏或暂停卡片\([\s\S]*?BURY_SUSPEND_MODE_SUSPEND/);
-  const suspendBody = page.match(/private async 执行批量挂起\(\): Promise<void> \{[\s\S]*?\n  \}/)?.[0] ?? '';
-  assert.match(suspendBody, /this\.退出多选\(\);[\s\S]*?await this\.执行搜索\(\);/);
-  assert.doesNotMatch(suspendBody, /本地移除选中行\(/);
-
-  assert.match(page,
-    /this\.浏览模式值 === 'cards' \?[\s\S]*?this\.选中ID列表\.slice\(\) : await this\.解析选中笔记的卡片ID\(\)/);
-  assert.match(page, /private async 解析选中笔记的卡片ID\(\): Promise<number\[\]>/);
+  const body = page.match(/private async 执行批量挂起[\s\S]*?\n  \}/)[0];
+  assert.match(body, /selection\.mode === 'notes'/);
+  assert.match(body, /批量埋藏或暂停笔记\(selection\.ids/);
+  assert.match(body, /批量埋藏或暂停卡片\(selection\.ids/);
+  assert.match(body, /runBatchOperation/);
+  assert.match(page, /operations\.isCurrent[\s\S]*?this\.退出多选\(\)/);
   assert.match(page, /this\.笔记服务实例\.获取笔记的卡片\(笔记ID\)/);
-  assert.match(page, /Set<number>[\s\S]*?!已添加\.has\(卡片ID\)/);
+  assert.match(page, /!已添加\.has\(卡片ID\)/);
 });
 
 test('BrowserPage build renders 批量操作栏 conditionally on 多选模式值 + 选中ID列表', () => {
@@ -1005,15 +1002,15 @@ test('BrowserPage has T9 state + methods', () => {
   assert.match(page, /@State\s+private\s+查找替换错误:\s*string/);
   // 2 个方法：执行查找替换 + 解析选中为笔记ID
   assert.match(page, /private\s+async\s+执行查找替换\s*\(/);
-  assert.match(page, /private\s+async\s+解析选中为笔记ID\s*\(\s*\):\s*Promise<number\[\]>/);
+  assert.match(page, /private\s+async\s+解析选中为笔记ID\s*\([^\n]*\):\s*Promise<number\[\]>/);
   // 执行查找替换调用 搜索服务.查找并替换
   assert.match(page, /this\.搜索服务实例\.查找并替换\s*\(/);
 });
 
-test('BrowserPage top bar has T9 find&replace entry button', () => {
+test('BrowserPage more menu keeps the find&replace entry', () => {
   const page = read('entry/src/main/ets/pages/浏览页.ets');
-  // 顶部条含 查找替换 按钮（i18n key 复用 browser_action_find_replace），与主页同款 按下态按钮
-  assert.match(page, /按下态按钮\s*\(\s*\{[^]*文案:\s*\$r\('app\.string\.browser_action_find_replace'\)/);
+  assert.match(page, /\.bindMenu\(this\.browserMoreMenu\(\)\)/);
+  assert.match(page, /private browserMoreMenu\(\)[\s\S]*?app\.string\.browser_action_find_replace/);
   // 点击设 显示查找替换 = true
   assert.match(page, /this\.显示查找替换\s*=\s*true/);
 });
@@ -1143,12 +1140,15 @@ test('BrowserPage has T6 sidebar methods', () => {
   assert.match(page, /this\.配置服务实例\.设置配置布尔\s*\(/);
 });
 
-test('BrowserPage top bar has T6 sidebar entry button', () => {
+test('BrowserPage more menu owns the T6 sidebar entry', () => {
   const page = read('entry/src/main/ets/pages/浏览页.ets');
-  // 顶部条含 筛选 按钮（i18n key browser_action_sidebar），与主页顶部工具栏同款 按下态按钮
-  assert.match(page, /按下态按钮\s*\(\s*\{[^]*文案:\s*\$r\('app\.string\.browser_action_sidebar'\)/);
-  // 点击调用 打开侧边栏
-  assert.match(page, /this\.打开侧边栏\s*\(/);
+  const menu = page.slice(page.indexOf('private browserMoreMenu()'), page.indexOf('private resultCountLabel()'));
+  const topBar = page.slice(page.indexOf('private 顶部条()'), page.indexOf('\n  build()'));
+  assert.match(menu, /this\.搜索文本\.trim\(\) === '' \? \$r\('app\.string\.browser_action_sidebar'\)[\s\S]*?app\.string\.browser_filter_active/);
+  assert.match(menu, /enabled: this\.阶段 === 'list'/);
+  assert.match(menu, /this\.打开侧边栏\s*\(/);
+  assert.doesNotMatch(topBar, /browser_action_sidebar|browser_filter_active|this\.打开侧边栏/);
+  assert.match(topBar, /\.bindMenu\(this\.browserMoreMenu\(\)\)/);
 });
 
 test('BrowserPage renders 字段帮助面板 and wires help buttons for new features', () => {
@@ -1171,8 +1171,12 @@ test('BrowserPage renders 字段帮助面板 and wires help buttons for new feat
 
 test('查找替换对话框 has ⓘ help button that fires onHelp (统一字段帮助面板)', () => {
   const dialog = read('entry/src/main/ets/components/browser/查找替换对话框.ets');
-  // 标题旁有 ⓘ 按钮（field_help_button）
-  assert.match(dialog, /field_help_button/);
+  // 说明入口由标题栏呈现，正文不再单占一行。
+  assert.match(dialog, /DialogHeader\(\{[\s\S]*?showHelp: true/);
+  assert.match(dialog, /helpEnabled: !this\.busy/);
+  const header = read('entry/src/main/ets/components/common/DialogHeader.ets');
+  assert.match(header, /Text\(this\.title\)[\s\S]*?if \(this\.showHelp\)[\s\S]*?field_help_button/);
+  assert.match(header, /this\.onHelp\(\)/);
   // 点击 ⓘ 上抛 onHelp 回调（由父组件统一渲染 字段帮助面板 浮层，与批量操作栏 ⓘ 同模式）
   assert.match(dialog, /onHelp:\s*\(\)\s*=>\s*void/);
   assert.match(dialog, /this\.onHelp\s*\(/);

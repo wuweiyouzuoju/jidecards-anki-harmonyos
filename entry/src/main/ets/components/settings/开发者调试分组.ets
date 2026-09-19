@@ -15,8 +15,6 @@ import { 设置分组卡片 } from './设置分组卡片';
 export struct 开发者调试分组 {
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop 是否深色: boolean = false;
-  @Prop 已展开: boolean = false;
-  切换展开回调: () => void = (): void => {};
   启用成功回调: () => void = (): void => {};
 
   @StorageLink(AI_AGENT_CHANNELS_APP_STORAGE_KEY) private Agent入口已启用: boolean = false;
@@ -57,9 +55,7 @@ export struct 开发者调试分组 {
   build() {
     设置分组卡片({
       标题: $r('app.string.settings_developer_debug_title'),
-      是否深色: this.是否深色,
-      是否展开: this.已展开,
-      切换展开回调: this.切换展开回调
+      是否深色: this.是否深色
     }) {
       Column({ space: 应用尺寸.间距_10 }) {
         if (this.Agent入口已启用) {

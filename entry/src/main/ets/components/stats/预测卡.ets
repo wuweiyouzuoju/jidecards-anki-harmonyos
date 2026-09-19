@@ -6,13 +6,13 @@
 // 底部统计表：总计 / 平均 / 明日到期 / 日均负载。
 // Invariants: build 单根 Column；负键 = 积压天数，仅在 显示积压 时参与渲染与总计。
 
+import { forecastAverage } from '../../model/StatsOverview';
 import type { FutureDue } from '../../proto/messages/StatsMessages';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 颜色键 } from '../../model/颜色主题';
 import { 取预测柱色 } from '../../model/统计色板';
 import { 取轴域 } from '../../model/统计分箱';
 import type { 轴域 } from '../../model/统计分箱';
-import { 范围切换条 } from './范围切换条';
 import { 纵轴刻度, 横轴日期条, 纵轴宽 } from './图表轴';
 
 /** 单柱：位置（0=最左/最深积压）+ 数量 */
@@ -28,15 +28,9 @@ export struct 预测卡 {
   @Prop 是否显示全部: boolean = false;
   /** 积压复选框切换回调：父组件负责写 GraphPreferences（Anki 保存即生效） */
   on积压变更: (值: boolean) => void = (): void => {};
-  @State private 范围索引: number = 0;
+  @Prop @Watch('更新缓存') 范围索引: number = 0;
   @State private 柱缓存: 预测柱[] = [];
   private readonly 柱区高度: number = 108;
-  private readonly 范围标签: Resource[] = [
-    $r('app.string.stats_hours_range_1m'),
-    $r('app.string.stats_hours_range_3m'),
-    $r('app.string.stats_hours_range_1y'),
-    $r('app.string.stats_hours_range_all')
-  ];
   @StorageProp(颜色键.主色按钮背景) private 主色按钮背景: string = '#2F5FD0';
 
   aboutToAppear(): void {
@@ -196,14 +190,6 @@ export struct 预测卡 {
 
   build() {
     Column({ space: 应用尺寸.间距_8 }) {
-      范围切换条({
-        当前索引: this.范围索引,
-        标签集: this.是否显示全部 ? this.范围标签 : this.范围标签.slice(0, 3),
-        onRangeChange: (): void => {
-          this.更新缓存();
-        }
-      })
-
       // 积压复选框：仅存在积压时显示（Anki Backlog checkbox）
       if (this.预测数据 !== null && this.预测数据.haveBacklog) {
         Row({ space: 应用尺寸.间距_7 }) {
@@ -283,7 +269,7 @@ export struct 预测卡 {
               .fontSize(应用尺寸.字号_正文_小)
               .fontColor($r('app.color.text_secondary'))
             Blank()
-            Text($r('app.string.stats_forecast_average', `${Math.round(this.取总计() / this.取期间天数())}`))
+            Text($r('app.string.stats_forecast_average', forecastAverage(this.取总计(), this.取期间天数())))
               .fontSize(应用尺寸.字号_正文_小)
               .fontColor($r('app.color.text_primary'))
           }

@@ -96,7 +96,7 @@ test('home coordinates one delayed ten-minute announcement check without polling
   assert.match(source, /private 官方公告延迟检查任务: number = -1/);
   assert.match(source, /private 主页允许公告检查: boolean = true/);
   assert.match(source, /private 主页公告检查已激活: boolean = false/);
-  assert.match(source, /private 待展示官方公告数据: 官方公告展示项 \| null = null/);
+  assert.match(source, /announcementController: HomeAnnouncementController/);
   assert.match(source, /private 请求主页官方公告检查\(\): void/);
   assert.match(source, /官方公告检查延迟毫秒\(this\.上次官方公告检查开始时间, Date\.now\(\)\)/);
   assert.match(source, /this\.官方公告延迟检查任务 = setTimeout/);
@@ -117,12 +117,12 @@ test('every real home return enters the shared refresh and announcement path', (
 
 test('acknowledgement suppresses the same id immediately in the current process', () => {
   const source = read('../../entry/src/main/ets/pages/首页.ets');
-  assert.match(source, /private 当前进程已确认官方公告ID集合: Set<string> = new Set<string>\(\)/);
+  assert.match(source, /announcementController: HomeAnnouncementController/);
   const load = source.match(/private async 尝试显示官方公告\(\)[\s\S]*?\n  private /)?.[0] ?? '';
-  assert.match(load, /当前进程已确认官方公告ID集合\.has\(announcement\.id\)/);
+  assert.match(load, /announcementController\.check/);
   const acknowledge = source.match(/private async 确认官方公告\(\)[\s\S]*?\n  private /)?.[0] ?? '';
-  assert.match(acknowledge, /当前进程已确认官方公告ID集合\.add\(id\)/);
-  assert.ok(acknowledge.indexOf('当前进程已确认官方公告ID集合.add(id)') <
+  assert.match(acknowledge, /announcementController\.confirm\(id\)/);
+  assert.ok(acknowledge.indexOf('announcementController.confirm(id)') <
     acknowledge.indexOf('await 标记已确认官方公告(id)'));
 });
 

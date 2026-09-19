@@ -43,6 +43,7 @@ export interface 浏览行数据 {
   id: number;
   cells: BrowserCell[];
   color: BrowserRowColor;
+  hasSuspendedCards: boolean;
 }
 
 @Component
@@ -50,6 +51,8 @@ export struct 卡片表格 {
   @Prop 行列表: 浏览行数据[] = [];
   @Prop 结果总数: number = 0;
   @Prop 已加载行数: number = 0;
+  @Prop subtitleIndex: number = 1;
+  @Prop notesMode: boolean = false;
   /** 从 Agent 改卡入口进入时，首次挂载即显示多选框。 */
   @Prop 初始多选模式: boolean = false;
   onRowClick: (id: number) => void = (): void => {};
@@ -90,12 +93,13 @@ export struct 卡片表格 {
     return 行.cells[0].text || `#${行.id}`;
   }
 
-  /** 取行第二列文本作为副文案（Deck 列，可能不存在）。 */
+  /** 按选择读取副标题；牌组仅展示末级名称，完整路径仍保留在详情。 */
   private 取行副文案(行: 浏览行数据): string {
-    if (行.cells.length < 2) {
-      return '';
-    }
-    return 行.cells[1].text || '';
+    const text: string = 行.cells[this.subtitleIndex]?.text ?? '';
+    if (this.subtitleIndex !== 1) return text;
+    const deck: string = text.split('::').pop() ?? text;
+    const due: string = this.notesMode ? '' : (行.cells[2]?.text ?? '');
+    return due === '' ? deck : `${deck} · ${due}`;
   }
 
   /** 行标志色：根据 BrowserRowColor 返回色条颜色，无标志返回透明。 */
@@ -112,9 +116,9 @@ export struct 卡片表格 {
     }
   }
 
-  /** 行是否挂起（COLOR_SUSPENDED），用于行背景变灰。 */
+  /** 暂停状态独立于旗标颜色，用于弱化行背景。 */
   private 是否挂起行(行: 浏览行数据): boolean {
-    return 行.color === BrowserRowColor.COLOR_SUSPENDED;
+    return 行.hasSuspendedCards;
   }
 
   /** 点击行：多选模式下切换选中，否则触发 onRowClick。 */
@@ -176,8 +180,9 @@ export struct 卡片表格 {
                   Text(this.取行主文案(行))
                     .fontSize(应用尺寸.字号_正文)
                     .fontColor(this.是否挂起行(行) ? $r('app.color.text_secondary') : $r('app.color.text_primary'))
-                    .maxLines(1)
+                    .maxLines(2)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
+                    .textAlign(TextAlign.Start)
                     .width('100%')
 
                   if (this.取行副文案(行) !== '') {
@@ -186,7 +191,18 @@ export struct 卡片表格 {
                       .fontColor($r('app.color.text_secondary'))
                       .maxLines(1)
                       .textOverflow({ overflow: TextOverflow.Ellipsis })
+                      .textAlign(TextAlign.Start)
                       .width('100%')
+                  }
+                  if (行.hasSuspendedCards) {
+                    Text(this.notesMode ? $r('app.string.browser_contains_suspended') :
+                      $r('app.string.stats_cards_suspended'))
+                      .fontSize(应用尺寸.字号_正文_小)
+                      .fontColor($r('app.color.text_primary'))
+                      .padding({ left: 6, right: 6, top: 2, bottom: 2 })
+                      .backgroundColor($r('app.color.surface_card'))
+                      .border({ width: 0.5, color: $r('app.color.border_subtle') })
+                      .borderRadius(4)
                   }
                 }
                 .alignItems(HorizontalAlign.Start)
@@ -196,6 +212,7 @@ export struct 卡片表格 {
                 // hitTestBehavior(Block) 阻止点击事件冒泡到行 onClick（ClickEvent 无 stopPropagation）
                 if (!this.多选模式) {
                   Text('ⓘ')
+                    .accessibilityText($r('app.string.browser_card_info'))
                     .fontSize(应用尺寸.字号_正文)
                     .fontColor($r('app.color.text_secondary'))
                     .padding({
@@ -217,7 +234,7 @@ export struct 卡片表格 {
                 top: 应用尺寸.间距_8,
                 bottom: 应用尺寸.间距_8
               })
-              .backgroundColor(this.是否挂起行(行) ? $r('app.color.surface_card') : $r('app.color.surface_page'))
+              .backgroundColor($r('app.color.surface_card'))
               // 有标志时加 4px 左边框作色条（不增加子元素，不影响布局高度）
               .border(this.取行标志色(行) !== 'transparent' ? {
                 width: { left: 4 },
@@ -229,7 +246,8 @@ export struct 卡片表格 {
                   .onAction((): void => this.处理长按(行.id))
               )
             }
-          }, (行: 浏览行数据): string => `${行.id}-${行.color}`)
+          }, (行: 浏览行数据): string =>
+            `${行.id}-${行.color}-${行.hasSuspendedCards}-${JSON.stringify(行.cells)}`)
         }
         .width('100%')
         .layoutWeight(1)

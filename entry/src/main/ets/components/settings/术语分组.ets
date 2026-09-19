@@ -20,8 +20,7 @@ import { 设置分组卡片 } from './设置分组卡片';
 //
 // @输入
 // 是否深色：当前是否深色模式（影响色板取值）。
-// 是否展开：本分组是否展开。
-// 切换展开回调 / 打开说明回调：父组件注入；打开说明回调 上抛 标题 + 正文 Resource。
+// 打开说明回调：父组件注入；打开说明回调 上抛 标题 + 正文 Resource。
 //
 // @输出
 // 渲染术语表分组卡片；用户点击 ⓘ 时上抛 打开说明回调。
@@ -32,8 +31,6 @@ import { 设置分组卡片 } from './设置分组卡片';
 @Component
 export struct 术语分组 {
   @Prop 是否深色: boolean = false;
-  @Prop 是否展开: boolean = false;
-  切换展开回调: () => void = (): void => {};
   // ⓘ 按钮上抛：由父组件 SettingsPanel 统一渲染 FieldHelpPanel 浮层，避免嵌在分组卡片内
   打开说明回调: (标题: Resource, 正文: Resource) => void = (_标题: Resource, _正文: Resource): void => {};
   // B12-Y5 2026-07-29 修复 Bug 1：术语分组没有任何 @StorageLink 颜色键，
@@ -173,9 +170,7 @@ export struct 术语分组 {
   build() {
     设置分组卡片({
       标题: $r('app.string.settings_glossary'),
-      是否深色: this.是否深色,
-      是否展开: this.是否展开,
-      切换展开回调: this.切换展开回调
+      是否深色: this.是否深色
     }) {
       Column() {
         ForEach(this.条目列表, (条目: 术语条目) => {

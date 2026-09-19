@@ -93,10 +93,10 @@ test('study page refreshes undo availability on entry and after rating', () => {
   const page = read(STUDY_PAGE);
 
   assert.match(page, /import \{ 集合服务 \} from '\.\.\/backend\/集合服务'/);
-  assert.match(page, /private async 刷新撤销状态\(\): Promise<void>/);
-  assert.match(page, /await this\.集合服务实例\.获取撤销状态\(\)/);
-  assert.match(page, /this\.可撤销 = status\.undo\.length > 0/,
-    'empty undo label means unavailable');
+  assert.match(page, /this\.可撤销 = snapshot\.canUndo/);
+  const adapter = read('entry/src/main/ets/backend/StudySessionBackend.ts');
+  assert.match(adapter, /await this\.collection\.获取撤销状态\(\)/);
+  assert.match(adapter, /undo\.length > 0/, 'empty undo label means unavailable');
   // loadNextCard 同时覆盖「页面进入」与「评分成功后」两条路径（startSession/rate 均汇入）
   // 入口、评分后与撤销后的刷新由 study-lifecycle 行为测试验证。
 });
@@ -112,7 +112,7 @@ test('study page undo button is wired to undo then refetch', () => {
   assert.match(page, /this\.撤销上次\(\);/, 'menu item taps into undo handler');
 
   assert.match(page, /if \(this\.评分中 \|\| !this\.可撤销\)/, 'undo reuses reentrancy guard');
-  assert.match(page, /await this\.集合服务实例\.撤销\(\);\s*await this\.加载下一张卡\(\);/,
+  assert.match(page, /await this\.studySession\.undo\(\);\s*await this\.加载下一张卡\(\);/,
     'undone card returns to queue front, refetch required');
   const undoBody = page.match(/撤销上次\(\): Promise<void> \{[\s\S]*?\n  \}/);
   assert.notEqual(undoBody, null);

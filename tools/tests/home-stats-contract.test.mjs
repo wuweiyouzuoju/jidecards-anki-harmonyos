@@ -69,7 +69,7 @@ test('home wires graphs into the snapshot and degrades quietly', () => {
   assert.notEqual(method, null);
   // 2026-08-26 起跟随统计页「近 1 年/全部」本地持久化偏好（加载统计天数），
   // 不再写死 365；仍禁止用日期函数派生天数。
-  assert.match(method[0], /统计服务实例\.获取图表统计\(await 加载统计天数\(\)\)/,
+  assert.match(method[0], /const days: number = await 加载统计天数\(\);[\s\S]*获取图表统计\(days\)/,
     'lookback window must follow the persisted stats range preference, not a date-derived value');
   assert.doesNotMatch(method[0], /获取图表统计\(new Date\(\)/,
     'days must never be derived from the current date');

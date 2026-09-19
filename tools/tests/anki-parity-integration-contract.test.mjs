@@ -17,8 +17,8 @@ test('home wires the Anki deck tree, action menu, and selected-deck flows', () =
   assert.match(transferCoord, /数据迁移面板/);
   assert.match(index, /展开的牌组ID集合/);
   assert.match(index, /创建父牌组ID/);
-  assert.match(index, /this\.创建父牌组ID = ''/);
-  assert.match(index, /this\.创建父牌组ID = this\.选中的牌组ID/);
+  assert.match(index, /this\.openCreateDeck\(''\)/);
+  assert.match(index, /this\.openCreateDeck\(this\.选中的牌组ID\)/);
   // 创建牌组协调器 接收 父牌组ID Prop（内部转发给 创建牌组面板 的 initialParentId）
   assert.match(index, /父牌组ID: this\.创建父牌组ID/);
   assert.match(detail, /添加卡片/);
@@ -31,11 +31,12 @@ test('home wires the Anki deck tree, action menu, and selected-deck flows', () =
 
 test('settings owns only language, data, database check, and about entry points', () => {
   const settings = read('entry/src/main/ets/components/设置面板.ets');
-  assert.match(settings, /设置语言模式/);
+  assert.match(read('entry/src/main/ets/components/settings/GeneralSettings.ets'), /设置语言模式/);
   assert.match(settings, /导入数据回调/);
   assert.match(settings, /导出数据回调/);
-  const dataGroup = settings.slice(settings.indexOf('settings_data_management'), settings.indexOf('settings_database_check'));
-  assert.doesNotMatch(dataGroup, /check_db_title/);
+  const dataGroup = read('entry/src/main/ets/components/settings/数据分组.ets');
+  assert.match(dataGroup, /check_db_title/);
+  assert.match(settings, /onCheckDatabase:.*this\.执行数据库检查\(\)/);
   assert.doesNotMatch(settings, /backup_sync_title/);
   assert.doesNotMatch(settings, /onUnavailable/);
   assert.doesNotMatch(settings, /onImport:\s*\(/);
@@ -67,19 +68,18 @@ test('personal replacement is confirmed twice and export is finalized by UI cont
   assert.doesNotMatch(index, /throw new Error\('ability context unavailable'\)/);
 });
 
-test('add-note hides image occlusion while retaining other notetypes and type-answer submits on Enter', () => {
-  // 图片遮盖建卡入口关闭，但 Basic 变种仍与其他通用类型一起展示。
+test('add-note exposes image occlusion and other notetypes and type-answer submits on Enter', () => {
+  // 图片遮盖和 Basic 变种均在创建入口展示。
   const addNote = read('entry/src/main/ets/pages/添加笔记页.ets');
-  assert.match(addNote, /可建卡类型: NotetypeNameId\[\] = 名称列表\.filter/);
-  assert.match(addNote, /!this\.是图片遮盖笔记类型名\(项\.name\)/);
-  assert.match(addNote, /笔记类型选项 = 可建卡类型\.map/);
+  assert.match(addNote, /笔记类型选项 = 名称列表\.map/);
+  assert.doesNotMatch(addNote, /名称列表\.filter/);
   assert.doesNotMatch(addNote, /是隐藏的笔记类型变种/);
   assert.doesNotMatch(addNote, /暂不做 UI 适配/);
   // 三种变体的专属帮助文案分发必须保留（下拉选中后展示用途说明）
   assert.match(addNote, /Basic反转笔记类型名集合\.indexOf/);
   assert.match(addNote, /Basic可选反转笔记类型名集合\.indexOf/);
   assert.match(addNote, /Basic输入答案笔记类型名集合\.indexOf/);
-  // 若保存的默认类型是已关闭的图片遮盖，必须回退到第一个可见类型。
+  // 已删除的默认类型必须回退到可见类型。
   assert.match(addNote, /默认ID可见/);
   assert.match(addNote, /默认笔记类型ID = this\.笔记类型选项\[0\]\.id/);
 
@@ -89,9 +89,9 @@ test('add-note hides image occlusion while retaining other notetypes and type-an
   assert.match(study, /onSubmit\(\(\): void => \{\s*this\.显示答案\(\);\s*\}\)/);
 });
 
-test('stock notetype restore covers basic, cloze and the three basic variants without provisioning image occlusion', () => {
+test('stock notetype restore covers basic variants, cloze and image occlusion', () => {
   // 2026-08-29：兜底恢复清单必须覆盖 stock kind 0/1/2/3/4；
-  // 图片遮盖建卡入口关闭，添加笔记页不能补建该笔记类型。
+  // 图片遮盖通过专属服务补建。
   const addNote = read('entry/src/main/ets/pages/添加笔记页.ets');
   assert.match(addNote, /获取标准笔记类型JSON\(标准笔记类型种类\.BASIC\)/);
   assert.match(addNote, /获取标准笔记类型JSON\(标准笔记类型种类\.BASIC_AND_REVERSED\)/);
@@ -99,7 +99,7 @@ test('stock notetype restore covers basic, cloze and the three basic variants wi
   assert.match(addNote, /获取标准笔记类型JSON\(标准笔记类型种类\.BASIC_TYPING\)/);
   assert.match(addNote, /获取标准笔记类型JSON\(标准笔记类型种类\.CLOZE\)/);
   assert.doesNotMatch(addNote, /获取标准笔记类型JSON\(标准笔记类型种类\.IMAGE_OCCLUSION\)/);
-  assert.doesNotMatch(addNote, /图片遮罩服务实例\.添加图片遮罩笔记类型\(\)/);
+  assert.match(addNote, /图片遮罩服务实例\.添加图片遮罩笔记类型\(\)/);
   const study = read('entry/src/main/ets/pages/学习页.ets');
   const preview = read('entry/src/main/ets/components/browser/卡片预览页.ets');
   assert.match(study, /anki\.imageOcclusion\.setup\(\)/);
