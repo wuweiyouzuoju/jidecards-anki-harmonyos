@@ -19,7 +19,7 @@
 
 | 项目 | 当前值 | 事实来源 |
 | --- | --- | --- |
-| 应用版本 | 2.6.0 / versionCode 2600 | `AppScope/app.json5` |
+| 应用版本 | 2.7.0 / versionCode 2700 | `AppScope/app.json5` |
 | 最低兼容 SDK | HarmonyOS 6.0.1（API 21） | `build-profile.json5` 的 `compatibleSdkVersion` |
 | 目标 SDK | HarmonyOS 6.1.0（API 23） | `build-profile.json5` 的 `targetSdkVersion` |
 | 编译 SDK | DevEco Studio 当前配套 6.1.0.105（API 23） | 本机 SDK 与 `UPSTREAM.lock` |
@@ -47,6 +47,14 @@ phone、tablet 和 2in1，但声明设备类型不等于已完成所有形态的
 以上只表示代码路径存在并受契约测试覆盖，不等于与桌面 Anki 的全部功能、全部
 历史 schema 或所有设备行为完全等价。对外介绍应使用“复用 Anki 26.05 Rust
 Core”或“兼容常用 Anki 数据与学习流程”，不要使用未经差分测试证明的“完整兼容”。
+
+## 学习会话与自动同步边界
+
+学习页的取卡、评分和撤销编排已提取到 `StudySessionController`，通过适配器复用既有后端服务；此次不修改 Anki Core、原生桥或同步协议。`AutoSyncScheduler` 合并成功学习写入产生的同步意图，首页负责前台、弹窗与导航安全检查。
+
+每次答题先本地保存；连续学习时不启动自动集合同步，完成页或返回首页空闲后执行。正常自动同步不显示进度弹窗，错误提示和需要用户选择的全量冲突仍保留。完成页恢复学习须等待已开始的集合同步并重新取卡，媒体同步可以继续。此方案不承诺逐张即时上传或消除所有进入学习前的等待。
+
+2026-09-18：完整 Node 回归与 Rust 双架构、ArkTS、签名 HAP 构建通过；设备操作由用户自行完成，本轮未安装或执行设备验收。
 
 ## 当前发布开关与限制
 

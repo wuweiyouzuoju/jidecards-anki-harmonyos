@@ -38,6 +38,7 @@ import type { TtsItem } from '../proto/messages/CardRenderingMessages';
 import { 加载语音人物, 获取语音版本号 } from '../model/TTS语音存储';
 import { AudioFocusCoordinator } from './AudioFocusCoordinator';
 import { AudioQueuePlayer } from '../model/CardAudioSession';
+import { AudioQueueCompletion } from '../model/AudioQueueCompletion';
 
 const 域: number = 0x0001;
 const 标签: string = 'TtsPlayer';
@@ -148,20 +149,29 @@ export class TTS播放器 implements AudioQueuePlayer<TtsItem> {
   private 队列: TtsItem[] = [];
   private 索引: number = 0;
   private 代次: number = 0;
+  private completion: AudioQueueCompletion = new AudioQueueCompletion();
+  private activeRequestId: string = '';
+
+  waitForCompletion(): Promise<void> { return this.completion.wait(); }
 
   /** 顺序朗读一组 TTS items；空列表等价 停止 */
   async 播放队列(条目列表: TtsItem[]): Promise<void> {
     this.代次++;
+    const generation: number = this.代次;
+    this.activeRequestId = '';
+    this.completion.begin();
     this.队列 = 条目列表;
     记录信息('playQueue: gen=%{public}d count=%{public}d', this.代次, 条目列表.length);
     for (let i: number = 0; i < 条目列表.length; i++) {
       记录信息('  queue[%{public}d]=%{public}s lang=%{public}s', i, 条目列表[i].text, 条目列表[i].language);
     }
     await this.内部停止();
+    if (generation !== this.代次) return;
     if (条目列表.length > 0) {
       await this.音频焦点协调器.beginPlayback(this);
-      await this.从指定位置开始(0, this.代次);
+      await this.从指定位置开始(0, generation);
     } else {
+      this.completion.finish();
       await this.音频焦点协调器.endPlayback(this);
     }
   }
@@ -172,15 +182,14 @@ export class TTS播放器 implements AudioQueuePlayer<TtsItem> {
       记录警告('replay: queue empty, nothing to replay');
       return;
     }
-    this.代次++;
-    记录信息('replay: gen=%{public}d', this.代次);
-    await this.内部停止();
-    await this.从指定位置开始(0, this.代次);
+    await this.播放队列(this.队列.slice());
   }
 
   /** 停止并清空队列 */
   async 停止(): Promise<void> {
     this.代次++;
+    this.activeRequestId = '';
+    this.completion.finish();
     记录信息('stop: gen=%{public}d', this.代次);
     this.队列 = [];
     await this.内部停止();
@@ -316,6 +325,8 @@ export class TTS播放器 implements AudioQueuePlayer<TtsItem> {
         记录信息('onStart: requestId=%{public}d', 请求ID);
       },
       onComplete: (请求ID: string, 响应: textToSpeech.CompleteResponse): void => {
+        if (请求ID !== this.activeRequestId || 请求ID === '') return;
+        this.activeRequestId = '';
         记录信息('onComplete: requestId=%{public}d → advance to next', 请求ID);
         this.前进到下一项();
       },
@@ -326,6 +337,8 @@ export class TTS播放器 implements AudioQueuePlayer<TtsItem> {
         // 流式音频回调（本端直接由引擎内部播放，无需处理）
       },
       onError: (请求ID: string, 错误码: number, 错误信息: string): void => {
+        if (请求ID !== this.activeRequestId || 请求ID === '') return;
+        this.activeRequestId = '';
         记录错误('onError: requestId=%{public}d code=%{public}d msg=%{public}s → advance', 请求ID, 错误码, 错误信息);
         this.前进到下一项();
       }
@@ -340,6 +353,7 @@ export class TTS播放器 implements AudioQueuePlayer<TtsItem> {
       return;
     }
     if (位置 >= this.队列.length) {
+      this.completion.finish();
       记录信息('startAt[%{public}d]: end of queue', 位置);
       await this.音频焦点协调器.endPlayback(this);
       return;
@@ -365,6 +379,7 @@ export class TTS播放器 implements AudioQueuePlayer<TtsItem> {
     }
     // requestId 在同一实例内只能用一次，每次 speak 生成新 ID
     const 请求ID: string = `tts-${代次}-${位置}-${Date.now()}`;
+    this.activeRequestId = 请求ID;
     const 朗读参数: textToSpeech.SpeakParams = {
       requestId: 请求ID,
       extraParams: {}
@@ -383,6 +398,7 @@ export class TTS播放器 implements AudioQueuePlayer<TtsItem> {
   private 前进到下一项(): void {
     const 当后代次: number = this.代次;
     this.从指定位置开始(this.索引 + 1, 当后代次).catch((异常: Object): void => {
+      if (当后代次 === this.代次) this.completion.finish();
       记录错误('advance: startAt(next) rejected %{public}s', 错误文本(异常 as BusinessError | undefined));
     });
   }

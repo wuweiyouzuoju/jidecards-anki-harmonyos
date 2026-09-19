@@ -5,6 +5,7 @@ import { 保存显示今日进度卡, 主页今日进度卡AppStorage键 } from 
 import { 设置面板色板, 设置面板色板_取 } from '../../utils/设置面板配色';
 import { 颜色键 } from '../../model/颜色主题';
 import { 设置分组卡片 } from './设置分组卡片';
+import { STUDY_HAPTICS_KEY, saveStudyHaptics } from '../../utils/StudyHaptics';
 
 // ========================================================
 // @块ID UI-LAYOUT-001
@@ -49,8 +50,13 @@ export struct 布局分组 {
   @StorageProp('themeMode') private 主题模式监听: string = 'system';
 
   @State private 当前布局模式: 学习布局模式 | null = null;
+  @StorageProp(STUDY_HAPTICS_KEY) @Watch('syncHapticsToggle') private hapticsEnabled: boolean = true;
+  @State private hapticsToggle: boolean = true;
+  @State private hapticsSaving: boolean = false;
+  @State private hapticsSaveFailed: boolean = false;
 
   async aboutToAppear(): Promise<void> {
+    this.hapticsToggle = this.hapticsEnabled;
     // 失败回退到 'bottom'（默认），保证 chip 一直可选。
     try {
       this.当前布局模式 = await 加载学习布局模式();
@@ -61,6 +67,27 @@ export struct 布局分组 {
 
   private 取本地化文本(资源: Resource): string {
     return this.getUIContext().getHostContext()!.resourceManager.getStringSync(资源.id);
+  }
+
+  /** 设置广播和保存失败都让开关显示实际生效值。 */
+  private syncHapticsToggle(): void {
+    this.hapticsToggle = this.hapticsEnabled;
+  }
+
+  /** 保存期间防止重复写入，失败恢复开关并显示可重试的提示。 */
+  private async changeStudyHaptics(enabled: boolean): Promise<void> {
+    if (this.hapticsSaving || enabled === this.hapticsEnabled) { return; }
+    this.hapticsSaving = true;
+    this.hapticsSaveFailed = false;
+    this.hapticsToggle = enabled;
+    try {
+      await saveStudyHaptics(enabled);
+    } catch (error) {
+      this.hapticsSaveFailed = true;
+    } finally {
+      this.hapticsToggle = this.hapticsEnabled;
+      this.hapticsSaving = false;
+    }
   }
 
   /** 按钮背景专用主色（配 #FFFFFF 文字 ≥ 4.5:1）。2.1.4.1 深色模式修复。 */
@@ -182,6 +209,28 @@ export struct 布局分组 {
           }
           .width('100%')
           .height(48)
+
+          Divider()
+            .color(设置面板色板_取(this.是否深色).分隔线)
+            .strokeWidth(1)
+            .margin({ top: 4, bottom: 4 })
+          Row() {
+            Text($r('app.string.settings_study_haptics'))
+              .fontSize(15)
+              .fontColor(设置面板色板_取(this.是否深色).主文字)
+              .layoutWeight(1)
+            Toggle({ type: ToggleType.Switch, isOn: this.hapticsToggle })
+              .selectedColor(this.解析主色按钮背景())
+              .enabled(!this.hapticsSaving)
+              .onChange((enabled: boolean): void => { this.changeStudyHaptics(enabled); })
+          }
+          .width('100%')
+          .height(48)
+          if (this.hapticsSaveFailed) {
+            Text($r('app.string.settings_study_haptics_save_failed'))
+              .fontSize(12)
+              .fontColor($r('app.color.error_text'))
+          }
 
           // 主页今日进度卡开关：Divider 分隔 + 标题+ⓘ + Toggle。
           // 原小字说明（settings_home_today_summary_hint）从下方移入 ⓘ 浮层。

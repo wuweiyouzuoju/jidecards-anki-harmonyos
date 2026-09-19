@@ -1,3 +1,4 @@
+import { attachStudySession } from './study-session-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -38,7 +39,7 @@ function harness(phase = 'question') {
     已渲染: {}, 正面HTML: 'old-front', 背面HTML: 'old-back', 拼写字段名: 'Old', 已输入答案: 'old-input',
     声音播放器实例: { 停止: async () => {}, 播放队列: async () => {} },
     TTS播放器实例: { 停止: async () => {}, 播放队列: async () => {} },
-    刷新撤销状态: async () => {}, 是否深色: () => false, maybeShowStudyGuide: () => {},
+    集合服务实例: {获取撤销状态: async () => ({undo: ''})}, 是否深色: () => false, maybeShowStudyGuide: () => {},
     加载完成页信息: async () => {}, 构建拼写答案HTML: async html => html.replace('[[type:Updated]]', 'new-expected-answer'),
     调度器服务实例: { 描述下一档状态: async () => ['1m', '5m', '1d', '4d'], 获取队首卡片: async () => ({ newCount: 12, learningCount: 3, reviewCount: 4,
       cards: store.empty ? [] : [{ cardId: store.id, noteId: 42, templateIdx: 1, states: 'new-states' }] }) },
@@ -48,6 +49,7 @@ function harness(phase = 'question') {
     网页控制器: { loadData: html => displayed.push(html), runJavaScript: async () => {} }, 取文案: key => key,
     笔记服务实例: { 更新笔记: async notes => { store.front = notes[0].fields[0]; store.back = notes[0].fields[1]; } }
   });
+  attachStudySession(page);
   return { page, store, displayed };
 }
 
@@ -136,4 +138,22 @@ test('refresh failure displays the existing error state rather than leaving old 
   assert.equal(page.阶段, 'error');
   assert.equal(page.错误详情, 'read failed');
   assert.equal(page.评分中, false);
+});
+
+test('sync notification on completion waits for collection commit then presents the new remote queue', async () => {
+  const { page, store, displayed } = harness('done'), owner = {};
+  page.当前卡片 = null; page.已渲染 = null; page.studySession.markComplete();
+  page.syncActivity.acquire(owner);
+  store.id = 99; store.front = 'remote-question';
+  page.卡片内容变更信号 = 1; page.卡片内容变更_回调();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(store.renders, 0);
+  assert.equal(page.studyScheduler.canSync(), false);
+  page.syncActivity.setCollectionBusy(owner, false);
+  await settle(page);
+  assert.equal(page.当前卡片.cardId, 99);
+  assert.equal(page.阶段, 'question');
+  assert.equal(displayed.at(-1), 'old-css:remote-question');
+  assert.equal(page.studyScheduler.canSync(), false, 'remote cards reopen active study');
+  assert.equal(page.studyScheduler.hasPending(), false, 'refresh itself must not create a sync loop');
 });

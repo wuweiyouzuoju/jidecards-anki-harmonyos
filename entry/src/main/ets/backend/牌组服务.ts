@@ -87,9 +87,9 @@ export class 牌组服务 {
    * 删除牌组：调用后端 remove_decks（method 16）。
    *
    * 后端语义（rslib/src/decks/remove.rs:6 remove_decks_and_child_decks）：
-   * - 递归删除所有子牌组及其卡片
-   * - 牌组内所有卡片会移到「已删除」状态（可通过 undo 恢复）
-   * - 返回 OpChangesWithCount.count = 实际删除的牌组数（不含被级联删除的子牌组）
+   * - 递归处理子牌组；普通牌组删除卡片及孤立笔记，筛选牌组将卡片归还原牌组
+   * - 默认牌组保留并重置名称；媒体文件不随牌组删除
+   * - 返回 OpChangesWithCount.count = 实际删除的卡片数（含子牌组），操作进入 Core 撤销栈
    *
    * 二次确认防误删（与 Anki 桌面端 deckbrowser.py:369 行为一致）。
    */

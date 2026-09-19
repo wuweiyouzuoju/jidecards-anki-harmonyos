@@ -44,8 +44,6 @@ test('navigation applies one fade transition including the home boundary', () =>
   assert.match(fade, /const 转场曲线: Curve = Curve\.EaseOut/);
   assert.match(fade, /expectedFrameRateRange: \{ min: 60, max: 120, expected: 60 \}/);
   assert.match(fade, /onFinish:[\s\S]*?transitionProxy\.finishTransition\(\)/);
-  assert.match(read('entry/src/main/ets/components/common/ThemeBackground.ets'),
-    /expectedFrameRateRange: \{ min: 30, max: 60, expected: 60 \}/);
 
   for (const [path, name] of [
     ['entry/src/main/ets/pages/设置页.ets', 'SettingsPage'],

@@ -74,8 +74,16 @@ test('Agent create and edit labels and page background use the themed shell', ()
   const page = read('entry/src/main/ets/pages/AI制卡页.ets');
   const zh = JSON.parse(read('entry/src/main/resources/base/element/string.json')).string;
   const byName = new Map(zh.map((item) => [item.name, item.value]));
-  assert.equal(byName.get('ai_card_title'), 'Agent 制卡');
-  assert.equal(byName.get('ai_card_edit'), 'Agent 改卡');
+  assert.equal(byName.get('ai_card_title'), 'AI 制卡');
+  assert.equal(byName.get('ai_card_edit'), 'AI 改卡');
+  assert.equal(byName.get('ai_agent_history_create_title'), 'AI 制卡');
+  assert.equal(byName.get('ai_agent_history_edit_title'), 'AI 改卡');
+  const en = JSON.parse(read('entry/src/main/resources/en_US/element/string.json')).string;
+  const enByName = new Map(en.map((item) => [item.name, item.value]));
+  assert.equal(enByName.get('ai_card_title'), 'AI Cards');
+  assert.equal(enByName.get('ai_card_edit'), 'AI Edit Cards');
+  assert.equal(enByName.get('ai_agent_history_create_title'), 'AI Card Creation');
+  assert.equal(enByName.get('ai_agent_history_edit_title'), 'AI Card Editing');
   assert.match(page, /@StorageProp\(PAGE_SURFACE_KEY\)[^\n]*页面底色微染值/);
   assert.match(page, /private 顶部条\(\)[\s\S]*?backgroundColor\(this\.页面底色微染值\)/);
   assert.match(page, /build\(\)[\s\S]*?height\('100%'\)[\s\S]*?backgroundColor\(this\.页面底色微染值\)/);

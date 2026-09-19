@@ -1,3 +1,4 @@
+import { AutoSyncScheduler } from '../../entry/src/main/ets/model/AutoSyncScheduler.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,7 +11,7 @@ const read = path => readFileSync(new URL('../../entry/src/main/ets/' + path, im
 
 test('automatic execution is wired to startup/foreground/home return and manual panels retain navigation guards', () => {
   const home = read('pages/首页.ets'), settings = read('pages/设置页.ets');
-  assert.match(home, /aboutToAppear\(\): void \{\s*this\.requestAutoSync\(\)/);
+  assert.match(home, /aboutToAppear\(\): void \{[\s\S]*?this\.requestAutoSync\(\)/);
   assert.match(home, /@StorageProp\(APP_FOREGROUND_KEY\) @Watch\('syncForegroundChanged'\)/);
   assert.match(home, /private 返回主页后刷新\(\)[\s\S]*?this\.requestAutoSync\(\)/);
   assert.match(home, /同步面板\(\{[\s\S]*?automatic: true/);
@@ -31,17 +32,23 @@ function componentMethods(source, names, dependencies) {
 }
 
 function homeHarness() {
-  const state = { enabled: true, ready: true, auth: { hkey: 'test-key', endpoint: 'http://lan:8080/', username: 'u' }, timers: new Map(), seq: 0 };
+  const state = { enabled: true, ready: true, auth: { hkey: 'test-key', endpoint: 'http://lan:8080/', username: 'u' }, timers: new Map(), seq: 0, navigation: [], toasts: 0 };
   const gate = new SyncActivity();
-  const Page = componentMethods(read('pages/首页.ets'), ['requestAutoSync', 'stopAutoSyncTimer', 'tryAutoSync', 'syncForegroundChanged', 'onPageHide', 'onBackPress'], {
+  const Page = componentMethods(read('pages/首页.ets'), ['requestAutoSync', 'scheduleAutoSyncCheck', 'isAutoSyncLocationSafe', 'stopAutoSyncTimer', 'tryAutoSync', 'syncForegroundChanged', 'onPageHide', 'onBackPress', 'deferForSync', 'flushSyncAction', 'autoSyncCollectionFinished', 'autoSyncStateChanged', '选择牌组', '开始学习', 'openCreateDeck', 'openSettings', 'openReminders'], {
+    AppStorage: { get() {}, setOrCreate() {} },
     loadAutoSyncEnabled: () => state.enabled, 加载同步凭证: () => state.auth,
+    $r: key => key, 牌组显示名: deck => deck.name, 保存上次牌组ID: async () => {},
     后端会话: { 获取实例: () => ({ 是否就绪: () => state.ready }) }, syncActivity: gate,
     setTimeout: fn => { const id = ++state.seq; state.timers.set(id, fn); return id; },
     clearTimeout: id => state.timers.delete(id)
   });
   const page = new Page();
-  Object.assign(page, { syncForeground: true, autoSyncStartupReady: true, autoSyncPending: false, autoSyncTimer: -1,
-    页面栈: { size: () => 0 }, 加载状态: 'ready', 显示同步面板: false, 暂停主页官方公告检查() {} });
+  Object.assign(page, { syncForeground: true, autoSyncStartupReady: true, syncScheduler: new AutoSyncScheduler(), autoSyncTimer: -1,
+    页面栈: { size: () => 0, pushPath: path => state.navigation.push(path) }, 加载状态: 'ready', 显示同步面板: false,
+    autoSyncCollectionBusy: false, autoSyncRefreshing: false, autoSyncModal: false, pendingSyncAction: null,
+    显示提示: () => { state.toasts++; }, 已选中牌组: () => true, 选中牌组: () => ({ id: 'deck', name: 'deck' }), 展开牌组路径() {}, 当前断点: 'xs',
+    加载主页数据: async () => {}, 同步后检查FSRS: async () => {}, 暂停主页官方公告检查() {} });
+  page.syncScheduler.setListener(() => page.scheduleAutoSyncCheck());
   const tick = () => { const callbacks = [...state.timers.values()]; state.timers.clear(); callbacks.forEach(fn => fn()); };
   return { page, state, tick, gate };
 }
@@ -63,7 +70,7 @@ test('startup waits for collection and prompts, then opens one auto sync with la
   assert.equal(state.timers.size, 0);
   page.requestAutoSync();
   assert.equal(state.timers.size, 0);
-  assert.equal(page.onBackPress(), true);
+  assert.equal(page.onBackPress(), false, 'background status must not consume the system back button');
 });
 
 test('auto sync does not poll during study/background and resumes on the next foreground/home request', () => {
@@ -106,29 +113,89 @@ test('disabled sync and logged-out state stop queued work without a network requ
   }
 });
 
+test('deletion keeps a queued sync pending until its refresh and preference cleanup finish', () => {
+  const { page, tick } = homeHarness();
+  page.deckDeletionBusy = true;
+  page.requestAutoSync();
+  tick();
+  assert.equal(page.显示同步面板, false);
+  assert.equal(page.syncScheduler.hasPending(), true);
+  page.deckDeletionBusy = false;
+  tick();
+  assert.equal(page.显示同步面板, true);
+  assert.equal(page.syncScheduler.hasPending(), false);
+});
+
+test('successful learning requests coalesce without polling and start on the visible completion screen', () => {
+  const { page, state, tick } = homeHarness(), study = {};
+  page.页面栈 = { size: () => 1, getAllPathName: () => ['StudyPage'] };
+  page.syncScheduler.setStudyActive(study, true);
+  for (let card = 0; card < 10; card++) page.syncScheduler.request();
+  assert.equal(state.timers.size, 0);
+  assert.equal(page.syncScheduler.hasPending(), true);
+  page.syncScheduler.setStudyActive(study, false);
+  assert.equal(state.timers.size, 1);
+  tick();
+  assert.equal(page.显示同步面板, true);
+  assert.equal(page.syncScheduler.hasPending(), false);
+  assert.equal(state.timers.size, 0);
+});
+
+test('resuming study before the scheduled sync cancels execution and retains unsynced intent', () => {
+  const { page, state, tick } = homeHarness(), study = {};
+  page.页面栈 = { size: () => 1, getAllPathName: () => ['StudyPage'] };
+  page.syncScheduler.setStudyActive(study, false); page.syncScheduler.request();
+  assert.equal(state.timers.size, 1);
+  page.syncScheduler.setStudyActive(study, true); tick();
+  assert.equal(page.显示同步面板, false);
+  assert.equal(state.timers.size, 0);
+  assert.equal(page.syncScheduler.hasPending(), true);
+  page.页面栈 = { size: () => 0 };
+  page.syncScheduler.removeStudy(study); tick();
+  assert.equal(page.显示同步面板, true);
+});
+
+test('a completed but hidden study screen cannot sync through another editor or while backgrounded', () => {
+  for (const names of [['SettingsPage'], ['StudyPage', 'SettingsPage']]) {
+    const { page, state, tick } = homeHarness(), study = {};
+    page.页面栈 = { size: () => names.length, getAllPathName: () => names };
+    page.syncScheduler.setStudyActive(study, false); page.syncScheduler.request();
+    assert.equal(state.timers.size, 0);
+    assert.equal(page.显示同步面板, false);
+    page.syncForeground = false; page.syncForegroundChanged();
+    page.页面栈 = { size: () => 1, getAllPathName: () => ['StudyPage'] };
+    page.syncScheduler.setStudyActive(study, false);
+    assert.equal(state.timers.size, 0);
+    page.syncForeground = true; page.syncForegroundChanged(); tick();
+    assert.equal(page.显示同步面板, true);
+  }
+});
+
 async function settle() { for (let i = 0; i < 8; i++) await new Promise(resolve => setImmediate(resolve)); }
 
 function panelHarness({ required = 1, media = false, automatic = true, fsrsBefore = true, fsrsAfter = true } = {}) {
   const state = { closed: 0, refreshed: 0, media, pending: false, cleared: false, endpoint: '', calls: [], timers: new Map(),
-    fsrsValues: [fsrsBefore, fsrsAfter], fsrsReads: 0, fsrsNotifications: 0, fsrsResults: [],
+    fsrsValues: [fsrsBefore, fsrsAfter], fsrsReads: 0, fsrsNotifications: 0, fsrsResults: [], states: [], delays: [], cancellations: [],
     response: { required, newEndpoint: '', hostNumber: 0, serverMediaUsn: 3, serverMessage: '' } };
   class BackendError extends Error {}
   const gate = new SyncActivity();
   const Panel = componentMethods(read('components/同步面板.ets'), ['aboutToAppear', 'aboutToDisappear', '启动同步',
-    'notifySyncResult', 'notifyCollectionResult', 'captureFsrsAfterSync', '处理同步错误', '完成中止', '冲突确认', '启动媒体阶段', '开始媒体轮询', '清理轮询定时器', '是否允许关闭'], {
+    'notifySyncResult', 'notifyCollectionResult', 'captureFsrsAfterSync', '处理同步错误', '完成中止', '冲突确认', '启动媒体阶段', '开始媒体轮询', '清理轮询定时器', '是否允许关闭', 'publishSyncState', 'setSyncPhase', 'dismissPresentation', 'syncForegroundChanged', 'requestBackgroundTime', 'releaseSuspendDelay'], {
     ...flow, syncActivity: gate, 后端错误: BackendError,
     加载FSRS开启状态: async () => state.fsrsValues[state.fsrsReads++],
     notifyFsrsStateChanged: () => { state.fsrsNotifications++; },
     加载媒体同步开关: () => state.media, 加载媒体待同步: () => state.pending,
     设置媒体待同步: value => { state.pending = value; }, 保存同步端点: value => { state.endpoint = value; },
     清除同步凭证: () => { state.cleared = true; },
-    hilog: { info() {}, error() {} }, 同步日志域: 0, 同步日志标签: 'test', $r: key => key,
+    backgroundTaskManager: { requestSuspendDelay: (_reason, expire) => { state.delays.push(expire); return { requestId: state.delays.length }; }, cancelSuspendDelay: id => { state.cancellations.push(id); } },
+    hilog: { info() {}, error() {}, warn() {} }, 同步日志域: 0, 同步日志标签: 'test', $r: key => key,
     setInterval: fn => { state.timers.set(1, fn); return 1; }, clearInterval: id => state.timers.delete(id)
   });
   const panel = new Panel();
   const auth = { hkey: 'test-key', endpoint: 'https://custom.example/anki/', ioTimeoutSecs: 0 };
   Object.assign(panel, { syncOwner: {}, automatic, 初始鉴权: auth, 当前阶段: 'syncing', 错误文案: '', 是否请求中止: false,
-    轮询定时器: -1, 集合已同步: false, 是否在媒体阶段: false,
+    轮询定时器: -1, 集合已同步: false, 是否在媒体阶段: false, detailsVisible: false, suspendDelayId: -1, syncForeground: true,
+    状态变化回调: (busy, modal) => { state.states.push({ busy, modal }); },
     取本地化文案: key => key, 关闭回调: () => { state.closed++; },
     同步完成回调: value => { state.refreshed++; state.fsrsResults.push(value); },
     同步服务实例: {
@@ -259,14 +326,15 @@ test('slow media polls do not overlap or deliver stale completion after the pane
   finish({ active: false, progress: { checked: '', added: '', removed: '' } });
   await settle();
   assert.equal(state.closed, 0);
-  assert.equal(state.refreshed, 0);
+  assert.equal(state.refreshed, 1, 'collection was delivered before media; late media result cannot deliver it again');
   assert.equal(state.pending, true);
 });
 
 test('login uses the saved custom endpoint, blocks unsaved input, and never persists a password', async () => {
   const calls = [], persisted = [];
   class BackendError extends Error {}
-  const Group = componentMethods(read('components/settings/同步分组.ets'), ['点击登录'], {
+  const Group = componentMethods(read('components/settings/同步分组.ets'), ['点击登录', 'syncSettingsBusy'], {
+    syncActivity: new SyncActivity(),
     保存同步凭证: auth => persisted.push(auth), 后端错误: BackendError, 分类同步错误: flow.分类同步错误, $r: value => value
   });
   const group = new Group();
@@ -287,7 +355,8 @@ test('login uses the saved custom endpoint, blocks unsaved input, and never pers
 
 test('login/server save cannot be overlapped and invalid URL produces a localized error before saving', async () => {
   const calls = [];
-  const Group = componentMethods(read('components/settings/同步分组.ets'), ['saveServer'], {
+  const Group = componentMethods(read('components/settings/同步分组.ets'), ['saveServer', 'syncSettingsBusy'], {
+    syncActivity: new SyncActivity(),
     normalizeSyncServer: input => { if (input === 'invalid') throw new Error('invalid'); return input; },
     saveCustomSyncServer: async input => { calls.push(input); return input; }, $r: key => key
   });
@@ -334,4 +403,137 @@ test('centered server dialog opens on the persisted value, cancels drafts, and b
   assert.equal(closed, 1);
   assert.equal(group.serverInput, group.savedServer);
   assert.equal(group.serverError, '');
+});
+
+
+test('automatic sync protects only collection work, delivers it before media, and hiding details retains the task', async () => {
+  const { panel, state, gate } = panelHarness({ media: true });
+  let finishCollection;
+  panel.同步服务实例.同步集合 = () => new Promise(resolve => { finishCollection = resolve; });
+  panel.aboutToAppear(); await settle();
+  assert.deepEqual(state.states.at(-1), { busy: true, modal: false });
+  assert.equal(state.refreshed, 0);
+  finishCollection(state.response); await settle();
+  assert.deepEqual(state.states.at(-1), { busy: false, modal: false });
+  assert.equal(state.refreshed, 1);
+  assert.equal(gate.isActive(), true, 'media retains the account lease');
+  panel.detailsVisible = true; panel.publishSyncState();
+  assert.equal(state.states.at(-1).modal, true);
+  panel.dismissPresentation();
+  assert.equal(state.states.at(-1).modal, false);
+  assert.equal(state.closed, 0);
+  assert.equal(state.timers.size, 1, 'hiding details must not destroy media polling');
+  state.timers.get(1)(); await settle();
+  assert.equal(state.refreshed, 1);
+  assert.equal(gate.isActive(), false);
+  assert.equal(state.closed, 1);
+});
+
+test('collection completion waits for the home snapshot before consuming the latest click once', async () => {
+  const { page, state } = homeHarness();
+  let finishRefresh;
+  page.加载主页数据 = () => new Promise(resolve => { finishRefresh = resolve; });
+  page.autoSyncStateChanged(true, false);
+  page.开始学习(); page.openSettings(); page.开始学习();
+  assert.equal(state.navigation.length, 0);
+  assert.equal(state.toasts, 3);
+  const refreshed = page.autoSyncCollectionFinished(false);
+  page.autoSyncStateChanged(false, false);
+  assert.equal(state.navigation.length, 0, 'collection unlock alone is insufficient');
+  finishRefresh(); await refreshed;
+  assert.deepEqual(state.navigation.map(path => path.name), ['StudyPage']);
+  page.autoSyncStateChanged(false, false);
+  assert.equal(state.navigation.length, 1);
+  page.开始学习();
+  assert.equal(state.navigation.length, 2, 'background media does not defer learning');
+});
+
+test('back/background cancels queued navigation; refreshed data is revalidated before learning', async () => {
+  for (const cancel of ['back', 'background', 'deck-deleted', 'refresh-failed']) {
+    const { page, state } = homeHarness();
+    page.autoSyncStateChanged(true, false); page.开始学习();
+    if (cancel === 'back') page.onBackPress();
+    if (cancel === 'background') { page.syncForeground = false; page.syncForegroundChanged(); }
+    if (cancel === 'deck-deleted') page.已选中牌组 = () => false;
+    if (cancel === 'refresh-failed') page.加载主页数据 = async () => { page.加载状态 = 'error'; };
+    await page.autoSyncCollectionFinished(false);
+    page.autoSyncStateChanged(false, false);
+    assert.equal(state.navigation.length, 0, cancel);
+  }
+});
+
+test('full conflicts block queued actions until dismissed and never silently overwrite', async () => {
+  const { page, state } = homeHarness();
+  page.autoSyncStateChanged(true, false); page.开始学习();
+  page.autoSyncStateChanged(false, true);
+  assert.equal(state.navigation.length, 0);
+  page.autoSyncStateChanged(false, false);
+  assert.equal(state.navigation.length, 1);
+  const { panel, state: sync } = panelHarness({ required: 2 });
+  panel.aboutToAppear(); await settle();
+  assert.deepEqual(sync.states.at(-1), { busy: false, modal: true });
+  panel.dismissPresentation();
+  assert.equal(sync.closed, 1);
+  assert.equal(sync.calls.some(call => call[0] === 'full'), false);
+});
+
+test('short background allowance is requested synchronously by Ability and returned on finish, foreground or expiry', async () => {
+  assert.match(read('entryability/EntryAbility.ets'), /onBackground\(\): void \{\s*syncActivity.continueInBackground\(\)/);
+  for (const end of ['finished', 'foreground', 'expiry', 'destroyed']) {
+    const { panel, state, gate } = panelHarness({ media: true });
+    panel.aboutToAppear(); await settle();
+    gate.continueInBackground(); gate.continueInBackground();
+    assert.equal(state.delays.length, 1);
+    if (end === 'finished') { state.timers.get(1)(); await settle(); }
+    if (end === 'foreground') panel.syncForegroundChanged();
+    if (end === 'expiry') state.delays[0]();
+    if (end === 'destroyed') panel.aboutToDisappear();
+    assert.deepEqual(state.cancellations, [1], end);
+    panel.releaseSuspendDelay();
+    assert.deepEqual(state.cancellations, [1], 'quota is returned exactly once');
+  }
+});
+
+test('account changes and a second manual sync cannot race background media', async () => {
+  const gate = new SyncActivity(), owner = {};
+  const Group = componentMethods(read('components/settings/同步分组.ets'),
+    ['syncSettingsBusy', '确认注销', '点击立即同步', 'saveServer', '点击登录'], {
+      syncActivity: gate, $r: key => key,
+      清除同步凭证: () => { throw new Error('must not clear while media is running'); }
+    });
+  const group = new Group(); group.取本地化文本 = key => key;
+  gate.acquire(owner);
+  group.确认注销(); group.点击立即同步(); await group.saveServer(); await group.点击登录();
+  assert.equal(group.错误文本, 'app.string.sync_already_running');
+  assert.equal(gate.isActive(), true);
+  gate.release(owner, Date.now());
+  assert.equal(group.syncSettingsBusy(), false);
+});
+
+test('a completed old status cannot release a newer sync lease', () => {
+  const gate = new SyncActivity(), oldOwner = {}, newOwner = {};
+  gate.acquire(oldOwner); gate.release(oldOwner, 1);
+  gate.acquire(newOwner); gate.release(oldOwner, 2);
+  assert.equal(gate.isActive(), true);
+});
+
+test('automatic sync stays invisible during transfer and preserves error/conflict recovery', () => {
+  const home = read('pages/首页.ets'), panel = read('components/同步面板.ets');
+  assert.ok(home.indexOf('同步面板({') > home.indexOf('.navDestination(this.页面映射)'));
+  assert.match(panel, /HitTestMode.Transparent : HitTestMode.Default/);
+  assert.doesNotMatch(panel, /statusVisible|sync_background_collection|sync_background_media/);
+  assert.match(panel, /else if \(this\.错误文案 !== ''\) \{\s*this\.syncErrorStatus\(\)/);
+  assert.match(panel, /if \(!this.automatic \|\| this.detailsVisible \|\| this.当前阶段 === 'conflict'\)/);
+});
+
+
+test('selecting another deck remains available during collection sync and cancels the previous study intent', () => {
+  const { page, state } = homeHarness();
+  page.autoSyncStateChanged(true, false); page.开始学习();
+  page.选择牌组('another-deck');
+  assert.equal(page.选中的牌组ID, 'another-deck');
+  assert.equal(page.显示牌组详情, true);
+  assert.equal(page.pendingSyncAction, null);
+  page.autoSyncStateChanged(false, false);
+  assert.equal(state.navigation.length, 0, 'selecting a deck does not automatically study it');
 });

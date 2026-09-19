@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { AutoSyncScheduler, autoSyncScheduler } from '../model/AutoSyncScheduler';
 import { ThemeTextSpans } from '../components/common/ThemeText';
 import { 按下态按钮 } from '../components/common/按下态按钮';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
@@ -60,6 +61,7 @@ import type {
 import { UPDATE_DECK_CONFIGS_MODE_NORMAL } from '../proto/messages/DeckConfigMessages';
 import { 牌组配置表单, 校验问题 } from '../model/牌组配置表单';
 import { 牌组选项编辑 } from '../model/牌组选项编辑';
+import { copyDeckConfig, deckConfigUseCount, prepareDeckConfigForSave } from '../model/DeckConfigSave';
 import { 学习页, 学习页参数 } from './学习页';
 import { 浏览页, 浏览页参数 } from './浏览页';
 import { 统计页, 统计页参数 } from './统计页';
@@ -214,9 +216,16 @@ struct 首页 {
   @State private 同步面板认证: SyncAuth | null = null;
   @State private 同步面板账号名: string = '';
   @StorageProp(APP_FOREGROUND_KEY) @Watch('syncForegroundChanged') private syncForeground: boolean = false;
-  private autoSyncPending: boolean = false;
+  private readonly syncScheduler: AutoSyncScheduler = autoSyncScheduler;
   private autoSyncTimer: number = -1;
   private autoSyncStartupReady: boolean = false;
+  private deckDeletionBusy: boolean = false;
+  @State private autoSyncCollectionBusy: boolean = false;
+  @State private autoSyncModal: boolean = false;
+  @State private syncBackRequest: number = 0;
+  private autoSyncRefreshing: boolean = false;
+  private pendingSyncAction: (() => void) | null = null;
+
   @State private 显示牌组定制: boolean = false;
   @State private 定制牌组ID: string = '';
   @State private 定制牌组中: boolean = false;
@@ -276,6 +285,7 @@ struct 首页 {
   private 预览加载中: boolean = false;
 
   aboutToAppear(): void {
+    this.syncScheduler.setListener((): void => { this.scheduleAutoSyncCheck(); });
     this.requestAutoSync();
     this.恢复主题();
     this.恢复颜色主题();
@@ -286,7 +296,9 @@ struct 首页 {
   }
 
   aboutToDisappear(): void {
+    this.syncScheduler.setListener(null);
     this.stopAutoSyncTimer();
+    syncActivity.cancelReservation();
   }
 
   /** 前台恢复时排队；在编辑或学习中恢复时，等待真正返回首页。 */
@@ -294,20 +306,33 @@ struct 首页 {
     if (this.syncForeground) {
       this.requestAutoSync();
     } else {
+      this.pendingSyncAction = null;
       this.stopAutoSyncTimer();
     }
   }
 
-  /** 将重复生命周期通知合并为一次请求，不丢弃冷却窗口内的学习结果。 */
+  /** 生命周期只记录意图；学习提交与此入口共用同一队列。 */
   private requestAutoSync(): void {
     if (this.显示同步面板) return;
-    this.autoSyncPending = true;
-    if (this.autoSyncTimer >= 0) return;
+    this.syncScheduler.request();
+  }
+
+  /** 答题中不轮询；会话完成/销毁或返回前台时再唤醒。 */
+  private scheduleAutoSyncCheck(): void {
+    if (this.autoSyncTimer >= 0 || !this.syncForeground || this.显示同步面板 ||
+      !this.syncScheduler.hasPending() || !this.isAutoSyncLocationSafe()) return;
     this.autoSyncTimer = setTimeout((): void => {
       this.autoSyncTimer = -1;
       this.tryAutoSync();
-      if (this.autoSyncPending && this.syncForeground) this.requestAutoSync();
+      this.scheduleAutoSyncCheck();
     }, 1000);
+  }
+
+  private isAutoSyncLocationSafe(): boolean {
+    if (!this.syncScheduler.canSync()) return false;
+    if (this.页面栈.size() === 0) return true;
+    return this.syncScheduler.isStudyComplete() && this.页面栈.size() === 1 &&
+      this.页面栈.getAllPathName()[0] === 'StudyPage';
   }
 
   /** 停止待执行检查；后台不轮询，也不在后台新建同步任务。 */
@@ -317,22 +342,21 @@ struct 首页 {
   }
 
   /**
-   * 仅在首页安全空闲时挂载既有同步流程，避免远端数据覆盖正在编辑的页面快照。
-   * Invariants: 集合已打开、前台、无导航子页、无导入/编辑/启动弹窗；手动自动共用互斥。
+   * 仅在首页或学习完成页安全空闲时挂载既有同步流程。
+   * Invariants: 集合已打开、前台、无活动学习/编辑、无导入/启动弹窗；手动自动共用互斥。
    */
   private tryAutoSync(): void {
-    if (!this.autoSyncPending || !loadAutoSyncEnabled() || 加载同步凭证() === null) {
-      this.autoSyncPending = false;
+    if (!this.syncScheduler.hasPending() || !loadAutoSyncEnabled() || 加载同步凭证() === null) {
+      this.syncScheduler.consume();
       this.stopAutoSyncTimer();
       return;
     }
-    if (!this.syncForeground || this.页面栈.size() > 0) {
-      this.autoSyncPending = false;
+    if (!this.syncForeground || !this.isAutoSyncLocationSafe()) {
       this.stopAutoSyncTimer();
       return;
     }
-    if (!this.autoSyncStartupReady || !this.syncForeground || this.页面栈.size() > 0 || !后端会话.获取实例().是否就绪() ||
-      this.加载状态 === 'loading' || this.加载状态 === 'error' || this.刷新中 ||
+    if (!this.autoSyncStartupReady || !this.syncForeground || !this.isAutoSyncLocationSafe() || !后端会话.获取实例().是否就绪() ||
+      this.加载状态 === 'loading' || this.加载状态 === 'error' || this.刷新中 || this.deckDeletionBusy ||
       this.官方公告检查中 || this.显示官方公告 || this.显示欢迎弹窗 || this.显示云端牌组弹窗 ||
       this.显示数据迁移 || this.数据迁移中 || this.显示牌组定制 || this.显示自定义学习 ||
       this.显示过滤牌组面板 || this.显示牌组选项 || this.牌组选项加载中 || this.牌组选项中 ||
@@ -342,11 +366,77 @@ struct 首页 {
     const info: 同步凭证信息 | null = 加载同步凭证();
     if (info === null) return;
     const auth: SyncAuth = { hkey: info.hkey, endpoint: info.endpoint, ioTimeoutSecs: 0 };
-    this.autoSyncPending = false;
+    this.syncScheduler.consume();
     this.stopAutoSyncTimer();
     this.同步面板认证 = auth;
     this.同步面板账号名 = info.username;
+    syncActivity.reserveCollection();
+    this.autoSyncCollectionBusy = true;
     this.显示同步面板 = true;
+  }
+
+  /** 集合独占期间合并点击意图，避免把页面 RPC 排在网络请求后无提示等待。 */
+  private deferForSync(action: () => void): boolean {
+    if (!this.autoSyncCollectionBusy && !this.autoSyncRefreshing) return false;
+    this.pendingSyncAction = action;
+    this.显示提示($r('app.string.sync_collection_wait'));
+    return true;
+  }
+
+  /** 刷新完成且仍停留首页时只执行最后一次意图；返回或退后台会取消它。 */
+  private flushSyncAction(): void {
+    if (this.autoSyncCollectionBusy || this.autoSyncRefreshing || this.autoSyncModal) return;
+    const action: (() => void) | null = this.pendingSyncAction;
+    this.pendingSyncAction = null;
+    if (action !== null && this.syncForeground && this.页面栈.size() === 0 && this.加载状态 !== 'error') action();
+  }
+
+  /** 数据与界面刷新均完成后再进入学习，媒体不参与此门禁。 */
+  private async autoSyncCollectionFinished(fsrsDisabledBySync: boolean): Promise<void> {
+    this.autoSyncRefreshing = true;
+    this.autoSyncCollectionBusy = false;
+    try {
+      // 完成页重新读取队列和撤销状态，不能沿用同步前的快照。
+      AppStorage.setOrCreate<number>('cardContentChangedTick',
+        (AppStorage.get<number>('cardContentChangedTick') ?? 0) + 1);
+      await this.加载主页数据();
+      await this.同步后检查FSRS(fsrsDisabledBySync);
+    } finally {
+      this.autoSyncRefreshing = false;
+      this.flushSyncAction();
+    }
+  }
+
+  /** 同步宿主只上报数据库占用和详情显隐，不把媒体同步当作导航锁。 */
+  private autoSyncStateChanged(busy: boolean, modal: boolean): void {
+    this.autoSyncCollectionBusy = busy;
+    this.autoSyncModal = modal;
+    this.flushSyncAction();
+  }
+
+  /** 创建入口先等待集合，避免表单持有同步前的牌组快照。 */
+  private openCreateDeck(parentId: string): void {
+    if (this.deferForSync((): void => { this.openCreateDeck(parentId); })) return;
+    this.创建牌组错误 = '';
+    this.创建父牌组ID = parentId;
+    this.显示创建牌组 = true;
+  }
+
+  /** 设置页会读取/修改集合，和学习入口共用等待规则。 */
+  private openSettings(): void {
+    if (this.deferForSync((): void => { this.openSettings(); })) return;
+    this.暂停主页官方公告检查();
+    const params: 设置页参数 = { openAiSettings: false };
+    this.页面栈.pushPath({ name: 'SettingsPage', param: params,
+      onPop: (): void => { this.返回主页后刷新(); } });
+  }
+
+  /** 提醒页也使用集合数据，切页前统一等待。 */
+  private openReminders(): void {
+    if (this.deferForSync((): void => { this.openReminders(); })) return;
+    this.暂停主页官方公告检查();
+    this.页面栈.pushPath({ name: 'ReminderPage',
+      onPop: (): void => { this.返回主页后刷新(); } });
   }
 
   /** 官方公告优先于首次云端牌组引导，云端牌组引导优先于版本欢迎弹窗。 */
@@ -529,7 +619,8 @@ struct 首页 {
    */
   onBackPress(): boolean {
     if (this.显示卡片预览) { this.显示卡片预览 = false; return true; }
-    if (this.显示同步面板) return true;
+    this.pendingSyncAction = null;
+    if (this.autoSyncModal) { this.syncBackRequest++; return true; }
     if (this.显示官方公告) {
       return true;
     }
@@ -624,6 +715,10 @@ struct 首页 {
   private 加载链尾: Promise<void> = Promise.resolve();
 
   private 加载主页数据(): Promise<void> {
+    if (this.autoSyncCollectionBusy) {
+      this.刷新中 = false;
+      return Promise.resolve();
+    }
     const 执行 = (): Promise<void> => this.执行加载主页数据();
     const 本轮: Promise<void> = this.加载链尾.then(执行, 执行);
     this.加载链尾 = 本轮;
@@ -700,6 +795,9 @@ struct 首页 {
       }
       this.主页快照数据 = snapshot;
       this.historyRefreshToken++;
+      if (!await this.reconcileDeckSelection(snapshot.decks)) {
+        this.显示提示($r('app.string.home_selection_save_failed'));
+      }
       // 首次加载时默认展开所有含子节点的父牌组；用 已初始化 标记而非 size 判断，避免用户全折叠后被刷新重置
       if (!this.牌组展开已初始化) {
         this.牌组展开已初始化 = true;
@@ -875,6 +973,7 @@ struct 首页 {
    * 若父牌组未展开，提示用户先展开父牌组才能拖子牌组。
    */
   private 进入排序模式(): void {
+    if (this.deferForSync((): void => { this.进入排序模式(); })) return;
     this.排序模式中 = true;
   }
 
@@ -1074,6 +1173,7 @@ struct 首页 {
   // 改 Navigation 栈状态
   // ========================================================
   private 开始学习(): void {
+    if (this.deferForSync((): void => { this.开始学习(); })) return;
     if (!this.已选中牌组()) {
       return;
     }
@@ -1096,6 +1196,7 @@ struct 首页 {
    * 只做搜索与渲染，不调用调度器，不写学习记录。
    */
   private async 打开牌组预览(): Promise<void> {
+    if (this.deferForSync((): void => { this.打开牌组预览(); })) return;
     const deck: 牌组汇总 = this.选中牌组();
     if (deck.id === '' || this.预览加载中) return;
     const context: common.UIAbilityContext | null = this.取能力上下文();
@@ -1132,6 +1233,7 @@ struct 首页 {
 
   /** 打开浏览页（全库浏览，不限定牌组）。浏览页可改卡/删卡/改到期，pop 回主页必须刷新。 */
   private 打开浏览页(): void {
+    if (this.deferForSync((): void => { this.打开浏览页(); })) return;
     const params: 浏览页参数 = {};
     this.暂停主页官方公告检查();
     this.页面栈.pushPath({
@@ -1169,6 +1271,7 @@ struct 首页 {
 
   /** 打开浏览页并预填搜索串（查找重复对话框跳转用）。 */
   private 打开带搜索浏览页(搜索串: string): void {
+    if (this.deferForSync((): void => { this.打开带搜索浏览页(搜索串); })) return;
     const params: 浏览页参数 = { initialSearch: 搜索串 };
     this.暂停主页官方公告检查();
     this.页面栈.pushPath({
@@ -1182,6 +1285,7 @@ struct 首页 {
 
   /** 打开统计页（全库统计图表）。'StatsPage' 是 NavPathStack 跨页面寻址协议，保留英文。 */
   private 打开统计页(): void {
+    if (this.deferForSync((): void => { this.打开统计页(); })) return;
     const params: 统计页参数 = {};
     this.暂停主页官方公告检查();
     this.页面栈.pushPath({
@@ -1203,6 +1307,7 @@ struct 首页 {
   }
 
   private 选择牌组(deckId: string): void {
+    this.pendingSyncAction = null;
     this.选中的牌组ID = deckId;
     const deck: 牌组汇总 = this.选中牌组();
     if (deck.id === '') {
@@ -1267,6 +1372,7 @@ struct 首页 {
 
   /** 长按牌组色条切换 tone：先持久化、再就地替换当前 主页快照数据 中对应行的 tone 并刷新列表，避免重拉后端数据。 */
   private async 更改牌组色调(deckId: string, tone: 牌组色调): Promise<void> {
+    if (this.deferForSync((): void => { this.更改牌组色调(deckId, tone); })) return;
     await 保存牌组色调(deckId, tone);
     const oldDecks: 牌组汇总[] = this.主页快照数据.decks;
     const newDecks: 牌组汇总[] = oldDecks.map((deck: 牌组汇总): 牌组汇总 => {
@@ -1302,6 +1408,7 @@ struct 首页 {
 
   /** 长按牌组 → 自定义牌组：打开改名面板。 */
   private 打开牌组定制(deckId: string): void {
+    if (this.deferForSync((): void => { this.打开牌组定制(deckId); })) return;
     const deck: 牌组汇总 = this.按ID查牌组(deckId);
     if (deck.id === '') {
       return;
@@ -1313,6 +1420,7 @@ struct 首页 {
 
   /** 长按牌组 → 自定义学习：对该牌组临时调增新卡/复习上限或按条件抽取卡片。 */
   private 打开自定义学习(deckId: string): void {
+    if (this.deferForSync((): void => { this.打开自定义学习(deckId); })) return;
     const deck: 牌组汇总 = this.按ID查牌组(deckId);
     if (deck.id === '') {
       return;
@@ -1324,6 +1432,7 @@ struct 首页 {
 
   /** 长按牌组 → 创建过滤牌组：按搜索条件抽取卡片到临时牌组。 */
   private 打开创建过滤牌组(): void {
+    if (this.deferForSync((): void => { this.打开创建过滤牌组(); })) return;
     this.显示过滤牌组面板 = true;
   }
 
@@ -1341,13 +1450,15 @@ struct 首页 {
   // 删除后刷新主页并清空选中态（防止详情页指向已删牌组）
   //
   // @业务规则
-  // 后端语义（rslib/src/decks/remove.rs:remove_decks_and_child_decks）：递归删除所有子牌组及其卡片，
-  // 卡片移到「已删除」状态（可通过 undo 恢复）。
+  // 后端语义（rslib/src/decks/remove.rs:remove_decks_and_child_decks）：递归处理子牌组，
+  // 普通牌组删除卡片，筛选牌组归还卡片；Core 记录撤销，但首页没有通用撤销入口。
   //
   // @副作用
   // 调后端删除牌组；写 preferences 清除上次选中牌组
   // ========================================================
   private 请求删除牌组(deckId: string): void {
+    if (this.deckDeletionBusy) return;
+    if (this.deferForSync((): void => { this.请求删除牌组(deckId); })) return;
     const deck: 牌组汇总 = this.按ID查牌组(deckId);
     if (deck.id === '') {
       return;
@@ -1377,22 +1488,50 @@ struct 首页 {
   }
 
   private async 确认删除牌组(deckId: string): Promise<void> {
+    if (this.deckDeletionBusy || this.deferForSync((): void => { this.确认删除牌组(deckId); })) return;
+    this.deckDeletionBusy = true;
     try {
-      const count: number = await this.牌组服务实例.删除牌组([Number(deckId)]);
-      // 选中态/详情页若指向已删牌组，清空避免悬空引用
-      if (this.选中的牌组ID === deckId) {
-        this.选中的牌组ID = '';
-        await 清除上次牌组ID();
+      let count: number;
+      try {
+        count = await this.牌组服务实例.删除牌组([Number(deckId)]);
+      } catch (error) {
+        const reason: string = error instanceof Error ? error.message : `${error}`;
+        const failMsg: string = this.getUIContext().getHostContext()!.resourceManager.getStringSync(
+          $r('app.string.deck_delete_failed').id).replace('%s', reason);
+        this.getUIContext().getPromptAction().showToast({ message: failMsg });
+        return;
       }
+      this.requestAutoSync();
+      // 用已知层级立即清除级联删除的选择；默认牌组 1 本身由 Core 保留。
+      const remaining: 牌组汇总[] = this.主页快照数据.decks.filter((deck: 牌组汇总): boolean =>
+        deck.id === '1' || (deck.id !== deckId && deck.ancestorIds.indexOf(deckId) < 0));
+      const selectionSaved: boolean = await this.reconcileDeckSelection(remaining);
       await this.加载主页数据();
-      const successMsg: string = this.getUIContext().getHostContext()!.resourceManager.getStringSync(
+      let successMsg: string = this.getUIContext().getHostContext()!.resourceManager.getStringSync(
         $r('app.string.deck_delete_success').id).replace('%d', count.toString());
+      if (!selectionSaved) successMsg += '\n' + this.getUIContext().getHostContext()!.resourceManager.getStringSync(
+        $r('app.string.home_selection_save_failed').id);
       this.getUIContext().getPromptAction().showToast({ message: successMsg });
+    } finally {
+      this.deckDeletionBusy = false;
+      this.scheduleAutoSyncCheck();
+    }
+  }
+
+  /** 数据变更后校验选择；偏好写入失败不改变已经提交的数据库操作结果。 */
+  private async reconcileDeckSelection(decks: 牌组汇总[]): Promise<boolean> {
+    const invalidSelection: boolean = this.选中的牌组ID !== '' &&
+      !decks.some((deck: 牌组汇总): boolean => deck.id === this.选中的牌组ID);
+    if (invalidSelection) this.选中的牌组ID = '';
+    try {
+      const saved: string = await 加载上次牌组ID();
+      if (invalidSelection || (saved !== '' && !decks.some((deck: 牌组汇总): boolean => deck.id === saved))) {
+        return await 清除上次牌组ID();
+      }
+      return true;
     } catch (error) {
-      const reason: string = error instanceof Error ? error.message : `${error}`;
-      const failMsg: string = this.getUIContext().getHostContext()!.resourceManager.getStringSync(
-        $r('app.string.deck_delete_failed').id).replace('%s', reason);
-      this.getUIContext().getPromptAction().showToast({ message: failMsg });
+      console.info(`Home selection persistence: ${error}`);
+      return false;
     }
   }
 
@@ -1417,6 +1556,7 @@ struct 首页 {
   // 写 preferences 持久化隐藏集合；写 preferences 清除上次选中牌组
   // ========================================================
   private async 隐藏牌组(deckId: string): Promise<void> {
+    if (this.deferForSync((): void => { this.隐藏牌组(deckId); })) return;
     try {
       await 隐藏牌组(deckId);
       if (this.选中的牌组ID === deckId) {
@@ -1442,6 +1582,7 @@ struct 首页 {
    *  简版方案（AlertDialog 只支持两个按钮）：全部恢复 / 取消。
    *  逐个恢复需 CustomDialog，后续按需升级。 */
   private 显示隐藏牌组对话框(): void {
+    if (this.deferForSync((): void => { this.显示隐藏牌组对话框(); })) return;
     const count: number = this.隐藏的牌组ID集合.size;
     if (count === 0) {
       this.getUIContext().getPromptAction().showToast({
@@ -1589,6 +1730,7 @@ struct 首页 {
    * 前者直接回首页，后者要二次确认且后续还要接欢迎弹窗。
    */
   private 打开云端牌组弹窗(从菜单打开: boolean): void {
+    if (this.deferForSync((): void => { this.打开云端牌组弹窗(从菜单打开); })) return;
     this.云端牌组从菜单打开 = 从菜单打开;
     this.显示云端牌组弹窗 = true;
     this.云端牌组选中ID列表 = [];
@@ -1834,6 +1976,7 @@ struct 首页 {
   }
 
   private async 从选择器导入牌组(): Promise<void> {
+    if (this.deferForSync((): void => { this.从选择器导入牌组(); })) return;
     if (this.数据迁移中) return;
     const context: common.UIAbilityContext | null = this.取能力上下文();
     if (context === null) return;
@@ -1908,6 +2051,7 @@ struct 首页 {
   }
 
   private 打开数据迁移(mode: 数据迁移模式, deckId: number, allowDeckSelection: boolean): void {
+    if (this.deferForSync((): void => { this.打开数据迁移(mode, deckId, allowDeckSelection); })) return;
     this.数据迁移初始模式 = mode;
     this.数据迁移初始牌组ID = deckId;
     this.数据迁移允许选牌组 = allowDeckSelection;
@@ -1937,6 +2081,7 @@ struct 首页 {
   // 改 Navigation 栈状态
   // ========================================================
   private 打开添加笔记(): void {
+    if (this.deferForSync((): void => { this.打开添加笔记(); })) return;
     if (!this.已选中牌组()) {
       return;
     }
@@ -1961,6 +2106,7 @@ struct 首页 {
    * 'AiCardPage' 字符串是 NavPathStack 跨页面寻址协议，保留英文。
    */
   private async 打开AI制卡(): Promise<void> {
+    if (this.deferForSync((): void => { this.打开AI制卡(); })) return;
     if (!await this.isAIConfigured()) {
       this.openAISettings();
       return;
@@ -1984,6 +2130,7 @@ struct 首页 {
 
   /** 从首页进入浏览页多选卡片；选定目标后再打开 Agent 改卡。 */
   private async 打开AI改卡(): Promise<void> {
+    if (this.deferForSync((): void => { this.打开AI改卡(); })) return;
     if (!await this.isAIConfigured()) {
       this.openAISettings();
       return;
@@ -2009,6 +2156,7 @@ struct 首页 {
 
   /** 未配置时从主页直接进入设置，并展开 AI 智能体分组。 */
   private openAISettings(): void {
+    if (this.deferForSync((): void => { this.openAISettings(); })) return;
     const params: 设置页参数 = { openAiSettings: true };
     this.暂停主页官方公告检查();
     this.页面栈.pushPath({
@@ -2126,6 +2274,7 @@ struct 首页 {
   // 调后端拉取配置视图
   // ========================================================
   private async 打开牌组选项(): Promise<void> {
+    if (this.deferForSync((): void => { this.打开牌组选项(); })) return;
     if (this.牌组选项加载中 || this.牌组选项中 || this.显示牌组选项) {
       return;
     }
@@ -2148,6 +2297,7 @@ struct 首页 {
       this.编辑配置 = config;
       this.编辑表单 = 牌组配置表单.从配置创建(config.config);
       this.编辑选项 = 牌组选项编辑.从视图创建(view.currentDeck === null ? null : view.currentDeck.limits, view.newCardsIgnoreReviewLimit, view.fsrs, view.applyAllParentLimits, view.fsrsHealthCheck);
+      this.编辑选项.sharedDeckCount = deckConfigUseCount(view, config.id);
       this.显示牌组选项 = true;
     } catch (error) {
       const msg: string = error instanceof Error ? error.message : `${error}`;
@@ -2222,8 +2372,9 @@ struct 首页 {
       return;
     }
     const view: DeckConfigsForUpdateView | null = this.编辑视图;
-    const config: DeckConfig | null = this.编辑配置;
-    if (view === null || config === null || config.config === null) {
+    const original: DeckConfig | null = this.编辑配置;
+    const config: DeckConfig | null = original === null ? null : copyDeckConfig(original);
+    if (view === null || original === null || config === null || config.config === null) {
       console.error('[jidecards] 保存牌组选项 失败：编辑视图或配置为空');
       this.牌组选项错误 = '保存失败：数据未就绪，请关闭后重试';
       return;
@@ -2242,7 +2393,7 @@ struct 首页 {
       const edited = options.转换为请求字段();
       const request: UpdateDeckConfigsInput = {
         targetDeckId: this.牌组选项牌组ID,
-        configs: [config],
+        configs: [prepareDeckConfigForSave(view, original, config, options.applyToSharedDecks)],
         removedConfigIds: [],
         mode: UPDATE_DECK_CONFIGS_MODE_NORMAL,
         cardStateCustomizer: view.cardStateCustomizer,
@@ -2542,8 +2693,7 @@ struct 首页 {
                   预览: (): void => { this.打开牌组预览(); },
                   添加卡片: (): void => { this.打开添加笔记(); },
                   创建子牌组: (): void => {
-                    this.创建父牌组ID = this.选中的牌组ID;
-                    this.显示创建牌组 = true;
+                    this.openCreateDeck(this.选中的牌组ID);
                   },
                   导出牌组: (): void => {
                     this.打开数据迁移('exportDeck', Number(this.选中的牌组ID), false);
@@ -2573,9 +2723,7 @@ struct 首页 {
           主页操作面板({
             创建牌组回调: (): void => {
               this.显示主页操作 = false;
-              this.创建牌组错误 = '';
-              this.创建父牌组ID = '';
-              this.显示创建牌组 = true;
+              this.openCreateDeck('');
             },
             导入牌组回调: (): void => {
               this.显示主页操作 = false;
@@ -2605,13 +2753,7 @@ struct 首页 {
           主页更多面板({
             设置回调: (): void => {
               this.显示更多菜单 = false;
-              this.暂停主页官方公告检查();
-              const params: 设置页参数 = { openAiSettings: false };
-              this.页面栈.pushPath({
-                name: 'SettingsPage',
-                param: params,
-                onPop: (): void => { this.返回主页后刷新(); }
-              });
+              this.openSettings();
             },
             浏览回调: (): void => {
               this.显示更多菜单 = false;
@@ -2623,11 +2765,7 @@ struct 首页 {
             },
             提醒回调: (): void => {
               this.显示更多菜单 = false;
-              this.暂停主页官方公告检查();
-              this.页面栈.pushPath({
-                name: 'ReminderPage',
-                onPop: (): void => { this.返回主页后刷新(); }
-              });
+              this.openReminders();
             },
             关闭回调: (): void => {
               this.显示更多菜单 = false;
@@ -2687,8 +2825,7 @@ struct 首页 {
                 this.打开添加笔记();
               },
               创建子牌组: (): void => {
-                this.创建父牌组ID = this.选中的牌组ID;
-                this.显示创建牌组 = true;
+                this.openCreateDeck(this.选中的牌组ID);
               },
               导出牌组: (): void => {
                 this.打开数据迁移('exportDeck', Number(this.选中的牌组ID), false);
@@ -2853,23 +2990,6 @@ struct 首页 {
           })
         }
 
-        if (this.显示同步面板) {
-          同步面板({
-            是否深色: this.是否深色(),
-            账号名: this.同步面板账号名,
-            初始鉴权: this.同步面板认证,
-            automatic: true,
-            同步完成回调: (fsrsDisabledBySync: boolean): void => {
-              this.加载主页数据();
-              this.同步后检查FSRS(fsrsDisabledBySync);
-            },
-            关闭回调: (): void => {
-              this.显示同步面板 = false;
-              this.同步面板认证 = null;
-              this.同步面板账号名 = '';
-            }
-          })
-        }
 
         // 首次启动欢迎弹窗：放最顶层，确保覆盖所有浮层
         //   关闭时调 标记已展示欢迎弹窗 持久化（已在 显示欢迎弹窗一次 中提前标记，
@@ -2960,6 +3080,27 @@ struct 首页 {
     // 用箭头函数包裹，避免方法引用丢失 this 绑定后 transition 回调内 this 为 undefined（BUG：从二级页面 push 三级页面时崩溃 "Cannot read property getUIContext of undefined"）。
     .customNavContentTransition((from: NavContentInfo, to: NavContentInfo, op: NavigationOperation): NavigationAnimatedTransition | undefined => this.自定义转场回调(from, to, op))
     .backgroundColor(Color.Transparent)
+      // 根宿主跨导航保留，收起详情/进入学习不销毁媒体轮询。
+      if (this.显示同步面板) {
+        同步面板({
+          是否深色: this.是否深色(),
+          账号名: this.同步面板账号名,
+          初始鉴权: this.同步面板认证,
+          automatic: true,
+          backRequest: this.syncBackRequest,
+          状态变化回调: (busy: boolean, modal: boolean): void => { this.autoSyncStateChanged(busy, modal); },
+          同步完成回调: (fsrsDisabledBySync: boolean): void => {
+            this.autoSyncCollectionFinished(fsrsDisabledBySync);
+          },
+          关闭回调: (): void => {
+            this.显示同步面板 = false;
+            this.同步面板认证 = null;
+            this.同步面板账号名 = '';
+            this.autoSyncStateChanged(false, false);
+            this.scheduleAutoSyncCheck();
+          }
+        })
+      }
     }
     .width('100%').height('100%')
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])

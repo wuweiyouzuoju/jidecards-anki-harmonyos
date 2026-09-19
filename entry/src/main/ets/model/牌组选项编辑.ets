@@ -64,6 +64,8 @@ function 解析保留率(输入文本: string): number | null { const 去除空�
 /** 仅用于 UI 的当前牌组限额与请求级调度器开关草稿。 */
 @Observed
 export class 牌组选项编辑 {
+  sharedDeckCount: number = 0;
+  applyToSharedDecks: boolean = false;
   复习限额文本: string = '';
   新卡限额文本: string = '';
   今日复习文本: string = '';

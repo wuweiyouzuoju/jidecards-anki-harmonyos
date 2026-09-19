@@ -84,7 +84,7 @@ test('study page bury/suspend entries use upstream reviewer semantics and refetc
   assert.notEqual(body, null);
   assert.match(body[0], /if \(this\.评分中 \|\| this\.当前卡片 === null\)/,
     'bury/suspend reuses reentrancy guard');
-  assert.match(body[0], /await this\.调度器服务实例\.埋藏或暂停卡片\(this\.当前卡片\.cardId, mode\);\s*await this\.加载下一张卡\(\);/,
+  assert.match(body[0], /await this\.调度器服务实例\.埋藏或暂停卡片\(cardId, mode\);\s*\}\);\s*await this\.加载下一张卡\(\);/,
     'card leaves today queue, next card fetched immediately');
   assert.match(body[0], /this\.阶段 = 'error';/,
     'bury/suspend failure surfaces through existing error state');
@@ -93,14 +93,14 @@ test('study page bury/suspend entries use upstream reviewer semantics and refetc
 test('done page fetches congrats info when queue empties and degrades silently on failure', () => {
   const page = read(STUDY_PAGE);
 
-  assert.match(page, /queued\.cards\.length === 0[\s\S]*?await this\.加载完成页信息\(\);/,
+  assert.match(page, /snapshot\.card === null[\s\S]*?await this\.加载完成页信息\(\);/,
     'congrats info fetched on entering done phase');
-  assert.match(page, /this\.完成页数据已加载 = false;[\s\S]*?获取队首卡片/,
+  assert.match(page, /this\.完成页数据已加载 = false;[\s\S]*?studySession\.loadNext/,
     'stale congrats cleared before every refetch');
 
   const body = page.match(/加载完成页信息\(\): Promise<void> \{[\s\S]*?\n  \}/);
   assert.notEqual(body, null);
-  assert.match(body[0], /await this\.调度器服务实例\.获取完成页信息\(\)/);
+  assert.match(body[0], /await this\.studySession\.congrats\(\)/);
   assert.match(body[0], /info\.secsUntilNextLearn < SECONDS_PER_DAY/,
     'learn-remaining hint suppressed when next learn card is >=1 day away (upstream buildNextLearnMsg)');
   assert.match(body[0], /this\.完成页有埋藏 = info\.haveSchedBuried \|\| info\.haveUserBuried/);
@@ -120,7 +120,7 @@ test('done page renders real congrats data and deck-scoped unbury entry', () => 
 
   const body = page.match(/恢复埋藏\(\): Promise<void> \{[\s\S]*?\n  \}/);
   assert.notEqual(body, null);
-  assert.match(body[0], /await this\.调度器服务实例\.按牌组恢复埋藏\(this\.牌组ID, UNBURY_MODE_ALL\);\s*await this\.加载下一张卡\(\);/,
+  assert.match(body[0], /await this\.调度器服务实例\.按牌组恢复埋藏\(this\.牌组ID, UNBURY_MODE_ALL\);\s*\}\);\s*await this\.加载下一张卡\(\);/,
     'CongratsInfo exposes no card ids, so restore is deck-scoped like desktop overview, then refetch');
   assert.match(body[0], /this\.阶段 = 'error';/);
 

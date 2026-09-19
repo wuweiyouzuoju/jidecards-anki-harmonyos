@@ -39,6 +39,7 @@ import { fileIo as fs } from '@kit.CoreFileKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { AudioFocusCoordinator } from './AudioFocusCoordinator';
 import { AudioQueuePlayer } from '../model/CardAudioSession';
+import { AudioQueueCompletion } from '../model/AudioQueueCompletion';
 
 const 域: number = 0x0001;
 const 标签: string = 'SoundPlayer';
@@ -80,6 +81,9 @@ export class 声音播放器 implements AudioQueuePlayer<string> {
   private 文件描述符: number = -1;
   private 代次: number = 0;
   private 状态定时器ID: number = -1;
+  private completion: AudioQueueCompletion = new AudioQueueCompletion();
+
+  waitForCompletion(): Promise<void> { return this.completion.wait(); }
 
   /**
    * ========================================================
@@ -104,16 +108,20 @@ export class 声音播放器 implements AudioQueuePlayer<string> {
    */
   async 播放队列(路径列表: string[]): Promise<void> {
     this.代次++;
+    const generation: number = this.代次;
+    this.completion.begin();
     this.队列 = 路径列表;
     记录信息('playQueue: gen=%{public}d count=%{public}d', this.代次, 路径列表.length);
     for (let i: number = 0; i < 路径列表.length; i++) {
       记录信息('  queue[%{public}d]=%{public}s', i, 路径列表[i]);
     }
     await this.停止播放器();
+    if (generation !== this.代次) return;
     if (路径列表.length > 0) {
       await this.音频焦点协调器.beginPlayback(this);
-      await this.从指定位置开始(0, this.代次);
+      await this.从指定位置开始(0, generation);
     } else {
+      this.completion.finish();
       await this.音频焦点协调器.endPlayback(this);
     }
   }
@@ -141,10 +149,7 @@ export class 声音播放器 implements AudioQueuePlayer<string> {
       记录警告('replay: queue empty, nothing to replay');
       return;
     }
-    this.代次++;
-    记录信息('replay: gen=%{public}d', this.代次);
-    await this.停止播放器();
-    await this.从指定位置开始(0, this.代次);
+    await this.播放队列(this.队列.slice());
   }
 
   /**
@@ -167,6 +172,7 @@ export class 声音播放器 implements AudioQueuePlayer<string> {
    */
   async 停止(): Promise<void> {
     this.代次++;
+    this.completion.finish();
     记录信息('stop: gen=%{public}d', this.代次);
     this.队列 = [];
     await this.停止播放器();
@@ -342,6 +348,7 @@ export class 声音播放器 implements AudioQueuePlayer<string> {
       return;
     }
     if (索引 >= this.队列.length) {
+      this.completion.finish();
       记录信息('startAt[%{public}d]: end of queue', 索引);
       await this.音频焦点协调器.endPlayback(this);
       return;
@@ -457,6 +464,7 @@ export class 声音播放器 implements AudioQueuePlayer<string> {
       记录警告('scheduleStateTimeout[%{public}d]: 3s timeout, state=%{public}s, advance to next', 索引, 状态);
       this.关闭文件描述符();
       this.从指定位置开始(索引 + 1, 代次).catch((e: Object): void => {
+        if (代次 === this.代次) this.completion.finish();
         记录错误('scheduleStateTimeout: startAt(next) rejected %{public}s', 错误文本(e as object | undefined));
       });
     }, 状态超时毫秒);
@@ -534,6 +542,7 @@ export class 声音播放器 implements AudioQueuePlayer<string> {
       this.清除状态定时器();
       this.关闭文件描述符();
       this.从指定位置开始(this.当前索引 + 1, 代次).catch((e: Object): void => {
+        if (代次 === this.代次) this.completion.finish();
         记录错误('stateChange: startAt(next) rejected %{public}s', 错误文本(e as object | undefined));
       });
     }

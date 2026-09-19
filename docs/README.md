@@ -6,6 +6,7 @@
 - [开发状态与后续工作](DEVELOPMENT_PLAN.md)：SDK/上游基线、发布限制、验证门和真实后续项。
 - [离线公式渲染](math-chemistry-rendering.md)：数学、化学和旧式 LaTeX 导入兼容计划与验收。
 - [当前架构](architecture.md)：模块边界、主要数据流和稳定不变量。
+- [易混淆功能状态](FEATURE_STATUS.md)：备份/恢复等能力的接入层次、源码入口与功能盘点边界。
 - [Agent 设计](agent-2-design.md)：源码中保留的 Agent 能力、安全边界与 2.4.0 发布状态。
 - [云端牌组托管](cloud-deck-hosting.md)：公开目录协议和发布操作。
 - [官方公告托管](official-announcement-hosting.md)：公告协议、发布、停用与送达语义。

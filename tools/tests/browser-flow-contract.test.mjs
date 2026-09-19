@@ -1143,12 +1143,15 @@ test('BrowserPage has T6 sidebar methods', () => {
   assert.match(page, /this\.配置服务实例\.设置配置布尔\s*\(/);
 });
 
-test('BrowserPage top bar has T6 sidebar entry button', () => {
+test('BrowserPage more menu owns the T6 sidebar entry', () => {
   const page = read('entry/src/main/ets/pages/浏览页.ets');
-  // 沿用筛选入口，并区分已提交搜索与全库状态。
-  assert.match(page, /文案: this\.搜索文本\.trim\(\) === '' \? \$r\('app\.string\.browser_action_sidebar'\)[\s\S]*?app\.string\.browser_filter_active/);
-  // 点击调用 打开侧边栏
-  assert.match(page, /this\.打开侧边栏\s*\(/);
+  const menu = page.slice(page.indexOf('private browserMoreMenu()'), page.indexOf('private resultCountLabel()'));
+  const topBar = page.slice(page.indexOf('private 顶部条()'), page.indexOf('\n  build()'));
+  assert.match(menu, /this\.搜索文本\.trim\(\) === '' \? \$r\('app\.string\.browser_action_sidebar'\)[\s\S]*?app\.string\.browser_filter_active/);
+  assert.match(menu, /enabled: this\.阶段 === 'list'/);
+  assert.match(menu, /this\.打开侧边栏\s*\(/);
+  assert.doesNotMatch(topBar, /browser_action_sidebar|browser_filter_active|this\.打开侧边栏/);
+  assert.match(topBar, /\.bindMenu\(this\.browserMoreMenu\(\)\)/);
 });
 
 test('BrowserPage renders 字段帮助面板 and wires help buttons for new features', () => {
@@ -1171,8 +1174,12 @@ test('BrowserPage renders 字段帮助面板 and wires help buttons for new feat
 
 test('查找替换对话框 has ⓘ help button that fires onHelp (统一字段帮助面板)', () => {
   const dialog = read('entry/src/main/ets/components/browser/查找替换对话框.ets');
-  // 标题旁有 ⓘ 按钮（field_help_button）
-  assert.match(dialog, /field_help_button/);
+  // 说明入口由标题栏呈现，正文不再单占一行。
+  assert.match(dialog, /DialogHeader\(\{[\s\S]*?showHelp: true/);
+  assert.match(dialog, /helpEnabled: !this\.busy/);
+  const header = read('entry/src/main/ets/components/common/DialogHeader.ets');
+  assert.match(header, /Text\(this\.title\)[\s\S]*?if \(this\.showHelp\)[\s\S]*?field_help_button/);
+  assert.match(header, /this\.onHelp\(\)/);
   // 点击 ⓘ 上抛 onHelp 回调（由父组件统一渲染 字段帮助面板 浮层，与批量操作栏 ⓘ 同模式）
   assert.match(dialog, /onHelp:\s*\(\)\s*=>\s*void/);
   assert.match(dialog, /this\.onHelp\s*\(/);

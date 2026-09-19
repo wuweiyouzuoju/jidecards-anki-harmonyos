@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { ThemeTextSpans } from './ThemeText';
+import { ThemeLabelGlyph, themeLabelGlyphs } from './ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
 import { 颜色键 } from '../../model/颜色主题';
@@ -15,7 +15,10 @@ export struct DialogHeader {
   @Prop closeEnabled: boolean = true;
   @Prop showClose: boolean = true;
   @Prop showAction: boolean = true;
+  @Prop showHelp: boolean = false;
+  @Prop helpEnabled: boolean = true;
   @Prop destructive: boolean = false;
+  onHelp: () => void = (): void => {};
   onAction: () => void = (): void => {};
   onClose: () => void = (): void => {};
   @StorageProp(颜色键.动作主色) private actionColor: string = '#2F5FD0';
@@ -41,18 +44,44 @@ export struct DialogHeader {
       }
       .width('28%')
       .justifyContent(FlexAlign.Start)
-      Text(this.title)
+      Row() {
+        Text(this.title)
         .fontSize(18)
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.text_primary'))
         .textAlign(TextAlign.Center)
-        .width('44%')
+        .flexShrink(1)
         .padding({ left: 4, right: 4 })
         .maxLines(2)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
+        if (this.showHelp) {
+          Button($r('app.string.field_help_button'))
+            .type(ButtonType.Normal)
+            .width(28)
+            .height(40)
+            .padding(0)
+            .fontSize(18)
+            .fontColor($r('app.color.text_secondary'))
+            .backgroundColor(Color.Transparent)
+            .enabled(this.helpEnabled)
+            .onClick((): void => {
+              if (this.helpEnabled) { this.onHelp(); }
+            })
+        }
+      }
+      .width('44%')
+      .justifyContent(FlexAlign.Center)
       Row() {
       Button() {
-        Text() { ThemeTextSpans(this.actionLabel, (this.destructive) ? [] : this.themeAccentColors, this.getUIContext()) }.fontSize(14).fontWeight(FontWeight.Medium).fontColor(this.destructive ? $r('app.color.error_text') : this.actionColor)
+        Text() {
+          if (!this.destructive && this.themeAccentColors.length > 0) {
+            ForEach(themeLabelGlyphs(this.actionLabel, this.themeAccentColors, this.getUIContext()), (glyph: ThemeLabelGlyph) => {
+              Span(glyph.letter).fontColor(glyph.color)
+            }, (glyph: ThemeLabelGlyph, index: number): string => `${index}-${glyph.letter}-${glyph.color}`)
+          } else {
+            Span(this.actionLabel)
+          }
+        }.fontSize(14).fontWeight(FontWeight.Medium).fontColor(this.destructive ? $r('app.color.error_text') : this.actionColor)
       }
         .type(ButtonType.Normal)
         .height(40)

@@ -22,17 +22,59 @@ vm.runInContext(stripTypeScriptTypes(`globalThis.Editor = class { ${editorMethod
 function editor(width, height, ratio) {
   const instance = new editorContext.Editor();
   const fills = [];
-  const context = { width, height, clearRect() { fills.length = 0; }, fillRect(...rect) { fills.push(rect); }, strokeRect() {} };
+  const paints = [], states = [];
+  const context = { width, height, globalAlpha: 1,
+    save() { states.push({ fillStyle: this.fillStyle, strokeStyle: this.strokeStyle, globalAlpha: this.globalAlpha }); },
+    restore() { Object.assign(this, states.pop()); },
+    clearRect() { fills.length = 0; paints.length = 0; },
+    fillRect(...rect) { fills.push(rect); paints.push([this.fillStyle, this.globalAlpha]); }, strokeRect() {} };
   Object.assign(instance, {
     上下文: context, 图片宽高比: ratio, 画布宽: 0, 画布高: 0, 画布就绪: false,
     遮罩列表: [], 当前选中编号: 1, 最小拖动距离: 0.005
   });
   instance.refreshCanvas();
-  return { instance, context, fills };
+  return { instance, context, fills, paints };
 }
 
-const touch = (x, y) => ({ fingerList: [{ localX: x, localY: y }] });
+const touch = (x, y, offsetX = 0, offsetY = 0) => ({ offsetX, offsetY, fingerList: [{ localX: x, localY: y }] });
 const plain = value => JSON.parse(JSON.stringify(value));
+
+test('五种遮罩颜色使用六位 RGB，透明度独立且不污染后续绘制', () => {
+  const { instance, context, paints } = editor(300, 300, 1);
+  for (let ordinal = 1; ordinal <= 5; ordinal++) {
+    const mask = { 形状: 'rect', 左: 0.1, 顶: 0.1, 宽: 0.2, 高: 0.2, 编号: ordinal };
+    instance.绘制遮罩(mask, false);
+    instance.绘制遮罩(mask, true);
+    assert.deepEqual(paints.slice(-2), [[编号颜色(ordinal), 0.4], [编号颜色(ordinal), 0.25]]);
+    assert.equal(context.globalAlpha, 1);
+  }
+});
+
+test('手势识别阈值不改变按下点，反向绘制与已存在遮罩命中都使用真实起点', () => {
+  const { instance } = editor(300, 300, 1);
+  instance.拖动开始(touch(90, 84, -10, -16));
+  instance.拖动更新(touch(40, 40));
+  instance.拖动结束();
+  assert.equal(生成Occlusions字符串(instance.遮罩列表), '{{c1::image-occlusion:rect:left=0.1333:top=0.1333:width=0.2:height=0.2}}');
+  // 按在右边缘内，识别时已越过遮罩；仍应移动原遮罩而非新建。
+  instance.拖动开始(touch(110, 60, 15, 0));
+  assert.equal(instance.拖动模式, 2);
+  instance.拖动结束();
+  assert.equal(instance.遮罩列表.length, 1);
+  assert.ok(Math.abs(instance.遮罩列表[0].左 - 55 / 300) < 1e-9);
+});
+
+test('从留白开始滑入图片不误建，绘制期间切换编号不会改变当前矩形颜色', () => {
+  const { instance } = editor(320, 500, 2);
+  instance.拖动开始(touch(80, 180, 0, 20));
+  assert.equal(instance.拖动模式, 0);
+  instance.当前选中编号 = 2;
+  instance.拖动开始(touch(80, 200));
+  instance.当前选中编号 = 5;
+  instance.拖动更新(touch(120, 240));
+  instance.拖动结束();
+  assert.equal(instance.遮罩列表[0].编号, 2);
+});
 
 test('横图、竖图、全景和长图始终完整居中，归一化使用图片边界', () => {
   for (const [width, height, ratio] of [[320, 500, 2], [320, 500, 0.5], [300, 450, 10], [600, 240, 0.1], [280, 280, 1]]) {

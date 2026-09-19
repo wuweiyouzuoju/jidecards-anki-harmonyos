@@ -7,7 +7,7 @@ import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
 // 由 首页.ets 通过 Navigation pathStack 以 NavDestination 形式入栈（与 学习页 同机制），
 // 取代原 添加笔记面板 弹层。Cloze 笔记类型下提供 c1-c5 快捷挖空按钮与保存前预校验。
 // Task 10：笔记类型加载失败时 try/catch 捕获，错误信息在 错误信息 显示，不静默 rejection。
-// 图片遮盖卡的学习与预览仍受支持；添加笔记页暂不开放图片遮盖建卡入口。
+// 图片遮盖类型使用选图与遮罩编辑器创建卡片。
 
 import { common } from '@kit.AbilityKit';
 import { fileIo as fs } from '@kit.CoreFileKit';
@@ -219,8 +219,7 @@ export struct 添加笔记页 {
   // @业务规则
   // context 不可用时直接报错，不进入后端调用。
   // 笔记类型名列表映射为下拉候选结构（id + name）。
-  // 图片遮盖建卡入口已关闭：不自动补建该笔记类型，并且不在下拉列表展示它。
-  // 已导入的图片遮盖卡仍由学习和预览页面正常渲染。
+  // 图片遮盖类型缺失时通过专属服务补建，并与其他类型一起展示。
   //
   // @副作用
   // 调后端 确保已打开 / 获取添加默认值 / 获取笔记类型名列表；读写 处理中 状态
@@ -291,20 +290,25 @@ export struct 添加笔记页 {
           this.错误信息 = e instanceof Error ? e.message : `${e}`;
         }
       }
+      if (!名称列表.some((项: NotetypeNameId): boolean => this.是图片遮盖笔记类型名(项.name))) {
+        try {
+          await this.图片遮罩服务实例.添加图片遮罩笔记类型();
+          类型缺失 = true;
+        } catch (e) {
+          this.错误信息 = e instanceof Error ? e.message : `${e}`;
+        }
+      }
       if (类型缺失) {
         名称列表 = await this.笔记类型服务实例.获取笔记类型名列表();
       }
-      // 保留全部通用笔记类型；仅关闭图片遮盖建卡入口。
-      const 可建卡类型: NotetypeNameId[] = 名称列表.filter(
-        (项: NotetypeNameId): boolean => !this.是图片遮盖笔记类型名(项.name));
-      this.笔记类型选项 = 可建卡类型.map((项: NotetypeNameId): 添加笔记笔记类型选项 => ({
+      this.笔记类型选项 = 名称列表.map((项: NotetypeNameId): 添加笔记笔记类型选项 => ({
         id: 项.id, name: 项.name
       }));
       if (this.笔记类型选项.length === 0) {
         this.错误信息 = this.取本地化文案($r('app.string.add_note_notetype_load_failed'));
         return;
       }
-      // 默认类型可能是已关闭入口的图片遮盖；此时回退到第一个可见类型。
+      // 已保存的默认类型可能被删除，此时回退到第一个可用类型。
       let 默认笔记类型ID: number = 默认值.notetypeId;
       const 默认ID可见: boolean = this.笔记类型选项.some(
         (项: 添加笔记笔记类型选项): boolean => 项.id === 默认笔记类型ID);

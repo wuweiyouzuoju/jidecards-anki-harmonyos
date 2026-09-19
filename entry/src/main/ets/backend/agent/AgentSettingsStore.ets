@@ -4,7 +4,7 @@ import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
 import { normalizeBatchLimit } from '../../model/agent/AgentPolicy';
 import type { ProviderId } from '../../model/agent/AgentTypes';
-import { DEEPSEEK_PROVIDER, OPENAI_PROVIDER } from '../../model/agent/ProviderCatalog';
+import { DEEPSEEK_PROVIDER, OPENAI_PROVIDER, normalizeDeepSeekModel } from '../../model/agent/ProviderCatalog';
 
 const STORE_NAME: string = 'jidecards_settings';
 const CONTEXT_KEY: string = 'abilityContext';
@@ -93,8 +93,8 @@ export async function loadAgentSettings(): Promise<AgentSettings> {
     const batchValue: preferences.ValueType = await store.get(BATCH_LIMIT_KEY, defaults.batchLimit);
     return {
       selectedProvider: providerValue(provider),
-      deepseekModel: stringValue(
-        await store.get(DEEPSEEK_MODEL_KEY, defaults.deepseekModel), defaults.deepseekModel),
+      deepseekModel: normalizeDeepSeekModel(stringValue(
+        await store.get(DEEPSEEK_MODEL_KEY, defaults.deepseekModel), defaults.deepseekModel)),
       openaiModel: stringValue(
         await store.get(OPENAI_MODEL_KEY, defaults.openaiModel), defaults.openaiModel),
       customBaseUrl: stringValue(await store.get(CUSTOM_BASE_URL_KEY, ''), ''),
@@ -112,7 +112,7 @@ export async function saveAgentSettings(settings: AgentSettings): Promise<void> 
     throw new Error('agent_settings_unavailable');
   }
   await store.put(PROVIDER_KEY, settings.selectedProvider);
-  await store.put(DEEPSEEK_MODEL_KEY, settings.deepseekModel.trim());
+  await store.put(DEEPSEEK_MODEL_KEY, normalizeDeepSeekModel(settings.deepseekModel));
   await store.put(OPENAI_MODEL_KEY, settings.openaiModel.trim());
   await store.put(CUSTOM_BASE_URL_KEY, settings.customBaseUrl.trim());
   await store.put(CUSTOM_MODEL_KEY, settings.customModel.trim());

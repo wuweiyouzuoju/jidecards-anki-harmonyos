@@ -817,7 +817,7 @@ export struct 浏览页 {
     this.批量错误 = '';
     try {
       const 卡片IDs: number[] = await this.解析选中为卡片ID();
-      await this.卡片服务实例.设置牌组(卡片IDs, 牌组ID);
+      if (卡片IDs.length > 0) { await this.卡片服务实例.设置牌组(卡片IDs, 牌组ID); }
       this.退出多选();
       await this.执行搜索();
     } catch (错误) {
@@ -835,7 +835,7 @@ export struct 浏览页 {
     this.批量错误 = '';
     try {
       const 卡片IDs: number[] = await this.解析选中为卡片ID();
-      await this.卡片服务实例.设置标志(卡片IDs, 标志);
+      if (卡片IDs.length > 0) { await this.卡片服务实例.设置标志(卡片IDs, 标志); }
       this.退出多选();
       await this.执行搜索();
     } catch (错误) {
@@ -891,11 +891,11 @@ export struct 浏览页 {
     }
   }
 
-  /** 将所选笔记展开为全部兄弟卡 ID，并去重供取消暂停/埋藏使用。 */
+  /** 将所选笔记展开为全部兄弟卡 ID，并去重供批量操作使用。 */
   private async 解析选中笔记的卡片ID(): Promise<number[]> {
     const 结果: number[] = [];
     const 已添加: Set<number> = new Set<number>();
-    for (const 笔记ID of this.选中ID列表) {
+    for (const 笔记ID of this.选中ID列表.slice()) {
       const 卡片IDs: number[] = await this.笔记服务实例.获取笔记的卡片(笔记ID);
       for (const 卡片ID of 卡片IDs) {
         if (!已添加.has(卡片ID)) {
@@ -1104,13 +1104,6 @@ export struct 浏览页 {
     }
   }
 
-  /** 本地从 结果ID列表 + 行列表 移除选中ID（挂起/删除后用，避免重新搜索的 loading 闪烁）。 */
-  private 本地移除选中行(): void {
-    const 选中集合: Set<number> = new Set<number>(this.选中ID列表);
-    this.结果ID列表 = this.结果ID列表.filter((id: number): boolean => !选中集合.has(id));
-    this.行列表 = this.行列表.filter((行: 浏览行数据): boolean => !选中集合.has(行.id));
-  }
-
   /** 执行批量删除：cards 模式直接 删除卡片(选中ID)；notes 模式先查每条笔记的所有卡片再删。 */
   private async 执行批量删除(): Promise<void> {
     this.显示删除确认 = false;
@@ -1118,10 +1111,10 @@ export struct 浏览页 {
     this.批量错误 = '';
     try {
       const 卡片IDs: number[] = await this.解析选中为卡片ID();
-      await this.卡片服务实例.删除卡片(卡片IDs);
-      // 删除成功后本地移除选中行（与挂起同款，避免重新搜索的 loading 闪烁）
-      this.本地移除选中行();
+      if (卡片IDs.length > 0) { await this.卡片服务实例.删除卡片(卡片IDs); }
       this.退出多选();
+      // 重新查询真实结果，零删除或外部变更都不能被显示为本地“删除成功”。
+      await this.执行搜索();
     } catch (错误) {
       this.批量错误 = this.取本地化文案($r('app.string.browser_action_delete_error'));
       console.info(`BrowserPage: 批量删除失败 错误=${错误}`);
@@ -1139,12 +1132,7 @@ export struct 浏览页 {
     if (this.浏览模式值 === 'cards') {
       return this.选中ID列表.slice();
     }
-    // notes 模式：查每条笔记的卡片。当前无"按笔记查卡片ID"的 RPC，
-    // 退化为用 卡片服务.获取卡片 逐个查（选中ID 当 cardId 查 noteId 再查卡片不现实）。
-    // 实际 notes 模式下选中ID是 noteId，Anki 后端无直接 noteId→cardIds 的 RPC，
-    // 此处暂返回空数组提示用户切到 cards 模式操作。
-    this.批量错误 = this.取本地化文案($r('app.string.browser_action_notes_mode_hint'));
-    return [];
+    return this.解析选中笔记的卡片ID();
   }
 
   /** 退出多选模式：清空选中 + 多选模式值 + 翻转信号触发 卡片表格 清内部状态。 */
@@ -1638,6 +1626,15 @@ export struct 浏览页 {
   /** 复用查找替换入口，并提供三种副标题显示方式。 */
   private browserMoreMenu(): MenuElement[] {
     const items: MenuElement[] = [{
+      value: this.取本地化文案(this.搜索文本.trim() === '' ? $r('app.string.browser_action_sidebar') :
+        $r('app.string.browser_filter_active')),
+      enabled: this.阶段 === 'list',
+      action: (): void => {
+        if (this.阶段 !== 'list') { return; }
+        this.侧边栏错误 = '';
+        this.打开侧边栏();
+      }
+    }, {
       value: this.取本地化文案($r('app.string.browser_action_find_replace')),
       enabled: this.阶段 === 'list',
       action: (): void => { this.查找替换错误 = ''; this.显示查找替换 = true; }
@@ -1664,7 +1661,7 @@ export struct 浏览页 {
 
   @Builder
   private 顶部条() {
-    // 普通模式提供返回、筛选和更多；多选模式沿用选中计数退出按钮。
+    // 普通模式提供返回和更多；多选模式沿用选中计数退出按钮。
     Row() {
       按下态按钮({
         文案: $r('app.string.study_back'),
@@ -1680,19 +1677,6 @@ export struct 浏览页 {
           点击回调: (): void => this.退出多选()
         })
       } else {
-        按下态按钮({
-          文案: this.搜索文本.trim() === '' ? $r('app.string.browser_action_sidebar') :
-            $r('app.string.browser_filter_active'),
-          字色: $r('app.color.text_primary'),
-          点击回调: (): void => {
-            if (this.阶段 !== 'list') {
-              return;
-            }
-            this.侧边栏错误 = '';
-            this.打开侧边栏();
-          }
-        })
-
         Blank()
 
         Button($r('app.string.study_more'))

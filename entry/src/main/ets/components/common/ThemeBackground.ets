@@ -50,7 +50,8 @@ export struct ThemeBackground {
     this.cycleDuration = this.visual.backgroundCycleMs;
     this.getUIContext().animateTo({
       duration: this.cycleDuration, curve: Curve.EaseInOut,
-      expectedFrameRateRange: { min: 30, max: 60, expected: 60 },
+      // 慢速彩雾降低持续绘制预算；导航转场独立请求高帧率并暂停背景。
+      expectedFrameRateRange: { min: 15, max: 30, expected: 30 },
       onFinish: (): void => {
         if (this.mounted && this.running && generation === this.generation) this.advanceMotion();
       }

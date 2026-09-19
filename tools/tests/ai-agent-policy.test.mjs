@@ -28,7 +28,7 @@ test('DeepSeek is the built-in default and built-in endpoints are fixed', () => 
   assert.equal(DEEPSEEK_PROVIDER.id, 'deepseek');
   assert.equal(DEEPSEEK_PROVIDER.isDefault, true);
   assert.equal(DEEPSEEK_PROVIDER.baseUrl, 'https://api.deepseek.com');
-  assert.equal(DEEPSEEK_PROVIDER.models[0], 'deepseek-v4-flash');
+  assert.equal(DEEPSEEK_PROVIDER.models[0], 'deepseek-flash');
   assert.equal(OPENAI_PROVIDER.baseUrl, 'https://api.openai.com/v1');
   assert.equal(OPENAI_PROVIDER.isDefault, false);
   assert.deepEqual(OPENAI_PROVIDER.models, [

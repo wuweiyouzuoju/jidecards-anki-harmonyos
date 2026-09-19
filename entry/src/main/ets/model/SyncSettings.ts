@@ -32,24 +32,69 @@ export function normalizeSyncServer(input: string): string {
 export class SyncActivity {
   private owner: Object | null = null;
   private lastFinishedAt: number = -1;
+  private backgroundHandler: (() => void) | null = null;
+  private collectionBusy: boolean = false;
+  private collectionWaiters: Array<() => void> = [];
+
+  /** 在自动面板挂载前预留集合，封住“点击恢复学习”与组件创建之间的窗口。 */
+  reserveCollection(): void { this.collectionBusy = true; }
+
+  cancelReservation(): void {
+    if (this.owner !== null) return;
+    this.collectionBusy = false;
+    this.resolveCollectionWaiters();
+  }
+
+  /** 学习恢复只等待集合，媒体传输仍可继续。冲突未决时继续等待。 */
+  async waitForCollection(): Promise<void> {
+    while (this.collectionBusy) {
+      await new Promise<void>((resolve: () => void): void => { this.collectionWaiters.push(resolve); });
+    }
+  }
+
+  setCollectionBusy(owner: Object, busy: boolean): void {
+    if (this.owner !== owner) return;
+    this.collectionBusy = busy;
+    if (!busy) this.resolveCollectionWaiters();
+  }
+
+  private resolveCollectionWaiters(): void {
+    const waiters: Array<() => void> = this.collectionWaiters;
+    this.collectionWaiters = [];
+    for (const resolve of waiters) resolve();
+  }
+
+  /** 账户与服务器变更必须等待当前同步（包括媒体）结束。 */
+  isActive(): boolean {
+    return this.owner !== null;
+  }
 
   /** 防止两个面板同时进入 Rust 同步流程。 */
-  acquire(owner: Object): boolean {
+  acquire(owner: Object, backgroundHandler: (() => void) | null = null): boolean {
     if (this.owner !== null) return false;
     this.owner = owner;
+    this.collectionBusy = true;
+    this.backgroundHandler = backgroundHandler;
     return true;
   }
 
-  /** 面板离开后开始冷却，避免手动同步返回首页立刻再次同步。 */
+  /** 任务完成或宿主离开后开始冷却；旧状态条不能释放新任务的租约。 */
   release(owner: Object, now: number): void {
     if (this.owner !== owner) return;
+    this.setCollectionBusy(owner, false);
     this.owner = null;
+    this.backgroundHandler = null;
     this.lastFinishedAt = now;
+  }
+
+  /** 在 Ability 的 onBackground 内同步申请配额，避免状态监听延迟至挂起后。 */
+  continueInBackground(): void {
+    if (this.backgroundHandler !== null) this.backgroundHandler();
   }
 
   /** 自动请求等待当前流程结束，并合并三十秒内的重复生命周期通知。 */
   canAutoSync(now: number): boolean {
-    return this.owner === null && (this.lastFinishedAt < 0 || now < this.lastFinishedAt ||
+    return this.owner === null && !this.collectionBusy && (this.lastFinishedAt < 0 || now < this.lastFinishedAt ||
       now - this.lastFinishedAt >= 30000);
   }
 }

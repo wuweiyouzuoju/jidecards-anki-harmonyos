@@ -67,7 +67,7 @@ test('home popup menus start below the status-aware toolbar', () => {
 test('regular settings entry always supplies a non-AI navigation parameter', () => {
   const home = read('entry/src/main/ets/pages/首页.ets');
   assert.match(home,
-    /设置回调:[\s\S]*?const params:\s*设置页参数\s*=\s*\{\s*openAiSettings:\s*false\s*\}[\s\S]*?name:\s*'SettingsPage',[\s\S]*?param:\s*params/);
+    /private openSettings\(\):[\s\S]*?const params:\s*设置页参数\s*=\s*\{\s*openAiSettings:\s*false\s*\}[\s\S]*?name:\s*'SettingsPage',[\s\S]*?param:\s*params/);
 });
 
 test('home shell keeps adaptive breakpoints and a virtualized deck list', () => {
@@ -699,7 +699,8 @@ test('theme settings persist three modes and synchronize system bars', () => {
   assert.match(ability, /abilityContext/);
   assert.match(page, /AppStorage\.setOrCreate<主题模式>\('themeMode'/);
   assert.match(ability, /AppStorage\.get<string>\('themeMode'\)/);
-  assert.match(ability, /应用系统栏样式\(this\.context, isDark\)/);
+  assert.match(ability, /const isDark: boolean = this\.effectiveDarkMode\(\);\s*应用颜色主题\(theme, isDark\)/);
+  // 色板和系统栏的一致性由 theme-configuration 运行真实回调验证。
 });
 
 test('Schulte-style settings keep the approved full-screen page architecture and about content', () => {

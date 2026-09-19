@@ -167,7 +167,10 @@ export struct 卡片预览页 {
     this.audioError = '';
     try {
       const hasAudio: boolean | null = await this.audioSession.play(
-        原始侧HTML(rendered, this.当前面), this.当前面 === 'question', this.媒体目录, autoplay);
+        原始侧HTML(rendered, this.当前面), this.当前面 === 'question', this.媒体目录, autoplay, '',
+        (available: boolean): void => {
+          if (this.mounted && version === this.documentVersion) this.hasAudio = available;
+        });
       if (hasAudio !== null && this.mounted && version === this.documentVersion) {
         this.hasAudio = hasAudio;
       }

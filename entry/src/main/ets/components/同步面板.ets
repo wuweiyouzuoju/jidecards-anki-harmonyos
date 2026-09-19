@@ -30,6 +30,8 @@ import { 颜色键 } from '../model/颜色主题';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { syncActivity } from '../model/SyncSettings';
 import { 加载FSRS开启状态, notifyFsrsStateChanged } from '../model/FSRS控制器';
+import { APP_FOREGROUND_KEY } from '../model/Redemption';
+import { backgroundTaskManager } from '@kit.BackgroundTasksKit';
 
 // 同步流程诊断日志：DOMAIN 0x4342 与 EntryAbility 一致，tag 用 jidecards 便于过滤
 const 同步日志域: number = 0x4342;
@@ -78,6 +80,11 @@ export struct 同步面板 {
   @Prop 是否深色: boolean = false;
   @Prop 账号名: string = '';
   @Prop automatic: boolean = false;
+  @Prop @Watch('dismissPresentation') backRequest: number = 0;
+  @StorageProp(APP_FOREGROUND_KEY) @Watch('syncForegroundChanged') private syncForeground: boolean = true;
+  @StorageProp('状态栏高度') private statusBarHeight: number = 0;
+  @State private detailsVisible: boolean = false;
+  状态变化回调: (collectionBusy: boolean, modal: boolean) => void = (_busy: boolean, _modal: boolean): void => {};
   // 初始鉴权 由 Index 在挂载本组件时传入（来自 SyncGroup 上抛）
   初始鉴权: SyncAuth | null = null;
   同步完成回调: (fsrsDisabledBySync: boolean) => void = (_fsrsDisabledBySync: boolean): void => {};
@@ -101,7 +108,7 @@ export struct 同步面板 {
   /** 媒体同步是否曾进入 active=true 状态（防误判：未启动时 active=false 不应立即判完成）。 */
   private 媒体曾进入活跃: boolean = false;
   private 待定服务器USN: number | null = null;
-  private 是否在媒体阶段: boolean = false;
+  @State private 是否在媒体阶段: boolean = false;
   /** syncCollection 已完成（数据已写入本地 DB）；中止后据此决定是否刷新牌组列表。 */
   private 集合已同步: boolean = false;
   private readonly 同步服务实例: 同步服务 = new 同步服务();
@@ -112,23 +119,83 @@ export struct 同步面板 {
   private fsrsBeforeSync: boolean | null = null;
   private fsrsDisabledBySync: boolean = false;
   private collectionResultNotified: boolean = false;
+  private suspendDelayId: number = -1;
 
   aboutToAppear(): void {
     this.disposed = false;
-    this.ownsSync = syncActivity.acquire(this.syncOwner);
+    this.ownsSync = syncActivity.acquire(this.syncOwner, (): void => { this.requestBackgroundTime(); });
     if (!this.ownsSync) {
       this.错误文案 = this.取本地化文案($r('app.string.sync_already_running'));
-      this.当前阶段 = 'done';
+      this.setSyncPhase('done');
       return;
     }
+    this.publishSyncState();
     this.鉴权 = this.初始鉴权;
     this.启动同步();
   }
 
   aboutToDisappear(): void {
     this.disposed = true;
+    this.releaseSuspendDelay();
     this.清理轮询定时器();
     syncActivity.release(this.syncOwner, Date.now());
+  }
+
+  /** 任务生命周期独立于详情显隐；集合阶段只保护数据库入口，不覆盖首页。 */
+  private publishSyncState(): void {
+    if (this.disposed) return;
+    syncActivity.setCollectionBusy(this.syncOwner, this.当前阶段 !== 'done' && !this.是否在媒体阶段);
+    this.状态变化回调(this.当前阶段 === 'syncing' && !this.是否在媒体阶段,
+      !this.automatic || this.detailsVisible || this.当前阶段 === 'conflict');
+  }
+
+  /** 终态释放任务租约，保留错误展示；媒体仍运行时不得释放。 */
+  private setSyncPhase(phase: 'syncing' | 'conflict' | 'done'): void {
+    this.当前阶段 = phase;
+    if (phase !== 'syncing') this.releaseSuspendDelay();
+    if (phase === 'done') syncActivity.release(this.syncOwner, Date.now());
+    this.publishSyncState();
+  }
+
+  /** 自动详情可以收起，正在执行的任务继续由根宿主持有。 */
+  private dismissPresentation(): void {
+    if (this.automatic && this.当前阶段 === 'syncing') {
+      this.detailsVisible = false;
+      this.publishSyncState();
+    } else if (this.是否允许关闭()) {
+      this.关闭回调();
+    }
+  }
+
+  /** 仅给已启动的同步申请退后台收尾时间，不创建后台轮询任务。 */
+  private syncForegroundChanged(): void {
+    if (this.syncForeground) {
+      this.releaseSuspendDelay();
+    }
+  }
+
+  /** 必须由 Ability 退后台回调同步触发，不能等 ArkUI Watch 调度。 */
+  private requestBackgroundTime(): void {
+    if (this.disposed || this.当前阶段 !== 'syncing' || !this.ownsSync || this.suspendDelayId >= 0) return;
+    try {
+      const delay: backgroundTaskManager.DelaySuspendInfo = backgroundTaskManager.requestSuspendDelay(
+        this.取本地化文案($r('app.string.settings_sync_group')), (): void => { this.releaseSuspendDelay(); });
+      this.suspendDelayId = delay.requestId;
+    } catch (error) {
+      hilog.warn(同步日志域, 同步日志标签, 'sync: background extension unavailable');
+    }
+  }
+
+  /** 完成、恢复前台或超时均归还短时任务配额。 */
+  private releaseSuspendDelay(): void {
+    if (this.suspendDelayId < 0) return;
+    const requestId: number = this.suspendDelayId;
+    this.suspendDelayId = -1;
+    try {
+      backgroundTaskManager.cancelSuspendDelay(requestId);
+    } catch (error) {
+      hilog.warn(同步日志域, 同步日志标签, 'sync: background extension already released');
+    }
   }
 
   /** 自动同步仅在成功完成后收起；媒体失败和全量覆盖冲突必须继续可见。 */
@@ -149,7 +216,7 @@ export struct 同步面板 {
     notifyFsrsStateChanged();
   }
 
-  /** 媒体成功、失败或中止共用一次集合结果通知。 */
+  /** 集合提交立即通知一次；后续媒体成功、失败或中止不会重复刷新。 */
   private notifyCollectionResult(): void {
     if (this.disposed || this.collectionResultNotified) return;
     this.collectionResultNotified = true;
@@ -232,7 +299,7 @@ export struct 同步面板 {
     this.清理轮询定时器();
     this.媒体进度文案 = '';
     this.状态文案 = this.取本地化文案($r('app.string.sync_aborted'));
-    this.当前阶段 = 'done';
+    this.setSyncPhase('done');
     // syncCollection 已完成（数据已入 DB）但用户中止了媒体阶段：仍需刷新牌组列表，
     // 否则用户看不到刚同步的牌组，再点同步又显示「已最新」但 UI 不更新。
     if (集合是否已同步) {
@@ -248,6 +315,7 @@ export struct 同步面板 {
    * - network/other：停留 done，显示错误文案，允许关闭。
    */
   private 处理同步错误(error: Error): void {
+    if (this.disposed) return;
     if (this.是否请求中止) {
       this.完成中止();
       return;
@@ -270,7 +338,7 @@ export struct 同步面板 {
     } else {
       this.错误文案 = `${this.取本地化文案($r('app.string.sync_error_generic'))} [kind=${后端错误类别 ?? -1}]：${error.message}`;
     }
-    this.当前阶段 = 'done';
+    this.setSyncPhase('done');
     // 媒体阶段出错时集合同步已完成（数据已入 DB），仍需刷新牌组列表让用户看到已同步的牌组。
     if (集合是否已同步) {
       hilog.info(同步日志域, 同步日志标签, 'sync: error after collection synced, refreshing deck list');
@@ -306,7 +374,7 @@ export struct 同步面板 {
     const 当前鉴权: SyncAuth | null = this.鉴权;
     if (当前鉴权 === null) {
       this.错误文案 = this.取本地化文案($r('app.string.sync_error_session_expired'));
-      this.当前阶段 = 'done';
+      this.setSyncPhase('done');
       return;
     }
     this.错误文案 = '';
@@ -317,7 +385,7 @@ export struct 同步面板 {
     this.fsrsBeforeSync = null;
     this.fsrsDisabledBySync = false;
     this.collectionResultNotified = false;
-    this.当前阶段 = 'syncing';
+    this.setSyncPhase('syncing');
     try {
       let 鉴权: SyncAuth = 当前鉴权;
       // 媒体同步开关关闭时，中止上次同步可能仍在运行的后台媒体同步线程
@@ -354,6 +422,7 @@ export struct 同步面板 {
         this.集合已同步 = true;
         await this.captureFsrsAfterSync();
         if (this.disposed) return;
+        this.notifyCollectionResult();
         if (this.是否请求中止) {
           this.完成中止();
           return;
@@ -364,7 +433,7 @@ export struct 同步面板 {
           // 媒体同步已禁用，清除待完成标志（避免上次中断的媒体同步残留标志干扰）。
           设置媒体待同步(false);
           this.状态文案 = this.取本地化文案($r('app.string.sync_success'));
-          this.当前阶段 = 'done';
+          this.setSyncPhase('done');
           this.notifySyncResult();
           return;
         }
@@ -382,7 +451,7 @@ export struct 同步面板 {
       // 全量冲突：进 conflict 阶段，等待用户选方向（不弹 CustomDialog，内联到本弹窗）
       this.待定服务器USN = 集合响应.serverMediaUsn;
       this.当前冲突类型 = 走向;
-      this.当前阶段 = 'conflict';
+      this.setSyncPhase('conflict');
       hilog.info(同步日志域, 同步日志标签, 'sync: entering conflict phase kind=%{public}s', 走向);
     } catch (error) {
       this.处理同步错误(error instanceof Error ? error : new Error(`${error}`));
@@ -415,12 +484,13 @@ export struct 同步面板 {
   private 冲突确认(是否上传: boolean): void {
     const 鉴权: SyncAuth | null = this.鉴权;
     if (鉴权 === null) {
-      this.当前阶段 = 'done';
+      this.setSyncPhase('done');
       return;
     }
     this.错误文案 = '';
     this.状态文案 = '';
-    this.当前阶段 = 'syncing';
+    this.detailsVisible = true;
+    this.setSyncPhase('syncing');
     // 媒体同步开关关闭时不传 serverUSN——rslib full_sync_inner 仅在 server_usn.is_some()
     // 时启动后台媒体同步（不检查 sync_media 字段），传 null 使 rslib 跳过媒体同步。
     const 媒体同步开启: boolean = 加载媒体同步开关();
@@ -434,6 +504,7 @@ export struct 同步面板 {
         this.集合已同步 = true;
         await this.captureFsrsAfterSync();
         if (this.disposed) return;
+        this.notifyCollectionResult();
         if (this.是否请求中止) {
           this.完成中止();
           return;
@@ -443,7 +514,7 @@ export struct 同步面板 {
           hilog.info(同步日志域, 同步日志标签, 'sync: fullUploadOrDownload done, media sync disabled, skipping media phase');
           设置媒体待同步(false);
           this.状态文案 = this.取本地化文案($r('app.string.sync_success'));
-          this.当前阶段 = 'done';
+          this.setSyncPhase('done');
           this.notifySyncResult();
           return;
         }
@@ -467,12 +538,14 @@ export struct 同步面板 {
       return;
     }
     this.是否在媒体阶段 = true;
-    this.当前阶段 = 'syncing';
+    this.notifyCollectionResult();
+    this.setSyncPhase('syncing');
     const RPC开始时间: number = Date.now();
     hilog.info(同步日志域, 同步日志标签,
       'sync: calling syncMedia (background start) at %{public}d', RPC开始时间);
     this.同步服务实例.同步媒体(鉴权)
       .then((): void => {
+        if (this.disposed) return;
         if (this.是否请求中止) {
           this.完成中止();
           return;
@@ -564,7 +637,7 @@ export struct 同步面板 {
             this.清理轮询定时器();
             this.媒体进度文案 = '';
             this.状态文案 = this.取本地化文案($r('app.string.sync_success'));
-            this.当前阶段 = 'done';
+            this.setSyncPhase('done');
             // 媒体同步成功，清除待完成标志。
             设置媒体待同步(false);
             this.notifySyncResult();
@@ -610,10 +683,10 @@ export struct 同步面板 {
     DialogHeader({
       title: this.取本地化文案($r('app.string.settings_sync_group')),
       actionLabel: $r('app.string.close'),
-      actionEnabled: this.是否允许关闭(),
+      actionEnabled: this.automatic || this.是否允许关闭(),
       showClose: false,
       onAction: (): void => {
-        this.关闭回调();
+        this.dismissPresentation();
       }
     })
   }
@@ -712,7 +785,8 @@ export struct 同步面板 {
 
   }
 
-  build() {
+  @Builder
+  private syncDialog() {
     Stack() {
       // 磨砂玻璃遮罩：canClose=false 时不响应点击
       Column()
@@ -725,9 +799,7 @@ export struct 同步面板 {
         })
         .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
         .onClick((): void => {
-          if (this.是否允许关闭()) {
-            this.关闭回调();
-          }
+          this.dismissPresentation();
         })
         .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
 
@@ -766,5 +838,53 @@ export struct 同步面板 {
     }
     .width('100%')
     .height('100%')
+  }
+
+  /** 自动同步只在失败时显示轻量提示，正常传输保持静默。 */
+  @Builder
+  private syncErrorStatus() {
+    Row({ space: 8 }) {
+      Text($r('app.string.sync_background_error'))
+        .fontSize(应用尺寸.字号_正文_小)
+        .fontColor(this.取色板().错误色)
+        .maxLines(2)
+        .layoutWeight(1)
+      Button($r('app.string.sync_background_details'))
+        .fontSize(应用尺寸.字号_正文_小)
+        .fontColor(this.动作主色)
+        .backgroundColor(Color.Transparent)
+        .onClick((): void => {
+          this.detailsVisible = true;
+          this.publishSyncState();
+        })
+      if (this.当前阶段 === 'done') {
+        Button($r('app.string.close'))
+          .fontSize(应用尺寸.字号_正文_小)
+          .fontColor(this.动作主色)
+          .backgroundColor(Color.Transparent)
+          .onClick((): void => { this.关闭回调(); })
+      }
+    }
+    .width('92%')
+    .constraintSize({ maxWidth: 480 })
+    .padding({ left: 12, right: 4, top: 4, bottom: 4 })
+    .backgroundColor(this.取色板().背景)
+    .borderRadius(应用尺寸.圆角_卡片)
+    .shadow({ radius: 8, color: 'rgba(0,0,0,0.12)', offsetY: 2 })
+    .margin({ top: this.statusBarHeight + 应用尺寸.工具栏高度 })
+  }
+
+  build() {
+    Stack({ alignContent: Alignment.Top }) {
+      if (!this.automatic || this.detailsVisible || this.当前阶段 === 'conflict') {
+        this.syncDialog()
+      } else if (this.错误文案 !== '') {
+        this.syncErrorStatus()
+      }
+    }
+    .width('100%')
+    .height('100%')
+    .hitTestBehavior(this.automatic && !this.detailsVisible && this.当前阶段 !== 'conflict' ?
+      HitTestMode.Transparent : HitTestMode.Default)
   }
 }

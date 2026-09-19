@@ -49,9 +49,9 @@ function harness() {
     interactionEnabled: true, foreground: true, isDark: false, 媒体目录: '/media',
     onPositionChanged: index => events.push(['position', index]),
     onEditField: id => events.push(['edit', id]), 取本地化文案: key => key,
-    soundPlayer: { 停止: async () => events.push('sound stop'), 释放: async () => events.push('sound release'),
+    soundPlayer: { waitForCompletion: async () => {}, 停止: async () => events.push('sound stop'), 释放: async () => events.push('sound release'),
       播放队列: async paths => sounds.push(paths) },
-    ttsPlayer: { 停止: async () => events.push('tts stop'), 释放: async () => events.push('tts release'),
+    ttsPlayer: { waitForCompletion: async () => {}, 停止: async () => events.push('tts stop'), 释放: async () => events.push('tts release'),
       播放队列: async items => tts.push(items) },
     卡片渲染服务实例: new Proxy(service, { get(target, key) {
       assert.ok(key in target, `unexpected service call: ${String(key)}`); return target[key];

@@ -211,8 +211,9 @@ export struct 图片遮罩编辑器 {
       || this.图片宽高比 <= 0 || event.fingerList.length === 0) {
       return;
     }
-    const x: number = this.归一化X(event.fingerList[0].localX);
-    const y: number = this.归一化Y(event.fingerList[0].localY);
+    // Pan 达到识别距离才回调，减去累计位移以还原按下点，避免起点及命中目标偏移。
+    const x: number = this.归一化X(event.fingerList[0].localX - event.offsetX);
+    const y: number = this.归一化Y(event.fingerList[0].localY - event.offsetY);
     if (x < 0 || x > 1 || y < 0 || y > 1) {
       return;
     }
@@ -227,6 +228,7 @@ export struct 图片遮罩编辑器 {
       this.移动偏移归一化Y = y - m.顶;
       // 切换当前选中编号到被拖动矩形的编号，便于用户继续画同色矩形
       this.当前选中编号 = m.编号;
+      this.拖动更新(event);
       return;
     }
 
@@ -242,6 +244,7 @@ export struct 图片遮罩编辑器 {
       高: 0,
       编号: this.当前选中编号
     };
+    this.拖动更新(event);
   }
 
   // ========================================================
@@ -277,7 +280,7 @@ export struct 图片遮罩编辑器 {
         顶: Math.min(this.创建起点归一化Y, y),
         宽: Math.abs(x - this.创建起点归一化X),
         高: Math.abs(y - this.创建起点归一化Y),
-        编号: this.当前选中编号
+        编号: this.创建中矩形.编号
       };
       this.重绘();
       return;
@@ -395,7 +398,7 @@ export struct 图片遮罩编辑器 {
   //
   // @业务规则
   // 颜色由 编号颜色(编号) 决定，c1-c5 固定红橙黄绿蓝。
-  // alpha 通过 hex 拼接 #RRGGBBAA 实现（已落定 '55' / 创建中 '88'）。
+  // 原生 Canvas 使用六位 RGB 与独立 globalAlpha，避免八位颜色字符串解析差异。
   // 不再画 × 删除按钮（2026-07-28 改），删除走顶部"撤销/清空"按钮。
   //
   // @副作用
@@ -411,13 +414,17 @@ export struct 图片遮罩编辑器 {
     const 颜色: string = 编号颜色(遮罩.编号);
 
     // 半透明填充：创建中态更淡
-    ctx.fillStyle = 颜色 + (创建中 ? '88' : '55');
+    ctx.save();
+    ctx.fillStyle = 颜色;
+    ctx.globalAlpha = 创建中 ? 0.25 : 0.4;
     ctx.fillRect(像素左, 像素顶, 像素宽, 像素高);
 
     // 实线边框
     ctx.strokeStyle = 颜色;
+    ctx.globalAlpha = 1;
     ctx.lineWidth = 2;
     ctx.strokeRect(像素左, 像素顶, 像素宽, 像素高);
+    ctx.restore();
   }
 
   // ========================================================

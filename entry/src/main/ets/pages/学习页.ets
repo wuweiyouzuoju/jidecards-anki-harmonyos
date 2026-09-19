@@ -17,6 +17,9 @@ import { webview } from '@kit.ArkWeb';
 import { interceptMathAsset } from '../utils/MathAssetResponse';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { 后端会话 } from '../backend/后端会话';
+import { AnkiStudySessionBackend } from '../backend/StudySessionBackend';
+import { StudySessionController, StudySnapshot } from '../model/StudySessionController';
+import { StudyOptions, StudyTiming, StudyAdvanceAction } from '../model/StudyTiming';
 import { 调度器服务 } from '../backend/调度器服务';
 import { 卡片渲染服务 } from '../backend/卡片渲染服务';
 import { 卡片服务 } from '../backend/卡片服务';
@@ -37,7 +40,7 @@ import {
   RATING_HARD,
   UNBURY_MODE_ALL
 } from '../proto/messages/SchedulerMessages';
-import type { SchedulingStatesRaw, StudyCard } from '../proto/messages/SchedulerMessages';
+import type { StudyCard } from '../proto/messages/SchedulerMessages';
 import {
   构建卡片HTML,
   提取拼写标记,
@@ -56,6 +59,7 @@ import { 学习浮动工具栏 } from '../components/学习浮动工具栏';
 import { 学习手写白板层 } from '../components/学习手写白板层';
 import { StudyActionButton } from '../components/StudyActionButton';
 import { isStudyGuideCompleted, completeStudyGuide } from '../utils/StudyGuideStore';
+import { playStudyHaptic } from '../utils/StudyHaptics';
 import { 按下态按钮 } from '../components/common/按下态按钮';
 import { 学习阶段 } from '../utils/吸附计算器';
 import { 加载学习布局模式, 学习布局模式 } from '../model/学习布局存储';
@@ -114,6 +118,8 @@ export struct 学习页 {
   private readonly 卡片渲染服务实例: 卡片渲染服务 = new 卡片渲染服务();
   private readonly 卡片服务实例: 卡片服务 = new 卡片服务();
   private readonly 集合服务实例: 集合服务 = new 集合服务();
+  private readonly studySession: StudySessionController = new StudySessionController(
+    new AnkiStudySessionBackend(this.调度器服务实例, this.卡片渲染服务实例, this.集合服务实例));
   private readonly 笔记服务实例: 笔记服务 = new 笔记服务();
   private readonly 笔记类型服务实例: 笔记类型服务 = new 笔记类型服务();
   private readonly 网页控制器: webview.WebviewController = new webview.WebviewController();
@@ -131,6 +137,13 @@ export struct 学习页 {
   @StorageProp(APP_FOREGROUND_KEY) @Watch('studyActivityChanged') private foreground: boolean = true;
   private 当前卡片: StudyCard | null = null;
   private 已渲染: RenderedCard | null = null;
+  @State private studyOptions: StudyOptions = new StudyOptions();
+  @State private autoAdvanceEnabled: boolean = false;
+  @State private studyTimerText: string = '';
+  private studyTiming: StudyTiming = new StudyTiming();
+  private studyTimerId: number = -1;
+  private studyMenuOpen: boolean = false;
+  private questionHasAudio: boolean = false;
   private 正面HTML: string = '';
   private 背面HTML: string = '';
   private 展示时刻毫秒: number = 0;
@@ -206,6 +219,7 @@ export struct 学习页 {
 
   async aboutToAppear(): Promise<void> {
     this.mounted = true;
+    this.studySession.activate();
     this.牌组ID = this.pageDeckId === '' ? 0 : parseInt(this.pageDeckId);
     this.牌组名 = this.pageDeckName;
     // 注册自定义转场回调：首页 Navigation.customNavContentTransition 通过此 name 查找回调，
@@ -255,6 +269,7 @@ export struct 学习页 {
 
   aboutToDisappear(): void {
     this.mounted = false;
+    this.studySession.dispose();
     this.页面已显示 = false;
     this.invalidateCardWork();
     this.待重渲染当前卡 = false;
@@ -303,6 +318,7 @@ export struct 学习页 {
       return;
     }
     this.studyGuideVisible = true;
+    this.stopStudyTimers();
     this.Ctrl按下 = false;
     const openedAt: number = Date.now();
     const card: StudyCard | null = this.当前卡片;
@@ -311,6 +327,7 @@ export struct 学习页 {
         this.展示时刻毫秒 += Date.now() - openedAt;
       }
       this.studyGuideVisible = false;
+      this.startStudyTimers();
     };
     this.getUIContext().showAlertDialog({
       title: $r('app.string.study_guide_title'),
@@ -393,14 +410,14 @@ export struct 学习页 {
     this.拼写填空 = false;
     this.拼写卡片序号 = 0;
     try {
-      await this.刷新撤销状态();
-      if (!this.isCurrentRequest(version)) { return; }
-      const queued = await this.调度器服务实例.获取队首卡片(this.牌组ID);
-      if (!this.isCurrentRequest(version)) { return; }
-      this.新卡剩余 = queued.newCount;
-      this.学习中剩余 = queued.learningCount;
-      this.复习剩余 = queued.reviewCount;
-      if (queued.cards.length === 0) {
+      const snapshot: StudySnapshot | null = await this.studySession.loadNext(this.牌组ID,
+        (): boolean => this.isCurrentRequest(version));
+      if (snapshot === null || !this.isCurrentRequest(version)) { return; }
+      this.可撤销 = snapshot.canUndo;
+      this.新卡剩余 = snapshot.queue.newCount;
+      this.学习中剩余 = snapshot.queue.learningCount;
+      this.复习剩余 = snapshot.queue.reviewCount;
+      if (snapshot.card === null || snapshot.rendered === null) {
         this.当前卡片 = null;
         this.已渲染 = null;
         this.正面HTML = '';
@@ -410,17 +427,17 @@ export struct 学习页 {
         this.阶段 = 'done';
         this.applyStudyHtml('<!DOCTYPE html><html><body></body></html>');
         await this.加载完成页信息();
+        if (this.isCurrentRequest(version)) this.studySession.markComplete();
         return;
       }
-      const card: StudyCard = queued.cards[0];
-      const rendered: RenderedCard = await this.卡片渲染服务实例.渲染既有卡片(card.cardId);
-      if (!this.isCurrentRequest(version)) { return; }
-      const labels: string[] = await this.调度器服务实例.描述下一档状态(card.states);
-      if (!this.isCurrentRequest(version)) { return; }
+      const card: StudyCard = snapshot.card;
+      const rendered: RenderedCard = snapshot.rendered;
       // 卡片身份、调度状态与渲染结果一起提交，异步期间不暴露半张新卡。
       this.当前卡片 = card;
       this.已渲染 = rendered;
-      this.按钮文案 = labels;
+      this.按钮文案 = snapshot.labels;
+      this.studyOptions = snapshot.options;
+      this.questionHasAudio = false;
       const marker = 提取拼写标记(rendered.answerNodes) ?? 提取拼写标记(rendered.questionNodes);
       if (marker !== null) {
         this.拼写字段名 = marker.fieldName;
@@ -447,6 +464,7 @@ export struct 学习页 {
 
   /** 统一使旧卡面请求失效；不撤回已经提交给 Anki 的写入。 */
   private invalidateCardWork(): void {
+    this.stopStudyTimers();
     this.requestVersion += 1;
     this.flipPending = false;
     this.pendingHtml = '';
@@ -462,6 +480,7 @@ export struct 学习页 {
   private studyActivityChanged(): void {
     if (!this.mounted) { return; }
     if (!this.页面已显示 || !this.foreground) {
+      this.autoAdvanceEnabled = false;
       this.invalidateCardWork();
       this.Ctrl按下 = false;
       this.待重渲染当前卡 = true;
@@ -480,9 +499,15 @@ export struct 学习页 {
     if (!this.controllerReady) { this.pendingHtml = html; return; }
     this.pendingHtml = '';
     this.网页控制器.loadData(html, 'text/html', 'UTF-8', 媒体基地址, ' ');
-    if (this.阶段 === 'question') { this.展示时刻毫秒 = Date.now(); }
+    if (this.阶段 === 'question') {
+      this.展示时刻毫秒 = Date.now();
+      this.studyTiming.showQuestion(this.展示时刻毫秒);
+    } else if (this.阶段 === 'answer') {
+      this.studyTiming.showAnswer(Date.now());
+    }
     this.maybeShowStudyGuide();
     this.playStudyAudio();
+    this.startStudyTimers();
   }
 
   /** 消费晚到的控制器；加载失败保持可见错误，不遗留可评分的空白卡面。 */
@@ -500,15 +525,27 @@ export struct 学习页 {
   }
 
   /** 原生音频失败不阻断评分；重播会重新解析，允许失败后恢复。 */
-  private async playStudyAudio(autoplay: boolean = true): Promise<void> {
+  private async playStudyAudio(autoplay: boolean = true, manual: boolean = false): Promise<void> {
     const rendered: RenderedCard | null = this.已渲染;
     if (!this.isCurrentRequest(this.requestVersion) || !this.controllerReady || rendered === null ||
       this.noteEditorVisible || this.noteEditorBusy || (this.阶段 !== 'question' && this.阶段 !== 'answer')) { return; }
     const version: number = this.requestVersion;
+    const question: boolean = this.阶段 === 'question';
+    const replayQuestion: string = manual && !question && !this.studyOptions.skipQuestionWhenReplayingAnswer ?
+      原始侧HTML(rendered, 'question') : '';
     try {
       const hasAudio: boolean | null = await this.audioSession.play(
-        原始侧HTML(rendered, this.阶段 === 'answer' ? 'answer' : 'question'), this.阶段 === 'question', this.媒体目录, autoplay);
-      if (hasAudio !== null && this.isCurrentRequest(version)) { this.有音频 = hasAudio; }
+        原始侧HTML(rendered, this.阶段 === 'answer' ? 'answer' : 'question'), this.阶段 === 'question', this.媒体目录,
+        autoplay && (manual || this.studyOptions.autoplay), replayQuestion,
+        (available: boolean): void => {
+          if (this.isCurrentRequest(version) && question === (this.阶段 === 'question')) {
+            if (question) this.questionHasAudio = available;
+            this.有音频 = available || (!question && !this.studyOptions.skipQuestionWhenReplayingAnswer && this.questionHasAudio);
+          }
+        });
+      if (hasAudio !== null && this.isCurrentRequest(version) && question === (this.阶段 === 'question')) {
+        this.有音频 = hasAudio || (!question && !this.studyOptions.skipQuestionWhenReplayingAnswer && this.questionHasAudio);
+      }
     } catch (error) {
       if (!this.isCurrentRequest(version)) { return; }
       this.有音频 = true;
@@ -519,16 +556,56 @@ export struct 学习页 {
     }
   }
 
-  /** 刷新撤销可用状态；查询失败不阻断学习流程，仅关闭撤销入口。 */
-  private async 刷新撤销状态(): Promise<void> {
+  /** 页面唯一计时器：隐藏/编辑/引导时暂停，过期回调不能触发新卡评分。 */
+  private startStudyTimers(): void {
+    if (!this.isCurrentRequest(this.requestVersion) || !this.controllerReady || this.studyMenuOpen ||
+      this.noteEditorVisible || this.noteEditorBusy || this.studyGuideVisible || this.手写模式 ||
+      (this.阶段 !== 'question' && this.阶段 !== 'answer')) return;
+    this.studyTiming.resume(Date.now());
+    const seconds: number = this.studyTiming.displaySeconds(Date.now(), this.studyOptions);
+    this.studyTimerText = `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, '0')}`;
+    if (this.studyTimerId >= 0 || (!this.studyOptions.showTimer && !this.autoAdvanceEnabled)) return;
     const version: number = this.requestVersion;
-    try {
-      const status = await this.集合服务实例.获取撤销状态();
-      if (!this.isCurrentRequest(version)) { return; }
-      this.可撤销 = status.undo.length > 0;
-    } catch (error) {
-      if (!this.isCurrentRequest(version)) { return; }
-      this.可撤销 = false;
+    this.studyTimerId = setInterval((): void => {
+      if (!this.isCurrentRequest(version)) return;
+      this.tickStudyTimers();
+    }, 200);
+  }
+
+  private stopStudyTimers(): void {
+    if (this.studyTimerId >= 0) clearInterval(this.studyTimerId);
+    this.studyTimerId = -1;
+    this.studyTiming.pause(Date.now());
+  }
+
+  private toggleAutoAdvance(): void {
+    this.autoAdvanceEnabled = !this.autoAdvanceEnabled;
+    this.studyTiming.restartAdvance(Date.now());
+    this.startStudyTimers();
+  }
+
+  private tickStudyTimers(): void {
+    if (!this.isCurrentRequest(this.requestVersion) || this.studyMenuOpen || this.noteEditorVisible ||
+      this.noteEditorBusy || this.studyGuideVisible || this.手写模式 || (this.阶段 !== 'question' && this.阶段 !== 'answer')) {
+      this.stopStudyTimers();
+      return;
+    }
+    const now: number = Date.now();
+    const seconds: number = this.studyTiming.displaySeconds(now, this.studyOptions);
+    this.studyTimerText = `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, '0')}`;
+    if (!this.autoAdvanceEnabled || this.评分中 || this.flipPending) return;
+    const action: StudyAdvanceAction = this.studyTiming.takeAction(now, this.studyOptions, this.audioSession.isPlaying());
+    switch (action) {
+      case StudyAdvanceAction.ShowAnswer: this.显示答案(); break;
+      case StudyAdvanceAction.Bury: this.埋藏或暂停当前卡(BURY_SUSPEND_MODE_BURY_USER); break;
+      case StudyAdvanceAction.Again: this.评分(0); break;
+      case StudyAdvanceAction.Good: this.评分(2); break;
+      case StudyAdvanceAction.Hard: this.评分(1); break;
+      case StudyAdvanceAction.Reminder:
+        const message: string = this.取文案(this.阶段 === 'question' ?
+          $r('app.string.study_question_time_elapsed') : $r('app.string.study_answer_time_elapsed'));
+        this.getUIContext().getPromptAction().showToast({ message: message });
+        break;
     }
   }
 
@@ -560,7 +637,7 @@ export struct 学习页 {
     this.invalidateCardWork();
     const version: number = this.requestVersion;
     try {
-      await this.集合服务实例.撤销();
+      await this.studySession.undo();
       await this.加载下一张卡();
     } catch (error) {
       if (!this.isCurrentRequest(version)) { return; }
@@ -607,6 +684,9 @@ export struct 学习页 {
     const canManageCard: boolean = !this.评分中 && this.当前卡片 !== null &&
       (this.阶段 === 'question' || this.阶段 === 'answer');
     const 菜单: MenuElement[] = [
+      { value: this.取文案(this.autoAdvanceEnabled ? $r('app.string.study_auto_advance_pause') :
+          $r('app.string.study_auto_advance_start')), action: () => { this.toggleAutoAdvance(); },
+        enabled: canManageCard && (this.studyOptions.secondsToShowQuestion > 0 || this.studyOptions.secondsToShowAnswer > 0) },
       { value: this.取文案($r('app.string.study_edit_note')), action: () => { this.openNoteEditor(); }, enabled: canManageCard },
       { value: this.取文案($r('app.string.study_guide_title')), action: () => { this.showStudyGuide(); }, enabled: this.阶段 !== 'loading' && !this.评分中 },
       { value: this.取文案($r('app.string.study_undo')), action: () => { this.撤销上次(); }, enabled: this.可撤销 },
@@ -633,7 +713,7 @@ export struct 学习页 {
       }
       菜单.push({
         value: this.取文案($r('app.string.study_handwrite')),
-        action: () => { this.手写模式 = true; },
+        action: () => { this.手写模式 = true; this.stopStudyTimers(); },
         enabled: true
       });
     }
@@ -674,6 +754,7 @@ export struct 学习页 {
       if (!this.noteEditorVisible) {
         this.评分中 = false;
         this.消费待重渲染();
+        this.startStudyTimers();
       }
     }
   }
@@ -688,6 +769,7 @@ export struct 学习页 {
     this.Ctrl按下 = false;
     this.消费待重渲染();
     this.playStudyAudio(false);
+    this.startStudyTimers();
   }
 
   /** 保存原笔记并保留撤销记录；从后端重新获取队首、调度状态和题面。 */
@@ -706,7 +788,9 @@ export struct 学习页 {
         fields: fields.slice(),
         tags: tags.slice()
       };
-      await this.笔记服务实例.更新笔记([updated], false);
+      await this.studySession.commitChange(async (): Promise<void> => {
+        await this.笔记服务实例.更新笔记([updated], false);
+      });
       if (!this.mounted) { return true; }
       await this.加载下一张卡();
       if (!this.mounted) { return true; }
@@ -723,6 +807,7 @@ export struct 学习页 {
       this.noteEditorBusy = false;
       this.消费待重渲染();
       if (!this.noteEditorVisible) { this.playStudyAudio(); }
+      this.startStudyTimers();
     }
   }
 
@@ -844,7 +929,10 @@ export struct 学习页 {
     this.invalidateCardWork();
     const version: number = this.requestVersion;
     try {
-      await this.调度器服务实例.埋藏或暂停卡片(this.当前卡片.cardId, mode);
+      const cardId: number = this.当前卡片.cardId;
+      await this.studySession.commitChange(async (): Promise<void> => {
+        await this.调度器服务实例.埋藏或暂停卡片(cardId, mode);
+      });
       await this.加载下一张卡();
     } catch (error) {
       if (!this.isCurrentRequest(version)) { return; }
@@ -889,6 +977,7 @@ export struct 学习页 {
     if (this.阶段 !== 'question' && this.阶段 !== 'answer') {
       return;
     }
+    this.autoAdvanceEnabled = false;
     this.getUIContext().showAlertDialog({
       title: $r('app.string.study_delete_card_confirm_title'),
       message: $r('app.string.study_delete_card_confirm_message'),
@@ -917,7 +1006,10 @@ export struct 学习页 {
     this.invalidateCardWork();
     const version: number = this.requestVersion;
     try {
-      await this.卡片服务实例.删除卡片([this.当前卡片.cardId]);
+      const cardId: number = this.当前卡片.cardId;
+      await this.studySession.commitChange(async (): Promise<void> => {
+        await this.卡片服务实例.删除卡片([cardId]);
+      });
       await this.加载下一张卡();
     } catch (error) {
       if (!this.isCurrentRequest(version)) { return; }
@@ -937,7 +1029,7 @@ export struct 学习页 {
   private async 加载完成页信息(): Promise<void> {
     const version: number = this.requestVersion;
     try {
-      const info = await this.调度器服务实例.获取完成页信息();
+      const info = await this.studySession.congrats();
       if (!this.isCurrentRequest(version)) { return; }
       // 上游 buildNextLearnMsg：下一张学习卡 >=1 天后到期时不再提示
       this.完成页学习剩余 = info.secsUntilNextLearn < SECONDS_PER_DAY ? info.learnRemaining : 0;
@@ -965,7 +1057,9 @@ export struct 学习页 {
     this.invalidateCardWork();
     const version: number = this.requestVersion;
     try {
-      await this.调度器服务实例.按牌组恢复埋藏(this.牌组ID, UNBURY_MODE_ALL);
+      await this.studySession.commitChange(async (): Promise<void> => {
+        await this.调度器服务实例.按牌组恢复埋藏(this.牌组ID, UNBURY_MODE_ALL);
+      });
       await this.加载下一张卡();
     } catch (error) {
       if (!this.isCurrentRequest(version)) { return; }
@@ -1102,19 +1196,11 @@ export struct 学习页 {
     }
     if (!this.isCurrentRequest(this.requestVersion)) { return; }
     this.评分中 = true;
+    playStudyHaptic();
     this.invalidateCardWork();
     const version: number = this.requestVersion;
     try {
-      const states: SchedulingStatesRaw = this.当前卡片.states;
-      const newStates: Uint8Array[] = [states.again, states.hard, states.good, states.easy];
-      await this.调度器服务实例.提交评分({
-        cardId: this.当前卡片.cardId,
-        currentState: states.current,
-        newState: newStates[rating],
-        rating: rating,
-        answeredAtMillis: Date.now(),
-        millisecondsTaken: Math.max(0, Date.now() - this.展示时刻毫秒)
-      });
+      await this.studySession.answer(this.当前卡片, rating, Date.now(), this.展示时刻毫秒);
       await this.加载下一张卡();
     } catch (error) {
       if (!this.isCurrentRequest(version)) { return; }
@@ -1191,6 +1277,8 @@ export struct 学习页 {
   private 返回(): void {
     if (this.noteEditorBusy) { return; }
     if (this.noteEditorVisible) { this.closeNoteEditor(); return; }
+    this.autoAdvanceEnabled = false;
+    this.stopStudyTimers();
     this.pathStack.pop();
   }
 
@@ -1278,7 +1366,7 @@ export struct 学习页 {
     }
     // `R` 重放音频（question/answer 阶段均生效，与 Anki 桌面端一致；无音频时 重播 静默无副作用）
     if (event.keyCode === KeyCode.KEYCODE_R) {
-      this.playStudyAudio();
+      this.playStudyAudio(true, true);
       return true;
     }
     // question 阶段：Space/Enter 显示答案
@@ -1365,7 +1453,10 @@ export struct 学习页 {
           .backgroundColor($r('app.color.surface_card'))
           .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
           .borderRadius(应用尺寸.圆角_胶囊)
-          .bindMenu(this.更多菜单())
+          .bindMenu(this.更多菜单(), {
+            onAppear: (): void => { this.studyMenuOpen = true; this.stopStudyTimers(); },
+            onDisappear: (): void => { this.studyMenuOpen = false; this.startStudyTimers(); }
+          })
       }
       .width('100%')
       .height('100%')
@@ -1453,6 +1544,18 @@ export struct 学习页 {
       // 且会与 Web 的触摸/滚动互相干扰。Web 内判定天然排除 A/INPUT/CANVAS 等交互标签，
       // 顶部条（返回/更多）与答案条/浮动工具栏（埋藏/暂停/评分按钮）在 ArkUI 层，不受影响。
 
+      if (this.studyOptions.showTimer && (this.阶段 === 'question' || this.阶段 === 'answer')) {
+        Text(this.studyTimerText)
+          .fontSize(应用尺寸.字号_正文_小)
+          .fontColor($r('app.color.text_secondary'))
+          .padding(应用尺寸.间距_8)
+          .backgroundColor($r('app.color.surface_card'))
+          .borderRadius(应用尺寸.圆角_胶囊)
+          .align(Alignment.TopEnd)
+          .margin(应用尺寸.间距_12)
+          .hitTestBehavior(HitTestMode.None)
+      }
+
       if (this.有音频 && (this.阶段 === 'question' || this.阶段 === 'answer')) {
         Button() {
           Text() { ThemeTextSpans($r('app.string.study_replay_sound'), this.themeAccentColors, this.getUIContext()) }.fontSize(应用尺寸.字号_按钮).fontColor(this.动作主色)
@@ -1466,7 +1569,7 @@ export struct 学习页 {
           .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
           .borderRadius(应用尺寸.圆角_胶囊)
           .onClick(() => {
-            this.playStudyAudio();
+            this.playStudyAudio(true, true);
           })
       }
 
@@ -1626,13 +1729,11 @@ export struct 学习页 {
         .padding({
           left: 应用尺寸.页面内边距_水平,
           right: 应用尺寸.页面内边距_水平,
-          // 间距用 padding（在背景内），避免透出页面底色形成主题色横带
-          top: 应用尺寸.间距_8
-        })
-        .margin({
+          // 上下留白都在背景内，浮动模式的导航条避让区不能透出主题色横带。
+          top: 应用尺寸.间距_8,
           bottom: this.学习布局模式值 === 'float' ? 应用尺寸.页面内边距_水平 + this.导航条高度 : 0
         })
-        // 与卡片区域/答案条同底色：此行原为透明，会透出整页的 页面底色微染（主题色浅色横带）
+        // 输入框和导航条避让区与卡片区域/答案条同底色。
         .backgroundColor($r('app.color.surface_card'))
       }
     }
@@ -1760,6 +1861,7 @@ export struct 学习页 {
             是否深色: this.是否深色(),
             onClose: (): void => {
               this.手写模式 = false;
+              this.startStudyTimers();
             }
           })
         }

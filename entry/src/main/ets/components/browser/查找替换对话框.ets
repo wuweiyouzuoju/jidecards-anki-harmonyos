@@ -150,9 +150,12 @@ export struct 查找替换对话框 {
 
       // 主面板
       Column({ space: 应用尺寸.间距_14 }) {
-        // 标题行：标题 + Blank + ⓘ 帮助按钮（点击上抛 onHelp，由父组件统一弹 字段帮助面板）
+        // 说明入口紧随标题，复用父组件的字段帮助面板。
         DialogHeader({
           title: $r('app.string.browser_find_title'),
+          showHelp: true,
+          helpEnabled: !this.busy,
+          onHelp: (): void => { this.onHelp(); },
           actionLabel: this.busy
             ? $r('app.string.browser_find_running')
             : $r('app.string.browser_find_execute'),
@@ -166,13 +169,6 @@ export struct 查找替换对话框 {
             this.提交();
           }
         })
-          Text($r('app.string.field_help_button'))
-            .fontSize(应用尺寸.字号_面板标题)
-            .fontColor($r('app.color.text_secondary'))
-            .padding({ left: 应用尺寸.间距_8, right: 应用尺寸.间距_4, top: 应用尺寸.间距_4, bottom: 应用尺寸.间距_4 })
-            .onClick((): void => {
-              this.onHelp();
-            })
 
         // 查找内容
         Column({ space: 应用尺寸.间距_5 }) {

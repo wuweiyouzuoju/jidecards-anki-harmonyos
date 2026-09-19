@@ -89,7 +89,7 @@ test('html builder assembles nodes, css and media base url', () => {
 
   const question = 构建卡片HTML(rendered, 'question');
   assert.match(question, /<!DOCTYPE html>/);
-  assert.match(question, /<style>\.card \{ color: black; \}/);
+  assert.match(question, /<style>[^<]*\.card \{ color: black; \}[^<]*<\/style>/);
   assert.match(question, /猫 <img src="https:\/\/jidecards-media\.local\/neko\.png">/);
   assert.match(question, /<div class="front">/);
 
@@ -239,11 +239,11 @@ test('study page wires the full review loop', () => {
   assert.match(page, /this\.pathStack\.pop\(\)/, 'back goes through NavPathStack pop');
   assert.doesNotMatch(page, /router\.(getParams|pushUrl|back)\b/, 'deprecated router must be gone');
   assert.match(page, /确保已打开\(context\.filesDir\)/);
-  assert.match(page, /调度器服务实例\.获取队首卡片\(this\.牌组ID\)/);
+  assert.match(page, /studySession\.loadNext\(this\.牌组ID,/);
   // 卡片身份、渲染与状态对应关系由 study-lifecycle 的延迟回调测试验证。
-  assert.match(page, /调度器服务实例\.提交评分\(/);
-  assert.match(page, /currentState: states\.current/, 'raw state passthrough on answer');
-  assert.match(page, /queued\.cards\.length === 0[\s\S]*?阶段 = 'done'/, 'empty queue reaches done phase');
+  assert.match(page, /studySession\.answer\(/);
+  assert.match(read('entry/src/main/ets/model/StudySessionController.ts'), /currentState: states\.current/, 'raw state passthrough on answer');
+  assert.match(page, /snapshot\.card === null[\s\S]*?阶段 = 'done'/, 'empty queue reaches done phase');
   assert.match(page, /this\.评分中 = true/, 'rating must be reentrancy-guarded');
 });
 
@@ -338,11 +338,11 @@ test('study page reconciles the current card and queue after an Agent edit', () 
   assert.match(refresh, /wasAnswer && this\.当前卡片\?\.cardId === currentCardId/);
   assert.match(refresh, /await this\.显示答案\(\)/);
   const load = page.match(/private async 加载下一张卡\(\)[\s\S]*?\n  \}/)?.[0] ?? '';
-  assert.match(load, /获取队首卡片/);
-  assert.match(load, /渲染既有卡片/);
-  assert.match(load, /this\.新卡剩余 = queued\.newCount/);
-  assert.match(load, /this\.学习中剩余 = queued\.learningCount/);
-  assert.match(load, /this\.复习剩余 = queued\.reviewCount/);
+  assert.match(load, /studySession\.loadNext/);
+  assert.match(load, /snapshot\.rendered/);
+  assert.match(load, /this\.新卡剩余 = snapshot\.queue\.newCount/);
+  assert.match(load, /this\.学习中剩余 = snapshot\.queue\.learningCount/);
+  assert.match(load, /this\.复习剩余 = snapshot\.queue\.reviewCount/);
 
   assert.doesNotMatch(refresh, /this\.评分\(|埋藏或暂停/,
     'queue reconciliation must not answer, bury, or suspend a card');

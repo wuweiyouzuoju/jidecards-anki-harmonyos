@@ -2,11 +2,51 @@
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { stripTypeScriptTypes } from 'node:module';
 import test from 'node:test';
+import { DEEPSEEK_PROVIDER, OPENAI_PROVIDER, normalizeDeepSeekModel } from '../../entry/src/main/ets/model/agent/ProviderCatalog.ts';
+import { normalizeBatchLimit } from '../../entry/src/main/ets/model/agent/AgentPolicy.ts';
 
 function read(path) {
   return readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 }
+
+test('settings load and save retire old DeepSeek models without altering other provider preferences', async () => {
+  const values = new Map([
+    ['ai_agent_provider', 'custom'],
+    ['ai_agent_custom_base_url', 'https://gateway.example/v1'],
+    ['ai_agent_custom_model', 'custom-model'],
+    ['ai_agent_openai_model', 'gpt-5.6-sol'],
+  ]);
+  const store = {
+    get: async (key, fallback) => values.get(key) ?? fallback,
+    put: async (key, value) => values.set(key, value),
+    flush: async () => {},
+  };
+  const source = stripTypeScriptTypes(read('entry/src/main/ets/backend/agent/AgentSettingsStore.ets')
+    .replace(/^import .*;\r?\n/gm, '').replace(/^export /gm, ''));
+  const settingsApi = new Function('preferences', 'AppStorage', 'DEEPSEEK_PROVIDER', 'OPENAI_PROVIDER',
+    'normalizeDeepSeekModel', 'normalizeBatchLimit', `${source}\nreturn { loadAgentSettings, saveAgentSettings };`)(
+    { getPreferences: async () => store }, { get: () => ({}) }, DEEPSEEK_PROVIDER, OPENAI_PROVIDER,
+    normalizeDeepSeekModel, normalizeBatchLimit);
+  for (const oldModel of ['deepseek-v4-flash', 'deepseek-v4-flash-vision-exp', 'deepseek-chat', '']) {
+    values.set('ai_agent_deepseek_model', oldModel);
+    const loaded = await settingsApi.loadAgentSettings();
+    assert.equal(loaded.deepseekModel, 'deepseek-flash');
+    assert.equal(loaded.selectedProvider, 'custom');
+    assert.equal(loaded.customBaseUrl, 'https://gateway.example/v1');
+    assert.equal(loaded.customModel, 'custom-model');
+    assert.equal(loaded.openaiModel, 'gpt-5.6-sol');
+    loaded.deepseekModel = oldModel;
+    await settingsApi.saveAgentSettings(loaded);
+    assert.equal(values.get('ai_agent_deepseek_model'), 'deepseek-flash');
+  }
+  values.set('ai_agent_deepseek_model', 'deepseek-v4-pro');
+  const pro = await settingsApi.loadAgentSettings();
+  assert.equal(pro.deepseekModel, 'deepseek-v4-pro');
+  await settingsApi.saveAgentSettings(pro);
+  assert.equal(values.get('ai_agent_deepseek_model'), 'deepseek-v4-pro');
+});
 
 test('agent settings remember provider models, custom coordinates, and batch limit', () => {
   const store = read('entry/src/main/ets/backend/agent/AgentSettingsStore.ets');

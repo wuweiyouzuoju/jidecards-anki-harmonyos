@@ -21,7 +21,7 @@ import {
 } from '../../model/同步凭证存储';
 import type { 同步凭证信息 } from '../../model/同步凭证存储';
 import { 分类同步错误 } from '../../model/同步流程';
-import { normalizeSyncServer } from '../../model/SyncSettings';
+import { normalizeSyncServer, syncActivity } from '../../model/SyncSettings';
 import { 设置面板色板, 设置面板色板_取 } from '../../utils/设置面板配色';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 颜色键 } from '../../model/颜色主题';
@@ -148,8 +148,16 @@ export struct 同步分组 {
     this.autoSyncEnabled = loadAutoSyncEnabled();
   }
 
+  /** 后台媒体仍使用当前账户，完成前不接受凭证或服务器变更。 */
+  private syncSettingsBusy(): boolean {
+    if (!syncActivity.isActive()) return false;
+    this.错误文本 = this.取本地化文本($r('app.string.sync_already_running'));
+    return true;
+  }
+
   /** 先校验并保存目标，再允许登录，避免未保存地址和实际登录目标不一致。 */
   private async saveServer(): Promise<void> {
+    if (this.syncSettingsBusy()) return;
     if (this.登录中 || this.settingsSaving || this.当前状态 === '已登录') return;
     this.serverError = '';
     try {
@@ -255,6 +263,7 @@ export struct 同步分组 {
   // 成功后调用 保存同步凭证 持久化凭证（密码绝不落盘）。
   // ========================================================
   private async 点击登录(): Promise<void> {
+    if (this.syncSettingsBusy()) return;
     if (this.登录中 || this.settingsSaving || this.serverInput !== this.savedServer) {
       return;
     }
@@ -294,6 +303,7 @@ export struct 同步分组 {
 
   /** 注销：弹 AlertDialog 二次确认后清空本地凭证与面板状态，回登录表单。 */
   private 点击注销(): void {
+    if (this.syncSettingsBusy()) return;
     this.getUIContext().showAlertDialog({
       title: this.取本地化文本($r('app.string.sync_logout')),
       message: this.取本地化文本($r('app.string.sync_logout_confirm_message')),
@@ -315,6 +325,7 @@ export struct 同步分组 {
 
   /** 真正执行注销：清凭证 + 清状态 + 回 未登录。 */
   private 确认注销(): void {
+    if (this.syncSettingsBusy()) return;
     清除同步凭证();
     this.鉴权凭证 = null;
     this.账号名 = '';
@@ -329,6 +340,7 @@ export struct 同步分组 {
    * 上抛 打开同步弹窗回调 给 Index 挂载 SyncPanel 弹窗。
    */
   private 点击立即同步(): void {
+    if (this.syncSettingsBusy()) return;
     const 信息: 同步凭证信息 | null = 加载同步凭证();
     if (信息 === null) {
       this.错误文本 = this.取本地化文本($r('app.string.sync_error_session_expired'));
