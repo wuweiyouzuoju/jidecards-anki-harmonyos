@@ -41,7 +41,8 @@ function dialogHarness(path, { current = false, choice = 0, save = async () => t
   return { page, state };
 }
 
-for (const path of ['pages/首页.ets', 'pages/设置页.ets']) {
+// 手动/自动同步都由首页根宿主交付集合结果，设置页不再持有同步弹窗。
+for (const path of ['pages/首页.ets']) {
   test(`${path}: no transition, an already re-enabled state and a read failure never show a warning`, async () => {
     for (const [transition, current] of [[false, false], [true, true], [true, null]]) {
       const { page, state } = dialogHarness(path, { current });

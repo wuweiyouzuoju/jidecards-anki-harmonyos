@@ -35,17 +35,36 @@ export class SyncActivity {
   private backgroundHandler: (() => void) | null = null;
   private collectionBusy: boolean = false;
   private collectionWaiters: Array<() => void> = [];
+  private studyYieldHandler: (() => boolean) | null = null;
+  private studyPriorityRequested: boolean = false;
 
   /** 在自动面板挂载前预留集合，封住“点击恢复学习”与组件创建之间的窗口。 */
-  reserveCollection(): void { this.collectionBusy = true; }
+  reserveCollection(): void {
+    this.studyPriorityRequested = false;
+    this.collectionBusy = true;
+  }
+
+  /** 学习优先于增量同步；预留到组件挂载之间的请求也必须保留。 */
+  requestStudyPriority(): boolean {
+    if (!this.collectionBusy) return false;
+    this.studyPriorityRequested = true;
+    return this.studyYieldHandler === null || this.studyYieldHandler();
+  }
+
+  setStudyYieldHandler(owner: Object, handler: () => boolean): void {
+    if (this.owner !== owner) return;
+    this.studyYieldHandler = handler;
+    if (this.studyPriorityRequested) handler();
+  }
 
   cancelReservation(): void {
     if (this.owner !== null) return;
     this.collectionBusy = false;
+    this.studyPriorityRequested = false;
     this.resolveCollectionWaiters();
   }
 
-  /** 学习恢复只等待集合，媒体传输仍可继续。冲突未决时继续等待。 */
+  /** 学习恢复等待集合安全释放；媒体传输与尚未选择覆盖方向的冲突不占集合。 */
   async waitForCollection(): Promise<void> {
     while (this.collectionBusy) {
       await new Promise<void>((resolve: () => void): void => { this.collectionWaiters.push(resolve); });
@@ -84,6 +103,8 @@ export class SyncActivity {
     this.setCollectionBusy(owner, false);
     this.owner = null;
     this.backgroundHandler = null;
+    this.studyYieldHandler = null;
+    this.studyPriorityRequested = false;
     this.lastFinishedAt = now;
   }
 

@@ -7,7 +7,6 @@ import { promptAction } from '@kit.ArkUI';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { 设置面板 } from '../components/设置面板';
 import { 许可证面板 } from '../components/许可证面板';
-import { 同步面板 } from '../components/同步面板';
 import { 数据迁移协调器 } from '../components/home/数据迁移协调器';
 import { 数据迁移意图, 数据迁移模式, 导出牌组选项 } from '../components/数据迁移面板';
 import type { SyncAuth } from '../proto/messages/SyncMessages';
@@ -21,7 +20,7 @@ import { 加载颜色主题, 保存颜色主题 } from '../model/颜色主题存
 import { 应用颜色主题 } from '../utils/颜色主题管理器';
 import { 应用主题 } from '../utils/主题控制器';
 import { 加载已隐藏牌组ID列表, 取消隐藏全部牌组 } from '../model/隐藏牌组存储';
-import { 加载FSRS开启状态, 设置FSRS开启状态, 刷新桌面卡片数据 } from '../model/FSRS控制器';
+import { 刷新桌面卡片数据 } from '../model/FSRS控制器';
 import { 选取数据文件 } from '../utils/文件导入助手';
 import { 平铺牌组树 } from '../model/牌组层级';
 import { 牌组汇总 } from '../model/主页模型';
@@ -40,6 +39,7 @@ export struct 设置页 {
   @State private activeSection: string = '';
   pathStack?: NavPathStack;
   openAiSettings: boolean = false;
+  onManualSync: () => void = (): void => {};
   private readonly 牌组服务实例: 牌组服务 = new 牌组服务();
 
   @StorageLink('systemDarkMode') private 系统暗黑模式: boolean = false;
@@ -49,9 +49,6 @@ export struct 设置页 {
 
   // 弹层状态
   @State private 显示许可证: boolean = false;
-  @State private 显示同步面板: boolean = false;
-  @State private 同步面板认证: SyncAuth | null = null;
-  @State private 同步面板账号名: string = '';
 
   // 数据迁移状态
   @State private 显示数据迁移: boolean = false;
@@ -312,47 +309,7 @@ export struct 设置页 {
     });
   }
 
-  private fsrsPromptActive: boolean = false;
-
-  private async 同步后检查FSRS(fsrsDisabledBySync: boolean): Promise<void> {
-    if (!fsrsDisabledBySync || this.fsrsPromptActive) return;
-    this.fsrsPromptActive = true;
-    try {
-      const fsrsEnabled: boolean | null = await 加载FSRS开启状态();
-      if (fsrsEnabled === false) {
-        const result: promptAction.ShowDialogSuccessResponse = await this.getUIContext().getPromptAction().showDialog({
-          title: this.getUIContext().getHostContext()!.resourceManager.getStringSync($r('app.string.sync_fsrs_disabled_title').id),
-          message: this.getUIContext().getHostContext()!.resourceManager.getStringSync($r('app.string.sync_fsrs_disabled_message').id),
-          buttons: [
-            {
-              text: this.getUIContext().getHostContext()!.resourceManager.getStringSync($r('app.string.sync_fsrs_disabled_reenable').id),
-              color: '#2F5FD0'
-            },
-            {
-              text: this.getUIContext().getHostContext()!.resourceManager.getStringSync($r('app.string.sync_fsrs_disabled_keep').id),
-              color: '#666666'
-            }
-          ]
-        });
-        if (result.index === 0) {
-          try {
-            await 设置FSRS开启状态(true);
-          } catch (error) {
-            this.getUIContext().getPromptAction().showToast({
-              message: this.getUIContext().getHostContext()!.resourceManager.getStringSync($r('app.string.sync_fsrs_reenable_error').id)
-            });
-          }
-        }
-      }
-    } catch (error) {
-      // 拉取 FSRS 状态失败或弹窗失败都不阻断，静默降级
-    } finally {
-      this.fsrsPromptActive = false;
-    }
-  }
-
   private 返回(): void {
-    if (this.显示同步面板) return;
     if (this.pathStack !== undefined && this.pathStack.size() > 0) {
       this.pathStack.pop();
     }
@@ -392,9 +349,7 @@ export struct 设置页 {
             this.打开数据迁移('exportPersonalData', 0, false);
           },
           打开同步弹窗回调: (auth: SyncAuth, accountName: string): void => {
-            this.同步面板认证 = auth;
-            this.同步面板账号名 = accountName;
-            this.显示同步面板 = true;
+            this.onManualSync();
           },
           关闭回调: (): void => {
             this.返回();
@@ -406,24 +361,6 @@ export struct 设置页 {
             isDark: this.是否深色(),
             onClose: (): void => {
               this.显示许可证 = false;
-            }
-          })
-        }
-
-        if (this.显示同步面板) {
-          同步面板({
-            是否深色: this.是否深色(),
-            账号名: this.同步面板账号名,
-            初始鉴权: this.同步面板认证,
-            同步完成回调: (fsrsDisabledBySync: boolean): void => {
-              // 通知首页刷新数据
-              AppStorage.setOrCreate<number>('需要刷新主页', Date.now());
-              this.同步后检查FSRS(fsrsDisabledBySync);
-            },
-            关闭回调: (): void => {
-              this.显示同步面板 = false;
-              this.同步面板认证 = null;
-              this.同步面板账号名 = '';
             }
           })
         }
@@ -457,7 +394,6 @@ export struct 设置页 {
     .hideTitleBar(true)
     .backgroundColor(Color.Transparent)
     .onBackPressed((): boolean => {
-      if (this.显示同步面板) return true;
       if (this.activeSection !== '') { this.activeSection = ''; return true; }
       return false;
     })

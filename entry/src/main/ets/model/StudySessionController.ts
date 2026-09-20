@@ -46,6 +46,7 @@ export class StudySessionController {
     if (this.disposed) return;
     this.complete = false;
     this.scheduler.setStudyActive(this, true);
+    this.activity.requestStudyPriority();
   }
 
   markComplete(): void {

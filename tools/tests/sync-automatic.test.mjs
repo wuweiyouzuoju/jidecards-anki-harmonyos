@@ -11,14 +11,14 @@ import * as flow from '../../entry/src/main/ets/model/同步流程.ts';
 
 const read = path => readFileSync(new URL('../../entry/src/main/ets/' + path, import.meta.url), 'utf8');
 
-test('automatic execution is wired to startup/foreground/home return and manual panels retain navigation guards', () => {
+test('automatic lifecycle and manual settings requests share the root task host', () => {
   const home = read('pages/首页.ets'), settings = read('pages/设置页.ets');
   assert.match(home, /aboutToAppear\(\): void \{[\s\S]*?this\.requestAutoSync\(\)/);
   assert.match(home, /@StorageProp\(APP_FOREGROUND_KEY\) @Watch\('syncForegroundChanged'\)/);
   assert.match(home, /private 返回主页后刷新\(\)[\s\S]*?this\.requestAutoSync\(\)/);
-  assert.match(home, /同步面板\(\{[\s\S]*?automatic: true/);
-  assert.match(settings, /\.onBackPressed\(\(\): boolean => \{\s*if \(this\.显示同步面板\) return true;/);
-  assert.match(settings, /private 返回\(\): void \{\s*if \(this\.显示同步面板\) return;/);
+  assert.match(home, /同步面板\(\{[\s\S]*?automatic: this.syncAutomatic/);
+  assert.doesNotMatch(settings, /显示同步面板|同步面板\(\{/);
+  assert.match(settings, /this\.onManualSync\(\)/);
 });
 
 // 执行真实组件方法，用可控时钟/后端代替 HarmonyOS；不复制同步实现。
@@ -36,7 +36,7 @@ function componentMethods(source, names, dependencies) {
 function homeHarness() {
   const state = { enabled: true, ready: true, auth: { hkey: 'test-key', endpoint: 'http://lan:8080/', username: 'u' }, timers: new Map(), seq: 0, navigation: [], toasts: 0 };
   const gate = new SyncActivity();
-  const Page = componentMethods(read('pages/首页.ets'), ['homeActivity', 'requestAutoSync', 'scheduleAutoSyncCheck', 'isAutoSyncLocationSafe', 'stopAutoSyncTimer', 'tryAutoSync', 'syncForegroundChanged', 'onPageHide', 'onBackPress', 'deferForSync', 'flushSyncAction', 'autoSyncCollectionFinished', 'autoSyncStateChanged', '选择牌组', '开始学习', 'openCreateDeck', 'openSettings', 'openReminders'], {
+  const Page = componentMethods(read('pages/首页.ets'), ['homeActivity', 'requestAutoSync', 'scheduleAutoSyncCheck', 'isAutoSyncLocationSafe', 'stopAutoSyncTimer', 'tryAutoSync', 'syncForegroundChanged', 'onPageHide', 'onBackPress', 'deferForSync', 'flushSyncAction', 'autoSyncCollectionFinished', 'autoSyncStateChanged', '选择牌组', '开始学习', 'openCreateDeck', 'openSettings', 'openReminders', 'syncYielded', 'presentPendingSyncWarning'], {
     canStartHomeAutoSync,
     AppStorage: { get() {}, setOrCreate() {} },
     loadAutoSyncEnabled: () => state.enabled, 加载同步凭证: () => state.auth,
@@ -48,7 +48,7 @@ function homeHarness() {
   const page = new Page();
   Object.assign(page, { announcementController: new HomeAnnouncementController(), homeActivityChanged() {}, syncForeground: true, autoSyncStartupReady: true, syncScheduler: new AutoSyncScheduler(), autoSyncTimer: -1,
     页面栈: { size: () => 0, pushPath: path => state.navigation.push(path) }, 加载状态: 'ready', 显示同步面板: false,
-    autoSyncCollectionBusy: false, autoSyncRefreshing: false, autoSyncModal: false, pendingSyncAction: null,
+    autoSyncCollectionBusy: false, autoSyncRefreshing: false, autoSyncModal: false, pendingSyncAction: null, pendingSyncFsrsWarning: false,
     显示提示: () => { state.toasts++; }, 已选中牌组: () => true, 选中牌组: () => ({ id: 'deck', name: 'deck' }), 展开牌组路径() {}, 当前断点: 'xs',
     加载主页数据: async () => {}, 同步后检查FSRS: async () => {}, 暂停主页官方公告检查() {} });
   page.syncScheduler.setListener(() => page.scheduleAutoSyncCheck());
@@ -178,13 +178,13 @@ async function settle() { for (let i = 0; i < 8; i++) await new Promise(resolve 
 
 function panelHarness({ required = 1, media = false, automatic = true, fsrsBefore = true, fsrsAfter = true } = {}) {
   const state = { closed: 0, refreshed: 0, media, pending: false, cleared: false, endpoint: '', calls: [], timers: new Map(),
-    fsrsValues: [fsrsBefore, fsrsAfter], fsrsReads: 0, fsrsNotifications: 0, fsrsResults: [], states: [], delays: [], cancellations: [],
+    fsrsValues: required >= 2 ? [fsrsBefore, fsrsBefore, fsrsAfter] : [fsrsBefore, fsrsAfter], fsrsReads: 0, fsrsNotifications: 0, fsrsResults: [], states: [], delays: [], cancellations: [],
     response: { required, newEndpoint: '', hostNumber: 0, serverMediaUsn: 3, serverMessage: '' } };
   class BackendError extends Error {}
   const gate = new SyncActivity();
   const Panel = componentMethods(read('components/同步面板.ets'), ['aboutToAppear', 'aboutToDisappear', '启动同步',
-    'notifySyncResult', 'notifyCollectionResult', 'captureFsrsAfterSync', '处理同步错误', '完成中止', '冲突确认', '启动媒体阶段', '开始媒体轮询', '清理轮询定时器', '是否允许关闭', 'publishSyncState', 'setSyncPhase', 'dismissPresentation', 'syncForegroundChanged', 'requestBackgroundTime', 'releaseSuspendDelay'], {
-    ...flow, syncActivity: gate, 后端错误: BackendError,
+    'notifySyncResult', 'notifyCollectionResult', 'captureFsrsAfterSync', '处理同步错误', '完成中止', '冲突确认', '启动媒体阶段', '开始媒体轮询', '清理轮询定时器', '是否允许关闭', 'publishSyncState', 'setSyncPhase', 'dismissPresentation', 'syncForegroundChanged', 'requestBackgroundTime', 'releaseSuspendDelay', 'publishStatus', 'showDetails', 'requestStudyYield', 'sendAbort', 'stopAbortTimer', 'syncCollectionWithPriority'], {
+    ...flow, syncActivity: gate, autoSyncScheduler: new AutoSyncScheduler(), 后端错误: BackendError,
     加载FSRS开启状态: async () => state.fsrsValues[state.fsrsReads++],
     notifyFsrsStateChanged: () => { state.fsrsNotifications++; },
     加载媒体同步开关: () => state.media, 加载媒体待同步: () => state.pending,
@@ -192,17 +192,19 @@ function panelHarness({ required = 1, media = false, automatic = true, fsrsBefor
     清除同步凭证: () => { state.cleared = true; },
     backgroundTaskManager: { requestSuspendDelay: (_reason, expire) => { state.delays.push(expire); return { requestId: state.delays.length }; }, cancelSuspendDelay: id => { state.cancellations.push(id); } },
     hilog: { info() {}, error() {}, warn() {} }, 同步日志域: 0, 同步日志标签: 'test', $r: key => key,
-    setInterval: fn => { state.timers.set(1, fn); return 1; }, clearInterval: id => state.timers.delete(id)
+    setInterval: (fn, delay) => { const id = delay === 50 ? 2 : 1; state.timers.set(id, fn); return id; }, clearInterval: id => state.timers.delete(id),
+    setTimeout: fn => { state.timers.set(3, fn); return 3; }, clearTimeout: id => state.timers.delete(id)
   });
   const panel = new Panel();
   const auth = { hkey: 'test-key', endpoint: 'https://custom.example/anki/', ioTimeoutSecs: 0 };
-  Object.assign(panel, { syncOwner: {}, automatic, 初始鉴权: auth, 当前阶段: 'syncing', 错误文案: '', 是否请求中止: false,
+  Object.assign(panel, { syncOwner: {}, automatic, yieldingForStudy: false, fullSyncInFlight: false, abortTimer: -1, abortCall: null, successTimer: -1, collectionCallInFlight: false, 初始鉴权: auth, 当前阶段: 'syncing', 错误文案: '', 是否请求中止: false,
     轮询定时器: -1, 集合已同步: false, 是否在媒体阶段: false, detailsVisible: false, suspendDelayId: -1, syncForeground: true,
     状态变化回调: (busy, modal) => { state.states.push({ busy, modal }); },
+    statusChanged: text => { state.status = text; }, onYield: automatic => { state.yielded = automatic ? 'auto' : 'manual'; },
     取本地化文案: key => key, 关闭回调: () => { state.closed++; },
     同步完成回调: value => { state.refreshed++; state.fsrsResults.push(value); },
     同步服务实例: {
-      中止媒体同步: async () => {},
+      中止同步: async () => {}, 中止媒体同步: async () => {},
       同步状态检查: async a => { state.calls.push(['status', a]); return { required: required === 0 ? 0 : 1, newEndpoint: '' }; },
       同步集合: async (a, m) => { state.calls.push(['collection', a, m]); return state.response; },
       全量上传或下载: async (a, upload, usn) => { state.calls.push(['full', a, upload, usn]); },
@@ -238,7 +240,7 @@ test('FSRS warning describes only a confirmed on-to-off transition for normal an
           assert.deepEqual(state.fsrsResults, []);
           panel.冲突确认(required === 4); await settle();
         }
-        assert.equal(state.fsrsReads, 2);
+        assert.equal(state.fsrsReads, required >= 2 ? 3 : 2);
         assert.equal(state.fsrsNotifications, 1);
         assert.deepEqual(state.fsrsResults, [before === true && after === false]);
         panel.notifyCollectionResult();
@@ -285,7 +287,7 @@ test('full-sync conflicts never pick a direction automatically, allow postponing
     assert.equal(panel.当前阶段, 'conflict');
     assert.equal(state.closed, 0);
     assert.equal(state.calls.some(call => call[0] === 'full'), false);
-    assert.equal(panel.是否允许关闭(), true);
+    assert.equal(panel.是否允许关闭(), false, 'conflict details hide without destroying the pending decision');
     panel.冲突确认(required !== 3); await settle();
     const full = state.calls.find(call => call[0] === 'full');
     assert.equal(full[2], required !== 3);
@@ -474,9 +476,9 @@ test('full conflicts block queued actions until dismissed and never silently ove
   assert.equal(state.navigation.length, 1);
   const { panel, state: sync } = panelHarness({ required: 2 });
   panel.aboutToAppear(); await settle();
-  assert.deepEqual(sync.states.at(-1), { busy: false, modal: true });
+  assert.deepEqual(sync.states.at(-1), { busy: false, modal: false });
   panel.dismissPresentation();
-  assert.equal(sync.closed, 1);
+  assert.equal(sync.closed, 0);
   assert.equal(sync.calls.some(call => call[0] === 'full'), false);
 });
 
@@ -524,9 +526,9 @@ test('automatic sync stays invisible during transfer and preserves error/conflic
   const home = read('pages/首页.ets'), panel = read('components/同步面板.ets');
   assert.ok(home.indexOf('同步面板({') > home.indexOf('.navDestination(this.页面映射)'));
   assert.match(panel, /HitTestMode.Transparent : HitTestMode.Default/);
-  assert.doesNotMatch(panel, /statusVisible|sync_background_collection|sync_background_media/);
-  assert.match(panel, /else if \(this\.错误文案 !== ''\) \{\s*this\.syncErrorStatus\(\)/);
-  assert.match(panel, /if \(!this.automatic \|\| this.detailsVisible \|\| this.当前阶段 === 'conflict'\)/);
+  assert.match(home, /Text\(this.syncStatusText\)/);
+  assert.match(panel, /this\.statusChanged\(text\)/);
+  assert.match(panel, /if \(this.detailsVisible\)/);
 });
 
 
@@ -539,4 +541,146 @@ test('selecting another deck remains available during collection sync and cancel
   assert.equal(page.pendingSyncAction, null);
   page.autoSyncStateChanged(false, false);
   assert.equal(state.navigation.length, 0, 'selecting a deck does not automatically study it');
+});
+
+test('study preempts slow sync, repeats an early abort, and waits for rollback before releasing readers', async () => {
+  for (const automatic of [true, false]) {
+    const { panel, state, gate } = panelHarness({ automatic });
+    let rejectCollection, aborts = 0, readerReleased = false;
+    panel.同步服务实例.同步集合 = () => new Promise((_resolve, reject) => { rejectCollection = reject; });
+    panel.同步服务实例.中止同步 = async () => { aborts++; };
+    panel.aboutToAppear(); await settle();
+    gate.waitForCollection().then(() => { readerReleased = true; });
+    assert.equal(gate.requestStudyPriority(), true);
+    await settle();
+    assert.equal(aborts, 1);
+    assert.equal(readerReleased, false, 'an abort acknowledgement is not a completed rollback');
+    state.timers.get(2)(); await settle();
+    assert.equal(aborts, 2, 'retry reaches a handle registered after the first signal');
+    rejectCollection(new Error('interrupted')); await settle();
+    assert.equal(readerReleased, true);
+    assert.equal(state.yielded, automatic ? 'auto' : 'manual');
+    assert.equal(state.closed, 1);
+    assert.equal(panel.错误文案, '');
+    assert.equal(state.timers.has(2), false, 'no stale abort can reach the next sync');
+    assert.equal(gate.isActive(), false);
+  }
+});
+
+test('study requested before task mount prevents collection network work', async () => {
+  const { panel, state, gate } = panelHarness();
+  gate.reserveCollection();
+  assert.equal(gate.requestStudyPriority(), true);
+  panel.aboutToAppear(); await settle();
+  assert.equal(state.calls.length, 0);
+  assert.equal(state.yielded, 'auto');
+  assert.equal(state.closed, 1);
+  assert.equal(gate.isActive(), false);
+});
+
+test('a committed collection wins the cancellation race and keeps its media task', async () => {
+  const { panel, state, gate } = panelHarness({ media: true });
+  let finish;
+  panel.同步服务实例.同步集合 = () => new Promise(resolve => { finish = resolve; });
+  panel.aboutToAppear(); await settle();
+  gate.requestStudyPriority();
+  finish(state.response); await settle();
+  assert.equal(state.refreshed, 1);
+  assert.equal(state.yielded, undefined);
+  assert.equal(panel.是否在媒体阶段, true);
+  assert.equal(state.timers.has(2), false);
+  assert.equal(gate.isActive(), true);
+  assert.equal(gate.requestStudyPriority(), false, 'media does not own the collection');
+});
+
+test('manual sync is nonmodal and its queued intent survives an automatic opt-out', async () => {
+  const { panel, state } = panelHarness({ automatic: false, media: true });
+  panel.aboutToAppear(); await settle();
+  assert.equal(state.states.at(-1).modal, false);
+  assert.equal(state.status, 'app.string.sync_syncing_media');
+  panel.showDetails(); panel.dismissPresentation();
+  assert.equal(state.closed, 0);
+  assert.equal(state.timers.has(1), true);
+  const home = homeHarness();
+  home.state.enabled = false;
+  home.page.syncYielded(false);
+  home.tick();
+  assert.equal(home.page.显示同步面板, true);
+  assert.equal(home.page.syncAutomatic, false);
+});
+
+test('home study clicks request priority without the wait-for-network toast', () => {
+  const { page, state, gate } = homeHarness();
+  const owner = {};
+  gate.acquire(owner);
+  let requested = 0;
+  gate.setStudyYieldHandler(owner, () => { requested++; return true; });
+  page.autoSyncStateChanged(true, false);
+  page.开始学习();
+  assert.equal(requested, 1);
+  assert.equal(state.toasts, 0);
+  assert.equal(state.navigation.length, 0);
+  gate.release(owner, Date.now());
+  page.autoSyncStateChanged(false, false);
+  assert.equal(state.navigation[0].name, 'StudyPage');
+});
+
+test('conflicts release the collection and recheck direction before replacing anything', async () => {
+  const { panel, state, gate } = panelHarness({ required: 2 });
+  panel.aboutToAppear(); await settle();
+  await gate.waitForCollection();
+  assert.equal(state.states.at(-1).modal, false);
+  assert.equal(state.status, 'app.string.sync_needs_attention');
+  state.response.required = 3; // cloud now requires download; the earlier upload choice is stale
+  await panel.冲突确认(true);
+  assert.equal(state.calls.filter(call => call[0] === 'collection').length, 2);
+  assert.equal(state.calls.some(call => call[0] === 'full'), false);
+  assert.equal(panel.当前阶段, 'conflict');
+  assert.equal(panel.当前冲突类型, 'fullDownload');
+});
+
+test('conflict recheck redirects are used by both full replacement and subsequent media', async () => {
+  const { panel, state } = panelHarness({ required: 2, media: true });
+  panel.aboutToAppear(); await settle();
+  state.response.newEndpoint = 'https://redirect.example/new/';
+  state.response.serverMediaUsn = 41;
+  await panel.冲突确认(true);
+  const full = state.calls.find(call => call[0] === 'full');
+  const media = state.calls.find(call => call[0] === 'media');
+  assert.equal(full[1].endpoint, state.response.newEndpoint);
+  assert.equal(full[3], 41);
+  assert.equal(media[1].endpoint, state.response.newEndpoint);
+});
+
+test('explicit full replacement can hide details but study never interrupts its database swap', async () => {
+  const { panel, state, gate } = panelHarness({ required: 2 });
+  let finish, aborts = 0;
+  panel.同步服务实例.中止同步 = async () => { aborts++; };
+  panel.同步服务实例.全量上传或下载 = () => new Promise(resolve => { finish = resolve; });
+  panel.aboutToAppear(); await settle();
+  const full = panel.冲突确认(true); await settle();
+  assert.equal(gate.requestStudyPriority(), false);
+  panel.dismissPresentation();
+  assert.equal(state.states.at(-1).modal, false);
+  assert.equal(state.states.at(-1).busy, true);
+  assert.equal(aborts, 0);
+  finish(); await full;
+  assert.equal(gate.isActive(), false);
+});
+
+test('a sync setting warning waits until study has ended instead of interrupting entry', async () => {
+  const { page, state } = homeHarness();
+  let depth = 0, warnings = 0;
+  page.页面栈 = { size: () => depth, pushPath: path => { depth++; state.navigation.push(path); } };
+  page.同步后检查FSRS = async () => { warnings++; };
+  page.autoSyncStateChanged(true, false);
+  page.开始学习();
+  await page.autoSyncCollectionFinished(true);
+  assert.equal(state.navigation[0].name, 'StudyPage');
+  assert.equal(warnings, 0);
+  assert.equal(page.pendingSyncFsrsWarning, true);
+  depth = 0;
+  await page.presentPendingSyncWarning();
+  assert.equal(warnings, 1);
+  assert.equal(page.pendingSyncFsrsWarning, false);
 });

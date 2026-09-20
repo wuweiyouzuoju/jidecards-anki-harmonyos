@@ -29,6 +29,7 @@ import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时
 import { 颜色键 } from '../model/颜色主题';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { syncActivity } from '../model/SyncSettings';
+import { autoSyncScheduler } from '../model/AutoSyncScheduler';
 import { 加载FSRS开启状态, notifyFsrsStateChanged } from '../model/FSRS控制器';
 import { APP_FOREGROUND_KEY } from '../model/Redemption';
 import { backgroundTaskManager } from '@kit.BackgroundTasksKit';
@@ -45,14 +46,13 @@ type 冲突类型 = 'fullSync' | 'fullDownload' | 'fullUpload';
 // @名称 同步面板组件声明与状态字段
 //
 // @作用
-// AnkiWeb 云同步独立弹窗（B14 2026-07-22）。
-// 从 SyncGroup 抽出来的同步流程：登录/注销留在 SyncGroup，点「立即同步」后由 Index
-// 挂载本弹窗。弹窗生命周期内完整跑 SyncCollection → 媒体阶段，关闭守卫
-// 确保 syncing/conflict/abortRequested 期间不可关闭——避免定时器泄漏、错误被吞、冲突中断。
+// 根宿主持有手动与自动共用的 SyncCollection → 媒体执行链。
+// 登录/注销仍在设置分组；详情随时可收起，任务不随页面返回销毁。
+// 首页接收状态文案；自动同步正常传输不显示状态，失败/冲突保留处理入口。
 //
 // 状态机：
-// - syncing：同步进行中（含 SyncStatus/SyncCollection/mediaSync pending 与媒体轮询中）
-// - conflict：服务端要求全量同步，等用户选方向（内联 UI，不再用 CustomDialog）
+// - syncing：同步进行中（含 SyncCollection/mediaSync pending 与媒体轮询中）
+// - conflict：服务端要求全量同步，释放集合供学习，确认方向前重新检查云端
 // - done：同步完成 / 已是最新 / 已中止 / 错误，允许关闭
 //
 // auth 流转：initialAuth 由 Index 透传；内部若服务端下发新端点，写回 preferences
@@ -66,7 +66,7 @@ type 冲突类型 = 'fullSync' | 'fullDownload' | 'fullUpload';
 // 一个全屏 Stack 弹窗：磨砂遮罩 + 居中浮卡（按阶段切换 syncing/conflict/done 内容）。
 //
 // @业务规则
-// 关闭守卫：仅 done 阶段且未在中止等待中可关闭。
+// 任务仅在终态销毁；收起详情不释放租约，学习让路必须等待原调用回滚或提交。
 // 颜色主题通过 @StorageProp 触发重 build，让 设置面板色板_取(isDark).主色 即时变化。
 //
 // @副作用
@@ -81,14 +81,17 @@ export struct 同步面板 {
   @Prop 账号名: string = '';
   @Prop automatic: boolean = false;
   @Prop @Watch('dismissPresentation') backRequest: number = 0;
+  @Prop @Watch('showDetails') detailsRequest: number = 0;
   @StorageProp(APP_FOREGROUND_KEY) @Watch('syncForegroundChanged') private syncForeground: boolean = true;
-  @StorageProp('状态栏高度') private statusBarHeight: number = 0;
   @State private detailsVisible: boolean = false;
   状态变化回调: (collectionBusy: boolean, modal: boolean) => void = (_busy: boolean, _modal: boolean): void => {};
   // 初始鉴权 由 Index 在挂载本组件时传入（来自 SyncGroup 上抛）
   初始鉴权: SyncAuth | null = null;
   同步完成回调: (fsrsDisabledBySync: boolean) => void = (_fsrsDisabledBySync: boolean): void => {};
   关闭回调: () => void = (): void => {};
+  statusChanged: (text: string) => void = (_text: string): void => {};
+  onYield: (automatic: boolean) => void = (_automatic: boolean): void => {};
+  onRetry: () => void = (): void => {};
 
   // @StorageProp 触发颜色主题切换时重 build，让 设置面板色板_取(isDark).主色 即时变化
   @StorageProp(颜色键.动作主色) private 动作主色: string = '#2F5FD0';
@@ -120,6 +123,12 @@ export struct 同步面板 {
   private fsrsDisabledBySync: boolean = false;
   private collectionResultNotified: boolean = false;
   private suspendDelayId: number = -1;
+  private yieldingForStudy: boolean = false;
+  private fullSyncInFlight: boolean = false;
+  private collectionCallInFlight: boolean = false;
+  private abortTimer: number = -1;
+  private abortCall: Promise<void> | null = null;
+  private successTimer: number = -1;
 
   aboutToAppear(): void {
     this.disposed = false;
@@ -131,12 +140,15 @@ export struct 同步面板 {
     }
     this.publishSyncState();
     this.鉴权 = this.初始鉴权;
+    syncActivity.setStudyYieldHandler(this.syncOwner, (): boolean => this.requestStudyYield());
     this.启动同步();
   }
 
   aboutToDisappear(): void {
     this.disposed = true;
     this.releaseSuspendDelay();
+    this.stopAbortTimer();
+    if (this.successTimer >= 0) clearTimeout(this.successTimer);
     this.清理轮询定时器();
     syncActivity.release(this.syncOwner, Date.now());
   }
@@ -144,9 +156,69 @@ export struct 同步面板 {
   /** 任务生命周期独立于详情显隐；集合阶段只保护数据库入口，不覆盖首页。 */
   private publishSyncState(): void {
     if (this.disposed) return;
-    syncActivity.setCollectionBusy(this.syncOwner, this.当前阶段 !== 'done' && !this.是否在媒体阶段);
+    syncActivity.setCollectionBusy(this.syncOwner, this.当前阶段 === 'syncing' && !this.是否在媒体阶段);
     this.状态变化回调(this.当前阶段 === 'syncing' && !this.是否在媒体阶段,
-      !this.automatic || this.detailsVisible || this.当前阶段 === 'conflict');
+      this.detailsVisible);
+    this.publishStatus();
+  }
+
+  /** 首页内联状态；自动传输保持静默，冲突只提示而不抢占学习。 */
+  private publishStatus(): void {
+    let text: string = '';
+    if (this.错误文案 !== '') text = this.取本地化文案($r('app.string.sync_background_error'));
+    else if (this.当前阶段 === 'conflict') text = this.取本地化文案($r('app.string.sync_needs_attention'));
+    else if (!this.automatic || this.fullSyncInFlight) {
+      text = this.yieldingForStudy ? this.取本地化文案($r('app.string.sync_yielding')) :
+        this.当前阶段 === 'done' ? this.状态文案 : this.是否在媒体阶段 ?
+          this.媒体进度文案 || this.取本地化文案($r('app.string.sync_syncing_media')) :
+          this.取本地化文案($r('app.string.sync_syncing'));
+    }
+    this.statusChanged(text);
+  }
+
+  private showDetails(): void {
+    this.detailsVisible = true;
+    this.publishSyncState();
+  }
+
+  /** 全量替换只能由用户明确发起，学习不自动打断已确认的替换。 */
+  private requestStudyYield(): boolean {
+    if (this.fullSyncInFlight) return false;
+    if (this.当前阶段 !== 'syncing' || this.是否在媒体阶段 || this.集合已同步) return true;
+    this.yieldingForStudy = true;
+    this.是否请求中止 = true;
+    this.detailsVisible = false;
+    this.publishSyncState();
+    if (this.collectionCallInFlight && this.abortTimer < 0) {
+      this.sendAbort();
+      this.abortTimer = setInterval((): void => { this.sendAbort(); }, 50);
+    }
+    return true;
+  }
+
+  /** 覆盖取消早于 Core 注册句柄的竞态；同一时刻只发送一个取消请求。 */
+  private sendAbort(): void {
+    if (this.disposed || !this.collectionCallInFlight || this.abortCall !== null) return;
+    this.abortCall = this.同步服务实例.中止同步()
+      .catch((): void => { hilog.warn(同步日志域, 同步日志标签, 'sync: abort signal failed, retrying'); })
+      .finally((): void => { this.abortCall = null; });
+  }
+
+  private stopAbortTimer(): void {
+    if (this.abortTimer >= 0) clearInterval(this.abortTimer);
+    this.abortTimer = -1;
+  }
+
+  /** 只有原始调用回滚/提交完成且取消信号落定后，才能归还集合租约。 */
+  private async syncCollectionWithPriority(auth: SyncAuth, media: boolean): Promise<SyncCollectionResponse> {
+    this.collectionCallInFlight = true;
+    try {
+      return await this.同步服务实例.同步集合(auth, media);
+    } finally {
+      this.collectionCallInFlight = false;
+      this.stopAbortTimer();
+      if (this.abortCall !== null) await this.abortCall;
+    }
   }
 
   /** 终态释放任务租约，保留错误展示；媒体仍运行时不得释放。 */
@@ -159,7 +231,7 @@ export struct 同步面板 {
 
   /** 自动详情可以收起，正在执行的任务继续由根宿主持有。 */
   private dismissPresentation(): void {
-    if (this.automatic && this.当前阶段 === 'syncing') {
+    if (this.当前阶段 !== 'done') {
       this.detailsVisible = false;
       this.publishSyncState();
     } else if (this.是否允许关闭()) {
@@ -202,8 +274,9 @@ export struct 同步面板 {
   private notifySyncResult(): void {
     if (this.disposed) return;
     this.notifyCollectionResult();
-    if (this.automatic && this.当前阶段 === 'done' && this.错误文案 === '' && !this.是否请求中止) {
-      this.关闭回调();
+    if (this.当前阶段 === 'done' && this.错误文案 === '' && !this.是否请求中止) {
+      if (this.automatic) this.关闭回调();
+      else this.successTimer = setTimeout((): void => { this.关闭回调(); }, 3000);
     }
   }
 
@@ -260,9 +333,9 @@ export struct 同步面板 {
     }
   }
 
-  /** 自动触发的全量冲突允许稍后处理；进行中的网络操作不可关闭。 */
+  /** 终态可以销毁任务；其他阶段只收起详情。 */
   private 是否允许关闭(): boolean {
-    return (this.当前阶段 === 'done' || (this.automatic && this.当前阶段 === 'conflict')) && !this.是否请求中止;
+    return this.当前阶段 === 'done' && !this.是否请求中止;
   }
 
   // ========================================================
@@ -299,6 +372,7 @@ export struct 同步面板 {
     this.清理轮询定时器();
     this.媒体进度文案 = '';
     this.状态文案 = this.取本地化文案($r('app.string.sync_aborted'));
+    if (this.yieldingForStudy) this.onYield(this.automatic);
     this.setSyncPhase('done');
     // syncCollection 已完成（数据已入 DB）但用户中止了媒体阶段：仍需刷新牌组列表，
     // 否则用户看不到刚同步的牌组，再点同步又显示「已最新」但 UI 不更新。
@@ -306,6 +380,7 @@ export struct 同步面板 {
       hilog.info(同步日志域, 同步日志标签, 'sync: aborted after collection synced, refreshing deck list');
       this.notifyCollectionResult();
     }
+    if (this.yieldingForStudy) this.关闭回调();
   }
 
   /**
@@ -380,7 +455,7 @@ export struct 同步面板 {
     this.错误文案 = '';
     this.状态文案 = '';
     this.媒体进度文案 = '';
-    this.是否请求中止 = false;
+    this.是否请求中止 = this.yieldingForStudy;
     this.集合已同步 = false;
     this.fsrsBeforeSync = null;
     this.fsrsDisabledBySync = false;
@@ -406,7 +481,10 @@ export struct 同步面板 {
       }
       hilog.info(同步日志域, 同步日志标签, 'sync: calling syncCollection syncMedia=%{public}s',
         媒体同步开启 ? 'true' : 'false');
-      const 集合响应: SyncCollectionResponse = await this.同步服务实例.同步集合(鉴权, 媒体同步开启);
+      const 集合响应: SyncCollectionResponse = await this.syncCollectionWithPriority(鉴权, 媒体同步开启);
+      // 提交先赢得竞态时，保留成功结果与 Core 已启动的媒体任务。
+      this.是否请求中止 = false;
+      this.yieldingForStudy = false;
       const 集合端点: string = 提取新端点(集合响应);
       if (集合端点 !== '') {
         鉴权 = 应用新端点(鉴权, 集合端点);
@@ -481,7 +559,8 @@ export struct 同步面板 {
   // ========================================================
 
   /** 冲突确认：FullUploadOrDownload 成功后进入媒体阶段。 */
-  private 冲突确认(是否上传: boolean): void {
+  private async 冲突确认(是否上传: boolean): Promise<void> {
+    if (this.当前阶段 !== 'conflict' || !autoSyncScheduler.canSync()) return;
     const 鉴权: SyncAuth | null = this.鉴权;
     if (鉴权 === null) {
       this.setSyncPhase('done');
@@ -490,7 +569,47 @@ export struct 同步面板 {
     this.错误文案 = '';
     this.状态文案 = '';
     this.detailsVisible = true;
+    this.fullSyncInFlight = true;
     this.setSyncPhase('syncing');
+    // 收起冲突后允许本地学习；覆盖前重新检查方向、端点和媒体 USN。
+    try {
+      this.fsrsBeforeSync = await 加载FSRS开启状态();
+      if (this.disposed) return;
+      const response: SyncCollectionResponse = await this.同步服务实例.同步集合(鉴权, false);
+      if (this.disposed) return;
+      const endpoint: string = 提取新端点(response);
+      if (endpoint !== '') {
+        this.鉴权 = 应用新端点(鉴权, endpoint);
+        保存同步端点(endpoint);
+      }
+      const outcome: 集合同步结果走向 = 判定集合同步走向(response);
+      this.待定服务器USN = response.serverMediaUsn;
+      if (outcome === 'done') {
+        this.集合已同步 = true;
+        await this.captureFsrsAfterSync();
+        this.fullSyncInFlight = false;
+        this.notifyCollectionResult();
+        if (加载媒体同步开关()) {
+          设置媒体待同步(true);
+          this.启动媒体阶段(this.鉴权!);
+        } else {
+          this.状态文案 = this.取本地化文案($r('app.string.sync_success'));
+          this.setSyncPhase('done');
+          this.notifySyncResult();
+        }
+        return;
+      }
+      this.当前冲突类型 = outcome;
+      if ((是否上传 && outcome === 'fullDownload') || (!是否上传 && outcome === 'fullUpload')) {
+        this.fullSyncInFlight = false;
+        this.setSyncPhase('conflict');
+        return;
+      }
+    } catch (error) {
+      this.fullSyncInFlight = false;
+      this.处理同步错误(error instanceof Error ? error : new Error(`${error}`));
+      return;
+    }
     // 媒体同步开关关闭时不传 serverUSN——rslib full_sync_inner 仅在 server_usn.is_some()
     // 时启动后台媒体同步（不检查 sync_media 字段），传 null 使 rslib 跳过媒体同步。
     const 媒体同步开启: boolean = 加载媒体同步开关();
@@ -498,13 +617,14 @@ export struct 同步面板 {
     hilog.info(同步日志域, 同步日志标签,
       'sync: calling fullUploadOrDownload upload=%{public}s serverUsn=%{public}s mediaEnabled=%{public}s',
       是否上传 ? 'true' : 'false', 服务器USN === null ? 'null' : `${服务器USN}`, 媒体同步开启 ? 'true' : 'false');
-    this.同步服务实例.全量上传或下载(鉴权, 是否上传, 服务器USN)
+    await this.同步服务实例.全量上传或下载(this.鉴权!, 是否上传, 服务器USN)
       .then(async (): Promise<void> => {
         // 全量上传/下载完成 = 集合已写入本地 DB；标记以便后续中止时刷新牌组列表。
         this.集合已同步 = true;
         await this.captureFsrsAfterSync();
         if (this.disposed) return;
         this.notifyCollectionResult();
+        this.fullSyncInFlight = false;
         if (this.是否请求中止) {
           this.完成中止();
           return;
@@ -521,9 +641,10 @@ export struct 同步面板 {
         hilog.info(同步日志域, 同步日志标签, 'sync: fullUploadOrDownload done, entering media phase');
         // 集合同步成功，媒体同步待完成——若媒体同步被中断，下次同步凭此标志继续。
         设置媒体待同步(true);
-        this.启动媒体阶段(鉴权);
+        this.启动媒体阶段(this.鉴权!);
       })
       .catch((error: Error): void => {
+        this.fullSyncInFlight = false;
         this.处理同步错误(error instanceof Error ? error : new Error(`${error}`));
       });
   }
@@ -617,6 +738,7 @@ export struct 同步面板 {
           // ↑=上传方向（本地→云端），↓=下载方向（云端→本地）。直接原样展示，不再替换符号。
           this.媒体进度文案 = `${this.取本地化文案($r('app.string.sync_syncing_media'))} ` +
             `${状态.progress.checked}  ${状态.progress.added}  ${状态.progress.removed}`;
+          this.publishStatus();
           hilog.info(同步日志域, 同步日志标签,
             'sync: mediaPoll check#%{public}d elapsed=%{public}dms active=%{public}s everActive=%{public}s checked=%{public}s added=%{public}s removed=%{public}s',
             this.媒体检查次数, Date.now() - 轮询开始时间, 状态.active ? 'true' : 'false',
@@ -683,7 +805,7 @@ export struct 同步面板 {
     DialogHeader({
       title: this.取本地化文案($r('app.string.settings_sync_group')),
       actionLabel: $r('app.string.close'),
-      actionEnabled: this.automatic || this.是否允许关闭(),
+      actionEnabled: true,
       showClose: false,
       onAction: (): void => {
         this.dismissPresentation();
@@ -716,7 +838,7 @@ export struct 同步面板 {
     }
   }
 
-  /** conflict 阶段：冲突说明 + 上传/下载按钮（无取消，强制选方向）。 */
+  /** 冲突详情只在用户主动展开后显示，方向选择执行前再次检查。 */
   @Builder
   private 冲突内容() {
     Text($r('app.string.sync_conflict_title'))
@@ -781,6 +903,8 @@ export struct 同步面板 {
         .fontColor(this.取色板().错误色)
         .width('100%')
         .maxLines(8)
+      Button($r('app.string.sync_retry'))
+        .onClick((): void => { this.onRetry(); })
     }
 
   }
@@ -840,51 +964,15 @@ export struct 同步面板 {
     .height('100%')
   }
 
-  /** 自动同步只在失败时显示轻量提示，正常传输保持静默。 */
-  @Builder
-  private syncErrorStatus() {
-    Row({ space: 8 }) {
-      Text($r('app.string.sync_background_error'))
-        .fontSize(应用尺寸.字号_正文_小)
-        .fontColor(this.取色板().错误色)
-        .maxLines(2)
-        .layoutWeight(1)
-      Button($r('app.string.sync_background_details'))
-        .fontSize(应用尺寸.字号_正文_小)
-        .fontColor(this.动作主色)
-        .backgroundColor(Color.Transparent)
-        .onClick((): void => {
-          this.detailsVisible = true;
-          this.publishSyncState();
-        })
-      if (this.当前阶段 === 'done') {
-        Button($r('app.string.close'))
-          .fontSize(应用尺寸.字号_正文_小)
-          .fontColor(this.动作主色)
-          .backgroundColor(Color.Transparent)
-          .onClick((): void => { this.关闭回调(); })
-      }
-    }
-    .width('92%')
-    .constraintSize({ maxWidth: 480 })
-    .padding({ left: 12, right: 4, top: 4, bottom: 4 })
-    .backgroundColor(this.取色板().背景)
-    .borderRadius(应用尺寸.圆角_卡片)
-    .shadow({ radius: 8, color: 'rgba(0,0,0,0.12)', offsetY: 2 })
-    .margin({ top: this.statusBarHeight + 应用尺寸.工具栏高度 })
-  }
-
   build() {
     Stack({ alignContent: Alignment.Top }) {
-      if (!this.automatic || this.detailsVisible || this.当前阶段 === 'conflict') {
+      if (this.detailsVisible) {
         this.syncDialog()
-      } else if (this.错误文案 !== '') {
-        this.syncErrorStatus()
       }
     }
     .width('100%')
     .height('100%')
-    .hitTestBehavior(this.automatic && !this.detailsVisible && this.当前阶段 !== 'conflict' ?
+    .hitTestBehavior(!this.detailsVisible ?
       HitTestMode.Transparent : HitTestMode.Default)
   }
 }

@@ -27,7 +27,7 @@ function homeHarness() {
   const events = [];
   const Page = pageMethods('首页', ['homeActivity', 'canPresentStartupPrompt', 'homeActivityChanged',
     '尝试显示官方公告', '尝试展示待展示官方公告', '请求主页官方公告检查', '暂停主页官方公告检查',
-    '继续首次弹窗序列', '显示欢迎弹窗一次', 'onBackPress', 'autoSyncCollectionFinished'], {
+    '继续首次弹窗序列', '显示欢迎弹窗一次', 'onBackPress', 'autoSyncCollectionFinished', 'presentPendingSyncWarning'], {
     canPresentHomePrompt, bundleManager: { BundleFlag: {}, getBundleInfoForSelf: async () => ({ versionName: 'test' }) },
     后端会话: { 获取实例: () => ({ 是否就绪: () => true }) }, 当前语言模式: () => 'zh',
     是否已确认官方公告: async () => false, 是否已完成云端牌组引导: async () => false,
@@ -38,6 +38,7 @@ function homeHarness() {
   });
   const page = new Page();
   Object.assign(page, { announcementController: new HomeAnnouncementController(), homeDisposed: false,
+    pendingSyncAction: null, pendingSyncFsrsWarning: false,
     syncForeground: true, 页面栈: { size: () => 0 }, 主页允许公告检查: true, 加载状态: 'ready',
     homeWorkTimer: -1, 官方公告延迟检查任务: -1, 官方公告检查中: false, 主页公告检查已激活: true,
     官方公告服务实例: { 加载公告: () => response.promise }, 显示官方公告: false,
@@ -79,7 +80,10 @@ test('sync refresh release explicitly wakes deferred announcement after asynchro
   const { page, response, tick } = homeHarness(), followUp = deferred();
   page.autoSyncCollectionBusy = true;
   const check = page.尝试显示官方公告(); response.resolve({ id: 'after-sync' }); await check; tick();
-  page.同步后检查FSRS = () => followUp.promise;
+  page.同步后检查FSRS = () => {
+    page.fsrsPromptActive = true;
+    return followUp.promise.finally(() => { page.fsrsPromptActive = false; });
+  };
   const finish = page.autoSyncCollectionFinished(true); await settle();
   page.homeActivityChanged(); tick(); assert.equal(page.显示官方公告, false);
   followUp.resolve(); await finish; tick();

@@ -1,5 +1,9 @@
 {
   "string": [
+    {"name":"sync_pending","value":"Sync queued until idle"},
+    {"name":"sync_yielding","value":"Pausing sync to start studying"},
+    {"name":"sync_needs_attention","value":"Sync needs attention. Open details to continue."},
+    {"name":"sync_retry","value":"Retry sync"},
     {"name": "settings_study_haptics", "value": "Rating haptic feedback"},
     {"name": "settings_study_haptics_save_failed", "value": "Unable to save haptic settings. Please try again."},
     { "name": "deck_save_scope_current", "value": "Changes apply only to this deck. Global settings are marked separately." },

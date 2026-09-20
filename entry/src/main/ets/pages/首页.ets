@@ -222,10 +222,13 @@ struct 首页 {
   @State private 数据迁移阶段: number = -1;
   @State private 个人数据替换步骤: number = 0;
   // 同步面板弹窗（B14 2026-07-22）：从 同步分组 点「立即同步」后挂载
-  // 同步中关闭守卫由 同步面板 内部 canClose() 控制，首页 不拦
+  // 根宿主持有同步任务；首页状态条与详情显示不决定任务生命周期。
   @State private 显示同步面板: boolean = false;
   @State private 同步面板认证: SyncAuth | null = null;
   @State private 同步面板账号名: string = '';
+  @State private syncAutomatic: boolean = true;
+  @State private syncStatusText: string = '';
+  @State private syncDetailsRequest: number = 0;
   @StorageProp(APP_FOREGROUND_KEY) @Watch('syncForegroundChanged') private syncForeground: boolean = false;
   private readonly syncScheduler: AutoSyncScheduler = autoSyncScheduler;
   private autoSyncTimer: number = -1;
@@ -236,6 +239,7 @@ struct 首页 {
   @State private syncBackRequest: number = 0;
   private autoSyncRefreshing: boolean = false;
   private pendingSyncAction: (() => void) | null = null;
+  private pendingSyncFsrsWarning: boolean = false;
 
   @State @Watch('homeActivityChanged') private 显示牌组定制: boolean = false;
   @State private 定制牌组ID: string = '';
@@ -342,7 +346,7 @@ struct 首页 {
       this.autoSyncTimer = -1;
       this.tryAutoSync();
       this.scheduleAutoSyncCheck();
-    }, 1000);
+    }, this.syncScheduler.isManualPending() ? 1000 : 3000);
   }
 
   private isAutoSyncLocationSafe(): boolean {
@@ -363,8 +367,10 @@ struct 首页 {
    * Invariants: 集合已打开、前台、无活动学习/编辑、无导入/启动弹窗；手动自动共用互斥。
    */
   private tryAutoSync(): void {
-    if (!this.syncScheduler.hasPending() || !loadAutoSyncEnabled() || 加载同步凭证() === null) {
+    const manual: boolean = this.syncScheduler.isManualPending();
+    if (!this.syncScheduler.hasPending() || (!manual && !loadAutoSyncEnabled()) || 加载同步凭证() === null) {
       this.syncScheduler.consume();
+      if (manual) this.syncStatusText = '';
       this.stopAutoSyncTimer();
       return;
     }
@@ -373,13 +379,14 @@ struct 首页 {
       return;
     }
     if (!this.autoSyncStartupReady || !canStartHomeAutoSync(this.homeActivity()) ||
-      this.显示同步面板 || !syncActivity.canAutoSync(Date.now())) return;
+      this.显示同步面板 || (manual ? syncActivity.isActive() : !syncActivity.canAutoSync(Date.now()))) return;
     const info: 同步凭证信息 | null = 加载同步凭证();
     if (info === null) return;
     const auth: SyncAuth = { hkey: info.hkey, endpoint: info.endpoint, ioTimeoutSecs: 0 };
     this.syncScheduler.consume();
     this.stopAutoSyncTimer();
     this.同步面板认证 = auth;
+    this.syncAutomatic = !manual;
     this.同步面板账号名 = info.username;
     syncActivity.reserveCollection();
     this.autoSyncCollectionBusy = true;
@@ -387,11 +394,36 @@ struct 首页 {
   }
 
   /** 集合独占期间合并点击意图，避免把页面 RPC 排在网络请求后无提示等待。 */
-  private deferForSync(action: () => void): boolean {
+  private deferForSync(action: () => void, study: boolean = false): boolean {
     if (!this.autoSyncCollectionBusy && !this.autoSyncRefreshing) return false;
     this.pendingSyncAction = action;
+    if (study && (syncActivity.requestStudyPriority() || this.autoSyncRefreshing)) return true;
     this.显示提示($r('app.string.sync_collection_wait'));
     return true;
+  }
+
+  /** 设置页仅提交意图并返回首页，由根宿主执行，页面销毁不影响传输。 */
+  private requestManualSync(): void {
+    this.stopAutoSyncTimer();
+    this.syncStatusText = this.getUIContext().getHostContext()!.resourceManager.getStringSync(
+      $r('app.string.sync_pending').id);
+    this.syncScheduler.requestManual();
+    this.页面栈.pop();
+  }
+
+  private syncYielded(automatic: boolean): void {
+    if (automatic) this.syncScheduler.request();
+    else this.syncScheduler.requestManual();
+  }
+
+  private syncHostClosed(): void {
+    this.显示同步面板 = false;
+    this.同步面板认证 = null;
+    this.同步面板账号名 = '';
+    this.syncStatusText = this.syncScheduler.isManualPending() ?
+      this.getUIContext().getHostContext()!.resourceManager.getStringSync($r('app.string.sync_pending').id) : '';
+    this.autoSyncStateChanged(false, false);
+    this.scheduleAutoSyncCheck();
   }
 
   /** 刷新完成且仍停留首页时只执行最后一次意图；返回或退后台会取消它。 */
@@ -404,6 +436,7 @@ struct 首页 {
 
   /** 数据与界面刷新均完成后再进入学习，媒体不参与此门禁。 */
   private async autoSyncCollectionFinished(fsrsDisabledBySync: boolean): Promise<void> {
+    this.pendingSyncFsrsWarning = this.pendingSyncFsrsWarning || fsrsDisabledBySync;
     this.autoSyncRefreshing = true;
     this.autoSyncCollectionBusy = false;
     try {
@@ -411,10 +444,23 @@ struct 首页 {
       AppStorage.setOrCreate<number>('cardContentChangedTick',
         (AppStorage.get<number>('cardContentChangedTick') ?? 0) + 1);
       await this.加载主页数据();
-      await this.同步后检查FSRS(fsrsDisabledBySync);
     } finally {
       this.autoSyncRefreshing = false;
       this.flushSyncAction();
+      await this.presentPendingSyncWarning();
+      this.homeActivityChanged();
+    }
+  }
+
+  /** 同步产生的设置提醒等待用户回到空闲首页，不打断开始或继续学习。 */
+  private async presentPendingSyncWarning(): Promise<void> {
+    if (!this.pendingSyncFsrsWarning || !this.syncForeground || this.页面栈.size() !== 0 ||
+      this.pendingSyncAction !== null || this.autoSyncCollectionBusy || this.autoSyncRefreshing ||
+      this.homeActivity().dialogOpen) return;
+    this.pendingSyncFsrsWarning = false;
+    try {
+      await this.同步后检查FSRS(true);
+    } finally {
       this.homeActivityChanged();
     }
   }
@@ -559,7 +605,7 @@ struct 首页 {
   /** 所有真正返回主页的入口都调用这里，避免遗漏公告检查。 */
   private 返回主页后刷新(): void {
     this.主页允许公告检查 = true;
-    this.加载主页数据();
+    this.加载主页数据().then((): void => { this.presentPendingSyncWarning(); });
     this.homeActivityChanged();
     this.requestAutoSync();
   }
@@ -1225,7 +1271,8 @@ struct 首页 {
   // 改 Navigation 栈状态
   // ========================================================
   private 开始学习(): void {
-    if (this.deferForSync((): void => { this.开始学习(); })) return;
+    this.stopAutoSyncTimer();
+    if (this.deferForSync((): void => { this.开始学习(); }, true)) return;
     if (!this.已选中牌组()) {
       return;
     }
@@ -2618,6 +2665,7 @@ struct 首页 {
     } else if (name === 'SettingsPage') {
       设置页({
         openAiSettings: (param as 设置页参数).openAiSettings ?? false,
+        onManualSync: (): void => { this.requestManualSync(); },
         pathStack: this.页面栈
       })
     }
@@ -2647,6 +2695,23 @@ struct 首页 {
             页面底色微染值: this.页面底色微染值,
             动作主色: this.动作主色
           })
+          if (this.syncStatusText !== '') {
+            Row({ space: 8 }) {
+              Text(this.syncStatusText)
+                .fontSize(应用尺寸.字号_正文_小)
+                .fontColor(this.动作主色)
+                .layoutWeight(1)
+                .maxLines(2)
+              if (this.显示同步面板) {
+                Button($r('app.string.sync_background_details'))
+                  .fontColor(this.动作主色)
+                  .backgroundColor(Color.Transparent)
+                  .onClick((): void => { this.syncDetailsRequest++; })
+              }
+            }
+            .width('100%')
+            .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平, top: 4, bottom: 4 })
+          }
           GridRow({
             columns: { xs: 4, sm: 8, md: 12 },
             breakpoints: {
@@ -3138,18 +3203,21 @@ struct 首页 {
           是否深色: this.是否深色(),
           账号名: this.同步面板账号名,
           初始鉴权: this.同步面板认证,
-          automatic: true,
+          automatic: this.syncAutomatic,
           backRequest: this.syncBackRequest,
+          detailsRequest: this.syncDetailsRequest,
+          statusChanged: (text: string): void => { this.syncStatusText = text; },
+          onYield: (automatic: boolean): void => { this.syncYielded(automatic); },
+          onRetry: (): void => {
+            this.syncScheduler.requestManual();
+            this.syncHostClosed();
+          },
           状态变化回调: (busy: boolean, modal: boolean): void => { this.autoSyncStateChanged(busy, modal); },
           同步完成回调: (fsrsDisabledBySync: boolean): void => {
             this.autoSyncCollectionFinished(fsrsDisabledBySync);
           },
           关闭回调: (): void => {
-            this.显示同步面板 = false;
-            this.同步面板认证 = null;
-            this.同步面板账号名 = '';
-            this.autoSyncStateChanged(false, false);
-            this.scheduleAutoSyncCheck();
+            this.syncHostClosed();
           }
         })
       }

@@ -1,5 +1,9 @@
 {
   "string": [
+    {"name":"sync_pending","value":"等待空闲时同步"},
+    {"name":"sync_yielding","value":"正在让出同步，优先开始学习"},
+    {"name":"sync_needs_attention","value":"同步需要处理，点击详情选择"},
+    {"name":"sync_retry","value":"重新同步"},
     {"name": "settings_study_haptics", "value": "评分震动反馈"},
     {"name": "settings_study_haptics_save_failed", "value": "未能保存震动设置，请重试"},
     { "name": "deck_save_scope_current", "value": "保存仅修改本牌组的选项；全局设置另有标注。" },
