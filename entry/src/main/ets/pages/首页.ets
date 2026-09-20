@@ -2679,6 +2679,9 @@ struct 首页 {
         Column() {
           主页顶部工具栏({
             排序模式中: this.排序模式中,
+            syncStatusText: this.syncStatusText,
+            syncDetailsAvailable: this.显示同步面板,
+            onSyncDetails: (): void => { this.syncDetailsRequest++; },
             on更多点击: (): void => {
               this.显示更多菜单 = true;
             },
@@ -2695,23 +2698,6 @@ struct 首页 {
             页面底色微染值: this.页面底色微染值,
             动作主色: this.动作主色
           })
-          if (this.syncStatusText !== '') {
-            Row({ space: 8 }) {
-              Text(this.syncStatusText)
-                .fontSize(应用尺寸.字号_正文_小)
-                .fontColor(this.动作主色)
-                .layoutWeight(1)
-                .maxLines(2)
-              if (this.显示同步面板) {
-                Button($r('app.string.sync_background_details'))
-                  .fontColor(this.动作主色)
-                  .backgroundColor(Color.Transparent)
-                  .onClick((): void => { this.syncDetailsRequest++; })
-              }
-            }
-            .width('100%')
-            .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平, top: 4, bottom: 4 })
-          }
           GridRow({
             columns: { xs: 4, sm: 8, md: 12 },
             breakpoints: {

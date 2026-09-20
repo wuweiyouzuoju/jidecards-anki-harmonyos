@@ -21,7 +21,7 @@ import { ThemeDefinition, themeDefinition, THEME_VISUALS_KEY } from '../../model
 // 动作主色: ResourceColor  动作类按钮字色
 //
 // @输出
-// 常规模式渲染 Row(更多按钮 + Blank + 创建牌组按钮)；
+// 常规模式渲染 Row(更多按钮 + 同步状态/弹性留白 + 创建牌组按钮)；
 // 排序模式渲染 Row(退出按钮 + Blank + 完成按钮)
 //
 // @业务规则
@@ -39,6 +39,9 @@ import { 按下态按钮 } from '../common/按下态按钮';
 export struct 主页顶部工具栏 {
   @StorageProp(THEME_VISUALS_KEY) private visual: ThemeDefinition = themeDefinition('aurora');
   @Prop 排序模式中: boolean = false;
+  @Prop syncStatusText: string = '';
+  @Prop syncDetailsAvailable: boolean = false;
+  onSyncDetails: () => void = (): void => {};
   on更多点击: () => void = (): void => {};
   on创建牌组点击: () => void = (): void => {};
   on排序退出: () => void = (): void => {};
@@ -72,7 +75,27 @@ export struct 主页顶部工具栏 {
           点击回调: (): void => { this.on更多点击(); }
         })
 
-        Blank()
+        if (this.syncStatusText !== '') {
+          Button({ type: ButtonType.Normal }) {
+            Text(this.syncStatusText)
+              .fontSize(应用尺寸.字号_正文_小)
+              .fontColor(this.动作主色)
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .textAlign(TextAlign.Center)
+              .width('100%')
+          }
+          .layoutWeight(1)
+          .height('100%')
+          .margin({ left: 8, right: 8 })
+          .padding(0)
+          .backgroundColor(Color.Transparent)
+          .enabled(this.syncDetailsAvailable)
+          .accessibilityText(this.syncStatusText)
+          .onClick((): void => { this.onSyncDetails(); })
+        } else {
+          Blank()
+        }
 
         按下态按钮({
           文案: $r('app.string.create_deck'),

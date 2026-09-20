@@ -526,7 +526,12 @@ test('automatic sync stays invisible during transfer and preserves error/conflic
   const home = read('pages/首页.ets'), panel = read('components/同步面板.ets');
   assert.ok(home.indexOf('同步面板({') > home.indexOf('.navDestination(this.页面映射)'));
   assert.match(panel, /HitTestMode.Transparent : HitTestMode.Default/);
-  assert.match(home, /Text\(this.syncStatusText\)/);
+  const toolbar = read('components/home/主页顶部工具栏.ets');
+  assert.match(home, /syncStatusText: this.syncStatusText/);
+  assert.match(home, /onSyncDetails:.*this.syncDetailsRequest\+\+/);
+  assert.match(toolbar, /Text\(this.syncStatusText\)/);
+  assert.ok(toolbar.indexOf('Text(this.syncStatusText)') > toolbar.indexOf("app.string.study_more"));
+  assert.ok(toolbar.indexOf('Text(this.syncStatusText)') < toolbar.indexOf("app.string.create_deck"));
   assert.match(panel, /this\.statusChanged\(text\)/);
   assert.match(panel, /if \(this.detailsVisible\)/);
 });
