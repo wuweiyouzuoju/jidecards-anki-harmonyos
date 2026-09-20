@@ -49,7 +49,7 @@ import {
   原始侧HTML,
   剥除拼写标记
 } from '../model/学习卡片HTML构建器';
-import { 解码文件名, 取MIME类型, 读取媒体文件 } from '../utils/媒体响应助手';
+import { interceptMediaRequest } from '../utils/媒体响应助手';
 import { 声音播放器 } from '../utils/声音播放器';
 import { TTS播放器 } from '../utils/TTS播放器';
 import { CardAudioSession } from '../model/CardAudioSession';
@@ -1234,37 +1234,7 @@ export struct 学习页 {
   // 读沙箱文件
   // ========================================================
   private 拦截媒体(event: OnInterceptRequestEvent): WebResourceResponse | null {
-    const url: string = event.request.getRequestUrl();
-    if (!url.startsWith(媒体基地址)) {
-      return null;
-    }
-    const fileName: string = decodeURIComponent(url.substring(媒体基地址.length));
-    if (fileName.length === 0) {
-      // Web 组件初始 src 占位：回一张空白页，避免 404 错误页闪现
-      const blank: WebResourceResponse = new WebResourceResponse();
-      blank.setResponseData('<!DOCTYPE html><html><body></body></html>');
-      blank.setResponseMimeType('text/html');
-      blank.setResponseEncoding('UTF-8');
-      blank.setResponseCode(200);
-      blank.setReasonMessage('OK');
-      return blank;
-    }
-    const data: ArrayBuffer | null = 读取媒体文件(this.媒体目录, fileName);
-    if (data === null) {
-      const notFound: WebResourceResponse = new WebResourceResponse();
-      notFound.setResponseCode(404);
-      notFound.setReasonMessage('Not Found');
-      notFound.setResponseData('');
-      notFound.setResponseMimeType('text/plain');
-      notFound.setResponseEncoding('UTF-8');
-      return notFound;
-    }
-    const response: WebResourceResponse = new WebResourceResponse();
-    response.setResponseData(data);
-    response.setResponseMimeType(取MIME类型(fileName));
-    response.setResponseCode(200);
-    response.setReasonMessage('OK');
-    return response;
+    return interceptMediaRequest(event.request, this.媒体目录, 媒体基地址);
   }
 
   private 按钮文案位(index: number): string {

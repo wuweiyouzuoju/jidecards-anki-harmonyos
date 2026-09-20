@@ -60,6 +60,8 @@
 
 ## 笔记模式批量操作与学习自动播放
 
+- Web 卡片本地音视频：学习页与预览页共用 `媒体响应助手.interceptMediaRequest`，支持单范围 `Range`（闭合、开放、后缀）及 `206/416`、`HEAD`。完整资源由 ArkWeb 文件句柄读取，部分区间异步读取并校验实际长度；图片、字体、脚本继续经过同一入口。`media-response.test.mjs` 验证 HTTP 元信息、实际正文、并发、短读与句柄归属；用户反馈的进度条拖动是否恢复仍需真机验证，不据隔离测试宣称已解决所有触摸问题。
+
 - 浏览页删除、改牌组、设置标志已复用 `笔记服务.获取笔记的卡片`，展开全部兄弟卡并去重。删除完成重新查询后端结果，不用本地移除行模拟删除；查询或写入失败保留选择并提示错误。
 - 学习页“关闭自动播放”已接入：`AnkiStudySessionBackend.studyOptions` 读取当前卡片实际牌组的配置（筛选卡使用原牌组），`StudySessionController` 将展示选项纳入当前快照，学习页自动播放遵循开关，按钮/快捷键手动重播仍可使用。每次加载重新读配置，过期响应不能更新当前卡面。
 - 回归入口：`browser-batch-runtime.test.mjs`、`study-autoplay-backend.test.mjs`、`study-lifecycle.test.mjs`、`study-session-controller.test.mjs`；验证为隔离行为测试及构建，设备表现仍需实测。

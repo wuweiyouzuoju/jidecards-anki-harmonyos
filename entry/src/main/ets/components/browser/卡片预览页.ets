@@ -45,7 +45,7 @@ import {
   剥除拼写标记,
   原始侧HTML
 } from '../../model/学习卡片HTML构建器';
-import { 解码文件名, 取MIME类型, 读取媒体文件 } from '../../utils/媒体响应助手';
+import { interceptMediaRequest } from '../../utils/媒体响应助手';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 取全屏转场曲线, 取全屏转场时长 } from '../../utils/转场时长';
 import { 颜色键 } from '../../model/颜色主题';
@@ -414,7 +414,7 @@ export struct 卡片预览页 {
   //
   // @作用
   // 拦截自建域名请求 → 沙箱媒体文件；未命中返回 null 放行。
-  // 与 学习页.拦截媒体 同实现（复用 媒体响应助手）。
+  // 与学习页共用媒体响应助手的 HTTP Range 与文件读取实现。
   //
   // @输入
   // event: OnInterceptRequestEvent
@@ -426,36 +426,7 @@ export struct 卡片预览页 {
   // 读沙箱文件
   // ========================================================
   private 拦截媒体(event: OnInterceptRequestEvent): WebResourceResponse | null {
-    const url: string = event.request.getRequestUrl();
-    if (!url.startsWith(媒体基地址)) {
-      return null;
-    }
-    const fileName: string = 解码文件名(url.substring(媒体基地址.length));
-    if (fileName.length === 0) {
-      const blank: WebResourceResponse = new WebResourceResponse();
-      blank.setResponseData('<!DOCTYPE html><html><body></body></html>');
-      blank.setResponseMimeType('text/html');
-      blank.setResponseEncoding('UTF-8');
-      blank.setResponseCode(200);
-      blank.setReasonMessage('OK');
-      return blank;
-    }
-    const data: ArrayBuffer | null = 读取媒体文件(this.媒体目录, fileName);
-    if (data === null) {
-      const notFound: WebResourceResponse = new WebResourceResponse();
-      notFound.setResponseCode(404);
-      notFound.setReasonMessage('Not Found');
-      notFound.setResponseData('');
-      notFound.setResponseMimeType('text/plain');
-      notFound.setResponseEncoding('UTF-8');
-      return notFound;
-    }
-    const response: WebResourceResponse = new WebResourceResponse();
-    response.setResponseData(data);
-    response.setResponseMimeType(取MIME类型(fileName));
-    response.setResponseCode(200);
-    response.setReasonMessage('OK');
-    return response;
+    return interceptMediaRequest(event.request, this.媒体目录, 媒体基地址);
   }
 
   /** 预览更多菜单：只保留编辑和 Agent 制卡，不做任何学习状态操作。 */

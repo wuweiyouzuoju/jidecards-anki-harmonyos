@@ -259,19 +259,18 @@ test('study page web component blocks file-protocol cross origin correctly', () 
   assert.match(page, /\.javaScriptAccess\(true\)/);
   assert.match(page, /\.onInterceptRequest\(/);
   assert.match(page, /loadData\([^,]+, 'text\/html', 'UTF-8', 媒体基地址, ' '\)/);
-  assert.match(page, /读取媒体文件\(this\.媒体目录, fileName\)/);
+  assert.match(page, /interceptMediaRequest\(event\.request, this\.媒体目录, 媒体基地址\)/);
   assert.match(page, /collection\.media/, 'media dir points at the anki media folder');
 });
 
-test('media helper infers mime types and reads sandbox files defensively', () => {
+test('media helper retains MIME inference for card assets', () => {
   const helper = read(MEDIA_HELPER);
 
   assert.match(helper, /export function 取MIME类型\(文件名: string\): string/);
   assert.match(helper, /'png': 'image\/png'/);
   assert.match(helper, /'mp3': 'audio\/mpeg'/);
   assert.match(helper, /application\/octet-stream/, 'unknown extensions fall back');
-  assert.match(helper, /export function 读取媒体文件\(媒体目录: string, 文件名: string\): ArrayBuffer \| null/);
-  assert.match(helper, /catch \(错误\) \{\s*return null;/, 'read failures degrade to null');
+  // HTTP 状态、范围正文、IO 失败和句柄归属由 media-response 行为测试验证。
 });
 
 test('study page is registered and reachable from home', () => {
