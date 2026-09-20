@@ -23,6 +23,7 @@ import { AI_AGENT_CHANNELS_APP_STORAGE_KEY, initializeAiAgentChannels } from '..
 import { initializeCardTextSize } from '../utils/CardTextSizeStore';
 import { initializeStudyHaptics } from '../utils/StudyHaptics';
 import { syncActivity } from '../model/SyncSettings';
+import { externalDeckUri, externalDeckOpens, EXTERNAL_DECK_OPEN_REVISION_KEY } from '../model/ExternalDeckOpen';
 
 const DOMAIN: number = 0x4342;
 
@@ -85,12 +86,22 @@ export default class EntryAbility extends UIAbility {
     }
     // DeepLink 跳转：桌面卡片点击 → jidecards://stats → 写 AppStorage 信号让首页 aboutToAppear 跳统计页
     this.处理DeepLink(want);
+    this.receiveExternalDeck(want);
     hilog.info(DOMAIN, 'jidecards', 'Application created');
   }
 
   onNewWant(want: Want, _launchParam: AbilityConstant.LaunchParam): void {
     // App 已在后台时，桌面卡片点击 → jidecards://stats → 写 AppStorage 信号让首页监听回调跳统计页
     this.处理DeepLink(want);
+    this.receiveExternalDeck(want);
+  }
+
+  /** 冷热启动共用入口，先保留文件，再通知首页安全导入。 */
+  private receiveExternalDeck(want: Want): void {
+    const uri: string | null = externalDeckUri(want.action ?? '', want.uri ?? '', want.type ?? '');
+    if (uri === null || !externalDeckOpens.enqueue(uri)) return;
+    const revision: number = AppStorage.get<number>(EXTERNAL_DECK_OPEN_REVISION_KEY) ?? 0;
+    AppStorage.setOrCreate<number>(EXTERNAL_DECK_OPEN_REVISION_KEY, revision + 1);
   }
 
   // ========================================================

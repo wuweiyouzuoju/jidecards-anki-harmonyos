@@ -8,7 +8,7 @@ import { 构建主页快照 } from '../../entry/src/main/ets/model/主页快照�
 import { THEME_CATALOG } from '../../entry/src/main/ets/model/ThemeCatalog.ts';
 
 const source = readFileSync(new URL('../../entry/src/main/ets/components/牌组列表项.ets', import.meta.url), 'utf8');
-const methods = ['toneOptions', 'toneIndex', 'selectTone', '取色条颜色'].map(name => {
+const methods = ['toneOptions', 'toneIndex', 'toneLabel', 'selectTone', '取色条颜色'].map(name => {
   const start = source.indexOf(`  private ${name}(`);
   assert.ok(start >= 0, name);
   return source.slice(start, source.indexOf('\n  }', start) + 4);
@@ -17,10 +17,10 @@ const options = source.match(/private readonly 色条选项列表: 色条选项\
 const Deck = new Function('牌组色调', '$r', stripTypeScriptTypes(
   `class Deck { ${options} ${methods.join('\n')} }`, { mode: 'transform' }) + '; return Deck;')(牌组色调, id => ({ id }));
 
-test('native tone selection reflects all seven persisted values and targets the current deck', () => {
+test('native tone selection reflects five common colors plus no stripe and targets the current deck', () => {
   const deck = new Deck();
   deck.getUIContext = () => ({ getHostContext: () => ({ resourceManager: { getStringSync: id => id } }) });
-  const tones = [牌组色调.Blue, 牌组色调.Purple, 牌组色调.Mint, 牌组色调.Amber, 牌组色调.Black, 牌组色调.Red, 牌组色调.None];
+  const tones = [牌组色调.Blue, 牌组色调.Purple, 牌组色调.Mint, 牌组色调.Amber, 牌组色调.Red, 牌组色调.None];
   assert.equal(deck.toneOptions().length, tones.length);
   const calls = [];
   deck.onToneChange = (id, tone) => calls.push([id, tone]);
@@ -32,6 +32,10 @@ test('native tone selection reflects all seven persisted values and targets the 
     assert.equal(deck.显示牌组菜单, false);
     assert.deepEqual(calls.at(-1), ['42', tone]);
   }
+  deck.deck = { id: '42', tone: 牌组色调.Black };
+  assert.equal(deck.toneIndex(), -1);
+  assert.equal(deck.toneLabel(), 'app.string.deck_tone_black');
+  assert.deepEqual(deck.取色条颜色(牌组色调.Black), { id: 'app.color.deck_black' });
   deck.selectTone(-1); deck.selectTone(tones.length);
   assert.equal(calls.length, tones.length);
   assert.match(source, /Select\(this\.toneOptions\(\)\)/);

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SelectStyle } from '../utils/SelectStyle';
 import { ThemeTextSpans } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
@@ -278,11 +279,12 @@ export struct 牌组选项面板 {
   @Builder
   private labeledInput(label: Resource, text: string, onChange: (value: string) => void, info: Resource) {
     Column({ space: 应用尺寸.间距_5 }) {
-      Row() {
-        Text(label).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).layoutWeight(1)
+      Row({ space: 4 }) {
+        Text(label).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).flexShrink(1)
         Button() {
           Text() { ThemeTextSpans($r('app.string.field_help_button'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.动作主色)
-        }.type(ButtonType.Normal).backgroundColor(Color.Transparent).fontColor(this.动作主色).onClick(() => this.openHelp(label, info))
+        }.type(ButtonType.Normal).width(32).height(32).padding(0).flexShrink(0)
+          .backgroundColor(Color.Transparent).fontColor(this.动作主色).onClick(() => this.openHelp(label, info))
       }.width('100%')
       TextInput({ text }).width('100%').height(应用尺寸.按钮高度).fontSize(应用尺寸.字号_正文)
         .backgroundColor($r('app.color.surface_card')).border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') }).borderRadius(应用尺寸.圆角_面板).enabled(!this.busy).onChange(onChange)
@@ -296,7 +298,7 @@ export struct 牌组选项面板 {
   //
   // @作用
   // 复习排序选择器：Select 组件 + 横向 Row 布局，对齐添加笔记页「笔记类型」选择行
-  // 与高级牌组选项面板 enumSelector 同款形态：标签左、Select 右、帮助按钮最右。
+  // 与高级牌组选项面板 enumSelector 同款形态：帮助紧跟标签，Select 靠右。
   //
   // @输入
   // label: 字段标签资源
@@ -317,15 +319,28 @@ export struct 牌组选项面板 {
   private reviewOrderSelector(label: Resource, selected: number, help: Resource) {
     Column({ space: 应用尺寸.间距_5 }) {
       Row() {
-        Text(label)
-          .fontSize(应用尺寸.字号_按钮)
-          .fontColor($r('app.color.text_secondary'))
-          .layoutWeight(1)
+        Row({ space: 4 }) {
+          Text(label)
+            .fontSize(应用尺寸.字号_按钮)
+            .fontColor($r('app.color.text_secondary'))
+            .flexShrink(1)
+          Button() {
+            Text() { ThemeTextSpans($r('app.string.field_help_button'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.动作主色)
+          }
+            .type(ButtonType.Normal)
+            .width(32).height(32).padding(0).flexShrink(0)
+            .backgroundColor(Color.Transparent)
+            .fontColor(this.动作主色)
+            .enabled(!this.busy)
+            .onClick(() => this.openHelp(label, help))
+        }.layoutWeight(1)
         Select(this.reviewOrderOptions().map((项: 牌组枚举选项): SelectOption => ({ value: 项.value })))
           .selected(this.reviewOrderOptionIndex(selected))
           .value(this.reviewOrderLabelString(selected))
-          .controlSize(ControlSize.SMALL)
           .enabled(!this.busy)
+          .attributeModifier(new SelectStyle())
+          .font(SelectStyle.controlFont)
+          .borderRadius(SelectStyle.controlRadius)
           .onSelect((index: number) => {
             const 选项 = this.reviewOrderOptions();
             if (index >= 0 && index < 选项.length) {
@@ -333,14 +348,6 @@ export struct 牌组选项面板 {
               if (this.form !== null) this.form.设置数值字段('reviewOrder', this.selectedReviewOrder.toString());
             }
           })
-        Button() {
-          Text() { ThemeTextSpans($r('app.string.field_help_button'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.动作主色)
-        }
-          .type(ButtonType.Normal)
-          .backgroundColor(Color.Transparent)
-          .fontColor(this.动作主色)
-          .enabled(!this.busy)
-          .onClick(() => this.openHelp(label, help))
       }.width('100%')
       if (this.是否有字段错误(this.fieldKey(label)))
         Text(this.resolveText(this.字段错误资源(this.fieldKey(label))))

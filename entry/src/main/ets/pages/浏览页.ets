@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SelectStyle } from '../utils/SelectStyle';
 import { BrowserOperationContext, BrowserOperationController } from '../model/BrowserOperationController';
 import { autoSyncScheduler } from '../model/AutoSyncScheduler';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
@@ -1745,9 +1746,11 @@ export struct 浏览页 {
     Row({ space: 8 }) {
       Select(this.quickFilterOptions())
         .selected(this.quickFilterIndex()).value(this.quickFilterOptions()[this.quickFilterIndex()].value)
-        .controlSize(ControlSize.SMALL).font({ size: 应用尺寸.字号_正文 })
         .menuAlign(MenuAlignType.START)
-        .height(40).enabled(!this.多选模式值)
+        .enabled(!this.多选模式值)
+        .attributeModifier(new SelectStyle($r('app.color.surface_card')))
+        .font(SelectStyle.controlFont)
+        .borderRadius(SelectStyle.controlRadius)
         .onSelect((index: number): void => {
           this.quickFilter = BROWSER_QUICK_FILTERS[index].id;
           this.执行搜索();
@@ -1757,10 +1760,12 @@ export struct 浏览页 {
         .layoutWeight(1).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
       Select(this.sortOptions())
         .selected(this.sortIndex()).value(this.sortLabel())
-        .controlSize(ControlSize.SMALL).font({ size: 应用尺寸.字号_正文 })
         .menuAlign(MenuAlignType.END)
-        .height(40).constraintSize({ maxWidth: '42%' })
+        .constraintSize({ maxWidth: '42%' })
         .enabled(!this.多选模式值 && this.阶段 === 'list')
+        .attributeModifier(new SelectStyle($r('app.color.surface_card')))
+        .font(SelectStyle.controlFont)
+        .borderRadius(SelectStyle.controlRadius)
         .onSelect((index: number): void => { this.selectSort(index); })
     }.width('100%')
       .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平, bottom: 6 })
@@ -2410,10 +2415,9 @@ export struct 浏览页 {
                   .value(this.选中新笔记类型ID === 0 ? '' :
                     this.笔记类型列表.find((项: NotetypeNameId): boolean => 项.id === this.选中新笔记类型ID)?.name ?? '')
                   .width('100%')
-                  .height(应用尺寸.按钮高度)
-                  .fontColor($r('app.color.text_primary'))
-                  .selectedOptionFontColor($r('app.color.action_on_primary'))
-                  .selectedOptionBgColor(this.主色容器色)
+                  .attributeModifier(new SelectStyle())
+                  .font(SelectStyle.controlFont)
+                  .borderRadius(SelectStyle.controlRadius)
                   .onSelect((索引: number): void => {
                     const 项: NotetypeNameId = this.笔记类型列表[索引];
                     this.选中新笔记类型ID = 项.id;
@@ -2439,8 +2443,9 @@ export struct 浏览页 {
                           this.取本地化文案($r('app.string.browser_action_change_notetype_no_map')) :
                           this.变更笔记类型信息数据!.oldFieldNames[this.字段映射[索引]])
                         .width('50%')
-                        .height(应用尺寸.按钮高度)
-                        .fontColor($r('app.color.text_primary'))
+                        .attributeModifier(new SelectStyle())
+                        .font(SelectStyle.controlFont)
+                        .borderRadius(SelectStyle.controlRadius)
                         .onSelect((选索引: number): void => {
                           // 选索引 0=不映射(-1)，1..N=旧字段 ord
                           const 新值: number = 选索引 === 0 ? -1 : 选索引 - 1;
@@ -2471,8 +2476,9 @@ export struct 浏览页 {
                             this.取本地化文案($r('app.string.browser_action_change_notetype_no_map')) :
                             this.变更笔记类型信息数据!.oldTemplateNames[this.模板映射[索引]])
                           .width('50%')
-                          .height(应用尺寸.按钮高度)
-                          .fontColor($r('app.color.text_primary'))
+                          .attributeModifier(new SelectStyle())
+                          .font(SelectStyle.controlFont)
+                          .borderRadius(SelectStyle.controlRadius)
                           .onSelect((选索引: number): void => {
                             const 新值: number = 选索引 === 0 ? -1 : 选索引 - 1;
                             const 新映射: number[] = this.模板映射.slice();

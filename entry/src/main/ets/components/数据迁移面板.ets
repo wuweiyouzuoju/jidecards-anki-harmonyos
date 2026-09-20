@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SelectStyle } from '../utils/SelectStyle';
 import { ThemeTextSpans } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
@@ -312,6 +313,9 @@ export struct 数据迁移面板 {
         .value(this.模式标签(this.模式))
         .width('100%')
         .enabled(!this.busy)
+        .attributeModifier(new SelectStyle())
+        .font(SelectStyle.controlFont)
+        .borderRadius(SelectStyle.controlRadius)
         .onSelect((索引: number): void => {
           this.模式 = 迁移模式列表[索引];
         })
@@ -328,6 +332,9 @@ export struct 数据迁移面板 {
             .value(this.已选牌组名称())
             .layoutWeight(1)
             .enabled(!this.busy && this.deckOptions.length > 0)
+            .attributeModifier(new SelectStyle())
+            .font(SelectStyle.controlFont)
+            .borderRadius(SelectStyle.controlRadius)
             .onSelect((索引: number): void => {
               this.已选导出牌组Id = this.deckOptions[索引].id;
             })

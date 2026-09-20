@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SelectStyle } from '../utils/SelectStyle';
 import { ThemeDefinition, themeDefinition, THEME_VISUALS_KEY } from '../model/ThemeCatalog';
 import { themeGradient } from '../utils/ThemeVisuals';
 import { GLASS_COLORS_KEY, GLASS_HIGHLIGHT_COLORS } from '../model/ThemeCatalog';
@@ -203,13 +204,12 @@ export struct 牌组列表项 {
     }
   }
 
-  /** 六种颜色与无色条，顺序同时用于 Select 索引和回调映射。 */
+  /** 五种常用颜色与无色条，顺序同时用于 Select 索引和回调映射。 */
   private readonly 色条选项列表: 色条选项[] = [
     { tone: 牌组色调.Blue, labelResource: $r('app.string.deck_tone_blue') },
     { tone: 牌组色调.Purple, labelResource: $r('app.string.deck_tone_purple') },
     { tone: 牌组色调.Mint, labelResource: $r('app.string.deck_tone_mint') },
     { tone: 牌组色调.Amber, labelResource: $r('app.string.deck_tone_amber') },
-    { tone: 牌组色调.Black, labelResource: $r('app.string.deck_tone_black') },
     { tone: 牌组色调.Red, labelResource: $r('app.string.deck_tone_red') },
     { tone: 牌组色调.None, labelResource: $r('app.string.deck_tone_none') }
   ];
@@ -221,9 +221,16 @@ export struct 牌组列表项 {
     }));
   }
 
-  /** 未识别的色调与色条渲染一致，回退蓝色。 */
+  /** 历史黑色可继续显示，但不作为新的候选项。 */
   private toneIndex(): number {
-    return Math.max(0, this.色条选项列表.findIndex((option: 色条选项): boolean => option.tone === this.deck.tone));
+    return this.色条选项列表.findIndex((option: 色条选项): boolean => option.tone === this.deck.tone);
+  }
+
+  /** 旧黑色色条不误标成蓝色。 */
+  private toneLabel(): string {
+    const index: number = this.toneIndex();
+    const label: Resource = index >= 0 ? this.色条选项列表[index].labelResource : $r('app.string.deck_tone_black');
+    return this.getUIContext().getHostContext()!.resourceManager.getStringSync(label.id);
   }
 
   /** 选择后关闭菜单，由首页保存并刷新当前牌组。 */
@@ -265,17 +272,15 @@ export struct 牌组列表项 {
   private 主菜单() {
     Column({ space: 0 }) {
       Row() {
-        Text($r('app.string.deck_menu_switch_tone'))
-          .fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_primary'))
-          .layoutWeight(1)
         Select(this.toneOptions())
           .selected(this.toneIndex())
-          .value(this.toneOptions()[this.toneIndex()].value)
-          .controlSize(ControlSize.SMALL)
-          .font({ size: 应用尺寸.字号_正文 })
-          .height(40)
-          .constraintSize({ maxWidth: '60%' })
+          .value(this.toneLabel())
+          .width('100%')
+          .accessibilityText(
+            $r('app.string.deck_menu_switch_tone'))
+          .attributeModifier(new SelectStyle())
+          .font(SelectStyle.controlFont)
+          .borderRadius(SelectStyle.controlRadius)
           .onSelect((index: number): void => { this.selectTone(index); })
       }
       .width('100%')
@@ -339,7 +344,7 @@ export struct 牌组列表项 {
       Row() {
         Text($r('app.string.deck_menu_hide'))
           .fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_secondary'))
+          .fontColor($r('app.color.text_primary'))
           .layoutWeight(1)
       }
       .width('100%')

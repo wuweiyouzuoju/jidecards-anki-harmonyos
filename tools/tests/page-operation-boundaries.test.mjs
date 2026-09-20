@@ -8,6 +8,7 @@ import { canPresentHomePrompt, canStartHomeAutoSync } from '../../entry/src/main
 import { BrowserOperationController } from '../../entry/src/main/ets/model/BrowserOperationController.ts';
 import { AutoSyncScheduler } from '../../entry/src/main/ets/model/AutoSyncScheduler.ts';
 import { CloudDeckImportController } from '../../entry/src/main/ets/model/CloudDeckImportController.ts';
+import { ExternalDeckOpenQueue } from '../../entry/src/main/ets/model/ExternalDeckOpen.ts';
 
 const deferred = () => { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; }); return { promise, resolve, reject }; };
 const settle = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
@@ -25,19 +26,21 @@ function pageMethods(file, names, dependencies = {}) {
 function homeHarness() {
   const response = deferred(), timers = new Map(); let next = 0;
   const events = [];
-  const Page = pageMethods('首页', ['homeActivity', 'canPresentStartupPrompt', 'homeActivityChanged',
+  const Page = pageMethods('首页', ['homeActivity', 'canPresentStartupPrompt', 'homeActivityChanged', 'tryImportExternalDeck',
     '尝试显示官方公告', '尝试展示待展示官方公告', '请求主页官方公告检查', '暂停主页官方公告检查',
-    '继续首次弹窗序列', '显示欢迎弹窗一次', 'onBackPress', 'autoSyncCollectionFinished', 'presentPendingSyncWarning'], {
+    '继续首次弹窗序列', '显示欢迎弹窗一次', 'closeHomeIntro', 'onBackPress', 'autoSyncCollectionFinished', 'presentPendingSyncWarning'], {
     canPresentHomePrompt, bundleManager: { BundleFlag: {}, getBundleInfoForSelf: async () => ({ versionName: 'test' }) },
     后端会话: { 获取实例: () => ({ 是否就绪: () => true }) }, 当前语言模式: () => 'zh',
     是否已确认官方公告: async () => false, 是否已完成云端牌组引导: async () => false,
-    是否已展示欢迎弹窗: async () => false, 标记已展示欢迎弹窗: async () => events.push('welcome-persist'),
+    isHomeIntroCompleted: async () => false, completeHomeIntro: async () => events.push('welcome-persist'),
     官方公告检查延迟毫秒: () => 600000,
+    externalDeckOpens: new ExternalDeckOpenQueue(),
     AppStorage: { get() {}, setOrCreate() {} },
     setTimeout: (fn, delay) => { const id = ++next; timers.set(id, { fn, delay }); return id; }, clearTimeout: id => timers.delete(id)
   });
   const page = new Page();
   Object.assign(page, { announcementController: new HomeAnnouncementController(), homeDisposed: false,
+    syncScheduler: new AutoSyncScheduler(),
     pendingSyncAction: null, pendingSyncFsrsWarning: false,
     syncForeground: true, 页面栈: { size: () => 0 }, 主页允许公告检查: true, 加载状态: 'ready',
     homeWorkTimer: -1, 官方公告延迟检查任务: -1, 官方公告检查中: false, 主页公告检查已激活: true,
@@ -48,6 +51,20 @@ function homeHarness() {
   });
   return { page, response, timers, events, tick: () => { for (const [id, timer] of [...timers]) if (timer.delay === 0) { timers.delete(id); timer.fn(); } } };
 }
+
+test('manual sync is considered before an unseen announcement can occupy the home dialog slot', async () => {
+  const { page, response, events, tick } = homeHarness();
+  page.显示创建牌组 = true;
+  const check = page.尝试显示官方公告();
+  response.resolve({ id: 'notice' }); await check;
+  page.syncScheduler.requestManual();
+  page.tryAutoSync = () => { events.push('manual-sync'); page.autoSyncCollectionBusy = true; };
+  page.显示创建牌组 = false;
+  page.homeActivityChanged(); tick();
+  assert.equal(events.includes('manual-sync'), true);
+  assert.equal(page.显示官方公告, false);
+  assert.equal(page.announcementController.hasPending(), true);
+});
 
 for (const blocker of ['显示创建牌组', '显示牌组选项', '显示数据迁移', '数据迁移中', '创建牌组中',
   'autoSyncCollectionBusy', 'autoSyncModal', 'nativeDialogOpen', '显示卡片预览', '预览加载中', '显示更多菜单']) {
@@ -107,6 +124,9 @@ test('welcome marker is not consumed while another dialog prevents presentation'
   assert.equal(page.welcomePending, true); assert.deepEqual(events, []);
   page.显示创建牌组 = false; page.homeActivityChanged(); tick(); await settle();
   assert.equal(page.显示欢迎弹窗, true);
+  assert.deepEqual(events.filter(e => e === 'welcome-persist'), []);
+  page.closeHomeIntro(); await settle();
+  assert.equal(page.显示欢迎弹窗, false);
   assert.deepEqual(events.filter(e => e === 'welcome-persist'), ['welcome-persist']);
 });
 

@@ -2,10 +2,12 @@
 
 jidecards 是面向 HarmonyOS 的开源 Anki 卡片学习客户端，使用 ArkUI 构建应用界面，并复用 Anki 的 Rust 后端。
 
-**当前源码版本：2.7.0（versionCode 2700）**
+**当前源码版本：2.7.9（versionCode 2790）**
 
 应用已发布到华为应用市场，可搜索“记得闪卡”下载安装。商店实际上架版本以
 AppGallery 页面为准；仓库中的构建版本以 `AppScope/app.json5` 为唯一依据。
+
+相对 2.7.0 的完整更新整理见 [2.7.9 更新说明](docs/releases/2.7.9.md)。
 
 ## 2.7.0 更新内容
 

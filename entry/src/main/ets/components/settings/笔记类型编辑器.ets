@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SelectStyle } from '../../utils/SelectStyle';
 import { ThemeTextSpans } from '../common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
@@ -504,11 +505,10 @@ export struct 笔记类型编辑器 {
                 ])
                   .selected(this.当前模板索引)
                   .value(this.当前模板().name)
-                  .height(应用尺寸.按钮高度)
-                  .backgroundColor($r('app.color.surface_card'))
-                  .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
-                  .borderRadius(应用尺寸.圆角_面板)
                   .width('100%')
+                  .attributeModifier(new SelectStyle())
+                  .font(SelectStyle.controlFont)
+                  .borderRadius(SelectStyle.controlRadius)
                   .onSelect((索引: number) => {
                     this.当前模板索引 = 索引;
                   })

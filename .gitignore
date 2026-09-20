@@ -22,6 +22,7 @@
 /PROJECT_CONTEXT.md
 
 # Temporary / debug
+tools/.cache/
 /.tmp_*
 /.tmp-*
 /tmp/

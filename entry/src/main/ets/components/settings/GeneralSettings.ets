@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SelectStyle } from '../../utils/SelectStyle';
 import { 当前语言模式, 语言模式, 设置语言模式 } from '../../model/语言存储';
 import { 保存显示今日进度卡, 主页今日进度卡AppStorage键 } from '../../model/主页偏好';
 import { 设置面板色板_取 } from '../../utils/设置面板配色';
@@ -58,7 +59,9 @@ export struct GeneralSettings {
             Select(this.语言选项())
               .selected(this.语言索引())
               .value(this.取本地化文本(this.语言模式标签(当前语言模式())))
-              .controlSize(ControlSize.SMALL)
+              .attributeModifier(new SelectStyle())
+              .font(SelectStyle.controlFont)
+              .borderRadius(SelectStyle.controlRadius)
               .onSelect((索引: number): void => {
                 const 模式列表: 语言模式[] = ['zh-Hans', 'en'];
                 this.选择语言(模式列表[索引]);

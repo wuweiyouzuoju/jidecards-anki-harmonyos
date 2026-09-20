@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SelectStyle } from '../../utils/SelectStyle';
 
 import { DialogHeader } from '../common/DialogHeader';
 // ========================================================
@@ -212,14 +213,10 @@ export struct 创建过滤牌组面板 {
               this.排序选项列表.find((选项: 排序选项) => 选项.值 === this.排序值)?.标签资源
               ?? $r('app.string.filtered_deck_order_added')))
             .width('100%')
-            .height(应用尺寸.按钮高度)
-            .fontColor($r('app.color.text_primary'))
-            .selectedOptionBgColor($r('app.color.surface_page'))
-            .optionBgColor($r('app.color.surface_card'))
-            .backgroundColor($r('app.color.surface_card'))
-            .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
-            .borderRadius(应用尺寸.圆角_面板)
             .enabled(!this.处理中)
+            .attributeModifier(new SelectStyle())
+            .font(SelectStyle.controlFont)
+            .borderRadius(SelectStyle.controlRadius)
             .onSelect((index: number) => {
               if (index >= 0 && index < this.排序选项列表.length) {
                 this.排序值 = this.排序选项列表[index].值;

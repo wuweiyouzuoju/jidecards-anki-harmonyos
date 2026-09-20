@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SelectStyle } from '../utils/SelectStyle';
 import { ThemeTextSpans } from '../components/common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
@@ -1063,8 +1064,10 @@ export struct 添加笔记页 {
               Select(this.笔记类型下拉选项())
                 .selected(this.已选笔记类型索引())
                 .value(this.已选笔记类型名())
-                .controlSize(ControlSize.SMALL)
                 .enabled(!this.处理中 && this.笔记类型选项.length > 0)
+                .attributeModifier(new SelectStyle($r('app.color.surface_card')))
+                .font(SelectStyle.controlFont)
+                .borderRadius(SelectStyle.controlRadius)
                 .onSelect((索引: number): void => {
                   this.加载笔记类型(this.笔记类型选项[索引].id);
                 })

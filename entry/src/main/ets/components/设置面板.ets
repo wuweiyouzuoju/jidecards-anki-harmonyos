@@ -1052,7 +1052,7 @@ export struct 设置面板 {
           top: 应用尺寸.pageContentTopInset,
           bottom: 应用尺寸.pageBottomInset + this.导航条高度
         })
-        .backgroundColor($r('app.color.surface_page'))
+        .backgroundColor(this.页面底色微染值)
         .scrollBar(BarState.Off)
         .edgeEffect(EdgeEffect.Spring)
         .alignListItem(ListItemAlign.Center)

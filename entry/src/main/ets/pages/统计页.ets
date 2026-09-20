@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SelectStyle } from '../utils/SelectStyle';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
 
 // ========================================================
@@ -218,7 +219,8 @@ export struct 统计页 {
       });
       this.牌组名列表 = 名列表;
       const 选项: SelectOption[] = [];
-      选项.push({ value: $r('app.string.stats_deck_all') } as SelectOption);
+      选项.push({ value: this.getUIContext().getHostContext()!.resourceManager
+        .getStringSync($r('app.string.stats_deck_all').id) });
       for (let i = 0; i < 名列表.length; i++) {
         选项.push({ value: 名列表[i] } as SelectOption);
       }
@@ -447,7 +449,7 @@ export struct 统计页 {
   @Builder
   private 顶部条() {
     // 与浏览页顶部条同款：左返回按钮（按下态胶囊样式 + 淡色边框）。
-    // 牌组选择位于统计内容首行，与 FSRS 状态左右排列。
+    // FSRS 状态位于右上角，牌组和历史范围位于内容首行。
     Stack({ alignContent: Alignment.Center }) {
       Text($r('app.string.stats_page_title'))
         .fontSize(应用尺寸.字号_标题).fontWeight(FontWeight.Medium)
@@ -462,11 +464,17 @@ export struct 统计页 {
 
         Blank()
 
-        范围切换条({
-          当前索引: this.统计天数 === 0 ? 1 : 0,
-          标签集: [$r('app.string.stats_history_range_year'), $r('app.string.stats_history_range_all')],
-          onRangeChange: (index: number): void => { this.on天数切换(index === 1 ? 0 : 365); }
-        })
+        if (this.图表数据 !== null) {
+          Row() {
+            Text(this.图表数据.fsrs
+              ? $r('app.string.stats_fsrs_enabled')
+              : $r('app.string.stats_fsrs_disabled'))
+              .fontSize(应用尺寸.字号_正文_小)
+              .fontColor($r('app.color.text_primary'))
+          }
+          .height(应用尺寸.紧凑控件高度)
+          .alignItems(VerticalAlign.Center)
+        }
       }
       .width('100%')
       .height('100%')
@@ -489,40 +497,29 @@ export struct 统计页 {
   private 统计内容() {
     Scroll() {
       Column({ space: 应用尺寸.pageSectionGap }) {
-        // 统计口径行：牌组选择在左，FSRS 状态在右。
-        Row() {
+        // 统计口径行：牌组选择在左，历史范围选择在右。
+        Row({ space: 应用尺寸.间距_8 }) {
           if (this.牌组选项.length > 1) {
             Select(this.牌组选项)
               .selected(this.选中牌组索引)
-              .value(this.选中牌组索引 === 0
-                ? (this.牌组选项[0].value as ResourceStr)
-                : (this.牌组选项[this.选中牌组索引].value as ResourceStr))
-              .fontColor($r('app.color.text_primary'))
-              .font({ size: 应用尺寸.字号_正文_小 })
-              .selectedOptionFontColor($r('app.color.text_primary'))
-              .optionFontColor($r('app.color.text_primary'))
-              .controlSize(ControlSize.SMALL)
-              .height(应用尺寸.紧凑控件高度)
-              .constraintSize({ maxWidth: '58%' })
+              .value(this.牌组选项[this.选中牌组索引]?.value ?? '')
+              .layoutWeight(1)
+              .attributeModifier(new SelectStyle($r('app.color.surface_card')))
+              .font(SelectStyle.controlFont)
+              .borderRadius(SelectStyle.controlRadius)
               .onSelect((索引: number) => {
                 this.on牌组切换(索引);
               })
+          } else {
+            Blank()
           }
 
-          Blank()
-
-          if (this.图表数据 !== null) {
-            Row() {
-              Text(this.图表数据.fsrs
-                ? $r('app.string.stats_fsrs_enabled')
-                : $r('app.string.stats_fsrs_disabled'))
-                .fontSize(应用尺寸.字号_正文_小)
-                .fontColor($r('app.color.text_primary'))
-            }
-            .height(应用尺寸.紧凑控件高度)
-            .alignItems(VerticalAlign.Center)
-            .padding({ right: 应用尺寸.卡片内边距 })
-          }
+          范围切换条({
+            surfaceColor: $r('app.color.surface_card'),
+            当前索引: this.统计天数 === 0 ? 1 : 0,
+            标签集: [$r('app.string.stats_history_range_year'), $r('app.string.stats_history_range_all')],
+            onRangeChange: (index: number): void => { this.on天数切换(index === 1 ? 0 : 365); }
+          })
         }
         .width('100%')
         .alignItems(VerticalAlign.Center)

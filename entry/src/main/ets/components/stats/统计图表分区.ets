@@ -76,6 +76,6 @@ export struct 统计图表分区 {
     .padding(应用尺寸.卡片内边距)
     .backgroundColor($r('app.color.surface_card'))
     .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
-    .borderRadius(16)
+    .borderRadius(应用尺寸.圆角_指标卡)
   }
 }

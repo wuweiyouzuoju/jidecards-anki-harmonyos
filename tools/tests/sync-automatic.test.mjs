@@ -36,11 +36,11 @@ function componentMethods(source, names, dependencies) {
 function homeHarness() {
   const state = { enabled: true, ready: true, auth: { hkey: 'test-key', endpoint: 'http://lan:8080/', username: 'u' }, timers: new Map(), seq: 0, navigation: [], toasts: 0 };
   const gate = new SyncActivity();
-  const Page = componentMethods(read('pages/首页.ets'), ['homeActivity', 'requestAutoSync', 'scheduleAutoSyncCheck', 'isAutoSyncLocationSafe', 'stopAutoSyncTimer', 'tryAutoSync', 'syncForegroundChanged', 'onPageHide', 'onBackPress', 'deferForSync', 'flushSyncAction', 'autoSyncCollectionFinished', 'autoSyncStateChanged', '选择牌组', '开始学习', 'openCreateDeck', 'openSettings', 'openReminders', 'syncYielded', 'presentPendingSyncWarning'], {
-    canStartHomeAutoSync,
+  const Page = componentMethods(read('pages/首页.ets'), ['requestManualSync', 'updatePendingSyncStatus', 'homeActivity', 'requestAutoSync', 'scheduleAutoSyncCheck', 'isAutoSyncLocationSafe', 'stopAutoSyncTimer', 'tryAutoSync', 'syncForegroundChanged', 'onPageHide', 'onBackPress', 'deferForSync', 'flushSyncAction', 'autoSyncCollectionFinished', 'autoSyncStateChanged', '选择牌组', '开始学习', 'openCreateDeck', 'openSettings', 'openReminders', 'syncYielded', 'presentPendingSyncWarning'], {
+    canStartHomeAutoSync, externalDeckOpens: { hasPending: () => state.externalDeckPending === true },
     AppStorage: { get() {}, setOrCreate() {} },
     loadAutoSyncEnabled: () => state.enabled, 加载同步凭证: () => state.auth,
-    $r: key => key, 牌组显示名: deck => deck.name, 保存上次牌组ID: async () => {},
+    $r: key => ({ id: key }), 牌组显示名: deck => deck.name, 保存上次牌组ID: async () => {},
     后端会话: { 获取实例: () => ({ 是否就绪: () => state.ready }) }, syncActivity: gate,
     setTimeout: fn => { const id = ++state.seq; state.timers.set(id, fn); return id; },
     clearTimeout: id => state.timers.delete(id)
@@ -49,12 +49,87 @@ function homeHarness() {
   Object.assign(page, { announcementController: new HomeAnnouncementController(), homeActivityChanged() {}, syncForeground: true, autoSyncStartupReady: true, syncScheduler: new AutoSyncScheduler(), autoSyncTimer: -1,
     页面栈: { size: () => 0, pushPath: path => state.navigation.push(path) }, 加载状态: 'ready', 显示同步面板: false,
     autoSyncCollectionBusy: false, autoSyncRefreshing: false, autoSyncModal: false, pendingSyncAction: null, pendingSyncFsrsWarning: false,
+    syncDetailsRequest: 0, getUIContext: () => ({ getHostContext: () => ({ resourceManager: { getStringSync: key => key } }) }),
     显示提示: () => { state.toasts++; }, 已选中牌组: () => true, 选中牌组: () => ({ id: 'deck', name: 'deck' }), 展开牌组路径() {}, 当前断点: 'xs',
     加载主页数据: async () => {}, 同步后检查FSRS: async () => {}, 暂停主页官方公告检查() {} });
   page.syncScheduler.setListener(() => page.scheduleAutoSyncCheck());
   const tick = () => { const callbacks = [...state.timers.values()]; state.timers.clear(); callbacks.forEach(fn => fn()); };
   return { page, state, tick, gate };
 }
+
+test('manual request survives settings pop before navigation finishes', () => {
+  const { page, state, tick } = homeHarness();
+  let depth = 1;
+  let popped = false;
+  page.页面栈 = { size: () => depth, pop: () => { popped = true; } };
+  page.requestManualSync();
+  assert.equal(popped, true);
+  assert.equal(state.timers.size, 1);
+  tick();
+  assert.equal(page.syncStatusText, 'app.string.sync_wait_home');
+  assert.equal(page.显示同步面板, false);
+  depth = 0;
+  tick();
+  assert.equal(page.显示同步面板, true);
+  assert.equal(page.syncAutomatic, false);
+});
+
+test('manual sync takes priority over unseen startup work but still waits for an open dialog', () => {
+  const { page, tick } = homeHarness();
+  page.autoSyncStartupReady = false;
+  page.官方公告检查中 = true;
+  page.startupContinuationPending = true;
+  page.显示牌组选项 = true;
+  page.syncScheduler.requestManual();
+  tick();
+  assert.equal(page.显示同步面板, false);
+  assert.equal(page.syncStatusText, 'app.string.sync_wait_dialog');
+  page.显示牌组选项 = false;
+  tick();
+  assert.equal(page.显示同步面板, true);
+  assert.equal(page.syncAutomatic, false);
+});
+
+test('manual pending reason follows the real blocker and resumes after editing completes', () => {
+  const { page, tick } = homeHarness();
+  const operation = {};
+  page.syncScheduler.beginOperation(operation);
+  page.syncScheduler.requestManual();
+  tick();
+  assert.equal(page.syncStatusText, 'app.string.sync_wait_study');
+  page.syncScheduler.endOperation(operation);
+  page.加载状态 = 'error';
+  tick();
+  assert.equal(page.syncStatusText, 'app.string.sync_wait_load_failed');
+  page.加载状态 = 'ready';
+  page.数据迁移中 = true;
+  tick();
+  assert.equal(page.syncStatusText, 'app.string.sync_wait_operation');
+  page.数据迁移中 = false;
+  tick();
+  assert.equal(page.显示同步面板, true);
+});
+
+test('manual click during an existing sync opens that task without overwriting its progress', () => {
+  const { page } = homeHarness();
+  page.页面栈 = { size: () => 0, pop() {} };
+  page.显示同步面板 = true;
+  page.syncStatusText = 'media progress';
+  page.requestManualSync();
+  assert.equal(page.syncStatusText, 'media progress');
+  assert.equal(page.syncDetailsRequest, 1);
+  assert.equal(page.syncScheduler.hasPending(), false);
+});
+
+test('pending external deck opens before automatic sync can reserve collection', () => {
+  const { page, state, tick } = homeHarness();
+  state.externalDeckPending = true;
+  page.requestAutoSync(); tick();
+  assert.equal(page.显示同步面板, false);
+  state.externalDeckPending = false;
+  tick();
+  assert.equal(page.显示同步面板, true);
+});
 
 test('startup waits for collection and prompts, then opens one auto sync with latest persisted endpoint', () => {
   const { page, state, tick } = homeHarness();

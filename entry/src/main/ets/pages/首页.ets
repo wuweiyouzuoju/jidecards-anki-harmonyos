@@ -30,6 +30,7 @@ import { 云端牌组弹窗 } from '../components/云端牌组弹窗';
 import { CloudDeckImportController, CloudDeckImportBackend, CloudDeckImportProgress } from '../model/CloudDeckImportController';
 import { HomeActivityState, canPresentHomePrompt, canStartHomeAutoSync } from '../model/HomeActivityPolicy';
 import { HomeAnnouncementController } from '../model/HomeAnnouncementController';
+import { externalDeckOpens, EXTERNAL_DECK_OPEN_REVISION_KEY } from '../model/ExternalDeckOpen';
 import { 官方公告弹窗 } from '../components/官方公告弹窗';
 import { 官方公告服务 } from '../backend/官方公告服务';
 import { 官方公告检查延迟毫秒 } from '../model/官方公告模型';
@@ -99,8 +100,11 @@ import { 应用尺寸 } from '../utils/应用尺寸';
 import { 选取数据文件 } from '../utils/文件导入助手';
 import { 可见牌组行, 平铺牌组树 } from '../model/牌组层级';
 import { 检查节流标记, 获取节流奖励 } from '../utils/操作节流';
-import { 欢迎弹窗 } from '../components/欢迎弹窗';
-import { 是否已展示欢迎弹窗, 标记已展示欢迎弹窗 } from '../model/欢迎弹窗存储';
+import { HomeIntroPanel } from '../components/HomeIntroPanel';
+import { isHomeIntroCompleted, completeHomeIntro } from '../utils/HomeIntroStore';
+import { DeckMediaCleanup } from '../model/DeckMediaCleanup';
+import { 媒体服务 } from '../backend/媒体服务';
+import { 同步服务 } from '../backend/同步服务';
 import {
   是否已完成云端牌组引导,
   标记已完成云端牌组引导,
@@ -165,6 +169,8 @@ struct 首页 {
   // 桌面卡片 DeepLink 信号：EntryAbility 处理DeepLink 收到 jidecards://stats 时写时间戳，
   // @Watch 监听变化触发 桌面卡片跳转_回调 调 打开统计页。0 = 无跳转请求。
   @StorageLink('navigateToStats') @Watch('桌面卡片跳转_回调') private 桌面卡片跳转信号: number = 0;
+  @StorageLink(EXTERNAL_DECK_OPEN_REVISION_KEY) @Watch('homeActivityChanged')
+  private externalDeckOpenRevision: number = 0;
   // 设置页数据迁移/同步/取消隐藏完成后写时间戳，@Watch 监听变化触发 加载主页数据 刷新
   @StorageLink('需要刷新主页') @Watch('需要刷新主页_回调') private 需要刷新主页信号: number = 0;
   // 主页今日进度卡开关：用户在设置页「复习页布局」分组末尾切换，
@@ -233,7 +239,13 @@ struct 首页 {
   private readonly syncScheduler: AutoSyncScheduler = autoSyncScheduler;
   private autoSyncTimer: number = -1;
   private autoSyncStartupReady: boolean = false;
-  private deckDeletionBusy: boolean = false;
+  @State private deckDeletionBusy: boolean = false;
+  @State private deckDeletionStatus: Resource = $r('app.string.deck_media_checking');
+  private readonly deckMediaCleanup: DeckMediaCleanup = new DeckMediaCleanup({
+    isSyncing: async (): Promise<boolean> => (await new 同步服务().媒体同步状态()).active,
+    unused: async (): Promise<string[]> => (await new 媒体服务().检查媒体()).unused,
+    trash: async (files: string[]): Promise<void> => { await new 媒体服务().媒体文件进回收站(files); }
+  });
   @State @Watch('homeActivityChanged') private autoSyncCollectionBusy: boolean = false;
   @State @Watch('homeActivityChanged') private autoSyncModal: boolean = false;
   @State private syncBackRequest: number = 0;
@@ -270,7 +282,7 @@ struct 首页 {
   @State @Watch('homeActivityChanged') private 排序模式中: boolean = false;
   // 上次选中牌组恢复标志：仅在首次 加载主页数据 完成后恢复一次，避免 onPop 刷新时反复覆盖用户主动取消的选中态
   private 上次牌组已恢复: boolean = false;
-  // 首次启动欢迎弹窗：介绍基础操作/个性设置/作者的话，由 aboutToAppear → 显示欢迎弹窗一次 触发
+  // 入门弹窗与启动序列共用展示槽位，由独立本机修订标记控制一次展示。
   @State @Watch('homeActivityChanged') private 显示欢迎弹窗: boolean = false;
   @State @Watch('homeActivityChanged') private 显示云端牌组弹窗: boolean = false;
   @State private 云端牌组加载中: boolean = false;
@@ -308,6 +320,22 @@ struct 首页 {
     // 首次进入先完成云端牌组选择与导入，再展示版本欢迎内容，避免两个全屏弹窗叠加。
     this.显示首次弹窗序列().finally((): void => { this.autoSyncStartupReady = true; });
     this.刷新云端牌组配额状态();
+    this.homeActivityChanged();
+  }
+
+  /** 外部打开优先于启动提示；当前学习、编辑和集合写入完成后才消费。 */
+  private tryImportExternalDeck(): boolean {
+    if (!externalDeckOpens.hasPending()) return false;
+    const activity: HomeActivityState = this.homeActivity();
+    if (!activity.collectionReady || !canPresentHomePrompt(activity) || this.pendingSyncAction !== null) return true;
+    const uri: string | null = externalDeckOpens.begin();
+    if (uri !== null) {
+      this.importDeckUri(uri).finally((): void => {
+        externalDeckOpens.finish();
+        this.homeActivityChanged();
+      });
+    }
+    return true;
   }
 
   aboutToDisappear(): void {
@@ -341,7 +369,8 @@ struct 首页 {
   /** 答题中不轮询；会话完成/销毁或返回前台时再唤醒。 */
   private scheduleAutoSyncCheck(): void {
     if (this.autoSyncTimer >= 0 || !this.syncForeground || this.显示同步面板 ||
-      !this.syncScheduler.hasPending() || !this.isAutoSyncLocationSafe()) return;
+      !this.syncScheduler.hasPending() ||
+      (!this.syncScheduler.isManualPending() && !this.isAutoSyncLocationSafe())) return;
     this.autoSyncTimer = setTimeout((): void => {
       this.autoSyncTimer = -1;
       this.tryAutoSync();
@@ -375,11 +404,19 @@ struct 首页 {
       return;
     }
     if (!this.syncForeground || !this.isAutoSyncLocationSafe()) {
+      if (manual) this.updatePendingSyncStatus();
       this.stopAutoSyncTimer();
       return;
     }
-    if (!this.autoSyncStartupReady || !canStartHomeAutoSync(this.homeActivity()) ||
-      this.显示同步面板 || (manual ? syncActivity.isActive() : !syncActivity.canAutoSync(Date.now()))) return;
+    const activity: HomeActivityState = this.homeActivity();
+    // 手动同步优先于尚未展示的公告/引导；已打开弹窗及集合占用仍保持互斥。
+    if (manual) activity.startupChecking = false;
+    if (externalDeckOpens.hasPending() || (!manual && !this.autoSyncStartupReady) ||
+      !canStartHomeAutoSync(activity) || this.显示同步面板 ||
+      (manual ? syncActivity.isActive() : !syncActivity.canAutoSync(Date.now()))) {
+      if (manual) this.updatePendingSyncStatus();
+      return;
+    }
     const info: 同步凭证信息 | null = 加载同步凭证();
     if (info === null) return;
     const auth: SyncAuth = { hkey: info.hkey, endpoint: info.endpoint, ioTimeoutSecs: 0 };
@@ -405,10 +442,29 @@ struct 首页 {
   /** 设置页仅提交意图并返回首页，由根宿主执行，页面销毁不影响传输。 */
   private requestManualSync(): void {
     this.stopAutoSyncTimer();
+    this.页面栈.pop();
+    if (this.显示同步面板) {
+      this.syncDetailsRequest++;
+      return;
+    }
     this.syncStatusText = this.getUIContext().getHostContext()!.resourceManager.getStringSync(
       $r('app.string.sync_pending').id);
     this.syncScheduler.requestManual();
-    this.页面栈.pop();
+  }
+
+  /** 排队提示反映实际阻挡原因，避免把所有状态都称为“空闲”。 */
+  private updatePendingSyncStatus(): void {
+    const activity: HomeActivityState = this.homeActivity();
+    let reason: Resource = $r('app.string.sync_pending');
+    if (!this.syncScheduler.canSync()) reason = $r('app.string.sync_wait_study');
+    else if (!this.isAutoSyncLocationSafe()) reason = $r('app.string.sync_wait_home');
+    else if (externalDeckOpens.hasPending()) reason = $r('app.string.sync_wait_import');
+    else if (this.加载状态 === 'error') reason = $r('app.string.sync_wait_load_failed');
+    else if (!activity.collectionReady) reason = $r('app.string.sync_wait_load');
+    else if (activity.dialogOpen) reason = $r('app.string.sync_wait_dialog');
+    else if (activity.collectionBusy || activity.interactionBusy) reason = $r('app.string.sync_wait_operation');
+    else if (syncActivity.isActive()) reason = $r('app.string.sync_wait_transfer');
+    this.syncStatusText = this.getUIContext().getHostContext()!.resourceManager.getStringSync(reason.id);
   }
 
   private syncYielded(automatic: boolean): void {
@@ -491,7 +547,7 @@ struct 首页 {
   }
 
   private canPresentStartupPrompt(): boolean {
-    return canPresentHomePrompt(this.homeActivity());
+    return !externalDeckOpens.hasPending() && canPresentHomePrompt(this.homeActivity());
   }
 
   /** 合并同一轮多个状态变化，先让待展示内容占位，再考虑后台同步。 */
@@ -499,9 +555,15 @@ struct 首页 {
     if (this.homeDisposed || this.homeWorkTimer >= 0) return;
     this.homeWorkTimer = setTimeout((): void => {
       this.homeWorkTimer = -1;
+      if (this.tryImportExternalDeck()) return;
       if (!this.canPresentStartupPrompt()) return;
       this.flushSyncAction();
       if (!this.canPresentStartupPrompt()) return;
+      if (this.syncScheduler.isManualPending()) {
+        this.tryAutoSync();
+        this.scheduleAutoSyncCheck();
+        return;
+      }
       if (this.尝试展示待展示官方公告()) return;
       if (this.startupContinuationPending) this.继续首次弹窗序列();
       else if (this.welcomePending) this.显示欢迎弹窗一次();
@@ -668,7 +730,7 @@ struct 首页 {
   // @名称 显示欢迎弹窗一次
   //
   // @作用
-  // 首次启动展示欢迎弹窗（介绍此次更新改动/获取牌组/作者的话）；已展示过则跳过。
+  // 新用户与升级用户展示入门说明；确认过当前内容修订则跳过。
   //
   // @输入
   // 无（读取 preferences 标记）
@@ -677,20 +739,25 @@ struct 首页 {
   // 设置 显示欢迎弹窗 状态为 true 触发弹窗渲染
   //
   // @业务规则
-  // 只有取得展示时机才记录已展示，避免用户表单占用时提前消耗欢迎弹窗。
+  // 只有用户确认才记录已读，避免表单占用或进程退出提前消耗入门机会。
   //
   // @副作用
   // 写 preferences 持久化 welcome_shown
   // ========================================================
   private async 显示欢迎弹窗一次(): Promise<void> {
     this.welcomePending = true;
-    const shown: boolean = await 是否已展示欢迎弹窗();
+    const shown: boolean = await isHomeIntroCompleted();
     if (this.homeDisposed) return;
     if (shown) { this.welcomePending = false; return; }
     if (!this.canPresentStartupPrompt() || this.announcementController.hasPending()) return;
     this.welcomePending = false;
     this.显示欢迎弹窗 = true;
-    await 标记已展示欢迎弹窗();
+  }
+
+  /** 用户确认后才记录入门已读，失败提示但不阻止进入应用。 */
+  private closeHomeIntro(): void {
+    this.显示欢迎弹窗 = false;
+    completeHomeIntro().catch((): void => { this.显示提示($r('app.string.home_intro_save_failed')); });
   }
 
   /** 页面每次可见都刷新（含从复习页返回），保证今日计数与队列状态同步。 */
@@ -731,7 +798,7 @@ struct 首页 {
     if (this.显示主页操作) { this.显示主页操作 = false; return true; }
     if (this.显示更多菜单) { this.显示更多菜单 = false; return true; }
     if (this.显示节流奖励) { this.显示节流奖励 = false; return true; }
-    if (this.显示欢迎弹窗) { this.显示欢迎弹窗 = false; return true; }
+    if (this.显示欢迎弹窗) { this.closeHomeIntro(); return true; }
     if (this.显示牌组详情) { this.显示牌组详情 = false; return true; }
     return false;
   }
@@ -1596,6 +1663,12 @@ struct 首页 {
     if (this.deckDeletionBusy || this.deferForSync((): void => { this.确认删除牌组(deckId); })) return;
     this.deckDeletionBusy = true;
     try {
+      this.deckDeletionStatus = $r('app.string.deck_media_checking');
+      let before: string[] | null = null;
+      try { before = await this.deckMediaCleanup.snapshot(); } catch {
+        // 不可靠的基线不能用于清理；牌组删除本身仍按已确认的意图进行。
+      }
+      this.deckDeletionStatus = $r('app.string.deck_deleting');
       let count: number;
       try {
         count = await this.牌组服务实例.删除牌组([Number(deckId)]);
@@ -1617,11 +1690,64 @@ struct 首页 {
       if (!selectionSaved) successMsg += '\n' + this.getUIContext().getHostContext()!.resourceManager.getStringSync(
         $r('app.string.home_selection_save_failed').id);
       this.getUIContext().getPromptAction().showToast({ message: successMsg });
+      await this.offerDeletedDeckMediaCleanup(before);
     } finally {
       this.deckDeletionBusy = false;
       this.homeActivityChanged();
       this.scheduleAutoSyncCheck();
     }
+  }
+
+  /** 删除已提交后独立检查并二次确认，失败不得报成牌组删除失败。 */
+  private async offerDeletedDeckMediaCleanup(before: string[] | null): Promise<void> {
+    if (this.homeDisposed || !this.syncForeground) return;
+    if (before === null) {
+      this.显示提示($r('app.string.deck_media_check_failed'));
+      return;
+    }
+    try {
+      this.deckDeletionStatus = $r('app.string.deck_media_checking');
+      const candidates: string[] = await this.deckMediaCleanup.candidates(before);
+      if (this.homeDisposed || !this.syncForeground) return;
+      if (candidates.length === 0) {
+        this.显示提示($r('app.string.deck_media_none'));
+        return;
+      }
+      this.deckDeletionStatus = $r('app.string.deck_media_waiting');
+      const confirmed: boolean = await this.confirmDeletedDeckMedia(candidates.length);
+      if (!confirmed || this.homeDisposed || !this.syncForeground) return;
+      this.deckDeletionStatus = $r('app.string.deck_media_checking');
+      const removed: number = await this.deckMediaCleanup.cleanup(candidates);
+      const message: string = this.getUIContext().getHostContext()!.resourceManager.getStringSync(
+        $r('app.string.deck_media_cleaned').id).replace('%d', removed.toString());
+      this.getUIContext().getPromptAction().showToast({ message: message });
+    } catch {
+      this.显示提示($r('app.string.deck_media_cleanup_failed'));
+    }
+  }
+
+  /** 确认窗口始终处于删除忙碌期，阻止其他写入和自动同步改变引用关系。 */
+  private confirmDeletedDeckMedia(count: number): Promise<boolean> {
+    const message: string = this.getUIContext().getHostContext()!.resourceManager.getStringSync(
+      $r('app.string.deck_media_confirm_message').id).replace('%d', count.toString());
+    return new Promise<boolean>((resolve): void => {
+      this.getUIContext().showAlertDialog({
+        title: $r('app.string.deck_media_confirm_title'),
+        message: message,
+        autoCancel: false,
+        alignment: DialogAlignment.Center,
+        cancel: (): void => { resolve(false); },
+        primaryButton: {
+          value: $r('app.string.deck_media_keep'),
+          action: (): void => { resolve(false); }
+        },
+        secondaryButton: {
+          value: $r('app.string.deck_media_remove'),
+          fontColor: $r('app.color.error_text'),
+          action: (): void => { resolve(true); }
+        }
+      });
+    });
   }
 
   /** 数据变更后校验选择；偏好写入失败不改变已经提交的数据库操作结果。 */
@@ -2079,6 +2205,14 @@ struct 首页 {
     finally { this.nativeDialogOpen = false; }
     if (this.homeDisposed) return;
     if (uri === null) return;
+    await this.importDeckUri(uri);
+  }
+
+  /** 系统打开与选择器共用暂存、导入、错误提示及列表刷新。 */
+  private async importDeckUri(uri: string): Promise<void> {
+    if (this.数据迁移中 || this.homeDisposed) return;
+    const context: common.UIAbilityContext | null = this.取能力上下文();
+    if (context === null) return;
     if (!this.显示数据迁移) {
       this.打开数据迁移('importDeck', 0, false);
     }
@@ -2854,6 +2988,10 @@ struct 首页 {
         // 更多下拉菜单：设置/浏览/统计/提醒 四项收纳
         if (this.显示更多菜单) {
           主页更多面板({
+            onIntro: (): void => {
+              this.显示更多菜单 = false;
+              this.显示欢迎弹窗 = true;
+            },
             设置回调: (): void => {
               this.显示更多菜单 = false;
               this.openSettings();
@@ -3095,7 +3233,7 @@ struct 首页 {
 
 
         // 首次启动欢迎弹窗：放最顶层，确保覆盖所有浮层
-        //   关闭时调 标记已展示欢迎弹窗 持久化（已在 显示欢迎弹窗一次 中提前标记，
+        //   关闭时持久化入门已读标记（不会在展示时提前标记，
         //   这里仅关闭状态；即使弹窗未显示也已标记，保证「只弹一次」语义）
         if (this.显示卡片预览) {
           卡片预览页({
@@ -3113,12 +3251,23 @@ struct 首页 {
         }
 
         if (this.显示欢迎弹窗) {
-          欢迎弹窗({
-            是否深色: this.是否深色(),
-            onClose: (): void => {
-              this.显示欢迎弹窗 = false;
-            }
+          HomeIntroPanel({
+            onClose: (): void => { this.closeHomeIntro(); }
           })
+        }
+
+        if (this.deckDeletionBusy) {
+          Column({ space: 12 }) {
+            LoadingProgress().width(36).height(36)
+            Text(this.deckDeletionStatus)
+              .fontSize(应用尺寸.字号_正文)
+              .fontColor($r('app.color.text_primary'))
+          }
+          .width('100%')
+          .height('100%')
+          .justifyContent(FlexAlign.Center)
+          .backgroundColor($r('app.color.surface_page'))
+          .onClick((): void => {})
         }
 
         if (this.显示节流奖励) {

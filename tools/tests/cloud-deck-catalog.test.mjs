@@ -6,10 +6,10 @@ import { 解析云端牌组目录 } from '../../entry/src/main/ets/model/云端�
 
 const 目录路径 = new URL('../../hosting/cloud-decks.json', import.meta.url);
 
-test('应用版本为 2.7.0', async () => {
+test('应用版本为 2.7.9', async () => {
   const 应用配置 = await readFile(new URL('../../AppScope/app.json5', import.meta.url), 'utf8');
-  assert.match(应用配置, /versionCode:\s*2700/);
-  assert.match(应用配置, /versionName:\s*'2\.7\.0'/);
+  assert.match(应用配置, /versionCode:\s*2790/);
+  assert.match(应用配置, /versionName:\s*'2\.7\.9'/);
 });
 
 test('托管目录提供六个带准确卡片数量的公开牌组', async () => {

@@ -161,7 +161,7 @@ export struct 卡片表格 {
           标题: $r('app.string.browser_empty')
         })
       } else {
-        List({ space: 1 }) {
+        List({ space: 应用尺寸.pageSectionGap }) {
           ForEach(this.行列表, (行: 浏览行数据, index: number) => {
             ListItem() {
               Row({ space: 应用尺寸.间距_8 }) {
@@ -229,10 +229,10 @@ export struct 卡片表格 {
               }
               .width('100%')
               .padding({
-                left: 应用尺寸.间距_16,
-                right: 应用尺寸.间距_16,
-                top: 应用尺寸.间距_8,
-                bottom: 应用尺寸.间距_8
+                left: 应用尺寸.卡片内边距,
+                right: 应用尺寸.卡片内边距,
+                top: 应用尺寸.间距_12,
+                bottom: 应用尺寸.间距_12
               })
               .backgroundColor($r('app.color.surface_card'))
               // 有标志时加 4px 左边框作色条（不增加子元素，不影响布局高度）
@@ -240,6 +240,7 @@ export struct 卡片表格 {
                 width: { left: 4 },
                 color: { left: this.取行标志色(行) }
               } : { width: 0 })
+              .borderRadius(应用尺寸.圆角_指标卡)
               .onClick((): void => this.处理行点击(行.id))
               .gesture(
                 LongPressGesture()
@@ -250,16 +251,12 @@ export struct 卡片表格 {
             `${行.id}-${行.color}-${行.hasSuspendedCards}-${JSON.stringify(行.cells)}`)
         }
         .width('100%')
+        .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平 })
         .layoutWeight(1)
         .edgeEffect(EdgeEffect.Spring)
         // 内容末尾偏移导航条高度：滚到底时最后一行完整可见、可点（AppGallery 导航栏适配要求）
-        .contentEndOffset(this.导航条高度)
-        .divider({
-          strokeWidth: 0.5,
-          color: $r('app.color.divider'),
-          startMargin: 应用尺寸.间距_16,
-          endMargin: 应用尺寸.间距_16
-        })
+        .contentStartOffset(应用尺寸.间距_8)
+        .contentEndOffset(this.导航条高度 + 应用尺寸.pageSectionGap)
         .onReachEnd((): void => {
           if (!this.加载中 && this.已加载行数 < this.结果总数) {
             this.加载中 = true;

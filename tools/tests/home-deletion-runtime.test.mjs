@@ -22,6 +22,8 @@ function harness(selected = 'child', saved = selected) {
   const page = new Page();
   Object.assign(page, {
     选中的牌组ID: selected, deckDeletionBusy: false,
+    deckMediaCleanup: { snapshot: async () => [] },
+    offerDeletedDeckMediaCleanup: async () => {},
     主页快照数据: { decks: [{ id: 'parent', ancestorIds: [] }, { id: 'child', ancestorIds: ['parent'] },
       { id: 'grandchild', ancestorIds: ['parent', 'child'] }, { id: 'other', ancestorIds: [] }, { id: '1', ancestorIds: [] }] },
     deferForSync: () => false, homeActivityChanged() {},
@@ -88,6 +90,7 @@ test('repeat delete is ignored while a write is pending, and refresh reconciliat
   page.牌组服务实例.删除牌组 = () => new Promise(resolve => { events.push('write'); release = resolve; });
   const first = page.确认删除牌组('parent');
   await page.确认删除牌组('parent');
+  while (!release) await Promise.resolve();
   assert.equal(events.filter(event => event === 'write').length, 1);
   release(3); await first;
   page.选中的牌组ID = 'other';

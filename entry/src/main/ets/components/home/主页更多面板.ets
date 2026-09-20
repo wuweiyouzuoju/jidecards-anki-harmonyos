@@ -34,6 +34,7 @@ export struct 主页更多面板 {
   浏览回调: () => void = (): void => {};
   统计回调: () => void = (): void => {};
   提醒回调: () => void = (): void => {};
+  onIntro: () => void = (): void => {};
   关闭回调: () => void = (): void => {};
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
 
@@ -92,6 +93,16 @@ export struct 主页更多面板 {
           .padding({ left: 应用尺寸.menuHorizontalPadding, right: 应用尺寸.menuHorizontalPadding })
           .textAlign(TextAlign.Center)
           .onClick((): void => this.提醒回调())
+        Divider().color($r('app.color.border_subtle')).strokeWidth(0.5)
+          .margin({ left: 应用尺寸.面板内边距, right: 应用尺寸.面板内边距 })
+        Text($r('app.string.home_intro_menu_title'))
+          .fontSize(应用尺寸.字号_正文)
+          .fontColor($r('app.color.text_primary'))
+          .width('100%')
+          .constraintSize({ minHeight: 应用尺寸.menuItemHeight })
+          .padding({ left: 应用尺寸.menuHorizontalPadding, right: 应用尺寸.menuHorizontalPadding })
+          .textAlign(TextAlign.Center)
+          .onClick((): void => this.onIntro())
       }
       .width(应用尺寸.compactMenuWidth)
       .backgroundColor($r('app.color.surface_card'))

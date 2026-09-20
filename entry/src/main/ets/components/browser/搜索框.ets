@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SelectStyle } from '../../utils/SelectStyle';
 
 // ========================================================
 // @块ID UI-BROWSER-SEARCH-001
@@ -53,9 +54,9 @@ export struct 搜索框 {
         .selected(this.浏览模式值 === 'cards' ? 0 : 1)
         .value(this.getUIContext().getHostContext()!.resourceManager.getStringSync(
           (this.浏览模式值 === 'cards' ? $r('app.string.browser_mode_cards') : $r('app.string.browser_mode_notes')).id))
-        .controlSize(ControlSize.SMALL)
-        .font({ size: 应用尺寸.字号_正文 })
-        .height(40)
+        .attributeModifier(new SelectStyle($r('app.color.surface_card')))
+        .font(SelectStyle.controlFont)
+        .borderRadius(SelectStyle.controlRadius)
         .onSelect((index: number): void => { this.onModeChange(index === 0 ? 'cards' : 'notes'); })
 
       TextInput({

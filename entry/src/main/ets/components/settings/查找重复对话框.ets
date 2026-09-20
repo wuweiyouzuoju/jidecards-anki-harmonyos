@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SelectStyle } from '../../utils/SelectStyle';
 
 import { DialogHeader } from '../common/DialogHeader';
 // ========================================================
@@ -305,7 +306,9 @@ export struct 查找重复对话框 {
             Select(this.类型选项())
               .selected(this.选中类型索引)
               .value(this.选中类型索引 >= 0 ? this.笔记类型列表[this.选中类型索引].name : '')
-              .controlSize(ControlSize.SMALL)
+              .attributeModifier(new SelectStyle())
+              .font(SelectStyle.controlFont)
+              .borderRadius(SelectStyle.controlRadius)
               .onSelect((索引: number): void => {
                 this.选中类型索引 = 索引;
                 this.重复组列表 = [];

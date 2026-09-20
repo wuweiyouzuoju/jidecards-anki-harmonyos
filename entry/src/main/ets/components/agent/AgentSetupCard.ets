@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SelectStyle } from '../../utils/SelectStyle';
 
 import type { AgentMode } from '../../model/agent/AgentTypes';
 import type { AgentTaskSetup } from '../../model/agent/AgentTaskContext';
 import { 应用尺寸 } from '../../utils/应用尺寸';
-import { 颜色键 } from '../../model/颜色主题';
 
 export interface AgentSetupChoice {
   id: number;
@@ -22,7 +22,6 @@ export struct AgentSetupCard {
   @Prop allDecksLabel: string = '';
   @Prop allNotetypesLabel: string = '';
   @Prop disabled: boolean = false;
-  @StorageProp(颜色键.主色按钮背景) private primaryBackground: string = '#2F5FD0';
   onDeckSelected: (id: number) => void = (_id: number): void => {};
   onNotetypeSelected: (id: number) => void = (_id: number): void => {};
 
@@ -47,9 +46,10 @@ export struct AgentSetupCard {
           .selected(this.deckOptions.findIndex((item: AgentSetupChoice): boolean =>
             item.id === this.setup.deckId))
           .value(this.setup.deckName)
-          .selectedOptionBgColor(this.primaryBackground)
-          .selectedOptionFontColor($r('app.color.action_on_primary'))
           .enabled(!this.disabled)
+          .attributeModifier(new SelectStyle())
+          .font(SelectStyle.controlFont)
+          .borderRadius(SelectStyle.controlRadius)
           .onSelect((index: number): void => {
             if (index >= 0 && index < this.deckOptions.length) {
               this.onDeckSelected(this.deckOptions[index].id);
@@ -62,9 +62,10 @@ export struct AgentSetupCard {
           .selected(this.notetypeOptions.findIndex((item: AgentSetupChoice): boolean =>
             item.id === this.setup.notetypeId))
           .value(this.setup.notetypeName)
-          .selectedOptionBgColor(this.primaryBackground)
-          .selectedOptionFontColor($r('app.color.action_on_primary'))
           .enabled(!this.disabled)
+          .attributeModifier(new SelectStyle())
+          .font(SelectStyle.controlFont)
+          .borderRadius(SelectStyle.controlRadius)
           .onSelect((index: number): void => {
             if (index >= 0 && index < this.notetypeOptions.length) {
               this.onNotetypeSelected(this.notetypeOptions[index].id);
@@ -78,9 +79,10 @@ export struct AgentSetupCard {
           .selected(this.setup.deckId <= 0 ? 0 : 1 + this.deckOptions.findIndex(
             (item: AgentSetupChoice): boolean => item.id === this.setup.deckId))
           .value(this.setup.deckId <= 0 ? this.allDecksLabel : this.setup.deckName)
-          .selectedOptionBgColor(this.primaryBackground)
-          .selectedOptionFontColor($r('app.color.action_on_primary'))
           .enabled(!this.disabled)
+          .attributeModifier(new SelectStyle())
+          .font(SelectStyle.controlFont)
+          .borderRadius(SelectStyle.controlRadius)
           .onSelect((index: number): void => {
             if (index === 0) { this.onDeckSelected(0); }
             else if (index > 0 && index <= this.deckOptions.length) {
@@ -94,9 +96,10 @@ export struct AgentSetupCard {
           .selected(this.setup.notetypeId <= 0 ? 0 : 1 + this.notetypeOptions.findIndex(
             (item: AgentSetupChoice): boolean => item.id === this.setup.notetypeId))
           .value(this.setup.notetypeId <= 0 ? this.allNotetypesLabel : this.setup.notetypeName)
-          .selectedOptionBgColor(this.primaryBackground)
-          .selectedOptionFontColor($r('app.color.action_on_primary'))
           .enabled(!this.disabled)
+          .attributeModifier(new SelectStyle())
+          .font(SelectStyle.controlFont)
+          .borderRadius(SelectStyle.controlRadius)
           .onSelect((index: number): void => {
             if (index === 0) { this.onNotetypeSelected(0); }
             else if (index > 0 && index <= this.notetypeOptions.length) {

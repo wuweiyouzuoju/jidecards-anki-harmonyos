@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SelectStyle } from '../utils/SelectStyle';
 import { ThemeTextSpans } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
@@ -381,6 +382,9 @@ export struct 添加笔记面板 {
               .value(this.选中牌组名())
               .width('100%')
               .enabled(!this.busy && this.deckOptions.length > 0)
+              .attributeModifier(new SelectStyle())
+              .font(SelectStyle.controlFont)
+              .borderRadius(SelectStyle.controlRadius)
               .onSelect((index: number): void => {
                 this.onSelectDeck(this.deckOptions[index].id);
               })
@@ -391,6 +395,9 @@ export struct 添加笔记面板 {
               .value(this.选中笔记类型名())
               .width('100%')
               .enabled(!this.busy && this.notetypeOptions.length > 0)
+              .attributeModifier(new SelectStyle())
+              .font(SelectStyle.controlFont)
+              .borderRadius(SelectStyle.controlRadius)
               .onSelect((index: number): void => {
                 this.onSelectNotetype(this.notetypeOptions[index].id);
               })

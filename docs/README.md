@@ -3,6 +3,7 @@
 ## 当前文档
 
 - [项目 README](../README.md)：产品、当前源码版本、构建入口。
+- [2.7.9 更新说明](releases/2.7.9.md)：相对 2.7.0 的功能、修复和验证边界。
 - [开发状态与后续工作](DEVELOPMENT_PLAN.md)：SDK/上游基线、发布限制、验证门和真实后续项。
 - [离线公式渲染](math-chemistry-rendering.md)：数学、化学和旧式 LaTeX 导入兼容计划与验收。
 - [当前架构](architecture.md)：模块边界、主要数据流和稳定不变量。

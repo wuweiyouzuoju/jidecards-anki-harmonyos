@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SelectStyle } from '../utils/SelectStyle';
 import { ThemeTextSpans } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
@@ -170,28 +171,32 @@ export struct 高级牌组选项面板 {
   // ========================================================
   @Builder
   private enumSelector(label: Resource, selected: number, values: 牌组枚举选项[], onChange: (numericValue: number) => void, help: Resource) {
-    // 2026-07-28：对齐添加笔记页「笔记类型」选择行——标签左、Select 右、帮助按钮最右，
-    // Select 用 controlSize(SMALL) 内容自适应，不再 100% 宽度撑满整行。
+    // 帮助紧跟标签，右侧选择框独立占位。
     Column({ space: 应用尺寸.间距_5 }) {
       Row() {
-        Text(label)
-          .fontSize(应用尺寸.字号_按钮)
-          .fontColor($r('app.color.text_secondary'))
-          .layoutWeight(1)
+        Row({ space: 4 }) {
+          Text(label)
+            .fontSize(应用尺寸.字号_按钮)
+            .fontColor($r('app.color.text_secondary'))
+            .flexShrink(1)
+          Button() {
+            Text() { ThemeTextSpans($r('app.string.field_help_button'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.动作主色)
+          }
+            .type(ButtonType.Normal)
+            .width(32).height(32).padding(0).flexShrink(0)
+            .backgroundColor(Color.Transparent)
+            .fontColor(this.动作主色)
+            .enabled(!this.busy)
+            .onClick(() => this.openHelp(label, help))
+        }.layoutWeight(1)
         Select(this.枚举转下拉选项(values))
           .selected(this.枚举索引(values, selected))
           .value(this.枚举标签(values, selected))
-          .controlSize(ControlSize.SMALL)
           .enabled(!this.busy)
+          .attributeModifier(new SelectStyle())
+          .font(SelectStyle.controlFont)
+          .borderRadius(SelectStyle.controlRadius)
           .onSelect((index: number) => onChange(values[index].numericValue))
-        Button() {
-          Text() { ThemeTextSpans($r('app.string.field_help_button'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.动作主色)
-        }
-          .type(ButtonType.Normal)
-          .backgroundColor(Color.Transparent)
-          .fontColor(this.动作主色)
-          .enabled(!this.busy)
-          .onClick(() => this.openHelp(label, help))
       }.width('100%')
       if (this.是否有字段错误(this.fieldKey(label))) Text(this.resolveText(this.字段错误资源(this.fieldKey(label)))).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.error_text')).width('100%')
     }.width('100%')
@@ -219,11 +224,12 @@ export struct 高级牌组选项面板 {
   @Builder
   private labeledInput(label: Resource, text: string, onChange: (value: string) => void, info: Resource) {
     Column({ space: 应用尺寸.间距_5 }) {
-      Row() {
-        Text(label).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).layoutWeight(1)
+      Row({ space: 4 }) {
+        Text(label).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).flexShrink(1)
         Button() {
           Text() { ThemeTextSpans($r('app.string.field_help_button'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.动作主色)
-        }.type(ButtonType.Normal).backgroundColor(Color.Transparent).fontColor(this.动作主色).onClick(() => this.openHelp(label, info))
+        }.type(ButtonType.Normal).width(32).height(32).padding(0).flexShrink(0)
+          .backgroundColor(Color.Transparent).fontColor(this.动作主色).onClick(() => this.openHelp(label, info))
       }.width('100%')
       TextInput({ text }).width('100%').height(应用尺寸.按钮高度).fontSize(应用尺寸.字号_正文)
         .backgroundColor($r('app.color.surface_card')).border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') }).borderRadius(应用尺寸.圆角_面板).enabled(!this.busy).onChange(onChange)
@@ -252,7 +258,23 @@ export struct 高级牌组选项面板 {
   // ========================================================
   @Builder
   private toggleRow(label: Resource, value: boolean, onChange: (value: boolean) => void, help: Resource) {
-    Column({ space: 应用尺寸.间距_5 }) { Row() { Text(label).fontSize(应用尺寸.字号_正文_小).layoutWeight(1); Button($r('app.string.field_help_button')).type(ButtonType.Normal).backgroundColor(Color.Transparent).onClick(() => this.openHelp(label, help)); Toggle({ type: ToggleType.Switch, isOn: value }).selectedColor(this.主色按钮背景).enabled(!this.busy).onChange(onChange) }.width('100%'); if (this.是否有字段错误(this.fieldKey(label))) Text(this.resolveText(this.字段错误资源(this.fieldKey(label)))).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.error_text')).width('100%') }.width('100%')
+    Column({ space: 应用尺寸.间距_5 }) {
+      Row() {
+        Row({ space: 4 }) {
+          Text(label).fontSize(应用尺寸.字号_正文_小).flexShrink(1)
+          Button($r('app.string.field_help_button'))
+            .type(ButtonType.Normal).width(32).height(32).padding(0).flexShrink(0)
+            .backgroundColor(Color.Transparent)
+            .onClick(() => this.openHelp(label, help))
+        }.layoutWeight(1)
+        Toggle({ type: ToggleType.Switch, isOn: value })
+          .selectedColor(this.主色按钮背景).enabled(!this.busy).onChange(onChange)
+      }.width('100%')
+      if (this.是否有字段错误(this.fieldKey(label))) {
+        Text(this.resolveText(this.字段错误资源(this.fieldKey(label))))
+          .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.error_text')).width('100%')
+      }
+    }.width('100%')
   }
 
   build() {

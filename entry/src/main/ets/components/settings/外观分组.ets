@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SelectStyle } from '../../utils/SelectStyle';
 
 import { 主题模式 } from '../../model/主题设置';
 import { 设置面板色板_取 } from '../../utils/设置面板配色';
@@ -121,7 +122,9 @@ export struct 外观分组 {
             Select(this.主题模式选项())
               .selected(this.主题模式索引())
               .value(this.主题模式标签(this.当前主题模式))
-              .controlSize(ControlSize.SMALL)
+              .attributeModifier(new SelectStyle())
+              .font(SelectStyle.controlFont)
+              .borderRadius(SelectStyle.controlRadius)
               .onSelect((索引: number): void => {
                 const 模式列表: 主题模式[] = ['system', 'light', 'dark'];
                 this.主题模式切换回调(模式列表[索引]);
@@ -148,8 +151,10 @@ export struct 外观分组 {
             Select(this.颜色主题选项())
               .selected(this.颜色主题索引())
               .value(this.颜色主题展示名文本(this.当前颜色主题))
-              .controlSize(ControlSize.SMALL)
               .margin({ left: 8 })
+              .attributeModifier(new SelectStyle())
+              .font(SelectStyle.controlFont)
+              .borderRadius(SelectStyle.controlRadius)
               .onSelect((索引: number): void => {
                 const 主题列表: 颜色主题[] = this.availableThemes();
                 this.颜色主题切换回调(主题列表[索引]);

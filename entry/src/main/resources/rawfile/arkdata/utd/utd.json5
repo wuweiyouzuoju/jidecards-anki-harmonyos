@@ -1,0 +1,12 @@
+{
+  "UniformDataTypeDeclarations": [
+    {
+      "TypeId": "com.jide.kapian.apkg",
+      "BelongingToTypes": ["general.archive", "general.file"],
+      "FilenameExtensions": [".apkg"],
+      "MIMETypes": ["application/apkg", "application/x-apkg"],
+      "Description": "Anki Deck Package",
+      "ReferenceURL": ""
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SelectStyle } from '../../utils/SelectStyle';
 
 import { 加载学习布局模式, 保存学习布局模式, 学习布局模式 } from '../../model/学习布局存储';
 import { 设置面板色板_取 } from '../../utils/设置面板配色';
@@ -125,7 +126,9 @@ export struct 布局分组 {
               .value(this.当前布局模式 !== null
                 ? this.布局模式标签(this.当前布局模式)
                 : this.取本地化文本($r('app.string.settings_study_layout_bottom')))
-              .controlSize(ControlSize.SMALL)
+              .attributeModifier(new SelectStyle())
+              .font(SelectStyle.controlFont)
+              .borderRadius(SelectStyle.controlRadius)
               .onSelect((索引: number): void => {
                 const 模式列表: 学习布局模式[] = ['bottom', 'float'];
                 this.切换布局(模式列表[索引]);

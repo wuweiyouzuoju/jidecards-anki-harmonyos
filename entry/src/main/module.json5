@@ -22,10 +22,21 @@
         startWindowIcon: '$media:app_icon',
         startWindowBackground: '$color:start_window_background',
         exported: true,
+        launchType: 'singleton',
         skills: [
           {
             entities: ['entity.system.home'],
             actions: ['action.system.home']
+          },
+          {
+            actions: ['ohos.want.action.viewData'],
+            uris: [
+              {
+                scheme: 'file',
+                type: 'com.jide.kapian.apkg',
+                linkFeature: 'FileOpen'
+              }
+            ]
           },
           {
             // DeepLink：桌面卡片点击后通过 jidecards://stats 拉起 App 并跳统计页

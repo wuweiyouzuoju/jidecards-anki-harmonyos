@@ -258,31 +258,18 @@ test('hour histogram range is shared by stats page, home card and widget', () =>
   assert.doesNotMatch(summary, /layoutWeight\(3\)/);
 });
 
-test('stats deck selector uses a normal compact select beside the aligned FSRS status', () => {
+test('stats toolbar shows FSRS and the scope row holds deck and history selectors', () => {
   const stats = read('entry/src/main/ets/pages/统计页.ets');
-  const topBar = stats.match(/private 顶部条\(\)[\s\S]*?@Builder\s+private 统计内容/)?.[0] ?? '';
-  const scopeRow = stats.match(/\/\/ 统计口径行[\s\S]*?\/\/ 1\. 今日计数/)?.[0] ?? '';
-  const deckSelect = scopeRow.match(/Select\(this\.牌组选项\)[\s\S]*?\.onSelect/)?.[0] ?? '';
-
-  assert.match(topBar, /Text\(\$r\('app\.string\.stats_page_title'\)\)/,
-    'the toolbar identifies the statistics page');
-  assert.doesNotMatch(topBar, /Select\(this\.牌组选项\)/,
-    'the deck selector must no longer occupy the toolbar center');
-  assert.match(scopeRow,
-    /Row\(\)[\s\S]*?Select\(this\.牌组选项\)[\s\S]*?Blank\(\)[\s\S]*?stats_fsrs_enabled/,
-    'the deck selector and FSRS status must share one left-right row');
-  assert.equal((scopeRow.match(/\.height\(应用尺寸\.紧凑控件高度\)/g) ?? []).length, 2,
-    'the deck selector and FSRS status must use the same compact control height');
-  assert.match(deckSelect, /\.controlSize\(ControlSize\.SMALL\)/,
-    'the deck selector must use the standard compact Select appearance');
-  assert.doesNotMatch(deckSelect, /\.backgroundColor\(|\.borderRadius\(/,
-    'the deck selector must not be rendered as a theme-colored block');
-  assert.doesNotMatch(scopeRow, /\.backgroundColor\(|\.borderRadius\(/,
-    'the FSRS status must be plain text without a background container');
-  assert.equal((scopeRow.match(/应用尺寸\.字号_正文_小/g) ?? []).length, 2,
-    'the deck selector and FSRS status must use the same font size');
-  assert.doesNotMatch(scopeRow, /app\.color\.text_secondary/,
-    'the FSRS status must use the same primary text color as the deck selector');
+  const topBar = stats.split('private 顶部条()')[1].split('private 统计内容()')[0];
+  const scopeRow = stats.split('// 统计口径行')[1].split('// 1. 今日计数')[0];
+  assert.ok(topBar.includes('stats_page_title'));
+  assert.ok(topBar.includes('stats_fsrs_enabled'));
+  assert.ok(topBar.includes('stats_fsrs_disabled'));
+  assert.ok(!topBar.includes('范围切换条({'));
+  assert.ok(!scopeRow.includes('stats_fsrs_enabled'));
+  assert.ok(scopeRow.indexOf('Select(this.牌组选项)') < scopeRow.indexOf('范围切换条({'));
+  assert.ok(scopeRow.includes("new SelectStyle($r('app.color.surface_card'))"));
+  assert.ok(scopeRow.includes('on天数切换(index === 1 ? 0 : 365)'));
 });
 
 test('primary pages share one shell gutter and common visual primitives', () => {
@@ -326,9 +313,9 @@ test('primary pages share one shell gutter and common visual primitives', () => 
   assert.match(reminders, /统一空态\(\{[\s\S]*?reminder_list_empty[\s\S]*?reminder_list_empty_hint/,
     'reminders must use the common empty-state component');
 
-  assert.equal((appearance.match(/controlSize\(ControlSize\.SMALL\)/g) ?? []).length, 2);
-  assert.match(read('entry/src/main/ets/components/settings/GeneralSettings.ets'), /controlSize\(ControlSize\.SMALL\)/);
-  assert.equal((agentSettings.match(/controlSize\(ControlSize\.SMALL\)/g) ?? []).length, 3,
+  assert.equal((appearance.match(/new SelectStyle\(\)/g) ?? []).length, 2);
+  assert.match(read('entry/src/main/ets/components/settings/GeneralSettings.ets'), /new SelectStyle\(\)/);
+  assert.equal((agentSettings.match(/new SelectStyle\(\)/g) ?? []).length, 3,
     'all Agent settings selects must match the other settings selects');
   assert.equal((syncSettings.match(/borderRadius\(应用尺寸\.圆角_面板\)/g) ?? []).length >= 2, true,
     'sync inputs must use the same form-field radius as Agent settings');
@@ -590,7 +577,7 @@ test('graph preferences are in-chart controls without a modal (Anki autoSavingPr
     '图表偏好面板.ets 已删除（Anki 无偏好弹窗）'
   );
   assert.doesNotMatch(statsPage, /显示偏好面板|保存偏好|onBackPress/, '统计页不得残留偏好弹窗状态/方法');
-  // 顶栏天数两档：365/0；右上角原生选择框切换后重新请求后端。
+  // 历史范围两档：365/0；统计口径行的选择框切换后重新请求后端。
   assert.match(statsPage, /on天数切换\(天数: number\)/, '须有顶栏天数切换');
   assert.doesNotMatch(statsPage, /显示统计范围菜单|统计范围切换菜单/);
   assert.match(statsPage, /on天数切换\(index === 1 \? 0 : 365\)/);

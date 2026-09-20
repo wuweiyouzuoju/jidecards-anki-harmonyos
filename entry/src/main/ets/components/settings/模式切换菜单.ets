@@ -55,28 +55,31 @@ export struct 模式切换菜单 {
           .fontSize(应用尺寸.字号_正文)
           .fontColor(this.当前简洁模式 ? this.主色 : $r('app.color.text_primary'))
           .width('100%')
-          .height(应用尺寸.行动按钮高度)
+          .constraintSize({ minHeight: 应用尺寸.menuItemHeight })
+          .padding({ left: 应用尺寸.menuHorizontalPadding, right: 应用尺寸.menuHorizontalPadding })
           .textAlign(TextAlign.Center)
           .onClick((): void => this.选择回调(true))
 
         Divider()
           .color($r('app.color.border_subtle'))
-          .strokeWidth(应用尺寸.卡片边框)
-          .margin({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
+          .strokeWidth(0.5)
+          .margin({ left: 应用尺寸.面板内边距, right: 应用尺寸.面板内边距 })
 
         // 实验版（当前项文字高亮主色，无勾选标记）
         Text() { ThemeTextSpans($r('app.string.settings_simple_mode_full'), (!this.当前简洁模式) ? this.themeAccentColors : [], this.getUIContext()) }
           .fontSize(应用尺寸.字号_正文)
           .fontColor(!this.当前简洁模式 ? this.主色 : $r('app.color.text_primary'))
           .width('100%')
-          .height(应用尺寸.行动按钮高度)
+          .constraintSize({ minHeight: 应用尺寸.menuItemHeight })
+          .padding({ left: 应用尺寸.menuHorizontalPadding, right: 应用尺寸.menuHorizontalPadding })
           .textAlign(TextAlign.Center)
           .onClick((): void => this.选择回调(false))
       }
-      .width(160)
+      .width(应用尺寸.compactMenuWidth)
       .backgroundColor($r('app.color.surface_card'))
-      .borderRadius(应用尺寸.圆角_卡片)
-      .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+      .borderRadius(应用尺寸.圆角_指标卡)
+      .border({ width: 0.5, color: $r('app.color.border_subtle') })
+      .shadow({ radius: 12, color: 'rgba(0,0,0,0.10)', offsetX: 0, offsetY: 4 })
       .margin({ top: this.顶部偏移, right: 应用尺寸.页面内边距_水平 })
       .onClick(() => {
         // 阻断点击穿透到遮罩

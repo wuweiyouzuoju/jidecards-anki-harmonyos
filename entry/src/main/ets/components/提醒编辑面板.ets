@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SelectStyle } from '../utils/SelectStyle';
 import { ThemeTextSpans } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
@@ -156,9 +157,11 @@ export struct 提醒编辑面板 {
               Select(this.小时选项())
                 .selected(this.小时)
                 .value(this.小时 < 10 ? `0${this.小时}` : `${this.小时}`)
-                .controlSize(ControlSize.NORMAL)
                 .width(100)
                 .enabled(!this.busy)
+                .attributeModifier(new SelectStyle())
+                .font(SelectStyle.controlFont)
+                .borderRadius(SelectStyle.controlRadius)
                 .onSelect((index: number): void => {
                   this.小时 = index;
                 })
@@ -169,9 +172,11 @@ export struct 提醒编辑面板 {
               Select(this.分钟选项())
                 .selected(this.分钟)
                 .value(this.分钟 < 10 ? `0${this.分钟}` : `${this.分钟}`)
-                .controlSize(ControlSize.NORMAL)
                 .width(100)
                 .enabled(!this.busy)
+                .attributeModifier(new SelectStyle())
+                .font(SelectStyle.controlFont)
+                .borderRadius(SelectStyle.controlRadius)
                 .onSelect((index: number): void => {
                   this.分钟 = index;
                 })

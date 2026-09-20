@@ -78,19 +78,19 @@
     },
     {
       "name": "deck_blue",
-      "value": "#748FC9"
+      "value": "#4B78D0"
     },
     {
       "name": "deck_purple",
-      "value": "#A89AE5"
+      "value": "#9564D6"
     },
     {
       "name": "deck_mint",
-      "value": "#619F8E"
+      "value": "#42966A"
     },
     {
       "name": "deck_amber",
-      "value": "#A2895A"
+      "value": "#C49C2F"
     },
     {
       "name": "deck_black",
@@ -98,7 +98,7 @@
     },
     {
       "name": "deck_red",
-      "value": "#CE7D7D"
+      "value": "#D45B5B"
     },
     {
       "name": "heat_0",
@@ -119,6 +119,7 @@
     {
       "name": "heat_4",
       "value": "#2F5FD0"
-    }
+    },
+    {"name": "home_intro_link", "value": "#2465D0"}
   ]
 }
