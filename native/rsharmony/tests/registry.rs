@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
-use jidecards_core::{BackendFailure, BackendRegistry, RawBackend};
+use jidecards_core::{BackendFailure, BackendRegistry, RawBackend, SyncAbort};
 
 struct EchoBackend;
 
@@ -92,4 +92,46 @@ fn serializes_calls_for_one_backend_instance() {
     }
 
     assert_eq!(peak.load(Ordering::SeqCst), 1);
+}
+
+struct CancellableBackend {
+    started: std::sync::mpsc::Sender<()>,
+    cancel: std::sync::mpsc::Sender<()>,
+    cancelled: std::sync::mpsc::Receiver<()>,
+}
+
+impl RawBackend for CancellableBackend {
+    fn sync_aborter(&self) -> Option<SyncAbort> {
+        let cancel = self.cancel.clone();
+        Some(Arc::new(move || {
+            let _ = cancel.send(());
+            Ok(Vec::new())
+        }))
+    }
+
+    fn run_method_raw(&mut self, _: u32, _: u32, _: &[u8]) -> Result<Vec<u8>, BackendFailure> {
+        self.started.send(()).unwrap();
+        Ok(if self.cancelled.recv_timeout(Duration::from_secs(2)).is_ok() {
+            b"cancelled".to_vec()
+        } else {
+            b"timed out".to_vec()
+        })
+    }
+}
+
+#[test]
+fn sync_abort_bypasses_running_call_without_releasing_its_backend() {
+    let registry = Arc::new(BackendRegistry::new());
+    let (started_tx, started_rx) = std::sync::mpsc::channel();
+    let (cancel_tx, cancel_rx) = std::sync::mpsc::channel();
+    let handle = registry.insert(CancellableBackend {
+        started: started_tx, cancel: cancel_tx, cancelled: cancel_rx,
+    });
+    let worker_registry = Arc::clone(&registry);
+    let worker = thread::spawn(move || worker_registry.call(handle, 1, 3, &[]));
+    started_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+    registry.call(handle, 1, 7, &[]).unwrap();
+    assert_eq!(worker.join().unwrap().unwrap(), b"cancelled");
+    assert!(registry.close(handle));
+    assert_eq!(registry.call(handle, 1, 7, &[]), Err(BackendFailure::HandleNotFound));
 }

@@ -181,7 +181,9 @@ void CompleteCall(napi_env env, napi_status asyncStatus, void *data)
         napi_value error = CreateNativeError(env, status, call->error);
         napi_reject_deferred(env, call->deferred, error);
     }
-    napi_delete_async_work(env, call->work);
+    if (call->work != nullptr) {
+        napi_delete_async_work(env, call->work);
+    }
 }
 
 napi_value RunMethodRaw(napi_env env, napi_callback_info info)
@@ -210,6 +212,12 @@ napi_value RunMethodRaw(napi_env env, napi_callback_info info)
     if (napi_create_promise(env, &call->deferred, &promise) != napi_ok) {
         napi_throw_error(env, nullptr, "failed to create native call promise");
         return nullptr;
+    }
+    // AbortSync 只发取消信号；不依赖可能被集合调用占满的工作线程池。
+    if (call->service == 1 && call->method == 7 && call->input.empty()) {
+        ExecuteCall(env, call.get());
+        CompleteCall(env, napi_ok, call.release());
+        return promise;
     }
     napi_create_string_utf8(env, "jidecardsBackendCall", NAPI_AUTO_LENGTH,
         &resourceName);

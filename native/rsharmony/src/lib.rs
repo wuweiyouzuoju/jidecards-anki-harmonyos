@@ -52,7 +52,14 @@ pub enum BackendFailure {
     Backend(Vec<u8>),
 }
 
+pub type SyncAbort = Arc<dyn Fn() -> Result<Vec<u8>, BackendFailure> + Send + Sync>;
+
 pub trait RawBackend: Send + 'static {
+    /// 独立取消通道只触发 Core 的取消句柄，不读取或写入集合。
+    fn sync_aborter(&self) -> Option<SyncAbort> {
+        None
+    }
+
     fn run_method_raw(
         &mut self,
         service: u32,
@@ -61,7 +68,12 @@ pub trait RawBackend: Send + 'static {
     ) -> Result<Vec<u8>, BackendFailure>;
 }
 
-type SharedBackend = Arc<Mutex<Box<dyn RawBackend>>>;
+struct BackendEntry {
+    backend: Mutex<Box<dyn RawBackend>>,
+    sync_abort: Option<SyncAbort>,
+}
+
+type SharedBackend = Arc<BackendEntry>;
 
 pub struct BackendRegistry {
     next_handle: AtomicU32,
@@ -87,7 +99,11 @@ impl BackendRegistry {
         loop {
             let handle = self.next_handle.fetch_add(1, Ordering::Relaxed);
             if handle != 0 && !backends.contains_key(&handle) {
-                backends.insert(handle, Arc::new(Mutex::new(Box::new(backend))));
+                let sync_abort = backend.sync_aborter();
+                backends.insert(handle, Arc::new(BackendEntry {
+                    backend: Mutex::new(Box::new(backend)),
+                    sync_abort,
+                }));
                 return handle;
             }
         }
@@ -107,7 +123,14 @@ impl BackendRegistry {
             .get(&handle)
             .cloned()
             .ok_or(BackendFailure::HandleNotFound)?;
-        let result = backend
+        // Anki 26.05 BackendSyncService.AbortSync：不得排在网络调用的锁后。
+        if service == 1 && method == 7 && input.is_empty() {
+            return match &backend.sync_abort {
+                Some(abort) => abort(),
+                None => Err(BackendFailure::Backend(Vec::new())),
+            };
+        }
+        let result = backend.backend
             .lock()
             .map_err(|_| BackendFailure::Poisoned)?
             .run_method_raw(service, method, input);
@@ -203,6 +226,13 @@ struct AnkiBackend(anki::backend::Backend);
 
 #[cfg(feature = "anki-core")]
 impl RawBackend for AnkiBackend {
+    fn sync_aborter(&self) -> Option<SyncAbort> {
+        let backend = self.0.clone();
+        Some(Arc::new(move || {
+            backend.run_service_method(1, 7, &[]).map_err(BackendFailure::Backend)
+        }))
+    }
+
     fn run_method_raw(
         &mut self,
         service: u32,
@@ -446,5 +476,76 @@ mod ffi_tests {
         assert_ne!(handle, 0);
         assert_eq!(anki_backend_close(handle), STATUS_OK);
         unsafe { anki_buffer_free(error) };
+    }
+
+    #[cfg(feature = "anki-core")]
+    #[test]
+    fn real_core_abort_releases_a_slow_network_sync_and_collection_can_be_read_again() {
+        use std::io::Read;
+        use std::net::TcpListener;
+        use std::sync::mpsc;
+        use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+        fn bytes_field(number: u8, value: &[u8], output: &mut Vec<u8>) {
+            output.push((number << 3) | 2);
+            let mut length = value.len();
+            while length >= 128 {
+                output.push((length as u8 & 127) | 128);
+                length >>= 7;
+            }
+            output.push(length as u8);
+            output.extend_from_slice(value);
+        }
+
+        let temp = std::env::temp_dir().canonicalize().unwrap();
+        let unique = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let folder = temp.join(format!("jidecards-sync-test-{unique}"));
+        std::fs::create_dir(&folder).unwrap();
+        let registry = Arc::new(BackendRegistry::new());
+        let handle = registry.insert(AnkiBackend(anki::backend::init_backend(&[]).unwrap()));
+        let mut open = Vec::new();
+        for (number, name) in [(1, "collection.anki2"), (2, "collection.media"), (3, "collection.media.db")] {
+            bytes_field(number, folder.join(name).to_str().unwrap().as_bytes(), &mut open);
+        }
+        registry.call(handle, 3, 0, &open).unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let endpoint = format!("http://{}/", listener.local_addr().unwrap());
+        let mut auth = Vec::new();
+        bytes_field(1, b"test", &mut auth);
+        bytes_field(2, endpoint.as_bytes(), &mut auth);
+        auth.extend_from_slice(&[24, 2]); // 2-second network timeout bounds a failed test.
+        let mut request = Vec::new();
+        bytes_field(1, &auth, &mut request);
+        let (finished_tx, finished_rx) = mpsc::channel();
+        let worker_registry = Arc::clone(&registry);
+        let worker = std::thread::spawn(move || {
+            finished_tx.send(worker_registry.call(handle, 1, 5, &request)).unwrap();
+        });
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        let mut stream = loop {
+            match listener.accept() {
+                Ok((stream, _)) => break stream,
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                    assert!(std::time::Instant::now() < deadline, "sync did not contact the local server");
+                    std::thread::sleep(Duration::from_millis(5));
+                }
+                Err(error) => panic!("{error}"),
+            }
+        };
+        stream.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+        assert!(stream.read(&mut [0; 1024]).unwrap() > 0);
+        registry.call(handle, 1, 7, &[]).unwrap();
+        let result = finished_rx.recv_timeout(Duration::from_secs(1)).expect("abort waited for the network timeout");
+        assert!(matches!(result, Err(BackendFailure::Backend(_))));
+        worker.join().unwrap();
+        registry.call(handle, 7, 4, &[]).expect("collection unavailable after abort");
+        registry.call(handle, 3, 1, &[]).unwrap();
+        registry.close(handle);
+        drop(stream);
+        drop(listener);
+        let resolved = folder.canonicalize().unwrap();
+        assert!(resolved.starts_with(&temp) && resolved != temp);
+        std::fs::remove_dir_all(resolved).unwrap();
     }
 }
