@@ -559,7 +559,6 @@ export struct 同步分组 {
           } else {
             this.已登录内容(设置面板色板_取(this.是否深色))
           }
-          if (!this.简洁模式 || this.savedServer !== '') {
           Row() {
             Button() {
               Text($r('app.string.sync_custom_server_entry'))
@@ -575,7 +574,6 @@ export struct 同步分组 {
           }
           .width('100%')
           .justifyContent(FlexAlign.Start)
-          }
         }
         .width('100%')
       }

@@ -2013,8 +2013,9 @@
     {"name": "settings_controls_review", "value": "复习操作"},
     {"name": "settings_controls_tap_hint", "value": "实验功能，点击屏幕区域快速答题"},
     {"name": "settings_appearance_display", "value": "主题与文字"},
-    {"name": "settings_directory_appearance_simple_hint", "value": "深浅主题、卡片字体大小"},
+    {"name": "settings_directory_appearance_simple_hint", "value": "深浅与颜色主题、动态背景、卡片字体大小、答题工具栏"},
+    {"name": "settings_directory_controls_simple_hint", "value": "评分振动"},
     {"name": "settings_directory_data_simple_hint", "value": "导入导出、手动备份、媒体管理"},
-    {"name": "settings_directory_sync_simple_hint", "value": "AnkiWeb 账号、自动同步"}
+    {"name": "settings_directory_sync_simple_hint", "value": "AnkiWeb 或自定义服务器、自动同步"}
   ]
 }

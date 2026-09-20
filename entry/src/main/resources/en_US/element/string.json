@@ -1405,8 +1405,9 @@
     {"name": "settings_controls_review", "value": "Review controls"},
     {"name": "settings_controls_tap_hint", "value": "Experimental: answer by tapping screen regions"},
     {"name": "settings_appearance_display", "value": "Theme and text"},
-    {"name": "settings_directory_appearance_simple_hint", "value": "Light or dark theme and card font size"},
+    {"name": "settings_directory_appearance_simple_hint", "value": "Appearance and color themes, motion, card font size and answer toolbar"},
+    {"name": "settings_directory_controls_simple_hint", "value": "Answer vibration"},
     {"name": "settings_directory_data_simple_hint", "value": "Import, export, manual backup and media"},
-    {"name": "settings_directory_sync_simple_hint", "value": "AnkiWeb account and automatic sync"}
+    {"name": "settings_directory_sync_simple_hint", "value": "AnkiWeb or custom server and automatic sync"}
   ]
 }

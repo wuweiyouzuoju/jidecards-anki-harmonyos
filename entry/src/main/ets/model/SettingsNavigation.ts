@@ -15,7 +15,7 @@ export const SETTINGS_ENTRIES: SettingsEntry[] = [
   { id: 'scheduler', titleKey: 'settings_directory_review', descriptionKey: 'settings_directory_algorithm_hint', fullOnly: true, agentOnly: false },
   { id: 'sync', titleKey: 'settings_directory_sync', descriptionKey: 'settings_directory_sync_hint', simpleDescriptionKey: 'settings_directory_sync_simple_hint', fullOnly: false, agentOnly: false },
   { id: 'appearance', titleKey: 'settings_directory_appearance', descriptionKey: 'settings_directory_appearance_hint', simpleDescriptionKey: 'settings_directory_appearance_simple_hint', fullOnly: false, agentOnly: false },
-  { id: 'controls', titleKey: 'settings_directory_controls', descriptionKey: 'settings_directory_controls_hint', fullOnly: true, agentOnly: false },
+  { id: 'controls', titleKey: 'settings_directory_controls', descriptionKey: 'settings_directory_controls_hint', simpleDescriptionKey: 'settings_directory_controls_simple_hint', fullOnly: false, agentOnly: false },
   { id: 'data', titleKey: 'settings_data_management', descriptionKey: 'settings_directory_data_hint', simpleDescriptionKey: 'settings_directory_data_simple_hint', fullOnly: false, agentOnly: false },
   { id: 'help', titleKey: 'settings_directory_help', descriptionKey: 'settings_directory_help_hint', fullOnly: false, agentOnly: false },
   { id: 'ai', titleKey: 'ai_agent_settings_title', descriptionKey: 'settings_directory_ai_hint', fullOnly: false, agentOnly: true },

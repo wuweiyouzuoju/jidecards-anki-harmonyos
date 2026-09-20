@@ -130,7 +130,6 @@ export struct 外观分组 {
           .width('100%')
           .height(48)
 
-          if (!this.简洁模式) {
           // 颜色主题行 Select（带渐变色条预览）
           Row() {
             Text($r('app.string.appearance_color_theme'))
@@ -161,7 +160,6 @@ export struct 外观分组 {
 
           if (themeDefinition(this.当前颜色主题).backgroundTextures.length > 0) {
             ThemeMotionControl()
-          }
           }
           CardTextSizeControl()
       }

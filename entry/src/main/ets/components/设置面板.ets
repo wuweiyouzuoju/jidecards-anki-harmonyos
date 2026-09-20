@@ -931,8 +931,8 @@ export struct 设置面板 {
               }
             }
           }
-          // 实验版在外观页提供复习布局细调，切换模式不改已保存的布局。
-          if (this.activeSection === 'appearance' && !this.简洁模式) {
+          // 两种模式都可选择答题工具栏位置，切换模式不改已保存的布局。
+          if (this.activeSection === 'appearance') {
             ListItem() {
               布局分组({
                 是否深色: this.是否深色,
