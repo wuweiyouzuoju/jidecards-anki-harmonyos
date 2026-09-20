@@ -45,7 +45,12 @@ test('localized settings search respects simple and developer gates', () => {
     assert.equal(filterSettingsEntries('', false, true, localize).length, SETTINGS_ENTRIES.length);
     const simple = filterSettingsEntries('', true, false, localize).map(entry => entry.id);
     assert.ok(!simple.includes('scheduler') && !simple.includes('ai'));
-    assert.deepEqual(simple, ['general', 'sync', 'appearance', 'data', 'help', 'about']);
+    assert.deepEqual(simple, ['general', 'sync', 'appearance', 'data', 'help', 'redemption', 'about']);
+    for (const simpleMode of [true, false]) {
+      for (const query of (locale === 'base' ? ['指纹', '识别码', '兑换'] : ['fingerprint', 'app ID', 'redeem'])) {
+        assert.deepEqual(filterSettingsEntries(query, simpleMode, false, localize).map(entry => entry.id), ['redemption']);
+      }
+    }
     assert.deepEqual(filterSettingsEntries(locale === 'base' ? '复习布局' : 'review layout', true, false, localize), []);
     assert.deepEqual(filterSettingsEntries(locale === 'base' ? '复习布局' : 'review layout', false, false, localize).map(entry => entry.id), ['appearance']);
     assert.ok(!simple.includes('controls') && !simple.includes('advanced'));

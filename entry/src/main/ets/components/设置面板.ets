@@ -1035,7 +1035,7 @@ export struct 设置面板 {
               })
             }
           }
-          if (this.activeSection === 'about') {
+          if (this.activeSection === 'redemption') {
             ListItem() {
               RedemptionPanel({
                 developerGroup: this.QQ群号,

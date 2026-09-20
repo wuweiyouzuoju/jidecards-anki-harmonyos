@@ -19,6 +19,7 @@ export const SETTINGS_ENTRIES: SettingsEntry[] = [
   { id: 'data', titleKey: 'settings_data_management', descriptionKey: 'settings_directory_data_hint', simpleDescriptionKey: 'settings_directory_data_simple_hint', fullOnly: false, agentOnly: false },
   { id: 'help', titleKey: 'settings_directory_help', descriptionKey: 'settings_directory_help_hint', fullOnly: false, agentOnly: false },
   { id: 'ai', titleKey: 'ai_agent_settings_title', descriptionKey: 'settings_directory_ai_hint', fullOnly: false, agentOnly: true },
+  { id: 'redemption', titleKey: 'settings_directory_redemption', descriptionKey: 'settings_directory_redemption_hint', fullOnly: false, agentOnly: false },
   { id: 'about', titleKey: 'settings_about', descriptionKey: 'settings_directory_about_hint', fullOnly: false, agentOnly: false },
   { id: 'advanced', titleKey: 'settings_directory_advanced', descriptionKey: 'settings_directory_advanced_hint', fullOnly: true, agentOnly: false }
 ];

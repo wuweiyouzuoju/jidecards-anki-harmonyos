@@ -8,7 +8,7 @@ import { getApplicationFingerprint, redeemContent, RedemptionResult } from '../.
 import { DialogHeader } from '../common/DialogHeader';
 import { 颜色主题, 颜色键 } from '../../model/颜色主题';
 
-/** 关于页的主题兑换入口；识别码按需打开，不占用日常设置。 */
+/** 两种模式共用的独立兑换分类，直接展示识别码与主题兑换入口。 */
 @Component
 export struct RedemptionPanel {
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
@@ -16,7 +16,6 @@ export struct RedemptionPanel {
   onUseTheme: (theme: 颜色主题) => void = (): void => {};
   @State private fingerprint: string = '';
   @State private expanded: boolean = false;
-  @State private showRedemption: boolean = false;
   @State private showContentInfo: boolean = false;
   @State private code: string = '';
   @State private busy: boolean = false;
@@ -140,8 +139,6 @@ export struct RedemptionPanel {
   @Builder
   private redemptionDetails() {
     Column({ space: 12 }) {
-      DialogHeader({ title: $r('app.string.redemption_contents_title'), showClose: false,
-        onAction: (): void => { this.showRedemption = false; } })
       Row() {
         Text($r('app.string.redemption_fingerprint'))
           .fontSize(15).fontColor($r('app.color.text_primary')).layoutWeight(1)
@@ -193,20 +190,6 @@ export struct RedemptionPanel {
     .padding(16).width('100%').borderRadius(20).backgroundColor($r('app.color.surface_card'))
   }
   build() {
-    Button() {
-      Row({ space: 12 }) {
-        Column({ space: 4 }) {
-          Text($r('app.string.redemption_entry')).fontSize(15).fontColor($r('app.color.text_primary'))
-          Text($r('app.string.redemption_fingerprint_hint')).fontSize(12).fontColor($r('app.color.text_secondary'))
-        }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-        Text('›').fontSize(20).fontColor($r('app.color.text_secondary'))
-      }.width('100%')
-    }
-    .type(ButtonType.Normal).width('100%').padding(16).borderRadius(16)
-    .backgroundColor($r('app.color.surface_card'))
-    .onClick((): void => { this.showRedemption = true; })
-    .bindSheet($$this.showRedemption, this.redemptionDetails(), {
-      height: SheetSize.FIT_CONTENT, showClose: false, backgroundColor: $r('app.color.surface_card')
-    })
+    this.redemptionDetails()
   }
 }
