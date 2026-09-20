@@ -866,7 +866,7 @@
     { "name": "settings_study_layout", "value": "学习布局" },
     { "name": "settings_study_layout_row", "value": "答题工具栏位置" },
     { "name": "settings_study_layout_bottom", "value": "固定在底部" },
-    { "name": "settings_study_layout_float", "value": "悬浮，可拖动" },
+    { "name": "settings_study_layout_float", "value": "悬浮可拖动" },
     { "name": "study_toolbar_drag_hint", "value": "在学习页按住浮动工具栏可拖到屏幕左右侧；松手后自动吸附到最近侧并保存位置。" },
     { "name": "settings_study_layout_help", "value": "学习页操作按钮的布局方式：\n\n• 底部固定：操作按钮贴在屏幕底部，传统体验，适合多数用户。\n\n• 浮动可拖：操作按钮浮在屏幕上方，可按住拖到屏幕左右侧，松手后自动吸附到最近侧并保存位置。适合单手操作或大屏设备。" },
     { "name": "settings_home_today_summary", "value": "首页显示卡片" },
