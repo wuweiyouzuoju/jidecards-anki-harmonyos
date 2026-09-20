@@ -43,6 +43,7 @@ export struct CardTextSizeControl {
         Text(`${this.selectedSize}%`)
           .fontSize(15)
           .fontColor($r('app.color.text_secondary'))
+          .translate({ x: 0.5 })
       }
       .width('100%')
       Slider({ value: this.selectedSize, min: MIN_CARD_TEXT_SIZE, max: MAX_CARD_TEXT_SIZE, step: 10 })
