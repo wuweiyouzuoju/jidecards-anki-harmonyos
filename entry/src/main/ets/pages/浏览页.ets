@@ -1,48 +1,24 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { loadBrowserSidebar } from '../model/BrowserSidebar';
+import { AnkiBrowserSidebar } from '../backend/AnkiBrowserSidebar';
+import { loadNoteEditor } from '../model/NoteEditorLoader';
+import { AnkiNoteEditor } from '../backend/AnkiNoteEditor';
+import { BrowserSearchSession, loadBrowserRows } from '../model/BrowserSearchSession';
+import { AnkiBrowserSearch } from '../backend/AnkiBrowserSearch';
+import { resolveBrowserCardIds, resolveBrowserNoteIds, snapshotNotetypeChange } from '../model/BrowserSelection';
+import type { 变更笔记类型请求 } from '../proto/messages/NotetypeMessages';
 import { SelectStyle } from '../utils/SelectStyle';
 import { BrowserOperationContext, BrowserOperationController } from '../model/BrowserOperationController';
 import { autoSyncScheduler } from '../model/AutoSyncScheduler';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
 
 import { DialogHeader } from '../components/common/DialogHeader';
-// ========================================================
-// @块ID UI-PAGE-BROWSER-001
-// @名称 浏览页
-//
-// @作用
-// 卡片/笔记浏览器（对标 Anki Browser）。手机端单栏布局：
-// 顶部条（返回 + 标题 + Cards/Notes 切换）+ 搜索框 + 结果列表。
-// 阶段 1 MVP：可搜索 + 查看只读列表。
-// 阶段 2：列表行点击后用 Stack+if 弹层打开 浏览编辑区 编辑笔记字段/标签。
-//
-// @输入
-// pageDeckId：可选牌组 ID（空=全库浏览）
-// pathStack：Navigation 页面栈，用于返回主页
-//
-// @输出
-// 渲染浏览页 NavDestination
-//
-// @业务规则
-// 进入页面即拉取全部卡片（空搜索串）。搜索串由后端构建（前端不拼字符串），
-// 保证与 Anki 桌面端搜索语法一致。行数据按需懒加载（浏览器行按ID）。
-//
-// @Invariants
-// - 搜索串必须经 搜索服务.构建搜索串 构建，不前端拼接
-// - 浏览模式切换后自动重新搜索
-// - 行缓存与 结果ID列表 按索引对齐
-//
-// @Extension Points
-// - T4 搜索框组件将替换内联 TextInput
-// - T5 卡片表格组件将替换内联 List
-// - T7 详情编辑区已接入（Stack+if 弹层），后续可扩展批量操作栏（T8）
-//
-// @副作用
-// 通过 搜索服务 调用后端 RPC，读取 Anki collection。
-// ========================================================
+// 页面负责导航、表单和 UI 事件；搜索/行读取、侧栏、编辑器读取各有独立模型。
+// 集合写入统一经过 BrowserOperationController，迟到读取按所属操作代次失效。
 
 import { common } from '@kit.AbilityKit';
-import { 后端会话 } from '../backend/后端会话';
-import { BROWSER_QUICK_FILTERS, BrowserQuickFilter, browserFilterNode } from '../model/BrowserQuickFilter';
+
+import { BROWSER_QUICK_FILTERS, BrowserQuickFilter } from '../model/BrowserQuickFilter';
 import { 搜索服务 } from '../backend/搜索服务';
 import { 笔记服务 } from '../backend/笔记服务';
 import { 笔记类型服务 } from '../backend/笔记类型服务';
@@ -52,17 +28,9 @@ import { 调度器服务 } from '../backend/调度器服务';
 import { 统计服务 } from '../backend/统计服务';
 import { 标签服务 } from '../backend/标签服务';
 import { 配置服务 } from '../backend/配置服务';
-import type {
-  BrowserColumn,
-  BrowserRow,
-  FindAndReplaceRequest,
-  SearchRequest,
-  SortOrder
-} from '../proto/messages/SearchMessages';
-import { BrowserColumnSorting, SearchNodeCardState, makeCardStateNode } from '../proto/messages/SearchMessages';
-import {
-  makeParsableTextNode
-} from '../proto/messages/SearchMessages';
+import type { BrowserColumn, BrowserRow, FindAndReplaceRequest } from '../proto/messages/SearchMessages';
+import { BrowserColumnSorting } from '../proto/messages/SearchMessages';
+
 import type { EditableNote } from '../proto/messages/NoteMessages';
 import type { Card } from '../proto/messages/CardsMessages';
 import type { CardStatsView } from '../proto/messages/StatsMessages';
@@ -89,7 +57,7 @@ import { 颜色键 } from '../model/颜色主题';
 import { 加载主题模式 } from '../model/主题存储';
 import { 解析是否深色, 主题模式 } from '../model/主题设置';
 import type { AI制卡页参数 } from './AI制卡页';
-import type { 设置页参数 } from './设置页';
+import { 设置页参数 } from '../model/navigation/PageParams';
 import {
   AgentSettings,
   isAgentProviderConfigured,
@@ -102,18 +70,6 @@ type 浏览阶段 = 'loading' | 'list' | 'error';
 
 /** 浏览模式：cards=卡片列表，notes=笔记列表 */
 type 浏览模式 = 'cards' | 'notes';
-
-/** 浏览页入栈参数 */
-export interface 浏览页参数 {
-  /** 可选：限定牌组 ID（空=全库浏览） */
-  deckId?: string;
-  /** 可选：初始搜索串（如查找重复对话框跳转时传入 `note:"Basic" "字段值"`） */
-  initialSearch?: string;
-  /** 可选：从主页 Agent 改卡进入时，列表加载后直接进入多选。 */
-  selectForAgentEdit?: boolean;
-  /** 可选：打开搜索结果后直接进入指定卡片的浏览编辑区。 */
-  editCardId?: number;
-}
 
 /** T8 改牌组选择器列表项（扁平化后的牌组树节点）。 */
 interface 牌组项 {
@@ -155,6 +111,10 @@ export struct 浏览页 {
   @State private sortColumn: string = '';
   @State private sortReverse: boolean = false;
   private suspendedRowIds: Set<number> = new Set<number>();
+  private readonly searchSession: BrowserSearchSession = new BrowserSearchSession(new AnkiBrowserSearch());
+  private readonly noteReader: AnkiNoteEditor = new AnkiNoteEditor();
+  private readonly sidebarBackend: AnkiBrowserSidebar = new AnkiBrowserSidebar();
+  private sidebarVersion: number = 0;
   private searchVersion: number = 0;
   private selectionVersion: number = 0;
   private editorVersion: number = 0;
@@ -387,27 +347,7 @@ export struct 浏览页 {
     return context === undefined ? null : context;
   }
 
-  // ========================================================
-  // @块ID UI-PAGE-BROWSER-002
-  // @名称 执行搜索
-  //
-  // @作用
-  // 根据当前搜索文本和浏览模式，调后端搜索卡片/笔记 ID，并预加载前 50 行数据。
-  //
-  // @输入
-  // 搜索文本 + 浏览模式值
-  //
-  // @输出
-  // 更新 阶段 / 结果ID列表 / 行列表 / 列定义
-  //
-  // @业务规则
-  // 搜索串由后端构建搜索串生成（前端不拼字符串）。
-  // 首次搜索时拉取列定义（全部浏览器列），后续复用。
-  // 行数据按需懒加载，MVP 预加载前 50 行避免首屏空白。
-  //
-  // @副作用
-  // 调后端 构建搜索串 / 搜索卡片 / 搜索笔记 / 全部浏览器列 / 浏览器行按ID
-  // ========================================================
+  /** 将查询快照交给搜索会话；一次性发布完整首屏，旧请求不修改 UI。 */
   private async 执行搜索(): Promise<void> {
     if (!this.operations.isAlive()) return;
     const version: number = ++this.searchVersion;
@@ -427,61 +367,15 @@ export struct 浏览页 {
           .getStringSync($r('app.string.ability_context_unavailable').id);
         return;
       }
-      await 后端会话.获取实例().确保已打开(context.filesDir);
-      if (version !== this.searchVersion) { return; }
-      await this.配置服务实例.设置配置布尔({
-        key: ConfigKeyBool.BROWSER_TABLE_SHOW_NOTES_MODE, value: notesMode, undoable: false
-      });
-      if (version !== this.searchVersion) { return; }
-
-      // 首次搜索时拉取列定义并设置激活列（后端 browser_row_for_id 要求 active_browser_columns 已设置）
-      if (this.列定义.length === 0) {
-        const cols = await this.搜索服务实例.全部浏览器列();
-        if (version !== this.searchVersion) { return; }
-        // 单元格顺序固定；副标题选择只切换展示，不反复请求整批行。
-        // 列 key 来自 Anki 后端 strum camelCase 序列化（browser_table.rs）：Question→"question" 等
-        // 未设置则 browser_row_for_id 报 "Active browser columns not set."
-        const 默认列键: string[] = ['question', 'deck', 'cardDue', 'flags', 'answer'];
-        await this.搜索服务实例.设置激活浏览器列(默认列键);
-        if (version !== this.searchVersion) { return; }
-        this.列定义 = cols.columns;
-        console.info(`BrowserPage: 列定义=${cols.columns.length} 列，激活列=${默认列键.join(',')}`);
-      }
-      if (version !== this.searchVersion) { return; }
-
-      // 构建搜索串（后端构建，前端不拼字符串）
-      const searchNode = browserFilterNode(text, filter);
-      const searchStr = await this.搜索服务实例.构建搜索串(searchNode);
-      if (version !== this.searchVersion) { return; }
-      console.info(`BrowserPage: 搜索文本="${this.搜索文本}" 搜索串="${searchStr}"`);
-
-      // 按模式搜索卡片或笔记
-      const order: SortOrder = sortColumn === '' ? { kind: 'none' } :
-        { kind: 'builtin', column: sortColumn, reverse: sortReverse };
-      const request: SearchRequest = { search: searchStr, order };
-      const ids = notesMode ? await this.搜索服务实例.搜索笔记(request) :
-        await this.搜索服务实例.搜索卡片(request);
-      if (version !== this.searchVersion) { return; }
-      // 行颜色优先显示旗标/标记，不能据此判断暂停；笔记搜索返回含暂停卡的笔记 ID。
-      const suspendedSearch: string = await this.搜索服务实例.构建搜索串(
-        makeCardStateNode(SearchNodeCardState.CARD_STATE_SUSPENDED));
-      if (version !== this.searchVersion) { return; }
-      const suspendedRequest: SearchRequest = { search: suspendedSearch, order: { kind: 'none' } };
-      const suspendedIds: number[] = notesMode ? await this.搜索服务实例.搜索笔记(suspendedRequest) :
-        await this.搜索服务实例.搜索卡片(suspendedRequest);
-      if (version !== this.searchVersion) { return; }
-      this.suspendedRowIds = new Set<number>(suspendedIds);
-      console.info(`BrowserPage: 模式=${this.浏览模式值} 搜索返回 ${ids.length} 个 ID`);
-
-      this.结果ID列表 = ids;
-      this.行列表 = [];
-
-      // 预加载前 200 行（避免首屏空白；后端 browser_row_for_id 是单 ID 查询，无批量接口）
-      await this.预加载行(ids.slice(0, 200), version);
-      if (version !== this.searchVersion) { return; }
-      console.info(`BrowserPage: 预加载完成 行列表=${this.行列表.length} 行`);
-
-      this.consumedRowCount = Math.min(200, ids.length);
+      const result = await this.searchSession.search({ filesDir: context.filesDir, notes: notesMode,
+        text: text, filter: filter, sortColumn: sortColumn, sortReverse: sortReverse },
+        (): boolean => this.operations.isAlive() && version === this.searchVersion);
+      if (result === null || version !== this.searchVersion) return;
+      this.列定义 = result.columns;
+      this.结果ID列表 = result.ids;
+      this.suspendedRowIds = result.suspended;
+      this.行列表 = result.rows;
+      this.consumedRowCount = result.consumed;
       this.阶段 = 'list';
     } catch (error) {
       if (version !== this.searchVersion) { return; }
@@ -492,7 +386,7 @@ export struct 浏览页 {
 
   /**
    * 加载更多行：取下一批未加载的 ID，预加载后追加到 行列表。
-   * 由 卡片表格.onReachEnd 触发；批次大小 100，并发 10。
+   * 由 卡片表格.onReachEnd 触发；批次大小 100，并发上限由 BrowserSearchSession 管理。
    */
   private async 加载更多(): Promise<void> {
     if (this.loadingMore || this.阶段 !== 'list') { return; }
@@ -515,40 +409,10 @@ export struct 浏览页 {
 
   /** 预加载行数据：并行拉取（每批 20 个），累积后一次性赋值触发 UI 刷新。 */
   private async 预加载行(ids: number[], version: number): Promise<void> {
-    const 批次大小: number = 20;
-    let 成功数: number = 0;
-    let 失败数: number = 0;
-    const 累积新增: 浏览行数据[] = [];
-    for (let i = 0; i < ids.length; i += 批次大小) {
-      if (version !== this.searchVersion) { return; }
-      const 批次: number[] = ids.slice(i, i + 批次大小);
-      const 行们: (BrowserRow | null)[] = await Promise.all(
-        批次.map((id: number): Promise<BrowserRow | null> => {
-          return this.搜索服务实例.浏览器行按ID(id)
-            .then((row: BrowserRow): BrowserRow => {
-              成功数++;
-              return row;
-            })
-            .catch((err: ESObject): BrowserRow | null => {
-              失败数++;
-              console.info(`BrowserPage: 浏览器行按ID(${id}) 失败: ${err}`);
-              return null;
-            });
-        })
-      );
-      批次.forEach((id: number, idx: number): void => {
-        const row: BrowserRow | null = 行们[idx];
-        if (row !== null) {
-          累积新增.push({ id, cells: row.cells, color: row.color,
-            hasSuspendedCards: this.suspendedRowIds.has(id) });
-        }
-      });
-    }
-    // 累积所有批次后一次性赋值，避免循环内多次 concat 导致 @State 更新丢失
-    if (version === this.searchVersion && 累积新增.length > 0) {
-      this.行列表 = this.行列表.concat(累积新增);
-    }
-    console.info(`BrowserPage: 预加载统计 成功=${成功数} 失败=${失败数}`);
+    const rows = await loadBrowserRows(ids, this.suspendedRowIds,
+      (id: number): Promise<BrowserRow> => this.搜索服务实例.浏览器行按ID(id),
+      (): boolean => this.operations.isAlive() && version === this.searchVersion);
+    if (version === this.searchVersion && this.operations.isAlive()) this.行列表 = this.行列表.concat(rows);
   }
 
   /** 切换浏览模式（cards/notes），切换后自动重新搜索。 */
@@ -617,20 +481,13 @@ export struct 浏览页 {
     this.编辑区初始标签 = '';
     this.显示编辑区 = true;
     try {
-      // 1. 拿到 noteId：Notes 模式直接用，Cards 模式经卡片查询
-      let noteId: number = 行ID;
-      if (mode === 'cards') {
-        const card: Card = await this.卡片服务实例.获取卡片(行ID);
-        noteId = card.noteId;
-      }
-      // 2. 拉笔记（必须先拿到 notetypeId 才能查字段名）
-      const note: EditableNote = await this.笔记服务实例.获取笔记(noteId);
-      const notetypeView = await this.笔记类型服务实例.获取笔记类型(note.notetypeId);
-      if (!this.operations.isAlive() || version !== this.editorVersion || !this.显示编辑区) return;
-      this.编辑区当前笔记 = note;
-      this.编辑区字段名列表 = notetypeView.fieldNames;
-      this.编辑区初始字段值 = note.fields.slice();
-      this.编辑区初始标签 = note.tags.join(' ');
+      const snapshot = await loadNoteEditor(行ID, mode === 'notes', this.noteReader,
+        (): boolean => this.operations.isAlive() && version === this.editorVersion && this.显示编辑区);
+      if (snapshot === null) return;
+      this.编辑区当前笔记 = snapshot.note;
+      this.编辑区字段名列表 = snapshot.fieldNames;
+      this.编辑区初始字段值 = snapshot.note.fields.slice();
+      this.编辑区初始标签 = snapshot.note.tags.join(' ');
     } catch (错误) {
       if (!this.operations.isAlive() || version !== this.editorVersion) return;
       this.编辑区错误 = this.取本地化文案($r('app.string.browser_detail_load_error'));
@@ -871,27 +728,19 @@ export struct 浏览页 {
       this.浏览模式值, this.选中ID列表, this.searchVersion, this.selectionVersion);
     if (selection === null) return false;
     this.mutationBusy = true;
-    autoSyncScheduler.beginOperation(selection);
-    let committed: boolean = false;
     try {
-      await action(selection);
-      committed = true;
-      if (!this.operations.isAlive()) return true;
-      if (clearSelection && this.operations.isCurrent(selection, this.浏览模式值, this.选中ID列表,
-        this.searchVersion, this.selectionVersion)) this.退出多选();
-      await this.执行搜索();
-      return true;
-    } catch (error) {
-      if (this.operations.isAlive()) onFailure(error instanceof Error ? error : new Error(`${error}`));
-      return false;
+      return await this.operations.execute(selection, action, {
+        afterCommit: async (): Promise<void> => {
+          if (clearSelection && this.operations.isCurrent(selection, this.浏览模式值, this.选中ID列表,
+            this.searchVersion, this.selectionVersion)) this.退出多选();
+          await this.执行搜索();
+        },
+        changed: (): void => { AppStorage.setOrCreate<number>('需要刷新主页', Date.now()); },
+        failed: onFailure,
+        refreshFailed: (error: Error): void => { this.阶段 = 'error'; this.错误详情 = error.message; }
+      }, autoSyncScheduler);
     } finally {
-      if (committed) {
-        AppStorage.setOrCreate<number>('需要刷新主页', Date.now());
-        autoSyncScheduler.request();
-      }
-      this.operations.finish(selection);
       if (this.operations.isAlive()) this.mutationBusy = false;
-      autoSyncScheduler.endOperation(selection);
     }
   }
 
@@ -948,18 +797,8 @@ export struct 浏览页 {
 
   /** 将所选笔记展开为全部兄弟卡 ID，并去重供批量操作使用。 */
   private async 解析选中笔记的卡片ID(selection: BrowserOperationContext = this.captureBrowserSelection()): Promise<number[]> {
-    const 结果: number[] = [];
-    const 已添加: Set<number> = new Set<number>();
-    for (const 笔记ID of selection.ids.slice()) {
-      const 卡片IDs: number[] = await this.笔记服务实例.获取笔记的卡片(笔记ID);
-      for (const 卡片ID of 卡片IDs) {
-        if (!已添加.has(卡片ID)) {
-          已添加.add(卡片ID);
-          结果.push(卡片ID);
-        }
-      }
-    }
-    return 结果;
+    return resolveBrowserCardIds(selection,
+      (noteId: number): Promise<number[]> => this.笔记服务实例.获取笔记的卡片(noteId));
   }
 
   /**
@@ -1118,14 +957,11 @@ export struct 浏览页 {
   private async 执行批量更改笔记类型(): Promise<void> {
     const info: 变更笔记类型信息 | null = this.变更笔记类型信息数据;
     if (info === null || this.选中新笔记类型ID === 0 || this.笔记类型弹层忙碌 || this.operations.isBusy()) return;
-    const fields: number[] = this.字段映射.slice();
-    const templates: number[] = this.模板映射.slice();
+    const input: 变更笔记类型请求 = snapshotNotetypeChange(info.input, this.字段映射, this.模板映射);
     this.显示笔记类型弹层 = false;
     await this.runBatchOperation(async (selection: BrowserOperationContext): Promise<void> => {
-      info.input.noteIds = await this.解析选中为笔记ID(selection);
-      info.input.newFields = fields;
-      info.input.newTemplates = templates;
-      await this.笔记类型服务实例.变更笔记类型(info.input);
+      input.noteIds = await this.解析选中为笔记ID(selection);
+      if (input.noteIds.length > 0) await this.笔记类型服务实例.变更笔记类型(input);
     }, $r('app.string.browser_action_change_notetype_error'));
   }
 
@@ -1144,10 +980,8 @@ export struct 浏览页 {
    * 暂停/恢复有独立的 Anki Core 语义，不经此方法。
    */
   private async 解析选中为卡片ID(selection: BrowserOperationContext = this.captureBrowserSelection()): Promise<number[]> {
-    if (selection.mode === 'cards') {
-      return selection.ids.slice();
-    }
-    return this.解析选中笔记的卡片ID(selection);
+    return resolveBrowserCardIds(selection,
+      (noteId: number): Promise<number[]> => this.笔记服务实例.获取笔记的卡片(noteId));
   }
 
   /** 退出多选模式：清空选中 + 多选模式值 + 翻转信号触发 卡片表格 清内部状态。 */
@@ -1228,20 +1062,10 @@ export struct 浏览页 {
    * 供 T9 查找替换"仅选中笔记"范围使用。
    */
   private async 解析选中为笔记ID(selection: BrowserOperationContext = this.captureBrowserSelection()): Promise<number[]> {
-    if (selection.mode === 'notes') {
-      return selection.ids.slice();
-    }
-    // cards 模式：逐个 cardId → card.noteId，去重
-    const noteIdSet: Set<number> = new Set<number>();
-    for (const 卡片ID of selection.ids) {
-      try {
-        const card: Card = await this.卡片服务实例.获取卡片(卡片ID);
-        noteIdSet.add(card.noteId);
-      } catch (错误) {
-        throw new Error(`Cannot resolve selected card ${卡片ID}: ${错误}`);
-      }
-    }
-    return Array.from(noteIdSet);
+    return resolveBrowserNoteIds(selection, async (cardId: number): Promise<number> => {
+      const card: Card = await this.卡片服务实例.获取卡片(cardId);
+      return card.noteId;
+    });
   }
 
   // ========================================================
@@ -1265,97 +1089,23 @@ export struct 浏览页 {
 
   /** 打开侧边栏：并行加载牌组树（若 null）+ 标签树 + 已保存搜索 + 分区折叠状态。失败收集到错误条。 */
   private async 打开侧边栏(): Promise<void> {
+    if (!this.operations.isAlive()) return;
+    const version: number = ++this.sidebarVersion;
     this.显示侧边栏 = true;
     this.侧边栏忙碌 = true;
     this.侧边栏错误 = '';
-    const 错误列表: string[] = [];
-    // 并行加载；已保存搜索 + 折叠状态失败时容错（key 不存在是正常的），不加入错误列表
-    const 牌组任务: Promise<void> = this.牌组树 === null
-      ? this.加载牌组树().catch((e: ESObject): void => {
-        错误列表.push(`牌组(${this.取错误摘要(e)})`);
-      })
-      : Promise.resolve();
-    const 标签任务: Promise<void> = this.加载标签树().catch((e: ESObject): void => {
-      错误列表.push(`标签(${this.取错误摘要(e)})`);
-    });
-    const 搜索任务: Promise<void> = this.加载已保存搜索();
-    const 折叠任务: Promise<void> = this.加载侧边栏折叠状态();
-    await Promise.all([牌组任务, 标签任务, 搜索任务, 折叠任务]);
-    if (错误列表.length > 0) {
-      this.侧边栏错误 = `${this.取本地化文案($r('app.string.browser_sidebar_load_error'))}：${错误列表.join('、')}`;
+    const snapshot = await loadBrowserSidebar(this.sidebarBackend, this.牌组树);
+    if (!this.operations.isAlive() || version !== this.sidebarVersion || !this.显示侧边栏) return;
+    this.牌组树 = snapshot.decks;
+    this.标签树 = snapshot.tags;
+    this.已保存搜索列表 = snapshot.saved;
+    this.侧边栏牌组折叠 = snapshot.collapsed[0];
+    this.侧边栏标签折叠 = snapshot.collapsed[1];
+    this.侧边栏已保存搜索折叠 = snapshot.collapsed[2];
+    if (snapshot.errors.length > 0) {
+      this.侧边栏错误 = `${this.取本地化文案($r('app.string.browser_sidebar_load_error'))}：${snapshot.errors.join('、')}`;
     }
     this.侧边栏忙碌 = false;
-  }
-
-  /** 从后端错误或通用 Error 中提取简短摘要，用于错误条显示。 */
-  private 取错误摘要(错误: ESObject): string {
-    try {
-      const msg: string = 错误?.message ?? `${错误}`;
-      // 后端错误 message 可能很长，截取前 40 字符
-      return msg.length > 40 ? msg.substring(0, 40) + '…' : msg;
-    } catch {
-      return '未知';
-    }
-  }
-
-  /** 加载标签树（失败置 null 并抛出，由 打开侧边栏 收集到错误条）。 */
-  private async 加载标签树(): Promise<void> {
-    try {
-      this.标签树 = await this.标签服务实例.标签树();
-    } catch (错误) {
-      console.info(`BrowserPage: 加载标签树失败 错误=${错误}`);
-      this.标签树 = null;
-      throw new Error(`${错误}`);
-    }
-  }
-
-  /** 加载已保存搜索（Anki 桌面端存在 config 表 savedSearches key 下，JSON 数组）。
-   *  key 不存在时后端返回错误，视为无已保存搜索（容错不抛出）。 */
-  private async 加载已保存搜索(): Promise<void> {
-    try {
-      const json: string = await this.配置服务实例.获取配置JSON('savedSearches');
-      if (json === '' || json === 'null') {
-        this.已保存搜索列表 = [];
-        return;
-      }
-      const 解析结果: object = JSON.parse(json);
-      if (!Array.isArray(解析结果)) {
-        this.已保存搜索列表 = [];
-        return;
-      }
-      // 仅保留 name + search 字段（防御性，忽略其他字段）
-      const 列表: 已保存搜索项[] = [];
-      for (let i: number = 0; i < 解析结果.length; i++) {
-        const 项: 已保存搜索项 = 解析结果[i] as 已保存搜索项;
-        const name: string = 项.name;
-        const search: string = 项.search;
-        if (name !== '' && search !== '') {
-          列表.push({ name, search });
-        }
-      }
-      this.已保存搜索列表 = 列表;
-    } catch (错误) {
-      // savedSearches key 不存在时后端返回错误，视为无已保存搜索（容错不抛出）
-      console.info(`BrowserPage: 加载已保存搜索失败（可能 key 不存在）错误=${错误}`);
-      this.已保存搜索列表 = [];
-    }
-  }
-
-  /** 加载三区折叠状态（COLLAPSE_DECKS/TAGS/SAVED_SEARCHES）。失败保持默认 false。 */
-  private async 加载侧边栏折叠状态(): Promise<void> {
-    try {
-      // ArkTS 禁止解构声明，改用数组索引访问
-      const 折叠状态: boolean[] = await Promise.all([
-        this.配置服务实例.获取配置布尔(ConfigKeyBool.COLLAPSE_DECKS),
-        this.配置服务实例.获取配置布尔(ConfigKeyBool.COLLAPSE_TAGS),
-        this.配置服务实例.获取配置布尔(ConfigKeyBool.COLLAPSE_SAVED_SEARCHES)
-      ]);
-      this.侧边栏牌组折叠 = 折叠状态[0];
-      this.侧边栏标签折叠 = 折叠状态[1];
-      this.侧边栏已保存搜索折叠 = 折叠状态[2];
-    } catch (错误) {
-      console.info(`BrowserPage: 加载侧边栏折叠状态失败 错误=${错误}`);
-    }
   }
 
   /** 切换分区折叠状态并持久化（undoable=false 不进撤销栈，与 Anki 桌面端一致）。 */
@@ -1703,7 +1453,6 @@ export struct 浏览页 {
           点击回调: (): void => this.退出多选()
         })
       } else {
-
 
         Button($r('app.string.study_more'))
           .height(应用尺寸.按钮高度)

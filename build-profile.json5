@@ -1,55 +1,26 @@
 {
   app: {
-    signingConfigs: [
-      {
-        "name": "default",
-        "type": "HarmonyOS",
-        "material": {
-          "storeFile": "D:/华为密钥库/huaweimiyaoku.p12",
-          "storePassword": "00000020404F56FA433DD4E39F2A48F72EA844EE03EE623D2347BFA1189D041D5FB5239BE8504AC6F50F040B840B0E9E",
-          "keyAlias": "jidekapian",
-          "keyPassword": "00000020F75E31A458747DE708EE5CAC26162D96EC5CF2CF4EA0A1F85B68A734E5C05091D220EDAC00D3F933B0615943",
-          "signAlg": "SHA256withECDSA",
-          "profile": "D:/edge浏览器下载/记得闪卡Release.p7b",
-          "certpath": "D:/edge浏览器下载/记得闪卡.cer"
-        }
-      },
-      {
-        "name": "ceshi",
-        "type": "HarmonyOS",
-        "material": {
-          "certpath": "C:\\Users\\cheng\\.ohos\\config\\ceshi_jidecards01_euulExKlOY5ewDdQCrKeSbSrMw-URkvQ8zZb6abSvUY=.cer",
-          "keyAlias": "debugKey",
-          "keyPassword": "0000001AFC6C677AC851C4736BDB70BAD9A9495B944DE71AF6F37657463E0C27CDC5E2A2ED2E5383D897",
-          "profile": "D:/edge浏览器下载/记得闪卡（测试）Debug.p7b",
-          "signAlg": "SHA256withECDSA",
-          "storeFile": "C:\\Users\\cheng\\.ohos\\config\\ceshi_jidecards01_euulExKlOY5ewDdQCrKeSbSrMw-URkvQ8zZb6abSvUY=.p12",
-          "storePassword": "0000001A61165C36A5B8B0DBC47911CDB32618D3282AB1A816F0CAE60F0BFF09FAE052B3EEFFBF766747"
-        }
-      }
-    ],
     products: [
       {
         name: 'default',
-        signingConfig: 'default',
         compatibleSdkVersion: '6.0.1(21)',
         targetSdkVersion: '6.1.0(23)',
         runtimeOS: 'HarmonyOS',
         buildOption: {
           strictMode: {
-            useNormalizedOHMUrl: true
-          }
-        }
-      }
+            useNormalizedOHMUrl: true,
+          },
+        },
+      },
     ],
     buildModeSet: [
       {
-        name: 'debug'
+        name: 'debug',
       },
       {
-        name: 'release'
-      }
-    ]
+        name: 'release',
+      },
+    ],
   },
   modules: [
     {
@@ -59,10 +30,10 @@
         {
           name: 'default',
           applyToProducts: [
-            'default'
-          ]
-        }
-      ]
-    }
-  ]
+            'default',
+          ],
+        },
+      ],
+    },
+  ],
 }

@@ -54,34 +54,8 @@ import { 设置面板色板_取 } from '../utils/设置面板配色';
 import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时长';
 import { 颜色键 } from '../model/颜色主题';
 
-export type 数据迁移模式 = 'exportDeck' | 'exportPersonalData' | 'importDeck' | 'importPersonalData';
-
-export interface 导出牌组选项 {
-  id: number;
-  name: string;
-}
-
-export interface 导出牌组意图 {
-  kind: 'exportDeck';
-  deckId: number;
-  options: 牌组导出选项;
-}
-
-export interface 导出个人数据意图 {
-  kind: 'exportPersonalData';
-  options: 整库导出选项;
-}
-
-export interface 导入牌组意图 {
-  kind: 'importDeck';
-}
-
-export interface 替换个人数据意图 {
-  kind: 'replacePersonalData';
-  confirmed: true;
-}
-
-export type 数据迁移意图 = 导出牌组意图 | 导出个人数据意图 | 导入牌组意图 | 替换个人数据意图;
+import type { 数据迁移模式, 导出牌组选项, 导出牌组意图, 导出个人数据意图, 导入牌组意图, 替换个人数据意图, 数据迁移意图 } from '../model/DataTransferIntent';
+export type { 数据迁移模式, 导出牌组选项, 导出牌组意图, 导出个人数据意图, 导入牌组意图, 替换个人数据意图, 数据迁移意图 } from '../model/DataTransferIntent';
 
 class 牌组选择项 {
   value: string = '';

@@ -65,13 +65,13 @@ test('home popup menus start below the status-aware toolbar', () => {
 });
 
 test('regular settings entry always supplies a non-AI navigation parameter', () => {
-  const home = read('entry/src/main/ets/pages/首页.ets');
+  const home = (read('entry/src/main/ets/pages/首页.ets') + read('entry/src/main/ets/backend/HomeDataRepository.ets'));
   assert.match(home,
     /private openSettings\(\):[\s\S]*?const params:\s*设置页参数\s*=\s*\{\s*openAiSettings:\s*false\s*\}[\s\S]*?name:\s*'SettingsPage',[\s\S]*?param:\s*params/);
 });
 
 test('home shell keeps adaptive breakpoints and a virtualized deck list', () => {
-  const page = read('entry/src/main/ets/pages/首页.ets');
+  const page = (read('entry/src/main/ets/pages/首页.ets') + read('entry/src/main/ets/backend/HomeDataRepository.ets'));
   const deckList = read('entry/src/main/ets/components/home/主页牌组列表.ets');
 
   assert.match(page, /value:\s*\['600vp',\s*'840vp'\]/);
@@ -117,7 +117,7 @@ test('home resources provide matching light and dark semantic colors', () => {
 });
 
 test('tablet shell shares one selection state and avoids high-cost visual effects', () => {
-  const page = read('entry/src/main/ets/pages/首页.ets');
+  const page = (read('entry/src/main/ets/pages/首页.ets') + read('entry/src/main/ets/backend/HomeDataRepository.ets'));
   const selectionDeclarations = page.match(/@(?:State|Provide|StorageLink)\s*(?:\([^)]*\)\s*)?(?:private\s+)?选中的牌组ID/g) ?? [];
 
   assert.equal(selectionDeclarations.length, 1);
@@ -130,7 +130,7 @@ test('tablet shell shares one selection state and avoids high-cost visual effect
 });
 
 test('large deck lists create rows lazily', () => {
-  const page = read('entry/src/main/ets/pages/首页.ets');
+  const page = (read('entry/src/main/ets/pages/首页.ets') + read('entry/src/main/ets/backend/HomeDataRepository.ets'));
   const deckList = read('entry/src/main/ets/components/home/主页牌组列表.ets');
   const model = read('entry/src/main/ets/model/主页模型.ets');
 
@@ -141,7 +141,7 @@ test('large deck lists create rows lazily', () => {
 });
 
 test('unavailable actions cannot fail the home shell when toast is unavailable', () => {
-  const page = read('entry/src/main/ets/pages/首页.ets');
+  const page = (read('entry/src/main/ets/pages/首页.ets') + read('entry/src/main/ets/backend/HomeDataRepository.ets'));
   const noticeMethod = page.match(/private 显示提示\([\s\S]*?\): void \{[\s\S]*?\n  \}/);
 
   assert.notEqual(noticeMethod, null);
@@ -155,7 +155,7 @@ test('unavailable actions cannot fail the home shell when toast is unavailable',
 });
 
 test('home error state offers an in-place retry path', () => {
-  const page = read('entry/src/main/ets/pages/首页.ets');
+  const page = (read('entry/src/main/ets/pages/首页.ets') + read('entry/src/main/ets/backend/HomeDataRepository.ets'));
   const deckList = read('entry/src/main/ets/components/home/主页牌组列表.ets');
   const strings = readJson('entry/src/main/resources/base/element/string.json').string;
   const stringNames = new Set(strings.map((item) => item.name));
@@ -169,7 +169,7 @@ test('home error state offers an in-place retry path', () => {
 });
 
 test('revised home uses a full-window toolbar without greeting or bottom navigation', () => {
-  const page = read('entry/src/main/ets/pages/首页.ets');
+  const page = (read('entry/src/main/ets/pages/首页.ets') + read('entry/src/main/ets/backend/HomeDataRepository.ets'));
   const toolbar = read('entry/src/main/ets/components/home/主页顶部工具栏.ets');
 
   assert.doesNotMatch(page, /app\.string\.home_title|app\.string\.home_subtitle/);
@@ -186,7 +186,7 @@ test('revised home uses a full-window toolbar without greeting or bottom navigat
 });
 
 test('summary pager hosts Swiper 8 pages with today progress and stats', () => {
-  const page = read('entry/src/main/ets/pages/首页.ets');
+  const page = (read('entry/src/main/ets/pages/首页.ets') + read('entry/src/main/ets/backend/HomeDataRepository.ets'));
   const summary = read('entry/src/main/ets/components/home/主页摘要分页.ets');
 
   // 主页摘要分页 改成 Swiper 8 页（用户决策 2026-08-15）：今日进度 + 7 统计页
@@ -233,7 +233,7 @@ test('hour histogram range is shared by stats page, home card and widget', () =>
   // 统计页切换后立即推送卡片快照
   assert.match(stats, /刷新卡片快照\(\)/);
   // 首页/FSRS 控制器提取时加载窗口偏好 + 分离偏好（卡片数量口径与统计页一致）
-  const home = read('entry/src/main/ets/pages/首页.ets');
+  const home = (read('entry/src/main/ets/pages/首页.ets') + read('entry/src/main/ets/backend/HomeDataRepository.ets'));
   const fsrs = read('entry/src/main/ets/model/FSRS控制器.ets');
   assert.match(home, /提取卡片数据\(graphs, 总待学, 牌组总数, await 加载小时分布窗口\(\), await 加载分离暂停偏好\(\)\)/);
   assert.match(fsrs, /提取卡片数据\(graphs, 总待学, 牌组总数, await 加载小时分布窗口\(\), await 加载分离暂停偏好\(\)\)/);
@@ -347,7 +347,7 @@ test('graphs request days follow the persisted stats range preference, never der
   // 首页摘要与桌面卡片的小时分布和统计页完全不一致。
   // 2026-08-26 起统计页顶栏「近 1 年(365)/全部(0)」本地持久化（stats_days_range），
   // 首页/FSRS控制器加载同一偏好，不再写死 365。
-  const home = read('entry/src/main/ets/pages/首页.ets');
+  const home = (read('entry/src/main/ets/pages/首页.ets') + read('entry/src/main/ets/backend/HomeDataRepository.ets'));
   const fsrs = read('entry/src/main/ets/model/FSRS控制器.ets');
   const stats = read('entry/src/main/ets/pages/统计页.ets');
   const store = read('entry/src/main/ets/model/桌面卡片数据存储.ets');
@@ -487,7 +487,7 @@ test('card counts caliber follows the separation preference across stats page, h
   // 跟随 GraphPreferences.cardCountsSeparateInactive（统计页图内复选框即时落库）。
   const store = read('entry/src/main/ets/model/桌面卡片数据存储.ets');
   const stats = read('entry/src/main/ets/pages/统计页.ets');
-  const home = read('entry/src/main/ets/pages/首页.ets');
+  const home = (read('entry/src/main/ets/pages/首页.ets') + read('entry/src/main/ets/backend/HomeDataRepository.ets'));
   const fsrs = read('entry/src/main/ets/model/FSRS控制器.ets');
 
   // 模型层：提取卡片数据 按偏好选口径（分离=excludingInactive，不分离=includingInactive）
@@ -673,7 +673,7 @@ test('theme settings persist three modes and synchronize system bars', () => {
   const store = read(storePath);
   const controller = read(controllerPath);
   const ability = read('entry/src/main/ets/entryability/EntryAbility.ets');
-  const page = read('entry/src/main/ets/pages/首页.ets');
+  const page = (read('entry/src/main/ets/pages/首页.ets') + read('entry/src/main/ets/backend/HomeDataRepository.ets'));
   assert.match(settings, /'system'\s*\|\s*'light'\s*\|\s*'dark'/);
   assert.match(store, /preferences\.getPreferences/);
   assert.match(controller, /setColorMode/);

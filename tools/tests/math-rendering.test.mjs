@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { stripTypeScriptTypes } from 'node:module';
 import vm from 'node:vm';
-import { 构建卡片HTML } from '../../entry/src/main/ets/model/学习卡片HTML构建器.ets';
+import { 构建卡片HTML } from '../../entry/src/main/ets/model/学习卡片HTML构建器.ts';
 import { MATH_ASSET_BASE } from '../../entry/src/main/ets/model/MathRendering.ts';
 import * as codec from '../../entry/src/main/ets/proto/messages/CardRenderingMessages.ts';
 import { 协议写入器 } from '../../entry/src/main/ets/proto/core/ProtoWriter.ts';

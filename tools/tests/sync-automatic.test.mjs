@@ -1,7 +1,9 @@
+import { decideHomeSync } from '../../entry/src/main/ets/model/HomeSyncPolicy.ts';
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { HomeStartupSequence } from '../../entry/src/main/ets/model/HomeStartupSequence.ts';
 import { canStartHomeAutoSync } from '../../entry/src/main/ets/model/HomeActivityPolicy.ts';
 import { HomeAnnouncementController } from '../../entry/src/main/ets/model/HomeAnnouncementController.ts';
 import { AutoSyncScheduler } from '../../entry/src/main/ets/model/AutoSyncScheduler.ts';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -37,7 +39,7 @@ function homeHarness() {
   const state = { enabled: true, ready: true, auth: { hkey: 'test-key', endpoint: 'http://lan:8080/', username: 'u' }, timers: new Map(), seq: 0, navigation: [], toasts: 0 };
   const gate = new SyncActivity();
   const Page = componentMethods(read('pages/首页.ets'), ['requestManualSync', 'updatePendingSyncStatus', 'homeActivity', 'requestAutoSync', 'scheduleAutoSyncCheck', 'isAutoSyncLocationSafe', 'stopAutoSyncTimer', 'tryAutoSync', 'syncForegroundChanged', 'onPageHide', 'onBackPress', 'deferForSync', 'flushSyncAction', 'autoSyncCollectionFinished', 'autoSyncStateChanged', '选择牌组', '开始学习', 'openCreateDeck', 'openSettings', 'openReminders', 'syncYielded', 'presentPendingSyncWarning'], {
-    canStartHomeAutoSync, externalDeckOpens: { hasPending: () => state.externalDeckPending === true },
+    decideHomeSync, canStartHomeAutoSync, externalDeckOpens: { hasPending: () => state.externalDeckPending === true },
     AppStorage: { get() {}, setOrCreate() {} },
     loadAutoSyncEnabled: () => state.enabled, 加载同步凭证: () => state.auth,
     $r: key => ({ id: key }), 牌组显示名: deck => deck.name, 保存上次牌组ID: async () => {},
@@ -46,7 +48,7 @@ function homeHarness() {
     clearTimeout: id => state.timers.delete(id)
   });
   const page = new Page();
-  Object.assign(page, { announcementController: new HomeAnnouncementController(), homeActivityChanged() {}, syncForeground: true, autoSyncStartupReady: true, syncScheduler: new AutoSyncScheduler(), autoSyncTimer: -1,
+  Object.assign(page, { startupSequence: new HomeStartupSequence(), announcementController: new HomeAnnouncementController(), homeActivityChanged() {}, syncForeground: true, autoSyncStartupReady: true, syncScheduler: new AutoSyncScheduler(), autoSyncTimer: -1,
     页面栈: { size: () => 0, pushPath: path => state.navigation.push(path) }, 加载状态: 'ready', 显示同步面板: false,
     autoSyncCollectionBusy: false, autoSyncRefreshing: false, autoSyncModal: false, pendingSyncAction: null, pendingSyncFsrsWarning: false,
     syncDetailsRequest: 0, getUIContext: () => ({ getHostContext: () => ({ resourceManager: { getStringSync: key => key } }) }),
@@ -78,7 +80,7 @@ test('manual sync takes priority over unseen startup work but still waits for an
   const { page, tick } = homeHarness();
   page.autoSyncStartupReady = false;
   page.官方公告检查中 = true;
-  page.startupContinuationPending = true;
+  page.startupSequence.continue({ canPresent: () => false });
   page.显示牌组选项 = true;
   page.syncScheduler.requestManual();
   tick();

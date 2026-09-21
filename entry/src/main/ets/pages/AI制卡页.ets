@@ -1,4 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { AgentHistoryList } from '../components/agent/AgentHistoryList';
+import { createAgentMessage, cloneAgentCard, cloneAgentTrace, cloneAgentMessage, projectAgentHistory, restoreAgentMessages } from '../model/agent/AgentConversationView';
+import type { 卡片草稿, 聊天消息 } from '../model/agent/AgentConversationView';
+import { AgentEditableCard } from '../components/agent/AgentEditableCard';
+import { AgentCardBatch } from '../model/agent/AgentCardBatch';
+import type { AgentBatchResult } from '../model/agent/AgentCardBatch';
+import { buildProviderDraftContext, limitProviderInput } from '../model/agent/AgentProviderContext';
 import { ThemeTextSpans } from '../components/common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
@@ -89,20 +96,12 @@ import type { EditableNote } from '../proto/messages/NoteMessages';
 import type { Card } from '../proto/messages/CardsMessages';
 import { NOTE_TYPE_KIND_NORMAL } from '../proto/messages/NotetypeMessages';
 import type { NotetypeCapabilities, NotetypeNameId } from '../proto/messages/NotetypeMessages';
-import {
-  AgentConversation,
-  AgentHistoryAudit,
-  AgentHistoryMessage,
-  AgentHistoryResult,
-  deleteAgentConversation,
-  loadAgentConversations,
-  saveAgentConversation
-} from '../model/agent/AgentConversationStore';
+import { AgentConversation, AgentHistoryAudit, AgentHistoryResult, deleteAgentConversation, loadAgentConversations, saveAgentConversation } from '../model/agent/AgentConversationStore';
 import { AgentDisclosureCard } from '../components/agent/AgentDisclosureCard';
 import { AgentSetupCard } from '../components/agent/AgentSetupCard';
 import { AgentClarificationCard } from '../components/agent/AgentClarificationCard';
 import {
-  AGENT_IMPORT_MAX_CONTEXT_CHARS,
+  mergeAgentImportedFiles,
   AGENT_IMPORT_MAX_FILES,
   AgentImportedFile,
   agentImportedFileNames,
@@ -134,85 +133,9 @@ export interface AI制卡页参数 {
   templateIdx?: number;
 }
 
+interface CardSaveMessages { failed: string; empty: string; duplicate: string; cloze: string; }
+
 interface 页面AI配置 { apiKey: string; baseUrl: string; model: string; }
-
-interface ProviderCardDraftContext {
-  index: number;
-  fields: string[];
-  status: string;
-  selected: boolean;
-}
-
-interface ProviderDraftOperationContext {
-  kind: string;
-  noteId: number;
-  cardId: number;
-  deckId: number;
-  fieldOrd: number;
-  before: string;
-  after: string;
-}
-
-interface ProviderChangeDraftContext {
-  id: string;
-  risk: string;
-  summary: string;
-  status: string;
-  operations: ProviderDraftOperationContext[];
-}
-
-interface ProviderDraftContext {
-  cards: ProviderCardDraftContext[];
-  changes: ProviderChangeDraftContext[];
-  executionResult: string;
-  truncated: boolean;
-}
-
-/** 单张待确认卡片：fields 与当前笔记类型字段顺序一一对应。 */
-interface 卡片草稿 {
-  fields: string[];
-  已选中: boolean;
-  /** draft=待保存 saved=已入库 failed=保存失败（可再次保存） */
-  状态: string;
-  /** 保存失败原因（本地化文案），仅 状态=failed 时非空 */
-  失败提示: string;
-}
-
-/** 一条聊天消息。 */
-interface 聊天消息 {
-  timeline: AgentTimelineBlock[];
-  timelineTruncated: boolean;
-  streaming: boolean;
-  action: AgentAction | null;
-  reasoningIsSummary: boolean;
-  reasoningTruncated: boolean;
-  draftDeckId: number;
-  draftNotetypeId: number;
-  draftTargetLabel: string;
-  id: number;
-  /** 'user' | 'ai' */
-  角色: string;
-  正文: string;
-  /** AI 错误消息（红色展示，无卡片） */
-  是否错误: boolean;
-  /** 仅 AI 成功消息有；同一批卡共用该消息的字段名 */
-  卡片列表: 卡片草稿[];
-  /** 该批次笔记类型的真实字段名（渲染字段标签用） */
-  字段名列表: string[];
-  /** 本批保存结果文案；空串=尚未保存过 */
-  批次结果: string;
-  批次保存中: boolean;
-  变更草稿列表: ChangeDraft[];
-  工具过程: AgentToolTrace[];
-  来源列表: SearchSource[];
-  推理摘要: string;
-  kind: string;
-  clarification: AgentClarificationView | null;
-  expanded: boolean;
-  taskStatus: string;
-  answerMessageId: number;
-  providerText: string;
-}
 
 class 页面Agent观察者 implements AgentRunObserver {
   private readonly callback: (event: AgentEvent) => void;
@@ -250,6 +173,8 @@ export struct AI制卡页 {
   private 本地范围笔记IDs: number[] = [];
   private 本地范围牌组IDs: number[] = [];
   private 本地范围笔记类型IDs: number[] = [];
+  private pageDisposed: boolean = false;
+  private readonly cardBatch: AgentCardBatch = new AgentCardBatch();
   private conversationId: string = `agent-${Date.now()}-${Math.random()}`;
   private 历史执行结果: AgentHistoryResult[] = [];
   private omittedMediaInContext: boolean = false;
@@ -337,6 +262,7 @@ export struct AI制卡页 {
   }
 
   aboutToDisappear(): void {
+    this.pageDisposed = true;
     if (this.agentScrollTimer >= 0) { clearTimeout(this.agentScrollTimer); this.agentScrollTimer = -1; }
     if (this.agentRunner !== null) { this.agentRunner.cancel(); }
     this.getUIContext().setKeyboardAvoidMode(this.上一键盘避让模式);
@@ -621,7 +547,7 @@ export struct AI制卡页 {
     const effectiveInput: string = this.输入草稿.trim().length > 0 ? this.输入草稿 :
       (successfulAgentImportedFiles(this.导入文件列表).length > 0 ? 'imported-file' : '');
     return evaluateAgentReadiness(this.taskSetup(), effectiveInput,
-      this.providerReady(), this.处理中 || this.文件解析中 || this.hasPendingClarification() || this.hasPendingAction());
+      this.providerReady(), this.cardBatch.isRunning() || this.处理中 || this.文件解析中 || this.hasPendingClarification() || this.hasPendingAction());
   }
 
   private canSubmit(): boolean {
@@ -751,79 +677,23 @@ export struct AI制卡页 {
   }
 
   private 空消息(角色: string, 正文: string, 是否错误: boolean): 聊天消息 {
-    return {
-      id: this.下一个消息ID(), 角色: 角色, 正文: 正文, 是否错误: 是否错误,
-      卡片列表: [], 字段名列表: [], 批次结果: '', 批次保存中: false,
-      变更草稿列表: [], 工具过程: [], 来源列表: [], 推理摘要: '', timeline: [], timelineTruncated: false, streaming: false,
-      action: null, reasoningIsSummary: false, reasoningTruncated: false, draftDeckId: 0, draftNotetypeId: 0, draftTargetLabel: '',
-      kind: 'normal', clarification: null, expanded: false, taskStatus: '',
-      answerMessageId: 0, providerText: 正文
-    };
+    return createAgentMessage(this.下一个消息ID(), 角色, 正文, 是否错误);
   }
 
   private 克隆卡片(卡: 卡片草稿): 卡片草稿 {
-    return {
-      fields: 卡.fields.slice(),
-      已选中: 卡.已选中,
-      状态: 卡.状态,
-      失败提示: 卡.失败提示
-    };
+    return cloneAgentCard(卡);
   }
 
   private 克隆工具追踪(追踪: AgentToolTrace): AgentHistoryAudit {
-    return {
-      callId: 追踪.callId, toolName: 追踪.toolName, status: 追踪.status,
-      providerRound: 追踪.providerRound, sequence: 追踪.sequence,
-      argumentsJson: 追踪.argumentsJson, outputJson: 追踪.outputJson,
-      errorCode: 追踪.errorCode, errorPath: 追踪.errorPath, errorMessage: 追踪.errorMessage,
-      receivedKeys: 追踪.receivedKeys.slice(), allowedKeys: 追踪.allowedKeys.slice(),
-      validTemplateJson: 追踪.validTemplateJson, repeatCount: 追踪.repeatCount,
-      argumentsTruncated: 追踪.argumentsTruncated, outputTruncated: 追踪.outputTruncated,
-      diagnosticTruncated: 追踪.diagnosticTruncated, expanded: 追踪.expanded,
-      legacySummary: 追踪.legacySummary
-    };
+    return cloneAgentTrace(追踪);
   }
 
   private 克隆历史审计(追踪: AgentToolTrace): AgentHistoryAudit {
-    return {
-      callId: 追踪.callId, toolName: 追踪.toolName, status: 追踪.status,
-      providerRound: 追踪.providerRound, sequence: 追踪.sequence,
-      argumentsJson: 追踪.argumentsJson, outputJson: 追踪.outputJson,
-      errorCode: 追踪.errorCode, errorPath: 追踪.errorPath, errorMessage: 追踪.errorMessage,
-      receivedKeys: 追踪.receivedKeys.slice(), allowedKeys: 追踪.allowedKeys.slice(),
-      validTemplateJson: 追踪.validTemplateJson, repeatCount: 追踪.repeatCount,
-      argumentsTruncated: 追踪.argumentsTruncated, outputTruncated: 追踪.outputTruncated,
-      diagnosticTruncated: 追踪.diagnosticTruncated, expanded: 追踪.expanded,
-      legacySummary: 追踪.legacySummary
-    };
+    return cloneAgentTrace(追踪);
   }
 
   private 克隆消息(消息: 聊天消息): 聊天消息 {
-    return {
-      timeline: cloneAgentTimeline(消息.timeline),
-      timelineTruncated: 消息.timelineTruncated,
-      streaming: 消息.streaming,
-      action: 消息.action, reasoningIsSummary: 消息.reasoningIsSummary, reasoningTruncated: 消息.reasoningTruncated,
-      draftDeckId: 消息.draftDeckId, draftNotetypeId: 消息.draftNotetypeId, draftTargetLabel: 消息.draftTargetLabel,
-      id: 消息.id,
-      角色: 消息.角色,
-      正文: 消息.正文,
-      是否错误: 消息.是否错误,
-      卡片列表: 消息.卡片列表.map((卡: 卡片草稿): 卡片草稿 => this.克隆卡片(卡)),
-      字段名列表: 消息.字段名列表.slice(),
-      批次结果: 消息.批次结果,
-      批次保存中: 消息.批次保存中,
-      变更草稿列表: 消息.变更草稿列表.slice(),
-      工具过程: 消息.工具过程.map((追踪: AgentToolTrace): AgentToolTrace => this.克隆工具追踪(追踪)),
-      来源列表: 消息.来源列表.slice(),
-      推理摘要: 消息.推理摘要,
-      kind: 消息.kind,
-      clarification: 消息.clarification === null ? null : cloneAgentClarificationView(消息.clarification),
-      expanded: 消息.expanded,
-      taskStatus: 消息.taskStatus,
-      answerMessageId: 消息.answerMessageId,
-      providerText: 消息.providerText
-    };
+    return cloneAgentMessage(消息);
   }
 
   /** 对某条消息做克隆-修改-回写；保证 ForEach 键不变时属性绑定仍走 @State 通道。 */
@@ -836,16 +706,22 @@ export struct AI制卡页 {
   }
 
   private 更新卡片字段(消息索引: number, 卡片索引: number, 字段索引: number, 值: string): void {
+    if (this.pageDisposed || this.消息列表[消息索引].批次保存中 ||
+      this.消息列表[消息索引].卡片列表[卡片索引].状态 === 'saved') return;
     this.更新消息(消息索引, (消息: 聊天消息): void => {
       const 卡: 卡片草稿 = this.克隆卡片(消息.卡片列表[卡片索引]);
       const fields: string[] = 卡.fields.slice();
       fields[字段索引] = 值;
       卡.fields = fields;
+      卡.状态 = 'draft';
+      卡.失败提示 = '';
       消息.卡片列表[卡片索引] = 卡;
     });
   }
 
   private 更新卡片选中(消息索引: number, 卡片索引: number, 值: boolean): void {
+    if (this.pageDisposed || this.消息列表[消息索引].批次保存中 ||
+      this.消息列表[消息索引].卡片列表[卡片索引].状态 === 'saved') return;
     this.更新消息(消息索引, (消息: 聊天消息): void => {
       const 卡: 卡片草稿 = this.克隆卡片(消息.卡片列表[卡片索引]);
       卡.已选中 = 值;
@@ -950,72 +826,11 @@ export struct AI制卡页 {
         }
       }
     }
-    return this.限制Provider输入(values);
-  }
-
-  private 截断Provider文本(value: string, limit: number): string {
-    if (value.length <= limit) { return value; }
-    const half: number = Math.floor((limit - 64) / 2);
-    return `${value.slice(0, half)}\n...[context truncated by jideCards]...\n${value.slice(value.length - half)}`;
+    return limitProviderInput(values);
   }
 
   private 构建消息草稿上下文(message: 聊天消息): string {
-    if (message.卡片列表.length === 0 && message.变更草稿列表.length === 0 &&
-      message.批次结果.length === 0) { return ''; }
-    const cards: ProviderCardDraftContext[] = [];
-    const changes: ProviderChangeDraftContext[] = [];
-    let operationCount: number = 0;
-    let truncated: boolean = false;
-    for (let index: number = 0; index < message.卡片列表.length; index++) {
-      if (cards.length >= 100) { truncated = true; break; }
-      const card: 卡片草稿 = message.卡片列表[index];
-      const fields: string[] = [];
-      for (const field of card.fields) { fields.push(this.截断Provider文本(field, 2000)); }
-      cards.push({ index: index + 1, fields: fields, status: card.状态, selected: card.已选中 });
-    }
-    for (const draft of message.变更草稿列表) {
-      if (changes.length >= 20) { truncated = true; break; }
-      const operations: ProviderDraftOperationContext[] = [];
-      for (const operation of draft.operations) {
-        if (operationCount >= 200) { truncated = true; break; }
-        operations.push({
-          kind: operation.kind, noteId: operation.noteId, cardId: operation.cardId,
-          deckId: operation.deckId, fieldOrd: operation.fieldOrd,
-          before: this.截断Provider文本(operation.before, 1000),
-          after: this.截断Provider文本(operation.after, 1000)
-        });
-        operationCount += 1;
-      }
-      changes.push({
-        id: draft.id, risk: draft.risk, summary: this.截断Provider文本(draft.summary, 1000),
-        status: draft.status, operations: operations
-      });
-      if (operationCount >= 200) { break; }
-    }
-    const context: ProviderDraftContext = {
-      cards: cards, changes: changes,
-      executionResult: this.截断Provider文本(message.批次结果, 2000), truncated: truncated
-    };
-    return `应用内当前草稿与执行状态（仅作后续对话上下文，不代表已保存）：${JSON.stringify(context)}`;
-  }
-
-  private 限制Provider输入(values: ProviderInputItem[]): ProviderInputItem[] {
-    const output: ProviderInputItem[] = [];
-    let totalChars: number = 0;
-    for (let index: number = values.length - 1; index >= 0; index--) {
-      if (output.length >= 80 || totalChars >= 240000) { break; }
-      const source: ProviderInputItem = values[index];
-      const remaining: number = 240000 - totalChars;
-      if (remaining <= 0) { break; }
-      const content: string = this.截断Provider文本(source.content, Math.max(128, remaining));
-      output.unshift({
-        kind: source.kind, role: source.role, content: content,
-        callId: source.callId, name: source.name,
-        argumentsJson: source.argumentsJson, output: source.output
-      });
-      totalChars += content.length;
-    }
-    return output;
+    return buildProviderDraftContext(message);
   }
 
   private async 发送(): Promise<void> {
@@ -1046,7 +861,7 @@ export struct AI制卡页 {
 
   private async runAgentTurn(providerText: string, visibleUserText: string,
     existingUserMessageId: number = 0, intentText: string = visibleUserText, resumeOutput: string = ''): Promise<AgentRunResult | null> {
-    if (this.处理中 || this.agentRunner === null || this.sessionController === null) { return null; }
+    if (this.pageDisposed || this.cardBatch.isRunning() || this.处理中 || this.agentRunner === null || this.sessionController === null) { return null; }
     this.重建本轮AgentScope();
     this.agentScope.configureCreateConstraints(this.pageMode === 'create' &&
       explicitYearClozeRequested(providerText));
@@ -1077,6 +892,7 @@ export struct AI制卡页 {
     aiMessage.streaming = true;
     this.追加消息(aiMessage);
     const aiIndex: number = this.消息列表.length - 1;
+    const conversationId: string = this.conversationId;
     try {
       const request: ProviderTurnRequest = {
         apiKey: this.AI配置.apiKey,
@@ -1096,9 +912,14 @@ export struct AI制卡页 {
         reasoningEffort: 'low', maxOutputTokens: 32768
       };
       const observer: 页面Agent观察者 = new 页面Agent观察者(
-        (event: AgentEvent): void => { this.处理Agent事件(aiIndex, event); });
+        (event: AgentEvent): void => {
+          const index: number = this.currentMessageIndex(conversationId, aiMessage.id);
+          if (index >= 0) this.处理Agent事件(index, event);
+        });
       const result: AgentRunResult = await this.sessionController.run(this.agentSettings.selectedProvider, request, observer, resumeOutput);
+      if (this.currentMessageIndex(conversationId, aiMessage.id) < 0) return null;
       await this.syncSessionTarget();
+      if (this.currentMessageIndex(conversationId, aiMessage.id) < 0) return null;
       if (result.status === 'awaiting_clarification') {
         this.更新消息(aiIndex, (message: 聊天消息): void => {
           message.taskStatus = 'waiting';
@@ -1114,6 +935,7 @@ export struct AI制卡页 {
       }
       return result;
     } catch (错误) {
+      if (this.currentMessageIndex(conversationId, aiMessage.id) < 0) return null;
       const 异常: Error = 错误 instanceof Error ? 错误 : new Error(`${错误}`);
       const 错误文案: string = this.取Agent错误文案(异常);
       this.更新消息(aiIndex, (message: 聊天消息): void => {
@@ -1127,9 +949,11 @@ export struct AI制卡页 {
       });
       return null;
     } finally {
-      this.更新消息(aiIndex, (message: 聊天消息): void => { message.streaming = false; });
-      this.处理中 = false;
-      await this.保存当前会话历史();
+      if (this.currentMessageIndex(conversationId, aiMessage.id) >= 0) {
+        this.更新消息(aiIndex, (message: 聊天消息): void => { message.streaming = false; });
+        this.处理中 = false;
+        await this.保存当前会话历史();
+      }
     }
   }
 
@@ -1494,7 +1318,7 @@ export struct AI制卡页 {
   }
 
   /** 保存一张卡。成功返回空串；失败返回本地化错误文案。 */
-  private async 保存单卡(fields: string[], deckId: number, notetypeId: number): Promise<string> {
+  private async 保存单卡(fields: string[], deckId: number, notetypeId: number, messages: CardSaveMessages): Promise<string> {
     try {
       const operations: DraftOperation[] = [];
       for (let fieldOrd: number = 0; fieldOrd < fields.length; fieldOrd++) {
@@ -1512,75 +1336,66 @@ export struct AI制卡页 {
       };
       const prepared: PreparedAgentDraft = await this.agentExecutor.prepare(draft);
       const result: AgentDraftExecutionResult = await this.agentExecutor.executeOrdinary(prepared, prepared.firstToken);
-      return result.failed === 0 ? '' : this.取本地化文案($r('app.string.ai_card_save_failed'));
+      return result.failed === 0 ? '' : messages.failed;
     } catch (错误) {
       if (错误 instanceof 笔记字段校验错误) {
         if (错误.messageKey === 'add_note_empty_error') {
-          return this.取本地化文案($r('app.string.add_note_empty_error'));
+          return messages.empty;
         }
         if (错误.messageKey === 'add_note_duplicate_error') {
-          return this.取本地化文案($r('app.string.add_note_duplicate_error'));
+          return messages.duplicate;
         }
         // MISSING_CLOZE / NOTETYPE_NOT_CLOZE / FIELD_NOT_CLOZE
-        return this.取本地化文案($r('app.string.add_note_cloze_missing'));
+        return messages.cloze;
       }
-      return this.取本地化文案($r('app.string.ai_card_save_failed'));
+      return messages.failed;
     }
   }
 
   private async 保存批次(消息索引: number): Promise<void> {
-    const 消息: 聊天消息 = this.消息列表[消息索引];
-    if (消息.批次保存中 || 消息.draftDeckId === 0 || 消息.draftNotetypeId === 0) {
-      return;
-    }
-    const 目标索引列表: number[] = [];
-    for (let i: number = 0; i < 消息.卡片列表.length; i++) {
-      const 卡: 卡片草稿 = 消息.卡片列表[i];
-      if (卡.已选中 && 卡.状态 !== 'saved') {
-        目标索引列表.push(i);
-      }
-    }
-    if (目标索引列表.length === 0) {
-      return;
-    }
-    this.更新消息(消息索引, (目标: 聊天消息): void => {
-      目标.批次保存中 = true;
-    });
-    let 成功数: number = 0;
-    let 失败数: number = 0;
-    for (const 卡索引 of 目标索引列表) {
-      const 卡: 卡片草稿 = this.消息列表[消息索引].卡片列表[卡索引];
-      const 失败提示: string = await this.保存单卡(卡.fields, 消息.draftDeckId, 消息.draftNotetypeId);
-      if (失败提示.length === 0) {
-        成功数++;
-        this.更新消息(消息索引, (目标: 聊天消息): void => {
-          const 已存卡: 卡片草稿 = this.克隆卡片(目标.卡片列表[卡索引]);
-          已存卡.状态 = 'saved';
-          已存卡.失败提示 = '';
-          目标.卡片列表[卡索引] = 已存卡;
+    const message: 聊天消息 = this.消息列表[消息索引];
+    if (this.pageDisposed || this.cardBatch.isRunning() || message.批次保存中 ||
+      message.draftDeckId === 0 || message.draftNotetypeId === 0 || this.待保存数(消息索引) === 0) return;
+    const messages: CardSaveMessages = {
+      failed: this.取本地化文案($r('app.string.ai_card_save_failed')),
+      empty: this.取本地化文案($r('app.string.add_note_empty_error')),
+      duplicate: this.取本地化文案($r('app.string.add_note_duplicate_error')),
+      cloze: this.取本地化文案($r('app.string.add_note_cloze_missing'))
+    };
+    const conversationId: string = this.conversationId;
+    const messageId: number = message.id;
+    const cards: 卡片草稿[] = message.卡片列表.map((card: 卡片草稿): 卡片草稿 => this.克隆卡片(card));
+    this.更新消息(消息索引, (target: 聊天消息): void => { target.批次保存中 = true; });
+    try {
+      const result: AgentBatchResult = await this.cardBatch.run(cards, message.draftDeckId, message.draftNotetypeId,
+        (fields: string[], deckId: number, notetypeId: number): Promise<string> => this.保存单卡(fields, deckId, notetypeId, messages),
+        this.取本地化文案($r('app.string.ai_card_save_failed')),
+        (cardIndex: number, failure: string): void => {
+          const index: number = this.currentMessageIndex(conversationId, messageId);
+          if (index < 0) return;
+          this.更新消息(index, (target: 聊天消息): void => {
+            const card: 卡片草稿 = this.克隆卡片(cards[cardIndex]);
+            card.状态 = failure.length === 0 ? 'saved' : 'failed';
+            card.失败提示 = failure;
+            target.卡片列表[cardIndex] = card;
+          });
         });
-      } else {
-        失败数++;
-        this.更新消息(消息索引, (目标: 聊天消息): void => {
-          const 失败卡: 卡片草稿 = this.克隆卡片(目标.卡片列表[卡索引]);
-          失败卡.状态 = 'failed';
-          失败卡.失败提示 = 失败提示;
-          目标.卡片列表[卡索引] = 失败卡;
-        });
-      }
+      if (result.succeeded > 0) AppStorage.setOrCreate<number>('noteAddedTick', Date.now());
+      const index: number = this.currentMessageIndex(conversationId, messageId);
+      if (index < 0) return;
+      const text: string = result.failed === 0 ?
+        this.取本地化格式($r('app.string.ai_card_batch_all_ok'), [`${result.succeeded}`]) :
+        this.取本地化格式($r('app.string.ai_card_batch_done'), [`${result.succeeded}`, `${result.failed}`]);
+      this.更新消息(index, (target: 聊天消息): void => { target.批次结果 = text; });
+    } finally {
+      const index: number = this.currentMessageIndex(conversationId, messageId);
+      if (index >= 0) this.更新消息(index, (target: 聊天消息): void => { target.批次保存中 = false; });
     }
-    const 结果文案: string = 失败数 === 0
-      ? this.取本地化格式($r('app.string.ai_card_batch_all_ok'), [`${成功数}`])
-      : this.取本地化格式($r('app.string.ai_card_batch_done'),
-        [`${成功数}`, `${失败数}`]);
-    this.更新消息(消息索引, (目标: 聊天消息): void => {
-      目标.批次保存中 = false;
-      目标.批次结果 = 结果文案;
-    });
-    if (成功数 > 0) {
-      // 笔记添加成功：写 AppStorage 标志位通知首页/牌组详情面板立即刷新统计计数（与 添加笔记页 同机制）
-      AppStorage.setOrCreate<number>('noteAddedTick', Date.now());
-    }
+  }
+
+  private currentMessageIndex(conversationId: string, messageId: number): number {
+    if (this.pageDisposed || this.conversationId !== conversationId) return -1;
+    return this.消息列表.findIndex((message: 聊天消息): boolean => message.id === messageId);
   }
 
   private saveSessionCheckpoint(): void {
@@ -1591,44 +1406,13 @@ export struct AI制卡页 {
   private async 保存当前会话历史(): Promise<void> {
     try {
       this.saveSessionCheckpoint();
-      const messages: AgentHistoryMessage[] = [];
-      const audits: AgentHistoryAudit[] = [];
-      const sources: SearchSource[] = [];
-      const defaultTitle: string = this.取本地化文案(this.pageMode === 'create' ?
-        $r('app.string.ai_agent_history_create_title') : $r('app.string.ai_agent_history_edit_title'));
-      let title: string = defaultTitle;
-      for (const message of this.消息列表) {
-        if ((message.timeline.length > 0 || message.正文.length > 0 || message.推理摘要.length > 0 || message.工具过程.length > 0 ||
-          message.action !== null) && (message.kind === 'normal' || message.kind === 'clarification')) {
-          messages.push({
-            id: message.id, reasoning: message.推理摘要, reasoningIsSummary: message.reasoningIsSummary,
-            timeline: cloneAgentTimeline(message.timeline),
-            timelineTruncated: message.timelineTruncated,
-            reasoningTruncated: message.reasoningTruncated,
-            role: message.角色 === 'user' ? 'user' : 'assistant',
-            text: message.角色 === 'ai' && message.providerText.length > 0 ?
-              message.providerText : message.正文,
-            kind: message.kind,
-            action: message.action ?? undefined,
-            clarification: message.clarification === null ? null : cloneAgentClarificationView(message.clarification),
-            expanded: message.expanded
-          });
-          if (message.角色 === 'user' && title === defaultTitle) {
-            title = message.正文.slice(0, 40);
-          }
-        }
-        for (const item of message.工具过程) {
-          const audit: AgentHistoryAudit = this.克隆历史审计(item);
-          audit.messageId = message.id;
-          audits.push(audit);
-        }
-        for (const source of message.来源列表) { sources.push(source); }
-      }
-      if (messages.length === 0) { return; }
+      const history = projectAgentHistory(this.消息列表, this.取本地化文案(this.pageMode === 'create' ?
+        $r('app.string.ai_agent_history_create_title') : $r('app.string.ai_agent_history_edit_title')));
+      if (history.messages.length === 0) { return; }
       const conversation: AgentConversation = {
-        id: this.conversationId, mode: this.pageMode, title: title, updatedAt: Date.now(),
+        id: this.conversationId, mode: this.pageMode, title: history.title, updatedAt: Date.now(),
         setup: this.taskSetup(),
-        messages: messages, audits: audits, sources: sources,
+        messages: history.messages, audits: history.audits, sources: history.sources,
         results: this.历史执行结果.slice()
       };
       await saveAgentConversation(conversation);
@@ -1639,12 +1423,14 @@ export struct AI制卡页 {
 
   /** 加载同模式历史到页面内列表；不再把会话伪装成 ActionMenu 按钮。 */
   private async 打开历史会话(): Promise<void> {
+    if (this.pageDisposed || this.处理中 || this.文件解析中 || this.cardBatch.isRunning()) return;
     if (this.显示历史区) {
       this.显示历史区 = false;
       return;
     }
     this.显示历史区 = true;
     const all: AgentConversation[] = await loadAgentConversations();
+    if (this.pageDisposed || !this.显示历史区) return;
     const sameMode: AgentConversation[] = [];
     for (const item of all) {
       if (item.mode === this.pageMode) { sameMode.push(item); }
@@ -1652,57 +1438,11 @@ export struct AI制卡页 {
     this.历史会话列表 = sameMode;
   }
 
-  private 两位数(value: number): string {
-    return value < 10 ? `0${value}` : `${value}`;
-  }
-
-  private 格式化历史时间(value: number): string {
-    const time: Date = new Date(value);
-    return `${time.getFullYear()}-${this.两位数(time.getMonth() + 1)}-${this.两位数(time.getDate())} ` +
-      `${this.两位数(time.getHours())}:${this.两位数(time.getMinutes())}`;
-  }
-
   /** 恢复可见历史、协议与检索进度；旧卡片写入令牌不恢复。 */
   private async 恢复历史会话(selected: AgentConversation): Promise<void> {
-    const restored: 聊天消息[] = [];
-    const messagePositions: Map<number, number> = new Map<number, number>();
-    for (const item of selected.messages) {
-      const message: 聊天消息 = this.空消息(item.role === 'user' ? 'user' : 'ai', item.text, false);
-      message.kind = item.kind;
-      message.action = item.action ?? null;
-      message.clarification = item.clarification;
-      message.expanded = item.expanded;
-      message.providerText = item.text;
-      message.推理摘要 = item.reasoning ?? '';
-      message.reasoningIsSummary = item.reasoningIsSummary === true;
-      message.reasoningTruncated = item.reasoningTruncated === true;
-      message.timeline = cloneAgentTimeline(item.timeline ?? []);
-      message.timelineTruncated = item.timelineTruncated === true;
-      if (item.id !== undefined) { messagePositions.set(item.id, restored.length); }
-      restored.push(message);
-    }
-    // 新历史按消息归属恢复；旧记录无法确定归属时单独列出，不冒充最后一轮调用。
-    let legacyAuditTarget: number = -1;
-    for (const audit of selected.audits) {
-      let auditTarget: number | undefined = audit.messageId === undefined ? undefined : messagePositions.get(audit.messageId);
-      if (auditTarget === undefined) {
-        if (legacyAuditTarget < 0) {
-          restored.push(this.空消息('ai', this.取本地化文案($r('app.string.ai_agent_history_unassigned_tools')), false));
-          legacyAuditTarget = restored.length - 1;
-        }
-        auditTarget = legacyAuditTarget;
-      }
-      const trace: AgentToolTrace = this.克隆工具追踪(audit);
-      trace.expanded = !this.simpleMode;
-      restored[auditTarget].工具过程.push(trace);
-    }
-    for (const message of restored) {
-      for (const block of message.timeline) {
-        if (block.kind === 'tool') {
-          block.index = message.工具过程.findIndex((trace: AgentToolTrace): boolean => trace.callId === block.refId);
-        }
-      }
-    }
+    if (this.pageDisposed || this.处理中 || this.文件解析中 || this.cardBatch.isRunning()) return;
+    const restored: 聊天消息[] = restoreAgentMessages(selected, (): number => this.下一个消息ID(),
+      this.取本地化文案($r('app.string.ai_agent_history_unassigned_tools')), !this.simpleMode);
     this.conversationId = selected.id;
     this.历史执行结果 = selected.results.slice();
     this.消息列表 = restored;
@@ -1778,6 +1518,7 @@ export struct AI制卡页 {
   }
 
   private 开始新会话(): void {
+    if (this.pageDisposed || this.处理中 || this.文件解析中 || this.cardBatch.isRunning()) return;
     this.sessionController?.clear();
     this.cancelPendingClarifications();
     this.conversationId = `agent-${Date.now()}-${Math.random()}`;
@@ -1785,30 +1526,6 @@ export struct AI制卡页 {
     this.消息列表 = [];
     this.导入文件列表 = [];
     this.显示历史区 = false;
-  }
-
-  private 复制导入文件并标记错误(file: AgentImportedFile, errorCode: string): AgentImportedFile {
-    return {
-      id: file.id,
-      name: file.name,
-      extension: file.extension,
-      byteSize: file.byteSize,
-      content: '',
-      errorCode: errorCode,
-      warningCode: ''
-    };
-  }
-
-  private 复制导入文件并裁剪内容(file: AgentImportedFile, remaining: number): AgentImportedFile {
-    return {
-      id: file.id,
-      name: file.name,
-      extension: file.extension,
-      byteSize: file.byteSize,
-      content: file.content.slice(0, remaining),
-      errorCode: '',
-      warningCode: 'content_truncated'
-    };
   }
 
   private async 选择并解析文件(): Promise<void> {
@@ -1826,34 +1543,20 @@ export struct AI制卡页 {
     }
     // 文件选择器返回时不恢复 TextArea 焦点，避免导入后主动弹起输入法。
     this.getUIContext().getFocusController().clearFocus();
+    const conversationId: string = this.conversationId;
     this.文件解析中 = true;
     try {
       const selected: AgentImportedFile[] = await selectAndParseAgentFiles(context, remaining);
       if (selected.length === 0) { return; }
-      let usedChars: number = 0;
-      for (const existing of successfulAgentImportedFiles(this.导入文件列表)) {
-        usedChars += existing.content.length;
-      }
-      const next: AgentImportedFile[] = this.导入文件列表.slice();
-      for (const file of selected) {
-        const available: number = AGENT_IMPORT_MAX_CONTEXT_CHARS - usedChars;
-        if (file.errorCode.length === 0 && available <= 0) {
-          next.push(this.复制导入文件并标记错误(file, 'context_limit'));
-        } else if (file.errorCode.length === 0 && file.content.length > available) {
-          next.push(this.复制导入文件并裁剪内容(file, available));
-          usedChars += available;
-        } else {
-          next.push(file);
-          if (file.errorCode.length === 0) { usedChars += file.content.length; }
-        }
-      }
-      this.导入文件列表 = next;
+      if (this.pageDisposed || conversationId !== this.conversationId) return;
+      this.导入文件列表 = mergeAgentImportedFiles(this.导入文件列表, selected);
       this.错误信息 = '';
     } catch (error) {
+      if (this.pageDisposed || conversationId !== this.conversationId) return;
       this.错误信息 = this.取本地化文案($r('app.string.ai_agent_file_picker_failed'));
     } finally {
       this.文件解析中 = false;
-      this.getUIContext().getFocusController().clearFocus();
+      if (!this.pageDisposed) this.getUIContext().getFocusController().clearFocus();
     }
   }
 
@@ -1980,6 +1683,7 @@ export struct AI制卡页 {
         if (this.显示历史区) {
           按下态按钮({
             文案: $r('app.string.ai_agent_history_new'),
+            是否启用: !this.处理中 && !this.文件解析中 && !this.cardBatch.isRunning(),
             字色: this.动作主色,
           themeText: true,
             点击回调: (): void => { this.开始新会话(); }
@@ -1987,6 +1691,7 @@ export struct AI制卡页 {
         } else {
           按下态按钮({
             文案: $r('app.string.ai_agent_history'),
+            是否启用: !this.处理中 && !this.文件解析中 && !this.cardBatch.isRunning(),
             字色: $r('app.color.text_primary'),
             点击回调: (): void => {
               if (!this.处理中) { this.打开历史会话(); }
@@ -2010,69 +1715,10 @@ export struct AI制卡页 {
 
   @Builder
   private 历史区() {
-    Column({ space: 应用尺寸.间距_10 }) {
-      if (this.历史会话列表.length === 0) {
-        Text($r('app.string.ai_agent_history_none'))
-          .fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_secondary'))
-          .width('100%')
-          .padding({ top: 应用尺寸.间距_16, bottom: 应用尺寸.间距_16 })
-          .textAlign(TextAlign.Center)
-      } else {
-        Scroll() {
-          Column({ space: 应用尺寸.间距_8 }) {
-            ForEach(this.历史会话列表, (item: AgentConversation) => {
-              Row({ space: 应用尺寸.间距_8 }) {
-                Column({ space: 应用尺寸.间距_4 }) {
-                  Row({ space: 应用尺寸.间距_5 }) {
-                    Text(item.title)
-                      .fontSize(应用尺寸.字号_正文)
-                      .fontWeight(FontWeight.Medium)
-                      .fontColor($r('app.color.text_primary'))
-                      .maxLines(1)
-                      .textOverflow({ overflow: TextOverflow.Ellipsis })
-                  }
-                  .width('100%')
-                  Text(this.取本地化格式($r('app.string.ai_agent_history_message_count'),
-                    [`${item.messages.length}`]) + ` · ${this.格式化历史时间(item.updatedAt)}`)
-                    .fontSize(应用尺寸.字号_正文_小)
-                    .fontColor($r('app.color.text_secondary'))
-                    .width('100%')
-                }
-                .layoutWeight(1)
-                .onClick((): void => { this.恢复历史会话(item); })
-                Button($r('app.string.ai_agent_history_delete'))
-                  .height(应用尺寸.按钮高度)
-                  .fontSize(应用尺寸.字号_按钮)
-                  .fontColor($r('app.color.error_text'))
-                  .backgroundColor(Color.Transparent)
-                  .onClick((): void => { this.删除历史会话(item); })
-              }
-              .width('100%')
-              .padding(应用尺寸.间距_10)
-              .backgroundColor(item.id === this.conversationId ?
-                this.选中背景色 : $r('app.color.surface_card'))
-              .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
-              .borderRadius(应用尺寸.圆角_面板)
-            }, (item: AgentConversation): string => item.id)
-          }
-          .width('100%')
-        }
-        .width('100%')
-        .layoutWeight(1)
-        .scrollBar(BarState.Auto)
-        .edgeEffect(EdgeEffect.Spring)
-      }
-    }
-    .width('100%')
-    .layoutWeight(1)
-    .padding({
-      left: 应用尺寸.页面内边距_水平,
-      right: 应用尺寸.页面内边距_水平,
-      top: 应用尺寸.pageContentTopInset,
-      bottom: 应用尺寸.pageBottomInset
+    AgentHistoryList({ conversations: this.历史会话列表, conversationId: this.conversationId,
+      onRestore: (item: AgentConversation): void => { this.恢复历史会话(item); },
+      onDelete: (item: AgentConversation): void => { this.删除历史会话(item); }
     })
-    .backgroundColor(this.页面底色微染值)
   }
 
   @Builder
@@ -2097,92 +1743,12 @@ export struct AI制卡页 {
 
   @Builder
   private 卡片项(消息索引: number, 卡片索引: number) {
-    Column({ space: 应用尺寸.间距_5 }) {
-      Row({ space: 应用尺寸.间距_8 }) {
-        // 选中圈：已保存的卡固定勾选且不可改
-        Row() {
-          if (this.消息列表[消息索引].卡片列表[卡片索引].已选中) {
-            Text('✓')
-              .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.action_on_primary'))
-          }
-        }
-        .width(20)
-        .height(20)
-        .borderRadius(10)
-        .backgroundColor(this.消息列表[消息索引].卡片列表[卡片索引].已选中
-          && this.消息列表[消息索引].卡片列表[卡片索引].状态 !== 'saved'
-          ? this.动作主色 : Color.Transparent)
-        .border({ width: 应用尺寸.卡片边框, color: this.动作主色 })
-        .justifyContent(FlexAlign.Center)
-        .alignItems(VerticalAlign.Center)
-        .enabled(this.消息列表[消息索引].卡片列表[卡片索引].状态 !== 'saved')
-        .onClick((): void => {
-          const 当前: 卡片草稿 = this.消息列表[消息索引].卡片列表[卡片索引];
-          this.更新卡片选中(消息索引, 卡片索引, !当前.已选中);
-        })
-
-        Text(this.取本地化格式($r('app.string.ai_card_card_index'), [`${卡片索引 + 1}`]))
-          .fontSize(应用尺寸.字号_正文)
-          .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.text_primary'))
-          .layoutWeight(1)
-          .opacity(this.消息列表[消息索引].卡片列表[卡片索引].已选中 ? 1 : 0.5)
-
-        if (this.消息列表[消息索引].卡片列表[卡片索引].状态 === 'saved') {
-          Text() { ThemeTextSpans($r('app.string.ai_card_saved'), this.themeAccentColors, this.getUIContext()) }
-            .fontSize(应用尺寸.字号_正文_小)
-            .fontColor(this.动作主色)
-        } else if (this.消息列表[消息索引].卡片列表[卡片索引].状态 === 'failed') {
-          Text($r('app.string.ai_card_save_failed'))
-            .fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.error_text'))
-        }
-      }
-      .width('100%')
-
-      if (this.消息列表[消息索引].卡片列表[卡片索引].状态 === 'failed'
-        && this.消息列表[消息索引].卡片列表[卡片索引].失败提示 !== '') {
-        Text(this.消息列表[消息索引].卡片列表[卡片索引].失败提示)
-          .fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.error_text'))
-          .width('100%')
-      }
-
-      // 字段编辑区：勾选才展开；已保存的卡展示为只读
-      if (this.消息列表[消息索引].卡片列表[卡片索引].已选中) {
-        ForEach(this.消息列表[消息索引].字段名列表, (字段名: string, 字段索引: number) => {
-          Column({ space: 应用尺寸.间距_5 }) {
-            Text(字段名)
-              .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_secondary'))
-              .width('100%')
-            TextArea({
-              text: this.消息列表[消息索引].卡片列表[卡片索引].fields[字段索引]
-            })
-              .width('100%')
-              .height(56)
-              .fontSize(应用尺寸.字号_正文)
-              .fontColor($r('app.color.text_primary'))
-              .backgroundColor($r('app.color.surface_card'))
-              .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
-              .borderRadius(应用尺寸.圆角_面板)
-              .padding(应用尺寸.间距_10)
-              .enabled(this.消息列表[消息索引].卡片列表[卡片索引].状态 === 'draft')
-              .onChange((值: string): void => {
-                this.更新卡片字段(消息索引, 卡片索引, 字段索引, 值);
-              })
-          }
-          .width('100%')
-        }, (字段名: string, 字段索引: number): string =>
-          `${消息索引}-${卡片索引}-${字段索引}-${字段名}`)
-      }
-    }
-    .width('100%')
-    .padding(应用尺寸.间距_10)
-    .backgroundColor($r('app.color.surface_page'))
-    .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
-    .borderRadius(应用尺寸.圆角_面板)
+    AgentEditableCard({ card: this.消息列表[消息索引].卡片列表[卡片索引],
+      fieldNames: this.消息列表[消息索引].字段名列表, busy: this.消息列表[消息索引].批次保存中,
+      index: 卡片索引, messageId: this.消息列表[消息索引].id,
+      onSelected: (selected: boolean): void => { this.更新卡片选中(消息索引, 卡片索引, selected); },
+      onField: (index: number, value: string): void => { this.更新卡片字段(消息索引, 卡片索引, index, value); }
+    })
   }
 
   @Builder

@@ -100,10 +100,13 @@ impl BackendRegistry {
             let handle = self.next_handle.fetch_add(1, Ordering::Relaxed);
             if handle != 0 && !backends.contains_key(&handle) {
                 let sync_abort = backend.sync_aborter();
-                backends.insert(handle, Arc::new(BackendEntry {
-                    backend: Mutex::new(Box::new(backend)),
-                    sync_abort,
-                }));
+                backends.insert(
+                    handle,
+                    Arc::new(BackendEntry {
+                        backend: Mutex::new(Box::new(backend)),
+                        sync_abort,
+                    }),
+                );
                 return handle;
             }
         }
@@ -130,7 +133,8 @@ impl BackendRegistry {
                 None => Err(BackendFailure::Backend(Vec::new())),
             };
         }
-        let result = backend.backend
+        let result = backend
+            .backend
             .lock()
             .map_err(|_| BackendFailure::Poisoned)?
             .run_method_raw(service, method, input);
@@ -167,6 +171,8 @@ unsafe fn set_error(target: *mut AnkiBuffer, message: &str) {
     unsafe { set_buffer(target, message.as_bytes().to_vec()) };
 }
 
+// C ABI 参数原样转发；额外 registry 参数用于隔离测试，不改变公开 ABI。
+#[allow(clippy::too_many_arguments)]
 unsafe fn call_with_registry(
     registry: &BackendRegistry,
     handle: u32,
@@ -229,7 +235,9 @@ impl RawBackend for AnkiBackend {
     fn sync_aborter(&self) -> Option<SyncAbort> {
         let backend = self.0.clone();
         Some(Arc::new(move || {
-            backend.run_service_method(1, 7, &[]).map_err(BackendFailure::Backend)
+            backend
+                .run_service_method(1, 7, &[])
+                .map_err(BackendFailure::Backend)
         }))
     }
 
@@ -245,6 +253,12 @@ impl RawBackend for AnkiBackend {
     }
 }
 
+/// 打开后端并交付句柄；错误缓冲区由调用方释放。
+///
+/// # Safety
+/// 非空输入必须在调用期间指向至少 init_len 字节的可读内存。
+/// 非空输出指针必须对齐、可写且彼此及与输入不重叠；输出不得持有未释放缓冲区。
+/// 返回的缓冲区只能通过 anki_buffer_free 释放一次。
 #[no_mangle]
 pub unsafe extern "C" fn anki_backend_open(
     init_ptr: *const u8,
@@ -312,6 +326,12 @@ pub unsafe extern "C" fn anki_backend_open(
     }
 }
 
+/// 同步执行一次原始协议调用并转移结果/错误缓冲区所有权。
+///
+/// # Safety
+/// 非空输入必须在调用期间指向至少 input_len 字节的可读内存。
+/// 非空输出指针必须对齐、可写且彼此及与输入不重叠；输出不得持有未释放缓冲区。
+/// 返回的每个缓冲区只能通过 anki_buffer_free 释放一次。
 #[no_mangle]
 pub unsafe extern "C" fn anki_backend_call(
     handle: u32,
@@ -345,6 +365,10 @@ pub extern "C" fn anki_backend_close(handle: u32) -> i32 {
     }
 }
 
+/// 归还由此库分配并转移给调用方的缓冲区。
+///
+/// # Safety
+/// 非空 buffer 必须原样来自此库且尚未释放；释放后不得再读取或重复释放。
 #[no_mangle]
 pub unsafe extern "C" fn anki_buffer_free(buffer: AnkiBuffer) {
     if !buffer.ptr.is_null() {
@@ -498,14 +522,25 @@ mod ffi_tests {
         }
 
         let temp = std::env::temp_dir().canonicalize().unwrap();
-        let unique = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
         let folder = temp.join(format!("jidecards-sync-test-{unique}"));
         std::fs::create_dir(&folder).unwrap();
         let registry = Arc::new(BackendRegistry::new());
         let handle = registry.insert(AnkiBackend(anki::backend::init_backend(&[]).unwrap()));
         let mut open = Vec::new();
-        for (number, name) in [(1, "collection.anki2"), (2, "collection.media"), (3, "collection.media.db")] {
-            bytes_field(number, folder.join(name).to_str().unwrap().as_bytes(), &mut open);
+        for (number, name) in [
+            (1, "collection.anki2"),
+            (2, "collection.media"),
+            (3, "collection.media.db"),
+        ] {
+            bytes_field(
+                number,
+                folder.join(name).to_str().unwrap().as_bytes(),
+                &mut open,
+            );
         }
         registry.call(handle, 3, 0, &open).unwrap();
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
@@ -520,26 +555,37 @@ mod ffi_tests {
         let (finished_tx, finished_rx) = mpsc::channel();
         let worker_registry = Arc::clone(&registry);
         let worker = std::thread::spawn(move || {
-            finished_tx.send(worker_registry.call(handle, 1, 5, &request)).unwrap();
+            finished_tx
+                .send(worker_registry.call(handle, 1, 5, &request))
+                .unwrap();
         });
         let deadline = std::time::Instant::now() + Duration::from_secs(5);
         let mut stream = loop {
             match listener.accept() {
                 Ok((stream, _)) => break stream,
                 Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
-                    assert!(std::time::Instant::now() < deadline, "sync did not contact the local server");
+                    assert!(
+                        std::time::Instant::now() < deadline,
+                        "sync did not contact the local server"
+                    );
                     std::thread::sleep(Duration::from_millis(5));
                 }
                 Err(error) => panic!("{error}"),
             }
         };
-        stream.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
         assert!(stream.read(&mut [0; 1024]).unwrap() > 0);
         registry.call(handle, 1, 7, &[]).unwrap();
-        let result = finished_rx.recv_timeout(Duration::from_secs(1)).expect("abort waited for the network timeout");
+        let result = finished_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("abort waited for the network timeout");
         assert!(matches!(result, Err(BackendFailure::Backend(_))));
         worker.join().unwrap();
-        registry.call(handle, 7, 4, &[]).expect("collection unavailable after abort");
+        registry
+            .call(handle, 7, 4, &[])
+            .expect("collection unavailable after abort");
         registry.call(handle, 3, 1, &[]).unwrap();
         registry.close(handle);
         drop(stream);

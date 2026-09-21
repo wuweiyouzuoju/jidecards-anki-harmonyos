@@ -2,14 +2,15 @@ import { StudyOptions } from '../../entry/src/main/ets/model/StudyTiming.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { stripTypeScriptTypes } from 'node:module';
+import { register } from 'node:module';
+import { UNBURY_MODE_ALL } from '../../entry/src/main/ets/proto/messages/SchedulerMessages.ts';
 
-const source = readFileSync(new URL('../../entry/src/main/ets/backend/StudySessionBackend.ts', import.meta.url), 'utf8');
-const start = source.indexOf('  async studyOptions(');
-assert.ok(start >= 0);
-const method = source.slice(start, source.indexOf('\n  }', start) + 4);
-const Backend = new Function('StudyOptions', stripTypeScriptTypes(`class Backend { ${method} }`, { mode: 'transform' }) + '; return Backend;')(StudyOptions);
+// 唯一替身是平台动态库；误触真实 RPC 必须失败，领域适配器直接导入执行。
+const native = 'data:text/javascript,' + encodeURIComponent(
+  'export function openBackend(){throw Error("Unexpected native call")} export const closeBackend=openBackend; export const runMethodRaw=openBackend;');
+const hook = `export function resolve(s,c,n){if(s==='libjidecards.so')return {url:${JSON.stringify(native)},shortCircuit:true};return n(s,c)}`;
+register('data:text/javascript,' + encodeURIComponent(hook), import.meta.url);
+const { AnkiStudySessionBackend: Backend } = await import('../../entry/src/main/ets/backend/StudySessionBackend.ts');
 
 test('autoplay uses the card deck, or its original deck for filtered cards, and refreshes changed preferences', async () => {
   for (const originalDeckId of [0, 7]) {
@@ -44,4 +45,17 @@ test('missing or unreadable deck preferences propagate failure instead of allowi
   await assert.rejects(backend.studyOptions(42), /configuration unavailable/);
   backend.deckConfigs.获取牌组配置编辑视图 = async () => { throw new Error('offline backend'); };
   await assert.rejects(backend.studyOptions(42), /offline backend/);
+});
+
+test('study mutation adapter retains note undo, single-card deletion and deck-scoped unbury semantics', async () => {
+  const calls = [], scheduler = {
+    埋藏或暂停卡片: async (...args) => calls.push(['bury', ...args]),
+    按牌组恢复埋藏: async (...args) => calls.push(['unbury', ...args])
+  };
+  const backend = new Backend(scheduler, {}, {});
+  backend.cards = { 删除卡片: async ids => calls.push(['delete', ids]) };
+  backend.notes = { 更新笔记: async (notes, skipUndo) => calls.push(['edit', notes, skipUndo]) };
+  const note = { id: 8, fields: ['edited'] };
+  await backend.updateNote(note); await backend.buryCard(9, 2); await backend.removeCard(10); await backend.unburyDeck(11);
+  assert.deepEqual(calls, [['edit', [note], false], ['bury', 9, 2], ['delete', [10]], ['unbury', 11, UNBURY_MODE_ALL]]);
 });

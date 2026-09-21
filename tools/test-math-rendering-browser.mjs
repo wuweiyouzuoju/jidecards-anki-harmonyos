@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { pathToFileURL, fileURLToPath } from 'node:url';
-import { 构建卡片HTML } from '../entry/src/main/ets/model/学习卡片HTML构建器.ets';
+import { 构建卡片HTML } from '../entry/src/main/ets/model/学习卡片HTML构建器.ts';
 import { MATH_ASSET_BASE } from '../entry/src/main/ets/model/MathRendering.ts';
 
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE ? pathToFileURL(process.env.PLAYWRIGHT_MODULE).href : 'playwright');

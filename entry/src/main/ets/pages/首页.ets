@@ -1,4 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { HomeDeckCommands } from '../backend/HomeDeckCommands';
+import { exportPersonalData } from '../backend/DataExportWorkflow';
+import { reconcileHomeExpansion, HomeDeckExpansion } from '../model/HomeDeckExpansion';
+import { HomeRefreshQueue } from '../model/HomeRefreshQueue';
+import { decideHomeSync } from '../model/HomeSyncPolicy';
+import { HomeDataRepository, HomeDataResult } from '../backend/HomeDataRepository';
+import { HomeWorkCoordinator, HomeWorkHost } from '../model/HomeWorkCoordinator';
+import { HomeStartupSequence, HomeStartupHost } from '../model/HomeStartupSequence';
 import { AutoSyncScheduler, autoSyncScheduler } from '../model/AutoSyncScheduler';
 import { ThemeTextSpans } from '../components/common/ThemeText';
 import { 按下态按钮 } from '../components/common/按下态按钮';
@@ -11,24 +19,24 @@ import { promptAction } from '@kit.ArkUI';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { 后端会话 } from '../backend/后端会话';
 import { 牌组服务 } from '../backend/牌组服务';
-import { 统计服务 } from '../backend/统计服务';
+
 import { 搜索服务 } from '../backend/搜索服务';
 import { 卡片预览页 } from '../components/browser/卡片预览页';
 import { deckHistorySearch } from '../model/DeckStudyHistory';
 import { makeParsableTextNode } from '../proto/messages/SearchMessages';
 import type { SearchRequest, SortOrder } from '../proto/messages/SearchMessages';
-import { 导出集合, 导出牌组, 完成导出, 执行牌组导入, 暂存导入文件, 替换集合 } from '../backend/数据迁移服务';
+import { 导出牌组, 执行牌组导入, 暂存导入文件, 替换集合 } from '../backend/数据迁移服务';
 import { 云端牌组服务, 云端牌组服务错误 } from '../backend/云端牌组服务';
 import { initializeRedemption } from '../utils/RedemptionStore';
 import { UNLOCKED_CONTENTS_KEY, isThemeAvailable } from '../model/ThemeCatalog';
 import { ThemeBackground } from '../components/common/ThemeBackground';
-import { 设置面板 } from '../components/设置面板';
+
 import { 牌组详情面板 } from '../components/牌组详情面板';
-import { 许可证面板 } from '../components/许可证面板';
+
 import { 主页操作面板 } from '../components/主页操作面板';
 import { 云端牌组弹窗 } from '../components/云端牌组弹窗';
 import { CloudDeckImportController, CloudDeckImportBackend, CloudDeckImportProgress } from '../model/CloudDeckImportController';
-import { HomeActivityState, canPresentHomePrompt, canStartHomeAutoSync } from '../model/HomeActivityPolicy';
+import { HomeActivityState, canPresentHomePrompt } from '../model/HomeActivityPolicy';
 import { HomeAnnouncementController } from '../model/HomeAnnouncementController';
 import { externalDeckOpens, EXTERNAL_DECK_OPEN_REVISION_KEY } from '../model/ExternalDeckOpen';
 import { 官方公告弹窗 } from '../components/官方公告弹窗';
@@ -38,8 +46,8 @@ import type { 官方公告展示项 } from '../model/官方公告模型';
 import { 是否已确认官方公告, 标记已确认官方公告 } from '../model/官方公告存储';
 import { 牌组定制面板, 牌组定制结果 } from '../components/牌组定制面板';
 import { 添加笔记页, 添加笔记页参数, 添加笔记牌组选项 } from './添加笔记页';
-import { AI制卡页, AI制卡页参数, AI制卡牌组选项 } from './AI制卡页';
-import { 数据迁移意图, 数据迁移模式, 导出牌组选项 } from '../components/数据迁移面板';
+import { AI制卡页, AI制卡页参数 } from './AI制卡页';
+import type { 数据迁移意图, 数据迁移模式, 导出牌组选项 } from '../model/DataTransferIntent';
 import { 同步面板 } from '../components/同步面板';
 import { syncActivity } from '../model/SyncSettings';
 import { 加载同步凭证, 同步凭证信息, loadAutoSyncEnabled } from '../model/同步凭证存储';
@@ -47,7 +55,8 @@ import { APP_FOREGROUND_KEY } from '../model/Redemption';
 import { 主页顶部工具栏 } from '../components/home/主页顶部工具栏';
 import { 主页更多面板 } from '../components/home/主页更多面板';
 import { 学习提醒页 } from './学习提醒页';
-import { 设置页, 设置页参数 } from './设置页';
+import { 设置页 } from './设置页';
+import { 设置页参数, 浏览页参数 } from '../model/navigation/PageParams';
 import { 主页摘要分页 } from '../components/home/主页摘要分页';
 import { 主页牌组列表 } from '../components/home/主页牌组列表';
 import { 牌组选项协调器 } from '../components/home/牌组选项协调器';
@@ -62,16 +71,15 @@ import type {
   DeckConfigsForUpdateView,
   UpdateDeckConfigsInput
 } from '../proto/messages/DeckConfigMessages';
-import { UPDATE_DECK_CONFIGS_MODE_NORMAL } from '../proto/messages/DeckConfigMessages';
+
 import { 牌组配置表单, 校验问题 } from '../model/牌组配置表单';
 import { 牌组选项编辑 } from '../model/牌组选项编辑';
-import { copyDeckConfig, deckConfigUseCount, prepareDeckConfigForSave } from '../model/DeckConfigSave';
+import { copyDeckConfig, deckConfigUseCount, buildDeckConfigRequest } from '../model/DeckConfigSave';
 import { 学习页, 学习页参数 } from './学习页';
-import { 浏览页, 浏览页参数 } from './浏览页';
+import { 浏览页 } from './浏览页';
 import { 统计页, 统计页参数 } from './统计页';
 import { 构建月历, 月历数据 } from '../model/日历模型';
-import { 构建主页快照 } from '../model/主页快照映射器';
-import type { GraphsView } from '../proto/messages/StatsMessages';
+
 import {
   牌组列表数据源,
   牌组汇总,
@@ -87,18 +95,17 @@ import { 加载主题模式, 保存主题模式 } from '../model/主题存储';
 import { 颜色主题, 颜色键, 默认颜色主题 } from '../model/颜色主题';
 import { 加载颜色主题, 保存颜色主题 } from '../model/颜色主题存储';
 import { 应用颜色主题 } from '../utils/颜色主题管理器';
-import { 加载牌组别名映射, 加载牌组色调映射, 保存牌组别名, 保存牌组色调,
-  加载牌组背景图映射, 保存牌组背景图, 清除牌组背景图 } from '../model/牌组元数据存储';
-import { 加载全部牌组顺序, 保存牌组顺序 } from '../model/牌组顺序存储';
-import { 加载已隐藏牌组ID列表, 隐藏牌组, 取消隐藏全部牌组 } from '../model/隐藏牌组存储';
+import { 保存牌组色调 } from '../model/牌组元数据存储';
+import { 保存牌组顺序 } from '../model/牌组顺序存储';
+import { 隐藏牌组, 取消隐藏全部牌组 } from '../model/隐藏牌组存储';
 import { 加载上次牌组ID, 保存上次牌组ID, 清除上次牌组ID } from '../model/上次牌组存储';
-import { 确保FSRS已开启一次, 加载FSRS开启状态, 设置FSRS开启状态, 刷新桌面卡片数据, notifyFsrsStateChanged } from '../model/FSRS控制器';
+import { 加载FSRS开启状态, 设置FSRS开启状态, 刷新桌面卡片数据, notifyFsrsStateChanged } from '../model/FSRS控制器';
 import { 加载显示今日进度卡, 主页今日进度卡AppStorage键 } from '../model/主页偏好';
-import { 提取卡片数据, 保存卡片数据, 加载小时分布窗口, 加载统计天数, 加载分离暂停偏好, 桌面卡片数据 } from '../model/桌面卡片数据存储';
+import { 桌面卡片数据 } from '../model/桌面卡片数据存储';
 import { 应用主题 } from '../utils/主题控制器';
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { 选取数据文件 } from '../utils/文件导入助手';
-import { 可见牌组行, 平铺牌组树 } from '../model/牌组层级';
+import { 可见牌组行 } from '../model/牌组层级';
 import { 检查节流标记, 获取节流奖励 } from '../utils/操作节流';
 import { HomeIntroPanel } from '../components/HomeIntroPanel';
 import { isHomeIntroCompleted, completeHomeIntro } from '../utils/HomeIntroStore';
@@ -137,12 +144,12 @@ struct 首页 {
   private readonly 页面栈: NavPathStack = new NavPathStack();
   private readonly 牌组数据源: 牌组列表数据源 = new 牌组列表数据源([]);
   private readonly 牌组服务实例: 牌组服务 = new 牌组服务();
-  private readonly 统计服务实例: 统计服务 = new 统计服务();
+  private readonly deckCommands: HomeDeckCommands = new HomeDeckCommands();
+  private readonly homeData: HomeDataRepository = new HomeDataRepository();
   private readonly 搜索服务实例: 搜索服务 = new 搜索服务();
   private readonly 牌组配置服务实例: 牌组配置服务 = new 牌组配置服务();
   private readonly 云端牌组服务实例: 云端牌组服务 = new 云端牌组服务();
   private readonly 官方公告服务实例: 官方公告服务 = new 官方公告服务();
-  private 首次弹窗序列已启动: boolean = false;
   @State @Watch('homeActivityChanged') private 显示官方公告: boolean = false;
   @State private 官方公告数据: 官方公告展示项 | null = null;
   @State private 官方公告确认中: boolean = false;
@@ -153,10 +160,11 @@ struct 首页 {
   private 官方公告延迟检查任务: number = -1;
   private readonly announcementController: HomeAnnouncementController = new HomeAnnouncementController();
   private homeDisposed: boolean = false;
-  private homeWorkTimer: number = -1;
-  private startupContinuationPending: boolean = false;
-  private startupContinuationRunning: boolean = false;
-  private welcomePending: boolean = false;
+  private readonly homeWork: HomeWorkCoordinator = new HomeWorkCoordinator(externalDeckOpens, {
+    schedule: (work: () => void): number => setTimeout(work, 0),
+    cancel: (id: number): void => clearTimeout(id)
+  });
+  private readonly startupSequence: HomeStartupSequence = new HomeStartupSequence();
   @State @Watch('homeActivityChanged') private nativeDialogOpen: boolean = false;
   private readonly cloudImportController: CloudDeckImportController = new CloudDeckImportController();
   private cloudCatalogVersion: number = 0;
@@ -323,27 +331,13 @@ struct 首页 {
     this.homeActivityChanged();
   }
 
-  /** 外部打开优先于启动提示；当前学习、编辑和集合写入完成后才消费。 */
-  private tryImportExternalDeck(): boolean {
-    if (!externalDeckOpens.hasPending()) return false;
-    const activity: HomeActivityState = this.homeActivity();
-    if (!activity.collectionReady || !canPresentHomePrompt(activity) || this.pendingSyncAction !== null) return true;
-    const uri: string | null = externalDeckOpens.begin();
-    if (uri !== null) {
-      this.importDeckUri(uri).finally((): void => {
-        externalDeckOpens.finish();
-        this.homeActivityChanged();
-      });
-    }
-    return true;
-  }
-
   aboutToDisappear(): void {
     this.homeDisposed = true;
     this.暂停主页官方公告检查();
     this.announcementController.dispose();
-    if (this.homeWorkTimer >= 0) clearTimeout(this.homeWorkTimer);
-    this.homeWorkTimer = -1;
+    this.homeWork.dispose();
+    this.refreshQueue.dispose();
+    this.startupSequence.dispose();
     this.syncScheduler.setListener(null);
     this.stopAutoSyncTimer();
     syncActivity.cancelReservation();
@@ -397,24 +391,23 @@ struct 首页 {
    */
   private tryAutoSync(): void {
     const manual: boolean = this.syncScheduler.isManualPending();
-    if (!this.syncScheduler.hasPending() || (!manual && !loadAutoSyncEnabled()) || 加载同步凭证() === null) {
+    const decision: string = decideHomeSync({
+      pending: this.syncScheduler.hasPending(), manual: manual, enabled: loadAutoSyncEnabled(),
+      authenticated: 加载同步凭证() !== null, foreground: this.syncForeground,
+      locationSafe: this.isAutoSyncLocationSafe(), externalImportPending: externalDeckOpens.hasPending(),
+      startupReady: this.autoSyncStartupReady, panelOpen: this.显示同步面板,
+      transferActive: syncActivity.isActive(), automaticAllowed: syncActivity.canAutoSync(Date.now()),
+      activity: this.homeActivity()
+    });
+    if (decision === 'drop') {
       this.syncScheduler.consume();
       if (manual) this.syncStatusText = '';
       this.stopAutoSyncTimer();
       return;
     }
-    if (!this.syncForeground || !this.isAutoSyncLocationSafe()) {
+    if (decision !== 'start') {
       if (manual) this.updatePendingSyncStatus();
-      this.stopAutoSyncTimer();
-      return;
-    }
-    const activity: HomeActivityState = this.homeActivity();
-    // 手动同步优先于尚未展示的公告/引导；已打开弹窗及集合占用仍保持互斥。
-    if (manual) activity.startupChecking = false;
-    if (externalDeckOpens.hasPending() || (!manual && !this.autoSyncStartupReady) ||
-      !canStartHomeAutoSync(activity) || this.显示同步面板 ||
-      (manual ? syncActivity.isActive() : !syncActivity.canAutoSync(Date.now()))) {
-      if (manual) this.updatePendingSyncStatus();
+      if (decision === 'pause') this.stopAutoSyncTimer();
       return;
     }
     const info: 同步凭证信息 | null = 加载同步凭证();
@@ -542,7 +535,7 @@ struct 首页 {
         this.显示卡片预览 || this.autoSyncModal || this.fsrsPromptActive || this.nativeDialogOpen,
       interactionBusy: this.排序模式中 || this.预览加载中 || this.定制牌组中,
       startupChecking: this.官方公告检查中 || this.announcementController.hasPending() ||
-        this.startupContinuationPending || this.startupContinuationRunning || this.welcomePending
+        this.startupSequence.hasPending()
     };
   }
 
@@ -550,26 +543,43 @@ struct 首页 {
     return !externalDeckOpens.hasPending() && canPresentHomePrompt(this.homeActivity());
   }
 
-  /** 合并同一轮多个状态变化，先让待展示内容占位，再考虑后台同步。 */
+  /** 页面映射当前占用与效果，任务优先级由 HomeWorkCoordinator 统一管理。 */
   private homeActivityChanged(): void {
-    if (this.homeDisposed || this.homeWorkTimer >= 0) return;
-    this.homeWorkTimer = setTimeout((): void => {
-      this.homeWorkTimer = -1;
-      if (this.tryImportExternalDeck()) return;
-      if (!this.canPresentStartupPrompt()) return;
-      this.flushSyncAction();
-      if (!this.canPresentStartupPrompt()) return;
-      if (this.syncScheduler.isManualPending()) {
-        this.tryAutoSync();
-        this.scheduleAutoSyncCheck();
-        return;
-      }
-      if (this.尝试展示待展示官方公告()) return;
-      if (this.startupContinuationPending) this.继续首次弹窗序列();
-      else if (this.welcomePending) this.显示欢迎弹窗一次();
-      else this.请求主页官方公告检查();
-      this.scheduleAutoSyncCheck();
-    }, 0);
+    if (this.homeDisposed) return;
+    const host: HomeWorkHost = {
+      activity: (): HomeActivityState => this.homeActivity(),
+      hasDeferredNavigation: (): boolean => this.pendingSyncAction !== null,
+      importDeck: (uri: string): Promise<void> => this.importDeckUri(uri),
+      importFailed: (error: Error): void => {
+        this.数据迁移错误 = error.message;
+        this.显示数据迁移 = true;
+      },
+      flushNavigation: (): void => this.flushSyncAction(),
+      manualSyncPending: (): boolean => this.syncScheduler.isManualPending(),
+      startManualSync: (): void => this.tryAutoSync(),
+      presentAnnouncement: (): boolean => this.尝试展示待展示官方公告(),
+      continueStartup: (): void => {
+        if (this.startupSequence.hasPending()) {
+          this.startupSequence.resume(this.startupHost()).catch((error: Error): void => {
+            this.getUIContext().getPromptAction().showToast({ message: error.message });
+          });
+        } else this.请求主页官方公告检查();
+      },
+      scheduleSync: (): void => this.scheduleAutoSyncCheck()
+    };
+    this.homeWork.wake(host);
+  }
+
+  private startupHost(): HomeStartupHost {
+    return {
+      canPresent: (): boolean => this.canPresentStartupPrompt() && !this.announcementController.hasPending(),
+      checkAnnouncement: (): Promise<boolean> => this.尝试显示官方公告(),
+      activateAnnouncementChecks: (): void => { this.主页公告检查已激活 = true; },
+      cloudCompleted: (): Promise<boolean> => 是否已完成云端牌组引导(),
+      introCompleted: (): Promise<boolean> => isHomeIntroCompleted(),
+      showCloud: (): void => this.打开云端牌组弹窗(false),
+      showIntro: (): void => { this.显示欢迎弹窗 = true; }
+    };
   }
 
   /** 创建入口先等待集合，避免表单持有同步前的牌组快照。 */
@@ -599,12 +609,7 @@ struct 首页 {
 
   /** 官方公告优先于首次云端牌组引导，云端牌组引导优先于版本欢迎弹窗。 */
   private async 显示首次弹窗序列(): Promise<void> {
-    if (this.首次弹窗序列已启动) return;
-    this.首次弹窗序列已启动 = true;
-    const displayed: boolean = await this.尝试显示官方公告();
-    if (displayed) return;
-    this.主页公告检查已激活 = true;
-    await this.继续首次弹窗序列();
+    await this.startupSequence.start(this.startupHost());
   }
 
   /** 执行一次真实网络检查；所有入口共用本方法，禁止并发。 */
@@ -673,18 +678,7 @@ struct 首页 {
   }
 
   private async 继续首次弹窗序列(): Promise<void> {
-    this.startupContinuationPending = true;
-    if (this.startupContinuationRunning || !this.canPresentStartupPrompt() || this.announcementController.hasPending()) return;
-    this.startupContinuationRunning = true;
-    try {
-      const completed: boolean = await 是否已完成云端牌组引导();
-      if (!this.canPresentStartupPrompt() || this.announcementController.hasPending()) return;
-      this.startupContinuationPending = false;
-      if (!completed) this.打开云端牌组弹窗(false);
-      else await this.显示欢迎弹窗一次();
-    } finally {
-      this.startupContinuationRunning = false;
-    }
+    await this.startupSequence.continue(this.startupHost());
   }
 
   /** 同步本机下载配额；读取失败按未用尽处理，避免用户平白丢失菜单入口。 */
@@ -745,13 +739,7 @@ struct 首页 {
   // 写 preferences 持久化 welcome_shown
   // ========================================================
   private async 显示欢迎弹窗一次(): Promise<void> {
-    this.welcomePending = true;
-    const shown: boolean = await isHomeIntroCompleted();
-    if (this.homeDisposed) return;
-    if (shown) { this.welcomePending = false; return; }
-    if (!this.canPresentStartupPrompt() || this.announcementController.hasPending()) return;
-    this.welcomePending = false;
-    this.显示欢迎弹窗 = true;
+    await this.startupSequence.welcome(this.startupHost());
   }
 
   /** 用户确认后才记录入门已读，失败提示但不阻止进入应用。 */
@@ -802,7 +790,6 @@ struct 首页 {
     if (this.显示牌组详情) { this.显示牌组详情 = false; return true; }
     return false;
   }
-
 
   // ========================================================
   // @块ID UI-PAGE-HOME-018
@@ -873,17 +860,14 @@ struct 首页 {
   // 并发加载会竞态覆盖——先发起的慢请求后完成，用旧 graphs 覆盖新快照，
   // 主页摘要卡片停留旧数据且无新触发器纠正（用户报告的“内部卡片高延迟”根因之一）。
   // ========================================================
-  private 加载链尾: Promise<void> = Promise.resolve();
+  private readonly refreshQueue: HomeRefreshQueue = new HomeRefreshQueue();
 
   private 加载主页数据(): Promise<void> {
     if (this.autoSyncCollectionBusy) {
       this.刷新中 = false;
       return Promise.resolve();
     }
-    const 执行 = (): Promise<void> => this.执行加载主页数据();
-    const 本轮: Promise<void> = this.加载链尾.then(执行, 执行);
-    this.加载链尾 = 本轮;
-    return 本轮;
+    return this.refreshQueue.run((): Promise<void> => this.执行加载主页数据());
   }
 
   private async 执行加载主页数据(): Promise<void> {
@@ -894,96 +878,24 @@ struct 首页 {
       return;
     }
     try {
-      await 后端会话.获取实例().确保已打开(context.filesDir);
-      // 首次启动自动开启 FSRS（用户决策：默认开启可关闭）。确保FSRS已开启一次
-      // 内部有 initialized 标记，只在首次跑一次；后续用户在设置页关掉就保持关闭。
-      // 放在 确保已打开 之后、拉取 tree 之前，避免与 deckTree/graphs 并发冲突。
-      await 确保FSRS已开启一次();
-      const tree = await this.牌组服务实例.获取牌组树();
-      const graphs: GraphsView | null = await this.静默加载图表();
-      hilog.info(0x4342, 'jidecards', `首页: 静默加载图表结果 graphs=${graphs === null ? 'null' : '非null'}`);
-      // 桌面卡片数据桥接：graphs 非空时提取 8 页数据存 filesDir，供 FormExtensionAbility 读取
-      if (graphs !== null) {
-        // 算待学数（牌组树 newCount+learnCount+reviewCount 聚合）和牌组数，供桌面卡片今日进度页
-        let 总待学: number = 0;
-        for (const 子节点 of tree.children) {
-          总待学 += 子节点.newCount + 子节点.learnCount + 子节点.reviewCount;
-        }
-        const 牌组总数: number = 平铺牌组树(tree).length;
-        const 卡片数据: 桌面卡片数据 = 提取卡片数据(graphs, 总待学, 牌组总数, await 加载小时分布窗口(), await 加载分离暂停偏好());
-        this.图表快照 = 卡片数据;
-        // 诊断日志：数值本身写进日志，用户报“数据旧”时抓 hilog 即可分辨
-        // 是后端返回旧 graphs（RPC/缓存问题）还是前端没刷新（渲染问题）。
-        hilog.info(0x4342, 'jidecards',
-          `首页: 图表快照更新 今日完成=${卡片数据.今日完成数} 今日答题=${卡片数据.今日答题数} 待学=${卡片数据.待学数}`);
-        // 必须 await：fire-and-forget 在用户立即按 Home 切桌面时会被系统冻结，
-        // 桌面卡片延迟到下次 30 分钟系统刷新才更新。App 在前台时同步等数据写入
-        // filesDir + formProvider.updateForm 推送完成，确保卡片立即反映最新统计。
-        try {
-          await 保存卡片数据(卡片数据);
-        } catch (e) {
-          hilog.error(0x4342, 'jidecards', `首页: 保存卡片数据失败 ${e}`);
-        }
-      }
-      const allDecks: 牌组汇总[] = 平铺牌组树(tree);
-      const deckIds: string[] = allDecks.map((deck: 牌组汇总): string => deck.id);
-      const toneOverrides: Map<string, 牌组色调> = await 加载牌组色调映射(deckIds);
-      const displayNameOverrides: Map<string, string> = await 加载牌组别名映射(deckIds);
-      // 收集所有 parent id（含顶层 ''）：用于按 parent 加载子牌组顺序覆盖
-      const parentIds: string[] = allDecks
-        .map((deck: 牌组汇总): string => deck.parentId)
-        .filter((pid: string, index: number, self: string[]): boolean => self.indexOf(pid) === index);
-      // allDecks 不含 root，但顶层 parent='' 总要尝试加载（若用户拖过顶层）
-      if (parentIds.indexOf('') < 0) {
-        parentIds.push('');
-      }
-      const orderOverrides: Map<string, string[]> = await 加载全部牌组顺序(parentIds);
-      const backgroundImageOverrides: Map<string, string> = await 加载牌组背景图映射(deckIds);
-      // 加载用户隐藏的 deck id 集合，可见牌组行 会过滤掉这些 id
-      const hiddenIds: string[] = await 加载已隐藏牌组ID列表();
-      this.隐藏的牌组ID集合 = new Set<string>(hiddenIds);
-      const snapshot: 主页快照 =
-        构建主页快照(tree, graphs, new Date(), toneOverrides, displayNameOverrides,
-          orderOverrides, backgroundImageOverrides);
-      // 默认牌组（id=1）名跟随系统语言：数据库里存的是 "Default"，
-      // 中文环境下显示"默认牌组"，英文环境显示"Default"。用户自定义别名优先。
-      const 默认牌组本地化名: string = this.getUIContext().getHostContext()!.resourceManager
-        .getStringSync($r('app.string.default_deck_name').id);
-      for (const deck of snapshot.decks) {
-        if (deck.id === '1' && deck.displayName === '') {
-          deck.name = 默认牌组本地化名;
-        }
-      }
+      const data: HomeDataResult = await this.homeData.load(context.filesDir,
+        context.resourceManager.getStringSync($r('app.string.default_deck_name').id));
+      if (this.homeDisposed) return;
+      const snapshot: 主页快照 = data.snapshot;
+      this.隐藏的牌组ID集合 = new Set<string>(data.hiddenIds);
+      if (data.cardData !== null) this.图表快照 = data.cardData;
+      if (data.graphs !== null) this.statsSnapshot = { graphs: data.graphs, days: data.days };
       this.主页快照数据 = snapshot;
       this.historyRefreshToken++;
       if (!await this.reconcileDeckSelection(snapshot.decks)) {
         this.显示提示($r('app.string.home_selection_save_failed'));
       }
-      // 首次加载时默认展开所有含子节点的父牌组；用 已初始化 标记而非 size 判断，避免用户全折叠后被刷新重置
-      if (!this.牌组展开已初始化) {
-        this.牌组展开已初始化 = true;
-        const next: Set<string> = new Set<string>();
-        for (const deck of snapshot.decks) {
-          if (deck.hasChildren) next.add(deck.id);
-        }
-        this.展开的牌组ID集合 = next;
-      } else {
-        // 同步/导入后：新出现的 hasChildren 牌组默认展开，已知牌组保持用户之前的展开/折叠状态。
-        // 用 已知牌组ID集合 区分「新牌组」与「用户手动折叠的牌组」——后者 id 在 已知牌组ID集合 中但不在 展开的牌组ID集合 中。
-        const next: Set<string> = new Set<string>(this.展开的牌组ID集合);
-        for (const deck of snapshot.decks) {
-          if (deck.hasChildren && !this.已知牌组ID集合.has(deck.id)) {
-            next.add(deck.id);
-          }
-        }
-        this.展开的牌组ID集合 = next;
-      }
-      // 更新已知牌组 id 集合
-      const newKnown: Set<string> = new Set<string>();
-      for (const deck of snapshot.decks) {
-        newKnown.add(deck.id);
-      }
-      this.已知牌组ID集合 = newKnown;
+      if (this.homeDisposed) return;
+      const expansion: HomeDeckExpansion = reconcileHomeExpansion(snapshot.decks, this.展开的牌组ID集合,
+        this.已知牌组ID集合, this.牌组展开已初始化);
+      this.牌组展开已初始化 = true;
+      this.展开的牌组ID集合 = expansion.expanded;
+      this.已知牌组ID集合 = expansion.known;
       this.牌组数据源.replaceAll(可见牌组行(snapshot.decks, this.展开的牌组ID集合, this.隐藏的牌组ID集合));
       this.月历 = 构建月历(new Date(), snapshot.reviewCountsByDate);
       this.加载状态 = snapshot.decks.length > 0 ? 'ready' : 'empty';
@@ -994,11 +906,12 @@ struct 首页 {
         await this.尝试恢复上次牌组();
       }
     } catch (error) {
+      if (this.homeDisposed) return;
       this.加载状态 = 'error';
       this.显示提示($r('app.string.home_load_error'));
     } finally {
       // 无论成功或失败都收起下拉刷新指示器；onPageShow 触发时本来即为 false，无副作用。
-      this.刷新中 = false;
+      if (!this.homeDisposed) this.刷新中 = false;
     }
   }
 
@@ -1056,18 +969,6 @@ struct 首页 {
   // @副作用
   // 无（仅调用后端）
   // ========================================================
-  private async 静默加载图表(): Promise<GraphsView | null> {
-    try {
-      // days 跟随统计页「近 1 年/全部」偏好：后端 hours 四档窗口都从 days 限定的 revlog 里统计，
-      // 传错会导致首页摘要/桌面卡片与统计页数据不一致（曾误传 new Date().getDate()）
-      const days: number = await 加载统计天数();
-      const graphs: GraphsView = await this.统计服务实例.获取图表统计(days);
-      this.statsSnapshot = { graphs: graphs, days: days };
-      return graphs;
-    } catch (error) {
-      return null;
-    }
-  }
 
   // ========================================================
   // @块ID UI-PAGE-HOME-005
@@ -1397,7 +1298,6 @@ struct 首页 {
       this.homeActivityChanged();
     }
   }
-
 
   /** 打开浏览页（全库浏览，不限定牌组）。浏览页可改卡/删卡/改到期，pop 回主页必须刷新。 */
   private 打开浏览页(): void {
@@ -1890,40 +1790,26 @@ struct 首页 {
     this.定制牌组中 = true;
     this.定制牌组错误 = '';
     try {
-      // 用户输入等于后端真实 name：清除覆盖（恢复显示后端原名）；
-      // 否则写入新覆盖。保存牌组别名 内部对空串会 delete 键。
-      const effectiveName: string = trimmedName === deck.name ? '' : trimmedName;
-      if (effectiveName !== deck.displayName) {
-        await 保存牌组别名(deckId, effectiveName);
-      }
-
-      // 背景图动作
-      if (result.背景动作 === 'remove') {
-        await 清除牌组背景图(deckId);
-      } else if (result.背景动作 === 'replace'
-        && result.背景像素图 !== null) {
-        try {
-          await 保存牌组背景图(deckId, result.背景像素图);
-        } catch (saveError) {
-          // 背景图保存失败：不阻断改名保存流程，单独提示
-          this.定制牌组错误 = this.getUIContext().getHostContext()!.resourceManager.getStringSync(
-            $r('app.string.deck_customize_background_save_failed').id);
-          this.定制牌组中 = false;
-          return;
-        }
+      const saved: boolean = await this.deckCommands.customize(deckId, deck.name, deck.displayName, result);
+      if (this.homeDisposed) return;
+      if (!saved) {
+        this.定制牌组错误 = this.取本地化文本($r('app.string.deck_customize_background_save_failed'));
+        return;
       }
 
       this.显示牌组定制 = false;
       await this.加载主页数据();
+      if (this.homeDisposed) return;
       this.显示提示($r('app.string.deck_customize_save_done'));
     } catch (error) {
+      if (this.homeDisposed) return;
       this.定制牌组错误 = error instanceof Error ? error.message : `${error}`;
       if (this.定制牌组错误 === '') {
         this.定制牌组错误 = this.getUIContext().getHostContext()!.resourceManager.getStringSync(
           $r('app.string.deck_customize_rename_failed').id);
       }
     } finally {
-      this.定制牌组中 = false;
+      if (!this.homeDisposed) this.定制牌组中 = false;
     }
   }
 
@@ -2413,13 +2299,8 @@ struct 首页 {
     this.数据迁移错误 = '';
     this.数据迁移阶段 = 0; // 导出数据中
     try {
-      const path: string = intent.kind === 'exportDeck'
-        ? await 导出牌组(context.filesDir, intent.deckId, intent.options)
-        : await 导出集合(context.filesDir, intent.options);
-      this.数据迁移阶段 = 1; // 保存文件中
-      const extension: string = intent.kind === 'exportDeck' ? '.apkg' : '.colpkg';
-      const fileName: string = intent.kind === 'exportDeck' ? 'jidecards-deck.apkg' : 'jidecards-data.colpkg';
-      const savedPath: string | null = await 完成导出(context, path, fileName, extension);
+      const savedPath: string | null = await exportPersonalData(context, intent,
+        (stage: number): void => { this.数据迁移阶段 = stage; });
       if (savedPath !== null) {
         this.显示提示($r('app.string.transfer_done'));
         this.显示数据迁移 = false;
@@ -2464,12 +2345,12 @@ struct 首页 {
         throw new Error(this.getUIContext().getHostContext()!.resourceManager.getStringSync(
           $r('app.string.ability_context_unavailable').id));
       }
-      await 后端会话.获取实例().确保已打开(context.filesDir);
-      const newDeckId: number = await this.牌组服务实例.创建牌组(name);
+      const newDeckId: number = await this.deckCommands.create(context.filesDir, name);
+      if (this.homeDisposed) return;
       this.显示创建牌组 = false;
       this.选中的牌组ID = newDeckId.toString();
-      await 保存上次牌组ID(newDeckId.toString());
       await this.加载主页数据();
+      if (this.homeDisposed) return;
       this.展开牌组路径(this.选中牌组());
       this.牌组数据源.replaceAll(可见牌组行(this.主页快照数据.decks, this.展开的牌组ID集合, this.隐藏的牌组ID集合));
       if (检查节流标记(name)) {
@@ -2479,9 +2360,10 @@ struct 首页 {
         this.显示提示($r('app.string.create_deck_done'));
       }
     } catch (error) {
+      if (this.homeDisposed) return;
       this.创建牌组错误 = error instanceof Error ? error.message : `${error}`;
     } finally {
-      this.创建牌组中 = false;
+      if (!this.homeDisposed) this.创建牌组中 = false;
     }
   }
 
@@ -2622,31 +2504,22 @@ struct 首页 {
     this.牌组选项中 = true;
     this.牌组选项错误 = '';
     try {
-      const edited = options.转换为请求字段();
-      const request: UpdateDeckConfigsInput = {
-        targetDeckId: this.牌组选项牌组ID,
-        configs: [prepareDeckConfigForSave(view, original, config, options.applyToSharedDecks)],
-        removedConfigIds: [],
-        mode: UPDATE_DECK_CONFIGS_MODE_NORMAL,
-        cardStateCustomizer: view.cardStateCustomizer,
-        limits: edited.limits,
-        newCardsIgnoreReviewLimit: edited.newCardsIgnoreReviewLimit,
-        fsrs: edited.fsrs,
-        applyAllParentLimits: edited.applyAllParentLimits,
-        fsrsReschedule: edited.fsrsReschedule,
-        fsrsHealthCheck: edited.fsrsHealthCheck
-      };
+      const request: UpdateDeckConfigsInput = buildDeckConfigRequest(this.牌组选项牌组ID,
+        view, original, config, options.applyToSharedDecks, options.转换为请求字段());
       await this.牌组配置服务实例.更新牌组配置(request);
       notifyFsrsStateChanged();
+      if (this.homeDisposed) return;
       this.关闭牌组选项();
       await this.加载主页数据();
+      if (this.homeDisposed) return;
     } catch (error) {
+      if (this.homeDisposed) return;
       const msg: string = error instanceof Error ? error.message : `${error}`;
       const stack: string = error instanceof Error && error.stack !== undefined ? error.stack : '';
       console.error(`[jidecards] 保存牌组选项 failed: deckId=${this.牌组选项牌组ID} msg=${msg} stack=${stack}`);
       this.牌组选项错误 = msg;
     } finally {
-      this.牌组选项中 = false;
+      if (!this.homeDisposed) this.牌组选项中 = false;
     }
   }
 
@@ -3231,7 +3104,6 @@ struct 首页 {
           })
         }
 
-
         // 首次启动欢迎弹窗：放最顶层，确保覆盖所有浮层
         //   关闭时持久化入门已读标记（不会在展示时提前标记，
         //   这里仅关闭状态；即使弹窗未显示也已标记，保证「只弹一次」语义）
@@ -3306,7 +3178,6 @@ struct 首页 {
                 .width('100%')
                 .textAlign(TextAlign.Center)
                 .padding({ top: 24, bottom: 32 })
-
 
             }
             .width('88%')

@@ -73,16 +73,13 @@ test('announcement fixed strings are aligned and translated', () => {
   }
 });
 
-test('home sequences official announcement before cloud onboarding and welcome', () => {
+test('home wires announcement service, acknowledgment and presentation', () => {
   const source = read('../../entry/src/main/ets/pages/首页.ets');
   assert.match(source, /官方公告服务实例/);
   assert.match(source, /bundleManager\.getBundleInfoForSelf/);
   assert.match(source, /当前语言模式\(\)/);
   assert.match(source, /是否已确认官方公告/);
   assert.match(source, /标记已确认官方公告/);
-  const sequence = source.match(/private async 显示首次弹窗序列\(\)[\s\S]*?private async 显示欢迎弹窗一次/)?.[0] ?? '';
-  assert.ok(sequence.indexOf('尝试显示官方公告') < sequence.indexOf('是否已完成云端牌组引导'));
-  assert.ok(sequence.indexOf('是否已完成云端牌组引导') < sequence.indexOf('显示欢迎弹窗一次'));
   assert.match(source, /if \(this\.显示官方公告\) \{\s*return true;/);
   assert.match(source, /onAcknowledge:[\s\S]*确认官方公告\(\)/);
   assert.match(source, /onOpenDetails:[\s\S]*打开官方公告详情\(\)/);

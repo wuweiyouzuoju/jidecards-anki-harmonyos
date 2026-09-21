@@ -8,15 +8,15 @@ import { stripTypeScriptTypes } from 'node:module';
 
 // Execute unchanged production methods with controllable backend/player delays.
 const source = fs.readFileSync(new URL('../../entry/src/main/ets/pages/学习页.ets', import.meta.url), 'utf8');
-const names = ['加载下一张卡', '显示答案', '埋藏或暂停当前卡', '评分', 'invalidateCardWork', 'isCurrentRequest', 'studyActivityChanged', 'applyStudyHtml', 'playStudyAudio', 'studyWebAttached', 'aboutToDisappear', '消费待重渲染', '刷新编辑后当前卡', '撤销上次', '加载完成页信息'];
+const names = ['请求删除当前卡', '确认删除当前卡', '加载下一张卡', '显示答案', '埋藏或暂停当前卡', '评分', 'invalidateCardWork', 'isCurrentRequest', 'studyActivityChanged', 'applyStudyHtml', 'playStudyAudio', 'studyWebAttached', 'aboutToDisappear', '消费待重渲染', '刷新编辑后当前卡', '撤销上次', '加载完成页信息'];
 const methods = names.map(name => {
   const start = source.search(new RegExp(`  (?:private )?(?:async )?${name}\\(`));
   assert.ok(start >= 0);
   return source.slice(start, source.indexOf('\n  }', start) + 4);
 });
-const Page = new Function('playStudyHaptic', '构建卡片HTML', '剥除拼写标记', '提取拼写标记', '原始侧HTML', '媒体基地址', 'CustomTransition', '刷新桌面卡片数据', 'AppStorage', 'SECONDS_PER_DAY', '$r', 'console',
+const Page = new Function('DialogAlignment', 'playStudyHaptic', '构建卡片HTML', '剥除拼写标记', '提取拼写标记', '原始侧HTML', '媒体基地址', 'CustomTransition', '刷新桌面卡片数据', 'AppStorage', 'SECONDS_PER_DAY', '$r', 'console',
   stripTypeScriptTypes(`class Page { ${methods.join('\n')} }`, {mode:'transform'}) + '; return Page;')(
-  () => {}, (card, side) => `${card.id}-${side}`, html => html, () => null,
+  { Center: 0 }, () => {}, (card, side) => `${card.id}-${side}`, html => html, () => null,
   (card, side) => `${card.id}-${side}`, 'media://',
   {getInstance:()=>({注销NavParam(){}})}, async()=>{}, {setOrCreate(){}}, 86400, key=>key, {info(){}});
 function deferred() {
@@ -298,4 +298,17 @@ test('leaving during a submitted rating keeps its eventual sync notification wit
   assert.equal(page.studyScheduler.hasPending(), true);
   assert.equal(page.studyScheduler.canSync(), true);
   assert.deepEqual(displayed, []);
+});
+
+test('delete confirmation cannot delete a different card after queue or request changes', async () => {
+  for (const invalidate of ['card', 'request']) {
+    const { page } = harness(); let dialog, deleted = 0;
+    page.getUIContext = () => ({ showAlertDialog: value => { dialog = value; } });
+    page.卡片服务实例 = { 删除卡片: async () => deleted++ };
+    page.请求删除当前卡();
+    if (invalidate === 'card') page.当前卡片 = { cardId: 'B' };
+    else page.requestVersion++;
+    dialog.secondaryButton.action(); await new Promise(resolve => setImmediate(resolve));
+    assert.equal(deleted, 0);
+  }
 });

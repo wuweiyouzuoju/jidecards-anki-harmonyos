@@ -45,6 +45,7 @@
 // 仅通过外部回调引发后端写入；本组件不直接落盘。
 // ========================================================
 
+import type { BrowserSavedSearch as 已保存搜索项 } from '../../model/BrowserSidebar';
 import { promptAction } from '@kit.ArkUI';
 import { BusinessError } from '@ohos.base';
 import { 应用尺寸 } from '../../utils/应用尺寸';
@@ -53,10 +54,7 @@ import type { DeckTreeNode } from '../../proto/messages/DeckMessages';
 import type { TagTreeNode } from '../../proto/messages/TagsMessages';
 
 /** 已保存搜索项（Anki 桌面端 savedSearches JSON 数组元素） */
-export interface 已保存搜索项 {
-  name: string;
-  search: string;
-}
+export type { BrowserSavedSearch as 已保存搜索项 } from '../../model/BrowserSidebar';
 
 /** 扁平化后的牌组行（含 level 驱动缩进） */
 interface 牌组行 {

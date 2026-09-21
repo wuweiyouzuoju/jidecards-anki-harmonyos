@@ -1,3 +1,5 @@
+import { resolveStudyKey } from '../../entry/src/main/ets/model/StudyInputPolicy.ts';
+import { loadNoteEditor } from '../../entry/src/main/ets/model/NoteEditorLoader.ts';
 import { attachStudySession } from './study-session-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
@@ -18,7 +20,7 @@ function harness(phase = 'question') {
   let now = 1000;
   const writes = [], reads = [], toasts = [];
   const note = { id: 42, guid: 'imported-note', notetypeId: 9, mtimeSecs: 3, usn: 4, fields: ['old', '<img src="a.png">'], tags: ['imported'] };
-  const context = vm.createContext({ Date: { now: () => now }, $r: key => key, playStudyHaptic: () => {} });
+  const context = vm.createContext({ resolveStudyKey, loadNoteEditor, studyKeyName: key => String(key), KeyType: { Down: 0 }, Date: { now: () => now }, $r: key => key, playStudyHaptic: () => {} });
   vm.runInContext(stripTypeScriptTypes(`globalThis.Page = class { ${methods.join('\n')} }`), context);
   const page = new context.Page();
   Object.assign(page, {

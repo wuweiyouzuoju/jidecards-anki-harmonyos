@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { nodeVersionProblem } from './node-runtime.mjs';
 
 const REQUIRED = [
   'node',
@@ -16,13 +17,22 @@ const REQUIRED = [
   'ohosClang',
   'cmake',
   'ninja',
-  'hvigor'
+  'hvigor',
+  'protoc',
+  'ankiCheckout',
+  'rustfmt',
+  'clippy'
 ];
 
 export function evaluateEnvironment(probe) {
   const missingRequired = REQUIRED.filter((name) => !probe[name]);
   const missingOptional = [];
   const problems = [];
+  const nodeProblem = nodeVersionProblem(probe.node);
+  if (nodeProblem) problems.push(nodeProblem);
+  if (probe.hostTestMode === 'bundled-gnu') {
+    for (const name of ['cargoZigbuild', 'zig']) if (!probe[name]) missingRequired.push(name);
+  }
 
   if (probe.harmonyApi == null) {
     problems.push('HarmonyOS compile SDK API could not be determined.');
@@ -65,9 +75,22 @@ function firstExisting(paths) {
 function discoverDevEcoRoot() {
   return firstExisting([
     process.env.DEVECO_HOME,
-    process.env.DEVECO_SDK_HOME,
+    process.env.DEVECO_SDK_HOME && path.dirname(process.env.DEVECO_SDK_HOME),
     'C:\\Program Files\\Huawei\\DevEco Studio'
   ]);
+}
+
+function findExecutable(directory, name) {
+  if (!existsSync(directory)) return null;
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const file = path.join(directory, entry.name);
+    if (entry.isFile() && entry.name === name) return file;
+    if (entry.isDirectory()) {
+      const found = findExecutable(file, name);
+      if (found) return found;
+    }
+  }
+  return null;
 }
 
 export function projectToolchainCommands(toolchainRoot) {
@@ -81,9 +104,9 @@ export function projectToolchainCommands(toolchainRoot) {
 
 export function discoverEnvironment() {
   const workspaceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-  const localCommands = projectToolchainCommands(
-    path.join(workspaceRoot, 'work', 'toolchains')
-  );
+  const toolchainRoot = firstExisting([process.env.JIDECARDS_TOOLCHAINS, path.join(workspaceRoot, 'work', 'toolchains')]);
+  const localCommands = projectToolchainCommands(toolchainRoot ?? path.join(workspaceRoot, 'work', 'toolchains'));
+  const cargo = firstExisting([localCommands.cargo]) ?? 'cargo';
   const devEcoRoot = discoverDevEcoRoot();
   const sdkRoot = devEcoRoot ? path.join(devEcoRoot, 'sdk', 'default') : null;
   const nativeRoot = sdkRoot ? path.join(sdkRoot, 'openharmony', 'native') : null;
@@ -108,7 +131,15 @@ export function discoverEnvironment() {
       devEcoRoot && path.join(devEcoRoot, 'jbr', 'bin', 'java')
     ]),
     rustc: commandVersion(firstExisting([localCommands.rustc]) ?? 'rustc'),
-    cargo: commandVersion(firstExisting([localCommands.cargo]) ?? 'cargo'),
+    cargo: commandVersion(cargo),
+    protoc: commandVersion(firstExisting([process.env.PROTOC,
+      toolchainRoot && path.join(toolchainRoot, 'protoc-31.1', 'bin', 'protoc.exe')]) ?? 'protoc'),
+    ankiCheckout: firstExisting([path.join(workspaceRoot, 'third_party', 'anki', 'rslib', 'Cargo.toml')]),
+    rustfmt: commandVersion(cargo, ['fmt', '--version']),
+    clippy: commandVersion(cargo, ['clippy', '--version']),
+    hostTestMode: toolchainRoot ? 'bundled-gnu' : 'installed-msvc',
+    cargoZigbuild: toolchainRoot ? firstExisting([path.join(toolchainRoot, 'python', 'site', 'bin', 'cargo-zigbuild.exe')]) : null,
+    zig: toolchainRoot ? findExecutable(path.join(toolchainRoot, 'zig-tar'), 'zig.exe') : null,
     ohosClang: firstExisting([
       nativeRoot && path.join(nativeRoot, 'llvm', 'bin', 'clang++.exe'),
       nativeRoot && path.join(nativeRoot, 'llvm', 'bin', 'clang++')

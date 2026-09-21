@@ -6,7 +6,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import vm from 'node:vm';
 import { CardAudioSession } from '../../entry/src/main/ets/model/CardAudioSession.ts';
 import { buildPreviewInteractionScript } from '../../entry/src/main/ets/model/PreviewInteraction.ts';
-import { 构建卡片HTML, 剥除拼写标记, 原始侧HTML } from '../../entry/src/main/ets/model/学习卡片HTML构建器.ets';
+import { 构建卡片HTML, 剥除拼写标记, 原始侧HTML } from '../../entry/src/main/ets/model/学习卡片HTML构建器.ts';
 
 const read = path => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 const source = read('entry/src/main/ets/components/browser/卡片预览页.ets');
@@ -318,8 +318,9 @@ test('preview wiring stays read-only, handles web errors, and preserves home/edi
   assert.match(editor, /onPop:[\s\S]*this\.显示卡片预览 = true/);
   assert.match(home, /onPositionChanged:[\s\S]*this\.预览初始索引 = index/);
   const autoSync = home.match(/private tryAutoSync[\s\S]*?\n  }/)[0];
-  assert.match(autoSync, /const activity: HomeActivityState = this\.homeActivity\(\)/);
-  assert.match(autoSync, /canStartHomeAutoSync\(activity\)/);
+  assert.match(autoSync, /activity: this\.homeActivity\(\)/);
+  assert.match(autoSync, /decideHomeSync\(/);
+  assert.match(read('entry/src/main/ets/model/HomeSyncPolicy.ts'), /canStartHomeAutoSync\(activity\)/);
   const activity = home.match(/private homeActivity[\s\S]*?\n  }/)[0];
   assert.match(activity, /this\.显示卡片预览/);
   assert.match(activity, /this\.预览加载中/);

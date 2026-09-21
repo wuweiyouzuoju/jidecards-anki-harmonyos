@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { HomeWorkCoordinator } from '../../entry/src/main/ets/model/HomeWorkCoordinator.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -42,7 +43,7 @@ test('queued and running files deduplicate, serialize, and permit intentional re
 
 function harness(failure = false) {
   const queue = new ExternalDeckOpenQueue(), events = [];
-  const methods = ['tryImportExternalDeck', 'importDeckUri', 'canPresentStartupPrompt'].map(name => {
+  const methods = ['importDeckUri', 'canPresentStartupPrompt'].map(name => {
     const start = home.search(new RegExp(`^  private (?:async )?${name}\\(`, 'm'));
     assert.ok(start >= 0, name);
     return home.slice(start, home.indexOf('\n  }', start) + 4);
@@ -58,6 +59,16 @@ function harness(failure = false) {
   const activity = { foreground: true, atHome: true, collectionReady: true, collectionBusy: false,
     dialogOpen: false, interactionBusy: false, startupChecking: true };
   const page = new Page();
+  const timers = [];
+  const coordinator = new HomeWorkCoordinator(queue, { schedule: fn => { timers.push(fn); return timers.length; }, cancel() {} });
+  page.tryImportExternalDeck = () => {
+    coordinator.wake({ activity: () => activity, hasDeferredNavigation: () => page.pendingSyncAction !== null,
+      importDeck: uri => page.importDeckUri(uri), importFailed: e => { throw e; },
+      flushNavigation() {}, manualSyncPending: () => false, startManualSync() {},
+      presentAnnouncement: () => false, continueStartup() {}, scheduleSync() {} });
+    while (timers.length) timers.shift()();
+    return true;
+  };
   Object.assign(page, { pendingSyncAction: null, homeActivity: () => activity,
     取能力上下文: () => ({ filesDir: 'sandbox' }), 主页快照数据: { decks: [] },
     打开数据迁移: () => { page.显示数据迁移 = true; },

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { resolveBrowserCardIds, resolveBrowserNoteIds, snapshotNotetypeChange } from '../../entry/src/main/ets/model/BrowserSelection.ts';
 import { BrowserOperationController } from '../../entry/src/main/ets/model/BrowserOperationController.ts';
 import { AutoSyncScheduler } from '../../entry/src/main/ets/model/AutoSyncScheduler.ts';
 import test from 'node:test';
@@ -14,9 +15,9 @@ const methods = names.map(name => {
   assert.ok(start >= 0, name);
   return source.slice(start, source.indexOf('\n  }', start) + 4);
 });
-const Page = new Function('$r', 'console', 'autoSyncScheduler', 'AppStorage', stripTypeScriptTypes(
+const Page = new Function('resolveBrowserCardIds', 'resolveBrowserNoteIds', 'snapshotNotetypeChange', '$r', 'console', 'autoSyncScheduler', 'AppStorage', stripTypeScriptTypes(
   `class Page { ${methods.join('\n')} }`, { mode: 'transform' }) + '; return Page;')(
-  key => key, { info() {} }, new AutoSyncScheduler(), { setOrCreate() {} });
+  resolveBrowserCardIds, resolveBrowserNoteIds, snapshotNotetypeChange, key => key, { info() {} }, new AutoSyncScheduler(), { setOrCreate() {} });
 
 function harness(mode = 'notes') {
   const page = new Page(), calls = [];

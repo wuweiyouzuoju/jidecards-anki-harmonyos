@@ -37,8 +37,8 @@ if ($LASTEXITCODE -ne 0) {
 
 # Toolchain resolution: prefer JIDECARDS_TOOLCHAINS env var; fall back to the
 # bundled work\toolchains directory (offline toolchain shipped with the repo).
-# If neither exists, enter "external mode" — assume rustup/protoc/cargo-zigbuild/
-# zig are already installed and on PATH; do not override CARGO_HOME/RUSTUP_HOME/
+# If neither exists, enter "external mode" — assume rustup/protoc and Visual Studio/MSVC
+# are already installed; do not override CARGO_HOME/RUSTUP_HOME/
 # PROTOC. In external mode, OHOS targets additionally need JIDECARDS_MSVC_SYSROOT
 # pointing to an xwin-generated MSVC sysroot (or leave unset after installing
 # Visual Studio Build Tools so clang can auto-detect).
@@ -61,21 +61,30 @@ if ($Toolchains) {
     $CargoZig = Join-Path $Toolchains 'python\site\bin\cargo-zigbuild.exe'
     $CargoBin = Join-Path $env:CARGO_HOME 'bin'
 } else {
-    Write-Host '[build-native] work\toolchains not found and JIDECARDS_TOOLCHAINS unset; using tools from PATH. Install rustup/protoc/cargo-zigbuild/zig manually.' -ForegroundColor Yellow
+    Write-Host '[build-native] using installed Rust/VS/protoc toolchain from PATH.'
     $CargoZig = 'cargo-zigbuild'
     $CargoBin = $null
 }
 
 if ($Target -eq 'host-test') {
-    $env:RUSTUP_TOOLCHAIN = '1.92.0-x86_64-pc-windows-gnu'
     if ($Toolchains) {
+        $env:RUSTUP_TOOLCHAIN = '1.92.0-x86_64-pc-windows-gnu'
         $ZigRoot = Get-ChildItem (Join-Path $Toolchains 'zig-tar') -Filter zig.exe -Recurse |
             Select-Object -First 1 -ExpandProperty DirectoryName
         $env:PATH = "$CargoBin;$ZigRoot;$($env:PATH)"
-    } elseif ($CargoBin) {
-        $env:PATH = "$CargoBin;$($env:PATH)"
+    } else {
+        # 已安装 VS 的主机直接执行真实 Core 测试，不额外依赖 Zig/GNU 工具链。
+        $env:RUSTUP_TOOLCHAIN = '1.92.0-x86_64-pc-windows-msvc'
     }
-    & $CargoZig test -p jidecards_core --features anki-core --target x86_64-pc-windows-gnu
+    & cargo fmt -p jidecards_core -- --check
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    & cargo clippy -p jidecards_core -- -D warnings
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    if ($Toolchains) {
+        & $CargoZig test -p jidecards_core --features anki-core --target x86_64-pc-windows-gnu
+    } else {
+        & cargo test -p jidecards_core --features anki-core
+    }
     exit $LASTEXITCODE
 }
 

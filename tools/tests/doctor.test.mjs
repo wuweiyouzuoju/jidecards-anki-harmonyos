@@ -15,7 +15,8 @@ test('resolves the workspace-local Rust toolchain without changing global PATH',
 
 test('reports required and optional toolchain gaps separately', () => {
   const result = evaluateEnvironment({
-    node: '22.0.0',
+    node: '24.18.0',
+    protoc: 'libprotoc 31.1', ankiCheckout: '/anki/rslib/Cargo.toml', rustfmt: 'rustfmt', clippy: 'clippy',
     git: '2.50.0',
     devEcoRoot: 'C:/DevEco',
     harmonyApi: 23,
@@ -35,7 +36,8 @@ test('reports required and optional toolchain gaps separately', () => {
 
 test('rejects a compile SDK below the locked API 23 baseline', () => {
   const result = evaluateEnvironment({
-    node: '22.0.0',
+    node: '24.18.0',
+    protoc: 'libprotoc 31.1', ankiCheckout: '/anki/rslib/Cargo.toml', rustfmt: 'rustfmt', clippy: 'clippy',
     git: '2.50.0',
     devEcoRoot: 'C:/DevEco',
     harmonyApi: 18,
@@ -54,7 +56,8 @@ test('rejects a compile SDK below the locked API 23 baseline', () => {
 
 test('accepts the fully pinned toolchain', () => {
   const result = evaluateEnvironment({
-    node: '22.0.0',
+    node: '24.18.0',
+    protoc: 'libprotoc 31.1', ankiCheckout: '/anki/rslib/Cargo.toml', rustfmt: 'rustfmt', clippy: 'clippy',
     git: '2.50.0',
     devEcoRoot: 'C:/DevEco',
     harmonyApi: 23,
@@ -73,7 +76,8 @@ test('accepts the fully pinned toolchain', () => {
 
 test('requires the bundled Java runtime used to package HAP files', () => {
   const result = evaluateEnvironment({
-    node: '22.0.0',
+    node: '24.18.0',
+    protoc: 'libprotoc 31.1', ankiCheckout: '/anki/rslib/Cargo.toml', rustfmt: 'rustfmt', clippy: 'clippy',
     git: '2.50.0',
     devEcoRoot: 'C:/DevEco',
     harmonyApi: 23,
@@ -88,4 +92,16 @@ test('requires the bundled Java runtime used to package HAP files', () => {
 
   assert.equal(result.ok, false);
   assert.deepEqual(result.missingRequired, ['java']);
+});
+
+test('diagnoses actual host test prerequisites before starting native validation', () => {
+  const probe = { node: '24.18.0', git: 'git', devEcoRoot: 'DevEco', harmonyApi: 23,
+    java: 'java', rustc: '1.92.0', cargo: 'cargo', ohosClang: 'clang', cmake: 'cmake', ninja: 'ninja', hvigor: 'hvigor',
+    protoc: 'protoc', ankiCheckout: 'anki', rustfmt: 'fmt', clippy: 'clippy', hostTestMode: 'installed-msvc' };
+  assert.equal(evaluateEnvironment(probe).ok, true, 'installed MSVC does not require Zig');
+  for (const field of ['protoc', 'ankiCheckout', 'rustfmt', 'clippy']) {
+    assert.deepEqual(evaluateEnvironment({ ...probe, [field]: null }).missingRequired, [field]);
+  }
+  assert.deepEqual(evaluateEnvironment({ ...probe, hostTestMode: 'bundled-gnu' }).missingRequired, ['cargoZigbuild', 'zig']);
+  assert.equal(evaluateEnvironment({ ...probe, node: '18.20.0' }).ok, false);
 });

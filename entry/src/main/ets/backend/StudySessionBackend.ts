@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import type { EditableNote } from '../proto/messages/NoteMessages';
+import { UNBURY_MODE_ALL } from '../proto/messages/SchedulerMessages';
+import { 笔记服务 } from './笔记服务';
 import type { StudySessionBackend } from '../model/StudySessionController';
 import type { CardAnswerInput, CongratsInfo, QueuedCardsView, SchedulingStatesRaw } from '../proto/messages/SchedulerMessages';
 import type { RenderedCard } from '../proto/messages/CardRenderingMessages';
@@ -16,6 +19,7 @@ export class AnkiStudySessionBackend implements StudySessionBackend {
   private scheduler: 调度器服务;
   private renderer: 卡片渲染服务;
   private collection: 集合服务;
+  private notes: 笔记服务 = new 笔记服务();
   private cards: 卡片服务 = new 卡片服务();
   private deckConfigs: 牌组配置服务 = new 牌组配置服务();
 
@@ -25,6 +29,10 @@ export class AnkiStudySessionBackend implements StudySessionBackend {
     this.collection = collection;
   }
 
+  async updateNote(note: EditableNote): Promise<void> { await this.notes.更新笔记([note], false); }
+  async buryCard(cardId: number, mode: number): Promise<void> { await this.scheduler.埋藏或暂停卡片(cardId, mode); }
+  async removeCard(cardId: number): Promise<void> { await this.cards.删除卡片([cardId]); }
+  async unburyDeck(deckId: number): Promise<void> { await this.scheduler.按牌组恢复埋藏(deckId, UNBURY_MODE_ALL); }
   async canUndo(): Promise<boolean> { return (await this.collection.获取撤销状态()).undo.length > 0; }
   queuedCards(deckId: number): Promise<QueuedCardsView> { return this.scheduler.获取队首卡片(deckId); }
   renderCard(cardId: number): Promise<RenderedCard> { return this.renderer.渲染既有卡片(cardId); }

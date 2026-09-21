@@ -1,7 +1,7 @@
 // 临时诊断脚本：复刻 AI制卡页 edit 模式的真实请求，直连 DeepSeek Responses API，
 // 验证模型是否能看到并调用 propose_* 工具。用完即删。
-import { agentFunctionTools } from '../entry/src/main/ets/model/agent/AgentToolCatalog.ts';
-import { buildResponsesPayload } from '../entry/src/main/ets/model/agent/ProviderProtocol.ts';
+import { agentFunctionTools } from '../../entry/src/main/ets/model/agent/AgentToolCatalog.ts';
+import { buildResponsesPayload } from '../../entry/src/main/ets/model/agent/ProviderProtocol.ts';
 
 const apiKey = process.env.DEEPSEEK_API_KEY;
 if (!apiKey) {

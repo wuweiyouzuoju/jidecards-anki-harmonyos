@@ -1,10 +1,11 @@
+import { loadPlatformModule } from './platform-module-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { buildDeckStudyHistory, deckHistorySearch, historyStudyDayKey } from '../../entry/src/main/ets/model/DeckStudyHistory.ts';
-import { copyDeckConfig, prepareDeckConfigForSave } from '../../entry/src/main/ets/model/DeckConfigSave.ts';
+import { copyDeckConfig, buildDeckConfigRequest, prepareDeckConfigForSave } from '../../entry/src/main/ets/model/DeckConfigSave.ts';
 import { emptyDeckConfigSettings } from '../../entry/src/main/ets/proto/messages/DeckConfigMessages.ts';
 
 const kinds = (learn = 0, relearn = 0, young = 0, mature = 0, filtered = 0) => ({ learn, relearn, young, mature, filtered });
@@ -152,7 +153,12 @@ function homeSaveHarness(method, dependencies) {
   const end = home.indexOf('\n  }', start) + 4;
   const code = stripTypeScriptTypes(`class SaveHarness { ${home.slice(start, end)} }`, { mode: 'transform' });
   const Harness = new Function(...Object.keys(dependencies), code + '\nreturn SaveHarness;')(...Object.values(dependencies));
-  return new Harness();
+  const page = new Harness();
+  if (method === '应用牌组定制') {
+    const Commands = loadPlatformModule('backend/HomeDeckCommands.ets', 'HomeDeckCommands', { ...dependencies, 牌组服务: class {} });
+    page.deckCommands = new Commands();
+  }
+  return page;
 }
 
 test('editing a deck waits for metadata writes then refreshes even when its ID is unchanged', async () => {
@@ -183,7 +189,7 @@ test('saving deck options refreshes only after backend changes finish', async ()
   const events = [];
   const saved = deferred();
   const state = homeSaveHarness('保存牌组选项', {
-    copyDeckConfig, prepareDeckConfigForSave,
+    copyDeckConfig, buildDeckConfigRequest, prepareDeckConfigForSave,
     UPDATE_DECK_CONFIGS_MODE_NORMAL: 0,
     notifyFsrsStateChanged: () => { events.push('fsrs'); }
   });
@@ -198,7 +204,7 @@ test('saving deck options refreshes only after backend changes finish', async ()
     加载主页数据: async () => { events.push('refresh'); }
   });
   const pending = state.保存牌组选项({ 校验: () => [], 应用到配置: () => true }, {
-    校验: () => [], 应用: () => true, 转换为请求字段: () => ({})
+    校验: () => [], 应用: () => true, 转换为请求字段: () => ({ limits: null, newCardsIgnoreReviewLimit: false, fsrs: false, applyAllParentLimits: false, fsrsReschedule: false, fsrsHealthCheck: false })
   });
   assert.deepEqual(events, ['save']);
   saved.resolve(); await pending;

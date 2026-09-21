@@ -1,3 +1,4 @@
+import { BrowserSearchSession, loadBrowserRows } from '../../entry/src/main/ets/model/BrowserSearchSession.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { BrowserOperationController } from '../../entry/src/main/ets/model/BrowserOperationController.ts';
 import assert from 'node:assert/strict';
@@ -16,10 +17,10 @@ const methods = names.map(name => {
   assert.ok(start >= 0, name);
   return source.slice(start, source.indexOf('\n  }', start) + 4);
 });
-const Page = new Function('后端会话', 'BrowserColumnSorting', 'SearchNodeCardState', 'makeCardStateNode',
+const Page = new Function('loadBrowserRows', '后端会话', 'BrowserColumnSorting', 'SearchNodeCardState', 'makeCardStateNode',
   'makeParsableTextNode', 'browserFilterNode', 'ConfigKeyBool', '$r', 'console',
   stripTypeScriptTypes(`class Page { ${methods.join('\n')} }`, { mode: 'transform' }) + '; return Page;')(
-  { 获取实例: () => ({ 确保已打开: async () => {} }) }, BrowserColumnSorting,
+  loadBrowserRows, { 获取实例: () => ({ 确保已打开: async () => {} }) }, BrowserColumnSorting,
   SearchNodeCardState, makeCardStateNode, makeParsableTextNode, browserFilterNode, ConfigKeyBool, key => key, { info() {} });
 
 function harness(notes = false) {
@@ -44,6 +45,13 @@ function harness(notes = false) {
       搜索笔记: async request => { calls.push(['notes', request]); return request.search === 'is:suspended' ? [21] : [21, 22]; },
       浏览器行按ID: async id => { calls.push(['row', id]); return { cells: [], color: 3 }; }
     }
+  });
+  page.searchSession = new BrowserSearchSession({
+    open: async () => {}, setNotesMode: value => page.配置服务实例.设置配置布尔({key: 0, value, undoable: false}),
+    columns: () => page.搜索服务实例.全部浏览器列(), activateColumns: keys => page.搜索服务实例.设置激活浏览器列(keys),
+    buildSearch: node => page.搜索服务实例.构建搜索串(node),
+    search: (request, notes) => notes ? page.搜索服务实例.搜索笔记(request) : page.搜索服务实例.搜索卡片(request),
+    row: id => page.搜索服务实例.浏览器行按ID(id)
   });
   return { page, calls };
 }
@@ -85,6 +93,7 @@ test('old pagination cannot append rows after a new search starts', async () => 
   let resolveRow;
   page.搜索服务实例.浏览器行按ID = () => new Promise(resolve => { resolveRow = resolve; });
   const oldLoad = page.预加载行([11], 0);
+  await new Promise(setImmediate);
   page.searchVersion = 1;
   page.行列表 = [{ id: 21 }];
   resolveRow({ cells: [], color: 0 });

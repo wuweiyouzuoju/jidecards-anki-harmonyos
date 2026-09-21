@@ -90,3 +90,24 @@ export function buildAgentImportedFilesContext(files: AgentImportedFile[]): stri
   }
   return sections.join('\n');
 }
+
+/** 合并解析结果并统一限制数量与总正文；失败文件保留错误用于用户重试。 */
+export function mergeAgentImportedFiles(existing: AgentImportedFile[], selected: AgentImportedFile[]): AgentImportedFile[] {
+  const result: AgentImportedFile[] = [];
+  let used: number = 0;
+  for (const file of existing.concat(selected)) {
+    if (result.length >= AGENT_IMPORT_MAX_FILES) break;
+    const remaining: number = Math.max(0, AGENT_IMPORT_MAX_CONTEXT_CHARS - used);
+    const valid: boolean = file.errorCode.length === 0;
+    const exhausted: boolean = valid && remaining === 0;
+    const truncated: boolean = valid && file.content.length > remaining;
+    const content: string = exhausted ? '' : (valid ? file.content.slice(0, remaining) : file.content);
+    result.push({
+      id: file.id, name: file.name, extension: file.extension, byteSize: file.byteSize, content: content,
+      errorCode: exhausted ? 'context_limit' : file.errorCode,
+      warningCode: exhausted ? '' : (truncated ? 'content_truncated' : file.warningCode)
+    });
+    if (valid) used += content.length;
+  }
+  return result;
+}

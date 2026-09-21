@@ -62,7 +62,7 @@ test('data transfer service exposes package workflows and safe collection replac
 });
 
 test('data transfer panel only emits typed intents and separates merge from replacement', () => {
-  const panel = read('entry/src/main/ets/components/数据迁移面板.ets');
+  const panel = read('entry/src/main/ets/components/数据迁移面板.ets') + read('entry/src/main/ets/model/DataTransferIntent.ts');
   assert.match(panel, /export type 数据迁移意图/);
   assert.match(panel, /replacePersonalData/);
   assert.match(panel, /onIntent/);

@@ -84,7 +84,7 @@ test('study page bury/suspend entries use upstream reviewer semantics and refetc
   assert.notEqual(body, null);
   assert.match(body[0], /if \(this\.评分中 \|\| this\.当前卡片 === null\)/,
     'bury/suspend reuses reentrancy guard');
-  assert.match(body[0], /await this\.调度器服务实例\.埋藏或暂停卡片\(cardId, mode\);\s*\}\);\s*await this\.加载下一张卡\(\);/,
+  assert.match(body[0], /await this\.studySession\.buryCard\(cardId, mode\);\s*await this\.加载下一张卡\(\);/,
     'card leaves today queue, next card fetched immediately');
   assert.match(body[0], /this\.阶段 = 'error';/,
     'bury/suspend failure surfaces through existing error state');
@@ -120,7 +120,7 @@ test('done page renders real congrats data and deck-scoped unbury entry', () => 
 
   const body = page.match(/恢复埋藏\(\): Promise<void> \{[\s\S]*?\n  \}/);
   assert.notEqual(body, null);
-  assert.match(body[0], /await this\.调度器服务实例\.按牌组恢复埋藏\(this\.牌组ID, UNBURY_MODE_ALL\);\s*\}\);\s*await this\.加载下一张卡\(\);/,
+  assert.match(body[0], /await this\.studySession\.unburyDeck\(this\.牌组ID\);\s*await this\.加载下一张卡\(\);/,
     'CongratsInfo exposes no card ids, so restore is deck-scoped like desktop overview, then refetch');
   assert.match(body[0], /this\.阶段 = 'error';/);
 

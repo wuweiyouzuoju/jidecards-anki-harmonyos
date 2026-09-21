@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
-import { copyDeckConfig, deckConfigUseCount, prepareDeckConfigForSave } from '../../entry/src/main/ets/model/DeckConfigSave.ts';
+import { copyDeckConfig, deckConfigUseCount, buildDeckConfigRequest, prepareDeckConfigForSave } from '../../entry/src/main/ets/model/DeckConfigSave.ts';
 import { emptyDeckConfigSettings, encodeDeckConfig, encodeUpdateDeckConfigsRequest, decodeUpdateDeckConfigsRequest } from '../../entry/src/main/ets/proto/messages/DeckConfigMessages.ts';
 import { 牌组配置表单 } from '../../entry/src/main/ets/model/牌组配置表单.ets';
 import { 牌组选项编辑 } from '../../entry/src/main/ets/model/牌组选项编辑.ets';
@@ -37,7 +37,7 @@ function saveHarness(id = 1, useCount = 2) {
   const source = read('entry/src/main/ets/pages/首页.ets').replaceAll('\r\n', '\n');
   const start = source.indexOf('  private async 保存牌组选项(');
   const end = source.indexOf('\n  }', start) + 4;
-  const dependencies = { copyDeckConfig, prepareDeckConfigForSave,
+  const dependencies = { copyDeckConfig, buildDeckConfigRequest, prepareDeckConfigForSave,
     UPDATE_DECK_CONFIGS_MODE_NORMAL: 0, notifyFsrsStateChanged: () => {} };
   const code = stripTypeScriptTypes(`class Harness { ${source.slice(start, end)} }`, { mode: 'transform' });
   const Harness = new Function(...Object.keys(dependencies), code + '\nreturn Harness;')(...Object.values(dependencies));
@@ -188,4 +188,14 @@ test('deck scope is available from the header help and global controls stay sepa
     assert.ok(globals.includes(`deck_${key}_label`));
     assert.equal(advanced.split(`deck_${key}_label`).length - 1, 1);
   }
+});
+
+test('configuration request snapshots limits and config bytes without mutating shared preset inputs', () => {
+  const {original, view} = fixture(); const draft = copyDeckConfig(original); draft.config.newPerDay = 7;
+  const options = { limits: {...view.currentDeck.limits}, newCardsIgnoreReviewLimit: true, fsrs: true,
+    applyAllParentLimits: true, fsrsReschedule: false, fsrsHealthCheck: true };
+  const request = buildDeckConfigRequest(10, view, original, draft, false, options);
+  draft.config.newPerDay = 99; options.limits.review = 999;
+  assert.equal(request.configs[0].id, 0); assert.equal(request.configs[0].config.newPerDay, 7);
+  assert.equal(request.limits.review, 80); assert.equal(original.config.newPerDay, 20); assert.equal(draft.id, original.id);
 });

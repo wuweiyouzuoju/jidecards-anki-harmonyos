@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { exportPersonalData } from '../backend/DataExportWorkflow';
 
 import { initializeRedemption } from '../utils/RedemptionStore';
 import { UNLOCKED_CONTENTS_KEY, isThemeAvailable } from '../model/ThemeCatalog';
 import { common } from '@kit.AbilityKit';
-import { promptAction } from '@kit.ArkUI';
+
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { 设置面板 } from '../components/设置面板';
 import { 许可证面板 } from '../components/许可证面板';
 import { 数据迁移协调器 } from '../components/home/数据迁移协调器';
-import { 数据迁移意图, 数据迁移模式, 导出牌组选项 } from '../components/数据迁移面板';
+import type { 数据迁移意图, 数据迁移模式, 导出牌组选项 } from '../model/DataTransferIntent';
 import type { SyncAuth } from '../proto/messages/SyncMessages';
 import { 牌组服务 } from '../backend/牌组服务';
 import { 后端会话 } from '../backend/后端会话';
-import { 导出集合, 导出牌组, 完成导出, 执行牌组导入, 暂存导入文件, 替换集合 } from '../backend/数据迁移服务';
+import { 执行牌组导入, 暂存导入文件, 替换集合 } from '../backend/数据迁移服务';
 import { 解析是否深色, 主题模式 } from '../model/主题设置';
 import { 加载主题模式, 保存主题模式 } from '../model/主题存储';
 import { 颜色主题, 默认颜色主题 } from '../model/颜色主题';
@@ -26,13 +27,8 @@ import { 平铺牌组树 } from '../model/牌组层级';
 import { 牌组汇总 } from '../model/主页模型';
 import type { DeckTreeNode } from '../proto/messages/DeckMessages';
 import { CustomTransition } from '../utils/自定义转场';
-import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时长';
-import { 浏览页参数 } from './浏览页';
 
-export interface 设置页参数 {
-  pathStack?: NavPathStack;
-  openAiSettings?: boolean;
-}
+import { 浏览页参数 } from '../model/navigation/PageParams';
 
 @Component
 export struct 设置页 {
@@ -172,13 +168,8 @@ export struct 设置页 {
     this.数据迁移错误 = '';
     this.数据迁移阶段 = 0;
     try {
-      const path: string = intent.kind === 'exportDeck'
-        ? await 导出牌组(context.filesDir, intent.deckId, intent.options)
-        : await 导出集合(context.filesDir, intent.options);
-      this.数据迁移阶段 = 1;
-      const extension: string = intent.kind === 'exportDeck' ? '.apkg' : '.colpkg';
-      const fileName: string = intent.kind === 'exportDeck' ? 'jidecards-deck.apkg' : 'jidecards-data.colpkg';
-      const savedPath: string | null = await 完成导出(context, path, fileName, extension);
+      const savedPath: string | null = await exportPersonalData(context, intent,
+        (stage: number): void => { this.数据迁移阶段 = stage; });
       if (savedPath !== null) {
         this.显示提示($r('app.string.transfer_done'));
         this.显示数据迁移 = false;

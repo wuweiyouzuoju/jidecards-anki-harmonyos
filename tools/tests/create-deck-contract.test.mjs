@@ -98,7 +98,8 @@ test('home page wires the create button through the full flow', () => {
   assert.match(page, /@State private 创建牌组错误: string/);
   assert.match(page, /async 创建牌组\(name: string\)/);
   assert.match(page, /确保已打开\(context\.filesDir\)/);
-  assert.match(page, /this\.牌组服务实例\.创建牌组\(name\)/);
+  assert.match(page, /this\.deckCommands\.create\(context\.filesDir, name\)/);
+  assert.match(read('entry/src/main/ets/backend/HomeDeckCommands.ets'), /this\.decks\.创建牌组\(name\)/);
   assert.match(page, /await this\.加载主页数据\(\)/, 'must refresh tree after creation');
   assert.match(page, /选中的牌组ID = newDeckId\.toString\(\)/, 'must select the new deck');
 });
@@ -110,5 +111,5 @@ test('create deck flow surfaces backend errors inside the panel', () => {
   assert.notEqual(method, null);
   assert.match(method[0], /catch \(error\)/);
   assert.match(method[0], /this\.创建牌组错误 = /);
-  assert.match(method[0], /finally \{\s*this\.创建牌组中 = false;/);
+  assert.match(method[0], /finally \{\s*if \(!this\.homeDisposed\) this\.创建牌组中 = false;/);
 });

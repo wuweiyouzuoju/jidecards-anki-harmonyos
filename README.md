@@ -129,11 +129,11 @@ AppGallery 页面为准；仓库中的构建版本以 `AppScope/app.json5` 为�
 
 ### 环境要求
 
-- Node.js 18 或更高版本
+- Node.js 24.x（与 CI 和本地验证一致）
 - DevEco Studio 6.1.0.860
 - HarmonyOS SDK 6.1.0.105，Compatible API 21、Target API 23（Compile API 由当前 DevEco SDK 决定）
 - Rust 1.92.0（见 `rust-toolchain.toml`）
-- `protoc`、`cargo-zigbuild`、`zig`
+- `protoc`；主机测试使用已安装的 Visual Studio/MSVC，或配有 `cargo-zigbuild` / `zig` 的 bundled GNU 工具链
 
 ### 获取 Anki 源码
 
@@ -156,14 +156,15 @@ npm run doctor
 npm run build:app
 ```
 
-`build-profile.json5` 中的签名材料路径只对配置它的开发机有效。首次在 DevEco
-Studio 运行或安装到模拟器/真机前，请在
-**File > Project Structure > Project > Signing Configs** 中改为自己的自动签名；
-命令行安装必须使用本机生成的 signed HAP，不能复用他人的签名配置。
+公共 `build-profile.json5` 不保存个人签名材料。复制 `config/signing.example.json` 为
+`.local/signing.json`，填入本机已有签名的原值；也可用 `JIDECARDS_SIGNING_CONFIG` 指定外部 JSON 文件。
+根 `hvigorfile.ts` 在模块求值前注入配置，IDE 和命令行共用。覆盖安装必须沿用既有签名身份，
+不要重新生成身份替代原证书。首次配置与无签名构建见 [签名说明](docs/development/signing.md)。
 
-运行 Node 契约测试：
+安装开发工具依赖并运行完整 Node 测试：
 
 ```bash
+npm ci
 npm test
 ```
 
@@ -174,3 +175,5 @@ npm test
 ## 开源许可
 
 本项目采用 [AGPL-3.0-or-later](LICENSE) 许可。第三方组件与上游说明见 [NOTICE.md](NOTICE.md)。
+
+开发任务入口见 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md)，验证范围见 [验证说明](docs/development/verification.md)。

@@ -28,7 +28,7 @@ test('deck detail preview queries all cards and mounts the existing read-only pr
   assert.match(preview, /app\.string\.study_edit_note/);
   assert.match(preview, /app\.string\.ai_card_title/);
   assert.match(preview, /bindMenu\(this\.预览更多菜单\(\)\)/);
-  assert.match(browser, /editCardId\?: number/);
+  assert.match(read('entry/src/main/ets/model/navigation/PageParams.ts'), /editCardId\?: number/);
   assert.match(browser, /pageEditCardId: number = -1/);
   assert.match(browser, /if \(this\.pageEditCardId > 0\)/);
 });

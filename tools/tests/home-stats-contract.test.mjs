@@ -59,13 +59,13 @@ test('service index pins GetGraphPreferences=3 and SetGraphPreferences=4', () =>
 });
 
 test('home wires graphs into the snapshot and degrades quietly', () => {
-  const index = read(INDEX_PAGE);
+  const index = read(INDEX_PAGE) + read('entry/src/main/ets/backend/HomeDataRepository.ets');
   assert.match(index, /import \{ 统计服务 \} from '..\/backend\/统计服务'/);
-  assert.match(index, /静默加载图表\(\): Promise<GraphsView \| null>/);
+  assert.match(index, /readGraphs\(\): Promise<GraphsView \| null>/);
   assert.match(index, /构建主页快照\(tree, graphs/);
   assert.match(index, /构建月历\(new Date\(\), snapshot\.reviewCountsByDate\)/);
 
-  const method = index.match(/private async 静默加载图表[\s\S]*?\n  \}/);
+  const method = index.match(/private async readGraphs[\s\S]*?\n  \}/);
   assert.notEqual(method, null);
   // 2026-08-26 起跟随统计页「近 1 年/全部」本地持久化偏好（加载统计天数），
   // 不再写死 365；仍禁止用日期函数派生天数。

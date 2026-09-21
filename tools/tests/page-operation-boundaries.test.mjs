@@ -1,4 +1,9 @@
+import { loadBrowserRows } from '../../entry/src/main/ets/model/BrowserSearchSession.ts';
+import { loadNoteEditor } from '../../entry/src/main/ets/model/NoteEditorLoader.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { resolveBrowserCardIds, resolveBrowserNoteIds, snapshotNotetypeChange } from '../../entry/src/main/ets/model/BrowserSelection.ts';
+import { HomeWorkCoordinator } from '../../entry/src/main/ets/model/HomeWorkCoordinator.ts';
+import { HomeStartupSequence } from '../../entry/src/main/ets/model/HomeStartupSequence.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -19,6 +24,7 @@ function pageMethods(file, names, dependencies = {}) {
     assert.ok(start >= 0, name);
     return source.slice(start, source.indexOf('\n  }', start) + 4);
   });
+  Object.assign(dependencies, { loadNoteEditor, loadBrowserRows, resolveBrowserCardIds, resolveBrowserNoteIds, snapshotNotetypeChange });
   return new Function(...Object.keys(dependencies), stripTypeScriptTypes(`class Page { ${methods.join('\n')} }`,
     { mode: 'transform' }) + '; return Page;')(...Object.values(dependencies));
 }
@@ -26,7 +32,7 @@ function pageMethods(file, names, dependencies = {}) {
 function homeHarness() {
   const response = deferred(), timers = new Map(); let next = 0;
   const events = [];
-  const Page = pageMethods('首页', ['homeActivity', 'canPresentStartupPrompt', 'homeActivityChanged', 'tryImportExternalDeck',
+  const Page = pageMethods('首页', ['homeActivity', 'canPresentStartupPrompt', 'homeActivityChanged', 'startupHost',
     '尝试显示官方公告', '尝试展示待展示官方公告', '请求主页官方公告检查', '暂停主页官方公告检查',
     '继续首次弹窗序列', '显示欢迎弹窗一次', 'closeHomeIntro', 'onBackPress', 'autoSyncCollectionFinished', 'presentPendingSyncWarning'], {
     canPresentHomePrompt, bundleManager: { BundleFlag: {}, getBundleInfoForSelf: async () => ({ versionName: 'test' }) },
@@ -43,7 +49,7 @@ function homeHarness() {
     syncScheduler: new AutoSyncScheduler(),
     pendingSyncAction: null, pendingSyncFsrsWarning: false,
     syncForeground: true, 页面栈: { size: () => 0 }, 主页允许公告检查: true, 加载状态: 'ready',
-    homeWorkTimer: -1, 官方公告延迟检查任务: -1, 官方公告检查中: false, 主页公告检查已激活: true,
+    startupSequence: new HomeStartupSequence(), homeWork: new HomeWorkCoordinator(new ExternalDeckOpenQueue(), { schedule: fn => { const id = ++next; timers.set(id, { fn, delay: 0 }); return id; }, cancel: id => timers.delete(id) }), 官方公告延迟检查任务: -1, 官方公告检查中: false, 主页公告检查已激活: true,
     官方公告服务实例: { 加载公告: () => response.promise }, 显示官方公告: false,
     scheduleAutoSyncCheck() { events.push('sync-check'); }, flushSyncAction() {},
     加载主页数据: async () => {}, 同步后检查FSRS: async () => {},
@@ -121,7 +127,7 @@ test('startup cloud sequence is deferred behind user form and cannot reopen twic
 test('welcome marker is not consumed while another dialog prevents presentation', async () => {
   const { page, events, tick } = homeHarness();
   page.显示创建牌组 = true; await page.显示欢迎弹窗一次();
-  assert.equal(page.welcomePending, true); assert.deepEqual(events, []);
+  assert.equal(page.startupSequence.hasPending(), true); assert.deepEqual(events, []);
   page.显示创建牌组 = false; page.homeActivityChanged(); tick(); await settle();
   assert.equal(page.显示欢迎弹窗, true);
   assert.deepEqual(events.filter(e => e === 'welcome-persist'), []);
@@ -169,6 +175,8 @@ function browserHarness() {
     笔记服务实例: { 获取笔记的卡片: async id => [id + 100], 更新笔记: async () => {} },
     笔记类型服务实例: {}, getUIContext: () => ({ getPromptAction: () => ({ showToast() {} }) })
   });
+  page.noteReader = { card: id => page.卡片服务实例.获取卡片(id), note: id => page.笔记服务实例.获取笔记(id),
+    notetype: id => page.笔记类型服务实例.获取笔记类型(id) };
   return { page, scheduler, calls, broadcasts };
 }
 

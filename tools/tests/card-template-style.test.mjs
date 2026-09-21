@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
-import { 构建卡片HTML } from '../../entry/src/main/ets/model/学习卡片HTML构建器.ets';
+import { 构建卡片HTML } from '../../entry/src/main/ets/model/学习卡片HTML构建器.ts';
 
 test('Anki style-field scripts remain intact without exposing application CSS on either side', () => {
   const css = '.card { color: #123456; }</style><script>window.templateLoaded = true;</script>';

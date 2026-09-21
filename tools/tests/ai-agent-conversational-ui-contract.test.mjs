@@ -11,7 +11,7 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'u
 
 test('one disclosure component owns the conversation arrow and animation', () => {
   const disclosure = read('entry/src/main/ets/components/agent/AgentDisclosureCard.ets');
-  const page = read('entry/src/main/ets/pages/AI制卡页.ets');
+  const page = read('entry/src/main/ets/pages/AI制卡页.ets') + read('entry/src/main/ets/model/agent/AgentConversationView.ts');
   assert.match(disclosure, /Text\('▼'\)/);
   assert.match(disclosure, /expanded\s*\?\s*0\s*:\s*-90/);
   assert.match(disclosure, /duration:\s*150/);
@@ -22,7 +22,7 @@ test('one disclosure component owns the conversation arrow and animation', () =>
 });
 
 test('create setup is an assistant-side local card instead of a fixed top form', () => {
-  const page = read('entry/src/main/ets/pages/AI制卡页.ets');
+  const page = read('entry/src/main/ets/pages/AI制卡页.ets') + read('entry/src/main/ets/model/agent/AgentConversationView.ts');
   const setup = read('entry/src/main/ets/components/agent/AgentSetupCard.ets');
   assert.match(page, /AgentSetupCard/);
   assert.doesNotMatch(page, /private 选择区\(\)/);
@@ -40,7 +40,7 @@ test('create setup is an assistant-side local card instead of a fixed top form',
 });
 
 test('edit setup exposes explicit deck and note-type search scope selectors', () => {
-  const page = read('entry/src/main/ets/pages/AI制卡页.ets');
+  const page = read('entry/src/main/ets/pages/AI制卡页.ets') + read('entry/src/main/ets/model/agent/AgentConversationView.ts');
   const setup = read('entry/src/main/ets/components/agent/AgentSetupCard.ets');
   assert.match(setup, /if \(this\.mode === 'create'\)[\s\S]*else \{[\s\S]*Select\(this\.editDeckOptions\(\)\)/);
   assert.match(setup, /Select\(this\.editNotetypeOptions\(\)\)/);
@@ -52,14 +52,14 @@ test('edit setup exposes explicit deck and note-type search scope selectors', ()
 });
 
 test('local setup is excluded while the task snapshot is sent', () => {
-  const page = read('entry/src/main/ets/pages/AI制卡页.ets');
+  const page = read('entry/src/main/ets/pages/AI制卡页.ets') + read('entry/src/main/ets/model/agent/AgentConversationView.ts');
   assert.match(page, /buildAgentTaskProviderText\((?:snapshot|providerSnapshot)\)/);
   assert.match(page, /message\.kind === 'normal'|message\.kind === 'clarification'/);
   assert.doesNotMatch(page, /role:\s*'assistant'.*local_setup/);
 });
 
 test('clarification is a separate assistant bubble with explicit continuation', () => {
-  const page = read('entry/src/main/ets/pages/AI制卡页.ets');
+  const page = read('entry/src/main/ets/pages/AI制卡页.ets') + read('entry/src/main/ets/model/agent/AgentConversationView.ts');
   const card = read('entry/src/main/ets/components/agent/AgentClarificationCard.ets');
   assert.match(page, /result\.status === 'awaiting_clarification'/);
   assert.match(page, /appendClarificationMessage/);
@@ -77,7 +77,7 @@ test('clarification is a separate assistant bubble with explicit continuation', 
 });
 
 test('composer readiness and clarification lifecycle remain controlled by the page', () => {
-  const page = read('entry/src/main/ets/pages/AI制卡页.ets');
+  const page = read('entry/src/main/ets/pages/AI制卡页.ets') + read('entry/src/main/ets/model/agent/AgentConversationView.ts');
   assert.match(page, /private canSubmit\(\): boolean/);
   assert.match(page, /return this\.readinessReason\(\) === 'ready'/);
   assert.match(page, /\.enabled\(this\.处理中 \|\| this\.canSubmit\(\)\)/);
@@ -88,7 +88,7 @@ test('composer readiness and clarification lifecycle remain controlled by the pa
 });
 
 test('every assistant reply bubble ends with the AI-generated disclaimer', () => {
-  const page = read('entry/src/main/ets/pages/AI制卡页.ets');
+  const page = read('entry/src/main/ets/pages/AI制卡页.ets') + read('entry/src/main/ets/model/agent/AgentConversationView.ts');
   const bubble = page.match(/private AI气泡\(消息索引: number\) \{([\s\S]*?)\n  \}/)?.[0] ?? '';
   assert.ok(bubble.length > 0, 'AI气泡 builder must exist');
   // 声明必须位于气泡内容末尾（批次结果之后、Column 收尾之前），覆盖整轮 AI 产物
@@ -107,7 +107,7 @@ test('every assistant reply bubble ends with the AI-generated disclaimer', () =>
 
 // 工具轨迹保留在发起问题的回复中，问题气泡本身没有工具外壳。
 test('clarification traces remain visible while question bubbles stay conversational', () => {
-  const page = read('entry/src/main/ets/pages/AI制卡页.ets');
+  const page = read('entry/src/main/ets/pages/AI制卡页.ets') + read('entry/src/main/ets/model/agent/AgentConversationView.ts');
   assert.doesNotMatch(page, /toolName !== 'request_clarification'/);
   assert.match(page, /else if \(this\.hasVisibleAssistantContent\(this\.消息列表\[消息索引\]\)\)/);
   assert.match(page, /audit\.messageId = message\.id/);
@@ -116,7 +116,7 @@ test('clarification traces remain visible while question bubbles stay conversati
 });
 
 test('simple and experimental modes only change the default tool detail visibility', () => {
-  const page = read('entry/src/main/ets/pages/AI制卡页.ets');
+  const page = read('entry/src/main/ets/pages/AI制卡页.ets') + read('entry/src/main/ets/model/agent/AgentConversationView.ts');
   assert.match(page, /@StorageProp\(简洁模式AppStorage键\) @Watch\('applyToolPresentationMode'\)/);
   assert.match(page, /if \(existingIndex < 0\) \{ trace\.expanded = !this\.simpleMode/);
   assert.match(page, /trace\.expanded = message\.工具过程\[existingIndex\]\.expanded/);

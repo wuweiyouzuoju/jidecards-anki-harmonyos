@@ -12,14 +12,12 @@
 
 # IDE
 /.idea/
+/.local/
 
 # Agent working files
 /.trae/
-/.agents/
 /.superpowers/
 /skills/
-/AGENTS.md
-/PROJECT_CONTEXT.md
 
 # Temporary / debug
 tools/.cache/

@@ -58,7 +58,8 @@ test('current documentation follows application and SDK configuration', () => {
   assert.match(readme, new RegExp(`当前源码版本：${versionName.replaceAll('.', '\\.')}`));
   assert.match(readme, /checkout --detach e64c6b1/);
   assert.match(readme, /rev-parse --short=7 HEAD/);
-  assert.match(readme, /Project > Signing Configs/);
+  assert.match(readme, /JIDECARDS_SIGNING_CONFIG/);
+  assert.match(readme, /docs\/development\/signing\.md/);
   assert.match(status, new RegExp(`应用版本 \\| ${versionName.replaceAll('.', '\\.')} / versionCode ${versionCode}`));
   assert.match(status, new RegExp(`最低兼容 SDK \\| HarmonyOS [^|]+（API ${compatibleApi}）`));
   assert.match(status, new RegExp(`目标 SDK \\| HarmonyOS [^|]+（API ${targetApi}）`));
@@ -68,7 +69,7 @@ test('current documentation follows application and SDK configuration', () => {
 test('current capability documentation follows release gates and runtime constants', () => {
   const releaseFeatures = read('entry/src/main/ets/model/ReleaseFeatures.ets');
   const agentPage = read('entry/src/main/ets/pages/AI制卡页.ets');
-  const cardHtml = read('entry/src/main/ets/model/学习卡片HTML构建器.ets');
+  const cardHtml = read('entry/src/main/ets/model/学习卡片HTML构建器.ts');
   const readme = read('README.md');
   const architecture = read('docs/architecture.md');
   const agentDesign = read('docs/agent-2-design.md');
@@ -85,7 +86,7 @@ test('current capability documentation follows release gates and runtime constan
   assert.match(agentDesign, /持久化[\s\S]*AppStorage/);
   assert.match(cardHtml, /https:\/\/jidecards-media\.local\//);
   assert.match(architecture, /https:\/\/jidecards-media\.local\//);
-  assert.match(architecture, /当前不检查 `protoc`、`cargo-zigbuild`、`zig`、Anki checkout 或签名材料/);
+  assert.match(architecture, /签名与链接器可用性以实际构建为准/);
   assert.match(gitignore, /^\/third_party\/$/m);
   assert.equal(existsSync(path.join(root, '.gitmodules')), false);
   assert.match(ci, /\. \.\/UPSTREAM\.lock/);
@@ -97,6 +98,11 @@ test('current capability documentation follows release gates and runtime constan
 test('active Markdown uses valid relative links', () => {
   const activeFiles = [
     'README.md',
+    'AGENTS.md',
+    'PROJECT_CONTEXT.md',
+    'tools/README.md',
+    ...markdownFiles(path.join(root, 'docs/development')).map(file => path.relative(root, file)),
+    ...markdownFiles(path.join(root, '.agents')).map(file => path.relative(root, file)),
     'NOTICE.md',
     'docs/README.md',
     'docs/DEVELOPMENT_PLAN.md',

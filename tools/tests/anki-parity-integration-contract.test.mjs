@@ -44,7 +44,7 @@ test('settings owns only language, data, database check, and about entry points'
 
 test('personal replacement is confirmed twice and export is finalized by UI context', () => {
   // 2026-08-15：数据迁移流程从首页迁移到设置页（设置页改为全屏独立页面）。
-  const index = read('entry/src/main/ets/pages/设置页.ets');
+  const index = read('entry/src/main/ets/pages/设置页.ets') + read('entry/src/main/ets/backend/DataExportWorkflow.ets');
   assert.match(index, /确认个人数据替换/);
   assert.match(index, /完成导出\(context,/);
   assert.match(index, /执行牌组导入/);

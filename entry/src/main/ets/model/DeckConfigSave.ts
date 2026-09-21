@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import type { DeckConfig, DeckConfigsForUpdateView } from '../proto/messages/DeckConfigMessages';
-import { decodeDeckConfig, encodeDeckConfig } from '../proto/messages/DeckConfigMessages';
+import type { DeckConfig, DeckConfigsForUpdateView, DeckLimits, UpdateDeckConfigsInput } from '../proto/messages/DeckConfigMessages';
+import { decodeDeckConfig, encodeDeckConfig, encodeUpdateDeckConfigsRequest, decodeUpdateDeckConfigsRequest, UPDATE_DECK_CONFIGS_MODE_NORMAL } from '../proto/messages/DeckConfigMessages';
 
 /** 复制完整配置，避免校验或保存失败污染原始预设及重试依据。 */
 export function copyDeckConfig(config: DeckConfig): DeckConfig {
@@ -34,4 +34,27 @@ export function prepareDeckConfigForSave(view: DeckConfigsForUpdateView, origina
     draft.usn = 0;
   }
   return draft;
+}
+
+export interface DeckConfigRequestOptions {
+  limits: DeckLimits | null;
+  newCardsIgnoreReviewLimit: boolean;
+  fsrs: boolean;
+  applyAllParentLimits: boolean;
+  fsrsReschedule: boolean;
+  fsrsHealthCheck: boolean;
+}
+/** 生成独立请求；共享预设分离与调度器开关由同一个领域边界决定。 */
+export function buildDeckConfigRequest(targetDeckId: number, view: DeckConfigsForUpdateView,
+  original: DeckConfig, draft: DeckConfig, applyToSharedDecks: boolean,
+  edited: DeckConfigRequestOptions): UpdateDeckConfigsInput {
+  const request: UpdateDeckConfigsInput = {
+    targetDeckId: targetDeckId,
+    configs: [prepareDeckConfigForSave(view, original, copyDeckConfig(draft), applyToSharedDecks)],
+    removedConfigIds: [], mode: UPDATE_DECK_CONFIGS_MODE_NORMAL, cardStateCustomizer: view.cardStateCustomizer,
+    limits: edited.limits, newCardsIgnoreReviewLimit: edited.newCardsIgnoreReviewLimit,
+    fsrs: edited.fsrs, applyAllParentLimits: edited.applyAllParentLimits,
+    fsrsReschedule: edited.fsrsReschedule, fsrsHealthCheck: edited.fsrsHealthCheck
+  };
+  return decodeUpdateDeckConfigsRequest(encodeUpdateDeckConfigsRequest(request));
 }

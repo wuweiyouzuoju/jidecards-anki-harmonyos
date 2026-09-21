@@ -17,7 +17,7 @@ import {
   媒体基地址,
   原始侧HTML,
   重写媒体地址
-} from '../../entry/src/main/ets/model/学习卡片HTML构建器.ets';
+} from '../../entry/src/main/ets/model/学习卡片HTML构建器.ts';
 import {
   decodeExtractAvTagsResponse,
   encodeExtractAvTagsRequest
@@ -221,7 +221,7 @@ test('study and preview share native audio lifecycle without Web autoplay', () =
 });
 
 test('image occlusion IIFE exposes toggle and hides #toggle button (BUG-007)', () => {
-  const builder = read('entry/src/main/ets/model/学习卡片HTML构建器.ets');
+  const builder = read('entry/src/main/ets/model/学习卡片HTML构建器.ts');
   // 上游 afmt 模板的 <button id="toggle"> 无 onclick，由 IIFE 在 setup() 中隐藏（2026-07-28 暂停切换功能）。
   assert.match(builder, /toggle:\s*function\s*\(\s*\)\s*\{/, 'anki.imageOcclusion.toggle method defined');
   assert.match(builder, /getElementById\(['"]toggle['"]\)/, '#toggle button looked up in setup');
@@ -279,7 +279,7 @@ test('study page is registered and reachable from home', () => {
   assert.ok(!mainPages.src.includes('pages/学习页'),
     '学习页 is a NavDestination, not a router page');
 
-  const index = read(INDEX_PAGE);
+  const index = read(INDEX_PAGE) + read('entry/src/main/ets/backend/HomeDataRepository.ets');
   assert.match(index, /Navigation\(this\.页面栈\)/);
   assert.match(index, /\.navDestination\(this\.页面映射\)/);
   assert.match(index, /name: 'StudyPage'/);
@@ -368,7 +368,7 @@ test('scheduler service exposes deck today counts via scheduler method 10', () =
 test('home sources completed today from graphs.today.answerCount instead of per-deck RPCs', () => {
   // 旧实现 sumCompletedToday 只迭代顶层牌组调用 countsForDeckToday，既漏子牌组学习、
   // 又缺 learn/relearn 口径；新实现直接用 graphs.today.answerCount（全库聚合、完整口径）。
-  const index = read(INDEX_PAGE);
+  const index = read(INDEX_PAGE) + read('entry/src/main/ets/backend/HomeDataRepository.ets');
   assert.doesNotMatch(index, /sumCompletedToday/,
     'sumCompletedToday must be removed; today.answerCount replaces it');
   assert.doesNotMatch(index, /调度器服务实例\.获取牌组今日计数/,

@@ -524,14 +524,16 @@ test('BrowserPage wires T7 edit panel: imports 浏览编辑区 + 笔记服务 + 
   assert.match(page, /import\s+type\s+\{[^}]*EditableNote[^}]*\}\s*from\s*['"][^'"]*NoteMessages['"]/);
 });
 
-test('BrowserPage 行点击 loads note via 笔记服务.获取笔记 and field names via 笔记类型服务.获取笔记类型', () => {
+test('BrowserPage editor reads use the shared loader and existing Anki services', () => {
   const page = read('entry/src/main/ets/pages/浏览页.ets');
-  assert.match(page, /private\s+async\s+行点击\s*\(/);
-  assert.match(page, /this\.笔记服务实例\.获取笔记\s*\(/);
-  assert.match(page, /this\.笔记类型服务实例\.获取笔记类型\s*\(/);
-  assert.match(page, /this\.卡片服务实例\.获取卡片\s*\(/);
-  // Cards 模式经 card.noteId 跳到 noteId
-  assert.match(page, /card\.noteId/);
+  const loader = read('entry/src/main/ets/model/NoteEditorLoader.ts');
+  const adapter = read('entry/src/main/ets/backend/AnkiNoteEditor.ts');
+  assert.match(page, /loadNoteEditor\(行ID, mode === 'notes', this\.noteReader/);
+  assert.match(adapter, /this\.notes\.获取笔记\(id\)/);
+  assert.match(adapter, /this\.notetypes\.获取笔记类型\(id\)/);
+  assert.match(adapter, /this\.cards\.获取卡片\(id\)/);
+  assert.match(loader, /await backend\.card\(id\)\)\.noteId/);
+
 });
 
 test('BrowserPage 保存编辑 calls 笔记服务.更新笔记 with skipUndoEntry=false and refreshes list', () => {
@@ -615,8 +617,8 @@ test('Browser suspend and restore use captured selection and the common completi
   assert.match(body, /批量埋藏或暂停卡片\(selection\.ids/);
   assert.match(body, /runBatchOperation/);
   assert.match(page, /operations\.isCurrent[\s\S]*?this\.退出多选\(\)/);
-  assert.match(page, /this\.笔记服务实例\.获取笔记的卡片\(笔记ID\)/);
-  assert.match(page, /!已添加\.has\(卡片ID\)/);
+  assert.match(page, /resolveBrowserCardIds\(selection,/);
+  // Sibling expansion and deduplication execute directly in browser-operation-model.test.mjs.
 });
 
 test('BrowserPage build renders 批量操作栏 conditionally on 多选模式值 + 选中ID列表', () => {
@@ -1121,10 +1123,9 @@ test('BrowserPage has T6 sidebar methods', () => {
   const page = read('entry/src/main/ets/pages/浏览页.ets');
   // 打开侧边栏（含加载逻辑）
   assert.match(page, /private\s+async\s+打开侧边栏\s*\(/);
+  const sidebar = read('entry/src/main/ets/backend/AnkiBrowserSidebar.ts');
+  assert.match(page, /loadBrowserSidebar\(this\.sidebarBackend, this\.牌组树\)/);
   // 加载标签树 / 已保存搜索 / 折叠状态
-  assert.match(page, /private\s+async\s+加载标签树\s*\(/);
-  assert.match(page, /private\s+async\s+加载已保存搜索\s*\(/);
-  assert.match(page, /private\s+async\s+加载侧边栏折叠状态\s*\(/);
   // 切换折叠状态（持久化）
   assert.match(page, /private\s+async\s+切换侧边栏折叠\s*\(/);
   // 节点点击/长按回调
@@ -1134,9 +1135,9 @@ test('BrowserPage has T6 sidebar methods', () => {
   assert.match(page, /private\s+追加牌组条件\s*\(/);
   assert.match(page, /private\s+追加标签条件\s*\(/);
   // 调用 标签服务.标签树 + 配置服务.获取配置JSON/获取配置布尔/设置配置布尔
-  assert.match(page, /this\.标签服务实例\.标签树\s*\(/);
-  assert.match(page, /this\.配置服务实例\.获取配置JSON\s*\(/);
-  assert.match(page, /this\.配置服务实例\.获取配置布尔\s*\(/);
+  assert.match(sidebar, /this\.tagService\.标签树\s*\(/);
+  assert.match(sidebar, /this\.config\.获取配置JSON\s*\(/);
+  assert.match(sidebar, /this\.config\.获取配置布尔\s*\(/);
   assert.match(page, /this\.配置服务实例\.设置配置布尔\s*\(/);
 });
 

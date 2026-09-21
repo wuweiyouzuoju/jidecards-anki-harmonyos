@@ -2,7 +2,7 @@
 // PLAYWRIGHT_MODULE 可指向本机 Playwright；验证模板与默认配色在真实 CSS 层叠后的可读性。
 import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
-import { 构建卡片HTML } from '../entry/src/main/ets/model/学习卡片HTML构建器.ets';
+import { 构建卡片HTML } from '../entry/src/main/ets/model/学习卡片HTML构建器.ts';
 import { 对比度 } from '../entry/src/main/ets/model/色阶生成.ets';
 
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE

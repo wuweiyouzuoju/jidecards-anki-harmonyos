@@ -12,7 +12,7 @@ const historyPath = path.join(root,
 
 test('local Agent history is resumable and deletable', () => {
   assert.equal(fs.existsSync(historyPath), true);
-  const source = fs.readFileSync(historyPath, 'utf8');
+  const source = fs.readFileSync(historyPath, 'utf8') + fs.readFileSync(path.join(root, 'entry/src/main/ets/model/agent/AgentConversationTypes.ts'), 'utf8');
   assert.match(source, /loadAgentConversations/);
   assert.match(source, /saveAgentConversation/);
   assert.match(source, /deleteAgentConversation/);
@@ -20,7 +20,7 @@ test('local Agent history is resumable and deletable', () => {
 });
 
 test('history schema keeps visible provider reasoning with reply attribution but no secrets or media', () => {
-  const source = fs.readFileSync(historyPath, 'utf8');
+  const source = fs.readFileSync(historyPath, 'utf8') + fs.readFileSync(path.join(root, 'entry/src/main/ets/model/agent/AgentConversationTypes.ts'), 'utf8');
   assert.match(source, /AgentHistoryAudit/);
   assert.match(source, /AgentHistoryResult/);
   assert.match(source, /SearchSource/);
@@ -51,11 +51,11 @@ test('history schema keeps visible provider reasoning with reply attribution but
 
 test('shared page persists completed turns and renders an in-page clickable history list', () => {
   const page = fs.readFileSync(
-    path.join(root, 'entry/src/main/ets/pages/AI制卡页.ets'), 'utf8');
+    path.join(root, 'entry/src/main/ets/pages/AI制卡页.ets'), 'utf8') + fs.readFileSync(path.join(root, 'entry/src/main/ets/model/agent/AgentConversationView.ts'), 'utf8') + fs.readFileSync(path.join(root, 'entry/src/main/ets/components/agent/AgentHistoryList.ets'), 'utf8');
   assert.match(page, /saveAgentConversation/);
   assert.match(page, /打开历史会话/);
   assert.match(page, /private 历史区\(\)/);
-  assert.match(page, /ForEach\(this\.历史会话列表/);
+  assert.match(page, /ForEach\(this\.conversations/);
   assert.match(page, /this\.恢复历史会话\(item\)/);
   assert.match(page, /this\.删除历史会话\(item\)/);
   assert.doesNotMatch(page, /promptAction\.showActionMenu/);
@@ -65,12 +65,12 @@ test('shared page persists completed turns and renders an in-page clickable hist
 
 test('history mode has its own toolbar, returns to chat, and marks selection with theme color only', () => {
   const page = fs.readFileSync(
-    path.join(root, 'entry/src/main/ets/pages/AI制卡页.ets'), 'utf8');
+    path.join(root, 'entry/src/main/ets/pages/AI制卡页.ets'), 'utf8') + fs.readFileSync(path.join(root, 'entry/src/main/ets/model/agent/AgentConversationView.ts'), 'utf8') + fs.readFileSync(path.join(root, 'entry/src/main/ets/components/agent/AgentHistoryList.ets'), 'utf8');
   const zh = JSON.parse(fs.readFileSync(
     path.join(root, 'entry/src/main/resources/base/element/string.json'), 'utf8')).string
     .reduce((map, item) => ({ ...map, [item.name]: item.value }), {});
   const top = page.match(/private 顶部条\(\)[\s\S]*?@Builder\s+private 历史区/)?.[0] ?? '';
-  const history = page.match(/private 历史区\(\)[\s\S]*?@Builder\s+private 用户气泡/)?.[0] ?? '';
+  const history = fs.readFileSync(path.join(root, 'entry/src/main/ets/components/agent/AgentHistoryList.ets'), 'utf8');
   const build = page.match(/build\(\) \{[\s\S]*?\.hideTitleBar\(true\)/)?.[0] ?? '';
 
   assert.equal(zh.ai_agent_history_title, '历史对话');
@@ -88,11 +88,11 @@ test('history mode has its own toolbar, returns to chat, and marks selection wit
 
 test('history saves and restores structured clarification without deleting its question', () => {
   const page = fs.readFileSync(
-    path.join(root, 'entry/src/main/ets/pages/AI制卡页.ets'), 'utf8');
+    path.join(root, 'entry/src/main/ets/pages/AI制卡页.ets'), 'utf8') + fs.readFileSync(path.join(root, 'entry/src/main/ets/model/agent/AgentConversationView.ts'), 'utf8') + fs.readFileSync(path.join(root, 'entry/src/main/ets/components/agent/AgentHistoryList.ets'), 'utf8');
   assert.match(page, /kind:\s*message\.kind/);
   assert.match(page, /clarification:\s*message\.clarification/);
   assert.match(page, /message\.kind\s*=\s*item\.kind/);
-  assert.match(page, /message\.clarification\s*=\s*item\.clarification/);
+  assert.match(page, /message\.clarification\s*=\s*item\.clarification === null \? null : cloneAgentClarificationView\(item\.clarification\)/);
   assert.match(page, /message\.expanded\s*=\s*item\.expanded/);
   assert.match(page, /message\.kind\s*=\s*'clarification'/);
   assert.match(page, /空消息\('ai', request\.question, false\)/);
@@ -100,7 +100,7 @@ test('history saves and restores structured clarification without deleting its q
 
 test('history stores raw assistant output without appending the localized terminal error', () => {
   const page = fs.readFileSync(
-    path.join(root, 'entry/src/main/ets/pages/AI制卡页.ets'), 'utf8');
+    path.join(root, 'entry/src/main/ets/pages/AI制卡页.ets'), 'utf8') + fs.readFileSync(path.join(root, 'entry/src/main/ets/model/agent/AgentConversationView.ts'), 'utf8') + fs.readFileSync(path.join(root, 'entry/src/main/ets/components/agent/AgentHistoryList.ets'), 'utf8');
   assert.match(page,
     /text:\s*message\.角色 === 'ai' && message\.providerText\.length > 0\s*\?\s*message\.providerText : message\.正文/);
   assert.match(page, /message\.providerText = item\.text/);

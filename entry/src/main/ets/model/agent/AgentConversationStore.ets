@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import type { AgentHistoryMessage, AgentHistoryAudit, AgentHistoryResult, AgentConversation } from './AgentConversationTypes';
 
 import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
@@ -29,42 +30,7 @@ function historyAction(action: AgentAction): AgentAction {
   return safe;
 }
 
-/** 保存接口实际返回的可见思考及其类型；不从正文生成或反推思考。 */
-export interface AgentHistoryMessage {
-  timeline?: AgentTimelineBlock[];
-  timelineTruncated?: boolean;
-  id?: number;
-  reasoning?: string;
-  reasoningIsSummary?: boolean;
-  reasoningTruncated?: boolean;
-  action?: AgentAction;
-  role: string;
-  text: string;
-  kind: string;
-  clarification: AgentClarificationView | null;
-  expanded: boolean;
-}
-
-export interface AgentHistoryAudit extends AgentToolTrace { messageId?: number; }
-
-export interface AgentHistoryResult {
-  draftId: string;
-  status: string;
-  succeeded: number;
-  failed: number;
-}
-
-export interface AgentConversation {
-  id: string;
-  mode: AgentMode;
-  title: string;
-  updatedAt: number;
-  setup: AgentTaskSetup;
-  messages: AgentHistoryMessage[];
-  audits: AgentHistoryAudit[];
-  sources: SearchSource[];
-  results: AgentHistoryResult[];
-}
+export type { AgentHistoryMessage, AgentHistoryAudit, AgentHistoryResult, AgentConversation } from './AgentConversationTypes';
 
 function safeStringArray(values: string[] | undefined): string[] {
   if (!Array.isArray(values)) { return []; }

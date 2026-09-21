@@ -1,6 +1,6 @@
 // 修复方案验证脚本（方案 A + B + C）
 // 基于 tools/verify-contrast.mjs 与 tools/verify-contrast-official.mjs 的算法。
-// 用法：node tools/verify-fix-plan.mjs
+// 用法：node tools/experimental/verify-fix-plan.mjs
 // 仅用于验证修复方案是否能让所有场景通过华为官方规范，完成后可删除。
 
 // ===== 核心算法（复用自 verify-contrast.mjs） =====

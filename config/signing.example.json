@@ -1,0 +1,18 @@
+{
+  "signingConfigs": [
+    {
+      "name": "local",
+      "type": "HarmonyOS",
+      "material": {
+        "certpath": "C:/path/to/certificate.cer",
+        "profile": "C:/path/to/profile.p7b",
+        "storeFile": "C:/path/to/keystore.p12",
+        "storePassword": "replace-with-existing-value",
+        "keyAlias": "replace-with-existing-alias",
+        "keyPassword": "replace-with-existing-value",
+        "signAlg": "SHA256withECDSA"
+      }
+    }
+  ],
+  "products": [{ "name": "default", "signingConfig": "local" }]
+}

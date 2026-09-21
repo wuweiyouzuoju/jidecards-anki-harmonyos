@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import type { EditableNote } from '../proto/messages/NoteMessages';
 import type { CardAnswerInput, CongratsInfo, QueuedCardsView, SchedulingStatesRaw, StudyCard } from '../proto/messages/SchedulerMessages';
 import type { RenderedCard } from '../proto/messages/CardRenderingMessages';
 import { AutoSyncScheduler, autoSyncScheduler } from './AutoSyncScheduler';
@@ -7,6 +8,10 @@ import { StudyOptions } from './StudyTiming';
 
 /** 显式后端边界，允许在不加载 NAPI/ArkUI 的测试中验证学习会话。 */
 export interface StudySessionBackend {
+  updateNote(note: EditableNote): Promise<void>;
+  buryCard(cardId: number, mode: number): Promise<void>;
+  removeCard(cardId: number): Promise<void>;
+  unburyDeck(deckId: number): Promise<void>;
   canUndo(): Promise<boolean>;
   queuedCards(deckId: number): Promise<QueuedCardsView>;
   renderCard(cardId: number): Promise<RenderedCard>;
@@ -65,17 +70,17 @@ export class StudySessionController {
       await this.activity.waitForCollection();
       if (this.disposed || !isCurrent()) return null;
       const canUndo: boolean = await this.canUndo();
-      if (!isCurrent()) return null;
+      if (this.disposed || !isCurrent()) return null;
       const queue: QueuedCardsView = await this.backend.queuedCards(deckId);
-      if (!isCurrent()) return null;
+      if (this.disposed || !isCurrent()) return null;
       const card: StudyCard | null = queue.cards.length === 0 ? null : queue.cards[0];
       if (card === null) return { queue: queue, canUndo: canUndo, card: null, rendered: null, labels: [], options: new StudyOptions() };
       const rendered: RenderedCard = await this.backend.renderCard(card.cardId);
-      if (!isCurrent()) return null;
+      if (this.disposed || !isCurrent()) return null;
       const options: StudyOptions = await this.backend.studyOptions(card.cardId);
-      if (!isCurrent()) return null;
+      if (this.disposed || !isCurrent()) return null;
       const labels: string[] = await this.backend.describeStates(card.states);
-      if (!isCurrent()) return null;
+      if (this.disposed || !isCurrent()) return null;
       return { queue: queue, canUndo: canUndo, card: card, rendered: rendered, labels: labels, options: options };
     } finally {
       this.endOperation();
@@ -90,7 +95,10 @@ export class StudySessionController {
     this.beginOperation();
     try {
       await this.activity.waitForCollection();
-      return await this.backend.congrats();
+      if (this.disposed) throw new Error('Study session disposed');
+      const info: CongratsInfo = await this.backend.congrats();
+      if (this.disposed) throw new Error('Study session disposed');
+      return info;
     } finally {
       this.endOperation();
     }
@@ -109,6 +117,26 @@ export class StudySessionController {
 
   undo(): Promise<void> {
     return this.commitChange((): Promise<void> => this.backend.undo());
+  }
+
+  saveNote(note: EditableNote, fields: string[], tags: string[]): Promise<void> {
+    const updated: EditableNote = {
+      id: note.id, guid: note.guid, notetypeId: note.notetypeId,
+      mtimeSecs: note.mtimeSecs, usn: note.usn, fields: fields.slice(), tags: tags.slice()
+    };
+    return this.commitChange((): Promise<void> => this.backend.updateNote(updated));
+  }
+
+  buryCard(cardId: number, mode: number): Promise<void> {
+    return this.commitChange((): Promise<void> => this.backend.buryCard(cardId, mode));
+  }
+
+  removeCard(cardId: number): Promise<void> {
+    return this.commitChange((): Promise<void> => this.backend.removeCard(cardId));
+  }
+
+  unburyDeck(deckId: number): Promise<void> {
+    return this.commitChange((): Promise<void> => this.backend.unburyDeck(deckId));
   }
 
   /** 写入完成才通知同步；销毁页面不撤回已提交的写入，也不能提前释放集合占用。 */

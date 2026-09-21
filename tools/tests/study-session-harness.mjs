@@ -7,6 +7,10 @@ import { stripTypeScriptTypes } from 'node:module';
 import { SyncActivity } from '../../entry/src/main/ets/model/SyncSettings.ts';
 
 export function attachStudySession(page) {
+  page.noteReader = {
+    card: id => page.卡片服务实例.获取卡片(id), note: id => page.笔记服务实例.获取笔记(id),
+    notetype: id => page.笔记类型服务实例.获取笔记类型(id)
+  };
   page.studyScheduler = new AutoSyncScheduler();
   page.syncActivity = new SyncActivity();
   page.studyOptions = new StudyOptions();
@@ -25,6 +29,10 @@ export function attachStudySession(page) {
     StudyAdvanceAction, 2, key => key);
   for (const name of names) page[name] = TimingPage.prototype[name];
   page.studySession = new StudySessionController({
+    updateNote: async note => { await page.笔记服务实例.更新笔记([note], false); },
+    buryCard: (id, mode) => page.调度器服务实例.埋藏或暂停卡片(id, mode),
+    removeCard: id => page.卡片服务实例.删除卡片([id]),
+    unburyDeck: id => page.调度器服务实例.按牌组恢复埋藏(id, 0),
     canUndo: async () => (await page.集合服务实例.获取撤销状态()).undo.length > 0,
     queuedCards: id => page.调度器服务实例.获取队首卡片(id),
     renderCard: id => page.卡片渲染服务实例.渲染既有卡片(id),

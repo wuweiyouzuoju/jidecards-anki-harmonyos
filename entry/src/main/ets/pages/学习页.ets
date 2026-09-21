@@ -22,14 +22,17 @@ import { StudySessionController, StudySnapshot } from '../model/StudySessionCont
 import { StudyOptions, StudyTiming, StudyAdvanceAction } from '../model/StudyTiming';
 import { 调度器服务 } from '../backend/调度器服务';
 import { 卡片渲染服务 } from '../backend/卡片渲染服务';
-import { 卡片服务 } from '../backend/卡片服务';
 import { 集合服务 } from '../backend/集合服务';
 import { 笔记服务 } from '../backend/笔记服务';
 import { 笔记类型服务 } from '../backend/笔记类型服务';
 import { EditableNote } from '../proto/messages/NoteMessages';
 import { 浏览编辑区 } from '../components/browser/浏览编辑区';
-import { 比对答案 } from '../model/拼写比对器';
-import { 提取拼写填空内容 } from '../model/填空解析器';
+import { loadNoteEditor } from '../model/NoteEditorLoader';
+import { AnkiNoteEditor } from '../backend/AnkiNoteEditor';
+import { renderStudyAnswer, StudyAnswerNotetype } from '../model/StudyAnswerRenderer';
+import { resolveStudyKey } from '../model/StudyInputPolicy';
+import { studyKeyName } from '../utils/StudyKeyAdapter';
+
 import type { RenderedCard, AvTagsResult } from '../proto/messages/CardRenderingMessages';
 import {
   BURY_SUSPEND_MODE_BURY_USER,
@@ -37,18 +40,10 @@ import {
   RATING_AGAIN,
   RATING_EASY,
   RATING_GOOD,
-  RATING_HARD,
-  UNBURY_MODE_ALL
+  RATING_HARD
 } from '../proto/messages/SchedulerMessages';
 import type { StudyCard } from '../proto/messages/SchedulerMessages';
-import {
-  构建卡片HTML,
-  提取拼写标记,
-  注入拼写结果,
-  媒体基地址,
-  原始侧HTML,
-  剥除拼写标记
-} from '../model/学习卡片HTML构建器';
+import { 构建卡片HTML, 提取拼写标记, 媒体基地址, 原始侧HTML, 剥除拼写标记 } from '../model/学习卡片HTML构建器';
 import { interceptMediaRequest } from '../utils/媒体响应助手';
 import { 声音播放器 } from '../utils/声音播放器';
 import { TTS播放器 } from '../utils/TTS播放器';
@@ -71,9 +66,9 @@ import { 刷新桌面卡片数据 } from '../model/FSRS控制器';
 import { 颜色键 } from '../model/颜色主题';
 import { CustomTransition } from '../utils/自定义转场';
 // KeyCode 枚举：用于 onKeyPreIme 键盘事件判断（API 12+）。物理键盘/蓝牙键盘/2in1 设备统一派发。
-import { KeyCode } from '@kit.InputKit';
+
 import type { AI制卡页参数 } from './AI制卡页';
-import type { 设置页参数 } from './设置页';
+import { 设置页参数 } from '../model/navigation/PageParams';
 import {
   AgentSettings,
   isAgentProviderConfigured,
@@ -116,7 +111,6 @@ export struct 学习页 {
   pathStack: NavPathStack = new NavPathStack();
   private readonly 调度器服务实例: 调度器服务 = new 调度器服务();
   private readonly 卡片渲染服务实例: 卡片渲染服务 = new 卡片渲染服务();
-  private readonly 卡片服务实例: 卡片服务 = new 卡片服务();
   private readonly 集合服务实例: 集合服务 = new 集合服务();
   private readonly studySession: StudySessionController = new StudySessionController(
     new AnkiStudySessionBackend(this.调度器服务实例, this.卡片渲染服务实例, this.集合服务实例));
@@ -721,6 +715,8 @@ export struct 学习页 {
   }
 
   /** 从当前学习卡读取笔记；字段就绪后才挂载编辑器，避免初始化为空草稿。 */
+  private readonly noteReader: AnkiNoteEditor = new AnkiNoteEditor();
+
   private async openNoteEditor(): Promise<void> {
     if (this.评分中 || this.studyGuideVisible || this.当前卡片 === null ||
       (this.阶段 !== 'question' && this.阶段 !== 'answer')) { return; }
@@ -734,12 +730,11 @@ export struct 学习页 {
     this.invalidateCardWork();
     const version: number = this.requestVersion;
     try {
-      const note: EditableNote = await this.笔记服务实例.获取笔记(card.noteId);
-      if (!this.isCurrentRequest(version)) { return; }
-      const notetype = await this.笔记类型服务实例.获取笔记类型(note.notetypeId);
-      if (!this.isCurrentRequest(version)) { return; }
-      this.editingNote = note;
-      this.editingFieldNames = notetype.fieldNames;
+      const snapshot = await loadNoteEditor(card.noteId, true, this.noteReader,
+        (): boolean => this.isCurrentRequest(version));
+      if (snapshot === null) return;
+      this.editingNote = snapshot.note;
+      this.editingFieldNames = snapshot.fieldNames;
       this.noteEditorVisible = true;
     } catch (error) {
       if (!this.isCurrentRequest(version)) { return; }
@@ -750,11 +745,13 @@ export struct 学习页 {
         message: this.取文案($r('app.string.browser_detail_load_error'))
       });
     } finally {
-      this.noteEditorBusy = false;
-      if (!this.noteEditorVisible) {
-        this.评分中 = false;
-        this.消费待重渲染();
-        this.startStudyTimers();
+      if (this.mounted) {
+        this.noteEditorBusy = false;
+        if (!this.noteEditorVisible) {
+          this.评分中 = false;
+          this.消费待重渲染();
+          this.startStudyTimers();
+        }
       }
     }
   }
@@ -779,18 +776,7 @@ export struct 学习页 {
     this.noteEditorBusy = true;
     this.noteEditorError = '';
     try {
-      const updated: EditableNote = {
-        id: note.id,
-        guid: note.guid,
-        notetypeId: note.notetypeId,
-        mtimeSecs: note.mtimeSecs,
-        usn: note.usn,
-        fields: fields.slice(),
-        tags: tags.slice()
-      };
-      await this.studySession.commitChange(async (): Promise<void> => {
-        await this.笔记服务实例.更新笔记([updated], false);
-      });
+      await this.studySession.saveNote(note, fields, tags);
       if (!this.mounted) { return true; }
       await this.加载下一张卡();
       if (!this.mounted) { return true; }
@@ -804,10 +790,12 @@ export struct 学习页 {
       this.noteEditorError = this.取文案($r('app.string.browser_detail_save_error'));
       return false;
     } finally {
-      this.noteEditorBusy = false;
-      this.消费待重渲染();
-      if (!this.noteEditorVisible) { this.playStudyAudio(); }
-      this.startStudyTimers();
+      if (this.mounted) {
+        this.noteEditorBusy = false;
+        this.消费待重渲染();
+        if (!this.noteEditorVisible) { this.playStudyAudio(); }
+        this.startStudyTimers();
+      }
     }
   }
 
@@ -930,18 +918,18 @@ export struct 学习页 {
     const version: number = this.requestVersion;
     try {
       const cardId: number = this.当前卡片.cardId;
-      await this.studySession.commitChange(async (): Promise<void> => {
-        await this.调度器服务实例.埋藏或暂停卡片(cardId, mode);
-      });
+      await this.studySession.buryCard(cardId, mode);
       await this.加载下一张卡();
     } catch (error) {
       if (!this.isCurrentRequest(version)) { return; }
       this.阶段 = 'error';
       this.错误详情 = error instanceof Error ? error.message : `${error}`;
     } finally {
-      this.评分中 = false;
-      this.消费待重渲染();
-      this.maybeShowStudyGuide();
+      if (this.mounted) {
+        this.评分中 = false;
+        this.消费待重渲染();
+        this.maybeShowStudyGuide();
+      }
     }
   }
 
@@ -978,6 +966,8 @@ export struct 学习页 {
       return;
     }
     this.autoAdvanceEnabled = false;
+    const cardId: number = this.当前卡片.cardId;
+    const version: number = this.requestVersion;
     this.getUIContext().showAlertDialog({
       title: $r('app.string.study_delete_card_confirm_title'),
       message: $r('app.string.study_delete_card_confirm_message'),
@@ -991,6 +981,7 @@ export struct 学习页 {
         value: $r('app.string.study_delete_card'),
         fontColor: $r('app.color.error_text'),
         action: (): void => {
+          if (!this.isCurrentRequest(version) || this.当前卡片?.cardId !== cardId) return;
           this.确认删除当前卡();
         }
       }
@@ -998,7 +989,7 @@ export struct 学习页 {
   }
 
   private async 确认删除当前卡(): Promise<void> {
-    if (this.当前卡片 === null) {
+    if (this.评分中 || this.当前卡片 === null) {
       return;
     }
     if (!this.isCurrentRequest(this.requestVersion)) { return; }
@@ -1007,9 +998,7 @@ export struct 学习页 {
     const version: number = this.requestVersion;
     try {
       const cardId: number = this.当前卡片.cardId;
-      await this.studySession.commitChange(async (): Promise<void> => {
-        await this.卡片服务实例.删除卡片([cardId]);
-      });
+      await this.studySession.removeCard(cardId);
       await this.加载下一张卡();
     } catch (error) {
       if (!this.isCurrentRequest(version)) { return; }
@@ -1019,9 +1008,11 @@ export struct 学习页 {
         .getStringSync($r('app.string.study_delete_card_failed').id)
         .replace('%s', reason);
     } finally {
-      this.评分中 = false;
-      this.消费待重渲染();
-      this.maybeShowStudyGuide();
+      if (this.mounted) {
+        this.评分中 = false;
+        this.消费待重渲染();
+        this.maybeShowStudyGuide();
+      }
     }
   }
 
@@ -1057,18 +1048,18 @@ export struct 学习页 {
     this.invalidateCardWork();
     const version: number = this.requestVersion;
     try {
-      await this.studySession.commitChange(async (): Promise<void> => {
-        await this.调度器服务实例.按牌组恢复埋藏(this.牌组ID, UNBURY_MODE_ALL);
-      });
+      await this.studySession.unburyDeck(this.牌组ID);
       await this.加载下一张卡();
     } catch (error) {
       if (!this.isCurrentRequest(version)) { return; }
       this.阶段 = 'error';
       this.错误详情 = error instanceof Error ? error.message : `${error}`;
     } finally {
-      this.评分中 = false;
-      this.消费待重渲染();
-      this.maybeShowStudyGuide();
+      if (this.mounted) {
+        this.评分中 = false;
+        this.消费待重渲染();
+        this.maybeShowStudyGuide();
+      }
     }
   }
 
@@ -1099,41 +1090,13 @@ export struct 学习页 {
 
   /** 根据翻面时的拼写快照生成比对结果；字段读取失败时仍显示答案。 */
   private async 构建拼写答案HTML(answerHtml: string): Promise<string> {
-    if (this.当前卡片 === null) {
-      return 剥除拼写标记(answerHtml);
-    }
-    const noteId: number = this.当前卡片.noteId;
-    const fieldName: string = this.拼写字段名;
-    const cloze: boolean = this.拼写填空;
-    const ordinal: number = this.拼写卡片序号;
-    const input: string = this.已输入答案;
-    const combining: boolean = this.拼写组合;
-    try {
-      const note = await this.笔记服务实例.获取笔记(noteId);
-      const notetype = await this.笔记类型服务实例.获取笔记类型(note.notetypeId);
-      const fieldIdx = notetype.fieldNames.indexOf(fieldName);
-      const fieldValue = fieldIdx >= 0 && fieldIdx < note.fields.length ? note.fields[fieldIdx] : '';
-      // Cloze 卡：从字段值中提取当前 cardOrd 的预期答案；无匹配则降级为剥除标记。
-      let expected: string;
-      if (cloze) {
-        expected = 提取拼写填空内容(fieldValue, ordinal + 1);
-        if (expected === '') {
-          return 剥除拼写标记(answerHtml);
-        }
-      } else {
-        expected = fieldValue;
-      }
-      const resultHtml = 比对答案(expected, input, combining);
-      // 注入比对结果；若 answerHtml 不含 [[type:...]] 占位符（标记仅在 questionNodes），
-      // 在末尾追加 <hr> + 比对结果，与 Anki 桌面端行为一致。
-      const injected = 注入拼写结果(answerHtml, resultHtml);
-      if (injected === answerHtml) {
-        return `${answerHtml}<hr><code id=typeans>${resultHtml}</code>`;
-      }
-      return injected;
-    } catch (error) {
-      return 剥除拼写标记(answerHtml);
-    }
+    return renderStudyAnswer(answerHtml, this.当前卡片 === null ? null : {
+      noteId: this.当前卡片.noteId, fieldName: this.拼写字段名, cloze: this.拼写填空,
+      ordinal: this.拼写卡片序号, input: this.已输入答案, combining: this.拼写组合
+    }, {
+      note: (id: number): Promise<EditableNote> => this.笔记服务实例.获取笔记(id),
+      notetype: (id: number): Promise<StudyAnswerNotetype> => this.笔记类型服务实例.获取笔记类型(id)
+    });
   }
 
   // ========================================================
@@ -1288,85 +1251,23 @@ export struct 学习页 {
   // 无（触发其他块副作用）
   // ========================================================
   private 处理按键(event: KeyEvent): boolean {
-    if (this.noteEditorVisible || this.noteEditorBusy) {
-      this.Ctrl按下 = false;
-      return false;
+    const result = resolveStudyKey(studyKeyName(event.keyCode), event.type === KeyType.Down,
+      this.Ctrl按下, this.阶段, this.noteEditorVisible || this.noteEditorBusy, this.studyGuideVisible);
+    this.Ctrl按下 = result.control;
+    switch (result.command) {
+      case 'undo': this.撤销上次(); break;
+      case 'back': this.返回(); break;
+      case 'delete': this.请求删除当前卡(); break;
+      case 'bury': this.埋藏或暂停当前卡(BURY_SUSPEND_MODE_BURY_USER); break;
+      case 'suspend': this.埋藏或暂停当前卡(BURY_SUSPEND_MODE_SUSPEND); break;
+      case 'replay': this.playStudyAudio(true, true); break;
+      case 'flip': this.显示答案(); break;
+      case 'again': this.评分(RATING_AGAIN); break;
+      case 'hard': this.评分(RATING_HARD); break;
+      case 'good': this.评分(RATING_GOOD); break;
+      case 'easy': this.评分(RATING_EASY); break;
     }
-    if (this.studyGuideVisible) { return false; }
-    // KeyType.Up：仅更新 Ctrl 松开状态，不执行业务
-    if (event.type !== KeyType.Down) {
-      if (event.keyCode === KeyCode.KEYCODE_CTRL_LEFT || event.keyCode === KeyCode.KEYCODE_CTRL_RIGHT) {
-        this.Ctrl按下 = false;
-      }
-      return false;
-    }
-    // Ctrl 按下：更新状态并消费，避免系统处理
-    if (event.keyCode === KeyCode.KEYCODE_CTRL_LEFT || event.keyCode === KeyCode.KEYCODE_CTRL_RIGHT) {
-      this.Ctrl按下 = true;
-      return true;
-    }
-    // Ctrl+Z 撤销（任意阶段都生效，与 Anki 桌面端一致）
-    if (this.Ctrl按下 && event.keyCode === KeyCode.KEYCODE_Z) {
-      this.撤销上次();
-      return true;
-    }
-    // Esc 返回（任意阶段都生效）
-    if (event.keyCode === KeyCode.KEYCODE_ESCAPE) {
-      this.返回();
-      return true;
-    }
-    // 仅 question/answer 阶段处理以下键
-    if (this.阶段 !== 'question' && this.阶段 !== 'answer') {
-      return false;
-    }
-    // Delete 删除当前卡（弹确认框，与按钮点击同流程）
-    if (event.keyCode === KeyCode.KEYCODE_FORWARD_DEL) {
-      this.请求删除当前卡();
-      return true;
-    }
-    // `*` 或 `B` 埋藏当前卡（B 为字母替代键，更易按；两者并存以兼容 Anki 桌面端键位）
-    if (event.keyCode === KeyCode.KEYCODE_STAR || event.keyCode === KeyCode.KEYCODE_B) {
-      this.埋藏或暂停当前卡(BURY_SUSPEND_MODE_BURY_USER);
-      return true;
-    }
-    // `@` 或 `S` 暂停当前卡（S 为字母替代键）
-    if (event.keyCode === KeyCode.KEYCODE_AT || event.keyCode === KeyCode.KEYCODE_S) {
-      this.埋藏或暂停当前卡(BURY_SUSPEND_MODE_SUSPEND);
-      return true;
-    }
-    // `R` 重放音频（question/answer 阶段均生效，与 Anki 桌面端一致；无音频时 重播 静默无副作用）
-    if (event.keyCode === KeyCode.KEYCODE_R) {
-      this.playStudyAudio(true, true);
-      return true;
-    }
-    // question 阶段：Space/Enter 显示答案
-    if (this.阶段 === 'question') {
-      if (event.keyCode === KeyCode.KEYCODE_SPACE || event.keyCode === KeyCode.KEYCODE_ENTER) {
-        this.显示答案();
-        return true;
-      }
-      return false;
-    }
-    // answer 阶段：1/2/3/4 评分；Space/Enter = Good（与 Anki 桌面端一致）
-    if (event.keyCode === KeyCode.KEYCODE_1) {
-      this.评分(RATING_AGAIN);
-      return true;
-    }
-    if (event.keyCode === KeyCode.KEYCODE_2) {
-      this.评分(RATING_HARD);
-      return true;
-    }
-    if (event.keyCode === KeyCode.KEYCODE_3
-      || event.keyCode === KeyCode.KEYCODE_SPACE
-      || event.keyCode === KeyCode.KEYCODE_ENTER) {
-      this.评分(RATING_GOOD);
-      return true;
-    }
-    if (event.keyCode === KeyCode.KEYCODE_4) {
-      this.评分(RATING_EASY);
-      return true;
-    }
-    return false;
+    return result.command !== 'none';
   }
 
   @Builder

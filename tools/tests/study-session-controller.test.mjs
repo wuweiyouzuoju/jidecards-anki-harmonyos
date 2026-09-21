@@ -1,5 +1,5 @@
-import { StudyOptions } from '../../entry/src/main/ets/model/StudyTiming.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { StudyOptions } from '../../entry/src/main/ets/model/StudyTiming.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { StudySessionController } from '../../entry/src/main/ets/model/StudySessionController.ts';
@@ -150,7 +150,7 @@ test('completion metadata in flight continues to block automatic sync after the 
   backend.congrats = () => gate.promise;
   const read = session.congrats(); await turn(); session.dispose();
   assert.equal(scheduler.canSync(), false);
-  gate.resolve({}); await read;
+  gate.resolve({}); await assert.rejects(read, /disposed/);
   assert.equal(scheduler.canSync(), true);
 });
 
@@ -170,3 +170,46 @@ test('scheduler preserves pending requests across subscribers and multiple overl
   scheduler.consume();
   assert.equal(scheduler.hasPending(), false);
 });
+
+for (const phase of ['canUndo', 'queuedCards', 'renderCard', 'studyOptions', 'describeStates']) {
+  test(`disposal during ${phase} stops the read even when caller still reports current`, async () => {
+    const { session, backend, scheduler } = harness();
+    const original = backend[phase], gate = deferred();
+    backend[phase] = async (...args) => { await gate.promise; return original(...args); };
+    const result = session.loadNext(1, () => true);
+    await turn(); session.dispose(); gate.resolve();
+    assert.equal(await result, null);
+    assert.equal(scheduler.canSync(), true);
+  });
+}
+
+test('completion read disposed while waiting never starts backend work', async () => {
+  const { session, backend, activity } = harness();
+  activity.reserveCollection(); let reads = 0;
+  backend.congrats = async () => { reads++; return {}; };
+  const result = session.congrats(); session.dispose(); activity.cancelReservation();
+  await assert.rejects(result, /disposed/); assert.equal(reads, 0);
+});
+
+test('accepted edits snapshot note identity, fields and tags before waiting for collection', async () => {
+  const { session, backend, activity, scheduler } = harness();
+  activity.reserveCollection(); let saved;
+  backend.updateNote = async note => { saved = note; };
+  const note = { id: 9, guid: 'g', notetypeId: 2, usn: 3, mtimeSecs: 4 };
+  const fields = ['accepted'], tags = ['original'];
+  const result = session.saveNote(note, fields, tags);
+  note.id = 100; fields[0] = 'late'; tags.push('late'); session.dispose();
+  assert.equal(scheduler.canSync(), false); activity.cancelReservation(); await result;
+  assert.deepEqual(saved, { id: 9, guid: 'g', notetypeId: 2, usn: 3, mtimeSecs: 4, fields: ['accepted'], tags: ['original'] });
+  assert.equal(scheduler.canSync(), true); assert.equal(scheduler.hasPending(), true);
+});
+
+for (const [method, args] of [['buryCard', [9, 2]], ['removeCard', [9]], ['unburyDeck', [10]]]) {
+  test(`${method} retains the write lease after disposal and notifies only success`, async () => {
+    const { session, backend, scheduler } = harness(), gate = deferred(); let captured;
+    backend[method] = async (...values) => { captured = values; await gate.promise; };
+    const result = session[method](...args); await turn(); session.dispose();
+    assert.equal(scheduler.canSync(), false); assert.deepEqual(captured, args);
+    gate.resolve(); await result; assert.equal(scheduler.hasPending(), true); assert.equal(scheduler.canSync(), true);
+  });
+}

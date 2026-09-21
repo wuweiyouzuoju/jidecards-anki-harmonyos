@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import type { 牌组背景动作, 牌组定制结果 } from '../model/DeckCustomization';
 import { DialogHeader } from './common/DialogHeader';
 // ========================================================
 // @块ID UI-DECK-CUSTOMIZE-001
@@ -48,15 +49,7 @@ import { 从图库选取图片 } from '../utils/文件导入助手';
 import { 颜色键 } from '../model/颜色主题';
 import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时长';
 
-/** 面板提交时携带的背景图动作。 */
-export type 牌组背景动作 = 'keep' | 'remove' | 'replace';
-
-/** 面板 onSave 上抛的结果：新名 + 背景图动作 + 裁剪后的 PixelMap（仅 replace 时有效）。 */
-export interface 牌组定制结果 {
-  新名: string;
-  背景动作: 牌组背景动作;
-  背景像素图: PixelMap | null;
-}
+export type { 牌组背景动作, 牌组定制结果 } from '../model/DeckCustomization';
 
 @Component
 export struct 牌组定制面板 {

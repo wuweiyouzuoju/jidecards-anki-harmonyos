@@ -111,11 +111,13 @@ impl RawBackend for CancellableBackend {
 
     fn run_method_raw(&mut self, _: u32, _: u32, _: &[u8]) -> Result<Vec<u8>, BackendFailure> {
         self.started.send(()).unwrap();
-        Ok(if self.cancelled.recv_timeout(Duration::from_secs(2)).is_ok() {
-            b"cancelled".to_vec()
-        } else {
-            b"timed out".to_vec()
-        })
+        Ok(
+            if self.cancelled.recv_timeout(Duration::from_secs(2)).is_ok() {
+                b"cancelled".to_vec()
+            } else {
+                b"timed out".to_vec()
+            },
+        )
     }
 }
 
@@ -125,7 +127,9 @@ fn sync_abort_bypasses_running_call_without_releasing_its_backend() {
     let (started_tx, started_rx) = std::sync::mpsc::channel();
     let (cancel_tx, cancel_rx) = std::sync::mpsc::channel();
     let handle = registry.insert(CancellableBackend {
-        started: started_tx, cancel: cancel_tx, cancelled: cancel_rx,
+        started: started_tx,
+        cancel: cancel_tx,
+        cancelled: cancel_rx,
     });
     let worker_registry = Arc::clone(&registry);
     let worker = thread::spawn(move || worker_registry.call(handle, 1, 3, &[]));
@@ -133,5 +137,8 @@ fn sync_abort_bypasses_running_call_without_releasing_its_backend() {
     registry.call(handle, 1, 7, &[]).unwrap();
     assert_eq!(worker.join().unwrap().unwrap(), b"cancelled");
     assert!(registry.close(handle));
-    assert_eq!(registry.call(handle, 1, 7, &[]), Err(BackendFailure::HandleNotFound));
+    assert_eq!(
+        registry.call(handle, 1, 7, &[]),
+        Err(BackendFailure::HandleNotFound)
+    );
 }

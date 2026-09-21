@@ -201,7 +201,7 @@ await this.调度器服务实例.提交评分({
 
 ## 四、卡片不是纯文本：渲染、媒体、TTS 与输入答案
 
-Anki 卡片本质上是模板、字段、CSS、媒体和若干特殊标记的组合。jidecards 让 Anki Core 先渲染出 question / answer 节点流和模板 CSS，再由 `学习卡片HTML构建器.ets` 组装成完整 HTML，最后交给 HarmonyOS Web 组件显示。
+Anki 卡片本质上是模板、字段、CSS、媒体和若干特殊标记的组合。jidecards 让 Anki Core 先渲染出 question / answer 节点流和模板 CSS，再由 `学习卡片HTML构建器.ts` 组装成完整 HTML，最后交给 HarmonyOS Web 组件显示。
 
 本地媒体没有开放 `file://`。构建器把相对资源改写到一个不存在于公网的锚点：
 

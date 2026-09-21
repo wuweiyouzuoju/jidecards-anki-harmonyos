@@ -1,4 +1,5 @@
 // SPDX-License-Identifier-Identifier: AGPL-3.0-or-later
+import type { BrowserDisplayRow as 浏览行数据 } from '../../model/BrowserSearchSession';
 
 // ========================================================
 // @块ID UI-BROWSER-TABLE-001
@@ -39,12 +40,7 @@ import { BrowserRowColor } from '../../proto/messages/SearchMessages';
 import type { BrowserCell } from '../../proto/messages/SearchMessages';
 
 /** 单行展示数据：卡片/笔记 ID + 后端返回的单元格 + 行颜色提示（标志/挂起等） */
-export interface 浏览行数据 {
-  id: number;
-  cells: BrowserCell[];
-  color: BrowserRowColor;
-  hasSuspendedCards: boolean;
-}
+export type { BrowserDisplayRow as 浏览行数据 } from '../../model/BrowserSearchSession';
 
 @Component
 export struct 卡片表格 {

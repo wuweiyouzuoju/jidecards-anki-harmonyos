@@ -1,3 +1,5 @@
+import { resolveStudyKey } from '../../entry/src/main/ets/model/StudyInputPolicy.ts';
+import { loadNoteEditor } from '../../entry/src/main/ets/model/NoteEditorLoader.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -22,7 +24,7 @@ function storeHarness() {
   };
   const source = read('entry/src/main/ets/utils/StudyGuideStore.ets')
     .replace(/^import .*;\r?\n/gm, '').replace(/^export /gm, '');
-  const context = vm.createContext({
+  const context = vm.createContext({ resolveStudyKey, loadNoteEditor, studyKeyName: key => String(key), KeyType: { Down: 0 },
     AppStorage: { get: () => ({}) },
     preferences: { getPreferencesSync: () => store }
   });
@@ -34,7 +36,7 @@ function pageHarness(completed = false) {
   let now = 1000;
   const dialogs = [];
   let saves = 0;
-  const context = vm.createContext({
+  const context = vm.createContext({ resolveStudyKey, loadNoteEditor, studyKeyName: key => String(key), KeyType: { Down: 0 },
     Date: { now: () => now }, $r: key => key,
     DialogAlignment: { Center: 0 },
     hilog: { warn: () => {} },

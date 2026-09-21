@@ -85,7 +85,7 @@ test('press and disclosure feedback use the shared fast rhythm', () => {
 });
 
 test('ArkWeb disclosure timing matches native disclosure timing', () => {
-  const html = read('entry/src/main/ets/model/学习卡片HTML构建器.ets');
+  const html = read('entry/src/main/ets/model/学习卡片HTML构建器.ts');
   assert.match(html, /transition: transform 150ms ease-out/);
   assert.doesNotMatch(html, /transition: max-height/);
   assert.match(html, /\.anki-collapsible\.expanded \{ max-height: none; \}/);

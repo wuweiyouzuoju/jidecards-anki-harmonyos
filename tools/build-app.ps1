@@ -9,6 +9,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $Workspace = Split-Path -Parent $PSScriptRoot
+& node (Join-Path $PSScriptRoot 'check-signing.mjs')
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $DevEcoRoot = if ($env:DEVECO_HOME) { $env:DEVECO_HOME } else { 'C:\Program Files\Huawei\DevEco Studio' }
 $env:DEVECO_SDK_HOME = Join-Path $DevEcoRoot 'sdk'
 $env:JAVA_HOME = Join-Path $DevEcoRoot 'jbr'
@@ -30,6 +32,19 @@ $Hvigor = Join-Path $DevEcoRoot 'tools\hvigor\bin\hvigorw.bat'
 & $Ohpm install --all
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-& $Hvigor --mode module -p product=default -p module=entry@default `
-    -p buildMode=$BuildMode assembleHap --no-daemon
-exit $LASTEXITCODE
+# Windows PowerShell 5 wraps redirected native stderr in error records.
+# Hvigor warnings must not abort this pipeline; inspect its exit code instead.
+try {
+    $ErrorActionPreference = 'Continue'
+    & $Hvigor --mode module -p product=default -p module=entry@default `
+        -p buildMode=$BuildMode assembleHap --no-daemon 2>&1 | Tee-Object -Variable BuildOutput
+    $HvigorExitCode = $LASTEXITCODE
+} finally {
+    $ErrorActionPreference = 'Stop'
+}
+if ($HvigorExitCode -ne 0) { exit $HvigorExitCode }
+$SignedHap = Join-Path $Workspace 'entry\build\default\outputs\default\entry-default-signed.hap'
+if (($BuildOutput -match 'No signingConfig found') -or -not (Test-Path -LiteralPath $SignedHap -PathType Leaf)) {
+    throw 'Signed HAP was not produced. Check the local signing configuration and Hvigor hook.'
+}
+exit 0

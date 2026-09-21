@@ -135,7 +135,7 @@ AI 页面
 
 | 命令 | 用途 |
 | --- | --- |
-| `npm run doctor` | Node、Git、DevEco/SDK、Java、Rust/Cargo、Clang、CMake、Ninja 与 Hvigor 诊断；当前不检查 `protoc`、`cargo-zigbuild`、`zig`、Anki checkout 或签名材料 |
+| `npm run doctor` | Node、Git、DevEco/SDK、Java、Rust/Cargo、Clang、CMake、Ninja 与 Hvigor 诊断；同时检查 protoc、Anki checkout、rustfmt/clippy；使用 bundled GNU 模式时检查 Zig 依赖。签名与链接器可用性以实际构建为准 |
 | `npm test` | protobuf、服务、页面壳、i18n、同步、云端功能和 Agent 契约测试 |
 | `tools\build-native.ps1 -Target host-test` | Rust FFI 与真实 Anki Core 主机测试 |
 | `npm run build:app` | Rust 双架构、ArkTS 与签名 HAP 完整构建 |

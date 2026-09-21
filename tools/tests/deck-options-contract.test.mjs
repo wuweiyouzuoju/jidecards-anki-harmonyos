@@ -82,10 +82,11 @@ test('home page converts through 牌组配置表单 before submitting preserved 
   assert.match(pane, /options\.校验\(\)/);
   assert.match(pane, /form\.应用到配置\(config\.config\)/);
   assert.match(pane, /options\.应用\(\)/);
-  assert.match(pane, /configs: \[prepareDeckConfigForSave\(view, original, config, options\.applyToSharedDecks\)\]/);
+  assert.match(pane, /buildDeckConfigRequest\(this\.牌组选项牌组ID/);
+  assert.match(read('entry/src/main/ets/model/DeckConfigSave.ts'), /configs: \[prepareDeckConfigForSave\(view, original, copyDeckConfig\(draft\), applyToSharedDecks\)\]/);
   assert.match(pane, /options\.转换为请求字段\(\)/);
-  assert.match(pane, /limits: edited\.limits/);
-  assert.match(pane, /newCardsIgnoreReviewLimit: edited\.newCardsIgnoreReviewLimit/);
-  assert.match(pane, /fsrsHealthCheck: edited\.fsrsHealthCheck/);
+  assert.match(read('entry/src/main/ets/model/DeckConfigSave.ts'), /limits: edited\.limits/);
+  assert.match(read('entry/src/main/ets/model/DeckConfigSave.ts'), /newCardsIgnoreReviewLimit: edited\.newCardsIgnoreReviewLimit/);
+  assert.match(read('entry/src/main/ets/model/DeckConfigSave.ts'), /fsrsHealthCheck: edited\.fsrsHealthCheck/);
   assert.match(pane, /this\.牌组配置服务实例\.更新牌组配置\(request\)/);
 });

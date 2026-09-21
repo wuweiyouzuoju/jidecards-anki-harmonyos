@@ -2,6 +2,9 @@
 
 ## 当前文档
 
+- [Agent 任务入口](../PROJECT_CONTEXT.md)：按任务读取模块约束与验证入口。
+- [本地验证与源码导出](development/verification.md)：领域测试、完整构建和设备验收。
+
 - [项目 README](../README.md)：产品、当前源码版本、构建入口。
 - [2.7.9 更新说明](releases/2.7.9.md)：相对 2.7.0 的功能、修复和验证边界。
 - [开发状态与后续工作](DEVELOPMENT_PLAN.md)：SDK/上游基线、发布限制、验证门和真实后续项。
