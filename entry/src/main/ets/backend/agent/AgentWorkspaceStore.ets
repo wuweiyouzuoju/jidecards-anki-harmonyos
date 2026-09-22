@@ -11,6 +11,7 @@ export class AgentWorkspaceStore {
   private queue: Promise<void> = Promise.resolve();
   constructor(context: common.UIAbilityContext) { this.context = context; }
 
+  /** @throws {Error} 工作区读取或提交失败，禁止以空工作区覆盖已有偏好和记忆。 */
   async load(): Promise<AgentWorkspaceState> {
     const store: preferences.Preferences = await preferences.getPreferences(this.context, 'jidecards_agent_workspace');
     const raw: preferences.ValueType = await store.get('workspace_v1', '');
@@ -22,12 +23,14 @@ export class AgentWorkspaceStore {
     return value;
   }
 
+  /** @throws {Error} 工作区读取或提交失败，禁止以空工作区覆盖已有偏好和记忆。 */
   private async save(state: AgentWorkspaceState): Promise<void> {
     const store: preferences.Preferences = await preferences.getPreferences(this.context, 'jidecards_agent_workspace');
     await store.put('workspace_v1', JSON.stringify(state));
     await store.flush();
   }
 
+  /** @throws {Error} 工作区读取或提交失败，禁止以空工作区覆盖已有偏好和记忆。 */
   saveSelection(deckId: number, notetypeId: number): Promise<void> {
     const task: Promise<void> = this.queue.catch((): void => {}).then(async (): Promise<void> => {
       if (deckId <= 0 || notetypeId <= 0) { return; }
@@ -41,6 +44,7 @@ export class AgentWorkspaceStore {
     return task;
   }
 
+  /** @throws {Error} 工作区读取或提交失败，禁止以空工作区覆盖已有偏好和记忆。 */
   changeMemory(change: AgentMemoryChange, actionId: string): Promise<void> {
     const task: Promise<void> = this.queue.catch((): void => {}).then(async (): Promise<void> => {
       const state: AgentWorkspaceState = await this.load();

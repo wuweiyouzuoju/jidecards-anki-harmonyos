@@ -2,8 +2,9 @@
 
 [返回任务索引](../../PROJECT_CONTEXT.md)
 
+- 本页只描述产品运行时的应用内 Agent，不描述负责修改仓库的编程 Agent；编程 Agent 规则见 [编程 Agent](coding-agent.md) 和根 [AGENTS.md](../../AGENTS.md)。
 - 代码路径以下均相对 `entry/src/main/ets/`。
-- 责任链：UI → 编排 → 工具/策略 → Service/DraftExecutor；AI 编程 Agent 的工作入口另见根 AGENTS.md。
+- 责任链：UI → 会话/Runner → 读取与提案；用户确认 → DraftExecutor / ActionExecutor → Service 或受控存储。
 - 快速反馈：`npm test -- agent`；完整验收见 [验证说明](verification.md)。
 
 ## Agent 过程展示
@@ -14,6 +15,10 @@
 
 
 ## 页面业务边界
+
+- `AgentAuxiliaryTools.ets` 只负责读取、校验目标和生成辅助提案；不持有确认账本或执行提案写入。`AgentSessionController.ets` 拥有 `AgentActionExecutor.ets`，登记和恢复 pending 动作；页面确认入口才调用 `executeConfirmed`。
+- `AgentActionExecutor.ets` 消费绑定 ID/种类/载荷的一次性确认，提交前重查牌组/笔记类型重名；记忆变更复用存储基线检查，分析授权只接受已冻结的 ID。`AgentDraftExecutor.ets` 仍负责 ChangeDraft 写入和高风险双确认，两者不是同一个确认协议。
+- `ai-agent-v2-runtime.test.mjs` 执行真实会话、工具和辅助执行器，覆盖未确认无写入、重复/取消/篡改确认、名称冲突及崩溃恢复。`architecture-boundaries.test.mjs` 防止 Runner/Registry/工具经字面量模块依赖取得执行器；它不替代运行时权限测试。
 
 - `AgentProviderContext.ts` 负责草稿语义上下文与 Provider 历史预算（最多80项、240000正文字符）；`truncateProviderText` 必须包括截断标记在内遵守额度，字段/操作丢失须标记 truncated。
 - `AgentCardBatch.ts` 在第一处等待前复制整批选中字段和目标；每张卡仍经页面适配器调用 `AgentDraftExecutor.prepare/executeOrdinary`。单卡失败不中断整批，已保存卡不再创建；操作占用直到整批完成，成功才通知同步。

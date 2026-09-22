@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { resourceText } from '../utils/UiFeedback';
 import { ThemeTextSpans } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
@@ -250,9 +251,13 @@ export struct 同步面板 {
   private requestBackgroundTime(): void {
     if (this.disposed || this.当前阶段 !== 'syncing' || !this.ownsSync || this.suspendDelayId >= 0) return;
     try {
-      const delay: backgroundTaskManager.DelaySuspendInfo = backgroundTaskManager.requestSuspendDelay(
-        this.取本地化文案($r('app.string.settings_sync_group')), (): void => { this.releaseSuspendDelay(); });
-      this.suspendDelayId = delay.requestId;
+      if (canIUse('SystemCapability.ResourceSchedule.BackgroundTaskManager.Core')) {
+        if (canIUse('SystemCapability.ResourceSchedule.BackgroundTaskManager.TransientTask')) {
+          const delay: backgroundTaskManager.DelaySuspendInfo = backgroundTaskManager.requestSuspendDelay(
+            this.取本地化文案($r('app.string.settings_sync_group')), (): void => { this.releaseSuspendDelay(); });
+          this.suspendDelayId = delay.requestId;
+        }
+      }
     } catch (error) {
       hilog.warn(同步日志域, 同步日志标签, 'sync: background extension unavailable');
     }
@@ -264,7 +269,11 @@ export struct 同步面板 {
     const requestId: number = this.suspendDelayId;
     this.suspendDelayId = -1;
     try {
-      backgroundTaskManager.cancelSuspendDelay(requestId);
+      if (canIUse('SystemCapability.ResourceSchedule.BackgroundTaskManager.Core')) {
+        if (canIUse('SystemCapability.ResourceSchedule.BackgroundTaskManager.TransientTask')) {
+          backgroundTaskManager.cancelSuspendDelay(requestId);
+        }
+      }
     } catch (error) {
       hilog.warn(同步日志域, 同步日志标签, 'sync: background extension already released');
     }
@@ -318,7 +327,7 @@ export struct 同步面板 {
   // ========================================================
 
   private 取本地化文案(资源: Resource): string {
-    return this.getUIContext().getHostContext()!.resourceManager.getStringSync(资源.id);
+    return resourceText(this.getUIContext(), 资源);
   }
 
   private 取色板(): 设置面板色板 {

@@ -3,8 +3,6 @@
 > 归档状态：这是一次性历史设计/执行记录，不是当前路线图、待办列表或操作手册。未勾选项不表示仍未实现；当前事实请查阅 [文档导航](../../README.md)、[开发状态](../../DEVELOPMENT_PLAN.md)、[当前架构](../../architecture.md) 和实际源码/测试。
 
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** Ship the 2.3.3 first-run cloud deck picker with a shorter modal, clickable QQ-group copy action, and the exact six-deck order and counts requested by the user.
 
 **Architecture:** Keep `云端牌组弹窗` presentation-only by exposing an `onCopyQQGroup` callback. `首页` owns the HarmonyOS pasteboard side effect and toast, while `hosting/cloud-decks.json` remains the single source of deck ordering and hosted metadata.

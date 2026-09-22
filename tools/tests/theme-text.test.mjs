@@ -1,3 +1,4 @@
+import { compileWithUiFeedback } from './ui-feedback-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -10,7 +11,7 @@ const read = path => readFileSync(new URL('../../entry/src/main/ets/' + path, im
 const source = read('components/common/ThemeText.ets');
 const js = stripTypeScriptTypes(source.replace(/^import .*$/gm, '').replace(/^@Builder$/gm, '').replace(/^export /gm, ''), { mode: 'transform' });
 const spans = [];
-const api = new Function('Span', 'ForEach', js + '\nreturn { themeLabelCharacters, themeAccentRampColor, themeLabelGlyphs, ThemeTextSpans };')(
+const api = compileWithUiFeedback('Span', 'ForEach', js + '\nreturn { themeLabelCharacters, themeAccentRampColor, themeLabelGlyphs, ThemeTextSpans };')(
   text => { const item = { text }; spans.push(item); return { fontColor: color => { item.color = color; } }; },
   (items, build) => items.forEach(build)
 );
@@ -90,7 +91,7 @@ test('glass deck selection exposes the existing background without opacity on it
 
 test('glass press surfaces share the deck material without a live backdrop filter', () => {
   const glassJs = stripTypeScriptTypes(read('utils/GlassSurface.ets').replace(/^import .*$/gm, '').replace(/^export /gm, ''), { mode: 'transform' });
-  const GlassSurface = new Function('themeGradient', '应用尺寸', 'Color', '$r', glassJs + '\nreturn GlassSurface;')(
+  const GlassSurface = compileWithUiFeedback('themeGradient', '应用尺寸', 'Color', '$r', glassJs + '\nreturn GlassSurface;')(
     colors => colors.map((color, index) => [color, index / Math.max(1, colors.length - 1)]),
     { 卡片边框: 1 }, { Transparent: 'transparent' }, name => name
   );

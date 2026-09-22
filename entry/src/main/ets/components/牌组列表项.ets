@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { resourceText } from '../utils/UiFeedback';
 import { SelectStyle } from '../utils/SelectStyle';
 import { ThemeDefinition, themeDefinition, THEME_VISUALS_KEY } from '../model/ThemeCatalog';
 import { themeGradient } from '../utils/ThemeVisuals';
@@ -217,7 +218,7 @@ export struct 牌组列表项 {
   /** 原生选择框使用本地化名称，不修改持久化色调值。 */
   private toneOptions(): SelectOption[] {
     return this.色条选项列表.map((option: 色条选项): SelectOption => ({
-      value: this.getUIContext().getHostContext()!.resourceManager.getStringSync(option.labelResource.id)
+      value: resourceText(this.getUIContext(), option.labelResource)
     }));
   }
 
@@ -230,7 +231,7 @@ export struct 牌组列表项 {
   private toneLabel(): string {
     const index: number = this.toneIndex();
     const label: Resource = index >= 0 ? this.色条选项列表[index].labelResource : $r('app.string.deck_tone_black');
-    return this.getUIContext().getHostContext()!.resourceManager.getStringSync(label.id);
+    return resourceText(this.getUIContext(), label);
   }
 
   /** 选择后关闭菜单，由首页保存并刷新当前牌组。 */

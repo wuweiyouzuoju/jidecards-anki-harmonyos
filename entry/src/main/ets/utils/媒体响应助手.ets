@@ -208,6 +208,8 @@ async function prepareMediaResponse(response: WebResourceResponse, request: WebR
   } finally {
     try {
       if (file !== null && !transferred) { await fs.close(file); }
+    } catch (error) {
+      console.warn('Media response file cleanup failed');
     } finally {
       response.setResponseIsReady(true);
     }

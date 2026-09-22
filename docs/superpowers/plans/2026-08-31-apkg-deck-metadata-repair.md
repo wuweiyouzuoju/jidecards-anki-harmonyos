@@ -3,8 +3,6 @@
 > 归档状态：这是一次性历史设计/执行记录，不是当前路线图、待办列表或操作手册。未勾选项不表示仍未实现；当前事实请查阅 [文档导航](../../README.md)、[开发状态](../../DEVELOPMENT_PLAN.md)、[当前架构](../../architecture.md) 和实际源码/测试。
 
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** Repair the malformed schema 11 deck metadata in four distributable APKG files and update the local cloud catalog to their verified sizes.
 
 **Architecture:** Keep the existing Azure TTS media and source collections. Add a focused schema validator to the packaging script, correct the generated root-deck shape, rebuild only the four affected packages, and validate each archive before changing the catalog sizes.
@@ -149,4 +147,3 @@ git diff --check
 ```
 
 Expected: Python tests pass, the JideCards test suite has zero failures, and `git diff --check` reports no errors.
-

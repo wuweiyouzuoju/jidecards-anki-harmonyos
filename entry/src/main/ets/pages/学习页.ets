@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { resourceText, showToastSafely } from '../utils/UiFeedback';
 import { ThemeTextSpans } from '../components/common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 import { PAGE_SURFACE_KEY, themeDefinition } from '../model/ThemeCatalog';
@@ -338,7 +339,7 @@ export struct 学习页 {
           closeGuide();
           completeStudyGuide().catch((error: Object): void => {
             hilog.warn(0x4342, '学习页', 'Study guide preference could not be saved');
-            this.getUIContext().getPromptAction().showToast({
+            showToastSafely(this.getUIContext(), {
               message: this.取文案($r('app.string.study_guide_save_failed'))
             });
           });
@@ -370,7 +371,7 @@ export struct 学习页 {
     const context: common.UIAbilityContext | null = this.取能力上下文();
     if (context === null) {
       this.阶段 = 'error';
-      this.错误详情 = this.getUIContext().getHostContext()!.resourceManager.getStringSync($r('app.string.ability_context_unavailable').id);
+      this.错误详情 = resourceText(this.getUIContext(), $r('app.string.ability_context_unavailable'));
       return;
     }
     this.媒体目录 = `${context.filesDir}/collection.media`;
@@ -488,6 +489,7 @@ export struct 学习页 {
   }
 
   /** 首卡可以早于 Web attach；只在可见且控制器就绪时推送当前文档。 */
+  /** @throws {Error} Web 渲染失败，由学习渲染控制器进入错误态。 */
   private applyStudyHtml(html: string): void {
     if (!this.isCurrentRequest(this.requestVersion)) { return; }
     if (!this.controllerReady) { this.pendingHtml = html; return; }
@@ -544,7 +546,7 @@ export struct 学习页 {
       if (!this.isCurrentRequest(version)) { return; }
       this.有音频 = true;
       console.info(`Study audio: ${error}`);
-      this.getUIContext().getPromptAction().showToast({
+      showToastSafely(this.getUIContext(), {
         message: this.取文案($r('app.string.browser_preview_audio_error'))
       });
     }
@@ -598,7 +600,7 @@ export struct 学习页 {
       case StudyAdvanceAction.Reminder:
         const message: string = this.取文案(this.阶段 === 'question' ?
           $r('app.string.study_question_time_elapsed') : $r('app.string.study_answer_time_elapsed'));
-        this.getUIContext().getPromptAction().showToast({ message: message });
+        showToastSafely(this.getUIContext(), { message: message });
         break;
     }
   }
@@ -671,7 +673,7 @@ export struct 学习页 {
   // 无（纯数据构建）。
   // ========================================================
   private 取文案(资源: Resource): string {
-    return this.getUIContext().getHostContext()!.resourceManager.getStringSync(资源.id);
+    return resourceText(this.getUIContext(), 资源);
   }
 
   private 更多菜单(): MenuElement[] {
@@ -741,7 +743,7 @@ export struct 学习页 {
       this.展示时刻毫秒 += Date.now() - this.editStartedAt;
       this.editingNote = null;
       this.评分中 = false;
-      this.getUIContext().getPromptAction().showToast({
+      showToastSafely(this.getUIContext(), {
         message: this.取文案($r('app.string.browser_detail_load_error'))
       });
     } finally {
@@ -1004,8 +1006,7 @@ export struct 学习页 {
       if (!this.isCurrentRequest(version)) { return; }
       this.阶段 = 'error';
       const reason: string = error instanceof Error ? error.message : `${error}`;
-      this.错误详情 = this.getUIContext().getHostContext()!.resourceManager
-        .getStringSync($r('app.string.study_delete_card_failed').id)
+      this.错误详情 = resourceText(this.getUIContext(), $r('app.string.study_delete_card_failed'))
         .replace('%s', reason);
     } finally {
       if (this.mounted) {

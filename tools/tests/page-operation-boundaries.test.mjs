@@ -1,3 +1,4 @@
+import { compileWithUiFeedback } from './ui-feedback-harness.mjs';
 import { loadBrowserRows } from '../../entry/src/main/ets/model/BrowserSearchSession.ts';
 import { loadNoteEditor } from '../../entry/src/main/ets/model/NoteEditorLoader.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -14,6 +15,8 @@ import { BrowserOperationController } from '../../entry/src/main/ets/model/Brows
 import { AutoSyncScheduler } from '../../entry/src/main/ets/model/AutoSyncScheduler.ts';
 import { CloudDeckImportController } from '../../entry/src/main/ets/model/CloudDeckImportController.ts';
 import { ExternalDeckOpenQueue } from '../../entry/src/main/ets/model/ExternalDeckOpen.ts';
+import { HomeSyncController } from '../../entry/src/main/ets/model/HomeSyncController.ts';
+import { SyncActivity } from '../../entry/src/main/ets/model/SyncSettings.ts';
 
 const deferred = () => { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; }); return { promise, resolve, reject }; };
 const settle = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
@@ -25,7 +28,7 @@ function pageMethods(file, names, dependencies = {}) {
     return source.slice(start, source.indexOf('\n  }', start) + 4);
   });
   Object.assign(dependencies, { loadNoteEditor, loadBrowserRows, resolveBrowserCardIds, resolveBrowserNoteIds, snapshotNotetypeChange });
-  return new Function(...Object.keys(dependencies), stripTypeScriptTypes(`class Page { ${methods.join('\n')} }`,
+  return compileWithUiFeedback(...Object.keys(dependencies), stripTypeScriptTypes(`class Page { ${methods.join('\n')} }`,
     { mode: 'transform' }) + '; return Page;')(...Object.values(dependencies));
 }
 
@@ -47,7 +50,6 @@ function homeHarness() {
   const page = new Page();
   Object.assign(page, { announcementController: new HomeAnnouncementController(), homeDisposed: false,
     syncScheduler: new AutoSyncScheduler(),
-    pendingSyncAction: null, pendingSyncFsrsWarning: false,
     syncForeground: true, 页面栈: { size: () => 0 }, 主页允许公告检查: true, 加载状态: 'ready',
     startupSequence: new HomeStartupSequence(), homeWork: new HomeWorkCoordinator(new ExternalDeckOpenQueue(), { schedule: fn => { const id = ++next; timers.set(id, { fn, delay: 0 }); return id; }, cancel: id => timers.delete(id) }), 官方公告延迟检查任务: -1, 官方公告检查中: false, 主页公告检查已激活: true,
     官方公告服务实例: { 加载公告: () => response.promise }, 显示官方公告: false,
@@ -55,6 +57,18 @@ function homeHarness() {
     加载主页数据: async () => {}, 同步后检查FSRS: async () => {},
     打开云端牌组弹窗() { page.显示云端牌组弹窗 = true; events.push('cloud'); }
   });
+  const syncActivity = new SyncActivity();
+  page.syncController = new HomeSyncController(page.syncScheduler, syncActivity, () => ({
+    activity: () => page.homeActivity(), syncCollectionBusy: () => page.autoSyncCollectionBusy === true,
+    isDisposed: () => page.homeDisposed, isForeground: () => page.syncForeground && !page.homeDisposed,
+    isPanelOpen: () => false, pageDepth: () => page.页面栈.size(), pathNames: () => [],
+    loadState: () => page.加载状态, startupReady: () => true, externalImportPending: () => false,
+    autoSyncEnabled: () => true, auth: () => null, username: () => '', setStatus: () => {}, notifyWait: () => {},
+    popPage: () => {}, requestPanelDetails: () => {}, openPanel: () => {}, closePanel: () => {},
+    setCollectionBusy: busy => { page.autoSyncCollectionBusy = busy; }, setPanelModal: modal => { page.autoSyncModal = modal; },
+    refreshAfterCollection: async () => { await page.加载主页数据(); },
+    presentFsrsWarning: async () => { await page.同步后检查FSRS(true); }, activityChanged: () => page.homeActivityChanged()
+  }), { now: () => Date.now(), setTimeout: (fn, delay) => { const id = ++next; timers.set(id, { fn, delay }); return id; }, clearTimeout: id => timers.delete(id) });
   return { page, response, timers, events, tick: () => { for (const [id, timer] of [...timers]) if (timer.delay === 0) { timers.delete(id); timer.fn(); } } };
 }
 

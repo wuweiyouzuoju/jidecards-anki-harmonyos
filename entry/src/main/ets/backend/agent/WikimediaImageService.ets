@@ -95,6 +95,7 @@ function safePartName(draftId: string, index: number): string {
   return `ai-agent-${safeId}-${index}`;
 }
 
+/** @throws {Error} 图片暂存或读取失败，调用方不得返回成功媒体结果。 */
 function ensureDirectory(path: string): void {
   if (!fs.accessSync(path)) {
     fs.mkdirSync(path);
@@ -109,6 +110,7 @@ function silentlyDelete(path: string): void {
   }
 }
 
+/** @throws {Error} 图片暂存或读取失败，调用方不得返回成功媒体结果。 */
 function readImageFile(path: string): Uint8Array {
   if (!fs.accessSync(path)) {
     throw new WikimediaImageServiceError('download', '图片下载文件不存在');
@@ -206,6 +208,7 @@ export class WikimediaImageService {
     }
   }
 
+  /** @throws {Error} 下载目录或下载任务失败，调用方不得提交图片。 */
   async download(context: common.UIAbilityContext, candidate: AgentImageCandidate,
     draftId: string, index: number): Promise<Uint8Array> {
     if (!allowedDownloadUrl(candidate.downloadUrl) || extensionForMime(candidate.mime).length === 0) {

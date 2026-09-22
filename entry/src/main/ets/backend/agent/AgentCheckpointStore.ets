@@ -15,6 +15,7 @@ export class AgentCheckpointStore {
     return `${this.directory}/${id}.json`;
   }
 
+  /** @throws {Error} 检查点 IO 或解析失败，由会话入口记录并禁止盲目恢复。 */
   save(id: string, state: AgentSessionState): void {
     const target: string = this.path(id);
     if (!fs.accessSync(this.directory)) { fs.mkdirSync(this.directory); }
@@ -34,12 +35,14 @@ export class AgentCheckpointStore {
     fs.renameSync(temporary, target);
   }
 
+  /** @throws {Error} 检查点 IO 或解析失败，由会话入口记录并禁止盲目恢复。 */
   load(id: string): AgentSessionState | null {
     const target: string = this.path(id);
     if (!fs.accessSync(target)) { return null; }
     return JSON.parse(fs.readTextSync(target)) as AgentSessionState;
   }
 
+  /** @throws {Error} 检查点 IO 或解析失败，由会话入口记录并禁止盲目恢复。 */
   remove(id: string): void {
     const target: string = this.path(id);
     if (fs.accessSync(target)) { fs.unlinkSync(target); }

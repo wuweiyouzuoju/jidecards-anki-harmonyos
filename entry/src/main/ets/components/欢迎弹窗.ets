@@ -8,7 +8,7 @@ import { DialogHeader } from './common/DialogHeader';
 // 样式复刻 jidecube WelcomePanel：磨砂玻璃遮罩 + 白色内容卡 + 圆角阴影
 //
 // @输入
-// onClose: 关闭回调（首页负责调 标记已展示欢迎弹窗 持久化「已显示」标记）
+// onClose: 关闭回调（旧入口曾由首页持久化更新弹窗标记；当前首页使用 HomeIntroStore）。
 //
 // @输出
 // 无（通过 onClose 回调关闭）

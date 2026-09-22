@@ -1,5 +1,8 @@
 {
   "string": [
+    {"name": "sync_server_load_failed", "value": "同步服务器地址读取失败，请重新打开设置或保存地址后再登录。"},
+    {"name": "settings_language_save_failed", "value": "语言切换失败，请重试。"},
+    {"name": "ai_agent_history_delete_failed", "value": "会话历史未能完整删除，请重试。"},
     {"name":"sync_pending","value":"准备同步…"},
     {"name":"sync_wait_study","value":"等待学习或编辑结束"},
     {"name":"sync_wait_home","value":"返回首页后继续同步"},
@@ -49,7 +52,6 @@
       "name": "module_desc",
       "value": "Local-first card learning for HarmonyOS"
     },
-    { "name": "app_name", "value": "记得闪卡" },
     { "name": "permission_reminder_reason", "value": "用于在指定时间发送学习提醒通知，提醒你完成今日的待学习和待复习卡片" },
     { "name": "deck_newPerDay_label", "value": "每日新卡上限" }, { "name": "deck_newPerDay_help", "value": "每天最多引入的新卡数量；当天没学满不会累积到明天，第二天仍按原上限计算。\n官方建议：新卡会在短期内显著增加复习负担，该值通常至少比「每日复习上限」小 10 倍。官方经验值——每天持续学 20 张新卡，日复习量会稳定在约 200 张。\n例：设为 20 时，今天最多学 20 张新卡，其余顺延到明天。\n注意：复习上限会连带限制新卡——复习上限 200 且已有 190 张复习在等待时，今天最多再引入 10 张新卡；复习额度用满后新卡默认不再出现（可在高级设置开启「新卡忽略复习上限」）。" },
     { "name": "deck_reviewsPerDay_label", "value": "每日复习上限" }, { "name": "deck_reviewsPerDay_help", "value": "每天最多展示的到期复习卡数量。达到上限后即使还有更多卡等待也不再展示；跨日学习卡会优先于复习卡计入该上限。\n例：设为 200 时，即使 300 张卡到期，今天也只展示 200 张，其余顺延到明天。\n该上限同时约束新卡：复习额度用满后，默认新卡也不再出现。\n官方提示：上限适合用来削平偶尔的到期高峰（比如休息一周后回来）；当有卡因上限被隐藏时，完成页会提示你时间充裕的话可以考虑提高上限。" },

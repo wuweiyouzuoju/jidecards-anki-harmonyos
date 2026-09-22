@@ -52,14 +52,15 @@ function harness({ snapshot = decodeGraphsResponse(new Uint8Array()), theme = Pr
 }
 
 test('home retains full graphs with their range and opens statistics immediately during sync', async () => {
-  const graph = decodeGraphsResponse(new Uint8Array()); let navigated;
+  const graph = decodeGraphsResponse(new Uint8Array()); let navigated, cancelled = 0;
   const Home = component('首页', ['打开统计页'], { 加载统计天数: async () => 0 });
   const home = new Home();
   Object.assign(home, {
     统计服务实例: { 获取图表统计: async days => { assert.equal(days, 0); return graph; } },
     autoSyncCollectionBusy: true, autoSyncRefreshing: true,
+    syncController: { cancel: () => { cancelled++; } },
     deferForSync: () => { throw new Error('navigation must not wait'); },
-    pendingSyncAction: () => {}, 暂停主页官方公告检查() {}, 页面栈: { pushPath: value => { navigated = value; } }
+    暂停主页官方公告检查() {}, 页面栈: { pushPath: value => { navigated = value; } }
   });
   const { repository, state } = homeDataHarness(); state.graph = graph; graph.today = { answerCount: 0 };
   const data = await repository.load('/', 'Default');
@@ -67,8 +68,8 @@ test('home retains full graphs with their range and opens statistics immediately
   assert.equal(data.graphs, graph);
   home.打开统计页();
   assert.equal(navigated.name, 'StatsPage');
+  assert.equal(cancelled, 1, 'statistics cancels the deferred sync navigation');
   assert.deepEqual(navigated.param, { graphs: graph, days: 0 });
-  assert.equal(home.pendingSyncAction, null);
   state.failGraphs = true;
   assert.equal((await repository.load('/', 'Default')).graphs, null);
   assert.equal(home.statsSnapshot.graphs, graph);

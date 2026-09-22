@@ -90,6 +90,7 @@ export class 数据迁移校验错误 extends Error {
 // ========================================================
 
 /** Exports a selected deck and its children into an Anki .apkg sandbox file. */
+/** @throws {Error} 导出文件创建或后端导出失败，交由导出入口显示错误。 */
 export async function 导出牌组(
   文件目录: string,
   牌组ID: number,
@@ -110,6 +111,7 @@ export async function 导出牌组(
 }
 
 /** Exports all personal Anki data into a sandbox .colpkg file. */
+/** @throws {Error} 导出文件创建或后端导出失败，交由导出入口显示错误。 */
 export async function 导出集合(
   文件目录: string,
   选项: 集合导出选项
@@ -145,6 +147,7 @@ export async function 导出集合(
  * Completes a previously exported sandbox file through Harmony's document saver.
  * Task 6 owns invoking this UI-context boundary after receiving an export intent.
  */
+/** @throws {Error} 保存目标不可写，交由导出入口显示错误。 */
 export async function 完成导出(
   上下文: common.UIAbilityContext,
   沙箱路径: string,
@@ -154,6 +157,7 @@ export async function 完成导出(
   return 保存沙箱导出(上下文, 沙箱路径, 文件名, 扩展名);
 }
 
+/** @throws {Error} 文件读写或迁移失败，调用方必须停止操作并显示失败。 */
 async function 保存沙箱导出(
   上下文: common.UIAbilityContext,
   沙箱路径: string,
@@ -174,6 +178,7 @@ async function 保存沙箱导出(
   }
 }
 
+/** @throws {Error} 文件读写或迁移失败，调用方必须停止操作并显示失败。 */
 function 生成输出路径(文件目录: string, 词干: string, 扩展名: string): string {
   const 导出目录 = `${文件目录}/exports`;
   确保目录存在(导出目录);
@@ -216,6 +221,7 @@ function 下一迁移输出ID(): number {
 // ========================================================
 
 /** Copies the selected .apkg into the sandbox for backend import. Returns the staged path. */
+/** @throws {Error} 文件读写或迁移失败，调用方必须停止操作并显示失败。 */
 export function 暂存导入文件(文件目录: string, 源URI: string): string {
   return 复制URI到沙箱(文件目录, 源URI, 'apkg');
 }
@@ -235,6 +241,7 @@ export async function 执行牌组导入(暂存路径: string): Promise<ImportSu
 }
 
 /** Replaces personal data only after the presentation layer obtains its second confirmation. */
+/** @throws {Error} 文件读写或迁移失败，调用方必须停止操作并显示失败。 */
 export async function 替换集合(
   文件目录: string,
   源URI: string,
@@ -280,6 +287,7 @@ export async function 替换集合(
   }
 }
 
+/** @throws {Error} 文件读写或迁移失败，调用方必须停止操作并显示失败。 */
 function 创建安全副本(文件目录: string): 安全副本结构 {
   const 根目录 = `${文件目录}/transfer-safety-${Date.now()}-${下一迁移输出ID()}`;
   const 集合文件路径 = `${根目录}/${集合文件名}`;
@@ -292,6 +300,7 @@ function 创建安全副本(文件目录: string): 安全副本结构 {
   return { 根目录, 集合文件路径, 媒体库路径, 媒体目录路径 };
 }
 
+/** @throws {Error} 文件读写或迁移失败，调用方必须停止操作并显示失败。 */
 function 恢复安全副本(文件目录: string, 安全副本: 安全副本结构): void {
   复制文件(安全副本.集合文件路径, `${文件目录}/${集合文件名}`);
   复制文件(安全副本.媒体库路径, `${文件目录}/${媒体库文件名}`);
@@ -339,6 +348,7 @@ function 静默删除目录(路径: string): void {
 // 直接读写沙箱文件系统：mkdirSync / rmdirSync / unlinkSync / copyFileSync / openSync / readSync / writeSync / closeSync。
 // ========================================================
 
+/** @throws {Error} 文件复制或清理失败，向迁移编排传播以停止替换并执行恢复。 */
 function 复制目录(源路径: string, 目标路径: string): void {
   if (!路径存在(源路径)) {
     return;
@@ -355,6 +365,7 @@ function 复制目录(源路径: string, 目标路径: string): void {
   }
 }
 
+/** @throws {Error} 文件复制或清理失败，向迁移编排传播以停止替换并执行恢复。 */
 function 删除目录(路径: string): void {
   if (!路径存在(路径)) {
     return;
@@ -370,6 +381,7 @@ function 删除目录(路径: string): void {
   fs.rmdirSync(路径);
 }
 
+/** @throws {Error} 文件复制或清理失败，向迁移编排传播以停止替换并执行恢复。 */
 function 确保目录存在(路径: string): void {
   if (!路径存在(路径)) {
     fs.mkdirSync(路径);
@@ -384,10 +396,12 @@ function 路径存在(路径: string): boolean {
   }
 }
 
+/** @throws {Error} 文件复制或清理失败，向迁移编排传播以停止替换并执行恢复。 */
 function 复制文件(源路径: string, 目标路径: string): void {
   fs.copyFileSync(源路径, 目标路径);
 }
 
+/** @throws {Error} 文件复制或清理失败，向迁移编排传播以停止替换并执行恢复。 */
 function 复制URI到沙箱(文件目录: string, URI: string, 扩展名: string): string {
   const 导入目录: string = `${文件目录}/imports`;
   if (!路径存在(导入目录)) fs.mkdirSync(导入目录);
@@ -405,6 +419,7 @@ function 复制URI到沙箱(文件目录: string, URI: string, 扩展名: string
  * Streams a sandbox path or a document-provider URI with descriptors. copyFileSync
  * cannot safely consume the temporary provider permissions returned by Harmony pickers.
  */
+/** @throws {Error} 文件复制或清理失败，向迁移编排传播以停止替换并执行恢复。 */
 function 按描述符复制文件(源URI或路径: string, 目标URI或路径: string): void {
   const 源文件: fs.File = fs.openSync(源URI或路径, fs.OpenMode.READ_ONLY);
   try {

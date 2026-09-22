@@ -1,9 +1,11 @@
+import { compileWithUiFeedback } from './ui-feedback-harness.mjs';
 import { decideHomeSync } from '../../entry/src/main/ets/model/HomeSyncPolicy.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { HomeStartupSequence } from '../../entry/src/main/ets/model/HomeStartupSequence.ts';
 import { canStartHomeAutoSync } from '../../entry/src/main/ets/model/HomeActivityPolicy.ts';
 import { HomeAnnouncementController } from '../../entry/src/main/ets/model/HomeAnnouncementController.ts';
 import { AutoSyncScheduler } from '../../entry/src/main/ets/model/AutoSyncScheduler.ts';
+import { HomeSyncController } from '../../entry/src/main/ets/model/HomeSyncController.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -32,7 +34,7 @@ function componentMethods(source, names, dependencies) {
     return source.slice(start, end + 4);
   });
   const js = stripTypeScriptTypes(`class Component { ${methods.join('\n')} }`, { mode: 'transform' });
-  return new Function(...Object.keys(dependencies), js + '\nreturn Component;')(...Object.values(dependencies));
+  return compileWithUiFeedback(...Object.keys(dependencies), js + '\nreturn Component;')(...Object.values(dependencies));
 }
 
 function homeHarness() {
@@ -48,12 +50,36 @@ function homeHarness() {
     clearTimeout: id => state.timers.delete(id)
   });
   const page = new Page();
-  Object.assign(page, { startupSequence: new HomeStartupSequence(), announcementController: new HomeAnnouncementController(), homeActivityChanged() {}, syncForeground: true, autoSyncStartupReady: true, syncScheduler: new AutoSyncScheduler(), autoSyncTimer: -1,
+  page.backupController = { schedule() {}, stop() {} };
+  const syncHost = () => ({
+    activity: () => page.homeActivity(), syncCollectionBusy: () => page.autoSyncCollectionBusy,
+    isDisposed: () => page.homeDisposed === true, isForeground: () => page.syncForeground && !page.homeDisposed,
+    isPanelOpen: () => page.显示同步面板, pageDepth: () => page.页面栈.size(),
+    pathNames: () => page.页面栈.getAllPathName ? page.页面栈.getAllPathName() : [],
+    loadState: () => page.加载状态, startupReady: () => page.autoSyncStartupReady,
+    externalImportPending: () => state.externalDeckPending === true, autoSyncEnabled: () => state.enabled,
+    auth: () => state.auth ? { hkey: state.auth.hkey, endpoint: state.auth.endpoint, ioTimeoutSecs: 0 } : null,
+    username: () => state.auth?.username ?? '', setStatus: key => { page.syncStatusText = key === null ? '' : `app.string.${key}`; },
+    notifyWait: () => { state.toasts++; }, popPage: () => page.页面栈.pop(),
+    requestPanelDetails: () => { page.syncDetailsRequest++; },
+    openPanel: (auth, automatic, username) => { page.同步面板认证 = auth; page.syncAutomatic = automatic; page.同步面板账号名 = username; page.显示同步面板 = true; },
+    closePanel: () => { page.显示同步面板 = false; page.同步面板认证 = null; page.同步面板账号名 = ''; },
+    setCollectionBusy: busy => { page.autoSyncCollectionBusy = busy; }, setPanelModal: modal => { page.autoSyncModal = modal; },
+    refreshAfterCollection: async () => { await page.加载主页数据(); },
+    presentFsrsWarning: async () => { await page.同步后检查FSRS(true); }, activityChanged: () => page.homeActivityChanged()
+  });
+  Object.assign(page, { startupSequence: new HomeStartupSequence(), announcementController: new HomeAnnouncementController(), homeActivityChanged() {}, homeDisposed: false, syncForeground: true, autoSyncStartupReady: true, syncScheduler: new AutoSyncScheduler(), autoSyncTimer: -1,
     页面栈: { size: () => 0, pushPath: path => state.navigation.push(path) }, 加载状态: 'ready', 显示同步面板: false,
-    autoSyncCollectionBusy: false, autoSyncRefreshing: false, autoSyncModal: false, pendingSyncAction: null, pendingSyncFsrsWarning: false,
+    autoSyncCollectionBusy: false, autoSyncModal: false,
     syncDetailsRequest: 0, getUIContext: () => ({ getHostContext: () => ({ resourceManager: { getStringSync: key => key } }) }),
     显示提示: () => { state.toasts++; }, 已选中牌组: () => true, 选中牌组: () => ({ id: 'deck', name: 'deck' }), 展开牌组路径() {}, 当前断点: 'xs',
     加载主页数据: async () => {}, 同步后检查FSRS: async () => {}, 暂停主页官方公告检查() {} });
+  page.syncController = new HomeSyncController(page.syncScheduler, gate, syncHost, {
+    now: () => Date.now(), setTimeout: (fn) => { const id = ++state.seq; state.timers.set(id, fn); return id; },
+    clearTimeout: id => state.timers.delete(id)
+  });
+  Object.defineProperty(page, 'pendingSyncAction', { get: () => page.syncController.hasDeferredNavigation() ? (() => {}) : null });
+  Object.defineProperty(page, 'pendingSyncFsrsWarning', { get: () => page.syncController.hasPendingFsrsWarning() });
   page.syncScheduler.setListener(() => page.scheduleAutoSyncCheck());
   const tick = () => { const callbacks = [...state.timers.values()]; state.timers.clear(); callbacks.forEach(fn => fn()); };
   return { page, state, tick, gate };
@@ -183,6 +209,23 @@ test('editing, import, sorting, startup prompts and manual sync defer automatic 
   assert.equal(page.显示同步面板, false, 'manual sync release starts a cooldown');
 });
 
+test('preview display and loading block controller sync until released', () => {
+  for (const field of ['显示卡片预览', '预览加载中']) {
+    const { page, tick, gate } = homeHarness();
+    page[field] = true;
+    page.requestAutoSync();
+    tick();
+    assert.equal(page.显示同步面板, false, field);
+    assert.equal(page.syncScheduler.hasPending(), true, field);
+    assert.equal(gate.isActive(), false, field);
+    page[field] = false;
+    tick();
+    assert.equal(page.显示同步面板, true, field);
+    assert.equal(page.syncScheduler.hasPending(), false, field);
+    assert.equal(page.autoSyncCollectionBusy, true, field);
+  }
+});
+
 test('disabled sync and logged-out state stop queued work without a network request', () => {
   for (const loggedOut of [false, true]) {
     const { page, state, tick } = homeHarness();
@@ -253,7 +296,7 @@ test('a completed but hidden study screen cannot sync through another editor or 
 
 async function settle() { for (let i = 0; i < 8; i++) await new Promise(resolve => setImmediate(resolve)); }
 
-function panelHarness({ required = 1, media = false, automatic = true, fsrsBefore = true, fsrsAfter = true } = {}) {
+function panelHarness({ required = 1, media = false, automatic = true, fsrsBefore = true, fsrsAfter = true, capability = true } = {}) {
   const state = { closed: 0, refreshed: 0, media, pending: false, cleared: false, endpoint: '', calls: [], timers: new Map(),
     fsrsValues: required >= 2 ? [fsrsBefore, fsrsBefore, fsrsAfter] : [fsrsBefore, fsrsAfter], fsrsReads: 0, fsrsNotifications: 0, fsrsResults: [], states: [], delays: [], cancellations: [],
     response: { required, newEndpoint: '', hostNumber: 0, serverMediaUsn: 3, serverMessage: '' } };
@@ -267,6 +310,7 @@ function panelHarness({ required = 1, media = false, automatic = true, fsrsBefor
     加载媒体同步开关: () => state.media, 加载媒体待同步: () => state.pending,
     设置媒体待同步: value => { state.pending = value; }, 保存同步端点: value => { state.endpoint = value; },
     清除同步凭证: () => { state.cleared = true; },
+    canIUse: () => capability,
     backgroundTaskManager: { requestSuspendDelay: (_reason, expire) => { state.delays.push(expire); return { requestId: state.delays.length }; }, cancelSuspendDelay: id => { state.cancellations.push(id); } },
     hilog: { info() {}, error() {}, warn() {} }, 同步日志域: 0, 同步日志标签: 'test', $r: key => key,
     setInterval: (fn, delay) => { const id = delay === 50 ? 2 : 1; state.timers.set(id, fn); return id; }, clearInterval: id => state.timers.delete(id),
@@ -420,7 +464,7 @@ test('login uses the saved custom endpoint, blocks unsaved input, and never pers
     保存同步凭证: auth => persisted.push(auth), 后端错误: BackendError, 分类同步错误: flow.分类同步错误, $r: value => value
   });
   const group = new Group();
-  Object.assign(group, { 登录中: false, settingsSaving: false, serverInput: 'https://new.example/',
+  Object.assign(group, { serverLoaded: true, 登录中: false, settingsSaving: false, serverInput: 'https://new.example/',
     savedServer: 'https://saved.example/', 用户名输入: 'user', 密码输入: 'transient-password',
     取本地化文本: key => key,
     同步服务实例: { 同步登录: async (...args) => { calls.push(args); return { hkey: 'test-key', endpoint: args[2], ioTimeoutSecs: 0 }; } }
@@ -590,6 +634,16 @@ test('account changes and a second manual sync cannot race background media', as
   assert.equal(gate.isActive(), true);
   gate.release(owner, Date.now());
   assert.equal(group.syncSettingsBusy(), false);
+});
+
+test('unsupported background capability leaves sync working without requesting system quota', async () => {
+  const { panel, state, gate } = panelHarness({ media: true, capability: false });
+  panel.aboutToAppear(); await settle();
+  gate.continueInBackground();
+  assert.deepEqual(state.delays, []);
+  panel.releaseSuspendDelay();
+  assert.deepEqual(state.cancellations, []);
+  panel.aboutToDisappear();
 });
 
 test('a completed old status cannot release a newer sync lease', () => {

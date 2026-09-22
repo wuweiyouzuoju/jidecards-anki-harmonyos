@@ -6,6 +6,7 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 import { CARD_TEXT_SIZE_KEY, DEFAULT_CARD_TEXT_SIZE, normalizeCardTextSize } from '../model/CardTextSize';
 
 /** 复用应用本机偏好，字号不写入集合或模板。 */
+/** @throws {Error} 本机字号偏好不可用或保存失败，由初始化兜底或设置页展示。 */
 function getCardTextPreferences(): preferences.Preferences {
   const context: common.UIAbilityContext | undefined = AppStorage.get<common.UIAbilityContext>('abilityContext');
   if (context === undefined) {
@@ -29,6 +30,7 @@ export function initializeCardTextSize(): void {
 }
 
 /** 落盘成功后通知学习与预览；失败交由设置界面显示。 */
+/** @throws {Error} 本机字号偏好不可用或保存失败，由初始化兜底或设置页展示。 */
 export async function saveCardTextSize(value: number): Promise<void> {
   const size: number = normalizeCardTextSize(value);
   const store: preferences.Preferences = getCardTextPreferences();

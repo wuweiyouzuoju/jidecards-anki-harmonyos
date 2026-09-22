@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { UIContext } from '@kit.ArkUI';
+import { resourceText } from '../../utils/UiFeedback';
 
 // ========================================================
 // @块ID UI-COMMON-THEMETEXT
@@ -36,7 +37,7 @@ function themeLabelCharacters(label: ResourceStr, context: UIContext): string[] 
       if (typeof value === 'string' || typeof value === 'number') args.push(value);
     }
   }
-  const text: string = context.getHostContext()!.resourceManager.getStringSync(label.id, ...args);
+  const text: string = resourceText(context, label, ...args);
   return text.match(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\s\S]/g) ?? [];
 }
 

@@ -353,7 +353,7 @@ export struct 浏览侧边栏 {
 
   /** 标签长按操作菜单：追加到搜索 / 重命名 / 删除 / 补全。 */
   private 显示标签操作菜单(标签名: string): void {
-    promptAction.showActionMenu({
+    this.getUIContext().getPromptAction().showActionMenu({
       title: $r('app.string.browser_tag_actions'),
       buttons: [
         { text: $r('app.string.browser_tag_append_search'), color: $r('app.color.text_primary') },

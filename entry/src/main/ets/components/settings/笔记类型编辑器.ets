@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { resourceText, showToastSafely } from '../../utils/UiFeedback';
 import { SelectStyle } from '../../utils/SelectStyle';
 import { ThemeTextSpans } from '../common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
@@ -39,7 +40,6 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 设置面板色板_取 } from '../../utils/设置面板配色';
 import { 颜色键 } from '../../model/颜色主题';
 import { 取全屏转场时长, 取全屏转场曲线 } from '../../utils/转场时长';
-import { promptAction } from '@kit.ArkUI';
 
 interface 字段项 {
   ord: number;
@@ -84,7 +84,7 @@ export struct 笔记类型编辑器 {
   }
 
   private 取本地化文本(资源: Resource): string {
-    return this.getUIContext().getHostContext()!.resourceManager.getStringSync(资源.id);
+    return resourceText(this.getUIContext(), 资源);
   }
 
   private async 加载JSON(): Promise<void> {
@@ -204,7 +204,7 @@ export struct 笔记类型编辑器 {
     try {
       const json: string = this.序列化JSON();
       await this.服务.更新笔记类型旧版(json, false);
-      promptAction.showToast({
+      showToastSafely(this.getUIContext(), {
         message: this.取本地化文本($r('app.string.notetype_editor_saved')),
         duration: 2000
       });

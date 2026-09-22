@@ -1,6 +1,6 @@
 # ArkTS / HarmonyOS 适配规则
 
-本文件定义 ArkTS / HarmonyOS Next 平台特定的代码适配规则。所有 .ets / .ts 文件均适用。
+本文件定义 `entry/src/main/ets/` 内 ArkTS / HarmonyOS 平台代码的适配规则，不约束 Node 工具脚本。编译兼容性以仓库锁定 SDK 的实际 HAP 构建为准。
 
 ## ArkTS 语言限制（linter 强制）
 
@@ -31,7 +31,7 @@
 | InputKit | `@kit.InputKit` | KeyCode |
 | ImageKit | `@kit.ImageKit` | image（PixelMap / ImageSource） |
 
-不要用旧 HMS 路径（如 `@hms.ai.face.faceDetector`），会导致检测失败。
+新增 API 以目标 SDK 的声明和官方文档核对模块、权限与版本，不凭其他项目的 Kit 用法推断。
 
 ## @Component 结构约定
 
@@ -61,9 +61,9 @@ export struct XxxComponent {
 // 简单 i18n：直接 $r 引用
 Text($r('app.string.xxx'))
 
-// 带参数 i18n：用 getStringSync(resource.id, args)
+// 带参数 i18n：通过 utils/UiFeedback 的真实资源错误边界，展开格式参数。
 private localizedFmt(resource: Resource, args: Array<string | number>): string {
-  return this.getUIContext().getHostContext()!.resourceManager.getStringSync(resource.id, args);
+  return resourceText(this.getUIContext(), resource, ...args);
 }
 this.localizedFmt($r('app.string.xxx_lang'), [arg1, arg2]);
 ```
@@ -75,10 +75,10 @@ this.localizedFmt($r('app.string.xxx_lang'), [arg1, arg2]);
 
 ## 语言切换机制
 
-- 切语言需重启应用（`setAppPreferredLanguage` 全局重渲染卡 UI）
-- 流程：弹窗确认 → `setAppPreferredLanguage` → `startAbility` + `terminateSelf`
-- 切换瞬间 UI 文本不会自动刷新（必须重启）
-- PROJECT_CONTEXT.md "扩展点" 列出新增语言的入口
+- `GeneralSettings.ets` 去重后调用 `setAppPreferredLanguage`，系统配置更新负责重渲染；当前实现不主动重启应用。
+- 系统设置失败时显示失败提示；配置更新期间 Select 重建不得重复触发语言切换。
+- 即时刷新与页面重建效果需做设备验证，编译和 Node 测试不能替代。
+- [扩展入口](../../docs/development/extension-points.md) 列出新增语言的入口
 
 ## ArkUI 关键约束
 
@@ -105,12 +105,16 @@ this.localizedFmt($r('app.string.xxx_lang'), [arg1, arg2]);
 ## 装机 / 签名
 
 - 装机用 `hdc -t <connect-key> install -r <hap>`（不是 `-s`，与 adb 不同）
-- 装后需 `hdc shell aa force-stop com.jide.kapian` 才加载新代码
+- 装后需 `hdc -t <connect-key> shell aa force-stop com.jide.kapian` 再启动当前包以加载新代码
 - **绝不 uninstall 清数据**：collection.anki2 + collection.media 在 sandbox 目录，uninstall 即永久删除
-- 命令行构建：`$env:DEVECO_SDK_HOME="C:\Program Files\Huawei\DevEco Studio\sdk"; node "C:\Program Files\Huawei\DevEco Studio\tools\hvigor\bin\hvigorw.js" assembleHap --mode module -p product=default --no-daemon`
+- 命令行构建：`npm run build:app`，通过仓库入口检查工具链、本机签名与最终 signed HAP；完整验收用 `npm run verify`
 
 ## 测试限制
 
-- model 层不要 import HarmonyOS Kit（@kit.*）：node test runner 无法解析，导致整个 .test.mjs 文件加载失败（ERR_INVALID_MODULE_SPECIFIER），失败信息只显示 `not ok N - file.test.mjs` 不显示具体 assertion，排查极慢
-- hilog 应放 utils 层，model 层保持纯函数无副作用
-- 人脸检测必须真机测试，不支持模拟器
+- SDK 的 `Function may throw exceptions` 警告不能批量忽略。底层确需上抛时用 `@throws` 声明失败语义，沿调用链核对最终 catch；UI 生命周期/点击入口要处理失败，不制造未处理拒绝。
+- 显示资源与 Toast 可使用 `utils/UiFeedback.ets`，但不能用空值/成功状态吞掉数据读写错误。偏好、导入、备份和工作区读取失败必须保留可观察的失败状态。
+- `npm run verify` 使用 clean HAP 构建并执行精确警告门禁；允许项和升级步骤见 [验证说明](../../docs/development/verification.md#hap-警告门禁)。
+
+- `model/**/*.ts` 与 `proto/**/*.ts` 是可直接测试的模型/协议层，只依赖这两层的 `.ts`；禁止直接或间接依赖 Kit、`.ets`、UI 或原生库。控制器通过显式宿主接口接收平台效果。
+- 既有 `model/*.ets` 包含 preferences 等平台适配器，不属于上述纯模型范围；新业务规则不要继续塞入平台存储适配器。hilog 等平台效果放适配层。
+- `architecture-boundaries.test.mjs` 检查字面量导入依赖，Node 行为测试不能代替 ArkTS 编译或设备验收。

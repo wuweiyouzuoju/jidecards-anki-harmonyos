@@ -163,8 +163,8 @@ export struct 学习浮动工具栏 {
   private 读取屏幕尺寸(): void {
     try {
       const 显示器: display.Display = display.getDefaultDisplaySync();
-      this.屏幕宽vp = px2vp(显示器.width);
-      this.屏幕高vp = px2vp(显示器.height);
+      this.屏幕宽vp = this.getUIContext().px2vp(显示器.width);
+      this.屏幕高vp = this.getUIContext().px2vp(显示器.height);
     } catch (error) {
       // 取不到屏幕尺寸时用一个保守值，避免除零；后续拖动夹紧按 360×720 估。
       this.屏幕宽vp = 360;

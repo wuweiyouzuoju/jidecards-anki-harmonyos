@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { showToastSafely } from '../utils/UiFeedback';
 import { DialogHeader } from './common/DialogHeader';
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { common } from '@kit.AbilityKit';
@@ -17,10 +18,10 @@ export struct HomeIntroPanel {
     try {
       await pasteboard.getSystemPasteboard().setData(
         pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, this.groupNumber));
-      this.getUIContext().getPromptAction().showToast({
+      showToastSafely(this.getUIContext(), {
         message: $r('app.string.about_qq_group_copied') });
     } catch {
-      this.getUIContext().getPromptAction().showToast({
+      showToastSafely(this.getUIContext(), {
         message: $r('app.string.redemption_copy_failed') });
     }
   }
@@ -31,7 +32,7 @@ export struct HomeIntroPanel {
       const context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
       await context.startAbility({ action: 'ohos.want.action.viewData', uri: this.decksUrl });
     } catch {
-      this.getUIContext().getPromptAction().showToast({
+      showToastSafely(this.getUIContext(), {
         message: $r('app.string.home_intro_website_failed') });
     }
   }

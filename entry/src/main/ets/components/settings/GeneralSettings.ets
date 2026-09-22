@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { resourceText, showToastSafely } from '../../utils/UiFeedback';
 import { SelectStyle } from '../../utils/SelectStyle';
 import { 当前语言模式, 语言模式, 设置语言模式 } from '../../model/语言存储';
 import { 保存显示今日进度卡, 主页今日进度卡AppStorage键 } from '../../model/主页偏好';
@@ -15,7 +16,7 @@ export struct GeneralSettings {
   打开说明回调: (标题: Resource, 正文: Resource) => void = (_标题: Resource, _正文: Resource): void => {};
 
   private 取本地化文本(资源: Resource): string {
-    return this.getUIContext().getHostContext()!.resourceManager.getStringSync(资源.id);
+    return resourceText(this.getUIContext(), 资源);
   }
   private 切换今日进度卡(开启: boolean): void { 保存显示今日进度卡(开启); }
   private 语言模式标签(模式: 语言模式): Resource {
@@ -31,7 +32,11 @@ export struct GeneralSettings {
     if (切换前 === 模式) {
       return;
     }
-    设置语言模式(模式);
+    try {
+      设置语言模式(模式);
+    } catch (error) {
+      showToastSafely(this.getUIContext(), { message: $r('app.string.settings_language_save_failed') });
+    }
   }
 
   // ---- 语言 Select 选项 / 索引 ----

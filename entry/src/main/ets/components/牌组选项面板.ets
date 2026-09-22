@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { resourceText } from '../utils/UiFeedback';
 import { SelectStyle } from '../utils/SelectStyle';
 import { ThemeTextSpans } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
@@ -188,7 +189,7 @@ export struct 牌组选项面板 {
       case 'deck_date_validation_error': resource = $r('app.string.deck_date_validation_error'); break;
       default: resource = $r('app.string.deck_invalid_number_validation_error'); break;
     }
-    return this.getUIContext().getHostContext()!.resourceManager.getStringSync(resource.id);
+    return resourceText(this.getUIContext(), resource);
   }
 
   // ========================================================
@@ -248,7 +249,7 @@ export struct 牌组选项面板 {
     ];
   }
   // Resource 转 string：bindMenu 的 MenuElement.value 只接受 string，无法直接传 Resource
-  private resolveText(resource: Resource): string { return this.getUIContext().getHostContext()!.resourceManager.getStringSync(resource.id); }
+  private resolveText(resource: Resource): string { return resourceText(this.getUIContext(), resource); }
   private reviewOrderLabelString(value: number): string {
     const 选项 = this.reviewOrderOptions();
     for (let i = 0; i < 选项.length; i++) {

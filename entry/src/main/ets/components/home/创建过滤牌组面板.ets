@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { resourceText, showToastSafely } from '../../utils/UiFeedback';
 import { SelectStyle } from '../../utils/SelectStyle';
 
 import { DialogHeader } from '../common/DialogHeader';
@@ -36,7 +37,6 @@ import { 颜色键 } from '../../model/颜色主题';
 import { 取全屏转场时长, 取全屏转场曲线 } from '../../utils/转场时长';
 import { 过滤牌组排序 } from '../../proto/messages/DeckMessages';
 import type { 过滤牌组更新, 搜索条件 } from '../../proto/messages/DeckMessages';
-import { promptAction } from '@kit.ArkUI';
 
 interface 排序选项 {
   值: number;
@@ -74,7 +74,7 @@ export struct 创建过滤牌组面板 {
   ];
 
   private 取本地化文本(资源: Resource): string {
-    return this.getUIContext().getHostContext()!.resourceManager.getStringSync(资源.id);
+    return resourceText(this.getUIContext(), 资源);
   }
 
   private 可提交(): boolean {
@@ -112,7 +112,7 @@ export struct 创建过滤牌组面板 {
       模板.allowEmpty = true;
       // 3. 回写后端
       await this.牌组服务实例.添加或更新过滤牌组(模板);
-      promptAction.showToast({
+      showToastSafely(this.getUIContext(), {
         message: this.取本地化文本($r('app.string.filtered_deck_success')),
         duration: 2000
       });

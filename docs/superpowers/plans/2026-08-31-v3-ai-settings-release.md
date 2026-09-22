@@ -3,8 +3,6 @@
 > 归档状态：这是一次性历史设计/执行记录，不是当前路线图、待办列表或操作手册。未勾选项不表示仍未实现；当前事实请查阅 [文档导航](../../README.md)、[开发状态](../../DEVELOPMENT_PLAN.md)、[当前架构](../../architecture.md) 和实际源码/测试。
 
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** 发布版本与正式公告统一到 3.0.0，并完成 AI 配置文案、DeepSeek 模型、输入框样式和标题居中的调整。
 
 **Architecture:** 发布元数据只修改当前生效的应用配置、正式公告和直接契约，历史 2.3.3 文档保持不变。AI 配置继续复用现有 ProviderCatalog、AgentSettingsStore 和共享 AI 页面，仅删除无价值的隐私 UI 状态，不改变发送时机、Asset Store 密钥和草稿写入安全边界。

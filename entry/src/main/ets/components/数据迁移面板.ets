@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { resourceText } from '../utils/UiFeedback';
 import { SelectStyle } from '../utils/SelectStyle';
 import { ThemeTextSpans } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
@@ -120,7 +121,7 @@ export struct 数据迁移面板 {
 
   // 官方 Select 文档：selected 仅控制菜单初始高亮，按钮文本需由 value 提供，否则框内空白。
   // value 必须传 string：传 Resource 时按钮文本不显示（同 高级牌组选项面板 同款 bug）。
-  private 解析文本(资源: Resource): string { return this.getUIContext().getHostContext()!.resourceManager.getStringSync(资源.id); }
+  private 解析文本(资源: Resource): string { return resourceText(this.getUIContext(), 资源); }
   private 模式标签(模式: 数据迁移模式): string {
     if (模式 === 'exportDeck') return this.解析文本($r('app.string.transfer_export_deck'));
     if (模式 === 'exportPersonalData') return this.解析文本($r('app.string.transfer_export_personal'));

@@ -3,8 +3,6 @@
 > 归档状态：这是一次性历史设计/执行记录，不是当前路线图、待办列表或操作手册。未勾选项不表示仍未实现；当前事实请查阅 [文档导航](../../README.md)、[开发状态](../../DEVELOPMENT_PLAN.md)、[当前架构](../../architecture.md) 和实际源码/测试。
 
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** Rewrite the root README so it accurately describes the HarmonyOS AppGallery 2.0.0 release represented by the current `main` branch.
 
 **Architecture:** This is a documentation-only change. The root README is rewritten around user-visible feature groups, while claims are checked against the current ArkTS call sites, version metadata, lock files, and contract tests.

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { resourceText } from '../../utils/UiFeedback';
 import { SelectStyle } from '../../utils/SelectStyle';
 
 import { DialogHeader } from '../common/DialogHeader';
@@ -90,11 +91,11 @@ export struct 查找重复对话框 {
   }
 
   private 取本地化文本(资源: Resource): string {
-    return this.getUIContext().getHostContext()!.resourceManager.getStringSync(资源.id);
+    return resourceText(this.getUIContext(), 资源);
   }
 
   private 取本地化带参文本(资源: Resource, 参数: Array<string | number>): string {
-    return this.getUIContext().getHostContext()!.resourceManager.getStringSync(资源.id, ...参数);
+    return resourceText(this.getUIContext(), 资源, ...参数);
   }
 
   /** Select 选项：从笔记类型列表生成。 */

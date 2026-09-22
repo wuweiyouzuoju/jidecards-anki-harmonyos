@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { resourceText, showToastSafely } from '../utils/UiFeedback';
 import { HomeDeckCommands } from '../backend/HomeDeckCommands';
 import { exportPersonalData } from '../backend/DataExportWorkflow';
 import { reconcileHomeExpansion, HomeDeckExpansion } from '../model/HomeDeckExpansion';
 import { HomeRefreshQueue } from '../model/HomeRefreshQueue';
-import { decideHomeSync } from '../model/HomeSyncPolicy';
 import { HomeDataRepository, HomeDataResult } from '../backend/HomeDataRepository';
 import { HomeWorkCoordinator, HomeWorkHost } from '../model/HomeWorkCoordinator';
 import { HomeStartupSequence, HomeStartupHost } from '../model/HomeStartupSequence';
 import { AutoSyncScheduler, autoSyncScheduler } from '../model/AutoSyncScheduler';
+import { HomeSyncController, HomeSyncHost } from '../model/HomeSyncController';
 import { ThemeTextSpans } from '../components/common/ThemeText';
 import { 按下态按钮 } from '../components/common/按下态按钮';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
@@ -37,7 +38,8 @@ import { 主页操作面板 } from '../components/主页操作面板';
 import { 云端牌组弹窗 } from '../components/云端牌组弹窗';
 import { CloudDeckImportController, CloudDeckImportBackend, CloudDeckImportProgress } from '../model/CloudDeckImportController';
 import { HomeActivityState, canPresentHomePrompt, canStartHomeAutoSync } from '../model/HomeActivityPolicy';
-import { backupCoordinator } from '../model/BackupCoordinator';
+import { BackupBackend } from '../model/BackupCoordinator';
+import { HomeBackupController, HomeBackupHost } from '../model/HomeBackupController';
 import { LocalBackups, loadAutomaticBackup } from '../backend/LocalBackups.ets';
 import { HomeAnnouncementController } from '../model/HomeAnnouncementController';
 import { externalDeckOpens, EXTERNAL_DECK_OPEN_REVISION_KEY } from '../model/ExternalDeckOpen';
@@ -247,8 +249,10 @@ struct 首页 {
   @State private syncDetailsRequest: number = 0;
   @StorageProp(APP_FOREGROUND_KEY) @Watch('syncForegroundChanged') private syncForeground: boolean = false;
   private readonly syncScheduler: AutoSyncScheduler = autoSyncScheduler;
-  private autoSyncTimer: number = -1;
-  private automaticBackupTimer: number = -1;
+  private readonly syncController: HomeSyncController = new HomeSyncController(
+    this.syncScheduler, syncActivity, (): HomeSyncHost => this.homeSyncHost());
+  private readonly backupController: HomeBackupController = new HomeBackupController(
+    (): HomeBackupHost => this.homeBackupHost(), (filesDir: string): BackupBackend => new LocalBackups(filesDir));
   private autoSyncStartupReady: boolean = false;
   @State private deckDeletionBusy: boolean = false;
   @State private deckDeletionStatus: Resource = $r('app.string.deck_media_checking');
@@ -260,9 +264,6 @@ struct 首页 {
   @State @Watch('homeActivityChanged') private autoSyncCollectionBusy: boolean = false;
   @State @Watch('homeActivityChanged') private autoSyncModal: boolean = false;
   @State private syncBackRequest: number = 0;
-  private autoSyncRefreshing: boolean = false;
-  private pendingSyncAction: (() => void) | null = null;
-  private pendingSyncFsrsWarning: boolean = false;
 
   @State @Watch('homeActivityChanged') private 显示牌组定制: boolean = false;
   @State private 定制牌组ID: string = '';
@@ -322,6 +323,76 @@ struct 首页 {
   @State private 预览媒体目录: string = '';
   private 预览加载中: boolean = false;
 
+  private homeSyncHost(): HomeSyncHost {
+    return {
+      activity: (): HomeActivityState => this.homeActivity(),
+      syncCollectionBusy: (): boolean => this.autoSyncCollectionBusy,
+      isDisposed: (): boolean => this.homeDisposed,
+      isForeground: (): boolean => this.syncForeground && !this.homeDisposed,
+      isPanelOpen: (): boolean => this.显示同步面板,
+      pageDepth: (): number => this.页面栈.size(),
+      pathNames: (): string[] => this.页面栈.getAllPathName(),
+      loadState: (): string => this.加载状态,
+      startupReady: (): boolean => this.autoSyncStartupReady,
+      externalImportPending: (): boolean => externalDeckOpens.hasPending(),
+      autoSyncEnabled: (): boolean => loadAutoSyncEnabled(),
+      auth: (): SyncAuth | null => {
+        const info: 同步凭证信息 | null = 加载同步凭证();
+        return info === null ? null : { hkey: info.hkey, endpoint: info.endpoint, ioTimeoutSecs: 0 };
+      },
+      username: (): string => {
+        const info: 同步凭证信息 | null = 加载同步凭证();
+        return info === null ? '' : info.username;
+      },
+      setStatus: (resourceKey: string | null): void => { this.设置同步状态(resourceKey); },
+      notifyWait: (): void => { this.显示提示($r('app.string.sync_collection_wait')); },
+      popPage: (): void => { this.页面栈.pop(); },
+      requestPanelDetails: (): void => { this.syncDetailsRequest++; },
+      openPanel: (auth: SyncAuth, automatic: boolean, username: string): void => {
+        this.同步面板认证 = auth;
+        this.syncAutomatic = automatic;
+        this.同步面板账号名 = username;
+        this.显示同步面板 = true;
+      },
+      closePanel: (): void => {
+        this.显示同步面板 = false;
+        this.同步面板认证 = null;
+        this.同步面板账号名 = '';
+      },
+      setCollectionBusy: (busy: boolean): void => { this.autoSyncCollectionBusy = busy; },
+      setPanelModal: (modal: boolean): void => { this.autoSyncModal = modal; },
+      refreshAfterCollection: async (): Promise<void> => {
+        AppStorage.setOrCreate<number>('cardContentChangedTick',
+          (AppStorage.get<number>('cardContentChangedTick') ?? 0) + 1);
+        await this.加载主页数据();
+      },
+      presentFsrsWarning: (): Promise<void> => this.同步后检查FSRS(true),
+      activityChanged: (): void => { this.homeActivityChanged(); }
+    };
+  }
+
+  private 设置同步状态(resourceKey: string | null): void {
+    if (resourceKey === null) {
+      this.syncStatusText = '';
+      return;
+    }
+    const resources: Record<string, Resource> = {
+      'sync_pending': $r('app.string.sync_pending'),
+      'sync_wait_study': $r('app.string.sync_wait_study'),
+      'sync_wait_home': $r('app.string.sync_wait_home'),
+      'sync_wait_import': $r('app.string.sync_wait_import'),
+      'sync_wait_load_failed': $r('app.string.sync_wait_load_failed'),
+      'sync_wait_load': $r('app.string.sync_wait_load'),
+      'sync_wait_dialog': $r('app.string.sync_wait_dialog'),
+      'sync_wait_operation': $r('app.string.sync_wait_operation'),
+      'sync_wait_transfer': $r('app.string.sync_wait_transfer')
+    };
+    const resource: Resource | undefined = resources[resourceKey];
+    if (resource !== undefined) {
+      this.syncStatusText = resourceText(this.getUIContext(), resource);
+    }
+  }
+
   aboutToAppear(): void {
     this.syncScheduler.setListener((): void => { this.scheduleAutoSyncCheck(); });
     this.requestAutoSync();
@@ -343,81 +414,54 @@ struct 首页 {
     this.startupSequence.dispose();
     this.syncScheduler.setListener(null);
     this.stopAutoSyncTimer();
+    this.backupController.dispose();
+    this.syncController.dispose();
     syncActivity.cancelReservation();
   }
 
   /** 前台恢复时排队；在编辑或学习中恢复时，等待真正返回首页。 */
   private syncForegroundChanged(): void {
-    if (this.syncForeground) {
-      this.homeActivityChanged();
-      this.requestAutoSync();
-    } else {
-      this.pendingSyncAction = null;
-      this.stopAutoSyncTimer();
-    }
+    this.syncController.foregroundChanged();
+    if (this.syncForeground) this.backupController.schedule();
+    else this.backupController.stop();
   }
 
   /** 生命周期只记录意图；学习提交与此入口共用同一队列。 */
   private requestAutoSync(): void {
-    if (this.显示同步面板) return;
-    this.syncScheduler.request();
+    this.syncController.request();
   }
 
   /** 答题中不轮询；会话完成/销毁或返回前台时再唤醒。 */
   private scheduleAutoSyncCheck(): void {
-    if (this.autoSyncTimer >= 0 || !this.syncForeground || this.显示同步面板 ||
-      !this.syncScheduler.hasPending() ||
-      (!this.syncScheduler.isManualPending() && !this.isAutoSyncLocationSafe())) return;
-    this.autoSyncTimer = setTimeout((): void => {
-      this.autoSyncTimer = -1;
-      this.tryAutoSync();
-      this.scheduleAutoSyncCheck();
-    }, this.syncScheduler.isManualPending() ? 1000 : 3000);
+    this.syncController.schedule();
   }
 
   private isAutoSyncLocationSafe(): boolean {
-    if (!this.syncScheduler.canSync()) return false;
-    if (this.页面栈.size() === 0) return true;
-    return this.syncScheduler.isStudyComplete() && this.页面栈.size() === 1 &&
-      this.页面栈.getAllPathName()[0] === 'StudyPage';
+    return this.syncController.isLocationSafe();
   }
 
   /** 停止待执行检查；后台不轮询，也不在后台新建同步任务。 */
   private stopAutoSyncTimer(): void {
-    if (this.autoSyncTimer >= 0) clearTimeout(this.autoSyncTimer);
-    this.autoSyncTimer = -1;
+    this.syncController.stopTimer();
   }
   private scheduleAutomaticBackup(): void {
-    if (this.automaticBackupTimer >= 0 || this.homeDisposed || !this.syncForeground) return;
-    this.automaticBackupTimer = setTimeout((): void => {
-      this.automaticBackupTimer = -1;
-      this.tryAutomaticBackup();
-    }, 5000);
+    this.backupController.schedule();
   }
 
-  private stopAutomaticBackupTimer(): void {
-    if (this.automaticBackupTimer >= 0) clearTimeout(this.automaticBackupTimer);
-    this.automaticBackupTimer = -1;
-  }
-
-  /** 启动后在首页安全空闲处交给 Core 判断间隔与保留数量。 */
-  private async tryAutomaticBackup(): Promise<void> {
-    if (this.homeDisposed || !this.syncForeground || this.页面栈.size() !== 0 ||
-      this.加载状态 !== 'ready' || !canStartHomeAutoSync(this.homeActivity())) {
-      if (!this.homeDisposed && this.syncForeground && this.页面栈.size() === 0 &&
-        this.加载状态 === 'ready') this.scheduleAutomaticBackup();
-      return;
-    }
-    const context: common.UIAbilityContext | null = this.取能力上下文();
-    if (context === null) return;
-    try {
-      if (!(await loadAutomaticBackup(context))) return;
-      await backupCoordinator.automatic(new LocalBackups(context.filesDir), Date.now(),
-        (): boolean => !this.homeDisposed && this.syncForeground && this.页面栈.size() === 0 &&
-          this.加载状态 === 'ready' && canStartHomeAutoSync(this.homeActivity()));
-    } catch (error) {
-      hilog.warn(0x4342, '首页', `自动备份失败: ${error}`);
-    }
+  private homeBackupHost(): HomeBackupHost {
+    return {
+      isDisposed: (): boolean => this.homeDisposed,
+      isForeground: (): boolean => this.syncForeground,
+      canRun: (): boolean => this.页面栈.size() === 0 && this.加载状态 === 'ready' &&
+        canStartHomeAutoSync(this.homeActivity()),
+      canReschedule: (): boolean => this.页面栈.size() === 0 && this.加载状态 === 'ready',
+      filesDir: (): string | null => this.取能力上下文()?.filesDir ?? null,
+      loadEnabled: async (): Promise<boolean> => {
+        const context: common.UIAbilityContext | null = this.取能力上下文();
+        return context !== null && await loadAutomaticBackup(context);
+      },
+      warn: (error: Error): void => { hilog.warn(0x4342, '首页', `自动备份失败: ${error}`); }
+    };
   }
 
 
@@ -426,135 +470,50 @@ struct 首页 {
    * Invariants: 集合已打开、前台、无活动学习/编辑、无导入/启动弹窗；手动自动共用互斥。
    */
   private tryAutoSync(): void {
-    const manual: boolean = this.syncScheduler.isManualPending();
-    const decision: string = decideHomeSync({
-      pending: this.syncScheduler.hasPending(), manual: manual, enabled: loadAutoSyncEnabled(),
-      authenticated: 加载同步凭证() !== null, foreground: this.syncForeground,
-      locationSafe: this.isAutoSyncLocationSafe(), externalImportPending: externalDeckOpens.hasPending(),
-      startupReady: this.autoSyncStartupReady, panelOpen: this.显示同步面板,
-      transferActive: syncActivity.isActive(), automaticAllowed: syncActivity.canAutoSync(Date.now()),
-      activity: this.homeActivity()
-    });
-    if (decision === 'drop') {
-      this.syncScheduler.consume();
-      if (manual) this.syncStatusText = '';
-      this.stopAutoSyncTimer();
-      return;
-    }
-    if (decision !== 'start') {
-      if (manual) this.updatePendingSyncStatus();
-      if (decision === 'pause') this.stopAutoSyncTimer();
-      return;
-    }
-    const info: 同步凭证信息 | null = 加载同步凭证();
-    if (info === null) return;
-    const auth: SyncAuth = { hkey: info.hkey, endpoint: info.endpoint, ioTimeoutSecs: 0 };
-    this.syncScheduler.consume();
-    this.stopAutoSyncTimer();
-    this.同步面板认证 = auth;
-    this.syncAutomatic = !manual;
-    this.同步面板账号名 = info.username;
-    syncActivity.reserveCollection();
-    this.autoSyncCollectionBusy = true;
-    this.显示同步面板 = true;
+    this.syncController.tryStart();
   }
 
   /** 集合独占期间合并点击意图，避免把页面 RPC 排在网络请求后无提示等待。 */
   private deferForSync(action: () => void, study: boolean = false): boolean {
-    if (!this.autoSyncCollectionBusy && !this.autoSyncRefreshing) return false;
-    this.pendingSyncAction = action;
-    if (study && (syncActivity.requestStudyPriority() || this.autoSyncRefreshing)) return true;
-    this.显示提示($r('app.string.sync_collection_wait'));
-    return true;
+    return this.syncController.defer(action, study);
   }
 
   /** 设置页仅提交意图并返回首页，由根宿主执行，页面销毁不影响传输。 */
   private requestManualSync(): void {
-    this.stopAutoSyncTimer();
-    this.页面栈.pop();
-    if (this.显示同步面板) {
-      this.syncDetailsRequest++;
-      return;
-    }
-    this.syncStatusText = this.getUIContext().getHostContext()!.resourceManager.getStringSync(
-      $r('app.string.sync_pending').id);
-    this.syncScheduler.requestManual();
+    this.syncController.requestManual();
   }
 
   /** 排队提示反映实际阻挡原因，避免把所有状态都称为“空闲”。 */
   private updatePendingSyncStatus(): void {
-    const activity: HomeActivityState = this.homeActivity();
-    let reason: Resource = $r('app.string.sync_pending');
-    if (!this.syncScheduler.canSync()) reason = $r('app.string.sync_wait_study');
-    else if (!this.isAutoSyncLocationSafe()) reason = $r('app.string.sync_wait_home');
-    else if (externalDeckOpens.hasPending()) reason = $r('app.string.sync_wait_import');
-    else if (this.加载状态 === 'error') reason = $r('app.string.sync_wait_load_failed');
-    else if (!activity.collectionReady) reason = $r('app.string.sync_wait_load');
-    else if (activity.dialogOpen) reason = $r('app.string.sync_wait_dialog');
-    else if (activity.collectionBusy || activity.interactionBusy) reason = $r('app.string.sync_wait_operation');
-    else if (syncActivity.isActive()) reason = $r('app.string.sync_wait_transfer');
-    this.syncStatusText = this.getUIContext().getHostContext()!.resourceManager.getStringSync(reason.id);
+    this.syncController.updateStatus();
   }
 
   private syncYielded(automatic: boolean): void {
-    if (automatic) this.syncScheduler.request();
-    else this.syncScheduler.requestManual();
+    this.syncController.yielded(automatic);
   }
 
   private syncHostClosed(): void {
-    this.显示同步面板 = false;
-    this.同步面板认证 = null;
-    this.同步面板账号名 = '';
-    this.syncStatusText = this.syncScheduler.isManualPending() ?
-      this.getUIContext().getHostContext()!.resourceManager.getStringSync($r('app.string.sync_pending').id) : '';
-    this.autoSyncStateChanged(false, false);
-    this.scheduleAutoSyncCheck();
+    this.syncController.closePanel();
   }
 
   /** 刷新完成且仍停留首页时只执行最后一次意图；返回或退后台会取消它。 */
   private flushSyncAction(): void {
-    if (this.autoSyncCollectionBusy || this.autoSyncRefreshing || this.autoSyncModal || this.homeActivity().dialogOpen) return;
-    const action: (() => void) | null = this.pendingSyncAction;
-    this.pendingSyncAction = null;
-    if (action !== null && this.syncForeground && this.页面栈.size() === 0 && this.加载状态 !== 'error') action();
+    this.syncController.flush();
   }
 
   /** 数据与界面刷新均完成后再进入学习，媒体不参与此门禁。 */
   private async autoSyncCollectionFinished(fsrsDisabledBySync: boolean): Promise<void> {
-    this.pendingSyncFsrsWarning = this.pendingSyncFsrsWarning || fsrsDisabledBySync;
-    this.autoSyncRefreshing = true;
-    this.autoSyncCollectionBusy = false;
-    try {
-      // 完成页重新读取队列和撤销状态，不能沿用同步前的快照。
-      AppStorage.setOrCreate<number>('cardContentChangedTick',
-        (AppStorage.get<number>('cardContentChangedTick') ?? 0) + 1);
-      await this.加载主页数据();
-    } finally {
-      this.autoSyncRefreshing = false;
-      this.flushSyncAction();
-      await this.presentPendingSyncWarning();
-      this.homeActivityChanged();
-    }
+    await this.syncController.collectionFinished(fsrsDisabledBySync);
   }
 
   /** 同步产生的设置提醒等待用户回到空闲首页，不打断开始或继续学习。 */
   private async presentPendingSyncWarning(): Promise<void> {
-    if (!this.pendingSyncFsrsWarning || !this.syncForeground || this.页面栈.size() !== 0 ||
-      this.pendingSyncAction !== null || this.autoSyncCollectionBusy || this.autoSyncRefreshing ||
-      this.homeActivity().dialogOpen) return;
-    this.pendingSyncFsrsWarning = false;
-    try {
-      await this.同步后检查FSRS(true);
-    } finally {
-      this.homeActivityChanged();
-    }
+    await this.syncController.presentPendingWarning();
   }
 
   /** 同步宿主只上报数据库占用和详情显隐，不把媒体同步当作导航锁。 */
   private autoSyncStateChanged(busy: boolean, modal: boolean): void {
-    this.autoSyncCollectionBusy = busy;
-    this.autoSyncModal = modal;
-    this.flushSyncAction();
+    this.syncController.panelStateChanged(busy, modal);
   }
 
   /** 新增集合任务或弹层只在此登记；公告和自动同步共用同一份占用事实。 */
@@ -563,7 +522,7 @@ struct 首页 {
       foreground: this.syncForeground && !this.homeDisposed,
       atHome: this.页面栈.size() === 0 && this.主页允许公告检查 && !this.显示牌组详情,
       collectionReady: 后端会话.获取实例().是否就绪() && this.加载状态 !== 'loading' && this.加载状态 !== 'error',
-      collectionBusy: this.autoSyncCollectionBusy || this.autoSyncRefreshing || this.刷新中 || this.deckDeletionBusy ||
+      collectionBusy: this.autoSyncCollectionBusy || this.syncController.isRefreshing() || this.刷新中 || this.deckDeletionBusy ||
         this.数据迁移中 || this.创建牌组中 || this.牌组选项加载中 || this.牌组选项中 || this.云端牌组忙碌,
       dialogOpen: this.显示官方公告 || this.显示欢迎弹窗 || this.显示云端牌组弹窗 || this.显示数据迁移 ||
         this.显示牌组定制 || this.显示自定义学习 || this.显示过滤牌组面板 || this.显示牌组选项 ||
@@ -584,7 +543,7 @@ struct 首页 {
     if (this.homeDisposed) return;
     const host: HomeWorkHost = {
       activity: (): HomeActivityState => this.homeActivity(),
-      hasDeferredNavigation: (): boolean => this.pendingSyncAction !== null,
+      hasDeferredNavigation: (): boolean => this.syncController.hasDeferredNavigation(),
       importDeck: (uri: string): Promise<void> => this.importDeckUri(uri),
       importFailed: (error: Error): void => {
         this.数据迁移错误 = error.message;
@@ -597,7 +556,7 @@ struct 首页 {
       continueStartup: (): void => {
         if (this.startupSequence.hasPending()) {
           this.startupSequence.resume(this.startupHost()).catch((error: Error): void => {
-            this.getUIContext().getPromptAction().showToast({ message: error.message });
+            showToastSafely(this.getUIContext(), { message: error.message });
           });
         } else this.请求主页官方公告检查();
       },
@@ -730,7 +689,7 @@ struct 首页 {
     this.announcementController.confirm(id);
     const saved: boolean = await 标记已确认官方公告(id);
     if (!saved) {
-      this.getUIContext().getPromptAction().showToast({
+      showToastSafely(this.getUIContext(), {
         message: $r('app.string.official_announcement_save_failed')
       });
     }
@@ -749,7 +708,7 @@ struct 首页 {
       action: 'ohos.want.action.viewData',
       uri: this.官方公告数据.actionUrl
     }).catch((_error: Error): void => {
-      this.getUIContext().getPromptAction().showToast({
+      showToastSafely(this.getUIContext(), {
         message: $r('app.string.official_announcement_open_failed')
       });
     });
@@ -804,7 +763,7 @@ struct 首页 {
   onBackPress(): boolean {
     if (this.数据迁移中 || this.创建牌组中 || this.定制牌组中 || this.牌组选项中 || this.deckDeletionBusy) return true;
     if (this.显示卡片预览) { this.显示卡片预览 = false; return true; }
-    this.pendingSyncAction = null;
+    this.syncController.cancel();
     if (this.autoSyncModal) { this.syncBackRequest++; return true; }
     if (this.显示官方公告) {
       return true;
@@ -1038,15 +997,15 @@ struct 首页 {
       const fsrsEnabled: boolean | null = await 加载FSRS开启状态();
       if (fsrsEnabled === false) {
         const result: promptAction.ShowDialogSuccessResponse = await this.getUIContext().getPromptAction().showDialog({
-          title: this.getUIContext().getHostContext()!.resourceManager.getStringSync($r('app.string.sync_fsrs_disabled_title').id),
-          message: this.getUIContext().getHostContext()!.resourceManager.getStringSync($r('app.string.sync_fsrs_disabled_message').id),
+          title: resourceText(this.getUIContext(), $r('app.string.sync_fsrs_disabled_title')),
+          message: resourceText(this.getUIContext(), $r('app.string.sync_fsrs_disabled_message')),
           buttons: [
             {
-              text: this.getUIContext().getHostContext()!.resourceManager.getStringSync($r('app.string.sync_fsrs_disabled_reenable').id),
+              text: resourceText(this.getUIContext(), $r('app.string.sync_fsrs_disabled_reenable')),
               color: '#2F5FD0'
             },
             {
-              text: this.getUIContext().getHostContext()!.resourceManager.getStringSync($r('app.string.sync_fsrs_disabled_keep').id),
+              text: resourceText(this.getUIContext(), $r('app.string.sync_fsrs_disabled_keep')),
               color: '#666666'
             }
           ]
@@ -1055,8 +1014,8 @@ struct 首页 {
           try {
             await 设置FSRS开启状态(true);
           } catch (error) {
-            this.getUIContext().getPromptAction().showToast({
-              message: this.getUIContext().getHostContext()!.resourceManager.getStringSync($r('app.string.sync_fsrs_reenable_error').id)
+            showToastSafely(this.getUIContext(), {
+              message: resourceText(this.getUIContext(), $r('app.string.sync_fsrs_reenable_error'))
             });
           }
         }
@@ -1249,7 +1208,7 @@ struct 首页 {
 
   private 显示提示(message: Resource): void {
     try {
-      this.getUIContext().getPromptAction().showToast({ message: message });
+      showToastSafely(this.getUIContext(), { message: message });
     } catch (error) {
       // 页面销毁或系统提示服务不可用时，不影响主界面的连续操作。
     }
@@ -1391,7 +1350,7 @@ struct 首页 {
   /** 打开统计页（全库统计图表）。'StatsPage' 是 NavPathStack 跨页面寻址协议，保留英文。 */
   private 打开统计页(): void {
     // 先展示首页已加载的统计；集合忙碌时由统计页延后数据库查询。
-    this.pendingSyncAction = null;
+    this.syncController.cancel();
     const params: 统计页参数 = this.statsSnapshot;
     this.暂停主页官方公告检查();
     this.页面栈.pushPath({
@@ -1413,7 +1372,7 @@ struct 首页 {
   }
 
   private 选择牌组(deckId: string): void {
-    this.pendingSyncAction = null;
+    this.syncController.cancel();
     this.选中的牌组ID = deckId;
     const deck: 牌组汇总 = this.选中牌组();
     if (deck.id === '') {
@@ -1570,10 +1529,10 @@ struct 首页 {
       return;
     }
     const displayName: string = 牌组显示名(deck);
-    const title: string = this.getUIContext().getHostContext()!.resourceManager.getStringSync(
-      $r('app.string.deck_delete_confirm_title').id).replace('%s', displayName);
-    const message: string = this.getUIContext().getHostContext()!.resourceManager.getStringSync(
-      $r('app.string.deck_delete_confirm_message').id);
+    const title: string = resourceText(this.getUIContext(),
+      $r('app.string.deck_delete_confirm_title')).replace('%s', displayName);
+    const message: string = resourceText(this.getUIContext(),
+      $r('app.string.deck_delete_confirm_message'));
     this.nativeDialogOpen = true;
     this.getUIContext().showAlertDialog({
       title: title,
@@ -1611,9 +1570,9 @@ struct 首页 {
         count = await this.牌组服务实例.删除牌组([Number(deckId)]);
       } catch (error) {
         const reason: string = error instanceof Error ? error.message : `${error}`;
-        const failMsg: string = this.getUIContext().getHostContext()!.resourceManager.getStringSync(
-          $r('app.string.deck_delete_failed').id).replace('%s', reason);
-        this.getUIContext().getPromptAction().showToast({ message: failMsg });
+        const failMsg: string = resourceText(this.getUIContext(),
+          $r('app.string.deck_delete_failed')).replace('%s', reason);
+        showToastSafely(this.getUIContext(), { message: failMsg });
         return;
       }
       this.requestAutoSync();
@@ -1622,11 +1581,11 @@ struct 首页 {
         deck.id === '1' || (deck.id !== deckId && deck.ancestorIds.indexOf(deckId) < 0));
       const selectionSaved: boolean = await this.reconcileDeckSelection(remaining);
       await this.加载主页数据();
-      let successMsg: string = this.getUIContext().getHostContext()!.resourceManager.getStringSync(
-        $r('app.string.deck_delete_success').id).replace('%d', count.toString());
-      if (!selectionSaved) successMsg += '\n' + this.getUIContext().getHostContext()!.resourceManager.getStringSync(
-        $r('app.string.home_selection_save_failed').id);
-      this.getUIContext().getPromptAction().showToast({ message: successMsg });
+      let successMsg: string = resourceText(this.getUIContext(),
+        $r('app.string.deck_delete_success')).replace('%d', count.toString());
+      if (!selectionSaved) successMsg += '\n' + resourceText(this.getUIContext(),
+        $r('app.string.home_selection_save_failed'));
+      showToastSafely(this.getUIContext(), { message: successMsg });
       await this.offerDeletedDeckMediaCleanup(before);
     } finally {
       this.deckDeletionBusy = false;
@@ -1655,9 +1614,9 @@ struct 首页 {
       if (!confirmed || this.homeDisposed || !this.syncForeground) return;
       this.deckDeletionStatus = $r('app.string.deck_media_checking');
       const removed: number = await this.deckMediaCleanup.cleanup(candidates);
-      const message: string = this.getUIContext().getHostContext()!.resourceManager.getStringSync(
-        $r('app.string.deck_media_cleaned').id).replace('%d', removed.toString());
-      this.getUIContext().getPromptAction().showToast({ message: message });
+      const message: string = resourceText(this.getUIContext(),
+        $r('app.string.deck_media_cleaned')).replace('%d', removed.toString());
+      showToastSafely(this.getUIContext(), { message: message });
     } catch {
       this.显示提示($r('app.string.deck_media_cleanup_failed'));
     }
@@ -1665,8 +1624,8 @@ struct 首页 {
 
   /** 确认窗口始终处于删除忙碌期，阻止其他写入和自动同步改变引用关系。 */
   private confirmDeletedDeckMedia(count: number): Promise<boolean> {
-    const message: string = this.getUIContext().getHostContext()!.resourceManager.getStringSync(
-      $r('app.string.deck_media_confirm_message').id).replace('%d', count.toString());
+    const message: string = resourceText(this.getUIContext(),
+      $r('app.string.deck_media_confirm_message')).replace('%d', count.toString());
     return new Promise<boolean>((resolve): void => {
       this.getUIContext().showAlertDialog({
         title: $r('app.string.deck_media_confirm_title'),
@@ -1736,13 +1695,13 @@ struct 首页 {
       next.add(deckId);
       this.隐藏的牌组ID集合 = next;
       this.牌组数据源.replaceAll(可见牌组行(this.主页快照数据.decks, this.展开的牌组ID集合, this.隐藏的牌组ID集合));
-      this.getUIContext().getPromptAction().showToast({
-        message: this.getUIContext().getHostContext()!.resourceManager.getStringSync($r('app.string.deck_hide_success').id)
+      showToastSafely(this.getUIContext(), {
+        message: resourceText(this.getUIContext(), $r('app.string.deck_hide_success'))
       });
     } catch (error) {
       // 持久化失败仅 Toast 提示，不阻断
-      this.getUIContext().getPromptAction().showToast({
-        message: this.getUIContext().getHostContext()!.resourceManager.getStringSync($r('app.string.deck_hide_failed').id)
+      showToastSafely(this.getUIContext(), {
+        message: resourceText(this.getUIContext(), $r('app.string.deck_hide_failed'))
       });
     }
   }
@@ -1754,12 +1713,12 @@ struct 首页 {
     if (this.deferForSync((): void => { this.显示隐藏牌组对话框(); })) return;
     const count: number = this.隐藏的牌组ID集合.size;
     if (count === 0) {
-      this.getUIContext().getPromptAction().showToast({
-        message: this.getUIContext().getHostContext()!.resourceManager.getStringSync($r('app.string.hidden_decks_empty').id)
+      showToastSafely(this.getUIContext(), {
+        message: resourceText(this.getUIContext(), $r('app.string.hidden_decks_empty'))
       });
       return;
     }
-    const title: string = this.getUIContext().getHostContext()!.resourceManager.getStringSync($r('app.string.hidden_decks_title').id);
+    const title: string = resourceText(this.getUIContext(), $r('app.string.hidden_decks_title'));
     const message: string = `${count}`;
     this.nativeDialogOpen = true;
     this.getUIContext().showAlertDialog({
@@ -1818,8 +1777,8 @@ struct 首页 {
     if (this.定制牌组中) return;
     const trimmedName: string = result.新名.trim();
     if (trimmedName === '') {
-      this.定制牌组错误 = this.getUIContext().getHostContext()!.resourceManager.getStringSync(
-        $r('app.string.deck_customize_name_empty').id);
+      this.定制牌组错误 = resourceText(this.getUIContext(),
+        $r('app.string.deck_customize_name_empty'));
       return;
     }
     const deckId: string = this.定制牌组ID;
@@ -1842,8 +1801,8 @@ struct 首页 {
       if (this.homeDisposed) return;
       this.定制牌组错误 = error instanceof Error ? error.message : `${error}`;
       if (this.定制牌组错误 === '') {
-        this.定制牌组错误 = this.getUIContext().getHostContext()!.resourceManager.getStringSync(
-          $r('app.string.deck_customize_rename_failed').id);
+        this.定制牌组错误 = resourceText(this.getUIContext(),
+          $r('app.string.deck_customize_rename_failed'));
       }
     } finally {
       if (!this.homeDisposed) this.定制牌组中 = false;
@@ -1879,7 +1838,7 @@ struct 首页 {
         resource = $r('app.string.cloud_deck_invalid_catalog');
       }
     }
-    return this.getUIContext().getHostContext()!.resourceManager.getStringSync(resource.id);
+    return resourceText(this.getUIContext(), resource);
   }
 
   /**
@@ -2000,7 +1959,7 @@ struct 首页 {
 
   /** 把 Resource 取成本地化字符串；showDialog 只收 string，不收 Resource。 */
   private 取本地化文本(resource: Resource): string {
-    return this.getUIContext().getHostContext()!.resourceManager.getStringSync(resource.id);
+    return resourceText(this.getUIContext(), resource);
   }
 
   /** 点击首次引导中的 QQ 群提示时复制群号；复制结果通过本地化提示反馈。 */
@@ -2379,8 +2338,8 @@ struct 首页 {
     try {
       const context: common.UIAbilityContext | null = this.取能力上下文();
       if (context === null) {
-        throw new Error(this.getUIContext().getHostContext()!.resourceManager.getStringSync(
-          $r('app.string.ability_context_unavailable').id));
+        throw new Error(resourceText(this.getUIContext(),
+          $r('app.string.ability_context_unavailable')));
       }
       const newDeckId: number = await this.deckCommands.create(context.filesDir, name);
       if (this.homeDisposed) return;
@@ -2493,7 +2452,7 @@ struct 首页 {
       case 'deck_date_validation_error': resource = $r('app.string.deck_date_validation_error'); break;
       default: resource = $r('app.string.deck_learn_steps_validation_error');
     }
-    return this.getUIContext().getHostContext()!.resourceManager.getStringSync(resource.id);
+    return resourceText(this.getUIContext(), resource);
   }
 
   // ========================================================

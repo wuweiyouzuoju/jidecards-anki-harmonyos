@@ -56,15 +56,18 @@ const CUSTOM_SERVER_KEY: string = 'custom_sync_server';
 const AUTO_SYNC_KEY: string = 'auto_sync_enabled';
 
 /** 用户配置独立于服务器重定向，注销后仍可用同一地址重新登录。 */
+/** @throws {Error} 同步端点读取失败，调用方必须停止连接，不能回退到其他服务器。 */
 export function loadCustomSyncServer(): string {
   const store: preferences.Preferences | null = 打开存储();
-  return store === null ? '' : 读取字符串(store, CUSTOM_SERVER_KEY);
+  if (store === null) throw new Error('Sync preferences unavailable');
+  return 读取字符串(store, CUSTOM_SERVER_KEY);
 }
 
 /**
  * 保存基础地址并撤销旧服务器会话；写盘失败恢复内存缓存并上抛给设置页。
  * Invariants: 新服务器不得收到旧服务器 hkey；不保存密码。
  */
+/** @throws {Error} 同步偏好读写失败，调用方不得更新已保存状态。 */
 export async function saveCustomSyncServer(input: string): Promise<string> {
   const endpoint: string = normalizeSyncServer(input);
   const store: preferences.Preferences | null = 打开存储();
@@ -90,10 +93,16 @@ export async function saveCustomSyncServer(input: string): Promise<string> {
 /** 自动同步默认开启，保留用户明确保存的关闭选择。 */
 export function loadAutoSyncEnabled(): boolean {
   const store: preferences.Preferences | null = 打开存储();
-  return store === null || store.getSync(AUTO_SYNC_KEY, true) === true;
+  try {
+    return store === null || store.getSync(AUTO_SYNC_KEY, true) === true;
+  } catch (error) {
+    hilog.warn(0x4342, 'jidecards', 'Automatic sync preference unavailable; keep sync disabled');
+    return false;
+  }
 }
 
 /** 等待开关落盘，失败时 UI 保留原值。 */
+/** @throws {Error} 同步偏好读写失败，调用方不得更新已保存状态。 */
 export async function saveAutoSyncEnabled(enabled: boolean): Promise<void> {
   const store: preferences.Preferences | null = 打开存储();
   if (store === null) throw new Error('Sync preferences unavailable');
@@ -163,6 +172,7 @@ function 静默落盘(存储: preferences.Preferences): void {
   });
 }
 
+/** @throws {Error} 同步偏好读写失败，调用方不得更新已保存状态。 */
 function 读取字符串(存储: preferences.Preferences, 键: string): string {
   const 值: preferences.ValueType = 存储.getSync(键, '');
   return typeof 值 === 'string' ? 值 : '';

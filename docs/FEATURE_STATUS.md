@@ -17,7 +17,7 @@
 - APKG 是牌组包，CSS 是笔记类型的卡片样式；单独的 `.css` 文件不包含牌组数据。模板 CSS 已由 Core 渲染结果传入学习和浏览预览共用的 `学习卡片HTML构建器.ts`。
 - 模板样式与应用默认/兜底样式分别包装，兼容样式字段中的 `</style><script>`，防止应用 CSS 变成正文。保留既有配色层叠顺序，不删除模板脚本。
 - 学习和预览都通过 `utils/CardAssetResponse.ets` 加载 HAP 内置 jQuery 3.7.1（与 Anki 锁定版本一致）和 MathJax；jQuery 在模板脚本前同步加载，不依赖 CDN。保留第三方完整发行文件和许可。
-- 验证边界：1069 项 Node 测试、31 项真实浏览器回归和完整构建通过；用户提供的 `blank.apkg` 抽样三张，明暗主题正反面共 12 种组合可显示题目、四个选项、答案解析，选择/对比答案无脚本报错。该牌组须从作者服务获取脚本，离线时题目仍为空；不是纯离线牌组。未验证全部卡片、全部第三方牌组或鸿蒙真机，不代表支持所有 Anki 插件/API。
+- 验证边界：当前 Node 测试结果以本次 `npm test` 输出为准；另有 31 项真实浏览器历史回归记录。用户提供的 `blank.apkg` 曾抽样三张，明暗主题正反面共 12 种组合可显示题目、四个选项、答案解析，选择/对比答案无脚本报错。该牌组须从作者服务获取脚本，离线时题目仍为空；不是纯离线牌组。未验证全部卡片、全部第三方牌组或鸿蒙真机，不代表支持所有 Anki 插件/API。
 - 回归入口：`tools/tests/card-template-style.test.mjs`、`tools/test-card-template-browser.mjs`、`tools/tests/math-rendering.test.mjs`。上游依据：[模板样式包装](https://github.com/ankitects/anki/blob/main/pylib/anki/template.py)、[reviewer 的 jQuery 导出](https://github.com/ankitects/anki/blob/main/ts/reviewer/index.ts)。
 
 ## 备份与恢复
@@ -116,4 +116,4 @@
 - 已接入系统 FileOpen、自定义 APKG UTD、EntryAbility 冷/热启动接收及首页直接导入；与原文件选择器共用现有暂存、Anki Core 导入、进度/错误展示及牌组刷新。
 - 学习、编辑、同步或弹层占用时等待首页空闲；排队/导入中的同一 URI 去重，不自动导入 COLPKG。
 - 发送应用必须交付文件 URI 及读取授权。当前设备为模拟器，华为真机上文件管理/聊天应用“其他应用打开”的候选列表及授权读取仍待实测。
-- 验证结果：1167 项 Node 测试、Rust 双架构及 ArkTS/HAP 构建通过；模拟器覆盖安装与启动成功，安装包管理信息确认 FileOpen / APKG 类型已登记。此结果不等同于华为真机端到端验收。
+- 验证结果：该功能接入时的记录为 1167 项 Node 测试、Rust 双架构及 ArkTS/HAP 构建通过；当前工作树需重新运行 `npm run verify`，不沿用历史测试总数。历史模拟器覆盖安装与启动成功，安装包管理信息确认 FileOpen / APKG 类型已登记；此结果不等同于华为真机端到端验收。

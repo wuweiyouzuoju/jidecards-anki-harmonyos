@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { resourceText, showToastSafely } from '../../utils/UiFeedback';
 import { ThemeTextSpans } from '../common/ThemeText';
 import { DialogHeader } from '../common/DialogHeader';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
@@ -88,6 +89,7 @@ export struct 同步分组 {
   @State private 媒体同步开启: boolean = true;
   @State private serverInput: string = '';
   @State private savedServer: string = '';
+  @State private serverLoaded: boolean = false;
   @State private settingsSaving: boolean = false;
   @State private autoSyncEnabled: boolean = true;
   @State private serverError: string = '';
@@ -141,8 +143,14 @@ export struct 同步分组 {
     }
     // 读取媒体同步开关（默认 true）
     this.媒体同步开启 = 加载媒体同步开关();
-    this.savedServer = loadCustomSyncServer();
-    this.serverInput = this.savedServer;
+    try {
+      this.savedServer = loadCustomSyncServer();
+      this.serverInput = this.savedServer;
+      this.serverLoaded = true;
+    } catch (error) {
+      this.serverLoaded = false;
+      this.错误文本 = this.取本地化文本($r('app.string.sync_server_load_failed'));
+    }
     this.autoSyncEnabled = loadAutoSyncEnabled();
   }
 
@@ -167,6 +175,7 @@ export struct 同步分组 {
     this.settingsSaving = true;
     try {
       this.savedServer = await saveCustomSyncServer(this.serverInput);
+      this.serverLoaded = true;
       this.serverInput = this.savedServer;
       this.密码输入 = '';
       this.serverDialogController.close();
@@ -211,7 +220,7 @@ export struct 同步分组 {
   }
 
   private 取本地化文本(资源: Resource): string {
-    return this.getUIContext().getHostContext()!.resourceManager.getStringSync(资源.id);
+    return resourceText(this.getUIContext(), 资源);
   }
 
   /** 按钮背景专用主色（配 #FFFFFF 文字 ≥ 4.5:1）。2.1.4.1 深色模式修复。 */
@@ -234,7 +243,7 @@ export struct 同步分组 {
         const 剪贴数据: pasteboard.PasteData =
           pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, this.注册网址);
         await pasteboard.getSystemPasteboard().setData(剪贴数据);
-        this.getUIContext().getPromptAction().showToast({
+        showToastSafely(this.getUIContext(), {
           message: $r('app.string.about_ankiweb_open_failed')
         });
       } catch (剪贴错误) {
@@ -262,6 +271,10 @@ export struct 同步分组 {
   // ========================================================
   private async 点击登录(): Promise<void> {
     if (this.syncSettingsBusy()) return;
+    if (!this.serverLoaded) {
+      this.错误文本 = this.取本地化文本($r('app.string.sync_server_load_failed'));
+      return;
+    }
     if (this.登录中 || this.settingsSaving || this.serverInput !== this.savedServer) {
       return;
     }
@@ -432,8 +445,8 @@ export struct 同步分组 {
       .fontColor('#FFFFFF')
       .backgroundColor(this.解析主色按钮背景())
       .borderRadius(22)
-      .enabled(!this.登录中 && !this.settingsSaving && this.serverInput === this.savedServer)
-      .opacity(this.登录中 || this.settingsSaving || this.serverInput !== this.savedServer ? 0.6 : 1)
+      .enabled(this.serverLoaded && !this.登录中 && !this.settingsSaving && this.serverInput === this.savedServer)
+      .opacity(!this.serverLoaded || this.登录中 || this.settingsSaving || this.serverInput !== this.savedServer ? 0.6 : 1)
       .onClick((): void => {
         this.点击登录();
       })

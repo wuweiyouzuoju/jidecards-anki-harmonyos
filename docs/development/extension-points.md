@@ -34,7 +34,7 @@
 | 修改主题/语言 | `model/主题设置.ets`、`model/语言存储.ets`、资源目录 | ThemeMode/ColorTheme 正交；语言切换需重启 |
 | 修改动画 | `utils/转场时长.ets`、`pages/首页.ets`、相关组件 | 导航/全屏层 200–300ms 淡入淡出；小菜单与展开 150ms；按压 80ms；禁止横向飞入 |
 | 修改学习音频 | `utils/AudioFocusCoordinator.ets`、`声音播放器.ets`、`TTS播放器.ets` | 跨应用混音由 AudioSession 管理；`SHARE_MODE` 只管应用内多流 |
-| 修改 Agent | `pages/AI制卡页.ets`、`backend/agent/`、`model/agent/` | 不绕过 Scope、确认和 DraftExecutor |
+| 修改应用内 Agent | `pages/AI制卡页.ets`、`backend/agent/`、`model/agent/` | 不绕过 Scope、确认及 DraftExecutor / ActionExecutor；见 [执行边界](agent.md) |
 | 修改发布入口 | `model/ReleaseFeatures.ets` 及入口契约测试 | 以 ReleaseFeatures.ets 的实际开关为准 |
 | 升级版本 | `AppScope/app.json5` | 同步 README、公告范围与发布记录 |
 
@@ -47,7 +47,7 @@
 | 新增页面 | `pages/首页.ets` 的目的地映射 | 学习页、浏览页、统计页 |
 | 新增设置分组 | `model/SettingsNavigation.ts`、`components/设置面板.ets`、`components/settings/` | `GeneralSettings.ets`、静态 `设置分组卡片.ets`；先核对同目录 `SETTINGS_PARITY.md` |
 | 新增统计图 | `components/stats/`、统计色板/分箱模型 | 复习卡、日历卡 |
-| 新增 Agent 工具 | `model/agent/AgentToolCatalog.ts` + 工具实现 | Scope、Schema、审计与确认必须同时覆盖 |
+| 新增应用内 Agent 工具 | `model/agent/AgentToolCatalog.ts` 汇总目录；辅助动作定义在 `AgentExtensionTools.ts` | Scope、Schema、审计与确认必须同时覆盖；提案工具不依赖确认执行器 |
 | 新增 Provider | `model/agent/ProviderCatalog.ts` + `backend/agent/*Adapter.ets` | Responses/SSE 契约，不做静默降级 |
 | 新增语言 | `resources/<locale>/element/string.json` + 语言存储/设置 UI | 资源 key 与 base 对齐 |
 | 新增动效 | 先复用现有按压、展开、小菜单、弹窗或导航节奏 | 优先 opacity/scale 合成属性，不用动画完成回调驱动业务 |
@@ -62,7 +62,7 @@
 - 公式脚本在正文前加载，模板可配置 MathJax 宏；答案滚动等待排版完成。内置 MathJax/MathML 资源通过 `https://jidecards-render.local/` 响应，不依赖 CDN。
 - `@Builder` 按值参数可能形成快照；动态状态需显式引用或放回组件状态。
 - 统计组件的 `build()` 保持单根容器；Builder 内避免声明临时变量。
-- model 层避免 import `@kit.*`，否则 Node 测试加载失败。
+- `model/**/*.ts` 与 `proto/**/*.ts` 只依赖这两层的 `.ts`，保持 Node 可直接测试；既有 `model/*.ets` 平台存储适配器另行做 HAP/设备验证。
 - Agent UI 当前隐藏且联网搜索关闭；Provider capability 不等于发布能力。
 - `docs/superpowers/` 与 `.trae/` 是历史记录，checkbox 和旧测试数量不能当当前事实。
 

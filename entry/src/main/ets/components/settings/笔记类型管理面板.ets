@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { resourceText, showToastSafely } from '../../utils/UiFeedback';
 import { ThemeTextSpans } from '../common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
@@ -36,7 +37,6 @@ import { 颜色键 } from '../../model/颜色主题';
 import { 取全屏转场时长, 取全屏转场曲线 } from '../../utils/转场时长';
 import { 标准笔记类型种类 } from '../../proto/messages/NotetypeMessages';
 import type { NotetypeNameId } from '../../proto/messages/NotetypeMessages';
-import { promptAction } from '@kit.ArkUI';
 
 @Component
 export struct 笔记类型管理面板 {
@@ -58,7 +58,7 @@ export struct 笔记类型管理面板 {
   }
 
   private 取本地化文本(资源: Resource): string {
-    return this.getUIContext().getHostContext()!.resourceManager.getStringSync(资源.id);
+    return resourceText(this.getUIContext(), 资源);
   }
 
   private async 刷新列表(): Promise<void> {
@@ -83,7 +83,7 @@ export struct 笔记类型管理面板 {
       const json: string = await this.服务.获取标准笔记类型JSON(标准笔记类型种类.BASIC);
       const newId: number = await this.服务.添加笔记类型旧版(json);
       if (newId > 0) {
-        promptAction.showToast({
+        showToastSafely(this.getUIContext(), {
           message: this.取本地化文本($r('app.string.notetype_mgmt_created')),
           duration: 2000
         });

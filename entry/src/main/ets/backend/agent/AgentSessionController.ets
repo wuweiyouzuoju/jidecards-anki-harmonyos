@@ -5,6 +5,7 @@ import type { AgentRunObserver, AgentRunResult } from './AgentRunner';
 import { AgentScope } from './AgentScope';
 import { AgentWorkspaceStore } from './AgentWorkspaceStore';
 import { AgentAuxiliaryTools } from './AgentAuxiliaryTools';
+import { AgentActionExecutor } from './AgentActionExecutor';
 import type { ProviderInputItem, ProviderTurnRequest } from '../../model/agent/ProviderProtocol';
 import type { ProviderId } from '../../model/agent/AgentTypes';
 import type { AgentAction } from '../../model/agent/AgentAction';
@@ -17,7 +18,8 @@ export class AgentSessionController {
   private readonly runner: AgentRunner;
   private readonly scope: AgentScope;
   private readonly store: AgentWorkspaceStore;
-  readonly auxiliary: AgentAuxiliaryTools;
+  private readonly auxiliary: AgentAuxiliaryTools;
+  readonly actionExecutor: AgentActionExecutor;
   private input: ProviderInputItem[] = [];
   private waitingCallId: string = '';
   private action: AgentAction | null = null;
@@ -27,8 +29,10 @@ export class AgentSessionController {
 
   constructor(runner: AgentRunner, scope: AgentScope, store: AgentWorkspaceStore, auxiliary: AgentAuxiliaryTools) {
     this.runner = runner; this.scope = scope; this.store = store; this.auxiliary = auxiliary;
+    this.actionExecutor = new AgentActionExecutor(scope, store);
   }
 
+  /** @throws {Error} 会话或工作区读取失败，由页面保留对话并显示错误。 */
   async run(provider: ProviderId, request: ProviderTurnRequest, observer: AgentRunObserver,
     resumeOutput: string = ''): Promise<AgentRunResult> {
     if (resumeOutput.length === 0) { this.requireYearCloze = this.scope.createRequiresYearCloze(); }
@@ -63,7 +67,7 @@ export class AgentSessionController {
       const result: AgentRunResult = await this.runner.run(provider, request, observer);
       if (result.action !== undefined) {
         await this.auxiliary.prepareAction(result.action);
-        this.action = result.action; this.auxiliary.registerPending(result.action);
+        this.action = result.action; this.actionExecutor.registerPending(result.action);
       }
       this.input = this.runner.getContinuationInput();
       if (result.status === 'awaiting_clarification' || result.status === 'awaiting_confirmation') {
@@ -114,7 +118,7 @@ export class AgentSessionController {
       safe.readableIds[2] ?? [], safe.readableIds[3] ?? []);
     this.scope.retrieval.restore(safe.retrieval);
     this.action = safe.action;
-    if (this.action !== null && this.action.status === 'pending') { this.auxiliary.registerPending(this.action); }
+    if (this.action !== null && this.action.status === 'pending') { this.actionExecutor.registerPending(this.action); }
     if (this.action !== null && this.action.status === 'executing') {
       this.action.status = 'failed';
       this.action.resultJson = '{"status":"execution_outcome_unknown","instruction":"Inspect current state before proposing again."}';

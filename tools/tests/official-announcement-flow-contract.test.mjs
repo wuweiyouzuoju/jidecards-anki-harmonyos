@@ -132,21 +132,22 @@ test('home closes and continues even when acknowledgement persistence fails', ()
   assert.match(method, /await this\.继续首次弹窗序列\(\)/);
 });
 
-test('hosted announcement manifest publishes the v2.3.6 release notice under 5 KiB', () => {
+test('hosted announcement manifest publishes the v2.7.9 release notice under 5 KiB', () => {
   const text = read('../../hosting/announcement.json');
   const manifest = JSON.parse(text);
   assert.equal(manifest.schemaVersion, 1);
   assert.equal(manifest.announcement.enabled, true);
-  assert.equal(manifest.announcement.id, '20260911-v2.3.6-release');
-  assert.equal(manifest.announcement.titleZh, '记得闪卡 v2.3.6 更新');
-  assert.equal(manifest.announcement.titleEn, "What's new in jidecards v2.3.6");
-  assert.match(manifest.announcement.contentZh, /动画效果/);
-  assert.match(manifest.announcement.contentZh, /设置 → 开发者调试/);
-  assert.match(manifest.announcement.contentZh, /获取调试资格/);
-  assert.match(manifest.announcement.contentEn, /smoother and clearer experience/);
-  assert.match(manifest.announcement.contentEn, /Settings → Developer Debug/);
-  assert.equal(manifest.announcement.minimumAppVersion, '2.3.6');
-  assert.equal(manifest.announcement.maximumAppVersion, '2.3.6');
+  assert.equal(manifest.announcement.id, '20260922-v2.7.9-release');
+  assert.equal(manifest.announcement.titleZh, '记得闪卡 v2.7.9 更新');
+  assert.equal(manifest.announcement.titleEn, "What's new in jidecards v2.7.9");
+  assert.match(manifest.announcement.contentZh, /自动同步/);
+  assert.match(manifest.announcement.contentZh, /外部 APKG/);
+  assert.match(manifest.announcement.contentZh, /联网搜索当前未开放/);
+  assert.match(manifest.announcement.contentEn, /automatic sync/);
+  assert.match(manifest.announcement.contentEn, /external APKG/);
+  assert.match(manifest.announcement.contentEn, /web search is currently disabled/);
+  assert.equal(manifest.announcement.minimumAppVersion, '2.7.9');
+  assert.equal(manifest.announcement.maximumAppVersion, '2.7.9');
   assert.equal(manifest.announcement.actionUrl, '');
   assert.ok(Buffer.byteLength(text, 'utf8') <= 5 * 1024);
 });

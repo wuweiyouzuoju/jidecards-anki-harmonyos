@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { namedResourceText, resourceText } from '../../utils/UiFeedback';
 import { SelectStyle } from '../../utils/SelectStyle';
 
 import { 主题模式 } from '../../model/主题设置';
@@ -48,7 +49,7 @@ export struct 外观分组 {
   颜色主题切换回调: (主题: 颜色主题) => void = (主题: 颜色主题): void => {};
 
   private 取本地化文本(资源: Resource): string {
-    return this.getUIContext().getHostContext()!.resourceManager.getStringSync(资源.id);
+    return resourceText(this.getUIContext(), 资源);
   }
 
   private 主题模式标签(模式: 主题模式): string {
@@ -62,7 +63,7 @@ export struct 外观分组 {
   }
 
   private 颜色主题展示名文本(主题: 颜色主题): string {
-    return this.getUIContext().getHostContext()!.resourceManager.getStringByNameSync('theme_color_' + 主题);
+    return namedResourceText(this.getUIContext(), 'theme_color_' + 主题);
   }
 
   // ---- 主题模式 Select 选项 / 索引 ----

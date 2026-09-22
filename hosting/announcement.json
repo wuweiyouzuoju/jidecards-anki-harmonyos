@@ -1,17 +1,17 @@
 {
   "schemaVersion": 1,
   "announcement": {
-    "id": "20260911-v2.3.6-release",
+    "id": "20260922-v2.7.9-release",
     "enabled": true,
-    "titleZh": "记得闪卡 v2.3.6 更新",
-    "contentZh": "【优化】优化页面转场、菜单、弹窗和折叠区域的动画效果，并调整统计页等界面布局，操作更顺滑、信息更清晰。\n\n【开发者测试】AI 制卡与改卡能力面向开发者测试，可前往「设置 → 开发者调试」查看申请方式并获取调试资格。",
-    "titleEn": "What's new in jidecards v2.3.6",
-    "contentEn": "[Improved] Refined page transitions, menus, dialogs, disclosure animations, and selected layouts, including the Statistics page, for a smoother and clearer experience.\n\n[Developer Preview] AI card creation and editing are available for developer testing. Open Settings → Developer Debug and follow the instructions to request access.",
-    "publishedAt": "2026-09-11T00:00:00+08:00",
-    "startsAt": "2026-09-11T00:00:00+08:00",
+    "titleZh": "记得闪卡 v2.7.9 更新",
+    "contentZh": "【学习与同步】完善自动前进、自动操作、音频等待、答题计时器、评分触感和自动同步的实际执行链路。\n\n【数据与浏览】增加云端牌组目录、外部 APKG 打开、备份恢复、浏览批量操作和统计设置整理，并修复过期响应覆盖新状态的问题。\n\n【卡片渲染】统一学习页与预览页的模板样式、脚本、MathJax、媒体 Range 请求和音频生命周期。\n\n【开发者功能】Agent 源码能力仍保留，发布包入口默认关闭；联网搜索当前未开放。",
+    "titleEn": "What's new in jidecards v2.7.9",
+    "contentEn": "[Study and sync] Improved automatic actions, audio waiting, answer timing, haptic feedback, and automatic sync.\n\n[Data and browsing] Added the public cloud deck catalog, external APKG opening, backup and restore, batch browser operations, and organized statistics settings.\n\n[Card rendering] Unified template styles, scripts, MathJax, media range requests, and audio lifecycles between study and preview.\n\n[Developer features] Agent source capabilities remain available for developer testing, while release-package entry points stay hidden and web search is currently disabled.",
+    "publishedAt": "2026-09-22T00:00:00+08:00",
+    "startsAt": "2026-09-22T00:00:00+08:00",
     "expiresAt": "2099-12-31T23:59:59+08:00",
-    "minimumAppVersion": "2.3.6",
-    "maximumAppVersion": "2.3.6",
+    "minimumAppVersion": "2.7.9",
+    "maximumAppVersion": "2.7.9",
     "actionUrl": ""
   }
 }

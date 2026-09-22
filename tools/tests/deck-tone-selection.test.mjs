@@ -1,3 +1,4 @@
+import { compileWithUiFeedback } from './ui-feedback-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -14,7 +15,7 @@ const methods = ['toneOptions', 'toneIndex', 'toneLabel', 'selectTone', '取色�
   return source.slice(start, source.indexOf('\n  }', start) + 4);
 });
 const options = source.match(/private readonly 色条选项列表: 色条选项\[\] = \[[\s\S]*?\n  \];/)[0];
-const Deck = new Function('牌组色调', '$r', stripTypeScriptTypes(
+const Deck = compileWithUiFeedback('牌组色调', '$r', stripTypeScriptTypes(
   `class Deck { ${options} ${methods.join('\n')} }`, { mode: 'transform' }) + '; return Deck;')(牌组色调, id => ({ id }));
 
 test('native tone selection reflects five common colors plus no stripe and targets the current deck', () => {
@@ -46,7 +47,7 @@ test('None produces a transparent stripe with no theme gradient in every theme',
   const start = source.indexOf('        Column()', source.indexOf('// 色条：tone===None'));
   const end = source.indexOf('\n        Column({', start);
   assert.ok(start >= 0 && end > start);
-  const render = new Function('Column', '应用尺寸', 'Color', '牌组色调', source.slice(start, end));
+  const render = compileWithUiFeedback('Column', '应用尺寸', 'Color', '牌组色调', source.slice(start, end));
   const deck = new Deck();
   for (const theme of THEME_CATALOG) {
     deck.visual = theme;

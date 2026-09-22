@@ -31,7 +31,7 @@ import { 统一空态 } from '../components/common/统一空态';
 @Component
 export struct 学习提醒页 {
   @State private 转场透明度: number = 1;
-  private pathStack?: NavPathStack;
+  pathStack?: NavPathStack;
 
   @StorageLink(颜色键.主色按钮背景) private 主色按钮背景链接: string = '';
   @StorageLink(PAGE_SURFACE_KEY) private 页面底色微染值: string = '#F5F7FA';

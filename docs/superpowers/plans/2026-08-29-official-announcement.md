@@ -3,8 +3,6 @@
 > 归档状态：这是一次性历史设计/执行记录，不是当前路线图、待办列表或操作手册。未勾选项不表示仍未实现；当前事实请查阅 [文档导航](../../README.md)、[开发状态](../../DEVELOPMENT_PLAN.md)、[当前架构](../../architecture.md) 和实际源码/测试。
 
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** Add a non-dismissible, once-per-announcement startup notice whose public JSON is hosted through 123 Cloud Disk static hosting and whose management credentials never enter the app.
 
 **Architecture:** A pure TypeScript model validates the remote protocol and decides whether a notice targets the current version and time. A small NetworkKit service fetches the public JSON with a five-minute cache-busting key, an ArkData store remembers acknowledged IDs, and the home page serializes the announcement before the existing cloud-deck onboarding and version welcome modal. ArkUI renders remote text natively; optional detail HTML opens only in the system browser.

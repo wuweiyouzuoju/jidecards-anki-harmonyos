@@ -8,6 +8,7 @@
 // Invariants: 数据键为距今天数（rslib 语义：0=今天，-1=昨天，-N=N 天前；正数=未来不出现）；build 单根 Column。
 
 import { common } from '@kit.AbilityKit';
+import { resourceText } from '../../utils/UiFeedback';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import type { ReviewKindCounts } from '../../proto/messages/StatsMessages';
 import { 应用尺寸 } from '../../utils/应用尺寸';
@@ -229,12 +230,12 @@ export struct 复习卡 {
     const ctx: common.UIAbilityContext | null = this.取能力上下文();
     if (小时 > 0) {
       return ctx !== null
-        ? ctx.resourceManager.getStringSync($r('app.string.stats_time_format_hour').id, 小时, 分)
+        ? resourceText(this.getUIContext(), $r('app.string.stats_time_format_hour'), 小时, 分)
         : `${小时}h${分}m`;
     }
     const 秒: number = 总秒 % 60;
     return ctx !== null
-      ? ctx.resourceManager.getStringSync($r('app.string.stats_time_format').id, 分, 秒)
+      ? resourceText(this.getUIContext(), $r('app.string.stats_time_format'), 分, 秒)
       : `${分}m${秒}s`;
   }
 

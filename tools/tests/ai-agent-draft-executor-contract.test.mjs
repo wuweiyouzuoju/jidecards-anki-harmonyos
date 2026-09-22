@@ -44,7 +44,7 @@ test('confirmation can be checked without consuming it before the second dialog'
   assert.doesNotThrow(() => manager.consume(first, 'danger-check', 1, 10_200));
 });
 
-test('draft executor is the sole service-writing boundary and revalidates before preparation', () => {
+test('ChangeDraft executor exposes confirmation paths and revalidates before preparation', () => {
   const executor = fs.readFileSync(
     path.join(root, 'entry/src/main/ets/backend/agent/AgentDraftExecutor.ets'), 'utf8',
   );
@@ -62,7 +62,7 @@ test('draft executor is the sole service-writing boundary and revalidates before
 test('runner and tool registry cannot import or call the write executor', () => {
   const runner = fs.readFileSync(path.join(root, 'entry/src/main/ets/backend/agent/AgentRunner.ets'), 'utf8');
   const registry = fs.readFileSync(path.join(root, 'entry/src/main/ets/backend/agent/AgentToolRegistry.ets'), 'utf8');
-  assert.doesNotMatch(runner + registry, /AgentDraftExecutor|executeHighRisk|executeOrdinary/);
+  assert.doesNotMatch(runner + registry, /AgentDraftExecutor|AgentActionExecutor|executeConfirmed|executeHighRisk|executeOrdinary/);
 });
 
 test('executor marks a post-confirmation baseline mismatch as conflict before writing', () => {

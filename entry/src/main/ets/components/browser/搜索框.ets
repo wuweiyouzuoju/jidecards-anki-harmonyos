@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { resourceText } from '../../utils/UiFeedback';
 import { SelectStyle } from '../../utils/SelectStyle';
 
 // ========================================================
@@ -48,12 +49,12 @@ export struct 搜索框 {
   build() {
     Row({ space: 应用尺寸.间距_8 }) {
       Select([
-        { value: this.getUIContext().getHostContext()!.resourceManager.getStringSync($r('app.string.browser_mode_cards').id) },
-        { value: this.getUIContext().getHostContext()!.resourceManager.getStringSync($r('app.string.browser_mode_notes').id) }
+        { value: resourceText(this.getUIContext(), $r('app.string.browser_mode_cards')) },
+        { value: resourceText(this.getUIContext(), $r('app.string.browser_mode_notes')) }
       ])
         .selected(this.浏览模式值 === 'cards' ? 0 : 1)
-        .value(this.getUIContext().getHostContext()!.resourceManager.getStringSync(
-          (this.浏览模式值 === 'cards' ? $r('app.string.browser_mode_cards') : $r('app.string.browser_mode_notes')).id))
+        .value(resourceText(this.getUIContext(),
+          (this.浏览模式值 === 'cards' ? $r('app.string.browser_mode_cards') : $r('app.string.browser_mode_notes'))))
         .attributeModifier(new SelectStyle($r('app.color.surface_card')))
         .font(SelectStyle.controlFont)
         .borderRadius(SelectStyle.controlRadius)

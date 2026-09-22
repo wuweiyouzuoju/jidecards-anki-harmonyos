@@ -11,6 +11,15 @@ const source = read('entry/src/main/ets/utils/媒体响应助手.ets')
 const load = new Function('fs', 'WebResourceResponse',
   stripTypeScriptTypes(source, { mode: 'transform' }) + '; return interceptMediaRequest;');
 
+test('a cleanup failure still completes a failed response without an unhandled rejection', async () => {
+  const h = harness({ statFailure: true, closeFailure: true });
+  const response = await h.run();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(response.code, 500);
+  assert.deepEqual(response.transitions, [false, true]);
+  assert.deepEqual(h.closed, [10]);
+});
+
 class Response {
   code = 0;
   headers = [];

@@ -275,6 +275,7 @@ export class TTS播放器 implements AudioQueuePlayer<TtsItem> {
     }
   }
 
+  /** @throws {Error} 语音引擎创建失败，交由朗读入口处理。 */
   private async 确保引擎(语种: string): Promise<textToSpeech.TextToSpeechEngine> {
     // 鸿蒙 CoreSpeechKit 多数设备只预装 zh-CN 音色；en-US 等需用户在系统设置下载后才能 createEngine。
     // 这里先按 listVoices 探测音色状态，未 INSTALLED 的语言直接降级到 zh-CN（zh-CN 引擎也能读英文，发音不标准但出声）。

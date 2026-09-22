@@ -530,7 +530,7 @@ export struct 统计页 {
           有数据: this.图表数据 !== null && this.图表数据.today !== null,
           帮助标题: $r('app.string.stats_section_today'),
           帮助正文: $r('app.string.stats_help_today'),
-          onHelp: this.on分区帮助.bind(this)
+          onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
         }) {
           今日计数卡({
             今日数据: this.图表数据 !== null ? this.图表数据.today : null,
@@ -547,7 +547,7 @@ export struct 统计页 {
           有数据: this.图表数据 !== null && this.图表数据.futureDue !== null,
           帮助标题: $r('app.string.stats_section_forecast'),
           帮助正文: $r('app.string.stats_help_forecast'),
-          onHelp: this.on分区帮助.bind(this)
+          onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
         }) {
           预测卡({
             范围索引: this.forecastRange,
@@ -566,7 +566,7 @@ export struct 统计页 {
           有数据: this.图表数据 !== null && this.图表数据.reviewCountsByDaysAgo !== null,
           帮助标题: $r('app.string.stats_section_calendar'),
           帮助正文: $r('app.string.stats_help_calendar'),
-          onHelp: this.on分区帮助.bind(this)
+          onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
         }) {
           日历卡({
             复习计数: this.图表数据 !== null ? this.图表数据.reviewCountsByDaysAgo : null,
@@ -588,7 +588,7 @@ export struct 统计页 {
           有数据: this.图表数据 !== null && this.图表数据.reviewCountsByDaysAgo !== null,
           帮助标题: $r('app.string.stats_section_reviews'),
           帮助正文: $r('app.string.stats_help_reviews'),
-          onHelp: this.on分区帮助.bind(this)
+          onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
         }) {
           复习卡({
             范围索引: this.reviewsRange,
@@ -604,7 +604,7 @@ export struct 统计页 {
           有数据: this.图表数据 !== null && this.图表数据.cardCounts !== null,
           帮助标题: $r('app.string.stats_section_card_counts'),
           帮助正文: $r('app.string.stats_help_card_counts'),
-          onHelp: this.on分区帮助.bind(this)
+          onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
         }) {
           卡片状态分布({
             卡片计数: this.图表数据 !== null ? this.图表数据.cardCounts : null,
@@ -624,7 +624,7 @@ export struct 统计页 {
           有数据: this.图表数据 !== null && this.图表数据.intervals !== null,
           帮助标题: $r('app.string.stats_section_interval'),
           帮助正文: $r('app.string.stats_help_interval'),
-          onHelp: this.on分区帮助.bind(this)
+          onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
         }) {
           间隔分布卡({
             范围索引: this.intervalRange,
@@ -642,7 +642,7 @@ export struct 统计页 {
             有数据: this.图表数据.stability !== null,
             帮助标题: $r('app.string.stats_section_stability'),
             帮助正文: $r('app.string.stats_help_stability'),
-            onHelp: this.on分区帮助.bind(this)
+            onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
           }) {
             稳定度分布卡({
             范围索引: this.stabilityRange,
@@ -663,7 +663,7 @@ export struct 统计页 {
             && (this.图表数据.eases !== null || this.图表数据.difficulty !== null),
           帮助标题: $r('app.string.stats_section_ease'),
           帮助正文: $r('app.string.stats_help_ease'),
-          onHelp: this.on分区帮助.bind(this)
+          onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
         }) {
           难度分布卡({
             范围索引: this.difficultyRange,
@@ -683,7 +683,7 @@ export struct 统计页 {
             有数据: this.图表数据.retrievability !== null,
             帮助标题: $r('app.string.stats_section_retrievability'),
             帮助正文: $r('app.string.stats_help_retrievability'),
-            onHelp: this.on分区帮助.bind(this)
+            onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
           }) {
             记忆率卡({
             范围索引: this.retrievabilityRange,
@@ -701,7 +701,7 @@ export struct 统计页 {
           有数据: this.图表数据 !== null && this.图表数据.trueRetention !== null,
           帮助标题: $r('app.string.stats_section_retention'),
           帮助正文: $r('app.string.stats_help_retention'),
-          onHelp: this.on分区帮助.bind(this)
+          onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
         }) {
           真实保留率卡({
             视图索引: this.retentionView,
@@ -724,7 +724,7 @@ export struct 统计页 {
           有数据: this.图表数据 !== null && this.图表数据.hours !== null,
           帮助标题: $r('app.string.stats_section_hours'),
           帮助正文: $r('app.string.stats_help_hours'),
-          onHelp: this.on分区帮助.bind(this)
+          onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
         }) {
           小时分布卡({
             小时数据: this.图表数据 !== null ? this.图表数据.hours : null,
@@ -742,7 +742,7 @@ export struct 统计页 {
           有数据: this.图表数据 !== null && this.图表数据.buttons !== null,
           帮助标题: $r('app.string.stats_section_buttons'),
           帮助正文: $r('app.string.stats_help_buttons'),
-          onHelp: this.on分区帮助.bind(this)
+          onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
         }) {
           回答按钮卡({
             范围索引: this.buttonsRange,
@@ -760,7 +760,7 @@ export struct 统计页 {
           有数据: this.图表数据 !== null && this.图表数据.added !== null,
           帮助标题: $r('app.string.stats_section_added'),
           帮助正文: $r('app.string.stats_help_added'),
-          onHelp: this.on分区帮助.bind(this)
+          onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
         }) {
           新增卡({
             范围索引: this.addedRange,

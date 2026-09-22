@@ -3,8 +3,6 @@
 > 归档状态：这是一次性历史设计/执行记录，不是当前路线图、待办列表或操作手册。未勾选项不表示仍未实现；当前事实请查阅 [文档导航](../../README.md)、[开发状态](../../DEVELOPMENT_PLAN.md)、[当前架构](../../architecture.md) 和实际源码/测试。
 
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** Build a native ArkTS bounded Agent runtime with DeepSeek-first provider selection, OpenAI/Custom adapters, secure key storage, real SSE events, web-search evidence, and safe semantic tool dispatch.
 
 **Architecture:** Pure TypeScript defines events, messages, provider capabilities, tool schemas, policy and draft state. Harmony-specific adapters own NetworkKit, Asset Store and persistence. `AgentRunner` consumes normalized provider events and invokes an allow-listed `AgentToolRegistry`; write tools return drafts only.

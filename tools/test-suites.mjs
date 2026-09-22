@@ -5,14 +5,14 @@ import { join } from 'node:path';
 // 领域筛选用于开发反馈，不声称是变更影响分析；all 始终从磁盘发现全部测试。
 export const SUITES = {
   release: /^(release-export|signing-config)/,
-  tooling: /^(doctor|tooling|build-app-wrapper|release-export|signing-config|documentation-contract|architecture-boundaries)/,
+  tooling: /^(doctor|tooling|change-impact|build-app-wrapper|build-warnings|release-export|signing-config|documentation-contract|architecture-boundaries)/,
   home: /^(home-|page-(?:operation|domain|repositories)|external-deck|cloud-deck|official-announcement|deck-media|sync-automatic)/,
   study: /^(page-domain|page-repositories|study-|bury-congrats|audio-|card-audio|native-audio|undo-|proto-study|deck-config|review-|tap-zone)/,
   sync: /sync|study-session|page-(?:operation|domain|repositories)|native-bridge/,
   browser: /browser|page-(?:operation|domain|repositories)|preview|search|note|card-info/,
   media: /media|audio|render|math|latex|jquery|preview|card-template/,
   agent: /page-domain|page-repositories|agent|provider|draft|sse/,
-  ui: /theme|color|spacing|layout|settings|ui-shell|i18n|brand|stats|navigation/,
+  ui: /theme|color|spacing|layout|settings|ui-shell|ui-feedback|platform-warning|i18n|brand|stats|navigation/,
   repo: /documentation-contract|architecture-boundaries|i18n-contract|brand-contract/
 };
 

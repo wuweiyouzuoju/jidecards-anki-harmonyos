@@ -139,7 +139,7 @@ test('unconfigured home AI entries route to the expanded AI settings group', () 
   assert.match(settingsPanel,
     /private openSection\(id: string\): void[\s\S]*?this\.activeSection = id;/);
   const aiToast = settingsPanel.match(/if \(this\.openAiSettings\) \{([\s\S]*?)\n    \}/)?.[1] ?? '';
-  assert.match(aiToast, /showToast\(\{[\s\S]*?ai_agent_config_required[\s\S]*?\}\)/,
+  assert.match(aiToast, /showToastSafely\(this\.getUIContext\(\), \{[\s\S]*?ai_agent_config_required[\s\S]*?\}\)/,
     'the hint must be a floating toast, not inline layout copy');
   assert.doesNotMatch(settingsPanel, /if \(this\.显示AI配置提示\) \{/,
     'no inline hint text may be embedded in the group layout');

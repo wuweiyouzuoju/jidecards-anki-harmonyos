@@ -69,6 +69,7 @@ function 背景图文件路径(上下文: common.UIAbilityContext, 牌组ID: str
 }
 
 /** 确保 deck_backgrounds 目录存在；已存在不重复创建。 */
+/** @throws {Error} 背景图文件或偏好写入失败，调用方保留原图并报告独立失败。 */
 async function 确保背景图目录存在(上下文: common.UIAbilityContext): Promise<void> {
   const 目录路径: string = `${上下文.filesDir}/${背景图目录名}`;
   try {
@@ -248,6 +249,7 @@ export async function 加载牌组背景图映射(牌组ID列表: string[]): Pro
  * 同时删除该 牌组ID 的旧文件，避免沙盒堆积。
  * 失败时抛出错误（调用方 UI 显示），不静默吞掉——因为图片保存失败是用户能感知的明显问题。
  */
+/** @throws {Error} 背景图文件或偏好写入失败，调用方保留原图并报告独立失败。 */
 export async function 保存牌组背景图(牌组ID: string, 像素图: PixelMap): Promise<string> {
   const 上下文: common.UIAbilityContext | null = 获取能力上下文();
   if (上下文 === null) {

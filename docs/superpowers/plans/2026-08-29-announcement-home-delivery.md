@@ -3,8 +3,6 @@
 > 归档状态：这是一次性历史设计/执行记录，不是当前路线图、待办列表或操作手册。未勾选项不表示仍未实现；当前事实请查阅 [文档导航](../../README.md)、[开发状态](../../DEVELOPMENT_PLAN.md)、[当前架构](../../architecture.md) 和实际源码/测试。
 
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** Extend the completed official-announcement feature so a supported client checks immediately on cold start and, after returning to the home page, checks immediately or once the ten-minute window expires, while preserving one acknowledgement per announcement ID.
 
 **Architecture:** Keep protocol parsing and timing arithmetic in the pure TypeScript announcement model. The home page owns one in-memory coordinator for visibility, single-flight fetches, one delayed timer, and per-process acknowledgement suppression; every real navigation return enters the same coordinator. The public JSON remains a small anonymous 123 Cloud Disk direct-link resource, but deployment is gated on proving that same-name replacement preserves one stable HTTPS long link.

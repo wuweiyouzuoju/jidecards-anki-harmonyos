@@ -59,6 +59,7 @@ export async function initializeAiAgentChannels(): Promise<void> {
 }
 
 /** Validates the developer key and permanently enables the hidden Agent channels. */
+/** @throws {Error} 解锁偏好未成功落盘，不得通知入口已开放。 */
 export async function enableAiAgentChannels(developerKey: string): Promise<boolean> {
   if (!isDeveloperDebugKeyValid(developerKey)) {
     return false;

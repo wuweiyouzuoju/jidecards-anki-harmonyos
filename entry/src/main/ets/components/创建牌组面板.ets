@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { resourceText } from '../utils/UiFeedback';
 import { ThemeTextSpans } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
@@ -108,12 +109,12 @@ export struct 创建牌组面板 {
   // 无。
   // ========================================================
   private 取本地化文本(resource: Resource): string {
-    return this.getUIContext().getHostContext()!.resourceManager.getStringSync(resource.id);
+    return resourceText(this.getUIContext(), resource);
   }
 
   /** 先格式化牌组名，再交给主题文字渲染，避免资源参数在 Builder 中丢失。 */
   private formatPreview(resource: Resource, ...names: string[]): string {
-    return this.getUIContext().getHostContext()!.resourceManager.getStringSync(resource.id, ...names);
+    return resourceText(this.getUIContext(), resource, ...names);
   }
 
   // ========================================================

@@ -3,8 +3,6 @@
 > 归档状态：这是一次性历史设计/执行记录，不是当前路线图、待办列表或操作手册。未勾选项不表示仍未实现；当前事实请查阅 [文档导航](../../README.md)、[开发状态](../../DEVELOPMENT_PLAN.md)、[当前架构](../../architecture.md) 和实际源码/测试。
 
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** Build a deployable static portfolio for 无谓又左 at `jideyanggeqi.cn`, initially documenting 记得闪卡 with complete crawler and AI-readable metadata.
 
 **Architecture:** Publish the existing `hosting/` directory as the web root. Core pages are hand-authored semantic HTML with one shared stylesheet and no required JavaScript; machine-readable files mirror the visible content. Existing `announcement.json` and `cloud-decks.json` remain at their current paths.

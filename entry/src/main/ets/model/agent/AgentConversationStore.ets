@@ -280,6 +280,7 @@ export async function loadAgentConversations(): Promise<AgentConversation[]> {
   } catch (error) { return []; }
 }
 
+/** @throws {Error} 历史存储提交失败，调用方记录或展示错误。 */
 export async function saveAgentConversation(value: AgentConversation): Promise<void> {
   const store: preferences.Preferences | null = await openStore();
   if (store === null) { return; }
@@ -292,6 +293,7 @@ export async function saveAgentConversation(value: AgentConversation): Promise<v
   await store.flush();
 }
 
+/** @throws {Error} 历史存储提交失败，调用方记录或展示错误。 */
 export async function deleteAgentConversation(id: string): Promise<void> {
   const store: preferences.Preferences | null = await openStore();
   if (store === null) { return; }

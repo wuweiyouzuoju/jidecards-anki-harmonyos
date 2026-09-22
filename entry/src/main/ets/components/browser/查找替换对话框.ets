@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { resourceText } from '../../utils/UiFeedback';
 
 import { DialogHeader } from '../common/DialogHeader';
 // ========================================================
@@ -115,7 +116,7 @@ export struct 查找替换对话框 {
   /** 读取本地化文案，context 不可用时回退空串。 */
   private 取本地化文案(资源: Resource): string {
     try {
-      return getContext(this).resourceManager.getStringSync(资源.id);
+      return resourceText(this.getUIContext(), 资源);
     } catch (_错误) {
       return '';
     }

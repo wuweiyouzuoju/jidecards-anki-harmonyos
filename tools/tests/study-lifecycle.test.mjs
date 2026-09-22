@@ -1,3 +1,4 @@
+import { compileWithUiFeedback } from './ui-feedback-harness.mjs';
 import { attachStudySession } from './study-session-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import fs from 'node:fs';
@@ -14,7 +15,7 @@ const methods = names.map(name => {
   assert.ok(start >= 0);
   return source.slice(start, source.indexOf('\n  }', start) + 4);
 });
-const Page = new Function('DialogAlignment', 'playStudyHaptic', '构建卡片HTML', '剥除拼写标记', '提取拼写标记', '原始侧HTML', '媒体基地址', 'CustomTransition', '刷新桌面卡片数据', 'AppStorage', 'SECONDS_PER_DAY', '$r', 'console',
+const Page = compileWithUiFeedback('DialogAlignment', 'playStudyHaptic', '构建卡片HTML', '剥除拼写标记', '提取拼写标记', '原始侧HTML', '媒体基地址', 'CustomTransition', '刷新桌面卡片数据', 'AppStorage', 'SECONDS_PER_DAY', '$r', 'console',
   stripTypeScriptTypes(`class Page { ${methods.join('\n')} }`, {mode:'transform'}) + '; return Page;')(
   { Center: 0 }, () => {}, (card, side) => `${card.id}-${side}`, html => html, () => null,
   (card, side) => `${card.id}-${side}`, 'media://',

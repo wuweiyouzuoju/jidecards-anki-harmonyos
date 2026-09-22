@@ -101,17 +101,12 @@ test('active Markdown uses valid relative links', () => {
     'AGENTS.md',
     'PROJECT_CONTEXT.md',
     'tools/README.md',
-    ...markdownFiles(path.join(root, 'docs/development')).map(file => path.relative(root, file)),
+    ...markdownFiles(path.join(root, 'docs'))
+      .filter(file => !path.relative(root, file).replaceAll('\\', '/').startsWith('docs/superpowers/'))
+      .map(file => path.relative(root, file)),
     ...markdownFiles(path.join(root, '.agents')).map(file => path.relative(root, file)),
+    ...markdownFiles(path.join(root, 'entry/src/main/ets')).map(file => path.relative(root, file)),
     'NOTICE.md',
-    'docs/README.md',
-    'docs/DEVELOPMENT_PLAN.md',
-    'docs/architecture.md',
-    'docs/agent-2-design.md',
-    'docs/cloud-deck-hosting.md',
-    'docs/official-announcement-hosting.md',
-    'docs/CSDN-记得闪卡项目全解.md',
-    'docs/releases/3.0.0.md',
     'docs/superpowers/README.md',
   ];
   const broken = [];
@@ -148,4 +143,85 @@ test('historical plans and specs are visibly archived', () => {
       path.relative(root, record));
   }
   assert.match(read('docs/releases/3.0.0.md'), /草案（未发布）/);
+});
+
+test('coding Agent-first rules are explicit and historical plans cannot issue commands', () => {
+  const agents = read('AGENTS.md');
+  const context = read('PROJECT_CONTEXT.md');
+  const codingAgent = read('docs/development/coding-agent.md');
+  const appAgent = read('docs/development/agent.md');
+  const decisions = read('docs/decisions/README.md');
+  const developmentPlan = read('docs/DEVELOPMENT_PLAN.md');
+  const decision = read('docs/decisions/2026-09-agent-first.md');
+  assert.match(agents, /最高优先级：编程 Agent-first/);
+  assert.match(agents, /只有根目录 `AGENTS\.md`、`\.agents\/` 和当前领域文档可以约束编程 Agent/);
+  assert.match(context, /编程 Agent-first 是本项目最高开发优先级/);
+  assert.match(context, /编程 Agent 协作与跨域决策/);
+  assert.match(context, /pages\/AI制卡页\.ets/);
+  assert.match(codingAgent, /本页只约束负责修改 jidecards 仓库的编程 Agent/);
+  assert.match(codingAgent, /编程 Agent-first 是本项目最高开发优先级/);
+  assert.match(codingAgent, /开发任务契约/);
+  assert.match(codingAgent, /\.agents\/rules\/paths/);
+  assert.match(appAgent, /本页只描述产品运行时的应用内 Agent，不描述负责修改仓库的编程 Agent/);
+  assert.match(decisions, /随源码一起版本控制/);
+  assert.match(developmentPlan, /最高开发优先级是编程 Agent-first/);
+  assert.match(decision, /应用内 Agent 是产品运行时能力/);
+  assert.match(read('docs/superpowers/README.md'), /不能约束当前编程 Agent/);
+  assert.doesNotMatch(agents, /\.trae\/decisions\.md/);
+  for (const file of markdownFiles(path.join(root, '.agents'))) {
+    assert.doesNotMatch(readFileSync(file, 'utf8'), /\.trae\/decisions\.md|SearchCodebase/,
+      path.relative(root, file));
+  }
+  for (const source of [context, codingAgent, developmentPlan, decision]) {
+    assert.doesNotMatch(source, /并优先推进应用内 Agent/);
+  }
+
+  const historicalInstructions = markdownFiles(path.join(root, 'docs', 'superpowers'))
+    .filter((file) => path.basename(file) !== 'README.md')
+    .filter((file) => /For agentic workers|REQUIRED SUB-SKILL|subagent-driven-development|executing-plans/.test(
+      readFileSync(file, 'utf8')))
+    .map((file) => path.relative(root, file));
+  assert.deepEqual(historicalInstructions, [],
+    'archived plans must not contain executable instructions for coding Agents');
+});
+
+test('coding Agent navigation has scoped rules, ownership, and a task contract', () => {
+  const agents = read('AGENTS.md');
+  const context = read('PROJECT_CONTEXT.md');
+  const ownership = read('docs/development/ownership.md');
+  const taskContract = read('docs/development/task-contract.md');
+  const verification = read('docs/development/verification.md');
+  const pathRules = ['README.md', 'entry.md', 'native.md', 'tools.md', 'docs.md'];
+
+  assert.match(agents, /\.agents\/rules\/paths/);
+  assert.match(agents, /所有开发和维护都必须方便后续编程 Agent/);
+  assert.match(context, /模块责任与变更入口/);
+  assert.match(context, /开发任务契约/);
+  assert.match(ownership, /## `entry`/);
+  assert.match(ownership, /## `native`/);
+  assert.match(ownership, /## `tools`/);
+  assert.match(taskContract, /目标/);
+  assert.match(taskContract, /不变量/);
+  assert.match(taskContract, /实际执行的命令/);
+  assert.match(verification, /按变更路径选择验证/);
+
+  for (const file of pathRules) {
+    const source = read(`.agents/rules/paths/${file}`);
+    assert.ok(source.length > 0, `.agents/rules/paths/${file} must not be empty`);
+  }
+  assert.doesNotMatch(agents, /并优先推进应用内 Agent/);
+  assert.match(taskContract, /不能只存在聊天上下文/);
+});
+
+test('current docs route confirmation owners and do not freeze current test totals', () => {
+  for (const file of ['docs/development/agent.md', 'docs/agent-2-design.md', 'docs/architecture.md']) {
+    assert.match(read(file), /AgentActionExecutor/);
+    assert.match(read(file), /AgentDraftExecutor/);
+    assert.doesNotMatch(read(file), /唯一卡库写入边界/);
+  }
+  for (const file of ['AGENTS.md', 'PROJECT_CONTEXT.md', 'docs/FEATURE_STATUS.md',
+    ...markdownFiles(path.join(root, 'docs/development')).map(file => path.relative(root, file))]) {
+    assert.doesNotMatch(read(file), /当前(?:工作树)?[^\n。]*测试(?:为|数[量为是：:]*)\s*\d+/,
+      file);
+  }
 });

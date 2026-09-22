@@ -90,6 +90,7 @@ export function 当前语言模式(): 语言模式 {
 // @副作用
 // 调用 i18n.System.setAppPreferredLanguage，可能触发系统级应用语言重载。
 // ========================================================
+/** @throws {Error} 系统语言设置失败，调用方显示错误且不宣称切换完成。 */
 export function 设置语言模式(模式: 语言模式): void {
   i18n.System.setAppPreferredLanguage(模式);
 }

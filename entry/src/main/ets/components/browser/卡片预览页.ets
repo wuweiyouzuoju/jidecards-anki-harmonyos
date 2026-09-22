@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { resourceText } from '../../utils/UiFeedback';
 
 // ========================================================
 // @块ID UI-BROWSER-PREVIEW-001
@@ -293,6 +294,7 @@ export struct 卡片预览页 {
   }
 
   /** 控制器可用后安装只读交互桥；失败时下一次重试会再次安装。 */
+  /** @throws {Error} Web 桥安装失败，调用方切换到可重试错误态。 */
   private installActionBridge(): void {
     if (this.bridgeReady) return;
     const proxy: PreviewActionProxy = new PreviewActionProxy();
@@ -392,7 +394,7 @@ export struct 卡片预览页 {
   /** 读取本地化文案，context 不可用时回退空串。 */
   private 取本地化文案(资源: Resource): string {
     try {
-      return this.getUIContext().getHostContext()!.resourceManager.getStringSync(资源.id);
+      return resourceText(this.getUIContext(), 资源);
     } catch (_错误) {
       return '';
     }

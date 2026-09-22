@@ -5,6 +5,7 @@ import { preferences } from '@kit.ArkData';
 const INTRO_KEY: string = 'home_intro_completed_v1';
 
 /** 与旧更新日志独立，一次确认对所有牌组生效。 */
+/** @throws {Error} 入门确认未持久化，调用方不得标记完成。 */
 function getStore(): preferences.Preferences {
   const context: common.UIAbilityContext | undefined = AppStorage.get<common.UIAbilityContext>('abilityContext');
   if (context === undefined) throw new Error('Ability context unavailable');
@@ -17,6 +18,7 @@ export async function isHomeIntroCompleted(): Promise<boolean> {
 }
 
 /** 只有用户确认且写入成功才完成；失败恢复缓存供下次重试。 */
+/** @throws {Error} 入门确认未持久化，调用方不得标记完成。 */
 export async function completeHomeIntro(): Promise<void> {
   const store: preferences.Preferences = getStore();
   const previous: preferences.ValueType = store.getSync(INTRO_KEY, false);

@@ -1,0 +1,348 @@
+{
+  "revision": "e64c6b1",
+  "fingerprint": "afa5a5461804026cb53c479bbb447316ca753b1f12f7b2e087b0f8f8bde6963b",
+  "services": {
+    "sync": {
+      "id": 1,
+      "methods": {
+        "0": "sync_media",
+        "1": "abort_media_sync",
+        "2": "media_sync_status",
+        "3": "sync_login",
+        "4": "sync_status",
+        "5": "sync_collection",
+        "6": "full_upload_or_download",
+        "7": "abort_sync",
+        "8": "set_custom_certificate"
+      }
+    },
+    "collection": {
+      "id": 3,
+      "methods": {
+        "0": "open_collection",
+        "1": "close_collection",
+        "2": "create_backup",
+        "3": "await_backup_completion",
+        "4": "latest_progress",
+        "5": "set_wants_abort",
+        "6": "check_database",
+        "7": "get_undo_status",
+        "8": "undo",
+        "9": "redo",
+        "10": "add_custom_undo_entry",
+        "11": "merge_undo_entries",
+        "14": "set_load_balancer_enabled",
+        "15": "get_custom_colours"
+      }
+    },
+    "cards": {
+      "id": 5,
+      "methods": {
+        "0": "get_card",
+        "1": "update_cards",
+        "2": "remove_cards",
+        "3": "set_deck",
+        "4": "set_flag"
+      }
+    },
+    "decks": {
+      "id": 7,
+      "methods": {
+        "0": "new_deck",
+        "1": "add_deck",
+        "2": "add_deck_legacy",
+        "3": "add_or_update_deck_legacy",
+        "4": "deck_tree",
+        "5": "deck_tree_legacy",
+        "6": "get_all_decks_legacy",
+        "7": "get_deck_id_by_name",
+        "8": "get_deck",
+        "9": "update_deck",
+        "10": "update_deck_legacy",
+        "11": "set_deck_collapsed",
+        "12": "get_deck_legacy",
+        "13": "get_deck_names",
+        "14": "get_deck_and_child_names",
+        "15": "new_deck_legacy",
+        "16": "remove_decks",
+        "17": "reparent_decks",
+        "18": "rename_deck",
+        "19": "get_or_create_filtered_deck",
+        "20": "add_or_update_filtered_deck",
+        "21": "filtered_deck_order_labels",
+        "22": "set_current_deck",
+        "23": "get_current_deck"
+      }
+    },
+    "config": {
+      "id": 9,
+      "methods": {
+        "0": "get_config_json",
+        "1": "set_config_json",
+        "2": "set_config_json_no_undo",
+        "3": "remove_config",
+        "4": "get_all_config",
+        "5": "get_config_bool",
+        "6": "set_config_bool",
+        "7": "get_config_string",
+        "8": "set_config_string",
+        "9": "get_preferences",
+        "10": "set_preferences"
+      }
+    },
+    "deck_config": {
+      "id": 11,
+      "methods": {
+        "0": "add_or_update_deck_config_legacy",
+        "1": "get_deck_config",
+        "2": "all_deck_config_legacy",
+        "3": "get_deck_config_legacy",
+        "4": "new_deck_config_legacy",
+        "5": "remove_deck_config",
+        "6": "get_deck_configs_for_update",
+        "7": "update_deck_configs",
+        "8": "get_ignored_before_count",
+        "9": "get_retention_workload"
+      }
+    },
+    "scheduler": {
+      "id": 13,
+      "methods": {
+        "0": "compute_fsrs_params_from_items",
+        "1": "fsrs_benchmark",
+        "2": "export_dataset",
+        "3": "get_queued_cards",
+        "4": "answer_card",
+        "5": "sched_timing_today",
+        "6": "studied_today",
+        "7": "studied_today_message",
+        "8": "update_stats",
+        "9": "extend_limits",
+        "10": "counts_for_deck_today",
+        "11": "congrats_info",
+        "12": "restore_buried_and_suspended_cards",
+        "13": "unbury_deck",
+        "14": "bury_or_suspend_cards",
+        "15": "empty_filtered_deck",
+        "16": "rebuild_filtered_deck",
+        "17": "schedule_cards_as_new",
+        "18": "schedule_cards_as_new_defaults",
+        "19": "set_due_date",
+        "20": "grade_now",
+        "21": "sort_cards",
+        "22": "sort_deck",
+        "23": "get_scheduling_states",
+        "24": "describe_next_states",
+        "25": "state_is_leech",
+        "26": "upgrade_scheduler",
+        "27": "custom_study",
+        "28": "custom_study_defaults",
+        "29": "reposition_defaults",
+        "30": "compute_fsrs_params",
+        "31": "get_optimal_retention_parameters",
+        "32": "compute_optimal_retention",
+        "33": "simulate_fsrs_review",
+        "34": "simulate_fsrs_workload",
+        "35": "evaluate_params",
+        "36": "evaluate_params_legacy",
+        "37": "compute_memory_state",
+        "38": "fuzz_delta"
+      }
+    },
+    "ankidroid": {
+      "id": 15,
+      "methods": {
+        "0": "sched_timing_today_legacy",
+        "1": "local_minutes_west_legacy",
+        "2": "set_page_size",
+        "3": "debug_produce_error",
+        "4": "run_db_command",
+        "5": "run_db_command_proto",
+        "6": "insert_for_id",
+        "7": "run_db_command_for_row_count",
+        "8": "flush_all_queries",
+        "9": "flush_query",
+        "10": "get_next_result_page",
+        "11": "get_column_names_from_query",
+        "12": "get_active_sequence_numbers"
+      }
+    },
+    "anki_hub": {
+      "id": 17,
+      "methods": {
+        "0": "ankihub_login",
+        "1": "ankihub_logout"
+      }
+    },
+    "ankiweb": {
+      "id": 19,
+      "methods": {
+        "0": "get_addon_info",
+        "1": "check_for_update"
+      }
+    },
+    "links": {
+      "id": 21,
+      "methods": {
+        "0": "help_page_link"
+      }
+    },
+    "notetypes": {
+      "id": 23,
+      "methods": {
+        "0": "add_notetype",
+        "1": "update_notetype",
+        "2": "add_notetype_legacy",
+        "3": "update_notetype_legacy",
+        "4": "add_or_update_notetype",
+        "5": "get_stock_notetype_legacy",
+        "6": "get_notetype",
+        "7": "get_notetype_legacy",
+        "8": "get_notetype_names",
+        "9": "get_notetype_names_and_counts",
+        "10": "get_notetype_id_by_name",
+        "11": "remove_notetype",
+        "12": "get_aux_notetype_config_key",
+        "13": "get_aux_template_config_key",
+        "14": "get_change_notetype_info",
+        "15": "change_notetype",
+        "16": "get_field_names",
+        "17": "restore_notetype_to_stock",
+        "18": "get_cloze_field_ords"
+      }
+    },
+    "notes": {
+      "id": 25,
+      "methods": {
+        "0": "new_note",
+        "1": "add_note",
+        "2": "add_notes",
+        "3": "defaults_for_adding",
+        "4": "default_deck_for_notetype",
+        "5": "update_notes",
+        "6": "get_note",
+        "7": "remove_notes",
+        "8": "cloze_numbers_in_note",
+        "9": "after_note_updates",
+        "10": "field_names_for_notes",
+        "11": "note_fields_check",
+        "12": "cards_of_note",
+        "13": "get_single_notetype_of_notes"
+      }
+    },
+    "card_rendering": {
+      "id": 27,
+      "methods": {
+        "0": "strip_html",
+        "1": "all_tts_voices",
+        "2": "write_tts_stream",
+        "3": "extract_av_tags",
+        "4": "extract_latex",
+        "5": "get_empty_cards",
+        "6": "render_existing_card",
+        "7": "render_uncommitted_card",
+        "8": "render_uncommitted_card_legacy",
+        "9": "strip_av_tags",
+        "10": "render_markdown",
+        "11": "encode_iri_paths",
+        "12": "decode_iri_paths",
+        "14": "html_to_text_line",
+        "15": "compare_answer",
+        "16": "extract_cloze_for_typing"
+      }
+    },
+    "search": {
+      "id": 29,
+      "methods": {
+        "0": "build_search_string",
+        "1": "search_cards",
+        "2": "search_notes",
+        "3": "join_search_nodes",
+        "4": "replace_search_node",
+        "5": "find_and_replace",
+        "6": "all_browser_columns",
+        "7": "browser_row_for_id",
+        "8": "set_active_browser_columns"
+      }
+    },
+    "github": {
+      "id": 33,
+      "methods": {
+        "0": "get_latest_release",
+        "1": "download_release"
+      }
+    },
+    "i18n": {
+      "id": 35,
+      "methods": {
+        "0": "translate_string",
+        "1": "format_timespan",
+        "2": "i18n_resources"
+      }
+    },
+    "image_occlusion": {
+      "id": 37,
+      "methods": {
+        "0": "get_image_for_occlusion",
+        "1": "get_image_occlusion_note",
+        "2": "get_image_occlusion_fields",
+        "3": "add_image_occlusion_notetype",
+        "4": "add_image_occlusion_note",
+        "5": "update_image_occlusion_note"
+      }
+    },
+    "import_export": {
+      "id": 39,
+      "methods": {
+        "0": "import_collection_package",
+        "1": "export_collection_package",
+        "2": "import_anki_package",
+        "3": "get_import_anki_package_presets",
+        "4": "export_anki_package",
+        "5": "get_csv_metadata",
+        "6": "import_csv",
+        "7": "export_note_csv",
+        "8": "export_card_csv",
+        "9": "import_json_file",
+        "10": "import_json_string"
+      }
+    },
+    "media": {
+      "id": 41,
+      "methods": {
+        "0": "check_media",
+        "1": "add_media_file",
+        "2": "trash_media_files",
+        "3": "empty_trash",
+        "4": "restore_trash",
+        "5": "extract_static_media_files"
+      }
+    },
+    "stats": {
+      "id": 43,
+      "methods": {
+        "0": "card_stats",
+        "1": "get_review_logs",
+        "2": "graphs",
+        "3": "get_graph_preferences",
+        "4": "set_graph_preferences"
+      }
+    },
+    "tags": {
+      "id": 45,
+      "methods": {
+        "0": "clear_unused_tags",
+        "1": "all_tags",
+        "2": "remove_tags",
+        "3": "set_tag_collapsed",
+        "4": "tag_tree",
+        "5": "reparent_tags",
+        "6": "rename_tags",
+        "7": "add_note_tags",
+        "8": "remove_note_tags",
+        "9": "find_and_replace_tag",
+        "10": "complete_tag"
+      }
+    }
+  }
+}

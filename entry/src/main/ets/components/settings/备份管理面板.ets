@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { resourceText } from '../../utils/UiFeedback';
 import { common } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { 设置面板色板_取 } from '../../utils/设置面板配色';
@@ -90,7 +91,7 @@ export struct 备份管理面板 {
   }
 
   private text(resource: Resource): string {
-    return this.getUIContext().getHostContext()!.resourceManager.getStringSync(resource.id);
+    return resourceText(this.getUIContext(), resource);
   }
 
   build() {

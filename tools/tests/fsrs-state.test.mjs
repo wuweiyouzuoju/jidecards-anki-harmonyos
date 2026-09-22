@@ -1,3 +1,4 @@
+import { compileWithUiFeedback } from './ui-feedback-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,7 +19,7 @@ function componentMethods(path, names, dependencies) {
     return source.slice(start, source.indexOf('\n  }', start) + 4);
   });
   const js = stripTypeScriptTypes(`class Component { ${methods.join('\n')} }`, { mode: 'transform' });
-  return new Function(...Object.keys(dependencies), js + '\nreturn Component;')(...Object.values(dependencies));
+  return compileWithUiFeedback(...Object.keys(dependencies), js + '\nreturn Component;')(...Object.values(dependencies));
 }
 
 function dialogHarness(path, { current = false, choice = 0, save = async () => true } = {}) {
@@ -133,7 +134,7 @@ test('the controller verifies saved FSRS and notifies readers even on write/read
       }
       async 更新牌组配置() { if (failure === 'write') throw new Error('write failed'); }
     }
-    const save = new Function('牌组配置服务', '默认牌组ID', '构造请求', 'notifyFsrsStateChanged', '刷新桌面卡片数据', 'hilog',
+    const save = compileWithUiFeedback('牌组配置服务', '默认牌组ID', '构造请求', 'notifyFsrsStateChanged', '刷新桌面卡片数据', 'hilog',
       js + ';return 设置FSRS开启状态;')(
       Service, 1, () => ({}), () => notifications++, async () => desktopRefreshes++, { error() {} }
     );

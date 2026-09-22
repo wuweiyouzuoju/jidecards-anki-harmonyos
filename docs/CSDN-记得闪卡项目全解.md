@@ -12,6 +12,8 @@ CSDN 标签建议：HarmonyOS, ArkTS, Rust, Anki, FSRS
 
 # 把 Anki 26.05 Rust Core 接到 HarmonyOS：记得闪卡 jidecards 源码架构全解（欢迎共建）
 
+> 历史快照：本文记录 2026-09-08 的一次源码审读。文中的版本号、文件数量、测试数量、发布开关名称和设备验证结果只代表当时工作树；当前版本、构建基线和发布状态请以根目录 README、PROJECT_CONTEXT.md 和 docs/DEVELOPMENT_PLAN.md 为准。
+
 如果要在 HarmonyOS 上做一个真正能长期使用的闪卡客户端，最难的部分不是写几个“正面/背面”页面，而是调度算法、模板渲染、媒体、同步、导入导出和数据兼容。
 
 [jidecards（记得闪卡）](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos) 的选择很直接：HarmonyOS 侧用 ArkTS/ArkUI 做原生交互，不另造一套调度器和数据库，而是把 Anki 26.05 的 Rust Core 接进来。

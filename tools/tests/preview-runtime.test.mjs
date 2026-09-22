@@ -318,8 +318,9 @@ test('preview wiring stays read-only, handles web errors, and preserves home/edi
   assert.match(editor, /onPop:[\s\S]*this\.显示卡片预览 = true/);
   assert.match(home, /onPositionChanged:[\s\S]*this\.预览初始索引 = index/);
   const autoSync = home.match(/private tryAutoSync[\s\S]*?\n  }/)[0];
-  assert.match(autoSync, /activity: this\.homeActivity\(\)/);
-  assert.match(autoSync, /decideHomeSync\(/);
+  assert.match(autoSync, /this\.syncController\.tryStart\(\)/);
+  const syncHost = home.match(/private homeSyncHost[\s\S]*?\n  }/)[0];
+  assert.match(syncHost, /activity:[^\n]*this\.homeActivity\(\)/);
   assert.match(read('entry/src/main/ets/model/HomeSyncPolicy.ts'), /canStartHomeAutoSync\(activity\)/);
   const activity = home.match(/private homeActivity[\s\S]*?\n  }/)[0];
   assert.match(activity, /this\.显示卡片预览/);

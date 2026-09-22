@@ -32,6 +32,7 @@ export async function loadAgentSecret(providerId: ProviderId): Promise<string> {
   }
 }
 
+/** @throws {Error} 系统安全存储写入失败，不得报告密钥保存成功。 */
 export async function saveAgentSecret(providerId: ProviderId, secret: string): Promise<void> {
   const normalized: string = secret.trim();
   if (normalized.length === 0) {

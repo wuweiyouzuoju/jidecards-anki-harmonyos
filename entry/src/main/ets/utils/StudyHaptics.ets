@@ -9,6 +9,7 @@ const SOFT_EFFECT: string = 'haptic.effect.soft';
 let softEffectSupported: boolean = false;
 
 /** 评分触感只保存在本机，复用现有设置存储。 */
+/** @throws {Error} 触感偏好读写失败，调用方保持原设置并反馈错误。 */
 function getHapticsPreferences(): preferences.Preferences {
   const context: common.UIAbilityContext | undefined = AppStorage.get<common.UIAbilityContext>('abilityContext');
   if (context === undefined) {
@@ -39,6 +40,7 @@ async function prepareStudyHaptics(): Promise<void> {
 }
 
 /** 保存成功才广播，失败恢复 preferences 内存值并交由设置页提示。 */
+/** @throws {Error} 触感偏好读写失败，调用方保持原设置并反馈错误。 */
 export async function saveStudyHaptics(enabled: boolean): Promise<void> {
   const store: preferences.Preferences = getHapticsPreferences();
   const previous: preferences.ValueType = store.getSync(STUDY_HAPTICS_KEY, true);

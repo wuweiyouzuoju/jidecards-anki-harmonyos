@@ -102,6 +102,7 @@ function parsedContent(content: string, warningCode: string = ''): ParsedAgentCo
   return { content: normalizeAgentDocumentText(content), warningCode: warningCode };
 }
 
+/** @throws {Error} 附件读取或解包失败，传播到文件导入入口，禁止返回部分内容冒充成功。 */
 function readFileBytes(file: fs.File, size: number): Uint8Array {
   const output: Uint8Array = new Uint8Array(size);
   let offset: number = 0;
@@ -163,6 +164,7 @@ function looksLikeBinary(content: string): boolean {
   return controlCount > Math.max(2, Math.floor(content.length / 100));
 }
 
+/** @throws {Error} 读取或解包失败，由单文件导入入口转换为失败状态。 */
 function readTextFromOpenFile(file: fs.File, size: number, extension: string): ParsedAgentContent {
   const readSize: number = Math.min(size, AGENT_IMPORT_MAX_TEXT_BYTES);
   const bytes: Uint8Array = readFileBytes(file, readSize);
@@ -199,6 +201,7 @@ function deletePathRecursively(path: string): void {
   }
 }
 
+/** @throws {Error} 附件读取或解包失败，传播到文件导入入口，禁止返回部分内容冒充成功。 */
 function copyOpenFileToPath(source: fs.File, size: number, targetPath: string): void {
   const target: fs.File = fs.openSync(
     targetPath, fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE | fs.OpenMode.TRUNC);
@@ -223,6 +226,7 @@ function copyOpenFileToPath(source: fs.File, size: number, targetPath: string): 
   }
 }
 
+/** @throws {Error} 附件读取或解包失败，传播到文件导入入口，禁止返回部分内容冒充成功。 */
 function readSandboxText(path: string): string {
   const file: fs.File = fs.openSync(path, fs.OpenMode.READ_ONLY);
   try {
@@ -235,6 +239,7 @@ function readSandboxText(path: string): string {
   }
 }
 
+/** @throws {Error} 附件读取或解包失败，传播到文件导入入口，禁止返回部分内容冒充成功。 */
 function collectFiles(path: string, output: string[]): void {
   if (output.length >= MAX_ARCHIVE_ENTRIES) { throw new Error('archive_too_many_entries'); }
   const names: string[] = fs.listFileSync(path);
@@ -259,6 +264,7 @@ function sortedFilesContaining(files: string[], segment: string, suffix: string)
   return result;
 }
 
+/** @throws {Error} 读取或解包失败，由单文件导入入口转换为失败状态。 */
 function combineMarkupFiles(files: string[], titlePrefix: string): ParsedAgentContent {
   const sections: string[] = [];
   let total: number = 0;
@@ -276,6 +282,7 @@ function combineMarkupFiles(files: string[], titlePrefix: string): ParsedAgentCo
   return parsedContent(sections.join('\n\n'), truncated ? 'content_truncated' : '');
 }
 
+/** @throws {Error} 读取或解包失败，由单文件导入入口转换为失败状态。 */
 function parseDocx(unpacked: string, files: string[]): ParsedAgentContent {
   const primary: string = `${unpacked}/word/document.xml`;
   if (!pathExists(primary)) { throw new Error('parse_failed'); }
@@ -297,6 +304,7 @@ function parseDocx(unpacked: string, files: string[]): ParsedAgentContent {
   return parsedContent(sections.join('\n\n'));
 }
 
+/** @throws {Error} 幻灯片读取失败，由单文件导入入口转换为失败状态。 */
 function parsePptx(files: string[]): ParsedAgentContent {
   const slides: string[] = sortedFilesContaining(files, '/ppt/slides/slide', '.xml');
   const filtered: string[] = [];
@@ -307,6 +315,7 @@ function parsePptx(files: string[]): ParsedAgentContent {
   return combineMarkupFiles(filtered, '幻灯片');
 }
 
+/** @throws {Error} 读取或解包失败，由单文件导入入口转换为失败状态。 */
 function parseXlsx(unpacked: string, files: string[]): ParsedAgentContent {
   let shared: string[] = [];
   const sharedPath: string = `${unpacked}/xl/sharedStrings.xml`;
@@ -329,6 +338,7 @@ function parseXlsx(unpacked: string, files: string[]): ParsedAgentContent {
   return parsedContent(sections.join('\n\n'), truncated ? 'content_truncated' : '');
 }
 
+/** @throws {Error} 附件读取或解包失败，传播到文件导入入口，禁止返回部分内容冒充成功。 */
 async function parseZipDocument(context: common.UIAbilityContext, source: fs.File,
   size: number, extension: string, id: string): Promise<ParsedAgentContent> {
   const root: string = `${context.cacheDir}/ai-agent-import-${id}`;
@@ -367,6 +377,7 @@ async function parseZipDocument(context: common.UIAbilityContext, source: fs.Fil
   }
 }
 
+/** @throws {Error} 读取或解包失败，由单文件导入入口转换为失败状态。 */
 async function parseBook(context: common.UIAbilityContext, source: fs.File,
   size: number, extension: string, id: string): Promise<ParsedAgentContent> {
   if (!canIUse('SystemCapability.Reader.ReaderService.BookParser')) {
@@ -431,6 +442,7 @@ async function parseImage(source: fs.File, ocr: AgentOcrSession): Promise<Parsed
   }
 }
 
+/** @throws {Error} 读取或解包失败，由单文件导入入口转换为失败状态。 */
 async function parsePdf(context: common.UIAbilityContext, source: fs.File,
   size: number, id: string, ocr: AgentOcrSession): Promise<ParsedAgentContent> {
   const path: string = `${context.cacheDir}/ai-agent-pdf-${id}.pdf`;

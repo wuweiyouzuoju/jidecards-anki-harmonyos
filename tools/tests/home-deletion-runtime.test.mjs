@@ -1,3 +1,4 @@
+import { compileWithUiFeedback } from './ui-feedback-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,7 +16,7 @@ const methods = names.map(name => {
 function harness(selected = 'child', saved = selected) {
   const events = [], scheduler = new AutoSyncScheduler();
   const preferences = { saved, fail: false };
-  const Page = new Function('清除上次牌组ID', '加载上次牌组ID', '$r', 'console',
+  const Page = compileWithUiFeedback('清除上次牌组ID', '加载上次牌组ID', '$r', 'console',
     stripTypeScriptTypes(`class Page { ${methods.join('\n')} }`, { mode: 'transform' }) + '; return Page;')(
     async () => { events.push('clear preference'); if (preferences.fail) return false; preferences.saved = ''; return true; },
     async () => preferences.saved, key => ({ id: key }), { info() {} });
@@ -105,7 +106,7 @@ test('actual last-deck storage reports flush failure without throwing or claimin
   const start = storageSource.indexOf('export async function 清除上次牌组ID');
   const method = storageSource.slice(start).replace('export ', '');
   let fail = false;
-  const clear = new Function('取上下文', 'preferences', '存储名', '上次牌组键',
+  const clear = compileWithUiFeedback('取上下文', 'preferences', '存储名', '上次牌组键',
     stripTypeScriptTypes(method, { mode: 'transform' }) + ';return 清除上次牌组ID;')(
     () => ({}), { getPreferences: async () => ({ delete: async () => {}, flush: async () => { if (fail) throw new Error('disk full'); } }) },
     'settings', 'last_deck');

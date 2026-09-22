@@ -98,6 +98,24 @@ test('映射原生错误 decodes 后端错误 protobuf details', () => {
   assert.equal(err.nativeStatus, 原生状态.后端错误);
 });
 
+test('映射原生错误 preserves high numbered sync kinds and unknown raw values', () => {
+  const w = new 协议写入器();
+  w.写入字符串(1, 'server message');
+  w.写入变长整数(2, 23); // SYNC_SERVER_MESSAGE
+  const known = 映射原生错误({ nativeStatus: 原生状态.后端错误, details: w.转为字节() });
+  assert.equal(known.kind, 23);
+  assert.equal(known.knownKind, 23);
+
+  const unknownWriter = new 协议写入器();
+  unknownWriter.写入变长整数(2, 99);
+  const unknown = 映射原生错误({ nativeStatus: 原生状态.后端错误, details: unknownWriter.转为字节() });
+  assert.equal(unknown.kind, 99);
+  assert.equal(unknown.knownKind, null);
+  const futureNative = 映射原生错误({ nativeStatus: 99, message: 'future status' });
+  assert.equal(futureNative.nativeStatus, 99);
+  assert.equal(futureNative.knownNativeStatus, null);
+});
+
 test('映射原生错误 falls back to native message for non-backend failures', () => {
   const err = 映射原生错误({ nativeStatus: 原生状态.句柄未找到, message: 'backend handle not found' });
   assert.equal(err.message, 'backend handle not found');

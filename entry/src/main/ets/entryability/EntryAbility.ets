@@ -205,8 +205,8 @@ export default class EntryAbility extends UIAbility {
     try {
       const 系统栏区 = this.主窗口.getWindowAvoidArea(window.AvoidAreaType.TYPE_SYSTEM);
       const 导航条区 = this.主窗口.getWindowAvoidArea(window.AvoidAreaType.TYPE_NAVIGATION_INDICATOR);
-      AppStorage.setOrCreate<number>('状态栏高度', px2vp(系统栏区.topRect.height));
-      AppStorage.setOrCreate<number>('导航条高度', px2vp(导航条区.bottomRect.height));
+      AppStorage.setOrCreate<number>('状态栏高度', this.主窗口.getUIContext().px2vp(系统栏区.topRect.height));
+      AppStorage.setOrCreate<number>('导航条高度', this.主窗口.getUIContext().px2vp(导航条区.bottomRect.height));
     } catch (e) {
       hilog.error(DOMAIN, 'jidecards', `getWindowAvoidArea failed: ${e}`);
     }
@@ -245,12 +245,15 @@ export default class EntryAbility extends UIAbility {
     // 配额机制：单次最长 3 分钟，单日 10 分钟（低电量 1 分钟）。刷新通常 1-3 秒完成。
     let 短时任务Id: number = -1;
     try {
-      const 信息: backgroundTaskManager.DelaySuspendInfo =
-        backgroundTaskManager.requestSuspendDelay('刷新桌面卡片数据', (): void => {
-          // 系统即将超时回调：仅记日志，不主动 cancel（让系统超时释放）
-          hilog.warn(DOMAIN, 'jidecards', '短时任务即将超时（刷新桌面卡片数据未在配额内完成）');
-        });
-      短时任务Id = 信息.requestId;
+      if (canIUse('SystemCapability.ResourceSchedule.BackgroundTaskManager.Core')) {
+        if (canIUse('SystemCapability.ResourceSchedule.BackgroundTaskManager.TransientTask')) {
+          const 信息: backgroundTaskManager.DelaySuspendInfo =
+            backgroundTaskManager.requestSuspendDelay('刷新桌面卡片数据', (): void => {
+              hilog.warn(DOMAIN, 'jidecards', '短时任务即将超时（刷新桌面卡片数据未在配额内完成）');
+            });
+          短时任务Id = 信息.requestId;
+        }
+      }
     } catch (e) {
       hilog.error(DOMAIN, 'jidecards', `申请短时任务失败（直接 fire-and-forget 降级）: ${e}`);
     }
@@ -259,7 +262,11 @@ export default class EntryAbility extends UIAbility {
         return;
       }
       try {
-        backgroundTaskManager.cancelSuspendDelay(短时任务Id);
+        if (canIUse('SystemCapability.ResourceSchedule.BackgroundTaskManager.Core')) {
+          if (canIUse('SystemCapability.ResourceSchedule.BackgroundTaskManager.TransientTask')) {
+            backgroundTaskManager.cancelSuspendDelay(短时任务Id);
+          }
+        }
       } catch (e) {
         // 重复释放或释放失败可忽略
       }

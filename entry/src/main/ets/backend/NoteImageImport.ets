@@ -4,6 +4,7 @@ import { image } from '@kit.ImageKit';
 import { 媒体服务 } from './媒体服务';
 import { noteImageExtension } from '../model/NoteImageDraft';
 
+/** @throws {Error} 图片读取、转换或媒体提交失败，调用方保留编辑草稿并显示错误。 */
 export async function importNoteImage(uri: string): Promise<string> {
   const file: fs.File = await fs.open(uri, fs.OpenMode.READ_ONLY);
   let source: image.ImageSource | null = null;

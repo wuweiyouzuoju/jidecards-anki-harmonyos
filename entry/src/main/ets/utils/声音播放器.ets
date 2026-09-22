@@ -106,6 +106,7 @@ export class 声音播放器 implements AudioQueuePlayer<string> {
    * 重置播放器状态、打开新文件描述符。
    * ========================================================
    */
+  /** @throws {Error} 播放器创建失败，由音频命令边界显示失败并允许重试。 */
   async 播放队列(路径列表: string[]): Promise<void> {
     this.代次++;
     const generation: number = this.代次;
@@ -144,6 +145,7 @@ export class 声音播放器 implements AudioQueuePlayer<string> {
    * 代次+1；先停后播。
    * ========================================================
    */
+  /** @throws {Error} 播放器创建失败，由音频命令边界显示失败并允许重试。 */
   async 重播(): Promise<void> {
     if (this.队列.length === 0) {
       记录警告('replay: queue empty, nothing to replay');
@@ -261,6 +263,7 @@ export class 声音播放器 implements AudioQueuePlayer<string> {
    * 首次调用会创建 AVPlayer 并挂载事件监听。
    * ========================================================
    */
+  /** @throws {Error} 平台播放器创建失败，交由播放入口处理。 */
   private async 确保播放器(): Promise<media.AVPlayer> {
     if (this.播放器实例 === null) {
       记录信息('ensurePlayer: creating new AVPlayer');
@@ -342,6 +345,7 @@ export class 声音播放器 implements AudioQueuePlayer<string> {
    * 打开文件描述符；调用 AVPlayer 的 reset/prepare/play；启动状态超时定时器。
    * ========================================================
    */
+  /** @throws {Error} 平台播放器创建失败，播放入口或队列回调负责结束本轮播放。 */
   private async 从指定位置开始(索引: number, 代次: number): Promise<void> {
     if (代次 !== this.代次) {
       记录信息('startAt[%{public}d]: gen stale (got %{public}d, current %{public}d), abort', 索引, 代次, this.代次);

@@ -534,7 +534,7 @@ export async function 加载卡片数据(上下文: common.Context): Promise<桌
     fileIo.readSync(文件.fd, 缓冲);
     fileIo.closeSync(文件);
     const 解码器: util.TextDecoder = util.TextDecoder.create('utf-8');
-    const JSON串: string = 解码器.decode(new Uint8Array(缓冲));
+    const JSON串: string = 解码器.decodeToString(new Uint8Array(缓冲));
     hilog.info(0x0000, 日志域, `加载卡片数据成功: ${路径}, ${JSON串.length} 字节`);
     return JSON.parse(JSON串) as 桌面卡片数据;
   } catch (错误) {
@@ -598,7 +598,7 @@ async function 写formId文件(上下文: common.Context, formId: string): Promi
       fileIo.readSync(文件.fd, 缓冲);
       fileIo.closeSync(文件);
       const 解码器: util.TextDecoder = util.TextDecoder.create('utf-8');
-      const JSON串: string = 解码器.decode(new Uint8Array(缓冲));
+      const JSON串: string = 解码器.decodeToString(new Uint8Array(缓冲));
       const 载体: formId载体 = JSON.parse(JSON串) as formId载体;
       ids = 载体.ids;
     }
@@ -631,7 +631,7 @@ async function 读formId列表(上下文: common.Context): Promise<string[]> {
     fileIo.readSync(文件.fd, 缓冲);
     fileIo.closeSync(文件);
     const 解码器: util.TextDecoder = util.TextDecoder.create('utf-8');
-    const JSON串: string = 解码器.decode(new Uint8Array(缓冲));
+    const JSON串: string = 解码器.decodeToString(new Uint8Array(缓冲));
     const 载体: formId载体 = JSON.parse(JSON串) as formId载体;
     return 载体.ids;
   } catch (错误) {

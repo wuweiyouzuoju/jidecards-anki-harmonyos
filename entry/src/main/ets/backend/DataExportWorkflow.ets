@@ -4,6 +4,7 @@ import type { 导出牌组意图, 导出个人数据意图 } from '../model/Data
 import { 导出牌组, 导出集合, 完成导出 } from './数据迁移服务';
 
 /** 导出和文件保存共用一条流程；阶段回调只报告进度，页面负责自己的可见状态。 */
+/** @throws {Error} 导出或系统文件保存失败，由页面操作入口显示错误。 */
 export async function exportPersonalData(context: common.UIAbilityContext,
   intent: 导出牌组意图 | 导出个人数据意图, stage: (value: number) => void): Promise<string | null> {
   const path: string = intent.kind === 'exportDeck'

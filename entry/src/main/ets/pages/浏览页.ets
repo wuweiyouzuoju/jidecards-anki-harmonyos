@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { namedResourceText, showToastSafely } from '../utils/UiFeedback';
 import { loadBrowserSidebar } from '../model/BrowserSidebar';
 import { AnkiBrowserSidebar } from '../backend/AnkiBrowserSidebar';
 import { loadNoteEditor } from '../model/NoteEditorLoader';
@@ -1050,7 +1051,7 @@ export struct 浏览页 {
     }, false);
     if (this.operations.isAlive()) {
       this.查找替换忙碌 = false;
-      if (done) this.getUIContext().getPromptAction().showToast({
+      if (done) showToastSafely(this.getUIContext(), {
         message: this.取本地化文案($r('app.string.browser_find_success')).replace('%d', String(count))
       });
     }
@@ -1221,7 +1222,7 @@ export struct 浏览页 {
     }, false);
     if (!this.operations.isAlive()) return;
     this.标签重命名忙碌 = false;
-    if (done) this.getUIContext().getPromptAction().showToast({
+    if (done) showToastSafely(this.getUIContext(), {
       message: this.取本地化文案($r('app.string.browser_tag_rename_success')).replace('%d', String(count))
     });
   }
@@ -1256,13 +1257,13 @@ export struct 浏览页 {
       count = await this.标签服务实例.移除标签(标签名);
       if (this.operations.isAlive()) { this.显示侧边栏 = false; this.标签树 = null; }
     }, (_error: Error): void => {
-      this.getUIContext().getPromptAction().showToast({
+      showToastSafely(this.getUIContext(), {
         message: this.取本地化文案($r('app.string.browser_tag_delete_error'))
       });
     }, false);
     if (!this.operations.isAlive()) return;
     this.标签操作忙碌 = false;
-    if (done) this.getUIContext().getPromptAction().showToast({
+    if (done) showToastSafely(this.getUIContext(), {
       message: this.取本地化文案($r('app.string.browser_tag_delete_success')).replace('%d', String(count))
     });
   }
@@ -1273,12 +1274,12 @@ export struct 浏览页 {
     try {
       const 响应 = await this.标签服务实例.补全标签({ input: 标签名, matchLimit: 20 });
       const count: number = 响应.tags.length;
-      this.getUIContext().getPromptAction().showToast({
+      showToastSafely(this.getUIContext(), {
         message: this.取本地化文案($r('app.string.browser_tag_complete_success')).replace('%d', String(count))
       });
     } catch (错误) {
       console.info(`BrowserPage: 补全标签失败 错误=${错误}`);
-      this.getUIContext().getPromptAction().showToast({
+      showToastSafely(this.getUIContext(), {
         message: this.取本地化文案($r('app.string.browser_tag_complete_error'))
       });
     }
@@ -1481,7 +1482,7 @@ export struct 浏览页 {
   /** 状态筛选保留原始搜索，放入选择框以留出列表空间。 */
   private quickFilterOptions(): SelectOption[] {
     return BROWSER_QUICK_FILTERS.map((filter: BrowserQuickFilter): SelectOption => ({
-      value: this.getUIContext().getHostContext()!.resourceManager.getStringByNameSync(filter.labelKey)
+      value: namedResourceText(this.getUIContext(), filter.labelKey)
     }));
   }
 

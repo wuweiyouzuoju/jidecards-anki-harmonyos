@@ -3,8 +3,6 @@
 > 归档状态：这是一次性历史设计/执行记录，不是当前路线图、待办列表或操作手册。未勾选项不表示仍未实现；当前事实请查阅 [文档导航](../../README.md)、[开发状态](../../DEVELOPMENT_PLAN.md)、[当前架构](../../architecture.md) 和实际源码/测试。
 
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** Connect the native Agent runtime to the existing editable AI-create drafts and add ordinary AI-edit flows from home, study and browser without changing scheduling state.
 
 **Architecture:** `AI制卡页.ets` becomes the shared Agent session surface through an explicit `mode` and optional immutable entry context. Existing card draft controls remain. Create/edit draft executors are separate from the runner and revalidate current Anki state immediately before applying writes.

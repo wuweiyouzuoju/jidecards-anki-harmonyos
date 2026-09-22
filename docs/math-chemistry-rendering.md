@@ -6,14 +6,20 @@
 
 保留现有编辑器，不新增公式输入工具栏。复杂结构图优先显示牌组附带的 SVG/图片，不在手机内引入完整 TeX 编译器。缺少预生成 LaTeX 图片时不能声称已支持编译，应显示可识别的缺失状态与原始公式。
 
-## 实施计划
+## 当前实现入口
+
+- 资源与校验：`entry/src/main/resources/rawfile/mathjax/`、`tools/vendor-mathjax.mjs`。
+- 排版与资源响应：`entry/src/main/ets/model/MathRendering.ts`、`entry/src/main/ets/utils/CardAssetResponse.ets`。
+- 上游 LaTeX 转换：`entry/src/main/ets/backend/卡片渲染服务.ts`；共享 HTML 组装见 `model/学习卡片HTML构建器.ts`。
+
+## 已实施方案
 
 1. 固化产品方向，核对 MathJax、Anki `latex_svg` 语义和 ArkWeb 本地资源加载。
 2. 固定 MathJax 3.2.2，将 SVG 排版组件、mhchem 与 MathML 输入随 HAP 打包，保留许可证和资源校验信息；不依赖 CDN 或远程字体。
 3. 通过两个页面共享的资源响应函数提供内置文件；保留原来的 collection.media 加载路径。
 4. 修正 `latexSvg` 导致跳过 MathJax 的判断，统一分隔符、加载顺序、公式挖空和长公式显示。
 5. 封装上游 ExtractLatex RPC，将旧式 LaTeX 转为标准媒体引用，不在前端复刻文件哈希规则。
-6. 加入协议、渲染与离线资源测试；运行完整 Node 测试和 Rust 双架构 + ArkTS/HAP 构建；在可用设备上验证导入、正反面和预览。
+6. 加入协议、渲染与离线资源测试；设备导入、正反面和预览验收独立进行，不将下方历史构建结果当成设备验证。
 
 ## 验收要点
 
@@ -24,7 +30,7 @@
 - 公式挖空保持后端生成的隐藏/揭示语义；模板自定义 MathJax 宏可以工作。
 - 旧式 LaTeX 的 SVG/PNG 媒体引用与上游一致，普通图片、音频、拼写和图片遮罩不回退。
 
-## 验证记录
+## 历史验证记录
 
 2026-09-12：步骤 1～5 和步骤 6 的自动化、构建部分已实现。
 
@@ -34,16 +40,15 @@
 - 首轮构建包已在模拟器 `127.0.0.1:5555` 覆盖安装并启动。模拟器只有默认空牌组，未添加测试卡；用户指出后停止设备操作。**没有完成模拟器内实际导入和公式显示验收，也没有实体手机验收。**
 - `.apkg` 测试文件已生成在 `tmp/math-rendering/math-chemistry-qa.apkg`，但未导入；不可将生成文件、安装成功或浏览器测试解释为设备导入成功。
 
-本机日志：`tmp/math-test-final.log`、`tmp/math-build-final.log`；浏览器结果与截图：`tmp/math-rendering/`。后续设备验收应直接使用含数学、化学、传统 LaTeX 媒体与挖空的测试牌组。
+当时的本机日志位于 `tmp/math-test-final.log`、`tmp/math-build-final.log`，截图位于 `tmp/math-rendering/`；这些被忽略的临时产物不保证在其他 checkout 存在，也不能作为当前验证证据。后续设备验收应使用含数学、化学、传统 LaTeX 媒体与挖空的测试牌组。
 
 ## 复现
 
 ```powershell
 npm test
-node tools/vendor-mathjax.mjs
 # PLAYWRIGHT_MODULE 可指向已有 playwright/index.mjs；默认从本机 Node 包查找。
 node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs tools/test-math-rendering-browser.mjs
 npm run build:app
 ```
 
-浏览器测试使用本机 Edge，无需访问公网；资源重建脚本仅在无校验通过的本地缓存时下载固定版本归档。
+浏览器测试使用本机 Edge，无需访问公网。资源维护时才运行 `node tools/vendor-mathjax.mjs`：它会重建受版本控制的资源，在无校验通过的本地缓存时下载固定版本归档；运行后审查资源差异，再执行上述验证。普通验证不应隐式重建资源。

@@ -17,6 +17,7 @@ let savedTokens: string[] = [];
 let mutationBusy: boolean = false;
 
 /** 独立于 Anki 数据和同步，本地安装身份不跟随牌组导入。 */
+/** @throws {Error} 身份、验签或权益存储失败，不生成替代身份、不发布未落盘权益。 */
 function getStore(): preferences.Preferences {
   const context: common.UIAbilityContext | undefined = AppStorage.get<common.UIAbilityContext>('abilityContext');
   if (context === undefined) throw new Error('Ability context unavailable');
@@ -24,6 +25,7 @@ function getStore(): preferences.Preferences {
 }
 
 /** 公钥仅验签；没有任何客户端生成发行签名的入口。 */
+/** @throws {Error} 身份、验签或权益存储失败，不生成替代身份、不发布未落盘权益。 */
 async function verifyToken(token: RedemptionToken): Promise<boolean> {
   const base64: util.Base64Helper = new util.Base64Helper();
   const publicBlob: cryptoFramework.DataBlob = { data: base64.decodeSync(REDEMPTION_PUBLIC_KEY) };
@@ -38,6 +40,7 @@ async function verifyToken(token: RedemptionToken): Promise<boolean> {
 }
 
 /** 写失败时恢复偏好缓存；只有 flush 成功后才发布权益和指纹。 */
+/** @throws {Error} 身份、验签或权益存储失败，不生成替代身份、不发布未落盘权益。 */
 async function persist(store: preferences.Preferences, key: string, value: preferences.ValueType,
   fallback: preferences.ValueType): Promise<void> {
   const previous: preferences.ValueType = store.getSync(key, fallback);
@@ -52,6 +55,7 @@ async function persist(store: preferences.Preferences, key: string, value: prefe
  * 启动时从已验签凭证派生权益，单个非法凭证不能解锁任何内容。
  * Invariants: 初始化共享同一个 Promise；已有身份损坏时不擅自换身份。
  */
+/** @throws {Error} 身份、验签或权益存储失败，不生成替代身份、不发布未落盘权益。 */
 async function restore(): Promise<void> {
   AppStorage.setOrCreate<string[]>(UNLOCKED_CONTENTS_KEY, []);
   const store: preferences.Preferences = getStore();
@@ -84,6 +88,7 @@ async function restore(): Promise<void> {
 }
 
 /** 初始化失败允许用户从设置重试，避免反复生成未落盘指纹。 */
+/** @throws {Error} 身份、验签或权益存储失败，不生成替代身份、不发布未落盘权益。 */
 export async function initializeRedemption(): Promise<void> {
   if (initialization === undefined) initialization = restore();
   try { await initialization; } catch (error) {
@@ -93,12 +98,14 @@ export async function initializeRedemption(): Promise<void> {
 }
 
 /** 只有成功保存的指纹可以分享给发行者。 */
+/** @throws {Error} 身份、验签或权益存储失败，不生成替代身份、不发布未落盘权益。 */
 export async function getApplicationFingerprint(): Promise<string> {
   await initializeRedemption();
   return fingerprint;
 }
 
 /** 验签、身份、内容全部匹配且落盘成功后才通知界面解锁。 */
+/** @throws {Error} 身份、验签或权益存储失败，不生成替代身份、不发布未落盘权益。 */
 export async function redeemContent(value: string): Promise<RedemptionResult> {
   if (mutationBusy) throw new Error('Redemption storage busy');
   mutationBusy = true;
@@ -119,6 +126,7 @@ export async function redeemContent(value: string): Promise<RedemptionResult> {
 }
 
 /** 动态效果是本机偏好，失败时保持原来的开关值。 */
+/** @throws {Error} 身份、验签或权益存储失败，不生成替代身份、不发布未落盘权益。 */
 export async function saveThemeMotion(enabled: boolean): Promise<void> {
   if (mutationBusy) throw new Error('Redemption storage busy');
   mutationBusy = true;

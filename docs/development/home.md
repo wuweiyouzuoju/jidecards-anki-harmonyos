@@ -33,9 +33,12 @@
 - `backend/HomeDataRepository.ets` 组装牌组树、用户覆盖、隐藏集合、图表及桌面卡片快照；统计范围和暂停分离口径来自持久化偏好。图表失败降级，桌面卡片保存失败不阻塞牌组列表。
 - `model/HomeRefreshQueue.ts` 串行刷新；销毁后不再启动排队读取。`HomeDeckExpansion.ts` 合并展开状态，保留主动折叠，只自动展开新父牌组。
 - `model/HomeSyncPolicy.ts` 从首页事实判定丢弃、暂停、等待或启动同步；手动请求越过尚未展示的启动工作，仍等待真实占用。
+- `model/HomeSyncController.ts` 拥有同步检查定时器、最后一次待执行导航、同步后刷新和待展示 FSRS 提醒。首页通过 `homeSyncHost()` 提供事实与 UI 效果；集合预留先于面板挂载，导航仅等待同步集合占用/刷新，普通首页占用只阻止同步启动。销毁和取消定时器使旧回调失效。
+- `model/HomeBackupController.ts` 拥有自动备份延迟任务和配置读取期间的占用；`homeBackupHost()` 与后端工厂隔离 Kit。后台/销毁取消尚未接受的任务，已开始的备份继续由 `BackupCoordinator` 持锁至结束；Core 决定归档间隔和保留数量。读取配置失败进入日志回调，不产生未处理 Promise 拒绝。
 - `backend/HomeDeckCommands.ets` 创建并记住牌组、写入别名与背景；页面只处理表单、刷新和提示。背景失败单独反馈，已落盘别名保留。
 - `model/DeckConfigSave.ts` 负责配置复制、共享预设分离和完整请求快照；配置表单负责校验。首页持有牌组选项弹层与编辑状态，经 `components/home/牌组选项协调器.ets` 接收保存回调，再调用 `backend/牌组配置服务.ts` 提交有效请求。
 - 数据迁移的弹层、进度和错误由首页持有，`components/home/数据迁移协调器.ets` 转发用户意图；首页的 `importDeckUri` / `确认个人数据替换` 调用 `backend/数据迁移服务.ts`，导出交给 `backend/DataExportWorkflow.ets`。
 - 同步的挂载状态、认证和账号由首页传入 `components/同步面板.ets`；任务调度与占用分别由 `model/AutoSyncScheduler.ts`、`model/SyncSettings.ts` 管理。创建牌组和定制弹层同样由首页持有 UI 状态，写入交给 `HomeDeckCommands`。
+- 控制器直接行为测试：`home-sync-controller.test.mjs`、`home-backup-controller.test.mjs`；既有页面集成测试继续覆盖同步、学习、公告和弹层的组合时序。
 - 扩展这些功能时沿上述现用调用链修改；历史 Phase 2/3 的独立 store 方案未接入，已移除，不作为待补实现或新功能入口。
 - 回归入口：`home-data-repository`、`home-work-coordinator`、`page-domain-models`、`page-repositories`、`deck-config-save`；平台模块测试注入底层服务，不复制生产编排。

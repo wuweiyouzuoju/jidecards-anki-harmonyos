@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { resourceText, namedResourceText, showToastSafely } from '../../utils/UiFeedback';
 import { ThemeTextSpans } from '../common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 import { pasteboard } from '@kit.BasicServicesKit';
@@ -36,9 +37,9 @@ export struct RedemptionPanel {
   private async copyFingerprint(): Promise<void> {
     try {
       await pasteboard.getSystemPasteboard().setData(pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, this.fingerprint));
-      this.getUIContext().getPromptAction().showToast({ message: $r('app.string.redemption_copied') });
+      showToastSafely(this.getUIContext(), { message: $r('app.string.redemption_copied') });
     } catch (error) {
-      this.getUIContext().getPromptAction().showToast({ message: $r('app.string.redemption_copy_failed') });
+      showToastSafely(this.getUIContext(), { message: $r('app.string.redemption_copy_failed') });
     }
   }
 
@@ -46,9 +47,9 @@ export struct RedemptionPanel {
   private async copyDeveloperGroup(): Promise<void> {
     try {
       await pasteboard.getSystemPasteboard().setData(pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, this.developerGroup));
-      this.getUIContext().getPromptAction().showToast({ message: $r('app.string.about_qq_group_copied') });
+      showToastSafely(this.getUIContext(), { message: $r('app.string.about_qq_group_copied') });
     } catch (error) {
-      this.getUIContext().getPromptAction().showToast({ message: $r('app.string.redemption_copy_failed') });
+      showToastSafely(this.getUIContext(), { message: $r('app.string.redemption_copy_failed') });
     }
   }
 
@@ -79,8 +80,8 @@ export struct RedemptionPanel {
   }
 
   private resultMessage(resource: Resource): string {
-    const manager = this.getUIContext().getHostContext()!.resourceManager;
-    return manager.getStringSync(resource.id, manager.getStringByNameSync('theme_color_' + this.unlockedTheme));
+    return resourceText(this.getUIContext(), resource,
+      namedResourceText(this.getUIContext(), 'theme_color_' + this.unlockedTheme));
   }
 
   private async redeem(): Promise<void> {

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { resourceText } from '../../utils/UiFeedback';
 
 import { 加载FSRS开启状态, 设置FSRS开启状态, FSRS_STATE_REVISION_KEY } from '../../model/FSRS控制器';
 import { 设置面板色板_取, 设置面板色板 } from '../../utils/设置面板配色';
@@ -109,7 +110,7 @@ export struct 调度器分组 {
   }
 
   private 取本地化文本(资源: Resource): string {
-    return this.getUIContext().getHostContext()!.resourceManager.getStringSync(资源.id);
+    return resourceText(this.getUIContext(), 资源);
   }
 
   /** 按钮背景专用主色（配 #FFFFFF 文字 ≥ 4.5:1）。2.1.4.1 深色模式修复。 */

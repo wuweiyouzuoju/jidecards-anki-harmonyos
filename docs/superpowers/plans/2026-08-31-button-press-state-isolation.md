@@ -5,8 +5,6 @@
 
 > **SUPERSEDED (2026-08-31):** The `stateEffect(false)` diagnosis and its screenshot-based validation were disproved. Use `2026-08-31-focus-theme-and-press-state-recovery.md`; this file remains only as an audit trail of the abandoned attempt.
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** Remove native Button press-effect flashes so settings help buttons stay transparent and only the touched study action button receives the custom blue highlight.
 
 **Architecture:** Keep ArkUI `Button` semantics and existing click handlers. Disable only the built-in `stateEffect` on affected buttons, leaving the study page's existing mutually exclusive `按下评分` state as the single visual source of truth.

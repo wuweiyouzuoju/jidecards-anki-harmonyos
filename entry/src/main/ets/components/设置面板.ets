@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { namedResourceText, resourceText, showToastSafely } from '../utils/UiFeedback';
 import { ThemeTextSpans } from './common/ThemeText';
 import { SettingsEntry, filterSettingsEntries, SETTINGS_ENTRIES } from '../model/SettingsNavigation';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
@@ -170,7 +171,7 @@ export struct 设置面板 {
     AppStorage.setOrCreate<boolean>(TapZones开关AppStorage键, TapZones值);
     // 未配置 AI 从制卡/改卡跳转进来：悬浮 Toast 提示 + 直接定位到 AI 智能体分组
     if (this.openAiSettings) {
-      this.getUIContext().getPromptAction().showToast({
+      showToastSafely(this.getUIContext(), {
         message: this.取本地化文本($r('app.string.ai_agent_config_required'))
       });
       // 等简洁模式恢复与内容 List 首帧布局完成后无动画定位；转场动画内完成，打开即在分组处
@@ -188,7 +189,7 @@ export struct 设置面板 {
   }
 
   private sectionText(key: string): string {
-    return this.getUIContext().getHostContext()!.resourceManager.getStringByNameSync(key);
+    return namedResourceText(this.getUIContext(), key);
   }
 
   private directoryEntries(): SettingsEntry[] {
@@ -243,7 +244,7 @@ export struct 设置面板 {
   }
 
   private 取本地化文本(资源: Resource): string {
-    return this.getUIContext().getHostContext()!.resourceManager.getStringSync(资源.id);
+    return resourceText(this.getUIContext(), 资源);
   }
 
   // ========================================================
@@ -327,18 +328,18 @@ export struct 设置面板 {
     try {
       const count: number = await this.标签服务实例.清除未用标签();
       if (count > 0) {
-        this.getUIContext().getPromptAction().showToast({
+        showToastSafely(this.getUIContext(), {
           message: this.取本地化文本($r('app.string.settings_clear_unused_tags_success'))
             .replace('%d', String(count))
         });
       } else {
-        this.getUIContext().getPromptAction().showToast({
+        showToastSafely(this.getUIContext(), {
           message: this.取本地化文本($r('app.string.settings_clear_unused_tags_empty'))
         });
       }
     } catch (错误) {
       console.info(`SettingsPanel: 清除未用标签失败 错误=${错误}`);
-      this.getUIContext().getPromptAction().showToast({
+      showToastSafely(this.getUIContext(), {
         message: this.取本地化文本($r('app.string.settings_clear_unused_tags_error'))
       });
     }
@@ -416,7 +417,7 @@ export struct 设置面板 {
         pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, this.AnkiWeb网址);
       const 系统剪贴板: pasteboard.SystemPasteboard = pasteboard.getSystemPasteboard();
       await 系统剪贴板.setData(剪贴数据);
-      this.getUIContext().getPromptAction().showToast({
+      showToastSafely(this.getUIContext(), {
         message: $r('app.string.about_ankiweb_open_failed')
       });
     } catch (错误) {
@@ -475,7 +476,7 @@ export struct 设置面板 {
         pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, 网址);
       const 系统剪贴板: pasteboard.SystemPasteboard = pasteboard.getSystemPasteboard();
       await 系统剪贴板.setData(剪贴数据);
-      this.getUIContext().getPromptAction().showToast({
+      showToastSafely(this.getUIContext(), {
         message: $r('app.string.about_anki_docs_open_failed')
       });
     } catch (错误) {
@@ -491,7 +492,7 @@ export struct 设置面板 {
         pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, this.QQ群号);
       const 系统剪贴板: pasteboard.SystemPasteboard = pasteboard.getSystemPasteboard();
       await 系统剪贴板.setData(剪贴数据);
-      this.getUIContext().getPromptAction().showToast({
+      showToastSafely(this.getUIContext(), {
         message: $r('app.string.about_qq_group_copied')
       });
     } catch (错误) {
@@ -563,7 +564,7 @@ export struct 设置面板 {
       hilog.info(0x0001, '设置面板', '回退 DeepLink 拉起应用市场成功');
     }).catch((错误: BusinessError) => {
       hilog.error(0x0001, '设置面板', `回退 DeepLink 失败 code=${错误.code} msg=${错误.message}`);
-      this.getUIContext().getPromptAction().showToast({
+      showToastSafely(this.getUIContext(), {
         message: $r('app.string.about_rate_failed_fallback'),
         duration: 3000
       });

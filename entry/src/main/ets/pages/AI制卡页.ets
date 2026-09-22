@@ -15,7 +15,7 @@ import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
 // 顶部：返回与历史；目标牌组和笔记类型位于本地对话设置卡。
 // 中间：聊天消息流。AI 返回的卡片以草稿形式内嵌在 AI 消息里，可勾选、可编辑字段、批量保存。
 // 底部：材料输入框 + 发送按钮。
-// 所有写入都经 AgentDraftExecutor，最终仍只调用现有 Anki ArkTS Service。
+// 卡库草稿经 AgentDraftExecutor；辅助动作经会话的 AgentActionExecutor，均需显式确认。
 // 不支持 Image Occlusion（走独立 RPC，本页直接从笔记类型候选中过滤）。
 
 import { common } from '@kit.AbilityKit';
@@ -346,6 +346,7 @@ export struct AI制卡页 {
     }
   }
 
+  /** @throws {Error} 会话持久化失败，由操作入口处理，不能报告已保存。 */
   private async syncSessionTarget(): Promise<void> {
     if (this.pageMode !== 'create') { return; }
     const target: number[] = this.agentScope.currentCreateTarget();
@@ -370,7 +371,7 @@ export struct AI制卡页 {
         action.status = 'executing';
         this.saveSessionCheckpoint();
         action.status = 'pending';
-        resultJson = await this.sessionController.auxiliary.executeConfirmed(action);
+        resultJson = await this.sessionController.actionExecutor.executeConfirmed(action);
         AppStorage.setOrCreate<number>('noteAddedTick', Date.now());
         await this.syncSessionTarget();
       } else { action.status = 'cancelled'; action.resultJson = resultJson; }
@@ -1398,6 +1399,7 @@ export struct AI制卡页 {
     return this.消息列表.findIndex((message: 聊天消息): boolean => message.id === messageId);
   }
 
+  /** @throws {Error} 会话持久化失败，由操作入口处理，不能报告已保存。 */
   private saveSessionCheckpoint(): void {
     if (this.checkpointStore === null || this.sessionController === null) { throw new Error('checkpoint_unavailable'); }
     this.checkpointStore.save(this.conversationId, this.sessionController.exportState());
@@ -1642,11 +1644,15 @@ export struct AI制卡页 {
   }
 
   private async 执行删除历史会话(id: string): Promise<void> {
-    await deleteAgentConversation(id);
-    this.checkpointStore?.remove(id);
-    this.历史会话列表 = this.历史会话列表.filter(
-      (item: AgentConversation): boolean => item.id !== id);
-    if (this.conversationId === id) { this.开始新会话(); }
+    try {
+      await deleteAgentConversation(id);
+      this.checkpointStore?.remove(id);
+      this.历史会话列表 = this.历史会话列表.filter(
+        (item: AgentConversation): boolean => item.id !== id);
+      if (this.conversationId === id) { this.开始新会话(); }
+    } catch (error) {
+      this.错误信息 = this.取本地化文案($r('app.string.ai_agent_history_delete_failed'));
+    }
   }
 
   // ========================================================

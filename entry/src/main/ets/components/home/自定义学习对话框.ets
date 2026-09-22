@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { resourceText, showToastSafely } from '../../utils/UiFeedback';
 import { ThemeTextSpans } from '../common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
@@ -42,7 +43,6 @@ import { 颜色键 } from '../../model/颜色主题';
 import { 取全屏转场时长, 取全屏转场曲线 } from '../../utils/转场时长';
 import { 自定义学习预设 } from '../../proto/messages/SchedulerMessages';
 import type { 自定义学习默认值 } from '../../proto/messages/SchedulerMessages';
-import { promptAction } from '@kit.ArkUI';
 
 interface 预设选项 {
   字段号: number;
@@ -117,11 +117,11 @@ export struct 自定义学习对话框 {
   }
 
   private 取本地化文本(资源: Resource): string {
-    return this.getUIContext().getHostContext()!.resourceManager.getStringSync(资源.id);
+    return resourceText(this.getUIContext(), 资源);
   }
 
   private 取本地化带参文本(资源: Resource, 参数: Array<string | number>): string {
-    return this.getUIContext().getHostContext()!.resourceManager.getStringSync(资源.id, ...参数);
+    return resourceText(this.getUIContext(), 资源, ...参数);
   }
 
   private async 加载默认值(): Promise<void> {
@@ -195,7 +195,7 @@ export struct 自定义学习对话框 {
     this.错误信息 = '';
     try {
       await this.调度器.自定义学习(id, 预设.字段号, 值);
-      promptAction.showToast({
+      showToastSafely(this.getUIContext(), {
         message: this.取本地化文本($r('app.string.custom_study_success')),
         duration: 2000
       });

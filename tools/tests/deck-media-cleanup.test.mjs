@@ -1,3 +1,4 @@
+import { compileWithUiFeedback } from './ui-feedback-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -54,7 +55,7 @@ const methods = methodNames.map(name => {
   assert.ok(start >= 0);
   return home.slice(start, home.indexOf('\n  }', start) + 4);
 });
-const Page = new Function('$r', 'DialogAlignment', stripTypeScriptTypes(`class Page { ${methods.join('\n')} }`,
+const Page = compileWithUiFeedback('$r', 'DialogAlignment', stripTypeScriptTypes(`class Page { ${methods.join('\n')} }`,
   { mode: 'transform' }) + '; return Page;')(id => ({ id }), { Center: 'center' });
 
 function pageHarness() {

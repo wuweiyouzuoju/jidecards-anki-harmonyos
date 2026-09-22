@@ -28,6 +28,7 @@ function 是HTTPS地址(url: string): boolean {
   return /^https:\/\/[^\s]+$/i.test(url);
 }
 
+/** @throws {Error} 下载文件不可用或 IO 失败，停止导入并向任务入口报告。 */
 function 确保目录存在(path: string): void {
   if (!fs.accessSync(path)) {
     fs.mkdirSync(path);
@@ -44,6 +45,7 @@ function 静默删除(path: string): void {
   }
 }
 
+/** @throws {Error} 下载文件不可用或 IO 失败，停止导入并向任务入口报告。 */
 function 校验下载文件(path: string, expectedSize: number | undefined): void {
   if (!fs.accessSync(path)) {
     throw new 云端牌组服务错误('file', '下载文件不存在');
@@ -83,10 +85,10 @@ export class 云端牌组服务 {
   /** 清除上次被系统终止后可能留在私有下载目录里的中间文件。 */
   清理残留下载(filesDir: string): void {
     const downloadDir: string = `${filesDir}/cloud-decks`;
-    if (!fs.accessSync(downloadDir)) {
-      return;
-    }
     try {
+      if (!fs.accessSync(downloadDir)) {
+        return;
+      }
       for (const name of fs.listFileSync(downloadDir)) {
         if (!name.endsWith('.part') && !name.endsWith('.apkg')) {
           continue;
@@ -148,6 +150,7 @@ export class 云端牌组服务 {
   }
 
   /** 将一个公开 `.apkg` 下载到沙箱；完成前持续上报已处理与总字节数。 */
+  /** @throws {Error} 下载文件不可用或 IO 失败，停止导入并向任务入口报告。 */
   async 下载牌组(
     context: common.UIAbilityContext,
     filesDir: string,

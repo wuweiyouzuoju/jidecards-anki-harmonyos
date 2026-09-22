@@ -26,7 +26,7 @@ test('dynamic deck previews bind formatted text directly instead of passing valu
     assert.ok(panel.includes(`Text(this.formatPreview($r('app.string.create_deck_preview_${key}'),`));
   }
   assert.doesNotMatch(panel, /ThemeTextSpans\(this\.formatPreview/);
-  assert.match(panel, /getStringSync\(resource\.id, \.\.\.names\)/);
+  assert.match(panel, /resourceText\(this\.getUIContext\(\), resource, \.\.\.names\)/);
   assert.match(panel, /@State private deckName: string/);
   assert.match(panel, /this\.deckName = value/);
 });

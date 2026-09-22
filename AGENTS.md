@@ -1,12 +1,23 @@
 # jidecards Agent 工作约定
 
 目标：让下一次修改能从明确入口开始，在局部边界完成，并得到可信的验证结果。
-进入项目先读 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md)，再按任务读取领域文档；ArkTS 改动同时读 [.agents/adapters/arkts.md](.agents/adapters/arkts.md)。
+进入项目先读 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md)，再按变更路径读取 [.agents/rules/paths/](.agents/rules/paths/) 中的局部规则和领域文档；ArkTS 改动同时读 [.agents/adapters/arkts.md](.agents/adapters/arkts.md)。业务、工具或跨模块改动同时看 [开发任务契约](docs/development/task-contract.md)。
+
+## 最高优先级：编程 Agent-first
+
+本项目的最高开发优先级是持续提升编程 Agent 对 jidecards 的理解、修改、验证和交付能力。所有产品功能、架构调整、修复、重构、测试和文档变更都必须先评估对 Agent-first 的影响。
+
+- 当普通产品目标与编程 Agent 的可理解、可修改、可验证或可扩展性发生冲突时，优先保持 Agent-first；只有用户明确改变本次目标时才例外。
+- 新能力必须有清晰的任务入口、稳定的责任边界、可直接执行的测试和当前文档；关键知识不得只放在被忽略目录或历史计划中。
+- 所有开发和维护都必须方便后续编程 Agent 理解、定位、修改、验证和交接；新增复杂度必须同时提供入口、边界、验证命令和必要的当前决策记录。
+- “编程 Agent”指负责修改本仓库的开发 Agent；“应用内 Agent”指产品运行时的 AI 制卡/改卡能力。两者必须在文档、测试和任务描述中明确区分。
+- 只有根目录 `AGENTS.md`、`.agents/` 和当前领域文档可以约束编程 Agent；`docs/superpowers/`、`.trae/` 和其他历史材料不得发出当前执行指令。
 
 ## 工作方式
 
 1. 检查当前改动，沿调用点读实现、依赖和相关测试；保留用户未完成的工作。
-2. 说明本次降低的具体风险或变更成本。复杂跨域改动可在 `.trae/decisions.md` 简记决策，不强制写计划文档。
+   使用 `npm run impact` 获取当前工作树的必读入口与最低验证范围；它只生成计划，不执行验证。多任务共享工作树时按验证说明指定本任务路径，并在交付前重新核对实际改动。
+2. 说明本次降低的具体风险或变更成本。复杂跨域改动可在受版本控制的 `docs/decisions/` 简记决策，不强制写计划文档。
 3. 按职责修改；业务编排应可直接执行测试。禁止为了行数指标拆文件、增加无实际调用方的抽象或全项目命名改写。
 4. 先用领域测试反馈，结束前运行全部测试；原生改动跑主机测试，结构/ArkTS 改动完成实际 HAP 构建。设备验证按影响范围进行。
 5. 更新受影响的领域文档；入口只保留索引、事实来源和全局不变量。报告实际验证与未验证范围。
@@ -23,4 +34,4 @@
 - 新代码默认英文标识符和简明中文意图注释；既有中文名称按局部风格维护。只记录有价值的不变量，不写模板化长注释。
 - 不为通过测试削弱行为断言；替换源码形状测试前先建立等价的直接行为验证。
 
-细则：[工作流](.agents/rules/workflow.md)、[测试](.agents/rules/testing.md)、[命名](.agents/rules/naming.md)、[注释](.agents/rules/comments.md)、[知识维护](.agents/rules/context.md)。
+细则：[工作流](.agents/rules/workflow.md)、[测试](.agents/rules/testing.md)、[命名](.agents/rules/naming.md)、[注释](.agents/rules/comments.md)、[知识维护](.agents/rules/context.md)、[目录级规则](.agents/rules/paths/)。模块责任见 [模块责任与边界](docs/development/ownership.md)，任务完成标准见 [开发任务契约](docs/development/task-contract.md)。

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { resourceText } from '../utils/UiFeedback';
 import { ThemeTextSpans } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
@@ -24,8 +25,8 @@ export struct 官方公告弹窗 {
   }
 
   private 本地化发布时间(): string {
-    return this.getUIContext().getHostContext()!.resourceManager.getStringSync(
-      $r('app.string.official_announcement_published_at').id, this.发布日期());
+    return resourceText(this.getUIContext(),
+      $r('app.string.official_announcement_published_at'), this.发布日期());
   }
 
   build() {

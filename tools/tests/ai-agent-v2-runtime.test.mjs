@@ -88,13 +88,13 @@ test('notetype proposal writes once only after confirmation, then uses the new t
  [call('cards','create_flashcards',{cards:[{fields:['apple','苹果']}]})]]);
  const pending=await h.run('新建单词类型并制卡');assert.equal(pending.status,'awaiting_confirmation');
  assert.equal(fixture.writes.length,0);
- const result=await h.auxiliary.executeConfirmed(pending.action);
+ const result=await h.session.actionExecutor.executeConfirmed(pending.action);
  assert.equal(fixture.writes.length,1);assert.deepEqual(h.scope.currentCreateTarget(),[1,4]);
  const completed=await h.run('确认后继续',result);
  assert.equal(completed.status,'completed');assert.equal(completed.drafts.length,1);
  assert.deepEqual(completed.drafts[0].affectedNotetypeIds,[4]);
  assert.ok(h.requests[1].input.some(x=>x.callId==='newtype'&&x.output.includes('"notetypeId":4')));
- await assert.rejects(()=>h.auxiliary.executeConfirmed(pending.action),/confirmation_mismatch/);
+ await assert.rejects(()=>h.session.actionExecutor.executeConfirmed(pending.action),/confirmation_mismatch/);
 });
 
 test('cancelled creation performs no writes; restored pending action keeps exact confirmation identity',async()=>{
@@ -105,13 +105,13 @@ test('cancelled creation performs no writes; restored pending action keeps exact
  assert.deepEqual(restored.session.getAction(),pending.action);
  const action=restored.session.getAction();action.status='cancelled';action.resultJson='{"status":"cancelled_by_user"}';
  await restored.run('取消',action.resultJson);assert.equal(fixture.writes.length,0);
- await assert.rejects(()=>restored.auxiliary.executeConfirmed(action),/confirmation_mismatch/);
+ await assert.rejects(()=>restored.session.actionExecutor.executeConfirmed(action),/confirmation_mismatch/);
 });
 
 test('confirmed memory survives session changes and a forged create cannot replace existing memory',async()=>{
  const h=harness([[call('mem','propose_memory_change',{operation:'create',memoryId:'',text:'答案简洁',scope:'global'})]]);
  const pending=await h.run('记住答案要简洁');assert.equal(h.store.state.memories.length,0);
- await h.auxiliary.executeConfirmed(pending.action);assert.equal(h.store.state.memories.length,1);
+ await h.session.actionExecutor.executeConfirmed(pending.action);assert.equal(h.store.state.memories.length,1);
  await assert.rejects(()=>h.auxiliary.propose('propose_memory_change',JSON.stringify({operation:'create',memoryId:pending.action.id,text:'overwrite',scope:'global'})),/invalid_memory_change/);
  h.session.clear();await h.run('下一个任务');assert.match(h.requests.at(-1).instructions,/答案简洁/);
 });
@@ -127,9 +127,9 @@ test('real collection tools traverse 2507 IDs, continue long fields and template
  for(let id=1;id<=200;id++)h.scope.retrieval.recordRead(id);
  const gated=await h.registry.execute({id:'read',name:'get_note_context',argumentsJson:'{"cardIds":[],"noteIds":[201]}'});
  assert.equal(gated.action.kind,'analysis');assert.equal(h.scope.retrieval.readCount(),200);
- await h.auxiliary.prepareAction(gated.action);h.auxiliary.registerPending(gated.action);
+ await h.auxiliary.prepareAction(gated.action);h.session.actionExecutor.registerPending(gated.action);
  const previousIds=fixture.noteIds;fixture.noteIds=[99999];
- await h.auxiliary.executeConfirmed(gated.action);fixture.noteIds=previousIds;
+ await h.session.actionExecutor.executeConfirmed(gated.action);fixture.noteIds=previousIds;
  assert.ok(!h.scope.retrieval.exportState().approvedNoteIds.includes(99999));
  const read=JSON.parse(await h.cards.executeRead('get_note_context','{"cardIds":[],"noteIds":[201]}'));
  assert.equal(read.notes[0].noteId,201);assert.equal(read.readCount,201);assert.equal(read.notes[0].fieldLengths[0],30000);
@@ -152,4 +152,59 @@ test('crash with executing action is never restored as a clickable retry',()=>{
  state.action={id:'unknown',kind:'create_deck',payloadJson:'{"name":"X"}',status:'executing',resultJson:''};
  h.session.restore(state);assert.equal(h.session.getAction().status,'failed');assert.equal(h.session.isPaused(),true);
  assert.match(h.session.getAction().resultJson,/execution_outcome_unknown/);
+});
+
+test('proposal tools expose no commit; unregistered and changed confirmations cannot write',async()=>{
+ fixture.writes=[];
+ const h=harness();
+ assert.equal(typeof h.auxiliary.executeConfirmed,'undefined');
+ assert.equal(typeof h.auxiliary.registerPending,'undefined');
+ const action=await h.auxiliary.propose('propose_create_deck','{"name":"Isolated proposal"}');
+ await assert.rejects(()=>h.session.actionExecutor.executeConfirmed(action),/confirmation_mismatch/);
+ h.session.actionExecutor.registerPending(action);
+ const payload=action.payloadJson;
+ action.payloadJson='{"name":"Changed after confirmation"}';
+ await assert.rejects(()=>h.session.actionExecutor.executeConfirmed(action),/confirmation_mismatch/);
+ assert.deepEqual(fixture.writes,[]);
+ action.payloadJson=payload;
+ await h.session.actionExecutor.executeConfirmed(action);
+ assert.deepEqual(fixture.writes,[['deck','Isolated proposal']]);
+});
+
+test('confirmation rechecks deck and notetype names after proposals without writing on conflict',async()=>{
+ for(const kind of ['deck','notetype']) {
+  fixture.writes=[];fixture.types=[{id:2,name:'Basic'}];
+  fixture.decks=[{deckId:1,name:'English',children:[]}];
+  const args=kind==='deck' ? {name:'Conflict'} :
+   {name:'Conflict',kind:'normal',fields:['Word','Meaning'],frontFields:['Word'],backFields:['Meaning']};
+  const h=harness([[call('conflict',kind==='deck'?'propose_create_deck':'propose_create_note_type',args)]]);
+  const pending=await h.run('propose');
+  assert.equal(pending.status,'awaiting_confirmation');
+  if(kind==='deck') fixture.decks.push({deckId:7,name:'Conflict',children:[]});
+  else fixture.types.push({id:7,name:'CONFLICT'});
+  await assert.rejects(()=>h.session.actionExecutor.executeConfirmed(pending.action),
+   new RegExp(`${kind}_name_exists`));
+  assert.equal(pending.action.status,'failed');
+  assert.deepEqual(fixture.writes,[]);
+ }
+});
+
+test('restored pending action commits exactly once through its new session executor',async()=>{
+ fixture.writes=[];fixture.decks=[{deckId:1,name:'English',children:[]}];
+ const h=harness([[call('restore','propose_create_deck',{name:'Restored proposal'})]]);
+ await h.run('propose');
+ const restored=harness();restored.session.restore(structuredClone(h.session.exportState()));
+ const action=restored.session.getAction();
+ await restored.session.actionExecutor.executeConfirmed(action);
+ await assert.rejects(()=>restored.session.actionExecutor.executeConfirmed(action),/confirmation_mismatch/);
+ assert.deepEqual(fixture.writes,[['deck','Restored proposal']]);
+});
+
+test('unsupported registered action fails explicitly without falling through to notetype creation',async()=>{
+ fixture.writes=[];
+ const h=harness();
+ const action={id:'unsupported',kind:'unknown',payloadJson:'{}',status:'pending',resultJson:''};
+ h.session.actionExecutor.registerPending(action);
+ await assert.rejects(()=>h.session.actionExecutor.executeConfirmed(action),/unsupported_action/);
+ assert.equal(action.status,'failed');assert.deepEqual(fixture.writes,[]);
 });

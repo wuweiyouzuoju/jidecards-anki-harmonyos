@@ -28,6 +28,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
       - name: Clone locked Anki source (required for path dependency resolution)
         run: |
           . ./UPSTREAM.lock
@@ -46,3 +49,5 @@ jobs:
         run: cargo fmt -p jidecards_core -- --check
       - name: clippy
         run: cargo clippy -p jidecards_core -- -D warnings
+      - name: Verify RPC mapping and locked protocol fingerprint
+        run: node tools/verify-rpc-index.mjs

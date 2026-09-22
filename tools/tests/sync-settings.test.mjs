@@ -44,9 +44,9 @@ test('manual and automatic sync share a lease and cooldown without losing a queu
 function preferencesHarness() {
   const source = readFileSync(new URL('../../entry/src/main/ets/model/同步凭证存储.ets', import.meta.url), 'utf8')
     .replace(/^import .*;\r?\n/gm, '').replace(/export /g, '');
-  const state = { values: new Map(), durable: new Map(), fail: false };
+  const state = { values: new Map(), durable: new Map(), fail: false, readFail: false };
   const store = {
-    getSync: (key, fallback) => state.values.has(key) ? state.values.get(key) : fallback,
+    getSync: (key, fallback) => { if (state.readFail) throw new Error('read failed'); return state.values.has(key) ? state.values.get(key) : fallback; },
     putSync: (key, value) => state.values.set(key, value),
     deleteSync: key => state.values.delete(key),
     flush: async () => { if (state.fail) throw new Error('disk full'); state.durable = new Map(state.values); }
@@ -55,7 +55,7 @@ function preferencesHarness() {
     '保存同步凭证', '加载同步凭证', '保存同步端点', '清除同步凭证', '设置媒体待同步', '加载媒体待同步'];
   const api = new Function('preferences', 'AppStorage', 'hilog', 'normalizeSyncServer',
     stripTypeScriptTypes(source, { mode: 'transform' }) + '\nreturn {' + names.join(',') + '};')(
-    { getPreferencesSync: () => store }, { get: () => ({}) }, { info() {}, error() {} }, normalizeSyncServer);
+    { getPreferencesSync: () => store }, { get: () => ({}) }, { info() {}, error() {}, warn() {} }, normalizeSyncServer);
   return { state, ...api };
 }
 
@@ -101,6 +101,17 @@ test('settings failures leave previous server/session and auto-sync preference i
   h.state.fail = false;
   await h.saveCustomSyncServer('https://two.example/');
   assert.equal(h.加载同步凭证(), null);
+});
+
+test('unreadable preferences cannot enable auto sync or fall back to another server', async () => {
+  const h = preferencesHarness();
+  await h.saveCustomSyncServer('https://private.example/');
+  h.state.readFail = true;
+  assert.throws(() => h.loadCustomSyncServer(), /read failed/);
+  assert.equal(h.loadAutoSyncEnabled(), false);
+  await assert.rejects(h.saveCustomSyncServer(''), /read failed/);
+  h.state.readFail = false;
+  assert.equal(h.loadCustomSyncServer(), 'https://private.example/');
 });
 
 test('automatic sync defaults on while an explicit saved opt-out survives reload and logout', async () => {

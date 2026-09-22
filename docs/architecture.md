@@ -40,7 +40,7 @@ ArkUI 页面/组件
 | `pages/` | 首页、学习、浏览、统计、设置、添加笔记、学习提醒和 AI 制卡/改卡页面 |
 | `components/` | 页面可复用 UI；浏览、统计、设置和 Agent 组件各有子目录 |
 | `backend/` | Anki 领域服务、后端会话/客户端，以及公告、云端牌组和 Agent 平台服务 |
-| `backend/agent/` | Provider 适配、Runner、工具实现、会话控制、密钥/检查点存储和唯一草稿执行器 |
+| `backend/agent/` | Provider 适配、Runner、工具实现、会话控制、密钥/检查点存储及草稿/辅助动作确认执行器 |
 | `model/` | 纯模型、设置/偏好存储、主页映射、主题、同步流程及发布开关 |
 | `model/agent/` | Agent 协议、工具 Schema、策略、草稿、澄清、历史与校验模型 |
 | `proto/core/` | protobuf reader/writer 与 UTF-8 基础实现 |
@@ -104,22 +104,23 @@ collection”两种生命周期，入口在 `后端会话.ts`，不能用一个�
   截止和最近 32 个已确认 ID。运维流程见
   [official-announcement-hosting.md](official-announcement-hosting.md)。
 
-### Agent
+### 应用内 Agent
 
 ```text
 AI 页面
   -> AgentSessionController
   -> AgentRunner（有界 Responses/SSE 工具循环）
   -> Provider Adapter + AgentToolCatalog + AgentScope
-  -> 只读工具或 ChangeDraft
-  -> 用户确认（高风险再次确认）
-  -> AgentDraftExecutor
+  -> 读取结果、ChangeDraft 或辅助 AgentAction 提案
+  -> 用户确认（ChangeDraft 高风险再次确认）
+  -> AgentDraftExecutor（卡库草稿）/ AgentActionExecutor（辅助动作）
   -> 既有 ArkTS Service -> Anki Core
 ```
 
 模型不能访问裸 RPC、数据库、文件系统或 shell。工具目录是模型可见契约的唯一
 来源，稳定 ID 的读权限不自动转化为写权限，真正写入前必须重新核对 baseline。
-2.4.0 默认关闭所有 Agent UI 入口，开发者调试可统一解锁；页面仍固定 `searchMode: 'off'`。详细现状见
+辅助动作的确认账本由会话持有，执行器与读取/提案工具分开；记忆和分析授权不走 Anki Service。
+2.7.9 默认关闭所有 Agent UI 入口，开发者调试可统一解锁；页面仍固定 `searchMode: 'off'`。详细现状见
 [agent-2-design.md](agent-2-design.md)。
 
 ## 6. 状态、主题与本地化
@@ -148,6 +149,7 @@ AI 页面
 - 根目录 `README.md`：用户与贡献者入口、当前版本和公开功能。
 - `DEVELOPMENT_PLAN.md`：当前基线、发布限制、验证门和后续工作。
 - 本文：稳定架构、数据流和模块职责。
-- `agent-2-design.md`：当前源码中的 Agent 行为与安全边界。
+- `agent-2-design.md`：当前源码中的应用内 Agent 行为与安全边界。
+- `development/coding-agent.md`：负责修改仓库的编程 Agent-first 规则。
 - `superpowers/`：历史设计与执行记录，仅用于追溯。
 - `PROJECT_CONTEXT.md`：本地 AI 协作索引；不得复制长篇历史流水账。

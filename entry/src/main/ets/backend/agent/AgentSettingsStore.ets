@@ -106,6 +106,7 @@ export async function loadAgentSettings(): Promise<AgentSettings> {
   }
 }
 
+/** @throws {Error} 设置提交或旧密钥清理失败，由设置/迁移入口处理。 */
 export async function saveAgentSettings(settings: AgentSettings): Promise<void> {
   const store: preferences.Preferences | null = await openStore();
   if (store === null) {
@@ -137,6 +138,7 @@ export async function loadLegacyAIConfiguration(): Promise<LegacyAIConfiguration
 }
 
 /** 只有调用方确认 Asset Store 写入成功后才能调用。 */
+/** @throws {Error} 设置提交或旧密钥清理失败，由设置/迁移入口处理。 */
 export async function clearLegacyAgentSecret(): Promise<void> {
   const store: preferences.Preferences | null = await openStore();
   if (store === null) {

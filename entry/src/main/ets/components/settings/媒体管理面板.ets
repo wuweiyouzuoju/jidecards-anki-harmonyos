@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { resourceText } from '../../utils/UiFeedback';
 import { ThemeTextSpans } from '../common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
@@ -79,11 +80,11 @@ export struct 媒体管理面板 {
   }
 
   private 取本地化文本(资源: Resource): string {
-    return this.getUIContext().getHostContext()!.resourceManager.getStringSync(资源.id);
+    return resourceText(this.getUIContext(), 资源);
   }
 
   private 取本地化带参文本(资源: Resource, 参数: Array<string | number>): string {
-    return this.getUIContext().getHostContext()!.resourceManager.getStringSync(资源.id, ...参数);
+    return resourceText(this.getUIContext(), 资源, ...参数);
   }
 
   private 选中数量(): number {

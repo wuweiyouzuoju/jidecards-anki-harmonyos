@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { resourceText } from '../utils/UiFeedback';
 import { SelectStyle } from '../utils/SelectStyle';
 import { ThemeTextSpans } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
@@ -143,7 +144,7 @@ export struct 高级牌组选项面板 {
   // 官方 Select 文档：selected 仅控制菜单初始高亮，按钮文本需由 value 提供，否则框内空白。
   // value 必须传 string：传 Resource 时按钮文本不显示（添加笔记面板用 string 正常，旧版高级牌组选项面板用 Resource 全空白）。
   // 项目已有此 Resource→string 模式：牌组选项面板.字段错误文本。
-  private resolveText(resource: Resource): string { return this.getUIContext().getHostContext()!.resourceManager.getStringSync(resource.id); }
+  private resolveText(resource: Resource): string { return resourceText(this.getUIContext(), resource); }
   private 枚举转下拉选项(值列表: 牌组枚举选项[]): 牌组下拉选项[] { const 输出: 牌组下拉选项[] = []; for (let i = 0; i < 值列表.length; i++) { const 项: 牌组下拉选项 = { value: this.resolveText(值列表[i].value) }; 输出.push(项); } return 输出; }
   private 枚举索引(值列表: 牌组枚举选项[], 数值: number): number { for (let i = 0; i < 值列表.length; i++) if (值列表[i].numericValue === 数值) return i; return 0; }
   private 枚举标签(值列表: 牌组枚举选项[], 数值: number): string { for (let i = 0; i < 值列表.length; i++) if (值列表[i].numericValue === 数值) return this.resolveText(值列表[i].value); return 值列表.length > 0 ? this.resolveText(值列表[0].value) : this.resolveText($r('app.string.deck_opt_mix')); }

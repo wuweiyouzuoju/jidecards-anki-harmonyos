@@ -6,6 +6,7 @@
     "test": "node tools/test.mjs",
     "test:release": "node tools/test.mjs release",
     "verify": "node tools/verify.mjs",
+    "impact": "node tools/change-impact.mjs",
     "export:source": "node tools/strip-for-release.mjs",
     "doctor": "node tools/doctor.mjs",
     "build:app": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/build-app.ps1"

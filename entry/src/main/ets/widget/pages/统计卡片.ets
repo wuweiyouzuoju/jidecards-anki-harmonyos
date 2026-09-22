@@ -141,7 +141,9 @@ function 空卡片数据(): 卡片数据 {
   };
 }
 
-@Entry
+const statsCardStorage: LocalStorage = new LocalStorage();
+
+@Entry(statsCardStorage)
 @Component
 struct 统计卡片 {
   // FormExtensionAbility 推送的 statsCardData 是整对象 JSON 字符串

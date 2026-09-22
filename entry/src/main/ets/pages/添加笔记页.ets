@@ -3,6 +3,7 @@ import { SelectStyle } from '../utils/SelectStyle';
 import { ThemeTextSpans } from '../components/common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
+import { 简洁模式AppStorage键, 加载简洁模式 } from '../model/简洁模式存储';
 
 // 添加笔记页：独立全屏建卡页（Task 9）。
 // 由 首页.ets 通过 Navigation pathStack 以 NavDestination 形式入栈（与 学习页 同机制），
@@ -60,6 +61,7 @@ export interface 添加笔记页参数 {
 
 @Component
 export struct 添加笔记页 {
+  @StorageProp(简洁模式AppStorage键) private isSimpleMode: boolean = true;
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @StorageProp(PAGE_SURFACE_KEY) private pageSurface: string = '#F5F7FA';
   /** Navigation 入栈参数 */
@@ -135,9 +137,6 @@ export struct 添加笔记页 {
   @StorageLink('systemDarkMode') private 系统暗黑模式: boolean = false;
 
   @StorageProp(颜色键.动作主色) private 动作主色: string = '#2F5FD0';
-  // 2.1.4.1 对比度：按钮背景专用档（配 #FFFFFF 文字 ≥ 4.5:1）
-  @StorageProp(颜色键.主色按钮背景) private 主色按钮背景色: string = '#2F5FD0';
-  @StorageProp(颜色键.主色按钮按下) private 主色按钮按下色: string = '#1E4FB8';
   // ⓘ 圆形按钮背景色（淡蓝容器色，配 动作主色 深蓝字符）
   @StorageProp(颜色键.主色容器) private 主色容器色: string = '#E8EEFC';
   // 手势导航条高度（底部固定按钮排需抬高避让导航条）
@@ -169,6 +168,9 @@ export struct 添加笔记页 {
     } catch (错误) {
       this.主题模式值 = 'system';
     }
+    const simpleMode: boolean = await 加载简洁模式();
+    if (!this.pageActive) { return; }
+    AppStorage.setOrCreate<boolean>(简洁模式AppStorage键, simpleMode);
     await this.加载初始数据();
   }
 
@@ -778,6 +780,7 @@ export struct 添加笔记页 {
   // @副作用
   // 打开 / 关闭文件描述符。
   // ========================================================
+  /** @throws {Error} 图片文件 IO 失败，由选图或保存入口处理并保留编辑内容。 */
   private 读取图片字节(URI: string): Uint8Array {
     const 文件: fs.File = fs.openSync(URI, fs.OpenMode.READ_ONLY);
     try {
@@ -913,6 +916,7 @@ export struct 添加笔记页 {
   // @副作用
   // 创建 / 写入 / 关闭沙箱文件。
   // ========================================================
+  /** @throws {Error} 图片文件 IO 失败，由选图或保存入口处理并保留编辑内容。 */
   private 写入临时图片文件(路径: string, 字节: Uint8Array): void {
     const 文件: fs.File = fs.openSync(
       路径, fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE | fs.OpenMode.TRUNC);
@@ -1010,27 +1014,25 @@ export struct 添加笔记页 {
   // 抽 @Builder 消除两个分支的高级设置代码重复（BUG-004 修复）。
   @Builder
   private 高级设置折叠区() {
-    Button() {
-      Row({ space: 应用尺寸.间距_8 }) {
+    if (!this.isSimpleMode) {
+      Button() {
         Text($r('app.string.add_note_tags'))
           .fontSize(应用尺寸.字号_正文)
           .fontColor($r('app.color.text_secondary'))
-        Text(this.高级已展开 ? '⌃' : '⌄')
-          .fontColor($r('app.color.text_tertiary'))
       }
-    }
-      .height(应用尺寸.紧凑控件高度)
-      .flexShrink(0)
-      .padding({ left: 应用尺寸.间距_12, right: 应用尺寸.间距_12 })
-      .backgroundColor(Color.Transparent)
-      .borderRadius(应用尺寸.圆角_面板)
-      .enabled(!this.处理中)
-      .onClick((): void => {
-        this.高级已展开 = !this.高级已展开;
-      })
+        .height(应用尺寸.紧凑控件高度)
+        .flexShrink(0)
+        .padding({ left: 应用尺寸.间距_12, right: 应用尺寸.间距_12 })
+        .backgroundColor(Color.Transparent)
+        .borderRadius(应用尺寸.圆角_面板)
+        .enabled(!this.处理中)
+        .onClick((): void => {
+          this.高级已展开 = !this.高级已展开;
+        })
 
-    if (this.高级已展开) {
-      this.标签字段块()
+      if (this.高级已展开) {
+        this.标签字段块()
+      }
     }
   }
 
@@ -1060,16 +1062,13 @@ export struct 添加笔记页 {
           }
         })
         Blank()
-        Button(this.处理中 ? $r('app.string.add_note_saving') : $r('app.string.add_note_save'))
-          .height(应用尺寸.紧凑控件高度)
-          .padding({ left: 应用尺寸.间距_16, right: 应用尺寸.间距_16 })
-          .fontSize(应用尺寸.字号_按钮)
-          .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.action_on_primary'))
-          .backgroundColor(this.主色按钮背景色)
-          .borderRadius(应用尺寸.圆角_面板)
-          .enabled(this.保存按钮可用())
-          .onClick((): void => { this.提交(); })
+        按下态按钮({
+          文案: this.处理中 ? $r('app.string.add_note_saving') : $r('app.string.add_note_save'),
+          字色: this.动作主色,
+          themeText: true,
+          是否启用: this.保存按钮可用(),
+          点击回调: (): void => { this.提交(); }
+        })
       }
       .width('100%')
       .height('100%')
@@ -1142,24 +1141,11 @@ export struct 添加笔记页 {
         // 保存位于顶栏，滚动区优先留给正反面内容。
         Scroll() {
           Column({ space: 应用尺寸.间距_14 }) {
-            // 2026-07-28：对齐舒尔特05 settingSelectRow 形态——标签在左、Select 在右，
-            // 帮助按钮 ⓘ 紧贴 Select 右侧；Select 不再 100% 宽，改为内容自适应。
-            // onClick 直接读 this.笔记类型帮助（与原 带帮助的标签 回调等价：点击时取最新值）。
+            // 帮助紧随字段标签，弹层内容在点击时读取当前类型；选择框靠右。
             Row() {
               Text($r('app.string.add_note_notetype'))
                 .fontSize(应用尺寸.字号_按钮)
                 .fontColor($r('app.color.text_secondary'))
-                .layoutWeight(1)
-              Select(this.笔记类型下拉选项())
-                .selected(this.已选笔记类型索引())
-                .value(this.已选笔记类型名())
-                .enabled(!this.处理中 && this.笔记类型选项.length > 0)
-                .attributeModifier(new SelectStyle($r('app.color.surface_card')))
-                .font(SelectStyle.controlFont)
-                .borderRadius(SelectStyle.controlRadius)
-                .onSelect((索引: number): void => {
-                  this.加载笔记类型(this.笔记类型选项[索引].id);
-                })
               Button() {
                 Text() { ThemeTextSpans($r('app.string.field_help_button'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.动作主色)
               }
@@ -1169,6 +1155,17 @@ export struct 添加笔记页 {
                 .enabled(!this.处理中)
                 .onClick((): void => {
                   this.打开帮助($r('app.string.add_note_notetype'), this.笔记类型帮助);
+                })
+              Blank()
+              Select(this.笔记类型下拉选项())
+                .selected(this.已选笔记类型索引())
+                .value(this.已选笔记类型名())
+                .enabled(!this.处理中 && this.笔记类型选项.length > 0)
+                .attributeModifier(new SelectStyle($r('app.color.surface_card')))
+                .font(SelectStyle.controlFont)
+                .borderRadius(SelectStyle.controlRadius)
+                .onSelect((索引: number): void => {
+                  this.加载笔记类型(this.笔记类型选项[索引].id);
                 })
             }
             .width('100%')

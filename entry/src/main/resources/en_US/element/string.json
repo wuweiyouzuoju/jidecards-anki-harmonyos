@@ -1,5 +1,8 @@
 {
   "string": [
+    {"name": "sync_server_load_failed", "value": "Could not read the sync server. Reopen settings or save the address before signing in."},
+    {"name": "settings_language_save_failed", "value": "Could not change language. Please retry."},
+    {"name": "ai_agent_history_delete_failed", "value": "Could not completely delete conversation history. Please retry."},
     {"name":"sync_pending","value":"Preparing to sync…"},
     {"name":"sync_wait_study","value":"Waiting for studying or editing to finish"},
     {"name":"sync_wait_home","value":"Return home to continue syncing"},
@@ -50,7 +53,6 @@
     { "name": "stats_form_ability_desc", "value": "JiDe Flashcards stats desktop widget" },
     { "name": "stats_card_name", "value": "Study Stats" },
     { "name": "stats_card_desc", "value": "Shows calendar heatmap, retention rate, today counts and future due forecast" },
-    { "name": "app_name", "value": "JiDe Flashcards" },
     { "name": "permission_reminder_reason", "value": "Used to send study reminder notifications at specified times to remind you to complete today's due and review cards" },
     { "name": "working_name", "value": "jidecards" },
     { "name": "home_title", "value": "Remember a little more today" },

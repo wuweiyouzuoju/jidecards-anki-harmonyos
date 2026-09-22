@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { resourceText } from '../utils/UiFeedback';
 import { SelectStyle } from '../utils/SelectStyle';
 import { ThemeTextSpans } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
@@ -103,7 +104,7 @@ export struct 提醒编辑面板 {
   }
 
   private 取本地化文本(resource: Resource): string {
-    return this.getUIContext().getHostContext()!.resourceManager.getStringSync(resource.id);
+    return resourceText(this.getUIContext(), resource);
   }
 
   /** 点标签把占位符追加到内容末尾，免手打花括号 */

@@ -299,6 +299,7 @@ export class AgentDraftExecutor {
     return `ai-agent-${safeId}-${noteIndex}-${imageIndex}.${extension}`;
   }
 
+  /** @throws {Error} 图片下载或写入失败，调用方通过 writtenMedia 补偿已写入媒体。 */
   private async appendImages(note: EditableNote, attachments: AgentImageAttachment[],
     draftId: string, noteIndex: number, writtenMedia: string[]): Promise<void> {
     if (attachments.length === 0) { return; }

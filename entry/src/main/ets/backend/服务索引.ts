@@ -19,7 +19,7 @@
 // @业务规则
 // 服务编号来自 backend.rs line 6668 的 Backend 分派表（奇数 1/3/5/.../45，跳过 31）。
 // 方法编号来自各 run_backend_*_service_method 分支行号。
-// 升级 Anki 版本时必须按 docs/superpowers/plans 中的 SOP 重新提取本表。
+// 升级 Anki 版本时按 docs/development/verification.md 的 RPC 门禁流程重建并核验本表。
 //
 // @副作用
 // 无

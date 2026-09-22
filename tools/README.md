@@ -4,10 +4,15 @@
 
 | 用途 | 入口 | 说明 |
 | --- | --- | --- |
+| 变更影响计划 | `npm run impact` | 支持 `--json`、`--base <ref>` 或 `--paths <路径> ...`；只读，不执行验证，详见 [验证说明](../docs/development/verification.md) |
 | 领域/完整 Node 回归 | `npm test -- <领域>` / `npm test` | 清单 `npm test -- --list` |
-| 最终本地验证 | `npm run verify` | 分阶段失败即停；细节见 [验证说明](../docs/development/verification.md) |
+| 仓库门禁 | `npm run verify -- repo` | Node、文档、架构和资源契约；CI 使用此模式 |
+| 原生门禁 | `npm run verify -- native` | 仓库门禁、Rust 主机测试和环境检查，不构建 HAP |
+| RPC 映射门禁 | `node tools/verify-rpc-index.mjs` | 锁定协议输入指纹与逐项语义映射；生成/升级步骤见 [验证说明](../docs/development/verification.md#rpc-协议门禁) |
+| 最终本地验证 | `npm run verify` | 环境、仓库、Rust 主机测试和签名 HAP；分阶段失败即停 |
 | 工具链诊断 | `doctor.mjs` | 检查本机 DevEco、Node、Rust |
 | 构建 | `build-app.ps1`、`build-native.ps1` | 其他 clang/zig cmd 是构建适配器 |
+| HAP 警告 | `npm run build:app -- -Clean` | 精确依赖/SDK 基线，项目新警告失败；[范围与维护](../docs/development/verification.md#hap-警告门禁) |
 | 本机签名 | `check-signing.mjs`、`signing-config.ts` | [配置和构建注入](../docs/development/signing.md)，不输出材料值 |
 | HAP 检查 | `inspect-hap.ps1` | 检查已有产物 |
 | 源码副本 | `npm run export:source -- <新目录>` | 保留源码与测试，只在副本脱敏签名字段，不覆盖已有目录 |

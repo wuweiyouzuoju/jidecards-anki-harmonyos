@@ -1,0 +1,200 @@
+{
+  "ankiRevision": "26.05-e64c6b1",
+  "methods": {
+    "集合方法": {
+      "打开": "open_collection",
+      "关闭": "close_collection",
+      "创建备份": "create_backup",
+      "等待备份完成": "await_backup_completion",
+      "最新进度": "latest_progress",
+      "设置中止请求": "set_wants_abort",
+      "检查数据库": "check_database",
+      "获取撤销状态": "get_undo_status",
+      "撤销": "undo",
+      "重做": "redo"
+    },
+    "牌组方法": {
+      "新建牌组": "new_deck",
+      "添加牌组": "add_deck",
+      "牌组树": "deck_tree",
+      "获取牌组名": "get_deck_names",
+      "删除牌组": "remove_decks",
+      "重命名牌组": "rename_deck",
+      "获取或创建过滤牌组": "get_or_create_filtered_deck",
+      "添加或更新过滤牌组": "add_or_update_filtered_deck",
+      "过滤牌组排序标签": "filtered_deck_order_labels",
+      "设置当前牌组": "set_current_deck",
+      "获取当前牌组": "get_current_deck"
+    },
+    "牌组配置方法": {
+      "获取牌组配置": "get_deck_config",
+      "获取牌组配置编辑视图": "get_deck_configs_for_update",
+      "更新牌组配置": "update_deck_configs"
+    },
+    "调度器方法": {
+      "获取队首卡片": "get_queued_cards",
+      "提交评分": "answer_card",
+      "今日计时": "sched_timing_today",
+      "牌组今日计数": "counts_for_deck_today",
+      "完成页信息": "congrats_info",
+      "恢复埋藏与暂停": "restore_buried_and_suspended_cards",
+      "按牌组恢复埋藏": "unbury_deck",
+      "埋藏或暂停": "bury_or_suspend_cards",
+      "清空过滤牌组": "empty_filtered_deck",
+      "重建过滤牌组": "rebuild_filtered_deck",
+      "设置到期日": "set_due_date",
+      "排序卡片": "sort_cards",
+      "重新定位默认值": "reposition_defaults",
+      "描述下一档状态": "describe_next_states",
+      "自定义学习": "custom_study",
+      "自定义学习默认值": "custom_study_defaults"
+    },
+    "卡片渲染方法": {
+      "提取音视频标签": "extract_av_tags",
+      "extractLatex": "extract_latex",
+      "获取空卡": "get_empty_cards",
+      "渲染既有卡片": "render_existing_card"
+    },
+    "笔记类型方法": {
+      "添加笔记类型旧版": "add_notetype_legacy",
+      "更新笔记类型旧版": "update_notetype_legacy",
+      "获取标准笔记类型JSON": "get_stock_notetype_legacy",
+      "获取笔记类型": "get_notetype",
+      "获取笔记类型旧版": "get_notetype_legacy",
+      "获取笔记类型名列表": "get_notetype_names",
+      "移除笔记类型": "remove_notetype",
+      "获取变更笔记类型信息": "get_change_notetype_info",
+      "变更笔记类型": "change_notetype",
+      "获取填空字段序号": "get_cloze_field_ords"
+    },
+    "笔记方法": {
+      "新建笔记": "new_note",
+      "添加笔记": "add_note",
+      "添加默认值": "defaults_for_adding",
+      "更新笔记": "update_notes",
+      "获取笔记": "get_note",
+      "笔记字段校验": "note_fields_check",
+      "某笔记的卡片": "cards_of_note",
+      "笔记的唯一笔记类型": "get_single_notetype_of_notes"
+    },
+    "导入导出方法": {
+      "导入集合包": "import_collection_package",
+      "导出集合包": "export_collection_package",
+      "导入Anki包": "import_anki_package",
+      "导出Anki包": "export_anki_package"
+    },
+    "统计方法": {
+      "卡片统计": "card_stats",
+      "获取复习日志": "get_review_logs",
+      "图表": "graphs",
+      "获取图表偏好": "get_graph_preferences",
+      "设置图表偏好": "set_graph_preferences"
+    },
+    "同步方法": {
+      "同步媒体": "sync_media",
+      "中止媒体同步": "abort_media_sync",
+      "媒体同步状态": "media_sync_status",
+      "同步登录": "sync_login",
+      "同步状态": "sync_status",
+      "同步集合": "sync_collection",
+      "全量上传或下载": "full_upload_or_download",
+      "中止同步": "abort_sync",
+      "设置自定义证书": "set_custom_certificate"
+    },
+    "卡片方法": {
+      "获取卡片": "get_card",
+      "更新卡片": "update_cards",
+      "删除卡片": "remove_cards",
+      "设置牌组": "set_deck",
+      "设置标志": "set_flag"
+    },
+    "配置方法": {
+      "获取配置JSON": "get_config_json",
+      "设置配置JSON": "set_config_json",
+      "设置配置JSON不入撤销栈": "set_config_json_no_undo",
+      "移除配置": "remove_config",
+      "获取全部配置": "get_all_config",
+      "获取配置布尔": "get_config_bool",
+      "设置配置布尔": "set_config_bool",
+      "获取配置字符串": "get_config_string",
+      "设置配置字符串": "set_config_string",
+      "获取偏好": "get_preferences",
+      "设置偏好": "set_preferences"
+    },
+    "Ankidroid方法": {
+      "今日计时_旧版": "sched_timing_today_legacy",
+      "本地时区偏移_旧版": "local_minutes_west_legacy",
+      "设置页大小": "set_page_size",
+      "调试产生错误": "debug_produce_error",
+      "运行DB命令": "run_db_command",
+      "运行DB命令Proto": "run_db_command_proto",
+      "按ID插入": "insert_for_id",
+      "运行DB命令取行数": "run_db_command_for_row_count",
+      "清空所有查询": "flush_all_queries",
+      "清空查询": "flush_query",
+      "取下一页结果": "get_next_result_page",
+      "从查询取列名": "get_column_names_from_query",
+      "取激活序列号": "get_active_sequence_numbers"
+    },
+    "AnkiHub方法": {
+      "AnkiHub登录": "ankihub_login",
+      "AnkiHub登出": "ankihub_logout"
+    },
+    "AnkiWeb方法": {
+      "获取插件信息": "get_addon_info",
+      "检查更新": "check_for_update"
+    },
+    "链接方法": {
+      "帮助页链接": "help_page_link"
+    },
+    "搜索方法": {
+      "构建搜索串": "build_search_string",
+      "搜索卡片": "search_cards",
+      "搜索笔记": "search_notes",
+      "连接搜索节点": "join_search_nodes",
+      "替换搜索节点": "replace_search_node",
+      "查找并替换": "find_and_replace",
+      "全部浏览器列": "all_browser_columns",
+      "浏览器行按ID": "browser_row_for_id",
+      "设置激活浏览器列": "set_active_browser_columns"
+    },
+    "Github方法": {
+      "获取最新发行版": "get_latest_release",
+      "下载发行版": "download_release"
+    },
+    "国际化方法": {
+      "翻译字符串": "translate_string",
+      "格式化时间跨度": "format_timespan",
+      "国际化资源": "i18n_resources"
+    },
+    "图片遮罩方法": {
+      "获取遮罩用图片": "get_image_for_occlusion",
+      "获取图片遮罩笔记": "get_image_occlusion_note",
+      "获取图片遮罩字段": "get_image_occlusion_fields",
+      "添加图片遮罩笔记类型": "add_image_occlusion_notetype",
+      "添加图片遮罩笔记": "add_image_occlusion_note",
+      "更新图片遮罩笔记": "update_image_occlusion_note"
+    },
+    "媒体方法": {
+      "检查媒体": "check_media",
+      "添加媒体文件": "add_media_file",
+      "媒体文件进回收站": "trash_media_files",
+      "清空回收站": "empty_trash",
+      "恢复回收站": "restore_trash",
+      "提取静态媒体文件": "extract_static_media_files"
+    },
+    "标签方法": {
+      "清除未用标签": "clear_unused_tags",
+      "全部标签": "all_tags",
+      "移除标签": "remove_tags",
+      "设置标签折叠": "set_tag_collapsed",
+      "标签树": "tag_tree",
+      "重新指定标签父级": "reparent_tags",
+      "重命名标签": "rename_tags",
+      "添加笔记标签": "add_note_tags",
+      "移除笔记标签": "remove_note_tags",
+      "查找并替换标签": "find_and_replace_tag",
+      "补全标签": "complete_tag"
+    }
+  }
+}

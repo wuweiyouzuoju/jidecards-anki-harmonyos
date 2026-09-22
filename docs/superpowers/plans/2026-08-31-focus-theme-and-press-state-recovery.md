@@ -3,8 +3,6 @@
 > 归档状态：这是一次性历史设计/执行记录，不是当前路线图、待办列表或操作手册。未勾选项不表示仍未实现；当前事实请查阅 [文档导航](../../README.md)、[开发状态](../../DEVELOPMENT_PLAN.md)、[当前架构](../../architecture.md) 和实际源码/测试。
 
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** Keep the type-answer input free of the system focus color while restoring isolated, 2.0.1-style button feedback in settings and study UI.
 
 **Architecture:** Replace the Ability-wide theme override with a `WithTheme` scope around the single type-answer `TextInput`. Limit settings animation to the arrow node, and replace the study page's shared pressed rating state with one local-state `StudyActionButton` instance per action.
@@ -295,4 +293,3 @@ If no physical device is connected, record the dynamic checks as pending user tr
 Replace the false `PROJECT_CONTEXT.md` press-isolation result with the final scoped-theme/local-state architecture and the exact fresh test/build/device evidence. Append a correction entry to `.trae/decisions.md` describing the historical patch chain, rejected alternatives, remaining limitations, and verification results.
 
 Because the working tree already contains overlapping uncommitted Agent work, do not create an implementation commit that would accidentally include unrelated hunks. Leave the verified implementation as a reviewable working-tree diff unless the user separately requests a scoped commit.
-

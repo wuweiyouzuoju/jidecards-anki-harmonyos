@@ -6,6 +6,7 @@
 // Invariants: 摘要始终可见；详细答题统计按需展开，缺失字段不当作零。
 
 import { common } from '@kit.AbilityKit';
+import { resourceText } from '../../utils/UiFeedback';
 import { dueOverview } from '../../model/StatsOverview';
 import type { FutureDue, TodayCounts } from '../../proto/messages/StatsMessages';
 import { 应用尺寸 } from '../../utils/应用尺寸';
@@ -38,7 +39,7 @@ export struct 今日计数卡 {
     if (分钟 < 60) {
       const ctx = this.取能力上下文();
       if (ctx !== null) {
-        return ctx.resourceManager.getStringSync($r('app.string.stats_time_format').id, 分钟, 秒);
+        return resourceText(this.getUIContext(), $r('app.string.stats_time_format'), 分钟, 秒);
       }
       return `${分钟}m${秒}s`;
     }
@@ -46,7 +47,7 @@ export struct 今日计数卡 {
     const 余分: number = 分钟 % 60;
     const ctx = this.取能力上下文();
     if (ctx !== null) {
-      return ctx.resourceManager.getStringSync($r('app.string.stats_time_format_hour').id, 小时, 余分);
+      return resourceText(this.getUIContext(), $r('app.string.stats_time_format_hour'), 小时, 余分);
     }
     return `${小时}h${余分}m`;
   }
