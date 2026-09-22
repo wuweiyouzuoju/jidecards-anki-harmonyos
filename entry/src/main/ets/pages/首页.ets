@@ -36,7 +36,9 @@ import { 牌组详情面板 } from '../components/牌组详情面板';
 import { 主页操作面板 } from '../components/主页操作面板';
 import { 云端牌组弹窗 } from '../components/云端牌组弹窗';
 import { CloudDeckImportController, CloudDeckImportBackend, CloudDeckImportProgress } from '../model/CloudDeckImportController';
-import { HomeActivityState, canPresentHomePrompt } from '../model/HomeActivityPolicy';
+import { HomeActivityState, canPresentHomePrompt, canStartHomeAutoSync } from '../model/HomeActivityPolicy';
+import { backupCoordinator } from '../model/BackupCoordinator';
+import { LocalBackups, loadAutomaticBackup } from '../backend/LocalBackups.ets';
 import { HomeAnnouncementController } from '../model/HomeAnnouncementController';
 import { externalDeckOpens, EXTERNAL_DECK_OPEN_REVISION_KEY } from '../model/ExternalDeckOpen';
 import { 官方公告弹窗 } from '../components/官方公告弹窗';
@@ -246,6 +248,7 @@ struct 首页 {
   @StorageProp(APP_FOREGROUND_KEY) @Watch('syncForegroundChanged') private syncForeground: boolean = false;
   private readonly syncScheduler: AutoSyncScheduler = autoSyncScheduler;
   private autoSyncTimer: number = -1;
+  private automaticBackupTimer: number = -1;
   private autoSyncStartupReady: boolean = false;
   @State private deckDeletionBusy: boolean = false;
   @State private deckDeletionStatus: Resource = $r('app.string.deck_media_checking');
@@ -384,6 +387,39 @@ struct 首页 {
     if (this.autoSyncTimer >= 0) clearTimeout(this.autoSyncTimer);
     this.autoSyncTimer = -1;
   }
+  private scheduleAutomaticBackup(): void {
+    if (this.automaticBackupTimer >= 0 || this.homeDisposed || !this.syncForeground) return;
+    this.automaticBackupTimer = setTimeout((): void => {
+      this.automaticBackupTimer = -1;
+      this.tryAutomaticBackup();
+    }, 5000);
+  }
+
+  private stopAutomaticBackupTimer(): void {
+    if (this.automaticBackupTimer >= 0) clearTimeout(this.automaticBackupTimer);
+    this.automaticBackupTimer = -1;
+  }
+
+  /** 启动后在首页安全空闲处交给 Core 判断间隔与保留数量。 */
+  private async tryAutomaticBackup(): Promise<void> {
+    if (this.homeDisposed || !this.syncForeground || this.页面栈.size() !== 0 ||
+      this.加载状态 !== 'ready' || !canStartHomeAutoSync(this.homeActivity())) {
+      if (!this.homeDisposed && this.syncForeground && this.页面栈.size() === 0 &&
+        this.加载状态 === 'ready') this.scheduleAutomaticBackup();
+      return;
+    }
+    const context: common.UIAbilityContext | null = this.取能力上下文();
+    if (context === null) return;
+    try {
+      if (!(await loadAutomaticBackup(context))) return;
+      await backupCoordinator.automatic(new LocalBackups(context.filesDir), Date.now(),
+        (): boolean => !this.homeDisposed && this.syncForeground && this.页面栈.size() === 0 &&
+          this.加载状态 === 'ready' && canStartHomeAutoSync(this.homeActivity()));
+    } catch (error) {
+      hilog.warn(0x4342, '首页', `自动备份失败: ${error}`);
+    }
+  }
+
 
   /**
    * 仅在首页或学习完成页安全空闲时挂载既有同步流程。
@@ -899,6 +935,7 @@ struct 首页 {
       this.牌组数据源.replaceAll(可见牌组行(snapshot.decks, this.展开的牌组ID集合, this.隐藏的牌组ID集合));
       this.月历 = 构建月历(new Date(), snapshot.reviewCountsByDate);
       this.加载状态 = snapshot.decks.length > 0 ? 'ready' : 'empty';
+      if (this.加载状态 === 'ready') this.scheduleAutomaticBackup();
       // 首次加载完成且宽屏：恢复上次选中的牌组（牌组详情面板 显示详情）。
       // 窄屏不恢复 选中的牌组ID——用户决策 2026-07-22：手机不高亮上次牌组。
       // 旋转到宽屏时由 onBreakpointChange 再触发一次恢复。

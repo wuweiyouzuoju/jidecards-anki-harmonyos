@@ -36,7 +36,7 @@
 | 剩余计数、按钮间隔、音频按钮可见性 | Core Preferences 已有相应字段；当前学习页有计数/间隔展示，但可配置读取和持久化需逐项审计，不能笼统写成缺少学习功能 | `外观分组.ets`、`pages/学习页.ets`、学习工具栏/评分按钮；同时验证普通与浮动布局 |
 | 屏幕常亮 | 本轮搜索未找到页面生命周期配套设置与窗口调用；平台实现需后续确认 | 复习设置、`pages/学习页.ets`、窗口生命周期；离页和后台释放，不替换系统全局设置 |
 | 完整手势/硬件键映射 | 已有固定 Tap Zones 与部分键盘/预览交互，不等于 AnkiDroid 可自定义手势系统 | `ReviewControlsSettings.ets`、`model/实验性功能存储.ets`、`model/PreviewInteraction.ts`、`pages/学习页.ets`；避免抢占网页链接、输入框、手写及滚动 |
-| 自动历史备份、保留数量、恢复列表 | 手动整库导入导出及导入失败回滚已存在；Core 备份引擎具备能力，应用自动触发和历史列表尚未接入，详见 `docs/FEATURE_STATUS.md` | `数据分组.ets`、`backend/集合服务.ts`、`backend/后端会话.ts`、`backend/数据迁移服务.ts`；补触发/等待/保留/安全恢复，不能把同步称作备份 |
+| 自动历史备份、保留数量、恢复列表 | 已接入：启动后安全空闲触发 Core 自动备份；数据管理提供开关、立即创建、历史列表与恢复确认。Core 负责间隔和保留，恢复复用整库替换安全副本。 | `components/settings/备份管理面板.ets`、`backend/LocalBackups.ets`、`model/BackupCoordinator.ts`、`backend/集合服务.ts` |
 | 独立无障碍页、自定义字体 | 卡片字号已实现；读屏顺序、按钮标签、大字体布局及自定义字体导入尚未完成系统审计，因此本轮不创建空分类 | `CardTextSizeControl.ets`、通用按钮、卡片 HTML 构建器、各页面；先核对已有读屏能力和资源路径 |
 | 设置内的复习提醒入口 | 已有首页“更多 → 提醒”、提醒列表及编辑页，不属于功能未实现；本轮未复制一套设置 | `pages/学习提醒页.ets`、`pages/设置页.ets`、首页导航；后续可复用现有路由并保持同步安全门禁 |
 | 多配置档案与 Android 专属设置 | 本轮未查证多档案完整链路；Android 存储、导航抽屉和系统集成开关不能直接搬到 HarmonyOS | 常规设置、`backend/后端会话.ts`、`entryability/EntryAbility.ets`；先确认数据隔离、系统能力、同步账户边界，再决定是否建设 |

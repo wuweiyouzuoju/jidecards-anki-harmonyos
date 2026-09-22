@@ -22,23 +22,23 @@
 
 ## 备份与恢复
 
-以下状态于 2026-09-18 在当前 jidecards 工作区核对。
+以下状态于 2026-09-21 在当前 jidecards 工作区核对。
 
 | 能力 | 当前状态 | 核查入口 |
 | --- | --- | --- |
 | 手动整库备份与恢复 | 已接入：导出个人数据为 `.colpkg`，导入个人数据替换集合 | `entry/src/main/ets/backend/数据迁移服务.ts`、`components/数据迁移面板.ets`、`pages/设置页.ets` |
 | 导入前自动安全副本 | 已接入：替换集合前复制数据库及媒体，失败恢复；成功后清理副本。这是单次操作回滚保护，不是长期历史备份 | `数据迁移服务.ts` 的 `替换集合`、`创建安全副本`、`恢复安全副本` 调用链 |
 | Anki Core 备份引擎 | 已具备：`create_backup` 调用 `maybe_backup`，检查变化及时间间隔，生成 `.colpkg` 并按策略清理；应用已登记创建/等待备份的 RPC 编号 | `third_party/anki/rslib/src/backend/collection.rs`、`collection/backup.rs`、`config/mod.rs`；`entry/src/main/ets/backend/服务索引.ts` |
-| 应用自动历史备份 | 本次未找到接入：应用层没有创建备份 RPC 调用、自动触发和历史列表；当前 Core 的打开/关闭集合实现不会自行调用 `create_backup` | `entry/src/main/ets/backend/后端会话.ts`、`集合服务.ts`，以及上行 Core 实现 |
-| 自动历史备份设置及恢复列表 | 本次未找到界面入口；不能据此推断手动备份、导入保护或底层引擎不存在 | `entry/src/main/ets/components/设置面板.ets`、`components/settings/数据分组.ets` |
+| 应用自动历史备份 | 已接入：首页首次稳定加载后在安全空闲处调用 Core `create_backup`，由 Core 判断间隔、是否有变更和 daily/weekly/monthly 保留策略；备份任务纳入集合操作互斥 | `model/BackupCoordinator.ts`、`backend/LocalBackups.ets`、`pages/首页.ets`、`backend/集合服务.ts` |
+| 自动历史备份设置及恢复列表 | 已接入：设置 → 数据管理 → 自动备份与恢复，支持关闭启动自动备份、立即创建、选择历史 `.colpkg` 恢复；恢复前先复制当前集合并复用整库替换回滚链，媒体仍按 Core 备份语义不包含在历史备份中 | `components/settings/备份管理面板.ets`、`backend/LocalBackups.ets`、`backend/数据迁移服务.ts` |
 
-补齐自动历史备份应复用现有 Core 引擎和安全导入能力，重点补应用触发、等待完成、错误呈现、保留策略入口及历史恢复流程，不应重新实现底层备份算法。
+自动备份复用 Core 引擎和现有安全导入能力，应用层只负责安全时机、互斥、错误呈现和恢复入口，不重新实现备份算法。
 
 ### 容易误判的证据
 
 - “备份同步”按钮打开手动导出个人数据流程，导出后仍由用户发起同步；不能当作已接入自动备份。
 - `创建备份: 2` 等服务编号只说明协议可用，不代表应用已调用。
-- 资源文案中“请从自动备份恢复”及旧占位文案不是功能已接入的证据。
+- 资源文案中“请从自动备份恢复”仍只是故障提示，功能是否可用应以备份面板和实际 RPC 调用链为准。
 - 本地自动落库、AnkiWeb 同步、导入回滚副本、长期历史备份应分别核查。
 
 ## 自动同步

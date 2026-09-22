@@ -33,7 +33,7 @@
 
 ## 核心数据流
 
-备份状态见 [易混淆功能状态](../FEATURE_STATUS.md)：手动 `.colpkg` 备份/恢复及替换集合前自动安全副本已接入；Core 已有 `create_backup/maybe_backup` 引擎，但当前应用自动历史备份触发、设置与恢复列表未见接入。判断缺项前须核对整条调用链，不能把缺设置入口等同于缺底层能力。
+备份状态见 [易混淆功能状态](../FEATURE_STATUS.md)：Core `create_backup/maybe_backup` 负责间隔、变更检测和 daily/weekly/monthly 保留；首页安全空闲时触发自动备份，设置页提供开关、立即创建和历史恢复。恢复前先保存当前集合，完成后通过现有替换链刷新集合和媒体路径。备份与同步共享 `AutoSyncScheduler` 操作占用，不能并发读写 collection。
 
 FSRS 的全局开关、牌组高级选项中的“启用 FSRS”和统计页状态统一来自 Anki collection 的 `BoolKey::Fsrs`；参数及重排选项不代表开关。首次启动自动开启仅执行一次。同步面板在集合同步前后读取实际值，仅将 `true→false` 上报为关闭变化；媒体失败不丢失已提交集合的结果。`FSRS控制器` 的 `FSRS_STATE_REVISION_KEY` 仅通知设置/统计页重新读取，不缓存或覆盖开关；牌组选项保存也发送通知。自建服务器复现可核对 `sync: FSRS before/after` 日志，缺失字段在底层默认关闭，不能据弹窗断言用户主动关闭。
 

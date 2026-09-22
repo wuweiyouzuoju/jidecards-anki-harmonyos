@@ -326,9 +326,8 @@ jidecards/
 ├─ entry/src/main/ets/
 │  ├─ pages/                  # 首页、学习、浏览、统计、设置、制卡
 │  ├─ components/             # 通用组件、浏览器、统计、设置、Agent UI
-│  ├─ stores/                 # 页面/面板状态机
-│  ├─ model/                  # 纯逻辑、偏好、主题、同步决策、Agent 契约
-│  ├─ backend/                # Anki 领域 Service 与会话
+│  ├─ model/                  # 首页任务编排、纯逻辑、偏好、主题、同步决策、Agent 契约
+│  ├─ backend/                # 首页数据/牌组命令、Anki 领域 Service 与会话
 │  ├─ proto/                  # 项目自有 protobuf 读写与消息编解码
 │  ├─ formability/            # 桌面服务卡片 Ability
 │  └─ widget/                 # 桌面卡片页面

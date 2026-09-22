@@ -37,6 +37,7 @@ export struct 数据分组 {
   点击查找重复回调: () => void = (): void => {};
   点击清除未用标签回调: () => void = (): void => {};
   点击媒体管理回调: () => void = (): void => {};
+  点击备份管理回调: () => void = (): void => {};
   @Prop databaseBusy: boolean = false;
   @Prop databaseChecked: boolean = false;
   @Prop databaseError: string = '';
@@ -122,6 +123,18 @@ export struct 数据分组 {
               this.点击已隐藏牌组回调();
             })
           }
+
+          // 自动备份与恢复：Core 负责间隔、保留和实际归档；面板负责手动创建与安全恢复
+          Row() {
+            Column({ space: 2 }) {
+              Text($r('app.string.backup_management_title'))
+                .fontSize(15).fontColor(设置面板色板_取(this.是否深色).主文字)
+              Text($r('app.string.backup_management_subtitle'))
+                .fontSize(12).fontColor(设置面板色板_取(this.是否深色).弱化文字)
+            }.alignItems(HorizontalAlign.Start)
+            Blank()
+            Text('›').fontSize(20).fontColor(设置面板色板_取(this.是否深色).弱化文字)
+          }.width('100%').height(58).onClick((): void => { this.点击备份管理回调(); })
 
           // 媒体管理行：检查未使用/缺失媒体 + 回收站操作
           Row() {

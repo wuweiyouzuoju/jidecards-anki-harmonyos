@@ -27,6 +27,8 @@
 // 通过 后端会话 间接调用 NAPI 桥，可能修改 Anki collection 状态（撤销/重做/数据库修复）。
 // ========================================================
 
+import { encodeCreateBackup } from '../proto/messages/PreferencesMessages';
+import { decodeBoolResponse } from '../proto/messages/ConfigMessages';
 import { 后端会话 } from './后端会话';
 import { 集合方法, 服务号 } from './服务索引';
 import type {
@@ -40,6 +42,12 @@ import {
 } from '../proto/messages/CollectionMessages';
 
 export class 集合服务 {
+  /** Core 决定是否创建及保留策略；返回前等待实际归档完成。 */
+  async createBackup(folder: string, force: boolean = false): Promise<boolean> {
+    return decodeBoolResponse(await this.会话.调用(服务号.后端集合, 集合方法.创建备份,
+      encodeCreateBackup(folder, force)));
+  }
+
   private readonly 会话: 后端会话 = 后端会话.获取实例();
 
   /** 查询撤销/重做状态；undo/redo 描述为空串表示对应方向不可用。 */

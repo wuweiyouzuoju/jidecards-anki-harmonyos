@@ -26,6 +26,7 @@ import { 模式切换菜单 } from './settings/模式切换菜单';
 import { 同步分组 } from './settings/同步分组';
 import { 术语分组 } from './settings/术语分组';
 import { 媒体管理面板 } from './settings/媒体管理面板';
+import { 备份管理面板 } from './settings/备份管理面板';
 import { 空卡列表面板 } from './settings/空卡列表面板';
 import { 查找重复对话框 } from './settings/查找重复对话框';
 import { 笔记类型管理面板 } from './settings/笔记类型管理面板';
@@ -135,6 +136,7 @@ export struct 设置面板 {
   @State private 说明正文: Resource = $r('app.string.settings_fsrs_help');
   // 媒体管理面板：从数据管理分组入口打开，挂在根 Stack 顶层
   @State private 显示媒体管理: boolean = false;
+  @State private 显示备份管理: boolean = false;
   // 空卡列表面板：从数据管理分组入口打开，挂在根 Stack 顶层
   @State private 显示空卡列表: boolean = false;
   // 查找重复对话框：从数据管理分组入口打开，挂在根 Stack 顶层
@@ -1004,6 +1006,7 @@ export struct 设置面板 {
                 点击笔记类型回调: (): void => { this.显示笔记类型管理 = true; },
                 点击已隐藏牌组回调: (): void => { this.点击已隐藏牌组回调(); },
                 点击媒体管理回调: (): void => { this.显示媒体管理 = true; },
+                点击备份管理回调: (): void => { this.显示备份管理 = true; },
                 点击空卡回调: (): void => { this.显示空卡列表 = true; },
                 点击查找重复回调: (): void => { this.显示查找重复 = true; },
                 点击清除未用标签回调: (): void => { this.请求清除未用标签(); }
@@ -1086,6 +1089,14 @@ export struct 设置面板 {
           },
           关闭回调: (): void => { this.显示模式菜单 = false; }
         })
+      }
+
+      if (this.显示备份管理) {
+        备份管理面板({
+          isDark: this.是否深色,
+          onClose: (): void => { this.显示备份管理 = false; }
+        })
+          .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
       }
 
       // 媒体管理面板：数据管理分组入口打开，挂在根 Stack 顶层

@@ -16,6 +16,8 @@ import { 后端会话 } from '../backend/后端会话';
 import { 笔记服务, 笔记字段校验错误 } from '../backend/笔记服务';
 import { 笔记类型服务 } from '../backend/笔记类型服务';
 import { 图片遮罩服务 } from '../backend/图片遮罩服务';
+import { importNoteImage } from '../backend/NoteImageImport';
+import { NoteFieldImage, prepareNoteImageFields } from '../model/NoteImageDraft';
 import { 文本中的填空编号 } from '../model/填空解析器';
 import { 生成Occlusions字符串, 识别图片扩展名 } from '../model/图片遮罩模型';
 import type { 遮罩描述 } from '../model/图片遮罩模型';
@@ -81,6 +83,11 @@ export struct 添加笔记页 {
   @State private 笔记类型选项: 添加笔记笔记类型选项[] = [];
   @State private 字段名列表: string[] = [];
   @State private 字段值列表: string[] = [];
+  @State private fieldImages: NoteFieldImage[] = [];
+  @State private pickingFieldImage: boolean = false;
+  private imageRequest: number = 0;
+  private nextImageId: number = 0;
+  private pageActive: boolean = false;
   // 笔记类型名称用于判断是否为 Cloze（Anki 默认 Cloze 笔记类型名为 "Cloze"）
   @State private 笔记类型名: string = '';
   @State private 笔记类型帮助: Resource = $r('app.string.add_note_notetype_help');
@@ -88,7 +95,6 @@ export struct 添加笔记页 {
   @State private 高级已展开: boolean = false;
   @State private 错误信息: string = '';
   @State private 处理中: boolean = false;
-  @State private 保存按下: boolean = false;
   @State private 显示帮助: boolean = false;
   @State private 帮助标题: Resource = $r('app.string.add_note_deck');
   @State private 帮助正文: Resource = $r('app.string.add_note_deck_help');
@@ -142,6 +148,7 @@ export struct 添加笔记页 {
   @State private 转场透明度: number = 1;
 
   async aboutToAppear(): Promise<void> {
+    this.pageActive = true;
     this.牌组ID = this.pageDeckId === '' ? 0 : parseInt(this.pageDeckId);
     this.牌组名 = this.pageDeckName;
     this.牌组选项 = this.pageDeckOptions;
@@ -166,6 +173,8 @@ export struct 添加笔记页 {
   }
 
   aboutToDisappear(): void {
+    this.pageActive = false;
+    this.imageRequest++;
     // 注销自定义转场回调，避免内存泄漏与野回调
     CustomTransition.getInstance().注销NavParam('AddNotePage');
   }
@@ -349,6 +358,9 @@ export struct 添加笔记页 {
   // 调后端 获取笔记类型；读写 处理中 状态
   // ========================================================
   private async 加载笔记类型(notetypeId: number): Promise<void> {
+    this.imageRequest++;
+    this.fieldImages = [];
+    this.pickingFieldImage = false;
     this.处理中 = true;
     try {
       const 视图: NotetypeView = await this.笔记类型服务实例.获取笔记类型(notetypeId);
@@ -629,7 +641,7 @@ export struct 添加笔记页 {
   // 调后端 新建笔记 / 添加笔记；读写 处理中 状态；成功后 pop 页面栈
   // ========================================================
   private async 提交(): Promise<void> {
-    if (this.处理中 || this.牌组ID === 0 || this.已选笔记类型ID === 0) {
+    if (this.处理中 || this.pickingFieldImage || this.牌组ID === 0 || this.已选笔记类型ID === 0) {
       return;
     }
     // T3.6：ImageOcclusion 模式走专属提交流程，不复用 Cloze 校验与字段直接填充逻辑。
@@ -643,16 +655,28 @@ export struct 添加笔记页 {
     }
     this.错误信息 = '';
     this.处理中 = true;
+    const fields: string[] = this.字段值列表.slice();
+    const images: NoteFieldImage[] = this.fieldImages.slice();
+    const tags: string[] = this.解析标签();
+    const notetypeId: number = this.已选笔记类型ID;
+    const deckId: number = this.牌组ID;
     try {
-      const 笔记: EditableNote = await this.笔记服务实例.新建笔记(this.已选笔记类型ID);
-      笔记.fields = this.字段值列表.slice();
-      笔记.tags = this.解析标签();
-      await this.笔记服务实例.添加笔记(笔记, this.牌组ID);
+      let preparedFields: string[];
+      try {
+        preparedFields = await prepareNoteImageFields(fields, images, importNoteImage);
+      } catch (error) {
+        throw new Error(this.取本地化文案($r('app.string.add_note_image_import_failed')));
+      }
+      const 笔记: EditableNote = await this.笔记服务实例.新建笔记(notetypeId);
+      笔记.fields = preparedFields;
+      笔记.tags = tags;
+      await this.笔记服务实例.添加笔记(笔记, deckId);
       // 笔记添加成功：写 AppStorage 标志位通知首页/牌组详情面板立即刷新统计计数。
       // 不依赖 NavPathStack.onPop 回调（不同设备/API 版本偶发不触发），用 @StorageLink + @Watch 兜底。
       AppStorage.setOrCreate<number>('noteAddedTick', Date.now());
-      this.pathStack.pop();
+      if (this.pageActive) { this.pathStack.pop(); }
     } catch (错误) {
+      if (!this.pageActive) { return; }
       if (错误 instanceof 笔记字段校验错误) {
         if (错误.messageKey === 'add_note_empty_error') {
           this.错误信息 = this.取本地化文案($r('app.string.add_note_empty_error'));
@@ -668,6 +692,29 @@ export struct 添加笔记页 {
     } finally {
       this.处理中 = false;
     }
+  }
+
+  private async pickFieldImage(fieldIndex: number): Promise<void> {
+    if (this.处理中 || this.pickingFieldImage) { return; }
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    if (!context) { return; }
+    const request: number = ++this.imageRequest;
+    this.pickingFieldImage = true;
+    try {
+      const uri: string | null = await 从图库选取图片(context);
+      if (!this.pageActive || request !== this.imageRequest || uri === null) { return; }
+      const attachment: NoteFieldImage = {
+        id: ++this.nextImageId, fieldIndex: fieldIndex, uri: uri, filename: ''
+      };
+      this.fieldImages = this.fieldImages.concat([attachment]);
+      this.错误信息 = '';
+    } finally {
+      if (request === this.imageRequest) { this.pickingFieldImage = false; }
+    }
+  }
+
+  private imagesForField(fieldIndex: number): NoteFieldImage[] {
+    return this.fieldImages.filter((attachment: NoteFieldImage): boolean => attachment.fieldIndex === fieldIndex);
   }
 
   // ========================================================
@@ -964,14 +1011,18 @@ export struct 添加笔记页 {
   @Builder
   private 高级设置折叠区() {
     Button() {
-      Text() { ThemeTextSpans(this.高级已展开 ? $r('app.string.add_note_advanced_hide') : $r('app.string.add_note_advanced'), this.themeAccentColors, this.getUIContext()) }.fontSize(应用尺寸.字号_按钮).fontColor(this.动作主色)
+      Row({ space: 应用尺寸.间距_8 }) {
+        Text($r('app.string.add_note_tags'))
+          .fontSize(应用尺寸.字号_正文)
+          .fontColor($r('app.color.text_secondary'))
+        Text(this.高级已展开 ? '⌃' : '⌄')
+          .fontColor($r('app.color.text_tertiary'))
+      }
     }
-      .width('100%')
-      .height(应用尺寸.按钮高度)
+      .height(应用尺寸.紧凑控件高度)
       .flexShrink(0)
-      .fontSize(应用尺寸.字号_按钮)
-      .fontColor(this.动作主色)
-      .backgroundColor($r('app.color.surface_page'))
+      .padding({ left: 应用尺寸.间距_12, right: 应用尺寸.间距_12 })
+      .backgroundColor(Color.Transparent)
       .borderRadius(应用尺寸.圆角_面板)
       .enabled(!this.处理中)
       .onClick((): void => {
@@ -1009,6 +1060,16 @@ export struct 添加笔记页 {
           }
         })
         Blank()
+        Button(this.处理中 ? $r('app.string.add_note_saving') : $r('app.string.add_note_save'))
+          .height(应用尺寸.紧凑控件高度)
+          .padding({ left: 应用尺寸.间距_16, right: 应用尺寸.间距_16 })
+          .fontSize(应用尺寸.字号_按钮)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.action_on_primary'))
+          .backgroundColor(this.主色按钮背景色)
+          .borderRadius(应用尺寸.圆角_面板)
+          .enabled(this.保存按钮可用())
+          .onClick((): void => { this.提交(); })
       }
       .width('100%')
       .height('100%')
@@ -1030,11 +1091,11 @@ export struct 添加笔记页 {
     Row({ space: 应用尺寸.间距_8 }) {
       ForEach(this.填空编号列表(), (编号: number) => {
         Button(`c${编号}`)
-          .height(36)
+          .height(应用尺寸.紧凑控件高度)
           .padding({ left: 应用尺寸.间距_12, right: 应用尺寸.间距_12 })
           .fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.action_on_primary'))
-          .backgroundColor(this.主色按钮背景色)
+          .fontColor(this.动作主色)
+          .backgroundColor($r('app.color.surface_page'))
           .borderRadius(应用尺寸.圆角_面板)
           .enabled(!this.处理中)
           .onClick((): void => {
@@ -1045,12 +1106,40 @@ export struct 添加笔记页 {
     .width('100%')
   }
 
+  @Builder
+  private fieldImagePreviews(fieldIndex: number) {
+    ForEach(this.imagesForField(fieldIndex), (attachment: NoteFieldImage) => {
+      Stack({ alignContent: Alignment.TopEnd }) {
+        Image(attachment.uri)
+          .width('100%')
+          .height(应用尺寸.卡片高度)
+          .objectFit(ImageFit.Contain)
+          .borderRadius(应用尺寸.圆角_面板)
+          .backgroundColor($r('app.color.surface_page'))
+          .accessibilityText(
+            $r('app.string.add_note_image_preview'))
+        Button($r('app.string.add_note_image_remove'))
+          .height(应用尺寸.紧凑控件高度)
+          .fontSize(应用尺寸.字号_正文_小)
+          .fontColor($r('app.color.text_secondary'))
+          .backgroundColor($r('app.color.surface_card'))
+          .borderRadius(应用尺寸.圆角_面板)
+          .margin(应用尺寸.间距_5)
+          .enabled(!this.处理中)
+          .onClick((): void => {
+            this.fieldImages = this.fieldImages.filter((item: NoteFieldImage): boolean => item.id !== attachment.id);
+          })
+      }
+      .width('100%')
+    }, (attachment: NoteFieldImage): string => `${attachment.id}`)
+  }
+
   build() {
     NavDestination() {
       Stack() {
       Column() {
         this.顶部条()
-        // 中间字段区可滚动，错误信息与按钮固定在底部
+        // 保存位于顶栏，滚动区优先留给正反面内容。
         Scroll() {
           Column({ space: 应用尺寸.间距_14 }) {
             // 2026-07-28：对齐舒尔特05 settingSelectRow 形态——标签在左、Select 在右，
@@ -1084,46 +1173,40 @@ export struct 添加笔记页 {
             }
             .width('100%')
 
-            // T3.3-T3.4：ImageOcclusion 模式渲染图片遮盖专属布局（选图 / 预览 / Header/Back Extra / Tags）；
-            // 其他笔记类型保留原通用 4 字段 TextArea + 高级设置折叠。
+            // 遮盖使用专属布局；普通字段支持文字与独立图片附件。
             if (this.是否图片遮盖模式) {
-              // ① 选图按钮（已选图后文案切为"更换图片"）
-              Button(this.图片遮盖_源图Uri === ''
-                ? $r('app.string.add_note_image_occlusion_pick_image')
-                : $r('app.string.add_note_image_occlusion_change_image'))
-                .width('100%')
-                .height(应用尺寸.按钮高度)
-                .fontSize(应用尺寸.字号_按钮)
-                .fontColor($r('app.color.action_on_primary'))
-                .backgroundColor(this.主色按钮背景色)
-                .borderRadius(应用尺寸.圆角_胶囊)
-                .enabled(!this.处理中)
-                .onClick((): void => {
-                  this.选取图片遮盖源图();
-                })
+              Row({ space: 应用尺寸.间距_8 }) {
+                Button(this.图片遮盖_源图Uri === ''
+                  ? $r('app.string.add_note_image_occlusion_pick_image')
+                  : $r('app.string.add_note_image_occlusion_change_image'))
+                  .height(应用尺寸.紧凑控件高度)
+                  .fontSize(应用尺寸.字号_正文)
+                  .fontColor(this.动作主色)
+                  .backgroundColor($r('app.color.surface_card'))
+                  .borderRadius(应用尺寸.圆角_面板)
+                  .enabled(!this.处理中)
+                  .onClick((): void => { this.选取图片遮盖源图(); })
+                if (this.图片遮盖_源图Uri !== '') {
+                  Button($r('app.string.add_note_image_occlusion_edit_masks'))
+                    .height(应用尺寸.紧凑控件高度)
+                    .fontSize(应用尺寸.字号_正文)
+                    .fontColor(this.动作主色)
+                    .backgroundColor($r('app.color.surface_card'))
+                    .borderRadius(应用尺寸.圆角_面板)
+                    .enabled(!this.处理中)
+                    .onClick((): void => { this.图片遮盖_显示编辑器 = true; })
+                }
+              }
+              .width('100%')
 
               // ② 图片预览 + 编辑遮罩入口
               if (this.图片遮盖_源图Uri !== '') {
                 Image(this.图片遮盖_源图Uri)
                   .width('100%')
+                  .height(应用尺寸.卡片高度)
                   .objectFit(ImageFit.Contain)
                   .borderRadius(应用尺寸.圆角_面板)
                   .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
-
-                Button() {
-                  Text() { ThemeTextSpans($r('app.string.add_note_image_occlusion_edit_masks'), this.themeAccentColors, this.getUIContext()) }.fontSize(应用尺寸.字号_按钮).fontColor(this.动作主色)
-                }
-                  .width('100%')
-                  .height(应用尺寸.按钮高度)
-                  .fontSize(应用尺寸.字号_按钮)
-                  .fontColor(this.动作主色)
-                  .backgroundColor($r('app.color.surface_page'))
-                  .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
-                  .borderRadius(应用尺寸.圆角_胶囊)
-                  .enabled(!this.处理中)
-                  .onClick((): void => {
-                    this.图片遮盖_显示编辑器 = true;
-                  })
               }
 
               // ③ Header / Back Extra 输入（用 字段名列表 中查到的字段名做 placeholder 变量）
@@ -1183,12 +1266,29 @@ export struct 添加笔记页 {
               // ④ Tags 折叠在「高级设置」里，与其他笔记类型保持一致（BUG-004 修复）
               this.高级设置折叠区()
             } else {
+              Text($r('app.string.add_note_images_hint'))
+                .fontSize(应用尺寸.字号_正文_小)
+                .fontColor($r('app.color.text_tertiary'))
+                .width('100%')
               ForEach(this.字段名列表, (字段名: string, 索引: number) => {
-                Column({ space: 应用尺寸.间距_5 }) {
-                  Text(字段名)
-                    .fontSize(应用尺寸.字号_正文_小)
-                    .fontColor($r('app.color.text_secondary'))
-                    .width('100%')
+                Column({ space: 应用尺寸.间距_8 }) {
+                  Row({ space: 应用尺寸.间距_8 }) {
+                    Text(字段名)
+                      .fontSize(应用尺寸.字号_正文)
+                      .fontWeight(FontWeight.Medium)
+                      .fontColor($r('app.color.text_primary'))
+                      .layoutWeight(1)
+                    Button($r('app.string.add_note_image_add'))
+                      .height(应用尺寸.紧凑控件高度)
+                      .fontSize(应用尺寸.字号_正文_小)
+                      .fontColor(this.动作主色)
+                      .backgroundColor(Color.Transparent)
+                      .borderRadius(应用尺寸.圆角_面板)
+                      .padding({ left: 应用尺寸.间距_10, right: 应用尺寸.间距_10 })
+                      .enabled(!this.处理中 && !this.pickingFieldImage)
+                      .onClick((): void => { this.pickFieldImage(索引); })
+                  }
+                  .width('100%')
                   if (this.是填空笔记类型() && 索引 === this.填空字段索引()) {
                     TextArea({
                       placeholder: $r('app.string.add_note_cloze_placeholder'),
@@ -1217,7 +1317,7 @@ export struct 添加笔记页 {
                     this.填空按钮行()
                   } else {
                     TextArea({
-                      placeholder: 字段名,
+                      placeholder: $r('app.string.add_note_field_placeholder'),
                       text: this.字段值列表[索引]
                     })
                       .width('100%')
@@ -1234,8 +1334,12 @@ export struct 添加笔记页 {
                         this.更新字段(索引, 值);
                       })
                   }
+                  this.fieldImagePreviews(索引)
                 }
                 .width('100%')
+                .padding(应用尺寸.间距_12)
+                .backgroundColor($r('app.color.surface_card'))
+                .borderRadius(应用尺寸.圆角_卡片)
               }, (字段名: string, 索引: number): string => `${索引}-${字段名}`)
 
               this.高级设置折叠区()
@@ -1254,7 +1358,7 @@ export struct 添加笔记页 {
           top: 应用尺寸.pageContentTopInset
         })
 
-        // 错误信息固定在按钮上方，避免软键盘或字段多时被裁剪
+        // 错误固定显示，避免字段较多时被滚出屏幕。
         if (this.错误信息 !== '') {
           Text(this.错误信息)
             .fontSize(应用尺寸.字号_正文_小)
@@ -1267,48 +1371,7 @@ export struct 添加笔记页 {
             })
         }
 
-        Row({ space: 应用尺寸.间距_10 }) {
-          Button($r('app.string.add_note_cancel'))
-            .height(应用尺寸.按钮高度)
-            .layoutWeight(1)
-            .fontSize(应用尺寸.字号_按钮)
-            .fontColor($r('app.color.text_primary'))
-            .backgroundColor($r('app.color.surface_page'))
-            .borderRadius(应用尺寸.圆角_胶囊)
-            .enabled(!this.处理中)
-            .onClick((): void => {
-              if (!this.处理中) {
-                this.pathStack.pop();
-              }
-            })
-          Button(this.处理中 ? $r('app.string.add_note_saving') : $r('app.string.add_note_save'))
-            .height(应用尺寸.按钮高度)
-            .layoutWeight(1)
-            .fontSize(应用尺寸.字号_按钮)
-            .fontColor($r('app.color.action_on_primary'))
-            .backgroundColor(this.保存按下 ? this.主色按钮按下色 : this.主色按钮背景色)
-            .borderRadius(应用尺寸.圆角_胶囊)
-            .animation({ duration: 80, curve: Curve.EaseOut })
-            .enabled(this.保存按钮可用())
-            .onTouch((事件: TouchEvent): void => {
-              if (事件.type === TouchType.Down) {
-                this.保存按下 = true;
-              } else if (事件.type === TouchType.Up || 事件.type === TouchType.Cancel) {
-                this.保存按下 = false;
-              }
-            })
-            .onClick((): void => {
-              this.提交();
-            })
-        }
-        .width('100%')
-        .padding({
-          left: 应用尺寸.页面内边距_水平,
-          right: 应用尺寸.页面内边距_水平,
-          top: 应用尺寸.间距_8,
-          // 抬高避让手势导航条（AppGallery 导航栏适配要求）
-          bottom: 应用尺寸.间距_8 + this.导航条高度
-        })
+        Column().height(应用尺寸.间距_8 + this.导航条高度).flexShrink(0)
       }
       .width('100%')
       .height('100%')
@@ -1361,7 +1424,7 @@ export struct 添加笔记页 {
 
   /** T3.7：保存按钮可用条件——ImageOcclusion 模式要求已选图 + 至少 1 个遮罩；其他模式与原逻辑一致。 */
   private 保存按钮可用(): boolean {
-    if (this.处理中) {
+    if (this.处理中 || this.pickingFieldImage) {
       return false;
     }
     if (this.字段名列表.length === 0) {
