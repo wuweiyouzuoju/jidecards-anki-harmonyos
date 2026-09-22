@@ -15,3 +15,5 @@
 没有本机文件且未显式指定环境路径时，直接调用 Hvigor 可以生成 unsigned HAP 供编译检查；`build-app.ps1` 与完整 verify 要求签名配置，缺少即失败。显式环境路径不存在、配置无效或产品不匹配时直接报错，不静默退回无签名构建。错误只打印字段名，不打印材料值。
 
 修改签名注入后必须观察实际 SignHap 成功与 signed HAP 产物，不能只看整个 Hvigor 命令退出成功。CI 的便携仓库验证不需要签名材料；签名构建在配置了 DevEco 与签名的主机执行。
+
+`tools/signing-config.ts` 是 Node/Hvigor 的 TypeScript 模块，字段遍历使用 `keyof SigningMaterial` 保持索引类型明确。修改此模块后，还须使用当前 DevEco 自带的 Node/Hvigor 执行 IDE 同步（`--sync -p product=default --analyze=normal --parallel --incremental --daemon`），验证构建脚本类型检查；Node 行为测试不会代替这项检查。

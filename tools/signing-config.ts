@@ -20,13 +20,16 @@ export function parseLocalSigning(text: string): LocalSigning {
   if (!parsed || !Array.isArray(parsed.signingConfigs) || !Array.isArray(parsed.products)) {
     throw new Error('Local signing requires signingConfigs and products arrays');
   }
+  const materialFields: (keyof SigningMaterial)[] = [
+    'certpath', 'profile', 'storeFile', 'storePassword', 'keyAlias', 'keyPassword', 'signAlg'
+  ];
   const names = new Set<string>();
   for (const config of parsed.signingConfigs) {
     if (!config || typeof config.name !== 'string' || !config.name || names.has(config.name)) {
       throw new Error('Invalid or duplicate signing config name');
     }
     names.add(config.name);
-    for (const key of ['certpath', 'profile', 'storeFile', 'storePassword', 'keyAlias', 'keyPassword', 'signAlg']) {
+    for (const key of materialFields) {
       if (!config.material || typeof config.material[key] !== 'string' || !config.material[key]) {
         throw new Error(`Missing signing material field: ${key}`);
       }
