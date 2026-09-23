@@ -118,7 +118,7 @@ test('theme configuration changes preserve elapsed position and adopt the next c
 function createNavigation(background) {
   const source = readFileSync(new URL('../../entry/src/main/ets/pages/首页.ets', import.meta.url), 'utf8');
   const start = source.indexOf('  private 自定义转场回调(');
-  const end = source.indexOf('\n  // ===', start);
+  const end = source.indexOf('\n  }', start) + 4;
   const js = stripTypeScriptTypes(`class Home { ${source.slice(start, end)} }`, { mode: 'transform' });
   const values = {
     NavigationOperation: { PUSH: 'push' },

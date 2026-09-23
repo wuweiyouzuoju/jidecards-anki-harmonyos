@@ -1,3 +1,4 @@
+import { DeckOptionsSession } from '../../entry/src/main/ets/model/home/DeckOptionsSession.ts';
 import { loadPlatformModule } from './platform-module-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
@@ -185,29 +186,15 @@ test('editing a deck waits for metadata writes then refreshes even when its ID i
   assert.equal(state.定制牌组中, false);
 });
 
-test('saving deck options refreshes only after backend changes finish', async () => {
-  const events = [];
-  const saved = deferred();
-  const state = homeSaveHarness('保存牌组选项', {
-    copyDeckConfig, buildDeckConfigRequest, prepareDeckConfigForSave,
-    UPDATE_DECK_CONFIGS_MODE_NORMAL: 0,
-    notifyFsrsStateChanged: () => { events.push('fsrs'); }
-  });
-  Object.assign(state, {
-    牌组选项中: false, 牌组选项牌组ID: 10,
-    编辑视图: { cardStateCustomizer: '', allConfigs: [] },
-    编辑配置: { id: 1, name: 'Default', mtimeSecs: 0, usn: 0, config: emptyDeckConfigSettings() },
-    牌组配置服务实例: { 更新牌组配置: async request => {
-      assert.equal(request.targetDeckId, 10); events.push('save'); await saved.promise;
-    } },
-    关闭牌组选项: () => { events.push('close'); },
-    加载主页数据: async () => { events.push('refresh'); }
-  });
-  const pending = state.保存牌组选项({ 校验: () => [], 应用到配置: () => true }, {
-    校验: () => [], 应用: () => true, 转换为请求字段: () => ({ limits: null, newCardsIgnoreReviewLimit: false, fsrs: false, applyAllParentLimits: false, fsrsReschedule: false, fsrsHealthCheck: false })
-  });
-  assert.deepEqual(events, ['save']);
-  saved.resolve(); await pending;
-  assert.deepEqual(events, ['save', 'fsrs', 'close', 'refresh']);
-  assert.equal(state.牌组选项中, false);
+test('saving deck options broadcasts refresh only after backend commit', async () => {
+  const events=[],saved=deferred();
+  const config={id:1,name:'Default',mtimeSecs:0,usn:0,config:emptyDeckConfigSettings()};
+  const view={currentDeck:{configId:1,name:'Deck',limits:null},allConfigs:[{config,useCount:1}],cardStateCustomizer:''};
+  const session=new DeckOptionsSession(10,{load:async()=>view,
+    save:async request=>{assert.equal(request.targetDeckId,10);events.push('save');await saved.promise;},
+    committed:()=>events.push('fsrs-refresh')},s=>{if(s.phase==='saved')events.push('close');});
+  await session.load();
+  const pending=session.save(config,false,{limits:null,newCardsIgnoreReviewLimit:false,fsrs:false,applyAllParentLimits:false,fsrsReschedule:false,fsrsHealthCheck:false});
+  assert.deepEqual(events,['save']);saved.resolve();await pending;
+  assert.deepEqual(events,['save','fsrs-refresh','close']);
 });

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { exportPersonalData } from '../backend/DataExportWorkflow';
+import { DataTransferSession, DataTransferState, initialTransferState } from '../model/home/DataTransferSession';
+import { AnkiDataTransfer } from '../backend/AnkiDataTransfer';
 
 import { initializeRedemption } from '../utils/RedemptionStore';
 import { UNLOCKED_CONTENTS_KEY, isThemeAvailable } from '../model/ThemeCatalog';
@@ -8,12 +9,11 @@ import { common } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { 设置面板 } from '../components/设置面板';
 import { 许可证面板 } from '../components/许可证面板';
-import { 数据迁移协调器 } from '../components/home/数据迁移协调器';
-import type { 数据迁移意图, 数据迁移模式, 导出牌组选项 } from '../model/DataTransferIntent';
+import { DataTransferFeature } from '../components/home/DataTransferFeature';
+import type { 数据迁移模式, 导出牌组选项 } from '../model/DataTransferIntent';
 import type { SyncAuth } from '../proto/messages/SyncMessages';
 import { 牌组服务 } from '../backend/牌组服务';
 import { 后端会话 } from '../backend/后端会话';
-import { 执行牌组导入, 暂存导入文件, 替换集合 } from '../backend/数据迁移服务';
 import { 解析是否深色, 主题模式 } from '../model/主题设置';
 import { 加载主题模式, 保存主题模式 } from '../model/主题存储';
 import { 颜色主题, 默认颜色主题 } from '../model/颜色主题';
@@ -22,7 +22,6 @@ import { 应用颜色主题 } from '../utils/颜色主题管理器';
 import { 应用主题 } from '../utils/主题控制器';
 import { 加载已隐藏牌组ID列表, 取消隐藏全部牌组 } from '../model/隐藏牌组存储';
 import { 刷新桌面卡片数据 } from '../model/FSRS控制器';
-import { 选取数据文件 } from '../utils/文件导入助手';
 import { 平铺牌组树 } from '../model/牌组层级';
 import { 牌组汇总 } from '../model/主页模型';
 import type { DeckTreeNode } from '../proto/messages/DeckMessages';
@@ -32,6 +31,15 @@ import { 浏览页参数 } from '../model/navigation/PageParams';
 
 @Component
 export struct 设置页 {
+  @State private transfer: DataTransferState = initialTransferState();
+  private disposed: boolean = false;
+  private readonly transferSession: DataTransferSession = new DataTransferSession(new AnkiDataTransfer(),
+    (state: DataTransferState): void => { this.transfer = state; },
+    (): Promise<void> => this.加载牌组列表(),
+    (): void => this.显示提示($r('app.string.transfer_done')));
+  private 打开数据迁移(mode: 数据迁移模式, deckId: number, allowDeckSelection: boolean): void {
+    this.transferSession.open(mode, deckId, allowDeckSelection);
+  }
   @State private activeSection: string = '';
   pathStack?: NavPathStack;
   openAiSettings: boolean = false;
@@ -45,16 +53,6 @@ export struct 设置页 {
 
   // 弹层状态
   @State private 显示许可证: boolean = false;
-
-  // 数据迁移状态
-  @State private 显示数据迁移: boolean = false;
-  @State private 数据迁移初始模式: 数据迁移模式 = 'exportDeck';
-  @State private 数据迁移初始牌组ID: number = 0;
-  @State private 数据迁移允许选牌组: boolean = false;
-  @State private 数据迁移中: boolean = false;
-  @State private 数据迁移错误: string = '';
-  @State private 数据迁移阶段: number = -1;
-  @State private 个人数据替换步骤: number = 0;
 
   // 牌组列表（用于导出选项）
   @State private 牌组列表: 导出牌组选项[] = [];
@@ -78,6 +76,8 @@ export struct 设置页 {
   }
 
   aboutToDisappear(): void {
+    this.disposed = true;
+    this.transferSession.dispose();
     CustomTransition.getInstance().注销NavParam('SettingsPage');
   }
 
@@ -135,6 +135,7 @@ export struct 设置页 {
       await 后端会话.获取实例().确保已打开(context.filesDir);
       const tree: DeckTreeNode = await this.牌组服务实例.获取牌组树();
       const allDecks: 牌组汇总[] = 平铺牌组树(tree);
+      if (this.disposed) return;
       this.牌组列表 = allDecks.map((deck: 牌组汇总): 导出牌组选项 => ({
         id: Number(deck.id), name: deck.fullName
       }));
@@ -143,111 +144,6 @@ export struct 设置页 {
     }
   }
 
-  private 打开数据迁移(mode: 数据迁移模式, deckId: number, allowDeckSelection: boolean): void {
-    this.数据迁移初始模式 = mode;
-    this.数据迁移初始牌组ID = deckId;
-    this.数据迁移允许选牌组 = allowDeckSelection;
-    this.数据迁移错误 = '';
-    this.个人数据替换步骤 = 0;
-    this.显示数据迁移 = true;
-  }
-
-  private async 处理数据迁移(intent: 数据迁移意图): Promise<void> {
-    if (this.数据迁移中) return;
-    if (intent.kind === 'importDeck') {
-      await this.从选择器导入牌组();
-      return;
-    }
-    if (intent.kind === 'replacePersonalData') {
-      await this.确认个人数据替换();
-      return;
-    }
-    const context: common.UIAbilityContext | null = this.取能力上下文();
-    if (context === null) return;
-    this.数据迁移中 = true;
-    this.数据迁移错误 = '';
-    this.数据迁移阶段 = 0;
-    try {
-      const savedPath: string | null = await exportPersonalData(context, intent,
-        (stage: number): void => { this.数据迁移阶段 = stage; });
-      if (savedPath !== null) {
-        this.显示提示($r('app.string.transfer_done'));
-        this.显示数据迁移 = false;
-        this.个人数据替换步骤 = 0;
-      }
-    } catch (error) {
-      this.数据迁移错误 = error instanceof Error ? error.message : `${error}`;
-    } finally {
-      this.数据迁移中 = false;
-      this.数据迁移阶段 = -1;
-    }
-  }
-
-  private async 从选择器导入牌组(): Promise<void> {
-    if (this.数据迁移中) return;
-    const context: common.UIAbilityContext | null = this.取能力上下文();
-    if (context === null) return;
-    const uri: string | null = await 选取数据文件(context, ['.apkg']);
-    if (uri === null) return;
-    if (!this.显示数据迁移) {
-      this.打开数据迁移('importDeck', 0, false);
-    }
-    this.数据迁移中 = true;
-    this.数据迁移错误 = '';
-    this.数据迁移阶段 = 0;
-    try {
-      await 后端会话.获取实例().确保已打开(context.filesDir);
-      const stagedPath: string = 暂存导入文件(context.filesDir, uri);
-      this.数据迁移阶段 = 1;
-      await 执行牌组导入(stagedPath);
-      this.数据迁移阶段 = 2;
-      this.显示提示($r('app.string.transfer_done'));
-      this.显示数据迁移 = false;
-      this.个人数据替换步骤 = 0;
-      // 通知首页刷新数据
-      AppStorage.setOrCreate<number>('需要刷新主页', Date.now());
-      // 刷新本页牌组列表
-      await this.加载牌组列表();
-    } catch (error) {
-      const failureDetail: string = error instanceof Error ? error.message : `${error}`;
-      this.打开数据迁移('importDeck', 0, false);
-      this.数据迁移错误 = failureDetail;
-      this.显示提示($r('app.string.transfer_failed'));
-    } finally {
-      this.数据迁移中 = false;
-      this.数据迁移阶段 = -1;
-    }
-  }
-
-  private async 确认个人数据替换(): Promise<void> {
-    if (this.数据迁移中) return;
-    if (this.个人数据替换步骤 === 0) {
-      this.个人数据替换步骤 = 1;
-      return;
-    }
-    const context: common.UIAbilityContext | null = this.取能力上下文();
-    if (context === null) return;
-    const uri: string | null = await 选取数据文件(context, ['.colpkg']);
-    if (uri === null) return;
-    this.数据迁移中 = true;
-    this.数据迁移错误 = '';
-    try {
-      await 替换集合(context.filesDir, uri, true, (stage: number) => { this.数据迁移阶段 = stage; });
-      this.数据迁移阶段 = 4;
-      this.个人数据替换步骤 = 0;
-      this.显示提示($r('app.string.transfer_done'));
-      this.显示数据迁移 = false;
-      // 通知首页刷新数据
-      AppStorage.setOrCreate<number>('需要刷新主页', Date.now());
-      // 刷新本页牌组列表
-      await this.加载牌组列表();
-    } catch (error) {
-      this.数据迁移错误 = error instanceof Error ? error.message : `${error}`;
-    } finally {
-      this.数据迁移中 = false;
-      this.数据迁移阶段 = -1;
-    }
-  }
 
   private async 显示隐藏牌组对话框(): Promise<void> {
     try {
@@ -356,27 +252,8 @@ export struct 设置页 {
           })
         }
 
-        数据迁移协调器({
-          显示: this.显示数据迁移,
-          进行中: this.数据迁移中,
-          错误: this.数据迁移错误,
-          阶段: this.数据迁移阶段,
-          个人数据替换步骤: this.个人数据替换步骤,
-          初始模式: this.数据迁移初始模式,
-          初始牌组ID: this.数据迁移初始牌组ID,
-          允许选牌组: this.数据迁移允许选牌组,
-          牌组选项列表: this.牌组列表,
-          是否深色: this.是否深色(),
-          onIntent: (intent: 数据迁移意图): void => {
-            this.处理数据迁移(intent);
-          },
-          onClose: (): void => {
-            if (!this.数据迁移中) {
-              this.显示数据迁移 = false;
-              this.个人数据替换步骤 = 0;
-            }
-          }
-        })
+        DataTransferFeature({ state: this.transfer, session: this.transferSession,
+          deckOptions: this.牌组列表, isDark: this.是否深色() })
       }
       .width('100%')
       .height('100%')
@@ -385,6 +262,8 @@ export struct 设置页 {
     .hideTitleBar(true)
     .backgroundColor(Color.Transparent)
     .onBackPressed((): boolean => {
+      if (this.transfer.phase !== 'idle') return true;
+      if (this.transfer.visible) { this.transferSession.close(); return true; }
       if (this.activeSection !== '') { this.activeSection = ''; return true; }
       return false;
     })

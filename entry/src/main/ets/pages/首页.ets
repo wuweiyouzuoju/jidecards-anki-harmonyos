@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { resourceText, showToastSafely } from '../utils/UiFeedback';
 import { HomeDeckCommands } from '../backend/HomeDeckCommands';
-import { exportPersonalData } from '../backend/DataExportWorkflow';
+import { DataTransferSession, DataTransferState, initialTransferState } from '../model/home/DataTransferSession';
+import { AnkiDataTransfer } from '../backend/AnkiDataTransfer';
 import { reconcileHomeExpansion, HomeDeckExpansion } from '../model/HomeDeckExpansion';
 import { HomeRefreshQueue } from '../model/HomeRefreshQueue';
 import { HomeDataRepository, HomeDataResult } from '../backend/HomeDataRepository';
@@ -15,7 +16,6 @@ import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
 
 import { bundleManager, common } from '@kit.AbilityKit';
-import { pasteboard } from '@kit.BasicServicesKit';
 import { promptAction } from '@kit.ArkUI';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { 后端会话 } from '../backend/后端会话';
@@ -26,8 +26,6 @@ import { 卡片预览页 } from '../components/browser/卡片预览页';
 import { deckHistorySearch } from '../model/DeckStudyHistory';
 import { makeParsableTextNode } from '../proto/messages/SearchMessages';
 import type { SearchRequest, SortOrder } from '../proto/messages/SearchMessages';
-import { 导出牌组, 执行牌组导入, 暂存导入文件, 替换集合 } from '../backend/数据迁移服务';
-import { 云端牌组服务, 云端牌组服务错误 } from '../backend/云端牌组服务';
 import { initializeRedemption } from '../utils/RedemptionStore';
 import { UNLOCKED_CONTENTS_KEY, isThemeAvailable } from '../model/ThemeCatalog';
 import { ThemeBackground } from '../components/common/ThemeBackground';
@@ -35,8 +33,7 @@ import { ThemeBackground } from '../components/common/ThemeBackground';
 import { 牌组详情面板 } from '../components/牌组详情面板';
 
 import { 主页操作面板 } from '../components/主页操作面板';
-import { 云端牌组弹窗 } from '../components/云端牌组弹窗';
-import { CloudDeckImportController, CloudDeckImportBackend, CloudDeckImportProgress } from '../model/CloudDeckImportController';
+import { CloudDeckFeature } from '../components/home/CloudDeckFeature';
 import { HomeActivityState, canPresentHomePrompt, canStartHomeAutoSync } from '../model/HomeActivityPolicy';
 import { BackupBackend } from '../model/BackupCoordinator';
 import { HomeBackupController, HomeBackupHost } from '../model/HomeBackupController';
@@ -51,7 +48,7 @@ import { 是否已确认官方公告, 标记已确认官方公告 } from '../mod
 import { 牌组定制面板, 牌组定制结果 } from '../components/牌组定制面板';
 import { 添加笔记页, 添加笔记页参数, 添加笔记牌组选项 } from './添加笔记页';
 import { AI制卡页, AI制卡页参数 } from './AI制卡页';
-import type { 数据迁移意图, 数据迁移模式, 导出牌组选项 } from '../model/DataTransferIntent';
+import type { 数据迁移模式, 导出牌组选项 } from '../model/DataTransferIntent';
 import { 同步面板 } from '../components/同步面板';
 import { syncActivity } from '../model/SyncSettings';
 import { 加载同步凭证, 同步凭证信息, loadAutoSyncEnabled } from '../model/同步凭证存储';
@@ -63,22 +60,13 @@ import { 设置页 } from './设置页';
 import { 设置页参数, 浏览页参数 } from '../model/navigation/PageParams';
 import { 主页摘要分页 } from '../components/home/主页摘要分页';
 import { 主页牌组列表 } from '../components/home/主页牌组列表';
-import { 牌组选项协调器 } from '../components/home/牌组选项协调器';
-import { 数据迁移协调器 } from '../components/home/数据迁移协调器';
+import { DeckOptionsFeature } from '../components/home/DeckOptionsFeature';
+import { DataTransferFeature } from '../components/home/DataTransferFeature';
 import { 创建牌组协调器 } from '../components/home/创建牌组协调器';
 import { 自定义学习对话框 } from '../components/home/自定义学习对话框';
 import { 创建过滤牌组面板 } from '../components/home/创建过滤牌组面板';
 import type { SyncAuth } from '../proto/messages/SyncMessages';
-import { 牌组配置服务 } from '../backend/牌组配置服务';
-import type {
-  DeckConfig,
-  DeckConfigsForUpdateView,
-  UpdateDeckConfigsInput
-} from '../proto/messages/DeckConfigMessages';
 
-import { 牌组配置表单, 校验问题 } from '../model/牌组配置表单';
-import { 牌组选项编辑 } from '../model/牌组选项编辑';
-import { copyDeckConfig, deckConfigUseCount, buildDeckConfigRequest } from '../model/DeckConfigSave';
 import { 学习页, 学习页参数 } from './学习页';
 import { 浏览页 } from './浏览页';
 import { 统计页, 统计页参数 } from './统计页';
@@ -102,12 +90,11 @@ import { 保存牌组色调 } from '../model/牌组元数据存储';
 import { 保存牌组顺序 } from '../model/牌组顺序存储';
 import { 隐藏牌组, 取消隐藏全部牌组 } from '../model/隐藏牌组存储';
 import { 加载上次牌组ID, 保存上次牌组ID, 清除上次牌组ID } from '../model/上次牌组存储';
-import { 加载FSRS开启状态, 设置FSRS开启状态, 刷新桌面卡片数据, notifyFsrsStateChanged } from '../model/FSRS控制器';
+import { 加载FSRS开启状态, 设置FSRS开启状态, 刷新桌面卡片数据 } from '../model/FSRS控制器';
 import { 加载显示今日进度卡, 主页今日进度卡AppStorage键 } from '../model/主页偏好';
 import { 桌面卡片数据 } from '../model/桌面卡片数据存储';
 import { 应用主题 } from '../utils/主题控制器';
 import { 应用尺寸 } from '../utils/应用尺寸';
-import { 选取数据文件 } from '../utils/文件导入助手';
 import { 可见牌组行 } from '../model/牌组层级';
 import { 检查节流标记, 获取节流奖励 } from '../utils/操作节流';
 import { HomeIntroPanel } from '../components/HomeIntroPanel';
@@ -117,11 +104,8 @@ import { 媒体服务 } from '../backend/媒体服务';
 import { 同步服务 } from '../backend/同步服务';
 import {
   是否已完成云端牌组引导,
-  标记已完成云端牌组引导,
-  是否已用尽云端牌组下载配额,
-  标记已用尽云端牌组下载配额
+  是否已用尽云端牌组下载配额
 } from '../model/云端牌组引导存储';
-import { 云端牌组目录, 云端牌组目录项 } from '../model/云端牌组模型';
 import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时长';
 import { CustomTransition } from '../utils/自定义转场';
 import { 当前语言模式 } from '../model/语言存储';
@@ -137,11 +121,31 @@ interface 牌组详情页参数 {
   deckId?: string;
 }
 
-const 云端牌组最多选择数量: number = 3;
-
 @Entry
 @Component
 struct 首页 {
+  @State @Watch('homeActivityChanged') private transfer: DataTransferState = initialTransferState();
+  private readonly transferSession: DataTransferSession = new DataTransferSession(new AnkiDataTransfer(),
+    (state: DataTransferState): void => { this.transfer = state; },
+    async (): Promise<void> => {
+      const before: Set<string> = new Set(this.主页快照数据.decks.map((deck: 牌组汇总): string => deck.id));
+      await this.加载主页数据();
+      if (!this.homeDisposed) this.展开新导入牌组(before);
+    }, (): void => { this.显示提示($r('app.string.transfer_done')); });
+
+  private 从选择器导入牌组(): void {
+    if (this.deferForSync((): void => this.从选择器导入牌组())) return;
+    this.transferSession.open('importDeck', 0, false);
+    this.transferSession.execute({ kind: 'importDeck' });
+  }
+
+  private importDeckUri(uri: string): Promise<void> { return this.transferSession.importUri(uri); }
+
+  private 打开数据迁移(mode: 数据迁移模式, deckId: number, allowDeckSelection: boolean): void {
+    if (this.deferForSync((): void => this.打开数据迁移(mode, deckId, allowDeckSelection))) return;
+    this.transferSession.open(mode, deckId, allowDeckSelection);
+  }
+
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   private readonly 牌组列表滚动器: Scroller = new Scroller();
   private readonly 页面栈: NavPathStack = new NavPathStack();
@@ -150,8 +154,6 @@ struct 首页 {
   private readonly deckCommands: HomeDeckCommands = new HomeDeckCommands();
   private readonly homeData: HomeDataRepository = new HomeDataRepository();
   private readonly 搜索服务实例: 搜索服务 = new 搜索服务();
-  private readonly 牌组配置服务实例: 牌组配置服务 = new 牌组配置服务();
-  private readonly 云端牌组服务实例: 云端牌组服务 = new 云端牌组服务();
   private readonly 官方公告服务实例: 官方公告服务 = new 官方公告服务();
   @State @Watch('homeActivityChanged') private 显示官方公告: boolean = false;
   @State private 官方公告数据: 官方公告展示项 | null = null;
@@ -169,8 +171,6 @@ struct 首页 {
   });
   private readonly startupSequence: HomeStartupSequence = new HomeStartupSequence();
   @State @Watch('homeActivityChanged') private nativeDialogOpen: boolean = false;
-  private readonly cloudImportController: CloudDeckImportController = new CloudDeckImportController();
-  private cloudCatalogVersion: number = 0;
   @StorageLink('systemDarkMode') private 系统暗黑模式: boolean = false;
   // 笔记添加广播：添加笔记页保存成功后写 noteAddedTick = Date.now()，
   // 这里 @Watch 监听变化触发 加载主页数据，绕开 NavPathStack.onPop 偶发不触发的问题，
@@ -229,14 +229,6 @@ struct 首页 {
   // 用户主动隐藏的牌组 id 集合：加载主页数据 时从 preferences 加载，可见牌组行 过滤掉这些 id。
   // 隐藏入口在 牌组列表项 长按菜单「隐藏牌组」；恢复入口在设置页「已隐藏牌组」。
   @State private 隐藏的牌组ID集合: Set<string> = new Set<string>();
-  @State @Watch('homeActivityChanged') private 显示数据迁移: boolean = false;
-  @State private 数据迁移初始模式: 数据迁移模式 = 'exportDeck';
-  @State private 数据迁移初始牌组ID: number = 0;
-  @State private 数据迁移允许选牌组: boolean = false;
-  @State @Watch('homeActivityChanged') private 数据迁移中: boolean = false;
-  @State private 数据迁移错误: string = '';
-  @State private 数据迁移阶段: number = -1;
-  @State private 个人数据替换步骤: number = 0;
   // 同步面板弹窗（B14 2026-07-22）：从 同步分组 点「立即同步」后挂载
   // 根宿主持有同步任务；首页状态条与详情显示不决定任务生命周期。
   @State private 显示同步面板: boolean = false;
@@ -273,17 +265,11 @@ struct 首页 {
   @State private 自定义学习牌组名: string = '';
   // 创建过滤牌组面板（T2）：牌组长按菜单「创建过滤牌组」触发，按搜索条件抽取卡片到临时牌组
   @State @Watch('homeActivityChanged') private 显示过滤牌组面板: boolean = false;
+  @State @Watch('homeActivityChanged') private deckOptionsBusy: boolean = false;
   // 牌组选项：在根 Stack 中挂载以实现平板下的全局磨砂覆盖（与 创建牌组面板 同款）
   @State @Watch('homeActivityChanged') private 显示牌组选项: boolean = false;
-  @State @Watch('homeActivityChanged') private 牌组选项加载中: boolean = false;
-  @State @Watch('homeActivityChanged') private 牌组选项中: boolean = false;
-  @State private 牌组选项错误: string = '';
   @State private 牌组选项牌组ID: number = 0;
   @State private 牌组选项牌组名: string = '';
-  private 编辑视图: DeckConfigsForUpdateView | null = null;
-  private 编辑配置: DeckConfig | null = null;
-  @State private 编辑表单: 牌组配置表单 | null = null;
-  @State private 编辑选项: 牌组选项编辑 | null = null;
   /** 下拉刷新状态：与 Refresh 组件双向绑定；加载主页数据 完成后置回 false 收起指示器。 */
   @State @Watch('homeActivityChanged') private 刷新中: boolean = false;
   // 同级子牌组拖拽排序模式：true 时所有 牌组列表项 进入可拖态、顶部显示「完成排序」Bar、onClick 不选牌。
@@ -293,19 +279,14 @@ struct 首页 {
   private 上次牌组已恢复: boolean = false;
   // 入门弹窗与启动序列共用展示槽位，由独立本机修订标记控制一次展示。
   @State @Watch('homeActivityChanged') private 显示欢迎弹窗: boolean = false;
-  @State @Watch('homeActivityChanged') private 显示云端牌组弹窗: boolean = false;
-  @State private 云端牌组加载中: boolean = false;
   @State @Watch('homeActivityChanged') private 云端牌组忙碌: boolean = false;
-  @State private 云端牌组错误: string = '';
-  @State private 云端牌组列表: 云端牌组目录项[] = [];
-  @State private 云端牌组选中ID列表: string[] = [];
-  @State private 云端牌组成功ID列表: string[] = [];
-  @State private 云端牌组失败ID列表: string[] = [];
-  @State private 云端牌组当前名称: string = '';
-  @State private 云端牌组当前阶段: string = '';
-  @State private 云端牌组进度: number = 0;
-  @State private 云端牌组已处理数: number = 0;
-  @State private 云端牌组任务数: number = 0;
+  @State private cloudBackRequest: number = 0;
+  private 打开云端牌组弹窗(从菜单打开: boolean): void {
+    if (this.deferForSync((): void => this.打开云端牌组弹窗(从菜单打开))) return;
+    this.云端牌组从菜单打开 = 从菜单打开;
+    this.显示云端牌组弹窗 = true;
+  }
+  @State @Watch('homeActivityChanged') private 显示云端牌组弹窗: boolean = false;
   // 打开来源：true 表示从右上角菜单进入，关闭即回首页；false 表示开机引导，关闭需二次确认。
   @State private 云端牌组从菜单打开: boolean = false;
   // 本机直链牌组下载配额是否已用尽；用尽后菜单第 5 项隐藏，冷启动也不再弹引导。
@@ -403,6 +384,7 @@ struct 首页 {
   }
 
   aboutToDisappear(): void {
+    this.transferSession.dispose();
     this.homeDisposed = true;
     this.暂停主页官方公告检查();
     this.announcementController.dispose();
@@ -460,7 +442,6 @@ struct 首页 {
       warn: (error: Error): void => { hilog.warn(0x4342, '首页', `自动备份失败: ${error}`); }
     };
   }
-
 
   /**
    * 仅在首页或学习完成页安全空闲时挂载既有同步流程。
@@ -520,8 +501,8 @@ struct 首页 {
       atHome: this.页面栈.size() === 0 && this.主页允许公告检查 && !this.显示牌组详情,
       collectionReady: 后端会话.获取实例().是否就绪() && this.加载状态 !== 'loading' && this.加载状态 !== 'error',
       collectionBusy: this.autoSyncCollectionBusy || this.syncController.isRefreshing() || this.刷新中 || this.deckDeletionBusy ||
-        this.数据迁移中 || this.创建牌组中 || this.牌组选项加载中 || this.牌组选项中 || this.云端牌组忙碌,
-      dialogOpen: this.显示官方公告 || this.显示欢迎弹窗 || this.显示云端牌组弹窗 || this.显示数据迁移 ||
+        (this.transfer.phase !== 'idle') || this.创建牌组中 || this.deckOptionsBusy || this.云端牌组忙碌,
+      dialogOpen: this.显示官方公告 || this.显示欢迎弹窗 || this.显示云端牌组弹窗 || this.transfer.visible ||
         this.显示牌组定制 || this.显示自定义学习 || this.显示过滤牌组面板 || this.显示牌组选项 ||
         this.显示创建牌组 || this.显示主页操作 || this.显示更多菜单 || this.显示节流奖励 || this.显示许可证 ||
         this.显示卡片预览 || this.autoSyncModal || this.fsrsPromptActive || this.nativeDialogOpen,
@@ -543,8 +524,7 @@ struct 首页 {
       hasDeferredNavigation: (): boolean => this.syncController.hasDeferredNavigation(),
       importDeck: (uri: string): Promise<void> => this.importDeckUri(uri),
       importFailed: (error: Error): void => {
-        this.数据迁移错误 = error.message;
-        this.显示数据迁移 = true;
+        showToastSafely(this.getUIContext(), { message: error.message });
       },
       flushNavigation: (): void => this.flushSyncAction(),
       manualSyncPending: (): boolean => this.syncScheduler.isManualPending(),
@@ -711,25 +691,8 @@ struct 首页 {
     });
   }
 
-  // ========================================================
-  // @块ID UI-PAGE-HOME-019
-  // @名称 显示欢迎弹窗一次
-  //
-  // @作用
-  // 新用户与升级用户展示入门说明；确认过当前内容修订则跳过。
-  //
-  // @输入
-  // 无（读取 preferences 标记）
-  //
-  // @输出
-  // 设置 显示欢迎弹窗 状态为 true 触发弹窗渲染
-  //
-  // @业务规则
+  // 显示欢迎弹窗一次
   // 只有用户确认才记录已读，避免表单占用或进程退出提前消耗入门机会。
-  //
-  // @副作用
-  // 写 preferences 持久化 welcome_shown
-  // ========================================================
   private async 显示欢迎弹窗一次(): Promise<void> {
     await this.startupSequence.welcome(this.startupHost());
   }
@@ -758,21 +721,21 @@ struct 首页 {
    * Extension Points: 新增弹窗时在此链中按层级插入对应 @State 判断。
    */
   onBackPress(): boolean {
-    if (this.数据迁移中 || this.创建牌组中 || this.定制牌组中 || this.牌组选项中 || this.deckDeletionBusy) return true;
+    if ((this.transfer.phase !== 'idle') || this.创建牌组中 || this.定制牌组中 || this.deckOptionsBusy || this.deckDeletionBusy) return true;
     if (this.显示卡片预览) { this.显示卡片预览 = false; return true; }
     this.syncController.cancel();
     if (this.autoSyncModal) { this.syncBackRequest++; return true; }
     if (this.显示官方公告) {
       return true;
     }
-    if (this.显示数据迁移) { this.显示数据迁移 = false; return true; }
+    if (this.transfer.visible) { this.transferSession.close(); return true; }
     if (this.显示牌组定制) { this.显示牌组定制 = false; return true; }
     if (this.显示自定义学习) { this.显示自定义学习 = false; return true; }
     if (this.显示过滤牌组面板) { this.显示过滤牌组面板 = false; return true; }
     if (this.显示牌组选项) { this.显示牌组选项 = false; return true; }
     if (this.显示创建牌组) { this.显示创建牌组 = false; return true; }
     if (this.显示云端牌组弹窗) {
-      this.云端牌组弹窗按主按钮出口();
+      this.cloudBackRequest++;
       return true;
     }
     if (this.显示主页操作) { this.显示主页操作 = false; return true; }
@@ -783,33 +746,12 @@ struct 首页 {
     return false;
   }
 
-  // ========================================================
-  // @块ID UI-PAGE-HOME-018
-  // @名称 笔记添加广播回调
-  //
-  // @作用
-  // 监听 @StorageLink('noteAddedTick') 变化：添加笔记页保存成功后写 AppStorage
-  // 标志位触发本回调，立即调 加载主页数据 让 牌组详情面板 的统计计数刷新。
-  // 解决 NavPathStack.onPop 在不同设备/API 版本偶发不触发导致统计数字不刷新的问题（BUG-006）。
-  //
-  // @输入
-  // 无（@Watch 回调约定无参）
-  //
-  // @输出
-  // fire-and-forget 调 加载主页数据（async，不 await）
-  //
-  // @副作用
-  // 触发后端 RPC 重新拉取牌组树 + 图表统计
-  // ========================================================
+  // 笔记添加广播回调
   private 笔记添加广播_回调(): void {
     this.加载主页数据();
   }
 
-  // ========================================================
-  // @名称 桌面卡片跳转回调
-  // @作用 桌面卡片点击 → EntryAbility 解析 jidecards://stats → 写 AppStorage 'navigateToStats'
-  //       @Watch 监听变化 → 调 打开统计页 跳转统计页
-  // ========================================================
+  // 桌面卡片跳转回调
   private 桌面卡片跳转_回调(): void {
     if (this.桌面卡片跳转信号 > 0) {
       this.打开统计页();
@@ -823,35 +765,15 @@ struct 首页 {
     }
   }
 
-  // ========================================================
-  // @块ID UI-PAGE-HOME-002
-  // @名称 加载主页数据
-  //
-  // @作用
-  // 打开本地 collection 并拉取牌组树，构建主页快照供 UI 渲染；
-  // 失败时进入 error 态并提示。
-  //
-  // @输入
-  // 无（从 abilityContext 取 filesDir，调后端服务）
-  //
-  // @输出
-  // 更新主页快照数据、加载状态和牌组数据源等状态字段
-  //
-  // @业务规则
+  // 加载主页数据
   // 首次启动自动开启 FSRS（用户决策：默认开启可关闭）。
   // 首次加载默认展开所有含子节点的父牌组；
   // 后续刷新：新出现的 hasChildren 牌组默认展开，已知牌组保持用户之前状态。
   // 首次加载完成且宽屏：恢复上次选中的牌组。
-  //
-  // @副作用
-  // 调后端服务、读写 preferences、刷新多个 @State 字段
-  //
-  // @Invariants
   // 所有触发严格串行（链式追加，不允许并发）：
   // 学习页退出时「需要刷新主页 广播 + onPop」双触发、用户连续两次学习会话退出等场景下，
   // 并发加载会竞态覆盖——先发起的慢请求后完成，用旧 graphs 覆盖新快照，
   // 主页摘要卡片停留旧数据且无新触发器纠正（用户报告的“内部卡片高延迟”根因之一）。
-  // ========================================================
   private readonly refreshQueue: HomeRefreshQueue = new HomeRefreshQueue();
 
   private 加载主页数据(): Promise<void> {
@@ -907,26 +829,9 @@ struct 首页 {
     }
   }
 
-  // ========================================================
-  // @块ID UI-PAGE-HOME-003
-  // @名称 尝试恢复上次牌组
-  //
-  // @作用
-  // 恢复上次选中的牌组（仅宽屏调用）：设 选中的牌组ID 让 牌组详情面板 显示详情。
-  //
-  // @输入
-  // 无（从 preferences 读取上次牌组 ID）
-  //
-  // @输出
-  // 更新 选中的牌组ID / 展开的牌组ID集合 / 牌组数据源
-  //
-  // @业务规则
+  // 尝试恢复上次牌组
   // 窄屏不调用——用户决策 2026-07-22：手机不高亮上次牌组，仅平板宽屏恢复。
   // 上次牌组已恢复 保证只恢复一次；snapshot 未加载时跳过等下次触发。
-  //
-  // @副作用
-  // 读 preferences
-  // ========================================================
   private async 尝试恢复上次牌组(): Promise<void> {
     if (this.上次牌组已恢复) {
       return;
@@ -945,45 +850,13 @@ struct 首页 {
     }
   }
 
-  // ========================================================
-  // @块ID UI-PAGE-HOME-004
-  // @名称 静默加载图表
-  //
-  // @作用
-  // 拉取月历热力/记忆率/今日完成数据；失败静默降级为空态，不阻断首页其余数据。
-  //
-  // @输入
-  // 无（取本月当日号数）
-  //
-  // @输出
-  // GraphsView 或 null（失败时）
-  //
-  // @副作用
-  // 无（仅调用后端）
-  // ========================================================
+  // 静默加载图表
 
-  // ========================================================
-  // @块ID UI-PAGE-HOME-005
-  // @名称 同步后检查FSRS
-  //
-  // @作用
-  // 同步完成后检查 FSRS 状态：若云端 collection 的 fsrs=false 覆盖了本地，弹窗让用户决策。
-  //
-  // @输入
-  // 本次同步是否已确认 FSRS 从开启变为关闭；弹窗前再次读取实际状态。
-  //
-  // @输出
-  // 用户选「重新开启」时回写 fsrs=true
-  //
-  // @业务规则
+  // 同步后检查FSRS
   // 触发场景：AnkiWeb 云端在桌面端等关掉了 FSRS，syncCollection/fullDownload 把 fsrs=false
   // 写到本地 collection；本地 确保FSRS已开启一次 因 fsrs_initialized=true 不会自动重开。
   // 弹窗用 promptAction.showDialog（系统原生）：按钮 0 = 重新开启（回写 fsrs=true），
   // 按钮 1 = 保持关闭（不动）。
-  //
-  // @副作用
-  // 写本地 FSRS 状态（用户选「重新开启」时）
-  // ========================================================
   private fsrsPromptActive: boolean = false;
 
   private async 同步后检查FSRS(fsrsDisabledBySync: boolean): Promise<void> {
@@ -1046,30 +919,11 @@ struct 首页 {
     this.加载主页数据();
   }
 
-  // ========================================================
-  // @块ID UI-PAGE-HOME-006
-  // @名称 处理牌组移动
-  //
-  // @作用
-  // 处理 List.onMove 回调：校验 from/to 在同一 parent 后，调用 牌组数据源.moveItem
-  // 同步内存顺序，并立即落盘到 DeckOrderStore。
-  //
-  // @输入
-  // from: 拖动起始索引
-  // to: 拖动目标索引
-  //
-  // @输出
-  // 更新 牌组数据源 内存顺序
-  //
-  // @业务规则
+  // 处理牌组移动
   // 跨 parent（不同 depth 或不同 ancestorIds）的拖动直接拒绝，避免破坏树结构。
   // 例如：顶层牌组不能拖到子牌组下面，子牌组不能拖到顶层。
   // onMove 在用户拖动期间会持续触发（from/to 实时更新），每次都立即落盘以保证
   // 用户中途退出排序模式不丢失中间状态。落盘是 async，但 fire-and-forget，不阻塞 UI。
-  //
-  // @副作用
-  // 写 preferences（保存牌组顺序）
-  // ========================================================
   private 处理牌组移动(from: number, to: number): void {
     if (!this.排序模式中) {
       return;
@@ -1117,24 +971,7 @@ struct 首页 {
     应用颜色主题(restored, this.是否深色());
   }
 
-  // ========================================================
-  // @块ID UI-PAGE-HOME-019
-  // @名称 恢复今日进度卡开关
-  //
-  // @作用
-  // 启动时从 preferences 加载「是否显示今日进度卡片」开关，
-  // 同步写 AppStorage 让 @StorageLink(显示今日进度卡) 拿到持久化值，
-  // 避免首次渲染用默认 true 后又因读到 false 闪一下又消失。
-  //
-  // @输入
-  // 无
-  //
-  // @输出
-  // 写 AppStorage 的 'homeShowTodaySummary' 键
-  //
-  // @副作用
-  // 读 preferences（jidecards_settings store）；写 AppStorage 触发 @StorageLink 重渲染。
-  // ========================================================
+  // 恢复今日进度卡开关
   private async 恢复今日进度卡开关(): Promise<void> {
     const 开启: boolean = await 加载显示今日进度卡();
     AppStorage.setOrCreate<boolean>(主页今日进度卡AppStorage键, 开启);
@@ -1210,26 +1047,9 @@ struct 首页 {
     }
   }
 
-  // ========================================================
-  // @块ID UI-PAGE-HOME-007
-  // @名称 进入复习页
-  //
-  // @作用
-  // 把当前选中牌组作为参数推栈 学习页；返回（pop）时通过 onPop 刷新主页数据。
-  //
-  // @输入
-  // 无（使用 选中的牌组ID）
-  //
-  // @输出
-  // 推入 NavPathStack 一条 'StudyPage' 项
-  //
-  // @业务规则
+  // 进入复习页
   // 仅当前选中牌组有效时入栈。
   // 'StudyPage' 字符串是 NavPathStack 跨页面寻址协议，保留英文。
-  //
-  // @副作用
-  // 改 Navigation 栈状态
-  // ========================================================
   private 开始学习(): void {
     this.stopAutoSyncTimer();
     if (this.deferForSync((): void => { this.开始学习(); }, true)) return;
@@ -1391,27 +1211,10 @@ struct 首页 {
     this.牌组数据源.replaceAll(可见牌组行(this.主页快照数据.decks, this.展开的牌组ID集合, this.隐藏的牌组ID集合));
   }
 
-  // ========================================================
-  // @块ID UI-PAGE-HOME-008
-  // @名称 递归切换牌组
-  //
-  // @作用
-  // 双击牌组：递归展开/折叠该牌组及其所有子孙牌组。
-  //
-  // @输入
-  // deckId: 触发双击的牌组 ID
-  //
-  // @输出
-  // 更新 展开的牌组ID集合 / 牌组数据源
-  //
-  // @业务规则
+  // 递归切换牌组
   // 当前折叠 → 展开本牌组 + 所有子孙牌组
   // 当前展开 → 折叠本牌组 + 所有子孙牌组
   // 通过 ancestorIds 包含 deckId 来判定子孙关系。
-  //
-  // @副作用
-  // 无
-  // ========================================================
   private 递归切换牌组(deckId: string): void {
     const isExpanded: boolean = this.展开的牌组ID集合.has(deckId);
     const next: Set<string> = new Set<string>(this.展开的牌组ID集合);
@@ -1497,26 +1300,9 @@ struct 首页 {
     this.显示过滤牌组面板 = true;
   }
 
-  // ========================================================
-  // @块ID UI-PAGE-HOME-009
-  // @名称 删除牌组
-  //
-  // @作用
-  // 长按牌组 → 删除牌组：先弹 AlertDialog 二次确认，确认后真正调 牌组服务实例.删除牌组。
-  //
-  // @输入
-  // deckId: 待删除牌组 ID
-  //
-  // @输出
-  // 删除后刷新主页并清空选中态（防止详情页指向已删牌组）
-  //
-  // @业务规则
+  // 删除牌组
   // 后端语义（rslib/src/decks/remove.rs:remove_decks_and_child_decks）：递归处理子牌组，
   // 普通牌组删除卡片，筛选牌组归还卡片；Core 记录撤销，但首页没有通用撤销入口。
-  //
-  // @副作用
-  // 调后端删除牌组；写 preferences 清除上次选中牌组
-  // ========================================================
   private 请求删除牌组(deckId: string): void {
     if (this.deckDeletionBusy) return;
     if (this.deferForSync((): void => { this.请求删除牌组(deckId); })) return;
@@ -1659,26 +1445,9 @@ struct 首页 {
     }
   }
 
-  // ========================================================
-  // @块ID UI-PAGE-HOME-010
-  // @名称 隐藏牌组
-  //
-  // @作用
-  // 长按牌组 → 隐藏牌组：写入 隐藏的牌组ID集合 持久化 + 更新内存态 + 重新过滤列表。
-  //
-  // @输入
-  // deckId: 待隐藏牌组 ID
-  //
-  // @输出
-  // 更新 隐藏的牌组ID集合 / 牌组数据源
-  //
-  // @业务规则
+  // 隐藏牌组
   // 与删除不同：隐藏只在前端列表里过滤掉，不动后端数据；可在设置页「已隐藏牌组」恢复。
   // 选中态/详情页若指向已隐藏牌组，清空避免悬空引用。
-  //
-  // @副作用
-  // 写 preferences 持久化隐藏集合；写 preferences 清除上次选中牌组
-  // ========================================================
   private async 隐藏牌组(deckId: string): Promise<void> {
     if (this.deferForSync((): void => { this.隐藏牌组(deckId); })) return;
     try {
@@ -1748,27 +1517,10 @@ struct 首页 {
     }
   }
 
-  // ========================================================
-  // @块ID UI-PAGE-HOME-011
-  // @名称 应用牌组定制
-  //
-  // @作用
-  // 面板内点「保存」：写入本地 displayName 覆盖 + 处理背景图动作 + 刷新主页。
-  //
-  // @输入
-  // result: 牌组定制结果（newName / backgroundAction / backgroundPixelMap）
-  //
-  // @输出
-  // 关闭面板、刷新主页数据、显示提示
-  //
-  // @业务规则
+  // 应用牌组定制
   // 走 UI 覆盖路线（不动后端 rename_deck）：避免重名/层级冲突 BackendError、避免子牌组前缀级联改名、
   // 避免 LazyForKey 不含 name 导致 UI 不刷新。代价：导出 apkg/同步到其他设备时仍显示后端原名。
   // 背景图动作：keep 不动；remove 删沙盒文件 + preferences 键；replace 编码 PixelMap 写入沙盒 + preferences。
-  //
-  // @副作用
-  // 写 preferences（牌组别名 / 牌组背景图）
-  // ========================================================
   private async 应用牌组定制(result: 牌组定制结果): Promise<void> {
     if (this.定制牌组中) return;
     const trimmedName: string = result.新名.trim();
@@ -1805,153 +1557,35 @@ struct 首页 {
     }
   }
 
-  // ========================================================
-  // @块ID UI-PAGE-HOME-012
-  // @名称 数据迁移处理
-  //
-  // @作用
-  // 处理导入/导出/替换意图：选取文件、调后端服务、刷新主页。
-  //
-  // @输入
-  // intent: 数据迁移意图（importDeck / replacePersonalData / exportDeck / exportPersonalData）
-  //
-  // @输出
-  // 关闭弹窗、刷新主页、显示提示；失败时显示错误
-  //
-  // @业务规则
+  // 数据迁移处理
   // 导入后展开新导入的含子牌组的父牌组。
   // 个人数据替换需二次确认（个人数据替换步骤 控制）。
-  //
-  // @副作用
-  // 调后端导入/导出服务；读写沙箱文件
-  // ========================================================
-  private 云端牌组错误文案(error: Error): string {
-    let resource: Resource = $r('app.string.cloud_deck_load_failed');
-    if (error instanceof 云端牌组服务错误) {
-      if (error.code === 'not_configured') {
-        resource = $r('app.string.cloud_deck_not_configured');
-      } else if (error.code === 'catalog' || error.code === 'invalid_url') {
-        resource = $r('app.string.cloud_deck_invalid_catalog');
-      }
-    }
-    return resourceText(this.getUIContext(), resource);
-  }
 
   /**
    * 打开云端牌组弹窗，并重置上一次临时任务状态。
    * Invariants: 从菜单打开与开机引导共用同一份目录与下载逻辑，只有关闭语义不同——
    * 前者直接回首页，后者要二次确认且后续还要接欢迎弹窗。
    */
-  private 打开云端牌组弹窗(从菜单打开: boolean): void {
-    if (this.deferForSync((): void => { this.打开云端牌组弹窗(从菜单打开); })) return;
-    this.云端牌组从菜单打开 = 从菜单打开;
-    this.显示云端牌组弹窗 = true;
-    this.云端牌组选中ID列表 = [];
-    this.云端牌组成功ID列表 = [];
-    this.云端牌组失败ID列表 = [];
-    this.云端牌组当前名称 = '';
-    this.云端牌组当前阶段 = '';
-    this.云端牌组进度 = 0;
-    this.云端牌组已处理数 = 0;
-    this.云端牌组任务数 = 0;
-    this.加载云端牌组目录();
-  }
 
   /** 加载目录；未配置和网络错误都只留在弹窗中，不阻断首页。 */
-  private async 加载云端牌组目录(): Promise<void> {
-    const version: number = ++this.cloudCatalogVersion;
-    this.云端牌组加载中 = true;
-    this.云端牌组错误 = '';
-    try {
-      const context: common.UIAbilityContext | null = this.取能力上下文();
-      if (context !== null) {
-        this.云端牌组服务实例.清理残留下载(context.filesDir);
-      }
-      const catalog: 云端牌组目录 = await this.云端牌组服务实例.加载目录();
-      if (this.homeDisposed || version !== this.cloudCatalogVersion || !this.显示云端牌组弹窗) return;
-      this.云端牌组列表 = catalog.decks;
-    } catch (error) {
-      if (this.homeDisposed || version !== this.cloudCatalogVersion) return;
-      const normalized: Error = error instanceof Error ? error : new Error(`${error}`);
-      this.云端牌组列表 = [];
-      this.云端牌组错误 = this.云端牌组错误文案(normalized);
-    } finally {
-      if (!this.homeDisposed && version === this.cloudCatalogVersion) this.云端牌组加载中 = false;
-    }
-  }
 
   /**
    * 至少一个牌组成功导入且完成标记落盘后，才允许关闭弹窗。
    * Invariants: 关闭后两态都刷新首页让新牌组立刻可见；欢迎弹窗只在开机引导序列里衔接，
    * 菜单态用户已在正常使用中，突然弹版本欢迎页时机不合理。
    */
-  private async 完成云端牌组首次引导(): Promise<void> {
-    if (this.云端牌组忙碌) return;
-    if (this.云端牌组成功ID列表.length === 0) return;
-    const 已保存: boolean = await 标记已完成云端牌组引导();
-    if (!已保存) {
-      this.显示提示($r('app.string.cloud_deck_save_failed'));
-      return;
-    }
-    this.显示云端牌组弹窗 = false;
-    this.返回主页后刷新();
-    if (!this.云端牌组从菜单打开) {
-      await this.显示欢迎弹窗一次();
-    }
-  }
 
   /**
    * 返回键在云端牌组弹窗上的出口：完全复用右下角主按钮的行为，保证两条退出路径语义一致。
    * Invariants: busy 期间主按钮不可点，返回键同样静默；引导态有成功牌组时等于「进入软件」，
    * 其余情况等于「稍后再说」（菜单态即「关闭」）。
    */
-  private 云端牌组弹窗按主按钮出口(): void {
-    if (this.云端牌组忙碌) {
-      return;
-    }
-    if (!this.云端牌组从菜单打开 && this.云端牌组成功ID列表.length > 0) {
-      this.完成云端牌组首次引导();
-      return;
-    }
-    this.跳过云端牌组引导();
-  }
 
   /**
    * 「稍后再说」/ 菜单态「关闭」的统一出口。
    * Invariants: 开机引导态必须二次确认并持久化完成标记，后续冷启动不再自动弹出；
    * 跳过不消耗下载配额，菜单里的「获取直链牌组」仍保持可见。
    */
-  private async 跳过云端牌组引导(): Promise<void> {
-    if (this.云端牌组从菜单打开) {
-      this.显示云端牌组弹窗 = false;
-      this.返回主页后刷新();
-      return;
-    }
-    try {
-      const result: promptAction.ShowDialogSuccessResponse =
-        await this.getUIContext().getPromptAction().showDialog({
-          title: this.取本地化文本($r('app.string.cloud_deck_skip_confirm_title')),
-          message: this.取本地化文本($r('app.string.cloud_deck_skip_confirm_message')),
-          buttons: [
-            { text: this.取本地化文本($r('app.string.cancel')), color: '#666666' },
-            { text: this.取本地化文本($r('app.string.cloud_deck_enter')), color: this.动作主色 }
-          ]
-        });
-      if (result.index !== 1) {
-        return;
-      }
-    } catch (error) {
-      // 弹窗失败不阻断：留在原弹窗上，用户可以重新点「稍后再说」。
-      return;
-    }
-    const 已保存: boolean = await 标记已完成云端牌组引导();
-    if (!已保存) {
-      this.显示提示($r('app.string.cloud_deck_save_failed'));
-      return;
-    }
-    this.显示云端牌组弹窗 = false;
-    await this.显示欢迎弹窗一次();
-  }
 
   /** 把 Resource 取成本地化字符串；showDialog 只收 string，不收 Resource。 */
   private 取本地化文本(resource: Resource): string {
@@ -1959,32 +1593,6 @@ struct 首页 {
   }
 
   /** 点击首次引导中的 QQ 群提示时复制群号；复制结果通过本地化提示反馈。 */
-  private async 复制云端牌组QQ群号(): Promise<void> {
-    const groupNumber: string = '726837065';
-    try {
-      const data: pasteboard.PasteData =
-        pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, groupNumber);
-      await pasteboard.getSystemPasteboard().setData(data);
-      this.显示提示($r('app.string.about_qq_group_copied'));
-    } catch (error) {
-      this.显示提示($r('app.string.cloud_deck_qq_copy_failed', groupNumber));
-    }
-  }
-
-  private 切换云端牌组选择(deckId: string): void {
-    if (this.云端牌组忙碌 || this.云端牌组成功ID列表.indexOf(deckId) >= 0) return;
-    const index: number = this.云端牌组选中ID列表.indexOf(deckId);
-    if (index >= 0) {
-      this.云端牌组选中ID列表 = this.云端牌组选中ID列表.filter(
-        (id: string): boolean => id !== deckId);
-      return;
-    }
-    if (this.云端牌组选中ID列表.length >= 云端牌组最多选择数量) {
-      this.显示提示($r('app.string.cloud_deck_selection_limit', 云端牌组最多选择数量));
-      return;
-    }
-    this.云端牌组选中ID列表 = this.云端牌组选中ID列表.concat([deckId]);
-  }
 
   /** 刷新导入后的主页，并展开这次新出现且含子牌组的父节点。 */
   private 展开新导入牌组(oldDeckIds: Set<string>): void {
@@ -2002,152 +1610,8 @@ struct 首页 {
   }
 
   /** 按选择顺序串行下载并导入，单项失败不阻断后续牌组。 */
-  private async 下载选中云端牌组(): Promise<void> {
-    if (this.云端牌组忙碌 || this.云端牌组选中ID列表.length === 0) return;
-    if (this.云端牌组选中ID列表.length > 云端牌组最多选择数量) {
-      this.显示提示($r('app.string.cloud_deck_selection_limit', 云端牌组最多选择数量));
-      return;
-    }
-    const context: common.UIAbilityContext | null = this.取能力上下文();
-    if (context === null) return;
-
-    const selectedDecks: 云端牌组目录项[] = [];
-    for (const deck of this.云端牌组列表) {
-      if (deck.accessType === 'public' && this.云端牌组选中ID列表.indexOf(deck.id) >= 0) {
-        selectedDecks.push(deck);
-      }
-    }
-    if (selectedDecks.length === 0) return;
-
-    const oldDeckIds: Set<string> = new Set(this.主页快照数据.decks.map(
-      (deck: 牌组汇总): string => deck.id));
-    this.云端牌组忙碌 = true;
-    const backend: CloudDeckImportBackend = {
-      prepare: (): Promise<void> => 后端会话.获取实例().确保已打开(context.filesDir),
-      download: (deck: 云端牌组目录项, progress: (processed: number, total: number) => void): Promise<string> =>
-        this.云端牌组服务实例.下载牌组(context, context.filesDir, deck, progress),
-      importDeck: async (path: string): Promise<void> => { await 执行牌组导入(path); }
-    };
-    const result: CloudDeckImportProgress = await this.cloudImportController.run(
-      selectedDecks, this.云端牌组成功ID列表, backend, (state: CloudDeckImportProgress): void => {
-        if (this.homeDisposed) return;
-        this.云端牌组当前名称 = state.name;
-        this.云端牌组当前阶段 = state.stage;
-        this.云端牌组进度 = state.percent;
-        this.云端牌组已处理数 = state.processed;
-        this.云端牌组任务数 = state.total;
-        this.云端牌组成功ID列表 = state.successIds;
-        this.云端牌组失败ID列表 = state.failedIds;
-      });
-    const successIds: string[] = result.successIds;
-    const failedIds: string[] = result.failedIds;
-    try {
-      if (successIds.length > 0 && !this.homeDisposed) {
-        await this.加载主页数据();
-        this.展开新导入牌组(oldDeckIds);
-        this.requestAutoSync();
-      }
-    } finally {
-      this.云端牌组当前阶段 = '';
-      this.云端牌组选中ID列表 = failedIds.concat([]);
-      this.云端牌组服务实例.清理残留下载(context.filesDir);
-      // 只要有 ≥1 个牌组导入成功就锁死配额：否则「留一个失败」就能阻止弹窗收尾，
-      // 用户可反复分批下载，把整个目录搬空。锁死只影响下次入口，当前弹窗仍可重试失败项。
-      let 配额已锁定: boolean = true;
-      if (successIds.length > 0) {
-        配额已锁定 = await 标记已用尽云端牌组下载配额();
-        this.云端牌组配额已用尽 = 配额已锁定;
-      }
-      this.云端牌组忙碌 = false;
-      if (this.homeDisposed) return;
-      if (!配额已锁定) {
-        this.显示提示($r('app.string.cloud_deck_save_failed'));
-      } else {
-        this.显示提示(failedIds.length > 0 ?
-          $r('app.string.cloud_deck_install_partial') : $r('app.string.cloud_deck_install_complete'));
-        if (failedIds.length === 0 && successIds.length > 0) {
-          await this.完成云端牌组首次引导();
-        }
-      }
-    }
-  }
-
-  private async 从选择器导入牌组(): Promise<void> {
-    if (this.deferForSync((): void => { this.从选择器导入牌组(); })) return;
-    if (this.数据迁移中) return;
-    const context: common.UIAbilityContext | null = this.取能力上下文();
-    if (context === null) return;
-    this.nativeDialogOpen = true;
-    let uri: string | null = null;
-    try { uri = await 选取数据文件(context, ['.apkg']); }
-    finally { this.nativeDialogOpen = false; }
-    if (this.homeDisposed) return;
-    if (uri === null) return;
-    await this.importDeckUri(uri);
-  }
 
   /** 系统打开与选择器共用暂存、导入、错误提示及列表刷新。 */
-  private async importDeckUri(uri: string): Promise<void> {
-    if (this.数据迁移中 || this.homeDisposed) return;
-    const context: common.UIAbilityContext | null = this.取能力上下文();
-    if (context === null) return;
-    if (!this.显示数据迁移) {
-      this.打开数据迁移('importDeck', 0, false);
-    }
-    this.数据迁移中 = true;
-    this.数据迁移错误 = '';
-    this.数据迁移阶段 = 0; // 准备文件中
-    try {
-      await 后端会话.获取实例().确保已打开(context.filesDir);
-      const stagedPath: string = 暂存导入文件(context.filesDir, uri);
-      this.数据迁移阶段 = 1; // 导入数据中
-      await 执行牌组导入(stagedPath);
-      this.数据迁移阶段 = 2; // 刷新列表中
-      const oldDeckIds: Set<string> = new Set(this.主页快照数据.decks.map((d: 牌组汇总): string => d.id));
-      await this.加载主页数据();
-      this.展开新导入牌组(oldDeckIds);
-      this.显示提示($r('app.string.transfer_done'));
-      // B13 2026-07-22：导入成功后关闭弹窗（原仅 显示提示，弹窗残留）
-      this.显示数据迁移 = false;
-      this.个人数据替换步骤 = 0;
-    } catch (error) {
-      const failureDetail: string = error instanceof Error ? error.message : `${error}`;
-      this.打开数据迁移('importDeck', 0, false);
-      this.数据迁移错误 = failureDetail;
-      this.显示提示($r('app.string.transfer_failed'));
-    } finally {
-      this.数据迁移中 = false;
-      this.数据迁移阶段 = -1;
-    }
-  }
-
-  private async 确认个人数据替换(): Promise<void> {
-    if (this.数据迁移中) return;
-    if (this.个人数据替换步骤 === 0) {
-      this.个人数据替换步骤 = 1;
-      return;
-    }
-    const context: common.UIAbilityContext | null = this.取能力上下文();
-    if (context === null) return;
-    const uri: string | null = await 选取数据文件(context, ['.colpkg']);
-    if (uri === null) return;
-    this.数据迁移中 = true;
-    this.数据迁移错误 = '';
-    try {
-      await 替换集合(context.filesDir, uri, true, (stage: number) => { this.数据迁移阶段 = stage; });
-      this.数据迁移阶段 = 4; // 刷新列表中
-      await this.加载主页数据();
-      this.个人数据替换步骤 = 0;
-      this.显示提示($r('app.string.transfer_done'));
-      // B13 2026-07-22：替换成功后关闭弹窗（原仅 显示提示，弹窗残留）
-      this.显示数据迁移 = false;
-    } catch (error) {
-      this.数据迁移错误 = error instanceof Error ? error.message : `${error}`;
-    } finally {
-      this.数据迁移中 = false;
-      this.数据迁移阶段 = -1;
-    }
-  }
 
   private 添加笔记的牌组选项(): 添加笔记牌组选项[] {
     return this.主页快照数据.decks.map((deck: 牌组汇总): 添加笔记牌组选项 => ({ id: Number(deck.id), name: deck.fullName }));
@@ -2159,36 +1623,9 @@ struct 首页 {
     }));
   }
 
-  private 打开数据迁移(mode: 数据迁移模式, deckId: number, allowDeckSelection: boolean): void {
-    if (this.deferForSync((): void => { this.打开数据迁移(mode, deckId, allowDeckSelection); })) return;
-    this.数据迁移初始模式 = mode;
-    this.数据迁移初始牌组ID = deckId;
-    this.数据迁移允许选牌组 = allowDeckSelection;
-    this.数据迁移错误 = '';
-    this.个人数据替换步骤 = 0;
-    this.显示数据迁移 = true;
-  }
-
-  // ========================================================
-  // @块ID UI-PAGE-HOME-013
-  // @名称 进入建卡页
-  //
-  // @作用
-  // 推栈 添加笔记页；onPop 时刷新主页数据。
-  //
-  // @输入
-  // 无（使用 选中的牌组ID / 添加笔记的牌组选项）
-  //
-  // @输出
-  // 推入 NavPathStack 一条 'AddNotePage' 项
-  //
-  // @业务规则
+  // 进入建卡页
   // 仅当前选中牌组有效时入栈。
   // 'AddNotePage' 字符串是 NavPathStack 跨页面寻址协议，保留英文。
-  //
-  // @副作用
-  // 改 Navigation 栈状态
-  // ========================================================
   private 打开添加笔记(): void {
     if (this.deferForSync((): void => { this.打开添加笔记(); })) return;
     if (!this.已选中牌组()) {
@@ -2275,56 +1712,8 @@ struct 首页 {
     });
   }
 
-  private async 处理数据迁移(intent: 数据迁移意图): Promise<void> {
-    if (this.数据迁移中) return;
-    if (intent.kind === 'importDeck') {
-      await this.从选择器导入牌组();
-      return;
-    }
-    if (intent.kind === 'replacePersonalData') {
-      await this.确认个人数据替换();
-      return;
-    }
-    const context: common.UIAbilityContext | null = this.取能力上下文();
-    if (context === null) return;
-    this.数据迁移中 = true;
-    this.数据迁移错误 = '';
-    this.数据迁移阶段 = 0; // 导出数据中
-    try {
-      const savedPath: string | null = await exportPersonalData(context, intent,
-        (stage: number): void => { this.数据迁移阶段 = stage; });
-      if (savedPath !== null) {
-        this.显示提示($r('app.string.transfer_done'));
-        this.显示数据迁移 = false;
-        this.个人数据替换步骤 = 0;
-      }
-    } catch (error) {
-      this.数据迁移错误 = error instanceof Error ? error.message : `${error}`;
-    } finally {
-      this.数据迁移中 = false;
-      this.数据迁移阶段 = -1;
-    }
-  }
-
-  // ========================================================
-  // @块ID UI-PAGE-HOME-014
-  // @名称 创建牌组
-  //
-  // @作用
-  // 新建牌组全链路：确保已打开 → 创建牌组 → 刷新主页 → 选中新牌组。
-  //
-  // @输入
-  // name: 新牌组名称
-  //
-  // @输出
-  // 关闭面板、刷新主页数据、选中并展开新牌组、显示提示
-  //
-  // @业务规则
+  // 创建牌组
   // 创建后立即记忆为新选中的牌组；失败时面板上显示错误。
-  //
-  // @副作用
-  // 调后端创建牌组；写 preferences 保存上次牌组 ID
-  // ========================================================
   private async 创建牌组(name: string): Promise<void> {
     if (this.创建牌组中) {
       return;
@@ -2359,192 +1748,23 @@ struct 首页 {
     }
   }
 
-  // ========================================================
-  // @块ID UI-PAGE-HOME-015
-  // @名称 打开牌组选项
-  //
-  // @作用
-  // 拉取牌组配置视图后弹出全屏磨砂面板（与 创建牌组面板 同款全局覆盖）。
-  //
-  // @输入
-  // 无（使用 选中牌组）
-  //
-  // @输出
-  // 显示牌组选项=true 触发面板渲染；失败时设置 牌组选项错误
-  //
-  // @业务规则
-  // 找不到 currentDeck 对应 config 时抛错。
-  //
-  // @副作用
-  // 调后端拉取配置视图
-  // ========================================================
-  private async 打开牌组选项(): Promise<void> {
+  private 打开牌组选项(): void {
     if (this.deferForSync((): void => { this.打开牌组选项(); })) return;
-    if (this.牌组选项加载中 || this.牌组选项中 || this.显示牌组选项) {
-      return;
-    }
+    if (this.deckOptionsBusy || this.显示牌组选项) return;
     const deck: 牌组汇总 = this.选中牌组();
     const deckId: number = Number(deck.id);
-    if (!Number.isFinite(deckId) || deckId <= 0) {
-      return;
-    }
-    this.牌组选项加载中 = true;
-    this.牌组选项错误 = '';
+    if (!Number.isFinite(deckId) || deckId <= 0) return;
     this.牌组选项牌组ID = deckId;
     this.牌组选项牌组名 = 牌组显示名(deck);
-    try {
-      const view: DeckConfigsForUpdateView = await this.牌组配置服务实例.获取牌组配置编辑视图(deckId);
-      if (this.homeDisposed || this.页面栈.size() > 0 || this.选中的牌组ID !== deck.id) return;
-      const config: DeckConfig | null = this.查找当前配置(view);
-      if (config === null || config.config === null) {
-        throw new Error('deck config not found');
-      }
-      this.编辑视图 = view;
-      this.编辑配置 = config;
-      this.编辑表单 = 牌组配置表单.从配置创建(config.config);
-      this.编辑选项 = 牌组选项编辑.从视图创建(view.currentDeck === null ? null : view.currentDeck.limits, view.newCardsIgnoreReviewLimit, view.fsrs, view.applyAllParentLimits, view.fsrsHealthCheck);
-      this.编辑选项.sharedDeckCount = deckConfigUseCount(view, config.id);
-      this.显示牌组选项 = true;
-    } catch (error) {
-      const msg: string = error instanceof Error ? error.message : `${error}`;
-      const stack: string = error instanceof Error && error.stack !== undefined ? error.stack : '';
-      console.error(`[jidecards] 打开牌组选项 failed: deckId=${deckId} msg=${msg} stack=${stack}`);
-      this.牌组选项错误 = msg;
-    } finally {
-      this.牌组选项加载中 = false;
-    }
+    this.显示牌组选项 = true;
   }
 
-  private 查找当前配置(view: DeckConfigsForUpdateView): DeckConfig | null {
-    if (view.currentDeck === null) {
-      return null;
-    }
-    const configId: number = view.currentDeck.configId;
-    for (const entry of view.allConfigs) {
-      if (entry.config.id === configId) {
-        return entry.config;
-      }
-    }
-    return null;
-  }
-
-  private 关闭牌组选项(): void {
-    this.显示牌组选项 = false;
-    this.牌组选项错误 = '';
-    this.编辑视图 = null;
-    this.编辑配置 = null;
-    this.编辑表单 = null;
-    this.编辑选项 = null;
-  }
-
-  private 牌组选项校验消息(issue: 校验问题): string {
-    let resource: Resource = $r('app.string.deck_learn_steps_validation_error');
-    switch (issue.消息键) {
-      case 'deck_relearn_steps_validation_error': resource = $r('app.string.deck_relearn_steps_validation_error'); break;
-      case 'deck_limit_validation_error': resource = $r('app.string.deck_limit_validation_error'); break;
-      case 'deck_retention_validation_error': resource = $r('app.string.deck_retention_validation_error'); break;
-      case 'deck_nonnegative_validation_error': resource = $r('app.string.deck_nonnegative_validation_error'); break;
-      case 'deck_enum_validation_error': resource = $r('app.string.deck_enum_validation_error'); break;
-      case 'deck_date_validation_error': resource = $r('app.string.deck_date_validation_error'); break;
-      default: resource = $r('app.string.deck_learn_steps_validation_error');
-    }
-    return resourceText(this.getUIContext(), resource);
-  }
-
-  // ========================================================
-  // @块ID UI-PAGE-HOME-016
-  // @名称 保存牌组选项
-  //
-  // @作用
-  // 校验表单 → 提交到后端 → 关闭面板 → 刷新主页。
-  //
-  // @输入
-  // form: 牌组配置表单
-  // options: 牌组选项编辑
-  //
-  // @输出
-  // 关闭面板、刷新主页数据；失败时设置 牌组选项错误
-  //
-  // @业务规则
-  // 校验失败时不调后端，仅显示错误。
-  // 提交字段含 limits / newCardsIgnoreReviewLimit / fsrs / applyAllParentLimits / fsrsReschedule / fsrsHealthCheck。
-  //
-  // @副作用
-  // 调后端更新牌组配置
-  // ========================================================
-  private async 保存牌组选项(form: 牌组配置表单, options: 牌组选项编辑): Promise<void> {
-    if (this.牌组选项中) {
-      console.warn('[jidecards] 保存牌组选项 被跳过：正在保存中');
-      return;
-    }
-    const view: DeckConfigsForUpdateView | null = this.编辑视图;
-    const original: DeckConfig | null = this.编辑配置;
-    const config: DeckConfig | null = original === null ? null : copyDeckConfig(original);
-    if (view === null || original === null || config === null || config.config === null) {
-      console.error('[jidecards] 保存牌组选项 失败：编辑视图或配置为空');
-      this.牌组选项错误 = '保存失败：数据未就绪，请关闭后重试';
-      return;
-    }
-    const issues = form.校验();
-    if (issues.length > 0 || options.校验().length > 0 || !form.应用到配置(config.config) || !options.应用()) {
-      const issue: 校验问题 = issues.length > 0 ? issues[0] : {
-        字段键: 'learnSteps', 消息键: 'deck_learn_steps_validation_error'
-      };
-      this.牌组选项错误 = this.牌组选项校验消息(issue);
-      return;
-    }
-    this.牌组选项中 = true;
-    this.牌组选项错误 = '';
-    try {
-      const request: UpdateDeckConfigsInput = buildDeckConfigRequest(this.牌组选项牌组ID,
-        view, original, config, options.applyToSharedDecks, options.转换为请求字段());
-      await this.牌组配置服务实例.更新牌组配置(request);
-      notifyFsrsStateChanged();
-      if (this.homeDisposed) return;
-      this.关闭牌组选项();
-      await this.加载主页数据();
-      if (this.homeDisposed) return;
-    } catch (error) {
-      if (this.homeDisposed) return;
-      const msg: string = error instanceof Error ? error.message : `${error}`;
-      const stack: string = error instanceof Error && error.stack !== undefined ? error.stack : '';
-      console.error(`[jidecards] 保存牌组选项 failed: deckId=${this.牌组选项牌组ID} msg=${msg} stack=${stack}`);
-      this.牌组选项错误 = msg;
-    } finally {
-      if (!this.homeDisposed) this.牌组选项中 = false;
-    }
-  }
-
-  // ========================================================
-  // @块ID UI-PAGE-HOME-016-TRANSITION
-  // @名称 Navigation 自定义转场回调
-  //
-  // @作用
-  // 配合 .customNavContentTransition 实现 NavDestination 推栈的淡入淡出转场，
-  // 替代系统默认左右平移（AppGallery 评价要求：禁止左右平移，使用淡入淡出）。
-  // 时长按设备物理英寸分档（200/250/300ms），透明度使用不回弹的 EaseOut。
-  //
-  // @输入
-  // from: 转场起始页 NavContentInfo
-  // to: 转场目的页 NavContentInfo
-  // operation: PUSH / POP
-  //
-  // @输出
-  // 返回 NavigationAnimatedTransition 让系统执行自定义动画；首页没有注册透明度回调时，
-  // 仅动画 NavDestination 一侧，仍保持同一套淡入淡出而不回退到横向平移。
-  //
-  // @业务规则
+  // Navigation 自定义转场回调
   // 通过 CustomTransition 单例查找 from/to 注册的 opacity 设置回调，
   // 在 animateTo 内调用起点→终点回调，触发淡入淡出。
   // 动画结束后必须调 proxy.finishTransition()，否则 timeout(1200ms) 后系统强制结束。
-  //
-  // @Invariants
   // - 首页与各 NavDestination 之间也必须走本回调，禁止回退到系统横向平移
   // - 时长取自 取全屏转场时长，透明度避免弹簧过冲与限幅停顿
-  //
-  // @副作用
-  // 调用 from/to NavDestination 注册的 opacity 设置回调（修改其 @State 透明度）。
-  // ========================================================
   private 自定义转场回调(from: NavContentInfo, to: NavContentInfo,
     operation: NavigationOperation): NavigationAnimatedTransition | undefined {
     const isPush: boolean = operation === NavigationOperation.PUSH;
@@ -2598,26 +1818,8 @@ struct 首页 {
     };
   }
 
-  // ========================================================
-  // @块ID UI-PAGE-HOME-017
-  // @名称 页面映射
-  //
-  // @作用
-  // Navigation 目的地映射：学习页 / 浏览页 / 统计页 / 添加笔记页 以 NavDestination 形式入栈展示。
-  //
-  // @输入
-  // name: NavPathStack 寻址字符串
-  // param: 入栈参数
-  //
-  // @输出
-  // 渲染对应 NavDestination 内容
-  //
-  // @业务规则
+  // 页面映射
   // 'StudyPage' / 'BrowserPage' / 'StatsPage' / 'AddNotePage' 字符串是 NavPathStack 跨页面寻址协议，保留英文。
-  //
-  // @副作用
-  // 无（仅渲染）
-  // ========================================================
   @Builder
   private 页面映射(name: string, param: ESObject) {
     if (name === 'StudyPage') {
@@ -2670,266 +1872,126 @@ struct 首页 {
     }
   }
 
-  build() {
-    Stack() {
-      ThemeBackground({ transitionActive: this.backgroundTransitionActive })
-    Navigation(this.页面栈) {
-      Stack() {
-        Column() {
-          主页顶部工具栏({
-            排序模式中: this.排序模式中,
-            syncStatusText: this.syncStatusText,
-            syncDetailsAvailable: this.显示同步面板,
-            onSyncDetails: (): void => { this.syncDetailsRequest++; },
-            on更多点击: (): void => {
-              this.显示更多菜单 = true;
-            },
-            on创建牌组点击: (): void => {
-              this.显示主页操作 = true;
-            },
-            on排序退出: (): void => {
-              this.退出排序模式();
-            },
-            on排序完成: (): void => {
-              this.退出排序模式();
-            },
-            主色容器色: this.主色容器色,
-            页面底色微染值: this.页面底色微染值,
-            动作主色: this.动作主色
-          })
-          GridRow({
-            columns: { xs: 4, sm: 8, md: 12 },
-            breakpoints: {
-              value: ['600vp', '840vp'],
-              reference: BreakpointsReference.WindowSize
-            },
-            gutter: 0
-          }) {
-            GridCol({ span: { xs: 4, sm: 5, md: 8 } }) {
-              // B12-Y2 2026-07-23：主面板 直接铺满左 GridCol，去掉 Stack(Center) 居中。
-              // 牌组列表右端 = 左 GridCol 右端 = 牌组详情面板 左端，紧贴无空白。
-              // 用 主页摘要分页 + 主页牌组列表 两个积木组件替代原 主面板 @Builder，
-              // 由 首页.ets 保留对数据状态的控制权（业务契约要求）。
-              Column({ space: 应用尺寸.pageSectionGap }) {
-                if (this.显示今日进度卡) {
-                  主页摘要分页({
-                    主页快照数据: this.主页快照数据,
-                    图表快照: this.图表快照
-                  })
-                }
-                主页牌组列表({
-                  牌组数据源: this.牌组数据源,
-                  牌组列表滚动器: this.牌组列表滚动器,
-                  展开的牌组ID集合: this.展开的牌组ID集合,
-                  选中的牌组ID: this.选中的牌组ID,
-                  排序模式中: this.排序模式中,
-                  加载状态: this.加载状态,
-                  刷新中: this.刷新中,
-                  动作主色: this.动作主色,
-                  主色按钮背景色: this.主色按钮背景色,
-                  onMove: (from: number, to: number): void => {
-                    this.处理牌组移动(from, to);
-                  },
-                  onItemSelect: (deckId: string): void => {
-                    this.选择牌组(deckId);
-                  },
-                  onItemToggle: (deckId: string): void => {
-                    this.切换牌组展开(deckId);
-                  },
-                  onItemToneChange: (deckId: string, tone: 牌组色调): void => {
-                    this.更改牌组色调(deckId, tone);
-                  },
-                  onItemCustomize: (deckId: string): void => {
-                    this.打开牌组定制(deckId);
-                  },
-                  onItemEnterReorder: (deckId: string): void => {
-                    this.进入排序模式();
-                  },
-                  onItemDelete: (deckId: string): void => {
-                    this.请求删除牌组(deckId);
-                  },
-                  onItemHide: (deckId: string): void => {
-                    this.隐藏牌组(deckId);
-                  },
-                  onItemDoubleTap: (deckId: string): void => {
-                    this.递归切换牌组(deckId);
-                  },
-                  onItemCustomStudy: (deckId: string): void => {
-                    this.打开自定义学习(deckId);
-                  },
-                  onItemCreateFilteredDeck: (): void => {
-                    this.打开创建过滤牌组();
-                  },
-                  onRefresh: (): void => {
-                    // 先置 刷新中=true 触发 @Watch 同步 刷新指示器开关=true（Refresh 内部已置 true，无副作用）；
-                    // 加载主页数据() 内部 finally 置 刷新中=false（true→false 触发 @Watch 同步 刷新指示器开关=false 收起指示器）。
-                    // 不显式置 true 会导致 刷新中 一直 false，@Watch 不触发，刷新指示器永远转圈。
-                    this.刷新中 = true;
-                    this.加载主页数据();
-                  },
-                  onRetry: (): void => {
-                    this.加载主页数据();
-                  }
-                })
-              }
-              .width('100%')
-              .height('100%')
-              .padding({
-                left: 应用尺寸.页面内边距_水平,
-                right: 应用尺寸.页面内边距_水平,
-                top: 应用尺寸.pageContentTopInset,
-                bottom: 应用尺寸.pageBottomInset
-              })
-              .backgroundColor(this.页面底色微染值)
-            }
-            if (this.当前断点 !== 'xs') {
-              GridCol({ span: { xs: 0, sm: 3, md: 4 } }) {
-                牌组详情面板({
-                  historyRefreshToken: this.historyRefreshToken,
-                  是否深色: this.是否深色(),
-                  牌组选项加载中: this.牌组选项加载中,
-                  牌组选项错误: this.牌组选项错误,
-                  开始学习: (): void => {
-                    this.开始学习();
-                  },
-                  预览: (): void => { this.打开牌组预览(); },
-                  添加卡片: (): void => { this.打开添加笔记(); },
-                  创建子牌组: (): void => {
-                    this.openCreateDeck(this.选中的牌组ID);
-                  },
-                  导出牌组: (): void => {
-                    this.打开数据迁移('exportDeck', Number(this.选中的牌组ID), false);
-                  },
-                  打开牌组选项: (): void => {
-                    this.打开牌组选项();
-                  }
-                })
-              }
-            }
-          }
-          .layoutWeight(1)
-          .onBreakpointChange((breakpoint: string) => {
-            this.当前断点 = breakpoint;
-            // 旋转/首屏 breakpoint 确定后若尚未恢复且变到宽屏，触发一次上次牌组恢复
-            if (!this.上次牌组已恢复 && breakpoint !== 'xs') {
-              this.尝试恢复上次牌组();
-            }
-          })
-        }
-        .width('100%')
-        .constraintSize({ maxWidth: 应用尺寸.内容最大宽度 })
-        .height('100%')
-        .backgroundColor(this.页面底色微染值)
-
-        if (this.显示主页操作) {
-          主页操作面板({
-            创建牌组回调: (): void => {
-              this.显示主页操作 = false;
-              this.openCreateDeck('');
-            },
-            导入牌组回调: (): void => {
-              this.显示主页操作 = false;
-              this.从选择器导入牌组();
-            },
-            AI制卡回调: (): void => {
-              this.显示主页操作 = false;
-              this.打开AI制卡();
-            },
-            AI改卡回调: (): void => {
-              this.显示主页操作 = false;
-              this.打开AI改卡();
-            },
-            显示获取直链牌组: !this.云端牌组配额已用尽,
-            获取直链牌组回调: (): void => {
-              this.显示主页操作 = false;
-              this.打开云端牌组弹窗(true);
-            },
-            关闭回调: (): void => {
-              this.显示主页操作 = false;
-            }
-          })
-        }
-
-        // 更多下拉菜单：设置/浏览/统计/提醒 四项收纳
-        if (this.显示更多菜单) {
-          主页更多面板({
-            onIntro: (): void => {
-              this.显示更多菜单 = false;
-              this.显示欢迎弹窗 = true;
-            },
-            设置回调: (): void => {
-              this.显示更多菜单 = false;
-              this.openSettings();
-            },
-            浏览回调: (): void => {
-              this.显示更多菜单 = false;
-              this.打开浏览页();
-            },
-            统计回调: (): void => {
-              this.显示更多菜单 = false;
-              this.打开统计页();
-            },
-            提醒回调: (): void => {
-              this.显示更多菜单 = false;
-              this.openReminders();
-            },
-            关闭回调: (): void => {
-              this.显示更多菜单 = false;
-            }
-          })
-        }
-
-        // 窄屏详情显隐（方案 C 2026-07-25）：显示牌组详情=true 时 牌组详情面板 盖住列表。
-        // 牌组详情面板 在根 Stack 内，作为 @Entry 后代，@Consume 能找到 @Provide。
-        // B12-Y3 2026-07-28：详情面板必须在 3 个协调器弹窗之前渲染，否则弹窗被详情面板遮挡，
-        // 用户点「创建子牌组/牌组选项/导出」后弹窗藏在详情面板背后，返回后才看到。
-        if (this.当前断点 === 'xs' && this.显示牌组详情) {
-          Column() {
-            Row() {
-              Button($r('app.string.study_back'))
-                .height(应用尺寸.按钮高度)
-                .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
-                .constraintSize({ minWidth: 0 })
-                .fontSize(应用尺寸.字号_按钮)
-                .fontColor($r('app.color.text_primary'))
-                .backgroundColor($r('app.color.surface_card'))
-                .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
-                .borderRadius(应用尺寸.圆角_胶囊)
-                .onClick(() => {
-                  this.显示牌组详情 = false;
-                  this.加载主页数据();
-                })
-              Blank()
-              按下态按钮({
-                文案: $r('app.string.deck_add_card'),
-                字色: this.动作主色,
-                themeText: true,
-                点击回调: (): void => { this.打开添加笔记(); }
+  @Builder
+  private homeLayout() {
+    Column() {
+      主页顶部工具栏({
+        排序模式中: this.排序模式中,
+        syncStatusText: this.syncStatusText,
+        syncDetailsAvailable: this.显示同步面板,
+        onSyncDetails: (): void => { this.syncDetailsRequest++; },
+        on更多点击: (): void => {
+          this.显示更多菜单 = true;
+        },
+        on创建牌组点击: (): void => {
+          this.显示主页操作 = true;
+        },
+        on排序退出: (): void => {
+          this.退出排序模式();
+        },
+        on排序完成: (): void => {
+          this.退出排序模式();
+        },
+        主色容器色: this.主色容器色,
+        页面底色微染值: this.页面底色微染值,
+        动作主色: this.动作主色
+      })
+      GridRow({
+        columns: { xs: 4, sm: 8, md: 12 },
+        breakpoints: {
+          value: ['600vp', '840vp'],
+          reference: BreakpointsReference.WindowSize
+        },
+        gutter: 0
+      }) {
+        GridCol({ span: { xs: 4, sm: 5, md: 8 } }) {
+          // B12-Y2 2026-07-23：主面板 直接铺满左 GridCol，去掉 Stack(Center) 居中。
+          // 牌组列表右端 = 左 GridCol 右端 = 牌组详情面板 左端，紧贴无空白。
+          // 用 主页摘要分页 + 主页牌组列表 两个积木组件替代原 主面板 @Builder，
+          // 由 首页.ets 保留对数据状态的控制权（业务契约要求）。
+          Column({ space: 应用尺寸.pageSectionGap }) {
+            if (this.显示今日进度卡) {
+              主页摘要分页({
+                主页快照数据: this.主页快照数据,
+                图表快照: this.图表快照
               })
             }
-            .width('100%')
-            .height(应用尺寸.工具栏高度 + this.状态栏高度)
-            .padding({
-              left: 应用尺寸.页面内边距_水平,
-              right: 应用尺寸.页面内边距_水平,
-              top: this.状态栏高度 + 应用尺寸.toolbarVerticalInset,
-              bottom: 应用尺寸.toolbarVerticalInset
+            主页牌组列表({
+              牌组数据源: this.牌组数据源,
+              牌组列表滚动器: this.牌组列表滚动器,
+              展开的牌组ID集合: this.展开的牌组ID集合,
+              选中的牌组ID: this.选中的牌组ID,
+              排序模式中: this.排序模式中,
+              加载状态: this.加载状态,
+              刷新中: this.刷新中,
+              动作主色: this.动作主色,
+              主色按钮背景色: this.主色按钮背景色,
+              onMove: (from: number, to: number): void => {
+                this.处理牌组移动(from, to);
+              },
+              onItemSelect: (deckId: string): void => {
+                this.选择牌组(deckId);
+              },
+              onItemToggle: (deckId: string): void => {
+                this.切换牌组展开(deckId);
+              },
+              onItemToneChange: (deckId: string, tone: 牌组色调): void => {
+                this.更改牌组色调(deckId, tone);
+              },
+              onItemCustomize: (deckId: string): void => {
+                this.打开牌组定制(deckId);
+              },
+              onItemEnterReorder: (deckId: string): void => {
+                this.进入排序模式();
+              },
+              onItemDelete: (deckId: string): void => {
+                this.请求删除牌组(deckId);
+              },
+              onItemHide: (deckId: string): void => {
+                this.隐藏牌组(deckId);
+              },
+              onItemDoubleTap: (deckId: string): void => {
+                this.递归切换牌组(deckId);
+              },
+              onItemCustomStudy: (deckId: string): void => {
+                this.打开自定义学习(deckId);
+              },
+              onItemCreateFilteredDeck: (): void => {
+                this.打开创建过滤牌组();
+              },
+              onRefresh: (): void => {
+                // 先置 刷新中=true 触发 @Watch 同步 刷新指示器开关=true（Refresh 内部已置 true，无副作用）；
+                // 加载主页数据() 内部 finally 置 刷新中=false（true→false 触发 @Watch 同步 刷新指示器开关=false 收起指示器）。
+                // 不显式置 true 会导致 刷新中 一直 false，@Watch 不触发，刷新指示器永远转圈。
+                this.刷新中 = true;
+                this.加载主页数据();
+              },
+              onRetry: (): void => {
+                this.加载主页数据();
+              }
             })
-            .backgroundColor(this.页面底色微染值)
-
+          }
+          .width('100%')
+          .height('100%')
+          .padding({
+            left: 应用尺寸.页面内边距_水平,
+            right: 应用尺寸.页面内边距_水平,
+            top: 应用尺寸.pageContentTopInset,
+            bottom: 应用尺寸.pageBottomInset
+          })
+          .backgroundColor(this.页面底色微染值)
+        }
+        if (this.当前断点 !== 'xs') {
+          GridCol({ span: { xs: 0, sm: 3, md: 4 } }) {
             牌组详情面板({
               historyRefreshToken: this.historyRefreshToken,
-              showAddCard: false,
               是否深色: this.是否深色(),
-              牌组选项加载中: this.牌组选项加载中,
-              牌组选项错误: this.牌组选项错误,
+              牌组选项加载中: this.deckOptionsBusy,
               开始学习: (): void => {
                 this.开始学习();
               },
               预览: (): void => { this.打开牌组预览(); },
-              添加卡片: (): void => {
-                this.打开添加笔记();
-              },
+              添加卡片: (): void => { this.打开添加笔记(); },
               创建子牌组: (): void => {
                 this.openCreateDeck(this.选中的牌组ID);
               },
@@ -2940,249 +2002,368 @@ struct 首页 {
                 this.打开牌组选项();
               }
             })
-            .layoutWeight(1)
           }
+        }
+      }
+      .layoutWeight(1)
+      .onBreakpointChange((breakpoint: string) => {
+        this.当前断点 = breakpoint;
+        // 旋转/首屏 breakpoint 确定后若尚未恢复且变到宽屏，触发一次上次牌组恢复
+        if (!this.上次牌组已恢复 && breakpoint !== 'xs') {
+          this.尝试恢复上次牌组();
+        }
+      })
+    }
+    .width('100%')
+    .constraintSize({ maxWidth: 应用尺寸.内容最大宽度 })
+    .height('100%')
+    .backgroundColor(this.页面底色微染值)
+  }
+
+  @Builder
+  private homeMenus() {
+    if (this.显示主页操作) {
+      主页操作面板({
+        创建牌组回调: (): void => {
+          this.显示主页操作 = false;
+          this.openCreateDeck('');
+        },
+        导入牌组回调: (): void => {
+          this.显示主页操作 = false;
+          this.从选择器导入牌组();
+        },
+        AI制卡回调: (): void => {
+          this.显示主页操作 = false;
+          this.打开AI制卡();
+        },
+        AI改卡回调: (): void => {
+          this.显示主页操作 = false;
+          this.打开AI改卡();
+        },
+        显示获取直链牌组: !this.云端牌组配额已用尽,
+        获取直链牌组回调: (): void => {
+          this.显示主页操作 = false;
+          this.打开云端牌组弹窗(true);
+        },
+        关闭回调: (): void => {
+          this.显示主页操作 = false;
+        }
+      })
+    }
+
+    // 更多下拉菜单：设置/浏览/统计/提醒 四项收纳
+    if (this.显示更多菜单) {
+      主页更多面板({
+        onIntro: (): void => {
+          this.显示更多菜单 = false;
+          this.显示欢迎弹窗 = true;
+        },
+        设置回调: (): void => {
+          this.显示更多菜单 = false;
+          this.openSettings();
+        },
+        浏览回调: (): void => {
+          this.显示更多菜单 = false;
+          this.打开浏览页();
+        },
+        统计回调: (): void => {
+          this.显示更多菜单 = false;
+          this.打开统计页();
+        },
+        提醒回调: (): void => {
+          this.显示更多菜单 = false;
+          this.openReminders();
+        },
+        关闭回调: (): void => {
+          this.显示更多菜单 = false;
+        }
+      })
+    }
+  }
+
+  @Builder
+  private compactDeckDetails() {
+    if (this.当前断点 === 'xs' && this.显示牌组详情) {
+      Column() {
+        Row() {
+          Button($r('app.string.study_back'))
+            .height(应用尺寸.按钮高度)
+            .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
+            .constraintSize({ minWidth: 0 })
+            .fontSize(应用尺寸.字号_按钮)
+            .fontColor($r('app.color.text_primary'))
+            .backgroundColor($r('app.color.surface_card'))
+            .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+            .borderRadius(应用尺寸.圆角_胶囊)
+            .onClick(() => {
+              this.显示牌组详情 = false;
+              this.加载主页数据();
+            })
+          Blank()
+          按下态按钮({
+            文案: $r('app.string.deck_add_card'),
+            字色: this.动作主色,
+            themeText: true,
+            点击回调: (): void => { this.打开添加笔记(); }
+          })
+        }
+        .width('100%')
+        .height(应用尺寸.工具栏高度 + this.状态栏高度)
+        .padding({
+          left: 应用尺寸.页面内边距_水平,
+          right: 应用尺寸.页面内边距_水平,
+          top: this.状态栏高度 + 应用尺寸.toolbarVerticalInset,
+          bottom: 应用尺寸.toolbarVerticalInset
+        })
+        .backgroundColor(this.页面底色微染值)
+
+        牌组详情面板({
+          historyRefreshToken: this.historyRefreshToken,
+          showAddCard: false,
+          是否深色: this.是否深色(),
+          牌组选项加载中: this.deckOptionsBusy,
+          开始学习: (): void => {
+            this.开始学习();
+          },
+          预览: (): void => { this.打开牌组预览(); },
+          添加卡片: (): void => {
+            this.打开添加笔记();
+          },
+          创建子牌组: (): void => {
+            this.openCreateDeck(this.选中的牌组ID);
+          },
+          导出牌组: (): void => {
+            this.打开数据迁移('exportDeck', Number(this.选中的牌组ID), false);
+          },
+          打开牌组选项: (): void => {
+            this.打开牌组选项();
+          }
+        })
+        .layoutWeight(1)
+      }
+      .width('100%')
+      .height('100%')
+      .backgroundColor(this.页面底色微染值)
+    }
+  }
+
+  @Builder
+  private homeFeatures() {
+    创建牌组协调器({
+      显示: this.显示创建牌组,
+      进行中: this.创建牌组中,
+      错误: this.创建牌组错误,
+      父牌组ID: this.创建父牌组ID,
+      牌组选项列表: this.主页快照数据.decks,
+      是否深色: this.是否深色(),
+      onCancel: (): void => {
+        this.显示创建牌组 = false;
+      },
+      onConfirm: (name: string): void => {
+        this.创建牌组(name);
+      }
+    })
+
+    DataTransferFeature({ state: this.transfer, session: this.transferSession,
+      deckOptions: this.导出牌组选项列表(), isDark: this.是否深色() })
+
+    if (this.显示牌组选项) {
+      DeckOptionsFeature({
+        deckId: this.牌组选项牌组ID,
+        deckName: this.牌组选项牌组名,
+        isDark: this.是否深色(),
+        onBusy: (busy: boolean): void => { this.deckOptionsBusy = busy; },
+        onClose: (): void => { this.deckOptionsBusy = false; this.显示牌组选项 = false; }
+      })
+    }
+
+    if (this.显示牌组定制) {
+      牌组定制面板({
+        isDark: this.是否深色(),
+        deck: this.按ID查牌组(this.定制牌组ID),
+        busy: this.定制牌组中,
+        errorMessage: this.定制牌组错误,
+        onClose: (): void => {
+          if (!this.定制牌组中) {
+            this.显示牌组定制 = false;
+          }
+        },
+        onSave: (result: 牌组定制结果): void => {
+          this.应用牌组定制(result);
+        }
+      })
+    }
+
+    // 自定义学习对话框（T2）：长按牌组 → 自定义学习…，成功后刷新主页
+    if (this.显示自定义学习) {
+      自定义学习对话框({
+        isDark: this.是否深色(),
+        deckId: this.自定义学习牌组ID,
+        deckName: this.自定义学习牌组名,
+        onClose: (): void => {
+          this.显示自定义学习 = false;
+        },
+        onSuccess: (): void => {
+          this.加载主页数据();
+        }
+      })
+    }
+
+    // 创建过滤牌组面板（T2）：长按牌组 → 创建过滤牌组，成功后刷新主页
+    if (this.显示过滤牌组面板) {
+      创建过滤牌组面板({
+        isDark: this.是否深色(),
+        onClose: (): void => {
+          this.显示过滤牌组面板 = false;
+        },
+        onSuccess: (): void => {
+          this.加载主页数据();
+        }
+      })
+    }
+
+    if (this.显示云端牌组弹窗) {
+      CloudDeckFeature({ isDark: this.是否深色(), 云端牌组从菜单打开: this.云端牌组从菜单打开,
+        backRequest: this.cloudBackRequest,
+        onBusy: (busy: boolean): void => { this.云端牌组忙碌 = busy; },
+        onQuota: (exhausted: boolean): void => { this.云端牌组配额已用尽 = exhausted; },
+        onImported: async (): Promise<void> => {
+          const before: Set<string> = new Set(this.主页快照数据.decks.map((deck: 牌组汇总): string => deck.id));
+          await this.加载主页数据();
+          if (!this.homeDisposed) { this.展开新导入牌组(before); this.requestAutoSync(); }
+        },
+        onClose: (welcome: boolean): void => {
+          this.显示云端牌组弹窗 = false; this.云端牌组忙碌 = false;
+          this.返回主页后刷新();
+          if (welcome) this.显示欢迎弹窗一次();
+        }
+      })
+    }
+  }
+
+  @Builder
+  private homePrompts() {
+    if (this.显示官方公告 && this.官方公告数据 !== null) {
+      官方公告弹窗({
+        announcement: this.官方公告数据,
+        isDark: this.是否深色(),
+        acknowledging: this.官方公告确认中,
+        onAcknowledge: (): void => { this.确认官方公告(); },
+        onOpenDetails: (): void => { this.打开官方公告详情(); }
+      })
+    }
+
+    // 首次启动欢迎弹窗：放最顶层，确保覆盖所有浮层
+    //   关闭时持久化入门已读标记（不会在展示时提前标记，
+    //   这里仅关闭状态；即使弹窗未显示也已标记，保证「只弹一次」语义）
+    if (this.显示卡片预览) {
+      卡片预览页({
+        isDark: this.是否深色(),
+        卡片ID列表: this.预览卡片ID列表,
+        初始索引: this.预览初始索引,
+        媒体目录: this.预览媒体目录,
+        onPositionChanged: (index: number): void => {
+          this.预览初始索引 = index;
+        },
+        onEditField: (卡片ID: number): void => { this.关闭预览并编辑(卡片ID); },
+        onCreateWithAgent: (): void => { this.关闭预览并进入Agent制卡(); },
+        onClose: (): void => { this.显示卡片预览 = false; }
+      })
+    }
+
+    if (this.显示欢迎弹窗) {
+      HomeIntroPanel({
+        onClose: (): void => { this.closeHomeIntro(); }
+      })
+    }
+
+    if (this.deckDeletionBusy) {
+      Column({ space: 12 }) {
+        LoadingProgress().width(36).height(36)
+        Text(this.deckDeletionStatus)
+          .fontSize(应用尺寸.字号_正文)
+          .fontColor($r('app.color.text_primary'))
+      }
+      .width('100%')
+      .height('100%')
+      .justifyContent(FlexAlign.Center)
+      .backgroundColor($r('app.color.surface_page'))
+      .onClick((): void => {})
+    }
+
+    if (this.显示节流奖励) {
+      Stack() {
+        Column()
           .width('100%')
           .height('100%')
-          .backgroundColor(this.页面底色微染值)
-        }
+          .backgroundColor('rgba(0,0,0,0.35)')
+          .backgroundBlurStyle(BlurStyle.Thin, {
+            colorMode: ThemeColorMode.LIGHT,
+            adaptiveColor: AdaptiveColor.DEFAULT
+          })
+          .onClick(() => { this.显示节流奖励 = false; })
 
-        // 详情触发的弹层（创建牌组/数据迁移/牌组选项）：用 3 个协调器组件替代原 @Builder。
+        Column() {
+          Row() {
+            Button() {
+              Text() { ThemeTextSpans($r('app.string.easter_egg_got_it'), this.themeAccentColors, this.getUIContext()) }.fontSize(应用尺寸.字号_按钮).fontWeight(FontWeight.Medium).fontColor(this.动作主色)
+            }
+              .type(ButtonType.Capsule)
+              .height(应用尺寸.按钮高度)
+              .fontSize(应用尺寸.字号_按钮)
+              .fontWeight(FontWeight.Medium)
+              .backgroundColor(Color.Transparent)
+              .fontColor(this.动作主色)
+              .onClick(() => { this.显示节流奖励 = false; })
+          }
+          .width('100%')
+          .justifyContent(FlexAlign.End)
+          .padding({ left: 20, right: 20, top: 12 })
+
+          Text(this.节流奖励文案)
+            .fontSize(应用尺寸.字号_彩蛋文案)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.text_primary'))
+            .width('100%')
+            .textAlign(TextAlign.Center)
+            .padding({ top: 24, bottom: 32 })
+
+        }
+        .width('88%')
+        .constraintSize({ maxWidth: 380 })
+        .backgroundColor($r('app.color.surface_page'))
+        .borderRadius(应用尺寸.圆角_指标卡)
+        .shadow({ radius: 24, color: 'rgba(0,0,0,0.18)', offsetX: 0, offsetY: 4 })
+      }
+      .width('100%')
+      .height('100%')
+      .alignContent(Alignment.Center)
+      .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
+    }
+  }
+
+  build() {
+    Stack() {
+      ThemeBackground({ transitionActive: this.backgroundTransitionActive })
+    Navigation(this.页面栈) {
+      Stack() {
+        this.homeLayout()
+
+        this.homeMenus()
+
+        // 窄屏详情显隐（方案 C 2026-07-25）：显示牌组详情=true 时 牌组详情面板 盖住列表。
+        // 牌组详情面板 在根 Stack 内，作为 @Entry 后代，@Consume 能找到 @Provide。
+        // B12-Y3 2026-07-28：详情面板必须在 3 个协调器弹窗之前渲染，否则弹窗被详情面板遮挡，
+        // 用户点「创建子牌组/牌组选项/导出」后弹窗藏在详情面板背后，返回后才看到。
+        this.compactDeckDetails()
+
+        // 功能弹层在窄屏详情之后绘制，保持可见和可交互。
         // B12-Y3 2026-07-28：弹层渲染在窄屏详情面板之后，确保弹窗能盖住详情面板。
-        创建牌组协调器({
-          显示: this.显示创建牌组,
-          进行中: this.创建牌组中,
-          错误: this.创建牌组错误,
-          父牌组ID: this.创建父牌组ID,
-          牌组选项列表: this.主页快照数据.decks,
-          是否深色: this.是否深色(),
-          onCancel: (): void => {
-            this.显示创建牌组 = false;
-          },
-          onConfirm: (name: string): void => {
-            this.创建牌组(name);
-          }
-        })
-
-        数据迁移协调器({
-          显示: this.显示数据迁移,
-          进行中: this.数据迁移中,
-          错误: this.数据迁移错误,
-          阶段: this.数据迁移阶段,
-          个人数据替换步骤: this.个人数据替换步骤,
-          初始模式: this.数据迁移初始模式,
-          初始牌组ID: this.数据迁移初始牌组ID,
-          允许选牌组: this.数据迁移允许选牌组,
-          牌组选项列表: this.导出牌组选项列表(),
-          是否深色: this.是否深色(),
-          onIntent: (intent: 数据迁移意图): void => {
-            this.处理数据迁移(intent);
-          },
-          onClose: (): void => {
-            if (!this.数据迁移中) {
-              this.显示数据迁移 = false;
-              this.个人数据替换步骤 = 0;
-            }
-          }
-        })
-
-        if (this.显示牌组选项 && this.编辑表单 !== null && this.编辑选项 !== null) {
-          牌组选项协调器({
-            进行中: this.牌组选项中,
-            错误: this.牌组选项错误,
-            牌组名: this.牌组选项牌组名,
-            编辑表单: this.编辑表单,
-            编辑选项: this.编辑选项,
-            是否深色: this.是否深色(),
-            onCancel: (): void => {
-              if (!this.牌组选项中) this.关闭牌组选项();
-            },
-            onSave: (form: 牌组配置表单, options: 牌组选项编辑): void => {
-              this.保存牌组选项(form, options);
-            }
-          })
-        }
-
-        if (this.显示牌组定制) {
-          牌组定制面板({
-            isDark: this.是否深色(),
-            deck: this.按ID查牌组(this.定制牌组ID),
-            busy: this.定制牌组中,
-            errorMessage: this.定制牌组错误,
-            onClose: (): void => {
-              if (!this.定制牌组中) {
-                this.显示牌组定制 = false;
-              }
-            },
-            onSave: (result: 牌组定制结果): void => {
-              this.应用牌组定制(result);
-            }
-          })
-        }
-
-        // 自定义学习对话框（T2）：长按牌组 → 自定义学习…，成功后刷新主页
-        if (this.显示自定义学习) {
-          自定义学习对话框({
-            isDark: this.是否深色(),
-            deckId: this.自定义学习牌组ID,
-            deckName: this.自定义学习牌组名,
-            onClose: (): void => {
-              this.显示自定义学习 = false;
-            },
-            onSuccess: (): void => {
-              this.加载主页数据();
-            }
-          })
-        }
-
-        // 创建过滤牌组面板（T2）：长按牌组 → 创建过滤牌组，成功后刷新主页
-        if (this.显示过滤牌组面板) {
-          创建过滤牌组面板({
-            isDark: this.是否深色(),
-            onClose: (): void => {
-              this.显示过滤牌组面板 = false;
-            },
-            onSuccess: (): void => {
-              this.加载主页数据();
-            }
-          })
-        }
-
-        if (this.显示云端牌组弹窗) {
-          云端牌组弹窗({
-            isDark: this.是否深色(),
-            从菜单打开: this.云端牌组从菜单打开,
-            loading: this.云端牌组加载中,
-            busy: this.云端牌组忙碌,
-            errorMessage: this.云端牌组错误,
-            decks: this.云端牌组列表,
-            selectedIds: this.云端牌组选中ID列表,
-            successIds: this.云端牌组成功ID列表,
-            failedIds: this.云端牌组失败ID列表,
-            currentDeckName: this.云端牌组当前名称,
-            currentStage: this.云端牌组当前阶段,
-            progressPercent: this.云端牌组进度,
-            completedCount: this.云端牌组已处理数,
-            taskCount: this.云端牌组任务数,
-            onToggle: (deckId: string): void => {
-              this.切换云端牌组选择(deckId);
-            },
-            onRetry: (): void => {
-              this.加载云端牌组目录();
-            },
-            onDownload: (): void => {
-              this.下载选中云端牌组();
-            },
-            onEnter: (): void => {
-              this.完成云端牌组首次引导();
-            },
-            onSkip: (): void => {
-              this.跳过云端牌组引导();
-            },
-            onCopyQQGroup: (): void => {
-              this.复制云端牌组QQ群号();
-            }
-          })
-        }
+        this.homeFeatures()
 
         // 官方启动公告：层级高于云端牌组引导与欢迎弹窗；返回键与遮罩不关闭，仅「我知道了」关闭
-        if (this.显示官方公告 && this.官方公告数据 !== null) {
-          官方公告弹窗({
-            announcement: this.官方公告数据,
-            isDark: this.是否深色(),
-            acknowledging: this.官方公告确认中,
-            onAcknowledge: (): void => { this.确认官方公告(); },
-            onOpenDetails: (): void => { this.打开官方公告详情(); }
-          })
-        }
+        this.homePrompts()
 
-        // 首次启动欢迎弹窗：放最顶层，确保覆盖所有浮层
-        //   关闭时持久化入门已读标记（不会在展示时提前标记，
-        //   这里仅关闭状态；即使弹窗未显示也已标记，保证「只弹一次」语义）
-        if (this.显示卡片预览) {
-          卡片预览页({
-            isDark: this.是否深色(),
-            卡片ID列表: this.预览卡片ID列表,
-            初始索引: this.预览初始索引,
-            媒体目录: this.预览媒体目录,
-            onPositionChanged: (index: number): void => {
-              this.预览初始索引 = index;
-            },
-            onEditField: (卡片ID: number): void => { this.关闭预览并编辑(卡片ID); },
-            onCreateWithAgent: (): void => { this.关闭预览并进入Agent制卡(); },
-            onClose: (): void => { this.显示卡片预览 = false; }
-          })
-        }
-
-        if (this.显示欢迎弹窗) {
-          HomeIntroPanel({
-            onClose: (): void => { this.closeHomeIntro(); }
-          })
-        }
-
-        if (this.deckDeletionBusy) {
-          Column({ space: 12 }) {
-            LoadingProgress().width(36).height(36)
-            Text(this.deckDeletionStatus)
-              .fontSize(应用尺寸.字号_正文)
-              .fontColor($r('app.color.text_primary'))
-          }
-          .width('100%')
-          .height('100%')
-          .justifyContent(FlexAlign.Center)
-          .backgroundColor($r('app.color.surface_page'))
-          .onClick((): void => {})
-        }
-
-        if (this.显示节流奖励) {
-          Stack() {
-            Column()
-              .width('100%')
-              .height('100%')
-              .backgroundColor('rgba(0,0,0,0.35)')
-              .backgroundBlurStyle(BlurStyle.Thin, {
-                colorMode: ThemeColorMode.LIGHT,
-                adaptiveColor: AdaptiveColor.DEFAULT
-              })
-              .onClick(() => { this.显示节流奖励 = false; })
-
-            Column() {
-              Row() {
-                Button() {
-                  Text() { ThemeTextSpans($r('app.string.easter_egg_got_it'), this.themeAccentColors, this.getUIContext()) }.fontSize(应用尺寸.字号_按钮).fontWeight(FontWeight.Medium).fontColor(this.动作主色)
-                }
-                  .type(ButtonType.Capsule)
-                  .height(应用尺寸.按钮高度)
-                  .fontSize(应用尺寸.字号_按钮)
-                  .fontWeight(FontWeight.Medium)
-                  .backgroundColor(Color.Transparent)
-                  .fontColor(this.动作主色)
-                  .onClick(() => { this.显示节流奖励 = false; })
-              }
-              .width('100%')
-              .justifyContent(FlexAlign.End)
-              .padding({ left: 20, right: 20, top: 12 })
-
-              Text(this.节流奖励文案)
-                .fontSize(应用尺寸.字号_彩蛋文案)
-                .fontWeight(FontWeight.Bold)
-                .fontColor($r('app.color.text_primary'))
-                .width('100%')
-                .textAlign(TextAlign.Center)
-                .padding({ top: 24, bottom: 32 })
-
-            }
-            .width('88%')
-            .constraintSize({ maxWidth: 380 })
-            .backgroundColor($r('app.color.surface_page'))
-            .borderRadius(应用尺寸.圆角_指标卡)
-            .shadow({ radius: 24, color: 'rgba(0,0,0,0.18)', offsetX: 0, offsetY: 4 })
-          }
-          .width('100%')
-          .height('100%')
-          .alignContent(Alignment.Center)
-          .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
-        }
       }
       .width('100%')
       .height('100%')

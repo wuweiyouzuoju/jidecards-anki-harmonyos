@@ -17,10 +17,14 @@
 
 ### 状态所有者
 
-下面按实际状态定位，不要求为每个函数另建抽象。页面仍拥有 ArkUI 可观察状态，控制器通过显式宿主能力产生效果。
+下面按实际状态定位，不要求为每个函数另建抽象。页面拥有导航、跨功能占用和页面数据快照；功能组件拥有局部可观察状态，纯会话通过回调发布结果。
 
 | 状态或资源 | 所有者 / 生命周期 | 直接验证入口 |
 | --- | --- | --- |
+| 牌组选项草稿、加载和提交 | DeckOptionsFeature / [DeckOptionsSession](../../entry/src/main/ets/model/home/DeckOptionsSession.ts)；表单随弹层销毁，已接受提交继续 | [deck-options-session](../../tools/tests/deck-options-session.test.mjs)、[deck-config-save](../../tools/tests/deck-config-save.test.mjs) |
+| 文件选择、整库确认及导入导出进度 | [DataTransferSession](../../entry/src/main/ets/model/home/DataTransferSession.ts)；首页与设置页复用，读取结果禁止离页启动写入 | [home-transfer-session](../../tools/tests/home-transfer-session.test.mjs) |
+| 云端目录、选择和下载引导 | [CloudDeckFeature](../../entry/src/main/ets/components/home/CloudDeckFeature.ets)；配额与清理先于释放占用，销毁后禁止 UI 回写 | [cloud-deck-feature](../../tools/tests/cloud-deck-feature.test.mjs) |
+| 浏览类型映射草稿和读取代次 | [BrowserNotetypeSession](../../entry/src/main/ets/model/browser/BrowserNotetypeSession.ts)；随功能销毁，输出冻结请求 | [browser-notetype-session](../../tools/tests/browser-notetype-session.test.mjs) |
 | 首页同步定时器、待执行导航、刷新收尾 | [HomeSyncController](../../entry/src/main/ets/model/HomeSyncController.ts)；页面销毁使旧回调失效 | [home-sync-controller](../../tools/tests/home-sync-controller.test.mjs) |
 | 自动备份延迟与配置读取 | [HomeBackupController](../../entry/src/main/ets/model/HomeBackupController.ts)；已接受备份由 BackupCoordinator 持有至结束 | [home-backup-controller](../../tools/tests/home-backup-controller.test.mjs) |
 | 同步租约与集合等待 | [SyncActivity](../../entry/src/main/ets/model/SyncSettings.ts)；持有者释放，取消请求不等于 IO 已结束 | [sync-settings](../../tools/tests/sync-settings.test.mjs) |

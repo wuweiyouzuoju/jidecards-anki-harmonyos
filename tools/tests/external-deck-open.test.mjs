@@ -3,7 +3,7 @@ import { HomeWorkCoordinator } from '../../entry/src/main/ets/model/HomeWorkCoor
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { stripTypeScriptTypes } from 'node:module';
+import { DataTransferSession, initialTransferState } from '../../entry/src/main/ets/model/home/DataTransferSession.ts';
 import { externalDeckUri, ExternalDeckOpenQueue } from '../../entry/src/main/ets/model/ExternalDeckOpen.ts';
 import { canPresentHomePrompt } from '../../entry/src/main/ets/model/HomeActivityPolicy.ts';
 
@@ -19,7 +19,8 @@ test('external APKG recognition preserves encoded names and handles uppercase/ex
     assert.equal(externalDeckUri(action, 'file://chat/1234', type), 'file://chat/1234');
   }
   for (const uri of ['https://site/deck.apkg', 'jidecards://stats', '/data/deck.apkg',
-    'file://chat/backup.colpkg', 'file://chat/deck.zip', 'file://chat/deck.apkg.exe', 'file://chat/%ZZ.apkg']) {
+    'file://chat/backup.colpkg', 'file://chat/deck.zip', 'file://chat/deck.jide', 'file://chat/deck.json',
+    'file://chat/deck.apkg.exe', 'file://chat/%ZZ.apkg']) {
     assert.equal(externalDeckUri(action, uri, 'com.jide.kapian.apkg'), null);
   }
   assert.equal(externalDeckUri('action.system.home', 'file://chat/deck.apkg', ''), null);
@@ -43,37 +44,26 @@ test('queued and running files deduplicate, serialize, and permit intentional re
 
 function harness(failure = false) {
   const queue = new ExternalDeckOpenQueue(), events = [];
-  const methods = ['importDeckUri', 'canPresentStartupPrompt'].map(name => {
-    const start = home.search(new RegExp(`^  private (?:async )?${name}\\(`, 'm'));
-    assert.ok(start >= 0, name);
-    return home.slice(start, home.indexOf('\n  }', start) + 4);
-  });
   let finishImport;
   const imported = new Promise(resolve => { finishImport = resolve; });
-  const deps = { externalDeckOpens: queue, canPresentHomePrompt, $r: key => key,
-    后端会话: { 获取实例: () => ({ 确保已打开: async () => { events.push('open'); } }) },
-    暂存导入文件: (_dir, uri) => { events.push(uri); return 'sandbox.apkg'; },
-    执行牌组导入: async () => { events.push('import'); await imported; if (failure) throw new Error('unreadable deck'); } };
-  const Page = new Function(...Object.keys(deps), stripTypeScriptTypes(`class Page { ${methods.join('\n')} }`,
-    { mode: 'transform' }) + '; return Page;')(...Object.values(deps));
   const activity = { foreground: true, atHome: true, collectionReady: true, collectionBusy: false,
     dialogOpen: false, interactionBusy: false, startupChecking: true };
-  const page = new Page();
+  const page = { pendingSyncAction: null, transfer: initialTransferState(),
+    canPresentStartupPrompt: () => !queue.hasPending() && canPresentHomePrompt(activity) };
+  const session = new DataTransferSession({
+    importDeck: async uri => { events.push(uri, 'import'); await imported; if (failure) throw new Error('unreadable deck'); return null; },
+    committed: () => events.push('committed'), pickDeck: () => assert.fail('external open must not launch a picker')
+  }, state => { page.transfer = state; }, async () => { events.push('refresh', 'expand'); }, () => events.push('success'));
   const timers = [];
   const coordinator = new HomeWorkCoordinator(queue, { schedule: fn => { timers.push(fn); return timers.length; }, cancel() {} });
   page.tryImportExternalDeck = () => {
     coordinator.wake({ activity: () => activity, hasDeferredNavigation: () => page.pendingSyncAction !== null,
-      importDeck: uri => page.importDeckUri(uri), importFailed: e => { throw e; },
+      importDeck: uri => session.importUri(uri), importFailed: e => { throw e; },
       flushNavigation() {}, manualSyncPending: () => false, startManualSync() {},
       presentAnnouncement: () => false, continueStartup() {}, scheduleSync() {} });
     while (timers.length) timers.shift()();
     return true;
   };
-  Object.assign(page, { pendingSyncAction: null, homeActivity: () => activity,
-    取能力上下文: () => ({ filesDir: 'sandbox' }), 主页快照数据: { decks: [] },
-    打开数据迁移: () => { page.显示数据迁移 = true; },
-    加载主页数据: async () => { events.push('refresh'); }, 展开新导入牌组: () => events.push('expand'),
-    显示提示: key => events.push(key), homeActivityChanged: () => events.push('wake') });
   return { page, queue, activity, events, finishImport };
 }
 
@@ -90,12 +80,12 @@ for (const [field, value] of [['foreground', false], ['atHome', false], ['collec
     page.tryImportExternalDeck(); page.tryImportExternalDeck();
     await settle();
     assert.equal(events.filter(x => x === 'import').length, 1);
-    assert.equal(page.数据迁移中, true);
+    assert.equal(page.transfer.phase, 'running');
     assert.equal(queue.enqueue('file://chat/deck.apkg'), false);
     finishImport(); await settle();
     assert.equal(queue.hasPending(), false);
-    assert.equal(page.显示数据迁移, false);
-    assert.equal(page.数据迁移中, false);
+    assert.equal(page.transfer.visible, false);
+    assert.equal(page.transfer.phase, 'idle');
     assert.ok(events.includes('refresh'));
     assert.ok(events.includes('expand'));
   });
@@ -106,17 +96,17 @@ test('failed external import releases queue and shows the existing failure panel
   queue.enqueue('file://chat/broken.apkg');
   page.tryImportExternalDeck(); finishImport(); await settle();
   assert.equal(queue.hasPending(), false);
-  assert.equal(page.数据迁移错误, 'unreadable deck');
-  assert.equal(page.显示数据迁移, true);
-  assert.equal(page.数据迁移中, false);
+  assert.equal(page.transfer.error, 'unreadable deck');
+  assert.equal(page.transfer.visible, true);
+  assert.equal(page.transfer.phase, 'idle');
   assert.equal(events.includes('refresh'), false);
 });
 
 test('APKG FileOpen declaration matches registered UTD and both Ability lifecycle entry points', () => {
   const manifest = read('entry/src/main/module.json5');
-  const declaration = JSON.parse(read('entry/src/main/resources/rawfile/arkdata/utd/utd.json5')).UniformDataTypeDeclarations[0];
-  assert.deepEqual(declaration.FilenameExtensions, ['.apkg']);
-  assert.ok(manifest.includes(`type: '${declaration.TypeId}'`));
+  const declarations = JSON.parse(read('entry/src/main/resources/rawfile/arkdata/utd/utd.json5')).UniformDataTypeDeclarations;
+  assert.deepEqual(declarations.map(item => item.FilenameExtensions[0]), ['.apkg']);
+  for (const declaration of declarations) assert.ok(manifest.includes(`type: '${declaration.TypeId}'`));
   assert.match(manifest, /scheme: 'file',[\s\S]*?linkFeature: 'FileOpen'/);
   assert.match(manifest, /launchType: 'singleton'/);
   assert.doesNotMatch(manifest, /application\/octet-stream|type: '\*\/\*'/);

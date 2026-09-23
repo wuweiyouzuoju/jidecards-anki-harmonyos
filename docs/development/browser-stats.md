@@ -33,6 +33,10 @@
 
 ## 浏览写入边界
 
+浏览页是多选模式和 ID 集合的唯一所有者；`卡片表格` 通过 Prop 展示选择、通过回调提交意图，不再维护第二份集合或退出计数信号。七种批量弹层由一个 `batchDialog` 槽互斥显示。到期、改标签、重新定位的表单草稿属于各自 Dialog；重新定位默认值读取随 Dialog 销毁失效。
+
+`components/browser/BrowserNotetypeFeature.ets` 与 `model/browser/BrowserNotetypeSession.ts` 拥有类型列表、映射加载及草稿。切换类型丢弃旧请求，提交时输出不可变映射快照，写入仍回到页面的统一操作边界。关闭弹层、切换选择或模式都会结束旧表单；页面不再复制映射状态。对应行为测试为 `browser-notetype-session`、`browser-selection-view`，页面 `build()` 按结果、检查、搜索和变更面板装配。
+
 `BrowserSelection.ts` 负责 cards/notes 解析、稳定去重和变更笔记类型 schema/映射快照；解析失败必须整批停止，不能将部分集合误当成完整选择。`BrowserOperationController.execute` 区分写入失败与写入后的刷新失败；后者保留写入成功结果，避免诱发重复提交。离页继续已接受写入，只广播数据变化；旧操作不能清理新选择。页面只提供服务调用、当前选择判断和 UI 效果。
 
 直接行为验证在 `browser-operation-model.test.mjs`；页面接线与选择切换回归仍在 `page-operation-boundaries.test.mjs` 和 `browser-batch-runtime.test.mjs`。新增批量操作先扩展这里的行为测试，不要求业务规则仍写在页面里。

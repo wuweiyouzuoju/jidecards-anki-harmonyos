@@ -73,20 +73,12 @@ test('every editable Anki DeckConfig field has a form or panel binding', () => {
   assert.match(form, /other.*preserved/, 'opaque Anki bytes remain preserved, not edited as text');
 });
 
-test('home page converts through 牌组配置表单 before submitting preserved config', () => {
-  // B12 重构：牌组选项流程从 牌组详情面板 上移到 首页.ets 根 Stack（全局磨砂覆盖）
-  const pane = read('entry/src/main/ets/pages/首页.ets');
-  assert.match(pane, /牌组配置表单\.从配置创建\(config\.config\)/);
-  assert.match(pane, /private async 保存牌组选项\(form: 牌组配置表单, options: 牌组选项编辑\)/);
-  assert.match(pane, /form\.校验\(\)/);
-  assert.match(pane, /options\.校验\(\)/);
-  assert.match(pane, /form\.应用到配置\(config\.config\)/);
-  assert.match(pane, /options\.应用\(\)/);
-  assert.match(pane, /buildDeckConfigRequest\(this\.牌组选项牌组ID/);
-  assert.match(read('entry/src/main/ets/model/DeckConfigSave.ts'), /configs: \[prepareDeckConfigForSave\(view, original, copyDeckConfig\(draft\), applyToSharedDecks\)\]/);
-  assert.match(pane, /options\.转换为请求字段\(\)/);
-  assert.match(read('entry/src/main/ets/model/DeckConfigSave.ts'), /limits: edited\.limits/);
-  assert.match(read('entry/src/main/ets/model/DeckConfigSave.ts'), /newCardsIgnoreReviewLimit: edited\.newCardsIgnoreReviewLimit/);
-  assert.match(read('entry/src/main/ets/model/DeckConfigSave.ts'), /fsrsHealthCheck: edited\.fsrsHealthCheck/);
-  assert.match(pane, /this\.牌组配置服务实例\.更新牌组配置\(request\)/);
+test('home mounts the deck feature without owning editable drafts or persistence', () => {
+  const home=read('entry/src/main/ets/pages/首页.ets');
+  assert.match(home,/DeckOptionsFeature\(\{/);
+  assert.doesNotMatch(home,/编辑表单|编辑视图|牌组配置服务实例/);
+  const feature=read('entry/src/main/ets/components/home/DeckOptionsFeature.ets');
+  assert.match(feature,/prepareDeckOptionsDraft/);
+  assert.match(feature,/DeckOptionsSession/);
+  // Validation, shared presets, preserved bytes, retries and lifecycle execute in deck-config-save/deck-options-session.
 });

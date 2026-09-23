@@ -27,7 +27,7 @@ import type { BrowserDisplayRow as 浏览行数据 } from '../../model/BrowserSe
 // - 非多选模式：点击行 → onRowClick(id)
 // - 多选模式：长按行进入并选中该行；点击行切换选中（不触发 onRowClick）
 // - 选中计数和退出入口由浏览页顶栏统一渲染，本组件不额外占用列表空间
-// - 选中ID集合用 Set<number>；切换时整体重新赋值以触发 @State 刷新
+// - 选择状态属于页面；列表只根据 Prop 展示并上抛新的选择快照
 // - 滚动到底部且 已加载行数 < 结果总数 时触发 onLoadMore
 //
 // @副作用
@@ -81,7 +81,8 @@ export struct 卡片表格 {
   @Prop subtitleIndex: number = 1;
   @Prop notesMode: boolean = false;
   /** 从 Agent 改卡入口进入时，首次挂载即显示多选框。 */
-  @Prop 初始多选模式: boolean = false;
+  @Prop 多选模式: boolean = false;
+  @Prop 选中IDs: number[] = [];
   onRowClick: (id: number) => void = (): void => {};
   onLongPress: () => void = (): void => {};
   onLoadMore: () => Promise<void> = async (): Promise<void> => {};
@@ -91,32 +92,22 @@ export struct 卡片表格 {
   onSelectionChange: (选中IDs: number[]) => void = (): void => {};
   /** T8 批量操作栏：多选模式切换时上抛（true=进入多选，false=退出） */
   onMultiSelectChange: (多选: boolean) => void = (): void => {};
-  /** T8 批量操作栏：宿主完成批量操作后翻转此信号（+1），触发组件内部清空选中并退出多选 */
-  @Prop @Watch('当退出多选信号变化') 退出多选信号: number = 0;
   // 手势导航条高度（列表滚到底时最后一行需完整滚出导航条区域）
   @StorageProp('导航条高度') private 导航条高度: number = 0;
 
-  @State private 多选模式: boolean = false;
-  @State private 选中ID集合: Set<number> = new Set<number>();
   @State private 加载中: boolean = false;
   private readonly 行数据源: 浏览行数据源 = new 浏览行数据源();
 
   aboutToAppear(): void {
     this.同步行数据源();
-    if (this.初始多选模式) {
-      this.多选模式 = true;
-    }
+
   }
 
   private 同步行数据源(): void {
     this.行数据源.replaceAll(this.行列表);
   }
 
-  /** 退出多选信号变化时清空内部选中（宿主已清自己的，这里同步组件内部状态）。 */
-  private 当退出多选信号变化(): void {
-    this.多选模式 = false;
-    this.选中ID集合 = new Set<number>();
-  }
+
 
   /** 取行第一列文本作为主文案（Question 列，空则回退 #id）。 */
   private 取行主文案(行: 浏览行数据): string {
@@ -157,7 +148,7 @@ export struct 卡片表格 {
   /** 点击行：多选模式下切换选中，否则触发 onRowClick。 */
   private 处理行点击(id: number): void {
     if (this.多选模式) {
-      this.设置选中(id, !this.选中ID集合.has(id));
+      this.设置选中(id, this.选中IDs.indexOf(id) < 0);
     } else {
       this.onRowClick(id);
     }
@@ -168,22 +159,19 @@ export struct 卡片表格 {
     if (this.多选模式) {
       return;
     }
-    this.多选模式 = true;
-    this.选中ID集合 = new Set<number>([id]);
     this.onMultiSelectChange(true);
     this.onSelectionChange([id]);
     this.onLongPress();
   }
 
-  /** 设置某行选中状态（整体重新赋值以触发 @State 刷新）。 */
+  /** 提交某行选择意图，页面决定并回传最新快照。 */
   private 设置选中(id: number, 选中: boolean): void {
-    const 新集合: Set<number> = new Set<number>(this.选中ID集合);
+    const 新集合: Set<number> = new Set<number>(this.选中IDs);
     if (选中) {
       新集合.add(id);
     } else {
       新集合.delete(id);
     }
-    this.选中ID集合 = 新集合;
     this.onSelectionChange(Array.from(新集合));
   }
 
@@ -200,7 +188,7 @@ export struct 卡片表格 {
               Row({ space: 应用尺寸.间距_8 }) {
                 if (this.多选模式) {
                   Checkbox()
-                    .select(this.选中ID集合.has(行.id))
+                    .select(this.选中IDs.indexOf(行.id) >= 0)
                     .selectedColor($r('app.color.action_primary'))
                     .width(20)
                     .height(20)

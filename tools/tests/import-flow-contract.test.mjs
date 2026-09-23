@@ -31,19 +31,15 @@ test('file import helper returns the system-granted URI while the transfer servi
   assert.doesNotMatch(helper, /fileIo|copyFileSync|readSync|writeSync/);
 });
 
-test('home page reuses the DataTransfer deck-merge picker and refreshes after import', () => {
-  const page = read(PAGE);
-  const transferCoord = read('entry/src/main/ets/components/home/数据迁移协调器.ets');
-
-  assert.match(page, /async 从选择器导入牌组\(\): Promise<void>/);
-  assert.match(page, /选取数据文件\(context, \['\.apkg'\]\)/);
-  // B12 2026-07-22：导入拆为 暂存导入文件（同步）+ 执行牌组导入（异步），支撑多阶段进度
-  assert.match(page, /暂存导入文件\(context\.filesDir, uri\)/);
-  assert.match(page, /await 执行牌组导入\(stagedPath\)/);
-  assert.match(page, /await this\.加载主页数据\(\)/, 'must refresh tree after import');
-  assert.match(page, /主页操作面板/);
-  // 数据迁移面板 现在挂在 数据迁移协调器 积木组件里
-  assert.match(transferCoord, /数据迁移面板/);
+test('home routes picker and external imports through the transfer session and platform adapter', () => {
+  const page=read(PAGE),adapter=read('entry/src/main/ets/backend/AnkiDataTransfer.ets');
+  assert.match(page,/DataTransferFeature\(\{/);
+  assert.match(page,/transferSession\.importUri/);
+  assert.match(adapter,/选取数据文件\(this\.context\(\), \['\.apkg'\]\)/);
+  assert.match(adapter,/暂存导入文件\(context\.filesDir, uri\)/);
+  assert.match(adapter,/await 执行牌组导入\(path\)/);
+  assert.doesNotMatch(page,/暂存导入文件|选取数据文件/);
+  // Queueing, refresh ordering, confirmation and disposal execute against DataTransferSession.
 });
 
 test('settings opens the unified data-management entry instead of a direct import row', () => {

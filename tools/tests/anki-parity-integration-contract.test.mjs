@@ -9,7 +9,7 @@ const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), '
 test('home wires the Anki deck tree, action menu, and selected-deck flows', () => {
   const index = read('entry/src/main/ets/pages/首页.ets');
   const detail = read('entry/src/main/ets/components/牌组详情面板.ets');
-  const transferCoord = read('entry/src/main/ets/components/home/数据迁移协调器.ets');
+  const transferCoord = read('entry/src/main/ets/components/home/DataTransferFeature.ets');
   assert.match(index, /主页操作面板/);
   assert.match(index, /可见牌组行/);
   assert.match(index, /添加笔记页/);
@@ -25,8 +25,8 @@ test('home wires the Anki deck tree, action menu, and selected-deck flows', () =
   assert.match(detail, /创建子牌组/);
   assert.match(detail, /导出牌组/);
   // B12 重构：牌组选项校验错误流上移到 首页.ets（牌组详情面板 仅上抛回调）
-  assert.match(index, /校验问题/);
-  assert.match(index, /issue\.消息键/);
+  assert.match(index, /DeckOptionsFeature\(\{/);
+  assert.doesNotMatch(index, /牌组配置表单|牌组配置服务实例/);
 });
 
 test('settings owns only language, data, database check, and about entry points', () => {
@@ -42,17 +42,15 @@ test('settings owns only language, data, database check, and about entry points'
   assert.doesNotMatch(settings, /onImport:\s*\(/);
 });
 
-test('personal replacement is confirmed twice and export is finalized by UI context', () => {
-  // 2026-08-15：数据迁移流程从首页迁移到设置页（设置页改为全屏独立页面）。
-  const index = read('entry/src/main/ets/pages/设置页.ets') + read('entry/src/main/ets/backend/DataExportWorkflow.ets');
-  assert.match(index, /确认个人数据替换/);
-  assert.match(index, /完成导出\(context,/);
-  assert.match(index, /执行牌组导入/);
-  assert.match(index, /数据迁移初始模式/);
-  assert.match(index, /数据迁移初始牌组ID/);
-  assert.match(index, /数据迁移允许选牌组/);
-  assert.match(index, /savedPath !== null/);
-  assert.match(index, /this\.显示数据迁移 = true/);
+test('home and settings share the transfer session and platform export workflow', () => {
+  for (const page of ['首页', '设置页']) {
+    const index = read(`entry/src/main/ets/pages/${page}.ets`);
+    assert.match(index, /new DataTransferSession\(new AnkiDataTransfer\(\)/);
+    assert.match(index, /DataTransferFeature\(\{/);
+  }
+  assert.match(read('entry/src/main/ets/backend/AnkiDataTransfer.ets'), /exportPersonalData\(this\.context\(\), intent, progress\)/);
+  assert.match(read('entry/src/main/ets/backend/DataExportWorkflow.ets'), /完成导出\(context,/);
+  // 选择器占用、整库二次确认、失败重试在 home-transfer-session 中执行真实会话验证。
 
   const transfer = read('entry/src/main/ets/components/数据迁移面板.ets');
   assert.match(transfer, /@Prop initialMode/);
@@ -62,10 +60,6 @@ test('personal replacement is confirmed twice and export is finalized by UI cont
   assert.match(transfer, /this\.已选导出牌组Id = this\.deckOptions\[0\]\.id/);
   assert.match(transfer, /this\.已选导出牌组Id <= 0/);
   assert.match(transfer, /this\.模式 !== 'exportDeck' \|\| this\.已选导出牌组Id > 0/);
-  assert.match(index, /打开数据迁移\('importDeck', 0, true\)/);
-  assert.match(index, /打开数据迁移\('importDeck', 0, false\);\s*this\.数据迁移错误 =/,
-    'top-right import failure detail must be assigned after opening the panel');
-  assert.doesNotMatch(index, /throw new Error\('ability context unavailable'\)/);
 });
 
 test('add-note exposes image occlusion and other notetypes and type-answer submits on Enter', () => {

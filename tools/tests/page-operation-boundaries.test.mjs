@@ -1,3 +1,4 @@
+import { initialTransferState } from '../../entry/src/main/ets/model/home/DataTransferSession.ts';
 import { compileWithUiFeedback } from './ui-feedback-harness.mjs';
 import { loadBrowserRows } from '../../entry/src/main/ets/model/BrowserSearchSession.ts';
 import { loadNoteEditor } from '../../entry/src/main/ets/model/NoteEditorLoader.ts';
@@ -48,6 +49,7 @@ function homeHarness() {
     setTimeout: (fn, delay) => { const id = ++next; timers.set(id, { fn, delay }); return id; }, clearTimeout: id => timers.delete(id)
   });
   const page = new Page();
+  page.transfer = initialTransferState();
   Object.assign(page, { announcementController: new HomeAnnouncementController(), homeDisposed: false,
     syncScheduler: new AutoSyncScheduler(),
     syncForeground: true, 页面栈: { size: () => 0 }, 主页允许公告检查: true, 加载状态: 'ready',
@@ -86,7 +88,7 @@ test('manual sync is considered before an unseen announcement can occupy the hom
   assert.equal(page.announcementController.hasPending(), true);
 });
 
-for (const blocker of ['显示创建牌组', '显示牌组选项', '显示数据迁移', '数据迁移中', '创建牌组中',
+for (const blocker of ['显示创建牌组', '显示牌组选项', '创建牌组中',
   'autoSyncCollectionBusy', 'autoSyncModal', 'nativeDialogOpen', '显示卡片预览', '预览加载中', '显示更多菜单']) {
   test(`late announcement waits for ${blocker}, then is shown once after release`, async () => {
     const { page, response, tick } = homeHarness();
@@ -97,6 +99,20 @@ for (const blocker of ['显示创建牌组', '显示牌组选项', '显示数据
     assert.equal(page.announcementController.hasPending(), true);
     page[blocker] = false; page.homeActivityChanged(); tick();
     assert.equal(page.官方公告数据.id, 'notice');
+    assert.equal(page.announcementController.hasPending(), false);
+  });
+}
+
+for (const phase of ['dialog', 'picking', 'running', 'refreshing']) {
+  test(`announcement waits for transfer ${phase} and resumes after release`, async () => {
+    const { page, response, tick } = homeHarness();
+    const check = page.尝试显示官方公告();
+    page.transfer = { ...page.transfer, visible: phase === 'dialog', phase: phase === 'dialog' ? 'idle' : phase };
+    response.resolve({ id: 'transfer-finished' }); await check; tick();
+    assert.equal(page.显示官方公告, false);
+    assert.equal(page.announcementController.hasPending(), true);
+    page.transfer = initialTransferState(); page.homeActivityChanged(); tick();
+    assert.equal(page.官方公告数据.id, 'transfer-finished');
     assert.equal(page.announcementController.hasPending(), false);
   });
 }
@@ -151,7 +167,7 @@ test('welcome marker is not consumed while another dialog prevents presentation'
 });
 
 test('back cannot remove an active transaction form', () => {
-  for (const busy of ['数据迁移中', '创建牌组中', '定制牌组中', '牌组选项中', 'deckDeletionBusy']) {
+  for (const busy of ['创建牌组中', '定制牌组中', 'deckOptionsBusy', 'deckDeletionBusy']) {
     const { page } = homeHarness(); page[busy] = true; page.显示创建牌组 = true;
     assert.equal(page.onBackPress(), true); assert.equal(page.显示创建牌组, true);
   }
@@ -174,12 +190,13 @@ function browserHarness() {
     'isBrowserSelectionCurrent', '退出多选', '解析选中为卡片ID', '解析选中笔记的卡片ID', '解析选中为笔记ID',
     '执行批量改牌组', '执行批量删除', '执行批量设置标志', '执行批量挂起', '执行批量恢复',
     '执行批量设置到期日', '执行批量重新定位', '执行批量更改笔记类型', '保存编辑', '执行查找替换',
-    '行点击', 'editorVisibilityChanged', '加载变更笔记类型信息', 'mappingVisibilityChanged',
+    '行点击', 'editorVisibilityChanged',
     '打开卡片信息', '关闭卡片信息', '加载更多', '预加载行', '打开改牌组弹层', '切换模式'], {
     autoSyncScheduler: scheduler, AppStorage: { setOrCreate: (...args) => broadcasts.push(args) },
     $r: key => key, console: { info() {} }, BURY_SUSPEND_MODE_SUSPEND: 2
   });
   const page = new Page();
+  page.transfer = initialTransferState();
   Object.assign(page, { operations: new BrowserOperationController(), 浏览模式值: 'cards',
     选中ID列表: [101, 102], selectionVersion: 0, searchVersion: 1, editorVersion: 0, mappingVersion: 0, infoVersion: 0,
     多选模式值: true, 退出多选信号: 0, 批量忙碌: false, 批量错误: '', mutationBusy: false,
@@ -220,7 +237,10 @@ for (const action of ['执行批量删除', '执行批量设置标志', '执行�
     page.重新定位随机 = false; page.重新定位顺移 = true;
     page.变更笔记类型信息数据 = { input: { oldNotetypeId: 1, newNotetypeId: 2 } };
     page.选中新笔记类型ID = 2; page.字段映射 = [0, 1]; page.模板映射 = [0];
-    const work = page[action](3); await settle();
+    const argument = action === '执行批量设置到期日' ? '5' : action === '执行批量重新定位' ?
+      {start:3,step:2,random:false,shift:true} : action === '执行批量更改笔记类型' ?
+      { oldNotetypeId: 1, newNotetypeId: 2, newFields: [0,1], newTemplates: [0], noteIds: [] } : 3;
+    const work = page[action](argument); await settle();
     assert.equal(writes.length, 1);
     if (action === '执行批量更改笔记类型') {
       assert.deepEqual(writes[0][0].noteIds, [1101, 1102]);
@@ -318,13 +338,8 @@ test('latest editor request wins and dismissal invalidates in-flight loading', a
   assert.equal(page.编辑区当前笔记, null); assert.equal(page.编辑区忙碌, false);
 });
 
-test('mapping requests and card info never overwrite a newer request', async () => {
-  const { page } = browserHarness(), old = deferred();
-  page.旧笔记类型ID缓存 = 1; page.显示笔记类型弹层 = true;
-  const info = n => ({ input: { newFields: [n], newTemplates: [n] } });
-  page.笔记类型服务实例.获取变更笔记类型信息 = async (_, id) => id === 2 ? old.promise : info(id);
-  const first = page.加载变更笔记类型信息(2); await page.加载变更笔记类型信息(3);
-  old.resolve(info(2)); await first; assert.deepEqual(page.字段映射, [3]);
+test('card info never overwrites a newer request', async () => {
+  const { page } = browserHarness();
   const stats = deferred(); page.统计服务实例 = { 获取卡片统计: id => id === 1 ? stats.promise : Promise.resolve({ id }) };
   const earlier = page.打开卡片信息(1); await page.打开卡片信息(2); stats.resolve({ id: 1 }); await earlier;
   assert.equal(page.卡片信息数据.id, 2);

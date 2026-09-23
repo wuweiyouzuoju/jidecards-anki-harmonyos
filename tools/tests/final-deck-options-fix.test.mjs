@@ -55,7 +55,7 @@ test('deck option controls bind editable limits and render adjacent field errors
   const panel = read('entry/src/main/ets/components/牌组选项面板.ets');
   const advanced = read('entry/src/main/ets/components/高级牌组选项面板.ets');
   // 牌组选项流已迁移：保存入口在 首页.ets（options.转换为请求字段()），开关控件在 高级牌组选项面板.ets
-  const host = read('entry/src/main/ets/pages/首页.ets');
+  const host = read('entry/src/main/ets/model/DeckOptionsDraft.ets');
   for (const key of ['reviewLimit', 'newLimit', 'reviewToday', 'newToday', 'desiredRetentionOverride', 'newCardsIgnoreReviewLimit', 'fsrs', 'applyAllParentLimits', 'fsrsReschedule', 'fsrsHealthCheck']) assert.match(`${panel}\n${advanced}\n${host}`, new RegExp(key));
   assert.match(panel, /private 字段错误资源\(key: string\)/);
   assert.match(panel, /this\.字段错误资源\(this\.fieldKey\(label\)\)/);

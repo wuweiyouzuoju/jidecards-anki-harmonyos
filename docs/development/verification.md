@@ -22,6 +22,8 @@ Node 24.x 与 `package.json` / CI 一致。首次进入或 lockfile 变化后运
 领域筛选是显式的开发反馈，不是完整依赖影响分析。`all` 总从磁盘发现测试；新增测试无须登记进完整清单。
 增加新的业务领域或代表性测试名称时调整 `tools/test-suites.mjs`。既有混合行为/静态测试逐步按真实改动迁移，不靠文件名声称全部是 runtime 测试。
 
+`platform-module-harness.mjs` 可注入平台依赖执行 `.ets` 模块或组件的真实非渲染逻辑；组件装饰器与 build 被去除，因此不证明 ArkUI 观察、Prop 更新或布局行为。不要在测试中重新实现会话规则，也不能用该 harness 代替 HAP 和设备验证。
+
 `verify` 按阶段打印 environment/repository/native/rpc-index/hap，失败立即非零退出。结束报告必须写明执行的模式，repo 成功不等于整个应用验证完成。
 
 ## 开发可维护性门禁

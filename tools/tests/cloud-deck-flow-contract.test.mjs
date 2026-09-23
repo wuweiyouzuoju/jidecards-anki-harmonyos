@@ -145,24 +145,6 @@ test('each cloud deck tap uses exactly one toggle path', () => {
   assert.equal((rowBuilder.match(/this\.onToggle\(deck\.id\)/g) ?? []).length, 1);
 });
 
-test('home limits the initial cloud deck selection to three before downloading', () => {
-  const source = read('../../entry/src/main/ets/pages/首页.ets');
-  assert.match(source, /const 云端牌组最多选择数量: number = 3;/);
-
-  const toggleMethod = source.match(
-    /private 切换云端牌组选择\(deckId: string\): void \{[\s\S]*?private 展开新导入牌组/,
-  )?.[0] ?? '';
-  assert.match(toggleMethod, /if \(index >= 0\)[\s\S]*return;/);
-  assert.match(toggleMethod,
-    /云端牌组选中ID列表\.length >= 云端牌组最多选择数量[\s\S]*cloud_deck_selection_limit[\s\S]*return;[\s\S]*concat\(\[deckId\]\)/);
-
-  const downloadMethod = source.match(
-    /private async 下载选中云端牌组\(\): Promise<void> \{[\s\S]*?private async 从选择器导入牌组/,
-  )?.[0] ?? '';
-  assert.match(downloadMethod,
-    /云端牌组选中ID列表\.length > 云端牌组最多选择数量[\s\S]*cloud_deck_selection_limit[\s\S]*return;/);
-});
-
 test('cloud deck and import source strings are aligned and translated', () => {
   const zh = JSON.parse(read('../../entry/src/main/resources/base/element/string.json')).string;
   const en = JSON.parse(read('../../entry/src/main/resources/en_US/element/string.json')).string;
@@ -204,94 +186,6 @@ test('later Import Deck directly opens the local picker and exposes no cloud rou
   assert.doesNotMatch(source, /显示导入来源弹窗/);
   assert.doesNotMatch(source, /onCloud/);
   assert.match(source, /导入牌组回调:[\s\S]*this\.从选择器导入牌组\(\)/);
-  assert.match(source, /选取数据文件\(context, \['\.apkg'\]\)/);
-});
-
-test('home sequences the dismissible-with-confirmation cloud onboarding before welcome', () => {
-  const source = read('../../entry/src/main/ets/pages/首页.ets');
-  assert.match(source, /是否已完成云端牌组引导/);
-  assert.match(source, /显示首次弹窗序列/);
-  assert.match(source, /打开云端牌组弹窗\(false\)/);
-  assert.match(source, /标记已完成云端牌组引导/);
-  assert.match(source, /显示欢迎弹窗一次\(\)/);
-  // 返回键与主按钮同一出口：不再无条件吞掉返回。
-  assert.match(source, /if \(this\.显示云端牌组弹窗\) \{/);
-  assert.match(source, /云端牌组弹窗按主按钮出口\(\);/);
-  assert.doesNotMatch(source, /if \(this\.显示云端牌组弹窗\) \{\s*return true;/);
-  // 引导态跳过必须二次确认；确认后持久化完成标记，但不消耗下载配额。
-  assert.match(source, /private async 跳过云端牌组引导/);
-  assert.match(source, /cloud_deck_skip_confirm_title/);
-  const skipMethod = source.match(/private async 跳过云端牌组引导\(\): Promise<void> \{[\s\S]*?\n  private 取本地化文本/)?.[0] ?? '';
-  assert.match(
-    skipMethod,
-    /if \(result\.index !== 1\)[\s\S]*const 已保存: boolean = await 标记已完成云端牌组引导\(\)/,
-  );
-  assert.match(skipMethod, /if \(!已保存\)[\s\S]*cloud_deck_save_failed/);
-  assert.doesNotMatch(skipMethod, /标记已用尽云端牌组下载配额/);
-  assert.doesNotMatch(source, /关闭云端牌组弹窗/);
-});
-
-test('home reopens the cloud deck modal from the deck menu until the download quota is spent', () => {
-  const homeSource = read('../../entry/src/main/ets/pages/首页.ets');
-  const menuSource = read('../../entry/src/main/ets/components/主页操作面板.ets');
-  // 菜单第 5 项按配额显隐，入口回调以菜单态打开弹窗。
-  assert.match(menuSource, /显示获取直链牌组: boolean = true/);
-  assert.match(menuSource, /cloud_deck_menu_entry/);
-  assert.match(homeSource, /显示获取直链牌组: !this\.云端牌组配额已用尽/);
-  assert.match(homeSource, /this\.打开云端牌组弹窗\(true\);/);
-  // 冷启动同步配额状态；批次结束只要 ≥1 个成功即锁死配额。
-  assert.match(homeSource, /this\.刷新云端牌组配额状态\(\)/);
-  assert.match(homeSource, /标记已用尽云端牌组下载配额\(\)/);
-  // 下载成功关闭弹窗后两态都刷新首页，欢迎弹窗只在引导态衔接。
-  const finishMethod = homeSource.match(
-    /private async 完成云端牌组首次引导\(\): Promise<void> \{[\s\S]*?\n  \}/)?.[0] ?? '';
-  assert.match(finishMethod, /this\.返回主页后刷新\(\);/);
-  assert.match(finishMethod, /if \(!this\.云端牌组从菜单打开\) \{/);
-});
-
-test('home downloads and imports selected cloud decks sequentially through the existing backend', () => {
-  const source = read('../../entry/src/main/ets/pages/首页.ets');
-  assert.match(source, /cloudImportController\.run/);
-  assert.match(source, /this\.云端牌组服务实例\.下载牌组/);
-  assert.match(source, /await 执行牌组导入\(path\)/);
-  assert.match(source, /await this\.加载主页数据\(\)/);
-  assert.match(source, /展开新导入牌组/);
-  assert.match(source, /successIds/);
-  assert.match(source, /failedIds/);
-});
-
-test('home cleans interrupted files before catalog loading and only completes after a successful import', () => {
-  const source = read('../../entry/src/main/ets/pages/首页.ets');
-  const downloadMethod = source.match(/private async 下载选中云端牌组\(\)[\s\S]*?\n  private async 从选择器导入牌组/)?.[0] ?? '';
-  assert.doesNotMatch(downloadMethod, /标记已完成云端牌组引导/);
-  assert.match(source, /云端牌组服务实例\.清理残留下载\(context\.filesDir\)/);
-  assert.match(source, /private async 完成云端牌组首次引导\(\): Promise<void>/);
-  assert.match(source, /if \(this\.云端牌组成功ID列表\.length === 0/);
-  assert.match(source, /const 已保存: boolean = await 标记已完成云端牌组引导\(\)/);
-  assert.match(source, /if \(!已保存\)/);
-  assert.match(source, /this\.显示云端牌组弹窗 = false/);
-  assert.match(source, /onEnter:[\s\S]*完成云端牌组首次引导\(\)/);
-});
-
-test('home owns QQ group clipboard copy and wires it to the cloud deck modal', () => {
-  const source = read('../../entry/src/main/ets/pages/首页.ets');
-  assert.match(source, /from '@kit\.BasicServicesKit'/);
-  assert.match(source, /private async 复制云端牌组QQ群号\(\): Promise<void>/);
-  assert.match(source, /pasteboard\.createData\(pasteboard\.MIMETYPE_TEXT_PLAIN, groupNumber\)/);
-  assert.match(source, /onCopyQQGroup:[\s\S]*复制云端牌组QQ群号\(\)/);
-});
-
-test('cloud deck retries preserve earlier successful imports and select only failures', () => {
-  const source = read('../../entry/src/main/ets/pages/首页.ets');
-  const downloadMethod = source.match(/private async 下载选中云端牌组\(\)[\s\S]*?\n  private async 从选择器导入牌组/)?.[0] ?? '';
-  assert.match(downloadMethod, /const successIds: string\[\] = result\.successIds/);
-  assert.match(downloadMethod, /selectedDecks, this\.云端牌组成功ID列表, backend/);
-  assert.match(downloadMethod, /this\.云端牌组选中ID列表 = failedIds\.concat\(\[\]\)/);
-});
-
-test('home enters automatically after every selected cloud deck imports successfully', () => {
-  const source = read('../../entry/src/main/ets/pages/首页.ets');
-  const downloadMethod = source.match(/private async 下载选中云端牌组\(\)[\s\S]*?\n  private async 从选择器导入牌组/)?.[0] ?? '';
-  assert.match(downloadMethod,
-    /this\.云端牌组忙碌 = false;[\s\S]*if \(failedIds\.length === 0 && successIds\.length > 0\) \{\s*await this\.完成云端牌组首次引导\(\);/);
+  assert.match(source, /this\.transferSession\.execute/);
+  assert.match(read('../../entry/src/main/ets/backend/AnkiDataTransfer.ets'), /选取数据文件\(this\.context\(\), \['\.apkg'\]\)/);
 });

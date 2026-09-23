@@ -1,3 +1,4 @@
+import { initialTransferState } from '../../entry/src/main/ets/model/home/DataTransferSession.ts';
 import { compileWithUiFeedback } from './ui-feedback-harness.mjs';
 import { decideHomeSync } from '../../entry/src/main/ets/model/HomeSyncPolicy.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -50,6 +51,7 @@ function homeHarness() {
     clearTimeout: id => state.timers.delete(id)
   });
   const page = new Page();
+  page.transfer = initialTransferState();
   page.backupController = { schedule() {}, stop() {} };
   const syncHost = () => ({
     activity: () => page.homeActivity(), syncCollectionBusy: () => page.autoSyncCollectionBusy,
@@ -130,10 +132,10 @@ test('manual pending reason follows the real blocker and resumes after editing c
   tick();
   assert.equal(page.syncStatusText, 'app.string.sync_wait_load_failed');
   page.加载状态 = 'ready';
-  page.数据迁移中 = true;
+  page.transfer.phase = 'running';
   tick();
   assert.equal(page.syncStatusText, 'app.string.sync_wait_operation');
-  page.数据迁移中 = false;
+  page.transfer.phase = 'idle';
   tick();
   assert.equal(page.显示同步面板, true);
 });
@@ -194,7 +196,7 @@ test('auto sync does not poll during study/background and resumes on the next fo
 
 test('editing, import, sorting, startup prompts and manual sync defer automatic work', () => {
   for (const field of ['显示创建牌组', '显示牌组选项', '显示自定义学习', '显示过滤牌组面板',
-    '显示数据迁移', '数据迁移中', '显示牌组定制', '官方公告检查中', '显示官方公告', '显示云端牌组弹窗',
+    '显示牌组定制', '官方公告检查中', '显示官方公告', '显示云端牌组弹窗',
     '显示欢迎弹窗', '显示主页操作', '显示更多菜单', '排序模式中', '刷新中', '云端牌组忙碌', 'fsrsPromptActive']) {
     const { page, tick } = homeHarness();
     page[field] = true; page.requestAutoSync(); tick();
@@ -207,6 +209,18 @@ test('editing, import, sorting, startup prompts and manual sync defer automatic 
   assert.equal(page.显示同步面板, false);
   gate.release(manual, Date.now()); tick();
   assert.equal(page.显示同步面板, false, 'manual sync release starts a cooldown');
+});
+
+test('transfer dialog and every active phase block automatic sync until released', () => {
+  for (const phase of ['dialog', 'picking', 'running', 'refreshing']) {
+    const { page, tick, gate } = homeHarness();
+    page.transfer = { ...page.transfer, visible: phase === 'dialog', phase: phase === 'dialog' ? 'idle' : phase };
+    page.requestAutoSync(); tick();
+    assert.equal(page.显示同步面板, false, phase);
+    assert.equal(gate.isActive(), false, phase);
+    page.transfer = initialTransferState(); tick();
+    assert.equal(page.显示同步面板, true, phase);
+  }
 });
 
 test('preview display and loading block controller sync until released', () => {

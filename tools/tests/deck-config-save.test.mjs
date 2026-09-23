@@ -2,7 +2,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
-import { stripTypeScriptTypes } from 'node:module';
+import { DeckOptionsSession } from '../../entry/src/main/ets/model/home/DeckOptionsSession.ts';
+import { prepareDeckOptionsDraft } from '../../entry/src/main/ets/model/DeckOptionsDraft.ets';
 import { copyDeckConfig, deckConfigUseCount, buildDeckConfigRequest, prepareDeckConfigForSave } from '../../entry/src/main/ets/model/DeckConfigSave.ts';
 import { emptyDeckConfigSettings, encodeDeckConfig, encodeUpdateDeckConfigsRequest, decodeUpdateDeckConfigsRequest } from '../../entry/src/main/ets/proto/messages/DeckConfigMessages.ts';
 import { 牌组配置表单 } from '../../entry/src/main/ets/model/牌组配置表单.ets';
@@ -34,23 +35,27 @@ function fixture(id = 1, useCount = 2) {
 
 function saveHarness(id = 1, useCount = 2) {
   const { original, view } = fixture(id, useCount);
-  const source = read('entry/src/main/ets/pages/首页.ets').replaceAll('\r\n', '\n');
-  const start = source.indexOf('  private async 保存牌组选项(');
-  const end = source.indexOf('\n  }', start) + 4;
-  const dependencies = { copyDeckConfig, buildDeckConfigRequest, prepareDeckConfigForSave,
-    UPDATE_DECK_CONFIGS_MODE_NORMAL: 0, notifyFsrsStateChanged: () => {} };
-  const code = stripTypeScriptTypes(`class Harness { ${source.slice(start, end)} }`, { mode: 'transform' });
-  const Harness = new Function(...Object.keys(dependencies), code + '\nreturn Harness;')(...Object.values(dependencies));
   const calls = [];
-  const state = Object.assign(new Harness(), {
-    编辑视图: view, 编辑配置: original, 牌组选项牌组ID: 10, 牌组选项中: false,
-    牌组选项错误: '', 牌组选项校验消息: issue => issue.消息键,
-    关闭牌组选项: () => { state.closed = true; }, 加载主页数据: async () => {},
-    牌组配置服务实例: { 更新牌组配置: async request => {
+  const state = { 编辑视图: view, 牌组选项错误: '', 牌组选项中: false };
+  const session = new DeckOptionsSession(10, {
+    load: async () => view,
+    save: async request => {
       calls.push(decodeUpdateDeckConfigsRequest(encodeUpdateDeckConfigsRequest(request)));
       if (state.failSave) throw new Error('save failed');
-    } }
+    },
+    committed: () => {}
+  }, snapshot => {
+    state.牌组选项错误 = snapshot.error;
+    state.牌组选项中 = snapshot.phase === 'saving';
+    if (snapshot.phase === 'saved') state.closed = true;
   });
+  const ready = session.load();
+  state.保存牌组选项 = async (form, options) => {
+    await ready;
+    const draft = prepareDeckOptionsDraft(original, form, options);
+    if (draft.errorKey) { state.牌组选项错误 = draft.errorKey; return; }
+    await session.save(draft.config, draft.shared, draft.options);
+  };
   const form = 牌组配置表单.从配置创建(original.config);
   const options = 牌组选项编辑.从视图创建(view.currentDeck.limits, true, true, true, true);
   options.sharedDeckCount = deckConfigUseCount(view, id);
@@ -172,10 +177,10 @@ test('editing or discarding drafts without saving leaves collection data untouch
 });
 
 test('deck scope is available from the header help and global controls stay separate', () => {
-  const home = read('entry/src/main/ets/pages/首页.ets');
+  const home = read('entry/src/main/ets/components/home/DeckOptionsFeature.ets');
   const panel = read('entry/src/main/ets/components/牌组选项面板.ets');
   const advanced = read('entry/src/main/ets/components/高级牌组选项面板.ets');
-  assert.match(home, /sharedDeckCount = deckConfigUseCount\(view, config.id\)/);
+  assert.match(home, /sharedDeckCount = deckConfigUseCount\(view, state.config.id\)/);
   assert.match(panel, /private openScopeHelp\(\): void \{[\s\S]*?this\.options\.applyToSharedDecks[\s\S]*?deck_save_scope_shared/);
   assert.match(panel, /deck_options_scope_help_title', this\.deckName/);
   assert.match(panel, /DialogHeader\(\{[\s\S]*?showHelp: true[\s\S]*?onHelp: \(\) => this\.openScopeHelp\(\)/);

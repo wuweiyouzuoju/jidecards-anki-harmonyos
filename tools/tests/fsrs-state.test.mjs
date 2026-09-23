@@ -168,5 +168,5 @@ test('statistics reload their backend snapshot on FSRS changes and both visible 
   for (const path of ['pages/统计页.ets', 'components/settings/调度器分组.ets']) {
     assert.match(read(path), /@StorageProp\(FSRS_STATE_REVISION_KEY\) @Watch\('onFsrsStateChanged'\)/);
   }
-  assert.match(read('pages/首页.ets'), /await this\.牌组配置服务实例\.更新牌组配置\(request\);\s*notifyFsrsStateChanged\(\)/);
+  assert.match(read('backend/AnkiDeckOptions.ets'), /committed\(\): void \{\s*notifyFsrsStateChanged\(\)/);
 });
