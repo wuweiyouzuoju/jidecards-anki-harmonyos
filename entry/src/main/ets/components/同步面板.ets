@@ -559,6 +559,7 @@ export struct 同步面板 {
         集合响应.required, 走向, 集合响应.serverMediaUsn, 集合响应.hostNumber, 集合响应.serverMessage);
       if (走向 === 'done') {
         // outcome=done = 集合已原子提交到本地 DB；标记以便后续中止时刷新牌组列表。
+        设置媒体待同步(媒体同步开启);
         this.集合已同步 = true;
         await this.captureFsrsAfterSync();
         if (this.disposed) return;
@@ -647,7 +648,10 @@ export struct 同步面板 {
       const endpoint: string = 提取新端点(response);
       if (this.disposed) {
         if (endpoint !== '') 保存同步端点(endpoint);
-        if (判定集合同步走向(response) === 'done') await this.captureFsrsAfterSync();
+        if (判定集合同步走向(response) === 'done') {
+          设置媒体待同步(加载媒体同步开关());
+          await this.captureFsrsAfterSync();
+        }
         return;
       }
       if (endpoint !== '') {
@@ -657,6 +661,7 @@ export struct 同步面板 {
       const outcome: 集合同步结果走向 = 判定集合同步走向(response);
       this.待定服务器USN = response.serverMediaUsn;
       if (outcome === 'done') {
+        设置媒体待同步(加载媒体同步开关());
         this.集合已同步 = true;
         await this.captureFsrsAfterSync();
         if (this.disposed) return;

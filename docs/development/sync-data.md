@@ -33,7 +33,7 @@
 
 ## 核心数据流
 
-同步宿主被销毁时，`同步面板` 保留正在执行的集合/全量任务和媒体启动 Promise，待提交或回滚及取消调用落定后才释放 `SyncActivity`。Core 的 AbortMediaSync 只发取消信号，清理还需重复查询直至 `active=false`；一次查询失败不能当作完成。离页后不启动尚未接受的全量替换、不回调旧页面，已提交结果仍保存端点/媒体待同步标志并广播 FSRS 刷新。对应竞态由 `sync-disposal.test.mjs` 执行真实组件方法覆盖，通用测试支架为 `sync-panel-harness.mjs`。
+同步宿主被销毁时，`同步面板` 保留正在执行的集合/全量任务和媒体启动 Promise，待提交或回滚及取消调用落定后才释放 `SyncActivity`。Core 的 AbortMediaSync 只发取消信号，清理还需重复查询直至 `active=false`；一次查询失败不能当作完成。离页后不启动尚未接受的全量替换、不回调旧页面，已提交结果仍保存端点/媒体待同步标志并广播 FSRS 刷新。媒体待同步标志在集合提交后、读取 FSRS 前保存，避免后续读取期间离页丢失恢复信息。对应竞态由 `sync-disposal.test.mjs` 执行真实组件方法覆盖，通用测试支架为 `sync-panel-harness.mjs`。
 
 备份状态见 [易混淆功能状态](../FEATURE_STATUS.md)：Core `create_backup/maybe_backup` 负责间隔、变更检测和 daily/weekly/monthly 保留；首页安全空闲时触发自动备份，设置页提供开关、立即创建和历史恢复。恢复前先保存当前集合，完成后通过现有替换链刷新集合和媒体路径。备份与同步共享 `AutoSyncScheduler` 操作占用，不能并发读写 collection。
 
