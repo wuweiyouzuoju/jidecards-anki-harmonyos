@@ -104,6 +104,8 @@ Node 24 测试使用内置 TypeScript 转换，运行时可能输出 `Experiment
 
 主机测试：已有 VS/MSVC 时直接使用锁定 Rust；存在 `JIDECARDS_TOOLCHAINS` 或 `work/toolchains` 时沿用 bundled GNU/Zig。doctor 检查相应依赖，最终仍以真实测试和链接结果为准。
 
+锁定 Anki checkout 还需执行 `git -C third_party/anki submodule update --init --depth 1 -- ftl/core-repo ftl/qt-repo`，提供 Core 构建所需的翻译。`build-native.ps1` 在干净源码上先应用受版本控制的补丁，重复运行不再应用；真实补丁冲突必须停止。Windows PowerShell 的这些分支由 `build-native-wrapper.test.mjs` 执行临时源码验证。
+
 签名材料由 [签名说明](signing.md) 定义。`build-app.ps1` 构建前检查本机配置/文件，构建后拒绝缺少 signingConfig 或缺失 signed HAP 的结果；Hvigor 的普通 BUILD SUCCESSFUL 不能独自作为签名构建成功证据。
 
 设备回归还覆盖：浏览批量操作中切换选择与离页；学习编辑、删除确认、埋藏/恢复后返回；AI 批量保存中离页、连续保存与附件解析。未连接设备时明确记为未执行。

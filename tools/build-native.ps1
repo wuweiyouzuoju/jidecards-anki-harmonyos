@@ -20,9 +20,17 @@ $AnkiPatch = Join-Path $Workspace 'tools\patches\anki-compact-import-log.patch'
 if (-not (Test-Path $AnkiRoot)) {
     throw 'third_party\anki is missing; clone the Anki source before building native code.'
 }
-& git -C $Workspace apply --check --reverse --recount --ignore-space-change --ignore-whitespace `
-    --directory=third_party/anki $AnkiPatch 2>$null
-if ($LASTEXITCODE -ne 0) {
+# Reverse-check failure is expected on pristine sources. PowerShell 5 must
+# reach the forward check instead of treating native stderr as terminating.
+try {
+    $ErrorActionPreference = 'Continue'
+    & git -C $Workspace apply --check --reverse --recount --ignore-space-change --ignore-whitespace `
+        --directory=third_party/anki $AnkiPatch 2>$null
+    $AnkiPatchAlreadyApplied = $LASTEXITCODE -eq 0
+} finally {
+    $ErrorActionPreference = 'Stop'
+}
+if (-not $AnkiPatchAlreadyApplied) {
     & git -C $Workspace apply --check --recount --ignore-space-change --ignore-whitespace `
         --directory=third_party/anki $AnkiPatch
     if ($LASTEXITCODE -ne 0) {
