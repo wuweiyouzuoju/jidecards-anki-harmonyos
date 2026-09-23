@@ -38,7 +38,7 @@ Node 24.x 与 `package.json` / CI 一致。首次进入或 lockfile 变化后运
 
 `tools/rpc-index-methods.json` 按本地常量名称绑定语义方法名；`tools/rpc-index-baseline.json` 是从生成的 `backend.rs` 导出的分派基线。交换两个有效编号、缺少末项、新增未登记常量、上游输入变动都失败。CI 的 Rust 作业在克隆锁定 Anki 后调用同一脚本；仓库测试使用受版本控制的基线和变异测试，不因缺少本机 Anki 而悄悄跳过。
 
-升级流程：更新锁定依赖并完成真实 Core 构建，核对别名语义，然后运行 `node tools/verify-rpc-index.mjs --generate <本次构建生成的backend.rs绝对路径>`，审查两份 JSON 的差异，最后运行完整 `npm run verify`。禁止拿旧缓存生成新版本基线。传入单个 `backend.rs` 路径则只校验该显式产物，不扫描并择优使用旧缓存。
+升级流程：更新锁定依赖并完成真实 Core 构建，核对别名语义，然后运行 `node tools/verify-rpc-index.mjs --generate <本次构建生成的backend.rs绝对路径>`，审查两份 JSON 的差异，最后运行完整 `npm run verify`。生成基线必须使用独立的、提交匹配 `UPSTREAM.lock` 的 Anki Git checkout；协议/生成器目录及 `Cargo.lock` 有未提交修改时拒绝生成，防止把本机裁剪工作区后的依赖锁写成官方基线。普通校验仍支持源码归档。禁止拿旧缓存生成新版本基线。传入单个 `backend.rs` 路径则只校验该显式产物，不扫描并择优使用旧缓存。
 
 输入指纹覆盖 proto、Rust 接口生成器及其依赖锁；它证明这些输入与已审查基线一致，不代表本次刚编译过 Core。显式产物校验和 Rust/HAP 构建仍是独立证据，远端 CI 与设备行为也须分别报告。
 

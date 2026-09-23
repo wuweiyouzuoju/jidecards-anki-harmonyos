@@ -11,6 +11,7 @@ import * as serviceIndex from '../entry/src/main/ets/backend/服务索引.ts';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const manifestPath = path.join(root, 'tools', 'rpc-index-methods.json');
 const baselinePath = path.join(root, 'tools', 'rpc-index-baseline.json');
+const protocolPaths = ['Cargo.lock', 'rslib/rust_interface.rs', 'proto', 'rslib/proto', 'rslib/proto_gen'];
 
 const serviceNames = new Map([
   ['后端同步', 'sync'], ['后端集合', 'collection'], ['后端卡片', 'cards'], ['后端牌组', 'decks'],
@@ -112,6 +113,18 @@ export function verifyBaseline(baseline, revision, fingerprint) {
   if (baseline.fingerprint !== fingerprint) throw new Error('Anki protocol/generator inputs changed; rebuild and regenerate the RPC baseline');
 }
 
+export function verifyGenerationCheckout(ankiRoot, revision) {
+  if (!existsSync(path.join(ankiRoot, '.git'))) {
+    throw new Error('RPC baseline generation requires an independent locked Anki Git checkout');
+  }
+  const git = args => execFileSync('git', ['-C', ankiRoot, ...args], { encoding: 'utf8' }).trim();
+  if (git(['rev-parse', '--short=7', 'HEAD']) !== revision) {
+    throw new Error('RPC baseline generation requires the locked Anki revision');
+  }
+  const changed = git(['status', '--porcelain', '--untracked-files=all', '--', ...protocolPaths]);
+  if (changed) throw new Error(`RPC baseline generation refuses modified protocol/generator inputs:\n${changed}`);
+}
+
 function main() {
   const args = process.argv.slice(2);
   if (args.length > 2 || (args.length === 2 && args[0] !== '--generate')) throw new Error('Usage: node tools/verify-rpc-index.mjs [backend.rs | --generate backend.rs]');
@@ -127,6 +140,7 @@ function main() {
   if (manifest.ankiRevision !== `${lock.ANKI_TAG}-${revision}`) throw new Error('RPC aliases differ from UPSTREAM.lock');
   if (args[0] === '--generate') {
     if (!args[1]) throw new Error('--generate requires the exact freshly built backend.rs path');
+    verifyGenerationCheckout(ankiRoot, revision);
     const services = parseGeneratedBackend(readFileSync(path.resolve(args[1]), 'utf8'));
     verifyIndex(serviceIndex, manifest, services);
     writeFileSync(baselinePath, JSON.stringify({ revision, fingerprint, services }, null, 2) + '\n');
