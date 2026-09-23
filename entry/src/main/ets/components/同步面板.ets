@@ -130,6 +130,10 @@ export struct 同步面板 {
   private abortTimer: number = -1;
   private abortCall: Promise<void> | null = null;
   private successTimer: number = -1;
+  private syncTask: Promise<void> | null = null;
+  private mediaStart: Promise<void> | null = null;
+  private mediaMayBeRunning: boolean = false;
+  private disposalStarted: boolean = false;
 
   aboutToAppear(): void {
     this.disposed = false;
@@ -151,6 +155,39 @@ export struct 同步面板 {
     this.stopAbortTimer();
     if (this.successTimer >= 0) clearTimeout(this.successTimer);
     this.清理轮询定时器();
+    if (!this.ownsSync || this.disposalStarted) return;
+    this.disposalStarted = true;
+    if (this.当前阶段 === 'done' ||
+      (this.syncTask === null && this.mediaStart === null && !this.mediaMayBeRunning)) {
+      syncActivity.release(this.syncOwner, Date.now());
+    } else {
+      this.finishDisposedSync();
+    }
+  }
+
+  /** 销毁仅解除展示；集合提交/回滚及后台媒体确实结束后才释放租约。 */
+  private async finishDisposedSync(): Promise<void> {
+    try {
+      if (this.syncTask !== null) await this.syncTask;
+      if (this.mediaStart !== null) await this.mediaStart;
+      if (this.abortCall !== null) await this.abortCall;
+    } catch (error) {
+      hilog.warn(同步日志域, 同步日志标签, 'sync: detached operation finished with error');
+    }
+    if (this.mediaMayBeRunning) {
+      // AbortMediaSync 只发信号；再次查询 active=false 才证明后台线程已退出。
+      while (true) {
+        try {
+          await this.同步服务实例.中止媒体同步();
+          const status: MediaSyncStatusResponse = await this.同步服务实例.媒体同步状态();
+          if (!status.active) break;
+        } catch (error) {
+          // 状态查询会取走已结束线程的错误；下一次确认 inactive，不能据一次失败提前释放。
+          hilog.warn(同步日志域, 同步日志标签, 'sync: waiting for detached media termination');
+        }
+        await new Promise<void>((resolve: () => void): void => { setTimeout(resolve, 1000); });
+      }
+    }
     syncActivity.release(this.syncOwner, Date.now());
   }
 
@@ -454,7 +491,13 @@ export struct 同步面板 {
   // ========================================================
 
   /** 启动同步：SyncCollection → 媒体阶段。 */
-  private async 启动同步(): Promise<void> {
+  private 启动同步(): Promise<void> {
+    if (this.disposed || this.syncTask !== null) return Promise.resolve();
+    this.syncTask = this.runSync().finally((): void => { this.syncTask = null; });
+    return this.syncTask;
+  }
+
+  private async runSync(): Promise<void> {
     const 当前鉴权: SyncAuth | null = this.鉴权;
     if (当前鉴权 === null) {
       this.错误文案 = this.取本地化文案($r('app.string.sync_error_session_expired'));
@@ -490,7 +533,17 @@ export struct 同步面板 {
       }
       hilog.info(同步日志域, 同步日志标签, 'sync: calling syncCollection syncMedia=%{public}s',
         媒体同步开启 ? 'true' : 'false');
+      this.mediaMayBeRunning = 媒体同步开启;
       const 集合响应: SyncCollectionResponse = await this.syncCollectionWithPriority(鉴权, 媒体同步开启);
+      if (this.disposed) {
+        const endpoint: string = 提取新端点(集合响应);
+        if (endpoint !== '') 保存同步端点(endpoint);
+        if (判定集合同步走向(集合响应) === 'done') {
+          设置媒体待同步(媒体同步开启);
+          await this.captureFsrsAfterSync();
+        }
+        return;
+      }
       // 提交先赢得竞态时，保留成功结果与 Core 已启动的媒体任务。
       this.是否请求中止 = false;
       this.yieldingForStudy = false;
@@ -568,7 +621,13 @@ export struct 同步面板 {
   // ========================================================
 
   /** 冲突确认：FullUploadOrDownload 成功后进入媒体阶段。 */
-  private async 冲突确认(是否上传: boolean): Promise<void> {
+  private 冲突确认(是否上传: boolean): Promise<void> {
+    if (this.disposed || this.syncTask !== null) return Promise.resolve();
+    this.syncTask = this.runFullSync(是否上传).finally((): void => { this.syncTask = null; });
+    return this.syncTask;
+  }
+
+  private async runFullSync(是否上传: boolean): Promise<void> {
     if (this.当前阶段 !== 'conflict' || !autoSyncScheduler.canSync()) return;
     const 鉴权: SyncAuth | null = this.鉴权;
     if (鉴权 === null) {
@@ -585,8 +644,12 @@ export struct 同步面板 {
       this.fsrsBeforeSync = await 加载FSRS开启状态();
       if (this.disposed) return;
       const response: SyncCollectionResponse = await this.同步服务实例.同步集合(鉴权, false);
-      if (this.disposed) return;
       const endpoint: string = 提取新端点(response);
+      if (this.disposed) {
+        if (endpoint !== '') 保存同步端点(endpoint);
+        if (判定集合同步走向(response) === 'done') await this.captureFsrsAfterSync();
+        return;
+      }
       if (endpoint !== '') {
         this.鉴权 = 应用新端点(鉴权, endpoint);
         保存同步端点(endpoint);
@@ -596,6 +659,7 @@ export struct 同步面板 {
       if (outcome === 'done') {
         this.集合已同步 = true;
         await this.captureFsrsAfterSync();
+        if (this.disposed) return;
         this.fullSyncInFlight = false;
         this.notifyCollectionResult();
         if (加载媒体同步开关()) {
@@ -626,8 +690,10 @@ export struct 同步面板 {
     hilog.info(同步日志域, 同步日志标签,
       'sync: calling fullUploadOrDownload upload=%{public}s serverUsn=%{public}s mediaEnabled=%{public}s',
       是否上传 ? 'true' : 'false', 服务器USN === null ? 'null' : `${服务器USN}`, 媒体同步开启 ? 'true' : 'false');
+    this.mediaMayBeRunning = 媒体同步开启;
     await this.同步服务实例.全量上传或下载(this.鉴权!, 是否上传, 服务器USN)
       .then(async (): Promise<void> => {
+        设置媒体待同步(媒体同步开启);
         // 全量上传/下载完成 = 集合已写入本地 DB；标记以便后续中止时刷新牌组列表。
         this.集合已同步 = true;
         await this.captureFsrsAfterSync();
@@ -673,7 +739,8 @@ export struct 同步面板 {
     const RPC开始时间: number = Date.now();
     hilog.info(同步日志域, 同步日志标签,
       'sync: calling syncMedia (background start) at %{public}d', RPC开始时间);
-    this.同步服务实例.同步媒体(鉴权)
+    this.mediaMayBeRunning = true;
+    this.mediaStart = this.同步服务实例.同步媒体(鉴权)
       .then((): void => {
         if (this.disposed) return;
         if (this.是否请求中止) {
@@ -689,7 +756,8 @@ export struct 同步面板 {
           'sync: syncMedia RPC FAILED in %{public}dms: %{public}s',
           Date.now() - RPC开始时间, error instanceof Error ? error.message : `${error}`);
         this.处理同步错误(error instanceof Error ? error : new Error(`${error}`));
-      });
+      })
+      .finally((): void => { this.mediaStart = null; });
   }
 
   // ========================================================
