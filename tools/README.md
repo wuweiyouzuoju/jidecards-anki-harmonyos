@@ -4,6 +4,9 @@
 
 | 用途 | 入口 | 说明 |
 | --- | --- | --- |
+| 选择题制卡 | `npm run choice:validate -- source.json` / `npm run choice:build -- source.json output.apkg` / `npm run choice:inspect -- output.apkg` | Node 24 校验源文件；打包/验包另需 Python，打包依赖 `choice-requirements.txt`；[规范与 Agent 指南](../docs/choice-authoring.md) |
+| 选择题 APKG 集成回归 | `npm run choice:test` | 实际生成并读取 ZIP/SQLite，检验字段、GUID 和损坏输入；需要上述 Python 打包依赖，不等于真机/AnkiWeb 验收 |
+| 选择题 Anki 引擎验收 | `python tools/choice-anki-roundtrip.py` | 独立 Python 环境安装 `anki==26.5`；临时集合验证导入、模板渲染、重复导入和含 Hard/Good 记录的导出再导入，不访问真实账户 |
 | 变更影响计划 | `npm run impact` | 支持 `--json`、`--base <ref>` 或 `--paths <路径> ...`；只读，不执行验证，详见 [验证说明](../docs/development/verification.md) |
 | 领域/完整 Node 回归 | `npm test -- <领域>` / `npm test` | 清单 `npm test -- --list` |
 | 仓库门禁 | `npm run verify -- repo` | Node、文档、架构和资源契约；CI 使用此模式 |

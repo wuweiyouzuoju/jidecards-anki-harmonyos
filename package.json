@@ -7,6 +7,10 @@
     "test:release": "node tools/test.mjs release",
     "verify": "node tools/verify.mjs",
     "impact": "node tools/change-impact.mjs",
+    "choice:validate": "node tools/choice-package.mjs validate",
+    "choice:build": "node tools/choice-package.mjs build",
+    "choice:inspect": "node tools/choice-package.mjs inspect",
+    "choice:test": "node tools/choice-package.integration.mjs",
     "export:source": "node tools/strip-for-release.mjs",
     "doctor": "node tools/doctor.mjs",
     "build:app": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/build-app.ps1"

@@ -325,6 +325,38 @@ test('selected-only find replace aborts on unresolved card instead of mutating a
   assert.equal(writes, 0); assert.equal(scheduler.canSync(), true);
 });
 
+test('find replace captures every filtered result before waiting, deduplicates notes and ignores later searches', async () => {
+  const { page } = browserHarness(), gate = deferred(), writes = [];
+  page.结果ID列表 = [101, 102, 103]; page.选中ID列表 = [101];
+  page.行列表 = [{ id: 101 }]; // Only the first row has been loaded.
+  page.卡片服务实例.获取卡片 = async id => {
+    if (id === 101) await gate.promise;
+    return { noteId: id < 103 ? 10 : 20 };
+  };
+  page.搜索服务实例 = { 查找并替换: async request => { writes.push(request); return 2; } };
+  const work = page.执行查找替换('old', 'new', 'Front', false, true, false);
+  await settle();
+  page.结果ID列表[2] = 999; page.浏览模式值 = 'notes'; page.searchVersion++;
+  gate.resolve();
+  assert.equal(await work, true);
+  assert.deepEqual(writes[0].nids, [10, 20]);
+  assert.equal(writes[0].fieldName, 'Front');
+});
+
+test('find replace uses note result IDs directly and never treats an empty result as the whole collection', async () => {
+  const { page } = browserHarness(), writes = [];
+  page.浏览模式值 = 'notes'; page.结果ID列表 = [5, 6];
+  page.卡片服务实例.获取卡片 = async () => { throw new Error('notes are not card IDs'); };
+  page.搜索服务实例 = { 查找并替换: async request => { writes.push(request.nids); return 2; } };
+  assert.equal(await page.执行查找替换('a', 'b', '', false, false, false), true);
+  assert.deepEqual(writes, [[5, 6]]);
+  page.结果ID列表 = [];
+  assert.equal(await page.执行查找替换('a', 'b', '', false, false, false), false);
+  page.结果ID列表 = [5]; page.阶段 = 'loading';
+  assert.equal(await page.执行查找替换('a', 'b', '', false, false, false), false);
+  assert.equal(writes.length, 1);
+});
+
 test('latest editor request wins and dismissal invalidates in-flight loading', async () => {
   const { page } = browserHarness(), first = deferred(); page.浏览模式值 = 'notes';
   page.笔记服务实例.获取笔记 = async id => id === 1 ? first.promise : { id, notetypeId: id, fields: ['second'], tags: [] };

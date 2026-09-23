@@ -119,7 +119,7 @@ export class 搜索服务 {
   }
 
   /**
-   * 查找并替换（FindAndReplace）。在指定笔记的字段或标签中替换文本。
+   * 查找并替换（FindAndReplace）。仅替换指定笔记的字段；标签使用标签服务。
    * @param 请求 nids(空=全部笔记) + search + replacement + regex + matchCase + fieldName(空=所有字段)
    * @returns 实际替换的笔记数
    */

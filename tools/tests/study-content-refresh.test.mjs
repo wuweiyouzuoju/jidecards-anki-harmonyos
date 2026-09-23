@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 
 const source = readFileSync(new URL('../../entry/src/main/ets/pages/学习页.ets', import.meta.url), 'utf8');
-const names = ['加载下一张卡', '刷新编辑后当前卡', '消费待重渲染', '卡片内容变更_回调', '显示答案', 'saveNoteEdits', 'invalidateCardWork', 'isCurrentRequest', 'studyActivityChanged', 'applyStudyHtml', 'playStudyAudio'];
+const names = ['加载下一张卡', '刷新编辑后当前卡', '消费待重渲染', '卡片内容变更_回调', '显示答案', 'saveNoteEdits', 'invalidateCardWork', 'isCurrentRequest', 'studyActivityChanged', 'applyStudyHtml', 'playStudyAudio', 'clearChoiceAutoAdvance', 'scheduleChoiceAutoAdvance', 'choiceAutoAdvanceSeconds'];
 const methods = names.map(name => {
   const start = source.search(new RegExp(`  private (?:async )?${name}\\(`));
   assert.ok(start >= 0);
@@ -34,6 +34,7 @@ function harness(phase = 'question') {
     mounted: true, sessionReady: true, foreground: true, requestVersion: 0, loadingVersion: -1, flipPending: false, controllerReady: true, pendingHtml: '',
     audioSession: { stop: async () => {}, play: async () => false },
     页面已显示: true, 待重渲染当前卡: false, contentRefreshInFlight: false, 评分中: false,
+    choiceQuestion: null, choiceGrade: null, choiceAutoAdvanceTimer: -1, choiceFeedbackDeadline: 0, studyMenuOpen: false,
     noteEditorVisible: false, noteEditorBusy: false, 阶段: phase, 牌组ID: 10,
     当前卡片: { cardId: 7, noteId: 42, templateIdx: 0, states: 'old-states' },
     已渲染: {}, 正面HTML: 'old-front', 背面HTML: 'old-back', 拼写字段名: 'Old', 已输入答案: 'old-input',

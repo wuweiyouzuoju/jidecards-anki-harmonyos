@@ -5,12 +5,46 @@ import { readFileSync } from 'node:fs';
 import { DeckOptionsSession } from '../../entry/src/main/ets/model/home/DeckOptionsSession.ts';
 import { prepareDeckOptionsDraft } from '../../entry/src/main/ets/model/DeckOptionsDraft.ets';
 import { copyDeckConfig, deckConfigUseCount, buildDeckConfigRequest, prepareDeckConfigForSave } from '../../entry/src/main/ets/model/DeckConfigSave.ts';
-import { emptyDeckConfigSettings, encodeDeckConfig, encodeUpdateDeckConfigsRequest, decodeUpdateDeckConfigsRequest } from '../../entry/src/main/ets/proto/messages/DeckConfigMessages.ts';
+import { emptyDeckConfigSettings, encodeDeckConfig, encodeLimits, decodeLimits, encodeUpdateDeckConfigsRequest, decodeUpdateDeckConfigsRequest } from '../../entry/src/main/ets/proto/messages/DeckConfigMessages.ts';
 import { 牌组配置表单 } from '../../entry/src/main/ets/model/牌组配置表单.ets';
 import { 牌组选项编辑 } from '../../entry/src/main/ets/model/牌组选项编辑.ets';
 import { 协议写入器 } from '../../entry/src/main/ets/proto/core/ProtoWriter.ts';
 
 const read = path => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
+
+test('optional zero limits have explicit protobuf presence instead of clearing the override', () => {
+  const limits = { review: 0, new: 0, reviewToday: 0, newToday: 0,
+    reviewTodayActive: false, newTodayActive: false, desiredRetention: null };
+  const bytes = encodeLimits(limits).转为字节();
+  assert.deepEqual(Array.from(bytes), [8, 0, 16, 0, 24, 0, 32, 0]);
+  assert.deepEqual(decodeLimits(bytes), limits);
+  const cleared = { ...limits, review: null, new: null, reviewToday: null, newToday: null };
+  assert.equal(encodeLimits(cleared).转为字节().length, 0);
+  assert.deepEqual(decodeLimits(new Uint8Array()), cleared);
+});
+
+test('saving disabled today limits clears the Core overrides while retaining the open draft', async () => {
+  const { state, form, options, calls } = saveHarness();
+  options.今日复习文本 = '50'; options.今日复习启用 = false;
+  options.今日新卡文本 = '40'; options.今日新卡启用 = false;
+  await state.保存牌组选项(form, options);
+  assert.equal(calls[0].limits.reviewToday, null);
+  assert.equal(calls[0].limits.newToday, null);
+  assert.equal(calls[0].limits.review, 80, 'ordinary deck override must survive');
+  assert.equal(options.今日复习文本, '50');
+  assert.equal(options.今日新卡文本, '40');
+});
+
+test('enabled zero limits survive serialization and an expired limit is not revived', async () => {
+  const { state, form, options, calls } = saveHarness();
+  options.今日复习文本 = '0'; options.今日复习启用 = true;
+  options.今日新卡文本 = '25'; options.今日新卡启用 = false;
+  await state.保存牌组选项(form, options);
+  assert.equal(calls[0].limits.reviewToday, 0);
+  assert.equal(calls[0].limits.reviewTodayActive, true);
+  assert.equal(calls[0].limits.newToday, null);
+  assert.equal(calls[0].limits.newTodayActive, false);
+});
 function fixture(id = 1, useCount = 2) {
   const unknown = new 协议写入器();
   unknown.写入变长整数(200, 42);

@@ -5,6 +5,7 @@ import type { RenderedCard } from '../proto/messages/CardRenderingMessages';
 import { AutoSyncScheduler, autoSyncScheduler } from './AutoSyncScheduler';
 import { SyncActivity, syncActivity } from './SyncSettings';
 import { StudyOptions } from './StudyTiming';
+import type { JideChoiceQuestion } from './JideChoice';
 
 /** 显式后端边界，允许在不加载 NAPI/ArkUI 的测试中验证学习会话。 */
 export interface StudySessionBackend {
@@ -20,6 +21,7 @@ export interface StudySessionBackend {
   answer(input: CardAnswerInput): Promise<void>;
   undo(): Promise<void>;
   congrats(): Promise<CongratsInfo>;
+  choiceQuestion?(noteId: number): Promise<JideChoiceQuestion | null>;
 }
 
 export interface StudySnapshot {
@@ -29,6 +31,7 @@ export interface StudySnapshot {
   rendered: RenderedCard | null;
   labels: string[];
   options: StudyOptions;
+  choiceQuestion: JideChoiceQuestion | null;
 }
 
 /** 编排取卡/评分，页面只消费完整快照；不改动调度算法和原始状态字节。 */
@@ -74,14 +77,18 @@ export class StudySessionController {
       const queue: QueuedCardsView = await this.backend.queuedCards(deckId);
       if (this.disposed || !isCurrent()) return null;
       const card: StudyCard | null = queue.cards.length === 0 ? null : queue.cards[0];
-      if (card === null) return { queue: queue, canUndo: canUndo, card: null, rendered: null, labels: [], options: new StudyOptions() };
+      if (card === null) return { queue: queue, canUndo: canUndo, card: null, rendered: null, labels: [], options: new StudyOptions(), choiceQuestion: null };
       const rendered: RenderedCard = await this.backend.renderCard(card.cardId);
       if (this.disposed || !isCurrent()) return null;
       const options: StudyOptions = await this.backend.studyOptions(card.cardId);
       if (this.disposed || !isCurrent()) return null;
       const labels: string[] = await this.backend.describeStates(card.states);
       if (this.disposed || !isCurrent()) return null;
-      return { queue: queue, canUndo: canUndo, card: card, rendered: rendered, labels: labels, options: options };
+      const choiceQuestion: JideChoiceQuestion | null = this.backend.choiceQuestion === undefined
+        ? null : await this.backend.choiceQuestion(card.noteId);
+      if (this.disposed || !isCurrent()) return null;
+      return { queue: queue, canUndo: canUndo, card: card, rendered: rendered, labels: labels, options: options,
+        choiceQuestion: choiceQuestion };
     } finally {
       this.endOperation();
     }

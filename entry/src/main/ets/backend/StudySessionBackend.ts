@@ -13,6 +13,9 @@ import { 牌组配置服务 } from './牌组配置服务';
 import type { Card } from '../proto/messages/CardsMessages';
 import type { DeckConfigsForUpdateView } from '../proto/messages/DeckConfigMessages';
 import { StudyOptions } from '../model/StudyTiming';
+import { jideChoiceQuestionFromNote } from '../model/JideChoice';
+import type { JideChoiceQuestion } from '../model/JideChoice';
+import { 笔记类型服务 } from './笔记类型服务';
 
 /** 复用既有 RPC 编解码，不在应用层重建调度状态。 */
 export class AnkiStudySessionBackend implements StudySessionBackend {
@@ -22,6 +25,7 @@ export class AnkiStudySessionBackend implements StudySessionBackend {
   private notes: 笔记服务 = new 笔记服务();
   private cards: 卡片服务 = new 卡片服务();
   private deckConfigs: 牌组配置服务 = new 牌组配置服务();
+  private notetypes: 笔记类型服务 = new 笔记类型服务();
 
   constructor(scheduler: 调度器服务, renderer: 卡片渲染服务, collection: 集合服务) {
     this.scheduler = scheduler;
@@ -36,6 +40,11 @@ export class AnkiStudySessionBackend implements StudySessionBackend {
   async canUndo(): Promise<boolean> { return (await this.collection.获取撤销状态()).undo.length > 0; }
   queuedCards(deckId: number): Promise<QueuedCardsView> { return this.scheduler.获取队首卡片(deckId); }
   renderCard(cardId: number): Promise<RenderedCard> { return this.renderer.渲染既有卡片(cardId); }
+  async choiceQuestion(noteId: number): Promise<JideChoiceQuestion | null> {
+    const note = await this.notes.获取笔记(noteId);
+    const notetype = await this.notetypes.获取笔记类型(note.notetypeId);
+    return jideChoiceQuestionFromNote(note.fields, notetype.fieldNames);
+  }
   /** 筛选牌组遵循原牌组配置；每张卡重新读取，避免子牌组或同步后沿用旧设置。 */
   async studyOptions(cardId: number): Promise<StudyOptions> {
     const card: Card = await this.cards.获取卡片(cardId);

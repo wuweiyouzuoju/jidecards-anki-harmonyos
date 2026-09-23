@@ -18,6 +18,7 @@ test('review menu exposes bury and suspend on both card faces and dispatches the
     const calls = [];
     const page = {
       阶段: phase, 评分中: false, 当前卡片: {}, 可撤销: false,
+      choiceQuestion: null, choiceAutoAdvanceSeconds: () => 5,
       studyOptions: { secondsToShowQuestion: 0, secondsToShowAnswer: 0 },
       取文案: key => key, 埋藏或暂停当前卡: mode => calls.push(mode)
     };

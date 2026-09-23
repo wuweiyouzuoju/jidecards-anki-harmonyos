@@ -9,7 +9,7 @@ import { stripTypeScriptTypes } from 'node:module';
 
 // Execute unchanged production methods with controllable backend/player delays.
 const source = fs.readFileSync(new URL('../../entry/src/main/ets/pages/学习页.ets', import.meta.url), 'utf8');
-const names = ['请求删除当前卡', '确认删除当前卡', '加载下一张卡', '显示答案', '埋藏或暂停当前卡', '评分', 'invalidateCardWork', 'isCurrentRequest', 'studyActivityChanged', 'applyStudyHtml', 'playStudyAudio', 'studyWebAttached', 'aboutToDisappear', '消费待重渲染', '刷新编辑后当前卡', '撤销上次', '加载完成页信息'];
+const names = ['请求删除当前卡', '确认删除当前卡', '加载下一张卡', '显示答案', '埋藏或暂停当前卡', '评分', 'invalidateCardWork', 'isCurrentRequest', 'studyActivityChanged', 'applyStudyHtml', 'playStudyAudio', 'studyWebAttached', 'aboutToDisappear', '消费待重渲染', '刷新编辑后当前卡', '撤销上次', '加载完成页信息', 'clearChoiceAutoAdvance', 'scheduleChoiceAutoAdvance', 'choiceAutoAdvanceSeconds'];
 const methods = names.map(name => {
   const start = source.search(new RegExp(`  (?:private )?(?:async )?${name}\\(`));
   assert.ok(start >= 0);
@@ -31,6 +31,7 @@ function harness() {
   Object.assign(page, {
     mounted:true, sessionReady:true, foreground:true, requestVersion:0, loadingVersion:-1, flipPending:false, controllerReady:true, pendingHtml:'', 媒体目录:'',
     页面已显示:true, 阶段:'question', 评分中:false, studyGuideVisible:false,
+    choiceQuestion:null, choiceGrade:null, choiceAutoAdvanceTimer:-1, choiceFeedbackDeadline:0, studyMenuOpen:false,
     contentRefreshInFlight:false, 待重渲染当前卡:false, 可撤销:true,
     noteEditorVisible:false, noteEditorBusy:false, 拼写字段名:'', 牌组ID:1,
     当前卡片:{cardId:'A', states:{current:[],again:[],hard:[],good:[],easy:[]}},

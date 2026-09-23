@@ -6,6 +6,10 @@
 - 责任链：pages/学习页.ets → StudySessionController → StudySessionBackend → Anki Core；预览只读。
 - 快速反馈：`npm test -- study / npm test -- media`；完整验收见 [验证说明](verification.md)。
 
+## APKG 选择题
+
+格式见 [选择题 APKG v1](../choice-apkg-v1.md)，制作流程见 [Agent 指南](../choice-authoring.md)。`JideChoice.ts` 负责源文件校验、版本标记、模板、精确集合判分和字段一致性；工具 `tools/choice-package.mjs` 复用它打包标准 APKG，应用不直接导入 JSON 或自定义后缀。`AnkiStudySessionBackend` 按字段名和 payload 版本识别题型，不依赖笔记类型显示名称，未知版本按普通卡处理。学习页接收 `StudySessionController` 的题型数据，2–10 个选项分左右两列；答对直接提交 Good，答错直接提交 Hard，不再次评分。更多菜单的跳转秒数属于本次学习会话，切题保留；提交后的右滑只切题，不重复写复习记录。回归入口是 `tools/tests/jide-choice.test.mjs` 和 `tools/tests/choice-package.test.mjs`。AnkiWeb 实际往返与真机交互须另行验收。
+
 ## 卡片文字显示
 
 外观与语言中的 `CardTextSizeControl` 调整本机文字缩放（50%–200%，默认 100%）；`CardTextSizeStore` 启动恢复偏好，学习页和卡片预览通过 ArkWeb `textZoomRatio` 共用该值，不改模板或同步数据。设置内显示百分比和滑块。

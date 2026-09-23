@@ -2,7 +2,7 @@
 
 export const EXTERNAL_DECK_OPEN_REVISION_KEY: string = 'externalDeckOpenRevision';
 
-/** 只接收系统交付的 APKG 文件；解码仅用于识别，读取仍使用原始 URI。 */
+/** 只接收系统交付的 APKG；解码仅用于识别，读取仍使用原始 URI。 */
 export function externalDeckUri(action: string, uri: string, type: string): string | null {
   if (action !== 'ohos.want.action.viewData' || !uri.startsWith('file://')) return null;
   let path: string;

@@ -44,6 +44,18 @@ export interface DeckConfigRequestOptions {
   fsrsReschedule: boolean;
   fsrsHealthCheck: boolean;
 }
+
+/** Core 只按今日数值是否存在保存覆盖；Active 是读取状态，不是停用指令。 */
+function limitsForSave(limits: DeckLimits | null): DeckLimits | null {
+  if (limits === null) return null;
+  return {
+    review: limits.review, new: limits.new, desiredRetention: limits.desiredRetention,
+    reviewToday: limits.reviewTodayActive ? limits.reviewToday : null,
+    newToday: limits.newTodayActive ? limits.newToday : null,
+    reviewTodayActive: limits.reviewTodayActive && limits.reviewToday !== null,
+    newTodayActive: limits.newTodayActive && limits.newToday !== null
+  };
+}
 /** 生成独立请求；共享预设分离与调度器开关由同一个领域边界决定。 */
 export function buildDeckConfigRequest(targetDeckId: number, view: DeckConfigsForUpdateView,
   original: DeckConfig, draft: DeckConfig, applyToSharedDecks: boolean,
@@ -52,7 +64,7 @@ export function buildDeckConfigRequest(targetDeckId: number, view: DeckConfigsFo
     targetDeckId: targetDeckId,
     configs: [prepareDeckConfigForSave(view, original, copyDeckConfig(draft), applyToSharedDecks)],
     removedConfigIds: [], mode: UPDATE_DECK_CONFIGS_MODE_NORMAL, cardStateCustomizer: view.cardStateCustomizer,
-    limits: edited.limits, newCardsIgnoreReviewLimit: edited.newCardsIgnoreReviewLimit,
+    limits: limitsForSave(edited.limits), newCardsIgnoreReviewLimit: edited.newCardsIgnoreReviewLimit,
     fsrs: edited.fsrs, applyAllParentLimits: edited.applyAllParentLimits,
     fsrsReschedule: edited.fsrsReschedule, fsrsHealthCheck: edited.fsrsHealthCheck
   };

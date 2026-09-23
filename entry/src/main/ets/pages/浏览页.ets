@@ -759,19 +759,26 @@ export struct 浏览页 {
    * T9 执行查找替换：调 搜索服务.查找并替换。
    * nids 解析：
    * - 仅选中=true：cards 模式经 卡片服务.获取卡片 把 cardId 转 noteId 后去重；notes 模式直接用选中ID
-   * - 仅选中=false：nids 留空，后端对全部笔记生效
+   * - 仅选中=false：固定当前完整搜索结果，包含筛选及尚未加载的分页行
+   * 空结果必须中止：Core 将空 nids 解释为全库。
    * 成功后关闭弹层 + toast 提示替换数 + 重新搜索刷新列表。
    */
   private async 执行查找替换(
     查找: string, 替换: string, 字段名: string, 正则: boolean, 区分大小写: boolean, 仅选中: boolean
   ): Promise<boolean> {
     if (this.operations.isBusy()) return false;
+    if (this.阶段 !== 'list') {
+      this.查找替换错误 = this.取本地化文案($r('app.string.browser_find_results_not_ready'));
+      return false;
+    }
+    const scope: BrowserOperationContext = this.captureBrowserSelection();
+    if (!仅选中) scope.ids = this.结果ID列表.slice();
     this.查找替换忙碌 = true;
     this.查找替换错误 = '';
     let count: number = 0;
-    const done: boolean = await this.runBrowserOperation(async (selection: BrowserOperationContext): Promise<void> => {
-      const nids: number[] = 仅选中 ? await this.解析选中为笔记ID(selection) : [];
-      if (仅选中 && nids.length === 0) throw new Error(this.取本地化文案($r('app.string.browser_find_no_notes_error')));
+    const done: boolean = await this.runBrowserOperation(async (_selection: BrowserOperationContext): Promise<void> => {
+      const nids: number[] = await this.解析选中为笔记ID(scope);
+      if (nids.length === 0) throw new Error(this.取本地化文案($r('app.string.browser_find_no_notes_error')));
       const request: FindAndReplaceRequest = {
         nids, search: 查找, replacement: 替换, regex: 正则, matchCase: 区分大小写, fieldName: 字段名
       };

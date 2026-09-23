@@ -1,0 +1,53 @@
+{
+  "format": "jidecards.choice",
+  "version": 1,
+  "id": "org.jidecards.examples.choice-v1",
+  "title": "JideCards choice demo",
+  "feedbackSeconds": 5,
+  "questions": [
+    {
+      "id": "demo-single-001",
+      "type": "single_choice",
+      "prompt": "Which number is even?",
+      "options": [
+        { "id": "one", "text": "1" },
+        { "id": "two", "text": "2" },
+        { "id": "three", "text": "3" }
+      ],
+      "answer": ["two"],
+      "explanation": "2 is divisible by 2 with no remainder."
+    },
+    {
+      "id": "demo-multiple-001",
+      "type": "multiple_choice",
+      "prompt": "Select the primary colors of light.",
+      "options": [
+        { "id": "red", "text": "Red" },
+        { "id": "green", "text": "Green" },
+        { "id": "blue", "text": "Blue" },
+        { "id": "yellow", "text": "Yellow" }
+      ],
+      "answer": ["red", "green", "blue"],
+      "explanation": "Additive RGB color uses red, green, and blue as its primary colors."
+    },
+    {
+      "id": "demo-ten-001",
+      "type": "single_choice",
+      "prompt": "以下哪一个数字等于 3 × 3？",
+      "options": [
+        { "id": "n1", "text": "1" },
+        { "id": "n2", "text": "2" },
+        { "id": "n3", "text": "3" },
+        { "id": "n4", "text": "4" },
+        { "id": "n5", "text": "5" },
+        { "id": "n6", "text": "6" },
+        { "id": "n7", "text": "7" },
+        { "id": "n8", "text": "8" },
+        { "id": "n9", "text": "9" },
+        { "id": "n10", "text": "10" }
+      ],
+      "answer": ["n9"],
+      "explanation": "3 × 3 = 9。此题用于检查左侧 A–E、右侧 F–J 的十选项布局。"
+    }
+  ]
+}

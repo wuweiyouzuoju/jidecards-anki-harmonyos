@@ -144,7 +144,17 @@ export function decodeDeckConfig(bytes: Uint8Array): DeckConfig {
 }
 
 export interface DeckLimits { review: number | null; new: number | null; reviewToday: number | null; newToday: number | null; reviewTodayActive: boolean; newTodayActive: boolean; desiredRetention: number | null; }
-export function encodeLimits(v: DeckLimits): 协议写入器 { const w = new 协议写入器(); if (v.review !== null) uint(w, 1, v.review); if (v.new !== null) uint(w, 2, v.new); if (v.reviewToday !== null) uint(w, 3, v.reviewToday); if (v.newToday !== null) uint(w, 4, v.newToday); bool(w, 5, v.reviewTodayActive); bool(w, 6, v.newTodayActive); if (v.desiredRetention !== null) float(w, 7, v.desiredRetention); return w; }
+export function encodeLimits(v: DeckLimits): 协议写入器 {
+  const w = new 协议写入器();
+  // optional 的 0 表示零限额，必须与 null（跟随预设／清除覆盖）区分。
+  if (v.review !== null) w.写入变长整数(1, v.review);
+  if (v.new !== null) w.写入变长整数(2, v.new);
+  if (v.reviewToday !== null) w.写入变长整数(3, v.reviewToday);
+  if (v.newToday !== null) w.写入变长整数(4, v.newToday);
+  bool(w, 5, v.reviewTodayActive); bool(w, 6, v.newTodayActive);
+  if (v.desiredRetention !== null) w.写入浮点(7, v.desiredRetention);
+  return w;
+}
 export function decodeLimits(bytes: Uint8Array): DeckLimits { const r = new 协议读取器(bytes); const out: DeckLimits = { review: null, new: null, reviewToday: null, newToday: null, reviewTodayActive: false, newTodayActive: false, desiredRetention: null }; let tag; while ((tag = r.读取标签()) !== null) { switch (tag.字段号) { case 1: out.review = r.读取变长整数(); break; case 2: out.new = r.读取变长整数(); break; case 3: out.reviewToday = r.读取变长整数(); break; case 4: out.newToday = r.读取变长整数(); break; case 5: out.reviewTodayActive = r.读取布尔(); break; case 6: out.newTodayActive = r.读取布尔(); break; case 7: out.desiredRetention = r.读取浮点(); break; default: r.跳过字段(tag.线类型); } } return out; }
 
 export interface DeckConfigWithUseCount { config: DeckConfig; useCount: number; }

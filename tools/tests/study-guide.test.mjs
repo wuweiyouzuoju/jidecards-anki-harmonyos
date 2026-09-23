@@ -44,7 +44,7 @@ function pageHarness(completed = false) {
     playStudyHaptic: () => {},
     completeStudyGuide: async () => { saves++; completed = true; }
   });
-  const methods = ['maybeShowStudyGuide', 'showStudyGuide', '处理按键', '处理TapZone点击', '评分'].map(name => {
+  const methods = ['maybeShowStudyGuide', 'showStudyGuide', '处理按键', '处理TapZone点击', '评分', 'clearChoiceAutoAdvance', 'scheduleChoiceAutoAdvance', 'choiceAutoAdvanceSeconds'].map(name => {
     const start = pageSource.search(new RegExp(`  private (?:async )?${name}\\(`));
     assert.notEqual(start, -1);
     return pageSource.slice(start, pageSource.indexOf('\n  }', start) + 4);
@@ -53,6 +53,7 @@ function pageHarness(completed = false) {
   const page = new context.Harness();
   Object.assign(page, {
     studyGuideChecked: false, studyGuideVisible: false, stopStudyTimers() {}, startStudyTimers() {}, controllerReady: true, pendingHtml: '',
+    choiceQuestion: null, choiceGrade: null, choiceAutoAdvanceTimer: -1, choiceFeedbackDeadline: 0, studyMenuOpen: false,
     页面已显示: false, 阶段: 'loading', 当前卡片: {}, 展示时刻毫秒: 500,
     getUIContext: () => ({ showAlertDialog: options => dialogs.push(options) })
   });

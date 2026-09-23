@@ -41,6 +41,10 @@
 
 `BrowserSelection.ts` 负责 cards/notes 解析、稳定去重和变更笔记类型 schema/映射快照；解析失败必须整批停止，不能将部分集合误当成完整选择。`BrowserOperationController.execute` 区分写入失败与写入后的刷新失败；后者保留写入成功结果，避免诱发重复提交。离页继续已接受写入，只广播数据变化；旧操作不能清理新选择。页面只提供服务调用、当前选择判断和 UI 效果。
 
+查找替换的“当前搜索结果”在提交时复制完整 `结果ID列表` 与模式，再进入统一写入边界；不是已加载行，也不是提交后重新读取的搜索条件。空结果和未就绪搜索不调用写入，避免 Core 将空 `nids` 当作全库。卡片模式解析笔记 ID 并去重，任一解析失败整批停止；查找替换只支持字段，标签用标签服务。范围、翻页及等待期间切换搜索的回归在 `page-operation-boundaries.test.mjs`。
+
+牌组选项通过 `DeckConfigSave.ts` 将未启用的今日限额转为 null，再构造保存请求；协议的 Active 字段只描述读取状态，不能靠发送 false 停用覆盖。编辑框中的关闭值仅保留到本次编辑结束，保存清除覆盖。`DeckConfigMessages.encodeLimits` 保留 optional 数值 0 的字段存在性，0 与 null 不等价；回归见 `deck-config-save.test.mjs`。说明正文及对应实现索引见 [应用内帮助](in-app-help.md)。
+
 直接行为验证在 `browser-operation-model.test.mjs`；页面接线与选择切换回归仍在 `page-operation-boundaries.test.mjs` 和 `browser-batch-runtime.test.mjs`。新增批量操作先扩展这里的行为测试，不要求业务规则仍写在页面里。
 
 ## 搜索与编辑入口

@@ -28,6 +28,7 @@ function harness(phase = 'question') {
     mounted: true, sessionReady: true, foreground: true, 页面已显示: true, requestVersion: 0,
     audioSession: { stop: async () => {} }, playStudyAudio: () => {},
     阶段: phase, 评分中: false, studyGuideVisible: false, noteEditorVisible: false,
+    choiceQuestion: null, choiceAutoAdvanceSeconds: () => 5,
     noteEditorBusy: false, noteEditorError: '', editingNote: null, 展示时刻毫秒: 500,
     当前卡片: { cardId: 7, noteId: 42, states: 'original' }, 已渲染: {}, Ctrl按下: false,
     取文案: key => key,

@@ -14,6 +14,7 @@ import { PRIMARY_GLASS_KEY, PrimaryGlassStyle, themePrimaryGlass } from '../mode
 
 import { common } from '@kit.AbilityKit';
 import { LengthMetrics } from '@kit.ArkUI';
+import { promptAction } from '@kit.ArkUI';
 import { webview } from '@kit.ArkWeb';
 import { interceptCardAsset } from '../utils/CardAssetResponse';
 import { hilog } from '@kit.PerformanceAnalysisKit';
@@ -66,6 +67,8 @@ import { 解析是否深色, 主题模式 } from '../model/主题设置';
 import { 刷新桌面卡片数据 } from '../model/FSRS控制器';
 import { 颜色键 } from '../model/颜色主题';
 import { CustomTransition } from '../utils/自定义转场';
+import type { JideChoiceOption, JideChoiceQuestion, JideChoiceGrade } from '../model/JideChoice';
+import { gradeJideChoice, hideJideChoiceStaticOptions } from '../model/JideChoice';
 // KeyCode 枚举：用于 onKeyPreIme 键盘事件判断（API 12+）。物理键盘/蓝牙键盘/2in1 设备统一派发。
 
 import type { AI制卡页参数 } from './AI制卡页';
@@ -95,9 +98,14 @@ export interface 学习页参数 {
 class TapZone代理 {
   处理: (nx: number, ny: number) => void = (nx: number, ny: number): void => {
   };
+  右滑处理: () => void = (): void => {};
 
   onTap(nx: number, ny: number): void {
     this.处理(nx, ny);
+  }
+
+  onSwipeRight(): void {
+    this.右滑处理();
   }
 }
 
@@ -137,6 +145,9 @@ export struct 学习页 {
   @State private studyTimerText: string = '';
   private studyTiming: StudyTiming = new StudyTiming();
   private studyTimerId: number = -1;
+  private choiceAutoAdvanceTimer: number = -1;
+  private choiceFeedbackDeadline: number = 0;
+  private choiceDelayMenuOpen: boolean = false;
   private studyMenuOpen: boolean = false;
   private questionHasAudio: boolean = false;
   private 正面HTML: string = '';
@@ -209,6 +220,10 @@ export struct 学习页 {
   @State private 拼写组合: boolean = true;
   @State private 拼写填空: boolean = false;
   @State private 拼写卡片序号: number = 0;
+  @State private choiceQuestion: JideChoiceQuestion | null = null;
+  @State private choiceSelectedIds: string[] = [];
+  @State private choiceGrade: JideChoiceGrade | null = null;
+  @State private choiceFeedbackSecondsOverride: number = -1;
   /** NavDestination 透明度（由 customNavContentTransition 回调控制，实现淡入淡出转场）。 */
   @State private 转场透明度: number = 1;
 
@@ -267,6 +282,7 @@ export struct 学习页 {
     this.studySession.dispose();
     this.页面已显示 = false;
     this.invalidateCardWork();
+    this.clearChoiceAutoAdvance();
     this.待重渲染当前卡 = false;
     this.controllerReady = false;
     this.audioSession.release();
@@ -314,6 +330,7 @@ export struct 学习页 {
     }
     this.studyGuideVisible = true;
     this.stopStudyTimers();
+    this.clearChoiceAutoAdvance();
     this.Ctrl按下 = false;
     const openedAt: number = Date.now();
     const card: StudyCard | null = this.当前卡片;
@@ -323,6 +340,7 @@ export struct 学习页 {
       }
       this.studyGuideVisible = false;
       this.startStudyTimers();
+      this.scheduleChoiceAutoAdvance();
     };
     this.getUIContext().showAlertDialog({
       title: $r('app.string.study_guide_title'),
@@ -395,6 +413,7 @@ export struct 学习页 {
       return;
     }
     this.invalidateCardWork();
+    this.clearChoiceAutoAdvance();
     const version: number = this.requestVersion;
     this.loadingVersion = version;
     this.阶段 = 'loading';
@@ -404,6 +423,9 @@ export struct 学习页 {
     this.拼写组合 = true;
     this.拼写填空 = false;
     this.拼写卡片序号 = 0;
+    this.choiceQuestion = null;
+    this.choiceSelectedIds = [];
+    this.choiceGrade = null;
     try {
       const snapshot: StudySnapshot | null = await this.studySession.loadNext(this.牌组ID,
         (): boolean => this.isCurrentRequest(version));
@@ -431,6 +453,7 @@ export struct 学习页 {
       this.当前卡片 = card;
       this.已渲染 = rendered;
       this.按钮文案 = snapshot.labels;
+      this.choiceQuestion = snapshot.choiceQuestion;
       this.studyOptions = snapshot.options;
       this.questionHasAudio = false;
       const marker = 提取拼写标记(rendered.answerNodes) ?? 提取拼写标记(rendered.questionNodes);
@@ -444,6 +467,10 @@ export struct 学习页 {
       this.背面HTML = this.拼写字段名 !== ''
         ? 构建卡片HTML(rendered, 'answer', this.是否深色())
         : 剥除拼写标记(构建卡片HTML(rendered, 'answer', this.是否深色()));
+      if (this.choiceQuestion !== null) {
+        this.正面HTML = hideJideChoiceStaticOptions(this.正面HTML);
+        this.背面HTML = hideJideChoiceStaticOptions(this.背面HTML);
+      }
       this.阶段 = 'question';
       this.applyStudyHtml(this.正面HTML);
     } catch (error) {
@@ -475,6 +502,7 @@ export struct 学习页 {
   private studyActivityChanged(): void {
     if (!this.mounted) { return; }
     if (!this.页面已显示 || !this.foreground) {
+      this.clearChoiceAutoAdvance();
       this.autoAdvanceEnabled = false;
       this.invalidateCardWork();
       this.Ctrl按下 = false;
@@ -486,6 +514,7 @@ export struct 学习页 {
       return;
     }
     this.消费待重渲染();
+    this.scheduleChoiceAutoAdvance();
   }
 
   /** 首卡可以早于 Web attach；只在可见且控制器就绪时推送当前文档。 */
@@ -574,6 +603,67 @@ export struct 学习页 {
     this.studyTiming.pause(Date.now());
   }
 
+  private clearChoiceAutoAdvance(): void {
+    if (this.choiceAutoAdvanceTimer >= 0) clearTimeout(this.choiceAutoAdvanceTimer);
+    this.choiceAutoAdvanceTimer = -1;
+  }
+
+  private scheduleChoiceAutoAdvance(): void {
+    this.clearChoiceAutoAdvance();
+    if (!this.页面已显示 || !this.foreground || this.studyGuideVisible || this.studyMenuOpen || this.评分中 ||
+      this.noteEditorVisible || this.noteEditorBusy || this.手写模式 || this.choiceDelayMenuOpen ||
+      this.阶段 !== 'answer' || this.choiceGrade === null || this.choiceQuestion === null ||
+      this.choiceAutoAdvanceSeconds() <= 0 || this.choiceFeedbackDeadline <= 0) return;
+    const remaining: number = Math.max(0, this.choiceFeedbackDeadline - Date.now());
+    this.choiceAutoAdvanceTimer = setTimeout((): void => {
+      this.choiceAutoAdvanceTimer = -1;
+      this.继续选择题反馈();
+    }, remaining);
+  }
+
+  private choiceAutoAdvanceSeconds(): number {
+    if (this.choiceFeedbackSecondsOverride >= 0) return this.choiceFeedbackSecondsOverride;
+    return this.choiceQuestion === null ? 0 : this.choiceQuestion.feedbackSeconds;
+  }
+
+  private 选择题自动跳过选项(): void {
+    this.clearChoiceAutoAdvance();
+    this.choiceDelayMenuOpen = true;
+    const seconds: number[] = [0, 3, 5, 10, 15, 30];
+    this.getUIContext().getPromptAction().showActionMenu({
+      title: this.取文案($r('app.string.jide_choice_auto_skip_title')),
+      buttons: [
+        { text: this.取文案($r('app.string.jide_choice_auto_skip_option', 0)), color: $r('app.color.text_primary') },
+        { text: this.取文案($r('app.string.jide_choice_auto_skip_option', 3)), color: $r('app.color.text_primary') },
+        { text: this.取文案($r('app.string.jide_choice_auto_skip_option', 5)), color: $r('app.color.text_primary') },
+        { text: this.取文案($r('app.string.jide_choice_auto_skip_option', 10)), color: $r('app.color.text_primary') },
+        { text: this.取文案($r('app.string.jide_choice_auto_skip_option', 15)), color: $r('app.color.text_primary') },
+        { text: this.取文案($r('app.string.jide_choice_auto_skip_option', 30)), color: $r('app.color.text_primary') }
+      ]
+    }).then((data: promptAction.ActionMenuSuccessResponse): void => {
+      this.choiceDelayMenuOpen = false;
+      if (this.choiceQuestion !== null && data.index >= 0 && data.index < seconds.length) {
+        this.choiceFeedbackSecondsOverride = seconds[data.index];
+        if (this.choiceGrade !== null && this.阶段 === 'answer') {
+          this.choiceFeedbackDeadline = seconds[data.index] > 0 ? Date.now() + seconds[data.index] * 1000 : 0;
+        }
+      }
+      this.scheduleChoiceAutoAdvance();
+    }).catch((): void => {
+      this.choiceDelayMenuOpen = false;
+      this.scheduleChoiceAutoAdvance();
+    });
+  }
+
+  private 继续选择题反馈(): void {
+    if (this.choiceGrade === null || this.阶段 !== 'answer' || this.评分中 || this.studyGuideVisible ||
+      this.studyMenuOpen || this.choiceDelayMenuOpen || this.noteEditorVisible || this.noteEditorBusy || this.手写模式 ||
+      !this.页面已显示 || !this.foreground) return;
+    this.clearChoiceAutoAdvance();
+    this.choiceFeedbackDeadline = 0;
+    this.加载下一张卡();
+  }
+
   private toggleAutoAdvance(): void {
     this.autoAdvanceEnabled = !this.autoAdvanceEnabled;
     this.studyTiming.restartAdvance(Date.now());
@@ -589,7 +679,7 @@ export struct 学习页 {
     const now: number = Date.now();
     const seconds: number = this.studyTiming.displaySeconds(now, this.studyOptions);
     this.studyTimerText = `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, '0')}`;
-    if (!this.autoAdvanceEnabled || this.评分中 || this.flipPending) return;
+    if (this.choiceQuestion !== null || !this.autoAdvanceEnabled || this.评分中 || this.flipPending) return;
     const action: StudyAdvanceAction = this.studyTiming.takeAction(now, this.studyOptions, this.audioSession.isPlaying());
     switch (action) {
       case StudyAdvanceAction.ShowAnswer: this.显示答案(); break;
@@ -680,9 +770,6 @@ export struct 学习页 {
     const canManageCard: boolean = !this.评分中 && this.当前卡片 !== null &&
       (this.阶段 === 'question' || this.阶段 === 'answer');
     const 菜单: MenuElement[] = [
-      { value: this.取文案(this.autoAdvanceEnabled ? $r('app.string.study_auto_advance_pause') :
-          $r('app.string.study_auto_advance_start')), action: () => { this.toggleAutoAdvance(); },
-        enabled: canManageCard && (this.studyOptions.secondsToShowQuestion > 0 || this.studyOptions.secondsToShowAnswer > 0) },
       { value: this.取文案($r('app.string.study_edit_note')), action: () => { this.openNoteEditor(); }, enabled: canManageCard },
       { value: this.取文案($r('app.string.study_guide_title')), action: () => { this.showStudyGuide(); }, enabled: this.阶段 !== 'loading' && !this.评分中 },
       { value: this.取文案($r('app.string.study_undo')), action: () => { this.撤销上次(); }, enabled: this.可撤销 },
@@ -698,6 +785,20 @@ export struct 学习页 {
       },
       { value: this.取文案($r('app.string.study_delete_card')), action: () => { this.请求删除当前卡(); }, enabled: this.阶段 === 'question' || this.阶段 === 'answer' }
     ];
+    if (this.choiceQuestion !== null) {
+      菜单.push({
+        value: this.取文案($r('app.string.jide_choice_auto_skip_current', this.choiceAutoAdvanceSeconds())),
+        action: (): void => { this.选择题自动跳过选项(); },
+        enabled: canManageCard
+      });
+    } else {
+      菜单.unshift({
+        value: this.取文案(this.autoAdvanceEnabled ? $r('app.string.study_auto_advance_pause') :
+          $r('app.string.study_auto_advance_start')),
+        action: (): void => { this.toggleAutoAdvance(); },
+        enabled: canManageCard && (this.studyOptions.secondsToShowQuestion > 0 || this.studyOptions.secondsToShowAnswer > 0)
+      });
+    }
     // 「手写」入口：常驻显示（question/answer 阶段），无开关，进入后叠加 Canvas 笔迹层
     if (this.阶段 === 'question' || this.阶段 === 'answer') {
       if (this.Agent入口已启用) {
@@ -1068,6 +1169,7 @@ export struct 学习页 {
   private async 显示答案(): Promise<void> {
     if (this.noteEditorVisible || this.noteEditorBusy || this.studyGuideVisible || this.flipPending ||
       (this.评分中 && !this.contentRefreshInFlight)) { return; }
+    if (this.choiceQuestion !== null) return;
     if (!this.isCurrentRequest(this.requestVersion) || !this.controllerReady || this.pendingHtml !== '' ||
       this.阶段 !== 'question' || this.已渲染 === null) { return; }
     const version: number = this.requestVersion;
@@ -1087,6 +1189,136 @@ export struct 学习页 {
     } finally {
       if (version === this.requestVersion) { this.flipPending = false; }
     }
+  }
+
+  private 切换选择题选项(id: string): void {
+    if (this.choiceGrade !== null || this.choiceQuestion === null) return;
+    if (this.choiceQuestion.type === 'single_choice') {
+      this.choiceSelectedIds = [id];
+      return;
+    }
+    const next: string[] = this.choiceSelectedIds.slice();
+    const index: number = next.indexOf(id);
+    if (index >= 0) next.splice(index, 1); else next.push(id);
+    this.choiceSelectedIds = next;
+  }
+
+  private async 提交选择题(): Promise<void> {
+    if (this.choiceQuestion === null || this.choiceGrade !== null || this.choiceSelectedIds.length === 0 ||
+      this.阶段 !== 'question' || this.studyGuideVisible || this.noteEditorVisible || this.noteEditorBusy ||
+      this.当前卡片 === null || this.评分中 || !this.isCurrentRequest(this.requestVersion)) return;
+    const version: number = this.requestVersion;
+    const question: JideChoiceQuestion = this.choiceQuestion;
+    const card: StudyCard = this.当前卡片;
+    const grade: JideChoiceGrade = gradeJideChoice(this.choiceSelectedIds, question.answer);
+    this.choiceGrade = grade;
+    this.评分中 = true;
+    playStudyHaptic();
+    try {
+      await this.studySession.answer(card, grade.correct ? RATING_GOOD : RATING_HARD, Date.now(), this.展示时刻毫秒);
+      if (!this.isCurrentRequest(version) || this.当前卡片 !== card) return;
+      this.阶段 = 'answer';
+      this.applyStudyHtml(this.背面HTML);
+      const autoAdvanceSeconds: number = this.choiceAutoAdvanceSeconds();
+      this.choiceFeedbackDeadline = autoAdvanceSeconds > 0 ? Date.now() + autoAdvanceSeconds * 1000 : 0;
+      this.scheduleChoiceAutoAdvance();
+    } catch (error) {
+      if (!this.isCurrentRequest(version)) return;
+      this.阶段 = 'error';
+      this.错误详情 = error instanceof Error ? error.message : `${error}`;
+    } finally {
+      this.评分中 = false;
+      this.scheduleChoiceAutoAdvance();
+    }
+  }
+
+  @Builder
+  private 选择题区() {
+    if (this.choiceQuestion !== null && (this.阶段 === 'question' || this.阶段 === 'answer')) {
+      Column({ space: 应用尺寸.间距_8 }) {
+        Scroll() {
+          Row({ space: 应用尺寸.间距_8 }) {
+            Column({ space: 应用尺寸.间距_8 }) {
+              ForEach(this.choiceQuestion.options.slice(0, Math.ceil(this.choiceQuestion.options.length / 2)),
+                (option: JideChoiceOption): void => { this.选择题选项按钮(option); },
+                (option: JideChoiceOption): string => option.id)
+            }.layoutWeight(1)
+            Column({ space: 应用尺寸.间距_8 }) {
+              ForEach(this.choiceQuestion.options.slice(Math.ceil(this.choiceQuestion.options.length / 2)),
+                (option: JideChoiceOption): void => { this.选择题选项按钮(option); },
+                (option: JideChoiceOption): string => option.id)
+            }.layoutWeight(1)
+          }
+          .width('100%')
+        }
+        .layoutWeight(1)
+        .scrollBar(BarState.Auto)
+        if (this.阶段 === 'question') {
+          Button($r('app.string.jide_choice_submit'))
+            .width('100%').height(应用尺寸.行动按钮高度)
+            .backgroundColor(this.动作主色).fontColor($r('app.color.action_on_primary'))
+            .borderRadius(应用尺寸.圆角_行动按钮)
+            .enabled(this.choiceSelectedIds.length > 0 && !this.评分中)
+            .onClick((): void => { this.提交选择题(); });
+        }
+        if (this.阶段 === 'answer' && this.choiceGrade !== null) {
+          Text(this.choiceGrade.correct ? $r('app.string.jide_choice_correct') : $r('app.string.jide_choice_wrong'))
+            .fontSize(应用尺寸.字号_正文_中)
+            .fontColor(this.choiceGrade.correct ? $r('app.color.status_ready') : $r('app.color.error_text'))
+          Button($r('app.string.jide_choice_continue'))
+            .width('100%').height(应用尺寸.行动按钮高度)
+            .backgroundColor(this.动作主色).fontColor($r('app.color.action_on_primary'))
+            .borderRadius(应用尺寸.圆角_行动按钮)
+            .onClick((): void => { this.继续选择题反馈(); });
+        }
+      }
+      .width('100%').height('58%')
+      .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平,
+        top: 应用尺寸.间距_8, bottom: 应用尺寸.间距_8 })
+      .align(Alignment.Bottom)
+      .backgroundColor($r('app.color.surface_page'))
+      .parallelGesture(SwipeGesture({ direction: SwipeDirection.Horizontal })
+        .onAction((event: GestureEvent): void => {
+          if (Math.abs(event.angle) < 90) this.继续选择题反馈();
+        }))
+    }
+  }
+
+  private 选择题选项序号(option: JideChoiceOption): number {
+    return this.choiceQuestion === null ? 0 : this.choiceQuestion.options.indexOf(option);
+  }
+
+  private 选择题选项已选(option: JideChoiceOption): boolean {
+    return this.choiceSelectedIds.indexOf(option.id) >= 0;
+  }
+
+  private 选择题选项正确(option: JideChoiceOption): boolean {
+    return this.choiceQuestion !== null && this.choiceQuestion.answer.indexOf(option.id) >= 0;
+  }
+
+  @Builder
+  private 选择题选项按钮(option: JideChoiceOption) {
+    Button() {
+      Row({ space: 应用尺寸.间距_8 }) {
+        Text(`${String.fromCharCode(65 + this.选择题选项序号(option))}.`)
+          .fontSize(应用尺寸.字号_按钮).fontColor($r('app.color.text_secondary'))
+        Text(this.choiceGrade === null ? (this.选择题选项已选(option) ? '✓' : '○') :
+          (this.选择题选项正确(option) ? '✓' : (this.选择题选项已选(option) ? '×' : '○')))
+          .fontSize(应用尺寸.字号_按钮)
+          .fontColor(this.choiceGrade === null ? this.动作主色 :
+            (this.选择题选项正确(option) ? $r('app.color.status_ready') :
+              (this.选择题选项已选(option) ? $r('app.color.error_text') : this.动作主色)))
+        Text(option.text).fontSize(应用尺寸.字号_正文_中)
+          .fontColor($r('app.color.text_primary')).textAlign(TextAlign.Start).layoutWeight(1)
+      }
+      .width('100%')
+    }
+    .width('100%').constraintSize({ minHeight: 应用尺寸.行动按钮高度 })
+    .backgroundColor(this.选择题选项已选(option) ? $r('app.color.surface_selected') : $r('app.color.surface_card'))
+    .border({ width: 1, color: $r('app.color.border_subtle') })
+    .borderRadius(应用尺寸.圆角_面板)
+    .enabled(this.choiceGrade === null && !this.评分中)
+    .onClick((): void => { this.切换选择题选项(option.id); });
   }
 
   /** 根据翻面时的拼写快照生成比对结果；字段读取失败时仍显示答案。 */
@@ -1155,6 +1387,7 @@ export struct 学习页 {
   // ========================================================
   private async 评分(rating: number): Promise<void> {
     if (this.studyGuideVisible) { return; }
+    if (this.choiceQuestion !== null) { return; }
     if (this.评分中 || this.阶段 !== 'answer' || this.当前卡片 === null) {
       return;
     }
@@ -1326,8 +1559,8 @@ export struct 学习页 {
           .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
           .borderRadius(应用尺寸.圆角_胶囊)
           .bindMenu(this.更多菜单(), {
-            onAppear: (): void => { this.studyMenuOpen = true; this.stopStudyTimers(); },
-            onDisappear: (): void => { this.studyMenuOpen = false; this.startStudyTimers(); }
+            onAppear: (): void => { this.studyMenuOpen = true; this.stopStudyTimers(); this.clearChoiceAutoAdvance(); },
+            onDisappear: (): void => { this.studyMenuOpen = false; this.startStudyTimers(); this.scheduleChoiceAutoAdvance(); }
           })
       }
       .width('100%')
@@ -1371,7 +1604,8 @@ export struct 学习页 {
           代理.处理 = (nx: number, ny: number): void => {
             this.处理TapZone点击(nx, ny);
           };
-          this.网页控制器.registerJavaScriptProxy(代理, 'ankiTapZone', ['onTap']);
+          代理.右滑处理 = (): void => { this.继续选择题反馈(); };
+          this.网页控制器.registerJavaScriptProxy(代理, 'ankiTapZone', ['onTap', 'onSwipeRight']);
           this.studyWebAttached();
         })
         .onInterceptRequest((event: OnInterceptRequestEvent): WebResourceResponse | null => {
@@ -1396,6 +1630,10 @@ export struct 学习页 {
             + 'el=el.parentElement;}'
             + 'if(window.ankiTapZone){window.ankiTapZone.onTap(e.clientX/window.innerWidth, e.clientY/window.innerHeight);}'
             + '},true); })();'
+            + '(function(){if(window.__jideSwipeInstalled){return;}window.__jideSwipeInstalled=true;var sx=0,sy=0,st=0;'
+            + 'document.addEventListener("touchstart",function(e){if(e.touches.length!==1){st=0;return;}sx=e.touches[0].clientX;sy=e.touches[0].clientY;st=Date.now();},{passive:true,capture:true});'
+            + 'document.addEventListener("touchend",function(e){if(!st||e.changedTouches.length!==1)return;var dx=e.changedTouches[0].clientX-sx,dy=e.changedTouches[0].clientY-sy;'
+            + 'if(dx>=56&&Math.abs(dx)>Math.abs(dy)*1.25&&Date.now()-st<1500&&window.ankiTapZone){window.ankiTapZone.onSwipeRight();}st=0;},{passive:true,capture:true});})();'
           );
           // 翻面后自动滚动到答案区（<hr id=answer> 或底部），避免用户手动下滑（2026-07-28 加）。
           // 先等待公式排版再给图片留 100ms，避免公式撑高后滚动位置偏移。
@@ -1406,9 +1644,12 @@ export struct 学习页 {
           }
         })
         .width('100%')
-        .height('100%')
+        .height(this.choiceQuestion === null ? '100%' : '42%')
+        .align(Alignment.TopStart)
         // 保留控制器供撤销/恢复埋藏复用；加载、完成及错误态均不透出旧卡。
         .visibility(this.阶段 === 'question' || this.阶段 === 'answer' ? Visibility.Visible : Visibility.Hidden)
+
+        this.选择题区()
 
       // Tap Zones（实验性功能，仅「实验版」模式下且开关开启时生效）：
       // 点击判定在卡片 Web 内部完成（onPageEnd 注入的 click 监听 + javaScriptProxy 回调），
@@ -1617,7 +1858,7 @@ export struct 学习页 {
   @Builder
   private 答案条() {
     Column() {
-      if (this.阶段 === 'question') {
+      if (this.阶段 === 'question' && this.choiceQuestion === null) {
         Button() {
           Text() { ThemeTextSpans($r('app.string.study_show_answer'), this.themeAccentColors, this.getUIContext()) }
             .fontSize(应用尺寸.字号_标题).fontWeight(FontWeight.Medium).fontColor(this.动作主色)
@@ -1642,7 +1883,7 @@ export struct 学习页 {
             this.显示答案();
           })
       }
-      if (this.阶段 === 'answer') {
+      if (this.阶段 === 'answer' && this.choiceQuestion === null) {
         Row({ space: 应用尺寸.间距_8 }) {
           StudyActionButton({
             label: $r('app.string.rating_again'),
@@ -1713,7 +1954,7 @@ export struct 学习页 {
 
         if (this.学习布局模式值 === 'float') {
           // 主操作浮动工具栏：question 阶段显示「显示答案」，answer 阶段切换为 4 个评分按钮。
-          学习浮动工具栏({
+          if (this.choiceQuestion === null) 学习浮动工具栏({
             当前阶段: this.阶段,
             评分按钮文案: this.按钮文案,
             是否深色: this.是否深色(),

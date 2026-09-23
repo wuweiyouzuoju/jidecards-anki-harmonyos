@@ -3,7 +3,7 @@
 import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
 
-const STUDY_GUIDE_KEY: string = 'studyGuideCompleted';
+const STUDY_GUIDE_KEY: string = 'studyGuideCompletedV2';
 
 /** 学习教学只记录在本机应用偏好中，所有牌组共用。 */
 /** @throws {Error} 教学偏好读取或确认落盘失败，调用方保留可重试状态。 */

@@ -54,6 +54,10 @@ AppGallery 页面为准；仓库中的构建版本以 `AppScope/app.json5` 为�
 
 ## 主要功能
 
+### APKG 选择题扩展（当前源码）
+
+选择题沿用标准 `.apkg` 导入与 Anki 同步。jidecards 识别版本化字段并提供原生单选/多选交互，其他 Anki 客户端按普通正反面卡片复习。公开的 [v1 规范](docs/choice-apkg-v1.md)、[Agent 制题指南](docs/choice-authoring.md)、[JSON Schema](docs/schemas/choice-source-v1.schema.json) 和 [示例 APKG](docs/examples/choice-demo.apkg) 随源码提供；使用 `npm run choice:build` 生成题包。此处描述当前源码能力，不代表已上架版本或真实云同步验收结论。
+
 ### AI 制卡与 AI 改卡（2.7.0 默认隐藏，开发者调试解锁后可用）
 
 - **应用内 AI Agent**：AI 制卡和 AI 改卡共用 ArkTS 轻量 Agent 内核，可理解自然语言、读取授权范围内的牌组/卡片结构，并通过受控语义工具完成任务；模型不能直接访问 Anki Rust、数据库、文件系统或任意后端 RPC。

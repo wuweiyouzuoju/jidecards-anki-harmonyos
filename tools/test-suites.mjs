@@ -7,7 +7,7 @@ export const SUITES = {
   release: /^(release-export|signing-config)/,
   tooling: /^(doctor|tooling|change-impact|build-(?:app|native)-wrapper|build-warnings|release-export|signing-config|documentation-contract|architecture-boundaries)/,
   home: /^(home-|page-(?:operation|domain|repositories)|external-deck|cloud-deck|official-announcement|deck-media|deck-options|deck-config|sync-automatic)/,
-  study: /^(page-domain|page-repositories|study-|bury-congrats|audio-|card-audio|native-audio|undo-|proto-study|deck-config|review-|tap-zone)/,
+  study: /^(page-domain|page-repositories|study-|jide-choice|choice-package|bury-congrats|audio-|card-audio|native-audio|undo-|proto-study|deck-config|review-|tap-zone)/,
   sync: /sync|home-transfer|study-session|page-(?:operation|domain|repositories)|native-bridge/,
   browser: /browser|page-(?:operation|domain|repositories)|preview|search|note|card-info/,
   media: /media|audio|render|math|latex|jquery|preview|card-template/,
