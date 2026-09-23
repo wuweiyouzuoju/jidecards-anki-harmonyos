@@ -1562,7 +1562,7 @@ export struct 浏览页 {
               初始多选模式: this.pageSelectForAgentEdit,
               onRowClick: (行ID: number): void => { this.行点击处理(行ID); },
               onLongPress: (): void => {},
-              onLoadMore: (): void => { this.加载更多(); },
+              onLoadMore: (): Promise<void> => this.加载更多(),
               onInfoClick: (行ID: number): void => { this.打开卡片信息(行ID); },
               onSelectionChange: (选中IDs: number[]): void => { this.selectionVersion++; this.选中ID列表 = 选中IDs.slice(); },
               onMultiSelectChange: (多选: boolean): void => { this.多选模式值 = 多选; },

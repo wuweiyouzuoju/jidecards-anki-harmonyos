@@ -30,7 +30,8 @@ test('Windows PowerShell build wrapper tolerates stderr warnings but rejects uns
       if (scenario === 'missing') rmSync(signed);
       const warning = scenario === 'unsigned' ? 'No signingConfig found for product default' :
         scenario === 'new-warning' ? 'WARN: new diagnostic' : 'WARN: fixture warning';
-      writeFileSync(join(devEco, 'tools/hvigor/bin/hvigorw.bat'), `@echo off\r\necho ${warning} 1>&2\r\nexit /b ${scenario === 'failure' ? 7 : 0}\r\n`);
+      writeFileSync(join(devEco, 'tools/hvigor/bin/hvigorw.bat'), `@echo off\r\necho ${warning} 1>&2\r\necho ARGS=%*>>"${join(root, 'hvigor-args.log')}"\r\n` +
+        `exit /b ${scenario === 'failure' ? 7 : 0}\r\n`);
       const result = spawnSync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', join(tools, 'build-app.ps1'), '-SkipRust'], {
         cwd: root, env: { ...process.env, DEVECO_HOME: devEco }, encoding: 'utf8'
       });
@@ -39,5 +40,9 @@ test('Windows PowerShell build wrapper tolerates stderr warnings but rejects uns
       assert.doesNotMatch(result.stdout + result.stderr, /Cannot convert null|ActionPreference/);
       assert.equal(JSON.parse(readFileSync(join(root, '.hvigor/build-warning-report.json'), 'utf8')).status, 'not-run',
         'each invocation clears previous gate status; this fixture verifier does not publish a report');
+      if (scenario === 'warning') {
+        assert.match(readFileSync(join(root, 'hvigor-args.log'), 'utf8'), /ARGS=.*(?:^| )assembleHap(?: |$)/,
+          'Hvigor must receive assembleHap as one argument');
+      }
     }
   });

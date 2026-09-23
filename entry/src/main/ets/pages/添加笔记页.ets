@@ -21,6 +21,7 @@ import { importNoteImage } from '../backend/NoteImageImport';
 import { NoteFieldImage, prepareNoteImageFields } from '../model/NoteImageDraft';
 import { 文本中的填空编号 } from '../model/填空解析器';
 import { 生成Occlusions字符串, 识别图片扩展名 } from '../model/图片遮罩模型';
+import { NoteSaveLifecycle } from '../model/NoteSaveLifecycle';
 import type { 遮罩描述 } from '../model/图片遮罩模型';
 import { 加载主题模式 } from '../model/主题存储';
 import { 解析是否深色, 主题模式 } from '../model/主题设置';
@@ -90,6 +91,7 @@ export struct 添加笔记页 {
   private imageRequest: number = 0;
   private nextImageId: number = 0;
   private pageActive: boolean = false;
+  private readonly saveLifecycle: NoteSaveLifecycle = new NoteSaveLifecycle();
   // 笔记类型名称用于判断是否为 Cloze（Anki 默认 Cloze 笔记类型名为 "Cloze"）
   @State private 笔记类型名: string = '';
   @State private 笔记类型帮助: Resource = $r('app.string.add_note_notetype_help');
@@ -148,6 +150,7 @@ export struct 添加笔记页 {
 
   async aboutToAppear(): Promise<void> {
     this.pageActive = true;
+    this.saveLifecycle.appear();
     this.牌组ID = this.pageDeckId === '' ? 0 : parseInt(this.pageDeckId);
     this.牌组名 = this.pageDeckName;
     this.牌组选项 = this.pageDeckOptions;
@@ -176,6 +179,7 @@ export struct 添加笔记页 {
 
   aboutToDisappear(): void {
     this.pageActive = false;
+    this.saveLifecycle.disappear();
     this.imageRequest++;
     // 注销自定义转场回调，避免内存泄漏与野回调
     CustomTransition.getInstance().注销NavParam('AddNotePage');
@@ -863,6 +867,11 @@ export struct 添加笔记页 {
     }
     this.错误信息 = '';
     this.处理中 = true;
+    const saveToken: number | null = this.saveLifecycle.accept();
+    if (saveToken === null) {
+      this.处理中 = false;
+      return;
+    }
     let 临时路径: string = '';
     try {
       // 1-2. 读 URI 字节，按魔数定扩展名，写入沙箱临时文件
@@ -882,9 +891,13 @@ export struct 添加笔记页 {
       // 不依赖 NavPathStack.onPop 回调（不同设备/API 版本偶发不触发），用 @StorageLink + @Watch 兜底。
       AppStorage.setOrCreate<number>('noteAddedTick', Date.now());
       // 4. pop 返回牌组详情
-      this.pathStack.pop();
+      if (this.saveLifecycle.canNavigate(saveToken)) {
+        this.pathStack.pop();
+      }
     } catch (错误) {
-      this.错误信息 = 错误 instanceof Error ? 错误.message : `${错误}`;
+      if (this.saveLifecycle.isCurrent(saveToken)) {
+        this.错误信息 = 错误 instanceof Error ? 错误.message : `${错误}`;
+      }
     } finally {
       if (临时路径 !== '') {
         try {

@@ -17,7 +17,7 @@ import type { BrowserDisplayRow as 浏览行数据 } from '../../model/BrowserSe
 // 已加载行数：当前已加载的行数（用于判断是否还有更多）
 // onRowClick：非多选模式下点击行回调
 // onLongPress：长按行进入多选模式时回调
-// onLoadMore：滚动到底部时触发，宿主应加载下一批行
+// onLoadMore：滚动到底部时触发，宿主应加载下一批行并在请求完成后 resolve
 //
 // @输出
 // 渲染扁平列表 / 空态
@@ -39,12 +39,43 @@ import { 统一空态 } from '../common/统一空态';
 import { BrowserRowColor } from '../../proto/messages/SearchMessages';
 import type { BrowserCell } from '../../proto/messages/SearchMessages';
 
+/**
+ * List data source for browser rows.  The page owns the query and mutation
+ * state; this object owns only the visible row snapshot and its change
+ * notifications, which keeps list virtualization out of the page component.
+ */
+export class 浏览行数据源 implements IDataSource {
+  private rows: 浏览行数据[] = [];
+  private readonly listeners: DataChangeListener[] = [];
+
+  totalCount(): number { return this.rows.length; }
+  getData(index: number): 浏览行数据 { return this.rows[index]; }
+  keyFor(index: number): string {
+    return this.keyForRow(this.rows[index]);
+  }
+  keyForRow(row: 浏览行数据): string {
+    // ID 在一次搜索结果中唯一；显示颜色/挂起状态变化应更新同一行，而不是重建节点。
+    return `${row.id}`;
+  }
+  replaceAll(rows: 浏览行数据[]): void {
+    this.rows = rows.slice();
+    for (const listener of this.listeners) listener.onDataReloaded();
+  }
+  registerDataChangeListener(listener: DataChangeListener): void {
+    if (this.listeners.indexOf(listener) < 0) this.listeners.push(listener);
+  }
+  unregisterDataChangeListener(listener: DataChangeListener): void {
+    const index: number = this.listeners.indexOf(listener);
+    if (index >= 0) this.listeners.splice(index, 1);
+  }
+}
+
 /** 单行展示数据：卡片/笔记 ID + 后端返回的单元格 + 行颜色提示（标志/挂起等） */
 export type { BrowserDisplayRow as 浏览行数据 } from '../../model/BrowserSearchSession';
 
 @Component
 export struct 卡片表格 {
-  @Prop 行列表: 浏览行数据[] = [];
+  @Prop @Watch('同步行数据源') 行列表: 浏览行数据[] = [];
   @Prop 结果总数: number = 0;
   @Prop 已加载行数: number = 0;
   @Prop subtitleIndex: number = 1;
@@ -53,7 +84,7 @@ export struct 卡片表格 {
   @Prop 初始多选模式: boolean = false;
   onRowClick: (id: number) => void = (): void => {};
   onLongPress: () => void = (): void => {};
-  onLoadMore: () => void = (): void => {};
+  onLoadMore: () => Promise<void> = async (): Promise<void> => {};
   /** T11 卡片信息：非多选模式下点击行右侧 info 按钮触发 */
   onInfoClick: (id: number) => void = (): void => {};
   /** T8 批量操作栏：选中ID集合变化时上抛（数组快照），宿主据此显示/隐藏批量操作栏 */
@@ -68,11 +99,17 @@ export struct 卡片表格 {
   @State private 多选模式: boolean = false;
   @State private 选中ID集合: Set<number> = new Set<number>();
   @State private 加载中: boolean = false;
+  private readonly 行数据源: 浏览行数据源 = new 浏览行数据源();
 
   aboutToAppear(): void {
+    this.同步行数据源();
     if (this.初始多选模式) {
       this.多选模式 = true;
     }
+  }
+
+  private 同步行数据源(): void {
+    this.行数据源.replaceAll(this.行列表);
   }
 
   /** 退出多选信号变化时清空内部选中（宿主已清自己的，这里同步组件内部状态）。 */
@@ -158,7 +195,7 @@ export struct 卡片表格 {
         })
       } else {
         List({ space: 应用尺寸.pageSectionGap }) {
-          ForEach(this.行列表, (行: 浏览行数据, index: number) => {
+          LazyForEach(this.行数据源, (行: 浏览行数据) => {
             ListItem() {
               Row({ space: 应用尺寸.间距_8 }) {
                 if (this.多选模式) {
@@ -243,8 +280,7 @@ export struct 卡片表格 {
                   .onAction((): void => this.处理长按(行.id))
               )
             }
-          }, (行: 浏览行数据): string =>
-            `${行.id}-${行.color}-${行.hasSuspendedCards}-${JSON.stringify(行.cells)}`)
+          }, (行: 浏览行数据): string => this.行数据源.keyForRow(行))
         }
         .width('100%')
         .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平 })
@@ -256,13 +292,21 @@ export struct 卡片表格 {
         .onReachEnd((): void => {
           if (!this.加载中 && this.已加载行数 < this.结果总数) {
             this.加载中 = true;
-            this.onLoadMore();
-            setTimeout((): void => { this.加载中 = false; }, 1000);
+            this.加载下一页();
           }
         })
       }
     }
     .width('100%')
     .layoutWeight(1)
+  }
+
+  /** 由请求本身结束加载态，避免固定延时造成重复请求或过早解除锁定。 */
+  private async 加载下一页(): Promise<void> {
+    try {
+      await this.onLoadMore();
+    } finally {
+      this.加载中 = false;
+    }
   }
 }

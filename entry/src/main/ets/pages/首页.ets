@@ -82,7 +82,6 @@ import { copyDeckConfig, deckConfigUseCount, buildDeckConfigRequest } from '../m
 import { 学习页, 学习页参数 } from './学习页';
 import { 浏览页 } from './浏览页';
 import { 统计页, 统计页参数 } from './统计页';
-import { 构建月历, 月历数据 } from '../model/日历模型';
 
 import {
   牌组列表数据源,
@@ -213,7 +212,6 @@ struct 首页 {
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
   // 顶部 设置/创建牌组 两按钮共用一个 pressed 状态：0=无，1=设置，2=创建牌组
   @State private 工具栏按下状态: number = 0;
-  @State private 显示设置: boolean = false;
   @State @Watch('homeActivityChanged') private 显示许可证: boolean = false;
   @State @Watch('homeActivityChanged') private 显示创建牌组: boolean = false;
   @State private 创建父牌组ID: string = '';
@@ -286,7 +284,6 @@ struct 首页 {
   private 编辑配置: DeckConfig | null = null;
   @State private 编辑表单: 牌组配置表单 | null = null;
   @State private 编辑选项: 牌组选项编辑 | null = null;
-  @State private 月历: 月历数据 = 构建月历(new Date(), new Map<string, number>());
   /** 下拉刷新状态：与 Refresh 组件双向绑定；加载主页数据 完成后置回 false 收起指示器。 */
   @State @Watch('homeActivityChanged') private 刷新中: boolean = false;
   // 同级子牌组拖拽排序模式：true 时所有 牌组列表项 进入可拖态、顶部显示「完成排序」Bar、onClick 不选牌。
@@ -838,7 +835,7 @@ struct 首页 {
   // 无（从 abilityContext 取 filesDir，调后端服务）
   //
   // @输出
-  // 更新 主页快照数据 / 加载状态 / 月历 / 牌组数据源 等状态字段
+  // 更新主页快照数据、加载状态和牌组数据源等状态字段
   //
   // @业务规则
   // 首次启动自动开启 FSRS（用户决策：默认开启可关闭）。
@@ -892,7 +889,6 @@ struct 首页 {
       this.展开的牌组ID集合 = expansion.expanded;
       this.已知牌组ID集合 = expansion.known;
       this.牌组数据源.replaceAll(可见牌组行(snapshot.decks, this.展开的牌组ID集合, this.隐藏的牌组ID集合));
-      this.月历 = 构建月历(new Date(), snapshot.reviewCountsByDate);
       this.加载状态 = snapshot.decks.length > 0 ? 'ready' : 'empty';
       if (this.加载状态 === 'ready') this.scheduleAutomaticBackup();
       // 首次加载完成且宽屏：恢复上次选中的牌组（牌组详情面板 显示详情）。

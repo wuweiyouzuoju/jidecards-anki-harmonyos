@@ -8,7 +8,7 @@
 
 ## 浏览列表
 
-浏览结果每条采用独立圆角卡片，左右沿用页面内边距，条目间距沿用设置分组；信息入口、多选、旗标和分页仍在 `卡片表格` 中。应用所有原生 Select 共用 `utils/SelectStyle.ets` 的高度、字重、16vp 卡片圆角及明暗资源配色，页面独立选择框传入 surface_card（浅色白、深色卡片底），卡片内默认 surface_sidebar；调用方通过 `.font(SelectStyle.controlFont)` 与 `.borderRadius(SelectStyle.controlRadius)` 在每次刷新时重设字体和圆角，避免 AttributeModifier 差分跳过未变值后残留系统默认外观；其余样式继续由 modifier 提供。调用方保留宽度、菜单对齐和业务绑定。统计页 FSRS 状态位于顶栏右侧，历史范围位于牌组选择右侧。牌组长按菜单直接显示满宽颜色选择框；设置模式菜单沿用首页更多的 compactMenuWidth。
+浏览结果每条采用独立圆角卡片，左右沿用页面内边距，条目间距沿用设置分组；信息入口、多选、旗标和分页仍在 `卡片表格` 中。表格通过 `IDataSource` + `LazyForEach` 消费行快照，行 key 使用稳定业务字段，避免大列表状态变化时按整数组重建；分页加载态跟随宿主 `Promise` 结束，不使用固定延时。应用所有原生 Select 共用 `utils/SelectStyle.ets` 的高度、字重、16vp 卡片圆角及明暗资源配色，页面独立选择框传入 surface_card（浅色白、深色卡片底），卡片内默认 surface_sidebar；调用方通过 `.font(SelectStyle.controlFont)` 与 `.borderRadius(SelectStyle.controlRadius)` 在每次刷新时重设字体和圆角，避免 AttributeModifier 差分跳过未变值后残留系统默认外观；其余样式继续由 modifier 提供。调用方保留宽度、菜单对齐和业务绑定。统计页 FSRS 状态位于顶栏右侧，历史范围位于牌组选择右侧。牌组长按菜单直接显示满宽颜色选择框；设置模式菜单沿用首页更多的 compactMenuWidth。
 
 笔记模式批量删除/改牌组/标志复用 `笔记服务.获取笔记的卡片` 展开全部兄弟卡并去重；删除后重新查询后端结果，失败保留选择。不要回到空卡片列表调用后本地移除行的做法。回归见 `browser-batch-runtime.test.mjs`。
 

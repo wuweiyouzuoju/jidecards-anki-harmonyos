@@ -41,7 +41,16 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 # Windows PowerShell 5 wraps redirected native stderr in error records.
 # Hvigor warnings must not abort this pipeline; inspect its exit code instead.
-$BuildTasks = if ($Clean) { @('clean', 'assembleHap') } else { @('assembleHap') }
+# PowerShell unwraps a one-item array produced by an assignment.  Passing that
+# scalar with @BuildTasks makes native argument expansion treat the task name as
+# an enumerable string ("assembleHap" becomes eight arguments).  Build the
+# argument array incrementally so the native Hvigor invocation always receives
+# whole task names.
+$BuildTasks = @()
+if ($Clean) {
+    $BuildTasks += 'clean'
+}
+$BuildTasks += 'assembleHap'
 try {
     $ErrorActionPreference = 'Continue'
     & $Hvigor --mode module -p product=default -p module=entry@default `
