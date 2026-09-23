@@ -63,8 +63,6 @@ test('home wires graphs into the snapshot and degrades quietly', () => {
   assert.match(index, /import \{ 统计服务 \} from '..\/backend\/统计服务'/);
   assert.match(index, /readGraphs\(\): Promise<GraphsView \| null>/);
   assert.match(index, /构建主页快照\(tree, graphs/);
-  assert.doesNotMatch(index, /构建月历\(new Date\(\), snapshot\.reviewCountsByDate\)/,
-    'homepage no longer constructs the retired monthly calendar UI');
 
   const method = index.match(/private async readGraphs[\s\S]*?\n  \}/);
   assert.notEqual(method, null);

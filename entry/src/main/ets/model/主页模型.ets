@@ -142,7 +142,6 @@ export interface 记忆表现汇总 {
 export interface 主页快照 {
   today: 今日学习汇总;
   decks: 牌组汇总[];
-  reviewCountsByDate: Map<string, number>;
   memory: 记忆表现汇总;
 }
 
@@ -253,7 +252,6 @@ export const 空主页快照: 主页快照 = {
     deckCount: 0
   },
   decks: [],
-  reviewCountsByDate: new Map<string, number>(),
   memory: {
     state: 'loading',
     todayAgainRate: 0,

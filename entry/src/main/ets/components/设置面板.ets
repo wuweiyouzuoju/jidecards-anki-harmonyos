@@ -11,6 +11,7 @@ import { commentManager } from '@kit.AppGalleryKit';
 import { 主题模式 } from '../model/主题设置';
 import { 颜色主题, 颜色键 } from '../model/颜色主题';
 import { 集合服务 } from '../backend/集合服务';
+import { CollectionMaintenanceSession, CollectionMaintenanceState } from '../model/settings/CollectionMaintenanceSession';
 import { 标签服务 } from '../backend/标签服务';
 import { 链接服务 } from '../backend/链接服务';
 import { HelpPage } from '../proto/messages/LinksMessages';
@@ -55,9 +56,7 @@ import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../model/ReleaseFeatures';
 // 顶栏布局：左「返回」（关闭设置页）+ 右「当前模式名」（弹出 模式切换菜单 选 简洁版/实验版），
 // 替代原底部「当前模式」分组，该分组已于 2026-08-29 删除）。
 // 5 个分组（外观/调度器/布局/数据/术语表）+ 模式切换菜单 已抽到 components/settings/ 子组件；
-// 数据库检查分组与关于分组保留在主壳中：
-//   - 数据库检查：契约测试 check-database-contract 要求主壳直接持有 集合服务 并调 检查数据库；
-//   - 关于分组：契约测试要求 feedback_email / sponsor_qrcode 资源引用留在主壳。
+// 数据库检查与关于分组仍在主壳中；分组入口通过状态与回调连接。
 //
 // @输入
 // 当前主题模式 / 是否深色 / 当前颜色主题：父页面注入；
@@ -125,11 +124,8 @@ export struct 设置面板 {
   // 不在契约要求中但保持父组件统一管理，便于后续按分组排序。
   @State private 反馈子项展开: boolean = false;
   @State private 赞助子项展开: boolean = false;
-  // 数据库检查状态：契约测试 check-database-contract 要求主壳持有这些字段。
-  @State private 数据库检查中: boolean = false;
-  @State private 数据库检查完成: boolean = false;
-  @State private 数据库问题列表: string[] = [];
-  @State private 数据库错误信息: string = '';
+  @State private maintenance: CollectionMaintenanceState = new CollectionMaintenanceState();
+  private readonly maintenanceSession: CollectionMaintenanceSession = new CollectionMaintenanceSession();
   // 子分组（FSRS / 语音朗读）ⓘ 按钮上抛的说明请求：统一在本面板根 Stack 浮层显示，
   // 避免在子分组卡片内嵌套 字段帮助面板 导致其被压在分组卡片内呈现为「新界面」。
   @State private 显示说明浮层: boolean = false;
@@ -152,22 +148,27 @@ export struct 设置面板 {
   @StorageLink(简洁模式AppStorage键) private 简洁模式: boolean = true;
   // 输入开发者密钥后即时显示隐藏的 Agent 设置与各页面入口。
   @StorageLink(AI_AGENT_CHANNELS_APP_STORAGE_KEY) private Agent入口已启用: boolean = false;
-  // 清除未用标签状态：数据管理分组入口 → 确认对话框 → 调后端
-  @State private 清除标签忙碌: boolean = false;
   // 内容 List 滚动器：openAiSettings 跳转进来时无动画直接定位到 AI 智能体分组
   private readonly 内容滚动器: Scroller = new Scroller();
+  private disposed: boolean = false;
+  private lifecycleVersion: number = 0;
 
   private readonly 集合服务实例: 集合服务 = new 集合服务();
   private readonly 标签服务实例: 标签服务 = new 标签服务();
   private readonly 链接服务实例: 链接服务 = new 链接服务();
 
   async aboutToAppear(): Promise<void> {
+    this.disposed = false;
+    const lifecycleVersion: number = ++this.lifecycleVersion;
+    this.maintenanceSession.attach((state: CollectionMaintenanceState): void => { this.maintenance = state; });
     if (this.openAiSettings) { this.openSection('ai'); }
     // 加载持久化的简洁模式值到 AppStorage，让 @StorageLink 跨重启保持一致
     const 持久化值: boolean = await 加载简洁模式();
+    if (this.disposed || lifecycleVersion !== this.lifecycleVersion) return;
     AppStorage.setOrCreate<boolean>(简洁模式AppStorage键, 持久化值);
     // 实验性功能开关同样加载持久化值，让 @StorageLink 跨重启保持一致
     const TapZones值: boolean = await 加载TapZones开关();
+    if (this.disposed || lifecycleVersion !== this.lifecycleVersion) return;
     AppStorage.setOrCreate<boolean>(TapZones开关AppStorage键, TapZones值);
     // 未配置 AI 从制卡/改卡跳转进来：悬浮 Toast 提示 + 直接定位到 AI 智能体分组
     if (this.openAiSettings) {
@@ -176,9 +177,17 @@ export struct 设置面板 {
       });
       // 等简洁模式恢复与内容 List 首帧布局完成后无动画定位；转场动画内完成，打开即在分组处
       setTimeout((): void => {
-        this.内容滚动器.scrollToIndex(0);
+        if (!this.disposed && lifecycleVersion === this.lifecycleVersion) {
+          this.内容滚动器.scrollToIndex(0);
+        }
       }, 50);
     }
+  }
+
+  aboutToDisappear(): void {
+    this.disposed = true;
+    this.lifecycleVersion++;
+    this.maintenanceSession.detach();
   }
 
   /** 目录导航只改变展示位置，设置的保存仍交给原有组件。 */
@@ -247,44 +256,8 @@ export struct 设置面板 {
     return resourceText(this.getUIContext(), 资源);
   }
 
-  // ========================================================
-  // @块ID UI-SETTINGS-PANEL-002
-  // @名称 执行数据库检查
-  //
-  // @作用
-  // 调 集合服务实例.检查数据库 拉数据库问题列表；数据库检查中 防重入；
-  // 完成后填充 数据库问题列表 与 数据库检查完成；失败时透传错误信息到 数据库错误信息。
-  //
-  // @输入
-  // 无（直接读 @State 与 集合服务实例）。
-  //
-  // @输出
-  // 更新 数据库检查中 / 数据库检查完成 / 数据库问题列表 / 数据库错误信息。
-  //
-  // @业务规则
-  // 契约测试 check-database-contract 要求此方法保留在主壳内联，不可抽到子组件。
-  // problems 为空 = 通过，非空 = 列出条数与内容摘要；失败透传错误信息。
-  //
-  // @副作用
-  // 调用 集合服务.检查数据库 触发后端数据库巡检。
-  // ========================================================
   private async 执行数据库检查(): Promise<void> {
-    if (this.数据库检查中) {
-      return;
-    }
-    this.数据库检查中 = true;
-    this.数据库检查完成 = false;
-    this.数据库问题列表 = [];
-    this.数据库错误信息 = '';
-    try {
-      const 问题列表: string[] = await this.集合服务实例.检查数据库();
-      this.数据库问题列表 = 问题列表;
-      this.数据库检查完成 = true;
-    } catch (error) {
-      this.数据库错误信息 = error instanceof Error ? error.message : `${error}`;
-    } finally {
-      this.数据库检查中 = false;
-    }
+    await this.maintenanceSession.checkDatabase((): Promise<string[]> => this.集合服务实例.检查数据库());
   }
 
   // 契约测试要求保留 this.遮罩色() 调用形式；色板统一来自 设置面板色板。
@@ -303,7 +276,7 @@ export struct 设置面板 {
   // 调后端 标签服务.清除未用标签，修改 Anki collection（可撤销）。
   // ========================================================
   private 请求清除未用标签(): void {
-    if (this.清除标签忙碌) {
+    if (this.disposed || this.maintenance.clearingTags) {
       return;
     }
     this.getUIContext().showAlertDialog({
@@ -324,9 +297,12 @@ export struct 设置面板 {
   }
 
   private async 执行清除未用标签(): Promise<void> {
-    this.清除标签忙碌 = true;
+    if (this.disposed) return;
+    const lifecycleVersion: number = this.lifecycleVersion;
     try {
-      const count: number = await this.标签服务实例.清除未用标签();
+      const count: number | null = await this.maintenanceSession.clearUnusedTags(
+        (): Promise<number> => this.标签服务实例.清除未用标签());
+      if (count === null || this.disposed || lifecycleVersion !== this.lifecycleVersion) return;
       if (count > 0) {
         showToastSafely(this.getUIContext(), {
           message: this.取本地化文本($r('app.string.settings_clear_unused_tags_success'))
@@ -338,12 +314,12 @@ export struct 设置面板 {
         });
       }
     } catch (错误) {
+      if (this.disposed || lifecycleVersion !== this.lifecycleVersion) return;
       console.info(`SettingsPanel: 清除未用标签失败 错误=${错误}`);
       showToastSafely(this.getUIContext(), {
         message: this.取本地化文本($r('app.string.settings_clear_unused_tags_error'))
       });
     }
-    this.清除标签忙碌 = false;
   }
 
   /** 选中态主色：直接引用 @StorageLink 动作主色链接 让颜色主题切换时 @Builder 重执行（与 外观分组 同款）。 */
@@ -993,10 +969,10 @@ export struct 设置面板 {
               数据分组({
                 是否深色: this.是否深色,
                 简洁模式: this.简洁模式,
-                databaseBusy: this.数据库检查中,
-                databaseChecked: this.数据库检查完成,
-                databaseError: this.数据库错误信息,
-                databaseProblems: this.数据库问题列表,
+                databaseBusy: this.maintenance.checking,
+                databaseChecked: this.maintenance.checked,
+                databaseError: this.maintenance.error,
+                databaseProblems: this.maintenance.problems,
                 onCheckDatabase: (): void => { this.执行数据库检查(); },
                 onDatabaseHelp: (): void => {
                   this.说明标题 = $r('app.string.check_db_title');

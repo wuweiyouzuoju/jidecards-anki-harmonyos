@@ -15,7 +15,7 @@ export function homeDataHarness() {
     加载全部牌组顺序: async () => new Map(), 加载牌组背景图映射: async () => new Map(), 加载已隐藏牌组ID列表: async () => ['hidden'],
     提取卡片数据: (graphs, pending, decks, hours, separate) => { state.calls.push(['widget', graphs, pending, decks, hours, separate]); return { 今日完成数: graphs.today.answerCount }; },
     保存卡片数据: async () => { state.calls.push('save'); if (state.failSave) throw new Error('disk'); },
-    构建主页快照: (tree, graphs) => ({ decks: [{ id: '1', name: 'Default', displayName: '' }], reviewCountsByDate: [], graph: graphs })
+    构建主页快照: (tree, graphs) => ({ decks: [{ id: '1', name: 'Default', displayName: '' }], graph: graphs })
   };
   const source = readFileSync(new URL('../../entry/src/main/ets/backend/HomeDataRepository.ets', import.meta.url), 'utf8')
     .replace(/^import[^;]+;\s*/gm, '').replace(/^export /gm, '');

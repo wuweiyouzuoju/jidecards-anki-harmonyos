@@ -174,6 +174,9 @@ export struct AI制卡页 {
   private 本地范围牌组IDs: number[] = [];
   private 本地范围笔记类型IDs: number[] = [];
   private pageDisposed: boolean = false;
+  private historyLoadVersion: number = 0;
+  private historyRestoreVersion: number = 0;
+  private notetypeLoadVersion: number = 0;
   private readonly cardBatch: AgentCardBatch = new AgentCardBatch();
   private conversationId: string = `agent-${Date.now()}-${Math.random()}`;
   private 历史执行结果: AgentHistoryResult[] = [];
@@ -263,6 +266,8 @@ export struct AI制卡页 {
 
   aboutToDisappear(): void {
     this.pageDisposed = true;
+    this.historyLoadVersion++;
+    this.historyRestoreVersion++;
     if (this.agentScrollTimer >= 0) { clearTimeout(this.agentScrollTimer); this.agentScrollTimer = -1; }
     if (this.agentRunner !== null) { this.agentRunner.cancel(); }
     this.getUIContext().setKeyboardAvoidMode(this.上一键盘避让模式);
@@ -597,6 +602,8 @@ export struct AI制卡页 {
   }
 
   private 选择笔记类型(notetypeId: number): void {
+    this.historyRestoreVersion++;
+    this.notetypeLoadVersion++;
     if (notetypeId > 0) {
       this.加载笔记类型(notetypeId);
       return;
@@ -647,9 +654,13 @@ export struct AI制卡页 {
     }
   }
 
-  private async 加载笔记类型(notetypeId: number): Promise<void> {
+  private async 加载笔记类型(notetypeId: number, expectedRestoreVersion?: number): Promise<void> {
+    const loadVersion: number = ++this.notetypeLoadVersion;
+    const restoreVersion: number = expectedRestoreVersion ?? this.historyRestoreVersion;
     try {
       const 能力: NotetypeCapabilities = await this.笔记类型服务实例.获取笔记类型能力(notetypeId);
+      if (this.pageDisposed || loadVersion !== this.notetypeLoadVersion ||
+        restoreVersion !== this.historyRestoreVersion) return;
       this.已选笔记类型ID = 能力.notetypeId;
       this.笔记类型名 = 能力.name;
       this.字段名列表 = 能力.fieldNames;
@@ -657,6 +668,8 @@ export struct AI制卡页 {
       this.clozeFieldOrds = 能力.clozeFieldOrds;
       this.错误信息 = '';
     } catch (错误) {
+      if (this.pageDisposed || loadVersion !== this.notetypeLoadVersion ||
+        restoreVersion !== this.historyRestoreVersion) return;
       this.已选笔记类型ID = 0;
       this.笔记类型名 = '';
       this.字段名列表 = [];
@@ -1427,22 +1440,31 @@ export struct AI制卡页 {
   private async 打开历史会话(): Promise<void> {
     if (this.pageDisposed || this.处理中 || this.文件解析中 || this.cardBatch.isRunning()) return;
     if (this.显示历史区) {
-      this.显示历史区 = false;
+      this.关闭历史区();
       return;
     }
+    const loadVersion: number = ++this.historyLoadVersion;
     this.显示历史区 = true;
-    const all: AgentConversation[] = await loadAgentConversations();
-    if (this.pageDisposed || !this.显示历史区) return;
-    const sameMode: AgentConversation[] = [];
-    for (const item of all) {
-      if (item.mode === this.pageMode) { sameMode.push(item); }
+    try {
+      const all: AgentConversation[] = await loadAgentConversations();
+      if (this.pageDisposed || loadVersion !== this.historyLoadVersion || !this.显示历史区) return;
+      const sameMode: AgentConversation[] = [];
+      for (const item of all) {
+        if (item.mode === this.pageMode) { sameMode.push(item); }
+      }
+      this.历史会话列表 = sameMode;
+    } catch (error) {
+      if (!this.pageDisposed && loadVersion === this.historyLoadVersion && this.显示历史区) {
+        this.错误信息 = this.取本地化文案($r('app.string.ai_agent_history_load_failed'));
+      }
     }
-    this.历史会话列表 = sameMode;
   }
 
   /** 恢复可见历史、协议与检索进度；旧卡片写入令牌不恢复。 */
   private async 恢复历史会话(selected: AgentConversation): Promise<void> {
     if (this.pageDisposed || this.处理中 || this.文件解析中 || this.cardBatch.isRunning()) return;
+    const restoreVersion: number = ++this.historyRestoreVersion;
+    this.关闭历史区();
     const restored: 聊天消息[] = restoreAgentMessages(selected, (): number => this.下一个消息ID(),
       this.取本地化文案($r('app.string.ai_agent_history_unassigned_tools')), !this.simpleMode);
     this.conversationId = selected.id;
@@ -1468,7 +1490,6 @@ export struct AI制卡页 {
         }
       } catch (error) { this.错误信息 = this.取本地化文案($r('app.string.ai_agent_checkpoint_failed')); }
     }
-    this.显示历史区 = false;
     let validContext: boolean = true;
     if (this.pageMode === 'create') {
       const deckExists: boolean = this.牌组选项.some(
@@ -1481,7 +1502,8 @@ export struct AI制卡页 {
         this.已选笔记类型ID = 0;
       } else {
         this.牌组ID = selected.setup.deckId;
-        await this.加载笔记类型(selected.setup.notetypeId);
+        await this.加载笔记类型(selected.setup.notetypeId, restoreVersion);
+        if (this.pageDisposed || restoreVersion !== this.historyRestoreVersion) return;
         validContext = this.已选笔记类型ID === selected.setup.notetypeId && this.字段名列表.length > 0;
       }
     } else {
@@ -1491,7 +1513,8 @@ export struct AI制卡页 {
         (item: AI制卡笔记类型选项): boolean => item.id === selected.setup.notetypeId);
       this.牌组ID = deckExists ? selected.setup.deckId : 0;
       if (notetypeExists && selected.setup.notetypeId > 0) {
-        await this.加载笔记类型(selected.setup.notetypeId);
+        await this.加载笔记类型(selected.setup.notetypeId, restoreVersion);
+        if (this.pageDisposed || restoreVersion !== this.historyRestoreVersion) return;
       } else {
         this.选择笔记类型(0);
       }
@@ -1521,6 +1544,8 @@ export struct AI制卡页 {
 
   private 开始新会话(): void {
     if (this.pageDisposed || this.处理中 || this.文件解析中 || this.cardBatch.isRunning()) return;
+    this.historyRestoreVersion++;
+    this.historyLoadVersion++;
     this.sessionController?.clear();
     this.cancelPendingClarifications();
     this.conversationId = `agent-${Date.now()}-${Math.random()}`;
@@ -1530,8 +1555,13 @@ export struct AI制卡页 {
     this.显示历史区 = false;
   }
 
+  private 关闭历史区(): void {
+    this.historyLoadVersion++;
+    this.显示历史区 = false;
+  }
+
   private async 选择并解析文件(): Promise<void> {
-    if (this.处理中 || this.文件解析中 || this.hasPendingClarification() || this.hasPendingAction()) { return; }
+    if (this.pageDisposed || this.处理中 || this.文件解析中 || this.hasPendingClarification() || this.hasPendingAction()) { return; }
     const remaining: number = AGENT_IMPORT_MAX_FILES - this.导入文件列表.length;
     if (remaining <= 0) {
       this.错误信息 = this.取本地化格式($r('app.string.ai_agent_file_max_count'),
@@ -1557,8 +1587,10 @@ export struct AI制卡页 {
       if (this.pageDisposed || conversationId !== this.conversationId) return;
       this.错误信息 = this.取本地化文案($r('app.string.ai_agent_file_picker_failed'));
     } finally {
-      this.文件解析中 = false;
-      if (!this.pageDisposed) this.getUIContext().getFocusController().clearFocus();
+      if (!this.pageDisposed && conversationId === this.conversationId) this.文件解析中 = false;
+      if (!this.pageDisposed && conversationId === this.conversationId) {
+        this.getUIContext().getFocusController().clearFocus();
+      }
     }
   }
 
@@ -1647,10 +1679,13 @@ export struct AI制卡页 {
     try {
       await deleteAgentConversation(id);
       this.checkpointStore?.remove(id);
+      if (this.pageDisposed) return;
+      this.historyLoadVersion++;
       this.历史会话列表 = this.历史会话列表.filter(
         (item: AgentConversation): boolean => item.id !== id);
       if (this.conversationId === id) { this.开始新会话(); }
     } catch (error) {
+      if (this.pageDisposed) return;
       this.错误信息 = this.取本地化文案($r('app.string.ai_agent_history_delete_failed'));
     }
   }
@@ -1668,7 +1703,7 @@ export struct AI制卡页 {
           字色: $r('app.color.text_primary'),
           点击回调: (): void => {
             if (this.显示历史区) {
-              this.显示历史区 = false;
+              this.关闭历史区();
             } else {
               this.pathStack.pop();
             }

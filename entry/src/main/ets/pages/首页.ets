@@ -1264,7 +1264,6 @@ struct 首页 {
     this.主页快照数据 = {
       today: this.主页快照数据.today,
       decks: newDecks,
-      reviewCountsByDate: this.主页快照数据.reviewCountsByDate,
       memory: this.主页快照数据.memory
     };
     this.牌组数据源.replaceAll(可见牌组行(newDecks, this.展开的牌组ID集合));

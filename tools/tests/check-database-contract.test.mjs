@@ -3,8 +3,7 @@
 // 检查数据库链路契约测试（T5）：
 // - 集合服务 只经 后端会话 走 后端集合(3) 的 检查数据库(6)；
 // - CheckDatabaseResponse 解码器字段符合 collection.proto（repeated string problems = 1）；
-// - SettingsPanel「检查数据库」入口真实调用 检查数据库()，busy 防重入，
-//   结果（通过/问题列表）与错误透传均走面板内状态行。
+// - 设置页数据分组把检查动作与状态行正确连接；异步生命周期在行为测试中覆盖。
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -55,16 +54,12 @@ test('check database decoder reads repeated problems, empty wire means pass', ()
 test('settings panel wires check database entry to the service with busy guard', () => {
   const panel = read(SETTINGS_PANEL);
 
-  assert.match(panel, /import \{ 集合服务 \} from '\.\.\/backend\/集合服务'/);
-  assert.match(panel, /await this\.集合服务实例\.检查数据库\(\)/,
-    'entry really calls the service');
   assert.match(panel, /onCheckDatabase:.*this\.执行数据库检查\(\);/, 'row taps into the handler');
-  for (const [prop, state] of [['databaseBusy', '数据库检查中'], ['databaseChecked', '数据库检查完成'], ['databaseError', '数据库错误信息'], ['databaseProblems', '数据库问题列表']]) {
+  for (const [prop, state] of [['databaseBusy', 'maintenance.checking'], ['databaseChecked', 'maintenance.checked'], ['databaseError', 'maintenance.error'], ['databaseProblems', 'maintenance.problems']]) {
     assert.ok(panel.includes(`${prop}: this.${state}`), `${prop} receives the parent state`);
   }
   assert.match(read(DATA_GROUP), /this\.onCheckDatabase\(\)/);
 
-  assert.match(panel, /if \(this\.数据库检查中\) \{[\s\S]*?return;/, 'reentrancy guard in handler');
   const group = read(DATA_GROUP);
   assert.match(group, /\.enabled\(!this\.databaseBusy\)/, 'row disabled while busy');
   assert.match(group, /this\.databaseBusy \? \$r\('app\.string\.check_db_running'\)/,
@@ -77,12 +72,6 @@ test('settings panel renders pass, problems and error outcomes', () => {
   const group = read(DATA_GROUP);
   assert.match(group, /if \(this\.databaseError !== ''\)/, 'error branch first');
   assert.match(group, /Text\(this\.databaseError\)/, 'error message passed through');
-  const handler = panel.match(/执行数据库检查\(\): Promise<void> \{[\s\S]*?\n  \}/);
-  assert.notEqual(handler, null);
-  assert.match(handler[0], /this\.数据库错误信息 = error instanceof Error \? error\.message : `\$\{error\}`;/,
-    'failure surfaces raw backend message');
-  assert.match(handler[0], /finally \{\s*this\.数据库检查中 = false;/, 'busy always released');
-
   assert.match(group, /this\.databaseProblems\.length === 0/);
   assert.match(group, /\$r\('app\.string\.check_db_passed'\)/, 'empty problems means pass');
   assert.match(group, /\$r\('app\.string\.check_db_problems', this\.databaseProblems\.length\)/,

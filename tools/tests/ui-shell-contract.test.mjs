@@ -644,7 +644,6 @@ test('home UI uses shared dimension tokens instead of magic numbers', () => {
   const files = [
     'entry/src/main/ets/pages/首页.ets',
     'entry/src/main/ets/components/今日摘要卡.ets',
-    'entry/src/main/ets/components/月历卡.ets',
     'entry/src/main/ets/components/牌组列表项.ets',
     'entry/src/main/ets/components/牌组详情面板.ets',
     'entry/src/main/ets/components/开始学习按钮.ets',
@@ -714,23 +713,4 @@ test('jidecards synchronizes system bars after content loads', () => {
   const loadCallback = ability.match(/loadContent\('pages\/首页',[\s\S]*?\n    \}\);/)?.[0] ?? '';
 
   assert.match(loadCallback, /应用系统栏样式/);
-});
-
-test('calendar model builds a 5-or-6-week heat map based on actual month layout', () => {
-  const calendarPath = 'entry/src/main/ets/model/日历模型.ets';
-  assert.equal(existsSync(projectUrl(calendarPath)), true, `${calendarPath} must exist`);
-
-  const calendar = read(calendarPath);
-  assert.match(calendar, /export interface 日历单日/);
-  assert.match(calendar, /export interface 月历数据/);
-  // 旧实现固定 42 格（6 行），某些月份多空行 + 卡片高度溢出；改为动态 5/6 行：
-  // 月历最大周数=6 上限、日历列数=7 每行 7 格；周数 由 leading+days 决定。
-  assert.match(calendar, /const 月历最大周数:\s*number\s*=\s*6/);
-  assert.match(calendar, /const 日历列数:\s*number\s*=\s*7/);
-  assert.match(calendar, /周数:\s*number/);
-  assert.match(calendar, /Math\.ceil\(总格数 \/ 日历列数\)/);
-  assert.match(calendar,
-    /export function 构建月历\(当前时间: Date, 按日期复习次数: Map<string, number>\): 月历数据/);
-  assert.match(calendar, /热力强度:/);
-  assert.doesNotMatch(calendar, /demoIntensity|Math\.random/);
 });

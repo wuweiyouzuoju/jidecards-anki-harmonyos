@@ -68,7 +68,6 @@ test('empty root yields an empty formal snapshot', () => {
   assert.equal(snap.today.completedCount, 0);
   assert.equal(snap.today.deckCount, 0);
   assert.equal(snap.memory.state, 'load_error', 'no graphs => load_error (no today data to show)');
-  assert.equal(snap.reviewCountsByDate.size, 0);
 });
 
 test('all deck rows keep backend aggregate counts without double counting', () => {
@@ -164,32 +163,6 @@ function graphs(partial) {
     ...partial
   };
 }
-
-test('review counts map day-offset buckets to local calendar dates', () => {
-  // Anki reviews.rs 中 day key = (elapsed_secs_since(next_day_start) / 86_400) as i32，
-  // 语义是「相对今天的偏移」：0=今天、-1=昨天、-2=前天。
-  const data = graphs({
-    reviewCountsByDaysAgo: new Map([
-      [0, { learn: 2, relearn: 1, young: 3, mature: 4, filtered: 1 }],
-      [-2, { learn: 0, relearn: 0, young: 5, mature: 0, filtered: 0 }],
-      [-4, { learn: 0, relearn: 0, young: 0, mature: 0, filtered: 0 }]
-    ])
-  });
-  // 锚定 2026-07-02（本地时区），验证跨月回卷：2 天前 = 2026-06-30
-  const now = new Date(2026, 6, 2, 12, 0, 0);
-  const snap = 构建主页快照(node({}),data, now);
-
-  assert.equal(snap.reviewCountsByDate.size, 2, 'zero-total days are omitted');
-  assert.equal(snap.reviewCountsByDate.get('2026-07-02'), 11, 'kinds are summed');
-  assert.equal(snap.reviewCountsByDate.get('2026-06-30'), 5, 'month rolls back correctly');
-});
-
-test('missing graphs keeps the heat calendar empty', () => {
-  const now = new Date(2026, 6, 2, 12, 0, 0);
-  assert.equal(构建主页快照(node({}),null, now).reviewCountsByDate.size, 0);
-  assert.equal(
-    构建主页快照(node({}),graphs({}), now).reviewCountsByDate.size, 0);
-});
 
 // B12-X 改造 2026-07-21：记忆卡主指标改用「今日不会率」(answer-correct)/answer，
 // 全库平均可提取率降为副标题参考。语义改用 Anki Desktop today.ts 同款算法。

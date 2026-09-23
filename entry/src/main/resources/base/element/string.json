@@ -3,6 +3,7 @@
     {"name": "sync_server_load_failed", "value": "同步服务器地址读取失败，请重新打开设置或保存地址后再登录。"},
     {"name": "settings_language_save_failed", "value": "语言切换失败，请重试。"},
     {"name": "ai_agent_history_delete_failed", "value": "会话历史未能完整删除，请重试。"},
+    {"name": "ai_agent_history_load_failed", "value": "无法加载会话历史，请重试。"},
     {"name":"sync_pending","value":"准备同步…"},
     {"name":"sync_wait_study","value":"等待学习或编辑结束"},
     {"name":"sync_wait_home","value":"返回首页后继续同步"},
@@ -893,7 +894,7 @@
     { "name": "study_toolbar_drag_hint", "value": "在学习页按住浮动工具栏可拖到屏幕左右侧；松手后自动吸附到最近侧并保存位置。" },
     { "name": "settings_study_layout_help", "value": "学习页操作按钮的布局方式：\n\n• 底部固定：操作按钮贴在屏幕底部，传统体验，适合多数用户。\n\n• 浮动可拖：操作按钮浮在屏幕上方，可按住拖到屏幕左右侧，松手后自动吸附到最近侧并保存位置。适合单手操作或大屏设备。" },
     { "name": "settings_home_today_summary", "value": "首页显示卡片" },
-    { "name": "settings_home_today_summary_hint", "value": "控制主页顶部是否显示今日摘要卡与月历卡片。\n\n• 开启：主页顶部显示今日摘要卡与月历卡片，可快速查看当日学习进度与月度复习分布。\n\n• 关闭：主页顶部不再显示这两张卡片，主页更简洁。" },
+    { "name": "settings_home_today_summary_hint", "value": "控制主页顶部是否显示今日摘要卡。\n\n• 开启：主页顶部显示今日学习进度。\n\n• 关闭：主页更简洁。" },
     {
       "name": "appearance_theme",
       "value": "外观主题"

@@ -66,6 +66,58 @@ test('history deletion handles both storage and checkpoint errors without an unh
   }
 });
 
+test('history list ignores an older load after close and reopen', async () => {
+  const pending = [];
+  const Page = methods('pages/AI制卡页.ets', ['打开历史会话', '关闭历史区'], {
+    loadAgentConversations: () => new Promise(resolve => pending.push(resolve))
+  });
+  const page = new Page();
+  Object.assign(page, { pageDisposed: false, 处理中: false, 文件解析中: false,
+    cardBatch: { isRunning: () => false }, 显示历史区: false, pageMode: 'create',
+    historyLoadVersion: 0, 历史会话列表: [], 取本地化文案: value => value, $r: value => value });
+
+  const oldLoad = page.打开历史会话();
+  page.关闭历史区();
+  const currentLoad = page.打开历史会话();
+  pending[1]([{ id: 'current', mode: 'create' }]);
+  await currentLoad;
+  pending[0]([{ id: 'stale', mode: 'create' }]);
+  await oldLoad;
+
+  assert.deepEqual(page.历史会话列表.map(item => item.id), ['current']);
+});
+
+test('late notetype capabilities cannot overwrite a newer choice or a new conversation', async () => {
+  const pending = [];
+  const Page = methods('pages/AI制卡页.ets', ['加载笔记类型', '选择笔记类型'], {
+    NOTE_TYPE_KIND_NORMAL: 0, $r: value => value
+  });
+  const page = new Page();
+  Object.assign(page, { pageDisposed: false, historyRestoreVersion: 0, notetypeLoadVersion: 0,
+    取本地化文案: value => value,
+    笔记类型服务实例: { 获取笔记类型能力: () => new Promise((resolve, reject) => pending.push({ resolve, reject })) }
+  });
+  const capability = id => ({ notetypeId: id, name: `type ${id}`, fieldNames: ['Front'], kind: 0, clozeFieldOrds: [] });
+  const older = page.加载笔记类型(1);
+  const newer = page.加载笔记类型(2);
+  pending[1].resolve(capability(2));
+  await newer;
+  pending[0].reject(Error('stale failure'));
+  await older;
+  assert.equal(page.已选笔记类型ID, 2);
+  assert.equal(page.错误信息, '');
+  const clearing = page.加载笔记类型(3);
+  page.选择笔记类型(0);
+  pending[2].resolve(capability(3));
+  await clearing;
+  assert.equal(page.已选笔记类型ID, 0);
+  const restoring = page.加载笔记类型(4, page.historyRestoreVersion);
+  page.historyRestoreVersion++;
+  pending[3].resolve(capability(4));
+  await restoring;
+  assert.equal(page.已选笔记类型ID, 0);
+});
+
 test('language failure is displayed and redundant language changes remain no-ops', () => {
   const toasts = [];
   const Page = methods('components/settings/GeneralSettings.ets', ['选择语言'], {

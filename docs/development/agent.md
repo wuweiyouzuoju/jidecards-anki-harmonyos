@@ -24,6 +24,7 @@
 - `AgentCardBatch.ts` 在第一处等待前复制整批选中字段和目标；每张卡仍经页面适配器调用 `AgentDraftExecutor.prepare/executeOrdinary`。单卡失败不中断整批，已保存卡不再创建；操作占用直到整批完成，成功才通知同步。
 - 页面通过会话 ID 和消息 ID 回写状态，不能依赖异步开始时的数组索引。离页后执行器继续已接受写入，禁止访问旧 UI 或读取下一张卡的可变字段；错误文案在开始保存前固定。
 - `AgentFileImport.ts` 的 `mergeAgentImportedFiles` 统一限制10个文件、160000正文字符。迟到文件解析不得进入另一个会话。
+- 历史列表每次打开/关闭都更新读取代次；恢复历史、新建会话和手动选择类型使旧能力响应失效。笔记类型请求还独立去重，迟到失败不能清空新选择。离页后的文件解析及历史删除只完成已接受的存储操作，不回写旧 UI；回归见 `platform-warning-boundaries`。
 - `agent-page-models.test.mjs` 直接测试业务规则；`agent-page-lifecycle.test.mjs` 仅保留页面与真实模型的接线验证，覆盖离页、消息替换、整批输入与确认执行器路径。
 
 - `AgentConversationTypes.ts` 定义持久化协议；`AgentConversationView.ts` 负责可见消息复制、历史投影和恢复，平台偏好读写留在 `AgentConversationStore.ets`。历史工具按消息 ID 归属，旧无归属记录独立展示；恢复时复制澄清和操作状态，不恢复写入令牌。

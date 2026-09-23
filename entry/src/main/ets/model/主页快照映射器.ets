@@ -6,13 +6,13 @@
 //
 // @作用
 // 把后端 DeckTreeNode + GraphsView 映射为主页快照（牌组列表 + 今日学习汇总 +
-// 月历热力 + 记忆表现汇总）。纯函数，无 UI/后端依赖，可单测。
+// 记忆表现汇总）。纯函数，无 UI/后端依赖，可单测。
 //
 // 数据语义（third_party/anki/rslib/src/decks/tree.rs）：
 // - 根节点为占位（deckId=0、name=''），真实牌组在 children；
 // - 节点 name 为末级名（顶层节点即完整牌组名）；
 // - 节点 new/learn/review 计数已按日限裁剪，且含全部子节点合计。
-// 月历热力/记忆率语义（third_party/anki/rslib/src/stats/graphs/）：
+// 记忆率语义（third_party/anki/rslib/src/stats/graphs/）：
 // - reviews.count 键为相对今天的 day offset（0=今天、-1=昨天、-2=前天…，
 //   见 reviews.rs `(elapsed_secs_since(next_day_start) / 86_400) as i32`）；
 // - retrievability.average 为 0-100 百分制，仅 FSRS 开启且有 memory_state 卡片时非零。
@@ -22,7 +22,7 @@
 // / 色调覆盖 / 别名覆盖 / 顺序覆盖 / 背景图覆盖
 //
 // @输出
-// 主页快照对象（含 decks / today / reviewCountsByDate / memory）
+// 主页快照对象（含 decks / today / memory）
 //
 // @业务规则
 // 父牌组计数直接沿用 Anki Core 聚合计数，不从已平铺子牌组重新求和。
@@ -34,7 +34,7 @@
 // ========================================================
 
 import type { DeckTreeNode } from '../proto/messages/DeckMessages';
-import type { GraphsView, RetrievabilitySummary, ReviewKindCounts } from '../proto/messages/StatsMessages';
+import type { GraphsView, RetrievabilitySummary } from '../proto/messages/StatsMessages';
 import type { 牌组汇总, 牌组色调, 主页快照, 记忆表现汇总 } from './主页模型';
 import { 平铺牌组树 } from './牌组层级';
 
@@ -44,35 +44,6 @@ function 统计牌组树节点数(节点: DeckTreeNode): number {
     总数 += 统计牌组树节点数(子节点);
   }
   return 总数;
-}
-
-function 补零两位(值: number): string {
-  return 值 < 10 ? `0${值}` : 值.toString();
-}
-
-/** 与 CalendarModels.dateKey 同一格式：YYYY-MM-DD（本地时区）。 */
-function 日历日期键(日期: Date): string {
-  return `${日期.getFullYear()}-${补零两位(日期.getMonth() + 1)}-${补零两位(日期.getDate())}`;
-}
-
-/** day offset（0=今天、-1=昨天…） → 本地日历日期的复习计数；各阶段（新学/重学/年轻/熟练/筛选）求和，0 记为无热力。 */
-function 转为按日期复习计数(图表数据: GraphsView | null, 当前时刻: Date): Map<string, number> {
-  const 输出: Map<string, number> = new Map<string, number>();
-  if (图表数据 === null || 图表数据.reviewCountsByDaysAgo === null) {
-    return 输出;
-  }
-  图表数据.reviewCountsByDaysAgo.forEach((各阶段计数: ReviewKindCounts, 天偏移: number) => {
-    const 合计: number =
-      各阶段计数.learn + 各阶段计数.relearn + 各阶段计数.young + 各阶段计数.mature + 各阶段计数.filtered;
-    if (合计 <= 0) {
-      return;
-    }
-    // Anki 返回的 天偏移 是「相对今天的偏移」（0=今天、负数=过去），
-    // 直接相加即可得到对应日历日（ getDate() + 0 = 今天、getDate() + (-1) = 昨天）。
-    const 日期: Date = new Date(当前时刻.getFullYear(), 当前时刻.getMonth(), 当前时刻.getDate() + 天偏移);
-    输出.set(日历日期键(日期), 合计);
-  });
-  return 输出;
 }
 
 /** 主页第三张卡：B12-X 改造 2026-07-21（详见 decisions.md）。
@@ -166,7 +137,6 @@ export function 构建主页快照(根节点: DeckTreeNode,
       deckCount: 统计牌组树节点数(根节点)
     },
     decks: 牌组列表,
-    reviewCountsByDate: 转为按日期复习计数(图表数据, 当前时刻),
     memory: 转为记忆表现汇总(图表数据)
   };
 }

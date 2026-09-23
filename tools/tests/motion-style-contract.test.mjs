@@ -70,11 +70,6 @@ test('press and disclosure feedback use the shared fast rhythm', () => {
   const header = read('entry/src/main/ets/components/common/DialogHeader.ets');
   assert.match(header, /scale\(\{ x: this\.actionPressed[\s\S]*?\.animation\(\{ duration: 80, curve: Curve\.EaseOut \}\)/);
 
-  const calendar = read('entry/src/main/ets/components/月历卡.ets');
-  assert.equal((calendar.match(/duration: 150, curve: Curve\.EaseOut/g) ?? []).length, 1);
-  assert.doesNotMatch(calendar, /duration: 300/);
-  assert.doesNotMatch(calendar, /\.height\(this\.已折叠 \? 82 : this\.卡片高度\(\)\)\s*\.animation/);
-
   for (const path of [
     'entry/src/main/ets/components/高级牌组选项面板.ets',
     'entry/src/main/ets/components/设置面板.ets',

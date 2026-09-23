@@ -21,6 +21,7 @@
 
 | 状态或资源 | 所有者 / 生命周期 | 直接验证入口 |
 | --- | --- | --- |
+| 设置中的数据库检查和标签清理 | [CollectionMaintenanceSession](../../entry/src/main/ets/model/settings/CollectionMaintenanceSession.ts)；操作独立完成，面板挂载时订阅快照 | [settings-maintenance](../../tools/tests/settings-maintenance.test.mjs) |
 | 牌组选项草稿、加载和提交 | DeckOptionsFeature / [DeckOptionsSession](../../entry/src/main/ets/model/home/DeckOptionsSession.ts)；表单随弹层销毁，已接受提交继续 | [deck-options-session](../../tools/tests/deck-options-session.test.mjs)、[deck-config-save](../../tools/tests/deck-config-save.test.mjs) |
 | 文件选择、整库确认及导入导出进度 | [DataTransferSession](../../entry/src/main/ets/model/home/DataTransferSession.ts)；首页与设置页复用，读取结果禁止离页启动写入 | [home-transfer-session](../../tools/tests/home-transfer-session.test.mjs) |
 | 云端目录、选择和下载引导 | [CloudDeckFeature](../../entry/src/main/ets/components/home/CloudDeckFeature.ets)；配额与清理先于释放占用，销毁后禁止 UI 回写 | [cloud-deck-feature](../../tools/tests/cloud-deck-feature.test.mjs) |
