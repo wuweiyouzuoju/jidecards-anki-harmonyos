@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { resourceText, showToastSafely } from '../utils/UiFeedback';
-import { HomeDeckCommands } from '../backend/HomeDeckCommands';
 import { DataTransferSession, DataTransferState, initialTransferState } from '../model/home/DataTransferSession';
 import { AnkiDataTransfer } from '../backend/AnkiDataTransfer';
 import { reconcileHomeExpansion, HomeDeckExpansion } from '../model/HomeDeckExpansion';
@@ -45,7 +44,7 @@ import { 官方公告服务 } from '../backend/官方公告服务';
 import { 官方公告检查延迟毫秒 } from '../model/官方公告模型';
 import type { 官方公告展示项 } from '../model/官方公告模型';
 import { 是否已确认官方公告, 标记已确认官方公告 } from '../model/官方公告存储';
-import { 牌组定制面板, 牌组定制结果 } from '../components/牌组定制面板';
+import { DeckCustomizationFeature } from '../components/home/DeckCustomizationFeature';
 import { 添加笔记页, 添加笔记页参数, 添加笔记牌组选项 } from './添加笔记页';
 import { AI制卡页, AI制卡页参数 } from './AI制卡页';
 import type { 数据迁移模式, 导出牌组选项 } from '../model/DataTransferIntent';
@@ -62,7 +61,7 @@ import { 主页摘要分页 } from '../components/home/主页摘要分页';
 import { 主页牌组列表 } from '../components/home/主页牌组列表';
 import { DeckOptionsFeature } from '../components/home/DeckOptionsFeature';
 import { DataTransferFeature } from '../components/home/DataTransferFeature';
-import { 创建牌组协调器 } from '../components/home/创建牌组协调器';
+import { CreateDeckFeature } from '../components/home/CreateDeckFeature';
 import { 自定义学习对话框 } from '../components/home/自定义学习对话框';
 import { 创建过滤牌组面板 } from '../components/home/创建过滤牌组面板';
 import type { SyncAuth } from '../proto/messages/SyncMessages';
@@ -151,7 +150,6 @@ struct 首页 {
   private readonly 页面栈: NavPathStack = new NavPathStack();
   private readonly 牌组数据源: 牌组列表数据源 = new 牌组列表数据源([]);
   private readonly 牌组服务实例: 牌组服务 = new 牌组服务();
-  private readonly deckCommands: HomeDeckCommands = new HomeDeckCommands();
   private readonly homeData: HomeDataRepository = new HomeDataRepository();
   private readonly 搜索服务实例: 搜索服务 = new 搜索服务();
   private readonly 官方公告服务实例: 官方公告服务 = new 官方公告服务();
@@ -219,7 +217,6 @@ struct 首页 {
   // 更多下拉菜单（设置/浏览/统计/提醒收纳）：左上角"更多"按钮触发
   @State @Watch('homeActivityChanged') private 显示更多菜单: boolean = false;
   @State @Watch('homeActivityChanged') private 创建牌组中: boolean = false;
-  @State private 创建牌组错误: string = '';
   @State private 展开的牌组ID集合: Set<string> = new Set<string>();
   @State private 牌组展开已初始化: boolean = false;
   // 已知牌组 id 集合：用于区分「用户手动折叠的牌组」与「同步/导入新出现的牌组」。
@@ -236,6 +233,7 @@ struct 首页 {
   @State private 同步面板账号名: string = '';
   @State private syncAutomatic: boolean = true;
   @State private syncStatusText: string = '';
+  @State private syncIndicator: string = 'hidden';
   @State private syncDetailsRequest: number = 0;
   @StorageProp(APP_FOREGROUND_KEY) @Watch('syncForegroundChanged') private syncForeground: boolean = false;
   private readonly syncScheduler: AutoSyncScheduler = autoSyncScheduler;
@@ -258,7 +256,6 @@ struct 首页 {
   @State @Watch('homeActivityChanged') private 显示牌组定制: boolean = false;
   @State private 定制牌组ID: string = '';
   @State @Watch('homeActivityChanged') private 定制牌组中: boolean = false;
-  @State private 定制牌组错误: string = '';
   // 自定义学习对话框（T2）：牌组长按菜单「自定义学习…」触发，对该牌组临时调增新卡/复习上限或抽取卡片
   @State @Watch('homeActivityChanged') private 显示自定义学习: boolean = false;
   @State private 自定义学习牌组ID: string = '';
@@ -352,6 +349,7 @@ struct 首页 {
   private 设置同步状态(resourceKey: string | null): void {
     if (resourceKey === null) {
       this.syncStatusText = '';
+      this.syncIndicator = 'hidden';
       return;
     }
     const resources: Record<string, Resource> = {
@@ -368,6 +366,7 @@ struct 首页 {
     const resource: Resource | undefined = resources[resourceKey];
     if (resource !== undefined) {
       this.syncStatusText = resourceText(this.getUIContext(), resource);
+      this.syncIndicator = resourceKey === 'sync_wait_load_failed' ? 'attention' : 'waiting';
     }
   }
 
@@ -557,7 +556,6 @@ struct 首页 {
   /** 创建入口先等待集合，避免表单持有同步前的牌组快照。 */
   private openCreateDeck(parentId: string): void {
     if (this.deferForSync((): void => { this.openCreateDeck(parentId); })) return;
-    this.创建牌组错误 = '';
     this.创建父牌组ID = parentId;
     this.显示创建牌组 = true;
   }
@@ -1277,7 +1275,6 @@ struct 首页 {
       return;
     }
     this.定制牌组ID = deckId;
-    this.定制牌组错误 = '';
     this.显示牌组定制 = true;
   }
 
@@ -1520,40 +1517,9 @@ struct 首页 {
   // 走 UI 覆盖路线（不动后端 rename_deck）：避免重名/层级冲突 BackendError、避免子牌组前缀级联改名、
   // 避免 LazyForKey 不含 name 导致 UI 不刷新。代价：导出 apkg/同步到其他设备时仍显示后端原名。
   // 背景图动作：keep 不动；remove 删沙盒文件 + preferences 键；replace 编码 PixelMap 写入沙盒 + preferences。
-  private async 应用牌组定制(result: 牌组定制结果): Promise<void> {
-    if (this.定制牌组中) return;
-    const trimmedName: string = result.新名.trim();
-    if (trimmedName === '') {
-      this.定制牌组错误 = resourceText(this.getUIContext(),
-        $r('app.string.deck_customize_name_empty'));
-      return;
-    }
-    const deckId: string = this.定制牌组ID;
-    const deck: 牌组汇总 = this.按ID查牌组(deckId);
-    this.定制牌组中 = true;
-    this.定制牌组错误 = '';
-    try {
-      const saved: boolean = await this.deckCommands.customize(deckId, deck.name, deck.displayName, result);
-      if (this.homeDisposed) return;
-      if (!saved) {
-        this.定制牌组错误 = this.取本地化文本($r('app.string.deck_customize_background_save_failed'));
-        return;
-      }
-
-      this.显示牌组定制 = false;
-      await this.加载主页数据();
-      if (this.homeDisposed) return;
-      this.显示提示($r('app.string.deck_customize_save_done'));
-    } catch (error) {
-      if (this.homeDisposed) return;
-      this.定制牌组错误 = error instanceof Error ? error.message : `${error}`;
-      if (this.定制牌组错误 === '') {
-        this.定制牌组错误 = resourceText(this.getUIContext(),
-          $r('app.string.deck_customize_rename_failed'));
-      }
-    } finally {
-      if (!this.homeDisposed) this.定制牌组中 = false;
-    }
+  private async deckCustomized(): Promise<void> {
+    await this.加载主页数据();
+    if (!this.homeDisposed) this.显示提示($r('app.string.deck_customize_save_done'));
   }
 
   // 数据迁移处理
@@ -1713,37 +1679,17 @@ struct 首页 {
 
   // 创建牌组
   // 创建后立即记忆为新选中的牌组；失败时面板上显示错误。
-  private async 创建牌组(name: string): Promise<void> {
-    if (this.创建牌组中) {
-      return;
-    }
-    this.创建牌组中 = true;
-    this.创建牌组错误 = '';
-    try {
-      const context: common.UIAbilityContext | null = this.取能力上下文();
-      if (context === null) {
-        throw new Error(resourceText(this.getUIContext(),
-          $r('app.string.ability_context_unavailable')));
-      }
-      const newDeckId: number = await this.deckCommands.create(context.filesDir, name);
-      if (this.homeDisposed) return;
-      this.显示创建牌组 = false;
-      this.选中的牌组ID = newDeckId.toString();
-      await this.加载主页数据();
-      if (this.homeDisposed) return;
-      this.展开牌组路径(this.选中牌组());
-      this.牌组数据源.replaceAll(可见牌组行(this.主页快照数据.decks, this.展开的牌组ID集合, this.隐藏的牌组ID集合));
-      if (检查节流标记(name)) {
-        this.节流奖励文案 = 获取节流奖励();
-        this.显示节流奖励 = true;
-      } else {
-        this.显示提示($r('app.string.create_deck_done'));
-      }
-    } catch (error) {
-      if (this.homeDisposed) return;
-      this.创建牌组错误 = error instanceof Error ? error.message : `${error}`;
-    } finally {
-      if (!this.homeDisposed) this.创建牌组中 = false;
+  private async deckCreated(deckId: string, name: string): Promise<void> {
+    this.选中的牌组ID = deckId;
+    await this.加载主页数据();
+    if (this.homeDisposed) return;
+    this.展开牌组路径(this.选中牌组());
+    this.牌组数据源.replaceAll(可见牌组行(this.主页快照数据.decks, this.展开的牌组ID集合, this.隐藏的牌组ID集合));
+    if (检查节流标记(name)) {
+      this.节流奖励文案 = 获取节流奖励();
+      this.显示节流奖励 = true;
+    } else {
+      this.显示提示($r('app.string.create_deck_done'));
     }
   }
 
@@ -1877,8 +1823,11 @@ struct 首页 {
       主页顶部工具栏({
         排序模式中: this.排序模式中,
         syncStatusText: this.syncStatusText,
-        syncDetailsAvailable: this.显示同步面板,
-        onSyncDetails: (): void => { this.syncDetailsRequest++; },
+        syncIndicator: this.syncIndicator,
+        onSyncDetails: (): void => {
+          if (this.显示同步面板) this.syncDetailsRequest++;
+          else showToastSafely(this.getUIContext(), { message: this.syncStatusText });
+        },
         on更多点击: (): void => {
           this.显示更多菜单 = true;
         },
@@ -2148,20 +2097,12 @@ struct 首页 {
 
   @Builder
   private homeFeatures() {
-    创建牌组协调器({
-      显示: this.显示创建牌组,
-      进行中: this.创建牌组中,
-      错误: this.创建牌组错误,
-      父牌组ID: this.创建父牌组ID,
-      牌组选项列表: this.主页快照数据.decks,
-      是否深色: this.是否深色(),
-      onCancel: (): void => {
-        this.显示创建牌组 = false;
-      },
-      onConfirm: (name: string): void => {
-        this.创建牌组(name);
-      }
-    })
+    if (this.显示创建牌组) {
+      CreateDeckFeature({ isDark: this.是否深色(), parentId: this.创建父牌组ID, decks: this.主页快照数据.decks,
+        onBusy: (busy: boolean): void => { this.创建牌组中 = busy; },
+        onClose: (): void => { this.创建牌组中 = false; this.显示创建牌组 = false; },
+        onCreated: (id: string, name: string): Promise<void> => this.deckCreated(id, name) })
+    }
 
     DataTransferFeature({ state: this.transfer, session: this.transferSession,
       deckOptions: this.导出牌组选项列表(), isDark: this.是否深色() })
@@ -2177,20 +2118,10 @@ struct 首页 {
     }
 
     if (this.显示牌组定制) {
-      牌组定制面板({
-        isDark: this.是否深色(),
-        deck: this.按ID查牌组(this.定制牌组ID),
-        busy: this.定制牌组中,
-        errorMessage: this.定制牌组错误,
-        onClose: (): void => {
-          if (!this.定制牌组中) {
-            this.显示牌组定制 = false;
-          }
-        },
-        onSave: (result: 牌组定制结果): void => {
-          this.应用牌组定制(result);
-        }
-      })
+      DeckCustomizationFeature({ isDark: this.是否深色(), deck: this.按ID查牌组(this.定制牌组ID),
+        onBusy: (busy: boolean): void => { this.定制牌组中 = busy; },
+        onClose: (): void => { this.定制牌组中 = false; this.显示牌组定制 = false; },
+        onSaved: (): Promise<void> => this.deckCustomized() })
     }
 
     // 自定义学习对话框（T2）：长按牌组 → 自定义学习…，成功后刷新主页
@@ -2384,7 +2315,10 @@ struct 首页 {
           automatic: this.syncAutomatic,
           backRequest: this.syncBackRequest,
           detailsRequest: this.syncDetailsRequest,
-          statusChanged: (text: string): void => { this.syncStatusText = text; },
+          statusChanged: (text: string, indicator: string): void => {
+            this.syncStatusText = text;
+            this.syncIndicator = indicator;
+          },
           onYield: (automatic: boolean): void => { this.syncYielded(automatic); },
           onRetry: (): void => {
             this.syncScheduler.requestManual();

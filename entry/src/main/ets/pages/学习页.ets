@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { StudyTimerController, StudyTimerState } from '../model/StudyTimerController';
 import { resourceText, showToastSafely } from '../utils/UiFeedback';
 import { ThemeTextSpans } from '../components/common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
@@ -21,7 +22,7 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 import { 后端会话 } from '../backend/后端会话';
 import { AnkiStudySessionBackend } from '../backend/StudySessionBackend';
 import { StudySessionController, StudySnapshot } from '../model/StudySessionController';
-import { StudyOptions, StudyTiming, StudyAdvanceAction } from '../model/StudyTiming';
+import { StudyOptions, StudyAdvanceAction } from '../model/StudyTiming';
 import { 调度器服务 } from '../backend/调度器服务';
 import { 卡片渲染服务 } from '../backend/卡片渲染服务';
 import { 集合服务 } from '../backend/集合服务';
@@ -29,7 +30,7 @@ import { 笔记服务 } from '../backend/笔记服务';
 import { 笔记类型服务 } from '../backend/笔记类型服务';
 import { EditableNote } from '../proto/messages/NoteMessages';
 import { 浏览编辑区 } from '../components/browser/浏览编辑区';
-import { loadNoteEditor } from '../model/NoteEditorLoader';
+import { NoteEditorSession, NoteEditorState, initialNoteEditorState } from '../model/NoteEditorSession';
 import { AnkiNoteEditor } from '../backend/AnkiNoteEditor';
 import { renderStudyAnswer, StudyAnswerNotetype } from '../model/StudyAnswerRenderer';
 import { resolveStudyKey } from '../model/StudyInputPolicy';
@@ -143,8 +144,15 @@ export struct 学习页 {
   @State private studyOptions: StudyOptions = new StudyOptions();
   @State private autoAdvanceEnabled: boolean = false;
   @State private studyTimerText: string = '';
-  private studyTiming: StudyTiming = new StudyTiming();
-  private studyTimerId: number = -1;
+  private readonly studyTimer: StudyTimerController = new StudyTimerController({
+    state: (): StudyTimerState => this.studyTimerState(),
+    display: (text: string): void => { this.studyTimerText = text; },
+    act: (action: StudyAdvanceAction): void => { this.applyTimedAction(action); }
+  }, {
+    now: (): number => Date.now(),
+    repeat: (work: () => void): number => setInterval(work, 200),
+    cancel: (id: number): void => clearInterval(id)
+  });
   private choiceAutoAdvanceTimer: number = -1;
   private choiceFeedbackDeadline: number = 0;
   private choiceDelayMenuOpen: boolean = false;
@@ -157,11 +165,9 @@ export struct 学习页 {
   private 媒体目录: string = '';
   private studyGuideChecked: boolean = false;
   private studyGuideVisible: boolean = false;
-  @State private noteEditorVisible: boolean = false;
-  @State private noteEditorBusy: boolean = false;
-  @State private noteEditorError: string = '';
-  private editingNote: EditableNote | null = null;
-  private editingFieldNames: string[] = [];
+  @State private editor: NoteEditorState = initialNoteEditorState();
+  private readonly editorSession: NoteEditorSession = new NoteEditorSession(new AnkiNoteEditor(),
+    (state: NoteEditorState): void => { this.editor = state; });
   private editStartedAt: number = 0;
   @State private 牌组ID: number = 0;
   @State private 牌组名: string = '';
@@ -278,6 +284,8 @@ export struct 学习页 {
   }
 
   aboutToDisappear(): void {
+    this.editorSession.dispose();
+    this.studyTimer.dispose();
     this.mounted = false;
     this.studySession.dispose();
     this.页面已显示 = false;
@@ -526,9 +534,9 @@ export struct 学习页 {
     this.网页控制器.loadData(html, 'text/html', 'UTF-8', 媒体基地址, ' ');
     if (this.阶段 === 'question') {
       this.展示时刻毫秒 = Date.now();
-      this.studyTiming.showQuestion(this.展示时刻毫秒);
+      this.studyTimer.showQuestion(this.展示时刻毫秒);
     } else if (this.阶段 === 'answer') {
-      this.studyTiming.showAnswer(Date.now());
+      this.studyTimer.showAnswer(Date.now());
     }
     this.maybeShowStudyGuide();
     this.playStudyAudio();
@@ -553,7 +561,7 @@ export struct 学习页 {
   private async playStudyAudio(autoplay: boolean = true, manual: boolean = false): Promise<void> {
     const rendered: RenderedCard | null = this.已渲染;
     if (!this.isCurrentRequest(this.requestVersion) || !this.controllerReady || rendered === null ||
-      this.noteEditorVisible || this.noteEditorBusy || (this.阶段 !== 'question' && this.阶段 !== 'answer')) { return; }
+      this.editor.visible || this.editor.busy || (this.阶段 !== 'question' && this.阶段 !== 'answer')) { return; }
     const version: number = this.requestVersion;
     const question: boolean = this.阶段 === 'question';
     const replayQuestion: string = manual && !question && !this.studyOptions.skipQuestionWhenReplayingAnswer ?
@@ -583,24 +591,11 @@ export struct 学习页 {
 
   /** 页面唯一计时器：隐藏/编辑/引导时暂停，过期回调不能触发新卡评分。 */
   private startStudyTimers(): void {
-    if (!this.isCurrentRequest(this.requestVersion) || !this.controllerReady || this.studyMenuOpen ||
-      this.noteEditorVisible || this.noteEditorBusy || this.studyGuideVisible || this.手写模式 ||
-      (this.阶段 !== 'question' && this.阶段 !== 'answer')) return;
-    this.studyTiming.resume(Date.now());
-    const seconds: number = this.studyTiming.displaySeconds(Date.now(), this.studyOptions);
-    this.studyTimerText = `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, '0')}`;
-    if (this.studyTimerId >= 0 || (!this.studyOptions.showTimer && !this.autoAdvanceEnabled)) return;
-    const version: number = this.requestVersion;
-    this.studyTimerId = setInterval((): void => {
-      if (!this.isCurrentRequest(version)) return;
-      this.tickStudyTimers();
-    }, 200);
+    this.studyTimer.start();
   }
 
   private stopStudyTimers(): void {
-    if (this.studyTimerId >= 0) clearInterval(this.studyTimerId);
-    this.studyTimerId = -1;
-    this.studyTiming.pause(Date.now());
+    this.studyTimer.stop();
   }
 
   private clearChoiceAutoAdvance(): void {
@@ -611,7 +606,7 @@ export struct 学习页 {
   private scheduleChoiceAutoAdvance(): void {
     this.clearChoiceAutoAdvance();
     if (!this.页面已显示 || !this.foreground || this.studyGuideVisible || this.studyMenuOpen || this.评分中 ||
-      this.noteEditorVisible || this.noteEditorBusy || this.手写模式 || this.choiceDelayMenuOpen ||
+      this.editor.visible || this.editor.busy || this.手写模式 || this.choiceDelayMenuOpen ||
       this.阶段 !== 'answer' || this.choiceGrade === null || this.choiceQuestion === null ||
       this.choiceAutoAdvanceSeconds() <= 0 || this.choiceFeedbackDeadline <= 0) return;
     const remaining: number = Math.max(0, this.choiceFeedbackDeadline - Date.now());
@@ -657,7 +652,7 @@ export struct 学习页 {
 
   private 继续选择题反馈(): void {
     if (this.choiceGrade === null || this.阶段 !== 'answer' || this.评分中 || this.studyGuideVisible ||
-      this.studyMenuOpen || this.choiceDelayMenuOpen || this.noteEditorVisible || this.noteEditorBusy || this.手写模式 ||
+      this.studyMenuOpen || this.choiceDelayMenuOpen || this.editor.visible || this.editor.busy || this.手写模式 ||
       !this.页面已显示 || !this.foreground) return;
     this.clearChoiceAutoAdvance();
     this.choiceFeedbackDeadline = 0;
@@ -666,21 +661,21 @@ export struct 学习页 {
 
   private toggleAutoAdvance(): void {
     this.autoAdvanceEnabled = !this.autoAdvanceEnabled;
-    this.studyTiming.restartAdvance(Date.now());
+    this.studyTimer.restartAdvance();
     this.startStudyTimers();
   }
 
-  private tickStudyTimers(): void {
-    if (!this.isCurrentRequest(this.requestVersion) || this.studyMenuOpen || this.noteEditorVisible ||
-      this.noteEditorBusy || this.studyGuideVisible || this.手写模式 || (this.阶段 !== 'question' && this.阶段 !== 'answer')) {
-      this.stopStudyTimers();
-      return;
-    }
-    const now: number = Date.now();
-    const seconds: number = this.studyTiming.displaySeconds(now, this.studyOptions);
-    this.studyTimerText = `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, '0')}`;
-    if (this.choiceQuestion !== null || !this.autoAdvanceEnabled || this.评分中 || this.flipPending) return;
-    const action: StudyAdvanceAction = this.studyTiming.takeAction(now, this.studyOptions, this.audioSession.isPlaying());
+  private studyTimerState(): StudyTimerState {
+    return { version: this.requestVersion,
+      active: this.isCurrentRequest(this.requestVersion) && this.controllerReady && !this.studyMenuOpen &&
+        !this.editor.visible && !this.editor.busy && !this.studyGuideVisible && !this.手写模式 &&
+        (this.阶段 === 'question' || this.阶段 === 'answer'),
+      advance: this.autoAdvanceEnabled,
+      blocked: this.choiceQuestion !== null || this.评分中 || this.flipPending,
+      audioPlaying: this.audioSession.isPlaying(), options: this.studyOptions };
+  }
+
+  private applyTimedAction(action: StudyAdvanceAction): void {
     switch (action) {
       case StudyAdvanceAction.ShowAnswer: this.显示答案(); break;
       case StudyAdvanceAction.Bury: this.埋藏或暂停当前卡(BURY_SUSPEND_MODE_BURY_USER); break;
@@ -818,53 +813,35 @@ export struct 学习页 {
   }
 
   /** 从当前学习卡读取笔记；字段就绪后才挂载编辑器，避免初始化为空草稿。 */
-  private readonly noteReader: AnkiNoteEditor = new AnkiNoteEditor();
 
   private async openNoteEditor(): Promise<void> {
     if (this.评分中 || this.studyGuideVisible || this.当前卡片 === null ||
-      (this.阶段 !== 'question' && this.阶段 !== 'answer')) { return; }
-    if (!this.isCurrentRequest(this.requestVersion)) { return; }
+      (this.阶段 !== 'question' && this.阶段 !== 'answer') || !this.isCurrentRequest(this.requestVersion)) return;
     this.评分中 = true;
-    this.noteEditorBusy = true;
-    this.noteEditorError = '';
     this.editStartedAt = Date.now();
     this.Ctrl按下 = false;
-    const card: StudyCard = this.当前卡片;
+    const noteId: number = this.当前卡片.noteId;
     this.invalidateCardWork();
     const version: number = this.requestVersion;
-    try {
-      const snapshot = await loadNoteEditor(card.noteId, true, this.noteReader,
-        (): boolean => this.isCurrentRequest(version));
-      if (snapshot === null) return;
-      this.editingNote = snapshot.note;
-      this.editingFieldNames = snapshot.fieldNames;
-      this.noteEditorVisible = true;
-    } catch (error) {
-      if (!this.isCurrentRequest(version)) { return; }
+    const result: string = await this.editorSession.open(noteId, true,
+      (): boolean => this.isCurrentRequest(version), false);
+    if (!this.mounted) return;
+    if (result === 'failed') {
       this.展示时刻毫秒 += Date.now() - this.editStartedAt;
-      this.editingNote = null;
+      showToastSafely(this.getUIContext(), { message: this.取文案($r('app.string.browser_detail_load_error')) });
+    }
+    if (!this.editor.visible) {
       this.评分中 = false;
-      showToastSafely(this.getUIContext(), {
-        message: this.取文案($r('app.string.browser_detail_load_error'))
-      });
-    } finally {
-      if (this.mounted) {
-        this.noteEditorBusy = false;
-        if (!this.noteEditorVisible) {
-          this.评分中 = false;
-          this.消费待重渲染();
-          this.startStudyTimers();
-        }
-      }
+      this.消费待重渲染();
+      this.startStudyTimers();
     }
   }
 
   /** 取消不重载卡片，并扣除编辑占用的答题时间。 */
   private closeNoteEditor(): void {
-    if (this.noteEditorBusy || !this.noteEditorVisible) { return; }
+    if (this.editor.busy || !this.editor.visible) return;
     this.展示时刻毫秒 += Date.now() - this.editStartedAt;
-    this.noteEditorVisible = false;
-    this.editingNote = null;
+    this.editorSession.close();
     this.评分中 = false;
     this.Ctrl按下 = false;
     this.消费待重渲染();
@@ -874,32 +851,19 @@ export struct 学习页 {
 
   /** 保存原笔记并保留撤销记录；从后端重新获取队首、调度状态和题面。 */
   private async saveNoteEdits(fields: string[], tags: string[]): Promise<boolean> {
-    const note: EditableNote | null = this.editingNote;
-    if (this.noteEditorBusy || !this.noteEditorVisible || note === null) { return false; }
-    this.noteEditorBusy = true;
-    this.noteEditorError = '';
-    try {
-      await this.studySession.saveNote(note, fields, tags);
-      if (!this.mounted) { return true; }
-      await this.加载下一张卡();
-      if (!this.mounted) { return true; }
-      this.noteEditorVisible = false;
-      this.editingNote = null;
-      this.评分中 = false;
-      this.Ctrl按下 = false;
+    if (this.editor.busy || !this.editor.visible || this.editor.note === null) return false;
+    const saved: boolean = await this.editorSession.save(fields, tags, async (note: EditableNote): Promise<boolean> => {
+      await this.studySession.saveNote(note, note.fields, note.tags);
+      if (this.mounted) await this.加载下一张卡();
       return true;
-    } catch (error) {
-      if (!this.mounted) { return false; }
-      this.noteEditorError = this.取文案($r('app.string.browser_detail_save_error'));
-      return false;
-    } finally {
-      if (this.mounted) {
-        this.noteEditorBusy = false;
-        this.消费待重渲染();
-        if (!this.noteEditorVisible) { this.playStudyAudio(); }
-        this.startStudyTimers();
-      }
+    });
+    if (this.mounted) {
+      if (saved) { this.评分中 = false; this.Ctrl按下 = false; }
+      this.消费待重渲染();
+      if (!this.editor.visible) this.playStudyAudio();
+      this.startStudyTimers();
     }
+    return saved;
   }
 
   /** 当前卡只作为本地入口上下文；打开页面不会触发任何 AI 网络请求。
@@ -958,7 +922,7 @@ export struct 学习页 {
   /** 返回与写入通知共用刷新入口；加载或编辑期间保留标记，不并发覆盖卡面。 */
   private 消费待重渲染(): void {
     if (!this.mounted || !this.sessionReady || !this.foreground || !this.待重渲染当前卡 ||
-      !this.页面已显示 || this.contentRefreshInFlight || this.评分中 || this.noteEditorVisible || this.noteEditorBusy ||
+      !this.页面已显示 || this.contentRefreshInFlight || this.评分中 || this.editor.visible || this.editor.busy ||
       (this.阶段 === 'loading' && this.loadingVersion === this.requestVersion)) { return; }
     this.待重渲染当前卡 = false;
     this.刷新编辑后当前卡();
@@ -1167,7 +1131,7 @@ export struct 学习页 {
 
   /** 翻面只提交当前请求结果；拼写请求期间切卡会使本次结果失效。 */
   private async 显示答案(): Promise<void> {
-    if (this.noteEditorVisible || this.noteEditorBusy || this.studyGuideVisible || this.flipPending ||
+    if (this.editor.visible || this.editor.busy || this.studyGuideVisible || this.flipPending ||
       (this.评分中 && !this.contentRefreshInFlight)) { return; }
     if (this.choiceQuestion !== null) return;
     if (!this.isCurrentRequest(this.requestVersion) || !this.controllerReady || this.pendingHtml !== '' ||
@@ -1205,7 +1169,7 @@ export struct 学习页 {
 
   private async 提交选择题(): Promise<void> {
     if (this.choiceQuestion === null || this.choiceGrade !== null || this.choiceSelectedIds.length === 0 ||
-      this.阶段 !== 'question' || this.studyGuideVisible || this.noteEditorVisible || this.noteEditorBusy ||
+      this.阶段 !== 'question' || this.studyGuideVisible || this.editor.visible || this.editor.busy ||
       this.当前卡片 === null || this.评分中 || !this.isCurrentRequest(this.requestVersion)) return;
     const version: number = this.requestVersion;
     const question: JideChoiceQuestion = this.choiceQuestion;
@@ -1442,8 +1406,8 @@ export struct 学习页 {
   }
 
   private 返回(): void {
-    if (this.noteEditorBusy) { return; }
-    if (this.noteEditorVisible) { this.closeNoteEditor(); return; }
+    if (this.editor.busy) { return; }
+    if (this.editor.visible) { this.closeNoteEditor(); return; }
     this.autoAdvanceEnabled = false;
     this.stopStudyTimers();
     this.pathStack.pop();
@@ -1486,7 +1450,7 @@ export struct 学习页 {
   // ========================================================
   private 处理按键(event: KeyEvent): boolean {
     const result = resolveStudyKey(studyKeyName(event.keyCode), event.type === KeyType.Down,
-      this.Ctrl按下, this.阶段, this.noteEditorVisible || this.noteEditorBusy, this.studyGuideVisible);
+      this.Ctrl按下, this.阶段, this.editor.visible || this.editor.busy, this.studyGuideVisible);
     this.Ctrl按下 = result.control;
     switch (result.command) {
       case 'undo': this.撤销上次(); break;
@@ -1978,14 +1942,14 @@ export struct 学习页 {
             }
           })
         }
-        if (this.noteEditorVisible && this.editingNote !== null) {
+        if (this.editor.visible && this.editor.note !== null) {
           浏览编辑区({
             isDark: this.是否深色(),
-            busy: this.noteEditorBusy,
-            errorMessage: this.noteEditorError,
-            fieldNames: this.editingFieldNames,
-            initialFieldValues: this.editingNote.fields,
-            initialTags: this.editingNote.tags.join(' '),
+            busy: this.editor.busy,
+            errorMessage: this.editor.error === '' ? '' : this.取文案($r('app.string.browser_detail_save_error')),
+            fieldNames: this.editor.fieldNames,
+            initialFieldValues: this.editor.note.fields,
+            initialTags: this.editor.note.tags.join(' '),
             onCancel: (): void => { this.closeNoteEditor(); },
             onSave: (fields: string[], tags: string[]): Promise<boolean> => {
               return this.saveNoteEdits(fields, tags);
@@ -2008,8 +1972,8 @@ export struct 学习页 {
     .hideTitleBar(true)
     .backgroundColor(Color.Transparent)
     .onBackPressed((): boolean => {
-      if (this.noteEditorBusy) { return true; }
-      if (this.noteEditorVisible) { this.closeNoteEditor(); return true; }
+      if (this.editor.busy) { return true; }
+      if (this.editor.visible) { this.closeNoteEditor(); return true; }
       return false;
     })
     .opacity(this.转场透明度)

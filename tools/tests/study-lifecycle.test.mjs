@@ -78,16 +78,16 @@ test('automatic actions use guarded production grading and hiding cancels the ne
     await page.加载下一张卡();
     await page.显示答案();
     page.autoAdvanceEnabled = true;
-    page.studyTiming.showAnswer(Date.now() - 10);
-    page.tickStudyTimers(); page.tickStudyTimers();
+    page.studyTimer.showAnswer(Date.now() - 10);
+    page.studyTimer.tick(); page.studyTimer.tick();
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(answers.length, 1);
     assert.equal(answers[0].rating, [0, 0, 2, 1][action]);
     page.foreground = false;
     page.studyActivityChanged();
-    page.tickStudyTimers();
+    page.studyTimer.tick();
     assert.equal(page.autoAdvanceEnabled, false);
-    assert.equal(page.studyTimerId, -1);
+    assert.equal(page.timerHandles.size, 0);
     assert.equal(answers.length, 1);
     page.aboutToDisappear();
   }
@@ -98,19 +98,19 @@ test('automatic question deadline waits for native audio and editing or guides b
   page.studyOptions.secondsToShowQuestion = 0.001;
   page.studyOptions.waitForAudio = true;
   page.autoAdvanceEnabled = true;
-  page.studyTiming.showQuestion(Date.now() - 20);
+  page.studyTimer.showQuestion(Date.now() - 20);
   let playing = true;
   page.audioSession.isPlaying = () => playing;
-  page.tickStudyTimers();
+  page.studyTimer.tick();
   assert.equal(page.阶段, 'question');
-  for (const field of ['noteEditorVisible', 'noteEditorBusy', 'studyGuideVisible', 'studyMenuOpen', '手写模式']) {
-    playing = false; page[field] = true;
-    page.tickStudyTimers();
+  for (const [owner, field] of [[page.editor, 'visible'], [page.editor, 'busy'], [page, 'studyGuideVisible'], [page, 'studyMenuOpen'], [page, '手写模式']]) {
+    playing = false; owner[field] = true;
+    page.studyTimer.tick();
     assert.equal(page.阶段, 'question');
-    page[field] = false;
-    page.studyTiming.resume(Date.now() - 20);
+    owner[field] = false;
+    page.studyTimer.showQuestion(Date.now() - 20);
   }
-  page.tickStudyTimers();
+  page.studyTimer.tick();
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(page.阶段, 'answer');
   assert.equal(answers.length, 0);

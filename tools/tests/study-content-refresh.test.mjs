@@ -32,7 +32,7 @@ function harness(phase = 'question') {
   const page = new Page();
   Object.assign(page, {
     mounted: true, sessionReady: true, foreground: true, requestVersion: 0, loadingVersion: -1, flipPending: false, controllerReady: true, pendingHtml: '',
-    audioSession: { stop: async () => {}, play: async () => false },
+    audioSession: { stop: async () => {}, play: async () => false, isPlaying: () => false },
     页面已显示: true, 待重渲染当前卡: false, contentRefreshInFlight: false, 评分中: false,
     choiceQuestion: null, choiceGrade: null, choiceAutoAdvanceTimer: -1, choiceFeedbackDeadline: 0, studyMenuOpen: false,
     noteEditorVisible: false, noteEditorBusy: false, 阶段: phase, 牌组ID: 10,
@@ -82,12 +82,13 @@ test('returning without an AI notification reloads actual front, back, CSS and s
 
 test('manual editor save reaches Web with new field content instead of a mocked reload', async () => {
   const { page, displayed } = harness('answer');
-  page.noteEditorVisible = true;
-  page.editingNote = { id: 42, guid: 'g', notetypeId: 9, mtimeSecs: 0, usn: 0 };
+  page.笔记服务实例.获取笔记 = async () => ({ id: 42, guid: 'g', notetypeId: 9, mtimeSecs: 0, usn: 0, fields: [], tags: [] });
+  page.笔记类型服务实例 = { 获取笔记类型: async () => ({ fieldNames: ['Front', 'Back'] }) };
+  await page.editorSession.open(42, true, () => true);
   assert.equal(await page.saveNoteEdits(['saved-front', 'saved-back'], []), true);
   assert.equal(displayed.at(-1), 'old-css:saved-front');
   assert.equal(page.背面HTML, 'old-css:saved-back');
-  assert.equal(page.noteEditorVisible, false);
+  assert.equal(page.editor.visible, false);
 });
 
 test('changed spelling template refreshes expected-answer metadata and the displayed answer', async () => {

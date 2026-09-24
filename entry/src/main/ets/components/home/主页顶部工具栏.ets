@@ -40,7 +40,7 @@ export struct 主页顶部工具栏 {
   @StorageProp(THEME_VISUALS_KEY) private visual: ThemeDefinition = themeDefinition('aurora');
   @Prop 排序模式中: boolean = false;
   @Prop syncStatusText: string = '';
-  @Prop syncDetailsAvailable: boolean = false;
+  @Prop syncIndicator: string = 'hidden';
   onSyncDetails: () => void = (): void => {};
   on更多点击: () => void = (): void => {};
   on创建牌组点击: () => void = (): void => {};
@@ -53,57 +53,52 @@ export struct 主页顶部工具栏 {
 
   build() {
     Row() {
-      if (this.排序模式中) {
+      // 等权侧栏保证状态组中心始终等于屏幕中心，不受两侧标签宽度影响。
+      Row() {
         按下态按钮({
-          文案: $r('app.string.deck_reorder_exit'),
+          文案: this.排序模式中 ? $r('app.string.deck_reorder_exit') : $r('app.string.study_more'),
           字色: $r('app.color.text_primary'),
-          点击回调: (): void => { this.on排序退出(); }
-        })
-
-        Blank()
-
-        按下态按钮({
-          文案: $r('app.string.deck_reorder_done'),
-          字色: this.动作主色,
-          themeText: true,
-          点击回调: (): void => { this.on排序完成(); }
-        })
-      } else {
-        按下态按钮({
-          文案: $r('app.string.study_more'),
-          字色: $r('app.color.text_primary'),
-          点击回调: (): void => { this.on更多点击(); }
-        })
-
-        if (this.syncStatusText !== '') {
-          Button({ type: ButtonType.Normal }) {
-            Text(this.syncStatusText)
-              .fontSize(应用尺寸.字号_正文_小)
-              .fontColor(this.动作主色)
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-              .textAlign(TextAlign.Center)
-              .width('100%')
+          singleLine: true,
+          点击回调: (): void => {
+            if (this.排序模式中) this.on排序退出();
+            else this.on更多点击();
           }
-          .layoutWeight(1)
-          .height('100%')
-          .margin({ left: 8, right: 8 })
-          .padding(0)
-          .backgroundColor(Color.Transparent)
-          .enabled(this.syncDetailsAvailable)
-          .accessibilityText(this.syncStatusText)
-          .onClick((): void => { this.onSyncDetails(); })
-        } else {
-          Blank()
-        }
-
-        按下态按钮({
-          文案: $r('app.string.create_deck'),
-          字色: this.动作主色,
-          themeText: true,
-          点击回调: (): void => { this.on创建牌组点击(); }
         })
       }
+      .layoutWeight(1)
+      .justifyContent(FlexAlign.Start)
+
+      if (!this.排序模式中 && this.syncIndicator === 'syncing') {
+        Row({ space: 8 }) {
+          Button({ type: ButtonType.Circle }) {
+            LoadingProgress()
+              .width(24).height(24)
+              .color(this.动作主色)
+          }
+          .width(44).height(44)
+          .padding(0)
+          .backgroundColor(Color.Transparent)
+          .accessibilityText(this.syncStatusText)
+          .onClick((): void => { this.onSyncDetails(); })
+        }
+        .justifyContent(FlexAlign.Center)
+        .margin({ left: 8, right: 8 })
+      }
+
+      Row() {
+        按下态按钮({
+          文案: this.排序模式中 ? $r('app.string.deck_reorder_done') : $r('app.string.create_deck'),
+          字色: this.动作主色,
+          themeText: true,
+          singleLine: true,
+          点击回调: (): void => {
+            if (this.排序模式中) this.on排序完成();
+            else this.on创建牌组点击();
+          }
+        })
+      }
+      .layoutWeight(1)
+      .justifyContent(FlexAlign.End)
     }
     .width('100%')
     .height(应用尺寸.工具栏高度 + this.状态栏高度)

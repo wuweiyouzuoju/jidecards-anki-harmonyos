@@ -183,7 +183,8 @@ export class 协议读取器 {
         this.前进(8);
         return;
       case 线类型_长度分隔:
-        this.读取字节();
+        // 跳过大报告或未知载荷时仅移动游标，避免复制整段字节。
+        this.前进(this.读取变长整数());
         return;
       case 线类型_定长32:
         this.前进(4);

@@ -157,7 +157,8 @@ test('BrowserPage editor reads use the shared loader and existing Anki services'
   const page = read('entry/src/main/ets/pages/浏览页.ets');
   const loader = read('entry/src/main/ets/model/NoteEditorLoader.ts');
   const adapter = read('entry/src/main/ets/backend/AnkiNoteEditor.ts');
-  assert.match(page, /loadNoteEditor\(行ID, mode === 'notes', this\.noteReader/);
+  assert.match(page, /this\.editorSession\.open\(行ID, this\.浏览模式值 === 'notes'/);
+  assert.match(read('entry/src/main/ets/model/NoteEditorSession.ts'), /await loadNoteEditor\(/);
   assert.match(adapter, /this\.notes\.获取笔记\(id\)/);
   assert.match(adapter, /this\.notetypes\.获取笔记类型\(id\)/);
   assert.match(adapter, /this\.cards\.获取卡片\(id\)/);
@@ -170,19 +171,20 @@ test('BrowserPage 保存编辑 calls 笔记服务.更新笔记 with skipUndoEntr
   assert.match(page, /private\s+async\s+保存编辑\s*\(/);
   assert.match(page, /this\.笔记服务实例\.更新笔记\s*\(\s*\[[^\]]+\]\s*,\s*false\s*\)/);
   // 保存成功后关闭弹层 + 重新搜索
-  assert.match(page, /this\.显示编辑区\s*=\s*false/);
+  assert.match(page, /this\.editorSession\.close\(/);
   assert.match(page, /this\.执行搜索\s*\(\s*\)/);
 });
 
 test('BrowserPage build renders 浏览编辑区 conditionally on 显示编辑区', () => {
   const page = read('entry/src/main/ets/pages/浏览页.ets');
-  assert.match(page, /if\s*\(this\.显示编辑区\)\s*\{/);
+  assert.match(page, /if\s*\(this\.editor\.visible\s*&&\s*this\.editor\.note\s*!==\s*null\)\s*\{/);
   assert.match(page, /浏览编辑区\s*\(\s*\{/);
   // 接线必备 @Prop 与回调
   assert.match(page, /isDark:\s*this\.是否深色\s*\(\s*\)/);
-  assert.match(page, /fieldNames:\s*this\.编辑区字段名列表/);
-  assert.match(page, /initialFieldValues:\s*this\.编辑区初始字段值/);
-  assert.match(page, /initialTags:\s*this\.编辑区初始标签/);
+  assert.match(page, /fieldNames:\s*this\.editor\.fieldNames/);
+  assert.match(page, /initialFieldValues:\s*this\.editor\.note\.fields/);
+  assert.match(page, /initialTags:\s*this\.editor\.note\.tags\.join\(' '\)/);
+  assert.match(page, /showAction:\s*false/);
   // onSave 回调最终调 this.保存编辑（箭头函数体跨行，用 [\s\S] 非贪婪匹配）
   assert.match(page, /onSave:[\s\S]*?this\.保存编辑/);
 });
@@ -194,7 +196,7 @@ test('浏览编辑区 component preserves T7 presentation-only invariants', () =
   // 必备 @Prop 与回调签名
   assert.match(panel, /@Prop\s+isDark:\s*boolean/);
   assert.match(panel, /@Prop\s+busy:\s*boolean/);
-  assert.match(panel, /@Prop\s+errorMessage:\s*string/);
+  assert.match(panel, /(?:@Prop|@State private)\s+errorMessage:\s*string/);
   assert.match(panel, /@Prop\s+fieldNames:\s*string\[\]/);
   assert.match(panel, /@Prop\s+initialFieldValues:\s*string\[\]/);
   assert.match(panel, /@Prop\s+initialTags:\s*string/);
@@ -354,25 +356,12 @@ test('T8 i18n keys exist in both base and en_US string.json', () => {
 // encodeCardIdRequest/decodeCardStatsResponse/ReviewKind。
 // ============================================================
 
-test('BrowserPage wires T11 card info: imports 卡片信息 + 统计服务 + CardStatsView', () => {
+test('BrowserPage delegates card info loading to its target-owned panel', () => {
   const page = read('entry/src/main/ets/pages/浏览页.ets');
-  assert.match(page, /import\s+\{[^}]*卡片信息[^}]*\}\s*from\s*['"][^'"]*卡片信息['"]/);
-  assert.match(page, /import\s+\{[^}]*统计服务[^}]*\}\s*from\s*['"][^'"]*统计服务['"]/);
-  assert.match(page, /import\s+type\s+\{[^}]*CardStatsView[^}]*\}\s*from\s*['"][^'"]*StatsMessages['"]/);
-  assert.match(page, /private\s+readonly\s+统计服务实例:\s*统计服务/);
-});
-
-test('BrowserPage has T11 打开卡片信息 / 关闭卡片信息 methods', () => {
-  const page = read('entry/src/main/ets/pages/浏览页.ets');
-  assert.match(page, /private\s+async\s+打开卡片信息\s*\(\s*卡片ID:\s*number\s*\)/);
-  assert.match(page, /private\s+关闭卡片信息\s*\(\s*\)/);
-  // 打开时调 统计服务.获取卡片统计
-  assert.match(page, /this\.统计服务实例\.获取卡片统计\s*\(/);
-  // 4 个 @State：显示 / 数据 / 错误 / 忙碌
-  assert.match(page, /@State\s+private\s+显示卡片信息:\s*boolean/);
-  assert.match(page, /@State\s+private\s+卡片信息数据:\s*CardStatsView\s*\|\s*null/);
-  assert.match(page, /@State\s+private\s+卡片信息错误:\s*string/);
-  assert.match(page, /@State\s+private\s+卡片信息忙碌:\s*boolean/);
+  const panel = read('entry/src/main/ets/components/browser/卡片信息.ets');
+  assert.match(page, /cardId: this\.infoCardId/);
+  assert.doesNotMatch(page, /统计服务实例|卡片信息数据|infoVersion/);
+  assert.match(panel, /this\.service\.获取卡片统计\(this\.cardId\)/);
 });
 
 test('BrowserPage build renders 卡片信息 conditionally on 显示卡片信息', () => {
@@ -380,7 +369,7 @@ test('BrowserPage build renders 卡片信息 conditionally on 显示卡片信息
   assert.match(page, /if\s*\(this\.显示卡片信息\)\s*\{/);
   assert.match(page, /卡片信息\s*\(\s*\{/);
   assert.match(page, /isDark:\s*this\.是否深色\s*\(\s*\)/);
-  assert.match(page, /stats:\s*this\.卡片信息数据/);
+  assert.match(page, /cardId:\s*this\.infoCardId/);
   assert.match(page, /onClose:[\s\S]*?this\.关闭卡片信息/);
 });
 
@@ -406,14 +395,14 @@ test('服务索引 defines 统计方法.卡片统计 = 0 (Anki stats.proto CardS
   assert.match(idx, /卡片统计:\s*0/);
 });
 
-test('卡片信息 component preserves T11 presentation-only invariants', () => {
+test('卡片信息 owns a read-only target and retains localized presentation', () => {
   const panel = read('entry/src/main/ets/components/browser/卡片信息.ets');
   // 纯展示层：不直接调后端
-  assert.doesNotMatch(panel, /后端会话|统计服务|卡片服务|笔记服务|\.会话\.调用\s*\(/);
+  assert.doesNotMatch(panel, /后端会话|卡片服务|笔记服务|\.会话\.调用\s*\(/);
   // 必备 @Prop 与回调签名
   assert.match(panel, /@Prop\s+isDark:\s*boolean/);
-  assert.match(panel, /@Prop\s+stats:\s*CardStatsView\s*\|\s*null/);
-  assert.match(panel, /@Prop\s+errorMessage:\s*string/);
+  assert.match(panel, /@Prop @Watch\('load'\) cardId: number/);
+  assert.match(panel, /(?:@Prop|@State private)\s+errorMessage:\s*string/);
   assert.match(panel, /onClose:\s*\(\)\s*=>\s*void/);
   // 标题与分区文案走 i18n
   assert.match(panel, /app\.string\.browser_info_title/);
@@ -523,7 +512,7 @@ test('查找替换对话框 component preserves T9 presentation-only invariants'
   // 必备 @Prop 与回调签名
   assert.match(panel, /@Prop\s+isDark:\s*boolean/);
   assert.match(panel, /@Prop\s+busy:\s*boolean/);
-  assert.match(panel, /@Prop\s+errorMessage:\s*string/);
+  assert.match(panel, /(?:@Prop|@State private)\s+errorMessage:\s*string/);
   assert.match(panel, /@Prop\s+有选中笔记:\s*boolean/);
   assert.match(panel, /onCancel:\s*\(\)\s*=>\s*void/);
   assert.match(panel, /onExecute:\s*\(/);
@@ -716,7 +705,7 @@ test('浏览侧边栏 component preserves T6 presentation-only invariants', () =
   // 必备 @Prop
   assert.match(panel, /@Prop\s+isDark:\s*boolean/);
   assert.match(panel, /@Prop\s+busy:\s*boolean/);
-  assert.match(panel, /@Prop\s+errorMessage:\s*string/);
+  assert.match(panel, /(?:@Prop|@State private)\s+errorMessage:\s*string/);
   assert.match(panel, /@Prop\s+牌组树:\s*DeckTreeNode\s*\|\s*null/);
   assert.match(panel, /@Prop\s+标签树:\s*TagTreeNode\s*\|\s*null/);
   assert.match(panel, /@Prop\s+已保存搜索列表:\s*已保存搜索项\[\]/);

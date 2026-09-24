@@ -36,13 +36,13 @@
 
 自定义弹窗通过 `components/common/DialogHeader.ets` 将确认、保存、完成固定在标题栏右侧，取消或关闭放左侧；左右操作区等宽，标题相对弹窗整体居中。主操作为透明底色文字按钮，文字跟随 `颜色键.动作主色`，保留调用方的忙碌与校验守卫。媒体管理的操作按未使用媒体和回收站分区排列，禁用按钮保留位置与清晰的灰色文字。系统原生确认框沿用平台布局。
 
-学习页右上角更多菜单提供“编辑”，复用 `components/browser/浏览编辑区.ets` 修改当前笔记字段和标签。编辑期间屏蔽学习快捷键及评分；取消保留当前卡面并排除编辑耗时，保存保留撤销记录并通过既有加载流程重新获取队首、调度状态与题面。
+学习页右上角更多菜单提供“编辑”，复用 `components/browser/浏览编辑区.ets` 修改当前笔记字段和标签。`model/NoteEditorSession.ts` 拥有读取代次、草稿可见性和写入输入快照；学习页仅适配当前会话的写入与刷新。编辑期间屏蔽学习快捷键及评分；字段读取完成前不挂载空编辑器；取消保留当前卡面并排除编辑耗时，保存保留撤销记录并通过既有加载流程重新获取队首、调度状态与题面。
 
 学习页从其他页面返回时通过 NavDestination 的隐藏/显示回调标记并消费内容刷新，不依赖编辑入口是否发送 AI 专用通知。刷新复用完整加载链更新正反面、模板、拼写元数据和音频；同卡恢复原正反面，失效卡按后端新队首展示。加载或编辑中保留待刷新标记，刷新过程中新增变更完成后再次消费；失败进入可见错误态，禁止把旧题面当作最新内容继续评分。
 
 学习加载和拼写翻面共用请求代次：切卡、编辑、隐藏/后台与销毁立即使旧工作失效；卡片身份、调度状态、HTML准备完成后一起提交。ArkWeb未挂载时缓存当前文档，attach后再显示和启动音频。新增学习操作应复用invalidateCardWork/isCurrentRequest，不让异步回调直接覆盖新卡。
 
-学习与预览共用model/CardAudioSession.ts，负责取消旧音频解析、串行原生播放/清理、销毁后禁止播放。声音与TTS由卡片渲染服务.extractAudioTags一次RPC取得，旧的分开提取入口已删除；音频失败保留卡面和重播恢复。两个页面各自保留学习调度与只读预览规则。新增媒体入口应复用该会话，不直接调用两套播放器。
+学习与预览共用model/CardAudioSession.ts，负责取消旧音频解析、串行原生播放/清理、销毁后禁止播放。声音与TTS由卡片渲染服务.extractAudioTags一次RPC取得，旧的分开提取入口已删除；音频失败保留卡面和重播恢复。`model/StudyTimerController.ts` 只拥有普通计时与自动推进判定，页面继续拥有卡片、音频、编辑/引导阻塞事实以及评分写入；不为计时再引入状态框架。两个页面各自保留学习调度与只读预览规则。新增媒体入口应复用该会话，不直接调用两套播放器。
 
 
 ## 学习会话读写
@@ -53,6 +53,8 @@
 
 `study-session-controller.test.mjs` 直接测试生命周期和输入；`study-autoplay-backend.test.mjs` 直接导入完整后端适配器，平台动态库替身遇到意外 RPC 会失败，不能用这些测试声称设备/NAPI 已通过。
 
+媒体管理检查沿用 AnkiDroid 的完整结果语义：Core 返回的 `report` 作为一个可滚动文本块展示，unused 只保留完整文件名供一次性提交给 TrashMediaFiles，missing 只保留计数。页面不为单个文件创建 ArkUI 行、复选框或分页状态；`decodeCheckMediaSummary` 跳过 missing 文件名和笔记 ID，避免重复复制大型字段。回归入口为 `tools/tests/media-check.test.mjs`。
+
 ## 页面剩余职责边界
 
-`StudyInputPolicy.ts` 将键盘事件映射为学习命令，`utils/StudyKeyAdapter.ets` 只映射 Kit 键码。编辑期间不触发学习操作；引导期间也清理松开的 Ctrl。`StudyAnswerRenderer.ts` 使用翻面时的字段/输入快照生成拼写答案，读取失败回退原答案，是否展示仍由学习会话代次决定。纯 HTML 构建器已使用 `.ts`，无需 ArkUI 即可直接测试。编辑器读取共用 `NoteEditorLoader.ts`；Web 控件装载、焦点和 UI 效果仍由页面负责，音频生命周期属于 `CardAudioSession`，计时决策属于 `StudyTiming`。
+`StudyInputPolicy.ts` 将键盘事件映射为学习命令，`utils/StudyKeyAdapter.ets` 只映射 Kit 键码。编辑期间不触发学习操作；引导期间也清理松开的 Ctrl。`StudyAnswerRenderer.ts` 使用翻面时的字段/输入快照生成拼写答案，读取失败回退原答案，是否展示仍由学习会话代次决定。纯 HTML 构建器已使用 `.ts`，无需 ArkUI 即可直接测试。编辑生命周期共用 `NoteEditorSession.ts`，内部读取复用 `NoteEditorLoader.ts`；Web 控件装载、焦点和 UI 效果仍由页面负责，音频生命周期属于 `CardAudioSession`，普通计时资源属于 `StudyTimerController`，时长与动作计算仍复用 `StudyTiming`。

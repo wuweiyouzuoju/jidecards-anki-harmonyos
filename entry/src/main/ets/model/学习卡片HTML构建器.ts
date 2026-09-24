@@ -10,7 +10,7 @@
 //
 // 媒体路径策略：Anki 卡片 HTML 中媒体以相对文件名引用（<img src="foo.png">）。
 // ArkWeb 对 file/resource 协议跨域请求一律拦截（官方文档：本地资源跨域），
-// 因此把相对文件名重写为自建 https 域名 媒体基地址，由 StudyPage 的
+// 因此由 loadData 的 https 媒体基地址解析标准相对 URL，再由共享
 // onInterceptRequest 拦截并映射到沙箱 collection.media/ 目录。
 // 依据：developer.huawei.com ArkWeb「本地资源跨域」章节 + 社区示例。
 //
@@ -22,7 +22,6 @@
 // resultHtml: string - 拼写比对结果 HTML
 //
 // @输出
-// 重写媒体地址(html): string
 // 原始侧HTML(rendered, side): string
 // 构建卡片HTML(rendered, side): string
 // 提取拼写标记(nodes): 拼写标记 | null
@@ -109,38 +108,6 @@ mjx-container[jax="SVG"][display="true"] { overflow-x: auto; overflow-y: hidden;
 .typeMissed { color: #888; }
 #typearrow { color: #888; }
 `;
-
-// ========================================================
-// @块ID MODEL-STUDY-HTML-004
-// @名称 重写媒体地址
-//
-// @作用
-// 把卡片正文中的相对媒体文件名重写为 媒体基地址 绝对地址。
-//
-// @输入
-// html: string - 原始 HTML
-//
-// @输出
-// string：重写后的 HTML（src / href 相对路径被替换为 媒体基地址 + 文件名）
-//
-// @业务规则
-// href 以 '#' 开头的锚点链接不重写。
-//
-// @副作用
-// 无
-// ========================================================
-export function 重写媒体地址(html: string): string {
-  return html
-    .replace(/(src\s*=\s*")([^":/][^":]*)"/g, (_匹配: string, 前缀: string, 文件名: string): string => {
-      return `${前缀}${媒体基地址}${encodeURIComponent(文件名)}"`;
-    })
-    .replace(/(href\s*=\s*")([^":/][^":]*)"/g, (_匹配: string, 前缀: string, 文件名: string): string => {
-      if (文件名.startsWith('#')) {
-        return `${前缀}${文件名}"`;
-      }
-      return `${前缀}${媒体基地址}${encodeURIComponent(文件名)}"`;
-    });
-}
 
 /** 节点流 → HTML 片段：text 节点为模板原文，replacement 节点为后端已渲染的字段 HTML */
 function 节点流转HTML(节点列表: TemplateNode[]): string {
@@ -488,7 +455,7 @@ const 可折叠字段脚本: string = `<script>
 // 无
 // ========================================================
 export function 构建卡片HTML(渲染结果: RenderedCard, 侧面: 卡片正反面, isDark: boolean = false): string {
-  const 正文: string = 剥除音频标签(重写媒体地址(原始侧HTML(渲染结果, 侧面)));
+  const 正文: string = 剥除音频标签(原始侧HTML(渲染结果, 侧面));
   const 默认配色: string = `body { color: ${isDark ? '#E6E6E6' : '#1A1A1A'}; background: transparent; }`;
   const 样式: string = `${基础样式}\n${图片遮罩渲染样式}\n${可折叠字段样式}`;
   // latexSvg 只决定传统 LaTeX 图片后缀，不能关闭同一卡片中的 MathJax。

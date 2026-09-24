@@ -46,7 +46,7 @@ export function panelHarness({ required = 1, media = false, automatic = true, fs
   Object.assign(panel, { syncOwner: {}, syncTask: null, mediaStart: null, mediaMayBeRunning: false, disposalStarted: false, automatic, yieldingForStudy: false, fullSyncInFlight: false, abortTimer: -1, abortCall: null, successTimer: -1, collectionCallInFlight: false, 初始鉴权: auth, 当前阶段: 'syncing', 错误文案: '', 是否请求中止: false,
     轮询定时器: -1, 集合已同步: false, 是否在媒体阶段: false, detailsVisible: false, suspendDelayId: -1, syncForeground: true,
     状态变化回调: (busy, modal) => { state.states.push({ busy, modal }); },
-    statusChanged: text => { state.status = text; }, onYield: automatic => { state.yielded = automatic ? 'auto' : 'manual'; },
+    statusChanged: (text, indicator) => { state.status = text; state.indicator = indicator; }, onYield: automatic => { state.yielded = automatic ? 'auto' : 'manual'; },
     取本地化文案: key => key, 关闭回调: () => { state.closed++; },
     同步完成回调: value => { state.refreshed++; state.fsrsResults.push(value); },
     同步服务实例: {

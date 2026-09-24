@@ -27,7 +27,7 @@ function harness(notes = false) {
   const page = new Page();
   const calls = [];
   Object.assign(page, {
-    operations: new BrowserOperationController(), 关闭卡片信息() {}, editorVersion: 0, mappingVersion: 0, searchVersion: 0, 浏览模式值: notes ? 'notes' : 'cards', 搜索文本: '',
+    editorSession: { close() {} }, operations: new BrowserOperationController(), 关闭卡片信息() {}, editorVersion: 0, mappingVersion: 0, searchVersion: 0, 浏览模式值: notes ? 'notes' : 'cards', 搜索文本: '',
     sortColumn: '', sortReverse: false, 列定义: [], 行列表: [], 结果ID列表: [],
     suspendedRowIds: new Set(), 取能力上下文: () => ({ filesDir: '/collection' }),
     取本地化文案: key => key, 退出多选() {},

@@ -3,7 +3,7 @@ import { BrowserNotetypeFeature } from '../components/browser/BrowserNotetypeFea
 import { namedResourceText, showToastSafely } from '../utils/UiFeedback';
 import { loadBrowserSidebar } from '../model/BrowserSidebar';
 import { AnkiBrowserSidebar } from '../backend/AnkiBrowserSidebar';
-import { loadNoteEditor } from '../model/NoteEditorLoader';
+import { NoteEditorSession, NoteEditorState, initialNoteEditorState } from '../model/NoteEditorSession';
 import { AnkiNoteEditor } from '../backend/AnkiNoteEditor';
 import { BrowserSearchSession, loadBrowserRows } from '../model/BrowserSearchSession';
 import { AnkiBrowserSearch } from '../backend/AnkiBrowserSearch';
@@ -32,7 +32,6 @@ import { 笔记类型服务 } from '../backend/笔记类型服务';
 import { 卡片服务 } from '../backend/卡片服务';
 import { 牌组服务 } from '../backend/牌组服务';
 import { 调度器服务 } from '../backend/调度器服务';
-import { 统计服务 } from '../backend/统计服务';
 import { 标签服务 } from '../backend/标签服务';
 import { 配置服务 } from '../backend/配置服务';
 import type { BrowserColumn, BrowserRow, FindAndReplaceRequest } from '../proto/messages/SearchMessages';
@@ -40,7 +39,6 @@ import { BrowserColumnSorting } from '../proto/messages/SearchMessages';
 
 import type { EditableNote } from '../proto/messages/NoteMessages';
 import type { Card } from '../proto/messages/CardsMessages';
-import type { CardStatsView } from '../proto/messages/StatsMessages';
 import type { DeckTreeNode } from '../proto/messages/DeckMessages';
 import type { TagTreeNode } from '../proto/messages/TagsMessages';
 
@@ -50,6 +48,7 @@ import { 应用尺寸 } from '../utils/应用尺寸';
 import { CustomTransition } from '../utils/自定义转场';
 import { 统一加载态 } from '../components/common/统一加载态';
 import { 统一错误态 } from '../components/common/统一错误态';
+import { DialogHeader } from '../components/common/DialogHeader';
 import { 搜索框 } from '../components/browser/搜索框';
 import { 卡片表格, 浏览行数据 } from '../components/browser/卡片表格';
 import { 浏览编辑区 } from '../components/browser/浏览编辑区';
@@ -98,7 +97,6 @@ export struct 浏览页 {
   private readonly 卡片服务实例: 卡片服务 = new 卡片服务();
   private readonly 牌组服务实例: 牌组服务 = new 牌组服务();
   private readonly 调度器服务实例: 调度器服务 = new 调度器服务();
-  private readonly 统计服务实例: 统计服务 = new 统计服务();
   private readonly 标签服务实例: 标签服务 = new 标签服务();
   private readonly 配置服务实例: 配置服务 = new 配置服务();
 
@@ -115,13 +113,13 @@ export struct 浏览页 {
   @State private sortReverse: boolean = false;
   private suspendedRowIds: Set<number> = new Set<number>();
   private readonly searchSession: BrowserSearchSession = new BrowserSearchSession(new AnkiBrowserSearch());
-  private readonly noteReader: AnkiNoteEditor = new AnkiNoteEditor();
+  @State private editor: NoteEditorState = initialNoteEditorState();
+  private readonly editorSession: NoteEditorSession = new NoteEditorSession(new AnkiNoteEditor(),
+    (state: NoteEditorState): void => { this.editor = state; });
   private readonly sidebarBackend: AnkiBrowserSidebar = new AnkiBrowserSidebar();
   private sidebarVersion: number = 0;
   private searchVersion: number = 0;
   private selectionVersion: number = 0;
-  private editorVersion: number = 0;
-  private infoVersion: number = 0;
   private consumedRowCount: number = 0;
   private readonly operations: BrowserOperationController = new BrowserOperationController();
   @State private mutationBusy: boolean = false;
@@ -134,21 +132,9 @@ export struct 浏览页 {
   @State private 说明标题: Resource = $r('app.string.browser_help_sidebar_title');
   @State private 说明正文: Resource = $r('app.string.browser_help_sidebar_body');
 
-  // T7 浏览编辑区状态：行点击后懒加载笔记 + 字段名，弹层内编辑字段/标签，保存调 更新笔记
-  @State @Watch('editorVisibilityChanged') private 显示编辑区: boolean = false;
-  @State private 编辑区字段名列表: string[] = [];
-  @State private 编辑区初始字段值: string[] = [];
-  @State private 编辑区初始标签: string = '';
-  @State private 编辑区错误: string = '';
-  @State private 编辑区忙碌: boolean = false;
-  // 当前正在编辑的笔记（保存时复用 id/guid/notetypeId/mtime/usn，仅 fields/tags 来自弹层）
-  @State private 编辑区当前笔记: EditableNote | null = null;
-
   // T11 卡片信息状态：非多选模式下点击行右侧 info 按钮 → 懒加载该卡 CardStatsView
   @State private 显示卡片信息: boolean = false;
-  @State private 卡片信息数据: CardStatsView | null = null;
-  @State private 卡片信息错误: string = '';
-  @State private 卡片信息忙碌: boolean = false;
+  @State private infoCardId: number = 0;
 
   // T8 批量操作栏状态：多选模式 + 选中ID + 4 个操作弹层 + 牌组树（改牌组选择器用）
   @State private 多选模式值: boolean = false;
@@ -278,10 +264,10 @@ export struct 浏览页 {
    */
 
   aboutToDisappear(): void {
+    this.editorSession.dispose();
     this.operations.dispose();
     this.searchVersion++;
-    this.editorVersion++;
-    this.infoVersion++;
+    this.editorSession.close();
     CustomTransition.getInstance().注销NavParam('BrowserPage');
     // 通知首页刷新牌组计数：页内删除/改牌组/挂起/重置到期等写操作分散在多个方法，
     // 统一在离页时广播（幂等，纯浏览未改数据时多刷一次无副作用）；onPop 偶发不触发时仍能刷新。
@@ -300,7 +286,7 @@ export struct 浏览页 {
     if (this.显示查找替换) { this.显示查找替换 = false; return true; }
     if (this.显示侧边栏) { this.显示侧边栏 = false; return true; }
     if (this.显示预览) { this.显示预览 = false; return true; }
-    if (this.显示编辑区) { this.显示编辑区 = false; return true; }
+    if (this.editor.visible) { this.editorSession.close(); return true; }
     if (this.显示卡片信息) { this.关闭卡片信息(); return true; }
     if (this.显示说明浮层) { this.显示说明浮层 = false; return true; }
     if (this.多选模式值) { this.退出多选(); return true; }
@@ -387,8 +373,7 @@ export struct 浏览页 {
       return;
     }
     this.batchDialog = 'none';
-    this.显示编辑区 = false;
-    this.editorVersion++;
+    this.editorSession.close();
     this.关闭卡片信息();
     this.浏览模式值 = 模式;
     if (!this.sortableColumns().some((column: BrowserColumn): boolean => column.key === this.sortColumn)) {
@@ -410,30 +395,7 @@ export struct 浏览页 {
   // 加载期间不禁用列表（只设 编辑区忙碌），用户可关闭弹层或重试。
   private async 行点击(行ID: number): Promise<void> {
     if (!this.operations.isAlive() || this.mutationBusy) return;
-    const version: number = ++this.editorVersion;
-    const mode: 浏览模式 = this.浏览模式值;
-    this.编辑区忙碌 = true;
-    this.编辑区错误 = '';
-    this.编辑区当前笔记 = null;
-    this.编辑区字段名列表 = [];
-    this.编辑区初始字段值 = [];
-    this.编辑区初始标签 = '';
-    this.显示编辑区 = true;
-    try {
-      const snapshot = await loadNoteEditor(行ID, mode === 'notes', this.noteReader,
-        (): boolean => this.operations.isAlive() && version === this.editorVersion && this.显示编辑区);
-      if (snapshot === null) return;
-      this.编辑区当前笔记 = snapshot.note;
-      this.编辑区字段名列表 = snapshot.fieldNames;
-      this.编辑区初始字段值 = snapshot.note.fields.slice();
-      this.编辑区初始标签 = snapshot.note.tags.join(' ');
-    } catch (错误) {
-      if (!this.operations.isAlive() || version !== this.editorVersion) return;
-      this.编辑区错误 = this.取本地化文案($r('app.string.browser_detail_load_error'));
-      console.info(`BrowserPage: 行点击加载笔记失败 行ID=${行ID} 模式=${this.浏览模式值} 错误=${错误}`);
-    } finally {
-      if (this.operations.isAlive() && version === this.editorVersion) this.编辑区忙碌 = false;
-    }
+    await this.editorSession.open(行ID, this.浏览模式值 === 'notes', (): boolean => this.operations.isAlive());
   }
 
   // T5 行点击路由
@@ -476,27 +438,12 @@ export struct 浏览页 {
   // - 编辑区当前笔记 为 null 时直接返回 false（不应发生，兜底）
   // - 字段值数组长度不足 字段名列表 时用空串补齐（防御性）
   private async 保存编辑(fields: string[], tags: string[]): Promise<boolean> {
-    const note: EditableNote | null = this.编辑区当前笔记;
-    if (note === null || this.operations.isBusy()) return false;
-    const version: number = this.editorVersion;
-    const values: string[] = fields.slice();
-    while (values.length < this.编辑区字段名列表.length) values.push('');
-    const updated: EditableNote = { id: note.id, guid: note.guid, notetypeId: note.notetypeId,
-      mtimeSecs: note.mtimeSecs, usn: note.usn, tags: tags.slice(), fields: values };
-    this.编辑区忙碌 = true;
-    this.编辑区错误 = '';
-    const saved: boolean = await this.runBrowserOperation(async (_selection: BrowserOperationContext): Promise<void> => {
-      await this.笔记服务实例.更新笔记([updated], false);
-      if (this.operations.isAlive() && version === this.editorVersion) {
-        this.显示编辑区 = false;
-        this.编辑区当前笔记 = null;
-        if (this.显示预览) this.预览刷新版本 += 1;
-      }
-    }, (_error: Error): void => {
-      if (version === this.editorVersion) this.编辑区错误 = this.取本地化文案($r('app.string.browser_detail_save_error'));
-    }, false);
-    if (this.operations.isAlive() && version === this.editorVersion) this.编辑区忙碌 = false;
-    return saved;
+    if (this.operations.isBusy()) return false;
+    return this.editorSession.save(fields, tags, (updated: EditableNote): Promise<boolean> =>
+      this.runBrowserOperation(async (_selection: BrowserOperationContext): Promise<void> => {
+        await this.笔记服务实例.更新笔记([updated], false);
+        if (this.operations.isAlive() && this.显示预览) this.预览刷新版本 += 1;
+      }, (_error: Error): void => {}, false), true);
   }
 
   // T8 批量操作
@@ -535,9 +482,7 @@ export struct 浏览页 {
     }
   }
 
-  private editorVisibilityChanged(): void {
-    if (!this.显示编辑区) { this.editorVersion++; this.编辑区忙碌 = false; }
-  }
+
 
   private isBrowserSelectionCurrent(selection: BrowserOperationContext): boolean {
     return this.operations.isAlive() && selection.mode === this.浏览模式值 &&
@@ -726,33 +671,16 @@ export struct 浏览页 {
   }
 
   /** 打开卡片信息弹层：调 统计服务.获取卡片统计 懒加载该卡的 CardStatsView。 */
-  private async 打开卡片信息(卡片ID: number): Promise<void> {
+  private 打开卡片信息(卡片ID: number): void {
     if (!this.operations.isAlive()) return;
-    const version: number = ++this.infoVersion;
-    this.卡片信息数据 = null;
-    this.卡片信息错误 = '';
-    this.卡片信息忙碌 = true;
+    this.infoCardId = 卡片ID;
     this.显示卡片信息 = true;
-    try {
-      const stats: CardStatsView = await this.统计服务实例.获取卡片统计(卡片ID);
-      if (!this.operations.isAlive() || version !== this.infoVersion) return;
-      this.卡片信息数据 = stats;
-    } catch (错误) {
-      if (!this.operations.isAlive() || version !== this.infoVersion) return;
-      this.卡片信息错误 = this.取本地化文案($r('app.string.browser_info_load_error'));
-      console.info(`BrowserPage: 加载卡片信息失败 cid=${卡片ID} 错误=${错误}`);
-    } finally {
-      if (this.operations.isAlive() && version === this.infoVersion) this.卡片信息忙碌 = false;
-    }
   }
 
   /** 关闭卡片信息弹层。 */
   private 关闭卡片信息(): void {
-    this.infoVersion++;
-    this.卡片信息忙碌 = false;
     this.显示卡片信息 = false;
-    this.卡片信息数据 = null;
-    this.卡片信息错误 = '';
+    this.infoCardId = 0;
   }
 
   /**
@@ -1339,7 +1267,7 @@ export struct 浏览页 {
         初始索引: this.预览初始索引,
         媒体目录: this.预览媒体目录,
         刷新版本: this.预览刷新版本,
-        interactionEnabled: !this.显示编辑区 && !this.编辑区忙碌,
+        interactionEnabled: !this.editor.visible && !this.editor.busy,
         onClose: (): void => {
           this.显示预览 = false;
         },
@@ -1349,33 +1277,49 @@ export struct 浏览页 {
       })
     }
 
-    // T7 浏览编辑区弹层：Stack + if 控制挂载/卸载（与 添加笔记页.ets 的 字段帮助面板/图片遮罩编辑器 同机制）
-    if (this.显示编辑区) {
+    // 字段就绪后才初始化草稿；读取期间可关闭，旧结果由会话代次拒绝。
+    if (this.editor.visible && this.editor.note !== null) {
       浏览编辑区({
         isDark: this.是否深色(),
-        busy: this.编辑区忙碌 || this.mutationBusy,
-        errorMessage: this.编辑区错误,
-        fieldNames: this.编辑区字段名列表,
-        initialFieldValues: this.编辑区初始字段值,
-        initialTags: this.编辑区初始标签,
+        busy: this.editor.busy || this.mutationBusy,
+        errorMessage: this.editor.error === '' ? '' : this.取本地化文案(this.editor.error === 'load' ? $r('app.string.browser_detail_load_error') : $r('app.string.browser_detail_save_error')),
+        fieldNames: this.editor.fieldNames,
+        initialFieldValues: this.editor.note.fields,
+        initialTags: this.editor.note.tags.join(' '),
         onCancel: (): void => {
-          this.显示编辑区 = false;
-          this.编辑区当前笔记 = null;
+          this.editorSession.close();
         },
         onSave: (fields: string[], tags: string[]): Promise<boolean> => {
           return this.保存编辑(fields, tags);
         }
       })
+    } else if (this.editor.visible) {
+      Stack() {
+        Column().width('100%').height('100%')
+          .backgroundColor(this.是否深色() ? 'rgba(0,0,0,0.40)' : 'rgba(0,0,0,0.15)')
+          .onClick((): void => { this.editorSession.close(); })
+        Column({ space: 应用尺寸.间距_14 }) {
+          DialogHeader({ title: $r('app.string.browser_detail_title'),
+            closeLabel: $r('app.string.browser_detail_cancel'),
+            showAction: false,
+            onClose: (): void => { this.editorSession.close(); } })
+          if (this.editor.busy) {
+            LoadingProgress().width(40).height(40)
+          } else {
+            Text($r('app.string.browser_detail_load_error')).fontColor($r('app.color.error_text'))
+          }
+        }
+        .width('88%').constraintSize({ maxWidth: 520 }).padding(应用尺寸.卡片内边距)
+        .backgroundColor($r('app.color.surface_card')).borderRadius(应用尺寸.圆角_卡片)
+        .onClick((): void => {})
+      }.width('100%').height('100%')
     }
 
     // T11 卡片信息弹层：非多选模式下点击行右侧 info 按钮 → 懒加载 CardStatsView
     if (this.显示卡片信息) {
       卡片信息({
         isDark: this.是否深色(),
-        stats: this.卡片信息数据,
-        errorMessage: this.卡片信息忙碌 && this.卡片信息错误 === ''
-          ? this.取本地化文案($r('app.string.browser_info_loading'))
-          : this.卡片信息错误,
+        cardId: this.infoCardId,
         onClose: (): void => {
           this.关闭卡片信息();
         }

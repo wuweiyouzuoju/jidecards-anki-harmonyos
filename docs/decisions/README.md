@@ -22,3 +22,4 @@
 ## 决策索引
 
 - [首页运行时与 RPC 验证边界](2026-09-22-home-runtime-rpc.md)：同步/备份的状态所有者、协议基线和验证范围。
+- [编辑、计时与首页表单的职责边界](2026-09-24-editor-feature-boundaries.md)：局部 Feature/Session 的状态所有者、异步生命周期和不过度抽象的取舍。

@@ -312,7 +312,7 @@ test('preview wiring stays read-only, handles web errors, and preserves home/edi
   assert.match(source, /onRenderExited/);
   assert.match(source, /browser_preview_retry/);
   assert.match(source, /if \(this\.agentEnabled\)/);
-  assert.match(read('entry/src/main/ets/pages/浏览页.ets'), /interactionEnabled: !this\.显示编辑区 && !this\.编辑区忙碌/);
+  assert.match(read('entry/src/main/ets/pages/浏览页.ets'), /interactionEnabled: !this\.editor\.visible && !this\.editor\.busy/);
   const home = read('entry/src/main/ets/pages/首页.ets');
   const editor = home.match(/private 关闭预览并编辑[\s\S]*?\n  }/)[0];
   assert.match(editor, /onPop:[\s\S]*this\.显示卡片预览 = true/);

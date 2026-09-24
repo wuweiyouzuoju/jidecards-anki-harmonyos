@@ -106,7 +106,7 @@ const ChoicePage = new Function('gradeJideChoice', 'playStudyHaptic', 'RATING_GO
 function choicePage() {
   const page = new ChoicePage();
   const writes = [];
-  Object.assign(page, {
+  Object.assign(page, { editor: { visible: false, busy: false },
     choiceQuestion: parseJideChoiceDeck(JSON.stringify(sample)).questions[0], choiceGrade: null,
     choiceSelectedIds: [], choiceFeedbackSecondsOverride: -1, 当前卡片: { cardId: 1 },
     requestVersion: 1, 阶段: 'question', 评分中: false, 页面已显示: true, foreground: true,

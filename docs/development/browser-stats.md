@@ -57,4 +57,6 @@
 - `backend/AnkiBrowserSearch.ets` 只适配已有服务。行展示类型属于模型，表格不拥有查询协议。
 - `model/BrowserSidebar.ts` 读取牌组、标签、已保存搜索与折叠偏好；缺失偏好分别降级，损坏的搜索项逐条过滤。页面以独立代次拒绝关闭/重开后的旧结果。
 - `model/NoteEditorLoader.ts` 与 `backend/AnkiNoteEditor.ts` 共用于浏览和学习；每次 RPC 前后检查所属请求，字段名返回副本。写入仍分别经过 BrowserOperationController / StudySessionController。
+- `model/NoteEditorSession.ts` 统一拥有编辑读取代次、可见/忙碌/错误快照和输入冻结；浏览页只把写入接入 `BrowserOperationController`，学习页只把写入接入 `StudySessionController`。字段读取完成前不挂载 `浏览编辑区`，避免空字段草稿覆盖真实数据；`components/browser/浏览编辑区.ets` 只管理输入和回调。
+- `components/browser/卡片信息.ets` 拥有卡片统计读取和目标代次，浏览页只持有当前卡片 ID 与显示槽，不再复制统计请求状态。
 - 新规则优先直接测试模型；`browser-presentation` 与 `page-operation-boundaries` 验证页面接线，`page-domain-models` / `page-repositories` 验证跨请求并发和解析。

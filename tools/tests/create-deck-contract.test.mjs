@@ -87,29 +87,14 @@ test('deck service creates decks via NewDeck template then AddDeck', () => {
   assert.match(service, /decodeOpChangesWithId/);
 });
 
-test('home page wires the create button through the full flow', () => {
+test('home creation delegates form state and writes while retaining selection and refresh', () => {
   const page = read(PAGE);
-  const createCoord = read('entry/src/main/ets/components/home/创建牌组协调器.ets');
-
-  // 创建牌组面板 现在挂在 创建牌组协调器 积木组件里
-  assert.match(createCoord, /创建牌组面板/);
-  assert.match(page, /@State(?: @Watch\('[^']+'\))? private 显示创建牌组: boolean/);
-  assert.match(page, /@State(?: @Watch\('[^']+'\))? private 创建牌组中: boolean/);
-  assert.match(page, /@State private 创建牌组错误: string/);
-  assert.match(page, /async 创建牌组\(name: string\)/);
-  assert.match(page, /确保已打开\(context\.filesDir\)/);
-  assert.match(page, /this\.deckCommands\.create\(context\.filesDir, name\)/);
-  assert.match(read('entry/src/main/ets/backend/HomeDeckCommands.ets'), /this\.decks\.创建牌组\(name\)/);
-  assert.match(page, /await this\.加载主页数据\(\)/, 'must refresh tree after creation');
-  assert.match(page, /选中的牌组ID = newDeckId\.toString\(\)/, 'must select the new deck');
-});
-
-test('create deck flow surfaces backend errors inside the panel', () => {
-  const page = read(PAGE);
-  const method = page.match(/private async 创建牌组\(name: string\): Promise<void> \{[\s\S]*?\n  \}/);
-
-  assert.notEqual(method, null);
-  assert.match(method[0], /catch \(error\)/);
-  assert.match(method[0], /this\.创建牌组错误 = /);
-  assert.match(method[0], /finally \{\s*if \(!this\.homeDisposed\) this\.创建牌组中 = false;/);
+  const feature = read('entry/src/main/ets/components/home/CreateDeckFeature.ets');
+  assert.match(page, /CreateDeckFeature\(/);
+  assert.match(feature, /创建牌组面板/);
+  assert.match(feature, /this\.commands\.create\(context\.filesDir, name\)/);
+  assert.match(page, /onCreated:.*this\.deckCreated\(id, name\)/);
+  assert.match(page, /this\.选中的牌组ID = deckId/);
+  assert.match(page, /await this\.加载主页数据\(\)/);
+  assert.doesNotMatch(page, /创建牌组错误|deckCommands/);
 });

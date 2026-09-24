@@ -2,7 +2,7 @@
 
 // 复习流程链路契约测试（M7）：
 // - 调度器服务/卡片渲染服务 只经 后端会话 走正确服务/方法索引；
-// - 学习卡片HTML构建器 为纯函数：节点流 → HTML，媒体相对路径重写到自建域名；
+// - 学习卡片HTML构建器 为纯函数：节点流 → HTML，保留媒体相对 URL 由 Web 解析；
 // - 学习页.ets 走完整链路（取卡→渲染→文案→评分→下一张），Web 组件配置防跨域；
 // - 首页.ets 通过 Navigation + NavPathStack 跳转 学习页（API 12 推荐写法，替代废弃 router）。
 import assert from 'node:assert/strict';
@@ -15,8 +15,7 @@ import {
   构建卡片HTML,
   提取拼写标记,
   媒体基地址,
-  原始侧HTML,
-  重写媒体地址
+  原始侧HTML
 } from '../../entry/src/main/ets/model/学习卡片HTML构建器.ts';
 import {
   decodeExtractAvTagsResponse,
@@ -90,23 +89,25 @@ test('html builder assembles nodes, css and media base url', () => {
   const question = 构建卡片HTML(rendered, 'question');
   assert.match(question, /<!DOCTYPE html>/);
   assert.match(question, /<style>[^<]*\.card \{ color: black; \}[^<]*<\/style>/);
-  assert.match(question, /猫 <img src="https:\/\/jidecards-media\.local\/neko\.png">/);
+  assert.match(question, /猫 <img src="neko\.png">/);
   assert.match(question, /<div class="front">/);
 
   const answer = 构建卡片HTML(rendered, 'answer');
-  assert.match(answer, /href="https:\/\/jidecards-media\.local\/sound\.mp3"/);
+  assert.match(answer, /href="sound\.mp3"/);
   assert.ok(!answer.includes('neko.png'), 'answer side must not include question nodes');
 });
 
-test('media url rewrite skips absolute urls and anchors', () => {
+test('builder preserves standard URLs and template scripts for browser base URL resolution', () => {
   const html = '<img src="https://cdn.example.com/a.png"><img src="/abs.png">' +
     '<a href="#section">x</a><img src="空格 图.png">';
-  const out = 重写媒体地址(html);
-  assert.match(out, /src="https:\/\/cdn\.example\.com\/a\.png"/, 'absolute http untouched');
-  assert.match(out, /src="\/abs\.png"/, 'absolute path untouched');
-  assert.match(out, /href="#section"/, 'anchor untouched');
-  assert.match(out, new RegExp(`src="${媒体基地址.replaceAll('.', '\\.')}${encodeURIComponent('空格 图.png')}"`),
-    'relative media names are rewritten and uri-encoded');
+  const resources = html + '<link href="./_quizify.css?v=2" rel="stylesheet">' +
+    '<script src="./_quizify.js"></script><img src=plain.png>' +
+    '<img srcset="a.png 1x, b.png 2x"><img src="a%23b.png">' +
+    "<script>window.template='<img src=\"./dynamic.png\">';</script>" +
+    "<img src='./single.png'><img src=\"a&amp;b.png\">";
+  const nodes = [{ text: resources, replacement: null }];
+  const out = 构建卡片HTML({ questionNodes: nodes, answerNodes: nodes, css: '', latexSvg: false, isEmpty: false }, 'question');
+  assert.ok(out.includes(resources), 'do not rewrite HTML, scripts, entities or URL escapes');
 });
 
 test('html builder strips [sound:] tags, playback left to native player', () => {

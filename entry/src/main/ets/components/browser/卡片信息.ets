@@ -1,31 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { DialogHeader } from '../common/DialogHeader';
-// ========================================================
-// @名称 卡片信息
-//
-// @作用
-// 浏览页 T11 卡片信息弹层：纯展示层，展示单张卡片的调度信息 + 复习历史。
-// 父级（浏览页）拥有全部后端调用，本组件仅负责渲染 CardStatsView。
-// 复用 浏览编辑区.ets 的弹层骨架（Stack + 遮罩 + 居中面板）。
-//
-// @输入
-// isDark: 是否深色主题
-// stats: CardStatsView（父级加载后下发）
-// errorMessage: 父级下发的错误文案
-// onClose: 关闭回调
-//
-// @输出
-// 无（纯展示组件，无回调写入）
-//
-// @Invariants
-// - 本组件不直接调后端，所有数据经 @Prop stats 下发
-// - 父级用 if 控制组件挂载/卸载，每次打开是新实例
-//
-// @副作用
-// 无
-// ========================================================
-
+// 卡片信息的读取、错误和请求代次随弹层存活，页面只指定目标卡片。
+import { 统计服务 } from '../../backend/统计服务';
+import { resourceText } from '../../utils/UiFeedback';
 import { common } from '@kit.AbilityKit';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 颜色键 } from '../../model/颜色主题';
@@ -35,8 +13,31 @@ import { ReviewKind } from '../../proto/messages/StatsMessages';
 @Component
 export struct 卡片信息 {
   @Prop isDark: boolean = false;
-  @Prop stats: CardStatsView | null = null;
-  @Prop errorMessage: string = '';
+  @Prop @Watch('load') cardId: number = 0;
+  @State private stats: CardStatsView | null = null;
+  @State private errorMessage: string = '';
+  private version: number = 0;
+  private disposed: boolean = false;
+  private readonly service: 统计服务 = new 统计服务();
+
+  aboutToAppear(): void { this.load(); }
+  aboutToDisappear(): void { this.disposed = true; this.version++; }
+
+  private async load(): Promise<void> {
+    if (this.disposed || this.cardId <= 0) return;
+    const version: number = ++this.version;
+    this.stats = null;
+    this.errorMessage = resourceText(this.getUIContext(), $r('app.string.browser_info_loading'));
+    try {
+      const stats: CardStatsView = await this.service.获取卡片统计(this.cardId);
+      if (this.disposed || version !== this.version) return;
+      this.stats = stats;
+      this.errorMessage = '';
+    } catch (error) {
+      if (this.disposed || version !== this.version) return;
+      this.errorMessage = resourceText(this.getUIContext(), $r('app.string.browser_info_load_error'));
+    }
+  }
   onClose: () => void = (): void => {};
 
   @StorageProp(颜色键.主色按钮背景) private 主色按钮背景: string = '#2F5FD0';

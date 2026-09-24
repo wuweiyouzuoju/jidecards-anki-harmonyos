@@ -124,7 +124,10 @@ test('render service resolves legacy nodes on both sides and preserves ordinary 
   assert.deepEqual(calls.map((c) => [c.service, c.method]), [[27, 6], [27, 4], [27, 4]]);
   assert.deepEqual([...calls[1].bytes], [...codec.encodeExtractLatexRequest('[$]x[/$]', true)]);
   for (const side of ['question', 'answer']) {
-    assert.match(构建卡片HTML(rendered, side), /src="https:\/\/jidecards-media.local\/latex-upstream.svg"/);
+    const html = 构建卡片HTML(rendered, side);
+    assert.match(html, /src="latex-upstream.svg"/);
+    assert.equal(new URL('latex-upstream.svg', 'https://jidecards-media.local/').href,
+      'https://jidecards-media.local/latex-upstream.svg');
   }
   calls.length = 0;
   await service.resolveLatexImages(card(false).questionNodes, false);

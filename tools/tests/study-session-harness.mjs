@@ -1,3 +1,5 @@
+import { NoteEditorSession, initialNoteEditorState } from '../../entry/src/main/ets/model/NoteEditorSession.ts';
+import { StudyTimerController } from '../../entry/src/main/ets/model/StudyTimerController.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { StudySessionController } from '../../entry/src/main/ets/model/StudySessionController.ts';
 import { AutoSyncScheduler } from '../../entry/src/main/ets/model/AutoSyncScheduler.ts';
@@ -14,12 +16,12 @@ export function attachStudySession(page) {
   page.studyScheduler = new AutoSyncScheduler();
   page.syncActivity = new SyncActivity();
   page.studyOptions = new StudyOptions();
-  page.studyTiming = new StudyTiming();
-  page.studyTimerId = -1;
+  page.editor = initialNoteEditorState();
+  page.editorSession = new NoteEditorSession(page.noteReader, state => { page.editor = state; });
   page.autoAdvanceEnabled = false;
   page.studyMenuOpen = false;
   const source = readFileSync(new URL('../../entry/src/main/ets/pages/学习页.ets', import.meta.url), 'utf8');
-  const names = ['startStudyTimers', 'stopStudyTimers', 'tickStudyTimers', 'toggleAutoAdvance'];
+  const names = ['startStudyTimers', 'stopStudyTimers', 'studyTimerState', 'applyTimedAction', 'toggleAutoAdvance'];
   const methods = names.map(name => {
     const start = source.indexOf('  private ' + name + '(');
     return source.slice(start, source.indexOf('\n  }', start) + 4);
@@ -28,6 +30,12 @@ export function attachStudySession(page) {
     stripTypeScriptTypes('class TimingPage {' + methods.join('\n') + '}', { mode: 'transform' }) + '; return TimingPage;')(
     StudyAdvanceAction, 2, key => key);
   for (const name of names) page[name] = TimingPage.prototype[name];
+  page.timerHandles = new Map(); let nextTimer = 0;
+  page.studyTimer = new StudyTimerController({ state: () => page.studyTimerState(),
+    display: text => { page.studyTimerText = text; }, act: action => page.applyTimedAction(action) }, {
+    now: () => Date.now(), repeat: fn => { const id = ++nextTimer; page.timerHandles.set(id, fn); return id; },
+    cancel: id => page.timerHandles.delete(id)
+  });
   page.studySession = new StudySessionController({
     updateNote: async note => { await page.笔记服务实例.更新笔记([note], false); },
     buryCard: (id, mode) => page.调度器服务实例.埋藏或暂停卡片(id, mode),

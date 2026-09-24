@@ -45,6 +45,42 @@ export interface CheckMediaResponse {
   haveTrash: boolean;
 }
 
+// The report is rendered as one scrollable text block; no per-file UI nodes are created.
+
+/** 保留 unused 供一次性清理，报告负责展示全部明细。 */
+export interface CheckMediaSummary {
+  unused: string[];
+  unusedCount: number;
+  missingCount: number;
+  report: string;
+  haveTrash: boolean;
+}
+
+/** 面板显示 Core 报告，不把每个文件展开成 ArkUI 节点。 */
+export function decodeCheckMediaSummary(bytes: Uint8Array): CheckMediaSummary {
+  const reader = new 协议读取器(bytes);
+  const result: CheckMediaSummary = {
+    unused: [], unusedCount: 0, missingCount: 0, report: '', haveTrash: false
+  };
+  let tag;
+  while ((tag = reader.读取标签()) !== null) {
+    if (tag.字段号 === 1) {
+      result.unusedCount++;
+      result.unused.push(reader.读取字符串());
+    } else if (tag.字段号 === 2) {
+      result.missingCount++;
+      reader.跳过字段(tag.线类型);
+    } else if (tag.字段号 === 4) {
+      result.report = reader.读取字符串();
+    } else if (tag.字段号 === 5) {
+      result.haveTrash = reader.读取布尔();
+    } else {
+      reader.跳过字段(tag.线类型);
+    }
+  }
+  return result;
+}
+
 /**
  * 编码 generic.Empty（无字段），返回空字节数组。
  * CheckMedia / EmptyTrash / RestoreTrash 的入参。

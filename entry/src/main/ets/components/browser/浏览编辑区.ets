@@ -55,6 +55,7 @@ export struct 浏览编辑区 {
   @State private fieldValues: string[] = [];
   @State private tags: string = '';
   @State private 本地错误: string = '';
+  private disposed: boolean = false;
 
   @StorageProp(颜色键.主色按钮背景) private 主色按钮背景: string = '#2F5FD0';
   @StorageProp(颜色键.主色按钮按下) private 主色按钮按下: string = '#1E4FB8';
@@ -64,6 +65,8 @@ export struct 浏览编辑区 {
     this.fieldValues = this.initialFieldValues.slice();
     this.tags = this.initialTags;
   }
+
+  aboutToDisappear(): void { this.disposed = true; }
 
   private 更新字段(索引: number, 值: string): void {
     const 新值 = this.fieldValues.slice();
@@ -91,7 +94,7 @@ export struct 浏览编辑区 {
     this.本地错误 = '';
     try {
       const 成功 = await this.onSave(this.fieldValues.slice(), this.解析标签());
-      if (成功) {
+      if (成功 && !this.disposed) {
         this.onCancel();
       }
     } catch (_错误) {

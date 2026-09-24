@@ -3,6 +3,7 @@ import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 import { GLASS_COLORS_KEY, GLASS_HIGHLIGHT_COLORS } from '../../model/ThemeCatalog';
 import { ThemeLabelGlyph, themeLabelGlyphs } from './ThemeText';
 import { GlassSurface } from '../../utils/GlassSurface';
+import { resourceText } from '../../utils/UiFeedback';
 
 // ========================================================
 // @块ID UI-COMMON-PRESSBTN-001
@@ -40,6 +41,8 @@ export struct 按下态按钮 {
   @Prop 字号: number = 应用尺寸.字号_按钮;
   @Prop 字色: ResourceColor = $r('app.color.text_primary');
   @Prop 是否启用: boolean = true;
+  // 工具栏在等宽侧栏内约束标签，保留完整无障碍名称。
+  @Prop singleLine: boolean = false;
   点击回调: () => void = (): void => {};
   @State private 按下中: boolean = false;
 
@@ -57,17 +60,23 @@ export struct 按下态按钮 {
             }, (glyph: ThemeLabelGlyph, index: number): string => `${index}-${glyph.letter}-${glyph.color}`)
           }
             .fontSize(this.字号)
+            .maxLines(this.singleLine ? 1 : undefined)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
         } else {
           Text(this.文案)
             .fontSize(this.字号)
             .fontColor(this.字色)
+            .maxLines(this.singleLine ? 1 : undefined)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
       }
       .justifyContent(FlexAlign.Center)
+      .constraintSize({ maxWidth: this.singleLine ? '100%' : undefined })
     }
     .height(应用尺寸.按钮高度)
     .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
-    .constraintSize({ minWidth: 0 })
+    .constraintSize({ minWidth: 0, maxWidth: this.singleLine ? '100%' : undefined })
+    .accessibilityText(typeof this.文案 === 'string' ? this.文案 : resourceText(this.getUIContext(), this.文案))
     .fontColor(this.字色)
     .attributeModifier(new GlassSurface(this.按下中, this.glassColors))
     .stateEffect(false)

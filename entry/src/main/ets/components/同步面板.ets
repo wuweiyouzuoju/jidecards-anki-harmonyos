@@ -49,7 +49,7 @@ type 冲突类型 = 'fullSync' | 'fullDownload' | 'fullUpload';
 // @作用
 // 根宿主持有手动与自动共用的 SyncCollection → 媒体执行链。
 // 登录/注销仍在设置分组；详情随时可收起，任务不随页面返回销毁。
-// 首页接收状态文案；自动同步正常传输不显示状态，失败/冲突保留处理入口。
+// 首页接收状态文案与图标状态；自动传输只显示小图标，失败/冲突保留处理入口。
 //
 // 状态机：
 // - syncing：同步进行中（含 SyncCollection/mediaSync pending 与媒体轮询中）
@@ -90,7 +90,7 @@ export struct 同步面板 {
   初始鉴权: SyncAuth | null = null;
   同步完成回调: (fsrsDisabledBySync: boolean) => void = (_fsrsDisabledBySync: boolean): void => {};
   关闭回调: () => void = (): void => {};
-  statusChanged: (text: string) => void = (_text: string): void => {};
+  statusChanged: (text: string, indicator: string) => void = (_text: string, _indicator: string): void => {};
   onYield: (automatic: boolean) => void = (_automatic: boolean): void => {};
   onRetry: () => void = (): void => {};
 
@@ -125,6 +125,7 @@ export struct 同步面板 {
   private collectionResultNotified: boolean = false;
   private suspendDelayId: number = -1;
   private yieldingForStudy: boolean = false;
+  private syncAborted: boolean = false;
   private fullSyncInFlight: boolean = false;
   private collectionCallInFlight: boolean = false;
   private abortTimer: number = -1;
@@ -200,18 +201,26 @@ export struct 同步面板 {
     this.publishStatus();
   }
 
-  /** 首页内联状态；自动传输保持静默，冲突只提示而不抢占学习。 */
+  /** 图标语义独立于翻译文案；等待处理与中止不能伪装成仍在传输或成功。 */
   private publishStatus(): void {
     let text: string = '';
-    if (this.错误文案 !== '') text = this.取本地化文案($r('app.string.sync_background_error'));
-    else if (this.当前阶段 === 'conflict') text = this.取本地化文案($r('app.string.sync_needs_attention'));
-    else if (!this.automatic || this.fullSyncInFlight) {
-      text = this.yieldingForStudy ? this.取本地化文案($r('app.string.sync_yielding')) :
-        this.当前阶段 === 'done' ? this.状态文案 : this.是否在媒体阶段 ?
-          this.媒体进度文案 || this.取本地化文案($r('app.string.sync_syncing_media')) :
-          this.取本地化文案($r('app.string.sync_syncing'));
+    let indicator: string = 'syncing';
+    if (this.错误文案 !== '' || this.当前阶段 === 'conflict') {
+      indicator = 'attention';
+      text = this.取本地化文案(this.错误文案 !== '' ?
+        $r('app.string.sync_background_error') : $r('app.string.sync_needs_attention'));
+    } else if (this.当前阶段 === 'done') {
+      indicator = this.syncAborted ? 'paused' : 'done';
+      text = this.状态文案;
+    } else if (this.yieldingForStudy) {
+      indicator = 'waiting';
+      text = this.取本地化文案($r('app.string.sync_yielding'));
+    } else {
+      text = this.是否在媒体阶段 ?
+        this.媒体进度文案 || this.取本地化文案($r('app.string.sync_syncing_media')) :
+        this.取本地化文案($r('app.string.sync_syncing'));
     }
-    this.statusChanged(text);
+    this.statusChanged(text, indicator);
   }
 
   private showDetails(): void {
@@ -412,6 +421,7 @@ export struct 同步面板 {
   /** 中止落定态：清轮询、置 done、显示「已中止」文案。 */
   private 完成中止(): void {
     const 集合是否已同步: boolean = this.集合已同步;
+    this.syncAborted = true;
     this.是否请求中止 = false;
     this.集合已同步 = false;
     this.是否在媒体阶段 = false;

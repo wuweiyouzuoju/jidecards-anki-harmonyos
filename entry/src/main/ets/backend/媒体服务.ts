@@ -42,11 +42,12 @@ import { 协议写入器 } from '../proto/core/ProtoWriter';
 import { encodeNotetypeId } from '../proto/messages/NotetypeMessages';
 import {
   decodeCheckMediaResponse,
+  decodeCheckMediaSummary,
   decodeStringList,
   encodeEmpty,
   encodeTrashMediaFilesRequest
 } from '../proto/messages/MediaMessages';
-import type { CheckMediaResponse } from '../proto/messages/MediaMessages';
+import type { CheckMediaResponse, CheckMediaSummary } from '../proto/messages/MediaMessages';
 
 function encodeAddMediaFileRequest(文件名: string, 字节: Uint8Array): Uint8Array {
   const writer = new 协议写入器();
@@ -94,6 +95,13 @@ export class 媒体服务 {
     const 响应字节 = await this.会话.调用(
       服务号.后端媒体, 媒体方法.检查媒体, encodeEmpty());
     return decodeCheckMediaResponse(响应字节);
+  }
+
+  /** 面板保留文件名供分页与清理，不解码重复报告与笔记 ID。 */
+  async checkMediaSummary(): Promise<CheckMediaSummary> {
+    const bytes = await this.会话.调用(
+      服务号.后端媒体, 媒体方法.检查媒体, encodeEmpty());
+    return decodeCheckMediaSummary(bytes);
   }
 
   /**

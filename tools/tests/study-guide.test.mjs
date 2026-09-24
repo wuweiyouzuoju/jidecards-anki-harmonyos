@@ -51,7 +51,7 @@ function pageHarness(completed = false) {
   });
   vm.runInContext(stripTypeScriptTypes(`globalThis.Harness = class { ${methods.join('\n')} }`), context);
   const page = new context.Harness();
-  Object.assign(page, {
+  Object.assign(page, { editor: { visible: false, busy: false },
     studyGuideChecked: false, studyGuideVisible: false, stopStudyTimers() {}, startStudyTimers() {}, controllerReady: true, pendingHtml: '',
     choiceQuestion: null, choiceGrade: null, choiceAutoAdvanceTimer: -1, choiceFeedbackDeadline: 0, studyMenuOpen: false,
     页面已显示: false, 阶段: 'loading', 当前卡片: {}, 展示时刻毫秒: 500,

@@ -1,3 +1,4 @@
+import { NoteEditorSession, initialNoteEditorState } from '../../entry/src/main/ets/model/NoteEditorSession.ts';
 import { initialTransferState } from '../../entry/src/main/ets/model/home/DataTransferSession.ts';
 import { compileWithUiFeedback } from './ui-feedback-harness.mjs';
 import { loadBrowserRows } from '../../entry/src/main/ets/model/BrowserSearchSession.ts';
@@ -190,7 +191,7 @@ function browserHarness() {
     'isBrowserSelectionCurrent', '退出多选', '解析选中为卡片ID', '解析选中笔记的卡片ID', '解析选中为笔记ID',
     '执行批量改牌组', '执行批量删除', '执行批量设置标志', '执行批量挂起', '执行批量恢复',
     '执行批量设置到期日', '执行批量重新定位', '执行批量更改笔记类型', '保存编辑', '执行查找替换',
-    '行点击', 'editorVisibilityChanged',
+    '行点击',
     '打开卡片信息', '关闭卡片信息', '加载更多', '预加载行', '打开改牌组弹层', '切换模式'], {
     autoSyncScheduler: scheduler, AppStorage: { setOrCreate: (...args) => broadcasts.push(args) },
     $r: key => key, console: { info() {} }, BURY_SUSPEND_MODE_SUSPEND: 2
@@ -208,6 +209,8 @@ function browserHarness() {
   });
   page.noteReader = { card: id => page.卡片服务实例.获取卡片(id), note: id => page.笔记服务实例.获取笔记(id),
     notetype: id => page.笔记类型服务实例.获取笔记类型(id) };
+  page.editor = initialNoteEditorState();
+  page.editorSession = new NoteEditorSession(page.noteReader, state => { page.editor = state; });
   return { page, scheduler, calls, broadcasts };
 }
 
@@ -272,8 +275,9 @@ test('late batch error cannot overwrite errors of a new selection', async () => 
 
 test('editor save owns immutable fields and retains sync occupancy until actual commit after leaving', async () => {
   const { page, scheduler, calls } = browserHarness(), write = deferred(), saved = [];
-  page.编辑区当前笔记 = { id: 1, guid: 'g', notetypeId: 1, mtimeSecs: 0, usn: 0 };
-  page.编辑区字段名列表 = ['Front', 'Back']; page.显示编辑区 = true;
+  page.笔记服务实例.获取笔记 = async () => ({ id: 1, guid: 'g', notetypeId: 1, mtimeSecs: 0, usn: 0, fields: [], tags: [] });
+  page.笔记类型服务实例.获取笔记类型 = async () => ({ fieldNames: ['Front', 'Back'] });
+  await page.editorSession.open(1, true, () => true);
   page.笔记服务实例.更新笔记 = async notes => { saved.push(notes); await write.promise; };
   const fields = ['hello'], tags = ['t'];
   const work = page.保存编辑(fields, tags); fields[0] = 'changed'; tags.push('changed');
@@ -363,18 +367,18 @@ test('latest editor request wins and dismissal invalidates in-flight loading', a
   page.笔记类型服务实例.获取笔记类型 = async () => ({ fieldNames: ['Front'] });
   const old = page.行点击(1); await page.行点击(2);
   first.resolve({ id: 1, notetypeId: 1, fields: ['old'], tags: [] }); await old;
-  assert.equal(page.编辑区当前笔记.id, 2); assert.deepEqual(page.编辑区初始字段值, ['second']);
+  assert.equal(page.editor.note.id, 2); assert.deepEqual(page.editor.note.fields, ['second']);
   const delayed = deferred(); page.笔记服务实例.获取笔记 = () => delayed.promise;
-  const closed = page.行点击(3); page.显示编辑区 = false; page.editorVisibilityChanged();
+  const closed = page.行点击(3); page.editorSession.close();
   delayed.resolve({ id: 3, notetypeId: 3, fields: ['late'], tags: [] }); await closed;
-  assert.equal(page.编辑区当前笔记, null); assert.equal(page.编辑区忙碌, false);
+  assert.equal(page.editor.note, null); assert.equal(page.editor.busy, false);
 });
 
-test('card info never overwrites a newer request', async () => {
+test('card info page keeps only its current target and delegates loading to the panel', async () => {
   const { page } = browserHarness();
-  const stats = deferred(); page.统计服务实例 = { 获取卡片统计: id => id === 1 ? stats.promise : Promise.resolve({ id }) };
-  const earlier = page.打开卡片信息(1); await page.打开卡片信息(2); stats.resolve({ id: 1 }); await earlier;
-  assert.equal(page.卡片信息数据.id, 2);
+  page.打开卡片信息(1); page.打开卡片信息(2);
+  assert.equal(page.infoCardId, 2); assert.equal(page.显示卡片信息, true);
+  page.关闭卡片信息(); assert.equal(page.infoCardId, 0); assert.equal(page.显示卡片信息, false);
 });
 
 test('failed rows advance pagination cursor without repeating successful rows', async () => {

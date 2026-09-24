@@ -21,4 +21,6 @@ EntryAbility 的配置更新及返回前台通过 `refreshThemeColors()` 使用�
 
 页面间距共用 `toolbarVerticalInset`（8vp）、`pageContentTopInset`（8vp）、`pageSectionGap`（12vp）、`pageBottomInset`（12vp）；页面左右12vp，工具栏按钮下缘到首内容块16vp。首页、设置、统计、浏览、学习、添加笔记、提醒及Agent页面和顶部菜单已接入；提醒页亦注册统一导航淡入淡出。新增页面与检查范围见 `docs/UI_SPACING.md`。表单、聊天气泡和闪卡HTML内部间距按用途保留。
 
+首页顶部工具栏将左右操作区设置为相同 `layoutWeight`，中间状态组按内容宽度排列、两侧各留 8vp；单个图标对准屏幕中线，组内多个元素以整体中心对齐。不可用两个 Blank 夹住状态或绝对定位覆盖操作区，否则左右按钮标签长度不同会导致偏移或重叠。工具栏按钮启用 `按下态按钮.singleLine`，宽度不超过侧栏，长标签单行省略并保留完整无障碍名称；其他按钮维持原多行行为。同步圆圈固定为 24vp，点击区为 44vp；只在实际同步中显示，其余状态隐藏。当前只渲染一个同步圆圈。
+
 

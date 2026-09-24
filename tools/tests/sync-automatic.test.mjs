@@ -614,17 +614,53 @@ test('a completed old status cannot release a newer sync lease', () => {
   assert.equal(gate.isActive(), true);
 });
 
-test('automatic sync stays invisible during transfer and preserves error/conflict recovery', () => {
+test('sync indicator distinguishes transfer, attention, waiting, completion and cancellation', () => {
+  const { panel, state } = panelHarness();
+  panel.publishStatus();
+  assert.equal(state.indicator, 'syncing');
+  assert.equal(state.status, 'app.string.sync_syncing');
+  panel.是否在媒体阶段 = true;
+  panel.媒体进度文案 = '3 / 8';
+  panel.publishStatus();
+  assert.equal(state.indicator, 'syncing');
+  assert.equal(state.status, '3 / 8');
+  panel.当前阶段 = 'conflict';
+  panel.publishStatus();
+  assert.equal(state.indicator, 'attention');
+  assert.equal(state.status, 'app.string.sync_needs_attention');
+  panel.当前阶段 = 'done';
+  panel.错误文案 = 'offline';
+  panel.publishStatus();
+  assert.equal(state.indicator, 'attention');
+  assert.equal(state.status, 'app.string.sync_background_error');
+  panel.错误文案 = '';
+  panel.状态文案 = 'completed';
+  panel.publishStatus();
+  assert.equal(state.indicator, 'done');
+  panel.当前阶段 = 'syncing';
+  panel.yieldingForStudy = true;
+  panel.publishStatus();
+  assert.equal(state.indicator, 'waiting');
+  assert.equal(state.status, 'app.string.sync_yielding');
+  panel.完成中止();
+  assert.equal(state.indicator, 'paused');
+  assert.equal(state.status, 'app.string.sync_aborted');
+});
+
+test('sync icon stays inline with accessible details and preserves error/conflict recovery', () => {
   const home = read('pages/首页.ets'), panel = read('components/同步面板.ets');
   assert.ok(home.indexOf('同步面板({') > home.indexOf('.navDestination(this.页面映射)'));
   assert.match(panel, /HitTestMode.Transparent : HitTestMode.Default/);
   const toolbar = read('components/home/主页顶部工具栏.ets');
   assert.match(home, /syncStatusText: this.syncStatusText/);
-  assert.match(home, /onSyncDetails:.*this.syncDetailsRequest\+\+/);
-  assert.match(toolbar, /Text\(this.syncStatusText\)/);
-  assert.ok(toolbar.indexOf('Text(this.syncStatusText)') > toolbar.indexOf("app.string.study_more"));
-  assert.ok(toolbar.indexOf('Text(this.syncStatusText)') < toolbar.indexOf("app.string.create_deck"));
-  assert.match(panel, /this\.statusChanged\(text\)/);
+  assert.match(home, /syncIndicator: this.syncIndicator/);
+  assert.match(home, /onSyncDetails:[\s\S]*?this.syncDetailsRequest\+\+/);
+  assert.match(home, /else showToastSafely\(this.getUIContext\(\), \{ message: this.syncStatusText \}\)/);
+  assert.match(toolbar, /accessibilityText\(this.syncStatusText\)/);
+  assert.doesNotMatch(toolbar, /\bText\(this.syncStatusText\)/);
+  assert.ok(toolbar.indexOf('LoadingProgress()') > toolbar.indexOf("app.string.study_more"));
+  assert.ok(toolbar.indexOf('LoadingProgress()') < toolbar.indexOf("app.string.create_deck"));
+  assert.match(panel, /this\.statusChanged\(text, indicator\)/);
   assert.match(panel, /if \(this.detailsVisible\)/);
 });
 

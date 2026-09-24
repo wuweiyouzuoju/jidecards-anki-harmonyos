@@ -26,7 +26,7 @@ function harness(phase = 'question') {
   const page = new context.Page();
   Object.assign(page, {
     mounted: true, sessionReady: true, foreground: true, 页面已显示: true, requestVersion: 0,
-    audioSession: { stop: async () => {} }, playStudyAudio: () => {},
+    audioSession: { stop: async () => {}, isPlaying: () => false }, playStudyAudio: () => {},
     阶段: phase, 评分中: false, studyGuideVisible: false, noteEditorVisible: false,
     choiceQuestion: null, choiceAutoAdvanceSeconds: () => 5,
     noteEditorBusy: false, noteEditorError: '', editingNote: null, 展示时刻毫秒: 500,
@@ -61,8 +61,8 @@ test('More > Edit opens the current note from either face and is disabled withou
     await page.openNoteEditor();
     await new Promise(resolve => setImmediate(resolve));
     assert.deepEqual(reads, [42]);
-    assert.equal(page.noteEditorVisible, true);
-    assert.equal(page.editingNote.id, 42);
+    assert.equal(page.editor.visible, true);
+    assert.equal(page.editor.note.id, 42);
     assert.equal(page.阶段, phase);
     assert.equal(page.更多菜单().find(item => item.value === 'app.string.study_edit_note').enabled, false);
   }
@@ -80,7 +80,7 @@ test('cancel keeps card face and scheduling, excludes editing time, and does not
   await page.openNoteEditor();
   advance(60000);
   page.返回();
-  assert.equal(page.noteEditorVisible, false);
+  assert.equal(page.editor.visible, false);
   assert.equal(page.阶段, 'answer');
   assert.equal(page.当前卡片.states, 'original');
   assert.equal(page.展示时刻毫秒, 60500);
@@ -112,8 +112,8 @@ test('loading failure reports the error and restores study controls without an e
   const { page, toasts, advance } = harness();
   page.笔记类型服务实例.获取笔记类型 = async () => { advance(500); throw new Error('read failed'); };
   await page.openNoteEditor();
-  assert.equal(page.noteEditorVisible, false);
-  assert.equal(page.noteEditorBusy, false);
+  assert.equal(page.editor.visible, false);
+  assert.equal(page.editor.busy, false);
   assert.equal(page.评分中, false);
   assert.equal(page.展示时刻毫秒, 1000);
   assert.equal(toasts.length, 1);
@@ -124,16 +124,16 @@ test('failed save keeps the editor and draft available for retry; concurrent sav
   await page.openNoteEditor();
   page.笔记服务实例.更新笔记 = async () => { throw new Error('disk full'); };
   assert.equal(await page.saveNoteEdits(['draft'], []), false);
-  assert.equal(page.noteEditorVisible, true);
-  assert.equal(page.noteEditorBusy, false);
-  assert.equal(page.noteEditorError, 'app.string.browser_detail_save_error');
+  assert.equal(page.editor.visible, true);
+  assert.equal(page.editor.busy, false);
+  assert.equal(page.editor.error, 'save');
   assert.equal(page.评分中, true);
   let finish, calls = 0;
   page.笔记服务实例.更新笔记 = () => { calls++; return new Promise(resolve => { finish = resolve; }); };
   const pending = page.saveNoteEdits(['draft'], []);
   assert.equal(await page.saveNoteEdits(['draft'], []), false);
   page.返回();
-  assert.equal(page.noteEditorVisible, true);
+  assert.equal(page.editor.visible, true);
   finish();
   assert.equal(await pending, true);
   assert.equal(calls, 1);

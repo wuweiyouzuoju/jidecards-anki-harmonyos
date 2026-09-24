@@ -20,7 +20,7 @@ test('home wires the Anki deck tree, action menu, and selected-deck flows', () =
   assert.match(index, /this\.openCreateDeck\(''\)/);
   assert.match(index, /this\.openCreateDeck\(this\.选中的牌组ID\)/);
   // 创建牌组协调器 接收 父牌组ID Prop（内部转发给 创建牌组面板 的 initialParentId）
-  assert.match(index, /父牌组ID: this\.创建父牌组ID/);
+  assert.match(index, /parentId: this\.创建父牌组ID/);
   assert.match(detail, /添加卡片/);
   assert.match(detail, /创建子牌组/);
   assert.match(detail, /导出牌组/);

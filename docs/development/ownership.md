@@ -31,6 +31,9 @@
 | 同步租约与集合等待 | [SyncActivity](../../entry/src/main/ets/model/SyncSettings.ts)；持有者释放，取消请求不等于 IO 已结束 | [sync-settings](../../tools/tests/sync-settings.test.mjs) |
 | 学习卡片/队列代次与接受后的操作 | [StudySessionController](../../entry/src/main/ets/model/StudySessionController.ts)；过期读取不得覆盖新会话 | [study-session-controller](../../tools/tests/study-session-controller.test.mjs) |
 | 浏览批量快照与操作占用 | [BrowserOperationController](../../entry/src/main/ets/model/BrowserOperationController.ts)；离页禁止 UI 回写但不取消已接受写入 | [browser-operation-model](../../tools/tests/browser-operation-model.test.mjs) |
+| 笔记编辑读取、草稿快照与写入代次 | [NoteEditorSession](../../entry/src/main/ets/model/NoteEditorSession.ts)；浏览和学习页只提供写入适配，关闭/离页不撤销已接受写入 | [note-editor-session](../../tools/tests/note-editor-session.test.mjs) |
+| 学习页普通计时与自动推进 | [StudyTimerController](../../entry/src/main/ets/model/StudyTimerController.ts)；页面提供当前卡片、音频和阻塞事实，控制器不拥有评分或后端写入 | [study-timer-controller](../../tools/tests/study-timer-controller.test.mjs) |
+| 首页创建牌组与牌组定制表单 | [CreateDeckFeature](../../entry/src/main/ets/components/home/CreateDeckFeature.ets)、[DeckCustomizationFeature](../../entry/src/main/ets/components/home/DeckCustomizationFeature.ets)；页面只装配弹层、刷新和导航 | [home-deck-features](../../tools/tests/home-deck-features.test.mjs) |
 | 应用内 Agent 会话、检索范围与辅助确认账本 | [AgentSessionController](../../entry/src/main/ets/backend/agent/AgentSessionController.ets) 拥有会话状态和 ActionExecutor；Scope 拥有稳定 ID | [ai-agent-v2-runtime](../../tools/tests/ai-agent-v2-runtime.test.mjs) |
 | 卡库 ChangeDraft 提交 | [AgentDraftExecutor](../../entry/src/main/ets/backend/agent/AgentDraftExecutor.ets)；独立于辅助动作确认协议，调用方保持批次占用 | [agent-page-models](../../tools/tests/agent-page-models.test.mjs)、[草稿媒体回归](../../tools/tests/ai-agent-draft-media-runtime.test.mjs) |
 

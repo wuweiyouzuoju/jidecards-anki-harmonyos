@@ -1,5 +1,5 @@
 import { DeckOptionsSession } from '../../entry/src/main/ets/model/home/DeckOptionsSession.ts';
-import { loadPlatformModule } from './platform-module-harness.mjs';
+import { loadPlatformModule, loadComponentLogic } from './platform-module-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -155,35 +155,31 @@ function homeSaveHarness(method, dependencies) {
   const code = stripTypeScriptTypes(`class SaveHarness { ${home.slice(start, end)} }`, { mode: 'transform' });
   const Harness = new Function(...Object.keys(dependencies), code + '\nreturn SaveHarness;')(...Object.values(dependencies));
   const page = new Harness();
-  if (method === '应用牌组定制') {
-    const Commands = loadPlatformModule('backend/HomeDeckCommands.ets', 'HomeDeckCommands', { ...dependencies, 牌组服务: class {} });
-    page.deckCommands = new Commands();
-  }
   return page;
 }
 
 test('editing a deck waits for metadata writes then refreshes even when its ID is unchanged', async () => {
-  const events = [];
-  const saved = deferred();
-  const state = homeSaveHarness('应用牌组定制', {
+  const events = [], saved = deferred();
+  const Commands = loadPlatformModule('backend/HomeDeckCommands.ets', 'HomeDeckCommands', {
+    牌组服务: class {},
     保存牌组别名: async (id, name) => { assert.equal(id, '10'); assert.equal(name, '刑法笔记'); events.push('save'); await saved.promise; },
     保存牌组背景图: async () => { events.push('background'); },
-    清除牌组背景图: async () => { throw new Error('unexpected remove'); },
-    $r: name => name
+    清除牌组背景图: async () => { throw new Error('unexpected remove'); }
   });
-  Object.assign(state, {
-    定制牌组中: false, 定制牌组ID: '10', 显示牌组定制: true,
-    按ID查牌组: () => ({ id: '10', name: '刑法', displayName: '' }),
-    加载主页数据: async () => { events.push('refresh'); },
-    显示提示: () => { events.push('done'); }
+  const Feature = loadComponentLogic('components/home/DeckCustomizationFeature.ets', 'DeckCustomizationFeature', {
+    HomeDeckCommands: Commands, 空牌组汇总: {}, AppStorage: {setOrCreate() {}}, $r: key => key
   });
-  const pending = state.应用牌组定制({ 新名: '刑法笔记', 背景动作: 'replace', 背景像素图: {} });
-  assert.deepEqual(events, ['save'], 'must not refresh before persistence finishes');
-  saved.resolve(); await pending;
-  assert.deepEqual(events, ['save', 'background', 'refresh', 'done']);
-  assert.equal(state.定制牌组ID, '10');
-  assert.equal(state.显示牌组定制, false);
-  assert.equal(state.定制牌组中, false);
+  const state = homeSaveHarness('deckCustomized', {$r: key => key});
+  state.加载主页数据 = async () => events.push('refresh');
+  state.显示提示 = () => events.push('done');
+  const feature = new Feature();
+  feature.deck = {id:'10', name:'刑法', displayName:''};
+  feature.onSaved = () => state.deckCustomized();
+  feature.onClose = () => events.push('close');
+  const pending = feature.save({新名:'刑法笔记',背景动作:'replace',背景像素图:{}});
+  assert.deepEqual(events,['save']);saved.resolve();await pending;
+  assert.deepEqual(events,['save','background','refresh','done','close']);
+  assert.equal(feature.deck.id,'10');assert.equal(feature.busy,false);
 });
 
 test('saving deck options broadcasts refresh only after backend commit', async () => {
