@@ -7,6 +7,13 @@ export function resourceText(context: UIContext, resource: Resource, ...args: Ar
   try {
     const host = context.getHostContext();
     if (host === undefined) { throw new Error('UI context unavailable'); }
+    // $r 的第一个参数是资源名，后续参数才是占位符值；显式参数优先。
+    if (args.length === 0 && resource.params !== undefined) {
+      for (let index: number = 1; index < resource.params.length; index++) {
+        const value: Object = resource.params[index];
+        if (typeof value === 'string' || typeof value === 'number') args.push(value);
+      }
+    }
     return host.resourceManager.getStringSync(resource.id, ...args);
   } catch (error) {
     const name: string = resource.params !== undefined && typeof resource.params[0] === 'string'

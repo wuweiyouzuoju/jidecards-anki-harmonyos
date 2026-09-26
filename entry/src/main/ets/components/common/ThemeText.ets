@@ -30,14 +30,7 @@ export interface ThemeLabelGlyph {
 /** 保留本地化参数与 Unicode 码点，不把表情拆成两个字形。 */
 function themeLabelCharacters(label: ResourceStr, context: UIContext): string[] {
   if (typeof label === 'string') return label.match(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\s\S]/g) ?? [];
-  const args: Array<string | number> = [];
-  if (label.params !== undefined) {
-    for (let index: number = 1; index < label.params.length; index++) {
-      const value: Object = label.params[index];
-      if (typeof value === 'string' || typeof value === 'number') args.push(value);
-    }
-  }
-  const text: string = resourceText(context, label, ...args);
+  const text: string = resourceText(context, label);
   return text.match(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\s\S]/g) ?? [];
 }
 

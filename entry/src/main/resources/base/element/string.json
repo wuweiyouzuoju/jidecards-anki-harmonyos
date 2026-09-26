@@ -2085,6 +2085,7 @@
     {"name": "home_intro_theme_preview", "value": "【幻彩】主题预览"},
     {"name": "home_intro_theme_group_prefix", "value": "官方 QQ 群 "},
     {"name": "home_intro_theme_group_suffix", "value": "（点击复制），联系开发者获取。"},
-    {"name": "home_intro_website_failed", "value": "暂时无法打开网站，请稍后重试。"}
+    {"name": "home_intro_website_failed", "value": "暂时无法打开网站，请稍后重试。"},
+    {"name":"study_auto_advance_seconds","value":"%s 秒"}
   ]
 }

@@ -1477,6 +1477,7 @@
     {"name": "home_intro_theme_preview", "value": "Iridescent theme preview"},
     {"name": "home_intro_theme_group_prefix", "value": "the official QQ group "},
     {"name": "home_intro_theme_group_suffix", "value": " (tap to copy) and contact the developer to receive it."},
-    {"name": "home_intro_website_failed", "value": "Could not open the website. Please try again later."}
+    {"name": "home_intro_website_failed", "value": "Could not open the website. Please try again later."},
+    {"name":"study_auto_advance_seconds","value":"%s seconds"}
   ]
 }

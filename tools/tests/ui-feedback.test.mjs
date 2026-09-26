@@ -43,3 +43,17 @@ test('a toast failure cannot turn a completed write into an operation failure', 
   const options = { message: 'done', duration: 1000 };
   api.showToastSafely({ getPromptAction: () => ({ showToast: actual => assert.equal(actual, options) }) }, options);
 });
+
+
+test('resource objects retain embedded format arguments and explicit arguments take precedence', () => {
+  const api = loadUiFeedback();
+  const calls = [];
+  const context = { getHostContext: () => ({ resourceManager: {
+    getStringSync: (id, ...args) => { calls.push([id, ...args]); return `%s 秒`.replace('%s', args[0]); }
+  } }) };
+  const resource = { id: 7, params: ['app.string.study_auto_advance_seconds', '5'] };
+  assert.equal(api.resourceText(context, resource), '5 秒');
+  assert.equal(api.resourceText(context, resource, 12.5), '12.5 秒');
+  assert.deepEqual(calls, [[7, '5'], [7, 12.5]]);
+  assert.deepEqual(resource.params, ['app.string.study_auto_advance_seconds', '5']);
+});
