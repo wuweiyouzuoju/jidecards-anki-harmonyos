@@ -60,6 +60,7 @@ export class 后端会话 {
   private readonly 客户端 = new 后端客户端();
   private 状态: 会话状态 = 'closed';
   private 打开中: Promise<void> | null = null;
+  private generation: number = 0;
 
   /**
    * 幂等打开：先开 backend（BackendInit），再开 collection。
@@ -73,18 +74,24 @@ export class 后端会话 {
     if (this.打开中 !== null) {
       return this.打开中;
     }
+    const generation: number = this.generation;
     this.打开中 = this.内部打开(文件目录)
       .then(() => {
+        if (generation !== this.generation) {
+          throw new Error('Backend session was closed while opening');
+        }
         this.状态 = 'ready';
       })
       .catch((e: unknown) => {
         // 打开失败：关闭半初始化的句柄，允许下次重试
-        this.客户端.关闭();
-        this.状态 = 'closed';
+        if (generation === this.generation) {
+          this.客户端.关闭();
+          this.状态 = 'closed';
+        }
         throw e;
       })
       .finally(() => {
-        this.打开中 = null;
+        if (generation === this.generation) this.打开中 = null;
       });
     return this.打开中;
   }
@@ -129,12 +136,13 @@ export class 后端会话 {
     if (!this.是否就绪()) {
       throw new 后端错误('backend session is not ready', 0, '确保已打开', 原生状态.原生致命错误);
     }
+    const generation: number = this.generation;
     await this.原始调用(
       服务号.后端集合,
       集合方法.关闭,
       encodeCloseCollectionRequest(false)
     );
-    this.状态 = 'collectionClosed';
+    if (generation === this.generation) this.状态 = 'collectionClosed';
   }
 
   /**
@@ -170,7 +178,9 @@ export class 后端会话 {
 
   /** 关闭 collection 与 backend 句柄；之后可再次 确保已打开 */
   关闭(): void {
-    this.客户端.关闭();
+    this.generation++;
+    this.打开中 = null;
     this.状态 = 'closed';
+    this.客户端.关闭();
   }
 }
