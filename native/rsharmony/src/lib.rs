@@ -7,6 +7,9 @@ use std::ptr;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
+mod rpc_ids;
+use rpc_ids::{ABORT_SYNC, SYNC_SERVICE};
+
 pub const STATUS_OK: i32 = 0;
 pub const STATUS_INVALID_ARGUMENT: i32 = 1;
 pub const STATUS_HANDLE_NOT_FOUND: i32 = 2;
@@ -127,7 +130,7 @@ impl BackendRegistry {
             .cloned()
             .ok_or(BackendFailure::HandleNotFound)?;
         // Anki 26.05 BackendSyncService.AbortSync：不得排在网络调用的锁后。
-        if service == 1 && method == 7 && input.is_empty() {
+        if service == SYNC_SERVICE && method == ABORT_SYNC && input.is_empty() {
             return match &backend.sync_abort {
                 Some(abort) => abort(),
                 None => Err(BackendFailure::Backend(Vec::new())),
@@ -236,7 +239,7 @@ impl RawBackend for AnkiBackend {
         let backend = self.0.clone();
         Some(Arc::new(move || {
             backend
-                .run_service_method(1, 7, &[])
+                .run_service_method(SYNC_SERVICE, ABORT_SYNC, &[])
                 .map_err(BackendFailure::Backend)
         }))
     }

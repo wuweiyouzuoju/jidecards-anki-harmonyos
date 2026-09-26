@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include "napi/native_api.h"
 #include "rsharmony.h"
+#include "rpc_ids.h"
 
 #include <cstdint>
 #include <cstring>
@@ -214,7 +215,7 @@ napi_value RunMethodRaw(napi_env env, napi_callback_info info)
         return nullptr;
     }
     // AbortSync 只发取消信号；不依赖可能被集合调用占满的工作线程池。
-    if (call->service == 1 && call->method == 7 && call->input.empty()) {
+    if (call->service == RPC_SYNC_SERVICE && call->method == RPC_ABORT_SYNC && call->input.empty()) {
         ExecuteCall(env, call.get());
         CompleteCall(env, napi_ok, call.release());
         return promise;
@@ -224,6 +225,9 @@ napi_value RunMethodRaw(napi_env env, napi_callback_info info)
     if (napi_create_async_work(env, nullptr, resourceName, ExecuteCall, CompleteCall,
         call.get(), &call->work) != napi_ok ||
         napi_queue_async_work(env, call->work) != napi_ok) {
+        if (call->work != nullptr) {
+            napi_delete_async_work(env, call->work);
+        }
         napi_throw_error(env, nullptr, "failed to queue native backend call");
         return nullptr;
     }

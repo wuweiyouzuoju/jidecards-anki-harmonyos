@@ -7,10 +7,21 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import * as serviceIndex from '../../entry/src/main/ets/backend/服务索引.ts';
 import { parseGeneratedBackend, verifyIndex, verifyBaseline, protocolFingerprint, verifyGenerationCheckout } from '../verify-rpc-index.mjs';
+import { renderRpcIndex, renderNativeRpcIds } from '../generate-rpc-index.mjs';
 
 const manifest = JSON.parse(readFileSync(new URL('../rpc-index-methods.json', import.meta.url), 'utf8'));
 const baseline = JSON.parse(readFileSync(new URL('../rpc-index-baseline.json', import.meta.url), 'utf8'));
 const clone = value => structuredClone(value);
+
+test('RPC source is reproducibly generated from locked dispatch names and native header', () => {
+  const header = readFileSync(new URL('../../native/rsharmony/include/rsharmony.h', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('../../entry/src/main/ets/backend/服务索引.ts', import.meta.url), 'utf8');
+  assert.equal(source.replace(/\r\n/g, '\n'), renderRpcIndex(manifest, baseline, header));
+  assert.equal(readFileSync(new URL('../../native/rsharmony/src/rpc_ids.rs', import.meta.url), 'utf8').replace(/\r\n/g, '\n'), renderNativeRpcIds(baseline));
+  assert.equal(readFileSync(new URL('../../native/napi_bridge/src/rpc_ids.h', import.meta.url), 'utf8').replace(/\r\n/g, '\n'), renderNativeRpcIds(baseline, true));
+  const drift = clone(baseline); drift.services.sync.methods[0] = 'renamed_upstream';
+  assert.throws(() => renderRpcIndex(manifest, drift, header), /missing method/);
+});
 
 test('all source aliases match the checked-in generated dispatch baseline without local Anki artifacts', () => {
   verifyIndex(serviceIndex, manifest, baseline.services);

@@ -13,7 +13,7 @@ const manifestPath = path.join(root, 'tools', 'rpc-index-methods.json');
 const baselinePath = path.join(root, 'tools', 'rpc-index-baseline.json');
 const protocolPaths = ['Cargo.lock', 'rslib/rust_interface.rs', 'proto', 'rslib/proto', 'rslib/proto_gen'];
 
-const serviceNames = new Map([
+export const serviceNames = new Map([
   ['后端同步', 'sync'], ['后端集合', 'collection'], ['后端卡片', 'cards'], ['后端牌组', 'decks'],
   ['后端配置', 'config'], ['后端牌组配置', 'deck_config'], ['后端调度器', 'scheduler'],
   ['后端Ankidroid', 'ankidroid'], ['后端AnkiHub', 'anki_hub'], ['后端AnkiWeb', 'ankiweb'],
@@ -23,7 +23,7 @@ const serviceNames = new Map([
   ['后端媒体', 'media'], ['后端统计', 'stats'], ['后端标签', 'tags']
 ]);
 
-const methodNames = new Map([
+export const methodNames = new Map([
   ['集合方法', 'collection'], ['牌组方法', 'decks'], ['牌组配置方法', 'deck_config'],
   ['调度器方法', 'scheduler'], ['卡片渲染方法', 'card_rendering'], ['笔记类型方法', 'notetypes'],
   ['笔记方法', 'notes'], ['导入导出方法', 'import_export'], ['统计方法', 'stats'],
@@ -125,7 +125,7 @@ export function verifyGenerationCheckout(ankiRoot, revision) {
   if (changed) throw new Error(`RPC baseline generation refuses modified protocol/generator inputs:\n${changed}`);
 }
 
-function main() {
+async function main() {
   const args = process.argv.slice(2);
   if (args.length > 2 || (args.length === 2 && args[0] !== '--generate')) throw new Error('Usage: node tools/verify-rpc-index.mjs [backend.rs | --generate backend.rs]');
   const ankiRoot = path.join(root, 'third_party', 'anki');
@@ -142,9 +142,11 @@ function main() {
     if (!args[1]) throw new Error('--generate requires the exact freshly built backend.rs path');
     verifyGenerationCheckout(ankiRoot, revision);
     const services = parseGeneratedBackend(readFileSync(path.resolve(args[1]), 'utf8'));
-    verifyIndex(serviceIndex, manifest, services);
-    writeFileSync(baselinePath, JSON.stringify({ revision, fingerprint, services }, null, 2) + '\n');
-    console.log('[rpc-index] generated baseline; review it together with protocol/alias changes');
+    const baseline = { revision, fingerprint, services };
+    const { writeGeneratedIndexes } = await import('./generate-rpc-index.mjs');
+    writeGeneratedIndexes(manifest, baseline, readFileSync(path.join(root, 'native/rsharmony/include/rsharmony.h'), 'utf8'));
+    writeFileSync(baselinePath, JSON.stringify(baseline, null, 2) + '\n');
+    console.log('[rpc-index] generated baseline and source; review protocol and alias changes together');
   } else {
     const baseline = JSON.parse(readFileSync(baselinePath, 'utf8'));
     verifyBaseline(baseline, revision, fingerprint);
@@ -155,7 +157,7 @@ function main() {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  try { main(); }
+  try { await main(); }
   catch (error) {
     console.error(`[rpc-index] ${error instanceof Error ? error.message : String(error)}`);
     process.exitCode = 1;
