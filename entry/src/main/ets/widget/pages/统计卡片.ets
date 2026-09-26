@@ -297,7 +297,7 @@ struct 统计卡片 {
                 .fontSize(应用尺寸.字号_指标)
                 .fontWeight(FontWeight.Bold)
                 .fontColor(this.数据.主题色.主色文字)
-              Text(this.t('今日答对率', 'Today Accuracy'))
+              Text(this.t('今日评分通过率', 'Rating pass rate'))
                 .fontSize(应用尺寸.字号_正文_小)
                 .fontColor(this.数据.主题色.文字次)
             }
@@ -348,7 +348,7 @@ struct 统计卡片 {
   记忆率页() {
     Column({ space: 4 }) {
       Row() {
-        Text(this.t('记忆可提取性', 'Card Retrievability'))
+        Text(this.t('可回忆率', 'Retrievability'))
           .fontSize(13)
           .fontWeight(FontWeight.Medium)
           .fontColor(this.数据.主题色.文字主)
@@ -371,7 +371,7 @@ struct 统计卡片 {
                 .fontSize(22)
                 .fontWeight(FontWeight.Bold)
                 .fontColor(this.数据.主题色.文字主)
-              Text(this.t('平均可提取性', 'Avg Retrieval'))
+              Text(this.t('平均可回忆率', 'Avg retrievability'))
                 .fontSize(10)
                 .fontColor(this.数据.主题色.文字次)
             }
@@ -388,7 +388,7 @@ struct 统计卡片 {
           Text(this.t('未启用 FSRS', 'FSRS not enabled'))
             .fontSize(15)
             .fontColor(this.数据.主题色.文字主)
-          Text(this.t('在设置→调度器中开启 FSRS', 'Enable in Settings→Scheduler'))
+          Text(this.t('在牌组选项→高级设置中开启 FSRS', 'Enable FSRS in Deck Options > Advanced'))
             .fontSize(11)
             .fontColor(this.数据.主题色.文字次)
             .margin({ top: 3 })
@@ -433,19 +433,19 @@ struct 统计卡片 {
         Column({ space: 4 }) {
           Row({ space: 6 }) {
             this.计数格(this.t('答题', 'Answered'), this.数据.今日答题数, this.数据.主题色.主色按钮背景)
-            this.计数格(this.t('正确', 'Correct'), this.数据.今日正确数, '#238463')
+            this.计数格(this.t('评分通过', 'Passed'), this.数据.今日正确数, '#238463')
           }
           .width('100%')
 
           Row({ space: 6 }) {
-            this.计数格(this.t('学习', 'New'), this.数据.今日新学数, this.数据.主题色.主色文字)
+            this.计数格(this.t('学习', 'Learning'), this.数据.今日新学数, this.数据.主题色.主色文字)
             this.计数格(this.t('复习', 'Review'), this.数据.今日复习数, this.数据.主题色.主色容器)
             this.计数格(this.t('重学', 'Relearn'), this.数据.今日重学数, '#B34C00')
           }
           .width('100%')
 
           if (this.数据.今日答题数 > 0) {
-            Text(`${this.t('正确率', 'Accuracy')} ${Math.round(this.数据.今日正确数 / this.数据.今日答题数 * 100)}%`)
+            Text(`${this.t('评分通过率', 'Rating pass rate')} ${Math.round(this.数据.今日正确数 / this.数据.今日答题数 * 100)}%`)
               .fontSize(11)
               .fontColor(this.数据.主题色.文字主)
               .width('100%')
@@ -517,7 +517,7 @@ struct 统计卡片 {
           Row({ space: 4 }) {
             this.状态格(this.t('已熟练', 'Mature'), this.数据.卡片状态.成熟, 色卡片_成熟)
             this.状态格(this.t('已暂停', 'Suspended'), this.数据.卡片状态.暂停, 色卡片_已暂停)
-            this.状态格(this.t('已搁置', 'Buried'), this.数据.卡片状态.埋藏, 色卡片_已埋藏)
+            this.状态格(this.t('今日跳过', 'Buried for today'), this.数据.卡片状态.埋藏, 色卡片_已埋藏)
           }
           .width('100%')
 
@@ -687,7 +687,7 @@ struct 统计卡片 {
   难度分布页() {
     Column({ space: 4 }) {
       Row() {
-        Text(this.t('卡片难度', 'Difficulty'))
+        Text(this.t('卡片易度 / 难度', 'Card ease / difficulty'))
           .fontSize(13)
           .fontWeight(FontWeight.Medium)
           .fontColor(this.数据.主题色.文字主)
@@ -700,7 +700,7 @@ struct 统计卡片 {
 
       if (this.数据.hasData && this.数据.难度分布.桶.length > 0) {
         Column({ space: 2 }) {
-          Text(`${this.t('平均难度', 'Avg Difficulty')} ${this.数据.难度分布.平均.toFixed(0)}%`)
+          Text(`${this.t('平均值', 'Average')} ${this.数据.难度分布.平均.toFixed(0)}%`)
             .fontSize(11)
             .fontColor(this.数据.主题色.文字主)
             .width('100%')
@@ -713,7 +713,7 @@ struct 统计卡片 {
         .justifyContent(FlexAlign.End)
       } else if (this.数据.hasData) {
         Column() {
-          Text(this.t('暂无难度数据', 'No difficulty data'))
+          Text(this.t('暂无易度或难度数据', 'No ease or difficulty data'))
             .fontSize(13)
             .fontColor(this.数据.主题色.文字次)
         }

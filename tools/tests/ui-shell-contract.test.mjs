@@ -106,7 +106,7 @@ test('home resources provide matching light and dark semantic colors', () => {
   const lightNames = new Set(lightColors.map((item) => item.name));
   const darkNames = new Set(darkColors.map((item) => item.name));
 
-  for (const name of ['home_title', 'start_study', 'nav_decks', 'nav_browse', 'nav_stats', 'nav_settings']) {
+  for (const name of ['today_progress', 'start_study', 'create_deck', 'browser_title', 'stats_page_title', 'settings_title']) {
     assert.equal(stringNames.has(name), true, `missing string resource: ${name}`);
   }
 
@@ -270,6 +270,17 @@ test('stats toolbar shows FSRS and the scope row holds deck and history selector
   assert.ok(scopeRow.indexOf('Select(this.牌组选项)') < scopeRow.indexOf('范围切换条({'));
   assert.ok(scopeRow.includes("new SelectStyle($r('app.color.surface_card'))"));
   assert.ok(scopeRow.includes('on天数切换(index === 1 ? 0 : 365)'));
+});
+
+test('stats history range uses concise current-period labels', () => {
+  const zh = readJson('entry/src/main/resources/base/element/string.json').string;
+  const en = readJson('entry/src/main/resources/en_US/element/string.json').string;
+  const value = (items, name) => items.find(item => item.name === name)?.value;
+  assert.equal(value(zh, 'stats_history_range_year'), '近一年');
+  assert.equal(value(zh, 'stats_history_range_all'), '全部');
+  assert.equal(value(en, 'stats_history_range_year'), 'Last year');
+  assert.equal(value(en, 'stats_history_range_all'), 'All');
+  assert.doesNotMatch(JSON.stringify(zh), /历史：近1年|历史：全部/);
 });
 
 test('primary pages share one shell gutter and common visual primitives', () => {
@@ -529,7 +540,8 @@ test('home summary card and widget use Anki official chart colors from 统计色
     assert.ok(summary.includes(常量), `摘要卡卡片状态须用 ${常量}`);
     assert.ok(widget.includes(常量), `桌面卡片卡片状态须用 ${常量}`);
   }
-  assert.match(summary, /已搁置/, '摘要卡卡片状态须含已搁置（7 项与统计页一致）');
+  assert.match(summary, /数值:\s*this\.图表快照!\.卡片状态\.埋藏,\s*色型:\s*色卡片_已埋藏/,
+    '摘要卡须展示埋藏计数并使用对应状态颜色');
 
   // 桌面卡片：四张柱图用 Anki 色带，不再用主题色画柱，无热力死键
   assert.match(widget, /取小时柱色/, '桌面卡片小时分布须用 Anki 蓝色带');
@@ -703,8 +715,14 @@ test('settings directory keeps full-screen navigation and existing about content
 
 
 
-  assert.match(panel, /app\.string\.feedback_email/);
-  assert.match(panel, /app\.media\.sponsor_qrcode/);
+  const aboutDialog = read('entry/src/main/ets/components/settings/AboutActionDialog.ets');
+  assert.match(panel, /builder: AboutActionDialog\(/);
+  assert.match(panel, /groupNumber: this\.QQ群号/);
+  assert.match(panel, /this\.feedbackDialog\.open\(\)/);
+  assert.match(panel, /this\.sponsorDialog\.open\(\)/);
+  assert.match(aboutDialog, /app\.string\.feedback_copy_group/);
+  assert.match(aboutDialog, /app\.media\.sponsor_qrcode/);
+  assert.doesNotMatch(panel, /反馈子项展开|赞助子项展开|app\.string\.feedback_email/);
   assert.match(panel, /主题模式/);
 });
 

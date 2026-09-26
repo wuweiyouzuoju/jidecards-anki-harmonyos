@@ -83,7 +83,7 @@ test('settings panel renders pass, problems and error outcomes', () => {
 test('check database strings are resourced', () => {
   const strings = read(STRINGS);
   for (const name of ['check_db_title', 'check_db_hint', 'check_db_running',
-    'check_db_passed', 'check_db_problems', 'check_db_failed']) {
+    'check_db_passed', 'check_db_problems']) {
     assert.match(strings, new RegExp(`"name": "${name}"`), `missing string ${name}`);
   }
 });

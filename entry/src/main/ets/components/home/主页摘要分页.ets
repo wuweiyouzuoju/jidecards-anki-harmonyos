@@ -183,7 +183,7 @@ export struct 主页摘要分页 {
   记忆率页() {
     Column({ space: 应用尺寸.间距_8 }) {
       Row() {
-        Text(this.t('记忆可提取性', 'Card Retrievability'))
+        Text(this.t('可回忆率', 'Retrievability'))
           .fontSize(应用尺寸.字号_摘要标题)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.text_primary'))
@@ -200,7 +200,7 @@ export struct 主页摘要分页 {
             .fontSize(32)
             .fontWeight(FontWeight.Bold)
             .fontColor(this.动作主色)
-          Text(this.t('全库平均可提取性', 'Avg Retrieval'))
+          Text(this.t('全库平均可回忆率', 'Collection-wide retrievability'))
             .fontSize(应用尺寸.字号_正文_小)
             .fontColor($r('app.color.text_secondary'))
             .margin({ left: 8, bottom: 4 })
@@ -213,7 +213,7 @@ export struct 主页摘要分页 {
           Text(this.t('未启用 FSRS', 'FSRS not enabled'))
             .fontSize(应用尺寸.字号_正文)
             .fontColor($r('app.color.text_secondary'))
-          Text(this.t('开启 FSRS 后显示全库记忆率', 'Enable FSRS to show retention'))
+          Text(this.t('开启 FSRS 后显示全库可回忆率', 'Enable FSRS to show retrievability'))
             .fontSize(应用尺寸.字号_正文_小)
             .fontColor($r('app.color.text_secondary'))
             .margin({ top: 4 })
@@ -248,12 +248,12 @@ export struct 主页摘要分页 {
 
       Row({ space: 应用尺寸.间距_10 }) {
         计数格组件({ 标签: this.t('答题', 'Reviews'), 数值: this.图表快照!.今日答题数, 色型: 'primary' })
-        计数格组件({ 标签: this.t('正确', 'Correct'), 数值: this.图表快照!.今日正确数, 色型: '#238463' })
+        计数格组件({ 标签: this.t('评分通过', 'Passed'), 数值: this.图表快照!.今日正确数, 色型: '#238463' })
       }
       .width('100%')
 
       Row({ space: 应用尺寸.间距_10 }) {
-        计数格组件({ 标签: this.t('学习', 'New'), 数值: this.图表快照!.今日新学数, 色型: 'new' })
+        计数格组件({ 标签: this.t('学习', 'Learning'), 数值: this.图表快照!.今日新学数, 色型: 'new' })
         计数格组件({ 标签: this.t('复习', 'Review'), 数值: this.图表快照!.今日复习数, 色型: 'review' })
         计数格组件({ 标签: this.t('重学', 'Relearn'), 数值: this.图表快照!.今日重学数, 色型: 'learn' })
       }
@@ -342,7 +342,7 @@ export struct 主页摘要分页 {
       Row({ space: 应用尺寸.间距_10 }) {
         计数格组件({ 标签: this.t('已熟练', 'Mature'), 数值: this.图表快照!.卡片状态.成熟, 色型: 色卡片_成熟 })
         计数格组件({ 标签: this.t('已暂停', 'Suspended'), 数值: this.图表快照!.卡片状态.暂停, 色型: 色卡片_已暂停 })
-        计数格组件({ 标签: this.t('已搁置', 'Buried'), 数值: this.图表快照!.卡片状态.埋藏, 色型: 色卡片_已埋藏 })
+        计数格组件({ 标签: this.t('今日跳过', 'Buried for today'), 数值: this.图表快照!.卡片状态.埋藏, 色型: 色卡片_已埋藏 })
       }
       .width('100%')
     }
@@ -433,7 +433,7 @@ export struct 主页摘要分页 {
     // 间距与其他柱图页统一为 4：加刻度行后 8 间距会超出卡片固定高度 150
     Column({ space: 应用尺寸.间距_4 }) {
       Row() {
-        Text(this.t('卡片难度', 'Difficulty'))
+        Text(this.t('卡片易度 / 难度', 'Card ease / difficulty'))
           .fontSize(应用尺寸.字号_摘要标题)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.text_primary'))

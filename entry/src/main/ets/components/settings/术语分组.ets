@@ -10,7 +10,7 @@ import { 设置分组卡片 } from './设置分组卡片';
 //
 // @作用
 // 列出复习页常见操作术语（埋藏/暂停/删除/撤销/评分按钮等），
-// 每项点击 ⓘ 弹 FieldHelpPanel 显示详细说明。
+// 每项点击 › 弹 FieldHelpPanel 显示详细说明。
 // 与 Anki 桌面端 More 菜单的语义保持一致；入口仅在设置页提供，
 // 复习页本身的按钮文字不内嵌长说明，避免打断学习节奏。
 //
@@ -24,7 +24,7 @@ import { 设置分组卡片 } from './设置分组卡片';
 // 打开说明回调：父组件注入；打开说明回调 上抛 标题 + 正文 Resource。
 //
 // @输出
-// 渲染术语表分组卡片；用户点击 ⓘ 时上抛 打开说明回调。
+// 渲染术语表分组卡片；用户点击 › 时上抛 打开说明回调。
 //
 // @副作用
 // 无。
@@ -32,7 +32,7 @@ import { 设置分组卡片 } from './设置分组卡片';
 @Component
 export struct 术语分组 {
   @Prop 是否深色: boolean = false;
-  // ⓘ 按钮上抛：由父组件 SettingsPanel 统一渲染 FieldHelpPanel 浮层，避免嵌在分组卡片内
+  // 术语行上抛：由父组件 SettingsPanel 统一渲染 FieldHelpPanel 浮层，避免嵌在分组卡片内
   打开说明回调: (标题: Resource, 正文: Resource) => void = (_标题: Resource, _正文: Resource): void => {};
   // B12-Y5 2026-07-29 修复 Bug 1：术语分组没有任何 @StorageLink 颜色键，
   // 主题切换时只靠 @Prop 是否深色 传播，若传播滞后则用旧色板（文字偏暗）。
@@ -133,14 +133,14 @@ export struct 术语分组 {
   // @名称 单条术语行
   //
   // @作用
-  // 渲染单条术语行：名称 + ⓘ 按钮，点击 ⓘ 上抛 打开说明回调 显示该术语的详细说明。
+  // 渲染单条术语行：名称 + › 箭头，点击行 上抛 打开说明回调 显示该术语的详细说明。
   //
   // @输入
   // 色板：当前色板。
   // 条目：术语条目数据（含 标签资源 / 帮助标题资源 / 帮助正文资源）。
   //
   // @输出
-  // 渲染单行；点击 ⓘ 时上抛 打开说明回调。
+  // 渲染单行；点击术语行时上抛 打开说明回调。
   //
   // @副作用
   // 无。
@@ -152,20 +152,15 @@ export struct 术语分组 {
         .fontSize(15)
         .fontColor(色板.主文字)
         .layoutWeight(1)
-      Button($r('app.string.field_help_button'))
-        .type(ButtonType.Normal)
-        .backgroundColor(Color.Transparent)
-        .fontSize(14)
-        .fontColor(色板.三级文字)
-        .width(28)
-        .height(28)
-        .padding(0)
-        .onClick(() => {
-          this.打开说明回调(条目.帮助标题资源, 条目.帮助正文资源);
-        })
+      Text('›')
+        .fontSize(22)
+        .fontColor(色板.次文字)
     }
     .width('100%')
     .height(44)
+    .onClick((): void => {
+      this.打开说明回调(条目.帮助标题资源, 条目.帮助正文资源);
+    })
   }
 
   build() {

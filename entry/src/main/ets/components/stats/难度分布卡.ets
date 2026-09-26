@@ -200,7 +200,8 @@ export struct 难度分布卡 {
           // 平均难度（Anki average 直出行；后端已换算为百分比口径）
           if ((this.取数据() as Eases).average > 0) {
             Row() {
-              Text($r('app.string.stats_ease_average_label'))
+              Text(this.是否FSRS && this.FSRS难度 !== null
+                ? $r('app.string.stats_ease_average_label') : $r('app.string.stats_ease_average_sm2_label'))
                 .fontSize(应用尺寸.字号_正文_小)
                 .fontColor($r('app.color.text_secondary'))
               Blank()

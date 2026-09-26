@@ -25,6 +25,42 @@ test('Chinese and English resources expose identical keys', () => {
   assert.deepEqual(resourceKeys(english), resourceKeys('entry/src/main/resources/base/element/string.json'));
 });
 
+test('localized strings preserve placeholder arguments and have unique keys', () => {
+  const base = JSON.parse(read('entry/src/main/resources/base/element/string.json')).string;
+  const english = JSON.parse(read('entry/src/main/resources/en_US/element/string.json')).string;
+  const byKey = new Map(english.map(item => [item.name, item.value]));
+  for (const entries of [base, english]) {
+    assert.equal(new Set(entries.map(item => item.name)).size, entries.length, 'duplicate resource key');
+  }
+  const argumentsOf = value => [...value.matchAll(/%(?:(\d+)\$)?([ds])/g)]
+    .map((match, index) => `${match[1] ?? index + 1}:${match[2]}`).sort();
+  for (const item of base) {
+    assert.deepEqual(argumentsOf(item.value), argumentsOf(byKey.get(item.name)), item.name);
+  }
+});
+
+test('source and manifest string references survive resource cleanup', () => {
+  const names = new Set([...resourceKeys('entry/src/main/resources/base/element/string.json'),
+    ...resourceKeys('AppScope/resources/base/element/string.json')]);
+  const directory = join(root, 'entry/src/main');
+  for (const file of readdirSync(directory, { recursive: true })) {
+    if (!/\.(ets|ts|json|json5|xml)$/.test(file)) continue;
+    const source = readFileSync(join(directory, file), 'utf8');
+    for (const match of source.matchAll(/(?:app\.string\.|\$string:)([a-zA-Z][a-zA-Z0-9_]*)/g)) {
+      // Comments may document whole resource families using a trailing wildcard.
+      if (source[match.index + match[0].length] === '*') continue;
+      assert.ok(names.has(match[1]), `${file}: missing ${match[1]}`);
+    }
+  }
+  // These two callers assemble names, so literal-reference scanning cannot find them.
+  for (const suffix of ['none', 'red', 'orange', 'green', 'blue']) {
+    assert.ok(names.has(`browser_action_flag_${suffix}`));
+  }
+  for (const suffix of ['aurora', 'forest', 'midnight', 'lagoon', 'sunset', 'lemon', 'minimal_gray', 'iridescent']) {
+    assert.ok(names.has(`theme_color_${suffix}`));
+  }
+});
+
 test('English resources are translated and contain no Chinese copy', () => {
   const english = 'entry/src/main/resources/en_US/element/string.json';
   assert.equal(existsSync(join(root, english)), true, 'English resources must exist');

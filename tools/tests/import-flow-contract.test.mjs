@@ -57,7 +57,7 @@ test('import strings and stage texts are resourced', () => {
   const strings = JSON.parse(read('entry/src/main/resources/base/element/string.json')).string;
   const names = new Set(strings.map((item) => item.name));
 
-  for (const key of ['import_close', 'transfer_import_deck', 'transfer_import_personal']) {
+  for (const key of ['close', 'transfer_import_deck', 'transfer_import_personal']) {
     assert.equal(names.has(key), true, `missing string resource: ${key}`);
   }
 });

@@ -132,7 +132,6 @@ export struct 备份管理面板 {
                 Row() {
                   Text(name).fontSize(14).layoutWeight(1)
                     .fontColor(设置面板色板_取(this.isDark).主文字);
-                  if (this.selectedBackup === name) Text('✓').fontColor(this.actionColor);
                 }.width('100%').padding(10)
                 .backgroundColor(this.selectedBackup === name ? 设置面板色板_取(this.isDark).标签背景 : Color.Transparent)
                 .onClick((): void => { this.selectedBackup = name; });

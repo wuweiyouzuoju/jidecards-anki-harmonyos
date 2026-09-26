@@ -18,6 +18,7 @@ import { HelpPage } from '../proto/messages/LinksMessages';
 import { 设置面板色板_取 } from '../utils/设置面板配色';
 import type { SyncAuth } from '../proto/messages/SyncMessages';
 import { RedemptionPanel } from './settings/RedemptionPanel';
+import { AboutActionDialog } from './settings/AboutActionDialog';
 import { GeneralSettings } from './settings/GeneralSettings';
 import { ReviewControlsSettings } from './settings/ReviewControlsSettings';
 import { 外观分组 } from './settings/外观分组';
@@ -121,9 +122,21 @@ export struct 设置面板 {
 
   // 右上角模式切换菜单：顶栏「当前模式」按钮触发，弹出 简洁版/实验版 选择
   @State private 显示模式菜单: boolean = false;
-  // 不在契约要求中但保持父组件统一管理，便于后续按分组排序。
-  @State private 反馈子项展开: boolean = false;
-  @State private 赞助子项展开: boolean = false;
+  private feedbackDialog: CustomDialogController = new CustomDialogController({
+    builder: AboutActionDialog({
+      groupNumber: this.QQ群号,
+      onCopyGroup: (): void => { this.复制QQ群号到剪贴板(); }
+    }),
+    autoCancel: true,
+    alignment: DialogAlignment.Center,
+    customStyle: true
+  });
+  private sponsorDialog: CustomDialogController = new CustomDialogController({
+    builder: AboutActionDialog({ sponsor: true }),
+    autoCancel: true,
+    alignment: DialogAlignment.Center,
+    customStyle: true
+  });
   @State private maintenance: CollectionMaintenanceState = new CollectionMaintenanceState();
   private readonly maintenanceSession: CollectionMaintenanceSession = new CollectionMaintenanceSession();
   // 子分组（FSRS / 语音朗读）ⓘ 按钮上抛的说明请求：统一在本面板根 Stack 浮层显示，
@@ -185,6 +198,8 @@ export struct 设置面板 {
   }
 
   aboutToDisappear(): void {
+    this.feedbackDialog.close();
+    this.sponsorDialog.close();
     this.disposed = true;
     this.lifecycleVersion++;
     this.maintenanceSession.detach();
@@ -221,9 +236,10 @@ export struct 设置面板 {
   private settingsDirectory() {
     Column({ space: 12 }) {
       TextInput({ text: this.settingsQuery, placeholder: $r('app.string.settings_search_placeholder') })
-        .height(44)
+        .height(应用尺寸.searchFieldHeight)
         .fontSize(应用尺寸.字号_正文)
         .backgroundColor($r('app.color.surface_card'))
+        .borderRadius(应用尺寸.searchFieldRadius)
         .onChange((value: string): void => { this.settingsQuery = value; })
       Column() {
         ForEach(this.directoryEntries(), (entry: SettingsEntry) => {
@@ -331,27 +347,6 @@ export struct 设置面板 {
   private 解析主色按钮背景(): string {
     return this.主色按钮背景链接 !== '' ? this.主色按钮背景链接 : 设置面板色板_取(this.是否深色).主色按钮背景;
   }
-
-  // ========================================================
-  // @块ID UI-SETTINGS-PANEL-004
-  // @名称 关于分组内容构建器
-  //
-  // @作用
-  // + AnkiWeb 资源入口 + 许可证入口 + Anki 官方文档入口。
-  // 反馈子项含 app.string.feedback_email 资源引用；赞助子项含 app.media.sponsor_qrcode 资源引用。
-  //
-  // @输入
-  // 直接读 @State 反馈子项展开 / 赞助子项展开 与 打开许可证回调。
-  //
-  // @输出
-  // 点 AnkiWeb 资源入口时调 打开AnkiWeb网址 方法；点许可证入口时上抛 打开许可证回调。
-  //
-  // @业务规则
-  // 契约测试要求 feedback_email / sponsor_qrcode 资源引用留在主壳（不可抽到子组件）。
-  //
-  // @副作用
-  // 无（仅切换本组件 @State 与触发外部回调）。
-  // ========================================================
 
   // ========================================================
   // @块ID UI-SETTINGS-PANEL-006
@@ -567,86 +562,33 @@ export struct 设置面板 {
 
       Divider().color(设置面板色板_取(this.是否深色).分隔线).strokeWidth(1)
 
-      // 反馈子项
-      Column() {
-        Row() {
-          Text($r('app.string.feedback_title'))
-            .fontSize(15)
-            .fontColor(设置面板色板_取(this.是否深色).主文字)
-          Blank()
-          Text('▼')
-            .fontSize(11)
-            .fontColor(设置面板色板_取(this.是否深色).弱化文字)
-            .rotate({ angle: this.反馈子项展开 ? 0 : -90 })
-            .animation({ duration: 150, curve: Curve.EaseOut })
-        }
-        .width('100%')
-        .height(48)
-        .onClick(() => {
-          this.反馈子项展开 = !this.反馈子项展开;
-        })
-
-        if (this.反馈子项展开) {
-          Column({ space: 8 }) {
-            Text($r('app.string.feedback_hint'))
-              .fontSize(12)
-              .fontColor(设置面板色板_取(this.是否深色).次文字)
-            Text($r('app.string.feedback_email'))
-              .fontSize(14)
-              .fontColor(设置面板色板_取(this.是否深色).主文字)
-              .fontWeight(FontWeight.Medium)
-              .maxLines(2)
-              .textOverflow({ overflow: TextOverflow.Clip })
-              .width('100%')
-          }
-          .width('100%')
-          .padding({ top: 0, bottom: 12 })
-          .alignItems(HorizontalAlign.Start)
-        }
+      Row() {
+        Text($r('app.string.feedback_title'))
+          .fontSize(15)
+          .fontColor(设置面板色板_取(this.是否深色).主文字)
+        Blank()
+        Text('›')
+          .fontSize(20)
+          .fontColor(设置面板色板_取(this.是否深色).弱化文字)
       }
       .width('100%')
+      .height(48)
+      .onClick((): void => { this.feedbackDialog.open(); })
 
       Divider().color(设置面板色板_取(this.是否深色).分隔线).strokeWidth(1)
 
-      // 赞助子项
-      Column() {
-        Row() {
-          Text($r('app.string.sponsor_title'))
-            .fontSize(15)
-            .fontColor(设置面板色板_取(this.是否深色).主文字)
-          Blank()
-          Text('▼')
-            .fontSize(11)
-            .fontColor(设置面板色板_取(this.是否深色).弱化文字)
-            .rotate({ angle: this.赞助子项展开 ? 0 : -90 })
-            .animation({ duration: 150, curve: Curve.EaseOut })
-        }
-        .width('100%')
-        .height(48)
-        .onClick(() => {
-          this.赞助子项展开 = !this.赞助子项展开;
-        })
-
-        if (this.赞助子项展开) {
-          Column({ space: 8 }) {
-            Text($r('app.string.sponsor_hint'))
-              .fontSize(12)
-              .fontColor(设置面板色板_取(this.是否深色).次文字)
-            Image($r('app.media.sponsor_qrcode'))
-              .width(180)
-              .height(180)
-              .objectFit(ImageFit.Contain)
-              .borderRadius(8)
-            Text($r('app.string.sponsor_qrcode_hint'))
-              .fontSize(12)
-              .fontColor(设置面板色板_取(this.是否深色).三级文字)
-          }
-          .width('100%')
-          .alignItems(HorizontalAlign.Center)
-          .padding({ top: 0, bottom: 12 })
-        }
+      Row() {
+        Text($r('app.string.sponsor_title'))
+          .fontSize(15)
+          .fontColor(设置面板色板_取(this.是否深色).主文字)
+        Blank()
+        Text('›')
+          .fontSize(20)
+          .fontColor(设置面板色板_取(this.是否深色).弱化文字)
       }
       .width('100%')
+      .height(48)
+      .onClick((): void => { this.sponsorDialog.open(); })
 
       Divider().color(设置面板色板_取(this.是否深色).分隔线).strokeWidth(1)
 
@@ -990,7 +932,7 @@ export struct 设置面板 {
               })
             }
           }
-          // 8. 关于分组（保留内联：含 feedback_email / sponsor_qrcode 资源引用）
+          // 8. 关于分组：反馈与赞赏由独立系统弹窗承载
           if (this.activeSection === 'about') {
             ListItem() {
               设置分组卡片({

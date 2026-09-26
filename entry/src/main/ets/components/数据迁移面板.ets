@@ -289,6 +289,9 @@ export struct 数据迁移面板 {
         .width('100%')
         .enabled(!this.busy)
         .attributeModifier(new SelectStyle())
+        .height(SelectStyle.controlHeight)
+        .padding(SelectStyle.controlPadding)
+        .space(SelectStyle.controlSpace)
         .font(SelectStyle.controlFont)
         .borderRadius(SelectStyle.controlRadius)
         .onSelect((索引: number): void => {
@@ -308,6 +311,9 @@ export struct 数据迁移面板 {
             .layoutWeight(1)
             .enabled(!this.busy && this.deckOptions.length > 0)
             .attributeModifier(new SelectStyle())
+            .height(SelectStyle.controlHeight)
+            .padding(SelectStyle.controlPadding)
+            .space(SelectStyle.controlSpace)
             .font(SelectStyle.controlFont)
             .borderRadius(SelectStyle.controlRadius)
             .onSelect((索引: number): void => {
