@@ -62,7 +62,7 @@ const home = page({
   title: '记得闪卡｜HarmonyOS 开源 Anki 客户端', description: work.summary, pathname: '/',
   graph: [{ '@type': 'WebSite', name: '记得闪卡 · jidecards', url: origin, author: { '@id': `${origin}/#author` } }, application],
   body: `<section class="intro"><p class="eyebrow">HarmonyOS · 开源</p><h1>记得闪卡</h1>
-    <p class="lede">Anki 卡片，鸿蒙原生界面。<br>间隔复习、AnkiWeb 同步、APKG 导入导出。</p>${download}</section>
+    <p class="lede">${esc(work.summary)}</p>${download}</section>
     ${theme}
     <nav class="entry-grid" aria-label="站点入口">
       <a class="entry" href="/works/jidecards/"><strong>功能与截图 <span aria-hidden="true">→</span></strong><span>学习、同步、卡片管理与外观</span></a>
