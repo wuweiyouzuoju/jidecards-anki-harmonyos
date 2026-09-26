@@ -12,7 +12,7 @@ export const SUITES = {
   browser: /browser|page-(?:operation|domain|repositories)|preview|search|note|card-info/,
   media: /media|audio|render|math|latex|jquery|preview|card-template/,
   agent: /page-domain|page-repositories|agent|provider|draft|sse/,
-  ui: /theme|color|spacing|layout|settings|ui-shell|ui-feedback|platform-warning|i18n|brand|stats|navigation/,
+  ui: /arkts-component-fields|theme|color|spacing|layout|settings|ui-shell|ui-feedback|platform-warning|i18n|brand|stats|navigation/,
   repo: /documentation-contract|architecture-boundaries|i18n-contract|brand-contract/
 };
 

@@ -8,7 +8,9 @@
 
 ## 浏览列表
 
-浏览结果每条采用独立圆角卡片，左右沿用页面内边距，条目间距沿用设置分组；信息入口、多选、旗标和分页仍在 `卡片表格` 中。表格通过 `IDataSource` + `LazyForEach` 消费行快照，行 key 使用稳定业务字段，避免大列表状态变化时按整数组重建；分页加载态跟随宿主 `Promise` 结束，不使用固定延时。应用所有原生 Select 共用 `utils/SelectStyle.ets` 的高度、字重、16vp 卡片圆角及明暗资源配色，页面独立选择框传入 surface_card（浅色白、深色卡片底），卡片内默认 surface_sidebar；调用方通过 `.font(SelectStyle.controlFont)` 与 `.borderRadius(SelectStyle.controlRadius)` 在每次刷新时重设字体和圆角，避免 AttributeModifier 差分跳过未变值后残留系统默认外观；其余样式继续由 modifier 提供。调用方保留宽度、菜单对齐和业务绑定。统计页 FSRS 状态位于顶栏右侧，历史范围位于牌组选择右侧。牌组长按菜单直接显示满宽颜色选择框；设置模式菜单沿用首页更多的 compactMenuWidth。
+浏览结果每条采用独立圆角卡片，左右沿用页面内边距，条目间距沿用设置分组；信息入口、多选、旗标和分页仍在 `卡片表格` 中。表格通过 `IDataSource` + `LazyForEach` 消费行快照，行 key 使用稳定业务字段，避免大列表状态变化时按整数组重建；分页加载态跟随宿主 `Promise` 结束，不使用固定延时。应用所有原生 Select 共用 `utils/SelectStyle.ets` 的高度、字重、16vp 卡片圆角及明暗资源配色，页面独立选择框传入 surface_card（浅色白、深色卡片底），卡片内默认 surface_sidebar；调用方直接声明共享 font、borderRadius、height、padding、space，避免 AttributeModifier 差分跳过未变值后残留系统默认外观。每处选择框以固定宽度、百分比或 layoutWeight 预留空间，切换长短选项不改变控件尺寸；历史范围使用共享宽度，表单默认占行宽一半。配色继续由 modifier 提供，菜单对齐和业务绑定仍属于调用方。统计页 FSRS 状态位于顶栏右侧，历史范围位于牌组选择右侧。牌组长按菜单直接显示满宽颜色选择框；设置模式菜单沿用首页更多的 compactMenuWidth。
+
+`AnchoredMenu` 与 `MenuItem` 由首页更多、新建牌组动作菜单、设置模式及浏览菜单共用，统一圆角、分隔线、居中文字、150ms 动效和主题色选中态。浏览搜索独占一行；下一行左侧为一个外框中的模式、状态、排序三个选值区，右侧显示完整结果数量。点击某个选值区只打开该组的选项，菜单宽度跟随整个选择框，不再套分类折叠或混列其他组；排序“默认”与各列选项同级。筛选分区使用相同菜单展开行，标题与展开内容属于同一张圆角卡片，分区之间沿用 pageSectionGap。折叠偏好和筛选协议不变。回归见 `ui-select-layout.test.mjs`，实际尺寸及点击行为另做设备验收。
 
 笔记模式批量删除/改牌组/标志复用 `笔记服务.获取笔记的卡片` 展开全部兄弟卡并去重；删除后重新查询后端结果，失败保留选择。不要回到空卡片列表调用后本地移除行的做法。回归见 `browser-batch-runtime.test.mjs`。
 
@@ -60,3 +62,6 @@
 - `model/NoteEditorSession.ts` 统一拥有编辑读取代次、可见/忙碌/错误快照和输入冻结；浏览页只把写入接入 `BrowserOperationController`，学习页只把写入接入 `StudySessionController`。字段读取完成前不挂载 `浏览编辑区`，避免空字段草稿覆盖真实数据；`components/browser/浏览编辑区.ets` 只管理输入和回调。
 - `components/browser/卡片信息.ets` 拥有卡片统计读取和目标代次，浏览页只持有当前卡片 ID 与显示槽，不再复制统计请求状态。
 - 新规则优先直接测试模型；`browser-presentation` 与 `page-operation-boundaries` 验证页面接线，`page-domain-models` / `page-repositories` 验证跨请求并发和解析。
+
+
+浏览结果分页由 `BrowserSearchSession` 拥有当前结果、消费游标、分页占用与查询代次。页面 `加载更多` 只请求 `more()` 并发布返回快照；选择操作保留自己的视图代次，不能把它混成分页游标。失败行同样消费 ID，旧查询的 finally 不解除新查询的占用。直接回归：`browser-search-pagination.test.mjs`；页面接线及批量快照保护继续由原有 browser 测试覆盖。

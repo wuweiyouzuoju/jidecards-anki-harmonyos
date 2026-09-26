@@ -35,6 +35,8 @@
 
 ## @Component 结构约定
 
+组件字段不得与 ArkUI 继承的属性方法同名，例如 `enabled`、`width`、`height`、`visibility`；布尔状态使用语义明确的 `isAdvanceEnabled` 等名称。`arkts-component-fields.test.mjs` 提前拦截常见装饰器字段冲突，但只覆盖常见名称，实际 HAP 编译仍是完成条件。纯逻辑测试通过不得报告为组件编译通过。
+
 ```typescript
 @Component
 export struct XxxComponent {
@@ -68,6 +70,8 @@ private localizedFmt(resource: Resource, args: Array<string | number>): string {
 this.localizedFmt($r('app.string.xxx_lang'), [arg1, arg2]);
 ```
 
+- `resourceText(context, $r('app.string.key', arg))` 与显式 `resourceText(context, $r('app.string.key'), arg)` 均保留参数；显式参数优先。参数提取只在 `UiFeedback.ets` 维护，禁止在页面或主题文字中再复制。
+- 格式化回归须运行真实 `resourceText` 并使用真实中英资源验证最终文字，不能只用 `$r` 拼接替身检查调用。公共回归：`ui-feedback.test.mjs`；设置弹窗示例：`study-auto-advance-settings.test.mjs`。
 - 中英 i18n key 必须完全对齐（数量 + 名称）
 - 英文 value 不能含中文字符
 - `Text()` / `Button()` 内禁止硬编码字符串字面量（除纯符号 `›▼✓⌄⌃×⚠≡`）
