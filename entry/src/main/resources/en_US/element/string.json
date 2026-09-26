@@ -1497,6 +1497,25 @@
     {"name":"browser_info_interval_today","value":"Same day"},
     {"name":"browser_info_interval_days","value":"%s days"},
     {"name":"browser_info_interval_months","value":"%s months"},
-    {"name":"browser_info_interval_years","value":"%s years"}
+    {"name":"browser_info_interval_years","value":"%s years"},
+    {"name":"deck_option_unset","value":"Not set"},
+    {"name":"deck_option_off","value":"Off"},
+    {"name":"deck_option_on","value":"On"},
+    {"name":"deck_option_back","value":"Back"},
+    {"name":"custom_study_preset_cram","value":"Study by card state or tag"},
+    {"name":"custom_study_preset_cram_hint","value":"Select cards from this deck, optionally filtered by state and tags."},
+    {"name":"custom_study_cards_label","value":"Number of cards"},
+    {"name":"custom_study_kind_new","value":"New cards only"},
+    {"name":"custom_study_kind_due","value":"Due cards only"},
+    {"name":"custom_study_kind_review","value":"All review cards in random order"},
+    {"name":"custom_study_kind_all","value":"All cards in random order (don't reschedule)"},
+    {"name":"custom_study_tags_any","value":"Any"},
+    {"name":"custom_study_tags_include","value":"Include tags"},
+    {"name":"custom_study_tags_exclude","value":"Exclude tags"},
+    {"name":"custom_study_tags_hint","value":"Match any included tag and none of the excluded tags. Leave unselected for no tag restriction."},
+    {"name":"custom_study_child_count","value":"(%d in subdecks)"},
+    {"name":"custom_study_preferences_error","value":"Study settings were applied, but the input could not be remembered."},
+    {"name":"custom_study_retry","value":"Retry"},
+    {"name":"custom_study_invalid_value","value":"Enter a valid non-zero integer. Days and card counts must be positive."}
   ]
 }

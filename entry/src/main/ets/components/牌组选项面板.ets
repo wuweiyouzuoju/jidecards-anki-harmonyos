@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { resourceText } from '../utils/UiFeedback';
-import { SelectStyle } from '../utils/SelectStyle';
+import { DeckOptionField, DeckOptionChoice } from './home/DeckOptionField';
+import { validateDeckOptionText } from '../model/DeckOptionValidation';
+import { namedResourceText } from '../utils/UiFeedback';
 import { ThemeTextSpans } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
@@ -11,7 +13,7 @@ import { DialogHeader } from './common/DialogHeader';
 //
 // @作用
 // 牌组选项弹层：常用 4 项（每日新卡上限 / 每日复习上限 / 学习步幅 /
-// 复习排序顺序）直接平铺；其余全部进入「高级设置」全屏磨砂覆盖层
+// 复习排序顺序）使用列表入口，点击弹窗编辑；其余全部进入「高级设置」全屏磨砂覆盖层
 // （高级牌组选项面板）。form/options 为引用共享，高级设置编辑后
 // 回到本面板统一保存。
 //
@@ -28,8 +30,7 @@ import { DialogHeader } from './common/DialogHeader';
 // onSave: 保存回调，参数为 form / options
 //
 // @业务规则
-// 测试断言保留：showAdvanced / reviewOrderSelector / enumSelector /
-// labeledInput 等字面符号由阶段 6 统一更新；本阶段保留以减小工作量。
+// 单项弹窗确认后只更新 form/options 草稿，主面板保存才写入后端。
 // proto 字段名（newPerDay / reviewsPerDay / learnSteps / reviewOrder /
 // fsrsParams4 等）作为依赖层 API 参数保留英文。
 //
@@ -75,7 +76,7 @@ export struct 牌组选项面板 {
   @StorageProp(颜色键.主色按钮按下) private 主色按钮按下: string = '#1E4FB8';
   @State private savePressed: boolean = false;
   // 复习排序顺序本地副本：@ObjectLink form 看不到 draft 内部字段变化，
-  // 用本地 @State 承载 selectedReviewOrder，菜单选中后立即刷新触发器文本与 ✓ 标记
+  // 用本地 @State 承载 selectedReviewOrder，确认后刷新当前值。
   @State private selectedReviewOrder: number = 0;
 
   aboutToAppear(): void {
@@ -263,7 +264,7 @@ export struct 牌组选项面板 {
   // @名称 带标签输入框
   //
   // @作用
-  // 渲染一行带帮助按钮 + TextInput + 字段错误的字段编辑单元。
+  // 渲染设置入口；点击弹窗输入，校验通过再更新草稿。
   //
   // @输入
   // label: 字段标签资源
@@ -279,18 +280,12 @@ export struct 牌组选项面板 {
   // ========================================================
   @Builder
   private labeledInput(label: Resource, text: string, onChange: (value: string) => void, info: Resource) {
-    Column({ space: 应用尺寸.间距_5 }) {
-      Row({ space: 4 }) {
-        Text(label).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).flexShrink(1)
-        Button() {
-          Text() { ThemeTextSpans($r('app.string.field_help_button'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.动作主色)
-        }.type(ButtonType.Normal).width(32).height(32).padding(0).flexShrink(0)
-          .backgroundColor(Color.Transparent).fontColor(this.动作主色).onClick(() => this.openHelp(label, info))
-      }.width('100%')
-      TextInput({ text }).width('100%').height(应用尺寸.按钮高度).fontSize(应用尺寸.字号_正文)
-        .backgroundColor($r('app.color.surface_card')).border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') }).borderRadius(应用尺寸.圆角_面板).enabled(!this.busy).onChange(onChange)
-      if (this.是否有字段错误(this.fieldKey(label))) Text(this.resolveText(this.字段错误资源(this.fieldKey(label)))).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.error_text')).width('100%')
-    }.width('100%')
+    DeckOptionField({ title: label, value: text, help: info, busy: this.busy,
+      error: this.是否有字段错误(this.fieldKey(label)) ? this.resolveText(this.字段错误资源(this.fieldKey(label))) : '',
+      validate: (value: string): string => {
+        const key: string = validateDeckOptionText(this.form, this.fieldKey(label), value);
+        return key === '' ? '' : namedResourceText(this.getUIContext(), key);
+      }, onChange: onChange })
   }
 
   // ========================================================
@@ -298,8 +293,7 @@ export struct 牌组选项面板 {
   // @名称 复习排序选择器
   //
   // @作用
-  // 复习排序选择器：Select 组件 + 横向 Row 布局，对齐添加笔记页「笔记类型」选择行
-  // 与高级牌组选项面板 enumSelector 同款形态：帮助紧跟标签，Select 靠右。
+  // 复习排序使用单项弹窗，候选项保留原有枚举值。
   //
   // @输入
   // label: 字段标签资源
@@ -310,52 +304,20 @@ export struct 牌组选项面板 {
   // Column 子树
   //
   // @业务规则
-  // 2026-07-28 弃用原 bindMenu + 自定义触发器方案——用户要求统一为 Select 组件形态，
-  // 接受 ▼ 箭头以换取与添加笔记页/高级设置 enumSelector 的视觉一致性。
+  // 确认后更新本地显示与表单枚举，取消不修改。
   //
   // @副作用
   // 无。
   // ========================================================
   @Builder
   private reviewOrderSelector(label: Resource, selected: number, help: Resource) {
-    Column({ space: 应用尺寸.间距_5 }) {
-      Row() {
-        Row({ space: 4 }) {
-          Text(label)
-            .fontSize(应用尺寸.字号_按钮)
-            .fontColor($r('app.color.text_secondary'))
-            .flexShrink(1)
-          Button() {
-            Text() { ThemeTextSpans($r('app.string.field_help_button'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.动作主色)
-          }
-            .type(ButtonType.Normal)
-            .width(32).height(32).padding(0).flexShrink(0)
-            .backgroundColor(Color.Transparent)
-            .fontColor(this.动作主色)
-            .enabled(!this.busy)
-            .onClick(() => this.openHelp(label, help))
-        }.layoutWeight(1)
-        Select(this.reviewOrderOptions().map((项: 牌组枚举选项): SelectOption => ({ value: 项.value })))
-          .selected(this.reviewOrderOptionIndex(selected))
-          .value(this.reviewOrderLabelString(selected))
-          .enabled(!this.busy)
-          .attributeModifier(new SelectStyle())
-          .font(SelectStyle.controlFont)
-          .borderRadius(SelectStyle.controlRadius)
-          .onSelect((index: number) => {
-            const 选项 = this.reviewOrderOptions();
-            if (index >= 0 && index < 选项.length) {
-              this.selectedReviewOrder = 选项[index].numericValue;
-              if (this.form !== null) this.form.设置数值字段('reviewOrder', this.selectedReviewOrder.toString());
-            }
-          })
-      }.width('100%')
-      if (this.是否有字段错误(this.fieldKey(label)))
-        Text(this.resolveText(this.字段错误资源(this.fieldKey(label))))
-          .fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.error_text'))
-          .width('100%')
-    }.width('100%')
+    DeckOptionField({ title: label, value: selected.toString(), help: help, busy: this.busy,
+      choices: this.reviewOrderOptions().map((item: 牌组枚举选项): DeckOptionChoice =>
+        ({ label: item.value, value: item.numericValue.toString() })),
+      onChange: (value: string): void => {
+        this.selectedReviewOrder = Number(value);
+        this.form.设置数值字段('reviewOrder', value);
+      } })
   }
 
   /** 按 numericValue 查选项索引；未命中返回 0。供 Select.selected 使用。 */
@@ -440,7 +402,7 @@ export struct 牌组选项面板 {
           // 上方仅 8px、下方却达 8+16+8=32px，上下比例 1:4 视觉失衡。
           // 改为 space=间距_12 并删除 Blank，使复习排序顺序与上下元素均保持 12px 间距。
           Column({ space: 应用尺寸.间距_12 }) {
-            // 常用 4 项直接平铺（目标记忆保持率已移入高级设置的 FSRS 组）
+            // 常用 4 项使用列表入口，具体值在单项弹窗内修改
             if (this.form !== null) {
               this.labeledInput($r('app.string.deck_newPerDay_label'), this.form.每日新卡数文本, (value: string) => { if (this.form !== null) this.form.每日新卡数文本 = value; }, $r('app.string.deck_newPerDay_help'))
               this.labeledInput($r('app.string.deck_reviewsPerDay_label'), this.form.每日复习数文本, (value: string) => { if (this.form !== null) this.form.每日复习数文本 = value; }, $r('app.string.deck_reviewsPerDay_help'))

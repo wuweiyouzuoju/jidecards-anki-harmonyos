@@ -35,7 +35,8 @@ import type {
   SchedTimingToday,
   SchedulingStatesRaw,
   重新定位默认值,
-  自定义学习默认值
+  自定义学习默认值,
+  CustomStudyCram
 } from '../proto/messages/SchedulerMessages';
 import {
   decodeCongratsInfo,
@@ -50,6 +51,7 @@ import {
   encodeCardIds,
   encodeCustomStudyDefaultsRequest,
   encodeCustomStudyRequest,
+  encodeCustomStudyCramRequest,
   encodeGetQueuedCardsRequest,
   encodeSchedulingStates,
   encodeSetDueDateRequest,
@@ -171,7 +173,7 @@ export class 调度器服务 {
 
   /**
    * 自定义学习（CustomStudy, method 27）。
-   * 5 个预设：
+   * 数字预设；状态/标签分支见 customStudyByStateOrTags：
    * - 新卡上限增量 / 复习上限增量：调整当前牌组上限，不创建过滤牌组
    * - 复习遗忘天数 / 提前复习天数 / 预览新卡天数：创建名为「Custom Study Session」的过滤牌组
    * 失败以 BackendError 抛出。
@@ -180,6 +182,11 @@ export class 调度器服务 {
     const 请求字节: Uint8Array = encodeCustomStudyRequest(牌组ID, 预设, 值);
     await this.会话.调用(
       服务号.后端调度器, 调度器方法.自定义学习, 请求字节);
+  }
+
+  async customStudyByStateOrTags(deckId: number, cram: CustomStudyCram): Promise<void> {
+    await this.会话.调用(服务号.后端调度器, 调度器方法.自定义学习,
+      encodeCustomStudyCramRequest(deckId, cram));
   }
 
   /**

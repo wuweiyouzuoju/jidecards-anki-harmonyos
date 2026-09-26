@@ -2105,6 +2105,25 @@
     {"name":"browser_info_interval_today","value":"当天"},
     {"name":"browser_info_interval_days","value":"%s 天"},
     {"name":"browser_info_interval_months","value":"%s 月"},
-    {"name":"browser_info_interval_years","value":"%s 年"}
+    {"name":"browser_info_interval_years","value":"%s 年"},
+    {"name":"deck_option_unset","value":"未设置"},
+    {"name":"deck_option_off","value":"关闭"},
+    {"name":"deck_option_on","value":"开启"},
+    {"name":"deck_option_back","value":"返回"},
+    {"name":"custom_study_preset_cram","value":"按卡片状态或标签学习"},
+    {"name":"custom_study_preset_cram_hint","value":"从当前牌组中选择指定数量的卡片，可按状态和标签筛选。"},
+    {"name":"custom_study_cards_label","value":"卡片数量"},
+    {"name":"custom_study_kind_new","value":"仅新卡片"},
+    {"name":"custom_study_kind_due","value":"仅到期卡片"},
+    {"name":"custom_study_kind_review","value":"随机排列所有复习卡片"},
+    {"name":"custom_study_kind_all","value":"随机排列所有卡片（不重新排程）"},
+    {"name":"custom_study_tags_any","value":"不限"},
+    {"name":"custom_study_tags_include","value":"需要学习的标签"},
+    {"name":"custom_study_tags_exclude","value":"需要排除的标签"},
+    {"name":"custom_study_tags_hint","value":"包含标签满足任意一个即可；排除标签均不得包含。不选标签则不限制。"},
+    {"name":"custom_study_child_count","value":"（子牌组中 %d 张）"},
+    {"name":"custom_study_preferences_error","value":"学习设置已应用，但未能记住此次输入。"},
+    {"name":"custom_study_retry","value":"重新加载"},
+    {"name":"custom_study_invalid_value","value":"请输入有效的非零整数；天数和卡片数量必须为正数。"}
   ]
 }

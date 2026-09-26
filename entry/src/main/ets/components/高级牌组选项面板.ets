@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { resourceText } from '../utils/UiFeedback';
-import { SelectStyle } from '../utils/SelectStyle';
+import { DeckOptionField, DeckOptionChoice } from './home/DeckOptionField';
+import { validateDeckOptionText } from '../model/DeckOptionValidation';
+import { namedResourceText } from '../utils/UiFeedback';
 import { ThemeTextSpans } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
@@ -24,10 +26,7 @@ import { DialogHeader } from './common/DialogHeader';
 // onClose: 关闭回调
 //
 // @业务规则
-// 测试断言保留：newExpanded / lapsesExpanded / buryingExpanded /
-// audioExpanded / timerExpanded / fsrsExpanded / advancedExpanded /
-// deckLimitsExpanded / todayLimitsExpanded / enumSelector / labeledInput /
-// toggleRow 等字面符号由阶段 6 统一更新；本阶段保留以减小工作量。
+// 单项弹窗确认后只更新 form/options 草稿，主面板保存才写入后端。
 // proto 字段名（newCardInsertOrder / newCardGatherPriority / ...）作为
 // 依赖层 API 参数保留英文。
 //
@@ -46,29 +45,17 @@ import type { 校验问题 } from '../model/牌组配置表单';
 interface 牌组枚举选项 { value: Resource; numericValue: number; }
 interface 牌组下拉选项 { value: string; }
 
-/**
- * 高级设置 section 折叠标题：独立子组件（非 @Builder），expanded 用 @Prop 保证响应式，
- * 只让箭头旋转，内容显隐立即生效，避免布局动画拖慢操作。
- */
+/** 分类入口与设置页统一使用右箭头，点击后切换到对应分类弹窗。 */
 @Component
 struct 段落标题 {
   @Prop title: Resource;
-  @Prop expanded: boolean = false;
   onToggle: () => void = (): void => {};
-
   build() {
-    Column({ space: 应用尺寸.间距_8 }) {
-      Row() {
-        Text(this.title).fontSize(应用尺寸.字号_正文_中).fontWeight(FontWeight.Medium).layoutWeight(1)
-        Text('▼')
-          .fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_secondary'))
-          .rotate({ angle: this.expanded ? 0 : -90 })
-          .animation({ duration: 150, curve: Curve.EaseOut })
-      }.width('100%').onClick(() => {
-        this.onToggle();
-      })
-    }.width('100%').padding(应用尺寸.间距_10).backgroundColor($r('app.color.surface_page')).borderRadius(应用尺寸.圆角_面板)
+    Row() {
+      Text(this.title).fontSize(15).fontColor($r('app.color.text_primary')).layoutWeight(1)
+      Text('›').fontSize(20).fontColor($r('app.color.text_secondary'))
+    }.width('100%').constraintSize({ minHeight: 48 }).padding({ left: 10, right: 10 })
+      .onClick((): void => { this.onToggle(); })
   }
 }
 
@@ -91,6 +78,7 @@ export struct 高级牌组选项面板 {
   @State private deckLimitsExpanded: boolean = false;
   @State private todayLimitsExpanded: boolean = false;
   @State private globalExpanded: boolean = false;
+  @State private sectionTitle: Resource = $r('app.string.deck_group_advanced_hub');
   @State private showHelp: boolean = false;
   @State private helpTitle: Resource = $r('app.string.deck_learn_steps');
   @State private helpBody: Resource = $r('app.string.deck_learn_steps_help');
@@ -136,7 +124,7 @@ export struct 高级牌组选项面板 {
   // @副作用
   // 无。
   // ========================================================
-  private fieldKey(label: Resource): string { if (label.id === $r('app.string.deck_newPerDay_label').id) return 'newPerDay'; if (label.id === $r('app.string.deck_reviewsPerDay_label').id) return 'reviewsPerDay'; if (label.id === $r('app.string.deck_learnSteps_label').id) return 'learnSteps'; if (label.id === $r('app.string.deck_relearnSteps_label').id) return 'relearnSteps'; if (label.id === $r('app.string.deck_newPerDayMinimum_label').id) return 'newPerDayMinimum'; if (label.id === $r('app.string.deck_graduatingIntervalGood_label').id) return 'graduatingIntervalGood'; if (label.id === $r('app.string.deck_graduatingIntervalEasy_label').id) return 'graduatingIntervalEasy'; if (label.id === $r('app.string.deck_newCardInsertOrder_label').id) return 'newCardInsertOrder'; if (label.id === $r('app.string.deck_newCardGatherPriority_label').id) return 'newCardGatherPriority'; if (label.id === $r('app.string.deck_newCardSortOrder_label').id) return 'newCardSortOrder'; if (label.id === $r('app.string.deck_newMix_label').id) return 'newMix'; if (label.id === $r('app.string.deck_interdayLearningMix_label').id) return 'interdayLearningMix'; if (label.id === $r('app.string.deck_minimumLapseInterval_label').id) return 'minimumLapseInterval'; if (label.id === $r('app.string.deck_leechThreshold_label').id) return 'leechThreshold'; if (label.id === $r('app.string.deck_leechAction_label').id) return 'leechAction'; if (label.id === $r('app.string.deck_reviewOrder_label').id) return 'reviewOrder'; if (label.id === $r('app.string.deck_buryNew_label').id) return 'buryNew'; if (label.id === $r('app.string.deck_buryReviews_label').id) return 'buryReviews'; if (label.id === $r('app.string.deck_buryInterdayLearning_label').id) return 'buryInterdayLearning'; if (label.id === $r('app.string.deck_disableAutoplay_label').id) return 'disableAutoplay'; if (label.id === $r('app.string.deck_skipQuestionWhenReplayingAnswer_label').id) return 'skipQuestionWhenReplayingAnswer'; if (label.id === $r('app.string.deck_waitForAudio_label').id) return 'waitForAudio'; if (label.id === $r('app.string.deck_capAnswerTimeToSecs_label').id) return 'capAnswerTimeToSecs'; if (label.id === $r('app.string.deck_showTimer_label').id) return 'showTimer'; if (label.id === $r('app.string.deck_stopTimerOnAnswer_label').id) return 'stopTimerOnAnswer'; if (label.id === $r('app.string.deck_secondsToShowQuestion_label').id) return 'secondsToShowQuestion'; if (label.id === $r('app.string.deck_secondsToShowAnswer_label').id) return 'secondsToShowAnswer'; if (label.id === $r('app.string.deck_questionAction_label').id) return 'questionAction'; if (label.id === $r('app.string.deck_answerAction_label').id) return 'answerAction'; if (label.id === $r('app.string.deck_desiredRetention_label').id) return 'desiredRetention'; if (label.id === $r('app.string.deck_fsrsParams4_label').id) return 'fsrsParams4'; if (label.id === $r('app.string.deck_easyDaysPercentages_label').id) return 'easyDaysPercentages'; if (label.id === $r('app.string.deck_fsrsParams5_label').id) return 'fsrsParams5'; if (label.id === $r('app.string.deck_fsrsParams6_label').id) return 'fsrsParams6'; if (label.id === $r('app.string.deck_historicalRetention_label').id) return 'historicalRetention'; if (label.id === $r('app.string.deck_initialEase_label').id) return 'initialEase'; if (label.id === $r('app.string.deck_easyMultiplier_label').id) return 'easyMultiplier'; if (label.id === $r('app.string.deck_hardMultiplier_label').id) return 'hardMultiplier'; if (label.id === $r('app.string.deck_lapseMultiplier_label').id) return 'lapseMultiplier'; if (label.id === $r('app.string.deck_intervalMultiplier_label').id) return 'intervalMultiplier'; if (label.id === $r('app.string.deck_maximumReviewInterval_label').id) return 'maximumReviewInterval'; if (label.id === $r('app.string.deck_ignoreRevlogsBeforeDate_label').id) return 'ignoreRevlogsBeforeDate'; if (label.id === $r('app.string.deck_reviewLimit_label').id) return 'reviewLimit'; if (label.id === $r('app.string.deck_newLimit_label').id) return 'newLimit'; if (label.id === $r('app.string.deck_reviewToday_label').id) return 'reviewToday'; if (label.id === $r('app.string.deck_newToday_label').id) return 'newToday'; if (label.id === $r('app.string.deck_desiredRetentionOverride_label').id) return 'desiredRetentionOverride'; return ''; }
+  private fieldKey(label: Resource): string { if (label.id === $r('app.string.deck_paramSearch_label').id) return 'paramSearch'; if (label.id === $r('app.string.deck_newPerDay_label').id) return 'newPerDay'; if (label.id === $r('app.string.deck_reviewsPerDay_label').id) return 'reviewsPerDay'; if (label.id === $r('app.string.deck_learnSteps_label').id) return 'learnSteps'; if (label.id === $r('app.string.deck_relearnSteps_label').id) return 'relearnSteps'; if (label.id === $r('app.string.deck_newPerDayMinimum_label').id) return 'newPerDayMinimum'; if (label.id === $r('app.string.deck_graduatingIntervalGood_label').id) return 'graduatingIntervalGood'; if (label.id === $r('app.string.deck_graduatingIntervalEasy_label').id) return 'graduatingIntervalEasy'; if (label.id === $r('app.string.deck_newCardInsertOrder_label').id) return 'newCardInsertOrder'; if (label.id === $r('app.string.deck_newCardGatherPriority_label').id) return 'newCardGatherPriority'; if (label.id === $r('app.string.deck_newCardSortOrder_label').id) return 'newCardSortOrder'; if (label.id === $r('app.string.deck_newMix_label').id) return 'newMix'; if (label.id === $r('app.string.deck_interdayLearningMix_label').id) return 'interdayLearningMix'; if (label.id === $r('app.string.deck_minimumLapseInterval_label').id) return 'minimumLapseInterval'; if (label.id === $r('app.string.deck_leechThreshold_label').id) return 'leechThreshold'; if (label.id === $r('app.string.deck_leechAction_label').id) return 'leechAction'; if (label.id === $r('app.string.deck_reviewOrder_label').id) return 'reviewOrder'; if (label.id === $r('app.string.deck_buryNew_label').id) return 'buryNew'; if (label.id === $r('app.string.deck_buryReviews_label').id) return 'buryReviews'; if (label.id === $r('app.string.deck_buryInterdayLearning_label').id) return 'buryInterdayLearning'; if (label.id === $r('app.string.deck_disableAutoplay_label').id) return 'disableAutoplay'; if (label.id === $r('app.string.deck_skipQuestionWhenReplayingAnswer_label').id) return 'skipQuestionWhenReplayingAnswer'; if (label.id === $r('app.string.deck_waitForAudio_label').id) return 'waitForAudio'; if (label.id === $r('app.string.deck_capAnswerTimeToSecs_label').id) return 'capAnswerTimeToSecs'; if (label.id === $r('app.string.deck_showTimer_label').id) return 'showTimer'; if (label.id === $r('app.string.deck_stopTimerOnAnswer_label').id) return 'stopTimerOnAnswer'; if (label.id === $r('app.string.deck_secondsToShowQuestion_label').id) return 'secondsToShowQuestion'; if (label.id === $r('app.string.deck_secondsToShowAnswer_label').id) return 'secondsToShowAnswer'; if (label.id === $r('app.string.deck_questionAction_label').id) return 'questionAction'; if (label.id === $r('app.string.deck_answerAction_label').id) return 'answerAction'; if (label.id === $r('app.string.deck_desiredRetention_label').id) return 'desiredRetention'; if (label.id === $r('app.string.deck_fsrsParams4_label').id) return 'fsrsParams4'; if (label.id === $r('app.string.deck_easyDaysPercentages_label').id) return 'easyDaysPercentages'; if (label.id === $r('app.string.deck_fsrsParams5_label').id) return 'fsrsParams5'; if (label.id === $r('app.string.deck_fsrsParams6_label').id) return 'fsrsParams6'; if (label.id === $r('app.string.deck_historicalRetention_label').id) return 'historicalRetention'; if (label.id === $r('app.string.deck_initialEase_label').id) return 'initialEase'; if (label.id === $r('app.string.deck_easyMultiplier_label').id) return 'easyMultiplier'; if (label.id === $r('app.string.deck_hardMultiplier_label').id) return 'hardMultiplier'; if (label.id === $r('app.string.deck_lapseMultiplier_label').id) return 'lapseMultiplier'; if (label.id === $r('app.string.deck_intervalMultiplier_label').id) return 'intervalMultiplier'; if (label.id === $r('app.string.deck_maximumReviewInterval_label').id) return 'maximumReviewInterval'; if (label.id === $r('app.string.deck_ignoreRevlogsBeforeDate_label').id) return 'ignoreRevlogsBeforeDate'; if (label.id === $r('app.string.deck_reviewLimit_label').id) return 'reviewLimit'; if (label.id === $r('app.string.deck_newLimit_label').id) return 'newLimit'; if (label.id === $r('app.string.deck_reviewToday_label').id) return 'reviewToday'; if (label.id === $r('app.string.deck_newToday_label').id) return 'newToday'; if (label.id === $r('app.string.deck_desiredRetentionOverride_label').id) return 'desiredRetentionOverride'; return ''; }
 
   private 校验问题列表(): 校验问题[] { const 输出: 校验问题[] = []; if (this.form !== null) 输出.push(...this.form.校验()); if (this.options !== null) 输出.push(...this.options.校验()); return 输出; }
   private 是否有字段错误(key: string): boolean { return this.校验问题列表().some((issue: 校验问题): boolean => issue.字段键 === key); }
@@ -155,7 +143,7 @@ export struct 高级牌组选项面板 {
   // @名称 枚举选择器
   //
   // @作用
-  // 渲染一行带帮助按钮 + Select 下拉的枚举字段编辑单元。
+  // 渲染设置入口；弹窗选择本地化选项，确认后更新草稿。
   //
   // @输入
   // label: 字段标签资源
@@ -172,35 +160,9 @@ export struct 高级牌组选项面板 {
   // ========================================================
   @Builder
   private enumSelector(label: Resource, selected: number, values: 牌组枚举选项[], onChange: (numericValue: number) => void, help: Resource) {
-    // 帮助紧跟标签，右侧选择框独立占位。
-    Column({ space: 应用尺寸.间距_5 }) {
-      Row() {
-        Row({ space: 4 }) {
-          Text(label)
-            .fontSize(应用尺寸.字号_按钮)
-            .fontColor($r('app.color.text_secondary'))
-            .flexShrink(1)
-          Button() {
-            Text() { ThemeTextSpans($r('app.string.field_help_button'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.动作主色)
-          }
-            .type(ButtonType.Normal)
-            .width(32).height(32).padding(0).flexShrink(0)
-            .backgroundColor(Color.Transparent)
-            .fontColor(this.动作主色)
-            .enabled(!this.busy)
-            .onClick(() => this.openHelp(label, help))
-        }.layoutWeight(1)
-        Select(this.枚举转下拉选项(values))
-          .selected(this.枚举索引(values, selected))
-          .value(this.枚举标签(values, selected))
-          .enabled(!this.busy)
-          .attributeModifier(new SelectStyle())
-          .font(SelectStyle.controlFont)
-          .borderRadius(SelectStyle.controlRadius)
-          .onSelect((index: number) => onChange(values[index].numericValue))
-      }.width('100%')
-      if (this.是否有字段错误(this.fieldKey(label))) Text(this.resolveText(this.字段错误资源(this.fieldKey(label)))).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.error_text')).width('100%')
-    }.width('100%')
+    DeckOptionField({ title: label, value: selected.toString(), help: help, busy: this.busy,
+      choices: values.map((item: 牌组枚举选项): DeckOptionChoice => ({ label: item.value, value: item.numericValue.toString() })),
+      onChange: (value: string): void => { onChange(Number(value)); } })
   }
 
   // ========================================================
@@ -208,7 +170,7 @@ export struct 高级牌组选项面板 {
   // @名称 带标签输入框
   //
   // @作用
-  // 渲染一行带帮助按钮 + TextInput 的数值字段编辑单元。
+  // 渲染设置入口；点击弹窗输入，复用既有字段校验。
   //
   // @输入
   // label: 字段标签资源
@@ -224,18 +186,12 @@ export struct 高级牌组选项面板 {
   // ========================================================
   @Builder
   private labeledInput(label: Resource, text: string, onChange: (value: string) => void, info: Resource) {
-    Column({ space: 应用尺寸.间距_5 }) {
-      Row({ space: 4 }) {
-        Text(label).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).flexShrink(1)
-        Button() {
-          Text() { ThemeTextSpans($r('app.string.field_help_button'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.动作主色)
-        }.type(ButtonType.Normal).width(32).height(32).padding(0).flexShrink(0)
-          .backgroundColor(Color.Transparent).fontColor(this.动作主色).onClick(() => this.openHelp(label, info))
-      }.width('100%')
-      TextInput({ text }).width('100%').height(应用尺寸.按钮高度).fontSize(应用尺寸.字号_正文)
-        .backgroundColor($r('app.color.surface_card')).border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') }).borderRadius(应用尺寸.圆角_面板).enabled(!this.busy).onChange(onChange)
-      if (this.是否有字段错误(this.fieldKey(label))) Text(this.resolveText(this.字段错误资源(this.fieldKey(label)))).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.error_text')).width('100%')
-    }.width('100%')
+    DeckOptionField({ title: label, value: text, help: info, busy: this.busy,
+      error: this.是否有字段错误(this.fieldKey(label)) ? this.resolveText(this.字段错误资源(this.fieldKey(label))) : '',
+      validate: (value: string): string => {
+        const key: string = validateDeckOptionText(this.form, this.fieldKey(label), value);
+        return key === '' ? '' : namedResourceText(this.getUIContext(), key);
+      }, onChange: onChange })
   }
 
   // ========================================================
@@ -243,7 +199,7 @@ export struct 高级牌组选项面板 {
   // @名称 开关行
   //
   // @作用
-  // 渲染一行带帮助按钮 + Toggle 的布尔字段编辑单元。
+  // 渲染开关设置入口；在弹窗选择开启或关闭。
   //
   // @输入
   // label: 字段标签资源
@@ -259,23 +215,27 @@ export struct 高级牌组选项面板 {
   // ========================================================
   @Builder
   private toggleRow(label: Resource, value: boolean, onChange: (value: boolean) => void, help: Resource) {
-    Column({ space: 应用尺寸.间距_5 }) {
-      Row() {
-        Row({ space: 4 }) {
-          Text(label).fontSize(应用尺寸.字号_正文_小).flexShrink(1)
-          Button($r('app.string.field_help_button'))
-            .type(ButtonType.Normal).width(32).height(32).padding(0).flexShrink(0)
-            .backgroundColor(Color.Transparent)
-            .onClick(() => this.openHelp(label, help))
-        }.layoutWeight(1)
-        Toggle({ type: ToggleType.Switch, isOn: value })
-          .selectedColor(this.主色按钮背景).enabled(!this.busy).onChange(onChange)
-      }.width('100%')
-      if (this.是否有字段错误(this.fieldKey(label))) {
-        Text(this.resolveText(this.字段错误资源(this.fieldKey(label))))
-          .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.error_text')).width('100%')
-      }
-    }.width('100%')
+    DeckOptionField({ title: label, value: value ? 'true' : 'false', help: help, busy: this.busy,
+      choices: [{ label: $r('app.string.deck_option_off'), value: 'false' },
+        { label: $r('app.string.deck_option_on'), value: 'true' }],
+      onChange: (selected: string): void => { onChange(selected === 'true'); } })
+  }
+
+  private hasActiveSection(): boolean { return this.deckLimitsExpanded || this.todayLimitsExpanded || this.newExpanded || this.lapsesExpanded || this.buryingExpanded || this.audioExpanded || this.timerExpanded || this.fsrsExpanded || this.globalExpanded || this.advancedExpanded; }
+
+  private closeSection(): void {
+    if (this.busy) return;
+    if (!this.hasActiveSection()) { this.onClose(); return; }
+    this.deckLimitsExpanded = false;
+    this.todayLimitsExpanded = false;
+    this.newExpanded = false;
+    this.lapsesExpanded = false;
+    this.buryingExpanded = false;
+    this.audioExpanded = false;
+    this.timerExpanded = false;
+    this.fsrsExpanded = false;
+    this.globalExpanded = false;
+    this.advancedExpanded = false;
   }
 
   build() {
@@ -291,40 +251,65 @@ export struct 高级牌组选项面板 {
         })
         // 遮罩扩展进安全区，否则状态栏/导航条区域露出下层背景
         .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-        .onClick(() => { if (!this.busy) this.onClose(); })
+        .onClick(() => { if (!this.busy) this.closeSection(); })
         // 过渡仅动 opacity 合成属性，不触发布局（思路参考：华为官方 TransitionEffect 示例）
         .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
 
       Column({ space: 应用尺寸.间距_12 }) {
         DialogHeader({
-          title: $r('app.string.deck_group_advanced_hub'),
+          title: this.hasActiveSection() ? this.sectionTitle : $r('app.string.deck_group_advanced_hub'),
           actionLabel: $r('app.string.done'),
           actionEnabled: !this.busy,
-          showClose: false,
-          onAction: () => this.onClose()
+          showClose: this.hasActiveSection(),
+          closeLabel: $r('app.string.deck_option_back'),
+          onClose: (): void => { this.closeSection(); },
+          onAction: (): void => { this.closeSection(); }
         })
 
         Scroll() {
           Column({ space: 应用尺寸.间距_8 }) {
             if (this.options.sharedDeckCount > 1) {
-              this.toggleRow($r('app.string.deck_apply_shared_label', this.options.sharedDeckCount),
-                this.options.applyToSharedDecks, (value: boolean) => { this.options.applyToSharedDecks = value; },
-                $r('app.string.deck_apply_shared_help'))
+              if (!this.hasActiveSection()) {
+                Row({ space: 8 }) {
+                  Text($r('app.string.deck_apply_shared_label', this.options.sharedDeckCount))
+                    .fontSize(15).fontColor($r('app.color.text_primary')).layoutWeight(1)
+                  Button($r('app.string.field_help_button'))
+                    .type(ButtonType.Normal).width(28).height(40).padding(0).fontSize(18)
+                    .fontColor($r('app.color.text_secondary')).backgroundColor(Color.Transparent)
+                    .enabled(!this.busy)
+                    .onClick((): void => {
+                      this.openHelp($r('app.string.deck_apply_shared_label', this.options.sharedDeckCount),
+                        $r('app.string.deck_apply_shared_help'));
+                    })
+                  Toggle({ type: ToggleType.Switch, isOn: this.options.applyToSharedDecks })
+                    .selectedColor(this.动作主色).enabled(!this.busy)
+                    .onChange((value: boolean): void => {
+                      if (!this.busy) this.options.applyToSharedDecks = value;
+                    })
+                }.width('100%').constraintSize({ minHeight: 48 }).padding({ left: 10, right: 10 })
+                Divider().color($r('app.color.border_subtle')).strokeWidth(0.5)
+              }
             }
             // 顶部「每日上限」6 字段拆成两组 section（用户决策 2026-07-22）：本牌组上限 + 今日上限
-            段落标题({ title: $r('app.string.deck_group_deck_limits'), expanded: this.deckLimitsExpanded, onToggle: () => { this.deckLimitsExpanded = !this.deckLimitsExpanded; } })
+            if (!this.hasActiveSection()) {
+              段落标题({ title: $r('app.string.deck_group_deck_limits'), onToggle: (): void => { this.sectionTitle = $r('app.string.deck_group_deck_limits'); this.deckLimitsExpanded = true; } })
+            }
             if (this.deckLimitsExpanded && this.options !== null && this.form !== null) {
               this.labeledInput($r('app.string.deck_reviewLimit_label'), this.options.复习限额文本, (value: string) => { if (this.options !== null) this.options.复习限额文本 = value; }, $r('app.string.deck_reviewLimit_help'))
               this.labeledInput($r('app.string.deck_newLimit_label'), this.options.新卡限额文本, (value: string) => { if (this.options !== null) this.options.新卡限额文本 = value; }, $r('app.string.deck_newLimit_help'))
             }
-            段落标题({ title: $r('app.string.deck_group_today_limits'), expanded: this.todayLimitsExpanded, onToggle: () => { this.todayLimitsExpanded = !this.todayLimitsExpanded; } })
+            if (!this.hasActiveSection()) {
+              段落标题({ title: $r('app.string.deck_group_today_limits'), onToggle: (): void => { this.sectionTitle = $r('app.string.deck_group_today_limits'); this.todayLimitsExpanded = true; } })
+            }
             if (this.todayLimitsExpanded && this.options !== null && this.form !== null) {
               this.labeledInput($r('app.string.deck_reviewToday_label'), this.options.今日复习文本, (value: string) => { if (this.options !== null) this.options.今日复习文本 = value; }, $r('app.string.deck_reviewToday_help'))
               this.toggleRow($r('app.string.deck_reviewTodayActive_label'), this.options.今日复习启用, (value: boolean) => { if (this.options !== null) this.options.今日复习启用 = value; }, $r('app.string.deck_reviewTodayActive_help'))
               this.labeledInput($r('app.string.deck_newToday_label'), this.options.今日新卡文本, (value: string) => { if (this.options !== null) this.options.今日新卡文本 = value; }, $r('app.string.deck_newToday_help'))
               this.toggleRow($r('app.string.deck_newTodayActive_label'), this.options.今日新卡启用, (value: boolean) => { if (this.options !== null) this.options.今日新卡启用 = value; }, $r('app.string.deck_newTodayActive_help'))
             }
-            段落标题({ title: $r('app.string.deck_group_new'), expanded: this.newExpanded, onToggle: () => { this.newExpanded = !this.newExpanded; } })
+            if (!this.hasActiveSection()) {
+              段落标题({ title: $r('app.string.deck_group_new'), onToggle: (): void => { this.sectionTitle = $r('app.string.deck_group_new'); this.newExpanded = true; } })
+            }
             if (this.newExpanded && this.form !== null) {
               this.labeledInput($r('app.string.deck_newPerDayMinimum_label'), this.form.取字段文本值('newPerDayMinimum'), (value: string) => { if (this.form !== null) this.form.设置数值字段('newPerDayMinimum', value); }, $r('app.string.deck_newPerDayMinimum_help'))
               this.labeledInput($r('app.string.deck_graduatingIntervalGood_label'), this.form.取字段文本值('graduatingIntervalGood'), (value: string) => { if (this.form !== null) this.form.设置数值字段('graduatingIntervalGood', value); }, $r('app.string.deck_graduatingIntervalGood_help'))
@@ -335,18 +320,26 @@ export struct 高级牌组选项面板 {
               this.enumSelector($r('app.string.deck_newMix_label'), this.form.取配置().newMix, this.混合选项(), (value: number) => { if (this.form !== null) this.form.设置数值字段('newMix', value.toString()); }, $r('app.string.deck_newMix_help'))
               this.enumSelector($r('app.string.deck_interdayLearningMix_label'), this.form.取配置().interdayLearningMix, this.混合选项(), (value: number) => { if (this.form !== null) this.form.设置数值字段('interdayLearningMix', value.toString()); }, $r('app.string.deck_interdayLearningMix_help'))
             }
-            段落标题({ title: $r('app.string.deck_group_lapses'), expanded: this.lapsesExpanded, onToggle: () => { this.lapsesExpanded = !this.lapsesExpanded; } })
+            if (!this.hasActiveSection()) {
+              段落标题({ title: $r('app.string.deck_group_lapses'), onToggle: (): void => { this.sectionTitle = $r('app.string.deck_group_lapses'); this.lapsesExpanded = true; } })
+            }
             if (this.lapsesExpanded && this.form !== null) {
               this.labeledInput($r('app.string.deck_relearnSteps_label'), this.form.重学步骤文本, (value: string) => { if (this.form !== null) this.form.重学步骤文本 = value; }, $r('app.string.deck_relearnSteps_help'))
               this.labeledInput($r('app.string.deck_minimumLapseInterval_label'), this.form.取字段文本值('minimumLapseInterval'), (value: string) => { if (this.form !== null) this.form.设置数值字段('minimumLapseInterval', value); }, $r('app.string.deck_minimumLapseInterval_help'))
               this.labeledInput($r('app.string.deck_leechThreshold_label'), this.form.取字段文本值('leechThreshold'), (value: string) => { if (this.form !== null) this.form.设置数值字段('leechThreshold', value); }, $r('app.string.deck_leechThreshold_help'))
               this.enumSelector($r('app.string.deck_leechAction_label'), this.form.取配置().leechAction, [{ value: $r('app.string.deck_opt_suspend'), numericValue: 0 }, { value: $r('app.string.deck_opt_tag_only'), numericValue: 1 }], (value: number) => { if (this.form !== null) this.form.设置数值字段('leechAction', value.toString()); }, $r('app.string.deck_leechAction_help'))
             }
-            段落标题({ title: $r('app.string.deck_group_burying'), expanded: this.buryingExpanded, onToggle: () => { this.buryingExpanded = !this.buryingExpanded; } })
+            if (!this.hasActiveSection()) {
+              段落标题({ title: $r('app.string.deck_group_burying'), onToggle: (): void => { this.sectionTitle = $r('app.string.deck_group_burying'); this.buryingExpanded = true; } })
+            }
             if (this.buryingExpanded && this.form !== null) { this.toggleRow($r('app.string.deck_buryNew_label'), this.form.取配置().buryNew, (value: boolean) => { if (this.form !== null) this.form.设置布尔字段('buryNew', value); }, $r('app.string.deck_buryNew_help')); this.toggleRow($r('app.string.deck_buryReviews_label'), this.form.取配置().buryReviews, (value: boolean) => { if (this.form !== null) this.form.设置布尔字段('buryReviews', value); }, $r('app.string.deck_buryReviews_help')); this.toggleRow($r('app.string.deck_buryInterdayLearning_label'), this.form.取配置().buryInterdayLearning, (value: boolean) => { if (this.form !== null) this.form.设置布尔字段('buryInterdayLearning', value); }, $r('app.string.deck_buryInterdayLearning_help')); }
-            段落标题({ title: $r('app.string.deck_group_audio'), expanded: this.audioExpanded, onToggle: () => { this.audioExpanded = !this.audioExpanded; } })
+            if (!this.hasActiveSection()) {
+              段落标题({ title: $r('app.string.deck_group_audio'), onToggle: (): void => { this.sectionTitle = $r('app.string.deck_group_audio'); this.audioExpanded = true; } })
+            }
             if (this.audioExpanded && this.form !== null) { this.toggleRow($r('app.string.deck_disableAutoplay_label'), this.form.取配置().disableAutoplay, (value: boolean) => { if (this.form !== null) this.form.设置布尔字段('disableAutoplay', value); }, $r('app.string.deck_disableAutoplay_help')); this.toggleRow($r('app.string.deck_skipQuestionWhenReplayingAnswer_label'), this.form.取配置().skipQuestionWhenReplayingAnswer, (value: boolean) => { if (this.form !== null) this.form.设置布尔字段('skipQuestionWhenReplayingAnswer', value); }, $r('app.string.deck_skipQuestionWhenReplayingAnswer_help')); this.toggleRow($r('app.string.deck_waitForAudio_label'), this.form.取配置().waitForAudio, (value: boolean) => { if (this.form !== null) this.form.设置布尔字段('waitForAudio', value); }, $r('app.string.deck_waitForAudio_help')); }
-            段落标题({ title: $r('app.string.deck_group_timer'), expanded: this.timerExpanded, onToggle: () => { this.timerExpanded = !this.timerExpanded; } })
+            if (!this.hasActiveSection()) {
+              段落标题({ title: $r('app.string.deck_group_timer'), onToggle: (): void => { this.sectionTitle = $r('app.string.deck_group_timer'); this.timerExpanded = true; } })
+            }
             if (this.timerExpanded && this.form !== null) {
               this.labeledInput($r('app.string.deck_capAnswerTimeToSecs_label'), this.form.取字段文本值('capAnswerTimeToSecs'), (value: string) => { if (this.form !== null) this.form.设置数值字段('capAnswerTimeToSecs', value); }, $r('app.string.deck_capAnswerTimeToSecs_help'))
               this.toggleRow($r('app.string.deck_showTimer_label'), this.form.取配置().showTimer, (value: boolean) => { if (this.form !== null) this.form.设置布尔字段('showTimer', value); }, $r('app.string.deck_showTimer_help'))
@@ -356,14 +349,18 @@ export struct 高级牌组选项面板 {
               this.enumSelector($r('app.string.deck_questionAction_label'), this.form.取配置().questionAction, [{ value: $r('app.string.deck_opt_show_answer'), numericValue: 0 }, { value: $r('app.string.deck_opt_show_reminder'), numericValue: 1 }], (value: number) => { if (this.form !== null) this.form.设置数值字段('questionAction', value.toString()); }, $r('app.string.deck_questionAction_help'))
               this.enumSelector($r('app.string.deck_answerAction_label'), this.form.取配置().answerAction, [{ value: $r('app.string.deck_opt_bury_card'), numericValue: 0 }, { value: $r('app.string.deck_opt_answer_again'), numericValue: 1 }, { value: $r('app.string.deck_opt_answer_good'), numericValue: 2 }, { value: $r('app.string.deck_opt_answer_hard'), numericValue: 3 }, { value: $r('app.string.deck_opt_show_reminder'), numericValue: 4 }], (value: number) => { if (this.form !== null) this.form.设置数值字段('answerAction', value.toString()); }, $r('app.string.deck_answerAction_help'))
             }
-            段落标题({ title: $r('app.string.deck_group_fsrs'), expanded: this.fsrsExpanded, onToggle: () => { this.fsrsExpanded = !this.fsrsExpanded; } })
+            if (!this.hasActiveSection()) {
+              段落标题({ title: $r('app.string.deck_group_fsrs'), onToggle: (): void => { this.sectionTitle = $r('app.string.deck_group_fsrs'); this.fsrsExpanded = true; } })
+            }
             if (this.fsrsExpanded && this.form !== null) {
               // 目标记忆保持率放在 FSRS 组顶部（与 FSRS 语义最贴近）
               this.labeledInput($r('app.string.deck_desiredRetention_label'), this.form.目标保留率文本, (value: string) => { if (this.form !== null) this.form.目标保留率文本 = value; }, $r('app.string.deck_desiredRetention_help'))
               if (this.options !== null) { this.labeledInput($r('app.string.deck_desiredRetentionOverride_label'), this.options.目标保留率覆盖文本, (value: string) => { if (this.options !== null) this.options.目标保留率覆盖文本 = value; }, $r('app.string.deck_desiredRetentionOverride_help'));  this.toggleRow($r('app.string.deck_fsrsReschedule_label'), this.options.FSRS重排, (value: boolean) => { if (this.options !== null) this.options.FSRS重排 = value; }, $r('app.string.deck_fsrsReschedule_help'));  }
               this.labeledInput($r('app.string.deck_fsrsParams4_label'), this.form.取浮点数组文本('fsrsParams4'), (value: string) => { if (this.form !== null) this.form.设置浮点数组字段('fsrsParams4', value); }, $r('app.string.deck_fsrsParams4_help')); this.labeledInput($r('app.string.deck_easyDaysPercentages_label'), this.form.取浮点数组文本('easyDaysPercentages'), (value: string) => { if (this.form !== null) this.form.设置浮点数组字段('easyDaysPercentages', value); }, $r('app.string.deck_easyDaysPercentages_help')); this.labeledInput($r('app.string.deck_fsrsParams5_label'), this.form.取浮点数组文本('fsrsParams5'), (value: string) => { if (this.form !== null) this.form.设置浮点数组字段('fsrsParams5', value); }, $r('app.string.deck_fsrsParams5_help')); this.labeledInput($r('app.string.deck_fsrsParams6_label'), this.form.取浮点数组文本('fsrsParams6'), (value: string) => { if (this.form !== null) this.form.设置浮点数组字段('fsrsParams6', value); }, $r('app.string.deck_fsrsParams6_help')); this.labeledInput($r('app.string.deck_historicalRetention_label'), this.form.取字段文本值('historicalRetention'), (value: string) => { if (this.form !== null) this.form.设置数值字段('historicalRetention', value); }, $r('app.string.deck_historicalRetention_help')); this.labeledInput($r('app.string.deck_paramSearch_label'), this.form.取配置().paramSearch, (value: string) => { if (this.form !== null) this.form.设置文本字段('paramSearch', value); }, $r('app.string.deck_paramSearch_help'))
             }
-            段落标题({ title: $r('app.string.deck_group_global'), expanded: this.globalExpanded, onToggle: () => { this.globalExpanded = !this.globalExpanded; } })
+            if (!this.hasActiveSection()) {
+              段落标题({ title: $r('app.string.deck_group_global'), onToggle: (): void => { this.sectionTitle = $r('app.string.deck_group_global'); this.globalExpanded = true; } })
+            }
             if (this.globalExpanded) {
               Text($r('app.string.deck_global_scope_hint')).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
               this.toggleRow($r('app.string.deck_fsrsEnabled_label'), this.options.是否启用FSRS, (value: boolean) => { if (this.options !== null) this.options.是否启用FSRS = value; }, $r('app.string.deck_fsrsEnabled_help'))
@@ -371,7 +368,9 @@ export struct 高级牌组选项面板 {
               this.toggleRow($r('app.string.deck_newCardsIgnoreReviewLimit_label'), this.options.新卡忽略复习限额, (value: boolean) => { if (this.options !== null) this.options.新卡忽略复习限额 = value; }, $r('app.string.deck_newCardsIgnoreReviewLimit_help'))
               this.toggleRow($r('app.string.deck_applyAllParentLimits_label'), this.options.应用所有父级限额, (value: boolean) => { if (this.options !== null) this.options.应用所有父级限额 = value; }, $r('app.string.deck_applyAllParentLimits_help'))
             }
-            段落标题({ title: $r('app.string.deck_group_advanced'), expanded: this.advancedExpanded, onToggle: () => { this.advancedExpanded = !this.advancedExpanded; } })
+            if (!this.hasActiveSection()) {
+              段落标题({ title: $r('app.string.deck_group_advanced'), onToggle: (): void => { this.sectionTitle = $r('app.string.deck_group_advanced'); this.advancedExpanded = true; } })
+            }
             if (this.advancedExpanded && this.form !== null) { this.labeledInput($r('app.string.deck_initialEase_label'), this.form.取字段文本值('initialEase'), (value: string) => { if (this.form !== null) this.form.设置数值字段('initialEase', value); }, $r('app.string.deck_initialEase_help')); this.labeledInput($r('app.string.deck_easyMultiplier_label'), this.form.取字段文本值('easyMultiplier'), (value: string) => { if (this.form !== null) this.form.设置数值字段('easyMultiplier', value); }, $r('app.string.deck_easyMultiplier_help')); this.labeledInput($r('app.string.deck_hardMultiplier_label'), this.form.取字段文本值('hardMultiplier'), (value: string) => { if (this.form !== null) this.form.设置数值字段('hardMultiplier', value); }, $r('app.string.deck_hardMultiplier_help')); this.labeledInput($r('app.string.deck_lapseMultiplier_label'), this.form.取字段文本值('lapseMultiplier'), (value: string) => { if (this.form !== null) this.form.设置数值字段('lapseMultiplier', value); }, $r('app.string.deck_lapseMultiplier_help')); this.labeledInput($r('app.string.deck_intervalMultiplier_label'), this.form.取字段文本值('intervalMultiplier'), (value: string) => { if (this.form !== null) this.form.设置数值字段('intervalMultiplier', value); }, $r('app.string.deck_intervalMultiplier_help')); this.labeledInput($r('app.string.deck_maximumReviewInterval_label'), this.form.取字段文本值('maximumReviewInterval'), (value: string) => { if (this.form !== null) this.form.设置数值字段('maximumReviewInterval', value); }, $r('app.string.deck_maximumReviewInterval_help')); this.labeledInput($r('app.string.deck_ignoreRevlogsBeforeDate_label'), this.form.取配置().ignoreRevlogsBeforeDate, (value: string) => { if (this.form !== null) this.form.设置文本字段('ignoreRevlogsBeforeDate', value); }, $r('app.string.deck_ignoreRevlogsBeforeDate_help')); }
           }.width('100%')
         }.constraintSize({ maxHeight: '60%' }).width('100%').scrollBar(BarState.Auto).edgeEffect(EdgeEffect.Spring)

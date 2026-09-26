@@ -446,7 +446,7 @@ export function encodeSchedulingStates(states: SchedulingStatesRaw): Uint8Array 
 // 来源：proto/anki/scheduler.proto
 // ========================================================
 
-/** CustomStudyRequest 的预设类型（oneof value 的 5 个分支） */
+/** CustomStudyRequest 的预设类型（与锁定 scheduler.proto 的 oneof value 对齐） */
 export const 自定义学习预设 = {
   /** 增加新卡上限（int32，可负）—— 不创建过滤牌组 */
   新卡上限增量: 2,
@@ -457,8 +457,35 @@ export const 自定义学习预设 = {
   /** 提前复习（uint32 天数）—— 创建过滤牌组 */
   提前复习天数: 5,
   /** 预览新卡（uint32 天数）—— 创建过滤牌组 */
-  预览新卡天数: 6
+  预览新卡天数: 6,
+  按状态或标签: 7
 } as const;
+
+export enum CustomStudyCardKind { Due = 0, New = 1, Review = 2, All = 3 }
+
+export interface CustomStudyCram {
+  kind: CustomStudyCardKind;
+  cardLimit: number;
+  tagsToInclude: string[];
+  tagsToExclude: string[];
+}
+
+/** 状态/标签分支由 Core 构造搜索，前端不拼接标签查询或重新实现调度。 */
+export function encodeCustomStudyCramRequest(deckId: number, cram: CustomStudyCram): Uint8Array {
+  const w = new 协议写入器();
+  w.写入64位整数(1, deckId);
+  const value = new 协议写入器();
+  value.写入变长整数(1, cram.kind);
+  value.写入变长整数(2, cram.cardLimit);
+  for (const tag of cram.tagsToInclude) {
+    value.写入字符串(3, tag);
+  }
+  for (const tag of cram.tagsToExclude) {
+    value.写入字符串(4, tag);
+  }
+  w.写入子消息(7, value);
+  return w.转为字节();
+}
 
 /**
  * 编码 CustomStudyRequest（oneof value 只编码指定字段，其余跳过）。
