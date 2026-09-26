@@ -1,0 +1,19 @@
+name: Scheduled DevEco HAP validation
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * 1'
+permissions:
+  contents: read
+jobs:
+  hap:
+    # Only trusted default-branch code runs on the signing host; never pull_request_target.
+    runs-on: [self-hosted, Windows, X64, jidecards-deveco]
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          clean: false
+      - run: npm ci
+      - name: Validate repository, Core and signed HAP
+        run: npm run verify

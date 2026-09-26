@@ -38,7 +38,7 @@ Node 24.x 与 `package.json` / CI 一致。首次进入或 lockfile 变化后运
 
 `tools/rpc-index-methods.json` 按本地常量名称绑定语义方法名；`tools/rpc-index-baseline.json` 是从生成的 `backend.rs` 导出的分派基线。交换两个有效编号、缺少末项、新增未登记常量、上游输入变动都失败。CI 的 Rust 作业在克隆锁定 Anki 后调用同一脚本；仓库测试使用受版本控制的基线和变异测试，不因缺少本机 Anki 而悄悄跳过。
 
-升级流程：更新锁定依赖并完成真实 Core 构建，核对别名语义，然后运行 `node tools/verify-rpc-index.mjs --generate <本次构建生成的backend.rs绝对路径>`，审查两份 JSON 的差异，最后运行完整 `npm run verify`。生成基线必须使用独立的、提交匹配 `UPSTREAM.lock` 的 Anki Git checkout；协议/生成器目录及 `Cargo.lock` 有未提交修改时拒绝生成，防止把本机裁剪工作区后的依赖锁写成官方基线。普通校验仍支持源码归档。禁止拿旧缓存生成新版本基线。传入单个 `backend.rs` 路径则只校验该显式产物，不扫描并择优使用旧缓存。
+升级流程：更新锁定依赖并完成真实 Core 构建，核对别名语义，然后运行 `node tools/verify-rpc-index.mjs --generate <本次构建生成的backend.rs绝对路径>`，审查别名、基线 JSON 与生成的 ArkTS/Rust/C++ 常量差异，最后运行完整 `npm run verify`。生成基线必须使用独立的、提交匹配 `UPSTREAM.lock` 的 Anki Git checkout；协议/生成器目录及 `Cargo.lock` 有未提交修改时拒绝生成，防止把本机裁剪工作区后的依赖锁写成官方基线。普通校验仍支持源码归档。禁止拿旧缓存生成新版本基线。传入单个 `backend.rs` 路径则只校验该显式产物，不扫描并择优使用旧缓存。
 
 输入指纹覆盖 proto、Rust 接口生成器及其依赖锁；它证明这些输入与已审查基线一致，不代表本次刚编译过 Core。显式产物校验和 Rust/HAP 构建仍是独立证据，远端 CI 与设备行为也须分别报告。
 
@@ -109,3 +109,11 @@ Node 24 测试使用内置 TypeScript 转换，运行时可能输出 `Experiment
 签名材料由 [签名说明](signing.md) 定义。`build-app.ps1` 构建前检查本机配置/文件，构建后拒绝缺少 signingConfig 或缺失 signed HAP 的结果；Hvigor 的普通 BUILD SUCCESSFUL 不能独自作为签名构建成功证据。
 
 设备回归还覆盖：浏览批量操作中切换选择与离页；学习编辑、删除确认、埋藏/恢复后返回；AI 批量保存中离页、连续保存与附件解析。未连接设备时明确记为未执行。
+
+
+## Core 集成、生成索引与定期 HAP
+
+- `node tools/generate-rpc-index.mjs` 从已锁定的分派基线、语义别名及 C 头生成 ArkTS 索引、`native/rsharmony/src/rpc_ids.rs` 和 `native/napi_bridge/src/rpc_ids.h`；`--check` 只比较，不写入。升级基线的 `verify-rpc-index --generate` 同步生成这些文件。不要手改数字；新增语义别名放 `rpc-index-methods.json`。完整 Node 测试验证可再生成性。
+- `node tools/test-anki-core.mjs` 是 CI 与本地共用的真实 Core 入口：校验锁定输入、准备翻译子模块、幂等应用已跟踪补丁，运行 `cargo test -p jidecards_core --features anki-core --locked`。独立 checkout 核对提交；源码归档核对协议指纹，不能错误借用父仓库 HEAD。Windows 原生工具链仍可用 `build-native.ps1 -Target host-test`。
+- `.github/workflows/ci.yml` 的 Rust 作业增加上述 Core 入口，覆盖实际集合/媒体/取消行为；远端执行结果需另行查看，不以本地通过冒充。
+- `.github/workflows/hap.yml` 每周和手动运行 `npm run verify`，需要带 `jidecards-deveco` 标签的 Windows 自托管 runner。Runner 必须预置锁定 SDK、Rust/Anki 及本机签名配置。`clean: false` 保留这些不受版本控制的本机依赖。工作流只运行可信默认分支，不接入 PR 的签名主机执行；配置文件存在不代表 runner 已注册或定时任务已运行。

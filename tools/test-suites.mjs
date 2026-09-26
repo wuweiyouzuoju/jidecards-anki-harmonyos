@@ -5,10 +5,10 @@ import { join } from 'node:path';
 // 领域筛选用于开发反馈，不声称是变更影响分析；all 始终从磁盘发现全部测试。
 export const SUITES = {
   release: /^(release-export|signing-config)/,
-  tooling: /^(doctor|tooling|change-impact|build-(?:app|native)-wrapper|build-warnings|release-export|signing-config|documentation-contract|architecture-boundaries)/,
+  tooling: /^(rpc-index|core-integration|doctor|tooling|change-impact|build-(?:app|native)-wrapper|build-warnings|release-export|signing-config|documentation-contract|architecture-boundaries)/,
   home: /^(home-|page-(?:operation|domain|repositories)|external-deck|cloud-deck|official-announcement|deck-media|deck-options|deck-config|sync-automatic)/,
   study: /^(page-domain|page-repositories|study-|note-editor|jide-choice|choice-package|bury-congrats|audio-|card-audio|native-audio|undo-|proto-study|deck-config|review-|tap-zone)/,
-  sync: /sync|home-transfer|study-session|page-(?:operation|domain|repositories)|native-bridge/,
+  sync: /sync|backend-session|data-transfer|home-transfer|study-session|page-(?:operation|domain|repositories)|native-bridge/,
   browser: /browser|page-(?:operation|domain|repositories)|preview|search|note|card-info/,
   media: /media|audio|render|math|latex|jquery|preview|card-template/,
   agent: /page-domain|page-repositories|agent|provider|draft|sse/,

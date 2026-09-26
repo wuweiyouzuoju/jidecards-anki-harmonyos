@@ -45,6 +45,8 @@ jobs:
         run: cargo check -p jidecards_core
       - name: Run FFI unit tests
         run: cargo test -p jidecards_core
+      - name: Run locked Anki Core integration tests
+        run: node tools/test-anki-core.mjs
       - name: rustfmt check
         run: cargo fmt -p jidecards_core -- --check
       - name: clippy

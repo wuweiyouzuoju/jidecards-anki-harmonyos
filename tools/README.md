@@ -26,3 +26,6 @@
 | 历史实验 | `experimental/` | 不进源码导出或自动验证；以当前模型/协议为准 |
 
 `tests/` 是测试，`patches/` 是构建所需上游补丁；不要因“工具目录清理”删除这两个目录。
+
+
+RPC 常量生成：`node tools/generate-rpc-index.mjs [--check]`；真实 Core 跨平台测试：`node tools/test-anki-core.mjs`。输入、前提与自托管 HAP 路线见 [验证说明](../docs/development/verification.md)。
