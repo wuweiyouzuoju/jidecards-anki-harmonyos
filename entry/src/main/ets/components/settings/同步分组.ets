@@ -351,7 +351,7 @@ export struct 同步分组 {
    * 上抛 打开同步弹窗回调 给 Index 挂载 SyncPanel 弹窗。
    */
   private 点击立即同步(): void {
-    if (this.syncSettingsBusy()) return;
+    // 已有任务（含等待选择方向）交给首页重开；租约只阻止重复执行和账户变更。
     const 信息: 同步凭证信息 | null = 加载同步凭证();
     if (信息 === null) {
       this.错误文本 = this.取本地化文本($r('app.string.sync_error_session_expired'));

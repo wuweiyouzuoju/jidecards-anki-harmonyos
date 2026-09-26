@@ -68,12 +68,22 @@ export struct 主页顶部工具栏 {
       .layoutWeight(1)
       .justifyContent(FlexAlign.Start)
 
-      if (!this.排序模式中 && this.syncIndicator === 'syncing') {
+      if (!this.排序模式中 && (this.syncIndicator === 'syncing' || this.syncIndicator === 'attention')) {
         Row({ space: 8 }) {
           Button({ type: ButtonType.Circle }) {
-            LoadingProgress()
-              .width(24).height(24)
-              .color(this.动作主色)
+            if (this.syncIndicator === 'syncing') {
+              LoadingProgress()
+                .width(24).height(24)
+                .color(this.动作主色)
+            } else {
+              Text('!')
+                .width(24).height(24)
+                .fontSize(18)
+                .fontWeight(FontWeight.Bold)
+                .fontColor($r('app.color.error_text'))
+                .textAlign(TextAlign.Center)
+                .border({ width: 2, color: $r('app.color.error_text'), radius: 12 })
+            }
           }
           .width(44).height(44)
           .padding(0)

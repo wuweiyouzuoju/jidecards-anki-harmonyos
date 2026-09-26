@@ -581,20 +581,57 @@ test('short background allowance is requested synchronously by Ability and retur
   }
 });
 
-test('account changes and a second manual sync cannot race background media', async () => {
+test('account changes cannot race background media', async () => {
   const gate = new SyncActivity(), owner = {};
   const Group = componentMethods(read('components/settings/同步分组.ets'),
-    ['syncSettingsBusy', '确认注销', '点击立即同步', 'saveServer', '点击登录'], {
+    ['syncSettingsBusy', '确认注销', 'saveServer', '点击登录'], {
       syncActivity: gate, $r: key => key,
       清除同步凭证: () => { throw new Error('must not clear while media is running'); }
     });
   const group = new Group(); group.取本地化文本 = key => key;
   gate.acquire(owner);
-  group.确认注销(); group.点击立即同步(); await group.saveServer(); await group.点击登录();
+  group.确认注销(); await group.saveServer(); await group.点击登录();
   assert.equal(group.错误文本, 'app.string.sync_already_running');
   assert.equal(gate.isActive(), true);
   gate.release(owner, Date.now());
   assert.equal(group.syncSettingsBusy(), false);
+});
+
+test('settings sync action reaches a hidden conflict or running media without starting another task', async () => {
+  for (const required of [0, 2, 3, 4]) {
+    const { panel, state, gate } = panelHarness({ required, media: true });
+    panel.aboutToAppear(); await settle();
+    assert.equal(gate.isActive(), true);
+    assert.equal(panel.detailsVisible, false);
+    assert.equal(state.indicator, required === 0 ? 'syncing' : 'attention');
+    const callsBefore = state.calls.length;
+    const scheduler = new AutoSyncScheduler();
+    let popped = 0;
+    const controller = new HomeSyncController(scheduler, gate, () => ({
+      popPage: () => { popped++; },
+      isPanelOpen: () => true,
+      requestPanelDetails: () => panel.showDetails()
+    }));
+    const Group = componentMethods(read('components/settings/同步分组.ets'),
+      ['点击立即同步', 'syncSettingsBusy'], {
+        syncActivity: gate, $r: key => key,
+        加载同步凭证: () => ({ hkey: 'test-key', endpoint: 'https://custom.example/anki/' })
+      });
+    const group = new Group();
+    Object.assign(group, {
+      账号名: 'test-user', 错误文本: 'app.string.sync_already_running',
+      取本地化文本: key => key,
+      打开同步弹窗回调: () => controller.requestManual()
+    });
+    group.点击立即同步();
+    assert.equal(popped, 1, 'settings must forward the request even while the sync lease is held');
+    assert.equal(group.错误文本, '');
+    assert.equal(panel.detailsVisible, true);
+    assert.equal(state.indicator, required === 0 ? 'syncing' : 'attention');
+    assert.equal(scheduler.hasPending(), false, 'reopening the existing task must not queue another sync');
+    assert.equal(gate.isActive(), true);
+    assert.equal(state.calls.length, callsBefore, 'opening the task must not choose a direction or repeat network work');
+  }
 });
 
 test('unsupported background capability leaves sync working without requesting system quota', async () => {
@@ -658,6 +695,10 @@ test('sync icon stays inline with accessible details and preserves error/conflic
   assert.match(home, /else showToastSafely\(this.getUIContext\(\), \{ message: this.syncStatusText \}\)/);
   assert.match(toolbar, /accessibilityText\(this.syncStatusText\)/);
   assert.doesNotMatch(toolbar, /\bText\(this.syncStatusText\)/);
+  assert.match(toolbar, /this\.syncIndicator === 'syncing' \|\| this\.syncIndicator === 'attention'/);
+  assert.match(toolbar, /if \(this\.syncIndicator === 'syncing'\)\s*\{\s*LoadingProgress\(\)/);
+  assert.match(toolbar, /Text\('!'\)[\s\S]*?\.width\(24\)\.height\(24\)[\s\S]*?\.fontColor\(\$r\('app.color.error_text'\)\)[\s\S]*?\.border\(\{ width: 2, color: \$r\('app.color.error_text'\), radius: 12 \}\)/);
+  assert.doesNotMatch(toolbar, /Text\('⚠'\)/);
   assert.ok(toolbar.indexOf('LoadingProgress()') > toolbar.indexOf("app.string.study_more"));
   assert.ok(toolbar.indexOf('LoadingProgress()') < toolbar.indexOf("app.string.create_deck"));
   assert.match(panel, /this\.statusChanged\(text, indicator\)/);
