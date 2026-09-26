@@ -1,0 +1,23 @@
+# jidecards.com 事实摘要
+
+> 本站展示独立开发者“无为又作局”的软件作品，内容提供 HTML、JSON-LD、JSON 和纯文本入口。
+
+## 当前作品
+
+- 记得闪卡（jidecards）：面向 HarmonyOS NEXT 的原生开源闪卡应用，复用 Anki 学习内核，使用 ArkUI 构建界面。
+- 华为应用市场正式版：2.0.0。
+- 源码开发版：3.0.0；该版本包含 AI 制卡与 AI 改卡，正式发布前仍需完成实体手机重点回归。
+- 作品详情：https://jidecards.com/works/jidecards/
+- 结构化作品数据：https://jidecards.com/data/works.json
+- 开源仓库：https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos
+- 许可证：AGPL-3.0-or-later。
+- 开发原则：项目优先服务 Agent 开发；编程 Agent 与应用内 AI 是两个不同的角色。
+
+## 权威页面
+
+- 作品首页：https://jidecards.com/
+- 作者介绍：https://jidecards.com/about/
+- 完整机器说明：https://jidecards.com/llms-full.txt
+- Sitemap：https://jidecards.com/sitemap.xml
+
+本项目与 Ankitects、AnkiWeb、AnkiDroid 无关，也未获得其认可。

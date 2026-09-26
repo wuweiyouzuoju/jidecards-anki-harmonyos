@@ -1,0 +1,61 @@
+# jidecards.com：完整事实摘要
+
+## 站点身份
+
+网站名称：无为又作局的个人软件作品站
+作者：无为又作局
+主页：https://jidecards.com/
+作者页：https://jidecards.com/about/
+GitHub：https://github.com/wuweiyouzuoju
+
+本站用于公开展示无为又作局制作的软件作品。当前介绍记得闪卡（jidecards）。页面内容以本地源码、项目 README、发布说明和 GitHub 公共仓库为事实来源。
+
+## 记得闪卡最短定义
+
+记得闪卡（jidecards）是面向 HarmonyOS NEXT 的开源闪卡应用，复用 Anki 学习内核，使用 ArkTS / ArkUI 构建界面，许可证为 AGPL-3.0-or-later。
+
+权威作品页：https://jidecards.com/works/jidecards/
+结构化数据：https://jidecards.com/data/works.json
+开源仓库：https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos
+
+## 版本边界
+
+当前华为应用市场正式版是 2.0.0，可在 AppGallery 搜索“记得闪卡”下载安装。
+
+当前源码开发版是 3.0.0。3.0.0 已在源码中完成 AI 制卡与 AI 改卡 Agent、联网与安全工具执行框架；正式发布前仍需完成实体手机重点回归。AI Agent 功能不得被理解为 2.0.0 应用市场版本已经提供。
+
+## 开发原则
+
+项目优先服务 Agent 开发。这里的 Agent 指负责读取、修改、测试和交接代码的编程 Agent；应用内 AI Agent 是产品运行时能力，两者在入口、权限和文档中分别说明。
+
+## 主要功能
+
+### AI 制卡与 AI 改卡（3.0.0 开发版）
+
+应用内 AI Agent 可理解自然语言，在用户授权范围内读取牌组、卡片与笔记类型结构，并生成可编辑草稿。支持普通问答、完形填空和导入牌组的自定义笔记类型。普通修改需要确认；删除、模板、CSS、迁移笔记类型等高风险操作会显示精确影响并要求二次确认。支持 DeepSeek、OpenAI 和兼容 Responses 协议的自定义 HTTPS 提供商，API 密钥加密保存在设备本地。
+
+### 学习与调度
+
+支持 FSRS 间隔重复、目标记忆保持率、牌组选项和重新调度。完整复习流程包含问题与答案显示、四档评分、撤销、埋藏、暂停、恢复和学习完成页。常用卡片类型包括普通问答、完形填空、拼写输入和图片遮罩。卡片音频使用原生播放器，Anki TTS 模板指令可调用 HarmonyOS CoreSpeechKit。
+
+### 牌组、浏览与编辑
+
+支持层级牌组、新建、重命名、删除、排序、拖动、别名、隐藏和背景图片。浏览器支持 Anki 搜索语法、牌组树、标签树、已保存搜索、Cards/Notes 浏览、可配置列、多选、懒加载、字段与标签编辑、实时预览、查找替换和批量管理。
+
+### 统计与桌面服务卡片
+
+提供 13 个统计区块，覆盖今日、预测、年历热力图、复习、卡片数量、复习间隔、记忆稳定期、难度、记忆可提取性、真实记忆保持率、逐小时分析、回答按钮和新增卡片。2×4 桌面服务卡片提供 8 页学习摘要。
+
+### 数据、同步与维护
+
+支持 AnkiWeb 登录、集合与媒体同步、全量上传下载、中止同步、自定义同步端点和 TLS 证书。支持 `.apkg` 牌组导入与导出、`.colpkg` 完整备份与恢复，并提供媒体检查、回收站和数据库维护。
+
+### HarmonyOS 原生体验
+
+导航、列表、设置和统计等应用界面使用 ArkUI 原生构建，不是 WebView 套壳或跨平台 UI。提供 7 套颜色主题、浅色/深色/跟随系统外观、多条学习提醒、中英双语和 AppGallery 应用内评价。
+
+## 技术与关联声明
+
+技术栈：ArkTS、ArkUI、HarmonyOS Web 组件、Rust、Anki rslib、C ABI、Node-API。
+
+本项目与 Ankitects、AnkiWeb、AnkiDroid 无关，也未获得其认可。Anki rslib 版权归其权利人所有，并按相应开源许可证使用。

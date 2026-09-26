@@ -1,0 +1,9 @@
+{
+  "$schema": "https://developers.cloudflare.com/workers/wrangler/config-schema.json",
+  "name": "wispy-glade-db0d",
+  "compatibility_date": "2026-09-26",
+  "assets": {
+    "directory": "."
+  },
+  "workers_dev": false
+}

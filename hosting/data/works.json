@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "author": {
+    "name": "无为又作局",
+    "url": "https://jidecards.com/about/",
+    "github": "https://github.com/wuweiyouzuoju"
+  },
+  "works": [
+    {
+      "slug": "jidecards",
+      "name": "记得闪卡",
+      "alternateName": "jidecards",
+      "summary": "记得闪卡（jidecards）是面向 HarmonyOS NEXT 的开源闪卡应用，复用 Anki 学习内核，支持 FSRS、AnkiWeb、数据导入导出和应用内 AI 功能。",
+      "platform": "HarmonyOS NEXT",
+      "license": "AGPL-3.0-or-later",
+      "releaseVersion": "2.0.0",
+      "developmentVersion": "3.0.0",
+      "developmentPriority": "项目优先服务 Agent 开发",
+      "url": "https://jidecards.com/works/jidecards/",
+      "repository": "https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos",
+      "features": [
+        "ArkUI 原生界面",
+        "Anki Rust 后端",
+        "FSRS 间隔重复",
+        "AnkiWeb 同步",
+        "AI 制卡与 AI 改卡",
+        "导入导出与媒体维护"
+      ]
+    }
+  ]
+}

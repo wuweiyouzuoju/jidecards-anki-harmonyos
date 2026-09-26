@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>记得闪卡（jidecards）｜HarmonyOS NEXT 开源闪卡应用</title>
+  <meta name="description" content="记得闪卡（jidecards）是面向 HarmonyOS NEXT 的开源闪卡应用，兼容 Anki 数据与学习体系，提供应用市场正式版和公开源码。">
+  <meta name="author" content="无为又作局">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <link rel="canonical" href="https://jidecards.com/">
+  <link rel="stylesheet" href="/styles.css">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:site_name" content="无为又作局的作品站">
+  <meta property="og:title" content="记得闪卡（jidecards）｜HarmonyOS NEXT 开源闪卡应用">
+  <meta property="og:description" content="面向 HarmonyOS NEXT 的开源闪卡应用，兼容 Anki 数据与学习体系。">
+  <meta property="og:url" content="https://jidecards.com/">
+  <meta property="og:image" content="https://jidecards.com/assets/app-preview-01.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Person",
+        "@id": "https://jidecards.com/#author",
+        "name": "无为又作局",
+        "url": "https://jidecards.com/about/",
+        "sameAs": ["https://github.com/wuweiyouzuoju"]
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://jidecards.com/#website",
+        "url": "https://jidecards.com/",
+        "name": "无为又作局的个人软件作品站",
+        "inLanguage": "zh-CN",
+        "author": { "@id": "https://jidecards.com/#author" },
+        "description": "展示无为又作局开发的软件作品，当前收录记得闪卡（jidecards）。"
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <a class="skip-link" href="#content">跳到主要内容</a>
+  <header class="site-header">
+    <a class="wordmark" href="/" aria-label="无为又作局的作品站首页">
+      <span class="wordmark-mark" aria-hidden="true">无</span>
+      <span>无为又作局</span>
+    </a>
+    <nav aria-label="主要导航">
+      <a href="/works/jidecards/">作品</a>
+      <a href="/about/">关于</a>
+      <a href="https://github.com/wuweiyouzuoju" rel="me">GitHub</a>
+    </nav>
+  </header>
+
+  <main id="content">
+    <section class="hero" aria-labelledby="hero-title">
+      <p class="eyebrow">HarmonyOS NEXT · Open source</p>
+      <h1 id="hero-title">记得闪卡</h1>
+      <p class="hero-summary">记得闪卡（jidecards）是面向 <strong>HarmonyOS NEXT</strong> 的原生闪卡应用。它复用 <strong>Anki</strong> 学习内核，公开源码，支持从应用市场安装正式版，也支持从源码了解实现。</p>
+      <div class="hero-actions">
+        <a class="button button-primary" href="/works/jidecards/">查看记得闪卡</a>
+        <a class="button button-secondary" href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos">查看开源代码</a>
+      </div>
+    </section>
+
+    <section class="entry-section" aria-labelledby="entry-title">
+      <div class="section-heading">
+        <p class="section-index">入口</p>
+        <h2 id="entry-title">按你的目的继续。</h2>
+      </div>
+      <div class="entry-grid">
+        <a href="/works/jidecards/"><strong>作品详情</strong><span>功能、截图、技术和版本事实</span></a>
+        <a href="https://appgallery.huawei.com/" rel="external"><strong>应用市场</strong><span>在 AppGallery 搜索“记得闪卡”</span></a>
+        <a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos" rel="external"><strong>开源仓库</strong><span>源码、构建和问题反馈</span></a>
+        <a href="/about/"><strong>作者与原则</strong><span>项目背景和开发原则</span></a>
+        <a href="/data/works.json"><strong>结构化数据</strong><span>JSON 作品记录</span></a>
+        <a href="/llms-full.txt"><strong>机器资料</strong><span>适合 AI 和爬虫读取的完整事实</span></a>
+      </div>
+    </section>
+
+    <section class="work-section" aria-labelledby="work-heading">
+      <div class="section-heading">
+        <p class="section-index">01 / 当前作品</p>
+        <h2 id="work-heading">记得闪卡 <span>jidecards</span></h2>
+      </div>
+
+      <article class="work-card">
+        <div class="work-copy">
+          <p class="work-kicker">HarmonyOS NEXT 原生闪卡应用</p>
+          <h3>用于学习、同步和管理卡片的完整工具。</h3>
+          <p>以 ArkUI 构建界面，复用 Anki Rust 后端，包含 FSRS 间隔重复、牌组管理、学习统计、AnkiWeb 同步、导入导出和 AI 制卡与改卡。</p>
+
+          <ul class="tag-list" aria-label="主要特性">
+            <li>ArkUI 原生</li>
+            <li>AGPL 开源</li>
+            <li>Anki 兼容</li>
+            <li>FSRS</li>
+            <li>AI Agent</li>
+          </ul>
+
+          <dl class="version-list">
+            <div>
+              <dt>应用市场正式版</dt>
+              <dd>2.0.0</dd>
+            </div>
+            <div>
+              <dt>源码开发版</dt>
+              <dd>3.0.0</dd>
+            </div>
+          </dl>
+
+          <div class="text-links">
+            <a href="/works/jidecards/">查看完整功能 <span aria-hidden="true">↗</span></a>
+            <a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos">GitHub 开源仓库 <span aria-hidden="true">↗</span></a>
+          </div>
+        </div>
+
+        <figure class="work-visual">
+          <div class="phone-frame">
+            <img src="/assets/app-preview-01.png" width="540" height="1168" alt="记得闪卡首页，展示牌组列表和今日学习概览" loading="eager">
+          </div>
+          <figcaption>原生首页：牌组、进度与学习入口在同一视图中。</figcaption>
+        </figure>
+      </article>
+
+      <div class="home-gallery" aria-label="记得闪卡更多界面截图">
+        <figure>
+          <img src="/assets/app-preview-02.png" width="540" height="1168" alt="记得闪卡统计页，展示卡片数量、复习间隔和记忆稳定期" loading="lazy">
+          <figcaption>学习统计与记忆指标</figcaption>
+        </figure>
+        <figure>
+          <img src="/assets/app-preview-03.png" width="540" height="1168" alt="记得闪卡学习提醒设置，包含时间、标题和动态学习数量" loading="lazy">
+          <figcaption>原生学习提醒</figcaption>
+        </figure>
+        <figure>
+          <img src="/assets/app-preview-04.png" width="540" height="1168" alt="HarmonyOS NEXT 桌面上的记得闪卡服务卡片" loading="lazy">
+          <figcaption>桌面服务卡片</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="principles" aria-labelledby="principles-title">
+      <div class="section-heading">
+        <p class="section-index">02 / 做事方式</p>
+        <h2 id="principles-title">清楚、可控、能长期使用。</h2>
+      </div>
+      <div class="principle-grid">
+        <article>
+          <span aria-hidden="true">A</span>
+          <h3>原生体验</h3>
+          <p>遵循平台能力和交互方式，不套一层网页壳。</p>
+        </article>
+        <article>
+          <span aria-hidden="true">B</span>
+          <h3>开放验证</h3>
+          <p>源代码公开，功能边界、版本状态和依赖关系写清楚。</p>
+        </article>
+        <article>
+          <span aria-hidden="true">C</span>
+          <h3>数据自主</h3>
+          <p>支持标准格式与本地导入导出，让学习资料可以迁移。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="author-strip" aria-labelledby="author-title">
+      <p class="section-index">作者</p>
+      <div>
+        <h2 id="author-title">无为又作局</h2>
+        <p>独立开发者，持续制作自己愿意长期使用的软件。</p>
+      </div>
+      <a href="/about/">了解作者 <span aria-hidden="true">→</span></a>
+    </section>
+  </main>
+
+  <footer>
+    <p>© 2026 无为又作局</p>
+    <p><a href="/llms.txt">LLM 说明</a> · <a href="/sitemap.xml">Sitemap</a></p>
+  </footer>
+</body>
+</html>
