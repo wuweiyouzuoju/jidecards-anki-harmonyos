@@ -213,6 +213,18 @@ test('coding Agent navigation has scoped rules, ownership, and a task contract',
   assert.match(taskContract, /不能只存在聊天上下文/);
 });
 
+test('same-kind change guidance is reachable from entry, workflow, acceptance and decision index', () => {
+  const guide = 'docs/development/coding-agent.md';
+  const decision = 'docs/decisions/2026-09-26-consistent-change-coverage.md';
+  for (const file of ['AGENTS.md', '.agents/rules/workflow.md', 'docs/development/task-contract.md', decision]) {
+    const links = [...read(file).matchAll(/\[[^\]]+\]\(([^)]+)#同类变更闭环\)/g)];
+    assert.ok(links.some(link => path.resolve(root, path.dirname(file), link[1]) === path.resolve(root, guide)),
+      `${file}: missing route to the canonical guidance`);
+  }
+  assert.match(read(guide), /^## 同类变更闭环$/m, 'linked section must exist');
+  assert.ok(read('docs/decisions/README.md').includes(path.basename(decision)));
+});
+
 test('current docs route confirmation owners and do not freeze current test totals', () => {
   for (const file of ['docs/development/agent.md', 'docs/agent-2-design.md', 'docs/architecture.md']) {
     assert.match(read(file), /AgentActionExecutor/);
