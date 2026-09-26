@@ -85,20 +85,11 @@ test('home wires announcement service, acknowledgment and presentation', () => {
   assert.match(source, /onOpenDetails:[\s\S]*打开官方公告详情\(\)/);
 });
 
-test('home coordinates one delayed ten-minute announcement check without polling', () => {
+test('home delegates announcement scheduling to its owner without polling', () => {
   const source = read('../../entry/src/main/ets/pages/首页.ets');
-  assert.match(source, /官方公告检查延迟毫秒/);
-  assert.match(source, /private 上次官方公告检查开始时间: number = 0/);
-  assert.match(source, /private 官方公告检查中: boolean = false/);
-  assert.match(source, /private 官方公告延迟检查任务: number = -1/);
-  assert.match(source, /private 主页允许公告检查: boolean = true/);
-  assert.match(source, /private 主页公告检查已激活: boolean = false/);
-  assert.match(source, /announcementController: HomeAnnouncementController/);
-  assert.match(source, /private 请求主页官方公告检查\(\): void/);
-  assert.match(source, /官方公告检查延迟毫秒\(this\.上次官方公告检查开始时间, Date\.now\(\)\)/);
-  assert.match(source, /this\.官方公告延迟检查任务 = setTimeout/);
-  assert.match(source, /clearTimeout\(this\.官方公告延迟检查任务\)/);
-  assert.doesNotMatch(source, /setInterval\(/);
+  assert.match(source, /announcementController\.request\(/);
+  assert.match(source, /announcementController\.pause\(/);
+  assert.doesNotMatch(source, /官方公告延迟检查任务|上次官方公告检查开始时间|setInterval\(/);
 });
 
 test('every real home return enters the shared refresh and announcement path', () => {

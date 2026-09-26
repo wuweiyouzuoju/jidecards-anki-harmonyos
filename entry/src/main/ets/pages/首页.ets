@@ -41,7 +41,6 @@ import { HomeAnnouncementController } from '../model/HomeAnnouncementController'
 import { externalDeckOpens, EXTERNAL_DECK_OPEN_REVISION_KEY } from '../model/ExternalDeckOpen';
 import { 官方公告弹窗 } from '../components/官方公告弹窗';
 import { 官方公告服务 } from '../backend/官方公告服务';
-import { 官方公告检查延迟毫秒 } from '../model/官方公告模型';
 import type { 官方公告展示项 } from '../model/官方公告模型';
 import { 是否已确认官方公告, 标记已确认官方公告 } from '../model/官方公告存储';
 import { DeckCustomizationFeature } from '../components/home/DeckCustomizationFeature';
@@ -158,9 +157,7 @@ struct 首页 {
   @State private 官方公告确认中: boolean = false;
   private 主页公告检查已激活: boolean = false;
   private 主页允许公告检查: boolean = true;
-  private 上次官方公告检查开始时间: number = 0;
-  private 官方公告检查中: boolean = false;
-  private 官方公告延迟检查任务: number = -1;
+  private get 官方公告检查中(): boolean { return this.announcementController.isChecking(); }
   private readonly announcementController: HomeAnnouncementController = new HomeAnnouncementController();
   private homeDisposed: boolean = false;
   private readonly homeWork: HomeWorkCoordinator = new HomeWorkCoordinator(externalDeckOpens, {
@@ -585,8 +582,6 @@ struct 首页 {
   /** 执行一次真实网络检查；所有入口共用本方法，禁止并发。 */
   private async 尝试显示官方公告(): Promise<boolean> {
     if (this.homeDisposed || this.官方公告检查中) return false;
-    this.官方公告检查中 = true;
-    this.上次官方公告检查开始时间 = Date.now();
     try {
       const found: boolean = await this.announcementController.check(async (): Promise<官方公告展示项 | null> => {
         const info: bundleManager.BundleInfo = await bundleManager.getBundleInfoForSelf(
@@ -598,7 +593,6 @@ struct 首页 {
     } catch (error) {
       return false;
     } finally {
-      this.官方公告检查中 = false;
       this.homeActivityChanged();
     }
   }
@@ -615,28 +609,14 @@ struct 首页 {
   /** 返回主页时按十分钟窗口立即检查或只安排一个延迟检查。 */
   private 请求主页官方公告检查(): void {
     if (this.尝试展示待展示官方公告()) return;
-    if (!this.主页公告检查已激活 || !this.canPresentStartupPrompt() || this.官方公告检查中 ||
-      this.announcementController.hasPending()) return;
-    if (this.官方公告延迟检查任务 >= 0) return;
-    const delayMs: number = 官方公告检查延迟毫秒(this.上次官方公告检查开始时间, Date.now());
-    if (delayMs === 0) {
-      this.尝试显示官方公告().catch((): void => {});
-      return;
-    }
-    this.官方公告延迟检查任务 = setTimeout((): void => {
-      this.官方公告延迟检查任务 = -1;
-      if (!this.canPresentStartupPrompt()) return;
-      this.尝试显示官方公告().catch((): void => {});
-    }, delayMs);
+    this.announcementController.request(
+      (): boolean => this.主页公告检查已激活 && this.canPresentStartupPrompt(),
+      (): Promise<boolean> => this.尝试显示官方公告(), Date.now());
   }
 
-  /** 离开主页或进入后台时取消尚未执行的延迟检查。 */
   private 暂停主页官方公告检查(): void {
     this.主页允许公告检查 = false;
-    if (this.官方公告延迟检查任务 >= 0) {
-      clearTimeout(this.官方公告延迟检查任务);
-      this.官方公告延迟检查任务 = -1;
-    }
+    this.announcementController.pause();
   }
 
   /** 所有真正返回主页的入口都调用这里，避免遗漏公告检查。 */

@@ -44,3 +44,8 @@
 - 回归入口：`home-data-repository`、`home-work-coordinator`、`page-domain-models`、`page-repositories`、`deck-config-save`、`deck-options-session`、`home-transfer-session`、`cloud-deck-feature`；平台模块测试注入底层服务，不复制生产编排。
 
 首页的 `build()` 仅排列布局、菜单、功能弹层与提示层；布局仍依赖页面快照，留在同文件 Builder。功能新增状态应进入对应 Feature/Session，不把拆出的表单状态重新挂回首页。已删除两个仅转发参数的旧协调器，设置页也使用同一数据迁移入口。
+
+
+公告的并发检查、最近检查时间、延迟任务和取消代次统一归 `HomeAnnouncementController`；首页只传是否允许展示、网络读取、展示效果。暂停后的迟到 timer 不得清除新 timer，销毁后不再调度。直接回归：`home-announcement-scheduling.test.mjs`。
+
+牌组直链渠道通过 `model/ReleaseFeatures.ets` 的 `CLOUD_DECK_CHANNEL_ENABLED` 暂时关闭：开屏跳过云端引导，首页菜单隐藏获取直链牌组，打开方法也检查同一开关。保留下载实现、历史配额与用户内容；恢复时统一调整该开关。
