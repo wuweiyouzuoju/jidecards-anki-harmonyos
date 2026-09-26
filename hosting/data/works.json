@@ -1,7 +1,8 @@
 {
   "schemaVersion": 1,
+  "updatedAt": "2026-09-26",
   "author": {
-    "name": "无为又作局",
+    "name": "可塑性天赋",
     "url": "https://jidecards.com/about/",
     "github": "https://github.com/wuweiyouzuoju"
   },
@@ -10,21 +11,32 @@
       "slug": "jidecards",
       "name": "记得闪卡",
       "alternateName": "jidecards",
-      "summary": "记得闪卡（jidecards）是面向 HarmonyOS NEXT 的开源闪卡应用，复用 Anki 学习内核，支持 FSRS、AnkiWeb、数据导入导出和应用内 AI 功能。",
+      "summary": "面向 HarmonyOS 的开源 Anki 闪卡客户端，支持 FSRS 间隔复习、AnkiWeb 同步与 APKG 导入导出。",
       "platform": "HarmonyOS NEXT",
       "license": "AGPL-3.0-or-later",
-      "releaseVersion": "2.0.0",
-      "developmentVersion": "3.0.0",
+      "releaseVersion": "2.8.1",
+      "releaseVersionSource": "作者确认当前应用市场上线版本",
       "developmentPriority": "项目优先服务 Agent 开发",
       "url": "https://jidecards.com/works/jidecards/",
       "repository": "https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos",
-      "features": [
-        "ArkUI 原生界面",
-        "Anki Rust 后端",
-        "FSRS 间隔重复",
-        "AnkiWeb 同步",
-        "AI 制卡与 AI 改卡",
-        "导入导出与媒体维护"
+      "marketplace": {
+        "name": "华为应用市场",
+        "url": "https://appgallery.huawei.com/",
+        "searchTerm": "记得闪卡"
+      },
+      "promotion": {
+        "title": "幻彩限时主题色",
+        "description": "领取方式见应用内说明。",
+        "details": "活动时间以应用内公告为准。"
+      },
+      "features": ["FSRS 间隔复习", "AnkiWeb 同步", "APKG 导入导出", "普通卡与挖空卡", "图像遮挡", "幻彩限时主题色"],
+      "featureGroups": [
+        { "name": "复习", "description": "Anki 学习内核、FSRS 调度、四档评分、撤销、埋藏与暂停。" },
+        { "name": "卡片", "description": "普通卡、挖空卡、输入答案、图像遮挡；支持图片、音频与数学公式。" },
+        { "name": "同步", "description": "AnkiWeb 集合与媒体同步，支持自定义同步服务器。" },
+        { "name": "导入导出", "description": "APKG 牌组导入导出，集合备份与恢复。" },
+        { "name": "管理", "description": "牌组层级、搜索、批量编辑、标签与学习统计。" },
+        { "name": "桌面与外观", "description": "桌面服务卡片、学习提醒、主题色；提供幻彩限时主题色。" }
       ]
     }
   ]

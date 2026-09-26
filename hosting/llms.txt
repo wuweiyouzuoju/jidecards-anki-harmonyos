@@ -1,23 +1,18 @@
-# jidecards.com 事实摘要
+# 记得闪卡（jidecards）
 
-> 本站展示独立开发者“无为又作局”的软件作品，内容提供 HTML、JSON-LD、JSON 和纯文本入口。
+面向 HarmonyOS 的开源 Anki 闪卡客户端，支持 FSRS 间隔复习、AnkiWeb 同步与 APKG 导入导出。
 
-## 当前作品
+- 作者：可塑性天赋
+- 华为应用市场上线版本：2.8.1
+- 幻彩限时主题色：领取方式见应用内说明。
+- 许可证：AGPL-3.0-or-later
+- 首页：https://jidecards.com/
+- 下载与功能：https://jidecards.com/works/jidecards/
+- 开发文档：https://jidecards.com/developers/
+- 作者：https://jidecards.com/about/
+- 源码：https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos
+- JSON：https://jidecards.com/data/works.json
+- 完整资料：https://jidecards.com/llms-full.txt
 
-- 记得闪卡（jidecards）：面向 HarmonyOS NEXT 的原生开源闪卡应用，复用 Anki 学习内核，使用 ArkUI 构建界面。
-- 华为应用市场正式版：2.0.0。
-- 源码开发版：3.0.0；该版本包含 AI 制卡与 AI 改卡，正式发布前仍需完成实体手机重点回归。
-- 作品详情：https://jidecards.com/works/jidecards/
-- 结构化作品数据：https://jidecards.com/data/works.json
-- 开源仓库：https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos
-- 许可证：AGPL-3.0-or-later。
-- 开发原则：项目优先服务 Agent 开发；编程 Agent 与应用内 AI 是两个不同的角色。
-
-## 权威页面
-
-- 作品首页：https://jidecards.com/
-- 作者介绍：https://jidecards.com/about/
-- 完整机器说明：https://jidecards.com/llms-full.txt
-- Sitemap：https://jidecards.com/sitemap.xml
-
-本项目与 Ankitects、AnkiWeb、AnkiDroid 无关，也未获得其认可。
+项目优先服务 Agent 开发；指参与仓库开发的编程 Agent。
+独立开源项目，非 Anki 官方客户端。

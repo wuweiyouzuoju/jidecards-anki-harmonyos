@@ -3,255 +3,37 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>记得闪卡｜HarmonyOS NEXT 原生开源 Anki 闪卡软件</title>
-  <meta name="description" content="记得闪卡（jidecards）是面向 HarmonyOS NEXT 的开源闪卡应用，复用 Anki 学习内核。应用市场提供正式版，GitHub 提供源码。">
-  <meta name="author" content="无为又作局">
+  <title>记得闪卡 2.8.1｜功能与下载</title>
+  <meta name="description" content="面向 HarmonyOS 的开源 Anki 闪卡客户端，支持 FSRS 间隔复习、AnkiWeb 同步与 APKG 导入导出。">
+  <meta name="author" content="可塑性天赋">
   <meta name="robots" content="index, follow, max-image-preview:large">
   <link rel="canonical" href="https://jidecards.com/works/jidecards/">
-  <link rel="stylesheet" href="/styles.css">
-  <meta property="og:type" content="article">
+  <link rel="stylesheet" href="/styles.css?v=20260926-2">
+  <meta property="og:type" content="website">
   <meta property="og:locale" content="zh_CN">
-  <meta property="og:site_name" content="无为又作局的作品站">
-  <meta property="og:title" content="记得闪卡｜HarmonyOS NEXT 原生开源闪卡软件">
-  <meta property="og:description" content="兼容 Anki 与 FSRS，覆盖学习、统计、同步、数据管理和 AI 制卡改卡。">
+  <meta property="og:site_name" content="记得闪卡 · jidecards">
+  <meta property="og:title" content="记得闪卡 2.8.1｜功能与下载">
+  <meta property="og:description" content="面向 HarmonyOS 的开源 Anki 闪卡客户端，支持 FSRS 间隔复习、AnkiWeb 同步与 APKG 导入导出。">
   <meta property="og:url" content="https://jidecards.com/works/jidecards/">
-  <meta property="og:image" content="https://jidecards.com/assets/app-preview-02.png">
-  <meta name="twitter:card" content="summary_large_image">
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@graph": [
-      {
-        "@type": "SoftwareApplication",
-        "@id": "https://jidecards.com/works/jidecards/#app",
-        "name": "记得闪卡",
-        "alternateName": "jidecards",
-        "description": "面向 HarmonyOS NEXT 的开源闪卡应用，兼容 Anki 数据与学习体系。",
-        "applicationCategory": "EducationalApplication",
-        "operatingSystem": "HarmonyOS NEXT",
-        "softwareVersion": "2.0.0",
-        "isAccessibleForFree": true,
-        "license": "https://spdx.org/licenses/AGPL-3.0-or-later.html",
-        "author": {
-          "@type": "Person",
-          "name": "无为又作局",
-          "url": "https://jidecards.com/about/"
-        },
-        "codeRepository": "https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos",
-        "url": "https://jidecards.com/works/jidecards/",
-        "image": [
-          "https://jidecards.com/assets/app-preview-01.png",
-          "https://jidecards.com/assets/app-preview-02.png"
-        ],
-        "featureList": [
-          "ArkUI 原生界面",
-          "Anki Rust 后端",
-          "FSRS 间隔重复",
-          "AnkiWeb 同步",
-          "AI 制卡与 AI 改卡",
-          "导入导出与媒体维护"
-        ]
-      },
-      {
-        "@type": "SoftwareSourceCode",
-        "@id": "https://jidecards.com/works/jidecards/#source",
-        "name": "jidecards source code",
-        "codeRepository": "https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos",
-        "programmingLanguage": ["ArkTS", "Rust"],
-        "runtimePlatform": "HarmonyOS NEXT",
-        "license": "https://spdx.org/licenses/AGPL-3.0-or-later.html",
-        "version": "3.0.0",
-        "author": { "@type": "Person", "name": "无为又作局" }
-      }
-    ]
-  }
-  </script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Person","@id":"https://jidecards.com/#author","name":"可塑性天赋","url":"https://jidecards.com/about/","sameAs":["https://github.com/wuweiyouzuoju"]},{"@type":"SoftwareApplication","@id":"https://jidecards.com/#app","name":"记得闪卡","alternateName":"jidecards","url":"https://jidecards.com/works/jidecards/","operatingSystem":"HarmonyOS NEXT","applicationCategory":"EducationalApplication","softwareVersion":"2.8.1","description":"面向 HarmonyOS 的开源 Anki 闪卡客户端，支持 FSRS 间隔复习、AnkiWeb 同步与 APKG 导入导出。","author":{"@id":"https://jidecards.com/#author"},"featureList":["FSRS 间隔复习","AnkiWeb 同步","APKG 导入导出","普通卡与挖空卡","图像遮挡","幻彩限时主题色"],"license":"https://spdx.org/licenses/AGPL-3.0-or-later.html"},{"@type":"SoftwareSourceCode","name":"jidecards","codeRepository":"https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos","programmingLanguage":["ArkTS","Rust","C++"],"license":"https://spdx.org/licenses/AGPL-3.0-or-later.html"}]}</script>
 </head>
 <body>
-  <a class="skip-link" href="#content">跳到主要内容</a>
-  <header class="site-header">
-    <a class="wordmark" href="/" aria-label="无为又作局的作品站首页">
-      <span class="wordmark-mark" aria-hidden="true">无</span>
-      <span>无为又作局</span>
-    </a>
-    <nav aria-label="主要导航">
-      <a href="/works/jidecards/" aria-current="page">作品</a>
-      <a href="/about/">关于</a>
-      <a href="https://github.com/wuweiyouzuoju" rel="me">GitHub</a>
-    </nav>
-  </header>
-
-  <main id="content">
-    <nav class="breadcrumb" aria-label="面包屑">
-      <a href="/">作品首页</a><span aria-hidden="true">/</span><span aria-current="page">记得闪卡</span>
-    </nav>
-
-    <article>
-      <header class="work-hero">
-        <div class="work-hero-copy">
-          <p class="eyebrow">jidecards · Open source</p>
-          <h1>记得闪卡</h1>
-          <p class="work-lead">记得闪卡是一款面向 <strong>HarmonyOS NEXT</strong> 的开源闪卡应用。它使用 ArkUI 构建界面，复用 Anki 的 Rust 后端，兼容 Anki 数据与学习体系。</p>
-          <div class="hero-actions">
-            <a class="button button-primary" href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos">GitHub 开源仓库</a>
-            <a class="button button-secondary" href="#features">查看功能</a>
-          </div>
-        </div>
-        <figure class="work-hero-image">
-          <img src="/assets/app-preview-01.png" width="540" height="1168" alt="记得闪卡 HarmonyOS NEXT 原生首页，显示今日进度与多层牌组列表">
-        </figure>
-      </header>
-
-      <section class="fact-band" aria-labelledby="status-title">
-        <div>
-          <p class="section-index">版本事实</p>
-          <h2 id="status-title">正式版与开发版分开说明</h2>
-        </div>
-        <dl>
-          <div>
-            <dt>华为应用市场正式版</dt>
-            <dd><strong>2.0.0</strong><span>可在 AppGallery 搜索“记得闪卡”</span></dd>
-          </div>
-          <div>
-            <dt>当前源码开发版</dt>
-            <dd><strong>3.0.0</strong><span>AI Agent 等新功能所在版本</span></dd>
-          </div>
-        </dl>
-        <p class="status-note"><strong>3.0.0 状态：</strong>AI 制卡与 AI 改卡的开发版已完成，正式发布前仍需完成实体手机重点回归。以下涉及 AI Agent 的说明属于源码开发版能力，不代表 2.0.0 应用市场版本已经提供。</p>
-      </section>
-
-      <section id="features" class="feature-section" aria-labelledby="features-title">
-        <div class="section-heading">
-          <p class="section-index">核心能力</p>
-          <h2 id="features-title">从记住一张卡，<br>到管理整个知识库。</h2>
-        </div>
-
-        <div class="feature-list">
-          <article class="feature-item feature-highlight">
-            <div class="feature-number">01</div>
-            <div>
-              <p class="feature-label">3.0.0 开发版</p>
-              <h3>AI 制卡与 AI 改卡</h3>
-              <p>应用内 AI Agent 可以理解自然语言，在用户授权的牌组和卡片范围内读取结构，并生成可编辑草稿。支持普通问答、完形填空和导入牌组的自定义笔记类型。</p>
-              <ul>
-                <li>写入前展示字段、标签、目标牌组与影响范围，可逐张修改和选择。</li>
-                <li>从首页、学习中的当前卡片或浏览器选中内容进入 AI 改卡。</li>
-                <li>删除、模板、CSS 和笔记结构变更会显示精确影响并要求二次确认。</li>
-                <li>支持 DeepSeek、OpenAI 与兼容 Responses 协议的自定义 HTTPS 提供商；密钥加密保存在设备本地。</li>
-              </ul>
-            </div>
-          </article>
-
-          <article class="feature-item">
-            <div class="feature-number">02</div>
-            <div>
-              <p class="feature-label">学习与调度</p>
-              <h3>FSRS 间隔重复与完整复习流程</h3>
-              <p>基于 Anki 26.05 内核，支持 FSRS、目标记忆保持率与重新调度。学习过程包括显示问题和答案、四档评分、撤销、埋藏、暂停、恢复和学习完成页。</p>
-              <p>支持普通问答、完形填空、拼写输入和图片遮罩，并使用 HarmonyOS CoreSpeechKit 处理原生 TTS。</p>
-            </div>
-          </article>
-
-          <article class="feature-item">
-            <div class="feature-number">03</div>
-            <div>
-              <p class="feature-label">组织与编辑</p>
-              <h3>牌组、卡片与批量管理</h3>
-              <p>支持层级牌组、新建、重命名、删除、排序、拖动和背景定制。浏览器支持 Anki 搜索语法、牌组树、标签树、已保存搜索、字段编辑与实时预览。</p>
-              <p>批量工具覆盖查找替换、改牌组、标志、暂停恢复、删除、设置到期日、重排新卡和更改笔记类型。</p>
-            </div>
-          </article>
-
-          <article class="feature-item">
-            <div class="feature-number">04</div>
-            <div>
-              <p class="feature-label">分析与桌面</p>
-              <h3>统计与桌面服务卡片</h3>
-              <p>提供 13 个统计区块，包括今日、预测、年历热力图、复习、卡片数量、间隔、记忆稳定期、难度、记忆可提取性、真实记忆保持率和逐小时分析。</p>
-              <p>2×4 桌面服务卡片提供 8 页学习摘要，点击可直接进入应用统计页。</p>
-            </div>
-          </article>
-
-          <article class="feature-item">
-            <div class="feature-number">05</div>
-            <div>
-              <p class="feature-label">数据与同步</p>
-              <h3>AnkiWeb、导入与导出</h3>
-              <p>支持 AnkiWeb 登录、集合和媒体同步、全量上传下载以及自定义同步端点。可用 `.apkg` 合并导入或导出牌组，用 `.colpkg` 备份或恢复完整个人数据。</p>
-              <p>媒体管理可以检查未引用文件、缺失文件和受影响笔记，并通过回收站恢复或永久清理。</p>
-            </div>
-          </article>
-
-          <article class="feature-item">
-            <div class="feature-number">06</div>
-            <div>
-              <p class="feature-label">平台体验</p>
-          <h3>HarmonyOS 原生应用</h3>
-              <p>导航、列表、设置和统计等界面由 ArkTS / ArkUI 原生构建，不是套壳网页或跨平台界面。提供 7 套颜色主题、浅色与深色外观、中英双语、多条学习提醒和 AppGallery 应用内评价。</p>
-            </div>
-          </article>
-        </div>
-      </section>
-
-      <section class="screenshots" aria-labelledby="screenshots-title">
-        <div class="section-heading">
-          <p class="section-index">真实截图</p>
-          <h2 id="screenshots-title">学习、统计、提醒与桌面。</h2>
-        </div>
-        <div class="screenshot-grid">
-          <figure>
-            <img src="/assets/app-preview-01.png" width="540" height="1168" alt="记得闪卡首页，展示今日进度和多个学习牌组" loading="lazy">
-            <figcaption>首页：今日进度与层级牌组</figcaption>
-          </figure>
-          <figure>
-            <img src="/assets/app-preview-02.png" width="540" height="1168" alt="记得闪卡统计页，展示卡片数量、复习间隔和记忆稳定期图表" loading="lazy">
-            <figcaption>统计：卡片状态与记忆指标</figcaption>
-          </figure>
-          <figure>
-            <img src="/assets/app-preview-03.png" width="540" height="1168" alt="记得闪卡学习提醒设置，包含提醒时间、标题和动态卡片数量" loading="lazy">
-            <figcaption>提醒：HarmonyOS 定时学习通知</figcaption>
-          </figure>
-          <figure>
-            <img src="/assets/app-preview-04.png" width="540" height="1168" alt="HarmonyOS NEXT 桌面上的记得闪卡服务卡片，显示卡片数量统计" loading="lazy">
-            <figcaption>桌面：2×4 学习统计服务卡片</figcaption>
-          </figure>
-        </div>
-      </section>
-
-      <section class="tech-section" aria-labelledby="tech-title">
-        <div>
-          <p class="section-index">实现方式</p>
-          <h2 id="tech-title">原生界面，成熟内核。</h2>
-          <p>前端使用 ArkTS / ArkUI；卡片 HTML/CSS 由 HarmonyOS Web 组件渲染；Anki rslib 26.05 通过 C ABI 与 Node-API 桥接到应用。代码以 AGPL-3.0-or-later 许可证开源。</p>
-        </div>
-        <dl class="tech-list">
-          <div><dt>平台</dt><dd>HarmonyOS NEXT</dd></div>
-          <div><dt>界面</dt><dd>ArkTS / ArkUI</dd></div>
-          <div><dt>学习内核</dt><dd>Anki rslib 26.05 / Rust</dd></div>
-          <div><dt>许可证</dt><dd>AGPL-3.0-or-later</dd></div>
-          <div><dt>作者</dt><dd>无为又作局</dd></div>
-        </dl>
-      </section>
-
-      <section class="availability" aria-labelledby="get-title">
-        <p class="section-index">获取方式</p>
-        <h2 id="get-title">从应用市场使用，<br>或从源码了解它。</h2>
-        <p>在华为应用市场（AppGallery）搜索“记得闪卡”可下载安装当前正式版。开发、构建与最新版本信息以 GitHub 仓库为准。</p>
-        <div class="hero-actions">
-          <a class="button button-primary" href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos">访问 GitHub</a>
-          <a class="button button-secondary" href="/">返回作品首页</a>
-        </div>
-      </section>
-
-      <aside class="disclaimer" aria-label="关联声明">
-        <strong>关联声明：</strong>本项目与 Ankitects、AnkiWeb、AnkiDroid 无关，也未获得其认可。Anki rslib 版权归其权利人所有，并按相应开源许可证使用。
-      </aside>
-    </article>
-  </main>
-
-  <footer>
-    <p>© 2026 无为又作局</p>
-    <p><a href="/llms-full.txt">完整机器说明</a> · <a href="/data/works.json">作品数据</a></p>
-  </footer>
+  <a class="skip-link" href="#content">跳到正文</a>
+  <header class="site-header"><nav class="nav" aria-label="主导航">
+    <a class="brand" href="/">记得闪卡 <span>jidecards</span></a>
+    <div class="nav-links"><a href="/works/jidecards/#download">下载</a><a href="/works/jidecards/" aria-current="page">功能</a><a href="/developers/">开发</a><a href="/about/">作者</a><a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos">GitHub ↗</a></div>
+  </nav></header>
+  <main id="content" class="wrap"><p class="eyebrow">功能与下载</p><h1>记得闪卡 <small>2.8.1</small></h1><p class="lede">面向 HarmonyOS 的开源 Anki 闪卡客户端，支持 FSRS 间隔复习、AnkiWeb 同步与 APKG 导入导出。</p>
+    <section id="download" class="download-block"><h2>下载</h2><div class="actions"><a class="button" href="https://appgallery.huawei.com/">打开华为应用市场 <span aria-hidden="true">↗</span></a><span class="meta">搜索「记得闪卡」 · 正式版 2.8.1</span></div><p class="meta">适用于 HarmonyOS NEXT。应用已上架华为应用市场。</p></section>
+    <section id="features"><h2>功能</h2><dl class="feature-list"><div><dt>复习</dt><dd>Anki 学习内核、FSRS 调度、四档评分、撤销、埋藏与暂停。</dd></div>
+<div><dt>卡片</dt><dd>普通卡、挖空卡、输入答案、图像遮挡；支持图片、音频与数学公式。</dd></div>
+<div><dt>同步</dt><dd>AnkiWeb 集合与媒体同步，支持自定义同步服务器。</dd></div>
+<div><dt>导入导出</dt><dd>APKG 牌组导入导出，集合备份与恢复。</dd></div>
+<div><dt>管理</dt><dd>牌组层级、搜索、批量编辑、标签与学习统计。</dd></div>
+<div><dt>桌面与外观</dt><dd>桌面服务卡片、学习提醒、主题色；提供幻彩限时主题色。</dd></div></dl></section>
+    <section id="appearance"><h2>幻彩限时主题色</h2><p>领取方式见应用内说明。</p><p class="meta">活动时间以应用内公告为准。</p></section>
+    <section id="screenshots"><h2>应用截图</h2><div class="media-grid"><figure><a href="/assets/app-preview-01.png"><img src="/assets/app-preview-01.png" alt="记得闪卡应用界面截图 1" width="540" height="1168" loading="lazy"></a></figure><figure><a href="/assets/app-preview-02.png"><img src="/assets/app-preview-02.png" alt="记得闪卡应用界面截图 2" width="540" height="1168" loading="lazy"></a></figure><figure><a href="/assets/app-preview-03.png"><img src="/assets/app-preview-03.png" alt="记得闪卡应用界面截图 3" width="540" height="1168" loading="lazy"></a></figure><figure><a href="/assets/app-preview-04.png"><img src="/assets/app-preview-04.png" alt="记得闪卡应用界面截图 4" width="540" height="1168" loading="lazy"></a></figure></div></section>
+    <section><h2>源码与反馈</h2><p><a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos">GitHub 仓库</a> · <a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/issues">反馈问题</a> · <a href="/developers/">开发文档</a></p><p class="meta">AGPL-3.0-or-later。独立开源项目，非 Anki 官方客户端。</p></section></main>
+  <footer class="footer"><div class="wrap footer-inner"><a href="/about/">可塑性天赋</a><div><a href="/data/works.json">JSON</a><a href="/llms.txt">llms.txt</a><span>AGPL-3.0-or-later</span></div></div></footer>
 </body>
 </html>

@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "hosting/**"
+      - "tools/build-site.mjs"
       - ".github/workflows/site-deploy.yml"
   workflow_dispatch:
 
@@ -17,6 +18,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Generate static pages
+        run: node tools/build-site.mjs
       - name: Deploy static site to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
         with:
