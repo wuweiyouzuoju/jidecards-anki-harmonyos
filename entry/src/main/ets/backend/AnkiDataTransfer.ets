@@ -20,7 +20,7 @@ export class AnkiDataTransfer implements DataTransferBackend {
     const context = this.context();
     await 后端会话.获取实例().确保已打开(context.filesDir);
     progress(1);
-    const path: string = 暂存导入文件(context.filesDir, uri);
+    const path: string = await 暂存导入文件(context.filesDir, uri);
     await 执行牌组导入(path);
   }
   /** @throws 集合替换失败由 DataTransferSession 展示。 */

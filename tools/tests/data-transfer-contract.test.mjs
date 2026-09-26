@@ -40,7 +40,7 @@ test('data transfer service exposes package workflows and safe collection replac
     assert.match(service, new RegExp(`export async function ${method}`));
   }
   // B12 2026-07-22：importDeck 拆为 暂存导入文件（同步复制到沙箱）+ 执行牌组导入（后端 RPC）
-  assert.match(service, /export function 暂存导入文件/);
+  assert.match(service, /export async function 暂存导入文件/);
   assert.match(service, /if \(!是否已确认\) \{\s*throw new 数据迁移校验错误/);
   assert.match(service, /export class 数据迁移校验错误 extends Error/);
   assert.doesNotMatch(service, /会话\.关闭\(\)/);
@@ -96,22 +96,11 @@ test('sandbox exports are delivered through the official document saver and alwa
   assert.match(service, /finally[\s\S]*静默删除\(沙箱路径\)/);
 });
 
-test('provider URI imports stage data through file descriptors instead of copyFileSync', () => {
+test('provider URI imports delegate to the asynchronous descriptor adapter', () => {
   const service = read('entry/src/main/ets/backend/数据迁移服务.ts');
-  assert.match(service, /function 按描述符复制文件\(\s*源URI或路径: string,\s*目标URI或路径: string\s*\): void/);
-  assert.match(service, /fs\.openSync\(源URI或路径, fs\.OpenMode\.READ_ONLY\)/);
-  assert.match(service, /fs\.openSync\(\s*目标URI或路径,\s*fs\.OpenMode\.READ_WRITE \| fs\.OpenMode\.CREATE \| fs\.OpenMode\.TRUNC\s*\)/);
-  assert.match(service, /fs\.readSync\(源文件\.fd, 缓冲区, \{ length: 缓冲区\.byteLength \}\)/);
-  assert.match(service, /let 已写入总数: number = 0;/);
-  assert.match(service, /while \(已写入总数 < 读取大小\) \{/);
-  assert.match(service, /const 剩余缓冲: ArrayBuffer = 缓冲区\.slice\(已写入总数, 读取大小\);/);
-  assert.match(service, /const 写入大小: number =\s*fs\.writeSync\(\s*目标文件\.fd, 剩余缓冲, \{ length: 剩余缓冲\.byteLength \}\);/);
-  assert.match(service, /if \(写入大小 <= 0\) \{\s*throw new Error\('Unable to write transferred data\.'\);\s*\}/);
-  assert.match(service, /已写入总数 \+= 写入大小;/);
-  assert.match(service, /finally\s*\{\s*fs\.closeSync\(目标文件\);\s*\}/);
-  assert.match(service, /finally\s*\{\s*fs\.closeSync\(源文件\);\s*\}/);
-  assert.match(service, /按描述符复制文件\(URI, 路径\)/);
-  assert.doesNotMatch(service, /fs\.copyFileSync\(URI, 路径\)/);
+  assert.match(service, /from '.\/DataTransferFiles'/);
+  assert.match(service, /await 复制URI到沙箱/);
+  assert.doesNotMatch(service, /fs\.\w+Sync\(/);
 });
 
 test('document saver writes the selected provider URI through file descriptors and cleans up', () => {

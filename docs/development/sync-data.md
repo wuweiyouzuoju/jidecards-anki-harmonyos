@@ -65,3 +65,12 @@ Agent：页面 -> SessionController -> Runner -> Provider/工具/Scope -> Change
 
 
 导出意图定义在 `model/DataTransferIntent.ts`，选项定义在纯类型模块 `model/数据传输模型.ts`；首页与设置页共用 `backend/DataExportWorkflow.ets` 的导出、格式选择和文件保存流程。用户取消保存返回 null，页面保留面板；整库替换仍必须经过原有两步确认，不与合并导入共用写入语义。
+
+
+## 会话与异步文件迁移
+
+`后端会话` 的 generation 同时守卫打开成功、失败清理、finally 和关闭集合完成：关闭立即失效旧打开，新打开不共享旧 Promise，旧失败不能关闭新句柄。回归：`backend-session-lifecycle.test.mjs`。
+
+`backend/DataTransferFiles.ts` 独占文件描述符、目录遍历、复制和删除，使用 fileIo Promise API；包协议与替换回滚仍在 `数据迁移服务.ts`。暂存 API 现在返回 Promise，调用者必须 await。流复制固定 64 KiB，处理短读、短写、零写入及所有描述符释放路径。安全副本任何阶段失败都清理半成品、重开原集合；导入失败恢复完整副本后重开；成功后的副本清理失败不触发回滚。回归：`data-transfer-files.test.mjs`。
+
+保留全量媒体安全副本的磁盘成本；异步化解决执行线程阻塞，不减少恢复所需空间。不能为省空间直接删除旧媒体或跳过回滚；崩溃恢复持久化事务属于另一个协议变更，当前不承诺进程被杀后的自动恢复。
