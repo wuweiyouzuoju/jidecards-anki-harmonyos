@@ -10,7 +10,7 @@ import { DialogHeader } from '../common/DialogHeader';
 //
 // @作用
 // 媒体管理弹层面板：检查 unused/missing 媒体 + 回收站操作（进回收站/清空/恢复）。
-// 持有 媒体服务 实例直接调后端，与 设置面板 持有 集合服务 调 检查数据库 同款模式。
+// MediaMaintenanceSession 持有操作与原生快照；面板只适配 Service 和展示状态。
 // 不上抛数据意图；操作结果在本面板内实时呈现。
 //
 // @输入
@@ -18,7 +18,7 @@ import { DialogHeader } from '../common/DialogHeader';
 // onClose: 关闭回调
 //
 // @输出
-// 渲染媒体管理面板；用户操作时调 媒体服务 并更新本地 @State。
+// 渲染媒体管理面板；用户操作委托会话，连续滚动按需续读报告。
 //
 // @业务规则
 // 检查媒体返回 Core 报告 + unused/missing 计数 + have_trash 标记；unused 可一次性进回收站；
@@ -36,7 +36,7 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 设置面板色板_取 } from '../../utils/设置面板配色';
 import { 颜色键 } from '../../model/颜色主题';
 import { 取全屏转场时长, 取全屏转场曲线 } from '../../utils/转场时长';
-import type { CheckMediaSummary } from '../../proto/messages/MediaMessages';
+import { MediaMaintenanceSession, MediaMaintenanceState } from '../../model/settings/MediaMaintenanceSession';
 
 @Component
 export struct 媒体管理面板 {
@@ -51,17 +51,38 @@ export struct 媒体管理面板 {
   @State private 已检查: boolean = false;
   @State private 未使用总数: number = 0;
   @State private 缺失总数: number = 0;
-  @State private 检查报告: string = '';
   @State private 回收站有内容: boolean = false;
   @State private 错误信息: string = '';
   @State private 媒体同步中: boolean = false;
 
   private readonly 媒体服务实例: 媒体服务 = new 媒体服务();
   private readonly 同步服务实例: 同步服务 = new 同步服务();
-  // 完整文件名只用于一次性清理，不逐项进入 ArkUI 状态树。
-  private 未使用全部: string[] = [];
+  // 原生快照由会话持有；页面不保存完整文件列表。
+  @State private reportChunks: string[] = [];
+  @State private reportRevision: number = 0;
+  @State private hasMoreReport: boolean = false;
+  private readonly maintenance: MediaMaintenanceSession = new MediaMaintenanceSession({
+    createSnapshot: () => this.媒体服务实例.createSnapshot(),
+    reportPage: (token: number, offset: number) => this.媒体服务实例.reportPage(token, offset),
+    trashSnapshot: (token: number) => this.媒体服务实例.trashSnapshot(token),
+    releaseSnapshot: (token: number) => this.媒体服务实例.releaseSnapshot(token),
+    emptyTrash: () => this.媒体服务实例.清空回收站(),
+    restoreTrash: () => this.媒体服务实例.恢复回收站(),
+    isSyncing: async (): Promise<boolean> => (await this.同步服务实例.媒体同步状态()).active
+  }, (state: MediaMaintenanceState): void => {
+    this.检查中 = state.busy && !state.checked; this.处理中 = state.busy; this.已检查 = state.checked;
+    this.未使用总数 = state.unusedCount; this.缺失总数 = state.missingCount;
+    this.回收站有内容 = state.haveTrash;
+    this.reportRevision = state.revision;
+    this.reportChunks = state.reports; this.hasMoreReport = state.next;
+    this.错误信息 = state.error;
+  });
+
+  private visible: boolean = false;
+  aboutToDisappear(): void { this.visible = false; this.maintenance.dispose(); }
 
   aboutToAppear(): void {
+    this.visible = true;
     this.检查媒体同步状态();
   }
 
@@ -73,9 +94,9 @@ export struct 媒体管理面板 {
   private async 检查媒体同步状态(): Promise<void> {
     try {
       const 状态 = await this.同步服务实例.媒体同步状态();
-      this.媒体同步中 = 状态.active;
+      if (this.visible) this.媒体同步中 = 状态.active;
     } catch {
-      this.媒体同步中 = false;
+      if (this.visible) this.媒体同步中 = false;
     }
   }
 
@@ -87,56 +108,12 @@ export struct 媒体管理面板 {
     return resourceText(this.getUIContext(), 资源, ...参数);
   }
 
-  /**
-   * 刷新媒体状态：调 CheckMedia RPC 并更新本地 @State（报告、计数、have_trash、已检查）。
-   * 无防重入；调用方负责防重入（检查中/处理中）。
-   * Invariants: 报告文本由 Core 生成，页面不展开逐文件 ArkUI 节点。
-   * 失败时错误信息写入 @State 错误信息，不抛出。
-   */
-  private async 刷新媒体状态(): Promise<void> {
-    this.错误信息 = '';
-    try {
-      const 响应: CheckMediaSummary = await this.媒体服务实例.checkMediaSummary();
-      this.未使用总数 = 响应.unusedCount;
-      this.缺失总数 = 响应.missingCount;
-      this.未使用全部 = 响应.unused;
-      this.检查报告 = 响应.report;
-      this.回收站有内容 = 响应.haveTrash;
-      this.已检查 = true;
-    } catch (error) {
-      this.错误信息 = error instanceof Error ? error.message : `${error}`;
-    }
-  }
-
-  /**
-   * 执行检查媒体：检查中/处理中防重入壳，内部委托 刷新媒体状态。
-   * 同时刷新媒体同步状态（用户可能在面板开着时同步开始/结束）。
-   */
   private async 执行检查媒体(): Promise<void> {
-    if (this.检查中 || this.处理中) {
-      return;
-    }
-    this.检查中 = true;
-    this.检查媒体同步状态();
-    await this.刷新媒体状态();
-    this.检查中 = false;
+    await this.maintenance.check();
   }
 
   private async 执行进回收站(): Promise<void> {
-    if (this.检查中 || this.处理中) { return; }
-    if (this.未使用全部.length === 0 || this.处理中) {
-      return;
-    }
-    this.处理中 = true;
-    this.错误信息 = '';
-    try {
-      await this.媒体服务实例.媒体文件进回收站(this.未使用全部);
-      await this.刷新媒体状态();
-    } catch (error) {
-      this.错误信息 = error instanceof Error ? error.message : `${error}`;
-    } finally {
-      this.处理中 = false;
-    }
+    await this.maintenance.trash();
   }
 
   private 确认清空回收站(): void {
@@ -161,35 +138,11 @@ export struct 媒体管理面板 {
   }
 
   private async 执行清空回收站(): Promise<void> {
-    if (this.检查中 || this.处理中) {
-      return;
-    }
-    this.处理中 = true;
-    this.错误信息 = '';
-    try {
-      await this.媒体服务实例.清空回收站();
-      this.回收站有内容 = false;
-    } catch (error) {
-      this.错误信息 = error instanceof Error ? error.message : `${error}`;
-    } finally {
-      this.处理中 = false;
-    }
+    await this.maintenance.empty();
   }
 
   private async 执行恢复回收站(): Promise<void> {
-    if (this.检查中 || this.处理中 || !this.回收站有内容) {
-      return;
-    }
-    this.处理中 = true;
-    this.错误信息 = '';
-    try {
-      await this.媒体服务实例.恢复回收站();
-      await this.刷新媒体状态();
-    } catch (error) {
-      this.错误信息 = error instanceof Error ? error.message : `${error}`;
-    } finally {
-      this.处理中 = false;
-    }
+    await this.maintenance.restore();
   }
 
   build() {
@@ -333,18 +286,20 @@ export struct 媒体管理面板 {
               .backgroundColor($r('app.color.surface_page'))
               .borderRadius(12)
 
-              // Core 已生成完整报告；单个 Text 节点避免为每个文件创建 ArkUI 行。
+              // 连续滚动按需追加报告块；分页仅存在于传输边界。
               Column({ space: 应用尺寸.间距_4 }) {
                 Text($r('app.string.media_check_report'))
                   .fontSize(应用尺寸.字号_正文)
                   .fontColor($r('app.color.text_primary'))
                   .fontWeight(FontWeight.Medium)
                   .width('100%')
-                Text(this.检查报告)
+                ForEach(this.reportChunks, (chunk: string, index: number) => {
+                Text(chunk)
                   .fontSize(应用尺寸.字号_正文_小)
                   .fontColor(设置面板色板_取(this.isDark).主文字)
                   .width('100%')
                   .textAlign(TextAlign.Start)
+                }, (_chunk: string, index: number): string => `${this.reportRevision}:${index}`)
               }
               .width('100%')
               .padding(12)
@@ -407,6 +362,9 @@ export struct 媒体管理面板 {
           .width('100%')
           .constraintSize({ maxHeight: 420 })
           .scrollBar(BarState.Auto)
+          .onScrollEdge((edge: Edge): void => {
+            if (edge === Edge.Bottom && this.hasMoreReport) this.maintenance.loadMore();
+          })
           .edgeEffect(EdgeEffect.Spring)
 
           // 处理中指示

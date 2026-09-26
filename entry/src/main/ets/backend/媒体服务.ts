@@ -35,19 +35,21 @@
 // 通过 后端会话 间接调用 NAPI 桥；会在 collection.media 目录写入/删除/恢复文件。
 // ========================================================
 
+import type { MediaSnapshotPage } from '../proto/messages/MediaSnapshotMessages';
 import { 后端会话 } from './后端会话';
+import { MEDIA_SNAPSHOT_SERVICE, encodeMediaSnapshotRequest,
+  decodeMediaSnapshotPage } from '../proto/messages/MediaSnapshotMessages';
 import { 媒体方法, 服务号 } from './服务索引';
 import { 协议读取器 } from '../proto/core/ProtoReader';
 import { 协议写入器 } from '../proto/core/ProtoWriter';
 import { encodeNotetypeId } from '../proto/messages/NotetypeMessages';
 import {
   decodeCheckMediaResponse,
-  decodeCheckMediaSummary,
   decodeStringList,
   encodeEmpty,
   encodeTrashMediaFilesRequest
 } from '../proto/messages/MediaMessages';
-import type { CheckMediaResponse, CheckMediaSummary } from '../proto/messages/MediaMessages';
+import type { CheckMediaResponse } from '../proto/messages/MediaMessages';
 
 function encodeAddMediaFileRequest(文件名: string, 字节: Uint8Array): Uint8Array {
   const writer = new 协议写入器();
@@ -76,6 +78,43 @@ function decodeString(bytes: Uint8Array): string {
 export class 媒体服务 {
   private readonly 会话: 后端会话 = 后端会话.获取实例();
 
+  async createSnapshot(): Promise<MediaSnapshotPage> {
+    return decodeMediaSnapshotPage(await this.会话.调用(MEDIA_SNAPSHOT_SERVICE, 0, encodeEmpty()));
+  }
+
+  async reportPage(token: number, offset: number): Promise<MediaSnapshotPage> {
+    return decodeMediaSnapshotPage(await this.会话.调用(MEDIA_SNAPSHOT_SERVICE, 1, encodeMediaSnapshotRequest(token, offset)));
+  }
+
+  async unusedPage(token: number, offset: number): Promise<MediaSnapshotPage> {
+    return decodeMediaSnapshotPage(await this.会话.调用(MEDIA_SNAPSHOT_SERVICE, 2, encodeMediaSnapshotRequest(token, offset)));
+  }
+
+  async trashSnapshot(token: number): Promise<void> {
+    await this.会话.调用(MEDIA_SNAPSHOT_SERVICE, 3, encodeMediaSnapshotRequest(token));
+  }
+
+  async releaseSnapshot(token: number): Promise<void> {
+    await this.会话.调用(MEDIA_SNAPSHOT_SERVICE, 4, encodeMediaSnapshotRequest(token));
+  }
+
+  /** 牌组删除差集仍需文件名，但不再传输完整报告和缺失笔记。 */
+  async unusedFiles(): Promise<string[]> {
+    const snapshot: MediaSnapshotPage = await this.createSnapshot();
+    const files: string[] = [];
+    let offset: number = 0;
+    try {
+      do {
+        const page: MediaSnapshotPage = await this.unusedPage(snapshot.token, offset);
+        for (const file of page.files) files.push(file);
+        offset = page.nextOffset;
+      } while (offset !== 0);
+      return files;
+    } finally {
+      await this.releaseSnapshot(snapshot.token);
+    }
+  }
+
   /**
    * 把字节写入 collection.media 并返回最终文件名。
    * 图片遮盖建卡流程等使用。
@@ -97,21 +136,16 @@ export class 媒体服务 {
     return decodeCheckMediaResponse(响应字节);
   }
 
-  /** 面板保留文件名供分页与清理，不解码重复报告与笔记 ID。 */
-  async checkMediaSummary(): Promise<CheckMediaSummary> {
-    const bytes = await this.会话.调用(
-      服务号.后端媒体, 媒体方法.检查媒体, encodeEmpty());
-    return decodeCheckMediaSummary(bytes);
-  }
-
   /**
    * 将指定文件名列表放入回收站（后端 TrashMediaFiles）。
    * 文件从 collection.media 移到 trash 子目录，可通过 恢复回收站 找回。
    * 失败以 BackendError 抛出。
    */
   async 媒体文件进回收站(文件名列表: string[]): Promise<void> {
-    await this.会话.调用(
-      服务号.后端媒体, 媒体方法.媒体文件进回收站, encodeTrashMediaFilesRequest(文件名列表));
+    for (let offset: number = 0; offset < 文件名列表.length; offset += 256) {
+      await this.会话.调用(服务号.后端媒体, 媒体方法.媒体文件进回收站,
+        encodeTrashMediaFilesRequest(文件名列表.slice(offset, offset + 256)));
+    }
   }
 
   /**

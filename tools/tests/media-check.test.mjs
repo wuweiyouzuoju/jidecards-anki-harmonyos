@@ -45,12 +45,13 @@ test('skipping a length-delimited field still rejects a truncated payload', () =
   assert.throws(() => decodeCheckMediaSummary(new Uint8Array([0x22, 0x05, 0x61])), /input|end/);
 });
 
-test('media panel uses a report block and a single whole-list cleanup action', async () => {
+test('media panel renders loaded report chunks and delegates whole-snapshot cleanup', async () => {
   const { readFileSync } = await import('node:fs');
   const source = readFileSync(new URL('../../entry/src/main/ets/components/settings/媒体管理面板.ets', import.meta.url), 'utf8');
-  assert.match(source, /Text\(this\.检查报告\)/);
+  assert.match(source, /Text\(chunk\)/);
   assert.match(source, /media_trash_all_unused/);
-  assert.doesNotMatch(source, /ForEach\(/);
+  assert.match(source, /ForEach\(this\.reportChunks/);
+  assert.match(source, /maintenance\.trash\(/);
   assert.doesNotMatch(source, /Toggle\(/);
   assert.doesNotMatch(source, /MEDIA_CHECK_DISPLAY_LIMIT|MediaCheckSelection/);
 });

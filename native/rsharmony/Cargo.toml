@@ -21,6 +21,7 @@ default = []
 anki-core = ["dep:anki", "anki/rustls", "dep:reqwest"]
 
 [dependencies]
+prost = "0.13.5"
 anki = { path = "../../third_party/anki/rslib", default-features = false, optional = true }
 # rsharmony 不直接调用 reqwest API，仅用于把 rustls-tls-webpki-roots feature 透传给 reqwest（与 anki 的 native-roots 合并）。
 # 版本与 anki workspace 保持一致（third_party/anki/Cargo.toml），避免 cargo 重复拉两份 reqwest。

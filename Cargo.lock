@@ -2795,6 +2795,7 @@ name = "jidecards_core"
 version = "0.1.0"
 dependencies = [
  "anki",
+ "prost",
  "reqwest",
  "tokio",
 ]

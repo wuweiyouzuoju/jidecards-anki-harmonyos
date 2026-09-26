@@ -246,7 +246,7 @@ struct 首页 {
   @State private deckDeletionStatus: Resource = $r('app.string.deck_media_checking');
   private readonly deckMediaCleanup: DeckMediaCleanup = new DeckMediaCleanup({
     isSyncing: async (): Promise<boolean> => (await new 同步服务().媒体同步状态()).active,
-    unused: async (): Promise<string[]> => (await new 媒体服务().检查媒体()).unused,
+    unused: async (): Promise<string[]> => await new 媒体服务().unusedFiles(),
     trash: async (files: string[]): Promise<void> => { await new 媒体服务().媒体文件进回收站(files); }
   });
   @State @Watch('homeActivityChanged') private autoSyncCollectionBusy: boolean = false;

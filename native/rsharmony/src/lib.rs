@@ -6,9 +6,9 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
-
+mod media_snapshot;
 mod rpc_ids;
-use rpc_ids::{ABORT_SYNC, SYNC_SERVICE};
+use rpc_ids::{ABORT_SYNC, CLOSE_COLLECTION, COLLECTION_SERVICE, OPEN_COLLECTION, SYNC_SERVICE};
 
 pub const STATUS_OK: i32 = 0;
 pub const STATUS_INVALID_ARGUMENT: i32 = 1;
@@ -72,8 +72,32 @@ pub trait RawBackend: Send + 'static {
 }
 
 struct BackendEntry {
-    backend: Mutex<Box<dyn RawBackend>>,
+    backend: Mutex<BackendState>,
     sync_abort: Option<SyncAbort>,
+}
+
+struct BackendState {
+    raw: Box<dyn RawBackend>,
+    media: media_snapshot::MediaSnapshot,
+}
+
+impl BackendState {
+    fn run_method_raw(
+        &mut self,
+        service: u32,
+        method: u32,
+        input: &[u8],
+    ) -> Result<Vec<u8>, BackendFailure> {
+        if service == media_snapshot::SERVICE {
+            return self.media.call(self.raw.as_mut(), method, input);
+        }
+        if service == COLLECTION_SERVICE
+            && (method == OPEN_COLLECTION || method == CLOSE_COLLECTION)
+        {
+            self.media.clear();
+        }
+        self.raw.run_method_raw(service, method, input)
+    }
 }
 
 type SharedBackend = Arc<BackendEntry>;
@@ -106,7 +130,10 @@ impl BackendRegistry {
                 backends.insert(
                     handle,
                     Arc::new(BackendEntry {
-                        backend: Mutex::new(Box::new(backend)),
+                        backend: Mutex::new(BackendState {
+                            raw: Box::new(backend),
+                            media: media_snapshot::MediaSnapshot::default(),
+                        }),
                         sync_abort,
                     }),
                 );
@@ -579,6 +606,7 @@ mod ffi_tests {
         stream
             .set_read_timeout(Some(Duration::from_secs(2)))
             .unwrap();
+        stream.set_nonblocking(false).unwrap();
         assert!(stream.read(&mut [0; 1024]).unwrap() > 0);
         registry.call(handle, 1, 7, &[]).unwrap();
         let result = finished_rx
