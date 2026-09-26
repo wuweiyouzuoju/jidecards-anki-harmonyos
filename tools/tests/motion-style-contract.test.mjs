@@ -42,7 +42,7 @@ test('navigation applies one fade transition including the home boundary', () =>
   const home = read('entry/src/main/ets/pages/首页.ets');
   assert.doesNotMatch(home, /from\.index === -1 \|\| to\.index === -1/);
   assert.match(home, /const context: UIContext \| undefined = this\.getUIContext\(\)/);
-  assert.match(home, /if \(context === undefined\) \{\s*transitionProxy\.finishTransition\(\);/);
+  assert.match(home, /if \(context === undefined\) \{\s*showDestination\(\);\s*transitionProxy\.finishTransition\(\);/);
   const fade = home.slice(home.indexOf('private 自定义转场回调('), home.indexOf('// @名称 页面映射'));
   assert.match(fade, /const 转场曲线: Curve = Curve\.EaseOut/);
   assert.match(fade, /expectedFrameRateRange: \{ min: 60, max: 120, expected: 60 \}/);

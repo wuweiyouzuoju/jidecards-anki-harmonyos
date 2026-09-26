@@ -92,7 +92,6 @@ export class 应用尺寸 {
 
   // ---- 宽屏限宽 ----
   static readonly 内容最大宽度: number = 1200; // 首页超宽屏内容限宽，超出居中留白
-  static readonly 复习页内容最大宽度: number = 840; // 复习页内容限宽，保持卡片可读宽度
 
   // ---- 日历 ----
   static readonly 日历_单元格高度: number = 21;

@@ -1,5 +1,13 @@
 {
   "color": [
+    { "name": "study_again_background", "value": "#5C252B" },
+    { "name": "study_again_text", "value": "#FFCDD2" },
+    { "name": "study_hard_background", "value": "#5B381D" },
+    { "name": "study_hard_text", "value": "#FFE0B2" },
+    { "name": "study_good_background", "value": "#23472D" },
+    { "name": "study_good_text", "value": "#C8E6C9" },
+    { "name": "study_easy_background", "value": "#16415B" },
+    { "name": "study_easy_text", "value": "#B3E5FC" },
     {
       "name": "start_window_background",
       "value": "#10151D"

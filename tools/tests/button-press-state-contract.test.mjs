@@ -55,7 +55,6 @@ test('help buttons do not carry the disproven native-effect workaround', () => {
   for (const path of [
     'entry/src/main/ets/components/settings/设置分组卡片.ets',
     'entry/src/main/ets/components/settings/布局分组.ets',
-    'entry/src/main/ets/components/settings/术语分组.ets',
     'entry/src/main/ets/components/settings/GeneralSettings.ets',
     'entry/src/main/ets/components/settings/ReviewControlsSettings.ets',
   ]) {

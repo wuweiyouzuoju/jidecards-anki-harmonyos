@@ -37,6 +37,7 @@ import { resourceText } from '../../utils/UiFeedback';
 // ========================================================
 
 import { webview } from '@kit.ArkWeb';
+import { deviceInfo } from '@kit.BasicServicesKit';
 import { interceptCardAsset } from '../../utils/CardAssetResponse';
 import { 卡片渲染服务 } from '../../backend/卡片渲染服务';
 import type { RenderedCard, AvTagsResult } from '../../proto/messages/CardRenderingMessages';
@@ -57,6 +58,9 @@ import { CardAudioSession } from '../../model/CardAudioSession';
 import { APP_FOREGROUND_KEY } from '../../model/Redemption';
 import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../../model/ReleaseFeatures';
 import { buildPreviewInteractionScript } from '../../model/PreviewInteraction';
+import { cardViewportWidth } from '../../model/CardViewportLayout';
+import { PAGE_SURFACE_KEY } from '../../model/ThemeCatalog';
+import { ThemeBackground } from '../common/ThemeBackground';
 
 /** 仅向预览转发显示操作，文档版本由组件校验。 */
 class PreviewActionProxy {
@@ -71,6 +75,9 @@ type 预览面 = 'question' | 'answer';
 
 @Component
 export struct 卡片预览页 {
+  private readonly desktopPreview: boolean = deviceInfo.deviceType === '2in1' || deviceInfo.deviceType === 'pc';
+  @State private cardContentWidth: number = cardViewportWidth(0, 0);
+  @StorageProp(PAGE_SURFACE_KEY) private pageSurface: string = '#F5F7FA';
   @StorageProp('cardTextSizePercent') private cardTextSizePercent: number = 100;
   @Prop isDark: boolean = false;
   @Prop 卡片ID列表: number[] = [];
@@ -83,7 +90,7 @@ export struct 卡片预览页 {
   onPositionChanged: (index: number) => void = (_index: number): void => {};
   onClose: () => void = (): void => {};
   onEditField: (卡片ID: number) => void = (_卡片ID: number): void => {};
-  onCreateWithAgent: () => void = (): void => {};
+  onEditWithAgent: (cardId: number) => void = (_cardId: number): void => {};
 
   private readonly 网页控制器: webview.WebviewController = new webview.WebviewController();
   private readonly 卡片渲染服务实例: 卡片渲染服务 = new 卡片渲染服务();
@@ -391,6 +398,13 @@ export struct 卡片预览页 {
     this.onEditField(卡片ID);
   }
 
+  private 请求AI改卡(): void {
+    const cardId: number = this.取当前卡片ID();
+    if (!this.agentEnabled || cardId === 0 || this.忙碌 || !this.interactionEnabled || this.错误详情 !== '') return;
+    this.stopAudio();
+    this.onEditWithAgent(cardId);
+  }
+
   /** 读取本地化文案，context 不可用时回退空串。 */
   private 取本地化文案(资源: Resource): string {
     try {
@@ -431,19 +445,27 @@ export struct 卡片预览页 {
     return interceptMediaRequest(event.request, this.媒体目录, 媒体基地址);
   }
 
-  /** 预览更多菜单：只保留编辑和 Agent 制卡，不做任何学习状态操作。 */
+  /** 与学习页共用右上角操作位置；预览不提供评分或撤销学习动作。 */
   private 预览更多菜单(): MenuElement[] {
+    const canManageCard: boolean = !this.忙碌 && this.interactionEnabled && this.错误详情 === '' &&
+      this.取当前卡片ID() !== 0;
     const items: MenuElement[] = [
       {
         value: this.取本地化文案($r('app.string.study_edit_note')),
         action: (): void => { this.请求编辑字段(); },
-        enabled: !this.忙碌 && this.错误详情 === ''
+        enabled: canManageCard
+      },
+      {
+        value: this.取本地化文案($r('app.string.study_replay_sound')),
+        action: (): void => { this.playCurrentAudio(); },
+        enabled: canManageCard && (this.hasAudio || this.audioError !== '')
       }
     ];
     if (this.agentEnabled) {
       items.push({
-        value: this.取本地化文案($r('app.string.ai_card_title')),
-        action: (): void => { this.onCreateWithAgent(); }
+        value: this.取本地化文案($r('app.string.ai_card_edit')),
+        action: (): void => { this.请求AI改卡(); },
+        enabled: canManageCard
       });
     }
     return items;
@@ -493,9 +515,11 @@ export struct 卡片预览页 {
 
   @Builder
   private 卡片区() {
+    Column() {
     Stack() {
       // Web 组件：src 必须为空字符串（BUG-008 修复），baseUrl=媒体基地址 由 loadData 传入。
       Web({ src: '', controller: this.网页控制器 })
+        .backgroundColor($r('app.color.surface_card'))
         .textZoomRatio(this.cardTextSizePercent)
         .javaScriptAccess(true)
         .fileAccess(true)
@@ -558,6 +582,21 @@ export struct 卡片预览页 {
     }
     .width('100%')
     .layoutWeight(1)
+    .backgroundColor($r('app.color.surface_card'))
+    .borderRadius(应用尺寸.圆角_卡片)
+    .clip(true)
+    .border({ width: 1.5, color: $r('app.color.border_input') })
+    .shadow(ShadowStyle.OUTER_DEFAULT_XS)
+    }
+    .width('100%')
+    .layoutWeight(1)
+    .padding({
+      top: 应用尺寸.pageContentTopInset,
+      left: 应用尺寸.页面内边距_水平,
+      right: 应用尺寸.页面内边距_水平,
+      bottom: 应用尺寸.间距_8
+    })
+    .backgroundColor(this.pageSurface)
   }
 
   @Builder
@@ -567,21 +606,12 @@ export struct 卡片预览页 {
         .fontSize(应用尺寸.字号_正文_小)
         .fontColor($r('app.color.text_secondary'))
       // 不放按钮：点击卡片看答案、左右滑上一步/下一步（Anki 预览 "<" ">" 的等价语义，见 PreviewInteraction 注入脚本）。
-      if (this.hasAudio || this.audioError !== '') {
-        Button($r('app.string.study_replay_sound'))
-          .height(应用尺寸.按钮高度)
-          .fontSize(应用尺寸.字号_按钮)
-          .fontColor($r('app.color.text_primary'))
-          .backgroundColor($r('app.color.surface_card'))
-          .enabled(!this.忙碌 && this.错误详情 === '' && this.interactionEnabled)
-          .onClick((): void => { this.playCurrentAudio(); })
-      }
       if (this.audioError !== '') {
         Text(this.audioError)
           .fontSize(应用尺寸.字号_正文_小)
           .fontColor($r('app.color.error_text'))
       }
-      Text($r('app.string.browser_preview_hint'))
+      Text(this.desktopPreview ? $r('app.string.browser_preview_keyboard_hint') : $r('app.string.browser_preview_hint'))
         .fontSize(应用尺寸.字号_正文_小)
         .fontColor($r('app.color.text_secondary'))
 
@@ -598,33 +628,36 @@ export struct 卡片预览页 {
 
   build() {
     Stack() {
-      // 遮罩层：点击关闭
-      Column()
-        .width('100%')
-        .height('100%')
-        .backgroundColor(this.isDark ? 'rgba(0,0,0,0.40)' : 'rgba(0,0,0,0.15)')
-        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-        .onClick((): void => { this.onClose(); })
-        .transition(TransitionEffect.OPACITY.animation({
-          curve: 取全屏转场曲线(),
-          duration: 取全屏转场时长()
-        }))
+      // 预览覆盖在已有页面上，必须独立绘制主题背景，不能透出宿主控件。
+      ThemeBackground()
 
       // 主面板：全屏卡片预览（OPACITY 转场，禁止左右平移）
       Column() {
-        this.预览顶部条()
-        this.卡片区()
-        this.底部条()
+        Column() {
+          this.预览顶部条()
+          this.卡片区()
+          this.底部条()
+        }
+        .width('100%')
+        .constraintSize({ maxWidth: this.cardContentWidth })
+        .height('100%')
       }
       .width('100%')
       .height('100%')
-      .backgroundColor($r('app.color.surface_page'))
-      .transition(TransitionEffect.OPACITY.animation({
-        curve: 取全屏转场曲线(),
-        duration: 取全屏转场时长()
-      }))
+      .alignItems(HorizontalAlign.Center)
+      .backgroundColor(this.pageSurface)
+      .onAreaChange((_oldArea: Area, area: Area): void => {
+        this.cardContentWidth = cardViewportWidth(Number(area.width), Number(area.height));
+      })
     }
     .width('100%')
     .height('100%')
+    .backgroundColor($r('app.color.surface_page'))
+    .hitTestBehavior(HitTestMode.Block)
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+    .transition(TransitionEffect.OPACITY.animation({
+      curve: 取全屏转场曲线(),
+      duration: 取全屏转场时长()
+    }))
   }
 }

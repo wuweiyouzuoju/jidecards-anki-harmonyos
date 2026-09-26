@@ -1021,6 +1021,26 @@ export struct 浏览页 {
     });
   }
 
+  /** 预览改卡只传当前卡，不使用浏览页的批量选择。 */
+  private async 打开预览AI改卡(cardId: number): Promise<void> {
+    if (!this.显示预览 || this.previewCardIds[this.预览初始索引] !== cardId || this.editor.visible || this.editor.busy) return;
+    const configured: boolean = await this.isAIConfigured();
+    if (!this.显示预览 || this.previewCardIds[this.预览初始索引] !== cardId || this.editor.visible || this.editor.busy) return;
+    this.显示预览 = false;
+    const restorePreview = (): void => {
+      this.预览刷新版本 += 1;
+      this.显示预览 = true;
+      this.执行搜索();
+    };
+    if (!configured) {
+      const settings: 设置页参数 = { openAiSettings: true };
+      this.pathStack.pushPath({ name: 'SettingsPage', param: settings, onPop: restorePreview });
+      return;
+    }
+    const params: AI制卡页参数 = { mode: 'edit', cardIds: [cardId], noteIds: [], templateIdx: -1 };
+    this.pathStack.pushPath({ name: 'AiCardPage', param: params, onPop: restorePreview });
+  }
+
   /** Agent 入口配置预检（与首页同款）；读取失败按未配置处理。 */
   private async isAIConfigured(): Promise<boolean> {
     try {
@@ -1345,6 +1365,8 @@ export struct 浏览页 {
         媒体目录: this.预览媒体目录,
         刷新版本: this.预览刷新版本,
         interactionEnabled: !this.editor.visible && !this.editor.busy,
+        onPositionChanged: (index: number): void => { this.预览初始索引 = index; },
+        onEditWithAgent: (cardId: number): void => { this.打开预览AI改卡(cardId); },
         onClose: (): void => {
           this.显示预览 = false;
         },

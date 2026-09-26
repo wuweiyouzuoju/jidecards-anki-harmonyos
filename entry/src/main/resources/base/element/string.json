@@ -44,7 +44,7 @@
     { "name": "study_guide_title", "value": "学习说明" },
     { "name": "study_guide_start", "value": "知道了" },
     { "name": "study_guide_save_failed", "value": "学习说明的已读状态未保存，下次可能再次提示。" },
-    { "name": "study_guide_message", "value": "先回忆答案，再点「显示答案」，按记忆情况评分。\n\n忘记：想不起来或答错了。\n困难：答对了，但回忆很费力。\n良好：正常回忆后答对了。\n简单：几乎不用思考就答对了。\n\n按钮下的时间表示选择该评分后，预计多久再次复习这张卡。请按记忆情况评分，不要按想等待的时间选择。\n\n今日跳过（埋藏）：今天先跳过这张卡，下一个学习日自动恢复。\n\n暂停此卡：停止复习这张卡，手动恢复后才会再次出现。\n\n选择题：选择答案并提交后，答对自动记为「良好」，答错自动记为「困难」，不会再询问评分。显示反馈后默认 5 秒自动进入下一题；可在右上角「更多」调整，并沿用到本次学习结束。反馈期间向右滑动可立即继续。" },
+    { "name": "study_guide_message", "value": "先回忆答案，再点「显示答案」，按记忆情况评分。\n\n忘记：想不起来或答错了。\n困难：答对了，但回忆很费力。\n良好：正常回忆后答对了。\n简单：几乎不用思考就答对了。\n\n按钮下的时间表示选择该评分后，预计多久再次复习这张卡。请按记忆情况评分，不要按想等待的时间选择。\n\n撤销操作：在「更多」中撤销最近一次可撤销的操作。例如，刚才误选了评分，撤销后那张卡会重新出现，可以再次作答和评分。按钮灰色表示当前没有可撤销的操作。\n\n今日跳过（埋藏）：今天先跳过这张卡，下一个学习日自动恢复。\n\n暂停此卡：停止复习这张卡，手动恢复后才会再次出现。\n\n自动前进：在「更多 → 自动前进」中设置问题、答案的停留时间与超时动作，再点「开始自动前进」；选择「关闭」表示该面不倒计时。时间和动作的调整仅本次学习生效，退出后恢复牌组设置。\n\n选择题：选择答案并提交后，答对自动记为「良好」，答错自动记为「困难」，不会再询问评分。反馈停留时间默认 5 秒，之后自动进入下一题；可在「更多 → 自动前进」中调整或关闭，仅本次学习生效。反馈期间向右滑动可立即继续。" },
     { "name": "jide_choice_submit", "value": "提交答案" },
     { "name": "jide_choice_correct", "value": "回答正确 · 已记为良好" },
     { "name": "jide_choice_wrong", "value": "回答错误 · 已记为困难" },
@@ -335,7 +335,7 @@
     },
     {
       "name": "study_undo",
-      "value": "撤销此卡"
+      "value": "撤销操作"
     },
     {
       "name": "study_edit_note",
@@ -375,7 +375,7 @@
     },
     {
       "name": "study_delete_card_confirm_message",
-      "value": "仅删除当前这一张卡片，不影响牌组里的其他卡片。若该笔记只有这一张卡，笔记会一并清理。可通过顶部「更多 → 撤销」恢复。"
+      "value": "仅删除当前这一张卡片，不影响牌组里的其他卡片。若该笔记只有这一张卡，笔记会一并清理。可通过顶部「更多 → 撤销操作」恢复。"
     },
     {
       "name": "study_delete_card_failed",
@@ -1169,7 +1169,7 @@
     { "name": "glossary_fuzz_label", "value": "随机抖动（Fuzz）" },
     { "name": "glossary_fuzz_help", "value": "复习卡按评分计算下次到期日后，Anki 会再加一点随机偏移，防止同期引入、同评分的卡片永远同天到期、扎堆出现。\n\n学习卡也会被加最多 5 分钟的额外延迟，让它们顺序不那么固定（但评分按钮上的下次到期文字不会反映这个延迟）。\n\n官方说明：此特性无法关闭。" },
     { "name": "glossary_shortcuts_label", "value": "键盘快捷键" },
-    { "name": "glossary_shortcuts_help", "value": "普通闪卡支持物理键盘：\n\n· 空格／Enter：问题面显示答案；答案面评为良好。\n· 1／2／3／4：答案面评为忘记／困难／良好／简单。\n· * 或 B：今日跳过。\n· @ 或 S：暂停此卡。\n· Delete：删除当前卡，需确认。\n· Ctrl+Z：撤销当前可撤销操作。\n· Esc：返回。\n· R：重放音频；在答案面会遵循“重放答案时跳过问题音频”选项，未开启时也会播放问题音频。\n\n选择题通过选择和提交自动判题，不能用普通翻面或 1～4 评分快捷键作答。" },
+    { "name": "glossary_shortcuts_help", "value": "jidecards 学习页键盘快捷键（普通闪卡）：\n\n· 空格／Enter：问题面显示答案；答案面评为良好。\n· 1／2／3／4：答案面评为忘记／困难／良好／简单。\n· B：今日跳过。\n· S：暂停此卡。\n· Delete：删除当前卡，需确认。\n· Ctrl+Z：撤销当前可撤销操作。\n· Esc：返回。\n· R：重放音频；在答案面会遵循“重放答案时跳过问题音频”选项，未开启时也会播放问题音频。\n\n选择题通过选择和提交自动判题，不能用普通翻面或 1～4 评分快捷键作答。" },
     { "name": "glossary_browser_info_label", "value": "卡片信息（浏览页）" },
     { "name": "glossary_browser_info_help", "value": "在浏览页卡片行右侧点 ⓘ，查看卡片类型（模板名称）、牌组、到期信息、间隔、复习与遗忘次数，以及可用的 FSRS 记忆信息和复习历史。\n\n“卡片类型”不是新卡、暂停或埋藏状态。弹层为只读；修改内容请点击条目进入编辑。" },
     { "name": "glossary_lapse_label", "value": "遗忘（Lapse）" },
@@ -2124,6 +2124,14 @@
     {"name":"custom_study_child_count","value":"（子牌组中 %d 张）"},
     {"name":"custom_study_preferences_error","value":"学习设置已应用，但未能记住此次输入。"},
     {"name":"custom_study_retry","value":"重新加载"},
-    {"name":"custom_study_invalid_value","value":"请输入有效的非零整数；天数和卡片数量必须为正数。"}
+    {"name":"custom_study_invalid_value","value":"请输入有效的非零整数；天数和卡片数量必须为正数。"},
+    {"name":"study_auto_advance_set_time","value":"请先设置问题或答案停留时间，再开始自动前进。"},
+    {"name":"study_auto_advance_off","value":"关闭"},
+    {"name":"study_auto_advance_feedback","value":"反馈停留时间"},
+    {"name":"study_auto_advance_answer","value":"答案停留时间"},
+    {"name":"study_auto_advance_question","value":"问题停留时间"},
+    {"name":"study_auto_advance_session_only","value":"仅本次学习"},
+    {"name":"study_auto_advance_title","value":"自动前进"},
+    {"name":"browser_preview_keyboard_hint","value":"点击卡片看答案，按左右方向键切换"}
   ]
 }

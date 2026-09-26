@@ -190,6 +190,7 @@ struct 首页 {
   @Provide('snapshot') private 主页快照数据: 主页快照 = 空主页快照;
   @State private historyRefreshToken: number = 0;
   @State private backgroundTransitionActive: boolean = false;
+  @State private homeTransitionOpacity: number = 1;
   private backgroundTransitionGeneration: number = 0;
   // 图表快照：静默加载图表 后用 提取卡片数据 转成纯基础类型，传给 主页摘要分页 渲染 Swiper 多页统计
   @State private 图表快照: 桌面卡片数据 | null = null;
@@ -1124,10 +1125,24 @@ struct 首页 {
     });
   }
 
-  /** 预览更多菜单“Agent 制卡”：关闭预览并进入 AI 制卡页。 */
-  private 关闭预览并进入Agent制卡(): void {
+  /** 仅把当前预览卡交给 AI 改卡；配置或编辑返回后恢复预览位置。 */
+  private async 关闭预览并进入AI改卡(cardId: number): Promise<void> {
+    if (!this.显示卡片预览 || this.预览卡片ID列表[this.预览初始索引] !== cardId) return;
+    const configured: boolean = await this.isAIConfigured();
+    if (!this.显示卡片预览 || this.预览卡片ID列表[this.预览初始索引] !== cardId) return;
     this.显示卡片预览 = false;
-    this.打开AI制卡();
+    this.暂停主页官方公告检查();
+    const restorePreview = (): void => {
+      this.返回主页后刷新();
+      this.显示卡片预览 = true;
+    };
+    if (!configured) {
+      const settings: 设置页参数 = { openAiSettings: true };
+      this.页面栈.pushPath({ name: 'SettingsPage', param: settings, onPop: restorePreview });
+      return;
+    }
+    const params: AI制卡页参数 = { mode: 'edit', cardIds: [cardId], noteIds: [], templateIdx: -1 };
+    this.页面栈.pushPath({ name: 'AiCardPage', param: params, onPop: restorePreview });
   }
 
   /** 打开浏览页并预填搜索串（查找重复对话框跳转用）。 */
@@ -1688,8 +1703,8 @@ struct 首页 {
   }
 
   // Navigation 自定义转场回调
-  // 通过 CustomTransition 单例查找 from/to 注册的 opacity 设置回调，
-  // 在 animateTo 内调用起点→终点回调，触发淡入淡出。
+  // 退出内容立即隐藏，只有进入内容淡入；透明页面不可交叉淡化，否则文字会叠影。
+  // NavBar 首页没有目的地注册，由本页单独控制内容透明度，根背景不参与淡入。
   // 动画结束后必须调 proxy.finishTransition()，否则 timeout(1200ms) 后系统强制结束。
   // - 首页与各 NavDestination 之间也必须走本回调，禁止回退到系统横向平移
   // - 时长取自 取全屏转场时长，透明度避免弹簧过冲与限幅停顿
@@ -1712,18 +1727,22 @@ struct 首页 {
         // 转场期间冻结当前彩雾；旧转场结束不能恢复新转场暂停的背景。
         backgroundGeneration = ++this.backgroundTransitionGeneration;
         this.backgroundTransitionActive = true;
-        const from起点 = CustomTransition.getInstance().取起点回调(fromName);
         const from终点 = CustomTransition.getInstance().取终点回调(fromName);
         const to起点 = CustomTransition.getInstance().取起点回调(toName);
         const to终点 = CustomTransition.getInstance().取终点回调(toName);
-        if (from起点 !== null) {
-          from起点(isPush, true);
-        }
+        if (from.index === -1) this.homeTransitionOpacity = 0;
+        if (from终点 !== null) from终点(isPush, true);
+        if (to.index === -1) this.homeTransitionOpacity = 0;
         if (to起点 !== null) {
           to起点(isPush, false);
         }
+        const showDestination = (): void => {
+          if (to.index === -1) this.homeTransitionOpacity = 1;
+          if (to终点 !== null) to终点(isPush, false);
+        };
         const context: UIContext | undefined = this.getUIContext();
         if (context === undefined) {
+          showDestination();
           transitionProxy.finishTransition();
           return;
         }
@@ -1734,14 +1753,7 @@ struct 首页 {
           onFinish: (): void => {
             transitionProxy.finishTransition();
           }
-        }, (): void => {
-          if (from终点 !== null) {
-            from终点(isPush, true);
-          }
-          if (to终点 !== null) {
-            to终点(isPush, false);
-          }
-        });
+        }, showDestination);
       }
     };
   }
@@ -2180,7 +2192,7 @@ struct 首页 {
           this.预览初始索引 = index;
         },
         onEditField: (卡片ID: number): void => { this.关闭预览并编辑(卡片ID); },
-        onCreateWithAgent: (): void => { this.关闭预览并进入Agent制卡(); },
+        onEditWithAgent: (cardId: number): void => { this.关闭预览并进入AI改卡(cardId); },
         onClose: (): void => { this.显示卡片预览 = false; }
       })
     }
@@ -2283,6 +2295,7 @@ struct 首页 {
       .height('100%')
       .backgroundColor(this.页面底色微染值)
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+      .opacity(this.homeTransitionOpacity)
     }
     .hideTitleBar(true)
     .mode(NavigationMode.Stack)

@@ -44,7 +44,7 @@
     { "name": "study_guide_title", "value": "Study guide" },
     { "name": "study_guide_start", "value": "Got it" },
     { "name": "study_guide_save_failed", "value": "Could not save that you read the guide. It may appear again next time." },
-    { "name": "study_guide_message", "value": "Recall the answer, tap Show Answer, then rate your recall.\n\nAgain: You forgot or answered incorrectly.\nHard: You answered correctly with difficulty.\nGood: You recalled the answer normally.\nEasy: You answered correctly without effort.\n\nThe time below each button estimates when this card will be reviewed again if you choose that rating. Rate your recall, rather than the delay you prefer.\n\nSkip today (Bury): Skip this card for today. It becomes available again on the next study day.\n\nSuspend card: Stop reviewing this card until you manually restore it.\n\nChoice questions: Submit your answer to record correct answers as Good and incorrect answers as Hard, with no second rating prompt. Feedback advances automatically after 5 seconds by default; set the delay in More at the top right and keep that setting for this study session, or swipe right during feedback to continue immediately." },
+    { "name": "study_guide_message", "value": "Recall the answer, tap Show Answer, then rate your recall.\n\nAgain: You forgot or answered incorrectly.\nHard: You answered correctly with difficulty.\nGood: You recalled the answer normally.\nEasy: You answered correctly without effort.\n\nThe time below each button estimates when this card will be reviewed again if you choose that rating. Rate your recall, rather than the delay you prefer.\n\nUndo: Open More to undo the most recent undoable action. For example, if you just chose the wrong rating, undoing it brings that card back so you can answer and rate it again. A gray button means there is no action to undo.\n\nSkip today (Bury): Skip this card for today. It becomes available again on the next study day.\n\nSuspend card: Stop reviewing this card until you manually restore it.\n\nAuto advance: In More > Auto advance, set question and answer durations and actions, then select Start auto advance. Off disables the timer for that side. Duration and action changes apply only to this study session; deck defaults return when you leave.\n\nChoice questions: Submit your answer to record correct answers as Good and incorrect answers as Hard, with no second rating prompt. Feedback advances automatically after 5 seconds by default. Adjust or disable the feedback duration in More > Auto advance for this session only, or swipe right during feedback to continue immediately." },
     { "name": "jide_choice_submit", "value": "Submit answer" },
     { "name": "jide_choice_correct", "value": "Correct · recorded as Good" },
     { "name": "jide_choice_wrong", "value": "Incorrect · recorded as Hard" },
@@ -560,7 +560,7 @@
     { "name": "glossary_fuzz_label", "value": "Fuzz Factor" },
     { "name": "glossary_fuzz_help", "value": "After a review card's next due date is computed from the rating, Anki applies a small random offset so cards introduced at the same time with the same rating don't always fall on the same day and cluster together.\n\nLearning cards also receive up to 5 minutes of extra delay so they don't always appear in the same order (the next-due text on the rating buttons does not reflect this delay).\n\nOfficial note: this feature cannot be turned off." },
     { "name": "glossary_shortcuts_label", "value": "Keyboard Shortcuts" },
-    { "name": "glossary_shortcuts_help", "value": "Physical-keyboard shortcuts for regular flashcards:\n\n• Space / Enter: show the answer on the question side; rate Good on the answer side.\n• 1 / 2 / 3 / 4: rate Again / Hard / Good / Easy on the answer side.\n• * or B: skip today.\n• @ or S: suspend the card.\n• Delete: delete the current card with confirmation.\n• Ctrl+Z: undo the available action.\n• Esc: go back.\n• R: replay audio. On the answer side, the Skip question when replaying answer option applies; with it off, question audio is included.\n\nChoice cards require selecting and submitting an answer for automatic grading; regular flip and 1–4 rating shortcuts do not answer them." },
+    { "name": "glossary_shortcuts_help", "value": "jidecards study keyboard shortcuts (regular flashcards):\n\n• Space / Enter: show the answer on the question side; rate Good on the answer side.\n• 1 / 2 / 3 / 4: rate Again / Hard / Good / Easy on the answer side.\n• B: skip today.\n• S: suspend the card.\n• Delete: delete the current card with confirmation.\n• Ctrl+Z: undo the available action.\n• Esc: go back.\n• R: replay audio. On the answer side, the Skip question when replaying answer option applies; with it off, question audio is included.\n\nChoice cards require selecting and submitting an answer for automatic grading; regular flip and 1–4 rating shortcuts do not answer them." },
     { "name": "glossary_lapse_label", "value": "Lapse" },
     { "name": "glossary_lapse_help", "value": "Rating a review card Again causes a lapse and adds 1 to its lapse count. Reaching the leech threshold triggers the configured leech action.\n\nWith fixed relearning steps, the card follows those delays. SM-2 then uses the lapse multiplier, minimum lapse interval and other constraints. FSRS calculates from memory state instead of those two legacy options, and may schedule short-term relearning even with empty steps." },
     { "name": "glossary_browser_info_label", "value": "Card Info (Browser)" },
@@ -1516,6 +1516,14 @@
     {"name":"custom_study_child_count","value":"(%d in subdecks)"},
     {"name":"custom_study_preferences_error","value":"Study settings were applied, but the input could not be remembered."},
     {"name":"custom_study_retry","value":"Retry"},
-    {"name":"custom_study_invalid_value","value":"Enter a valid non-zero integer. Days and card counts must be positive."}
+    {"name":"custom_study_invalid_value","value":"Enter a valid non-zero integer. Days and card counts must be positive."},
+    {"name":"study_auto_advance_set_time","value":"Set a question or answer duration before starting auto advance."},
+    {"name":"study_auto_advance_off","value":"Off"},
+    {"name":"study_auto_advance_feedback","value":"Feedback duration"},
+    {"name":"study_auto_advance_answer","value":"Answer duration"},
+    {"name":"study_auto_advance_question","value":"Question duration"},
+    {"name":"study_auto_advance_session_only","value":"This session only"},
+    {"name":"study_auto_advance_title","value":"Auto advance"},
+    {"name":"browser_preview_keyboard_hint","value":"Click the card to reveal the answer; use the left/right arrow keys to navigate"}
   ]
 }

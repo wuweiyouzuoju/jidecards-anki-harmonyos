@@ -12,7 +12,7 @@ const read = path => readFileSync(new URL(`../../${path}`, import.meta.url), 'ut
 const source = read('entry/src/main/ets/components/browser/卡片预览页.ets');
 const names = ['aboutToAppear', 'aboutToDisappear', 'updateActivity', 'stopAudio', 'playCurrentAudio',
   '预览刷新版本变化', '取当前卡片ID', '加载当前卡', '应用HTML', 'webFailed', 'installActionBridge', 'onControllerAttached回调',
-  '翻面', '上一张', '下一张', '请求编辑字段'];
+  '翻面', '上一张', '下一张', '请求编辑字段', '请求AI改卡', '预览更多菜单'];
 const methods = names.map(name => {
   const start = source.search(new RegExp(`^  (?:private )?(?:async )?${name}\\(`, 'm'));
   assert.ok(start >= 0, name);
@@ -301,6 +301,78 @@ test('preview matches Anki: no side buttons, question first, reveal by tap, swip
       `stale preview strings must be removed from ${file}`);
     for (const key of ['browser_preview_front', 'browser_preview_back', 'browser_preview_hint']) {
       assert.match(strings, new RegExp(`"name": "${key}"`), `missing ${key} in ${file}`);
+    }
+  }
+});
+
+test('desktop preview advertises arrow keys while touch devices keep their swipe hint', () => {
+  const expression = source.match(/private readonly desktopPreview: boolean = ([^;]+);/)[1];
+  for (const deviceType of ['2in1', 'pc', 'phone', 'tablet']) {
+    assert.equal(vm.runInNewContext(expression, { deviceInfo: { deviceType } }), ['2in1', 'pc'].includes(deviceType));
+  }
+  assert.match(source, /Text\(this\.desktopPreview \? \$r\('app.string.browser_preview_keyboard_hint'\) : \$r\('app.string.browser_preview_hint'\)\)/);
+  for (const locale of ['base', 'en_US']) {
+    const strings = new Map(JSON.parse(read(`entry/src/main/resources/${locale}/element/string.json`)).string.map(item => [item.name, item.value]));
+    assert.ok(strings.get('browser_preview_keyboard_hint'));
+    if (locale === 'base') assert.match(strings.get('browser_preview_keyboard_hint'), /按左右方向键/);
+  }
+});
+
+test('top-right preview menu replays audio and edits exactly the current card with AI', async () => {
+  const { page } = harness();
+  const edited = [];
+  let replayed = 0;
+  Object.assign(page, { agentEnabled: true, hasAudio: true, 当前索引值: 1,
+    onEditWithAgent: id => edited.push(id), playCurrentAudio: () => { replayed++; } });
+  const menu = page.预览更多菜单();
+  const replay = menu.find(item => item.value === 'app.string.study_replay_sound');
+  const agent = menu.find(item => item.value === 'app.string.ai_card_edit');
+  assert.equal(replay.enabled, true);
+  assert.equal(agent.enabled, true);
+  replay.action(); agent.action();
+  assert.equal(replayed, 1);
+  assert.deepEqual(edited, [22]);
+  page.interactionEnabled = false;
+  assert.equal(page.预览更多菜单().find(item => item.value === 'app.string.ai_card_edit').enabled, false);
+  page.请求AI改卡();
+  assert.deepEqual(edited, [22]);
+  page.agentEnabled = false;
+  assert.ok(!page.预览更多菜单().some(item => item.value === 'app.string.ai_card_edit'));
+  const bottom = source.match(/private 底部条\(\)[\s\S]*?\n  \}/)[0];
+  assert.doesNotMatch(bottom, /study_replay_sound|Button\(/);
+});
+
+test('both preview hosts pass current card IDs to edit mode and restore preview on return', async () => {
+  for (const [file, method, visible, ids, stack] of [
+    ['首页', '关闭预览并进入AI改卡', '显示卡片预览', '预览卡片ID列表', '页面栈'],
+    ['浏览页', '打开预览AI改卡', '显示预览', 'previewCardIds', 'pathStack']
+  ]) {
+    const hostSource = read(`entry/src/main/ets/pages/${file}.ets`);
+    const start = hostSource.indexOf(`  private async ${method}(`);
+    const body = hostSource.slice(start, hostSource.indexOf('\n  }', start) + 4);
+    const Host = vm.runInNewContext(stripTypeScriptTypes(`class Host { ${body} }; Host;`));
+    for (const configured of [true, false]) {
+      const host = new Host(), paths = [];
+      Object.assign(host, { [visible]: true, [ids]: [11, 22], 预览初始索引: 1, 预览刷新版本: 0,
+        editor: { visible: false, busy: false }, [stack]: { pushPath: path => paths.push(path) },
+        isAIConfigured: async () => configured, 暂停主页官方公告检查() {}, 返回主页后刷新() {}, 执行搜索() {} });
+      await host[method](22);
+      assert.equal(paths.length, 1);
+      assert.equal(host[visible], false);
+      assert.equal(paths[0].name, configured ? 'AiCardPage' : 'SettingsPage');
+      if (configured) {
+        assert.equal(paths[0].param.mode, 'edit');
+        assert.deepEqual(Array.from(paths[0].param.cardIds), [22]);
+      } else assert.equal(paths[0].param.openAiSettings, true);
+      paths[0].onPop();
+      assert.equal(host[visible], true);
+      assert.equal(host.预览初始索引, 1);
+      let finish;
+      host.isAIConfigured = () => new Promise(resolve => { finish = resolve; });
+      const pending = host[method](22);
+      host.预览初始索引 = 0;
+      finish(true); await pending;
+      assert.equal(paths.length, 1, 'a stale preview target must not open another AI page');
     }
   }
 });

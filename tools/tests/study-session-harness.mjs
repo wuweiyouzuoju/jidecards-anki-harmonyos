@@ -3,7 +3,7 @@ import { StudyTimerController } from '../../entry/src/main/ets/model/StudyTimerC
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { StudySessionController } from '../../entry/src/main/ets/model/StudySessionController.ts';
 import { AutoSyncScheduler } from '../../entry/src/main/ets/model/AutoSyncScheduler.ts';
-import { StudyOptions, StudyTiming, StudyAdvanceAction } from '../../entry/src/main/ets/model/StudyTiming.ts';
+import { StudyOptions, StudyTiming, StudyAdvanceAction, StudyAutoAdvanceSettings } from '../../entry/src/main/ets/model/StudyTiming.ts';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { SyncActivity } from '../../entry/src/main/ets/model/SyncSettings.ts';
@@ -19,6 +19,7 @@ export function attachStudySession(page) {
   page.editor = initialNoteEditorState();
   page.editorSession = new NoteEditorSession(page.noteReader, state => { page.editor = state; });
   page.autoAdvanceEnabled = false;
+  page.autoAdvanceSettings = new StudyAutoAdvanceSettings();
   page.studyMenuOpen = false;
   const source = readFileSync(new URL('../../entry/src/main/ets/pages/学习页.ets', import.meta.url), 'utf8');
   const names = ['startStudyTimers', 'stopStudyTimers', 'studyTimerState', 'applyTimedAction', 'toggleAutoAdvance'];

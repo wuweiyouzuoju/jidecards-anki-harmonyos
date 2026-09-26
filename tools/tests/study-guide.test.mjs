@@ -52,6 +52,7 @@ function pageHarness(completed = false) {
   vm.runInContext(stripTypeScriptTypes(`globalThis.Harness = class { ${methods.join('\n')} }`), context);
   const page = new context.Harness();
   Object.assign(page, { editor: { visible: false, busy: false },
+    取文案: key => key,
     studyGuideChecked: false, studyGuideVisible: false, stopStudyTimers() {}, startStudyTimers() {}, controllerReady: true, pendingHtml: '',
     choiceQuestion: null, choiceGrade: null, choiceAutoAdvanceTimer: -1, choiceFeedbackDeadline: 0, studyMenuOpen: false,
     页面已显示: false, 阶段: 'loading', 当前卡片: {}, 展示时刻毫秒: 500,
@@ -148,6 +149,20 @@ test('manual guide cannot open during loading or while a rating is being submitt
   page.showStudyGuide();
   assert.equal(dialogs.length, 0);
   assert.equal(page.studyGuideVisible, false);
+});
+
+test('study guide includes the shared keyboard shortcuts in both languages', () => {
+  for (const locale of ['base', 'en_US']) {
+    const strings = new Map(JSON.parse(read(`entry/src/main/resources/${locale}/element/string.json`)).string.map(item => [item.name, item.value]));
+    const { page, dialogs } = pageHarness();
+    page.取文案 = key => strings.get(key.replace('app.string.', ''));
+    page.页面已显示 = true;
+    page.阶段 = 'question';
+    page.maybeShowStudyGuide();
+    assert.equal(dialogs[0].message, strings.get('study_guide_message') + '\n\n' + strings.get('glossary_shortcuts_help'));
+    for (const key of ['Enter', 'Ctrl+Z', 'Delete', 'Esc']) assert.ok(dialogs[0].message.includes(key));
+    if (locale === 'base') assert.equal(strings.get('study_undo'), '撤销操作');
+  }
 });
 
 test('both review layouts preserve rating identity while displaying backend intervals separately', () => {

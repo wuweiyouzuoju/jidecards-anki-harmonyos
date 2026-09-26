@@ -110,6 +110,27 @@ test('builder preserves standard URLs and template scripts for browser base URL 
   assert.ok(out.includes(resources), 'do not rewrite HTML, scripts, entities or URL escapes');
 });
 
+test('study keeps the card opaque while its gutters and answer bar reveal the shared theme background', () => {
+  const html = 构建卡片HTML({
+    questionNodes: [{ text: 'front', replacement: null }],
+    answerNodes: [{ text: 'back', replacement: null }],
+    css: 'body { background: white; }', latexSvg: false, isEmpty: false
+  }, 'question', false, '#E8EEFC');
+  assert.match(html, /html, body \{ background: #E8EEFC !important; \}/);
+  const page = read(STUDY_PAGE);
+  assert.match(page, /构建卡片HTML\(rendered, 'question', this\.是否深色\(\)\)/);
+  assert.match(page, /Web\(\{ src: '', controller: this\.网页控制器 \}\)\s*\.backgroundColor\(\$r\('app\.color\.surface_card'\)\)/);
+  assert.match(page, /\.backgroundColor\(this\.页面底色微染值\)/);
+  const cardArea = page.slice(page.indexOf('private 卡片区()'), page.indexOf('private 答案条()'));
+  const answerBar = page.slice(page.indexOf('private 答案条()'), page.indexOf('\n  build()'));
+  for (const section of [cardArea, answerBar]) {
+    assert.doesNotMatch(section, /app\.color\.surface_page/, 'a static page fill hides the shared cloud background');
+    assert.match(section, /\.backgroundColor\(this\.页面底色微染值\)\s*\}/, 'outer section consumes PAGE_SURFACE_KEY');
+  }
+  assert.match(page, /\.hideTitleBar\(true\)\s*\.backgroundColor\(Color\.Transparent\)/);
+  assert.match(page, /\.opacity\(this\.转场透明度\)/);
+});
+
 test('html builder strips [sound:] tags, playback left to native player', () => {
   const rendered = {
     questionNodes: [

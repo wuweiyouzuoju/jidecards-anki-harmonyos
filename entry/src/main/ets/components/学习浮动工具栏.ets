@@ -426,7 +426,8 @@ export struct 学习浮动工具栏 {
     .width('100%')
     .height('100%')
     .padding({ left: 4, right: 4 })
-    .attributeModifier(new PrimaryGlassSurface(this.按下的评分 === 显示答案标签, this.primaryGlass))
+    .attributeModifier(new PrimaryGlassSurface(this.按下的评分 === 显示答案标签, this.primaryGlass,
+      $r('app.color.border_input'), 1.5))
     .stateEffect(false)
     .borderRadius(应用尺寸.圆角_面板)
     .animation({ duration: 80, curve: Curve.EaseOut })
@@ -440,7 +441,7 @@ export struct 学习浮动工具栏 {
   }
 
   @Builder
-  private 竖版评分按钮(评分: number, 标签: ResourceStr, 文字色: ResourceColor) {
+  private 竖版评分按钮(评分: number, 标签: ResourceStr, 文字色: ResourceColor, 底色: ResourceColor) {
     Button({ type: ButtonType.Normal }) {
       Column({ space: 2 }) {
         Text(标签)
@@ -454,7 +455,7 @@ export struct 学习浮动工具栏 {
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
             .fontSize(12)
-            .fontColor($r('app.color.text_secondary'))
+            .fontColor(文字色)
         }
       }
       .width('100%')
@@ -462,7 +463,7 @@ export struct 学习浮动工具栏 {
     .width('100%')
     .padding({ left: 4, right: 4 })
     .layoutWeight(1)
-    .attributeModifier(new GlassSurface(this.按下的评分 === 评分, this.glassColors))
+    .attributeModifier(new GlassSurface(this.按下的评分 === 评分, this.glassColors, 底色))
     .stateEffect(false)
     .borderRadius(应用尺寸.圆角_面板)
     .animation({ duration: 80, curve: Curve.EaseOut })
@@ -478,10 +479,14 @@ export struct 学习浮动工具栏 {
   @Builder
   private 竖版评分按钮列() {
     Column({ space: 应用尺寸.间距_8 }) {
-      this.竖版评分按钮(RATING_AGAIN, $r('app.string.rating_again'), $r('app.color.error_text'))
-      this.竖版评分按钮(RATING_HARD, $r('app.string.rating_hard'), $r('app.color.text_primary'))
-      this.竖版评分按钮(RATING_GOOD, $r('app.string.rating_good'), this.动作主色)
-      this.竖版评分按钮(RATING_EASY, $r('app.string.rating_easy'), $r('app.color.text_primary'))
+      this.竖版评分按钮(RATING_AGAIN, $r('app.string.rating_again'),
+        $r('app.color.study_again_text'), $r('app.color.study_again_background'))
+      this.竖版评分按钮(RATING_HARD, $r('app.string.rating_hard'),
+        $r('app.color.study_hard_text'), $r('app.color.study_hard_background'))
+      this.竖版评分按钮(RATING_GOOD, $r('app.string.rating_good'),
+        $r('app.color.study_good_text'), $r('app.color.study_good_background'))
+      this.竖版评分按钮(RATING_EASY, $r('app.string.rating_easy'),
+        $r('app.color.study_easy_text'), $r('app.color.study_easy_background'))
     }
     .width('100%')
     .height('100%')

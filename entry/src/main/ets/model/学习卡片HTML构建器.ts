@@ -454,9 +454,12 @@ const 可折叠字段脚本: string = `<script>
 // @副作用
 // 无
 // ========================================================
-export function 构建卡片HTML(渲染结果: RenderedCard, 侧面: 卡片正反面, isDark: boolean = false): string {
+export function 构建卡片HTML(渲染结果: RenderedCard, 侧面: 卡片正反面, isDark: boolean = false,
+  cardBackground: string = isDark ? '#18202B' : '#FFFFFF'): string {
   const 正文: string = 剥除音频标签(原始侧HTML(渲染结果, 侧面));
   const 默认配色: string = `body { color: ${isDark ? '#E6E6E6' : '#1A1A1A'}; background: transparent; }`;
+  // 模板 CSS 可能声明白色 body；最后注入主题背景，确保 ArkWeb 实际绘制面与原生卡片一致。
+  const 卡片背景样式: string = `html, body { background: ${cardBackground} !important; }`;
   const 样式: string = `${基础样式}\n${图片遮罩渲染样式}\n${可折叠字段样式}`;
   // latexSvg 只决定传统 LaTeX 图片后缀，不能关闭同一卡片中的 MathJax。
   return `<!DOCTYPE html>
@@ -468,6 +471,7 @@ export function 构建卡片HTML(渲染结果: RenderedCard, 侧面: 卡片正�
 <style>${默认配色}</style>
 <style>${渲染结果.css}</style>
 <style>${样式}</style>
+<style>${卡片背景样式}</style>
 ${图片遮罩渲染脚本}
 ${MATH_SCRIPTS}
 ${可折叠字段脚本}

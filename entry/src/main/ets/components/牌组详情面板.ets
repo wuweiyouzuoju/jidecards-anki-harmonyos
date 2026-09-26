@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { GlassSurface } from '../utils/GlassSurface';
 import { GLASS_COLORS_KEY, GLASS_HIGHLIGHT_COLORS } from '../model/ThemeCatalog';
-import { 按下态按钮 } from './common/按下态按钮';
+import { ThemeTextSpans } from './common/ThemeText';
+import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 import { DeckStudyHistoryCard } from './DeckStudyHistoryCard';
 import { deckHistorySearch } from '../model/DeckStudyHistory';
 
@@ -44,6 +45,7 @@ import { 颜色键 } from '../model/颜色主题';
 // ========================================================
 @Component
 export struct 牌组详情面板 {
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @StorageProp(GLASS_COLORS_KEY) private glassColors: string[] = GLASS_HIGHLIGHT_COLORS;
   @Prop showAddCard: boolean = true;
   @Prop historyRefreshToken: number = 0;
@@ -74,7 +76,7 @@ export struct 牌组详情面板 {
   @StorageProp(颜色键.学习中计数色) private 学习中计数色: string = '#B56A22';
   @StorageProp(颜色键.复习中计数色) private 复习中计数色: string = '#7056C8';
   @StorageProp(颜色键.动作主色) private 动作主色: string = '#2F5FD0';
-  // 更多及其子按钮共用按下状态，添加卡片使用共用工具栏按钮。
+  // 更多及其子按钮共用按下状态。
   @State private 按下按钮编号: number = 0;
 
   // ========================================================
@@ -106,32 +108,6 @@ export struct 牌组详情面板 {
       // B12-Y2 2026-07-23：Scroll 包裹，"更多"展开后内容超出时可滚动，开始学习按钮 不被推出边界
       Scroll(this.detailScroller) {
       Column({ space: 应用尺寸.pageSectionGap }) {
-        Row() {
-          Text($r('app.string.selected_deck'))
-            .fontSize(应用尺寸.字号_正文_中)
-            .fontColor($r('app.color.text_tertiary'))
-            .layoutWeight(1)
-          Text($r('app.string.deck_preview'))
-            .fontSize(应用尺寸.字号_正文_中)
-            .fontColor($r('app.color.text_tertiary'))
-            .padding({
-              left: 应用尺寸.间距_8,
-              right: this.showAddCard ? 应用尺寸.间距_12 : 0,
-              top: 应用尺寸.间距_8,
-              bottom: 应用尺寸.间距_8
-            })
-            .onClick((): void => { this.预览(); })
-          if (this.showAddCard) {
-            按下态按钮({
-              文案: $r('app.string.deck_add_card'),
-              字色: this.动作主色,
-              themeText: true,
-              是否启用: this.选中牌组Id !== '',
-              点击回调: (): void => { this.添加卡片(); }
-            })
-          }
-        }
-        .width('100%')
         // 第 6 次修复：完全绕过 @State/@Watch/@Builder 间接响应链，
         // 直接在 build() 中用 ForEach + if 从 @Consume 主页快照数据 渲染。
         // ForEach 建立 @Consume 主页快照数据 响应式依赖，
@@ -139,15 +115,46 @@ export struct 牌组详情面板 {
         // 直接用 deck.totalCards 等渲染，不经过 @State 中转。
         ForEach(this.主页快照数据.decks, (deck: 牌组汇总) => {
           if (deck.id === this.选中牌组Id) {
-            Text(牌组显示名(deck))
-              .fontSize(应用尺寸.字号_牌组标题)
-              .fontWeight(FontWeight.Bold)
-              .fontColor($r('app.color.text_primary'))
-              .width('100%')
-            Text(deck.description)
-              .fontSize(应用尺寸.字号_正文)
-              .fontColor($r('app.color.text_secondary'))
-              .width('100%')
+            // 标题只占操作区以外的宽度，长名称换行，不遮挡右上角预览。
+            Row({ space: 应用尺寸.间距_12 }) {
+              Text(牌组显示名(deck))
+                .fontSize(应用尺寸.字号_牌组标题)
+                .fontWeight(FontWeight.Bold)
+                .fontColor($r('app.color.text_primary'))
+                .layoutWeight(1)
+                .wordBreak(WordBreak.BREAK_ALL)
+              Row({ space: 应用尺寸.间距_12 }) {
+                if (this.showAddCard) {
+                  Button({ type: ButtonType.Normal }) {
+                    Text() {
+                      ThemeTextSpans($r('app.string.deck_add_card'), this.themeAccentColors, this.getUIContext())
+                    }
+                    .fontSize(应用尺寸.字号_按钮)
+                    .fontColor(this.动作主色)
+                  }
+                  .height(应用尺寸.按钮高度)
+                  .padding(0)
+                  .backgroundColor(Color.Transparent)
+                  .enabled(this.选中牌组Id !== '')
+                  .onClick((): void => { this.添加卡片(); })
+                }
+                Text($r('app.string.deck_preview'))
+                  .fontSize(应用尺寸.字号_正文_中)
+                  .fontColor($r('app.color.text_tertiary'))
+                  .padding({ top: 应用尺寸.间距_8, bottom: 应用尺寸.间距_8 })
+                  .constraintSize({ minHeight: 应用尺寸.按钮高度 })
+                  .onClick((): void => { this.预览(); })
+              }
+              .flexShrink(0)
+            }
+            .width('100%')
+            .alignItems(VerticalAlign.Top)
+            if (deck.description !== '') {
+              Text(deck.description)
+                .fontSize(应用尺寸.字号_正文)
+                .fontColor($r('app.color.text_secondary'))
+                .width('100%')
+            }
             Column({ space: 应用尺寸.间距_15 }) {
               Row() {
                 Text($r('app.string.deck_total_cards'))

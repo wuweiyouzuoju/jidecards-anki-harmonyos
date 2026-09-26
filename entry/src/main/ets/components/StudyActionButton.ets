@@ -16,6 +16,7 @@ export struct StudyActionButton {
   @Prop buttonHeight: number = 应用尺寸.行动按钮高度;
   @Prop labelFontSize: number = 应用尺寸.字号_按钮;
   @Prop labelColor: ResourceColor = $r('app.color.text_primary');
+  @Prop fillColor: ResourceColor = $r('app.color.surface_card');
   onActivate: () => void = (): void => {};
   @State private isPressed: boolean = false;
 
@@ -31,7 +32,7 @@ export struct StudyActionButton {
         if (this.subtitle.length > 0) {
           Text(this.subtitle)
             .fontSize(12)
-            .fontColor($r('app.color.text_secondary'))
+            .fontColor(this.labelColor)
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
@@ -45,7 +46,7 @@ export struct StudyActionButton {
       .padding({ left: 4, right: 4 })
       .fontSize(this.labelFontSize)
       .fontColor(this.labelColor)
-      .attributeModifier(new GlassSurface(this.isPressed, this.glassColors))
+      .attributeModifier(new GlassSurface(this.isPressed, this.glassColors, this.fillColor))
       .borderRadius(应用尺寸.圆角_面板)
       .animation({ duration: 80, curve: Curve.EaseOut })
       .onTouch((event: TouchEvent): void => {

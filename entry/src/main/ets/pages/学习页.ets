@@ -22,7 +22,9 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 import { 后端会话 } from '../backend/后端会话';
 import { AnkiStudySessionBackend } from '../backend/StudySessionBackend';
 import { StudySessionController, StudySnapshot } from '../model/StudySessionController';
-import { StudyOptions, StudyAdvanceAction } from '../model/StudyTiming';
+import { StudyOptions, StudyAdvanceAction, StudyAutoAdvanceSettings } from '../model/StudyTiming';
+import { StudyAutoAdvanceDraft } from '../model/StudyAutoAdvanceDraft';
+import { StudyAutoAdvanceDialog } from '../components/StudyAutoAdvanceDialog';
 import { 调度器服务 } from '../backend/调度器服务';
 import { 卡片渲染服务 } from '../backend/卡片渲染服务';
 import { 集合服务 } from '../backend/集合服务';
@@ -35,6 +37,7 @@ import { AnkiNoteEditor } from '../backend/AnkiNoteEditor';
 import { renderStudyAnswer, StudyAnswerNotetype } from '../model/StudyAnswerRenderer';
 import { resolveStudyKey } from '../model/StudyInputPolicy';
 import { studyKeyName } from '../utils/StudyKeyAdapter';
+import { cardViewportWidth } from '../model/CardViewportLayout';
 
 import type { RenderedCard, AvTagsResult } from '../proto/messages/CardRenderingMessages';
 import {
@@ -143,6 +146,7 @@ export struct 学习页 {
   private 已渲染: RenderedCard | null = null;
   @State private studyOptions: StudyOptions = new StudyOptions();
   @State private autoAdvanceEnabled: boolean = false;
+  private readonly autoAdvanceSettings: StudyAutoAdvanceSettings = new StudyAutoAdvanceSettings();
   @State private studyTimerText: string = '';
   private readonly studyTimer: StudyTimerController = new StudyTimerController({
     state: (): StudyTimerState => this.studyTimerState(),
@@ -155,7 +159,9 @@ export struct 学习页 {
   });
   private choiceAutoAdvanceTimer: number = -1;
   private choiceFeedbackDeadline: number = 0;
-  private choiceDelayMenuOpen: boolean = false;
+  private autoAdvanceSettingsOpen: boolean = false;
+  private autoAdvanceDialog: CustomDialogController | null = null;
+  private autoAdvanceDialogBack: () => void = (): void => {};
   private studyMenuOpen: boolean = false;
   private questionHasAudio: boolean = false;
   private 正面HTML: string = '';
@@ -212,6 +218,7 @@ export struct 学习页 {
   // 2.1.4.1 对比度：按钮背景专用档（配 #FFFFFF 文字 ≥ 4.5:1）
   @StorageProp(颜色键.主色容器) private 主色容器色: string = '#E8EEFC';
   @StorageProp(PAGE_SURFACE_KEY) private 页面底色微染值: string = '#F5F7FA';
+  @State private cardContentWidth: number = cardViewportWidth(0, 0);
   // 状态栏高度（沉浸式全屏下，顶部条需让出状态栏区域，避免按钮叠在状态栏上）
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
   // 手势导航条高度（bottom 布局下答案条贴底，需抬高避让导航条）
@@ -230,27 +237,22 @@ export struct 学习页 {
   @State private choiceSelectedIds: string[] = [];
   @State private choiceGrade: JideChoiceGrade | null = null;
   @State private choiceFeedbackSecondsOverride: number = -1;
-  /** NavDestination 透明度（由 customNavContentTransition 回调控制，实现淡入淡出转场）。 */
   @State private 转场透明度: number = 1;
 
   async aboutToAppear(): Promise<void> {
+    // 与浏览、统计共用转场协议；背景由首页根层持续持有。
+    CustomTransition.getInstance().注册NavParam('StudyPage',
+      (isPush: boolean, isExit: boolean): void => {
+        this.转场透明度 = isExit ? 1 : 0;
+      },
+      (isPush: boolean, isExit: boolean): void => {
+        this.转场透明度 = isExit ? 0 : 1;
+      }
+    );
     this.mounted = true;
     this.studySession.activate();
     this.牌组ID = this.pageDeckId === '' ? 0 : parseInt(this.pageDeckId);
     this.牌组名 = this.pageDeckName;
-    // 注册自定义转场回调：首页 Navigation.customNavContentTransition 通过此 name 查找回调，
-    // 在 animateTo 内调用起点/终点回调修改 转场透明度，实现淡入淡出（替代系统默认左右平移）。
-    // key 用 'StudyPage'（NavPathStack pushPath 时传的 name，与 from.name / to.name 一致）。
-    CustomTransition.getInstance().注册NavParam('StudyPage',
-      (isPush: boolean, isExit: boolean): void => {
-        // 起点：进入方从 0 开始淡入；退出方从 1 起始（保持显示，淡出由终点回调控制）
-        this.转场透明度 = isExit ? 1 : 0;
-      },
-      (isPush: boolean, isExit: boolean): void => {
-        // 终点：进入方淡入到 1；退出方淡出到 0（pop 时退出方被卸载，opacity 无关紧要）
-        this.转场透明度 = isExit ? 0 : 1;
-      }
-    );
     // 恢复显示偏好后启动会话；失败使用默认值。
     try {
       this.主题模式值 = await 加载主题模式();
@@ -284,6 +286,7 @@ export struct 学习页 {
   }
 
   aboutToDisappear(): void {
+    CustomTransition.getInstance().注销NavParam('StudyPage');
     this.editorSession.dispose();
     this.studyTimer.dispose();
     this.mounted = false;
@@ -294,8 +297,6 @@ export struct 学习页 {
     this.待重渲染当前卡 = false;
     this.controllerReady = false;
     this.audioSession.release();
-    // 注销自定义转场回调，避免内存泄漏与野回调
-    CustomTransition.getInstance().注销NavParam('StudyPage');
     // 评分已写入后端，pop 离开学习页时异步刷新桌面卡片数据（拉最新 Graphs + 牌组树 → 推送所有桌面卡片）。
     // 不 await，不阻塞页面销毁；失败静默，不影响主流程。
     // 解决：学习期间桌面卡片显示旧数据，必须进统计页才更新的问题。
@@ -352,7 +353,8 @@ export struct 学习页 {
     };
     this.getUIContext().showAlertDialog({
       title: $r('app.string.study_guide_title'),
-      message: $r('app.string.study_guide_message'),
+      message: this.取文案($r('app.string.study_guide_message')) + '\n\n' +
+        this.取文案($r('app.string.glossary_shortcuts_help')),
       autoCancel: false,
       alignment: DialogAlignment.Center,
       onWillDismiss: (action: DismissDialogAction): void => {
@@ -496,6 +498,7 @@ export struct 学习页 {
   private invalidateCardWork(): void {
     this.stopStudyTimers();
     this.requestVersion += 1;
+    this.autoAdvanceDialog?.close();
     this.flipPending = false;
     this.pendingHtml = '';
     this.有音频 = false;
@@ -606,7 +609,7 @@ export struct 学习页 {
   private scheduleChoiceAutoAdvance(): void {
     this.clearChoiceAutoAdvance();
     if (!this.页面已显示 || !this.foreground || this.studyGuideVisible || this.studyMenuOpen || this.评分中 ||
-      this.editor.visible || this.editor.busy || this.手写模式 || this.choiceDelayMenuOpen ||
+      this.editor.visible || this.editor.busy || this.手写模式 || this.autoAdvanceSettingsOpen ||
       this.阶段 !== 'answer' || this.choiceGrade === null || this.choiceQuestion === null ||
       this.choiceAutoAdvanceSeconds() <= 0 || this.choiceFeedbackDeadline <= 0) return;
     const remaining: number = Math.max(0, this.choiceFeedbackDeadline - Date.now());
@@ -621,38 +624,64 @@ export struct 学习页 {
     return this.choiceQuestion === null ? 0 : this.choiceQuestion.feedbackSeconds;
   }
 
-  private 选择题自动跳过选项(): void {
+  private configureAutoAdvance(): void {
+    if (this.autoAdvanceSettingsOpen || this.评分中 || this.当前卡片 === null ||
+      (this.阶段 !== 'question' && this.阶段 !== 'answer')) return;
+    const version: number = this.requestVersion;
+    const choice: boolean = this.choiceQuestion !== null;
+    const openedAt: number = Date.now();
+    const initialFeedbackSeconds: number = this.choiceAutoAdvanceSeconds();
+    let feedbackTimeChanged: boolean = false;
+    const draft: StudyAutoAdvanceDraft = new StudyAutoAdvanceDraft(
+      this.autoAdvanceSettings.resolve(this.studyOptions), this.autoAdvanceEnabled, initialFeedbackSeconds);
+    this.autoAdvanceSettingsOpen = true;
+    this.stopStudyTimers();
     this.clearChoiceAutoAdvance();
-    this.choiceDelayMenuOpen = true;
-    const seconds: number[] = [0, 3, 5, 10, 15, 30];
-    this.getUIContext().getPromptAction().showActionMenu({
-      title: this.取文案($r('app.string.jide_choice_auto_skip_title')),
-      buttons: [
-        { text: this.取文案($r('app.string.jide_choice_auto_skip_option', 0)), color: $r('app.color.text_primary') },
-        { text: this.取文案($r('app.string.jide_choice_auto_skip_option', 3)), color: $r('app.color.text_primary') },
-        { text: this.取文案($r('app.string.jide_choice_auto_skip_option', 5)), color: $r('app.color.text_primary') },
-        { text: this.取文案($r('app.string.jide_choice_auto_skip_option', 10)), color: $r('app.color.text_primary') },
-        { text: this.取文案($r('app.string.jide_choice_auto_skip_option', 15)), color: $r('app.color.text_primary') },
-        { text: this.取文案($r('app.string.jide_choice_auto_skip_option', 30)), color: $r('app.color.text_primary') }
-      ]
-    }).then((data: promptAction.ActionMenuSuccessResponse): void => {
-      this.choiceDelayMenuOpen = false;
-      if (this.choiceQuestion !== null && data.index >= 0 && data.index < seconds.length) {
-        this.choiceFeedbackSecondsOverride = seconds[data.index];
-        if (this.choiceGrade !== null && this.阶段 === 'answer') {
-          this.choiceFeedbackDeadline = seconds[data.index] > 0 ? Date.now() + seconds[data.index] * 1000 : 0;
-        }
+    const finish: () => void = (): void => {
+      if (!this.autoAdvanceSettingsOpen) return;
+      this.autoAdvanceSettingsOpen = false;
+      this.autoAdvanceDialog = null;
+      this.autoAdvanceDialogBack = (): void => {};
+      if (!this.isCurrentRequest(version)) return;
+      if (choice && this.choiceFeedbackDeadline > 0) {
+        this.choiceFeedbackDeadline = feedbackTimeChanged ? Date.now() + this.choiceAutoAdvanceSeconds() * 1000 :
+          this.choiceFeedbackDeadline + Date.now() - openedAt;
       }
+      this.startStudyTimers();
       this.scheduleChoiceAutoAdvance();
-    }).catch((): void => {
-      this.choiceDelayMenuOpen = false;
-      this.scheduleChoiceAutoAdvance();
-    });
+    };
+    try {
+      this.autoAdvanceDialog = new CustomDialogController({
+        builder: StudyAutoAdvanceDialog({ draft: draft, choice: choice,
+          registerBack: (back: () => void): void => { this.autoAdvanceDialogBack = back; },
+          onConfirm: (result: StudyAutoAdvanceDraft): void => {
+            if (!this.isCurrentRequest(version)) return;
+            if (choice) {
+              feedbackTimeChanged = result.feedbackSeconds !== initialFeedbackSeconds;
+              this.choiceFeedbackSecondsOverride = result.feedbackSeconds;
+              if (this.choiceGrade !== null && this.阶段 === 'answer' && feedbackTimeChanged) {
+                this.choiceFeedbackDeadline = result.feedbackSeconds > 0 ? Date.now() + result.feedbackSeconds * 1000 : 0;
+              }
+            } else {
+              result.apply(this.autoAdvanceSettings);
+              this.autoAdvanceEnabled = result.enabled && result.canEnable();
+            }
+            this.studyTimer.restartAdvance();
+          },
+          onClose: finish }),
+        autoCancel: false, customStyle: true, alignment: DialogAlignment.Center,
+        onWillDismiss: (_action: DismissDialogAction): void => { this.autoAdvanceDialogBack(); }
+      });
+      this.autoAdvanceDialog.open();
+    } catch (error) {
+      console.error(`Auto advance dialog failed: ${error}`);
+      finish();
+    }
   }
 
   private 继续选择题反馈(): void {
     if (this.choiceGrade === null || this.阶段 !== 'answer' || this.评分中 || this.studyGuideVisible ||
-      this.studyMenuOpen || this.choiceDelayMenuOpen || this.editor.visible || this.editor.busy || this.手写模式 ||
+      this.studyMenuOpen || this.autoAdvanceSettingsOpen || this.editor.visible || this.editor.busy || this.手写模式 ||
       !this.页面已显示 || !this.foreground) return;
     this.clearChoiceAutoAdvance();
     this.choiceFeedbackDeadline = 0;
@@ -667,12 +696,12 @@ export struct 学习页 {
 
   private studyTimerState(): StudyTimerState {
     return { version: this.requestVersion,
-      active: this.isCurrentRequest(this.requestVersion) && this.controllerReady && !this.studyMenuOpen &&
+      active: this.isCurrentRequest(this.requestVersion) && this.controllerReady && !this.studyMenuOpen && !this.autoAdvanceSettingsOpen &&
         !this.editor.visible && !this.editor.busy && !this.studyGuideVisible && !this.手写模式 &&
         (this.阶段 === 'question' || this.阶段 === 'answer'),
       advance: this.autoAdvanceEnabled,
       blocked: this.choiceQuestion !== null || this.评分中 || this.flipPending,
-      audioPlaying: this.audioSession.isPlaying(), options: this.studyOptions };
+      audioPlaying: this.audioSession.isPlaying(), options: this.autoAdvanceSettings.resolve(this.studyOptions) };
   }
 
   private applyTimedAction(action: StudyAdvanceAction): void {
@@ -766,6 +795,11 @@ export struct 学习页 {
       (this.阶段 === 'question' || this.阶段 === 'answer');
     const 菜单: MenuElement[] = [
       { value: this.取文案($r('app.string.study_edit_note')), action: () => { this.openNoteEditor(); }, enabled: canManageCard },
+      {
+        value: this.取文案($r('app.string.study_replay_sound')),
+        action: () => { this.playStudyAudio(true, true); },
+        enabled: this.有音频 && canManageCard
+      },
       { value: this.取文案($r('app.string.study_guide_title')), action: () => { this.showStudyGuide(); }, enabled: this.阶段 !== 'loading' && !this.评分中 },
       { value: this.取文案($r('app.string.study_undo')), action: () => { this.撤销上次(); }, enabled: this.可撤销 },
       {
@@ -780,20 +814,6 @@ export struct 学习页 {
       },
       { value: this.取文案($r('app.string.study_delete_card')), action: () => { this.请求删除当前卡(); }, enabled: this.阶段 === 'question' || this.阶段 === 'answer' }
     ];
-    if (this.choiceQuestion !== null) {
-      菜单.push({
-        value: this.取文案($r('app.string.jide_choice_auto_skip_current', this.choiceAutoAdvanceSeconds())),
-        action: (): void => { this.选择题自动跳过选项(); },
-        enabled: canManageCard
-      });
-    } else {
-      菜单.unshift({
-        value: this.取文案(this.autoAdvanceEnabled ? $r('app.string.study_auto_advance_pause') :
-          $r('app.string.study_auto_advance_start')),
-        action: (): void => { this.toggleAutoAdvance(); },
-        enabled: canManageCard && (this.studyOptions.secondsToShowQuestion > 0 || this.studyOptions.secondsToShowAnswer > 0)
-      });
-    }
     // 「手写」入口：常驻显示（question/answer 阶段），无开关，进入后叠加 Canvas 笔迹层
     if (this.阶段 === 'question' || this.阶段 === 'answer') {
       if (this.Agent入口已启用) {
@@ -809,6 +829,11 @@ export struct 学习页 {
         enabled: true
       });
     }
+    菜单.push({
+      value: this.取文案($r('app.string.study_auto_advance_title')),
+      action: (): void => { this.configureAutoAdvance(); },
+      enabled: canManageCard
+    });
     return 菜单;
   }
 
@@ -1450,7 +1475,8 @@ export struct 学习页 {
   // ========================================================
   private 处理按键(event: KeyEvent): boolean {
     const result = resolveStudyKey(studyKeyName(event.keyCode), event.type === KeyType.Down,
-      this.Ctrl按下, this.阶段, this.editor.visible || this.editor.busy, this.studyGuideVisible);
+      this.Ctrl按下, this.阶段, this.editor.visible || this.editor.busy,
+      this.studyGuideVisible || this.autoAdvanceSettingsOpen);
     this.Ctrl按下 = result.control;
     switch (result.command) {
       case 'undo': this.撤销上次(); break;
@@ -1555,6 +1581,7 @@ export struct 学习页 {
         // 改为空字符串避免自动加载；loadData 的 baseUrl 仍是 媒体基地址，
         // 相对路径资源解析与 onInterceptRequest 媒体拦截不受影响。
         Web({ src: '', controller: this.网页控制器 })
+        .backgroundColor($r('app.color.surface_card'))
         .textZoomRatio(this.cardTextSizePercent)
         .javaScriptAccess(true)
         .fileAccess(true)
@@ -1631,23 +1658,6 @@ export struct 学习页 {
           .align(Alignment.TopEnd)
           .margin(应用尺寸.间距_12)
           .hitTestBehavior(HitTestMode.None)
-      }
-
-      if (this.有音频 && (this.阶段 === 'question' || this.阶段 === 'answer')) {
-        Button() {
-          Text() { ThemeTextSpans($r('app.string.study_replay_sound'), this.themeAccentColors, this.getUIContext()) }.fontSize(应用尺寸.字号_按钮).fontColor(this.动作主色)
-        }
-          .height(应用尺寸.按钮高度)
-          .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
-          .margin(应用尺寸.间距_12)
-          .fontSize(应用尺寸.字号_按钮)
-          .fontColor(this.动作主色)
-          .backgroundColor($r('app.color.surface_card'))
-          .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
-          .borderRadius(应用尺寸.圆角_胶囊)
-          .onClick(() => {
-            this.playStudyAudio(true, true);
-          })
       }
 
       if (this.阶段 === 'loading') {
@@ -1752,6 +1762,11 @@ export struct 学习页 {
       .width('100%')
       .layoutWeight(1)
       .alignContent(Alignment.BottomEnd)
+      .backgroundColor($r('app.color.surface_card'))
+      .borderRadius(应用尺寸.圆角_卡片)
+      .clip(true)
+      .border({ width: 1.5, color: $r('app.color.border_input') })
+      .shadow(ShadowStyle.OUTER_DEFAULT_XS)
 
       // Type-in-the-Answer：正面阶段在 Web 下方渲染输入框，翻面后比对用户输入与笔记字段值。
       // Enter 提交翻面（对齐 Anki 桌面端输入框回车显示答案）。
@@ -1816,7 +1831,14 @@ export struct 学习页 {
     }
     .width('100%')
     .layoutWeight(1)
-    .padding({ top: 应用尺寸.pageContentTopInset })
+    .padding({
+      top: 应用尺寸.pageContentTopInset,
+      left: 应用尺寸.页面内边距_水平,
+      right: 应用尺寸.页面内边距_水平,
+      bottom: 应用尺寸.间距_8
+    })
+    // 幻彩时 PAGE_SURFACE_KEY 为透明，让卡片四周显示已有根背景。
+    .backgroundColor(this.页面底色微染值)
   }
 
   @Builder
@@ -1832,7 +1854,8 @@ export struct 学习页 {
           .fontSize(应用尺寸.字号_标题)
           .fontWeight(FontWeight.Medium)
           .fontColor(this.动作主色)
-          .attributeModifier(new PrimaryGlassSurface(this.显示答案按下, this.primaryGlass))
+          .attributeModifier(new PrimaryGlassSurface(this.显示答案按下, this.primaryGlass,
+            $r('app.color.border_input'), 1.5))
           .stateEffect(false)
           .borderRadius(应用尺寸.圆角_行动按钮)
           .animation({ duration: 80, curve: Curve.EaseOut })
@@ -1852,7 +1875,8 @@ export struct 学习页 {
           StudyActionButton({
             label: $r('app.string.rating_again'),
             subtitle: this.按钮文案位(RATING_AGAIN),
-            labelColor: $r('app.color.error_text'),
+            labelColor: $r('app.color.study_again_text'),
+            fillColor: $r('app.color.study_again_background'),
             onActivate: (): void => {
               this.评分(RATING_AGAIN);
             }
@@ -1860,6 +1884,8 @@ export struct 学习页 {
           StudyActionButton({
             label: $r('app.string.rating_hard'),
             subtitle: this.按钮文案位(RATING_HARD),
+            labelColor: $r('app.color.study_hard_text'),
+            fillColor: $r('app.color.study_hard_background'),
             onActivate: (): void => {
               this.评分(RATING_HARD);
             }
@@ -1867,7 +1893,8 @@ export struct 学习页 {
           StudyActionButton({
             label: $r('app.string.rating_good'),
             subtitle: this.按钮文案位(RATING_GOOD),
-            labelColor: this.动作主色,
+            labelColor: $r('app.color.study_good_text'),
+            fillColor: $r('app.color.study_good_background'),
             onActivate: (): void => {
               this.评分(RATING_GOOD);
             }
@@ -1875,6 +1902,8 @@ export struct 学习页 {
           StudyActionButton({
             label: $r('app.string.rating_easy'),
             subtitle: this.按钮文案位(RATING_EASY),
+            labelColor: $r('app.color.study_easy_text'),
+            fillColor: $r('app.color.study_easy_background'),
             onActivate: (): void => {
               this.评分(RATING_EASY);
             }
@@ -1891,7 +1920,7 @@ export struct 学习页 {
       // 抬高避让手势导航条（AppGallery 导航栏适配要求）
       bottom: 应用尺寸.页面内边距_水平 + this.导航条高度
     })
-    .backgroundColor($r('app.color.surface_card'))
+    .backgroundColor(this.页面底色微染值)
   }
 
   build() {
@@ -1908,13 +1937,16 @@ export struct 学习页 {
             }
           }
           .width('100%')
-          .constraintSize({ maxWidth: 应用尺寸.复习页内容最大宽度 })
+          .constraintSize({ maxWidth: this.cardContentWidth })
           .height('100%')
         }
         .width('100%')
         .height('100%')
         .alignItems(HorizontalAlign.Center)
         .backgroundColor(Color.Transparent)
+        .onAreaChange((_oldArea: Area, area: Area): void => {
+          this.cardContentWidth = cardViewportWidth(Number(area.width), Number(area.height));
+        })
 
         if (this.学习布局模式值 === 'float') {
           // 主操作浮动工具栏：question 阶段显示「显示答案」，answer 阶段切换为 4 个评分按钮。
@@ -1971,12 +2003,12 @@ export struct 学习页 {
     }
     .hideTitleBar(true)
     .backgroundColor(Color.Transparent)
+    .opacity(this.转场透明度)
     .onBackPressed((): boolean => {
       if (this.editor.busy) { return true; }
       if (this.editor.visible) { this.closeNoteEditor(); return true; }
       return false;
     })
-    .opacity(this.转场透明度)
     // 从任何编辑/设置页返回都重新读取卡面。onPageShow 只对 @Entry 路由页生效，
     // NavDestination 必须用 onShown（与 学习提醒页 同款）；这是比 onPop 可靠的通道。
     .onShown((): void => {

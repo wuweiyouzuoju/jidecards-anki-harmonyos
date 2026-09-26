@@ -21,12 +21,13 @@ test('deck detail preview queries all cards and mounts the existing read-only pr
   assert.doesNotMatch(home, /显示编辑字段|显示更多菜单: true/, 'top bar is shared by both preview entries');
   assert.match(home, /onPositionChanged: \(index: number\): void => \{/);
   assert.match(home, /onEditField: \(卡片ID: number\): void => \{ this\.关闭预览并编辑\(卡片ID\); \}/);
-  assert.match(home, /onCreateWithAgent: \(\): void => \{ this\.关闭预览并进入Agent制卡\(\); \}/);
+  assert.match(home, /onEditWithAgent: \(cardId: number\): void => \{ this\.关闭预览并进入AI改卡\(cardId\); \}/);
+  assert.match(browser, /onEditWithAgent: \(cardId: number\): void => \{ this\.打开预览AI改卡\(cardId\); \}/);
   assert.doesNotMatch(preview, /@Prop 初始面/, 'preview always starts on the question, like Anki');
   assert.match(preview, /构建卡片HTML\(this\.已渲染, 'answer', this\.isDark\)/);
   assert.match(preview, /预览更多菜单/);
   assert.match(preview, /app\.string\.study_edit_note/);
-  assert.match(preview, /app\.string\.ai_card_title/);
+  assert.match(preview, /app\.string\.ai_card_edit/);
   assert.match(preview, /bindMenu\(this\.预览更多菜单\(\)\)/);
   assert.match(read('entry/src/main/ets/model/navigation/PageParams.ts'), /editCardId\?: number/);
   assert.match(browser, /pageEditCardId: number = -1/);
@@ -48,4 +49,16 @@ test('deck preview resources exist in both base and en_US', () => {
     .find((entry) => entry.name === 'browser_preview_position').value;
   assert.equal(zhValue, '%d/%d');
   assert.notEqual(enValue, zhValue);
+});
+
+test('deck title wraps beside the top-right preview without a separate current-deck row', () => {
+  const panel = read('entry/src/main/ets/components/牌组详情面板.ets');
+  assert.doesNotMatch(panel, /app\.string\.selected_deck/);
+  const header = panel.slice(panel.indexOf('Text(牌组显示名(deck))'), panel.indexOf("if (deck.description !== '')"));
+  assert.match(header, /\.layoutWeight\(1\)/);
+  assert.match(header, /\.wordBreak\(WordBreak\.BREAK_ALL\)/);
+  assert.doesNotMatch(header, /\.maxLines\(|TextOverflow\.Ellipsis/);
+  assert.match(header, /app\.string\.deck_preview/);
+  assert.match(header, /\.flexShrink\(0\)/);
+  assert.match(header, /\.alignItems\(VerticalAlign\.Top\)/);
 });

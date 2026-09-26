@@ -16,6 +16,29 @@ export class StudyOptions {
 
 export enum StudyAdvanceAction { None, ShowAnswer, Reminder, Bury, Again, Good, Hard }
 
+/** 仅覆盖本次学习明确修改的选项，切卡仍读取其余牌组默认值。 */
+export class StudyAutoAdvanceSettings {
+  questionSeconds: number = -1;
+  answerSeconds: number = -1;
+  questionAction: number = -1;
+  answerAction: number = -1;
+
+  resolve(base: StudyOptions): StudyOptions {
+    return {
+      autoplay: base.autoplay,
+      skipQuestionWhenReplayingAnswer: base.skipQuestionWhenReplayingAnswer,
+      waitForAudio: base.waitForAudio,
+      showTimer: base.showTimer,
+      stopTimerOnAnswer: base.stopTimerOnAnswer,
+      capAnswerTimeToSecs: base.capAnswerTimeToSecs,
+      secondsToShowQuestion: this.questionSeconds >= 0 ? this.questionSeconds : base.secondsToShowQuestion,
+      secondsToShowAnswer: this.answerSeconds >= 0 ? this.answerSeconds : base.secondsToShowAnswer,
+      questionAction: this.questionAction >= 0 ? this.questionAction : base.questionAction,
+      answerAction: this.answerAction >= 0 ? this.answerAction : base.answerAction
+    };
+  }
+}
+
 /**
  * 屏幕计时与自动前进的时钟，可在无 ArkUI/原生定时器的测试中验证。
  * Invariants: 每面只发出一次动作；暂停不累计时间；屏幕停表不改统计用时。

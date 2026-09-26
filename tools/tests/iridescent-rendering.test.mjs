@@ -116,6 +116,23 @@ test('theme configuration changes preserve elapsed position and adopt the next c
 
 /** 执行首页实际转场协议，模拟 @Prop 的更新通知。 */
 function createNavigation(background) {
+  const pages = new Map();
+  const callbacks = new Map();
+  const registry = {
+    注册NavParam: (name, start, end) => callbacks.set(name, { start, end }),
+    取起点回调: name => callbacks.get(name)?.start ?? null,
+    取终点回调: name => callbacks.get(name)?.end ?? null,
+  };
+  // 使用页面实际注册回调；这里只替换平台动画，不复制生产透明度规则。
+  for (const [file, name] of [['设置页', 'SettingsPage'], ['浏览页', 'BrowserPage'], ['学习页', 'StudyPage']]) {
+    const pageSource = readFileSync(new URL(`../../entry/src/main/ets/pages/${file}.ets`, import.meta.url), 'utf8');
+    const begin = pageSource.indexOf('CustomTransition.getInstance().注册NavParam(');
+    const registration = pageSource.slice(begin, pageSource.indexOf('\n    );', begin) + 7);
+    const page = { 转场透明度: 1 };
+    const register = new Function('CustomTransition', stripTypeScriptTypes(registration, { mode: 'transform' }));
+    register.call(page, { getInstance: () => registry });
+    pages.set(name, page);
+  }
   const source = readFileSync(new URL('../../entry/src/main/ets/pages/首页.ets', import.meta.url), 'utf8');
   const start = source.indexOf('  private 自定义转场回调(');
   const end = source.indexOf('\n  }', start) + 4;
@@ -124,23 +141,73 @@ function createNavigation(background) {
     NavigationOperation: { PUSH: 'push' },
     取全屏转场时长: () => 250,
     Curve: { EaseOut: 'ease-out' },
-    CustomTransition: { getInstance: () => ({ 取起点回调: () => null, 取终点回调: () => null }) },
+    CustomTransition: { getInstance: () => registry },
   };
   const home = new Function(...Object.keys(values), js + '; return new Home();')(...Object.values(values));
   home.backgroundTransitionGeneration = 0;
+  home.homeTransitionOpacity = 1;
   Object.defineProperty(home, 'backgroundTransitionActive', {
     get: () => background.transitionActive,
     set: active => { background.transitionActive = active; background.updatePlayback(); },
   });
   const fades = [];
-  home.getUIContext = () => ({ animateTo: (options, update) => { fades.push(options); update(); } });
-  const startTransition = (operation = 'push') => {
-    const protocol = home.自定义转场回调({ name: 'Home' }, { name: 'SettingsPage' }, operation);
+  const snapshot = () => Object.fromEntries([['Home', home.homeTransitionOpacity],
+    ...Array.from(pages, ([name, page]) => [name, page.转场透明度])]);
+  const frames = [];
+  home.getUIContext = () => ({ animateTo: (options, update) => {
+    fades.push(options);
+    const start = snapshot();
+    update();
+    frames.push({ start, end: snapshot() });
+  } });
+  const startTransition = (operation = 'push', from = { index: -1 }, to = { name: 'SettingsPage', index: 0 }) => {
+    const protocol = home.自定义转场回调(from, to, operation);
     protocol.transition({ finishTransition: () => protocol.onTransitionEnd(true) });
     return protocol;
   };
-  return { home, fades, startTransition };
+  return { home, fades, frames, snapshot, startTransition };
 }
+
+test('home and nested transparent destinations never crossfade old and new content', () => {
+  for (const [operation, from, to] of [
+    ['push', { index: -1 }, { name: 'StudyPage', index: 0 }],
+    ['pop', { name: 'StudyPage', index: 0 }, { index: -1 }],
+    ['push', { name: 'StudyPage', index: 0 }, { name: 'SettingsPage', index: 1 }],
+    ['pop', { name: 'SettingsPage', index: 1 }, { name: 'StudyPage', index: 0 }],
+    ['push', { index: -1 }, { name: 'SettingsPage', index: 0 }],
+    ['pop', { name: 'SettingsPage', index: 0 }, { index: -1 }],
+    ['push', { name: 'SettingsPage', index: 0 }, { name: 'BrowserPage', index: 1 }],
+    ['pop', { name: 'BrowserPage', index: 1 }, { name: 'SettingsPage', index: 0 }],
+    ['replace', { name: 'SettingsPage', index: 0 }, { name: 'BrowserPage', index: 0 }],
+  ]) {
+    const { background } = createBackground();
+    const nav = createNavigation(background);
+    nav.startTransition(operation, from, to);
+    const source = from.index === -1 ? 'Home' : from.name;
+    const destination = to.index === -1 ? 'Home' : to.name;
+    assert.equal(nav.frames[0].start[source], 0, `${operation}: source hidden before animation`);
+    assert.equal(nav.frames[0].end[source], 0, `${operation}: source cannot fade back in`);
+    assert.equal(nav.frames[0].start[destination], 0);
+    assert.equal(nav.frames[0].end[destination], 1);
+    nav.fades[0].onFinish();
+    assert.equal(nav.snapshot()[destination], 1);
+  }
+  const home = readFileSync(new URL('../../entry/src/main/ets/pages/首页.ets', import.meta.url), 'utf8');
+  assert.match(home, /\.expandSafeArea\([^\n]*\)\s*\.opacity\(this\.homeTransitionOpacity\)/,
+    'bind home opacity to NavBar content, not Navigation or the shared background');
+});
+
+test('missing UI context still reveals the destination for page and home returns', () => {
+  for (const to of [{ name: 'SettingsPage', index: 0 }, { index: -1 }]) {
+    const { background } = createBackground();
+    const nav = createNavigation(background);
+    nav.home.getUIContext = () => undefined;
+    nav.startTransition('pop', { name: 'BrowserPage', index: 1 }, to);
+    assert.equal(nav.snapshot().BrowserPage, 0);
+    assert.equal(nav.snapshot()[to.index === -1 ? 'Home' : to.name], 1);
+    assert.equal(background.transitionActive, false);
+  }
+});
 
 test('push and pop freeze the current cloud pose and resume only after navigation completes', () => {
   for (const operation of ['push', 'pop']) {
