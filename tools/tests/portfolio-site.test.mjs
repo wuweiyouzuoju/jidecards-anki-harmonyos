@@ -41,7 +41,7 @@ test('release facts stay consistent across human and machine entry points', asyn
 test('home offers separate entry points while development policy stays on its own page', async () => {
   const home = await read('index.html');
   for (const destination of [work.marketplace.url, work.repository, '/works/jidecards/', '/developers/', '/about/']) {
-    assert.ok(home.includes(`href="${destination}"`), destination);
+    assert.ok(home.includes(`href="${destination.replaceAll('&', '&amp;')}"`), destination);
   }
   assert.doesNotMatch(home, /项目优先服务|Agent-first|Agent 开发/);
   assert.match(await read('developers/index.html'), /项目优先服务 Agent 开发/);
