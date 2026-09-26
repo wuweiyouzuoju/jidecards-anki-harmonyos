@@ -248,7 +248,8 @@ export struct 牌组定制面板 {
         .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
 
       // ---- 主面板 ----
-      Column({ space: 应用尺寸.间距_12 }) {
+      // 内容高度随表单收缩，避免短表单被固定面板高度撑出大块空白。
+      Column({ space: 应用尺寸.间距_8 }) {
         DialogHeader({
           title: $r('app.string.deck_customize_title'),
           actionLabel: $r('app.string.deck_customize_save'),
@@ -419,12 +420,9 @@ export struct 牌组定制面板 {
             .width('100%')
         }
 
-        Blank()
-
       }
       .width('88%')
-      .height('88%')
-      .constraintSize({ maxWidth: 480 })
+      .constraintSize({ maxWidth: 480, maxHeight: '88%' })
       .padding(应用尺寸.卡片内边距)
       .backgroundColor($r('app.color.surface_card'))
       .borderRadius(应用尺寸.圆角_卡片)

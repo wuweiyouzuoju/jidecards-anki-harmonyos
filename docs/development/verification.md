@@ -99,7 +99,7 @@ Node 24 测试使用内置 TypeScript 转换，运行时可能输出 `Experiment
 ## 设备验收
 
 仅覆盖安装 `hdc -t <connect-key> install -r <signed-hap>`，然后 force-stop / 启动当前包。禁止 uninstall 清数据。
-本轮改首页任务协调时，检查：启动公告/云端引导/入门顺序；设置手动同步返回首页；忙碌时外部 APKG 排队；前后台与离页后不冒出迟到弹窗。
+本轮改首页任务协调时，检查：启动公告/入门顺序，以及开屏和菜单的直链入口均隐藏；设置手动同步返回首页；忙碌时外部 APKG 排队；前后台与离页后不冒出迟到弹窗。
 实际账户网络同步和用户文件导入需使用适当测试数据；没执行的场景单独报告。构建和安装成功不证明这些交互通过。
 
 主机测试：已有 VS/MSVC 时直接使用锁定 Rust；存在 `JIDECARDS_TOOLCHAINS` 或 `work/toolchains` 时沿用 bundled GNU/Zig。doctor 检查相应依赖，最终仍以真实测试和链接结果为准。

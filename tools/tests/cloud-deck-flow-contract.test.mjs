@@ -157,7 +157,7 @@ test('cloud deck and import source strings are aligned and translated', () => {
     'cloud_deck_enter', 'cloud_deck_meta_cards', 'cloud_deck_meta_cards_unknown_size',
     'cloud_deck_qq_group_entry', 'cloud_deck_qq_copy_failed', 'cloud_deck_selection_limit',
     'cloud_deck_skip', 'cloud_deck_menu_entry', 'cloud_deck_offline_notice',
-    'cloud_deck_reopen_hint', 'cloud_deck_skip_confirm_title', 'cloud_deck_skip_confirm_message',
+    'cloud_deck_onboarding_message', 'cloud_deck_skip_confirm_title', 'cloud_deck_skip_confirm_message',
     'cloud_deck_install_partial', 'cloud_deck_install_complete', 'cloud_deck_save_failed',
   ];
   for (const key of required) {
@@ -169,10 +169,7 @@ test('cloud deck and import source strings are aligned and translated', () => {
     zhMap.get('cloud_deck_title'),
     '获取你的牌组',
   );
-  assert.equal(zhMap.get('cloud_deck_onboarding_message'),
-    '首次进入牌组至少选择 1 个、最多选择 3 个。下载后将自动导入，本次选择机会仅有一次，请按需选择。'
-    + '可以选择稍后再说，之后从右上角「新建牌组」菜单里的「获取直链牌组」再次打开该界面。\n'
-    + '本项目属单机应用，牌组内容来自第三方直链获取。');
+  assert.doesNotMatch(zhMap.get('cloud_deck_onboarding_message'), /首次进入牌组|单机应用|菜单里的「获取直链牌组」/);
   assert.equal(zhMap.get('cloud_deck_qq_group_entry'),
     '更多牌组文件可前往官方 QQ 群 %s 免费下载（点击复制）');
   assert.equal(zhMap.get('cloud_deck_selection_limit'), '最多只能选择 %d 个牌组');

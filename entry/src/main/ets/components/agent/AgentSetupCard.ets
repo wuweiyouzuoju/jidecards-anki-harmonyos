@@ -48,6 +48,10 @@ export struct AgentSetupCard {
           .value(this.setup.deckName)
           .enabled(!this.disabled)
           .attributeModifier(new SelectStyle())
+          .height(SelectStyle.controlHeight)
+          .padding(SelectStyle.controlPadding)
+          .space(SelectStyle.controlSpace)
+          .width(SelectStyle.fieldWidth)
           .font(SelectStyle.controlFont)
           .borderRadius(SelectStyle.controlRadius)
           .onSelect((index: number): void => {
@@ -64,6 +68,10 @@ export struct AgentSetupCard {
           .value(this.setup.notetypeName)
           .enabled(!this.disabled)
           .attributeModifier(new SelectStyle())
+          .height(SelectStyle.controlHeight)
+          .padding(SelectStyle.controlPadding)
+          .space(SelectStyle.controlSpace)
+          .width(SelectStyle.fieldWidth)
           .font(SelectStyle.controlFont)
           .borderRadius(SelectStyle.controlRadius)
           .onSelect((index: number): void => {
@@ -81,6 +89,10 @@ export struct AgentSetupCard {
           .value(this.setup.deckId <= 0 ? this.allDecksLabel : this.setup.deckName)
           .enabled(!this.disabled)
           .attributeModifier(new SelectStyle())
+          .height(SelectStyle.controlHeight)
+          .padding(SelectStyle.controlPadding)
+          .space(SelectStyle.controlSpace)
+          .width(SelectStyle.fieldWidth)
           .font(SelectStyle.controlFont)
           .borderRadius(SelectStyle.controlRadius)
           .onSelect((index: number): void => {
@@ -98,6 +110,10 @@ export struct AgentSetupCard {
           .value(this.setup.notetypeId <= 0 ? this.allNotetypesLabel : this.setup.notetypeName)
           .enabled(!this.disabled)
           .attributeModifier(new SelectStyle())
+          .height(SelectStyle.controlHeight)
+          .padding(SelectStyle.controlPadding)
+          .space(SelectStyle.controlSpace)
+          .width(SelectStyle.fieldWidth)
           .font(SelectStyle.controlFont)
           .borderRadius(SelectStyle.controlRadius)
           .onSelect((index: number): void => {

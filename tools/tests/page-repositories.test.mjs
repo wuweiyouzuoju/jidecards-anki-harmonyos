@@ -2,13 +2,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadPlatformModule } from './platform-module-harness.mjs';
-import { parseBrowserSavedSearches, loadBrowserSidebar } from '../../entry/src/main/ets/model/BrowserSidebar.ts';
+import { parseBrowserSavedSearches, loadBrowserSidebar, removeBrowserSavedSearch, serializeBrowserSavedSearches, upsertBrowserSavedSearch } from '../../entry/src/main/ets/model/BrowserSidebar.ts';
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
 
 test('saved searches reject malformed entries individually without losing valid siblings', () => {
   assert.deepEqual(parseBrowserSavedSearches(JSON.stringify([null, 1, {}, { name: 3, search: 'x' },
     { name: 'valid', search: 'tag:one', extra: true }, { name: '', search: 'x' }])), [{ name: 'valid', search: 'tag:one' }]);
   assert.deepEqual(parseBrowserSavedSearches('broken'), []); assert.deepEqual(parseBrowserSavedSearches('{}'), []);
+});
+test('saved searches use the Anki savedFilters map and preserve CRUD semantics', () => {
+  const items = parseBrowserSavedSearches('{"Due":"is:due","Marked":"tag:marked"}');
+  assert.deepEqual(items, [{ name: 'Due', search: 'is:due' }, { name: 'Marked', search: 'tag:marked' }]);
+  assert.deepEqual(JSON.parse(serializeBrowserSavedSearches(items)), { Due: 'is:due', Marked: 'tag:marked' });
+  assert.equal(upsertBrowserSavedSearch(items, 'Due', 'is:new').ok, false);
+  const renamed = upsertBrowserSavedSearch(items, 'Today', 'is:due', 'Due');
+  assert.equal(renamed.ok, true);
+  if (renamed.ok) assert.deepEqual(renamed.items, [{ name: 'Today', search: 'is:due' }, { name: 'Marked', search: 'tag:marked' }]);
+  const removed = removeBrowserSavedSearch(items, 'Marked');
+  assert.equal(removed.ok, true);
 });
 test('sidebar tolerates missing preferences independently and retains cached decks without rereading', async () => {
   const cached = { id: 1 }, backend = { decks: async () => { throw new Error('should not read'); },

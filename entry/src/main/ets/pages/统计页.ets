@@ -505,6 +505,9 @@ export struct 统计页 {
               .value(this.牌组选项[this.选中牌组索引]?.value ?? '')
               .layoutWeight(1)
               .attributeModifier(new SelectStyle($r('app.color.surface_card')))
+              .height(SelectStyle.controlHeight)
+              .padding(SelectStyle.controlPadding)
+              .space(SelectStyle.controlSpace)
               .font(SelectStyle.controlFont)
               .borderRadius(SelectStyle.controlRadius)
               .onSelect((索引: number) => {

@@ -507,6 +507,9 @@ export struct 笔记类型编辑器 {
                   .value(this.当前模板().name)
                   .width('100%')
                   .attributeModifier(new SelectStyle())
+                  .height(SelectStyle.controlHeight)
+                  .padding(SelectStyle.controlPadding)
+                  .space(SelectStyle.controlSpace)
                   .font(SelectStyle.controlFont)
                   .borderRadius(SelectStyle.controlRadius)
                   .onSelect((索引: number) => {

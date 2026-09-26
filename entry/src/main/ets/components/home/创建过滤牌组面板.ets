@@ -215,6 +215,9 @@ export struct 创建过滤牌组面板 {
             .width('100%')
             .enabled(!this.处理中)
             .attributeModifier(new SelectStyle())
+            .height(SelectStyle.controlHeight)
+            .padding(SelectStyle.controlPadding)
+            .space(SelectStyle.controlSpace)
             .font(SelectStyle.controlFont)
             .borderRadius(SelectStyle.controlRadius)
             .onSelect((index: number) => {

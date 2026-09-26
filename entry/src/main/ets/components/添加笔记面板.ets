@@ -383,6 +383,9 @@ export struct 添加笔记面板 {
               .width('100%')
               .enabled(!this.busy && this.deckOptions.length > 0)
               .attributeModifier(new SelectStyle())
+              .height(SelectStyle.controlHeight)
+              .padding(SelectStyle.controlPadding)
+              .space(SelectStyle.controlSpace)
               .font(SelectStyle.controlFont)
               .borderRadius(SelectStyle.controlRadius)
               .onSelect((index: number): void => {
@@ -396,6 +399,9 @@ export struct 添加笔记面板 {
               .width('100%')
               .enabled(!this.busy && this.notetypeOptions.length > 0)
               .attributeModifier(new SelectStyle())
+              .height(SelectStyle.controlHeight)
+              .padding(SelectStyle.controlPadding)
+              .space(SelectStyle.controlSpace)
               .font(SelectStyle.controlFont)
               .borderRadius(SelectStyle.controlRadius)
               .onSelect((index: number): void => {

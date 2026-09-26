@@ -9,16 +9,20 @@ function read(path) {
 }
 
 test('small anchored menus share the restrained 150ms transition', () => {
+  const shared = read('entry/src/main/ets/components/common/AnchoredMenu.ets');
+  assert.match(shared, /TransitionEffect\.scale\(\{ x: 0\.98, y: 0\.98 \}\)/);
+  assert.equal((shared.match(/duration: 150/g) ?? []).length, 2);
+  assert.equal((shared.match(/curve: Curve\.EaseOut/g) ?? []).length, 2);
   for (const path of [
     'entry/src/main/ets/components/主页操作面板.ets',
     'entry/src/main/ets/components/home/主页更多面板.ets',
     'entry/src/main/ets/components/settings/模式切换菜单.ets',
+    'entry/src/main/ets/components/browser/BrowserMoreMenu.ets',
+    'entry/src/main/ets/components/browser/BrowserViewMenu.ets',
   ]) {
     const source = read(path);
     assert.doesNotMatch(source, /取全屏转场时长|取全屏转场曲线/, path);
-    assert.match(source, /TransitionEffect\.scale\(\{ x: 0\.98, y: 0\.98 \}\)/, path);
-    assert.equal((source.match(/duration: 150/g) ?? []).length, 2, path);
-    assert.equal((source.match(/curve: Curve\.EaseOut/g) ?? []).length, 2, path);
+    assert.match(source, /AnchoredMenu\(\{/, path);
   }
 });
 

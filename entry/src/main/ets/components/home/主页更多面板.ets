@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { AnchoredMenu } from '../common/AnchoredMenu';
+import { AnchoredMenuItem } from '../common/MenuItem';
 
 // ========================================================
 // @名称 主页更多面板
@@ -39,94 +41,20 @@ export struct 主页更多面板 {
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
 
   build() {
-    Stack() {
-      // 透明承接层：不遮暗不模糊，仅让菜单外点击可关闭
-      Column()
-        .width('100%')
-        .height('100%')
-        .backgroundColor(Color.Transparent)
-        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-        .onClick((): void => this.关闭回调())
-
-      Column() {
-        Text($r('app.string.top_settings'))
-          .fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_primary'))
-          .width('100%')
-          .constraintSize({ minHeight: 应用尺寸.menuItemHeight })
-          .padding({ left: 应用尺寸.menuHorizontalPadding, right: 应用尺寸.menuHorizontalPadding })
-          .textAlign(TextAlign.Center)
-          .onClick((): void => this.设置回调())
-        Divider()
-          .color($r('app.color.border_subtle'))
-          .strokeWidth(0.5)
-          .margin({ left: 应用尺寸.面板内边距, right: 应用尺寸.面板内边距 })
-        Text($r('app.string.browser_title'))
-          .fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_primary'))
-          .width('100%')
-          .constraintSize({ minHeight: 应用尺寸.menuItemHeight })
-          .padding({ left: 应用尺寸.menuHorizontalPadding, right: 应用尺寸.menuHorizontalPadding })
-          .textAlign(TextAlign.Center)
-          .onClick((): void => this.浏览回调())
-        Divider()
-          .color($r('app.color.border_subtle'))
-          .strokeWidth(0.5)
-          .margin({ left: 应用尺寸.面板内边距, right: 应用尺寸.面板内边距 })
-        Text($r('app.string.stats_page_title'))
-          .fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_primary'))
-          .width('100%')
-          .constraintSize({ minHeight: 应用尺寸.menuItemHeight })
-          .padding({ left: 应用尺寸.menuHorizontalPadding, right: 应用尺寸.menuHorizontalPadding })
-          .textAlign(TextAlign.Center)
-          .onClick((): void => this.统计回调())
-        Divider()
-          .color($r('app.color.border_subtle'))
-          .strokeWidth(0.5)
-          .margin({ left: 应用尺寸.面板内边距, right: 应用尺寸.面板内边距 })
-        Text($r('app.string.reminder_list_title'))
-          .fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_primary'))
-          .width('100%')
-          .constraintSize({ minHeight: 应用尺寸.menuItemHeight })
-          .padding({ left: 应用尺寸.menuHorizontalPadding, right: 应用尺寸.menuHorizontalPadding })
-          .textAlign(TextAlign.Center)
-          .onClick((): void => this.提醒回调())
-        Divider().color($r('app.color.border_subtle')).strokeWidth(0.5)
-          .margin({ left: 应用尺寸.面板内边距, right: 应用尺寸.面板内边距 })
-        Text($r('app.string.home_intro_menu_title'))
-          .fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_primary'))
-          .width('100%')
-          .constraintSize({ minHeight: 应用尺寸.menuItemHeight })
-          .padding({ left: 应用尺寸.menuHorizontalPadding, right: 应用尺寸.menuHorizontalPadding })
-          .textAlign(TextAlign.Center)
-          .onClick((): void => this.onIntro())
-      }
-      .width(应用尺寸.compactMenuWidth)
-      .backgroundColor($r('app.color.surface_card'))
-      .borderRadius(应用尺寸.圆角_指标卡)
-      .border({ width: 0.5, color: $r('app.color.border_subtle') })
-      .shadow({ radius: 12, color: 'rgba(0,0,0,0.10)', offsetX: 0, offsetY: 4 })
-      .margin({
-        top: 应用尺寸.工具栏高度 + this.状态栏高度 + 应用尺寸.pageContentTopInset,
-        left: 应用尺寸.页面内边距_水平
-      })
-      .onClick(() => {
-        // 阻断点击穿透到遮罩
-      })
-      // 小菜单统一使用 150ms EaseOut：入场轻缩放，退场只淡出。
-      .transition(TransitionEffect.asymmetric(
-        TransitionEffect.opacity(0)
-          .combine(TransitionEffect.scale({ x: 0.98, y: 0.98 }))
-          .animation({ curve: Curve.EaseOut, duration: 150 }),
-        TransitionEffect.opacity(0)
-          .animation({ curve: Curve.EaseOut, duration: 150 })
-      ))
+    AnchoredMenu({ menuWidth: 应用尺寸.compactMenuWidth, alignEnd: false,
+      contentMaxWidth: 应用尺寸.内容最大宽度,
+      topOffset: 应用尺寸.工具栏高度 + this.状态栏高度 + 应用尺寸.pageContentTopInset,
+      onClose: (): void => { this.关闭回调(); } }) {
+      AnchoredMenuItem({ label: $r('app.string.top_settings'), divider: false,
+        onSelect: (): void => { this.设置回调(); } })
+      AnchoredMenuItem({ label: $r('app.string.browser_title'), divider: true,
+        onSelect: (): void => { this.浏览回调(); } })
+      AnchoredMenuItem({ label: $r('app.string.stats_page_title'), divider: true,
+        onSelect: (): void => { this.统计回调(); } })
+      AnchoredMenuItem({ label: $r('app.string.reminder_list_title'), divider: true,
+        onSelect: (): void => { this.提醒回调(); } })
+      AnchoredMenuItem({ label: $r('app.string.home_intro_menu_title'), divider: true,
+        onSelect: (): void => { this.onIntro(); } })
     }
-    .width('100%')
-    .height('100%')
-    .alignContent(Alignment.TopStart)
   }
 }

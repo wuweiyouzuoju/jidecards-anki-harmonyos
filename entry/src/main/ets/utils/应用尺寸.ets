@@ -79,6 +79,8 @@ export class 应用尺寸 {
   static readonly pageSectionGap: number = 12;
   static readonly pageBottomInset: number = 12;
   static readonly 紧凑控件高度: number = 36;
+  static readonly searchFieldHeight: number = 44;
+  static readonly searchFieldRadius: number = 22;
   static readonly 按钮高度: number = 44;
   static readonly 行动按钮高度: number = 52;
   // 下拉菜单与长按菜单共用紧凑尺寸，长文案入口使用较宽档。

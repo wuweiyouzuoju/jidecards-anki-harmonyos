@@ -28,7 +28,6 @@
 // onItemHide: (deckId: string) => void  隐藏牌组回调
 // onItemDoubleTap: (deckId: string) => void  递归展开回调
 // onItemCustomStudy: (deckId: string) => void  打开自定义学习对话框回调
-// onItemCreateFilteredDeck: () => void  打开创建过滤牌组面板回调
 // onRefresh: () => void  下拉刷新回调
 // onRetry: () => void  错误态重试回调
 //
@@ -84,7 +83,6 @@ export struct 主页牌组列表 {
   onItemHide: (deckId: string) => void = (deckId: string): void => {};
   onItemDoubleTap: (deckId: string) => void = (deckId: string): void => {};
   onItemCustomStudy: (deckId: string) => void = (deckId: string): void => {};
-  onItemCreateFilteredDeck: () => void = (): void => {};
   onRefresh: () => void = (): void => {};
   onRetry: () => void = (): void => {};
 
@@ -138,9 +136,6 @@ export struct 主页牌组列表 {
                 },
                 onCustomStudy: (deckId: string): void => {
                   this.onItemCustomStudy(deckId);
-                },
-                onCreateFilteredDeck: (): void => {
-                  this.onItemCreateFilteredDeck();
                 }
               })
             }

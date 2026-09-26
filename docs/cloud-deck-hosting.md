@@ -1,5 +1,7 @@
 # 云端牌组托管指南
 
+> 当前牌组直链渠道已暂停：`ReleaseFeatures.ets` 的 `CLOUD_DECK_CHANNEL_ENABLED=false` 同时隐藏开屏与首页菜单入口。以下协议与资源保留供后续恢复；不会修改已下载内容或本机配额。
+
 > 现行运维文档。目录 Schema 以 `entry/src/main/ets/model/云端牌组模型.ts` 为准，
 > 当前发布数据以 `hosting/cloud-decks.json` 为准；历史 plan/spec 不能覆盖这两处事实。
 
@@ -81,7 +83,7 @@ export const 云端牌组目录地址: string =
   'https://你的目录直链/cloud-decks.json';
 ```
 
-重新构建软件即可。该版本把云端目录用于不可跳过的一次性首次引导，因此发布前必须保证目录地址已配置且可访问。
+重新构建软件即可。恢复直链渠道前须检查目录地址已配置且可访问；当前开关关闭时不会在启动阶段加载目录。
 
 ## 4. 123Pan 与其他服务
 

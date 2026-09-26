@@ -11,6 +11,9 @@ const DEVELOPER_DEBUG_KEY_NORMALIZED: string = 'jidecardsdeveloperdebug3.0.0';
 /** AppStorage protocol key shared by every hidden Agent entry. */
 export const AI_AGENT_CHANNELS_APP_STORAGE_KEY: string = 'aiAgentChannelsEnabled';
 
+/** 暂停牌组直链分发；开屏与首页菜单共用开关，不修改已有下载配额。 */
+export const CLOUD_DECK_CHANNEL_ENABLED: boolean = false;
+
 function normalizeDeveloperDebugKey(value: string): string {
   let normalized: string = '';
   const lower: string = value.trim().toLowerCase();

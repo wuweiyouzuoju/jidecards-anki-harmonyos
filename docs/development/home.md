@@ -3,7 +3,7 @@
 [返回任务索引](../../PROJECT_CONTEXT.md)
 
 - 代码路径以下均相对 `entry/src/main/ets/`。
-- 责任链：首页映射 UI → HomeWorkCoordinator / HomeStartupSequence / HomeSyncPolicy 决策 → HomeDataRepository / HomeDeckCommands / 既有 Service。
+- 责任链：首页映射 UI → HomeWorkCoordinator / HomeStartupSequence / HomeSyncPolicy 决策 → HomeDataRepository / 既有 Service。
 - 快速反馈：`npm test -- home`；完整验收见 [验证说明](verification.md)。
 
 ## 页面操作边界扩展点
@@ -15,11 +15,11 @@
 
 ## 首页入门与删除媒体
 
-`HomeIntroPanel` 复用首页启动弹层序列，在公告与首次云端牌组流程后展示；`HomeIntroStore` 用独立内容修订键，只有确认才写入，旧欢迎版本不抑制新介绍。首页“更多 → 应用速览”可重看。说明覆盖闪卡用途、牌组获取渠道（QQ群、Anki 共享牌组、AI 或人工制卡）、外部 Agent 制卡/改卡、APKG 导入复习以及 3.0.0 前老用户进群领取幻彩兑换码；沿用现有签名兑换，不自动赠送或调整应用版本。
+`HomeIntroPanel` 复用首页启动弹层序列，在公告处理后展示（直链渠道暂停时跳过云端牌组流程）；`HomeIntroStore` 用独立内容修订键，只有确认才写入，旧欢迎版本不抑制新介绍。首页“更多 → 速览”可重看。新用户说明明确默认配置即可开始，不要求先探索复杂设置。内容覆盖闪卡用途、牌组获取渠道（QQ群、Anki 共享牌组、AI 或人工制卡）、外部 Agent 制卡/改卡、APKG 导入复习以及 3.0.0 前老用户进群领取幻彩兑换码；沿用现有签名兑换，不自动赠送或调整应用版本。
 
 删除牌组期间显示忙碌遮罩，自动同步与其他首页操作等待。`DeckMediaCleanup` 比较删除前后 Core 媒体检查的 unused 差集，仅提示此次新增未引用文件；用户单独确认后再次检查，仍 unused 的确认文件才移入媒体回收站，绝不清空全局回收站。媒体同步活动或检查失败时保留媒体，牌组删除成功不回滚、不误报为删除失败。共享引用、原有闲置媒体和筛选牌组归还的卡片受检查保护。行为测试在 `deck-media-cleanup` 与 `home-deletion-runtime`。
 
-牌组色条候选为蓝、紫、绿、黄、红五色和取消色条；绿色/黄色继续使用现有 mint/amber 存储键，历史黑色仍正确显示但不再提供为新候选。定制入口显示“改名 / 自定义背景”，隐藏操作使用正常正文色。
+牌组色条候选为蓝、紫、绿、黄、红五色和取消色条；绿色/黄色继续使用现有 mint/amber 存储键，历史黑色仍正确显示但不再提供为新候选。色条子菜单仅以当前主题色文字标明选中项（幻彩沿用主题文字渐变），不显示勾号。定制入口显示“改名 / 自定义背景”，隐藏操作使用正常正文色。
 
 速览中的官方QQ群号在获取渠道与幻彩说明内均可点击复制，Anki共享牌组链接调用系统浏览器；点击链接使用独立蓝色资源以免随幻彩文字变色。`iridescent_preview.png` 为用户提供的实际主题截图，按原始比例展示于说明下方。布局与交互需在设备上验证；覆盖安装保留用户数据。
 
@@ -30,6 +30,10 @@
 
 ## 数据与牌组修改入口
 
+- 首页右上角“新建牌组”菜单统一承载独立创建入口：普通牌组与筛选牌组。“创建筛选牌组”仅实验版显示（简洁模式为 false），按搜索条件取卡，不隐式绑定当前牌组；长按菜单中的学习入口保留接收当前牌组 ID 的“自定义学习”。创建入口由 `components/主页操作面板.ets` 回调至首页，不再经牌组列表逐层转发；回归见 `create-deck-contract.test.mjs`。
+- `components/home/自定义学习对话框.ets` 保留单页：六种方式列表下只显示当前方式的说明与输入，状态/标签方式额外显示四种卡片范围和包含/排除标签。整个表单按内容占高、顶部对齐，仅空间不足时收缩滚动，不用纵向 `layoutWeight(1)` 撑满弹窗。
+- 文案与设置含义对照本地 AnkiDroid `dialogs/customstudy/CustomStudyDialog.kt`、`values-zh-rCN/03-dialogs.xml` 及锁定 Core 的 `custom-study.ftl`：额度默认值用 Core 的 `extendNew/extendReview`，子牌组可用数分列显示；预览是过去 N 天添加的新卡，不重新排程。天数与抽取张数由 `backend/CustomStudyPreferences.ets` 记在本机，读取失败可重试，保存偏好失败不能诱导重复创建。
+- `model/CustomStudyOptions.ts` 负责整数校验与默认值；`SchedulerMessages.ts` 的 Cram oneof 7 保留原始标签数组与 Core 枚举，筛选/排序/排程仍由 Core 决定。包含任一标签、排除任一标签、无标签限制均沿用 Core 语义。回归入口 `custom-study-options.test.mjs`、`custom-study-dialog.test.mjs`；设备验收覆盖正常/大字号、键盘、六种方式切换、负增量与状态/标签选择。
 - `backend/HomeDataRepository.ets` 组装牌组树、用户覆盖、隐藏集合、图表及桌面卡片快照；统计范围和暂停分离口径来自持久化偏好。图表失败降级，桌面卡片保存失败不阻塞牌组列表。
 - `model/HomeRefreshQueue.ts` 串行刷新；销毁后不再启动排队读取。`HomeDeckExpansion.ts` 合并展开状态，保留主动折叠，只自动展开新父牌组。
 - `model/HomeSyncPolicy.ts` 从首页事实判定丢弃、暂停、等待或启动同步；手动请求越过尚未展示的启动工作，仍等待真实占用。

@@ -5,6 +5,8 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 
 const source = readFileSync(new URL('../../entry/src/main/ets/utils/HomeIntroStore.ets', import.meta.url), 'utf8');
+const panel = readFileSync(new URL('../../entry/src/main/ets/components/HomeIntroPanel.ets', import.meta.url), 'utf8');
+const homePage = readFileSync(new URL('../../entry/src/main/ets/pages/首页.ets', import.meta.url), 'utf8');
 function storeHarness() {
   const values = new Map([['welcome_shown', '2.7.0']]);
   const state = { fail: false };
@@ -35,4 +37,11 @@ test('failed persistence rolls back the in-memory marker so the introduction is 
   state.fail = false;
   await api.completeHomeIntro();
   assert.equal(await api.isHomeIntroCompleted(), true);
+});
+
+test('overview reassures new users and remains part of the first-start popup flow', () => {
+  assert.match(panel, /home_intro_simple_start_title/);
+  assert.match(panel, /home_intro_simple_start_body/);
+  assert.match(homePage, /introCompleted:\s*\(\): Promise<boolean> => isHomeIntroCompleted\(\)/);
+  assert.match(homePage, /showIntro:\s*\(\): void => \{ this\.显示欢迎弹窗 = true; \}/);
 });

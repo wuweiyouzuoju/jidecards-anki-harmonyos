@@ -12,6 +12,9 @@ export class AnkiBrowserSidebar implements BrowserSidebarBackend {
   private readonly config: 配置服务 = new 配置服务();
   decks(): Promise<DeckTreeNode> { return this.deckService.获取牌组树(); }
   tags(): Promise<TagTreeNode> { return this.tagService.标签树(); }
-  savedSearches(): Promise<string> { return this.config.获取配置JSON('savedSearches'); }
+  savedSearches(): Promise<string> { return this.config.获取配置JSON('savedFilters'); }
+  async saveSavedSearches(json: string): Promise<void> {
+    await this.config.设置配置JSON({ key: 'savedFilters', valueJson: json, undoable: false });
+  }
   collapsed(key: ConfigKeyBool): Promise<boolean> { return this.config.获取配置布尔(key); }
 }

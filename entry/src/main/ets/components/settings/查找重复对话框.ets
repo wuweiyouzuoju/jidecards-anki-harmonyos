@@ -308,6 +308,10 @@ export struct 查找重复对话框 {
               .selected(this.选中类型索引)
               .value(this.选中类型索引 >= 0 ? this.笔记类型列表[this.选中类型索引].name : '')
               .attributeModifier(new SelectStyle())
+              .height(SelectStyle.controlHeight)
+              .padding(SelectStyle.controlPadding)
+              .space(SelectStyle.controlSpace)
+              .width(SelectStyle.fieldWidth)
               .font(SelectStyle.controlFont)
               .borderRadius(SelectStyle.controlRadius)
               .onSelect((索引: number): void => {

@@ -59,7 +59,7 @@ test('home popup menus start below the status-aware toolbar', () => {
   for (const menu of [moreMenu, actionMenu]) {
     assert.match(menu, /@StorageProp\('状态栏高度'\)\s+private\s+状态栏高度:\s*number\s*=\s*0/);
     assert.match(menu,
-      /top:\s*应用尺寸\.工具栏高度\s*\+\s*this\.状态栏高度\s*\+\s*应用尺寸\.pageContentTopInset/);
+      /topOffset:\s*应用尺寸\.工具栏高度\s*\+\s*this\.状态栏高度\s*\+\s*应用尺寸\.pageContentTopInset/);
     assert.doesNotMatch(menu, /margin\(\{\s*top:\s*64/);
   }
 });

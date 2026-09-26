@@ -1,11 +1,13 @@
+import { BrowserMoreMenu } from '../components/browser/BrowserMoreMenu';
 import { BrowserNotetypeFeature } from '../components/browser/BrowserNotetypeFeature';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { namedResourceText, showToastSafely } from '../utils/UiFeedback';
-import { loadBrowserSidebar } from '../model/BrowserSidebar';
+import { loadBrowserSidebar, parseBrowserSavedSearches, removeBrowserSavedSearch, serializeBrowserSavedSearches, upsertBrowserSavedSearch } from '../model/BrowserSidebar';
+import type { BrowserSavedSearch } from '../model/BrowserSidebar';
 import { AnkiBrowserSidebar } from '../backend/AnkiBrowserSidebar';
 import { NoteEditorSession, NoteEditorState, initialNoteEditorState } from '../model/NoteEditorSession';
 import { AnkiNoteEditor } from '../backend/AnkiNoteEditor';
-import { BrowserSearchSession, loadBrowserRows } from '../model/BrowserSearchSession';
+import { BrowserSearchSession } from '../model/BrowserSearchSession';
 import { AnkiBrowserSearch } from '../backend/AnkiBrowserSearch';
 import { resolveBrowserCardIds, resolveBrowserNoteIds } from '../model/BrowserSelection';
 import type { 变更笔记类型请求 } from '../proto/messages/NotetypeMessages';
@@ -16,6 +18,7 @@ import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
 
 import { BrowserDueDialog } from '../components/browser/BrowserDueDialog';
 import { BrowserRenameTagDialog } from '../components/browser/BrowserRenameTagDialog';
+import { BrowserSavedSearchDialog } from '../components/browser/BrowserSavedSearchDialog';
 import { BrowserDeckDialog } from '../components/browser/BrowserDeckDialog';
 import { BrowserFlagDialog } from '../components/browser/BrowserFlagDialog';
 import { BrowserBatchConfirm } from '../components/browser/BrowserBatchConfirm';
@@ -50,6 +53,7 @@ import { 统一加载态 } from '../components/common/统一加载态';
 import { 统一错误态 } from '../components/common/统一错误态';
 import { DialogHeader } from '../components/common/DialogHeader';
 import { 搜索框 } from '../components/browser/搜索框';
+import { BrowserViewMenu } from '../components/browser/BrowserViewMenu';
 import { 卡片表格, 浏览行数据 } from '../components/browser/卡片表格';
 import { 浏览编辑区 } from '../components/browser/浏览编辑区';
 import { 批量操作栏 } from '../components/browser/批量操作栏';
@@ -109,9 +113,12 @@ export struct 浏览页 {
   @State private 行列表: 浏览行数据[] = [];
   @State private 列定义: BrowserColumn[] = [];
   @State private subtitleIndex: number = 1;
+  @State private showMoreMenu: boolean = false;
+  @State private showViewMenu: boolean = false;
+  @State private viewMenuGroup: string = 'mode';
+  @State private viewMenuWidth: number = 240;
   @State private sortColumn: string = '';
   @State private sortReverse: boolean = false;
-  private suspendedRowIds: Set<number> = new Set<number>();
   private readonly searchSession: BrowserSearchSession = new BrowserSearchSession(new AnkiBrowserSearch());
   @State private editor: NoteEditorState = initialNoteEditorState();
   private readonly editorSession: NoteEditorSession = new NoteEditorSession(new AnkiNoteEditor(),
@@ -123,7 +130,6 @@ export struct 浏览页 {
   private consumedRowCount: number = 0;
   private readonly operations: BrowserOperationController = new BrowserOperationController();
   @State private mutationBusy: boolean = false;
-  private loadingMore: boolean = false;
   /** NavDestination 透明度（由 customNavContentTransition 回调控制，实现淡入淡出转场）。 */
   @State private 转场透明度: number = 1;
 
@@ -166,6 +172,11 @@ export struct 浏览页 {
   @State private 侧边栏牌组折叠: boolean = false;
   @State private 侧边栏标签折叠: boolean = false;
   @State private 侧边栏已保存搜索折叠: boolean = false;
+  @State private 显示保存搜索: boolean = false;
+  @State private 保存搜索编辑项: BrowserSavedSearch | null = null;
+  @State private 保存搜索初始查询: string = '';
+  @State private 保存搜索错误: string = '';
+  @State private 保存搜索忙碌: boolean = false;
 
   // T6 标签管理状态：侧边栏长按标签 → 弹操作菜单 → 重命名/删除/补全
   @State private 显示标签重命名: boolean = false;
@@ -281,7 +292,10 @@ export struct 浏览页 {
    * Extension Points: 新增弹窗时在此链中按层级插入对应 @State 判断。
    */
   onBackPress(): boolean {
+    if (this.showViewMenu) { this.showViewMenu = false; return true; }
+    if (this.showMoreMenu) { this.showMoreMenu = false; return true; }
     if (this.batchDialog !== 'none') { this.batchDialog = 'none'; return true; }
+    if (this.显示保存搜索) { if (!this.保存搜索忙碌) this.显示保存搜索 = false; return true; }
     if (this.显示标签重命名) { this.显示标签重命名 = false; return true; }
     if (this.显示查找替换) { this.显示查找替换 = false; return true; }
     if (this.显示侧边栏) { this.显示侧边栏 = false; return true; }
@@ -308,7 +322,6 @@ export struct 浏览页 {
     const filter: string = this.quickFilter;
     const sortColumn: string = this.sortColumn;
     const sortReverse: boolean = this.sortReverse;
-    this.loadingMore = false;
     this.consumedRowCount = 0;
     this.阶段 = 'loading';
     try {
@@ -325,7 +338,6 @@ export struct 浏览页 {
       if (result === null || version !== this.searchVersion) return;
       this.列定义 = result.columns;
       this.结果ID列表 = result.ids;
-      this.suspendedRowIds = result.suspended;
       this.行列表 = result.rows;
       this.consumedRowCount = result.consumed;
       this.阶段 = 'list';
@@ -341,30 +353,13 @@ export struct 浏览页 {
    * 由 卡片表格.onReachEnd 触发；批次大小 100，并发上限由 BrowserSearchSession 管理。
    */
   private async 加载更多(): Promise<void> {
-    if (this.loadingMore || this.阶段 !== 'list') { return; }
-    const 已加载数: number = this.consumedRowCount;
-    if (已加载数 >= this.结果ID列表.length) {
-      return;
-    }
-    const 下一批: number[] = this.结果ID列表.slice(已加载数, 已加载数 + 100);
-    console.info(`BrowserPage: 加载更多 已加载=${已加载数} 本批=${下一批.length} 总=${this.结果ID列表.length}`);
+    if (this.阶段 !== 'list') return;
     const version: number = this.searchVersion;
-    this.loadingMore = true;
-    try {
-      await this.预加载行(下一批, version);
-      if (version === this.searchVersion) this.consumedRowCount += 下一批.length;
-    } finally {
-      if (version === this.searchVersion) this.loadingMore = false;
-    }
-    console.info(`BrowserPage: 加载更多完成 行列表=${this.行列表.length} 行`);
-  }
-
-  /** 预加载行数据：并行拉取（每批 20 个），累积后一次性赋值触发 UI 刷新。 */
-  private async 预加载行(ids: number[], version: number): Promise<void> {
-    const rows = await loadBrowserRows(ids, this.suspendedRowIds,
-      (id: number): Promise<BrowserRow> => this.搜索服务实例.浏览器行按ID(id),
+    const result = await this.searchSession.more(
       (): boolean => this.operations.isAlive() && version === this.searchVersion);
-    if (version === this.searchVersion && this.operations.isAlive()) this.行列表 = this.行列表.concat(rows);
+    if (result === null || version !== this.searchVersion) return;
+    this.行列表 = result.rows;
+    this.consumedRowCount = result.consumed;
   }
 
   /** 切换浏览模式（cards/notes），切换后自动重新搜索。 */
@@ -802,8 +797,77 @@ export struct 浏览页 {
   /** 侧边栏点已保存搜索 → 替换搜索文本为已保存的搜索串。 */
   private 选已保存搜索(搜索串: string): void {
     this.搜索文本 = 搜索串;
+    this.quickFilter = 'all';
     this.显示侧边栏 = false;
     this.执行搜索();
+  }
+
+  private 当前保存搜索串(): string {
+    const filter: BrowserQuickFilter | undefined = BROWSER_QUICK_FILTERS.find((item: BrowserQuickFilter): boolean => item.id === this.quickFilter);
+    const extra: string = filter === undefined ? '' : filter.query;
+    const base: string = this.搜索文本.trim();
+    return base === '' ? extra : extra === '' ? base : `${base} ${extra}`;
+  }
+
+  private 打开保存搜索(编辑项: BrowserSavedSearch | null): void {
+    if (this.阶段 !== 'list' || this.operations.isBusy()) return;
+    this.保存搜索编辑项 = 编辑项 === null ? null : { name: 编辑项.name, search: 编辑项.search };
+    this.保存搜索初始查询 = 编辑项 === null ? this.当前保存搜索串() : 编辑项.search;
+    this.保存搜索错误 = '';
+    this.显示保存搜索 = true;
+  }
+
+  private async 提交保存搜索(name: string): Promise<void> {
+    if (this.保存搜索忙碌 || !this.显示保存搜索) return;
+    const original: BrowserSavedSearch | null = this.保存搜索编辑项;
+    const query: string = this.保存搜索初始查询;
+    this.保存搜索忙碌 = true;
+    this.保存搜索错误 = '';
+    try {
+      const current: BrowserSavedSearch[] = parseBrowserSavedSearches(await this.sidebarBackend.savedSearches());
+      const result = original === null ? upsertBrowserSavedSearch(current, name, query) :
+        upsertBrowserSavedSearch(current, name, query, original.name);
+      if (!result.ok) {
+        if (result.reason === 'duplicate_name') this.保存搜索错误 = this.取本地化文案($r('app.string.browser_saved_search_duplicate'));
+        else if (result.reason === 'missing') this.保存搜索错误 = this.取本地化文案($r('app.string.browser_saved_search_missing'));
+        else this.保存搜索错误 = this.取本地化文案($r('app.string.browser_saved_search_empty'));
+        return;
+      }
+      await this.sidebarBackend.saveSavedSearches(serializeBrowserSavedSearches(result.items));
+      if (!this.operations.isAlive()) return;
+      this.已保存搜索列表 = result.items;
+      this.显示保存搜索 = false;
+      showToastSafely(this.getUIContext(), { message: this.取本地化文案($r('app.string.done')) });
+    } catch (error) {
+      this.保存搜索错误 = this.取本地化文案($r('app.string.browser_saved_search_save_error'));
+    } finally {
+      this.保存搜索忙碌 = false;
+    }
+  }
+
+  private 请求删除保存搜索(item: BrowserSavedSearch): void {
+    this.getUIContext().showAlertDialog({
+      title: $r('app.string.browser_saved_search_delete'),
+      message: item.name,
+      autoCancel: true,
+      primaryButton: { value: $r('app.string.cancel'), action: (): void => {} },
+      secondaryButton: { value: $r('app.string.browser_saved_search_delete'), fontColor: $r('app.color.error_text'),
+        action: (): void => { this.删除保存搜索(item); } }
+    });
+  }
+
+  private async 删除保存搜索(item: BrowserSavedSearch): Promise<void> {
+    if (this.保存搜索忙碌 || this.operations.isBusy()) return;
+    this.保存搜索忙碌 = true;
+    try {
+      const current: BrowserSavedSearch[] = parseBrowserSavedSearches(await this.sidebarBackend.savedSearches());
+      const result = removeBrowserSavedSearch(current, item.name);
+      if (!result.ok) { this.侧边栏错误 = this.取本地化文案($r('app.string.browser_saved_search_missing')); return; }
+      await this.sidebarBackend.saveSavedSearches(serializeBrowserSavedSearches(result.items));
+      if (this.operations.isAlive()) this.已保存搜索列表 = result.items;
+    } catch (error) {
+      this.侧边栏错误 = this.取本地化文案($r('app.string.browser_saved_search_save_error'));
+    } finally { this.保存搜索忙碌 = false; }
   }
 
   /** 侧边栏长按牌组 → 追加 AND deck:"xxx" 到搜索文本。 */
@@ -997,7 +1061,7 @@ export struct 浏览页 {
     return `${this.浏览模式值 === 'notes' ? column.notesModeLabel : column.cardsModeLabel} ${descending ? '↓' : '↑'}`;
   }
 
-  /** 选择框直接列出两个方向，避免二级菜单向侧边展开。 */
+  /** 排序组只列选项值；默认与各列升降序同级，不夹带类别标题。 */
   private sortOptions(): SelectOption[] {
     const items: SelectOption[] = [{ value: this.取本地化文案($r('app.string.browser_sort_default')) }];
     for (const column of this.sortableColumns()) {
@@ -1032,33 +1096,29 @@ export struct 浏览页 {
     this.执行搜索();
   }
 
-  /** 复用查找替换入口，并提供三种副标题显示方式。 */
-  private browserMoreMenu(): MenuElement[] {
-    const items: MenuElement[] = [{
-      value: this.取本地化文案(this.搜索文本.trim() === '' ? $r('app.string.browser_action_sidebar') :
-        $r('app.string.browser_filter_active')),
-      enabled: this.阶段 === 'list',
-      action: (): void => {
-        if (this.阶段 !== 'list') { return; }
-        this.侧边栏错误 = '';
-        this.打开侧边栏();
-      }
-    }, {
-      value: this.取本地化文案($r('app.string.browser_action_find_replace')),
-      enabled: this.阶段 === 'list',
-      action: (): void => { if (this.operations.isBusy()) return; this.查找替换错误 = ''; this.显示查找替换 = true; }
-    }];
-    const indices: number[] = [1, 4, 2];
-    const labels: Resource[] = [$r('app.string.browser_subtitle_deck'),
-      $r('app.string.browser_subtitle_answer'), $r('app.string.browser_subtitle_due')];
-    for (let index = 0; index < indices.length; index++) {
-      const cellIndex: number = indices[index];
-      items.push({
-        value: `${this.取本地化文案(labels[index])}${this.subtitleIndex === cellIndex ? ' ✓' : ''}`,
-        action: (): void => { this.subtitleIndex = cellIndex; }
-      });
+  @Builder
+  private browserMoreMenu() {
+    if (this.showMoreMenu) {
+      BrowserMoreMenu({ filterActive: this.搜索文本.trim() !== '' || this.quickFilter !== 'all', available: this.阶段 === 'list',
+        subtitleIndex: this.subtitleIndex,
+        topOffset: this.状态栏高度 + 应用尺寸.工具栏高度 + 应用尺寸.pageContentTopInset,
+        onClose: (): void => { this.showMoreMenu = false; },
+        onFilter: (): void => {
+          if (this.阶段 !== 'list') return;
+          this.showMoreMenu = false;
+          this.侧边栏错误 = '';
+          this.打开侧边栏();
+        },
+        onFindReplace: (): void => {
+          if (this.阶段 !== 'list' || this.operations.isBusy()) return;
+          this.showMoreMenu = false;
+          this.查找替换错误 = '';
+          this.显示查找替换 = true;
+        },
+        onSaveSearch: (): void => { this.showMoreMenu = false; this.打开保存搜索(null); },
+        onSubtitle: (index: number): void => { this.subtitleIndex = index; this.showMoreMenu = false; }
+      })
     }
-    return items;
   }
 
   /** 数量使用完整 ID 结果，区分卡片与笔记。 */
@@ -1101,7 +1161,7 @@ export struct 浏览页 {
           .backgroundColor($r('app.color.surface_card'))
           .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
           .borderRadius(应用尺寸.圆角_胶囊)
-          .bindMenu(this.browserMoreMenu())
+          .onClick((): void => { this.showMoreMenu = !this.showMoreMenu; })
       }
       }.width('100%').height('100%').alignItems(VerticalAlign.Center)
     }
@@ -1117,7 +1177,7 @@ export struct 浏览页 {
     .alignContent(Alignment.Center)
   }
 
-  /** 状态筛选保留原始搜索，放入选择框以留出列表空间。 */
+  /** 状态筛选保留原始搜索，由合并选择框的状态区域打开。 */
   private quickFilterOptions(): SelectOption[] {
     return BROWSER_QUICK_FILTERS.map((filter: BrowserQuickFilter): SelectOption => ({
       value: namedResourceText(this.getUIContext(), filter.labelKey)
@@ -1129,32 +1189,51 @@ export struct 浏览页 {
       filter.id === this.quickFilter));
   }
 
+  /** 单一外框中的三个选值区：只打开被点击的那一组，不套第二层分类。 */
+  private openViewMenu(group: string): void {
+    if (this.多选模式值 || this.阶段 !== 'list') return;
+    this.showMoreMenu = false;
+    this.viewMenuGroup = group;
+    this.showViewMenu = true;
+  }
+
+  @Builder
+  private viewChoice(label: string, group: string) {
+    Button() {
+      Row({ space: 4 }) {
+        Text(label).fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary'))
+          .layoutWeight(1).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+          .textAlign(TextAlign.Center)
+        Polygon().width(8).height(5).points([[0, 0], [8, 0], [4, 5]])
+          .fill($r('app.color.text_secondary'))
+      }.width('100%').height('100%').alignItems(VerticalAlign.Center)
+    }
+    .id('browser-view-' + group)
+    .type(ButtonType.Normal).backgroundColor(Color.Transparent)
+    .height(SelectStyle.controlHeight).padding({ left: 6, right: 6 }).borderRadius(0)
+    .layoutWeight(1).enabled(!this.多选模式值 && this.阶段 === 'list')
+    .accessibilityText(label)
+    .onClick((): void => { this.openViewMenu(group); })
+  }
+
   @Builder
   private browserControls() {
-    Row({ space: 8 }) {
-      Select(this.quickFilterOptions())
-        .selected(this.quickFilterIndex()).value(this.quickFilterOptions()[this.quickFilterIndex()].value)
-        .menuAlign(MenuAlignType.START)
-        .enabled(!this.多选模式值)
-        .attributeModifier(new SelectStyle($r('app.color.surface_card')))
-        .font(SelectStyle.controlFont)
-        .borderRadius(SelectStyle.controlRadius)
-        .onSelect((index: number): void => {
-          this.quickFilter = BROWSER_QUICK_FILTERS[index].id;
-          this.执行搜索();
-        })
+    Row({ space: 应用尺寸.间距_8 }) {
+      Row() {
+        this.viewChoice(this.浏览模式值 === 'cards' ? this.取本地化文案($r('app.string.browser_mode_cards')) :
+          this.取本地化文案($r('app.string.browser_mode_notes')), 'mode')
+        Divider().vertical(true).height(16).strokeWidth(0.5).color($r('app.color.border_subtle'))
+        this.viewChoice(namedResourceText(this.getUIContext(), BROWSER_QUICK_FILTERS[this.quickFilterIndex()].labelKey), 'filter')
+        Divider().vertical(true).height(16).strokeWidth(0.5).color($r('app.color.border_subtle'))
+        this.viewChoice(this.sortLabel(), 'sort')
+      }
+      .id('browser-view-selector')
+      .layoutWeight(7).height(SelectStyle.controlHeight)
+      .backgroundColor($r('app.color.surface_card')).borderRadius(SelectStyle.controlRadius).clip(true)
+      .onAreaChange((_oldArea: Area, area: Area): void => { this.viewMenuWidth = Number(area.width); })
       Text(this.阶段 === 'loading' ? $r('app.string.browser_loading') : this.resultCountLabel())
         .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
-        .layoutWeight(1).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-      Select(this.sortOptions())
-        .selected(this.sortIndex()).value(this.sortLabel())
-        .menuAlign(MenuAlignType.END)
-        .constraintSize({ maxWidth: '42%' })
-        .enabled(!this.多选模式值 && this.阶段 === 'list')
-        .attributeModifier(new SelectStyle($r('app.color.surface_card')))
-        .font(SelectStyle.controlFont)
-        .borderRadius(SelectStyle.controlRadius)
-        .onSelect((index: number): void => { this.selectSort(index); })
+        .layoutWeight(3).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).textAlign(TextAlign.End)
     }.width('100%')
       .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平, bottom: 6 })
   }
@@ -1164,12 +1243,10 @@ export struct 浏览页 {
     Column() {
       this.顶部条()
 
-      // 搜索框组件（TextInput + Cards/Notes 模式切换）
+      // 搜索独占一行；合并选择框与数量放在下一行。
       搜索框({
         搜索文本: this.搜索文本,
-        浏览模式值: this.浏览模式值,
-        onSearch: (文本: string): void => { this.提交搜索(文本); },
-        onModeChange: (模式: string): void => { this.切换模式(模式 as 浏览模式); }
+        onSearch: (文本: string): void => { this.提交搜索(文本); }
       })
         .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平,
           top: 应用尺寸.pageContentTopInset,
@@ -1380,6 +1457,8 @@ export struct 浏览页 {
         onSelectDeck: (牌组名: string): void => { this.选牌组节点(牌组名); },
         onSelectTag: (标签名: string): void => { this.选标签节点(标签名); },
         onSelectSavedSearch: (搜索串: string): void => { this.选已保存搜索(搜索串); },
+        onRenameSavedSearch: (项: 已保存搜索项): void => { this.打开保存搜索(项); },
+        onDeleteSavedSearch: (项: 已保存搜索项): void => { this.请求删除保存搜索(项); },
         onAppendDeck: (牌组名: string): void => { this.追加牌组条件(牌组名); },
         onAppendTag: (标签名: string): void => { this.追加标签条件(标签名); },
         onRenameTag: (标签名: string): void => { this.请求重命名标签(标签名); },
@@ -1389,6 +1468,13 @@ export struct 浏览页 {
           this.切换侧边栏折叠(分区);
         }
       })
+    }
+    if (this.显示保存搜索) {
+      BrowserSavedSearchDialog({ isDark: this.是否深色(), busy: this.保存搜索忙碌,
+        editing: this.保存搜索编辑项 !== null, initialName: this.保存搜索编辑项 === null ? '' : this.保存搜索编辑项.name,
+        initialSearch: this.保存搜索初始查询, error: this.保存搜索错误,
+        onClose: (): void => { if (!this.保存搜索忙碌) this.显示保存搜索 = false; },
+        onSubmit: (name: string): void => { this.提交保存搜索(name); } })
     }
   }
 
@@ -1462,6 +1548,36 @@ export struct 浏览页 {
 
         // T6 标签重命名对话框：侧边栏长按标签 → 重命名 → 弹此对话框
         this.browserMutationPanels()
+
+        this.browserMoreMenu()
+
+        if (this.showViewMenu) {
+          BrowserViewMenu({
+            notes: this.浏览模式值 === 'notes',
+            filterIndex: this.quickFilterIndex(),
+            sortIndex: this.sortIndex(),
+            group: this.viewMenuGroup,
+            menuWidth: this.viewMenuWidth,
+            filterOptions: this.quickFilterOptions(),
+            sortOptions: this.sortOptions(),
+            available: !this.多选模式值 && this.阶段 === 'list',
+            topOffset: this.状态栏高度 + 应用尺寸.工具栏高度 + 应用尺寸.pageContentTopInset + SelectStyle.controlHeight * 2 + 应用尺寸.间距_8 * 2,
+            onClose: (): void => { this.showViewMenu = false; },
+            onModeChange: (notes: boolean): void => {
+              this.showViewMenu = false;
+              this.切换模式(notes ? 'notes' : 'cards');
+            },
+            onFilterChange: (index: number): void => {
+              this.showViewMenu = false;
+              this.quickFilter = BROWSER_QUICK_FILTERS[index].id;
+              this.执行搜索();
+            },
+            onSortChange: (index: number): void => {
+              this.showViewMenu = false;
+              this.selectSort(index);
+            }
+          })
+        }
 
       // 字段帮助浮层（与设置面板同模式：根 Stack 顶层统一渲染）
       if (this.显示说明浮层) {

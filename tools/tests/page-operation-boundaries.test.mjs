@@ -43,6 +43,7 @@ function homeHarness() {
     canPresentHomePrompt, bundleManager: { BundleFlag: {}, getBundleInfoForSelf: async () => ({ versionName: 'test' }) },
     后端会话: { 获取实例: () => ({ 是否就绪: () => true }) }, 当前语言模式: () => 'zh',
     是否已确认官方公告: async () => false, 是否已完成云端牌组引导: async () => false,
+    CLOUD_DECK_CHANNEL_ENABLED: false,
     isHomeIntroCompleted: async () => false, completeHomeIntro: async () => events.push('welcome-persist'),
     官方公告检查延迟毫秒: () => 600000,
     externalDeckOpens: new ExternalDeckOpenQueue(),
@@ -144,15 +145,18 @@ test('sync refresh release explicitly wakes deferred announcement after asynchro
   assert.equal(page.官方公告数据.id, 'after-sync');
 });
 
-test('startup cloud sequence is deferred behind user form and cannot reopen twice', async () => {
+test('startup skips disabled cloud downloads and defers intro behind the active form', async () => {
   const { page, events, tick } = homeHarness();
   page.显示创建牌组 = true;
   await page.继续首次弹窗序列();
   assert.deepEqual(events, []);
   page.显示创建牌组 = false; page.homeActivityChanged(); tick(); await settle();
-  assert.deepEqual(events.filter(e => e === 'cloud'), ['cloud']);
+  assert.equal(page.显示欢迎弹窗, true);
+  assert.equal(page.startupSequence.hasPending(), false);
+  assert.deepEqual(events.filter(e => e === 'cloud'), []);
   page.homeActivityChanged(); tick(); await settle();
-  assert.deepEqual(events.filter(e => e === 'cloud'), ['cloud']);
+  assert.equal(page.显示欢迎弹窗, true);
+  assert.deepEqual(events.filter(e => e === 'cloud'), []);
 });
 
 test('welcome marker is not consumed while another dialog prevents presentation', async () => {
@@ -192,7 +196,7 @@ function browserHarness() {
     '执行批量改牌组', '执行批量删除', '执行批量设置标志', '执行批量挂起', '执行批量恢复',
     '执行批量设置到期日', '执行批量重新定位', '执行批量更改笔记类型', '保存编辑', '执行查找替换',
     '行点击',
-    '打开卡片信息', '关闭卡片信息', '加载更多', '预加载行', '打开改牌组弹层', '切换模式'], {
+    '打开卡片信息', '关闭卡片信息', '加载更多', '打开改牌组弹层', '切换模式'], {
     autoSyncScheduler: scheduler, AppStorage: { setOrCreate: (...args) => broadcasts.push(args) },
     $r: key => key, console: { info() {} }, BURY_SUSPEND_MODE_SUSPEND: 2
   });
@@ -289,7 +293,7 @@ test('editor save owns immutable fields and retains sync occupancy until actual 
 
 test('old pagination finally does not unlock a newer load or append stale rows', async () => {
   const { page } = browserHarness(), rows = deferred();
-  page.搜索服务实例 = { 浏览器行按ID: () => rows.promise };
+  page.searchSession = {more: async current => {await rows.promise; return current() ? {rows: [{id: 101}], consumed: 1} : null;}};
   const work = page.加载更多(); page.searchVersion++; page.loadingMore = true; page.consumedRowCount = 7;
   rows.resolve({ cells: [], color: 0 }); await work;
   assert.equal(page.loadingMore, true); assert.equal(page.consumedRowCount, 7); assert.deepEqual(page.行列表, []);
@@ -381,10 +385,10 @@ test('card info page keeps only its current target and delegates loading to the 
   page.关闭卡片信息(); assert.equal(page.infoCardId, 0); assert.equal(page.显示卡片信息, false);
 });
 
-test('failed rows advance pagination cursor without repeating successful rows', async () => {
-  const { page } = browserHarness(); page.结果ID列表 = [1, 2, 3];
-  page.搜索服务实例 = { 浏览器行按ID: async id => { if (id === 2) throw new Error('bad row'); return { cells: [id], color: 0 }; } };
-  await page.加载更多(); await page.加载更多();
+test('browser view publishes the search owner pagination snapshot', async () => {
+  const { page } = browserHarness();
+  page.searchSession = {more: async () => ({rows: [{id: 1}, {id: 3}], consumed: 3})};
+  await page.加载更多();
   assert.deepEqual(page.行列表.map(r => r.id), [1, 3]); assert.equal(page.consumedRowCount, 3);
 });
 

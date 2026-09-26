@@ -124,6 +124,10 @@ export struct 外观分组 {
               .selected(this.主题模式索引())
               .value(this.主题模式标签(this.当前主题模式))
               .attributeModifier(new SelectStyle())
+              .height(SelectStyle.controlHeight)
+              .padding(SelectStyle.controlPadding)
+              .space(SelectStyle.controlSpace)
+              .width(SelectStyle.fieldWidth)
               .font(SelectStyle.controlFont)
               .borderRadius(SelectStyle.controlRadius)
               .onSelect((索引: number): void => {
@@ -154,6 +158,10 @@ export struct 外观分组 {
               .value(this.颜色主题展示名文本(this.当前颜色主题))
               .margin({ left: 8 })
               .attributeModifier(new SelectStyle())
+              .height(SelectStyle.controlHeight)
+              .padding(SelectStyle.controlPadding)
+              .space(SelectStyle.controlSpace)
+              .width(SelectStyle.fieldWidth)
               .font(SelectStyle.controlFont)
               .borderRadius(SelectStyle.controlRadius)
               .onSelect((索引: number): void => {

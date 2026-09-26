@@ -67,12 +67,44 @@ async function readBrowserRows(ids: number[], suspended: Set<number>,
 /** 后端浏览模式是集合级配置：串行化整个搜索，避免旧请求把新模式的行解释成另一类 ID。 */
 export class BrowserSearchSession {
   private columnsCache: BrowserColumn[] = [];
+  private result: BrowserSearchResult | null = null;
+  private generation: number = 0;
+  private loadingMore: boolean = false;
   private readonly backend: BrowserSearchBackend;
   constructor(backend: BrowserSearchBackend) { this.backend = backend; }
 
   search(query: BrowserQuery, current: () => boolean): Promise<BrowserSearchResult | null> {
-    const run = (): Promise<BrowserSearchResult | null> => this.execute(query, current);
+    const generation: number = ++this.generation;
+    this.result = null;
+    this.loadingMore = false;
+    const valid = (): boolean => generation === this.generation && current();
+    const run = async (): Promise<BrowserSearchResult | null> => {
+      const result = await this.execute(query, valid);
+      if (!valid()) return null;
+      this.result = result;
+      return result;
+    };
     return serializeBrowserRead(run);
+  }
+
+  /** 搜索会话独占分页游标与结果；失败行也消费 ID，旧分页不影响新查询。 */
+  async more(current: () => boolean): Promise<BrowserSearchResult | null> {
+    const result: BrowserSearchResult | null = this.result;
+    if (this.loadingMore || result === null || result.consumed >= result.ids.length || !current()) return null;
+    const generation: number = this.generation;
+    const valid = (): boolean => generation === this.generation && current();
+    const ids: number[] = result.ids.slice(result.consumed, result.consumed + 100);
+    this.loadingMore = true;
+    try {
+      const rows = await loadBrowserRows(ids, result.suspended,
+        (id: number): Promise<BrowserRow> => this.backend.row(id), valid);
+      if (!valid()) return null;
+      this.result = { columns: result.columns, ids: result.ids, suspended: result.suspended,
+        rows: result.rows.concat(rows), consumed: result.consumed + ids.length };
+      return this.result;
+    } finally {
+      if (generation === this.generation) this.loadingMore = false;
+    }
   }
 
   private async execute(query: BrowserQuery, current: () => boolean): Promise<BrowserSearchResult | null> {

@@ -136,6 +136,7 @@ export struct HomeIntroPanel {
         Scroll() {
           Column({ space: 20 }) {
             this.section($r('app.string.home_intro_flashcards_title'), $r('app.string.home_intro_flashcards_body'))
+            this.section($r('app.string.home_intro_simple_start_title'), $r('app.string.home_intro_simple_start_body'))
             this.sourcesSection()
             this.section($r('app.string.home_intro_agent_title'), $r('app.string.home_intro_agent_body'))
             this.section($r('app.string.home_intro_apkg_title'), $r('app.string.home_intro_apkg_body'))

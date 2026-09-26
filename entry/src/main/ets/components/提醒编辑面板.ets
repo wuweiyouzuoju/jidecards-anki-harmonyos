@@ -161,6 +161,9 @@ export struct 提醒编辑面板 {
                 .width(100)
                 .enabled(!this.busy)
                 .attributeModifier(new SelectStyle())
+                .height(SelectStyle.controlHeight)
+                .padding(SelectStyle.controlPadding)
+                .space(SelectStyle.controlSpace)
                 .font(SelectStyle.controlFont)
                 .borderRadius(SelectStyle.controlRadius)
                 .onSelect((index: number): void => {
@@ -176,6 +179,9 @@ export struct 提醒编辑面板 {
                 .width(100)
                 .enabled(!this.busy)
                 .attributeModifier(new SelectStyle())
+                .height(SelectStyle.controlHeight)
+                .padding(SelectStyle.controlPadding)
+                .space(SelectStyle.controlSpace)
                 .font(SelectStyle.controlFont)
                 .borderRadius(SelectStyle.controlRadius)
                 .onSelect((index: number): void => {

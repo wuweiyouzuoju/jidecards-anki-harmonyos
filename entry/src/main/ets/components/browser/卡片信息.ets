@@ -72,15 +72,15 @@ export struct 卡片信息 {
   /** 天数 + 间隔类型转可读串（如 "12天" / "1.5月"）。 */
   private 格式化间隔(天: number): string {
     if (天 === 0) {
-      return '当天';
+      return resourceText(this.getUIContext(), $r('app.string.browser_info_interval_today'));
     }
     if (天 < 30) {
-      return `${天}天`;
+      return resourceText(this.getUIContext(), $r('app.string.browser_info_interval_days'), 天);
     }
     if (天 < 365) {
-      return `${(天 / 30).toFixed(1)}月`;
+      return resourceText(this.getUIContext(), $r('app.string.browser_info_interval_months'), (天 / 30).toFixed(1));
     }
-    return `${(天 / 365).toFixed(1)}年`;
+    return resourceText(this.getUIContext(), $r('app.string.browser_info_interval_years'), (天 / 365).toFixed(1));
   }
 
   /** ease per mill → 百分比（如 2500 → 250%）。 */

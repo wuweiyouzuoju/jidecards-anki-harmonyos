@@ -39,7 +39,12 @@ test('native tone selection reflects five common colors plus no stripe and targe
   assert.deepEqual(deck.取色条颜色(牌组色调.Black), { id: 'app.color.deck_black' });
   deck.selectTone(-1); deck.selectTone(tones.length);
   assert.equal(calls.length, tones.length);
-  assert.match(source, /Select\(this\.toneOptions\(\)\)/);
+  assert.match(source, /deck_menu_tone_label/);
+  assert.match(source, /placement: Placement\.Right/);
+  assert.match(source, /this\.显示色条菜单/);
+  assert.match(source, /\.alignItems\(VerticalAlign\.Center\)/);
+  assert.match(source, /Text\('›'\)[\s\S]*?\.width\(24\)[\s\S]*?\.height\(24\)[\s\S]*?\.textAlign\(TextAlign\.Center\)/);
+  assert.doesNotMatch(source, /Select\(this\.toneOptions\(\)\)/);
   assert.doesNotMatch(source, /ThemeTextSpans\('✓'|菜单模式/);
 });
 

@@ -128,6 +128,10 @@ export struct 布局分组 {
                 ? this.布局模式标签(this.当前布局模式)
                 : this.取本地化文本($r('app.string.settings_study_layout_bottom')))
               .attributeModifier(new SelectStyle())
+              .height(SelectStyle.controlHeight)
+              .padding(SelectStyle.controlPadding)
+              .space(SelectStyle.controlSpace)
+              .width(SelectStyle.fieldWidth)
               .font(SelectStyle.controlFont)
               .borderRadius(SelectStyle.controlRadius)
               .onSelect((索引: number): void => {

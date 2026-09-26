@@ -39,7 +39,6 @@
 //
 // @Extension Points
 // - 长按追加当前仅支持 AND，后续可扩展 AND/OR 切换（加顶部 Joiner 选择器）
-// - 已保存搜索的管理（新增/删除/重命名）可扩展为独立对话框
 //
 // @副作用
 // 仅通过外部回调引发后端写入；本组件不直接落盘。
@@ -49,11 +48,12 @@ import type { BrowserSavedSearch as 已保存搜索项 } from '../../model/Brows
 import { promptAction } from '@kit.ArkUI';
 import { BusinessError } from '@ohos.base';
 import { 应用尺寸 } from '../../utils/应用尺寸';
+import { AnchoredMenuItem } from '../common/MenuItem';
 import { 颜色键 } from '../../model/颜色主题';
 import type { DeckTreeNode } from '../../proto/messages/DeckMessages';
 import type { TagTreeNode } from '../../proto/messages/TagsMessages';
 
-/** 已保存搜索项（Anki 桌面端 savedSearches JSON 数组元素） */
+/** 已保存搜索项（Anki/AnkiDroid savedFilters JSON 映射展开后的元素） */
 export type { BrowserSavedSearch as 已保存搜索项 } from '../../model/BrowserSidebar';
 
 /** 扁平化后的牌组行（含 level 驱动缩进） */
@@ -89,6 +89,8 @@ export struct 浏览侧边栏 {
   onSelectDeck: (deckName: string) => void = (_name: string): void => {};
   onSelectTag: (tagName: string) => void = (_name: string): void => {};
   onSelectSavedSearch: (search: string) => void = (_search: string): void => {};
+  onRenameSavedSearch: (item: 已保存搜索项) => void = (_item: 已保存搜索项): void => {};
+  onDeleteSavedSearch: (item: 已保存搜索项) => void = (_item: 已保存搜索项): void => {};
   onAppendDeck: (deckName: string) => void = (_name: string): void => {};
   onAppendTag: (tagName: string) => void = (_name: string): void => {};
   onRenameTag: (tagName: string) => void = (_name: string): void => {};
@@ -147,11 +149,6 @@ export struct 浏览侧边栏 {
     }
   }
 
-  /** 分区标题折叠图标：折叠显示 +，展开显示 −。 */
-  private 折叠图标(折叠: boolean): string {
-    return 折叠 ? '+' : '−';
-  }
-
   build() {
     Stack({ alignContent: Alignment.Start }) {
       // 遮罩层：点击关闭
@@ -205,7 +202,9 @@ export struct 浏览侧边栏 {
         Scroll() {
           Column() {
             // 牌组分区
-            this.分区标题($r('app.string.browser_sidebar_decks'), this.牌组折叠, 'decks')
+            Column() {
+            AnchoredMenuItem({ label: $r('app.string.browser_sidebar_decks'), disclosure: true, expanded: !this.牌组折叠,
+              onSelect: (): void => { this.onToggle折叠('decks'); } })
             if (!this.牌组折叠) {
               if (this.牌组树 === null) {
                 this.空提示()
@@ -215,9 +214,14 @@ export struct 浏览侧边栏 {
                 }, (行: 牌组行): string => `${行.deckId}-${行.name}`)
               }
             }
+            }.width('100%').backgroundColor($r('app.color.surface_card'))
+              .borderRadius(应用尺寸.圆角_指标卡).clip(true)
+              .margin({ bottom: 应用尺寸.pageSectionGap })
 
             // 标签分区
-            this.分区标题($r('app.string.browser_sidebar_tags'), this.标签折叠, 'tags')
+            Column() {
+            AnchoredMenuItem({ label: $r('app.string.browser_sidebar_tags'), disclosure: true, expanded: !this.标签折叠,
+              onSelect: (): void => { this.onToggle折叠('tags'); } })
             if (!this.标签折叠) {
               if (this.标签树 === null) {
                 this.空提示()
@@ -227,9 +231,14 @@ export struct 浏览侧边栏 {
                 }, (行: 标签行, 索引: number): string => `${索引}-${行.name}`)
               }
             }
+            }.width('100%').backgroundColor($r('app.color.surface_card'))
+              .borderRadius(应用尺寸.圆角_指标卡).clip(true)
+              .margin({ bottom: 应用尺寸.pageSectionGap })
 
             // 已保存搜索分区
-            this.分区标题($r('app.string.browser_sidebar_saved_searches'), this.已保存搜索折叠, 'saved_searches')
+            Column() {
+            AnchoredMenuItem({ label: $r('app.string.browser_sidebar_saved_searches'), disclosure: true, expanded: !this.已保存搜索折叠,
+              onSelect: (): void => { this.onToggle折叠('saved_searches'); } })
             if (!this.已保存搜索折叠) {
               if (this.已保存搜索列表.length === 0) {
                 this.空提示()
@@ -239,9 +248,14 @@ export struct 浏览侧边栏 {
                 }, (项: 已保存搜索项, 索引: number): string => `${索引}-${项.name}`)
               }
             }
+            }.width('100%').backgroundColor($r('app.color.surface_card'))
+              .borderRadius(应用尺寸.圆角_指标卡).clip(true)
+              .margin({ bottom: 应用尺寸.pageSectionGap })
+
           }
           .width('100%')
-          .padding({ bottom: 应用尺寸.间距_16 })
+          .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平,
+            top: 应用尺寸.pageContentTopInset, bottom: 应用尺寸.间距_16 })
         }
         .width('100%')
         .layoutWeight(1)
@@ -256,29 +270,6 @@ export struct 浏览侧边栏 {
     }
     .width('100%')
     .height('100%')
-  }
-
-  /** 分区标题行：折叠图标 + 标题 + 计数。 */
-  @Builder
-  分区标题(标题: Resource, 折叠: boolean, 分区: 侧边栏分区) {
-    Row({ space: 应用尺寸.间距_8 }) {
-      Text(this.折叠图标(折叠))
-        .fontSize(应用尺寸.字号_正文)
-        .fontColor($r('app.color.text_secondary'))
-        .width(16)
-      Text(标题)
-        .fontSize(应用尺寸.字号_正文)
-        .fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.text_primary'))
-        .layoutWeight(1)
-    }
-    .width('100%')
-    .padding({ left: 应用尺寸.间距_16, right: 应用尺寸.间距_16,
-      top: 应用尺寸.间距_12, bottom: 应用尺寸.间距_8 })
-    .backgroundColor($r('app.color.surface_card'))
-    .onClick((): void => {
-      this.onToggle折叠(分区);
-    })
   }
 
   /** 空提示行（树未加载或无数据时显示）。 */
@@ -395,5 +386,18 @@ export struct 浏览侧边栏 {
     .onClick((): void => {
       this.onSelectSavedSearch(项.search);
     })
+    .gesture(LongPressGesture({ repeat: false, duration: 500 }).onAction((): void => {
+      this.getUIContext().getPromptAction().showActionMenu({
+        title: $r('app.string.browser_saved_search_actions'),
+        buttons: [
+          { text: $r('app.string.browser_saved_search_rename'), color: $r('app.color.text_primary') },
+          { text: $r('app.string.browser_saved_search_delete'), color: $r('app.color.error_text') }
+        ]
+      }, (err: BusinessError, data: promptAction.ActionMenuSuccessResponse): void => {
+        if (err !== null) return;
+        if (data.index === 0) this.onRenameSavedSearch(项);
+        if (data.index === 1) this.onDeleteSavedSearch(项);
+      });
+    }))
   }
 }

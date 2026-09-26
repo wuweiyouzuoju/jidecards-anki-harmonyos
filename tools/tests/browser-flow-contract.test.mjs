@@ -315,7 +315,7 @@ test('Browser suspension copy matches the implemented Anki semantics', () => {
   const zh = JSON.parse(read('entry/src/main/resources/base/element/string.json')).string;
   const byName = new Map(zh.map((item) => [item.name, item.value]));
   assert.equal(byName.get('browser_action_suspend'), '暂停');
-  assert.equal(byName.get('browser_action_unsuspend'), '取消暂停');
+  assert.equal(byName.get('browser_action_restore'), '恢复卡片');
   assert.match(byName.get('browser_action_suspend_confirm'), /笔记模式.*全部卡片/);
   assert.match(byName.get('glossary_suspend_help'), /浏览页选中卡片后使用「恢复卡片」/);
   assert.doesNotMatch(byName.get('browser_help_batch_body'), /没有 noteId|RPC/);
@@ -487,8 +487,10 @@ test('BrowserPage has T9 state + methods', () => {
 
 test('BrowserPage more menu keeps the find&replace entry', () => {
   const page = read('entry/src/main/ets/pages/浏览页.ets');
-  assert.match(page, /\.bindMenu\(this\.browserMoreMenu\(\)\)/);
-  assert.match(page, /private browserMoreMenu\(\)[\s\S]*?app\.string\.browser_action_find_replace/);
+  const menu = read('entry/src/main/ets/components/browser/BrowserMoreMenu.ets');
+  assert.match(page, /this\.browserMoreMenu\(\)/);
+  assert.match(menu, /app\.string\.browser_action_find_replace[\s\S]*?this\.onFindReplace\(\)/);
+  assert.match(page, /onFindReplace:[\s\S]*?this\.阶段 !== 'list' \|\| this\.operations\.isBusy\(\)/);
   // 点击设 显示查找替换 = true
   assert.match(page, /this\.显示查找替换\s*=\s*true/);
 });
@@ -620,12 +622,14 @@ test('BrowserPage has T6 sidebar methods', () => {
 test('BrowserPage more menu owns the T6 sidebar entry', () => {
   const page = read('entry/src/main/ets/pages/浏览页.ets');
   const menu = page.slice(page.indexOf('private browserMoreMenu()'), page.indexOf('private resultCountLabel()'));
+  const component = read('entry/src/main/ets/components/browser/BrowserMoreMenu.ets');
   const topBar = page.slice(page.indexOf('private 顶部条()'), page.indexOf('\n  build()'));
-  assert.match(menu, /this\.搜索文本\.trim\(\) === '' \? \$r\('app\.string\.browser_action_sidebar'\)[\s\S]*?app\.string\.browser_filter_active/);
-  assert.match(menu, /enabled: this\.阶段 === 'list'/);
+  assert.match(menu, /filterActive: this\.搜索文本\.trim\(\) !== ''/);
+  assert.match(component, /this\.filterActive \? \$r\('app\.string\.browser_filter_active'\)[\s\S]*?app\.string\.browser_action_sidebar/);
+  assert.match(menu, /available: this\.阶段 === 'list'/);
   assert.match(menu, /this\.打开侧边栏\s*\(/);
   assert.doesNotMatch(topBar, /browser_action_sidebar|browser_filter_active|this\.打开侧边栏/);
-  assert.match(topBar, /\.bindMenu\(this\.browserMoreMenu\(\)\)/);
+  assert.match(topBar, /this\.showMoreMenu = !this\.showMoreMenu/);
 });
 
 test('BrowserPage renders 字段帮助面板 and wires help buttons for new features', () => {

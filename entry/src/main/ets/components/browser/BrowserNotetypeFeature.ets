@@ -81,6 +81,9 @@ export struct BrowserNotetypeFeature {
               this.state.names.find((项: NotetypeNameId): boolean => 项.id === this.state.selectedId)?.name ?? '')
             .width('100%')
             .attributeModifier(new SelectStyle())
+            .height(SelectStyle.controlHeight)
+            .padding(SelectStyle.controlPadding)
+            .space(SelectStyle.controlSpace)
             .font(SelectStyle.controlFont)
             .borderRadius(SelectStyle.controlRadius)
             .onSelect((索引: number): void => {
@@ -108,6 +111,9 @@ export struct BrowserNotetypeFeature {
                     this.state.info!.oldFieldNames[this.state.fields[索引]])
                   .width('50%')
                   .attributeModifier(new SelectStyle())
+                  .height(SelectStyle.controlHeight)
+                  .padding(SelectStyle.controlPadding)
+                  .space(SelectStyle.controlSpace)
                   .font(SelectStyle.controlFont)
                   .borderRadius(SelectStyle.controlRadius)
                   .onSelect((选索引: number): void => {
@@ -139,6 +145,9 @@ export struct BrowserNotetypeFeature {
                       this.state.info!.oldTemplateNames[this.state.templates[索引]])
                     .width('50%')
                     .attributeModifier(new SelectStyle())
+                    .height(SelectStyle.controlHeight)
+                    .padding(SelectStyle.controlPadding)
+                    .space(SelectStyle.controlSpace)
                     .font(SelectStyle.controlFont)
                     .borderRadius(SelectStyle.controlRadius)
                     .onSelect((选索引: number): void => {

@@ -7,6 +7,7 @@ import { HomeRefreshQueue } from '../model/HomeRefreshQueue';
 import { HomeDataRepository, HomeDataResult } from '../backend/HomeDataRepository';
 import { HomeWorkCoordinator, HomeWorkHost } from '../model/HomeWorkCoordinator';
 import { HomeStartupSequence, HomeStartupHost } from '../model/HomeStartupSequence';
+import { CLOUD_DECK_CHANNEL_ENABLED } from '../model/ReleaseFeatures';
 import { AutoSyncScheduler, autoSyncScheduler } from '../model/AutoSyncScheduler';
 import { HomeSyncController, HomeSyncHost } from '../model/HomeSyncController';
 import { ThemeTextSpans } from '../components/common/ThemeText';
@@ -257,7 +258,7 @@ struct 首页 {
   @State @Watch('homeActivityChanged') private 显示自定义学习: boolean = false;
   @State private 自定义学习牌组ID: string = '';
   @State private 自定义学习牌组名: string = '';
-  // 创建过滤牌组面板（T2）：牌组长按菜单「创建过滤牌组」触发，按搜索条件抽取卡片到临时牌组
+  // 筛选牌组从首页新建菜单创建，搜索范围不绑定当前选中的牌组。
   @State @Watch('homeActivityChanged') private 显示过滤牌组面板: boolean = false;
   @State @Watch('homeActivityChanged') private deckOptionsBusy: boolean = false;
   // 牌组选项：在根 Stack 中挂载以实现平板下的全局磨砂覆盖（与 创建牌组面板 同款）
@@ -276,6 +277,7 @@ struct 首页 {
   @State @Watch('homeActivityChanged') private 云端牌组忙碌: boolean = false;
   @State private cloudBackRequest: number = 0;
   private 打开云端牌组弹窗(从菜单打开: boolean): void {
+    if (!CLOUD_DECK_CHANNEL_ENABLED) return;
     if (this.deferForSync((): void => this.打开云端牌组弹窗(从菜单打开))) return;
     this.云端牌组从菜单打开 = 从菜单打开;
     this.显示云端牌组弹窗 = true;
@@ -373,7 +375,7 @@ struct 首页 {
     this.恢复主题();
     this.恢复颜色主题();
     this.恢复今日进度卡开关();
-    // 首次进入先完成云端牌组选择与导入，再展示版本欢迎内容，避免两个全屏弹窗叠加。
+    // 直链渠道暂停期间，启动序列直接从公告进入入门介绍。
     this.显示首次弹窗序列().finally((): void => { this.autoSyncStartupReady = true; });
     this.刷新云端牌组配额状态();
     this.homeActivityChanged();
@@ -543,7 +545,8 @@ struct 首页 {
       canPresent: (): boolean => this.canPresentStartupPrompt() && !this.announcementController.hasPending(),
       checkAnnouncement: (): Promise<boolean> => this.尝试显示官方公告(),
       activateAnnouncementChecks: (): void => { this.主页公告检查已激活 = true; },
-      cloudCompleted: (): Promise<boolean> => 是否已完成云端牌组引导(),
+      cloudCompleted: async (): Promise<boolean> =>
+        !CLOUD_DECK_CHANNEL_ENABLED || await 是否已完成云端牌组引导(),
       introCompleted: (): Promise<boolean> => isHomeIntroCompleted(),
       showCloud: (): void => this.打开云端牌组弹窗(false),
       showIntro: (): void => { this.显示欢迎弹窗 = true; }
@@ -574,7 +577,7 @@ struct 首页 {
       onPop: (): void => { this.返回主页后刷新(); } });
   }
 
-  /** 官方公告优先于首次云端牌组引导，云端牌组引导优先于版本欢迎弹窗。 */
+  /** 启动时先处理官方公告，再进入版本欢迎弹窗；牌组直链下载不再自动弹出。 */
   private async 显示首次弹窗序列(): Promise<void> {
     await this.startupSequence.start(this.startupHost());
   }
@@ -1270,7 +1273,7 @@ struct 首页 {
     this.显示自定义学习 = true;
   }
 
-  /** 长按牌组 → 创建过滤牌组：按搜索条件抽取卡片到临时牌组。 */
+  /** 新建菜单 → 创建筛选牌组：按搜索条件抽取卡片到临时牌组。 */
   private 打开创建过滤牌组(): void {
     if (this.deferForSync((): void => { this.打开创建过滤牌组(); })) return;
     this.显示过滤牌组面板 = true;
@@ -1884,9 +1887,6 @@ struct 首页 {
               onItemCustomStudy: (deckId: string): void => {
                 this.打开自定义学习(deckId);
               },
-              onItemCreateFilteredDeck: (): void => {
-                this.打开创建过滤牌组();
-              },
               onRefresh: (): void => {
                 // 先置 刷新中=true 触发 @Watch 同步 刷新指示器开关=true（Refresh 内部已置 true，无副作用）；
                 // 加载主页数据() 内部 finally 置 刷新中=false（true→false 触发 @Watch 同步 刷新指示器开关=false 收起指示器）。
@@ -1956,6 +1956,10 @@ struct 首页 {
           this.显示主页操作 = false;
           this.openCreateDeck('');
         },
+        onCreateFilteredDeck: (): void => {
+          this.显示主页操作 = false;
+          this.打开创建过滤牌组();
+        },
         导入牌组回调: (): void => {
           this.显示主页操作 = false;
           this.从选择器导入牌组();
@@ -1968,7 +1972,7 @@ struct 首页 {
           this.显示主页操作 = false;
           this.打开AI改卡();
         },
-        显示获取直链牌组: !this.云端牌组配额已用尽,
+        显示获取直链牌组: CLOUD_DECK_CHANNEL_ENABLED && !this.云端牌组配额已用尽,
         获取直链牌组回调: (): void => {
           this.显示主页操作 = false;
           this.打开云端牌组弹窗(true);
@@ -2119,7 +2123,7 @@ struct 首页 {
       })
     }
 
-    // 创建过滤牌组面板（T2）：长按牌组 → 创建过滤牌组，成功后刷新主页
+    // 新建菜单 → 创建筛选牌组，成功后刷新主页。
     if (this.显示过滤牌组面板) {
       创建过滤牌组面板({
         isDark: this.是否深色(),

@@ -11,7 +11,7 @@ import { browserFilterNode } from '../../entry/src/main/ets/model/BrowserQuickFi
 import { ConfigKeyBool } from '../../entry/src/main/ets/proto/messages/ConfigMessages.ts';
 
 const source = readFileSync(new URL('../../entry/src/main/ets/pages/浏览页.ets', import.meta.url), 'utf8');
-const names = ['执行搜索', '预加载行', 'sortableColumns', 'sortLabel', 'sortOptions', 'sortIndex', 'selectSort', '切换模式', 'resultCountLabel'];
+const names = ['执行搜索', '加载更多', 'sortableColumns', 'sortLabel', 'sortOptions', 'sortIndex', 'selectSort', '切换模式', 'resultCountLabel'];
 const methods = names.map(name => {
   const start = source.search(new RegExp(`  private (?:async )?${name}\\(`));
   assert.ok(start >= 0, name);
@@ -92,7 +92,9 @@ test('old pagination cannot append rows after a new search starts', async () => 
   const { page } = harness();
   let resolveRow;
   page.搜索服务实例.浏览器行按ID = () => new Promise(resolve => { resolveRow = resolve; });
-  const oldLoad = page.预加载行([11], 0);
+  page.阶段 = 'list';
+  page.searchSession.more = async current => { const row = await page.搜索服务实例.浏览器行按ID(11); return current() ? {rows: [row], consumed: 1} : null; };
+  const oldLoad = page.加载更多();
   await new Promise(setImmediate);
   page.searchVersion = 1;
   page.行列表 = [{ id: 21 }];

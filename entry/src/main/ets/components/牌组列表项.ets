@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { resourceText } from '../utils/UiFeedback';
-import { SelectStyle } from '../utils/SelectStyle';
-import { ThemeDefinition, themeDefinition, THEME_VISUALS_KEY } from '../model/ThemeCatalog';
+import { ThemeDefinition, themeDefinition, THEME_VISUALS_KEY, THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
+import { ThemeLabelGlyph, themeLabelGlyphs } from './common/ThemeText';
 import { themeGradient } from '../utils/ThemeVisuals';
 import { GLASS_COLORS_KEY, GLASS_HIGHLIGHT_COLORS } from '../model/ThemeCatalog';
 
@@ -48,6 +48,11 @@ interface 弹层状态事件 {
   isVisible: boolean;
 }
 
+/** 色条子菜单 bindPopup 的状态事件。 */
+interface 色条弹层状态事件 {
+  isVisible: boolean;
+}
+
 /** 色条选择项：持久化色调与本地化名称。 */
 interface 色条选项 {
   tone: 牌组色调;
@@ -56,6 +61,7 @@ interface 色条选项 {
 
 @Component
 export struct 牌组列表项 {
+  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @StorageProp(GLASS_COLORS_KEY) private glassColors: string[] = GLASS_HIGHLIGHT_COLORS;
   @StorageProp(THEME_VISUALS_KEY) private visual: ThemeDefinition = themeDefinition('aurora');
   // 注：deck / expanded / onToggle 保留英文名以兼容 deck-hierarchy-contract.test.mjs 阶段 6 前的断言。
@@ -73,6 +79,7 @@ export struct 牌组列表项 {
   // 用户通过 牌组列表项 长按菜单的「拖动排序」项进入；Index.ets 顶部 Bar 上的「完成」退出。
   @Prop reorderMode: boolean = false;
   @State private 显示牌组菜单: boolean = false;
+  @State private 显示色条菜单: boolean = false;
   // 沙盒背景图异步加载的 PixelMap。
   // 必须用 PixelMap 而不是直接传文件路径给 Image——ArkUI Image 对沙盒绝对路径解析不稳定，
   // 标准方式是 fileIo.openSync → image.createImageSource → createPixelMap → Image(pixelMap)。
@@ -106,15 +113,12 @@ export struct 牌组列表项 {
   // 用户在长按菜单选「自定义学习」时触发；Index.ets 弹自定义学习对话框。
   onCustomStudy: (deckId: string) => void = (deckId: string): void => {
   };
-  // 用户在长按菜单选「创建过滤牌组」时触发；Index.ets 弹创建过滤牌组面板。
-  onCreateFilteredDeck: () => void = (): void => {
-  };
 
   @StorageProp(颜色键.动作主色) private 动作主色: string = '#2F5FD0';
   @StorageProp(颜色键.选中背景) private 选中背景色: string = '#E8EEFC';
   @StorageProp(颜色键.主色边框) private 主色边框色: string = '#B8CEFA';
   @StorageProp(颜色键.新卡计数色) private 新卡计数色: string = '#3974D9';
-  // 简洁模式：true 时长按菜单不显示「自定义学习」「创建过滤牌组」两项高级入口
+  // 简洁模式下隐藏牌组的「自定义学习」高级入口。
   @StorageLink(简洁模式AppStorage键) private 简洁模式: boolean = true;
   @StorageProp(颜色键.学习中计数色) private 学习中计数色: string = '#B56A22';
   @StorageProp(颜色键.复习中计数色) private 复习中计数色: string = '#7056C8';
@@ -215,7 +219,7 @@ export struct 牌组列表项 {
     { tone: 牌组色调.None, labelResource: $r('app.string.deck_tone_none') }
   ];
 
-  /** 原生选择框使用本地化名称，不修改持久化色调值。 */
+  /** 颜色子菜单使用本地化名称，不修改持久化色调值。 */
   private toneOptions(): SelectOption[] {
     return this.色条选项列表.map((option: 色条选项): SelectOption => ({
       value: resourceText(this.getUIContext(), option.labelResource)
@@ -238,6 +242,7 @@ export struct 牌组列表项 {
   private selectTone(index: number): void {
     if (index < 0 || index >= this.色条选项列表.length) return;
     this.显示牌组菜单 = false;
+    this.显示色条菜单 = false;
     this.onToneChange(this.deck.id, this.色条选项列表[index].tone);
   }
 
@@ -262,31 +267,78 @@ export struct 牌组列表项 {
   // 关 Popup 时置 this.显示牌组菜单=false。
   //
   // @业务规则
-  // 色条通过原生 Select 展示当前值；选择后关 Popup 再上抛回调。
+  // 色条通过文字入口打开右侧子菜单；选择后关闭两层 Popup 再上抛回调。
   //
   // @副作用
   // 无。仅修改内部 @State 与上抛回调。
   // ========================================================
 
-  /** 主菜单：色条选择框与牌组操作入口。 */
+  /** 颜色子菜单：复用主页菜单的紧凑行高与卡片表面。 */
+  @Builder
+  private 色条菜单() {
+    Column() {
+      ForEach(this.色条选项列表, (option: 色条选项, index: number): void => {
+        Row() {
+          Text() {
+            if (option.tone === this.deck.tone && this.themeAccentColors.length > 0) {
+              ForEach(themeLabelGlyphs(option.labelResource, this.themeAccentColors, this.getUIContext()),
+                (glyph: ThemeLabelGlyph) => {
+                  Span(glyph.letter).fontColor(glyph.color)
+                }, (glyph: ThemeLabelGlyph, index: number): string => `${index}-${glyph.letter}-${glyph.color}`)
+            } else {
+              Span(option.labelResource)
+            }
+          }
+            .fontSize(应用尺寸.字号_正文)
+            .fontColor(option.tone === this.deck.tone
+              ? this.动作主色 : $r('app.color.text_primary'))
+            .layoutWeight(1)
+        }
+        .width('100%')
+        .constraintSize({ minHeight: 应用尺寸.menuItemHeight })
+        .padding({ left: 应用尺寸.menuHorizontalPadding, right: 应用尺寸.menuHorizontalPadding,
+          top: 8, bottom: 8 })
+        .onClick((): void => { this.selectTone(index); })
+      }, (option: 色条选项): string => `${option.tone}`)
+    }
+    .width(应用尺寸.contextMenuWidth)
+    .backgroundColor($r('app.color.surface_card'))
+    .borderRadius(应用尺寸.圆角_面板)
+  }
+
+  /** 主菜单：色条文字入口与牌组操作入口。 */
   @Builder
   private 主菜单() {
     Column({ space: 0 }) {
       Row() {
-        Select(this.toneOptions())
-          .selected(this.toneIndex())
-          .value(this.toneLabel())
-          .width('100%')
-          .accessibilityText(
-            $r('app.string.deck_menu_switch_tone'))
-          .attributeModifier(new SelectStyle())
-          .font(SelectStyle.controlFont)
-          .borderRadius(SelectStyle.controlRadius)
-          .onSelect((index: number): void => { this.selectTone(index); })
+        Text($r('app.string.deck_menu_tone_label'))
+          .fontSize(应用尺寸.字号_正文)
+          .fontColor($r('app.color.text_primary'))
+          .layoutWeight(1)
+        Text('›')
+          .fontSize(应用尺寸.字号_标题)
+          .fontColor($r('app.color.text_secondary'))
+          .width(24)
+          .height(24)
+          .textAlign(TextAlign.Center)
+          .hitTestBehavior(HitTestMode.None)
       }
       .width('100%')
+      .alignItems(VerticalAlign.Center)
       .constraintSize({ minHeight: 应用尺寸.menuItemHeight })
       .padding({ left: 应用尺寸.menuHorizontalPadding, right: 应用尺寸.menuHorizontalPadding, top: 10, bottom: 10 })
+      .bindPopup(this.显示色条菜单, {
+        builder: this.色条菜单,
+        placement: Placement.Right,
+        popupColor: $r('app.color.surface_card'),
+        enableArrow: true,
+        onStateChange: (event: 色条弹层状态事件): void => {
+          if (!event.isVisible) {
+            this.显示色条菜单 = false;
+          }
+        }
+      })
+      .onClick((): void => { this.显示色条菜单 = true; })
       Row() {
         Text($r('app.string.deck_menu_reorder'))
           .fontSize(应用尺寸.字号_正文)
@@ -313,7 +365,7 @@ export struct 牌组列表项 {
         this.显示牌组菜单 = false;
         this.onCustomizeDeck(this.deck.id);
       })
-      // 简洁模式下隐藏「自定义学习」「创建过滤牌组」两项高级入口
+      // 自定义学习作用于当前牌组；独立创建入口在首页新建菜单。
       if (!this.简洁模式) {
         Row() {
           Text($r('app.string.custom_study_menu'))
@@ -327,19 +379,6 @@ export struct 牌组列表项 {
         .onClick(() => {
           this.显示牌组菜单 = false;
           this.onCustomStudy(this.deck.id);
-        })
-        Row() {
-          Text($r('app.string.filtered_deck_title'))
-            .fontSize(应用尺寸.字号_正文)
-            .fontColor($r('app.color.text_primary'))
-            .layoutWeight(1)
-        }
-        .width('100%')
-        .constraintSize({ minHeight: 应用尺寸.menuItemHeight })
-        .padding({ left: 应用尺寸.menuHorizontalPadding, right: 应用尺寸.menuHorizontalPadding, top: 10, bottom: 10 })
-        .onClick(() => {
-          this.显示牌组菜单 = false;
-          this.onCreateFilteredDeck();
         })
       }
       Row() {

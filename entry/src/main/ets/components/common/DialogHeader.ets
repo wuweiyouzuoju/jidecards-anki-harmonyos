@@ -18,6 +18,7 @@ export struct DialogHeader {
   @Prop showHelp: boolean = false;
   @Prop helpEnabled: boolean = true;
   @Prop destructive: boolean = false;
+  @Prop showDivider: boolean = true;
   onHelp: () => void = (): void => {};
   onAction: () => void = (): void => {};
   onClose: () => void = (): void => {};
@@ -113,6 +114,6 @@ export struct DialogHeader {
     .width('100%')
     .constraintSize({ minHeight: 48 })
     .padding({ bottom: 8 })
-    .border({ width: { bottom: 0.5 }, color: $r('app.color.border_input') })
+    .border({ width: { bottom: this.showDivider ? 0.5 : 0 }, color: $r('app.color.border_input') })
   }
 }

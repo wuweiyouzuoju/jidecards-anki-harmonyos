@@ -20,6 +20,18 @@ const PANEL = 'entry/src/main/ets/components/创建牌组面板.ets';
 const PAGE = 'entry/src/main/ets/pages/首页.ets';
 const SERVICE = 'entry/src/main/ets/backend/牌组服务.ts';
 
+test('filtered deck creation belongs to the experimental home add menu, not a deck context', () => {
+  const menu = read('entry/src/main/ets/components/主页操作面板.ets');
+  assert.match(menu, /@StorageLink\(简洁模式AppStorage键\) private 简洁模式: boolean = true/);
+  assert.match(menu, /if \(!this\.简洁模式\) \{\s*AnchoredMenuItem\(\{ label: \$r\('app\.string\.filtered_deck_title'\)/);
+  assert.match(menu, /onSelect: \(\): void => \{ this\.onCreateFilteredDeck\(\); \}/);
+  assert.match(read(PAGE), /onCreateFilteredDeck: \(\): void => \{\s*this\.显示主页操作 = false;\s*this\.打开创建过滤牌组\(\);/);
+  const deckItem = read('entry/src/main/ets/components/牌组列表项.ets');
+  assert.doesNotMatch(deckItem, /filtered_deck_title|onCreateFilteredDeck/);
+  assert.match(deckItem, /this\.onCustomStudy\(this\.deck\.id\)/);
+  assert.doesNotMatch(read('entry/src/main/ets/components/home/主页牌组列表.ets'), /onItemCreateFilteredDeck/);
+});
+
 test('dynamic deck previews bind formatted text directly instead of passing value snapshots through a span builder', () => {
   const panel = read(PANEL);
   for (const key of ['child', 'child_pending', 'top']) {

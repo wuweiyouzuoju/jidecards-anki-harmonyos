@@ -1175,6 +1175,10 @@ export struct 添加笔记页 {
                 .value(this.已选笔记类型名())
                 .enabled(!this.处理中 && this.笔记类型选项.length > 0)
                 .attributeModifier(new SelectStyle($r('app.color.surface_card')))
+                .height(SelectStyle.controlHeight)
+                .padding(SelectStyle.controlPadding)
+                .space(SelectStyle.controlSpace)
+                .width(SelectStyle.fieldWidth)
                 .font(SelectStyle.controlFont)
                 .borderRadius(SelectStyle.controlRadius)
                 .onSelect((索引: number): void => {

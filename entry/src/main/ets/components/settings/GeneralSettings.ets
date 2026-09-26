@@ -65,6 +65,10 @@ export struct GeneralSettings {
               .selected(this.语言索引())
               .value(this.取本地化文本(this.语言模式标签(当前语言模式())))
               .attributeModifier(new SelectStyle())
+              .height(SelectStyle.controlHeight)
+              .padding(SelectStyle.controlPadding)
+              .space(SelectStyle.controlSpace)
+              .width(SelectStyle.fieldWidth)
               .font(SelectStyle.controlFont)
               .borderRadius(SelectStyle.controlRadius)
               .onSelect((索引: number): void => {

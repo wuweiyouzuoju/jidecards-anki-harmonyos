@@ -23,7 +23,7 @@
 //
 // @业务规则
 // 服务号 9（后端配置），方法号 0/1/5/6。
-// saved searches 在 Anki 桌面端存在 config 表的 "savedSearches" key 下，JSON 数组格式。
+// saved searches 在 Anki/AnkiDroid 共享 config 表的 "savedFilters" key 下，为名称到查询的 JSON 映射。
 // 折叠状态走 ConfigKey.Bool 枚举（COLLAPSE_TAGS=4 / COLLAPSE_DECKS=6 / COLLAPSE_SAVED_SEARCHES=7）。
 // GetConfigJson 返回空串表示该 key 不存在（Anki 后端对缺失 key 返回空 JSON）。
 //
