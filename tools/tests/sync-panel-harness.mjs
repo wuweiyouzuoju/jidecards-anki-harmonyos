@@ -22,7 +22,7 @@ export function componentMethods(source, names, dependencies) {
 export async function settle() { for (let i = 0; i < 8; i++) await new Promise(resolve => setImmediate(resolve)); }
 
 export function panelHarness({ required = 1, media = false, automatic = true, fsrsBefore = true, fsrsAfter = true, capability = true } = {}) {
-  const state = { closed: 0, refreshed: 0, media, pending: false, cleared: false, endpoint: '', calls: [], timers: new Map(),
+  const state = { closed: 0, refreshed: 0, toasts: [], media, pending: false, cleared: false, endpoint: '', calls: [], timers: new Map(),
     fsrsValues: required >= 2 ? [fsrsBefore, fsrsBefore, fsrsAfter] : [fsrsBefore, fsrsAfter], fsrsReads: 0, fsrsNotifications: 0, fsrsResults: [], states: [], delays: [], cancellations: [],
     response: { required, newEndpoint: '', hostNumber: 0, serverMediaUsn: 3, serverMessage: '' } };
   class BackendError extends Error {}
@@ -43,11 +43,12 @@ export function panelHarness({ required = 1, media = false, automatic = true, fs
   });
   const panel = new Panel();
   const auth = { hkey: 'test-key', endpoint: 'https://custom.example/anki/', ioTimeoutSecs: 0 };
-  Object.assign(panel, { syncOwner: {}, syncTask: null, mediaStart: null, mediaMayBeRunning: false, disposalStarted: false, automatic, yieldingForStudy: false, fullSyncInFlight: false, abortTimer: -1, abortCall: null, successTimer: -1, collectionCallInFlight: false, 初始鉴权: auth, 当前阶段: 'syncing', 错误文案: '', 是否请求中止: false,
+  Object.assign(panel, { syncOwner: {}, syncTask: null, mediaStart: null, mediaMayBeRunning: false, disposalStarted: false, automatic, yieldingForStudy: false, fullSyncInFlight: false, abortTimer: -1, abortCall: null, collectionCallInFlight: false, 初始鉴权: auth, 当前阶段: 'syncing', 错误文案: '', 是否请求中止: false,
     轮询定时器: -1, 集合已同步: false, 是否在媒体阶段: false, detailsVisible: false, suspendDelayId: -1, syncForeground: true,
     状态变化回调: (busy, modal) => { state.states.push({ busy, modal }); },
     statusChanged: (text, indicator) => { state.status = text; state.indicator = indicator; }, onYield: automatic => { state.yielded = automatic ? 'auto' : 'manual'; },
     取本地化文案: key => key, 关闭回调: () => { state.closed++; },
+    getUIContext: () => ({ getPromptAction: () => ({ showToast: options => { state.toasts.push(options.message); } }) }),
     同步完成回调: value => { state.refreshed++; state.fsrsResults.push(value); },
     同步服务实例: {
       中止同步: async () => {}, 中止媒体同步: async () => {},

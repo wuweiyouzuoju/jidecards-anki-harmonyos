@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { resourceText } from '../utils/UiFeedback';
+import { resourceText, showToastSafely } from '../utils/UiFeedback';
 import { ThemeTextSpans } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
@@ -130,7 +130,6 @@ export struct 同步面板 {
   private collectionCallInFlight: boolean = false;
   private abortTimer: number = -1;
   private abortCall: Promise<void> | null = null;
-  private successTimer: number = -1;
   private syncTask: Promise<void> | null = null;
   private mediaStart: Promise<void> | null = null;
   private mediaMayBeRunning: boolean = false;
@@ -154,7 +153,6 @@ export struct 同步面板 {
     this.disposed = true;
     this.releaseSuspendDelay();
     this.stopAbortTimer();
-    if (this.successTimer >= 0) clearTimeout(this.successTimer);
     this.清理轮询定时器();
     if (!this.ownsSync || this.disposalStarted) return;
     this.disposalStarted = true;
@@ -325,13 +323,15 @@ export struct 同步面板 {
     }
   }
 
-  /** 自动同步仅在成功完成后收起；媒体失败和全量覆盖冲突必须继续可见。 */
+  /** 成功立即提示并结束旧任务，避免下次手动同步打开残留完成态；失败/冲突保留详情。 */
   private notifySyncResult(): void {
     if (this.disposed) return;
     this.notifyCollectionResult();
     if (this.当前阶段 === 'done' && this.错误文案 === '' && !this.是否请求中止) {
-      if (this.automatic) this.关闭回调();
-      else this.successTimer = setTimeout((): void => { this.关闭回调(); }, 3000);
+      if (!this.automatic || this.detailsVisible) {
+        showToastSafely(this.getUIContext(), { message: this.状态文案, duration: 3000 });
+      }
+      this.关闭回调();
     }
   }
 

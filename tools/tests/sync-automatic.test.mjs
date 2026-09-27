@@ -328,13 +328,15 @@ test('a completed but hidden study screen cannot sync through another editor or 
   }
 });
 
-test('automatic incremental sync uses custom endpoint, refreshes and closes; manual success stays visible', async () => {
+test('incremental sync closes immediately and manual completion is visible without opening details', async () => {
   for (const automatic of [false, true]) {
     const { panel, state, gate } = panelHarness({ automatic });
     panel.aboutToAppear(); await settle();
     assert.equal(state.calls[0][0], 'collection', 'syncStatus cache must not prevent a fresh server check');
     assert.equal(state.calls[0][1].endpoint, 'https://custom.example/anki/');
-    assert.equal(state.closed, automatic ? 1 : 0);
+    assert.equal(state.closed, 1);
+    assert.deepEqual(state.toasts, automatic ? [] : ['app.string.sync_success']);
+    assert.equal(state.timers.has(3), false, 'no stale completion window on the next manual request');
     assert.equal(state.refreshed, 1);
     assert.equal(gate.canAutoSync(Date.now()), false);
     panel.aboutToDisappear();
@@ -626,6 +628,21 @@ test('account changes cannot race background media', async () => {
   assert.equal(gate.isActive(), true);
   gate.release(owner, Date.now());
   assert.equal(group.syncSettingsBusy(), false);
+});
+
+test('manual completion waits for media and reports once whether details are open or hidden', async () => {
+  for (const detailsVisible of [false, true]) {
+    const { panel, state, gate } = panelHarness({ automatic: false, media: true });
+    panel.aboutToAppear(); await settle();
+    if (detailsVisible) panel.showDetails();
+    assert.deepEqual(state.toasts, [], 'collection commit is not full sync completion');
+    assert.equal(state.closed, 0);
+    state.timers.get(1)(); await settle();
+    assert.deepEqual(state.toasts, ['app.string.sync_success']);
+    assert.equal(state.closed, 1);
+    assert.equal(gate.isActive(), false);
+    assert.equal(state.timers.size, 0);
+  }
 });
 
 test('settings sync action reaches a hidden conflict or running media without starting another task', async () => {
