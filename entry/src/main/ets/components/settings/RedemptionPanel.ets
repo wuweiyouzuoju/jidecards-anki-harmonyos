@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { DisclosureChevron } from '../common/DisclosureChevron';
 import { resourceText, namedResourceText, showToastSafely } from '../../utils/UiFeedback';
 import { ThemeTextSpans } from '../common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
@@ -176,7 +177,7 @@ export struct RedemptionPanel {
       Button() {
         Row() {
           Text() { ThemeTextSpans($r('app.string.redemption_entry'), this.themeAccentColors, this.getUIContext()) }.fontSize(15).fontColor(this.primary).layoutWeight(1)
-          Text('›').fontSize(22).fontColor($r('app.color.text_tertiary'))
+          DisclosureChevron({ tint: $r('app.color.text_tertiary') })
         }.width('100%')
       }
         .width('100%').height(44).backgroundColor(Color.Transparent).borderRadius(12)

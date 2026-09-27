@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { DisclosureChevron } from './DisclosureChevron';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 颜色键 } from '../../model/颜色主题';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
@@ -41,8 +42,7 @@ export struct AnchoredMenuItem {
           right: this.disclosure ? 28 : 应用尺寸.menuHorizontalPadding, top: 8, bottom: 8 })
         .textAlign(TextAlign.Center)
         if (this.disclosure) {
-          Text('›').fontSize(应用尺寸.字号_标题)
-            .fontColor($r('app.color.text_secondary'))
+          DisclosureChevron({ tint: $r('app.color.text_secondary') })
             .rotate({ angle: this.expanded ? 90 : 0 })
             .animation({ duration: 150, curve: Curve.EaseOut })
             .margin({ right: 应用尺寸.menuHorizontalPadding })

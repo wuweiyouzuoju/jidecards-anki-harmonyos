@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { DisclosureChevron } from '../common/DisclosureChevron';
 import { resourceText } from '../../utils/UiFeedback';
 import { SelectStyle } from '../../utils/SelectStyle';
 
@@ -241,9 +242,7 @@ export struct 查找重复对话框 {
         }
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1)
-        Text('›')
-          .fontSize(20)
-          .fontColor(设置面板色板_取(this.isDark).弱化文字)
+        DisclosureChevron({ tint: 设置面板色板_取(this.isDark).弱化文字 })
       }
       .width('100%')
       .onClick(() => { this.跳转浏览(this.重复组列表[索引]); })

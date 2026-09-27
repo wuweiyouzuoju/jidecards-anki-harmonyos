@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { DisclosureChevron } from './common/DisclosureChevron';
 import { namedResourceText, resourceText, showToastSafely } from '../utils/UiFeedback';
 import { ThemeTextSpans } from './common/ThemeText';
 import { SettingsEntry, filterSettingsEntries, SETTINGS_ENTRIES } from '../model/SettingsNavigation';
@@ -253,7 +254,7 @@ export struct 设置面板 {
                   .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
                   .width('100%')
               }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-              Text('›').fontSize(22).fontColor($r('app.color.text_secondary'))
+              DisclosureChevron({ tint: $r('app.color.text_secondary') })
             }.width('100%').padding({ left: 16, right: 16, top: 14, bottom: 14 })
           }
           .type(ButtonType.Normal).width('100%').backgroundColor(Color.Transparent)
@@ -567,9 +568,7 @@ export struct 设置面板 {
           .fontSize(15)
           .fontColor(设置面板色板_取(this.是否深色).主文字)
         Blank()
-        Text('›')
-          .fontSize(20)
-          .fontColor(设置面板色板_取(this.是否深色).弱化文字)
+        DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
       }
       .width('100%')
       .height(48)
@@ -582,9 +581,7 @@ export struct 设置面板 {
           .fontSize(15)
           .fontColor(设置面板色板_取(this.是否深色).主文字)
         Blank()
-        Text('›')
-          .fontSize(20)
-          .fontColor(设置面板色板_取(this.是否深色).弱化文字)
+        DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
       }
       .width('100%')
       .height(48)
@@ -608,9 +605,7 @@ export struct 设置面板 {
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1)
         Blank()
-        Text('›')
-          .fontSize(20)
-          .fontColor(设置面板色板_取(this.是否深色).弱化文字)
+        DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
       }
       .width('100%')
       .height(58)
@@ -635,9 +630,7 @@ export struct 设置面板 {
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1)
         Blank()
-        Text('›')
-          .fontSize(20)
-          .fontColor(设置面板色板_取(this.是否深色).弱化文字)
+        DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
       }
       .width('100%')
       .height(58)
@@ -673,9 +666,7 @@ export struct 设置面板 {
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1)
         Blank()
-        Text('›')
-          .fontSize(20)
-          .fontColor(设置面板色板_取(this.是否深色).弱化文字)
+        DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
       }
       .width('100%')
       .height(58)
@@ -697,9 +688,7 @@ export struct 设置面板 {
         }
         .alignItems(HorizontalAlign.Start)
         Blank()
-        Text('›')
-          .fontSize(20)
-          .fontColor(设置面板色板_取(this.是否深色).弱化文字)
+        DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
       }
       .width('100%')
       .height(58)
@@ -725,9 +714,7 @@ export struct 设置面板 {
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1)
         Blank()
-        Text('›')
-          .fontSize(20)
-          .fontColor(设置面板色板_取(this.是否深色).弱化文字)
+        DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
       }
       .width('100%')
       .height(58)

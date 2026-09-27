@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { DisclosureChevron } from './common/DisclosureChevron';
 import { resourceText } from '../utils/UiFeedback';
 import { DeckOptionField, DeckOptionChoice } from './home/DeckOptionField';
 import { validateDeckOptionText } from '../model/DeckOptionValidation';
@@ -53,7 +54,7 @@ struct 段落标题 {
   build() {
     Row() {
       Text(this.title).fontSize(15).fontColor($r('app.color.text_primary')).layoutWeight(1)
-      Text('›').fontSize(20).fontColor($r('app.color.text_secondary'))
+      DisclosureChevron({ tint: $r('app.color.text_secondary') })
     }.width('100%').constraintSize({ minHeight: 48 }).padding({ left: 10, right: 10 })
       .onClick((): void => { this.onToggle(); })
   }

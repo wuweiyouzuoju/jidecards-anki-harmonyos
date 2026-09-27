@@ -80,7 +80,7 @@ test('deck fields use dialogs while the shared-deck save scope uses an inline sw
   assert.match(advanced, /if \(!this\.busy\) this\.options\.applyToSharedDecks = value/);
   assert.equal((advanced.match(/if \(!this\.hasActiveSection\(\)\)/g) || []).length, 12);
   assert.match(advanced, /title: this\.hasActiveSection\(\) \? this\.sectionTitle/);
-  assert.match(advanced, /Text\('›'\)/);
+  assert.match(advanced, /DisclosureChevron\(/);
   assert.doesNotMatch(advanced, /Text\('▼'\)|\.rotate\(/);
   assert.match(source, /showHelp: true/);
   assert.match(source, /aboutToDisappear\(\): void \{ this\.dialog\?\.close\(\)/);

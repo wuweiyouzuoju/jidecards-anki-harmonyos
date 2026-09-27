@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { DisclosureChevron } from '../common/DisclosureChevron';
 import { resourceText } from '../../utils/UiFeedback';
 
 import { 设置面板色板_取, 设置面板色板 } from '../../utils/设置面板配色';
@@ -152,9 +153,7 @@ export struct 术语分组 {
         .fontSize(15)
         .fontColor(色板.主文字)
         .layoutWeight(1)
-      Text('›')
-        .fontSize(22)
-        .fontColor(色板.次文字)
+      DisclosureChevron({ tint: 色板.次文字 })
     }
     .width('100%')
     .height(44)

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { DisclosureChevron } from './common/DisclosureChevron';
 import { StudyAutoAdvanceDraft, StudyAdvanceField } from '../model/StudyAutoAdvanceDraft';
 import { StudyOptions } from '../model/StudyTiming';
 import { DialogHeader } from './common/DialogHeader';
@@ -97,7 +98,7 @@ export struct StudyAutoAdvanceDialog {
         Text(this.label(field, this.draft.value(field)))
           .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-      Text('›').fontSize(20).fontColor($r('app.color.text_secondary'))
+      DisclosureChevron({ tint: $r('app.color.text_secondary') })
     }
     .width('100%').constraintSize({ minHeight: 64 }).padding({ left: 8, right: 8, top: 8, bottom: 8 })
     .onClick((): void => { this.open(field); })

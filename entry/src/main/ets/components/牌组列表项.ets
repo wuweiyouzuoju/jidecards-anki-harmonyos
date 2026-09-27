@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { DisclosureChevron } from './common/DisclosureChevron';
 import { resourceText } from '../utils/UiFeedback';
 import { ThemeDefinition, themeDefinition, THEME_VISUALS_KEY, THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 import { ThemeLabelGlyph, themeLabelGlyphs } from './common/ThemeText';
@@ -315,12 +316,7 @@ export struct 牌组列表项 {
           .fontSize(应用尺寸.字号_正文)
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1)
-        Text('›')
-          .fontSize(应用尺寸.字号_标题)
-          .fontColor($r('app.color.text_secondary'))
-          .width(24)
-          .height(24)
-          .textAlign(TextAlign.Center)
+        DisclosureChevron({ tint: $r('app.color.text_secondary') })
           .hitTestBehavior(HitTestMode.None)
       }
       .width('100%')

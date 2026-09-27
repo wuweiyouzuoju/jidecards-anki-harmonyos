@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { DisclosureChevron } from '../common/DisclosureChevron';
 import { resourceText } from '../../utils/UiFeedback';
 
 import { 设置面板色板_取 } from '../../utils/设置面板配色';
@@ -67,9 +68,7 @@ export struct 数据分组 {
             }
             .alignItems(HorizontalAlign.Start)
             Blank()
-            Text('›')
-              .fontSize(20)
-              .fontColor(设置面板色板_取(this.是否深色).弱化文字)
+            DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
           }
           .width('100%')
           .height(58)
@@ -90,9 +89,7 @@ export struct 数据分组 {
               }
               .alignItems(HorizontalAlign.Start)
               Blank()
-              Text('›')
-                .fontSize(20)
-                .fontColor(设置面板色板_取(this.是否深色).弱化文字)
+              DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
             }
             .width('100%')
             .height(58)
@@ -114,9 +111,7 @@ export struct 数据分组 {
               }
               .alignItems(HorizontalAlign.Start)
               Blank()
-              Text('›')
-                .fontSize(20)
-                .fontColor(设置面板色板_取(this.是否深色).弱化文字)
+              DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
             }
             .width('100%')
             .height(58)
@@ -134,7 +129,7 @@ export struct 数据分组 {
                 .fontSize(12).fontColor(设置面板色板_取(this.是否深色).弱化文字)
             }.alignItems(HorizontalAlign.Start)
             Blank()
-            Text('›').fontSize(20).fontColor(设置面板色板_取(this.是否深色).弱化文字)
+            DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
           }.width('100%').height(58).onClick((): void => { this.点击备份管理回调(); })
 
           // 媒体管理行：检查未使用/缺失媒体 + 回收站操作
@@ -149,9 +144,7 @@ export struct 数据分组 {
             }
             .alignItems(HorizontalAlign.Start)
             Blank()
-            Text('›')
-              .fontSize(20)
-              .fontColor(设置面板色板_取(this.是否深色).弱化文字)
+            DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
           }
           .width('100%')
           .height(58)
@@ -177,9 +170,7 @@ export struct 数据分组 {
                   .maxLines(2)
               }.alignItems(HorizontalAlign.Start)
             Blank()
-            Text('›')
-              .fontSize(20)
-              .fontColor(设置面板色板_取(this.是否深色).弱化文字)
+            DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
           }.width('100%').height(58)
             .enabled(!this.databaseBusy)
             .onClick((): void => { this.onCheckDatabase(); })
@@ -213,9 +204,7 @@ export struct 数据分组 {
               }
               .alignItems(HorizontalAlign.Start)
               Blank()
-              Text('›')
-                .fontSize(20)
-                .fontColor(设置面板色板_取(this.是否深色).弱化文字)
+              DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
             }
             .width('100%')
             .height(58)
@@ -237,9 +226,7 @@ export struct 数据分组 {
               }
               .alignItems(HorizontalAlign.Start)
               Blank()
-              Text('›')
-                .fontSize(20)
-                .fontColor(设置面板色板_取(this.是否深色).弱化文字)
+              DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
             }
             .width('100%')
             .height(58)
@@ -261,9 +248,7 @@ export struct 数据分组 {
               }
               .alignItems(HorizontalAlign.Start)
               Blank()
-              Text('›')
-                .fontSize(20)
-                .fontColor(设置面板色板_取(this.是否深色).弱化文字)
+              DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
             }
             .width('100%')
             .height(58)

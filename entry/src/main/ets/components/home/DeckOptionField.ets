@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { DisclosureChevron } from '../common/DisclosureChevron';
 import { DialogHeader } from '../common/DialogHeader';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 
@@ -114,7 +115,7 @@ export struct DeckOptionField {
         Text(this.title).fontSize(15).fontColor($r('app.color.text_primary')).layoutWeight(1)
         Text(this.summary()).fontSize(14).fontColor($r('app.color.text_secondary'))
           .constraintSize({ maxWidth: '38%' }).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-        Text('›').fontSize(20).fontColor($r('app.color.text_secondary'))
+        DisclosureChevron({ tint: $r('app.color.text_secondary') })
       }
       .width('100%').constraintSize({ minHeight: 48 }).padding({ left: 10, right: 10, top: 6, bottom: 6 })
       .enabled(!this.busy).onClick((): void => { this.open(); })

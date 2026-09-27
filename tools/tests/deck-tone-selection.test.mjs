@@ -43,7 +43,7 @@ test('native tone selection reflects five common colors plus no stripe and targe
   assert.match(source, /placement: Placement\.Right/);
   assert.match(source, /this\.显示色条菜单/);
   assert.match(source, /\.alignItems\(VerticalAlign\.Center\)/);
-  assert.match(source, /Text\('›'\)[\s\S]*?\.width\(24\)[\s\S]*?\.height\(24\)[\s\S]*?\.textAlign\(TextAlign\.Center\)/);
+  assert.match(source, /DisclosureChevron\(/);
   assert.doesNotMatch(source, /Select\(this\.toneOptions\(\)\)/);
   assert.doesNotMatch(source, /ThemeTextSpans\('✓'|菜单模式/);
 });
