@@ -1246,7 +1246,7 @@
     { "name": "browser_preview_close", "value": "关闭" },
     { "name": "browser_preview_load_error", "value": "加载卡片失败" },
     { "name": "browser_preview_hint", "value": "点击卡片看答案，左右滑切换" },
-    { "name": "browser_preview_keyboard_hint", "value": "点击卡片看答案，按左右方向键切换" },
+    { "name": "browser_preview_keyboard_hint", "value": "按左右方向键：右键显示答案，再按下一张；左键收起答案，再按上一张" },
     { "name": "browser_preview_position", "value": "%d/%d" },
     { "name": "stats_page_title", "value": "统计" },
     { "name": "stats_loading", "value": "加载统计中…" },

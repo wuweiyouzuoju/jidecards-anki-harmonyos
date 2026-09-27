@@ -300,6 +300,7 @@ struct 首页 {
   // 窄屏详情显隐（方案 C 2026-07-25）：点牌组后 true，根 Stack 内 牌组详情面板 盖住列表，替代推栈 NavDestination
   @State @Watch('homeActivityChanged') private 显示牌组详情: boolean = false;
   @State @Watch('homeActivityChanged') private 显示卡片预览: boolean = false;
+  private previewBackHandler: (() => boolean) | null = null;
   @State private 预览卡片ID列表: number[] = [];
   @State private 预览初始索引: number = 0;
   @State private 预览媒体目录: string = '';
@@ -781,7 +782,11 @@ struct 首页 {
    */
   onBackPress(): boolean {
     if ((this.transfer.phase !== 'idle') || this.创建牌组中 || this.定制牌组中 || this.deckOptionsBusy || this.deckDeletionBusy) return true;
-    if (this.显示卡片预览) { this.显示卡片预览 = false; return true; }
+    if (this.显示卡片预览) {
+      if (this.previewBackHandler?.()) return true;
+      this.显示卡片预览 = false;
+      return true;
+    }
     this.syncController.cancel();
     if (this.autoSyncModal) { this.syncBackRequest++; return true; }
     if (this.显示官方公告) {
@@ -2273,6 +2278,7 @@ struct 首页 {
         },
         onEditField: (卡片ID: number): void => { this.关闭预览并编辑(卡片ID); },
         onEditWithAgent: (cardId: number): void => { this.关闭预览并进入AI改卡(cardId); },
+        onBackHandlerChange: (handler: (() => boolean) | null): void => { this.previewBackHandler = handler; },
         onClose: (): void => { this.显示卡片预览 = false; }
       })
     }

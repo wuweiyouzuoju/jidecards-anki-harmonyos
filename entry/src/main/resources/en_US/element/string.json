@@ -797,7 +797,7 @@
     { "name": "browser_preview_close", "value": "Close" },
     { "name": "browser_preview_load_error", "value": "Failed to load card" },
     { "name": "browser_preview_hint", "value": "Tap card for answer, swipe to switch" },
-    { "name": "browser_preview_keyboard_hint", "value": "Click the card to reveal the answer; use the left/right arrow keys to navigate" },
+    { "name": "browser_preview_keyboard_hint", "value": "Use the left/right arrow keys: Right reveals the answer, then advances; Left hides the answer, then goes back" },
     { "name": "browser_preview_position", "value": "%d / %d" },
     { "name": "stats_page_title", "value": "Statistics" },
     { "name": "stats_loading", "value": "Loading statistics…" },

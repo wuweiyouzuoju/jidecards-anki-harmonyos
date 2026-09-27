@@ -10,9 +10,22 @@ import { 构建卡片HTML, 剥除拼写标记, 原始侧HTML } from '../../entry
 
 const read = path => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 const source = read('entry/src/main/ets/components/browser/卡片预览页.ets');
+test('preview overlay admits child input while keeping loading input blocked', () => {
+  // ArkUI Block excludes descendants from hit testing: the page and retry overlay
+  // must accept their children. These are wiring checks, not native touch tests.
+  const root = source.slice(source.lastIndexOf('  build() {'));
+  const loading = source.slice(source.indexOf('// Loading 覆盖层'), source.indexOf('// 错误覆盖层'));
+  const error = source.slice(source.indexOf('// 错误覆盖层'), source.indexOf('  private 底部条()'));
+  assert.doesNotMatch(root, /hitTestBehavior\(HitTestMode\.Block\)/,
+    'root Block makes close, more, menu items and Web untouchable');
+  assert.doesNotMatch(error, /hitTestBehavior\(HitTestMode\.Block\)/,
+    'error overlay Block makes its Retry button untouchable');
+  assert.match(loading, /hitTestBehavior\(HitTestMode\.Block\)/,
+    'loading must still prevent interaction with stale card content');
+});
 const names = ['aboutToAppear', 'aboutToDisappear', 'updateActivity', 'stopAudio', 'playCurrentAudio',
   '预览刷新版本变化', '取当前卡片ID', '加载当前卡', '应用HTML', 'webFailed', 'installActionBridge', 'onControllerAttached回调',
-  '翻面', '上一张', '下一张', '请求编辑字段', '请求AI改卡', '预览更多菜单'];
+  '翻面', '上一张', '下一张', '请求编辑字段', '请求AI改卡', '预览更多菜单', 'focusPreviewCard', 'dismissMoreMenu'];
 const methods = names.map(name => {
   const start = source.search(new RegExp(`^  (?:private )?(?:async )?${name}\\(`, 'm'));
   assert.ok(start >= 0, name);
@@ -48,6 +61,7 @@ function harness() {
     待加载HTML: '', 控制器已挂载: true,
     interactionEnabled: true, foreground: true, isDark: false, 媒体目录: '/media',
     onPositionChanged: index => events.push(['position', index]),
+    onBackHandlerChange: () => {},
     onEditField: id => events.push(['edit', id]), 取本地化文案: key => key,
     soundPlayer: { waitForCompletion: async () => {}, 停止: async () => events.push('sound stop'), 释放: async () => events.push('sound release'),
       播放队列: async paths => sounds.push(paths) },
@@ -62,6 +76,33 @@ function harness() {
   page.audioSession = new CardAudioSession(page.soundPlayer, page.ttsPlayer, (raw, question) => service.extractAudioTags(raw, question));
   return { page, displayed, sounds, tts, renderedIds, events, service };
 }
+
+test('both preview hosts dismiss the open menu before leaving preview and release the handler on unmount', async () => {
+  const { page } = harness();
+  let handler = null;
+  page.onBackHandlerChange = value => { handler = value; };
+  page.aboutToAppear(); await settle(page);
+  assert.equal(typeof handler, 'function');
+  for (const [file, visible] of [['首页', '显示卡片预览'], ['浏览页', '显示预览']]) {
+    const hostSource = read(`entry/src/main/ets/pages/${file}.ets`);
+    const start = hostSource.indexOf('  onBackPress(): boolean {');
+    const method = hostSource.slice(start, hostSource.indexOf('\n  }', start) + 4);
+    const Host = new Function(stripTypeScriptTypes(`class Host {${method}}`) + '; return Host;')();
+    const host = Object.assign(new Host(), { [visible]: true, previewBackHandler: handler,
+      transfer: { phase: 'idle' }, batchDialog: 'none' });
+    page.moreMenuOpen = true;
+    assert.equal(host.onBackPress(), true);
+    assert.equal(page.moreMenuOpen, false);
+    assert.equal(host[visible], true, 'first back only closes the menu');
+    assert.equal(host.onBackPress(), true);
+    assert.equal(host[visible], false, 'second back leaves preview');
+    assert.match(hostSource, /onBackHandlerChange:[^\n]*this\.previewBackHandler = handler/);
+  }
+  page.moreMenuOpen = true;
+  page.aboutToDisappear();
+  assert.equal(handler, null);
+  assert.equal(page.moreMenuOpen, false);
+});
 
 test('preview loads the question first and caches the answer for flipping, one side of audio at a time', async () => {
   const { page, displayed, sounds, tts } = harness();
@@ -218,11 +259,11 @@ test('editor and background suppress audio and paging; stale document callbacks 
   assert.equal(sounds.length, 2);
 });
 
-function domHarness() {
+function domHarness(version = 42) {
   const listeners = {}, actions = [];
   const window = { getSelection: () => '', jidePreview: { onAction: (...args) => actions.push(args) } };
   const document = { addEventListener: (name, fn) => { listeners[name] = fn; }, getElementById: () => null };
-  vm.runInNewContext(buildPreviewInteractionScript(42), { window, document, Promise, setTimeout: fn => fn() });
+  vm.runInNewContext(buildPreviewInteractionScript(version), { window, document, Promise, setTimeout: fn => fn() });
   return { listeners, actions, window };
 }
 
@@ -252,6 +293,8 @@ test('DOM keyboard switches cards with arrows without consuming typing', () => {
   listeners.keydown({ key: ' ', target: {}, preventDefault() { assert.fail(); } });
   listeners.keydown({ key: ' ', target: { tagName: 'INPUT' }, preventDefault() { assert.fail(); } });
   listeners.keydown({ key: 'ArrowRight', target: {}, repeat: true, preventDefault() { assert.fail(); } });
+  listeners.keydown({ key: 'ArrowRight', target: { tagName: 'INPUT' }, preventDefault() { assert.fail(); } });
+  listeners.keydown({ key: 'ArrowLeft', target: { isContentEditable: true }, preventDefault() { assert.fail(); } });
   assert.deepEqual(actions.map(a => a[0]), ['next', 'previous']);
 });
 
@@ -303,6 +346,42 @@ test('preview matches Anki: no side buttons, question first, reveal by tap, swip
       assert.match(strings, new RegExp(`"name": "${key}"`), `missing ${key} in ${file}`);
     }
   }
+});
+
+test('real arrow events reveal and hide answers before moving to another card', async () => {
+  const { page } = harness();
+  await page.加载当前卡(); await settle(page);
+  const press = async (key, index, side) => {
+    const dom = domHarness(page.documentVersion);
+    dom.window.jidePreview = page.proxy;
+    let consumed = false;
+    dom.listeners.keydown({ key, target: {}, preventDefault() { consumed = true; } });
+    await settle(page);
+    assert.equal(consumed, true);
+    assert.equal(page.当前索引值, index); assert.equal(page.当前面, side);
+  };
+  await press('ArrowLeft', 0, 'question');
+  await press('ArrowRight', 0, 'answer');
+  await press('ArrowLeft', 0, 'question');
+  await press('ArrowRight', 0, 'answer');
+  await press('ArrowRight', 1, 'question');
+  await press('ArrowRight', 1, 'answer');
+  await press('ArrowLeft', 1, 'question');
+  await press('ArrowLeft', 0, 'question');
+});
+
+test('preview requests initial Web focus once and never steals it back on later flips', () => {
+  const { page } = harness();
+  let calls = 0;
+  page.initialFocusPending = true;
+  page.网页控制器.requestFocus = () => { calls++; };
+  page.interactionEnabled = false; page.focusPreviewCard(); assert.equal(calls, 0);
+  page.interactionEnabled = true; page.focusPreviewCard(); assert.equal(calls, 1);
+  page.focusPreviewCard(); assert.equal(calls, 1);
+  page.initialFocusPending = true;
+  page.网页控制器.requestFocus = () => { throw new Error('not attached'); };
+  page.focusPreviewCard(); assert.equal(page.initialFocusPending, true);
+  assert.match(source, /\.onPageEnd[\s\S]*this\.focusPreviewCard\(\)/);
 });
 
 test('desktop preview advertises arrow keys while touch devices keep their swipe hint', () => {

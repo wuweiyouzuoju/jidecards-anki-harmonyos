@@ -1,12 +1,11 @@
-import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { StudyTimerController, StudyTimerState } from '../model/StudyTimerController';
 import { resourceText, showToastSafely } from '../utils/UiFeedback';
 import { ThemeTextSpans } from '../components/common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
-import { PAGE_SURFACE_KEY, themeDefinition } from '../model/ThemeCatalog';
-import { PrimaryGlassSurface } from '../utils/PrimaryGlassSurface';
-import { PRIMARY_GLASS_KEY, PrimaryGlassStyle, themePrimaryGlass } from '../model/ThemeCatalog';
+import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
+import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
+import { 开始学习按钮 } from '../components/开始学习按钮';
 
 // 学习页：复习流程页（M7）。
 // 链路：确保已打开 → SetCurrentDeck+GetQueuedCards → RenderExistingCard →
@@ -38,7 +37,9 @@ import { AnkiNoteEditor } from '../backend/AnkiNoteEditor';
 import { renderStudyAnswer, StudyAnswerNotetype } from '../model/StudyAnswerRenderer';
 import { resolveStudyKey } from '../model/StudyInputPolicy';
 import { studyKeyName } from '../utils/StudyKeyAdapter';
-import { cardViewportWidth } from '../model/CardViewportLayout';
+import { CardViewport } from '../components/common/CardViewport';
+import { CardActionMenu } from '../components/common/CardActionMenu';
+import { DelayedLoadingIndicator } from '../components/common/DelayedLoadingIndicator';
 
 import type { RenderedCard, AvTagsResult } from '../proto/messages/CardRenderingMessages';
 import {
@@ -164,7 +165,7 @@ export struct 学习页 {
   private autoAdvanceSettingsOpen: boolean = false;
   private autoAdvanceDialog: CustomDialogController | null = null;
   private autoAdvanceDialogBack: () => void = (): void => {};
-  private studyMenuOpen: boolean = false;
+  @State private studyMenuOpen: boolean = false;
   private questionHasAudio: boolean = false;
   private 正面HTML: string = '';
   private 背面HTML: string = '';
@@ -220,13 +221,10 @@ export struct 学习页 {
   // 2.1.4.1 对比度：按钮背景专用档（配 #FFFFFF 文字 ≥ 4.5:1）
   @StorageProp(颜色键.主色容器) private 主色容器色: string = '#E8EEFC';
   @StorageProp(PAGE_SURFACE_KEY) private 页面底色微染值: string = '#F5F7FA';
-  @State private cardContentWidth: number = cardViewportWidth(0, 0);
   // 状态栏高度（沉浸式全屏下，顶部条需让出状态栏区域，避免按钮叠在状态栏上）
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
   // 手势导航条高度（bottom 布局下答案条贴底，需抬高避让导航条）
   @StorageProp('导航条高度') private 导航条高度: number = 0;
-  @State private 显示答案按下: boolean = false;
-  @StorageProp(PRIMARY_GLASS_KEY) private primaryGlass: PrimaryGlassStyle = themePrimaryGlass(themeDefinition('aurora'), false);
   // Type-in-the-Answer：拼写字段名 为空串表示当前卡无 {{type:FieldName}} 标记，
   // 不渲染 TextInput、翻面时不注入比对结果。
   // 拼写填空=true 时翻面用 提取拼写填空内容 提取当前 cardOrd 的预期答案。
@@ -288,6 +286,7 @@ export struct 学习页 {
   }
 
   aboutToDisappear(): void {
+    this.studyMenuOpen = false;
     CustomTransition.getInstance().注销NavParam('StudyPage');
     this.editorSession.dispose();
     this.studyTimer.dispose();
@@ -421,6 +420,7 @@ export struct 学习页 {
   private async 加载下一张卡(): Promise<void> {
     if (!this.mounted) { return; }
     if (!this.页面已显示 || !this.foreground) {
+      this.studyMenuOpen = false;
       this.待重渲染当前卡 = true;
       return;
     }
@@ -515,6 +515,7 @@ export struct 学习页 {
   private studyActivityChanged(): void {
     if (!this.mounted) { return; }
     if (!this.页面已显示 || !this.foreground) {
+      this.studyMenuOpen = false;
       this.clearChoiceAutoAdvance();
       this.autoAdvanceEnabled = false;
       this.invalidateCardWork();
@@ -770,7 +771,7 @@ export struct 学习页 {
   // 2026-07-28：原顶部条左侧「返回+撤销」+ 右侧「删除」三按钮布局，
   // 撤销按钮（约 62px）与返回按钮叠加宽度约 132px，覆盖到居中牌组名
   // （maxWidth 40% 居中后左边缘约屏宽 30%）的左侧字符。
-  // 改为左侧只留「返回」，右侧「更多」按钮 bindMenu 弹出菜单：
+  // 改为左侧只留「返回」，右侧「更多」按钮通过共享 CardActionMenu 弹出菜单：
   //   - 撤销（enabled = 可撤销）
   //   - 删除此卡（enabled = 阶段是 question/answer）
   // 牌组名 maxWidth 放大到 50%（左侧只剩返回按钮，避让空间充足）。
@@ -779,7 +780,7 @@ export struct 学习页 {
   // 无（读取 可撤销 / 阶段 / 评分中）
   //
   // @输出
-  // MenuElement[]：bindMenu 数据源
+  // MenuElement[]：共享动作菜单数据源
   //
   // @业务规则
   // MenuElement.value 只接受 string，需把 Resource 转 string。
@@ -837,6 +838,29 @@ export struct 学习页 {
       enabled: canManageCard
     });
     return 菜单;
+  }
+
+  private openStudyMenu(): void {
+    this.studyMenuOpen = true;
+    this.Ctrl按下 = false;
+    this.stopStudyTimers();
+    this.clearChoiceAutoAdvance();
+  }
+
+  private closeStudyMenu(): void {
+    if (!this.studyMenuOpen) return;
+    this.studyMenuOpen = false;
+    this.startStudyTimers();
+    this.scheduleChoiceAutoAdvance();
+  }
+
+  private selectStudyMenu(item: MenuElement): void {
+    if (!this.studyMenuOpen || item.enabled === false) return;
+    this.studyMenuOpen = false;
+    // 动作先建立编辑/引导/手写阻塞状态，再判断是否恢复计时。
+    item.action?.();
+    this.startStudyTimers();
+    this.scheduleChoiceAutoAdvance();
   }
 
   /** 从当前学习卡读取笔记；字段就绪后才挂载编辑器，避免初始化为空草稿。 */
@@ -1476,6 +1500,11 @@ export struct 学习页 {
   // 无（触发其他块副作用）
   // ========================================================
   private 处理按键(event: KeyEvent): boolean {
+    if (this.studyMenuOpen) {
+      this.Ctrl按下 = false;
+      if (event.type === KeyType.Down && studyKeyName(event.keyCode) === 'escape') this.closeStudyMenu();
+      return true;
+    }
     const result = resolveStudyKey(studyKeyName(event.keyCode), event.type === KeyType.Down,
       this.Ctrl按下, this.阶段, this.editor.visible || this.editor.busy,
       this.studyGuideVisible || this.autoAdvanceSettingsOpen);
@@ -1526,7 +1555,7 @@ export struct 学习页 {
       // 顶层：所有按钮放同一 Row，用 Blank() 撑开左右——
       // 不再分左右两个 width('100%') Row 叠层（之前 hitTestBehavior Transparent 仍被遮挡），
       // 单层 Row 内按钮天然不重叠，Blank() 占位区无 onClick 不消费触摸。
-      // 2026-07-28：撤销与删除合并到右侧「更多」按钮（bindMenu），左侧只留返回，
+      // 2026-07-28：撤销与删除合并到右侧「更多」按钮（共享菜单），左侧只留返回，
       // 避免左侧两按钮叠加宽度覆盖居中牌组名。
       Row() {
         // 左侧：返回
@@ -1539,7 +1568,7 @@ export struct 学习页 {
         // 中间空白撑开：让左侧按钮靠左、右侧按钮靠右
         Blank()
 
-        // 右侧：更多（bindMenu 弹出 撤销 / 删除此卡）
+        // 右侧：更多（共享菜单展示学习动作）
         // 菜单项 enabled 跟随 可撤销 / 阶段 状态，组件重新 build 时数组重新求值。
         Button($r('app.string.study_more'))
           .height(应用尺寸.按钮高度)
@@ -1550,10 +1579,7 @@ export struct 学习页 {
           .backgroundColor($r('app.color.surface_card'))
           .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
           .borderRadius(应用尺寸.圆角_胶囊)
-          .bindMenu(this.更多菜单(), {
-            onAppear: (): void => { this.studyMenuOpen = true; this.stopStudyTimers(); this.clearChoiceAutoAdvance(); },
-            onDisappear: (): void => { this.studyMenuOpen = false; this.startStudyTimers(); this.scheduleChoiceAutoAdvance(); }
-          })
+          .onClick((): void => { this.openStudyMenu(); })
       }
       .width('100%')
       .height('100%')
@@ -1664,15 +1690,12 @@ export struct 学习页 {
 
       if (this.阶段 === 'loading') {
         Column({ space: 应用尺寸.间距_8 }) {
-          LoadingProgress()
-            .width(应用尺寸.加载指示器尺寸)
-            .height(应用尺寸.加载指示器尺寸)
-            .color(this.动作主色)
+          DelayedLoadingIndicator({ tint: this.动作主色 })
         }
         .width('100%')
         .height('100%')
         .justifyContent(FlexAlign.Center)
-        .backgroundColor(this.页面底色微染值)
+        .backgroundColor($r('app.color.surface_card'))
       }
 
       if (this.阶段 === 'error') {
@@ -1767,8 +1790,7 @@ export struct 学习页 {
       .backgroundColor($r('app.color.surface_card'))
       .borderRadius(应用尺寸.圆角_卡片)
       .clip(true)
-      .border({ width: 1.5, color: $r('app.color.border_input') })
-      .shadow(ShadowStyle.OUTER_DEFAULT_XS)
+      .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
 
       // Type-in-the-Answer：正面阶段在 Web 下方渲染输入框，翻面后比对用户输入与笔记字段值。
       // Enter 提交翻面（对齐 Anki 桌面端输入框回车显示答案）。
@@ -1846,31 +1868,14 @@ export struct 学习页 {
   @Builder
   private 答案条() {
     Column() {
-      if (this.阶段 === 'question' && this.choiceQuestion === null) {
-        Button() {
-          Text() { ThemeTextSpans($r('app.string.study_show_answer'), this.themeAccentColors, this.getUIContext()) }
-            .fontSize(应用尺寸.字号_标题).fontWeight(FontWeight.Medium).fontColor(this.动作主色)
-        }
-          .width('100%')
-          .height(应用尺寸.行动按钮高度)
-          .fontSize(应用尺寸.字号_标题)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(this.动作主色)
-          .attributeModifier(new PrimaryGlassSurface(this.显示答案按下, this.primaryGlass,
-            $r('app.color.border_input'), 1.5))
-          .stateEffect(false)
-          .borderRadius(应用尺寸.圆角_行动按钮)
-          .animation({ duration: 80, curve: Curve.EaseOut })
-          .onTouch((event: TouchEvent): void => {
-            if (event.type === TouchType.Down) {
-              this.显示答案按下 = true;
-            } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-              this.显示答案按下 = false;
-            }
-          })
-          .onClick(() => {
-            this.显示答案();
-          })
+      // 非学习阶段也占据同样的按钮高度，避免首帧和完成页撑大卡片。
+      if ((this.阶段 === 'question' && this.choiceQuestion === null) ||
+        this.阶段 === 'loading' || this.阶段 === 'done' || this.阶段 === 'error') {
+        开始学习按钮({
+          文案: $r('app.string.study_show_answer'),
+          isAvailable: this.阶段 === 'question',
+          开始学习回调: (): void => { this.显示答案(); }
+        })
       }
       if (this.阶段 === 'answer' && this.choiceQuestion === null) {
         Row({ space: 应用尺寸.间距_8 }) {
@@ -1925,30 +1930,28 @@ export struct 学习页 {
     .backgroundColor(this.页面底色微染值)
   }
 
+  @Builder
+  private cardViewportContent() {
+    Column() {
+      this.顶部条()
+      this.卡片区()
+      if (this.学习布局模式值 === 'bottom') {
+        this.答案条()
+      }
+    }
+    .width('100%')
+    .height('100%')
+  }
+
   build() {
     NavDestination() {
       // 外层 Stack：浮层工具栏用 position 绝对定位，需要全屏父容器；底层是限宽居中的内容列。
       // bottom 模式下 答案条 在内容列内，与原体验一致；float 模式下 答案条 不渲染，答案与评分浮动工具栏叠加在 Stack 上层。
       Stack() {
-        Column() {
-          Column() {
-            this.顶部条()
-            this.卡片区()
-            if (this.学习布局模式值 === 'bottom') {
-              this.答案条()
-            }
-          }
-          .width('100%')
-          .constraintSize({ maxWidth: this.cardContentWidth })
-          .height('100%')
-        }
+        CardViewport({ content: () => { this.cardViewportContent(); } })
         .width('100%')
         .height('100%')
-        .alignItems(HorizontalAlign.Center)
         .backgroundColor(Color.Transparent)
-        .onAreaChange((_oldArea: Area, area: Area): void => {
-          this.cardContentWidth = cardViewportWidth(Number(area.width), Number(area.height));
-        })
 
         if (this.学习布局模式值 === 'float') {
           // 主操作浮动工具栏：question 阶段显示「显示答案」，answer 阶段切换为 4 个评分按钮。
@@ -1975,6 +1978,11 @@ export struct 学习页 {
               this.startStudyTimers();
             }
           })
+        }
+        if (this.studyMenuOpen) {
+          CardActionMenu({ items: this.更多菜单(),
+            onClose: (): void => { this.closeStudyMenu(); },
+            onSelect: (item: MenuElement): void => { this.selectStudyMenu(item); } })
         }
         if (this.editor.visible && this.editor.note !== null) {
           浏览编辑区({
@@ -2007,6 +2015,7 @@ export struct 学习页 {
     .backgroundColor(Color.Transparent)
     .opacity(this.转场透明度)
     .onBackPressed((): boolean => {
+      if (this.studyMenuOpen) { this.closeStudyMenu(); return true; }
       if (this.editor.busy) { return true; }
       if (this.editor.visible) { this.closeNoteEditor(); return true; }
       return false;

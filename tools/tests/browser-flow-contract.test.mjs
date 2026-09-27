@@ -34,7 +34,7 @@ test('card preview keeps its position header and preserves preview while editing
   assert.match(preview, /Text\(this\.取位置文案\(\)\)/);
   assert.match(preview, /文案: \$r\('app\.string\.browser_preview_close'\)/);
   assert.match(preview, /Button\(\$r\('app\.string\.study_more'\)\)/);
-  assert.match(preview, /bindMenu\(this\.预览更多菜单\(\)\)/);
+  assert.match(preview, /CardActionMenu\(\{ items: this\.预览更多菜单\(\)/);
   assert.doesNotMatch(preview, /DialogHeader\(/);
   assert.match(preview, /@Prop\s+@Watch\('预览刷新版本变化'\)\s+刷新版本:\s*number/);
   assert.match(preview,

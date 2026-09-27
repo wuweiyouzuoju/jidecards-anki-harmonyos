@@ -19,6 +19,7 @@ test('small anchored menus share the restrained 150ms transition', () => {
     'entry/src/main/ets/components/settings/模式切换菜单.ets',
     'entry/src/main/ets/components/browser/BrowserMoreMenu.ets',
     'entry/src/main/ets/components/browser/BrowserViewMenu.ets',
+    'entry/src/main/ets/components/common/CardActionMenu.ets',
   ]) {
     const source = read(path);
     assert.doesNotMatch(source, /取全屏转场时长|取全屏转场曲线/, path);

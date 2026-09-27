@@ -28,7 +28,7 @@ test('deck detail preview queries all cards and mounts the existing read-only pr
   assert.match(preview, /预览更多菜单/);
   assert.match(preview, /app\.string\.study_edit_note/);
   assert.match(preview, /app\.string\.ai_card_edit/);
-  assert.match(preview, /bindMenu\(this\.预览更多菜单\(\)\)/);
+  assert.match(preview, /CardActionMenu\(\{ items: this\.预览更多菜单\(\)/);
   assert.match(read('entry/src/main/ets/model/navigation/PageParams.ts'), /editCardId\?: number/);
   assert.match(browser, /pageEditCardId: number = -1/);
   assert.match(browser, /if \(this\.pageEditCardId > 0\)/);
@@ -60,5 +60,7 @@ test('deck title wraps beside the top-right preview without a separate current-d
   assert.doesNotMatch(header, /\.maxLines\(|TextOverflow\.Ellipsis/);
   assert.match(header, /app\.string\.deck_preview/);
   assert.match(header, /\.flexShrink\(0\)/);
+  assert.match(header, /Column\(\{ space: 应用尺寸\.间距_4 \}\)[\s\S]*app\.string\.deck_add_card[\s\S]*app\.string\.deck_preview/);
+  assert.match(header, /\.alignItems\(HorizontalAlign\.End\)/);
   assert.match(header, /\.alignItems\(VerticalAlign\.Top\)/);
 });

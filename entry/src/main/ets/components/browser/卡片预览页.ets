@@ -58,7 +58,9 @@ import { CardAudioSession } from '../../model/CardAudioSession';
 import { APP_FOREGROUND_KEY } from '../../model/Redemption';
 import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../../model/ReleaseFeatures';
 import { buildPreviewInteractionScript } from '../../model/PreviewInteraction';
-import { cardViewportWidth } from '../../model/CardViewportLayout';
+import { CardViewport } from '../common/CardViewport';
+import { CardActionMenu } from '../common/CardActionMenu';
+import { studyKeyName } from '../../utils/StudyKeyAdapter';
 import { PAGE_SURFACE_KEY } from '../../model/ThemeCatalog';
 import { DECK_LIST_NARROW_KEY } from '../../model/DeckListAppearance';
 import { ThemeBackground } from '../common/ThemeBackground';
@@ -80,7 +82,6 @@ export struct 卡片预览页 {
   @State private moreMenuOpen: boolean = false;
   private initialFocusPending: boolean = true;
   private readonly desktopPreview: boolean = deviceInfo.deviceType === '2in1' || deviceInfo.deviceType === 'pc';
-  @State private cardContentWidth: number = cardViewportWidth(0, 0);
   @StorageProp(PAGE_SURFACE_KEY) private pageSurface: string = '#F5F7FA';
   @StorageProp('cardTextSizePercent') private cardTextSizePercent: number = 100;
   @Prop isDark: boolean = false;
@@ -93,6 +94,7 @@ export struct 卡片预览页 {
   @StorageProp(AI_AGENT_CHANNELS_APP_STORAGE_KEY) private agentEnabled: boolean = false;
   onPositionChanged: (index: number) => void = (_index: number): void => {};
   onClose: () => void = (): void => {};
+  onBackHandlerChange: (handler: (() => boolean) | null) => void = (_handler: (() => boolean) | null): void => {};
   onEditField: (卡片ID: number) => void = (_卡片ID: number): void => {};
   onEditWithAgent: (cardId: number) => void = (_cardId: number): void => {};
 
@@ -131,6 +133,7 @@ export struct 卡片预览页 {
 
   aboutToAppear(): void {
     this.mounted = true;
+    this.onBackHandlerChange((): boolean => this.dismissMoreMenu());
     // 固定本次预览的 ID 顺序；字段编辑后的搜索重排不能把当前卡换成另一张。
     this.previewIds = this.卡片ID列表.slice();
     this.当前索引值 = Math.max(0, Math.min(this.初始索引, this.previewIds.length - 1));
@@ -138,6 +141,8 @@ export struct 卡片预览页 {
   }
 
   aboutToDisappear(): void {
+    this.moreMenuOpen = false;
+    this.onBackHandlerChange(null);
     this.mounted = false;
     this.loadVersion += 1;
     this.documentVersion += 1;
@@ -146,8 +151,15 @@ export struct 卡片预览页 {
     this.待加载HTML = '';
   }
 
+  private dismissMoreMenu(): boolean {
+    if (!this.moreMenuOpen) return false;
+    this.moreMenuOpen = false;
+    return true;
+  }
+
   /** 编辑或后台期间停止所有声音；返回后由用户重播，不自动打断其他音频。 */
   private updateActivity(): void {
+    if (!this.interactionEnabled || !this.foreground) this.moreMenuOpen = false;
     if (!this.interactionEnabled || !this.foreground) {
       this.audioRefreshPending = this.已渲染 !== null;
       this.stopAudio();
@@ -374,7 +386,7 @@ export struct 卡片预览页 {
   }
 
   /**
-   * 下一张（Anki 预览的 ">" / 右方向键 / 回车）：题目态先显示答案；答案态才切下一张卡。
+   * 下一张（Anki 预览的 ">" / 右方向键）：题目态先显示答案；答案态才切下一张卡。
    * 加载中或错误态直接切卡，保留“坏卡/慢卡可跳过”的既有行为。
    */
   private 下一张(): void {
@@ -400,6 +412,16 @@ export struct 卡片预览页 {
     }
     this.stopAudio();
     this.onEditField(卡片ID);
+  }
+
+  private focusPreviewCard(): void {
+    if (!this.initialFocusPending || !this.mounted || !this.interactionEnabled || !this.foreground || this.忙碌) return;
+    try {
+      this.网页控制器.requestFocus();
+      this.initialFocusPending = false;
+    } catch (error) {
+      console.info(`Preview focus: ${error}`);
+    }
   }
 
   private 请求AI改卡(): void {
@@ -501,7 +523,7 @@ export struct 卡片预览页 {
           .backgroundColor($r('app.color.surface_card'))
           .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
           .borderRadius(应用尺寸.圆角_胶囊)
-          .bindMenu(this.预览更多菜单())
+          .onClick((): void => { this.moreMenuOpen = true; })
       }
       .width('100%')
       .height('100%')
@@ -530,6 +552,8 @@ export struct 卡片预览页 {
         .domStorageAccess(true)
         .zoomAccess(true)
         .focusable(true)
+        // 进入预览即接收方向键，无需先点卡片；Web 内表单仍自行处理编辑按键。
+        .defaultFocus(true)
         .onControllerAttached((): void => { this.onControllerAttached回调(); })
         .onInterceptRequest((event: OnInterceptRequestEvent): WebResourceResponse | null => {
           return interceptCardAsset(event.request.getRequestUrl()) ?? this.拦截媒体(event);
@@ -539,6 +563,8 @@ export struct 卡片预览页 {
         })
         .onRenderExited((): void => { this.webFailed(); })
         .onPageEnd((event: OnPageEndEvent) => {
+          // 覆盖层不是新导航页，不能只依赖 defaultFocus；首次加载后主动获焦一次。
+          this.focusPreviewCard();
           // ImageOcclusion 兜底（与 学习页 同款）：setup() 内部幂等，无 canvas 直接返回。
           try {
             this.网页控制器.runJavaScript('anki.imageOcclusion.setup()')
@@ -581,7 +607,9 @@ export struct 卡片预览页 {
         .justifyContent(FlexAlign.Center)
         .padding(应用尺寸.卡片内边距)
         .backgroundColor(this.isDark ? 'rgba(0,0,0,0.40)' : 'rgba(255,255,255,0.60)')
-        .hitTestBehavior(HitTestMode.Block)
+        // Default 保留重试按钮的命中；背景承接点击，避免落到下层卡片。
+        .hitTestBehavior(HitTestMode.Default)
+        .onClick((): void => {})
       }
     }
     .width('100%')
@@ -589,8 +617,7 @@ export struct 卡片预览页 {
     .backgroundColor($r('app.color.surface_card'))
     .borderRadius(应用尺寸.圆角_卡片)
     .clip(true)
-    .border({ width: 1.5, color: $r('app.color.border_input') })
-    .shadow(ShadowStyle.OUTER_DEFAULT_XS)
+    .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
     }
     .width('100%')
     .layoutWeight(1)
@@ -630,34 +657,47 @@ export struct 卡片预览页 {
     })
   }
 
+  @Builder
+  private cardViewportContent() {
+    Column() {
+      this.预览顶部条()
+      this.卡片区()
+      this.底部条()
+    }
+    .width('100%')
+    .height('100%')
+  }
+
   build() {
     Stack() {
       // 预览覆盖在已有页面上，必须独立绘制主题背景，不能透出宿主控件。
       ThemeBackground()
 
       // 主面板：全屏卡片预览（OPACITY 转场，禁止左右平移）
-      Column() {
-        Column() {
-          this.预览顶部条()
-          this.卡片区()
-          this.底部条()
-        }
-        .width('100%')
-        .constraintSize({ maxWidth: this.cardContentWidth })
-        .height('100%')
-      }
+      CardViewport({ content: () => { this.cardViewportContent(); } })
       .width('100%')
       .height('100%')
-      .alignItems(HorizontalAlign.Center)
       .backgroundColor(this.pageSurface)
-      .onAreaChange((_oldArea: Area, area: Area): void => {
-        this.cardContentWidth = cardViewportWidth(Number(area.width), Number(area.height));
-      })
+      if (this.moreMenuOpen) {
+        CardActionMenu({ items: this.预览更多菜单(),
+          onClose: (): void => { this.dismissMoreMenu(); },
+          onSelect: (item: MenuElement): void => {
+            this.moreMenuOpen = false;
+            item.action?.();
+          } })
+      }
     }
     .width('100%')
     .height('100%')
     .backgroundColor($r('app.color.surface_page'))
-    .hitTestBehavior(HitTestMode.Block)
+    // Block 会连同关闭、更多和 Web 一起屏蔽；此处只隔离宿主页面。
+    .hitTestBehavior(HitTestMode.Default)
+    .onClick((): void => {})
+    .onKeyPreIme((event: KeyEvent): boolean => {
+      if (!this.moreMenuOpen) return false;
+      if (event.type === KeyType.Down && studyKeyName(event.keyCode) === 'escape') this.dismissMoreMenu();
+      return true;
+    })
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
     .transition(TransitionEffect.OPACITY.animation({
       curve: 取全屏转场曲线(),

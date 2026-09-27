@@ -21,13 +21,15 @@
 
 ## 卡片只读预览
 
+电脑端预览首次 Web 页面加载完成后主动请求一次焦点；后续翻面不重复抢焦点。左右键与横向滑动共用已有预览状态机：右键题目→答案→下一张题目；左键答案→题目→上一张题目，首尾不回绕。表单与可编辑正文保留自身按键行为，预览不写入学习评分。键盘提示必须明确先显示/收起答案再换卡，行为链由 `preview-runtime.test.mjs` 从真实 DOM 按键脚本到页面方法验证。
+
 全屏预览作为覆盖层时，根 Stack 必须有不透明 `surface_page` 底色并拦截命中，内部自行绘制 `ThemeBackground`，背景与内容整体转场。`PAGE_SURFACE_KEY` 在幻彩主题下为透明，只能用于已具备独立背景的内容区；不能用它替代覆盖层底色，否则首页的添加卡片、开始学习等控件会透出。不要恢复半透明的点击关闭遮罩，退出使用预览自己的关闭入口。
 
 预览页移除底部重播音频按钮，和学习页一样从右上角“更多”操作。AI 改卡经 `onEditWithAgent` 传当前卡片 ID；首页与浏览页都进入 AiCardPage 的 edit 模式，配置检查后再次核对预览目标，返回时恢复当前索引并重新加载卡面。未配置时打开 AI 设置，不自动请求模型，不使用浏览页的批量选择或新建模式。回归在 `preview-runtime`。
 
 学习页的首次教学和手动“学习说明”共用 `study_guide_message` 与 `glossary_shortcuts_help`，快捷键只描述 `StudyKeyAdapter` → `StudyInputPolicy` → 学习页实际处理的动作：Space/Enter、1–4、B、S、Delete、Ctrl+Z、Esc、R，明确普通闪卡与选择题限制。撤销菜单统一显示“撤销操作”。预览独立使用 `PreviewInteraction` 的左右方向键；电脑（deviceType 为 2in1/pc）显示“按左右方向键”，触屏设备保留滑动提示，不把学习评分键当作预览功能。
 
-两页卡片外框共用 `model/CardViewportLayout.ts` 的窗口宽高策略，窗口尺寸变化和旋转会重新计算：竖屏最多 840vp；横屏按窗口宽度的 92% 放宽，下限受 840vp 和实际窗口约束，上限 1600vp。卡片高度使用剩余区域，字体不随外框拉伸，图片沿用 HTML 的等比约束。预览复用学习页卡片圆角、边框、阴影与不透明底色；只读预览不接入评分。牌组模板自身的正文 `max-width` 仍保留，调整外框不会改写导入的模板 CSS。验证见 `card-viewport-layout`、`preview-runtime` 与 `study-guide`。
+两页卡片外框共用 `model/CardViewportLayout.ts` 的窗口宽高策略，窗口尺寸变化和旋转会重新计算：竖屏最多 840vp；横屏按窗口宽度的 92% 放宽，下限受 840vp 和实际窗口约束，上限 1600vp。`components/common/CardViewport.ets` 在 `onMeasureSize` 中用本轮父级约束直接测量内容列，并在 `onPlaceChildren` 居中；首帧与旋转使用同一条路径，禁止先渲染默认 840vp 再由 `onAreaChange` 回写状态扩宽。该容器只用于有确定宽高的全屏区域，调用方不要添加内边距或边框。卡片高度使用剩余区域，字体不随外框拉伸，图片沿用 HTML 的等比约束。学习页与预览页统一使用已有的平面卡片样式，沿用牌组详情的圆角、surface_card 底色以及 应用尺寸.卡片边框 / border_subtle 浅边框，不添加外阴影或输入框式深色描边；只读预览不接入评分。牌组模板自身的正文 `max-width` 仍保留，调整外框不会改写导入的模板 CSS。验证见 `card-viewport-layout`、`preview-runtime` 与 `study-guide`。
 
 学习与预览的本地 Web 媒体请求统一由 `utils/媒体响应助手.ets` 的 `interceptMediaRequest` 处理：GET/HEAD、单字节范围 206、不可满足范围 416，非法或多范围回退完整 200。整文件（含 `bytes=0-`）交 ArkWeb 文件描述符读取并关闭；局部范围异步读取，短读继续，提前 EOF 返回 500，响应就绪后才交付。所有页面不得再复制状态码/文件读取逻辑；原生 `[sound:]` 播放链与学习页焦点/快捷键行为保持原样。运行回归见 `tools/tests/media-response.test.mjs`，实际 ArkWeb 拖动仍需问题卡片真机验收。
 
@@ -47,6 +49,8 @@
 
 
 ## 弹窗操作
+
+学习与预览的“更多”菜单共用 `components/common/CardActionMenu.ets`，定位和样式归 `AnchoredMenu`，内容限宽复用 `CardViewportLayout.cardViewportWidth`。学习页拥有菜单显示状态：打开时暂停普通计时和选择题自动推进；点击外部、返回或 Escape 收起后恢复，选中动作先建立编辑/引导/手写阻塞状态再检查恢复条件；后台、隐藏与销毁清除菜单。打开期间屏蔽学习快捷键。`study-menu.test.mjs` 执行真实菜单方法验证暂停、恢复、禁用动作和 Escape；实际布局须另做设备验收。
 
 学习页更多菜单将“编辑”固定为第一项，“自动前进”固定为最后一项，即使时间为 0 也可进入。`components/StudyAutoAdvanceDialog.ets` 复用 JideCards 的 `surface_card`、`应用尺寸` 与 `DialogHeader`，此弹窗按用户指定将公共操作栏放在底部：左“返回”、右“确定”。主界面为设置名称、当前值和箭头；二级为带选中态的单选列表。二级返回（含系统返回）丢弃当前待选值并回主界面，二级确定更新弹窗草稿并回主界面；主界面确定才应用到会话，主界面返回丢弃整个草稿。不要用连续 `showActionMenu` 代替具有返回层级和确认语义的设置弹窗。
 

@@ -189,6 +189,7 @@ export struct 浏览页 {
 
   // T5 卡片预览状态：Cards 模式下点击行 → 弹全屏预览；底部「编辑字段」→ 在预览上方打开 浏览编辑区
   @State private 显示预览: boolean = false;
+  private previewBackHandler: (() => boolean) | null = null;
   @State private previewCardIds: number[] = [];
   @State private 预览初始索引: number = 0;
   @State private 预览媒体目录: string = '';
@@ -301,7 +302,11 @@ export struct 浏览页 {
     if (this.显示标签重命名) { this.显示标签重命名 = false; return true; }
     if (this.显示查找替换) { this.显示查找替换 = false; return true; }
     if (this.显示侧边栏) { this.显示侧边栏 = false; return true; }
-    if (this.显示预览) { this.显示预览 = false; return true; }
+    if (this.显示预览) {
+      if (this.previewBackHandler?.()) return true;
+      this.显示预览 = false;
+      return true;
+    }
     if (this.editor.visible) { this.editorSession.close(); return true; }
     if (this.显示卡片信息) { this.关闭卡片信息(); return true; }
     if (this.显示说明浮层) { this.显示说明浮层 = false; return true; }
@@ -1369,6 +1374,7 @@ export struct 浏览页 {
         interactionEnabled: !this.editor.visible && !this.editor.busy,
         onPositionChanged: (index: number): void => { this.预览初始索引 = index; },
         onEditWithAgent: (cardId: number): void => { this.打开预览AI改卡(cardId); },
+        onBackHandlerChange: (handler: (() => boolean) | null): void => { this.previewBackHandler = handler; },
         onClose: (): void => {
           this.显示预览 = false;
         },

@@ -13,7 +13,7 @@ import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 // @名称 开始学习按钮 主题玻璃与组件字段
 //
 // @作用
-// 开始学习主按钮：主屏窄屏底部与详情 pane 共用。
+// 开始学习与固定显示答案共用的主按钮；调用方只传文案与动作。
 // 主操作使用带当前主题轻染色的玻璃表面，默认也保留玻璃质感。
 // 普通主题由种子色派生材料，幻彩使用多色材料；深浅模式由主题管理器发布。
 // 按下加厚色层，抬起恢复；共用 PrimaryGlassSurface，不逐帧模糊。
@@ -37,6 +37,8 @@ import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 // ========================================================
 @Component
 export struct 开始学习按钮 {
+  @Prop 文案: Resource = $r('app.string.start_study');
+  @Prop isAvailable: boolean = true;
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @StorageProp(颜色键.动作主色) private primaryLabel: string = '#2F5FD0';
   @StorageProp(PRIMARY_GLASS_KEY) private primaryGlass: PrimaryGlassStyle = themePrimaryGlass(themeDefinition('aurora'), false);
@@ -52,7 +54,7 @@ export struct 开始学习按钮 {
   // @名称 开始学习按钮主渲染
   //
   // @作用
-  // 渲染主题玻璃按钮，仅显示居中的“开始学习”。
+  // 渲染主题玻璃按钮，居中显示调用方文案，默认“开始学习”。
   //
   // @输入
   // @StorageProp primaryGlass / themeAccentColors + @State 已按下。
@@ -71,9 +73,15 @@ export struct 开始学习按钮 {
   build() {
     Button() {
       Row() {
-        Text() { ThemeTextSpans($r('app.string.start_study'), this.themeAccentColors, this.getUIContext()) }
-          .fontSize(应用尺寸.字号_卡片标题)
-          .fontWeight(FontWeight.Bold)
+        Text() {
+          if (this.isAvailable) {
+            ThemeTextSpans(this.文案, this.themeAccentColors, this.getUIContext())
+          } else {
+            Span(this.文案).fontColor($r('app.color.text_secondary'))
+          }
+        }
+          .fontSize(应用尺寸.字号_标题)
+          .fontWeight(FontWeight.Medium)
           .fontColor(this.primaryLabel)
       }
       .width('100%')
@@ -83,12 +91,15 @@ export struct 开始学习按钮 {
     .width('100%')
     .height(应用尺寸.行动按钮高度)
     .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
-    .attributeModifier(new PrimaryGlassSurface(this.已按下, this.primaryGlass))
-    .border({ width: 1, color: '#66' + this.primaryLabel.substring(1) })
+    .attributeModifier(new PrimaryGlassSurface(this.isAvailable && this.已按下, this.primaryGlass,
+      $r('app.color.border_input'), 1.5))
+    .enabled(this.isAvailable)
+    .grayscale(this.isAvailable ? 0 : 1)
     .stateEffect(false)
     .borderRadius(应用尺寸.圆角_行动按钮)
     .animation({ duration: 80, curve: Curve.EaseOut })
     .onTouch((event: TouchEvent): void => {
+      if (!this.isAvailable) { this.已按下 = false; return; }
       // 按下加厚玻璃，抬起或取消恢复正常材料。
       if (event.type === TouchType.Down) {
         this.已按下 = true;
@@ -97,7 +108,7 @@ export struct 开始学习按钮 {
       }
     })
     .onClick(() => {
-      this.开始学习回调();
+      if (this.isAvailable) this.开始学习回调();
     })
   }
 }

@@ -31,10 +31,14 @@ test('primary glass text stays readable for every theme in both appearances', ()
 });
 
 test('start study and both show-answer layouts use persistent theme glass', () => {
-  for (const path of ['pages/学习页.ets', 'components/学习浮动工具栏.ets', 'components/开始学习按钮.ets']) {
+  const study = read('entry/src/main/ets/pages/学习页.ets');
+  assert.match(study, /开始学习按钮\(\{\s*文案: \$r\('app.string.study_show_answer'\),\s*isAvailable: this\.阶段 === 'question',\s*开始学习回调: \(\): void => \{ this\.显示答案\(\); \}/);
+  assert.doesNotMatch(study, /显示答案按下|PrimaryGlassSurface/);
+  for (const path of ['components/学习浮动工具栏.ets', 'components/开始学习按钮.ets']) {
     const source = read('entry/src/main/ets/' + path);
     assert.match(source, /@StorageProp\(PRIMARY_GLASS_KEY\)/, path);
     assert.match(source, /attributeModifier\(new PrimaryGlassSurface\(/, path);
+    assert.match(source, /new PrimaryGlassSurface\([^;]*\$r\('app.color.border_input'\), 1\.5\)/, path);
   }
   const theme = themeDefinition('iridescent');
   assert.ok(new Set(themePrimaryGlass(theme, false).colors).size >= 3);
