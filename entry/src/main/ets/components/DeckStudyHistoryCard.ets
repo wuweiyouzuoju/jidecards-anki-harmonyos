@@ -5,11 +5,13 @@ import { DeckStudyDay, DeckStudyHistory, buildDeckStudyHistory, historyStudyDayK
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 import { 颜色键 } from '../model/颜色主题';
 import { 应用尺寸 } from '../utils/应用尺寸';
+import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
 import { themeGradient } from '../utils/ThemeVisuals';
 
 /** 仅查询当前牌组范围；刷新时隐藏旧值，离开/切换后丢弃在途结果。 */
 @Component
 export struct DeckStudyHistoryCard {
+  @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
   @Prop @Watch('reload') search: string = '';
   @Prop @Watch('reload') refreshToken: number = 0;
   @StorageProp(颜色键.动作主色) private accent: string = '#2F5FD0';
@@ -80,7 +82,7 @@ export struct DeckStudyHistoryCard {
   }
 
   build() {
-    Column({ space: 应用尺寸.pageSectionGap }) {
+    Column({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout) }) {
       Text($r('app.string.deck_history_title'))
         .fontSize(应用尺寸.字号_按钮)
         .fontWeight(FontWeight.Medium)

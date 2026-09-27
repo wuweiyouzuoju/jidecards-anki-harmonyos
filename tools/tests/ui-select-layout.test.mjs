@@ -92,6 +92,6 @@ test('sidebar sections share menu disclosure styling and keep expanded contents 
     assert.match(sidebar, new RegExp(`browser_sidebar_${key}'[\\s\\S]*?expanded: !this\\.[^,]+,[\\s\\S]*?onToggle折叠\\('${key}'\\)`));
   }
   assert.match(header, /\.rotate\(\{ angle: this\.expanded \? 90 : 0 \}\)/);
-  assert.equal((sidebar.match(/margin\(\{ bottom: 应用尺寸\.pageSectionGap \}\)/g) || []).length, 3);
+  assert.equal((sidebar.match(/margin\(\{ bottom: 应用尺寸\.页面分组间距\(this\.narrowDeckLayout\) \}\)/g) || []).length, 3);
   assert.doesNotMatch(sidebar, /折叠图标|分区标题\(/);
 });

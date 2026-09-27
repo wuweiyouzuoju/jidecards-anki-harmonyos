@@ -1,5 +1,6 @@
 // SPDX-License-Identifier-Identifier: AGPL-3.0-or-later
 import type { BrowserDisplayRow as 浏览行数据 } from '../../model/BrowserSearchSession';
+import { DECK_LIST_NARROW_KEY } from '../../model/DeckListAppearance';
 
 // ========================================================
 // @块ID UI-BROWSER-TABLE-001
@@ -75,6 +76,7 @@ export type { BrowserDisplayRow as 浏览行数据 } from '../../model/BrowserSe
 
 @Component
 export struct 卡片表格 {
+  @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
   @Prop @Watch('同步行数据源') 行列表: 浏览行数据[] = [];
   @Prop 结果总数: number = 0;
   @Prop 已加载行数: number = 0;
@@ -182,7 +184,7 @@ export struct 卡片表格 {
           标题: $r('app.string.browser_empty')
         })
       } else {
-        List({ space: 应用尺寸.pageSectionGap }) {
+        List({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout) }) {
           LazyForEach(this.行数据源, (行: 浏览行数据) => {
             ListItem() {
               Row({ space: 应用尺寸.间距_8 }) {
@@ -276,7 +278,7 @@ export struct 卡片表格 {
         .edgeEffect(EdgeEffect.Spring)
         // 内容末尾偏移导航条高度：滚到底时最后一行完整可见、可点（AppGallery 导航栏适配要求）
         .contentStartOffset(应用尺寸.间距_8)
-        .contentEndOffset(this.导航条高度 + 应用尺寸.pageSectionGap)
+        .contentEndOffset(this.导航条高度 + 应用尺寸.页面分组间距(this.narrowDeckLayout))
         .onReachEnd((): void => {
           if (!this.加载中 && this.已加载行数 < this.结果总数) {
             this.加载中 = true;

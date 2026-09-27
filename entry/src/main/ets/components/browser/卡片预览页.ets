@@ -60,6 +60,7 @@ import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../../model/ReleaseFeatures';
 import { buildPreviewInteractionScript } from '../../model/PreviewInteraction';
 import { cardViewportWidth } from '../../model/CardViewportLayout';
 import { PAGE_SURFACE_KEY } from '../../model/ThemeCatalog';
+import { DECK_LIST_NARROW_KEY } from '../../model/DeckListAppearance';
 import { ThemeBackground } from '../common/ThemeBackground';
 
 /** 仅向预览转发显示操作，文档版本由组件校验。 */
@@ -75,6 +76,9 @@ type 预览面 = 'question' | 'answer';
 
 @Component
 export struct 卡片预览页 {
+  @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
+  @State private moreMenuOpen: boolean = false;
+  private initialFocusPending: boolean = true;
   private readonly desktopPreview: boolean = deviceInfo.deviceType === '2in1' || deviceInfo.deviceType === 'pc';
   @State private cardContentWidth: number = cardViewportWidth(0, 0);
   @StorageProp(PAGE_SURFACE_KEY) private pageSurface: string = '#F5F7FA';
@@ -504,12 +508,12 @@ export struct 卡片预览页 {
       .alignItems(VerticalAlign.Center)
     }
     .width('100%')
-    .height(应用尺寸.工具栏高度 + this.状态栏高度)
+    .height(应用尺寸.pageToolbarHeight(this.状态栏高度, this.narrowDeckLayout))
     .padding({
       left: 应用尺寸.页面内边距_水平,
       right: 应用尺寸.页面内边距_水平,
-      top: this.状态栏高度 + 应用尺寸.toolbarVerticalInset,
-      bottom: 应用尺寸.toolbarVerticalInset
+      top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout),
+      bottom: 0
     })
   }
 
@@ -591,7 +595,7 @@ export struct 卡片预览页 {
     .width('100%')
     .layoutWeight(1)
     .padding({
-      top: 应用尺寸.pageContentTopInset,
+      top: 应用尺寸.页面内容顶部间距(this.narrowDeckLayout),
       left: 应用尺寸.页面内边距_水平,
       right: 应用尺寸.页面内边距_水平,
       bottom: 应用尺寸.间距_8

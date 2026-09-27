@@ -1,5 +1,15 @@
 {
   "string": [
+    {"name": "deck_width_hint_title", "value": "Switch to narrow decks?"},
+    {"name": "deck_width_hint_message", "value": "Your decks no longer fit in the visible list. Narrow mode shows more decks on one screen and adjusts page spacing to match.\n\nChoose Switch to narrow to apply it now. You can change this later in More → Settings → Appearance → Deck width."},
+    {"name": "deck_width_hint_keep", "value": "Keep wide"},
+    {"name": "deck_width_hint_confirm", "value": "Switch to narrow"},
+    {"name": "deck_width_hint_open_failed", "value": "Could not show the deck width suggestion. You can change it in Settings → Appearance → Deck width."},
+    {"name": "deck_width_hint_save_failed", "value": "Could not save your response. This suggestion may appear again after restarting."},
+    {"name": "deck_width", "value": "Deck width"},
+    {"name": "deck_width_wide", "value": "Wide"},
+    {"name": "deck_width_narrow", "value": "Narrow"},
+    {"name": "deck_width_save_failed", "value": "Could not save deck width. Please try again."},
     {"name":"deck_option_unset","value":"Not set"},
     {"name":"deck_option_off","value":"Off"},
     {"name":"deck_option_on","value":"On"},

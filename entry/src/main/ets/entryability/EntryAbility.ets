@@ -21,6 +21,7 @@ import { 刷新桌面卡片数据 } from '../model/FSRS控制器';
 import { 刷新学习提醒 } from '../model/学习提醒服务';
 import { AI_AGENT_CHANNELS_APP_STORAGE_KEY, initializeAiAgentChannels } from '../model/ReleaseFeatures';
 import { initializeCardTextSize } from '../utils/CardTextSizeStore';
+import { initializeDeckListAppearance } from '../utils/DeckListAppearanceStore';
 import { initializeStudyHaptics } from '../utils/StudyHaptics';
 import { syncActivity } from '../model/SyncSettings';
 import { externalDeckUri, externalDeckOpens, EXTERNAL_DECK_OPEN_REVISION_KEY } from '../model/ExternalDeckOpen';
@@ -71,6 +72,7 @@ export default class EntryAbility extends UIAbility {
   onCreate(want: Want, _launchParam: AbilityConstant.LaunchParam): void {
     AppStorage.setOrCreate<common.UIAbilityContext>('abilityContext', this.context);
     initializeCardTextSize();
+    initializeDeckListAppearance();
     initializeStudyHaptics();
     AppStorage.setOrCreate<boolean>(AI_AGENT_CHANNELS_APP_STORAGE_KEY, false);
     initializeAiAgentChannels().catch((_error: Object): void => {

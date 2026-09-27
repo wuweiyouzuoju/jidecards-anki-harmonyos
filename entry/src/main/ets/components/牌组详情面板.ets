@@ -5,6 +5,7 @@ import { ThemeTextSpans } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 import { DeckStudyHistoryCard } from './DeckStudyHistoryCard';
 import { deckHistorySearch } from '../model/DeckStudyHistory';
+import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
 
 import { 牌组汇总, 主页快照, 牌组显示名 } from '../model/主页模型';
 import { 应用尺寸 } from '../utils/应用尺寸';
@@ -45,6 +46,7 @@ import { 颜色键 } from '../model/颜色主题';
 // ========================================================
 @Component
 export struct 牌组详情面板 {
+  @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @StorageProp(GLASS_COLORS_KEY) private glassColors: string[] = GLASS_HIGHLIGHT_COLORS;
   @Prop showAddCard: boolean = true;
@@ -84,7 +86,7 @@ export struct 牌组详情面板 {
   // @名称 牌组详情面板主渲染
   //
   // @作用
-  // 添加卡片位于右上角；计数卡和更多可滚动，开始学习固定在面板底部。
+  // 添加卡片位于右上角；详情卡片内可滚动，开始学习独立固定在卡片下方。
   //
   // @输入
   // @Consume 主页快照数据 + 选中牌组Id（直接在 build() 内 ForEach + if 建立响应式依赖）。
@@ -107,7 +109,7 @@ export struct 牌组详情面板 {
       Column() {
       // B12-Y2 2026-07-23：Scroll 包裹，"更多"展开后内容超出时可滚动，开始学习按钮 不被推出边界
       Scroll(this.detailScroller) {
-      Column({ space: 应用尺寸.pageSectionGap }) {
+      Column({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout) }) {
         // 第 6 次修复：完全绕过 @State/@Watch/@Builder 间接响应链，
         // 直接在 build() 中用 ForEach + if 从 @Consume 主页快照数据 渲染。
         // ForEach 建立 @Consume 主页快照数据 响应式依赖，
@@ -123,7 +125,7 @@ export struct 牌组详情面板 {
                 .fontColor($r('app.color.text_primary'))
                 .layoutWeight(1)
                 .wordBreak(WordBreak.BREAK_ALL)
-              Row({ space: 应用尺寸.间距_12 }) {
+              Column({ space: 应用尺寸.间距_4 }) {
                 if (this.showAddCard) {
                   Button({ type: ButtonType.Normal }) {
                     Text() {
@@ -145,6 +147,7 @@ export struct 牌组详情面板 {
                   .constraintSize({ minHeight: 应用尺寸.按钮高度 })
                   .onClick((): void => { this.预览(); })
               }
+              .alignItems(HorizontalAlign.End)
               .flexShrink(0)
             }
             .width('100%')
@@ -323,7 +326,7 @@ export struct 牌组详情面板 {
         left: 应用尺寸.卡片内边距,
         right: 应用尺寸.卡片内边距,
         top: 应用尺寸.卡片内边距,
-        bottom: 应用尺寸.pageBottomInset
+        bottom: 应用尺寸.页面底部间距(this.narrowDeckLayout)
       })
       }
       .width('100%')
@@ -331,6 +334,11 @@ export struct 牌组详情面板 {
       .align(Alignment.Top)
       .scrollBar(BarState.Off)
       .edgeEffect(EdgeEffect.Spring)
+      .backgroundColor($r('app.color.surface_card'))
+      .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+      .borderRadius(应用尺寸.圆角_卡片)
+      .clip(true)
+      .margin({ bottom: 应用尺寸.间距_8 })
       ForEach(this.主页快照数据.decks, (deck: 牌组汇总) => {
         if (deck.id === this.选中牌组Id) {
           Row() {
@@ -341,29 +349,21 @@ export struct 牌组详情面板 {
           .width('100%')
           .flexShrink(0)
           .padding({
-            left: 应用尺寸.卡片内边距,
-            right: 应用尺寸.卡片内边距,
-            top: 应用尺寸.pageSectionGap,
-            // 外层已有底部留白，合计至少保留导航安全区上方16vp。
-            bottom: Math.max(应用尺寸.pageBottomInset,
-              this.navigationBottomInset + 应用尺寸.间距_16 - 应用尺寸.pageBottomInset)
+            top: 应用尺寸.间距_8,
+            bottom: 应用尺寸.页面内边距_水平 + this.navigationBottomInset
           })
         }
       }, (deck: 牌组汇总): string => deck.id)
       }
       .width('100%')
       .height('100%')
-      .backgroundColor($r('app.color.surface_card'))
-      .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
-      .borderRadius(应用尺寸.圆角_卡片)
     }
     .width('100%')
     .height('100%')
     .padding({
       left: 应用尺寸.页面内边距_水平,
       right: 应用尺寸.页面内边距_水平,
-      top: 应用尺寸.pageContentTopInset,
-      bottom: 应用尺寸.pageBottomInset
+      top: 应用尺寸.页面内容顶部间距(this.narrowDeckLayout)
     })
   }
 }

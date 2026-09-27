@@ -1,3 +1,4 @@
+import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { resourceText, showToastSafely } from '../utils/UiFeedback';
 import { DataTransferSession, DataTransferState, initialTransferState } from '../model/home/DataTransferSession';
@@ -123,6 +124,7 @@ interface 牌组详情页参数 {
 @Entry
 @Component
 struct 首页 {
+  @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
   @State @Watch('homeActivityChanged') private transfer: DataTransferState = initialTransferState();
   private readonly transferSession: DataTransferSession = new DataTransferSession(new AnkiDataTransfer(),
     (state: DataTransferState): void => { this.transfer = state; },
@@ -377,7 +379,10 @@ struct 首页 {
     this.恢复颜色主题();
     this.恢复今日进度卡开关();
     // 直链渠道暂停期间，启动序列直接从公告进入入门介绍。
-    this.显示首次弹窗序列().finally((): void => { this.autoSyncStartupReady = true; });
+    this.显示首次弹窗序列().finally((): void => {
+      this.autoSyncStartupReady = true;
+      this.homeActivityChanged();
+    });
     this.刷新云端牌组配额状态();
     this.homeActivityChanged();
   }
@@ -541,7 +546,9 @@ struct 首页 {
       presentAnnouncement: (): boolean => this.尝试展示待展示官方公告(),
       continueStartup: (): void => {
         if (this.startupSequence.hasPending()) {
-          this.startupSequence.resume(this.startupHost()).catch((error: Error): void => {
+          this.startupSequence.resume(this.startupHost()).then((): void => {
+            this.homeActivityChanged();
+          }).catch((error: Error): void => {
             showToastSafely(this.getUIContext(), { message: error.message });
           });
         } else this.请求主页官方公告检查();
@@ -777,7 +784,8 @@ struct 首页 {
   }
 
   private async 执行加载主页数据(): Promise<void> {
-    this.加载状态 = 'loading';
+    // 从学习页返回后的刷新保留已呈现的快照，避免详情/首页先闪回加载态。
+    if (this.加载状态 !== 'ready' && this.加载状态 !== 'empty') this.加载状态 = 'loading';
     const context: common.UIAbilityContext | null = this.取能力上下文();
     if (context === null) {
       this.加载状态 = 'error';
@@ -1862,7 +1870,7 @@ struct 首页 {
           // 牌组列表右端 = 左 GridCol 右端 = 牌组详情面板 左端，紧贴无空白。
           // 用 主页摘要分页 + 主页牌组列表 两个积木组件替代原 主面板 @Builder，
           // 由 首页.ets 保留对数据状态的控制权（业务契约要求）。
-          Column({ space: 应用尺寸.pageSectionGap }) {
+          Column({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout) }) {
             if (this.显示今日进度卡) {
               主页摘要分页({
                 主页快照数据: this.主页快照数据,
@@ -1926,8 +1934,8 @@ struct 首页 {
           .padding({
             left: 应用尺寸.页面内边距_水平,
             right: 应用尺寸.页面内边距_水平,
-            top: 应用尺寸.pageContentTopInset,
-            bottom: 应用尺寸.pageBottomInset
+            top: 应用尺寸.页面内容顶部间距(this.narrowDeckLayout),
+            bottom: 应用尺寸.页面底部间距(this.narrowDeckLayout)
           })
           .backgroundColor(this.页面底色微染值)
         }
@@ -2063,12 +2071,12 @@ struct 首页 {
           })
         }
         .width('100%')
-        .height(应用尺寸.工具栏高度 + this.状态栏高度)
+        .height(应用尺寸.pageToolbarHeight(this.状态栏高度, this.narrowDeckLayout))
         .padding({
           left: 应用尺寸.页面内边距_水平,
           right: 应用尺寸.页面内边距_水平,
-          top: this.状态栏高度 + 应用尺寸.toolbarVerticalInset,
-          bottom: 应用尺寸.toolbarVerticalInset
+          top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout),
+          bottom: 0
         })
         .backgroundColor(this.页面底色微染值)
 

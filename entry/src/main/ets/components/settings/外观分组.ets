@@ -8,6 +8,7 @@ import { 设置分组卡片 } from './设置分组卡片';
 import { UNLOCKED_CONTENTS_KEY, availableThemes, themeDefinition } from '../../model/ThemeCatalog';
 import { ThemeMotionControl } from './ThemeMotionControl';
 import { CardTextSizeControl } from './CardTextSizeControl';
+import { DeckWidthControl } from './DeckWidthControl';
 import {
   颜色主题,
   颜色主题渐变档
@@ -175,6 +176,7 @@ export struct 外观分组 {
           if (themeDefinition(this.当前颜色主题).backgroundTextures.length > 0) {
             ThemeMotionControl()
           }
+          DeckWidthControl()
           CardTextSizeControl()
       }
       .width('100%')

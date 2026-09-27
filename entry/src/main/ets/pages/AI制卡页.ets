@@ -9,6 +9,7 @@ import { buildProviderDraftContext, limitProviderInput } from '../model/agent/Ag
 import { ThemeTextSpans } from '../components/common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
+import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
 
 // AI 制卡/改卡共享页：带结构化工具、可编辑草稿与显式确认的轻量 Agent。
 // 由 首页.ets 通过 Navigation pathStack 以 NavDestination 形式入栈（与 添加笔记页 同机制）。
@@ -145,6 +146,7 @@ class 页面Agent观察者 implements AgentRunObserver {
 
 @Component
 export struct AI制卡页 {
+  @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   /** Navigation 入栈参数 */
   pageDeckId: string = '';
@@ -1744,12 +1746,12 @@ export struct AI制卡页 {
       .justifyContent(FlexAlign.End)
     }
     .width('100%')
-    .height(应用尺寸.工具栏高度 + this.状态栏高度)
+    .height(应用尺寸.pageToolbarHeight(this.状态栏高度, this.narrowDeckLayout))
     .padding({
       left: 应用尺寸.页面内边距_水平,
       right: 应用尺寸.页面内边距_水平,
-      top: this.状态栏高度 + 应用尺寸.toolbarVerticalInset,
-      bottom: 应用尺寸.toolbarVerticalInset
+      top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout),
+      bottom: 0
     })
     .backgroundColor(this.页面底色微染值)
   }
@@ -2186,7 +2188,7 @@ export struct AI制卡页 {
   @Builder
   private 消息流() {
     Scroll(this.聊天滚动器) {
-      Column({ space: 应用尺寸.pageSectionGap }) {
+      Column({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout) }) {
         if (this.hasFixedEditSelection()) {
           if (this.消息列表.length === 0) {
             Text(this.selectedEditContext())
@@ -2230,8 +2232,8 @@ export struct AI制卡页 {
       .padding({
         left: 应用尺寸.页面内边距_水平,
         right: 应用尺寸.页面内边距_水平,
-        top: 应用尺寸.pageContentTopInset,
-        bottom: 应用尺寸.pageBottomInset
+        top: 应用尺寸.页面内容顶部间距(this.narrowDeckLayout),
+        bottom: 应用尺寸.页面底部间距(this.narrowDeckLayout)
       })
     }
     .layoutWeight(1)

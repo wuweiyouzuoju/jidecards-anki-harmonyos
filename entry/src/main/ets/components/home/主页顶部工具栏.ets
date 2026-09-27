@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { DECK_LIST_NARROW_KEY } from '../../model/DeckListAppearance';
 import { ThemeDefinition, themeDefinition, THEME_VISUALS_KEY } from '../../model/ThemeCatalog';
 
 // ========================================================
@@ -49,6 +50,7 @@ export struct 主页顶部工具栏 {
   @Prop 主色容器色: ResourceColor;
   @Prop 页面底色微染值: ResourceColor;
   @Prop 动作主色: ResourceColor;
+  @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
 
   build() {
@@ -111,12 +113,12 @@ export struct 主页顶部工具栏 {
       .justifyContent(FlexAlign.End)
     }
     .width('100%')
-    .height(应用尺寸.工具栏高度 + this.状态栏高度)
+    .height(应用尺寸.pageToolbarHeight(this.状态栏高度, this.narrowDeckLayout))
     .padding({
       left: 应用尺寸.页面内边距_水平,
       right: 应用尺寸.页面内边距_水平,
-      top: this.状态栏高度 + 应用尺寸.toolbarVerticalInset,
-      bottom: 应用尺寸.toolbarVerticalInset
+      top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout),
+      bottom: 0
     })
     .backgroundColor(this.页面底色微染值)
   }

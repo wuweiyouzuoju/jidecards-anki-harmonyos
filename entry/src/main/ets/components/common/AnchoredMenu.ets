@@ -1,13 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { 应用尺寸 } from '../../utils/应用尺寸';
+import { DECK_LIST_NARROW_KEY } from '../../model/DeckListAppearance';
 
-/** 首页、设置及浏览共用同一菜单表面、锚点留白、承接层和动效。 */
+/** 顶部菜单共用表面、锚点留白、承接层、滚动边界和动效。 */
 @Component
 export struct AnchoredMenu {
   @Prop menuWidth: number = 应用尺寸.compactMenuWidth;
-  @Prop topOffset: number = 68;
+  /** 调用方传入最终窗口坐标；公共表面不得再次扣除密度偏移。 */
+  @Prop topOffset: number = 0;
   @Prop alignEnd: boolean = true;
   @Prop contentMaxWidth: Length = '100%';
+  @State private viewportHeight: number = 600;
+  @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
   onClose: () => void = (): void => {};
   @BuilderParam content: () => void = this.emptyContent;
 
@@ -23,9 +27,13 @@ export struct AnchoredMenu {
         .onClick((): void => { this.onClose(); })
       // 定位容器与宿主工具栏同宽；外部点击承接层仍覆盖整个窗口。
       Stack({ alignContent: this.alignEnd ? Alignment.TopEnd : Alignment.TopStart }) {
-        Column() {
-          this.content()
+        Scroll() {
+          Column() {
+            this.content()
+          }.width('100%')
         }
+        .constraintSize({ maxHeight: Math.max(48, this.viewportHeight - this.topOffset - 应用尺寸.页面底部间距(this.narrowDeckLayout)) })
+        .scrollBar(BarState.Auto)
         .width(this.menuWidth)
         .backgroundColor($r('app.color.surface_card'))
         .borderRadius(应用尺寸.圆角_指标卡)
@@ -47,5 +55,6 @@ export struct AnchoredMenu {
       .hitTestBehavior(HitTestMode.Transparent)
     }
     .width('100%').height('100%')
+    .onAreaChange((_old: Area, area: Area): void => { this.viewportHeight = Number(area.height); })
   }
 }

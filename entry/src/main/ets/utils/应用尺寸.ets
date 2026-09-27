@@ -73,11 +73,48 @@ export class 应用尺寸 {
   // ---- 页面骨架 ----
   static readonly 页面内边距_水平: number = 12;
   static readonly 工具栏高度: number = 60;
-  /** 顶部工具栏与首张内容卡片之间的共用留白。 */
-  static readonly pageContentTopInset: number = 8;
+  // 非页面顶栏（如全屏编辑器）的内部留白，不参与 a/b/c/d。
   static readonly toolbarVerticalInset: number = 8;
   static readonly pageSectionGap: number = 12;
   static readonly pageBottomInset: number = 12;
+  /** 窄牌组布局的页面密度；所有同级内容和首卡留白从这里派生。 */
+  static readonly narrowPageSectionGap: number = 8;
+  static readonly narrowPageBottomInset: number = 8;
+
+  static 页面分组间距(窄版: boolean): number {
+    return 窄版 ? 应用尺寸.narrowPageSectionGap : 应用尺寸.pageSectionGap;
+  }
+
+  static 页面内容顶部间距(窄版: boolean): number {
+    return 应用尺寸.页面分组间距(窄版);
+  }
+
+  /** 系统安全区底部到时间文字下缘的光学校准估计，非系统 API 测量。
+   * 2026-09-27 用户截图的初始估计；字体/设备变化需重新做像素验收。
+   * 禁止将安全区底部或按钮内文字当成时间文字下缘。
+   */
+  static readonly statusTextBottomInset: number = 6;
+
+  static statusTextBottom(statusBarHeight: number): number {
+    return Math.max(0, statusBarHeight - 应用尺寸.statusTextBottomInset);
+  }
+
+  static pageToolbarTop(statusBarHeight: number, narrow: boolean): number {
+    return 应用尺寸.statusTextBottom(statusBarHeight) + 应用尺寸.页面分组间距(narrow);
+  }
+
+  // 工具栏在按钮下缘结束，b 只由内容区的顶部间距贡献一次。
+  static pageToolbarHeight(statusBarHeight: number, narrow: boolean): number {
+    return 应用尺寸.pageToolbarTop(statusBarHeight, narrow) + 应用尺寸.按钮高度;
+  }
+
+  static pageContentTop(statusBarHeight: number, narrow: boolean): number {
+    return 应用尺寸.pageToolbarHeight(statusBarHeight, narrow) + 应用尺寸.页面内容顶部间距(narrow);
+  }
+
+  static 页面底部间距(窄版: boolean): number {
+    return 窄版 ? 应用尺寸.narrowPageBottomInset : 应用尺寸.pageBottomInset;
+  }
   static readonly 紧凑控件高度: number = 36;
   static readonly searchFieldHeight: number = 44;
   static readonly searchFieldRadius: number = 22;
@@ -109,6 +146,7 @@ export class 应用尺寸 {
   // 牌组行实机高度：padding(13+13) + 计数 Column(字号_强调+间距_5+字号_正文_小+间距_5+Row 字号_正文_小 ≈ 66)
   // 用于 牌组定制面板 预览框，保证用户裁剪选区与实际渲染一致
   static readonly 牌组行高度: number = 92;
+  static readonly narrowDeckRowHeight: number = 60;
 
   // ---- 进度条 ----
   static readonly 进度条高度: number = 7;

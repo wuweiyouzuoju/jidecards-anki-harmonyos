@@ -15,6 +15,7 @@ import { SelectStyle } from '../utils/SelectStyle';
 import { BrowserOperationContext, BrowserOperationController } from '../model/BrowserOperationController';
 import { autoSyncScheduler } from '../model/AutoSyncScheduler';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
+import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
 
 import { BrowserDueDialog } from '../components/browser/BrowserDueDialog';
 import { BrowserRenameTagDialog } from '../components/browser/BrowserRenameTagDialog';
@@ -85,6 +86,7 @@ type 浏览模式 = 'cards' | 'notes';
 
 @Component
 export struct 浏览页 {
+  @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
   /** Navigation 入栈参数：牌组 ID（空=全库） */
   pageDeckId: string = '';
   /** Navigation 入栈参数：初始搜索串（空=默认搜索；查找重复对话框跳转时传入） */
@@ -1121,7 +1123,7 @@ export struct 浏览页 {
     if (this.showMoreMenu) {
       BrowserMoreMenu({ filterActive: this.搜索文本.trim() !== '' || this.quickFilter !== 'all', available: this.阶段 === 'list',
         subtitleIndex: this.subtitleIndex,
-        topOffset: this.状态栏高度 + 应用尺寸.工具栏高度 + 应用尺寸.pageContentTopInset,
+        topOffset: 应用尺寸.pageContentTop(this.状态栏高度, this.narrowDeckLayout),
         onClose: (): void => { this.showMoreMenu = false; },
         onFilter: (): void => {
           if (this.阶段 !== 'list') return;
@@ -1186,12 +1188,12 @@ export struct 浏览页 {
       }.width('100%').height('100%').alignItems(VerticalAlign.Center)
     }
     .width('100%')
-    .height(应用尺寸.工具栏高度 + this.状态栏高度)
+    .height(应用尺寸.pageToolbarHeight(this.状态栏高度, this.narrowDeckLayout))
     .padding({
       left: 应用尺寸.页面内边距_水平,
       right: 应用尺寸.页面内边距_水平,
-      top: this.状态栏高度 + 应用尺寸.toolbarVerticalInset,
-      bottom: 应用尺寸.toolbarVerticalInset
+      top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout),
+      bottom: 0
     })
     .backgroundColor(this.页面底色微染值)
     .alignContent(Alignment.Center)
@@ -1269,7 +1271,7 @@ export struct 浏览页 {
         onSearch: (文本: string): void => { this.提交搜索(文本); }
       })
         .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平,
-          top: 应用尺寸.pageContentTopInset,
+          top: 应用尺寸.页面内容顶部间距(this.narrowDeckLayout),
           bottom: 应用尺寸.间距_8 })
 
       this.browserControls()
@@ -1583,7 +1585,7 @@ export struct 浏览页 {
             filterOptions: this.quickFilterOptions(),
             sortOptions: this.sortOptions(),
             available: !this.多选模式值 && this.阶段 === 'list',
-            topOffset: this.状态栏高度 + 应用尺寸.工具栏高度 + 应用尺寸.pageContentTopInset + SelectStyle.controlHeight * 2 + 应用尺寸.间距_8 * 2,
+            topOffset: 应用尺寸.pageContentTop(this.状态栏高度, this.narrowDeckLayout) + SelectStyle.controlHeight * 2 + 应用尺寸.间距_8 * 2,
             onClose: (): void => { this.showViewMenu = false; },
             onModeChange: (notes: boolean): void => {
               this.showViewMenu = false;

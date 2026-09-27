@@ -2,6 +2,7 @@
 
 import type { 牌组背景动作, 牌组定制结果 } from '../model/DeckCustomization';
 import { DialogHeader } from './common/DialogHeader';
+import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
 // ========================================================
 // @块ID UI-DECK-CUSTOMIZE-001
 // @名称 牌组定制面板
@@ -53,6 +54,7 @@ export type { 牌组背景动作, 牌组定制结果 } from '../model/DeckCustom
 
 @Component
 export struct 牌组定制面板 {
+  @StorageProp(DECK_LIST_NARROW_KEY) private narrow: boolean = false;
   @Prop isDark: boolean = false;
   @Prop deck: 牌组汇总 = {
     id: '', name: '', fullName: '', depth: 0, parentId: '', hasChildren: false, ancestorIds: [],
@@ -290,7 +292,7 @@ export struct 牌组定制面板 {
 
           // 预览框：与牌组行实际渲染口径一致（objectFit=Cover + 同宽度 + 同高度）
           // onAreaChange 测量实际尺寸供 cropper 使用；
-          // 预览框高度 = 应用尺寸.牌组行高度（与牌组列表项自适应行高一致，
+          // 预览框高度跟随当前宽/窄版（与牌组列表项行高一致，
           // 保证用户在裁剪器看到的选区比例就是牌组行实际显示的比例）
           Stack() {
             if (this.背景动作 === 'remove') {
@@ -353,7 +355,7 @@ export struct 牌组定制面板 {
             }
           }
           .width('100%')
-          .height(应用尺寸.牌组行高度)
+          .height(this.narrow ? 应用尺寸.narrowDeckRowHeight : 应用尺寸.牌组行高度)
           .backgroundColor($r('app.color.surface_page'))
           .borderRadius(应用尺寸.圆角_面板)
           .border({

@@ -2,6 +2,7 @@
 import { CustomTransition } from '../utils/自定义转场';
 import { ThemeTextSpans } from '../components/common/ThemeText';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
+import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
 
 import { 加载学习提醒设置, 保存学习提醒设置, 提醒项, 生成提醒项ID } from '../model/学习提醒存储';
 import { 刷新学习提醒, 首次引导通知设置 } from '../model/学习提醒服务';
@@ -30,6 +31,7 @@ import { 统一空态 } from '../components/common/统一空态';
 
 @Component
 export struct 学习提醒页 {
+  @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
   @State private 转场透明度: number = 1;
   pathStack?: NavPathStack;
 
@@ -263,12 +265,12 @@ export struct 学习提醒页 {
       .hitTestBehavior(HitTestMode.Transparent)
     }
     .width('100%')
-    .height(应用尺寸.工具栏高度 + this.状态栏高度)
+    .height(应用尺寸.pageToolbarHeight(this.状态栏高度, this.narrowDeckLayout))
     .padding({
       left: 应用尺寸.页面内边距_水平,
       right: 应用尺寸.页面内边距_水平,
-      top: this.状态栏高度 + 应用尺寸.toolbarVerticalInset,
-      bottom: 应用尺寸.toolbarVerticalInset
+      top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout),
+      bottom: 0
     })
     .backgroundColor(this.页面底色微染值)
     .alignContent(Alignment.Center)
@@ -347,7 +349,7 @@ export struct 学习提醒页 {
 
           if (this.已加载) {
             Scroll() {
-              Column({ space: 应用尺寸.pageSectionGap }) {
+              Column({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout) }) {
                 if (this.提醒项列表.length === 0) {
                   this.空状态()
                 } else {
@@ -368,8 +370,8 @@ export struct 学习提醒页 {
               .padding({
                 left: 应用尺寸.页面内边距_水平,
                 right: 应用尺寸.页面内边距_水平,
-                top: 应用尺寸.pageContentTopInset,
-                bottom: 应用尺寸.pageBottomInset + this.导航条高度
+                top: 应用尺寸.页面内容顶部间距(this.narrowDeckLayout),
+                bottom: 应用尺寸.页面底部间距(this.narrowDeckLayout) + this.导航条高度
               })
             }
             .layoutWeight(1)

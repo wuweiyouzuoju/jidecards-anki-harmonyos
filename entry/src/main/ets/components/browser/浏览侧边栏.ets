@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { DECK_LIST_NARROW_KEY } from '../../model/DeckListAppearance';
 
 // ========================================================
 // @名称 浏览侧边栏
@@ -75,6 +76,7 @@ type 侧边栏分区 = 'decks' | 'tags' | 'saved_searches';
 
 @Component
 export struct 浏览侧边栏 {
+  @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
   @Prop isDark: boolean = false;
   @Prop busy: boolean = false;
   @Prop errorMessage: string = '';
@@ -216,7 +218,7 @@ export struct 浏览侧边栏 {
             }
             }.width('100%').backgroundColor($r('app.color.surface_card'))
               .borderRadius(应用尺寸.圆角_指标卡).clip(true)
-              .margin({ bottom: 应用尺寸.pageSectionGap })
+              .margin({ bottom: 应用尺寸.页面分组间距(this.narrowDeckLayout) })
 
             // 标签分区
             Column() {
@@ -233,7 +235,7 @@ export struct 浏览侧边栏 {
             }
             }.width('100%').backgroundColor($r('app.color.surface_card'))
               .borderRadius(应用尺寸.圆角_指标卡).clip(true)
-              .margin({ bottom: 应用尺寸.pageSectionGap })
+              .margin({ bottom: 应用尺寸.页面分组间距(this.narrowDeckLayout) })
 
             // 已保存搜索分区
             Column() {
@@ -250,12 +252,12 @@ export struct 浏览侧边栏 {
             }
             }.width('100%').backgroundColor($r('app.color.surface_card'))
               .borderRadius(应用尺寸.圆角_指标卡).clip(true)
-              .margin({ bottom: 应用尺寸.pageSectionGap })
+              .margin({ bottom: 应用尺寸.页面分组间距(this.narrowDeckLayout) })
 
           }
           .width('100%')
           .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平,
-            top: 应用尺寸.pageContentTopInset, bottom: 应用尺寸.间距_16 })
+            top: 应用尺寸.页面内容顶部间距(this.narrowDeckLayout), bottom: 应用尺寸.页面底部间距(this.narrowDeckLayout) })
         }
         .width('100%')
         .layoutWeight(1)

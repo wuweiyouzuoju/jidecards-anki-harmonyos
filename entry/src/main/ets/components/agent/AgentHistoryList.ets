@@ -2,9 +2,11 @@
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 颜色键 } from '../../model/颜色主题';
 import { PAGE_SURFACE_KEY } from '../../model/ThemeCatalog';
+import { DECK_LIST_NARROW_KEY } from '../../model/DeckListAppearance';
 import type { AgentConversation } from '../../model/agent/AgentConversationTypes';
 @Component
 export struct AgentHistoryList {
+  @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
   @Prop conversations: AgentConversation[] = [];
   @Prop conversationId: string = '';
   @StorageProp(颜色键.选中背景) private 选中背景色: string = '#E8EEFC';
@@ -78,8 +80,8 @@ export struct AgentHistoryList {
     .padding({
       left: 应用尺寸.页面内边距_水平,
       right: 应用尺寸.页面内边距_水平,
-      top: 应用尺寸.pageContentTopInset,
-      bottom: 应用尺寸.pageBottomInset
+      top: 应用尺寸.页面内容顶部间距(this.narrowDeckLayout),
+      bottom: 应用尺寸.页面底部间距(this.narrowDeckLayout)
     })
     .backgroundColor(this.页面底色微染值)
   }

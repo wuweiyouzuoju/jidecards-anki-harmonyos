@@ -3,41 +3,62 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
+import { 应用尺寸 } from '../../entry/src/main/ets/utils/应用尺寸.ets';
 
 test('home and settings keep the same gap below their toolbar buttons', () => {
-  const sizes = read('entry/src/main/ets/utils/应用尺寸.ets');
-  const inset = Number(sizes.match(/pageContentTopInset: number = (\d+)/)[1]);
-  const toolbar = Number(sizes.match(/工具栏高度: number = (\d+)/)[1]);
-  const button = Number(sizes.match(/按钮高度: number = (\d+)/)[1]);
-  assert.equal((toolbar - button) / 2 + inset, 16);
+  const toolbarSource = read('entry/src/main/ets/components/home/主页顶部工具栏.ets');
+  const height = toolbarSource.match(/\.height\((应用尺寸\.pageToolbarHeight[^\n]+)\)/)[1];
+  const top = toolbarSource.match(/top: (应用尺寸\.pageToolbarTop[^\n]+),/)[1];
+  const bottom = Number(toolbarSource.match(/bottom: (\d+)/)[1]);
+  const evaluate = (expression, state) => new Function('应用尺寸', `return ${expression}`).call(state, 应用尺寸);
+  for (const statusBar of [0, 24, 40, 48]) {
+    for (const narrow of [false, true, false]) {
+      const state = { 状态栏高度: statusBar, narrowDeckLayout: narrow };
+      const buttonTop = evaluate(top, state);
+      const toolbarBottom = evaluate(height, state);
+      const buttonBottom = buttonTop + 应用尺寸.按钮高度;
+      const firstCardTop = toolbarBottom + 应用尺寸.页面内容顶部间距(narrow);
+      const a = buttonTop - 应用尺寸.statusTextBottom(statusBar);
+      const b = firstCardTop - buttonBottom;
+      const c = 应用尺寸.页面分组间距(narrow);
+      const d = 应用尺寸.页面分组间距(narrow);
+      assert.deepEqual([a, b, c, d], Array(4).fill(narrow ? 8 : 12));
+      assert.equal(toolbarBottom - buttonBottom, bottom, 'toolbar adds no second gap');
+      assert.equal(应用尺寸.pageContentTop(statusBar, narrow), firstCardTop, 'menu shares the first-card edge');
+    }
+  }
+  // a uses the explicit optical estimate. This test cannot measure system glyph pixels.
   for (const path of ['entry/src/main/ets/pages/首页.ets', 'entry/src/main/ets/components/设置面板.ets']) {
-    assert.match(read(path), /left: 应用尺寸\.页面内边距_水平,\s*right: 应用尺寸\.页面内边距_水平,\s*top: 应用尺寸\.pageContentTopInset/, path);
+    assert.match(read(path), /left: 应用尺寸\.页面内边距_水平,\s*right: 应用尺寸\.页面内边距_水平,\s*top: 应用尺寸\.页面内容顶部间距\(this\.narrowDeckLayout\)/, path);
   }
 });
 
 test('every primary page consumes the shared first-content and toolbar spacing', () => {
   for (const name of ['首页', '统计页', '学习提醒页', '浏览页', '学习页', '添加笔记页', 'AI制卡页']) {
     const page = read(`entry/src/main/ets/pages/${name}.ets`);
-    assert.match(page, /top: 应用尺寸\.pageContentTopInset/, name);
-    assert.match(page, /top: this\.状态栏高度 \+ 应用尺寸\.toolbarVerticalInset/, name);
-    assert.match(page, /bottom: 应用尺寸\.toolbarVerticalInset/, name);
+    assert.match(page, /top: 应用尺寸\.页面内容顶部间距\(this\.narrowDeckLayout\)/, name);
+    assert.match(page, /top: 应用尺寸\.pageToolbarTop\(this\.状态栏高度, this\.narrowDeckLayout\)/, name);
+    assert.match(page, /bottom: 0/, name);
   }
   const settings = read('entry/src/main/ets/components/设置面板.ets');
-  assert.match(settings, /top: 应用尺寸\.pageContentTopInset/);
-  assert.match(settings, /top: this\.状态栏高度 \+ 应用尺寸\.toolbarVerticalInset/);
+  assert.match(settings, /top: 应用尺寸\.页面内容顶部间距\(this\.narrowDeckLayout\)/);
+  assert.match(settings, /top: 应用尺寸\.pageToolbarTop\(this\.状态栏高度, this\.narrowDeckLayout\)/);
   const agent = read('entry/src/main/ets/pages/AI制卡页.ets');
   assert.doesNotMatch(agent.slice(agent.lastIndexOf('  build() {')), /Divider\(/,
     'a second divider must not add an extra offset below the Agent toolbar');
 });
 
 test('peer cards share one gap and reminder scrolling does not fix the content height', () => {
-  for (const path of ['components/home/主页牌组列表.ets', 'components/设置面板.ets', 'components/牌组详情面板.ets', 'pages/首页.ets', 'pages/统计页.ets', 'pages/学习提醒页.ets']) {
-    assert.match(read('entry/src/main/ets/' + path), /space: 应用尺寸\.pageSectionGap/, path);
+  for (const path of ['components/设置面板.ets', 'components/牌组详情面板.ets', 'pages/首页.ets', 'pages/统计页.ets', 'pages/学习提醒页.ets']) {
+    assert.match(read('entry/src/main/ets/' + path), /space: 应用尺寸\.页面分组间距\(this\.narrowDeckLayout\)/, path);
   }
+  // 宽版保持公共间距，窄版是显式的用户外观偏好。
+  assert.match(read('entry/src/main/ets/components/home/主页牌组列表.ets'),
+    /space: 应用尺寸\.页面分组间距\(this\.narrow\)/);
   const reminder = read('entry/src/main/ets/pages/学习提醒页.ets');
   const scroll = reminder.slice(reminder.indexOf('Scroll() {'), reminder.indexOf('.layoutWeight(1)', reminder.indexOf('Scroll() {')));
   assert.doesNotMatch(scroll, /\.height\('100%'\)/);
-  assert.match(scroll, /bottom: 应用尺寸\.pageBottomInset \+ this\.导航条高度/);
+  assert.match(scroll, /bottom: 应用尺寸\.页面底部间距\(this\.narrowDeckLayout\) \+ this\.导航条高度/);
   assert.doesNotMatch(reminder.slice(reminder.indexOf('private 提醒项卡片'), reminder.indexOf('private 空状态')), /\.margin\(\{ bottom:/);
 });
 
@@ -59,9 +80,13 @@ test('home popup menus start below the status-aware toolbar', () => {
   for (const menu of [moreMenu, actionMenu]) {
     assert.match(menu, /@StorageProp\('状态栏高度'\)\s+private\s+状态栏高度:\s*number\s*=\s*0/);
     assert.match(menu,
-      /topOffset:\s*应用尺寸\.工具栏高度\s*\+\s*this\.状态栏高度\s*\+\s*应用尺寸\.pageContentTopInset/);
+      /topOffset: 应用尺寸\.pageContentTop\(this\.状态栏高度, this\.narrowDeckLayout\)/);
     assert.doesNotMatch(menu, /margin\(\{\s*top:\s*64/);
   }
+  const shell = read('entry/src/main/ets/components/common/AnchoredMenu.ets');
+  assert.match(shell, /@StorageProp\(DECK_LIST_NARROW_KEY\)/);
+  assert.doesNotMatch(shell, /effectiveTopOffset|pageToolbarHeight|pageContentTop\(/);
+  assert.match(shell, /margin\(\{ top: this\.topOffset/);
 });
 
 test('regular settings entry always supplies a non-AI navigation parameter', () => {
@@ -296,7 +321,7 @@ test('primary pages share one shell gutter and common visual primitives', () => 
   const addNote = read('entry/src/main/ets/pages/添加笔记页.ets');
   const agentPage = read('entry/src/main/ets/pages/AI制卡页.ets');
 
-  const settingsList = settingsPanel.match(/List\(\{ space: 应用尺寸\.pageSectionGap[\s\S]*?\.scrollBar\(BarState\.Off\)/)?.[0] ?? '';
+  const settingsList = settingsPanel.match(/List\(\{ space: 应用尺寸\.页面分组间距\(this\.narrowDeckLayout\)[\s\S]*?\.scrollBar\(BarState\.Off\)/)?.[0] ?? '';
   assert.match(settingsList, /left:\s*应用尺寸\.页面内边距_水平/,
     'settings cards must align with the toolbar left gutter');
   assert.match(settingsList, /right:\s*应用尺寸\.页面内边距_水平/,
@@ -710,7 +735,7 @@ test('settings directory keeps full-screen navigation and existing about content
   const panel = read(panelPath);
   assert.match(panel, /Stack\(\)/);
   // 内容 List 挂滚动器：openAiSettings 跳转进来时 scrollToIndex 直接定位到 AI 智能体分组
-  assert.match(panel, /List\(\{ space: 应用尺寸\.pageSectionGap, scroller: this\.内容滚动器 \}\)/);
+  assert.match(panel, /List\(\{ space: 应用尺寸\.页面分组间距\(this\.narrowDeckLayout\), scroller: this\.内容滚动器 \}\)/);
 
 
 

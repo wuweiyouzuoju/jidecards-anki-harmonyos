@@ -1,5 +1,15 @@
 {
   "string": [
+    {"name": "deck_width_hint_title", "value": "切换为窄牌组？"},
+    {"name": "deck_width_hint_message", "value": "牌组已超出当前屏幕的显示范围。切换为“窄”可在一屏显示更多牌组，页面间距也会同步调整。\n\n点击“切换为窄”立即生效。以后可在“更多 → 设置 → 外观 → 牌组宽度”中修改。"},
+    {"name": "deck_width_hint_keep", "value": "保持宽"},
+    {"name": "deck_width_hint_confirm", "value": "切换为窄"},
+    {"name": "deck_width_hint_open_failed", "value": "无法显示牌组宽度建议，可到设置 → 外观 → 牌组宽度修改。"},
+    {"name": "deck_width_hint_save_failed", "value": "提示记录保存失败，重启后可能再次提示。"},
+    {"name": "deck_width", "value": "牌组宽度"},
+    {"name": "deck_width_wide", "value": "宽"},
+    {"name": "deck_width_narrow", "value": "窄"},
+    {"name": "deck_width_save_failed", "value": "牌组宽度保存失败，请重试。"},
     {"name":"deck_option_unset","value":"未设置"},
     {"name":"deck_option_off","value":"关闭"},
     {"name":"deck_option_on","value":"开启"},

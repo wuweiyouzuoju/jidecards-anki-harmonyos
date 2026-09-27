@@ -3,6 +3,7 @@ import { SelectStyle } from '../utils/SelectStyle';
 import { ThemeTextSpans } from '../components/common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
+import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
 import { 简洁模式AppStorage键, 加载简洁模式 } from '../model/简洁模式存储';
 
 // 添加笔记页：独立全屏建卡页（Task 9）。
@@ -62,6 +63,7 @@ export interface 添加笔记页参数 {
 
 @Component
 export struct 添加笔记页 {
+  @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
   @StorageProp(简洁模式AppStorage键) private isSimpleMode: boolean = true;
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @StorageProp(PAGE_SURFACE_KEY) private pageSurface: string = '#F5F7FA';
@@ -1088,12 +1090,12 @@ export struct 添加笔记页 {
       .alignItems(VerticalAlign.Center)
     }
     .width('100%')
-    .height(应用尺寸.工具栏高度 + this.状态栏高度)
+    .height(应用尺寸.pageToolbarHeight(this.状态栏高度, this.narrowDeckLayout))
     .padding({
       left: 应用尺寸.页面内边距_水平,
       right: 应用尺寸.页面内边距_水平,
-      top: this.状态栏高度 + 应用尺寸.toolbarVerticalInset,
-      bottom: 应用尺寸.toolbarVerticalInset
+      top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout),
+      bottom: 0
     })
     .backgroundColor(Color.Transparent)
   }
@@ -1369,7 +1371,7 @@ export struct 添加笔记页 {
         .padding({
           left: 应用尺寸.页面内边距_水平,
           right: 应用尺寸.页面内边距_水平,
-          top: 应用尺寸.pageContentTopInset
+          top: 应用尺寸.页面内容顶部间距(this.narrowDeckLayout)
         })
 
         // 错误固定显示，避免字段较多时被滚出屏幕。

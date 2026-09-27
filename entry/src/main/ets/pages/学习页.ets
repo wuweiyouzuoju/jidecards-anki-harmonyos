@@ -1,3 +1,4 @@
+import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { StudyTimerController, StudyTimerState } from '../model/StudyTimerController';
 import { resourceText, showToastSafely } from '../utils/UiFeedback';
@@ -115,6 +116,7 @@ class TapZone代理 {
 
 @Component
 export struct 学习页 {
+  @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @StorageProp('cardTextSizePercent') private cardTextSizePercent: number = 100;
   /** Navigation 入栈参数（替代原路由取参方式） */
@@ -1558,12 +1560,12 @@ export struct 学习页 {
       .alignItems(VerticalAlign.Center)
     }
     .width('100%')
-    .height(应用尺寸.工具栏高度 + this.状态栏高度)
+    .height(应用尺寸.pageToolbarHeight(this.状态栏高度, this.narrowDeckLayout))
     .padding({
       left: 应用尺寸.页面内边距_水平,
       right: 应用尺寸.页面内边距_水平,
-      top: this.状态栏高度 + 应用尺寸.toolbarVerticalInset,
-      bottom: 应用尺寸.toolbarVerticalInset
+      top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout),
+      bottom: 0
     })
     .backgroundColor(this.页面底色微染值)
   }
@@ -1832,7 +1834,7 @@ export struct 学习页 {
     .width('100%')
     .layoutWeight(1)
     .padding({
-      top: 应用尺寸.pageContentTopInset,
+      top: 应用尺寸.页面内容顶部间距(this.narrowDeckLayout),
       left: 应用尺寸.页面内边距_水平,
       right: 应用尺寸.页面内边距_水平,
       bottom: 应用尺寸.间距_8

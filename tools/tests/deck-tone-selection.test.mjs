@@ -49,10 +49,9 @@ test('native tone selection reflects five common colors plus no stripe and targe
 });
 
 test('None produces a transparent stripe with no theme gradient in every theme', () => {
-  const start = source.indexOf('        Column()', source.indexOf('// 色条：tone===None'));
-  const end = source.indexOf('\n        Column({', start);
-  assert.ok(start >= 0 && end > start);
-  const render = compileWithUiFeedback('Column', '应用尺寸', 'Color', '牌组色调', source.slice(start, end));
+  const stripe = source.match(/Column\(\)\s*\.width\(应用尺寸\.色条宽度\)[\s\S]*?\.borderRadius\(应用尺寸\.圆角_色条\)/)?.[0];
+  assert.ok(stripe);
+  const render = compileWithUiFeedback('Column', '应用尺寸', 'Color', '牌组色调', stripe);
   const deck = new Deck();
   for (const theme of THEME_CATALOG) {
     deck.visual = theme;

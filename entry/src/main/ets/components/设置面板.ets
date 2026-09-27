@@ -4,6 +4,7 @@ import { namedResourceText, resourceText, showToastSafely } from '../utils/UiFee
 import { ThemeTextSpans } from './common/ThemeText';
 import { SettingsEntry, filterSettingsEntries, SETTINGS_ENTRIES } from '../model/SettingsNavigation';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
+import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
 
 import { common, Want } from '@kit.AbilityKit';
 import { pasteboard, BusinessError } from '@kit.BasicServicesKit';
@@ -73,6 +74,7 @@ import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../model/ReleaseFeatures';
 // ========================================================
 @Component
 export struct 设置面板 {
+  @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
   @Link activeSection: string;
   @State private settingsQuery: string = '';
   @Prop openAiSettings: boolean = false;
@@ -773,16 +775,16 @@ export struct 设置面板 {
           .hitTestBehavior(HitTestMode.Transparent)
         }
         .width('100%')
-        .height(应用尺寸.工具栏高度 + this.状态栏高度)
+        .height(应用尺寸.pageToolbarHeight(this.状态栏高度, this.narrowDeckLayout))
         .padding({
-          top: this.状态栏高度 + 应用尺寸.toolbarVerticalInset,
-          bottom: 应用尺寸.toolbarVerticalInset
+          top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout),
+          bottom: 0
         })
         .backgroundColor(this.页面底色微染值)
         .alignContent(Alignment.Center)
 
         // 内容区
-        List({ space: 应用尺寸.pageSectionGap, scroller: this.内容滚动器 }) {
+        List({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout), scroller: this.内容滚动器 }) {
           if (this.activeSection === '') {
             ListItem() { this.settingsDirectory() }
           }
@@ -958,8 +960,8 @@ export struct 设置面板 {
         .padding({
           left: 应用尺寸.页面内边距_水平,
           right: 应用尺寸.页面内边距_水平,
-          top: 应用尺寸.pageContentTopInset,
-          bottom: 应用尺寸.pageBottomInset + this.导航条高度
+          top: 应用尺寸.页面内容顶部间距(this.narrowDeckLayout),
+          bottom: 应用尺寸.页面底部间距(this.narrowDeckLayout) + this.导航条高度
         })
         .backgroundColor(this.页面底色微染值)
         .scrollBar(BarState.Off)
@@ -985,7 +987,7 @@ export struct 设置面板 {
         模式切换菜单({
           当前简洁模式: this.简洁模式,
           主色: this.解析主色(),
-          顶部偏移: 应用尺寸.工具栏高度 + this.状态栏高度 + 应用尺寸.pageContentTopInset,
+          顶部偏移: 应用尺寸.pageContentTop(this.状态栏高度, this.narrowDeckLayout),
           选择回调: (简洁: boolean): void => {
             this.显示模式菜单 = false;
             if (简洁 !== this.简洁模式) {

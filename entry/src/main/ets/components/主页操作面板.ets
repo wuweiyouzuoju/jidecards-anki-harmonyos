@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
 import { AnchoredMenu } from './common/AnchoredMenu';
 import { AnchoredMenuItem } from './common/MenuItem';
 
@@ -40,6 +41,7 @@ export struct 主页操作面板 {
   @Prop 显示获取直链牌组: boolean = false;
   获取直链牌组回调: () => void = (): void => {};
   关闭回调: () => void = (): void => {};
+  @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
   @StorageLink(AI_AGENT_CHANNELS_APP_STORAGE_KEY) private Agent入口已启用: boolean = false;
   @StorageLink(简洁模式AppStorage键) private 简洁模式: boolean = true;
@@ -47,7 +49,7 @@ export struct 主页操作面板 {
   build() {
     AnchoredMenu({ menuWidth: !this.简洁模式 || this.Agent入口已启用 || this.显示获取直链牌组 ? 应用尺寸.extendedMenuWidth : 应用尺寸.compactMenuWidth, alignEnd: true,
       contentMaxWidth: 应用尺寸.内容最大宽度,
-      topOffset: 应用尺寸.工具栏高度 + this.状态栏高度 + 应用尺寸.pageContentTopInset,
+      topOffset: 应用尺寸.pageContentTop(this.状态栏高度, this.narrowDeckLayout),
       onClose: (): void => { this.关闭回调(); } }) {
       AnchoredMenuItem({ label: $r('app.string.create_deck_title'), divider: false,
         onSelect: (): void => { this.创建牌组回调(); } })

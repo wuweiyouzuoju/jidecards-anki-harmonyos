@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { SelectStyle } from '../utils/SelectStyle';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
+import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
 
 // ========================================================
 // @块ID UI-PAGE-STATS-001
@@ -83,6 +84,7 @@ function 默认偏好(): GraphPreferences {
 
 @Component
 export struct 统计页 {
+  @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
   /** 页面栈：返回主页时 pop */
   pathStack: NavPathStack = new NavPathStack();
   initialSnapshot: 统计页参数 = { graphs: null, days: 365 };
@@ -482,13 +484,13 @@ export struct 统计页 {
 
     }
     .width('100%')
-    .height(应用尺寸.工具栏高度 + this.状态栏高度)
+    .height(应用尺寸.pageToolbarHeight(this.状态栏高度, this.narrowDeckLayout))
     .alignContent(Alignment.Center)
     .padding({
       left: 应用尺寸.页面内边距_水平,
       right: 应用尺寸.页面内边距_水平,
-      top: this.状态栏高度 + 应用尺寸.toolbarVerticalInset,
-      bottom: 应用尺寸.toolbarVerticalInset
+      top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout),
+      bottom: 0
     })
     .backgroundColor(this.页面底色微染值)
   }
@@ -496,7 +498,7 @@ export struct 统计页 {
   @Builder
   private 统计内容() {
     Scroll() {
-      Column({ space: 应用尺寸.pageSectionGap }) {
+      Column({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout) }) {
         // 统计口径行：牌组选择在左，历史范围选择在右。
         Row({ space: 应用尺寸.间距_8 }) {
           if (this.牌组选项.length > 1) {
@@ -777,9 +779,9 @@ export struct 统计页 {
       .padding({
         left: 应用尺寸.页面内边距_水平,
         right: 应用尺寸.页面内边距_水平,
-        top: 应用尺寸.pageContentTopInset,
+        top: 应用尺寸.页面内容顶部间距(this.narrowDeckLayout),
         // 抬高避让手势导航条（AppGallery 导航栏适配要求）
-        bottom: 应用尺寸.pageBottomInset + this.导航条高度
+        bottom: 应用尺寸.页面底部间距(this.narrowDeckLayout) + this.导航条高度
       })
     }
     .width('100%')

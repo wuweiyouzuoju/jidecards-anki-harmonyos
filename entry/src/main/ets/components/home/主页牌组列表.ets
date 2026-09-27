@@ -44,6 +44,7 @@
 // ========================================================
 
 import { 牌组列表项 } from '../牌组列表项';
+import { DECK_LIST_NARROW_KEY, deckListOverflows } from '../../model/DeckListAppearance';
 import { 统一加载态 } from '../common/统一加载态';
 import { 统一空态 } from '../common/统一空态';
 import { 统一错误态 } from '../common/统一错误态';
@@ -52,17 +53,18 @@ import { 牌组列表数据源, 牌组汇总, 牌组色调, 主页加载状态 }
 
 @Component
 export struct 主页牌组列表 {
+  @StorageProp(DECK_LIST_NARROW_KEY) @Watch('reportOverflow') private narrow: boolean = false;
   // 引用类型字段：保持引用同一性，不深拷贝。
   // 牌组数据源 内部维护 DataChangeListener，LazyForEach 通过它自刷新；@Prop 深拷贝会破坏监听关系。
   牌组数据源: 牌组列表数据源 = new 牌组列表数据源([]);
   // Scroller 是 ArkUI 控制器实例，引用同对象才能复用滚动位置。
   牌组列表滚动器: Scroller = new Scroller();
-  // Set<string> 是 ES6 引用类型，作为普通字段传递；LazyForEach 重建 ListItem 时重新读 .has(deck.id)。
-  展开的牌组ID集合: Set<string> = new Set<string>();
+  // 展开状态必须响应父级替换，让现有行的 expanded 更新并播放旋转，而不是重建行。
+  @Prop 展开的牌组ID集合: Set<string> = new Set<string>();
 
   @Prop 选中的牌组ID: string = '';
   @Prop 排序模式中: boolean = false;
-  @Prop 加载状态: 主页加载状态 = 'loading';
+  @Prop @Watch('reportOverflow') 加载状态: 主页加载状态 = 'loading';
   // 父组件控制 刷新中 状态：onRefresh 回调后由父组件加载完毕置 false。
   // 子组件通过 @Watch 同步到本地 @State 刷新指示器开关，供 Refresh 容器 $$ 双向绑定（任务约束不允许 @Link）。
   @Prop @Watch('同步刷新指示器') 刷新中: boolean = false;
@@ -85,10 +87,37 @@ export struct 主页牌组列表 {
   onItemCustomStudy: (deckId: string) => void = (deckId: string): void => {};
   onRefresh: () => void = (): void => {};
   onRetry: () => void = (): void => {};
+  onOverflowChange: (overflow: boolean) => void = (_overflow: boolean): void => {};
+  private viewportHeight: number = 0;
+  private readonly overflowListener: DataChangeListener = {
+    onDataReloaded: (): void => { this.reportOverflow(); },
+    onDataAdded: (_index: number): void => { this.reportOverflow(); },
+    onDataChanged: (_index: number): void => { this.reportOverflow(); },
+    onDataDeleted: (_index: number): void => { this.reportOverflow(); },
+    onDataMoved: (_from: number, _to: number): void => { this.reportOverflow(); },
+    onDataAdd: (_index: number): void => { this.reportOverflow(); },
+    onDataChange: (_index: number): void => { this.reportOverflow(); },
+    onDataDelete: (_index: number): void => { this.reportOverflow(); },
+    onDataMove: (_from: number, _to: number): void => { this.reportOverflow(); },
+    onDatasetChange: (_operations: DataOperation[]): void => { this.reportOverflow(); }
+  };
+
+  private reportOverflow(): void {
+    this.onOverflowChange(this.加载状态 === 'ready' && deckListOverflows(
+      this.牌组数据源.totalCount(),
+      this.narrow ? 应用尺寸.narrowDeckRowHeight : 应用尺寸.牌组行高度,
+      应用尺寸.页面分组间距(this.narrow), this.viewportHeight));
+  }
 
   aboutToAppear(): void {
     // 首次渲染时把父组件 刷新中 同步到本地指示器开关，避免 Refresh 容器初始状态错位。
     this.刷新指示器开关 = this.刷新中;
+    this.牌组数据源.registerDataChangeListener(this.overflowListener);
+  }
+
+  aboutToDisappear(): void {
+    this.牌组数据源.unregisterDataChangeListener(this.overflowListener);
+    this.onOverflowChange(false);
   }
 
   // 父组件 刷新中 变化时同步到本地 @State，让 $$ 刷新指示器开关 跟随父组件状态收起指示器。
@@ -102,7 +131,7 @@ export struct 主页牌组列表 {
       // 下拉刷新容器：onRefreshing 触发后调 onRefresh；
       // 父组件加载完毕置 刷新中=false → @Watch 同步 刷新指示器开关=false 收起指示器。
       Refresh({ refreshing: $$this.刷新指示器开关 }) {
-        List({ scroller: this.牌组列表滚动器, space: 应用尺寸.pageSectionGap }) {
+        List({ scroller: this.牌组列表滚动器, space: 应用尺寸.页面分组间距(this.narrow) }) {
           LazyForEach(this.牌组数据源, (deck: 牌组汇总) => {
             ListItem() {
               牌组列表项({
@@ -192,6 +221,10 @@ export struct 主页牌组列表 {
         .layoutWeight(1)
         .scrollBar(BarState.Auto)
         .edgeEffect(EdgeEffect.Spring)
+        .onAreaChange((_old: Area, area: Area): void => {
+          this.viewportHeight = Number(area.height);
+          this.reportOverflow();
+        })
       }
       .onRefreshing(() => {
         // 用户下拉到阈值后触发；父组件加载完毕后置 刷新中=false，@Watch 同步收起指示器。

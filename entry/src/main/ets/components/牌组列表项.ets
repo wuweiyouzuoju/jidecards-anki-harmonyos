@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { DisclosureChevron } from './common/DisclosureChevron';
+import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
 import { resourceText } from '../utils/UiFeedback';
 import { ThemeDefinition, themeDefinition, THEME_VISUALS_KEY, THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 import { ThemeLabelGlyph, themeLabelGlyphs } from './common/ThemeText';
@@ -62,6 +63,7 @@ interface 色条选项 {
 
 @Component
 export struct 牌组列表项 {
+  @StorageProp(DECK_LIST_NARROW_KEY) private narrow: boolean = false;
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @StorageProp(GLASS_COLORS_KEY) private glassColors: string[] = GLASS_HIGHLIGHT_COLORS;
   @StorageProp(THEME_VISUALS_KEY) private visual: ThemeDefinition = themeDefinition('aurora');
@@ -442,6 +444,33 @@ export struct 牌组列表项 {
   // @副作用
   // 无。仅上抛回调。
   // ========================================================
+  @Builder
+  private expansionControl() {
+    Column() {
+      if (this.reorderMode) {
+        Text('≡')
+          .fontSize(this.narrow ? 应用尺寸.字号_强调 : 应用尺寸.字号_标题)
+          .fontColor($r('app.color.text_secondary'))
+      } else if (this.deck.hasChildren) {
+        Text('▼')
+          .fontSize(this.narrow ? 应用尺寸.字号_强调 : 应用尺寸.字号_标题)
+          .fontColor($r('app.color.text_secondary'))
+          .rotate({ angle: this.expanded ? 0 : -90 })
+          .animation({ duration: 150, curve: Curve.EaseOut })
+      }
+    }
+    .width(this.narrow ? 24 : 应用尺寸.箭头槽位宽度)
+    .height(应用尺寸.箭头槽位高度)
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Center)
+    .margin({ left: this.narrow ? 0 : -应用尺寸.间距_10 })
+    .onClick(() => {
+      if (!this.reorderMode && this.deck.hasChildren) {
+        this.onToggle(this.deck.id);
+      }
+    })
+  }
+
   build() {
     Stack() {
       // 底层：背景图（objectFit=Cover 与 牌组定制面板 预览口径一致，
@@ -455,67 +484,45 @@ export struct 牌组列表项 {
           .borderRadius(应用尺寸.圆角_牌组行)
       }
       // Row 内容：箭头/手柄/色条/文字/计数
-      Row({ space: 应用尺寸.间距_12 }) {
-        // 箭头槽位：所有行同宽占位，父子行内容纵向对齐；仅用 ▼ 字形旋转向右，规避 ▶ 的 emoji 呈现
-        // reorderMode 时显示 ≡ 手柄（提示可拖），且 onClick 不触发折叠/展开
-        Column() {
-          if (this.reorderMode) {
-            Text('≡')
-              .fontSize(应用尺寸.字号_标题)
-              .fontColor($r('app.color.text_secondary'))
-          } else if (this.deck.hasChildren) {
-            Text('▼')
-              .fontSize(应用尺寸.字号_标题)
-              .fontColor($r('app.color.text_secondary'))
-              .rotate({ angle: this.expanded ? 0 : -90 })
-              .animation({ duration: 150, curve: Curve.EaseOut })
-          }
+      Row({ space: this.narrow ? 应用尺寸.间距_6 : 应用尺寸.间距_12 }) {
+        // 同层级统一保留左侧槽位；窄版缩小槽宽，无子牌组也占位以对齐名称。
+        this.expansionControl()
+        // 窄版连同色条占位一起移除；保留色调偏好，切回宽版恢复。
+        if (!this.narrow) {
+          Column()
+            .width(应用尺寸.色条宽度)
+            .height(应用尺寸.色条高度)
+            .backgroundColor(
+              this.deck.tone === 牌组色调.None ? Color.Transparent : this.取色条颜色(this.deck.tone))
+            .borderRadius(应用尺寸.圆角_色条)
         }
-        .width(应用尺寸.箭头槽位宽度)
-        .height(应用尺寸.箭头槽位高度)
-        .justifyContent(FlexAlign.Center)
-        .alignItems(HorizontalAlign.Center)
-        .margin({ left: -应用尺寸.间距_10 })
-        .onClick(() => {
-          if (this.reorderMode) {
-            return;
-          }
-          if (this.deck.hasChildren) {
-            this.onToggle(this.deck.id);
-          }
-        })
-        // 色条：tone===None 时不渲染色块，但保留 Column 占位以维持行内对齐。
-        Column()
-          .width(应用尺寸.色条宽度)
-          .height(应用尺寸.色条高度)
-          .backgroundColor(
-            this.deck.tone === 牌组色调.None ? Color.Transparent : this.取色条颜色(this.deck.tone))
-          .borderRadius(应用尺寸.圆角_色条)
-        Column({ space: 应用尺寸.间距_5 }) {
+        Column({ space: this.narrow ? 应用尺寸.间距_3 : 应用尺寸.间距_5 }) {
           Text(牌组显示名(this.deck))
-            .fontSize(应用尺寸.字号_标题)
+            .fontSize(this.narrow ? 应用尺寸.字号_强调 : 应用尺寸.字号_标题)
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.text_primary'))
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
-          Text(this.deck.description)
-            .fontSize(应用尺寸.字号_正文_中)
-            .fontColor($r('app.color.text_secondary'))
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
+          if (!this.narrow || this.deck.description.trim().length > 0) {
+            Text(this.deck.description)
+              .fontSize(this.narrow ? 应用尺寸.字号_正文_小 : 应用尺寸.字号_正文_中)
+              .fontColor($r('app.color.text_secondary'))
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+          }
         }
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1)
         Column({ space: 应用尺寸.间距_5 }) {
-          Row({ space: 应用尺寸.间距_8 }) {
+          Row({ space: this.narrow ? 应用尺寸.间距_6 : 应用尺寸.间距_8 }) {
             Text($r('app.string.deck_new_short', this.deck.newCount))
-              .fontSize(应用尺寸.字号_正文_小)
+              .fontSize(this.narrow ? 应用尺寸.字号_说明 : 应用尺寸.字号_正文_小)
               .fontColor(this.新卡计数色)
             Text($r('app.string.deck_learning_short', this.deck.learningCount))
-              .fontSize(应用尺寸.字号_正文_小)
+              .fontSize(this.narrow ? 应用尺寸.字号_说明 : 应用尺寸.字号_正文_小)
               .fontColor(this.学习中计数色)
             Text($r('app.string.deck_review_short', this.deck.reviewCount))
-              .fontSize(应用尺寸.字号_正文_小)
+              .fontSize(this.narrow ? 应用尺寸.字号_说明 : 应用尺寸.字号_正文_小)
               .fontColor(this.复习中计数色)
           }
         }
@@ -523,10 +530,10 @@ export struct 牌组列表项 {
       }
       .width('100%')
       .padding({
-        left: 应用尺寸.间距_14 + this.deck.depth * 应用尺寸.间距_16,
-        right: 应用尺寸.间距_14,
-        top: 应用尺寸.间距_13,
-        bottom: 应用尺寸.间距_13
+        left: (this.narrow ? 应用尺寸.间距_12 : 应用尺寸.间距_14) + this.deck.depth * 应用尺寸.间距_16,
+        right: this.narrow ? 应用尺寸.间距_12 : 应用尺寸.间距_14,
+        top: this.narrow ? 应用尺寸.间距_6 : 应用尺寸.间距_13,
+        bottom: this.narrow ? 应用尺寸.间距_6 : 应用尺寸.间距_13
       })
       .onClick(() => {
         // 排序模式下不触发选牌；长按手柄+拖动才是预期操作
@@ -569,7 +576,7 @@ export struct 牌组列表项 {
       })
     }
     .width('100%')
-    .height(应用尺寸.牌组行高度)
+    .height(this.narrow ? 应用尺寸.narrowDeckRowHeight : 应用尺寸.牌组行高度)
     .clip(true)
     .borderRadius(应用尺寸.圆角_牌组行)
     .linearGradient({ angle: 110, colors: this.visual.selectedColors.length > 0 && this.selected
