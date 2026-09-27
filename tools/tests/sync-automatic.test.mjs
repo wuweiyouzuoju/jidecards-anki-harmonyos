@@ -388,7 +388,8 @@ test('media-only sync runs even with unchanged collection and closes only after 
   const { panel, state } = panelHarness({ required: 0, media: true });
   panel.aboutToAppear(); await settle();
   assert.equal(state.calls.some(call => call[0] === 'collection'), true);
-  assert.equal(state.calls.some(call => call[0] === 'media'), true);
+  assert.equal(state.calls.find(call => call[0] === 'collection')[2], true, 'Core starts media');
+  assert.equal(state.calls.some(call => call[0] === 'media'), false, 'only monitor the existing task');
   assert.equal(state.closed, 0);
   state.timers.get(1)(); await settle();
   assert.equal(state.closed, 1);
@@ -415,8 +416,9 @@ test('network/auth/media failures remain visible and cannot be mistaken for auto
   for (const kind of ['network', 'auth', 'media']) {
     const { panel, state } = panelHarness({ media: kind === 'media' });
     if (kind !== 'media') panel.同步服务实例.同步集合 = async () => { throw new Error(kind === 'auth' ? '401 unauthorized' : 'network timeout'); };
-    else panel.同步服务实例.同步媒体 = async () => { throw new Error('network timeout'); };
+    else panel.同步服务实例.媒体同步状态 = async () => { throw new Error('network timeout'); };
     panel.aboutToAppear(); await settle();
+    if (kind === 'media') { state.timers.get(1)(); await settle(); }
     assert.equal(panel.当前阶段, 'done');
     assert.notEqual(panel.错误文案, '');
     assert.equal(state.closed, 0);
@@ -426,12 +428,14 @@ test('network/auth/media failures remain visible and cannot be mistaken for auto
   }
 });
 
-test('server redirects are passed through to media as well as collection sync', async () => {
+test('server redirects persist without restarting the media task Core already owns', async () => {
   const { panel, state } = panelHarness({ media: true });
   state.response.newEndpoint = 'https://redirect.example/prefix/';
   panel.aboutToAppear(); await settle();
   assert.equal(state.endpoint, state.response.newEndpoint);
-  assert.equal(state.calls.find(call => call[0] === 'media')[1].endpoint, state.response.newEndpoint);
+  assert.equal(panel.鉴权.endpoint, state.response.newEndpoint);
+  assert.equal(state.calls.find(call => call[0] === 'collection')[2], true);
+  assert.equal(state.calls.some(call => call[0] === 'media'), false);
 });
 
 test('slow media polls do not overlap or deliver stale completion after the panel is removed', async () => {
@@ -554,7 +558,7 @@ test('collection completion waits for the home snapshot before consuming the lat
   let finishRefresh;
   page.加载主页数据 = () => new Promise(resolve => { finishRefresh = resolve; });
   page.autoSyncStateChanged(true, false);
-  page.开始学习(); page.openSettings(); page.开始学习();
+  page.开始学习(); page.开始学习(); page.开始学习();
   assert.equal(state.navigation.length, 0);
   assert.equal(state.toasts, 3);
   const refreshed = page.autoSyncCollectionFinished(false);
@@ -635,10 +639,10 @@ test('manual completion waits for media and reports once whether details are ope
     const { panel, state, gate } = panelHarness({ automatic: false, media: true });
     panel.aboutToAppear(); await settle();
     if (detailsVisible) panel.showDetails();
-    assert.deepEqual(state.toasts, [], 'collection commit is not full sync completion');
+    assert.deepEqual(state.toasts, ['app.string.sync_collection_complete'], 'collection is usable before media completes');
     assert.equal(state.closed, 0);
     state.timers.get(1)(); await settle();
-    assert.deepEqual(state.toasts, ['app.string.sync_success']);
+    assert.deepEqual(state.toasts, ['app.string.sync_collection_complete', 'app.string.sync_media_complete'], 'completion must identify the stage');
     assert.equal(state.closed, 1);
     assert.equal(gate.isActive(), false);
     assert.equal(state.timers.size, 0);
@@ -868,10 +872,9 @@ test('conflict recheck redirects are used by both full replacement and subsequen
   state.response.serverMediaUsn = 41;
   await panel.冲突确认(true);
   const full = state.calls.find(call => call[0] === 'full');
-  const media = state.calls.find(call => call[0] === 'media');
   assert.equal(full[1].endpoint, state.response.newEndpoint);
   assert.equal(full[3], 41);
-  assert.equal(media[1].endpoint, state.response.newEndpoint);
+  assert.equal(state.calls.some(call => call[0] === 'media'), false, 'full replacement starts media with its updated auth');
 });
 
 test('explicit full replacement can hide details but study never interrupts its database swap', async () => {

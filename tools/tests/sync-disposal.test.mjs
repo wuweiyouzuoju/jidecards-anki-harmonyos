@@ -78,7 +78,7 @@ test('a conflict recheck committed while leaving still records redirect and noti
 });
 
 test('destroyed media owner waits for start, abort registration and confirmed thread exit', async () => {
-  const { panel, state, gate } = panelHarness({ media: true });
+  const { panel, state, gate } = panelHarness({ required: 2, media: true });
   let finishStart, aborts = 0, queries = 0;
   panel.同步服务实例.同步媒体 = () => new Promise(resolve => { finishStart = resolve; });
   panel.同步服务实例.中止媒体同步 = async () => { aborts++; };
@@ -88,6 +88,8 @@ test('destroyed media owner waits for start, abort registration and confirmed th
     return { active: queries === 1, progress: {} };
   };
   panel.aboutToAppear(); await settle();
+  state.response.required = 0;
+  await panel.冲突确认(true); await settle();
   panel.aboutToDisappear(); panel.aboutToDisappear();
   await settle();
   assert.equal(aborts, 0, 'cannot abort before the start RPC registers its task');

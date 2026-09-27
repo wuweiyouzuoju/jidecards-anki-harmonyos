@@ -31,7 +31,7 @@ import { DialogHeader } from '../common/DialogHeader';
 // ========================================================
 
 import { 媒体服务 } from '../../backend/媒体服务';
-import { 同步服务 } from '../../backend/同步服务';
+import { syncActivity } from '../../model/SyncSettings';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 设置面板色板_取 } from '../../utils/设置面板配色';
 import { 颜色键 } from '../../model/颜色主题';
@@ -56,7 +56,6 @@ export struct 媒体管理面板 {
   @State private 媒体同步中: boolean = false;
 
   private readonly 媒体服务实例: 媒体服务 = new 媒体服务();
-  private readonly 同步服务实例: 同步服务 = new 同步服务();
   // 原生快照由会话持有；页面不保存完整文件列表。
   @State private reportChunks: string[] = [];
   @State private reportRevision: number = 0;
@@ -68,7 +67,7 @@ export struct 媒体管理面板 {
     releaseSnapshot: (token: number) => this.媒体服务实例.releaseSnapshot(token),
     emptyTrash: () => this.媒体服务实例.清空回收站(),
     restoreTrash: () => this.媒体服务实例.恢复回收站(),
-    isSyncing: async (): Promise<boolean> => (await this.同步服务实例.媒体同步状态()).active
+    isSyncing: async (): Promise<boolean> => syncActivity.isActive()
   }, (state: MediaMaintenanceState): void => {
     this.检查中 = state.busy && !state.checked; this.处理中 = state.busy; this.已检查 = state.checked;
     this.未使用总数 = state.unusedCount; this.缺失总数 = state.missingCount;
@@ -92,12 +91,8 @@ export struct 媒体管理面板 {
    * （新落地的文件还未被笔记引用前临时算 unused，或引用关系还在更新）。
    */
   private async 检查媒体同步状态(): Promise<void> {
-    try {
-      const 状态 = await this.同步服务实例.媒体同步状态();
-      if (this.visible) this.媒体同步中 = 状态.active;
-    } catch {
-      if (this.visible) this.媒体同步中 = false;
-    }
+    // Core 状态接口会消费终态，只能由同步宿主读取。清理按任务租约保守互斥。
+    if (this.visible) this.媒体同步中 = syncActivity.isActive();
   }
 
   private 取本地化文本(资源: Resource): string {

@@ -123,6 +123,7 @@ export struct 同步面板 {
   private fsrsBeforeSync: boolean | null = null;
   private fsrsDisabledBySync: boolean = false;
   private collectionResultNotified: boolean = false;
+  private lastCompletionToast: string = '';
   private suspendDelayId: number = -1;
   private yieldingForStudy: boolean = false;
   private syncAborted: boolean = false;
@@ -323,16 +324,20 @@ export struct 同步面板 {
     }
   }
 
-  /** 成功立即提示并结束旧任务，避免下次手动同步打开残留完成态；失败/冲突保留详情。 */
+  /** 卡片与媒体分别提示各自完成，重复回调不重复提示同一阶段。 */
   private notifySyncResult(): void {
     if (this.disposed) return;
     this.notifyCollectionResult();
     if (this.当前阶段 === 'done' && this.错误文案 === '' && !this.是否请求中止) {
-      if (!this.automatic || this.detailsVisible) {
-        showToastSafely(this.getUIContext(), { message: this.状态文案, duration: 3000 });
-      }
+      this.showCompletionToast();
       this.关闭回调();
     }
+  }
+
+  private showCompletionToast(): void {
+    if (this.lastCompletionToast === this.状态文案 || (this.automatic && !this.detailsVisible)) return;
+    this.lastCompletionToast = this.状态文案;
+    showToastSafely(this.getUIContext(), { message: this.状态文案, duration: 3000 });
   }
 
   /** 集合成功提交后立即取样，避免媒体阶段影响变化判定；未知值不推断为关闭。 */
@@ -456,6 +461,7 @@ export struct 同步面板 {
     this.是否在媒体阶段 = false;
     this.清理轮询定时器();
     this.媒体进度文案 = '';
+    this.状态文案 = 集合是否已同步 ? this.取本地化文案($r('app.string.sync_collection_complete')) : '';
     const 后端错误类别: number | undefined = error instanceof 后端错误 ? error.kind : undefined;
     const 错误类别 = 分类同步错误(error, 后端错误类别);
     hilog.error(同步日志域, 同步日志标签, 'sync error: kind=%{public}s backendKind=%{public}d msg=%{public}s',
@@ -522,6 +528,7 @@ export struct 同步面板 {
     this.fsrsBeforeSync = null;
     this.fsrsDisabledBySync = false;
     this.collectionResultNotified = false;
+    this.lastCompletionToast = '';
     this.setSyncPhase('syncing');
     try {
       let 鉴权: SyncAuth = 当前鉴权;
@@ -679,7 +686,7 @@ export struct 同步面板 {
         this.notifyCollectionResult();
         if (加载媒体同步开关()) {
           设置媒体待同步(true);
-          this.启动媒体阶段(this.鉴权!);
+          this.启动媒体阶段(this.鉴权!, true);
         } else {
           this.状态文案 = this.取本地化文案($r('app.string.sync_success'));
           this.setSyncPhase('done');
@@ -740,17 +747,24 @@ export struct 同步面板 {
   }
 
   /**
-   * 媒体阶段：SyncMedia 后台启动 → 1s 轮询 MediaSyncStatus。
+   * 常规/全量同步由 Core 启动媒体，此处只监测；重检未启动媒体时才显式启动。
    * rslib 约定：媒体同步出错后下一次 MediaSyncStatus 返回错误（走 catch 分支）。
    */
-  private 启动媒体阶段(鉴权: SyncAuth): void {
+  private 启动媒体阶段(鉴权: SyncAuth, startMedia: boolean = false): void {
     if (this.是否请求中止) {
       this.完成中止();
       return;
     }
     this.是否在媒体阶段 = true;
+    this.状态文案 = this.取本地化文案($r('app.string.sync_collection_complete'));
+    this.showCompletionToast();
     this.notifyCollectionResult();
     this.setSyncPhase('syncing');
+    this.mediaMayBeRunning = true;
+    if (!startMedia) {
+      this.开始媒体轮询();
+      return;
+    }
     const RPC开始时间: number = Date.now();
     hilog.info(同步日志域, 同步日志标签,
       'sync: calling syncMedia (background start) at %{public}d', RPC开始时间);
@@ -850,7 +864,7 @@ export struct 同步面板 {
             this.是否在媒体阶段 = false;
             this.清理轮询定时器();
             this.媒体进度文案 = '';
-            this.状态文案 = this.取本地化文案($r('app.string.sync_success'));
+            this.状态文案 = this.取本地化文案($r('app.string.sync_media_complete'));
             this.setSyncPhase('done');
             // 媒体同步成功，清除待完成标志。
             设置媒体待同步(false);
@@ -913,12 +927,19 @@ export struct 同步面板 {
         .width(18)
         .height(18)
         .color(this.取色板().主色)
-      Text($r('app.string.sync_syncing'))
+      Text(this.是否在媒体阶段 ? $r('app.string.sync_syncing_media') : $r('app.string.sync_syncing'))
         .fontSize(应用尺寸.字号_正文)
         .fontColor(this.取色板().主文字)
     }
     .width('100%')
     .height(40)
+
+    if (this.是否在媒体阶段) {
+      Text($r('app.string.sync_collection_complete'))
+        .fontSize(应用尺寸.字号_正文_小)
+        .fontColor(this.取色板().次文字)
+        .width('100%')
+    }
 
     if (this.媒体进度文案 !== '') {
       Text(this.媒体进度文案)

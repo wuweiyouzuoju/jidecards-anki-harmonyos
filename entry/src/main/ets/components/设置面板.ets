@@ -3,6 +3,7 @@ import { DisclosureChevron } from './common/DisclosureChevron';
 import { namedResourceText, resourceText, showToastSafely } from '../utils/UiFeedback';
 import { ThemeTextSpans } from './common/ThemeText';
 import { SettingsEntry, filterSettingsEntries, SETTINGS_ENTRIES } from '../model/SettingsNavigation';
+import { syncActivity } from '../model/SyncSettings';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
 import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
 
@@ -210,6 +211,10 @@ export struct 设置面板 {
 
   /** 目录导航只改变展示位置，设置的保存仍交给原有组件。 */
   private openSection(id: string): void {
+    if ((id === 'scheduler' || id === 'data' || id === 'advanced') && syncActivity.isCollectionBusy()) {
+      showToastSafely(this.getUIContext(), { message: this.取本地化文本($r('app.string.sync_wait_operation')) });
+      return;
+    }
     this.activeSection = id;
 
     this.内容滚动器.scrollToIndex(0);

@@ -102,7 +102,6 @@ import { HomeIntroPanel } from '../components/HomeIntroPanel';
 import { isHomeIntroCompleted, completeHomeIntro } from '../utils/HomeIntroStore';
 import { DeckMediaCleanup } from '../model/DeckMediaCleanup';
 import { 媒体服务 } from '../backend/媒体服务';
-import { 同步服务 } from '../backend/同步服务';
 import {
   是否已完成云端牌组引导,
   是否已用尽云端牌组下载配额
@@ -251,7 +250,7 @@ struct 首页 {
   @State private deckDeletionBusy: boolean = false;
   @State private deckDeletionStatus: Resource = $r('app.string.deck_media_checking');
   private readonly deckMediaCleanup: DeckMediaCleanup = new DeckMediaCleanup({
-    isSyncing: async (): Promise<boolean> => (await new 同步服务().媒体同步状态()).active,
+    isSyncing: async (): Promise<boolean> => syncActivity.isActive(),
     unused: async (): Promise<string[]> => await new 媒体服务().unusedFiles(),
     trash: async (files: string[]): Promise<void> => { await new 媒体服务().媒体文件进回收站(files); }
   });
@@ -400,6 +399,7 @@ struct 首页 {
     this.announcementController.dispose();
     this.homeWork.dispose();
     this.refreshQueue.dispose();
+    this.statisticsQueue.dispose();
     this.startupSequence.dispose();
     this.syncScheduler.setListener(null);
     this.stopAutoSyncTimer();
@@ -637,9 +637,9 @@ struct 首页 {
     this.显示创建牌组 = true;
   }
 
-  /** 设置页会读取/修改集合，和学习入口共用等待规则。 */
+  /** 先进入设置；依赖集合的分组在设置内部保护，独立内容不等待网络。 */
   private openSettings(): void {
-    if (this.deferForSync((): void => { this.openSettings(); })) return;
+    this.syncController.cancel();
     this.暂停主页官方公告检查();
     const params: 设置页参数 = { openAiSettings: false };
     this.页面栈.pushPath({ name: 'SettingsPage', param: params,
@@ -839,6 +839,8 @@ struct 首页 {
   // 并发加载会竞态覆盖——先发起的慢请求后完成，用旧 graphs 覆盖新快照，
   // 主页摘要卡片停留旧数据且无新触发器纠正（用户报告的“内部卡片高延迟”根因之一）。
   private readonly refreshQueue: HomeRefreshQueue = new HomeRefreshQueue();
+  private readonly statisticsQueue: HomeRefreshQueue = new HomeRefreshQueue();
+  private homeDataGeneration: number = 0;
 
   private 加载主页数据(): Promise<void> {
     if (this.autoSyncCollectionBusy) {
@@ -849,6 +851,7 @@ struct 首页 {
   }
 
   private async 执行加载主页数据(): Promise<void> {
+    const generation: number = ++this.homeDataGeneration;
     // 从学习页返回后的刷新保留已呈现的快照，避免详情/首页先闪回加载态。
     if (this.加载状态 !== 'ready' && this.加载状态 !== 'empty') this.加载状态 = 'loading';
     const context: common.UIAbilityContext | null = this.取能力上下文();
@@ -859,8 +862,11 @@ struct 首页 {
     try {
       const data: HomeDataResult = await this.homeData.load(context.filesDir,
         context.resourceManager.getStringSync($r('app.string.default_deck_name').id));
-      if (this.homeDisposed) return;
+      if (this.homeDisposed || generation !== this.homeDataGeneration) return;
       const snapshot: 主页快照 = data.snapshot;
+      // 牌组先可用；旧统计留到新统计完成，避免刷新期间闪成零或错误态。
+      snapshot.today.completedCount = this.主页快照数据.today.completedCount;
+      snapshot.memory = this.主页快照数据.memory;
       this.隐藏的牌组ID集合 = new Set<string>(data.hiddenIds);
       if (data.cardData !== null) this.图表快照 = data.cardData;
       if (data.graphs !== null) this.statsSnapshot = { graphs: data.graphs, days: data.days };
@@ -869,7 +875,7 @@ struct 首页 {
       if (!await this.reconcileDeckSelection(snapshot.decks)) {
         this.显示提示($r('app.string.home_selection_save_failed'));
       }
-      if (this.homeDisposed) return;
+      if (this.homeDisposed || generation !== this.homeDataGeneration) return;
       const expansion: HomeDeckExpansion = reconcileHomeExpansion(snapshot.decks, this.展开的牌组ID集合,
         this.已知牌组ID集合, this.牌组展开已初始化);
       this.牌组展开已初始化 = true;
@@ -884,14 +890,33 @@ struct 首页 {
       if (!this.上次牌组已恢复 && this.当前断点 !== 'xs') {
         await this.尝试恢复上次牌组();
       }
+      this.queueHomeStatistics(data, generation);
     } catch (error) {
-      if (this.homeDisposed) return;
+      if (this.homeDisposed || generation !== this.homeDataGeneration) return;
       this.加载状态 = 'error';
       this.显示提示($r('app.string.home_load_error'));
     } finally {
       // 无论成功或失败都收起下拉刷新指示器；onPageShow 触发时本来即为 false，无副作用。
       if (!this.homeDisposed) this.刷新中 = false;
     }
+  }
+
+  /** 队列持有推送直到落定；学习/离页不等待统计，旧代次不能回写新首页。 */
+  private queueHomeStatistics(data: HomeDataResult, generation: number): void {
+    this.statisticsQueue.run(async (): Promise<void> => {
+      if (this.homeDisposed || generation !== this.homeDataGeneration || this.autoSyncCollectionBusy ||
+        this.页面栈.size() !== 0 || this.syncController.hasDeferredNavigation() || !autoSyncScheduler.canSync()) return;
+      await syncActivity.waitForCollection();
+      if (this.homeDisposed || generation !== this.homeDataGeneration || this.页面栈.size() !== 0) return;
+      const result: HomeDataResult = await this.homeData.loadStatistics(data);
+      if (this.homeDisposed || generation !== this.homeDataGeneration || this.页面栈.size() !== 0) return;
+      if (result.cardData !== null) this.图表快照 = result.cardData;
+      if (result.graphs !== null) this.statsSnapshot = { graphs: result.graphs, days: result.days };
+      this.主页快照数据 = { decks: this.主页快照数据.decks, today: result.snapshot.today, memory: result.snapshot.memory };
+      this.historyRefreshToken++;
+    }).catch((error: Object): void => {
+      hilog.warn(0x4342, 'jidecards', `首页: 统计刷新失败 ${error}`);
+    });
   }
 
   // 尝试恢复上次牌组
@@ -1748,7 +1773,7 @@ struct 首页 {
 
   /** 未配置时从主页直接进入设置，并展开 AI 智能体分组。 */
   private openAISettings(): void {
-    if (this.deferForSync((): void => { this.openAISettings(); })) return;
+    this.syncController.cancel();
     const params: 设置页参数 = { openAiSettings: true };
     this.暂停主页官方公告检查();
     this.页面栈.pushPath({

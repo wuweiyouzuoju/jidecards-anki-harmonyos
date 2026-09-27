@@ -4,6 +4,7 @@ import { 后端会话 } from '../backend/后端会话';
 import { 牌组服务 } from '../backend/牌组服务';
 import { 统计服务 } from '../backend/统计服务';
 import { 构建主页快照 } from '../model/主页快照映射器';
+import type { DeckTreeNode } from '../proto/messages/DeckMessages';
 import type { GraphsView } from '../proto/messages/StatsMessages';
 import { 牌组汇总, 牌组色调, 主页快照 } from '../model/主页模型';
 import { 加载牌组别名映射, 加载牌组色调映射, 加载牌组背景图映射 } from '../model/牌组元数据存储';
@@ -13,6 +14,7 @@ import { 确保FSRS已开启一次 } from '../model/FSRS控制器';
 import { 提取卡片数据, 保存卡片数据, 加载小时分布窗口, 加载统计天数, 加载分离暂停偏好, 桌面卡片数据 } from '../model/桌面卡片数据存储';
 import { 平铺牌组树 } from '../model/牌组层级';
 export interface HomeDataResult {
+  tree: DeckTreeNode;
   snapshot: 主页快照;
   cardData: 桌面卡片数据 | null;
   graphs: GraphsView | null;
@@ -20,20 +22,54 @@ export interface HomeDataResult {
   hiddenIds: string[];
 }
 
-/** 读取并组装完整首页快照；页面不参与偏好/图表/桌面卡片存储协议。 */
+/** 先读取可用牌组，再独立加载统计；页面不参与偏好和桌面卡片存储协议。 */
 export class HomeDataRepository {
   private readonly decks: 牌组服务 = new 牌组服务();
   private readonly stats: 统计服务 = new 统计服务();
   private days: number = 365;
 
   async load(filesDir: string, defaultDeckName: string): Promise<HomeDataResult> {
-    let cardData: 桌面卡片数据 | null = null;
       await 后端会话.获取实例().确保已打开(filesDir);
       // 首次启动自动开启 FSRS（用户决策：默认开启可关闭）。确保FSRS已开启一次
       // 内部有 initialized 标记，只在首次跑一次；后续用户在设置页关掉就保持关闭。
       // 放在 确保已打开 之后、拉取 tree 之前，避免与 deckTree/graphs 并发冲突。
       await 确保FSRS已开启一次();
       const tree = await this.decks.获取牌组树();
+      const allDecks: 牌组汇总[] = 平铺牌组树(tree);
+      const deckIds: string[] = allDecks.map((deck: 牌组汇总): string => deck.id);
+      const toneOverrides: Map<string, 牌组色调> = await 加载牌组色调映射(deckIds);
+      const displayNameOverrides: Map<string, string> = await 加载牌组别名映射(deckIds);
+      // 收集所有 parent id（含顶层 ''）：用于按 parent 加载子牌组顺序覆盖
+      const parentIds: string[] = allDecks
+        .map((deck: 牌组汇总): string => deck.parentId)
+        .filter((pid: string, index: number, self: string[]): boolean => self.indexOf(pid) === index);
+      // allDecks 不含 root，但顶层 parent='' 总要尝试加载（若用户拖过顶层）
+      if (parentIds.indexOf('') < 0) {
+        parentIds.push('');
+      }
+      const orderOverrides: Map<string, string[]> = await 加载全部牌组顺序(parentIds);
+      const backgroundImageOverrides: Map<string, string> = await 加载牌组背景图映射(deckIds);
+      // 加载用户隐藏的 deck id 集合，可见牌组行 会过滤掉这些 id
+      const hiddenIds: string[] = await 加载已隐藏牌组ID列表();
+
+      const snapshot: 主页快照 =
+        构建主页快照(tree, null, new Date(), toneOverrides, displayNameOverrides,
+          orderOverrides, backgroundImageOverrides);
+      // 默认牌组（id=1）名跟随系统语言：数据库里存的是 "Default"，
+      // 中文环境下显示"默认牌组"，英文环境显示"Default"。用户自定义别名优先。
+      const 默认牌组本地化名: string = defaultDeckName;
+      for (const deck of snapshot.decks) {
+        if (deck.id === '1' && deck.displayName === '') {
+          deck.name = 默认牌组本地化名;
+        }
+      }
+      return { tree: tree, snapshot: snapshot, cardData: null, graphs: null, days: this.days, hiddenIds: hiddenIds };
+  }
+
+  /** 统计与桌面卡片推送由首页的独立队列持有，不延迟牌组可用和学习导航。 */
+  async loadStatistics(data: HomeDataResult): Promise<HomeDataResult> {
+    const tree: DeckTreeNode = data.tree;
+    let cardData: 桌面卡片数据 | null = null;
       const graphs: GraphsView | null = await this.readGraphs();
       hilog.info(0x4342, 'jidecards', `首页: 静默加载图表结果 graphs=${graphs === null ? 'null' : '非null'}`);
       // 桌面卡片数据桥接：graphs 非空时提取 8 页数据存 filesDir，供 FormExtensionAbility 读取
@@ -59,35 +95,9 @@ export class HomeDataRepository {
           hilog.error(0x4342, 'jidecards', `首页: 保存卡片数据失败 ${e}`);
         }
       }
-      const allDecks: 牌组汇总[] = 平铺牌组树(tree);
-      const deckIds: string[] = allDecks.map((deck: 牌组汇总): string => deck.id);
-      const toneOverrides: Map<string, 牌组色调> = await 加载牌组色调映射(deckIds);
-      const displayNameOverrides: Map<string, string> = await 加载牌组别名映射(deckIds);
-      // 收集所有 parent id（含顶层 ''）：用于按 parent 加载子牌组顺序覆盖
-      const parentIds: string[] = allDecks
-        .map((deck: 牌组汇总): string => deck.parentId)
-        .filter((pid: string, index: number, self: string[]): boolean => self.indexOf(pid) === index);
-      // allDecks 不含 root，但顶层 parent='' 总要尝试加载（若用户拖过顶层）
-      if (parentIds.indexOf('') < 0) {
-        parentIds.push('');
-      }
-      const orderOverrides: Map<string, string[]> = await 加载全部牌组顺序(parentIds);
-      const backgroundImageOverrides: Map<string, string> = await 加载牌组背景图映射(deckIds);
-      // 加载用户隐藏的 deck id 集合，可见牌组行 会过滤掉这些 id
-      const hiddenIds: string[] = await 加载已隐藏牌组ID列表();
-
-      const snapshot: 主页快照 =
-        构建主页快照(tree, graphs, new Date(), toneOverrides, displayNameOverrides,
-          orderOverrides, backgroundImageOverrides);
-      // 默认牌组（id=1）名跟随系统语言：数据库里存的是 "Default"，
-      // 中文环境下显示"默认牌组"，英文环境显示"Default"。用户自定义别名优先。
-      const 默认牌组本地化名: string = defaultDeckName;
-      for (const deck of snapshot.decks) {
-        if (deck.id === '1' && deck.displayName === '') {
-          deck.name = 默认牌组本地化名;
-        }
-      }
-      return { snapshot: snapshot, cardData: cardData, graphs: graphs, days: this.days, hiddenIds: hiddenIds };
+    const summary: 主页快照 = 构建主页快照(tree, graphs);
+    const snapshot: 主页快照 = { decks: data.snapshot.decks, today: summary.today, memory: summary.memory };
+    return { tree: tree, snapshot: snapshot, cardData: cardData, graphs: graphs, days: this.days, hiddenIds: data.hiddenIds };
   }
 
   private async readGraphs(): Promise<GraphsView | null> {

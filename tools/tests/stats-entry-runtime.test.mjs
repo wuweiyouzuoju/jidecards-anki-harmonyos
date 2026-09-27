@@ -63,7 +63,7 @@ test('home retains full graphs with their range and opens statistics immediately
     暂停主页官方公告检查() {}, 页面栈: { pushPath: value => { navigated = value; } }
   });
   const { repository, state } = homeDataHarness(); state.graph = graph; graph.today = { answerCount: 0 };
-  const data = await repository.load('/', 'Default');
+  const data = await repository.loadStatistics(await repository.load('/', 'Default'));
   home.statsSnapshot = { graphs: data.graphs, days: data.days };
   assert.equal(data.graphs, graph);
   home.打开统计页();
@@ -71,7 +71,7 @@ test('home retains full graphs with their range and opens statistics immediately
   assert.equal(cancelled, 1, 'statistics cancels the deferred sync navigation');
   assert.deepEqual(navigated.param, { graphs: graph, days: 0 });
   state.failGraphs = true;
-  assert.equal((await repository.load('/', 'Default')).graphs, null);
+  assert.equal((await repository.loadStatistics(await repository.load('/', 'Default'))).graphs, null);
   assert.equal(home.statsSnapshot.graphs, graph);
   assert.match(read('首页'), /if \(data.graphs !== null\) this.statsSnapshot/);
   assert.match(read('首页'), /initialSnapshot: param as 统计页参数/);

@@ -88,6 +88,8 @@ export class SyncActivity {
     return this.owner !== null;
   }
 
+  isCollectionBusy(): boolean { return this.collectionBusy; }
+
   /** 防止两个面板同时进入 Rust 同步流程。 */
   acquire(owner: Object, backgroundHandler: (() => void) | null = null): boolean {
     if (this.owner !== null) return false;

@@ -28,7 +28,7 @@ export function panelHarness({ required = 1, media = false, automatic = true, fs
   class BackendError extends Error {}
   const gate = new SyncActivity();
   const Panel = componentMethods(read('components/同步面板.ets'), ['aboutToAppear', 'aboutToDisappear', '启动同步', 'runSync', 'runFullSync', 'finishDisposedSync',
-    'notifySyncResult', 'notifyCollectionResult', 'captureFsrsAfterSync', '处理同步错误', '完成中止', '冲突确认', '启动媒体阶段', '开始媒体轮询', '清理轮询定时器', '是否允许关闭', 'publishSyncState', 'setSyncPhase', 'dismissPresentation', 'syncForegroundChanged', 'requestBackgroundTime', 'releaseSuspendDelay', 'publishStatus', 'showDetails', 'requestStudyYield', 'sendAbort', 'stopAbortTimer', 'syncCollectionWithPriority'], {
+    'notifySyncResult', 'showCompletionToast', 'notifyCollectionResult', 'captureFsrsAfterSync', '处理同步错误', '完成中止', '冲突确认', '启动媒体阶段', '开始媒体轮询', '清理轮询定时器', '是否允许关闭', 'publishSyncState', 'setSyncPhase', 'dismissPresentation', 'syncForegroundChanged', 'requestBackgroundTime', 'releaseSuspendDelay', 'publishStatus', 'showDetails', 'requestStudyYield', 'sendAbort', 'stopAbortTimer', 'syncCollectionWithPriority'], {
     ...flow, syncActivity: gate, autoSyncScheduler: new AutoSyncScheduler(), 后端错误: BackendError,
     加载FSRS开启状态: async () => state.fsrsValues[state.fsrsReads++],
     notifyFsrsStateChanged: () => { state.fsrsNotifications++; },

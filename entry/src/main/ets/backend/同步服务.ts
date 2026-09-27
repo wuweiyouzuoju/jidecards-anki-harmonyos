@@ -105,7 +105,7 @@ export class 同步服务 {
     );
   }
 
-  /** 后台启动媒体同步（rslib 对重复启动安全）；响应为 generic.Empty，忽略字节。 */
+  /** 显式启动媒体；Core 已启动时只监测，重复调用可能丢弃已结束任务的结果。 */
   async 同步媒体(凭证: SyncAuth): Promise<void> {
     await this.会话.调用(
       服务号.后端同步,
@@ -114,7 +114,7 @@ export class 同步服务 {
     );
   }
 
-  /** 查询媒体同步状态：active 表示进行中，progress 为后端预格式化文本。 */
+  /** 消费媒体结果：只允许任务拥有者调用；其他页面通过 SyncActivity 查询占用。 */
   async 媒体同步状态(): Promise<MediaSyncStatusResponse> {
     const 响应字节 = await this.会话.调用(
       服务号.后端同步,

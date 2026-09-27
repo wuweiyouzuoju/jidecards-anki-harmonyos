@@ -945,6 +945,8 @@
     { "name": "sync_syncing_media", "value": "正在同步媒体文件…" },
     { "name": "sync_abort", "value": "中止" },
     { "name": "sync_success", "value": "同步完成" },
+    { "name": "sync_collection_complete", "value": "卡片数据已同步，可以开始学习" },
+    { "name": "sync_media_complete", "value": "媒体同步完成" },
     { "name": "close", "value": "关闭" },
     { "name": "sync_aborted", "value": "同步已中止" },
     { "name": "sync_error_auth", "value": "用户名或密码错误" },

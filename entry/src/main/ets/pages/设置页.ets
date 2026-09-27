@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { DataTransferSession, DataTransferState, initialTransferState } from '../model/home/DataTransferSession';
 import { AnkiDataTransfer } from '../backend/AnkiDataTransfer';
+import { syncActivity } from '../model/SyncSettings';
+import { showToastSafely } from '../utils/UiFeedback';
 
 import { initializeRedemption } from '../utils/RedemptionStore';
 import { UNLOCKED_CONTENTS_KEY, isThemeAvailable } from '../model/ThemeCatalog';
@@ -38,6 +40,10 @@ export struct 设置页 {
     (): Promise<void> => this.加载牌组列表(),
     (): void => this.显示提示($r('app.string.transfer_done')));
   private 打开数据迁移(mode: 数据迁移模式, deckId: number, allowDeckSelection: boolean): void {
+    if (syncActivity.isCollectionBusy()) {
+      this.显示提示($r('app.string.sync_wait_operation'));
+      return;
+    }
     this.transferSession.open(mode, deckId, allowDeckSelection);
   }
   @State private activeSection: string = '';
@@ -93,7 +99,7 @@ export struct 设置页 {
 
   private 显示提示(message: Resource): void {
     try {
-      this.getUIContext().getPromptAction().showToast({ message: message });
+      showToastSafely(this.getUIContext(), { message: message });
     } catch (error) {
       // 页面销毁或系统提示服务不可用时，不影响主界面的连续操作。
     }
@@ -130,6 +136,8 @@ export struct 设置页 {
 
   private async 加载牌组列表(): Promise<void> {
     try {
+      await syncActivity.waitForCollection();
+      if (this.disposed) return;
       const context: common.UIAbilityContext | null = this.取能力上下文();
       if (context === null) return;
       await 后端会话.获取实例().确保已打开(context.filesDir);
@@ -149,7 +157,7 @@ export struct 设置页 {
     try {
       const hiddenIds: string[] = await 加载已隐藏牌组ID列表();
       if (hiddenIds.length === 0) {
-        this.getUIContext().getPromptAction().showToast({
+        showToastSafely(this.getUIContext(), {
           message: this.getUIContext().getHostContext()!.resourceManager.getStringSync($r('app.string.hidden_decks_empty').id)
         });
         return;

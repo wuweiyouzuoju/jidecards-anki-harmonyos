@@ -55,7 +55,7 @@ test('home refresh preserves ready/empty presentation while initial load stays l
   for (const initial of ['ready', 'empty', 'loading', 'error']) {
     let reject;
     const pending = new Promise((_, no) => { reject = no; });
-    const page = Object.assign(new Page(), { 加载状态: initial, homeDisposed: false,
+    const page = Object.assign(new Page(), { 加载状态: initial, homeDisposed: false, homeDataGeneration: 0,
       取能力上下文: () => ({ filesDir: '/files', resourceManager: { getStringSync: () => 'Default' } }),
       homeData: { load: () => pending }, 显示提示: () => {} });
     const refresh = page.执行加载主页数据();
