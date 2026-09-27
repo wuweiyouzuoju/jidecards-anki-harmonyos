@@ -1,4 +1,3 @@
-import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { resourceText, showToastSafely } from '../utils/UiFeedback';
 import { DataTransferSession, DataTransferState, initialTransferState } from '../model/home/DataTransferSession';
@@ -60,6 +59,8 @@ import { 设置页 } from './设置页';
 import { 设置页参数, 浏览页参数 } from '../model/navigation/PageParams';
 import { 主页摘要分页 } from '../components/home/主页摘要分页';
 import { 主页牌组列表 } from '../components/home/主页牌组列表';
+import { DECK_LIST_NARROW_KEY, DECK_WIDTH_HINT_HANDLED_KEY } from '../model/DeckListAppearance';
+import { saveDeckListNarrow, completeDeckWidthHint } from '../utils/DeckListAppearanceStore';
 import { DeckOptionsFeature } from '../components/home/DeckOptionsFeature';
 import { DataTransferFeature } from '../components/home/DataTransferFeature';
 import { CreateDeckFeature } from '../components/home/CreateDeckFeature';
@@ -125,6 +126,10 @@ interface 牌组详情页参数 {
 @Component
 struct 首页 {
   @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
+  @StorageProp(DECK_WIDTH_HINT_HANDLED_KEY) private deckWidthHintHandled: boolean = false;
+  @State @Watch('homeActivityChanged') private deckListOverflow: boolean = false;
+  private deckWidthHintShown: boolean = false;
+  private deckWidthHintSaving: boolean = false;
   @State @Watch('homeActivityChanged') private transfer: DataTransferState = initialTransferState();
   private readonly transferSession: DataTransferSession = new DataTransferSession(new AnkiDataTransfer(),
     (state: DataTransferState): void => { this.transfer = state; },
@@ -553,9 +558,62 @@ struct 首页 {
           });
         } else this.请求主页官方公告检查();
       },
+      presentLayoutSuggestion: (): boolean => this.presentDeckWidthHint(),
       scheduleSync: (): void => this.scheduleAutoSyncCheck()
     };
     this.homeWork.wake(host);
+  }
+
+  /** 由首页协调器在其他提示结束后调用；每台设备只处理一次此建议。 */
+  private presentDeckWidthHint(): boolean {
+    if (!this.autoSyncStartupReady || this.加载状态 !== 'ready' || !this.deckListOverflow ||
+      this.narrowDeckLayout || this.deckWidthHintHandled || this.deckWidthHintShown) return false;
+    this.deckWidthHintShown = true;
+    this.nativeDialogOpen = true;
+    try {
+      this.getUIContext().showAlertDialog({
+        title: $r('app.string.deck_width_hint_title'),
+        message: $r('app.string.deck_width_hint_message'),
+        alignment: DialogAlignment.Center,
+        autoCancel: false,
+        cancel: (): void => { this.finishDeckWidthHint(false); },
+        primaryButton: {
+          value: $r('app.string.deck_width_hint_keep'),
+          action: (): void => { this.finishDeckWidthHint(false); }
+        },
+        secondaryButton: {
+          value: $r('app.string.deck_width_hint_confirm'),
+          action: (): void => { this.finishDeckWidthHint(true); }
+        }
+      });
+      return true;
+    } catch (error) {
+      this.nativeDialogOpen = false;
+      showToastSafely(this.getUIContext(), { message: $r('app.string.deck_width_hint_open_failed') });
+      return false;
+    }
+  }
+
+  private async finishDeckWidthHint(useNarrow: boolean): Promise<void> {
+    if (this.deckWidthHintSaving || !this.nativeDialogOpen || this.homeDisposed) return;
+    this.deckWidthHintSaving = true;
+    try {
+      if (useNarrow) {
+        try {
+          await saveDeckListNarrow(true);
+        } catch (error) {
+          if (!this.homeDisposed) this.显示提示($r('app.string.deck_width_save_failed'));
+        }
+      }
+      try {
+        await completeDeckWidthHint();
+      } catch (error) {
+        if (!this.homeDisposed) this.显示提示($r('app.string.deck_width_hint_save_failed'));
+      }
+    } finally {
+      this.deckWidthHintSaving = false;
+      if (!this.homeDisposed) this.nativeDialogOpen = false;
+    }
   }
 
   private startupHost(): HomeStartupHost {
@@ -650,6 +708,7 @@ struct 首页 {
 
   private async 继续首次弹窗序列(): Promise<void> {
     await this.startupSequence.continue(this.startupHost());
+    this.homeActivityChanged();
   }
 
   /** 同步本机下载配额；读取失败按未用尽处理，避免用户平白丢失菜单入口。 */
@@ -694,6 +753,7 @@ struct 首页 {
   // 只有用户确认才记录已读，避免表单占用或进程退出提前消耗入门机会。
   private async 显示欢迎弹窗一次(): Promise<void> {
     await this.startupSequence.welcome(this.startupHost());
+    this.homeActivityChanged();
   }
 
   /** 用户确认后才记录入门已读，失败提示但不阻止进入应用。 */
@@ -1878,6 +1938,7 @@ struct 首页 {
               })
             }
             主页牌组列表({
+              onOverflowChange: (overflow: boolean): void => { this.deckListOverflow = overflow; },
               牌组数据源: this.牌组数据源,
               牌组列表滚动器: this.牌组列表滚动器,
               展开的牌组ID集合: this.展开的牌组ID集合,

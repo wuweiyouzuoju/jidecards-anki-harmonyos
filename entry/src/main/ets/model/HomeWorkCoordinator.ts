@@ -19,6 +19,7 @@ export interface HomeWorkHost {
   startManualSync: () => void;
   presentAnnouncement: () => boolean;
   continueStartup: () => void;
+  presentLayoutSuggestion: () => boolean;
   scheduleSync: () => void;
 }
 
@@ -69,6 +70,10 @@ export class HomeWorkCoordinator {
     }
     if (host.presentAnnouncement() || this.disposed) return;
     host.continueStartup();
+    if (this.disposed) return;
+    const afterStartup: HomeActivityState = host.activity();
+    if (afterStartup.collectionReady && !afterStartup.startupChecking &&
+      canPresentHomePrompt(afterStartup) && host.presentLayoutSuggestion()) return;
     if (!this.disposed) host.scheduleSync();
   }
 

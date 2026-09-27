@@ -23,7 +23,8 @@ function harness() {
     importDeck: async uri => { events.push(uri); }, importFailed: e => events.push(e.message),
     flushNavigation: () => events.push('navigation'), manualSyncPending: () => false,
     startManualSync: () => events.push('manual'), presentAnnouncement: () => false,
-    continueStartup: () => events.push('startup'), scheduleSync: () => events.push('sync') };
+    continueStartup: () => events.push('startup'), presentLayoutSuggestion: () => false,
+    scheduleSync: () => events.push('sync') };
   const tick = () => { const pending = [...timers.values()]; timers.clear(); for (const fn of pending) fn(); };
   return { queue, coordinator, host, activity, events, timers, tick };
 }
@@ -108,6 +109,33 @@ test('disposal cancels scheduled work and rejects all later wakes', () => {
   const h = harness(); h.coordinator.wake(h.host);
   h.coordinator.dispose(); h.tick(); h.coordinator.wake(h.host);
   assert.deepEqual(h.events, []); assert.equal(h.timers.size, 0);
+});
+
+test('layout suggestion waits for startup and activity, then owns the prompt slot', () => {
+  for (const blocker of ['startupChecking', 'collectionBusy', 'dialogOpen', 'interactionBusy']) {
+    const h = harness();
+    h.host.presentLayoutSuggestion = () => { h.events.push('layout'); return true; };
+    h.activity[blocker] = true;
+    h.coordinator.wake(h.host); h.tick();
+    assert.ok(!h.events.includes('layout'), blocker);
+    h.activity[blocker] = false; h.events.length = 0;
+    h.coordinator.wake(h.host); h.tick();
+    assert.deepEqual(h.events, ['navigation', 'startup', 'layout']);
+  }
+  const h = harness();
+  h.host.continueStartup = () => { h.activity.dialogOpen = true; };
+  h.host.presentLayoutSuggestion = () => { throw Error('must not stack on startup dialog'); };
+  h.coordinator.wake(h.host); h.tick();
+});
+
+test('manual sync and announcements outrank layout suggestions', () => {
+  const h = harness();
+  h.host.presentLayoutSuggestion = () => { throw Error('must not interrupt'); };
+  h.host.manualSyncPending = () => true;
+  h.coordinator.wake(h.host); h.tick();
+  h.host.manualSyncPending = () => false;
+  h.host.presentAnnouncement = () => true;
+  h.coordinator.wake(h.host); h.tick();
 });
 
 function startupHarness() {

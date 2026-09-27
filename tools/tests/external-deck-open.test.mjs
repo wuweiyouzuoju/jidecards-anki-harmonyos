@@ -60,7 +60,7 @@ function harness(failure = false) {
     coordinator.wake({ activity: () => activity, hasDeferredNavigation: () => page.pendingSyncAction !== null,
       importDeck: uri => session.importUri(uri), importFailed: e => { throw e; },
       flushNavigation() {}, manualSyncPending: () => false, startManualSync() {},
-      presentAnnouncement: () => false, continueStartup() {}, scheduleSync() {} });
+      presentAnnouncement: () => false, continueStartup() {}, presentLayoutSuggestion: () => false, scheduleSync() {} });
     while (timers.length) timers.shift()();
     return true;
   };
