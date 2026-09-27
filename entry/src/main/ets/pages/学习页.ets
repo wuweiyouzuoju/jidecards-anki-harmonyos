@@ -1923,9 +1923,9 @@ export struct 学习页 {
     .padding({
       left: 应用尺寸.页面内边距_水平,
       right: 应用尺寸.页面内边距_水平,
-      top: 应用尺寸.间距_8,
+      top: 应用尺寸.操作区顶部间距(this.narrowDeckLayout),
       // 抬高避让手势导航条（AppGallery 导航栏适配要求）
-      bottom: 应用尺寸.页面内边距_水平 + this.导航条高度
+      bottom: 应用尺寸.操作区底部间距(this.narrowDeckLayout, this.导航条高度)
     })
     .backgroundColor(this.页面底色微染值)
   }

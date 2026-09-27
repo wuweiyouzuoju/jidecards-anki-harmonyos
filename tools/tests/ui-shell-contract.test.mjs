@@ -62,6 +62,32 @@ test('peer cards share one gap and reminder scrolling does not fix the content h
   assert.doesNotMatch(reminder.slice(reminder.indexOf('private 提醒项卡片'), reminder.indexOf('private 空状态')), /\.margin\(\{ bottom:/);
 });
 
+test('fixed action bars and browser result boundaries use the shared responsive spacing', () => {
+  const detail = read('entry/src/main/ets/components/牌组详情面板.ets');
+  const study = read('entry/src/main/ets/pages/学习页.ets');
+  const browser = read('entry/src/main/ets/pages/浏览页.ets');
+  const table = read('entry/src/main/ets/components/browser/卡片表格.ets');
+  assert.match(detail, /\.margin\(\{ bottom: 0 \}\)/,
+    'detail card must not add a second gap below the card');
+  assert.match(detail, /top: 应用尺寸\.操作区顶部间距\(this\.narrowDeckLayout\)/);
+  assert.match(detail, /bottom: 应用尺寸\.操作区底部间距\(this\.narrowDeckLayout, this\.navigationBottomInset\)/);
+  assert.match(study, /top: 应用尺寸\.操作区顶部间距\(this\.narrowDeckLayout\)/);
+  assert.match(study, /bottom: 应用尺寸\.操作区底部间距\(this\.narrowDeckLayout, this\.导航条高度\)/);
+  assert.match(browser, /bottom: 应用尺寸\.页面分组间距\(this\.narrowDeckLayout\) \}\)/,
+    'search and filter boundaries must use the responsive section gap');
+  assert.match(browser, /bottom: 0 \}\)/,
+    'filter row must not add a second boundary gap');
+  assert.match(table, /contentStartOffset\(应用尺寸\.页面分组间距\(this\.narrowDeckLayout\)\)/,
+    'the first result card must use the same section gap as peer cards');
+  for (const narrow of [false, true]) {
+    for (const nav of [0, 24]) {
+      const base = 应用尺寸.页面分组间距(narrow);
+      assert.equal(应用尺寸.操作区顶部间距(narrow), base);
+      assert.equal(应用尺寸.操作区底部间距(narrow, nav), 应用尺寸.页面底部间距(narrow) + nav);
+    }
+  }
+});
+
 function projectUrl(relativePath) {
   return new URL(`../../${relativePath}`, import.meta.url);
 }

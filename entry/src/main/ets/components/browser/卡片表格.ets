@@ -277,7 +277,7 @@ export struct 卡片表格 {
         .layoutWeight(1)
         .edgeEffect(EdgeEffect.Spring)
         // 内容末尾偏移导航条高度：滚到底时最后一行完整可见、可点（AppGallery 导航栏适配要求）
-        .contentStartOffset(应用尺寸.间距_8)
+        .contentStartOffset(应用尺寸.页面分组间距(this.narrowDeckLayout))
         .contentEndOffset(this.导航条高度 + 应用尺寸.页面分组间距(this.narrowDeckLayout))
         .onReachEnd((): void => {
           if (!this.加载中 && this.已加载行数 < this.结果总数) {

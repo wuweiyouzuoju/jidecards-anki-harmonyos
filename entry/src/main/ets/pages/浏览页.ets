@@ -1262,7 +1262,8 @@ export struct 浏览页 {
         .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
         .layoutWeight(3).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).textAlign(TextAlign.End)
     }.width('100%')
-      .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平, bottom: 6 })
+      // 首张结果卡由列表的 contentStartOffset 贡献唯一的区块间距。
+      .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平, bottom: 0 })
   }
 
   @Builder
@@ -1277,7 +1278,7 @@ export struct 浏览页 {
       })
         .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平,
           top: 应用尺寸.页面内容顶部间距(this.narrowDeckLayout),
-          bottom: 应用尺寸.间距_8 })
+          bottom: 应用尺寸.页面分组间距(this.narrowDeckLayout) })
 
       this.browserControls()
 

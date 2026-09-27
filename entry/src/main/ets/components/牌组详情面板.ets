@@ -338,7 +338,8 @@ export struct 牌组详情面板 {
       .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
       .borderRadius(应用尺寸.圆角_卡片)
       .clip(true)
-      .margin({ bottom: 应用尺寸.间距_8 })
+      // 操作区自己贡献唯一的区块间距，避免卡片 margin 与按钮 padding 叠加。
+      .margin({ bottom: 0 })
       ForEach(this.主页快照数据.decks, (deck: 牌组汇总) => {
         if (deck.id === this.选中牌组Id) {
           Row() {
@@ -349,8 +350,8 @@ export struct 牌组详情面板 {
           .width('100%')
           .flexShrink(0)
           .padding({
-            top: 应用尺寸.间距_8,
-            bottom: 应用尺寸.页面内边距_水平 + this.navigationBottomInset
+            top: 应用尺寸.操作区顶部间距(this.narrowDeckLayout),
+            bottom: 应用尺寸.操作区底部间距(this.narrowDeckLayout, this.navigationBottomInset)
           })
         }
       }, (deck: 牌组汇总): string => deck.id)

@@ -115,6 +115,16 @@ export class 应用尺寸 {
   static 页面底部间距(窄版: boolean): number {
     return 窄版 ? 应用尺寸.narrowPageBottomInset : 应用尺寸.pageBottomInset;
   }
+
+  /** 页面固定操作区与上方内容之间的公共区块间距。 */
+  static 操作区顶部间距(窄版: boolean): number {
+    return 应用尺寸.页面分组间距(窄版);
+  }
+
+  /** 页面固定操作区的底部留白，导航条存在时在其外侧继续避让。 */
+  static 操作区底部间距(窄版: boolean, 导航条高度: number): number {
+    return 应用尺寸.页面底部间距(窄版) + Math.max(0, 导航条高度);
+  }
   static readonly 紧凑控件高度: number = 36;
   static readonly searchFieldHeight: number = 44;
   static readonly searchFieldRadius: number = 22;
