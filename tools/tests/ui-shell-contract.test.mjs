@@ -73,6 +73,8 @@ test('fixed action bars and browser result boundaries use the shared responsive 
   assert.match(detail, /bottom: 应用尺寸\.操作区底部间距\(this\.narrowDeckLayout, this\.navigationBottomInset\)/);
   assert.match(study, /top: 应用尺寸\.操作区顶部间距\(this\.narrowDeckLayout\)/);
   assert.match(study, /bottom: 应用尺寸\.操作区底部间距\(this\.narrowDeckLayout, this\.导航条高度\)/);
+  assert.match(study, /bottom: this\.学习布局模式值 === 'bottom' \? 0 : 应用尺寸\.页面分组间距\(this\.narrowDeckLayout\)/,
+    'bottom study mode must not double the card-to-action gap');
   assert.match(browser, /bottom: 应用尺寸\.页面分组间距\(this\.narrowDeckLayout\) \}\)/,
     'search and filter boundaries must use the responsive section gap');
   assert.match(browser, /bottom: 0 \}\)/,

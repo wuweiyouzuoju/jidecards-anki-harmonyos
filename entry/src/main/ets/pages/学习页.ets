@@ -1859,7 +1859,8 @@ export struct 学习页 {
       top: 应用尺寸.页面内容顶部间距(this.narrowDeckLayout),
       left: 应用尺寸.页面内边距_水平,
       right: 应用尺寸.页面内边距_水平,
-      bottom: 应用尺寸.间距_8
+      // bottom 模式的答案条自己贡献唯一的上方区块间距，避免卡片区再叠一层。
+      bottom: this.学习布局模式值 === 'bottom' ? 0 : 应用尺寸.页面分组间距(this.narrowDeckLayout)
     })
     // 幻彩时 PAGE_SURFACE_KEY 为透明，让卡片四周显示已有根背景。
     .backgroundColor(this.页面底色微染值)
