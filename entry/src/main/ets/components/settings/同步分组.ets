@@ -2,6 +2,8 @@
 import { resourceText, showToastSafely } from '../../utils/UiFeedback';
 import { ThemeTextSpans } from '../common/ThemeText';
 import { DialogHeader } from '../common/DialogHeader';
+import { SettingsToggleRow } from '../common/SettingsToggleRow';
+import { DisclosureChevron } from '../common/DisclosureChevron';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
 import { common } from '@kit.AbilityKit';
@@ -91,12 +93,13 @@ export struct 同步分组 {
   @State private savedServer: string = '';
   @State private serverLoaded: boolean = false;
   @State private settingsSaving: boolean = false;
-  @State private autoSyncEnabled: boolean = true;
+  @State private autoSyncEnabled: boolean = false;
   @State private serverError: string = '';
 
   // ---- 内部（非 @State，不参与 UI 刷新） ----
   /** 登录成功后持有的会话凭证（hkey + endpoint） */
   private 鉴权凭证: SyncAuth | null = null;
+  private disposed: boolean = false;
 
   private readonly 同步服务实例: 同步服务 = new 同步服务();
   /** 居中弹窗控制器：手机窗口宽度 < 600vp 时 bindSheet 只能底部弹出，改用 CustomDialog 保证居中。 */
@@ -127,6 +130,7 @@ export struct 同步分组 {
   private readonly 注册网址: string = 'https://ankiweb.net/account/signup';
 
   aboutToAppear(): void {
+    this.disposed = false;
     // 启动读取本地凭证：有 hkey 直接进 已登录（重启免登录）
     const 信息: 同步凭证信息 | null = 加载同步凭证();
     if (信息 !== null) {
@@ -152,6 +156,10 @@ export struct 同步分组 {
       this.错误文本 = this.取本地化文本($r('app.string.sync_server_load_failed'));
     }
     this.autoSyncEnabled = loadAutoSyncEnabled();
+  }
+
+  aboutToDisappear(): void {
+    this.disposed = true;
   }
 
   /** 后台媒体仍使用当前账户，完成前不接受凭证或服务器变更。 */
@@ -202,14 +210,31 @@ export struct 同步分组 {
     this.serverDialogController.close();
   }
 
-  /** 只有持久化成功才接受自动同步开关；失败可在面板内重试。 */
+  /** 开启前说明对即时学习的影响；取消或保存失败都恢复原开关。 */
   private async changeAutoSync(enabled: boolean): Promise<void> {
-    if (this.settingsSaving) return;
+    if (this.settingsSaving || this.disposed || enabled === this.autoSyncEnabled) return;
     this.settingsSaving = true;
     this.错误文本 = '';
     const previous: boolean = this.autoSyncEnabled;
     this.autoSyncEnabled = enabled;
     try {
+      if (enabled) {
+        const confirmed: boolean = await new Promise<boolean>((resolve: (value: boolean) => void): void => {
+          this.getUIContext().showAlertDialog({
+            title: $r('app.string.sync_auto_confirm_title'),
+            message: $r('app.string.sync_auto_confirm_message'),
+            alignment: DialogAlignment.Center,
+            autoCancel: false,
+            primaryButton: { value: $r('app.string.cancel'), action: (): void => { resolve(false); } },
+            secondaryButton: { value: $r('app.string.sync_auto_confirm_enable'), action: (): void => { resolve(true); } },
+            cancel: (): void => { resolve(false); }
+          });
+        });
+        if (!confirmed || this.disposed) {
+          this.autoSyncEnabled = previous;
+          return;
+        }
+      }
       await saveAutoSyncEnabled(enabled);
     } catch (error) {
       this.autoSyncEnabled = previous;
@@ -480,35 +505,35 @@ export struct 同步分组 {
   // ========================================================
   @Builder
   private 已登录内容(色板: 设置面板色板) {
-    Text(this.账号名)
-      .fontSize(15)
-      .fontColor(色板.主文字)
-      .width('100%')
-      .maxLines(1)
-      .textOverflow({ overflow: TextOverflow.Ellipsis })
-    // 媒体同步开关（对齐 Anki 桌面端 Preferences → Sync → "Sync media"）。
-    // 关闭后 syncCollection 传 syncMedia=false，跳过媒体阶段。
-    Row() {
-      Column({ space: 2 }) {
-        Text($r('app.string.settings_sync_media_toggle'))
-          .fontSize(15)
-          .fontColor(色板.主文字)
-        Text($r('app.string.settings_sync_media_toggle_hint'))
-          .fontSize(12)
-          .fontColor(色板.三级文字)
-      }
-      .alignItems(HorizontalAlign.Start)
-      .layoutWeight(1)
-
-      Toggle({ type: ToggleType.Switch, isOn: this.媒体同步开启 })
-        .selectedColor(this.解析主色按钮背景())
-        .onChange((值: boolean): void => {
-          this.媒体同步开启 = 值;
-          设置媒体同步开关(值);
-        })
+    Column({ space: 应用尺寸.间距_4 }) {
+      Text($r('app.string.sync_current_account'))
+        .fontSize(应用尺寸.字号_正文_小)
+        .fontColor(色板.次文字)
+      Text(this.账号名)
+        .fontSize(应用尺寸.字号_正文)
+        .fontColor(色板.主文字)
+        .width('100%')
+        .wordBreak(WordBreak.BREAK_ALL)
     }
     .width('100%')
-    .padding({ top: 4, bottom: 4 })
+    .alignItems(HorizontalAlign.Start)
+    .padding({ top: 应用尺寸.间距_4, bottom: 应用尺寸.间距_16 })
+    Divider().color(色板.分隔线)
+    this.autoSyncSetting()
+    // 媒体同步开关（对齐 Anki 桌面端 Preferences → Sync → "Sync media"）。
+    // 关闭后 syncCollection 传 syncMedia=false，跳过媒体阶段。
+    SettingsToggleRow({
+      title: $r('app.string.settings_sync_media_toggle'),
+      hint: $r('app.string.settings_sync_media_toggle_hint'),
+      isOn: this.媒体同步开启,
+      isDark: this.是否深色,
+      tint: this.解析主色按钮背景(),
+      onChange: (value: boolean): void => {
+        this.媒体同步开启 = value;
+        设置媒体同步开关(value);
+      }
+    })
+    Divider().color(色板.分隔线).margin({ bottom: 应用尺寸.间距_16 })
     Row({ space: 8 }) {
       Button($r('app.string.sync_backup_first'))
         .layoutWeight(1)
@@ -545,6 +570,7 @@ export struct 同步分组 {
         })
     }
     .width('100%')
+    .margin({ bottom: 应用尺寸.间距_12 })
     if (this.错误文本 !== '') {
       Text(this.错误文本)
         .fontSize(12)
@@ -565,28 +591,34 @@ export struct 同步分组 {
 
         打开说明回调: this.打开说明回调
       }) {
-        Column({ space: 10 }) {
-          this.autoSyncSetting(设置面板色板_取(this.是否深色))
+        Column() {
           if (this.当前状态 === '未登录') {
-            this.未登录内容(设置面板色板_取(this.是否深色))
+            this.autoSyncSetting()
+            Column({ space: 应用尺寸.间距_12 }) {
+              this.未登录内容(设置面板色板_取(this.是否深色))
+            }.width('100%').margin({ bottom: 应用尺寸.间距_12 })
           } else {
             this.已登录内容(设置面板色板_取(this.是否深色))
           }
-          Row() {
-            Button() {
+          Divider().color(设置面板色板_取(this.是否深色).分隔线)
+          Button() {
+            Row({ space: 应用尺寸.间距_12 }) {
               Text($r('app.string.sync_custom_server_entry'))
-                .fontSize(12)
+                .fontSize(应用尺寸.字号_正文_中)
                 .fontColor(设置面板色板_取(this.是否深色).次文字)
+                .layoutWeight(1)
+                .textAlign(TextAlign.Start)
+              DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).三级文字 })
             }
-            .type(ButtonType.Normal)
-            .backgroundColor(Color.Transparent)
-            .height(32)
-            .padding(0)
-            .enabled(!this.登录中 && !this.settingsSaving)
-            .onClick((): void => { this.openServerDialog(); })
+            .width('100%')
           }
+          .type(ButtonType.Normal)
+          .backgroundColor(Color.Transparent)
           .width('100%')
-          .justifyContent(FlexAlign.Start)
+          .constraintSize({ minHeight: 应用尺寸.按钮高度 })
+          .padding({ top: 应用尺寸.间距_8, bottom: 应用尺寸.间距_8 })
+          .enabled(!this.登录中 && !this.settingsSaving)
+          .onClick((): void => { this.openServerDialog(); })
         }
         .width('100%')
       }
@@ -597,20 +629,16 @@ export struct 同步分组 {
 
   /** 自动同步开关保留在同步分组内，不随服务器弹窗隐藏。 */
   @Builder
-  private autoSyncSetting(色板: 设置面板色板) {
-    Row({ space: 10 }) {
-      Column({ space: 2 }) {
-        Text($r('app.string.sync_auto_label')).fontSize(15).fontColor(色板.主文字)
-        Text($r('app.string.sync_auto_hint')).fontSize(12).fontColor(色板.次文字)
-      }
-      .alignItems(HorizontalAlign.Start)
-      .layoutWeight(1)
-      Toggle({ type: ToggleType.Switch, isOn: this.autoSyncEnabled })
-        .selectedColor(this.解析主色按钮背景())
-        .enabled(!this.settingsSaving && !this.登录中)
-        .onChange((enabled: boolean): void => { this.changeAutoSync(enabled); })
-    }
-    .width('100%')
+  private autoSyncSetting() {
+    SettingsToggleRow({
+      title: $r('app.string.sync_auto_label'),
+      hint: $r('app.string.sync_auto_hint'),
+      isOn: this.autoSyncEnabled,
+      isInteractive: !this.settingsSaving && !this.登录中,
+      isDark: this.是否深色,
+      tint: this.解析主色按钮背景(),
+      onChange: (enabled: boolean): void => { this.changeAutoSync(enabled); }
+    })
   }
 }
 

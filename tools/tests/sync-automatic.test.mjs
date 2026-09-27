@@ -30,7 +30,7 @@ test('automatic lifecycle and manual settings requests share the root task host'
 function homeHarness() {
   const state = { enabled: true, ready: true, auth: { hkey: 'test-key', endpoint: 'http://lan:8080/', username: 'u' }, timers: new Map(), seq: 0, navigation: [], toasts: 0 };
   const gate = new SyncActivity();
-  const Page = componentMethods(read('pages/首页.ets'), ['requestManualSync', 'updatePendingSyncStatus', 'homeActivity', 'requestAutoSync', 'scheduleAutoSyncCheck', 'isAutoSyncLocationSafe', 'stopAutoSyncTimer', 'tryAutoSync', 'syncForegroundChanged', 'onPageHide', 'onBackPress', 'deferForSync', 'flushSyncAction', 'autoSyncCollectionFinished', 'autoSyncStateChanged', '选择牌组', '开始学习', 'openCreateDeck', 'openSettings', 'openReminders', 'syncYielded', 'presentPendingSyncWarning'], {
+  const Page = componentMethods(read('pages/首页.ets'), ['requestManualSync', 'startSyncFromMenu', 'updatePendingSyncStatus', 'homeActivity', 'requestAutoSync', 'scheduleAutoSyncCheck', 'isAutoSyncLocationSafe', 'stopAutoSyncTimer', 'tryAutoSync', 'syncForegroundChanged', 'onPageHide', 'onBackPress', 'deferForSync', 'flushSyncAction', 'autoSyncCollectionFinished', 'autoSyncStateChanged', '选择牌组', '开始学习', 'openCreateDeck', 'openSettings', 'openReminders', 'syncYielded', 'presentPendingSyncWarning'], {
     decideHomeSync, canStartHomeAutoSync, externalDeckOpens: { hasPending: () => state.externalDeckPending === true },
     AppStorage: { get() {}, setOrCreate() {} },
     loadAutoSyncEnabled: () => state.enabled, 加载同步凭证: () => state.auth,
@@ -75,6 +75,37 @@ function homeHarness() {
   const tick = () => { const callbacks = [...state.timers.values()]; state.timers.clear(); callbacks.forEach(fn => fn()); };
   return { page, state, tick, gate };
 }
+
+test('home menu starts the shared manual sync even when automatic sync is disabled', () => {
+  const { page, state, tick } = homeHarness();
+  state.enabled = false;
+  page.页面栈.pop = () => {};
+  page.显示更多菜单 = true;
+  page.startSyncFromMenu();
+  assert.equal(page.显示更多菜单, false);
+  assert.equal(page.syncScheduler.isManualPending(), true);
+  tick();
+  assert.equal(page.显示同步面板, true);
+  assert.equal(page.syncAutomatic, false);
+  assert.equal(page.同步面板认证.hkey, state.auth.hkey);
+  assert.equal(page.同步面板账号名, state.auth.username);
+});
+
+test('home menu opens settings for login and reopens an existing task without a new request', () => {
+  const { page, state } = homeHarness();
+  state.auth = null;
+  page.显示更多菜单 = true;
+  page.startSyncFromMenu();
+  assert.equal(page.显示更多菜单, false);
+  assert.equal(state.navigation[0].name, 'SettingsPage');
+  assert.equal(state.toasts, 1);
+  assert.equal(page.syncScheduler.hasPending(), false);
+  page.页面栈.pop = () => {};
+  page.显示同步面板 = true;
+  page.startSyncFromMenu();
+  assert.equal(page.syncDetailsRequest, 1);
+  assert.equal(page.syncScheduler.hasPending(), false);
+});
 
 test('manual request survives settings pop before navigation finishes', () => {
   const { page, state, tick } = homeHarness();

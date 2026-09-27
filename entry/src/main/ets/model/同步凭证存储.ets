@@ -53,7 +53,9 @@ const 媒体待同步键: string = 'media_sync_pending';
 // rslib 不会挂起媒体同步任务，同步面板也不进媒体阶段。
 const 媒体同步开关键: string = 'sync_media_enabled';
 const CUSTOM_SERVER_KEY: string = 'custom_sync_server';
-const AUTO_SYNC_KEY: string = 'auto_sync_enabled';
+// 新版要求重新确认；旧 auto_sync_enabled 即使为 true 也不再读取。
+// 固定使用此键，后续启动/升级保留用户在新版重新确认的选择。
+const AUTO_SYNC_KEY: string = 'auto_sync_enabled_v2';
 
 /** 用户配置独立于服务器重定向，注销后仍可用同一地址重新登录。 */
 /** @throws {Error} 同步端点读取失败，调用方必须停止连接，不能回退到其他服务器。 */
@@ -90,11 +92,11 @@ export async function saveCustomSyncServer(input: string): Promise<string> {
   return endpoint;
 }
 
-/** 自动同步默认开启，保留用户明确保存的关闭选择。 */
+/** 安装/旧版升级默认关闭，仅保留新版重新确认的选择；存储不可用时不启动。 */
 export function loadAutoSyncEnabled(): boolean {
   const store: preferences.Preferences | null = 打开存储();
   try {
-    return store === null || store.getSync(AUTO_SYNC_KEY, true) === true;
+    return store !== null && store.getSync(AUTO_SYNC_KEY, false) === true;
   } catch (error) {
     hilog.warn(0x4342, 'jidecards', 'Automatic sync preference unavailable; keep sync disabled');
     return false;
@@ -106,7 +108,7 @@ export function loadAutoSyncEnabled(): boolean {
 export async function saveAutoSyncEnabled(enabled: boolean): Promise<void> {
   const store: preferences.Preferences | null = 打开存储();
   if (store === null) throw new Error('Sync preferences unavailable');
-  const previous: boolean = store.getSync(AUTO_SYNC_KEY, true) === true;
+  const previous: boolean = store.getSync(AUTO_SYNC_KEY, false) === true;
   try {
     store.putSync(AUTO_SYNC_KEY, enabled);
     await store.flush();

@@ -321,7 +321,7 @@ struct 首页 {
       },
       setStatus: (resourceKey: string | null): void => { this.设置同步状态(resourceKey); },
       notifyWait: (): void => { this.显示提示($r('app.string.sync_collection_wait')); },
-      popPage: (): void => { this.页面栈.pop(); },
+      popPage: (): void => { if (this.页面栈.size() > 0) this.页面栈.pop(); },
       requestPanelDetails: (): void => { this.syncDetailsRequest++; },
       openPanel: (auth: SyncAuth, automatic: boolean, username: string): void => {
         this.同步面板认证 = auth;
@@ -455,9 +455,19 @@ struct 首页 {
     return this.syncController.defer(action, study);
   }
 
-  /** 设置页仅提交意图并返回首页，由根宿主执行，页面销毁不影响传输。 */
+  /** 首页和设置页共用手动同步意图，由根宿主执行。 */
   private requestManualSync(): void {
     this.syncController.requestManual();
+  }
+
+  private startSyncFromMenu(): void {
+    this.显示更多菜单 = false;
+    if (!this.显示同步面板 && 加载同步凭证() === null) {
+      this.openSettings();
+      this.显示提示($r('app.string.sync_login_required'));
+      return;
+    }
+    this.requestManualSync();
   }
 
   /** 排队提示反映实际阻挡原因，避免把所有状态都称为“空闲”。 */
@@ -1995,9 +2005,10 @@ struct 首页 {
       })
     }
 
-    // 更多下拉菜单：设置/浏览/统计/提醒 四项收纳
+    // 更多下拉菜单：手动同步和页面入口共用现有菜单样式。
     if (this.显示更多菜单) {
       主页更多面板({
+        onSync: (): void => { this.startSyncFromMenu(); },
         onIntro: (): void => {
           this.显示更多菜单 = false;
           this.显示欢迎弹窗 = true;
