@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { showToastSafely } from './UiFeedback';
 
 // ========================================================
 // @名称 应用内好评入口（commentManager + DeepLink 降级）
@@ -124,7 +125,7 @@ export function 跳转应用市场详情页(上下文: common.UIAbilityContext, 
 async function 显示Toast(上下文: common.UIAbilityContext, 文案: Resource): Promise<void> {
   try {
     const 主窗口: window.Window = await window.getLastWindow(上下文);
-    主窗口.getUIContext().getPromptAction().showToast({
+    showToastSafely(主窗口.getUIContext(), {
       message: 文案,
       duration: 3000
     });

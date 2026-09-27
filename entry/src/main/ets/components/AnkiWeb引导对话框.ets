@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { ThemeTextSpans } from './common/ThemeText';
+import { showToastSafely } from '../utils/UiFeedback';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
 import { DialogHeader } from './common/DialogHeader';
@@ -69,7 +70,7 @@ export struct AnkiWeb引导对话框 {
           pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, this.网址);
         const 系统剪贴板: pasteboard.SystemPasteboard = pasteboard.getSystemPasteboard();
         await 系统剪贴板.setData(剪贴数据);
-        this.getUIContext().getPromptAction().showToast({
+        showToastSafely(this.getUIContext(), {
           message: $r('app.string.about_ankiweb_open_failed')
         });
       } catch (复制错误) {

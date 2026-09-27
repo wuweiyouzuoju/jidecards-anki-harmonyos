@@ -38,6 +38,10 @@ export function namedResourceText(context: UIContext, name: string): string {
 /** Toast 是尽力展示的反馈，不得把已完成的数据写入变成失败或制造未处理拒绝。 */
 export function showToastSafely(context: UIContext, options: promptAction.ShowToastOptions): void {
   try {
+    // 短提示统一不带句末句号，省略号和正文中的标点保持原样。
+    const message: string = typeof options.message === 'string'
+      ? options.message : resourceText(context, options.message);
+    options.message = message.replace(/。+\s*$/, '').replace(/([^\.])\.\s*$/, '$1');
     context.getPromptAction().showToast(options);
   } catch (error) {
     hilog.warn(0x4342, 'jidecards', 'Toast unavailable; operation result is unchanged');

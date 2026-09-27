@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadUiFeedback } from './ui-feedback-harness.mjs';
+import { readFileSync, readdirSync } from 'node:fs';
 
 test('UI resource lookup retains formatting arguments and dynamic resource names', () => {
   const api = loadUiFeedback();
@@ -41,7 +42,35 @@ test('a toast failure cannot turn a completed write into an operation failure', 
   assert.equal(failed, false);
   assert.equal(logs.length, 1);
   const options = { message: 'done', duration: 1000 };
-  api.showToastSafely({ getPromptAction: () => ({ showToast: actual => assert.equal(actual, options) }) }, options);
+  api.showToastSafely({ getPromptAction: () => ({ showToast: actual => assert.deepEqual(actual, options) }) }, options);
+});
+
+test('short toast messages omit final periods while retaining progress ellipses and message content', () => {
+  const api = loadUiFeedback();
+  let actual;
+  const context = { getPromptAction: () => ({ showToast: value => { actual = value; } }),
+    getHostContext: () => ({ resourceManager: { getStringSync: (_id, count) => `已保存 ${count} 张卡片。` } }) };
+  for (const [message, expected] of [
+    ['卡片数据已同步，可以开始学习。', '卡片数据已同步，可以开始学习'],
+    ['媒体同步完成。', '媒体同步完成'], ['Media sync complete.', 'Media sync complete'],
+    ['已保存。请返回。', '已保存。请返回'], ['Loading...', 'Loading...'],
+    ['加载中…', '加载中…'], ['Version 3.0.0', 'Version 3.0.0'],
+    ['打开 https://ankiweb.net', '打开 https://ankiweb.net'],
+    [{ id: 7, params: ['app.string.saved', 3] }, '已保存 3 张卡片']
+  ]) {
+    const options = { message, duration: 3000, bottom: '64vp' };
+    api.showToastSafely(context, options);
+    assert.deepEqual(actual, { ...options, message: expected });
+  }
+});
+
+test('all native toast entry points use the shared feedback formatter', () => {
+  const root = new URL('../../entry/src/main/ets/', import.meta.url);
+  for (const path of readdirSync(root, { recursive: true })) {
+    if (!/\.(ets|ts)$/.test(path) || path.replaceAll('\\', '/') === 'utils/UiFeedback.ets') continue;
+    const source = readFileSync(new URL(path.replaceAll('\\', '/'), root), 'utf8');
+    assert.doesNotMatch(source, /\.showToast\s*\(/, `${path} bypasses the shared toast formatter`);
+  }
 });
 
 

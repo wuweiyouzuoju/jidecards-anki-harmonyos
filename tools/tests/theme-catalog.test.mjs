@@ -10,11 +10,16 @@ import { 对比度 } from '../../entry/src/main/ets/model/色阶生成.ets';
 
 const read = path => readFileSync(new URL('../../' + path, import.meta.url), 'utf8');
 
-test('primary glass text stays readable for every theme in both appearances', () => {
+test('primary action text stays readable on the solid surface and pressed feedback', () => {
   for (const theme of THEME_CATALOG) for (const dark of [false, true]) {
     const palette = 解析主题色板(theme.id, dark);
     const glass = themePrimaryGlass(theme, dark);
     const labels = (dark ? theme.darkActionColors : theme.lightActionColors);
+    const surface = JSON.parse(read(`entry/src/main/resources/${dark ? 'dark' : 'base'}/element/color.json`))
+      .color.find(item => item.name === 'surface_card').value;
+    for (const label of labels.length > 0 ? labels : [palette.动作主色]) {
+      assert.ok(对比度(label, surface) >= 4.5, `${theme.id} dark=${dark} ${label} on ${surface}`);
+    }
     for (const material of [...glass.colors, ...glass.pressedColors]) {
       const alpha = parseInt(material.slice(1, 3), 16) / 255;
       const backdrop = dark ? '#18202B' : '#FFFFFF';
@@ -30,7 +35,11 @@ test('primary glass text stays readable for every theme in both appearances', ()
   }
 });
 
-test('start study and both show-answer layouts use persistent theme glass', () => {
+test('start study and both show-answer layouts share an opaque surface without an outline', () => {
+  const surface = read('entry/src/main/ets/utils/PrimaryGlassSurface.ets');
+  assert.match(surface, /backgroundColor\(\$r\('app.color.surface_card'\)\)/);
+  assert.match(surface, /themeGradient\(this.pressed \? this.style.pressedColors : \[\]\)/);
+  assert.match(surface, /\.border\(\{ width: 0 \}\)/);
   const study = read('entry/src/main/ets/pages/学习页.ets');
   assert.match(study, /开始学习按钮\(\{\s*文案: \$r\('app.string.study_show_answer'\),\s*isAvailable: this\.阶段 === 'question',\s*开始学习回调: \(\): void => \{ this\.显示答案\(\); \}/);
   assert.doesNotMatch(study, /显示答案按下|PrimaryGlassSurface/);
@@ -38,7 +47,7 @@ test('start study and both show-answer layouts use persistent theme glass', () =
     const source = read('entry/src/main/ets/' + path);
     assert.match(source, /@StorageProp\(PRIMARY_GLASS_KEY\)/, path);
     assert.match(source, /attributeModifier\(new PrimaryGlassSurface\(/, path);
-    assert.match(source, /new PrimaryGlassSurface\([^;]*\$r\('app.color.border_input'\), 1\.5\)/, path);
+    assert.match(source, /new PrimaryGlassSurface\([^\n]*this.primaryGlass\)\)/, path);
   }
   const theme = themeDefinition('iridescent');
   assert.ok(new Set(themePrimaryGlass(theme, false).colors).size >= 3);

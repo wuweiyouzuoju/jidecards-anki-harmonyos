@@ -403,7 +403,7 @@ export struct 学习浮动工具栏 {
   // 渲染 Button / Column 竖版组合，layoutWeight 平均分配高度。
   //
   // @业务规则
-  // 按下态：评分使用共用玻璃反馈，显示答案使用带主题染色的主操作玻璃；
+  // 按下态：评分使用共用玻璃反馈，显示答案在不透明白底上叠加主题反馈；
   // GOOD 评分按下时边框高亮 动作主色。
   // 触摸事件：Down 记 按下的评分；Up/Cancel 恢复 -1。
   // 按钮内 Text 用 maxLines=2 + Ellipsis，允许跨行展示完整文案。
@@ -426,8 +426,7 @@ export struct 学习浮动工具栏 {
     .width('100%')
     .height('100%')
     .padding({ left: 4, right: 4 })
-    .attributeModifier(new PrimaryGlassSurface(this.按下的评分 === 显示答案标签, this.primaryGlass,
-      $r('app.color.border_input'), 1.5))
+    .attributeModifier(new PrimaryGlassSurface(this.按下的评分 === 显示答案标签, this.primaryGlass))
     .stateEffect(false)
     .borderRadius(应用尺寸.圆角_面板)
     .animation({ duration: 80, curve: Curve.EaseOut })
