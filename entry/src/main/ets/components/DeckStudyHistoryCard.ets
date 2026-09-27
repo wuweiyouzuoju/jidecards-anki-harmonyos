@@ -8,7 +8,7 @@ import { 应用尺寸 } from '../utils/应用尺寸';
 import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
 import { themeGradient } from '../utils/ThemeVisuals';
 
-/** 仅查询当前牌组范围；刷新时隐藏旧值，离开/切换后丢弃在途结果。 */
+/** 同牌组同一天刷新保留已展示图表；切换范围隐藏旧值，迟到结果丢弃。 */
 @Component
 export struct DeckStudyHistoryCard {
   @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
@@ -25,6 +25,7 @@ export struct DeckStudyHistoryCard {
   private requestId: number = 0;
   private active: boolean = false;
   private dayKey: string = '';
+  private loadedSearch: string = '';
   private timer: number = -1;
 
   aboutToAppear(): void {
@@ -64,7 +65,8 @@ export struct DeckStudyHistoryCard {
     if (!this.active) return;
     const request: number = ++this.requestId;
     const search: string = this.search;
-    this.loading = true;
+    this.loading = this.loadedSearch !== search || this.history.days.length === 0 ||
+      this.dayKey !== historyStudyDayKey(new Date(), this.history.rolloverHour);
     this.failed = false;
     const started: Date = new Date();
     try {
@@ -72,6 +74,7 @@ export struct DeckStudyHistoryCard {
       const graphs: GraphsView = await this.service.获取图表统计(6, search);
       if (!this.active || request !== this.requestId) return;
       this.history = buildDeckStudyHistory(graphs);
+      this.loadedSearch = search;
       this.dayKey = historyStudyDayKey(started, graphs.rolloverHour);
       this.loading = false;
     } catch (_) {

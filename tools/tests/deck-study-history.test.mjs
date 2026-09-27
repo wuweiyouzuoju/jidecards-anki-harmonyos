@@ -100,7 +100,10 @@ test('switching deck discards slow old success; reloading same scope fetches new
   pending[0].resolve(graphs(99)); await old;
   assert.equal(state.history.totalCount, 20);
   assert.deepEqual(pending.map(item => item.scope), ['did:10', 'did:20']);
-  const undo = state.reload(); pending[2].resolve(graphs(19)); await undo;
+  const undo = state.reload();
+  assert.equal(state.loading, false, 'same-scope refresh keeps the chart mounted while awaiting updated counts');
+  assert.equal(state.history.totalCount, 20);
+  pending[2].resolve(graphs(19)); await undo;
   assert.equal(state.history.totalCount, 19);
 });
 
