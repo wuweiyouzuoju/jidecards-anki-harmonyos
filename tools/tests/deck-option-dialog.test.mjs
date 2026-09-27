@@ -80,8 +80,32 @@ test('deck fields use dialogs while the shared-deck save scope uses an inline sw
   assert.match(advanced, /if \(!this\.busy\) this\.options\.applyToSharedDecks = value/);
   assert.equal((advanced.match(/if \(!this\.hasActiveSection\(\)\)/g) || []).length, 12);
   assert.match(advanced, /title: this\.hasActiveSection\(\) \? this\.sectionTitle/);
-  assert.match(advanced, /DisclosureChevron\(/);
+  assert.match(advanced, /DeckOptionRow\(/);
   assert.doesNotMatch(advanced, /Text\('▼'\)|\.rotate\(/);
   assert.match(source, /showHelp: true/);
   assert.match(source, /aboutToDisappear\(\): void \{ this\.dialog\?\.close\(\)/);
+});
+
+test('experimental advanced entry, categories and editable fields share the whole option row', () => {
+  const read = path => readFileSync(new URL('../../entry/src/main/ets/components/' + path, import.meta.url), 'utf8');
+  const panel = read('牌组选项面板.ets');
+  const entry = panel.slice(panel.indexOf('  private advancedHubEntry()'), panel.indexOf('  build() {'));
+  assert.match(entry, /DeckOptionRow\(\{ title: \$r\('app.string.deck_group_advanced_hub'\), busy: this.busy/);
+  assert.match(entry, /onOpen:[^\n]*this.showAdvanced = true/);
+  assert.doesNotMatch(entry, /\bRow\(|fontSize|fontWeight|backgroundColor|borderRadius|\.height\(/);
+  assert.match(panel, /if \(!this\.简洁模式\) \{\s*this\.advancedHubEntry\(\)/);
+  const advanced = read('高级牌组选项面板.ets');
+  const category = advanced.slice(advanced.indexOf('struct 段落标题'), advanced.indexOf('export struct 高级牌组选项面板'));
+  assert.match(category, /DeckOptionRow\(\{ title: this.title, onOpen:[^\n]*this.onToggle\(\)/);
+  assert.doesNotMatch(category, /\bRow\(|fontSize|backgroundColor|borderRadius/);
+  const field = source.slice(source.indexOf('export struct DeckOptionField'));
+  assert.match(field, /DeckOptionRow\(\{ title: this.title, summary: this.summary\(\), error: this.error, busy: this.busy/);
+  assert.doesNotMatch(field, /DisclosureChevron\(|\bRow\(|fontSize/);
+  const row = read('home/DeckOptionRow.ets');
+  assert.match(row, /DisclosureChevron\(/);
+  assert.match(row, /fontSize\(15\)/);
+  assert.match(row, /minHeight: 48/);
+  assert.match(row, /Divider\(\)/);
+  assert.match(row, /if \(this.summary !== ''\)/, 'navigation rows have no fake current value');
+  assert.doesNotMatch(row, /backgroundColor|borderRadius|CustomDialogController/);
 });

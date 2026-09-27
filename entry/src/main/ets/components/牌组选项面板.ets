@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { DisclosureChevron } from './common/DisclosureChevron';
+import { DeckOptionRow } from './home/DeckOptionRow';
 import { resourceText } from '../utils/UiFeedback';
 import { DeckOptionField, DeckOptionChoice } from './home/DeckOptionField';
 import { validateDeckOptionText } from '../model/DeckOptionValidation';
@@ -348,22 +348,8 @@ export struct 牌组选项面板 {
   // ========================================================
   @Builder
   private advancedHubEntry() {
-    Row() {
-      Text($r('app.string.deck_group_advanced_hub'))
-        .fontSize(应用尺寸.字号_正文_中)
-        .fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.text_primary'))
-        .layoutWeight(1)
-      DisclosureChevron({ tint: $r('app.color.text_secondary') })
-    }
-    .width('100%')
-    .height(应用尺寸.按钮高度)
-    .padding({ left: 应用尺寸.间距_10, right: 应用尺寸.间距_10 })
-    .backgroundColor($r('app.color.surface_page'))
-    .borderRadius(应用尺寸.圆角_面板)
-    .onClick(() => {
-      if (!this.busy) this.showAdvanced = true;
-    })
+    DeckOptionRow({ title: $r('app.string.deck_group_advanced_hub'), busy: this.busy,
+      onOpen: (): void => { if (!this.busy) this.showAdvanced = true; } })
   }
 
   build() {

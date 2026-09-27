@@ -6,6 +6,7 @@
 | --- | --- | --- |
 | 详情/展开箭头（`>` / `›`） | [DisclosureChevron.ets](DisclosureChevron.ets) | `tools/tests/ui-disclosure-contract.test.mjs`：扫描所有 ArkTS，禁止独立文字箭头；检查居中几何 |
 | 菜单项、展开行 | [MenuItem.ets](MenuItem.ets) | `ui-select-layout.test.mjs` |
+| 牌组选项字段、高级入口及分类行 | [DeckOptionRow.ets](../home/DeckOptionRow.ets)，字段编辑器仍由 DeckOptionField 管理；导航入口只传标题与回调 | `deck-option-dialog.test.mjs`，防止实验版入口另写灰底按钮 |
 | 页面四段等距与菜单锚点 | [应用尺寸](../../utils/应用尺寸.ets) 的 `页面分组间距`、`pageToolbarTop`、`pageToolbarHeight`、`pageContentTop`；光学估计限制见 [间距验收](../../../../../../docs/UI_SPACING.md) | `ui-shell-contract.test.mjs`；真实状态栏字形须设备验收 |
 | 菜单承接层与定位 | [AnchoredMenu.ets](AnchoredMenu.ets) | `ui-select-layout.test.mjs` |
 | 学习/预览右上角动作菜单 | [CardActionMenu.ets](CardActionMenu.ets)，直接组合 AnchoredMenu、MenuItem，宽度复用 CardViewportLayout 策略 | `study-menu.test.mjs`、`motion-style-contract.test.mjs`；禁止回退原生 bindMenu |

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { DisclosureChevron } from '../common/DisclosureChevron';
+import { DeckOptionRow } from './DeckOptionRow';
 import { DialogHeader } from '../common/DialogHeader';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 
@@ -110,17 +110,7 @@ export struct DeckOptionField {
   }
 
   build() {
-    Column({ space: 4 }) {
-      Row({ space: 12 }) {
-        Text(this.title).fontSize(15).fontColor($r('app.color.text_primary')).layoutWeight(1)
-        Text(this.summary()).fontSize(14).fontColor($r('app.color.text_secondary'))
-          .constraintSize({ maxWidth: '38%' }).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-        DisclosureChevron({ tint: $r('app.color.text_secondary') })
-      }
-      .width('100%').constraintSize({ minHeight: 48 }).padding({ left: 10, right: 10, top: 6, bottom: 6 })
-      .enabled(!this.busy).onClick((): void => { this.open(); })
-      if (this.error !== '') Text(this.error).fontSize(14).fontColor($r('app.color.error_text')).width('100%')
-      Divider().color($r('app.color.border_subtle')).strokeWidth(0.5)
-    }.width('100%')
+    DeckOptionRow({ title: this.title, summary: this.summary(), error: this.error, busy: this.busy,
+      onOpen: (): void => { this.open(); } })
   }
 }
