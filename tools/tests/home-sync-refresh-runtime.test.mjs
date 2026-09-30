@@ -104,5 +104,8 @@ test('settings opens during collection work while database-only sections remain 
   panel.openSection('sync'); assert.equal(panel.activeSection, 'sync');
   panel.openSection('appearance'); assert.equal(panel.activeSection, 'appearance');
   assert.equal(notices, 3);
+  panel.简洁模式 = true; panel.openSection('scheduler'); assert.equal(panel.activeSection, 'scheduler');
+  assert.equal(notices, 3, 'local review controls remain available in simple mode during sync');
+  panel.简洁模式 = false;
   activity.cancelReservation(); panel.openSection('scheduler'); assert.equal(panel.activeSection, 'scheduler');
 });

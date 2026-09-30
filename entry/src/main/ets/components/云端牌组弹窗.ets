@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../utils/PressFeedback';
+import { DialogBackdrop } from './common/DialogBackdrop';
 import { ThemeTextSpans } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
@@ -149,6 +151,7 @@ export struct 云端牌组弹窗 {
       color: this.已选中(deck.id) ? this.动作主色 : $r('app.color.border_subtle')
     })
     .borderRadius(应用尺寸.圆角_面板)
+    .attributeModifier(new PressFeedback())
     .onClick((): void => {
       if (!this.busy && deck.accessType === 'public' && !this.已成功(deck.id)) {
         this.onToggle(deck.id);
@@ -158,15 +161,7 @@ export struct 云端牌组弹窗 {
 
   build() {
     Stack() {
-      Column()
-        .width('100%')
-        .height('100%')
-        .backgroundColor(this.isDark ? 'rgba(0,0,0,0.40)' : 'rgba(0,0,0,0.15)')
-        .backgroundBlurStyle(BlurStyle.Thin, {
-          colorMode: this.isDark ? ThemeColorMode.DARK : ThemeColorMode.LIGHT,
-          adaptiveColor: AdaptiveColor.DEFAULT
-        })
-        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+      DialogBackdrop()
         .transition(TransitionEffect.OPACITY.animation({
           curve: 取全屏转场曲线(), duration: 取全屏转场时长()
         }))
@@ -200,6 +195,7 @@ export struct 云端牌组弹窗 {
           .fontSize(应用尺寸.字号_说明)
           .fontColor(this.动作主色)
           .width('100%')
+          .attributeModifier(new PressFeedback())
           .onClick((): void => { this.onCopyQQGroup(); })
 
         if (this.loading) {
@@ -228,6 +224,8 @@ export struct 云端牌组弹窗 {
               .backgroundColor($r('app.color.surface_page'))
               .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
               .borderRadius(应用尺寸.圆角_面板)
+              .attributeModifier(new PressFeedback())
+              .stateEffect(false)
               .onClick((): void => { this.onRetry(); })
           }
           .width('100%')

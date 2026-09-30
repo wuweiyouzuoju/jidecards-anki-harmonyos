@@ -144,7 +144,11 @@ test('visibility refreshes data and rollover polling only queries when study day
 test('both detail layouts refresh on committed home snapshots and history watches scope/token', () => {
   const home = readFileSync(new URL('../../entry/src/main/ets/pages/首页.ets', import.meta.url), 'utf8');
   assert.match(home, /this\.主页快照数据 = snapshot;\s*this\.historyRefreshToken\+\+/);
-  assert.equal((home.match(/historyRefreshToken: this\.historyRefreshToken/g) ?? []).length, 2);
+  assert.equal((home.match(/historyRefreshToken: this\.historyRefreshToken/g) ?? []).length, 1);
+  assert.match(home, /this\.deckDetails\(true\)/);
+  assert.match(home, /this\.deckDetails\(false\)/);
+  const details = readFileSync(new URL('../../entry/src/main/ets/components/home/HomeDeckDetails.ets', import.meta.url), 'utf8');
+  assert.match(details, /牌组详情面板\(\{\s*historyRefreshToken: this\.historyRefreshToken/);
   assert.match(source, /@Prop @Watch\('reload'\) search/);
   assert.match(source, /@Prop @Watch\('reload'\) refreshToken/);
   assert.match(home, /name: 'StudyPage',[\s\S]*?onPop:[\s\S]*?this\.返回主页后刷新\(\)/);

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { DialogBackdrop } from './common/DialogBackdrop';
 import { showToastSafely } from '../utils/UiFeedback';
 import { DialogHeader } from './common/DialogHeader';
 import { 应用尺寸 } from '../utils/应用尺寸';
@@ -120,10 +121,7 @@ export struct HomeIntroPanel {
 
   build() {
     Stack() {
-      Column()
-        .width('100%')
-        .height('100%')
-        .backgroundColor('rgba(0,0,0,0.35)')
+      DialogBackdrop()
         .onClick((): void => {})
       Column() {
         DialogHeader({

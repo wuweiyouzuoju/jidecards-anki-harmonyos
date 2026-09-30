@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../utils/PressFeedback';
 import { DisclosureChevron } from './common/DisclosureChevron';
 import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
 import { resourceText } from '../utils/UiFeedback';
@@ -301,6 +302,7 @@ export struct 牌组列表项 {
         .constraintSize({ minHeight: 应用尺寸.menuItemHeight })
         .padding({ left: 应用尺寸.menuHorizontalPadding, right: 应用尺寸.menuHorizontalPadding,
           top: 8, bottom: 8 })
+        .attributeModifier(new PressFeedback())
         .onClick((): void => { this.selectTone(index); })
       }, (option: 色条选项): string => `${option.tone}`)
     }
@@ -336,6 +338,7 @@ export struct 牌组列表项 {
           }
         }
       })
+      .attributeModifier(new PressFeedback())
       .onClick((): void => { this.显示色条菜单 = true; })
       Row() {
         Text($r('app.string.deck_menu_reorder'))
@@ -346,6 +349,7 @@ export struct 牌组列表项 {
       .width('100%')
       .constraintSize({ minHeight: 应用尺寸.menuItemHeight })
       .padding({ left: 应用尺寸.menuHorizontalPadding, right: 应用尺寸.menuHorizontalPadding, top: 10, bottom: 10 })
+      .attributeModifier(new PressFeedback())
       .onClick(() => {
         this.显示牌组菜单 = false;
         this.onEnterReorder(this.deck.id);
@@ -359,6 +363,7 @@ export struct 牌组列表项 {
       .width('100%')
       .constraintSize({ minHeight: 应用尺寸.menuItemHeight })
       .padding({ left: 应用尺寸.menuHorizontalPadding, right: 应用尺寸.menuHorizontalPadding, top: 10, bottom: 10 })
+      .attributeModifier(new PressFeedback())
       .onClick(() => {
         this.显示牌组菜单 = false;
         this.onCustomizeDeck(this.deck.id);
@@ -374,6 +379,7 @@ export struct 牌组列表项 {
         .width('100%')
         .constraintSize({ minHeight: 应用尺寸.menuItemHeight })
         .padding({ left: 应用尺寸.menuHorizontalPadding, right: 应用尺寸.menuHorizontalPadding, top: 10, bottom: 10 })
+        .attributeModifier(new PressFeedback())
         .onClick(() => {
           this.显示牌组菜单 = false;
           this.onCustomStudy(this.deck.id);
@@ -388,6 +394,7 @@ export struct 牌组列表项 {
       .width('100%')
       .constraintSize({ minHeight: 应用尺寸.menuItemHeight })
       .padding({ left: 应用尺寸.menuHorizontalPadding, right: 应用尺寸.menuHorizontalPadding, top: 10, bottom: 10 })
+      .attributeModifier(new PressFeedback())
       .onClick(() => {
         this.显示牌组菜单 = false;
         this.onHideDeck(this.deck.id);
@@ -401,6 +408,7 @@ export struct 牌组列表项 {
       .width('100%')
       .constraintSize({ minHeight: 应用尺寸.menuItemHeight })
       .padding({ left: 应用尺寸.menuHorizontalPadding, right: 应用尺寸.menuHorizontalPadding, top: 10, bottom: 10 })
+      .attributeModifier(new PressFeedback())
       .onClick(() => {
         this.显示牌组菜单 = false;
         this.onDeleteDeck(this.deck.id);
@@ -464,6 +472,7 @@ export struct 牌组列表项 {
     .justifyContent(FlexAlign.Center)
     .alignItems(HorizontalAlign.Center)
     .margin({ left: this.narrow ? 0 : -应用尺寸.间距_10 })
+    .attributeModifier(new PressFeedback())
     .onClick(() => {
       if (!this.reorderMode && this.deck.hasChildren) {
         this.onToggle(this.deck.id);
@@ -535,6 +544,7 @@ export struct 牌组列表项 {
         top: this.narrow ? 应用尺寸.间距_6 : 应用尺寸.间距_13,
         bottom: this.narrow ? 应用尺寸.间距_6 : 应用尺寸.间距_13
       })
+      .attributeModifier(new PressFeedback())
       .onClick(() => {
         // 排序模式下不触发选牌；长按手柄+拖动才是预期操作
         if (this.reorderMode) {

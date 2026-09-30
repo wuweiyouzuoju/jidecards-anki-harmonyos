@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../utils/PressFeedback';
 import { GlassSurface } from '../utils/GlassSurface';
 import { GLASS_COLORS_KEY, GLASS_HIGHLIGHT_COLORS } from '../model/ThemeCatalog';
 import { ThemeTextSpans } from './common/ThemeText';
@@ -36,7 +37,7 @@ import { 颜色键 } from '../model/颜色主题';
 // - @Watch 回调中 @State 赋值不触发 build() 重新执行
 // - build() 中模板字符串引用 @Consume 不可靠
 // 最终方案：ForEach(this.snapshot.decks) + if (deck.id === this.selectedDeckId) 直接渲染。
-// 按下按钮编号：0=无，2=更多，3=创建子牌组，4=牌组选项，5=导出。
+// 按钮按压由公共 GlassSurface 处理，不写入面板状态。
 //
 // @副作用
 // 无。仅渲染与上抛回调。
@@ -79,7 +80,6 @@ export struct 牌组详情面板 {
   @StorageProp(颜色键.复习中计数色) private 复习中计数色: string = '#7056C8';
   @StorageProp(颜色键.动作主色) private 动作主色: string = '#2F5FD0';
   // 更多及其子按钮共用按下状态。
-  @State private 按下按钮编号: number = 0;
 
   // ========================================================
   // @块ID UI-DECK-DETAIL-002
@@ -138,6 +138,8 @@ export struct 牌组详情面板 {
                   .padding(0)
                   .backgroundColor(Color.Transparent)
                   .enabled(this.选中牌组Id !== '')
+                  .attributeModifier(new PressFeedback())
+                  .stateEffect(false)
                   .onClick((): void => { this.添加卡片(); })
                 }
                 Text($r('app.string.deck_preview'))
@@ -145,6 +147,7 @@ export struct 牌组详情面板 {
                   .fontColor($r('app.color.text_tertiary'))
                   .padding({ top: 应用尺寸.间距_8, bottom: 应用尺寸.间距_8 })
                   .constraintSize({ minHeight: 应用尺寸.按钮高度 })
+                  .attributeModifier(new PressFeedback())
                   .onClick((): void => { this.预览(); })
               }
               .alignItems(HorizontalAlign.End)
@@ -234,13 +237,8 @@ export struct 牌组详情面板 {
             .width('100%')
             .height(应用尺寸.按钮高度)
             .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
-            .attributeModifier(new GlassSurface(this.按下按钮编号 === 2, this.glassColors))
+            .attributeModifier(new GlassSurface(this.glassColors))
             .borderRadius(应用尺寸.圆角_胶囊)
-            .animation({ duration: 80, curve: Curve.EaseOut })
-            .onTouch((event: TouchEvent): void => {
-              if (event.type === TouchType.Down) { this.按下按钮编号 = 2; }
-              else if (event.type === TouchType.Up || event.type === TouchType.Cancel) { this.按下按钮编号 = 0; }
-            })
             .onClick(() => {
               this.显示更多 = !this.显示更多;
               this.scrollToMorePending = this.显示更多;
@@ -253,13 +251,9 @@ export struct 牌组详情面板 {
                   .height(应用尺寸.按钮高度)
                   .fontSize(应用尺寸.字号_按钮)
                   .fontColor($r('app.color.text_primary'))
-                  .attributeModifier(new GlassSurface(this.按下按钮编号 === 3, this.glassColors))
+                  .attributeModifier(new GlassSurface(this.glassColors))
+                  .stateEffect(false)
                   .borderRadius(应用尺寸.圆角_胶囊)
-                  .animation({ duration: 80, curve: Curve.EaseOut })
-                  .onTouch((event: TouchEvent): void => {
-                    if (event.type === TouchType.Down) { this.按下按钮编号 = 3; }
-                    else if (event.type === TouchType.Up || event.type === TouchType.Cancel) { this.按下按钮编号 = 0; }
-                  })
                   .onClick((): void => {
                     this.显示更多 = false;
                     this.创建子牌组();
@@ -269,13 +263,9 @@ export struct 牌组详情面板 {
                   .height(应用尺寸.按钮高度)
                   .fontSize(应用尺寸.字号_按钮)
                   .fontColor($r('app.color.text_primary'))
-                  .attributeModifier(new GlassSurface(this.按下按钮编号 === 4, this.glassColors))
+                  .attributeModifier(new GlassSurface(this.glassColors))
+                  .stateEffect(false)
                   .borderRadius(应用尺寸.圆角_胶囊)
-                  .animation({ duration: 80, curve: Curve.EaseOut })
-                  .onTouch((event: TouchEvent): void => {
-                    if (event.type === TouchType.Down) { this.按下按钮编号 = 4; }
-                    else if (event.type === TouchType.Up || event.type === TouchType.Cancel) { this.按下按钮编号 = 0; }
-                  })
                   .enabled(!this.牌组选项加载中)
                   .onClick((): void => {
                     this.显示更多 = false;
@@ -286,13 +276,9 @@ export struct 牌组详情面板 {
                   .height(应用尺寸.按钮高度)
                   .fontSize(应用尺寸.字号_按钮)
                   .fontColor($r('app.color.text_primary'))
-                  .attributeModifier(new GlassSurface(this.按下按钮编号 === 5, this.glassColors))
+                  .attributeModifier(new GlassSurface(this.glassColors))
+                  .stateEffect(false)
                   .borderRadius(应用尺寸.圆角_胶囊)
-                  .animation({ duration: 80, curve: Curve.EaseOut })
-                  .onTouch((event: TouchEvent): void => {
-                    if (event.type === TouchType.Down) { this.按下按钮编号 = 5; }
-                    else if (event.type === TouchType.Up || event.type === TouchType.Cancel) { this.按下按钮编号 = 0; }
-                  })
                   .onClick((): void => {
                     this.显示更多 = false;
                     this.导出牌组();

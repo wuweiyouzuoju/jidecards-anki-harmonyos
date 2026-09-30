@@ -9,7 +9,15 @@ test('home repository uses persisted graph range and widget preferences, localiz
   assert.deepEqual(state.calls[4], ['widget', state.graph, 9, 1, 2, true]);
   assert.equal(result.graphs, state.graph); assert.equal(result.days, 0);
   assert.equal(result.snapshot.today.completedCount, 9); assert.equal(result.snapshot.decks[0].name, '默认牌组');
-  assert.deepEqual(result.hiddenIds, ['hidden']); assert.equal(result.cardData.今日完成数, 9);
+  assert.deepEqual(result.hiddenIds, ['1']); assert.equal(result.cardData.今日完成数, 9);
+});
+
+test('home hidden IDs exclude deleted decks and duplicates without changing saved preferences', async () => {
+  const { repository, state } = homeDataHarness();
+  state.hiddenIds = ['removed', '1', '1', 'old-collection'];
+  const result = await repository.load('/collection', 'Default');
+  assert.deepEqual(result.hiddenIds, ['1']);
+  assert.deepEqual(state.hiddenIds, ['removed', '1', '1', 'old-collection']);
 });
 test('graph and widget persistence failures leave home deck loading available', async () => {
   const { repository, state } = homeDataHarness();

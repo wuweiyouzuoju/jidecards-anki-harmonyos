@@ -1,9 +1,7 @@
-import { compileWithUiFeedback } from './ui-feedback-harness.mjs';
+import { createDeletion } from './home-deletion-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { stripTypeScriptTypes } from 'node:module';
 import { DeckMediaCleanup } from '../../entry/src/main/ets/model/DeckMediaCleanup.ts';
 
 function harness() {
@@ -48,29 +46,25 @@ test('filtered deck deletion or unchanged references offer no media', async () =
   assert.deepEqual(await cleanup.candidates(await cleanup.snapshot()), []);
 });
 
-const home = readFileSync(new URL('../../entry/src/main/ets/pages/首页.ets', import.meta.url), 'utf8');
-const methodNames = ['offerDeletedDeckMediaCleanup', 'confirmDeletedDeckMedia'];
-const methods = methodNames.map(name => {
-  const start = home.search(new RegExp('^  private (?:async )?' + name + '\\(', 'm'));
-  assert.ok(start >= 0);
-  return home.slice(start, home.indexOf('\n  }', start) + 4);
-});
-const Page = compileWithUiFeedback('$r', 'DialogAlignment', stripTypeScriptTypes(`class Page { ${methods.join('\n')} }`,
-  { mode: 'transform' }) + '; return Page;')(id => ({ id }), { Center: 'center' });
-
 function pageHarness() {
   const { state, cleanup } = harness();
-  const page = new Page();
+  const page = {};
   const dialogs = [], messages = [];
   Object.assign(page, {
     homeDisposed: false, syncForeground: true, deckMediaCleanup: cleanup,
     显示提示: value => messages.push(value.id),
     getUIContext: () => ({
-      getHostContext: () => ({ resourceManager: { getStringSync: id => id + ' %d' } }),
+      getHostContext: () => ({ resourceManager: { getStringSync: id =>
+        id + (['app.string.deck_media_confirm_message', 'app.string.deck_media_cleaned'].includes(id) ? ' %d' : '') } }),
       showAlertDialog: value => dialogs.push(value),
       getPromptAction: () => ({ showToast: value => messages.push(value.message) })
     })
   });
+  const feature = createDeletion({
+    getUIContext: () => page.getUIContext(), isVisible: () => !page.homeDisposed && page.syncForeground,
+    onStateChanged: (_busy, status) => { page.deckDeletionStatus = status; }
+  }, {}, cleanup);
+  page.offerDeletedDeckMediaCleanup = before => feature.offerDeletedDeckMediaCleanup(before);
   return { page, state, dialogs, messages };
 }
 

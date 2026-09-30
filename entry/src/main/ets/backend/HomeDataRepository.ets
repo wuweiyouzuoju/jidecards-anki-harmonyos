@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { createStatsWidget, publishStatsWidget } from './StatsWidgetPublisher';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { 后端会话 } from '../backend/后端会话';
 import { 牌组服务 } from '../backend/牌组服务';
@@ -10,8 +11,9 @@ import { 牌组汇总, 牌组色调, 主页快照 } from '../model/主页模型'
 import { 加载牌组别名映射, 加载牌组色调映射, 加载牌组背景图映射 } from '../model/牌组元数据存储';
 import { 加载全部牌组顺序 } from '../model/牌组顺序存储';
 import { 加载已隐藏牌组ID列表 } from '../model/隐藏牌组存储';
+import { activeHiddenDeckIds } from '../model/HiddenDecks';
 import { 确保FSRS已开启一次 } from '../model/FSRS控制器';
-import { 提取卡片数据, 保存卡片数据, 加载小时分布窗口, 加载统计天数, 加载分离暂停偏好, 桌面卡片数据 } from '../model/桌面卡片数据存储';
+import { 加载小时分布窗口, 加载统计天数, 加载分离暂停偏好, 桌面卡片数据 } from '../model/桌面卡片数据存储';
 import { 平铺牌组树 } from '../model/牌组层级';
 export interface HomeDataResult {
   tree: DeckTreeNode;
@@ -50,7 +52,7 @@ export class HomeDataRepository {
       const orderOverrides: Map<string, string[]> = await 加载全部牌组顺序(parentIds);
       const backgroundImageOverrides: Map<string, string> = await 加载牌组背景图映射(deckIds);
       // 加载用户隐藏的 deck id 集合，可见牌组行 会过滤掉这些 id
-      const hiddenIds: string[] = await 加载已隐藏牌组ID列表();
+      const hiddenIds: string[] = activeHiddenDeckIds(await 加载已隐藏牌组ID列表(), deckIds);
 
       const snapshot: 主页快照 =
         构建主页快照(tree, null, new Date(), toneOverrides, displayNameOverrides,
@@ -74,13 +76,8 @@ export class HomeDataRepository {
       hilog.info(0x4342, 'jidecards', `首页: 静默加载图表结果 graphs=${graphs === null ? 'null' : '非null'}`);
       // 桌面卡片数据桥接：graphs 非空时提取 8 页数据存 filesDir，供 FormExtensionAbility 读取
       if (graphs !== null) {
-        // 算待学数（牌组树 newCount+learnCount+reviewCount 聚合）和牌组数，供桌面卡片今日进度页
-        let 总待学: number = 0;
-        for (const 子节点 of tree.children) {
-          总待学 += 子节点.newCount + 子节点.learnCount + 子节点.reviewCount;
-        }
-        const 牌组总数: number = 平铺牌组树(tree).length;
-        const 卡片数据: 桌面卡片数据 = 提取卡片数据(graphs, 总待学, 牌组总数, await 加载小时分布窗口(), await 加载分离暂停偏好());
+        const 卡片数据: 桌面卡片数据 = createStatsWidget(graphs, tree,
+          await 加载小时分布窗口(), await 加载分离暂停偏好());
         cardData = 卡片数据;
         // 诊断日志：数值本身写进日志，用户报“数据旧”时抓 hilog 即可分辨
         // 是后端返回旧 graphs（RPC/缓存问题）还是前端没刷新（渲染问题）。
@@ -90,7 +87,7 @@ export class HomeDataRepository {
         // 桌面卡片延迟到下次 30 分钟系统刷新才更新。App 在前台时同步等数据写入
         // filesDir + formProvider.updateForm 推送完成，确保卡片立即反映最新统计。
         try {
-          await 保存卡片数据(卡片数据);
+          await publishStatsWidget(卡片数据);
         } catch (e) {
           hilog.error(0x4342, 'jidecards', `首页: 保存卡片数据失败 ${e}`);
         }

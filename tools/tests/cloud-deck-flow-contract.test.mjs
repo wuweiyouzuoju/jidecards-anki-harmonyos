@@ -122,7 +122,7 @@ test('cloud deck modal presents selectable public decks, locked future decks and
   assert.match(source, /cloud_deck_qq_group_entry/);
   assert.match(source, /maxHeight: '72%'/);
   assert.doesNotMatch(source, /maxHeight: '88%'/);
-  assert.match(source, /backgroundBlurStyle\(BlurStyle\.Thin/);
+  assert.match(source, /DialogBackdrop\(\)/);
   // 双态契约：引导态提供「稍后再说」，菜单态主按钮退化为「关闭」，首次说明只在引导态出现。
   assert.match(source, /cloud_deck_skip/);
   assert.match(source, /从菜单打开: boolean = false/);

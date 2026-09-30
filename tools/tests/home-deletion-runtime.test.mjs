@@ -1,3 +1,4 @@
+import { createDeletion } from './home-deletion-harness.mjs';
 import { compileWithUiFeedback } from './ui-feedback-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
@@ -6,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { AutoSyncScheduler } from '../../entry/src/main/ets/model/AutoSyncScheduler.ts';
 const source = readFileSync(new URL('../../entry/src/main/ets/pages/首页.ets', import.meta.url), 'utf8');
-const names = ['确认删除牌组', 'reconcileDeckSelection'];
+const names = ['deckDeleted', 'reconcileDeckSelection'];
 const methods = names.map(name => {
   const start = source.indexOf('  private async ' + name + '(');
   assert.ok(start >= 0);
@@ -14,7 +15,7 @@ const methods = names.map(name => {
 });
 
 function harness(selected = 'child', saved = selected) {
-  const events = [], scheduler = new AutoSyncScheduler();
+  const events = [], dialogs = [], scheduler = new AutoSyncScheduler();
   const preferences = { saved, fail: false };
   const Page = compileWithUiFeedback('清除上次牌组ID', '加载上次牌组ID', '$r', 'console',
     stripTypeScriptTypes(`class Page { ${methods.join('\n')} }`, { mode: 'transform' }) + '; return Page;')(
@@ -33,10 +34,46 @@ function harness(selected = 'child', saved = selected) {
     scheduleAutoSyncCheck: () => { assert.equal(page.deckDeletionBusy, false); events.push('sync check'); },
     加载主页数据: async () => { events.push('refresh'); },
     getUIContext: () => ({ getHostContext: () => ({ resourceManager: { getStringSync: key => key + ' %d' } }),
-      getPromptAction: () => ({ showToast: value => events.push(value.message) }) })
+      getPromptAction: () => ({ showToast: value => events.push(value.message) }),
+      showAlertDialog: value => dialogs.push(value) })
   });
-  return { page, preferences, events, scheduler };
+  const feature = createDeletion({
+    getUIContext: () => page.getUIContext(), deferForSync: action => page.deferForSync(action),
+    findDeck: id => page.主页快照数据.decks.find(deck => deck.id === id) ?? { id: '' },
+    isVisible: () => false, onDialogChanged: open => { page.nativeDialogOpen = open; },
+    onStateChanged: (busy, status) => { page.deckDeletionBusy = busy; page.deckDeletionStatus = status; },
+    onDeleted: id => page.deckDeleted(id),
+    onSettled: () => { page.homeActivityChanged(); page.scheduleAutoSyncCheck(); }
+  }, page.牌组服务实例, page.deckMediaCleanup);
+  page.确认删除牌组 = id => feature.execute(id);
+  return { page, feature, preferences, events, dialogs, scheduler };
 }
+
+test('delete entry defers during sync and requires an explicit destructive confirmation', async () => {
+  const { page, feature, events, dialogs } = harness();
+  feature.request('missing');
+  assert.equal(dialogs.length, 0);
+  let deferred;
+  page.deferForSync = action => { deferred = action; return true; };
+  feature.request('parent');
+  assert.equal(dialogs.length, 0);
+  page.deferForSync = () => false;
+  deferred();
+  assert.equal(page.nativeDialogOpen, true);
+  dialogs.at(-1).primaryButton.action();
+  assert.equal(page.nativeDialogOpen, false);
+  assert.deepEqual(events, []);
+  feature.request('parent');
+  dialogs.at(-1).cancel();
+  assert.equal(page.nativeDialogOpen, false);
+  assert.deepEqual(events, []);
+  feature.request('parent');
+  dialogs.at(-1).secondaryButton.action();
+  assert.equal(page.nativeDialogOpen, false);
+  for (let n = 0; n < 30 && page.deckDeletionBusy; n++) await Promise.resolve();
+  assert.equal(events.filter(event => event === 'delete committed').length, 1);
+  assert.equal(page.deckDeletionBusy, false);
+});
 
 test('cascade deletion clears selected descendants and persisted selection before refreshing and syncing', async () => {
   for (const selected of ['parent', 'child', 'grandchild']) {

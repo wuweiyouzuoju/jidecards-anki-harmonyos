@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../utils/PressFeedback';
+import { DialogBackdrop } from './common/DialogBackdrop';
 import { resourceText } from '../utils/UiFeedback';
 import { ThemeTextSpans } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
@@ -31,15 +33,7 @@ export struct 官方公告弹窗 {
 
   build() {
     Stack() {
-      Column()
-        .width('100%')
-        .height('100%')
-        .backgroundColor(this.isDark ? 'rgba(0,0,0,0.40)' : 'rgba(0,0,0,0.15)')
-        .backgroundBlurStyle(BlurStyle.Thin, {
-          colorMode: this.isDark ? ThemeColorMode.DARK : ThemeColorMode.LIGHT,
-          adaptiveColor: AdaptiveColor.DEFAULT
-        })
-        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+      DialogBackdrop()
         .onClick((): void => {})
         .transition(TransitionEffect.OPACITY.animation({
           curve: 取全屏转场曲线(), duration: 取全屏转场时长()
@@ -81,6 +75,8 @@ export struct 官方公告弹窗 {
               .fontColor($r('app.color.action_primary'))
               .backgroundColor(Color.Transparent)
               .borderRadius(应用尺寸.圆角_面板)
+              .attributeModifier(new PressFeedback())
+              .stateEffect(false)
               .onClick((): void => { this.onOpenDetails(); })
           }
 
