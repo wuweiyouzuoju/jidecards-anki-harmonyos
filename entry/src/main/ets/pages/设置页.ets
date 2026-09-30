@@ -23,6 +23,7 @@ import { 加载颜色主题, 保存颜色主题 } from '../model/颜色主题存
 import { 应用颜色主题 } from '../utils/颜色主题管理器';
 import { 应用主题 } from '../utils/主题控制器';
 import { 加载已隐藏牌组ID列表, 取消隐藏全部牌组 } from '../model/隐藏牌组存储';
+import { activeHiddenDeckIds } from '../model/HiddenDecks';
 import { 刷新桌面卡片数据 } from '../model/FSRS控制器';
 import { 平铺牌组树 } from '../model/牌组层级';
 import { 牌组汇总 } from '../model/主页模型';
@@ -33,6 +34,7 @@ import { 浏览页参数 } from '../model/navigation/PageParams';
 
 @Component
 export struct 设置页 {
+  @State private settingsBackRequest: number = 0;
   @State private transfer: DataTransferState = initialTransferState();
   private disposed: boolean = false;
   private readonly transferSession: DataTransferSession = new DataTransferSession(new AnkiDataTransfer(),
@@ -155,7 +157,15 @@ export struct 设置页 {
 
   private async 显示隐藏牌组对话框(): Promise<void> {
     try {
-      const hiddenIds: string[] = await 加载已隐藏牌组ID列表();
+      await syncActivity.waitForCollection();
+      if (this.disposed) return;
+      const context: common.UIAbilityContext | null = this.取能力上下文();
+      if (context === null) return;
+      await 后端会话.获取实例().确保已打开(context.filesDir);
+      const tree: DeckTreeNode = await this.牌组服务实例.获取牌组树();
+      const deckIds: string[] = 平铺牌组树(tree).map((deck: 牌组汇总): string => deck.id);
+      const hiddenIds: string[] = activeHiddenDeckIds(await 加载已隐藏牌组ID列表(), deckIds);
+      if (this.disposed) return;
       if (hiddenIds.length === 0) {
         showToastSafely(this.getUIContext(), {
           message: this.getUIContext().getHostContext()!.resourceManager.getStringSync($r('app.string.hidden_decks_empty').id)
@@ -182,7 +192,7 @@ export struct 设置页 {
         }
       });
     } catch (error) {
-      // 加载失败静默降级
+      if (!this.disposed) this.显示提示($r('app.string.sync_wait_load_failed'));
     }
   }
 
@@ -214,6 +224,7 @@ export struct 设置页 {
     NavDestination() {
       Stack() {
         设置面板({
+          backRequest: this.settingsBackRequest,
           activeSection: this.activeSection,
           openAiSettings: this.openAiSettings,
           当前主题模式: this.主题模式值,
@@ -272,8 +283,9 @@ export struct 设置页 {
     .onBackPressed((): boolean => {
       if (this.transfer.phase !== 'idle') return true;
       if (this.transfer.visible) { this.transferSession.close(); return true; }
-      if (this.activeSection !== '') { this.activeSection = ''; return true; }
-      return false;
+      if (this.显示许可证) { this.显示许可证 = false; return true; }
+      this.settingsBackRequest++;
+      return true;
     })
     .opacity(this.转场透明度)
   }

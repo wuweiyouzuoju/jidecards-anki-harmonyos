@@ -129,7 +129,9 @@ export struct 外观分组 {
               .padding(SelectStyle.controlPadding)
               .space(SelectStyle.controlSpace)
               .width(SelectStyle.fieldWidth)
+              .constraintSize(SelectStyle.fieldConstraint)
               .font(SelectStyle.controlFont)
+              .textModifier(SelectStyle.labelText())
               .borderRadius(SelectStyle.controlRadius)
               .onSelect((索引: number): void => {
                 const 模式列表: 主题模式[] = ['system', 'light', 'dark'];
@@ -163,7 +165,9 @@ export struct 外观分组 {
               .padding(SelectStyle.controlPadding)
               .space(SelectStyle.controlSpace)
               .width(SelectStyle.fieldWidth)
+              .constraintSize(SelectStyle.fieldConstraint)
               .font(SelectStyle.controlFont)
+              .textModifier(SelectStyle.labelText())
               .borderRadius(SelectStyle.controlRadius)
               .onSelect((索引: number): void => {
                 const 主题列表: 颜色主题[] = this.availableThemes();

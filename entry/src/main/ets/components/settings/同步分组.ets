@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../../utils/PressFeedback';
 import { resourceText, showToastSafely } from '../../utils/UiFeedback';
 import { ThemeTextSpans } from '../common/ThemeText';
 import { DialogHeader } from '../common/DialogHeader';
@@ -426,6 +427,7 @@ export struct 同步分组 {
           .fontSize(12)
           .fontWeight(FontWeight.Medium)
           .fontColor(this.解析主色按钮背景())
+          .attributeModifier(new PressFeedback())
           .onClick((): void => {
             this.打开注册页();
           })
@@ -472,6 +474,8 @@ export struct 同步分组 {
       .borderRadius(22)
       .enabled(this.serverLoaded && !this.登录中 && !this.settingsSaving && this.serverInput === this.savedServer)
       .opacity(!this.serverLoaded || this.登录中 || this.settingsSaving || this.serverInput !== this.savedServer ? 0.6 : 1)
+      .attributeModifier(new PressFeedback(!this.serverLoaded || this.登录中 || this.settingsSaving || this.serverInput !== this.savedServer ? 0.6 : 1))
+      .stateEffect(false)
       .onClick((): void => {
         this.点击登录();
       })
@@ -543,6 +547,8 @@ export struct 同步分组 {
         .fontColor(色板.主文字)
         .backgroundColor(色板.标签背景)
         .borderRadius(20)
+        .attributeModifier(new PressFeedback())
+        .stateEffect(false)
         .onClick((): void => {
           this.点击导出数据回调();
         })
@@ -554,6 +560,8 @@ export struct 同步分组 {
         .fontColor(色板.主文字)
         .backgroundColor(色板.标签背景)
         .borderRadius(20)
+        .attributeModifier(new PressFeedback())
+        .stateEffect(false)
         .onClick((): void => {
           this.点击立即同步();
         })
@@ -565,6 +573,8 @@ export struct 同步分组 {
         .fontColor(色板.主文字)
         .backgroundColor(色板.标签背景)
         .borderRadius(20)
+        .attributeModifier(new PressFeedback())
+        .stateEffect(false)
         .onClick((): void => {
           this.点击注销();
         })
@@ -618,6 +628,8 @@ export struct 同步分组 {
           .constraintSize({ minHeight: 应用尺寸.按钮高度 })
           .padding({ top: 应用尺寸.间距_8, bottom: 应用尺寸.间距_8 })
           .enabled(!this.登录中 && !this.settingsSaving)
+          .attributeModifier(new PressFeedback())
+          .stateEffect(false)
           .onClick((): void => { this.openServerDialog(); })
         }
         .width('100%')

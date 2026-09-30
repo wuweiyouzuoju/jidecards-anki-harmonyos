@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../../utils/PressFeedback';
+import { HelpLabel } from '../common/HelpLabel';
+import { 字段帮助对话框 } from '../字段帮助面板';
 import { DisclosureChevron } from '../common/DisclosureChevron';
 import { resourceText, namedResourceText, showToastSafely } from '../../utils/UiFeedback';
 import { ThemeTextSpans } from '../common/ThemeText';
@@ -7,6 +10,7 @@ import { pasteboard } from '@kit.BasicServicesKit';
 import { ThemeId, themeForContent } from '../../model/ThemeCatalog';
 import { displayFingerprint, parseRedemption } from '../../model/Redemption';
 import { getApplicationFingerprint, redeemContent, RedemptionResult } from '../../utils/RedemptionStore';
+import { 应用尺寸 } from '../../utils/应用尺寸';
 import { DialogHeader } from '../common/DialogHeader';
 import { 颜色主题, 颜色键 } from '../../model/颜色主题';
 
@@ -18,7 +22,14 @@ export struct RedemptionPanel {
   onUseTheme: (theme: 颜色主题) => void = (): void => {};
   @State private fingerprint: string = '';
   @State private expanded: boolean = false;
-  @State private showContentInfo: boolean = false;
+  private contentHelp: CustomDialogController = new CustomDialogController({
+    builder: 字段帮助对话框({ 标题: $r('app.string.redemption_contents_title'),
+      内容: (): void => { this.contentInfo(); } }),
+    customStyle: true, autoCancel: true, alignment: DialogAlignment.Center,
+    width: '100%', height: '100%', maskColor: Color.Transparent
+  });
+
+  aboutToDisappear(): void { this.contentHelp.close(); }
   @State private code: string = '';
   @State private busy: boolean = false;
   @State private loadFailed: boolean = false;
@@ -57,10 +68,6 @@ export struct RedemptionPanel {
   @Builder
   private contentInfo() {
     Column({ space: 18 }) {
-      DialogHeader({
-        title: $r('app.string.redemption_contents_title'), showClose: false,
-        onAction: (): void => { this.showContentInfo = false; }
-      })
       Text($r('app.string.redemption_contents_iridescent'))
         .fontSize(16).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary')).width('100%')
       Text($r('app.string.redemption_contents_eligibility'))
@@ -76,13 +83,27 @@ export struct RedemptionPanel {
         }.width('100%')
       }
       .width('100%').height(48).padding({ left: 14, right: 14 }).borderRadius(12)
-      .backgroundColor($r('app.color.surface_page')).onClick((): void => { this.copyDeveloperGroup(); })
-    }.width('100%').padding({ left: 20, right: 20, top: 8, bottom: 28 })
+      .backgroundColor($r('app.color.surface_page')).attributeModifier(new PressFeedback())
+      .stateEffect(false)
+      .onClick((): void => { this.copyDeveloperGroup(); })
+    }.width('100%')
   }
 
   private resultMessage(resource: Resource): string {
     return resourceText(this.getUIContext(), resource,
       namedResourceText(this.getUIContext(), 'theme_color_' + this.unlockedTheme));
+  }
+
+  private closeRedemption(): void {
+    if (this.busy) return;
+    this.expanded = false;
+    this.code = '';
+  }
+
+  private dismissRedemption(action: DismissSheetAction): void {
+    if (this.busy) return;
+    this.closeRedemption();
+    action.dismiss();
   }
 
   private async redeem(): Promise<void> {
@@ -117,7 +138,7 @@ export struct RedemptionPanel {
       DialogHeader({
         title: $r('app.string.redemption_entry'), actionLabel: $r('app.string.redemption_submit'),
         actionEnabled: !this.busy && this.code.trim() !== '', closeEnabled: !this.busy,
-        onClose: (): void => { this.expanded = false; this.code = ''; },
+        onClose: (): void => { this.closeRedemption(); },
         onAction: (): void => { this.redeem(); }
       })
       Text($r('app.string.redemption_form_hint'))
@@ -133,6 +154,8 @@ export struct RedemptionPanel {
       if (this.unlocked) {
         Button($r('app.string.redemption_use_theme'))
           .width('100%').height(44)
+          .attributeModifier(new PressFeedback())
+          .stateEffect(false)
           .onClick((): void => { this.onUseTheme(this.unlockedTheme); this.expanded = false; })
       }
     }.padding({ left: 20, right: 20, top: 8, bottom: 28 }).width('100%')
@@ -148,7 +171,9 @@ export struct RedemptionPanel {
           Text() { ThemeTextSpans($r('app.string.redemption_copy'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.primary)
         }
           .fontColor(this.primary).backgroundColor(Color.Transparent)
-          .enabled(this.fingerprint !== '').onClick((): void => { this.copyFingerprint(); })
+          .enabled(this.fingerprint !== '').attributeModifier(new PressFeedback())
+          .stateEffect(false)
+          .onClick((): void => { this.copyFingerprint(); })
       }.width('100%')
       Column({ space: 6 }) {
         Text(this.fingerprintLine(1))
@@ -156,21 +181,14 @@ export struct RedemptionPanel {
         Text(this.fingerprintLine(5))
           .fontSize(14).fontFamily('monospace').fontColor($r('app.color.text_secondary')).width('100%')
       }.width('100%').padding(12).borderRadius(12).backgroundColor($r('app.color.surface_page'))
-      Row({ space: 4 }) {
-        Text($r('app.string.redemption_fingerprint_hint'))
-          .fontSize(12).fontColor($r('app.color.text_secondary'))
-        Button() {
-          SymbolGlyph($r('sys.symbol.info_circle')).fontSize(15).fontColor([$r('app.color.text_tertiary')])
-        }
-        .width(32).height(32).backgroundColor(Color.Transparent)
-        .accessibilityText($r('app.string.redemption_contents_title'))
-        .onClick((): void => { this.showContentInfo = true; })
-        .bindSheet($$this.showContentInfo, this.contentInfo(), {
-          height: SheetSize.FIT_CONTENT, showClose: false, backgroundColor: $r('app.color.surface_card')
-        })
-      }.width('100%')
+      HelpLabel({ title: $r('app.string.redemption_fingerprint_hint'), textSize: 12,
+        textColor: $r('app.color.text_secondary'),
+        onHelp: (): void => { this.contentHelp.open(); }
+      }).width('100%')
       if (this.loadFailed) {
         Button($r('app.string.redemption_retry'))
+          .attributeModifier(new PressFeedback())
+          .stateEffect(false)
           .onClick((): void => { this.loadFingerprint(); })
       }
       Divider().color($r('app.color.border_subtle')).margin({ top: 4 })
@@ -182,9 +200,14 @@ export struct RedemptionPanel {
       }
         .width('100%').height(44).backgroundColor(Color.Transparent).borderRadius(12)
         .enabled(this.fingerprint !== '')
+        .attributeModifier(new PressFeedback())
+        .stateEffect(false)
         .onClick((): void => { this.expanded = true; this.message = ''; this.unlocked = false; this.code = ''; })
         .bindSheet($$this.expanded, this.redemptionForm(), {
-          height: SheetSize.FIT_CONTENT, showClose: false,
+          height: SheetSize.FIT_CONTENT, preferType: SheetType.CENTER, width: 应用尺寸.dialogMaxWidth,
+          showClose: false, dragBar: false,
+          onWillDismiss: (action: DismissSheetAction): void => { this.dismissRedemption(action); },
+          onWillSpringBackWhenDismiss: (action: SpringBackAction): void => { if (this.busy) action.springBack(); },
           backgroundColor: $r('app.color.surface_card')
         })
 

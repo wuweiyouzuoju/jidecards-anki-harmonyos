@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../utils/PressFeedback';
 import { DisclosureChevron } from './common/DisclosureChevron';
 import { namedResourceText, resourceText, showToastSafely } from '../utils/UiFeedback';
 import { ThemeTextSpans } from './common/ThemeText';
@@ -7,21 +8,17 @@ import { syncActivity } from '../model/SyncSettings';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
 import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
 
-import { common, Want } from '@kit.AbilityKit';
-import { pasteboard, BusinessError } from '@kit.BasicServicesKit';
+import { common } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
-import { commentManager } from '@kit.AppGalleryKit';
 import { 主题模式 } from '../model/主题设置';
 import { 颜色主题, 颜色键 } from '../model/颜色主题';
 import { 集合服务 } from '../backend/集合服务';
 import { CollectionMaintenanceSession, CollectionMaintenanceState } from '../model/settings/CollectionMaintenanceSession';
 import { 标签服务 } from '../backend/标签服务';
-import { 链接服务 } from '../backend/链接服务';
-import { HelpPage } from '../proto/messages/LinksMessages';
 import { 设置面板色板_取 } from '../utils/设置面板配色';
 import type { SyncAuth } from '../proto/messages/SyncMessages';
 import { RedemptionPanel } from './settings/RedemptionPanel';
-import { AboutActionDialog } from './settings/AboutActionDialog';
+import { AboutSettings } from './settings/AboutSettings';
 import { GeneralSettings } from './settings/GeneralSettings';
 import { ReviewControlsSettings } from './settings/ReviewControlsSettings';
 import { 外观分组 } from './settings/外观分组';
@@ -41,10 +38,6 @@ import { AIAgent设置分组 } from './settings/AIAgent设置分组';
 import { 开发者调试分组 } from './settings/开发者调试分组';
 import { 设置分组卡片 } from './settings/设置分组卡片';
 import { 简洁模式AppStorage键, 加载简洁模式, 保存简洁模式 } from '../model/简洁模式存储';
-import {
-  TapZones开关AppStorage键,
-  加载TapZones开关
-} from '../model/实验性功能存储';
 import { 字段帮助面板 } from './字段帮助面板';
 import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时长';
 import { 应用尺寸 } from '../utils/应用尺寸';
@@ -60,7 +53,7 @@ import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../model/ReleaseFeatures';
 // 顶栏布局：左「返回」（关闭设置页）+ 右「当前模式名」（弹出 模式切换菜单 选 简洁版/实验版），
 // 替代原底部「当前模式」分组，该分组已于 2026-08-29 删除）。
 // 5 个分组（外观/调度器/布局/数据/术语表）+ 模式切换菜单 已抽到 components/settings/ 子组件；
-// 数据库检查与关于分组仍在主壳中；分组入口通过状态与回调连接。
+// 维护会话与各设置分组独立持有业务状态；主壳负责目录和弹层接线。
 //
 // @输入
 // 当前主题模式 / 是否深色 / 当前颜色主题：父页面注入；
@@ -75,6 +68,26 @@ import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../model/ReleaseFeatures';
 // ========================================================
 @Component
 export struct 设置面板 {
+  @Prop @Watch('handleBackRequest') backRequest: number = 0;
+  @State private notetypeEditorBackRequest: number = 0;
+  @State private notetypeManagerBackRequest: number = 0;
+  @State private duplicatesBackRequest: number = 0;
+  @State private emptyCardsBackRequest: number = 0;
+  @State private mediaBackRequest: number = 0;
+  @State private backupBackRequest: number = 0;
+
+  private handleBackRequest(): void {
+    if (this.显示笔记类型编辑器) { this.notetypeEditorBackRequest++; return; }
+    if (this.显示笔记类型管理) { this.notetypeManagerBackRequest++; return; }
+    if (this.显示查找重复) { this.duplicatesBackRequest++; return; }
+    if (this.显示空卡列表) { this.emptyCardsBackRequest++; return; }
+    if (this.显示媒体管理) { this.mediaBackRequest++; return; }
+    if (this.显示备份管理) { this.backupBackRequest++; return; }
+    if (this.显示模式菜单) { this.显示模式菜单 = false; return; }
+    if (this.显示说明浮层) { this.显示说明浮层 = false; return; }
+    this.navigateBack();
+  }
+
   @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
   @Link activeSection: string;
   @State private settingsQuery: string = '';
@@ -97,14 +110,6 @@ export struct 设置面板 {
   };
   打开许可证回调: () => void = (): void => {
   };
-  // AnkiWeb 共享牌组网址（与 AnkiWeb引导对话框.ets 同款字面量，作为外部网址保留原文）
-  private readonly AnkiWeb网址: string = 'https://ankiweb.net/shared/decks';
-  // Anki 官方文档 URL（后端 LinksService.HelpPageLink 不可用时的兜底常量，与 docs.ankiweb.net 一致）
-  private readonly Anki文档网址: string = 'https://docs.ankiweb.net';
-  // 官方 QQ 群号（关于分组入口点击复制到剪贴板，与 欢迎弹窗 中 QQ群号 保持一致）
-  private readonly QQ群号: string = '726837065';
-  // 本应用 bundleName，用于拼接应用市场 DeepLink 跳转本应用详情页（好评回退路径）
-  private readonly 本应用包名: string = 'com.jide.kapian';
   导入数据回调: () => void = (): void => {
   };
   导出数据回调: () => void = (): void => {
@@ -126,21 +131,6 @@ export struct 设置面板 {
 
   // 右上角模式切换菜单：顶栏「当前模式」按钮触发，弹出 简洁版/实验版 选择
   @State private 显示模式菜单: boolean = false;
-  private feedbackDialog: CustomDialogController = new CustomDialogController({
-    builder: AboutActionDialog({
-      groupNumber: this.QQ群号,
-      onCopyGroup: (): void => { this.复制QQ群号到剪贴板(); }
-    }),
-    autoCancel: true,
-    alignment: DialogAlignment.Center,
-    customStyle: true
-  });
-  private sponsorDialog: CustomDialogController = new CustomDialogController({
-    builder: AboutActionDialog({ sponsor: true }),
-    autoCancel: true,
-    alignment: DialogAlignment.Center,
-    customStyle: true
-  });
   @State private maintenance: CollectionMaintenanceState = new CollectionMaintenanceState();
   private readonly maintenanceSession: CollectionMaintenanceSession = new CollectionMaintenanceSession();
   // 子分组（FSRS / 语音朗读）ⓘ 按钮上抛的说明请求：统一在本面板根 Stack 浮层显示，
@@ -172,7 +162,6 @@ export struct 设置面板 {
 
   private readonly 集合服务实例: 集合服务 = new 集合服务();
   private readonly 标签服务实例: 标签服务 = new 标签服务();
-  private readonly 链接服务实例: 链接服务 = new 链接服务();
 
   async aboutToAppear(): Promise<void> {
     this.disposed = false;
@@ -183,10 +172,7 @@ export struct 设置面板 {
     const 持久化值: boolean = await 加载简洁模式();
     if (this.disposed || lifecycleVersion !== this.lifecycleVersion) return;
     AppStorage.setOrCreate<boolean>(简洁模式AppStorage键, 持久化值);
-    // 实验性功能开关同样加载持久化值，让 @StorageLink 跨重启保持一致
-    const TapZones值: boolean = await 加载TapZones开关();
-    if (this.disposed || lifecycleVersion !== this.lifecycleVersion) return;
-    AppStorage.setOrCreate<boolean>(TapZones开关AppStorage键, TapZones值);
+    // 学习控制偏好由 ReviewControlsSettings 自行恢复，并展示读取失败。
     // 未配置 AI 从制卡/改卡跳转进来：悬浮 Toast 提示 + 直接定位到 AI 智能体分组
     if (this.openAiSettings) {
       showToastSafely(this.getUIContext(), {
@@ -202,8 +188,6 @@ export struct 设置面板 {
   }
 
   aboutToDisappear(): void {
-    this.feedbackDialog.close();
-    this.sponsorDialog.close();
     this.disposed = true;
     this.lifecycleVersion++;
     this.maintenanceSession.detach();
@@ -211,7 +195,7 @@ export struct 设置面板 {
 
   /** 目录导航只改变展示位置，设置的保存仍交给原有组件。 */
   private openSection(id: string): void {
-    if ((id === 'scheduler' || id === 'data' || id === 'advanced') && syncActivity.isCollectionBusy()) {
+    if (((id === 'scheduler' && !this.简洁模式) || id === 'data' || id === 'advanced') && syncActivity.isCollectionBusy()) {
       showToastSafely(this.getUIContext(), { message: this.取本地化文本($r('app.string.sync_wait_operation')) });
       return;
     }
@@ -240,15 +224,29 @@ export struct 设置面板 {
     else { this.关闭回调(); }
   }
 
+  private onSettingsSearchChange(value: string): void {
+    this.settingsQuery = value;
+    // 全局搜索框在详情页也保持可见；开始新的搜索时回到目录展示结果。
+    if (value.trim() !== '' && this.activeSection !== '') {
+      this.activeSection = '';
+      this.内容滚动器.scrollToIndex(0);
+    }
+  }
+
+  @Builder
+  private settingsSearchField(): void {
+    TextInput({ text: this.settingsQuery, placeholder: $r('app.string.settings_search_placeholder') })
+      .width('100%')
+      .height(应用尺寸.searchFieldHeight)
+      .fontSize(应用尺寸.字号_正文)
+      .backgroundColor($r('app.color.surface_card'))
+      .borderRadius(应用尺寸.searchFieldRadius)
+      .onChange((value: string): void => { this.onSettingsSearchChange(value); })
+  }
+
   @Builder
   private settingsDirectory() {
-    Column({ space: 12 }) {
-      TextInput({ text: this.settingsQuery, placeholder: $r('app.string.settings_search_placeholder') })
-        .height(应用尺寸.searchFieldHeight)
-        .fontSize(应用尺寸.字号_正文)
-        .backgroundColor($r('app.color.surface_card'))
-        .borderRadius(应用尺寸.searchFieldRadius)
-        .onChange((value: string): void => { this.settingsQuery = value; })
+    Column() {
       Column() {
         ForEach(this.directoryEntries(), (entry: SettingsEntry) => {
           Button() {
@@ -265,7 +263,8 @@ export struct 设置面板 {
             }.width('100%').padding({ left: 16, right: 16, top: 14, bottom: 14 })
           }
           .type(ButtonType.Normal).width('100%').backgroundColor(Color.Transparent)
-          .onClick((): void => { this.openSection(entry.id); })
+          .attributeModifier(new PressFeedback())
+          .stateEffect(false).onClick((): void => { this.openSection(entry.id); })
           Divider().color($r('app.color.border_subtle')).margin({ left: 16, right: 16 })
         }, (entry: SettingsEntry): string => entry.id)
         if (this.directoryEntries().length === 0) {
@@ -357,389 +356,12 @@ export struct 设置面板 {
   }
 
   // ========================================================
-  // @块ID UI-SETTINGS-PANEL-006
-  // @名称 打开 AnkiWeb 网址
-  //
-  // @作用
-  // 点击「关于 → AnkiWeb 共享牌组」入口行：用系统浏览器打开 AnkiWeb 共享牌组页面。
-  // 若系统无可用浏览器（startAbility 失败），兜底把网址复制到剪贴板并 toast 提示。
-  //
-  // @输入
-  // 无（读 this.AnkiWeb网址）
-  //
-  // @输出
-  // 调系统 startAbility 打开网址；失败时写系统剪贴板 + 弹 toast。
-  //
-  // @业务规则
-  // 不在 app 内嵌 Web 组件打开 AnkiWeb（避免登录态/cookie 与本应用混淆），
-  // 一律交给系统浏览器处理。
-  //
-  // @副作用
-  // 调系统 startAbility（可能拉起系统浏览器）；
-  // 失败时写系统剪贴板（pasteboard）+ 弹 toast。
-  // ========================================================
-  private 打开AnkiWeb网址(): void {
-    const 上下文: common.UIAbilityContext =
-      this.getUIContext().getHostContext() as common.UIAbilityContext;
-    上下文.startAbility({
-      action: 'ohos.want.action.viewData',
-      uri: this.AnkiWeb网址
-    }).catch((错误: Error): void => {
-      // 兜底：复制网址到剪贴板 + toast 提示用户手动打开
-      this.复制AnkiWeb网址到剪贴板();
-    });
-  }
-
-  private async 复制AnkiWeb网址到剪贴板(): Promise<void> {
-    try {
-      const 剪贴数据: pasteboard.PasteData =
-        pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, this.AnkiWeb网址);
-      const 系统剪贴板: pasteboard.SystemPasteboard = pasteboard.getSystemPasteboard();
-      await 系统剪贴板.setData(剪贴数据);
-      showToastSafely(this.getUIContext(), {
-        message: $r('app.string.about_ankiweb_open_failed')
-      });
-    } catch (错误) {
-      // 复制失败静默；用户仍可在关于分组看到网址文本手动抄录
-    }
-  }
-
-  // ========================================================
-  // @块ID UI-SETTINGS-PANEL-007
-  // @名称 打开 Anki 官方文档
-  //
-  // @作用
-  // 点击设置页底部「查看 Anki 官方文档」入口行：
-  // 优先调后端 LinksService.HelpPageLink(INDEX) 取官方文档 URL（按 locale 选站点），
-  // 后端不可用或返回空串时兜底用本地常量 Anki文档网址；再用系统浏览器打开。
-  // 若系统无可用浏览器（startAbility 失败），兜底把网址复制到剪贴板并 toast 提示。
-  //
-  // @输入
-  // 无（读 this.Anki文档网址 / this.链接服务实例）
-  //
-  // @输出
-  // 调系统 startAbility 打开网址；失败时写系统剪贴板 + 弹 toast。
-  //
-  // @业务规则
-  // 不在 app 内嵌 Web 组件打开文档（与 打开AnkiWeb网址 一致，交给系统浏览器处理）。
-  //
-  // @副作用
-  // 调后端 链接服务.获取帮助页链接（NAPI 桥）；
-  // 调系统 startAbility（可能拉起系统浏览器）；
-  // 失败时写系统剪贴板（pasteboard）+ 弹 toast。
-  // ========================================================
-  private async 打开Anki官方文档(): Promise<void> {
-    let 网址: string = this.Anki文档网址;
-    try {
-      const 后端网址: string = await this.链接服务实例.获取帮助页链接(HelpPage.INDEX);
-      if (后端网址 !== '') {
-        网址 = 后端网址;
-      }
-    } catch (错误) {
-      // 后端不可用：兜底用本地常量网址，确保用户仍能打开文档
-    }
-    const 上下文: common.UIAbilityContext =
-      this.getUIContext().getHostContext() as common.UIAbilityContext;
-    上下文.startAbility({
-      action: 'ohos.want.action.viewData',
-      uri: 网址
-    }).catch((错误: Error): void => {
-      // 兜底：复制网址到剪贴板 + toast 提示用户手动打开
-      this.复制Anki文档网址到剪贴板(网址);
-    });
-  }
-
-  private async 复制Anki文档网址到剪贴板(网址: string): Promise<void> {
-    try {
-      const 剪贴数据: pasteboard.PasteData =
-        pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, 网址);
-      const 系统剪贴板: pasteboard.SystemPasteboard = pasteboard.getSystemPasteboard();
-      await 系统剪贴板.setData(剪贴数据);
-      showToastSafely(this.getUIContext(), {
-        message: $r('app.string.about_anki_docs_open_failed')
-      });
-    } catch (错误) {
-      // 复制失败静默；用户仍可在关于分组看到网址文本手动抄录
-    }
-  }
-
-  // 点击「关于 → QQ 群」入口行：把 QQ 群号写入系统剪贴板并 toast 提示。
-  // 不跳转 QQ 应用（避免未装 QQ 时 startAbility 失败的复杂降级链路），统一走复制 + 用户自行打开 QQ 加群。
-  private async 复制QQ群号到剪贴板(): Promise<void> {
-    try {
-      const 剪贴数据: pasteboard.PasteData =
-        pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, this.QQ群号);
-      const 系统剪贴板: pasteboard.SystemPasteboard = pasteboard.getSystemPasteboard();
-      await 系统剪贴板.setData(剪贴数据);
-      showToastSafely(this.getUIContext(), {
-        message: $r('app.string.about_qq_group_copied')
-      });
-    } catch (错误) {
-      // 复制失败静默；用户仍可在关于分组看到群号文本手动抄录
-    }
-  }
-
-  // ========================================================
-  // @块ID UI-SETTINGS-PANEL-006
-  // @名称 打开好评弹窗
-  //
-  // @作用
-  // 点击「关于 → 给我好评」入口：优先调 commentManager.showCommentDialog 弹系统好评弹窗；
-  // 失败回退 跳转应用市场详情页（DeepLink）拉起华为应用市场本应用详情页。
-  //
-  // @输入
-  // 无（内部用 getUIContext().getHostContext() 取 UIAbilityContext）
-  //
-  // @输出
-  // 无返回值；调 commentManager.showCommentDialog，失败时调 跳转应用市场详情页。
-  //
-  // @副作用
-  // 调 commentManager.showCommentDialog（系统弹窗）；失败时调 跳转应用市场详情页（startAbility）。
-  // ========================================================
-  private 打开好评弹窗(): void {
-    const 上下文: common.UIAbilityContext =
-      this.getUIContext().getHostContext() as common.UIAbilityContext;
-    try {
-      commentManager.showCommentDialog(上下文).then(() => {
-        hilog.info(0x0001, '设置面板', 'showCommentDialog 成功');
-      }).catch((错误: BusinessError) => {
-        this.处理好评失败(错误);
-      });
-    } catch (错误) {
-      this.处理好评失败(错误);
-    }
-  }
-
-  private 处理好评失败(错误: BusinessError): void {
-    hilog.error(0x0001, '设置面板', `showCommentDialog 失败 code=${错误.code} msg=${错误.message}`);
-    this.跳转应用市场详情页();
-  }
-
-  // ========================================================
-  // @块ID UI-SETTINGS-PANEL-008
-  // @名称 跳转应用市场详情页
-  //
-  // @作用
-  // 好评弹窗失败时的回退路径：用 DeepLink store://appgallery.huawei.com/app/detail?id=<本应用包名>
-  // 拉起华为应用市场本应用详情页，用户可在详情页内查看评分并写评论。
-  // DeepLink 拉起失败时 toast 提示用户。
-  //
-  // @输入
-  // 无（读 this.本应用包名）
-  //
-  // @输出
-  // 调系统 startAbility 拉起应用市场详情页；失败时弹 toast。
-  //
-  // @副作用
-  // 调系统 startAbility（拉起华为应用市场）；失败时弹 toast 提示。
-  // ========================================================
-  private 跳转应用市场详情页(): void {
-    const 上下文: common.UIAbilityContext =
-      this.getUIContext().getHostContext() as common.UIAbilityContext;
-    const want: Want = {
-      uri: `store://appgallery.huawei.com/app/detail?id=${this.本应用包名}`
-    };
-    上下文.startAbility(want).then(() => {
-      hilog.info(0x0001, '设置面板', '回退 DeepLink 拉起应用市场成功');
-    }).catch((错误: BusinessError) => {
-      hilog.error(0x0001, '设置面板', `回退 DeepLink 失败 code=${错误.code} msg=${错误.message}`);
-      showToastSafely(this.getUIContext(), {
-        message: $r('app.string.about_rate_failed_fallback'),
-        duration: 3000
-      });
-    });
-  }
-
-  @Builder
-  private 关于分组内容() {
-    Column() {
-      Column({ space: 9 }) {
-        Text($r('app.string.app_about_title'))
-          .fontSize(18)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(设置面板色板_取(this.是否深色).主文字)
-          .width('100%')
-        Text($r('app.string.app_about_copyright'))
-          .fontSize(12)
-          .fontColor(设置面板色板_取(this.是否深色).三级文字)
-          .width('100%')
-      }
-      .width('100%')
-      .alignItems(HorizontalAlign.Start)
-      .padding({ bottom: 12 })
-
-      Divider().color(设置面板色板_取(this.是否深色).分隔线).strokeWidth(1)
-
-      Row() {
-        Text($r('app.string.feedback_title'))
-          .fontSize(15)
-          .fontColor(设置面板色板_取(this.是否深色).主文字)
-        Blank()
-        DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
-      }
-      .width('100%')
-      .height(48)
-      .onClick((): void => { this.feedbackDialog.open(); })
-
-      Divider().color(设置面板色板_取(this.是否深色).分隔线).strokeWidth(1)
-
-      Row() {
-        Text($r('app.string.sponsor_title'))
-          .fontSize(15)
-          .fontColor(设置面板色板_取(this.是否深色).主文字)
-        Blank()
-        DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
-      }
-      .width('100%')
-      .height(48)
-      .onClick((): void => { this.sponsorDialog.open(); })
-
-      Divider().color(设置面板色板_取(this.是否深色).分隔线).strokeWidth(1)
-
-      // 好评入口行：点击直接跳应用市场详情页（DeepLink）
-      // 失败时回退到 DeepLink 跳应用市场详情页（见 打开好评弹窗 / 跳转应用市场详情页）
-      Row() {
-        Column({ space: 2 }) {
-          Text($r('app.string.about_rate_title'))
-            .fontSize(15)
-            .fontColor(设置面板色板_取(this.是否深色).主文字)
-          Text($r('app.string.about_rate_summary'))
-            .fontSize(12)
-            .fontColor(设置面板色板_取(this.是否深色).弱化文字)
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-        }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
-        Blank()
-        DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
-      }
-      .width('100%')
-      .height(58)
-      .onClick(() => {
-        this.打开好评弹窗();
-      })
-
-      Divider().color(设置面板色板_取(this.是否深色).分隔线).strokeWidth(1)
-
-      // AnkiWeb 资源入口行：点击用系统浏览器打开 AnkiWeb 共享牌组页面
-      Row() {
-        Column({ space: 2 }) {
-          Text($r('app.string.about_ankiweb_title'))
-            .fontSize(15)
-            .fontColor(设置面板色板_取(this.是否深色).主文字)
-          Text(this.AnkiWeb网址)
-            .fontSize(12)
-            .fontColor(设置面板色板_取(this.是否深色).弱化文字)
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-        }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
-        Blank()
-        DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
-      }
-      .width('100%')
-      .height(58)
-      .onClick(() => {
-        this.打开AnkiWeb网址();
-      })
-
-      Divider().color(设置面板色板_取(this.是否深色).分隔线).strokeWidth(1)
-
-      // QQ 群入口行：点击复制群号到剪贴板（不跳转 QQ 应用，避免未装 QQ 时降级链路复杂）
-      Row() {
-        Column({ space: 2 }) {
-          Text($r('app.string.about_qq_group_title'))
-            .fontSize(15)
-            .fontColor(设置面板色板_取(this.是否深色).主文字)
-          Row({ space: 4 }) {
-            Text($r('app.string.about_qq_group_summary'))
-              .fontSize(12)
-              .fontColor(设置面板色板_取(this.是否深色).弱化文字)
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-            Text($r('app.string.about_qq_group_number_label'))
-              .fontSize(12)
-              .fontColor(设置面板色板_取(this.是否深色).弱化文字)
-            Text() { ThemeTextSpans(this.QQ群号, [], this.getUIContext()) }
-              .fontSize(12)
-              .fontColor(this.解析主色())
-              .fontWeight(FontWeight.Medium)
-              .copyOption(CopyOptions.LocalDevice)
-          }
-          .width('100%')
-        }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
-        Blank()
-        DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
-      }
-      .width('100%')
-      .height(58)
-      .onClick(() => {
-        this.复制QQ群号到剪贴板();
-      })
-
-      Divider().color(设置面板色板_取(this.是否深色).分隔线).strokeWidth(1)
-
-      // 许可证入口行
-      Row() {
-        Column({ space: 2 }) {
-          Text($r('app.string.licenses_title'))
-            .fontSize(15)
-            .fontColor(设置面板色板_取(this.是否深色).主文字)
-          Text($r('app.string.licenses_summary'))
-            .fontSize(12)
-            .fontColor(设置面板色板_取(this.是否深色).弱化文字)
-        }
-        .alignItems(HorizontalAlign.Start)
-        Blank()
-        DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
-      }
-      .width('100%')
-      .height(58)
-      .onClick(() => {
-        this.打开许可证回调();
-      })
-
-      Divider().color(设置面板色板_取(this.是否深色).分隔线).strokeWidth(1)
-
-      // Anki 官方文档入口行（设置页底部）：点击用系统浏览器打开 docs.ankiweb.net
-      // 优先调后端 LinksService.HelpPageLink 取 URL（按 locale 选站点），失败兜底本地常量
-      Row() {
-        Column({ space: 2 }) {
-          Text($r('app.string.about_anki_docs_title'))
-            .fontSize(15)
-            .fontColor(设置面板色板_取(this.是否深色).主文字)
-          Text(this.Anki文档网址)
-            .fontSize(12)
-            .fontColor(设置面板色板_取(this.是否深色).弱化文字)
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-        }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
-        Blank()
-        DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
-      }
-      .width('100%')
-      .height(58)
-      .onClick(() => {
-        this.打开Anki官方文档();
-      })
-    }
-    .width('100%')
-  }
-
-  // ========================================================
   // @块ID UI-SETTINGS-PANEL-005
   // @名称 设置面板主构建
   //
   // @作用
   // 设置目录及详情共用主壳；状态和说明浮层在页面级保留。
   // 分组顺序：标题栏 → 外观 → 调度器 → 布局 → 同步 → 数据库检查 → 术语表 → 数据管理 → 关于。
-  // 数据库检查与关于分组内联在主壳（见 UI-SETTINGS-PANEL-001 / UI-SETTINGS-PANEL-002 / UI-SETTINGS-PANEL-004）。
   //
   // @输入
   // 直接读所有 @Prop / @State / @StorageLink 与外部回调。
@@ -788,6 +410,18 @@ export struct 设置面板 {
         .backgroundColor(this.页面底色微染值)
         .alignContent(Alignment.Center)
 
+        // 搜索框属于设置面板公共壳，进入二级/三级设置仍保持在顶栏下方。
+        Column() {
+          this.settingsSearchField()
+        }
+        .width('100%')
+        .padding({
+          left: 应用尺寸.页面内边距_水平,
+          right: 应用尺寸.页面内边距_水平,
+          top: 应用尺寸.页面内容顶部间距(this.narrowDeckLayout),
+          bottom: 应用尺寸.页面分组间距(this.narrowDeckLayout)
+        })
+
         // 内容区
         List({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout), scroller: this.内容滚动器 }) {
           if (this.activeSection === '') {
@@ -805,7 +439,7 @@ export struct 设置面板 {
               })
             }
           }
-          if (this.activeSection === 'controls') {
+          if (this.activeSection === 'scheduler') {
             ListItem() {
               ReviewControlsSettings({
                 是否深色: this.是否深色,
@@ -818,16 +452,16 @@ export struct 设置面板 {
               })
             }
           }
-          // 1. 外观与语言分组
-          if (this.activeSection === 'appearance') {
+          // 两种模式都可选择答题工具栏位置，切换模式不改已保存的布局。
+          if (this.activeSection === 'scheduler') {
             ListItem() {
-              外观分组({
+              布局分组({
                 是否深色: this.是否深色,
-                简洁模式: this.简洁模式,
-                当前主题模式: this.当前主题模式,
-                当前颜色主题: this.当前颜色主题,
-                主题模式切换回调: (模式: 主题模式): void => { this.主题模式切换回调(模式); },
-                颜色主题切换回调: (主题: 颜色主题): void => { this.颜色主题切换回调(主题); }
+                打开说明回调: (标题: Resource, 正文: Resource): void => {
+                  this.说明标题 = 标题;
+                  this.说明正文 = 正文;
+                  this.显示说明浮层 = true;
+                }
               })
             }
           }
@@ -846,16 +480,16 @@ export struct 设置面板 {
               }
             }
           }
-          // 两种模式都可选择答题工具栏位置，切换模式不改已保存的布局。
+          // 1. 外观与语言分组
           if (this.activeSection === 'appearance') {
             ListItem() {
-              布局分组({
+              外观分组({
                 是否深色: this.是否深色,
-                打开说明回调: (标题: Resource, 正文: Resource): void => {
-                  this.说明标题 = 标题;
-                  this.说明正文 = 正文;
-                  this.显示说明浮层 = true;
-                }
+                简洁模式: this.简洁模式,
+                当前主题模式: this.当前主题模式,
+                当前颜色主题: this.当前颜色主题,
+                主题模式切换回调: (模式: 主题模式): void => { this.主题模式切换回调(模式); },
+                颜色主题切换回调: (主题: 颜色主题): void => { this.颜色主题切换回调(主题); }
               })
             }
           }
@@ -926,14 +560,17 @@ export struct 设置面板 {
               })
             }
           }
-          // 8. 关于分组：反馈与赞赏由独立系统弹窗承载
+          // 8. 关于分组：反馈由独立系统弹窗承载
           if (this.activeSection === 'about') {
             ListItem() {
               设置分组卡片({
                 标题: $r('app.string.settings_about'),
                 是否深色: this.是否深色,
               }) {
-                this.关于分组内容();
+                AboutSettings({
+                  是否深色: this.是否深色,
+                  打开许可证回调: (): void => { this.打开许可证回调(); }
+                })
               }
             }
           }
@@ -954,7 +591,7 @@ export struct 设置面板 {
           if (this.activeSection === 'redemption') {
             ListItem() {
               RedemptionPanel({
-                developerGroup: this.QQ群号,
+                developerGroup: '726837065',
                 onUseTheme: (theme: 颜色主题): void => { this.颜色主题切换回调(theme); }
               })
             }
@@ -965,7 +602,7 @@ export struct 设置面板 {
         .padding({
           left: 应用尺寸.页面内边距_水平,
           right: 应用尺寸.页面内边距_水平,
-          top: 应用尺寸.页面内容顶部间距(this.narrowDeckLayout),
+          top: 0,
           bottom: 应用尺寸.页面底部间距(this.narrowDeckLayout) + this.导航条高度
         })
         .backgroundColor(this.页面底色微染值)
@@ -1006,6 +643,7 @@ export struct 设置面板 {
 
       if (this.显示备份管理) {
         备份管理面板({
+          backRequest: this.backupBackRequest,
           isDark: this.是否深色,
           onClose: (): void => { this.显示备份管理 = false; }
         })
@@ -1015,6 +653,7 @@ export struct 设置面板 {
       // 媒体管理面板：数据管理分组入口打开，挂在根 Stack 顶层
       if (this.显示媒体管理) {
         媒体管理面板({
+          backRequest: this.mediaBackRequest,
           isDark: this.是否深色,
           onClose: (): void => { this.显示媒体管理 = false; }
         })
@@ -1023,6 +662,7 @@ export struct 设置面板 {
 
       if (this.显示空卡列表) {
         空卡列表面板({
+          backRequest: this.emptyCardsBackRequest,
           isDark: this.是否深色,
           onClose: (): void => { this.显示空卡列表 = false; }
         })
@@ -1032,6 +672,7 @@ export struct 设置面板 {
       // 查找重复对话框：数据管理分组入口打开，挂在根 Stack 顶层
       if (this.显示查找重复) {
         查找重复对话框({
+          backRequest: this.duplicatesBackRequest,
           isDark: this.是否深色,
           onClose: (): void => { this.显示查找重复 = false; },
           onJumpToBrowser: (searchText: string): void => {
@@ -1045,6 +686,7 @@ export struct 设置面板 {
       // 笔记类型管理面板（T3）：数据管理分组入口打开
       if (this.显示笔记类型管理) {
         笔记类型管理面板({
+          backRequest: this.notetypeManagerBackRequest,
           isDark: this.是否深色,
           onClose: (): void => { this.显示笔记类型管理 = false; },
           onEdit: (id: number, name: string): void => {
@@ -1060,6 +702,7 @@ export struct 设置面板 {
       // 笔记类型编辑器（T3）：从管理面板点击编辑后打开
       if (this.显示笔记类型编辑器) {
         笔记类型编辑器({
+          backRequest: this.notetypeEditorBackRequest,
           isDark: this.是否深色,
           notetypeId: this.编辑笔记类型ID,
           notetypeName: this.编辑笔记类型名,

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../../utils/PressFeedback';
+import { DialogBackdrop } from '../common/DialogBackdrop';
 import { resourceText } from '../../utils/UiFeedback';
 import { ThemeTextSpans } from '../common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
@@ -42,6 +44,12 @@ import type { 笔记空卡 } from '../../proto/messages/CardRenderingMessages';
 
 @Component
 export struct 空卡列表面板 {
+  @Prop @Watch('handleBackRequest') backRequest: number = 0;
+
+  private handleBackRequest(): void {
+    if (!(this.检查中 || this.处理中)) this.onClose();
+  }
+
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
   onClose: () => void = (): void => {};
@@ -208,15 +216,7 @@ export struct 空卡列表面板 {
   build() {
     Stack() {
       // 磨砂玻璃遮罩层
-      Column()
-        .width('100%')
-        .height('100%')
-        .backgroundColor(设置面板色板_取(this.isDark).遮罩)
-        .backgroundBlurStyle(BlurStyle.Thin, {
-          colorMode: this.isDark ? ThemeColorMode.DARK : ThemeColorMode.LIGHT,
-          adaptiveColor: AdaptiveColor.DEFAULT
-        })
-        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+      DialogBackdrop()
         .onClick(() => {
           if (!this.检查中 && !this.处理中) {
             this.onClose();
@@ -285,6 +285,8 @@ export struct 空卡列表面板 {
                     .backgroundColor(Color.Transparent)
                     .fontColor(this.主色按钮背景)
                     .fontSize(应用尺寸.字号_正文_小)
+                    .attributeModifier(new PressFeedback())
+                    .stateEffect(false)
                     .onClick(() => { this.切换全选(); })
                 }
               }
@@ -319,6 +321,8 @@ export struct 空卡列表面板 {
             .borderRadius(应用尺寸.圆角_胶囊)
             .enabled(this.选中数量() > 0 && !this.处理中)
             .opacity(this.选中数量() > 0 && !this.处理中 ? 1 : 0.4)
+            .attributeModifier(new PressFeedback(this.选中数量() > 0 && !this.处理中 ? 1 : 0.4))
+            .stateEffect(false)
             .onClick(() => { this.确认删除(); })
 
           // 处理中指示

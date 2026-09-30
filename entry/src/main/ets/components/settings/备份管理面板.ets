@@ -1,4 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../../utils/PressFeedback';
+import { 按下态按钮 } from '../common/按下态按钮';
+import { DialogFrame } from '../common/DialogFrame';
+import { DialogHeader } from '../common/DialogHeader';
+import { SettingsToggleRow } from '../common/SettingsToggleRow';
 import { resourceText } from '../../utils/UiFeedback';
 import { common } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
@@ -10,6 +15,12 @@ import { LocalBackups, loadAutomaticBackup, saveAutomaticBackup } from '../../ba
 
 @Component
 export struct 备份管理面板 {
+  @Prop @Watch('handleBackRequest') backRequest: number = 0;
+
+  private handleBackRequest(): void {
+    if (!this.busy) this.onClose();
+  }
+
   @Prop isDark: boolean = false;
   onClose: () => void = (): void => {};
   @StorageProp(颜色键.动作主色) private actionColor: string = '#2F5FD0';
@@ -94,59 +105,53 @@ export struct 备份管理面板 {
     return resourceText(this.getUIContext(), resource);
   }
 
-  build() {
-    Stack() {
-      Column({ space: 应用尺寸.间距_8 }) {
-        Row() {
-          Text($r('app.string.backup_management_title')).fontSize(18).fontWeight(FontWeight.Bold)
-            .fontColor(设置面板色板_取(this.isDark).主文字);
-          Blank();
-          Button($r('app.string.close')).type(ButtonType.Normal).backgroundColor(Color.Transparent)
-            .fontColor(this.actionColor).onClick((): void => this.onClose());
-        }.width('100%');
+  @Builder
+  private dialogHeader() {
+    DialogHeader({ title: $r('app.string.backup_management_title'), showAction: false,
+      closeLabel: $r('app.string.close'), closeEnabled: !this.busy,
+      onClose: (): void => this.handleBackRequest() })
+  }
+
+  @Builder
+  private dialogContent() {
         Text($r('app.string.backup_management_subtitle')).fontSize(13)
           .fontColor(设置面板色板_取(this.isDark).次文字).width('100%');
-        Row() {
-          Column({ space: 2 }) {
-            Text($r('app.string.backup_management_auto')).fontSize(15)
-              .fontColor(设置面板色板_取(this.isDark).主文字);
-            Text($r('app.string.backup_management_auto_hint')).fontSize(12).maxLines(3)
-              .fontColor(设置面板色板_取(this.isDark).弱化文字);
-          }.layoutWeight(1);
-          Toggle({ type: ToggleType.Switch, isOn: this.automaticEnabled }).enabled(!this.busy)
-            .onChange((value: boolean): void => { this.toggleAutomatic(value); });
-        }.width('100%');
+        SettingsToggleRow({ title: $r('app.string.backup_management_auto'),
+          hint: $r('app.string.backup_management_auto_hint'), isOn: this.automaticEnabled,
+          isInteractive: !this.busy, isDark: this.isDark, tint: this.actionColor, onChange: (value: boolean): void => { this.toggleAutomatic(value); } })
         Row({ space: 应用尺寸.间距_8 }) {
-          Button($r('app.string.backup_management_create')).enabled(!this.busy)
-            .onClick((): void => { this.createBackup(); });
-          Button($r('app.string.backup_management_restore')).enabled(!this.busy && this.selectedBackup !== '')
-            .onClick((): void => { this.restoreBackup(); });
+          按下态按钮({ 文案: $r('app.string.backup_management_create'), 字色: this.actionColor, themeText: true,
+            是否启用: !this.busy, 点击回调: (): void => { this.createBackup(); } }).layoutWeight(1)
+          按下态按钮({ 文案: $r('app.string.backup_management_restore'), 字色: this.actionColor, themeText: true,
+            是否启用: !this.busy && this.selectedBackup !== '', 点击回调: (): void => { this.restoreBackup(); } }).layoutWeight(1)
         }.width('100%');
         if (this.backups.length === 0) {
           Text($r('app.string.backup_management_empty')).fontSize(13)
             .fontColor(设置面板色板_取(this.isDark).次文字).width('100%');
         } else {
-          List() {
+          Column() {
             ForEach(this.backups, (name: string) => {
-              ListItem() {
+              Column() {
                 Row() {
                   Text(name).fontSize(14).layoutWeight(1)
                     .fontColor(设置面板色板_取(this.isDark).主文字);
                 }.width('100%').padding(10)
                 .backgroundColor(this.selectedBackup === name ? 设置面板色板_取(this.isDark).标签背景 : Color.Transparent)
-                .onClick((): void => { this.selectedBackup = name; });
+                .attributeModifier(new PressFeedback())
+                .onClick((): void => { if (!this.busy) this.selectedBackup = name; });
               }
             }, (name: string): string => name);
-          }.layoutWeight(1).width('100%');
+          }.width('100%');
         }
         if (this.statusMessage !== '') Text(this.statusMessage).fontSize(13)
           .fontColor(this.actionColor).width('100%');
         if (this.errorMessage !== '') Text(this.errorMessage).fontSize(13)
           .fontColor(设置面板色板_取(this.isDark).错误色).width('100%');
-      }.width('92%').height('88%').padding(应用尺寸.卡片内边距)
-        .backgroundColor(设置面板色板_取(this.isDark).背景).borderRadius(18)
-        .shadow({ radius: 20, color: '#33000000', offsetX: 0, offsetY: 8 });
-    }.width('100%').height('100%').backgroundColor('#66000000')
-      .alignContent(Alignment.Center);
+
+  }
+
+  build() {
+    DialogFrame({ header: () => { this.dialogHeader(); }, content: () => { this.dialogContent(); }, canDismiss: !this.busy,
+      onDismiss: (): void => this.handleBackRequest() })
   }
 }

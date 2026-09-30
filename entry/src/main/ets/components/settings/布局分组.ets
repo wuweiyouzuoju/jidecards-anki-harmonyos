@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { HelpLabel } from '../common/HelpLabel';
 import { resourceText } from '../../utils/UiFeedback';
 import { SelectStyle } from '../../utils/SelectStyle';
 
@@ -12,7 +13,7 @@ import { 设置分组卡片 } from './设置分组卡片';
 //
 // @作用
 // 提供底部固定 / 浮动可拖 两种学习页布局模式切换，
-// 首页进度移至常规，评分振动移至控制；这里只保留复习界面的布局。
+// 首页进度移至常规，评分振动移至复习；这里只保留复习界面的布局。
 // 当前布局模式 = null 表示加载中；加载失败回退 'bottom'。
 // 切换后立即生效（下次进入学习页）。
 //
@@ -101,26 +102,12 @@ export struct 布局分组 {
       Column({ space: 8 }) {
           // 第 1 行：学习页布局（左侧标题+ⓘ，右侧 Select 选择框——与「当前模式」行同款对齐）
           Row() {
-            Row() {
-              Text(this.取本地化文本($r('app.string.settings_study_layout_row')))
-                .fontSize(15)
-                .fontColor(设置面板色板_取(this.是否深色).主文字)
-              Button($r('app.string.field_help_button'))
-                .type(ButtonType.Normal)
-                .backgroundColor(Color.Transparent)
-                .fontSize(14)
-                .fontColor(设置面板色板_取(this.是否深色).三级文字)
-                .width(28)
-                .height(28)
-                .padding(0)
-                .margin({ left: 4 })
-                .onClick(() => {
-                  this.打开说明回调(
-                    $r('app.string.settings_study_layout_row'),
-                    $r('app.string.settings_study_layout_help')
-                  );
-                })
-            }
+            HelpLabel({ title: $r('app.string.settings_study_layout_row'),
+              textColor: 设置面板色板_取(this.是否深色).主文字,
+              onHelp: (): void => {
+                this.打开说明回调($r('app.string.settings_study_layout_row'), $r('app.string.settings_study_layout_help'));
+              }
+            })
             .layoutWeight(1)
             Select(this.布局模式选项())
               .selected(this.布局模式索引())
@@ -132,7 +119,9 @@ export struct 布局分组 {
               .padding(SelectStyle.controlPadding)
               .space(SelectStyle.controlSpace)
               .width(SelectStyle.fieldWidth)
+              .constraintSize(SelectStyle.fieldConstraint)
               .font(SelectStyle.controlFont)
+              .textModifier(SelectStyle.labelText())
               .borderRadius(SelectStyle.controlRadius)
               .onSelect((索引: number): void => {
                 const 模式列表: 学习布局模式[] = ['bottom', 'float'];

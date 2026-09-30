@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../../utils/PressFeedback';
 import { ThemeTextSpans } from '../common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
@@ -102,6 +103,8 @@ export struct 开发者调试分组 {
             .borderRadius(22)
             .enabled(!this.正在启用 && this.开发者密钥.trim() !== '')
             .opacity(this.正在启用 || this.开发者密钥.trim() === '' ? 0.6 : 1)
+            .attributeModifier(new PressFeedback(this.正在启用 || this.开发者密钥.trim() === '' ? 0.6 : 1))
+            .stateEffect(false)
             .onClick((): void => { this.启用开发者功能(); })
         }
         if (this.显示错误) {

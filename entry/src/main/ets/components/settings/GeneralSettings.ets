@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { HelpLabel } from '../common/HelpLabel';
 import { resourceText, showToastSafely } from '../../utils/UiFeedback';
 import { SelectStyle } from '../../utils/SelectStyle';
 import { 当前语言模式, 语言模式, 设置语言模式 } from '../../model/语言存储';
@@ -69,7 +70,9 @@ export struct GeneralSettings {
               .padding(SelectStyle.controlPadding)
               .space(SelectStyle.controlSpace)
               .width(SelectStyle.fieldWidth)
+              .constraintSize(SelectStyle.fieldConstraint)
               .font(SelectStyle.controlFont)
+              .textModifier(SelectStyle.labelText())
               .borderRadius(SelectStyle.controlRadius)
               .onSelect((索引: number): void => {
                 const 模式列表: 语言模式[] = ['zh-Hans', 'en'];
@@ -79,26 +82,12 @@ export struct GeneralSettings {
           .width('100%')
           .height(48)
           Row() {
-            Row() {
-              Text($r('app.string.settings_home_today_summary'))
-                .fontSize(15)
-                .fontColor(设置面板色板_取(this.是否深色).主文字)
-              Button($r('app.string.field_help_button'))
-                .type(ButtonType.Normal)
-                .backgroundColor(Color.Transparent)
-                .fontSize(14)
-                .fontColor(设置面板色板_取(this.是否深色).三级文字)
-                .width(28)
-                .height(28)
-                .padding(0)
-                .margin({ left: 4 })
-                .onClick(() => {
-                  this.打开说明回调(
-                    $r('app.string.settings_home_today_summary'),
-                    $r('app.string.settings_home_today_summary_hint')
-                  );
-                })
-            }
+            HelpLabel({ title: $r('app.string.settings_home_today_summary'),
+              textColor: 设置面板色板_取(this.是否深色).主文字,
+              onHelp: (): void => {
+                this.打开说明回调($r('app.string.settings_home_today_summary'), $r('app.string.settings_home_today_summary_hint'));
+              }
+            })
             .layoutWeight(1)
 
             Toggle({ type: ToggleType.Switch, isOn: this.显示今日进度卡 })

@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../../utils/PressFeedback';
+import { DialogFrame } from '../common/DialogFrame';
+import { AnchoredMenuItem } from '../common/MenuItem';
 import { resourceText, showToastSafely } from '../../utils/UiFeedback';
 import { SelectStyle } from '../../utils/SelectStyle';
 import { ThemeTextSpans } from '../common/ThemeText';
@@ -39,12 +42,8 @@ import { 笔记类型服务 } from '../../backend/笔记类型服务';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 设置面板色板_取 } from '../../utils/设置面板配色';
 import { 颜色键 } from '../../model/颜色主题';
-import { 取全屏转场时长, 取全屏转场曲线 } from '../../utils/转场时长';
 
-interface 字段项 {
-  ord: number;
-  name: string;
-}
+import { NotetypeFieldDraft as 字段项, serializeNotetypeFields } from '../../model/NotetypeFieldDraft';
 
 interface 模板项 {
   ord: number;
@@ -55,6 +54,12 @@ interface 模板项 {
 
 @Component
 export struct 笔记类型编辑器 {
+  @Prop @Watch('handleBackRequest') backRequest: number = 0;
+
+  private handleBackRequest(): void {
+    if (!(this.保存中)) this.onClose();
+  }
+
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
   @Prop notetypeId: number = 0;
@@ -127,7 +132,7 @@ export struct 笔记类型编辑器 {
             name: typeof fname === 'string' ? fname : ''
           });
         }
-        列表.sort((a: 字段项, b: 字段项): number => a.ord - b.ord);
+        列表.sort((a: 字段项, b: 字段项): number => (a.ord ?? 0) - (b.ord ?? 0));
         this.字段列表 = 列表;
       }
       // 模板
@@ -166,14 +171,7 @@ export struct 笔记类型编辑器 {
       // 更新字段（保留原始字段对象，只改 name 和 ord）
       const 原flds: Object | undefined = obj['flds'];
       if (Array.isArray(原flds)) {
-        const 新flds: Object[] = [];
-        for (let i = 0; i < this.字段列表.length; i++) {
-          const 原项: Record<string, Object> = (i < 原flds.length ? 原flds[i] : {}) as Record<string, Object>;
-          原项['name'] = this.字段列表[i].name;
-          原项['ord'] = i;
-          新flds.push(原项);
-        }
-        obj['flds'] = 新flds;
+        obj['flds'] = serializeNotetypeFields(原flds, this.字段列表);
       }
       // 更新模板（保留原始模板对象，只改 name/qfmt/afmt/ord）
       const 原tmpls: Object | undefined = obj['tmpls'];
@@ -191,7 +189,7 @@ export struct 笔记类型编辑器 {
       }
       return JSON.stringify(obj);
     } catch (error) {
-      return this.原始JSON;
+      throw error instanceof Error ? error : new Error(`${error}`);
     }
   }
 
@@ -219,7 +217,7 @@ export struct 笔记类型编辑器 {
 
   // 字段操作
   private 添加字段(): void {
-    this.字段列表.push({ ord: this.字段列表.length, name: '' });
+    this.字段列表.push({ ord: null, name: '' });
     // ArkUI @State 数组 push 后需要触发刷新
     this.字段列表 = [...this.字段列表];
   }
@@ -230,10 +228,7 @@ export struct 笔记类型编辑器 {
       return;
     }
     this.字段列表.splice(索引, 1);
-    // 重新编号
-    for (let i = 0; i < this.字段列表.length; i++) {
-      this.字段列表[i] = { ord: i, name: this.字段列表[i].name };
-    }
+    // 保留原 ord，数组位置才是新的显示顺序。
     this.字段列表 = [...this.字段列表];
   }
 
@@ -244,9 +239,6 @@ export struct 笔记类型编辑器 {
     const 临时: 字段项 = this.字段列表[索引 - 1];
     this.字段列表[索引 - 1] = this.字段列表[索引];
     this.字段列表[索引] = 临时;
-    for (let i = 0; i < this.字段列表.length; i++) {
-      this.字段列表[i] = { ord: i, name: this.字段列表[i].name };
-    }
     this.字段列表 = [...this.字段列表];
   }
 
@@ -257,9 +249,6 @@ export struct 笔记类型编辑器 {
     const 临时: 字段项 = this.字段列表[索引 + 1];
     this.字段列表[索引 + 1] = this.字段列表[索引];
     this.字段列表[索引] = 临时;
-    for (let i = 0; i < this.字段列表.length; i++) {
-      this.字段列表[i] = { ord: i, name: this.字段列表[i].name };
-    }
     this.字段列表 = [...this.字段列表];
   }
 
@@ -321,6 +310,7 @@ export struct 笔记类型编辑器 {
         .width(28)
         .height(28)
         .textAlign(TextAlign.Center)
+        .attributeModifier(new PressFeedback())
         .onClick(() => { this.上移字段(索引); })
       // 下移
       Text() { ThemeTextSpans('↓', (索引 < this.字段列表.length - 1) ? this.themeAccentColors : [], this.getUIContext()) }
@@ -329,6 +319,7 @@ export struct 笔记类型编辑器 {
         .width(28)
         .height(28)
         .textAlign(TextAlign.Center)
+        .attributeModifier(new PressFeedback())
         .onClick(() => { this.下移字段(索引); })
       // 删除
       Text('×')
@@ -337,6 +328,7 @@ export struct 笔记类型编辑器 {
         .width(28)
         .height(28)
         .textAlign(TextAlign.Center)
+        .attributeModifier(new PressFeedback())
         .onClick(() => { this.删除字段(索引); })
     }
     .width('100%')
@@ -351,6 +343,7 @@ export struct 笔记类型编辑器 {
       .borderRadius(应用尺寸.圆角_面板)
       .padding({ left: 8, right: 8, top: 4, bottom: 4 })
       .margin({ right: 4, bottom: 4 })
+      .attributeModifier(new PressFeedback())
       .onClick(() => {
         // 点击令牌插入到当前模板的正面编辑区末尾
         const t: 模板项 = this.当前模板();
@@ -358,302 +351,227 @@ export struct 笔记类型编辑器 {
       })
   }
 
-  build() {
-    Stack() {
-      // 磨砂玻璃遮罩层
-      Column()
-        .width('100%')
-        .height('100%')
-        .backgroundColor(设置面板色板_取(this.isDark).遮罩)
-        .backgroundBlurStyle(BlurStyle.Thin, {
-          colorMode: this.isDark ? ThemeColorMode.DARK : ThemeColorMode.LIGHT,
-          adaptiveColor: AdaptiveColor.DEFAULT
-        })
-        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-        .onClick(() => {
-          if (!this.加载中 && !this.保存中) {
-            this.onClose();
-          }
-        })
-        .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
+  @Builder
+  private dialogHeader() {
+    DialogHeader({
+      title: $r('app.string.notetype_editor_title'),
+      actionLabel: this.保存中 ? $r('app.string.notetype_editor_saving') : $r('app.string.notetype_editor_save'),
+      actionEnabled: !this.加载中 && !this.保存中,
+      closeLabel: $r('app.string.create_deck_cancel'),
+      closeEnabled: !this.保存中,
+      onClose: (): void => { this.onClose(); },
+      onAction: () => { this.保存(); }
+    })
+  }
 
-      Column({ space: 应用尺寸.间距_16 }) {
-          // 固定标题操作栏
-          DialogHeader({
-            title: $r('app.string.notetype_editor_title'),
-            actionLabel: this.保存中 ? $r('app.string.notetype_editor_saving') : $r('app.string.notetype_editor_save'),
-            actionEnabled: !this.加载中 && !this.保存中,
-            closeLabel: $r('app.string.create_deck_cancel'),
-            closeEnabled: !this.保存中,
-            onClose: (): void => { this.onClose(); },
-            onAction: () => { this.保存(); }
-          })
-
-        Scroll() {
-        Column({ space: 应用尺寸.间距_16 }) {
-          // 加载中
-          if (this.加载中) {
-            Row({ space: 应用尺寸.间距_8 }) {
-              LoadingProgress()
-                .width(20)
-                .height(20)
-                .color($r('app.color.action_primary'))
-              Text($r('app.string.notetype_editor_loading'))
-                .fontSize(应用尺寸.字号_正文_中)
-                .fontColor($r('app.color.text_secondary'))
-            }
-            .width('100%')
-            .justifyContent(FlexAlign.Center)
-          }
-
-          // 错误信息
-          if (this.错误信息 !== '') {
-            Text(this.错误信息)
-              .fontSize(应用尺寸.字号_正文_中)
-              .fontColor($r('app.color.error_text'))
-              .width('100%')
-          }
-
-          if (!this.加载中) {
-            // === 名称区 ===
-            Column({ space: 应用尺寸.间距_5 }) {
-              Text($r('app.string.notetype_editor_name'))
-                .fontSize(应用尺寸.字号_正文_小)
-                .fontColor($r('app.color.text_secondary'))
-                .width('100%')
-              TextInput({ text: this.类型名 })
-                .height(应用尺寸.按钮高度)
-                .fontSize(应用尺寸.字号_正文)
-                .backgroundColor($r('app.color.surface_card'))
-                .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
-                .borderRadius(应用尺寸.圆角_面板)
-                .onChange((值: string) => { this.类型名 = 值; })
-            }
-            .width('100%')
-
-            Button() {
-              Row() {
-                Text($r('app.string.notetype_editor_fields'))
-                  .fontSize(应用尺寸.字号_正文)
-                  .fontColor($r('app.color.text_primary'))
-                  .layoutWeight(1)
-                Text(this.fieldsExpanded ? '⌃' : '⌄')
-                  .fontColor($r('app.color.text_secondary'))
-              }
-              .width('100%')
-            }
-            .type(ButtonType.Normal)
-            .width('100%')
-            .height(应用尺寸.按钮高度)
-            .backgroundColor($r('app.color.surface_card'))
-            .onClick((): void => { this.fieldsExpanded = !this.fieldsExpanded; })
-            if (this.fieldsExpanded) {
-            // === 字段区 ===
-            Column({ space: 应用尺寸.间距_5 }) {
-              Row() {
-                Text($r('app.string.notetype_editor_fields'))
-                  .fontSize(应用尺寸.字号_正文)
-                  .fontColor($r('app.color.text_primary'))
-                  .fontWeight(FontWeight.Medium)
-                  .layoutWeight(1)
-                Text() { ThemeTextSpans($r('app.string.notetype_editor_add_field'), this.themeAccentColors, this.getUIContext()) }
-                  .fontSize(应用尺寸.字号_正文_小)
-                  .fontColor(this.主色按钮背景)
-                  .onClick(() => { this.添加字段(); })
-              }
-              .width('100%')
-
-              ForEach(this.字段列表, (字段: 字段项, 索引: number) => {
-                this.字段行(字段, 索引)
-              }, (字段: 字段项, 索引: number): string => `${索引}_${字段.name}`)
-            }
-            .width('100%')
-
-            }
-
-            Button() {
-              Row() {
-                Text($r('app.string.notetype_editor_templates'))
-                  .fontSize(应用尺寸.字号_正文)
-                  .fontColor($r('app.color.text_primary'))
-                  .layoutWeight(1)
-                Text(this.templatesExpanded ? '⌃' : '⌄')
-                  .fontColor($r('app.color.text_secondary'))
-              }
-              .width('100%')
-            }
-            .type(ButtonType.Normal)
-            .width('100%')
-            .height(应用尺寸.按钮高度)
-            .backgroundColor($r('app.color.surface_card'))
-            .onClick((): void => { this.templatesExpanded = !this.templatesExpanded; })
-            if (this.templatesExpanded) {
-            // === 模板区 ===
-            Column({ space: 应用尺寸.间距_5 }) {
-              Text($r('app.string.notetype_editor_templates'))
-                .fontSize(应用尺寸.字号_正文)
-                .fontColor($r('app.color.text_primary'))
-                .fontWeight(FontWeight.Medium)
-                .width('100%')
-
-              // 模板选择器
-              if (this.模板列表.length > 1) {
-                Select([
-                  ...this.模板列表.map((t: 模板项): SelectOption => {
-                    return { value: t.name };
-                  })
-                ])
-                  .selected(this.当前模板索引)
-                  .value(this.当前模板().name)
-                  .width('100%')
-                  .attributeModifier(new SelectStyle())
-                  .height(SelectStyle.controlHeight)
-                  .padding(SelectStyle.controlPadding)
-                  .space(SelectStyle.controlSpace)
-                  .font(SelectStyle.controlFont)
-                  .borderRadius(SelectStyle.controlRadius)
-                  .onSelect((索引: number) => {
-                    this.当前模板索引 = 索引;
-                  })
-              }
-
-              // 模板名
-              Text($r('app.string.notetype_editor_template_name'))
-                .fontSize(应用尺寸.字号_正文_小)
-                .fontColor($r('app.color.text_secondary'))
-                .width('100%')
-              TextInput({ text: this.当前模板().name })
-                .height(应用尺寸.按钮高度)
-                .fontSize(应用尺寸.字号_正文_小)
-                .backgroundColor($r('app.color.surface_card'))
-                .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
-                .borderRadius(应用尺寸.圆角_面板)
-                .onChange((值: string) => { this.更新模板名(值); })
-
-              // 字段令牌（点击插入）
-              if (this.字段列表.length > 0) {
-                Text($r('app.string.notetype_editor_tokens'))
-                  .fontSize(应用尺寸.字号_正文_小)
-                  .fontColor($r('app.color.text_secondary'))
-                  .width('100%')
-                Flex({ wrap: FlexWrap.Wrap }) {
-                  ForEach(this.字段列表, (字段: 字段项) => {
-                    this.字段令牌行(字段.name)
-                  }, (字段: 字段项): string => 字段.name)
-                }
-                .width('100%')
-              }
-
-              // 正面模板
-              Text($r('app.string.notetype_editor_front_template'))
-                .fontSize(应用尺寸.字号_正文_小)
-                .fontColor($r('app.color.text_secondary'))
-                .width('100%')
-              TextArea({ text: this.当前模板().qfmt })
-                .fontSize(应用尺寸.字号_正文_小)
-                .backgroundColor($r('app.color.surface_card'))
-                .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
-                .borderRadius(应用尺寸.圆角_面板)
-                .constraintSize({ minHeight: 80 })
-                .width('100%')
-                .onChange((值: string) => { this.更新正面模板(值); })
-
-              // 背面模板
-              Text($r('app.string.notetype_editor_back_template'))
-                .fontSize(应用尺寸.字号_正文_小)
-                .fontColor($r('app.color.text_secondary'))
-                .width('100%')
-              TextArea({ text: this.当前模板().afmt })
-                .fontSize(应用尺寸.字号_正文_小)
-                .backgroundColor($r('app.color.surface_card'))
-                .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
-                .borderRadius(应用尺寸.圆角_面板)
-                .constraintSize({ minHeight: 80 })
-                .width('100%')
-                .onChange((值: string) => { this.更新背面模板(值); })
-            }
-            .width('100%')
-
-            }
-
-            Button() {
-              Row() {
-                Text($r('app.string.notetype_editor_css'))
-                  .fontSize(应用尺寸.字号_正文)
-                  .fontColor($r('app.color.text_primary'))
-                  .layoutWeight(1)
-                Text(this.stylesExpanded ? '⌃' : '⌄')
-                  .fontColor($r('app.color.text_secondary'))
-              }
-              .width('100%')
-            }
-            .type(ButtonType.Normal)
-            .width('100%')
-            .height(应用尺寸.按钮高度)
-            .backgroundColor($r('app.color.surface_card'))
-            .onClick((): void => { this.stylesExpanded = !this.stylesExpanded; })
-            if (this.stylesExpanded) {
-            // === CSS 区 ===
-            Column({ space: 应用尺寸.间距_5 }) {
-              Text($r('app.string.notetype_editor_css'))
-                .fontSize(应用尺寸.字号_正文)
-                .fontColor($r('app.color.text_primary'))
-                .fontWeight(FontWeight.Medium)
-                .width('100%')
-              TextArea({ text: this.CSS文本 })
-                .fontSize(应用尺寸.字号_正文_小)
-                .backgroundColor($r('app.color.surface_card'))
-                .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
-                .borderRadius(应用尺寸.圆角_面板)
-                .constraintSize({ minHeight: 100 })
-                .width('100%')
-                .onChange((值: string) => { this.CSS文本 = 值; })
-            }
-            .width('100%')
-
-            }
-
-            // === 保存按钮 ===
-
-            if (this.保存中) {
-              Row({ space: 应用尺寸.间距_8 }) {
-                LoadingProgress()
-                  .width(20)
-                  .height(20)
-                  .color($r('app.color.action_primary'))
-                Text($r('app.string.notetype_editor_saving'))
-                  .fontSize(应用尺寸.字号_正文_中)
-                  .fontColor($r('app.color.text_secondary'))
-              }
-              .width('100%')
-              .justifyContent(FlexAlign.Center)
-            }
-          }
+  @Builder
+  private dialogContent() {
+    Column({ space: 应用尺寸.间距_12 }) {
+      // 加载中
+      if (this.加载中) {
+        Row({ space: 应用尺寸.间距_8 }) {
+          LoadingProgress()
+            .width(20)
+            .height(20)
+            .color($r('app.color.action_primary'))
+          Text($r('app.string.notetype_editor_loading'))
+            .fontSize(应用尺寸.字号_正文_中)
+            .fontColor($r('app.color.text_secondary'))
         }
         .width('100%')
-        }
-        .width('100%')
-        .layoutWeight(1)
-        .scrollBar(BarState.Auto)
-        .align(Alignment.TopStart)
-        .edgeEffect(EdgeEffect.Spring)
+        .justifyContent(FlexAlign.Center)
       }
-        .width('88%')
-        .height('80%')
-        .constraintSize({ maxWidth: 480 })
-        .padding(应用尺寸.面板内边距)
-        .backgroundColor($r('app.color.surface_card'))
-        .borderRadius(应用尺寸.圆角_卡片)
-        .onClick(() => {})
-        .transition(TransitionEffect.asymmetric(
-          TransitionEffect.opacity(0)
-            .combine(TransitionEffect.scale({ x: 0.96, y: 0.96 }))
-            .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }),
-          TransitionEffect.opacity(0)
-            .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() })
-        ))
+
+      // 错误信息
+      if (this.错误信息 !== '') {
+        Text(this.错误信息)
+          .fontSize(应用尺寸.字号_正文_中)
+          .fontColor($r('app.color.error_text'))
+          .width('100%')
+      }
+
+      if (!this.加载中) {
+        // === 名称区 ===
+        Column({ space: 应用尺寸.间距_5 }) {
+          Text($r('app.string.notetype_editor_name'))
+            .fontSize(应用尺寸.字号_正文_小)
+            .fontColor($r('app.color.text_secondary'))
+            .width('100%')
+          TextInput({ text: this.类型名 })
+            .height(应用尺寸.按钮高度)
+            .fontSize(应用尺寸.字号_正文)
+            .backgroundColor($r('app.color.surface_card'))
+            .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
+            .borderRadius(应用尺寸.圆角_面板)
+            .onChange((值: string) => { this.类型名 = 值; })
+        }
+        .width('100%')
+
+        AnchoredMenuItem({
+          label: $r('app.string.notetype_editor_fields'),
+          labelAlignment: TextAlign.Start,
+          disclosure: true,
+          expanded: this.fieldsExpanded,
+          available: !this.保存中,
+          onSelect: (): void => { this.fieldsExpanded = !this.fieldsExpanded; }
+        })
+        if (this.fieldsExpanded) {
+          // === 字段区 ===
+          Column({ space: 应用尺寸.间距_5 }) {
+            Row() {
+              Text() { ThemeTextSpans($r('app.string.notetype_editor_add_field'), this.themeAccentColors, this.getUIContext()) }
+                .fontSize(应用尺寸.字号_正文_小)
+                .fontColor(this.主色按钮背景)
+                .attributeModifier(new PressFeedback())
+                .onClick(() => { this.添加字段(); })
+            }
+            .width('100%')
+
+            ForEach(this.字段列表, (字段: 字段项, 索引: number) => {
+              this.字段行(字段, 索引)
+            }, (字段: 字段项, 索引: number): string => `${索引}_${字段.name}`)
+          }
+          .width('100%')
+        }
+
+        AnchoredMenuItem({
+          label: $r('app.string.notetype_editor_templates'),
+          labelAlignment: TextAlign.Start,
+          disclosure: true,
+          expanded: this.templatesExpanded,
+          available: !this.保存中,
+          onSelect: (): void => { this.templatesExpanded = !this.templatesExpanded; }
+        })
+        if (this.templatesExpanded) {
+          // === 模板区 ===
+          Column({ space: 应用尺寸.间距_5 }) {
+            // 模板选择器
+            if (this.模板列表.length > 1) {
+              Select([
+                ...this.模板列表.map((t: 模板项): SelectOption => {
+                  return { value: t.name };
+                })
+              ])
+                .selected(this.当前模板索引)
+                .value(this.当前模板().name)
+                .width('100%')
+                .attributeModifier(new SelectStyle())
+                .height(SelectStyle.controlHeight)
+                .padding(SelectStyle.controlPadding)
+                .space(SelectStyle.controlSpace)
+                .font(SelectStyle.controlFont)
+                .textModifier(SelectStyle.labelText())
+                .borderRadius(SelectStyle.controlRadius)
+                .onSelect((索引: number) => {
+                  this.当前模板索引 = 索引;
+                })
+            }
+
+            // 模板名
+            Text($r('app.string.notetype_editor_template_name'))
+              .fontSize(应用尺寸.字号_正文_小)
+              .fontColor($r('app.color.text_secondary'))
+              .width('100%')
+            TextInput({ text: this.当前模板().name })
+              .height(应用尺寸.按钮高度)
+              .fontSize(应用尺寸.字号_正文_小)
+              .backgroundColor($r('app.color.surface_card'))
+              .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
+              .borderRadius(应用尺寸.圆角_面板)
+              .onChange((值: string) => { this.更新模板名(值); })
+
+            // 字段令牌（点击插入）
+            if (this.字段列表.length > 0) {
+              Text($r('app.string.notetype_editor_tokens'))
+                .fontSize(应用尺寸.字号_正文_小)
+                .fontColor($r('app.color.text_secondary'))
+                .width('100%')
+              Flex({ wrap: FlexWrap.Wrap }) {
+                ForEach(this.字段列表, (字段: 字段项) => {
+                  this.字段令牌行(字段.name)
+                }, (字段: 字段项): string => 字段.name)
+              }
+              .width('100%')
+            }
+
+            // 正面模板
+            Text($r('app.string.notetype_editor_front_template'))
+              .fontSize(应用尺寸.字号_正文_小)
+              .fontColor($r('app.color.text_secondary'))
+              .width('100%')
+            TextArea({ text: this.当前模板().qfmt })
+              .fontSize(应用尺寸.字号_正文_小)
+              .backgroundColor($r('app.color.surface_card'))
+              .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
+              .borderRadius(应用尺寸.圆角_面板)
+              .constraintSize({ minHeight: 80 })
+              .width('100%')
+              .onChange((值: string) => { this.更新正面模板(值); })
+
+            // 背面模板
+            Text($r('app.string.notetype_editor_back_template'))
+              .fontSize(应用尺寸.字号_正文_小)
+              .fontColor($r('app.color.text_secondary'))
+              .width('100%')
+            TextArea({ text: this.当前模板().afmt })
+              .fontSize(应用尺寸.字号_正文_小)
+              .backgroundColor($r('app.color.surface_card'))
+              .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
+              .borderRadius(应用尺寸.圆角_面板)
+              .constraintSize({ minHeight: 80 })
+              .width('100%')
+              .onChange((值: string) => { this.更新背面模板(值); })
+          }
+          .width('100%')
+        }
+
+        AnchoredMenuItem({
+          label: $r('app.string.notetype_editor_css'),
+          labelAlignment: TextAlign.Start,
+          disclosure: true,
+          expanded: this.stylesExpanded,
+          available: !this.保存中,
+          onSelect: (): void => { this.stylesExpanded = !this.stylesExpanded; }
+        })
+        if (this.stylesExpanded) {
+          // === CSS 区 ===
+          Column({ space: 应用尺寸.间距_5 }) {
+            TextArea({ text: this.CSS文本 })
+              .fontSize(应用尺寸.字号_正文_小)
+              .backgroundColor($r('app.color.surface_card'))
+              .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
+              .borderRadius(应用尺寸.圆角_面板)
+              .constraintSize({ minHeight: 100 })
+              .width('100%')
+              .onChange((值: string) => { this.CSS文本 = 值; })
+          }
+          .width('100%')
+        }
+
+        if (this.保存中) {
+          Row({ space: 应用尺寸.间距_8 }) {
+            LoadingProgress()
+              .width(20)
+              .height(20)
+              .color($r('app.color.action_primary'))
+            Text($r('app.string.notetype_editor_saving'))
+              .fontSize(应用尺寸.字号_正文_中)
+              .fontColor($r('app.color.text_secondary'))
+          }
+          .width('100%')
+          .justifyContent(FlexAlign.Center)
+        }
+      }
     }
     .width('100%')
-    .height('100%')
+  }
+
+  build() {
+    DialogFrame({
+      header: () => { this.dialogHeader(); },
+      content: () => { this.dialogContent(); },
+      canDismiss: !this.加载中 && !this.保存中,
+      onDismiss: (): void => { this.onClose(); }
+    })
   }
 }

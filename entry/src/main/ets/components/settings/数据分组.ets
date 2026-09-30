@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../../utils/PressFeedback';
+import { HelpLabel } from '../common/HelpLabel';
 import { DisclosureChevron } from '../common/DisclosureChevron';
 import { resourceText } from '../../utils/UiFeedback';
 
@@ -33,7 +35,7 @@ export struct 数据分组 {
   点击导出导入回调: () => void = (): void => {};
   点击笔记类型回调: () => void = (): void => {};
   点击已隐藏牌组回调: () => void = (): void => {};
-  // 简洁模式：true 时只显示导出导入+媒体管理，隐藏其余高级入口
+  // 简洁模式保留导入导出、隐藏牌组恢复、备份与媒体管理。
   @Prop 简洁模式: boolean = true;
   点击空卡回调: () => void = (): void => {};
   点击查找重复回调: () => void = (): void => {};
@@ -72,7 +74,7 @@ export struct 数据分组 {
           }
           .width('100%')
           .height(58)
-          .onClick(() => {
+          .attributeModifier(new PressFeedback()).onClick(() => {
             this.点击导出导入回调();
           })
 
@@ -93,32 +95,30 @@ export struct 数据分组 {
             }
             .width('100%')
             .height(58)
-            .onClick(() => {
+            .attributeModifier(new PressFeedback()).onClick(() => {
               this.点击笔记类型回调();
             })
           }
 
-          // 已隐藏牌组行（简洁模式下隐藏）
-          if (!this.简洁模式) {
-            Row() {
-              Column({ space: 2 }) {
-                Text($r('app.string.hidden_decks_entry'))
-                  .fontSize(15)
-                  .fontColor(设置面板色板_取(this.是否深色).主文字)
-                Text($r('app.string.hidden_decks_entry_subtitle'))
-                  .fontSize(12)
-                  .fontColor(设置面板色板_取(this.是否深色).弱化文字)
-              }
-              .alignItems(HorizontalAlign.Start)
-              Blank()
-              DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
+          // 简洁版与实验版都展示隐藏牌组入口，也必须能恢复。
+          Row() {
+            Column({ space: 2 }) {
+              Text($r('app.string.hidden_decks_entry'))
+                .fontSize(15)
+                .fontColor(设置面板色板_取(this.是否深色).主文字)
+              Text($r('app.string.hidden_decks_entry_subtitle'))
+                .fontSize(12)
+                .fontColor(设置面板色板_取(this.是否深色).弱化文字)
             }
-            .width('100%')
-            .height(58)
-            .onClick(() => {
-              this.点击已隐藏牌组回调();
-            })
+            .alignItems(HorizontalAlign.Start)
+            Blank()
+            DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
           }
+          .width('100%')
+          .height(58)
+          .attributeModifier(new PressFeedback()).onClick(() => {
+            this.点击已隐藏牌组回调();
+          })
 
           // 自动备份与恢复：Core 负责间隔、保留和实际归档；面板负责手动创建与安全恢复
           Row() {
@@ -130,7 +130,7 @@ export struct 数据分组 {
             }.alignItems(HorizontalAlign.Start)
             Blank()
             DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
-          }.width('100%').height(58).onClick((): void => { this.点击备份管理回调(); })
+          }.width('100%').height(58).attributeModifier(new PressFeedback()).onClick((): void => { this.点击备份管理回调(); })
 
           // 媒体管理行：检查未使用/缺失媒体 + 回收站操作
           Row() {
@@ -148,32 +148,26 @@ export struct 数据分组 {
           }
           .width('100%')
           .height(58)
-          .onClick(() => {
+          .attributeModifier(new PressFeedback()).onClick(() => {
             this.点击媒体管理回调();
           })
 
           if (!this.简洁模式) {
           Row() {
               Column({ space: 2 }) {
-                Row() {
-                  Text(this.databaseBusy ? $r('app.string.check_db_running') : $r('app.string.check_db_title'))
-                    .fontSize(15).fontColor(设置面板色板_取(this.是否深色).主文字)
-                  Button($r('app.string.field_help_button'))
-                    .type(ButtonType.Normal).backgroundColor(Color.Transparent)
-                    .fontSize(14).fontColor(设置面板色板_取(this.是否深色).三级文字)
-                    .width(28).height(28).padding(0)
-                    .accessibilityText($r('app.string.check_db_title'))
-                    .onClick((): void => { this.onDatabaseHelp(); })
-                }
+                HelpLabel({ title: this.databaseBusy ? $r('app.string.check_db_running') : $r('app.string.check_db_title'),
+                  textColor: 设置面板色板_取(this.是否深色).主文字,
+                  onHelp: (): void => { this.onDatabaseHelp(); }
+                })
                 Text($r('app.string.check_db_hint'))
                   .fontSize(12).fontColor(设置面板色板_取(this.是否深色).弱化文字)
                   .maxLines(2)
-              }.alignItems(HorizontalAlign.Start)
-            Blank()
+              }.alignItems(HorizontalAlign.Start).layoutWeight(1)
+
             DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
-          }.width('100%').height(58)
+          }.width('100%').constraintSize({ minHeight: 64 })
             .enabled(!this.databaseBusy)
-            .onClick((): void => { this.onCheckDatabase(); })
+            .attributeModifier(new PressFeedback()).onClick((): void => { this.onCheckDatabase(); })
           if (this.databaseError !== '') {
             Text(this.databaseError).fontSize(12)
               .fontColor(设置面板色板_取(this.是否深色).错误色)
@@ -208,7 +202,7 @@ export struct 数据分组 {
             }
             .width('100%')
             .height(58)
-            .onClick(() => {
+            .attributeModifier(new PressFeedback()).onClick(() => {
               this.点击空卡回调();
             })
           }
@@ -230,7 +224,7 @@ export struct 数据分组 {
             }
             .width('100%')
             .height(58)
-            .onClick(() => {
+            .attributeModifier(new PressFeedback()).onClick(() => {
               this.点击查找重复回调();
             })
           }
@@ -252,7 +246,7 @@ export struct 数据分组 {
             }
             .width('100%')
             .height(58)
-            .onClick(() => {
+            .attributeModifier(new PressFeedback()).onClick(() => {
               this.点击清除未用标签回调();
             })
           }

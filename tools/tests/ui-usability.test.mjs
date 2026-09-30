@@ -7,6 +7,9 @@ import { browserFilterNode, BROWSER_QUICK_FILTERS } from '../../entry/src/main/e
 import { filterSettingsEntries, SETTINGS_ENTRIES } from '../../entry/src/main/ets/model/SettingsNavigation.ts';
 import { SearchNodeJoiner, encodeSearchNode, decodeSearchNode } from '../../entry/src/main/ets/proto/messages/SearchMessages.ts';
 
+const SETTINGS_PANEL_SOURCE = readFileSync(new URL('../../entry/src/main/ets/components/设置面板.ets', import.meta.url), 'utf8');
+const DATA_GROUP_SOURCE = readFileSync(new URL('../../entry/src/main/ets/components/settings/数据分组.ets', import.meta.url), 'utf8');
+
 test('due overview counts backlog once, excludes future days and distinguishes unavailable data', () => {
   assert.equal(dueOverview(null), null);
   assert.equal(dueOverview({ futureDue: null }), null);
@@ -44,22 +47,46 @@ test('localized settings search respects simple and developer gates', () => {
     SETTINGS_ENTRIES.forEach(entry => { localize(entry.titleKey); localize(entry.descriptionKey); if (entry.simpleDescriptionKey) localize(entry.simpleDescriptionKey); });
     assert.equal(filterSettingsEntries('', false, true, localize).length, SETTINGS_ENTRIES.length);
     const simple = filterSettingsEntries('', true, false, localize).map(entry => entry.id);
-    assert.ok(!simple.includes('scheduler') && !simple.includes('ai'));
-    assert.deepEqual(simple, ['general', 'sync', 'appearance', 'controls', 'data', 'help', 'redemption', 'about']);
+    assert.ok(simple.includes('scheduler') && !simple.includes('ai'));
+    assert.deepEqual(filterSettingsEntries('FSRS', true, false, localize), []);
+    assert.deepEqual(simple, ['general', 'scheduler', 'sync', 'appearance', 'data', 'help', 'redemption', 'about']);
     for (const simpleMode of [true, false]) {
+      for (const query of (locale === 'base' ? ['隐藏', '隐藏牌组', '恢复显示'] : ['hidden', 'hidden decks', 'restore'])) {
+        assert.deepEqual(filterSettingsEntries(query, simpleMode, false, localize).map(entry => entry.id), ['data']);
+      }
       for (const query of (locale === 'base' ? ['指纹', '识别码', '兑换'] : ['fingerprint', 'app ID', 'redeem'])) {
         assert.deepEqual(filterSettingsEntries(query, simpleMode, false, localize).map(entry => entry.id), ['redemption']);
       }
     }
-    assert.deepEqual(filterSettingsEntries(locale === 'base' ? '答题工具栏' : 'answer toolbar', true, false, localize).map(entry => entry.id), ['appearance']);
-    assert.deepEqual(filterSettingsEntries(locale === 'base' ? '复习布局' : 'review layout', false, false, localize).map(entry => entry.id), ['appearance']);
-    assert.deepEqual(filterSettingsEntries(locale === 'base' ? '评分振动' : 'answer vibration', true, false, localize).map(entry => entry.id), ['controls']);
-    assert.deepEqual(filterSettingsEntries(locale === 'base' ? '分区点击' : 'tap zones', true, false, localize), []);
+    for (const simpleMode of [true, false]) {
+      for (const query of (locale === 'base' ? ['学习布局', '复习布局', '答题工具栏'] : ['review layout', 'answer toolbar'])) {
+        assert.deepEqual(filterSettingsEntries(query, simpleMode, false, localize).map(entry => entry.id), ['scheduler']);
+      }
+      assert.deepEqual(filterSettingsEntries(locale === 'base' ? '评分振动' : 'grading vibration', simpleMode, false, localize).map(entry => entry.id), ['scheduler']);
+      assert.deepEqual(filterSettingsEntries(locale === 'base' ? '分区点击' : 'tap zones', simpleMode, false, localize).map(entry => entry.id), ['scheduler']);
+      assert.deepEqual(filterSettingsEntries(locale === 'base' ? '手势' : 'gestures', simpleMode, false, localize).map(entry => entry.id), ['scheduler']);
+    }
     assert.deepEqual(filterSettingsEntries(locale === 'base' ? '自定义服务器' : 'custom server', true, false, localize).map(entry => entry.id), ['sync']);
-    assert.ok(simple.includes('controls') && !simple.includes('advanced'));
+    assert.ok(simple.includes('scheduler') && !simple.includes('advanced'));
     assert.ok(simple.includes('about') && simple.includes('sync'));
     assert.deepEqual(filterSettingsEntries('FsRs', false, false, localize).map(entry => entry.id), ['scheduler']);
     assert.deepEqual(filterSettingsEntries(locale === 'base' ? '字体' : 'FONT', true, false, localize).map(entry => entry.id), ['appearance']);
     assert.deepEqual(filterSettingsEntries('zzzzunmatched', false, true, localize), []);
   }
+});
+
+test('settings search stays visible in detail pages and returns to directory for new queries', () => {
+  assert.match(SETTINGS_PANEL_SOURCE,
+    /private settingsSearchField\(\)[\s\S]*?TextInput\([\s\S]*?onSettingsSearchChange/);
+  assert.match(SETTINGS_PANEL_SOURCE,
+    /搜索框属于设置面板公共壳[\s\S]*?this\.settingsSearchField\(\)[\s\S]*?\/\/ 内容区[\s\S]*?List\(/);
+  assert.match(SETTINGS_PANEL_SOURCE,
+    /value\.trim\(\) !== '' && this\.activeSection !== ''[\s\S]*?this\.activeSection = ''/);
+});
+
+test('hidden deck recovery entry is rendered in simple and experimental data settings', () => {
+  const hiddenDeckEntry = DATA_GROUP_SOURCE.match(/简洁版与实验版都展示隐藏牌组入口[\s\S]*?\/\/ 自动备份与恢复/);
+  assert.ok(hiddenDeckEntry, 'hidden deck row should be outside the simple-mode-only branches');
+  assert.match(hiddenDeckEntry[0], /hidden_decks_entry/);
+  assert.doesNotMatch(hiddenDeckEntry[0], /if \(!this\.简洁模式\)/);
 });

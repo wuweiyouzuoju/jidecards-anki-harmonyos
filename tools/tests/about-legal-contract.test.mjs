@@ -19,7 +19,7 @@ test('Licenses panel explains the Anki core relationship and app overview', () =
 
 test('About keeps copyright and licenses entry, stays free of heavy legal wording', () => {
   // 2026-07-28：关于页只保留 title + copyright，描述性文字已移到许可证面板。
-  const panel = read('entry/src/main/ets/components/设置面板.ets');
+  const panel = read('entry/src/main/ets/components/settings/AboutSettings.ets');
 
   for (const key of ['app_about_title', 'app_about_copyright', 'licenses_title']) {
     assert.match(panel, new RegExp(`app\\.string\\.${key}`));

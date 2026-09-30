@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../../utils/PressFeedback';
+import { DialogBackdrop } from '../common/DialogBackdrop';
 import { DisclosureChevron } from '../common/DisclosureChevron';
 import { resourceText } from '../../utils/UiFeedback';
 import { SelectStyle } from '../../utils/SelectStyle';
@@ -63,6 +65,12 @@ interface 笔记字段结果 {
 
 @Component
 export struct 查找重复对话框 {
+  @Prop @Watch('handleBackRequest') backRequest: number = 0;
+
+  private handleBackRequest(): void {
+    if (!(this.加载中)) this.onClose();
+  }
+
   @Prop isDark: boolean = false;
   onClose: () => void = (): void => {};
   onJumpToBrowser: (searchText: string) => void = (searchText: string): void => {};
@@ -245,6 +253,7 @@ export struct 查找重复对话框 {
         DisclosureChevron({ tint: 设置面板色板_取(this.isDark).弱化文字 })
       }
       .width('100%')
+      .attributeModifier(new PressFeedback())
       .onClick(() => { this.跳转浏览(this.重复组列表[索引]); })
 
       if (this.展开组索引 === 索引) {
@@ -268,15 +277,7 @@ export struct 查找重复对话框 {
   build() {
     Stack() {
       // 磨砂玻璃遮罩层
-      Column()
-        .width('100%')
-        .height('100%')
-        .backgroundColor(设置面板色板_取(this.isDark).遮罩)
-        .backgroundBlurStyle(BlurStyle.Thin, {
-          colorMode: this.isDark ? ThemeColorMode.DARK : ThemeColorMode.LIGHT,
-          adaptiveColor: AdaptiveColor.DEFAULT
-        })
-        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+      DialogBackdrop()
         .onClick(() => {
           if (!this.加载中) {
             this.onClose();
@@ -311,7 +312,9 @@ export struct 查找重复对话框 {
               .padding(SelectStyle.controlPadding)
               .space(SelectStyle.controlSpace)
               .width(SelectStyle.fieldWidth)
+              .constraintSize(SelectStyle.fieldConstraint)
               .font(SelectStyle.controlFont)
+              .textModifier(SelectStyle.labelText())
               .borderRadius(SelectStyle.controlRadius)
               .onSelect((索引: number): void => {
                 this.选中类型索引 = 索引;

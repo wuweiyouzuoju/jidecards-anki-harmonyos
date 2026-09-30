@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../../utils/PressFeedback';
 import { DisclosureChevron } from '../common/DisclosureChevron';
 import { resourceText } from '../../utils/UiFeedback';
 
@@ -157,6 +158,7 @@ export struct 术语分组 {
     }
     .width('100%')
     .height(44)
+    .attributeModifier(new PressFeedback())
     .onClick((): void => {
       this.打开说明回调(条目.帮助标题资源, 条目.帮助正文资源);
     })

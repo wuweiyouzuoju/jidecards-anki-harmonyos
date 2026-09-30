@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../../utils/PressFeedback';
 import { SelectStyle } from '../../utils/SelectStyle';
 
 import type { ProviderId } from '../../model/agent/AgentTypes';
@@ -117,7 +118,9 @@ export struct AIAgent设置分组 {
               .padding(SelectStyle.controlPadding)
               .space(SelectStyle.controlSpace)
               .width(SelectStyle.fieldWidth)
+              .constraintSize(SelectStyle.fieldConstraint)
               .font(SelectStyle.controlFont)
+              .textModifier(SelectStyle.labelText())
               .borderRadius(SelectStyle.controlRadius)
               .onSelect((index: number): void => { this.switchProvider(index); })
           }.width('100%')
@@ -131,7 +134,9 @@ export struct AIAgent设置分组 {
                 .padding(SelectStyle.controlPadding)
                 .space(SelectStyle.controlSpace)
                 .width(SelectStyle.fieldWidth)
+                .constraintSize(SelectStyle.fieldConstraint)
                 .font(SelectStyle.controlFont)
+                .textModifier(SelectStyle.labelText())
                 .borderRadius(SelectStyle.controlRadius)
                 .onSelect((index: number): void => {
                   this.deepseekModel = DEEPSEEK_PROVIDER.models[index];
@@ -177,7 +182,9 @@ export struct AIAgent设置分组 {
               .padding(SelectStyle.controlPadding)
               .space(SelectStyle.controlSpace)
               .width(SelectStyle.fieldWidth)
+              .constraintSize(SelectStyle.fieldConstraint)
               .font(SelectStyle.controlFont)
+              .textModifier(SelectStyle.labelText())
               .borderRadius(SelectStyle.controlRadius)
               .onSelect((index: number): void => { this.batchLimit = [100, 250, 500, 1000][index]; })
           }.width('100%')
@@ -191,6 +198,8 @@ export struct AIAgent设置分组 {
             .borderRadius(22)
             .enabled(!this.saving)
             .opacity(this.saving ? 0.6 : 1)
+            .attributeModifier(new PressFeedback(this.saving ? 0.6 : 1))
+            .stateEffect(false)
             .onClick((): void => { this.save(); })
           if (this.message !== '') { Text(this.message).fontSize(12).fontColor($r('app.color.text_secondary')) }
       }

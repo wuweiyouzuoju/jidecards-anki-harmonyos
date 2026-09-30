@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../../utils/PressFeedback';
+import { DialogBackdrop } from '../common/DialogBackdrop';
 import { resourceText } from '../../utils/UiFeedback';
 import { ThemeTextSpans } from '../common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
@@ -40,6 +42,12 @@ import { MediaMaintenanceSession, MediaMaintenanceState } from '../../model/sett
 
 @Component
 export struct 媒体管理面板 {
+  @Prop @Watch('handleBackRequest') backRequest: number = 0;
+
+  private handleBackRequest(): void {
+    if (!(this.检查中 || this.处理中)) this.onClose();
+  }
+
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @StorageProp(颜色键.动作主色) private dialogActionColor: string = '#2F5FD0';
   @Prop isDark: boolean = false;
@@ -143,15 +151,7 @@ export struct 媒体管理面板 {
   build() {
     Stack() {
       // 磨砂玻璃遮罩层
-      Column()
-        .width('100%')
-        .height('100%')
-        .backgroundColor(设置面板色板_取(this.isDark).遮罩)
-        .backgroundBlurStyle(BlurStyle.Thin, {
-          colorMode: this.isDark ? ThemeColorMode.DARK : ThemeColorMode.LIGHT,
-          adaptiveColor: AdaptiveColor.DEFAULT
-        })
-        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+      DialogBackdrop()
         .onClick(() => {
           if (!this.检查中 && !this.处理中) {
             this.onClose();
@@ -253,6 +253,8 @@ export struct 媒体管理面板 {
                   .enabled(this.未使用总数 > 0 && !this.检查中 && !this.处理中)
                   .stateStyles({ disabled: { .opacity(1) } })
                   .margin({ top: 8 })
+                  .attributeModifier(new PressFeedback(1, 1))
+                  .stateEffect(false)
                   .onClick(() => { this.执行进回收站(); })
               }
               .width('100%')
@@ -329,6 +331,8 @@ export struct 媒体管理面板 {
                     .borderRadius(10)
                     .enabled(this.回收站有内容 && !this.检查中 && !this.处理中)
                     .stateStyles({ disabled: { .opacity(1) } })
+                    .attributeModifier(new PressFeedback(1, 1))
+                    .stateEffect(false)
                     .onClick(() => { this.执行恢复回收站(); })
 
                   Button($r('app.string.media_empty_trash'))
@@ -343,6 +347,8 @@ export struct 媒体管理面板 {
                     .borderRadius(10)
                     .enabled(this.回收站有内容 && !this.检查中 && !this.处理中)
                     .stateStyles({ disabled: { .opacity(1) } })
+                    .attributeModifier(new PressFeedback(1, 1))
+                    .stateEffect(false)
                     .onClick(() => { this.确认清空回收站(); })
                 }
                 .width('100%')

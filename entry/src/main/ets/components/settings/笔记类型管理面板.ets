@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../../utils/PressFeedback';
+import { DialogBackdrop } from '../common/DialogBackdrop';
 import { resourceText, showToastSafely } from '../../utils/UiFeedback';
 import { ThemeTextSpans } from '../common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
@@ -40,6 +42,12 @@ import type { NotetypeNameId } from '../../proto/messages/NotetypeMessages';
 
 @Component
 export struct 笔记类型管理面板 {
+  @Prop @Watch('handleBackRequest') backRequest: number = 0;
+
+  private handleBackRequest(): void {
+    if (!(this.加载中 || this.处理中)) this.onClose();
+  }
+
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
   onClose: () => void = (): void => {};
@@ -156,6 +164,7 @@ export struct 笔记类型管理面板 {
         .fontSize(应用尺寸.字号_正文_小)
         .fontColor(this.主色按钮背景)
         .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+        .attributeModifier(new PressFeedback())
         .onClick(() => {
           this.onEdit(类型.id, 类型.name);
         })
@@ -165,6 +174,7 @@ export struct 笔记类型管理面板 {
         .fontSize(应用尺寸.字号_正文_小)
         .fontColor($r('app.color.error_text'))
         .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+        .attributeModifier(new PressFeedback())
         .onClick(() => {
           this.确认删除(类型);
         })
@@ -176,15 +186,7 @@ export struct 笔记类型管理面板 {
   build() {
     Stack() {
       // 磨砂玻璃遮罩层
-      Column()
-        .width('100%')
-        .height('100%')
-        .backgroundColor(设置面板色板_取(this.isDark).遮罩)
-        .backgroundBlurStyle(BlurStyle.Thin, {
-          colorMode: this.isDark ? ThemeColorMode.DARK : ThemeColorMode.LIGHT,
-          adaptiveColor: AdaptiveColor.DEFAULT
-        })
-        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+      DialogBackdrop()
         .onClick(() => {
           if (!this.加载中 && !this.处理中) {
             this.onClose();
