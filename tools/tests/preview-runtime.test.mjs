@@ -74,6 +74,7 @@ function harness() {
       registerJavaScriptProxy: proxy => { page.proxy = proxy; } }
   });
   page.audioSession = new CardAudioSession(page.soundPlayer, page.ttsPlayer, (raw, question) => service.extractAudioTags(raw, question));
+  page.cardWeb = { reset() {}, attach() {}, show: html => page.网页控制器.loadData(html) };
   return { page, displayed, sounds, tts, renderedIds, events, service };
 }
 
@@ -89,7 +90,7 @@ test('both preview hosts dismiss the open menu before leaving preview and releas
     const method = hostSource.slice(start, hostSource.indexOf('\n  }', start) + 4);
     const Host = new Function(stripTypeScriptTypes(`class Host {${method}}`) + '; return Host;')();
     const host = Object.assign(new Host(), { [visible]: true, previewBackHandler: handler,
-      transfer: { phase: 'idle' }, batchDialog: 'none' });
+      transfer: { phase: 'idle' }, batchDialog: 'none', editor: { visible: false, busy: false } });
     page.moreMenuOpen = true;
     assert.equal(host.onBackPress(), true);
     assert.equal(page.moreMenuOpen, false);
@@ -381,7 +382,7 @@ test('preview requests initial Web focus once and never steals it back on later 
   page.initialFocusPending = true;
   page.网页控制器.requestFocus = () => { throw new Error('not attached'); };
   page.focusPreviewCard(); assert.equal(page.initialFocusPending, true);
-  assert.match(source, /\.onPageEnd[\s\S]*this\.focusPreviewCard\(\)/);
+  assert.match(source, /new CardWebView\([\s\S]*?this\.focusPreviewCard\(\)/);
 });
 
 test('desktop preview advertises arrow keys while touch devices keep their swipe hint', () => {
@@ -463,7 +464,7 @@ test('preview wiring stays read-only, handles web errors, and preserves home/edi
   assert.match(source, /onRenderExited/);
   assert.match(source, /browser_preview_retry/);
   assert.match(source, /if \(this\.agentEnabled\)/);
-  assert.match(read('entry/src/main/ets/pages/浏览页.ets'), /interactionEnabled: !this\.editor\.visible && !this\.editor\.busy/);
+  assert.match(read('entry/src/main/ets/pages/浏览页.ets'), /interactionEnabled: !this\.editingPageOpen/);
   const home = read('entry/src/main/ets/pages/首页.ets');
   const editor = home.match(/private 关闭预览并编辑[\s\S]*?\n  }/)[0];
   assert.match(editor, /onPop:[\s\S]*this\.显示卡片预览 = true/);

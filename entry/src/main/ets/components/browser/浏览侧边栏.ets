@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../../utils/PressFeedback';
 import { DECK_LIST_NARROW_KEY } from '../../model/DeckListAppearance';
 
 // ========================================================
@@ -181,6 +182,8 @@ export struct 浏览侧边栏 {
             .fontColor($r('app.color.text_primary'))
             .backgroundColor($r('app.color.surface_card'))
             .borderRadius(应用尺寸.圆角_胶囊)
+            .attributeModifier(new PressFeedback())
+            .stateEffect(false)
             .onClick((): void => {
               this.onClose();
             })
@@ -306,6 +309,7 @@ export struct 浏览侧边栏 {
     .width('100%')
     .padding({ left: 应用尺寸.间距_16, right: 应用尺寸.间距_16,
       top: 应用尺寸.间距_10, bottom: 应用尺寸.间距_10 })
+    .attributeModifier(new PressFeedback())
     .onClick((): void => {
       this.onSelectDeck(行.name);
     })
@@ -333,6 +337,7 @@ export struct 浏览侧边栏 {
     .width('100%')
     .padding({ left: 应用尺寸.间距_16, right: 应用尺寸.间距_16,
       top: 应用尺寸.间距_10, bottom: 应用尺寸.间距_10 })
+    .attributeModifier(new PressFeedback())
     .onClick((): void => {
       this.onSelectTag(行.name);
     })
@@ -385,6 +390,7 @@ export struct 浏览侧边栏 {
     .width('100%')
     .padding({ left: 应用尺寸.间距_16, right: 应用尺寸.间距_16,
       top: 应用尺寸.间距_10, bottom: 应用尺寸.间距_10 })
+    .attributeModifier(new PressFeedback())
     .onClick((): void => {
       this.onSelectSavedSearch(项.search);
     })

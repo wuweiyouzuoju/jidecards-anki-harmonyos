@@ -144,49 +144,19 @@ test('browser_* i18n keys exist and align between zh-Hans and en_US', () => {
 // /initialFieldValues/initialTags 六个 @Prop。修改这些字段名会破坏接线。
 // ============================================================
 
-test('BrowserPage wires T7 edit panel: imports 浏览编辑区 + 笔记服务 + 笔记类型服务 + 卡片服务', () => {
+test('browser routes card and note IDs to the dedicated editor without embedding a second editor', () => {
   const page = read('entry/src/main/ets/pages/浏览页.ets');
-  assert.match(page, /import\s+\{[^}]*浏览编辑区[^}]*\}\s*from\s*['"][^'"]*浏览编辑区['"]/);
-  assert.match(page, /import\s+\{[^}]*笔记服务[^}]*\}\s*from\s*['"][^'"]*笔记服务['"]/);
-  assert.match(page, /import\s+\{[^}]*笔记类型服务[^}]*\}\s*from\s*['"][^'"]*笔记类型服务['"]/);
-  assert.match(page, /import\s+\{[^}]*卡片服务[^}]*\}\s*from\s*['"][^'"]*卡片服务['"]/);
-  assert.match(page, /import\s+type\s+\{[^}]*EditableNote[^}]*\}\s*from\s*['"][^'"]*NoteMessages['"]/);
-});
-
-test('BrowserPage editor reads use the shared loader and existing Anki services', () => {
-  const page = read('entry/src/main/ets/pages/浏览页.ets');
-  const loader = read('entry/src/main/ets/model/NoteEditorLoader.ts');
-  const adapter = read('entry/src/main/ets/backend/AnkiNoteEditor.ts');
-  assert.match(page, /this\.editorSession\.open\(行ID, this\.浏览模式值 === 'notes'/);
-  assert.match(read('entry/src/main/ets/model/NoteEditorSession.ts'), /await loadNoteEditor\(/);
-  assert.match(adapter, /this\.notes\.获取笔记\(id\)/);
-  assert.match(adapter, /this\.notetypes\.获取笔记类型\(id\)/);
-  assert.match(adapter, /this\.cards\.获取卡片\(id\)/);
-  assert.match(loader, /await backend\.card\(id\)\)\.noteId/);
-
-});
-
-test('BrowserPage 保存编辑 calls 笔记服务.更新笔记 with skipUndoEntry=false and refreshes list', () => {
-  const page = read('entry/src/main/ets/pages/浏览页.ets');
-  assert.match(page, /private\s+async\s+保存编辑\s*\(/);
-  assert.match(page, /this\.笔记服务实例\.更新笔记\s*\(\s*\[[^\]]+\]\s*,\s*false\s*\)/);
-  // 保存成功后关闭弹层 + 重新搜索
-  assert.match(page, /this\.editorSession\.close\(/);
-  assert.match(page, /this\.执行搜索\s*\(\s*\)/);
-});
-
-test('BrowserPage build renders 浏览编辑区 conditionally on 显示编辑区', () => {
-  const page = read('entry/src/main/ets/pages/浏览页.ets');
-  assert.match(page, /if\s*\(this\.editor\.visible\s*&&\s*this\.editor\.note\s*!==\s*null\)\s*\{/);
-  assert.match(page, /浏览编辑区\s*\(\s*\{/);
-  // 接线必备 @Prop 与回调
-  assert.match(page, /isDark:\s*this\.是否深色\s*\(\s*\)/);
-  assert.match(page, /fieldNames:\s*this\.editor\.fieldNames/);
-  assert.match(page, /initialFieldValues:\s*this\.editor\.note\.fields/);
-  assert.match(page, /initialTags:\s*this\.editor\.note\.tags\.join\(' '\)/);
-  assert.match(page, /showAction:\s*false/);
-  // onSave 回调最终调 this.保存编辑（箭头函数体跨行，用 [\s\S] 非贪婪匹配）
-  assert.match(page, /onSave:[\s\S]*?this\.保存编辑/);
+  assert.match(page, /name: 'EditNotePage', param: params/);
+  assert.match(page, /this.openEditPage\(行ID, this.浏览模式值 === 'notes'\)/);
+  assert.match(page, /this.openEditPage\(卡片ID, false\)/);
+  assert.doesNotMatch(page, /浏览编辑区\(/);
+  const editor=read('entry/src/main/ets/pages/EditNotePage.ets');
+  assert.match(editor,/this.session.open\(this.targetId, this.isNote/);
+  assert.match(editor,/if \(this.editor.note !== null\)/);
+  assert.match(editor,/initialFieldValues: this.editor.note.fields/);
+  assert.match(editor,/initialTags: this.editor.note.tags.join/);
+  assert.match(read('entry/src/main/ets/backend/AnkiNoteUpdate.ets'),/更新笔记\(\[note\], false\)/);
+  assert.match(page,/onShown.*returnFromEditor/);
 });
 
 test('浏览编辑区 component preserves T7 presentation-only invariants', () => {
@@ -201,7 +171,7 @@ test('浏览编辑区 component preserves T7 presentation-only invariants', () =
   assert.match(panel, /@Prop\s+initialFieldValues:\s*string\[\]/);
   assert.match(panel, /@Prop\s+initialTags:\s*string/);
   assert.match(panel, /onCancel:\s*\(\)\s*=>\s*void/);
-  assert.match(panel, /onSave:\s*\(fields:\s*string\[\],\s*tags:\s*string\[\]\)\s*=>\s*Promise<boolean>/);
+  assert.match(panel, /onSave:\s*\(fields:\s*string\[\],\s*tags:\s*string\[\],\s*images:\s*NoteFieldImage\[\]\)\s*=>\s*Promise<boolean>/);
   // 草稿保留：aboutToAppear 从 initialFieldValues/initialTags 拷贝到内部状态
   assert.match(panel, /this\.fieldValues\s*=\s*this\.initialFieldValues\.slice/);
   assert.match(panel, /this\.tags\s*=\s*this\.initialTags/);
@@ -376,9 +346,10 @@ test('BrowserPage build renders 卡片信息 conditionally on 显示卡片信息
 test('卡片表格 component exposes onInfoClick callback for T11', () => {
   const table = read('entry/src/main/ets/components/browser/卡片表格.ets');
   assert.match(table, /onInfoClick:\s*\(id:\s*number\)\s*=>\s*void/);
-  // 非多选模式下渲染 info 按钮并用 hitTestBehavior(Block) 阻止冒泡后上抛
+  // 非多选模式的独立信息动作复用公共点击隔离。
   assert.match(table, /if\s*\(\s*!this\.多选模式\s*\)/);
-  assert.match(table, /hitTestBehavior\s*\(\s*HitTestMode\.Block\s*\)/);
+  assert.match(table, /HelpButton\(\{ label: \$r\('app.string.browser_card_info'\)/);
+  assert.match(read('entry/src/main/ets/components/common/HelpButton.ets'), /monopolizeEvents\(true\)/);
   assert.match(table, /this\.onInfoClick\s*\(\s*行\.id\s*\)/);
 });
 
@@ -656,8 +627,8 @@ test('查找替换对话框 has ⓘ help button that fires onHelp (统一字段�
   assert.match(dialog, /DialogHeader\(\{[\s\S]*?showHelp: true/);
   assert.match(dialog, /helpEnabled: !this\.busy/);
   const header = read('entry/src/main/ets/components/common/DialogHeader.ets');
-  assert.match(header, /Text\(this\.title\)[\s\S]*?if \(this\.showHelp\)[\s\S]*?field_help_button/);
-  assert.match(header, /this\.onHelp\(\)/);
+  assert.match(header, /HelpLabel\(\{ title: this.title[\s\S]*?showHelp: this.showHelp/);
+  assert.match(header, /isHelpEnabled: this.helpEnabled, onHelp: this.onHelp/);
   // 点击 ⓘ 上抛 onHelp 回调（由父组件统一渲染 字段帮助面板 浮层，与批量操作栏 ⓘ 同模式）
   assert.match(dialog, /onHelp:\s*\(\)\s*=>\s*void/);
   assert.match(dialog, /this\.onHelp\s*\(/);
@@ -676,7 +647,8 @@ test('BrowserPage wires 查找替换对话框 onHelp to 字段帮助面板', () 
 test('批量操作栏 has onHelp callback and renders ⓘ button', () => {
   const bar = read('entry/src/main/ets/components/browser/批量操作栏.ets');
   assert.match(bar, /onHelp:\s*\(\)\s*=>\s*void/);
-  assert.match(bar, /field_help_button/);
+  assert.match(bar, /HelpLabel\(\{ title: \$r\('app.string.browser_help_batch_title'\)/);
+  assert.match(bar, /onHelp:.*this.onHelp\(\)/);
 });
 
 test('BrowserPage build renders 浏览侧边栏 conditionally on 显示侧边栏', () => {

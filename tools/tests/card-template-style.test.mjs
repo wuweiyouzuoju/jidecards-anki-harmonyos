@@ -26,3 +26,19 @@ test('bundled jQuery matches the Anki-pinned full distribution and retains its M
     'fc9a93dd241f6b045cbff0481cf4e1901becd0e12fb45166a8f17f95823f0b1a');
   assert.match(readFileSync(new URL('LICENSE.txt', base), 'utf8'), /Permission is hereby granted/);
 });
+
+test('default card colors precede template color pairs on both sides in both modes', () => {
+  const css = '.card { color: black; background: white; } .nightMode { color: white; background: #222; }';
+  const nodes = [{ text: '<span style="color:black">正文</span>', replacement: null }];
+  const card = { css, questionNodes: nodes, answerNodes: nodes, latexSvg: false, isEmpty: false };
+  for (const dark of [false, true]) for (const side of ['question', 'answer']) {
+    const html = 构建卡片HTML(card, side, dark);
+    const background = dark ? '#18202B' : '#FFFFFF';
+    const defaultColor = dark ? '#E6E6E6' : '#1A1A1A';
+    const defaults = `body { color: ${defaultColor}; background: ${background}; }`;
+    assert.ok(html.includes(defaults));
+    assert.ok(html.indexOf(defaults) < html.indexOf(css));
+    assert.doesNotMatch(html.slice(html.indexOf(css) + css.length), /background:[^;]*!important/,
+      'never force a dark background behind unchanged black template text');
+  }
+});

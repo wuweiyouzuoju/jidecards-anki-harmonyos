@@ -29,9 +29,9 @@ test('deck detail preview queries all cards and mounts the existing read-only pr
   assert.match(preview, /app\.string\.study_edit_note/);
   assert.match(preview, /app\.string\.ai_card_edit/);
   assert.match(preview, /CardActionMenu\(\{ items: this\.预览更多菜单\(\)/);
-  assert.match(read('entry/src/main/ets/model/navigation/PageParams.ts'), /editCardId\?: number/);
-  assert.match(browser, /pageEditCardId: number = -1/);
-  assert.match(browser, /if \(this\.pageEditCardId > 0\)/);
+  assert.match(read('entry/src/main/ets/model/navigation/PageParams.ts'), /interface EditNotePageParams/);
+  assert.match(home, /name: 'EditNotePage'/);
+  assert.match(browser, /this.openEditPage\(卡片ID, false\)/);
 });
 
 test('deck preview resources exist in both base and en_US', () => {

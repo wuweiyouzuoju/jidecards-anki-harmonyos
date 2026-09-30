@@ -1,12 +1,13 @@
+import { PressFeedback } from '../utils/PressFeedback';
+import { EditNotePageParams } from '../model/navigation/PageParams';
 import { BrowserMoreMenu } from '../components/browser/BrowserMoreMenu';
 import { BrowserNotetypeFeature } from '../components/browser/BrowserNotetypeFeature';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { DialogBackdrop } from '../components/common/DialogBackdrop';
 import { namedResourceText, showToastSafely } from '../utils/UiFeedback';
 import { loadBrowserSidebar, parseBrowserSavedSearches, removeBrowserSavedSearch, serializeBrowserSavedSearches, upsertBrowserSavedSearch } from '../model/BrowserSidebar';
 import type { BrowserSavedSearch } from '../model/BrowserSidebar';
 import { AnkiBrowserSidebar } from '../backend/AnkiBrowserSidebar';
-import { NoteEditorSession, NoteEditorState, initialNoteEditorState } from '../model/NoteEditorSession';
-import { AnkiNoteEditor } from '../backend/AnkiNoteEditor';
 import { BrowserSearchSession } from '../model/BrowserSearchSession';
 import { AnkiBrowserSearch } from '../backend/AnkiBrowserSearch';
 import { resolveBrowserCardIds, resolveBrowserNoteIds } from '../model/BrowserSelection';
@@ -41,7 +42,6 @@ import { 配置服务 } from '../backend/配置服务';
 import type { BrowserColumn, BrowserRow, FindAndReplaceRequest } from '../proto/messages/SearchMessages';
 import { BrowserColumnSorting } from '../proto/messages/SearchMessages';
 
-import type { EditableNote } from '../proto/messages/NoteMessages';
 import type { Card } from '../proto/messages/CardsMessages';
 import type { DeckTreeNode } from '../proto/messages/DeckMessages';
 import type { TagTreeNode } from '../proto/messages/TagsMessages';
@@ -56,7 +56,6 @@ import { DialogHeader } from '../components/common/DialogHeader';
 import { 搜索框 } from '../components/browser/搜索框';
 import { BrowserViewMenu } from '../components/browser/BrowserViewMenu';
 import { 卡片表格, 浏览行数据 } from '../components/browser/卡片表格';
-import { 浏览编辑区 } from '../components/browser/浏览编辑区';
 import { 批量操作栏 } from '../components/browser/批量操作栏';
 import { 字段帮助面板 } from '../components/字段帮助面板';
 import { 按下态按钮 } from '../components/common/按下态按钮';
@@ -86,6 +85,7 @@ type 浏览模式 = 'cards' | 'notes';
 
 @Component
 export struct 浏览页 {
+  @State private batchBackRequest: number = 0;
   @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
   /** Navigation 入栈参数：牌组 ID（空=全库） */
   pageDeckId: string = '';
@@ -93,8 +93,6 @@ export struct 浏览页 {
   pageInitialSearch: string = '';
   /** Navigation 入栈参数：是否为 Agent 改卡直接进入多选。 */
   pageSelectForAgentEdit: boolean = false;
-  /** Navigation 入栈参数：搜索完成后直接进入指定卡片的编辑区（-1=不自动打开）。 */
-  pageEditCardId: number = -1;
   /** 页面栈：返回主页时 pop */
   pathStack: NavPathStack = new NavPathStack();
   private readonly 搜索服务实例: 搜索服务 = new 搜索服务();
@@ -122,14 +120,14 @@ export struct 浏览页 {
   @State private sortColumn: string = '';
   @State private sortReverse: boolean = false;
   private readonly searchSession: BrowserSearchSession = new BrowserSearchSession(new AnkiBrowserSearch());
-  @State private editor: NoteEditorState = initialNoteEditorState();
-  private readonly editorSession: NoteEditorSession = new NoteEditorSession(new AnkiNoteEditor(),
-    (state: NoteEditorState): void => { this.editor = state; });
+  @State private editingPageOpen: boolean = false;
+  private editingChangedTick: number = 0;
   private readonly sidebarBackend: AnkiBrowserSidebar = new AnkiBrowserSidebar();
   private sidebarVersion: number = 0;
   private searchVersion: number = 0;
   private selectionVersion: number = 0;
   private consumedRowCount: number = 0;
+  private refreshingSearch: boolean = false;
   private readonly operations: BrowserOperationController = new BrowserOperationController();
   @State private mutationBusy: boolean = false;
   /** NavDestination 透明度（由 customNavContentTransition 回调控制，实现淡入淡出转场）。 */
@@ -233,9 +231,6 @@ export struct 浏览页 {
     }
     await this.执行搜索();
     if (!this.operations.isAlive()) return;
-    if (this.pageEditCardId > 0) {
-      this.打开编辑区For(this.pageEditCardId);
-    }
     // 顶部牌组选择器：加载牌组树（失败不阻塞搜索，Select 仅显示"全部"）
     this.加载牌组树().catch((错误: ESObject): void => {
       console.info(`BrowserPage: aboutToAppear 加载牌组树失败 错误=${错误}`);
@@ -278,10 +273,8 @@ export struct 浏览页 {
    */
 
   aboutToDisappear(): void {
-    this.editorSession.dispose();
     this.operations.dispose();
     this.searchVersion++;
-    this.editorSession.close();
     CustomTransition.getInstance().注销NavParam('BrowserPage');
     // 通知首页刷新牌组计数：页内删除/改牌组/挂起/重置到期等写操作分散在多个方法，
     // 统一在离页时广播（幂等，纯浏览未改数据时多刷一次无副作用）；onPop 偶发不触发时仍能刷新。
@@ -295,24 +288,25 @@ export struct 浏览页 {
    * Extension Points: 新增弹窗时在此链中按层级插入对应 @State 判断。
    */
   onBackPress(): boolean {
+    if (this.显示说明浮层) { this.显示说明浮层 = false; return true; }
     if (this.showViewMenu) { this.showViewMenu = false; return true; }
     if (this.showMoreMenu) { this.showMoreMenu = false; return true; }
-    if (this.batchDialog !== 'none') { this.batchDialog = 'none'; return true; }
+    if (this.batchDialog !== 'none') { if (!this.mutationBusy) this.batchBackRequest++; return true; }
+    if (this.显示标签重命名) { if (!this.标签重命名忙碌 && !this.mutationBusy) this.显示标签重命名 = false; return true; }
     if (this.显示保存搜索) { if (!this.保存搜索忙碌) this.显示保存搜索 = false; return true; }
-    if (this.显示标签重命名) { this.显示标签重命名 = false; return true; }
-    if (this.显示查找替换) { this.显示查找替换 = false; return true; }
     if (this.显示侧边栏) { this.显示侧边栏 = false; return true; }
+    if (this.显示查找替换) { if (!this.查找替换忙碌 && !this.mutationBusy) this.显示查找替换 = false; return true; }
+    if (this.显示卡片信息) { this.关闭卡片信息(); return true; }
     if (this.显示预览) {
       if (this.previewBackHandler?.()) return true;
       this.显示预览 = false;
       return true;
     }
-    if (this.editor.visible) { this.editorSession.close(); return true; }
-    if (this.显示卡片信息) { this.关闭卡片信息(); return true; }
-    if (this.显示说明浮层) { this.显示说明浮层 = false; return true; }
     if (this.多选模式值) { this.退出多选(); return true; }
     return false;
   }
+
+
 
   private 取能力上下文(): common.UIAbilityContext | null {
     const context: common.UIAbilityContext | undefined =
@@ -321,7 +315,7 @@ export struct 浏览页 {
   }
 
   /** 将查询快照交给搜索会话；一次性发布完整首屏，旧请求不修改 UI。 */
-  private async 执行搜索(): Promise<void> {
+  private async 执行搜索(keepRows: boolean = false): Promise<void> {
     if (!this.operations.isAlive()) return;
     const version: number = ++this.searchVersion;
     const notesMode: boolean = this.浏览模式值 === 'notes';
@@ -329,8 +323,9 @@ export struct 浏览页 {
     const filter: string = this.quickFilter;
     const sortColumn: string = this.sortColumn;
     const sortReverse: boolean = this.sortReverse;
-    this.consumedRowCount = 0;
-    this.阶段 = 'loading';
+    this.refreshingSearch = true;
+    const retainedCount: number = keepRows ? this.consumedRowCount : 0;
+    if (!keepRows) { this.consumedRowCount = 0; this.阶段 = 'loading'; }
     try {
       const context: common.UIAbilityContext | null = this.取能力上下文();
       if (context === null) {
@@ -343,16 +338,24 @@ export struct 浏览页 {
         text: text, filter: filter, sortColumn: sortColumn, sortReverse: sortReverse },
         (): boolean => this.operations.isAlive() && version === this.searchVersion);
       if (result === null || version !== this.searchVersion) return;
+      let rows: 浏览行数据[] = result.rows;
+      let consumed: number = result.consumed;
+      while (consumed < Math.min(retainedCount, result.ids.length)) {
+        const more = await this.searchSession.more((): boolean => this.operations.isAlive() && version === this.searchVersion);
+        if (more === null || version !== this.searchVersion) return;
+        if (more.consumed <= consumed) break;
+        rows = more.rows; consumed = more.consumed;
+      }
       this.列定义 = result.columns;
       this.结果ID列表 = result.ids;
-      this.行列表 = result.rows;
-      this.consumedRowCount = result.consumed;
+      this.行列表 = rows;
+      this.consumedRowCount = consumed;
       this.阶段 = 'list';
     } catch (error) {
       if (version !== this.searchVersion) { return; }
       this.阶段 = 'error';
       this.错误详情 = error instanceof Error ? error.message : `${error}`;
-    }
+    } finally { if (version === this.searchVersion) this.refreshingSearch = false; }
   }
 
   /**
@@ -360,7 +363,7 @@ export struct 浏览页 {
    * 由 卡片表格.onReachEnd 触发；批次大小 100，并发上限由 BrowserSearchSession 管理。
    */
   private async 加载更多(): Promise<void> {
-    if (this.阶段 !== 'list') return;
+    if (this.阶段 !== 'list' || this.refreshingSearch) return;
     const version: number = this.searchVersion;
     const result = await this.searchSession.more(
       (): boolean => this.operations.isAlive() && version === this.searchVersion);
@@ -375,7 +378,6 @@ export struct 浏览页 {
       return;
     }
     this.batchDialog = 'none';
-    this.editorSession.close();
     this.关闭卡片信息();
     this.浏览模式值 = 模式;
     if (!this.sortableColumns().some((column: BrowserColumn): boolean => column.key === this.sortColumn)) {
@@ -392,12 +394,25 @@ export struct 浏览页 {
     this.执行搜索();
   }
 
-  // 行点击
-  // Cards 模式下需多一跳卡片查询，但 UI 仍只展示笔记字段（与 Anki 桌面端一致）。
-  // 加载期间不禁用列表（只设 编辑区忙碌），用户可关闭弹层或重试。
+  // 来源只传身份，独立编辑页负责读取、重试与保存。
   private async 行点击(行ID: number): Promise<void> {
-    if (!this.operations.isAlive() || this.mutationBusy) return;
-    await this.editorSession.open(行ID, this.浏览模式值 === 'notes', (): boolean => this.operations.isAlive());
+    this.openEditPage(行ID, this.浏览模式值 === 'notes');
+  }
+
+  private openEditPage(id: number, isNote: boolean): void {
+    if (!this.operations.isAlive() || this.mutationBusy || this.editingPageOpen) return;
+    this.editingPageOpen = true;
+    this.editingChangedTick = AppStorage.get<number>('cardContentChangedTick') ?? 0;
+    const params: EditNotePageParams = { targetId: id, isNote: isNote };
+    this.pathStack.pushPath({ name: 'EditNotePage', param: params });
+  }
+
+  private returnFromEditor(): void {
+    if (!this.editingPageOpen) return;
+    this.editingPageOpen = false;
+    if ((AppStorage.get<number>('cardContentChangedTick') ?? 0) === this.editingChangedTick) return;
+    this.预览刷新版本 += 1;
+    this.执行搜索(true);
   }
 
   // T5 行点击路由
@@ -432,20 +447,7 @@ export struct 浏览页 {
 
   /** T5 预览页「编辑字段」回调：保留预览并在其上方打开编辑区（Cards 模式下 行ID 即 cardId）。 */
   private 打开编辑区For(卡片ID: number): void {
-    this.行点击(卡片ID);
-  }
-
-  // 保存编辑
-  // - skipUndoEntry=false 保留撤销栈（与 Anki 桌面端默认一致）
-  // - 编辑区当前笔记 为 null 时直接返回 false（不应发生，兜底）
-  // - 字段值数组长度不足 字段名列表 时用空串补齐（防御性）
-  private async 保存编辑(fields: string[], tags: string[]): Promise<boolean> {
-    if (this.operations.isBusy()) return false;
-    return this.editorSession.save(fields, tags, (updated: EditableNote): Promise<boolean> =>
-      this.runBrowserOperation(async (_selection: BrowserOperationContext): Promise<void> => {
-        await this.笔记服务实例.更新笔记([updated], false);
-        if (this.operations.isAlive() && this.显示预览) this.预览刷新版本 += 1;
-      }, (_error: Error): void => {}, false), true);
+    this.openEditPage(卡片ID, false);
   }
 
   // T8 批量操作
@@ -1030,9 +1032,9 @@ export struct 浏览页 {
 
   /** 预览改卡只传当前卡，不使用浏览页的批量选择。 */
   private async 打开预览AI改卡(cardId: number): Promise<void> {
-    if (!this.显示预览 || this.previewCardIds[this.预览初始索引] !== cardId || this.editor.visible || this.editor.busy) return;
+    if (!this.显示预览 || this.previewCardIds[this.预览初始索引] !== cardId || this.editingPageOpen) return;
     const configured: boolean = await this.isAIConfigured();
-    if (!this.显示预览 || this.previewCardIds[this.预览初始索引] !== cardId || this.editor.visible || this.editor.busy) return;
+    if (!this.显示预览 || this.previewCardIds[this.预览初始索引] !== cardId || this.editingPageOpen) return;
     this.显示预览 = false;
     const restorePreview = (): void => {
       this.预览刷新版本 += 1;
@@ -1188,6 +1190,8 @@ export struct 浏览页 {
           .backgroundColor($r('app.color.surface_card'))
           .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
           .borderRadius(应用尺寸.圆角_胶囊)
+          .attributeModifier(new PressFeedback())
+          .stateEffect(false)
           .onClick((): void => { this.showMoreMenu = !this.showMoreMenu; })
       }
       }.width('100%').height('100%').alignItems(VerticalAlign.Center)
@@ -1240,6 +1244,8 @@ export struct 浏览页 {
     .height(SelectStyle.controlHeight).padding({ left: 6, right: 6 }).borderRadius(0)
     .layoutWeight(1).enabled(!this.多选模式值 && this.阶段 === 'list')
     .accessibilityText(label)
+    .attributeModifier(new PressFeedback())
+    .stateEffect(false)
     .onClick((): void => { this.openViewMenu(group); })
   }
 
@@ -1372,7 +1378,7 @@ export struct 浏览页 {
         初始索引: this.预览初始索引,
         媒体目录: this.预览媒体目录,
         刷新版本: this.预览刷新版本,
-        interactionEnabled: !this.editor.visible && !this.editor.busy,
+        interactionEnabled: !this.editingPageOpen,
         onPositionChanged: (index: number): void => { this.预览初始索引 = index; },
         onEditWithAgent: (cardId: number): void => { this.打开预览AI改卡(cardId); },
         onBackHandlerChange: (handler: (() => boolean) | null): void => { this.previewBackHandler = handler; },
@@ -1383,44 +1389,6 @@ export struct 浏览页 {
           this.打开编辑区For(卡片ID);
         }
       })
-    }
-
-    // 字段就绪后才初始化草稿；读取期间可关闭，旧结果由会话代次拒绝。
-    if (this.editor.visible && this.editor.note !== null) {
-      浏览编辑区({
-        isDark: this.是否深色(),
-        busy: this.editor.busy || this.mutationBusy,
-        errorMessage: this.editor.error === '' ? '' : this.取本地化文案(this.editor.error === 'load' ? $r('app.string.browser_detail_load_error') : $r('app.string.browser_detail_save_error')),
-        fieldNames: this.editor.fieldNames,
-        initialFieldValues: this.editor.note.fields,
-        initialTags: this.editor.note.tags.join(' '),
-        onCancel: (): void => {
-          this.editorSession.close();
-        },
-        onSave: (fields: string[], tags: string[]): Promise<boolean> => {
-          return this.保存编辑(fields, tags);
-        }
-      })
-    } else if (this.editor.visible) {
-      Stack() {
-        Column().width('100%').height('100%')
-          .backgroundColor(this.是否深色() ? 'rgba(0,0,0,0.40)' : 'rgba(0,0,0,0.15)')
-          .onClick((): void => { this.editorSession.close(); })
-        Column({ space: 应用尺寸.间距_14 }) {
-          DialogHeader({ title: $r('app.string.browser_detail_title'),
-            closeLabel: $r('app.string.browser_detail_cancel'),
-            showAction: false,
-            onClose: (): void => { this.editorSession.close(); } })
-          if (this.editor.busy) {
-            LoadingProgress().width(40).height(40)
-          } else {
-            Text($r('app.string.browser_detail_load_error')).fontColor($r('app.color.error_text'))
-          }
-        }
-        .width('88%').constraintSize({ maxWidth: 520 }).padding(应用尺寸.卡片内边距)
-        .backgroundColor($r('app.color.surface_card')).borderRadius(应用尺寸.圆角_卡片)
-        .onClick((): void => {})
-      }.width('100%').height('100%')
     }
 
     // T11 卡片信息弹层：非多选模式下点击行右侧 info 按钮 → 懒加载 CardStatsView
@@ -1519,26 +1487,26 @@ export struct 浏览页 {
 
     // T8 改牌组选择器弹层
     if (this.batchDialog === 'deck') {
-      BrowserDeckDialog({ isDark: this.是否深色(), busy: this.批量忙碌, 牌组树: this.牌组树,
+      BrowserDeckDialog({ backRequest: this.batchBackRequest, isDark: this.是否深色(), busy: this.批量忙碌, 牌组树: this.牌组树,
         onClose: (): void => { this.batchDialog = 'none'; },
         onSubmit: (id: number): void => { this.执行批量改牌组(id); } })
     }
 
     // T8 标志选择器弹层（无/红/橙/绿/蓝）
     if (this.batchDialog === 'flag') {
-      BrowserFlagDialog({ isDark: this.是否深色(), busy: this.批量忙碌, onClose: (): void => { this.batchDialog = 'none'; },
+      BrowserFlagDialog({ backRequest: this.batchBackRequest, isDark: this.是否深色(), busy: this.批量忙碌, onClose: (): void => { this.batchDialog = 'none'; },
         onSubmit: (flag: number): void => { this.执行批量设置标志(flag); } })
     }
 
     // T8 挂起确认弹层
     if (this.batchDialog === 'suspend') {
-      BrowserBatchConfirm({ isDark: this.是否深色(), busy: this.批量忙碌, onClose: (): void => { this.batchDialog = 'none'; },
+      BrowserBatchConfirm({ backRequest: this.batchBackRequest, isDark: this.是否深色(), busy: this.批量忙碌, onClose: (): void => { this.batchDialog = 'none'; },
         onSubmit: (): void => { this.执行批量挂起(); } })
     }
 
     // T8 删除确认弹层
     if (this.batchDialog === 'delete') {
-      BrowserBatchConfirm({ isDark: this.是否深色(), busy: this.批量忙碌,
+      BrowserBatchConfirm({ backRequest: this.batchBackRequest, isDark: this.是否深色(), busy: this.批量忙碌,
         title: $r('app.string.browser_action_delete'), message: $r('app.string.browser_action_delete_confirm'),
         destructive: true, onClose: (): void => { this.batchDialog = 'none'; },
         onSubmit: (): void => { this.执行批量删除(); } })
@@ -1546,20 +1514,20 @@ export struct 浏览页 {
 
     // T8 设置到期日弹层：TextInput 输入 days 字符串
     if (this.batchDialog === 'due') {
-      BrowserDueDialog({ isDark: this.是否深色(), busy: this.批量忙碌, onClose: (): void => { this.batchDialog = 'none'; },
+      BrowserDueDialog({ backRequest: this.batchBackRequest, isDark: this.是否深色(), busy: this.批量忙碌, onClose: (): void => { this.batchDialog = 'none'; },
         onSubmit: (days: string): void => { this.执行批量设置到期日(days); } })
     }
 
     // T8 重新定位弹层：起始位置/步长/随机/顺移已有
     if (this.batchDialog === 'reposition') {
-      BrowserRepositionDialog({ isDark: this.是否深色(), busy: this.批量忙碌,
+      BrowserRepositionDialog({ backRequest: this.batchBackRequest, isDark: this.是否深色(), busy: this.批量忙碌,
         onClose: (): void => { this.batchDialog = 'none'; },
         onSubmit: (input: BrowserRepositionInput): void => { this.执行批量重新定位(input); } })
     }
 
     // T8 更改笔记类型弹层：选新类型 + 字段/模板映射
     if (this.batchDialog === 'notetype' && this.选中ID列表.length > 0) {
-      BrowserNotetypeFeature({ firstId: this.选中ID列表[0], notes: this.浏览模式值 === 'notes',
+      BrowserNotetypeFeature({ backRequest: this.batchBackRequest, firstId: this.选中ID列表[0], notes: this.浏览模式值 === 'notes',
         isDark: this.是否深色(), busy: this.批量忙碌,
         onClose: (): void => { this.batchDialog = 'none'; },
         onSubmit: (input: 变更笔记类型请求): void => { this.执行批量更改笔记类型(input); } })
@@ -1625,6 +1593,7 @@ export struct 浏览页 {
     .hideTitleBar(true)
     .backgroundColor(Color.Transparent)
     .onBackPressed((): boolean => this.onBackPress())
+    .onShown((): void => { this.returnFromEditor(); })
     .opacity(this.转场透明度)
   }
 }

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../../utils/PressFeedback';
+import { HelpButton } from '../common/HelpButton';
 import type { BrowserDisplayRow as 浏览行数据 } from '../../model/BrowserSearchSession';
 import { DECK_LIST_NARROW_KEY } from '../../model/DeckListAppearance';
 
@@ -232,22 +234,11 @@ export struct 卡片表格 {
                 .layoutWeight(1)
 
                 // T11 卡片信息按钮：非多选模式下显示，点击触发 onInfoClick
-                // hitTestBehavior(Block) 阻止点击事件冒泡到行 onClick（ClickEvent 无 stopPropagation）
+                // 独立信息动作保留在行尾；公共按钮独占点击，不进入编辑。
                 if (!this.多选模式) {
-                  Text('ⓘ')
-                    .accessibilityText($r('app.string.browser_card_info'))
-                    .fontSize(应用尺寸.字号_正文)
-                    .fontColor($r('app.color.text_secondary'))
-                    .padding({
-                      left: 应用尺寸.间距_8,
-                      right: 应用尺寸.间距_4,
-                      top: 应用尺寸.间距_4,
-                      bottom: 应用尺寸.间距_4
-                    })
-                    .hitTestBehavior(HitTestMode.Block)
-                    .onClick((): void => {
-                      this.onInfoClick(行.id);
-                    })
+                  HelpButton({ label: $r('app.string.browser_card_info'),
+                    onHelp: (): void => { this.onInfoClick(行.id); }
+                  })
                 }
               }
               .width('100%')
@@ -264,6 +255,7 @@ export struct 卡片表格 {
                 color: { left: this.取行标志色(行) }
               } : { width: 0 })
               .borderRadius(应用尺寸.圆角_指标卡)
+              .attributeModifier(new PressFeedback())
               .onClick((): void => this.处理行点击(行.id))
               .gesture(
                 LongPressGesture()

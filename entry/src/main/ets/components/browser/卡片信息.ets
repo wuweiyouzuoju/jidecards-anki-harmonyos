@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { DialogBackdrop } from '../common/DialogBackdrop';
 
 import { DialogHeader } from '../common/DialogHeader';
 // 卡片信息的读取、错误和请求代次随弹层存活，页面只指定目标卡片。
@@ -151,11 +152,7 @@ export struct 卡片信息 {
   build() {
     Stack() {
       // 遮罩层：点击关闭
-      Column()
-        .width('100%')
-        .height('100%')
-        .backgroundColor(this.isDark ? 'rgba(0,0,0,0.40)' : 'rgba(0,0,0,0.15)')
-        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+      DialogBackdrop()
         .onClick((): void => {
           this.onClose();
         })
@@ -164,9 +161,9 @@ export struct 卡片信息 {
       Column({ space: 应用尺寸.间距_14 }) {
         DialogHeader({
           title: $r('app.string.browser_info_title'),
-          actionLabel: $r('app.string.browser_info_close'),
-          showClose: false,
-          onAction: (): void => { this.onClose(); }
+          closeLabel: $r('app.string.browser_info_close'),
+          showAction: false,
+          onClose: (): void => { this.onClose(); }
         })
         if (this.stats === null) {
           // 加载/错误态
@@ -296,17 +293,12 @@ export struct 卡片信息 {
         // 关闭按钮
 
       }
-      .width('90%')
-      .constraintSize({ maxHeight: '85%' })
+      .width(应用尺寸.dialogWidth)
+      .constraintSize({ maxWidth: 应用尺寸.dialogMaxWidth, maxHeight: 应用尺寸.dialogMaxHeight })
       .alignItems(HorizontalAlign.Start)
-      .padding({
-        top: 应用尺寸.间距_16,
-        bottom: 应用尺寸.间距_16,
-        left: 应用尺寸.间距_4,
-        right: 应用尺寸.间距_4
-      })
-      .backgroundColor($r('app.color.surface_page'))
-      .borderRadius(应用尺寸.圆角_面板)
+      .padding(应用尺寸.卡片内边距)
+      .backgroundColor($r('app.color.surface_card'))
+      .borderRadius(应用尺寸.圆角_卡片)
     }
     .width('100%')
     .height('100%')

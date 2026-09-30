@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { HelpLabel } from '../common/HelpLabel';
+import { DialogBackdrop } from '../common/DialogBackdrop';
 import { resourceText } from '../../utils/UiFeedback';
 
 import { DialogHeader } from '../common/DialogHeader';
@@ -130,23 +132,12 @@ export struct 查找替换对话框 {
   build() {
     Stack() {
       // 遮罩层：点击关闭
-      Column()
-        .width('100%')
-        .height('100%')
-        .backgroundColor(this.isDark ? 'rgba(0,0,0,0.40)' : 'rgba(0,0,0,0.15)')
-        // 磨砂玻璃质感：模糊下层内容避免叠字，材质着色跟随应用内主题
-        .backgroundBlurStyle(BlurStyle.Thin, {
-          colorMode: this.isDark ? ThemeColorMode.DARK : ThemeColorMode.LIGHT,
-          adaptiveColor: AdaptiveColor.DEFAULT
-        })
-        // 遮罩扩展进安全区，否则状态栏/导航条区域露出下层背景
-        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+      DialogBackdrop()
         .onClick((): void => {
           if (!this.busy) {
             this.onCancel();
           }
         })
-        // 过渡仅动 opacity 合成属性，不触发布局
         .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
 
       // 主面板
@@ -250,18 +241,10 @@ export struct 查找替换对话框 {
               .onChange((值: boolean): void => {
                 this.是否正则 = 值;
               })
-            Text($r('app.string.browser_find_regex'))
-              .fontSize(应用尺寸.字号_正文)
-              .fontColor($r('app.color.text_primary'))
-            // 正则表达式 ⓘ：点击上抛 onHelp，由父组件弹 字段帮助面板 显示正则语法说明
-            Text($r('app.string.field_help_button'))
-              .fontSize(应用尺寸.字号_正文)
-              .fontColor($r('app.color.text_secondary'))
-              .padding({ left: 应用尺寸.间距_4, right: 0, top: 应用尺寸.间距_4, bottom: 应用尺寸.间距_4 })
-              .onClick((): void => {
-                this.正则帮助回调();
-              })
-          }
+            HelpLabel({ title: $r('app.string.browser_find_regex'), textSize: 应用尺寸.字号_正文,
+              isHelpEnabled: !this.busy, onHelp: (): void => { this.正则帮助回调(); }
+            }).layoutWeight(1)
+          }.layoutWeight(1)
 
           Row({ space: 应用尺寸.间距_5 }) {
             Checkbox()
@@ -271,10 +254,10 @@ export struct 查找替换对话框 {
               .onChange((值: boolean): void => {
                 this.是否区分大小写 = 值;
               })
-            Text($r('app.string.browser_find_match_case'))
+            Text($r('app.string.browser_find_match_case')).flexShrink(1)
               .fontSize(应用尺寸.字号_正文)
               .fontColor($r('app.color.text_primary'))
-          }
+          }.layoutWeight(1)
         }
         .width('100%')
 

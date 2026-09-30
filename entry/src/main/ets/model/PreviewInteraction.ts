@@ -7,7 +7,9 @@
  */
 export function buildPreviewInteractionScript(version: number): string {
   return `(function(){
-    var version=${version};
+    window.__jidePreviewVersion=${version};
+    if(window.__jidePreviewInstalled) return;
+    window.__jidePreviewInstalled=true;
     function interactive(el){
       while(el){
         if(/^(A|BUTTON|INPUT|TEXTAREA|SELECT|OPTION|CANVAS|AUDIO|VIDEO|IFRAME|SUMMARY|DETAILS)$/.test(el.tagName)
@@ -33,22 +35,22 @@ export function buildPreviewInteractionScript(version: number): string {
       if(!e.changedTouches || e.changedTouches.length!==1 || startedOnInteractive) return;
       var t=e.changedTouches[0], dx=t.clientX-startX, dy=t.clientY-startY;
       if(Math.abs(dx)<48 || Math.abs(dx)<=Math.abs(dy) || Date.now()-startTime>1200) return;
-      if(window.jidePreview) window.jidePreview.onAction(dx<0?'next':'previous',version);
+      if(window.jidePreview) window.jidePreview.onAction(dx<0?'next':'previous',window.__jidePreviewVersion);
     },{passive:true});
     // 点击卡片 = 看答案（题目态有效；答案态由后端状态机忽略）。滑动后的合成 click 被 moved 抑制。
     document.addEventListener('click',function(e){
       if(e.defaultPrevented || moved || String(window.getSelection()||'').length) return;
       if(e.target.classList && e.target.classList.contains('sound-flag')){
-        if(window.jidePreview) window.jidePreview.onAction('replay',version);
+        if(window.jidePreview) window.jidePreview.onAction('replay',window.__jidePreviewVersion);
         return;
       }
       if(interactive(e.target)) return;
-      if(window.jidePreview) window.jidePreview.onAction('flip',version);
+      if(window.jidePreview) window.jidePreview.onAction('flip',window.__jidePreviewVersion);
     });
     document.addEventListener('keydown',function(e){
       if(e.defaultPrevented || e.repeat || e.ctrlKey || e.altKey || e.metaKey || interactive(e.target)) return;
       var action=e.key==='ArrowLeft'?'previous':e.key==='ArrowRight'?'next':'';
-      if(action && window.jidePreview){e.preventDefault();window.jidePreview.onAction(action,version);}
+      if(action && window.jidePreview){e.preventDefault();window.jidePreview.onAction(action,window.__jidePreviewVersion);}
     });
   })();`;
 }

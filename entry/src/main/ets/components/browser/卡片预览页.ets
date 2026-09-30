@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../../utils/PressFeedback';
 import { resourceText } from '../../utils/UiFeedback';
 
 // ========================================================
@@ -37,6 +38,7 @@ import { resourceText } from '../../utils/UiFeedback';
 // ========================================================
 
 import { webview } from '@kit.ArkWeb';
+import { CardWebView } from '../../utils/CardWebView';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { interceptCardAsset } from '../../utils/CardAssetResponse';
 import { 卡片渲染服务 } from '../../backend/卡片渲染服务';
@@ -99,6 +101,8 @@ export struct 卡片预览页 {
   onEditWithAgent: (cardId: number) => void = (_cardId: number): void => {};
 
   private readonly 网页控制器: webview.WebviewController = new webview.WebviewController();
+  private readonly cardWeb: CardWebView = new CardWebView(this.网页控制器,
+    (): void => { this.focusPreviewCard(); }, (_message: string): void => { this.webFailed(); });
   private readonly 卡片渲染服务实例: 卡片渲染服务 = new 卡片渲染服务();
   private 已渲染: RenderedCard | null = null;
   /** 控制器未 attach 时缓存的待加载 HTML（规避 aboutToAppear 异步链白屏时序坑）。 */
@@ -141,6 +145,7 @@ export struct 卡片预览页 {
   }
 
   aboutToDisappear(): void {
+    this.cardWeb.reset();
     this.moreMenuOpen = false;
     this.onBackHandlerChange(null);
     this.mounted = false;
@@ -246,6 +251,7 @@ export struct 卡片预览页 {
   // ========================================================
   private async 加载当前卡(): Promise<void> {
     if (!this.mounted) return;
+    this.cardWeb.reset();
     const version: number = ++this.loadVersion;
     this.documentVersion += 1;
     this.stopAudio();
@@ -283,18 +289,18 @@ export struct 卡片预览页 {
   }
 
   /**
-   * 应用 HTML 到 Web 组件：控制器已 attach 时直接 loadData，否则缓存到 待加载HTML
+   * 应用 HTML 到共享渲染器：同卡翻面更新内容，新卡加载文档；未 attach 则缓存到 待加载HTML
    * 由 onControllerAttached 回调消费。规避 aboutToAppear 异步链调 loadData 时
    * Web 未 attach 的白屏时序坑（PROJECT_CONTEXT.md「Web 组件 attach 时序」）。
    */
   private 应用HTML(html: string): void {
     const version: number = ++this.documentVersion;
-    const document: string = html.replace('</body>',
-      `<script>${buildPreviewInteractionScript(version)}</script></body>`);
+    const document: string = html.replace('</div></body>',
+      `<script>${buildPreviewInteractionScript(version)}</script></div></body>`);
     if (this.控制器已挂载) {
       try {
         this.installActionBridge();
-        this.网页控制器.loadData(document, 'text/html', 'UTF-8', 媒体基地址, ' ');
+        this.cardWeb.show(document, this.loadVersion, this.当前面);
         this.playCurrentAudio();
       } catch (错误) {
         this.错误详情 = this.取本地化文案($r('app.string.browser_preview_load_error'));
@@ -309,6 +315,7 @@ export struct 卡片预览页 {
   /** 仅主文档/渲染进程失败进入可恢复错误态；缺失的单个媒体不遮挡整张卡。 */
   private webFailed(): void {
     if (!this.mounted) return;
+    this.cardWeb.reset();
     this.loadVersion += 1;
     this.documentVersion += 1;
     this.忙碌 = false;
@@ -336,12 +343,18 @@ export struct 卡片预览页 {
   private onControllerAttached回调(): void {
     if (!this.mounted) return;
     this.控制器已挂载 = true;
+    try {
+      this.cardWeb.attach();
+    } catch (error) {
+      this.webFailed();
+      return;
+    }
     if (this.待加载HTML !== '') {
       const 缓存: string = this.待加载HTML;
       this.待加载HTML = '';
       try {
         this.installActionBridge();
-        this.网页控制器.loadData(缓存, 'text/html', 'UTF-8', 媒体基地址, ' ');
+        this.cardWeb.show(缓存, this.loadVersion, this.当前面);
         this.playCurrentAudio();
       } catch (错误) {
         this.错误详情 = this.取本地化文案($r('app.string.browser_preview_load_error'));
@@ -523,6 +536,8 @@ export struct 卡片预览页 {
           .backgroundColor($r('app.color.surface_card'))
           .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
           .borderRadius(应用尺寸.圆角_胶囊)
+          .attributeModifier(new PressFeedback())
+          .stateEffect(false)
           .onClick((): void => { this.moreMenuOpen = true; })
       }
       .width('100%')
@@ -562,17 +577,6 @@ export struct 卡片预览页 {
           if (event.request.isMainFrame() && event.request.getRequestUrl() !== 'about:blank') this.webFailed();
         })
         .onRenderExited((): void => { this.webFailed(); })
-        .onPageEnd((event: OnPageEndEvent) => {
-          // 覆盖层不是新导航页，不能只依赖 defaultFocus；首次加载后主动获焦一次。
-          this.focusPreviewCard();
-          // ImageOcclusion 兜底（与 学习页 同款）：setup() 内部幂等，无 canvas 直接返回。
-          try {
-            this.网页控制器.runJavaScript('anki.imageOcclusion.setup()')
-              .catch((error: Object): void => { console.info(`Preview occlusion: ${error}`); });
-          } catch (_错误) {
-            // 预览场景 setup 失败不影响主流程
-          }
-        })
         .width('100%')
         .height('100%')
         // 左右滑切卡在文档内监听判断，保留链接、媒体、遮罩和表单的原生交互。
@@ -600,6 +604,8 @@ export struct 卡片预览页 {
             .fontSize(应用尺寸.字号_正文)
             .fontColor($r('app.color.error_text'))
           Button($r('app.string.browser_preview_retry'))
+            .attributeModifier(new PressFeedback())
+            .stateEffect(false)
             .onClick((): void => { this.加载当前卡(); })
         }
         .width('100%')

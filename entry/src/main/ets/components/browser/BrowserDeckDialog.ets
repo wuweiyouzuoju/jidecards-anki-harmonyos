@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../../utils/PressFeedback';
+import { DialogFrame } from '../common/DialogFrame';
 import { DialogHeader } from '../common/DialogHeader';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { resourceText, namedResourceText } from '../../utils/UiFeedback';
@@ -7,6 +9,12 @@ interface 牌组项 { id: number; 名: string; }
 
 @Component
 export struct BrowserDeckDialog {
+  @Prop @Watch('handleBackRequest') backRequest: number = 0;
+
+  private handleBackRequest(): void {
+    if (!this.busy) this.onClose();
+  }
+
   @Prop isDark: boolean = false;
   @Prop busy: boolean = false;
   onClose: () => void = (): void => {};
@@ -29,54 +37,42 @@ export struct BrowserDeckDialog {
     }
     return 输出;
   }
-  build() {
-    Stack() {
-      Column()
-        .width('100%')
-        .height('100%')
-        .backgroundColor(this.isDark ? 'rgba(0,0,0,0.40)' : 'rgba(0,0,0,0.15)')
-        .onClick((): void => {
-          if (!this.busy) { this.onClose(); }
-        })
+  @Builder
+  private dialogHeader() {
+    DialogHeader({
+      title: $r('app.string.browser_action_change_deck'),
+      showAction: false,
+      closeLabel: $r('app.string.browser_detail_cancel'),
+      closeEnabled: !this.busy,
+      onClose: (): void => { this.onClose(); }
+    })
+  }
 
-      Column({ space: 应用尺寸.间距_14 }) {
-        DialogHeader({
-          title: $r('app.string.browser_action_change_deck'),
-          showClose: false,
-          actionLabel: $r('app.string.browser_detail_cancel'),
-          actionEnabled: !this.busy,
-          onAction: (): void => { this.onClose(); }
-        })
-
-        Scroll() {
-          Column({ space: 应用尺寸.间距_4 }) {
-            if (this.牌组树 !== null) {
-              ForEach(this.扁平化牌组树为列表(), (项: 牌组项) => {
-                Text(项.名)
-                  .fontSize(应用尺寸.字号_正文)
-                  .fontColor($r('app.color.text_primary'))
-                  .padding({ left: 应用尺寸.间距_16, right: 应用尺寸.间距_16,
-                    top: 应用尺寸.间距_12, bottom: 应用尺寸.间距_12 })
-                  .width('100%')
-                  .borderRadius(应用尺寸.圆角_面板)
-                  .backgroundColor($r('app.color.surface_page'))
-                  .onClick((): void => { this.onSubmit(项.id); })
-              }, (项: 牌组项): string => `${项.id}`)
-            }
-          }
-          .width('100%')
+  @Builder
+  private dialogContent() {
+    Column({ space: 应用尺寸.间距_4 }) {
+        if (this.牌组树 !== null) {
+          ForEach(this.扁平化牌组树为列表(), (项: 牌组项) => {
+            Text(项.名)
+              .fontSize(应用尺寸.字号_正文)
+              .fontColor($r('app.color.text_primary'))
+              .padding({ left: 应用尺寸.间距_16, right: 应用尺寸.间距_16,
+                top: 应用尺寸.间距_12, bottom: 应用尺寸.间距_12 })
+              .width('100%')
+              .borderRadius(应用尺寸.圆角_面板)
+              .backgroundColor($r('app.color.surface_page'))
+              .enabled(!this.busy)
+              .attributeModifier(new PressFeedback())
+              .onClick((): void => { if (!this.busy) this.onSubmit(项.id); })
+          }, (项: 牌组项): string => `${项.id}`)
         }
-        .width('100%')
-        .layoutWeight(1)
-        .scrollBar(BarState.Auto)
-        .edgeEffect(EdgeEffect.Spring)
-
       }
-      .width('88%')
-      .constraintSize({ maxWidth: 520, maxHeight: '80%' })
-      .padding(应用尺寸.卡片内边距)
-      .backgroundColor($r('app.color.surface_card'))
-      .borderRadius(应用尺寸.圆角_卡片)
-    }
+      .width('100%')
+  }
+
+  build() {
+    DialogFrame({ maximumWidth: 应用尺寸.dialogMaxWidth, canDismiss: !this.busy,
+      header: () => { this.dialogHeader(); }, content: () => { this.dialogContent(); },
+      onDismiss: (): void => { this.onClose(); } })
   }
 }
