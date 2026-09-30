@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../utils/PressFeedback';
+import { HelpLabel } from './common/HelpLabel';
+import { DialogBackdrop } from './common/DialogBackdrop';
 import { SelectStyle } from '../utils/SelectStyle';
 import { ThemeTextSpans } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
@@ -325,32 +328,16 @@ export struct 添加笔记面板 {
   // ========================================================
   @Builder
   private 带帮助的标签(label: Resource, help: Resource) {
-    Row() {
-      Text(label)
-        .fontSize(应用尺寸.字号_正文_小)
-        .fontColor($r('app.color.text_secondary'))
-        .layoutWeight(1)
-      Button() {
-        Text() { ThemeTextSpans($r('app.string.field_help_button'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.动作主色)
-      }
-        .type(ButtonType.Normal)
-        .backgroundColor(Color.Transparent)
-        .fontColor(this.动作主色)
-        .enabled(!this.busy)
-        .onClick((): void => {
-          this.打开帮助(label, help);
-        })
-    }
-    .width('100%')
+    // 点击时读取帮助，避免切换笔记类型后仍显示旧说明。
+    HelpLabel({ title: label, textSize: 应用尺寸.字号_正文_小,
+      textColor: $r('app.color.text_secondary'), isHelpEnabled: !this.busy,
+      onHelp: (): void => { this.打开帮助(label, help); }
+    }).width('100%')
   }
 
   build() {
     Stack() {
-      Column()
-        .width('100%')
-        .height('100%')
-        .backgroundColor(this.isDark ? 'rgba(0,0,0,0.40)' : 'rgba(0,0,0,0.15)')
-        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+      DialogBackdrop()
         .onClick(() => {
           if (!this.busy) {
             this.onCancel();
@@ -387,6 +374,7 @@ export struct 添加笔记面板 {
               .padding(SelectStyle.controlPadding)
               .space(SelectStyle.controlSpace)
               .font(SelectStyle.controlFont)
+              .textModifier(SelectStyle.labelText())
               .borderRadius(SelectStyle.controlRadius)
               .onSelect((index: number): void => {
                 this.onSelectDeck(this.deckOptions[index].id);
@@ -403,6 +391,7 @@ export struct 添加笔记面板 {
               .padding(SelectStyle.controlPadding)
               .space(SelectStyle.controlSpace)
               .font(SelectStyle.controlFont)
+              .textModifier(SelectStyle.labelText())
               .borderRadius(SelectStyle.controlRadius)
               .onSelect((index: number): void => {
                 this.onSelectNotetype(this.notetypeOptions[index].id);
@@ -444,6 +433,8 @@ export struct 添加笔记面板 {
               .backgroundColor($r('app.color.surface_page'))
               .borderRadius(应用尺寸.圆角_面板)
               .enabled(!this.busy)
+              .attributeModifier(new PressFeedback())
+              .stateEffect(false)
               .onClick((): void => {
                 this.高级已展开 = !this.高级已展开;
               })
@@ -503,8 +494,8 @@ export struct 添加笔记面板 {
 
       if (this.显示帮助) {
         字段帮助面板({
-          title: this.帮助标题,
-          body: this.帮助正文,
+          标题: this.帮助标题,
+          正文: this.帮助正文,
           onClose: (): void => {
             this.显示帮助 = false;
           }

@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { noteImageExtension, prepareNoteImageFields } from '../../entry/src/main/ets/model/NoteImageDraft.ts';
+import { NoteCreationSession } from '../../entry/src/main/ets/model/NoteCreationSession.ts';
 
 const attachment = (fieldIndex, uri, id = fieldIndex) => ({ id, fieldIndex, uri, filename: '' });
 
@@ -153,6 +154,19 @@ function pageHarness(picker, importer = async () => 'image.png') {
       新建笔记: async notetypeId => ({ notetypeId }),
       添加笔记: async (note, deckId) => { events.push({ note, deckId }); }
     }
+  });
+  page.creationSession = new NoteCreationSession({
+    importImage: importer,
+    async saveNote(input) {
+      const note = await page.笔记服务实例.新建笔记(input.notetypeId);
+      note.fields = input.fields; note.tags = input.tags;
+      await page.笔记服务实例.添加笔记(note, input.deckId);
+    },
+    committed: () => events.push('tick'), errorMessage: error => error.message
+  }, state => {
+    if (!page.pageActive) return;
+    page.处理中 = state.busy; page.错误信息 = state.error;
+    if (state.saved) page.pathStack.pop();
   });
   return { page, events };
 }

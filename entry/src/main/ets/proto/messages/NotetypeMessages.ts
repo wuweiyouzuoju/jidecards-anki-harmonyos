@@ -46,6 +46,10 @@ export interface NotetypeField {
 }
 
 export interface NotetypeView {
+  optionalReverseFieldOrd?: number;
+  originalStockKind?: number;
+  clozeFieldOrds?: number[];
+  imageOcclusionFields?: number[];
   id: number;
   name: string;
   kind: number;
@@ -144,13 +148,15 @@ function decodeNotetypeField(bytes: Uint8Array): NotetypeField {
   return field;
 }
 
-function decodeNotetypeConfig(bytes: Uint8Array): number {
+function decodeNotetypeConfig(bytes: Uint8Array, view: NotetypeView): number {
   const reader = new 协议读取器(bytes);
   let kind: number = NOTE_TYPE_KIND_NORMAL;
   let tag;
   while ((tag = reader.读取标签()) !== null) {
     if (tag.字段号 === 1) {
       kind = reader.读取变长整数();
+    } else if (tag.字段号 === 9) {
+      view.originalStockKind = reader.读取变长整数();
     } else {
       reader.跳过字段(tag.线类型);
     }
@@ -174,7 +180,7 @@ export function decodeNotetype(bytes: Uint8Array): NotetypeView {
     } else if (tag.字段号 === 2) {
       result.name = reader.读取字符串();
     } else if (tag.字段号 === 7) {
-      result.kind = decodeNotetypeConfig(reader.读取字节());
+      result.kind = decodeNotetypeConfig(reader.读取字节(), result);
     } else if (tag.字段号 === 8) {
       result.fields.push(decodeNotetypeField(reader.读取字节()));
     } else {

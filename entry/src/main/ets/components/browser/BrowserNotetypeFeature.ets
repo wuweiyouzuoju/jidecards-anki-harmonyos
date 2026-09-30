@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { DialogFrame } from '../common/DialogFrame';
 import { DialogHeader } from '../common/DialogHeader';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { SelectStyle } from '../../utils/SelectStyle';
@@ -9,6 +10,12 @@ import { AnkiBrowserNotetype } from '../../backend/AnkiBrowserNotetype';
 
 @Component
 export struct BrowserNotetypeFeature {
+  @Prop @Watch('handleBackRequest') backRequest: number = 0;
+
+  private handleBackRequest(): void {
+    if (!(this.busy || this.state.busy)) this.onClose();
+  }
+
   firstId: number = 0;
   notes: boolean = false;
   @Prop isDark: boolean = false;
@@ -37,136 +44,137 @@ export struct BrowserNotetypeFeature {
     }
     return 选项;
   }
-  build() {
-    Stack() {
-      Column()
+  @Builder
+  private dialogHeader() {
+    DialogHeader({
+      title: $r('app.string.browser_action_change_notetype'),
+      closeLabel: $r('app.string.browser_detail_cancel'),
+      closeEnabled: !this.busy && !this.state.busy,
+      onClose: (): void => { this.onClose(); },
+      actionLabel: $r('app.string.browser_detail_confirm'),
+      actionEnabled: !this.busy && !this.state.busy && this.state.info !== null,
+      onAction: (): void => { this.submit(); }
+    })
+  }
+
+  @Builder
+  private dialogContent() {
+    if (this.state.error !== '') {
+      Text(this.state.error).fontColor($r('app.color.error_text'))
+    }
+    if (this.state.busy) {
+      Text($r('app.string.browser_action_change_notetype_loading'))
+        .fontSize(应用尺寸.字号_正文)
+        .fontColor($r('app.color.text_secondary'))
         .width('100%')
-        .height('100%')
-        .backgroundColor(this.isDark ? 'rgba(0,0,0,0.40)' : 'rgba(0,0,0,0.15)')
-        .onClick((): void => {
-          if (!this.state.busy && !this.busy) { this.onClose(); }
+    } else {
+      // 选择新笔记类型
+      Text($r('app.string.browser_action_change_notetype_new'))
+        .fontSize(应用尺寸.字号_正文)
+        .fontColor($r('app.color.text_primary'))
+        .width('100%')
+      Select(this.state.names.map((项: NotetypeNameId): SelectOption => {
+        return { value: 项.name };
+      }))
+        .selected(this.state.selectedId === 0 ? -1 : this.state.names.findIndex(
+          (项: NotetypeNameId): boolean => 项.id === this.state.selectedId))
+        .value(this.state.selectedId === 0 ? '' :
+          this.state.names.find((项: NotetypeNameId): boolean => 项.id === this.state.selectedId)?.name ?? '')
+        .width('100%')
+        .attributeModifier(new SelectStyle())
+        .height(SelectStyle.controlHeight)
+        .padding(SelectStyle.controlPadding)
+        .space(SelectStyle.controlSpace)
+        .font(SelectStyle.controlFont)
+        .textModifier(SelectStyle.labelText())
+        .borderRadius(SelectStyle.controlRadius)
+        .enabled(!this.busy && !this.state.busy)
+        .onSelect((索引: number): void => {
+          if (this.busy || this.state.busy) return;
+          const 项: NotetypeNameId = this.state.names[索引];
+          this.session?.select(项.id);
         })
 
-      Column({ space: 应用尺寸.间距_14 }) {
-        DialogHeader({
-          title: $r('app.string.browser_action_change_notetype'),
-          closeLabel: $r('app.string.browser_detail_cancel'),
-          closeEnabled: !this.busy && !this.state.busy,
-          onClose: (): void => { this.onClose(); },
-          actionLabel: $r('app.string.browser_detail_confirm'),
-          actionEnabled: !this.busy && !this.state.busy && this.state.info !== null,
-          onAction: (): void => { this.submit(); }
-        })
+      // 字段/模板映射表（仅在加载完变更信息后显示）
+      if (this.state.info !== null) {
+        Text($r('app.string.browser_action_change_notetype_field_map'))
+          .fontSize(应用尺寸.字号_正文)
+          .fontColor($r('app.color.text_primary'))
+          .fontWeight(FontWeight.Medium)
+          .width('100%')
+        ForEach(this.state.info.newFieldNames, (字段名: string, 索引: number) => {
+          Row({ space: 应用尺寸.间距_8 }) {
+            Text(字段名)
+              .fontSize(应用尺寸.字号_正文_小)
+              .fontColor($r('app.color.text_primary'))
+              .layoutWeight(1)
+            Select(this.构建映射选项列表(this.state.info!.oldFieldNames))
+              .selected(this.state.fields[索引] === -1 ? 0 : this.state.fields[索引] + 1)
+              .value(this.state.fields[索引] === -1 ?
+                resourceText(this.getUIContext(), $r('app.string.browser_action_change_notetype_no_map')) :
+                this.state.info!.oldFieldNames[this.state.fields[索引]])
+              .width('50%')
+              .attributeModifier(new SelectStyle())
+              .height(SelectStyle.controlHeight)
+              .padding(SelectStyle.controlPadding)
+              .space(SelectStyle.controlSpace)
+              .font(SelectStyle.controlFont)
+              .textModifier(SelectStyle.labelText())
+              .borderRadius(SelectStyle.controlRadius)
+              .enabled(!this.busy && !this.state.busy)
+              .onSelect((选索引: number): void => {
+                if (this.busy || this.state.busy) return;
+                // 选索引 0=不映射(-1)，1..N=旧字段 ord
+                const 新值: number = 选索引 === 0 ? -1 : 选索引 - 1;
+                this.session?.setField(索引, 新值);
+              })
+          }
+          .width('100%')
+        }, (字段名: string, 索引: number): string => `${字段名}-${索引}`)
 
-        if (this.state.error !== '') {
-          Text(this.state.error).fontColor($r('app.color.error_text'))
-        }
-        if (this.state.busy) {
-          Text($r('app.string.browser_action_change_notetype_loading'))
-            .fontSize(应用尺寸.字号_正文)
-            .fontColor($r('app.color.text_secondary'))
-            .width('100%')
-        } else {
-          // 选择新笔记类型
-          Text($r('app.string.browser_action_change_notetype_new'))
+        // 模板映射（仅当新笔记类型有模板时显示）
+        if (this.state.info!.newTemplateNames.length > 0) {
+          Text($r('app.string.browser_action_change_notetype_template_map'))
             .fontSize(应用尺寸.字号_正文)
             .fontColor($r('app.color.text_primary'))
+            .fontWeight(FontWeight.Medium)
             .width('100%')
-          Select(this.state.names.map((项: NotetypeNameId): SelectOption => {
-            return { value: 项.name };
-          }))
-            .selected(this.state.selectedId === 0 ? -1 : this.state.names.findIndex(
-              (项: NotetypeNameId): boolean => 项.id === this.state.selectedId))
-            .value(this.state.selectedId === 0 ? '' :
-              this.state.names.find((项: NotetypeNameId): boolean => 项.id === this.state.selectedId)?.name ?? '')
-            .width('100%')
-            .attributeModifier(new SelectStyle())
-            .height(SelectStyle.controlHeight)
-            .padding(SelectStyle.controlPadding)
-            .space(SelectStyle.controlSpace)
-            .font(SelectStyle.controlFont)
-            .borderRadius(SelectStyle.controlRadius)
-            .onSelect((索引: number): void => {
-              const 项: NotetypeNameId = this.state.names[索引];
-              this.session?.select(项.id);
-            })
-
-          // 字段/模板映射表（仅在加载完变更信息后显示）
-          if (this.state.info !== null) {
-            Text($r('app.string.browser_action_change_notetype_field_map'))
-              .fontSize(应用尺寸.字号_正文)
-              .fontColor($r('app.color.text_primary'))
-              .fontWeight(FontWeight.Medium)
-              .width('100%')
-            ForEach(this.state.info.newFieldNames, (字段名: string, 索引: number) => {
-              Row({ space: 应用尺寸.间距_8 }) {
-                Text(字段名)
-                  .fontSize(应用尺寸.字号_正文_小)
-                  .fontColor($r('app.color.text_primary'))
-                  .layoutWeight(1)
-                Select(this.构建映射选项列表(this.state.info!.oldFieldNames))
-                  .selected(this.state.fields[索引] === -1 ? 0 : this.state.fields[索引] + 1)
-                  .value(this.state.fields[索引] === -1 ?
-                    resourceText(this.getUIContext(), $r('app.string.browser_action_change_notetype_no_map')) :
-                    this.state.info!.oldFieldNames[this.state.fields[索引]])
-                  .width('50%')
-                  .attributeModifier(new SelectStyle())
-                  .height(SelectStyle.controlHeight)
-                  .padding(SelectStyle.controlPadding)
-                  .space(SelectStyle.controlSpace)
-                  .font(SelectStyle.controlFont)
-                  .borderRadius(SelectStyle.controlRadius)
-                  .onSelect((选索引: number): void => {
-                    // 选索引 0=不映射(-1)，1..N=旧字段 ord
-                    const 新值: number = 选索引 === 0 ? -1 : 选索引 - 1;
-                    this.session?.setField(索引, 新值);
-                  })
-              }
-              .width('100%')
-            }, (字段名: string, 索引: number): string => `${字段名}-${索引}`)
-
-            // 模板映射（仅当新笔记类型有模板时显示）
-            if (this.state.info!.newTemplateNames.length > 0) {
-              Text($r('app.string.browser_action_change_notetype_template_map'))
-                .fontSize(应用尺寸.字号_正文)
+          ForEach(this.state.info!.newTemplateNames, (模板名: string, 索引: number) => {
+            Row({ space: 应用尺寸.间距_8 }) {
+              Text(模板名)
+                .fontSize(应用尺寸.字号_正文_小)
                 .fontColor($r('app.color.text_primary'))
-                .fontWeight(FontWeight.Medium)
-                .width('100%')
-              ForEach(this.state.info!.newTemplateNames, (模板名: string, 索引: number) => {
-                Row({ space: 应用尺寸.间距_8 }) {
-                  Text(模板名)
-                    .fontSize(应用尺寸.字号_正文_小)
-                    .fontColor($r('app.color.text_primary'))
-                    .layoutWeight(1)
-                  Select(this.构建映射选项列表(this.state.info!.oldTemplateNames))
-                    .selected(this.state.templates[索引] === -1 ? 0 : this.state.templates[索引] + 1)
-                    .value(this.state.templates[索引] === -1 ?
-                      resourceText(this.getUIContext(), $r('app.string.browser_action_change_notetype_no_map')) :
-                      this.state.info!.oldTemplateNames[this.state.templates[索引]])
-                    .width('50%')
-                    .attributeModifier(new SelectStyle())
-                    .height(SelectStyle.controlHeight)
-                    .padding(SelectStyle.controlPadding)
-                    .space(SelectStyle.controlSpace)
-                    .font(SelectStyle.controlFont)
-                    .borderRadius(SelectStyle.controlRadius)
-                    .onSelect((选索引: number): void => {
-                      const 新值: number = 选索引 === 0 ? -1 : 选索引 - 1;
-                      this.session?.setTemplate(索引, 新值);
-                    })
-                }
-                .width('100%')
-              }, (模板名: string, 索引: number): string => `${模板名}-${索引}`)
+                .layoutWeight(1)
+              Select(this.构建映射选项列表(this.state.info!.oldTemplateNames))
+                .selected(this.state.templates[索引] === -1 ? 0 : this.state.templates[索引] + 1)
+                .value(this.state.templates[索引] === -1 ?
+                  resourceText(this.getUIContext(), $r('app.string.browser_action_change_notetype_no_map')) :
+                  this.state.info!.oldTemplateNames[this.state.templates[索引]])
+                .width('50%')
+                .attributeModifier(new SelectStyle())
+                .height(SelectStyle.controlHeight)
+                .padding(SelectStyle.controlPadding)
+                .space(SelectStyle.controlSpace)
+                .font(SelectStyle.controlFont)
+                .textModifier(SelectStyle.labelText())
+                .borderRadius(SelectStyle.controlRadius)
+                .enabled(!this.busy && !this.state.busy)
+                .onSelect((选索引: number): void => {
+                  if (this.busy || this.state.busy) return;
+                  const 新值: number = 选索引 === 0 ? -1 : 选索引 - 1;
+                  this.session?.setTemplate(索引, 新值);
+                })
             }
-          }
+            .width('100%')
+          }, (模板名: string, 索引: number): string => `${模板名}-${索引}`)
         }
-
       }
-      .width('88%')
-      .constraintSize({ maxWidth: 520, maxHeight: '80%' })
-      .padding(应用尺寸.卡片内边距)
-      .backgroundColor($r('app.color.surface_card'))
-      .borderRadius(应用尺寸.圆角_卡片)
     }
+  }
+
+  build() {
+    DialogFrame({ maximumWidth: 应用尺寸.dialogWideMaxWidth, canDismiss: !this.busy && !this.state.busy,
+      header: () => { this.dialogHeader(); }, content: () => { this.dialogContent(); },
+      onDismiss: (): void => { this.onClose(); } })
   }
 }

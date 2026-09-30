@@ -24,6 +24,8 @@
 // 通过 后端会话 间接调用 NAPI 桥；只读方法不修改 collection，写入方法会修改。
 // ========================================================
 
+import { 图片遮罩服务 } from './图片遮罩服务';
+import { optionalReverseField } from '../model/NoteTypePresentation';
 import { 后端会话 } from './后端会话';
 import { decodeOpChangesWithId } from '../proto/messages/CollectionMessages';
 import { 笔记类型方法, 服务号 } from './服务索引';
@@ -63,6 +65,20 @@ export class 笔记类型服务 {
     const 响应字节 = await this.会话.调用(
       服务号.后端笔记类型, 笔记类型方法.获取笔记类型, encodeNotetypeId(ID));
     return decodeNotetype(响应字节);
+  }
+
+  /** 编辑器使用 Core 的结构身份与字段索引，不依赖本地化名称。 */
+  async 获取编辑笔记类型(ID: number): Promise<NotetypeView> {
+    const view: NotetypeView = await this.获取笔记类型(ID);
+    view.clozeFieldOrds = view.kind === NOTE_TYPE_KIND_CLOZE ? await this.获取填空字段序号(ID) : [];
+    view.imageOcclusionFields = [];
+    view.optionalReverseFieldOrd = view.originalStockKind === 3 ?
+      optionalReverseField(view, await this.获取笔记类型旧版(ID)) : -1;
+    if (view.originalStockKind === 6) {
+      const indexes = await new 图片遮罩服务().获取图片遮罩字段(ID);
+      view.imageOcclusionFields = [indexes.遮罩, indexes.图片, indexes.标题, indexes.额外];
+    }
+    return view;
   }
 
   /** Return the exact field ordinals that accept cloze markers for this note type. */

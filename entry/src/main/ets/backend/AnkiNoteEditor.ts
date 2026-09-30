@@ -10,5 +10,5 @@ export class AnkiNoteEditor implements NoteEditorBackend {
   private readonly notetypes: 笔记类型服务 = new 笔记类型服务();
   card(id: number): Promise<NoteEditorCard> { return this.cards.获取卡片(id); }
   note(id: number): Promise<EditableNote> { return this.notes.获取笔记(id); }
-  notetype(id: number): Promise<NoteEditorNotetype> { return this.notetypes.获取笔记类型(id); }
+  notetype(id: number): Promise<NoteEditorNotetype> { return this.notetypes.获取编辑笔记类型(id); }
 }
