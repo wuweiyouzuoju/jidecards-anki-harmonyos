@@ -17,10 +17,17 @@
 
 ### 状态所有者
 
+学习手势由 `model/StudyGestures.ts` 唯一识别和映射；`model/实验性功能存储.ets` 拥有本机开关与四象限引导已读状态；学习页拥有当前卡面代次和教学显隐，提交评分仍归 `StudySessionController`。入口与验证见 [学习手势与四象限引导](study-media.md#学习手势与四象限引导)。
+
 下面按实际状态定位，不要求为每个函数另建抽象。页面拥有导航、跨功能占用和页面数据快照；功能组件拥有局部可观察状态，纯会话通过回调发布结果。
 
 | 状态或资源 | 所有者 / 生命周期 | 直接验证入口 |
 | --- | --- | --- |
+| 首页牌组展开记忆 | [HomeDeckExpansion](../../entry/src/main/ets/model/HomeDeckExpansion.ts) 协调 ID；[HomeDeckExpansionStore](../../entry/src/main/ets/utils/HomeDeckExpansionStore.ets) 唯一偏好入口，串行落盘独立于页面生命周期 | [home-deck-expansion](../../tools/tests/home-deck-expansion.test.mjs)；手机透明详情的底层显隐见 [首页](home.md#牌组展开记忆与手机详情) |
+| 首页目的地与详情装配 | [HomeDestinations](../../entry/src/main/ets/pages/navigation/HomeDestinations.ets)、[HomeDeckDetails](../../entry/src/main/ets/components/home/HomeDeckDetails.ets)；页面栈、选择及动作仍由首页持有 | [home-composition](../../tools/tests/home-composition.test.mjs) |
+| 首页导航转场 | [HomeNavigationTransition](../../entry/src/main/ets/utils/HomeNavigationTransition.ets)；持有代次、淡入顺序与背景冻结回调 | [iridescent-rendering](../../tools/tests/iridescent-rendering.test.mjs) |
+| 首页删除交互与媒体二次确认 | [HomeDeckDeletion](../../entry/src/main/ets/components/home/HomeDeckDeletion.ets)；Core 提交后交回首页协调选择、刷新与同步，媒体清理由 DeckMediaCleanup 校验 | [home-deletion-runtime](../../tools/tests/home-deletion-runtime.test.mjs)、[deck-media-cleanup](../../tools/tests/deck-media-cleanup.test.mjs) |
+| 弹窗外壳与返回层级 | `DialogFrame` / `DialogBackdrop` 只拥有展示几何和主题；宿主拥有显隐，功能组件拥有草稿与忙碌状态，`backRequest` 沿已挂载的最上层传递并消费 | [ui-dialog-layout](../../tools/tests/ui-dialog-layout.test.mjs)，ArkUI 的观察更新、键盘和布局另需设备验收 |
 | 媒体检查、报告续读与清理 | [MediaMaintenanceSession](../../entry/src/main/ets/model/settings/MediaMaintenanceSession.ts)；原生快照随 backend/面板释放，已接受写入独立完成 | [media-maintenance-session](../../tools/tests/media-maintenance-session.test.mjs)、Rust media_snapshot 测试 |
 | 浏览查询结果、游标与分页占用 | [BrowserSearchSession](../../entry/src/main/ets/model/BrowserSearchSession.ts)；新查询使旧分页失效 | [browser-search-pagination](../../tools/tests/browser-search-pagination.test.mjs) |
 | 公告节流与延迟任务 | [HomeAnnouncementController](../../entry/src/main/ets/model/HomeAnnouncementController.ts)；暂停/销毁失效旧 timer | [home-announcement-scheduling](../../tools/tests/home-announcement-scheduling.test.mjs) |
@@ -33,9 +40,15 @@
 | 首页同步定时器、待执行导航、刷新收尾 | [HomeSyncController](../../entry/src/main/ets/model/HomeSyncController.ts)；页面销毁使旧回调失效 | [home-sync-controller](../../tools/tests/home-sync-controller.test.mjs) |
 | 自动备份延迟与配置读取 | [HomeBackupController](../../entry/src/main/ets/model/HomeBackupController.ts)；已接受备份由 BackupCoordinator 持有至结束 | [home-backup-controller](../../tools/tests/home-backup-controller.test.mjs) |
 | 同步租约与集合等待 | [SyncActivity](../../entry/src/main/ets/model/SyncSettings.ts)；持有者释放，取消请求不等于 IO 已结束 | [sync-settings](../../tools/tests/sync-settings.test.mjs) |
+| 单次同步任务、冲突与媒体终态 | [SyncSession](../../entry/src/main/ets/model/SyncSession.ts) 持有 RPC、轮询、取消和租约收尾；AnkiSyncSession 适配平台效果，同步面板只展示快照 | [sync-disposal](../../tools/tests/sync-disposal.test.mjs)、[sync-media-ownership](../../tools/tests/sync-media-ownership.test.mjs)；支架直接构造真实会话 |
+| 新增笔记初始化与一次提交 | [NoteCreationSession](../../entry/src/main/ets/model/NoteCreationSession.ts) 持有读取代次及冻结提交；AnkiNoteCreation 拥有标准类型恢复、Core 字段索引与永久媒体导入，页面拥有表单输入 | [note-creation-session](../../tools/tests/note-creation-session.test.mjs)、[note-image-media](../../tools/tests/note-image-media.test.mjs) |
+| 统计查询、偏好写入与桌面快照 | [StatsSession](../../entry/src/main/ets/model/StatsSession.ts) 拒绝旧读取；[StatsWidgetPublisher](../../entry/src/main/ets/backend/StatsWidgetPublisher.ets) 统一首页、统计页与 FSRS 的聚合/发布队列，接受的推送完整结束 | [stats-session](../../tools/tests/stats-session.test.mjs)、[stats-entry-runtime](../../tools/tests/stats-entry-runtime.test.mjs) |
+| 关于分组外链和弹窗 | [AboutSettings](../../entry/src/main/ets/components/settings/AboutSettings.ets) 拥有反馈/赞赏弹窗与复制操作，好评复用现有好评引导；设置壳只持有导航 | [settings-about-runtime](../../tools/tests/settings-about-runtime.test.mjs) |
+| 应用内 Agent 历史读取/恢复代次 | [AgentHistoryCoordinator](../../entry/src/main/ets/model/agent/AgentHistoryCoordinator.ts) 协调列表、checkpoint、冻结的历史保存和删除；不拥有卡片写入令牌或重新执行动作 | [agent-history-coordinator](../../tools/tests/agent-history-coordinator.test.mjs)、[platform-warning-boundaries](../../tools/tests/platform-warning-boundaries.test.mjs) |
 | 学习卡片/队列代次与接受后的操作 | [StudySessionController](../../entry/src/main/ets/model/StudySessionController.ts)；过期读取不得覆盖新会话 | [study-session-controller](../../tools/tests/study-session-controller.test.mjs) |
+| 同卡翻面的 Web 文档与脚本执行 | [CardWebSession](../../entry/src/main/ets/model/CardWebSession.ts) 拥有文档、卡面版本和更新队列；[CardWebView](../../entry/src/main/ets/utils/CardWebView.ets) 适配 ArkWeb，学习/预览共同使用；新卡或编辑重新加载时隔离旧全局状态 | [card-web-session](../../tools/tests/card-web-session.test.mjs)、[真实浏览器翻面](../../tools/test-card-flip-browser.mjs)；设备范围见 [学习与媒体](study-media.md#卡片模板脚本与样式) |
 | 浏览批量快照与操作占用 | [BrowserOperationController](../../entry/src/main/ets/model/BrowserOperationController.ts)；离页禁止 UI 回写但不取消已接受写入 | [browser-operation-model](../../tools/tests/browser-operation-model.test.mjs) |
-| 笔记编辑读取、草稿快照与写入代次 | [NoteEditorSession](../../entry/src/main/ets/model/NoteEditorSession.ts)；浏览和学习页只提供写入适配，关闭/离页不撤销已接受写入 | [note-editor-session](../../tools/tests/note-editor-session.test.mjs) |
+| 笔记编辑读取、草稿快照与写入代次 | [NoteEditorSession](../../entry/src/main/ets/model/NoteEditorSession.ts)；EditNotePage 持有读取/写入会话，AnkiNoteUpdate 适配媒体和更新；来源只传 ID，关闭/离页不撤销已接受写入 | [note-editor-session](../../tools/tests/note-editor-session.test.mjs) |
 | 学习页普通计时与自动推进 | [StudyTimerController](../../entry/src/main/ets/model/StudyTimerController.ts)；页面提供当前卡片、音频和阻塞事实，控制器不拥有评分或后端写入 | [study-timer-controller](../../tools/tests/study-timer-controller.test.mjs) |
 | 首页创建牌组与牌组定制表单 | [CreateDeckFeature](../../entry/src/main/ets/components/home/CreateDeckFeature.ets)、[DeckCustomizationFeature](../../entry/src/main/ets/components/home/DeckCustomizationFeature.ets)；页面只装配弹层、刷新和导航 | [home-deck-features](../../tools/tests/home-deck-features.test.mjs) |
 | 应用内 Agent 会话、检索范围与辅助确认账本 | [AgentSessionController](../../entry/src/main/ets/backend/agent/AgentSessionController.ets) 拥有会话状态和 ActionExecutor；Scope 拥有稳定 ID | [ai-agent-v2-runtime](../../tools/tests/ai-agent-v2-runtime.test.mjs) |

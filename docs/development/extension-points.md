@@ -25,14 +25,17 @@
 | 任务 | 入口 | 注意 |
 | --- | --- | --- |
 | 修改学习 | `pages/学习页.ets`、`backend/调度器服务.ts` | 评分防重入；不在前端算调度 |
-| 修改卡片渲染 | `backend/卡片渲染服务.ts`、`model/学习卡片HTML构建器.ts` | 保持媒体拦截域名一致 |
+| 修改卡片渲染 | `backend/卡片渲染服务.ts`、`model/学习卡片HTML构建器.ts`、`model/CardWebSession.ts`、`model/CardReviewerRuntime.ts` | 学习/预览经 `utils/CardWebView.ets` 共用同卡文档；保持媒体域名、脚本执行顺序和回调代次一致 |
 | 修改公式兼容 | `model/MathRendering.ts`、`utils/CardAssetResponse.ets`、`resources/rawfile/mathjax/` | 离线资源经独占域名响应；`latexSvg` 不控制 MathJax；传统 LaTeX 经上游 ExtractLatex |
 | 修改浏览 | `pages/浏览页.ets`、`components/browser/` | Cards/Notes ID 语义不同；返回后保留搜索状态 |
-| 修改统计 | `pages/统计页.ets`、`components/stats/`、`backend/统计服务.ts` | 图表组件只展示，口径来自后端 |
-| 修改同步 | `model/同步流程.ts`、`backend/同步服务.ts` | 集合同步与媒体同步状态分开 |
+| 修改统计 | `model/StatsSession.ts`、`backend/AnkiStatsSession.ets`、`backend/StatsWidgetPublisher.ets`；布局在 `pages/统计页.ets` / `components/stats/` | 旧查询失效，偏好写入串行，只有全库口径发布桌面卡片 |
+| 修改同步 | `model/SyncSession.ts`、`model/同步流程.ts`、`backend/AnkiSyncSession.ets`、`backend/同步服务.ts` | 任务拥有租约与媒体终态，组件只展示和转交意图 |
+| 修改新增笔记 | `model/NoteCreationSession.ts`、`backend/AnkiNoteCreation.ets`、`model/NoteTypeCatalog.ts` | 表单留在页面；类型恢复及文件 IO 在后端，已接受保存不随离页取消 |
+| 修改关于设置 | `components/settings/AboutSettings.ets`、`utils/好评引导.ets` | 复用 AboutActionDialog 和现有好评回退；设置壳只导航 |
+| 修改应用内 Agent 历史 | `model/agent/AgentHistoryCoordinator.ts`、`AgentConversationView.ts`、现有历史/CheckpointStore | 恢复只交既有 runtime 校验，不恢复写入令牌、不重放动作 |
 | 修改导入导出 | `backend/数据迁移服务.ts`、`backend/后端会话.ts` | collection 生命周期和失败恢复优先 |
 | 修改主题/语言 | `model/主题设置.ets`、`model/语言存储.ets`、资源目录 | ThemeMode/ColorTheme 正交；语言切换需重启 |
-| 修改动画 | `utils/转场时长.ets`、`pages/首页.ets`、相关组件 | 导航/全屏层 200–300ms 淡入淡出；小菜单与展开 150ms；按压 80ms；禁止横向飞入 |
+| 修改动画 | `utils/转场时长.ets`、`utils/HomeNavigationTransition.ets`、相关组件 | 导航/全屏层 200–300ms 淡入淡出；小菜单与展开 150ms；按钮按压由原生多态表面或系统反馈单独负责，不叠加整按钮动画；禁止横向飞入 |
 | 修改学习音频 | `utils/AudioFocusCoordinator.ets`、`声音播放器.ets`、`TTS播放器.ets` | 跨应用混音由 AudioSession 管理；`SHARE_MODE` 只管应用内多流 |
 | 修改应用内 Agent | `pages/AI制卡页.ets`、`backend/agent/`、`model/agent/` | 不绕过 Scope、确认及 DraftExecutor / ActionExecutor；见 [执行边界](agent.md) |
 | 修改发布入口 | `model/ReleaseFeatures.ets` 及入口契约测试 | 以 ReleaseFeatures.ets 的实际开关为准 |
@@ -44,7 +47,7 @@
 | 场景 | 入口 | 参考 |
 | --- | --- | --- |
 | 新增 Anki 服务方法 | `backend/服务索引.ts` + 对应 Service + proto/messages | 现有牌组/统计/媒体服务 |
-| 新增页面 | `pages/首页.ets` 的目的地映射 | 学习页、浏览页、统计页 |
+| 新增页面 | `pages/navigation/HomeDestinations.ets` | 首页持有页面栈、导航时机与返回刷新；映射模块只接参数并渲染目的地 |
 | 新增设置分组 | `model/SettingsNavigation.ts`、`components/设置面板.ets`、`components/settings/` | `GeneralSettings.ets`、静态 `设置分组卡片.ets`；先核对同目录 `SETTINGS_PARITY.md` |
 | 新增统计图 | `components/stats/`、统计色板/分箱模型 | 复习卡、日历卡 |
 | 新增应用内 Agent 工具 | `model/agent/AgentToolCatalog.ts` 汇总目录；辅助动作定义在 `AgentExtensionTools.ts` | Scope、Schema、审计与确认必须同时覆盖；提案工具不依赖确认执行器 |

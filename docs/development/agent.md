@@ -30,3 +30,9 @@
 - `AgentConversationTypes.ts` 定义持久化协议；`AgentConversationView.ts` 负责可见消息复制、历史投影和恢复，平台偏好读写留在 `AgentConversationStore.ets`。历史工具按消息 ID 归属，旧无归属记录独立展示；恢复时复制澄清和操作状态，不恢复写入令牌。
 - `components/agent/AgentEditableCard.ets` 只呈现字段、选择和保存状态并上抛事件；`AgentHistoryList.ets` 只呈现历史和打开/删除事件。领域状态与执行器由页面协调，不向子组件传整个页面实例。
 - 新边界直接行为测试见 `page-domain-models.test.mjs`；历史恢复覆盖原始 Provider 正文、推理、工具归属、旧记录、可变快照隔离。
+
+## 历史编排入口
+
+`model/agent/AgentHistoryCoordinator.ts` 拥有历史列表读取/恢复代次，协调 `AgentConversationView`、现有会话存储及 CheckpointStore。保存时冻结可见记录，checkpoint 失败不声称已保存；已接受的历史写入按序完成，删除等待先前写入，避免晚到保存重建刚删除的记录。关闭/重开列表、切换上下文、新会话和离页均使旧读取失效。
+
+恢复把 checkpoint 交给既有 `AgentSessionController.restore` 校验，只重建显示、协议及检索进度；不恢复卡片写入令牌，不自动重新执行动作。创建模式校验牌组/类型是否仍存在，页面异步加载类型后再次核对恢复代次；编辑模式仍允许未指定目标。页面继续拥有输入、文件选择、导航与错误呈现。直接回归 `agent-history-coordinator.test.mjs`，页面接线及迟到类型结果回归 `platform-warning-boundaries.test.mjs`。

@@ -6,6 +6,16 @@
 - 责任链：pages/学习页.ets → StudySessionController → StudySessionBackend → Anki Core；预览只读。
 - 快速反馈：`npm test -- study / npm test -- media`；完整验收见 [验证说明](verification.md)。
 
+## 学习手势与四象限引导
+
+`ReviewControlsSettings.ets` 在两种界面模式都提供独立的学习手势、四象限开关，默认关闭。`model/实验性功能存储.ets` 是偏好唯一入口，保留旧 `tap_zones_enabled` 键；串行落盘成功后才广播，失败恢复原值并显示错误。四象限由关闭变为开启时重置本机已读标记，旧用户缺少标记也会收到引导。
+
+`model/StudyGestures.ts` 在 Web 文档内识别输入并按当前状态映射：普通卡题目面双击显示答案，答案面左滑良好、右滑困难；四象限单击题目面显示答案，答案面左上忘记、右上困难、左下良好、右下简单。启用双击时单击等待 320ms，双击不评分；滑动后的合成点击、多指/取消、长按、文本选中、交互元素及已滚动的内容不产生评分。模板可在自定义交互区域添加 `data-jide-gesture="ignore"`。卡片与卡面代次随桥接事件传回，页面统一检查菜单、教学、编辑、白板、后台和评分占用。选择题保持提交后右滑继续；只读预览沿用独立语义。
+
+学习页在首次可用普通卡上显示 `StudyTapZonesGuide`，与卡片 Web 使用相同矩形，无额外分区边距；四格平分可用宽高，顶部/底部工具栏与系统安全区均不计入分区。引导覆盖层复用评分按钮的深浅四档背景色，独立色块使用 50% 透明度透出卡面，位置标签与确认操作保持不透明；暂停计时与输入，明确确认才保存已读，返回关闭不标已读，后台/离页不消耗提示机会。首次通用教学先显示，关闭后再显示分区教学。更多里的学习说明与设置帮助共用 `study_gestures_help`、`settings_tap_zones_hint`。
+
+直接验证：`tools/tests/study-gestures.test.mjs` 覆盖生产事件脚本、动作策略、偏好失败/重启、代次和引导；`study-guide.test.mjs` 核对两种语言的实际说明组合。真实浏览器输入回归为 `node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs tools/test-study-gestures-browser.mjs`，环境见 [工具入口](../../tools/README.md)。`npm test -- study` 仅验证模型和接线；真实 ArkWeb 手势、横竖屏、大字体、两种工具栏及彩色覆盖层仍须设备验收。完整自定义映射、九宫格、多指和摇晃未实现。
+
 ## APKG 选择题
 
 格式见 [选择题 APKG v1](../choice-apkg-v1.md)，制作流程见 [Agent 指南](../choice-authoring.md)。`JideChoice.ts` 负责源文件校验、版本标记、模板、精确集合判分和字段一致性；工具 `tools/choice-package.mjs` 复用它打包标准 APKG，应用不直接导入 JSON 或自定义后缀。`AnkiStudySessionBackend` 按字段名和 payload 版本识别题型，不依赖笔记类型显示名称，未知版本按普通卡处理。学习页接收 `StudySessionController` 的题型数据，2–10 个选项分左右两列；答对直接提交 Good，答错直接提交 Hard，不再次评分。“更多 → 自动前进”中的反馈停留时间属于本次学习会话，切题保留；提交后的右滑只切题，不重复写复习记录。回归入口是 `tools/tests/jide-choice.test.mjs` 和 `tools/tests/choice-package.test.mjs`。AnkiWeb 实际往返与真机交互须另行验收。
@@ -13,6 +23,8 @@
 ## 卡片文字显示
 
 学习页沿用浏览、统计页的背景链路：`首页.ets` 在 Navigation 外持有唯一 `ThemeBackground`，学习页 NavDestination 透明；顶部条、卡片区外围及答案条订阅 `PAGE_SURFACE_KEY`（本页变量 `页面底色微染值`）。这个键在幻彩主题下是 `#00000000`，普通主题下才是微染底色，不能把它当作固定不透明色，也不能在卡片外边距或底部避让区写死 `surface_page`，否则主题背景只剩顶部可见。卡片本体由 ArkUI 圆角外壳和 `学习卡片HTML构建器.ts` 的 ArkWeb 文档组成，使用 `surface_card` 深浅表面；不要把选中态用的 `主色容器` 铺满正文。
+
+HTML 构建器在模板 CSS 前同时提供默认字色与不透明卡片底色。模板显式设置的字色、底色和 `nightMode` 配色必须成对保留；不能在模板后用 `!important` 强制覆盖背景，否则标准 Anki 黑字白底模板会变成黑字深色底。学习与浏览预览共用此入口；未声明配色时仍使用应用深浅默认表面。CSS 顺序回归见 `tools/tests/card-template-style.test.mjs`，实际浏览器配色与对比度回归见 `tools/test-card-colors-browser.mjs`（Node 参数与 `PLAYWRIGHT_MODULE` 配置同 `tools/test-card-template-browser.mjs`）。
 
 学习页注册现有 `CustomTransition` 协议，首页统一先隐藏退出页、再淡入进入页，并冻结/恢复根背景；不在学习页复制背景或用禁用转场掩盖问题。转场运行验证见 `tools/tests/iridescent-rendering.test.mjs`，背景接线见 `tools/tests/study-flow-contract.test.mjs`。设备验收须比较卡片四周、答案按钮四周与顶部背景是否连续，并检查进入、返回、翻面；Node 测试及 HAP 编译不能证明实际视觉效果。
 
@@ -45,6 +57,14 @@
 
 ## 卡片模板脚本与样式
 
+学习与预览的 Web 生命周期统一由 `utils/CardWebView.ets` → `model/CardWebSession.ts` → `model/CardReviewerRuntime.ts` 管理。页面只提供当前加载代次、HTML 和正反面；只有适配器调用 ArkWeb `loadData`。同一次卡片加载的正反面共用 document/window，翻面替换 `#qa`，依次重新执行模板脚本并等待外部脚本，保留模板自己的全局作答状态和同源 Web Storage。模板 CSS 和通过 CSS 字段嵌入的脚本也放在 `#qa`，按每面执行；jQuery、MathJax 和应用内置脚本只在文档首次加载。每面重新处理公式、遮罩、折叠字段及 onUpdateHook/onShownHook；预览的文档监听只安装一次，动作使用当前卡面版本。
+
+新卡、撤销后重新取卡、编辑刷新及离页会使旧会话失效；新卡采用新文档，防止上一张卡的计时器、监听和全局变量串入下一张。这个隔离范围有意限定为“同卡翻面持久”，不承诺 Anki 桌面整个复习会话的全局变量寿命，也不清空作者的 localStorage/sessionStorage。持久化数据和调度仍归 Anki Core；模板小题得分不是调度评分。
+
+完成信号由 JS 桥带文档/卡面版本回传，不能把 `runJavaScript` 返回当作页面内异步脚本已执行完毕。首次加载未结束的翻面请求排队，连续更新串行处理最新一面；旧文档回调不能确认新卡，当前脚本资源失败进入页面错误态，不通过重新 loadData 隐式丢掉作答状态。资源超时为 15 秒。
+
+回归入口：`tools/tests/card-web-session.test.mjs` 验证队列、旧回调、错误恢复和适配器；`tools/test-card-flip-browser.mjs` 用真实导航执行生产 HTML、渲染会话与脚本，覆盖学习/预览、深浅色、完整/部分作答、反复翻面、切卡隔离、Storage、外部脚本顺序、公式、遮罩、折叠和预览监听。浏览器命令：`node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs tools/test-card-flip-browser.mjs`，可用 `PLAYWRIGHT_MODULE` 指定 Playwright 模块路径，需安装 Edge。ArkWeb 桥及原问题牌组仍需真机验收；浏览器回归不证明任意第三方模板全部兼容。
+
 学习和浏览预览共用 `model/学习卡片HTML构建器.ts`。默认配色、笔记类型 CSS、应用布局/媒体兜底分别包在独立 style 中，保持原有顺序；不能重新合并，部分 Anki 牌组在 CSS 字段用闭合标签嵌入脚本。`utils/CardAssetResponse.ets`（原 MathAssetResponse）统一映射固定的内置 jQuery 3.7.1/MathJax rawfile；未知内置域请求返回 404，其他域沿原媒体/网络逻辑。jQuery 必须先于模板脚本同步加载。新增内置脚本需同时更新固定映射、许可与浏览器回归；不要修改导入笔记类型原文来规避渲染问题。外部作者脚本依赖与实际验证边界见 docs/FEATURE_STATUS.md。
 
 
@@ -60,7 +80,7 @@
 
 自定义弹窗通过 `components/common/DialogHeader.ets` 将确认、保存、完成固定在标题栏右侧，取消或关闭放左侧；左右操作区等宽，标题相对弹窗整体居中。主操作为透明底色文字按钮，文字跟随 `颜色键.动作主色`，保留调用方的忙碌与校验守卫。媒体管理的操作按未使用媒体和回收站分区排列，禁用按钮保留位置与清晰的灰色文字。系统原生确认框沿用平台布局。
 
-学习页右上角更多菜单提供“编辑”，复用 `components/browser/浏览编辑区.ets` 修改当前笔记字段和标签。`model/NoteEditorSession.ts` 拥有读取代次、草稿可见性和写入输入快照；学习页仅适配当前会话的写入与刷新。编辑期间屏蔽学习快捷键及评分；字段读取完成前不挂载空编辑器；取消保留当前卡面并排除编辑耗时，保存保留撤销记录并通过既有加载流程重新获取队首、调度状态与题面。
+学习页右上角更多菜单提供“编辑”，进入 `pages/EditNotePage.ets` 独立页面，复用新增的标题栏与字段卡片。`model/NoteEditorSession.ts` 在编辑页拥有读取代次、草稿可见性和写入输入快照；`AnkiNoteUpdate` 在集合操作保护内导图和更新。学习页只冻结交互，并在 onShown 恢复，写入通知通过原有 cardContentChangedTick 消费。编辑期间屏蔽学习快捷键及评分；字段读取完成前不挂载空编辑器；取消保留当前卡面并排除编辑耗时，保存保留撤销记录并通过既有加载流程重新获取队首、调度状态与题面。
 
 学习页从其他页面返回时通过 NavDestination 的隐藏/显示回调标记并消费内容刷新，不依赖编辑入口是否发送 AI 专用通知。刷新复用完整加载链更新正反面、模板、拼写元数据和音频；同卡恢复原正反面，失效卡按后端新队首展示。加载或编辑中保留待刷新标记，刷新过程中新增变更完成后再次消费；失败进入可见错误态，禁止把旧题面当作最新内容继续评分。
 
@@ -88,3 +108,6 @@
 ## 页面剩余职责边界
 
 `StudyInputPolicy.ts` 将键盘事件映射为学习命令，`utils/StudyKeyAdapter.ets` 只映射 Kit 键码。编辑期间不触发学习操作；引导期间也清理松开的 Ctrl。`StudyAnswerRenderer.ts` 使用翻面时的字段/输入快照生成拼写答案，读取失败回退原答案，是否展示仍由学习会话代次决定。纯 HTML 构建器已使用 `.ts`，无需 ArkUI 即可直接测试。编辑生命周期共用 `NoteEditorSession.ts`，内部读取复用 `NoteEditorLoader.ts`；Web 控件装载、焦点和 UI 效果仍由页面负责，音频生命周期属于 `CardAudioSession`，普通计时资源属于 `StudyTimerController`，时长与动作计算仍复用 `StudyTiming`。
+
+
+学习编辑的图片准备通过 `StudySessionController.saveNote` 的 prepareFields 回调在 commitChange 内运行：先等待集合可用，再导入图片并更新原笔记；文本保存不调用媒体导入。离页后保护持续到整个保存结束，失败不广播写入成功。`study-session-controller.test.mjs` 覆盖集合等待、媒体/笔记失败与离页收尾；`study-note-editor.test.mjs` 覆盖返回请求确认后保留卡面/调度、不保存并排除编辑时间。HTML 工具和草稿入口见 [基础编辑](browser-stats.md#基础字段编辑与草稿保护)。

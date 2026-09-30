@@ -6,7 +6,21 @@
 - 责任链：首页映射 UI → HomeWorkCoordinator / HomeStartupSequence / HomeSyncPolicy 决策 → HomeDataRepository / 既有 Service。
 - 快速反馈：`npm test -- home`；完整验收见 [验证说明](verification.md)。
 
-`HomeDataRepository.load()` 只读取牌组树、本机展示偏好及隐藏列表；首页完成选择校验后即可放行学习。`loadStatistics()` 单独读取图表并 await 桌面卡片保存/推送，由首页 `statisticsQueue` 持有，不能再串回同步完成/学习入口的等待链。必要牌组刷新仍由 `refreshQueue` 串行；每次实际加载递增代次，统计队列跳过旧代次、已离页或等待导航的任务，已接受的推送完整结束后才执行下一项。返回首页会重新读取统计，迟到结果不覆盖新快照或学习期间的界面。回归：`home-data-repository`、`home-sync-refresh-runtime`；后者覆盖慢推送、导航抢先、销毁和过期代次。
+## 牌组展开记忆与手机详情
+
+首页保留 NavPathStack、选择/快照、刷新与跨功能占用协调。`pages/navigation/HomeDestinations.ets` 只渲染目的地并映射路由参数，导航时机和返回刷新仍由首页负责；`utils/HomeNavigationTransition.ets` 拥有转场代次、淡入与背景冻结顺序，通过宿主回调更新首页透明度。新增页面或调整转场请进入对应模块。
+
+`components/home/HomeDeckDetails.ets` 统一手机详情和宽屏侧栏，复用 `牌组详情面板`；首页 `deckDetails(compact)` 只接一次动作回调和历史刷新 token。详情继续继承首页的 Provide/Consume，不复制选择或快照。`components/home/HomeDeckDeletion.ets` 拥有原生确认、删除服务调用、媒体二次确认和忙碌状态；通过 `onDeleted` 交回首页协调选择、刷新及同步，通过状态回调参与首页占用。已确认写入继续完成，媒体清理提示仍检查前台可见性。
+
+边界回归：`home-composition` 执行真实目的地映射及详情回调，`home-deletion-runtime` 执行真实删除入口与事务收尾，`iridescent-rendering` 执行真实转场实现。移除的首页主题切换、带搜索浏览入口及取消隐藏弹窗均已无调用；现用入口仍分别由设置/浏览模块负责。
+
+`model/HomeDeckExpansion.ts` 负责展开集合与已知 ID 的协调及持久化格式，`utils/HomeDeckExpansionStore.ets` 是本机 `homeDeckExpansion` 偏好的唯一读写入口。首页在启动加载前同步恢复，通过展开集合的 Watch 保存单击、递归切换、显式选择祖先路径和导入后的变化；刷新先更新已知 ID 再触发保存。首次安装默认展开父牌组，已有牌组保留折叠，新 ID 默认展开，删除 ID 在成功刷新时清理。宽屏自动恢复上次选择不展开祖先，避免覆盖折叠记忆。存储快照在调用时冻结，flush 串行且不随页面销毁取消，失败记录日志；读取失败不回写覆盖原偏好。
+
+手机详情仍挂在首页 Stack 内以继承 Provide。`homeLayout` 在 `xs && 显示牌组详情` 时使用 `Visibility.Hidden`，保留列表位置和断点测量，同时禁止底层列表绘制与点击。幻彩页面表面透明，不能仅靠详情背景遮住首页，否则操作区间隙和底部安全区会透出牌组行。宽屏恢复双栏，主题背景继续由根 `ThemeBackground` 提供；预览覆盖页和导航页保留各自已有的生命周期。这里不改变间距：卡片与按钮间距仅由操作区 top padding 贡献，底部由 `操作区底部间距(narrow, navigationBottomInset)` 贡献。
+
+回归入口：`tools/tests/home-deck-expansion.test.mjs`，覆盖重启、全部折叠、新增/删除、连续保存、失败重试、页面接线及手机/宽屏显隐。实际设备仍需检查幻彩/普通主题、宽窄密度、导航条有无、横竖屏、返回列表位置与冷启动恢复；Node 测试不模拟 ArkUI 布局。
+
+`HomeDataRepository.load()` 只读取牌组树、本机展示偏好及隐藏列表；首页完成选择校验后即可放行学习。`loadStatistics()` 单独读取图表，经 `StatsWidgetPublisher` 聚合并 await 桌面卡片保存/推送（与统计页、FSRS 共用），由首页 `statisticsQueue` 持有，不能再串回同步完成/学习入口的等待链。必要牌组刷新仍由 `refreshQueue` 串行；每次实际加载递增代次，统计队列跳过旧代次、已离页或等待导航的任务，已接受的推送完整结束后才执行下一项。返回首页会重新读取统计，迟到结果不覆盖新快照或学习期间的界面。回归：`home-data-repository`、`home-sync-refresh-runtime`；后者覆盖慢推送、导航抢先、销毁和过期代次。
 
 ## 页面操作边界扩展点
 
@@ -46,7 +60,7 @@
 - `backend/HomeDeckCommands.ets` 创建并记住牌组、写入别名与背景；`CreateDeckFeature.ets` 和 `DeckCustomizationFeature.ets` 分别拥有表单忙碌态、校验错误及已接受写入的收尾，页面只装配弹层、刷新和提示。背景失败单独反馈，已落盘别名保留；刷新失败不会把已成功写入重新标成可重试写入。
 - `components/home/DeckOptionsFeature.ets` 持有表单和校验错误，`model/DeckOptionsDraft.ets` 从表单构造有效草稿；`model/home/DeckOptionsSession.ts` 拥有读取代次、原配置和提交状态，经 `backend/AnkiDeckOptions.ets` 调用服务。`DeckConfigSave.ts` 复制配置、分离共享预设并冻结请求。首页只持有打开目标与占用；失败保留草稿，成功不可重复提交，离页后的已接受写入仍广播 FSRS/首页刷新。
 - `model/home/DataTransferSession.ts` 是首页与设置页共用的数据迁移入口，拥有弹层、选择器占用、整库替换二次确认、进度和错误。页面只观察一个状态快照；`components/home/DataTransferFeature.ets` 绑定面板与会话，`backend/AnkiDataTransfer.ets` 适配选择器、导入/替换及 `DataExportWorkflow`。系统入口直接调用 `importUri`，选择器结果在离页后不得启动新写入，已接受写入仍完成并广播，提交后刷新失败不可诱导重复导入。
-- 同步的挂载状态、认证和账号由首页传入 `components/同步面板.ets`；任务调度与占用分别由 `model/AutoSyncScheduler.ts`、`model/SyncSettings.ts` 管理。创建牌组和定制弹层的局部状态由各自 Feature 持有，首页只保留显示目标和跨功能占用事实。
+- 同步的挂载状态、认证和账号由首页传入 `components/同步面板.ets`；面板通过 `backend/AnkiSyncSession.ets` 创建 `model/SyncSession.ts`，只展示快照并传递冲突选择/详情显隐。会话拥有集合 RPC、媒体终态轮询和销毁收尾，调度与占用仍分别由 `AutoSyncScheduler`、`SyncActivity` 管理。创建牌组和定制弹层的局部状态由各自 Feature 持有，首页只保留显示目标和跨功能占用事实。
 - 控制器直接行为测试：`home-sync-controller.test.mjs`、`home-backup-controller.test.mjs`；既有页面集成测试继续覆盖同步、学习、公告和弹层的组合时序。
 - 扩展这些功能时沿上述现用调用链修改；历史 Phase 2/3 的独立 store 方案未接入，已移除，不作为待补实现或新功能入口。
 - 回归入口：`home-data-repository`、`home-work-coordinator`、`page-domain-models`、`page-repositories`、`deck-config-save`、`deck-options-session`、`home-transfer-session`、`cloud-deck-feature`；平台模块测试注入底层服务，不复制生产编排。

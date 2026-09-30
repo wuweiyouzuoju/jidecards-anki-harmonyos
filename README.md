@@ -6,7 +6,7 @@
 
 jidecards（中文名“记得闪卡”）是一个面向 HarmonyOS NEXT 的开源 Anki 卡片学习客户端，支持鸿蒙手机、平板和电脑。它使用 ArkTS/ArkUI 构建原生界面，通过 C ABI 与 Node-API 复用 Anki Rust Core，提供复习、牌组管理、统计、同步和数据维护能力。
 
-**当前源码版本：2.9.0（versionCode 2900）**
+**当前源码版本：2.9.6（versionCode 2960）**
 
 应用可在[华为应用市场](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare)搜索“记得闪卡”下载安装。仓库构建版本的唯一事实来源是 [AppScope/app.json5](AppScope/app.json5)；商店实际上架版本以 AppGallery 页面为准。
 

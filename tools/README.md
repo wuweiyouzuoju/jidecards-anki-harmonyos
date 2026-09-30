@@ -19,7 +19,7 @@
 | 本机签名 | `check-signing.mjs`、`signing-config.ts` | [配置和构建注入](../docs/development/signing.md)，不输出材料值 |
 | HAP 检查 | `inspect-hap.ps1` | 检查已有产物 |
 | 源码副本 | `npm run export:source -- <新目录>` | 保留源码与测试，只在副本脱敏签名字段，不覆盖已有目录 |
-| 卡片浏览器回归 | `test-card-template-browser.mjs`、`test-math-rendering-browser.mjs`、`test-card-colors-browser.mjs` | 需要对应浏览器环境，按脚本参数运行 |
+| 卡片浏览器回归 | `test-card-template-browser.mjs`、`test-card-flip-browser.mjs`、`test-math-rendering-browser.mjs`、`test-card-colors-browser.mjs` | 需要对应浏览器环境；翻面测试使用生产会话与真实导航，命令见 [学习与媒体](../docs/development/study-media.md#卡片模板脚本与样式) |
 | 颜色专项分析 | `verify-contrast.mjs`、`verify-contrast-official.mjs`、`verify-hardcoded-colors.mjs` | 专项输出，不是完整验收 |
 | 第三方资源/纹理维护 | `vendor-mathjax.mjs`、`generate-iridescent-textures.mjs` | 显式资源更新任务才运行，检查许可和字节保真 |
 | 兑换内容发行 | `redemption-issuer.mjs`、`redemption-ui.mjs` 及启动器 | 业务发行入口，不属于测试；私钥由外部工具环境提供 |
@@ -27,5 +27,9 @@
 
 `tests/` 是测试，`patches/` 是构建所需上游补丁；不要因“工具目录清理”删除这两个目录。
 
+学习手势浏览器回归：`node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs tools/test-study-gestures-browser.mjs`。需要 Playwright 和本机 Edge，可用 `PLAYWRIGHT_MODULE` 指定模块入口。测试生产脚本的真实触摸双击、左右滑动、控件点击、原生纵向滚动与旧卡面事件取消；不替代 ArkWeb 与原生教学层的设备验收。
+
 
 RPC 常量生成：`node tools/generate-rpc-index.mjs [--check]`；真实 Core 跨平台测试：`node tools/test-anki-core.mjs`。输入、前提与自托管 HAP 路线见 [验证说明](../docs/development/verification.md)。
+
+按钮反馈审计：`arkui-click-targets.mjs` 提供 ArkUI 点击目标与修饰链解析，`tests/ui-press-feedback.test.mjs` 检查全应用可操作节点统一接入 PressFeedback / GlassSurface / PrimaryGlassSurface，遮罩、事件屏障、Span 文内链接和桌面卡片按明确例外处理。该检查不是设备触摸测试。
