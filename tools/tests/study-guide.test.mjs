@@ -1,4 +1,5 @@
 import { resolveStudyKey } from '../../entry/src/main/ets/model/StudyInputPolicy.ts';
+import { resolveStudyGesture } from '../../entry/src/main/ets/model/StudyGestures.ts';
 import { loadNoteEditor } from '../../entry/src/main/ets/model/NoteEditorLoader.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
@@ -36,15 +37,15 @@ function pageHarness(completed = false) {
   let now = 1000;
   const dialogs = [];
   let saves = 0;
-  const context = vm.createContext({ resolveStudyKey, loadNoteEditor, studyKeyName: key => String(key), KeyType: { Down: 0 },
-    Date: { now: () => now }, $r: key => key,
+  const context = vm.createContext({ resolveStudyKey, resolveStudyGesture, loadNoteEditor, studyKeyName: key => String(key), KeyType: { Down: 0 },
+    Date: { now: () => now }, $r: key => key, isTapZonesGuideCompleted: () => false,
     DialogAlignment: { Center: 0 },
     hilog: { warn: () => {} },
     isStudyGuideCompleted: () => completed,
     playStudyHaptic: () => {},
     completeStudyGuide: async () => { saves++; completed = true; }
   });
-  const methods = ['maybeShowStudyGuide', 'showStudyGuide', '处理按键', '处理TapZone点击', '评分', 'clearChoiceAutoAdvance', 'scheduleChoiceAutoAdvance', 'choiceAutoAdvanceSeconds'].map(name => {
+  const methods = ['maybeShowStudyGuide', 'maybeShowTapZonesGuide', 'showStudyGuide', '处理按键', 'handleStudyGesture', '评分', 'clearChoiceAutoAdvance', 'scheduleChoiceAutoAdvance', 'choiceAutoAdvanceSeconds'].map(name => {
     const start = pageSource.search(new RegExp(`  private (?:async )?${name}\\(`));
     assert.notEqual(start, -1);
     return pageSource.slice(start, pageSource.indexOf('\n  }', start) + 4);
@@ -54,6 +55,7 @@ function pageHarness(completed = false) {
   Object.assign(page, { editor: { visible: false, busy: false },
     取文案: key => key,
     studyGuideChecked: false, studyGuideVisible: false, stopStudyTimers() {}, startStudyTimers() {}, controllerReady: true, pendingHtml: '',
+    isCurrentRequest: () => true, requestVersion: 1, interactionVersion: 1,
     choiceQuestion: null, choiceGrade: null, choiceAutoAdvanceTimer: -1, choiceFeedbackDeadline: 0, studyMenuOpen: false,
     页面已显示: false, 阶段: 'loading', 当前卡片: {}, 展示时刻毫秒: 500,
     getUIContext: () => ({ showAlertDialog: options => dialogs.push(options) })
@@ -114,7 +116,7 @@ test('confirmation saves completion and excludes reading time without allowing r
   page.showStudyGuide();
   assert.equal(dialogs.length, 1);
   assert.equal(page.处理按键({}), false, 'let dialog handle keys without invoking review shortcuts');
-  page.处理TapZone点击(0, 0);
+  page.handleStudyGesture('tap', 0, 0, 1, 1);
   await page.评分(0);
   advance(60000);
   dialogs[0].confirm.action();
@@ -159,7 +161,8 @@ test('study guide includes the shared keyboard shortcuts in both languages', () 
     page.页面已显示 = true;
     page.阶段 = 'question';
     page.maybeShowStudyGuide();
-    assert.equal(dialogs[0].message, strings.get('study_guide_message') + '\n\n' + strings.get('glossary_shortcuts_help'));
+    assert.equal(dialogs[0].message, ['study_guide_message', 'glossary_shortcuts_help',
+      'study_gestures_help', 'settings_tap_zones_hint'].map(key => strings.get(key)).join('\n\n'));
     for (const key of ['Enter', 'Ctrl+Z', 'Delete', 'Esc']) assert.ok(dialogs[0].message.includes(key));
     if (locale === 'base') assert.equal(strings.get('study_undo'), '撤销操作');
   }

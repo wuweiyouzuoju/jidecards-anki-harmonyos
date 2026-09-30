@@ -103,7 +103,7 @@ test('automatic question deadline waits for native audio and editing or guides b
   page.audioSession.isPlaying = () => playing;
   page.studyTimer.tick();
   assert.equal(page.阶段, 'question');
-  for (const [owner, field] of [[page.editor, 'visible'], [page.editor, 'busy'], [page, 'studyGuideVisible'], [page, 'studyMenuOpen'], [page, '手写模式']]) {
+  for (const [owner, field] of [[page, 'editingPageOpen'], [page, 'studyGuideVisible'], [page, 'studyMenuOpen'], [page, '手写模式']]) {
     playing = false; owner[field] = true;
     page.studyTimer.tick();
     assert.equal(page.阶段, 'question');

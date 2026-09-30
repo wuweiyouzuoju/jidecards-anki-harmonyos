@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../utils/PressFeedback';
 import { DisclosureChevron } from './common/DisclosureChevron';
 import { StudyAutoAdvanceDraft, StudyAdvanceField } from '../model/StudyAutoAdvanceDraft';
 import { StudyOptions } from '../model/StudyTiming';
@@ -101,6 +102,7 @@ export struct StudyAutoAdvanceDialog {
       DisclosureChevron({ tint: $r('app.color.text_secondary') })
     }
     .width('100%').constraintSize({ minHeight: 64 }).padding({ left: 8, right: 8, top: 8, bottom: 8 })
+    .attributeModifier(new PressFeedback())
     .onClick((): void => { this.open(field); })
     Divider().color($r('app.color.border_subtle')).strokeWidth(0.5)
   }
@@ -134,12 +136,14 @@ export struct StudyAutoAdvanceDialog {
             } else {
               ForEach(this.draft.choices(), (value: number) => {
                 Row({ space: 应用尺寸.间距_12 }) {
-                  Radio({ value: value.toString(), group: 'study-auto-advance' }).checked(this.selected === value)
-                    .onChange((checked: boolean): void => { if (checked) this.selected = value; })
                   Text(this.label(this.field, value)).fontSize(应用尺寸.字号_正文)
                     .fontColor($r('app.color.text_primary')).layoutWeight(1)
                 }
                 .width('100%').constraintSize({ minHeight: 48 }).padding({ left: 8, right: 8 })
+                .borderRadius(应用尺寸.圆角_面板)
+                .backgroundColor(this.selected === value ? $r('app.color.surface_page') : Color.Transparent)
+                .accessibilitySelected(this.selected === value)
+                .attributeModifier(new PressFeedback())
                 .onClick((): void => { this.selected = value; })
               }, (value: number): string => `${this.field}-${value}`)
             }

@@ -44,8 +44,6 @@ import { themeDefinition } from '../model/ThemeCatalog';
 import { PrimaryGlassSurface } from '../utils/PrimaryGlassSurface';
 import { PRIMARY_GLASS_KEY, PrimaryGlassStyle, themePrimaryGlass } from '../model/ThemeCatalog';
 
-// 按下的评分 用的辅助 tag（避免与 RATING_AGAIN/HARD/GOOD/EASY 冲突）
-const 显示答案标签: number = 100;
 
 // ========================================================
 // @块ID COMP-STUDY-TOOLBAR-001
@@ -53,7 +51,6 @@ const 显示答案标签: number = 100;
 //
 // @作用
 // 复习页可拖动浮动工具栏组件主体。维护工具栏位置（vp）、当前吸附侧、
-// 按下的评分 等响应式状态；持有屏幕宽高与拖动起点等非响应式内部状态。
 // 主工具栏（main）按 学习阶段 切换「显示答案」与 4 个评分按钮；
 //
 // @输入
@@ -69,8 +66,6 @@ const 显示答案标签: number = 100;
 // （作为持久化与跨模块约定值）。
 // @StorageProp 绑定 颜色键.* 全局主题色键，跟随用户选择的主题即时刷新。
 // 2.1.4.1 对比度：按钮背景专用档（配 #FFFFFF 文字 ≥ 4.5:1）。
-// 单状态 按下的评分：按下记 rating/tag，松开恢复 -1。
-// 评分按钮用 RATING_AGAIN/HARD/GOOD/EASY（0/1/2/3）；显示答案用 显示答案标签。
 //
 // @副作用
 // aboutToAppear 读取屏幕尺寸 / 加载位置 / 注册监听；aboutToDisappear 注销监听。
@@ -121,9 +116,6 @@ export struct 学习浮动工具栏 {
   @StorageProp(PRIMARY_GLASS_KEY) private primaryGlass: PrimaryGlassStyle = themePrimaryGlass(themeDefinition('aurora'), false);
   @StorageProp(颜色键.主色容器) private 主色容器: string = '#E8EEFC';
   @StorageProp(颜色键.主色边框) private 主色边框: string = '#B8CEFA';
-  // 与 StudyPage 同款单状态 按下的评分：按下记 rating，松开恢复 -1。
-  // 评分按钮用 RATING_AGAIN/HARD/GOOD/EASY（0/1/2/3）；显示答案用 显示答案标签。
-  @State private 按下的评分: number = -1;
 
   async aboutToAppear(): Promise<void> {
     this.读取屏幕尺寸();
@@ -405,7 +397,6 @@ export struct 学习浮动工具栏 {
   // @业务规则
   // 按下态：评分使用共用玻璃反馈，显示答案在不透明白底上叠加主题反馈；
   // GOOD 评分按下时边框高亮 动作主色。
-  // 触摸事件：Down 记 按下的评分；Up/Cancel 恢复 -1。
   // 按钮内 Text 用 maxLines=2 + Ellipsis，允许跨行展示完整文案。
   //
   // @副作用
@@ -426,14 +417,9 @@ export struct 学习浮动工具栏 {
     .width('100%')
     .height('100%')
     .padding({ left: 4, right: 4 })
-    .attributeModifier(new PrimaryGlassSurface(this.按下的评分 === 显示答案标签, this.primaryGlass))
+    .attributeModifier(new PrimaryGlassSurface(this.primaryGlass))
     .stateEffect(false)
     .borderRadius(应用尺寸.圆角_面板)
-    .animation({ duration: 80, curve: Curve.EaseOut })
-    .onTouch((event: TouchEvent): void => {
-      if (event.type === TouchType.Down) { this.按下的评分 = 显示答案标签; }
-      else if (event.type === TouchType.Up || event.type === TouchType.Cancel) { this.按下的评分 = -1; }
-    })
     .onClick(() => {
       this.显示答案回调();
     })
@@ -462,14 +448,9 @@ export struct 学习浮动工具栏 {
     .width('100%')
     .padding({ left: 4, right: 4 })
     .layoutWeight(1)
-    .attributeModifier(new GlassSurface(this.按下的评分 === 评分, this.glassColors, 底色))
+    .attributeModifier(new GlassSurface(this.glassColors, 底色))
     .stateEffect(false)
     .borderRadius(应用尺寸.圆角_面板)
-    .animation({ duration: 80, curve: Curve.EaseOut })
-    .onTouch((event: TouchEvent): void => {
-      if (event.type === TouchType.Down) { this.按下的评分 = 评分; }
-      else if (event.type === TouchType.Up || event.type === TouchType.Cancel) { this.按下的评分 = -1; }
-    })
     .onClick(() => {
       this.评分回调(评分);
     })

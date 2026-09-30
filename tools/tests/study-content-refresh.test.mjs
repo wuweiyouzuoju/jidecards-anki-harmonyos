@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 
 const source = readFileSync(new URL('../../entry/src/main/ets/pages/学习页.ets', import.meta.url), 'utf8');
-const names = ['加载下一张卡', '刷新编辑后当前卡', '消费待重渲染', '卡片内容变更_回调', '显示答案', 'saveNoteEdits', 'invalidateCardWork', 'isCurrentRequest', 'studyActivityChanged', 'applyStudyHtml', 'playStudyAudio', 'clearChoiceAutoAdvance', 'scheduleChoiceAutoAdvance', 'choiceAutoAdvanceSeconds'];
+const names = ['加载下一张卡', '刷新编辑后当前卡', '消费待重渲染', '卡片内容变更_回调', '显示答案', 'returnFromEditor', 'invalidateCardWork', 'isCurrentRequest', 'studyActivityChanged', 'applyStudyHtml', 'playStudyAudio', 'clearChoiceAutoAdvance', 'scheduleChoiceAutoAdvance', 'choiceAutoAdvanceSeconds'];
 const methods = names.map(name => {
   const start = source.search(new RegExp(`  private (?:async )?${name}\\(`));
   assert.ok(start >= 0);
@@ -80,15 +80,12 @@ test('returning without an AI notification reloads actual front, back, CSS and s
   }
 });
 
-test('manual editor save reaches Web with new field content instead of a mocked reload', async () => {
-  const { page, displayed } = harness('answer');
-  page.笔记服务实例.获取笔记 = async () => ({ id: 42, guid: 'g', notetypeId: 9, mtimeSecs: 0, usn: 0, fields: [], tags: [] });
-  page.笔记类型服务实例 = { 获取笔记类型: async () => ({ fieldNames: ['Front', 'Back'] }) };
-  await page.editorSession.open(42, true, () => true);
-  assert.equal(await page.saveNoteEdits(['saved-front', 'saved-back'], []), true);
-  assert.equal(displayed.at(-1), 'old-css:saved-front');
-  assert.equal(page.背面HTML, 'old-css:saved-back');
-  assert.equal(page.editor.visible, false);
+test('manual editor change notification refreshes the actual card while preserving its face', async () => {
+  const {page,store,displayed}=harness('answer');page.editingPageOpen=true;page.editStartedAt=Date.now();
+  hidden.call(page);Object.assign(store,{front:'saved-front',back:'saved-back'});
+  page.卡片内容变更信号=1;page.卡片内容变更_回调();assert.equal(store.renders,0);
+  shown.call(page);await settle(page);assert.equal(page.editingPageOpen,false);
+  assert.equal(displayed.at(-1),'old-css:saved-back');assert.equal(page.正面HTML,'old-css:saved-front');
 });
 
 test('changed spelling template refreshes expected-answer metadata and the displayed answer', async () => {

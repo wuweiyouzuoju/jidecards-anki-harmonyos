@@ -9,6 +9,8 @@ import { stripTypeScriptTypes } from 'node:module';
 import { SyncActivity } from '../../entry/src/main/ets/model/SyncSettings.ts';
 
 export function attachStudySession(page) {
+  // These tests isolate study orchestration. CardWebSession has separate runtime/browser coverage.
+  page.cardWeb = { reset() {}, attach() {}, show: html => page.网页控制器.loadData(html) };
   page.noteReader = {
     card: id => page.卡片服务实例.获取卡片(id), note: id => page.笔记服务实例.获取笔记(id),
     notetype: id => page.笔记类型服务实例.获取笔记类型(id)

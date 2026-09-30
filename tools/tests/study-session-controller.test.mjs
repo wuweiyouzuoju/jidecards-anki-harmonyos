@@ -213,3 +213,26 @@ for (const [method, args] of [['buryCard', [9, 2]], ['removeCard', [9]], ['unbur
     gate.resolve(); await result; assert.equal(scheduler.hasPending(), true); assert.equal(scheduler.canSync(), true);
   });
 }
+
+
+test('note media preparation waits for collection and retains ownership through disposal and failure', async () => {
+  for (const failure of ['none', 'media', 'note']) {
+    const { session, activity, scheduler, backend } = harness(), media = deferred(), writes = [];
+    let imports = 0;
+    backend.updateNote = async note => { writes.push(note); if (failure === 'note') throw Error('note failed'); };
+    activity.reserveCollection();
+    const original = { id: 1, guid: 'keep', notetypeId: 2, fields: ['old'], tags: ['old'] };
+    const saving = session.saveNote(original, ['draft'], ['tag'], async fields => {
+      imports++; await media.promise; return [fields[0] + '<img src="safe.png">'];
+    });
+    await turn(); assert.equal(imports, 0);
+    activity.cancelReservation(); await turn(); assert.equal(imports, 1);
+    session.dispose(); assert.equal(scheduler.canSync(), false);
+    if (failure === 'media') media.reject(Error('media failed')); else media.resolve();
+    if (failure === 'none') await saving; else await assert.rejects(saving, /failed/);
+    assert.equal(writes.length, failure === 'media' ? 0 : 1);
+    if (writes.length) assert.deepEqual(writes[0].fields, ['draft<img src="safe.png">']);
+    assert.deepEqual(original.fields, ['old']);
+    assert.equal(scheduler.canSync(), true); assert.equal(scheduler.hasPending(), failure === 'none');
+  }
+});

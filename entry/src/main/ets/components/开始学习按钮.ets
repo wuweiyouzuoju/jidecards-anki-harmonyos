@@ -47,7 +47,6 @@ export struct 开始学习按钮 {
   // 跟随用户选择的颜色主题（极光蓝/仙野绿/暗夜紫/碧涛青/活力橙/柠檬金）
   // 白底上使用主题文字。
   // 色板变化由 AppStorage 绑定更新。
-  @State private 已按下: boolean = false;
 
   // ========================================================
   // @块ID UI-START-STUDY-BUTTON-003
@@ -57,7 +56,7 @@ export struct 开始学习按钮 {
   // 渲染白底主按钮，居中显示调用方文案，默认“开始学习”。
   //
   // @输入
-  // @StorageProp primaryGlass / themeAccentColors + @State 已按下。
+  // @StorageProp primaryGlass / themeAccentColors；按压由 PrimaryGlassSurface 处理。
   //
   // @输出
   // Touch Down 显示主题反馈、Up/Cancel 恢复白底；点击上抛 开始学习回调。
@@ -91,21 +90,11 @@ export struct 开始学习按钮 {
     .width('100%')
     .height(应用尺寸.行动按钮高度)
     .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
-    .attributeModifier(new PrimaryGlassSurface(this.isAvailable && this.已按下, this.primaryGlass))
+    .attributeModifier(new PrimaryGlassSurface(this.primaryGlass))
     .enabled(this.isAvailable)
     .grayscale(this.isAvailable ? 0 : 1)
     .stateEffect(false)
     .borderRadius(应用尺寸.圆角_行动按钮)
-    .animation({ duration: 80, curve: Curve.EaseOut })
-    .onTouch((event: TouchEvent): void => {
-      if (!this.isAvailable) { this.已按下 = false; return; }
-      // 按下显示主题反馈，抬起或取消恢复白底。
-      if (event.type === TouchType.Down) {
-        this.已按下 = true;
-      } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-        this.已按下 = false;
-      }
-    })
     .onClick(() => {
       if (this.isAvailable) this.开始学习回调();
     })

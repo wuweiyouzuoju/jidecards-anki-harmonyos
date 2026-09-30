@@ -126,12 +126,17 @@ export class StudySessionController {
     return this.commitChange((): Promise<void> => this.backend.undo());
   }
 
-  saveNote(note: EditableNote, fields: string[], tags: string[]): Promise<void> {
+  saveNote(note: EditableNote, fields: string[], tags: string[],
+    prepareFields: ((fields: string[]) => Promise<string[]>) | null = null): Promise<void> {
     const updated: EditableNote = {
       id: note.id, guid: note.guid, notetypeId: note.notetypeId,
       mtimeSecs: note.mtimeSecs, usn: note.usn, fields: fields.slice(), tags: tags.slice()
     };
-    return this.commitChange((): Promise<void> => this.backend.updateNote(updated));
+    return this.commitChange(async (): Promise<void> => {
+      // 媒体导入和笔记更新共用写入保护，离页后仍完成已接受的保存。
+      if (prepareFields !== null) updated.fields = await prepareFields(updated.fields);
+      await this.backend.updateNote(updated);
+    });
   }
 
   buryCard(cardId: number, mode: number): Promise<void> {

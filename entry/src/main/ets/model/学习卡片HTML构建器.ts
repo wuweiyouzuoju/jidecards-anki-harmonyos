@@ -89,6 +89,8 @@ export type 卡片正反面 = 'question' | 'answer';
 const 基础样式: string = `
 body {
   margin: 0;
+  min-height: 100vh;
+  box-sizing: border-box;
   padding: 20px 16px;
   font-family: sans-serif;
   font-size: 17px;
@@ -415,6 +417,7 @@ const 可折叠字段脚本: string = `<script>
     var nodes = document.querySelectorAll('.anki-collapsible');
     for (var i = 0; i < nodes.length; i++) { setup(nodes[i]); }
   }
+  window.ankiSetupCollapsible = initAll;
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initAll);
   } else {
@@ -439,7 +442,7 @@ const 可折叠字段脚本: string = `<script>
 // string：完整 HTML 文档字符串
 //
 // @业务规则
-// 默认配色在模板 CSS 前，避免夜间字色覆盖模板文字却保留白底；布局与媒体兜底在后。
+// 默认字色与不透明底色一起放在模板 CSS 前，保留模板完整配色及 nightMode；布局与媒体兜底在后。
 // 与 Anki TemplateRenderOutput 一样独立包装模板样式：部分牌组用 </style><script>
 // 在样式字段加载脚本，不能让提前闭合的标签把应用兜底 CSS 暴露成正文。
 // 字段中的 [sound:xxx] 标签剥除为小标记，
@@ -457,9 +460,9 @@ const 可折叠字段脚本: string = `<script>
 export function 构建卡片HTML(渲染结果: RenderedCard, 侧面: 卡片正反面, isDark: boolean = false,
   cardBackground: string = isDark ? '#18202B' : '#FFFFFF'): string {
   const 正文: string = 剥除音频标签(原始侧HTML(渲染结果, 侧面));
-  const 默认配色: string = `body { color: ${isDark ? '#E6E6E6' : '#1A1A1A'}; background: transparent; }`;
-  // 模板 CSS 可能声明白色 body；最后注入主题背景，确保 ArkWeb 实际绘制面与原生卡片一致。
-  const 卡片背景样式: string = `html, body { background: ${cardBackground} !important; }`;
+  // 底色只作兜底；单独强制替换模板底色会让黑字白底卡片变成黑字深色底。
+  const 默认配色: string = `html { background: ${cardBackground}; }
+body { color: ${isDark ? '#E6E6E6' : '#1A1A1A'}; background: ${cardBackground}; }`;
   const 样式: string = `${基础样式}\n${图片遮罩渲染样式}\n${可折叠字段样式}`;
   // latexSvg 只决定传统 LaTeX 图片后缀，不能关闭同一卡片中的 MathJax。
   return `<!DOCTYPE html>
@@ -469,14 +472,12 @@ export function 构建卡片HTML(渲染结果: RenderedCard, 侧面: 卡片正�
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://jidecards-render.local/jquery/3.7.1/jquery.min.js"></script>
 <style>${默认配色}</style>
-<style>${渲染结果.css}</style>
-<style>${样式}</style>
-<style>${卡片背景样式}</style>
 ${图片遮罩渲染脚本}
 ${MATH_SCRIPTS}
 ${可折叠字段脚本}
 </head>
-<body class="card${isDark ? ' nightMode' : ''}">${正文}</body>
+<body class="card${isDark ? ' nightMode' : ''}"><div id="qa"><style>${渲染结果.css}</style>
+<style>${样式}</style>${正文}</div></body>
 </html>`;
 }
 

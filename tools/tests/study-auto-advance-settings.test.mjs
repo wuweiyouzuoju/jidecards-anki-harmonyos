@@ -199,7 +199,9 @@ test('actual dialog labels format real Chinese and English resources through the
 test('dialog uses shared app chrome, bottom actions, selected controls and routed system back', () => {
   assert.match(dialogSource, /DialogHeader\(\{ title: '', closeLabel: \$r\('app.string.study_back'\)/);
   assert.ok(dialogSource.indexOf('DialogHeader({') > dialogSource.indexOf('Scroll()'));
-  assert.match(dialogSource, /Radio[\s\S]*checked\(this.selected === value\)/);
+  assert.match(dialogSource, /backgroundColor\(this.selected === value/);
+  assert.match(dialogSource, /accessibilitySelected\(this.selected === value\)/);
+  assert.doesNotMatch(dialogSource, /Radio\(/);
   assert.match(source, /onWillDismiss:[^\n]*this.autoAdvanceDialogBack\(\)/);
   assert.doesNotMatch(source, /selectAutoAdvanceOption|showActionMenu/);
 });

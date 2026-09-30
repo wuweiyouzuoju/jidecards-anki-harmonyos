@@ -110,13 +110,16 @@ test('builder preserves standard URLs and template scripts for browser base URL 
   assert.ok(out.includes(resources), 'do not rewrite HTML, scripts, entities or URL escapes');
 });
 
-test('study keeps the card opaque while its gutters and answer bar reveal the shared theme background', () => {
+test('study keeps default cards opaque without replacing template backgrounds while gutters reveal the theme', () => {
   const html = 构建卡片HTML({
     questionNodes: [{ text: 'front', replacement: null }],
     answerNodes: [{ text: 'back', replacement: null }],
     css: 'body { background: white; }', latexSvg: false, isEmpty: false
   }, 'question', false, '#E8EEFC');
-  assert.match(html, /html, body \{ background: #E8EEFC !important; \}/);
+  assert.match(html, /html \{ background: #E8EEFC; \}/);
+  assert.ok(html.indexOf('background: #E8EEFC;') < html.indexOf('body { background: white; }'),
+    'template foreground/background pairs must override the application defaults together');
+  assert.doesNotMatch(html, /background: #E8EEFC !important/);
   const page = read(STUDY_PAGE);
   assert.match(page, /构建卡片HTML\(rendered, 'question', this\.是否深色\(\)\)/);
   assert.match(page, /Web\(\{ src: '', controller: this\.网页控制器 \}\)\s*\.backgroundColor\(\$r\('app\.color\.surface_card'\)\)/);
@@ -239,7 +242,7 @@ test('study and preview share native audio lifecycle without Web autoplay', () =
   }
   // 播放、重播、取消和销毁由 card-audio-session/页面运行测试验证。
   assert.doesNotMatch(page, /runJavaScript\([^)]*\.play\(/i);
-  assert.match(page, /anki\.imageOcclusion\.setup\(\)/);
+  assert.match(read('entry/src/main/ets/model/CardReviewerRuntime.ts'), /anki\.imageOcclusion\.setup\(\)/);
 });
 
 test('image occlusion IIFE exposes toggle and hides #toggle button (BUG-007)', () => {
@@ -280,7 +283,7 @@ test('study page web component blocks file-protocol cross origin correctly', () 
   assert.match(page, /\.fileAccess\(true\)/);
   assert.match(page, /\.javaScriptAccess\(true\)/);
   assert.match(page, /\.onInterceptRequest\(/);
-  assert.match(page, /loadData\([^,]+, 'text\/html', 'UTF-8', 媒体基地址, ' '\)/);
+  assert.match(read('entry/src/main/ets/utils/CardWebView.ets'), /loadData\([^,]+, 'text\/html', 'UTF-8', 媒体基地址, ' '\)/);
   assert.match(page, /interceptMediaRequest\(event\.request, this\.媒体目录, 媒体基地址\)/);
   assert.match(page, /collection\.media/, 'media dir points at the anki media folder');
 });

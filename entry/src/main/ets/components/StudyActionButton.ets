@@ -5,8 +5,8 @@ import { GLASS_COLORS_KEY, GLASS_HIGHLIGHT_COLORS } from '../model/ThemeCatalog'
 import { 应用尺寸 } from '../utils/应用尺寸';
 
 /**
- * 学习页专用操作按钮。每个实例独立持有按压状态，避免父级一次状态刷新
- * 让同一行的兄弟按钮同时进入按压视觉态。
+ * 学习页专用操作按钮。按压由各按钮的 GlassSurface 多态属性处理，
+ * 不写父层或组件状态，避免触摸导致文字和兄弟按钮重建。
  */
 @Component
 export struct StudyActionButton {
@@ -18,7 +18,6 @@ export struct StudyActionButton {
   @Prop labelColor: ResourceColor = $r('app.color.text_primary');
   @Prop fillColor: ResourceColor = $r('app.color.surface_card');
   onActivate: () => void = (): void => {};
-  @State private isPressed: boolean = false;
 
   build() {
     Button({ type: ButtonType.Normal }) {
@@ -39,23 +38,15 @@ export struct StudyActionButton {
       }
       .width('100%')
     }
-      // 按压视觉完全由本组件的局部状态控制，关闭 Button 自带的缩放叠加效果。
-      .stateEffect(false)
       .layoutWeight(1)
       .height(this.buttonHeight)
       .padding({ left: 4, right: 4 })
       .fontSize(this.labelFontSize)
       .fontColor(this.labelColor)
-      .attributeModifier(new GlassSurface(this.isPressed, this.glassColors, this.fillColor))
+      // 公共多态表面拥有按压反馈，不叠加 Button 默认效果。
+      .attributeModifier(new GlassSurface(this.glassColors, this.fillColor))
+      .stateEffect(false)
       .borderRadius(应用尺寸.圆角_面板)
-      .animation({ duration: 80, curve: Curve.EaseOut })
-      .onTouch((event: TouchEvent): void => {
-        if (event.type === TouchType.Down) {
-          this.isPressed = true;
-        } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-          this.isPressed = false;
-        }
-      })
       .onClick((): void => {
         this.onActivate();
       })
