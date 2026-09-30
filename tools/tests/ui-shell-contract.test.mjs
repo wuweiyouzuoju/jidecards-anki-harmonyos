@@ -95,6 +95,45 @@ function projectUrl(relativePath) {
   return new URL(`../../${relativePath}`, import.meta.url);
 }
 
+test('study answer input shares the action pill silhouette without a second inset or white wrapper', () => {
+  const study = read('entry/src/main/ets/pages/学习页.ets');
+  const start = study.indexOf("if (this.阶段 === 'question' && this.拼写字段名 !== '') {");
+  const end = study.indexOf('  private 答案条()', start);
+  const inputArea = study.slice(start, end);
+  const input = inputArea.slice(inputArea.indexOf('TextInput('), inputArea.indexOf('.enterKeyType('));
+  const wrapper = inputArea.slice(inputArea.indexOf("        .width('100%')\n        .padding({"),
+    inputArea.indexOf("    .width('100%')\n    .layoutWeight(1)"));
+  const action = read('entry/src/main/ets/components/开始学习按钮.ets');
+  for (const source of [input, action]) {
+    assert.match(source, /\.height\(应用尺寸\.行动按钮高度\)/);
+    assert.match(source, /\.borderRadius\(应用尺寸\.圆角_行动按钮\)/);
+  }
+  assert.match(input, /backgroundColor\(\$r\('app.color.surface_card'\)\)/);
+  assert.doesNotMatch(input, /border_input|圆角_面板/);
+  assert.equal((input.match(/\.border\(\{ width: 0 \}\)/g) || []).length, 3,
+    'initial, focused and normal states must all keep the outline absent');
+  assert.match(wrapper, /backgroundColor\(Color.Transparent\)/);
+  assert.doesNotMatch(wrapper, /left:|right:|surface_card/);
+  assert.match(wrapper, /top: 应用尺寸\.操作区顶部间距\(this\.narrowDeckLayout\)/);
+  const evaluate = (expression, state) => new Function('应用尺寸', `return ${expression}`).call(state, 应用尺寸);
+  const inputTop = wrapper.match(/top: ([^\n]+),/)[1];
+  const inputBottom = wrapper.match(/bottom: ([^\n]+)/)[1];
+  const parentBottom = inputArea.match(/bottom: (this\.学习布局模式值 === 'bottom'[^\n]+)/)[1];
+  const actionArea = study.slice(end, study.indexOf('  private cardViewportContent()', end));
+  const actionTop = actionArea.match(/top: ([^\n]+),/)[1];
+  const actionBottom = actionArea.match(/bottom: ([^\n]+)/)[1];
+  for (const narrow of [false, true]) for (const nav of [0, 24]) {
+    const state = { narrowDeckLayout: narrow, 导航条高度: nav, 学习布局模式值: 'bottom' };
+    const gap = 应用尺寸.页面分组间距(narrow);
+    assert.equal(evaluate(inputTop, state), gap);
+    assert.equal(evaluate(inputBottom, state) + evaluate(parentBottom, state) + evaluate(actionTop, state), gap);
+    assert.equal(evaluate(actionBottom, state), 应用尺寸.操作区底部间距(narrow, nav));
+    state.学习布局模式值 = 'float';
+    assert.equal(evaluate(inputBottom, state) + evaluate(parentBottom, state),
+      应用尺寸.页面内边距_水平 + nav + gap, 'preserve floating-mode safe-area clearance');
+  }
+});
+
 function read(relativePath) {
   return readFileSync(projectUrl(relativePath), 'utf8');
 }

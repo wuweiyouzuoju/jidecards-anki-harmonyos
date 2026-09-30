@@ -1800,7 +1800,7 @@ export struct 学习页 {
 
       // Type-in-the-Answer：正面阶段在 Web 下方渲染输入框，翻面后比对用户输入与笔记字段值。
       // Enter 提交翻面（对齐 Anki 桌面端输入框回车显示答案）。
-      // 输入框与答案条使用相同的左右内边距；
+      // 左右边距由卡片区唯一提供，与答案条对齐；输入控件复用主操作的圆角和底色。
       // float 模式下 答案条 不渲染、输入框是卡片区最后元素贴屏底，
       // 底部抬高避让手势导航条（与 答案条 bottom padding 同公式）。
       if (this.阶段 === 'question' && this.拼写字段名 !== '') {
@@ -1820,17 +1820,20 @@ export struct 学习页 {
               .width('100%')
               .height(应用尺寸.行动按钮高度)
               .fontSize(应用尺寸.字号_按钮)
-              .borderRadius(应用尺寸.圆角_面板)
-              .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
+              .fontColor($r('app.color.text_primary'))
+              .placeholderColor($r('app.color.text_tertiary'))
+              .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
+              .borderRadius(应用尺寸.圆角_行动按钮)
+              .border({ width: 0 })
               .backgroundColor($r('app.color.surface_card'))
               // 聚焦视觉完全去主题色，三层处理：局部主题色、组件状态样式、系统焦点框。
               .stateStyles({
                 focused: {
-                  .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
+                  .border({ width: 0 })
                   .backgroundColor($r('app.color.surface_card'))
                 },
                 normal: {
-                  .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
+                  .border({ width: 0 })
                   .backgroundColor($r('app.color.surface_card'))
                 }
               })
@@ -1849,14 +1852,11 @@ export struct 学习页 {
         }
         .width('100%')
         .padding({
-          left: 应用尺寸.页面内边距_水平,
-          right: 应用尺寸.页面内边距_水平,
-          // 上下留白都在背景内，浮动模式的导航条避让区不能透出主题色横带。
-          top: 应用尺寸.间距_8,
+          top: 应用尺寸.操作区顶部间距(this.narrowDeckLayout),
           bottom: this.学习布局模式值 === 'float' ? 应用尺寸.页面内边距_水平 + this.导航条高度 : 0
         })
-        // 输入框和导航条避让区与卡片区域/答案条同底色。
-        .backgroundColor($r('app.color.surface_card'))
+        // 留白透出页面底色，避免输入控件外出现矩形白底。
+        .backgroundColor(Color.Transparent)
       }
     }
     .width('100%')
