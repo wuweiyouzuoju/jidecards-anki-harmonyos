@@ -53,7 +53,7 @@ import { AI制卡页参数 } from './AI制卡页';
 import type { 数据迁移模式, 导出牌组选项 } from '../model/DataTransferIntent';
 import { 同步面板 } from '../components/同步面板';
 import { syncActivity } from '../model/SyncSettings';
-import { 加载同步凭证, 同步凭证信息, loadAutoSyncEnabled } from '../model/同步凭证存储';
+import { loadVisibleSyncAuth, 同步凭证信息, loadAutoSyncEnabled } from '../model/同步凭证存储';
 import { APP_FOREGROUND_KEY } from '../model/Redemption';
 import { 主页顶部工具栏 } from '../components/home/主页顶部工具栏';
 import { 主页更多面板 } from '../components/home/主页更多面板';
@@ -325,11 +325,11 @@ struct 首页 {
       externalImportPending: (): boolean => externalDeckOpens.hasPending(),
       autoSyncEnabled: (): boolean => loadAutoSyncEnabled(),
       auth: (): SyncAuth | null => {
-        const info: 同步凭证信息 | null = 加载同步凭证();
+        const info: 同步凭证信息 | null = loadVisibleSyncAuth();
         return info === null ? null : { hkey: info.hkey, endpoint: info.endpoint, ioTimeoutSecs: 0 };
       },
       username: (): string => {
-        const info: 同步凭证信息 | null = 加载同步凭证();
+        const info: 同步凭证信息 | null = loadVisibleSyncAuth();
         return info === null ? '' : info.username;
       },
       setStatus: (resourceKey: string | null): void => { this.设置同步状态(resourceKey); },
@@ -504,7 +504,7 @@ struct 首页 {
 
   private startSyncFromMenu(): void {
     this.显示更多菜单 = false;
-    if (!this.显示同步面板 && 加载同步凭证() === null) {
+    if (!this.显示同步面板 && loadVisibleSyncAuth() === null) {
       this.openSettings();
       this.显示提示($r('app.string.sync_login_required'));
       return;

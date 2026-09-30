@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { OFFICIAL_ANKIWEB_SYNC_UI_ENABLED } from '../../model/ReleaseFeatures';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { resourceText, showToastSafely } from '../../utils/UiFeedback';
 import { ThemeTextSpans } from '../common/ThemeText';
@@ -14,7 +15,7 @@ import { 后端错误 } from '../../backend/错误类型';
 import type { SyncAuth } from '../../proto/messages/SyncMessages';
 import {
   清除同步凭证,
-  加载同步凭证,
+  loadVisibleSyncAuth,
   保存同步凭证,
   加载媒体同步开关,
   设置媒体同步开关,
@@ -25,7 +26,7 @@ import {
 } from '../../model/同步凭证存储';
 import type { 同步凭证信息 } from '../../model/同步凭证存储';
 import { 分类同步错误 } from '../../model/同步流程';
-import { normalizeSyncServer, syncActivity } from '../../model/SyncSettings';
+import { normalizeSyncServer, isSyncEndpointVisible, syncActivity } from '../../model/SyncSettings';
 import { 设置面板色板, 设置面板色板_取 } from '../../utils/设置面板配色';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 颜色键 } from '../../model/颜色主题';
@@ -38,7 +39,7 @@ import { 设置分组卡片 } from './设置分组卡片';
 // @作用
 // 仅负责登录/注销状态机，同步流程已抽到独立弹窗 SyncPanel。
 // 三态简化为两态：未登录（登录表单）/ 已登录（账号 + 立即同步/注销）。
-// 点「立即同步」时 加载同步凭证 拿最新凭证（端点可能被 SyncPanel 更新过），
+// 点「立即同步」时 loadVisibleSyncAuth 拿最新凭证（端点可能被 SyncPanel 更新过），
 // 上抛 打开同步弹窗回调(凭证, 账号名) 给 Index，Index 挂载 SyncPanel 弹窗。
 //
 // 同步流程不再放在本组件的原因：
@@ -53,7 +54,7 @@ import { 设置分组卡片 } from './设置分组卡片';
 // 渲染同步分组卡片；用户登录/注销/同步时分别上抛对应回调。
 //
 // @副作用
-// 调用 加载同步凭证 / 保存同步凭证 / 清除同步凭证 读写本地凭证；
+// 调用 loadVisibleSyncAuth / 保存同步凭证 / 清除同步凭证 读写本地凭证；
 // 调用 同步服务.同步登录 与 AnkiWeb 通信。
 // ========================================================
 @Component
@@ -133,7 +134,7 @@ export struct 同步分组 {
   aboutToAppear(): void {
     this.disposed = false;
     // 启动读取本地凭证：有 hkey 直接进 已登录（重启免登录）
-    const 信息: 同步凭证信息 | null = 加载同步凭证();
+    const 信息: 同步凭证信息 | null = loadVisibleSyncAuth();
     if (信息 !== null) {
       const 凭证: SyncAuth = {
         hkey: 信息.hkey,
@@ -373,12 +374,12 @@ export struct 同步分组 {
   }
 
   /**
-   * 立即同步：加载同步凭证 拿最新凭证（端点可能被上次 SyncPanel 更新过），
+   * 立即同步：loadVisibleSyncAuth 拿最新凭证（端点可能被上次 SyncPanel 更新过），
    * 上抛 打开同步弹窗回调 给 Index 挂载 SyncPanel 弹窗。
    */
   private 点击立即同步(): void {
     // 已有任务（含等待选择方向）交给首页重开；租约只阻止重复执行和账户变更。
-    const 信息: 同步凭证信息 | null = 加载同步凭证();
+    const 信息: 同步凭证信息 | null = loadVisibleSyncAuth();
     if (信息 === null) {
       this.错误文本 = this.取本地化文本($r('app.string.sync_error_session_expired'));
       this.当前状态 = '未登录';
@@ -417,7 +418,7 @@ export struct 同步分组 {
       .fontColor(色板.次文字)
       .width('100%')
     // 账号前置说明：同步需先有 Anki 账号，右侧「前往注册」拉起系统浏览器打开 AnkiWeb 注册页
-    if (this.savedServer === '') {
+    if (OFFICIAL_ANKIWEB_SYNC_UI_ENABLED && this.savedServer === '') {
       Row({ space: 6 }) {
         Text($r('app.string.sync_account_required_hint'))
           .fontSize(12)
@@ -597,12 +598,18 @@ export struct 同步分组 {
         是否深色: this.是否深色,
 
         帮助标题: $r('app.string.settings_sync_group'),
-        帮助正文: $r('app.string.sync_help_text'),
+        帮助正文: OFFICIAL_ANKIWEB_SYNC_UI_ENABLED ? $r('app.string.sync_help_text') : $r('app.string.sync_custom_help_text'),
 
         打开说明回调: this.打开说明回调
       }) {
         Column() {
-          if (this.当前状态 === '未登录') {
+          if (!isSyncEndpointVisible(this.savedServer, OFFICIAL_ANKIWEB_SYNC_UI_ENABLED)) {
+            Text($r('app.string.sync_configure_custom_hint'))
+              .fontSize(应用尺寸.字号_正文_中)
+              .fontColor(设置面板色板_取(this.是否深色).次文字)
+              .width('100%')
+              .margin({ bottom: 应用尺寸.间距_12 })
+          } else if (this.当前状态 === '未登录') {
             this.autoSyncSetting()
             Column({ space: 应用尺寸.间距_12 }) {
               this.未登录内容(设置面板色板_取(this.是否深色))
@@ -726,11 +733,11 @@ struct 自定义服务器弹窗 {
 
   @Builder
   private 服务器表单(色板: 设置面板色板) {
-    Text(this.当前状态 === '已登录' ? $r('app.string.sync_server_logout_hint') : $r('app.string.sync_server_hint'))
+    Text(this.当前状态 === '已登录' ? $r('app.string.sync_server_logout_hint') : (OFFICIAL_ANKIWEB_SYNC_UI_ENABLED ? $r('app.string.sync_server_hint') : $r('app.string.sync_custom_server_hint')))
       .fontSize(12)
       .fontColor(色板.次文字)
       .width('100%')
-    TextInput({ text: this.serverInput, placeholder: $r('app.string.sync_server_placeholder') })
+    TextInput({ text: this.serverInput, placeholder: OFFICIAL_ANKIWEB_SYNC_UI_ENABLED ? $r('app.string.sync_server_placeholder') : $r('app.string.sync_custom_server_placeholder') })
       .fontSize(14)
       .fontColor(色板.主文字)
       .placeholderColor(色板.弱化文字)

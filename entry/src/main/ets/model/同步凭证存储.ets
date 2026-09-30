@@ -37,7 +37,8 @@
 import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
 import { hilog } from '@kit.PerformanceAnalysisKit';
-import { normalizeSyncServer } from './SyncSettings';
+import { OFFICIAL_ANKIWEB_SYNC_UI_ENABLED } from './ReleaseFeatures';
+import { normalizeSyncServer, isSyncEndpointVisible } from './SyncSettings';
 
 const 存储名: string = 'jidecards_sync';
 const HKEY键: string = 'sync_hkey';
@@ -429,4 +430,10 @@ export function 加载媒体同步开关(): boolean {
   } catch (错误) {
     return true;
   }
+}
+
+/** 界面入口共用可见性筛选；不修改或清除原始凭证，恢复开关即重新可用。 */
+export function loadVisibleSyncAuth(): 同步凭证信息 | null {
+  const auth: 同步凭证信息 | null = 加载同步凭证();
+  return auth !== null && isSyncEndpointVisible(auth.endpoint, OFFICIAL_ANKIWEB_SYNC_UI_ENABLED) ? auth : null;
 }

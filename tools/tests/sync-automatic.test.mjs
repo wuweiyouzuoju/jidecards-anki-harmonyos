@@ -33,7 +33,7 @@ function homeHarness() {
   const Page = componentMethods(read('pages/首页.ets'), ['requestManualSync', 'startSyncFromMenu', 'updatePendingSyncStatus', 'homeActivity', 'requestAutoSync', 'scheduleAutoSyncCheck', 'isAutoSyncLocationSafe', 'stopAutoSyncTimer', 'tryAutoSync', 'syncForegroundChanged', 'onPageHide', 'onBackPress', 'deferForSync', 'flushSyncAction', 'autoSyncCollectionFinished', 'autoSyncStateChanged', '选择牌组', '开始学习', 'openCreateDeck', 'openSettings', 'openReminders', 'syncYielded', 'presentPendingSyncWarning'], {
     decideHomeSync, canStartHomeAutoSync, externalDeckOpens: { hasPending: () => state.externalDeckPending === true },
     AppStorage: { get() {}, setOrCreate() {} },
-    loadAutoSyncEnabled: () => state.enabled, 加载同步凭证: () => state.auth,
+    loadAutoSyncEnabled: () => state.enabled, loadVisibleSyncAuth: () => state.auth,
     $r: key => ({ id: key }), 牌组显示名: deck => deck.name, 保存上次牌组ID: async () => {},
     后端会话: { 获取实例: () => ({ 是否就绪: () => state.ready }) }, syncActivity: gate,
     setTimeout: fn => { const id = ++state.seq; state.timers.set(id, fn); return id; },
@@ -667,7 +667,7 @@ test('settings sync action reaches a hidden conflict or running media without st
     const Group = componentMethods(read('components/settings/同步分组.ets'),
       ['点击立即同步', 'syncSettingsBusy'], {
         syncActivity: gate, $r: key => key,
-        加载同步凭证: () => ({ hkey: 'test-key', endpoint: 'https://custom.example/anki/' })
+        loadVisibleSyncAuth: () => ({ hkey: 'test-key', endpoint: 'https://custom.example/anki/' })
       });
     const group = new Group();
     Object.assign(group, {

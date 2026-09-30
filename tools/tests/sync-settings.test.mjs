@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
-import { normalizeSyncServer, SyncActivity } from '../../entry/src/main/ets/model/SyncSettings.ts';
+import { normalizeSyncServer, isSyncEndpointVisible, SyncActivity } from '../../entry/src/main/ets/model/SyncSettings.ts';
 import { componentMethods, settle } from './sync-panel-harness.mjs';
 
 test('custom sync URLs preserve proxy paths and normalize trailing slashes', () => {
@@ -42,7 +42,7 @@ test('manual and automatic sync share a lease and cooldown without losing a queu
   assert.equal(gate.canAutoSync(100), true, 'a wall clock correction must not suppress sync indefinitely');
 });
 
-function preferencesHarness() {
+function preferencesHarness(officialUiEnabled = false) {
   const source = readFileSync(new URL('../../entry/src/main/ets/model/同步凭证存储.ets', import.meta.url), 'utf8')
     .replace(/^import .*;\r?\n/gm, '').replace(/export /g, '');
   const state = { values: new Map(), durable: new Map(), fail: false, readFail: false, unavailable: false };
@@ -53,11 +53,11 @@ function preferencesHarness() {
     flush: async () => { if (state.fail) throw new Error('disk full'); state.durable = new Map(state.values); }
   };
   const names = ['loadCustomSyncServer', 'saveCustomSyncServer', 'loadAutoSyncEnabled', 'saveAutoSyncEnabled',
-    '保存同步凭证', '加载同步凭证', '保存同步端点', '清除同步凭证', '设置媒体待同步', '加载媒体待同步'];
-  const api = new Function('preferences', 'AppStorage', 'hilog', 'normalizeSyncServer',
+    'loadVisibleSyncAuth', '保存同步凭证', '加载同步凭证', '保存同步端点', '清除同步凭证', '设置媒体待同步', '加载媒体待同步'];
+  const api = new Function('preferences', 'AppStorage', 'hilog', 'normalizeSyncServer', 'isSyncEndpointVisible', 'OFFICIAL_ANKIWEB_SYNC_UI_ENABLED',
     stripTypeScriptTypes(source, { mode: 'transform' }) + '\nreturn {' + names.join(',') + '};')(
     { getPreferencesSync: () => { if (state.unavailable) throw Error('unavailable'); return store; } },
-    { get: () => ({}) }, { info() {}, error() {}, warn() {} }, normalizeSyncServer);
+    { get: () => ({}) }, { info() {}, error() {}, warn() {} }, normalizeSyncServer, isSyncEndpointVisible, officialUiEnabled);
   return { state, ...api };
 }
 
@@ -225,4 +225,53 @@ test('failed opt-in rolls back the switch and reports a retryable error', async 
   assert.equal(group.错误文本, 'app.string.sync_settings_save_failed');
   assert.equal(group.settingsSaving, false);
   await settle();
+});
+
+
+test('temporary official UI gate leaves the default login path and stored accounts intact', async () => {
+  const flags = readFileSync(new URL('../../entry/src/main/ets/model/ReleaseFeatures.ets', import.meta.url), 'utf8');
+  assert.match(flags, /OFFICIAL_ANKIWEB_SYNC_UI_ENABLED: boolean = false/);
+  const source = readFileSync(new URL('../../entry/src/main/ets/components/settings/同步分组.ets', import.meta.url), 'utf8');
+  assert.match(source, /if \(!isSyncEndpointVisible\(this.savedServer, OFFICIAL_ANKIWEB_SYNC_UI_ENABLED\)\)/);
+  assert.match(source, /if \(OFFICIAL_ANKIWEB_SYNC_UI_ENABLED && this.savedServer === ''\)/);
+  const saved = [], calls = [];
+  const Group = componentMethods(source, ['点击登录'], { 保存同步凭证: auth => saved.push(auth) });
+  const group = new Group();
+  Object.assign(group, { syncSettingsBusy: () => false, serverLoaded: true, savedServer: '', serverInput: '',
+    登录中: false, settingsSaving: false, 用户名输入: 'existing-user', 密码输入: 'transient-password',
+    同步服务实例: { 同步登录: async (...args) => { calls.push(args); return { hkey: 'token', endpoint: '' }; } } });
+  await group.点击登录();
+  assert.deepEqual(calls, [['existing-user', 'transient-password', '']]);
+  assert.deepEqual(saved, [{ hkey: 'token', username: 'existing-user', endpoint: '' }]);
+  assert.equal(group.当前状态, '已登录');
+  const h = preferencesHarness();
+  h.保存同步凭证(saved[0]);
+  assert.deepEqual(h.加载同步凭证(), saved[0]);
+  assert.equal(h.loadCustomSyncServer(), '');
+});
+
+
+test('official UI gate covers default and explicit official hosts and can be restored by a developer', () => {
+  for (const endpoint of ['', 'https://ankiweb.net/', 'https://SYNC2.ANKIWEB.NET.:443/']) {
+    assert.equal(isSyncEndpointVisible(endpoint, false), false);
+    assert.equal(isSyncEndpointVisible(endpoint, true), true);
+  }
+  for (const endpoint of ['https://custom.example/anki/', 'http://192.168.1.2:8080/', 'http://[::1]:8080/']) {
+    assert.equal(isSyncEndpointVisible(endpoint, false), true);
+    assert.equal(isSyncEndpointVisible(endpoint, true), true);
+  }
+  for (const enabled of [false, true]) {
+    const h = preferencesHarness(enabled);
+    const auth = { username: 'existing', hkey: 'retained-token', endpoint: '' };
+    h.保存同步凭证(auth);
+    assert.deepEqual(h.加载同步凭证(), auth, 'raw credentials are never removed by hiding UI');
+    assert.deepEqual(h.loadVisibleSyncAuth(), enabled ? auth : null);
+    h.保存同步端点('https://custom.example/');
+    assert.equal(h.loadVisibleSyncAuth().hkey, auth.hkey);
+  }
+  for (const path of ['components/settings/同步分组.ets', 'pages/首页.ets']) {
+    const ui = readFileSync(new URL('../../entry/src/main/ets/' + path, import.meta.url), 'utf8');
+    assert.match(ui, /loadVisibleSyncAuth/);
+    assert.doesNotMatch(ui, /加载同步凭证\(/);
+  }
 });

@@ -25,6 +25,20 @@ export function normalizeSyncServer(input: string): string {
   return match[1].toLowerCase() + '://' + authority.toLowerCase() + path + (path.endsWith('/') ? '' : '/');
 }
 
+/** 仅用于界面入口可见性；开启官方入口时完全沿用原有端点行为。 */
+export function isSyncEndpointVisible(endpoint: string, officialUiEnabled: boolean): boolean {
+  if (officialUiEnabled) return true;
+  try {
+    const normalized: string = normalizeSyncServer(endpoint);
+    const match: RegExpExecArray | null = new RegExp('^https?://(\\[[^\\]]+\\]|[^/:]+)', 'i').exec(normalized);
+    if (match === null) return false;
+    const host: string = match[1].replace(new RegExp('\\.+$'), '').toLowerCase();
+    return host !== 'ankiweb.net' && !host.endsWith('.ankiweb.net');
+  } catch (error) {
+    return false;
+  }
+}
+
 /**
  * 手动和自动同步共享的进程内互斥与节流。
  * Invariants: 冲突等待和媒体轮询仍持有租约；只有持有者可以释放。
