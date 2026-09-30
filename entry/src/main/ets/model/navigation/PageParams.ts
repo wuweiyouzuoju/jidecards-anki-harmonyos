@@ -9,5 +9,9 @@ export interface 浏览页参数 {
   deckId?: string;
   initialSearch?: string;
   selectForAgentEdit?: boolean;
-  editCardId?: number;
+}
+
+export interface EditNotePageParams {
+  targetId: number;
+  isNote: boolean;
 }

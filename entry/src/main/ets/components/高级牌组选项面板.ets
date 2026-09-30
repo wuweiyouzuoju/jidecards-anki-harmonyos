@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { HelpLabel } from './common/HelpLabel';
+import { DialogBackdrop } from './common/DialogBackdrop';
 import { DeckOptionRow } from './home/DeckOptionRow';
 import { resourceText } from '../utils/UiFeedback';
 import { DeckOptionField, DeckOptionChoice } from './home/DeckOptionField';
@@ -58,6 +60,13 @@ struct 段落标题 {
 
 @Component
 export struct 高级牌组选项面板 {
+  @Prop @Watch('handleBackRequest') backRequest: number = 0;
+
+  private handleBackRequest(): void {
+    if (this.showHelp) { this.showHelp = false; return; }
+    this.closeSection();
+  }
+
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
   @ObjectLink form: 牌组配置表单;
@@ -237,19 +246,8 @@ export struct 高级牌组选项面板 {
 
   build() {
     Stack() {
-      Column()
-        .width('100%')
-        .height('100%')
-        .backgroundColor(this.isDark ? 'rgba(0,0,0,0.40)' : 'rgba(0,0,0,0.15)')
-        // 磨砂玻璃质感：模糊下层内容避免叠字，材质着色跟随应用内主题（思路参考：华为开发者文档 backgroundBlurStyle）
-        .backgroundBlurStyle(BlurStyle.Thin, {
-          colorMode: this.isDark ? ThemeColorMode.DARK : ThemeColorMode.LIGHT,
-          adaptiveColor: AdaptiveColor.DEFAULT
-        })
-        // 遮罩扩展进安全区，否则状态栏/导航条区域露出下层背景
-        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+      DialogBackdrop()
         .onClick(() => { if (!this.busy) this.closeSection(); })
-        // 过渡仅动 opacity 合成属性，不触发布局（思路参考：华为官方 TransitionEffect 示例）
         .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
 
       Column({ space: 应用尺寸.间距_12 }) {
@@ -268,16 +266,13 @@ export struct 高级牌组选项面板 {
             if (this.options.sharedDeckCount > 1) {
               if (!this.hasActiveSection()) {
                 Row({ space: 8 }) {
-                  Text($r('app.string.deck_apply_shared_label', this.options.sharedDeckCount))
-                    .fontSize(15).fontColor($r('app.color.text_primary')).layoutWeight(1)
-                  Button($r('app.string.field_help_button'))
-                    .type(ButtonType.Normal).width(28).height(40).padding(0).fontSize(18)
-                    .fontColor($r('app.color.text_secondary')).backgroundColor(Color.Transparent)
-                    .enabled(!this.busy)
-                    .onClick((): void => {
+                  HelpLabel({ title: $r('app.string.deck_apply_shared_label', this.options.sharedDeckCount),
+                    isHelpEnabled: !this.busy,
+                    onHelp: (): void => {
                       this.openHelp($r('app.string.deck_apply_shared_label', this.options.sharedDeckCount),
                         $r('app.string.deck_apply_shared_help'));
-                    })
+                    }
+                  }).layoutWeight(1)
                   Toggle({ type: ToggleType.Switch, isOn: this.options.applyToSharedDecks })
                     .selectedColor(this.动作主色).enabled(!this.busy)
                     .onChange((value: boolean): void => {

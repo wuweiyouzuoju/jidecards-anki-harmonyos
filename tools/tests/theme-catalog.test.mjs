@@ -38,7 +38,7 @@ test('primary action text stays readable on the solid surface and pressed feedba
 test('start study and both show-answer layouts share an opaque surface without an outline', () => {
   const surface = read('entry/src/main/ets/utils/PrimaryGlassSurface.ets');
   assert.match(surface, /backgroundColor\(\$r\('app.color.surface_card'\)\)/);
-  assert.match(surface, /themeGradient\(this.pressed \? this.style.pressedColors : \[\]\)/);
+  assert.match(surface, /themePressGradient\(this.style.pressedColors, pressed\)/);
   assert.match(surface, /\.border\(\{ width: 0 \}\)/);
   const study = read('entry/src/main/ets/pages/学习页.ets');
   assert.match(study, /开始学习按钮\(\{\s*文案: \$r\('app.string.study_show_answer'\),\s*isAvailable: this\.阶段 === 'question',\s*开始学习回调: \(\): void => \{ this\.显示答案\(\); \}/);

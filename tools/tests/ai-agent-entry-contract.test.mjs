@@ -67,7 +67,7 @@ test('home exposes Agent create directly and routes Agent edit through Browser s
   assert.match(editEntry, /selectForAgentEdit:\s*true/);
   assert.match(editEntry, /name:\s*'BrowserPage'/);
   assert.doesNotMatch(editEntry, /name:\s*'AiCardPage'|mode:\s*'edit'/);
-  assert.match(home, /pageSelectForAgentEdit:\s*\(param as 浏览页参数\)\.selectForAgentEdit \?\? false/);
+  assert.match(read('entry/src/main/ets/pages/navigation/HomeDestinations.ets'), /pageSelectForAgentEdit:\s*\(param as 浏览页参数\)\.selectForAgentEdit \?\? false/);
 });
 
 test('Agent create and edit labels and page background use the themed shell', () => {
@@ -127,7 +127,7 @@ test('unconfigured home AI entries route to the expanded AI settings group', () 
   assert.match(editEntry, /if \(!(?:await this\.isAIConfigured\(\)|configured)\)[\s\S]*?this\.openAISettings\(\)/);
   assert.match(home, /设置页参数\s*=\s*\{ openAiSettings:\s*true \}/);
   assert.match(home, /name:\s*'SettingsPage'/);
-  assert.match(home,
+  assert.match(read('entry/src/main/ets/pages/navigation/HomeDestinations.ets'),
     /设置页\(\{[\s\S]*?openAiSettings:\s*\(param as 设置页参数\)\.openAiSettings \?\? false/);
   assert.match(settingsPage,
     /设置面板\(\{[\s\S]*?openAiSettings:\s*this\.openAiSettings/);

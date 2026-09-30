@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { HelpLabel } from './common/HelpLabel';
+import { 字段帮助对话框 } from './字段帮助面板';
+import { DialogBackdrop } from './common/DialogBackdrop';
 import { resourceText } from '../utils/UiFeedback';
 import { SelectStyle } from '../utils/SelectStyle';
 import { ThemeTextSpans } from './common/ThemeText';
@@ -173,18 +176,16 @@ export struct 数据迁移面板 {
     return this.忙碌文案();
   }
 
-  /** 弹出 AlertDialog 说明「旧版兼容」含义：何时启用、代价是什么 */
+  private legacyHelp: CustomDialogController = new CustomDialogController({
+    builder: 字段帮助对话框({ 标题: $r('app.string.transfer_legacy'), 正文: $r('app.string.transfer_legacy_help') }),
+    customStyle: true, autoCancel: true, alignment: DialogAlignment.Center,
+    width: '100%', height: '100%', maskColor: Color.Transparent
+  });
+
+  aboutToDisappear(): void { this.legacyHelp.close(); }
+
   private 打开旧版帮助(): void {
-    this.getUIContext().showAlertDialog({
-      title: this.解析文本($r('app.string.transfer_legacy')),
-      message: this.解析文本($r('app.string.transfer_legacy_help')),
-      autoCancel: true,
-      alignment: DialogAlignment.Center,
-      primaryButton: {
-        value: this.解析文本($r('app.string.close')),
-        action: (): void => {}
-      }
-    });
+    if (!this.busy) this.legacyHelp.open();
   }
 
   private 可提交(): boolean {
@@ -252,17 +253,8 @@ export struct 数据迁移面板 {
   build() {
     Stack() {
       // B13 2026-07-22：磨砂玻璃遮罩层（Thin 比 Regular/Thick 更轻薄，避免磨砂过厚）
-      Column()
-        .width('100%')
-        .height('100%')
-        .backgroundColor(设置面板色板_取(this.isDark).遮罩)
-        .backgroundBlurStyle(BlurStyle.Thin, {
-          colorMode: this.isDark ? ThemeColorMode.DARK : ThemeColorMode.LIGHT,
-          adaptiveColor: AdaptiveColor.DEFAULT
-        })
-        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+      DialogBackdrop()
         .onClick(() => { if (!this.busy) this.onClose(); })
-        // 过渡仅动 opacity/translate/scale 合成属性，不触发布局（思路参考：华为官方 TransitionEffect 示例）
         .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
 
       Column({ space: 应用尺寸.间距_12 }) {
@@ -293,6 +285,7 @@ export struct 数据迁移面板 {
         .padding(SelectStyle.controlPadding)
         .space(SelectStyle.controlSpace)
         .font(SelectStyle.controlFont)
+        .textModifier(SelectStyle.labelText())
         .borderRadius(SelectStyle.controlRadius)
         .onSelect((索引: number): void => {
           this.模式 = 迁移模式列表[索引];
@@ -315,6 +308,7 @@ export struct 数据迁移面板 {
             .padding(SelectStyle.controlPadding)
             .space(SelectStyle.controlSpace)
             .font(SelectStyle.controlFont)
+            .textModifier(SelectStyle.labelText())
             .borderRadius(SelectStyle.controlRadius)
             .onSelect((索引: number): void => {
               this.已选导出牌组Id = this.deckOptions[索引].id;
@@ -334,20 +328,10 @@ export struct 数据迁移面板 {
           }
           this.选项行(this.解析文本($r('app.string.transfer_include_media')),
             this.包含媒体, (值: boolean) => { this.包含媒体 = 值; })
-          // 旧版兼容 行单独写：加 ⓘ 帮助按钮，点击弹 AlertDialog 说明旧版兼容含义（用户决策 2026-07-24）
           Row() {
-            Text(this.解析文本($r('app.string.transfer_legacy')))
-              .fontSize(应用尺寸.字号_正文)
-              .fontColor($r('app.color.text_primary'))
-              .layoutWeight(1)
-            Button() {
-              Text() { ThemeTextSpans($r('app.string.field_help_button'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.主色按钮背景).fontSize(应用尺寸.字号_正文)
-            }
-              .type(ButtonType.Normal)
-              .backgroundColor(Color.Transparent)
-              .fontColor(this.主色按钮背景)
-              .fontSize(应用尺寸.字号_正文)
-              .onClick(() => this.打开旧版帮助())
+            HelpLabel({ title: $r('app.string.transfer_legacy'), textSize: 应用尺寸.字号_正文,
+              isHelpEnabled: !this.busy, onHelp: (): void => { this.打开旧版帮助(); }
+            }).layoutWeight(1)
             Toggle({ type: ToggleType.Switch, isOn: this.旧版兼容 })
               .selectedColor(this.主色按钮背景)
               .onChange((值: boolean) => { this.旧版兼容 = 值; })

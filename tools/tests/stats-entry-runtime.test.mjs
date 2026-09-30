@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { SyncActivity } from '../../entry/src/main/ets/model/SyncSettings.ts';
+import { StatsSession } from '../../entry/src/main/ets/model/StatsSession.ts';
 import { decodeGraphsResponse } from '../../entry/src/main/ets/proto/messages/StatsMessages.ts';
 
 const read = name => readFileSync(new URL('../../entry/src/main/ets/pages/' + name + '.ets', import.meta.url), 'utf8');
@@ -23,7 +24,15 @@ function component(name, names, dependencies) {
 
 function harness({ snapshot = decodeGraphsResponse(new Uint8Array()), theme = Promise.resolve('dark'), days = 365 } = {}) {
   const sync = new SyncActivity(), events = [], fresh = decodeGraphsResponse(new Uint8Array());
-  const Page = component('统计页', ['aboutToAppear', 'aboutToDisappear', '加载统计数据', '加载牌组列表', '更新偏好', 'on分离变更'], {
+  const Page = component('统计页', ['aboutToAppear', 'aboutToDisappear', 'getStatsSession', 'statsRequest', '加载统计数据', '加载牌组列表', '更新偏好', 'on分离变更'], {
+    StatsSession,
+    AnkiStatsSession: class {
+      waitForCollection() { return sync.waitForCollection(); }
+      async graphs() { events.push('open'); return page.统计服务实例.获取图表统计(); }
+      preferences() { return page.统计服务实例.获取图表偏好(); }
+      savePreferences(value) { return page.统计服务实例.设置图表偏好(value); }
+      publishWidget() { return page.刷新卡片快照(); }
+    },
     syncActivity: sync,
     AppStorage: { get: () => 'dark' },
     CustomTransition: { getInstance: () => ({ 注册NavParam() {}, 注销NavParam() {} }) },
@@ -38,7 +47,7 @@ function harness({ snapshot = decodeGraphsResponse(new Uint8Array()), theme = Pr
   });
   const page = new Page();
   Object.assign(page, {
-    pageActive: false, 请求序号: 0, 阶段: 'loading', 图表数据: null,
+    pageActive: false, statsSession: null, 阶段: 'loading', 图表数据: null,
     initialSnapshot: { graphs: snapshot, days: 365 }, 图表偏好: { cardCountsSeparateInactive: false },
     取搜索串: () => '', 取能力上下文: () => ({ filesDir: 'test' }),
     刷新卡片快照: async () => { events.push('widgets'); },
@@ -74,7 +83,7 @@ test('home retains full graphs with their range and opens statistics immediately
   assert.equal((await repository.loadStatistics(await repository.load('/', 'Default'))).graphs, null);
   assert.equal(home.statsSnapshot.graphs, graph);
   assert.match(read('首页'), /if \(data.graphs !== null\) this.statsSnapshot/);
-  assert.match(read('首页'), /initialSnapshot: param as 统计页参数/);
+  assert.match(read('navigation/HomeDestinations'), /initialSnapshot: param as 统计页参数/);
 });
 
 test('cached charts are available before any await; RPCs wait only for collection release', async () => {

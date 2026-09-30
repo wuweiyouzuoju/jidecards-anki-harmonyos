@@ -6,6 +6,7 @@ import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { 构建卡片HTML } from '../entry/src/main/ets/model/学习卡片HTML构建器.ts';
 import { MATH_ASSET_BASE } from '../entry/src/main/ets/model/MathRendering.ts';
+import { serializeNoteRichText } from '../entry/src/main/ets/model/NoteRichText.ts';
 
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE ? pathToFileURL(process.env.PLAYWRIGHT_MODULE).href : 'playwright');
 const output = new URL('../tmp/math-rendering/', import.meta.url);
@@ -15,8 +16,10 @@ const context = await browser.newContext({ viewport: { width: 390, height: 844 }
 const unexpected = [];
 const errors = [];
 const requested = new Set();
+const editorExamples = serializeNoteRichText([{ text: String.raw`\(\frac{1}{2}\) \(\ce{2H2 + O2 -> 2H2O}\)`, format: 0 }]);
 const question = String.raw`
 <h2>数学 · 化学</h2>
+<div id="editor-examples">${editorExamples}</div>
 <div id="fraction">\(\frac{-b\pm\sqrt{b^2-4ac}}{2a}\)</div>
 <div id="mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><mfrac><mi>x</mi><mn>2</mn></mfrac></math></div>
 <div id="matrix">\[\begin{pmatrix}1&2\\3&4\end{pmatrix}\]</div>
@@ -72,6 +75,7 @@ try {
     await page.goto('https://jidecards-media.local/test');
     await page.waitForFunction(() => document.documentElement.dataset.mathReady === 'true');
     assert.equal(await page.locator('[data-mml-node="merror"]').count(), 0, 'no formula parsing errors');
+    assert.equal(await page.locator('#editor-examples mjx-container svg').count(), 2, 'editor help examples survive HTML escaping');
     for (const id of ['fraction', 'mathml', 'matrix', 'integral', 'chem', 'reaction', 'charge', 'units', 'macro', 'cloze', 'dollar', 'long']) {
       assert.ok(await page.locator(`#${id} mjx-container svg`).count() > 0, id);
     }

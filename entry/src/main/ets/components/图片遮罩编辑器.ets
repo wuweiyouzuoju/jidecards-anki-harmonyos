@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../utils/PressFeedback';
 
 import { DialogHeader } from './common/DialogHeader';
 // ========================================================
@@ -45,6 +46,9 @@ interface ImageContentRect {
 @Component
 export struct 图片遮罩编辑器 {
   @Prop 源图Uri: string = '';
+  @Prop initialMasks: 遮罩描述[] = [];
+
+  aboutToAppear(): void { this.遮罩列表 = this.initialMasks.slice(); }
   @Prop 是否深色: boolean = false;
   onConfirm: (遮罩列表: 遮罩描述[]) => void = (_l: 遮罩描述[]): void => {};
   onCancel: () => void = (): void => {};
@@ -505,6 +509,8 @@ export struct 图片遮罩编辑器 {
               color: '#FFFFFF'
             })
             .borderRadius(应用尺寸.圆角_胶囊)
+            .attributeModifier(new PressFeedback())
+            .stateEffect(false)
             .onClick((): void => {
               this.当前选中编号 = 编号;
             })
@@ -523,6 +529,8 @@ export struct 图片遮罩编辑器 {
           .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
           .borderRadius(应用尺寸.圆角_胶囊)
           .enabled(this.遮罩列表.length > 0)
+          .attributeModifier(new PressFeedback())
+          .stateEffect(false)
           .onClick((): void => { this.撤销最后一个(); })
 
         Button($r('app.string.image_occlusion_clear'))
@@ -535,6 +543,8 @@ export struct 图片遮罩编辑器 {
           .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
           .borderRadius(应用尺寸.圆角_胶囊)
           .enabled(this.遮罩列表.length > 0)
+          .attributeModifier(new PressFeedback())
+          .stateEffect(false)
           .onClick((): void => { this.清空全部(); })
       }
       .width('100%')

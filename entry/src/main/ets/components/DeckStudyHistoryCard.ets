@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../utils/PressFeedback';
 import { 统计服务 } from '../backend/统计服务';
 import { GraphsView } from '../proto/messages/StatsMessages';
 import { DeckStudyDay, DeckStudyHistory, buildDeckStudyHistory, historyStudyDayKey } from '../model/DeckStudyHistory';
@@ -104,6 +105,8 @@ export struct DeckStudyHistoryCard {
           .fontColor(this.accent)
           .backgroundColor(Color.Transparent)
           .height(应用尺寸.按钮高度)
+          .attributeModifier(new PressFeedback())
+          .stateEffect(false)
           .onClick((): void => { this.reload(); })
       } else {
         Row({ space: 8 }) {

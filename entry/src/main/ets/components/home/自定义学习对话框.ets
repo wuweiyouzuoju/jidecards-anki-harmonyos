@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../../utils/PressFeedback';
+import { DialogBackdrop } from '../common/DialogBackdrop';
 import { resourceText, showToastSafely } from '../../utils/UiFeedback';
 import { ThemeTextSpans } from '../common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
@@ -27,6 +29,12 @@ interface 预设选项 {
 
 @Component
 export struct 自定义学习对话框 {
+  @Prop @Watch('handleBackRequest') backRequest: number = 0;
+
+  private handleBackRequest(): void {
+    if (!(this.处理中)) this.onClose();
+  }
+
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
   @Prop deckId: string = '';
@@ -256,6 +264,7 @@ export struct 自定义学习对话框 {
       })
       .borderRadius(应用尺寸.圆角_面板)
       .enabled(!this.处理中 && !this.加载默认值中 && this.默认值 !== null)
+      .attributeModifier(new PressFeedback())
       .onClick(() => { this.切换预设(预设.字段号); })
     }
     .width('100%')
@@ -304,6 +313,7 @@ export struct 自定义学习对话框 {
           .selected(this.cardKindIndex)
           .value(this.取本地化文本(this.kindLabels[this.cardKindIndex]))
           .font(SelectStyle.controlFont)
+          .textModifier(SelectStyle.labelText())
           .borderRadius(SelectStyle.controlRadius)
           .height(SelectStyle.controlHeight)
           .padding(SelectStyle.controlPadding)
@@ -325,11 +335,13 @@ export struct 自定义学习对话框 {
                 { value: this.取本地化文本($r('app.string.custom_study_tags_exclude')) }
               ])
                 .width(SelectStyle.fieldWidth)
+                .constraintSize(SelectStyle.fieldConstraint)
                 .selected(this.tagSelection(tag.name))
                 .value(this.取本地化文本(this.tagSelection(tag.name) === 1 ? $r('app.string.custom_study_tags_include') :
                   (this.tagSelection(tag.name) === 2 ? $r('app.string.custom_study_tags_exclude') :
                     $r('app.string.custom_study_tags_any'))))
                 .font(SelectStyle.controlFont)
+                .textModifier(SelectStyle.labelText())
                 .borderRadius(SelectStyle.controlRadius)
                 .height(SelectStyle.controlHeight)
                 .padding(SelectStyle.controlPadding)
@@ -346,14 +358,7 @@ export struct 自定义学习对话框 {
 
   build() {
     Stack() {
-      Column()
-        .width('100%').height('100%')
-        .backgroundColor(设置面板色板_取(this.isDark).遮罩)
-        .backgroundBlurStyle(BlurStyle.Thin, {
-          colorMode: this.isDark ? ThemeColorMode.DARK : ThemeColorMode.LIGHT,
-          adaptiveColor: AdaptiveColor.DEFAULT
-        })
-        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+      DialogBackdrop()
         .onClick(() => { if (!this.处理中) { this.onClose(); } })
         .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
       Column({ space: 应用尺寸.间距_16 }) {
@@ -385,7 +390,9 @@ export struct 自定义学习对话框 {
                 .fontColor($r('app.color.error_text')).width('100%')
               if (this.默认值 === null) {
                 Button($r('app.string.custom_study_retry'))
-                  .enabled(!this.加载默认值中).onClick(() => { this.加载默认值(); })
+                  .enabled(!this.加载默认值中).attributeModifier(new PressFeedback())
+                  .stateEffect(false)
+                  .onClick(() => { this.加载默认值(); })
               }
             }
           }.width('100%').alignItems(HorizontalAlign.Start)

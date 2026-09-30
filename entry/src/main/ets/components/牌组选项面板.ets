@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { DialogBackdrop } from './common/DialogBackdrop';
 import { DeckOptionRow } from './home/DeckOptionRow';
 import { resourceText } from '../utils/UiFeedback';
 import { DeckOptionField, DeckOptionChoice } from './home/DeckOptionField';
@@ -53,6 +54,15 @@ interface 牌组枚举选项 { value: Resource; numericValue: number; }
 
 @Component
 export struct 牌组选项面板 {
+  @State private advancedBackRequest: number = 0;
+  @Prop @Watch('handleBackRequest') backRequest: number = 0;
+
+  private handleBackRequest(): void {
+    if (this.showHelp) { this.showHelp = false; return; }
+    if (this.showAdvanced) { this.advancedBackRequest++; return; }
+    if (!this.busy) this.onCancel();
+  }
+
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
   @Prop deckName: string = '';
@@ -354,19 +364,8 @@ export struct 牌组选项面板 {
 
   build() {
     Stack() {
-      Column()
-        .width('100%')
-        .height('100%')
-        .backgroundColor(this.isDark ? 'rgba(0,0,0,0.40)' : 'rgba(0,0,0,0.15)')
-        // 磨砂玻璃质感：模糊下层内容避免叠字，材质着色跟随应用内主题（思路参考：华为开发者文档 backgroundBlurStyle）
-        .backgroundBlurStyle(BlurStyle.Thin, {
-          colorMode: this.isDark ? ThemeColorMode.DARK : ThemeColorMode.LIGHT,
-          adaptiveColor: AdaptiveColor.DEFAULT
-        })
-        // 遮罩扩展进安全区，否则状态栏/导航条区域露出下层背景
-        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+      DialogBackdrop()
         .onClick(() => { if (!this.busy) this.onCancel(); })
-        // 过渡仅动 opacity 合成属性，不触发布局（思路参考：华为官方 TransitionEffect 示例）
         .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
 
       Column({ space: 应用尺寸.间距_12 }) {
@@ -422,7 +421,7 @@ export struct 牌组选项面板 {
       ))
 
       if (this.showAdvanced) {
-        高级牌组选项面板({
+        高级牌组选项面板({ backRequest: this.advancedBackRequest,
           isDark: this.isDark,
           form: this.form,
           options: this.options,

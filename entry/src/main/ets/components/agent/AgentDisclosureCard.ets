@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../../utils/PressFeedback';
 
 import { 应用尺寸 } from '../../utils/应用尺寸';
 
@@ -35,6 +36,7 @@ export struct AgentDisclosureCard {
           .animation({ duration: 150, curve: Curve.EaseOut })
       }
       .width('100%')
+      .attributeModifier(new PressFeedback())
       .onClick((): void => {
         if (!this.toggleLocked) { this.onToggle(); }
       })

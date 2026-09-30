@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../../utils/PressFeedback';
 
 // 今日计数卡：渲染 GraphsView.today 为 4 行文字列表（对齐 Anki TodayStats）。
 // 行 1 今天学习了 N 张，用时 X（Y 秒/张）；行 2 重来次数 N (P%)；
@@ -131,7 +132,9 @@ export struct 今日计数卡 {
       if (this.今日数据 !== null && this.今日数据.answerCount > 0) {
         Button($r('app.string.stats_today_details'))
           .backgroundColor(Color.Transparent).fontColor($r('app.color.text_secondary'))
-          .height(36).onClick((): void => { this.showDetails = !this.showDetails; })
+          .height(36).attributeModifier(new PressFeedback())
+          .stateEffect(false)
+          .onClick((): void => { this.showDetails = !this.showDetails; })
       }
       if (this.showDetails && this.今日数据 !== null && this.今日数据.answerCount > 0) {
         // 内容内联（原 @Builder 值传参参数被固化，牌组切换后数字不更新，2026-08-29 修复）

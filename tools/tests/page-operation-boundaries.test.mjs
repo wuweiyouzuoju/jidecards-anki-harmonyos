@@ -1,3 +1,4 @@
+import { editorPageHarness } from './editor-page-harness.mjs';
 import { NoteEditorSession, initialNoteEditorState } from '../../entry/src/main/ets/model/NoteEditorSession.ts';
 import { initialTransferState } from '../../entry/src/main/ets/model/home/DataTransferSession.ts';
 import { compileWithUiFeedback } from './ui-feedback-harness.mjs';
@@ -33,6 +34,42 @@ function pageMethods(file, names, dependencies = {}) {
   return compileWithUiFeedback(...Object.keys(dependencies), stripTypeScriptTypes(`class Page { ${methods.join('\n')} }`,
     { mode: 'transform' }) + '; return Page;')(...Object.values(dependencies));
 }
+
+test('browser editor return preserves mounted rows and reloads the previous pagination depth with the same filters', async () => {
+  const gate = deferred(); const queries = []; let moreCalls = 0;
+  const Page = pageMethods('浏览页', ['执行搜索', '加载更多']);
+  const page = new Page();
+  const oldRows = [{ id: 1, value: 'old' }];
+  Object.assign(page, { operations: { isAlive: () => true }, searchVersion: 0,
+    浏览模式值: 'notes', 搜索文本: 'deck:test', quickFilter: 'marked', sortColumn: 'noteCrt', sortReverse: true,
+    consumedRowCount: 3, 阶段: 'list', 行列表: oldRows, 取能力上下文: () => ({ filesDir: '/collection' }),
+    searchSession: {
+      search: async query => { queries.push(query); await gate.promise;
+        return { rows: [{ id: 1, value: 'new' }], consumed: 1, ids: [1, 2, 3, 4], columns: ['front'] }; },
+      more: async () => { moreCalls++; return { rows: [1, 2, 3].map(id => ({ id, value: 'new' })), consumed: 3 }; }
+    }
+  });
+  const work = page.执行搜索(true);
+  assert.equal(page.阶段, 'list'); assert.equal(page.行列表, oldRows);
+  await page.加载更多(); assert.equal(moreCalls, 0, 'scroll cannot race the retained-page reload');
+  gate.resolve(); await work;
+  assert.deepEqual(queries, [{ filesDir: '/collection', notes: true, text: 'deck:test', filter: 'marked',
+    sortColumn: 'noteCrt', sortReverse: true }]);
+  assert.equal(moreCalls, 1); assert.equal(page.consumedRowCount, 3);
+  assert.deepEqual(page.行列表.map(row => row.id), [1, 2, 3]); assert.equal(page.refreshingSearch, false);
+});
+
+test('browser editor cancellation preserves preview, while a saved note refreshes it once', () => {
+  let tick = 1; const refreshes = [];
+  const Page = pageMethods('浏览页', ['returnFromEditor'], { AppStorage: { get: () => tick } });
+  const page = new Page();
+  Object.assign(page, { editingPageOpen: true, editingChangedTick: 1, 预览刷新版本: 0,
+    执行搜索: keepRows => refreshes.push(keepRows) });
+  page.returnFromEditor(); assert.deepEqual(refreshes, []); assert.equal(page.预览刷新版本, 0);
+  page.editingPageOpen = true; tick = 2;
+  page.returnFromEditor(); page.returnFromEditor();
+  assert.deepEqual(refreshes, [true]); assert.equal(page.预览刷新版本, 1);
+});
 
 function homeHarness() {
   const response = deferred(), timers = new Map(); let next = 0;
@@ -194,7 +231,7 @@ function browserHarness() {
   const Page = pageMethods('浏览页', ['runBrowserOperation', 'runBatchOperation', 'captureBrowserSelection',
     'isBrowserSelectionCurrent', '退出多选', '解析选中为卡片ID', '解析选中笔记的卡片ID', '解析选中为笔记ID',
     '执行批量改牌组', '执行批量删除', '执行批量设置标志', '执行批量挂起', '执行批量恢复',
-    '执行批量设置到期日', '执行批量重新定位', '执行批量更改笔记类型', '保存编辑', '执行查找替换',
+    '执行批量设置到期日', '执行批量重新定位', '执行批量更改笔记类型', '执行查找替换',
     '行点击',
     '打开卡片信息', '关闭卡片信息', '加载更多', '打开改牌组弹层', '切换模式'], {
     autoSyncScheduler: scheduler, AppStorage: { setOrCreate: (...args) => broadcasts.push(args) },
@@ -278,17 +315,12 @@ test('late batch error cannot overwrite errors of a new selection', async () => 
 });
 
 test('editor save owns immutable fields and retains sync occupancy until actual commit after leaving', async () => {
-  const { page, scheduler, calls } = browserHarness(), write = deferred(), saved = [];
-  page.笔记服务实例.获取笔记 = async () => ({ id: 1, guid: 'g', notetypeId: 1, mtimeSecs: 0, usn: 0, fields: [], tags: [] });
-  page.笔记类型服务实例.获取笔记类型 = async () => ({ fieldNames: ['Front', 'Back'] });
-  await page.editorSession.open(1, true, () => true);
-  page.笔记服务实例.更新笔记 = async notes => { saved.push(notes); await write.promise; };
-  const fields = ['hello'], tags = ['t'];
-  const work = page.保存编辑(fields, tags); fields[0] = 'changed'; tags.push('changed');
-  await settle(); page.operations.dispose();
-  assert.equal(scheduler.canSync(), false); write.resolve(); assert.equal(await work, true);
-  assert.deepEqual(saved[0][0].fields, ['hello', '']); assert.deepEqual(saved[0][0].tags, ['t']);
-  assert.equal(calls.includes('search'), false); assert.equal(scheduler.canSync(), true);
+  const {page,scheduler,io,writes,pops}=editorPageHarness(), write=deferred();await page.load();
+  io.write=async (notes,undo)=>{writes.push({notes,undo});await write.promise};
+  const fields=['hello'],tags=['t'];const work=page.save(fields,tags,[]);fields[0]='changed';tags.push('changed');
+  await settle();page.aboutToDisappear();assert.equal(scheduler.canSync(),false);
+  write.resolve();assert.equal(await work,true);assert.deepEqual(writes[0].notes[0].fields,['hello','']);
+  assert.deepEqual(writes[0].notes[0].tags,['t']);assert.equal(pops.length,0);assert.equal(scheduler.canSync(),true);
 });
 
 test('old pagination finally does not unlock a newer load or append stale rows', async () => {
@@ -369,11 +401,11 @@ test('latest editor request wins and dismissal invalidates in-flight loading', a
   const { page } = browserHarness(), first = deferred(); page.浏览模式值 = 'notes';
   page.笔记服务实例.获取笔记 = async id => id === 1 ? first.promise : { id, notetypeId: id, fields: ['second'], tags: [] };
   page.笔记类型服务实例.获取笔记类型 = async () => ({ fieldNames: ['Front'] });
-  const old = page.行点击(1); await page.行点击(2);
+  const old = page.editorSession.open(1,true,()=>true); await page.editorSession.open(2,true,()=>true);
   first.resolve({ id: 1, notetypeId: 1, fields: ['old'], tags: [] }); await old;
   assert.equal(page.editor.note.id, 2); assert.deepEqual(page.editor.note.fields, ['second']);
   const delayed = deferred(); page.笔记服务实例.获取笔记 = () => delayed.promise;
-  const closed = page.行点击(3); page.editorSession.close();
+  const closed = page.editorSession.open(3,true,()=>true); page.editorSession.close();
   delayed.resolve({ id: 3, notetypeId: 3, fields: ['late'], tags: [] }); await closed;
   assert.equal(page.editor.note, null); assert.equal(page.editor.busy, false);
 });

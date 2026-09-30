@@ -1,41 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { StatsSession, StatsSnapshot, StatsRequest } from '../model/StatsSession';
+import { AnkiStatsSession } from '../backend/AnkiStatsSession';
 import { SelectStyle } from '../utils/SelectStyle';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
 import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
 
-// ========================================================
-// @块ID UI-PAGE-STATS-001
-// @名称 统计页
-//
-// @作用
-// 全库统计图表页（对标 Anki Stats）。展示今日计数、预测、卡片状态分布、
-// 小时分布、难度分布、间隔分布、真实保留率、记忆率等完整统计信息。
-// 手机端单栏布局：顶部条（返回 + 统计天数两档「近 1 年/全部」）+ 滚动统计内容。
-// 图表偏好无集中弹窗（对齐 Anki：偏好控件内嵌各图即时落库）——积压/分离复选框在图内、
-// 周首日点日历星期标签切换；Anki 官方 GraphsOverview 无偏好弹窗，autoSavingPrefs 即时保存。
-//
-// @输入
-// pathStack: Navigation 页面栈，用于返回主页
-//
-// @输出
-// 渲染统计页 NavDestination
-//
-// @Invariants
-// - 统计页注册 CustomTransition（name='StatsPage'），与浏览页同模式实现淡入淡出转场
-// - 未注册时首页 .customNavContentTransition 导致 NavDestination 卡在 opacity=0（ArkUI bug）
-//
-// @Extension Points
-// - 图表组件可替换为更丰富的可视化
-// - 统计数据范围可扩展（按牌组/按时间）
-//
-// @副作用
-// 通过 统计服务 调用后端 RPC，读取 Anki collection。
-// ========================================================
+// 页面保留范围、布局和交互；StatsSession 拥有查询代次、偏好写入及快照发布。
 
 import { common } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
-import { 后端会话 } from '../backend/后端会话';
-import { 统计服务 } from '../backend/统计服务';
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { 颜色键 } from '../model/颜色主题';
 import { 解析是否深色, 主题模式 } from '../model/主题设置';
@@ -59,7 +32,7 @@ import { 回答按钮卡 } from '../components/stats/回答按钮卡';
 import { 新增卡 } from '../components/stats/新增卡';
 
 import { 字段帮助面板 } from '../components/字段帮助面板';
-import { 提取卡片数据, 保存卡片数据, 加载小时分布窗口, 保存小时分布窗口, 加载统计天数, 保存统计天数 } from '../model/桌面卡片数据存储';
+import { 加载小时分布窗口, 保存小时分布窗口, 加载统计天数, 保存统计天数 } from '../model/桌面卡片数据存储';
 import { 牌组服务 } from '../backend/牌组服务';
 import { 平铺牌组树 } from '../model/牌组层级';
 import type { 牌组汇总 } from '../model/主页模型';
@@ -89,7 +62,7 @@ export struct 统计页 {
   pathStack: NavPathStack = new NavPathStack();
   initialSnapshot: 统计页参数 = { graphs: null, days: 365 };
   private pageActive: boolean = false;
-  private readonly 统计服务实例: 统计服务 = new 统计服务();
+  private statsSession: StatsSession | null = null;
 
   @State private 阶段: 统计阶段 = 'loading';
   @State private 错误详情: string = '';
@@ -138,9 +111,6 @@ export struct 统计页 {
   @State private 牌组选项: SelectOption[] = [];
   @State private 选中牌组索引: number = 0;
   private 牌组名列表: string[] = [];
-  // 加载竞态防护：每次 加载统计数据 递增；旧的未完成请求返回后发现序号不匹配即丢弃，
-  // 防止快速切换牌组/天数时慢的旧请求后完成覆盖新数据（与首页 加载链串行 同族问题，2026-08-28 修复）。
-  private 请求序号: number = 0;
   @StorageProp(FSRS_STATE_REVISION_KEY) @Watch('onFsrsStateChanged') private fsrsRevision: number = 0;
   private fsrsRefreshReady: boolean = false;
   // 小时分布时间段（0=近1月 1=近3月 2=近1年 3=全部）：与首页卡片/桌面卡片共用同一偏好
@@ -199,7 +169,7 @@ export struct 统计页 {
   aboutToDisappear(): void {
     this.pageActive = false;
     this.fsrsRefreshReady = false;
-    this.请求序号++;
+    this.statsSession?.dispose();
     CustomTransition.getInstance().注销NavParam('StatsPage');
   }
 
@@ -252,14 +222,8 @@ export struct 统计页 {
   }
 
   /** 图内偏好变更：本地即时生效 + 异步写后端（对齐 Anki autoSavingPrefs 行为） */
-  private async 更新偏好(字段: (旧: GraphPreferences) => GraphPreferences): Promise<void> {
-    await syncActivity.waitForCollection();
-    if (!this.pageActive) return;
-    const 新偏好: GraphPreferences = 字段(this.图表偏好);
-    this.图表偏好 = 新偏好;
-    this.统计服务实例.设置图表偏好(新偏好).catch((_错误: Object): void => {
-      // 写偏好失败不阻塞展示，下次打开回读旧值
-    });
+  private async 更新偏好(change: (old: GraphPreferences) => GraphPreferences): Promise<void> {
+    await this.getStatsSession()?.updatePreferences(change);
   }
 
   /** 预测卡积压复选框切换（图内控件，即时落库） */
@@ -329,103 +293,31 @@ export struct 统计页 {
     return context === undefined ? null : context;
   }
 
-  /**
-   * 用当前 图表数据 + 小时分布窗口 + 分离偏好 提取卡片数据并保存推送。
-   * 拉牌组树算待学数/牌组数，供桌面卡片今日进度页（失败时传0，桌面卡片显示"-"）。
-   * 序号非空时（来自 加载统计数据）：等牌组树期间若有更新的加载请求则放弃本次推送，防旧快照覆盖新快照。
-   */
-  private async 刷新卡片快照(序号: number | null = null): Promise<void> {
-    // 同步前的展示快照不能反写桌面卡片；等待最新查询完成后统一刷新。
-    if (!this.pageActive || this.阶段 !== 'content') return;
-    const 图表: GraphsView | null = this.图表数据;
-    if (图表 === null) {
-      return;
-    }
-    const 分离暂停: boolean = this.图表偏好.cardCountsSeparateInactive;
-    try {
-      const 牌组服务实例 = new 牌组服务();
-      const tree: DeckTreeNode = await 牌组服务实例.获取牌组树();
-      if (序号 !== null && 序号 !== this.请求序号) {
-        return;
-      }
-      let 总待学: number = 0;
-      for (const 子节点 of tree.children) {
-        总待学 += 子节点.newCount + 子节点.learnCount + 子节点.reviewCount;
-      }
-      const 牌组总数: number = 平铺牌组树(tree).length;
-      保存卡片数据(提取卡片数据(图表, 总待学, 牌组总数, this.小时分布窗口, 分离暂停)).catch((e: Object): void => {
-        hilog.error(0xFFFE, '统计页', `保存卡片数据失败 ${e}`);
+  private async 刷新卡片快照(): Promise<void> {
+    await this.getStatsSession()?.refreshWidget(this.statsRequest());
+  }
+
+  private statsRequest(): StatsRequest {
+    return { days: this.统计天数, search: this.取搜索串(), hours: this.小时分布窗口 };
+  }
+
+  private getStatsSession(): StatsSession | null {
+    if (!this.pageActive) return null;
+    if (this.statsSession !== null) return this.statsSession;
+    const context = this.取能力上下文();
+    if (context === null) { this.阶段 = 'error'; return null; }
+    this.statsSession = new StatsSession(new AnkiStatsSession(context.filesDir), this.图表数据, 默认偏好(),
+      (state: StatsSnapshot): void => {
+        this.图表数据 = state.graphs;
+        this.图表偏好 = state.preferences;
+        this.阶段 = state.phase;
+        this.错误详情 = state.error;
       });
-    } catch (_牌组错误) {
-      if (序号 !== null && 序号 !== this.请求序号) {
-        return;
-      }
-      保存卡片数据(提取卡片数据(图表, 0, 0, this.小时分布窗口, 分离暂停)).catch((e: Object): void => {
-        hilog.error(0xFFFE, '统计页', `保存卡片数据失败 ${e}`);
-      });
-    }
+    return this.statsSession;
   }
 
   private async 加载统计数据(): Promise<void> {
-    const 本次序号: number = ++this.请求序号;
-    // 请求前固化搜索串：await 期间用户可能再切换牌组，返回后必须按发起时的口径处理
-    //（含桌面卡片快照的"仅全库"判定，防止单牌组数据污染首页/桌面卡片）。
-    const 搜索串: string = this.取搜索串();
-    this.阶段 = 'loading';
-    try {
-      await syncActivity.waitForCollection();
-      if (!this.pageActive || 本次序号 !== this.请求序号) return;
-      const context: common.UIAbilityContext | null = this.取能力上下文();
-      if (context === null) {
-        this.阶段 = 'error';
-        this.错误详情 = '能力上下文不可用';
-        return;
-      }
-      await 后端会话.获取实例().确保已打开(context.filesDir);
-      if (!this.pageActive || 本次序号 !== this.请求序号) return;
-      // 图表统计是主数据，偏好加载失败不阻塞（回退默认值）。
-      // 搜索串为空 = 全库统计；选中牌组时传 deck:"全名"（后端 graph_data_for_search 牌组分支）
-      const 图表: GraphsView = await this.统计服务实例.获取图表统计(this.统计天数, 搜索串);
-      if (本次序号 !== this.请求序号) {
-        // 等待期间已有更新的请求（牌组/天数再切换）：丢弃本次旧结果，防止旧数据覆盖新数据
-        hilog.info(0xFFFE, '统计页', `丢弃过期请求 序号=${本次序号} 当前=${this.请求序号} 搜索串=${搜索串}`);
-        return;
-      }
-      this.图表数据 = 图表;
-      const 复习天数: number = 图表.reviewCountsByDaysAgo !== null ? 图表.reviewCountsByDaysAgo.size : -1;
-      let 首日样例: string = '无';
-      if (图表.reviewCountsByDaysAgo !== null && 图表.reviewCountsByDaysAgo.size > 0) {
-        const 键值: string[] = [];
-        图表.reviewCountsByDaysAgo.forEach((v: ReviewKindCounts, k: number): void => {
-          const 总: number = v.mature + v.young + v.relearn + v.learn + v.filtered;
-          键值.push(`${k}:${总}`);
-        });
-        键值.sort();
-        首日样例 = 键值.join(',');
-      }
-      hilog.info(0xFFFE, '统计页', `图表已更新 序号=${本次序号} 搜索串=${搜索串} 键值=${首日样例}`);
-      let preferences: GraphPreferences = 默认偏好();
-      try {
-        preferences = await this.统计服务实例.获取图表偏好();
-      } catch (_偏好错误) {}
-      if (!this.pageActive || 本次序号 !== this.请求序号) return;
-      this.图表偏好 = preferences;
-      this.阶段 = 'content';
-      // 顺带刷新桌面卡片数据（仅全库口径；选中单牌组时不覆盖首页/桌面卡片）：
-      // 用户进入统计页时把最新 GraphsView 推送到桌面卡片，
-      // 避免桌面卡片长期显示旧数据（FSRS 切换、复习后未回首页等场景）。
-      if (搜索串 === '') {
-        await this.刷新卡片快照(本次序号);
-      }
-    } catch (error) {
-      if (本次序号 !== this.请求序号) {
-        // 旧请求的失败不作数（新请求进行中会自行落 阶段），防止旧错误顶掉新数据
-        return;
-      }
-      this.阶段 = 'error';
-      this.错误详情 = error instanceof Error ? error.message : `${error}`;
-      hilog.error(0xFFFE, '统计页', `加载失败: ${this.错误详情}`);
-    }
+    await this.getStatsSession()?.load(this.statsRequest());
   }
 
   /** 返回主页。 */
@@ -511,6 +403,7 @@ export struct 统计页 {
               .padding(SelectStyle.controlPadding)
               .space(SelectStyle.controlSpace)
               .font(SelectStyle.controlFont)
+              .textModifier(SelectStyle.labelText())
               .borderRadius(SelectStyle.controlRadius)
               .onSelect((索引: number) => {
                 this.on牌组切换(索引);
@@ -832,7 +725,6 @@ export struct 统计页 {
           字段帮助面板({
             标题: this.分区帮助标题,
             正文: this.分区帮助正文,
-            是否深色: this.是否深色(),
             onClose: (): void => {
               this.显示分区帮助 = false;
             }
@@ -846,6 +738,11 @@ export struct 统计页 {
     }
     .hideTitleBar(true)
     .backgroundColor(Color.Transparent)
+    .onBackPressed((): boolean => {
+      if (!this.显示分区帮助) return false;
+      this.显示分区帮助 = false;
+      return true;
+    })
     .opacity(this.转场透明度)
   }
 }

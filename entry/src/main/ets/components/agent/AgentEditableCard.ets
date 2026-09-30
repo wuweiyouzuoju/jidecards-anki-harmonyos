@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../../utils/PressFeedback';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 颜色键 } from '../../model/颜色主题';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
@@ -36,6 +37,7 @@ export struct AgentEditableCard {
         .justifyContent(FlexAlign.Center)
         .alignItems(VerticalAlign.Center)
         .enabled(!this.busy && this.card.状态 !== 'saved')
+        .attributeModifier(new PressFeedback())
         .onClick((): void => {
           const 当前: 卡片草稿 = this.card;
           this.onSelected(!当前.已选中);

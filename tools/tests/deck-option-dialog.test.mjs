@@ -83,7 +83,19 @@ test('deck fields use dialogs while the shared-deck save scope uses an inline sw
   assert.match(advanced, /DeckOptionRow\(/);
   assert.doesNotMatch(advanced, /Text\('▼'\)|\.rotate\(/);
   assert.match(source, /showHelp: true/);
-  assert.match(source, /aboutToDisappear\(\): void \{ this\.dialog\?\.close\(\)/);
+  assert.match(source, /aboutToDisappear\(\): void \{[\s\S]*?this.helpDialog\?\.close\(\)[\s\S]*?this.dialog\?\.close\(\)/);
+});
+
+test('opening help preserves the editor draft, validation error and confirmation boundary', () => {
+  const editor = new Editor();
+  let helps = 0, commits = 0;
+  editor.initialValue = '20'; editor.aboutToAppear();
+  editor.draft = 'unfinished'; editor.error = 'invalid';
+  editor.onConfirm = () => { commits++; };
+  editor.onHelp = () => { helps++; };
+  editor.onHelp();
+  assert.equal(helps, 1); assert.equal(commits, 0);
+  assert.equal(editor.draft, 'unfinished'); assert.equal(editor.error, 'invalid');
 });
 
 test('experimental advanced entry, categories and editable fields share the whole option row', () => {

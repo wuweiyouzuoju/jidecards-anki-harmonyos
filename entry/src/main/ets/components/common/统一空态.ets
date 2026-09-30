@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../../utils/PressFeedback';
 
 // ========================================================
 // @块ID UI-COMMON-EMPTY-001
@@ -53,6 +54,8 @@ export struct 统一空态 {
           .height(应用尺寸.按钮高度)
           .padding({ left: 应用尺寸.间距_16, right: 应用尺寸.间距_16 })
           .fontSize(应用尺寸.字号_按钮)
+          .attributeModifier(new PressFeedback())
+          .stateEffect(false)
           .onClick(() => this.onAction())
       }
     }

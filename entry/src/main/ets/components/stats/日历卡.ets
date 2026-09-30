@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../../utils/PressFeedback';
 import { ThemeTextSpans } from '../common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
@@ -175,6 +176,7 @@ export struct 日历卡 {
         Text() { ThemeTextSpans('◄', (this.目标年份 > this.取最小年份()) ? this.themeAccentColors : [], this.getUIContext()) }
           .fontSize(应用尺寸.字号_正文_小)
           .fontColor(this.目标年份 > this.取最小年份() ? this.主色 : $r('app.color.text_tertiary'))
+          .attributeModifier(new PressFeedback())
           .onClick((): void => {
             if (this.目标年份 > this.取最小年份()) {
               this.目标年份 -= 1;
@@ -188,6 +190,7 @@ export struct 日历卡 {
         Text() { ThemeTextSpans('►', (this.目标年份 < new Date().getFullYear()) ? this.themeAccentColors : [], this.getUIContext()) }
           .fontSize(应用尺寸.字号_正文_小)
           .fontColor(this.目标年份 < new Date().getFullYear() ? this.主色 : $r('app.color.text_tertiary'))
+          .attributeModifier(new PressFeedback())
           .onClick((): void => {
             if (this.目标年份 < new Date().getFullYear()) {
               this.目标年份 += 1;
@@ -226,6 +229,7 @@ export struct 日历卡 {
                 .fontColor(this.是否深色 ? '#dddddd' : '#000000')
                 .width(10)
                 .textAlign(TextAlign.End)
+                .attributeModifier(new PressFeedback())
                 .onClick((): void => {
                   const 数字: number = (周首日转数字(this.周首日) + 行) % 7;
                   if (数字 !== 2 && 数字 !== 3 && 数字 !== 4) {
@@ -249,6 +253,7 @@ export struct 日历卡 {
                     .borderRadius(2)
                     .accessibilityText($r('app.string.stats_calendar_day',
                       (this.取格数据(列, 行) as 日历格).日期, (this.取格数据(列, 行) as 日历格).数量))
+                    .attributeModifier(new PressFeedback())
                     .onClick((): void => {
                       const day: 日历格 | null = this.取格数据(列, 行);
                       if (day !== null) {

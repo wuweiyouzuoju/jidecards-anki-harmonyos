@@ -133,18 +133,17 @@ function createNavigation(background) {
     register.call(page, { getInstance: () => registry });
     pages.set(name, page);
   }
-  const source = readFileSync(new URL('../../entry/src/main/ets/pages/首页.ets', import.meta.url), 'utf8');
-  const start = source.indexOf('  private 自定义转场回调(');
-  const end = source.indexOf('\n  }', start) + 4;
-  const js = stripTypeScriptTypes(`class Home { ${source.slice(start, end)} }`, { mode: 'transform' });
+  const source = readFileSync(new URL('../../entry/src/main/ets/utils/HomeNavigationTransition.ets', import.meta.url), 'utf8')
+    .replace(/^import[^;]+;\s*/gm, '').replace(/^export /gm, '');
+  const js = stripTypeScriptTypes(source, { mode: 'transform' });
   const values = {
     NavigationOperation: { PUSH: 'push' },
     取全屏转场时长: () => 250,
     Curve: { EaseOut: 'ease-out' },
     CustomTransition: { getInstance: () => registry },
   };
-  const home = new Function(...Object.keys(values), js + '; return new Home();')(...Object.values(values));
-  home.backgroundTransitionGeneration = 0;
+  const Transition = new Function(...Object.keys(values), js + '; return HomeNavigationTransition;')(...Object.values(values));
+  const home = {};
   home.homeTransitionOpacity = 1;
   Object.defineProperty(home, 'backgroundTransitionActive', {
     get: () => background.transitionActive,
@@ -160,8 +159,11 @@ function createNavigation(background) {
     update();
     frames.push({ start, end: snapshot() });
   } });
+  const transition = new Transition({ getUIContext: () => home.getUIContext(),
+    setHomeOpacity: value => { home.homeTransitionOpacity = value; },
+    setBackgroundActive: value => { home.backgroundTransitionActive = value; } });
   const startTransition = (operation = 'push', from = { index: -1 }, to = { name: 'SettingsPage', index: 0 }) => {
-    const protocol = home.自定义转场回调(from, to, operation);
+    const protocol = transition.create(from, to, operation);
     protocol.transition({ finishTransition: () => protocol.onTransitionEnd(true) });
     return protocol;
   };

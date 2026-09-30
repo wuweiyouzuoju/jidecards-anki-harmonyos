@@ -28,6 +28,13 @@
 // ========================================================
 
 export class 应用尺寸 {
+  // 普通弹窗共用外缘；紧凑确认与宽内容只改变最大宽度。
+  static readonly dialogWidth: string = '88%';
+  static readonly dialogMaxWidth: number = 480;
+  static readonly dialogCompactMaxWidth: number = 420;
+  static readonly dialogWideMaxWidth: number = 560;
+  static readonly dialogMaxHeight: string = '88%';
+  static readonly dialogHeightRatio: number = 0.88;
   // ---- 字号 ----
   static readonly 字号_说明_小: number = 10; // 星期表头
   static readonly 字号_说明: number = 11; // 日历格数字、辅助提示

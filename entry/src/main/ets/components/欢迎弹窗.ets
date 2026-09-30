@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { DialogBackdrop } from './common/DialogBackdrop';
 import { DialogHeader } from './common/DialogHeader';
 // ========================================================
 // @名称 欢迎弹窗 — 首次启动欢迎+更新日志+作者的话
@@ -65,14 +66,7 @@ export struct 欢迎弹窗 {
   build() {
     Stack() {
       // 遮罩 + 磨砂玻璃（点击空白处关闭）
-      Column()
-        .width('100%')
-        .height('100%')
-        .backgroundColor('rgba(0,0,0,0.35)')
-        .backgroundBlurStyle(BlurStyle.Thin, {
-          colorMode: this.是否深色 ? ThemeColorMode.DARK : ThemeColorMode.LIGHT,
-          adaptiveColor: AdaptiveColor.DEFAULT
-        })
+      DialogBackdrop()
         .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
         .onClick(() => this.onClose())
 

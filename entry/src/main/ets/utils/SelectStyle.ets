@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { TextModifier } from '@kit.ArkUI';
 import { 应用尺寸 } from './应用尺寸';
 
 /**
@@ -15,7 +16,19 @@ export class SelectStyle implements AttributeModifier<SelectAttribute> {
   static readonly controlSpace: number = 8;
   // Select 按当前选项内容测量，避免短标签占满行并留下大块空白。
   static readonly fieldWidth: string = 'auto';
+  // 给同一行的字段标签和帮助入口留出空间，不能由长选项挤占。
+  static readonly fieldConstraint: ConstraintSizeOptions = { maxWidth: '56%' };
   static readonly rangeWidth: number = 112;
+
+  // textModifier 不支持在 attributeModifier 内调用，由每个 Select 直接接入。
+  static labelText(): TextModifier {
+    return new TextModifier()
+      .fontSize(应用尺寸.字号_正文)
+      .fontWeight(FontWeight.Medium)
+      .fontColor($r('app.color.text_primary'))
+      .maxLines(1)
+      .textOverflow({ overflow: TextOverflow.Ellipsis });
+  }
 
   private surfaceColor: ResourceColor;
 

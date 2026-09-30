@@ -44,7 +44,6 @@ export struct 按下态按钮 {
   // 工具栏在等宽侧栏内约束标签，保留完整无障碍名称。
   @Prop singleLine: boolean = false;
   点击回调: () => void = (): void => {};
-  @State private 按下中: boolean = false;
 
   build() {
     Button() {
@@ -78,15 +77,10 @@ export struct 按下态按钮 {
     .constraintSize({ minWidth: 0, maxWidth: this.singleLine ? '100%' : undefined })
     .accessibilityText(typeof this.文案 === 'string' ? this.文案 : resourceText(this.getUIContext(), this.文案))
     .fontColor(this.字色)
-    .attributeModifier(new GlassSurface(this.按下中, this.glassColors))
+    .attributeModifier(new GlassSurface(this.glassColors))
     .stateEffect(false)
     .borderRadius(应用尺寸.圆角_胶囊)
     .enabled(this.是否启用)
-    .animation({ duration: 80, curve: Curve.EaseOut })
-    .onTouch((event: TouchEvent): void => {
-      if (event.type === TouchType.Down) { this.按下中 = true; }
-      else if (event.type === TouchType.Up || event.type === TouchType.Cancel) { this.按下中 = false; }
-    })
     .onClick(() => { this.点击回调(); })
   }
 }

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../utils/PressFeedback';
+import { DialogBackdrop } from './common/DialogBackdrop';
 import { resourceText } from '../utils/UiFeedback';
 import { SelectStyle } from '../utils/SelectStyle';
 import { ThemeTextSpans } from './common/ThemeText';
@@ -114,15 +116,7 @@ export struct 提醒编辑面板 {
 
   build() {
     Stack() {
-      Column()
-        .width('100%')
-        .height('100%')
-        .backgroundColor(this.isDark ? 'rgba(0,0,0,0.40)' : 'rgba(0,0,0,0.15)')
-        .backgroundBlurStyle(BlurStyle.Thin, {
-          colorMode: this.isDark ? ThemeColorMode.DARK : ThemeColorMode.LIGHT,
-          adaptiveColor: AdaptiveColor.DEFAULT
-        })
-        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+      DialogBackdrop()
         .onClick(() => {
           if (!this.busy) {
             this.onCancel();
@@ -165,6 +159,7 @@ export struct 提醒编辑面板 {
                 .padding(SelectStyle.controlPadding)
                 .space(SelectStyle.controlSpace)
                 .font(SelectStyle.controlFont)
+                .textModifier(SelectStyle.labelText())
                 .borderRadius(SelectStyle.controlRadius)
                 .onSelect((index: number): void => {
                   this.小时 = index;
@@ -183,6 +178,7 @@ export struct 提醒编辑面板 {
                 .padding(SelectStyle.controlPadding)
                 .space(SelectStyle.controlSpace)
                 .font(SelectStyle.controlFont)
+                .textModifier(SelectStyle.labelText())
                 .borderRadius(SelectStyle.controlRadius)
                 .onSelect((index: number): void => {
                   this.分钟 = index;
@@ -239,6 +235,7 @@ export struct 提醒编辑面板 {
                 .padding({ left: 应用尺寸.间距_12, right: 应用尺寸.间距_12, top: 6, bottom: 6 })
                 .border({ width: 1, color: this.主色按钮背景 })
                 .borderRadius(14)
+                .attributeModifier(new PressFeedback())
                 .onClick((): void => {
                   this.插入占位符($r('app.string.reminder_edit_token_new'));
                 })
@@ -248,6 +245,7 @@ export struct 提醒编辑面板 {
                 .padding({ left: 应用尺寸.间距_12, right: 应用尺寸.间距_12, top: 6, bottom: 6 })
                 .border({ width: 1, color: this.主色按钮背景 })
                 .borderRadius(14)
+                .attributeModifier(new PressFeedback())
                 .onClick((): void => {
                   this.插入占位符($r('app.string.reminder_edit_token_review'));
                 })
@@ -285,6 +283,8 @@ export struct 提醒编辑面板 {
             .backgroundColor(Color.Transparent)
             .borderRadius(应用尺寸.圆角_胶囊)
             .enabled(!this.busy)
+            .attributeModifier(new PressFeedback())
+            .stateEffect(false)
             .onClick(() => {
               this.onDelete();
             })

@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../utils/PressFeedback';
+import { AgentHistoryCoordinator } from '../model/agent/AgentHistoryCoordinator';
+import { AgentSessionState } from '../model/agent/AgentSessionState';
 import { AgentHistoryList } from '../components/agent/AgentHistoryList';
-import { createAgentMessage, cloneAgentCard, cloneAgentTrace, cloneAgentMessage, projectAgentHistory, restoreAgentMessages } from '../model/agent/AgentConversationView';
+import { createAgentMessage, cloneAgentCard, cloneAgentTrace, cloneAgentMessage } from '../model/agent/AgentConversationView';
 import type { 卡片草稿, 聊天消息 } from '../model/agent/AgentConversationView';
 import { AgentEditableCard } from '../components/agent/AgentEditableCard';
 import { AgentCardBatch } from '../model/agent/AgentCardBatch';
@@ -176,8 +179,17 @@ export struct AI制卡页 {
   private 本地范围牌组IDs: number[] = [];
   private 本地范围笔记类型IDs: number[] = [];
   private pageDisposed: boolean = false;
-  private historyLoadVersion: number = 0;
-  private historyRestoreVersion: number = 0;
+  private readonly history: AgentHistoryCoordinator = new AgentHistoryCoordinator({
+    load: loadAgentConversations,
+    save: saveAgentConversation,
+    remove: deleteAgentConversation,
+    saveCheckpoint: (id: string, state: AgentSessionState): void => {
+      if (this.checkpointStore === null) throw new Error('checkpoint_unavailable');
+      this.checkpointStore.save(id, state);
+    },
+    loadCheckpoint: (id: string): AgentSessionState | null => this.checkpointStore?.load(id) ?? null,
+    removeCheckpoint: (id: string): void => { this.checkpointStore?.remove(id); }
+  });
   private notetypeLoadVersion: number = 0;
   private readonly cardBatch: AgentCardBatch = new AgentCardBatch();
   private conversationId: string = `agent-${Date.now()}-${Math.random()}`;
@@ -268,8 +280,7 @@ export struct AI制卡页 {
 
   aboutToDisappear(): void {
     this.pageDisposed = true;
-    this.historyLoadVersion++;
-    this.historyRestoreVersion++;
+    this.history.dispose();
     if (this.agentScrollTimer >= 0) { clearTimeout(this.agentScrollTimer); this.agentScrollTimer = -1; }
     if (this.agentRunner !== null) { this.agentRunner.cancel(); }
     this.getUIContext().setKeyboardAvoidMode(this.上一键盘避让模式);
@@ -604,7 +615,7 @@ export struct AI制卡页 {
   }
 
   private 选择笔记类型(notetypeId: number): void {
-    this.historyRestoreVersion++;
+    this.history.invalidateRestore();
     this.notetypeLoadVersion++;
     if (notetypeId > 0) {
       this.加载笔记类型(notetypeId);
@@ -658,11 +669,11 @@ export struct AI制卡页 {
 
   private async 加载笔记类型(notetypeId: number, expectedRestoreVersion?: number): Promise<void> {
     const loadVersion: number = ++this.notetypeLoadVersion;
-    const restoreVersion: number = expectedRestoreVersion ?? this.historyRestoreVersion;
+    const restoreVersion: number = expectedRestoreVersion ?? this.history.version();
     try {
       const 能力: NotetypeCapabilities = await this.笔记类型服务实例.获取笔记类型能力(notetypeId);
       if (this.pageDisposed || loadVersion !== this.notetypeLoadVersion ||
-        restoreVersion !== this.historyRestoreVersion) return;
+        !this.history.isCurrent(restoreVersion)) return;
       this.已选笔记类型ID = 能力.notetypeId;
       this.笔记类型名 = 能力.name;
       this.字段名列表 = 能力.fieldNames;
@@ -671,7 +682,7 @@ export struct AI制卡页 {
       this.错误信息 = '';
     } catch (错误) {
       if (this.pageDisposed || loadVersion !== this.notetypeLoadVersion ||
-        restoreVersion !== this.historyRestoreVersion) return;
+        !this.history.isCurrent(restoreVersion)) return;
       this.已选笔记类型ID = 0;
       this.笔记类型名 = '';
       this.字段名列表 = [];
@@ -1416,116 +1427,59 @@ export struct AI制卡页 {
 
   /** @throws {Error} 会话持久化失败，由操作入口处理，不能报告已保存。 */
   private saveSessionCheckpoint(): void {
-    if (this.checkpointStore === null || this.sessionController === null) { throw new Error('checkpoint_unavailable'); }
-    this.checkpointStore.save(this.conversationId, this.sessionController.exportState());
+    this.history.checkpoint(this.conversationId, this.sessionController);
   }
 
   private async 保存当前会话历史(): Promise<void> {
+    const id: string = this.conversationId;
     try {
-      this.saveSessionCheckpoint();
-      const history = projectAgentHistory(this.消息列表, this.取本地化文案(this.pageMode === 'create' ?
-        $r('app.string.ai_agent_history_create_title') : $r('app.string.ai_agent_history_edit_title')));
-      if (history.messages.length === 0) { return; }
-      const conversation: AgentConversation = {
-        id: this.conversationId, mode: this.pageMode, title: history.title, updatedAt: Date.now(),
-        setup: this.taskSetup(),
-        messages: history.messages, audits: history.audits, sources: history.sources,
-        results: this.历史执行结果.slice()
-      };
-      await saveAgentConversation(conversation);
+      await this.history.save(id, this.pageMode, this.taskSetup(), this.消息列表, this.历史执行结果,
+        this.取本地化文案(this.pageMode === 'create' ? $r('app.string.ai_agent_history_create_title') :
+          $r('app.string.ai_agent_history_edit_title')), this.sessionController);
     } catch (error) {
-      this.错误信息 = this.取本地化文案($r('app.string.ai_agent_checkpoint_failed'));
+      if (!this.pageDisposed && id === this.conversationId) this.错误信息 = this.取本地化文案($r('app.string.ai_agent_checkpoint_failed'));
     }
   }
 
   /** 加载同模式历史到页面内列表；不再把会话伪装成 ActionMenu 按钮。 */
   private async 打开历史会话(): Promise<void> {
     if (this.pageDisposed || this.处理中 || this.文件解析中 || this.cardBatch.isRunning()) return;
-    if (this.显示历史区) {
-      this.关闭历史区();
-      return;
-    }
-    const loadVersion: number = ++this.historyLoadVersion;
+    if (this.显示历史区) { this.关闭历史区(); return; }
     this.显示历史区 = true;
     try {
-      const all: AgentConversation[] = await loadAgentConversations();
-      if (this.pageDisposed || loadVersion !== this.historyLoadVersion || !this.显示历史区) return;
-      const sameMode: AgentConversation[] = [];
-      for (const item of all) {
-        if (item.mode === this.pageMode) { sameMode.push(item); }
-      }
-      this.历史会话列表 = sameMode;
+      const items: AgentConversation[] | null = await this.history.open(this.pageMode);
+      if (items !== null) this.历史会话列表 = items;
     } catch (error) {
-      if (!this.pageDisposed && loadVersion === this.historyLoadVersion && this.显示历史区) {
-        this.错误信息 = this.取本地化文案($r('app.string.ai_agent_history_load_failed'));
-      }
+      this.错误信息 = this.取本地化文案($r('app.string.ai_agent_history_load_failed'));
     }
   }
 
   /** 恢复可见历史、协议与检索进度；旧卡片写入令牌不恢复。 */
   private async 恢复历史会话(selected: AgentConversation): Promise<void> {
     if (this.pageDisposed || this.处理中 || this.文件解析中 || this.cardBatch.isRunning()) return;
-    const restoreVersion: number = ++this.historyRestoreVersion;
-    this.关闭历史区();
-    const restored: 聊天消息[] = restoreAgentMessages(selected, (): number => this.下一个消息ID(),
-      this.取本地化文案($r('app.string.ai_agent_history_unassigned_tools')), !this.simpleMode);
+    const restored = this.history.restore(selected,
+      this.牌组选项.map((item: AI制卡牌组选项): number => item.id),
+      this.笔记类型选项.map((item: AI制卡笔记类型选项): number => item.id),
+      (): number => this.下一个消息ID(), this.取本地化文案($r('app.string.ai_agent_history_unassigned_tools')),
+      !this.simpleMode, this.sessionController);
+    this.显示历史区 = false;
     this.conversationId = selected.id;
     this.历史执行结果 = selected.results.slice();
-    this.消息列表 = restored;
-    if (this.sessionController !== null) {
-      this.sessionController.clear();
-      try {
-        const state = this.checkpointStore?.load(selected.id);
-        if (state !== undefined && state !== null) { this.sessionController.restore(state); }
-        const action: AgentAction | null = this.sessionController.getAction();
-        for (const message of restored) {
-          if (action !== null && message.action?.id === action.id) { message.action = action; }
-          else if (message.action?.status === 'pending' || message.action?.status === 'executing') {
-            message.action.status = 'cancelled';
-          }
-        }
-        this.消息列表 = restored.slice();
-        if (this.sessionController.isPaused()) {
-          const pausedMessage: 聊天消息 = this.空消息('ai', '', false);
-          pausedMessage.taskStatus = 'paused';
-          this.追加消息(pausedMessage);
-        }
-      } catch (error) { this.错误信息 = this.取本地化文案($r('app.string.ai_agent_checkpoint_failed')); }
-    }
-    let validContext: boolean = true;
-    if (this.pageMode === 'create') {
-      const deckExists: boolean = this.牌组选项.some(
-        (item: AI制卡牌组选项): boolean => item.id === selected.setup.deckId);
-      const notetypeExists: boolean = this.笔记类型选项.some(
-        (item: AI制卡笔记类型选项): boolean => item.id === selected.setup.notetypeId);
-      if (!deckExists || !notetypeExists) {
-        validContext = false;
-        this.牌组ID = deckExists ? selected.setup.deckId : 0;
-        this.已选笔记类型ID = 0;
-      } else {
-        this.牌组ID = selected.setup.deckId;
-        await this.加载笔记类型(selected.setup.notetypeId, restoreVersion);
-        if (this.pageDisposed || restoreVersion !== this.historyRestoreVersion) return;
-        validContext = this.已选笔记类型ID === selected.setup.notetypeId && this.字段名列表.length > 0;
-      }
+    this.消息列表 = restored.messages;
+    if (restored.checkpointFailed) this.错误信息 = this.取本地化文案($r('app.string.ai_agent_checkpoint_failed'));
+    this.牌组ID = restored.deckId;
+    let validContext: boolean = restored.contextValid;
+    if (restored.notetypeId > 0) {
+      await this.加载笔记类型(restored.notetypeId, restored.generation);
+      if (!this.history.isCurrent(restored.generation)) return;
+      if (this.pageMode === 'create') validContext = this.已选笔记类型ID === restored.notetypeId && this.字段名列表.length > 0;
+    } else if (this.pageMode === 'edit') {
+      this.选择笔记类型(0);
     } else {
-      const deckExists: boolean = selected.setup.deckId <= 0 || this.牌组选项.some(
-        (item: AI制卡牌组选项): boolean => item.id === selected.setup.deckId);
-      const notetypeExists: boolean = selected.setup.notetypeId <= 0 || this.笔记类型选项.some(
-        (item: AI制卡笔记类型选项): boolean => item.id === selected.setup.notetypeId);
-      this.牌组ID = deckExists ? selected.setup.deckId : 0;
-      if (notetypeExists && selected.setup.notetypeId > 0) {
-        await this.加载笔记类型(selected.setup.notetypeId, restoreVersion);
-        if (this.pageDisposed || restoreVersion !== this.historyRestoreVersion) return;
-      } else {
-        this.选择笔记类型(0);
-      }
+      this.已选笔记类型ID = 0;
     }
-    if (!validContext) {
-      this.cancelRestoredClarifications(this.取本地化文案(
-        this.牌组ID === 0 ? $r('app.string.ai_agent_setup_missing_deck') :
-          $r('app.string.ai_agent_setup_missing_notetype')));
-    }
+    if (!validContext) this.cancelRestoredClarifications(this.取本地化文案(this.牌组ID === 0 ?
+      $r('app.string.ai_agent_setup_missing_deck') : $r('app.string.ai_agent_setup_missing_notetype')));
     this.滚动到底部();
   }
 
@@ -1546,8 +1500,8 @@ export struct AI制卡页 {
 
   private 开始新会话(): void {
     if (this.pageDisposed || this.处理中 || this.文件解析中 || this.cardBatch.isRunning()) return;
-    this.historyRestoreVersion++;
-    this.historyLoadVersion++;
+    this.history.invalidateRestore();
+    this.history.close();
     this.sessionController?.clear();
     this.cancelPendingClarifications();
     this.conversationId = `agent-${Date.now()}-${Math.random()}`;
@@ -1558,7 +1512,7 @@ export struct AI制卡页 {
   }
 
   private 关闭历史区(): void {
-    this.historyLoadVersion++;
+    this.history.close();
     this.显示历史区 = false;
   }
 
@@ -1679,16 +1633,11 @@ export struct AI制卡页 {
 
   private async 执行删除历史会话(id: string): Promise<void> {
     try {
-      await deleteAgentConversation(id);
-      this.checkpointStore?.remove(id);
-      if (this.pageDisposed) return;
-      this.historyLoadVersion++;
-      this.历史会话列表 = this.历史会话列表.filter(
-        (item: AgentConversation): boolean => item.id !== id);
-      if (this.conversationId === id) { this.开始新会话(); }
+      if (!await this.history.remove(id)) return;
+      this.历史会话列表 = this.历史会话列表.filter((item: AgentConversation): boolean => item.id !== id);
+      if (this.conversationId === id) this.开始新会话();
     } catch (error) {
-      if (this.pageDisposed) return;
-      this.错误信息 = this.取本地化文案($r('app.string.ai_agent_history_delete_failed'));
+      if (!this.pageDisposed) this.错误信息 = this.取本地化文案($r('app.string.ai_agent_history_delete_failed'));
     }
   }
 
@@ -1831,6 +1780,8 @@ export struct AI制卡页 {
         .backgroundColor(this.消息列表[消息索引].变更草稿列表[草稿索引].risk === 'high_risk'
           ? $r('app.color.error_text') : this.主色按钮背景色)
         .enabled(this.消息列表[消息索引].变更草稿列表[草稿索引].status === 'pending')
+        .attributeModifier(new PressFeedback())
+        .stateEffect(false)
         .onClick((): void => { this.准备执行草稿(消息索引, 草稿索引); })
     }
     .width('100%').padding(应用尺寸.间距_10)
@@ -2105,6 +2056,8 @@ export struct AI制卡页 {
             .height(应用尺寸.按钮高度).fontSize(应用尺寸.字号_按钮)
             .backgroundColor(this.主色按钮背景色).fontColor($r('app.color.action_on_primary'))
             .borderRadius(应用尺寸.圆角_胶囊)
+            .attributeModifier(new PressFeedback())
+            .stateEffect(false)
             .onClick((): void => { this.resumePausedTask(消息索引); })
         }
         if (this.消息列表[消息索引].timeline.length === 0 && this.消息列表[消息索引].卡片列表.length > 0) {
@@ -2139,6 +2092,8 @@ export struct AI制卡页 {
             .backgroundColor(this.主色按钮背景色)
             .borderRadius(应用尺寸.圆角_胶囊)
             .enabled(this.待保存数(消息索引) > 0 && !this.消息列表[消息索引].批次保存中)
+            .attributeModifier(new PressFeedback())
+            .stateEffect(false)
             .onClick((): void => {
               this.保存批次(消息索引);
             })
@@ -2280,6 +2235,8 @@ export struct AI制卡页 {
                   .fontSize(应用尺寸.字号_正文_小)
                   .fontColor(this.动作主色)
                   .backgroundColor(Color.Transparent)
+                  .attributeModifier(new PressFeedback())
+                  .stateEffect(false)
                   .onClick((): void => { this.移除导入文件(index); })
               }
               .width('100%')
@@ -2339,6 +2296,8 @@ export struct AI制卡页 {
             .backgroundColor($r('app.color.surface_card'))
             .borderRadius(应用尺寸.圆角_胶囊)
             .enabled(!this.处理中 && !this.文件解析中 && !this.hasPendingClarification())
+            .attributeModifier(new PressFeedback())
+            .stateEffect(false)
             .onClick((): void => { this.选择并解析文件(); })
           Button(this.处理中 ? $r('app.string.ai_agent_cancel') : $r('app.string.ai_card_send'))
             .height(应用尺寸.按钮高度)
@@ -2349,6 +2308,8 @@ export struct AI制卡页 {
             .backgroundColor(this.处理中 ? this.主色按钮按下色 : this.主色按钮背景色)
             .borderRadius(应用尺寸.圆角_胶囊)
             .enabled(this.处理中 || this.canSubmit())
+            .attributeModifier(new PressFeedback())
+            .stateEffect(false)
             .onClick((): void => {
               if (this.处理中) { this.取消当前请求(); }
               else { this.发送(); }

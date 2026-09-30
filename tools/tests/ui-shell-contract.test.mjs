@@ -37,8 +37,9 @@ test('every primary page consumes the shared first-content and toolbar spacing',
   for (const name of ['首页', '统计页', '学习提醒页', '浏览页', '学习页', '添加笔记页', 'AI制卡页']) {
     const page = read(`entry/src/main/ets/pages/${name}.ets`);
     assert.match(page, /top: 应用尺寸\.页面内容顶部间距\(this\.narrowDeckLayout\)/, name);
-    assert.match(page, /top: 应用尺寸\.pageToolbarTop\(this\.状态栏高度, this\.narrowDeckLayout\)/, name);
-    assert.match(page, /bottom: 0/, name);
+    const toolbar = name === '首页' ? read('entry/src/main/ets/components/home/HomeDeckDetails.ets') : name === '添加笔记页' ? read('entry/src/main/ets/components/common/NoteEditorHeader.ets').replaceAll('this.statusBarHeight', 'this.状态栏高度').replaceAll('this.narrow', 'this.narrowDeckLayout') : page;
+    assert.match(toolbar, /top: 应用尺寸\.pageToolbarTop\(this\.状态栏高度, this\.narrowDeckLayout\)/, name);
+    assert.match(toolbar, /bottom: 0/, name);
   }
   const settings = read('entry/src/main/ets/components/设置面板.ets');
   assert.match(settings, /top: 应用尺寸\.页面内容顶部间距\(this\.narrowDeckLayout\)/);
@@ -288,8 +289,8 @@ test('hour histogram range is shared by stats page, home card and widget', () =>
   // 首页/FSRS 控制器提取时加载窗口偏好 + 分离偏好（卡片数量口径与统计页一致）
   const home = (read('entry/src/main/ets/pages/首页.ets') + read('entry/src/main/ets/backend/HomeDataRepository.ets'));
   const fsrs = read('entry/src/main/ets/model/FSRS控制器.ets');
-  assert.match(home, /提取卡片数据\(graphs, 总待学, 牌组总数, await 加载小时分布窗口\(\), await 加载分离暂停偏好\(\)\)/);
-  assert.match(fsrs, /提取卡片数据\(graphs, 总待学, 牌组总数, await 加载小时分布窗口\(\), await 加载分离暂停偏好\(\)\)/);
+  assert.match(home, /createStatsWidget\(graphs, tree,\s*await 加载小时分布窗口\(\), await 加载分离暂停偏好\(\)\)/);
+  assert.match(fsrs, /createStatsWidget\(graphs, tree, await 加载小时分布窗口\(\), await 加载分离暂停偏好\(\)\)/);
   // 两处卡片标题跟随窗口（不再固定"全部"）
   assert.doesNotMatch(summary, /小时分布（全部）'\)/);
   assert.doesNotMatch(widget, /小时分布（全部）'\)/);
@@ -346,7 +347,7 @@ test('primary pages share one shell gutter and common visual primitives', () => 
   const stats = read('entry/src/main/ets/pages/统计页.ets');
   const browser = read('entry/src/main/ets/pages/浏览页.ets');
   const reminders = read('entry/src/main/ets/pages/学习提醒页.ets');
-  const addNote = read('entry/src/main/ets/pages/添加笔记页.ets');
+  const addNote = read('entry/src/main/ets/pages/添加笔记页.ets') + read('entry/src/main/ets/components/common/NoteEditorHeader.ets');
   const agentPage = read('entry/src/main/ets/pages/AI制卡页.ets');
 
   const settingsList = settingsPanel.match(/List\(\{ space: 应用尺寸\.页面分组间距\(this\.narrowDeckLayout\)[\s\S]*?\.scrollBar\(BarState\.Off\)/)?.[0] ?? '';
@@ -428,30 +429,7 @@ test('graphs request days follow the persisted stats range preference, never der
   }
 });
 
-test('stats page load is race-guarded: stale graph responses must not overwrite newer data', () => {
-  // 2026-08-28 修复：统计页快速切换牌组/天数时多个 获取图表统计 并发，
-  // 慢的旧请求后完成会把 图表数据 覆盖成旧口径（与 2026-08-24 首页 加载链串行 同族）。
-  // 症状：下拉框显示 A 而图表是 B 的数据；切回来显示又不同；偶发"卡在同一个界面"。
-  // 修复模式：请求序号（每次加载递增，旧请求返回发现序号不匹配即丢弃）+ 请求前固化搜索串
-  //（await 后重读 取搜索串() 会把单牌组数据当全库推给桌面卡片，污染首页/桌面卡片快照）。
-  const stats = read('entry/src/main/ets/pages/统计页.ets');
-  assert.match(stats, /private 请求序号: number = 0/, '统计页须有请求序号字段');
-  assert.match(stats, /const 本次序号: number = \+\+this\.请求序号/, '加载统计数据 开头须取本次序号');
-  assert.match(stats, /const 搜索串: string = this\.取搜索串\(\)/, '搜索串须在 await 前固化');
-  // 图表返回后与 catch 里都必须有序号校验（旧数据 / 旧错误都不得落地；中间可夹诊断日志行）
-  assert.match(stats, /if \(本次序号 !== this\.请求序号\) \{\s*\n\s*\/\/ 等待期间已有更新的请求[\s\S]{0,200}?\n\s*return;/,
-    '图表返回后须校验序号丢弃旧结果');
-  assert.match(stats, /if \(本次序号 !== this\.请求序号\) \{\s*\n\s*\/\/ 旧请求的失败不作数[\s\S]{0,200}?\n\s*return;/,
-    'catch 须校验序号丢弃旧错误');
-  // 桌面卡片快照只按固化搜索串判定全库（禁止 await 后重读状态再 await 快照的旧 bug 形态）
-  assert.match(stats, /if \(搜索串 === ''\) \{\s*\n\s*await this\.刷新卡片快照\(本次序号\)/, '快照推送须用固化搜索串并传序号');
-  assert.doesNotMatch(stats, /if \(this\.取搜索串\(\) === ''\) \{\s*\n\s*await this\.刷新卡片快照/, '禁止 await 后重读 取搜索串() 判定全库');
-  // 快照内部等牌组树期间也须校验序号（防旧快照覆盖新快照）
-  assert.match(stats, /刷新卡片快照\(序号: number \| null = null\)/, '刷新卡片快照 须收可选序号');
-  assert.match(stats, /if \(序号 !== null && 序号 !== this\.请求序号\) \{\s*\n\s*return;/, '快照落盘前须校验序号');
-  // 分离复选框切换推送快照须限定全库口径（单牌组图表数据不得污染首页/桌面卡片）
-  assert.match(stats, /if \(this\.取搜索串\(\) === ''\) \{\s*\n\s*this\.刷新卡片快照\(\)\.catch/, '分离切换推送快照须限定全库');
-});
+// stats-session.test.mjs 直接执行旧结果/错误、冻结范围与卡片代次失效行为。
 
 test('stats bar heights use fixed vp arithmetic, never template percent strings', () => {
   // 2026-08-28 修复：柱高模板字符串百分比（`${x}%`）在两级百分比链（柱格 Stack height('100%')
@@ -641,7 +619,7 @@ test('graph preferences are in-chart controls without a modal (Anki autoSavingPr
     false,
     '图表偏好面板.ets 已删除（Anki 无偏好弹窗）'
   );
-  assert.doesNotMatch(statsPage, /显示偏好面板|保存偏好|onBackPress/, '统计页不得残留偏好弹窗状态/方法');
+  assert.doesNotMatch(statsPage, /显示偏好面板|保存偏好/, '统计页不得残留偏好弹窗状态/方法');
   // 历史范围两档：365/0；统计口径行的选择框切换后重新请求后端。
   assert.match(statsPage, /on天数切换\(天数: number\)/, '须有顶栏天数切换');
   assert.doesNotMatch(statsPage, /显示统计范围菜单|统计范围切换菜单/);
@@ -652,7 +630,7 @@ test('graph preferences are in-chart controls without a modal (Anki autoSavingPr
   assert.match(statsPage, /stats_history_range_year/);
   assert.match(statsPage, /stats_history_range_all/);
   // 图内偏好控件：即时写偏好（更新偏好 + 设置图表偏好）
-  assert.match(statsPage, /更新偏好\(字段: \(旧: GraphPreferences\) => GraphPreferences\)/, '须有图内偏好即时落库辅助');
+  assert.match(statsPage, /更新偏好\(change: \(old: GraphPreferences\) => GraphPreferences\)/, '须有图内偏好即时落库辅助');
   assert.match(statsPage, /on分离变更/, '卡片数量分离复选框回调');
   assert.match(statsPage, /on首日变更/, '日历星期标签切周首日回调');
   // 卡片数量图内复选框（Anki CardCounts InputBox checkbox）
@@ -768,14 +746,16 @@ test('settings directory keeps full-screen navigation and existing about content
 
 
 
+  assert.match(panel, /AboutSettings\(\{/);
+  const about = read('entry/src/main/ets/components/settings/AboutSettings.ets');
   const aboutDialog = read('entry/src/main/ets/components/settings/AboutActionDialog.ets');
-  assert.match(panel, /builder: AboutActionDialog\(/);
-  assert.match(panel, /groupNumber: this\.QQ群号/);
-  assert.match(panel, /this\.feedbackDialog\.open\(\)/);
-  assert.match(panel, /this\.sponsorDialog\.open\(\)/);
+  assert.match(about, /builder: AboutActionDialog\(/);
+  assert.match(about, /groupNumber: this\.QQ群号/);
+  assert.match(about, /this\.feedbackDialog\.open\(\)/);
+  assert.doesNotMatch(about, /sponsorDialog|app\.string\.sponsor_title/);
   assert.match(aboutDialog, /app\.string\.feedback_copy_group/);
   assert.match(aboutDialog, /app\.media\.sponsor_qrcode/);
-  assert.doesNotMatch(panel, /反馈子项展开|赞助子项展开|app\.string\.feedback_email/);
+  assert.doesNotMatch(about, /反馈子项展开|赞助子项展开|app\.string\.feedback_email/);
   assert.match(panel, /主题模式/);
 });
 

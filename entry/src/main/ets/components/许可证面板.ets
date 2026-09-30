@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { DialogFrame } from './common/DialogFrame';
+import { DialogHeader } from './common/DialogHeader';
 import { ThemeTextSpans } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
@@ -69,50 +71,15 @@ export struct 许可证面板 {
       .width('100%')
   }
 
-  build() {
-    Stack() {
-      Column()
-        .width('100%')
-        .height('100%')
-        .backgroundColor(this.isDark ? 'rgba(0,0,0,0.40)' : 'rgba(0,0,0,0.15)')
-        // 磨砂玻璃质感：模糊下层内容避免叠字，材质着色跟随应用内主题（思路参考：华为开发者文档 backgroundBlurStyle）
-        .backgroundBlurStyle(BlurStyle.Thin, {
-          colorMode: this.isDark ? ThemeColorMode.DARK : ThemeColorMode.LIGHT,
-          adaptiveColor: AdaptiveColor.DEFAULT
-        })
-        // 遮罩扩展进安全区，否则状态栏/导航条区域露出下层背景
-        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-        .onClick(() => {
-          this.onClose();
-        })
-        // 过渡仅动 opacity/translate/scale 合成属性，不触发布局（思路参考：华为官方 TransitionEffect 示例）
-        .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
+  @Builder
+  private dialogHeader() {
+    DialogHeader({ title: $r('app.string.licenses_title'), showAction: false,
+      closeLabel: $r('app.string.close'), onClose: (): void => this.onClose() })
+  }
 
-      Column({ space: 应用尺寸.间距_12 }) {
-        Row() {
-          Text($r('app.string.licenses_title'))
-            .fontSize(应用尺寸.字号_面板标题)
-            .fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.text_primary'))
-          Blank()
-          Text() { ThemeTextSpans($r('app.string.licenses_confirm'), this.themeAccentColors, this.getUIContext()) }
-            .fontSize(应用尺寸.字号_强调)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(this.动作主色)
-            .padding({
-              left: 应用尺寸.页面内边距_水平,
-              right: 应用尺寸.间距_4,
-              top: 应用尺寸.间距_8,
-              bottom: 应用尺寸.间距_8
-            })
-            .onClick(() => {
-              this.onClose();
-            })
-        }
-        .width('100%')
-
-        Scroll() {
-          Column({ space: 应用尺寸.间距_16 }) {
+  @Builder
+  private dialogContent() {
+    Column({ space: 应用尺寸.间距_16 }) {
             this.许可证段落($r('app.string.licenses_overview_section'),
               $r('app.string.licenses_overview_body'))
             this.许可证段落($r('app.string.licenses_app_section'),
@@ -129,32 +96,10 @@ export struct 许可证面板 {
               $r('app.string.licenses_trademark_body'))
             this.许可证段落($r('app.string.licenses_disclaimer_section'),
               $r('app.string.licenses_disclaimer_body'))
-          }
-          .width('100%')
-          .alignItems(HorizontalAlign.Start)
-        }
-        .layoutWeight(1)
-        .scrollBar(BarState.Off)
-        .edgeEffect(EdgeEffect.Spring)
-        .align(Alignment.Top)
-      }
-      .width('88%')
-      .constraintSize({ maxWidth: 480, maxHeight: '88%' })
-      .height('88%')
-      .padding(应用尺寸.卡片内边距)
-      .backgroundColor($r('app.color.surface_card'))
-      .borderRadius(应用尺寸.圆角_卡片)
-      .onClick(() => {
-      })
-      .transition(TransitionEffect.asymmetric(
-        TransitionEffect.opacity(0)
-          .combine(TransitionEffect.scale({ x: 0.96, y: 0.96 }))
-          .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }),
-        TransitionEffect.opacity(0)
-          .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() })
-      ))
-    }
-    .width('100%')
-    .height('100%')
+    }.width('100%').alignItems(HorizontalAlign.Start)
+  }
+
+  build() {
+    DialogFrame({ header: () => { this.dialogHeader(); }, content: () => { this.dialogContent(); }, onDismiss: (): void => this.onClose() })
   }
 }

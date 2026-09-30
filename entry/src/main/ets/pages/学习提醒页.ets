@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../utils/PressFeedback';
 import { CustomTransition } from '../utils/自定义转场';
 import { ThemeTextSpans } from '../components/common/ThemeText';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
@@ -313,6 +314,7 @@ export struct 学习提醒页 {
         .margin({ left: 12 })
       }
       .layoutWeight(1)
+      .attributeModifier(new PressFeedback())
       .onClick((): void => {
         this.编辑提醒(项);
       })
@@ -413,6 +415,11 @@ export struct 学习提醒页 {
     }
     .hideTitleBar(true)
     .backgroundColor(Color.Transparent)
+    .onBackPressed((): boolean => {
+      if (!this.显示编辑面板) return false;
+      if (!this.面板保存中) this.显示编辑面板 = false;
+      return true;
+    })
     .opacity(this.转场透明度)
     // 从编辑页 pop 返回时刷新列表。onPageShow 只对 @Entry 路由页生效，NavDestination 必须用 onShown。
     .onShown((): void => {

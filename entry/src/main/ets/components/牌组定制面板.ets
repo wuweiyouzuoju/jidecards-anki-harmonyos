@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../utils/PressFeedback';
+import { DialogBackdrop } from './common/DialogBackdrop';
 
 import type { 牌组背景动作, 牌组定制结果 } from '../model/DeckCustomization';
 import { DialogHeader } from './common/DialogHeader';
@@ -54,6 +56,14 @@ export type { 牌组背景动作, 牌组定制结果 } from '../model/DeckCustom
 
 @Component
 export struct 牌组定制面板 {
+  @Prop @Watch('handleBackRequest') backRequest: number = 0;
+
+  private handleBackRequest(): void {
+    if (this.busy) return;
+    if (this.裁剪模式) { this.取消裁剪(); return; }
+    this.onClose();
+  }
+
   @StorageProp(DECK_LIST_NARROW_KEY) private narrow: boolean = false;
   @Prop isDark: boolean = false;
   @Prop deck: 牌组汇总 = {
@@ -237,15 +247,7 @@ export struct 牌组定制面板 {
   build() {
     Stack() {
       // ---- 底层：磨砂遮罩 + 主面板 ----
-      Column()
-        .width('100%')
-        .height('100%')
-        .backgroundColor(this.isDark ? 'rgba(0,0,0,0.40)' : 'rgba(0,0,0,0.15)')
-        .backgroundBlurStyle(BlurStyle.Thin, {
-          colorMode: this.isDark ? ThemeColorMode.DARK : ThemeColorMode.LIGHT,
-          adaptiveColor: AdaptiveColor.DEFAULT
-        })
-        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+      DialogBackdrop()
         .onClick(() => { if (!this.busy && !this.裁剪模式) this.onClose(); })
         .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
 
@@ -306,6 +308,7 @@ export struct 牌组定制面板 {
               .height('100%')
               .justifyContent(FlexAlign.Center)
               .alignItems(HorizontalAlign.Center)
+              .attributeModifier(new PressFeedback())
               .onClick(() => { this.撤销移除(); })
             } else if (this.背景动作 === 'replace' && this.已裁剪像素图 !== null) {
               // 已裁剪：显示裁剪结果预览（PixelMap）
@@ -326,6 +329,8 @@ export struct 牌组定制面板 {
                 .markAnchor({ x: '100%', y: '0%' })
                 .position({ x: '100%', y: 0 })
                 .translate({ x: -4, y: 4 })
+                .attributeModifier(new PressFeedback())
+                .stateEffect(false)
                 .onClick(() => { this.标记移除(); })
             } else if (this.原像素图 !== null) {
               // 沿用原背景图（用 PixelMap 渲染，避免沙盒路径白屏）
@@ -344,6 +349,8 @@ export struct 牌组定制面板 {
                 .markAnchor({ x: '100%', y: '0%' })
                 .position({ x: '100%', y: 0 })
                 .translate({ x: -4, y: 4 })
+                .attributeModifier(new PressFeedback())
+                .stateEffect(false)
                 .onClick(() => { this.标记移除(); })
             } else {
               // 无背景图：空态
@@ -390,6 +397,8 @@ export struct 牌组定制面板 {
               .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
               .borderRadius(应用尺寸.圆角_胶囊)
               .enabled(!this.busy)
+              .attributeModifier(new PressFeedback())
+              .stateEffect(false)
               .onClick(() => { this.选取并裁剪(); })
             if (this.是否有背景()) {
               Button($r('app.string.deck_customize_background_remove'))
@@ -402,6 +411,8 @@ export struct 牌组定制面板 {
                 .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
                 .borderRadius(应用尺寸.圆角_胶囊)
                 .enabled(!this.busy)
+                .attributeModifier(new PressFeedback())
+                .stateEffect(false)
                 .onClick(() => { this.标记移除(); })
             }
           }

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../../utils/PressFeedback';
+import { 字段帮助对话框 } from '../字段帮助面板';
 import { DeckOptionRow } from './DeckOptionRow';
 import { DialogHeader } from '../common/DialogHeader';
 import { 应用尺寸 } from '../../utils/应用尺寸';
@@ -20,7 +22,7 @@ export struct DeckOptionEditor {
   onConfirm: (value: string) => void = (_value: string): void => {};
   @State private draft: string = '';
   @State private error: string = '';
-  @State private showHelp: boolean = false;
+  onHelp: () => void = (): void => {};
 
   aboutToAppear(): void { this.draft = this.initialValue; }
 
@@ -35,13 +37,10 @@ export struct DeckOptionEditor {
     Column() {
       Column({ space: 应用尺寸.间距_12 }) {
         DialogHeader({ title: this.title, actionLabel: $r('app.string.done'), showHelp: true,
-          onHelp: (): void => { this.showHelp = !this.showHelp; },
+          onHelp: (): void => { this.onHelp(); },
           onClose: (): void => { this.controller?.close(); }, onAction: (): void => { this.confirm(); } })
         Scroll() {
           Column({ space: 应用尺寸.间距_12 }) {
-            if (this.showHelp) {
-              Text(this.help).fontSize(14).fontColor($r('app.color.text_secondary')).width('100%')
-            }
             if (this.choices.length === 0) {
               TextInput({ text: this.draft })
                 .width('100%').height(应用尺寸.按钮高度).fontSize(应用尺寸.字号_正文)
@@ -56,6 +55,7 @@ export struct DeckOptionEditor {
                 .width('100%').constraintSize({ minHeight: 48 }).padding({ left: 8, right: 8 })
                 .backgroundColor(this.draft === choice.value ? $r('app.color.surface_page') : Color.Transparent)
                 .borderRadius(10)
+                .attributeModifier(new PressFeedback())
                 .onClick((): void => { this.draft = choice.value; this.error = ''; })
               }, (choice: DeckOptionChoice): string => choice.value)
             }
@@ -84,9 +84,22 @@ export struct DeckOptionField {
   onChange: (value: string) => void = (_value: string): void => {};
   @State private displayValue: string = '';
   private dialog: CustomDialogController | null = null;
+  private helpDialog: CustomDialogController | null = null;
 
   aboutToAppear(): void { this.syncValue(); }
-  aboutToDisappear(): void { this.dialog?.close(); this.dialog = null; }
+  aboutToDisappear(): void {
+    this.helpDialog?.close(); this.helpDialog = null;
+    this.dialog?.close(); this.dialog = null;
+  }
+
+  private openHelp(): void {
+    this.helpDialog = new CustomDialogController({
+      builder: 字段帮助对话框({ 标题: this.title, 正文: this.help }),
+      customStyle: true, autoCancel: true, alignment: DialogAlignment.Center,
+      width: '100%', height: '100%', maskColor: Color.Transparent
+    });
+    this.helpDialog.open();
+  }
   private syncValue(): void { this.displayValue = this.value; }
   private summary(): ResourceStr {
     const choice: DeckOptionChoice | undefined = this.choices.find((item: DeckOptionChoice): boolean =>
@@ -98,6 +111,7 @@ export struct DeckOptionField {
     if (this.busy) return;
     this.dialog = new CustomDialogController({
       builder: DeckOptionEditor({ title: this.title, help: this.help, initialValue: this.displayValue,
+        onHelp: (): void => { this.openHelp(); },
         choices: this.choices, validate: (value: string): string => this.validate(value),
         onConfirm: (value: string): void => {
           if (this.busy) return;

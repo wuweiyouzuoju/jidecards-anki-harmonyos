@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../../utils/PressFeedback';
 
 import type { AgentClarificationOption, AgentClarificationView } from '../../model/agent/AgentClarification';
 import { canAnswerClarification } from '../../model/agent/AgentClarification';
@@ -31,6 +32,8 @@ export struct AgentClarificationCard {
             this.primaryBackground : $r('app.color.surface_card'))
           .fontColor(option.id === this.clarification.selectedOptionId ?
             $r('app.color.action_on_primary') : $r('app.color.text_primary'))
+          .attributeModifier(new PressFeedback())
+          .stateEffect(false)
           .onClick((): void => { this.onOptionSelected(option.id); })
         if (option.id === this.clarification.request.recommendedOptionId) {
           Text($r('app.string.ai_agent_clarification_recommended'))
@@ -66,6 +69,8 @@ export struct AgentClarificationCard {
         .height(应用尺寸.按钮高度).fontSize(应用尺寸.字号_按钮)
         .backgroundColor(this.primaryBackground).fontColor($r('app.color.action_on_primary'))
         .borderRadius(应用尺寸.圆角_胶囊)
+        .attributeModifier(new PressFeedback())
+        .stateEffect(false)
         .onClick((): void => { this.onContinue(); })
     }
   }

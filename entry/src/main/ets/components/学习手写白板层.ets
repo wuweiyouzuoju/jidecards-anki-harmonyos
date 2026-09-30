@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../utils/PressFeedback';
 import { ThemeTextSpans } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
@@ -136,6 +137,8 @@ export struct 学习手写白板层 {
           .backgroundColor($r('app.color.surface_card'))
           .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
           .borderRadius(应用尺寸.圆角_胶囊)
+          .attributeModifier(new PressFeedback())
+          .stateEffect(false)
           .onClick((): void => {
             this.笔迹数组 = [];
             this.当前笔迹 = [];
@@ -154,6 +157,8 @@ export struct 学习手写白板层 {
           .backgroundColor($r('app.color.surface_card'))
           .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
           .borderRadius(应用尺寸.圆角_胶囊)
+          .attributeModifier(new PressFeedback())
+          .stateEffect(false)
           .onClick((): void => {
             if (this.笔迹数组.length > 0) {
               this.笔迹数组.pop();
@@ -172,6 +177,8 @@ export struct 学习手写白板层 {
           .backgroundColor($r('app.color.surface_card'))
           .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
           .borderRadius(应用尺寸.圆角_胶囊)
+          .attributeModifier(new PressFeedback())
+          .stateEffect(false)
           .onClick((): void => {
             this.笔迹数组 = [];
             this.当前笔迹 = [];

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../../utils/PressFeedback';
 
 // ========================================================
 // @块ID UI-COMMON-ERROR-001
@@ -42,6 +43,8 @@ export struct 统一错误态 {
         .fontSize(应用尺寸.字号_按钮)
         .backgroundColor($r('app.color.surface_card'))
         .fontColor($r('app.color.text_primary'))
+        .attributeModifier(new PressFeedback())
+        .stateEffect(false)
         .onClick(() => this.onRetry())
     }
     .width('100%')

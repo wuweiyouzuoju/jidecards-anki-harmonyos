@@ -14,10 +14,14 @@ function files(dir) {
   });
 }
 
-test('shared Select width is content-sized instead of reserving half the row', () => {
+test('shared Select keeps short labels compact and bounds long names with ellipsis', () => {
   const style = read('utils/SelectStyle.ets');
   assert.match(style, /fieldWidth:\s*string\s*=\s*'auto'/);
   assert.doesNotMatch(style, /fieldWidth:\s*string\s*=\s*'50%'/);
+  assert.match(style, /fieldConstraint:\s*ConstraintSizeOptions\s*=\s*\{ maxWidth: '56%' \}/);
+  assert.match(style, /labelText\(\): TextModifier[\s\S]*?\.maxLines\(1\)[\s\S]*?\.textOverflow\(\{ overflow: TextOverflow\.Ellipsis \}\)/);
+  assert.doesNotMatch(style.slice(style.indexOf('applyNormalAttribute(')), /\.textModifier\(/,
+    'Select textModifier must be applied directly; ArkUI does not support it inside attributeModifier');
 });
 
 // Native Select can restore system geometry after a selection. Every caller must
@@ -36,6 +40,10 @@ test('all native selects reserve layout space and directly reapply geometry', ()
         assert.match(control, new RegExp(`\\.${property}\\(SelectStyle\\.control`), `${path}: ${property}`);
       }
       assert.match(control, /\.(width|layoutWeight)\(/, `content-dependent width: ${path}`);
+      assert.match(control, /\.textModifier\(SelectStyle\.labelText\(\)\)/, `missing shared ellipsis: ${path}`);
+      if (control.includes('.width(SelectStyle.fieldWidth)')) {
+        assert.match(control, /\.constraintSize\(SelectStyle\.fieldConstraint\)/, `unbounded field width: ${path}`);
+      }
       count++;
     }
   }
@@ -48,7 +56,8 @@ test('browser subtitle choices share aligned theme selection and dismissal', () 
   const item = read('components/common/MenuItem.ets');
   const page = read('pages/浏览页.ets');
   assert.doesNotMatch(menu, /[✓✔]/);
-  assert.match(item, /\.textAlign\(TextAlign\.Center\)/);
+  assert.match(item, /@Prop labelAlignment: TextAlign = TextAlign\.Center/);
+  assert.match(item, /\.textAlign\(this\.labelAlignment\)/);
   assert.match(item, /this\.selected \? this\.accent/);
   assert.match(item, /themeLabelGlyphs\(this\.label, this\.accentColors/);
   for (const index of [1, 4, 2]) {

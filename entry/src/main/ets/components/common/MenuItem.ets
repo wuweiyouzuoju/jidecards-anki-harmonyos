@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../../utils/PressFeedback';
 import { DisclosureChevron } from './DisclosureChevron';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 颜色键 } from '../../model/颜色主题';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 import { ThemeLabelGlyph, themeLabelGlyphs } from './ThemeText';
 
-/** 所有顶部菜单统一行高、居中对齐、分隔线及选中主题色。 */
+/** 菜单和表单展开行共享尺寸、箭头及选中主题色；表单标题可左对齐。 */
 @Component
 export struct AnchoredMenuItem {
   @Prop label: ResourceStr = '';
+  @Prop labelAlignment: TextAlign = TextAlign.Center;
   @Prop selected: boolean = false;
   @Prop available: boolean = true;
   @Prop divider: boolean = false;
@@ -38,9 +40,9 @@ export struct AnchoredMenuItem {
         .fontColor(this.selected ? this.accent : $r('app.color.text_primary'))
         .width('100%')
         .constraintSize({ minHeight: 应用尺寸.menuItemHeight })
-        .padding({ left: this.disclosure ? 28 : 应用尺寸.menuHorizontalPadding,
+        .padding({ left: this.labelAlignment === TextAlign.Start ? 0 : (this.disclosure ? 28 : 应用尺寸.menuHorizontalPadding),
           right: this.disclosure ? 28 : 应用尺寸.menuHorizontalPadding, top: 8, bottom: 8 })
-        .textAlign(TextAlign.Center)
+        .textAlign(this.labelAlignment)
         if (this.disclosure) {
           DisclosureChevron({ tint: $r('app.color.text_secondary') })
             .rotate({ angle: this.expanded ? 90 : 0 })
@@ -49,7 +51,8 @@ export struct AnchoredMenuItem {
             .hitTestBehavior(HitTestMode.None)
         }
       }
-      .width('100%').opacity(this.available ? 1 : 0.4)
+      .width('100%')
+      .attributeModifier(new PressFeedback())
       .enabled(this.available)
       .onClick((): void => { this.onSelect(); })
     }.width('100%')

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { DialogBackdrop } from '../common/DialogBackdrop';
 import { resourceText, showToastSafely } from '../../utils/UiFeedback';
 import { SelectStyle } from '../../utils/SelectStyle';
 
@@ -45,6 +46,12 @@ interface 排序选项 {
 
 @Component
 export struct 创建过滤牌组面板 {
+  @Prop @Watch('handleBackRequest') backRequest: number = 0;
+
+  private handleBackRequest(): void {
+    if (!(this.处理中)) this.onClose();
+  }
+
   @Prop isDark: boolean = false;
   onClose: () => void = (): void => {};
   onSuccess: () => void = (): void => {};
@@ -127,15 +134,7 @@ export struct 创建过滤牌组面板 {
 
   build() {
     Stack() {
-      Column()
-        .width('100%')
-        .height('100%')
-        .backgroundColor(设置面板色板_取(this.isDark).遮罩)
-        .backgroundBlurStyle(BlurStyle.Thin, {
-          colorMode: this.isDark ? ThemeColorMode.DARK : ThemeColorMode.LIGHT,
-          adaptiveColor: AdaptiveColor.DEFAULT
-        })
-        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+      DialogBackdrop()
         .onClick(() => {
           if (!this.处理中) {
             this.onClose();
@@ -219,6 +218,7 @@ export struct 创建过滤牌组面板 {
             .padding(SelectStyle.controlPadding)
             .space(SelectStyle.controlSpace)
             .font(SelectStyle.controlFont)
+            .textModifier(SelectStyle.labelText())
             .borderRadius(SelectStyle.controlRadius)
             .onSelect((index: number) => {
               if (index >= 0 && index < this.排序选项列表.length) {

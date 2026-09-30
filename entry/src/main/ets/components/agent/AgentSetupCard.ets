@@ -52,7 +52,9 @@ export struct AgentSetupCard {
           .padding(SelectStyle.controlPadding)
           .space(SelectStyle.controlSpace)
           .width(SelectStyle.fieldWidth)
+          .constraintSize(SelectStyle.fieldConstraint)
           .font(SelectStyle.controlFont)
+          .textModifier(SelectStyle.labelText())
           .borderRadius(SelectStyle.controlRadius)
           .onSelect((index: number): void => {
             if (index >= 0 && index < this.deckOptions.length) {
@@ -72,7 +74,9 @@ export struct AgentSetupCard {
           .padding(SelectStyle.controlPadding)
           .space(SelectStyle.controlSpace)
           .width(SelectStyle.fieldWidth)
+          .constraintSize(SelectStyle.fieldConstraint)
           .font(SelectStyle.controlFont)
+          .textModifier(SelectStyle.labelText())
           .borderRadius(SelectStyle.controlRadius)
           .onSelect((index: number): void => {
             if (index >= 0 && index < this.notetypeOptions.length) {
@@ -93,7 +97,9 @@ export struct AgentSetupCard {
           .padding(SelectStyle.controlPadding)
           .space(SelectStyle.controlSpace)
           .width(SelectStyle.fieldWidth)
+          .constraintSize(SelectStyle.fieldConstraint)
           .font(SelectStyle.controlFont)
+          .textModifier(SelectStyle.labelText())
           .borderRadius(SelectStyle.controlRadius)
           .onSelect((index: number): void => {
             if (index === 0) { this.onDeckSelected(0); }
@@ -114,7 +120,9 @@ export struct AgentSetupCard {
           .padding(SelectStyle.controlPadding)
           .space(SelectStyle.controlSpace)
           .width(SelectStyle.fieldWidth)
+          .constraintSize(SelectStyle.fieldConstraint)
           .font(SelectStyle.controlFont)
+          .textModifier(SelectStyle.labelText())
           .borderRadius(SelectStyle.controlRadius)
           .onSelect((index: number): void => {
             if (index === 0) { this.onNotetypeSelected(0); }

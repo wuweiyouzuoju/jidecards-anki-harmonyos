@@ -9,7 +9,7 @@ import { CustomStudyCardKind, 自定义学习预设 } from '../../entry/src/main
 const source = readFileSync(new URL('../../entry/src/main/ets/components/home/自定义学习对话框.ets', import.meta.url), 'utf8');
 const logic = (source.slice(0, source.indexOf('  @Builder')) + '\n}')
   .replace(/^import[^;]+;\s*/gm, '')
-  .replace(/@(Component|State|Prop|StorageProp)(?:\([^\n]*?\))?\s*/g, '')
+  .replace(/@(Component|State|Prop|StorageProp|Watch)(?:\([^\n]*?\))?\s*/g, '')
   .replace('export struct 自定义学习对话框', 'class Dialog');
 const defaults = { tags: [{ name: 'alpha', include: true, exclude: false }, { name: 'beta', include: false, exclude: true }],
   extendNew: 12, extendReview: 34, availableNew: 5, availableNewInChildren: 7, availableReview: 8, availableReviewInChildren: 0 };

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../../utils/PressFeedback';
+import { HelpLabel } from './HelpLabel';
 import { ThemeLabelGlyph, themeLabelGlyphs } from './ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
@@ -23,20 +25,23 @@ export struct DialogHeader {
   onAction: () => void = (): void => {};
   onClose: () => void = (): void => {};
   @StorageProp(颜色键.动作主色) private actionColor: string = '#2F5FD0';
-  @State private actionPressed: boolean = false;
 
   build() {
-    Row() {
+    Stack({ alignContent: Alignment.Center }) {
+      Row() {
       Row() {
       if (this.showClose) {
         Button(this.closeLabel)
           .type(ButtonType.Normal)
           .height(44)
+          .constraintSize({ maxWidth: '100%' })
           .padding({ left: 4, right: 4 })
           .fontSize(14)
           .fontColor($r('app.color.text_secondary'))
           .backgroundColor(Color.Transparent)
           .borderRadius(10)
+          .attributeModifier(new PressFeedback())
+          .stateEffect(false)
           .enabled(this.closeEnabled)
           .onClick((): void => {
             if (this.closeEnabled) { this.onClose(); }
@@ -45,33 +50,7 @@ export struct DialogHeader {
       }
       .width('28%')
       .justifyContent(FlexAlign.Start)
-      Row() {
-        Text(this.title)
-        .fontSize(18)
-        .fontWeight(FontWeight.Bold)
-        .fontColor($r('app.color.text_primary'))
-        .textAlign(TextAlign.Center)
-        .flexShrink(1)
-        .padding({ left: 4, right: 4 })
-        .maxLines(2)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-        if (this.showHelp) {
-          Button($r('app.string.field_help_button'))
-            .type(ButtonType.Normal)
-            .width(28)
-            .height(40)
-            .padding(0)
-            .fontSize(18)
-            .fontColor($r('app.color.text_secondary'))
-            .backgroundColor(Color.Transparent)
-            .enabled(this.helpEnabled)
-            .onClick((): void => {
-              if (this.helpEnabled) { this.onHelp(); }
-            })
-        }
-      }
-      .width('44%')
-      .justifyContent(FlexAlign.Center)
+      Blank().layoutWeight(1)
       Row() {
       Button() {
         Text() {
@@ -85,7 +64,7 @@ export struct DialogHeader {
         }.fontSize(14).fontWeight(FontWeight.Medium).fontColor(this.destructive ? $r('app.color.error_text') : this.actionColor)
       }
         .type(ButtonType.Normal)
-        .height(40)
+        .height(44)
         .padding({ left: 4, right: 4 })
         .constraintSize({ maxWidth: '100%' })
         .fontSize(14)
@@ -94,22 +73,19 @@ export struct DialogHeader {
         .backgroundColor(Color.Transparent)
         .borderRadius(12)
         .visibility(this.showAction ? Visibility.Visible : Visibility.Hidden)
+        .attributeModifier(new PressFeedback())
+        .stateEffect(false)
         .enabled(this.actionEnabled)
-        .scale({ x: this.actionPressed ? 0.97 : 1, y: this.actionPressed ? 0.97 : 1 })
-        .animation({ duration: 80, curve: Curve.EaseOut })
-        .onTouch((event: TouchEvent): void => {
-          if (event.type === TouchType.Down) {
-            this.actionPressed = true;
-          } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-            this.actionPressed = false;
-          }
-        })
         .onClick((): void => {
           if (this.actionEnabled) { this.onAction(); }
         })
       }
       .width('28%')
       .justifyContent(FlexAlign.End)
+      }.width('100%')
+      HelpLabel({ title: this.title, textSize: 18, textWeight: FontWeight.Bold,
+        centered: true, showHelp: this.showHelp, isHelpEnabled: this.helpEnabled, onHelp: this.onHelp })
+        .width('44%')
     }
     .width('100%')
     .constraintSize({ minHeight: 48 })

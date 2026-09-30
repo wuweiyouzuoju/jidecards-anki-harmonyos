@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { compileWithUiFeedback } from './ui-feedback-harness.mjs';
+import { AgentHistoryCoordinator } from '../../entry/src/main/ets/model/agent/AgentHistoryCoordinator.ts';
 
 const read = path => readFileSync(new URL('../../' + path, import.meta.url), 'utf8');
 function methods(path, names, dependencies) {
@@ -56,6 +57,8 @@ test('history deletion handles both storage and checkpoint errors without an unh
     });
     const page = new Page();
     Object.assign(page, { conversationId: 'one', 历史会话列表: [{ id: 'one' }, { id: 'two' }],
+      history: new AgentHistoryCoordinator({ remove: async () => { if (failure === 'history') throw Error('disk'); },
+        removeCheckpoint: () => { if (failure === 'checkpoint') throw Error('checkpoint'); } }),
       checkpointStore: { remove() { if (failure === 'checkpoint') throw Error('checkpoint'); } },
       取本地化文案: key => key, 开始新会话: () => { resets++; }
     });
@@ -73,6 +76,7 @@ test('history list ignores an older load after close and reopen', async () => {
   });
   const page = new Page();
   Object.assign(page, { pageDisposed: false, 处理中: false, 文件解析中: false,
+    history: new AgentHistoryCoordinator({ load: () => new Promise(resolve => pending.push(resolve)) }),
     cardBatch: { isRunning: () => false }, 显示历史区: false, pageMode: 'create',
     historyLoadVersion: 0, 历史会话列表: [], 取本地化文案: value => value, $r: value => value });
 
@@ -94,6 +98,7 @@ test('late notetype capabilities cannot overwrite a newer choice or a new conver
   });
   const page = new Page();
   Object.assign(page, { pageDisposed: false, historyRestoreVersion: 0, notetypeLoadVersion: 0,
+    history: new AgentHistoryCoordinator({}),
     取本地化文案: value => value,
     笔记类型服务实例: { 获取笔记类型能力: () => new Promise((resolve, reject) => pending.push({ resolve, reject })) }
   });
@@ -111,8 +116,8 @@ test('late notetype capabilities cannot overwrite a newer choice or a new conver
   pending[2].resolve(capability(3));
   await clearing;
   assert.equal(page.已选笔记类型ID, 0);
-  const restoring = page.加载笔记类型(4, page.historyRestoreVersion);
-  page.historyRestoreVersion++;
+  const restoring = page.加载笔记类型(4, page.history.version());
+  page.history.invalidateRestore();
   pending[3].resolve(capability(4));
   await restoring;
   assert.equal(page.已选笔记类型ID, 0);

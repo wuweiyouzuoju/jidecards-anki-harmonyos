@@ -65,7 +65,7 @@ test('home and settings share the transfer session and platform export workflow'
 test('add-note exposes image occlusion and other notetypes and type-answer submits on Enter', () => {
   // 图片遮盖和 Basic 变种均在创建入口展示。
   const addNote = read('entry/src/main/ets/pages/添加笔记页.ets');
-  assert.match(addNote, /笔记类型选项 = 名称列表\.map/);
+  assert.match(addNote, /笔记类型选项 = state\.types/);
   assert.doesNotMatch(addNote, /名称列表\.filter/);
   assert.doesNotMatch(addNote, /是隐藏的笔记类型变种/);
   assert.doesNotMatch(addNote, /暂不做 UI 适配/);
@@ -73,9 +73,7 @@ test('add-note exposes image occlusion and other notetypes and type-answer submi
   assert.match(addNote, /Basic反转笔记类型名集合\.indexOf/);
   assert.match(addNote, /Basic可选反转笔记类型名集合\.indexOf/);
   assert.match(addNote, /Basic输入答案笔记类型名集合\.indexOf/);
-  // 已删除的默认类型必须回退到可见类型。
-  assert.match(addNote, /默认ID可见/);
-  assert.match(addNote, /默认笔记类型ID = this\.笔记类型选项\[0\]\.id/);
+  // 默认类型回退与完整列表在 note-creation-session 中直接验证。
 
   // Type-in-the-Answer 对齐桌面端：输入框回车 = 显示答案（比对结果在背面注入）
   const study = read('entry/src/main/ets/pages/学习页.ets');
@@ -86,16 +84,10 @@ test('add-note exposes image occlusion and other notetypes and type-answer submi
 test('stock notetype restore covers basic variants, cloze and image occlusion', () => {
   // 2026-08-29：兜底恢复清单必须覆盖 stock kind 0/1/2/3/4；
   // 图片遮盖通过专属服务补建。
-  const addNote = read('entry/src/main/ets/pages/添加笔记页.ets');
-  assert.match(addNote, /获取标准笔记类型JSON\(标准笔记类型种类\.BASIC\)/);
-  assert.match(addNote, /获取标准笔记类型JSON\(标准笔记类型种类\.BASIC_AND_REVERSED\)/);
-  assert.match(addNote, /获取标准笔记类型JSON\(标准笔记类型种类\.BASIC_OPTIONAL_REVERSED\)/);
-  assert.match(addNote, /获取标准笔记类型JSON\(标准笔记类型种类\.BASIC_TYPING\)/);
-  assert.match(addNote, /获取标准笔记类型JSON\(标准笔记类型种类\.CLOZE\)/);
-  assert.doesNotMatch(addNote, /获取标准笔记类型JSON\(标准笔记类型种类\.IMAGE_OCCLUSION\)/);
-  assert.match(addNote, /图片遮罩服务实例\.添加图片遮罩笔记类型\(\)/);
+  // 五种 Core 类型、已存在别名与图片遮盖专用服务在 note-creation-session 中执行验证。
   const study = read('entry/src/main/ets/pages/学习页.ets');
   const preview = read('entry/src/main/ets/components/browser/卡片预览页.ets');
-  assert.match(study, /anki\.imageOcclusion\.setup\(\)/);
-  assert.match(preview, /anki\.imageOcclusion\.setup\(\)/);
+  assert.match(study, /new CardWebView\(/);
+  assert.match(preview, /new CardWebView\(/);
+  assert.match(read('entry/src/main/ets/model/CardReviewerRuntime.ts'), /anki\.imageOcclusion\.setup\(\)/);
 });

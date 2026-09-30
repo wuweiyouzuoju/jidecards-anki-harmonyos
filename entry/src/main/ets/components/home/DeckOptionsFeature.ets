@@ -9,11 +9,18 @@ import { namedResourceText } from '../../utils/UiFeedback';
 import { 牌组选项面板 } from '../牌组选项面板';
 import { 统一加载态 } from '../common/统一加载态';
 import { 统一错误态 } from '../common/统一错误态';
+import { DialogFrame } from '../common/DialogFrame';
 import { DialogHeader } from '../common/DialogHeader';
 
 /** 表单和提交状态随功能挂载，首页只持有打开目标与占用事实。 */
 @Component
 export struct DeckOptionsFeature {
+  @Prop @Watch('handleBackRequest') backRequest: number = 0;
+
+  private handleBackRequest(): void {
+    if (this.form === null || this.options === null) this.onClose();
+  }
+
   deckId: number = 0;
   deckName: string = '';
   @Prop isDark: boolean = false;
@@ -28,7 +35,7 @@ export struct DeckOptionsFeature {
   aboutToAppear(): void {
     this.session = new DeckOptionsSession(this.deckId, new AnkiDeckOptions(), (state: DeckOptionsSnapshot): void => {
       this.state = state;
-      this.onBusy(state.phase === 'loading' || state.phase === 'saving');
+      this.onBusy(state.phase === 'saving');
       if (state.phase === 'ready' && this.form === null && state.view !== null && state.config?.config !== null && state.config !== null) {
         this.form = 牌组配置表单.从配置创建(state.config.config!);
         const view = state.view;
@@ -54,21 +61,29 @@ export struct DeckOptionsFeature {
     this.session?.save(draft.config, draft.shared, draft.options);
   }
 
+  @Builder
+  private statusHeader() {
+    DialogHeader({ title: $r('app.string.deck_options_title'), showAction: false,
+      onClose: (): void => this.onClose() })
+  }
+
+  @Builder
+  private statusBody() {
+    if (this.state.phase === 'loading') {
+      统一加载态({ 文案: $r('app.string.browser_loading') })
+    } else {
+      统一错误态({ 文案: this.state.error, onRetry: (): void => { this.session?.load(); } })
+    }
+  }
+
   build() {
     if (this.form !== null && this.options !== null) {
-      牌组选项面板({ isDark: this.isDark, deckName: this.deckName, form: this.form, options: this.options,
+      牌组选项面板({ backRequest: this.backRequest, isDark: this.isDark, deckName: this.deckName, form: this.form, options: this.options,
         busy: this.state.phase === 'saving', errorMessage: this.validationError || this.state.error,
         onCancel: (): void => { if (this.state.phase !== 'saving') this.onClose(); },
         onSave: (form: 牌组配置表单, options: 牌组选项编辑): void => this.save(form, options) })
     } else {
-      Column() {
-        DialogHeader({ title: $r('app.string.deck_options_title'), onClose: (): void => this.onClose() })
-        if (this.state.phase === 'loading') {
-          统一加载态({ 文案: $r('app.string.browser_loading') })
-        } else {
-          统一错误态({ 文案: this.state.error, onRetry: (): void => { this.session?.load(); } })
-        }
-      }.width('100%').height('100%').backgroundColor($r('app.color.surface_page'))
+      DialogFrame({ header: () => { this.statusHeader(); }, content: () => { this.statusBody(); }, onDismiss: (): void => this.onClose() })
     }
   }
 }

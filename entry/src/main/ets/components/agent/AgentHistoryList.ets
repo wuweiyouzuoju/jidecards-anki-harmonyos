@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../../utils/PressFeedback';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 颜色键 } from '../../model/颜色主题';
 import { PAGE_SURFACE_KEY } from '../../model/ThemeCatalog';
@@ -51,12 +52,15 @@ export struct AgentHistoryList {
                     .width('100%')
                 }
                 .layoutWeight(1)
+                .attributeModifier(new PressFeedback())
                 .onClick((): void => { this.onRestore(item); })
                 Button($r('app.string.ai_agent_history_delete'))
                   .height(应用尺寸.按钮高度)
                   .fontSize(应用尺寸.字号_按钮)
                   .fontColor($r('app.color.error_text'))
                   .backgroundColor(Color.Transparent)
+                  .attributeModifier(new PressFeedback())
+                  .stateEffect(false)
                   .onClick((): void => { this.onDelete(item); })
               }
               .width('100%')

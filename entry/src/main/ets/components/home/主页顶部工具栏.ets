@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../../utils/PressFeedback';
 import { DECK_LIST_NARROW_KEY } from '../../model/DeckListAppearance';
 import { ThemeDefinition, themeDefinition, THEME_VISUALS_KEY } from '../../model/ThemeCatalog';
 
@@ -91,6 +92,8 @@ export struct 主页顶部工具栏 {
           .padding(0)
           .backgroundColor(Color.Transparent)
           .accessibilityText(this.syncStatusText)
+          .attributeModifier(new PressFeedback())
+          .stateEffect(false)
           .onClick((): void => { this.onSyncDetails(); })
         }
         .justifyContent(FlexAlign.Center)

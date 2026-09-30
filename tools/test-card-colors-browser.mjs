@@ -11,7 +11,8 @@ const browser = await chromium.launch({ headless: true, channel: 'msedge' });
 const page = await browser.newPage();
 await page.route('**/*', route => route.abort());
 const cases = [
-  { name: 'default', css: '', light: '#1A1A1A', dark: '#E6E6E6' },
+  { name: 'default', css: '', light: '#1A1A1A', dark: '#E6E6E6',
+    background: '#FFFFFF', darkBackground: '#18202B' },
   { name: 'standard Anki card', css: '.card { color: black; background-color: white; }',
     light: '#000000', dark: '#000000', background: '#FFFFFF' },
   { name: 'body template', css: 'body { color: #333333; background: #FAFAFA; }',
@@ -42,13 +43,16 @@ try {
           return {
             text: toHex(getComputedStyle(document.querySelector('#text')).color),
             emphasis: toHex(getComputedStyle(document.querySelector('#emphasis')).color),
-            background: getComputedStyle(document.body).backgroundColor
+            background: getComputedStyle(document.body).backgroundColor,
+            bodyHeight: document.body.getBoundingClientRect().height,
+            viewportHeight: window.innerHeight
           };
         });
         const name = `${item.name} / ${dark ? 'dark' : 'light'} / ${side}`;
         try {
           assert.equal(actual.text, dark ? item.dark : item.light, name);
           assert.equal(actual.emphasis, '#D05030', 'preserve explicit field colors');
+          assert.ok(actual.bodyHeight >= actual.viewportHeight, `${name}: body background fills the card`);
           const expectedBackground = (dark && item.darkBackground) || item.background;
           let background = dark ? '#18202B' : '#FFFFFF';
           if (expectedBackground) {

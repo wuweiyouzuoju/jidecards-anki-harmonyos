@@ -40,11 +40,11 @@ test('dialogs enter gently and leave with opacity only', () => {
 });
 
 test('navigation applies one fade transition including the home boundary', () => {
-  const home = read('entry/src/main/ets/pages/首页.ets');
+  const home = read('entry/src/main/ets/utils/HomeNavigationTransition.ets');
   assert.doesNotMatch(home, /from\.index === -1 \|\| to\.index === -1/);
-  assert.match(home, /const context: UIContext \| undefined = this\.getUIContext\(\)/);
+  assert.match(home, /const context: UIContext \| undefined = this\.host\.getUIContext\(\)/);
   assert.match(home, /if \(context === undefined\) \{\s*showDestination\(\);\s*transitionProxy\.finishTransition\(\);/);
-  const fade = home.slice(home.indexOf('private 自定义转场回调('), home.indexOf('// @名称 页面映射'));
+  const fade = home;
   assert.match(fade, /const 转场曲线: Curve = Curve\.EaseOut/);
   assert.match(fade, /expectedFrameRateRange: \{ min: 60, max: 120, expected: 60 \}/);
   assert.match(fade, /onFinish:[\s\S]*?transitionProxy\.finishTransition\(\)/);
@@ -65,15 +65,16 @@ test('navigation applies one fade transition including the home boundary', () =>
   }
 });
 
-test('press and disclosure feedback use the shared fast rhythm', () => {
+test('plain buttons share PressFeedback without a second touch animation', () => {
   const batch = read('entry/src/main/ets/components/browser/批量操作栏.ets');
-  assert.equal((batch.match(/\.animation\(\{ duration: 80, curve: Curve\.EaseOut \}\)/g) ?? []).length, 9);
-  assert.match(batch, /backgroundColor\(\$r\('app\.color\.surface_card'\)\)[\s\S]*?opacity\(this\.已按下 === 8 \? 0\.82 : 1\)[\s\S]*?this\.已按下 = 8/);
-
+  assert.equal((batch.match(/Button\(/g) ?? []).length, 9);
+  assert.doesNotMatch(batch, /onTouch\(|已按下|\.animation\(/);
+  assert.equal((batch.match(/\.enabled\(!this.busy\)/g) ?? []).length, 9);
+  assert.equal((batch.match(/new PressFeedback\(/g) ?? []).length, 9);
   const info = read('entry/src/main/ets/components/browser/卡片信息.ets');
   assert.match(info, /DialogHeader\(\{/);
   const header = read('entry/src/main/ets/components/common/DialogHeader.ets');
-  assert.match(header, /scale\(\{ x: this\.actionPressed[\s\S]*?\.animation\(\{ duration: 80, curve: Curve\.EaseOut \}\)/);
+  assert.doesNotMatch(header, /onTouch\(|actionPressed|\.scale\(|\.animation\(/);
 
   for (const path of [
     'entry/src/main/ets/components/高级牌组选项面板.ets',

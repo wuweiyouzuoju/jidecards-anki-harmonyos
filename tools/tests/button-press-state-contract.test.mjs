@@ -38,20 +38,19 @@ test('settings detail content stays visible without accordion state', () => {
   assert.match(shell, /this\.内容\(\)/);
 });
 
-test('study actions use isolated component state', () => {
+test('study actions use isolated native press surfaces without touch-driven component rebuilds', () => {
   const page = read('entry/src/main/ets/pages/学习页.ets');
   const buttonUrl = new URL('../../entry/src/main/ets/components/StudyActionButton.ets', import.meta.url);
   assert.ok(existsSync(buttonUrl), 'isolated StudyActionButton component must exist');
   const button = read('entry/src/main/ets/components/StudyActionButton.ets');
   assert.doesNotMatch(page, /按下评分|BURY_RATING_TAG|SUSPEND_RATING_TAG/);
   assert.equal((page.match(/StudyActionButton\(\{/g) ?? []).length, 4);
-  assert.match(button, /@State private isPressed: boolean = false/);
-  assert.match(button, /TouchType\.Down[\s\S]*?this\.isPressed = true/);
-  assert.match(button, /TouchType\.Up[\s\S]*?TouchType\.Cancel[\s\S]*?this\.isPressed = false/);
+  assert.doesNotMatch(button, /@State|onTouch\(|\.animation\(/);
+  assert.match(button, /new GlassSurface\(this.glassColors, this.fillColor\)/);
   assert.match(button, /\.stateEffect\(false\)/);
 });
 
-test('help buttons do not carry the disproven native-effect workaround', () => {
+test('help buttons use the shared press feedback as the sole feedback owner', () => {
   for (const path of [
     'entry/src/main/ets/components/settings/设置分组卡片.ets',
     'entry/src/main/ets/components/settings/布局分组.ets',
@@ -59,12 +58,28 @@ test('help buttons do not carry the disproven native-effect workaround', () => {
     'entry/src/main/ets/components/settings/ReviewControlsSettings.ets',
   ]) {
     const source = read(path);
-    const blocks = source.split("Button($r('app.string.field_help_button'))").slice(1);
-    assert.ok(blocks.length > 0, `${path}: expected at least one help button`);
-    for (const block of blocks) {
-      const click = block.indexOf('.onClick(');
-      assert.notEqual(click, -1, `${path}: help button click handler missing`);
-      assert.doesNotMatch(block.slice(0, click), /\.stateEffect\(false\)/, path);
+    assert.match(source, /HelpLabel\(/, `${path}: expected shared help label`);
+  }
+  const button = read('entry/src/main/ets/components/common/HelpButton.ets');
+  assert.match(button, /\.onClick\(/);
+  assert.match(button, /new PressFeedback\(/);
+  assert.match(button, /\.stateEffect\(false\)/);
+});
+
+// The surface behavior itself is executed in theme-text.test.mjs; these checks audit every caller.
+test('all custom press surfaces use one native feedback owner', () => {
+  for (const file of ['components/common/按下态按钮.ets', 'components/StudyActionButton.ets',
+    'components/开始学习按钮.ets', 'components/学习浮动工具栏.ets', 'components/牌组详情面板.ets']) {
+    const source = read('entry/src/main/ets/' + file);
+    assert.doesNotMatch(source, /onTouch\(|duration: 80/, file);
+    const surfaces = [...source.matchAll(/\.attributeModifier\(new (?:Primary)?GlassSurface\([^\n]+\)\)([\s\S]*?)\.onClick/g)];
+    assert.ok(surfaces.length > 0, file);
+    // Deck 'More' is a clickable Row with no native Button effect; only its three Buttons need the opt-out.
+    const buttons = file.endsWith('牌组详情面板.ets') ? surfaces.slice(1) : surfaces;
+    if (file.endsWith('牌组详情面板.ets')) {
+      assert.equal(surfaces.length, 4);
+      assert.doesNotMatch(surfaces[0][1], /stateEffect/);
     }
+    for (const surface of buttons) assert.match(surface[1], /\.stateEffect\(false\)/, file);
   }
 });

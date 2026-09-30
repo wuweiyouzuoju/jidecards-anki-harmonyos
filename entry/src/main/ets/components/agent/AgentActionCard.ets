@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PressFeedback } from '../../utils/PressFeedback';
 import { ThemeTextSpans } from '../common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
@@ -74,11 +75,15 @@ export struct AgentActionCard {
         Row({ space: 12 }) {
           Button() {
             Text() { ThemeTextSpans($r('app.string.ai_agent_action_cancel'), this.themeAccentColors, this.getUIContext()) }.fontSize(应用尺寸.字号_按钮).fontColor(this.actionColor)
-          }.enabled(!this.disabled).onClick(this.onCancel)
+          }.enabled(!this.disabled).attributeModifier(new PressFeedback())
+          .stateEffect(false)
+          .onClick(this.onCancel)
             .height(应用尺寸.按钮高度).fontSize(应用尺寸.字号_按钮)
             .backgroundColor($r('app.color.surface_card')).fontColor(this.actionColor)
             .borderRadius(应用尺寸.圆角_胶囊)
-          Button($r('app.string.ai_agent_action_confirm')).enabled(!this.disabled).onClick(this.onConfirm)
+          Button($r('app.string.ai_agent_action_confirm')).enabled(!this.disabled).attributeModifier(new PressFeedback())
+          .stateEffect(false)
+          .onClick(this.onConfirm)
             .height(应用尺寸.按钮高度).fontSize(应用尺寸.字号_按钮)
             .backgroundColor(this.primaryBackground).fontColor($r('app.color.action_on_primary'))
             .borderRadius(应用尺寸.圆角_胶囊)
