@@ -4,13 +4,14 @@
 
 | UI 语义 | 唯一实现 | 自动检查 |
 | --- | --- | --- |
+| 内置笔记类型与字段的本地化显示 | [NoteTypeText.ets](../../utils/NoteTypeText.ets) / [NoteTypePresentation.ts](../../model/NoteTypePresentation.ts)；字段标题与提示统一由 NoteFieldCard 调用，保留原始名称与模板引用 | `note-type-i18n.test.mjs`；边界见 [浏览与编辑](../../../../../../docs/development/browser-stats.md#内置名称的统一显示) |
 | 新增/编辑顶栏与字段卡片 | [NoteEditorHeader.ets](NoteEditorHeader.ets)、[NoteFieldCard.ets](NoteFieldCard.ets)；独立 EditNotePage 和新增页共享，草稿归宿主 | `editor-page.test.mjs`、`ui-shell-contract.test.mjs` |
 | 笔记 HTML 字段与选区工具 | [NoteFieldEditor.ets](NoteFieldEditor.ets)；拥有 RichEditor 格式输入、选区/光标与首次学习，复杂 HTML 回退源码；工具自动换行且不收缩；草稿与图片仍归父层；新增和浏览/学习共用 | `note-editing-basics.test.mjs`、`note-rich-editor.test.mjs`；真实中文输入、光标和 ArkUI 更新须设备验收 |
 | ⓘ 帮助/信息按钮及标题位置 | [HelpButton.ets](HelpButton.ets) 固定图标、点击区、朗读及事件隔离；[HelpLabel.ets](HelpLabel.ets) 让说明紧随标题；仅卡片信息独立动作保留行尾 | `ui-help-entry.test.mjs` 全 ArkTS 扫描、禁用回调、几何与帮助生命周期回归；规范见 [应用内帮助](../../../../../../docs/development/in-app-help.md) |
 | 只读帮助弹窗 | [字段帮助面板.ets](../字段帮助面板.ets) 组合 DialogFrame / DialogHeader；字段帮助对话框适配原生弹窗，支持正文及富内容插槽 | `ui-help-entry.test.mjs`、`ui-dialog-layout.test.mjs`、`deck-option-dialog.test.mjs`；实际系统返回、手势与字体布局须设备验收 |
 | 详情/展开箭头（`>` / `›` / `⌃` / `⌄`） | [DisclosureChevron.ets](DisclosureChevron.ets) | `tools/tests/ui-disclosure-contract.test.mjs`：扫描所有 ArkTS，禁止独立文字箭头；检查居中几何 |
 | 菜单项、展开行 | [MenuItem.ets](MenuItem.ets)：菜单默认居中，表单展开行通过 `labelAlignment: TextAlign.Start` 左对齐；笔记类型字段、模板、CSS 共用，箭头状态和行高统一 | `ui-select-layout.test.mjs` |
-| 原生下拉框与长名称省略 | [SelectStyle.ets](../../utils/SelectStyle.ets)：共享尺寸、行内最大宽度和单行尾部省略；几何及 textModifier 由调用点直接声明，完整名称和选值不变 | `ui-select-layout.test.mjs` 全调用扫描；长短选项切换、标签/ⓘ 避让须设备验收 |
+| 原生下拉框与长名称省略 | [SelectStyle.ets](../../utils/SelectStyle.ets)：共享尺寸、统一按钮/普通项/选中项字号、行内最大宽度和单行尾部省略；三类 font、几何及只负责省略的 textModifier 由调用点直接声明，完整名称和选值不变 | `ui-select-layout.test.mjs` 全调用扫描；长短选项切换、标签/ⓘ 避让须设备验收 |
 | 牌组选项字段、高级入口及分类行 | [DeckOptionRow.ets](../home/DeckOptionRow.ets)，字段编辑器仍由 DeckOptionField 管理；导航入口只传标题与回调 | `deck-option-dialog.test.mjs`，防止实验版入口另写灰底按钮 |
 | 按钮按压反馈 | [GlassSurface.ets](../../utils/GlassSurface.ets)、[PrimaryGlassSurface.ets](../../utils/PrimaryGlassSurface.ets)：原生多态色层、稳定底色/边框，不经触摸状态重建文字；普通按钮与操作行同用 [PressFeedback.ets](../../utils/PressFeedback.ets)，统一单次变淡反馈 | `ui-press-feedback.test.mjs` 全仓点击入口审计，以及 `theme-text.test.mjs`、`button-press-state-contract.test.mjs`、`motion-style-contract.test.mjs`；快点/取消/禁用须设备验收 |
 | 页面四段等距与菜单锚点 | [应用尺寸](../../utils/应用尺寸.ets) 的 `页面分组间距`、`pageToolbarTop`、`pageToolbarHeight`、`pageContentTop`；光学估计限制见 [间距验收](../../../../../../docs/UI_SPACING.md) | `ui-shell-contract.test.mjs`；真实状态栏字形须设备验收 |

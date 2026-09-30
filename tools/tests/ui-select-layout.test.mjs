@@ -4,6 +4,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
+import { loadPlatformModule } from './platform-module-harness.mjs';
 
 const root = fileURLToPath(new URL('../../entry/src/main/ets/', import.meta.url));
 const read = path => readFileSync(join(root, path), 'utf8');
@@ -24,6 +25,30 @@ test('shared Select keeps short labels compact and bounds long names with ellips
     'Select textModifier must be applied directly; ArkUI does not support it inside attributeModifier');
 });
 
+test('button, menu and selected item share a font size with one owner for each font', () => {
+  class TextModifier {
+    calls = [];
+    maxLines(value) { this.calls.push(['maxLines', value]); return this; }
+    textOverflow(value) { this.calls.push(['textOverflow', value]); return this; }
+  }
+  const SelectStyle = loadPlatformModule('utils/SelectStyle.ets', 'SelectStyle', {
+    TextModifier, FontWeight: { Normal: 400, Medium: 500 }, TextOverflow: { Ellipsis: 'ellipsis' },
+    应用尺寸: { 字号_正文: 14, 圆角_指标卡: 16 }, $r: key => key
+  });
+  assert.equal(SelectStyle.controlFont.size, 14);
+  assert.equal(SelectStyle.optionFont.size, SelectStyle.controlFont.size);
+  assert.deepEqual(SelectStyle.selectedOptionFont, SelectStyle.controlFont);
+  assert.deepEqual(SelectStyle.labelText().calls,
+    [['maxLines', 1], ['textOverflow', { overflow: 'ellipsis' }]]);
+  const calls = [];
+  const instance = new Proxy({}, { get: (_target, name) => (...args) => { calls.push([name, ...args]); return instance; } });
+  const style = new SelectStyle('surface');
+  style.applyNormalAttribute(instance);
+  style.applyNormalAttribute(instance);
+  assert.equal(calls.some(([name]) => /font$|fontSize|fontWeight|controlSize/i.test(name)), false,
+    'diffed modifiers must not own or reset fonts when Select options are rebuilt');
+});
+
 // Native Select can restore system geometry after a selection. Every caller must
 // declare geometry directly and reserve width independently of the current label.
 // Device bounds before/after selection are the rendering acceptance check.
@@ -38,6 +63,12 @@ test('all native selects reserve layout space and directly reapply geometry', ()
       assert.doesNotMatch(control.slice(7), /\bSelect\(/, `ambiguous Select boundary: ${path}`);
       for (const property of ['height', 'padding', 'space', 'font', 'borderRadius']) {
         assert.match(control, new RegExp(`\\.${property}\\(SelectStyle\\.control`), `${path}: ${property}`);
+      }
+      assert.match(control, /\.optionFont\(SelectStyle\.optionFont\)/, `missing menu font: ${path}`);
+      assert.match(control, /\.selectedOptionFont\(SelectStyle\.selectedOptionFont\)/, `missing selected menu font: ${path}`);
+      for (const property of ['font', 'optionFont', 'selectedOptionFont']) {
+        assert.equal((control.match(new RegExp(`\\.${property}\\(`, 'g')) || []).length, 1,
+          `duplicate font owner for ${property}: ${path}`);
       }
       assert.match(control, /\.(width|layoutWeight)\(/, `content-dependent width: ${path}`);
       assert.match(control, /\.textModifier\(SelectStyle\.labelText\(\)\)/, `missing shared ellipsis: ${path}`);

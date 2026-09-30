@@ -313,6 +313,8 @@ export struct 自定义学习对话框 {
           .selected(this.cardKindIndex)
           .value(this.取本地化文本(this.kindLabels[this.cardKindIndex]))
           .font(SelectStyle.controlFont)
+          .optionFont(SelectStyle.optionFont)
+          .selectedOptionFont(SelectStyle.selectedOptionFont)
           .textModifier(SelectStyle.labelText())
           .borderRadius(SelectStyle.controlRadius)
           .height(SelectStyle.controlHeight)
@@ -341,6 +343,8 @@ export struct 自定义学习对话框 {
                   (this.tagSelection(tag.name) === 2 ? $r('app.string.custom_study_tags_exclude') :
                     $r('app.string.custom_study_tags_any'))))
                 .font(SelectStyle.controlFont)
+                .optionFont(SelectStyle.optionFont)
+                .selectedOptionFont(SelectStyle.selectedOptionFont)
                 .textModifier(SelectStyle.labelText())
                 .borderRadius(SelectStyle.controlRadius)
                 .height(SelectStyle.controlHeight)

@@ -403,6 +403,8 @@ export struct 统计页 {
               .padding(SelectStyle.controlPadding)
               .space(SelectStyle.controlSpace)
               .font(SelectStyle.controlFont)
+              .optionFont(SelectStyle.optionFont)
+              .selectedOptionFont(SelectStyle.selectedOptionFont)
               .textModifier(SelectStyle.labelText())
               .borderRadius(SelectStyle.controlRadius)
               .onSelect((索引: number) => {

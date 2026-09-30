@@ -8,8 +8,10 @@ import { 应用尺寸 } from './应用尺寸';
  * Extension Points: 通用尺寸和配色集中在此调整，宽度及菜单对齐由使用场景决定。
  */
 export class SelectStyle implements AttributeModifier<SelectAttribute> {
-  // 几何属性由调用方直接声明，避免 Select 重建后 modifier 跳过未变值。
+  // 三种字体和几何均直接声明；modifier 差分会漏掉重建的菜单项，导致选过的项才缩小。
   static readonly controlFont: Font = { size: 应用尺寸.字号_正文, weight: FontWeight.Medium };
+  static readonly optionFont: Font = { size: 应用尺寸.字号_正文, weight: FontWeight.Normal };
+  static readonly selectedOptionFont: Font = SelectStyle.controlFont;
   static readonly controlRadius: number = 应用尺寸.圆角_指标卡;
   static readonly controlHeight: number = 40;
   static readonly controlPadding: Padding = { left: 12, right: 12, top: 0, bottom: 0 };
@@ -20,12 +22,9 @@ export class SelectStyle implements AttributeModifier<SelectAttribute> {
   static readonly fieldConstraint: ConstraintSizeOptions = { maxWidth: '56%' };
   static readonly rangeWidth: number = 112;
 
-  // textModifier 不支持在 attributeModifier 内调用，由每个 Select 直接接入。
+  // 只负责截断；字体归 Select.font，避免两套字体设置在节点更新时互相覆盖。
   static labelText(): TextModifier {
     return new TextModifier()
-      .fontSize(应用尺寸.字号_正文)
-      .fontWeight(FontWeight.Medium)
-      .fontColor($r('app.color.text_primary'))
       .maxLines(1)
       .textOverflow({ overflow: TextOverflow.Ellipsis });
   }
@@ -43,10 +42,8 @@ export class SelectStyle implements AttributeModifier<SelectAttribute> {
       .fontColor($r('app.color.text_primary'))
       .backgroundColor(this.surfaceColor)
       .clip(true)
-      .optionFont({ size: 应用尺寸.字号_正文, weight: FontWeight.Normal })
       .optionFontColor($r('app.color.text_primary'))
       .optionBgColor($r('app.color.surface_card'))
-      .selectedOptionFont({ size: 应用尺寸.字号_正文, weight: FontWeight.Medium })
       .selectedOptionFontColor($r('app.color.text_primary'))
       .selectedOptionBgColor($r('app.color.surface_selected'));
   }

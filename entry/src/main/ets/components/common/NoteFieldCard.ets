@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { noteFieldText } from '../../utils/NoteTypeText';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { NoteFieldEditor } from './NoteFieldEditor';
 import { SettingsToggleRow } from './SettingsToggleRow';
@@ -9,6 +10,7 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 @Component
 export struct NoteFieldCard {
   @Prop fieldName: string = '';
+  @Prop originalStockKind: number = 0;
   @Prop value: string = '';
   @Prop disabled: boolean = false;
   @Prop clozeEnabled: boolean = false;
@@ -31,7 +33,7 @@ export struct NoteFieldCard {
           onChange: (isOn: boolean): void => { this.onChange(isOn ? '1' : ''); } })
       } else {
         Row() {
-          Text(this.fieldName).fontSize(应用尺寸.字号_按钮).fontWeight(FontWeight.Medium)
+          Text(noteFieldText(this.getUIContext(), this.fieldName, this.originalStockKind)).fontSize(应用尺寸.字号_按钮).fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.text_primary')).layoutWeight(1)
           Button($r('app.string.add_note_image_add')).height(应用尺寸.紧凑控件高度)
             .fontSize(应用尺寸.字号_正文_小).fontColor(this.accent).backgroundColor(Color.Transparent)
@@ -40,7 +42,7 @@ export struct NoteFieldCard {
             .stateEffect(false)
             .onClick(this.onAddImage)
         }.width('100%')
-        NoteFieldEditor({ value: this.value, fieldName: this.fieldName, disabled: this.disabled,
+        NoteFieldEditor({ value: this.value, fieldName: noteFieldText(this.getUIContext(), this.fieldName, this.originalStockKind), disabled: this.disabled,
           clozeEnabled: this.clozeEnabled, allFields: this.allFields, onChange: this.onChange })
         ForEach(this.images, (attachment: NoteFieldImage) => {
           Stack({ alignContent: Alignment.TopEnd }) {

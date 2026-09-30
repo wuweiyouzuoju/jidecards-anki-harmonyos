@@ -72,7 +72,7 @@ export struct EditNotePage {
       if (this.editor.note !== null) {
         浏览编辑区({ isDark: 解析是否深色(this.theme, this.systemDark), busy: this.editor.busy,
           errorMessage: this.editor.error === '' ? '' : resourceText(this.getUIContext(), $r('app.string.browser_detail_save_error')),
-          fieldNames: this.editor.fieldNames, clozeFieldOrds: this.editor.clozeFieldOrds,
+          originalStockKind: this.editor.originalStockKind, fieldNames: this.editor.fieldNames, clozeFieldOrds: this.editor.clozeFieldOrds,
           optionalReverseFieldOrd: this.editor.optionalReverseFieldOrd, backRequest: this.backRequest,
           initialFieldValues: this.editor.note.fields, initialTags: this.editor.note.tags.join(' '),
           onCancel: (): void => { if (this.active) this.pathStack.pop(); },

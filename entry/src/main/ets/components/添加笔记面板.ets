@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { noteTypeText, noteFieldText } from '../utils/NoteTypeText';
 import { PressFeedback } from '../utils/PressFeedback';
 import { HelpLabel } from './common/HelpLabel';
 import { DialogBackdrop } from './common/DialogBackdrop';
@@ -61,6 +62,7 @@ interface 添加笔记下拉选项 {
 
 @Component
 export struct 添加笔记面板 {
+  @Prop originalStockKind: number = 0;
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
   @Prop busy: boolean = false;
@@ -229,7 +231,7 @@ export struct 添加笔记面板 {
   private 选中笔记类型名(): string {
     for (const 笔记类型 of this.notetypeOptions) {
       if (笔记类型.id === this.selectedNotetypeId) {
-        return 笔记类型.name;
+        return noteTypeText(this.getUIContext(), 笔记类型.name);
       }
     }
     return '';
@@ -238,7 +240,7 @@ export struct 添加笔记面板 {
   private 笔记类型下拉选项(): 添加笔记下拉选项[] {
     const 选项: 添加笔记下拉选项[] = [];
     for (const 笔记类型 of this.notetypeOptions) {
-      选项.push({ value: 笔记类型.name });
+      选项.push({ value: noteTypeText(this.getUIContext(), 笔记类型.name) });
     }
     return 选项;
   }
@@ -374,6 +376,8 @@ export struct 添加笔记面板 {
               .padding(SelectStyle.controlPadding)
               .space(SelectStyle.controlSpace)
               .font(SelectStyle.controlFont)
+              .optionFont(SelectStyle.optionFont)
+              .selectedOptionFont(SelectStyle.selectedOptionFont)
               .textModifier(SelectStyle.labelText())
               .borderRadius(SelectStyle.controlRadius)
               .onSelect((index: number): void => {
@@ -391,6 +395,8 @@ export struct 添加笔记面板 {
               .padding(SelectStyle.controlPadding)
               .space(SelectStyle.controlSpace)
               .font(SelectStyle.controlFont)
+              .optionFont(SelectStyle.optionFont)
+              .selectedOptionFont(SelectStyle.selectedOptionFont)
               .textModifier(SelectStyle.labelText())
               .borderRadius(SelectStyle.controlRadius)
               .onSelect((index: number): void => {
@@ -399,11 +405,11 @@ export struct 添加笔记面板 {
 
             ForEach(this.fieldNames, (字段名: string, index: number) => {
               Column({ space: 应用尺寸.间距_5 }) {
-                Text(字段名)
+                Text(noteFieldText(this.getUIContext(), 字段名, this.originalStockKind))
                   .fontSize(应用尺寸.字号_正文_小)
                   .fontColor($r('app.color.text_secondary'))
                   .width('100%')
-                TextArea({ placeholder: 字段名, text: this.fieldValues[index] })
+                TextArea({ placeholder: noteFieldText(this.getUIContext(), 字段名, this.originalStockKind), text: this.fieldValues[index] })
                   .width('100%')
                   // B12-Y2 2026-07-22：height 88 → 56，配合 Scroll 让字段多时可滚动不越界
                   .height(56)

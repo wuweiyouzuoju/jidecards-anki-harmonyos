@@ -31,6 +31,8 @@ export struct 范围切换条 {
       .space(SelectStyle.controlSpace)
       .width(SelectStyle.rangeWidth)
       .font(SelectStyle.controlFont)
+      .optionFont(SelectStyle.optionFont)
+      .selectedOptionFont(SelectStyle.selectedOptionFont)
       .textModifier(SelectStyle.labelText())
       .borderRadius(SelectStyle.controlRadius)
       .onSelect((index: number): void => { this.onRangeChange(index); })

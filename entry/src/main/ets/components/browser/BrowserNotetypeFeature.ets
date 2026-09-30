@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { noteTypeText } from '../../utils/NoteTypeText';
 import { DialogFrame } from '../common/DialogFrame';
 import { DialogHeader } from '../common/DialogHeader';
 import { 应用尺寸 } from '../../utils/应用尺寸';
@@ -74,18 +75,20 @@ export struct BrowserNotetypeFeature {
         .fontColor($r('app.color.text_primary'))
         .width('100%')
       Select(this.state.names.map((项: NotetypeNameId): SelectOption => {
-        return { value: 项.name };
+        return { value: noteTypeText(this.getUIContext(), 项.name) };
       }))
         .selected(this.state.selectedId === 0 ? -1 : this.state.names.findIndex(
           (项: NotetypeNameId): boolean => 项.id === this.state.selectedId))
         .value(this.state.selectedId === 0 ? '' :
-          this.state.names.find((项: NotetypeNameId): boolean => 项.id === this.state.selectedId)?.name ?? '')
+          noteTypeText(this.getUIContext(), this.state.names.find((项: NotetypeNameId): boolean => 项.id === this.state.selectedId)?.name ?? ''))
         .width('100%')
         .attributeModifier(new SelectStyle())
         .height(SelectStyle.controlHeight)
         .padding(SelectStyle.controlPadding)
         .space(SelectStyle.controlSpace)
         .font(SelectStyle.controlFont)
+        .optionFont(SelectStyle.optionFont)
+        .selectedOptionFont(SelectStyle.selectedOptionFont)
         .textModifier(SelectStyle.labelText())
         .borderRadius(SelectStyle.controlRadius)
         .enabled(!this.busy && !this.state.busy)
@@ -119,6 +122,8 @@ export struct BrowserNotetypeFeature {
               .padding(SelectStyle.controlPadding)
               .space(SelectStyle.controlSpace)
               .font(SelectStyle.controlFont)
+              .optionFont(SelectStyle.optionFont)
+              .selectedOptionFont(SelectStyle.selectedOptionFont)
               .textModifier(SelectStyle.labelText())
               .borderRadius(SelectStyle.controlRadius)
               .enabled(!this.busy && !this.state.busy)
@@ -156,6 +161,8 @@ export struct BrowserNotetypeFeature {
                 .padding(SelectStyle.controlPadding)
                 .space(SelectStyle.controlSpace)
                 .font(SelectStyle.controlFont)
+                .optionFont(SelectStyle.optionFont)
+                .selectedOptionFont(SelectStyle.selectedOptionFont)
                 .textModifier(SelectStyle.labelText())
                 .borderRadius(SelectStyle.controlRadius)
                 .enabled(!this.busy && !this.state.busy)

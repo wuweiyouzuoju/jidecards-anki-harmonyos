@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { noteTypeText } from '../../utils/NoteTypeText';
 import { SelectStyle } from '../../utils/SelectStyle';
 
 import type { AgentMode } from '../../model/agent/AgentTypes';
@@ -33,7 +34,7 @@ export struct AgentSetupCard {
 
   private editNotetypeOptions(): AgentSelectOption[] {
     const output: AgentSelectOption[] = [{ value: this.allNotetypesLabel }];
-    for (const item of this.notetypeOptions) { output.push({ value: item.name }); }
+    for (const item of this.notetypeOptions) { output.push({ value: noteTypeText(this.getUIContext(), item.name) }); }
     return output;
   }
 
@@ -54,6 +55,8 @@ export struct AgentSetupCard {
           .width(SelectStyle.fieldWidth)
           .constraintSize(SelectStyle.fieldConstraint)
           .font(SelectStyle.controlFont)
+          .optionFont(SelectStyle.optionFont)
+          .selectedOptionFont(SelectStyle.selectedOptionFont)
           .textModifier(SelectStyle.labelText())
           .borderRadius(SelectStyle.controlRadius)
           .onSelect((index: number): void => {
@@ -64,10 +67,10 @@ export struct AgentSetupCard {
       }.width('100%')
       Row() {
         Text($r('app.string.add_note_notetype')).layoutWeight(1)
-        Select(this.notetypeOptions.map((item: AgentSetupChoice): AgentSelectOption => ({ value: item.name })))
+        Select(this.notetypeOptions.map((item: AgentSetupChoice): AgentSelectOption => ({ value: noteTypeText(this.getUIContext(), item.name) })))
           .selected(this.notetypeOptions.findIndex((item: AgentSetupChoice): boolean =>
             item.id === this.setup.notetypeId))
-          .value(this.setup.notetypeName)
+          .value(noteTypeText(this.getUIContext(), this.setup.notetypeName))
           .enabled(!this.disabled)
           .attributeModifier(new SelectStyle())
           .height(SelectStyle.controlHeight)
@@ -76,6 +79,8 @@ export struct AgentSetupCard {
           .width(SelectStyle.fieldWidth)
           .constraintSize(SelectStyle.fieldConstraint)
           .font(SelectStyle.controlFont)
+          .optionFont(SelectStyle.optionFont)
+          .selectedOptionFont(SelectStyle.selectedOptionFont)
           .textModifier(SelectStyle.labelText())
           .borderRadius(SelectStyle.controlRadius)
           .onSelect((index: number): void => {
@@ -99,6 +104,8 @@ export struct AgentSetupCard {
           .width(SelectStyle.fieldWidth)
           .constraintSize(SelectStyle.fieldConstraint)
           .font(SelectStyle.controlFont)
+          .optionFont(SelectStyle.optionFont)
+          .selectedOptionFont(SelectStyle.selectedOptionFont)
           .textModifier(SelectStyle.labelText())
           .borderRadius(SelectStyle.controlRadius)
           .onSelect((index: number): void => {
@@ -113,7 +120,7 @@ export struct AgentSetupCard {
         Select(this.editNotetypeOptions())
           .selected(this.setup.notetypeId <= 0 ? 0 : 1 + this.notetypeOptions.findIndex(
             (item: AgentSetupChoice): boolean => item.id === this.setup.notetypeId))
-          .value(this.setup.notetypeId <= 0 ? this.allNotetypesLabel : this.setup.notetypeName)
+          .value(this.setup.notetypeId <= 0 ? this.allNotetypesLabel : noteTypeText(this.getUIContext(), this.setup.notetypeName))
           .enabled(!this.disabled)
           .attributeModifier(new SelectStyle())
           .height(SelectStyle.controlHeight)
@@ -122,6 +129,8 @@ export struct AgentSetupCard {
           .width(SelectStyle.fieldWidth)
           .constraintSize(SelectStyle.fieldConstraint)
           .font(SelectStyle.controlFont)
+          .optionFont(SelectStyle.optionFont)
+          .selectedOptionFont(SelectStyle.selectedOptionFont)
           .textModifier(SelectStyle.labelText())
           .borderRadius(SelectStyle.controlRadius)
           .onSelect((index: number): void => {

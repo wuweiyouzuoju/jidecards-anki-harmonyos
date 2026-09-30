@@ -218,6 +218,8 @@ export struct 创建过滤牌组面板 {
             .padding(SelectStyle.controlPadding)
             .space(SelectStyle.controlSpace)
             .font(SelectStyle.controlFont)
+            .optionFont(SelectStyle.optionFont)
+            .selectedOptionFont(SelectStyle.selectedOptionFont)
             .textModifier(SelectStyle.labelText())
             .borderRadius(SelectStyle.controlRadius)
             .onSelect((index: number) => {

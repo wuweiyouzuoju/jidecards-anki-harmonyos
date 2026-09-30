@@ -460,6 +460,8 @@ export struct 笔记类型编辑器 {
                 .padding(SelectStyle.controlPadding)
                 .space(SelectStyle.controlSpace)
                 .font(SelectStyle.controlFont)
+                .optionFont(SelectStyle.optionFont)
+                .selectedOptionFont(SelectStyle.selectedOptionFont)
                 .textModifier(SelectStyle.labelText())
                 .borderRadius(SelectStyle.controlRadius)
                 .onSelect((索引: number) => {

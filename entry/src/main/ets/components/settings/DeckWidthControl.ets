@@ -48,6 +48,8 @@ export struct DeckWidthControl {
           .width(SelectStyle.fieldWidth)
           .constraintSize(SelectStyle.fieldConstraint)
           .font(SelectStyle.controlFont)
+          .optionFont(SelectStyle.optionFont)
+          .selectedOptionFont(SelectStyle.selectedOptionFont)
           .textModifier(SelectStyle.labelText())
           .borderRadius(SelectStyle.controlRadius)
           .enabled(!this.saving)

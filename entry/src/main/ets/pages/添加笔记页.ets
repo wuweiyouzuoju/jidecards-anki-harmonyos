@@ -5,7 +5,7 @@ import { confirmNoteDiscard } from '../utils/ConfirmNoteDiscard';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { NoteCreationSession, NoteCreationState } from '../model/NoteCreationSession';
 import { NoteTypeCatalog } from '../model/NoteTypeCatalog';
-import { noteTypeDisplayKey } from '../model/NoteTypePresentation';
+import { noteTypeText, noteFieldText } from '../utils/NoteTypeText';
 import { AnkiNoteCreation } from '../backend/AnkiNoteCreation';
 import { namedResourceText } from '../utils/UiFeedback';
 import { HelpLabel } from '../components/common/HelpLabel';
@@ -80,6 +80,7 @@ export struct 添加笔记页 {
   @State private 已选笔记类型ID: number = 0;
   @State private 笔记类型选项: 添加笔记笔记类型选项[] = [];
   @State private 字段名列表: string[] = [];
+  @State private originalStockKind: number = 0;
   @State private 字段值列表: string[] = [];
   @State private fieldImages: NoteFieldImage[] = [];
   @State private pickingFieldImage: boolean = false;
@@ -206,6 +207,7 @@ export struct 添加笔记页 {
       this.已选笔记类型ID = state.view === null ? 0 : state.view.id;
       this.笔记类型名 = state.view === null ? '' : state.view.name;
       this.optionalReverseIndex = state.view?.optionalReverseFieldOrd ?? -1;
+      this.originalStockKind = state.view?.originalStockKind ?? 0;
       this.字段名列表 = state.view === null ? [] : state.view.fieldNames.slice();
       this.字段值列表 = this.字段名列表.map((_name: string): string => '');
       this.clozeFieldOrds = state.view?.clozeFieldOrds ?? [];
@@ -391,8 +393,7 @@ export struct 添加笔记页 {
   }
 
   private displayTypeName(name: string): string {
-    const key: string = noteTypeDisplayKey(name);
-    return key === '' ? name : namedResourceText(this.getUIContext(), key);
+    return noteTypeText(this.getUIContext(), name);
   }
 
   @Builder
@@ -495,6 +496,8 @@ export struct 添加笔记页 {
                 .width(SelectStyle.fieldWidth)
                 .constraintSize(SelectStyle.fieldConstraint)
                 .font(SelectStyle.controlFont)
+                .optionFont(SelectStyle.optionFont)
+                .selectedOptionFont(SelectStyle.selectedOptionFont)
                 .textModifier(SelectStyle.labelText())
                 .borderRadius(SelectStyle.controlRadius)
                 .onSelect((索引: number): void => {
@@ -547,12 +550,12 @@ export struct 添加笔记页 {
               // ③ Header / Back Extra 输入（用 字段名列表 中查到的字段名做 placeholder 变量）
               if (this.图片遮盖_标题字段索引() >= 0) {
                 Column({ space: 应用尺寸.间距_5 }) {
-                  Text(this.字段名列表[this.图片遮盖_标题字段索引()])
+                  Text(noteFieldText(this.getUIContext(), this.字段名列表[this.图片遮盖_标题字段索引()], this.originalStockKind))
                     .fontSize(应用尺寸.字号_正文_小)
                     .fontColor($r('app.color.text_secondary'))
                     .width('100%')
                   TextArea({
-                    placeholder: this.字段名列表[this.图片遮盖_标题字段索引()],
+                    placeholder: noteFieldText(this.getUIContext(), this.字段名列表[this.图片遮盖_标题字段索引()], this.originalStockKind),
                     text: this.图片遮盖_标题
                   })
                     .width('100%')
@@ -573,12 +576,12 @@ export struct 添加笔记页 {
               }
               if (this.图片遮盖_额外字段索引() >= 0) {
                 Column({ space: 应用尺寸.间距_5 }) {
-                  Text(this.字段名列表[this.图片遮盖_额外字段索引()])
+                  Text(noteFieldText(this.getUIContext(), this.字段名列表[this.图片遮盖_额外字段索引()], this.originalStockKind))
                     .fontSize(应用尺寸.字号_正文_小)
                     .fontColor($r('app.color.text_secondary'))
                     .width('100%')
                   TextArea({
-                    placeholder: this.字段名列表[this.图片遮盖_额外字段索引()],
+                    placeholder: noteFieldText(this.getUIContext(), this.字段名列表[this.图片遮盖_额外字段索引()], this.originalStockKind),
                     text: this.图片遮盖_额外
                   })
                     .width('100%')
@@ -602,7 +605,7 @@ export struct 添加笔记页 {
               this.高级设置折叠区()
             } else {
               ForEach(this.字段名列表, (字段名: string, 索引: number) => {
-                NoteFieldCard({ fieldName: 字段名, value: this.字段值列表[索引],
+                NoteFieldCard({ fieldName: 字段名, originalStockKind: this.originalStockKind, value: this.字段值列表[索引],
                   disabled: this.处理中 || this.pickingFieldImage || this.confirmingDiscard,
                   reverseToggle: 索引 === this.optionalReverseIndex, isDark: this.是否深色(), accent: this.动作主色,
                   clozeEnabled: this.clozeFieldOrds.indexOf(索引) >= 0, allFields: this.字段值列表,

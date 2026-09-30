@@ -285,6 +285,8 @@ export struct 数据迁移面板 {
         .padding(SelectStyle.controlPadding)
         .space(SelectStyle.controlSpace)
         .font(SelectStyle.controlFont)
+        .optionFont(SelectStyle.optionFont)
+        .selectedOptionFont(SelectStyle.selectedOptionFont)
         .textModifier(SelectStyle.labelText())
         .borderRadius(SelectStyle.controlRadius)
         .onSelect((索引: number): void => {
@@ -308,6 +310,8 @@ export struct 数据迁移面板 {
             .padding(SelectStyle.controlPadding)
             .space(SelectStyle.controlSpace)
             .font(SelectStyle.controlFont)
+            .optionFont(SelectStyle.optionFont)
+            .selectedOptionFont(SelectStyle.selectedOptionFont)
             .textModifier(SelectStyle.labelText())
             .borderRadius(SelectStyle.controlRadius)
             .onSelect((索引: number): void => {

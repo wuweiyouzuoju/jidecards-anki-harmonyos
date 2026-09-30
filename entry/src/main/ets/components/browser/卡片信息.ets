@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { noteTypeText } from '../../utils/NoteTypeText';
 import { DialogBackdrop } from '../common/DialogBackdrop';
 
 import { DialogHeader } from '../common/DialogHeader';
@@ -206,7 +207,7 @@ export struct 卡片信息 {
                 this.信息行($r('app.string.browser_info_total_time'),
                   this.格式化用时(this.stats.totalSecs))
                 this.信息行($r('app.string.browser_info_card_type'), this.stats.cardType)
-                this.信息行($r('app.string.browser_info_notetype'), this.stats.notetype)
+                this.信息行($r('app.string.browser_info_notetype'), noteTypeText(this.getUIContext(), this.stats.notetype))
                 this.信息行($r('app.string.browser_info_deck'), this.stats.deck)
                 if (this.stats.fsrsRetrievability !== undefined) {
                   this.信息行($r('app.string.browser_info_retrievability'),

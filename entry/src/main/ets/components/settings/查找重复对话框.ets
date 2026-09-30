@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { noteTypeText } from '../../utils/NoteTypeText';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { DialogBackdrop } from '../common/DialogBackdrop';
 import { DisclosureChevron } from '../common/DisclosureChevron';
@@ -111,7 +112,7 @@ export struct 查找重复对话框 {
   private 类型选项(): SelectOption[] {
     const 选项: SelectOption[] = [];
     for (let i = 0; i < this.笔记类型列表.length; i++) {
-      选项.push({ value: this.笔记类型列表[i].name });
+      选项.push({ value: noteTypeText(this.getUIContext(), this.笔记类型列表[i].name) });
     }
     return 选项;
   }
@@ -306,7 +307,7 @@ export struct 查找重复对话框 {
               .layoutWeight(1)
             Select(this.类型选项())
               .selected(this.选中类型索引)
-              .value(this.选中类型索引 >= 0 ? this.笔记类型列表[this.选中类型索引].name : '')
+              .value(this.选中类型索引 >= 0 ? noteTypeText(this.getUIContext(), this.笔记类型列表[this.选中类型索引].name) : '')
               .attributeModifier(new SelectStyle())
               .height(SelectStyle.controlHeight)
               .padding(SelectStyle.controlPadding)
@@ -314,6 +315,8 @@ export struct 查找重复对话框 {
               .width(SelectStyle.fieldWidth)
               .constraintSize(SelectStyle.fieldConstraint)
               .font(SelectStyle.controlFont)
+              .optionFont(SelectStyle.optionFont)
+              .selectedOptionFont(SelectStyle.selectedOptionFont)
               .textModifier(SelectStyle.labelText())
               .borderRadius(SelectStyle.controlRadius)
               .onSelect((索引: number): void => {

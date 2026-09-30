@@ -131,6 +131,8 @@ export struct 外观分组 {
               .width(SelectStyle.fieldWidth)
               .constraintSize(SelectStyle.fieldConstraint)
               .font(SelectStyle.controlFont)
+              .optionFont(SelectStyle.optionFont)
+              .selectedOptionFont(SelectStyle.selectedOptionFont)
               .textModifier(SelectStyle.labelText())
               .borderRadius(SelectStyle.controlRadius)
               .onSelect((索引: number): void => {
@@ -167,6 +169,8 @@ export struct 外观分组 {
               .width(SelectStyle.fieldWidth)
               .constraintSize(SelectStyle.fieldConstraint)
               .font(SelectStyle.controlFont)
+              .optionFont(SelectStyle.optionFont)
+              .selectedOptionFont(SelectStyle.selectedOptionFont)
               .textModifier(SelectStyle.labelText())
               .borderRadius(SelectStyle.controlRadius)
               .onSelect((索引: number): void => {

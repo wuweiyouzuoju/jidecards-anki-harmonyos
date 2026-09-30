@@ -31,6 +31,7 @@ export struct 浏览编辑区 {
   @Prop isDark: boolean = false;
   @Prop busy: boolean = false;
   @Prop errorMessage: string = '';
+  @Prop originalStockKind: number = 0;
   @Prop fieldNames: string[] = [];
   @Prop initialFieldValues: string[] = [];
   @Prop initialTags: string = '';
@@ -115,7 +116,7 @@ export struct 浏览编辑区 {
       Scroll() {
         Column({ space: 应用尺寸.间距_14 }) {
           ForEach(this.fieldNames, (name: string, index: number) => {
-            NoteFieldCard({ fieldName: name, value: this.fieldValues[index] ?? '',
+            NoteFieldCard({ fieldName: name, originalStockKind: this.originalStockKind, value: this.fieldValues[index] ?? '',
               disabled: this.busy || this.pickingImage || this.confirmingClose,
               reverseToggle: index === this.optionalReverseFieldOrd, editing: true,
               isDark: this.isDark, accent: this.主色按钮背景,

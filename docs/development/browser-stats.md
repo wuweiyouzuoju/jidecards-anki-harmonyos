@@ -8,7 +8,7 @@
 
 ## 浏览列表
 
-浏览结果每条采用独立圆角卡片，左右沿用页面内边距，条目间距沿用设置分组；信息入口、多选、旗标和分页仍在 `卡片表格` 中。表格通过 `IDataSource` + `LazyForEach` 消费行快照，行 key 使用稳定业务字段，避免大列表状态变化时按整数组重建；分页加载态跟随宿主 `Promise` 结束，不使用固定延时。应用所有原生 Select 共用 `utils/SelectStyle.ets` 的高度、字重、16vp 卡片圆角及明暗资源配色，页面独立选择框传入 surface_card（浅色白、深色卡片底），卡片内默认 surface_sidebar；调用方直接声明共享 font、borderRadius、height、padding、space，避免 AttributeModifier 差分跳过未变值后残留系统默认外观。每处选择框以固定宽度、百分比或 layoutWeight 预留空间，切换长短选项不改变控件尺寸；历史范围使用共享宽度，表单默认占行宽一半。配色继续由 modifier 提供，菜单对齐和业务绑定仍属于调用方。统计页 FSRS 状态位于顶栏右侧，历史范围位于牌组选择右侧。牌组长按菜单直接显示满宽颜色选择框；设置模式菜单沿用首页更多的 compactMenuWidth。
+浏览结果每条采用独立圆角卡片，左右沿用页面内边距，条目间距沿用设置分组；信息入口、多选、旗标和分页仍在 `卡片表格` 中。表格通过 `IDataSource` + `LazyForEach` 消费行快照，行 key 使用稳定业务字段，避免大列表状态变化时按整数组重建；分页加载态跟随宿主 `Promise` 结束，不使用固定延时。应用所有原生 Select 共用 `utils/SelectStyle.ets` 的高度、字重、16vp 卡片圆角及明暗资源配色，页面独立选择框传入 surface_card（浅色白、深色卡片底），卡片内默认 surface_sidebar；调用方直接声明共享 font、optionFont、selectedOptionFont、borderRadius、height、padding、space，避免 AttributeModifier 差分跳过未变值后残留系统默认外观。按钮、未选菜单项和选中菜单项使用相同字号；字重区分选中态。labelText 只负责单行省略，不重复设置字号、字重或颜色。不能把菜单字体移回 AttributeModifier，否则原生菜单项重建后可能只有访问过的项应用指定字号。每处选择框以固定宽度、百分比或 layoutWeight 预留空间；行内字段选择采用 auto 宽度并限制为行宽 56%，长名称单行省略，切换选项不改变字号；历史范围使用共享宽度，表单默认占行宽一半。配色继续由 modifier 提供，菜单对齐和业务绑定仍属于调用方。统计页 FSRS 状态位于顶栏右侧，历史范围位于牌组选择右侧。牌组长按菜单直接显示满宽颜色选择框；设置模式菜单沿用首页更多的 compactMenuWidth。
 
 `AnchoredMenu` 与 `MenuItem` 由首页更多、新建牌组动作菜单、设置模式及浏览菜单共用，统一圆角、分隔线、居中文字、150ms 动效和主题色选中态。浏览搜索独占一行；下一行左侧为一个外框中的模式、状态、排序三个选值区，右侧显示完整结果数量。点击某个选值区只打开该组的选项，菜单宽度跟随整个选择框，不再套分类折叠或混列其他组；排序“默认”与各列选项同级。筛选分区使用相同菜单展开行，标题与展开内容属于同一张圆角卡片，分区之间沿用 pageSectionGap。折叠偏好和筛选协议不变。回归见 `ui-select-layout.test.mjs`，实际尺寸及点击行为另做设备验收。
 
@@ -93,3 +93,13 @@
 
 
 新增和编辑共用 `NoteEditorHeader` 与 `NoteFieldCard`：字段标题右侧添加图片、下方可视编辑和附件预览，工具按钮共享尺寸及固定 8vp 横纵间距。浏览返回在 onShown 消费内容变更信号，保持预览位置；列表刷新保留已挂载列表，并补齐之前已加载的分页范围，避免返回跳到首屏。取消不触发搜索。学习返回保留原卡面，实际写入通过 cardContentChangedTick 触发既有队列/卡面刷新。新页面导航和保存回归见 `editor-page.test.mjs`、`study-note-editor.test.mjs`。
+
+## 内置名称的统一显示
+
+`model/NoteTypePresentation.ts` 是内置笔记类型与字段的显示键入口，`utils/NoteTypeText.ets` 在渲染时通过 `UiFeedback` 解析当前语言。类型别名沿用 `NoteTypeCatalog` 的中英及繁体标准名称；列表协议只提供 ID/名称，因此仅精确匹配标准名称，其他名称原样显示，不做模糊匹配或改库。新增、类型管理、批量更改类型、查找重复、卡片信息与 AI 类型选择共用此入口。
+
+字段标题和输入提示由公共 `NoteFieldCard` 同时处理，Core `originalStockKind` 经 `NoteEditorLoader` / `NoteEditorSession` 传递到编辑表单；只有对应标准类型中的标准字段名才翻译，用户改名、未知类型及无身份信息的字段保持原样。图片遮盖的标题和额外输入使用同一文字入口。原始字段名、顺序、类型 ID 和字段值不受展示翻译影响。
+
+合理差异：模板编辑器的名称输入、`{{字段}}` 插入按钮、批量映射的字段/模板名以及 AI 草稿中的 schema 字段保留真实名称，方便精确核对和引用；搜索串、AI 协议、写入及导出也使用原名，不得把显示别名写回。旧的 `添加笔记面板` 当前无运行时调用，但其类型选择和字段展示也已复用公共入口。
+
+查找调用使用 `rg -n 'noteTypeText|noteFieldText|NoteFieldCard' entry/src/main/ets`。`tools/tests/note-type-i18n.test.mjs` 执行真实公共函数及中英资源，覆盖全部标准类型、字段、语言切换、输入提示、自定义名称和编辑会话身份传递，并扫描绕开公共显示的旧写法；快速验证 `npm test -- browser`，完整验证 `npm run verify`。实际语言切换与系统菜单渲染仍需设备验收。

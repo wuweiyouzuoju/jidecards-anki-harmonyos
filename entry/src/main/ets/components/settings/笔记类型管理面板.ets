@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { noteTypeText } from '../../utils/NoteTypeText';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { DialogBackdrop } from '../common/DialogBackdrop';
 import { resourceText, showToastSafely } from '../../utils/UiFeedback';
@@ -114,7 +115,7 @@ export struct 笔记类型管理面板 {
     }
     this.getUIContext().showAlertDialog({
       title: this.取本地化文本($r('app.string.notetype_mgmt_delete')),
-      message: this.取本地化文本($r('app.string.notetype_mgmt_confirm_delete')) + '\n' + 类型.name,
+      message: this.取本地化文本($r('app.string.notetype_mgmt_confirm_delete')) + '\n' + noteTypeText(this.getUIContext(), 类型.name),
       autoCancel: true,
       alignment: DialogAlignment.Center,
       primaryButton: {
@@ -149,7 +150,7 @@ export struct 笔记类型管理面板 {
   private 类型行(类型: NotetypeNameId) {
     Row({ space: 应用尺寸.间距_8 }) {
       Column({ space: 2 }) {
-        Text(类型.name)
+        Text(noteTypeText(this.getUIContext(), 类型.name))
           .fontSize(应用尺寸.字号_正文)
           .fontColor(设置面板色板_取(this.isDark).主文字)
           .maxLines(1)

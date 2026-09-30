@@ -72,6 +72,8 @@ export struct GeneralSettings {
               .width(SelectStyle.fieldWidth)
               .constraintSize(SelectStyle.fieldConstraint)
               .font(SelectStyle.controlFont)
+              .optionFont(SelectStyle.optionFont)
+              .selectedOptionFont(SelectStyle.selectedOptionFont)
               .textModifier(SelectStyle.labelText())
               .borderRadius(SelectStyle.controlRadius)
               .onSelect((索引: number): void => {
