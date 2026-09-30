@@ -49,8 +49,9 @@ import { 牌组配置服务 } from '../backend/牌组配置服务';
 import { 统计服务 } from '../backend/统计服务';
 import { 牌组服务 } from '../backend/牌组服务';
 import { 后端会话 } from '../backend/后端会话';
-import { 保存卡片数据, 提取卡片数据, 加载小时分布窗口, 加载统计天数, 加载分离暂停偏好 } from './桌面卡片数据存储';
-import { 平铺牌组树 } from './牌组层级';
+import { 加载小时分布窗口, 加载统计天数, 加载分离暂停偏好 } from './桌面卡片数据存储';
+import { createStatsWidget, publishStatsWidget } from '../backend/StatsWidgetPublisher';
+import type { DeckTreeNode } from '../proto/messages/DeckMessages';
 import type {
   DeckConfig,
   DeckConfigsForUpdateView,
@@ -223,20 +224,10 @@ export async function 刷新桌面卡片数据(): Promise<void> {
     const 统计: 统计服务 = new 统计服务();
     // days 跟随统计页「近 1 年/全部」偏好，否则桌面卡片与统计页数据不一致
     const graphs: GraphsView = await 统计.获取图表统计(await 加载统计天数());
-    // 拉牌组树算待学数/牌组数，供桌面卡片今日进度页（失败时传0）
-    let 总待学: number = 0;
-    let 牌组总数: number = 0;
-    try {
-      const 牌组: 牌组服务 = new 牌组服务();
-      const tree = await 牌组.获取牌组树();
-      for (const 子节点 of tree.children) {
-        总待学 += 子节点.newCount + 子节点.learnCount + 子节点.reviewCount;
-      }
-      牌组总数 = 平铺牌组树(tree).length;
-    } catch (_牌组错误) {
-      // 牌组树拉取失败不阻塞，桌面卡片显示0
-    }
-    await 保存卡片数据(提取卡片数据(graphs, 总待学, 牌组总数, await 加载小时分布窗口(), await 加载分离暂停偏好()));
+    // 树读取失败时沿用零计数降级；聚合和发布与首页、统计页共用。
+    let tree: DeckTreeNode | null = null;
+    try { tree = await new 牌组服务().获取牌组树(); } catch (error) {}
+    await publishStatsWidget(createStatsWidget(graphs, tree, await 加载小时分布窗口(), await 加载分离暂停偏好()));
   } catch (错误) {
     hilog.error(0x0000, 'FSRS控制器', `刷新桌面卡片数据异常: ${错误}`);
   }

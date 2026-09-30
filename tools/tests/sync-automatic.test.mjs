@@ -754,7 +754,7 @@ test('sync icon stays inline with accessible details and preserves error/conflic
   assert.ok(toolbar.indexOf('LoadingProgress()') > toolbar.indexOf("app.string.study_more"));
   assert.ok(toolbar.indexOf('LoadingProgress()') < toolbar.indexOf("app.string.create_deck"));
   assert.match(panel, /this\.statusChanged\(text, indicator\)/);
-  assert.match(panel, /if \(this.detailsVisible\)/);
+  assert.match(panel, /if \(this.state.detailsVisible\)/);
 });
 
 

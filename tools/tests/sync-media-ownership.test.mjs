@@ -63,7 +63,8 @@ test('media management observes the lease without consuming the sync result', as
 });
 
 test('non-owner media guards never call the consuming Core status RPC', () => {
-  for (const path of ['pages/首页.ets', 'components/settings/媒体管理面板.ets']) {
+  assert.doesNotMatch(read('pages/首页.ets'), /\.媒体同步状态\(/);
+  for (const path of ['components/home/HomeDeckDeletion.ets', 'components/settings/媒体管理面板.ets']) {
     assert.doesNotMatch(read(path), /\.媒体同步状态\(/, path);
     assert.match(read(path), /isSyncing:[^\n]+syncActivity\.isActive\(\)/);
   }
