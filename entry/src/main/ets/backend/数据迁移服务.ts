@@ -10,10 +10,16 @@
 
 import { common } from '@kit.AbilityKit';
 import { picker } from '@kit.CoreFileKit';
-import { 复制目录, 删除目录, 确保目录存在, 复制文件, 复制URI到沙箱, 按描述符复制文件, 静默删除 } from './DataTransferFiles';
+import { ImportOperation } from '../model/ImportOperation';
+import { withImportProgress } from './ImportProgressService';
+import { checkReplacementSpace, prepareReplacementRecovery, markReplacementCommitted,
+  recoverInterruptedReplacement, cleanupReplacementRecovery } from './TransferRecovery';
+import { 确保目录存在, 复制URI到沙箱, 按描述符复制文件, 静默删除 } from './DataTransferFiles';
 import { 后端会话 } from './后端会话';
 import { 导入导出方法, 服务号 } from './服务索引';
-import type { ImportSummary } from '../proto/messages/ImportExportMessages';
+import type { TextExportOptions } from '../proto/messages/TextExportMessages';
+import { encodeTextExportRequest } from '../proto/messages/TextExportMessages';
+import type { ImportSummary, ImportAnkiPackageOptions } from '../proto/messages/ImportExportMessages';
 import {
   decodeImportResponse,
   encodeExportAnkiPackageRequest,
@@ -39,12 +45,6 @@ const 媒体库文件名: string = 'collection.mdb';
 const 媒体目录名: string = 'collection.media';
 let 迁移输出ID: number = 0;
 
-interface 安全副本结构 {
-  根目录: string;
-  集合文件路径: string;
-  媒体库路径: string;
-  媒体目录路径: string;
-}
 
 export type 数据迁移校验键 = 'transfer_confirmation_required';
 
@@ -106,6 +106,20 @@ export async function 导出牌组(
     return 输出路径;
   } catch (error) {
     await 静默删除(输出路径);
+    throw error;
+  }
+}
+
+/** @throws {Error} 文本导出失败保留原始错误并清理临时文件。 */
+export async function exportText(filesDir: string, deckId: number, options: TextExportOptions): Promise<string> {
+  const path = await 生成输出路径(filesDir, 'text', 'txt');
+  try {
+    await 后端会话.获取实例().调用(服务号.后端导入导出,
+      options.kind === 'notes' ? 导入导出方法.exportNoteCsv : 导入导出方法.exportCardCsv,
+      encodeTextExportRequest(path, deckId, options));
+    return path;
+  } catch (error) {
+    await 静默删除(path);
     throw error;
   }
 }
@@ -222,18 +236,19 @@ function 下一迁移输出ID(): number {
 
 /** Copies the selected .apkg into the sandbox for backend import. Returns the staged path. */
 /** @throws {Error} 文件读写或迁移失败，调用方必须停止操作并显示失败。 */
-export async function 暂存导入文件(文件目录: string, 源URI: string): Promise<string> {
-  return await 复制URI到沙箱(文件目录, 源URI, 'apkg');
+export async function 暂存导入文件(文件目录: string, 源URI: string, operation: ImportOperation | null = null): Promise<string> {
+  return await 复制URI到沙箱(文件目录, 源URI, 'apkg', operation);
 }
 
 /** Runs the backend import on a previously staged file, then cleans up. */
-export async function 执行牌组导入(暂存路径: string): Promise<ImportSummary> {
+export async function 执行牌组导入(暂存路径: string, options?: ImportAnkiPackageOptions,
+  operation: ImportOperation | null = null): Promise<ImportSummary> {
   try {
-    const 响应 = await 后端会话.获取实例().调用(
+    const 响应 = await withImportProgress(operation, async (): Promise<Uint8Array> => await 后端会话.获取实例().调用(
       服务号.后端导入导出,
       导入导出方法.导入Anki包,
-      encodeImportAnkiPackageRequest(暂存路径)
-    );
+      encodeImportAnkiPackageRequest(暂存路径, options)
+    ));
     return decodeImportResponse(响应);
   } finally {
     await 静默删除(暂存路径);
@@ -246,22 +261,31 @@ export async function 替换集合(
   文件目录: string,
   源URI: string,
   是否已确认: boolean,
-  阶段回调?: (阶段: number) => void
+  阶段回调?: (阶段: number) => void,
+  operation: ImportOperation | null = null
 ): Promise<void> {
   if (!是否已确认) {
     throw new 数据迁移校验错误('transfer_confirmation_required');
   }
 
   阶段回调?.(0); // 准备文件中
-  const 暂存路径 = await 复制URI到沙箱(文件目录, 源URI, 'colpkg');
+  const 暂存路径 = await 复制URI到沙箱(文件目录, 源URI, 'colpkg', operation);
   const 会话 = 后端会话.获取实例();
-  let 安全副本: 安全副本结构 | null = null;
+  let closed: boolean = false;
+  let prepared: boolean = false;
+  let committed: boolean = false;
   try {
+    await checkReplacementSpace(文件目录, 暂存路径);
+    operation?.check();
     阶段回调?.(1); // 关闭数据库中
     await 会话.关闭集合();
-    安全副本 = await 创建安全副本(文件目录);
+    closed = true;
+    operation?.progress('', 0, 0, false);
+    await prepareReplacementRecovery(文件目录, operation);
+    prepared = true;
+    operation?.check();
     阶段回调?.(2); // 导入数据中
-    await 会话.在集合关闭下调用(
+    await withImportProgress(operation, async (): Promise<Uint8Array> => await 会话.在集合关闭下调用(
       服务号.后端导入导出,
       导入导出方法.导入集合包,
       encodeImportCollectionPackageRequest({
@@ -270,58 +294,23 @@ export async function 替换集合(
         mediaFolder: `${文件目录}/${媒体目录名}`,
         mediaDb: `${文件目录}/${媒体库文件名}`
       })
-    );
+    ));
     阶段回调?.(3); // 恢复数据库中
-    await 会话.确保已打开(文件目录);
+    operation?.progress('', 0, 0, false);
+    await 会话.确保已打开(文件目录, true);
+    closed = false;
+    await markReplacementCommitted(文件目录);
+    committed = true;
   } catch (error) {
-    if (安全副本 !== null) {
-      await 恢复安全副本(文件目录, 安全副本);
+    operation?.progress('', 0, 0, false);
+    if (prepared && !committed) {
+      if (!closed) await 会话.关闭集合();
+      await recoverInterruptedReplacement(文件目录);
     }
-    await 会话.确保已打开(文件目录);
+    if (closed || prepared) await 会话.确保已打开(文件目录);
     throw error;
   } finally {
     await 静默删除(暂存路径);
   }
-  if (安全副本 !== null) {
-    await 删除安全副本(安全副本);
-  }
-}
-
-/** @throws {Error} 文件读写或迁移失败，调用方必须停止操作并显示失败。 */
-async function 创建安全副本(文件目录: string): Promise<安全副本结构> {
-  const 根目录 = `${文件目录}/transfer-safety-${Date.now()}-${下一迁移输出ID()}`;
-  const 集合文件路径 = `${根目录}/${集合文件名}`;
-  const 媒体库路径 = `${根目录}/${媒体库文件名}`;
-  const 媒体目录路径 = `${根目录}/${媒体目录名}`;
-  await 确保目录存在(根目录);
-  try {
-    await 复制文件(`${文件目录}/${集合文件名}`, 集合文件路径);
-    await 复制文件(`${文件目录}/${媒体库文件名}`, 媒体库路径);
-    await 复制目录(`${文件目录}/${媒体目录名}`, 媒体目录路径);
-  } catch (error) {
-    await 静默删除目录(根目录);
-    throw error;
-  }
-  return { 根目录, 集合文件路径, 媒体库路径, 媒体目录路径 };
-}
-
-/** @throws {Error} 文件读写或迁移失败，调用方必须停止操作并显示失败。 */
-async function 恢复安全副本(文件目录: string, 安全副本: 安全副本结构): Promise<void> {
-  await 复制文件(安全副本.集合文件路径, `${文件目录}/${集合文件名}`);
-  await 复制文件(安全副本.媒体库路径, `${文件目录}/${媒体库文件名}`);
-  const 媒体路径 = `${文件目录}/${媒体目录名}`;
-  await 删除目录(媒体路径);
-  await 复制目录(安全副本.媒体目录路径, 媒体路径);
-}
-
-async function 删除安全副本(安全副本: 安全副本结构): Promise<void> {
-  await 静默删除目录(安全副本.根目录);
-}
-
-async function 静默删除目录(路径: string): Promise<void> {
-  try {
-    await 删除目录(路径);
-  } catch (error) {
-    // A stale private recovery copy is safe; it must not roll back a successful import.
-  }
+  await cleanupReplacementRecovery(文件目录);
 }

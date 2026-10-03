@@ -67,7 +67,7 @@ export class 后端会话 {
    * 并发调用共享同一次打开过程；失败后可重试。
    * 文件目录 为应用沙箱文件目录（context.filesDir）。
    */
-  确保已打开(文件目录: string): Promise<void> {
+  确保已打开(文件目录: string, 验证待提交替换: boolean = false): Promise<void> {
     if (this.状态 === 'ready') {
       return Promise.resolve();
     }
@@ -75,7 +75,7 @@ export class 后端会话 {
       return this.打开中;
     }
     const generation: number = this.generation;
-    this.打开中 = this.内部打开(文件目录)
+    this.打开中 = this.内部打开(文件目录, generation, 验证待提交替换)
       .then(() => {
         if (generation !== this.generation) {
           throw new Error('Backend session was closed while opening');
@@ -96,7 +96,16 @@ export class 后端会话 {
     return this.打开中;
   }
 
-  private async 内部打开(文件目录: string): Promise<void> {
+  /** @throws Recovery or native open failures are handled by 确保已打开 and reported to its caller. */
+  private async 内部打开(文件目录: string, generation: number, 验证待提交替换: boolean): Promise<void> {
+    if (!验证待提交替换) {
+      // Every ordinary reopen must finish pending recovery, including a failed rollback in this process.
+      // Only the replacement owner skips this to validate its new collection before marking it committed.
+      const recovery = await import('./TransferRecovery');
+      if (generation !== this.generation) throw new Error('Backend session was closed while opening');
+      await recovery.recoverInterruptedReplacement(文件目录);
+    }
+    if (generation !== this.generation) throw new Error('Backend session was closed while opening');
     if (!this.客户端.是否已打开()) {
       // server=false：本地库模式；26.05 允许空 locale 目录无翻译运行
       const init = encodeBackendInit({ preferredLangs: ['zh-Hans', 'en'], localeFolderPath: '', server: false });
@@ -113,6 +122,12 @@ export class 后端会话 {
       mediaDbPath: `${文件目录}/collection.mdb`
     });
     await this.原始调用(服务号.后端集合, 集合方法.打开, request);
+  }
+
+  /** 已打开 backend 且 collection 就绪 */
+  async 调用进度控制(method: number): Promise<Uint8Array> {
+    if (method !== 集合方法.最新进度 && method !== 集合方法.设置中止请求) throw new Error('Invalid progress control');
+    return this.原始调用(服务号.后端集合, method, new Uint8Array(0));
   }
 
   /** 已打开 backend 且 collection 就绪 */

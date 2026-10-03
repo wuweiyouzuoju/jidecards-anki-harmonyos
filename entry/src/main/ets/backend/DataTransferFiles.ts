@@ -2,6 +2,7 @@
 // 文件描述符与目录树 IO 的唯一适配；大文件复制不占用 UI 执行线程。
 import { BusinessError } from '@kit.BasicServicesKit';
 import { fileIo as fs } from '@kit.CoreFileKit';
+import { ImportOperation } from '../model/ImportOperation';
 let transferFileId: number = 0;
 function nextTransferFileId(): number { return ++transferFileId; }
 
@@ -60,12 +61,13 @@ export async function 复制文件(源路径: string, 目标路径: string): Pro
 }
 
 /** @throws {Error} 文件复制或清理失败，向迁移编排传播以停止替换并执行恢复。 */
-export async function 复制URI到沙箱(文件目录: string, URI: string, 扩展名: string): Promise<string> {
+export async function 复制URI到沙箱(文件目录: string, URI: string, 扩展名: string,
+  operation: ImportOperation | null = null): Promise<string> {
   const 导入目录: string = `${文件目录}/imports`;
   if (!await 路径存在(导入目录)) await fs.mkdir(导入目录);
   const 路径: string = `${导入目录}/import-${Date.now()}-${nextTransferFileId()}.${扩展名}`;
   try {
-    await 按描述符复制文件(URI, 路径);
+    await 按描述符复制文件(URI, 路径, operation);
     return 路径;
   } catch (error) {
     await 静默删除(路径);
@@ -78,15 +80,20 @@ export async function 复制URI到沙箱(文件目录: string, URI: string, 扩�
  * cannot safely consume the temporary provider permissions returned by Harmony pickers.
  */
 /** @throws {Error} 文件复制或清理失败，向迁移编排传播以停止替换并执行恢复。 */
-export async function 按描述符复制文件(源URI或路径: string, 目标URI或路径: string): Promise<void> {
+export async function 按描述符复制文件(源URI或路径: string, 目标URI或路径: string,
+  operation: ImportOperation | null = null): Promise<void> {
+  operation?.check();
   const 源文件: fs.File = await fs.open(源URI或路径, fs.OpenMode.READ_ONLY);
   try {
+    const total: number = operation === null ? 0 : (await fs.stat(源文件.fd)).size;
+    let processed: number = 0;
     const 目标文件: fs.File = await fs.open(
       目标URI或路径, fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE | fs.OpenMode.TRUNC);
     try {
       const 缓冲区: ArrayBuffer = new ArrayBuffer(64 * 1024);
       let 读取大小: number = await fs.read(源文件.fd, 缓冲区, { length: 缓冲区.byteLength });
       while (读取大小 > 0) {
+        operation?.check();
         let 已写入总数: number = 0;
         while (已写入总数 < 读取大小) {
           // fileIo's offset is a file position, not an ArrayBuffer offset.
@@ -98,8 +105,11 @@ export async function 按描述符复制文件(源URI或路径: string, 目标UR
           }
           已写入总数 += 写入大小;
         }
+        processed += 读取大小;
+        operation?.progress('', processed, total);
         读取大小 = await fs.read(源文件.fd, 缓冲区, { length: 缓冲区.byteLength });
       }
+      operation?.check();
     } finally {
       await fs.close(目标文件);
     }

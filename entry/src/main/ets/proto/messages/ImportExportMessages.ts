@@ -69,6 +69,11 @@ export interface ImportSummary {
   updatedNotes: number;
   duplicateNotes: number;
   foundNotes: number;
+  conflictingNotes: number;
+  firstFieldMatches: number;
+  missingNotetypeNotes: number;
+  missingDeckNotes: number;
+  emptyFirstFieldNotes: number;
 }
 
 export const DEFAULT_IMPORT_ANKI_PACKAGE_OPTIONS: ImportAnkiPackageOptions = {
@@ -157,7 +162,8 @@ function encodeExportAnkiPackageOptions(options: ExportAnkiPackageOptions): 协�
 
 /** ImportResponse: only counts the Log section required by the presentation layer. */
 export function decodeImportResponse(bytes: Uint8Array): ImportSummary {
-  const summary: ImportSummary = { newNotes: 0, updatedNotes: 0, duplicateNotes: 0, foundNotes: 0 };
+  const summary: ImportSummary = { newNotes: 0, updatedNotes: 0, duplicateNotes: 0, foundNotes: 0,
+    conflictingNotes: 0, firstFieldMatches: 0, missingNotetypeNotes: 0, missingDeckNotes: 0, emptyFirstFieldNotes: 0 };
   const r = new 协议读取器(bytes);
   let tag;
   while ((tag = r.读取标签()) !== null) {
@@ -187,6 +193,11 @@ function decodeImportLog(bytes: Uint8Array, summary: ImportSummary): void {
         summary.duplicateNotes += 1;
         r.跳过字段(tag.线类型);
         break;
+      case 4: summary.conflictingNotes++; r.跳过字段(tag.线类型); break;
+      case 5: summary.firstFieldMatches++; r.跳过字段(tag.线类型); break;
+      case 6: summary.missingNotetypeNotes++; r.跳过字段(tag.线类型); break;
+      case 7: summary.missingDeckNotes++; r.跳过字段(tag.线类型); break;
+      case 8: summary.emptyFirstFieldNotes++; r.跳过字段(tag.线类型); break;
       case 10:
         summary.foundNotes = r.读取变长整数();
         break;

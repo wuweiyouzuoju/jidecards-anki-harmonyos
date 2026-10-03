@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
+import { ImportOperation, ImportCancelled } from '../../entry/src/main/ets/model/ImportOperation.ts';
 function files(fs) {
   const source = readFileSync(new URL('../../entry/src/main/ets/backend/DataTransferFiles.ts', import.meta.url), 'utf8')
     .replace(/^import .*;\r?$/gm, '').replace(/export /g, '');
@@ -22,8 +23,16 @@ function harness(fail = '') {
       if (fail === 'write') throw Error('write'); if (fail === 'zero') return 0;
       const count = Math.min(options.length, 73); writes.push(Buffer.from(buffer).subarray(0, count)); return count;
     }, close: async file => {closed.push(file.fd); if (fail === 'close' && file.fd === 2) throw Error('close');}};
+  fs.stat = async () => ({size: input.length});
   return {api: files(fs), input, writes, closed, reads};
 }
+
+test('copy cancellation releases descriptors and stops before consuming the rest of the file', async () => {
+  const h = harness();
+  const operation = new ImportOperation(() => operation.cancel());
+  await assert.rejects(h.api.按描述符复制文件('input', 'output', operation), ImportCancelled);
+  assert.deepEqual(h.closed, [2, 1]); assert.ok(Buffer.concat(h.writes).length < h.input.length);
+});
 test('async provider stream preserves short reads/writes with bounded buffers and closes both descriptors', async () => {
   const h = harness(); await h.api.按描述符复制文件('provider://input', 'provider://output');
   assert.deepEqual(Buffer.concat(h.writes), h.input); assert.deepEqual(h.closed, [2, 1]);
@@ -42,34 +51,69 @@ test('migration file adapter has no blocking filesystem calls', () => {
   assert.doesNotMatch(source, /fs\.\w+Sync\(/);
 });
 
-function replacement(fail) {
-  const events = [];
-  const copy = async (source, dest) => {events.push(['copy', source, dest]); if (fail === 'backup' && dest.endsWith('collection.mdb')) throw Error('disk full');};
-  const session = {关闭集合: async () => events.push('close'),
-    在集合关闭下调用: async () => {events.push('import'); if (fail === 'import') throw Error('import failed');},
-    确保已打开: async () => events.push('open')};
-  const deps = {复制目录: copy, 删除目录: async path => {events.push(['remove', path]); if (fail === 'cleanup' && path.includes('safety')) throw Error('cleanup');},
-    确保目录存在: async () => {}, 复制文件: copy, 复制URI到沙箱: async () => '/temporary.colpkg',
-    按描述符复制文件: async () => {}, 静默删除: async path => events.push(['unlink', path]),
-    后端会话: {获取实例: () => session}, 服务号: {后端导入导出: 39}, 导入导出方法: {导入集合包: 0}, encodeImportCollectionPackageRequest: x => x};
-  const source = readFileSync(new URL('../../entry/src/main/ets/backend/数据迁移服务.ts', import.meta.url), 'utf8')
-    .replace(/^import [\s\S]*?from ['"][^'"]+['"];\r?\n/gm, '').replace(/export /g, '');
-  const run = new Function(...Object.keys(deps), stripTypeScriptTypes(source) + '; return 替换集合;')(...Object.values(deps));
-  return {events, run: () => run('/files', 'provider://collection', true)};
+// Replacement integration now exercises the durable recovery adapter against a real temporary filesystem.
+import { after } from 'node:test';
+import { promises as fsp, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { loadPlatformModule } from './platform-module-harness.mjs';
+const roots=[];
+after(async()=>{for(const root of roots) await fsp.rm(root,{recursive:true,force:true});});
+async function replacement(fail='') {
+  const root=mkdtempSync(path.join(tmpdir(),'jide-import-')); roots.push(root);
+  await fsp.mkdir(root+'/collection.media');
+  await fsp.writeFile(root+'/collection.anki2','original db');
+  await fsp.writeFile(root+'/collection.mdb','original media db');
+  await fsp.writeFile(root+'/collection.media/original','original media');
+  await fsp.writeFile(root+'/input.colpkg','package');
+  const events=[];
+  const exists=async p=>{try{await fsp.access(p);return true;}catch(e){if(e.code==='ENOENT')return false;throw e;}};
+  const copy=async(src,dst)=>{events.push(['copy',src,dst]);if(fail==='backup'&&dst.includes('transfer-recovery/')&&dst.endsWith('collection.mdb'))throw Error('disk full');await fsp.copyFile(src,dst);};
+  const remove=async p=>{events.push(['remove',p]);if(fail==='cleanup'&&p.endsWith('transfer-recovery-discarded'))throw Error('cleanup');await fsp.rm(p,{recursive:true,force:true});};
+  const deps={fs:{...fsp,listFile:async p=>fsp.readdir(p)},statfs:{getFreeSize:async()=>fail==='space'?0:1e12},
+    路径存在:exists,复制文件:copy,复制目录:async(src,dst)=>{if(await exists(src)){events.push(['copy',src,dst]);await fsp.cp(src,dst,{recursive:true});}},
+    删除目录:remove,确保目录存在:async p=>fsp.mkdir(p,{recursive:true})};
+  const recovery=loadPlatformModule('backend/TransferRecovery.ts','({checkReplacementSpace,prepareReplacementRecovery,markReplacementCommitted,recoverInterruptedReplacement,cleanupReplacementRecovery})',deps);
+  const session={关闭集合:async()=>events.push('close'),确保已打开:async()=>events.push('open'),
+    在集合关闭下调用:async()=>{events.push('import');await fsp.writeFile(root+'/collection.anki2','new db');await fsp.writeFile(root+'/collection.media/new','new media');if(fail==='import')throw Error('import failed');return new Uint8Array();}};
+  const run=loadPlatformModule('backend/数据迁移服务.ts','替换集合',{...deps,...recovery,withImportProgress:async(_op,fn)=>fn(),
+    复制URI到沙箱:async()=>root+'/input.colpkg',静默删除:async p=>fsp.rm(p,{force:true}),
+    后端会话:{获取实例:()=>session},服务号:{后端导入导出:39},导入导出方法:{导入集合包:0},encodeImportCollectionPackageRequest:x=>x});
+  return {root,events,recovery,run:()=>run(root,'provider://collection',true),read:async p=>fsp.readFile(root+'/'+p,'utf8')};
 }
-test('failed import restores complete safety copy before reopening and preserves original error', async () => {
-  const h = replacement('import'); await assert.rejects(h.run(), /import failed/);
-  const importAt = h.events.indexOf('import'); assert.equal(h.events[0], 'close');
-  assert.equal(h.events.slice(0, importAt).filter(e => e[0] === 'copy').length, 3);
-  assert.equal(h.events.slice(importAt).filter(e => e[0] === 'copy').length, 3);
-  assert.ok(h.events.indexOf('open') > importAt); assert.deepEqual(h.events.at(-1), ['unlink', '/temporary.colpkg']);
+test('failed import restores complete safety copy before reopening and preserves original error',async()=>{
+ const h=await replacement('import');await assert.rejects(h.run(),/import failed/);
+ assert.equal(await h.read('collection.anki2'),'original db');assert.equal(await h.read('collection.mdb'),'original media db');
+ assert.equal(await h.read('collection.media/original'),'original media');await assert.rejects(h.read('collection.media/new'));
+ assert.equal(h.events.at(-1),'open');
 });
-test('failed safety copy cleans partial backup, reopens original and never starts import', async () => {
-  const h = replacement('backup'); await assert.rejects(h.run(), /disk full/);
-  assert.equal(h.events.includes('import'), false); assert.ok(h.events.includes('open'));
-  assert.ok(h.events.some(e => e[0] === 'remove' && e[1].includes('safety')));
+test('failed safety copy cleans partial backup, reopens original and never starts import',async()=>{
+ const h=await replacement('backup');await assert.rejects(h.run(),/disk full/);
+ assert.equal(h.events.includes('import'),false);assert.ok(h.events.includes('open'));assert.equal(await h.read('collection.anki2'),'original db');
+ await assert.rejects(fsp.access(h.root+'/transfer-recovery'));
 });
-test('cleanup failure after success never rolls back the accepted replacement', async () => {
-  const h = replacement('cleanup'); await h.run();
-  assert.equal(h.events.filter(e => e[0] === 'copy').length, 3); assert.equal(h.events.filter(e => e === 'open').length, 1);
+test('cleanup failure after success never rolls back the accepted replacement, including next startup',async()=>{
+ const h=await replacement('cleanup');await h.run();assert.equal(await h.read('collection.anki2'),'new db');
+ await h.recovery.recoverInterruptedReplacement(h.root);assert.equal(await h.read('collection.anki2'),'new db');
+});
+test('space failure occurs before closing or modifying the collection',async()=>{
+ const h=await replacement('space');await assert.rejects(h.run(),/transfer_space_insufficient/);assert.deepEqual(h.events,[]);
+ assert.equal(await h.read('collection.anki2'),'original db');
+});
+test('startup restores an interrupted replacement and removes WAL and newly imported media',async()=>{
+ const h=await replacement();await h.recovery.prepareReplacementRecovery(h.root,null);
+ await fsp.writeFile(h.root+'/collection.anki2','half imported');await fsp.writeFile(h.root+'/collection.anki2-wal','stale WAL');
+ await fsp.writeFile(h.root+'/collection.media/partial','partial');
+ await h.recovery.recoverInterruptedReplacement(h.root);await h.recovery.recoverInterruptedReplacement(h.root);
+ assert.equal(await h.read('collection.anki2'),'original db');await assert.rejects(h.read('collection.anki2-wal'));await assert.rejects(h.read('collection.media/partial'));
+});
+test('an incomplete backup never replaces the intact current database',async()=>{
+ const h=await replacement();await fsp.mkdir(h.root+'/transfer-recovery');await fsp.writeFile(h.root+'/transfer-recovery/collection.anki2','partial backup');
+ await h.recovery.recoverInterruptedReplacement(h.root);assert.equal(await h.read('collection.anki2'),'original db');
+});
+test('interruption during rollback retains backup and retries the whole rollback',async()=>{
+ const h=await replacement();await h.recovery.prepareReplacementRecovery(h.root,null);
+ await fsp.writeFile(h.root+'/collection.anki2','partial rollback');await fsp.rm(h.root+'/collection.media',{recursive:true});
+ await h.recovery.recoverInterruptedReplacement(h.root);assert.equal(await h.read('collection.media/original'),'original media');
+ assert.equal(await h.read('collection.anki2'),'original db');
 });

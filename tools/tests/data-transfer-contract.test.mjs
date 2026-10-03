@@ -45,18 +45,18 @@ test('data transfer service exposes package workflows and safe collection replac
   assert.match(service, /export class 数据迁移校验错误 extends Error/);
   assert.doesNotMatch(service, /会话\.关闭\(\)/);
   const closeAt = service.indexOf('会话.关闭集合()');
-  const backupAt = service.indexOf('创建安全副本');
+  const backupAt = service.indexOf('await prepareReplacementRecovery');
   const importAt = service.indexOf('会话.在集合关闭下调用(', backupAt);
-  const reopenAt = service.indexOf('会话.确保已打开(文件目录)', importAt);
+  const reopenAt = service.indexOf('会话.确保已打开(文件目录, true)', importAt);
   assert.ok(closeAt < backupAt && backupAt < importAt && importAt < reopenAt);
   assert.match(service, /finally[\s\S]*静默删除/);
   assert.match(service, /export async function 完成导出/);
   assert.match(service, /保存沙箱导出/);
   assert.match(service, /下一迁移输出ID/);
-  assert.match(service, /复制目录\(/);
-  assert.match(service, /静默删除目录\(安全副本\.根目录\)/);
-  const successfulReopenAt = service.indexOf('await 会话.确保已打开(文件目录);');
-  const cleanupAt = service.indexOf('删除安全副本(安全副本);');
+  assert.match(service, /await recoverInterruptedReplacement\(文件目录\)/);
+  assert.match(service, /await markReplacementCommitted\(文件目录\)/);
+  const successfulReopenAt = service.indexOf('await 会话.确保已打开(文件目录, true);');
+  const cleanupAt = service.indexOf('await cleanupReplacementRecovery(文件目录);');
   const catchAt = service.indexOf('} catch (error)', reopenAt);
   assert.ok(successfulReopenAt < cleanupAt && catchAt < cleanupAt, 'safety cleanup must run after rollback scope');
 });
@@ -67,10 +67,9 @@ test('data transfer panel only emits typed intents and separates merge from repl
   assert.match(panel, /replacePersonalData/);
   assert.match(panel, /onIntent/);
   assert.doesNotMatch(panel, /数据迁移服务|后端会话|\.run\(/);
-  // 模式切换：Task 3 2026-07-23 改用 Select 下拉（4 选项折叠）替代 @Builder modeTab（横屏越界）
-  assert.match(panel, /迁移模式列表: 数据迁移模式\[\]/);
-  assert.match(panel, /Select\(this\.模式下拉选项\(\)\)/);
-  assert.match(panel, /模式下拉索引/);
+  assert.doesNotMatch(panel, /迁移模式列表|模式下拉/);
+  assert.match(panel, /title: this\.模式标签\(this\.模式\)/);
+  assert.match(panel, /Text\(this\.fileName\)/);
   // 导出选项默认展开（不再用 showExportOptions 切换）
   assert.match(panel, /已确认替换个人数据/);
   for (const option of ['withScheduling', 'withDeckConfigs', 'includeMedia', 'legacy']) {

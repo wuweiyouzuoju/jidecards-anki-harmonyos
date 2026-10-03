@@ -40,7 +40,7 @@ test('method ids match the generated backend.rs dispatch table', () => {
     新建牌组: 0, 添加牌组: 1, 牌组树: 4, 获取牌组名: 13,
     删除牌组: 16, 重命名牌组: 18,
     获取或创建过滤牌组: 19, 添加或更新过滤牌组: 20, 过滤牌组排序标签: 21,
-    设置当前牌组: 22, 获取当前牌组: 23
+    设置当前牌组: 22, 获取当前牌组: 23, getAllDecksLegacy: 6
   });
   assert.deepEqual({ ...牌组配置方法 }, {
     获取牌组配置: 1, 获取牌组配置编辑视图: 6, 更新牌组配置: 7
@@ -52,19 +52,20 @@ test('method ids match the generated backend.rs dispatch table', () => {
     清空过滤牌组: 15, 重建过滤牌组: 16,
     设置到期日: 19, 排序卡片: 21,
     描述下一档状态: 24, 自定义学习: 27, 自定义学习默认值: 28,
-    重新定位默认值: 29
+    重新定位默认值: 29, computeFsrsParams: 30, simulateFsrsWorkload: 34
   });
-  assert.deepEqual({ ...卡片渲染方法 }, { 提取音视频标签: 3, extractLatex: 4, 获取空卡: 5, 渲染既有卡片: 6 });
+  assert.deepEqual({ ...卡片渲染方法 }, { 提取音视频标签: 3, extractLatex: 4, 获取空卡: 5, 渲染既有卡片: 6,
+    renderUncommittedCardLegacy: 8 });
   assert.deepEqual({ ...导入导出方法 }, {
     导入集合包: 0, 导出集合包: 1,
-    导入Anki包: 2, 导出Anki包: 4
+    导入Anki包: 2, 导出Anki包: 4, 获取CSV元数据: 5, 导入CSV: 6, exportNoteCsv: 7, exportCardCsv: 8
   });
   // Type-in-the-Answer 翻面拉取笔记字段：笔记方法.获取笔记=6 + 笔记类型方法.获取笔记类型=6
   // 浏览编辑区 T7 保存修改：笔记方法.更新笔记=5（UpdateNotes RPC，返回 OpChanges）
   assert.deepEqual({ ...笔记方法 }, {
     新建笔记: 0, 添加笔记: 1, 添加默认值: 3,
     更新笔记: 5, 获取笔记: 6, 笔记字段校验: 11,
-    某笔记的卡片: 12, 笔记的唯一笔记类型: 13
+    某笔记的卡片: 12, 笔记的唯一笔记类型: 13, clozeNumbersInNote: 8
   });
   // T8 批量操作「更改笔记类型」：获取变更笔记类型信息=14 + 变更笔记类型=15
   assert.deepEqual({ ...笔记类型方法 }, {

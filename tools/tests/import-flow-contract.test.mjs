@@ -36,20 +36,32 @@ test('home routes picker and external imports through the transfer session and p
   assert.match(page,/DataTransferFeature\(\{/);
   assert.match(page,/transferSession\.importUri/);
   assert.match(adapter,/选取数据文件\(this\.context\(\), \['\.apkg'\]\)/);
-  assert.match(adapter,/暂存导入文件\(context\.filesDir, uri\)/);
-  assert.match(adapter,/await 执行牌组导入\(path\)/);
+  assert.match(adapter,/暂存导入文件\(context\.filesDir, uri, operation\)/);
+  assert.match(adapter,/await 执行牌组导入\(path, options, operation\)/);
   assert.doesNotMatch(page,/暂存导入文件|选取数据文件/);
   // Queueing, refresh ordering, confirmation and disposal execute against DataTransferSession.
 });
 
-test('settings opens the unified data-management entry instead of a direct import row', () => {
+test('settings exposes separate import, export and backup routes', () => {
   const settings = read(SETTINGS);
   const dataGroup = read(DATA_GROUP);
 
   assert.match(settings, /导入数据回调: \(\) => void/);
   assert.match(settings, /导出数据回调: \(\) => void/);
-  assert.match(dataGroup, /app\.string\.settings_export_import_data/);
-  assert.match(settings, /点击导出导入回调:.*this\.导出数据回调\(\)/);
+  for (const id of ['import', 'export_deck', 'backups']) assert.ok(dataGroup.includes(`settingsItemText(this.getUIContext(), '${id}')`));
+  assert.match(settings, /点击导入回调:.*this\.导入数据回调\(\)/);
+  assert.match(settings, /点击导出回调:.*this\.导出数据回调\(\)/);
+  assert.match(read('entry/src/main/ets/pages/首页.ets'), /transferSession\.startImport\(\)/);
+  const settingsPage = read('entry/src/main/ets/pages/设置页.ets');
+  assert.match(settingsPage, /打开数据迁移\('importFile', 0, false\)/);
+  assert.match(settingsPage, /创建完整备份回调:.*打开数据迁移\('exportPersonalData'/);
+  assert.match(settingsPage, /恢复完整备份回调:.*打开数据迁移\('importPersonalData'/);
+  const backups = read('entry/src/main/ets/components/settings/备份管理面板.ets');
+  assert.match(backups, /onAction: this\.onExportCollection/);
+  assert.match(backups, /onAction: this\.onImportCollection/);
+  assert.match(backups, /backup_management_subtitle/);
+  assert.match(backups, /DataActionRow/);
+  assert.match(dataGroup, /DataActionRow/);
   assert.doesNotMatch(settings, /backup_sync_title/);
 });
 
