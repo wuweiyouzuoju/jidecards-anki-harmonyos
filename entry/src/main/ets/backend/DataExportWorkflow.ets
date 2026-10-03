@@ -1,12 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { common } from '@kit.AbilityKit';
-import type { 导出牌组意图, 导出个人数据意图 } from '../model/DataTransferIntent';
-import { 导出牌组, 导出集合, 完成导出 } from './数据迁移服务';
+import type { 导出牌组意图, 导出个人数据意图, ExportTextIntent } from '../model/DataTransferIntent';
+import { 导出牌组, 导出集合, 完成导出, exportText } from './数据迁移服务';
 
 /** 导出和文件保存共用一条流程；阶段回调只报告进度，页面负责自己的可见状态。 */
 /** @throws {Error} 导出或系统文件保存失败，由页面操作入口显示错误。 */
 export async function exportPersonalData(context: common.UIAbilityContext,
-  intent: 导出牌组意图 | 导出个人数据意图, stage: (value: number) => void): Promise<string | null> {
+  intent: 导出牌组意图 | 导出个人数据意图 | ExportTextIntent, stage: (value: number) => void): Promise<string | null> {
+  if (intent.kind === 'exportText') {
+    const path = await exportText(context.filesDir, intent.deckId, intent.options);
+    stage(1);
+    return 完成导出(context, path, 'jidecards-' + intent.options.kind + '.txt', '.txt');
+  }
   const path: string = intent.kind === 'exportDeck'
     ? await 导出牌组(context.filesDir, intent.deckId, intent.options)
     : await 导出集合(context.filesDir, intent.options);

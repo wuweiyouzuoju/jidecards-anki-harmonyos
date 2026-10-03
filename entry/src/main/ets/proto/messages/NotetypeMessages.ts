@@ -22,7 +22,7 @@
 // 解码：NotetypeView / NotetypeNameId[]
 // 编码：UpdateNotetypeLegacyRequest（JSON 路径整体更新，不走完整 Notetype proto 编码）
 // NotetypeField.ord 解码后用作排序键，确保字段顺序与 Anki 桌面端一致。
-// NotetypeField 内的 Field config 等子字段只读跳过。
+// Field config 只读取编辑器使用的 sticky，其余配置由 Core 保持。
 //
 // @副作用
 // 无
@@ -43,9 +43,22 @@ export interface NotetypeNameId {
 export interface NotetypeField {
   ord: number;
   name: string;
+  sticky?: boolean;
+}
+
+export interface NotetypeTemplateView {
+  ord: number;
+  name: string;
+  questionFormat: string;
+  answerFormat: string;
+}
+
+export interface NotetypeTemplatePreview extends NotetypeTemplateView {
+  truncated: boolean;
 }
 
 export interface NotetypeView {
+  templates?: NotetypeTemplateView[];
   optionalReverseFieldOrd?: number;
   originalStockKind?: number;
   clozeFieldOrds?: number[];
@@ -59,6 +72,8 @@ export interface NotetypeView {
 
 /** Agent/UI shared structural capabilities for a note type. */
 export interface NotetypeCapabilities {
+  templateCount?: number;
+  templatePreviews?: NotetypeTemplatePreview[];
   notetypeId: number;
   name: string;
   kind: number;
@@ -140,6 +155,13 @@ function decodeNotetypeField(bytes: Uint8Array): NotetypeField {
       field.ord = decodeUInt32(reader.读取字节());
     } else if (tag.字段号 === 2) {
       field.name = reader.读取字符串();
+    } else if (tag.字段号 === 5) {
+      const config = new 协议读取器(reader.读取字节());
+      let configTag;
+      while ((configTag = config.读取标签()) !== null) {
+        if (configTag.字段号 === 1) field.sticky = config.读取布尔();
+        else config.跳过字段(configTag.线类型);
+      }
     } else {
       // Field config and any future fields are read-only for this flow.
       reader.跳过字段(tag.线类型);
@@ -164,6 +186,48 @@ function decodeNotetypeConfig(bytes: Uint8Array, view: NotetypeView): number {
   return kind;
 }
 
+function decodeTemplateConfig(bytes: Uint8Array, template: NotetypeTemplateView): void {
+  const reader = new 协议读取器(bytes);
+  let tag;
+  while ((tag = reader.读取标签()) !== null) {
+    if (tag.字段号 === 1) {
+      template.questionFormat = reader.读取字符串();
+    } else if (tag.字段号 === 2) {
+      template.answerFormat = reader.读取字符串();
+    } else {
+      reader.跳过字段(tag.线类型);
+    }
+  }
+}
+
+function decodeNotetypeTemplate(bytes: Uint8Array): NotetypeTemplateView {
+  const reader = new 协议读取器(bytes);
+  const template: NotetypeTemplateView = { ord: 0, name: '', questionFormat: '', answerFormat: '' };
+  let tag;
+  while ((tag = reader.读取标签()) !== null) {
+    if (tag.字段号 === 1) {
+      template.ord = decodeUInt32(reader.读取字节());
+    } else if (tag.字段号 === 2) {
+      template.name = reader.读取字符串();
+    } else if (tag.字段号 === 5) {
+      decodeTemplateConfig(reader.读取字节(), template);
+    } else {
+      reader.跳过字段(tag.线类型);
+    }
+  }
+  return template;
+}
+
+/** 有界原始模板预览；不按名称/祖先类型推断，也不另写模板渲染器。 */
+export function previewNotetypeTemplates(templates: NotetypeTemplateView[]): NotetypeTemplatePreview[] {
+  return templates.slice(0, 4).map((template: NotetypeTemplateView): NotetypeTemplatePreview => ({
+    ord: template.ord, name: template.name,
+    questionFormat: template.questionFormat.slice(0, 500),
+    answerFormat: template.answerFormat.slice(0, 500),
+    truncated: template.questionFormat.length > 500 || template.answerFormat.length > 500
+  }));
+}
+
 export function decodeNotetype(bytes: Uint8Array): NotetypeView {
   const reader = new 协议读取器(bytes);
   const result: NotetypeView = {
@@ -171,7 +235,8 @@ export function decodeNotetype(bytes: Uint8Array): NotetypeView {
     name: '',
     kind: NOTE_TYPE_KIND_NORMAL,
     fields: [],
-    fieldNames: []
+    fieldNames: [],
+    templates: []
   };
   let tag;
   while ((tag = reader.读取标签()) !== null) {
@@ -183,6 +248,8 @@ export function decodeNotetype(bytes: Uint8Array): NotetypeView {
       result.kind = decodeNotetypeConfig(reader.读取字节(), result);
     } else if (tag.字段号 === 8) {
       result.fields.push(decodeNotetypeField(reader.读取字节()));
+    } else if (tag.字段号 === 9) {
+      result.templates!.push(decodeNotetypeTemplate(reader.读取字节()));
     } else {
       // This UI never writes Notetype protobufs, so preserve its source bytes in Anki.
       reader.跳过字段(tag.线类型);
@@ -190,6 +257,7 @@ export function decodeNotetype(bytes: Uint8Array): NotetypeView {
   }
   result.fields.sort((left: NotetypeField, right: NotetypeField): number => left.ord - right.ord);
   result.fieldNames = result.fields.map((field: NotetypeField): string => field.name);
+  result.templates!.sort((left: NotetypeTemplateView, right: NotetypeTemplateView): number => left.ord - right.ord);
   return result;
 }
 

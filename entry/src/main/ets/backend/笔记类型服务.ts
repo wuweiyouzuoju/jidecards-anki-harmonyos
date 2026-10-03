@@ -26,7 +26,10 @@
 
 import { 图片遮罩服务 } from './图片遮罩服务';
 import { optionalReverseField } from '../model/NoteTypePresentation';
+import { updateNotetypeFieldSticky } from '../model/NotetypeFieldDraft';
 import { 后端会话 } from './后端会话';
+import { 搜索服务 } from './搜索服务';
+import type { NotetypeImpact } from '../model/NotetypeManagement';
 import { decodeOpChangesWithId } from '../proto/messages/CollectionMessages';
 import { 笔记类型方法, 服务号 } from './服务索引';
 import type {
@@ -48,12 +51,36 @@ import {
   encodeUpdateNotetypeLegacyRequest,
   encodeGetChangeNotetypeInfoRequest,
   encodeChangeNotetypeRequest,
+  previewNotetypeTemplates,
   NOTE_TYPE_KIND_CLOZE
 } from '../proto/messages/NotetypeMessages';
 
 /** AddNotePanel 所属页面使用的 Anki 笔记类型边界。 */
 export class 笔记类型服务 {
   private readonly 会话: 后端会话 = 后端会话.获取实例();
+
+  /** 影响确认使用真实 ID 和旧模板序号；新增数量由 Core 保存时按字段条件决定。 */
+  async impact(id: number, original: string, draft: string): Promise<NotetypeImpact> {
+    const searches = new 搜索服务();
+    const query: string = `mid:${id}`;
+    const noteIds = await searches.搜索笔记({ search: query, order: { kind: 'none' } });
+    const cardIds = await searches.搜索卡片({ search: query, order: { kind: 'none' } });
+    const old = JSON.parse(original) as Record<string, Object>;
+    const next = JSON.parse(draft) as Record<string, Object>;
+    const before = old['tmpls'] as Record<string, Object>[];
+    const after = next['tmpls'] as Record<string, Object | null>[];
+    const removed: number[] = [], moved: number[] = [];
+    if (old['type'] !== 1) {
+      for (const template of before) {
+        const ordinal = template['ord'] as number;
+        const index = after.findIndex((item: Record<string, Object | null>): boolean => item['ord'] === ordinal);
+        if (index === ordinal) continue;
+        const ids = await searches.搜索卡片({ search: query + ` card:${ordinal + 1}`, order: { kind: 'none' } });
+        if (index < 0) removed.push(...ids); else moved.push(...ids);
+      }
+    }
+    return { noteIds: noteIds, cardIds: cardIds, removedCardIds: removed, movedCardIds: moved };
+  }
 
   async 获取笔记类型名列表(): Promise<NotetypeNameId[]> {
     const 响应字节 = await this.会话.调用(
@@ -65,6 +92,11 @@ export class 笔记类型服务 {
     const 响应字节 = await this.会话.调用(
       服务号.后端笔记类型, 笔记类型方法.获取笔记类型, encodeNotetypeId(ID));
     return decodeNotetype(响应字节);
+  }
+
+  async setFieldSticky(id: number, ord: number, sticky: boolean): Promise<void> {
+    const json: string = await this.获取笔记类型旧版(id);
+    await this.更新笔记类型旧版(updateNotetypeFieldSticky(json, ord, sticky));
   }
 
   /** 编辑器使用 Core 的结构身份与字段索引，不依赖本地化名称。 */
@@ -100,7 +132,9 @@ export class 笔记类型服务 {
       name: 视图.name,
       kind: 视图.kind,
       fieldNames: 视图.fieldNames.slice(),
-      clozeFieldOrds: 填空字段序号
+      clozeFieldOrds: 填空字段序号,
+      templateCount: 视图.templates?.length ?? 0,
+      templatePreviews: previewNotetypeTemplates(视图.templates ?? [])
     };
   }
 
