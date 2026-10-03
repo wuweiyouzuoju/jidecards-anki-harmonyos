@@ -14,6 +14,10 @@ import { 提醒编辑面板 } from '../components/提醒编辑面板';
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { 按下态按钮 } from '../components/common/按下态按钮';
 import { 统一空态 } from '../components/common/统一空态';
+import { appInterface } from '../backend/AppInterfaceService';
+import { visibleInterfaceItems, AppInterfaceControl } from '../model/AppInterface';
+import { interfaceItemText } from '../utils/AppInterfaceText';
+import { namedResourceText } from '../utils/UiFeedback';
 
 // ========================================================
 // @块ID UI-STUDY-REMINDER-PAGE-001
@@ -43,18 +47,19 @@ export struct 学习提醒页 {
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
   // 手势导航条高度（提醒列表滚到底时最后一项需完整滚出导航条区域）
   @StorageProp('导航条高度') private 导航条高度: number = 0;
-  @StorageLink('systemDarkMode') private 系统暗黑模式: boolean = false;
-  @State private 主题模式值: 主题模式 = 'system';
+  @StorageLink('systemDarkMode') @Watch('refreshThemeState') private 系统暗黑模式: boolean = false;
+  @StorageLink('themeMode') @Watch('refreshThemeState') private 主题模式值: 主题模式 = 'system';
 
   @State private 是否深色: boolean = false;
-  @State private 提醒项列表: 提醒项[] = [];
-  @State private 操作中: boolean = false;
-  @State private 错误信息: string = '';
-  @State private 已加载: boolean = false;
+  private interfaceMounted: boolean = false;
+  @State @Watch('publishInterface') private 提醒项列表: 提醒项[] = [];
+  @State @Watch('publishInterface') private 操作中: boolean = false;
+  @State @Watch('publishInterface') private 错误信息: string = '';
+  @State @Watch('publishInterface') private 已加载: boolean = false;
   // 新建/编辑共用的磨砂弹层（与创建牌组面板同款风格）
-  @State private 显示编辑面板: boolean = false;
+  @State @Watch('publishInterface') private 显示编辑面板: boolean = false;
   @State private 面板是否新建: boolean = true;
-  @State private 面板目标ID: number = -1;
+  @State @Watch('publishInterface') private 面板目标ID: number = -1;
   @State private 面板初始小时: number = 6;
   @State private 面板初始分钟: number = 0;
   @State private 面板初始标题: string = '';
@@ -63,12 +68,18 @@ export struct 学习提醒页 {
   @State private 面板错误: string = '';
 
   async aboutToAppear(): Promise<void> {
+    this.interfaceMounted = true;
+    this.publishInterface();
     CustomTransition.getInstance().注册NavParam('ReminderPage',
       (isPush: boolean, isExit: boolean): void => { this.转场透明度 = isExit ? 1 : 0; },
       (isPush: boolean, isExit: boolean): void => { this.转场透明度 = isExit ? 0 : 1; }
     );
-    this.是否深色 = 解析是否深色(this.主题模式值, this.系统暗黑模式);
+    this.refreshThemeState();
     await this.加载列表();
+  }
+
+  private refreshThemeState(): void {
+    this.是否深色 = 解析是否深色(this.主题模式值, this.系统暗黑模式);
   }
 
   private async 加载列表(): Promise<void> {
@@ -78,7 +89,34 @@ export struct 学习提醒页 {
   }
 
   aboutToDisappear(): void {
+    this.interfaceMounted = false;
+    appInterface.hidePage('reminders');
+    appInterface.leave('reminders');
     CustomTransition.getInstance().注销NavParam('ReminderPage');
+  }
+
+  private publishInterface(): void {
+    if (!this.interfaceMounted) return;
+    const reminders: 提醒项[] = this.已加载 ? this.提醒项列表.slice(0, 100) : [];
+    const controls: AppInterfaceControl[] = visibleInterfaceItems('reminders',
+      { simple: false, agent: false, cloudDeck: false, themeHasTextures: false })
+      .map((item): AppInterfaceControl => ({ id: item.id, title: namedResourceText(this.getUIContext(), item.titleKey),
+        titleKey: item.titleKey, enabled: true, selected: false }));
+    const labels: string[] = [];
+    for (const item of reminders) {
+      const title: string = this.格式化时间(item.小时, item.分钟) + ' · ' + this.预览标题(item).slice(0, 160);
+      labels.push(title);
+      controls.push({ id: 'edit-' + item.唯一ID, title: title, enabled: true,
+        selected: this.显示编辑面板 && this.面板目标ID === item.唯一ID });
+      controls.push({ id: 'toggle-' + item.唯一ID, title: title, enabled: !this.操作中, selected: item.开启 });
+    }
+    appInterface.observe({ surface: 'reminders', sectionId: '',
+      selectedId: this.显示编辑面板 ? String(this.面板目标ID) : '',
+      optionIds: reminders.map((item): string => 'edit-' + item.唯一ID), optionLabels: labels,
+      optionsTotal: this.已加载 ? this.提醒项列表.length : 0,
+      busy: !this.已加载 || this.操作中, items: controls, controlsComplete: true,
+      values: [{ id: 'loaded', value: String(this.已加载) }, { id: 'editor_open', value: String(this.显示编辑面板) },
+        { id: 'has_error', value: String(this.错误信息.length > 0) }] });
   }
 
   private 解析主色按钮背景(): string {
@@ -247,14 +285,14 @@ export struct 学习提醒页 {
       // 左返回 + 右新建按钮，铺满
       Row() {
         按下态按钮({
-          文案: $r('app.string.study_back'),
+          文案: interfaceItemText(this.getUIContext(), 'reminders', 'back'),
           字色: $r('app.color.text_primary'),
           点击回调: (): void => { this.返回(); }
         })
         Blank()
           .hitTestBehavior(HitTestMode.Transparent)
         按下态按钮({
-          文案: $r('app.string.reminder_list_create_button'),
+          文案: interfaceItemText(this.getUIContext(), 'reminders', 'create'),
           字色: this.动作主色,
           themeText: true,
           点击回调: (): void => { this.新建提醒(); }
@@ -423,7 +461,10 @@ export struct 学习提醒页 {
     .opacity(this.转场透明度)
     // 从编辑页 pop 返回时刷新列表。onPageShow 只对 @Entry 路由页生效，NavDestination 必须用 onShown。
     .onShown((): void => {
+      appInterface.showPage('reminders');
+      this.publishInterface();
       this.加载列表();
     })
+    .onHidden((): void => { appInterface.hidePage('reminders'); })
   }
 }

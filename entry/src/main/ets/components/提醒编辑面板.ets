@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../utils/PressFeedback';
 import { DialogBackdrop } from './common/DialogBackdrop';
-import { resourceText } from '../utils/UiFeedback';
+import { resourceText, namedResourceText } from '../utils/UiFeedback';
 import { SelectStyle } from '../utils/SelectStyle';
 import { ThemeTextSpans } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
@@ -39,15 +39,18 @@ import { DialogHeader } from './common/DialogHeader';
 
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { 颜色键 } from '../model/颜色主题';
+import { appInterface } from '../backend/AppInterfaceService';
+import { reminderEditorControls, reminderEditorTitle, AppInterfaceMenuItem, AppInterfaceControl } from '../model/AppInterface';
+import { interfaceControlText } from '../utils/AppInterfaceText';
 import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时长';
 
 @Component
 export struct 提醒编辑面板 {
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
-  @Prop busy: boolean = false;
-  @Prop errorMessage: string = '';
-  @Prop 是否新建: boolean = true;
+  @Prop @Watch('publishInterface') busy: boolean = false;
+  @Prop @Watch('publishInterface') errorMessage: string = '';
+  @Prop @Watch('publishInterface') 是否新建: boolean = true;
   @Prop 初始小时: number = 6;
   @Prop 初始分钟: number = 0;
   @Prop 初始标题: string = '';
@@ -61,10 +64,11 @@ export struct 提醒编辑面板 {
   };
 
   // 新建默认早上 6 点（用户指定），编辑模式回填原值
-  @State private 小时: number = 6;
-  @State private 分钟: number = 0;
-  @State private 标题: string = '';
-  @State private 内容: string = '';
+  private interfaceMounted: boolean = false;
+  @State @Watch('publishInterface') private 小时: number = 6;
+  @State @Watch('publishInterface') private 分钟: number = 0;
+  @State @Watch('publishInterface') private 标题: string = '';
+  @State @Watch('publishInterface') private 内容: string = '';
 
   @StorageProp(颜色键.主色按钮背景) private 主色按钮背景: string = '#2F5FD0';
   @StorageProp(颜色键.主色按钮按下) private 主色按钮按下: string = '#1E4FB8';
@@ -86,6 +90,45 @@ export struct 提醒编辑面板 {
     this.分钟 = this.初始分钟;
     this.标题 = this.初始标题;
     this.内容 = this.初始内容;
+    this.interfaceMounted = true;
+    this.publishInterface();
+  }
+
+  aboutToDisappear(): void { this.interfaceMounted = false; appInterface.leave('reminder_editor'); }
+
+  private interfaceControls(): AppInterfaceMenuItem[] { return reminderEditorControls(this.是否新建, this.busy); }
+  private interfaceLabel(id: string): string {
+    return interfaceControlText(this.getUIContext(), this.interfaceControls(), id);
+  }
+  private interfaceEnabled(id: string): boolean {
+    return this.interfaceControls().find((item): boolean => item.id === id)?.enabled ?? false;
+  }
+  private publishInterface(): void {
+    if (!this.interfaceMounted) return;
+    const controls: AppInterfaceControl[] = this.interfaceControls().map((item): AppInterfaceControl =>
+      ({ id: item.id, title: namedResourceText(this.getUIContext(), item.titleKey), titleKey: item.titleKey,
+        enabled: item.enabled, selected: item.selected }));
+    const ids: string[] = [];
+    const labels: string[] = [];
+    const hours: SelectOption[] = this.小时选项();
+    const minutes: SelectOption[] = this.分钟选项();
+    for (const group of ['hour', 'minute']) {
+      const options: SelectOption[] = group === 'hour' ? hours : minutes;
+      for (let index: number = 0; index < options.length; index++) {
+        const id: string = group + '-' + index;
+        const value: ResourceStr = options[index].value;
+        const title: string = typeof value === 'string' ? value : resourceText(this.getUIContext(), value);
+        ids.push(id); labels.push(title);
+        controls.push({ id: id, title: title, enabled: !this.busy,
+          selected: index === (group === 'hour' ? this.小时 : this.分钟) });
+      }
+    }
+    appInterface.observe({ surface: 'reminder_editor', titleKey: reminderEditorTitle(this.是否新建),
+      sectionId: this.是否新建 ? 'create' : 'edit', selectedId: '', optionIds: ids, optionLabels: labels,
+      busy: this.busy, items: controls, controlsComplete: true,
+      values: [{ id: 'hour', value: String(this.小时) }, { id: 'minute', value: String(this.分钟) },
+        { id: 'title_length', value: String(this.标题.length) }, { id: 'content_length', value: String(this.内容.length) },
+        { id: 'has_error', value: String(this.errorMessage.length > 0) }] });
   }
 
   // ArkTS 严格模式：Select 选项数组需显式 SelectOption[] 类型 + push，不能字面量拼接
@@ -126,11 +169,11 @@ export struct 提醒编辑面板 {
 
       Column({ space: 应用尺寸.间距_16 }) {
         DialogHeader({
-          title: this.是否新建 ? $r('app.string.reminder_edit_title_create') : $r('app.string.reminder_edit_title_edit'),
-          actionLabel: this.是否新建 ? $r('app.string.create_deck_confirm') : $r('app.string.deck_customize_save'),
-          actionEnabled: !this.busy,
-          closeLabel: $r('app.string.create_deck_cancel'),
-          closeEnabled: !this.busy,
+          title: namedResourceText(this.getUIContext(), reminderEditorTitle(this.是否新建)),
+          actionLabel: this.interfaceLabel('confirm'),
+          actionEnabled: this.interfaceEnabled('confirm'),
+          closeLabel: this.interfaceLabel('cancel'),
+          closeEnabled: this.interfaceEnabled('cancel'),
           onClose: () => {
             this.onCancel();
           },
@@ -143,16 +186,14 @@ export struct 提醒编辑面板 {
         // constraintSize 必须传数字（见字段声明处注释）。
         Scroll() {
           Column({ space: 应用尺寸.间距_16 }) {
-            Text($r('app.string.reminder_edit_time_label'))
-              .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_secondary'))
-              .width('100%')
-
-            Row() {
+            Row({ space: 应用尺寸.间距_12 }) {
+              Text(this.interfaceLabel('time')).fontSize(应用尺寸.字号_正文)
+                .fontColor($r('app.color.text_primary')).layoutWeight(1)
+              Row() {
               Select(this.小时选项())
                 .selected(this.小时)
                 .value(this.小时 < 10 ? `0${this.小时}` : `${this.小时}`)
-                .width(100)
+                .layoutWeight(1)
                 .enabled(!this.busy)
                 .attributeModifier(new SelectStyle())
                 .height(SelectStyle.controlHeight)
@@ -173,7 +214,7 @@ export struct 提醒编辑面板 {
               Select(this.分钟选项())
                 .selected(this.分钟)
                 .value(this.分钟 < 10 ? `0${this.分钟}` : `${this.分钟}`)
-                .width(100)
+                .layoutWeight(1)
                 .enabled(!this.busy)
                 .attributeModifier(new SelectStyle())
                 .height(SelectStyle.controlHeight)
@@ -187,11 +228,10 @@ export struct 提醒编辑面板 {
                 .onSelect((index: number): void => {
                   this.分钟 = index;
                 })
-            }
-            .width('100%')
-            .justifyContent(FlexAlign.Center)
+              }.width('56%').flexShrink(0).alignItems(VerticalAlign.Center)
+            }.width('100%').alignItems(VerticalAlign.Center)
 
-            Text($r('app.string.reminder_edit_notification_title'))
+            Text(this.interfaceLabel('title'))
               .fontSize(应用尺寸.字号_正文_小)
               .fontColor($r('app.color.text_secondary'))
               .width('100%')
@@ -206,12 +246,12 @@ export struct 提醒编辑面板 {
               .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
               .borderRadius(应用尺寸.圆角_面板)
               .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
-              .enabled(!this.busy)
+                .enabled(this.interfaceEnabled('title'))
               .onChange((value: string) => {
                 this.标题 = value;
               })
 
-            Text($r('app.string.reminder_edit_notification_content'))
+            Text(this.interfaceLabel('content'))
               .fontSize(应用尺寸.字号_正文_小)
               .fontColor($r('app.color.text_secondary'))
               .width('100%')
@@ -226,14 +266,14 @@ export struct 提醒编辑面板 {
               .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
               .borderRadius(应用尺寸.圆角_面板)
               .padding(应用尺寸.间距_8)
-              .enabled(!this.busy)
+              .enabled(this.interfaceEnabled('content'))
               .onChange((value: string) => {
                 this.内容 = value;
               })
 
             // 快捷插入标签：点一下把占位符追加到内容末尾
             Row({ space: 应用尺寸.间距_8 }) {
-              Text() { ThemeTextSpans($r('app.string.reminder_edit_insert_new'), this.themeAccentColors, this.getUIContext()) }
+                Text() { ThemeTextSpans(this.interfaceLabel('insert_new'), this.themeAccentColors, this.getUIContext()) }
                 .fontSize(应用尺寸.字号_正文_小)
                 .fontColor(this.主色按钮背景)
                 .padding({ left: 应用尺寸.间距_12, right: 应用尺寸.间距_12, top: 6, bottom: 6 })
@@ -243,7 +283,7 @@ export struct 提醒编辑面板 {
                 .onClick((): void => {
                   this.插入占位符($r('app.string.reminder_edit_token_new'));
                 })
-              Text() { ThemeTextSpans($r('app.string.reminder_edit_insert_review'), this.themeAccentColors, this.getUIContext()) }
+                Text() { ThemeTextSpans(this.interfaceLabel('insert_review'), this.themeAccentColors, this.getUIContext()) }
                 .fontSize(应用尺寸.字号_正文_小)
                 .fontColor(this.主色按钮背景)
                 .padding({ left: 应用尺寸.间距_12, right: 应用尺寸.间距_12, top: 6, bottom: 6 })
@@ -278,7 +318,7 @@ export struct 提醒编辑面板 {
         }
 
         if (!this.是否新建) {
-          Button($r('app.string.reminder_edit_delete'))
+          Button(this.interfaceLabel('delete'))
             .type(ButtonType.Normal)
             .alignSelf(ItemAlign.End)
             .height(应用尺寸.按钮高度)
@@ -286,7 +326,7 @@ export struct 提醒编辑面板 {
             .fontColor($r('app.color.error_text'))
             .backgroundColor(Color.Transparent)
             .borderRadius(应用尺寸.圆角_胶囊)
-            .enabled(!this.busy)
+            .enabled(this.interfaceEnabled('delete'))
             .attributeModifier(new PressFeedback())
             .stateEffect(false)
             .onClick(() => {

@@ -63,11 +63,48 @@ test('peer cards share one gap and reminder scrolling does not fix the content h
   assert.doesNotMatch(reminder.slice(reminder.indexOf('private 提醒项卡片'), reminder.indexOf('private 空状态')), /\.margin\(\{ bottom:/);
 });
 
+test('note creation and editing share home gaps with one card padding owner', () => {
+  const card = read('entry/src/main/ets/components/common/NoteFieldCard.ets');
+  const padding = card.match(/\}\.width\('100%'\)\.padding\((应用尺寸\.[^)]+)\)\s*\.backgroundColor/)[1];
+  assert.equal(new Function('应用尺寸', `return ${padding}`)(应用尺寸), 16);
+  const cardContainer = card.slice(card.lastIndexOf("    }.width('100%')"));
+  assert.doesNotMatch(cardContainer, /\.margin\(|\.offset\(/, 'field cards must not add an external gap');
+  const header = read('entry/src/main/ets/components/common/NoteEditorHeader.ets');
+  const height = header.match(/\.height\((应用尺寸\.pageToolbarHeight[^\n]+)\)/)[1];
+  for (const [file, density] of [
+    ['pages/添加笔记页.ets', 'narrowDeckLayout'], ['components/browser/浏览编辑区.ets', 'narrow']
+  ]) {
+    const source = read('entry/src/main/ets/' + file);
+    const scrollStart = source.search(/Scroll\([^)]*\) \{/);
+    assert.ok(scrollStart >= 0, `${file}: scroll container`);
+    const scroll = source.slice(scrollStart);
+    const gap = scroll.match(/Column\(\{ space: (应用尺寸\.页面分组间距\([^)]+\)) \}\)/)[1];
+    const top = scroll.match(/top: (应用尺寸\.页面内容顶部间距\([^)]+\))/)[1];
+    assert.doesNotMatch(scroll, /Column\(\{ space: 应用尺寸.间距_14/);
+    assert.match(source, new RegExp(`@StorageProp\\(DECK_LIST_NARROW_KEY\\) private ${density}: boolean`));
+    for (const statusBarHeight of [0, 40]) {
+      for (const narrow of [false, true, false]) {
+        const state = { statusBarHeight, narrow, [density]: narrow };
+        const evaluate = expression => new Function('应用尺寸', `return ${expression}`).call(state, 应用尺寸);
+        const toolbarBottom = evaluate(height);
+        const firstContentTop = toolbarBottom + evaluate(top);
+        const expected = narrow ? 8 : 12;
+        assert.equal(firstContentTop - toolbarBottom, expected, `${file}: header to content`);
+        assert.equal(evaluate(gap), expected, `${file}: selector/field/next field boundaries`);
+        assert.equal(evaluate(gap), 应用尺寸.页面分组间距(narrow));
+      }
+    }
+  }
+});
+
 test('fixed action bars and browser result boundaries use the shared responsive spacing', () => {
   const detail = read('entry/src/main/ets/components/牌组详情面板.ets');
   const study = read('entry/src/main/ets/pages/学习页.ets');
   const browser = read('entry/src/main/ets/pages/浏览页.ets');
   const table = read('entry/src/main/ets/components/browser/卡片表格.ets');
+  const addNote = read('entry/src/main/ets/pages/添加笔记页.ets');
+  assert.match(addNote, /top: 应用尺寸\.操作区顶部间距\(this\.narrowDeckLayout\)/);
+  assert.match(addNote, /bottom: 应用尺寸\.操作区底部间距\(this\.narrowDeckLayout, this\.导航条高度\)/);
   assert.match(detail, /\.margin\(\{ bottom: 0 \}\)/,
     'detail card must not add a second gap below the card');
   assert.match(detail, /top: 应用尺寸\.操作区顶部间距\(this\.narrowDeckLayout\)/);
@@ -211,7 +248,7 @@ test('home resources provide matching light and dark semantic colors', () => {
 
 test('tablet shell shares one selection state and avoids high-cost visual effects', () => {
   const page = (read('entry/src/main/ets/pages/首页.ets') + read('entry/src/main/ets/backend/HomeDataRepository.ets'));
-  const selectionDeclarations = page.match(/@(?:State|Provide|StorageLink)\s*(?:\([^)]*\)\s*)?(?:private\s+)?选中的牌组ID/g) ?? [];
+  const selectionDeclarations = page.match(/@(?:State|Provide|StorageLink)\s*(?:\([^)]*\)\s*)?(?:@Watch\([^)]*\)\s*)?(?:private\s+)?选中的牌组ID/g) ?? [];
 
   assert.equal(selectionDeclarations.length, 1);
   assert.match(page, /columns:\s*\{\s*xs:\s*4,\s*sm:\s*8,\s*md:\s*12\s*\}/);
@@ -269,8 +306,8 @@ test('revised home uses a full-window toolbar without greeting or bottom navigat
   assert.doesNotMatch(page, /bottomNavigation|bottomNavItem|sidePane|sideNavItem/);
   // 顶部工具栏按钮文案移至 主页顶部工具栏 积木组件
   // 2026-07-20 后：原设置/浏览/统计 3 按钮合并为「更多」按钮（study_more），右侧保留「创建牌组」
-  assert.match(toolbar, /app\.string\.study_more/);
-  assert.match(toolbar, /app\.string\.create_deck/);
+  assert.match(toolbar, /interfaceItemText\(this\.getUIContext\(\), 'home', 'more'\)/);
+  assert.match(toolbar, /interfaceItemText\(this\.getUIContext\(\), 'home', 'create'\)/);
   assert.match(page, /span:\s*\{\s*xs:\s*4,\s*sm:\s*5,\s*md:\s*8\s*\}/);
   assert.match(page, /span:\s*\{\s*xs:\s*0,\s*sm:\s*3,\s*md:\s*4\s*\}/);
   assert.match(page, /if\s*\(this\.当前断点 !== 'xs'\)\s*\{\s*GridCol/);
@@ -642,7 +679,8 @@ test('interval graph always shows intervals; stability is a separate FSRS-only g
   assert.doesNotMatch(interval, /FSRS稳定度|是否FSRS/, '间隔分布卡不得含 FSRS 分支');
   assert.match(statsPage, /间隔分布卡\(\{[^}]*间隔数据/, '统计页间隔分布卡只接 intervals');
   assert.match(statsPage, /图表数据\.fsrs[^)]*稳定度分布卡|稳定度分布卡/, '统计页须有独立稳定度分布卡');
-  assert.match(statsPage, /图表数据 !== null && this\.图表数据\.fsrs\)/, '稳定度卡仅在 FSRS 启用时渲染');
+  assert.match(statsPage, /statsInterfaceSections\(this\.图表数据\.fsrs\)/, 'FSRS 显隐由实际 UI 使用的共用分区定义决定');
+  assert.match(statsPage, /ForEach\(this\.interfaceSections\(\)/);
   assert.match(store, /间隔源: Intervals \| null = 图表数据\.intervals/, '卡片快照间隔分布只用 intervals');
 });
 

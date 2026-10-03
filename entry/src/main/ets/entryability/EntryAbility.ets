@@ -5,16 +5,15 @@ import {
   AbilityConstant,
   common,
   Configuration,
-  ConfigurationConstant,
   UIAbility,
   Want
 } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
-import { resourceManager, i18n } from '@kit.LocalizationKit';
+import { i18n } from '@kit.LocalizationKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { backgroundTaskManager } from '@kit.BackgroundTasksKit';
-import { 应用系统栏样式 } from '../utils/主题控制器';
+import { 应用系统栏样式, readSystemDarkMode } from '../utils/主题控制器';
 import { 应用颜色主题 } from '../utils/颜色主题管理器';
 import { 颜色主题, 默认颜色主题, 规范化颜色主题 } from '../model/颜色主题';
 import { 刷新桌面卡片数据 } from '../model/FSRS控制器';
@@ -23,6 +22,7 @@ import { AI_AGENT_CHANNELS_APP_STORAGE_KEY, initializeAiAgentChannels } from '..
 import { initializeCardTextSize } from '../utils/CardTextSizeStore';
 import { initializeDeckListAppearance } from '../utils/DeckListAppearanceStore';
 import { initializeStudyHaptics } from '../utils/StudyHaptics';
+import { initializeSimpleMode } from '../model/简洁模式存储';
 import { syncActivity } from '../model/SyncSettings';
 import { externalDeckUri, externalDeckOpens, EXTERNAL_DECK_OPEN_REVISION_KEY } from '../model/ExternalDeckOpen';
 
@@ -38,11 +38,7 @@ export default class EntryAbility extends UIAbility {
 
   private refreshSystemDarkMode(): void {
     try {
-      const configuration: resourceManager.Configuration =
-        this.context.resourceManager.getConfigurationSync();
-      this.publishSystemDarkMode(
-        configuration.colorMode === resourceManager.ColorMode.DARK
-      );
+      this.publishSystemDarkMode(readSystemDarkMode());
     } catch (error) {
       // 暂时读取失败保留已知状态，避免返回前台时闪成浅色。
       this.publishSystemDarkMode(AppStorage.get<boolean>('systemDarkMode') ?? false);
@@ -71,6 +67,7 @@ export default class EntryAbility extends UIAbility {
 
   onCreate(want: Want, _launchParam: AbilityConstant.LaunchParam): void {
     AppStorage.setOrCreate<common.UIAbilityContext>('abilityContext', this.context);
+    initializeSimpleMode();
     initializeCardTextSize();
     initializeDeckListAppearance();
     initializeStudyHaptics();
@@ -123,12 +120,8 @@ export default class EntryAbility extends UIAbility {
   }
 
   onConfigurationUpdate(configuration: Configuration): void {
-    // 语言/窗口等配置通知可能没有指定颜色模式，不能把它当成浅色切换。
-    if (configuration.colorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK) {
-      this.publishSystemDarkMode(true);
-    } else if (configuration.colorMode === ConfigurationConstant.ColorMode.COLOR_MODE_LIGHT) {
-      this.publishSystemDarkMode(false);
-    }
+    // 通知可能来自应用强制模式或语言变更，始终读取设备实际主题。
+    this.refreshSystemDarkMode();
     // 系统语言变化时同步刷新 AppStorage，否则组件读到的还是上次启动时的旧值，
     // 主页摘要卡、桌面卡片注入的语言字段全部不会跟随系统切换。
     // language 字段为空时回退到 i18n.System.getAppPreferredLanguage() 兜底。

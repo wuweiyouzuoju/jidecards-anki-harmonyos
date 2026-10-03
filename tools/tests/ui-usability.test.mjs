@@ -51,7 +51,7 @@ test('localized settings search respects simple and developer gates', () => {
     assert.deepEqual(filterSettingsEntries('FSRS', true, false, localize), []);
     assert.deepEqual(simple, ['general', 'scheduler', 'sync', 'appearance', 'data', 'help', 'redemption', 'about']);
     for (const simpleMode of [true, false]) {
-      for (const query of (locale === 'base' ? ['隐藏', '隐藏牌组', '恢复显示'] : ['hidden', 'hidden decks', 'restore'])) {
+      for (const query of (locale === 'base' ? ['隐藏', '隐藏牌组', '恢复显示', '导入文件', 'CSV', '备份与恢复'] : ['hidden', 'hidden decks', 'restore', 'import file', 'CSV', 'backups and restore'])) {
         assert.deepEqual(filterSettingsEntries(query, simpleMode, false, localize).map(entry => entry.id), ['data']);
       }
       for (const query of (locale === 'base' ? ['指纹', '识别码', '兑换'] : ['fingerprint', 'app ID', 'redeem'])) {
@@ -65,6 +65,7 @@ test('localized settings search respects simple and developer gates', () => {
       assert.deepEqual(filterSettingsEntries(locale === 'base' ? '评分振动' : 'grading vibration', simpleMode, false, localize).map(entry => entry.id), ['scheduler']);
       assert.deepEqual(filterSettingsEntries(locale === 'base' ? '分区点击' : 'tap zones', simpleMode, false, localize).map(entry => entry.id), ['scheduler']);
       assert.deepEqual(filterSettingsEntries(locale === 'base' ? '手势' : 'gestures', simpleMode, false, localize).map(entry => entry.id), ['scheduler']);
+      assert.deepEqual(filterSettingsEntries(locale === 'base' ? '快捷答题方式' : 'quick answer mode', simpleMode, false, localize).map(entry => entry.id), ['scheduler']);
     }
     assert.deepEqual(filterSettingsEntries(locale === 'base' ? '自定义服务器' : 'custom server', true, false, localize).map(entry => entry.id), ['sync']);
     assert.ok(simple.includes('scheduler') && !simple.includes('advanced'));
@@ -85,7 +86,7 @@ test('settings search stays visible in detail pages and returns to directory for
 });
 
 test('hidden deck recovery entry is rendered in simple and experimental data settings', () => {
-  const hiddenDeckEntry = DATA_GROUP_SOURCE.match(/简洁版与实验版都展示隐藏牌组入口[\s\S]*?\/\/ 自动备份与恢复/);
+  const hiddenDeckEntry = DATA_GROUP_SOURCE.match(/简洁版与实验版都展示隐藏牌组入口[\s\S]*?\/\/ 媒体管理行/);
   assert.ok(hiddenDeckEntry, 'hidden deck row should be outside the simple-mode-only branches');
   assert.match(hiddenDeckEntry[0], /hidden_decks_entry/);
   assert.doesNotMatch(hiddenDeckEntry[0], /if \(!this\.简洁模式\)/);

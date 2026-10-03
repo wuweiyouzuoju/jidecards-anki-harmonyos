@@ -223,7 +223,8 @@ test('ImportResponse tallies log buckets and found_notes', () => {
   resp.写入子消息(2, log);
 
   const summary = decodeImportResponse(resp.转为字节());
-  assert.deepEqual(summary, { newNotes: 2, updatedNotes: 1, duplicateNotes: 1, foundNotes: 99 });
+  assert.deepEqual(summary, { newNotes: 2, updatedNotes: 1, duplicateNotes: 1, foundNotes: 99,
+    conflictingNotes: 0, firstFieldMatches: 0, missingNotetypeNotes: 0, missingDeckNotes: 0, emptyFirstFieldNotes: 0 });
 });
 
 // ---- Tags messages (T6 标签管理) ----

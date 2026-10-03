@@ -74,14 +74,15 @@ test('browser editor cancellation preserves preview, while a saved note refreshe
 function homeHarness() {
   const response = deferred(), timers = new Map(); let next = 0;
   const events = [];
-  const Page = pageMethods('首页', ['homeActivity', 'canPresentStartupPrompt', 'homeActivityChanged', 'startupHost',
+  const Page = pageMethods('首页', ['homeActivity', 'canPresentStartupPrompt', 'publishHomeInterface', 'homeActivityChanged', 'startupHost',
     '尝试显示官方公告', '尝试展示待展示官方公告', '请求主页官方公告检查', '暂停主页官方公告检查',
     '继续首次弹窗序列', '显示欢迎弹窗一次', 'closeHomeIntro', 'onBackPress', 'autoSyncCollectionFinished', 'presentPendingSyncWarning'], {
     canPresentHomePrompt, bundleManager: { BundleFlag: {}, getBundleInfoForSelf: async () => ({ versionName: 'test' }) },
     后端会话: { 获取实例: () => ({ 是否就绪: () => true }) }, 当前语言模式: () => 'zh',
     是否已确认官方公告: async () => false, 是否已完成云端牌组引导: async () => false,
-    CLOUD_DECK_CHANNEL_ENABLED: false,
+    CLOUD_DECK_CHANNEL_ENABLED: false, appInterface: { observe() {} },
     isHomeIntroCompleted: async () => false, completeHomeIntro: async () => events.push('welcome-persist'),
+    isIridescentGiftNoticeCompleted: async () => true,
     官方公告检查延迟毫秒: () => 600000,
     externalDeckOpens: new ExternalDeckOpenQueue(),
     AppStorage: { get() {}, setOrCreate() {} },
@@ -89,6 +90,7 @@ function homeHarness() {
   });
   const page = new Page();
   page.transfer = initialTransferState();
+  page.牌组数据源 = { snapshotDecks: () => [] };
   Object.assign(page, { announcementController: new HomeAnnouncementController(), homeDisposed: false,
     syncScheduler: new AutoSyncScheduler(),
     syncForeground: true, 页面栈: { size: () => 0 }, 主页允许公告检查: true, 加载状态: 'ready',

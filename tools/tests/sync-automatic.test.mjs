@@ -7,6 +7,7 @@ import { canStartHomeAutoSync } from '../../entry/src/main/ets/model/HomeActivit
 import { HomeAnnouncementController } from '../../entry/src/main/ets/model/HomeAnnouncementController.ts';
 import { AutoSyncScheduler } from '../../entry/src/main/ets/model/AutoSyncScheduler.ts';
 import { HomeSyncController } from '../../entry/src/main/ets/model/HomeSyncController.ts';
+import { DeckPreviewSession } from '../../entry/src/main/ets/model/DeckPreviewSession.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -40,6 +41,7 @@ function homeHarness() {
     clearTimeout: id => state.timers.delete(id)
   });
   const page = new Page();
+  page.deckPreviewSession = new DeckPreviewSession({ cardIds: async () => [] });
   page.transfer = initialTransferState();
   page.backupController = { schedule() {}, stop() {} };
   const syncHost = () => ({
@@ -505,7 +507,7 @@ test('the server entry lives inside the sync card and the editor is a centered c
   assert.ok(source.includes('@CustomDialog'), 'server editor must be a @CustomDialog');
   assert.ok(source.includes('struct 自定义服务器弹窗'), 'server dialog struct must exist');
   assert.ok(source.includes('alignment: DialogAlignment.Center'), 'server dialog must be centered');
-  const entryLine = source.split(/\r?\n/).find(line => line.includes('sync_custom_server_entry'));
+  const entryLine = source.split(/\r?\n/).find(line => line.includes("settingsItemText(this.getUIContext(), 'sync_custom_server')"));
   assert.ok(entryLine !== undefined && entryLine.startsWith(' '.repeat(14)),
     'entry must be nested in the sync card content');
 });
@@ -751,8 +753,8 @@ test('sync icon stays inline with accessible details and preserves error/conflic
   assert.match(toolbar, /if \(this\.syncIndicator === 'syncing'\)\s*\{\s*LoadingProgress\(\)/);
   assert.match(toolbar, /Text\('!'\)[\s\S]*?\.width\(24\)\.height\(24\)[\s\S]*?\.fontColor\(\$r\('app.color.error_text'\)\)[\s\S]*?\.border\(\{ width: 2, color: \$r\('app.color.error_text'\), radius: 12 \}\)/);
   assert.doesNotMatch(toolbar, /Text\('⚠'\)/);
-  assert.ok(toolbar.indexOf('LoadingProgress()') > toolbar.indexOf("app.string.study_more"));
-  assert.ok(toolbar.indexOf('LoadingProgress()') < toolbar.indexOf("app.string.create_deck"));
+  assert.ok(toolbar.indexOf('LoadingProgress()') > toolbar.indexOf("'home', 'more'"));
+  assert.ok(toolbar.indexOf('LoadingProgress()') < toolbar.indexOf("'home', 'create'"));
   assert.match(panel, /this\.statusChanged\(text, indicator\)/);
   assert.match(panel, /if \(this.state.detailsVisible\)/);
 });
