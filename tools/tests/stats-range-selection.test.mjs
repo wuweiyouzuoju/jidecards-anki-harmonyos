@@ -39,7 +39,7 @@ test('every chart range is controlled by its title selector and invalidates cach
 
 test('global one-year range removes hidden all-time choices without changing independent percentile ranges', () => {
   const Page = component(page, ['normalizeTimeRanges']);
-  const state = Object.assign(new Page(), { 统计天数: 0, forecastRange: 3, reviewsRange: 1,
+  const state = Object.assign(new Page(), { publishInterface() {}, 统计天数: 0, forecastRange: 3, reviewsRange: 1,
     buttonsRange: 3, addedRange: 3, intervalRange: 3, stabilityRange: 2, difficultyRange: 3 });
   state.normalizeTimeRanges();
   assert.equal(state.forecastRange, 3);

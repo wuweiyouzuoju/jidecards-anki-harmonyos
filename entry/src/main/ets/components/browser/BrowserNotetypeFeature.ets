@@ -4,6 +4,7 @@ import { DialogFrame } from '../common/DialogFrame';
 import { DialogHeader } from '../common/DialogHeader';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { SelectStyle } from '../../utils/SelectStyle';
+import { FormSelectRow } from '../common/FormSelectRow';
 import { resourceText } from '../../utils/UiFeedback';
 import type { NotetypeNameId, 变更笔记类型请求 } from '../../proto/messages/NotetypeMessages';
 import { BrowserNotetypeSession, BrowserNotetypeState, initialNotetypeState } from '../../model/browser/BrowserNotetypeSession';
@@ -34,6 +35,10 @@ export struct BrowserNotetypeFeature {
   private submit(): void {
     const input = this.session?.request();
     if (input !== null && input !== undefined) this.onSubmit(input);
+  }
+  private selectType(index: number): void {
+    if (this.busy || this.state.busy || index < 0 || index >= this.state.names.length) return;
+    this.session?.select(this.state.names[index].id);
   }
   private 构建映射选项列表(旧名列表: string[]): SelectOption[] {
     const 选项: SelectOption[] = [];
@@ -70,33 +75,15 @@ export struct BrowserNotetypeFeature {
         .width('100%')
     } else {
       // 选择新笔记类型
-      Text($r('app.string.browser_action_change_notetype_new'))
-        .fontSize(应用尺寸.字号_正文)
-        .fontColor($r('app.color.text_primary'))
-        .width('100%')
-      Select(this.state.names.map((项: NotetypeNameId): SelectOption => {
-        return { value: noteTypeText(this.getUIContext(), 项.name) };
-      }))
-        .selected(this.state.selectedId === 0 ? -1 : this.state.names.findIndex(
-          (项: NotetypeNameId): boolean => 项.id === this.state.selectedId))
-        .value(this.state.selectedId === 0 ? '' :
-          noteTypeText(this.getUIContext(), this.state.names.find((项: NotetypeNameId): boolean => 项.id === this.state.selectedId)?.name ?? ''))
-        .width('100%')
-        .attributeModifier(new SelectStyle())
-        .height(SelectStyle.controlHeight)
-        .padding(SelectStyle.controlPadding)
-        .space(SelectStyle.controlSpace)
-        .font(SelectStyle.controlFont)
-        .optionFont(SelectStyle.optionFont)
-        .selectedOptionFont(SelectStyle.selectedOptionFont)
-        .textModifier(SelectStyle.labelText())
-        .borderRadius(SelectStyle.controlRadius)
-        .enabled(!this.busy && !this.state.busy)
-        .onSelect((索引: number): void => {
-          if (this.busy || this.state.busy) return;
-          const 项: NotetypeNameId = this.state.names[索引];
-          this.session?.select(项.id);
-        })
+      FormSelectRow({ label: $r('app.string.browser_action_change_notetype_new'),
+        options: this.state.names.map((项: NotetypeNameId): SelectOption => {
+          return { value: noteTypeText(this.getUIContext(), 项.name) };
+        }), selectedIndex: this.state.selectedId === 0 ? -1 : this.state.names.findIndex(
+          (项: NotetypeNameId): boolean => 项.id === this.state.selectedId),
+        value: this.state.selectedId === 0 ? '' : noteTypeText(this.getUIContext(),
+          this.state.names.find((项: NotetypeNameId): boolean => 项.id === this.state.selectedId)?.name ?? ''),
+        isInteractive: !this.busy && !this.state.busy,
+        onSelect: (index: number): void => { this.selectType(index); } })
 
       // 字段/模板映射表（仅在加载完变更信息后显示）
       if (this.state.info !== null) {

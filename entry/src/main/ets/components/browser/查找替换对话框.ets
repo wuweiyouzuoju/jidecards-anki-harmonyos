@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { FormInputStyle } from '../../utils/FormInputStyle';
 import { HelpLabel } from '../common/HelpLabel';
 import { DialogBackdrop } from '../common/DialogBackdrop';
 import { resourceText } from '../../utils/UiFeedback';
@@ -169,15 +170,7 @@ export struct 查找替换对话框 {
             .fontColor($r('app.color.text_secondary'))
             .width('100%')
           TextInput({ placeholder: $r('app.string.browser_find_find_placeholder'), text: this.查找文本 })
-            .width('100%')
-            .height(应用尺寸.按钮高度)
-            .fontSize(应用尺寸.字号_正文)
-            .fontColor($r('app.color.text_primary'))
-            .placeholderColor($r('app.color.text_tertiary'))
-            .backgroundColor($r('app.color.surface_card'))
-            .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
-            .borderRadius(应用尺寸.圆角_面板)
-            .padding({ left: 应用尺寸.间距_10, right: 应用尺寸.间距_10 })
+            .attributeModifier(new FormInputStyle())
             .enabled(!this.busy)
             .onChange((value: string): void => {
               this.查找文本 = value;
@@ -192,15 +185,7 @@ export struct 查找替换对话框 {
             .fontColor($r('app.color.text_secondary'))
             .width('100%')
           TextInput({ placeholder: $r('app.string.browser_find_replace_placeholder'), text: this.替换文本 })
-            .width('100%')
-            .height(应用尺寸.按钮高度)
-            .fontSize(应用尺寸.字号_正文)
-            .fontColor($r('app.color.text_primary'))
-            .placeholderColor($r('app.color.text_tertiary'))
-            .backgroundColor($r('app.color.surface_card'))
-            .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
-            .borderRadius(应用尺寸.圆角_面板)
-            .padding({ left: 应用尺寸.间距_10, right: 应用尺寸.间距_10 })
+            .attributeModifier(new FormInputStyle())
             .enabled(!this.busy)
             .onChange((value: string): void => {
               this.替换文本 = value;
@@ -215,15 +200,7 @@ export struct 查找替换对话框 {
             .fontColor($r('app.color.text_secondary'))
             .width('100%')
           TextInput({ placeholder: $r('app.string.browser_find_field_placeholder'), text: this.字段名 })
-            .width('100%')
-            .height(应用尺寸.按钮高度)
-            .fontSize(应用尺寸.字号_正文)
-            .fontColor($r('app.color.text_primary'))
-            .placeholderColor($r('app.color.text_tertiary'))
-            .backgroundColor($r('app.color.surface_card'))
-            .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
-            .borderRadius(应用尺寸.圆角_面板)
-            .padding({ left: 应用尺寸.间距_10, right: 应用尺寸.间距_10 })
+            .attributeModifier(new FormInputStyle())
             .enabled(!this.busy)
             .onChange((value: string): void => {
               this.字段名 = value;

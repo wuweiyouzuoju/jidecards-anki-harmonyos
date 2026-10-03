@@ -1,6 +1,7 @@
 import { PressFeedback } from '../utils/PressFeedback';
 import { EditNotePageParams } from '../model/navigation/PageParams';
 import { BrowserMoreMenu } from '../components/browser/BrowserMoreMenu';
+import { appInterface } from '../backend/AppInterfaceService';
 import { BrowserNotetypeFeature } from '../components/browser/BrowserNotetypeFeature';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { DialogBackdrop } from '../components/common/DialogBackdrop';
@@ -91,6 +92,7 @@ export struct 浏览页 {
   pageDeckId: string = '';
   /** Navigation 入栈参数：初始搜索串（空=默认搜索；查找重复对话框跳转时传入） */
   pageInitialSearch: string = '';
+  pageInitialNotesMode: boolean = false;
   /** Navigation 入栈参数：是否为 Agent 改卡直接进入多选。 */
   pageSelectForAgentEdit: boolean = false;
   /** 页面栈：返回主页时 pop */
@@ -104,12 +106,13 @@ export struct 浏览页 {
   private readonly 标签服务实例: 标签服务 = new 标签服务();
   private readonly 配置服务实例: 配置服务 = new 配置服务();
 
-  @State private 阶段: 浏览阶段 = 'loading';
+  private interfaceMounted: boolean = false;
+  @State @Watch('publishInterface') private 阶段: 浏览阶段 = 'loading';
   @State private 错误详情: string = '';
   @State private 搜索文本: string = '';
-  @State private quickFilter: string = 'all';
-  @State private 浏览模式值: 浏览模式 = 'cards';
-  @State private 结果ID列表: number[] = [];
+  @State @Watch('publishInterface') private quickFilter: string = 'all';
+  @State @Watch('publishInterface') private 浏览模式值: 浏览模式 = 'cards';
+  @State @Watch('publishInterface') private 结果ID列表: number[] = [];
   @State private 行列表: 浏览行数据[] = [];
   @State private 列定义: BrowserColumn[] = [];
   @State private subtitleIndex: number = 1;
@@ -129,7 +132,7 @@ export struct 浏览页 {
   private consumedRowCount: number = 0;
   private refreshingSearch: boolean = false;
   private readonly operations: BrowserOperationController = new BrowserOperationController();
-  @State private mutationBusy: boolean = false;
+  @State @Watch('publishInterface') private mutationBusy: boolean = false;
   /** NavDestination 透明度（由 customNavContentTransition 回调控制，实现淡入淡出转场）。 */
   @State private 转场透明度: number = 1;
 
@@ -144,7 +147,7 @@ export struct 浏览页 {
 
   // T8 批量操作栏状态：多选模式 + 选中ID + 4 个操作弹层 + 牌组树（改牌组选择器用）
   @State private 多选模式值: boolean = false;
-  @State private 选中ID列表: number[] = [];
+  @State @Watch('publishInterface') private 选中ID列表: number[] = [];
   // 退出多选信号：每次退出多选 +1，经 @Watch 触发 卡片表格 清内部选中（组件内部状态不可外部直改）
   @State private batchDialog: string = 'none';
   @State private 批量忙碌: boolean = false;
@@ -194,7 +197,7 @@ export struct 浏览页 {
   @State private 预览刷新版本: number = 0;
 
   // 主题模式：编辑区 isDark 判断用（与 学习页/添加笔记页 同语义）
-  @State private 主题模式值: 主题模式 = 'system';
+  @StorageLink('themeMode') private 主题模式值: 主题模式 = 'system';
   @StorageLink('systemDarkMode') private 系统暗黑模式: boolean = false;
 
   @StorageProp(颜色键.主色按钮背景) private 主色按钮背景色: string = '#2F5FD0';
@@ -203,6 +206,8 @@ export struct 浏览页 {
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
 
   async aboutToAppear(): Promise<void> {
+    this.interfaceMounted = true;
+    this.publishInterface();
     this.多选模式值 = this.pageSelectForAgentEdit;
     // 注册自定义转场回调：首页 Navigation.customNavContentTransition 通过此 name 查找回调，
     // 在 animateTo 内调用起点/终点回调修改 转场透明度，实现淡入淡出（替代系统默认左右平移）。
@@ -226,6 +231,7 @@ export struct 浏览页 {
     if (this.pageInitialSearch !== '') {
       this.搜索文本 = this.pageInitialSearch;
     }
+    if (this.pageInitialNotesMode) this.浏览模式值 = 'notes';
     if (this.pageSelectForAgentEdit) {
       this.多选模式值 = true;
     }
@@ -273,12 +279,24 @@ export struct 浏览页 {
    */
 
   aboutToDisappear(): void {
+    this.interfaceMounted = false;
+    appInterface.hidePage('browser');
+    appInterface.leave('browser');
     this.operations.dispose();
     this.searchVersion++;
     CustomTransition.getInstance().注销NavParam('BrowserPage');
     // 通知首页刷新牌组计数：页内删除/改牌组/挂起/重置到期等写操作分散在多个方法，
     // 统一在离页时广播（幂等，纯浏览未改数据时多刷一次无副作用）；onPop 偶发不触发时仍能刷新。
     AppStorage.setOrCreate<number>('需要刷新主页', Date.now());
+  }
+
+  private publishInterface(): void {
+    if (!this.interfaceMounted) return;
+    appInterface.observe({ surface: 'browser', sectionId: this.阶段, selectedId: this.浏览模式值,
+      optionIds: this.结果ID列表.slice(0, 100).map((id: number): string => String(id)), optionLabels: [],
+      optionsTotal: this.结果ID列表.length, busy: this.mutationBusy || this.阶段 === 'loading',
+      values: [{ id: 'mode', value: this.浏览模式值 }, { id: 'filter', value: this.quickFilter },
+        { id: 'selected_count', value: String(this.选中ID列表.length) }] });
   }
 
   /**
@@ -1593,7 +1611,8 @@ export struct 浏览页 {
     .hideTitleBar(true)
     .backgroundColor(Color.Transparent)
     .onBackPressed((): boolean => this.onBackPress())
-    .onShown((): void => { this.returnFromEditor(); })
+    .onShown((): void => { appInterface.showPage('browser'); this.returnFromEditor(); this.publishInterface(); })
+    .onHidden((): void => { appInterface.hidePage('browser'); })
     .opacity(this.转场透明度)
   }
 }

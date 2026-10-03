@@ -165,13 +165,13 @@ test('浏览编辑区 component preserves T7 presentation-only invariants', () =
   assert.doesNotMatch(panel, /后端会话|笔记服务|笔记类型服务|\.run\(/);
   // 必备 @Prop 与回调签名
   assert.match(panel, /@Prop\s+isDark:\s*boolean/);
-  assert.match(panel, /@Prop\s+busy:\s*boolean/);
-  assert.match(panel, /(?:@Prop|@State private)\s+errorMessage:\s*string/);
-  assert.match(panel, /@Prop\s+fieldNames:\s*string\[\]/);
+  assert.match(panel, /@Prop\s+@Watch\('publishInterface'\)\s+busy:\s*boolean/);
+  assert.match(panel, /@Prop\s+@Watch\('publishInterface'\)\s+errorMessage:\s*string/);
+  assert.match(panel, /@Prop\s+@Watch\('publishInterface'\)\s+fieldNames:\s*string\[\]/);
   assert.match(panel, /@Prop\s+initialFieldValues:\s*string\[\]/);
   assert.match(panel, /@Prop\s+initialTags:\s*string/);
   assert.match(panel, /onCancel:\s*\(\)\s*=>\s*void/);
-  assert.match(panel, /onSave:\s*\(fields:\s*string\[\],\s*tags:\s*string\[\],\s*images:\s*NoteFieldImage\[\]\)\s*=>\s*Promise<boolean>/);
+  assert.match(panel, /onSave:\s*\(fields:\s*string\[\],\s*tags:\s*string\[\],\s*images:\s*NoteFieldImage\[\],\s*audios:\s*NoteFieldAudio\[\]\)\s*=>\s*Promise<boolean>/);
   // 草稿保留：aboutToAppear 从 initialFieldValues/initialTags 拷贝到内部状态
   assert.match(panel, /this\.fieldValues\s*=\s*this\.initialFieldValues\.slice/);
   assert.match(panel, /this\.tags\s*=\s*this\.initialTags/);
@@ -460,7 +460,8 @@ test('BrowserPage more menu keeps the find&replace entry', () => {
   const page = read('entry/src/main/ets/pages/浏览页.ets');
   const menu = read('entry/src/main/ets/components/browser/BrowserMoreMenu.ets');
   assert.match(page, /this\.browserMoreMenu\(\)/);
-  assert.match(menu, /app\.string\.browser_action_find_replace[\s\S]*?this\.onFindReplace\(\)/);
+  assert.match(read('entry/src/main/ets/model/AppInterface.ts'), /id: 'find_replace', titleKey: 'browser_action_find_replace'/);
+  assert.match(menu, /id === 'find_replace'\) this\.onFindReplace\(\)/);
   assert.match(page, /onFindReplace:[\s\S]*?this\.阶段 !== 'list' \|\| this\.operations\.isBusy\(\)/);
   // 点击设 显示查找替换 = true
   assert.match(page, /this\.显示查找替换\s*=\s*true/);
@@ -596,7 +597,8 @@ test('BrowserPage more menu owns the T6 sidebar entry', () => {
   const component = read('entry/src/main/ets/components/browser/BrowserMoreMenu.ets');
   const topBar = page.slice(page.indexOf('private 顶部条()'), page.indexOf('\n  build()'));
   assert.match(menu, /filterActive: this\.搜索文本\.trim\(\) !== ''/);
-  assert.match(component, /this\.filterActive \? \$r\('app\.string\.browser_filter_active'\)[\s\S]*?app\.string\.browser_action_sidebar/);
+  assert.match(component, /browserInterfaceMenu\(this.available, this.filterActive, this.subtitleIndex\)/);
+  assert.match(read('entry/src/main/ets/model/AppInterface.ts'), /item.id === 'filter' && filterActive \? 'browser_filter_active' : item.titleKey/);
   assert.match(menu, /available: this\.阶段 === 'list'/);
   assert.match(menu, /this\.打开侧边栏\s*\(/);
   assert.doesNotMatch(topBar, /browser_action_sidebar|browser_filter_active|this\.打开侧边栏/);

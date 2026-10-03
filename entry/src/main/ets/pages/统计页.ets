@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appInterface } from '../backend/AppInterfaceService';
+import { statsInterfaceSections, visibleInterfaceItems, AppInterfaceItem, AppInterfaceControl } from '../model/AppInterface';
+import { namedResourceText, resourceText } from '../utils/UiFeedback';
+import { interfaceItemText } from '../utils/AppInterfaceText';
 import { StatsSession, StatsSnapshot, StatsRequest } from '../model/StatsSession';
 import { AnkiStatsSession } from '../backend/AnkiStatsSession';
 import { SelectStyle } from '../utils/SelectStyle';
@@ -64,12 +68,13 @@ export struct 统计页 {
   private pageActive: boolean = false;
   private statsSession: StatsSession | null = null;
 
-  @State private 阶段: 统计阶段 = 'loading';
-  @State private 错误详情: string = '';
-  @State private 图表数据: GraphsView | null = null;
+  @State @Watch('publishInterface') private 阶段: 统计阶段 = 'loading';
+  @State @Watch('publishInterface') private 错误详情: string = '';
+  @State @Watch('publishInterface') private 图表数据: GraphsView | null = null;
   @State private 图表偏好: GraphPreferences = 默认偏好();
   @State @Watch('normalizeTimeRanges') private 统计天数: number = 365;
   @State private forecastRange: number = 0;
+  @State private todayDetailsOpen: boolean = false;
   @State private reviewsRange: number = 0;
   @State private intervalRange: number = 2;
   @State private stabilityRange: number = 2;
@@ -108,15 +113,15 @@ export struct 统计页 {
     $r('app.string.stats_retention_view_summary')
   ];
   // 牌组选择（统计内容首行左侧下拉）：索引 0 = 全部牌组（搜索串空），>0 对应 牌组名列表[索引-1]
-  @State private 牌组选项: SelectOption[] = [];
-  @State private 选中牌组索引: number = 0;
+  @State @Watch('publishInterface') private 牌组选项: SelectOption[] = [];
+  @State @Watch('publishInterface') private 选中牌组索引: number = 0;
   private 牌组名列表: string[] = [];
   @StorageProp(FSRS_STATE_REVISION_KEY) @Watch('onFsrsStateChanged') private fsrsRevision: number = 0;
   private fsrsRefreshReady: boolean = false;
   // 小时分布时间段（0=近1月 1=近3月 2=近1年 3=全部）：与首页卡片/桌面卡片共用同一偏好
   @State private 小时分布窗口: number = 0;
   // 分区帮助浮层：点击各分区 i 时由 onHelp 回调设置标题/正文，页面级 Stack 统一弹字段帮助面板
-  @State private 显示分区帮助: boolean = false;
+  @State @Watch('publishInterface') private 显示分区帮助: boolean = false;
   @State private 分区帮助标题: Resource = $r('app.string.stats_no_data');
   @State private 分区帮助正文: Resource = $r('app.string.stats_no_data');
   /** NavDestination 透明度（由 customNavContentTransition 回调控制，实现淡入淡出转场）。 */
@@ -129,7 +134,7 @@ export struct 统计页 {
   // 手势导航条高度（统计内容滚到底时需完整滚出导航条区域）
   @StorageProp('导航条高度') private 导航条高度: number = 0;
   @StorageLink('systemDarkMode') private 系统暗黑模式: boolean = false;
-  @State private 主题模式值: 主题模式 = 'system';
+  @StorageLink('themeMode') private 主题模式值: 主题模式 = 'system';
 
   /** 是否深色（与浏览页同款：解析主题模式 + 系统暗黑模式） */
   private 是否深色(): boolean {
@@ -168,6 +173,9 @@ export struct 统计页 {
 
   aboutToDisappear(): void {
     this.pageActive = false;
+    appInterface.hidePage('stats');
+    appInterface.leave('stats');
+    appInterface.leave('stats_sections');
     this.fsrsRefreshReady = false;
     this.statsSession?.dispose();
     CustomTransition.getInstance().注销NavParam('StatsPage');
@@ -269,11 +277,44 @@ export struct 统计页 {
 
   /** 全局缩为近一年时，不让已隐藏的“全部”档位残留在选择框和图表中。 */
   private normalizeTimeRanges(): void {
-    if (this.统计天数 === 0) return;
+    if (this.统计天数 === 0) { this.publishInterface(); return; }
     if (this.forecastRange > 2) this.forecastRange = 2;
     if (this.reviewsRange > 2) this.reviewsRange = 2;
     if (this.buttonsRange > 2) this.buttonsRange = 2;
     if (this.addedRange > 2) this.addedRange = 2;
+    this.publishInterface();
+  }
+
+  private interfaceSections(): AppInterfaceItem[] {
+    return this.图表数据 === null ? [] : statsInterfaceSections(this.图表数据.fsrs);
+  }
+
+  private publishInterface(): void {
+    if (!this.pageActive) return;
+    const hasCharts: boolean = this.图表数据 !== null;
+    const controls: AppInterfaceControl[] = visibleInterfaceItems('stats',
+      { simple: false, agent: false, cloudDeck: false, themeHasTextures: false })
+      .filter((item): boolean => item.id === 'back' || (hasCharts && (item.id !== 'deck' || this.牌组选项.length > 1)))
+      .map((item): AppInterfaceControl => ({ id: item.id, title: namedResourceText(this.getUIContext(), item.titleKey),
+        titleKey: item.titleKey, enabled: item.id === 'back' || this.阶段 === 'content',
+        selected: item.id === 'year' ? this.统计天数 !== 0 : item.id === 'all' && this.统计天数 === 0 }));
+    const options: SelectOption[] = hasCharts && this.牌组选项.length > 1 ? this.牌组选项.slice(0, 100) : [];
+    const labels: string[] = options.map((option): string => typeof option.value === 'string' ? option.value.slice(0, 160) : resourceText(this.getUIContext(), option.value));
+    appInterface.observe({ surface: 'stats', sectionId: '', selectedId: 'deck-' + this.选中牌组索引,
+      optionIds: labels.map((_label, index): string => 'deck-' + index), optionLabels: labels,
+      optionsTotal: options.length > 0 ? this.牌组选项.length : 0, busy: this.阶段 === 'loading',
+      items: controls, controlsComplete: true,
+      values: [{ id: 'phase', value: this.阶段 }, { id: 'days', value: String(this.统计天数) },
+        { id: 'fsrs', value: hasCharts ? String(this.图表数据?.fsrs) : 'unknown' },
+        { id: 'section_count', value: String(this.interfaceSections().length) },
+        { id: 'help_open', value: String(this.显示分区帮助) }, { id: 'has_error', value: String(this.错误详情 !== '') }] });
+    if (!hasCharts) { appInterface.leave('stats_sections'); return; }
+    const sections: AppInterfaceItem[] = this.interfaceSections();
+    appInterface.observe({ surface: 'stats_sections', sectionId: '', selectedId: '',
+      optionIds: sections.map((item): string => item.id), optionLabels: sections.map((item): string => namedResourceText(this.getUIContext(), item.titleKey)),
+      busy: this.阶段 !== 'content', controlsComplete: true, items: sections.map((item): AppInterfaceControl =>
+        ({ id: item.id, title: namedResourceText(this.getUIContext(), item.titleKey), titleKey: item.titleKey,
+          enabled: this.阶段 === 'content', selected: false })) });
   }
 
   /** 顶栏统计天数切换（对齐 Anki RangeBox：1 年=365 / 全部=0 两档，切换重新请求后端） */
@@ -351,7 +392,7 @@ export struct 统计页 {
         .maxLines(1).hitTestBehavior(HitTestMode.None)
       Row() {
         按下态按钮({
-          文案: $r('app.string.study_back'),
+          文案: interfaceItemText(this.getUIContext(), 'stats', 'back'),
           字色: $r('app.color.text_primary'),
           点击回调: (): void => this.返回()
         })
@@ -424,250 +465,264 @@ export struct 统计页 {
         .width('100%')
         .alignItems(VerticalAlign.Center)
 
-        // 1. 今日计数（Anki TodayStats）
-        统计图表分区({
-          标题: $r('app.string.stats_section_today'),
-          有数据: this.图表数据 !== null && this.图表数据.today !== null,
-          帮助标题: $r('app.string.stats_section_today'),
-          帮助正文: $r('app.string.stats_help_today'),
-          onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
-        }) {
-          今日计数卡({
-            今日数据: this.图表数据 !== null ? this.图表数据.today : null,
-            预测数据: this.图表数据 !== null ? this.图表数据.futureDue : null
-          })
-        }
+        ForEach(this.interfaceSections(), (section: AppInterfaceItem) => {
+          if (section.id === 'today') {
+            统计图表分区({
+              interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
 
-        // 2. 预测（Anki FutureDue）
-        统计图表分区({
-          rangeLabels: this.统计天数 === 0 ? this.forecastLabels : this.forecastLabels.slice(0, 3),
-          rangeIndex: this.forecastRange,
-          onRangeChange: (index: number): void => { this.forecastRange = index; },
-          标题: $r('app.string.stats_section_forecast'),
-          有数据: this.图表数据 !== null && this.图表数据.futureDue !== null,
-          帮助标题: $r('app.string.stats_section_forecast'),
-          帮助正文: $r('app.string.stats_help_forecast'),
-          onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
-        }) {
-          预测卡({
-            范围索引: this.forecastRange,
-            预测数据: this.图表数据 !== null ? this.图表数据.futureDue : null,
-            显示积压: this.图表偏好.futureDueShowBacklog,
-            是否显示全部: this.统计天数 === 0,
-            on积压变更: (值: boolean): void => {
-              this.on积压变更(值);
+              有数据: this.图表数据 !== null && this.图表数据.today !== null,
+              帮助标题: $r('app.string.stats_section_today'),
+              帮助正文: $r('app.string.stats_help_today'),
+              actionTitleKey: this.图表数据 !== null && this.图表数据.today !== null && this.图表数据.today.answerCount > 0
+                ? 'stats_today_details' : '', actionSelected: this.todayDetailsOpen,
+              onAction: (): void => { if (this.阶段 === 'content') this.todayDetailsOpen = !this.todayDetailsOpen; },
+              onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
+            }) {
+              今日计数卡({
+                showDetails: this.todayDetailsOpen,
+                今日数据: this.图表数据 !== null ? this.图表数据.today : null,
+                预测数据: this.图表数据 !== null ? this.图表数据.futureDue : null
+              })
             }
-          })
-        }
-
-        // 3. 日历（Anki CalendarGraph，年历热力图）
-        统计图表分区({
-          标题: $r('app.string.stats_section_calendar'),
-          有数据: this.图表数据 !== null && this.图表数据.reviewCountsByDaysAgo !== null,
-          帮助标题: $r('app.string.stats_section_calendar'),
-          帮助正文: $r('app.string.stats_help_calendar'),
-          onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
-        }) {
-          日历卡({
-            复习计数: this.图表数据 !== null ? this.图表数据.reviewCountsByDaysAgo : null,
-            周首日: this.图表偏好.calendarFirstDayOfWeek,
-            统计天数: this.统计天数,
-            是否深色: this.是否深色(),
-            on首日变更: (首日: Weekday): void => {
-              this.on首日变更(首日);
-            }
-          })
-        }
-
-        // 4. 复习（Anki ReviewsGraph，5 系列堆叠柱）
-        统计图表分区({
-          rangeLabels: this.统计天数 === 0 ? this.historyLabels : this.historyLabels.slice(0, 3),
-          rangeIndex: this.reviewsRange,
-          onRangeChange: (index: number): void => { this.reviewsRange = index; },
-          标题: $r('app.string.stats_section_reviews'),
-          有数据: this.图表数据 !== null && this.图表数据.reviewCountsByDaysAgo !== null,
-          帮助标题: $r('app.string.stats_section_reviews'),
-          帮助正文: $r('app.string.stats_help_reviews'),
-          onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
-        }) {
-          复习卡({
-            范围索引: this.reviewsRange,
-            复习计数: this.图表数据 !== null ? this.图表数据.reviewCountsByDaysAgo : null,
-            复习时间: this.图表数据 !== null ? this.图表数据.reviewTimesByDaysAgo : null,
-            是否显示全部: this.统计天数 === 0
-          })
-        }
-
-        // 5. 卡片数量（Anki CardCounts）
-        统计图表分区({
-          标题: $r('app.string.stats_section_card_counts'),
-          有数据: this.图表数据 !== null && this.图表数据.cardCounts !== null,
-          帮助标题: $r('app.string.stats_section_card_counts'),
-          帮助正文: $r('app.string.stats_help_card_counts'),
-          onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
-        }) {
-          卡片状态分布({
-            卡片计数: this.图表数据 !== null ? this.图表数据.cardCounts : null,
-            分离暂停: this.图表偏好.cardCountsSeparateInactive,
-            on分离变更: (值: boolean): void => {
-              this.on分离变更(值);
-            }
-          })
-        }
-
-        // 6. 间隔分布（Anki IntervalsGraph）
-        统计图表分区({
-          rangeLabels: this.intervalLabels,
-          rangeIndex: this.intervalRange,
-          onRangeChange: (index: number): void => { this.intervalRange = index; },
-          标题: $r('app.string.stats_section_interval'),
-          有数据: this.图表数据 !== null && this.图表数据.intervals !== null,
-          帮助标题: $r('app.string.stats_section_interval'),
-          帮助正文: $r('app.string.stats_help_interval'),
-          onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
-        }) {
-          间隔分布卡({
-            范围索引: this.intervalRange,
-            间隔数据: this.图表数据 !== null ? this.图表数据.intervals : null
-          })
-        }
-
-        // 7. 稳定度分布（Anki StabilityGraph，仅 FSRS）
-        if (this.图表数据 !== null && this.图表数据.fsrs) {
-          统计图表分区({
-          rangeLabels: this.intervalLabels,
-          rangeIndex: this.stabilityRange,
-          onRangeChange: (index: number): void => { this.stabilityRange = index; },
-            标题: $r('app.string.stats_section_stability'),
-            有数据: this.图表数据.stability !== null,
-            帮助标题: $r('app.string.stats_section_stability'),
-            帮助正文: $r('app.string.stats_help_stability'),
-            onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
-          }) {
-            稳定度分布卡({
-            范围索引: this.stabilityRange,
-              稳定度数据: this.图表数据.stability
-            })
           }
-        }
+          else if (section.id === 'forecast') {
+            统计图表分区({
+              interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
+              rangeLabels: this.统计天数 === 0 ? this.forecastLabels : this.forecastLabels.slice(0, 3),
+              rangeIndex: this.forecastRange,
+              onRangeChange: (index: number): void => { this.forecastRange = index; },
 
-        // 8. 难度分布（Anki EaseGraph/DifficultyGraph 互斥合一：FSRS→difficulty，SM-2→eases）
-        统计图表分区({
-          rangeLabels: this.图表数据 !== null && this.图表数据.fsrs ? this.percentageLabels : [],
-          rangeIndex: this.difficultyRange,
-          onRangeChange: (index: number): void => { this.difficultyRange = index; },
-          标题: this.图表数据 !== null && this.图表数据.fsrs
-            ? $r('app.string.stats_section_ease')
-            : $r('app.string.stats_section_ease_sm2'),
-          有数据: this.图表数据 !== null
-            && (this.图表数据.eases !== null || this.图表数据.difficulty !== null),
-          帮助标题: $r('app.string.stats_section_ease'),
-          帮助正文: $r('app.string.stats_help_ease'),
-          onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
-        }) {
-          难度分布卡({
-            范围索引: this.difficultyRange,
-            难度数据: this.图表数据 !== null ? this.图表数据.eases : null,
-            FSRS难度: this.图表数据 !== null ? this.图表数据.difficulty : null,
-            是否FSRS: this.图表数据 !== null ? this.图表数据.fsrs : false
-          })
-        }
-
-        // 9. 记忆率（Anki RetrievabilityGraph，仅 FSRS）
-        if (this.图表数据 !== null && this.图表数据.fsrs) {
-          统计图表分区({
-          rangeLabels: this.percentageLabels,
-          rangeIndex: this.retrievabilityRange,
-          onRangeChange: (index: number): void => { this.retrievabilityRange = index; },
-            标题: $r('app.string.stats_section_retrievability'),
-            有数据: this.图表数据.retrievability !== null,
-            帮助标题: $r('app.string.stats_section_retrievability'),
-            帮助正文: $r('app.string.stats_help_retrievability'),
-            onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
-          }) {
-            记忆率卡({
-            范围索引: this.retrievabilityRange,
-              记忆率数据: this.图表数据.retrievability
-            })
+              有数据: this.图表数据 !== null && this.图表数据.futureDue !== null,
+              帮助标题: $r('app.string.stats_section_forecast'),
+              帮助正文: $r('app.string.stats_help_forecast'),
+              onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
+            }) {
+              预测卡({
+                范围索引: this.forecastRange,
+                预测数据: this.图表数据 !== null ? this.图表数据.futureDue : null,
+                显示积压: this.图表偏好.futureDueShowBacklog,
+                是否显示全部: this.统计天数 === 0,
+                on积压变更: (值: boolean): void => {
+                  this.on积压变更(值);
+                }
+              })
+            }
           }
-        }
+          else if (section.id === 'calendar') {
+            统计图表分区({
+              interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
 
-        // 10. 真实保留率（Anki TrueRetention）
-        统计图表分区({
-          rangeLabels: this.retentionLabels,
-          rangeIndex: this.retentionView,
-          onRangeChange: (index: number): void => { this.retentionView = index; },
-          标题: $r('app.string.stats_section_retention'),
-          有数据: this.图表数据 !== null && this.图表数据.trueRetention !== null,
-          帮助标题: $r('app.string.stats_section_retention'),
-          帮助正文: $r('app.string.stats_help_retention'),
-          onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
-        }) {
-          真实保留率卡({
-            视图索引: this.retentionView,
-            保留率数据: this.图表数据 !== null ? this.图表数据.trueRetention : null,
-            是否显示全部: this.统计天数 === 0
-          })
-        }
+              有数据: this.图表数据 !== null && this.图表数据.reviewCountsByDaysAgo !== null,
+              帮助标题: $r('app.string.stats_section_calendar'),
+              帮助正文: $r('app.string.stats_help_calendar'),
+              onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
+            }) {
+              日历卡({
+                复习计数: this.图表数据 !== null ? this.图表数据.reviewCountsByDaysAgo : null,
+                周首日: this.图表偏好.calendarFirstDayOfWeek,
+                统计天数: this.统计天数,
+                是否深色: this.是否深色(),
+                on首日变更: (首日: Weekday): void => {
+                  this.on首日变更(首日);
+                }
+              })
+            }
+          }
+          else if (section.id === 'reviews') {
+            统计图表分区({
+              interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
+              rangeLabels: this.统计天数 === 0 ? this.historyLabels : this.historyLabels.slice(0, 3),
+              rangeIndex: this.reviewsRange,
+              onRangeChange: (index: number): void => { this.reviewsRange = index; },
 
-        // 11. 小时分布（Anki HourGraph）
-        统计图表分区({
-          rangeLabels: this.historyLabels,
-          rangeIndex: this.小时分布窗口,
-          onRangeChange: (索引: number): void => {
-              this.小时分布窗口 = 索引;
-              保存小时分布窗口(索引).catch((): void => {});
-              // 切换窗口后立即把对应窗口数据推送到首页/桌面卡片
-              this.刷新卡片快照();
-            },
-          标题: $r('app.string.stats_section_hours'),
-          有数据: this.图表数据 !== null && this.图表数据.hours !== null,
-          帮助标题: $r('app.string.stats_section_hours'),
-          帮助正文: $r('app.string.stats_help_hours'),
-          onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
-        }) {
-          小时分布卡({
-            小时数据: this.图表数据 !== null ? this.图表数据.hours : null,
-            时间段索引: this.小时分布窗口,
-            是否深色: this.是否深色()
-          })
-        }
+              有数据: this.图表数据 !== null && this.图表数据.reviewCountsByDaysAgo !== null,
+              帮助标题: $r('app.string.stats_section_reviews'),
+              帮助正文: $r('app.string.stats_help_reviews'),
+              onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
+            }) {
+              复习卡({
+                范围索引: this.reviewsRange,
+                复习计数: this.图表数据 !== null ? this.图表数据.reviewCountsByDaysAgo : null,
+                复习时间: this.图表数据 !== null ? this.图表数据.reviewTimesByDaysAgo : null,
+                是否显示全部: this.统计天数 === 0
+              })
+            }
+          }
+          else if (section.id === 'card_counts') {
+            统计图表分区({
+              interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
 
-        // 12. 回答按钮（Anki ButtonsGraph）
-        统计图表分区({
-          rangeLabels: this.统计天数 === 0 ? this.historyLabels : this.historyLabels.slice(0, 3),
-          rangeIndex: this.buttonsRange,
-          onRangeChange: (index: number): void => { this.buttonsRange = index; },
-          标题: $r('app.string.stats_section_buttons'),
-          有数据: this.图表数据 !== null && this.图表数据.buttons !== null,
-          帮助标题: $r('app.string.stats_section_buttons'),
-          帮助正文: $r('app.string.stats_help_buttons'),
-          onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
-        }) {
-          回答按钮卡({
-            范围索引: this.buttonsRange,
-            按钮数据: this.图表数据 !== null ? this.图表数据.buttons : null,
-            是否显示全部: this.统计天数 === 0
-          })
-        }
+              有数据: this.图表数据 !== null && this.图表数据.cardCounts !== null,
+              帮助标题: $r('app.string.stats_section_card_counts'),
+              帮助正文: $r('app.string.stats_help_card_counts'),
+              onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
+            }) {
+              卡片状态分布({
+                卡片计数: this.图表数据 !== null ? this.图表数据.cardCounts : null,
+                分离暂停: this.图表偏好.cardCountsSeparateInactive,
+                on分离变更: (值: boolean): void => {
+                  this.on分离变更(值);
+                }
+              })
+            }
+          }
+          else if (section.id === 'interval') {
+            统计图表分区({
+              interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
+              rangeLabels: this.intervalLabels,
+              rangeIndex: this.intervalRange,
+              onRangeChange: (index: number): void => { this.intervalRange = index; },
 
-        // 13. 新增（Anki AddedGraph）
-        统计图表分区({
-          rangeLabels: this.统计天数 === 0 ? this.historyLabels : this.historyLabels.slice(0, 3),
-          rangeIndex: this.addedRange,
-          onRangeChange: (index: number): void => { this.addedRange = index; },
-          标题: $r('app.string.stats_section_added'),
-          有数据: this.图表数据 !== null && this.图表数据.added !== null,
-          帮助标题: $r('app.string.stats_section_added'),
-          帮助正文: $r('app.string.stats_help_added'),
-          onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
-        }) {
-          新增卡({
-            范围索引: this.addedRange,
-            新增数据: this.图表数据 !== null ? this.图表数据.added : null,
-            是否显示全部: this.统计天数 === 0
-          })
-        }
+              有数据: this.图表数据 !== null && this.图表数据.intervals !== null,
+              帮助标题: $r('app.string.stats_section_interval'),
+              帮助正文: $r('app.string.stats_help_interval'),
+              onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
+            }) {
+              间隔分布卡({
+                范围索引: this.intervalRange,
+                间隔数据: this.图表数据 !== null ? this.图表数据.intervals : null
+              })
+            }
+          }
+          else if (section.id === 'stability') {
+            统计图表分区({
+              interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
+              rangeLabels: this.intervalLabels,
+              rangeIndex: this.stabilityRange,
+              onRangeChange: (index: number): void => { this.stabilityRange = index; },
+
+              有数据: (this.图表数据?.stability ?? null) !== null,
+              帮助标题: $r('app.string.stats_section_stability'),
+              帮助正文: $r('app.string.stats_help_stability'),
+              onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
+            }) {
+              稳定度分布卡({
+                范围索引: this.stabilityRange,
+                稳定度数据: this.图表数据?.stability ?? null
+              })
+            }
+          }
+          else if (section.id === 'ease') {
+            统计图表分区({
+              interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
+              rangeLabels: this.图表数据 !== null && this.图表数据.fsrs ? this.percentageLabels : [],
+              rangeIndex: this.difficultyRange,
+              onRangeChange: (index: number): void => { this.difficultyRange = index; },
+
+              有数据: this.图表数据 !== null
+                && (this.图表数据.eases !== null || this.图表数据.difficulty !== null),
+              帮助标题: $r('app.string.stats_section_ease'),
+              帮助正文: $r('app.string.stats_help_ease'),
+              onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
+            }) {
+              难度分布卡({
+                范围索引: this.difficultyRange,
+                难度数据: this.图表数据 !== null ? this.图表数据.eases : null,
+                FSRS难度: this.图表数据 !== null ? this.图表数据.difficulty : null,
+                是否FSRS: this.图表数据 !== null ? this.图表数据.fsrs : false
+              })
+            }
+          }
+          else if (section.id === 'retrievability') {
+            统计图表分区({
+              interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
+              rangeLabels: this.percentageLabels,
+              rangeIndex: this.retrievabilityRange,
+              onRangeChange: (index: number): void => { this.retrievabilityRange = index; },
+
+              有数据: (this.图表数据?.retrievability ?? null) !== null,
+              帮助标题: $r('app.string.stats_section_retrievability'),
+              帮助正文: $r('app.string.stats_help_retrievability'),
+              onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
+            }) {
+              记忆率卡({
+                范围索引: this.retrievabilityRange,
+                记忆率数据: this.图表数据?.retrievability ?? null
+              })
+            }
+          }
+          else if (section.id === 'retention') {
+            统计图表分区({
+              interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
+              rangeLabels: this.retentionLabels,
+              rangeIndex: this.retentionView,
+              onRangeChange: (index: number): void => { this.retentionView = index; },
+
+              有数据: this.图表数据 !== null && this.图表数据.trueRetention !== null,
+              帮助标题: $r('app.string.stats_section_retention'),
+              帮助正文: $r('app.string.stats_help_retention'),
+              onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
+            }) {
+              真实保留率卡({
+                视图索引: this.retentionView,
+                保留率数据: this.图表数据 !== null ? this.图表数据.trueRetention : null,
+                是否显示全部: this.统计天数 === 0
+              })
+            }
+          }
+          else if (section.id === 'hours') {
+            统计图表分区({
+              interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
+              rangeLabels: this.historyLabels,
+              rangeIndex: this.小时分布窗口,
+              onRangeChange: (索引: number): void => {
+                  this.小时分布窗口 = 索引;
+                  保存小时分布窗口(索引).catch((): void => {});
+                  // 切换窗口后立即把对应窗口数据推送到首页/桌面卡片
+                  this.刷新卡片快照();
+                },
+
+              有数据: this.图表数据 !== null && this.图表数据.hours !== null,
+              帮助标题: $r('app.string.stats_section_hours'),
+              帮助正文: $r('app.string.stats_help_hours'),
+              onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
+            }) {
+              小时分布卡({
+                小时数据: this.图表数据 !== null ? this.图表数据.hours : null,
+                时间段索引: this.小时分布窗口,
+                是否深色: this.是否深色()
+              })
+            }
+          }
+          else if (section.id === 'buttons') {
+            统计图表分区({
+              interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
+              rangeLabels: this.统计天数 === 0 ? this.historyLabels : this.historyLabels.slice(0, 3),
+              rangeIndex: this.buttonsRange,
+              onRangeChange: (index: number): void => { this.buttonsRange = index; },
+
+              有数据: this.图表数据 !== null && this.图表数据.buttons !== null,
+              帮助标题: $r('app.string.stats_section_buttons'),
+              帮助正文: $r('app.string.stats_help_buttons'),
+              onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
+            }) {
+              回答按钮卡({
+                范围索引: this.buttonsRange,
+                按钮数据: this.图表数据 !== null ? this.图表数据.buttons : null,
+                是否显示全部: this.统计天数 === 0
+              })
+            }
+          }
+          else if (section.id === 'added') {
+            统计图表分区({
+              interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
+              rangeLabels: this.统计天数 === 0 ? this.historyLabels : this.historyLabels.slice(0, 3),
+              rangeIndex: this.addedRange,
+              onRangeChange: (index: number): void => { this.addedRange = index; },
+
+              有数据: this.图表数据 !== null && this.图表数据.added !== null,
+              帮助标题: $r('app.string.stats_section_added'),
+              帮助正文: $r('app.string.stats_help_added'),
+              onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
+            }) {
+              新增卡({
+                范围索引: this.addedRange,
+                新增数据: this.图表数据 !== null ? this.图表数据.added : null,
+                是否显示全部: this.统计天数 === 0
+              })
+            }
+          }
+        }, (section: AppInterfaceItem): string => section.id)
       }
       .width('100%')
       .enabled(this.阶段 === 'content')
@@ -746,6 +801,8 @@ export struct 统计页 {
       return true;
     })
     .opacity(this.转场透明度)
+    .onShown((): void => { appInterface.showPage('stats'); this.publishInterface(); })
+    .onHidden((): void => { appInterface.hidePage('stats'); })
   }
 }
 

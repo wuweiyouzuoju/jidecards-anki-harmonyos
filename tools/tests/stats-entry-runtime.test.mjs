@@ -1,4 +1,5 @@
 import { homeDataHarness } from './home-data-harness.mjs';
+import { appInterfaceDependencies } from './app-interface-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -25,7 +26,7 @@ function component(name, names, dependencies) {
 function harness({ snapshot = decodeGraphsResponse(new Uint8Array()), theme = Promise.resolve('dark'), days = 365 } = {}) {
   const sync = new SyncActivity(), events = [], fresh = decodeGraphsResponse(new Uint8Array());
   const Page = component('统计页', ['aboutToAppear', 'aboutToDisappear', 'getStatsSession', 'statsRequest', '加载统计数据', '加载牌组列表', '更新偏好', 'on分离变更'], {
-    StatsSession,
+    ...appInterfaceDependencies(), StatsSession,
     AnkiStatsSession: class {
       waitForCollection() { return sync.waitForCollection(); }
       async graphs() { events.push('open'); return page.统计服务实例.获取图表统计(); }

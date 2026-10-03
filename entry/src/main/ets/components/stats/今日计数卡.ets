@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { PressFeedback } from '../../utils/PressFeedback';
 
 // 今日计数卡：渲染 GraphsView.today 为 4 行文字列表（对齐 Anki TodayStats）。
 // 行 1 今天学习了 N 张，用时 X（Y 秒/张）；行 2 重来次数 N (P%)；
@@ -18,7 +17,7 @@ export struct 今日计数卡 {
   /** 渲染哨兵：@Prop 变化经 @Watch 递增，驱动本组件重新渲染
    *  （@Prop 直连 UI 在统计图表分区尾闭包内不触发刷新，实测 2026-08-29） */
   @Prop @Watch('数据已变') 预测数据: FutureDue | null = null;
-  @State private showDetails: boolean = false;
+  @Prop @Watch('数据已变') showDetails: boolean = false;
   @State private 渲染指纹: number = 0;
 
   private 数据已变(): void {
@@ -129,13 +128,6 @@ export struct 今日计数卡 {
             .fontColor($r('app.color.text_secondary')).maxLines(2)
         }.layoutWeight(1).alignItems(HorizontalAlign.Start)
       }.width('100%').alignItems(VerticalAlign.Top)
-      if (this.今日数据 !== null && this.今日数据.answerCount > 0) {
-        Button($r('app.string.stats_today_details'))
-          .backgroundColor(Color.Transparent).fontColor($r('app.color.text_secondary'))
-          .height(36).attributeModifier(new PressFeedback())
-          .stateEffect(false)
-          .onClick((): void => { this.showDetails = !this.showDetails; })
-      }
       if (this.showDetails && this.今日数据 !== null && this.今日数据.answerCount > 0) {
         // 内容内联（原 @Builder 值传参参数被固化，牌组切换后数字不更新，2026-08-29 修复）
         Column({ space: 应用尺寸.间距_10 }) {
