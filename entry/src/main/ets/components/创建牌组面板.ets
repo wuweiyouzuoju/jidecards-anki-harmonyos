@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { interfaceItemText } from '../utils/AppInterfaceText';
+import { appInterface } from '../backend/AppInterfaceService';
+import { FormInputStyle } from '../utils/FormInputStyle';
 import { PressFeedback } from '../utils/PressFeedback';
 import { DialogBackdrop } from './common/DialogBackdrop';
 import { resourceText } from '../utils/UiFeedback';
@@ -45,9 +48,9 @@ import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时
 export struct 创建牌组面板 {
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
-  @Prop busy: boolean = false;
+  @Prop @Watch('publishInterface') busy: boolean = false;
   @Prop errorMessage: string = '';
-  @Prop parentOptions: 牌组汇总[] = [];
+  @Prop @Watch('publishInterface') parentOptions: 牌组汇总[] = [];
   @Prop initialParentId: string = '';
   onCancel: () => void = (): void => {
   };
@@ -55,7 +58,7 @@ export struct 创建牌组面板 {
   };
 
   @State private deckName: string = '';
-  @State private parentId: string = '';
+  @State @Watch('publishInterface') private parentId: string = '';
 
   @StorageProp(颜色键.动作主色) private 动作主色: string = '#2F5FD0';
   @StorageProp(颜色键.动作主色按下) private 动作主色按下: string = '#1E4FB8';
@@ -67,7 +70,17 @@ export struct 创建牌组面板 {
 
   aboutToAppear(): void {
     this.parentId = this.initialParentId;
+    this.publishInterface();
   }
+
+  private publishInterface(): void {
+    appInterface.observe({ surface: 'create_deck', sectionId: '', selectedId: this.parentId,
+      optionIds: [''].concat(this.parentOptions.slice(0, 100).map((deck: 牌组汇总): string => deck.id)),
+      optionLabels: [interfaceItemText(this.getUIContext(), 'create_deck', 'top_level')].concat(
+        this.parentOptions.slice(0, 100).map((deck: 牌组汇总): string => deck.name)),
+      optionsTotal: this.parentOptions.length + 1, busy: this.busy });
+  }
+  aboutToDisappear(): void { appInterface.leave('create_deck'); }
 
   // ========================================================
   // @块ID UI-CREATE-DECK-002
@@ -286,9 +299,9 @@ export struct 创建牌组面板 {
         // 标题行
         DialogHeader({
           title: $r('app.string.create_deck_title'),
-          actionLabel: this.busy ? $r('app.string.create_deck_creating') : $r('app.string.create_deck_confirm'),
+          actionLabel: this.busy ? $r('app.string.create_deck_creating') : interfaceItemText(this.getUIContext(), 'create_deck', 'confirm'),
           actionEnabled: this.canSubmit(),
-          closeLabel: $r('app.string.create_deck_cancel'),
+          closeLabel: interfaceItemText(this.getUIContext(), 'create_deck', 'cancel'),
           closeEnabled: !this.busy,
           onClose: () => {
             this.onCancel();
@@ -299,16 +312,8 @@ export struct 创建牌组面板 {
         })
 
         // 牌组名称输入框上移到标题下方（先填名称 → 再选父牌组 → 看预览 → 提交）
-        TextInput({ placeholder: $r('app.string.deck_name_placeholder'), text: this.deckName })
-          .width('100%')
-          .height(应用尺寸.按钮高度)
-          .fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_primary'))
-          .placeholderColor($r('app.color.text_tertiary'))
-          .backgroundColor($r('app.color.surface_card'))
-          .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
-          .borderRadius(应用尺寸.圆角_面板)
-          .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
+        TextInput({ placeholder: interfaceItemText(this.getUIContext(), 'create_deck', 'name'), text: this.deckName })
+          .attributeModifier(new FormInputStyle(应用尺寸.卡片内边距))
           .enabled(!this.busy)
           .onChange((value: string) => {
             this.deckName = value;

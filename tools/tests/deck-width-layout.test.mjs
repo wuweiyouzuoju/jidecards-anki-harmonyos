@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import vm from 'node:vm';
+import { localPreferenceApi } from './local-preference-harness.mjs';
 import { DECK_LIST_NARROW_KEY, DECK_WIDTH_HINT_HANDLED_KEY } from '../../entry/src/main/ets/model/DeckListAppearance.ts';
 import { 应用尺寸 } from '../../entry/src/main/ets/utils/应用尺寸.ets';
 
@@ -15,6 +16,7 @@ test('deck width defaults to wide, survives restart and rolls back failed writes
   const app = new Map([['abilityContext', {}]]);
   let fail = false;
   const context = vm.createContext({
+    ...localPreferenceApi({ setOrCreate: (key, value) => app.set(key, value) }),
     DECK_LIST_NARROW_KEY,
     DECK_WIDTH_HINT_HANDLED_KEY,
     AppStorage: { get: key => app.get(key), setOrCreate: (key, value) => app.set(key, value) },

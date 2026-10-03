@@ -198,6 +198,7 @@ test('saving deck options broadcasts refresh only after backend commit', async (
     committed:()=>events.push('fsrs-refresh')},s=>{if(s.phase==='saved')events.push('close');});
   await session.load();
   const pending=session.save(config,false,{limits:null,newCardsIgnoreReviewLimit:false,fsrs:false,applyAllParentLimits:false,fsrsReschedule:false,fsrsHealthCheck:false});
+  await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual(events,['save']);saved.resolve();await pending;
   assert.deepEqual(events,['save','fsrs-refresh','close']);
 });

@@ -22,9 +22,9 @@ const SERVICE = 'entry/src/main/ets/backend/牌组服务.ts';
 
 test('filtered deck creation belongs to the experimental home add menu, not a deck context', () => {
   const menu = read('entry/src/main/ets/components/主页操作面板.ets');
-  assert.match(menu, /@StorageLink\(简洁模式AppStorage键\) private 简洁模式: boolean = true/);
-  assert.match(menu, /if \(!this\.简洁模式\) \{\s*AnchoredMenuItem\(\{ label: \$r\('app\.string\.filtered_deck_title'\)/);
-  assert.match(menu, /onSelect: \(\): void => \{ this\.onCreateFilteredDeck\(\); \}/);
+  assert.match(menu, /@StorageLink\(简洁模式AppStorage键\)[^\n]*private 简洁模式: boolean = true/);
+  assert.match(menu, /visibleInterfaceItems\('home_create',[\s\S]*?simple: this\.简洁模式/);
+  assert.match(menu, /case 'filtered_deck': this\.onCreateFilteredDeck\(\)/);
   assert.match(read(PAGE), /onCreateFilteredDeck: \(\): void => \{\s*this\.显示主页操作 = false;\s*this\.打开创建过滤牌组\(\);/);
   const deckItem = read('entry/src/main/ets/components/牌组列表项.ets');
   assert.doesNotMatch(deckItem, /filtered_deck_title|onCreateFilteredDeck/);
@@ -58,7 +58,7 @@ test('create deck panel exists as a pure UI building block', () => {
 test('create deck panel guards submission and reflects busy/error props', () => {
   const panel = read(PANEL);
 
-  assert.match(panel, /@Prop busy: boolean/);
+  assert.match(panel, /@Prop[^\n]*busy: boolean/);
   assert.match(panel, /@Prop errorMessage: string/);
   assert.match(panel, /deckName\.trim\(\)\.length > 0/);
   assert.match(panel, /actionEnabled: this\.canSubmit\(\)/);
@@ -82,10 +82,10 @@ test('create deck panel uses shared dimension tokens and string resources', () =
   assert.match(panel, /应用尺寸/);
   assert.doesNotMatch(panel, /\.fontSize\(\d/, 'must not hardcode fontSize');
   assert.doesNotMatch(panel, /\.borderRadius\(\d/, 'must not hardcode borderRadius');
-  for (const key of ['create_deck_title', 'deck_name_placeholder',
-    'create_deck_cancel', 'create_deck_confirm', 'create_deck_creating']) {
+  for (const key of ['create_deck_title', 'create_deck_creating']) {
     assert.match(panel, new RegExp(`app\\.string\\.${key}`), `panel must use ${key}`);
   }
+  for (const id of ['name', 'confirm', 'cancel']) assert.ok(panel.includes(`interfaceItemText(this.getUIContext(), 'create_deck', '${id}')`));
 });
 
 test('deck service creates decks via NewDeck template then AddDeck', () => {

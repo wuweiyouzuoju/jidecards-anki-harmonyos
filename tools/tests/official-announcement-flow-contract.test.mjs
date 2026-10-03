@@ -95,7 +95,7 @@ test('home delegates announcement scheduling to its owner without polling', () =
 test('every real home return enters the shared refresh and announcement path', () => {
   const source = read('../../entry/src/main/ets/pages/首页.ets');
   assert.match(source, /onPageShow\(\): void \{\s*this\.返回主页后刷新\(\);/);
-  assert.match(source, /onPageHide\(\): void \{\s*this\.暂停主页官方公告检查\(\);/);
+  assert.match(source, /onPageHide\(\): void \{\s*(?:this\.deckPreviewSession\.invalidate\(\);\s*)?this\.暂停主页官方公告检查\(\);/);
   assert.match(source, /name: 'StudyPage'[\s\S]*?onPop:[\s\S]*?返回主页后刷新/);
   assert.match(source, /name: 'StatsPage'[\s\S]*?onPop:[\s\S]*?返回主页后刷新/);
   assert.match(source, /name: 'SettingsPage'[\s\S]*?onPop:[\s\S]*?返回主页后刷新/);

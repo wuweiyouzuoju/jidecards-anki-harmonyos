@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { AppInterfaceItem, visibleInterfaceItems } from '../model/AppInterface';
+import { appInterface } from '../backend/AppInterfaceService';
+import { namedResourceText } from '../utils/UiFeedback';
 import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
 import { AnchoredMenu } from './common/AnchoredMenu';
 import { AnchoredMenuItem } from './common/MenuItem';
 
 import { 应用尺寸 } from '../utils/应用尺寸';
-import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../model/ReleaseFeatures';
 import { 简洁模式AppStorage键 } from '../model/简洁模式存储';
 
 // ========================================================
@@ -35,42 +37,45 @@ export struct 主页操作面板 {
   创建牌组回调: () => void = (): void => {};
   onCreateFilteredDeck: () => void = (): void => {};
   导入牌组回调: () => void = (): void => {};
-  AI制卡回调: () => void = (): void => {};
-  AI改卡回调: () => void = (): void => {};
   /** 由父级按渠道开关和下载配额决定是否显示。 */
-  @Prop 显示获取直链牌组: boolean = false;
+  @Prop @Watch('publishInterface') 显示获取直链牌组: boolean = false;
   获取直链牌组回调: () => void = (): void => {};
   关闭回调: () => void = (): void => {};
   @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
-  @StorageLink(AI_AGENT_CHANNELS_APP_STORAGE_KEY) private Agent入口已启用: boolean = false;
-  @StorageLink(简洁模式AppStorage键) private 简洁模式: boolean = true;
+  @StorageLink(简洁模式AppStorage键) @Watch('publishInterface') private 简洁模式: boolean = true;
+
+  private menuItems(): AppInterfaceItem[] {
+    return visibleInterfaceItems('home_create', { simple: this.简洁模式, agent: false, cloudDeck: this.显示获取直链牌组, themeHasTextures: false });
+  }
+
+  private selectItem(id: string): void {
+    switch (id) {
+      case 'create_deck': this.创建牌组回调(); break;
+      case 'filtered_deck': this.onCreateFilteredDeck(); break;
+      case 'import': this.导入牌组回调(); break;
+      case 'cloud_deck': this.获取直链牌组回调(); break;
+    }
+  }
+
+  private publishInterface(): void {
+    const items: AppInterfaceItem[] = this.menuItems();
+    appInterface.observe({ surface: 'home_create', sectionId: '', selectedId: '',
+      optionIds: items.map((item: AppInterfaceItem): string => item.id),
+      optionLabels: items.map((item: AppInterfaceItem): string => namedResourceText(this.getUIContext(), item.titleKey)), busy: false });
+  }
+  aboutToAppear(): void { this.publishInterface(); }
+  aboutToDisappear(): void { appInterface.leave('home_create'); }
 
   build() {
-    AnchoredMenu({ menuWidth: !this.简洁模式 || this.Agent入口已启用 || this.显示获取直链牌组 ? 应用尺寸.extendedMenuWidth : 应用尺寸.compactMenuWidth, alignEnd: true,
+    AnchoredMenu({ menuWidth: !this.简洁模式 || this.显示获取直链牌组 ? 应用尺寸.extendedMenuWidth : 应用尺寸.compactMenuWidth, alignEnd: true,
       contentMaxWidth: 应用尺寸.内容最大宽度,
       topOffset: 应用尺寸.pageContentTop(this.状态栏高度, this.narrowDeckLayout),
       onClose: (): void => { this.关闭回调(); } }) {
-      AnchoredMenuItem({ label: $r('app.string.create_deck_title'), divider: false,
-        onSelect: (): void => { this.创建牌组回调(); } })
-      if (!this.简洁模式) {
-        AnchoredMenuItem({ label: $r('app.string.filtered_deck_title'), divider: true,
-          onSelect: (): void => { this.onCreateFilteredDeck(); } })
-      }
-      AnchoredMenuItem({ label: $r('app.string.transfer_import_deck'), divider: true,
-        onSelect: (): void => { this.导入牌组回调(); } })
-      if (this.Agent入口已启用) {
-      AnchoredMenuItem({ label: $r('app.string.ai_card_title'), divider: true,
-        onSelect: (): void => { this.AI制卡回调(); } })
-      }
-      if (this.Agent入口已启用) {
-      AnchoredMenuItem({ label: $r('app.string.ai_card_edit'), divider: true,
-        onSelect: (): void => { this.AI改卡回调(); } })
-      }
-      if (this.显示获取直链牌组) {
-      AnchoredMenuItem({ label: $r('app.string.cloud_deck_menu_entry'), divider: true,
-        onSelect: (): void => { this.获取直链牌组回调(); } })
-      }
+      ForEach(this.menuItems(), (item: AppInterfaceItem, index: number) => {
+        AnchoredMenuItem({ label: namedResourceText(this.getUIContext(), item.titleKey), divider: index > 0,
+          onSelect: (): void => { this.selectItem(item.id); } })
+      }, (item: AppInterfaceItem): string => item.id)
     }
   }
 }

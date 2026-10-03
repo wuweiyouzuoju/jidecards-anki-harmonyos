@@ -6,8 +6,10 @@ export interface HomeStartupHost {
   activateAnnouncementChecks: () => void;
   cloudCompleted: () => Promise<boolean>;
   introCompleted: () => Promise<boolean>;
+  giftCompleted: () => Promise<boolean>;
   showCloud: () => void;
   showIntro: () => void;
+  showGift: () => void;
 }
 
 /**
@@ -20,10 +22,13 @@ export class HomeStartupSequence {
   private continuationRunning: boolean = false;
   private introPending: boolean = false;
   private introRunning: boolean = false;
+  private giftPending: boolean = false;
+  private giftRunning: boolean = false;
   private disposed: boolean = false;
 
   hasPending(): boolean {
-    return this.continuationPending || this.continuationRunning || this.introPending || this.introRunning;
+    return this.continuationPending || this.continuationRunning || this.introPending || this.introRunning ||
+      this.giftPending || this.giftRunning;
   }
 
   /** 首次检查结束前不读取引导偏好；有公告时由确认事件继续序列。 */
@@ -39,6 +44,7 @@ export class HomeStartupSequence {
   async resume(host: HomeStartupHost): Promise<void> {
     if (this.continuationPending) await this.continue(host);
     else if (this.introPending) await this.welcome(host);
+    else if (this.giftPending) await this.gift(host);
   }
 
   async continue(host: HomeStartupHost): Promise<void> {
@@ -65,7 +71,7 @@ export class HomeStartupSequence {
     try {
       const shown: boolean = await host.introCompleted();
       if (this.disposed) return;
-      if (shown) { this.introPending = false; return; }
+      if (shown) { this.introPending = false; await this.gift(host); return; }
       if (!host.canPresent()) return;
       this.introPending = false;
       host.showIntro();
@@ -74,9 +80,26 @@ export class HomeStartupSequence {
     }
   }
 
+  /** 入门确认后继续；已获得或已确认的用户不弹赠送提醒。 */
+  async gift(host: HomeStartupHost): Promise<void> {
+    if (this.disposed) return;
+    this.giftPending = true;
+    if (this.giftRunning || !host.canPresent()) return;
+    this.giftRunning = true;
+    try {
+      const completed: boolean = await host.giftCompleted();
+      if (this.disposed || !host.canPresent()) return;
+      this.giftPending = false;
+      if (!completed) host.showGift();
+    } finally {
+      this.giftRunning = false;
+    }
+  }
+
   dispose(): void {
     this.disposed = true;
     this.continuationPending = false;
     this.introPending = false;
+    this.giftPending = false;
   }
 }

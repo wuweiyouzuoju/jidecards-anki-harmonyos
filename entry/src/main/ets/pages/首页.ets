@@ -14,6 +14,8 @@ import { HomeRefreshQueue } from '../model/HomeRefreshQueue';
 import { HomeDataRepository, HomeDataResult } from '../backend/HomeDataRepository';
 import { HomeWorkCoordinator, HomeWorkHost } from '../model/HomeWorkCoordinator';
 import { HomeStartupSequence, HomeStartupHost } from '../model/HomeStartupSequence';
+import { IridescentGiftPanel } from '../components/IridescentGiftPanel';
+import { isIridescentGiftNoticeCompleted, completeIridescentGiftNotice } from '../utils/IridescentGiftStore';
 import { CLOUD_DECK_CHANNEL_ENABLED } from '../model/ReleaseFeatures';
 import { AutoSyncScheduler, autoSyncScheduler } from '../model/AutoSyncScheduler';
 import { HomeSyncController, HomeSyncHost } from '../model/HomeSyncController';
@@ -24,11 +26,9 @@ import { promptAction } from '@kit.ArkUI';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { 后端会话 } from '../backend/后端会话';
 
-import { 搜索服务 } from '../backend/搜索服务';
+import { DeckPreviewService } from '../backend/DeckPreviewService';
+import { DeckPreviewScope, DeckPreviewSession } from '../model/DeckPreviewSession';
 import { 卡片预览页 } from '../components/browser/卡片预览页';
-import { deckHistorySearch } from '../model/DeckStudyHistory';
-import { makeParsableTextNode } from '../proto/messages/SearchMessages';
-import type { SearchRequest, SortOrder } from '../proto/messages/SearchMessages';
 import { initializeRedemption } from '../utils/RedemptionStore';
 import { UNLOCKED_CONTENTS_KEY, isThemeAvailable } from '../model/ThemeCatalog';
 import { ThemeBackground } from '../components/common/ThemeBackground';
@@ -57,6 +57,7 @@ import { loadVisibleSyncAuth, 同步凭证信息, loadAutoSyncEnabled } from '..
 import { APP_FOREGROUND_KEY } from '../model/Redemption';
 import { 主页顶部工具栏 } from '../components/home/主页顶部工具栏';
 import { 主页更多面板 } from '../components/home/主页更多面板';
+import { appInterface } from '../backend/AppInterfaceService';
 import { 设置页参数, 浏览页参数 } from '../model/navigation/PageParams';
 import { 主页摘要分页 } from '../components/home/主页摘要分页';
 import { 主页牌组列表 } from '../components/home/主页牌组列表';
@@ -136,11 +137,10 @@ struct 首页 {
 
   private 从选择器导入牌组(): void {
     if (this.deferForSync((): void => this.从选择器导入牌组())) return;
-    this.transferSession.open('importDeck', 0, false);
-    this.transferSession.execute({ kind: 'importDeck' });
+    this.transferSession.startImport();
   }
 
-  private importDeckUri(uri: string): Promise<void> { return this.transferSession.importUri(uri); }
+  private importDeckUri(uri: string): Promise<void> { return this.transferSession.importUri(uri, true); }
 
   private 打开数据迁移(mode: 数据迁移模式, deckId: number, allowDeckSelection: boolean): void {
     if (this.deferForSync((): void => this.打开数据迁移(mode, deckId, allowDeckSelection))) return;
@@ -151,7 +151,7 @@ struct 首页 {
   private readonly 页面栈: NavPathStack = new NavPathStack();
   private readonly 牌组数据源: 牌组列表数据源 = new 牌组列表数据源([]);
   private readonly homeData: HomeDataRepository = new HomeDataRepository();
-  private readonly 搜索服务实例: 搜索服务 = new 搜索服务();
+  private readonly deckPreviewSession: DeckPreviewSession = new DeckPreviewSession(new DeckPreviewService());
   private readonly 官方公告服务实例: 官方公告服务 = new 官方公告服务();
   @State @Watch('homeActivityChanged') private 显示官方公告: boolean = false;
   @State private 官方公告数据: 官方公告展示项 | null = null;
@@ -186,7 +186,7 @@ struct 首页 {
   @StorageLink(主页今日进度卡AppStorage键) private 显示今日进度卡: boolean = true;
   // 用 @Provide 暴露给宽屏 GridCol 路径下的 牌组详情面板：
   // 改用 @Provide/@Consume 让 牌组详情面板 内部根据 选中的牌组ID 自查 主页快照，
-  @Provide('selectedDeckId') private 选中的牌组ID: string = '';
+  @Provide('selectedDeckId') @Watch('previewDeckChanged') private 选中的牌组ID: string = '';
   @Provide('snapshot') private 主页快照数据: 主页快照 = 空主页快照;
   @State private historyRefreshToken: number = 0;
   @State private backgroundTransitionActive: boolean = false;
@@ -201,7 +201,7 @@ struct 首页 {
   private statsSnapshot: 统计页参数 = { graphs: null, days: 365 };
   @State @Watch('homeActivityChanged') private 加载状态: 主页加载状态 = 'loading';
   @State private 当前断点: string = 'xs';
-  @State private 主题模式值: 主题模式 = 'system';
+  @StorageLink('themeMode') private 主题模式值: 主题模式 = 'system';
   @StorageLink('colorTheme') private 颜色主题值: 颜色主题 = 默认颜色主题;
   // 跟随用户选择的颜色主题（极光蓝/仙野绿/暗夜紫/碧涛青/活力橙/柠檬金）
   @StorageProp(颜色键.动作主色) private 动作主色: string = '#2F5FD0';
@@ -287,6 +287,7 @@ struct 首页 {
   private 上次牌组已恢复: boolean = false;
   // 入门弹窗与启动序列共用展示槽位，由独立本机修订标记控制一次展示。
   @State @Watch('homeActivityChanged') private 显示欢迎弹窗: boolean = false;
+  @State @Watch('homeActivityChanged') private showIridescentGift: boolean = false;
   @State @Watch('homeActivityChanged') private 云端牌组忙碌: boolean = false;
   @State private cloudBackRequest: number = 0;
   private 打开云端牌组弹窗(从菜单打开: boolean): void {
@@ -306,10 +307,12 @@ struct 首页 {
   @State @Watch('homeActivityChanged') private 显示牌组详情: boolean = false;
   @State @Watch('homeActivityChanged') private 显示卡片预览: boolean = false;
   private previewBackHandler: (() => boolean) | null = null;
+  private deckDetailsBackHandler: (() => boolean) | null = null;
   @State private 预览卡片ID列表: number[] = [];
   @State private 预览初始索引: number = 0;
   @State private 预览媒体目录: string = '';
-  private 预览加载中: boolean = false;
+  @State @Watch('homeActivityChanged') private 预览加载中: boolean = false;
+  @State @Watch('homeActivityChanged') private deckPreviewMenuOpen: boolean = false;
 
   private homeSyncHost(): HomeSyncHost {
     return {
@@ -400,6 +403,8 @@ struct 首页 {
   }
 
   aboutToDisappear(): void {
+    appInterface.leave('home');
+    this.deckPreviewSession.dispose();
     this.transferSession.dispose();
     this.homeDisposed = true;
     this.暂停主页官方公告检查();
@@ -443,7 +448,15 @@ struct 首页 {
   private syncForegroundChanged(): void {
     this.syncController.foregroundChanged();
     if (this.syncForeground) this.backupController.schedule();
-    else this.backupController.stop();
+    else {
+      this.deckPreviewSession.invalidate();
+      this.backupController.stop();
+    }
+  }
+
+  private previewDeckChanged(): void {
+    this.deckPreviewSession.invalidate();
+    this.publishHomeInterface();
   }
 
   /** 生命周期只记录意图；学习提交与此入口共用同一队列。 */
@@ -553,10 +566,10 @@ struct 首页 {
       collectionReady: 后端会话.获取实例().是否就绪() && this.加载状态 !== 'loading' && this.加载状态 !== 'error',
       collectionBusy: this.autoSyncCollectionBusy || this.syncController.isRefreshing() || this.刷新中 || this.deckDeletionBusy ||
         (this.transfer.phase !== 'idle') || this.创建牌组中 || this.deckOptionsBusy || this.云端牌组忙碌,
-      dialogOpen: this.显示官方公告 || this.显示欢迎弹窗 || this.显示云端牌组弹窗 || this.transfer.visible ||
+      dialogOpen: this.显示官方公告 || this.显示欢迎弹窗 || this.showIridescentGift || this.显示云端牌组弹窗 || this.transfer.visible ||
         this.显示牌组定制 || this.显示自定义学习 || this.显示过滤牌组面板 || this.显示牌组选项 ||
         this.显示创建牌组 || this.显示主页操作 || this.显示更多菜单 || this.显示节流奖励 ||
-        this.显示卡片预览 || this.autoSyncModal || this.fsrsPromptActive || this.nativeDialogOpen,
+        this.显示卡片预览 || this.deckPreviewMenuOpen || this.autoSyncModal || this.fsrsPromptActive || this.nativeDialogOpen,
       interactionBusy: this.排序模式中 || this.预览加载中 || this.定制牌组中,
       startupChecking: this.官方公告检查中 || this.announcementController.hasPending() ||
         this.startupSequence.hasPending()
@@ -567,9 +580,19 @@ struct 首页 {
     return !externalDeckOpens.hasPending() && canPresentHomePrompt(this.homeActivity());
   }
 
+  private publishHomeInterface(): void {
+    if (this.homeDisposed) return;
+    const visibleDecks: 牌组汇总[] = this.牌组数据源.snapshotDecks();
+    appInterface.observe({ surface: 'home', sectionId: '', selectedId: this.选中的牌组ID,
+      optionIds: visibleDecks.slice(0, 100).map((deck: 牌组汇总): string => deck.id),
+      optionLabels: visibleDecks.slice(0, 100).map((deck: 牌组汇总): string => deck.name),
+      optionsTotal: visibleDecks.length, busy: this.homeActivity().collectionBusy });
+  }
+
   /** 页面映射当前占用与效果，任务优先级由 HomeWorkCoordinator 统一管理。 */
   private homeActivityChanged(): void {
     if (this.homeDisposed) return;
+    this.publishHomeInterface();
     const host: HomeWorkHost = {
       activity: (): HomeActivityState => this.homeActivity(),
       hasDeferredNavigation: (): boolean => this.syncController.hasDeferredNavigation(),
@@ -656,8 +679,15 @@ struct 首页 {
       cloudCompleted: async (): Promise<boolean> =>
         !CLOUD_DECK_CHANNEL_ENABLED || await 是否已完成云端牌组引导(),
       introCompleted: (): Promise<boolean> => isHomeIntroCompleted(),
+      giftCompleted: async (): Promise<boolean> => {
+        try { return await isIridescentGiftNoticeCompleted(); } catch (error) {
+          if (!this.homeDisposed) this.显示提示($r('app.string.iridescent_gift_load_failed'));
+          return true;
+        }
+      },
       showCloud: (): void => this.打开云端牌组弹窗(false),
-      showIntro: (): void => { this.显示欢迎弹窗 = true; }
+      showIntro: (): void => { this.显示欢迎弹窗 = true; },
+      showGift: (): void => { this.showIridescentGift = true; }
     };
   }
 
@@ -792,6 +822,14 @@ struct 首页 {
   private closeHomeIntro(): void {
     this.显示欢迎弹窗 = false;
     completeHomeIntro().catch((): void => { this.显示提示($r('app.string.home_intro_save_failed')); });
+    this.startupSequence.gift(this.startupHost()).then((): void => { this.homeActivityChanged(); });
+  }
+
+  private closeIridescentGift(): void {
+    this.showIridescentGift = false;
+    completeIridescentGiftNotice().catch((): void => {
+      if (!this.homeDisposed) this.显示提示($r('app.string.iridescent_gift_save_failed'));
+    });
   }
 
   /** 页面每次可见都刷新（含从复习页返回），保证今日计数与队列状态同步。 */
@@ -802,6 +840,7 @@ struct 首页 {
   /** 进入后台：取消尚未执行的公告延迟检查，返回前台由 onPageShow 重新协调。 */
   onPageHide(): void {
     this.暂停主页官方公告检查();
+    this.deckPreviewSession.invalidate();
     this.stopAutoSyncTimer();
   }
 
@@ -812,7 +851,9 @@ struct 首页 {
    * Extension Points: 新增弹窗时在此链中按层级插入对应 @State 判断。
    */
   onBackPress(): boolean {
-    if ((this.transfer.phase !== 'idle') || this.创建牌组中 || this.定制牌组中 || this.deckOptionsBusy || this.deckDeletionBusy) return true;
+    // Open deck options owns Back: computing can leave; accepted saving stays protected inside the panel.
+    if ((this.transfer.phase !== 'idle') || this.创建牌组中 || this.定制牌组中 ||
+      (this.deckOptionsBusy && !this.显示牌组选项) || this.deckDeletionBusy) return true;
     if (this.显示卡片预览) {
       if (this.previewBackHandler?.()) return true;
       this.显示卡片预览 = false;
@@ -836,8 +877,17 @@ struct 首页 {
     if (this.显示主页操作) { this.显示主页操作 = false; return true; }
     if (this.显示更多菜单) { this.显示更多菜单 = false; return true; }
     if (this.显示节流奖励) { this.显示节流奖励 = false; return true; }
+    if (this.showIridescentGift) { this.closeIridescentGift(); return true; }
     if (this.显示欢迎弹窗) { this.closeHomeIntro(); return true; }
-    if (this.显示牌组详情) { this.显示牌组详情 = false; return true; }
+    if (this.deckDetailsBackHandler?.()) return true;
+    if (this.预览加载中) {
+      this.deckPreviewSession.invalidate();
+      return true;
+    }
+    if (this.显示牌组详情) {
+      this.显示牌组详情 = false;
+      return true;
+    }
     return false;
   }
 
@@ -1105,7 +1155,9 @@ struct 首页 {
     AppStorage.setOrCreate<主题模式>('themeMode', mode);
     const context: common.UIAbilityContext | null = this.取能力上下文();
     if (context !== null) {
-      应用主题(context, mode, this.系统暗黑模式);
+      应用主题(context, mode, this.系统暗黑模式).catch((error: Object): void => {
+        hilog.warn(0x4342, '首页', 'Startup theme unavailable: %{public}s', `${error}`);
+      });
     }
     // 深浅色变化时颜色主题的浅色/深色套也要同步刷新
     应用颜色主题(this.颜色主题值, this.是否深色());
@@ -1165,40 +1217,30 @@ struct 首页 {
   }
 
   /**
-   * 打开当前牌组全部卡片的只读预览。
-   * 只做搜索与渲染，不调用调度器，不写学习记录。
+   * 读取独立集合快照；翻面/切卡不进入正式学习会话。
    */
-  private async 打开牌组预览(): Promise<void> {
-    if (this.deferForSync((): void => { this.打开牌组预览(); })) return;
+  private async 打开牌组预览(scope: DeckPreviewScope): Promise<void> {
+    if (this.deferForSync((): void => { this.打开牌组预览(scope); })) return;
     const deck: 牌组汇总 = this.选中牌组();
     if (deck.id === '' || this.预览加载中) return;
     const context: common.UIAbilityContext | null = this.取能力上下文();
     if (context === null) return;
-    const scope: string = deckHistorySearch(deck.id, this.主页快照数据.decks);
-    if (scope === '') {
-      this.显示提示($r('app.string.deck_preview_empty'));
-      return;
-    }
     this.预览加载中 = true;
     try {
-      await 后端会话.获取实例().确保已打开(context.filesDir);
-      const search: string = await this.搜索服务实例.构建搜索串(makeParsableTextNode(scope));
-      const order: SortOrder = { kind: 'none' };
-      const request: SearchRequest = { search: search, order: order };
-      const ids: number[] = await this.搜索服务实例.搜索卡片(request);
+      const ids: number[] | null = await this.deckPreviewSession.load(deck.id, scope);
+      if (ids === null || this.homeDisposed || this.页面栈.size() > 0 || this.选中的牌组ID !== deck.id || !this.syncForeground) return;
       if (ids.length === 0) {
         this.显示提示($r('app.string.deck_preview_empty'));
         return;
       }
       if (this.homeDisposed || this.页面栈.size() > 0 || this.选中的牌组ID !== deck.id) return;
-      ids.sort((a: number, b: number): number => a - b);
       this.预览卡片ID列表 = ids;
       this.预览初始索引 = 0;
       this.预览媒体目录 = `${context.filesDir}/collection.media`;
       this.显示卡片预览 = true;
     } catch (error) {
       console.info(`首页: 打开牌组预览失败 deck=${deck.id} 错误=${error}`);
-      this.显示提示($r('app.string.deck_preview_error'));
+      if (!this.homeDisposed && this.选中的牌组ID === deck.id) this.显示提示($r('app.string.deck_preview_error'));
     } finally {
       this.预览加载中 = false;
       this.homeActivityChanged();
@@ -1533,17 +1575,17 @@ struct 首页 {
     });
   }
 
-  /** 从首页进入浏览页多选卡片；选定目标后再打开 Agent 改卡。 */
-  private async 打开AI改卡(): Promise<void> {
-    if (this.deferForSync((): void => { this.打开AI改卡(); })) return;
+  /** 更多中的唯一 AI 入口，空白对话按意图调用已有制卡/改卡工具。 */
+  private async openAgent(): Promise<void> {
+    if (this.deferForSync((): void => { this.openAgent(); })) return;
     if (!await this.isAIConfigured()) {
       this.openAISettings();
       return;
     }
-    const params: 浏览页参数 = { selectForAgentEdit: true };
+    const params: AI制卡页参数 = { mode: 'assistant' };
     this.暂停主页官方公告检查();
     this.页面栈.pushPath({
-      name: 'BrowserPage', param: params,
+      name: 'AiCardPage', param: params,
       onPop: (): void => { this.返回主页后刷新(); }
     });
   }
@@ -1661,7 +1703,6 @@ struct 首页 {
               选中的牌组ID: this.选中的牌组ID,
               排序模式中: this.排序模式中,
               加载状态: this.加载状态,
-              刷新中: this.刷新中,
               动作主色: this.动作主色,
               主色按钮背景色: this.主色按钮背景色,
               onMove: (from: number, to: number): void => {
@@ -1694,12 +1735,13 @@ struct 首页 {
               onItemCustomStudy: (deckId: string): void => {
                 this.打开自定义学习(deckId);
               },
-              onRefresh: (): void => {
-                // 先置 刷新中=true 触发 @Watch 同步 刷新指示器开关=true（Refresh 内部已置 true，无副作用）；
-                // 加载主页数据() 内部 finally 置 刷新中=false（true→false 触发 @Watch 同步 刷新指示器开关=false 收起指示器）。
-                // 不显式置 true 会导致 刷新中 一直 false，@Watch 不触发，刷新指示器永远转圈。
+              onRefresh: async (): Promise<void> => {
                 this.刷新中 = true;
-                this.加载主页数据();
+                try {
+                  await this.加载主页数据();
+                } finally {
+                  this.刷新中 = false;
+                }
               },
               onRetry: (): void => {
                 this.加载主页数据();
@@ -1755,14 +1797,6 @@ struct 首页 {
           this.显示主页操作 = false;
           this.从选择器导入牌组();
         },
-        AI制卡回调: (): void => {
-          this.显示主页操作 = false;
-          this.打开AI制卡();
-        },
-        AI改卡回调: (): void => {
-          this.显示主页操作 = false;
-          this.打开AI改卡();
-        },
         显示获取直链牌组: CLOUD_DECK_CHANNEL_ENABLED && !this.云端牌组配额已用尽,
         获取直链牌组回调: (): void => {
           this.显示主页操作 = false;
@@ -1777,6 +1811,10 @@ struct 首页 {
     // 更多下拉菜单：手动同步和页面入口共用现有菜单样式。
     if (this.显示更多菜单) {
       主页更多面板({
+        onAgent: (): void => {
+          this.显示更多菜单 = false;
+          this.openAgent();
+        },
         onSync: (): void => { this.startSyncFromMenu(); },
         onIntro: (): void => {
           this.显示更多菜单 = false;
@@ -1809,10 +1847,15 @@ struct 首页 {
   private deckDetails(compact: boolean) {
     HomeDeckDetails({ compact: compact, isDark: this.是否深色(), optionsBusy: this.deckOptionsBusy,
       historyRefreshToken: this.historyRefreshToken,
+      onBackHandlerChange: (handler: (() => boolean) | null): void => { this.deckDetailsBackHandler = handler; },
+      deckId: this.选中的牌组ID,
+      previewBusy: this.预览加载中,
+      onMenuStateChange: (open: boolean): void => { this.deckPreviewMenuOpen = open; },
       onBack: (): void => { this.显示牌组详情 = false; this.加载主页数据(); },
       onStudy: (): void => { this.开始学习(); },
-      onPreview: (): void => { this.打开牌组预览(); },
+      onPreview: (scope: DeckPreviewScope): void => { this.打开牌组预览(scope); },
       onAddNote: (): void => { this.打开添加笔记(); },
+      onCreateWithAI: (): void => { this.打开AI制卡(); },
       onCreateChild: (): void => { this.openCreateDeck(this.选中的牌组ID); },
       onExport: (): void => { this.打开数据迁移('exportDeck', Number(this.选中的牌组ID), false); },
       onOptions: (): void => { this.打开牌组选项(); } })
@@ -1938,6 +1981,10 @@ struct 首页 {
       })
     }
 
+    if (this.showIridescentGift) {
+      IridescentGiftPanel({ announcement: true, onClose: (): void => { this.closeIridescentGift(); } })
+    }
+
     if (this.deckDeletionBusy) {
       Column({ space: 12 }) {
         LoadingProgress().width(36).height(36)
@@ -2016,6 +2063,10 @@ struct 首页 {
     .hideTitleBar(true)
     .mode(NavigationMode.Stack)
     .navDestination(this.页面映射)
+    .onNavBarStateChange((visible: boolean): void => {
+      if (visible) appInterface.showPage('home');
+      else appInterface.hidePage('home');
+    })
     // 用箭头函数包裹，避免方法引用丢失 this 绑定后 transition 回调内 this 为 undefined（BUG：从二级页面 push 三级页面时崩溃 "Cannot read property getUIContext of undefined"）。
     .customNavContentTransition((from: NavContentInfo, to: NavContentInfo, op: NavigationOperation): NavigationAnimatedTransition | undefined => this.navigationTransition.create(from, to, op))
     .backgroundColor(Color.Transparent)

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { interfaceItemText } from '../../utils/AppInterfaceText';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { DECK_LIST_NARROW_KEY } from '../../model/DeckListAppearance';
 import { ThemeDefinition, themeDefinition, THEME_VISUALS_KEY } from '../../model/ThemeCatalog';
@@ -59,7 +60,7 @@ export struct 主页顶部工具栏 {
       // 等权侧栏保证状态组中心始终等于屏幕中心，不受两侧标签宽度影响。
       Row() {
         按下态按钮({
-          文案: this.排序模式中 ? $r('app.string.deck_reorder_exit') : $r('app.string.study_more'),
+          文案: this.排序模式中 ? $r('app.string.deck_reorder_exit') : interfaceItemText(this.getUIContext(), 'home', 'more'),
           字色: $r('app.color.text_primary'),
           singleLine: true,
           点击回调: (): void => {
@@ -102,7 +103,7 @@ export struct 主页顶部工具栏 {
 
       Row() {
         按下态按钮({
-          文案: this.排序模式中 ? $r('app.string.deck_reorder_done') : $r('app.string.create_deck'),
+          文案: this.排序模式中 ? $r('app.string.deck_reorder_done') : interfaceItemText(this.getUIContext(), 'home', 'create'),
           字色: this.动作主色,
           themeText: true,
           singleLine: true,

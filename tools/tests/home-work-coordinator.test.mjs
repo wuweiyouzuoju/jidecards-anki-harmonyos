@@ -142,7 +142,8 @@ function startupHarness() {
   const sequence = new HomeStartupSequence(), events = [];
   let allowed = true;
   const host = { canPresent: () => allowed, checkAnnouncement: async () => false, activateAnnouncementChecks() {},
-    cloudCompleted: async () => false, introCompleted: async () => false,
+    cloudCompleted: async () => false, introCompleted: async () => false, giftCompleted: async () => true,
+    showGift: () => { events.push('gift'); allowed = false; },
     showCloud: () => { events.push('cloud'); allowed = false; }, showIntro: () => { events.push('intro'); allowed = false; } };
   return { sequence, host, events, allow: value => { allowed = value; } };
 }
@@ -195,4 +196,35 @@ test('failed preference reads release busy state and remain retryable; completed
   h.host.cloudCompleted = async () => true; h.host.introCompleted = async () => true;
   await h.sequence.resume(h.host);
   assert.deepEqual(h.events, []); assert.equal(h.sequence.hasPending(), false);
+});
+
+test('gift follows completed intro and never stacks on active UI or repeats for owners', async () => {
+  const h = startupHarness();
+  h.host.cloudCompleted = async () => true; h.host.introCompleted = async () => true;
+  h.host.giftCompleted = async () => false;
+  await h.sequence.start(h.host);
+  assert.deepEqual(h.events, ['gift']);
+  assert.equal(h.sequence.hasPending(), false);
+  h.allow(true); h.host.giftCompleted = async () => true;
+  await h.sequence.gift(h.host);
+  assert.deepEqual(h.events, ['gift']);
+  h.allow(false); h.host.giftCompleted = async () => false;
+  await h.sequence.gift(h.host);
+  assert.equal(h.sequence.hasPending(), true);
+  h.allow(true); await h.sequence.resume(h.host);
+  assert.deepEqual(h.events, ['gift', 'gift']);
+});
+
+test('gift reads coalesce, defer late results behind UI, and disposal suppresses presentation', async () => {
+  for (const disposed of [false, true]) {
+    const h = startupHarness(), gate = deferred(); let reads = 0;
+    h.host.giftCompleted = () => { reads++; return gate.promise; };
+    const pending = h.sequence.gift(h.host); await h.sequence.gift(h.host);
+    assert.equal(reads, 1);
+    if (disposed) h.sequence.dispose(); else h.allow(false);
+    gate.resolve(false); await pending;
+    assert.deepEqual(h.events, []);
+    h.allow(true); await h.sequence.resume(h.host);
+    assert.deepEqual(h.events, disposed ? [] : ['gift']);
+  }
 });

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { FormInputStyle } from '../../utils/FormInputStyle';
 import { DialogBackdrop } from '../common/DialogBackdrop';
 import { resourceText, showToastSafely } from '../../utils/UiFeedback';
-import { SelectStyle } from '../../utils/SelectStyle';
+import { FormSelectRow } from '../common/FormSelectRow';
 
 import { DialogHeader } from '../common/DialogHeader';
 // ========================================================
@@ -161,15 +162,7 @@ export struct 创建过滤牌组面板 {
             .fontColor($r('app.color.text_secondary'))
             .width('100%')
           TextInput({ placeholder: $r('app.string.filtered_deck_search_placeholder'), text: this.搜索串 })
-            .width('100%')
-            .height(应用尺寸.按钮高度)
-            .fontSize(应用尺寸.字号_正文)
-            .fontColor($r('app.color.text_primary'))
-            .placeholderColor($r('app.color.text_tertiary'))
-            .backgroundColor($r('app.color.surface_card'))
-            .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
-            .borderRadius(应用尺寸.圆角_面板)
-            .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
+            .attributeModifier(new FormInputStyle(应用尺寸.卡片内边距))
             .enabled(!this.处理中)
             .onChange((value: string) => { this.搜索串 = value; })
         }
@@ -182,14 +175,7 @@ export struct 创建过滤牌组面板 {
             .fontColor($r('app.color.text_secondary'))
             .width('100%')
           TextInput({ text: this.数量上限 })
-            .width('100%')
-            .height(应用尺寸.按钮高度)
-            .fontSize(应用尺寸.字号_正文)
-            .fontColor($r('app.color.text_primary'))
-            .backgroundColor($r('app.color.surface_card'))
-            .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
-            .borderRadius(应用尺寸.圆角_面板)
-            .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
+            .attributeModifier(new FormInputStyle(应用尺寸.卡片内边距))
             .type(InputType.Number)
             .enabled(!this.处理中)
             .onChange((value: string) => { this.数量上限 = value; })
@@ -197,38 +183,14 @@ export struct 创建过滤牌组面板 {
         .width('100%')
 
         // 排序方式
-        Column({ space: 应用尺寸.间距_5 }) {
-          Text($r('app.string.filtered_deck_order_label'))
-            .fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_secondary'))
-            .width('100%')
-          Select([
-            ...this.排序选项列表.map((选项: 排序选项): SelectOption => {
-              return { value: this.取本地化文本(选项.标签资源) };
-            })
-          ])
-            .selected(this.排序选项列表.findIndex((选项: 排序选项) => 选项.值 === this.排序值))
-            .value(this.取本地化文本(
-              this.排序选项列表.find((选项: 排序选项) => 选项.值 === this.排序值)?.标签资源
-              ?? $r('app.string.filtered_deck_order_added')))
-            .width('100%')
-            .enabled(!this.处理中)
-            .attributeModifier(new SelectStyle())
-            .height(SelectStyle.controlHeight)
-            .padding(SelectStyle.controlPadding)
-            .space(SelectStyle.controlSpace)
-            .font(SelectStyle.controlFont)
-            .optionFont(SelectStyle.optionFont)
-            .selectedOptionFont(SelectStyle.selectedOptionFont)
-            .textModifier(SelectStyle.labelText())
-            .borderRadius(SelectStyle.controlRadius)
-            .onSelect((index: number) => {
-              if (index >= 0 && index < this.排序选项列表.length) {
-                this.排序值 = this.排序选项列表[index].值;
-              }
-            })
-        }
-        .width('100%')
+        FormSelectRow({ label: $r('app.string.filtered_deck_order_label'),
+          options: this.排序选项列表.map((选项: 排序选项): SelectOption => {
+            return { value: this.取本地化文本(选项.标签资源) };
+          }),
+          selectedIndex: this.排序选项列表.findIndex((选项: 排序选项): boolean => 选项.值 === this.排序值),
+          value: this.取本地化文本(this.排序选项列表.find((选项: 排序选项): boolean => 选项.值 === this.排序值)?.标签资源
+            ?? $r('app.string.filtered_deck_order_added')), isInteractive: !this.处理中,
+          onSelect: (index: number): void => { this.排序值 = this.排序选项列表[index].值; } })
 
         // 调整调度开关
         Row() {

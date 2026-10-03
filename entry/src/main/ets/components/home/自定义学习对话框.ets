@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { FormInputStyle } from '../../utils/FormInputStyle';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { DialogBackdrop } from '../common/DialogBackdrop';
 import { resourceText, showToastSafely } from '../../utils/UiFeedback';
@@ -18,6 +19,7 @@ import { 自定义学习默认值, 自定义学习标签 } from '../../proto/mes
 import { customStudyInitialValue, customStudyValueValid, isCustomStudyLimit } from '../../model/CustomStudyOptions';
 import { CustomStudyPreferences } from '../../backend/CustomStudyPreferences';
 import { SelectStyle } from '../../utils/SelectStyle';
+import { FormSelectRow } from '../common/FormSelectRow';
 
 interface 预设选项 {
   字段号: number;
@@ -289,14 +291,7 @@ export struct 自定义学习对话框 {
         .fontColor($r('app.color.text_secondary'))
         .width('100%')
       TextInput({ text: this.输入值 })
-        .width('100%')
-        .height(应用尺寸.按钮高度)
-        .fontSize(应用尺寸.字号_正文)
-        .fontColor($r('app.color.text_primary'))
-        .backgroundColor($r('app.color.surface_card'))
-        .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
-        .borderRadius(应用尺寸.圆角_面板)
-        .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
+        .attributeModifier(new FormInputStyle(应用尺寸.卡片内边距))
         .type(isCustomStudyLimit(this.选中预设) ? InputType.Normal : InputType.Number)
         .inputFilter(isCustomStudyLimit(this.选中预设) ? '^-?[0-9]*$' : '^[0-9]*$')
         .enabled(!this.处理中 && !this.加载默认值中 && this.默认值 !== null)
@@ -308,21 +303,10 @@ export struct 自定义学习对话框 {
           .fontColor($r('app.color.error_text'))
       }
       if (this.选中预设 === 自定义学习预设.按状态或标签) {
-        Select(this.kindLabels.map((label: Resource): SelectOption => ({ value: this.取本地化文本(label) })))
-          .width('100%')
-          .selected(this.cardKindIndex)
-          .value(this.取本地化文本(this.kindLabels[this.cardKindIndex]))
-          .font(SelectStyle.controlFont)
-          .optionFont(SelectStyle.optionFont)
-          .selectedOptionFont(SelectStyle.selectedOptionFont)
-          .textModifier(SelectStyle.labelText())
-          .borderRadius(SelectStyle.controlRadius)
-          .height(SelectStyle.controlHeight)
-          .padding(SelectStyle.controlPadding)
-          .space(SelectStyle.controlSpace)
-          .attributeModifier(new SelectStyle())
-          .enabled(!this.处理中)
-          .onSelect((index: number) => { this.cardKindIndex = index; })
+        FormSelectRow({ label: $r('app.string.custom_study_kind_label'),
+          options: this.kindLabels.map((label: Resource): SelectOption => ({ value: this.取本地化文本(label) })),
+          selectedIndex: this.cardKindIndex, value: this.取本地化文本(this.kindLabels[this.cardKindIndex]),
+          isInteractive: !this.处理中, onSelect: (index: number): void => { this.cardKindIndex = index; } })
         if (this.默认值 !== null && this.默认值.tags.length > 0) {
           Text($r('app.string.custom_study_tags_hint'))
             .fontSize(应用尺寸.字号_正文_小)
@@ -337,7 +321,7 @@ export struct 自定义学习对话框 {
                 { value: this.取本地化文本($r('app.string.custom_study_tags_exclude')) }
               ])
                 .width(SelectStyle.fieldWidth)
-                .constraintSize(SelectStyle.fieldConstraint)
+                .constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
                 .selected(this.tagSelection(tag.name))
                 .value(this.取本地化文本(this.tagSelection(tag.name) === 1 ? $r('app.string.custom_study_tags_include') :
                   (this.tagSelection(tag.name) === 2 ? $r('app.string.custom_study_tags_exclude') :

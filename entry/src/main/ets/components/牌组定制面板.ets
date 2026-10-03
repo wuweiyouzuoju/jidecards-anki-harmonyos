@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../utils/PressFeedback';
+import { LabeledActionRow } from './common/LabeledActionRow';
 import { DialogBackdrop } from './common/DialogBackdrop';
 
 import type { 牌组背景动作, 牌组定制结果 } from '../model/DeckCustomization';
@@ -283,10 +284,10 @@ export struct 牌组定制面板 {
 
         // 背景图预览与操作区
         Column({ space: 应用尺寸.间距_5 }) {
-          Text($r('app.string.deck_customize_background_label'))
-            .fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_secondary'))
-            .width('100%')
+          LabeledActionRow({ label: $r('app.string.deck_customize_background_label'),
+            actionLabel: this.是否有背景() ? $r('app.string.deck_customize_background_replace') :
+              $r('app.string.deck_customize_background_pick'), tint: this.动作主色, isInteractive: !this.busy,
+            onAction: (): void => { this.选取并裁剪(); } })
           Text($r('app.string.deck_customize_background_hint'))
             .fontSize(应用尺寸.字号_说明)
             .fontColor($r('app.color.text_tertiary'))
@@ -384,39 +385,6 @@ export struct 牌组定制面板 {
           // 操作按钮：选择图片 / 替换图片 / 移除背景
           // 按钮文本与显示用 是否有背景() 统一判断，避免 标记移除 后 deck.backgroundImage
           // 仍非空导致按钮文本/显示不正确
-          Row({ space: 应用尺寸.间距_8 }) {
-            Button(this.是否有背景()
-              ? $r('app.string.deck_customize_background_replace')
-              : $r('app.string.deck_customize_background_pick'))
-              .type(ButtonType.Normal)
-              .layoutWeight(1)
-              .height(应用尺寸.按钮高度)
-              .fontSize(应用尺寸.字号_按钮)
-              .fontColor($r('app.color.text_primary'))
-              .backgroundColor($r('app.color.surface_card'))
-              .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
-              .borderRadius(应用尺寸.圆角_胶囊)
-              .enabled(!this.busy)
-              .attributeModifier(new PressFeedback())
-              .stateEffect(false)
-              .onClick(() => { this.选取并裁剪(); })
-            if (this.是否有背景()) {
-              Button($r('app.string.deck_customize_background_remove'))
-                .type(ButtonType.Normal)
-                .layoutWeight(1)
-                .height(应用尺寸.按钮高度)
-                .fontSize(应用尺寸.字号_按钮)
-                .fontColor($r('app.color.error_text'))
-                .backgroundColor($r('app.color.surface_card'))
-                .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
-                .borderRadius(应用尺寸.圆角_胶囊)
-                .enabled(!this.busy)
-                .attributeModifier(new PressFeedback())
-                .stateEffect(false)
-                .onClick(() => { this.标记移除(); })
-            }
-          }
-          .width('100%')
         }
         .width('100%')
 

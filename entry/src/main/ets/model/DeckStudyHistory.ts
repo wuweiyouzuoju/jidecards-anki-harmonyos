@@ -36,8 +36,11 @@ function sumKinds(counts: ReviewKindCounts | undefined): number {
   return counts.learn + counts.relearn + counts.young + counts.mature + counts.filtered;
 }
 
-/** Anki reviews.rs 使用负的历史日偏移；仅显示含今天的7个学习日。 */
-export function buildDeckStudyHistory(graphs: GraphsView): DeckStudyHistory {
+/** Anki reviews.rs 使用负的历史日偏移；默认显示含今天的7个学习日。 */
+export function buildDeckStudyHistory(graphs: GraphsView, days: number = 7): DeckStudyHistory {
+  if (!Number.isSafeInteger(days) || days < 1 || days > 90) {
+    throw new Error('Invalid study history window');
+  }
   if (graphs.reviewCountsByDaysAgo === null || graphs.reviewTimesByDaysAgo === null) {
     throw new Error('Missing deck review statistics');
   }
@@ -45,7 +48,7 @@ export function buildDeckStudyHistory(graphs: GraphsView): DeckStudyHistory {
     days: [], activeDays: 0, totalCount: 0, totalMillis: 0, maxCount: 0,
     rolloverHour: graphs.rolloverHour
   };
-  for (let daysAgo = 6; daysAgo >= 0; daysAgo--) {
+  for (let daysAgo = days - 1; daysAgo >= 0; daysAgo--) {
     const count = sumKinds(graphs.reviewCountsByDaysAgo.get(-daysAgo));
     result.days.push({ daysAgo, count });
     result.totalCount += count;

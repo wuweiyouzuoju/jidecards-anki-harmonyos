@@ -14,7 +14,6 @@
 // 展开的牌组ID集合: Set<string>  展开的父牌组集合
 // 排序模式中: boolean  拖拽排序模式开关
 // 加载状态: 主页加载状态  'loading' / 'ready' / 'empty' / 'error'
-// 刷新中: boolean  下拉刷新指示器开关
 // 牌组列表滚动器: Scroller  List 滚动控制器
 // 动作主色: string  LoadingProgress 颜色
 // 主色按钮背景色: string  预留（与主页主色联动）
@@ -28,7 +27,7 @@
 // onItemHide: (deckId: string) => void  隐藏牌组回调
 // onItemDoubleTap: (deckId: string) => void  递归展开回调
 // onItemCustomStudy: (deckId: string) => void  打开自定义学习对话框回调
-// onRefresh: () => void  下拉刷新回调
+// onRefresh: () => Promise<void>  下拉刷新完成信号
 // onRetry: () => void  错误态重试回调
 //
 // @输出
@@ -43,6 +42,7 @@
 // 无。
 // ========================================================
 
+import { hilog } from '@kit.PerformanceAnalysisKit';
 import { 牌组列表项 } from '../牌组列表项';
 import { DECK_LIST_NARROW_KEY, deckListOverflows } from '../../model/DeckListAppearance';
 import { 统一加载态 } from '../common/统一加载态';
@@ -65,9 +65,6 @@ export struct 主页牌组列表 {
   @Prop 选中的牌组ID: string = '';
   @Prop 排序模式中: boolean = false;
   @Prop @Watch('reportOverflow') 加载状态: 主页加载状态 = 'loading';
-  // 父组件控制 刷新中 状态：onRefresh 回调后由父组件加载完毕置 false。
-  // 子组件通过 @Watch 同步到本地 @State 刷新指示器开关，供 Refresh 容器 $$ 双向绑定（任务约束不允许 @Link）。
-  @Prop @Watch('同步刷新指示器') 刷新中: boolean = false;
   @Prop 动作主色: string = '#2F5FD0';
   @Prop 主色按钮背景色: string = '#2F5FD0';
 
@@ -85,7 +82,7 @@ export struct 主页牌组列表 {
   onItemHide: (deckId: string) => void = (deckId: string): void => {};
   onItemDoubleTap: (deckId: string) => void = (deckId: string): void => {};
   onItemCustomStudy: (deckId: string) => void = (deckId: string): void => {};
-  onRefresh: () => void = (): void => {};
+  onRefresh: () => Promise<void> = (): Promise<void> => Promise.resolve();
   onRetry: () => void = (): void => {};
   onOverflowChange: (overflow: boolean) => void = (_overflow: boolean): void => {};
   private viewportHeight: number = 0;
@@ -110,8 +107,6 @@ export struct 主页牌组列表 {
   }
 
   aboutToAppear(): void {
-    // 首次渲染时把父组件 刷新中 同步到本地指示器开关，避免 Refresh 容器初始状态错位。
-    this.刷新指示器开关 = this.刷新中;
     this.牌组数据源.registerDataChangeListener(this.overflowListener);
   }
 
@@ -120,16 +115,20 @@ export struct 主页牌组列表 {
     this.onOverflowChange(false);
   }
 
-  // 父组件 刷新中 变化时同步到本地 @State，让 $$ 刷新指示器开关 跟随父组件状态收起指示器。
-  同步刷新指示器(): void {
-    this.刷新指示器开关 = this.刷新中;
+  private async refreshDecks(): Promise<void> {
+    this.刷新指示器开关 = true;
+    try {
+      await this.onRefresh();
+    } finally {
+      // 由本次请求直接收尾，避免父级 true→false 被同帧合并后漏掉 Watch。
+      this.刷新指示器开关 = false;
+    }
   }
 
   build() {
     Column({ space: 应用尺寸.间距_10 }) {
       // 排序模式的退出/完成入口在顶部工具栏（主页顶部工具栏 排序模式分支），此处不再渲染操作行。
-      // 下拉刷新容器：onRefreshing 触发后调 onRefresh；
-      // 父组件加载完毕置 刷新中=false → @Watch 同步 刷新指示器开关=false 收起指示器。
+      // 指示器等待刷新 Promise 落定，成功、失败或跳过都收起。
       Refresh({ refreshing: $$this.刷新指示器开关 }) {
         List({ scroller: this.牌组列表滚动器, space: 应用尺寸.页面分组间距(this.narrow) }) {
           LazyForEach(this.牌组数据源, (deck: 牌组汇总) => {
@@ -227,8 +226,9 @@ export struct 主页牌组列表 {
         })
       }
       .onRefreshing(() => {
-        // 用户下拉到阈值后触发；父组件加载完毕后置 刷新中=false，@Watch 同步收起指示器。
-        this.onRefresh();
+        this.refreshDecks().catch((error: Error): void => {
+          hilog.warn(0x4342, 'jidecards', `首页: 下拉刷新失败 ${error}`);
+        });
       })
       .layoutWeight(1)
     }

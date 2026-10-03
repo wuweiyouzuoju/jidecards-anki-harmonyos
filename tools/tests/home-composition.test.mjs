@@ -24,7 +24,7 @@ test('destination renderer preserves route defaults, explicit parameters, snapsh
   const context = { pathStack: {}, onManualSync: () => synced++ };
   const cases = [
     ['StudyPage', { pageDeckId: '', pageDeckName: '' }],
-    ['BrowserPage', { pageDeckId: '', pageInitialSearch: '', pageSelectForAgentEdit: false }],
+    ['BrowserPage', { pageDeckId: '', pageInitialSearch: '', pageInitialNotesMode: false, pageSelectForAgentEdit: false }],
     ['AddNotePage', { pageDeckId: '', pageDeckName: '', pageDeckOptions: [] }],
     ['AiCardPage', { pageMode: 'create', pageDeckId: '', pageDeckName: '', pageDeckOptions: [],
       pageCardIds: [], pageNoteIds: [], pageTemplateIdx: -1 }],
@@ -34,9 +34,9 @@ test('destination renderer preserves route defaults, explicit parameters, snapsh
     render(route, {}, context);
     assert.deepEqual(calls.at(-1).props, { ...expected, pathStack: context.pathStack });
   }
-  render('BrowserPage', { deckId: '4', initialSearch: 'tag:test', selectForAgentEdit: true }, context);
+  render('BrowserPage', { deckId: '4', initialSearch: 'tag:test', initialNotesMode: true, selectForAgentEdit: true }, context);
   assert.deepEqual(calls.at(-1), { name: '浏览页', props: { pageDeckId: '4', pageInitialSearch: 'tag:test',
-    pageSelectForAgentEdit: true, pathStack: context.pathStack } });
+    pageInitialNotesMode: true, pageSelectForAgentEdit: true, pathStack: context.pathStack } });
   render('EditNotePage', {targetId:42,isNote:true}, context);
   assert.deepEqual(calls.at(-1), {name:'EditNotePage',props:{targetId:42,isNote:true,pathStack:context.pathStack}});
   const options = [{ id: '4' }], cards = [5], notes = [6];
@@ -68,6 +68,7 @@ test('home binds its live navigation host and both detail layouts to the same ac
     是否深色: () => true, requestManualSync: () => events.push('sync'),
     加载主页数据: () => events.push('refresh'), 开始学习: () => events.push('study'),
     打开牌组预览: () => events.push('preview'), 打开添加笔记: () => events.push('add'),
+    打开AI制卡: () => events.push('ai-create'),
     openCreateDeck: id => events.push(['child', id]), 打开数据迁移: (...args) => events.push(args),
     打开牌组选项: () => events.push('options') });
   const params = {};
@@ -84,9 +85,14 @@ test('home binds its live navigation host and both detail layouts to the same ac
     assert.equal(details.historyRefreshToken, page.historyRefreshToken);
     assert.equal(details.optionsBusy, true);
     assert.equal(details.isDark, true);
+    const back = () => true;
+    details.onBackHandlerChange(back);
+    assert.equal(page.deckDetailsBackHandler, back);
+    details.onBackHandlerChange(null);
+    assert.equal(page.deckDetailsBackHandler, null);
     page.选中的牌组ID = '42';
-    for (const action of ['onStudy', 'onPreview', 'onAddNote', 'onCreateChild', 'onExport', 'onOptions', 'onBack']) details[action]();
-    assert.deepEqual(events.splice(0), ['study', 'preview', 'add', ['child', '42'], ['exportDeck', 42, false], 'options', 'refresh']);
+    for (const action of ['onStudy', 'onPreview', 'onAddNote', 'onCreateWithAI', 'onCreateChild', 'onExport', 'onOptions', 'onBack']) details[action]();
+    assert.deepEqual(events.splice(0), ['study', 'preview', 'add', 'ai-create', ['child', '42'], ['exportDeck', 42, false], 'options', 'refresh']);
     assert.equal(page.显示牌组详情, false);
     page.historyRefreshToken++;
   }

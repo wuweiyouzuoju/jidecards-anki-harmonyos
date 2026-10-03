@@ -177,12 +177,12 @@ test('cloud deck and import source strings are aligned and translated', () => {
   assert.deepEqual([...zhMap.keys()].sort(), [...enMap.keys()].sort());
 });
 
-test('later Import Deck directly opens the local picker and exposes no cloud route', () => {
+test('later Import Deck opens local import options and exposes no cloud route', () => {
   const source = read('../../entry/src/main/ets/pages/首页.ets');
   assert.doesNotMatch(source, /导入来源弹窗/);
   assert.doesNotMatch(source, /显示导入来源弹窗/);
   assert.doesNotMatch(source, /onCloud/);
   assert.match(source, /导入牌组回调:[\s\S]*this\.从选择器导入牌组\(\)/);
-  assert.match(source, /this\.transferSession\.execute/);
+  assert.match(source, /this\.transferSession\.startImport\(\)/);
   assert.match(read('../../entry/src/main/ets/backend/AnkiDataTransfer.ets'), /选取数据文件\(this\.context\(\), \['\.apkg'\]\)/);
 });
