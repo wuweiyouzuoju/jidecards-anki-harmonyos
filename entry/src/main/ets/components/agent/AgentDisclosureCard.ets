@@ -2,6 +2,7 @@
 import { PressFeedback } from '../../utils/PressFeedback';
 
 import { 应用尺寸 } from '../../utils/应用尺寸';
+import { DisclosureChevron } from '../common/DisclosureChevron';
 
 @Component
 export struct AgentDisclosureCard {
@@ -17,8 +18,10 @@ export struct AgentDisclosureCard {
   private emptyContent(): void {}
 
   build() {
-    Column({ space: 应用尺寸.间距_5 }) {
-      Row({ space: 应用尺寸.间距_5 }) {
+    Column({ space: 应用尺寸.间距_4 }) {
+      Row({ space: 应用尺寸.间距_8 }) {
+        SymbolGlyph($r('sys.symbol.wrench_and_screwdriver'))
+          .fontSize(18).fontColor([$r('app.color.text_secondary')]).flexShrink(0)
         Text(this.title)
           .fontSize(应用尺寸.字号_正文_小)
           .fontWeight(FontWeight.Medium)
@@ -28,24 +31,36 @@ export struct AgentDisclosureCard {
           Text(this.status)
             .fontSize(应用尺寸.字号_正文_小)
             .fontColor($r('app.color.text_secondary'))
+            .flexShrink(0)
         }
-        Text('▼')
-          .fontSize(11)
-          .fontColor($r('app.color.text_tertiary'))
-          .rotate({ angle: this.expanded ? 0 : -90 })
+        DisclosureChevron({ tint: $r('app.color.text_tertiary') })
+          .rotate({ angle: this.expanded ? 90 : 0 })
           .animation({ duration: 150, curve: Curve.EaseOut })
+          .flexShrink(0)
       }
       .width('100%')
+      .constraintSize({ minHeight: 应用尺寸.按钮高度 })
+      .padding({ left: 应用尺寸.间距_10, right: 应用尺寸.间距_10 })
       .attributeModifier(new PressFeedback())
       .onClick((): void => {
         if (!this.toggleLocked) { this.onToggle(); }
       })
-      if (this.expanded) { this.content(); }
+      if (this.expanded) {
+        Scroll() {
+          Column({ space: 应用尺寸.间距_8 }) { this.content(); }
+            .width('100%').alignItems(HorizontalAlign.Start)
+            .padding(应用尺寸.间距_10)
+        }
+        .width('100%').constraintSize({ maxHeight: 240 })
+        .align(Alignment.TopStart).scrollBar(BarState.Auto)
+        .border({ width: { top: 应用尺寸.卡片边框 }, color: $r('app.color.border_subtle') })
+      }
     }
     .width('100%')
-    .padding(应用尺寸.间距_8)
-    .backgroundColor($r('app.color.surface_page'))
+    .alignItems(HorizontalAlign.Start)
+    .backgroundColor($r('app.color.surface_card'))
     .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
-    .borderRadius(应用尺寸.圆角_卡片)
+    .borderRadius(应用尺寸.圆角_面板)
+    .clip(true)
   }
 }
