@@ -8,6 +8,15 @@ import { AgentWorkspaceStore } from './AgentWorkspaceStore';
 import { assertNewNotetypeName, deckNameExists } from './AgentAuxiliaryTools';
 import type { AnalysisActionPayload } from './AgentAuxiliaryTools';
 import { AgentActionLedger } from '../../model/agent/AgentAction';
+import { decodeSettingChange } from '../../model/agent/AgentSettingsTools';
+import type { AgentSettingChange } from '../../model/agent/AgentSettingsTools';
+import type { ThemeId } from '../../model/ThemeCatalog';
+import { appThemeColorSession } from '../AppThemeService';
+import { 设置FSRS开启状态 } from '../../model/FSRS控制器';
+import { saveCardTextSize } from '../../utils/CardTextSizeStore';
+import { saveDeckListNarrow } from '../../utils/DeckListAppearanceStore';
+import { saveStudyHaptics } from '../../utils/StudyHaptics';
+import { LocalPreferenceWriteError } from '../../utils/LocalPreferenceWrite';
 import type { AgentAction } from '../../model/agent/AgentAction';
 import type { AgentExtensionArguments } from '../../model/agent/AgentExtensionTools';
 import type { AgentMemoryChange } from '../../model/agent/AgentMemory';
@@ -30,7 +39,30 @@ export class AgentActionExecutor {
     try {
       const target: number[] = this.scope.currentCreateTarget();
       let result: string = '{"status":"completed"}';
-      if (action.kind === 'memory_change') {
+      if (action.kind === 'setting_change') {
+        const change: AgentSettingChange = decodeSettingChange(action.payloadJson);
+        if (change.settingId === 'color_theme') {
+          const outcome = await appThemeColorSession.setColor(change.after as ThemeId, change.before as ThemeId);
+          result = JSON.stringify(outcome);
+          if (outcome.status !== 'completed') {
+            action.resultJson = result; action.status = 'failed'; return result;
+          }
+        } else if (change.settingId === 'fsrs_enabled') {
+          const enabled: boolean = await 设置FSRS开启状态(change.after === 'true', change.before === 'true');
+          result = JSON.stringify({ status: 'completed', fsrsEnabled: enabled, scope: 'collection',
+            saved: true, rescheduled: enabled && change.before !== change.after });
+        } else {
+          if (change.settingId === 'card_text_size') {
+            await saveCardTextSize(Number(change.after), Number(change.before));
+          } else if (change.settingId === 'deck_list_narrow') {
+            await saveDeckListNarrow(change.after === 'true', change.before === 'true');
+          } else if (change.settingId === 'study_haptics') {
+            await saveStudyHaptics(change.after === 'true', change.before === 'true');
+          } else { throw new Error('unsupported_setting_write'); }
+          result = JSON.stringify({ status: 'completed', settingId: change.settingId,
+            value: change.after, scope: 'device', saved: true, applied: true });
+        }
+      } else if (action.kind === 'memory_change') {
         await this.store.changeMemory(JSON.parse(action.payloadJson) as AgentMemoryChange, action.id);
       } else if (action.kind === 'analysis') {
         const payload: AnalysisActionPayload = JSON.parse(action.payloadJson) as AnalysisActionPayload;
@@ -61,6 +93,11 @@ export class AgentActionExecutor {
       return result;
     } catch (error) {
       action.status = 'failed';
+      if (error instanceof LocalPreferenceWriteError) {
+        action.resultJson = JSON.stringify({ status: 'partial', saved: error.saved, applied: false,
+          error: error.message, instruction: 'Read get_settings before proposing another change; storage rollback is unverified.' });
+        return action.resultJson;
+      }
       action.resultJson = JSON.stringify({ status: 'failed', error: error instanceof Error ? error.message : 'action_failed' });
       if (error instanceof Error) { throw error; }
       throw new Error('action_failed');
