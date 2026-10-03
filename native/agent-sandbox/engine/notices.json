@@ -1,0 +1,83 @@
+{
+  "lock": "66460caf60ac2baad3cf249653a97d7bfbc3c6c23162c8908843b097fc4db914",
+  "engine": "db886771cf2a08f6be013014e1090b0bc985752bb6f3ac974fa00089815990a9",
+  "notices": "5cdbe1f842c24528faf9d49262f4d9fa5a6aaf3fe9661729527995a4636fb16a",
+  "sources": [
+    {
+      "url": "https://raw.githubusercontent.com/wasmi-labs/wasmi/852223aee0503646a45a89866de6f348e02d15a4/LICENSE-MIT",
+      "sha256": "172bc1497507c1c363496bc23b0f16de8fa8e94befa85db6c8d9fa790e0a8657"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/wasmi-labs/wasmi/852223aee0503646a45a89866de6f348e02d15a4/LICENSE-APACHE",
+      "sha256": "f031c1608e4a19e8cbcc3394cdba838067e79189610227459e8ffcd669e6f52d"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/wasmi-labs/wasmi/852223aee0503646a45a89866de6f348e02d15a4/LICENSE-MIT",
+      "sha256": "172bc1497507c1c363496bc23b0f16de8fa8e94befa85db6c8d9fa790e0a8657"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/wasmi-labs/wasmi/852223aee0503646a45a89866de6f348e02d15a4/LICENSE-APACHE",
+      "sha256": "f031c1608e4a19e8cbcc3394cdba838067e79189610227459e8ffcd669e6f52d"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/wasmi-labs/wasmi/852223aee0503646a45a89866de6f348e02d15a4/LICENSE-MIT",
+      "sha256": "172bc1497507c1c363496bc23b0f16de8fa8e94befa85db6c8d9fa790e0a8657"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/wasmi-labs/wasmi/852223aee0503646a45a89866de6f348e02d15a4/LICENSE-APACHE",
+      "sha256": "f031c1608e4a19e8cbcc3394cdba838067e79189610227459e8ffcd669e6f52d"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/wasmi-labs/wasmi/852223aee0503646a45a89866de6f348e02d15a4/LICENSE-MIT",
+      "sha256": "172bc1497507c1c363496bc23b0f16de8fa8e94befa85db6c8d9fa790e0a8657"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/wasmi-labs/wasmi/852223aee0503646a45a89866de6f348e02d15a4/LICENSE-APACHE",
+      "sha256": "f031c1608e4a19e8cbcc3394cdba838067e79189610227459e8ffcd669e6f52d"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasm-tools/e66235859a6ec0502bf6f9dcc358953eda4cafcc/LICENSE-MIT",
+      "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/bytecodealliance/wasm-tools/e66235859a6ec0502bf6f9dcc358953eda4cafcc/LICENSE-APACHE",
+      "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/WebAssembly/wasi-libc/1dfe5c302d1c5ab621f7abf04620fae92700fd22/LICENSE",
+      "sha256": "673f577e363e80e0058bd78214683f045d1d0c63930969a87f01a1d87d7cf1d6"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/WebAssembly/wasi-libc/1dfe5c302d1c5ab621f7abf04620fae92700fd22/LICENSE-MIT",
+      "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/WebAssembly/wasi-libc/1dfe5c302d1c5ab621f7abf04620fae92700fd22/LICENSE-APACHE",
+      "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/WebAssembly/wasi-libc/1dfe5c302d1c5ab621f7abf04620fae92700fd22/LICENSE-APACHE-LLVM",
+      "sha256": "268872b9816f90fd8e85db5a28d33f8150ebb8dd016653fb39ef1f94f2686bc5"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/WebAssembly/wasi-libc/1dfe5c302d1c5ab621f7abf04620fae92700fd22/libc-top-half/musl/COPYRIGHT",
+      "sha256": "f9bc4423732350eb0b3f7ed7e91d530298476f8fec0c6c427a1c04ade22655af"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/WebAssembly/wasi-libc/1dfe5c302d1c5ab621f7abf04620fae92700fd22/libc-bottom-half/cloudlibc/LICENSE",
+      "sha256": "c8b789cf5a746611e6300a0cc7750dbf92b61912a709d04e639245f7290656d0"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/WebAssembly/wasi-libc/1dfe5c302d1c5ab621f7abf04620fae92700fd22/dlmalloc/src/malloc.c",
+      "sha256": "4872c477338a576d7944d308b1d491afeb78408b9eca788468d5a1adae735553"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/WebAssembly/wasi-libc/1dfe5c302d1c5ab621f7abf04620fae92700fd22/emmalloc/emmalloc.c",
+      "sha256": "39dc3bb396a3fb991b80a5a243efc6449894420a20d0d9a283b41a5425de2ced"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/llvm/llvm-project/08d094a0e457360ad8b94b017d2dc277e697ca76/compiler-rt/LICENSE.TXT",
+      "sha256": "1a8f1058753f1ba890de984e48f0242a3a5c29a6a8f2ed9fd813f36985387e8d"
+    }
+  ]
+}

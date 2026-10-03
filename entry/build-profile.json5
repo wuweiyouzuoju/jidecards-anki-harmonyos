@@ -28,6 +28,9 @@
   ],
   targets: [
     {
+      name: 'ohosTest'
+    },
+    {
       name: 'default'
     }
   ]

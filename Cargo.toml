@@ -1,6 +1,6 @@
 [workspace]
 members = ["native/rsharmony"]
-exclude = ["third_party/anki"]
+exclude = ["third_party/anki", "native/agent-sandbox"]
 resolver = "2"
 
 [workspace.package]

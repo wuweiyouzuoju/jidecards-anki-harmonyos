@@ -4,10 +4,10 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, copyFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 
 test('Windows PowerShell build wrapper tolerates stderr warnings but rejects unsigned output and failed commands',
-  { skip: process.platform !== 'win32' }, t => {
+  { skip: process.platform !== 'win32' }, async t => {
     const root = mkdtempSync(join(tmpdir(), 'jidecards-build-wrapper-'));
     t.after(() => {
       assert.equal(dirname(resolve(root)), resolve(tmpdir()));
@@ -20,12 +20,17 @@ test('Windows PowerShell build wrapper tolerates stderr warnings but rejects uns
     const output = join(root, 'entry/build/default/outputs/default'); mkdirSync(output, { recursive: true });
     copyFileSync(new URL('../build-app.ps1', import.meta.url), join(tools, 'build-app.ps1'));
     writeFileSync(join(tools, 'check-signing.mjs'), 'process.exit(0);');
+    writeFileSync(join(tools, 'generate-agent-sandbox-notices.mjs'), 'process.exit(0);');
+    writeFileSync(join(tools, 'build-agent-sandbox.ps1'), 'param([string]$Target)\nif ($Target -ne "app") { exit 9 }\n$global:LASTEXITCODE = 0\n');
     writeFileSync(join(tools, 'verify-build-warnings.mjs'), `import { readFileSync } from 'node:fs';
       const log = readFileSync(process.argv[2], 'utf8');
       process.exit(log.includes('WARN: fixture warning') && !log.includes('new diagnostic') ? 0 : 1);`);
     writeFileSync(join(devEco, 'tools/ohpm/bin/ohpm.bat'), '@echo off\r\nexit /b 0\r\n');
     const signed = join(output, 'entry-default-signed.hap');
-    for (const scenario of ['warning', 'new-warning', 'unsigned', 'failure', 'missing']) {
+    for (const scenario of ['warning', 'new-warning', 'unsigned', 'failure', 'missing', 'sandbox-failure']) {
+      if (scenario === 'sandbox-failure') {
+        writeFileSync(join(tools, 'build-agent-sandbox.ps1'), 'exit 8\n');
+      }
       writeFileSync(signed, 'fixture');
       if (scenario === 'missing') rmSync(signed);
       const warning = scenario === 'unsigned' ? 'No signingConfig found for product default' :
@@ -45,4 +50,26 @@ test('Windows PowerShell build wrapper tolerates stderr warnings but rejects uns
           'Hvigor must receive assembleHap as one argument');
       }
     }
+    writeFileSync(join(tools, 'build-agent-sandbox.ps1'), '$global:LASTEXITCODE = 0\n');
+    writeFileSync(signed, 'fixture');
+    writeFileSync(join(root, 'concurrency.mjs'), `import { openSync, closeSync, unlinkSync, appendFileSync } from 'node:fs';
+      const fd = openSync('exclusive-build', 'wx');
+      appendFileSync('build-order.log', 'start\\n');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      appendFileSync('build-order.log', 'end\\n');
+      closeSync(fd); unlinkSync('exclusive-build');`);
+    writeFileSync(join(devEco, 'tools/hvigor/bin/hvigorw.bat'),
+      '@echo off\r\necho WARN: fixture warning 1>&2\r\nnode concurrency.mjs\r\nexit /b %ERRORLEVEL%\r\n');
+    const invoke = () => new Promise((fulfill, reject) => {
+      const child = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
+        join(tools, 'build-app.ps1'), '-SkipRust'], { cwd: root, env: { ...process.env, DEVECO_HOME: devEco } });
+      let output = '';
+      child.stdout.on('data', data => { output += data; });
+      child.stderr.on('data', data => { output += data; });
+      child.once('error', reject);
+      child.once('close', code => fulfill({ code, output }));
+    });
+    const results = await Promise.all([invoke(), invoke()]);
+    for (const result of results) assert.equal(result.code, 0, result.output);
+    assert.equal(readFileSync(join(root, 'build-order.log'), 'utf8'), 'start\nend\nstart\nend\n');
   });

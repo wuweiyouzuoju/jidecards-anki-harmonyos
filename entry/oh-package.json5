@@ -6,6 +6,7 @@
   "author": "jidecards contributors",
   "license": "AGPL-3.0-or-later",
   "dependencies": {
+    "libagent_sandbox.so": "file:./src/main/cpp/types/libagent_sandbox",
     "libjidecards.so": "file:./src/main/cpp/types/libjidecards",
     "@ibestservices/ibest-ui": "^2.2.7"
   },

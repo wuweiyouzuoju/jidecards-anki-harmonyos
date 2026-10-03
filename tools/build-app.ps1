@@ -5,11 +5,28 @@ param(
     [ValidateSet('debug', 'release')]
     [string]$BuildMode = 'debug',
     [switch]$SkipRust,
-    [switch]$Clean
+    [switch]$Clean,
+    [switch]$Test
 )
 
 $ErrorActionPreference = 'Stop'
 $Workspace = Split-Path -Parent $PSScriptRoot
+# Shared worktrees must not clean, sign or verify the same HAP concurrently.
+$Hasher = [System.Security.Cryptography.SHA256]::Create()
+try {
+    $LockHash = [BitConverter]::ToString($Hasher.ComputeHash([Text.Encoding]::UTF8.GetBytes($Workspace.ToLowerInvariant()))).Replace('-', '')
+} finally { $Hasher.Dispose() }
+$BuildMutex = [System.Threading.Mutex]::new($false, "Local\jidecards-hap-$LockHash")
+$HasBuildLock = $false
+try {
+    try { $HasBuildLock = $BuildMutex.WaitOne(0) }
+    catch [System.Threading.AbandonedMutexException] { $HasBuildLock = $true }
+    if (-not $HasBuildLock) {
+        Write-Host '[build-app] Waiting for the other HAP build in this workspace...'
+        try { $HasBuildLock = $BuildMutex.WaitOne([TimeSpan]::FromMinutes(10)) }
+        catch [System.Threading.AbandonedMutexException] { $HasBuildLock = $true }
+    }
+    if (-not $HasBuildLock) { throw 'Timed out waiting for the workspace HAP build lock.' }
 $BuildLog = Join-Path $Workspace '.hvigor\last-build.log'
 $WarningReport = Join-Path $Workspace '.hvigor\build-warning-report.json'
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $BuildLog) | Out-Null
@@ -18,10 +35,16 @@ $Utf8 = New-Object System.Text.UTF8Encoding($false)
 [System.IO.File]::WriteAllText($WarningReport, '{"status":"not-run"}', $Utf8)
 & node (Join-Path $PSScriptRoot 'check-signing.mjs')
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+& node (Join-Path $PSScriptRoot 'generate-agent-sandbox-notices.mjs') --check
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $DevEcoRoot = if ($env:DEVECO_HOME) { $env:DEVECO_HOME } else { 'C:\Program Files\Huawei\DevEco Studio' }
 $env:DEVECO_SDK_HOME = Join-Path $DevEcoRoot 'sdk'
 $env:JAVA_HOME = Join-Path $DevEcoRoot 'jbr'
 $env:PATH = "$(Join-Path $env:JAVA_HOME 'bin');$($env:PATH)"
+
+# Always check the small, pinned sandbox even when reusing the larger Core archive.
+& (Join-Path $PSScriptRoot 'build-agent-sandbox.ps1') -Target app
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 if (-not $SkipRust) {
     if ($Architecture -in @('all', 'arm64')) {
@@ -51,9 +74,10 @@ if ($Clean) {
     $BuildTasks += 'clean'
 }
 $BuildTasks += 'assembleHap'
+$ModuleTarget = if ($Test) { 'entry@ohosTest' } else { 'entry@default' }
 try {
     $ErrorActionPreference = 'Continue'
-    & $Hvigor --mode module -p product=default -p module=entry@default `
+    & $Hvigor --mode module -p product=default -p module=$ModuleTarget `
         -p buildMode=$BuildMode @BuildTasks --no-daemon 2>&1 | Tee-Object -Variable BuildOutput
     $HvigorExitCode = $LASTEXITCODE
     [System.IO.File]::WriteAllLines($BuildLog, [string[]]($BuildOutput | ForEach-Object { $_.ToString() }),
@@ -63,6 +87,7 @@ try {
 }
 if ($HvigorExitCode -ne 0) { exit $HvigorExitCode }
 $SignedHap = Join-Path $Workspace 'entry\build\default\outputs\default\entry-default-signed.hap'
+if ($Test) { $SignedHap = Join-Path $Workspace 'entry\build\default\outputs\ohosTest\entry-ohosTest-signed.hap' }
 if (($BuildOutput -match 'No signingConfig found') -or -not (Test-Path -LiteralPath $SignedHap -PathType Leaf)) {
     throw 'Signed HAP was not produced. Check the local signing configuration and Hvigor hook.'
 }
@@ -71,3 +96,7 @@ if ($Clean) { $WarningArgs += '--require-clean' }
 & node (Join-Path $PSScriptRoot 'verify-build-warnings.mjs') @WarningArgs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 exit 0
+} finally {
+    if ($HasBuildLock) { $BuildMutex.ReleaseMutex() }
+    $BuildMutex.Dispose()
+}

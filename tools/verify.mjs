@@ -22,6 +22,7 @@ try {
   run('repository', process.execPath, ['tools/test.mjs', 'all']);
   if (mode !== 'repo') {
     run('native', 'powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/build-native.ps1', '-Target', 'host-test']);
+    run('sandbox', 'powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/build-agent-sandbox.ps1', '-Target', 'host']);
     run('rpc-index', process.execPath, ['tools/verify-rpc-index.mjs']);
   }
   if (mode === 'all') {

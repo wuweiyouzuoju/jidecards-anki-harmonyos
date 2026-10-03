@@ -1,0 +1,82 @@
+{
+  "measured_at": "2026-09-30T16:25:11.755Z",
+  "connect_key": "127.0.0.1:5555",
+  "remote_directory": "/data/local/tmp/jidecards-sandbox-2026-09-30T16-24-54-338Z",
+  "wasm_sha256": "db886771cf2a08f6be013014e1090b0bc985752bb6f3ac974fa00089815990a9",
+  "tests": "ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.88s",
+  "probe": {
+    "cancel_join_ms": {
+      "max": 4.997692,
+      "median": 0.9579700000000001,
+      "min": 0.452177,
+      "p95": 1.6460139999999999
+    },
+    "memory_checkpoints": [
+      {
+        "process": {
+          "high_water_kib": 11340,
+          "rss_kib": 8496
+        },
+        "rounds": 0
+      },
+      {
+        "process": {
+          "high_water_kib": 27664,
+          "rss_kib": 9636
+        },
+        "rounds": 10
+      },
+      {
+        "process": {
+          "high_water_kib": 27664,
+          "rss_kib": 9636
+        },
+        "rounds": 20
+      }
+    ],
+    "module_init_ms": 69.34558200000001,
+    "samples": 20,
+    "schema_version": 1,
+    "target_arch": "x86_64",
+    "target_os": "linux",
+    "wasm_bytes": 1073552,
+    "workloads": [
+      {
+        "elapsed_ms": {
+          "max": 83.45619,
+          "median": 25.216033,
+          "min": 10.960151,
+          "p95": 57.683467
+        },
+        "max_fuel": 3186439,
+        "max_linear_memory_bytes": 2686976,
+        "name": "scalar",
+        "output_bytes": 2
+      },
+      {
+        "elapsed_ms": {
+          "max": 407.453263,
+          "median": 116.62275299999999,
+          "min": 42.653519,
+          "p95": 401.411786
+        },
+        "max_fuel": 208324187,
+        "max_linear_memory_bytes": 2818048,
+        "name": "clean_deduplicate_1000",
+        "output_bytes": 2291
+      },
+      {
+        "elapsed_ms": {
+          "max": 33.533841,
+          "median": 25.525862,
+          "min": 18.884413,
+          "p95": 30.127259
+        },
+        "max_fuel": 1167339413,
+        "max_linear_memory_bytes": 2686976,
+        "name": "sum_10000",
+        "output_bytes": 8
+      }
+    ]
+  }
+}
