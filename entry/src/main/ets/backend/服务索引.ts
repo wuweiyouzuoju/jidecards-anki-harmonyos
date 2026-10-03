@@ -51,7 +51,8 @@ export const 牌组方法 = {
   添加或更新过滤牌组: 20,
   过滤牌组排序标签: 21,
   设置当前牌组: 22,
-  获取当前牌组: 23
+  获取当前牌组: 23,
+  getAllDecksLegacy: 6
 } as const;
 
 export const 牌组配置方法 = {
@@ -76,14 +77,17 @@ export const 调度器方法 = {
   重新定位默认值: 29,
   描述下一档状态: 24,
   自定义学习: 27,
-  自定义学习默认值: 28
+  自定义学习默认值: 28,
+  computeFsrsParams: 30,
+  simulateFsrsWorkload: 34
 } as const;
 
 export const 卡片渲染方法 = {
   提取音视频标签: 3,
   extractLatex: 4,
   获取空卡: 5,
-  渲染既有卡片: 6
+  渲染既有卡片: 6,
+  renderUncommittedCardLegacy: 8
 } as const;
 
 export const 笔记类型方法 = {
@@ -107,14 +111,19 @@ export const 笔记方法 = {
   获取笔记: 6,
   笔记字段校验: 11,
   某笔记的卡片: 12,
-  笔记的唯一笔记类型: 13
+  笔记的唯一笔记类型: 13,
+  clozeNumbersInNote: 8
 } as const;
 
 export const 导入导出方法 = {
   导入集合包: 0,
   导出集合包: 1,
   导入Anki包: 2,
-  导出Anki包: 4
+  导出Anki包: 4,
+  获取CSV元数据: 5,
+  导入CSV: 6,
+  exportNoteCsv: 7,
+  exportCardCsv: 8
 } as const;
 
 export const 统计方法 = {

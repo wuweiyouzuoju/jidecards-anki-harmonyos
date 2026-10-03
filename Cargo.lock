@@ -2795,8 +2795,12 @@ name = "jidecards_core"
 version = "0.1.0"
 dependencies = [
  "anki",
+ "anki_proto",
  "prost",
  "reqwest",
+ "rusqlite",
+ "serde_json",
+ "tempfile",
  "tokio",
 ]
 

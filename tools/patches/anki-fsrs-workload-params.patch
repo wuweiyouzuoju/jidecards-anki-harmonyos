@@ -1,0 +1,24 @@
+diff --git a/rslib/src/scheduler/fsrs/simulator.rs b/rslib/src/scheduler/fsrs/simulator.rs
+--- a/rslib/src/scheduler/fsrs/simulator.rs
++++ b/rslib/src/scheduler/fsrs/simulator.rs
+@@ -27,2 +27,3 @@
+ use crate::prelude::*;
++use crate::scheduler::fsrs::memory_state::get_decay_from_params;
+ use crate::scheduler::states::fuzz::constrained_fuzz_bounds;
+@@ -301,4 +302,15 @@
+             .collect::<Result<HashMap<_, _>>>()?;
++        // jidecards: use Core's parameter-generation handling for the no-review
++        // baseline too. Card::retention_on indexes params[20] and panics for
++        // valid default/FSRS-4.5/FSRS-5 parameters (0/17/19 entries).
++        let decay = get_decay_from_params(&req.params);
+         let reviewless_end_memorized = cards.iter().fold(0., |p, c| {
+-            p + c.retention_on(&req.params, req.days_to_simulate as f32)
++            p + fsrs::current_retrievability(
++                fsrs::MemoryState {
++                    stability: c.stability,
++                    difficulty: c.difficulty,
++                },
++                req.days_to_simulate as f32 - c.last_date,
++                decay,
++            )
+         });

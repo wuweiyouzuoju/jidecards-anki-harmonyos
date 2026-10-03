@@ -1,0 +1,140 @@
+diff --git a/rslib/Cargo.toml b/rslib/Cargo.toml
+--- a/rslib/Cargo.toml
++++ b/rslib/Cargo.toml
+@@ -85,7 +85,7 @@
+ rayon.workspace = true
+ regex.workspace = true
+ reqwest.workspace = true
+-rusqlite.workspace = true
++rusqlite = { workspace = true, features = ["backup"] }
+ rustls-pemfile.workspace = true
+ same-file.workspace = true
+ scopeguard.workspace = true
+diff --git a/rslib/src/backend/mod.rs b/rslib/src/backend/mod.rs
+--- a/rslib/src/backend/mod.rs
++++ b/rslib/src/backend/mod.rs
+@@ -9,6 +9,7 @@
+ mod collection;
+ mod config;
+ pub(crate) mod dbproxy;
++mod deck_preview;
+ mod error;
+ mod github;
+ mod i18n;
+diff --git a/rslib/src/backend/deck_preview.rs b/rslib/src/backend/deck_preview.rs
+new file mode 100644
+--- /dev/null
++++ b/rslib/src/backend/deck_preview.rs
+@@ -0,0 +1,89 @@
++// Copyright: Ankitects Pty Ltd and contributors
++// License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
++//! jidecards adapter: preview runs on a SQLite backup, never the live scheduler.
++use prost::Message;
++
++use super::Backend;
++use crate::collection::CollectionBuilder;
++use crate::prelude::*;
++use crate::search::{Node, PropertyKind, RatingKind, SearchNode, SortMode, StateKind};
++
++impl Backend {
++    /// Application-local API; no upstream RPC IDs or scheduling rules are changed.
++    pub fn deck_preview_ids(
++        &self,
++        deck_id: i64,
++        scope: u32,
++    ) -> std::result::Result<Vec<i64>, Vec<u8>> {
++        self.deck_preview_ids_inner(DeckId(deck_id), scope)
++            .map_err(|err| err.into_protobuf(&self.tr).encode_to_vec())
++    }
++
++    fn deck_preview_ids_inner(&self, deck_id: DeckId, scope: u32) -> Result<Vec<i64>> {
++        require!(deck_id.0 > 0 && scope <= 3, "invalid preview request");
++        // The same Core lock excludes sync/writes while backing up committed WAL data.
++        // Keep temporary files beside the collection: HarmonyOS has no writable /tmp.
++        let file = self.with_col(|col| {
++            let file = anki_io::new_tempfile_in_parent_of(&col.col_path)?;
++            col.storage.db().backup("main", file.path(), None)?;
++            Ok(file)
++        })?;
++        let mut snapshot = CollectionBuilder::new(file.path())
++            .set_server(self.server)
++            .set_tr(self.tr.clone())
++            .build()?;
++        let result: Result<Vec<i64>> = (|| {
++            let deck = snapshot.get_deck(deck_id)?.or_not_found(deck_id)?;
++            let mut decks = snapshot.storage.child_decks(&deck)?;
++            decks.push(deck.as_ref().clone());
++            // This internal node emits an OR for original filtered-deck membership.
++            // Explicitly group it so the scope predicate applies to both branches.
++            let root = Node::Group(vec![SearchNode::DeckIdsWithoutChildren(
++                decks
++                    .iter()
++                    .map(|deck| deck.id.0.to_string())
++                    .collect::<Vec<_>>()
++                    .join(","),
++            )
++            .into()]);
++            if scope <= 1 {
++                let timing = snapshot.timing_today()?;
++                snapshot.unbury_if_day_rolled_over(timing)?;
++            }
++            let ids = match scope {
++                0 => {
++                    snapshot.set_current_deck(deck_id)?;
++                    snapshot.remaining_preview_ids()?
++                }
++                1 => snapshot.search_cards(
++                    Node::Group(vec![root, Node::And, StateKind::Due.into()]),
++                    SortMode::NoOrder,
++                )?,
++                2 => snapshot.search_cards(
++                    Node::Group(vec![
++                        root,
++                        Node::And,
++                        SearchNode::Property {
++                            operator: "=".to_owned(),
++                            kind: PropertyKind::Rated(0, RatingKind::AnyAnswerButton),
++                        }
++                        .into(),
++                    ]),
++                    SortMode::NoOrder,
++                )?,
++                3 => snapshot.search_cards(root, SortMode::NoOrder)?,
++                _ => unreachable!(),
++            };
++            let mut ids: Vec<i64> = ids.into_iter().map(|id| id.0).collect();
++            if scope != 0 {
++                ids.sort_unstable();
++            }
++            Ok(ids)
++        })();
++        // Close/checkpoint the temporary connection before the NamedTempFile is removed.
++        let closed = snapshot.close(None);
++        let ids = result?;
++        closed?;
++        Ok(ids)
++    }
++}
+diff --git a/rslib/src/scheduler/queue/mod.rs b/rslib/src/scheduler/queue/mod.rs
+--- a/rslib/src/scheduler/queue/mod.rs
++++ b/rslib/src/scheduler/queue/mod.rs
+@@ -80,6 +80,19 @@
+ }
+ 
+ impl Collection {
++    /// The existing queue chooses today's new/review cards and excludes siblings.
++    /// Include already-scheduled intraday steps later today without simulating answers.
++    pub(crate) fn remaining_preview_ids(&mut self) -> Result<Vec<CardId>> {
++        let queues = self.get_queues()?;
++        let mut seen = std::collections::HashSet::new();
++        Ok(queues
++            .iter()
++            .map(|entry| entry.card_id())
++            .chain(queues.intraday_learning.iter().map(|entry| entry.id))
++            .filter(|id| seen.insert(*id))
++            .collect())
++    }
++
+     pub fn get_next_card(&mut self) -> Result<Option<QueuedCard>> {
+         self.get_queued_cards(1, false)
+             .map(|queued| queued.cards.first().cloned())

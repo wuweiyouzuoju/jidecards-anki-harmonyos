@@ -6,9 +6,14 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
+pub mod deck_preview;
 mod media_snapshot;
+pub mod note_duplicates;
 mod rpc_ids;
-use rpc_ids::{ABORT_SYNC, CLOSE_COLLECTION, COLLECTION_SERVICE, OPEN_COLLECTION, SYNC_SERVICE};
+use rpc_ids::{
+    ABORT_SYNC, CLOSE_COLLECTION, COLLECTION_SERVICE, LATEST_PROGRESS, OPEN_COLLECTION,
+    SET_WANTS_ABORT, SYNC_SERVICE,
+};
 
 pub const STATUS_OK: i32 = 0;
 pub const STATUS_INVALID_ARGUMENT: i32 = 1;
@@ -56,8 +61,12 @@ pub enum BackendFailure {
 }
 
 pub type SyncAbort = Arc<dyn Fn() -> Result<Vec<u8>, BackendFailure> + Send + Sync>;
+pub type ProgressControl = Arc<dyn Fn(u32) -> Result<Vec<u8>, BackendFailure> + Send + Sync>;
 
 pub trait RawBackend: Send + 'static {
+    fn progress_control(&self) -> Option<ProgressControl> {
+        None
+    }
     /// 独立取消通道只触发 Core 的取消句柄，不读取或写入集合。
     fn sync_aborter(&self) -> Option<SyncAbort> {
         None
@@ -72,6 +81,7 @@ pub trait RawBackend: Send + 'static {
 }
 
 struct BackendEntry {
+    progress_control: Option<ProgressControl>,
     backend: Mutex<BackendState>,
     sync_abort: Option<SyncAbort>,
 }
@@ -127,9 +137,11 @@ impl BackendRegistry {
             let handle = self.next_handle.fetch_add(1, Ordering::Relaxed);
             if handle != 0 && !backends.contains_key(&handle) {
                 let sync_abort = backend.sync_aborter();
+                let progress_control = backend.progress_control();
                 backends.insert(
                     handle,
                     Arc::new(BackendEntry {
+                        progress_control,
                         backend: Mutex::new(BackendState {
                             raw: Box::new(backend),
                             media: media_snapshot::MediaSnapshot::default(),
@@ -160,6 +172,16 @@ impl BackendRegistry {
         if service == SYNC_SERVICE && method == ABORT_SYNC && input.is_empty() {
             return match &backend.sync_abort {
                 Some(abort) => abort(),
+                None => Err(BackendFailure::Backend(Vec::new())),
+            };
+        }
+        // These Core methods only lock shared progress, never the collection.
+        if service == COLLECTION_SERVICE
+            && matches!(method, LATEST_PROGRESS | SET_WANTS_ABORT)
+            && input.is_empty()
+        {
+            return match &backend.progress_control {
+                Some(control) => control(method),
                 None => Err(BackendFailure::Backend(Vec::new())),
             };
         }
@@ -262,6 +284,14 @@ struct AnkiBackend(anki::backend::Backend);
 
 #[cfg(feature = "anki-core")]
 impl RawBackend for AnkiBackend {
+    fn progress_control(&self) -> Option<ProgressControl> {
+        let backend = self.0.clone();
+        Some(Arc::new(move |method| {
+            backend
+                .run_service_method(COLLECTION_SERVICE, method, &[])
+                .map_err(BackendFailure::Backend)
+        }))
+    }
     fn sync_aborter(&self) -> Option<SyncAbort> {
         let backend = self.0.clone();
         Some(Arc::new(move || {
@@ -277,6 +307,12 @@ impl RawBackend for AnkiBackend {
         method: u32,
         input: &[u8],
     ) -> Result<Vec<u8>, BackendFailure> {
+        if service == deck_preview::SERVICE {
+            return deck_preview::call(&self.0, method, input);
+        }
+        if service == note_duplicates::SERVICE {
+            return note_duplicates::call(&self.0, method, input);
+        }
         self.0
             .run_service_method(service, method, input)
             .map_err(BackendFailure::Backend)
@@ -412,6 +448,59 @@ pub unsafe extern "C" fn anki_buffer_free(buffer: AnkiBuffer) {
 mod ffi_tests {
     use super::*;
 
+    #[test]
+    fn progress_and_abort_bypass_an_inflight_collection_call() {
+        use std::sync::mpsc;
+        use std::time::Duration;
+        struct BlockingBackend {
+            started: mpsc::Sender<()>,
+            finish: mpsc::Receiver<()>,
+            control: mpsc::Sender<u32>,
+        }
+        impl RawBackend for BlockingBackend {
+            fn progress_control(&self) -> Option<ProgressControl> {
+                let sender = self.control.clone();
+                Some(Arc::new(move |method| {
+                    sender.send(method).unwrap();
+                    Ok(vec![])
+                }))
+            }
+            fn run_method_raw(
+                &mut self,
+                _: u32,
+                _: u32,
+                _: &[u8],
+            ) -> Result<Vec<u8>, BackendFailure> {
+                self.started.send(()).unwrap();
+                self.finish.recv_timeout(Duration::from_secs(5)).unwrap();
+                Ok(vec![])
+            }
+        }
+        let (start_tx, start_rx) = mpsc::channel();
+        let (finish_tx, finish_rx) = mpsc::channel();
+        let (control_tx, control_rx) = mpsc::channel();
+        let registry = Arc::new(BackendRegistry::new());
+        let handle = registry.insert(BlockingBackend {
+            started: start_tx,
+            finish: finish_rx,
+            control: control_tx,
+        });
+        let worker_registry = registry.clone();
+        let worker = std::thread::spawn(move || worker_registry.call(handle, 39, 2, &[]));
+        start_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        for method in [LATEST_PROGRESS, SET_WANTS_ABORT] {
+            registry
+                .call(handle, COLLECTION_SERVICE, method, &[])
+                .unwrap();
+            assert_eq!(
+                control_rx.recv_timeout(Duration::from_secs(1)).unwrap(),
+                method
+            );
+        }
+        finish_tx.send(()).unwrap();
+        worker.join().unwrap().unwrap();
+    }
+
     struct PanicBackend;
 
     impl RawBackend for PanicBackend {
@@ -530,6 +619,101 @@ mod ffi_tests {
         assert_ne!(handle, 0);
         assert_eq!(anki_backend_close(handle), STATUS_OK);
         unsafe { anki_buffer_free(error) };
+    }
+
+    #[cfg(feature = "anki-core")]
+    #[test]
+    fn real_core_csv_metadata_and_import_preserve_quoted_multiline_fields_and_report_duplicates() {
+        use prost::Message;
+        use std::time::{SystemTime, UNIX_EPOCH};
+        #[derive(Clone, PartialEq, Message)]
+        struct PathRequest {
+            #[prost(string, tag = "1")]
+            path: String,
+            #[prost(bytes, optional, tag = "2")]
+            metadata: Option<Vec<u8>>,
+        }
+        #[derive(Clone, PartialEq, Message)]
+        struct OpenRequest {
+            #[prost(string, tag = "1")]
+            collection: String,
+            #[prost(string, tag = "2")]
+            media: String,
+            #[prost(string, tag = "3")]
+            media_db: String,
+        }
+        #[derive(Clone, PartialEq, Message)]
+        struct ImportLog {
+            #[prost(bytes, repeated, tag = "1")]
+            new: Vec<Vec<u8>>,
+            #[prost(bytes, repeated, tag = "3")]
+            duplicate: Vec<Vec<u8>>,
+            #[prost(uint32, tag = "10")]
+            found: u32,
+        }
+        #[derive(Clone, PartialEq, Message)]
+        struct ImportResponse {
+            #[prost(message, optional, tag = "2")]
+            log: Option<ImportLog>,
+        }
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir()
+            .canonicalize()
+            .unwrap()
+            .join(format!("jide-csv-{unique}"));
+        std::fs::create_dir(&root).unwrap();
+        let registry = BackendRegistry::new();
+        let handle = registry.insert(AnkiBackend(anki::backend::init_backend(&[]).unwrap()));
+        let open = OpenRequest {
+            collection: root.join("collection.anki2").to_string_lossy().into_owned(),
+            media: root.join("collection.media").to_string_lossy().into_owned(),
+            media_db: root.join("collection.mdb").to_string_lossy().into_owned(),
+        };
+        registry
+            .call(
+                handle,
+                COLLECTION_SERVICE,
+                OPEN_COLLECTION,
+                &open.encode_to_vec(),
+            )
+            .unwrap();
+        let path = root.join("notes.csv");
+        std::fs::write(
+            &path,
+            "#separator:Comma\n#html:false\n\"front,quoted\",\"answer\nline\"\n",
+        )
+        .unwrap();
+        let mut request = PathRequest {
+            path: path.to_string_lossy().into_owned(),
+            metadata: None,
+        };
+        let metadata = registry
+            .call(handle, 39, 5, &request.encode_to_vec())
+            .unwrap();
+        assert!(metadata
+            .windows(b"front,quoted".len())
+            .any(|part| part == b"front,quoted"));
+        assert!(metadata
+            .windows(b"answer\nline".len())
+            .any(|part| part == b"answer\nline"));
+        request.metadata = Some(metadata);
+        for expected_new in [1, 0] {
+            let bytes = registry
+                .call(handle, 39, 6, &request.encode_to_vec())
+                .unwrap();
+            let log = ImportResponse::decode(bytes.as_slice())
+                .unwrap()
+                .log
+                .unwrap();
+            assert_eq!(log.found, 1);
+            assert_eq!(log.new.len(), expected_new);
+            assert_eq!(log.duplicate.len(), 1 - expected_new);
+        }
+        registry.close(handle);
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[cfg(feature = "anki-core")]

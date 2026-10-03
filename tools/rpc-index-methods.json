@@ -24,7 +24,8 @@
       "添加或更新过滤牌组": "add_or_update_filtered_deck",
       "过滤牌组排序标签": "filtered_deck_order_labels",
       "设置当前牌组": "set_current_deck",
-      "获取当前牌组": "get_current_deck"
+      "获取当前牌组": "get_current_deck",
+      "getAllDecksLegacy": "get_all_decks_legacy"
     },
     "牌组配置方法": {
       "获取牌组配置": "get_deck_config",
@@ -47,13 +48,16 @@
       "重新定位默认值": "reposition_defaults",
       "描述下一档状态": "describe_next_states",
       "自定义学习": "custom_study",
-      "自定义学习默认值": "custom_study_defaults"
+      "自定义学习默认值": "custom_study_defaults",
+      "computeFsrsParams": "compute_fsrs_params",
+      "simulateFsrsWorkload": "simulate_fsrs_workload"
     },
     "卡片渲染方法": {
       "提取音视频标签": "extract_av_tags",
       "extractLatex": "extract_latex",
       "获取空卡": "get_empty_cards",
-      "渲染既有卡片": "render_existing_card"
+      "渲染既有卡片": "render_existing_card",
+      "renderUncommittedCardLegacy": "render_uncommitted_card_legacy"
     },
     "笔记类型方法": {
       "添加笔记类型旧版": "add_notetype_legacy",
@@ -75,13 +79,18 @@
       "获取笔记": "get_note",
       "笔记字段校验": "note_fields_check",
       "某笔记的卡片": "cards_of_note",
-      "笔记的唯一笔记类型": "get_single_notetype_of_notes"
+      "笔记的唯一笔记类型": "get_single_notetype_of_notes",
+      "clozeNumbersInNote": "cloze_numbers_in_note"
     },
     "导入导出方法": {
       "导入集合包": "import_collection_package",
       "导出集合包": "export_collection_package",
       "导入Anki包": "import_anki_package",
-      "导出Anki包": "export_anki_package"
+      "导出Anki包": "export_anki_package",
+      "获取CSV元数据": "get_csv_metadata",
+      "导入CSV": "import_csv",
+      "exportNoteCsv": "export_note_csv",
+      "exportCardCsv": "export_card_csv"
     },
     "统计方法": {
       "卡片统计": "card_stats",

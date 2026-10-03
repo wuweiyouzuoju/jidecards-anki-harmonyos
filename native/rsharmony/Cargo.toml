@@ -22,6 +22,7 @@ anki-core = ["dep:anki", "anki/rustls", "dep:reqwest"]
 
 [dependencies]
 prost = "0.13.5"
+serde_json = "1.0.150"
 anki = { path = "../../third_party/anki/rslib", default-features = false, optional = true }
 # rsharmony 不直接调用 reqwest API，仅用于把 rustls-tls-webpki-roots feature 透传给 reqwest（与 anki 的 native-roots 合并）。
 # 版本与 anki workspace 保持一致（third_party/anki/Cargo.toml），避免 cargo 重复拉两份 reqwest。
@@ -32,3 +33,13 @@ reqwest = { version = "0.12.20", default-features = false, features = ["rustls-t
 # 上游完整 workspace 靠其他 crate 做特性统一（feature unification）补齐 io-util；
 # 本裁剪 workspace 中只能由这里显式声明，否则 anki-core 特性开启时编译失败。
 tokio = { version = "1.45", features = ["io-util"] }
+
+[dev-dependencies]
+anki_proto = { path = "../../third_party/anki/rslib/proto" }
+rusqlite = "0.36.0"
+serde_json = "1.0.140"
+tempfile = "3.20.0"
+
+[[example]]
+name = "core_interop_check"
+required-features = ["anki-core"]

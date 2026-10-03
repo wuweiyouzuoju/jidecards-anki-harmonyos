@@ -16,30 +16,33 @@ if ($Profile -eq 'release') { $ReleaseArgs = @('--release') }
 # compiling so large APKG files do not retain and bridge a second full copy of
 # all note text. third_party/ is intentionally gitignored and may be recloned.
 $AnkiRoot = Join-Path $Workspace 'third_party\anki'
-$AnkiPatch = Join-Path $Workspace 'tools\patches\anki-compact-import-log.patch'
+$AnkiPatches = @('anki-compact-import-log.patch', 'anki-deck-preview.patch', 'anki-fsrs-workload-params.patch')
 if (-not (Test-Path $AnkiRoot)) {
     throw 'third_party\anki is missing; clone the Anki source before building native code.'
 }
 # Reverse-check failure is expected on pristine sources. PowerShell 5 must
 # reach the forward check instead of treating native stderr as terminating.
-try {
-    $ErrorActionPreference = 'Continue'
-    & git -C $Workspace apply --check --reverse --recount --ignore-space-change --ignore-whitespace `
-        --directory=third_party/anki $AnkiPatch 2>$null
-    $AnkiPatchAlreadyApplied = $LASTEXITCODE -eq 0
-} finally {
-    $ErrorActionPreference = 'Stop'
-}
-if (-not $AnkiPatchAlreadyApplied) {
-    & git -C $Workspace apply --check --recount --ignore-space-change --ignore-whitespace `
-        --directory=third_party/anki $AnkiPatch
-    if ($LASTEXITCODE -ne 0) {
-        throw 'Anki compact import-log patch does not apply to the current vendored source.'
+foreach ($PatchName in $AnkiPatches) {
+    $AnkiPatch = Join-Path $Workspace "tools\patches\$PatchName"
+    try {
+        $ErrorActionPreference = 'Continue'
+        & git -C $Workspace apply --check --reverse --recount --ignore-space-change --ignore-whitespace `
+            --directory=third_party/anki $AnkiPatch 2>$null
+        $AnkiPatchAlreadyApplied = $LASTEXITCODE -eq 0
+    } finally {
+        $ErrorActionPreference = 'Stop'
     }
-    & git -C $Workspace apply --recount --ignore-space-change --ignore-whitespace `
-        --directory=third_party/anki $AnkiPatch
-    if ($LASTEXITCODE -ne 0) {
-        throw 'Failed to apply the Anki compact import-log patch.'
+    if (-not $AnkiPatchAlreadyApplied) {
+        & git -C $Workspace apply --check --recount --ignore-space-change --ignore-whitespace `
+            --directory=third_party/anki $AnkiPatch
+        if ($LASTEXITCODE -ne 0) {
+            throw "Anki patch $PatchName does not apply to the current vendored source."
+        }
+        & git -C $Workspace apply --recount --ignore-space-change --ignore-whitespace `
+            --directory=third_party/anki $AnkiPatch
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to apply Anki patch $PatchName."
+        }
     }
 }
 

@@ -215,7 +215,10 @@ napi_value RunMethodRaw(napi_env env, napi_callback_info info)
         return nullptr;
     }
     // AbortSync 只发取消信号；不依赖可能被集合调用占满的工作线程池。
-    if (call->service == RPC_SYNC_SERVICE && call->method == RPC_ABORT_SYNC && call->input.empty()) {
+    if (call->input.empty() &&
+        ((call->service == RPC_SYNC_SERVICE && call->method == RPC_ABORT_SYNC) ||
+         (call->service == RPC_COLLECTION_SERVICE &&
+          (call->method == RPC_LATEST_PROGRESS || call->method == RPC_SET_WANTS_ABORT)))) {
         ExecuteCall(env, call.get());
         CompleteCall(env, napi_ok, call.release());
         return promise;
