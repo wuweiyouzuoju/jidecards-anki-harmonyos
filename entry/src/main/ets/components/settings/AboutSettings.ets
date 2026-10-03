@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { settingsItemText } from '../../utils/SettingsStructureText';
+import { OFFICIAL_QQ_GROUP } from '../../model/OfficialCommunity';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { common } from '@kit.AbilityKit';
 import { pasteboard } from '@kit.BasicServicesKit';
@@ -24,7 +26,7 @@ export struct AboutSettings {
   // Anki 官方文档 URL（后端 LinksService.HelpPageLink 不可用时的兜底常量，与 docs.ankiweb.net 一致）
   private readonly Anki文档网址: string = 'https://docs.ankiweb.net';
   // 官方 QQ 群号（关于分组入口点击复制到剪贴板，与 欢迎弹窗 中 QQ群号 保持一致）
-  private readonly QQ群号: string = '726837065';
+  private readonly QQ群号: string = OFFICIAL_QQ_GROUP;
   // 本应用 bundleName，用于拼接应用市场 DeepLink 跳转本应用详情页（好评回退路径）
   private readonly 本应用包名: string = 'com.jide.kapian';
   private feedbackDialog: CustomDialogController = new CustomDialogController({
@@ -128,7 +130,7 @@ export struct AboutSettings {
   build() {
     Column() {
       Column({ space: 9 }) {
-        Text($r('app.string.app_about_title'))
+        Text(settingsItemText(this.getUIContext(), 'app_information'))
           .fontSize(18)
           .fontWeight(FontWeight.Bold)
           .fontColor(设置面板色板_取(this.是否深色).主文字)
@@ -145,7 +147,7 @@ export struct AboutSettings {
       Divider().color(设置面板色板_取(this.是否深色).分隔线).strokeWidth(1)
 
       Row() {
-        Text($r('app.string.feedback_title'))
+        Text(settingsItemText(this.getUIContext(), 'feedback'))
           .fontSize(15)
           .fontColor(设置面板色板_取(this.是否深色).主文字)
         Blank()
@@ -160,7 +162,7 @@ export struct AboutSettings {
       // 复用公共好评入口及市场降级。
       Row() {
         Column({ space: 2 }) {
-          Text($r('app.string.about_rate_title'))
+          Text(settingsItemText(this.getUIContext(), 'rate'))
             .fontSize(15)
             .fontColor(设置面板色板_取(this.是否深色).主文字)
           Text($r('app.string.about_rate_summary'))
@@ -185,7 +187,7 @@ export struct AboutSettings {
       // AnkiWeb 资源入口行：点击用系统浏览器打开 AnkiWeb 共享牌组页面
       Row() {
         Column({ space: 2 }) {
-          Text($r('app.string.about_ankiweb_title'))
+          Text(settingsItemText(this.getUIContext(), 'ankiweb'))
             .fontSize(15)
             .fontColor(设置面板色板_取(this.是否深色).主文字)
           Text(this.AnkiWeb网址)
@@ -210,7 +212,7 @@ export struct AboutSettings {
       // QQ 群入口行：点击复制群号到剪贴板（不跳转 QQ 应用，避免未装 QQ 时降级链路复杂）
       Row() {
         Column({ space: 2 }) {
-          Text($r('app.string.about_qq_group_title'))
+          Text(settingsItemText(this.getUIContext(), 'community'))
             .fontSize(15)
             .fontColor(设置面板色板_取(this.是否深色).主文字)
           Row({ space: 4 }) {
@@ -246,7 +248,7 @@ export struct AboutSettings {
       // 许可证入口行
       Row() {
         Column({ space: 2 }) {
-          Text($r('app.string.licenses_title'))
+          Text(settingsItemText(this.getUIContext(), 'licenses'))
             .fontSize(15)
             .fontColor(设置面板色板_取(this.是否深色).主文字)
           Text($r('app.string.licenses_summary'))
@@ -269,7 +271,7 @@ export struct AboutSettings {
       // 优先调后端 LinksService.HelpPageLink 取 URL（按 locale 选站点），失败兜底本地常量
       Row() {
         Column({ space: 2 }) {
-          Text($r('app.string.about_anki_docs_title'))
+          Text(settingsItemText(this.getUIContext(), 'anki_documentation'))
             .fontSize(15)
             .fontColor(设置面板色板_取(this.是否深色).主文字)
           Text(this.Anki文档网址)

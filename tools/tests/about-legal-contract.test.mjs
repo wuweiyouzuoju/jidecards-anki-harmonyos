@@ -21,9 +21,11 @@ test('About keeps copyright and licenses entry, stays free of heavy legal wordin
   // 2026-07-28：关于页只保留 title + copyright，描述性文字已移到许可证面板。
   const panel = read('entry/src/main/ets/components/settings/AboutSettings.ets');
 
-  for (const key of ['app_about_title', 'app_about_copyright', 'licenses_title']) {
+  for (const key of ['app_about_copyright']) {
     assert.match(panel, new RegExp(`app\\.string\\.${key}`));
   }
+  assert.match(panel, /settingsItemText\(this\.getUIContext\(\), 'app_information'\)/);
+  assert.match(panel, /settingsItemText\(this\.getUIContext\(\), 'licenses'\)/);
   assert.doesNotMatch(panel, /Copyright ©/);
   assert.doesNotMatch(panel, /按“现状”提供/);
   assert.doesNotMatch(panel, /法律强制规定不得排除的责任除外/);

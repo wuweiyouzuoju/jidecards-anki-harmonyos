@@ -5,13 +5,15 @@ import { DialogHeader } from './common/DialogHeader';
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { common } from '@kit.AbilityKit';
 import { pasteboard } from '@kit.BasicServicesKit';
+import { OFFICIAL_QQ_GROUP } from '../model/OfficialCommunity';
+import { IridescentThemePreview } from './common/IridescentThemePreview';
 
 /** 简短入门说明，随内容收缩，小屏可滚动，确认按钮始终可见。 */
 @Component
 export struct HomeIntroPanel {
   onClose: () => void = (): void => {};
   @State private contentHeight: number = 400;
-  private readonly groupNumber: string = '726837065';
+  private readonly groupNumber: string = OFFICIAL_QQ_GROUP;
   private readonly decksUrl: string = 'https://ankiweb.net/shared/decks/';
 
   /** 两处群号共用复制动作，只写入群号本身。 */
@@ -89,14 +91,7 @@ export struct HomeIntroPanel {
       Text($r('app.string.home_intro_theme_preview'))
         .fontSize(应用尺寸.字号_正文_小)
         .fontColor($r('app.color.text_secondary')).width('100%')
-      Image($r('app.media.iridescent_preview'))
-        .width('100%')
-        .constraintSize({ maxWidth: 260 })
-        .aspectRatio(1320 / 2856)
-        .objectFit(ImageFit.Contain)
-        .borderRadius(应用尺寸.圆角_卡片)
-        .accessibilityText(
-          $r('app.string.home_intro_theme_preview'))
+      IridescentThemePreview()
     }
     .width('100%').alignItems(HorizontalAlign.Center)
   }

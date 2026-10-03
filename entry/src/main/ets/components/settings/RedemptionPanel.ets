@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { settingsItemText } from '../../utils/SettingsStructureText';
 import { PressFeedback } from '../../utils/PressFeedback';
+import { LabeledActionRow } from '../common/LabeledActionRow';
 import { HelpLabel } from '../common/HelpLabel';
 import { 字段帮助对话框 } from '../字段帮助面板';
 import { DisclosureChevron } from '../common/DisclosureChevron';
@@ -79,7 +81,7 @@ export struct RedemptionPanel {
         Row({ space: 8 }) {
           Text($r('app.string.about_qq_group_title')).fontSize(14).fontColor($r('app.color.text_secondary'))
           Text() { ThemeTextSpans(this.developerGroup, this.themeAccentColors, this.getUIContext()) }.fontSize(16).fontWeight(FontWeight.Medium).fontColor(this.primary).layoutWeight(1)
-          Text() { ThemeTextSpans($r('app.string.redemption_copy'), this.themeAccentColors, this.getUIContext()) }.fontSize(14).fontColor(this.primary)
+          Text() { ThemeTextSpans(settingsItemText(this.getUIContext(), 'fingerprint_copy'), this.themeAccentColors, this.getUIContext()) }.fontSize(14).fontColor(this.primary)
         }.width('100%')
       }
       .width('100%').height(48).padding({ left: 14, right: 14 }).borderRadius(12)
@@ -136,7 +138,7 @@ export struct RedemptionPanel {
   private redemptionForm() {
     Column({ space: 16 }) {
       DialogHeader({
-        title: $r('app.string.redemption_entry'), actionLabel: $r('app.string.redemption_submit'),
+        title: settingsItemText(this.getUIContext(), 'redemption'), actionLabel: $r('app.string.redemption_submit'),
         actionEnabled: !this.busy && this.code.trim() !== '', closeEnabled: !this.busy,
         onClose: (): void => { this.closeRedemption(); },
         onAction: (): void => { this.redeem(); }
@@ -148,15 +150,13 @@ export struct RedemptionPanel {
         .fontColor($r('app.color.text_primary')).placeholderColor($r('app.color.text_tertiary'))
         .backgroundColor($r('app.color.surface_page')).borderRadius(14).padding(14)
         .onChange((value: string): void => { this.code = value; this.message = ''; this.unlocked = false; })
-      if (this.message !== '') {
+      if (this.message !== '' && !this.unlocked) {
         Text(this.message).fontSize(13).fontColor($r('app.color.text_secondary')).width('100%')
       }
       if (this.unlocked) {
-        Button($r('app.string.redemption_use_theme'))
-          .width('100%').height(44)
-          .attributeModifier(new PressFeedback())
-          .stateEffect(false)
-          .onClick((): void => { this.onUseTheme(this.unlockedTheme); this.expanded = false; })
+        LabeledActionRow({ label: this.message, actionLabel: $r('app.string.redemption_use_theme'), tint: this.primary,
+          textColor: $r('app.color.text_secondary'), isInteractive: !this.busy,
+          onAction: (): void => { this.onUseTheme(this.unlockedTheme); this.expanded = false; } })
       }
     }.padding({ left: 20, right: 20, top: 8, bottom: 28 }).width('100%')
   }
@@ -165,10 +165,10 @@ export struct RedemptionPanel {
   private redemptionDetails() {
     Column({ space: 12 }) {
       Row() {
-        Text($r('app.string.redemption_fingerprint'))
+        Text(settingsItemText(this.getUIContext(), 'installation_fingerprint'))
           .fontSize(15).fontColor($r('app.color.text_primary')).layoutWeight(1)
         Button() {
-          Text() { ThemeTextSpans($r('app.string.redemption_copy'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.primary)
+          Text() { ThemeTextSpans(settingsItemText(this.getUIContext(), 'fingerprint_copy'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.primary)
         }
           .fontColor(this.primary).backgroundColor(Color.Transparent)
           .enabled(this.fingerprint !== '').attributeModifier(new PressFeedback())
@@ -194,7 +194,7 @@ export struct RedemptionPanel {
       Divider().color($r('app.color.border_subtle')).margin({ top: 4 })
       Button() {
         Row() {
-          Text() { ThemeTextSpans($r('app.string.redemption_entry'), this.themeAccentColors, this.getUIContext()) }.fontSize(15).fontColor(this.primary).layoutWeight(1)
+          Text() { ThemeTextSpans(settingsItemText(this.getUIContext(), 'redemption'), this.themeAccentColors, this.getUIContext()) }.fontSize(15).fontColor(this.primary).layoutWeight(1)
           DisclosureChevron({ tint: $r('app.color.text_tertiary') })
         }.width('100%')
       }

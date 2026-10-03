@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { OFFICIAL_QQ_GROUP } from '../model/OfficialCommunity';
 import { DialogBackdrop } from './common/DialogBackdrop';
 import { DialogHeader } from './common/DialogHeader';
 // ========================================================
@@ -50,7 +51,7 @@ export struct 欢迎弹窗 {
   // AnkiWeb 共享牌组页面（点击「获取牌组」Section 的蓝色链接时跳转）
   private static readonly 网址_获取牌组: string = 'https://ankiweb.net/shared/decks/';
   // 官方 QQ 群号（方式 2 获取牌组渠道，长按可选中复制）
-  private static readonly QQ群号: string = '726837065';
+  private static readonly QQ群号: string = OFFICIAL_QQ_GROUP;
 
   // 中部滚动区上限（vp）：屏高×88% 减去固定区（标题栏/分割线/底部按钮行，约 150vp）。
   // 必须是数字——constraintSize({ maxHeight: 数字 }) 才有"内容少随内容、超限封顶滚动"语义

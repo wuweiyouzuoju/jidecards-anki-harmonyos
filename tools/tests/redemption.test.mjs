@@ -183,7 +183,7 @@ test('animation lifecycle and entitlement gating remain connected', () => {
   const settings = readFileSync(new URL('../../entry/src/main/ets/components/设置面板.ets', import.meta.url), 'utf8');
   assert.ok(settings.lastIndexOf('RedemptionPanel({') > settings.indexOf('开发者调试分组({'));
   const appearance = readFileSync(new URL('../../entry/src/main/ets/components/settings/外观分组.ets', import.meta.url), 'utf8');
-  assert.match(appearance, /return availableThemes\(this\.unlockedContents\)/);
+  assert.match(appearance, /isThemeAvailable\(theme, this\.unlockedContents\)/);
 });
 
 test('texture motion stays bounded and pause samples match native easing without jumps', () => {

@@ -105,7 +105,9 @@ test('navigation owns one persistent background outside route content', () => {
   const home = read('entry/src/main/ets/pages/首页.ets');
   assert.match(home, /build\(\)\s*\{\s*Stack\(\)\s*\{\s*ThemeBackground\(\{ transitionActive: this\.backgroundTransitionActive \}\)\s*Navigation\(this\.页面栈\)/);
   assert.equal(home.match(/ThemeBackground\(/g).length, 1);
-  assert.doesNotMatch(home, /onNavBarStateChange|homeVisible/);
+  const visibility = home.slice(home.indexOf('.onNavBarStateChange('), home.indexOf('// 用箭头函数包裹'));
+  assert.match(visibility, /appInterface.showPage\('home'\)/);
+  assert.doesNotMatch(visibility, /ThemeBackground|homeVisible|页面底色|opacity/, 'visibility reports semantic state without changing persistent background rendering');
   const pages = readdirSync(new URL('../../entry/src/main/ets/pages/', import.meta.url)).filter(name => name.endsWith('.ets') && name !== '首页.ets');
   for (const name of pages) {
     const source = read('entry/src/main/ets/pages/' + name);
