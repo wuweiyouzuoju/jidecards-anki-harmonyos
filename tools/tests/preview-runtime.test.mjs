@@ -6,6 +6,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import vm from 'node:vm';
 import { CardAudioSession } from '../../entry/src/main/ets/model/CardAudioSession.ts';
 import { buildPreviewInteractionScript } from '../../entry/src/main/ets/model/PreviewInteraction.ts';
+import { renderPreviewAnswer } from '../../entry/src/main/ets/model/StudyAnswerRenderer.ts';
 import { 构建卡片HTML, 剥除拼写标记, 原始侧HTML } from '../../entry/src/main/ets/model/学习卡片HTML构建器.ts';
 
 const read = path => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
@@ -32,11 +33,11 @@ const methods = names.map(name => {
   return source.slice(start, source.indexOf('\n  }', start) + 4);
 });
 const Page = new Function('构建卡片HTML', '剥除拼写标记', '原始侧HTML', '媒体基地址',
-  '解码文件名', 'buildPreviewInteractionScript', '$r', 'PreviewActionProxy', 'console',
+  '解码文件名', 'buildPreviewInteractionScript', 'renderPreviewAnswer', '$r', 'PreviewActionProxy', 'console',
   stripTypeScriptTypes(`class Page {${methods.join('\n')}}`, { mode: 'transform' }) + '\nreturn Page;')(
   构建卡片HTML, 剥除拼写标记, 原始侧HTML, 'https://jidecards-media.local/',
   name => { try { return decodeURIComponent(name); } catch { return name; } },
-  buildPreviewInteractionScript, key => key,
+  buildPreviewInteractionScript, renderPreviewAnswer, key => key,
   class { onAction(action, version) { this.dispatch(action, version); } },
   // 故障注入的预期日志只留在替身中，避免 Windows Node 测试 IPC 与多字节 stdout 混写。
   { info() {} }
@@ -144,6 +145,51 @@ test('next/previous follow the Anki preview state machine', async () => {
   assert.equal(page.当前索引值, 0);
   assert.match(displayed.at(-1), /front-11/);
   assert.doesNotMatch(displayed.at(-1), /back-11/);
+});
+
+test('typing preview reveals the expected answer for normal, nc and numbered cloze cards', async () => {
+  for (const [marker, field, ordinal, expected] of [
+    ['[[type:背面]]', '<b>correct &amp; safe</b>', 0, 'correct &amp; safe'],
+    ['[[type:nc:背面]]', 'café', 0, 'café'],
+    ['[[type:cloze:背面]]', '{{c1::first}} / {{c2::second}}', 1, 'second']
+  ]) {
+    const { page, displayed, service } = harness();
+    service.渲染既有卡片 = async () => ({...card(11),
+      questionNodes: [{text: `Question${marker}`, replacement: null}],
+      answerNodes: [{text: `Question<hr id="answer">${marker}`, replacement: null}]});
+    page.卡片服务实例 = {获取卡片: async id => { assert.equal(id, 11); return {noteId: 101, templateIdx: ordinal}; }};
+    page.笔记服务实例 = {获取笔记: async id => { assert.equal(id, 101); return {notetypeId: 201, fields: ['Question', field]}; }};
+    page.笔记类型服务实例 = {获取笔记类型: async id => { assert.equal(id, 201); return {fieldNames: ['正面', '背面']}; }};
+    await page.加载当前卡(); await settle(page);
+    const body = html => html.slice(html.indexOf('<body')).split('<script>')[0].replace(/<style>[\s\S]*?<\/style>/g, '');
+    assert.doesNotMatch(body(displayed.at(-1)), /\[\[type:|id=typeans/);
+    page.翻面(); await settle(page);
+    assert.ok(body(displayed.at(-1)).includes(expected), `${marker} must reveal ${expected}`);
+    assert.match(body(displayed.at(-1)), /id=typeans/);
+    assert.doesNotMatch(body(displayed.at(-1)), /\[\[type:|<b>|first|typeBad/);
+  }
+});
+
+test('typing answer reads cannot overwrite a newer preview or display after closing', async () => {
+  for (const close of [false, true]) {
+    const { page, displayed, service } = harness(), slow = deferred();
+    service.渲染既有卡片 = async id => id === 11 ? {...card(id),
+      questionNodes: [{text: 'Q[[type:Back]]', replacement: null}],
+      answerNodes: [{text: 'Q<hr>[[type:Back]]', replacement: null}]} : card(id);
+    page.卡片服务实例 = {获取卡片: async () => ({noteId: 101, templateIdx: 0})};
+    page.笔记服务实例 = {获取笔记: () => slow.promise};
+    page.笔记类型服务实例 = {获取笔记类型: async () => ({fieldNames: ['Back']})};
+    const loading = page.加载当前卡(); await settle(page);
+    if (close) page.aboutToDisappear(); else { page.下一张(); await settle(page); }
+    slow.resolve({notetypeId: 201, fields: ['stale typing answer']});
+    await loading; await settle(page);
+    assert.equal(displayed.length, close ? 0 : 1);
+    if (!close) {
+      assert.match(displayed[0], /front-22/);
+      assert.doesNotMatch(page.背面HTML, /stale typing answer/);
+      assert.equal(page.已渲染.questionNodes[0].text, card(22).questionNodes[0].text);
+    }
+  }
 });
 
 test('editing preserves card identity even when search results reorder or remove the card', async () => {
@@ -334,7 +380,7 @@ test('preview matches Anki: no side buttons, question first, reveal by tap, swip
     'swipe lives in the injected document script; ArkWeb would swallow an ArkUI gesture');
   // 只加载一面：题目在前，答案按需翻面（背面模板自带 {{FrontSide}}，不额外拼接）
   assert.match(source, /构建卡片HTML\(this\.已渲染, 'question', this\.isDark\)/);
-  assert.match(source, /构建卡片HTML\(this\.已渲染, 'answer', this\.isDark\)/);
+  assert.match(source, /构建卡片HTML\(rendered, 'answer', this\.isDark\)/);
   assert.doesNotMatch(source, /构建双面卡片HTML/);
   // 顶部条统一为「关闭 / N/N / 更多」，不再有 DialogHeader 标题栏
   assert.doesNotMatch(source, /DialogHeader|browser_preview_title|browser_preview_edit_fields/);

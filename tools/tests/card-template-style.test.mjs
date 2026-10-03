@@ -42,3 +42,22 @@ test('default card colors precede template color pairs on both sides in both mod
       'never force a dark background behind unchanged black template text');
   }
 });
+
+test('card alignment belongs to templates and list/code defaults precede their overrides', () => {
+  const css = 'body { text-align: right; } li { text-align: center; } pre { text-align: right; }';
+  const nodes = [{ text: '<p>正文</p><ul><li>列表</li></ul><pre>code</pre>', replacement: null }];
+  const card = { css, questionNodes: nodes, answerNodes: nodes, latexSvg: false, isEmpty: false };
+  for (const dark of [false, true]) for (const side of ['question', 'answer']) {
+    const html = 构建卡片HTML(card, side, dark);
+    const styles = [...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(match => match[1]);
+    assert.ok(styles.includes(css), 'template alignment is preserved verbatim');
+    const applicationCss = styles.filter(style => style !== css).join('\n');
+    for (const rule of applicationCss.matchAll(/(?:\bbody|\.card|#qa)\s*\{([^}]*)\}/g)) {
+      assert.doesNotMatch(rule[1], /text-align\s*:/, 'application styles do not assign card text alignment');
+    }
+    for (const defaults of ['li { text-align: start; }', 'pre { text-align: left; }']) {
+      assert.ok(html.includes(defaults));
+      assert.ok(html.indexOf(defaults) < html.indexOf(css), 'equal-specificity template overrides win');
+    }
+  }
+});

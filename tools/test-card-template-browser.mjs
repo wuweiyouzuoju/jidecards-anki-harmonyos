@@ -47,6 +47,39 @@ try {
     await page.locator('#show').click();
     assert.equal(await page.locator('#content').innerText(), `${side} 答案`);
     passed++;
+    const alignmentCases = [
+      { name: 'unstyled', css: '', expected: ['start', 'start', 'start', 'left'] },
+      { name: 'standard Anki card', css: '.card { text-align: center; }', expected: ['center', 'center', 'start', 'left'] },
+      { name: 'card left', css: '.card { text-align: left; }', expected: ['left', 'left', 'start', 'left'] },
+      { name: 'body left', css: 'body { text-align: left; }', expected: ['left', 'left', 'start', 'left'] },
+      { name: 'body right', css: 'body { text-align: right; }', expected: ['right', 'right', 'start', 'left'] },
+      { name: 'container override', css: '.card { text-align: center; } #qa { text-align: left; }',
+        expected: ['center', 'left', 'start', 'left'] },
+      { name: 'field override', css: '.card { text-align: center; } #alignment-text { text-align: right; }',
+        expected: ['center', 'right', 'start', 'left'] },
+      { name: 'template list/code overrides', css: 'li { text-align: center; } pre { text-align: right; }',
+        expected: ['start', 'start', 'center', 'right'] },
+      { name: 'RTL template', css: '.card { direction: rtl; }', direction: 'rtl',
+        expected: ['start', 'start', 'start', 'left'] },
+      { name: 'inline field override', css: '.card { text-align: center; }', inline: 'text-align: left',
+        expected: ['center', 'left', 'start', 'left'] }
+    ];
+    for (const scenario of alignmentCases) {
+      const nodes = [{ text: `<p id="alignment-text" style="${scenario.inline ?? ''}">Card text</p>
+        <ul><li id="alignment-list">List item</li></ul><pre id="alignment-code">x = 1</pre>`, replacement: null }];
+      const card = { questionNodes: nodes, answerNodes: nodes, css: scenario.css, latexSvg: false, isEmpty: false };
+      await page.setContent(构建卡片HTML(card, side, dark));
+      const actual = await page.evaluate(() => ({
+        alignment: [document.body, ...['alignment-text', 'alignment-list', 'alignment-code']
+          .map(id => document.getElementById(id))].map(element => getComputedStyle(element).textAlign),
+        direction: getComputedStyle(document.getElementById('alignment-list')).direction,
+        maxWidth: getComputedStyle(document.getElementById('qa')).maxWidth
+      }));
+      assert.deepEqual(actual.alignment, scenario.expected, `${scenario.name}, ${side}, dark=${dark}`);
+      assert.equal(actual.direction, scenario.direction ?? 'ltr');
+      assert.equal(actual.maxWidth, 'none', 'card content is not constrained by an application reading width');
+      passed++;
+    }
     await context.close();
   }
   assert.deepEqual(errors, []);

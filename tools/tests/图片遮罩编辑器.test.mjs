@@ -11,12 +11,17 @@ import vm from 'node:vm';
 import {
   生成Occlusions字符串,
   编号颜色,
-  识别图片扩展名
+  识别图片扩展名,
+  copyMask, maskNumber, maskProperty, maskPoints, setMaskProperty, nextOcclusionOrdinal, OcclusionHistory,
+  parseOcclusionMasks, serializeOcclusionDocument, serializeMask
 } from '../../entry/src/main/ets/model/图片遮罩模型.ts';
 
 const editorSource = readFileSync(new URL('../../entry/src/main/ets/components/图片遮罩编辑器.ets', import.meta.url), 'utf8');
-const editorMethods = [...editorSource.matchAll(/^  private \w*[^\s:(]+\([^]*?^  }/gm)].map(match => match[0]);
-const editorContext = vm.createContext({ 编号颜色 });
+const editorMethods = [...editorSource.matchAll(/^  private (?:async )?\w*[^\s:(]+\([^]*?^  }/gm)].map(match => match[0]);
+let discard = false;
+const editorContext = vm.createContext({ 编号颜色, copyMask, maskNumber, maskProperty, maskPoints, setMaskProperty, OcclusionHistory,
+  nextOcclusionOrdinal,
+  confirmNoteDiscard: async () => discard });
 vm.runInContext(stripTypeScriptTypes(`globalThis.Editor = class { ${editorMethods.join('\n')} }`), editorContext);
 
 function editor(width, height, ratio) {
@@ -27,10 +32,15 @@ function editor(width, height, ratio) {
     save() { states.push({ fillStyle: this.fillStyle, strokeStyle: this.strokeStyle, globalAlpha: this.globalAlpha }); },
     restore() { Object.assign(this, states.pop()); },
     clearRect() { fills.length = 0; paints.length = 0; },
-    fillRect(...rect) { fills.push(rect); paints.push([this.fillStyle, this.globalAlpha]); }, strokeRect() {} };
+    fillRect(...rect) { fills.push(rect); paints.push([this.fillStyle, this.globalAlpha]); }, strokeRect() {},
+    translate() {}, rotate() {}, setLineDash() {}, beginPath() {}, closePath() {}, ellipse() {},
+    moveTo() {}, lineTo() {}, fill() {}, stroke() {}, fillText() {}, measureText(text) { return { width: text.length * 10 }; } };
   Object.assign(instance, {
     上下文: context, 图片宽高比: ratio, 画布宽: 0, 画布高: 0, 画布就绪: false,
-    遮罩列表: [], 当前选中编号: 1, 最小拖动距离: 0.005
+    遮罩列表: [], 当前选中编号: 1, 最小拖动距离: 0.005,
+    shapeKind: 'rect', selectedMask: -1, polygonPoints: [], annotationText: '', initialMasks: [],
+    imageFailed: false, sourceHeight: 1000, history: new OcclusionHistory(), dragSnapshot: null, newInactiveMode: 0,
+    confirmingClose: false, canUndo: false, canRedo: false, getUIContext: () => ({})
   });
   instance.refreshCanvas();
   return { instance, context, fills, paints };
@@ -38,6 +48,96 @@ function editor(width, height, ratio) {
 
 const touch = (x, y, offsetX = 0, offsetY = 0) => ({ offsetX, offsetY, fingerList: [{ localX: x, localY: y }] });
 const plain = value => JSON.parse(JSON.stringify(value));
+
+test('导入所有图形、多卡编号、转角、文本转义及未知属性无改动时逐字保留', () => {
+  const source = '<div>保留字段排版</div>' +
+    '{{c6,9::image-occlusion:ellipse:left=0.123456789:top=0.2:rx=0.1:ry=0.15:angle=1250:oi=1:future=value}}\n' +
+    '{{c0::image-occlusion:text:left=0.1:top=0.1:text=中文\\:标签\n第二行:fs=0.04:scale=1.5:fill=#334455}}' +
+    '{{c9::image-occlusion:polygon:left=0.5:top=0.5:points=-0.1,0 0.2,0 0.2,0.2:oi=0}}' +
+    '{{c12::image-occlusion:future:left=0.2:top=0.2:custom=keep}}<b>末尾</b>';
+  const masks = parseOcclusionMasks(source);
+  assert.equal(masks.length, 4);
+  assert.equal(maskProperty(masks[1], 'text'), '中文:标签\n第二行');
+  assert.equal(masks[0].宽, 0.2);
+  assert.equal(serializeOcclusionDocument(source, masks), source);
+  masks[0].左 = 0.333333333;
+  const moved = serializeOcclusionDocument(source, masks);
+  assert.ok(moved.includes('c6,9::'));
+  assert.ok(moved.includes('left=0.333333333'));
+  assert.ok(moved.includes('future=value'));
+  assert.ok(moved.endsWith(masks[3].source + '<b>末尾</b>'));
+  assert.equal(maskProperty(parseOcclusionMasks(moved)[1], 'text'), '中文:标签\n第二行');
+});
+
+test('只替换或删除选中图形片段，新图形追加，其他 HTML 和卡片编号保留', () => {
+  const source = '<p>before</p>{{c6::image-occlusion:rect:left=0.1:top=0.2:width=0.2:height=0.2}}<hr>{{c9::image-occlusion:ellipse:left=0.5:top=0.5:rx=0.1:ry=0.2}}after';
+  const masks = parseOcclusionMasks(source);
+  const extra = { 形状: 'rect', 左: 0.1, 顶: 0.1, 宽: 0.1, 高: 0.1, 编号: 12 };
+  assert.equal(serializeOcclusionDocument(source, [masks[1], extra]), '<p>before</p><hr>' + masks[1].source + 'after' + serializeMask(extra));
+});
+
+test('新编号避开导入多卡遮罩保留的所有编号，不意外合并旧卡片', () => {
+  const { instance } = editor(300,300,1);
+  instance.遮罩列表 = parseOcclusionMasks('{{c6,20::image-occlusion:rect:left=0.1:top=0.1:width=0.1:height=0.1}}');
+  instance.addOrdinal(); assert.equal(instance.当前选中编号,21);
+  assert.deepEqual(plain(instance.编号候选列表()),[19,20,21,22,23]);
+});
+
+test('移动、编号、调整大小和模式变化可连续撤销重做，取消移动回滚到拖动开始', () => {
+  const { instance } = editor(300, 300, 1);
+  const source = '{{c6,9::image-occlusion:ellipse:left=0.1:top=0.1:rx=0.1:ry=0.1:angle=0:oi=1:custom=kept}}';
+  instance.遮罩列表 = parseOcclusionMasks(source);
+  instance.拖动开始(touch(60, 60)); instance.拖动更新(touch(90, 90)); instance.cancelDrag();
+  assert.equal(serializeMask(instance.遮罩列表[0]), source);
+  assert.equal(instance.canUndo, false);
+  instance.拖动开始(touch(60, 60)); instance.拖动更新(touch(90, 90)); instance.拖动结束();
+  instance.selectOrdinal(12); instance.resizeSelected(0.9); instance.setInactiveMode(false);
+  const changed = serializeMask(instance.遮罩列表[0]);
+  assert.ok(changed.includes('c12::')); assert.ok(changed.includes('custom=kept'));
+  for (let i = 0; i < 4; i++) instance.撤销最后一个();
+  assert.equal(serializeMask(instance.遮罩列表[0]), source);
+  for (let i = 0; i < 4; i++) instance.redo();
+  assert.equal(serializeMask(instance.遮罩列表[0]), changed);
+  instance.撤销最后一个(); instance.selectedMask = 0; instance.deleteSelected();
+  assert.equal(instance.canRedo, false);
+});
+
+test('椭圆和多边形按实际轮廓命中，矩形旋转按图像像素比例换算', () => {
+  const { instance } = editor(400, 200, 2);
+  instance.遮罩列表 = parseOcclusionMasks('{{c1::image-occlusion:ellipse:left=0.1:top=0.1:rx=0.1:ry=0.1}}');
+  assert.equal(instance.命中遮罩(0.11, 0.11), -1);
+  assert.equal(instance.命中遮罩(0.2, 0.2), 0);
+  instance.遮罩列表 = parseOcclusionMasks('{{c1::image-occlusion:polygon:left=0.1:top=0.1:points=0,0 0.4,0 0,0.4}}');
+  assert.equal(instance.命中遮罩(0.45, 0.45), -1);
+  assert.equal(instance.命中遮罩(0.2, 0.2), 0);
+  instance.遮罩列表 = parseOcclusionMasks('{{c1::image-occlusion:rect:left=0.4:top=0.1:width=0.2:height=0.1:angle=2500}}');
+  assert.equal(instance.命中遮罩(0.375, 0.3), 0);
+  assert.equal(instance.命中遮罩(0.5, 0.15), -1);
+});
+
+test('多边形与文字创建使用 Core 坐标和 c0 标注，文字可更新而不重建图形', () => {
+  const { instance } = editor(300, 300, 1);
+  instance.shapeKind = 'polygon';
+  for (const point of [[30, 30], [90, 30], [90, 90]]) instance.tapImage(touch(...point));
+  instance.finishPolygon(); assert.equal(instance.遮罩列表[0].形状, 'polygon');
+  assert.deepEqual(maskPoints(instance.遮罩列表[0]), [{x:0.1,y:0.1},{x:0.3,y:0.1},{x:0.3,y:0.3}]);
+  instance.annotationText = 'A:B'; instance.addText();
+  assert.equal(instance.遮罩列表[1].编号, 0);
+  assert.ok(serializeMask(instance.遮罩列表[1]).includes('text=A\\:B'));
+  instance.selectedMask = 1; instance.annotationText = 'Changed'; instance.addText();
+  assert.equal(instance.遮罩列表.length, 2); assert.equal(maskProperty(instance.遮罩列表[1], 'text'), 'Changed');
+  instance.撤销最后一个(); assert.equal(maskProperty(instance.遮罩列表[1], 'text'), 'A:B');
+});
+
+test('关闭编辑器的各入口统一确认，取消保留草稿，确认才退出', async () => {
+  const { instance } = editor(300, 300, 1);
+  let closed = 0; instance.onCancel = () => closed++;
+  await instance.requestClose(); assert.equal(closed, 1);
+  instance.annotationText = '待添加文字'; discard = false;
+  await instance.requestClose(); assert.equal(closed, 1); assert.equal(instance.annotationText, '待添加文字');
+  discard = true; await instance.requestClose(); assert.equal(closed, 2);
+  discard = false;
+});
 
 test('五种遮罩颜色使用六位 RGB，透明度独立且不污染后续绘制', () => {
   const { instance, context, paints } = editor(300, 300, 1);

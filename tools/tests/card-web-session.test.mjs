@@ -4,9 +4,50 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { CardWebSession } from '../../entry/src/main/ets/model/CardWebSession.ts';
+import { CARD_REVIEWER_RUNTIME } from '../../entry/src/main/ets/model/CardReviewerRuntime.ts';
 import { loadPlatformModule } from './platform-module-harness.mjs';
 
 const html = side => `<html><head></head><body><div id="qa">${side}</div></body></html>`;
+
+test('renderer starts unanchored answers at the top and preserves answer anchors and preview scrolling', async () => {
+  for (const initial of [true, false]) {
+    for (const scenario of [
+      { side: 'question', scroll: true, anchored: true, expected: [['top', 0, 0]] },
+      { side: 'answer', scroll: true, anchored: false, expected: [['top', 0, 0]] },
+      { side: 'answer', scroll: true, anchored: true, expected: [['anchor', 'start']] },
+      { side: 'answer', scroll: false, anchored: false, expected: [] }
+    ]) {
+      const scrolls = [];
+      const qa = { innerHTML: '', querySelectorAll: () => [] };
+      const document = {
+        body: { className: 'card', scrollHeight: 3200 },
+        querySelectorAll: () => [],
+        getElementById: id => id === 'qa' ? qa : scenario.anchored
+          ? { scrollIntoView: options => scrolls.push(['anchor', options.block]) } : null
+      };
+      let onLoad, acknowledge;
+      const window = {
+        addEventListener: (_event, callback) => { onLoad = callback; },
+        scrollTo: (x, y) => scrolls.push(['top', x, y]),
+        jideCardRuntime: { onRendered: (_id, _revision, error) => acknowledge(error) }
+      };
+      const DOMParser = class { parseFromString() { return document; } };
+      vm.runInNewContext(CARD_REVIEWER_RUNTIME, { window, document, DOMParser });
+      const start = new Promise(resolve => { acknowledge = resolve; });
+      window.__jideCardReviewer.start(1, 1, initial ? scenario.side : 'question', scenario.scroll);
+      onLoad();
+      assert.equal(await start, '');
+      if (!initial) {
+        scrolls.length = 0;
+        const update = new Promise(resolve => { acknowledge = resolve; });
+        window.__jideCardReviewer.update(1, 2, html(scenario.side), scenario.side, scenario.scroll);
+        assert.equal(await update, '');
+      }
+      assert.deepEqual(scrolls, scenario.expected, JSON.stringify({ initial, ...scenario }));
+    }
+  }
+});
+
 function harness() {
   const loads = [], updates = [], shown = [], errors = [];
   const session = new CardWebSession({

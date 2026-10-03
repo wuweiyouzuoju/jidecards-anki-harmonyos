@@ -40,6 +40,7 @@
 // 修改这里可能影响学习页卡片渲染、媒体加载、拼写题功能。
 // ========================================================
 
+import { IMAGE_OCCLUSION_SCRIPT } from './ImageOcclusionRendering';
 import type { RenderedCard, TemplateNode } from '../proto/messages/CardRenderingMessages';
 import { MATH_SCRIPTS } from './MathRendering';
 
@@ -86,6 +87,10 @@ export const 媒体基地址: string = 'https://jidecards-media.local/';
 // ========================================================
 export type 卡片正反面 = 'question' | 'answer';
 
+// 对齐 Anki/AnkiDroid：正文由模板决定，列表和代码的默认对齐放在模板之前。
+const templateAlignmentDefaults: string = `li { text-align: start; }
+pre { text-align: left; }`;
+
 const 基础样式: string = `
 body {
   margin: 0;
@@ -95,7 +100,6 @@ body {
   font-family: sans-serif;
   font-size: 17px;
   line-height: 1.6;
-  text-align: center;
   word-wrap: break-word;
 }
 img { max-width: 100%; height: auto; }
@@ -203,121 +207,6 @@ const 图片遮罩渲染样式: string = `
   height: 100%;
 }
 `;
-
-// ========================================================
-// @块ID MODEL-STUDY-HTML-012
-// @名称 ImageOcclusion 渲染脚本
-//
-// @作用
-// 定义 window.anki.imageOcclusion.setup() 与 toggle()，供 ImageOcclusion 笔记类型
-// qfmt/afmt 中的 <script>anki.imageOcclusion.setup()</script> 调用，
-// 以及 afmt 中 <button id="toggle"> 的点击切换遮罩。
-// 在 canvas 上按 cloze 数据绘制矩形遮罩：正面用不透明粉色盖住区域，
-// 背面用透明填充揭示原图。仅在含 #image-occlusion-canvas 的卡片上生效。
-//
-// @输入
-// 无（自包含脚本，运行时从 DOM 读取 cloze 数据）
-//
-// @输出
-// string：以 <script>...</script> 包裹的 JS 文本，拼接到 构建卡片HTML
-// 输出的 <head> 末尾
-//
-// @业务规则
-// cloze 数据格式（Anki rslib/src/cloze.rs render_image_occlusion 产出）：
-//   <div class="cloze" data-ordinal="1" data-shape="rect"
-//        data-left="0.20" data-top="0.30" data-width="0.40"
-//        data-height="0.10"></div>
-// left/top/width/height 为 0-1 归一化坐标，乘以 canvas 像素尺寸得绘制坐标。
-// 三类 cloze class 对应三种绘制模式：
-//   .cloze            — 正面当前 ordinal，默认不透明粉色 #ff8e8e，toggle 后透明
-//   .cloze-inactive   — 其他 ordinal，仅 data-occludeinactive="1" 时绘制
-//   .cloze-highlight  — 背面当前 ordinal，透明填充揭示原图
-// 仅实现 rect 形状（spec §4 限定），ellipse/polygon/text 忽略。
-//
-// 上游 afmt 模板（rslib/src/image_occlusion/notetype.rs）的切换按钮 HTML：
-//   <div><button id="toggle">Toggle Masks</button></div>
-// 按钮无 onclick 属性，由本脚本在 setup() 中查找 #toggle 后隐藏（2026-07-28 暂停切换功能）。
-// toggle() 方法保留，hidden 变量保留，redraw 中 hidden 逻辑保留，不破坏 IIFE 结构。
-// 后续恢复切换遮罩功能时：去掉 btn.style.display='none'，重新绑事件即可。
-// 防重定义：if (window.anki.imageOcclusion) return 避免重定义对象导致 hidden 状态丢失。
-//
-// @副作用
-// 无（脚本在 webview 内执行，操作 DOM/canvas）
-// ========================================================
-const 图片遮罩渲染脚本: string = `<script>
-(function () {
-  window.anki = window.anki || {};
-  if (window.anki.imageOcclusion) { return; }
-  var hidden = true;
-  function drawRects(ctx, canvas, selector, fill, drawAll) {
-    var nodes = document.querySelectorAll(selector);
-    for (var i = 0; i < nodes.length; i++) {
-      var node = nodes[i];
-      if (node.tagName !== 'DIV') { continue; }
-      if (node.dataset.shape !== 'rect') { continue; }
-      var left = parseFloat(node.dataset.left);
-      var top = parseFloat(node.dataset.top);
-      var width = parseFloat(node.dataset.width);
-      var height = parseFloat(node.dataset.height);
-      if (!isFinite(left) || !isFinite(top) || !isFinite(width) || !isFinite(height)) { continue; }
-      if (width <= 0 || height <= 0) { continue; }
-      if (!drawAll && node.dataset.occludeinactive !== '1') { continue; }
-      ctx.fillStyle = fill;
-      ctx.fillRect(
-        Math.round(left * canvas.width),
-        Math.round(top * canvas.height),
-        Math.round(width * canvas.width),
-        Math.round(height * canvas.height)
-      );
-    }
-  }
-  function redraw() {
-    var canvas = document.querySelector('#image-occlusion-canvas');
-    var img = document.querySelector('#image-occlusion-container img');
-    if (!canvas || !img || !img.complete || !img.naturalWidth) { return; }
-    var w = img.naturalWidth, h = img.naturalHeight;
-    canvas.width = w;
-    canvas.height = h;
-    var ctx = canvas.getContext('2d');
-    if (!ctx) { return; }
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    var clozeFill = hidden ? '#ff8e8e' : 'rgba(255,142,142,0)';
-    drawRects(ctx, canvas, '.cloze', clozeFill, true);
-    drawRects(ctx, canvas, '.cloze-inactive', '#ffeba2', false);
-    drawRects(ctx, canvas, '.cloze-highlight', 'rgba(255,142,142,0)', true);
-  }
-  window.anki.imageOcclusion = {
-    setup: function () {
-      var canvas = document.querySelector('#image-occlusion-canvas');
-      if (!canvas) { return; }
-      var img = document.querySelector('#image-occlusion-container img');
-      if (!img) {
-        var err = document.getElementById('err');
-        if (err) { err.innerHTML = 'No image to show'; }
-        return;
-      }
-      if (img.complete && img.naturalWidth) {
-        redraw();
-      } else {
-        img.addEventListener('load', redraw);
-        img.addEventListener('error', redraw);
-      }
-      var btn = document.getElementById('toggle');
-      if (btn) {
-        // 暂时隐藏「切换遮罩」按钮（2026-07-28）：
-        // Web focusable(false) 下 click/touchend 都存在事件转发问题，toggle 无法稳定触发。
-        // 后续若恢复切换遮罩功能，去掉 display='none' 并重新绑事件即可。
-        // 保留 toggle 方法 + hidden 变量 + redraw 中的 hidden 逻辑，不破坏 IIFE 结构。
-        btn.style.display = 'none';
-      }
-    },
-    toggle: function () {
-      hidden = !hidden;
-      redraw();
-    }
-  };
-})();
-</script>`;
 
 // ========================================================
 // @块ID MODEL-STUDY-HTML-014
@@ -442,7 +331,7 @@ const 可折叠字段脚本: string = `<script>
 // string：完整 HTML 文档字符串
 //
 // @业务规则
-// 默认字色与不透明底色一起放在模板 CSS 前，保留模板完整配色及 nightMode；布局与媒体兜底在后。
+// 默认配色、列表和代码对齐放在模板 CSS 前；正文对齐由模板决定，布局与媒体兜底在后。
 // 与 Anki TemplateRenderOutput 一样独立包装模板样式：部分牌组用 </style><script>
 // 在样式字段加载脚本，不能让提前闭合的标签把应用兜底 CSS 暴露成正文。
 // 字段中的 [sound:xxx] 标签剥除为小标记，
@@ -471,8 +360,8 @@ body { color: ${isDark ? '#E6E6E6' : '#1A1A1A'}; background: ${cardBackground}; 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://jidecards-render.local/jquery/3.7.1/jquery.min.js"></script>
-<style>${默认配色}</style>
-${图片遮罩渲染脚本}
+<style>${默认配色}\n${templateAlignmentDefaults}</style>
+${IMAGE_OCCLUSION_SCRIPT}
 ${MATH_SCRIPTS}
 ${可折叠字段脚本}
 </head>

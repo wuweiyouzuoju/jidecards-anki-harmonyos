@@ -5,8 +5,8 @@
 // @名称 图片遮罩模型
 //
 // @作用
-// 定义图片遮盖（Image Occlusion）建卡流程中的纯数据与字符串生成逻辑：
-//   1. 遮罩描述 接口：单个矩形遮罩的归一化坐标与编号
+// 定义图片遮盖（Image Occlusion）建卡与编辑的纯数据、历史及字符串逻辑：
+//   1. 遮罩描述 接口：矩形、椭圆、多边形、文字的归一化坐标与编号
 //   2. 生成Occlusions字符串：把遮罩列表渲染为 Anki 兼容的 cloze 字符串
 //   3. 编号颜色：c1-c5 对应的固定展示色（红橙黄绿蓝），供编辑器组件高亮使用
 //
@@ -22,19 +22,19 @@
 // Anki cloze 字符串
 //
 // @业务规则
-// 仅支持 rect 形状（覆盖 90% 用例），ellipse/polygon/text 不在本次范围。
-// 编号 c1-c5 由调用方保证；编号越界（如 6）仍按 {{c6::...}} 输出，不强校验。
-// 坐标保留至多 4 位小数，去除末尾 0（0.2000 → "0.2"，0.123456 → "0.1235"）。
+// 椭圆使用 rx/ry，文字使用 fs/scale，angle 单位为万分之一圈，与锁定 Core 对齐。
+// 导入片段无改动时逐字保留；修改只覆盖图形对应属性，不丢未知属性或多卡编号。
+// 新建简单矩形保留旧的四位小数输出，c0 文字标注不生成卡片。
 // 该文件不依赖 HarmonyOS Kit 或 ArkUI，可被 node test runner 直接 import。
 //
 // @副作用
 // 无。
 // ========================================================
 
-/** 单个矩形遮罩的归一化描述。坐标全部 0-1，与 Anki 后端协议一致。 */
+/** 图形编辑用边界框，原始属性单独保留。宽/高对应椭圆的两倍半径。 */
 export interface 遮罩描述 {
-  /** 形状固定为 'rect'（保留字段以便后续扩展 ellipse/polygon/text） */
-  形状: 'rect';
+  /** Core 图形类型；未知类型保留原文而不提供编辑操作。 */
+  形状: string;
   /** 左上角横坐标，归一化 0-1 */
   左: number;
   /** 左上角纵坐标，归一化 0-1 */
@@ -43,8 +43,157 @@ export interface 遮罩描述 {
   宽: number;
   /** 高度，归一化 0-1 */
   高: number;
-  /** cloze 编号（1-5 对应 c1-c5）；越界值原样输出 */
+  /** 主 cloze 编号，0 为非考查标注；多编号保留在 ordinalText。 */
   编号: number;
+  /** 原始属性与片段保留导入精度和未知扩展，图形变更只覆盖对应属性。 */
+  properties?: OcclusionProperty[];
+  source?: string;
+  sourceStart?: number;
+  ordinalText?: string;
+}
+
+export interface OcclusionProperty { name: string; value: string; }
+
+/** Imported multi-card masks may reserve numbers beyond their primary ordinal. */
+export function nextOcclusionOrdinal(masks: 遮罩描述[]): number {
+  let largest: number = 0;
+  for (const mask of masks) {
+    largest = Math.max(largest, mask.编号);
+    if (mask.ordinalText === undefined || Number(mask.ordinalText.split(',')[0]) !== mask.编号) continue;
+    for (const text of mask.ordinalText.split(',')) largest = Math.max(largest, Number(text));
+  }
+  return largest + 1;
+}
+
+export function maskProperty(mask: 遮罩描述, name: string, fallback: string = ''): string {
+  return mask.properties?.find((property: OcclusionProperty): boolean => property.name === name)?.value ?? fallback;
+}
+
+export function maskNumber(mask: 遮罩描述, name: string, fallback: number = 0): number {
+  const value: string = maskProperty(mask, name);
+  const number: number = Number(value);
+  return value !== '' && Number.isFinite(number) ? number : fallback;
+}
+
+export function copyMask(mask: 遮罩描述): 遮罩描述 {
+  return { 形状: mask.形状, 左: mask.左, 顶: mask.顶, 宽: mask.宽, 高: mask.高, 编号: mask.编号,
+    properties: mask.properties?.map((property: OcclusionProperty): OcclusionProperty => ({ name: property.name, value: property.value })),
+    source: mask.source, sourceStart: mask.sourceStart, ordinalText: mask.ordinalText };
+}
+
+export function setMaskProperty(mask: 遮罩描述, name: string, value: string): void {
+  if (mask.properties === undefined) mask.properties = [];
+  const property: OcclusionProperty | undefined = mask.properties.find((item: OcclusionProperty): boolean => item.name === name);
+  if (property === undefined) mask.properties.push({ name: name, value: value });
+  else property.value = value;
+}
+
+/** The same colon escaping accepted by Core parse_image_cloze; keep unknown properties. */
+export function parseOcclusionMasks(source: string): 遮罩描述[] {
+  const pattern: RegExp = new RegExp('\\{\\{c([0-9]+(?:,[0-9]+)*)::image-occlusion:([^]*?)\\}\\}', 'g');
+  const masks: 遮罩描述[] = [];
+  let match: RegExpExecArray | null = pattern.exec(source);
+  while (match !== null) {
+    const chunks: string[] = match[2].split(new RegExp('(?<!\\\\):'));
+    const properties: OcclusionProperty[] = [];
+    for (let i: number = 1; i < chunks.length; i++) {
+      const equals: number = chunks[i].indexOf('=');
+      if (equals > 0) properties.push({ name: chunks[i].slice(0, equals),
+        value: chunks[i].slice(equals + 1).split('\\:').join(':') });
+    }
+    const mask: 遮罩描述 = { 形状: chunks[0], 左: 0, 顶: 0, 宽: 0, 高: 0,
+      编号: Number(match[1].split(',')[0]), ordinalText: match[1], properties: properties, source: match[0], sourceStart: match.index };
+    mask.左 = maskNumber(mask, 'left'); mask.顶 = maskNumber(mask, 'top');
+    mask.宽 = maskNumber(mask, 'width'); mask.高 = maskNumber(mask, 'height');
+    if (mask.形状 === 'ellipse') {
+      mask.宽 = maskNumber(mask, 'rx', mask.宽 / 2) * 2;
+      mask.高 = maskNumber(mask, 'ry', mask.高 / 2) * 2;
+    } else if (mask.形状 === 'polygon') {
+      const points: OcclusionPoint[] = maskPoints(mask);
+      if (points.length > 0) {
+        mask.宽 = Math.max(...points.map((p: OcclusionPoint): number => p.x)) - Math.min(...points.map((p: OcclusionPoint): number => p.x));
+        mask.高 = Math.max(...points.map((p: OcclusionPoint): number => p.y)) - Math.min(...points.map((p: OcclusionPoint): number => p.y));
+      }
+    } else if (mask.形状 === 'text') {
+      const scale: number = maskNumber(mask, 'scale', 1);
+      const font: number = maskNumber(mask, 'fs', 0.04);
+      mask.宽 = Math.max(0.04, maskProperty(mask, 'text').length * font * 0.6 * scale);
+      mask.高 = Math.max(0.04, font * 1.5 * scale);
+    }
+    masks.push(mask); match = pattern.exec(source);
+  }
+  return masks;
+}
+
+export interface OcclusionPoint { x: number; y: number; }
+export function maskPoints(mask: 遮罩描述): OcclusionPoint[] {
+  const points: OcclusionPoint[] = [];
+  for (const pair of maskProperty(mask, 'points').trim().split(new RegExp('\\s+'))) {
+    const xy: string[] = pair.split(',');
+    if (xy.length !== 2 || xy[0] === '' || xy[1] === '') return [];
+    const point: OcclusionPoint = { x: Number(xy[0]), y: Number(xy[1]) };
+    if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return [];
+    points.push(point);
+  }
+  return points;
+}
+
+/** Preserve the original token byte-for-byte when its geometry/group is untouched. */
+export function serializeMask(mask: 遮罩描述): string {
+  if (mask.source !== undefined) {
+    const original: 遮罩描述 | undefined = parseOcclusionMasks(mask.source)[0];
+    if (original !== undefined && original.形状 === mask.形状 && original.编号 === mask.编号 &&
+      original.左 === mask.左 && original.顶 === mask.顶 && original.宽 === mask.宽 && original.高 === mask.高 &&
+      original.ordinalText === mask.ordinalText && JSON.stringify(original.properties) === JSON.stringify(mask.properties)) return mask.source;
+  }
+  const output: 遮罩描述 = copyMask(mask);
+  setMaskProperty(output, 'left', String(mask.左)); setMaskProperty(output, 'top', String(mask.顶));
+  if (mask.形状 === 'rect') {
+    setMaskProperty(output, 'width', String(mask.宽)); setMaskProperty(output, 'height', String(mask.高));
+  } else if (mask.形状 === 'ellipse') {
+    setMaskProperty(output, 'rx', String(mask.宽 / 2)); setMaskProperty(output, 'ry', String(mask.高 / 2));
+  }
+  let value: string = mask.形状;
+  for (const property of output.properties ?? []) value += ':' + property.name + '=' + property.value.split(':').join('\\:');
+  const ordinal: string = mask.ordinalText !== undefined && Number(mask.ordinalText.split(',')[0]) === mask.编号 ? mask.ordinalText : String(mask.编号);
+  return '{{c' + ordinal + '::image-occlusion:' + value + '}}';
+}
+
+/** Remove only deleted shape tokens; preserve all unrelated HTML and unrecognized syntax. */
+export function serializeOcclusionDocument(source: string, masks: 遮罩描述[]): string {
+  let output: string = '', cursor: number = 0;
+  for (const original of parseOcclusionMasks(source)) {
+    const start: number = original.sourceStart ?? 0;
+    output += source.slice(cursor, start);
+    const mask: 遮罩描述 | undefined = masks.find((item: 遮罩描述): boolean => item.sourceStart === start);
+    if (mask !== undefined) output += serializeMask(mask);
+    cursor = start + (original.source?.length ?? 0);
+  }
+  output += source.slice(cursor);
+  for (const mask of masks) if (mask.sourceStart === undefined) output += serializeMask(mask);
+  return output;
+}
+
+export class OcclusionHistory {
+  private undoStates: 遮罩描述[][] = [];
+  private redoStates: 遮罩描述[][] = [];
+  remember(masks: 遮罩描述[]): void {
+    this.undoStates.push(masks.map(copyMask));
+    if (this.undoStates.length > 100) this.undoStates.shift();
+    this.redoStates = [];
+  }
+  canUndo(): boolean { return this.undoStates.length > 0; }
+  canRedo(): boolean { return this.redoStates.length > 0; }
+  undo(current: 遮罩描述[]): 遮罩描述[] {
+    const previous: 遮罩描述[] | undefined = this.undoStates.pop();
+    if (previous === undefined) return current;
+    this.redoStates.push(current.map(copyMask)); return previous.map(copyMask);
+  }
+  redo(current: 遮罩描述[]): 遮罩描述[] {
+    const next: 遮罩描述[] | undefined = this.redoStates.pop();
+    if (next === undefined) return current;
+    this.undoStates.push(current.map(copyMask)); return next.map(copyMask);
+  }
 }
 
 // ========================================================
@@ -98,6 +247,10 @@ export function 生成Occlusions字符串(遮罩列表: 遮罩描述[]): string 
   let 结果: string = '';
   for (let i = 0; i < 遮罩列表.length; i++) {
     const 遮罩: 遮罩描述 = 遮罩列表[i];
+    if (遮罩.形状 !== 'rect' || 遮罩.properties !== undefined) {
+      结果 += serializeMask(遮罩);
+      continue;
+    }
     const 左: string = 格式化归一化坐标(遮罩.左);
     const 顶: string = 格式化归一化坐标(遮罩.顶);
     const 宽: string = 格式化归一化坐标(遮罩.宽);

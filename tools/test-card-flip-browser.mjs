@@ -56,10 +56,13 @@ try {
       questionNodes: [{ text: `<button id="one" onclick="answers[0]=true;sessionStorage.setItem('answers',JSON.stringify(answers))">1</button>
         <button id="two" onclick="answers[1]=false;sessionStorage.setItem('answers',JSON.stringify(answers))">2</button>
         <button id="three" onclick="answers[2]=true;sessionStorage.setItem('answers',JSON.stringify(answers))">3</button>
+        <p id="alignment-text">Text</p><ul><li id="alignment-list">List</li></ul><pre id="alignment-code">code</pre>
         <script>window.answers=window.answers||[];window.questionRuns=(window.questionRuns||0)+1;</script>`, replacement: null }],
       answerNodes: [{ text: `<hr id="answer"><div id="score"></div><div class="anki-collapsible">details</div>\\(x^2\\)
         <div id="image-occlusion-container"><img src="occlusion.svg"><canvas id="image-occlusion-canvas"></canvas></div>
         <div class="cloze" data-shape="rect" data-left="0" data-top="0" data-width="1" data-height="1"></div>
+        <style>body { text-align: right; } li { text-align: center; } pre { text-align: right; }</style>
+        <p id="alignment-text">Text</p><ul><li id="alignment-list">List</li></ul><pre id="alignment-code">code</pre>
         <script src="dependency.js"></script><script>
         window.answerRuns=(window.answerRuns||0)+1;
         document.getElementById('score').textContent=answers.filter(Boolean).length+'/'+answers.length;
@@ -68,7 +71,7 @@ try {
         onUpdateHook.push(function(){window.updateRan=true});
         onShownHook.push(function(){window.shownRan=!!document.querySelector('mjx-container')});
         </script>`, replacement: null }],
-      css: '.card{color:black;background:white}</style><script>window.styleRuns=(window.styleRuns||0)+1;</script>',
+      css: 'body{color:black;background:white;text-align:left}</style><script>window.styleRuns=(window.styleRuns||0)+1;</script>',
       latexSvg: false, isEmpty: false
     };
     const html = (side, version) => {
@@ -83,9 +86,17 @@ try {
         assert.equal(shown, count);
       });
     }
+    async function assertAlignment(side) {
+      const actual = await page.evaluate(() => ['alignment-text', 'alignment-list', 'alignment-code']
+        .map(id => getComputedStyle(document.getElementById(id)).textAlign));
+      assert.deepEqual(actual, side === 'question' ? ['left', 'start', 'left'] : ['right', 'center', 'right'],
+        `alignment after ${side}, preview=${preview}, dark=${dark}`);
+    }
     session.show(html('question', 1), 1, 'question'); await waitShown(1);
+    await assertAlignment('question');
     await page.locator('#one').click(); await page.locator('#two').click(); await page.locator('#three').click();
     session.show(html('answer', 2), 1, 'answer', !preview); await waitShown(2);
+    await assertAlignment('answer');
     assert.equal(await page.locator('#score').textContent(), '2/3');
     assert.deepEqual(await page.evaluate(() => savedAnswers), [true, false, true]);
     assert.deepEqual(await page.evaluate(() => [questionRuns, answerRuns, styleRuns, dependencyRead, updateRan, shownRan]),
@@ -96,18 +107,22 @@ try {
       .getContext('2d').getImageData(5, 5, 1, 1).data)), [255, 142, 142, 255]);
     assert.equal(navigations, 1);
     session.show(html('question', 3), 1, 'question'); await waitShown(3);
+    await assertAlignment('question');
     session.show(html('answer', 4), 1, 'answer'); await waitShown(4);
+    await assertAlignment('answer');
     if (preview) {
       await page.locator('#score').click();
       await page.waitForFunction(() => true);
       assert.deepEqual(actions, [{ action: 'flip', version: 4 }], 'one current-version listener after repeated flips');
     }
     session.reset(); session.show(html('question', 5), 2, 'question'); await waitShown(5);
+    await assertAlignment('question');
     assert.deepEqual(await page.evaluate(() => [answers.length, questionRuns, styleRuns]), [0, 1, 1]);
     assert.equal(navigations, 2, 'a new card gets a fresh JS global environment');
     // Partially answered cards retain the existing answer and leave the other subquestions unanswered.
     await page.locator('#one').click();
     session.show(html('answer', 6), 2, 'answer'); await waitShown(6);
+    await assertAlignment('answer');
     assert.equal(await page.locator('#score').textContent(), '1/1');
     assert.deepEqual(errors, []);
     await Promise.all(pending);
