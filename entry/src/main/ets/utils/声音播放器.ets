@@ -10,7 +10,7 @@
 // 串行语义：播放队列/重播 先停后播；completed 自动接续下一首；代次 防旧回调污染。
 //
 // 状态机：fdSrc → initialized → prepare → prepared → play → playing → completed → 下一首
-// 主路径：从指定位置开始 主动调 prepare/play；兜底：状态变更处理 回调里按状态推进；
+// 主路径：从指定位置开始 initialized/prepared 事件各推进一次 prepare/play；
 //        超时：3s 未进入 playing 跳下一首。
 //
 // 音频焦点：AudioSession 使用 MIX_WITH_OTHERS 与其他应用并发；
@@ -74,6 +74,8 @@ function 错误文本(e: object | undefined): string {
 }
 
 export class 声音播放器 implements AudioQueuePlayer<string> {
+  // 编辑试听需要区分播完和跳过坏文件；默认不改变学习队列的跳过行为。
+  onPlaybackError: () => void = (): void => {};
   private readonly 音频焦点协调器: AudioFocusCoordinator = AudioFocusCoordinator.getInstance();
   private 播放器实例: media.AVPlayer | null = null;
   private 队列: string[] = [];
@@ -81,6 +83,9 @@ export class 声音播放器 implements AudioQueuePlayer<string> {
   private 文件描述符: number = -1;
   private 代次: number = 0;
   private 状态定时器ID: number = -1;
+  private prepareRequested: boolean = false;
+  private playRequested: boolean = false;
+  private advancing: boolean = false;
   private completion: AudioQueueCompletion = new AudioQueueCompletion();
 
   waitForCompletion(): Promise<void> { return this.completion.wait(); }
@@ -291,7 +296,7 @@ export class 声音播放器 implements AudioQueuePlayer<string> {
    * 无
    *
    * @副作用
-   * 注册 stateChange/error/audioInterrupt 监听；设置 audioInterruptMode。
+   * 注册 stateChange/error/audioInterrupt 监听；焦点模式等到 prepared 再设置。
    * ========================================================
    */
   private 挂载监听器(播放器: media.AVPlayer): void {
@@ -299,14 +304,9 @@ export class 声音播放器 implements AudioQueuePlayer<string> {
       this.状态变更处理(状态);
     });
     播放器.on('error', (错误: Object): void => {
+      this.onPlaybackError();
       记录错误('AVPlayer error event: %{public}s', 错误文本(错误 as object | undefined));
     });
-    try {
-      播放器.audioInterruptMode = audio.InterruptMode.SHARE_MODE;
-      记录信息('attachListeners: audioInterruptMode=SHARE_MODE set');
-    } catch (错误) {
-      记录警告('attachListeners: audioInterruptMode set failed %{public}s', 错误文本(错误 as object | undefined));
-    }
     播放器.on('audioInterrupt', (信息: audio.InterruptEvent): void => {
       记录信息('onAudioInterrupt: eventType=%{public}d forceType=%{public}d hintType=%{public}d',
         信息.eventType, 信息.forceType, 信息.hintType);
@@ -328,7 +328,7 @@ export class 声音播放器 implements AudioQueuePlayer<string> {
    *
    * @作用
    * 主播放路径：检查文件存在性 → reset → 设 fdSrc → 启动状态超时 →
-   * 主动 prepare/play 推进状态机；任意阶段代次过期则中止。
+   * 由 initialized/prepared 推进状态机；任意阶段代次过期则中止。
    *
    * @输入
    * index: 队列索引
@@ -339,7 +339,7 @@ export class 声音播放器 implements AudioQueuePlayer<string> {
    *
    * @业务规则
    * 文件不存在/为空 → 递归到下一首；代次过期 → 直接返回；
-   * prepare/play 失败不放弃，依赖 状态变更处理 兜底重试。
+   * prepare/play 只在合法状态调用一次，失败由错误事件或超时跳过。
    *
    * @副作用
    * 打开文件描述符；调用 AVPlayer 的 reset/prepare/play；启动状态超时定时器。
@@ -378,11 +378,13 @@ export class 声音播放器 implements AudioQueuePlayer<string> {
       记录错误('startAt[%{public}d]: fs.statSync FAILED %{public}s', 索引, 错误文本(错误 as object | undefined));
     }
     if (!文件存在) {
+      this.onPlaybackError();
       记录错误('startAt[%{public}d]: SKIP - file does not exist', 索引);
       await this.从指定位置开始(索引 + 1, 代次);
       return;
     }
     if (文件大小 <= 0) {
+      this.onPlaybackError();
       记录错误('startAt[%{public}d]: SKIP - file is empty', 索引);
       await this.从指定位置开始(索引 + 1, 代次);
       return;
@@ -403,34 +405,16 @@ export class 声音播放器 implements AudioQueuePlayer<string> {
     try {
       const 文件: fs.File = fs.openSync(路径, fs.OpenMode.READ_ONLY);
       this.文件描述符 = 文件.fd;
+      this.prepareRequested = false; this.playRequested = false; this.advancing = false;
+      this.安排状态超时(索引, 代次);
       播放器.fdSrc = { fd: 文件.fd, offset: 0, length: 文件大小 };
       记录信息('startAt[%{public}d]: fdSrc set, fd=%{public}d, state=%{public}s', 索引, 文件.fd, 播放器.state);
       // 启动状态超时定时器：3s 内未进入 playing 则跳下一首，避免 prepare/play hang 住
-      this.安排状态超时(索引, 代次);
-      // 主动 prepare 推进到 prepared：部分系统版本 fdSrc 赋值后不触发 initialized 事件，会导致卡在 idle 无声
-      try {
-        await 播放器.prepare();
-        记录信息('startAt[%{public}d]: prepare() ok, state=%{public}s', 索引, 播放器.state);
-      } catch (prepare错误) {
-        记录错误('startAt[%{public}d]: prepare() FAILED %{public}s, state=%{public}s', 索引,
-          错误文本(prepare错误 as object | undefined), 播放器.state);
-        // 不放弃：stateChange('initialized') 兜底会再调一次 prepare()
-      }
-      if (代次 !== this.代次) {
-        记录信息('startAt[%{public}d]: gen stale after prepare, abort', 索引);
-        return;
-      }
-      // prepare 完成后显式触发 play，不依赖 stateChange('prepared') 回调（部分版本回调时机不稳）
-      try {
-        await 播放器.play();
-        记录信息('startAt[%{public}d]: play() ok, state=%{public}s', 索引, 播放器.state);
-      } catch (play错误) {
-        记录错误('startAt[%{public}d]: play() FAILED %{public}s, state=%{public}s', 索引,
-          错误文本(play错误 as object | undefined), 播放器.state);
-        // 不放弃：stateChange('prepared') 兜底会再调一次 play()
-      }
+      // fdSrc 异步进入 initialized；事件与同步状态复用一次性守卫。
+      if (播放器.state === 'initialized') this.状态变更处理('initialized');
     } catch (错误) {
       记录错误('startAt[%{public}d]: prepare or openSync FAILED %{public}s', 索引, 错误文本(错误 as object | undefined));
+      this.onPlaybackError();
       this.关闭文件描述符();
       this.清除状态定时器();
       await this.从指定位置开始(索引 + 1, 代次);
@@ -465,6 +449,7 @@ export class 声音播放器 implements AudioQueuePlayer<string> {
         return;
       }
       const 状态: string = this.播放器实例 !== null ? this.播放器实例.state : 'null';
+      this.onPlaybackError();
       记录警告('scheduleStateTimeout[%{public}d]: 3s timeout, state=%{public}s, advance to next', 索引, 状态);
       this.关闭文件描述符();
       this.从指定位置开始(索引 + 1, 代次).catch((e: Object): void => {
@@ -507,8 +492,8 @@ export class 声音播放器 implements AudioQueuePlayer<string> {
    * @作用
    * AVPlayer stateChange 回调入口，按状态推进播放流程。
    * - playing：清除超时
-   * - initialized：兜底调 prepare
-   * - prepared：兜底调 play
+   * - initialized：调用一次 prepare
+   * - prepared：设置焦点模式，再调用一次 play
    * - completed/error：跳下一首
    *
    * @输入
@@ -523,25 +508,33 @@ export class 声音播放器 implements AudioQueuePlayer<string> {
    */
   private 状态变更处理(状态: media.AVPlayerState): void {
     const 代次: number = this.代次;
+    if (this.播放器实例 === null || this.播放器实例.state !== 状态 || this.队列.length === 0) return;
     记录信息('stateChange: state=%{public}s gen=%{public}d index=%{public}d', 状态, 代次, this.当前索引);
     if (状态 === 'playing') {
       // 进入播放态，清除超时定时器
       this.清除状态定时器();
-    } else if (状态 === 'initialized' && this.播放器实例 !== null) {
-      // 兜底：fdSrc 赋值后触发 initialized，若 从指定位置开始 中 prepare 失败这里再尝试
+    } else if (状态 === 'initialized' && !this.prepareRequested) {
+      this.prepareRequested = true;
       this.播放器实例.prepare().then((): void => {
         记录信息('stateChange(initialized): prepare() resolved');
       }).catch((e: Object): void => {
         记录错误('stateChange(initialized): prepare() rejected %{public}s', 错误文本(e as object | undefined));
       });
-    } else if (状态 === 'prepared' && this.播放器实例 !== null) {
-      // 兜底：若 从指定位置开始 中 play() 已失败，这里再尝试一次
+    } else if (状态 === 'prepared' && !this.playRequested) {
+      this.playRequested = true;
+      try {
+        this.播放器实例.audioInterruptMode = audio.InterruptMode.SHARE_MODE;
+        记录信息('stateChange(prepared): audioInterruptMode=SHARE_MODE set');
+      } catch (错误) {
+        记录警告('stateChange(prepared): audioInterruptMode set failed %{public}s', 错误文本(错误 as object | undefined));
+      }
       this.播放器实例.play().then((): void => {
         记录信息('stateChange(prepared): play() resolved');
       }).catch((e: Object): void => {
         记录错误('stateChange(prepared): play() rejected %{public}s', 错误文本(e as object | undefined));
       });
-    } else if (状态 === 'completed' || 状态 === 'error') {
+    } else if ((状态 === 'completed' || 状态 === 'error') && !this.advancing) {
+      this.advancing = true;
       记录信息('stateChange: %{public}s → advance to next track', 状态);
       this.清除状态定时器();
       this.关闭文件描述符();

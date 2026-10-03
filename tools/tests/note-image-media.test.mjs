@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { noteImageExtension, prepareNoteImageFields } from '../../entry/src/main/ets/model/NoteImageDraft.ts';
+import { mediaDialogHarness } from './note-media-dialog-harness.mjs';
 import { NoteCreationSession } from '../../entry/src/main/ets/model/NoteCreationSession.ts';
 
 const attachment = (fieldIndex, uri, id = fieldIndex) => ({ id, fieldIndex, uri, filename: '' });
@@ -73,7 +74,7 @@ test('common web image headers preserve their format and HEIC needs conversion',
 
 function importHarness(bytes, { failRead = false, failPack = false, failWrite = false } = {}) {
   const source = readFileSync(new URL('../../entry/src/main/ets/backend/NoteImageImport.ets', import.meta.url), 'utf8')
-    .replace(/^import .*;\r?\n/gm, '').replace('export async function', 'async function');
+    .replace(/^import .*;\r?\n/gm, '').replace(/^export /gm, '');
   const events = [];
   let cursor = 0;
   const fs = {
@@ -114,14 +115,14 @@ test('platform import handles short reads and uses backend returned name', async
   const bytes = new TextEncoder().encode('GIF89a-picture');
   const h = importHarness(bytes);
   assert.equal(await h.run('photo://test'), 'actual.png');
-  assert.deepEqual(h.events, [{ name: 'note-image.gif', data: [...bytes] }, 'close']);
+  assert.deepEqual(h.events, ['close', { name: 'note-image.gif', data: [...bytes] }]);
 });
 
 test('platform conversion and all failure paths release owned resources', async () => {
   const bytes = new TextEncoder().encode('0000ftypheic');
   const success = importHarness(bytes);
   await success.run('photo://test');
-  assert.deepEqual(success.events, [{ name: 'note-image.png', data: [1, 2, 3] }, 'packer-release', 'source-release', 'close']);
+  assert.deepEqual(success.events, ['packer-release', 'source-release', 'close', { name: 'note-image.png', data: [1, 2, 3] }]);
   for (const options of [{ failPack: true }, { failWrite: true }]) {
     const h = importHarness(bytes, options);
     await assert.rejects(h.run('photo://test'));
@@ -134,7 +135,7 @@ test('platform conversion and all failure paths release owned resources', async 
 
 function pageHarness(picker, importer = async () => 'image.png') {
   const source = readFileSync(new URL('../../entry/src/main/ets/pages/添加笔记页.ets', import.meta.url), 'utf8');
-  const methods = ['pickFieldImage', '提交', 'imagesForField'].map(name => {
+  const methods = ['applyFieldMedia', '更新字段', '提交', 'imagesForField'].map(name => {
     const start = source.search(new RegExp(`^  private (?:async )?${name}\\(`, 'm'));
     assert.ok(start >= 0);
     return source.slice(start, source.indexOf('\n  }', start) + 4);
@@ -144,7 +145,8 @@ function pageHarness(picker, importer = async () => 'image.png') {
     '笔记字段校验错误', stripTypeScriptTypes(`class Page { ${methods.join('\n')} }`, { mode: 'transform' }) + '; return Page;')(
     picker, prepareNoteImageFields, importer, { setOrCreate: () => events.push('tick') }, key => key, class extends Error {});
   const page = Object.assign(new Page(), {
-    pageActive: true, imageRequest: 0, nextImageId: 0, fieldImages: [], pickingFieldImage: false,
+    pageActive: true, imageRequest: 0, nextImageId: 0, fieldImages: [], fieldAudios: [], nextAudioId: 0, pickingFieldImage: false, audioBusy: false,
+    draftPreview: null,
     处理中: false, 牌组ID: 7, 已选笔记类型ID: 8, 是否图片遮盖模式: false,
     字段值列表: ['', ''], 错误信息: '',
     getUIContext: () => ({ getHostContext: () => ({}) }),
@@ -168,22 +170,32 @@ function pageHarness(picker, importer = async () => 'image.png') {
     page.处理中 = state.busy; page.错误信息 = state.error;
     if (state.saved) page.pathStack.pop();
   });
-  return { page, events };
+  const result = { page, events, dialog: null, async pick(fieldIndex) {
+    page.audioBusy = true;
+    const h = mediaDialogHarness(async () => { const uri = await picker(); return uri === null ? [] : [uri]; }, {
+      fieldIndex, initialValue: page.字段值列表[fieldIndex], initialImages: page.imagesForField(fieldIndex)
+    });
+    result.dialog = h.dialog;
+    h.dialog.onApply = (value, images, audios) => page.applyFieldMedia(fieldIndex, value, images, audios);
+    h.dialog.onClosed = () => { page.audioBusy = false; };
+    await h.dialog.pickImage(); h.dialog.close(true);
+  } };
+  return result;
 }
 
 test('picker cancellation and stale responses leave the current draft untouched', async () => {
-  const cancelled = pageHarness(async () => null).page;
-  await cancelled.pickFieldImage(0);
-  assert.deepEqual(cancelled.fieldImages, []);
-  assert.equal(cancelled.pickingFieldImage, false);
+  const cancelled = pageHarness(async () => null);
+  await cancelled.pick(0);
+  assert.deepEqual(cancelled.page.fieldImages, []);
+  assert.equal(cancelled.page.audioBusy, false);
   for (const leave of [false, true]) {
     let resolve;
     const h = pageHarness(() => new Promise(r => { resolve = r; }));
-    const picking = h.page.pickFieldImage(0);
+    const picking = h.pick(0);
     await h.page.提交();
     assert.deepEqual(h.events, [], 'cannot save while the picker owns input');
     if (leave) h.page.pageActive = false;
-    else h.page.imageRequest++;
+    h.dialog.aboutToDisappear();
     resolve('photo://old-field');
     await picking;
     assert.deepEqual(h.page.fieldImages, []);
@@ -193,17 +205,17 @@ test('picker cancellation and stale responses leave the current draft untouched'
 test('page saves both image fields in the selected deck, then refreshes and returns', async () => {
   let count = 0;
   const h = pageHarness(async () => `photo://${++count}`, async uri => uri.endsWith('1') ? 'front.png' : 'back.png');
-  await h.page.pickFieldImage(0);
-  await h.page.pickFieldImage(1);
+  await h.pick(0);
+  await h.pick(1);
   assert.equal(h.page.imagesForField(0).length, 1);
-  await h.page.提交();
+  await h.page.提交(true);
   assert.deepEqual(h.events, [{ note: { notetypeId: 8,
     fields: ['<img src="front.png">', '<img src="back.png">'], tags: ['test'] }, deckId: 7 }, 'tick', 'pop']);
 });
 
 test('page keeps failed image drafts and completes accepted saves after leaving without popping another page', async () => {
   const failed = pageHarness(async () => 'photo://front', async () => { throw new Error('failed'); });
-  await failed.page.pickFieldImage(0);
+  await failed.pick(0);
   await failed.page.提交();
   assert.equal(failed.page.fieldImages.length, 1);
   assert.match(failed.page.错误信息, /add_note_image_import_failed/);
@@ -212,7 +224,7 @@ test('page keeps failed image drafts and completes accepted saves after leaving 
 
   let resolve;
   const h = pageHarness(async () => 'photo://front', () => new Promise(r => { resolve = r; }));
-  await h.page.pickFieldImage(0);
+  await h.pick(0);
   const saving = h.page.提交();
   await h.page.提交();
   h.page.pageActive = false;

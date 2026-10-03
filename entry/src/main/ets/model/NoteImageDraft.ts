@@ -1,18 +1,26 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { noteImageSourceAttribute } from './NoteMediaParts';
 
 export interface NoteFieldImage {
   id: number;
   fieldIndex: number;
   uri: string;
   filename: string;
+  reference?: string;
 }
 
-function imageHtml(filename: string): string {
+export function noteImageHtml(filename: string): string {
   const escaped: string = filename.replace(new RegExp('&', 'g'), '&amp;')
     .replace(new RegExp('"', 'g'), '&quot;')
     .replace(new RegExp('<', 'g'), '&lt;')
     .replace(new RegExp('>', 'g'), '&gt;');
   return `<img src="${escaped}">`;
+}
+
+export function replaceNoteImageSource(tag: string, filename: string): string {
+  const source = noteImageSourceAttribute(tag);
+  const attribute: string = noteImageHtml(filename).slice(5, -1);
+  return source === undefined ? tag : tag.slice(0, source.start) + attribute + tag.slice(source.end);
 }
 
 /** 媒体先落库再引用；保留成功文件名，使后续失败重试不重复导入。 */
@@ -27,13 +35,18 @@ export async function prepareNoteImageFields(fields: string[], images: NoteField
     }
   }
   for (const attachment of pending) {
+    if (attachment.reference !== undefined && result[attachment.fieldIndex].indexOf(attachment.reference) < 0) continue;
     if (attachment.filename === '') {
       const filename: string = await importImage(attachment.uri);
       if (filename === '') { throw new Error('Image import returned no filename'); }
       attachment.filename = filename;
     }
     const index: number = attachment.fieldIndex;
-    result[index] += (result[index] === '' ? '' : '<br>') + imageHtml(attachment.filename);
+    if (attachment.reference !== undefined) {
+      result[index] = result[index].split(attachment.reference).join(replaceNoteImageSource(attachment.reference, attachment.filename));
+    } else {
+      result[index] += (result[index] === '' ? '' : '<br>') + noteImageHtml(attachment.filename);
+    }
   }
   return result;
 }

@@ -5,7 +5,7 @@ import { 媒体服务 } from './媒体服务';
 import { noteImageExtension } from '../model/NoteImageDraft';
 
 /** @throws {Error} 图片读取、转换或媒体提交失败，调用方保留编辑草稿并显示错误。 */
-export async function importNoteImage(uri: string): Promise<string> {
+export async function readNoteImageData(uri: string): Promise<NoteImageData> {
   const file: fs.File = await fs.open(uri, fs.OpenMode.READ_ONLY);
   let source: image.ImageSource | null = null;
   let packer: image.ImagePacker | null = null;
@@ -31,7 +31,7 @@ export async function importNoteImage(uri: string): Promise<string> {
       data = new Uint8Array(await packer.packToData(source, options));
       extension = 'png';
     }
-    return await new 媒体服务().添加媒体文件(`note-image.${extension}`, data);
+    return { data: data, extension: extension };
   } finally {
     try {
       if (packer !== null) { await packer.release(); }
@@ -43,4 +43,12 @@ export async function importNoteImage(uri: string): Promise<string> {
       }
     }
   }
+}
+
+export interface NoteImageData { data: Uint8Array; extension: string; }
+
+/** @throws {Error} 保存与预览共用 provider 完整读取及图片格式转换。 */
+export async function importNoteImage(uri: string): Promise<string> {
+  const imageData = await readNoteImageData(uri);
+  return new 媒体服务().添加媒体文件(`note-image.${imageData.extension}`, imageData.data);
 }

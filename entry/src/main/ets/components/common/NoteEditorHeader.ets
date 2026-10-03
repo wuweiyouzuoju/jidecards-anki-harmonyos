@@ -9,8 +9,9 @@ export struct NoteEditorHeader {
   @Prop title: ResourceStr = '';
   @Prop actionLabel: ResourceStr = '';
   @Prop actionEnabled: boolean = true;
+  @Prop showAction: boolean = true;
   @Prop closeEnabled: boolean = true;
-  @Prop accent: ResourceColor = $r('app.color.action_primary');
+  @Prop accent: ResourceColor = $r('app.color.text_primary');
   onBack: () => void = (): void => {};
   onSave: () => void = (): void => {};
   @StorageProp('状态栏高度') private statusBarHeight: number = 0;
@@ -29,8 +30,10 @@ export struct NoteEditorHeader {
         }.width('28%').justifyContent(FlexAlign.Start)
         Blank().layoutWeight(1)
         Row() {
-          按下态按钮({ 文案: this.actionLabel, 字色: this.accent, themeText: true,
-            是否启用: this.actionEnabled, singleLine: true, 点击回调: this.onSave })
+          if (this.showAction) {
+            按下态按钮({ 文案: this.actionLabel, 字色: this.accent,
+              是否启用: this.actionEnabled, singleLine: true, 点击回调: this.onSave })
+          }
         }.width('28%').justifyContent(FlexAlign.End)
       }.width('100%').height('100%').alignItems(VerticalAlign.Center)
     }.width('100%').height(应用尺寸.pageToolbarHeight(this.statusBarHeight, this.narrow))

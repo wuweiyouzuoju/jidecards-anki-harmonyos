@@ -5,7 +5,7 @@ export const FORMAT_UNDERLINE: number = 4;
 export const FORMAT_HIGHLIGHT: number = 8;
 export interface NoteTextRun { text: string; format: number; }
 
-function decodeText(text: string): string | null {
+export function decodeNoteTextEntities(text: string): string | null {
   let valid: boolean = true;
   const decoded: string = text.replace(new RegExp('&([^;\\s]+);', 'g'), (_all: string, entity: string): string => {
     if (entity === 'amp') return '&';
@@ -49,7 +49,7 @@ export function parseNoteRichText(html: string): NoteTextRun[] | null {
         tags.push(tag); masks.push(masks[masks.length - 1] | flag);
       }
     } else {
-      const text: string | null = decodeText(part);
+      const text: string | null = decodeNoteTextEntities(part);
       if (text === null) return null;
       runs.push({ text: text, format: masks[masks.length - 1] });
     }

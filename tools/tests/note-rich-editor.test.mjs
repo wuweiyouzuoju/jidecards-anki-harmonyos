@@ -1,4 +1,3 @@
-import { noteClozeDecorations } from '../../entry/src/main/ets/model/NoteClozeDecoration.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -47,7 +46,7 @@ function editor(html='') {
     setTypingStyle(style){typing.push(style);}, updateSpanStyle(patch){patches.push(patch);}
   };
   const Editor=loadComponentLogic('components/common/NoteFieldEditor.ets','NoteFieldEditor',{
-    ...rich, noteClozeDecorations, nextClozeNumber,wrapFieldSelection,
+    ...rich, nextClozeNumber,wrapFieldSelection,
     TextAreaController:class {},RichEditorController:class {constructor(){return controller;}},
     FontWeight:{Bold:9,Normal:10},FontStyle:{Italic:1,Normal:0},TextDecorationType:{Underline:1,None:0},
     Color:{Transparent:'#00000000'},DialogAlignment:{Center:0},应用尺寸:{字号_正文:16},
@@ -61,6 +60,17 @@ function editor(html='') {
   if(instance.ready)instance.loadRich(rich.parseNoteRichText(html));
   return {instance,controller,changes,seen,dialogs,patches,typing,set spans(value){spans=value;}};
 }
+
+test('a cleared or new-type editor cannot receive late source/ready callbacks from the disposed editor', () => {
+  const old=editor('<table><tr><td>source draft</td></tr></table>');
+  assert.equal(old.instance.sourceMode,true); old.instance.sourceChanged('<table>edited</table>');
+  assert.equal(old.changes.length,1); old.instance.disabled=true; old.instance.sourceChanged('disabled');
+  assert.equal(old.changes.length,1); old.instance.disabled=false; old.instance.aboutToDisappear();
+  old.instance.sourceChanged('late'); old.instance.richReady();
+  assert.equal(old.changes.length,1); assert.equal(old.instance.ready,false);
+  const fresh=editor(''); assert.equal(fresh.instance.sourceMode,false); assert.equal(fresh.instance.typingFormat,0);
+  assert.equal(fresh.instance.selectionStart,-1); assert.deepEqual(fresh.changes,[]);
+});
 
 test('mode button rereads editor state with the same captured builder arguments on both transitions', () => {
   const source=readFileSync(new URL('../../entry/src/main/ets/components/common/NoteFieldEditor.ets',import.meta.url),'utf8');
@@ -187,13 +197,16 @@ test('help uses current labels and the common header centers independently of si
 });
 
 
-test('cloze grey decoration is transient, IME preview is untouched, and decoration does not loop',()=>{
- const h=editor('{{c1::答案}}');h.instance.clozeEnabled=true;h.instance.decorateCloze();
- assert.ok(h.patches.some(p=>p.textStyle.textBackgroundStyle?.color==='app.color.note_editor_cloze_background'));
- const count=h.patches.length;h.instance.decorateCloze();assert.equal(h.patches.length,count);
- const span={value:'{{c1::更改}}',offsetInSpan:[0,10],previewText:'更改',textStyle:{fontWeight:10,fontStyle:0,
-   decoration:{type:0},textBackgroundStyle:{color:'#ECEFF1'}}};h.spans=[span];
- h.instance.decorateCloze();assert.equal(h.patches.length,count);
- span.previewText='';h.instance.publishRich();assert.equal(h.changes.at(-1),'{{c1::更改}}');
- assert.ok(h.patches.length>count);assert.equal(h.instance.typingFormat,0);
+test('cloze text has no automatic background and retains explicit highlight and stored markup',()=>{
+ for(const html of ['{{c1::答案}}','😀 {{c1::中<b>{{c2::文}}</b>::提示}} x {{c3::unfinished',
+   '{{c1::<mark>答案</mark>}}']) {
+   const h=editor(html);h.instance.clozeEnabled=true;h.instance.richReady();
+   const expected=rich.parseNoteRichText(html);
+   assert.deepEqual(h.controller.getSpans().map(span=>span.textStyle.textBackgroundStyle.color),
+     expected.map(run=>(run.format & rich.FORMAT_HIGHLIGHT)!==0?'#FFF176':'#00000000'));
+   assert.equal(rich.serializeNoteRichText(h.instance.richRuns()),html);
+   h.instance.publishRich();h.instance.publishRich();
+   assert.deepEqual(h.patches,[]);assert.deepEqual(h.changes,[]);
+   assert.equal(h.instance.typingFormat,0);
+ }
 });

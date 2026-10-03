@@ -1,6 +1,5 @@
 import { PressFeedback } from '../../utils/PressFeedback';
 import { LengthMetrics } from '@kit.ArkUI';
-import { noteClozeDecorations } from '../../model/NoteClozeDecoration';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 颜色键 } from '../../model/颜色主题';
@@ -30,7 +29,6 @@ export struct NoteFieldEditor {
   private ready: boolean = false;
   private applying: boolean = false;
   private lastSnapshot: string = '';
-  private decoratedSnapshot: string = '';
   private selectionVersion: number = 0;
   private hintDialog: CustomDialogController | null = null;
   private hintSaving: boolean = false;
@@ -49,6 +47,16 @@ export struct NoteFieldEditor {
     else if (this.ready) this.loadRich(runs);
   }
 
+  private sourceChanged(text: string): void {
+    if (this.disposed || this.disabled) return;
+    this.value = text; this.onChange(text);
+  }
+
+  private richReady(): void {
+    if (this.disposed) return;
+    this.ready = true; this.loadRich(parseNoteRichText(this.value) ?? []);
+  }
+
   private style(format: number): RichEditorTextStyle {
     return { fontSize: 应用尺寸.字号_正文,
       fontColor: (format & FORMAT_HIGHLIGHT) !== 0 ? '#202020' : $r('app.color.text_primary'),
@@ -61,13 +69,11 @@ export struct NoteFieldEditor {
   private loadRich(runs: NoteTextRun[]): void {
     this.applying = true;
     try {
-      this.decoratedSnapshot = '';
       this.richController.deleteSpans();
       for (const run of runs) this.richController.addTextSpan(run.text, { style: this.style(run.format) });
       this.lastSnapshot = serializeNoteRichText(runs);
       this.richController.setTypingStyle(this.style(this.typingFormat));
     } finally { this.applying = false; }
-    this.decorateCloze();
   }
 
   private richRuns(): NoteTextRun[] {
@@ -87,9 +93,8 @@ export struct NoteFieldEditor {
   }
 
   private publishRich(): void {
-    if (this.applying || !this.ready || this.disposed || this.sourceMode) return;
+    if (this.applying || !this.ready || this.disposed || this.disabled || this.sourceMode) return;
     const html: string = serializeNoteRichText(this.richRuns());
-    this.decorateCloze();
     if (html === this.lastSnapshot) return;
     this.lastSnapshot = html;
     this.value = html; this.onChange(html);
@@ -97,28 +102,6 @@ export struct NoteFieldEditor {
 
   private placeholderText(): string {
     return resourceText(this.getUIContext(), $r('app.string.note_editor_field_placeholder'), this.fieldName);
-  }
-
-  /** 只更新视觉背景，灰底不参与 HTML 序列化；预上屏时不干预中文输入。 */
-  private decorateCloze(): void {
-    if (!this.clozeEnabled || this.sourceMode || this.applying) return;
-    for (const span of this.richController.getSpans()) {
-      const text: RichEditorTextSpanResult = span as RichEditorTextSpanResult;
-      if (text.previewText !== undefined && text.previewText !== '') return;
-    }
-    const runs: NoteTextRun[] = this.richRuns();
-    const snapshot: string = serializeNoteRichText(runs);
-    if (snapshot === this.decoratedSnapshot) return;
-    this.applying = true;
-    try {
-      for (const part of noteClozeDecorations(runs)) {
-        this.richController.updateSpanStyle({ start: part.start, end: part.end,
-          textStyle: { textBackgroundStyle: { color: part.highlight ? '#FFF176' :
-            part.cloze ? $r('app.color.note_editor_cloze_background') : Color.Transparent } } });
-      }
-      this.decoratedSnapshot = snapshot;
-      this.richController.setTypingStyle(this.style(this.typingFormat));
-    } finally { this.applying = false; }
   }
 
   private applyFormat(flag: number): void {
@@ -271,7 +254,7 @@ export struct NoteFieldEditor {
           .backgroundColor($r('app.color.surface_card'))
           .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
           .borderRadius(应用尺寸.圆角_面板).padding(应用尺寸.间距_10).enabled(!this.disabled)
-          .onChange((text: string): void => { this.value = text; this.onChange(text); })
+          .onChange((text: string): void => { this.sourceChanged(text); })
           .onTextSelectionChange((start: number, end: number): void => { this.selectionStart = start; this.selectionEnd = end; })
         Text($r('app.string.note_editor_source_hint'))
           .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
@@ -281,7 +264,7 @@ export struct NoteFieldEditor {
           .backgroundColor($r('app.color.surface_card'))
           .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
           .borderRadius(应用尺寸.圆角_面板).padding(应用尺寸.间距_10).enabled(!this.disabled)
-          .onReady((): void => { this.ready = true; this.loadRich(parseNoteRichText(this.value) ?? []); })
+          .onReady((): void => { this.richReady(); })
           .onSelectionChange((range: RichEditorRange): void => {
             this.selectionStart = range.start ?? 0; this.selectionEnd = range.end ?? this.selectionStart;
             if (!this.applying && this.ready) this.richController.setTypingStyle(this.style(this.typingFormat));
