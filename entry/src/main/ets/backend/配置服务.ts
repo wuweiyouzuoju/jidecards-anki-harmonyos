@@ -5,11 +5,12 @@
 // @名称 配置服务边界
 //
 // @作用
-// 包装后端配置服务的 4 个 RPC（T6 侧边栏已保存搜索 + 折叠状态用）：
+// 包装 Core 配置与集合偏好 RPC：
 // - 获取配置JSON（GetConfigJson）：按字符串 key 读 JSON
 // - 设置配置JSON（SetConfigJson）：按字符串 key 写 JSON
 // - 获取配置布尔（GetConfigBool）：按 ConfigKey.Bool 枚举读布尔
 // - 设置配置布尔（SetConfigBool）：按 ConfigKey.Bool 枚举写布尔
+// - GetPreferences/SetPreferences：读取原始消息，按编辑字段局部替换后保存
 // 方法索引来源：服务索引.ts（提取自 Anki 26.05 生成代码 backend.rs）。
 //
 // @输入
@@ -22,7 +23,7 @@
 // Promise<string>（JSON）/ Promise<boolean> / Promise<OpChanges>
 //
 // @业务规则
-// 服务号 9（后端配置），方法号 0/1/5/6。
+// 服务号 9（后端配置），方法号 0/1/5/6/9/10。
 // saved searches 在 Anki/AnkiDroid 共享 config 表的 "savedFilters" key 下，为名称到查询的 JSON 映射。
 // 折叠状态走 ConfigKey.Bool 枚举（COLLAPSE_TAGS=4 / COLLAPSE_DECKS=6 / COLLAPSE_SAVED_SEARCHES=7）。
 // GetConfigJson 返回空串表示该 key 不存在（Anki 后端对缺失 key 返回空 JSON）。
@@ -48,6 +49,15 @@ import type { OpChanges } from '../proto/messages/CollectionMessages';
 
 export class 配置服务 {
   private readonly 会话: 后端会话 = 后端会话.获取实例();
+
+  /** Anki 26.05 Preferences 原始消息；调用方保留未编辑字段。 */
+  getPreferences(): Promise<Uint8Array> {
+    return this.会话.调用(服务号.后端配置, 配置方法.获取偏好, new Uint8Array(0));
+  }
+
+  async setPreferences(bytes: Uint8Array): Promise<OpChanges> {
+    return decodeOpChanges(await this.会话.调用(服务号.后端配置, 配置方法.设置偏好, bytes));
+  }
 
   /**
    * 获取配置JSON（GetConfigJson）。按字符串 key 读 JSON 字符串。

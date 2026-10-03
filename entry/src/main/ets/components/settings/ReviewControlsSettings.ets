@@ -1,22 +1,25 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { settingsItemText } from '../../utils/SettingsStructureText';
+import { SettingsToggleRow } from '../common/SettingsToggleRow';
 import { HelpLabel } from '../common/HelpLabel';
-import { 设置面板色板_取 } from '../../utils/设置面板配色';
+import { SelectStyle } from '../../utils/SelectStyle';
+import { resourceText } from '../../utils/UiFeedback';
+import { StudyQuickAnswerMode } from '../../model/StudyGestures';
 import { 颜色键 } from '../../model/颜色主题';
 import { 设置分组卡片 } from './设置分组卡片';
 import { STUDY_HAPTICS_KEY, saveStudyHaptics } from '../../utils/StudyHaptics';
-import { TapZones开关AppStorage键, 保存TapZones开关, 加载TapZones开关, STUDY_GESTURES_KEY,
-  loadStudyGestures, saveStudyGestures } from '../../model/实验性功能存储';
+import { STUDY_QUICK_ANSWER_KEY, loadStudyQuickAnswerMode,
+  saveStudyQuickAnswerMode } from '../../model/实验性功能存储';
 
-/** 学习手势、四象限和评分触感使用独立本机偏好。 */
+/** 快捷答题模式互斥；评分触感使用独立本机偏好。 */
 @Component
 export struct ReviewControlsSettings {
   @Prop 是否深色: boolean = false;
   @Prop 简洁模式: boolean = true;
   @StorageProp(颜色键.主色按钮背景) private actionColor: string = '#2F5FD0';
-  @StorageLink(TapZones开关AppStorage键) @Watch('syncControls') private TapZones开关: boolean = false;
-  @StorageLink(STUDY_GESTURES_KEY) @Watch('syncControls') private gesturesEnabled: boolean = false;
-  @State private tapZonesToggle: boolean = false;
-  @State private gesturesToggle: boolean = false;
+  @StorageLink(STUDY_QUICK_ANSWER_KEY) @Watch('syncControls')
+  private quickAnswerMode: StudyQuickAnswerMode = StudyQuickAnswerMode.Off;
+  @State private selectedMode: StudyQuickAnswerMode = StudyQuickAnswerMode.Off;
   @State private controlsSaving: boolean = false;
   @State private controlsFailed: boolean = false;
   打开说明回调: (标题: Resource, 正文: Resource) => void = (_标题: Resource, _正文: Resource): void => {};
@@ -35,8 +38,7 @@ export struct ReviewControlsSettings {
     this.controlsSaving = true;
     this.controlsFailed = false;
     try {
-      this.TapZones开关 = await 加载TapZones开关();
-      this.gesturesEnabled = await loadStudyGestures();
+      await loadStudyQuickAnswerMode();
     } catch (error) {
       this.controlsFailed = true;
     } finally {
@@ -46,20 +48,32 @@ export struct ReviewControlsSettings {
   }
 
   private syncControls(): void {
-    this.tapZonesToggle = this.TapZones开关;
-    this.gesturesToggle = this.gesturesEnabled;
+    this.selectedMode = this.quickAnswerMode;
   }
 
-  private async changeControl(tapZones: boolean, enabled: boolean): Promise<void> {
-    if (this.controlsSaving) return;
-    if (enabled === (tapZones ? this.TapZones开关 : this.gesturesEnabled)) return;
+  private modeOptions(): SelectOption[] {
+    return [
+      { value: resourceText(this.getUIContext(), $r('app.string.settings_quick_answer_off')) },
+      { value: resourceText(this.getUIContext(), $r('app.string.settings_tap_zones_label')) },
+      { value: resourceText(this.getUIContext(), $r('app.string.settings_study_gestures')) }
+    ];
+  }
+
+  private modeLabel(): Resource {
+    if (this.selectedMode === StudyQuickAnswerMode.TapZones) return $r('app.string.settings_tap_zones_label');
+    if (this.selectedMode === StudyQuickAnswerMode.Gestures) return $r('app.string.settings_study_gestures');
+    return $r('app.string.settings_quick_answer_off');
+  }
+
+  private async changeControl(index: number): Promise<void> {
+    if (this.controlsSaving || index < 0 || index > 2 || !Number.isInteger(index)) return;
+    if (index === this.quickAnswerMode) return;
+    const mode: StudyQuickAnswerMode = index;
     this.controlsSaving = true;
     this.controlsFailed = false;
-    if (tapZones) this.tapZonesToggle = enabled;
-    else this.gesturesToggle = enabled;
+    this.selectedMode = mode;
     try {
-      if (tapZones) await 保存TapZones开关(enabled);
-      else await saveStudyGestures(enabled);
+      await saveStudyQuickAnswerMode(mode);
     } catch (error) {
       this.controlsFailed = true;
     } finally {
@@ -90,20 +104,12 @@ export struct ReviewControlsSettings {
 
 
   build() {
-    设置分组卡片({ 标题: $r('app.string.settings_controls_review'), 是否深色: this.是否深色 }) {
+    设置分组卡片({ groupId: 'review_controls', 是否深色: this.是否深色 }) {
       Column({ space: 4 }) {
-          Row() {
-            Text($r('app.string.settings_study_haptics'))
-              .fontSize(15)
-              .fontColor(设置面板色板_取(this.是否深色).主文字)
-              .layoutWeight(1)
-            Toggle({ type: ToggleType.Switch, isOn: this.hapticsToggle })
-              .selectedColor(this.actionColor)
-              .enabled(!this.hapticsSaving)
-              .onChange((enabled: boolean): void => { this.changeStudyHaptics(enabled); })
-          }
-          .width('100%')
-          .height(48)
+          SettingsToggleRow({ title: settingsItemText(this.getUIContext(), 'study_haptics'),
+            isOn: this.hapticsToggle, tint: this.actionColor, isDark: this.是否深色,
+            isInteractive: !this.hapticsSaving,
+            onChange: (enabled: boolean): void => { this.changeStudyHaptics(enabled); } })
           if (this.hapticsSaveFailed) {
             Text($r('app.string.settings_study_haptics_save_failed'))
               .fontSize(12)
@@ -112,36 +118,30 @@ export struct ReviewControlsSettings {
 
 
         Row() {
-          Column({ space: 3 }) {
-            HelpLabel({ title: $r('app.string.settings_study_gestures'),
-              textColor: 设置面板色板_取(this.是否深色).主文字,
-              onHelp: (): void => {
-                this.打开说明回调($r('app.string.settings_study_gestures'), $r('app.string.study_gestures_help'));
-              }
-            })
-            Text($r('app.string.settings_study_gestures_hint')).fontSize(12)
-              .fontColor(设置面板色板_取(this.是否深色).次文字)
-          }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-          Toggle({ type: ToggleType.Switch, isOn: this.gesturesToggle })
-            .selectedColor(this.actionColor).enabled(!this.controlsSaving)
-            .onChange((enabled: boolean): void => { this.changeControl(false, enabled); })
-        }.width('100%').padding({ top: 8, bottom: 8 })
-          Row() {
-            Column({ space: 3 }) {
-              HelpLabel({ title: $r('app.string.settings_tap_zones_label'),
-                textColor: 设置面板色板_取(this.是否深色).主文字,
-                onHelp: (): void => {
-                  this.打开说明回调($r('app.string.settings_tap_zones_label'), $r('app.string.settings_tap_zones_hint'));
-                }
-              })
-              Text($r('app.string.settings_controls_tap_hint')).fontSize(12)
-                .fontColor(设置面板色板_取(this.是否深色).次文字)
-            }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-            Toggle({ type: ToggleType.Switch, isOn: this.tapZonesToggle })
-              .selectedColor(this.actionColor)
-              .enabled(!this.controlsSaving)
-              .onChange((enabled: boolean): void => { this.changeControl(true, enabled); })
-          }.width('100%').padding({ top: 8, bottom: 8 })
+          HelpLabel({ title: settingsItemText(this.getUIContext(), 'study_quick_answer'), onHelp: (): void => {
+            this.打开说明回调($r('app.string.settings_quick_answer'), $r('app.string.settings_quick_answer_help'));
+          } }).layoutWeight(1)
+          Select(this.modeOptions())
+            .selected(this.selectedMode)
+            .value(resourceText(this.getUIContext(), this.modeLabel()))
+            .attributeModifier(new SelectStyle())
+            .height(SelectStyle.controlHeight)
+            .padding(SelectStyle.controlPadding)
+            .space(SelectStyle.controlSpace)
+            .width(SelectStyle.fieldWidth)
+            .constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
+            .font(SelectStyle.controlFont)
+            .optionFont(SelectStyle.optionFont)
+            .selectedOptionFont(SelectStyle.selectedOptionFont)
+            .textModifier(SelectStyle.labelText())
+            .borderRadius(SelectStyle.controlRadius)
+            .enabled(!this.controlsSaving)
+            .onSelect((index: number): void => { this.changeControl(index); })
+        }.width('100%').constraintSize({ minHeight: 48 })
+        Text(this.selectedMode === StudyQuickAnswerMode.TapZones ? $r('app.string.settings_controls_tap_hint') :
+          (this.selectedMode === StudyQuickAnswerMode.Gestures ? $r('app.string.settings_study_gestures_hint') :
+            $r('app.string.settings_quick_answer_off_hint')))
+          .fontSize(12).fontColor($r('app.color.text_secondary')).width('100%')
         if (this.controlsFailed) {
           Text($r('app.string.settings_study_controls_failed')).fontSize(12)
             .fontColor($r('app.color.error_text'))
