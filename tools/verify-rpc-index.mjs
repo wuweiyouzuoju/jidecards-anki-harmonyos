@@ -136,6 +136,12 @@ async function main() {
     if (checkout !== revision) throw new Error(`Anki checkout ${checkout} differs from locked ${revision}`);
   }
   const fingerprint = protocolFingerprint(ankiRoot);
+  // 上游字段检查随协议门禁执行；可移植仓库测试不读取本机 Anki checkout。
+  const configProto = readFileSync(path.join(ankiRoot, 'proto/anki/config.proto'), 'utf8');
+  for (const field of ['uint32 rollover = 2;', 'uint32 learn_ahead_secs = 3;', 'bool show_remaining_due_counts = 3;',
+    'bool show_intervals_on_buttons = 4;', 'uint32 time_limit_secs = 5;']) {
+    if (!configProto.includes(field)) throw new Error(`Anki review preferences contract differs: ${field}`);
+  }
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
   if (manifest.ankiRevision !== `${lock.ANKI_TAG}-${revision}`) throw new Error('RPC aliases differ from UPSTREAM.lock');
   if (args[0] === '--generate') {

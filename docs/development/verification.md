@@ -37,7 +37,7 @@ Node 24.x 与 `package.json` / CI 一致。首次进入或 lockfile 变化后运
 
 `node tools/verify-rpc-index.mjs` 需要 Node 24 和 `third_party/anki` 源码，不依赖残留构建目录。它核对 `UPSTREAM.lock`、协议/生成器输入的 SHA-256 指纹，以及每个本地常量的服务号、方法号和 Rust 方法名。存在独立 Anki Git checkout 时还检查提交；源码归档没有 `.git` 时以输入指纹验证，不借用父仓库的 HEAD。
 
-`tools/rpc-index-methods.json` 按本地常量名称绑定语义方法名；`tools/rpc-index-baseline.json` 是从生成的 `backend.rs` 导出的分派基线。交换两个有效编号、缺少末项、新增未登记常量、上游输入变动都失败。CI 的 Rust 作业在克隆锁定 Anki 后调用同一脚本；仓库测试使用受版本控制的基线和变异测试，不因缺少本机 Anki 而悄悄跳过。
+`tools/rpc-index-methods.json` 按本地常量名称绑定语义方法名；`tools/rpc-index-baseline.json` 是从生成的 `backend.rs` 导出的分派基线。交换两个有效编号、缺少末项、新增未登记常量、上游输入变动都失败。同一门禁还读取上游 `config.proto`，核对复习偏好的字段类型和编号。CI 的 Rust 作业在克隆锁定 Anki 后调用同一脚本；仓库测试使用受版本控制的基线和合成 protobuf 字节执行字段编解码及 RPC 行为断言，不读取本机 Anki，也不因缺少它而悄悄跳过。
 
 升级流程：更新锁定依赖并完成真实 Core 构建，核对别名语义，然后运行 `node tools/verify-rpc-index.mjs --generate <本次构建生成的backend.rs绝对路径>`，审查别名、基线 JSON 与生成的 ArkTS/Rust/C++ 常量差异，最后运行完整 `npm run verify`。生成基线必须使用独立的、提交匹配 `UPSTREAM.lock` 的 Anki Git checkout；协议/生成器目录及 `Cargo.lock` 有未提交修改时拒绝生成，防止把本机裁剪工作区后的依赖锁写成官方基线。普通校验仍支持源码归档。禁止拿旧缓存生成新版本基线。传入单个 `backend.rs` 路径则只校验该显式产物，不扫描并择优使用旧缓存。
 

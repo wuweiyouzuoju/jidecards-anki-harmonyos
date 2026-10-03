@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { 协议写入器 as Writer } from '../../entry/src/main/ets/proto/core/ProtoWriter.ts';
 import { 协议读取器 as Reader } from '../../entry/src/main/ets/proto/core/ProtoReader.ts';
 import { ReviewPreferences, ReviewPreferenceField as F, decodeReviewPreferences, patchReviewPreferences } from '../../entry/src/main/ets/proto/messages/PreferencesMessages.ts';
@@ -44,14 +43,14 @@ function fields(bytes) {
 }
 const turn = () => new Promise(resolve => setImmediate(resolve));
 
-test('Preferences wire fields and RPCs match the locked Anki 26.05 contract', async () => {
-  const proto = readFileSync(new URL('../../third_party/anki/proto/anki/config.proto', import.meta.url), 'utf8');
-  for (const line of ['uint32 rollover = 2;', 'uint32 learn_ahead_secs = 3;', 'bool show_remaining_due_counts = 3;',
-    'bool show_intervals_on_buttons = 4;', 'uint32 time_limit_secs = 5;']) assert.ok(proto.includes(line));
+test('Preferences reads and writes preserve wire fields and use the locked Config RPCs', async () => {
   const calls = [];
   const Config = loadPlatformModule('backend/配置服务.ts', '配置服务', {服务号, 配置方法, decodeOpChanges,
     后端会话: {获取实例: () => ({调用: async (...args) => { calls.push(args); return args[1] === 9 ? preferencesFixture() : new Uint8Array(); }})}});
   const config = new Config(); const raw = await config.getPreferences();
+  assert.deepEqual({ ...decodeReviewPreferences(raw) }, {
+    rollover: 4, learnAheadSecs: 1201, timeLimitSecs: 60, showRemaining: true, showIntervals: true
+  });
   await config.setPreferences(patchReviewPreferences(raw, [{field:F.Rollover, value:0}]));
   assert.deepEqual(calls.map(call => call.slice(0, 2)), [[9,9],[9,10]]);
   assert.equal(calls[0][2].length, 0);
