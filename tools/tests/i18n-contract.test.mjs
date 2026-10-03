@@ -69,7 +69,8 @@ test('English resources are translated and contain no Chinese copy', () => {
   const allowedIdenticalValues = new Set(['working_name', 'entry_ability_desc', 'feedback_email', 'app_about_copyright', 'field_help_button', 'image_occlusion_c_label', 'stats_retention_rate', 'reminder_edit_time_colon', 'stats_range_p50', 'stats_range_p95', 'stats_range_p100', 'stats_retrievability_average_value', 'ai_agent_file_parsing']);
   for (const item of JSON.parse(read(english)).string) {
     assert.doesNotMatch(item.value, /[\u4e00-\u9fff]/, `${item.name} must be English`);
-    if (!allowedIdenticalValues.has(item.name)) {
+    // AI 是用户指定的跨语言入口名称，精确值另有入口回归约束。
+    if (!allowedIdenticalValues.has(item.name) && item.name !== 'ai_agent_title') {
       assert.notEqual(item.value, zhItems.get(item.name), `${item.name} must not copy the base translation`);
     }
   }

@@ -128,7 +128,6 @@
       "name": "heat_4",
       "value": "#6F96ED"
     },
-    {"name": "home_intro_link", "value": "#8AB4F8"},
-    {"name": "note_editor_cloze_background", "value": "#383B40"}
+    {"name": "home_intro_link", "value": "#8AB4F8"}
   ]
 }
