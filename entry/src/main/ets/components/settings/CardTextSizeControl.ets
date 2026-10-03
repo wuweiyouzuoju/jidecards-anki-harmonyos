@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { settingsItemText } from '../../utils/SettingsStructureText';
 import { 颜色键 } from '../../model/颜色主题';
 
 import { CARD_TEXT_SIZE_KEY, DEFAULT_CARD_TEXT_SIZE, MIN_CARD_TEXT_SIZE, MAX_CARD_TEXT_SIZE } from '../../model/CardTextSize';
@@ -7,7 +8,7 @@ import { saveCardTextSize } from '../../utils/CardTextSizeStore';
 /** 在外观设置内统一调整卡片文字大小。 */
 @Component
 export struct CardTextSizeControl {
-  @StorageProp(CARD_TEXT_SIZE_KEY) private savedSize: number = DEFAULT_CARD_TEXT_SIZE;
+  @StorageProp(CARD_TEXT_SIZE_KEY) @Watch('syncSavedSize') private savedSize: number = DEFAULT_CARD_TEXT_SIZE;
   @State private selectedSize: number = DEFAULT_CARD_TEXT_SIZE;
   @StorageProp(颜色键.主色按钮背景) private actionColor: string = '#2F5FD0';
   @State private saving: boolean = false;
@@ -15,6 +16,10 @@ export struct CardTextSizeControl {
 
   aboutToAppear(): void {
     this.selectedSize = this.savedSize;
+  }
+
+  private syncSavedSize(): void {
+    if (!this.saving) { this.selectedSize = this.savedSize; }
   }
 
   /** 保存单次手势的最终值，避免并发落盘覆盖较新的选择。 */
@@ -36,7 +41,7 @@ export struct CardTextSizeControl {
   build() {
     Column({ space: 8 }) {
       Row() {
-        Text($r('app.string.card_text_size'))
+        Text(settingsItemText(this.getUIContext(), 'card_text_size'))
           .fontSize(15)
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1)

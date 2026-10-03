@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { settingsItemText } from '../../utils/SettingsStructureText';
 import { 颜色键 } from '../../model/颜色主题';
 import { THEME_MOTION_KEY } from '../../model/Redemption';
 import { saveThemeMotion } from '../../utils/RedemptionStore';
+import { SettingsToggleRow } from '../common/SettingsToggleRow';
 
 /** 关闭动画后继续保留静态幻彩，持久化失败可见。 */
 @Component
 export struct ThemeMotionControl {
+  @Prop isDark: boolean = false;
   @StorageProp(THEME_MOTION_KEY) private motionEnabled: boolean = true;
   @StorageProp(颜色键.主色按钮背景) private actionColor: string = '#2F5FD0';
   @State private saving: boolean = false;
@@ -22,15 +25,10 @@ export struct ThemeMotionControl {
 
   build() {
     Column({ space: 6 }) {
-      Row() {
-        Text($r('app.string.iridescent_motion'))
-          .fontSize(15).fontColor($r('app.color.text_primary')).layoutWeight(1)
-        Toggle({ type: ToggleType.Switch, isOn: this.motionEnabled }).enabled(!this.saving)
-          .selectedColor(this.actionColor)
-          .onChange((value: boolean): void => { this.save(value); })
-      }.height(48).width('100%')
-      Text($r('app.string.iridescent_motion_hint'))
-        .fontSize(12).fontColor($r('app.color.text_secondary')).width('100%')
+      SettingsToggleRow({ title: settingsItemText(this.getUIContext(), 'theme_motion'),
+        hint: $r('app.string.iridescent_motion_hint'), isOn: this.motionEnabled,
+        isInteractive: !this.saving, tint: this.actionColor, isDark: this.isDark,
+        onChange: (value: boolean): void => { this.save(value); } })
       if (this.failed) {
         Text($r('app.string.redemption_storage_failed')).fontSize(12).fontColor($r('app.color.error_text'))
       }

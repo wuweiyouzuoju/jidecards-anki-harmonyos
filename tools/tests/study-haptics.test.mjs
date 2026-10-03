@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
+import { localPreferenceApi } from './local-preference-harness.mjs';
 
 const read = path => readFileSync(new URL('../../' + path, import.meta.url), 'utf8');
 const root = 'entry/src/main/ets/';
@@ -23,6 +24,7 @@ function harness(supported = true) {
     startVibration: async (effect, attributes) => { calls.push({ effect, attributes }); }
   };
   const dependencies = {
+    ...localPreferenceApi({ setOrCreate: (key, value) => storage.set(key, value) }),
     AppStorage: { get: key => storage.get(key), setOrCreate: (key, value) => storage.set(key, value) },
     preferences: { getPreferencesSync: () => store }, vibrator,
     hilog: { warn() {}, debug() {} }
@@ -99,7 +101,7 @@ test('all ratings vibrate once after guards, never wait for haptics, and reject 
     let release, answers = 0, loads = 0;
     const gate = new Promise(resolve => { release = resolve; });
     const page = new Page();
-    Object.assign(page, { choiceQuestion: null, studyGuideVisible: false, 评分中: false, 阶段: 'answer', 当前卡片: {}, requestVersion: 0,
+    Object.assign(page, { timeboxNotice: null, startStudyTimers() {}, choiceQuestion: null, studyGuideVisible: false, 评分中: false, 阶段: 'answer', 当前卡片: {}, requestVersion: 0,
       isCurrentRequest: () => true, invalidateCardWork() {},
       studySession: { answer: async (_card, value) => { assert.equal(value, rating); answers++; await gate; } },
       加载下一张卡: async () => { loads++; page.阶段 = 'question'; }, 消费待重渲染() {}, maybeShowStudyGuide() {} });

@@ -42,6 +42,21 @@ function 取上下文(): common.UIAbilityContext | null {
   return 上下文 === undefined ? null : 上下文;
 }
 
+/** 首屏前恢复全局模式，所有高级入口无需先打开设置才能得到保存值。 */
+export function initializeSimpleMode(): void {
+  let simple: boolean = AppStorage.get<boolean>(简洁模式AppStorage键) ?? true;
+  const context: common.UIAbilityContext | null = 取上下文();
+  if (context !== null) {
+    try {
+      const store: preferences.Preferences = preferences.getPreferencesSync(context, { name: 存储名 });
+      simple = store.getSync(简洁模式键, true) !== false;
+    } catch (error) {
+      // 读取失败保留已知模式；全新会话使用原有简洁版默认值，设置页仍可重新读取。
+    }
+  }
+  AppStorage.setOrCreate<boolean>(简洁模式AppStorage键, simple);
+}
+
 export async function 加载简洁模式(): Promise<boolean> {
   const 上下文: common.UIAbilityContext | null = 取上下文();
   if (上下文 === null) {

@@ -23,7 +23,7 @@
 //
 // @副作用
 // 读取/写入 HarmonyOS preferences（异步 IO）。
-// 偏好不可用时保留当前内存状态，不中断学习入口（catch 静默）。
+// 启动读取不可用时回退默认值；公共设置入口使用严格读取和可观察写入结果。
 // ========================================================
 
 import { common } from '@kit.AbilityKit';
@@ -55,17 +55,23 @@ export async function 加载主题模式(): Promise<主题模式> {
   }
 }
 
-/** 把主题模式写入 preferences 并 flush；上下文缺失或写入失败时静默跳过。 */
+/** @throws {Error} 读取失败与默认值不同；助手及公共写入入口必须保留失败。 */
+export async function readSavedThemeMode(): Promise<主题模式> {
+  const context: common.UIAbilityContext | null = 取能力上下文();
+  if (context === null) { throw new Error('ability_context_unavailable'); }
+  const store: preferences.Preferences = await preferences.getPreferences(context, 存储名);
+  const value: preferences.ValueType = await store.get(主题模式键, 默认主题模式);
+  if (value !== 'system' && value !== 'light' && value !== 'dark') { throw new Error('invalid_saved_theme_mode'); }
+  return value;
+}
+
+/** @throws {Error} 写入或 flush 失败必须由调用方展示，不得声称已保存。 */
 export async function 保存主题模式(模式: 主题模式): Promise<void> {
   const 上下文: common.UIAbilityContext | null = 取能力上下文();
   if (上下文 === null) {
-    return;
+    throw new Error('ability_context_unavailable');
   }
-  try {
-    const 存储: preferences.Preferences = await preferences.getPreferences(上下文, 存储名);
-    await 存储.put(主题模式键, 模式);
-    await 存储.flush();
-  } catch (错误) {
-    // 偏好不可用时保留当前内存状态，不中断学习入口。
-  }
+  const 存储: preferences.Preferences = await preferences.getPreferences(上下文, 存储名);
+  await 存储.put(主题模式键, 模式);
+  await 存储.flush();
 }

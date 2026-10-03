@@ -3,6 +3,7 @@ import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
 import { vibrator } from '@kit.SensorServiceKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
+import { saveLocalPreference } from './LocalPreferenceWrite';
 
 export const STUDY_HAPTICS_KEY: string = 'studyHapticsEnabled';
 const SOFT_EFFECT: string = 'haptic.effect.soft';
@@ -41,17 +42,8 @@ async function prepareStudyHaptics(): Promise<void> {
 
 /** 保存成功才广播，失败恢复 preferences 内存值并交由设置页提示。 */
 /** @throws {Error} 触感偏好读写失败，调用方保持原设置并反馈错误。 */
-export async function saveStudyHaptics(enabled: boolean): Promise<void> {
-  const store: preferences.Preferences = getHapticsPreferences();
-  const previous: preferences.ValueType = store.getSync(STUDY_HAPTICS_KEY, true);
-  store.putSync(STUDY_HAPTICS_KEY, enabled);
-  try {
-    await store.flush();
-  } catch (error) {
-    store.putSync(STUDY_HAPTICS_KEY, previous);
-    throw new Error(error instanceof Error ? error.message : `${error}`);
-  }
-  AppStorage.setOrCreate<boolean>(STUDY_HAPTICS_KEY, enabled);
+export async function saveStudyHaptics(enabled: boolean, expected: boolean | null = null): Promise<void> {
+  await saveLocalPreference(getHapticsPreferences(), STUDY_HAPTICS_KEY, enabled, true, expected);
 }
 
 /** 所有评分共享同一短震；失败不传播到评分，始终遵循系统触感开关。 */

@@ -4,6 +4,7 @@ import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { CARD_TEXT_SIZE_KEY, DEFAULT_CARD_TEXT_SIZE, normalizeCardTextSize } from '../model/CardTextSize';
+import { saveLocalPreference } from './LocalPreferenceWrite';
 
 /** 复用应用本机偏好，字号不写入集合或模板。 */
 /** @throws {Error} 本机字号偏好不可用或保存失败，由初始化兜底或设置页展示。 */
@@ -31,16 +32,7 @@ export function initializeCardTextSize(): void {
 
 /** 落盘成功后通知学习与预览；失败交由设置界面显示。 */
 /** @throws {Error} 本机字号偏好不可用或保存失败，由初始化兜底或设置页展示。 */
-export async function saveCardTextSize(value: number): Promise<void> {
+export async function saveCardTextSize(value: number, expected: number | null = null): Promise<void> {
   const size: number = normalizeCardTextSize(value);
-  const store: preferences.Preferences = getCardTextPreferences();
-  const previous: preferences.ValueType = store.getSync(CARD_TEXT_SIZE_KEY, DEFAULT_CARD_TEXT_SIZE);
-  store.putSync(CARD_TEXT_SIZE_KEY, size);
-  try {
-    await store.flush();
-  } catch (error) {
-    store.putSync(CARD_TEXT_SIZE_KEY, previous);
-    throw new Error(error instanceof Error ? error.message : `${error}`);
-  }
-  AppStorage.setOrCreate<number>(CARD_TEXT_SIZE_KEY, size);
+  await saveLocalPreference(getCardTextPreferences(), CARD_TEXT_SIZE_KEY, size, DEFAULT_CARD_TEXT_SIZE, expected);
 }

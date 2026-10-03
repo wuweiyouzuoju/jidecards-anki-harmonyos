@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { settingsItemText } from '../../utils/SettingsStructureText';
 import { DECK_LIST_NARROW_KEY } from '../../model/DeckListAppearance';
 import { saveDeckListNarrow } from '../../utils/DeckListAppearanceStore';
 import { SelectStyle } from '../../utils/SelectStyle';
@@ -33,7 +34,7 @@ export struct DeckWidthControl {
   build() {
     Column({ space: 4 }) {
       Row() {
-        Text($r('app.string.deck_width'))
+        Text(settingsItemText(this.getUIContext(), 'deck_list_narrow'))
           .fontSize(15)
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1)
@@ -46,7 +47,7 @@ export struct DeckWidthControl {
           .padding(SelectStyle.controlPadding)
           .space(SelectStyle.controlSpace)
           .width(SelectStyle.fieldWidth)
-          .constraintSize(SelectStyle.fieldConstraint)
+          .constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
           .font(SelectStyle.controlFont)
           .optionFont(SelectStyle.optionFont)
           .selectedOptionFont(SelectStyle.selectedOptionFont)

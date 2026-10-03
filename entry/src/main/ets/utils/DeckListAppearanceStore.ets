@@ -3,6 +3,7 @@ import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { DECK_LIST_NARROW_KEY, DECK_WIDTH_HINT_HANDLED_KEY } from '../model/DeckListAppearance';
+import { saveLocalPreference } from './LocalPreferenceWrite';
 
 /** @throws {Error} 偏好不可用时由启动日志或设置页展示。 */
 function getDeckListPreferences(): preferences.Preferences {
@@ -42,15 +43,6 @@ export async function completeDeckWidthHint(): Promise<void> {
 }
 
 /** @throws {Error} 保存失败保持原外观，交由设置控件显示错误。 */
-export async function saveDeckListNarrow(narrow: boolean): Promise<void> {
-  const store: preferences.Preferences = getDeckListPreferences();
-  const previous: preferences.ValueType = store.getSync(DECK_LIST_NARROW_KEY, false);
-  store.putSync(DECK_LIST_NARROW_KEY, narrow);
-  try {
-    await store.flush();
-  } catch (error) {
-    store.putSync(DECK_LIST_NARROW_KEY, previous);
-    throw new Error(error instanceof Error ? error.message : `${error}`);
-  }
-  AppStorage.setOrCreate<boolean>(DECK_LIST_NARROW_KEY, narrow);
+export async function saveDeckListNarrow(narrow: boolean, expected: boolean | null = null): Promise<void> {
+  await saveLocalPreference(getDeckListPreferences(), DECK_LIST_NARROW_KEY, narrow, false, expected);
 }

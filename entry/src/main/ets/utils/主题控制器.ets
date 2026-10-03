@@ -31,11 +31,21 @@
 
 import { common, ConfigurationConstant } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
+import { resourceManager } from '@kit.LocalizationKit';
 import { 解析是否深色, 主题模式 } from '../model/主题设置';
 import { 颜色键 } from '../model/颜色主题';
 
 const 浅色系统栏色: string = '#F5F7FA';
 const 深色系统栏色: string = '#10151D';
+
+/** @throws {Error} 读取失败或未指定颜色时上抛，调用方保留已知系统状态。 */
+export function readSystemDarkMode(): boolean {
+  // 应用资源和配置通知都会受 setColorMode 影响；系统资源管理器才是设备主题来源。
+  const configuration: resourceManager.Configuration = resourceManager.getSysResourceManager().getConfigurationSync();
+  if (configuration.colorMode === resourceManager.ColorMode.DARK) { return true; }
+  if (configuration.colorMode === resourceManager.ColorMode.LIGHT) { return false; }
+  throw new Error('system_theme_unavailable');
+}
 
 function 请求的色彩模式(模式: 主题模式): ConfigurationConstant.ColorMode {
   if (模式 === 'dark') {
@@ -66,14 +76,17 @@ export async function 应用系统栏样式(
   }
 }
 
+/** @throws {Error} strict=true 时资源模式失败上抛；系统栏仍为尽力同步。 */
 export async function 应用主题(
   上下文: common.UIAbilityContext,
   模式: 主题模式,
-  系统深色: boolean
+  系统深色: boolean,
+  strict: boolean = false
 ): Promise<void> {
   try {
     上下文.getApplicationContext().setColorMode(请求的色彩模式(模式));
   } catch (错误) {
+    if (strict) { throw new Error('theme_apply_failed'); }
     // 资源模式切换失败时仍尝试同步系统栏。
   }
   await 应用系统栏样式(上下文, 解析是否深色(模式, 系统深色));

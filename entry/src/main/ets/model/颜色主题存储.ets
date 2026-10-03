@@ -23,10 +23,11 @@
 //
 // @副作用
 // 读取/写入 HarmonyOS preferences（异步 IO）。
-// 偏好不可用时保留当前内存状态，不中断学习入口（catch 静默）。
+// 启动读取失败可回退；公共严格读取和保存失败必须传给设置调用方。
 // ========================================================
 
 import { UNLOCKED_CONTENTS_KEY, isThemeAvailable } from './ThemeCatalog';
+import { isThemeId } from './settings/ThemeColorSession';
 import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
 import { 默认颜色主题, 规范化颜色主题, 颜色主题 } from './颜色主题';
@@ -57,18 +58,27 @@ export async function 加载颜色主题(): Promise<颜色主题> {
   }
 }
 
-/** 把颜色主题写入 preferences 并 flush；上下文缺失或写入失败时静默跳过。 */
+/** @throws {Error} 公共设置读取保留 IO 失败，不把异常伪装成默认主题。 */
+export async function readSavedThemeColor(): Promise<颜色主题> {
+  const context: common.UIAbilityContext | null = 取能力上下文();
+  if (context === null) { throw new Error('ability_context_unavailable'); }
+  const store: preferences.Preferences = await preferences.getPreferences(context, 存储名);
+  const value: preferences.ValueType = await store.get(颜色主题键, 默认颜色主题);
+  if (typeof value !== 'string' || !isThemeId(value)) { throw new Error('invalid_saved_theme_color'); }
+  return value as 颜色主题;
+}
+
+/** @throws {Error} 权益、上下文或持久化失败必须反馈给调用方。 */
 export async function 保存颜色主题(主题: 颜色主题): Promise<void> {
-  if (!isThemeAvailable(主题, AppStorage.get<string[]>(UNLOCKED_CONTENTS_KEY) ?? [])) return;
+  if (!isThemeId(主题)) { throw new Error('invalid_theme_color'); }
+  if (!isThemeAvailable(主题, AppStorage.get<string[]>(UNLOCKED_CONTENTS_KEY) ?? [])) {
+    throw new Error('theme_color_locked');
+  }
   const 上下文: common.UIAbilityContext | null = 取能力上下文();
   if (上下文 === null) {
-    return;
+    throw new Error('ability_context_unavailable');
   }
-  try {
-    const 存储: preferences.Preferences = await preferences.getPreferences(上下文, 存储名);
-    await 存储.put(颜色主题键, 主题);
-    await 存储.flush();
-  } catch (错误) {
-    // 偏好不可用时保留当前内存状态，不中断学习入口。
-  }
+  const 存储: preferences.Preferences = await preferences.getPreferences(上下文, 存储名);
+  await 存储.put(颜色主题键, 主题);
+  await 存储.flush();
 }
