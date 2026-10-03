@@ -134,9 +134,9 @@ test('the controller verifies saved FSRS and notifies readers even on write/read
       }
       async 更新牌组配置() { if (failure === 'write') throw new Error('write failed'); }
     }
-    const save = compileWithUiFeedback('牌组配置服务', '默认牌组ID', '构造请求', 'notifyFsrsStateChanged', '刷新桌面卡片数据', 'hilog',
+    const save = compileWithUiFeedback('牌组配置服务', '默认牌组ID', '构造请求', 'notifyFsrsStateChanged', '刷新桌面卡片数据', 'hilog', 'enqueueFsrsMutation',
       js + ';return 设置FSRS开启状态;')(
-      Service, 1, () => ({}), () => notifications++, async () => desktopRefreshes++, { error() {} }
+      Service, 1, () => ({}), () => notifications++, async () => desktopRefreshes++, { error() {} }, operation => operation()
     );
     if (failure === 'none') assert.equal(await save(true), true);
     else await assert.rejects(save(true));

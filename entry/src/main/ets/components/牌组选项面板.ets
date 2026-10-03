@@ -5,6 +5,8 @@ import { resourceText } from '../utils/UiFeedback';
 import { DeckOptionField, DeckOptionChoice } from './home/DeckOptionField';
 import { validateDeckOptionText } from '../model/DeckOptionValidation';
 import { namedResourceText } from '../utils/UiFeedback';
+import { FsrsTools } from './home/FsrsTools';
+import { DeckOptionsFsrsState } from '../model/home/DeckOptionsSession';
 import { ThemeTextSpans } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
@@ -60,7 +62,7 @@ export struct 牌组选项面板 {
   private handleBackRequest(): void {
     if (this.showHelp) { this.showHelp = false; return; }
     if (this.showAdvanced) { this.advancedBackRequest++; return; }
-    if (!this.busy) this.onCancel();
+    if (!this.busy || this.computing) this.onCancel();
   }
 
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
@@ -69,6 +71,10 @@ export struct 牌组选项面板 {
   @ObjectLink form: 牌组配置表单;
   @ObjectLink options: 牌组选项编辑;
   @Prop busy: boolean = false;
+  @Prop computing: boolean = false;
+  @Prop fsrsState: DeckOptionsFsrsState = new DeckOptionsFsrsState();
+  onOptimize: (all: boolean, retry: boolean) => void = (): void => {};
+  onSimulate: (days: number) => void = (): void => {};
   @Prop errorMessage: string = '';
   onCancel: () => void = (): void => {};
   onSave: (form: 牌组配置表单, options: 牌组选项编辑) => void = (_form: 牌组配置表单, _options: 牌组选项编辑): void => {};
@@ -365,16 +371,17 @@ export struct 牌组选项面板 {
   build() {
     Stack() {
       DialogBackdrop()
-        .onClick(() => { if (!this.busy) this.onCancel(); })
+        .onClick(() => { if (!this.busy || this.computing) this.onCancel(); })
         .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
 
       Column({ space: 应用尺寸.间距_12 }) {
         DialogHeader({
           title: $r('app.string.deck_options_title'),
-          actionLabel: this.busy ? $r('app.string.deck_options_saving') : $r('app.string.deck_options_save'),
+          actionLabel: this.computing ? $r('app.string.deck_fsrs_computing') :
+            (this.busy ? $r('app.string.deck_options_saving') : $r('app.string.deck_options_save')),
           actionEnabled: this.canSubmit(),
           closeLabel: $r('app.string.create_deck_cancel'),
-          closeEnabled: !this.busy,
+          closeEnabled: !this.busy || this.computing,
           showHelp: true,
           helpEnabled: !this.busy,
           onClose: () => this.onCancel(),
@@ -392,6 +399,12 @@ export struct 牌组选项面板 {
               this.labeledInput($r('app.string.deck_reviewsPerDay_label'), this.form.每日复习数文本, (value: string) => { if (this.form !== null) this.form.每日复习数文本 = value; }, $r('app.string.deck_reviewsPerDay_help'))
               this.labeledInput($r('app.string.deck_learnSteps_label'), this.form.学习步骤文本, (value: string) => { if (this.form !== null) this.form.学习步骤文本 = value; }, $r('app.string.deck_learnSteps_help'))
               this.reviewOrderSelector($r('app.string.deck_reviewOrder_label'), this.selectedReviewOrder, $r('app.string.deck_reviewOrder_help'))
+              if (this.options.是否启用FSRS) {
+                this.labeledInput($r('app.string.deck_desiredRetention_label'), this.form.目标保留率文本,
+                  (value: string): void => { this.form.目标保留率文本 = value; }, $r('app.string.deck_desiredRetention_help'))
+                FsrsTools({ state: this.fsrsState, busy: this.busy, onOptimize: this.onOptimize, onSimulate: this.onSimulate,
+                  onRetention: (value: string): void => { this.form.目标保留率文本 = value; } })
+              }
             }
             // 简洁模式下隐藏「高级设置」入口
             if (!this.简洁模式) {

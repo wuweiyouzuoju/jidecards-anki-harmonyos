@@ -66,6 +66,13 @@ const 上下文键: string = 'abilityContext';
 const 默认牌组ID: number = 1;
 
 export const FSRS_STATE_REVISION_KEY: string = 'fsrsStateRevision';
+let fsrsMutationTail: Promise<void> = Promise.resolve();
+
+function enqueueFsrsMutation<T>(operation: () => Promise<T>): Promise<T> {
+  const result: Promise<T> = fsrsMutationTail.then(operation);
+  fsrsMutationTail = result.then((): void => {}, (): void => {});
+  return result;
+}
 
 /** 通知已挂载页面重新读取全局开关；通知值不承载 FSRS 状态。 */
 export function notifyFsrsStateChanged(): void {
@@ -150,23 +157,25 @@ function 构造请求(视图: DeckConfigsForUpdateView, fsrs开关: boolean, fsr
 // 通过 牌组配置服务 修改 Anki collection 的 fsrs 字段。
 // ========================================================
 export async function 确保FSRS已开启一次(): Promise<void> {
-  const 已初始化: boolean = await 加载已初始化标记();
-  if (已初始化) {
-    return;
-  }
-  const 服务: 牌组配置服务 = new 牌组配置服务();
-  try {
-    const 视图: DeckConfigsForUpdateView = await 服务.获取牌组配置编辑视图(默认牌组ID);
-    if (!视图.fsrs) {
-      const 请求: UpdateDeckConfigsInput = 构造请求(视图, true, true);
-      await 服务.更新牌组配置(请求);
-      notifyFsrsStateChanged();
+  return enqueueFsrsMutation(async (): Promise<void> => {
+    const 已初始化: boolean = await 加载已初始化标记();
+    if (已初始化) {
+      return;
     }
-  } catch (错误) {
-    // 后端不可用时不写 initialized 标记，下次启动重试。
-    return;
-  }
-  await 标记已初始化();
+    const 服务: 牌组配置服务 = new 牌组配置服务();
+    try {
+      const 视图: DeckConfigsForUpdateView = await 服务.获取牌组配置编辑视图(默认牌组ID);
+      if (!视图.fsrs) {
+        const 请求: UpdateDeckConfigsInput = 构造请求(视图, true, true);
+        await 服务.更新牌组配置(请求);
+        notifyFsrsStateChanged();
+      }
+    } catch (错误) {
+      // 后端不可用时不写 initialized 标记，下次启动重试。
+      return;
+    }
+    await 标记已初始化();
+  });
 }
 
 // ========================================================
@@ -186,27 +195,38 @@ export async function 确保FSRS已开启一次(): Promise<void> {
 // @副作用
 // 通过 牌组配置服务 修改 Anki collection 的 fsrs 字段。
 // ========================================================
-export async function 设置FSRS开启状态(开启: boolean): Promise<boolean> {
-  const 服务: 牌组配置服务 = new 牌组配置服务();
-  const 视图: DeckConfigsForUpdateView = await 服务.获取牌组配置编辑视图(默认牌组ID);
-  const 请求: UpdateDeckConfigsInput = 构造请求(视图, 开启, 开启);
-  try {
-    await 服务.更新牌组配置(请求);
-    const saved: DeckConfigsForUpdateView = await 服务.获取牌组配置编辑视图(默认牌组ID);
-    if (saved.fsrs !== 开启) {
-      throw new Error('FSRS state verification failed');
+export async function 设置FSRS开启状态(开启: boolean, expected: boolean | null = null): Promise<boolean> {
+  return enqueueFsrsMutation(async (): Promise<boolean> => {
+    const 服务: 牌组配置服务 = new 牌组配置服务();
+    const 视图: DeckConfigsForUpdateView = await 服务.获取牌组配置编辑视图(默认牌组ID);
+    if (expected !== null && 视图.fsrs !== expected) { throw new Error('setting_changed_since_proposal'); }
+    if (视图.fsrs === 开启) { return 开启; }
+    const 请求: UpdateDeckConfigsInput = 构造请求(视图, 开启, 开启);
+    try {
+      await 服务.更新牌组配置(请求);
+      const saved: DeckConfigsForUpdateView = await 服务.获取牌组配置编辑视图(默认牌组ID);
+      if (saved.fsrs !== 开启) {
+        throw new Error('FSRS state verification failed');
+      }
+    } finally {
+      // 写入或读回失败也刷新，避免界面继续展示未经确认的乐观状态。
+      notifyFsrsStateChanged();
     }
-  } finally {
-    // 写入或读回失败也刷新，避免界面继续展示未经确认的乐观状态。
-    notifyFsrsStateChanged();
-  }
-  // FSRS 状态变更后主动刷新桌面卡片数据：用户在设置页开/关 FSRS 后，
-  // 桌面卡片的"记忆率/难度分布"页需立即反映新状态，否则会一直显示
-  // "未启用 FSRS"（仅靠首页加载触发推送，用户不回首页就不会刷新）。
-  刷新桌面卡片数据().catch((错误: Object): void => {
-    hilog.error(0x0000, 'FSRS控制器', `切换FSRS后刷新桌面卡片数据失败: ${错误}`);
+    // FSRS 状态变更后主动刷新桌面卡片数据：用户在设置页开/关 FSRS 后，
+    // 桌面卡片的"记忆率/难度分布"页需立即反映新状态，否则会一直显示
+    // "未启用 FSRS"（仅靠首页加载触发推送，用户不回首页就不会刷新）。
+    刷新桌面卡片数据().catch((错误: Object): void => {
+      hilog.error(0x0000, 'FSRS控制器', `切换FSRS后刷新桌面卡片数据失败: ${错误}`);
   });
   return 开启;
+  });
+}
+
+/** @throws {Error} 助手读取不把后端失败当关闭；与变更队列保持顺序。 */
+export function readFsrsEnabled(): Promise<boolean> {
+  return fsrsMutationTail.then(async (): Promise<boolean> => {
+    return (await new 牌组配置服务().获取牌组配置编辑视图(默认牌组ID)).fsrs;
+  });
 }
 
 // ========================================================

@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { settingsItemText } from '../../utils/SettingsStructureText';
 import { resourceText } from '../../utils/UiFeedback';
 
 import { 加载FSRS开启状态, 设置FSRS开启状态, FSRS_STATE_REVISION_KEY } from '../../model/FSRS控制器';
 import { 设置面板色板_取, 设置面板色板 } from '../../utils/设置面板配色';
 import { 颜色键 } from '../../model/颜色主题';
 import { 设置分组卡片 } from './设置分组卡片';
+import { SettingsToggleRow } from '../common/SettingsToggleRow';
 
 // ========================================================
 // @块ID UI-SCHEDULER-001
@@ -120,7 +122,7 @@ export struct 调度器分组 {
 
   build() {
     设置分组卡片({
-      标题: $r('app.string.settings_scheduler'),
+      groupId: 'algorithm',
       是否深色: this.是否深色,
 
       帮助标题: $r('app.string.settings_fsrs_label'),
@@ -129,34 +131,23 @@ export struct 调度器分组 {
       打开说明回调: this.打开说明回调
     }) {
       Column({ space: 8 }) {
-          Text($r('app.string.settings_algorithm_scope'))
+          Text(settingsItemText(this.getUIContext(), 'algorithm_scope'))
             .fontSize(13).fontColor(设置面板色板_取(this.是否深色).次文字).width('100%')
-          Text($r('app.string.settings_algorithm_deck_options'))
+          Text(settingsItemText(this.getUIContext(), 'algorithm_deck_options'))
             .fontSize(13).fontColor(设置面板色板_取(this.是否深色).次文字).width('100%')
-          // FSRS 开关行：label + Toggle。说明文字已移到 分组头部 的 ⓘ 按钮弹层中。
-          // 注意：Toggle 的 isOn 必须用 $$ 双向绑定到 @State，否则开关不响应点击。
-          // 但本场景需要乐观更新 + 失败回滚，所以改用单向绑定 + onChange 手动控制。
-          Row() {
-            Text($r('app.string.settings_fsrs_label'))
-              .fontSize(15)
-              .fontColor(设置面板色板_取(this.是否深色).主文字)
-              .layoutWeight(1)
-            Blank()
-            if (this.是否启用FSRS === null) {
+          if (this.是否启用FSRS === null) {
+            Row() {
+              Text(settingsItemText(this.getUIContext(), 'fsrs_enabled'))
+                .fontSize(15).fontColor(设置面板色板_取(this.是否深色).主文字).layoutWeight(1)
               Text($r('app.string.settings_fsrs_loading'))
                 .fontSize(13)
                 .fontColor(设置面板色板_取(this.是否深色).三级文字)
-            } else {
-              Toggle({ type: ToggleType.Switch, isOn: this.是否启用FSRS })
-                .selectedColor(this.解析主色按钮背景())
-                .enabled(!this.FSRS操作中)
-                .onChange((值: boolean): void => {
-                  this.切换FSRS开关(值);
-                })
-            }
+            }.width('100%').constraintSize({ minHeight: 48 })
+          } else {
+            SettingsToggleRow({ title: settingsItemText(this.getUIContext(), 'fsrs_enabled'), isOn: this.是否启用FSRS,
+              tint: this.解析主色按钮背景(), isDark: this.是否深色, isInteractive: !this.FSRS操作中,
+              onChange: (值: boolean): void => { this.切换FSRS开关(值); } })
           }
-          .width('100%')
-          .padding({ top: 8, bottom: 8 })
 
           if (this.FSRS错误信息 !== '') {
             Text(this.FSRS错误信息)

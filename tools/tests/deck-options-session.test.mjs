@@ -5,6 +5,7 @@ import { DeckOptionsSession } from '../../entry/src/main/ets/model/home/DeckOpti
 import { emptyDeckConfigSettings } from '../../entry/src/main/ets/proto/messages/DeckConfigMessages.ts';
 
 const deferred = () => { let resolve, reject; const promise = new Promise((a,b) => {resolve=a; reject=b;}); return {promise,resolve,reject}; };
+const flush = () => new Promise(resolve => setImmediate(resolve));
 function setup() {
   const config = {id: 1,name: 'Default',mtimeSecs: 0,usn: 0,config: emptyDeckConfigSettings()};
   const view = {allConfigs: [{config,useCount: 2}], currentDeck: {name:'Deck',configId:1,parentConfigIds:[],limits:null},
@@ -17,9 +18,9 @@ function setup() {
 }
 test('deck option reads discard out-of-order results and errors after disposal',async()=>{
   const h=setup(),old=deferred(); h.backend.load=()=>old.promise;
-  const first=h.session.load(); h.backend.load=async()=>h.view; await h.session.load();
+  const first=h.session.load(); await flush(); h.backend.load=async()=>h.view; await h.session.load();
   old.reject(new Error('stale')); await first; assert.equal(h.states.at(-1).phase,'ready');
-  const late=deferred(); h.backend.load=()=>late.promise; const pending=h.session.load();
+  const late=deferred(); h.backend.load=()=>late.promise; const pending=h.session.load(); await flush();
   h.session.dispose(); const count=h.states.length; late.resolve(h.view); await pending; assert.equal(h.states.length,count);
 });
 test('accepted deck save freezes its request, rejects duplicate clicks, and broadcasts after disposal',async()=>{
@@ -28,6 +29,7 @@ test('accepted deck save freezes its request, rejects duplicate clicks, and broa
   const draft={...h.config,config:{...h.config.config,newPerDay:12}};
   const work=h.session.save(draft,false,h.options); draft.config.newPerDay=99;
   assert.equal(await h.session.save(draft,false,h.options),false);
+  await flush();
   assert.equal(h.writes[0].configs[0].config.newPerDay,12); assert.equal(h.writes[0].targetDeckId,7);
   h.session.dispose(); const count=h.states.length; pending.resolve(); assert.equal(await work,true);
   assert.equal(h.committed(),1); assert.equal(h.states.length,count);
