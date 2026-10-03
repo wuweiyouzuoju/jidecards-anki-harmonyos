@@ -28,7 +28,7 @@ export const DEEPSEEK_PROVIDER: ProviderCatalogEntry = {
   modelEditable: false,
   capabilities: {
     text: true,
-    image: false,
+    image: true,
     audio: false,
     streaming: true,
     toolCalls: true,
@@ -87,4 +87,11 @@ export function customProviderDefaults(): ProviderCatalogEntry {
 
 export function builtInProviders(): ProviderCatalogEntry[] {
   return [DEEPSEEK_PROVIDER, OPENAI_PROVIDER];
+}
+
+/** 能力按本轮实际模型确定；自定义模型由用户声明，文字模型仍可调用系统 OCR。 */
+export function providerSupportsImages(provider: ProviderId, model: string, customVisionEnabled: boolean = false): boolean {
+  if (provider === 'deepseek') return model === 'deepseek-flash';
+  if (provider === 'openai') return OPENAI_PROVIDER.capabilities.image;
+  return customVisionEnabled;
 }

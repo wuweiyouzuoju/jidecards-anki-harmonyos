@@ -7,6 +7,8 @@ import type { SearchMode } from './AgentTypes';
 export type ProviderInputKind =
   'message' | 'function_call' | 'function_call_output' | 'reasoning' | 'output_item';
 
+export interface ProviderInputImage { imageUrl: string; }
+
 export interface ProviderInputItem {
   kind: ProviderInputKind;
   role: string;
@@ -15,6 +17,7 @@ export interface ProviderInputItem {
   name: string;
   argumentsJson: string;
   output: string;
+  images?: ProviderInputImage[];
 }
 
 export interface ProviderFunctionTool {
@@ -29,6 +32,7 @@ export interface ProviderTurnRequest {
   apiKey: string;
   baseUrl: string;
   model: string;
+  supportsImages?: boolean;
   instructions: string;
   input: ProviderInputItem[];
   functionTools: ProviderFunctionTool[];
@@ -47,7 +51,14 @@ export interface ProviderTurnRequest {
 
 interface ResponsesMessageInput {
   role: string;
-  content: string;
+  content: string | ResponsesContentPart[];
+}
+
+interface ResponsesContentPart {
+  type: string;
+  text?: string;
+  image_url?: string;
+  detail?: string;
 }
 
 interface ResponsesFunctionCallInput {
@@ -60,7 +71,7 @@ interface ResponsesFunctionCallInput {
 interface ResponsesFunctionOutputInput {
   type: string;
   call_id: string;
-  output: string;
+  output: string | ResponsesContentPart[];
 }
 
 interface ResponsesReasoningInput {
@@ -73,9 +84,12 @@ interface ResponsesReasoningContent {
   text: string;
 }
 
-interface ResponsesOpaqueOutputInput {
+export interface ResponsesOpaqueOutputInput {
   type: string;
-  content?: object[];
+  id?: string;
+  content?: ResponsesReasoningContent[];
+  summary?: object[];
+  encrypted_content?: string;
 }
 
 type ResponsesInput = ResponsesMessageInput | ResponsesFunctionCallInput |
@@ -133,9 +147,13 @@ export function buildResponsesUrl(baseUrl: string): string {
   return `${normalized}/responses`;
 }
 
+/** @throws {ProviderProtocolError} 无效输入在发送前由请求编排层处理。 */
 function buildInput(item: ProviderInputItem): ResponsesInput {
   if (item.kind === 'message') {
-    return { role: item.role, content: item.content };
+    if (item.images !== undefined && item.images.length > 0 && item.role !== 'user' && item.role !== 'developer') {
+      throw new ProviderProtocolError('invalid_provider_image_role');
+    }
+    return { role: item.role, content: imageContent(item.content, item.images) };
   }
   if (item.kind === 'function_call') {
     return {
@@ -146,7 +164,7 @@ function buildInput(item: ProviderInputItem): ResponsesInput {
     };
   }
   if (item.kind === 'function_call_output') {
-    return { type: 'function_call_output', call_id: item.callId, output: item.output };
+    return { type: 'function_call_output', call_id: item.callId, output: imageContent(item.output, item.images) };
   }
   if (item.kind === 'reasoning') {
     return {
@@ -155,18 +173,42 @@ function buildInput(item: ProviderInputItem): ResponsesInput {
     };
   }
   if (item.kind === 'output_item') {
-    let value: ResponsesOpaqueOutputInput;
-    try { value = JSON.parse(item.content) as ResponsesOpaqueOutputInput; } catch (error) {
-      throw new ProviderProtocolError('invalid_provider_input');
-    }
-    if (value === null || typeof value !== 'object' || Array.isArray(value) ||
-      (value.type !== 'web_search_call' && value.type !== 'reasoning') ||
-      (value.type === 'reasoning' && !Array.isArray(value.content))) {
-      throw new ProviderProtocolError('invalid_provider_input');
-    }
-    return value;
+    return readProviderContinuation(item.content);
   }
   throw new ProviderProtocolError('invalid_provider_input');
+}
+
+/** @throws {ProviderProtocolError} 非续接输出不能作为 Provider 协议记录回放。 */
+export function readProviderContinuation(json: string): ResponsesOpaqueOutputInput {
+  let value: ResponsesOpaqueOutputInput;
+  try { value = JSON.parse(json) as ResponsesOpaqueOutputInput; } catch (error) {
+    throw new ProviderProtocolError('invalid_provider_input');
+  }
+  if (value === null || typeof value !== 'object' || Array.isArray(value) ||
+    (value.type !== 'web_search_call' && value.type !== 'reasoning') ||
+    (value.type === 'reasoning' && !Array.isArray(value.content) && !Array.isArray(value.summary) &&
+      !(typeof value.encrypted_content === 'string' && value.encrypted_content.length > 0))) {
+    throw new ProviderProtocolError('invalid_provider_input');
+  }
+  return value;
+}
+
+export function hasProviderReasoningText(item: ResponsesOpaqueOutputInput): boolean {
+  return item.type === 'reasoning' && Array.isArray(item.content) &&
+    item.content.some((part: ResponsesReasoningContent): boolean =>
+      part !== null && part.type === 'reasoning_text' && typeof part.text === 'string' && part.text.length > 0);
+}
+
+function imageContent(text: string, images?: ProviderInputImage[]): string | ResponsesContentPart[] {
+  if (images === undefined || images.length === 0) return text;
+  const parts: ResponsesContentPart[] = [{ type: 'input_text', text: text }];
+  for (const entry of images) {
+    if (!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(entry.imageUrl) || entry.imageUrl.length > 4 * 1024 * 1024) {
+      throw new ProviderProtocolError('invalid_provider_image');
+    }
+    parts.push({ type: 'input_image', image_url: entry.imageUrl, detail: 'high' });
+  }
+  return parts;
 }
 
 function parseToolParameters(parametersJson: string): object {
@@ -182,6 +224,11 @@ function parseToolParameters(parametersJson: string): object {
   return parameters;
 }
 
+// This is a serialized-character budget, not a provider token estimate.
+export const MAX_PROVIDER_PAYLOAD_CHARS: number = 240000;
+
+/** @throws {ProviderProtocolError} 无效协议或超限请求交给会话层报告。 */
+/** @throws {ProviderProtocolError} 无效输入或工具定义交给请求调用方，在发送前明确失败。 */
 export function buildResponsesPayload(request: ProviderTurnRequest): string {
   const input: ResponsesInput[] = [];
   for (const item of request.input) {
@@ -222,5 +269,14 @@ export function buildResponsesPayload(request: ProviderTurnRequest): string {
     store: false,
     include: ['web_search_call.action.sources']
   };
-  return JSON.stringify(body);
+  const payload: string = JSON.stringify(body);
+  let imageChars: number = 0;
+  let imageCount: number = 0;
+  for (const item of request.input) {
+    for (const entry of item.images ?? []) { imageChars += entry.imageUrl.length; imageCount++; }
+  }
+  if (payload.length - imageChars > MAX_PROVIDER_PAYLOAD_CHARS || imageChars > 12 * 1024 * 1024 || imageCount > 8) {
+    throw new ProviderProtocolError('agent_context_limit');
+  }
+  return payload;
 }

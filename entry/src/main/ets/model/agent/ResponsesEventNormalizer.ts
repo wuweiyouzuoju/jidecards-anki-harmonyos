@@ -42,6 +42,7 @@ interface RawResponseError {
 interface RawResponse {
   error?: RawResponseError;
   incomplete_details?: RawIncompleteDetails;
+  output?: RawOutputItem[];
 }
 
 interface RawIncompleteDetails {
@@ -95,6 +96,7 @@ export class ResponsesEventNormalizer {
   private pendingCalls: Map<string, PendingFunctionCall> = new Map<string, PendingFunctionCall>();
   private emittedCallItems: Set<string> = new Set<string>();
   private emittedSourceUrls: Set<string> = new Set<string>();
+  private emittedContinuations: Map<string, string> = new Map<string, string>();
 
   accept(message: SseMessage): AgentEvent[] {
     if (message.done) {
@@ -119,6 +121,7 @@ export class ResponsesEventNormalizer {
     this.pendingCalls.clear();
     this.emittedCallItems.clear();
     this.emittedSourceUrls.clear();
+    this.emittedContinuations.clear();
   }
 
   private normalize(raw: RawResponseEvent): AgentEvent[] {
@@ -155,6 +158,7 @@ export class ResponsesEventNormalizer {
       return progress === null ? [] : [progress];
     }
     if (type === 'response.function_call_arguments.done') {
+      if (typeof raw.item_id === 'string' && this.emittedCallItems.has(raw.item_id)) { return []; }
       const call: AgentToolCall | null = this.completeFunctionArguments(raw);
       if (call === null) {
         return [errorEvent('provider_tool_call_malformed')];
@@ -166,9 +170,7 @@ export class ResponsesEventNormalizer {
     if (type === 'response.output_item.done' && raw.item !== undefined) {
       const events: AgentEvent[] = this.sourcesFromItem(raw.item);
       if (raw.item.type === 'web_search_call' || raw.item.type === 'reasoning') {
-        const continuation: AgentEvent = emptyEvent('continuation_item');
-        continuation.text = JSON.stringify(raw.item);
-        events.push(continuation);
+        this.appendContinuation(events, raw.item);
       }
       const fallback: AgentToolCall | null = this.completeFunctionItem(raw.item);
       if (fallback !== null) {
@@ -186,18 +188,23 @@ export class ResponsesEventNormalizer {
       return source === null ? [] : [source];
     }
     if (type === 'response.completed') {
-      return [emptyEvent('completed')];
+      const events: AgentEvent[] = this.finalContinuations(raw.response);
+      events.push(emptyEvent('completed'));
+      return events;
     }
     if (type === 'response.incomplete') {
+      const events: AgentEvent[] = this.finalContinuations(raw.response);
       const reason: string = raw.response !== undefined &&
         raw.response.incomplete_details !== undefined &&
         typeof raw.response.incomplete_details.reason === 'string' ?
         raw.response.incomplete_details.reason : '';
       if (reason === 'max_output_tokens') {
-        return [textEvent('status', 'provider_response_incomplete_max_output_tokens')];
+        events.push(textEvent('status', 'provider_response_incomplete_max_output_tokens'));
+        return events;
       }
-      return [errorEvent(reason === 'content_filter' ?
-        'provider_response_incomplete_content_filter' : 'provider_response_incomplete')];
+      events.push(errorEvent(reason === 'content_filter' ?
+        'provider_response_incomplete_content_filter' : 'provider_response_incomplete'));
+      return events;
     }
     if (type === 'response.failed') {
       let code: string = 'provider_response_failed';
@@ -208,6 +215,25 @@ export class ResponsesEventNormalizer {
       return [errorEvent(code)];
     }
     return [];
+  }
+
+  private appendContinuation(events: AgentEvent[], item: RawOutputItem): void {
+    const text: string = JSON.stringify(item);
+    const key: string = item.id === undefined ? text : `${item.type}:${item.id}`;
+    if (this.emittedContinuations.get(key) === text) return;
+    this.emittedContinuations.set(key, text);
+    const event: AgentEvent = emptyEvent('continuation_item');
+    event.text = text;
+    events.push(event);
+  }
+
+  /** 部分兼容服务只在 terminal response.output 提供完整思考，不能忽略该记录。 */
+  private finalContinuations(response: RawResponse | undefined): AgentEvent[] {
+    const events: AgentEvent[] = [];
+    for (const item of response?.output ?? []) {
+      if (item.type === 'reasoning' || item.type === 'web_search_call') this.appendContinuation(events, item);
+    }
+    return events;
   }
 
   private rememberFunctionCall(item: RawOutputItem): void {

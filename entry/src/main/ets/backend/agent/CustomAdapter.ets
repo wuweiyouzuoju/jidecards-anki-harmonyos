@@ -13,6 +13,8 @@ import { AgentStreamObserver, AgentStreamRequest, AgentTransportSession } from '
  * 也不会在收到部分输出后改走另一个端点，避免重复执行工具。
  */
 export class CustomAdapter {
+  /** @throws {Error} 端点或请求编码失败交给会话层报告。 */
+  /** @throws {Error} 端点或请求校验失败上抛 Runner/页面，不发送无效载荷。 */
   createSession(request: ProviderTurnRequest, observer: AgentStreamObserver): AgentTransportSession {
     const baseUrl: string = request.baseUrl.trim();
     if (!baseUrl.startsWith('https://')) {

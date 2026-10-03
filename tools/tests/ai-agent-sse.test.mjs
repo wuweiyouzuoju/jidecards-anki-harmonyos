@@ -129,6 +129,10 @@ test('Responses normalizer accumulates function-call arguments before emitting o
       name: 'search_cards', arguments: '{"query":"ATP"}',
     },
   })), []);
+  assert.deepEqual(normalizer.accept(message({
+    type: 'response.function_call_arguments.done', item_id: 'fc_item',
+    name: 'search_cards', arguments: '{"query":"ATP"}',
+  })), [], 'duplicate completion must not turn a successfully emitted call into a protocol error');
 });
 
 test('Responses normalizer exposes only real text, reasoning, search, citation and completion events', () => {
