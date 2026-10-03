@@ -8,7 +8,7 @@
 
 ## 当前验证记录
 
-`npm run test:interop` 最终复跑通过：协议门禁、十二项 Core 行为、四组迁移/会话测试、三份恢复结果的 Core 完整性检查均通过；报告保存在 [`tmp/core-interop/run-9lhdmX/report.json`](../../tmp/core-interop/run-9lhdmX/report.json)。同目录保留五份 APKG/COLPKG、七条笔记/十一张卡/三条复习记录的 `expected.json`、三份恢复集合和分阶段日志，报告包含全部六份交付文件的哈希。先前独立成功轮次 `run-1wjV4c` 也保留，重复执行未覆盖旧结果。
+`npm run test:interop` 最终复跑通过：协议门禁、十二项 Core 行为、四组迁移/会话测试、三份恢复结果的 Core 完整性检查均通过；本机报告保存在 `tmp/core-interop/run-9lhdmX/report.json`，该目录是未提交的生成产物，获取自己的报告见[重复执行入口与范围](core-interop.md)。同目录保留五份 APKG/COLPKG、七条笔记/十一张卡/三条复习记录的 `expected.json`、三份恢复集合和分阶段日志，报告包含全部六份交付文件的哈希。先前独立成功轮次 `run-1wjV4c` 也保留，重复执行未覆盖旧结果。
 
 `npm test` 与 `npm run verify -- repo` 均通过全部 Node 测试，最终日志分别为 `tmp-core-interop-all-tests.log` 和 `tmp-core-interop-repo-delivery.log`。`$env:RUST_TEST_THREADS='1'; npm run verify -- native` 已通过环境、完整 Node、Rust fmt/clippy、全部 Core 主机测试、Agent 沙箱主机与 RPC 门禁。专项 `cargo +1.92.0-x86_64-pc-windows-msvc clippy -p jidecards_core --features anki-core --test core_interop --example core_interop_check --locked -- -D warnings` 通过，日志为 `tmp-core-interop-clippy.log`。单独 `cargo test -p jidecards_core --features anki-core --test fsrs --locked -- --test-threads=1` 也通过三项 FSRS 测试。串行设置只控制 Rust 测试间的并发；回归内部的进度/取消及子进程中断仍真实并发执行。
 
