@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/** Agent 文件输入只接受可安全转成纯文本的格式，不把原始文件交给 Provider 猜测。 */
+/** 文件经平台解析或保存为按页资料；Provider 只接收读取工具返回的文本与页面图片。 */
 export const AGENT_IMPORT_MAX_FILES: number = 10;
 export const AGENT_IMPORT_MAX_FILE_BYTES: number = 20 * 1024 * 1024;
 export const AGENT_IMPORT_MAX_TEXT_BYTES: number = 4 * 1024 * 1024;
@@ -19,6 +19,8 @@ export interface AgentImportedFile {
   errorCode: string;
   /** 非空表示内容可用，但存在降级、截断或部分页面无法识别。 */
   warningCode: string;
+  documentId?: string;
+  pageCount?: number;
 }
 
 const SUPPORTED_TEXT_EXTENSIONS: string[] = [
@@ -86,7 +88,10 @@ export function buildAgentImportedFilesContext(files: AgentImportedFile[]): stri
   ];
   for (let index: number = 0; index < accepted.length; index++) {
     const file: AgentImportedFile = accepted[index];
-    sections.push(`\n--- 导入文件 ${index + 1}：${file.name} ---\n${file.content}\n--- 文件结束 ---`);
+    const content: string = file.documentId === undefined ? file.content :
+      JSON.stringify({ documentId: file.documentId, name: file.name, pageCount: file.pageCount, warning: file.warningCode }) +
+      '\n使用 list_documents/read_document_page 按页查阅；需要时调用 ocr_document_page 或请求页面图片。页数不代表已读数量。';
+    sections.push(`\n--- 导入文件 ${index + 1}：${file.name} ---\n${content}\n--- 文件结束 ---`);
   }
   return sections.join('\n');
 }
@@ -104,6 +109,7 @@ export function mergeAgentImportedFiles(existing: AgentImportedFile[], selected:
     const content: string = exhausted ? '' : (valid ? file.content.slice(0, remaining) : file.content);
     result.push({
       id: file.id, name: file.name, extension: file.extension, byteSize: file.byteSize, content: content,
+      documentId: file.documentId, pageCount: file.pageCount,
       errorCode: exhausted ? 'context_limit' : file.errorCode,
       warningCode: exhausted ? '' : (truncated ? 'content_truncated' : file.warningCode)
     });

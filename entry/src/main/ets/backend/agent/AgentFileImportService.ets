@@ -7,6 +7,8 @@ import { fileIo as fs, picker } from '@kit.CoreFileKit';
 import { image } from '@kit.ImageKit';
 import { pdfService } from '@kit.PDFKit';
 import { textRecognition } from '@kit.CoreVisionKit';
+import { AgentDocumentStore, agentPdfPageText } from './AgentDocumentStore';
+import type { AgentDocumentInfo } from '../../model/agent/AgentDocuments';
 import {
   AGENT_IMPORT_MAX_ARCHIVE_BYTES,
   AGENT_IMPORT_MAX_CONTEXT_CHARS,
@@ -464,7 +466,7 @@ async function parsePdf(context: common.UIAbilityContext, source: fs.File,
     let truncated: boolean = pageCount > limit;
     for (let index: number = 0; index < limit; index++) {
       const page: pdfService.PdfPage = document.getPage(index);
-      let text: string = normalizeAgentDocumentText(page.getTextContent());
+      let text: string = agentPdfPageText(page);
       if (text.length === 0 && ocrPages < AGENT_IMPORT_MAX_OCR_PAGES) {
         let pixelMap: image.PixelMap | null = null;
         try {
@@ -483,6 +485,7 @@ async function parsePdf(context: common.UIAbilityContext, source: fs.File,
           }
         }
       }
+      page.release();
       if (text.length === 0) { unreadablePages += 1; continue; }
       const section: string = `第 ${index + 1} 页\n${text}`;
       const remaining: number = AGENT_IMPORT_MAX_CONTEXT_CHARS - total;
@@ -526,7 +529,7 @@ function errorCodeOf(error: Error, knownText: boolean): string {
 }
 
 async function parseSelectedFile(context: common.UIAbilityContext, uri: string,
-  index: number, ocr: AgentOcrSession): Promise<AgentImportedFile> {
+  index: number, ocr: AgentOcrSession, conversationId: string = ''): Promise<AgentImportedFile> {
   const id: string = `import-${Date.now()}-${index}`;
   let file: fs.File | null = null;
   let name: string = `file-${index + 1}`;
@@ -543,6 +546,13 @@ async function parseSelectedFile(context: common.UIAbilityContext, uri: string,
       return failedFile(id, name, extension, byteSize, 'file_too_large');
     }
     try {
+      if (conversationId.length > 0 && (extension === '.pdf' || isSupportedAgentImageFile(name))) {
+        const document: AgentDocumentInfo = new AgentDocumentStore(context).stage(conversationId, file,
+          { id: id, name: name, extension: extension, byteSize: byteSize, pageCount: 1, warningCode: '' });
+        return { id: id, name: name, extension: extension, byteSize: byteSize,
+          content: `${document.name} (${document.pageCount})`, errorCode: '', warningCode: '',
+          documentId: document.id, pageCount: document.pageCount };
+      }
       let parsed: ParsedAgentContent;
       if (isSupportedAgentTextFile(name)) {
         parsed = readTextFromOpenFile(file, byteSize, extension);
@@ -569,6 +579,13 @@ async function parseSelectedFile(context: common.UIAbilityContext, uri: string,
       if (parsed.content.length === 0) {
         return failedFile(id, name, extension, byteSize, 'no_extractable_text');
       }
+      if (conversationId.length > 0) {
+        const document: AgentDocumentInfo = new AgentDocumentStore(context).stage(conversationId, file,
+          { id: id, name: name, extension: extension, byteSize: byteSize, pageCount: 1, warningCode: parsed.warningCode }, parsed.content);
+        return { id: id, name: name, extension: extension, byteSize: byteSize,
+          content: `${document.name} (${document.pageCount})`, errorCode: '', warningCode: document.warningCode,
+          documentId: document.id, pageCount: document.pageCount };
+      }
       return successfulFile(id, name, extension, byteSize, parsed);
     } catch (error) {
       return failedFile(id, name, extension, byteSize,
@@ -586,7 +603,8 @@ async function parseSelectedFile(context: common.UIAbilityContext, uri: string,
 /** 选择器 URI 是临时授权，必须在 select 返回后立即逐个读取。 */
 export async function selectAndParseAgentFiles(
   context: common.UIAbilityContext,
-  maxSelectNumber: number
+  maxSelectNumber: number,
+  conversationId: string = ''
 ): Promise<AgentImportedFile[]> {
   const options: picker.DocumentSelectOptions = new picker.DocumentSelectOptions();
   options.maxSelectNumber = Math.max(1, maxSelectNumber);
@@ -596,7 +614,7 @@ export async function selectAndParseAgentFiles(
   const ocr: AgentOcrSession = new AgentOcrSession();
   try {
     for (let index: number = 0; index < uris.length; index++) {
-      result.push(await parseSelectedFile(context, uris[index], index, ocr));
+      result.push(await parseSelectedFile(context, uris[index], index, ocr, conversationId));
     }
   } finally {
     await ocr.release();

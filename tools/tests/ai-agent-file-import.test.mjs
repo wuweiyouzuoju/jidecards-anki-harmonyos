@@ -69,7 +69,9 @@ test('Harmony file picker reads temporary URIs immediately and classifies every 
   assert.match(service, /utf-16be/);
   assert.match(service, /gb18030/);
   assert.match(service, /pdfService\.PdfDocument/);
-  assert.match(service, /getTextContent\(\)/);
+  // API 21 实际适配行为由 ai-agent-documents.test 验证，禁止重新依赖 API 23。
+  assert.doesNotMatch(service, /\.getTextContent\(/);
+  assert.match(service, /agentPdfPageText\(page\)/);
   assert.match(service, /textRecognition\.recognizeText/);
   assert.match(service, /bookParser\.getDefaultHandler/);
   assert.match(service, /canIUse\('SystemCapability\.Reader\.ReaderService\.BookParser'\)/);
@@ -101,9 +103,9 @@ test('Agent composer shows per-file results and sends only successful parsed tex
   assert.match(page, /ai_agent_file_remove/);
   assert.doesNotMatch(page, /ai_agent_file_supported_hint/);
   const composer = page.match(/private 输入区\(\)[\s\S]*?\n  build\(\)/)?.[0] ?? '';
-  assert.match(composer, /Column\(\{ space: 应用尺寸\.间距_8 \}\) \{[\s\S]*?ai_agent_import_files[\s\S]*?ai_card_send/);
+  assert.match(composer, /Column\(\{ space: 应用尺寸\.间距_8 \}\) \{[\s\S]*?agentImportLabelKey\(false\)[\s\S]*?Button\(this\.interfaceLabel\('submit'\)\)/);
   assert.match(composer, /height\(应用尺寸\.按钮高度 \* 2 \+ 应用尺寸\.间距_8\)/);
-  assert.match(composer, /ThemeTextSpans\(\$r\('app\.string\.ai_agent_file_parsing'\), this\.themeAccentColors/);
+  assert.match(composer, /ThemeTextSpans\(namedResourceText\(this\.getUIContext\(\), agentImportLabelKey\(true\)\), this\.themeAccentColors/);
   assert.match(composer, /opacity\(this\.文件解析中 \? 0 : 1\)/);
   assert.match(composer, /opacity\(this\.文件解析中 \? 1 : 0\)/);
   assert.match(composer, /\.alignItems\(VerticalAlign\.Top\)/);
