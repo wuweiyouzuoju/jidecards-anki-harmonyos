@@ -5,15 +5,38 @@ import { 颜色键 } from '../../model/颜色主题';
 import { PAGE_SURFACE_KEY } from '../../model/ThemeCatalog';
 import { DECK_LIST_NARROW_KEY } from '../../model/DeckListAppearance';
 import type { AgentConversation } from '../../model/agent/AgentConversationTypes';
+import { appInterface } from '../../backend/AppInterfaceService';
+import { AppInterfaceControl } from '../../model/AppInterface';
+import { interfaceItemText, interfaceItemTitleKey } from '../../utils/AppInterfaceText';
 @Component
 export struct AgentHistoryList {
   @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
-  @Prop conversations: AgentConversation[] = [];
-  @Prop conversationId: string = '';
+  @Prop @Watch('publishInterface') conversations: AgentConversation[] = [];
+  @Prop @Watch('publishInterface') conversationId: string = '';
+  private interfaceMounted: boolean = false;
   @StorageProp(颜色键.选中背景) private 选中背景色: string = '#E8EEFC';
   @StorageProp(PAGE_SURFACE_KEY) private 页面底色微染值: string = '#F5F7FA';
   onRestore: (item: AgentConversation) => void = (): void => {};
   onDelete: (item: AgentConversation) => void = (): void => {};
+  aboutToAppear(): void { this.interfaceMounted = true; this.publishInterface(); }
+  aboutToDisappear(): void { this.interfaceMounted = false; appInterface.leave('agent_history'); }
+  private publishInterface(): void {
+    if (!this.interfaceMounted) return;
+    const conversations: AgentConversation[] = this.conversations.slice(0, 100);
+    const controls: AppInterfaceControl[] = [];
+    if (conversations.length > 0) {
+      controls.push({ id: 'delete', title: interfaceItemText(this.getUIContext(), 'agent_history', 'delete'),
+        titleKey: interfaceItemTitleKey('agent_history', 'delete'), enabled: true, selected: false });
+    }
+    for (const item of conversations) {
+      controls.push({ id: item.id, title: item.title.slice(0, 160), enabled: true, selected: item.id === this.conversationId });
+      controls.push({ id: 'delete-' + item.id, title: interfaceItemText(this.getUIContext(), 'agent_history', 'delete'),
+        titleKey: interfaceItemTitleKey('agent_history', 'delete'), enabled: true, selected: false });
+    }
+    appInterface.observe({ surface: 'agent_history', sectionId: '', selectedId: this.conversationId,
+      optionIds: conversations.map((item): string => item.id), optionLabels: conversations.map((item): string => item.title.slice(0, 160)),
+      optionsTotal: this.conversations.length, busy: false, items: controls, controlsComplete: true });
+  }
   private 两位数(value: number): string {
     return value < 10 ? `0${value}` : `${value}`;
   }
@@ -54,7 +77,7 @@ export struct AgentHistoryList {
                 .layoutWeight(1)
                 .attributeModifier(new PressFeedback())
                 .onClick((): void => { this.onRestore(item); })
-                Button($r('app.string.ai_agent_history_delete'))
+                Button(interfaceItemText(this.getUIContext(), 'agent_history', 'delete'))
                   .height(应用尺寸.按钮高度)
                   .fontSize(应用尺寸.字号_按钮)
                   .fontColor($r('app.color.error_text'))

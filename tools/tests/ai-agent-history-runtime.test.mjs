@@ -29,6 +29,19 @@ const conversation = (messages, audits = []) => ({ id: 'history-test', mode: 'cr
     fieldNames: ['Front'], noteTypeKind: 0, clozeFieldOrds: [], expanded: true },
   messages, audits, sources: [], results: [] });
 
+test('unified history retains the assistant mode and a pending native target request', async () => {
+  state.value='[]';
+  const reply=message(1,'选择目标');
+  reply.kind='clarification';reply.clarification={request:{kind:'create_target',id:'target',question:'选择目标',
+    options:[],recommendedOptionId:'',allowFreeText:true},selectedOptionId:'',supplementalText:'',state:'pending'};
+  const value=conversation([reply]);value.mode='assistant';value.setup.mode='assistant';
+  value.setup.deckId=0;value.setup.notetypeId=0;value.setup.fieldNames=[];
+  await saveAgentConversation(value);
+  const [restored]=await loadAgentConversations();
+  assert.equal(restored.mode,'assistant');assert.equal(restored.setup.mode,'assistant');
+  assert.equal(restored.setup.deckId,0);assert.equal(restored.messages[0].clarification.request.kind,'create_target');
+});
+
 test('history round trip retains actual reasoning, summary type and individual tool owners', async () => {
   state.value = '[]';
   const first = message(10, '', 'Need to clarify the topic.');

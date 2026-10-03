@@ -7,6 +7,13 @@ const deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {
 const settle=async()=>{for(let i=0;i<5;i++)await new Promise(setImmediate);};
 const setup=()=>({mode:'create',deckId:1,deckName:'d',notetypeId:2,notetypeName:'t',fieldNames:['Front'],noteTypeKind:0,clozeFieldOrds:[],expanded:false});
 const conversation=()=>({id:'c',mode:'create',title:'title',updatedAt:1,setup:setup(),messages:[],audits:[],sources:[],results:[]});
+
+test('unified AI history includes earlier create and edit conversations while scoped entries retain their filter',async()=>{
+  const all=['create','edit','assistant'].map((mode,index)=>({...conversation(),id:String(index),mode}));
+  const h=new AgentHistoryCoordinator({load:async()=>all});
+  assert.deepEqual((await h.open('assistant')).map(c=>c.mode),['create','edit','assistant']);
+  assert.deepEqual((await h.open('edit')).map(c=>c.mode),['edit']);
+});
 test('history save snapshots visible data and accepted writes finish before deletion even after disposal',async()=>{
   const gate=deferred(),events=[],saved=[];
   const h=new AgentHistoryCoordinator({saveCheckpoint:(id)=>events.push('checkpoint:'+id),

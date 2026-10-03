@@ -75,11 +75,11 @@ test('history mode has its own toolbar, returns to chat, and marks selection wit
 
   assert.equal(zh.ai_agent_history_title, '历史对话');
   assert.equal(zh.ai_agent_history_new, '新建对话');
-  assert.match(top, /this\.显示历史区 \? \$r\('app\.string\.ai_agent_history_title'\)/);
+  assert.match(top, /agentInterfaceTitle\(this\.pageMode, this\.显示历史区\)/);
   assert.match(top, /if \(this\.显示历史区\)[\s\S]*this\.关闭历史区\(\);[\s\S]*this\.pathStack\.pop\(\)/);
   assert.match(top,
-    /ai_agent_history_new'[\s\S]*字色: this\.动作主色[\s\S]*themeText: true/);
-  assert.match(top, /ai_agent_history_new'[\s\S]*this\.开始新会话\(\)/);
+    /this\.interfaceLabel\('new'\)[\s\S]*字色: this\.动作主色[\s\S]*themeText: true/);
+  assert.match(top, /this\.interfaceLabel\('new'\)[\s\S]*this\.开始新会话\(\)/);
   assert.doesNotMatch(history, /ai_agent_history_current/);
   assert.match(history, /item\.id === this\.conversationId \?[\s\S]*this\.选中背景色/);
   assert.match(page, /@StorageProp\(颜色键\.选中背景\) private 选中背景色/);

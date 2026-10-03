@@ -12,6 +12,7 @@ export interface AgentClarificationOption {
 }
 
 export interface AgentClarificationRequest {
+  kind?: 'create_target';
   id: string;
   question: string;
   options: AgentClarificationOption[];
@@ -125,11 +126,28 @@ export function cloneAgentClarificationView(value: AgentClarificationView): Agen
   return {
     request: {
       id: value.request.id, question: value.request.question, options: options,
-      recommendedOptionId: value.request.recommendedOptionId, allowFreeText: value.request.allowFreeText
+      recommendedOptionId: value.request.recommendedOptionId, allowFreeText: value.request.allowFreeText,
+      kind: value.request.kind === 'create_target' ? 'create_target' : undefined
     },
     selectedOptionId: value.selectedOptionId, supplementalText: value.supplementalText,
     state: value.state
   };
+}
+
+/** 目标选择复用澄清的暂停/接续协议，参数不能携带模型虚构的候选 ID。 */
+export function decodeAgentCreateTargetRequest(argumentsJson: string): AgentClarificationRequest {
+  const raw: RawClarificationRequest = JSON.parse(argumentsJson) as RawClarificationRequest;
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new AgentToolSchemaError('invalid_type', '$', 'Target selection requires an object');
+  }
+  for (const key of Object.keys(raw)) {
+    if (key !== 'clarificationId' && key !== 'question') {
+      throw new AgentToolSchemaError('unexpected_property', key, 'Only clarificationId and question are accepted');
+    }
+  }
+  return { id: boundedText(raw.clarificationId, 'clarificationId', 64),
+    question: boundedText(raw.question, 'question', 600), kind: 'create_target',
+    options: [], recommendedOptionId: '', allowFreeText: true };
 }
 
 export function buildClarificationAnswerText(request: AgentClarificationRequest,

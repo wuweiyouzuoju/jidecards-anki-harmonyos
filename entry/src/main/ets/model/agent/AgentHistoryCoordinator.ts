@@ -53,7 +53,7 @@ export class AgentHistoryCoordinator {
     try {
       const all: AgentConversation[] = await this.storage.load();
       if (!this.alive || !this.visible || generation !== this.loadGeneration) return null;
-      return all.filter((item: AgentConversation): boolean => item.mode === mode);
+      return all.filter((item: AgentConversation): boolean => mode === 'assistant' || item.mode === mode);
     } catch (error) {
       if (!this.alive || !this.visible || generation !== this.loadGeneration) return null;
       throw new Error('ai_agent_history_load_failed');

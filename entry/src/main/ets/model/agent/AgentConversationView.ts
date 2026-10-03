@@ -6,6 +6,7 @@ import { cloneAgentTimeline } from './AgentTimeline';
 import type { AgentClarificationView } from './AgentClarification';
 import { cloneAgentClarificationView } from './AgentClarification';
 import type { AgentHistoryAudit, AgentHistoryMessage, AgentConversation } from './AgentConversationTypes';
+import type { ThemeModeChange } from '../settings/ThemeModeSession';
 
 /** 单张待确认卡片：fields 与当前笔记类型字段顺序一一对应。 */
 export interface 卡片草稿 {
@@ -19,12 +20,16 @@ export interface 卡片草稿 {
 
 /** 一条聊天消息。 */
 export interface 聊天消息 {
+  /** 当前进程的主题操作反馈，归属该回复；历史不恢复撤销凭据。 */
+  themeChange: ThemeModeChange | null;
+  themeUndoNotice: string;
   timeline: AgentTimelineBlock[];
   timelineTruncated: boolean;
   streaming: boolean;
   action: AgentAction | null;
   reasoningIsSummary: boolean;
   reasoningTruncated: boolean;
+  expandedReasoningIds: number[];
   draftDeckId: number;
   draftNotetypeId: number;
   draftTargetLabel: string;
@@ -55,10 +60,13 @@ export interface 聊天消息 {
 
 export function createAgentMessage(id: number, 角色: string, 正文: string, 是否错误: boolean): 聊天消息 {
   return {
+    themeChange: null, themeUndoNotice: '',
     id: id, 角色: 角色, 正文: 正文, 是否错误: 是否错误,
     卡片列表: [], 字段名列表: [], 批次结果: '', 批次保存中: false,
     变更草稿列表: [], 工具过程: [], 来源列表: [], 推理摘要: '', timeline: [], timelineTruncated: false, streaming: false,
-    action: null, reasoningIsSummary: false, reasoningTruncated: false, draftDeckId: 0, draftNotetypeId: 0, draftTargetLabel: '',
+    action: null, reasoningIsSummary: false, reasoningTruncated: false,
+    expandedReasoningIds: 角色 === 'ai' ? [-1] : [],
+    draftDeckId: 0, draftNotetypeId: 0, draftTargetLabel: '',
     kind: 'normal', clarification: null, expanded: false, taskStatus: '',
     answerMessageId: 0, providerText: 正文
   };
@@ -89,9 +97,16 @@ export function cloneAgentTrace(追踪: AgentToolTrace): AgentHistoryAudit {
 
 export function cloneAgentMessage(消息: 聊天消息): 聊天消息 {
   return {
+    themeChange: 消息.themeChange === null ? null : {
+      status: 消息.themeChange.status, mode: 消息.themeChange.mode, previousMode: 消息.themeChange.previousMode,
+      saved: 消息.themeChange.saved, applied: 消息.themeChange.applied,
+      errorCode: 消息.themeChange.errorCode, undoId: 消息.themeChange.undoId
+    },
+    themeUndoNotice: 消息.themeUndoNotice,
     timeline: cloneAgentTimeline(消息.timeline),
     timelineTruncated: 消息.timelineTruncated,
     streaming: 消息.streaming,
+    expandedReasoningIds: 消息.expandedReasoningIds.slice(),
     action: 消息.action, reasoningIsSummary: 消息.reasoningIsSummary, reasoningTruncated: 消息.reasoningTruncated,
     draftDeckId: 消息.draftDeckId, draftNotetypeId: 消息.draftNotetypeId, draftTargetLabel: 消息.draftTargetLabel,
     id: 消息.id,
