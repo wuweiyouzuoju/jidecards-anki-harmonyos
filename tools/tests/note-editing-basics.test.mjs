@@ -7,8 +7,10 @@ import { wrapFieldSelection, nextClozeNumber, noteDraftChanged, parseNoteTags } 
 import { serializeNotetypeFields } from '../../entry/src/main/ets/model/NotetypeFieldDraft.ts';
 import { prepareNoteImageFields } from '../../entry/src/main/ets/model/NoteImageDraft.ts';
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
+import { noteInterfaceDependencies } from './app-interface-harness.mjs';
 import { decodeNotetype } from '../../entry/src/main/ets/proto/messages/NotetypeMessages.ts';
 import { 协议写入器 } from '../../entry/src/main/ets/proto/core/ProtoWriter.ts';
+import { creationPageHarness } from './note-creation-harness.mjs';
 
 test('formatting changes only selection and empty wrappers put caret inside, preserving imported HTML', () => {
   const source = '<img src="a&b.png"><span data-x="custom">中文😀</span>[sound:a.mp3]';
@@ -49,8 +51,10 @@ test('renamed IO stock identity is decoded from Core config, independent of name
 
 function panel(confirm=async()=>false,picker=async()=>null) {
   const Panel=loadComponentLogic('components/browser/浏览编辑区.ets','浏览编辑区',{
+    ...noteInterfaceDependencies(),
     noteDraftChanged,parseNoteTags,confirmNoteDiscard:confirm,从图库选取图片:picker,
     resourceText:(_ctx,key)=>key,$r:key=>key
+    ,NoteAudioPreview:class {async dispose(){}},discardNoteRecordings:async()=>{}
   });
   const instance=new Panel();let closes=0;
   Object.assign(instance,{initialFieldValues:['old','<img src="existing.png">'],initialTags:'tag',fieldNames:['A','B'],
@@ -69,7 +73,7 @@ test('editor close guard preserves dirty draft on cancel, blocks busy, and ignor
 });
 
 test('existing-note image attachments keep imported HTML and failed saves retain draft and media cache',async()=>{
-  const h=panel(async()=>false,async()=> 'photo://new');await h.instance.pickImage(1);
+  const h=panel();h.instance.applyFieldMedia(1,h.instance.fieldValues[1],[{id:1,fieldIndex:1,uri:'photo://new',filename:''}],[]);
   let attempts=0,imports=0;const saved=[];
   h.instance.onSave=async(fields,tags,images)=>{
     const result=await prepareNoteImageFields(fields,images,async()=>{imports++;return 'safe.png';});
@@ -87,7 +91,8 @@ test('new and existing editors both use the shared selection toolbar and guard t
   const panel=read('components/browser/浏览编辑区.ets');
   assert.match(panel,/onBack:[^]*?this\.requestClose\(\)/);
   assert.match(read('pages/EditNotePage.ets'),/backRequest: this\.backRequest/);
-  assert.match(read('components/common/NoteFieldCard.ets'),/NoteFieldEditor\(/);
+  assert.match(read('components/common/NoteFieldCard.ets'),/NoteAudioField\(/);
+  assert.match(read('components/common/NoteAudioField.ets'),/NoteFieldEditor\(/);
   assert.match(read('pages/添加笔记页.ets'),/\.onBackPressed\([^]*?this\.onBackPress\(\)/);
 });
 
@@ -120,35 +125,26 @@ test('Core editing capabilities follow renamed IO and multi-field Cloze structur
   await assert.rejects(service.获取编辑笔记类型(7),/structure read failed/);
 });
 
-test('pending discard blocks save, duplicate confirmation and image picking',async()=>{
+test('pending discard blocks save, duplicate confirmation and media draft application',async()=>{
   let resolve,confirms=0,picks=0,saves=0;
   const h=panel(()=>{confirms++;return new Promise(r=>resolve=r);},async()=>{picks++;return 'photo://x';});
   h.instance.tags='dirty';h.instance.onSave=async()=>{saves++;return true;};
   const closing=h.instance.requestClose();await h.instance.requestClose();
-  await h.instance.pickImage(0);await h.instance.提交();
+  h.instance.applyFieldMedia(0,'late',[{id:1,fieldIndex:0,uri:'photo://x',filename:''}],[]);await h.instance.提交();
+  assert.equal(h.instance.fieldValues[0],'old');assert.equal(h.instance.images.length,0);
   assert.equal(confirms,1);assert.equal(picks,0);assert.equal(saves,0);
   resolve(false);await closing;assert.equal(h.closes,0);assert.equal(h.instance.tags,'dirty');
 });
 
 
-function creationPage(confirm) {
-  const source=readFileSync(new URL('../../entry/src/main/ets/pages/添加笔记页.ets',import.meta.url),'utf8');
-  const names=['加载笔记类型','hasDraft','requestExit'];
-  const methods=names.map(name=>{
-    const start=source.search(new RegExp('  private (?:async )?'+name+'\\('));
-    assert.ok(start>=0);return source.slice(start,source.indexOf('\n  }',start)+4);
-  });
-  const Host=new Function('confirmNoteDiscard',stripTypeScriptTypes('class Host {'+methods.join('\n')+'}')+';return Host;')(confirm);
-  const loads=[],closes=[];
-  const page=Object.assign(new Host(),{pageActive:true,处理中:false,pickingFieldImage:false,confirmingDiscard:false,
-    typeSelectorVersion:0,已选笔记类型ID:1,字段值列表:['draft'],标签:'tag',fieldImages:[{uri:'photo://one'}],
-    图片遮盖_源图Uri:'',imageRequest:0,creationSession:{loadType:async id=>loads.push(id)},
-    pathStack:{pop:()=>closes.push('pop')},getUIContext:()=>({})});
-  return {page,loads,closes};
+async function creationPage(confirm) {
+  const h=creationPageHarness({confirm}); await h.ready; h.loads.length=0;
+  h.page.字段值列表=['draft']; h.page.标签='tag'; h.page.fieldImages=[{uri:'photo://one'}];
+  return {page:h.page,loads:h.loads,closes:h.pops};
 }
 
 test('new note type cancellation restores selection while preserving fields, tags and images',async()=>{
-  let resolve;const h=creationPage(()=>new Promise(r=>resolve=r));
+  let resolve;const h=await creationPage(()=>new Promise(r=>resolve=r));
   const pending=h.page.加载笔记类型(2);
   assert.equal(h.page.confirmingDiscard,true);
   await h.page.加载笔记类型(3);await h.page.requestExit();assert.deepEqual(h.loads,[]);
@@ -156,17 +152,17 @@ test('new note type cancellation restores selection while preserving fields, tag
   assert.equal(h.page.已选笔记类型ID,1);assert.equal(h.page.typeSelectorVersion,1);
   assert.deepEqual(h.page.字段值列表,['draft']);assert.equal(h.page.标签,'tag');assert.equal(h.page.fieldImages.length,1);
   assert.deepEqual(h.closes,[]);
-  const yes=creationPage(async()=>true);await yes.page.加载笔记类型(2);
+  const yes=await creationPage(async()=>true);await yes.page.加载笔记类型(2);
   assert.deepEqual(yes.loads,[2]);assert.deepEqual(yes.page.fieldImages,[]);
 });
 
 test('new note discard blocks busy exit and cannot navigate or reload after disposal',async()=>{
   for(const operation of ['requestExit','加载笔记类型']){
-    let resolve;const h=creationPage(()=>new Promise(r=>resolve=r));
+    let resolve;const h=await creationPage(()=>new Promise(r=>resolve=r));
     const pending=h.page[operation](2);h.page.pageActive=false;resolve(true);await pending;
     assert.deepEqual(h.loads,[]);assert.deepEqual(h.closes,[]);
   }
-  const h=creationPage(async()=>true);h.page.pickingFieldImage=true;
+  const h=await creationPage(async()=>true);h.page.pickingFieldImage=true;
   await h.page.requestExit();await h.page.加载笔记类型(2);assert.deepEqual(h.loads,[]);assert.deepEqual(h.closes,[]);
   h.page.pickingFieldImage=false;await h.page.requestExit();assert.deepEqual(h.closes,['pop']);
 });

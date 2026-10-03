@@ -29,6 +29,18 @@
 
 import { 协议读取器 } from '../core/ProtoReader';
 import { 线类型_长度分隔, 协议写入器 } from '../core/ProtoWriter';
+import type { EditableNote } from './NoteMessages';
+import { encodeNote } from './NoteMessages';
+
+/** RenderUncommittedCardLegacyRequest：模板 bytes 使用 UTF-8 JSON；不写入笔记或卡片。 */
+export function encodeRenderUncommittedCardRequest(note: EditableNote, ordinal: number, template: string, fillEmpty: boolean = false): Uint8Array {
+  const writer = new 协议写入器();
+  writer.写入字节(1, encodeNote(note));
+  writer.写入变长整数(2, ordinal);
+  writer.写入字符串(3, template);
+  writer.写入布尔(4, fillEmpty);
+  return writer.转为字节();
+}
 
 export function encodeRenderExistingCardRequest(cardId: number): Uint8Array {
   const w = new 协议写入器();

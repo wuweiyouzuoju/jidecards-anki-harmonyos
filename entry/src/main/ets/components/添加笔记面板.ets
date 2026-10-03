@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { FormInputStyle } from '../utils/FormInputStyle';
 import { noteTypeText, noteFieldText } from '../utils/NoteTypeText';
 import { PressFeedback } from '../utils/PressFeedback';
 import { HelpLabel } from './common/HelpLabel';
@@ -365,11 +366,14 @@ export struct 添加笔记面板 {
         Scroll() {
           Column({ space: 应用尺寸.间距_14 }) {
 
-            this.带帮助的标签($r('app.string.add_note_deck'), $r('app.string.add_note_deck_help'))
+            Row({ space: 应用尺寸.间距_12 }) {
+              Column() {
+              this.带帮助的标签($r('app.string.add_note_deck'), $r('app.string.add_note_deck_help'))
+              }.layoutWeight(1)
             Select(this.牌组下拉选项())
               .selected(this.选中牌组索引())
               .value(this.选中牌组名())
-              .width('100%')
+              .width(SelectStyle.fieldWidth).constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
               .enabled(!this.busy && this.deckOptions.length > 0)
               .attributeModifier(new SelectStyle())
               .height(SelectStyle.controlHeight)
@@ -381,14 +385,20 @@ export struct 添加笔记面板 {
               .textModifier(SelectStyle.labelText())
               .borderRadius(SelectStyle.controlRadius)
               .onSelect((index: number): void => {
-                this.onSelectDeck(this.deckOptions[index].id);
+                if (!this.busy && Number.isInteger(index) && index >= 0 && index < this.deckOptions.length) {
+                  this.onSelectDeck(this.deckOptions[index].id);
+                }
               })
+            }.width('100%').alignItems(VerticalAlign.Center)
 
-            this.带帮助的标签($r('app.string.add_note_notetype'), $r('app.string.add_note_notetype_help'))
+            Row({ space: 应用尺寸.间距_12 }) {
+              Column() {
+              this.带帮助的标签($r('app.string.add_note_notetype'), $r('app.string.add_note_notetype_help'))
+              }.layoutWeight(1)
             Select(this.笔记类型下拉选项())
               .selected(this.选中笔记类型索引())
               .value(this.选中笔记类型名())
-              .width('100%')
+              .width(SelectStyle.fieldWidth).constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
               .enabled(!this.busy && this.notetypeOptions.length > 0)
               .attributeModifier(new SelectStyle())
               .height(SelectStyle.controlHeight)
@@ -400,8 +410,11 @@ export struct 添加笔记面板 {
               .textModifier(SelectStyle.labelText())
               .borderRadius(SelectStyle.controlRadius)
               .onSelect((index: number): void => {
-                this.onSelectNotetype(this.notetypeOptions[index].id);
+                if (!this.busy && Number.isInteger(index) && index >= 0 && index < this.notetypeOptions.length) {
+                  this.onSelectNotetype(this.notetypeOptions[index].id);
+                }
               })
+            }.width('100%').alignItems(VerticalAlign.Center)
 
             ForEach(this.fieldNames, (字段名: string, index: number) => {
               Column({ space: 应用尺寸.间距_5 }) {
@@ -449,15 +462,7 @@ export struct 添加笔记面板 {
               Column({ space: 应用尺寸.间距_5 }) {
                 this.带帮助的标签($r('app.string.add_note_tags'), $r('app.string.add_note_tags_help'))
                 TextInput({ placeholder: $r('app.string.add_note_tags_placeholder'), text: this.tags })
-                  .width('100%')
-                  .height(应用尺寸.按钮高度)
-                  .fontSize(应用尺寸.字号_正文)
-                  .fontColor($r('app.color.text_primary'))
-                  .placeholderColor($r('app.color.text_tertiary'))
-                  .backgroundColor($r('app.color.surface_card'))
-                  .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
-                  .borderRadius(应用尺寸.圆角_面板)
-                  .padding({ left: 应用尺寸.间距_10, right: 应用尺寸.间距_10 })
+                  .attributeModifier(new FormInputStyle())
                   .enabled(!this.busy)
                   .onChange((value: string): void => {
                     this.tags = value;

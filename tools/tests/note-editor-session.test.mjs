@@ -12,6 +12,17 @@ function harness() {
   return {session,backend,events,get state(){return state;}};
 }
 
+test('IO 编辑能力按 Core 字段索引复制，失败保存仍可继续图形编辑', async () => {
+  const h = harness(), indexes = [2,0,3,1];
+  h.backend.notetype = async () => ({ fieldNames: ['Renamed image','Extra','Masks','Header'], imageOcclusionFields: indexes });
+  await h.session.open(1,true,()=>true);
+  indexes[0] = 99;
+  assert.deepEqual(h.state.imageOcclusionFields,[2,0,3,1]);
+  await h.session.save(['img','extra','edited','header'],[],async () => false);
+  assert.deepEqual(h.state.imageOcclusionFields,[2,0,3,1]);
+  assert.equal(h.state.visible,true);
+});
+
 test('editor loads card or note identity, latest open wins, close invalidates loading', async()=>{
   const h=harness(), gate=deferred();
   await h.session.open(2,false,()=>true); assert.equal(h.state.note.id,12);

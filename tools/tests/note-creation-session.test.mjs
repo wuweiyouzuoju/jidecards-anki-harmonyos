@@ -5,6 +5,7 @@ import { NoteCreationSession } from '../../entry/src/main/ets/model/NoteCreation
 import { NoteTypeCatalog, standardNoteTypes } from '../../entry/src/main/ets/model/NoteTypeCatalog.ts';
 import { prepareNoteImageFields } from '../../entry/src/main/ets/model/NoteImageDraft.ts';
 import { loadPlatformModule } from './platform-module-harness.mjs';
+import { NoteDuplicateWarning } from '../../entry/src/main/ets/model/NoteDuplicateSession.ts';
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
 const settle=async()=>{for(let i=0;i<5;i++)await new Promise(setImmediate);};
 test('note initialization exposes every type and falls back when the default was deleted',async()=>{
@@ -31,6 +32,7 @@ test('accepted note saves retain captured inputs, finish after disposal and neve
 function adapterHarness(options={}) {
   const events=[],names=options.names??[];
   const Adapter=loadPlatformModule('backend/AnkiNoteCreation.ets','AnkiNoteCreation',{
+    NoteDuplicateWarning, 笔记字段校验错误: class extends Error {},
     NoteTypeCatalog,standardNoteTypes,后端会话:{获取实例:()=>({确保已打开:async()=>{}})},
     笔记服务:class{
       async 获取添加默认值(){return {notetypeId:99};}

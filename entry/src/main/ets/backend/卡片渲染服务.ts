@@ -28,6 +28,7 @@
 // ========================================================
 
 import { 后端会话 } from './后端会话';
+import type { EditableNote } from '../proto/messages/NoteMessages';
 import { 卡片渲染方法, 服务号 } from './服务索引';
 import type { RenderedCard, TemplateNode, 空卡报告 } from '../proto/messages/CardRenderingMessages';
 import {
@@ -38,12 +39,23 @@ import {
   encodeExtractAvTagsRequest,
   encodeExtractLatexRequest,
   encodeRenderExistingCardRequest,
+  encodeRenderUncommittedCardRequest,
   encode空请求
 } from '../proto/messages/CardRenderingMessages';
 import type { AvTagsResult } from '../proto/messages/CardRenderingMessages';
 
 export class 卡片渲染服务 {
   private readonly 会话: 后端会话 = 后端会话.获取实例();
+
+  async renderUncommittedCard(note: EditableNote, ordinal: number, template: string, css: string, fillEmpty: boolean = false): Promise<RenderedCard> {
+    const response = await this.会话.调用(服务号.后端卡片渲染, 卡片渲染方法.renderUncommittedCardLegacy,
+      encodeRenderUncommittedCardRequest(note, ordinal, template, fillEmpty));
+    const rendered = decodeRenderCardResponse(response);
+    rendered.css = css;
+    await this.resolveLatexImages(rendered.questionNodes, rendered.latexSvg);
+    await this.resolveLatexImages(rendered.answerNodes, rendered.latexSvg);
+    return rendered;
+  }
 
   /**
    * 渲染既有卡片的正面/背面节点流与模板 CSS。

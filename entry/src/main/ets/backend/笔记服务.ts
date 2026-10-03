@@ -46,6 +46,7 @@ import {
 } from '../proto/messages/NoteMessages';
 import { encodeNotetypeId } from '../proto/messages/NotetypeMessages';
 import { NoteFieldsCheckState } from '../proto/messages/NoteMessages';
+import { 协议读取器 } from '../proto/core/ProtoReader';
 import type { OpChanges } from '../proto/messages/CollectionMessages';
 
 export type 笔记字段校验键 =
@@ -80,6 +81,22 @@ function 校验键对应状态(状态: NoteFieldsCheckState): 笔记字段校验
 
 export class 笔记服务 {
   private readonly 会话: 后端会话 = 后端会话.获取实例();
+
+  /** 草稿编号由锁定 Core 解析，包含嵌套和多编号 Cloze。 */
+  async clozeNumbersInNote(note: EditableNote): Promise<number[]> {
+    const reader = new 协议读取器(await this.会话.调用(
+      服务号.后端笔记, 笔记方法.clozeNumbersInNote, encodeNote(note)));
+    const numbers: number[] = [];
+    let tag;
+    while ((tag = reader.读取标签()) !== null) {
+      if (tag.字段号 === 1) {
+        if (tag.线类型 === 2) numbers.push(...reader.读取打包64位整数());
+        else numbers.push(reader.读取变长整数());
+      } else reader.跳过字段(tag.线类型);
+    }
+    return numbers.filter((value: number): boolean => value > 0 && value <= 65535)
+      .sort((a: number, b: number): number => a - b);
+  }
 
   async 获取添加默认值(): Promise<DeckAndNotetype> {
     const 响应 = await this.会话.调用(
@@ -129,10 +146,19 @@ export class 笔记服务 {
   }
 
   async 添加笔记(笔记: EditableNote, 牌组ID: number): Promise<number> {
+    return this.校验并添加笔记(笔记, 牌组ID, false);
+  }
+
+  /** 仅手动新增明确确认后调用；仍阻止空字段与全部非法 Cloze 状态。 */
+  async 添加笔记允许重复(笔记: EditableNote, 牌组ID: number): Promise<number> {
+    return this.校验并添加笔记(笔记, 牌组ID, true);
+  }
+
+  private async 校验并添加笔记(笔记: EditableNote, 牌组ID: number, 允许重复: boolean): Promise<number> {
     const 校验响应 = await this.会话.调用(
       服务号.后端笔记, 笔记方法.笔记字段校验, 编码笔记用于校验(笔记));
     const 校验键 = 校验键对应状态(decodeNoteFieldsCheckResponse(校验响应).state);
-    if (校验键 !== null) {
+    if (校验键 !== null && !(允许重复 && 校验键 === 'add_note_duplicate_error')) {
       throw new 笔记字段校验错误(校验键);
     }
     const 响应 = await this.会话.调用(

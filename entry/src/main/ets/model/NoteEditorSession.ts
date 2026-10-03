@@ -11,6 +11,7 @@ export interface NoteEditorState {
   fieldNames: string[];
   clozeFieldOrds: number[];
   optionalReverseFieldOrd: number;
+  imageOcclusionFields?: number[];
   error: string;
 }
 
@@ -41,7 +42,8 @@ export class NoteEditorSession {
       const snapshot = await loadNoteEditor(id, isNote, this.backend, valid);
       if (snapshot === null || !valid()) return 'stale';
       this.publish({ visible: true, busy: false, note: snapshot.note,
-        originalStockKind: snapshot.originalStockKind, fieldNames: snapshot.fieldNames, clozeFieldOrds: snapshot.clozeFieldOrds, optionalReverseFieldOrd: snapshot.optionalReverseFieldOrd, error: '' });
+        originalStockKind: snapshot.originalStockKind, fieldNames: snapshot.fieldNames, clozeFieldOrds: snapshot.clozeFieldOrds, optionalReverseFieldOrd: snapshot.optionalReverseFieldOrd,
+        imageOcclusionFields: snapshot.imageOcclusionFields, error: '' });
       return 'loaded';
     } catch (error) {
       if (!valid()) return 'stale';
@@ -61,7 +63,8 @@ export class NoteEditorSession {
     if (padFields) while (values.length < this.state.fieldNames.length) values.push('');
     const updated: EditableNote = { id: note.id, guid: note.guid, notetypeId: note.notetypeId,
       mtimeSecs: note.mtimeSecs, usn: note.usn, fields: values, tags: tags.slice() };
-    this.publish({ visible: true, busy: true, note: note, originalStockKind: this.state.originalStockKind, fieldNames: this.state.fieldNames, clozeFieldOrds: this.state.clozeFieldOrds, optionalReverseFieldOrd: this.state.optionalReverseFieldOrd, error: '' });
+    this.publish({ visible: true, busy: true, note: note, originalStockKind: this.state.originalStockKind, fieldNames: this.state.fieldNames, clozeFieldOrds: this.state.clozeFieldOrds, optionalReverseFieldOrd: this.state.optionalReverseFieldOrd,
+      imageOcclusionFields: this.state.imageOcclusionFields, error: '' });
     let saved: boolean = false;
     try {
       saved = await write(updated);
@@ -72,7 +75,8 @@ export class NoteEditorSession {
       if (!this.disposed && version === this.version) {
         if (saved) this.close();
         else this.publish({ visible: true, busy: false, note: note,
-          originalStockKind: this.state.originalStockKind, fieldNames: this.state.fieldNames, clozeFieldOrds: this.state.clozeFieldOrds, optionalReverseFieldOrd: this.state.optionalReverseFieldOrd, error: 'save' });
+          originalStockKind: this.state.originalStockKind, fieldNames: this.state.fieldNames, clozeFieldOrds: this.state.clozeFieldOrds, optionalReverseFieldOrd: this.state.optionalReverseFieldOrd,
+          imageOcclusionFields: this.state.imageOcclusionFields, error: 'save' });
       }
     }
   }

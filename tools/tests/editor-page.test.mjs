@@ -2,7 +2,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {editorPageHarness} from './editor-page-harness.mjs';
-import {noteClozeDecorations} from '../../entry/src/main/ets/model/NoteClozeDecoration.ts';
 import {parseNoteRichText,serializeNoteRichText} from '../../entry/src/main/ets/model/NoteRichText.ts';
 const deferred=()=>{let resolve; const promise=new Promise(r=>resolve=r);return {promise,resolve}};
 const settle=async()=>{for(let i=0;i<15;i++)await Promise.resolve()};
@@ -36,14 +35,14 @@ test('load failure supports retry and departed loading cannot revive a page',asy
  const gate=deferred();h.io.note=()=>gate.promise;const work=h.page.load();h.page.aboutToDisappear();gate.resolve(h.note);await work;
  assert.equal(h.page.editor.note,null);assert.equal(h.pops.length,0);
 });
-test('cloze decorations cover nested complete groups, preserve highlight and never alter stored markup',()=>{
+test('rich text preserves nested cloze numbers, hints, incomplete markers and explicit highlight',()=>{
  const html='😀 {{c1::中<b>{{c2::文}}</b>::提示}} x {{c3::unfinished';const runs=parseNoteRichText(html);
- const text=runs.map(x=>x.text).join('');const parts=noteClozeDecorations(runs);
- assert.equal(parts.filter(p=>p.cloze).map(p=>text.slice(p.start,p.end)).join(''),'{{c1::中{{c2::文}}::提示}}');
+ assert.equal(runs.map(x=>x.text).join(''),'😀 {{c1::中{{c2::文}}::提示}} x {{c3::unfinished');
  assert.equal(serializeNoteRichText(runs),html);
- const marked=noteClozeDecorations(parseNoteRichText('{{c1::<mark>亮</mark>}}'));
- assert.deepEqual(marked.filter(p=>p.highlight),[{start:6,end:7,cloze:true,highlight:true}]);
- assert.deepEqual(noteClozeDecorations([]),[]);
+ const highlighted='{{c1::<mark>亮</mark>}}';const marked=parseNoteRichText(highlighted);
+ assert.deepEqual(marked,[{text:'{{c1::',format:0},{text:'亮',format:8},{text:'}}',format:0}]);
+ assert.equal(serializeNoteRichText(marked),highlighted);
+ assert.deepEqual(parseNoteRichText(''),[]);
 });
 
 
