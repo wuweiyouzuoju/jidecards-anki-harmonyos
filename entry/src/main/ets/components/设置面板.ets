@@ -3,8 +3,11 @@ import { PressFeedback } from '../utils/PressFeedback';
 import { DisclosureChevron } from './common/DisclosureChevron';
 import { namedResourceText, resourceText, showToastSafely } from '../utils/UiFeedback';
 import { ThemeTextSpans } from './common/ThemeText';
+import { SettingsGroup, visibleSettingsGroups } from '../model/SettingsStructure';
+import { appInterface } from '../backend/AppInterfaceService';
 import { SettingsEntry, filterSettingsEntries, SETTINGS_ENTRIES } from '../model/SettingsNavigation';
 import { syncActivity } from '../model/SyncSettings';
+import { OFFICIAL_QQ_GROUP } from '../model/OfficialCommunity';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
 import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
 
@@ -21,6 +24,7 @@ import { RedemptionPanel } from './settings/RedemptionPanel';
 import { AboutSettings } from './settings/AboutSettings';
 import { GeneralSettings } from './settings/GeneralSettings';
 import { ReviewControlsSettings } from './settings/ReviewControlsSettings';
+import { ReviewPreferencesSettings } from './settings/ReviewPreferencesSettings';
 import { 外观分组 } from './settings/外观分组';
 import { 调度器分组 } from './settings/调度器分组';
 import { 布局分组 } from './settings/布局分组';
@@ -89,7 +93,7 @@ export struct 设置面板 {
   }
 
   @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
-  @Link activeSection: string;
+  @Link @Watch('publishInterface') activeSection: string;
   @State private settingsQuery: string = '';
   @Prop openAiSettings: boolean = false;
   @Prop 当前主题模式: 主题模式 = 'system';
@@ -114,6 +118,8 @@ export struct 设置面板 {
   };
   导出数据回调: () => void = (): void => {
   };
+  创建完整备份回调: () => void = (): void => {};
+  恢复完整备份回调: () => void = (): void => {};
   // 用户在数据管理分组点「隐藏牌组管理」：上抛给 Index 弹出隐藏牌组对话框
   点击已隐藏牌组回调: () => void = (): void => {
   };
@@ -164,6 +170,7 @@ export struct 设置面板 {
   private readonly 标签服务实例: 标签服务 = new 标签服务();
 
   async aboutToAppear(): Promise<void> {
+    this.publishInterface();
     this.disposed = false;
     const lifecycleVersion: number = ++this.lifecycleVersion;
     this.maintenanceSession.attach((state: CollectionMaintenanceState): void => { this.maintenance = state; });
@@ -188,6 +195,7 @@ export struct 设置面板 {
   }
 
   aboutToDisappear(): void {
+    appInterface.leave('settings');
     this.disposed = true;
     this.lifecycleVersion++;
     this.maintenanceSession.detach();
@@ -211,6 +219,15 @@ export struct 设置面板 {
   private directoryEntries(): SettingsEntry[] {
     return filterSettingsEntries(this.settingsQuery, this.简洁模式, this.Agent入口已启用,
       (key: string): string => this.sectionText(key));
+  }
+
+  private sectionGroups(): SettingsGroup[] {
+    return visibleSettingsGroups(this.activeSection, this.简洁模式, this.Agent入口已启用);
+  }
+
+  private publishInterface(): void {
+    appInterface.observe({ surface: 'settings', sectionId: this.activeSection, selectedId: '',
+      optionIds: [], optionLabels: [], busy: false });
   }
 
   private pageTitle(): string {
@@ -427,47 +444,50 @@ export struct 设置面板 {
           if (this.activeSection === '') {
             ListItem() { this.settingsDirectory() }
           }
-          if (this.activeSection === 'general') {
-            ListItem() {
-              GeneralSettings({
-                是否深色: this.是否深色,
-                打开说明回调: (标题: Resource, 正文: Resource): void => {
-                  this.说明标题 = 标题;
-                  this.说明正文 = 正文;
-                  this.显示说明浮层 = true;
-                }
-              })
+          ForEach(this.sectionGroups(), (group: SettingsGroup) => {
+            if (group.id === 'general_display') {
+              ListItem() {
+                GeneralSettings({
+                  是否深色: this.是否深色,
+                  打开说明回调: (标题: Resource, 正文: Resource): void => {
+                    this.说明标题 = 标题;
+                    this.说明正文 = 正文;
+                    this.显示说明浮层 = true;
+                  }
+                })
+              }
             }
-          }
-          if (this.activeSection === 'scheduler') {
-            ListItem() {
-              ReviewControlsSettings({
-                是否深色: this.是否深色,
-                简洁模式: this.简洁模式,
-                打开说明回调: (标题: Resource, 正文: Resource): void => {
-                  this.说明标题 = 标题;
-                  this.说明正文 = 正文;
-                  this.显示说明浮层 = true;
-                }
-              })
+            else if (group.id === 'review_controls') {
+              ListItem() {
+                ReviewControlsSettings({
+                  是否深色: this.是否深色,
+                  简洁模式: this.简洁模式,
+                  打开说明回调: (标题: Resource, 正文: Resource): void => {
+                    this.说明标题 = 标题;
+                    this.说明正文 = 正文;
+                    this.显示说明浮层 = true;
+                  }
+                })
+              }
             }
-          }
-          // 两种模式都可选择答题工具栏位置，切换模式不改已保存的布局。
-          if (this.activeSection === 'scheduler') {
-            ListItem() {
-              布局分组({
-                是否深色: this.是否深色,
-                打开说明回调: (标题: Resource, 正文: Resource): void => {
-                  this.说明标题 = 标题;
-                  this.说明正文 = 正文;
-                  this.显示说明浮层 = true;
-                }
-              })
+            else if (group.id === 'global_review' || group.id === 'study_display') {
+              ListItem() {
+                ReviewPreferencesSettings({ 是否深色: this.是否深色, displayOptions: group.id === 'study_display' })
+              }
             }
-          }
-          // 2. FSRS 调度器分组（简洁模式下隐藏）
-          if (!this.简洁模式) {
-            if (this.activeSection === 'scheduler') {
+            else if (group.id === 'study_layout') {
+              ListItem() {
+                布局分组({
+                  是否深色: this.是否深色,
+                  打开说明回调: (标题: Resource, 正文: Resource): void => {
+                    this.说明标题 = 标题;
+                    this.说明正文 = 正文;
+                    this.显示说明浮层 = true;
+                  }
+                })
+              }
+            }
+            else if (group.id === 'algorithm') {
               ListItem() {
                 调度器分组({
                   是否深色: this.是否深色,
@@ -479,49 +499,41 @@ export struct 设置面板 {
                 })
               }
             }
-          }
-          // 1. 外观与语言分组
-          if (this.activeSection === 'appearance') {
-            ListItem() {
-              外观分组({
-                是否深色: this.是否深色,
-                简洁模式: this.简洁模式,
-                当前主题模式: this.当前主题模式,
-                当前颜色主题: this.当前颜色主题,
-                主题模式切换回调: (模式: 主题模式): void => { this.主题模式切换回调(模式); },
-                颜色主题切换回调: (主题: 颜色主题): void => { this.颜色主题切换回调(主题); }
-              })
+            else if (group.id === 'appearance') {
+              ListItem() {
+                外观分组({
+                  是否深色: this.是否深色,
+                  简洁模式: this.简洁模式,
+                  当前主题模式: this.当前主题模式,
+                  当前颜色主题: this.当前颜色主题,
+                  主题模式切换回调: (模式: 主题模式): void => { this.主题模式切换回调(模式); },
+                  颜色主题切换回调: (主题: 颜色主题): void => { this.颜色主题切换回调(主题); }
+                })
+              }
             }
-          }
-          // 4. AnkiWeb 云同步分组（M10-T14：登录/同步/冲突全在 同步分组 内部状态机完成）
-          // 2026-07-22 上移两格：用户反馈云同步常用，原位于数据管理之后太靠下
-          // 2026-07-28：语音朗读分组已删除（用户决策），同步分组从原 5 号位上移到 4 号位
-          if (this.activeSection === 'sync') {
-            ListItem() {
-              同步分组({
-                是否深色: this.是否深色,
-                简洁模式: this.简洁模式,
-                打开同步弹窗回调: (凭证: SyncAuth, 账号名: string): void => { this.打开同步弹窗回调(凭证, 账号名); },
-                点击导出数据回调: (): void => { this.先备份后同步回调(); },
-                打开说明回调: (标题: Resource, 正文: Resource): void => {
-                  this.说明标题 = 标题;
-                  this.说明正文 = 正文;
-                  this.显示说明浮层 = true;
-                }
-              })
+            else if (group.id === 'sync') {
+              ListItem() {
+                同步分组({
+                  是否深色: this.是否深色,
+                  简洁模式: this.简洁模式,
+                  打开同步弹窗回调: (凭证: SyncAuth, 账号名: string): void => { this.打开同步弹窗回调(凭证, 账号名); },
+                  点击导出数据回调: (): void => { this.先备份后同步回调(); },
+                  打开说明回调: (标题: Resource, 正文: Resource): void => {
+                    this.说明标题 = 标题;
+                    this.说明正文 = 正文;
+                    this.显示说明浮层 = true;
+                  }
+                })
+              }
             }
-          }
-          if (this.Agent入口已启用) {
-            if (this.activeSection === 'ai') {
+            else if (group.id === 'ai') {
               ListItem() {
                 AIAgent设置分组({
                   是否深色: this.是否深色,
                 })
               }
             }
-          }
-          // 新手帮助在两种模式下都可访问。
-            if (this.activeSection === 'help') {
+            else if (group.id === 'help') {
               ListItem() {
                 术语分组({
                   是否深色: this.是否深色,
@@ -533,69 +545,68 @@ export struct 设置面板 {
                 })
               }
             }
-          // 数据管理：维护入口合并在同一列表，检查状态仍由主壳管理。
-          if (this.activeSection === 'data') {
-            ListItem() {
-              数据分组({
-                是否深色: this.是否深色,
-                简洁模式: this.简洁模式,
-                databaseBusy: this.maintenance.checking,
-                databaseChecked: this.maintenance.checked,
-                databaseError: this.maintenance.error,
-                databaseProblems: this.maintenance.problems,
-                onCheckDatabase: (): void => { this.执行数据库检查(); },
-                onDatabaseHelp: (): void => {
-                  this.说明标题 = $r('app.string.check_db_title');
-                  this.说明正文 = $r('app.string.check_db_help');
-                  this.显示说明浮层 = true;
-                },
-                点击导出导入回调: (): void => { this.导出数据回调(); },
-                点击笔记类型回调: (): void => { this.显示笔记类型管理 = true; },
-                点击已隐藏牌组回调: (): void => { this.点击已隐藏牌组回调(); },
-                点击媒体管理回调: (): void => { this.显示媒体管理 = true; },
-                点击备份管理回调: (): void => { this.显示备份管理 = true; },
-                点击空卡回调: (): void => { this.显示空卡列表 = true; },
-                点击查找重复回调: (): void => { this.显示查找重复 = true; },
-                点击清除未用标签回调: (): void => { this.请求清除未用标签(); }
-              })
-            }
-          }
-          // 8. 关于分组：反馈由独立系统弹窗承载
-          if (this.activeSection === 'about') {
-            ListItem() {
-              设置分组卡片({
-                标题: $r('app.string.settings_about'),
-                是否深色: this.是否深色,
-              }) {
-                AboutSettings({
+            else if (group.id === 'data') {
+              ListItem() {
+                数据分组({
                   是否深色: this.是否深色,
-                  打开许可证回调: (): void => { this.打开许可证回调(); }
+                  简洁模式: this.简洁模式,
+                  databaseBusy: this.maintenance.checking,
+                  databaseChecked: this.maintenance.checked,
+                  databaseError: this.maintenance.error,
+                  databaseProblems: this.maintenance.problems,
+                  onCheckDatabase: (): void => { this.执行数据库检查(); },
+                  onDatabaseHelp: (): void => {
+                    this.说明标题 = $r('app.string.check_db_title');
+                    this.说明正文 = $r('app.string.check_db_help');
+                    this.显示说明浮层 = true;
+                  },
+                  点击导入回调: (): void => { this.导入数据回调(); },
+                  点击导出回调: (): void => { this.导出数据回调(); },
+                  点击笔记类型回调: (): void => { this.显示笔记类型管理 = true; },
+                  点击已隐藏牌组回调: (): void => { this.点击已隐藏牌组回调(); },
+                  点击媒体管理回调: (): void => { this.显示媒体管理 = true; },
+                  点击备份管理回调: (): void => { this.显示备份管理 = true; },
+                  点击空卡回调: (): void => { this.显示空卡列表 = true; },
+                  点击查找重复回调: (): void => { this.显示查找重复 = true; },
+                  点击清除未用标签回调: (): void => { this.请求清除未用标签(); }
                 })
               }
             }
-          }
-          // 开发者调试始终可见；正确密钥只持久化布尔解锁状态，不保存输入内容。
-          if (this.activeSection === 'advanced') {
-            ListItem() {
-              开发者调试分组({
-                是否深色: this.是否深色,
-                启用成功回调: (): void => {
-                  this.openSection('ai');
-                  setTimeout((): void => {
-                    this.内容滚动器.scrollToIndex(0);
-                  }, 50);
+            else if (group.id === 'about') {
+              ListItem() {
+                设置分组卡片({
+                  groupId: 'about',
+                  是否深色: this.是否深色,
+                }) {
+                  AboutSettings({
+                    是否深色: this.是否深色,
+                    打开许可证回调: (): void => { this.打开许可证回调(); }
+                  })
                 }
-              })
+              }
             }
-          }
-          if (this.activeSection === 'redemption') {
-            ListItem() {
-              RedemptionPanel({
-                developerGroup: '726837065',
-                onUseTheme: (theme: 颜色主题): void => { this.颜色主题切换回调(theme); }
-              })
+            else if (group.id === 'advanced') {
+              ListItem() {
+                开发者调试分组({
+                  是否深色: this.是否深色,
+                  启用成功回调: (): void => {
+                    this.openSection('ai');
+                    setTimeout((): void => {
+                      this.内容滚动器.scrollToIndex(0);
+                    }, 50);
+                  }
+                })
+              }
             }
-          }
+            else if (group.id === 'redemption') {
+              ListItem() {
+                RedemptionPanel({
+                  developerGroup: OFFICIAL_QQ_GROUP,
+                  onUseTheme: (theme: 颜色主题): void => { this.颜色主题切换回调(theme); }
+                })
+              }
+            }
+          }, (group: SettingsGroup): string => group.id)
         }
         .layoutWeight(1)
         .width('100%')
@@ -645,6 +656,8 @@ export struct 设置面板 {
         备份管理面板({
           backRequest: this.backupBackRequest,
           isDark: this.是否深色,
+          onExportCollection: (): void => { this.创建完整备份回调(); },
+          onImportCollection: (): void => { this.恢复完整备份回调(); },
           onClose: (): void => { this.显示备份管理 = false; }
         })
           .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))

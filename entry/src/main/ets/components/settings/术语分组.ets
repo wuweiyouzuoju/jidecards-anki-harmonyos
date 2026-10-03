@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { settingsItemText } from '../../utils/SettingsStructureText';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { DisclosureChevron } from '../common/DisclosureChevron';
 import { resourceText } from '../../utils/UiFeedback';
@@ -44,82 +45,98 @@ export struct 术语分组 {
   /** 术语条目：标签资源 用于行内显示，帮助标题资源 / 帮助正文资源 用于弹层。 */
   private readonly 条目列表: 术语条目[] = [
     {
+      目录ID: 'help_bury',
       标签资源: $r('app.string.glossary_bury_label'),
       帮助标题资源: $r('app.string.glossary_bury_label'),
       帮助正文资源: $r('app.string.glossary_bury_help')
     },
     {
+      目录ID: 'help_suspend',
       标签资源: $r('app.string.glossary_suspend_label'),
       帮助标题资源: $r('app.string.glossary_suspend_label'),
       帮助正文资源: $r('app.string.glossary_suspend_help')
     },
     {
+      目录ID: 'help_siblings',
       标签资源: $r('app.string.glossary_siblings_label'),
       帮助标题资源: $r('app.string.glossary_siblings_label'),
       帮助正文资源: $r('app.string.glossary_siblings_help')
     },
     {
+      目录ID: 'help_delete',
       标签资源: $r('app.string.glossary_delete_label'),
       帮助标题资源: $r('app.string.glossary_delete_label'),
       帮助正文资源: $r('app.string.glossary_delete_help')
     },
     {
+      目录ID: 'help_undo',
       标签资源: $r('app.string.glossary_undo_label'),
       帮助标题资源: $r('app.string.glossary_undo_label'),
       帮助正文资源: $r('app.string.glossary_undo_help')
     },
     {
+      目录ID: 'help_rating',
       标签资源: $r('app.string.glossary_ratings_label'),
       帮助标题资源: $r('app.string.glossary_ratings_label'),
       帮助正文资源: $r('app.string.glossary_ratings_help')
     },
     {
+      目录ID: 'help_lapse',
       标签资源: $r('app.string.glossary_lapse_label'),
       帮助标题资源: $r('app.string.glossary_lapse_label'),
       帮助正文资源: $r('app.string.glossary_lapse_help')
     },
     {
+      目录ID: 'help_leech',
       标签资源: $r('app.string.glossary_leech_label'),
       帮助标题资源: $r('app.string.glossary_leech_label'),
       帮助正文资源: $r('app.string.glossary_leech_help')
     },
     {
+      目录ID: 'help_graduate',
       标签资源: $r('app.string.glossary_graduating_interval_label'),
       帮助标题资源: $r('app.string.glossary_graduating_interval_label'),
       帮助正文资源: $r('app.string.glossary_graduating_interval_help')
     },
     {
+      目录ID: 'help_fsrs',
       标签资源: $r('app.string.glossary_fsrs_retention_label'),
       帮助标题资源: $r('app.string.glossary_fsrs_retention_label'),
       帮助正文资源: $r('app.string.glossary_fsrs_retention_help')
     },
     {
+      目录ID: 'help_fuzz',
       标签资源: $r('app.string.glossary_fuzz_label'),
       帮助标题资源: $r('app.string.glossary_fuzz_label'),
       帮助正文资源: $r('app.string.glossary_fuzz_help')
     },
     {
+      目录ID: 'help_shortcuts',
       标签资源: $r('app.string.glossary_shortcuts_label'),
       帮助标题资源: $r('app.string.glossary_shortcuts_label'),
       帮助正文资源: $r('app.string.glossary_shortcuts_help')
     },
     // 浏览页新功能（T6/T8/T9/T11）集中查阅入口，正文复用浏览页 ⓘ 帮助文案
     {
+      目录ID: 'help_sidebar',
       标签资源: $r('app.string.browser_action_sidebar'),
       帮助标题资源: $r('app.string.browser_help_sidebar_title'),
       帮助正文资源: $r('app.string.browser_help_sidebar_body')
     },
     {
+      目录ID: 'help_find_replace',
       标签资源: $r('app.string.browser_action_find_replace'),
       帮助标题资源: $r('app.string.browser_help_find_replace_title'),
       帮助正文资源: $r('app.string.browser_help_find_replace_body')
     },
     {
+      目录ID: 'help_batch',
       标签资源: $r('app.string.browser_help_batch_title'),
       帮助标题资源: $r('app.string.browser_help_batch_title'),
       帮助正文资源: $r('app.string.browser_help_batch_body')
     },
     {
+      目录ID: 'help_browser_info',
       标签资源: $r('app.string.glossary_browser_info_label'),
       帮助标题资源: $r('app.string.glossary_browser_info_label'),
       帮助正文资源: $r('app.string.glossary_browser_info_help')
@@ -150,7 +167,7 @@ export struct 术语分组 {
   @Builder
   private 术语行(色板: 设置面板色板, 条目: 术语条目) {
     Row() {
-      Text(条目.标签资源)
+      Text(settingsItemText(this.getUIContext(), 条目.目录ID))
         .fontSize(15)
         .fontColor(色板.主文字)
         .layoutWeight(1)
@@ -166,7 +183,7 @@ export struct 术语分组 {
 
   build() {
     设置分组卡片({
-      标题: $r('app.string.settings_glossary'),
+      groupId: 'help',
       是否深色: this.是否深色
     }) {
       Column() {
@@ -181,6 +198,7 @@ export struct 术语分组 {
 
 /** 术语条目数据结构：标签资源 用于行内显示，帮助标题资源 / 帮助正文资源 用于弹层。 */
 interface 术语条目 {
+  目录ID: string;
   标签资源: Resource;
   帮助标题资源: Resource;
   帮助正文资源: Resource;

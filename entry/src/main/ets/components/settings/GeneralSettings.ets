@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { HelpLabel } from '../common/HelpLabel';
+import { settingsItemText } from '../../utils/SettingsStructureText';
+import { SettingsToggleRow } from '../common/SettingsToggleRow';
 import { resourceText, showToastSafely } from '../../utils/UiFeedback';
 import { SelectStyle } from '../../utils/SelectStyle';
 import { 当前语言模式, 语言模式, 设置语言模式 } from '../../model/语言存储';
@@ -54,11 +55,11 @@ export struct GeneralSettings {
 
 
   build() {
-    设置分组卡片({ 标题: $r('app.string.settings_general_display'), 是否深色: this.是否深色 }) {
+    设置分组卡片({ groupId: 'general_display', 是否深色: this.是否深色 }) {
       Column({ space: 4 }) {
           // 语言行 Select（zh-Hans/en）
           Row() {
-            Text($r('app.string.settings_language'))
+            Text(settingsItemText(this.getUIContext(), 'language'))
               .fontSize(15)
               .fontColor(设置面板色板_取(this.是否深色).主文字)
               .layoutWeight(1)
@@ -70,7 +71,7 @@ export struct GeneralSettings {
               .padding(SelectStyle.controlPadding)
               .space(SelectStyle.controlSpace)
               .width(SelectStyle.fieldWidth)
-              .constraintSize(SelectStyle.fieldConstraint)
+              .constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
               .font(SelectStyle.controlFont)
               .optionFont(SelectStyle.optionFont)
               .selectedOptionFont(SelectStyle.selectedOptionFont)
@@ -83,23 +84,15 @@ export struct GeneralSettings {
           }
           .width('100%')
           .height(48)
-          Row() {
-            HelpLabel({ title: $r('app.string.settings_home_today_summary'),
-              textColor: 设置面板色板_取(this.是否深色).主文字,
+          SettingsToggleRow({ title: settingsItemText(this.getUIContext(), 'home_today_summary'),
+              isOn: this.显示今日进度卡, tint: this.actionColor, isDark: this.是否深色, showHelp: true,
               onHelp: (): void => {
                 this.打开说明回调($r('app.string.settings_home_today_summary'), $r('app.string.settings_home_today_summary_hint'));
-              }
-            })
-            .layoutWeight(1)
-
-            Toggle({ type: ToggleType.Switch, isOn: this.显示今日进度卡 })
-              .selectedColor(this.actionColor)
-              .onChange((值: boolean): void => {
+              },
+              onChange: (值: boolean): void => {
                 this.切换今日进度卡(值);
-              })
-          }
-          .width('100%')
-          .height(48)
+              }
+          })
       }.width('100%')
     }
   }

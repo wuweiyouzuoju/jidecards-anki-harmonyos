@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { register, stripTypeScriptTypes } from 'node:module';
 import vm from 'node:vm';
+import { localPreferenceApi } from './local-preference-harness.mjs';
 import { normalizeCardTextSize } from '../../entry/src/main/ets/model/CardTextSize.ts';
 import { 协议写入器 } from '../../entry/src/main/ets/proto/core/ProtoWriter.ts';
 import { 笔记类型方法 } from '../../entry/src/main/ets/backend/服务索引.ts';
@@ -57,6 +58,7 @@ test('card text preference survives restart; failed save keeps the last successf
   const app = new Map([['abilityContext', {}]]);
   let fail = false;
   const context = vm.createContext({
+    ...localPreferenceApi({ setOrCreate: (key, value) => app.set(key, value) }),
     CARD_TEXT_SIZE_KEY: 'cardTextSizePercent', DEFAULT_CARD_TEXT_SIZE: 100, normalizeCardTextSize,
     AppStorage: { get: key => app.get(key), setOrCreate: (key, value) => app.set(key, value) },
     preferences: { getPreferencesSync: () => ({

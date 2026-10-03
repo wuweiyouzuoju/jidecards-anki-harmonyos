@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { isSettingsItemVisible } from '../../model/SettingsStructure';
+import { settingsItemText } from '../../utils/SettingsStructureText';
 import { namedResourceText, resourceText } from '../../utils/UiFeedback';
 import { SelectStyle } from '../../utils/SelectStyle';
 
 import { 主题模式 } from '../../model/主题设置';
 import { 设置面板色板_取 } from '../../utils/设置面板配色';
 import { 设置分组卡片 } from './设置分组卡片';
-import { UNLOCKED_CONTENTS_KEY, availableThemes, themeDefinition } from '../../model/ThemeCatalog';
+import { UNLOCKED_CONTENTS_KEY, THEME_CATALOG, ThemeDefinition, isThemeAvailable, themeDefinition } from '../../model/ThemeCatalog';
+import { IridescentGiftDialog } from '../IridescentGiftDialog';
 import { ThemeMotionControl } from './ThemeMotionControl';
 import { CardTextSizeControl } from './CardTextSizeControl';
 import { DeckWidthControl } from './DeckWidthControl';
@@ -37,6 +40,14 @@ import {
 @Component
 export struct 外观分组 {
   @StorageProp(UNLOCKED_CONTENTS_KEY) private unlockedContents: string[] = [];
+  @State private themeSelectionRevision: number = 0;
+  private giftDialog: CustomDialogController = new CustomDialogController({
+    builder: IridescentGiftDialog({}),
+    customStyle: true, autoCancel: false, alignment: DialogAlignment.Center,
+    width: '100%', height: '100%', maskColor: Color.Transparent
+  });
+
+  aboutToDisappear(): void { this.giftDialog.close(); }
   @Prop 是否深色: boolean = false;
   @Prop 简洁模式: boolean = true;
   @Prop 当前主题模式: 主题模式 = 'system';
@@ -82,19 +93,34 @@ export struct 外观分组 {
     return 0;
   }
 
-  /** 已验证的权益决定可选主题，所有索引共用同一列表。 */
-  private availableThemes(): 颜色主题[] {
-    return availableThemes(this.unlockedContents);
+  /** 展示完整目录，应用主题时仍校验权益。 */
+  private displayedThemes(): 颜色主题[] {
+    return THEME_CATALOG.map((theme: ThemeDefinition): 颜色主题 => theme.id);
+  }
+
+  private selectColorTheme(index: number): void {
+    const theme: 颜色主题 | undefined = this.displayedThemes()[index];
+    if (theme === undefined) return;
+    if (isThemeAvailable(theme, this.unlockedContents)) {
+      if (theme === this.当前颜色主题) return;
+      this.颜色主题切换回调(theme);
+    } else {
+      this.giftDialog.open();
+    }
+    // 原生 Select 已先更新内部选中值；重建使锁定项恢复为实际主题。
+    this.themeSelectionRevision += 1;
   }
 
   // ---- 颜色主题 Select 选项 / 索引 ----
   private 颜色主题选项(): SelectOption[] {
-    const 主题列表: 颜色主题[] = this.availableThemes();
-    return 主题列表.map((主题: 颜色主题): SelectOption => ({ value: this.颜色主题展示名文本(主题) }));
+    const 主题列表: 颜色主题[] = this.displayedThemes();
+    return 主题列表.map((主题: 颜色主题): SelectOption => ({ value: isThemeAvailable(主题, this.unlockedContents) ?
+      this.颜色主题展示名文本(主题) : resourceText(this.getUIContext(), $r('app.string.theme_color_locked'),
+        this.颜色主题展示名文本(主题)) }));
   }
 
   private 颜色主题索引(): number {
-    const 主题列表: 颜色主题[] = this.availableThemes();
+    const 主题列表: 颜色主题[] = this.displayedThemes();
     const 索引 = 主题列表.indexOf(this.当前颜色主题);
     return 索引 >= 0 ? 索引 : 0;
   }
@@ -111,13 +137,13 @@ export struct 外观分组 {
 
   build() {
     设置分组卡片({
-      标题: $r('app.string.settings_appearance_display'),
+      groupId: 'appearance',
       是否深色: this.是否深色
     }) {
       Column({ space: 4 }) {
           // 主题行 Select（system/light/dark）
           Row() {
-            Text($r('app.string.appearance_theme'))
+            Text(settingsItemText(this.getUIContext(), 'theme_mode'))
               .fontSize(15)
               .fontColor(设置面板色板_取(this.是否深色).主文字)
               .layoutWeight(1)
@@ -129,7 +155,7 @@ export struct 外观分组 {
               .padding(SelectStyle.controlPadding)
               .space(SelectStyle.controlSpace)
               .width(SelectStyle.fieldWidth)
-              .constraintSize(SelectStyle.fieldConstraint)
+              .constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
               .font(SelectStyle.controlFont)
               .optionFont(SelectStyle.optionFont)
               .selectedOptionFont(SelectStyle.selectedOptionFont)
@@ -145,7 +171,7 @@ export struct 外观分组 {
 
           // 颜色主题行 Select（带渐变色条预览）
           Row() {
-            Text($r('app.string.appearance_color_theme'))
+            Text(settingsItemText(this.getUIContext(), 'color_theme'))
               .fontSize(15)
               .fontColor(设置面板色板_取(this.是否深色).主文字)
               .layoutWeight(1)
@@ -158,7 +184,8 @@ export struct 外观分组 {
                 angle: 90,
                 colors: this.色样档位(this.当前颜色主题)
               })
-            Select(this.颜色主题选项())
+            ForEach([this.themeSelectionRevision], (_revision: number) => {
+              Select(this.颜色主题选项())
               .selected(this.颜色主题索引())
               .value(this.颜色主题展示名文本(this.当前颜色主题))
               .margin({ left: 8 })
@@ -167,22 +194,22 @@ export struct 外观分组 {
               .padding(SelectStyle.controlPadding)
               .space(SelectStyle.controlSpace)
               .width(SelectStyle.fieldWidth)
-              .constraintSize(SelectStyle.fieldConstraint)
+              .constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
               .font(SelectStyle.controlFont)
               .optionFont(SelectStyle.optionFont)
               .selectedOptionFont(SelectStyle.selectedOptionFont)
               .textModifier(SelectStyle.labelText())
               .borderRadius(SelectStyle.controlRadius)
               .onSelect((索引: number): void => {
-                const 主题列表: 颜色主题[] = this.availableThemes();
-                this.颜色主题切换回调(主题列表[索引]);
+                this.selectColorTheme(索引);
               })
+            }, (revision: number): string => revision.toString())
           }
           .width('100%')
           .height(48)
 
-          if (themeDefinition(this.当前颜色主题).backgroundTextures.length > 0) {
-            ThemeMotionControl()
+          if (isSettingsItemVisible('theme_motion', this.简洁模式, themeDefinition(this.当前颜色主题).backgroundTextures.length > 0)) {
+            ThemeMotionControl({ isDark: this.是否深色 })
           }
           DeckWidthControl()
           CardTextSizeControl()

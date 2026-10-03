@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { settingsItemText } from '../../utils/SettingsStructureText';
+import { PrimaryActionButton } from '../common/PrimaryActionButton';
 import { OFFICIAL_ANKIWEB_SYNC_UI_ENABLED } from '../../model/ReleaseFeatures';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { resourceText, showToastSafely } from '../../utils/UiFeedback';
@@ -424,7 +426,7 @@ export struct 同步分组 {
           .fontSize(12)
           .fontColor(色板.三级文字)
           .layoutWeight(1)
-        Text() { ThemeTextSpans($r('app.string.sync_register_link'), this.themeAccentColors, this.getUIContext()) }
+        Text() { ThemeTextSpans(settingsItemText(this.getUIContext(), 'sync_register'), this.themeAccentColors, this.getUIContext()) }
           .fontSize(12)
           .fontWeight(FontWeight.Medium)
           .fontColor(this.解析主色按钮背景())
@@ -435,7 +437,7 @@ export struct 同步分组 {
       }
       .width('100%')
     }
-    TextInput({ placeholder: this.savedServer === '' ? $r('app.string.sync_username_hint') :
+    TextInput({ placeholder: this.savedServer === '' ? settingsItemText(this.getUIContext(), 'sync_username') :
       $r('app.string.sync_custom_username_hint'), text: this.用户名输入 })
       .width('100%')
       .height(44)
@@ -449,7 +451,7 @@ export struct 同步分组 {
       .onChange((值: string) => {
         this.用户名输入 = 值;
       })
-    TextInput({ placeholder: $r('app.string.sync_password_hint'), text: this.密码输入 })
+    TextInput({ placeholder: settingsItemText(this.getUIContext(), 'sync_password'), text: this.密码输入 })
       .width('100%')
       .height(44)
       .fontSize(14)
@@ -466,20 +468,10 @@ export struct 同步分组 {
       .onSubmit((): void => {
         this.点击登录();
       })
-    Button(this.登录中 ? $r('app.string.sync_logging_in') : $r('app.string.sync_login'))
-      .width('100%')
-      .height(44)
-      .fontSize(15)
-      .fontColor('#FFFFFF')
-      .backgroundColor(this.解析主色按钮背景())
-      .borderRadius(22)
-      .enabled(this.serverLoaded && !this.登录中 && !this.settingsSaving && this.serverInput === this.savedServer)
-      .opacity(!this.serverLoaded || this.登录中 || this.settingsSaving || this.serverInput !== this.savedServer ? 0.6 : 1)
-      .attributeModifier(new PressFeedback(!this.serverLoaded || this.登录中 || this.settingsSaving || this.serverInput !== this.savedServer ? 0.6 : 1))
-      .stateEffect(false)
-      .onClick((): void => {
-        this.点击登录();
-      })
+    PrimaryActionButton({ label: this.登录中 ? $r('app.string.sync_logging_in') : settingsItemText(this.getUIContext(), 'sync_login'),
+      tint: this.解析主色按钮背景(),
+      isInteractive: this.serverLoaded && !this.登录中 && !this.settingsSaving && this.serverInput === this.savedServer,
+      onAction: (): void => { this.点击登录(); } })
     if (this.错误文本 !== '') {
       Text(this.错误文本)
         .fontSize(12)
@@ -511,7 +503,7 @@ export struct 同步分组 {
   @Builder
   private 已登录内容(色板: 设置面板色板) {
     Column({ space: 应用尺寸.间距_4 }) {
-      Text($r('app.string.sync_current_account'))
+      Text(settingsItemText(this.getUIContext(), 'sync_account'))
         .fontSize(应用尺寸.字号_正文_小)
         .fontColor(色板.次文字)
       Text(this.账号名)
@@ -528,7 +520,7 @@ export struct 同步分组 {
     // 媒体同步开关（对齐 Anki 桌面端 Preferences → Sync → "Sync media"）。
     // 关闭后 syncCollection 传 syncMedia=false，跳过媒体阶段。
     SettingsToggleRow({
-      title: $r('app.string.settings_sync_media_toggle'),
+      title: settingsItemText(this.getUIContext(), 'sync_media'),
       hint: $r('app.string.settings_sync_media_toggle_hint'),
       isOn: this.媒体同步开启,
       isDark: this.是否深色,
@@ -540,7 +532,7 @@ export struct 同步分组 {
     })
     Divider().color(色板.分隔线).margin({ bottom: 应用尺寸.间距_16 })
     Row({ space: 8 }) {
-      Button($r('app.string.sync_backup_first'))
+      Button(settingsItemText(this.getUIContext(), 'sync_backup_first'))
         .layoutWeight(1)
         .height(40)
         .fontSize(12)
@@ -553,7 +545,7 @@ export struct 同步分组 {
         .onClick((): void => {
           this.点击导出数据回调();
         })
-      Button($r('app.string.sync_now'))
+      Button(settingsItemText(this.getUIContext(), 'sync_now'))
         .layoutWeight(1)
         .height(40)
         .fontSize(12)
@@ -566,7 +558,7 @@ export struct 同步分组 {
         .onClick((): void => {
           this.点击立即同步();
         })
-      Button($r('app.string.sync_logout'))
+      Button(settingsItemText(this.getUIContext(), 'sync_logout'))
         .layoutWeight(1)
         .height(40)
         .fontSize(12)
@@ -594,7 +586,7 @@ export struct 同步分组 {
   build() {
     Column({ space: 2 }) {
       设置分组卡片({
-        标题: $r('app.string.settings_sync_group'),
+        groupId: 'sync',
         是否深色: this.是否深色,
 
         帮助标题: $r('app.string.settings_sync_group'),
@@ -620,7 +612,7 @@ export struct 同步分组 {
           Divider().color(设置面板色板_取(this.是否深色).分隔线)
           Button() {
             Row({ space: 应用尺寸.间距_12 }) {
-              Text($r('app.string.sync_custom_server_entry'))
+              Text(settingsItemText(this.getUIContext(), 'sync_custom_server'))
                 .fontSize(应用尺寸.字号_正文_中)
                 .fontColor(设置面板色板_取(this.是否深色).次文字)
                 .layoutWeight(1)
@@ -650,7 +642,7 @@ export struct 同步分组 {
   @Builder
   private autoSyncSetting() {
     SettingsToggleRow({
-      title: $r('app.string.sync_auto_label'),
+      title: settingsItemText(this.getUIContext(), 'auto_sync'),
       hint: $r('app.string.sync_auto_hint'),
       isOn: this.autoSyncEnabled,
       isInteractive: !this.settingsSaving && !this.登录中,

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { DataTransferSession, DataTransferState, initialTransferState } from '../model/home/DataTransferSession';
+import { appInterface } from '../backend/AppInterfaceService';
 import { AnkiDataTransfer } from '../backend/AnkiDataTransfer';
 import { syncActivity } from '../model/SyncSettings';
 import { showToastSafely } from '../utils/UiFeedback';
@@ -17,14 +18,12 @@ import type { SyncAuth } from '../proto/messages/SyncMessages';
 import { 牌组服务 } from '../backend/牌组服务';
 import { 后端会话 } from '../backend/后端会话';
 import { 解析是否深色, 主题模式 } from '../model/主题设置';
-import { 加载主题模式, 保存主题模式 } from '../model/主题存储';
+import { 加载主题模式 } from '../model/主题存储';
+import { appThemeSession, appThemeColorSession } from '../backend/AppThemeService';
 import { 颜色主题, 默认颜色主题 } from '../model/颜色主题';
-import { 加载颜色主题, 保存颜色主题 } from '../model/颜色主题存储';
-import { 应用颜色主题 } from '../utils/颜色主题管理器';
-import { 应用主题 } from '../utils/主题控制器';
+import { 加载颜色主题 } from '../model/颜色主题存储';
 import { 加载已隐藏牌组ID列表, 取消隐藏全部牌组 } from '../model/隐藏牌组存储';
 import { activeHiddenDeckIds } from '../model/HiddenDecks';
-import { 刷新桌面卡片数据 } from '../model/FSRS控制器';
 import { 平铺牌组树 } from '../model/牌组层级';
 import { 牌组汇总 } from '../model/主页模型';
 import type { DeckTreeNode } from '../proto/messages/DeckMessages';
@@ -46,7 +45,8 @@ export struct 设置页 {
       this.显示提示($r('app.string.sync_wait_operation'));
       return;
     }
-    this.transferSession.open(mode, deckId, allowDeckSelection);
+    if (mode === 'importFile') this.transferSession.startImport();
+    else this.transferSession.open(mode, deckId, allowDeckSelection);
   }
   @State private activeSection: string = '';
   pathStack?: NavPathStack;
@@ -55,7 +55,7 @@ export struct 设置页 {
   private readonly 牌组服务实例: 牌组服务 = new 牌组服务();
 
   @StorageLink('systemDarkMode') private 系统暗黑模式: boolean = false;
-  @State private 主题模式值: 主题模式 = 'system';
+  @StorageLink('themeMode') private 主题模式值: 主题模式 = 'system';
   @StorageLink('colorTheme') private 颜色主题值: 颜色主题 = 默认颜色主题;
   @State private 转场透明度: number = 1;
 
@@ -107,33 +107,28 @@ export struct 设置页 {
     }
   }
 
-  private 切换主题(mode: 主题模式): void {
-    this.主题模式值 = mode;
-    this.应用激活主题(mode);
-    保存主题模式(mode);
-    刷新桌面卡片数据().catch((错误: Object): void => {
-      hilog.error(0x0000, '设置页', `切换主题后刷新桌面卡片数据失败: ${错误}`);
-    });
-  }
-
-  private 应用激活主题(mode: 主题模式): void {
-    AppStorage.setOrCreate<主题模式>('themeMode', mode);
-    const context: common.UIAbilityContext | null = this.取能力上下文();
-    if (context !== null) {
-      应用主题(context, mode, this.系统暗黑模式);
+  private async 切换主题(mode: 主题模式): Promise<void> {
+    try {
+      const result = await appThemeSession.setMode(mode);
+      if (!this.disposed && result.status !== 'completed') {
+        this.显示提示(result.saved ? $r('app.string.theme_change_apply_failed') :
+          $r('app.string.theme_change_save_unverified'));
+      }
+    } catch (error) {
+      if (!this.disposed) { this.显示提示($r('app.string.theme_change_failed')); }
     }
-    应用颜色主题(this.颜色主题值, this.是否深色());
   }
 
-  private 切换颜色主题(theme: 颜色主题): void {
+  private async 切换颜色主题(theme: 颜色主题): Promise<void> {
     if (!isThemeAvailable(theme, AppStorage.get<string[]>(UNLOCKED_CONTENTS_KEY) ?? [])) return;
-    this.颜色主题值 = theme;
-    AppStorage.setOrCreate<颜色主题>('colorTheme', theme);
-    应用颜色主题(theme, this.是否深色());
-    保存颜色主题(theme);
-    刷新桌面卡片数据().catch((错误: Object): void => {
-      hilog.error(0x0000, '设置页', `切换颜色主题后刷新桌面卡片数据失败: ${错误}`);
-    });
+    try {
+      const result = await appThemeColorSession.setColor(theme);
+      if (!this.disposed && result.status !== 'completed') {
+        this.显示提示(result.saved ? $r('app.string.theme_change_apply_failed') : $r('app.string.theme_change_failed'));
+      }
+    } catch (error) {
+      if (!this.disposed) { this.显示提示($r('app.string.theme_change_failed')); }
+    }
   }
 
   private async 加载牌组列表(): Promise<void> {
@@ -207,7 +202,7 @@ export struct 设置页 {
   }
 
   private 打开带搜索浏览页(搜索串: string): void {
-    const params: 浏览页参数 = { initialSearch: 搜索串 };
+    const params: 浏览页参数 = { initialSearch: 搜索串, initialNotesMode: true };
     this.pathStack?.pushPath({
       name: 'BrowserPage',
       param: params
@@ -240,11 +235,13 @@ export struct 设置页 {
             this.显示许可证 = true;
           },
           导入数据回调: (): void => {
-            this.打开数据迁移('importDeck', 0, true);
+            this.打开数据迁移('importFile', 0, false);
           },
           导出数据回调: (): void => {
             this.打开数据迁移('exportDeck', 0, true);
           },
+          创建完整备份回调: (): void => { this.打开数据迁移('exportPersonalData', 0, false); },
+          恢复完整备份回调: (): void => { this.打开数据迁移('importPersonalData', 0, false); },
           点击已隐藏牌组回调: (): void => {
             this.显示隐藏牌组对话框();
           },
@@ -288,5 +285,7 @@ export struct 设置页 {
       return true;
     })
     .opacity(this.转场透明度)
+    .onShown((): void => { appInterface.showPage('settings'); })
+    .onHidden((): void => { appInterface.hidePage('settings'); })
   }
 }

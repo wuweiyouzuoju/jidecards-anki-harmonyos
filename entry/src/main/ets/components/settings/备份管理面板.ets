@@ -12,6 +12,7 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 颜色键 } from '../../model/颜色主题';
 import { backupCoordinator } from '../../model/BackupCoordinator';
 import { LocalBackups, loadAutomaticBackup, saveAutomaticBackup } from '../../backend/LocalBackups.ets';
+import { DataActionRow } from './DataActionRow';
 
 @Component
 export struct 备份管理面板 {
@@ -23,6 +24,8 @@ export struct 备份管理面板 {
 
   @Prop isDark: boolean = false;
   onClose: () => void = (): void => {};
+  onExportCollection: () => void = (): void => {};
+  onImportCollection: () => void = (): void => {};
   @StorageProp(颜色键.动作主色) private actionColor: string = '#2F5FD0';
   @State private automaticEnabled: boolean = true;
   @State private backups: string[] = [];
@@ -107,13 +110,22 @@ export struct 备份管理面板 {
 
   @Builder
   private dialogHeader() {
-    DialogHeader({ title: $r('app.string.backup_management_title'), showAction: false,
+    DialogHeader({ title: $r('app.string.backup_hub_title'), showAction: false,
       closeLabel: $r('app.string.close'), closeEnabled: !this.busy,
       onClose: (): void => this.handleBackRequest() })
   }
 
   @Builder
   private dialogContent() {
+        Column() {
+          DataActionRow({ title: $r('app.string.transfer_export_personal'), hint: $r('app.string.backup_full_export_hint'),
+            isInteractive: !this.busy, onAction: this.onExportCollection })
+          DataActionRow({ title: $r('app.string.transfer_import_personal'), hint: $r('app.string.backup_full_restore_hint'),
+            isInteractive: !this.busy, onAction: this.onImportCollection })
+        }.width('100%')
+        Divider().color($r('app.color.border_subtle'))
+        Text($r('app.string.backup_management_title')).fontSize(15).fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.text_primary')).width('100%')
         Text($r('app.string.backup_management_subtitle')).fontSize(13)
           .fontColor(设置面板色板_取(this.isDark).次文字).width('100%');
         SettingsToggleRow({ title: $r('app.string.backup_management_auto'),

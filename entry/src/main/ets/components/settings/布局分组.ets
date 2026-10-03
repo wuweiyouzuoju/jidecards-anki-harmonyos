@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { settingsItemText } from '../../utils/SettingsStructureText';
 import { HelpLabel } from '../common/HelpLabel';
 import { resourceText } from '../../utils/UiFeedback';
 import { SelectStyle } from '../../utils/SelectStyle';
@@ -96,13 +97,13 @@ export struct 布局分组 {
   // ========================================================
   build() {
     设置分组卡片({
-      标题: $r('app.string.settings_study_layout'),
+      groupId: 'study_layout',
       是否深色: this.是否深色
     }) {
       Column({ space: 8 }) {
           // 第 1 行：学习页布局（左侧标题+ⓘ，右侧 Select 选择框——与「当前模式」行同款对齐）
           Row() {
-            HelpLabel({ title: $r('app.string.settings_study_layout_row'),
+            HelpLabel({ title: settingsItemText(this.getUIContext(), 'study_layout'),
               textColor: 设置面板色板_取(this.是否深色).主文字,
               onHelp: (): void => {
                 this.打开说明回调($r('app.string.settings_study_layout_row'), $r('app.string.settings_study_layout_help'));
@@ -119,7 +120,7 @@ export struct 布局分组 {
               .padding(SelectStyle.controlPadding)
               .space(SelectStyle.controlSpace)
               .width(SelectStyle.fieldWidth)
-              .constraintSize(SelectStyle.fieldConstraint)
+              .constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
               .font(SelectStyle.controlFont)
               .optionFont(SelectStyle.optionFont)
               .selectedOptionFont(SelectStyle.selectedOptionFont)

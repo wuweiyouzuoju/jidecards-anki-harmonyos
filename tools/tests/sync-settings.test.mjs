@@ -228,9 +228,9 @@ test('failed opt-in rolls back the switch and reports a retryable error', async 
 });
 
 
-test('temporary official UI gate leaves the default login path and stored accounts intact', async () => {
+test('restored official UI keeps the default login path and stored accounts available', async () => {
   const flags = readFileSync(new URL('../../entry/src/main/ets/model/ReleaseFeatures.ets', import.meta.url), 'utf8');
-  assert.match(flags, /OFFICIAL_ANKIWEB_SYNC_UI_ENABLED: boolean = false/);
+  assert.match(flags, /OFFICIAL_ANKIWEB_SYNC_UI_ENABLED: boolean = true/);
   const source = readFileSync(new URL('../../entry/src/main/ets/components/settings/同步分组.ets', import.meta.url), 'utf8');
   assert.match(source, /if \(!isSyncEndpointVisible\(this.savedServer, OFFICIAL_ANKIWEB_SYNC_UI_ENABLED\)\)/);
   assert.match(source, /if \(OFFICIAL_ANKIWEB_SYNC_UI_ENABLED && this.savedServer === ''\)/);
@@ -244,8 +244,9 @@ test('temporary official UI gate leaves the default login path and stored accoun
   assert.deepEqual(calls, [['existing-user', 'transient-password', '']]);
   assert.deepEqual(saved, [{ hkey: 'token', username: 'existing-user', endpoint: '' }]);
   assert.equal(group.当前状态, '已登录');
-  const h = preferencesHarness();
+  const h = preferencesHarness(true);
   h.保存同步凭证(saved[0]);
+  assert.deepEqual(h.loadVisibleSyncAuth(), saved[0]);
   assert.deepEqual(h.加载同步凭证(), saved[0]);
   assert.equal(h.loadCustomSyncServer(), '');
 });
