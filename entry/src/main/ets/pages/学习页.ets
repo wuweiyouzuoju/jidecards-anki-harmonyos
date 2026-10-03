@@ -2,7 +2,9 @@ import { PressFeedback } from '../utils/PressFeedback';
 import { EditNotePageParams } from '../model/navigation/PageParams';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { StudyTimerController, StudyTimerState } from '../model/StudyTimerController';
-import { resourceText, showToastSafely } from '../utils/UiFeedback';
+import { resourceText, namedResourceText, showToastSafely } from '../utils/UiFeedback';
+import { AppInterfaceItem, AppInterfaceMenuItem, AppInterfaceControl, studyInterfaceMenu, visibleInterfaceItems } from '../model/AppInterface';
+import { appInterface } from '../backend/AppInterfaceService';
 import { ThemeTextSpans } from '../components/common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
@@ -23,7 +25,10 @@ import { interceptCardAsset } from '../utils/CardAssetResponse';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { 后端会话 } from '../backend/后端会话';
 import { AnkiStudySessionBackend } from '../backend/StudySessionBackend';
-import { StudySessionController, StudySnapshot } from '../model/StudySessionController';
+import { StudySessionController, StudySnapshot, StudyTimeboxNotice } from '../model/StudySessionController';
+import { ReviewPreferences } from '../proto/messages/PreferencesMessages';
+import { DialogFrame } from '../components/common/DialogFrame';
+import { DialogHeader } from '../components/common/DialogHeader';
 import { StudyOptions, StudyAdvanceAction, StudyAutoAdvanceSettings } from '../model/StudyTiming';
 import { StudyAutoAdvanceDraft } from '../model/StudyAutoAdvanceDraft';
 import { StudyAutoAdvanceDialog } from '../components/StudyAutoAdvanceDialog';
@@ -35,7 +40,7 @@ import { 笔记类型服务 } from '../backend/笔记类型服务';
 import { EditableNote } from '../proto/messages/NoteMessages';
 import { renderStudyAnswer, StudyAnswerNotetype } from '../model/StudyAnswerRenderer';
 import { resolveStudyKey } from '../model/StudyInputPolicy';
-import { buildStudyGestureScript, resolveStudyGesture, StudyGestureState } from '../model/StudyGestures';
+import { buildStudyGestureScript, resolveStudyGesture, StudyGestureState, StudyQuickAnswerMode } from '../model/StudyGestures';
 import { StudyTapZonesGuide } from '../components/StudyTapZonesGuide';
 import { studyKeyName } from '../utils/StudyKeyAdapter';
 import { CardViewport } from '../components/common/CardViewport';
@@ -69,7 +74,7 @@ import { 按下态按钮 } from '../components/common/按下态按钮';
 import { 学习阶段 } from '../utils/吸附计算器';
 import { 加载学习布局模式, 学习布局模式 } from '../model/学习布局存储';
 import { 简洁模式AppStorage键, 加载简洁模式 } from '../model/简洁模式存储';
-import { TapZones开关AppStorage键, 加载TapZones开关, STUDY_GESTURES_KEY, loadStudyGestures,
+import { STUDY_QUICK_ANSWER_KEY, loadStudyQuickAnswerMode,
   isTapZonesGuideCompleted, completeTapZonesGuide } from '../model/实验性功能存储';
 import { 加载主题模式 } from '../model/主题存储';
 import { 解析是否深色, 主题模式 } from '../model/主题设置';
@@ -148,6 +153,9 @@ export struct 学习页 {
   private 当前卡片: StudyCard | null = null;
   private 已渲染: RenderedCard | null = null;
   @State private studyOptions: StudyOptions = new StudyOptions();
+  @State private reviewPreferences: ReviewPreferences = new ReviewPreferences();
+  @State private timeboxNotice: StudyTimeboxNotice | null = null;
+  private timeboxOpenedAt: number = 0;
   @State private autoAdvanceEnabled: boolean = false;
   private readonly autoAdvanceSettings: StudyAutoAdvanceSettings = new StudyAutoAdvanceSettings();
   @State private studyTimerText: string = '';
@@ -165,12 +173,12 @@ export struct 学习页 {
   private autoAdvanceSettingsOpen: boolean = false;
   private autoAdvanceDialog: CustomDialogController | null = null;
   private autoAdvanceDialogBack: () => void = (): void => {};
-  @State private studyMenuOpen: boolean = false;
+  @State @Watch('publishInterface') private studyMenuOpen: boolean = false;
   private questionHasAudio: boolean = false;
   private 正面HTML: string = '';
   private 背面HTML: string = '';
   private 展示时刻毫秒: number = 0;
-  private 评分中: boolean = false;
+  @State @Watch('publishInterface') private 评分中: boolean = false;
   private 媒体目录: string = '';
   private studyGuideChecked: boolean = false;
   private studyGuideVisible: boolean = false;
@@ -178,19 +186,23 @@ export struct 学习页 {
   private tapZonesGuideChecked: boolean = false;
   private tapZonesGuideStarted: number = 0;
   @State private tapZonesGuideVisible: boolean = false;
-  @StorageLink(STUDY_GESTURES_KEY) private gesturesEnabled: boolean = false;
+  @StorageLink(STUDY_QUICK_ANSWER_KEY) private quickAnswerMode: StudyQuickAnswerMode = StudyQuickAnswerMode.Off;
+
+  private get gesturesEnabled(): boolean {
+    return this.quickAnswerMode === StudyQuickAnswerMode.Gestures;
+  }
   @State private editingPageOpen: boolean = false;
   private editStartedAt: number = 0;
   @State private 牌组ID: number = 0;
   @State private 牌组名: string = '';
-  @State private 阶段: 学习阶段 = 'loading';
+  @State @Watch('publishInterface') private 阶段: 学习阶段 = 'loading';
   @State private 错误详情: string = '';
   @State private 按钮文案: string[] = [];
-  @State private 新卡剩余: number = 0;
-  @State private 学习中剩余: number = 0;
-  @State private 复习剩余: number = 0;
-  @State private 可撤销: boolean = false;
-  @State private 有音频: boolean = false;
+  @State @Watch('publishInterface') private 新卡剩余: number = 0;
+  @State @Watch('publishInterface') private 学习中剩余: number = 0;
+  @State @Watch('publishInterface') private 复习剩余: number = 0;
+  @State @Watch('publishInterface') private 可撤销: boolean = false;
+  @State @Watch('publishInterface') private 有音频: boolean = false;
   @State private 完成页数据已加载: boolean = false;
   @State private 完成页学习剩余: number = 0;
   @State private 完成页下张学习分钟: number = 0;
@@ -205,8 +217,10 @@ export struct 学习页 {
   /** 保留当前界面模式；学习输入偏好不再受模式限制。 */
   @StorageLink(简洁模式AppStorage键) private 简洁模式: boolean = true;
   /** 四象限：题目面单击显示答案，答案面按分区评分。 */
-  @StorageLink(TapZones开关AppStorage键) private TapZones开关: boolean = false;
-  @StorageLink(AI_AGENT_CHANNELS_APP_STORAGE_KEY) private Agent入口已启用: boolean = false;
+  private get TapZones开关(): boolean {
+    return this.quickAnswerMode === StudyQuickAnswerMode.TapZones;
+  }
+  @StorageLink(AI_AGENT_CHANNELS_APP_STORAGE_KEY) @Watch('publishInterface') private Agent入口已启用: boolean = false;
   /** 手写模式：用户点「更多」菜单「手写」进入后置 true，关闭白板层后置 false（常驻入口，无开关） */
   @State private 手写模式: boolean = false;
   /** Agent 改卡写入成功后 AI制卡页 广播本键（Date.now()），本页据此协调当前卡与队列。
@@ -218,7 +232,7 @@ export struct 学习页 {
   private contentRefreshInFlight: boolean = false;
   /** 本 NavDestination 是否在前台（onShown / onHidden 维护）；隐藏时不向 Web 推数据。 */
   @State private 页面已显示: boolean = false;
-  @State private 主题模式值: 主题模式 = 'system';
+  @StorageLink('themeMode') private 主题模式值: 主题模式 = 'system';
   @StorageProp(颜色键.动作主色) private 动作主色: string = '#2F5FD0';
   @StorageProp(颜色键.动作主色按下) private 动作主色按下色: string = '#1E4FB8';
   // 2.1.4.1 对比度：按钮背景专用档（配 #FFFFFF 文字 ≥ 4.5:1）
@@ -275,10 +289,7 @@ export struct 学习页 {
       // 加载失败保留默认值 true（简洁版）
     }
     try {
-      const TapZones持久化值: boolean = await 加载TapZones开关();
-      AppStorage.setOrCreate<boolean>(TapZones开关AppStorage键, TapZones持久化值);
-      const gestures: boolean = await loadStudyGestures();
-      AppStorage.setOrCreate<boolean>(STUDY_GESTURES_KEY, gestures);
+      await loadStudyQuickAnswerMode();
     } catch (error) {
       showToastSafely(this.getUIContext(), { message: $r('app.string.settings_study_controls_failed') });
     }
@@ -291,10 +302,13 @@ export struct 学习页 {
   }
 
   aboutToDisappear(): void {
+    this.mounted = false;
+    appInterface.hidePage('study');
+    appInterface.leave('study');
+    appInterface.leave('study_more');
     this.studyMenuOpen = false;
     CustomTransition.getInstance().注销NavParam('StudyPage');
     this.studyTimer.dispose();
-    this.mounted = false;
     this.studySession.dispose();
     this.页面已显示 = false;
     this.invalidateCardWork();
@@ -484,6 +498,7 @@ export struct 学习页 {
         (): boolean => this.isCurrentRequest(version));
       if (snapshot === null || !this.isCurrentRequest(version)) { return; }
       this.可撤销 = snapshot.canUndo;
+      this.reviewPreferences = snapshot.preferences;
       this.新卡剩余 = snapshot.queue.newCount;
       this.学习中剩余 = snapshot.queue.learningCount;
       this.复习剩余 = snapshot.queue.reviewCount;
@@ -525,6 +540,7 @@ export struct 学习页 {
         this.背面HTML = hideJideChoiceStaticOptions(this.背面HTML);
       }
       this.阶段 = 'question';
+      this.publishInterface();
       this.applyStudyHtml(this.正面HTML);
     } catch (error) {
       if (!this.isCurrentRequest(version)) { return; }
@@ -556,7 +572,10 @@ export struct 学习页 {
   /** 隐藏和系统后台共用取消规则；回来后重新读取队列，不能继续评旧卡。 */
   private studyActivityChanged(): void {
     if (!this.mounted) { return; }
+    this.publishInterface();
     if (!this.页面已显示 || !this.foreground) {
+      this.timeboxNotice = null;
+      this.stopStudyTimers();
       if (this.tapZonesGuideVisible) {
         this.tapZonesGuideVisible = false;
         this.tapZonesGuideChecked = false;
@@ -659,11 +678,39 @@ export struct 学习页 {
 
   /** 页面唯一计时器：隐藏/编辑/引导时暂停，过期回调不能触发新卡评分。 */
   private startStudyTimers(): void {
+    this.maybeShowTimebox();
+    if (this.studyTimerState().active) this.studySession.resumeTimebox();
+    else this.studySession.pauseTimebox();
     this.studyTimer.start();
   }
 
   private stopStudyTimers(): void {
+    this.studySession.pauseTimebox();
     this.studyTimer.stop();
+  }
+
+  private maybeShowTimebox(): void {
+    if (!this.mounted || !this.页面已显示 || !this.foreground || this.评分中 || this.editingPageOpen ||
+      this.studyMenuOpen || this.studyGuideVisible || this.tapZonesGuideVisible || this.autoAdvanceSettingsOpen ||
+      this.手写模式 || this.timeboxNotice !== null || this.阶段 === 'loading' || this.阶段 === 'error') return;
+    const notice: StudyTimeboxNotice | null = this.studySession.pendingTimebox();
+    if (notice === null) return;
+    this.timeboxNotice = notice;
+    this.timeboxOpenedAt = Date.now();
+    this.Ctrl按下 = false;
+    this.stopStudyTimers();
+    this.clearChoiceAutoAdvance();
+  }
+
+  private closeTimebox(finish: boolean = false): void {
+    if (this.timeboxNotice === null) return;
+    this.timeboxNotice = null;
+    this.studySession.continueTimebox();
+    if (finish) { this.返回(); return; }
+    this.展示时刻毫秒 += Date.now() - this.timeboxOpenedAt;
+    if (this.choiceFeedbackDeadline > 0) this.choiceFeedbackDeadline += Date.now() - this.timeboxOpenedAt;
+    this.startStudyTimers();
+    this.scheduleChoiceAutoAdvance();
   }
 
   private clearChoiceAutoAdvance(): void {
@@ -674,7 +721,7 @@ export struct 学习页 {
   private scheduleChoiceAutoAdvance(): void {
     this.clearChoiceAutoAdvance();
     if (!this.页面已显示 || !this.foreground || this.studyGuideVisible || this.studyMenuOpen || this.评分中 ||
-      this.editingPageOpen || this.手写模式 || this.autoAdvanceSettingsOpen ||
+      this.editingPageOpen || this.手写模式 || this.autoAdvanceSettingsOpen || this.timeboxNotice !== null ||
       this.阶段 !== 'answer' || this.choiceGrade === null || this.choiceQuestion === null ||
       this.choiceAutoAdvanceSeconds() <= 0 || this.choiceFeedbackDeadline <= 0) return;
     const remaining: number = Math.max(0, this.choiceFeedbackDeadline - Date.now());
@@ -746,7 +793,7 @@ export struct 学习页 {
 
   private 继续选择题反馈(): void {
     if (this.choiceGrade === null || this.阶段 !== 'answer' || this.评分中 || this.studyGuideVisible ||
-      this.studyMenuOpen || this.autoAdvanceSettingsOpen || this.editingPageOpen || this.手写模式 ||
+      this.studyMenuOpen || this.autoAdvanceSettingsOpen || this.editingPageOpen || this.手写模式 || this.timeboxNotice !== null ||
       !this.页面已显示 || !this.foreground) return;
     this.clearChoiceAutoAdvance();
     this.choiceFeedbackDeadline = 0;
@@ -761,8 +808,8 @@ export struct 学习页 {
 
   private studyTimerState(): StudyTimerState {
     return { version: this.requestVersion,
-      active: this.isCurrentRequest(this.requestVersion) && this.controllerReady && !this.studyMenuOpen && !this.autoAdvanceSettingsOpen &&
-        !this.editingPageOpen && !this.studyGuideVisible && !this.tapZonesGuideVisible && !this.手写模式 &&
+      active: this.isCurrentRequest(this.requestVersion) && this.controllerReady && !this.studyMenuOpen && !this.autoAdvanceSettingsOpen && this.timeboxNotice === null &&
+        !this.editingPageOpen && !this.studyGuideVisible && !this.tapZonesGuideVisible && !this.手写模式 && !this.评分中 &&
         (this.阶段 === 'question' || this.阶段 === 'answer'),
       advance: this.autoAdvanceEnabled,
       blocked: this.choiceQuestion !== null || this.评分中 || this.flipPending,
@@ -822,6 +869,7 @@ export struct 学习页 {
       this.评分中 = false;
       this.消费待重渲染();
       this.maybeShowStudyGuide();
+      this.startStudyTimers();
     }
   }
 
@@ -856,54 +904,56 @@ export struct 学习页 {
   }
 
   private 更多菜单(): MenuElement[] {
-    const canManageCard: boolean = !this.评分中 && this.当前卡片 !== null &&
-      (this.阶段 === 'question' || this.阶段 === 'answer');
-    const 菜单: MenuElement[] = [
-      { value: this.取文案($r('app.string.study_edit_note')), action: () => { this.openNoteEditor(); }, enabled: canManageCard },
-      {
-        value: this.取文案($r('app.string.study_replay_sound')),
-        action: () => { this.playStudyAudio(true, true); },
-        enabled: this.有音频 && canManageCard
-      },
-      { value: this.取文案($r('app.string.study_guide_title')), action: () => { this.showStudyGuide(); }, enabled: this.阶段 !== 'loading' && !this.评分中 },
-      { value: this.取文案($r('app.string.study_undo')), action: () => { this.撤销上次(); }, enabled: this.可撤销 },
-      {
-        value: this.取文案($r('app.string.study_bury')),
-        action: () => { this.埋藏或暂停当前卡(BURY_SUSPEND_MODE_BURY_USER); },
-        enabled: canManageCard
-      },
-      {
-        value: this.取文案($r('app.string.study_suspend')),
-        action: () => { this.埋藏或暂停当前卡(BURY_SUSPEND_MODE_SUSPEND); },
-        enabled: canManageCard
-      },
-      { value: this.取文案($r('app.string.study_delete_card')), action: () => { this.请求删除当前卡(); }, enabled: this.阶段 === 'question' || this.阶段 === 'answer' }
-    ];
-    // 「手写」入口：常驻显示（question/answer 阶段），无开关，进入后叠加 Canvas 笔迹层
-    if (this.阶段 === 'question' || this.阶段 === 'answer') {
-      if (this.Agent入口已启用) {
-        菜单.push({
-          value: this.取文案($r('app.string.ai_card_edit')),
-          action: () => { this.打开AI改卡(); },
-          enabled: this.当前卡片 !== null
-        });
-      }
-      菜单.push({
-        value: this.取文案($r('app.string.study_handwrite')),
-        action: () => { this.手写模式 = true; this.stopStudyTimers(); },
-        enabled: true
-      });
-    }
-    菜单.push({
-      value: this.取文案($r('app.string.study_auto_advance_title')),
-      action: (): void => { this.configureAutoAdvance(); },
-      enabled: canManageCard
-    });
-    return 菜单;
+    return this.interfaceMenuItems().map((item: AppInterfaceMenuItem): MenuElement => ({
+      value: namedResourceText(this.getUIContext(), item.titleKey), enabled: item.enabled,
+      action: (): void => { this.executeMenuAction(item.id); }
+    }));
+  }
+
+  private interfaceMenuItems(): AppInterfaceMenuItem[] {
+    return studyInterfaceMenu({ phase: this.阶段, busy: this.评分中, hasCard: this.当前卡片 !== null,
+      hasAudio: this.有音频, canUndo: this.可撤销, agent: this.Agent入口已启用 });
+  }
+
+  private executeMenuAction(id: string): void {
+    if (id === 'edit') this.openNoteEditor();
+    else if (id === 'audio') this.playStudyAudio(true, true);
+    else if (id === 'guide') this.showStudyGuide();
+    else if (id === 'undo') this.撤销上次();
+    else if (id === 'bury') this.埋藏或暂停当前卡(BURY_SUSPEND_MODE_BURY_USER);
+    else if (id === 'suspend') this.埋藏或暂停当前卡(BURY_SUSPEND_MODE_SUSPEND);
+    else if (id === 'delete') this.请求删除当前卡();
+    else if (id === 'agent') this.打开AI改卡();
+    else if (id === 'handwrite') { this.手写模式 = true; this.stopStudyTimers(); }
+    else if (id === 'auto_advance') this.configureAutoAdvance();
+  }
+
+  private publishInterface(): void {
+    if (!this.mounted) return;
+    const controls: AppInterfaceControl[] = visibleInterfaceItems('study', { simple: this.简洁模式,
+      agent: this.Agent入口已启用, cloudDeck: false, themeHasTextures: false })
+      .filter((item: AppInterfaceItem): boolean => item.condition === undefined ||
+        (item.condition === this.阶段 && this.choiceQuestion === null))
+      .map((item: AppInterfaceItem): AppInterfaceControl => ({ id: item.id,
+        title: namedResourceText(this.getUIContext(), item.titleKey), enabled: !this.评分中, selected: false }));
+    appInterface.observe({ surface: 'study', sectionId: this.阶段, selectedId: String(this.当前卡片?.cardId ?? ''),
+      optionIds: [], optionLabels: [], busy: this.评分中,
+      items: controls,
+      values: [{ id: 'deck', value: this.牌组名 }, { id: 'phase', value: this.阶段 },
+        { id: 'new', value: String(this.新卡剩余) }, { id: 'learning', value: String(this.学习中剩余) },
+        { id: 'review', value: String(this.复习剩余) }] });
+    if (!this.studyMenuOpen || !this.页面已显示) { appInterface.leave('study_more'); return; }
+    const items: AppInterfaceMenuItem[] = this.interfaceMenuItems();
+    appInterface.observe({ surface: 'study_more', sectionId: this.阶段, selectedId: '', busy: this.评分中,
+      optionIds: items.map((item: AppInterfaceMenuItem): string => item.id),
+      optionLabels: items.map((item: AppInterfaceMenuItem): string => namedResourceText(this.getUIContext(), item.titleKey)),
+      items: items.map((item: AppInterfaceMenuItem): AppInterfaceControl => ({ id: item.id,
+        titleKey: item.titleKey,
+        title: namedResourceText(this.getUIContext(), item.titleKey), enabled: item.enabled, selected: false })) });
   }
 
   private openStudyMenu(): void {
-    if (this.tapZonesGuideVisible) return;
+    if (this.tapZonesGuideVisible || this.timeboxNotice !== null) return;
     this.studyMenuOpen = true;
     this.Ctrl按下 = false;
     this.stopStudyTimers();
@@ -1032,6 +1082,7 @@ export struct 学习页 {
       this.评分中 = false;
       this.消费待重渲染();
       this.maybeShowStudyGuide();
+      this.startStudyTimers();
     }
   }
 
@@ -1080,6 +1131,7 @@ export struct 学习页 {
         this.评分中 = false;
         this.消费待重渲染();
         this.maybeShowStudyGuide();
+        this.startStudyTimers();
       }
     }
   }
@@ -1162,6 +1214,7 @@ export struct 学习页 {
         this.评分中 = false;
         this.消费待重渲染();
         this.maybeShowStudyGuide();
+        this.startStudyTimers();
       }
     }
   }
@@ -1209,12 +1262,14 @@ export struct 学习页 {
         this.评分中 = false;
         this.消费待重渲染();
         this.maybeShowStudyGuide();
+        this.startStudyTimers();
       }
     }
   }
 
   /** 翻面只提交当前请求结果；拼写请求期间切卡会使本次结果失效。 */
   private async 显示答案(): Promise<void> {
+    if (this.timeboxNotice !== null) return;
     if (this.editingPageOpen || this.studyGuideVisible || this.tapZonesGuideVisible || this.flipPending ||
       (this.评分中 && !this.contentRefreshInFlight)) { return; }
     if (this.choiceQuestion !== null) return;
@@ -1252,6 +1307,7 @@ export struct 学习页 {
   }
 
   private async 提交选择题(): Promise<void> {
+    if (this.timeboxNotice !== null) return;
     if (this.choiceQuestion === null || this.choiceGrade !== null || this.choiceSelectedIds.length === 0 ||
       this.阶段 !== 'question' || this.studyGuideVisible || this.editingPageOpen ||
       this.当前卡片 === null || this.评分中 || !this.isCurrentRequest(this.requestVersion)) return;
@@ -1261,6 +1317,7 @@ export struct 学习页 {
     const grade: JideChoiceGrade = gradeJideChoice(this.choiceSelectedIds, question.answer);
     this.choiceGrade = grade;
     this.评分中 = true;
+    this.stopStudyTimers();
     playStudyHaptic();
     try {
       await this.studySession.answer(card, grade.correct ? RATING_GOOD : RATING_HARD, Date.now(), this.展示时刻毫秒);
@@ -1276,6 +1333,7 @@ export struct 学习页 {
       this.错误详情 = error instanceof Error ? error.message : `${error}`;
     } finally {
       this.评分中 = false;
+      this.startStudyTimers();
       this.scheduleChoiceAutoAdvance();
     }
   }
@@ -1391,7 +1449,7 @@ export struct 学习页 {
     const state: StudyGestureState = {
       phase: this.阶段, gestures: this.gesturesEnabled, tapZones: this.TapZones开关,
       choice: this.choiceQuestion !== null,
-      blocked: this.studyGuideVisible || this.tapZonesGuideVisible || this.studyMenuOpen ||
+      blocked: this.studyGuideVisible || this.tapZonesGuideVisible || this.studyMenuOpen || this.timeboxNotice !== null ||
         this.autoAdvanceSettingsOpen || this.editingPageOpen || this.手写模式 || this.评分中 ||
         this.flipPending || this.contentRefreshInFlight || !this.controllerReady || this.pendingHtml !== ''
     };
@@ -1425,6 +1483,7 @@ export struct 学习页 {
   // 调后端 提交评分
   // ========================================================
   private async 评分(rating: number): Promise<void> {
+    if (this.timeboxNotice !== null) return;
     if (this.studyGuideVisible || this.tapZonesGuideVisible) { return; }
     if (this.choiceQuestion !== null) { return; }
     if (this.评分中 || this.阶段 !== 'answer' || this.当前卡片 === null) {
@@ -1446,6 +1505,7 @@ export struct 学习页 {
       this.评分中 = false;
       this.消费待重渲染();
       this.maybeShowStudyGuide();
+      this.startStudyTimers();
     }
   }
 
@@ -1474,6 +1534,7 @@ export struct 学习页 {
   }
 
   private 按钮文案位(index: number): string {
+    if (!this.reviewPreferences.showIntervals) return '';
     if (index < this.按钮文案.length && this.按钮文案[index].length > 0) {
       return this.按钮文案[index];
     }
@@ -1481,6 +1542,7 @@ export struct 学习页 {
   }
 
   private 返回(): void {
+    if (this.timeboxNotice !== null) { this.closeTimebox(); return; }
     if (this.tapZonesGuideVisible) { this.closeTapZonesGuide(false); return; }
     if (this.editingPageOpen) return;
     this.autoAdvanceEnabled = false;
@@ -1524,6 +1586,11 @@ export struct 学习页 {
   // 无（触发其他块副作用）
   // ========================================================
   private 处理按键(event: KeyEvent): boolean {
+    if (this.timeboxNotice !== null) {
+      this.Ctrl按下 = false;
+      if (event.type === KeyType.Down && studyKeyName(event.keyCode) === 'escape') this.closeTimebox();
+      return true;
+    }
     if (this.tapZonesGuideVisible) {
       this.Ctrl按下 = false;
       if (event.type === KeyType.Down && studyKeyName(event.keyCode) === 'escape') this.closeTapZonesGuide(false);
@@ -1572,10 +1639,12 @@ export struct 学习页 {
           .constraintSize({ maxWidth: '50%' })
           .textAlign(TextAlign.Center)
 
-        Text($r('app.string.study_remaining_detail', this.新卡剩余, this.学习中剩余, this.复习剩余))
+        if (this.reviewPreferences.showRemaining) {
+          Text($r('app.string.study_remaining_detail', this.新卡剩余, this.学习中剩余, this.复习剩余))
           .fontSize(应用尺寸.字号_正文_小)
           .fontColor($r('app.color.text_secondary'))
           .margin({ top: 2 })
+        }
       }
       .justifyContent(FlexAlign.Center)
       .alignItems(HorizontalAlign.Center)
@@ -1964,7 +2033,7 @@ export struct 学习页 {
           // 主操作浮动工具栏：question 阶段显示「显示答案」，answer 阶段切换为 4 个评分按钮。
           if (this.choiceQuestion === null) 学习浮动工具栏({
             当前阶段: this.阶段,
-            评分按钮文案: this.按钮文案,
+            评分按钮文案: this.reviewPreferences.showIntervals ? this.按钮文案 : [],
             是否深色: this.是否深色(),
             显示答案回调: (): void => {
               this.显示答案();
@@ -1992,6 +2061,12 @@ export struct 学习页 {
             onSelect: (item: MenuElement): void => { this.selectStudyMenu(item); } })
         }
 
+        if (this.timeboxNotice !== null) {
+          DialogFrame({ onDismiss: (): void => { this.closeTimebox(); },
+            header: () => { this.timeboxHeader(); },
+            content: () => { this.timeboxContent(); } })
+        }
+
       }
       .width('100%')
       .height('100%')
@@ -2009,6 +2084,7 @@ export struct 学习页 {
     .backgroundColor(Color.Transparent)
     .opacity(this.转场透明度)
     .onBackPressed((): boolean => {
+      if (this.timeboxNotice !== null) { this.closeTimebox(); return true; }
       if (this.tapZonesGuideVisible) { this.closeTapZonesGuide(false); return true; }
       if (this.studyMenuOpen) { this.closeStudyMenu(); return true; }
       return false;
@@ -2016,14 +2092,33 @@ export struct 学习页 {
     // 从任何编辑/设置页返回都重新读取卡面。onPageShow 只对 @Entry 路由页生效，
     // NavDestination 必须用 onShown（与 学习提醒页 同款）；这是比 onPop 可靠的通道。
     .onShown((): void => {
+      appInterface.showPage('study');
       this.页面已显示 = true;
       this.returnFromEditor();
       this.studyActivityChanged();
       this.maybeShowStudyGuide();
+      this.publishInterface();
     })
     .onHidden((): void => {
+      appInterface.hidePage('study');
       this.页面已显示 = false;
       this.studyActivityChanged();
+      this.publishInterface();
     })
+  }
+
+  @Builder
+  private timeboxHeader() {
+    DialogHeader({ title: $r('app.string.study_timebox_title'),
+      closeLabel: $r('app.string.study_timebox_finish'), actionLabel: $r('app.string.continue'),
+      onClose: (): void => { this.closeTimebox(true); },
+      onAction: (): void => { this.closeTimebox(); } })
+  }
+
+  @Builder
+  private timeboxContent() {
+    Text($r('app.string.study_timebox_message', Math.floor((this.timeboxNotice?.seconds ?? 0) / 60),
+      this.timeboxNotice?.answers ?? 0))
+      .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary')).width('100%')
   }
 }

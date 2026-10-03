@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { StudyOptions } from '../../entry/src/main/ets/model/StudyTiming.ts';
+import { ReviewPreferences } from '../../entry/src/main/ets/proto/messages/PreferencesMessages.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { StudySessionController } from '../../entry/src/main/ets/model/StudySessionController.ts';
@@ -19,6 +20,7 @@ function harness() {
   const backend = {
     canUndo: async () => true,
     studyOptions: async () => new StudyOptions(),
+    reviewPreferences: async () => new ReviewPreferences(),
     queuedCards: async () => ({ cards: [card], newCount: 1, learningCount: 2, reviewCount: 3 }),
     renderCard: async id => ({ id }), describeStates: async () => ['1m', '5m', '1d', '4d'],
     answer: async input => { calls.push(input); }, undo: async () => { calls.push('undo'); },
@@ -41,6 +43,18 @@ test('snapshots carry autoplay and discard a late preference read after leaving 
   current = false;
   gate.resolve(new StudyOptions());
   assert.equal(await pending, null);
+});
+
+test('Core preferences are read before the queue and a failed read cannot publish fallback values', async () => {
+  const {session,backend}=harness();let queued=0;
+  const preferences=Object.assign(new ReviewPreferences(),{rollover:7,showIntervals:true,timeLimitSecs:120});
+  backend.reviewPreferences=async()=>preferences;
+  backend.queuedCards=async()=>{queued++;return {cards:[]};};
+  assert.equal((await session.loadNext(1,()=>true)).preferences,preferences);
+  assert.equal(queued,1);
+  backend.reviewPreferences=async()=>{throw Error('preferences unavailable');};
+  await assert.rejects(session.loadNext(1,()=>true),/preferences unavailable/);
+  assert.equal(queued,1);
 });
 
 test('each successful rating preserves raw bytes and queues one coalesced intent without starting sync', async () => {
@@ -171,7 +185,7 @@ test('scheduler preserves pending requests across subscribers and multiple overl
   assert.equal(scheduler.hasPending(), false);
 });
 
-for (const phase of ['canUndo', 'queuedCards', 'renderCard', 'studyOptions', 'describeStates']) {
+for (const phase of ['canUndo', 'reviewPreferences', 'queuedCards', 'renderCard', 'studyOptions', 'describeStates']) {
   test(`disposal during ${phase} stops the read even when caller still reports current`, async () => {
     const { session, backend, scheduler } = harness();
     const original = backend[phase], gate = deferred();

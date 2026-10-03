@@ -25,7 +25,7 @@ export const CARD_REVIEWER_RUNTIME: string = String.raw`
     if (side === 'answer' && scrollToAnswer) {
       var anchor = document.getElementById('answer');
       if (anchor) anchor.scrollIntoView({block: 'start'});
-      else window.scrollTo(0, document.body.scrollHeight);
+      else window.scrollTo(0, 0);
     }
   }
   async function replaceScript(oldScript) {

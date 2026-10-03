@@ -19,7 +19,7 @@ const Page = new Function('KeyType', 'studyKeyName',
 function harness() {
   const page = new Page();
   const events = [];
-  Object.assign(page, { studyMenuOpen: false, Ctrl按下: true,
+  Object.assign(page, { studyMenuOpen: false, timeboxNotice: null, Ctrl按下: true,
     stopStudyTimers: () => events.push('stop'), clearChoiceAutoAdvance: () => events.push('cancel'),
     startStudyTimers: () => events.push('resume'), scheduleChoiceAutoAdvance: () => events.push('schedule') });
   return { page, events };

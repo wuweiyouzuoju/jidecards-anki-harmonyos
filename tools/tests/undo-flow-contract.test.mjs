@@ -107,8 +107,8 @@ test('study page undo button is wired to undo then refetch', () => {
   // 2026-07-28：撤销按钮从顶部条独立 Button 改为「更多」菜单项。
   // 菜单项 enabled 跟随 可撤销 状态（无可撤销时灰色不可点），点击触发 撤销上次()。
   assert.match(page, /更多菜单\(\): MenuElement\[\]/, 'more menu builder exists');
-  assert.match(page, /\$r\('app\.string\.study_undo'\)/, 'undo string still referenced');
-  assert.match(page, /enabled: this\.可撤销/, 'undo menu item enabled follows 可撤销');
+  assert.match(read('entry/src/main/ets/model/AppInterface.ts'), /id: 'undo', titleKey: 'study_undo'/, 'undo label is shared');
+  assert.match(page, /canUndo: this\.可撤销/, 'undo menu availability follows 可撤销 through shared model');
   assert.match(page, /this\.撤销上次\(\);/, 'menu item taps into undo handler');
 
   assert.match(page, /if \(this\.评分中 \|\| !this\.可撤销\)/, 'undo reuses reentrancy guard');

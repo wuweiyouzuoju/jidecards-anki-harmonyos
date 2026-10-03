@@ -73,7 +73,7 @@ test('study page bury/suspend entries use upstream reviewer semantics and refetc
   const page = read(STUDY_PAGE);
 
   const menu = page.slice(page.indexOf('  private 更多菜单()'), page.indexOf('  private async 打开AI改卡()'));
-  assert.match(menu, /app\.string\.study_bury[\s\S]*?app\.string\.study_suspend/,
+  assert.match(read('entry/src/main/ets/model/AppInterface.ts'), /id: 'bury', titleKey: 'study_bury'[\s\S]*?id: 'suspend', titleKey: 'study_suspend'/,
     'bury/suspend are available in the reviewer menu');
   assert.match(page, /this\.埋藏或暂停当前卡\(BURY_SUSPEND_MODE_BURY_USER\)/,
     'manual bury maps to BURY_USER (see you tomorrow)');

@@ -6,6 +6,7 @@ import { AutoSyncScheduler, autoSyncScheduler } from './AutoSyncScheduler';
 import { SyncActivity, syncActivity } from './SyncSettings';
 import { StudyOptions } from './StudyTiming';
 import type { JideChoiceQuestion } from './JideChoice';
+import { ReviewPreferences } from '../proto/messages/PreferencesMessages';
 
 /** 显式后端边界，允许在不加载 NAPI/ArkUI 的测试中验证学习会话。 */
 export interface StudySessionBackend {
@@ -17,6 +18,7 @@ export interface StudySessionBackend {
   queuedCards(deckId: number): Promise<QueuedCardsView>;
   renderCard(cardId: number): Promise<RenderedCard>;
   studyOptions(cardId: number): Promise<StudyOptions>;
+  reviewPreferences(): Promise<ReviewPreferences>;
   describeStates(states: SchedulingStatesRaw): Promise<string[]>;
   answer(input: CardAnswerInput): Promise<void>;
   undo(): Promise<void>;
@@ -32,7 +34,10 @@ export interface StudySnapshot {
   labels: string[];
   options: StudyOptions;
   choiceQuestion: JideChoiceQuestion | null;
+  preferences: ReviewPreferences;
 }
+
+export interface StudyTimeboxNotice { seconds: number; answers: number; }
 
 /** 编排取卡/评分，页面只消费完整快照；不改动调度算法和原始状态字节。 */
 export class StudySessionController {
@@ -42,12 +47,19 @@ export class StudySessionController {
   private disposed: boolean = false;
   private operations: number = 0;
   private complete: boolean = false;
+  private readonly now: () => number;
+  private timeboxLimit: number = 0;
+  private timeboxElapsed: number = 0;
+  private timeboxStarted: number | null = null;
+  private timeboxAnswers: number = 0;
+  private timeboxNotice: StudyTimeboxNotice | null = null;
 
   constructor(backend: StudySessionBackend, scheduler: AutoSyncScheduler = autoSyncScheduler,
-    activity: SyncActivity = syncActivity) {
+    activity: SyncActivity = syncActivity, now: () => number = (): number => Date.now()) {
     this.backend = backend;
     this.scheduler = scheduler;
     this.activity = activity;
+    this.now = now;
   }
 
   activate(): void {
@@ -58,11 +70,14 @@ export class StudySessionController {
   }
 
   markComplete(): void {
+    this.pauseTimebox();
     this.complete = true;
     this.updateAvailability();
   }
 
   dispose(): void {
+    this.pauseTimebox();
+    this.timeboxNotice = null;
     this.disposed = true;
     this.updateAvailability();
   }
@@ -74,10 +89,13 @@ export class StudySessionController {
       if (this.disposed || !isCurrent()) return null;
       const canUndo: boolean = await this.canUndo();
       if (this.disposed || !isCurrent()) return null;
+      const preferences: ReviewPreferences = await this.backend.reviewPreferences();
+      if (this.disposed || !isCurrent()) return null;
+      this.setTimeboxLimit(preferences.timeLimitSecs);
       const queue: QueuedCardsView = await this.backend.queuedCards(deckId);
       if (this.disposed || !isCurrent()) return null;
       const card: StudyCard | null = queue.cards.length === 0 ? null : queue.cards[0];
-      if (card === null) return { queue: queue, canUndo: canUndo, card: null, rendered: null, labels: [], options: new StudyOptions(), choiceQuestion: null };
+      if (card === null) return { queue: queue, canUndo: canUndo, card: null, rendered: null, labels: [], options: new StudyOptions(), choiceQuestion: null, preferences: preferences };
       const rendered: RenderedCard = await this.backend.renderCard(card.cardId);
       if (this.disposed || !isCurrent()) return null;
       const options: StudyOptions = await this.backend.studyOptions(card.cardId);
@@ -88,7 +106,7 @@ export class StudySessionController {
         ? null : await this.backend.choiceQuestion(card.noteId);
       if (this.disposed || !isCurrent()) return null;
       return { queue: queue, canUndo: canUndo, card: card, rendered: rendered, labels: labels, options: options,
-        choiceQuestion: choiceQuestion };
+        choiceQuestion: choiceQuestion, preferences: preferences };
     } finally {
       this.endOperation();
     }
@@ -119,7 +137,43 @@ export class StudySessionController {
       cardId: card.cardId, currentState: states.current, newState: next[rating], rating: rating,
       answeredAtMillis: now, millisecondsTaken: Math.max(0, now - shownAt)
     };
+    this.pauseTimebox();
     await this.commitChange((): Promise<void> => this.backend.answer(input));
+    if (!this.disposed) {
+      this.timeboxAnswers++;
+      this.pauseTimebox();
+      if (this.timeboxLimit > 0 && this.timeboxElapsed >= this.timeboxLimit * 1000 && this.timeboxNotice === null) {
+        this.timeboxNotice = { seconds: Math.floor(this.timeboxElapsed / 1000), answers: this.timeboxAnswers };
+      }
+    }
+  }
+
+  private setTimeboxLimit(seconds: number): void {
+    if (seconds === this.timeboxLimit) return;
+    this.pauseTimebox();
+    this.timeboxLimit = seconds;
+    this.continueTimebox();
+  }
+
+  resumeTimebox(): void {
+    if (this.disposed || this.timeboxLimit <= 0 || this.timeboxNotice !== null || this.timeboxStarted !== null) return;
+    this.timeboxStarted = this.now();
+  }
+
+  pauseTimebox(): void {
+    if (this.timeboxStarted === null) return;
+    this.timeboxElapsed += Math.max(0, this.now() - this.timeboxStarted);
+    this.timeboxStarted = null;
+  }
+
+  pendingTimebox(): StudyTimeboxNotice | null { return this.disposed ? null : this.timeboxNotice; }
+
+  /** 继续后开始新一段；切卡、编辑和后台只暂停，不清空累计。 */
+  continueTimebox(): void {
+    this.timeboxElapsed = 0;
+    this.timeboxAnswers = 0;
+    this.timeboxStarted = null;
+    this.timeboxNotice = null;
   }
 
   undo(): Promise<void> {

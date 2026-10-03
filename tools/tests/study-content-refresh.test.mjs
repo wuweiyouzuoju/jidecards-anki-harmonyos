@@ -1,4 +1,5 @@
 import { attachStudySession } from './study-session-harness.mjs';
+import { appInterfaceDependencies, studyInterfaceMethods } from './app-interface-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,18 +13,21 @@ const methods = names.map(name => {
   assert.ok(start >= 0);
   return source.slice(start, source.indexOf('\n  }', start) + 4);
 });
-const js = stripTypeScriptTypes(`class Page { ${methods.join('\n')} }`, { mode: 'transform' });
+const interfaceDeps = appInterfaceDependencies();
+const js = stripTypeScriptTypes(`class Page { ${methods.join('\n')} ${studyInterfaceMethods(source)} }`, { mode: 'transform' });
 const hook = name => {
   const body = source.match(new RegExp(`\\.${name}\\(\\(\\): void => \\{([\\s\\S]*?)\\n    \\}\\)`))?.[1];
   assert.ok(body);
-  return new Function(stripTypeScriptTypes(body));
+  const callback = new Function('appInterface', stripTypeScriptTypes(body));
+  return function () { return callback.call(this, interfaceDeps.appInterface); };
 };
 const hidden = hook('onHidden'), shown = hook('onShown');
 
 function harness(phase = 'question') {
   const store = { front: 'old-front', back: 'old-back', css: 'old-css', id: 7, empty: false, renders: 0 };
   const displayed = [];
-  const Page = new Function('构建卡片HTML', '剥除拼写标记', '提取拼写标记', '原始侧HTML', '媒体基地址', js + '\nreturn Page;')(
+  const Page = new Function(...Object.keys(interfaceDeps), '构建卡片HTML', '剥除拼写标记', '提取拼写标记', '原始侧HTML', '媒体基地址', js + '\nreturn Page;')(
+    ...Object.values(interfaceDeps),
     (rendered, side) => rendered.css + ':' + (side === 'question' ? rendered.questionNodes : rendered.answerNodes).join(''),
     html => html.replace(/\[\[type:[^\]]+\]\]/g, ''),
     nodes => nodes.some(text => text.includes('[[type:')) ? { fieldName: 'Updated', combining: true, cloze: false } : null,
@@ -31,6 +35,7 @@ function harness(phase = 'question') {
   );
   const page = new Page();
   Object.assign(page, {
+    getUIContext: () => ({}),
     mounted: true, sessionReady: true, foreground: true, requestVersion: 0, loadingVersion: -1, flipPending: false, controllerReady: true, pendingHtml: '',
     audioSession: { stop: async () => {}, play: async () => false, isPlaying: () => false },
     页面已显示: true, 待重渲染当前卡: false, contentRefreshInFlight: false, 评分中: false,

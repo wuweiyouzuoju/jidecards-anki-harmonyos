@@ -52,7 +52,7 @@ function pageHarness(completed = false) {
   });
   vm.runInContext(stripTypeScriptTypes(`globalThis.Harness = class { ${methods.join('\n')} }`), context);
   const page = new context.Harness();
-  Object.assign(page, { editor: { visible: false, busy: false },
+  Object.assign(page, { timeboxNotice: null, editor: { visible: false, busy: false },
     取文案: key => key,
     studyGuideChecked: false, studyGuideVisible: false, stopStudyTimers() {}, startStudyTimers() {}, controllerReady: true, pendingHtml: '',
     isCurrentRequest: () => true, requestVersion: 1, interactionVersion: 1,
@@ -165,6 +165,19 @@ test('study guide includes the shared keyboard shortcuts in both languages', () 
       'study_gestures_help', 'settings_tap_zones_hint'].map(key => strings.get(key)).join('\n\n'));
     for (const key of ['Enter', 'Ctrl+Z', 'Delete', 'Esc']) assert.ok(dialogs[0].message.includes(key));
     if (locale === 'base') assert.equal(strings.get('study_undo'), '撤销操作');
+  }
+});
+
+test('both languages explain exclusive quick answer modes and their actual actions', () => {
+  for (const locale of ['base', 'en_US']) {
+    const strings = new Map(JSON.parse(read(`entry/src/main/resources/${locale}/element/string.json`)).string.map(item => [item.name, item.value]));
+    const help = strings.get('settings_quick_answer_help');
+    for (const key of ['settings_quick_answer_off', 'settings_tap_zones_label', 'settings_study_gestures',
+      'rating_again', 'rating_hard', 'rating_good', 'rating_easy']) {
+      assert.ok(help.includes(strings.get(key)), key);
+    }
+    assert.doesNotMatch(strings.get('settings_tap_zones_hint'), /同时开启学习手势|With study gestures also enabled/);
+    assert.ok(strings.get('settings_tap_zones_hint').includes(locale === 'base' ? '单击立即响应' : 'taps respond immediately'));
   }
 });
 

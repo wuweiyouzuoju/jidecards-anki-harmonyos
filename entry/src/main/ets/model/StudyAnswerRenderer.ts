@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { 比对答案 } from './拼写比对器';
 import { 提取拼写填空内容 } from './填空解析器';
-import { 注入拼写结果, 剥除拼写标记 } from './学习卡片HTML构建器';
+import { 注入拼写结果, 剥除拼写标记, 提取拼写标记 } from './学习卡片HTML构建器';
 import type { EditableNote } from '../proto/messages/NoteMessages';
+import type { Card } from '../proto/messages/CardsMessages';
+import type { RenderedCard } from '../proto/messages/CardRenderingMessages';
 export interface StudyAnswerNotetype { fieldNames: string[]; }
 export interface StudyAnswerBackend {
   note(id: number): Promise<EditableNote>;
@@ -15,6 +17,22 @@ export interface StudyAnswerRequest {
   ordinal: number;
   input: string;
   combining: boolean;
+}
+export interface PreviewAnswerBackend extends StudyAnswerBackend {
+  card(id: number): Promise<Card>;
+}
+
+/** 只读预览使用空输入显示正确答案；普通卡不额外读取，填空编号取当前卡片。 */
+export async function renderPreviewAnswer(answerHtml: string, rendered: RenderedCard, cardId: number,
+  backend: PreviewAnswerBackend): Promise<string> {
+  const marker = 提取拼写标记(rendered.questionNodes) ?? 提取拼写标记(rendered.answerNodes);
+  if (marker === null) return 剥除拼写标记(answerHtml);
+  const card = await backend.card(cardId);
+  const request: StudyAnswerRequest = {
+    noteId: card.noteId, fieldName: marker.fieldName, cloze: marker.cloze,
+    ordinal: card.templateIdx, input: '', combining: marker.combining
+  };
+  return renderStudyAnswer(answerHtml, request, backend);
 }
 /** 调用者提供翻面时的快照；读取失败仍展示原答案，异步结果是否可见由会话代次决定。 */
 export async function renderStudyAnswer(answerHtml: string, request: StudyAnswerRequest | null,

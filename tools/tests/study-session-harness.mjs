@@ -1,5 +1,6 @@
 import { NoteEditorSession, initialNoteEditorState } from '../../entry/src/main/ets/model/NoteEditorSession.ts';
 import { StudyTimerController } from '../../entry/src/main/ets/model/StudyTimerController.ts';
+import { ReviewPreferences } from '../../entry/src/main/ets/proto/messages/PreferencesMessages.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { StudySessionController } from '../../entry/src/main/ets/model/StudySessionController.ts';
 import { AutoSyncScheduler } from '../../entry/src/main/ets/model/AutoSyncScheduler.ts';
@@ -18,6 +19,10 @@ export function attachStudySession(page) {
   page.studyScheduler = new AutoSyncScheduler();
   page.syncActivity = new SyncActivity();
   page.studyOptions = new StudyOptions();
+  page.reviewPreferences = Object.assign(new ReviewPreferences(), {showRemaining: true, showIntervals: true});
+  page.timeboxNotice = null;
+  page.choiceFeedbackDeadline ??= 0;
+  page.maybeShowTimebox = () => {};
   page.editor = initialNoteEditorState();
   page.editorSession = new NoteEditorSession(page.noteReader, state => { page.editor = state; });
   page.autoAdvanceEnabled = false;
@@ -48,6 +53,7 @@ export function attachStudySession(page) {
     queuedCards: id => page.调度器服务实例.获取队首卡片(id),
     renderCard: id => page.卡片渲染服务实例.渲染既有卡片(id),
     studyOptions: async () => page.studyOptions,
+    reviewPreferences: async () => page.reviewPreferences,
     describeStates: states => page.调度器服务实例.描述下一档状态(states),
     answer: input => page.调度器服务实例.提交评分(input),
     undo: () => page.集合服务实例.撤销(),

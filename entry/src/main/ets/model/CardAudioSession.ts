@@ -18,6 +18,7 @@ export class CardAudioSession {
   private sound: AudioQueuePlayer<string>;
   private tts: AudioQueuePlayer<TtsItem>;
   private extract: (html: string, question: boolean) => Promise<AvTagsResult>;
+  private soundPath: (directory: string, filename: string) => string;
   private version: number = 0;
   private released: boolean = false;
   private work: Promise<void> = Promise.resolve();
@@ -26,10 +27,13 @@ export class CardAudioSession {
   isPlaying(): boolean { return this.playing; }
 
   constructor(sound: AudioQueuePlayer<string>, tts: AudioQueuePlayer<TtsItem>,
-    extract: (html: string, question: boolean) => Promise<AvTagsResult>) {
+    extract: (html: string, question: boolean) => Promise<AvTagsResult>,
+    soundPath: (directory: string, filename: string) => string =
+      (directory: string, filename: string): string => `${directory}/${filename}`) {
     this.sound = sound;
     this.tts = tts;
     this.extract = extract;
+    this.soundPath = soundPath;
   }
 
   /** 立即使旧请求失效，并在初始化结束后再停止一次，防止迟到的原生播放。 */
@@ -69,7 +73,7 @@ export class CardAudioSession {
           const paths: string[] = group.soundFiles.map((name: string): string => {
             let decoded: string = name;
             try { decoded = decodeURIComponent(name); } catch (_) { /* 文件名可以含非编码的 %。 */ }
-            return `${mediaDirectory}/${decoded}`;
+            return this.soundPath(mediaDirectory, decoded);
           });
           await this.sound.播放队列(paths);
           await this.sound.waitForCompletion();

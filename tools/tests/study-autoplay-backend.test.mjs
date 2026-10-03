@@ -4,6 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { register } from 'node:module';
 import { UNBURY_MODE_ALL } from '../../entry/src/main/ets/proto/messages/SchedulerMessages.ts';
+import { 协议写入器 } from '../../entry/src/main/ets/proto/core/ProtoWriter.ts';
 
 // 唯一替身是平台动态库；误触真实 RPC 必须失败，领域适配器直接导入执行。
 const native = 'data:text/javascript,' + encodeURIComponent(
@@ -11,6 +12,20 @@ const native = 'data:text/javascript,' + encodeURIComponent(
 const hook = `export function resolve(s,c,n){if(s==='libjidecards.so')return {url:${JSON.stringify(native)},shortCircuit:true};return n(s,c)}`;
 register('data:text/javascript,' + encodeURIComponent(hook), import.meta.url);
 const { AnkiStudySessionBackend: Backend } = await import('../../entry/src/main/ets/backend/StudySessionBackend.ts');
+
+test('global review preferences come from the Core service and refresh independently of card deck options', async () => {
+  const backend=new Backend();let calls=0;
+  const reviewing=new 协议写入器();reviewing.写入布尔(3,true);reviewing.写入布尔(4,false);reviewing.写入变长整数(5,61);
+  const preferences=new 协议写入器();preferences.写入字节(1,new Uint8Array([16,7,24,60]));
+  preferences.写入字节(2,reviewing.转为字节());
+  backend.config={getPreferences:async()=>{calls++;return preferences.转为字节();}};
+  backend.deckConfigs={获取牌组配置编辑视图:async()=>assert.fail('global preferences must not read a deck preset')};
+  assert.deepEqual({...await backend.reviewPreferences()},
+    {rollover:7,learnAheadSecs:60,timeLimitSecs:61,showRemaining:true,showIntervals:false});
+  await backend.reviewPreferences();assert.equal(calls,2);
+  backend.config.getPreferences=async()=>{throw Error('Core preferences failed');};
+  await assert.rejects(backend.reviewPreferences(),/Core preferences failed/);
+});
 
 test('autoplay uses the card deck, or its original deck for filtered cards, and refreshes changed preferences', async () => {
   for (const originalDeckId of [0, 7]) {

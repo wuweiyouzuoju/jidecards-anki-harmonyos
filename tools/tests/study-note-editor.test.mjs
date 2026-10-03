@@ -1,4 +1,5 @@
 import { resolveStudyKey } from '../../entry/src/main/ets/model/StudyInputPolicy.ts';
+import { appInterfaceDependencies, studyInterfaceMethods } from './app-interface-harness.mjs';
 import { loadNoteEditor } from '../../entry/src/main/ets/model/NoteEditorLoader.ts';
 import { attachStudySession } from './study-session-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -21,8 +22,8 @@ function harness(phase = 'question') {
   let now = 1000;
   const writes = [], reads = [], toasts = [];
   const note = { id: 42, guid: 'imported-note', notetypeId: 9, mtimeSecs: 3, usn: 4, fields: ['old', '<img src="a.png">'], tags: ['imported'] };
-  const context = vm.createContext({ ...uiFeedback, resolveStudyKey, loadNoteEditor, studyKeyName: key => String(key), KeyType: { Down: 0 }, Date: { now: () => now }, $r: key => key, playStudyHaptic: () => {} });
-  vm.runInContext(stripTypeScriptTypes(`globalThis.Page = class { ${methods.join('\n')} }`), context);
+  const context = vm.createContext({ ...uiFeedback, ...appInterfaceDependencies(), resolveStudyKey, loadNoteEditor, studyKeyName: key => String(key), KeyType: { Down: 0 }, Date: { now: () => now }, $r: key => key, playStudyHaptic: () => {} });
+  vm.runInContext(stripTypeScriptTypes(`globalThis.Page = class { ${methods.join('\n')} ${studyInterfaceMethods(source)} }`), context);
   const page = new context.Page();
   Object.assign(page, {
     mounted: true, sessionReady: true, foreground: true, 页面已显示: true, requestVersion: 0,

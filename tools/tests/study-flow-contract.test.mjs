@@ -246,12 +246,12 @@ test('study and preview share native audio lifecycle without Web autoplay', () =
 });
 
 test('image occlusion IIFE exposes toggle and hides #toggle button (BUG-007)', () => {
-  const builder = read('entry/src/main/ets/model/学习卡片HTML构建器.ts');
+  const builder = read('entry/src/main/ets/model/ImageOcclusionRendering.ts');
   // 上游 afmt 模板的 <button id="toggle"> 无 onclick，由 IIFE 在 setup() 中隐藏（2026-07-28 暂停切换功能）。
   assert.match(builder, /toggle:\s*function\s*\(\s*\)\s*\{/, 'anki.imageOcclusion.toggle method defined');
   assert.match(builder, /getElementById\(['"]toggle['"]\)/, '#toggle button looked up in setup');
   // 暂时隐藏按钮：Web focusable(false) 下 click/touchend 都存在事件转发问题
-  assert.match(builder, /btn\.style\.display\s*=\s*['"]none['"]/, '#toggle button hidden via display=none');
+  assert.match(builder, /(?:btn|button)\.style\.display\s*=\s*['"]none['"]/, '#toggle button hidden via display=none');
   // 防重定义：if (window.anki.imageOcclusion) return 防止 hidden 状态被重定义丢失
   assert.match(builder, /if\s*\(window\.anki\.imageOcclusion\)\s*\{\s*return;\s*\}/,
     'IIFE does not redefine anki.imageOcclusion if already present');
@@ -341,8 +341,8 @@ test('study page reconciles the current card and queue after an Agent edit', () 
 
   // 通道一：改卡写入成功后广播；学习页用 @StorageLink + @Watch 接收。
   assert.match(ai,
-    /if \(this\.pageMode === 'edit'\) \{\s*AppStorage\.setOrCreate<number>\('cardContentChangedTick', Date\.now\(\)\);\s*\}/,
-    'the Agent page must broadcast card content changes in edit mode only');
+    /if \(changedExistingCards\) \{\s*AppStorage\.setOrCreate<number>\('cardContentChangedTick', Date\.now\(\)\);\s*\}/,
+    'scoped and unified Agent edits must broadcast existing-card content changes');
   assert.match(page, /@StorageLink\('cardContentChangedTick'\) @Watch\('卡片内容变更_回调'\)/,
     'study page must watch the Agent edit broadcast');
 

@@ -1,6 +1,21 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { StudyInputCommand } from './StudyInputPolicy';
 
+export enum StudyQuickAnswerMode {
+  Off = 0,
+  TapZones = 1,
+  Gestures = 2
+}
+
+/** 旧版双开优先保留四象限；新模式是唯一有效值。 */
+export function resolveStudyQuickAnswerMode(value: number, tapZones: boolean,
+  gestures: boolean): StudyQuickAnswerMode {
+  if (value === StudyQuickAnswerMode.Off || value === StudyQuickAnswerMode.TapZones ||
+    value === StudyQuickAnswerMode.Gestures) return value;
+  return tapZones ? StudyQuickAnswerMode.TapZones :
+    (gestures ? StudyQuickAnswerMode.Gestures : StudyQuickAnswerMode.Off);
+}
+
 export interface StudyGestureState {
   phase: string;
   gestures: boolean;

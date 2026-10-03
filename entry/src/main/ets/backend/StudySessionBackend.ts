@@ -15,6 +15,8 @@ import type { DeckConfigsForUpdateView } from '../proto/messages/DeckConfigMessa
 import { StudyOptions } from '../model/StudyTiming';
 import { jideChoiceQuestionFromNote } from '../model/JideChoice';
 import type { JideChoiceQuestion } from '../model/JideChoice';
+import { 配置服务 } from './配置服务';
+import { ReviewPreferences, decodeReviewPreferences } from '../proto/messages/PreferencesMessages';
 import { 笔记类型服务 } from './笔记类型服务';
 
 /** 复用既有 RPC 编解码，不在应用层重建调度状态。 */
@@ -26,6 +28,11 @@ export class AnkiStudySessionBackend implements StudySessionBackend {
   private cards: 卡片服务 = new 卡片服务();
   private deckConfigs: 牌组配置服务 = new 牌组配置服务();
   private notetypes: 笔记类型服务 = new 笔记类型服务();
+  private config: 配置服务 = new 配置服务();
+
+  async reviewPreferences(): Promise<ReviewPreferences> {
+    return decodeReviewPreferences(await this.config.getPreferences());
+  }
 
   constructor(scheduler: 调度器服务, renderer: 卡片渲染服务, collection: 集合服务) {
     this.scheduler = scheduler;
