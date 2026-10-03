@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { AgentImageAttachment, ChangeDraft, DraftOperation } from './AgentTypes';
+import { readAgentDeckDeletionSnapshot } from './AgentDeckDeletion';
+import type { AgentDeckDeletionSnapshot } from './AgentDeckDeletion';
 
 interface RetryItemResult {
   targetId: number;
@@ -56,17 +58,26 @@ export function buildFailedOperationsRetryDraft(original: ChangeDraft,
       .concat(imageAttachments.map((value: AgentImageAttachment): number => value.noteId)));
   const cardIds: number[] = uniquePositive(operations.map((value: DraftOperation): number => value.cardId));
   const deckIds: number[] = uniquePositive(operations.map((value: DraftOperation): number => value.deckId));
+  for (const operation of operations) {
+    if (operation.kind !== 'delete_deck') continue;
+    const impact: AgentDeckDeletionSnapshot | null = readAgentDeckDeletionSnapshot(operation.after);
+    if (impact !== null) {
+      noteIds.push(...impact.noteIds); cardIds.push(...impact.cardIds); deckIds.push(...impact.deckIds);
+    }
+  }
   const retriesNoteMutation: boolean = imageAttachments.some(
     (value: AgentImageAttachment): boolean => value.noteId > 0) ||
     operations.some((value: DraftOperation): boolean =>
       value.kind === 'update_field' || value.kind === 'update_tags');
+  const retriesSharedType: boolean = operations.some((value: DraftOperation): boolean =>
+    value.kind === 'update_template' || value.kind === 'change_note_type' || value.kind === 'delete_note_type');
   return {
     id: retryId, risk: original.risk,
     summary: original.summary,
     baselineHash: original.baselineHash, confirmationLevel: original.confirmationLevel,
-    status: 'pending', affectedNoteIds: noteIds,
-    affectedCardIds: retriesNoteMutation ? original.affectedCardIds.slice() : cardIds,
-    affectedDeckIds: deckIds.length > 0 ? deckIds : original.affectedDeckIds.slice(),
+    status: 'pending', affectedNoteIds: retriesSharedType ? original.affectedNoteIds.slice() : uniquePositive(noteIds),
+    affectedCardIds: retriesNoteMutation || retriesSharedType ? original.affectedCardIds.slice() : uniquePositive(cardIds),
+    affectedDeckIds: deckIds.length > 0 ? uniquePositive(deckIds) : original.affectedDeckIds.slice(),
     affectedNotetypeIds: original.affectedNotetypeIds.slice(), operations: operations,
     imageAttachments: imageAttachments.length > 0 ? imageAttachments : undefined
   };

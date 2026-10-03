@@ -14,6 +14,12 @@ import { 笔记服务 } from '../笔记服务';
 import { 笔记类型服务 } from '../笔记类型服务';
 import { 媒体服务 } from '../媒体服务';
 import { WikimediaImageService } from './WikimediaImageService';
+import { readAgentNotetypeImpact } from './AgentNotetypeImpact';
+import type { AgentNotetypeImpact } from './AgentNotetypeImpact';
+import { sameAgentIds } from '../../model/agent/AgentTemplateUpdate';
+import { readAgentDeckDeletionImpact } from './AgentDeckDeletionImpact';
+import { readAgentDeckDeletionSnapshot, agentDeletionFullName } from '../../model/agent/AgentDeckDeletion';
+import type { AgentDeckDeletionSnapshot } from '../../model/agent/AgentDeckDeletion';
 
 interface TemplateUpdatePayload {
   templates: string;
@@ -177,6 +183,7 @@ export class AgentDraftExecutor {
     return result;
   }
 
+  /** @throws {Error} 树或精确影响变化使确认失效，由 prepare/execute 标记冲突。 */
   private async assertBaseline(draft: ChangeDraft): Promise<void> {
     for (const operation of draft.operations) {
       if (operation.kind === 'create_note') {
@@ -208,6 +215,15 @@ export class AgentDraftExecutor {
         if (deck === null || JSON.stringify(deck) !== operation.before) {
           throw new AgentDraftExecutorError('draft_conflict');
         }
+        const expected: AgentDeckDeletionSnapshot | null = readAgentDeckDeletionSnapshot(operation.after);
+        if (expected !== null) {
+          const current: AgentDeckDeletionSnapshot = await readAgentDeckDeletionImpact(deck);
+          if (!sameAgentIds(expected.deckIds, current.deckIds) || !sameAgentIds(expected.cardIds, current.cardIds) ||
+            !sameAgentIds(expected.noteIds, current.noteIds) ||
+            (expected.name !== undefined && expected.name !== agentDeletionFullName(tree, operation.deckId))) {
+            throw new AgentDraftExecutorError('draft_impact_changed');
+          }
+        }
       } else if (operation.kind === 'delete_note_type') {
         const id: number = draft.affectedNotetypeIds[0];
         const capability: NotetypeCapabilities = await this.notetypes.获取笔记类型能力(id);
@@ -215,6 +231,10 @@ export class AgentDraftExecutor {
       } else if (operation.kind === 'update_template') {
         const json: string = await this.notetypes.获取笔记类型旧版(draft.affectedNotetypeIds[0]);
         if (json !== operation.before) { throw new AgentDraftExecutorError('draft_conflict'); }
+        const impact: AgentNotetypeImpact = await readAgentNotetypeImpact(draft.affectedNotetypeIds[0]);
+        if (!sameAgentIds(impact.noteIds, draft.affectedNoteIds) || !sameAgentIds(impact.cardIds, draft.affectedCardIds)) {
+          throw new AgentDraftExecutorError('draft_impact_changed');
+        }
       } else if (operation.kind === 'change_note_type') {
         const before: 变更笔记类型请求 = parseChangeRequest(operation.before);
         const oldId: number = await this.notes.获取笔记的唯一笔记类型(draft.affectedNoteIds);
@@ -435,6 +455,9 @@ export class AgentDraftExecutor {
           notetype.tmpls = parseTemplates(payload.templates);
           notetype.css = payload.css;
           await this.notetypes.更新笔记类型旧版(JSON.stringify(notetype), false);
+          const saved: LegacyNotetypeJson = JSON.parse(
+            await this.notetypes.获取笔记类型旧版(draft.affectedNotetypeIds[0])) as LegacyNotetypeJson;
+          if (saved.css !== payload.css) { throw new AgentDraftExecutorError('style_verification_failed'); }
           this.appendSuccess(result, operation.kind, draft.affectedNotetypeIds[0]);
         }
       } catch (error) {

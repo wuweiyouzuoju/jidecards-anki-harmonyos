@@ -26,7 +26,8 @@ test('high-risk tools calculate impact through official read services before dra
   assert.match(source, /获取笔记的卡片/);
   assert.match(source, /获取变更笔记类型信息/);
   assert.match(source, /获取笔记类型旧版/);
-  assert.match(source, /搜索卡片/);
+  assert.match(source, /readAgentDeckDeletionImpact/);
+  assert.match(fs.readFileSync(path.join(root, 'entry/src/main/ets/backend/agent/AgentDeckDeletionImpact.ets'), 'utf8'), /搜索卡片/);
   assert.match(source, /搜索笔记/);
   assert.match(source, /affectedCardIds/);
   assert.match(source, /confirmationLevel:\s*2/);

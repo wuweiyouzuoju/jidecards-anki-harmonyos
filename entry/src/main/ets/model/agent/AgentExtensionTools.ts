@@ -2,8 +2,11 @@
 
 import type { ProviderFunctionTool } from './ProviderProtocol';
 import type { ToolRisk } from './AgentTypes';
+import type { AgentCardStyle } from './AgentCardStyle';
+import { AGENT_CARD_STYLE_SCHEMA, validateAgentCardStyle } from './AgentCardStyle';
 
 export interface AgentExtensionArguments {
+  style?: AgentCardStyle;
   name: string;
   kind: string;
   fields: string[];
@@ -19,6 +22,7 @@ export interface AgentExtensionArguments {
 }
 
 interface RawExtensionArguments {
+  style?: AgentCardStyle;
   name?: string;
   kind?: string;
   fields?: string[];
@@ -53,8 +57,8 @@ export function agentExtensionTools(): ProviderFunctionTool[] {
       `"deckId":${id},"notetypeId":${id}`, '"deckId","notetypeId"', '{"deckId":1,"notetypeId":1}'),
     extensionTool('propose_create_deck', '提出新建牌组；用户确认后创建并选为生成目标。',
       '"name":{"type":"string","minLength":1,"maxLength":200}', '"name"', '{"name":"英语::词汇"}'),
-    extensionTool('propose_create_note_type', '设计新笔记类型并展示字段和正反面布局，用户确认后创建并选用。kind=normal 或 cloze；cloze 的 frontFields 必须只有一个填空字段。',
-      `"name":{"type":"string","minLength":1,"maxLength":100},"kind":{"type":"string","enum":["normal","cloze"]},"fields":${fields},"frontFields":${fields},"backFields":${fields}`,
+    extensionTool('propose_create_note_type', '设计新笔记类型并展示字段和正反面布局，用户确认后创建并选用。可用 style 指定背景色、文字颜色和排版。kind=normal 或 cloze；cloze 的 frontFields 必须只有一个填空字段。',
+      `"name":{"type":"string","minLength":1,"maxLength":100},"kind":{"type":"string","enum":["normal","cloze"]},"fields":${fields},"frontFields":${fields},"backFields":${fields},"style":${AGENT_CARD_STYLE_SCHEMA}`,
       '"name","kind","fields","frontFields","backFields"',
       '{"name":"词汇例句","kind":"normal","fields":["单词","释义","例句"],"frontFields":["单词"],"backFields":["释义","例句"]}'),
     extensionTool('search_memory', '检索已经由用户确认保存的长期偏好；空 query 列出记忆。只读。',
@@ -107,6 +111,7 @@ export function decodeExtensionArguments(name: string, json: string): AgentExten
   }
   for (const key of schema.required) { if (keys.indexOf(key) < 0) { throw new Error('invalid_tool_arguments'); } }
   const args: AgentExtensionArguments = {
+    style: raw.style === undefined ? undefined : validateAgentCardStyle(raw.style),
     name: boundedString(raw.name, 200), kind: boundedString(raw.kind, 20),
     fields: stringList(raw.fields), frontFields: stringList(raw.frontFields), backFields: stringList(raw.backFields),
     deckId: raw.deckId ?? 0, notetypeId: raw.notetypeId ?? 0, query: boundedString(raw.query, 2000),

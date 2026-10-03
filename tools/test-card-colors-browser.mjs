@@ -4,6 +4,9 @@ import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
 import { 构建卡片HTML } from '../entry/src/main/ets/model/学习卡片HTML构建器.ts';
 import { 对比度 } from '../entry/src/main/ets/model/色阶生成.ets';
+import { applyAgentCardStyle } from '../entry/src/main/ets/model/agent/AgentCardStyle.ts';
+import { renderStudyAnswer } from '../entry/src/main/ets/model/StudyAnswerRenderer.ts';
+import { parseNoteRichText, serializeNoteRichText } from '../entry/src/main/ets/model/NoteRichText.ts';
 
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE
   ? pathToFileURL(process.env.PLAYWRIGHT_MODULE).href : 'playwright');
@@ -11,6 +14,11 @@ const browser = await chromium.launch({ headless: true, channel: 'msedge' });
 const page = await browser.newPage();
 await page.route('**/*', route => route.abort());
 const cases = [
+  { name: 'Agent appearance patch',
+    css: applyAgentCardStyle('.card { color: black; background: white; } .nightMode { background: #222; }',
+      { backgroundColor: '#FFF4CC', textColor: '#222222', darkBackgroundColor: '#18202B', darkTextColor: '#E6E6E6',
+        fontSize: 24, lineHeight: 1.6, textAlign: 'left' }),
+    light: '#222222', dark: '#E6E6E6', background: '#FFF4CC', darkBackground: '#18202B' },
   { name: 'default', css: '', light: '#1A1A1A', dark: '#E6E6E6',
     background: '#FFFFFF', darkBackground: '#18202B' },
   { name: 'standard Anki card', css: '.card { color: black; background-color: white; }',
@@ -70,6 +78,36 @@ try {
         }
       }
     }
+  }
+  const field = serializeNoteRichText(parseNoteRichText('<mark><b>Highlight</b></mark><br><u>Next line</u>'));
+  for (const kind of ['basic', 'typed', 'typed-rich'])
+    for (const width of [390, 1280]) for (const dark of [false, true]) for (const input of ['', 'wrong']) {
+    await page.setViewportSize({width, height: 800});
+    const node = {text: 'Question<hr id="answer">' + (kind === 'typed' ? '' : field) +
+      (kind === 'basic' ? '' : '[[type:Back]]'), replacement: null};
+    const html = 构建卡片HTML({questionNodes: [], answerNodes: [node], css: '', latexSvg: false}, 'answer', dark)
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
+    const rendered = await renderStudyAnswer(html,
+      kind === 'basic' ? null : {noteId: 1, fieldName: 'Back', cloze: false, ordinal: 0, input, combining: true},
+      {note: async () => ({notetypeId: 2, fields: ['Q', field]}), notetype: async () => ({fieldNames: ['Front', 'Back']})});
+    await page.setContent(rendered);
+    const actual = await page.evaluate(() => {
+      const mark = document.querySelector('mark'), bold = document.querySelector('b'), underline = document.querySelector('u');
+      if (!mark) return {rich: false, comparisons: document.querySelectorAll('#typeans').length};
+      return {rich: true, background: getComputedStyle(mark).backgroundColor, color: getComputedStyle(mark).color,
+        weight: getComputedStyle(bold).fontWeight, decoration: getComputedStyle(underline).textDecorationLine,
+        firstY: mark.getBoundingClientRect().top, nextY: underline.getBoundingClientRect().top,
+        overflow: document.body.scrollWidth > window.innerWidth,
+        comparisons: document.querySelectorAll('#typeans').length};
+    });
+    assert.equal(actual.rich, kind !== 'typed', 'stock typing must not inject formatted field content');
+    if (actual.rich) {
+      assert.equal(actual.background, 'rgb(255, 255, 0)'); assert.equal(actual.color, 'rgb(0, 0, 0)');
+      assert.equal(actual.weight, '700'); assert.equal(actual.decoration, 'underline');
+      assert.ok(actual.nextY > actual.firstY, 'br creates a visible new line'); assert.equal(actual.overflow, false);
+    }
+    assert.equal(actual.comparisons, kind === 'basic' ? 0 : 1);
+    passed++;
   }
   console.log(JSON.stringify({ passed, failures }, null, 2));
   assert.deepEqual(failures, []);

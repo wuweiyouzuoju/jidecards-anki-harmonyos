@@ -8,6 +8,7 @@ const stub = `
 export const common = {};
 export const fixture = { failure: '', trashFails: false, added: [], trashed: [], saved: [] };
 export class 卡片服务 {}
+export class 搜索服务 {}
 export class 牌组服务 { async 获取牌组树() { return {deckId:1,children:[]}; } }
 export class 笔记类型服务 { async 获取笔记类型能力() { return {notetypeId:2,fieldNames:['Front','Back']}; } }
 export class 笔记服务 {
@@ -38,7 +39,7 @@ export class WikimediaImageService {
 }
 `;
 const stubUrl = 'data:text/javascript;base64,' + Buffer.from(stub).toString('base64');
-const names = ['卡片服务', '牌组服务', '笔记类型服务', '笔记服务', '媒体服务', 'WikimediaImageService'];
+const names = ['搜索服务', '卡片服务', '牌组服务', '笔记类型服务', '笔记服务', '媒体服务', 'WikimediaImageService'];
 register('data:text/javascript;base64,' + Buffer.from(`export function resolve(s,c,next) {
  if (s==='@kit.AbilityKit' || ${JSON.stringify(names)}.some(n=>s.endsWith('/'+n)))
   return {url:${JSON.stringify(stubUrl)},shortCircuit:true};

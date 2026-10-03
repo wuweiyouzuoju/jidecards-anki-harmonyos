@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { AgentExtensionArguments } from './AgentExtensionTools';
+import { applyAgentCardStyle } from './AgentCardStyle';
 
 function escapeLabel(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -35,5 +36,8 @@ export function buildAgentNotetypeJson(stockJson: string, design: AgentExtension
   template['qfmt'] = notetypeFront(design); template['afmt'] = notetypeBack(design); template['ord'] = 0;
   stock['id'] = 0; stock['name'] = design.name; stock['flds'] = newFields; stock['tmpls'] = [template];
   stock['sortf'] = 0;
+  if (design.style !== undefined) {
+    stock['css'] = applyAgentCardStyle(typeof stock['css'] === 'string' ? stock['css'] as string : '', design.style);
+  }
   return JSON.stringify(stock);
 }
