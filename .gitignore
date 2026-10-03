@@ -42,3 +42,8 @@ build_log.txt
 
 # Debug output
 /stats_*.txt
+/work-*
+/Crash_*.dmp
+**/.wrangler/
+# Hvigor device-test intermediates are not source.
+entry/.test/
