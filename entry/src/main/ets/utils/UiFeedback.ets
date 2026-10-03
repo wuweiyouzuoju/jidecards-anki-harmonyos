@@ -24,11 +24,11 @@ export function resourceText(context: UIContext, resource: Resource, ...args: Ar
 }
 
 /** 动态资源名与静态资源使用相同的失败边界。 */
-export function namedResourceText(context: UIContext, name: string): string {
+export function namedResourceText(context: UIContext, name: string, ...args: Array<string | number>): string {
   try {
     const host = context.getHostContext();
     if (host === undefined) { throw new Error('UI context unavailable'); }
-    return host.resourceManager.getStringByNameSync(name);
+    return host.resourceManager.getStringByNameSync(name, ...args);
   } catch (error) {
     hilog.error(0x4342, 'jidecards', 'Resource text unavailable: %{public}s', name);
     return `[${name}]`;

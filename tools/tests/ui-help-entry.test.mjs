@@ -49,7 +49,9 @@ test('every ArkTS help entry shares the icon, and labelled help cannot float to 
   }
   assert.ok(callers > 0);
   const label = read('components/common/HelpLabel.ets');
-  assert.match(label, /Text\(this.title\)[\s\S]*?flexShrink\(1\)[\s\S]*?HelpButton\(/);
+  assert.match(label, /Text\(\)\s*\{\s*ThemeHighlightedTextSpans\(this.title, this.highlightLabel, this.highlightColors, this.getUIContext\(\)\)\s*\}[\s\S]*?flexShrink\(1\)[\s\S]*?HelpButton\(/);
+  assert.match(label, /@Prop highlightLabel: ResourceStr = ''/);
+  assert.match(label, /@Prop highlightColors: string\[\] = \[\]/);
   assert.doesNotMatch(label, /Blank\(|layoutWeight\(|margin\(|padding\(|Row\(\{/);
   assert.match(label, /alignItems\(VerticalAlign.Center\)/);
   // ArkUI wraps a custom component in a Common node. Centering that wrapper
@@ -98,7 +100,7 @@ test('note help reads the current resource and Back preserves all draft fields',
   const draft = ['front', 'back'];
   let exitRequests = 0;
   const page = method('pages/添加笔记页.ets', '打开帮助', {
-    fieldValues: draft, requestExit: () => { exitRequests++; }
+    fieldValues: draft, draftPreview: null, requestExit: () => { exitRequests++; }
   });
   page.打开帮助('type A', 'help A');
   page.打开帮助('type B', 'help B');

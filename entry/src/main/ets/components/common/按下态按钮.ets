@@ -43,7 +43,12 @@ export struct 按下态按钮 {
   @Prop 是否启用: boolean = true;
   // 工具栏在等宽侧栏内约束标签，保留完整无障碍名称。
   @Prop singleLine: boolean = false;
+  @Prop fillWidth: boolean = false;
   点击回调: () => void = (): void => {};
+
+  private activate(): void {
+    if (this.是否启用) this.点击回调();
+  }
 
   build() {
     Button() {
@@ -73,6 +78,7 @@ export struct 按下态按钮 {
       .constraintSize({ maxWidth: this.singleLine ? '100%' : undefined })
     }
     .height(应用尺寸.按钮高度)
+    .width(this.fillWidth ? '100%' : undefined)
     .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
     .constraintSize({ minWidth: 0, maxWidth: this.singleLine ? '100%' : undefined })
     .accessibilityText(typeof this.文案 === 'string' ? this.文案 : resourceText(this.getUIContext(), this.文案))
@@ -81,6 +87,6 @@ export struct 按下态按钮 {
     .stateEffect(false)
     .borderRadius(应用尺寸.圆角_胶囊)
     .enabled(this.是否启用)
-    .onClick(() => { this.点击回调(); })
+    .onClick(() => { this.activate(); })
   }
 }

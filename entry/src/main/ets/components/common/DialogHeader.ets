@@ -11,6 +11,8 @@ import { 颜色键 } from '../../model/颜色主题';
 export struct DialogHeader {
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop title: ResourceStr = '';
+  @Prop highlightLabel: ResourceStr = '';
+  @Prop highlightColors: string[] = [];
   @Prop actionLabel: ResourceStr = $r('app.string.done');
   @Prop closeLabel: ResourceStr = $r('app.string.create_deck_cancel');
   @Prop actionEnabled: boolean = true;
@@ -84,6 +86,7 @@ export struct DialogHeader {
       .justifyContent(FlexAlign.End)
       }.width('100%')
       HelpLabel({ title: this.title, textSize: 18, textWeight: FontWeight.Bold,
+        highlightLabel: this.highlightLabel, highlightColors: this.highlightColors,
         centered: true, showHelp: this.showHelp, isHelpEnabled: this.helpEnabled, onHelp: this.onHelp })
         .width('44%')
     }

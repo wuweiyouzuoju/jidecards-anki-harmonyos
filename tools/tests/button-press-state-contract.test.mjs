@@ -54,12 +54,19 @@ test('help buttons use the shared press feedback as the sole feedback owner', ()
   for (const path of [
     'entry/src/main/ets/components/settings/设置分组卡片.ets',
     'entry/src/main/ets/components/settings/布局分组.ets',
-    'entry/src/main/ets/components/settings/GeneralSettings.ets',
-    'entry/src/main/ets/components/settings/ReviewControlsSettings.ets',
+    'entry/src/main/ets/components/common/SettingsToggleRow.ets',
   ]) {
     const source = read(path);
     assert.match(source, /HelpLabel\(/, `${path}: expected shared help label`);
   }
+  for (const path of ['GeneralSettings']) {
+    assert.match(read(`entry/src/main/ets/components/settings/${path}.ets`),
+      /SettingsToggleRow\(\{[\s\S]*?showHelp: true[\s\S]*?onHelp:/,
+      `${path}: settings help must be wired through the shared switch row`);
+  }
+  const review = read('entry/src/main/ets/components/settings/ReviewControlsSettings.ets');
+  assert.match(review, /HelpLabel\(\{ title: settingsItemText\(this\.getUIContext\(\), 'study_quick_answer'\), onHelp:/);
+  assert.match(review, /this\.打开说明回调\(\$r\('app.string.settings_quick_answer'\), \$r\('app.string.settings_quick_answer_help'\)\)/);
   const button = read('entry/src/main/ets/components/common/HelpButton.ets');
   assert.match(button, /\.onClick\(/);
   assert.match(button, /new PressFeedback\(/);
@@ -74,10 +81,11 @@ test('all custom press surfaces use one native feedback owner', () => {
     assert.doesNotMatch(source, /onTouch\(|duration: 80/, file);
     const surfaces = [...source.matchAll(/\.attributeModifier\(new (?:Primary)?GlassSurface\([^\n]+\)\)([\s\S]*?)\.onClick/g)];
     assert.ok(surfaces.length > 0, file);
-    // Deck 'More' is a clickable Row with no native Button effect; only its three Buttons need the opt-out.
+    // Deck 'More' is a clickable Row; its following ForEach owns all three native Buttons.
     const buttons = file.endsWith('牌组详情面板.ets') ? surfaces.slice(1) : surfaces;
     if (file.endsWith('牌组详情面板.ets')) {
-      assert.equal(surfaces.length, 4);
+      assert.equal(surfaces.length, 2);
+      assert.match(source, /ForEach\(this.moreItems\(\), \(item: AppInterfaceItem\) => \{\s*Button/);
       assert.doesNotMatch(surfaces[0][1], /stateEffect/);
     }
     for (const surface of buttons) assert.match(surface[1], /\.stateEffect\(false\)/, file);

@@ -7,6 +7,8 @@ import { 取全屏转场时长, 取全屏转场曲线 } from '../../utils/转场
 @Component
 export struct DialogFrame {
   @Prop maximumWidth: number = 应用尺寸.dialogMaxWidth;
+  // 卡片预览自行拥有滚动；普通表单继续按内容收缩并由外壳滚动。
+  @Prop fillBody: boolean = false;
   @Prop canDismiss: boolean = true;
   onDismiss: () => void = (): void => {};
   @BuilderParam header: () => void = this.emptyContent;
@@ -21,6 +23,11 @@ export struct DialogFrame {
     if (this.canDismiss) this.onDismiss();
   }
 
+  private bodyHeight(): number {
+    return Math.max(0, this.viewportHeight * 应用尺寸.dialogHeightRatio -
+      this.headerHeight - 应用尺寸.卡片内边距 * 2 - 应用尺寸.间距_12);
+  }
+
   build() {
     Stack() {
       DialogBackdrop().onClick((): void => { this.dismiss(); })
@@ -28,13 +35,16 @@ export struct DialogFrame {
         Column() { this.header() }
           .width('100%').flexShrink(0)
           .onAreaChange((_old: Area, area: Area): void => { this.headerHeight = Number(area.height); })
-        Scroll() {
-          Column({ space: 应用尺寸.间距_12 }) { this.content() }.width('100%')
+        if (this.fillBody) {
+          Column() { this.content() }.width('100%').height(this.bodyHeight())
+        } else {
+          Scroll() {
+            Column({ space: 应用尺寸.间距_12 }) { this.content() }.width('100%')
+          }
+          .width('100%')
+          .constraintSize({ maxHeight: this.bodyHeight() })
+          .scrollBar(BarState.Auto)
         }
-        .width('100%')
-        .constraintSize({ maxHeight: Math.max(0, this.viewportHeight * 应用尺寸.dialogHeightRatio -
-          this.headerHeight - 应用尺寸.卡片内边距 * 2 - 应用尺寸.间距_12) })
-        .scrollBar(BarState.Auto)
       }
       .width(应用尺寸.dialogWidth)
       .constraintSize({ maxWidth: this.maximumWidth, maxHeight: 应用尺寸.dialogMaxHeight })

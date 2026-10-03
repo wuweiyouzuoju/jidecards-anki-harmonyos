@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
+import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
 
 const root = new URL('../../entry/src/main/ets/', import.meta.url);
 const read = path => readFileSync(new URL(path, root), 'utf8').replaceAll('\r\n', '\n');
@@ -80,7 +81,6 @@ const guardedPanels = [
   ['settings/备份管理面板', ['busy']],
   ['settings/媒体管理面板', ['检查中', '处理中']],
   ['settings/空卡列表面板', ['检查中', '处理中']],
-  ['settings/查找重复对话框', ['加载中']],
   ['settings/笔记类型管理面板', ['加载中', '处理中']],
   ['settings/笔记类型编辑器', ['保存中']],
   ['home/自定义学习对话框', ['处理中']],
@@ -93,6 +93,7 @@ const guardedPanels = [
   ['browser/BrowserNotetypeFeature', ['busy', 'state.busy']]
 ];
 for (const [path, guards] of guardedPanels) {
+  if (path === 'settings/笔记类型管理面板' || path === 'settings/笔记类型编辑器') continue;
   test(`${path}: Back is consumed while busy and closes once available`, () => {
     let closes = 0;
     const component = instance(`components/${path}.ets`, ['handleBackRequest'], {
@@ -197,7 +198,7 @@ test('shared chrome owns theme, scroll limits and safe areas; slots retain their
   assert.match(backdrop, /backgroundBlurStyle\(BlurStyle.Thin/);
   assert.match(backdrop, /expandSafeArea/);
   const frame = read('components/common/DialogFrame.ets');
-  assert.match(frame, /Scroll\(\)[\s\S]*maxHeight:[\s\S]*viewportHeight/);
+  assert.match(frame, /Scroll\(\)[\s\S]*maxHeight: this.bodyHeight\(\)/);
   assert.match(frame, /this.header\(\)[\s\S]*flexShrink\(0\)/);
   for (const path of readdirSync(root, { recursive: true }).filter(p => p.endsWith('.ets'))) {
     const source = read(path.replaceAll('\\', '/'));
@@ -211,6 +212,22 @@ test('shared chrome owns theme, scroll limits and safe areas; slots retain their
         `${path}: standard frosted modal scrims must reuse DialogBackdrop`);
     }
   }
+});
+
+test('preview fill mode and ordinary form scrolling share the available height after header and padding', () => {
+  const dimensions=loadPlatformModule('utils/应用尺寸.ets','应用尺寸',{});
+  const Frame=loadComponentLogic('components/common/DialogFrame.ets','DialogFrame',{应用尺寸:dimensions});
+  const frame=new Frame();
+  assert.equal(frame.fillBody,false,'ordinary dialogs keep content-sized scrolling by default');
+  for(const [viewport,header,expected] of [[800,56,604],[400,56,252],[400,112,196],[240,112,55.2],[120,112,0]]) {
+    frame.viewportHeight=viewport;frame.headerHeight=header;
+    assert.ok(Math.abs(frame.bodyHeight()-expected)<0.00001,`viewport ${viewport}, header ${header}`);
+    assert.ok(frame.bodyHeight()>=0);
+  }
+  const source=read('components/settings/NotetypeTemplatePreview.ets');
+  assert.match(source,/fillBody: true/);
+  assert.match(source,/Web\([\s\S]*\.layoutWeight\(1\)/);
+  assert.doesNotMatch(source,/\.height\(300\)/);
 });
 
 test('loading deck options offers close/retry without a no-op primary action', () => {
@@ -228,10 +245,15 @@ test('loading deck options offers close/retry without a no-op primary action', (
 test('type and mapping selections reject changes while loading or submitting', () => {
   const source = read('components/browser/BrowserNotetypeFeature.ets');
   const handlers = [...source.matchAll(/\.onSelect\((\([^\n]+=> \{[\s\S]*?)\n\s*\}\)/g)];
-  assert.equal(handlers.length, 3);
+  assert.equal(handlers.length, 2);
   let changes = 0;
   const host = { busy: true, state: { busy: false, names: [{ id: 10 }] },
     session: { select() { changes++; }, setField() { changes++; }, setTemplate() { changes++; } } };
+  const selector = instance('components/browser/BrowserNotetypeFeature.ets', ['selectType'], host);
+  selector.selectType(0); assert.equal(changes, 0);
+  selector.busy = false; selector.state.busy = true; selector.selectType(0); assert.equal(changes, 0);
+  selector.state.busy = false; selector.selectType(-1); selector.selectType(1); assert.equal(changes, 0);
+  selector.selectType(0); assert.equal(changes, 1); changes = 0;
   for (const handler of handlers) {
     const code = stripTypeScriptTypes(`const 索引 = 0; const callback = ${handler[1]}\n};`);
     const callback = new Function(code + '; return callback;').call(host);

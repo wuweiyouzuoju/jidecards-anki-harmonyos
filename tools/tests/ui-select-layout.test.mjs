@@ -92,8 +92,10 @@ test('browser subtitle choices share aligned theme selection and dismissal', () 
   assert.match(item, /this\.selected \? this\.accent/);
   assert.match(item, /themeLabelGlyphs\(this\.label, this\.accentColors/);
   for (const index of [1, 4, 2]) {
-    assert.match(menu, new RegExp(`selected: this\\.subtitleIndex === ${index},[\\s\\S]*?this\\.onSubtitle\\(${index}\\)`));
+    assert.match(read('model/AppInterface.ts'), new RegExp(`subtitleIndex === ${index}`));
+    assert.match(menu, new RegExp(`this\\.onSubtitle\\(${index}\\)`));
   }
+  assert.match(menu, /selected: item.selected/);
   assert.match(menu, /this\.onClose\(\)/);
   assert.match(page, /if \(this\.showMoreMenu\) \{ this\.showMoreMenu = false; return true; \}/);
   assert.match(page, /onSubtitle:[^\n]*this\.subtitleIndex = index; this\.showMoreMenu = false/);

@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { HelpButton } from './HelpButton';
+import { ThemeHighlightedTextSpans } from './ThemeText';
 
 /** 帮助紧随标题；仅标题收缩，剩余行宽由调用方分配给右侧业务控件。 */
 @Component
 export struct HelpLabel {
   @Prop title: ResourceStr = '';
+  @Prop highlightLabel: ResourceStr = '';
+  @Prop highlightColors: string[] = [];
   @Prop textSize: number = 15;
   @Prop textColor: ResourceColor = $r('app.color.text_primary');
   @Prop textWeight: FontWeight = FontWeight.Normal;
@@ -16,7 +19,7 @@ export struct HelpLabel {
 
   build() {
     Row() {
-      Text(this.title)
+      Text() { ThemeHighlightedTextSpans(this.title, this.highlightLabel, this.highlightColors, this.getUIContext()) }
         .fontSize(this.textSize).fontColor(this.textColor).fontWeight(this.textWeight)
         .textAlign(this.centered ? TextAlign.Center : TextAlign.Start)
         .maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis }).flexShrink(1)

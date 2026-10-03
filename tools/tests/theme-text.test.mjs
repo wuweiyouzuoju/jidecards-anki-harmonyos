@@ -12,7 +12,7 @@ const read = path => readFileSync(new URL('../../entry/src/main/ets/' + path, im
 const source = read('components/common/ThemeText.ets');
 const js = stripTypeScriptTypes(source.replace(/^import .*$/gm, '').replace(/^@Builder$/gm, '').replace(/^export /gm, ''), { mode: 'transform' });
 const spans = [];
-const api = compileWithUiFeedback('Span', 'ForEach', js + '\nreturn { themeLabelCharacters, themeAccentRampColor, themeLabelGlyphs, ThemeTextSpans };')(
+const api = compileWithUiFeedback('Span', 'ForEach', js + '\nreturn { themeLabelCharacters, themeAccentRampColor, themeLabelGlyphs, ThemeTextSpans, ThemeHighlightedTextSpans, themeHighlightedParts };')(
   text => { const item = { text }; spans.push(item); return { fontColor: color => { item.color = color; } }; },
   (items, build) => items.forEach(build)
 );
@@ -21,6 +21,28 @@ const context = { getHostContext: () => ({ resourceManager: { getStringSync: (id
   assert.deepEqual(args, ['课程', 12]);
   return '课程：12张';
 } } }) };
+
+test('Iridescent names share the create-deck ramp while prose and group numbers keep their inherited color', () => {
+  const theme = themeDefinition('iridescent');
+  for (const colors of [theme.lightActionColors, theme.darkActionColors]) {
+    const title = '获赠【幻彩】，QQ群 726837065，使用【幻彩】';
+    spans.length = 0;
+    api.ThemeHighlightedTextSpans(title, '【幻彩】', colors, context);
+    assert.equal(spans.map(span => span.text).join(''), title);
+    const painted = spans.filter(span => span.color !== undefined);
+    assert.equal(painted.length, 8);
+    assert.deepEqual(painted.slice(0, 4).map(x => x.color), api.themeLabelGlyphs('新建牌组', colors, context).map(x => x.color));
+    assert.deepEqual(painted.slice(4).map(x => x.color), painted.slice(0, 4).map(x => x.color));
+    assert.ok(spans.find(span => span.text.includes('726837065')).color === undefined);
+    assert.deepEqual(api.themeHighlightedParts('plain text', '【幻彩】', context), [{text: 'plain text', highlighted: false}]);
+  }
+  const resource = {id: 99, params: ['app.string.test', '课程', 12]};
+  for (const [highlight, colors] of [['', theme.lightActionColors], ['【幻彩】', []]]) {
+    spans.length = 0;
+    api.ThemeHighlightedTextSpans(resource, highlight, colors, context);
+    assert.deepEqual(spans, [{text: resource}], 'default titles retain native resource handling');
+  }
+});
 
 test('theme labels retain localized substitutions, emoji and single-text reading order', () => {
   assert.deepEqual(api.themeLabelCharacters('新建🎨牌组', context), ['新', '建', '🎨', '牌', '组']);
@@ -64,7 +86,7 @@ test('theme text identity changes with its color and create-deck draws spans in 
   assert.doesNotMatch(button, /ThemeTextSpans\(/, 'button colors must not be snapshotted by a value-parameter builder');
   assert.match(read('components/common/DialogHeader.ets'), /ForEach\(themeLabelGlyphs\(this\.actionLabel, this\.themeAccentColors/);
   assert.doesNotMatch(button, /index % this\.themeAccentColors\.length/);
-  assert.match(read('components/home/主页顶部工具栏.ets'), /create_deck'[\s\S]*?themeText: true/);
+  assert.match(read('components/home/主页顶部工具栏.ets'), /interfaceItemText\(this\.getUIContext\(\), 'home', 'create'\)[\s\S]*?themeText: true/);
 });
 
 test('data text stays single-color so times, counts and numbers never enter the ramp', () => {

@@ -9,12 +9,14 @@ test('UI resource lookup retains formatting arguments and dynamic resource names
   const calls = [];
   const context = { getHostContext: () => ({ resourceManager: {
     getStringSync: (id, ...args) => { calls.push([id, ...args]); return args.join(' / '); },
-    getStringByNameSync: name => { calls.push(name); return 'Theme'; }
+    getStringByNameSync: (name, ...args) => { calls.push(args.length ? [name, ...args] : name); return 'Theme'; }
   } }) };
   assert.equal(api.resourceText(context, { id: 7 }, 'Parent', 'Child'), 'Parent / Child');
   assert.equal(api.resourceText(context, { id: 8 }, 12, 'cards'), '12 / cards');
   assert.equal(api.namedResourceText(context, 'theme_color_aurora'), 'Theme');
-  assert.deepEqual(calls, [[7, 'Parent', 'Child'], [8, 12, 'cards'], 'theme_color_aurora']);
+  assert.equal(api.namedResourceText(context, 'notetype_change_field_moved', 'Front', 1, 2, ''), 'Theme');
+  assert.deepEqual(calls, [[7, 'Parent', 'Child'], [8, 12, 'cards'], 'theme_color_aurora',
+    ['notetype_change_field_moved', 'Front', 1, 2, '']]);
 });
 
 test('unavailable resources produce an explicit marker and log, including a missing host', () => {

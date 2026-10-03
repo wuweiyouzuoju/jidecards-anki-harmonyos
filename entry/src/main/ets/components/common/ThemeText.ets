@@ -76,3 +76,37 @@ export function ThemeTextSpans(label: ResourceStr, colors: string[], context: UI
     Span(label)
   }
 }
+
+export interface ThemeTextPart {
+  text: string;
+  highlighted: boolean;
+}
+
+/** 每个指定名称独立使用同一渐变，正文和数据文字保留原色。 */
+export function themeHighlightedParts(label: ResourceStr, highlight: ResourceStr, context: UIContext): ThemeTextPart[] {
+  const text: string = typeof label === 'string' ? label : resourceText(context, label);
+  const name: string = typeof highlight === 'string' ? highlight : resourceText(context, highlight);
+  if (name === '') return [{ text: text, highlighted: false }];
+  const parts: string[] = text.split(name);
+  const result: ThemeTextPart[] = [];
+  for (let index: number = 0; index < parts.length; index++) {
+    if (index > 0) result.push({ text: name, highlighted: true });
+    if (parts[index] !== '') result.push({ text: parts[index], highlighted: false });
+  }
+  return result;
+}
+
+@Builder
+export function ThemeHighlightedTextSpans(label: ResourceStr, highlight: ResourceStr, colors: string[], context: UIContext) {
+  if (colors.length === 0 || highlight === '') {
+    Span(label)
+  } else {
+    ForEach(themeHighlightedParts(label, highlight, context), (part: ThemeTextPart) => {
+      if (part.highlighted) {
+        ThemeTextSpans(part.text, colors, context)
+      } else {
+        Span(part.text)
+      }
+    }, (part: ThemeTextPart, index: number): string => `${index}-${part.text}-${colors.join(',')}`)
+  }
+}
