@@ -42,6 +42,12 @@ import { CardWebView } from '../../utils/CardWebView';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { interceptCardAsset } from '../../utils/CardAssetResponse';
 import { 卡片渲染服务 } from '../../backend/卡片渲染服务';
+import { 卡片服务 } from '../../backend/卡片服务';
+import { 笔记服务 } from '../../backend/笔记服务';
+import { 笔记类型服务 } from '../../backend/笔记类型服务';
+import { renderPreviewAnswer, StudyAnswerNotetype } from '../../model/StudyAnswerRenderer';
+import type { Card } from '../../proto/messages/CardsMessages';
+import type { EditableNote } from '../../proto/messages/NoteMessages';
 import type { RenderedCard, AvTagsResult } from '../../proto/messages/CardRenderingMessages';
 import {
   构建卡片HTML,
@@ -104,6 +110,9 @@ export struct 卡片预览页 {
   private readonly cardWeb: CardWebView = new CardWebView(this.网页控制器,
     (): void => { this.focusPreviewCard(); }, (_message: string): void => { this.webFailed(); });
   private readonly 卡片渲染服务实例: 卡片渲染服务 = new 卡片渲染服务();
+  private readonly 卡片服务实例: 卡片服务 = new 卡片服务();
+  private readonly 笔记服务实例: 笔记服务 = new 笔记服务();
+  private readonly 笔记类型服务实例: 笔记类型服务 = new 笔记类型服务();
   private 已渲染: RenderedCard | null = null;
   /** 控制器未 attach 时缓存的待加载 HTML（规避 aboutToAppear 异步链白屏时序坑）。 */
   private 待加载HTML: string = '';
@@ -242,7 +251,7 @@ export struct 卡片预览页 {
   // 失败 → 设 错误详情，显示错误覆盖层
   //
   // @业务规则
-  // - 正反面都剥除拼写标记（预览不渲染输入框占位，与学习页 type 预览过滤同语义）
+  // - 正面剥除拼写标记；背面复用学习页空输入的正确答案渲染，预览不收集输入
   // - 背面模板自身含 {{FrontSide}}，答案面因此带正面内容，不额外拼接
   // - 控制器未 attach 时缓存 HTML，onControllerAttached 回调消费
   //
@@ -274,10 +283,16 @@ export struct 卡片预览页 {
     try {
       const rendered: RenderedCard = await this.卡片渲染服务实例.渲染既有卡片(卡片ID);
       if (!this.mounted || version !== this.loadVersion) return;
+      const answerHtml: string = await renderPreviewAnswer(构建卡片HTML(rendered, 'answer', this.isDark),
+        rendered, 卡片ID, {
+          card: (id: number): Promise<Card> => this.卡片服务实例.获取卡片(id),
+          note: (id: number): Promise<EditableNote> => this.笔记服务实例.获取笔记(id),
+          notetype: (id: number): Promise<StudyAnswerNotetype> => this.笔记类型服务实例.获取笔记类型(id)
+        });
+      if (!this.mounted || version !== this.loadVersion) return;
       this.已渲染 = rendered;
-      // 预览正反面都剥除拼写标记（不收集输入，不渲染输入框占位）
       this.正面HTML = 剥除拼写标记(构建卡片HTML(this.已渲染, 'question', this.isDark));
-      this.背面HTML = 剥除拼写标记(构建卡片HTML(this.已渲染, 'answer', this.isDark));
+      this.背面HTML = answerHtml;
       this.应用HTML(this.当前面 === 'question' ? this.正面HTML : this.背面HTML);
     } catch (错误) {
       if (!this.mounted || version !== this.loadVersion) return;

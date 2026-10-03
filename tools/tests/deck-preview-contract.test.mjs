@@ -5,16 +5,17 @@ import test from 'node:test';
 
 const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 
-test('deck detail preview queries all cards and mounts the existing read-only preview', () => {
+test('deck detail preview loads the selected native snapshot and mounts the existing read-only preview', () => {
   const panel = read('entry/src/main/ets/components/牌组详情面板.ets');
   const home = read('entry/src/main/ets/pages/首页.ets');
   const preview = read('entry/src/main/ets/components/browser/卡片预览页.ets');
   const browser = read('entry/src/main/ets/pages/浏览页.ets');
-  assert.match(panel, /app\.string\.deck_preview/);
+  assert.match(panel, /interfaceItemText\(this.getUIContext\(\), 'deck_details', 'preview'\)/);
   assert.match(panel, /预览: \(\) => void/);
   assert.match(home, /打开牌组预览/);
-  assert.match(home, /deckHistorySearch\(/);
-  assert.match(home, /搜索服务实例\.搜索卡片/);
+  assert.match(home, /deckPreviewSession\.load\(deck.id, scope\)/);
+  assert.match(home, /onPreview: \(scope: DeckPreviewScope\)/);
+  assert.doesNotMatch(home, /ids\.sort\(/, 'today queue must retain Core ordering');
   assert.match(home, /卡片预览页\(\{/);
   assert.doesNotMatch(home, /调度器服务/);
   assert.doesNotMatch(home, /previewInitialSide/, 'preview always starts on the question, like Anki');
@@ -24,7 +25,7 @@ test('deck detail preview queries all cards and mounts the existing read-only pr
   assert.match(home, /onEditWithAgent: \(cardId: number\): void => \{ this\.关闭预览并进入AI改卡\(cardId\); \}/);
   assert.match(browser, /onEditWithAgent: \(cardId: number\): void => \{ this\.打开预览AI改卡\(cardId\); \}/);
   assert.doesNotMatch(preview, /@Prop 初始面/, 'preview always starts on the question, like Anki');
-  assert.match(preview, /构建卡片HTML\(this\.已渲染, 'answer', this\.isDark\)/);
+  assert.match(preview, /构建卡片HTML\(rendered, 'answer', this\.isDark\)/);
   assert.match(preview, /预览更多菜单/);
   assert.match(preview, /app\.string\.study_edit_note/);
   assert.match(preview, /app\.string\.ai_card_edit/);
@@ -51,16 +52,15 @@ test('deck preview resources exist in both base and en_US', () => {
   assert.notEqual(enValue, zhValue);
 });
 
-test('deck title wraps beside the top-right preview without a separate current-deck row', () => {
+test('deck title wraps at full width below the preview action row without a current-deck label', () => {
   const panel = read('entry/src/main/ets/components/牌组详情面板.ets');
   assert.doesNotMatch(panel, /app\.string\.selected_deck/);
   const header = panel.slice(panel.indexOf('Text(牌组显示名(deck))'), panel.indexOf("if (deck.description !== '')"));
-  assert.match(header, /\.layoutWeight\(1\)/);
+  assert.match(header, /\.width\('100%'\)/);
   assert.match(header, /\.wordBreak\(WordBreak\.BREAK_ALL\)/);
   assert.doesNotMatch(header, /\.maxLines\(|TextOverflow\.Ellipsis/);
-  assert.match(header, /app\.string\.deck_preview/);
-  assert.match(header, /\.flexShrink\(0\)/);
-  assert.match(header, /Column\(\{ space: 应用尺寸\.间距_4 \}\)[\s\S]*app\.string\.deck_add_card[\s\S]*app\.string\.deck_preview/);
-  assert.match(header, /\.alignItems\(HorizontalAlign\.End\)/);
-  assert.match(header, /\.alignItems\(VerticalAlign\.Top\)/);
+  const actions = panel.slice(panel.lastIndexOf('Row({ space:', panel.indexOf('Text(牌组显示名(deck))')),
+    panel.indexOf('Text(牌组显示名(deck))'));
+  assert.match(actions, /'deck_details', 'add_note'[\s\S]*'deck_details', 'agent'[\s\S]*'deck_details', 'preview'/);
+  assert.doesNotMatch(actions, /Column\(/);
 });
