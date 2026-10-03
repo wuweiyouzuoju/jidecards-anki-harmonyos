@@ -73,7 +73,11 @@ export function compareWarnings(warnings, baseline) {
       item.reason !== baselineCategory(item)) throw Error('Invalid or unapproved warning baseline entry: ' + id);
     allowed.set(id, item.count);
   }
-  const actual = aggregateWarnings(warnings);
+  // Test targets merge the same pinned dependency resources into a different directory.
+  // Keep the real path for verifyMergedResources; only comparison uses a canonical target.
+  const actual = aggregateWarnings(warnings.map(warning => ({ ...warning,
+    message: warning.message.replace('entry/build/default/intermediates/res/ohosTest/resource_str/',
+      'entry/build/default/intermediates/res/default/resource_str/') })));
   const unexpected = actual.filter(item => item.count > (allowed.get(key(item)) ?? 0));
   const reduced = baseline.warnings.filter(item => (actual.find(actual => key(actual) === key(item))?.count ?? 0) < item.count);
   return { unexpected, reduced, accepted: warnings.length - unexpected.reduce((sum, item) => sum + item.count, 0) };
@@ -102,7 +106,9 @@ export function verifyMergedResources(root, warnings) {
     return files.get(path);
   };
   for (const warning of warnings) {
-    if (baselineCategory(warning) !== 'ibest-resource-merge') continue;
+    const normalized = { ...warning, message: warning.message.replace('entry/build/default/intermediates/res/ohosTest/resource_str/',
+      'entry/build/default/intermediates/res/default/resource_str/') };
+    if (baselineCategory(normalized) !== 'ibest-resource-merge') continue;
     const [, name, duplicate] = /^Warning: '([^']+)' conflict, first declared\. Duplicate: (.+)$/.exec(warning.message);
     const source = strings(warning.file), merged = strings(duplicate);
     if (!source.has(name) || !merged.has(name) || JSON.stringify(source.get(name)) !== JSON.stringify(merged.get(name))) {

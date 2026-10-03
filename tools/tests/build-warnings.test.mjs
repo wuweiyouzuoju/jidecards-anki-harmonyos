@@ -84,6 +84,15 @@ test('baselined resource merge must contain identical values, not a genuine over
     writeFileSync(join(root, path), JSON.stringify({ string: [{ name: 'ibest_day', value: 'Day' }] }));
   }
   verifyMergedResources(root, [warning]);
+  const testDuplicate = duplicate.replace('/res/default/', '/res/ohosTest/');
+  mkdirSync(dirname(join(root, testDuplicate)), { recursive: true });
+  writeFileSync(join(root, testDuplicate), JSON.stringify({ string: [{ name: 'ibest_day', value: 'Day' }] }));
+  const testWarning = { file, message: warning.message.replace(duplicate, testDuplicate) };
+  const resourceBaseline = { warnings: [{ ...warning, count: 1, reason: 'ibest-resource-merge' }] };
+  assert.deepEqual(compareWarnings([testWarning], resourceBaseline).unexpected, []);
+  verifyMergedResources(root, [testWarning]);
+  writeFileSync(join(root, testDuplicate), JSON.stringify({ string: [{ name: 'ibest_day', value: 'Changed test resource' }] }));
+  assert.throws(() => verifyMergedResources(root, [testWarning]), /not an identical dependency copy/);
   writeFileSync(join(root, duplicate), JSON.stringify({ string: [{ name: 'ibest_day', value: 'Different' }] }));
   assert.throws(() => verifyMergedResources(root, [warning]), /not an identical dependency copy/);
   writeFileSync(join(root, duplicate), JSON.stringify({ string: [] }));
