@@ -22,10 +22,12 @@ try {
       if (!existsSync(folder) || readdirSync(folder).length === 0) throw new Error(`Anki archive lacks ftl/${name}; prepare translations from the locked checkout`);
     }
   }
-  const patch = 'tools/patches/anki-compact-import-log.patch';
   const base = ['apply', '--recount', '--ignore-space-change', '--ignore-whitespace', '--directory=third_party/anki'];
-  const reverse = spawnSync('git', [...base, '--check', '--reverse', patch], {cwd: root, stdio: 'ignore'});
-  if (reverse.status !== 0) { run('git', [...base, '--check', patch]); run('git', [...base, patch]); }
+  for (const name of ['anki-compact-import-log.patch', 'anki-deck-preview.patch', 'anki-fsrs-workload-params.patch']) {
+    const patch = `tools/patches/${name}`;
+    const reverse = spawnSync('git', [...base, '--check', '--reverse', patch], {cwd: root, stdio: 'ignore'});
+    if (reverse.status !== 0) { run('git', [...base, '--check', patch]); run('git', [...base, patch]); }
+  }
   run('cargo', ['test', '-p', 'jidecards_core', '--features', 'anki-core', '--locked']);
   run(process.execPath, ['tools/verify-rpc-index.mjs']);
   run(process.execPath, ['tools/generate-rpc-index.mjs', '--check']);

@@ -53,13 +53,14 @@ test('home and settings share the transfer session and platform export workflow'
   // 选择器占用、整库二次确认、失败重试在 home-transfer-session 中执行真实会话验证。
 
   const transfer = read('entry/src/main/ets/components/数据迁移面板.ets');
-  assert.match(transfer, /@Prop initialMode/);
+  assert.match(transfer, /@Prop @Watch\('syncMode'\) initialMode/);
   assert.match(transfer, /@Prop deckOptions/);
   assert.match(transfer, /@Prop allowDeckSelection/);
   assert.match(transfer, /aboutToAppear/);
   assert.match(transfer, /this\.已选导出牌组Id = this\.deckOptions\[0\]\.id/);
   assert.match(transfer, /this\.已选导出牌组Id <= 0/);
-  assert.match(transfer, /this\.模式 !== 'exportDeck' \|\| this\.已选导出牌组Id > 0/);
+  assert.match(transfer, /if \(this\.模式 === 'exportDeck'\) return this\.已选导出牌组Id > 0/);
+  assert.match(transfer, /actionEnabled: !this\.busy && this\.可提交\(\)/);
 });
 
 test('add-note exposes image occlusion and other notetypes and type-answer submits on Enter', () => {
