@@ -6,7 +6,7 @@ import test from 'node:test';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const read = file => readFile(path.join(root, 'hosting', file), 'utf8');
-const pages = ['index.html', 'works/jidecards/index.html', 'developers/index.html', 'about/index.html', '404.html'];
+const pages = ['index.html', 'works/jidecards/index.html', 'guides/harmonyos-anki/index.html', 'developers/index.html', 'about/index.html', '404.html'];
 const data = JSON.parse(await read('data/works.json'));
 const work = data.works[0];
 
@@ -70,10 +70,54 @@ test('crawler files include every canonical public page', async () => {
   assert.match(robots, /^Allow: \/$/m);
   assert.match(robots, /^Sitemap: https:\/\/jidecards\.com\/sitemap\.xml$/m);
   const sitemap = await read('sitemap.xml');
-  for (const route of ['/', '/works/jidecards/', '/developers/', '/about/']) {
+  for (const route of ['/', '/works/jidecards/', '/guides/harmonyos-anki/', '/developers/', '/about/']) {
     assert.ok(sitemap.includes(`<loc>https://jidecards.com${route}</loc>`));
   }
   assert.match(await read('404.html'), /content="noindex"/);
+});
+
+test('software facts and visible breadcrumbs agree with canonical page destinations', async () => {
+  for (const file of pages.filter(file => file !== '404.html')) {
+    const html = await read(file);
+    const canonical = html.match(/rel="canonical" href="([^"]+)"/)[1];
+    assert.ok(canonical.startsWith('https://jidecards.com/'));
+    const graph = JSON.parse(html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1])['@graph'];
+    const application = graph.find(item => item['@type'] === 'SoftwareApplication');
+    if (application) {
+      assert.equal(application.offers.price, work.marketplace.price);
+      assert.equal(application.offers.url, work.marketplace.url);
+      assert.equal(application.downloadUrl, work.marketplace.url);
+      assert.equal(application.operatingSystem, work.platform);
+      assert.ok(html.includes('免费下载'));
+      assert.equal(application.aggregateRating, undefined);
+    }
+    if (file !== 'index.html') {
+      const trail = graph.find(item => item['@type'] === 'BreadcrumbList').itemListElement;
+      assert.deepEqual(trail.map(item => item.position), [1, 2]);
+      assert.equal(trail.at(-1).item, canonical);
+      assert.match(html, /aria-label="面包屑"/);
+    }
+  }
+});
+
+test('guide and restored product details are discoverable with matching human and machine content', async () => {
+  const guide = JSON.parse(await read('data/harmonyos-anki-guide.json'));
+  const product = await read('works/jidecards/index.html');
+  const article = await read('guides/harmonyos-anki/index.html');
+  const fullText = await read('llms-full.txt');
+  assert.ok((await read('index.html')).includes(`href="${guide.pathname}"`));
+  assert.ok(!(await read('index.html')).includes(guide.intro), 'long guide must remain off the home body');
+  assert.ok(product.includes(`href="${guide.pathname}"`));
+  for (const section of [...work.detailSections, ...guide.sections]) {
+    assert.ok(fullText.includes(section.title));
+    const html = work.detailSections.includes(section) ? product : article;
+    assert.ok(html.includes(`id="${section.id}"`));
+    assert.ok(html.includes(section.title));
+  }
+  assert.ok(article.includes('全量下载：以云端集合替换本机集合'));
+  assert.ok(article.includes('全量上传：以本机集合替换云端集合'));
+  assert.ok(article.includes('https://docs.ankiweb.net/syncing.html'));
+  assert.match(article, /"@type":"TechArticle"/);
 });
 
 test('existing app data endpoints retain their contracts', async () => {

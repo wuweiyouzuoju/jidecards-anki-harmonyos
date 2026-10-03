@@ -1,13 +1,14 @@
 # 记得闪卡（jidecards）
 
-【记得闪卡】打包了全球顶流闪卡工具（Anki）内核。是完全基于鸿蒙Next系统原生实现的，只服务于鸿蒙Next系统用户的，拥有极其硬核的记忆算法与干净流畅的操作体验的闪卡学习记忆工具。其背靠Anki社区广大的闪卡资源，在全球Agent发展浪潮中进一步解放无限可能。是鸿蒙生态难得的优秀开源项目。
+记得闪卡是面向鸿蒙 HarmonyOS NEXT 的原生开源闪卡应用，基于 Anki 内核，用于背单词、记忆知识点与备考。根据记忆情况安排间隔复习，支持导入已有的 Anki 牌组、同步学习进度和备份学习资料。
 
 - 作者：可塑性天赋
-- 华为应用市场上线版本：2.8.1
+- 华为应用市场上线版本：2.9.6
 - 幻彩限时主题色：领取方式见应用内说明。
 - 许可证：AGPL-3.0-or-later
 - 首页：https://jidecards.com/
 - 下载与功能：https://jidecards.com/works/jidecards/
+- 使用指南：https://jidecards.com/guides/harmonyos-anki/
 - 开发文档：https://jidecards.com/developers/
 - 作者：https://jidecards.com/about/
 - 源码：https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos

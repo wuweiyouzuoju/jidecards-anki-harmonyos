@@ -6,6 +6,7 @@ on:
     paths:
       - "hosting/**"
       - "tools/build-site.mjs"
+      - "tools/site-worker.mjs"
       - ".github/workflows/site-deploy.yml"
   workflow_dispatch:
 

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-26",
+  "updatedAt": "2026-10-03",
   "author": {
     "name": "可塑性天赋",
     "url": "https://jidecards.com/about/",
@@ -10,17 +10,28 @@
     {
       "slug": "jidecards",
       "name": "记得闪卡",
-      "alternateName": "jidecards",
-      "summary": "【记得闪卡】打包了全球顶流闪卡工具（Anki）内核。是完全基于鸿蒙Next系统原生实现的，只服务于鸿蒙Next系统用户的，拥有极其硬核的记忆算法与干净流畅的操作体验的闪卡学习记忆工具。其背靠Anki社区广大的闪卡资源，在全球Agent发展浪潮中进一步解放无限可能。是鸿蒙生态难得的优秀开源项目。",
+      "alternateName": "JideCards",
+      "summary": "记得闪卡是面向鸿蒙 HarmonyOS NEXT 的原生开源闪卡应用，基于 Anki 内核，用于背单词、记忆知识点与备考。根据记忆情况安排间隔复习，支持导入已有的 Anki 牌组、同步学习进度和备份学习资料。",
+      "seo": {
+        "homeTitle": "记得闪卡 JideCards｜鸿蒙 HarmonyOS 闪卡 · Anki · 间隔复习",
+        "productTitle": "记得闪卡 JideCards 下载与功能｜鸿蒙 Anki · FSRS · APKG"
+      },
+      "useCases": [
+        { "name": "背单词", "description": "把单词、释义和例句做成闪卡，或导入已有的 Anki APKG 词汇牌组；支持图片、音频和输入答案。" },
+        { "name": "记忆知识点", "description": "把考试概念、公式和问答拆成卡片，用挖空卡回忆关键内容，用图像遮挡复习图中的信息。" },
+        { "name": "间隔复习", "description": "先尝试回忆，再查看答案并按记忆情况评分。Anki 内核的 FSRS 调度据此安排后续复习时间。" }
+      ],
       "platform": "HarmonyOS NEXT",
       "license": "AGPL-3.0-or-later",
-      "releaseVersion": "2.8.1",
-      "releaseVersionSource": "作者确认当前应用市场上线版本",
+      "releaseVersion": "2.9.6",
+      "releaseVersionSource": "2026-10-01 作者确认当前应用市场上线版本",
       "developmentPriority": "项目优先服务 Agent 开发",
       "url": "https://jidecards.com/works/jidecards/",
       "repository": "https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos",
       "marketplace": {
         "name": "华为应用市场",
+        "price": 0,
+        "priceCurrency": "CNY",
         "url": "https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare",
         "searchTerm": "记得闪卡"
       },
@@ -37,6 +48,62 @@
         { "name": "导入导出", "description": "APKG 牌组导入导出，集合备份与恢复。" },
         { "name": "管理", "description": "牌组层级、搜索、批量编辑、标签与学习统计。" },
         { "name": "桌面与外观", "description": "桌面服务卡片、学习提醒、主题色；提供幻彩限时主题色。" }
+      ],
+      "detailSections": [
+        {
+          "id": "fsrs",
+          "title": "FSRS：根据回忆情况安排间隔复习",
+          "paragraphs": [
+            "记得闪卡复用 Anki Rust Core 的学习与调度能力。FSRS 根据复习记录和记忆状态安排后续复习，支持目标记忆保持率及牌组选项；应用前端不另写一套调度算法。",
+            "学习时先尝试回忆，再显示答案，按实际情况选择忘记、困难、良好或简单。支持撤销上一次评分、埋藏暂时不想看的卡片，以及暂停和恢复卡片。背单词和备考知识点都可以沿用这套复习流程。"
+          ]
+        },
+        {
+          "id": "card-types",
+          "title": "问答、挖空、输入答案与图片遮挡",
+          "paragraphs": [
+            "普通问答适合单词释义与概念辨析，挖空卡适合回忆句子中的关键内容，输入答案可用于拼写练习。图片遮挡适合把示意图、结构图或标注图拆成多个回忆问题。",
+            "卡片支持图片、音频与数学公式。导入的 Anki 卡片模板通过 HTML/CSS 渲染；依赖桌面插件或特定客户端脚本的牌组需要单独检查，不能仅凭 APKG 导入成功就判断所有交互兼容。"
+          ]
+        },
+        {
+          "id": "ankiweb",
+          "title": "AnkiWeb：同步卡片、复习进度与媒体",
+          "paragraphs": [
+            "使用同一个 AnkiWeb 账号，可以在鸿蒙端与其他支持 AnkiWeb 的客户端之间同步集合和复习进度。集合数据与图片、音频的媒体同步分别处理，也支持兼容 Anki 的自定义同步服务器。",
+            "普通同步会合并可合并的变化；需要全量同步时，由用户选择上传本地集合或下载云端集合。第一次迁移前应确认哪一端保存了完整资料，并保留备份。"
+          ]
+        },
+        {
+          "id": "apkg",
+          "title": "APKG 导入导出与 COLPKG 备份",
+          "paragraphs": [
+            "已有 Anki 牌组可以通过 .apkg 文件导入鸿蒙端，也可以把牌组导出后用于其他兼容客户端。词汇、考试问答、挖空卡和带媒体的学习资料都可以通过牌组包转移。",
+            "APKG 用于牌组交换，COLPKG 用于完整集合的备份与恢复。恢复整库会替换当前集合，应按应用提示确认；同步便于多设备使用，独立备份则方便在误操作后找回资料。"
+          ]
+        },
+        {
+          "id": "organization",
+          "title": "牌组、搜索、批量编辑与学习统计",
+          "paragraphs": [
+            "使用层级牌组和标签组织学习资料，通过 Anki 搜索语法查找卡片。支持字段编辑、卡片预览及批量管理，便于整理已有牌组，而不只是逐张背诵。",
+            "学习统计展示复习量、卡片状态、间隔和记忆相关指标，帮助了解当前学习负担。学习提醒和 HarmonyOS 桌面服务卡片提供日常学习入口。"
+          ]
+        },
+        {
+          "id": "native",
+          "title": "HarmonyOS NEXT 原生界面与开源内核",
+          "paragraphs": [
+            "导航、牌组列表、设置与统计界面使用 ArkTS / ArkUI 构建；Anki 的 Rust 内核通过 C ABI 和 Node-API 接入。卡片本身仍使用 Web 组件呈现模板、图片和公式，以保留 Anki 卡片的表达方式。",
+            "项目以 AGPL-3.0-or-later 开源，源码、构建说明和问题反馈入口公开。记得闪卡是独立项目，非 Anki 官方客户端；正式版能力以应用市场发布版本为准。"
+          ]
+        }
+      ],
+      "screenshots": [
+        { "path": "/assets/app-preview-01.png", "caption": "首页：今日进度与层级牌组" },
+        { "path": "/assets/app-preview-02.png", "caption": "统计：卡片状态与记忆指标" },
+        { "path": "/assets/app-preview-03.png", "caption": "提醒：定时学习通知" },
+        { "path": "/assets/app-preview-04.png", "caption": "桌面：学习统计服务卡片" }
       ]
     }
   ]

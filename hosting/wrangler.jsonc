@@ -1,9 +1,18 @@
 {
   "$schema": "https://developers.cloudflare.com/workers/wrangler/config-schema.json",
   "name": "wispy-glade-db0d",
+  "main": "../tools/site-worker.mjs",
   "compatibility_date": "2026-09-26",
   "assets": {
-    "directory": "."
+    "directory": ".",
+    "binding": "ASSETS",
+    "run_worker_first": true
   },
-  "workers_dev": false
+  "workers_dev": false,
+  "routes": [
+    { "pattern": "jidecards.com", "custom_domain": true },
+    { "pattern": "jideyanggeqi.cn", "custom_domain": true },
+    { "pattern": "www.jidecards.com", "custom_domain": true },
+    { "pattern": "www.jideyanggeqi.cn", "custom_domain": true }
+  ]
 }
