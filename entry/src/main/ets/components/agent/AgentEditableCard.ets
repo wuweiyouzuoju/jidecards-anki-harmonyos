@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../../utils/PressFeedback';
+import { NoteFieldEditor } from '../common/NoteFieldEditor';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 颜色键 } from '../../model/颜色主题';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
@@ -78,21 +79,13 @@ export struct AgentEditableCard {
               .fontSize(应用尺寸.字号_正文_小)
               .fontColor($r('app.color.text_secondary'))
               .width('100%')
-            TextArea({
-              text: this.card.fields[字段索引]
-            })
-              .width('100%')
-              .height(56)
-              .fontSize(应用尺寸.字号_正文)
-              .fontColor($r('app.color.text_primary'))
-              .backgroundColor($r('app.color.surface_card'))
-              .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
-              .borderRadius(应用尺寸.圆角_面板)
-              .padding(应用尺寸.间距_10)
-              .enabled(!this.busy && this.card.状态 !== 'saved')
-              .onChange((值: string): void => {
+            NoteFieldEditor({
+              value: this.card.fields[字段索引], fieldName: 字段名,
+              allFields: this.card.fields, disabled: this.busy || this.card.状态 === 'saved',
+              onChange: (值: string): void => {
                 this.onField(字段索引, 值);
-              })
+              }
+            })
           }
           .width('100%')
         }, (字段名: string, 字段索引: number): string =>

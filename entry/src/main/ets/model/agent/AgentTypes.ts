@@ -2,10 +2,10 @@
 
 /** Agent 的纯数据契约；本文件不得导入 HarmonyOS Kit。 */
 
-export type AgentMode = 'create' | 'edit';
+export type AgentMode = 'create' | 'edit' | 'assistant';
 export type ProviderId = 'deepseek' | 'openai' | 'custom';
 export type SearchMode = 'auto' | 'always' | 'off';
-export type ToolRisk = 'read' | 'write' | 'high_risk' | 'blocked';
+export type ToolRisk = 'read' | 'setting_write' | 'write' | 'high_risk' | 'blocked';
 
 export interface ProviderCapabilities {
   text: boolean;
@@ -56,6 +56,7 @@ export type AgentToolTraceStatus = 'started' | 'completed' | 'failed' | 'awaitin
 
 /** 模型工具参数或执行失败的固定诊断；空值以空串/空数组表示。 */
 export interface AgentToolDiagnostic {
+  stage?: string;
   code: string;
   path: string;
   message: string;

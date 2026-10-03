@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { AgentDocumentAccess } from '../../model/agent/AgentDocuments';
 
 import type { Card } from '../../proto/messages/CardsMessages';
 import type { DeckTreeNode } from '../../proto/messages/DeckMessages';
@@ -8,6 +9,7 @@ import type { CardStatsView, StatsRevlogEntry } from '../../proto/messages/Stats
 import type { TagTreeNode } from '../../proto/messages/TagsMessages';
 import type { AgentImageAttachment, AgentImageCandidate, AgentMode, ChangeDraft, DraftOperation } from '../../model/agent/AgentTypes';
 import { validateAgentNoteFields } from '../../model/agent/AgentNoteValidation';
+import { buildAgentLearningOverview } from '../../model/agent/AgentLearningOverview';
 import type { AgentToolArguments } from '../../model/agent/AgentToolSchemas';
 import {
   AgentToolSchemaError,
@@ -189,6 +191,7 @@ class NamedDraftHandler implements AgentDraftToolHandler {
 
 /** 只读上下文和普通写草稿；本文件不调用任何写 Service。 */
 export class CardAgentTools {
+  private readonly documents: AgentDocumentAccess | null;
   private readonly scope: AgentScope;
   private readonly notes: 笔记服务 = new 笔记服务();
   private readonly cards: 卡片服务 = new 卡片服务();
@@ -199,7 +202,7 @@ export class CardAgentTools {
   private readonly stats: 统计服务 = new 统计服务();
   private readonly imageSearch: WikimediaImageService = new WikimediaImageService();
 
-  constructor(scope: AgentScope) { this.scope = scope; }
+  constructor(scope: AgentScope, documents: AgentDocumentAccess | null = null) { this.scope = scope; this.documents = documents; }
 
   register(registry: AgentToolRegistry, mode: AgentMode = 'edit'): void {
     registry.registerRead('get_note_type_capabilities', new NamedReadHandler(this, 'get_note_type_capabilities'));
@@ -212,10 +215,12 @@ export class CardAgentTools {
     registry.registerRead('list_tags', new NamedReadHandler(this, 'list_tags'));
     registry.registerRead('get_notetype_details', new NamedReadHandler(this, 'get_notetype_details'));
     registry.registerRead('get_card_statistics', new NamedReadHandler(this, 'get_card_statistics'));
+    registry.registerRead('get_learning_overview', new NamedReadHandler(this, 'get_learning_overview'));
     registry.registerRead('search_images', new NamedReadHandler(this, 'search_images'));
-    if (mode === 'create') {
+    if (mode !== 'edit') {
       registry.registerDraft('create_flashcards', new NamedDraftHandler(this, 'create_flashcards'));
-    } else {
+    }
+    if (mode !== 'create') {
       registry.registerDraft('propose_update_notes', new NamedDraftHandler(this, 'propose_update_notes'));
       registry.registerDraft('propose_move_cards', new NamedDraftHandler(this, 'propose_move_cards'));
     }
@@ -306,6 +311,11 @@ export class CardAgentTools {
         });
       }
       return JSON.stringify(values);
+    }
+    if (name === 'get_learning_overview') {
+      const query: string = args.query;
+      const graphs = await this.stats.获取图表统计(Math.max(1, args.days - 1), query);
+      return JSON.stringify(buildAgentLearningOverview(graphs, query, args.days, args.forecastDays));
     }
     if (name === 'get_card_statistics') {
       this.scope.assertReadableCardIds(args.cardIds);
@@ -436,6 +446,10 @@ export class CardAgentTools {
           noteId: -(index + 1), fieldOrd: image.fieldOrd, candidateId: image.candidateId,
           placement: 'append', altText: image.altText, before: '', candidate: candidate
         });
+      }
+      if ((item.sources ?? []).length > 0) {
+        if (this.documents === null) throw new Error('document_tools_unavailable');
+        item.fields = this.documents.annotate(item.fields, item.sources ?? []);
       }
     }
     const operations: DraftOperation[] = [];

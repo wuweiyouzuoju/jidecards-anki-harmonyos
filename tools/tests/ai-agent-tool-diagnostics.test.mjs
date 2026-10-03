@@ -53,6 +53,14 @@ test('identical failures escalate on the second attempt and abort on the third',
   );
 });
 
+test('syntax corrections past the visible diagnostic limit are not mistaken for identical failures', () => {
+  const prefix = '{"cards":[{"fields":["' + 'a'.repeat(10000);
+  const tracker = new AgentToolFailureTracker();
+  const syntax = { ...diagnostic, code: 'invalid_json', path: '$' };
+  tracker.record('create_flashcards', prefix + 'x', syntax);
+  assert.equal(tracker.record('create_flashcards', prefix + 'y', syntax).count, 1);
+});
+
 test('tool JSON sanitizer redacts nested secrets and media before truncating', () => {
   const safe = sanitizeAgentToolJson(JSON.stringify({
     apiKey: 'sk-top-secret',

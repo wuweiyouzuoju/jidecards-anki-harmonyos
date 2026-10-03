@@ -14,6 +14,10 @@ import {
   encodeNoteIds,
 } from '../../entry/src/main/ets/proto/messages/NoteMessages.ts';
 import { encodeNotetypeId } from '../../entry/src/main/ets/proto/messages/NotetypeMessages.ts';
+import { 后端错误 } from '../../entry/src/main/ets/backend/错误类型.ts';
+import { AgentToolSchemaError } from '../../entry/src/main/ets/model/agent/AgentToolSchemas.ts';
+import { agentFunctionTools } from '../../entry/src/main/ets/model/agent/AgentToolCatalog.ts';
+import { explicitWebSearchRequested, explicitSourceEvidenceRequested } from '../../entry/src/main/ets/model/agent/AgentPolicy.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
@@ -74,6 +78,8 @@ function toolCallEvent(call) {
 function runnerHarness(rounds, results) {
   const registry = {
     calls: [],
+    isDraftTool(name) { return name === 'create_flashcards' || name.startsWith('propose_update_'); },
+    cancelActive() {},
     async execute(call) {
       this.calls.push(call);
       const result = results.shift();
@@ -109,6 +115,50 @@ function clarificationResult() {
     },
   };
 }
+
+test('custom models use device web tools with provider search off and show real sources', async () => {
+  for (const name of ['web_search', 'read_webpage']) {
+    const output = name === 'web_search' ? { status: 'completed', query: 'facts',
+      results: [{ url: 'https://example.com/fact', title: 'Fact', description: 'Data' }] } :
+      { status: 'completed', url: 'https://example.com/fact', title: 'Fact', text: 'Data', nextOffset: -1, totalLength: 4 };
+    const events = [];
+    const { runner, requests } = runnerHarness([[toolCallEvent(toolCall('device-read', name))], []],
+      [{ outputJson: JSON.stringify(output), draft: null, clarification: null }]);
+    const result = await runner.run('custom', providerRequest({ functionTools: [functionTool(name)],
+      requiresWebSearch: true, requiresSearchEvidence: true }), { onEvent(event) { events.push(event); } });
+    assert.equal(result.status, 'completed');
+    assert.ok(requests.every(request => request.searchMode === 'off'));
+    assert.deepEqual(events.filter(e => e.kind === 'search_source').map(e => e.source),
+      [{ url: 'https://example.com/fact', title: 'Fact' }]);
+    assert.ok(requests.at(-1).input.some(item => item.kind === 'function_call_output' && item.output.includes('https://example.com/fact')));
+  }
+});
+test('a failed device request and prose links cannot satisfy explicit web requirements', async () => {
+  const events = [];
+  const { runner } = runnerHarness([[toolCallEvent(toolCall('fail-read', 'read_webpage'))],
+    [{ kind: 'text_delta', text: 'https://example.com/fact', toolCall: null, toolTrace: null, source: null, errorCode: '' }]],
+    [new Error('web_request_failed')]);
+  await assert.rejects(() => runner.run('custom', providerRequest({ functionTools: [functionTool('read_webpage')],
+    requiresWebSearch: true, requiresSearchEvidence: true }), { onEvent(event) { events.push(event); } }), /web_search_not_executed/);
+  assert.ok(events.some(event => event.kind === 'tool_failed'));
+  assert.ok(!events.some(event => event.kind === 'search_source'));
+});
+
+test('offline HTML card request reaches the provider and preserves generated HTML/JS output', async () => {
+  const intent='我是让你通过编写 HTML 代码来制作类网页交互闪卡';
+  const html='<button onclick="document.getElementById(\'answer\').hidden=false">显示答案</button><div id="answer" hidden>钠</div>';
+  const delta={kind:'text_delta',text:html,toolCall:null,toolTrace:null,source:null,errorCode:''};
+  const {runner,requests}=runnerHarness([[delta]],[]);
+  const events=[];
+  const result=await runner.run('deepseek',providerRequest({
+    input:[{kind:'message',role:'user',content:intent,callId:'',name:'',argumentsJson:'',output:''}],
+    searchMode:'off', requiresWebSearch:explicitWebSearchRequested(intent),
+    requiresSearchEvidence:explicitSourceEvidenceRequested(intent)
+  }),{onEvent:event=>events.push(event)});
+  assert.equal(requests.length,1);assert.equal(result.status,'completed');
+  assert.equal(requests[0].searchMode,'off');
+  assert.equal(events.filter(event=>event.kind==='text_delta').map(event=>event.text).join(''),html);
+});
 
 test('note helper codecs cover CardsOfNote and GetSingleNotetypeOfNotes wire shapes', () => {
   assert.deepEqual(decodeCardIds(encodeCardIds([11, 12, 900719])), [11, 12, 900719]);
@@ -189,8 +239,8 @@ test('runner replays provider continuation items and retries only before meaning
   assert.match(source, /receivedOutput/);
   assert.match(source, /shouldRetryTransport/);
   assert.match(source, /transientRetries\s*<\s*2/);
-  assert.match(source, /hasReasoningContinuation/);
-  assert.match(source, /!collector\.hasReasoningContinuation/);
+  assert.match(source, /hasProviderReasoningText/);
+  assert.match(source, /readProviderContinuation/);
   assert.match(source, /incompleteMaxOutput/);
   assert.match(source, /Continue from the truncated response/);
 });
@@ -443,21 +493,21 @@ test('undeclared tools are reported but never reach the registry', async () => {
   assert.equal(JSON.parse(output.output).tool_error, 'tool_not_declared');
 });
 
-test('two wholly failed tool rounds exhaust the repair budget even with changed arguments', async () => {
+test('different corrected arguments may succeed after two failed rounds within the global budget', async () => {
   const first = toolCall('draft-1', 'create_flashcards', '{"cards":[]}');
   const second = toolCall('draft-2', 'create_flashcards', '{"cards":[{}]}');
   const { runner, registry, requests } = runnerHarness(
-    [[toolCallEvent(first)], [toolCallEvent(second)], []],
-    [new Error('invalid_value'), new Error('unexpected_property')],
+    [[toolCallEvent(first)], [toolCallEvent(second)], [toolCallEvent(toolCall('draft-3', 'create_flashcards', '{"cards":[{"fields":["Q","A"]}]}'))]],
+    [new AgentToolSchemaError('invalid_value'), new AgentToolSchemaError('unexpected_property'),
+      { outputJson: '{}', draft: {id:'ok',operations:[],risk:'write'}, clarification:null }],
   );
-  await assert.rejects(
-    () => runner.run('deepseek', providerRequest({
+  const result = await runner.run('deepseek', providerRequest({
       requiresDraft: true, functionTools: [functionTool('create_flashcards')],
-    }), { onEvent() {} }),
-    (error) => error instanceof Error && error.message === 'agent_repeated_tool_failure',
-  );
-  assert.equal(registry.calls.length, 2);
-  assert.equal(requests.length, 2);
+    }), { onEvent() {} });
+  assert.equal(result.status, 'completed');
+  assert.equal(result.drafts[0].id, 'ok');
+  assert.equal(registry.calls.length, 3);
+  assert.equal(requests.length, 3);
 });
 
 test('mixed clarification batches execute no registry calls and return protocol failures', async () => {
@@ -481,8 +531,7 @@ test('mixed clarification batches execute no registry calls and return protocol 
   assert.equal(outputs.length, 2);
   for (const replayedCall of replayedCalls) {
     const index = requests[0].input.indexOf(replayedCall);
-    assert.equal(requests[0].input[index + 1].kind, 'function_call_output');
-    assert.equal(requests[0].input[index + 1].callId, replayedCall.callId);
+    assert.ok(outputs.every((item) => requests[0].input.indexOf(item) > index));
     assert.equal(outputs.filter((item) => item.callId === replayedCall.callId).length, 1);
   }
   assert.ok(outputs.every((item) => {
@@ -521,4 +570,39 @@ test('cancellation triggered by a completed clarification trace wins over the pa
   const outputs = requests[0].input.filter((item) => item.kind === 'function_call_output');
   assert.equal(outputs.length, 1);
   assert.equal(outputs[0].callId, call.id);
+});
+
+test('execution failures retain received fields and native cause instead of requesting smaller arguments', async () => {
+  const name = 'propose_update_note_type_templates';
+  const args = {notetypeIds:[2],css:'.card{background:#abc}',draftId:'style-1',reason:'test'};
+  for (const error of [new 后端错误('collection unavailable', 9, 'GetNotetypeLegacy', 3),
+    new AgentToolSchemaError('high_risk_batch_too_large'), new Error('collection_busy')]) {
+    const call = toolCall('style-call', name, JSON.stringify(args));
+    const {runner,requests} = runnerHarness([[toolCallEvent(call)],[]], [error]);
+    const events = [];
+    await assert.rejects(()=>runner.run('deepseek', providerRequest({functionTools:agentFunctionTools()}),
+      {onEvent(event){events.push(event);}}),/agent_no_valid_draft/);
+    const output = JSON.parse(requests[0].input.find(i=>i.kind==='function_call_output').output);
+    assert.equal(output.failureStage,'execution');
+    assert.deepEqual(output.receivedKeys,Object.keys(args));
+    assert.ok(output.allowedKeys.includes('css'));
+    assert.match(output.correction,/Arguments were received/);
+    assert.doesNotMatch(output.correction,/Rebuild/);
+    if (error instanceof 后端错误) {
+      assert.equal(output.tool_error,'backend_error');
+      assert.match(output.message,/collection unavailable/);
+      assert.match(output.message,/nativeStatus=3, kind=9, context=GetNotetypeLegacy/);
+    }
+  }
+});
+
+test('argument failures keep their field path and distinguish them from execution failures', async () => {
+  const call = toolCall('style-call','propose_update_card_style','{"notetypeIds":[2],"style":{"fontSize":0}}');
+  const {runner,requests} = runnerHarness([[toolCallEvent(call)],[]],
+    [new AgentToolSchemaError('invalid_value','style','invalid_card_style_font_size')]);
+  await assert.rejects(()=>runner.run('deepseek',providerRequest({functionTools:agentFunctionTools()}),{onEvent(){}}),
+    /agent_no_valid_draft/);
+  const output=JSON.parse(requests[0].input.find(i=>i.kind==='function_call_output').output);
+  assert.equal(output.failureStage,'arguments');assert.equal(output.errorPath,'style');
+  assert.deepEqual(output.receivedKeys,['notetypeIds','style']);
 });

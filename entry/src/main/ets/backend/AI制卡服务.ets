@@ -8,6 +8,7 @@
 
 import { http } from '@kit.NetworkKit';
 import { NOTE_TYPE_KIND_CLOZE } from '../proto/messages/NotetypeMessages';
+import { AGENT_IDENTITY_INSTRUCTIONS } from '../model/agent/AgentSessionContext';
 
 /** 错误类别：UI 层按 kind 本地化展示。 */
 export type AI制卡错误类别 =
@@ -88,7 +89,7 @@ export function 构建系统提示(参数: AI制卡请求参数): string {
     .map((名: string, 序: number): string => `${序 + 1}. ${名}`)
     .join('\n');
   let 提示: string =
-    `你是 Anki 闪卡制卡助手。根据用户提供的材料制作闪卡。\n` +
+    AGENT_IDENTITY_INSTRUCTIONS + `本次根据用户提供的材料制作闪卡，严格遵循以下 JSON 输出规则。\n` +
     `当前笔记类型：${参数.笔记类型名}\n` +
     `字段（fields 数组必须严格按以下顺序输出，共 ${参数.字段名列表.length} 个）：\n${字段行}\n` +
     `规则：\n` +

@@ -12,8 +12,8 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'u
 test('one disclosure component owns the conversation arrow and animation', () => {
   const disclosure = read('entry/src/main/ets/components/agent/AgentDisclosureCard.ets');
   const page = read('entry/src/main/ets/pages/AI制卡页.ets') + read('entry/src/main/ets/model/agent/AgentConversationView.ts');
-  assert.match(disclosure, /Text\('▼'\)/);
-  assert.match(disclosure, /expanded\s*\?\s*0\s*:\s*-90/);
+  assert.match(disclosure, /DisclosureChevron\(/);
+  assert.match(disclosure, /expanded\s*\?\s*90\s*:\s*0/);
   assert.match(disclosure, /duration:\s*150/);
   assert.match(disclosure, /Curve\.EaseOut/);
   assert.doesNotMatch(disclosure, /animateTo\(/);
@@ -80,7 +80,9 @@ test('composer readiness and clarification lifecycle remain controlled by the pa
   const page = read('entry/src/main/ets/pages/AI制卡页.ets') + read('entry/src/main/ets/model/agent/AgentConversationView.ts');
   assert.match(page, /private canSubmit\(\): boolean/);
   assert.match(page, /return this\.readinessReason\(\) === 'ready'/);
-  assert.match(page, /\.enabled\(this\.处理中 \|\| this\.canSubmit\(\)\)/);
+  assert.match(page, /\.enabled\(this\.interfaceEnabled\('submit'\)\)/);
+  assert.match(page, /canSubmit: this\.canSubmit\(\)/);
+  assert.match(read('entry/src/main/ets/model/AppInterface.ts'), /context\.processing \|\| context\.canSubmit/);
   assert.match(page, /hasPendingClarification\(\)/);
   assert.match(page, /answerMessageId/);
   assert.match(page, /existingUserMessageId/);
@@ -89,7 +91,7 @@ test('composer readiness and clarification lifecycle remain controlled by the pa
 
 test('every assistant reply bubble ends with the AI-generated disclaimer', () => {
   const page = read('entry/src/main/ets/pages/AI制卡页.ets') + read('entry/src/main/ets/model/agent/AgentConversationView.ts');
-  const bubble = page.match(/private AI气泡\(消息索引: number\) \{([\s\S]*?)\n  \}/)?.[0] ?? '';
+  const bubble = page.match(/private AI气泡\(ctx: AgentMessageViewContext\) \{([\s\S]*?)\n  \}/)?.[0] ?? '';
   assert.ok(bubble.length > 0, 'AI气泡 builder must exist');
   // 声明必须位于气泡内容末尾（批次结果之后、Column 收尾之前），覆盖整轮 AI 产物
   const disclaimerIndex = bubble.indexOf('ai_agent_generated_disclaimer');
@@ -112,15 +114,34 @@ test('clarification traces remain visible while question bubbles stay conversati
   assert.match(page, /else if \(this\.hasVisibleAssistantContent\(this\.消息列表\[消息索引\]\)\)/);
   assert.match(page, /audit\.messageId = message\.id/);
   assert.match(page, /messagePositions\.get\(audit\.messageId\)/);
-  assert.match(page, /trace\.expanded = !this\.simpleMode/);
+  assert.match(page, /trace\.expanded = false/);
 });
 
-test('simple and experimental modes only change the default tool detail visibility', () => {
+test('reasoning opens by default while tool details stay collapsed independently of simple mode', () => {
   const page = read('entry/src/main/ets/pages/AI制卡页.ets') + read('entry/src/main/ets/model/agent/AgentConversationView.ts');
-  assert.match(page, /@StorageProp\(简洁模式AppStorage键\) @Watch\('applyToolPresentationMode'\)/);
-  assert.match(page, /if \(existingIndex < 0\) \{ trace\.expanded = !this\.simpleMode/);
+  assert.doesNotMatch(page, /applyToolPresentationMode|!this.simpleMode/);
+  assert.match(page, /if \(existingIndex < 0\) \{ trace\.expanded = false/);
   assert.match(page, /trace\.expanded = message\.工具过程\[existingIndex\]\.expanded/);
-  assert.match(page, /for \(const trace of next\.工具过程\) \{ trace\.expanded = !this\.simpleMode; \}/);
+  assert.match(page, /expandedReasoningIds: 角色 === 'ai' \? \[-1\] : \[\]/);
+  assert.match(page, /this\.取本地化文案\(\$r\('app.string.ai_agent_history_unassigned_tools'\)\),\s*false, this.sessionController/);
   assert.match(page, /toggleLocked: false/);
   assert.doesNotMatch(page, /simpleMode[\s\S]{0,100}reasoningEffort/);
+});
+
+test('tool details use compact framed rows; reasoning is gray and independently bounded', () => {
+  const disclosure = read('entry/src/main/ets/components/agent/AgentDisclosureCard.ets');
+  assert.match(disclosure, /backgroundColor\(\$r\('app.color.surface_card'\)\)/);
+  assert.match(disclosure, /borderRadius\(应用尺寸.圆角_面板\)/);
+  assert.match(disclosure, /SymbolGlyph\(/);
+  assert.match(disclosure, /constraintSize\(\{ maxHeight: 240 \}\)/);
+  assert.match(disclosure, /border\(\{ width: \{ top:/);
+  const reasoning = read('entry/src/main/ets/components/agent/AgentReasoning.ets');
+  assert.match(reasoning, /constraintSize\(\{ maxHeight: 200 \}\)/);
+  assert.match(reasoning, /AgentMarkdownText\(\{ text: this.text,[\s\S]*text_secondary/);
+  assert.match(reasoning, /Text\(this.text\)[\s\S]*text_secondary/);
+  const page = read('entry/src/main/ets/pages/AI制卡页.ets');
+  const timeline = page.slice(page.indexOf('  private agentTimelineItem('), page.indexOf('  private agentTimelineKey('));
+  const tool = timeline.slice(0, timeline.indexOf(".kind === 'draft'"));
+  assert.doesNotMatch(tool, /orderedAgentText/, 'unvalidated tool parameters are not card results');
+  assert.match(page, /AgentReasoning\(\{[\s\S]*expandedReasoningIds/);
 });

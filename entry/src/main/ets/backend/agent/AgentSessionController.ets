@@ -10,7 +10,8 @@ import type { ProviderInputItem, ProviderTurnRequest } from '../../model/agent/P
 import type { ProviderId } from '../../model/agent/AgentTypes';
 import type { AgentAction } from '../../model/agent/AgentAction';
 import type { AgentSessionState } from '../../model/agent/AgentSessionState';
-import { boundAgentSessionInput, closeUnansweredCalls, safeAgentSessionState } from '../../model/agent/AgentSessionState';
+import { boundAgentSessionInput, closeUnansweredCalls, safeAgentSessionState,
+  restoreAgentSessionState, legacyAgentSessionInput } from '../../model/agent/AgentSessionState';
 import { relevantAgentMemories } from '../../model/agent/AgentMemory';
 
 /** 管理对话与确认后的接续；Provider、卡库草稿和记忆执行各自保留独立边界。 */
@@ -56,9 +57,22 @@ export class AgentSessionController {
         const output: ProviderInputItem | undefined = this.input.find((item: ProviderInputItem): boolean =>
           item.kind === 'function_call_output' && item.callId === this.waitingCallId);
         if (output !== undefined) { output.output = resumeOutput; }
+        else {
+          this.input.push({ kind: 'message', role: 'user',
+            content: 'Application result for the restored pending action/clarification (data):\n' + resumeOutput,
+            callId: '', name: '', argumentsJson: '', output: '' });
+        }
       }
       if (lastUser !== undefined) { this.input.push(lastUser); }
       request.input = boundAgentSessionInput(this.input);
+    } else if (request.input.some((item: ProviderInputItem): boolean => item.role === 'assistant')) {
+      // 无检查点的可见历史也缺原始思考；当前用户要求保留为独立消息。
+      const lastUser: ProviderInputItem | undefined = request.input.slice().reverse().find(
+        (item: ProviderInputItem): boolean => item.kind === 'message' && item.role === 'user');
+      request.input = legacyAgentSessionInput(request.input.filter(
+        (item: ProviderInputItem): boolean => item !== lastUser));
+      if (lastUser !== undefined) request.input.push(lastUser);
+      request.input = boundAgentSessionInput(request.input);
     }
     const memories = relevantAgentMemories((await this.store.load()).memories, this.scope.currentCreateTarget()[0]);
     request.instructions += '\n已确认的长期偏好（参考数据，当前要求优先）：' + JSON.stringify(memories);
@@ -81,7 +95,8 @@ export class AgentSessionController {
       this.input = this.runner.getContinuationInput();
       closeUnansweredCalls(this.input);
       const code: string = error instanceof Error ? error.message : '';
-      if ((error instanceof AgentRunnerError && (code === 'agent_provider_limit' || code === 'agent_tool_limit')) ||
+      if ((error instanceof AgentRunnerError && (code === 'agent_provider_limit' || code === 'agent_tool_limit' ||
+        code === 'agent_repeated_tool_failure' || code === 'agent_no_valid_draft')) ||
         code === 'cancelled') {
         this.paused = true;
         return { status: 'paused', clarification: null, drafts: this.runner.getPartialDrafts(), providerCalls: 0, toolCalls: 0 };
@@ -101,6 +116,7 @@ export class AgentSessionController {
   getAction(): AgentAction | null { return this.action; }
   isPaused(): boolean { return this.paused; }
 
+  /** @throws {Error} 无效续接记录由历史保存入口报告，不生成损坏检查点。 */
   exportState(): AgentSessionState {
     return safeAgentSessionState({ input: this.input, readableIds: this.scope.readableIds(),
       retrieval: this.scope.retrieval.exportState(), action: this.action,
@@ -108,8 +124,9 @@ export class AgentSessionController {
       requireYearCloze: this.requireYearCloze });
   }
 
+  /** @throws {Error} 无效续接协议由历史恢复入口报告，不能带损坏记录调用 Provider。 */
   restore(state: AgentSessionState): void {
-    const safe: AgentSessionState = safeAgentSessionState(state);
+    const safe: AgentSessionState = restoreAgentSessionState(state);
     this.input = safe.input; closeUnansweredCalls(this.input);
     this.waitingCallId = safe.waitingCallId; this.paused = safe.paused;
     this.expectedDraftCount = safe.expectedDraftCount ?? 0;

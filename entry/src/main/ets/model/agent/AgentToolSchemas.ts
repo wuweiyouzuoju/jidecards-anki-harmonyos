@@ -4,8 +4,14 @@
 
 import type { AgentToolDiagnostic } from './AgentTypes';
 import { agentFunctionTools } from './AgentToolCatalog';
+import type { AgentCardStyle } from './AgentCardStyle';
+import { validateAgentCardStyle } from './AgentCardStyle';
+import { sanitizeAgentToolJson } from './AgentToolDiagnostics';
+import type { AgentDocumentSource } from './AgentDocuments';
 
 export interface AgentToolArguments {
+  days: number;
+  forecastDays: number;
   cardIds: number[];
   noteIds: number[];
   deckIds: number[];
@@ -25,6 +31,9 @@ export interface AgentToolArguments {
   templateMappingJson: string;
   templateJson: string;
   css: string;
+  hasCss: boolean;
+  hasTemplateJson: boolean;
+  style: AgentCardStyle;
   tags: string[];
   reason: string;
   createNotes: AgentCreateNote[];
@@ -46,6 +55,7 @@ export interface AgentCreateNote {
   fields: string[];
   namedFields: AgentNamedField[];
   images: AgentImageRequest[];
+  sources?: AgentDocumentSource[];
 }
 
 export interface AgentNamedField {
@@ -56,7 +66,8 @@ export interface AgentNamedField {
 interface RawAgentCreateNote {
   fields?: string[];
   images?: RawAgentImageRequest[];
-  [key: string]: string | string[] | RawAgentImageRequest[] | undefined;
+  sources?: AgentDocumentSource[];
+  [key: string]: string | string[] | RawAgentImageRequest[] | AgentDocumentSource[] | undefined;
 }
 
 interface RawAgentImageRequest {
@@ -71,6 +82,8 @@ interface RawAgentImageUpdate extends RawAgentImageRequest {
 }
 
 interface RawAgentToolArguments {
+  days?: number;
+  forecastDays?: number;
   cardIds?: number[];
   noteIds?: number[];
   deckIds?: number[];
@@ -90,6 +103,7 @@ interface RawAgentToolArguments {
   templateMappingJson?: string;
   templateJson?: string;
   css?: string;
+  style?: AgentCardStyle;
   tags?: string[];
   reason?: string;
   notes?: RawAgentCreateNote[];
@@ -140,10 +154,12 @@ function schemaError(toolName: string, code: string, path: string, message: stri
 
 function emptyArguments(): AgentToolArguments {
   return {
+    days: 7, forecastDays: 7,
     cardIds: [], noteIds: [], deckIds: [], notetypeIds: [],
     cursor: '', offset: 0, length: 12000, noteId: 0, fieldOrd: 0, query: '', limit: 0, draftId: '', targetDeckId: 0, targetNotetypeId: 0,
     fieldUpdatesJson: '', fieldMappingJson: '', templateMappingJson: '',
-    templateJson: '', css: '', tags: [], reason: '', createNotes: [], imageUpdates: []
+    templateJson: '', css: '', hasCss: false, hasTemplateJson: false, style: {},
+    tags: [], reason: '', createNotes: [], imageUpdates: []
   };
 }
 
@@ -317,9 +333,9 @@ function validateCreateNotes(toolName: string, value: RawAgentCreateNote[] | und
     const keys: string[] = Object.keys(item);
     const namedFields: AgentNamedField[] = [];
     for (const key of keys) {
-      if (key !== 'fields' && key !== 'images') {
-        const dictionary: Record<string, string | string[] | RawAgentImageRequest[] | undefined> = item;
-        const namedValue: string | string[] | RawAgentImageRequest[] | undefined = dictionary[key];
+      if (key !== 'fields' && key !== 'images' && key !== 'sources') {
+        const dictionary: Record<string, string | string[] | RawAgentImageRequest[] | AgentDocumentSource[] | undefined> = item;
+        const namedValue: string | string[] | RawAgentImageRequest[] | AgentDocumentSource[] | undefined = dictionary[key];
         if (key.trim().length === 0 || key.length > 200 || typeof namedValue !== 'string') {
           throw schemaError(toolName, 'invalid_type', `cards[${noteIndex}].${key}`,
             'Named note-type fields must have string values', keys, ['fields', 'images']);
@@ -349,7 +365,18 @@ function validateCreateNotes(toolName: string, value: RawAgentCreateNote[] | und
         fields.push(field);
       }
     }
-    result.push({ fields: fields, namedFields: namedFields,
+    const sources: AgentDocumentSource[] = [];
+    if (item.sources !== undefined) {
+      if (!Array.isArray(item.sources) || item.sources.length > 10) throw schemaError(toolName, 'invalid_value', `cards[${noteIndex}].sources`, 'At most 10 document page sources');
+      for (const source of item.sources) {
+        if (source === null || typeof source !== 'object' || Array.isArray(source) ||
+          Object.keys(source).some((key: string): boolean => key !== 'documentId' && key !== 'page') ||
+          typeof source.documentId !== 'string' || !/^[A-Za-z0-9._-]{1,100}$/.test(source.documentId) ||
+          !Number.isSafeInteger(source.page) || source.page < 1) throw schemaError(toolName, 'invalid_value', `cards[${noteIndex}].sources`, 'Each source requires a real documentId and positive page');
+        sources.push({ documentId: source.documentId, page: source.page });
+      }
+    }
+    result.push({ fields: fields, namedFields: namedFields, sources: sources,
       images: validateImageRequests(toolName, `cards[${noteIndex}].images`, item.images) });
   }
   return result;
@@ -377,20 +404,30 @@ export function resolveCreateNoteFields(note: AgentCreateNote, fieldNames: strin
   return fields;
 }
 
+/** 不修补或猜测模型内容；把解析器原因反馈给模型，避免只回传空字段列表。 */
+export function parseAgentToolJsonObject(toolName: string, argumentsJson: string): Object {
+  let raw: Object;
+  try {
+    raw = JSON.parse(argumentsJson) as Object;
+  } catch (error) {
+    const reason: string = sanitizeAgentToolJson(error instanceof Error ? error.message : 'JSON syntax error', 512).text;
+    throw schemaError(toolName, 'invalid_json', '$',
+      `JSON syntax error (${argumentsJson.length} characters): ${reason}. ` +
+      'Return one complete JSON object. Escape quotes, backslashes and line breaks inside string values; ' +
+      'do not wrap it in markdown or an arguments property. No tool was executed.');
+  }
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw schemaError(toolName, 'invalid_type', '$', 'Tool arguments must be one JSON object');
+  }
+  return raw;
+}
+
 export function decodeAgentToolArguments(toolName: string, argumentsJson: string): AgentToolArguments {
   const allowed: string[] = allowedKeys(toolName);
   if (allowed.length === 0) {
     throw new AgentToolSchemaError('invalid_tool_arguments');
   }
-  let raw: RawAgentToolArguments;
-  try {
-    raw = JSON.parse(argumentsJson) as RawAgentToolArguments;
-  } catch (error) {
-    throw schemaError(toolName, 'invalid_json', '$', 'Tool arguments must be one valid JSON object');
-  }
-  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
-    throw schemaError(toolName, 'invalid_type', '$', 'Tool arguments must be one JSON object');
-  }
+  const raw: RawAgentToolArguments = parseAgentToolJsonObject(toolName, argumentsJson) as RawAgentToolArguments;
   const receivedKeys: string[] = Object.keys(raw);
   for (const key of receivedKeys) {
     if (!isAllowed(key, allowed)) {
@@ -402,7 +439,14 @@ export function decodeAgentToolArguments(toolName: string, argumentsJson: string
   output.cardIds = validateIds(toolName, 'cardIds', raw.cardIds);
   output.noteIds = validateIds(toolName, 'noteIds', raw.noteIds);
   output.deckIds = validateIds(toolName, 'deckIds', raw.deckIds);
+  if (toolName === 'propose_delete_deck' && output.deckIds.length === 0) {
+    throw schemaError(toolName, 'invalid_value', 'deckIds', 'deckIds must contain at least one discovered deck ID');
+  }
   output.notetypeIds = validateIds(toolName, 'notetypeIds', raw.notetypeIds);
+  if (toolName === 'propose_delete_note_type' && output.notetypeIds.length !== 1) {
+    throw schemaError(toolName, 'invalid_value', 'notetypeIds',
+      'propose_delete_note_type requires exactly one discovered note type ID');
+  }
   output.cursor = stringValue(toolName, 'cursor', raw.cursor);
   output.noteId = positiveId(toolName, 'noteId', raw.noteId);
   for (const key of ['offset', 'length', 'fieldOrd']) {
@@ -414,12 +458,39 @@ export function decodeAgentToolArguments(toolName: string, argumentsJson: string
   output.offset = raw.offset ?? 0; output.fieldOrd = raw.fieldOrd ?? 0;
   output.length = Math.min(12000, Math.max(1, raw.length ?? 12000));
   output.query = stringValue(toolName, 'query', raw.query).trim();
+  if (toolName === 'get_learning_overview') {
+    if (typeof raw.query !== 'string' || raw.query.length > 2000) {
+      throw schemaError(toolName, 'invalid_value', 'query', 'query must be a string of at most 2000 characters');
+    }
+    if (raw.days === undefined || !Number.isSafeInteger(raw.days) || raw.days < 1 || raw.days > 90) {
+      throw schemaError(toolName, 'invalid_value', 'days', 'days must be an integer between 1 and 90');
+    }
+    if (raw.forecastDays === undefined || !Number.isSafeInteger(raw.forecastDays) ||
+      raw.forecastDays < 1 || raw.forecastDays > 30) {
+      throw schemaError(toolName, 'invalid_value', 'forecastDays', 'forecastDays must be an integer between 1 and 30');
+    }
+    output.days = raw.days; output.forecastDays = raw.forecastDays;
+  }
   output.draftId = stringValue(toolName, 'draftId', raw.draftId).trim();
   output.fieldUpdatesJson = stringValue(toolName, 'fieldUpdatesJson', raw.fieldUpdatesJson);
   output.fieldMappingJson = stringValue(toolName, 'fieldMappingJson', raw.fieldMappingJson);
   output.templateMappingJson = stringValue(toolName, 'templateMappingJson', raw.templateMappingJson);
   output.templateJson = stringValue(toolName, 'templateJson', raw.templateJson);
   output.css = stringValue(toolName, 'css', raw.css);
+  output.hasCss = raw.css !== undefined;
+  output.hasTemplateJson = raw.templateJson !== undefined;
+  if (toolName === 'propose_update_card_style') {
+    if (raw.style === undefined) {
+      throw schemaError(toolName, 'missing_property', 'style', 'Provide at least one appearance property.', receivedKeys, allowed);
+    }
+    try { output.style = validateAgentCardStyle(raw.style); } catch (error) {
+      throw schemaError(toolName, 'invalid_value', 'style',
+        error instanceof Error ? error.message : 'invalid_card_style', receivedKeys, allowed);
+    }
+  }
+  if (toolName === 'propose_update_note_type_templates' && !output.hasCss && !output.hasTemplateJson) {
+    throw schemaError(toolName, 'missing_property', 'css', 'Provide css or templateJson; omitted values stay unchanged.', receivedKeys, allowed);
+  }
   output.imageUpdates = parseImageUpdates(toolName, stringValue(toolName, 'imagesJson', raw.imagesJson));
   output.reason = stringValue(toolName, 'reason', raw.reason).trim();
   output.targetDeckId = positiveId(toolName, 'targetDeckId', raw.targetDeckId);

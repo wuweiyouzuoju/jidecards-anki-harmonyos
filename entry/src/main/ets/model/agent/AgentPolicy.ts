@@ -37,6 +37,18 @@ export class SearchExecutionError extends Error {
 
 export function toolRiskOf(toolName: string): ToolRisk {
   switch (toolName) {
+    case 'set_theme_mode':
+      return 'setting_write';
+    case 'list_documents':
+    case 'read_document_page':
+    case 'ocr_document_page':
+    case 'save_document_notes':
+    case 'get_app_structure':
+    case 'list_settings':
+    case 'get_settings':
+    case 'list_theme_colors':
+    case 'get_deck_options':
+    case 'execute_code':
     case 'get_note_type_capabilities':
     case 'get_note_context':
     case 'read_note_field':
@@ -47,13 +59,19 @@ export function toolRiskOf(toolName: string): ToolRisk {
     case 'list_tags':
     case 'get_notetype_details':
     case 'get_card_statistics':
+    case 'get_learning_overview':
     case 'search_images':
     case 'web_search':
+    case 'read_webpage':
     case 'request_clarification':
+    case 'request_create_target':
       return 'read';
     case 'create_flashcards':
     case 'propose_update_notes':
     case 'propose_move_cards':
+    case 'propose_set_theme_color':
+    case 'propose_set_fsrs':
+    case 'propose_set_setting':
       return 'write';
     case 'remove_notes':
     case 'remove_cards':
@@ -67,6 +85,7 @@ export function toolRiskOf(toolName: string): ToolRisk {
     case 'propose_delete_note_type':
     case 'propose_change_note_type':
     case 'propose_update_note_type_templates':
+    case 'propose_update_card_style':
       return 'high_risk';
     default:
       return extensionToolRisk(toolName);
@@ -121,10 +140,11 @@ export function explicitWebSearchRequested(text: string): boolean {
   if (normalized.length === 0) { return false; }
   if (explicitWebSearchForbidden(normalized)) { return false; }
   const markers: string[] = [
-    '联网', '上网', '网页', '网站', '网上', '网络搜索', '搜索网络', '在线查',
+    '联网', '上网', '网上', '网络搜索', '搜索网络', '在线查',
+    '浏览网页', '访问网页', '读取网页', '抓取网页', '访问网站', '浏览网站', '查阅官网',
     '最新资料', '最新消息', '有道词典', '百度百科', '维基百科',
     'search the web', 'web search', 'browse the web', 'look up online',
-    'online source', 'cite sources', 'website'
+    'online source', 'cite sources', 'visit the website', 'browse the website', 'fetch a webpage'
   ];
   for (const marker of markers) {
     if (normalized.includes(marker)) { return true; }

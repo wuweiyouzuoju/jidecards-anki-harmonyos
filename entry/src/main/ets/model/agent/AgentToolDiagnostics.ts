@@ -69,7 +69,8 @@ function canonicalJson(value: string): string {
     keys.sort();
     return JSON.stringify(parsed, keys);
   } catch (error) {
-    return sanitizeAgentToolJson(value).text;
+    // 指纹不进入日志；不能截断，否则长参数后半段的真实修正会被误判为重复。
+    return value;
   }
 }
 

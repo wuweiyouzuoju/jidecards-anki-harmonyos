@@ -5,9 +5,35 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { loadPlatformModule } from './platform-module-harness.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
+
+test('JIDE starts hidden, persists explicit unlocking and restores previously unlocked access', async () => {
+  const persisted = new Map(), storage = new Map([['abilityContext', {}]]);
+  let fail = false;
+  const store = { get: async (key, fallback) => persisted.get(key) ?? fallback,
+    put: async (key, value) => { if (fail) throw Error('disk'); persisted.set(key, value); }, flush: async () => {} };
+  const api = loadPlatformModule('model/ReleaseFeatures.ets',
+    '{ initializeAiAgentChannels, enableAiAgentChannels, OFFICIAL_ANKIWEB_SYNC_UI_ENABLED }', {
+      preferences: { getPreferences: async () => store },
+      AppStorage: { get: key => storage.get(key), setOrCreate: (key, value) => storage.set(key, value) }
+    });
+  assert.equal(api.OFFICIAL_ANKIWEB_SYNC_UI_ENABLED, true);
+  await api.initializeAiAgentChannels();
+  assert.equal(storage.get('aiAgentChannelsEnabled'), false);
+  assert.equal(await api.enableAiAgentChannels('invalid'), false);
+  assert.equal(storage.get('aiAgentChannelsEnabled'), false);
+  fail = true;
+  await assert.rejects(api.enableAiAgentChannels('JideCards Developer Debug + 3.0.0'));
+  assert.equal(storage.get('aiAgentChannelsEnabled'), false);
+  fail = false;
+  assert.equal(await api.enableAiAgentChannels('JideCards Developer Debug + 3.0.0'), true);
+  storage.set('aiAgentChannelsEnabled', false);
+  await api.initializeAiAgentChannels();
+  assert.equal(storage.get('aiAgentChannelsEnabled'), true, 'upgrade preserves the existing preference key');
+});
 
 test('developer debug key persistently unlocks every hidden Agent channel through one runtime gate', () => {
   const features = read('entry/src/main/ets/model/ReleaseFeatures.ets');
@@ -23,9 +49,9 @@ test('developer debug key persistently unlocks every hidden Agent channel throug
   assert.match(entryAbility, /initializeAiAgentChannels\(\)/);
   assert.match(developerGroup, /InputType\.Password/);
   assert.match(developerGroup, /enableAiAgentChannels\(this\.开发者密钥\)/);
-  assert.match(developerGroup, /app\.string\.settings_developer_debug_qq_hint/);
+  assert.match(developerGroup, /settingsItemText\(this\.getUIContext\(\), 'developer_contact'\)/);
   assert.match(developerGroup,
-    /if \(this\.Agent入口已启用\) \{[\s\S]*?settings_developer_debug_enabled[\s\S]*?\.maxLines\(1\)/);
+    /if \(this\.Agent入口已启用\) \{[\s\S]*?'agent_enabled'[\s\S]*?\.maxLines\(1\)/);
   assert.doesNotMatch(developerGroup, /settings_developer_debug_enabled_hint|settings_developer_debug_success/,
     'successful activation must use the existing single-line settings status style');
   assert.match(settings, /开发者调试分组\(/);
@@ -42,7 +68,7 @@ test('developer debug key persistently unlocks every hidden Agent channel throug
     'Join the official QQ group 726837065 to request developer debug access.');
 
   for (const relative of [
-    'entry/src/main/ets/components/主页操作面板.ets',
+    'entry/src/main/ets/components/home/主页更多面板.ets',
     'entry/src/main/ets/pages/学习页.ets',
     'entry/src/main/ets/components/browser/批量操作栏.ets',
     'entry/src/main/ets/components/设置面板.ets',
@@ -51,39 +77,55 @@ test('developer debug key persistently unlocks every hidden Agent channel throug
     assert.match(source, /AI_AGENT_CHANNELS_APP_STORAGE_KEY/);
     assert.match(source,
       /@StorageLink\(AI_AGENT_CHANNELS_APP_STORAGE_KEY\)[^\n]*Agent入口已启用:\s*boolean\s*=\s*false/);
-    assert.match(source, /if \(this\.Agent入口已启用\) \{/);
+    if (relative.includes('主页更多面板')) assert.match(source, /visibleInterfaceItems\('home_more',[\s\S]*?agent: this\.Agent入口已启用/);
+    else if (relative.includes('设置面板')) assert.match(source, /visibleSettingsGroups\(this\.activeSection, this\.简洁模式, this\.Agent入口已启用\)/);
+    else if (relative.includes('学习页')) assert.match(source, /studyInterfaceMenu\([\s\S]*agent: this\.Agent入口已启用/);
+    else assert.match(source, /if \(this\.Agent入口已启用\) \{/);
   }
 });
 
-test('home exposes Agent create directly and routes Agent edit through Browser selection', () => {
+test('home exposes one AI conversation in More and removes both new-deck menu entries', () => {
   const panel = read('entry/src/main/ets/components/主页操作面板.ets');
+  const more = read('entry/src/main/ets/components/home/主页更多面板.ets');
   const home = read('entry/src/main/ets/pages/首页.ets');
-  assert.match(panel, /AI制卡回调/);
-  assert.match(panel, /AI改卡回调/);
-  assert.match(home, /打开AI制卡/);
-  assert.match(home, /打开AI改卡/);
-  assert.match(home, /mode:\s*'create'/);
-  const editEntry = home.match(/private async 打开AI改卡\(\)[\s\S]*?\n  \}/)?.[0] ?? '';
-  assert.match(editEntry, /selectForAgentEdit:\s*true/);
-  assert.match(editEntry, /name:\s*'BrowserPage'/);
-  assert.doesNotMatch(editEntry, /name:\s*'AiCardPage'|mode:\s*'edit'/);
+  assert.doesNotMatch(panel, /AI制卡回调|AI改卡回调|ai_card_title|ai_card_edit/);
+  assert.match(more, /ForEach\(this\.menuItems\(\)/);
+  assert.match(more, /case 'agent': this\.onAgent\(\)/);
+  for (const locale of ['base', 'en_US']) {
+    const strings = JSON.parse(read(`entry/src/main/resources/${locale}/element/string.json`)).string;
+    assert.equal(strings.find(item => item.name === 'ai_agent_title')?.value, 'JIDE');
+  }
+  assert.match(home,/onAgent:[\s\S]*?this\.openAgent\(\)/);
+  const entry = home.match(/private async openAgent\(\)[\s\S]*?\n  \}/)?.[0] ?? '';
+  assert.match(entry, /mode:\s*'assistant'/);
+  assert.match(entry, /name:\s*'AiCardPage'/);
+  assert.doesNotMatch(entry, /BrowserPage|deckId:|notetypeId:/);
   assert.match(read('entry/src/main/ets/pages/navigation/HomeDestinations.ets'), /pageSelectForAgentEdit:\s*\(param as 浏览页参数\)\.selectForAgentEdit \?\? false/);
+});
+
+test('unified conversation starts without setup and reuses the native selector only on request', () => {
+  const page = read('entry/src/main/ets/pages/AI制卡页.ets');
+  assert.match(page, /else if \(this\.pageMode !== 'assistant'\) \{[\s\S]*?AgentSetupCard\(/);
+  assert.match(page, /request\.kind === 'create_target'[\s\S]*?this\.openTargetSelection/);
+  assert.match(page, /private createTargetDialog\(\)[\s\S]*?DialogFrame\(/);
+  assert.match(page, /private targetDialogContent\(\)[\s\S]*?AgentSetupCard\(/);
+  assert.match(page, /private async restoreCreateSelection\(\)[\s\S]*?this\.pageMode !== 'create'/);
 });
 
 test('Agent create and edit labels and page background use the themed shell', () => {
   const page = read('entry/src/main/ets/pages/AI制卡页.ets') + read('entry/src/main/ets/model/agent/AgentConversationView.ts');
   const zh = JSON.parse(read('entry/src/main/resources/base/element/string.json')).string;
   const byName = new Map(zh.map((item) => [item.name, item.value]));
-  assert.equal(byName.get('ai_card_title'), 'AI 制卡');
-  assert.equal(byName.get('ai_card_edit'), 'AI 改卡');
-  assert.equal(byName.get('ai_agent_history_create_title'), 'AI 制卡');
-  assert.equal(byName.get('ai_agent_history_edit_title'), 'AI 改卡');
+  assert.equal(byName.get('ai_card_title'), 'JIDE 制卡');
+  assert.equal(byName.get('ai_card_edit'), 'JIDE 改卡');
+  assert.equal(byName.get('ai_agent_history_create_title'), 'JIDE 制卡');
+  assert.equal(byName.get('ai_agent_history_edit_title'), 'JIDE 改卡');
   const en = JSON.parse(read('entry/src/main/resources/en_US/element/string.json')).string;
   const enByName = new Map(en.map((item) => [item.name, item.value]));
-  assert.equal(enByName.get('ai_card_title'), 'AI Cards');
-  assert.equal(enByName.get('ai_card_edit'), 'AI Edit Cards');
-  assert.equal(enByName.get('ai_agent_history_create_title'), 'AI Card Creation');
-  assert.equal(enByName.get('ai_agent_history_edit_title'), 'AI Card Editing');
+  assert.equal(enByName.get('ai_card_title'), 'JIDE Create Cards');
+  assert.equal(enByName.get('ai_card_edit'), 'JIDE Edit Cards');
+  assert.equal(enByName.get('ai_agent_history_create_title'), 'JIDE Card Creation');
+  assert.equal(enByName.get('ai_agent_history_edit_title'), 'JIDE Card Editing');
   assert.match(page, /@StorageProp\(PAGE_SURFACE_KEY\)[^\n]*页面底色微染值/);
   assert.match(page, /private 顶部条\(\)[\s\S]*?backgroundColor\(this\.页面底色微染值\)/);
   assert.match(page, /build\(\)[\s\S]*?height\('100%'\)[\s\S]*?backgroundColor\(this\.页面底色微染值\)/);
@@ -122,7 +164,7 @@ test('unconfigured home AI entries route to the expanded AI settings group', () 
   assert.doesNotMatch(page, /private 配置区\(|ai_card_config|配置密钥输入|保存配置/);
   assert.doesNotMatch(page, /openAISettings\(|name:\s*'SettingsPage'/);
   const createEntry = home.match(/private async 打开AI制卡\(\)[\s\S]*?\n  \}/)?.[0] ?? '';
-  const editEntry = home.match(/private async 打开AI改卡\(\)[\s\S]*?\n  \}/)?.[0] ?? '';
+  const editEntry = home.match(/private async openAgent\(\)[\s\S]*?\n  \}/)?.[0] ?? '';
   assert.match(createEntry, /if \(!(?:await this\.isAIConfigured\(\)|configured)\)[\s\S]*?this\.openAISettings\(\)/);
   assert.match(editEntry, /if \(!(?:await this\.isAIConfigured\(\)|configured)\)[\s\S]*?this\.openAISettings\(\)/);
   assert.match(home, /设置页参数\s*=\s*\{ openAiSettings:\s*true \}/);
@@ -173,7 +215,7 @@ test('unconfigured browser and study AI edit entries route to the same AI settin
 
 test('study current-card entry passes stable context and reconciles the queue on return', () => {
   const study = read('entry/src/main/ets/pages/学习页.ets');
-  assert.match(study, /ai_card_edit/);
+  assert.match(read('entry/src/main/ets/model/AppInterface.ts'), /id: 'agent', titleKey: 'ai_card_edit'/);
   assert.match(study, /cardIds:\s*\[this\.当前卡片\.cardId\]/);
   assert.match(study, /noteIds:\s*\[this\.当前卡片\.noteId\]/);
   assert.match(study, /templateIdx:\s*this\.当前卡片\.templateIdx/);
@@ -202,8 +244,10 @@ test('preselected edit hides selectors, keeps global reads, and proposes discove
   assert.match(page,
     /if \(this\.hasFixedEditSelection\(\)\) \{[\s\S]*if \(this\.消息列表\.length === 0\)[\s\S]*Text\(this\.selectedEditContext\(\)\)[\s\S]*\} else \{[\s\S]*AgentSetupCard\(/);
   assert.match(page,
-    /private providerFunctionToolsForTurn\(\): ProviderFunctionTool\[\][\s\S]*return agentFunctionTools\(this\.agentSettings\.batchLimit, this\.pageMode\)/);
-  assert.match(page, /functionTools:\s*this\.providerFunctionToolsForTurn\(\)/);
+    /private providerFunctionToolsForTurn\(allowWeb: boolean = true\): ProviderFunctionTool\[\][\s\S]*return filterAgentWebTools\(agentFunctionTools\(this\.agentSettings\.batchLimit, this\.pageMode\), allowWeb\)/);
+  assert.match(page, /const functionTools: ProviderFunctionTool\[\] = this\.providerFunctionToolsForTurn\(allowWeb\)/);
+  assert.match(page, /setInterfaceTools\(functionTools\)/);
+  assert.match(page, /functionTools: functionTools/);
   const instructions = read('entry/src/main/ets/model/agent/AgentSessionContext.ts');
   assert.match(instructions, /用户审核具体范围后才能保存/);
   assert.match(instructions, /修改搜索发现的对象只生成草稿/);
@@ -223,7 +267,7 @@ test('tool traces translate stable provider IDs into detailed localized display 
   ]) {
     assert.match(page, new RegExp(`case '${toolName}'`));
   }
-  assert.match(page, /工具显示名\(this\.消息列表\[消息索引\]\.工具过程\[追踪索引\]\.toolName\)/);
+  assert.match(page, /工具显示名\(ctx\.message\.工具过程\[ctx.itemIndex\]\.toolName\)/);
   assert.match(strings, /"name": "ai_agent_tool_name_search_cards", "value": "在整个卡库中搜索闪卡"/);
   assert.match(strings, /"name": "ai_agent_tool_name_card_statistics", "value": "读取卡片统计与最近复习历史"/);
 });
@@ -234,14 +278,14 @@ test('shared page rebuilds stable ID scope and batch policy for every user turn'
   assert.match(page, /runAgentTurn[\s\S]*this\.重建本轮AgentScope\(\)/);
   assert.match(page, /this\.agentScope\.beginTurn\(\)/);
   assert.match(page, /configureBatchLimit\(this\.agentSettings\.batchLimit\)/);
-  assert.match(page, /providerFunctionToolsForTurn\(\)/);
+  assert.match(page, /providerFunctionToolsForTurn\(allowWeb\)/);
 });
 
-test('create mode exposes only create tools while edit mode enables edit and high-risk proposals', () => {
+test('both page modes register style proposals through the same mode-aware boundary', () => {
   const page = read('entry/src/main/ets/pages/AI制卡页.ets') + read('entry/src/main/ets/model/agent/AgentConversationView.ts');
   const catalog = read('entry/src/main/ets/model/agent/AgentToolCatalog.ts');
   assert.match(page, /register\(registry, this\.pageMode\)/);
-  assert.match(page, /if \(this\.pageMode === 'edit'\)[\s\S]*HighRiskAgentTools/);
+  assert.match(page, /new HighRiskAgentTools\(this\.agentScope\)\.register\(registry, this\.pageMode\)/);
   assert.match(catalog, /mode:\s*AgentMode/);
   assert.match(catalog, /mode === 'edit'/);
   assert.match(page, /create_flashcards/);
@@ -328,15 +372,18 @@ test('AI page title uses equal side regions around the screen midpoint', () => {
 
 test('settings API key, custom endpoint and custom model inputs share one visual style', () => {
   const settings = read('entry/src/main/ets/components/settings/AIAgent设置分组.ets');
-  assert.ok((settings.match(/backgroundColor\(\$r\('app\.color\.surface_card'\)\)/g) ?? []).length >= 3);
-  assert.ok((settings.match(/app\.color\.border_input/g) ?? []).length >= 3);
+  assert.equal((settings.match(/new FormInputStyle\(\)/g) ?? []).length, 3);
+  const style = read('entry/src/main/ets/utils/FormInputStyle.ets');
+  assert.match(style, /backgroundColor\(\$r\('app\.color\.surface_card'\)\)/);
+  assert.match(style, /app\.color\.border_input/);
 });
 
 test('an in-flight Agent turn is cancellable from the send button and exposes localized failures', () => {
   const page = read('entry/src/main/ets/pages/AI制卡页.ets') + read('entry/src/main/ets/model/agent/AgentConversationView.ts');
   assert.match(page, /private 取消当前请求\(\): void/);
   assert.match(page, /this\.agentRunner\.cancel\(\)/);
-  assert.match(page, /this\.处理中\s*\?\s*\$r\('app\.string\.ai_agent_cancel'\)/);
+  assert.match(page, /Button\(this\.interfaceLabel\('submit'\)\)/);
+  assert.match(read('entry/src/main/ets/model/AppInterface.ts'), /item\.id === 'submit' && context\.processing \? 'ai_agent_cancel'/);
   assert.match(page, /if \(this\.处理中\) \{ this\.取消当前请求\(\); \}/);
   assert.match(page, /ai_agent_web_search_unsupported/);
   assert.match(page, /ai_agent_turn_cancelled/);
@@ -358,9 +405,9 @@ test('all successful and failed tool calls use one typed detail view collapsed b
   assert.doesNotMatch(page, /工具过程:\s*string\[\]/);
   assert.doesNotMatch(page, /item\.indexOf\(':'\)/);
 
-  const bubble = page.match(/private AI气泡\(消息索引: number\)[\s\S]*?@Builder\s+private 消息流/)?.[0] ?? '';
+  const bubble = page.match(/private AI气泡\(ctx: AgentMessageViewContext\)[\s\S]*?@Builder\s+private 消息流/)?.[0] ?? '';
   const reasoningIndex = bubble.indexOf("ai_agent_reasoning_process");
-  const bodyIndex = bubble.indexOf('parseAgentBoldRuns(this.消息列表[消息索引].正文)');
+  const bodyIndex = bubble.indexOf('AgentMarkdownText({ text: ctx.message.正文');
   const toolsIndex = bubble.indexOf("ai_agent_tool_process");
   const sourcesIndex = bubble.indexOf("来源列表.length > 0");
   const cardsIndex = bubble.indexOf("卡片列表.length > 0");
@@ -372,8 +419,8 @@ test('all successful and failed tool calls use one typed detail view collapsed b
   assert.ok(draftsIndex > sourcesIndex, 'change drafts must render after reasoning, tools, and sources');
 
   const disclosure = read('entry/src/main/ets/components/agent/AgentDisclosureCard.ets');
-  assert.match(disclosure, /Text\('▼'\)/);
-  assert.match(disclosure, /expanded\s*\?\s*0\s*:\s*-90/);
+  assert.match(disclosure, /DisclosureChevron\(/);
+  assert.match(disclosure, /expanded\s*\?\s*90\s*:\s*0/);
   assert.doesNotMatch(page, /切换工具详情[\s\S]*?animateTo\(/);
   assert.match(page,
     /trace\.expanded\s*=\s*message\.工具过程\[existingIndex\]\.expanded[\s\S]*?message\.工具过程\[existingIndex\]\s*=\s*trace/,
@@ -400,9 +447,9 @@ test('Agent writes broadcast both refresh ticks with disjoint scopes', () => {
   assert.match(block, /if \(result\.succeeded > 0\)/, 'only successful writes may broadcast');
   assert.match(block, /AppStorage\.setOrCreate<number>\('noteAddedTick', Date\.now\(\)\)/,
     'home counts refresh on every successful Agent write');
-  assert.match(block,
-    /if \(this\.pageMode === 'edit'\) \{\s*AppStorage\.setOrCreate<number>\('cardContentChangedTick', Date\.now\(\)\);\s*\}/,
-    'card content tick is edit-only: creating notes must not re-render the study card');
+  assert.match(block, /operations\.some\([\s\S]*operation\.kind !== 'create_note'/,
+    'the unified conversation distinguishes existing-card changes by actual operations');
+  assert.match(block,/cardContentChangedTick/);
   assert.doesNotMatch(block, /cardContentChangedTick[\s\S]{0,80}pageMode !== 'edit'/);
 
   const saveBlock = page.match(/private async 保存单卡\([\s\S]*?\n  \}/)?.[0] ?? '';

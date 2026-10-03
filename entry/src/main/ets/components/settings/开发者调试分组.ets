@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { PressFeedback } from '../../utils/PressFeedback';
+import { settingsItemText } from '../../utils/SettingsStructureText';
+import { PrimaryActionButton } from '../common/PrimaryActionButton';
+import { FormInputStyle } from '../../utils/FormInputStyle';
 import { ThemeTextSpans } from '../common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
@@ -55,57 +57,40 @@ export struct 开发者调试分组 {
 
   build() {
     设置分组卡片({
-      标题: $r('app.string.settings_developer_debug_title'),
+      groupId: 'advanced',
       是否深色: this.是否深色
     }) {
       Column({ space: 应用尺寸.间距_10 }) {
         if (this.Agent入口已启用) {
-          Text() { ThemeTextSpans($r('app.string.settings_developer_debug_enabled'), this.themeAccentColors, this.getUIContext()) }
+          Text() { ThemeTextSpans(settingsItemText(this.getUIContext(), 'agent_enabled'), this.themeAccentColors, this.getUIContext()) }
             .width('100%')
             .fontSize(应用尺寸.字号_正文_小)
             .fontColor(设置面板色板_取(this.是否深色).主色)
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
         } else {
-          Text($r('app.string.settings_developer_debug_description'))
+          Text(settingsItemText(this.getUIContext(), 'developer_description'))
             .width('100%')
             .fontSize(应用尺寸.字号_正文_小)
             .fontColor(设置面板色板_取(this.是否深色).次文字)
-          Text() { ThemeTextSpans($r('app.string.settings_developer_debug_qq_hint'), this.themeAccentColors, this.getUIContext()) }
+          Text() { ThemeTextSpans(settingsItemText(this.getUIContext(), 'developer_contact'), this.themeAccentColors, this.getUIContext()) }
             .width('100%')
             .fontSize(应用尺寸.字号_正文_小)
             .fontColor(设置面板色板_取(this.是否深色).主色)
           TextInput({
-            placeholder: $r('app.string.settings_developer_debug_key_placeholder'),
+            placeholder: settingsItemText(this.getUIContext(), 'developer_key'),
             text: this.开发者密钥
           })
             .type(InputType.Password)
-            .width('100%')
-            .height(应用尺寸.按钮高度)
-            .fontSize(应用尺寸.字号_正文)
-            .fontColor($r('app.color.text_primary'))
-            .placeholderColor($r('app.color.text_tertiary'))
-            .backgroundColor($r('app.color.surface_card'))
-            .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
-            .borderRadius(应用尺寸.圆角_面板)
-            .padding({ left: 应用尺寸.间距_10, right: 应用尺寸.间距_10 })
+            .attributeModifier(new FormInputStyle())
             .onChange((value: string): void => {
               this.开发者密钥 = value;
               this.显示错误 = false;
             })
-          Button(this.正在启用 ? $r('app.string.settings_developer_debug_enabling') :
-            $r('app.string.settings_developer_debug_enable'))
-            .width('100%')
-            .height(44)
-            .fontSize(15)
-            .fontColor('#FFFFFF')
-            .backgroundColor(this.解析主色按钮背景())
-            .borderRadius(22)
-            .enabled(!this.正在启用 && this.开发者密钥.trim() !== '')
-            .opacity(this.正在启用 || this.开发者密钥.trim() === '' ? 0.6 : 1)
-            .attributeModifier(new PressFeedback(this.正在启用 || this.开发者密钥.trim() === '' ? 0.6 : 1))
-            .stateEffect(false)
-            .onClick((): void => { this.启用开发者功能(); })
+          PrimaryActionButton({ label: this.正在启用 ? $r('app.string.settings_developer_debug_enabling') :
+            settingsItemText(this.getUIContext(), 'developer_enable'), tint: this.解析主色按钮背景(),
+            isInteractive: !this.正在启用 && this.开发者密钥.trim() !== '',
+            onAction: (): void => { this.启用开发者功能(); } })
         }
         if (this.显示错误) {
           Text(this.错误文案)

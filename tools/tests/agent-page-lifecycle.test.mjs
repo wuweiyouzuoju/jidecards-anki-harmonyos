@@ -7,10 +7,11 @@ import { stripTypeScriptTypes } from 'node:module';
 import { AgentCardBatch } from '../../entry/src/main/ets/model/agent/AgentCardBatch.ts';
 import { AutoSyncScheduler } from '../../entry/src/main/ets/model/AutoSyncScheduler.ts';
 import { SyncActivity } from '../../entry/src/main/ets/model/SyncSettings.ts';
+import { AppInterfaceTracker, agentInterfaceControls, agentInterfaceTitle } from '../../entry/src/main/ets/model/AppInterface.ts';
 
 // 只验证 ArkUI 接线；整批状态机使用直接导入的生产模型。
 const source = readFileSync(new URL('../../entry/src/main/ets/pages/AI制卡页.ets', import.meta.url), 'utf8');
-const methods = ['保存单卡', '保存批次', '待保存数', '克隆卡片', 'currentMessageIndex', '更新卡片字段', '更新卡片选中'].map(name => {
+const methods = ['保存单卡', '保存批次', '待保存数', '克隆卡片', 'currentMessageIndex', '更新卡片字段', '更新卡片选中', 'interfaceControls', 'publishInterface'].map(name => {
   const start = source.search(new RegExp(`  private (?:async )?${name}\\(`));
   assert.ok(start >= 0, name);
   return source.slice(start, source.indexOf('\n  }', start) + 4);
@@ -19,11 +20,16 @@ const deferred = () => { let resolve; const promise = new Promise(r => { resolve
 
 function harness() {
   const broadcasts = [], writes = [], gate = deferred();
-  const Page = new Function('cloneAgentCard', '$r', 'AppStorage', '笔记字段校验错误', stripTypeScriptTypes(`class Page { ${methods.join('\n')} }`, { mode: 'transform' }) + ';return Page;')(
-    cloneAgentCard, value => value, { setOrCreate: (...args) => broadcasts.push(args) }, class extends Error {});
+  const tracker = new AppInterfaceTracker();
+  const Page = new Function('cloneAgentCard', '$r', 'AppStorage', '笔记字段校验错误', 'appInterface', 'agentInterfaceControls', 'agentInterfaceTitle', 'namedResourceText', stripTypeScriptTypes(`class Page { ${methods.join('\n')} }`, { mode: 'transform' }) + ';return Page;')(
+    cloneAgentCard, value => value, { setOrCreate: (...args) => broadcasts.push(args) }, class extends Error {},
+    tracker, agentInterfaceControls, agentInterfaceTitle, (_, key) => key);
   const page = new Page(), scheduler = new AutoSyncScheduler();
   Object.assign(page, {
     pageDisposed: false, conversationId: 'original', cardBatch: new AgentCardBatch(scheduler, new SyncActivity()),
+    interfaceMounted: true, pageMode: 'assistant', 显示历史区: false, 处理中: false, 文件解析中: false,
+    导入文件列表: [], 输入草稿: '', 错误信息: '', targetSelectionMessage: -1,
+    getUIContext: () => ({}), hasPendingClarification: () => false, canSubmit: () => !page.cardBatch.isRunning(),
     消息列表: [{ id: 1, draftDeckId: 7, draftNotetypeId: 8, 批次保存中: false, 批次结果: '',
       卡片列表: ['a', 'b'].map(text => ({ fields: [text], 已选中: true, 状态: 'draft', 失败提示: '' })) }],
     取本地化文案: key => { assert.equal(page.pageDisposed, false, 'no UI access after disposal'); return key; },
@@ -38,8 +44,18 @@ function harness() {
       }
     }
   });
-  return { page, scheduler, broadcasts, writes, gate };
+  return { page, scheduler, broadcasts, writes, gate, tracker };
 }
+
+test('interface observes batch start before the first progress event and completion after accepted writes', async () => {
+  const h = harness(), saving = h.page.保存批次(0);
+  assert.equal(h.tracker.snapshot()[0].busy, true);
+  assert.equal(h.tracker.snapshot()[0].items.find(x => x.id === 'history').enabled, false);
+  h.gate.resolve(); await saving;
+  assert.equal(h.tracker.snapshot()[0].busy, false);
+  assert.equal(h.tracker.snapshot()[0].items.find(x => x.id === 'history').enabled, true);
+  assert.equal(h.writes.length, 2);
+});
 
 test('leaving during save completes all accepted drafts through confirmation executor without touching old UI', async () => {
   const h = harness(), result = h.page.保存批次(0);

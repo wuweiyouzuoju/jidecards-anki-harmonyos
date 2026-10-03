@@ -121,14 +121,16 @@ test('memory changes use optimistic conflict checks and scoped retrieval', () =>
   assert.equal(applyAgentMemoryChange(changed, { ...update, operation: 'delete', before: changed[0] }, 'a', 400).length, 0);
 });
 
-test('checkpoints omit thinking, credentials and imported document bodies but retain call pairing', () => {
+test('checkpoints preserve original provider reasoning and call pairing while omitting imported document bodies', () => {
   const item = (kind, content = '', callId = '') => ({ kind, content, callId, role: 'user', name: 'search_notes', argumentsJson: '{}', output: '' });
   const input = [item('message', '用户要求：做卡\n以下是用户主动导入的本地文件内容\nSECRET-DOC'),
     item('reasoning', 'PRIVATE-THINKING'), item('function_call', '', 'call-1')];
   closeUnansweredCalls(input);
   const saved = safeAgentSessionState({ input, readableIds: [[], [], [], []],
     retrieval: { snapshots: [], readNoteIds: [], approvedNoteIds: [] }, action: null, waitingCallId: '', paused: true });
-  assert.doesNotMatch(JSON.stringify(saved), /SECRET-DOC|PRIVATE-THINKING/);
+  assert.doesNotMatch(JSON.stringify(saved), /SECRET-DOC/);
+  assert.equal(saved.input.find(value => value.kind === 'reasoning').content, 'PRIVATE-THINKING');
+  assert.equal(saved.reasoningReplayVersion, 1);
   assert.equal(saved.input.at(-1).callId, 'call-1');
   assert.equal(saved.input.at(-1).kind, 'function_call_output');
 });

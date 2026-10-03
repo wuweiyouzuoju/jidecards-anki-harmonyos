@@ -6,6 +6,9 @@ import { stripTypeScriptTypes } from 'node:module';
 import { appendAgentTimelineText, appendAgentTimelineReference, cloneAgentTimeline,
   agentDraftProgressText, agentContentParts, agentDraftOperationImages } from '../../entry/src/main/ets/model/agent/AgentTimeline.ts';
 import { ResponsesEventNormalizer } from '../../entry/src/main/ets/model/agent/ResponsesEventNormalizer.ts';
+import { createAgentMessage, cloneAgentMessage, projectAgentHistory, restoreAgentMessages } from '../../entry/src/main/ets/model/agent/AgentConversationView.ts';
+import { ThemeModeSession } from '../../entry/src/main/ets/model/settings/ThemeModeSession.ts';
+import { ScrollTailFollower } from '../../entry/src/main/ets/model/ScrollTailFollower.ts';
 
 test('interleaved narration, reasoning, images, tools and drafts retain occurrence order', () => {
   const blocks = [];
@@ -67,25 +70,98 @@ test('untrusted local or unfinished image syntax stays text', () => {
 // 运行页面实际的事件消费/草稿接收方法，仅替换 ArkUI 状态和本地化边界。
 const pageSource = fs.readFileSync(new URL('../../entry/src/main/ets/pages/AI制卡页.ets', import.meta.url), 'utf8');
 const pageMethods = pageSource.slice(pageSource.indexOf('  private 处理Agent事件('), pageSource.indexOf('  private 影响范围('));
+const method=name=>{
+  const start=pageSource.indexOf('  private '+name+'(');
+  assert.ok(start>=0,name);
+  return pageSource.slice(start,pageSource.indexOf('\n  }',start)+4);
+};
 const harnessSource = stripTypeScriptTypes(`class Page {
   constructor(drafts) {
-    this.消息列表 = [{timeline:[],正文:'',providerText:'',推理摘要:'',工具过程:[],来源列表:[],卡片列表:[],变更草稿列表:[]}];
+    this.消息列表 = [createAgentMessage(1,'ai','',false)];
+    this.conversationId='first';this.pageDisposed=false;this.处理中=false;this.themeUndoBusy=false;
+    this.cardBatch={isRunning:()=>false};this.lastThemeChange=null;
     this.agentRunner = {getPartialDrafts:() => drafts}; this.simpleMode = true;
     this.字段名列表 = ['Front','Back']; this.牌组ID = 1; this.已选笔记类型ID = 2;
   }
   更新消息(index, update) { const message = structuredClone(this.消息列表[index]); update(message); this.消息列表[index] = message; }
   克隆工具追踪(trace) { return structuredClone(trace); }
   取本地化格式(resource,args) { return args.join(' → '); }
+  取本地化文案(resource) { return resource; }
   滚动到底部() {}
   queueAgentTimelineScroll() {}
   selectedDeckName() { return 'Deck'; }
   selectedNotetypeName() { return 'Basic'; }
   ${pageMethods}
+  ${['receiveThemeChange','async undoThemeChange','currentMessageIndex'].map(method).join('\n')}
 }`, {mode:'transform'});
 const Page = new Function('appendAgentTimelineText', 'appendAgentTimelineReference', 'cloneAgentTimeline',
-  'agentDraftProgressText', 'agentDraftOperationImages', '$r', harnessSource + '; return Page;')(
-  appendAgentTimelineText, appendAgentTimelineReference, cloneAgentTimeline, agentDraftProgressText, agentDraftOperationImages, value => value);
+  'agentDraftProgressText', 'agentDraftOperationImages', 'createAgentMessage', '$r', harnessSource + '; return Page;')(
+  appendAgentTimelineText, appendAgentTimelineReference, cloneAgentTimeline, agentDraftProgressText, agentDraftOperationImages, createAgentMessage, value => value);
 const event = (kind, extra = {}) => ({kind,text:'',toolCall:null,toolTrace:null,source:null,errorCode:'',...extra});
+
+function themeFixture() {
+  const state={mode:'system',writes:[]};
+  const themes=new ThemeModeSession({readSavedMode:async()=>state.mode,
+    saveMode:async mode=>{state.mode=mode;state.writes.push(mode);},applyMode:async()=>{},systemDark:()=>false});
+  const page=new Page([]);page.appSettingsTools={undo:id=>themes.undo(id)};
+  const switchIn=async(index,mode)=>{
+    page.receiveThemeChange(await themes.setMode(mode));
+    page.处理Agent事件(index,event('tool_completed',{toolTrace:{callId:'theme-'+index,toolName:'set_theme_mode',status:'completed'}}));
+  };
+  return {page,themes,state,switchIn};
+}
+
+test('theme receipt stays in its tool reply; unrelated chat has none and undo updates that same reply',async()=>{
+  const {page,state,switchIn}=themeFixture();await switchIn(0,'dark');
+  page.消息列表.push(createAgentMessage(2,'ai','Discussing vocabulary',false));
+  page.处理Agent事件(1,event('text_delta',{text:'Next topic'}));
+  page.处理Agent事件(1,event('tool_completed',{toolTrace:{callId:'read',toolName:'get_settings',status:'completed'}}));
+  assert.equal(page.消息列表[0].themeChange.mode,'dark');
+  assert.equal(page.消息列表[1].themeChange,null);assert.equal(page.消息列表[1].themeUndoNotice,'');
+  await page.undoThemeChange(0);
+  assert.equal(state.mode,'system');assert.equal(page.消息列表[0].themeChange.undoId,'');
+  assert.equal(page.消息列表[0].themeUndoNotice,'app.string.theme_change_undone');
+  assert.equal(page.消息列表[1].themeChange,null);assert.equal(page.消息列表[1].themeUndoNotice,'');
+});
+
+test('a later theme command removes the earlier button and external changes report expiry only in its owning reply',async()=>{
+  const {page,themes,state,switchIn}=themeFixture();await switchIn(0,'dark');
+  page.消息列表.push(createAgentMessage(2,'ai','Switch again',false));await switchIn(1,'light');
+  assert.equal(page.消息列表[0].themeChange.mode,'dark');assert.equal(page.消息列表[0].themeChange.undoId,'');
+  const written=state.writes.length;await page.undoThemeChange(0);assert.equal(state.writes.length,written);
+  await themes.setMode('system');await page.undoThemeChange(1);
+  assert.equal(page.消息列表[1].themeChange.undoId,'');
+  assert.equal(page.消息列表[1].themeUndoNotice,'app.string.theme_change_undo_expired');
+  assert.equal(page.消息列表[0].themeUndoNotice,'');assert.equal(state.mode,'system');
+});
+
+test('accepted undo survives conversation replacement without adding feedback to the replacement',async()=>{
+  const {page,state,switchIn}=themeFixture();await switchIn(0,'dark');
+  const originalUndo=page.appSettingsTools.undo;let finish;
+  page.appSettingsTools.undo=async id=>{await new Promise(resolve=>{finish=resolve;});return originalUndo(id);};
+  const pending=page.undoThemeChange(0);
+  page.conversationId='replacement';page.消息列表=[createAgentMessage(1,'ai','New conversation',false)];
+  finish();await pending;
+  assert.equal(state.mode,'system');assert.equal(page.消息列表[0].themeChange,null);
+  assert.equal(page.消息列表[0].themeUndoNotice,'');assert.equal(page.themeUndoBusy,false);
+});
+
+test('theme feedback clones independently and history projection never restores its live undo button',()=>{
+  const message=createAgentMessage(1,'ai','Switched',false);
+  message.themeChange={status:'completed',mode:'dark',previousMode:'system',saved:true,applied:true,errorCode:'',undoId:'live-only'};
+  const clone=cloneAgentMessage(message);clone.themeChange.undoId='';assert.equal(message.themeChange.undoId,'live-only');
+  const projection=projectAgentHistory([message],'History');assert.doesNotMatch(JSON.stringify(projection),/live-only|themeChange/);
+  const [restored]=restoreAgentMessages({...projection,results:[]},()=>2,'tools',false);
+  assert.equal(restored.themeChange,null);assert.equal(restored.themeUndoNotice,'');
+});
+
+test('theme feedback is rendered inside the reply and excluded from the shared composer',()=>{
+  const bubble=pageSource.match(/private AI气泡\([\s\S]*?\n  \}/)?.[0]??'';
+  const composer=pageSource.match(/private 输入区\([\s\S]*?\n  \}/)?.[0]??'';
+  assert.match(bubble,/this\.themeChangeFeedback\(\{ message: ctx\.message/);
+  assert.doesNotMatch(composer,/themeChange|themeUndo|theme_change_/);
+  assert.match(pageSource,/undoThemeChange\(ctx\.messageIndex\)/);
+});
 
 test('page exposes create and edit previews before final turn and finalizes them in their original positions', () => {
   for (const kind of ['create_note','update_field']) {
@@ -120,6 +196,18 @@ test('page exposes create and edit previews before final turn and finalizes them
   }
 });
 
+test('failed tools clear unvalidated content and new traces always start collapsed', () => {
+  const page = new Page([]);
+  page.simpleMode = false;
+  const call = {id:'failed',name:'create_flashcards',argumentsJson:'{"cards":[{"fields":["Q","A"]}]}'};
+  page.处理Agent事件(0, event('tool_progress', {toolCall:call}));
+  assert.equal(page.消息列表[0].timeline[0].text, 'Q\n\nA');
+  page.处理Agent事件(0, event('tool_failed', {toolTrace:{callId:'failed',toolName:call.name,status:'failed'}}));
+  assert.equal(page.消息列表[0].timeline[0].text, '');
+  assert.equal(page.消息列表[0].工具过程[0].expanded, false);
+  assert.equal(page.消息列表[0].卡片列表.length, 0);
+});
+
 test('images follow their own card fields instead of accumulating after a multi-card draft', () => {
   const draft = {id:'pictures',summary:'Cards',operations:[
     {noteId:1,fieldOrd:0,before:'',after:'First'}, {noteId:2,fieldOrd:0,before:'',after:'Second'}],
@@ -138,22 +226,26 @@ test('images follow their own card fields instead of accumulating after a multi-
 
 test('streaming scroll coalesces layout updates and preserves upward reading position', () => {
   const scrollMethods = pageSource.slice(pageSource.indexOf('  private 滚动到底部('), pageSource.indexOf('  private 取Agent错误文案('));
-  const callbacks = [];
+  const callbacks = new Map();
+  let next = 0;
   let scrollCount = 0;
-  const ScrollPage = new Function('setTimeout','Edge', stripTypeScriptTypes(`class ScrollPage {
-    followAgentTail = true; agentScrollTimer = -1;
-    constructor(scroller) { this.聊天滚动器 = scroller; }
+  const ScrollPage = new Function(stripTypeScriptTypes(`class ScrollPage {
+    pageDisposed = false;
+    constructor(scroller, follower) { this.聊天滚动器 = scroller; this.agentTailFollower = follower; }
     ${scrollMethods}
-  }`,{mode:'transform'}) + '; return ScrollPage;')(callback => { callbacks.push(callback); return 1; }, {Bottom:0});
-  const page = new ScrollPage({scrollEdge:() => { scrollCount++; }});
+  }`,{mode:'transform'}) + '; return ScrollPage;')();
+  const follower = new ScrollTailFollower(() => { scrollCount++; }, () => true, 50, {
+    schedule: callback => { callbacks.set(++next, callback); return next; }, cancel: id => callbacks.delete(id)
+  });
+  const page = new ScrollPage({}, follower);
   page.queueAgentTimelineScroll(); page.queueAgentTimelineScroll();
-  assert.equal(callbacks.length, 1);
-  page.followAgentTail = false;
-  callbacks.shift()();
+  assert.equal(callbacks.size, 1);
+  const stale = callbacks.values().next().value;
+  page.pauseAgentTimelineFollow(); stale();
   assert.equal(scrollCount, 0);
   page.queueAgentTimelineScroll();
-  assert.equal(callbacks.length, 0);
+  assert.equal(callbacks.size, 0);
   page.滚动到底部();
-  callbacks.shift()();
+  callbacks.values().next().value();
   assert.equal(scrollCount, 1);
 });

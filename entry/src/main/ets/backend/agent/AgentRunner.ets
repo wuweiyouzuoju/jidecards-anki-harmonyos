@@ -20,6 +20,11 @@ import {
 } from '../../model/agent/AgentPolicy';
 import type { ProviderCapabilities } from '../../model/agent/AgentTypes';
 import { compactAgentToolOutputs } from '../../model/agent/AgentSessionState';
+import type { ProviderInputImage } from '../../model/agent/ProviderProtocol';
+import { readProviderContinuation, hasProviderReasoningText } from '../../model/agent/ProviderProtocol';
+import type { ResponsesOpaqueOutputInput } from '../../model/agent/ProviderProtocol';
+import { buildAgentRuntimeInstructions } from '../../model/agent/AgentSessionContext';
+import { agentWebResultSources } from '../../model/agent/AgentWeb';
 import {
   DEEPSEEK_PROVIDER,
   OPENAI_PROVIDER,
@@ -28,6 +33,7 @@ import {
 import type { AgentSearchSourceEvent } from '../../model/agent/AgentPolicy';
 import type {
   ProviderInputItem,
+  ProviderFunctionTool,
   ProviderTurnRequest
 } from '../../model/agent/ProviderProtocol';
 import { AgentStreamObserver, AgentTransportError, AgentTransportSession } from './AgentTransport';
@@ -37,6 +43,7 @@ import { CustomAdapter } from './CustomAdapter';
 import { AgentToolRegistry } from './AgentToolRegistry';
 import type { AgentToolResult } from './AgentToolRegistry';
 import { AgentToolSchemaError } from '../../model/agent/AgentToolSchemas';
+import { 后端错误 } from '../错误类型';
 import type { AgentAction } from '../../model/agent/AgentAction';
 import type { AgentClarificationRequest } from '../../model/agent/AgentClarification';
 import type { AgentToolFailureRecord } from '../../model/agent/AgentToolDiagnostics';
@@ -82,6 +89,7 @@ function toolStatusEvent(kind: 'tool_started' | 'tool_completed' | 'tool_failed'
 }
 
 interface AgentToolErrorOutput {
+  failureStage: string;
   tool_error: string;
   errorPath: string;
   message: string;
@@ -93,6 +101,7 @@ interface AgentToolErrorOutput {
 }
 
 function toolErrorCode(error: Object): string {
+  if (error instanceof 后端错误) { return 'backend_error'; }
   if (error instanceof Error && /^[a-z0-9_]{1,64}$/.test(error.message)) { return error.message; }
   return 'tool_failed';
 }
@@ -124,29 +133,61 @@ function undeclaredToolDiagnostic(request: ProviderTurnRequest,
 
 function diagnosticForError(error: Object, call: AgentToolCall,
   request: ProviderTurnRequest): AgentToolDiagnostic {
+  let receivedKeys: string[] = [];
+  let allowedKeys: string[] = [];
+  try {
+    const args: Object = JSON.parse(call.argumentsJson) as Object;
+    if (args !== null && typeof args === 'object' && !Array.isArray(args)) { receivedKeys = Object.keys(args); }
+  } catch (parseError) { /* Invalid JSON is reported by the argument decoder. */ }
+  for (const tool of request.functionTools) {
+    if (tool.name !== call.name) { continue; }
+    try {
+      const schema: ToolDiagnosticSchema = JSON.parse(tool.parametersJson) as ToolDiagnosticSchema;
+      if (schema.properties !== undefined) { allowedKeys = Object.keys(schema.properties); }
+    } catch (parseError) { /* Preserve the original failure if a provider schema is unavailable. */ }
+  }
   if (error instanceof AgentToolSchemaError) {
     const schemaDiagnostic: AgentToolDiagnostic = error.diagnostic();
+    const stage: string = ['invalid_json', 'invalid_type', 'invalid_value', 'unexpected_property',
+      'missing_property', 'invalid_tool_arguments'].indexOf(schemaDiagnostic.code) >= 0 ? 'arguments' : 'execution';
     return {
+      stage: stage,
       code: schemaDiagnostic.code,
       path: schemaDiagnostic.path,
-      message: schemaDiagnostic.message,
-      receivedKeys: schemaDiagnostic.receivedKeys.slice(),
-      allowedKeys: schemaDiagnostic.allowedKeys.slice(),
+      message: `[${stage}] ${schemaDiagnostic.message || schemaDiagnostic.code}`,
+      receivedKeys: schemaDiagnostic.receivedKeys.length > 0 ? schemaDiagnostic.receivedKeys.slice() : receivedKeys,
+      allowedKeys: schemaDiagnostic.allowedKeys.length > 0 ? schemaDiagnostic.allowedKeys.slice() : allowedKeys,
       validTemplateJson: schemaDiagnostic.validTemplateJson.length > 0 ?
         schemaDiagnostic.validTemplateJson : toolTemplate(request, call.name)
     };
   }
   const code: string = toolErrorCode(error);
+  let detail: string = error instanceof Error ? error.message : 'Unrecognized execution error';
+  if (error instanceof 后端错误) {
+    detail += ` (nativeStatus=${error.nativeStatus}, kind=${error.kind}, context=${error.context})`;
+  }
   return {
-    code: code, path: '', message: `The tool failed with ${code}. Rebuild the arguments from the template.`,
-    receivedKeys: [], allowedKeys: [], validTemplateJson: toolTemplate(request, call.name)
+    stage: 'execution', code: code, path: '',
+    message: sanitizeAgentToolJson(`[execution] ${detail}`, 2048).text,
+    receivedKeys: receivedKeys, allowedKeys: allowedKeys, validTemplateJson: toolTemplate(request, call.name)
   };
 }
 
+interface ToolDiagnosticSchema { properties?: Record<string, Object>; }
+
 function toolErrorJson(diagnostic: AgentToolDiagnostic, record: AgentToolFailureRecord): string {
-  const correction: string = record.requireCorrection ?
-    'Mandatory correction: do not repeat the same arguments. Rebuild them from validTemplateJson and remove every property rejected at errorPath.' : '';
+  const correction: string = diagnostic.stage === 'execution' ?
+    'Arguments were received; inspect the execution error. Do not infer a payload-size problem or unavailable tool from empty diagnostic fields. ' +
+    (diagnostic.code === 'duplicate_draft_id' ? 'Use a new draftId for an already successful proposal.' :
+      'Shrinking CSS does not fix scope, collection, or backend failures. Do not repeat unchanged failing calls.') :
+    (diagnostic.code === 'invalid_json' ?
+      'The JSON could not be parsed, so receivedKeys=[] does NOT mean no arguments were sent. ' +
+      'Use the parser reason in message to correct syntax. Return a complete replacement call, not a JSON fragment. ' : '') +
+    'Correct the reported error before calling again; do not repeat unchanged arguments. ' +
+    'Use validTemplateJson as the shape only, retaining the user content and real IDs. ' +
+    (record.requireCorrection ? 'This exact failure has repeated; change the approach or ask for missing information.' : '');
   const output: AgentToolErrorOutput = {
+    failureStage: diagnostic.stage ?? 'arguments',
     tool_error: diagnostic.code,
     errorPath: diagnostic.path,
     message: diagnostic.message,
@@ -175,19 +216,26 @@ function copyInput(item: ProviderInputItem): ProviderInputItem {
     callId: item.callId,
     name: item.name,
     argumentsJson: item.argumentsJson,
-    output: item.output
+    output: item.output,
+    images: item.images?.map((entry: ProviderInputImage): ProviderInputImage => ({ imageUrl: entry.imageUrl }))
   };
 }
 
 function copyRequest(request: ProviderTurnRequest): ProviderTurnRequest {
   const input: ProviderInputItem[] = [];
   for (const item of request.input) {
-    input.push(copyInput(item));
+    const copied: ProviderInputItem = copyInput(item);
+    if (request.supportsImages === false && copied.images !== undefined) {
+      copied.images = undefined;
+      copied.output += '\nPage image omitted for the current text-only model. Use ocr_document_page to read it.';
+    }
+    input.push(copied);
   }
   return {
     apiKey: request.apiKey,
     baseUrl: request.baseUrl,
     model: request.model,
+    supportsImages: request.supportsImages,
     instructions: request.instructions,
     input: input,
     functionTools: request.functionTools.slice(),
@@ -210,7 +258,7 @@ class RoundCollector implements AgentStreamObserver {
   searchStarted: boolean = false;
   errorCode: string = '';
   receivedOutput: boolean = false;
-  hasReasoningContinuation: boolean = false;
+  private readonly continuationIndexes: Map<string, number> = new Map<string, number>();
   incompleteMaxOutput: boolean = false;
   private readonly downstream: AgentRunObserver;
 
@@ -248,25 +296,29 @@ class RoundCollector implements AgentStreamObserver {
       this.searchSources.push(sourceEvent);
     } else if (event.kind === 'continuation_item') {
       this.receivedOutput = true;
-      if (event.text.length <= 65536) {
-        this.continuationItems.push(event.text);
-        try {
-          const item: ProviderContinuationItem = JSON.parse(event.text) as ProviderContinuationItem;
-          if (item.type === 'reasoning') { this.hasReasoningContinuation = true; }
-          if (item.type === 'web_search_call') { this.searchStarted = true; }
-        } catch (error) {
-          // 归一化器只会产生已验证的 JSON；失败时交由协议层拒绝。
-        }
+      let item: ResponsesOpaqueOutputInput;
+      try { item = readProviderContinuation(event.text); } catch (error) {
+        this.errorCode = 'invalid_provider_input';
+        const invalid: AgentEvent = simpleEvent('error', '');
+        invalid.errorCode = this.errorCode;
+        this.downstream.onEvent(invalid);
+        return;
       }
+      const key: string = item.id === undefined ? event.text : `${item.type}:${item.id}`;
+      const index: number | undefined = this.continuationIndexes.get(key);
+      if (index === undefined) {
+        this.continuationIndexes.set(key, this.continuationItems.length);
+        this.continuationItems.push(event.text);
+      } else {
+        // terminal 输出可能补全先前的空/不完整思考项，位置保持不变。
+        this.continuationItems[index] = event.text;
+      }
+      if (item.type === 'web_search_call') { this.searchStarted = true; }
     } else if (event.kind === 'error') {
       this.errorCode = event.errorCode.length === 0 ? 'provider_response_failed' : event.errorCode;
     }
     this.downstream.onEvent(event);
   }
-}
-
-interface ProviderContinuationItem {
-  type?: string;
 }
 
 function shouldRetryTransport(error: AgentTransportError): boolean {
@@ -293,16 +345,28 @@ function createDraftNoteCount(drafts: ChangeDraft[]): number {
   return ids.size;
 }
 
+/** @throws {Error} 续接格式异常交给本轮调用方，不发送损坏请求。 */
 function appendRoundContinuation(request: ProviderTurnRequest, collector: RoundCollector): void {
+  let fallback: string = collector.reasoning;
+  for (const json of collector.continuationItems) {
+    if (hasProviderReasoningText(readProviderContinuation(json))) { fallback = ''; break; }
+  }
   for (const continuationItem of collector.continuationItems) {
+    let content: string = continuationItem;
+    const value: ResponsesOpaqueOutputInput = readProviderContinuation(continuationItem);
+    if (value.type === 'reasoning' && fallback.length > 0) {
+      value.content = [{ type: 'reasoning_text', text: fallback }];
+      content = JSON.stringify(value);
+      fallback = '';
+    }
     request.input.push({
-      kind: 'output_item', role: '', content: continuationItem,
+      kind: 'output_item', role: '', content: content,
       callId: '', name: '', argumentsJson: '', output: ''
     });
   }
-  if (collector.reasoning.length > 0 && !collector.hasReasoningContinuation) {
+  if (fallback.length > 0) {
     request.input.push({
-      kind: 'reasoning', role: '', content: collector.reasoning,
+      kind: 'reasoning', role: '', content: fallback,
       callId: '', name: '', argumentsJson: '', output: ''
     });
   }
@@ -333,11 +397,14 @@ export class AgentRunner {
     this.limits = limits;
   }
 
+  /** @throws {Error} 协议续接或请求构建失败交给会话层处理。 */
+  /** @throws {Error} 协议、工具或网络失败交给 Session/页面处理，不能当作完成。 */
   async run(provider: ProviderId, originalRequest: ProviderTurnRequest,
     observer: AgentRunObserver): Promise<AgentRunResult> {
     this.cancelled = false;
     this.partialDrafts = [];
     const request: ProviderTurnRequest = copyRequest(originalRequest);
+    const baseInstructions: string = request.instructions;
     this.continuationInput = request.input;
     const capabilities: ProviderCapabilities = provider === 'deepseek' ?
       DEEPSEEK_PROVIDER.capabilities : (provider === 'openai' ?
@@ -348,11 +415,14 @@ export class AgentRunner {
     const configuredSearchMode: string = request.searchMode;
     const searchRequired: boolean = request.requiresWebSearch || request.requiresSearchEvidence;
     const searchForced: boolean = configuredSearchMode === 'always' || searchRequired;
-    if (configuredSearchMode === 'off' &&
+    const localWebAvailable: boolean = isToolDeclared(request, 'web_search') || isToolDeclared(request, 'read_webpage');
+    if (!localWebAvailable && configuredSearchMode === 'off' &&
       (request.requiresWebSearch || request.requiresSearchEvidence)) {
       throw new AgentRunnerError('web_search_disabled');
     }
-    if (!capabilities.webSearch) {
+    if (localWebAvailable) {
+      request.searchMode = 'off';
+    } else if (!capabilities.webSearch) {
       if (searchRequired) {
         throw new AgentRunnerError('web_search_provider_unsupported');
       }
@@ -372,15 +442,18 @@ export class AgentRunner {
     let providerCalls: number = 0;
     let toolCalls: number = 0;
     let transientRetries: number = 0;
-    let failedToolRounds: number = 0;
     let searchExecuted: boolean = false;
     let searchHandoffPending: boolean = searchForced && request.requiresDraft;
+    let draftRecoveryPending: boolean = false;
+    let draftRecoveryPrompted: boolean = false;
     while (providerCalls < this.limits.maxProviderCalls) {
       if (this.cancelled) {
         throw new AgentRunnerError('cancelled');
       }
       providerCalls += 1;
       compactAgentToolOutputs(request.input);
+      request.instructions = baseInstructions + buildAgentRuntimeInstructions(
+        request.functionTools, providerCalls, toolCalls, this.limits);
       const collector: RoundCollector = new RoundCollector(observer);
       this.activeSession = this.createSession(provider, request, collector);
       try {
@@ -437,6 +510,22 @@ export class AgentRunner {
           observer.onEvent(simpleEvent('status', 'provider_continuation'));
           continue;
         }
+        if (draftRecoveryPending && drafts.length === 0) {
+          appendRoundContinuation(request, collector);
+          if (!draftRecoveryPrompted && providerCalls < this.limits.maxProviderCalls) {
+            draftRecoveryPrompted = true;
+            request.input.push({
+              kind: 'message', role: 'user',
+              content: 'The draft tool failed; no valid draft has been delivered. Continue the original task using ' +
+                'the reported error and declared tools. A text list of cards is not a substitute for a valid draft. ' +
+                'If essential information is missing, ask for it; if blocked, explain the specific blocker. ' +
+                'Do not repeat unchanged failing calls or claim anything was saved.',
+              callId: '', name: '', argumentsJson: '', output: ''
+            });
+            continue;
+          }
+          throw new AgentRunnerError('agent_no_valid_draft');
+        }
         if (searchHandoffPending && searchExecuted && drafts.length === 0 &&
           providerCalls < this.limits.maxProviderCalls) {
           searchHandoffPending = false;
@@ -469,7 +558,7 @@ export class AgentRunner {
       searchHandoffPending = false;
       appendRoundContinuation(request, collector);
       const hasClarification: boolean = collector.toolCalls.some((call: AgentToolCall): boolean =>
-        call.name === 'request_clarification' || call.name === 'propose_create_deck' ||
+        call.name === 'request_clarification' || call.name === 'request_create_target' || call.name === 'propose_create_deck' ||
         call.name === 'propose_create_note_type' || call.name === 'propose_memory_change' ||
         call.name === 'propose_analysis' || call.name === 'configure_create_target');
       if (hasClarification && collector.toolCalls.length > 1) {
@@ -497,6 +586,9 @@ export class AgentRunner {
             kind: 'function_call', role: '', content: '', callId: call.id,
             name: call.name, argumentsJson: call.argumentsJson, output: ''
           });
+        }
+        // 同轮调用属于同一个助手段；结果插在调用之间会拆段并丢失后一段的思考关联。
+        for (const call of collector.toolCalls) {
           request.input.push({
             kind: 'function_call_output', role: '', content: '', callId: call.id,
             name: '', argumentsJson: '', output: output
@@ -527,8 +619,6 @@ export class AgentRunner {
           name: call.name, argumentsJson: call.argumentsJson, output: ''
         });
       }
-      let completedToolsInRound: number = 0;
-      let failedToolsInRound: number = 0;
       for (const call of acceptedToolCalls) {
         if (this.cancelled) { throw new AgentRunnerError('cancelled'); }
         const sequence: number = toolCalls - acceptedToolCalls.length + acceptedToolCalls.indexOf(call) + 1;
@@ -546,19 +636,29 @@ export class AgentRunner {
               kind: 'function_call_output', role: '', content: '', callId: call.id,
               name: '', argumentsJson: '', output: toolErrorJson(undeclared, undeclaredRecord)
             });
-            failedToolsInRound += 1;
             continue;
           }
           const result: AgentToolResult = await this.registry.execute(call);
+          if (this.cancelled) { throw new AgentRunnerError('cancelled'); }
+          if (call.name === 'web_search' || call.name === 'read_webpage') {
+            const sources: AgentSearchSourceEvent[] = agentWebResultSources(call.name, result.outputJson);
+            searchExecuted = true;
+            for (const source of sources) {
+              if (allSearchSources.some((seen: AgentSearchSourceEvent): boolean => seen.url === source.url)) { continue; }
+              allSearchSources.push(source);
+              observer.onEvent({ kind: 'search_source', text: '', toolCall: null, toolTrace: null,
+                source: { url: source.url, title: source.title }, errorCode: '' });
+            }
+          }
           if (result.draft !== null) { drafts.push(result.draft); }
           const completedTrace: AgentToolTrace = completeAgentToolTrace(startedTrace, result.outputJson);
           if (result.action !== undefined) { completedTrace.status = 'awaiting_confirmation'; }
           observer.onEvent(toolStatusEvent('tool_completed', call, completedTrace));
           request.input.push({
             kind: 'function_call_output', role: '', content: '', callId: call.id,
-            name: '', argumentsJson: '', output: sanitizeAgentToolJson(result.outputJson, Number.MAX_SAFE_INTEGER).text
+            name: '', argumentsJson: '', output: sanitizeAgentToolJson(result.outputJson, Number.MAX_SAFE_INTEGER).text,
+            images: result.images
           });
-          completedToolsInRound += 1;
           if (result.action !== undefined) {
             // 同批后续工具尚未执行，补齐协议结果，恢复时让模型重新发起。
             for (let pendingIndex: number = acceptedToolCalls.indexOf(call) + 1;
@@ -577,10 +677,12 @@ export class AgentRunner {
             return awaitingClarificationResult(result.clarification, providerCalls, toolCalls);
           }
         } catch (error) {
+          if (this.cancelled) { throw new AgentRunnerError('cancelled'); }
           if (error instanceof AgentRunnerError && error.code === 'cancelled') {
             throw error;
           }
           const diagnostic: AgentToolDiagnostic = diagnosticForError(error as Object, call, request);
+          if (this.registry.isDraftTool(call.name)) { draftRecoveryPending = true; }
           const record: AgentToolFailureRecord = failureTracker.record(call.name, call.argumentsJson, diagnostic);
           const failedTrace: AgentToolTrace = failAgentToolTrace(startedTrace, diagnostic, record.count);
           observer.onEvent(toolStatusEvent('tool_failed', call, failedTrace, diagnostic.code));
@@ -588,7 +690,6 @@ export class AgentRunner {
             kind: 'function_call_output', role: '', content: '', callId: call.id,
             name: '', argumentsJson: '', output: toolErrorJson(diagnostic, record)
           });
-          failedToolsInRound += 1;
           if (record.shouldAbort) {
             observer.onEvent(simpleEvent('error', '', 'agent_repeated_tool_failure'));
             throw new AgentRunnerError('agent_repeated_tool_failure');
@@ -597,7 +698,11 @@ export class AgentRunner {
       }
       if (drafts.length > 0) {
         const createdCount: number = createDraftNoteCount(drafts);
-        if (request.expectedDraftCount > 0 && createdCount !== request.expectedDraftCount) {
+        // 统一对话里的“修改 N 张卡”不能被制卡数量约束误拒绝；已有制卡模式仍严格校验。
+        const editToolsAvailable: boolean = request.functionTools.some((tool: ProviderFunctionTool): boolean =>
+          tool.name === 'propose_update_notes');
+        if (request.expectedDraftCount > 0 && (createdCount > 0 || !editToolsAvailable) &&
+          createdCount !== request.expectedDraftCount) {
           drafts.splice(0, drafts.length);
           throw new AgentRunnerError('agent_no_valid_draft');
         }
@@ -609,15 +714,6 @@ export class AgentRunner {
           drafts: drafts, providerCalls: providerCalls, toolCalls: toolCalls
         };
       }
-      if (failedToolsInRound > 0 && completedToolsInRound === 0) {
-        failedToolRounds += 1;
-        if (failedToolRounds >= 2) {
-          observer.onEvent(simpleEvent('error', '', 'agent_repeated_tool_failure'));
-          throw new AgentRunnerError('agent_repeated_tool_failure');
-        }
-      } else if (completedToolsInRound > 0) {
-        failedToolRounds = 0;
-      }
     }
     observer.onEvent(simpleEvent('error', '', 'agent_provider_limit'));
     throw new AgentRunnerError('agent_provider_limit');
@@ -625,11 +721,13 @@ export class AgentRunner {
 
   cancel(): void {
     this.cancelled = true;
+    this.registry.cancelActive();
     if (this.activeSession !== null) {
       this.activeSession.cancel();
     }
   }
 
+  /** @throws {Error} 请求构建失败交给本轮调用方。 */
   private createSession(provider: ProviderId, request: ProviderTurnRequest,
     observer: AgentStreamObserver): AgentTransportSession {
     if (provider === 'deepseek') {

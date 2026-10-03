@@ -116,3 +116,19 @@ test('explicit web-search intent is detected without treating local card search 
   assert.equal(explicitWebSearchForbidden('不要联网，只用本地内容'), true);
   assert.equal(explicitWebSearchForbidden('请上网查资料'), false);
 });
+
+test('local HTML creation and product website questions do not require an external search', () => {
+  for (const text of [
+    '我是让你通过编写 HTML 代码来制作类网页交互闪卡',
+    '帮我制作一个本地交互网页，用 HTML/CSS/JS 做选择题',
+    '设计一个网站的 HTML 布局',
+    'Create an interactive website in HTML and JavaScript',
+    '记得闪卡官网 jidecards.com 是什么？'
+  ]) {
+    assert.equal(explicitWebSearchRequested(text), false, text);
+    assert.equal(explicitSourceEvidenceRequested(text), false, text);
+  }
+  for (const text of ['请联网查钠的性质，然后生成 HTML 交互闪卡','请访问网站查询资料','请浏览网页并标注来源']) {
+    assert.equal(explicitWebSearchRequested(text),true,text);
+  }
+});

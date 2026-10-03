@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { AgentMode } from './AgentTypes';
+import type { NotetypeTemplatePreview } from '../../proto/messages/NotetypeMessages';
 
 export interface AgentTaskSetup {
+  templateCount?: number;
+  templatePreviews?: NotetypeTemplatePreview[];
   mode: AgentMode;
   deckId: number;
   deckName: string;
@@ -15,6 +18,8 @@ export interface AgentTaskSetup {
 }
 
 export interface AgentTaskSnapshot {
+  templateCount?: number;
+  templatePreviews?: NotetypeTemplatePreview[];
   mode: AgentMode;
   deckId: number;
   deckName: string;
@@ -30,6 +35,8 @@ export interface AgentTaskSnapshot {
 }
 
 interface AgentProviderTaskConfiguration {
+  templateCount?: number;
+  templatePreviews?: NotetypeTemplatePreview[];
   mode: AgentMode;
   deckId: number;
   deckName: string;
@@ -58,7 +65,8 @@ export function buildAgentTaskProviderText(snapshot: AgentTaskSnapshot): string 
     mode: snapshot.mode, deckId: snapshot.deckId, deckName: snapshot.deckName,
     notetypeId: snapshot.notetypeId, notetypeName: snapshot.notetypeName,
     fieldNames: snapshot.fieldNames.slice(), noteTypeKind: snapshot.noteTypeKind,
-    clozeFieldOrds: snapshot.clozeFieldOrds.slice(), batchLimit: snapshot.batchLimit
+    clozeFieldOrds: snapshot.clozeFieldOrds.slice(), batchLimit: snapshot.batchLimit,
+    templateCount: snapshot.templateCount, templatePreviews: snapshot.templatePreviews?.slice()
   };
   const mediaNotice: string = snapshot.omittedMedia ?
     '\n媒体说明：二进制媒体未发送，不得声称已经看见或听见。' : '';
@@ -67,6 +75,6 @@ export function buildAgentTaskProviderText(snapshot: AgentTaskSnapshot): string 
 }
 
 export function buildAgentTaskVisibleText(snapshot: AgentTaskSnapshot): string {
-  if (snapshot.mode === 'edit') { return snapshot.userText; }
+  if (snapshot.mode !== 'create') { return snapshot.userText; }
   return `目标：${snapshot.deckName} · 笔记类型：${snapshot.notetypeName}\n${snapshot.userText}`;
 }

@@ -2,6 +2,12 @@
 import assert from 'node:assert/strict';
 import { register } from 'node:module';
 import test from 'node:test';
+import {readFileSync} from 'node:fs';
+import {stripTypeScriptTypes} from 'node:module';
+import { buildFailedOperationsRetryDraft } from '../../entry/src/main/ets/model/agent/AgentDraftRetry.ts';
+import { AGENT_IDENTITY_INSTRUCTIONS, buildAgentSessionInstructions } from '../../entry/src/main/ets/model/agent/AgentSessionContext.ts';
+import { AgentDocumentAccess } from '../../entry/src/main/ets/model/agent/AgentDocuments.ts';
+import { buildResponsesPayload } from '../../entry/src/main/ets/model/agent/ProviderProtocol.ts';
 
 // 仅替换平台 IO；执行真实 Runner、Registry、Session、卡库工具和确认执行器。
 const stub = `
@@ -17,7 +23,8 @@ export class 牌组服务 {
 export class 笔记类型服务 {
  async 获取笔记类型名列表() { return fixture.types; }
  async 获取笔记类型能力(id) { const t=fixture.types.find(x=>x.id===id);if(!t)throw Error('notetype_not_found');
- return {notetypeId:id,name:t.name,kind:0,fieldNames:t.fields??['Front','Back'],clozeFieldOrds:[]}; }
+ return {notetypeId:id,name:t.name,kind:0,fieldNames:t.fields??['Front','Back'],clozeFieldOrds:[],
+ templateCount:t.templates?.length??0,templatePreviews:t.templates??[]}; }
  async 获取标准笔记类型JSON() { return JSON.stringify({id:0,name:'Basic',type:0,sortf:0,css:'.card{}',flds:[{name:'Front',ord:0}],tmpls:[{ord:0,name:'Card',qfmt:'',afmt:''}]}); }
  async 添加笔记类型旧版(json) { const t=JSON.parse(json);fixture.writes.push(['notetype',t]);fixture.types.push({id:4,name:t.name,fields:t.flds.map(f=>f.name)});return 4; }
  async 获取笔记类型旧版() { return JSON.stringify({css:fixture.longText}); }
@@ -30,10 +37,17 @@ export class 笔记服务 {
 export class 卡片服务 { async 获取卡片(id) { return {id,noteId:id,deckId:1}; } }
 export class 标签服务 { async 标签树() { return {name:'',level:0,children:[]}; } }
 export class 统计服务 {}
+export const appThemeColorSession = {};
+export async function 设置FSRS开启状态() { throw Error('unexpected setting write'); }
+export async function saveCardTextSize() { throw Error('unexpected setting write'); }
+export async function saveDeckListNarrow() { throw Error('unexpected setting write'); }
+export async function saveStudyHaptics() { throw Error('unexpected setting write'); }
+export class LocalPreferenceWriteError extends Error {}
 `;
 const stubUrl = 'data:text/javascript;base64,' + Buffer.from(stub).toString('base64');
 const names = ['AgentTransport','DeepSeekAdapter','OpenAIAdapter','CustomAdapter','AgentWorkspaceStore','WikimediaImageService',
- '牌组服务','笔记类型服务','搜索服务','笔记服务','卡片服务','标签服务','统计服务'];
+ '牌组服务','笔记类型服务','搜索服务','笔记服务','卡片服务','标签服务','统计服务','AppThemeService','FSRS控制器',
+ 'CardTextSizeStore','DeckListAppearanceStore','StudyHaptics','LocalPreferenceWrite'];
 register('data:text/javascript;base64,' + Buffer.from(`export function resolve(s,c,next) {
  if (${JSON.stringify(names)}.some(n=>s.endsWith('/'+n))) return {url:${JSON.stringify(stubUrl)},shortCircuit:true};
  return next(s,c); }`).toString('base64'), import.meta.url);
@@ -44,30 +58,182 @@ const { AgentRunner } = await import('../../entry/src/main/ets/backend/agent/Age
 const { AgentSessionController } = await import('../../entry/src/main/ets/backend/agent/AgentSessionController.ets');
 const { AgentAuxiliaryTools } = await import('../../entry/src/main/ets/backend/agent/AgentAuxiliaryTools.ets');
 const { CardAgentTools } = await import('../../entry/src/main/ets/backend/agent/CardAgentTools.ets');
+const { registerAgentDocumentTools } = await import('../../entry/src/main/ets/backend/agent/AgentDocumentTools.ets');
 const { agentFunctionTools } = await import('../../entry/src/main/ets/model/agent/AgentToolCatalog.ts');
 const { applyAgentMemoryChange } = await import('../../entry/src/main/ets/model/agent/AgentMemory.ts');
 
 const item = (text) => ({kind:'message',role:'user',content:text,callId:'',name:'',argumentsJson:'',output:''});
 const event = (kind,text='',toolCall=null) => ({kind,text,toolCall,toolTrace:null,source:null,errorCode:''});
 const call = (id,name,args) => event('tool_call','',{id,name,argumentsJson:JSON.stringify(args)});
-function harness(rounds=[],limits) {
- const scope=new AgentScope();scope.configureCreateTarget(1,2);scope.registerReadableDeckIds([1]);scope.registerReadableNotetypeIds([2]);
+function harness(rounds=[],limits,mode='create',documents=null,validate=null) {
+ const scope=new AgentScope();scope.configureCreateTarget(mode==='assistant'?0:1,mode==='assistant'?0:2);scope.registerReadableDeckIds([1]);scope.registerReadableNotetypeIds([2]);
  const store={state:{lastDeckId:1,deckPreferences:[],memories:[]},async load(){return this.state;},
  async saveSelection(deckId,notetypeId){this.state.lastDeckId=deckId;this.state.deckPreferences=[{deckId,notetypeId}];},
  async changeMemory(change,id){this.state.memories=applyAgentMemoryChange(this.state.memories,change,id,1);}};
- const registry=new AgentToolRegistry();const cards=new CardAgentTools(scope);cards.register(registry,'create');
+ const registry=new AgentToolRegistry();const cards=new CardAgentTools(scope,documents);cards.register(registry,mode);
+ if(documents!==null)registerAgentDocumentTools(registry,documents);
  const auxiliary=new AgentAuxiliaryTools(scope,store);auxiliary.register(registry);
  const runner=limits ? new AgentRunner(registry,limits) : new AgentRunner(registry);
  const requests=[];const events=[];
  runner.createSession=(_provider,request,observer)=>({async start(){requests.push(structuredClone(request));
+ if(validate!==null)validate(JSON.parse(buildResponsesPayload(request)));
  for(const e of rounds.shift()??[])observer.onEvent(e);},cancel(){}});
  const session=new AgentSessionController(runner,scope,store,auxiliary);
- const request=(text)=>({apiKey:'test',baseUrl:'https://example.test',model:'test',instructions:'',input:[item(text)],
- functionTools:agentFunctionTools(100,'create'),searchMode:'off',requiresWebSearch:false,requiresSearchEvidence:false,
+ const request=(text,instructions)=>({apiKey:'test',baseUrl:'https://example.test',model:'test',instructions,input:[item(text)],
+ functionTools:agentFunctionTools(100,mode),searchMode:'off',requiresWebSearch:false,requiresSearchEvidence:false,
  requiresDraft:false,expectedDraftCount:0,reasoningEffort:'',maxOutputTokens:1024});
- const run=(text,resume='')=>session.run('deepseek',request(text),{onEvent:e=>events.push(e)},resume);
+ const run=(text,resume='',expectedDraftCount=0,instructions='')=>{const value=request(text,instructions);value.expectedDraftCount=expectedDraftCount;return session.run('deepseek',value,{onEvent:e=>events.push(e)},resume);};
  return {scope,store,registry,cards,auxiliary,runner,session,requests,events,run};
 }
+
+test('every entry shares concise positive host facts without identity disclaimers or extra speaking rules',()=>{
+ assert.ok(AGENT_IDENTITY_INSTRUCTIONS.length <= 220);
+ assert.doesNotMatch(AGENT_IDENTITY_INSTRUCTIONS,/不要|不能|不代表|不是|官方|只有用户|例如|Ankitects|AnkiDroid/);
+ for(const mode of ['assistant','create','edit']) {
+   const instructions=buildAgentSessionInstructions({mode,deckId:0,notetypeId:0,fieldNames:[],noteTypeKind:0,clozeFieldOrds:[]},100);
+   assert.ok(instructions.startsWith('你是 JIDE，记得闪卡（jidecards）的应用内助手。'));
+   assert.match(AGENT_IDENTITY_INSTRUCTIONS,/基于 Anki Core/);
+   assert.match(AGENT_IDENTITY_INSTRUCTIONS,/原生界面与 AI 功能由记得闪卡实现/);
+   assert.match(AGENT_IDENTITY_INSTRUCTIONS,/Anki 开源社区的贡献/);
+   assert.match(AGENT_IDENTITY_INSTRUCTIONS,/记得闪卡官网是 https:\/\/jidecards\.com/);
+   assert.ok(instructions.includes(`当前任务模式=${mode}`));
+ }
+});
+
+test('restored old Anki self-description remains history while every provider round receives the current jidecards identity',async()=>{
+ const old=harness([[event('text_delta','我是你 Anki 里的学习助手。')]],undefined,'assistant');
+ await old.run('你是谁？','',0,'旧身份提示');
+ const next=harness([[call('types','list_notetypes',{})],[event('text_delta','已读取。')]],undefined,'assistant');
+ next.session.restore(structuredClone(old.session.exportState()));
+ const instructions=buildAgentSessionInstructions({mode:'assistant',deckId:0,notetypeId:0,fieldNames:[],noteTypeKind:0,clozeFieldOrds:[]},100);
+ await next.run('你运行在哪个应用里？','',0,instructions);
+ assert.equal(next.requests.length,2);
+ for(const request of next.requests) {
+   assert.ok(request.instructions.startsWith(AGENT_IDENTITY_INSTRUCTIONS));
+   assert.equal(request.instructions.split(AGENT_IDENTITY_INSTRUCTIONS).length,2);
+   assert.match(request.instructions,/你是 JIDE，记得闪卡（jidecards）的应用内助手/);
+   assert.doesNotMatch(request.instructions,/旧身份提示/);
+   assert.ok(request.input.some(item=>item.role==='assistant'&&item.content==='我是你 Anki 里的学习助手。'));
+ }
+});
+
+test('unified assistant chats with no implicit target and exposes both draft capabilities',async()=>{
+ const h=harness([[event('text_delta','我们可以先讨论。')]],undefined,'assistant');
+ assert.equal((await h.run('你好')).status,'completed');
+ assert.deepEqual(h.scope.currentCreateTarget(),[0,0]);
+ const names=h.requests[0].functionTools.map(t=>t.name);
+ for(const name of ['create_flashcards','propose_update_notes','search_cards','list_notetypes','request_create_target','propose_create_note_type'])assert.ok(names.includes(name),name);
+});
+
+test('native target selection pauses and resumes the same tool call before real create drafts',async()=>{
+ const h=harness([[call('target','request_create_target',{clarificationId:'target-1',question:'选择目标'})],
+ [call('create','create_flashcards',{cards:[{fields:['Front','Back']}]})]],undefined,'assistant');
+ const waiting=await h.run('根据这段内容做卡片');
+ assert.equal(waiting.status,'awaiting_clarification');assert.equal(waiting.clarification.kind,'create_target');
+ assert.deepEqual(h.scope.currentCreateTarget(),[0,0]);
+ await h.auxiliary.read('configure_create_target',JSON.stringify({deckId:1,notetypeId:2}));
+ const result=await h.run('English · Basic',JSON.stringify({status:'selected',deckId:1,notetypeId:2}));
+ assert.equal(result.status,'completed');assert.equal(result.drafts.length,1);
+ assert.equal(result.drafts[0].operations[0].kind,'create_note');
+ assert.deepEqual(result.drafts[0].affectedDeckIds,[1]);
+ assert.equal(h.requests[1].input.find(i=>i.kind==='function_call_output'&&i.callId==='target').output.includes('selected'),true);
+});
+
+test('cancelled target selection continues discussion without acquiring a target or draft',async()=>{
+ const h=harness([[call('target','request_create_target',{clarificationId:'cancel',question:'选择目标'})],
+ [event('text_delta','继续讨论。')]],undefined,'assistant');
+ await h.run('先讨论制卡');
+ const result=await h.run('取消选择',JSON.stringify({status:'cancelled'}));
+ assert.deepEqual(h.scope.currentCreateTarget(),[0,0]);assert.equal(result.drafts.length,0);
+ await assert.rejects(h.registry.execute({id:'invalid',name:'request_create_target',argumentsJson:'{"clarificationId":"bad","question":"选择","deckId":999}'}),e=>e.code==='unexpected_property'&&e.path==='deckId');
+});
+
+test('actual target dialog controller validates through the shared auxiliary service before resuming',async()=>{
+ const source=readFileSync(new URL('../../entry/src/main/ets/pages/AI制卡页.ets',import.meta.url),'utf8');
+ const methods=['private async finishTargetSelection(', 'private restoreTargetSelection(',
+   'private async selectDeckWithPreference(', 'private async selectNotetypeWithPreference('].map(name=>{
+   const start=source.indexOf('  '+name);
+   assert.ok(start>=0,name);
+   return source.slice(start,source.indexOf('\n  }',start)+4);
+ }).join('\n');
+ const Page=new Function('$r',stripTypeScriptTypes('class Page {'+methods+'}',{mode:'transform'})+';return Page;')(key=>key);
+ const h=harness([],undefined,'assistant');
+ const page=new Page();Object.assign(page,{targetSelectionMessage:0,targetSelectionBusy:false,处理中:false,pageDisposed:false,
+   牌组ID:1,已选笔记类型ID:2,字段名列表:['Front','Back'],auxiliaryTools:h.auxiliary,
+   消息列表:[{clarification:{request:{id:'real-target'},supplementalText:''}}],错误信息:''});
+ let continued=-1;
+ page.updateClarificationSupplement=(i,text)=>{page.消息列表[i].clarification.supplementalText=text;};
+ page.selectedDeckName=()=> 'English';page.selectedNotetypeName=()=> 'Basic';page.continueClarification=async i=>{continued=i;};
+ await page.finishTargetSelection('select');
+ assert.equal(continued,0);assert.deepEqual(h.scope.currentCreateTarget(),[1,2]);
+ assert.equal(page.消息列表[0].clarification.supplementalText,'English · Basic');assert.equal(page.targetSelectionMessage,-1);
+ page.targetSelectionMessage=0;page.牌组ID=999;continued=-1;
+ await page.finishTargetSelection('select');
+ assert.equal(continued,-1);assert.match(page.错误信息,/deck_not_found/);assert.equal(page.targetSelectionMessage,0);
+
+ // 真实选择方法在弹窗期间只改变暂存 UI，不保存偏好；取消恢复基线。
+ h.store.state.lastDeckId=1;h.store.state.deckPreferences=[{deckId:1,notetypeId:2}];
+ let preferenceWrites=0;const saveSelection=h.store.saveSelection.bind(h.store);
+ h.store.saveSelection=async(...args)=>{preferenceWrites++;await saveSelection(...args);};
+ page.workspaceStore=h.store;page.pageMode='assistant';page.笔记类型选项=[{id:2,name:'Basic'}];
+ page.加载笔记类型=async id=>{page.已选笔记类型ID=id;page.字段名列表=['Front','Back'];};
+ page.取本地化文案=key=>key;
+ page.targetSelectionBaseline={deckId:0,notetypeId:0,notetypeName:'',fieldNames:[],noteTypeKind:0,clozeFieldOrds:[]};
+ page.notetypeLoadVersion=0;
+ await page.selectDeckWithPreference(1);await page.selectNotetypeWithPreference(2);
+ assert.equal(page.已选笔记类型ID,2);
+ assert.equal(preferenceWrites,0);
+ assert.deepEqual(h.store.state.deckPreferences,[{deckId:1,notetypeId:2}]);
+ const stored=structuredClone(h.store.state);
+ await page.finishTargetSelection('cancel');
+ assert.equal(continued,0);assert.equal(page.牌组ID,0);assert.equal(page.已选笔记类型ID,0);
+ assert.deepEqual(page.字段名列表,[]);assert.equal(page.notetypeLoadVersion,1);
+ assert.deepEqual(h.store.state,stored);assert.equal(page.targetSelectionMessage,-1);
+
+ page.targetSelectionMessage=0;page.牌组ID=1;page.已选笔记类型ID=2;
+ page.选择笔记类型=id=>{page.已选笔记类型ID=id;page.字段名列表=[];};
+ await page.finishTargetSelection('new_notetype');
+ assert.equal(page.牌组ID,1);assert.equal(page.已选笔记类型ID,0);assert.equal(continued,0);
+ assert.equal(page.消息列表[0].clarification.supplementalText,'app.string.ai_agent_target_new_type_request');
+});
+
+test('actual unified write result refreshes existing cards even when a partial retry retains only creation',()=>{
+ const source=readFileSync(new URL('../../entry/src/main/ets/pages/AI制卡页.ets',import.meta.url),'utf8');
+ const start=source.indexOf('  private 记录执行结果(');
+ const method=source.slice(start,source.indexOf('\n  }',start)+4);
+ const ticks=[];
+ const Page=new Function('AppStorage','$r','buildFailedOperationsRetryDraft',
+   stripTypeScriptTypes('class Page {'+method+'}',{mode:'transform'})+';return Page;')(
+   {setOrCreate:key=>ticks.push(key)},key=>key,buildFailedOperationsRetryDraft);
+ const operation=(kind,noteId)=>({kind,noteId,cardId:noteId,deckId:1,fieldOrd:0,before:'Old',after:'New'});
+ for(const [operations,succeeded,failed,items,expected] of [
+   [[operation('create_note',0)],1,0,[],['noteAddedTick']],
+   [[operation('update_field',1)],1,0,[],['noteAddedTick','cardContentChangedTick']],
+   [[operation('update_field',1)],0,1,[{targetId:1,succeeded:false}],[]],
+   [[operation('update_field',1),operation('create_note',0)],1,1,
+     [{targetId:1,succeeded:true},{targetId:0,succeeded:false}],['noteAddedTick','cardContentChangedTick']]
+ ]) {
+   ticks.length=0;const page=new Page();
+   const draft={id:'d',operations,affectedNoteIds:[1],affectedCardIds:[1],affectedDeckIds:[1],affectedNotetypeIds:[2]};
+   Object.assign(page,{pageMode:'assistant',消息列表:[{变更草稿列表:[draft]}],历史执行结果:[]});
+   page.更新消息=(index,change)=>change(page.消息列表[index]);page.取本地化格式=()=>'';page.保存当前会话历史=()=>{};
+   page.记录执行结果(0,0,{draftId:'d',status:failed?'partial':'completed',succeeded,failed,items});
+   assert.deepEqual(ticks,expected);
+   if(succeeded===1&&failed===1)assert.deepEqual(page.消息列表[0].变更草稿列表[0].operations.map(o=>o.kind),['create_note']);
+ }
+});
+
+test('unified assistant discovers the requested note type and cards then produces existing edit previews',async()=>{
+ const h=harness([[call('types','list_notetypes',{query:'Basic',limit:20})],
+ [call('search','search_cards',{query:'note:Basic',limit:1})],
+ [call('context','get_note_context',{cardIds:[1]})],
+ [call('edit','propose_update_notes',{noteIds:[1],fieldUpdatesJson:JSON.stringify([{noteId:1,fieldOrd:1,after:'Short answer'}]),draftId:'edit-from-chat',reason:'Shorten answer'})]],undefined,'assistant');
+ const result=await h.run('把 Basic 类型1张卡的答案缩短','',1);
+ assert.equal(result.status,'completed');assert.equal(result.drafts.length,1);
+ const operation=result.drafts[0].operations[0];
+ assert.equal(operation.kind,'update_field');assert.equal(operation.before,'Answer');assert.equal(operation.after,'Short answer');
+ assert.deepEqual(h.scope.currentCreateTarget(),[0,0]);
+});
 
 test('normal chat retains final text; free-text clarification resumes its original call',async()=>{
  const h=harness([[event('text_delta','先谈谈学习目标。')],
@@ -82,10 +248,11 @@ test('normal chat retains final text; free-text clarification resumes its origin
  assert.ok(!h.events.some(x=>x.errorCode==='agent_no_valid_draft'));
 });
 
-test('notetype proposal writes once only after confirmation, then uses the new target for a real draft',async()=>{
+test('unified assistant creates a note type once after confirmation and previews cards with its real ID',async()=>{
  fixture.writes=[];fixture.types=[{id:2,name:'Basic'}];
  const h=harness([[call('newtype','propose_create_note_type',{name:'Vocabulary',kind:'normal',fields:['Word','Meaning'],frontFields:['Word'],backFields:['Meaning']})],
- [call('cards','create_flashcards',{cards:[{fields:['apple','苹果']}]})]]);
+ [call('cards','create_flashcards',{cards:[{fields:['apple','苹果']}]})]],undefined,'assistant');
+ h.scope.configureCreateTarget(1,0);
  const pending=await h.run('新建单词类型并制卡');assert.equal(pending.status,'awaiting_confirmation');
  assert.equal(fixture.writes.length,0);
  const result=await h.session.actionExecutor.executeConfirmed(pending.action);
@@ -154,6 +321,26 @@ test('crash with executing action is never restored as a clickable retry',()=>{
  assert.match(h.session.getAction().resultJson,/execution_outcome_unknown/);
 });
 
+test('agent can inspect renamed typing and ordinary candidates, switch target and produce a rich draft without card-library writes',async()=>{
+ fixture.writes=[];
+ fixture.types=[{id:2,name:'Renamed imported type',templates:[{ord:0,name:'Card',questionFormat:'{{Front}}{{type:Back}}',answerFormat:'{{type:Back}}',truncated:false}]},
+  {id:6,name:'Renamed reading type',templates:[{ord:0,name:'Card',questionFormat:'{{Front}}',answerFormat:'{{Back}}',truncated:false}]}];
+ const h=harness([[call('types','list_notetypes',{query:'',limit:20})],
+  [call('inspect','get_note_type_capabilities',{notetypeIds:[2,6]})],
+  [call('switch','configure_create_target',{deckId:1,notetypeId:6})],
+  [call('draft','create_flashcards',{cards:[{fields:['钠与水反应？','<mark>浮、熔、游、响、红</mark><br><b>放热</b>']}]})]]);
+ const result=await h.run('用荧光和粗体做一张知识卡');
+ assert.equal(result.status,'completed');
+ assert.deepEqual(h.scope.currentCreateTarget(),[1,6]);
+ assert.deepEqual(result.drafts[0].affectedNotetypeIds,[6]);
+ assert.match(result.drafts[0].operations.find(operation => operation.fieldOrd === 1).after, /<mark>.*<br><b>/);
+ const observed=h.requests[2].input.find(x=>x.callId==='inspect'&&x.kind==='function_call_output');
+ assert.match(observed.output,/type:Back/);
+ assert.match(observed.output,/\{\{Back\}\}/);
+ assert.deepEqual(fixture.writes,[]);
+ fixture.types=[{id:2,name:'Basic'}];
+});
+
 test('proposal tools expose no commit; unregistered and changed confirmations cannot write',async()=>{
  fixture.writes=[];
  const h=harness();
@@ -207,4 +394,298 @@ test('unsupported registered action fails explicitly without falling through to 
  h.session.actionExecutor.registerPending(action);
  await assert.rejects(()=>h.session.actionExecutor.executeConfirmed(action),/unsupported_action/);
  assert.equal(action.status,'failed');assert.deepEqual(fixture.writes,[]);
+});
+
+test('real registry reports malformed JSON and wrapped arguments; successive corrections deliver the original card without writes',async()=>{
+ fixture.writes=[];fixture.types=[{id:2,name:'Basic'}];
+ const fields=['钠与水的反应？','2Na + 2H₂O = 2NaOH + H₂↑\n观察“熔、浮、游”。'];
+ const raw='{"cards":[{"fields":["question","unescaped\nline"]}]}';
+ const h=harness([
+  [event('tool_call','',{id:'syntax',name:'create_flashcards',argumentsJson:raw})],
+  [call('wrapper','create_flashcards',{arguments:{cards:[{fields}]}})],
+  [call('correct','create_flashcards',{cards:[{fields}]})]
+ ]);
+ const result=await h.run('根据材料制卡');
+ assert.equal(result.status,'completed');assert.equal(result.drafts.length,1);
+ assert.deepEqual(result.drafts[0].operations.map(x=>x.after),fields);
+ const syntax=JSON.parse(h.requests[1].input.find(x=>x.callId==='syntax'&&x.kind==='function_call_output').output);
+ assert.equal(syntax.tool_error,'invalid_json');assert.equal(syntax.failureStage,'arguments');
+ assert.match(syntax.message,/JSON|position|character/i);assert.match(syntax.correction,/does NOT mean no arguments/);
+ const wrapper=JSON.parse(h.requests[2].input.find(x=>x.callId==='wrapper'&&x.kind==='function_call_output').output);
+ assert.equal(wrapper.tool_error,'unexpected_property');assert.deepEqual(wrapper.receivedKeys,['arguments']);
+ assert.deepEqual(fixture.writes,[]);
+ assert.equal(h.events.filter(x=>x.kind==='tool_failed').length,2);
+ assert.equal(h.events.filter(x=>x.kind==='tool_completed').length,1);
+});
+
+test('unchanged failures pause with exact tool observations and restore can finish without repeating successful work',async()=>{
+ fixture.types=[{id:2,name:'Basic'}];fixture.writes=[];
+ const h=harness(Array.from({length:3},(_,i)=>[call(`bad-${i}`,'create_flashcards',{cards:[]})]));
+ assert.equal((await h.run('制作卡片')).status,'paused');
+ assert.equal(h.requests.length,3);assert.equal(h.session.isPaused(),true);
+ const state=structuredClone(h.session.exportState());
+ const failures=state.input.filter(x=>x.kind==='function_call_output').map(x=>JSON.parse(x.output));
+ assert.deepEqual(failures.map(x=>x.repeatCount),[1,2,3]);
+ assert.ok(failures.every(x=>x.tool_error==='invalid_value'));
+ const next=harness([[call('recovered','create_flashcards',{cards:[{fields:['Q','A']}]})]]);
+ next.session.restore(state);
+ const result=await next.run('继续，修正空卡片列表','{"status":"continue"}');
+ assert.equal(result.status,'completed');assert.equal(result.drafts.length,1);
+ assert.ok(next.requests[0].input.some(x=>x.kind==='function_call_output'&&x.callId==='bad-2'&&JSON.parse(x.output).repeatCount===3));
+ assert.deepEqual(fixture.writes,[]);
+});
+
+test('runtime capabilities and remaining budget come from each actual request, without accumulating environment blocks',async()=>{
+ const h=harness([[call('read','list_notetypes',{})],[event('text_delta','已读取。')]],
+  {maxProviderCalls:4,maxToolCalls:5});
+ await h.run('看看笔记类型');
+ assert.equal(h.requests.length,2);
+ assert.equal(h.events.filter(x=>x.kind==='tool_failed').length,0);
+ assert.equal(h.events.filter(x=>x.kind==='tool_completed').length,1);
+ for(const request of h.requests) {
+  assert.equal(request.instructions.split('执行环境（应用提供）').length,2);
+  for(const tool of request.functionTools) assert.ok(request.instructions.includes(tool.name));
+ }
+ assert.match(h.requests[0].instructions,/还可请求模型 3 次.*可执行工具 5 次/);
+ assert.match(h.requests[1].instructions,/还可请求模型 2 次.*可执行工具 4 次/);
+ const tool=requestToolWithoutSandbox(h.requests[0]);
+ const {buildAgentRuntimeInstructions}=await import('../../entry/src/main/ets/model/agent/AgentSessionContext.ts');
+ assert.doesNotMatch(buildAgentRuntimeInstructions(tool,1,0,{maxProviderCalls:4,maxToolCalls:5}),/execute_code|JavaScript/);
+ assert.match(h.requests[0].instructions,/每次调用状态独立.*没有文件系统、网络/);
+});
+
+function requestToolWithoutSandbox(request) { return request.functionTools.filter(x=>x.name!=='execute_code'); }
+
+test('text fallback after a failed draft is not completion; one bounded handoff can deliver a real draft',async()=>{
+ fixture.types=[{id:2,name:'Basic'}];fixture.writes=[];
+ const h=harness([[call('invalid','create_flashcards',{cards:[]})],
+  [event('text_delta','问题：钠怎样保存？答案：煤油。')],
+  [call('valid','create_flashcards',{cards:[{fields:['钠怎样保存？','煤油。']}]})]]);
+ const result=await h.run('制作卡片');
+ assert.equal(result.status,'completed');assert.equal(result.drafts.length,1);
+ assert.equal(h.requests.length,3);
+ assert.ok(h.requests[2].input.some(x=>x.content.includes('no valid draft has been delivered')));
+ assert.ok(h.requests[2].input.some(x=>x.kind==='function_call_output'&&x.callId==='invalid'));
+ assert.deepEqual(fixture.writes,[]);
+});
+
+test('repeated text fallback preserves a paused task instead of claiming delivery or looping indefinitely',async()=>{
+ const h=harness([[call('invalid','create_flashcards',{cards:[]})],
+  [event('text_delta','这里是问答列表。')],[event('text_delta','仍然只返回列表。')]]);
+ const result=await h.run('制作卡片');
+ assert.equal(result.status,'paused');assert.equal(result.drafts.length,0);
+ assert.equal(h.requests.length,3);assert.equal(h.session.isPaused(),true);
+ const state=h.session.exportState();
+ assert.ok(state.input.some(x=>x.content==='仍然只返回列表。'));
+ assert.ok(state.input.some(x=>x.kind==='function_call_output'&&x.callId==='invalid'));
+});
+
+function documentAccessFixture(vision) {
+ const saved=[];const reads=[];
+ const documents=new AgentDocumentAccess({list:()=>[{id:'doc',name:'Chemistry.pdf',extension:'.pdf',byteSize:10,pageCount:2,warningCode:''}],
+  async read(c,id,page,mode){reads.push(mode);return {documentId:id,page,text:'Water is H2O.',method:mode,notes:saved[0]??'',warning:'',
+   image:mode==='image'?{imageUrl:'data:image/jpeg;base64,YWJj'}:undefined};},
+  saveNotes(c,id,page,text){saved.push(text);}});
+ documents.bind('chat',vision);documents.submit(['doc']);return {documents,saved,reads};
+}
+
+// 模拟提供商对真实序列化请求的要求；遗失原始思考时直接拒绝，而非只检查本地对象。
+function requireReasoningReplay(body) {
+ let hasReasoning=false;
+ for(const input of body.input) {
+   // 工具结果结束当前助手段；后续工具调用不能借用前一段的思考。
+   if(input.role==='user'||input.type==='function_call_output')hasReasoning=false;
+   if(input.type==='reasoning')hasReasoning=input.content?.some(part=>part.type==='reasoning_text'&&part.text.length>0)===true;
+   if(input.role==='assistant'||input.type==='function_call')assert.equal(hasReasoning,true,'HTTP 400: reasoning_text must be passed back');
+ }
+}
+
+test('confirmed action continues through a mixed target/details rejection with one assistant tool batch and no repeated write',async()=>{
+ fixture.writes=[];
+ const h=harness([
+   [event('reasoning_delta','prepare deck'),call('confirmed-deck','propose_create_deck',{name:'Confirmed once'})],
+   [event('reasoning_delta','read and configure first'),
+     call('target-mixed','configure_create_target',{deckId:1,notetypeId:2}),
+     call('details-mixed','get_notetype_details',{notetypeIds:[2]})],
+   [event('reasoning_delta','configure alone'),call('target-fixed','configure_create_target',{deckId:1,notetypeId:2})],
+   [event('reasoning_delta','read details next'),call('details-fixed','get_notetype_details',{notetypeIds:[2]})],
+   [event('reasoning_delta','finish task'),event('text_delta','continued')]
+ ],undefined,'assistant',null,requireReasoningReplay);
+ const pending=await h.run('Create deck then inspect templates');
+ assert.equal(pending.status,'awaiting_confirmation');assert.deepEqual(fixture.writes,[]);
+ const confirmed=await h.session.actionExecutor.executeConfirmed(h.session.getAction());
+ const resumed=await h.run('已确认此操作，请根据实际执行结果继续原任务。',confirmed);
+ assert.equal(resumed.status,'completed');assert.equal(h.requests.length,5);
+ assert.equal(fixture.writes.filter(x=>x[0]==='deck').length,1);
+ const mixed=h.requests[2].input.filter(x=>['target-mixed','details-mixed'].includes(x.callId));
+ assert.deepEqual(mixed.map(x=>[x.kind,x.callId]),[
+   ['function_call','target-mixed'],['function_call','details-mixed'],
+   ['function_call_output','target-mixed'],['function_call_output','details-mixed']]);
+ assert.ok(mixed.filter(x=>x.kind==='function_call_output').every(x=>JSON.parse(x.output).tool_error==='clarification_must_be_only_tool'));
+ assert.ok(!h.events.some(x=>x.kind==='tool_started'&&['target-mixed','details-mixed'].includes(x.toolCall.id)));
+ assert.ok(h.events.some(x=>x.kind==='tool_completed'&&x.toolCall.id==='target-fixed'));
+ assert.ok(h.events.some(x=>x.kind==='tool_completed'&&x.toolCall.id==='details-fixed'));
+ const restored=harness([[event('reasoning_delta','new task'),event('text_delta','okay')]],undefined,'assistant',null,requireReasoningReplay);
+ restored.session.restore(JSON.parse(JSON.stringify(h.session.exportState())));await restored.run('continue after restoring');
+ assert.equal(fixture.writes.filter(x=>x[0]==='deck').length,1);
+});
+
+test('mixed target batches in either order retain reasoning and all calls before all error outputs',async()=>{
+ for(const reversed of [false,true]) {
+   fixture.writes=[];
+   const calls=[call('target','configure_create_target',{deckId:1,notetypeId:2}),call('details','get_notetype_details',{notetypeIds:[2]})];
+   if(reversed)calls.reverse();
+   const h=harness([[event('reasoning_delta','complete raw thought'),...calls],
+     [event('reasoning_delta','acknowledge tool diagnostic'),event('text_delta','done')]],undefined,'assistant',null,requireReasoningReplay);
+   await h.run('read templates');
+   const wire=JSON.parse(buildResponsesPayload(h.requests[1])).input;
+   assert.deepEqual(wire.map(x=>x.type??x.role),['user','reasoning','function_call','function_call','function_call_output','function_call_output']);
+   assert.equal(wire[1].content[0].text,'complete raw thought');assert.deepEqual(fixture.writes,[]);
+ }
+});
+
+test('restoring a v1 checkpoint repairs the known rejected interleaved batch without replaying tools',async()=>{
+ fixture.writes=[];
+ const h=harness([[event('reasoning_delta','continue with historical failures'),event('text_delta','okay')]],undefined,'assistant',null,requireReasoningReplay);
+ const saved=h.session.exportState();
+ const errorOutput=JSON.stringify({tool_error:'clarification_must_be_only_tool',correction:'Call this tool alone, then continue after its result.'});
+ const target={...item(''),kind:'function_call',role:'',callId:'target-old',name:'configure_create_target',argumentsJson:'{"deckId":1,"notetypeId":2}'};
+ const details={...item(''),kind:'function_call',role:'',callId:'details-old',name:'get_notetype_details',argumentsJson:'{"notetypeIds":[2]}'};
+ const output=callId=>({...item(''),kind:'function_call_output',role:'',callId,output:errorOutput});
+ saved.input=[item('old request'),{...item('original raw thought'),kind:'reasoning',role:''},target,output(target.callId),details,output(details.callId)];
+ h.session.restore(JSON.parse(JSON.stringify(saved)));await h.run('继续原任务');
+ assert.deepEqual(h.requests[0].input.slice(2,6).map(x=>x.kind),['function_call','function_call','function_call_output','function_call_output']);
+ assert.equal(h.requests[0].input[1].content,'original raw thought');
+ assert.deepEqual(fixture.writes,[]);assert.ok(!h.events.some(x=>x.kind==='tool_started'));
+});
+
+test('real Session save/restore retains reasoning even for a prior reply without tool calls',async()=>{
+ const old=harness([[event('reasoning_delta','first complete thought'),event('text_delta','first answer')]],undefined,'assistant',null,requireReasoningReplay);
+ await old.run('first task');
+ const next=harness([[event('reasoning_delta','second thought'),call('read-types','list_notetypes',{})],
+   [event('reasoning_delta','third thought'),event('text_delta','finished')]],undefined,'assistant',null,requireReasoningReplay);
+ next.session.restore(JSON.parse(JSON.stringify(old.session.exportState())));
+ await next.run('continue');
+ assert.equal(next.requests.length,2);
+ assert.equal(next.requests[0].input.find(x=>x.kind==='reasoning').content,'first complete thought');
+ assert.equal(next.requests[1].input.filter(x=>x.kind==='reasoning').length,2);
+ assert.deepEqual(fixture.writes,[]);
+});
+
+test('real Runner retains opaque reasoning beyond 64KB without relying on text deltas',async()=>{
+ const original={type:'reasoning',id:'long-original',content:[{type:'reasoning_text',text:'thought'.repeat(15000)}],summary:[]};
+ const h=harness([[event('continuation_item',JSON.stringify(original)),call('read-types','list_notetypes',{})],
+   [event('reasoning_delta','finished thought'),event('text_delta','done')]],undefined,'assistant',null,requireReasoningReplay);
+ await h.run('read types');
+ const wire=JSON.parse(buildResponsesPayload(h.requests[1]));
+ assert.deepEqual(wire.input.find(x=>x.type==='reasoning'),original);
+ const restored=harness([[event('reasoning_delta','resumed'),event('text_delta','okay')]],undefined,'assistant',null,requireReasoningReplay);
+ restored.session.restore(JSON.parse(JSON.stringify(h.session.exportState())));await restored.run('continue');
+ assert.deepEqual(fixture.writes,[]);
+});
+
+test('empty canonical reasoning cannot suppress actual deltas; terminal completion replaces it in place',async()=>{
+ const blank={type:'reasoning',id:'r1',content:[],summary:[]};
+ const full={...blank,content:[{type:'reasoning_text',text:'canonical complete thought'}]};
+ for(const completed of [null,full]) {
+   const events=[event('reasoning_delta','actual delta thought'),event('continuation_item',JSON.stringify(blank))];
+   if(completed!==null)events.push(event('continuation_item',JSON.stringify(completed)));
+   events.push(call('read-types','list_notetypes',{}));
+   const h=harness([events,[event('reasoning_delta','finish'),event('text_delta','done')]],undefined,'assistant',null,requireReasoningReplay);
+   await h.run('read');
+   const records=JSON.parse(buildResponsesPayload(h.requests[1])).input.filter(x=>x.type==='reasoning');
+   assert.equal(records.length,1);assert.equal(records[0].id,'r1');
+   assert.equal(records[0].content[0].text,completed===null?'actual delta thought':'canonical complete thought');
+ }
+});
+
+test('malformed continuation fails the provider round before any tool is dispatched',async()=>{
+ const h=harness([[event('continuation_item','{"type":"computer_call"}'),call('read-types','list_notetypes',{})]],undefined,'assistant');
+ await assert.rejects(()=>h.run('read'),/invalid_provider_input/);
+ assert.equal(h.requests.length,1);assert.ok(!h.events.some(x=>x.kind==='tool_started'));
+ assert.deepEqual(fixture.writes,[]);
+});
+
+test('legacy checkpoints and missing checkpoints continue with historical data without replaying broken assistant/tool items',async()=>{
+ const oldInput=[item('old request'),{...item('old answer'),role:'assistant'},
+   {...item(''),kind:'function_call',callId:'old-call',name:'list_notetypes',argumentsJson:'{}'},
+   {...item(''),kind:'function_call_output',callId:'old-call',output:'{"status":"completed"}'}];
+ for(const checkpoint of [true,false]) {
+   const h=harness([[event('reasoning_delta','fresh reasoning'),event('text_delta','continued')]],undefined,'assistant',null,requireReasoningReplay);
+   if(checkpoint) {
+     const old=h.session.exportState();old.input=oldInput;delete old.reasoningReplayVersion;h.session.restore(old);
+     await h.run('new request');
+   } else {
+     const request={apiKey:'test',baseUrl:'https://example.test',model:'test',instructions:'',input:[...oldInput,item('new request')],
+       functionTools:agentFunctionTools(100,'assistant'),searchMode:'off',requiresWebSearch:false,requiresSearchEvidence:false,
+       requiresDraft:false,expectedDraftCount:0,reasoningEffort:'low',maxOutputTokens:1024};
+     await h.session.run('deepseek',request,{onEvent(){}});
+   }
+   assert.ok(h.requests[0].input.every(x=>x.kind==='message'&&x.role==='user'));
+   assert.match(h.requests[0].input[0].content,/old answer/);
+   assert.equal(h.requests[0].input.at(-1).content,'new request');assert.deepEqual(fixture.writes,[]);
+ }
+});
+
+test('a restored legacy pending action keeps confirmation and carries its result as data without reexecuting it',async()=>{
+ fixture.writes=[];
+ const old=harness([[event('reasoning_delta','prepare action'),call('action-call','propose_create_deck',{name:'Legacy'})]],undefined,'assistant');
+ const pending=await old.run('create a deck');const snapshot=old.session.exportState();
+ delete snapshot.reasoningReplayVersion;snapshot.input=snapshot.input.filter(x=>x.kind!=='reasoning'&&x.kind!=='output_item');
+ const h=harness([[event('reasoning_delta','read confirmation result'),event('text_delta','confirmed')]],undefined,'assistant',null,requireReasoningReplay);
+ h.session.restore(snapshot);assert.equal(h.session.getAction().status,'pending');assert.deepEqual(fixture.writes,[]);
+ const result=await h.session.actionExecutor.executeConfirmed(h.session.getAction());
+ await h.run('continue',result);
+ assert.equal(fixture.writes.filter(x=>x[0]==='deck').length,1);
+ assert.ok(h.requests[0].input.some(x=>x.content.includes(result)));
+ assert.equal(h.requests[0].input.filter(x=>x.kind==='function_call').length,0);
+ assert.equal(pending.action.id,snapshot.action.id);
+});
+test('file-to-card agent uses real Registry/Runner/Session OCR and notes before creating source-cited drafts, with no card writes',async()=>{
+ fixture.writes=[];const {documents,saved,reads}=documentAccessFixture(false);
+ const h=harness([
+  [call('docs','list_documents',{}),event('completed')],
+  [call('ocr','ocr_document_page',{documentId:'doc',page:1}),event('completed')],
+  [call('notes','save_document_notes',{documentId:'doc',page:1,notes:'Chemical formula: H2O'}),event('completed')],
+  [call('cards','create_flashcards',{cards:[{fields:['Water formula?','H2O'],sources:[{documentId:'doc',page:1}]}]}),event('completed')]
+ ],undefined,'create',documents);
+ const result=await h.run('Create a card from the imported document');
+ assert.equal(result.status,'completed');assert.equal(result.drafts.length,1);assert.deepEqual(reads,['ocr']);
+ assert.deepEqual(saved,['Chemical formula: H2O']);assert.deepEqual(fixture.writes,[]);
+ assert.match(result.drafts[0].operations.at(-1).after,/Chemistry.pdf/);
+ assert.equal(h.events.filter(e=>e.kind==='tool_completed').length,4);
+});
+test('vision document tool images survive real Runner and Session copies and become Responses image parts; checkpoints keep pointers',async()=>{
+ fixture.writes=[];const {documents}=documentAccessFixture(true);
+ const h=harness([
+  [call('read','read_document_page',{documentId:'doc',page:1,includeImage:true}),event('completed')],
+  [call('cards','create_flashcards',{cards:[{fields:['Formula?','H2O'],sources:[{documentId:'doc',page:1}]}]}),event('completed')]
+ ],undefined,'create',documents);
+ await h.run('Read the page image');
+ const input=h.requests[1].input.find(x=>x.kind==='function_call_output');assert.equal(input.images.length,1);
+ const payload=JSON.parse(buildResponsesPayload(h.requests[1]));
+ assert.equal(payload.input.find(x=>x.type==='function_call_output').output[1].type,'input_image');
+ assert.ok(!JSON.stringify(h.session.exportState()).includes('base64'));assert.deepEqual(fixture.writes,[]);
+});
+test('unread source citation cannot produce a valid draft; agent rereads then corrects it through the same execution chain',async()=>{
+ const {documents,reads}=documentAccessFixture(false);
+ const cards={cards:[{fields:['Q','A'],sources:[{documentId:'doc',page:2}]}]};
+ const h=harness([[call('bad','create_flashcards',cards),event('completed')],
+  [call('read','read_document_page',{documentId:'doc',page:2}),event('completed')],
+  [call('fixed','create_flashcards',cards),event('completed')]],undefined,'create',documents);
+ const result=await h.run('Make a document card');assert.equal(result.drafts.length,1);assert.deepEqual(reads,['text']);
+ assert.match(h.events.find(e=>e.kind==='tool_failed').toolTrace.errorMessage,/\[execution\] document_source_not_read/);
+});
+
+test('switching to a text-only model removes previous page images before the actual provider request',async()=>{
+ const h=harness([[event('text_delta','Use OCR next.')]],undefined,'assistant');
+ const source={kind:'function_call_output',role:'',content:'',callId:'page',name:'',argumentsJson:'',output:'{"documentId":"doc","page":1}',
+  images:[{imageUrl:'data:image/jpeg;base64,YWJj'}]};
+ const request={apiKey:'test',baseUrl:'https://example.test',model:'text-only',supportsImages:false,instructions:'',input:[source],
+  functionTools:agentFunctionTools(100,'assistant'),searchMode:'off',requiresWebSearch:false,requiresSearchEvidence:false,
+  requiresDraft:false,expectedDraftCount:0,reasoningEffort:'',maxOutputTokens:1024};
+ await h.runner.run('custom',request,{onEvent:e=>h.events.push(e)});
+ assert.equal(h.requests[0].input[0].images,undefined);
+ assert.match(h.requests[0].input[0].output,/ocr_document_page/);
+ assert.equal(source.images.length,1);
 });

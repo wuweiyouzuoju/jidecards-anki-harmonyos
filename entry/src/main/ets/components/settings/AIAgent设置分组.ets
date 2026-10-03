@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { PressFeedback } from '../../utils/PressFeedback';
+import { settingsItemText } from '../../utils/SettingsStructureText';
+import { PrimaryActionButton } from '../common/PrimaryActionButton';
+import { FormInputStyle } from '../../utils/FormInputStyle';
 import { SelectStyle } from '../../utils/SelectStyle';
 
 import type { ProviderId } from '../../model/agent/AgentTypes';
@@ -16,6 +18,8 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 设置面板色板_取 } from '../../utils/设置面板配色';
 import { 颜色键 } from '../../model/颜色主题';
 import { 设置分组卡片 } from './设置分组卡片';
+import { AgentWebSettingsSection } from './AgentWebSettingsSection';
+import { SettingsToggleRow } from '../common/SettingsToggleRow';
 
 interface SelectItem { value: string; }
 
@@ -28,6 +32,7 @@ export struct AIAgent设置分组 {
   @State private openaiModel: string = OPENAI_PROVIDER.defaultModel;
   @State private customBaseUrl: string = '';
   @State private customModel: string = '';
+  @State private customVisionEnabled: boolean = false;
   @State private batchLimit: number = 100;
   @State private secret: string = '';
   @State private saving: boolean = false;
@@ -50,6 +55,7 @@ export struct AIAgent设置分组 {
     this.openaiModel = settings.openaiModel;
     this.customBaseUrl = settings.customBaseUrl;
     this.customModel = settings.customModel;
+    this.customVisionEnabled = settings.customVisionEnabled === true;
     this.batchLimit = settings.batchLimit;
     this.secret = await loadAgentSecret(this.provider);
   }
@@ -90,6 +96,7 @@ export struct AIAgent设置分组 {
       settings.openaiModel = this.openaiModel;
       settings.customBaseUrl = this.customBaseUrl;
       settings.customModel = this.customModel;
+      settings.customVisionEnabled = this.customVisionEnabled;
       settings.batchLimit = this.batchLimit;
       await saveAgentSettings(settings);
       await saveAgentSecret(this.provider, this.secret);
@@ -102,12 +109,12 @@ export struct AIAgent设置分组 {
 
   build() {
     设置分组卡片({
-      标题: $r('app.string.ai_agent_settings_title'),
+      groupId: 'ai',
       是否深色: this.是否深色
     }) {
       Column({ space: 应用尺寸.间距_10 }) {
           Row() {
-            Text($r('app.string.ai_agent_provider')).layoutWeight(1)
+            Text(settingsItemText(this.getUIContext(), 'ai_provider')).layoutWeight(1)
             Select([{ value: 'DeepSeek' },
               { value: this.getString($r('app.string.ai_agent_provider_custom')) }])
               .selected(this.providerIndex())
@@ -118,7 +125,7 @@ export struct AIAgent设置分组 {
               .padding(SelectStyle.controlPadding)
               .space(SelectStyle.controlSpace)
               .width(SelectStyle.fieldWidth)
-              .constraintSize(SelectStyle.fieldConstraint)
+              .constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
               .font(SelectStyle.controlFont)
               .optionFont(SelectStyle.optionFont)
               .selectedOptionFont(SelectStyle.selectedOptionFont)
@@ -128,7 +135,7 @@ export struct AIAgent设置分组 {
           }.width('100%')
           if (this.provider !== 'custom') {
             Row() {
-              Text($r('app.string.ai_card_model')).layoutWeight(1)
+              Text(settingsItemText(this.getUIContext(), 'ai_model')).layoutWeight(1)
               Select(this.modelOptions()).selected(this.modelIndex())
                 .value(this.deepseekModel)
                 .attributeModifier(new SelectStyle())
@@ -136,7 +143,7 @@ export struct AIAgent设置分组 {
                 .padding(SelectStyle.controlPadding)
                 .space(SelectStyle.controlSpace)
                 .width(SelectStyle.fieldWidth)
-                .constraintSize(SelectStyle.fieldConstraint)
+                .constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
                 .font(SelectStyle.controlFont)
                 .optionFont(SelectStyle.optionFont)
                 .selectedOptionFont(SelectStyle.selectedOptionFont)
@@ -147,37 +154,23 @@ export struct AIAgent设置分组 {
                 })
             }.width('100%')
           } else {
-            TextInput({ placeholder: $r('app.string.ai_agent_custom_url_hint'), text: this.customBaseUrl })
-              .width('100%').height(应用尺寸.按钮高度)
-              .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary'))
-              .placeholderColor($r('app.color.text_tertiary'))
-              .backgroundColor($r('app.color.surface_card'))
-              .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
-              .borderRadius(应用尺寸.圆角_面板)
-              .padding({ left: 应用尺寸.间距_10, right: 应用尺寸.间距_10 })
+            TextInput({ placeholder: settingsItemText(this.getUIContext(), 'ai_custom_url'), text: this.customBaseUrl })
+              .attributeModifier(new FormInputStyle())
               .onChange((value: string): void => { this.customBaseUrl = value; })
-            TextInput({ placeholder: $r('app.string.ai_card_model_hint'), text: this.customModel })
-              .width('100%').height(应用尺寸.按钮高度)
-              .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary'))
-              .placeholderColor($r('app.color.text_tertiary'))
-              .backgroundColor($r('app.color.surface_card'))
-              .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
-              .borderRadius(应用尺寸.圆角_面板)
-              .padding({ left: 应用尺寸.间距_10, right: 应用尺寸.间距_10 })
+            TextInput({ placeholder: settingsItemText(this.getUIContext(), 'ai_custom_model'), text: this.customModel })
+              .attributeModifier(new FormInputStyle())
               .onChange((value: string): void => { this.customModel = value; })
+            SettingsToggleRow({ title: settingsItemText(this.getUIContext(), 'ai_vision'),
+              hint: $r('app.string.ai_agent_custom_vision_hint'), isOn: this.customVisionEnabled,
+              isInteractive: !this.saving, isDark: this.是否深色, tint: this.解析主色按钮背景(),
+              onChange: (value: boolean): void => { this.customVisionEnabled = value; } })
           }
-          TextInput({ placeholder: $r('app.string.ai_card_api_key'), text: this.secret })
+          TextInput({ placeholder: settingsItemText(this.getUIContext(), 'ai_key'), text: this.secret })
             .type(InputType.Password)
-            .width('100%').height(应用尺寸.按钮高度)
-            .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary'))
-            .placeholderColor($r('app.color.text_tertiary'))
-            .backgroundColor($r('app.color.surface_card'))
-            .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
-            .borderRadius(应用尺寸.圆角_面板)
-            .padding({ left: 应用尺寸.间距_10, right: 应用尺寸.间距_10 })
+            .attributeModifier(new FormInputStyle())
             .onChange((value: string): void => { this.secret = value; })
           Row() {
-            Text($r('app.string.ai_agent_batch_limit')).layoutWeight(1)
+            Text(settingsItemText(this.getUIContext(), 'ai_batch_limit')).layoutWeight(1)
             Select([{ value: '100' }, { value: '250' }, { value: '500' }, { value: '1000' }])
               .selected(this.batchLimit === 100 ? 0 : (this.batchLimit === 250 ? 1 : (this.batchLimit === 500 ? 2 : 3)))
               .value(this.batchLimit.toString())
@@ -186,7 +179,7 @@ export struct AIAgent设置分组 {
               .padding(SelectStyle.controlPadding)
               .space(SelectStyle.controlSpace)
               .width(SelectStyle.fieldWidth)
-              .constraintSize(SelectStyle.fieldConstraint)
+              .constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
               .font(SelectStyle.controlFont)
               .optionFont(SelectStyle.optionFont)
               .selectedOptionFont(SelectStyle.selectedOptionFont)
@@ -194,20 +187,11 @@ export struct AIAgent设置分组 {
               .borderRadius(SelectStyle.controlRadius)
               .onSelect((index: number): void => { this.batchLimit = [100, 250, 500, 1000][index]; })
           }.width('100%')
-          // 按钮规格与 同步分组 AnkiWeb 登录按钮统一（44 高 / 15 号字 / 白字 / 圆角 22 / 忙态 0.6 透明度）。
-          Button(this.saving ? $r('app.string.ai_card_generating') : $r('app.string.ai_card_save_config'))
-            .width('100%')
-            .height(44)
-            .fontSize(15)
-            .fontColor('#FFFFFF')
-            .backgroundColor(this.解析主色按钮背景())
-            .borderRadius(22)
-            .enabled(!this.saving)
-            .opacity(this.saving ? 0.6 : 1)
-            .attributeModifier(new PressFeedback(this.saving ? 0.6 : 1))
-            .stateEffect(false)
-            .onClick((): void => { this.save(); })
+          PrimaryActionButton({ label: this.saving ? $r('app.string.ai_card_generating') : settingsItemText(this.getUIContext(), 'ai_save'),
+            tint: this.解析主色按钮背景(), isInteractive: !this.saving,
+            onAction: (): void => { this.save(); } })
           if (this.message !== '') { Text(this.message).fontSize(12).fontColor($r('app.color.text_secondary')) }
+          AgentWebSettingsSection({ isDark: this.是否深色, tint: this.解析主色按钮背景() })
       }
       .padding({ bottom: 应用尺寸.间距_12 }).width('100%')
     }
