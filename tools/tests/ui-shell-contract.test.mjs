@@ -172,7 +172,7 @@ test('study answer input shares the action pill silhouette without a second inse
 });
 
 function read(relativePath) {
-  return readFileSync(projectUrl(relativePath), 'utf8');
+  return readFileSync(projectUrl(relativePath), 'utf8').replaceAll('\r\n', '\n');
 }
 
 function readJson(relativePath) {
