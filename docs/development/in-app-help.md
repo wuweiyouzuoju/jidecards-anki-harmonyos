@@ -36,6 +36,7 @@
 - `NoteFieldEditor` 的加粗/斜体/下划线/荧光支持可视输入：无选区时切换后续输入格式，选区操作仅作用于选区，不改变持续输入状态。公式和挖空仍为一次插入标记，学习卡面负责公式渲染。可视模式 Enter 与“换行”都保存为 HTML 换行；源码模式的普通回车只是源码换行。
 - 标准可选双向类型展示为“问答题（可选双向）”，第三字段使用“同时生成反向卡”开关；已有笔记说明关闭不会删除已生成卡片，可通过当前“查找空卡”入口处理。标准模板以 `NoteTypePresentation.ts` 检查；被自定义的模板保留原字段输入，不用开关覆盖有意义的字段内容。
 - `note_editor_hint_*` 是按名称读取的资源族，不因没有静态引用而删除。回归入口 `tools/tests/note-rich-editor.test.mjs`，Core 生成/保留行为见 `native/rsharmony/tests/note_editing.rs`。
+- 挖空按钮说明 `note_editor_hint_cloze_next` / `note_editor_hint_cloze_same` 与类型帮助 `add_note_notetype_cloze_help` 同步解释编号、卡片数量和隐藏内容：新挖空新增编号，同组挖空沿用当前最大编号，没有挖空时均从 c1 开始。正文用“北京是中国的首都”的 c1/c2 示例说明两张卡各隐藏一处和同一张卡同时隐藏两处；编号规则以 `model/NoteFieldEditing.ts` 的 `nextClozeNumber` 为准。
 
 ## 术语与过时内容维护
 
@@ -64,7 +65,7 @@
 | `deck_initialEase_help`、`deck_graduatingIntervalEasy_help`、`deck_intervalMultiplier_help`、`deck_maximumReviewInterval_help` | 首次毕业间隔不先乘初始 ease；简单毕业间隔的大小关系是建议；间隔倍率不代表全库所有间隔；到期不等于必定展示。Core `scheduler/states/` 与 `model/DeckConfigSave.ts`。 |
 | `deck_reviewOrder_help`、`deck_newCardGatherPriority_help` | 可回忆率递减为高概率先；按牌组收集使用名称顺序，不随首页拖动。Core `storage/card/`、`storage/deck/active_deck_ids_sorted.sql`。 |
 | `deck_fsrsParams4_help`、`deck_fsrsParams5_help`、`deck_fsrsParams6_help` | 非空 v6 → v5 → v4 回退；全部空才默认。Core `deckconfig/mod.rs`。 |
-| `deck_fsrsEnabled_help`、`deck_paramSearch_help`、`deck_fsrsHealthCheck_help` | 本应用可保存偏好，没有优化／评估入口。参数搜索决定优化训练范围；健康检查是拟合检查，不是保存时修库。`model/DeckConfigSave.ts`；Core `deckconfig/update.rs`、`scheduler/fsrs/params.rs`。 |
+| `deck_fsrsEnabled_help`、`deck_paramSearch_help`、`deck_fsrsHealthCheck_help`、`settings_algorithm_deck_options` | 启用后在牌组选项优化当前/全部预设、模拟学习负担，计算结果先保留为草稿，保存后生效。参数搜索决定优化训练范围；健康检查在优化时按开关执行，保留无法评估状态，不是保存时修库。责任与真实 Core 验证见 [FSRS 领域说明](browser-stats.md#fsrs-参数优化与学习负担模拟)。 |
 | `deck_historicalRetention_help`、`deck_ignoreRevlogsBeforeDate_help` | 历史保持率为缺失历史的计算假设；日期截止也参与记忆状态初始化／重算，不删除历史，不保证单独改日期立即重算。Core `scheduler/fsrs/`、`scheduler/answering/mod.rs`、`deckconfig/update.rs`。 |
 | `deck_desiredRetention_help`、`glossary_fsrs_retention_help` | 目标不是实测通过率，不承诺固定官方范围或实际正确率。 |
 | `deck_easyDaysPercentages_help` | 周一到周日；1=正常、0=最低、其余=减少，不解释为连续精确百分比。Core `scheduler/states/load_balancer.rs`。 |

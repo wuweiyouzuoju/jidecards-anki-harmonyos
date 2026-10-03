@@ -10,6 +10,7 @@
 
 - 资源与校验：`entry/src/main/resources/rawfile/mathjax/`、`tools/vendor-mathjax.mjs`。
 - 排版与资源响应：`entry/src/main/ets/model/MathRendering.ts`、`entry/src/main/ets/utils/CardAssetResponse.ets`。
+- JIDE 对话复用内置排版资源，以转义后的文字为输入；实现和独立验证见 [对话中的数学与化学公式](development/agent.md#对话中的数学与化学公式)。
 - 上游 LaTeX 转换：`entry/src/main/ets/backend/卡片渲染服务.ts`；共享 HTML 组装见 `model/学习卡片HTML构建器.ts`。
 
 ## 已实施方案

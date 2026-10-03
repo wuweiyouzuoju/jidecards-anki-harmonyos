@@ -50,6 +50,10 @@ ArkUI 页面/组件
 
 不要在文档中维护文件数量；目录在快速迭代中会变化，实际清单应使用 `rg --files`。
 
+`native/agent-sandbox/` 独立拥有 QuickJS-NG / wasmi 纯计算引擎及异步 Node-API。
+它不依赖 Anki 集合写入链路，`backend/agent/AgentCodeTool.ets` 通过受限输入/输出、
+资源预算与取消协议接入现有 Registry。引擎产物、来源和验收见[沙箱模块](../native/agent-sandbox/README.md)。
+
 ## 3. 页面与导航
 
 `首页.ets` 持有 `NavPathStack`，按名称创建学习、浏览、统计、设置、添加笔记、
@@ -120,8 +124,10 @@ AI 页面
 模型不能访问裸 RPC、数据库、文件系统或 shell。工具目录是模型可见契约的唯一
 来源，稳定 ID 的读权限不自动转化为写权限，真正写入前必须重新核对 baseline。
 辅助动作的确认账本由会话持有，执行器与读取/提案工具分开；记忆和分析授权不走 Anki Service。
-2.7.9 默认关闭所有 Agent UI 入口，开发者调试可统一解锁；页面仍固定 `searchMode: 'off'`。详细现状见
-[agent-2-design.md](agent-2-design.md)。
+当前发布配置默认关闭所有 Agent UI 入口，开发者调试可统一解锁。Provider 内置搜索
+固定 `searchMode: 'off'`，应用端联网工具由独立默认关闭的开关和所选服务凭据控制。
+本地资料只能通过授权会话和资料 ID 读取。稳定概览见[Agent 设计](agent-2-design.md)，
+工具能力、平台限制和当前验收入口见[Agent 领域说明](development/agent.md)。
 
 ## 6. 状态、主题与本地化
 
@@ -149,7 +155,8 @@ AI 页面
 - 根目录 `README.md`：用户与贡献者入口、当前版本和公开功能。
 - `DEVELOPMENT_PLAN.md`：当前基线、发布限制、验证门和后续工作。
 - 本文：稳定架构、数据流和模块职责。
-- `agent-2-design.md`：当前源码中的应用内 Agent 行为与安全边界。
+- `agent-2-design.md`：应用内 Agent 的稳定设计概览。
+- `development/agent.md`：JIDE 当前能力、实现入口、限制和验收记录。
 - `development/coding-agent.md`：负责修改仓库的编程 Agent-first 规则。
 - `superpowers/`：历史设计与执行记录，仅用于追溯。
 - `PROJECT_CONTEXT.md`：本地 AI 协作索引；不得复制长篇历史流水账。

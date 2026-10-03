@@ -19,7 +19,7 @@
 
 | 项目 | 当前值 | 事实来源 |
 | --- | --- | --- |
-| 应用版本 | 2.9.6 / versionCode 2960 | `AppScope/app.json5` |
+| 应用版本 | 2.9.9 / versionCode 2990 | `AppScope/app.json5` |
 | 最低兼容 SDK | HarmonyOS 6.0.1（API 21） | `build-profile.json5` 的 `compatibleSdkVersion` |
 | 目标 SDK | HarmonyOS 6.1.0（API 23） | `build-profile.json5` 的 `targetSdkVersion` |
 | 编译 SDK | DevEco Studio 当前配套 6.1.0.105（API 23） | 本机 SDK 与 `UPSTREAM.lock` |
@@ -43,6 +43,11 @@ phone、tablet 和 2in1，但声明设备类型不等于已完成所有形态的
 - AnkiWeb 集合/媒体同步及自定义同步端点。
 - 官方公告拉取；牌组直链下载的开屏与菜单入口暂时隐藏。
 - 应用内 Agent 的会话、工具、草稿、确认和写入实现仍在源码中。
+- JIDE 的统一对话、逐页资料/OCR、学习概览、受控设置、联网和本地纯计算沙箱。
+- 笔记音频与草稿预览、类型管理、字段查重、文本导出、CSV 映射及整库中断恢复。
+- FSRS 优化与负担模拟、Core 全局复习偏好、牌组预览，以及隔离 Core 互通回归。
+
+本轮源码整理见 [2.9.9 变更说明](releases/2.9.9.md)，可重复验证及已验收范围按领域文档查询。
 
 以上只表示代码路径存在并受契约测试覆盖，不等于与桌面 Anki 的全部功能、全部
 历史 schema 或所有设备行为完全等价。对外介绍应使用“复用 Anki 26.05 Rust
@@ -60,8 +65,8 @@ Core”或“兼容常用 Anki 数据与学习流程”，不要使用未经差�
 
 - 当前发布包的 AI 制卡、AI 改卡及设置入口默认关闭，可通过设置页的开发者调试功能统一解锁；
   实现没有删除，运行时开关由 `entry/src/main/ets/model/ReleaseFeatures.ets` 管理。
-- Agent 页面当前固定使用 `searchMode: 'off'`。Provider 搜索协议仍在，但产品
-  界面没有启用联网搜索。
+- Agent 页面保持 Provider `searchMode: 'off'`；应用端 `web_search` / `read_webpage`
+  由独立默认关闭的联网开关控制，配置豆包（默认）或 Brave 密钥后可启用。详见[应用内 Agent](development/agent.md)。
 - `docs/releases/3.0.0.md` 是未发布历史草案，不代表仓库或商店当前版本。
 - `third_party/anki/` 是被忽略的本地依赖目录，不是仓库 submodule。构建者需要
   按 README 准备锁定提交。
@@ -104,6 +109,6 @@ Core”或“兼容常用 Anki 数据与学习流程”，不要使用未经差�
   `build-profile.json5` 读取；上游版本只从 `UPSTREAM.lock` 和
   `rust-toolchain.toml` 读取。
 - 当前架构以 [architecture.md](architecture.md) 为准。
-- 应用内 Agent 当前行为以 [agent-2-design.md](agent-2-design.md) 和发布开关源码为准；编程 Agent 规则以根 `AGENTS.md` 和 [coding-agent.md](development/coding-agent.md) 为准。
+- 应用内 Agent 当前行为以 [Agent 领域说明](development/agent.md) 和发布开关源码为准；[agent-2-design.md](agent-2-design.md) 保留稳定设计概览。编程 Agent 规则以根 `AGENTS.md` 和 [coding-agent.md](development/coding-agent.md) 为准。
 - `docs/superpowers/` 下的文件全部是历史设计/执行记录，不是当前路线图。
 - 完成一次实现后，不在历史计划里伪造勾选状态；应更新本文、架构文档或发布记录。

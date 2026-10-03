@@ -10,6 +10,8 @@
 
 已有安装的应用必须保持原证书与身份；迁移配置位置不需要换证书，也不需要卸载。当前机器的迁移保留了原字段值。`.local/` 被 Git 忽略，并被源码导出工具明确排除。
 
+平板覆盖安装须选择与已安装包对应的开发测试配置。本机 `.local/tablet-signing.json` 已选择现有 `ceshi` 配置，可通过 `JIDECARDS_SIGNING_CONFIG` 临时指定后构建；不修改公共默认发布配置。正式 profile 的包可能被开发设备拒绝，返回 `9568322`（应用来源不受信任），不能把签名构建成功当作安装成功，也不要通过卸载处理。最终以 `install -r` 的成功消息核对结果。
+
 根 `hvigorfile.ts` 使用 SDK 提供的 `afterNodeEvaluate` / `OhosAppContext.setBuildProfileOpt` 注入签名，在子模块读取产品信息前完成。不要改成 `nodesEvaluated`：此时模块可能已固定无签名的产品快照。IDE 和命令行共享此入口。
 
 没有本机文件且未显式指定环境路径时，直接调用 Hvigor 可以生成 unsigned HAP 供编译检查；`build-app.ps1` 与完整 verify 要求签名配置，缺少即失败。显式环境路径不存在、配置无效或产品不匹配时直接报错，不静默退回无签名构建。错误只打印字段名，不打印材料值。

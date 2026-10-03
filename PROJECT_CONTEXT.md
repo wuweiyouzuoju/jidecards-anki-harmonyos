@@ -5,7 +5,7 @@
 ## 项目与事实来源
 
 HarmonyOS 本地闪卡客户端：ArkUI → 领域 Service → protobuf → C++ Node-API → Rust FFI → 锁定 Anki Core。
-编程 Agent-first 是本项目最高开发优先级：所有产品功能、架构调整、修复、重构、测试和文档工作都必须先降低编程 Agent 的理解、修改、验证和持续开发成本。导入学习、同步、应用内 Agent 和其他产品目标只能在不削弱编程 Agent-first 的前提下排序；这不改变应用内 Agent 的权限边界。
+Agent-first 原则与开发约束见 [AGENTS.md](AGENTS.md)，本页只提供任务入口和事实来源。
 
 | 事实 | 唯一配置来源 |
 | --- | --- |
@@ -45,9 +45,12 @@ HarmonyOS 本地闪卡客户端：ArkUI → 领域 Service → protobuf → C++ 
 | 首页任务、启动弹窗、外部 APKG | [首页](docs/development/home.md) | `HomeWorkCoordinator`、`HomeStartupSequence`、`HomeSyncPolicy`、`HomeDataRepository`；`npm test -- home` |
 | 学习、评分、音频、卡片预览 | [学习与媒体](docs/development/study-media.md) | `StudySessionController`、`StudyInputPolicy`、`StudyAnswerRenderer`、`CardAudioSession`；`npm test -- study` 或 `npm test -- media` |
 | 同步、导入导出、集合生命周期 | [同步](docs/development/sync-data.md) | `AutoSyncScheduler`、`SyncSettings`、`同步面板`；`npm test -- sync` |
+| APKG/CSV 导入、整库中断恢复 | [数据导入](docs/development/import-data.md) | `DataTransferSession`、`AnkiDataTransfer`、`TransferRecovery`；`npm test -- sync` |
+| Anki / AnkiDroid 核心互通回归 | [核心互通](docs/development/core-interop.md) | `npm run test:interop`；隔离包往返、行为断言与未验证范围 |
 | 搜索、批量编辑、统计、设置 | [浏览与统计](docs/development/browser-stats.md) | `BrowserSearchSession`、`BrowserOperationController`、`BrowserSidebar`、`StatsOverview`；`npm test -- browser` 或 `npm test -- ui` |
 | 主题、布局、权益 | [界面](docs/development/appearance.md) | `ThemeCatalog`、`ThemeBackground`、`SelectStyle`；`npm test -- ui` |
 | 应用内 Agent | [应用内 Agent](docs/development/agent.md) | `pages/AI制卡页.ets`、`components/agent/`、`backend/agent/`、`model/agent/`、`ReleaseFeatures.ets`；`npm test -- agent` |
+| 应用内 Agent 本地代码沙箱 | [本地沙箱方案与接手入口](docs/decisions/2026-09-30-agent-local-sandbox.md) | [模块入口](native/agent-sandbox/README.md)：execute_code、异步 NAPI、真实引擎测试、双架构 probe 与测试包 |
 | 工具链、测试、源码导出 | [验证](docs/development/verification.md) | `tools/README.md`；`npm test -- tooling` |
 | 新增能力 | [扩展点](docs/development/extension-points.md) | 按表查调用链；功能盘点先读 [FEATURE_STATUS](docs/FEATURE_STATUS.md) |
 

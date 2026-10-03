@@ -11,6 +11,12 @@
 | 领域/完整 Node 回归 | `npm test -- <领域>` / `npm test` | 清单 `npm test -- --list` |
 | 仓库门禁 | `npm run verify -- repo` | Node、文档、架构和资源契约；CI 使用此模式 |
 | 原生门禁 | `npm run verify -- native` | 仓库门禁、Rust 主机测试和环境检查，不构建 HAP |
+| Anki / AnkiDroid 核心互通 | `npm run test:interop` | 锁定 Core 主机、生产 Rust ABI 与恢复行为，创建独立样本与报告；[前提与未验证范围](../docs/development/core-interop.md)，不操作设备或账号 |
+| 本地代码沙箱 | `powershell -NoProfile -ExecutionPolicy Bypass -File tools/build-agent-sandbox.ps1 -Target all` | 真实引擎测试与双架构 probe；正式构建自动使用 app 目标，[前提与范围](../native/agent-sandbox/README.md) |
+| 沙箱桥接验收 | `powershell -File tools/build-app.ps1 -Test`；`node tools/test-agent-sandbox-app.mjs <connect-key>` | 当前 signed 主包安装后运行测试模块，不访问卡库 |
+| 沙箱第三方许可 | `node tools/generate-agent-sandbox-notices.mjs --check` | 离线校验随包许可；升级后显式 --write 生成并审查 |
+| 沙箱设备验收 | `node tools/test-agent-sandbox-device.mjs <connect-key> 20` | 自动识别架构、构建并执行独立测试与多样本 probe，保存 JSON；不安装应用、不访问卡库 |
+| Agent 在线评测 | `node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs tools/test-agent-live.mjs --run` | 显式发送合成任务，需 `DEEPSEEK_API_KEY`，产生 API 费用；不读写用户卡库，环境变量与验收范围见[应用内 Agent](../docs/development/agent.md#执行环境与错误恢复) |
 | RPC 映射门禁 | `node tools/verify-rpc-index.mjs` | 锁定协议输入指纹与逐项语义映射；生成/升级步骤见 [验证说明](../docs/development/verification.md#rpc-协议门禁) |
 | 最终本地验证 | `npm run verify` | 环境、仓库、Rust 主机测试和签名 HAP；分阶段失败即停 |
 | 工具链诊断 | `doctor.mjs` | 检查本机 DevEco、Node、Rust |
@@ -20,12 +26,17 @@
 | HAP 检查 | `inspect-hap.ps1` | 检查已有产物 |
 | 源码副本 | `npm run export:source -- <新目录>` | 保留源码与测试，只在副本脱敏签名字段，不覆盖已有目录 |
 | 卡片浏览器回归 | `test-card-template-browser.mjs`、`test-card-flip-browser.mjs`、`test-math-rendering-browser.mjs`、`test-card-colors-browser.mjs` | 需要对应浏览器环境；翻面测试使用生产会话与真实导航，命令见 [学习与媒体](../docs/development/study-media.md#卡片模板脚本与样式) |
+| 图片遮罩浏览器回归 | `node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs tools/test-image-occlusion-browser.mjs` | 真实 Edge/Canvas 检查形状、两种模式、答案轮廓及文字；`PLAYWRIGHT_MODULE` 可指定模块入口，截图在 `.local/io-preview-browser.png`，不操作卡库或设备 |
 | 颜色专项分析 | `verify-contrast.mjs`、`verify-contrast-official.mjs`、`verify-hardcoded-colors.mjs` | 专项输出，不是完整验收 |
 | 第三方资源/纹理维护 | `vendor-mathjax.mjs`、`generate-iridescent-textures.mjs` | 显式资源更新任务才运行，检查许可和字节保真 |
 | 兑换内容发行 | `redemption-issuer.mjs`、`redemption-ui.mjs` 及启动器 | 业务发行入口，不属于测试；私钥由外部工具环境提供 |
 | 历史实验 | `experimental/` | 不进源码导出或自动验证；以当前模型/协议为准 |
 
 `tests/` 是测试，`patches/` 是构建所需上游补丁；不要因“工具目录清理”删除这两个目录。
+
+JIDE 对话公式浏览器回归：`node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs tools/test-agent-math-browser.mjs`。需要 Playwright/本机 Edge，可用 `PLAYWRIGHT_MODULE` 指定模块入口。执行生产 Markdown 公式标记、排版队列和固定离线引擎，报告与截图在 `tmp/agent-math/`；阻断所有额外请求，不调用模型。覆盖数学、mhchem、流式接续、代码排除、长公式横向位置和深浅/宽窄布局；不替代 ArkWeb 的真机高度与手势验收，边界见 [对话公式](../docs/development/agent.md#对话中的数学与化学公式)。
+
+JIDE PDF/OCR 原生回归：构建并 `install -r` 当前主 HAP 后，`npm run build:app -- -SkipRust -Test`，再运行 `node tools/test-agent-documents-device.mjs <connect-key>`。设置 `DEVECO_HOME` 指向 DevEco Studio 安装目录。只处理合成资料，无模型调用或卡库写入；边界见 [文件资料与按页制卡](../docs/development/agent.md#文件资料与按页制卡)。
 
 学习手势浏览器回归：`node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs tools/test-study-gestures-browser.mjs`。需要 Playwright 和本机 Edge，可用 `PLAYWRIGHT_MODULE` 指定模块入口。测试生产脚本的真实触摸双击、左右滑动、控件点击、原生纵向滚动与旧卡面事件取消；不替代 ArkWeb 与原生教学层的设备验收。
 

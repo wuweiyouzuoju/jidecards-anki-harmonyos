@@ -27,6 +27,13 @@ function markdownFiles(directory) {
   });
 }
 
+test('JIDE document ownership and native validation have current navigation entries', () => {
+  assert.match(read('docs/development/ownership.md'), /AgentDocumentStore[\s\S]*AgentDocuments/);
+  assert.match(read('docs/development/agent.md'), /文件资料与按页制卡[\s\S]*test-agent-documents-device\.mjs/);
+  assert.match(read('tools/README.md'), /test-agent-documents-device\.mjs/);
+  assert.match(read('docs/decisions/README.md'), /2026-10-01-agent-document-reading\.md/);
+});
+
 test('current documentation follows application and SDK configuration', () => {
   const app = read('AppScope/app.json5');
   const buildProfile = read('build-profile.json5');
@@ -98,6 +105,9 @@ test('current capability documentation follows release gates and runtime constan
 test('active Markdown uses valid relative links', () => {
   const activeFiles = [
     'README.md',
+    'CONTRIBUTING.md',
+    'CHANGELOG.md',
+    '.github/pull_request_template.md',
     'AGENTS.md',
     'PROJECT_CONTEXT.md',
     'tools/README.md',
@@ -154,14 +164,22 @@ test('coding Agent-first rules are explicit and historical plans cannot issue co
   const developmentPlan = read('docs/DEVELOPMENT_PLAN.md');
   const decision = read('docs/decisions/2026-09-agent-first.md');
   assert.match(agents, /最高优先级：编程 Agent-first/);
-  assert.match(agents, /只有根目录 `AGENTS\.md`、`\.agents\/` 和当前领域文档可以约束编程 Agent/);
-  assert.match(context, /编程 Agent-first 是本项目最高开发优先级/);
+  assert.match(agents, /当前约束只来自根 `AGENTS\.md`、`\.agents\/` 和当前领域文档/);
+  assert.match(context, /Agent-first 原则与开发约束见 \[AGENTS\.md\]\(AGENTS\.md\)/);
   assert.match(context, /编程 Agent 协作与跨域决策/);
   assert.match(context, /pages\/AI制卡页\.ets/);
+  const sandboxDecision = '2026-09-30-agent-local-sandbox.md';
+  assert.ok(context.includes(`docs/decisions/${sandboxDecision}`));
+  assert.ok(appAgent.includes(`../decisions/${sandboxDecision}`));
+  assert.ok(decisions.includes(`](${sandboxDecision})`));
+  const sandboxReadme = 'native/agent-sandbox/README.md';
+  assert.ok(context.includes(sandboxReadme));
+  assert.ok(appAgent.includes(sandboxReadme));
+  assert.ok(read(`docs/decisions/${sandboxDecision}`).includes(sandboxReadme));
   assert.match(codingAgent, /本页只约束负责修改 jidecards 仓库的编程 Agent/);
-  assert.match(codingAgent, /编程 Agent-first 是本项目最高开发优先级/);
+  assert.match(codingAgent, /Agent-first 优先级与开发流程统一见根 \[AGENTS\.md\]\(\.\.\/\.\.\/AGENTS\.md\)/);
   assert.match(codingAgent, /开发任务契约/);
-  assert.match(codingAgent, /\.agents\/rules\/paths/);
+  assert.match(agents, /\.agents\/rules\/paths/);
   assert.match(appAgent, /本页只描述产品运行时的应用内 Agent，不描述负责修改仓库的编程 Agent/);
   assert.match(decisions, /随源码一起版本控制/);
   assert.match(developmentPlan, /最高开发优先级是编程 Agent-first/);
@@ -194,7 +212,7 @@ test('coding Agent navigation has scoped rules, ownership, and a task contract',
   const pathRules = ['README.md', 'entry.md', 'native.md', 'tools.md', 'docs.md'];
 
   assert.match(agents, /\.agents\/rules\/paths/);
-  assert.match(agents, /所有开发和维护都必须方便后续编程 Agent/);
+  assert.match(agents, /开发优先方便后续编程 Agent 理解、定位、修改、验证和接手项目/);
   assert.match(context, /模块责任与变更入口/);
   assert.match(context, /开发任务契约/);
   assert.match(ownership, /## `entry`/);

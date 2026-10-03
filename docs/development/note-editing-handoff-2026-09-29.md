@@ -57,7 +57,7 @@ node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs 
 
 ## 不在当前完成范围内
 
-已有 IO 笔记图形化编辑、ellipse/polygon/text 完整遮罩渲染兼容、未保存草稿预览、重复笔记策略与 AnkiDroid 完全对齐尚未完成。原 IO 渲染器只绘制 rect 的问题没有在本轮修复。不要将上述基础实现宣传为全面兼容 AnkiDroid。
+本节记录 2026-09-29 的范围：当时已有 IO 图形化编辑、ellipse/polygon/text 完整遮罩渲染、草稿预览及重复策略均未完成。后续状态以本文件后续记录和 [当前领域文档](browser-stats.md) 为准；2026-10-02 重复处理与字段查重见其专节。不要将上述基础实现宣传为全面兼容 AnkiDroid。
 
 
 ## 同日续接验证（2026-09-29）
@@ -145,13 +145,13 @@ npm run verify
 
 用户批准将编辑改成与新增对应的独立页面。EditNotePage 经 HomeDestinations 注册；首页预览直接进入，不再绕到浏览页。浏览/学习只传 ID，编辑页通过 NoteEditorSession 读取，复用 BrowserOperationController 的集合保护执行 AnkiNoteUpdate（导图+更新、撤销保留）。保存成功仅页面 pop，表单不再触发取消，防止二次返回。失败保留草稿和图片文件名；离页仍完成已接受写入和广播。
 
-NoteEditorHeader、NoteFieldCard 统一新增和编辑的标题、字段卡片、图片入口与附件；旧“浏览编辑区”路径现为全屏表单。工具栏源码按钮接入同一 builder，横纵间距固定 8vp，状态不改变尺寸。提示改为次要灰色“输入〈字段名〉”；完整挖空显示主题灰底，保留原标记和组号，荧光优先。NoteClozeDecoration 只计算 UTF-16 装饰范围；未闭合不着色，中文预上屏不干预，不存入 HTML。
+NoteEditorHeader、NoteFieldCard 统一新增和编辑的标题、字段卡片、图片入口与附件；旧“浏览编辑区”路径现为全屏表单。工具栏源码按钮接入同一 builder，横纵间距固定 8vp，状态不改变尺寸。提示改为次要灰色“输入〈字段名〉”。2026-10-02 按用户反馈取消挖空的自动灰底，移除装饰范围计算与输入后样式补写；挖空原标记和组号按普通文本显示，显式荧光仍保留。当前行为见 [编辑格式](appearance.md#编辑格式的交互规范)。
 
-验证入口：editor-page.test.mjs（保存/同步占用/离页/重试/读失败/装饰）、note-rich-editor（灰底序列化和预上屏）、study-note-editor（导航/取消计时/快捷键）、study-content-refresh（返回卡面）、page-operation-boundaries（返回保留查询/分页、取消不刷新、禁止滚动分页抢占刷新）。editor-page 已纳入 browser/study 领域筛选。用户继续自行操作设备，本轮不安装、不点击。版本维持 2.9.6/2960。
+验证入口：editor-page.test.mjs（保存/同步占用/离页/重试/读失败及嵌套挖空文本）、note-rich-editor（无自动背景、显式荧光和挖空标记保真）、study-note-editor（导航/取消计时/快捷键）、study-content-refresh（返回卡面）、page-operation-boundaries（返回保留查询/分页、取消不刷新、禁止滚动分页抢占刷新）。editor-page 已纳入 browser/study 领域筛选。用户继续自行操作设备，设备验收独立记录。
 
 完整 `npm run verify` 通过，继续采用上述 CARGO_INCREMENTAL=0、CARGO_BUILD_JOBS=2：1609 项 Node、16 项 Rust 主机测试、fmt/clippy、RPC 索引、双架构原生库及 clean 签名 HAP 全部通过，accepted=268、unexpected=0（`.local/editor-page-verify.log`）。补充两项浏览返回行为回归后，全部仓库测试为 1611 项通过（`.local/editor-page-final-repo.log`）；其后仅完善测试筛选与交接记录，最终仓库重验见 `.local/editor-page-delivery-repo.log`。`git diff --check` 通过。HAP 内 module.json 核实为 com.jide.kapian、2.9.6、2960，产物仍为 `entry/build/default/outputs/default/entry-default-signed.hap`。
 
-真机待用户验收：三个入口均进入完整编辑页；标题居中，源码与同排/换排按钮左边距一致；点亮按钮保持间距；长按拖动选区应用格式；中文输入及撤销不受灰底影响；深浅色、窄宽屏和键盘遮挡；保存仅返回一层、取消确认、失败后重试、浏览滚动位置和学习计时。主机回归未模拟 ArkUI 真实布局，不作为上述视觉验收完成的依据。
+真机待用户验收：三个入口均进入完整编辑页；标题居中，源码与同排/换排按钮左边距一致；点亮按钮保持间距；长按拖动选区应用格式；中文输入及撤销正常；深浅色、窄宽屏和键盘遮挡；保存仅返回一层、取消确认、失败后重试、浏览滚动位置和学习计时。主机回归未模拟 ArkUI 真实布局，不作为上述视觉验收完成的依据。
 
 ### 随后用户反馈：模式切换了，按钮文案没有切换
 

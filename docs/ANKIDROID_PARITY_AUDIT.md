@@ -2,6 +2,8 @@
 
 核查日期：2026-09-23
 
+本文保留当日对照快照和测试数量。2026-10-02 已补齐从标准/既有类型创建与克隆、模板增删和样例预览，以及笔记/卡片文本导出；CSV/TSV/TXT 导入此前已接入。当前实现和设备验收边界以 [功能状态](FEATURE_STATUS.md)、[笔记类型管理](development/browser-stats.md#笔记类型管理与模板预览2026-10-02)及[数据迁移](development/import-data.md)为准，不沿用下文快照中的缺口判断。
+
 参考源码：`D:\Projects\AnkiDroid`（AnkiDroid `main` 源码快照）
 
 被核查项目：jidecards 当前工作树

@@ -4,7 +4,10 @@
 
 - 代码路径以下均相对 `entry/src/main/ets/`。
 - 责任链：首页映射 UI → HomeWorkCoordinator / HomeStartupSequence / HomeSyncPolicy 决策 → HomeDataRepository / 既有 Service。
+- 首页新建牌组菜单不再提供 AI 制卡/改卡。“更多”通过 `onAgent` → `openAgent` 打开唯一“AI”空白对话入口，配置预检和开发者开关保持在既有责任入口；按需目标选择、改卡搜索与确认见[应用内 Agent](agent.md#统一-ai-对话入口)。
+- 平板等直接展示的牌组详情顶部先显示制卡、JIDE、预览的同一行等宽44vp操作，三项共用15fp字号、居中单行文字及对称4vp内部留白，相邻点击区间距沿用常规12vp/紧凑8vp且无额外margin；下方牌组名称独占整行并自然换行；手机详情将三个入口收进右上角“更多”，复用首页更多的无箭头 `AnchoredMenu` 和 `AnchoredMenuItem`，菜单宽度、分隔线、表面、动效和外部关闭层均由公共组件提供，靠右定位于工具栏下方；选择动作前、外部点击、系统返回、退出详情、换牌组或切换布局时关闭菜单。点击预览后显示 `DeckPreviewScopeMenu` 的四种范围，菜单尺寸与牌组长按 Popup 一致；手机保留父菜单中的“预览”行，范围子弹窗锚定该行向左展开；父菜单保留挂载，只有预览范围使用带箭头的 `bindPopup`，选择范围或退出时统一关闭两层菜单。宽屏锚定预览按钮。系统返回先关闭菜单，再退出详情。取卡读取独立集合快照，范围与数据边界见 [只读预览](study-media.md#卡片只读预览)。入口名称为 JIDE，仍进入标题为“JIDE 制卡”的页面。`HomeDeckDetails.onCreateWithAI` 转发到首页既有 `打开AI制卡`，使用当前牌组参数并保留同步等待、配置预检和开发者入口开关；验证见 `ui-shell-deck-actions.test.mjs`、`deck-preview-session.test.mjs`，长标签与长名称的设备观感单独验收。
 - 快速反馈：`npm test -- home`；完整验收见 [验证说明](verification.md)。
+- 外部 APKG 先确认选项再导入；CSV 映射、结果、取消和中断恢复见[数据导入](import-data.md)。
 
 ## 牌组展开记忆与手机详情
 
@@ -31,9 +34,11 @@
 
 ## 首页入门与删除媒体
 
+2.9.9 通过 `HomeStartupSequence.gift` 在公告、云端引导（如启用）和入门确认之后展示幻彩赠送提醒；同一首页展示槽位阻止与同步、导入或其他弹窗叠加，后台/离页会延迟结果，销毁后失效。`utils/IridescentGiftStore.ets` 先等待权益验签恢复，已获得幻彩或已确认提醒的用户跳过；独立修订键 `iridescent_gift_notice_299_completed` 只在确认/返回时保存，失败提示并恢复缓存，下次启动重试。`IridescentGiftPanel` 与主题锁定入口共用复制动作。回归：`home-work-coordinator`、`theme-iridescent-gift`。
+
 宽版牌组溢出建议由 `主页牌组列表.onOverflowChange` 报告实际视口是否容得下可见行，经 `HomeWorkCoordinator.presentLayoutSuggestion` 在空闲首页展示；排在现有启动提示之后。确认直接复用宽窄偏好保存入口，处理记录持久化避免反复打扰，见[界面文档](appearance.md)。列表只负责几何事实，不持有弹窗或写设置。
 
-`HomeIntroPanel` 复用首页启动弹层序列，在公告处理后展示（直链渠道暂停时跳过云端牌组流程）；`HomeIntroStore` 用独立内容修订键，只有确认才写入，旧欢迎版本不抑制新介绍。首页“更多 → 速览”可重看。新用户说明明确默认配置即可开始，不要求先探索复杂设置。内容覆盖闪卡用途、牌组获取渠道（QQ群、Anki 共享牌组、AI 或人工制卡）、外部 Agent 制卡/改卡、APKG 导入复习以及 3.0.0 前老用户进群领取幻彩兑换码；沿用现有签名兑换，不自动赠送或调整应用版本。
+`HomeIntroPanel` 复用首页启动弹层序列，在公告处理后展示（直链渠道暂停时跳过云端牌组流程）；`HomeIntroStore` 用独立内容修订键，只有确认才写入，旧欢迎版本不抑制新介绍。首页“更多 → 速览”可重看。新用户说明明确默认配置即可开始，不要求先探索复杂设置。内容覆盖闪卡用途、牌组获取渠道（QQ群、Anki 共享牌组、AI 或人工制卡）、外部 Agent 制卡/改卡、APKG 导入复习以及 3.0.0 前老用户进群领取幻彩兑换码；沿用现有签名兑换，不自动授予权益。
 
 删除牌组期间显示忙碌遮罩，自动同步与其他首页操作等待。`DeckMediaCleanup` 比较删除前后 Core 媒体检查的 unused 差集，仅提示此次新增未引用文件；用户单独确认后再次检查，仍 unused 的确认文件才移入媒体回收站，绝不清空全局回收站。媒体同步活动或检查失败时保留媒体，牌组删除成功不回滚、不误报为删除失败。共享引用、原有闲置媒体和筛选牌组归还的卡片受检查保护。行为测试在 `deck-media-cleanup` 与 `home-deletion-runtime`。
 
@@ -48,8 +53,9 @@
 
 ## 数据与牌组修改入口
 
-- 首页右上角“新建牌组”菜单统一承载独立创建入口：普通牌组与筛选牌组。“创建筛选牌组”仅实验版显示（简洁模式为 false），按搜索条件取卡，不隐式绑定当前牌组；长按菜单中的学习入口保留接收当前牌组 ID 的“自定义学习”。创建入口由 `components/主页操作面板.ets` 回调至首页，不再经牌组列表逐层转发；回归见 `create-deck-contract.test.mjs`。
+- 首页右上角“新建牌组”菜单的顺序由 `AppInterface.ts` 统一定义：普通牌组、导入、可用下载渠道、创建筛选牌组，UI 与 JIDE 共用。“创建筛选牌组”始终位于可见菜单末尾且仅实验版显示（简洁模式为 false），按搜索条件取卡，不隐式绑定当前牌组；长按菜单中的学习入口保留接收当前牌组 ID 的“自定义学习”。`EntryAbility.onCreate` 在发布 Ability 上下文后、创建首屏前调用 `简洁模式存储.initializeSimpleMode`，同步恢复已保存模式到 AppStorage，实验版冷启动不再依赖先打开设置。新用户默认简洁版，读取失败保留已知模式；启动只读取偏好。创建入口由 `components/主页操作面板.ets` 回调至首页，不再经牌组列表逐层转发；回归见 `home-simple-mode.test.mjs` 与 `create-deck-contract.test.mjs`。
 - `components/home/自定义学习对话框.ets` 保留单页：六种方式列表下只显示当前方式的说明与输入，状态/标签方式额外显示四种卡片范围和包含/排除标签。整个表单按内容占高、顶部对齐，仅空间不足时收缩滚动，不用纵向 `layoutWeight(1)` 撑满弹窗。
+- `components/home/创建过滤牌组面板.ets` 的排序标签与选择框在同一行：标签占剩余宽度，选择框靠右，宽度与长名称省略复用 `SelectStyle.fieldWidth/fieldConstraint`，两者间距为 12vp；排序值、选项及忙碌禁用仍由原表单持有。
 - 文案与设置含义对照本地 AnkiDroid `dialogs/customstudy/CustomStudyDialog.kt`、`values-zh-rCN/03-dialogs.xml` 及锁定 Core 的 `custom-study.ftl`：额度默认值用 Core 的 `extendNew/extendReview`，子牌组可用数分列显示；预览是过去 N 天添加的新卡，不重新排程。天数与抽取张数由 `backend/CustomStudyPreferences.ets` 记在本机，读取失败可重试，保存偏好失败不能诱导重复创建。
 - `model/CustomStudyOptions.ts` 负责整数校验与默认值；`SchedulerMessages.ts` 的 Cram oneof 7 保留原始标签数组与 Core 枚举，筛选/排序/排程仍由 Core 决定。包含任一标签、排除任一标签、无标签限制均沿用 Core 语义。回归入口 `custom-study-options.test.mjs`、`custom-study-dialog.test.mjs`；设备验收覆盖正常/大字号、键盘、六种方式切换、负增量与状态/标签选择。
 - `backend/HomeDataRepository.ets` 组装牌组树、用户覆盖、隐藏集合、图表及桌面卡片快照；统计范围和暂停分离口径来自持久化偏好。图表失败降级，桌面卡片保存失败不阻塞牌组列表。
@@ -71,3 +77,8 @@
 公告的并发检查、最近检查时间、延迟任务和取消代次统一归 `HomeAnnouncementController`；首页只传是否允许展示、网络读取、展示效果。暂停后的迟到 timer 不得清除新 timer，销毁后不再调度。直接回归：`home-announcement-scheduling.test.mjs`。
 
 牌组直链渠道通过 `model/ReleaseFeatures.ets` 的 `CLOUD_DECK_CHANNEL_ENABLED` 暂时关闭：开屏跳过云端引导，首页菜单隐藏获取直链牌组，打开方法也检查同一开关。保留下载实现、历史配额与用户内容；恢复时统一调整该开关。
+
+下拉刷新圈由 `主页牌组列表.refreshDecks()` 持有，等待首页 `onRefresh` 返回的 Promise 后在 finally 收起，不依赖父级布尔 Prop 的 Watch。同步占用时立即跳过、加载失败、上下文缺失均须完成收尾；首页的刷新占用另由回调 finally 释放。回归见 `home-pull-refresh.test.mjs`，设备仍需验收连续下拉与同步期间下拉。
+
+
+筛选牌组的排序方式和自定义学习的卡片范围使用 FormSelectRow；牌组背景选择/替换放到标题右侧，保留预览删除按钮及撤销移除入口。说明、限宽和省略策略归公共选择/辅助行，牌组、自定义学习与定制会话仍持有选值及保存状态。

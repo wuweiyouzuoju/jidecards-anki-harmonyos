@@ -1,9 +1,19 @@
 # jidecards 文档导航
 
+## 用户与贡献者入口
+
+- [项目 README](../README.md)：下载、功能、兼容范围、数据与构建入口。
+- [贡献指南](../CONTRIBUTING.md)：报告问题、开发环境、验证与提交要求。
+- [更新记录](../CHANGELOG.md)与[2.9.9 源码变更说明](releases/2.9.9.md)：源码变化及发布边界。
+- [使用指南](https://jidecards.com/guides/harmonyos-anki/)：导入牌组、同步与复习入门。
+
 ## 当前文档
 
 - [Agent 任务入口](../PROJECT_CONTEXT.md)：按任务读取模块约束与验证入口。
 - [本地验证与源码导出](development/verification.md)：领域测试、完整构建和设备验收。
+- [数据导入、导出与恢复](development/import-data.md)：APKG 选项、CSV 映射、笔记/卡片文本导出、取消、结果与中断恢复。
+- [Anki / AnkiDroid 核心互通回归](development/core-interop.md)：隔离样本、真实 Core 往返、取消与恢复、设备和在线未验证范围。
+- [本轮 Anki 补齐成果审查](development/anki-parity-review-2026-10-02.md)：2026-10-02 对七项成果、版本约束、实现问题和验收边界的检查记录。
 
 - [项目 README](../README.md)：产品、当前源码版本、构建入口。
 - [2.7.9 更新说明](releases/2.7.9.md)：相对 2.7.0 的功能、修复和验证边界。
@@ -11,7 +21,8 @@
 - [离线公式渲染](math-chemistry-rendering.md)：当前实现入口、验证方法与有日期的历史验收。
 - [当前架构](architecture.md)：模块边界、主要数据流和稳定不变量。
 - [易混淆功能状态](FEATURE_STATUS.md)：备份/恢复等能力的接入层次、源码入口与功能盘点边界。
-- [应用内 Agent 设计](agent-2-design.md)：源码中保留的应用内 Agent 能力、安全边界与当前发布状态。
+- [JIDE 应用内 Agent](development/agent.md)：当前工具、资料/联网/沙箱、运行时边界和验收入口。
+- [应用内 Agent 设计](agent-2-design.md)：稳定的会话、提案与确认设计概览。
 - [编程 Agent](development/coding-agent.md)：负责修改本仓库的 Agent-first 规则与开发闭环。
 - [模块责任与边界](development/ownership.md)：按目录定位代码所有者、修改边界和验证入口。
 - [开发任务契约](development/task-contract.md)：让每次开发都可验证、可交接、可被后续 Agent 继续。

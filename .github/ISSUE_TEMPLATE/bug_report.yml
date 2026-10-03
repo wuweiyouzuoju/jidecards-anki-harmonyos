@@ -1,0 +1,46 @@
+name: 问题报告
+description: 提供可复现的信息，帮助定位应用或构建问题。
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: 请移除日志、截图和示例中的个人资料、账号、API 密钥与签名信息。
+  - type: input
+    id: app_version
+    attributes:
+      label: 应用版本与来源
+      description: 例如应用市场版本，或源码提交及构建方式。
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: 设备与系统
+      description: 设备型号、HarmonyOS 版本/API；构建问题填写主机、Node 和 DevEco 版本。
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 从进入哪个页面开始，依次说明操作；标明是否每次发生。
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期结果
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际结果
+      description: 附完整错误文字；截图或脱敏日志可粘贴在这里。
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: 最小示例与补充信息
+      description: 牌组、模板、媒体或资料问题可附不含个人数据的最小文件。

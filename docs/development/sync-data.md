@@ -2,6 +2,8 @@
 
 [返回任务索引](../../PROJECT_CONTEXT.md)
 
+不依赖账号的 Anki / AnkiDroid 核心回归见[核心互通](core-interop.md)：`npm run test:interop` 生成隔离 APKG/COLPKG 与结果报告。它不证明线上同步通过；增量、全量和媒体同步需要用户另行提供隔离测试账号，未提供前保持未验证。
+
 - 代码路径以下均相对 `entry/src/main/ets/`。
 - 责任链：AutoSyncScheduler 保存意图；SyncActivity 拥有集合占用；SyncSession 执行同步，根同步面板展示快照。
 - 快速反馈：`npm test -- sync`；完整验收见 [验证说明](verification.md)。
@@ -86,13 +88,13 @@ Agent：页面 -> SessionController -> Runner -> Provider/工具/Scope -> Change
 
 `backend/DataTransferFiles.ts` 独占文件描述符、目录遍历、复制和删除，使用 fileIo Promise API；包协议与替换回滚仍在 `数据迁移服务.ts`。暂存 API 现在返回 Promise，调用者必须 await。流复制固定 64 KiB，处理短读、短写、零写入及所有描述符释放路径。安全副本任何阶段失败都清理半成品、重开原集合；导入失败恢复完整副本后重开；成功后的副本清理失败不触发回滚。回归：`data-transfer-files.test.mjs`。
 
-保留全量媒体安全副本的磁盘成本；异步化解决执行线程阻塞，不减少恢复所需空间。不能为省空间直接删除旧媒体或跳过回滚；崩溃恢复持久化事务属于另一个协议变更，当前不承诺进程被杀后的自动恢复。
+保留全量媒体安全副本的磁盘成本；异步化不减少恢复所需空间。整库替换现在由 `TransferRecovery.ts` 持久保存准备/提交标记，普通集合打开前恢复被中断的替换或回滚，失败阻止打开不一致数据。空间预检、标记时序、取消及验证入口见[数据导入与恢复](import-data.md)；不增加断电或硬件损坏下的保证。
 
 同步任务的平台适配集中在 `backend/AnkiSyncSession.ets`：同步服务、凭证、FSRS 通知、短时后台任务、计时器和日志经明确端口传入纯会话。`components/同步面板.ets` 只持有 `SyncSessionSnapshot`，显隐不终止任务，销毁禁止回写 UI；已接受的集合和媒体 IO 落定后才释放租约。
 
 
-### 官方同步入口的临时显示开关（2026-09-30）
+### 官方同步入口显示开关（2026-09-30）
 
-`model/ReleaseFeatures.ets` 的 `OFFICIAL_ANKIWEB_SYNC_UI_ENABLED = false` 是代码常量，不提供用户设置或调试解锁路径。它隐藏官方账号表单、注册链接、默认官方服务器提示，并通过 `loadVisibleSyncAuth` 让首页手动/自动同步不启动隐藏的官方账号。自定义服务器入口保留。
-恢复该常量为 `true` 并发布新版，即恢复官方入口及原有账号可用性。`SyncSettings.isSyncEndpointVisible` 统一识别空地址与官方域名，显式输入官方地址也不会显示登录表单；原始 `加载同步凭证`、默认端点协议、服务器保存与同步执行代码保持不变，不清除账号及自动同步偏好。
-`tools/tests/sync-settings.test.mjs` 覆盖关闭/恢复开关、显式官方域名、原有默认地址登录与凭证保留。共享牌组网站、文档与开源署名不属于此开关范围。
+`model/ReleaseFeatures.ets` 的 `OFFICIAL_ANKIWEB_SYNC_UI_ENABLED = true` 已恢复官方账号表单、注册链接、默认官方服务器提示，以及首页手动/自动同步对原有官方账号的访问。自定义服务器入口继续可用；自动同步仍遵守用户已有开关，不因恢复界面自动开启。
+该代码常量不提供用户设置或调试解锁路径。若以后设为 `false`，`SyncSettings.isSyncEndpointVisible` 与 `loadVisibleSyncAuth` 会统一隐藏空地址及显式官方域名对应的界面和账号访问；原始凭证、默认端点协议、服务器保存与同步执行代码不变，不清除账号或偏好。
+`tools/tests/sync-settings.test.mjs` 覆盖当前恢复状态、关闭/恢复开关、显式官方域名、原有默认地址登录与凭证保留。云牌组、AI、赞赏入口及共享牌组网站、文档、开源署名均不属于此开关范围。

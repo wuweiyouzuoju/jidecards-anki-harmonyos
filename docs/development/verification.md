@@ -12,6 +12,7 @@ Node 24.x 与 `package.json` / CI 一致。首次进入或 lockfile 变化后运
 | `npm test -- --list` | 当前可选领域及测试文件数 | 测试执行 |
 | `npm test -- home`（或 study/sync/browser/media/agent/ui/tooling/repo） | 领域内快速反馈 | 完整回归、编译、真机 |
 | `npm test` | 全部 Node 行为与静态约束测试 | ArkTS 类型检查、Kit/ArkUI 实际行为 |
+| `npm run test:interop` | 锁定 Core 的隔离 APKG/COLPKG、ID/历史/未知配置、取消及进程恢复；生成样本和报告，见[核心互通](core-interop.md) | Android/HarmonyOS 设备、Anki 桌面 GUI、真实在线同步 |
 | `npm run verify -- repo` | 可移植仓库门禁，CI 使用同一入口 | Rust、HAP、设备 |
 | `npm run doctor` | 本机工具链与版本诊断 | 实际构建、签名可用性 |
 | `npm run verify -- native` | 环境、全部 Node、Rust fmt/clippy 门禁和真实 Core 主机测试 | HAP 与设备 |
@@ -47,6 +48,8 @@ Node 24.x 与 `package.json` / CI 一致。首次进入或 lockfile 变化后运
 `build-app.ps1` 保存本次 Hvigor 原始输出到 `.hvigor/last-build.log`，签名检查后调用 `tools/verify-build-warnings.mjs`。诊断按相对文件路径、完整消息和次数核对 `tools/build-warning-baseline.json`；未知格式、新增文件/消息或次数增加均返回非零，报告写入 `.hvigor/build-warning-report.json`。不读取追加的历史日志，也不修改依赖缓存或关闭编译检查。
 
 构建入口先清空上次日志并将报告置为 `not-run`；检查器写入 `passed` 或 `failed`，签名/原生/编译提前失败不会沿用旧的成功报告。
+
+`build-app.ps1` 在任何产物或日志改动前取得按仓库目录区分的 Windows 命名互斥锁，覆盖原生构建、clean、签名及警告核验。共享工作树中的其他脚本构建等待最多 10 分钟，超时失败；异常和进程退出释放锁，不删除他人的产物。它不冻结源码，也不能约束直接绕过该入口启动的 IDE/Hvigor 构建；并行改码仍需在最终联合验收前稳定工作树。
 
 - `npm run build:app` 是增量反馈，只验证本次出现的警告，不证明全项目无新增警告。
 - `npm run build:app -- -Clean` 清理 HAP 构建缓存后验证；`npm run verify` 强制使用此模式，并保留双架构 Rust 构建及签名检查。
