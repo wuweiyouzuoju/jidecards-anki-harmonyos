@@ -36,6 +36,31 @@
 import { 协议读取器 } from '../core/ProtoReader';
 import { 协议写入器 } from '../core/ProtoWriter';
 
+export interface ScheduleCardsAsNewOptions { restorePosition: boolean; resetCounts: boolean; }
+export function encodeScheduleCardsAsNew(ids: number[], options: ScheduleCardsAsNewOptions): Uint8Array {
+  const writer = new 协议写入器();
+  for (const id of ids) {
+    if (!Number.isSafeInteger(id) || id <= 0) throw new Error('Invalid card ID');
+    writer.写入64位整数(1, id);
+  }
+  writer.写入布尔(2, true); // Keep history and record the manual reset.
+  writer.写入布尔(3, options.restorePosition);
+  writer.写入布尔(4, options.resetCounts);
+  writer.写入变长整数(5, 0); // optional BROWSER must be present, even when zero.
+  return writer.转为字节();
+}
+export function decodeScheduleCardsAsNewDefaults(bytes: Uint8Array): ScheduleCardsAsNewOptions {
+  const reader = new 协议读取器(bytes);
+  const options: ScheduleCardsAsNewOptions = { restorePosition: false, resetCounts: false };
+  let tag;
+  while ((tag = reader.读取标签()) !== null) {
+    if (tag.字段号 === 1) options.restorePosition = reader.读取布尔();
+    else if (tag.字段号 === 2) options.resetCounts = reader.读取布尔();
+    else reader.跳过字段(tag.线类型);
+  }
+  return options;
+}
+
 /** SchedulingState 的不透明原始字节，作答时原样回传 */
 export type RawSchedulingState = Uint8Array;
 

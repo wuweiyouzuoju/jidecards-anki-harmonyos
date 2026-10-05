@@ -8,7 +8,7 @@
 // 定义图片遮盖（Image Occlusion）建卡与编辑的纯数据、历史及字符串逻辑：
 //   1. 遮罩描述 接口：矩形、椭圆、多边形、文字的归一化坐标与编号
 //   2. 生成Occlusions字符串：把遮罩列表渲染为 Anki 兼容的 cloze 字符串
-//   3. 编号颜色：c1-c5 对应的固定展示色（红橙黄绿蓝），供编辑器组件高亮使用
+//   3. 编号颜色：c1-c7 对应红橙黄绿青蓝紫，供编辑器组件高亮使用
 //
 // 与 Anki rslib image_occlusion/imageocclusion.rs 的 parse_image_cloze
 // 严格对齐：每个遮罩渲染为
@@ -63,6 +63,23 @@ export function nextOcclusionOrdinal(masks: 遮罩描述[]): number {
     for (const text of mask.ordinalText.split(',')) largest = Math.max(largest, Number(text));
   }
   return largest + 1;
+}
+
+/** 展示固定候选、已存在的组及当前待绘制组；候选本身不生成卡片。 */
+export function occlusionOrdinals(masks: 遮罩描述[], current: number, minimum: number = 0): number[] {
+  const ordinals: Set<number> = new Set<number>();
+  for (let ordinal: number = 1; ordinal <= minimum; ordinal++) ordinals.add(ordinal);
+  if (current > 0) ordinals.add(current);
+  for (const mask of masks) {
+    if (mask.形状 === 'text') continue;
+    if (mask.编号 > 0) ordinals.add(mask.编号);
+    if (mask.ordinalText === undefined || Number(mask.ordinalText.split(',')[0]) !== mask.编号) continue;
+    for (const text of mask.ordinalText.split(',')) {
+      const ordinal: number = Number(text);
+      if (Number.isInteger(ordinal) && ordinal > 0) ordinals.add(ordinal);
+    }
+  }
+  return Array.from(ordinals).sort((a: number, b: number): number => a - b);
 }
 
 export function maskProperty(mask: 遮罩描述, name: string, fallback: string = ''): string {
@@ -136,6 +153,32 @@ export function maskPoints(mask: 遮罩描述): OcclusionPoint[] {
     points.push(point);
   }
   return points;
+}
+
+export function polygonImagePoints(mask: 遮罩描述): OcclusionPoint[] {
+  const points: OcclusionPoint[] = maskPoints(mask);
+  if (points.length === 0) return [];
+  const minX: number = Math.min(...points.map((p: OcclusionPoint): number => p.x));
+  const minY: number = Math.min(...points.map((p: OcclusionPoint): number => p.y));
+  return points.map((p: OcclusionPoint): OcclusionPoint => ({ x: mask.左 + p.x - minX, y: mask.顶 + p.y - minY }));
+}
+
+/** 顶点移动以原图坐标重定边界，保留其他顶点和未知属性。 */
+export function setPolygonImagePoints(mask: 遮罩描述, points: OcclusionPoint[]): void {
+  mask.左 = Math.min(...points.map((p: OcclusionPoint): number => p.x));
+  mask.顶 = Math.min(...points.map((p: OcclusionPoint): number => p.y));
+  mask.宽 = Math.max(...points.map((p: OcclusionPoint): number => p.x)) - mask.左;
+  mask.高 = Math.max(...points.map((p: OcclusionPoint): number => p.y)) - mask.顶;
+  setMaskProperty(mask, 'points', points.map((p: OcclusionPoint): string => String(p.x) + ',' + String(p.y)).join(' '));
+}
+
+export function occlusionPolygonArea(points: OcclusionPoint[]): number {
+  let area: number = 0;
+  for (let i: number = 0; i < points.length; i++) {
+    const a: OcclusionPoint = points[i], b: OcclusionPoint = points[(i + 1) % points.length];
+    area += a.x * b.y - b.x * a.y;
+  }
+  return Math.abs(area) / 2;
 }
 
 /** Preserve the original token byte-for-byte when its geometry/group is untouched. */
@@ -304,12 +347,10 @@ export function 识别图片扩展名(字节: Uint8Array): string {
 // @名称 编号颜色
 //
 // @作用
-// c1-c5 对应的固定展示色（红/橙/黄/绿/蓝），供编辑器组件高亮当前选中的
-// ordinal 与对应矩形。颜色取自 Material Design 色板，深浅色背景均可读。
-// 越界编号返回中性灰色，不报错。
+// 正编号循环使用七色，导入的更大编号继续保留展示色。
 //
 // @输入
-// cloze 编号（1-5 为合法范围；其他值返回默认色）
+// cloze 编号，0 和非法编号使用标注灰色。
 //
 // @输出
 // hex 颜色字符串
@@ -318,7 +359,8 @@ export function 识别图片扩展名(字节: Uint8Array): string {
 // 无。
 // ========================================================
 export function 编号颜色(编号: number): string {
-  switch (编号) {
+  if (!Number.isInteger(编号) || 编号 <= 0) return '#9E9E9E';
+  switch ((编号 - 1) % 7 + 1) {
     case 1:
       return '#E53935'; // c1 红
     case 2:
@@ -328,8 +370,10 @@ export function 编号颜色(编号: number): string {
     case 4:
       return '#43A047'; // c4 绿
     case 5:
-      return '#1E88E5'; // c5 蓝
+      return '#00ACC1'; // c5 青
+    case 6:
+      return '#1E88E5'; // c6 蓝
     default:
-      return '#9E9E9E'; // 越界灰
+      return '#8E24AA'; // c7 紫
   }
 }

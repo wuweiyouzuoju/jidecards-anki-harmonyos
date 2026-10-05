@@ -3,6 +3,8 @@ import { NoteEditorSession, initialNoteEditorState } from '../../entry/src/main/
 import { initialTransferState } from '../../entry/src/main/ets/model/home/DataTransferSession.ts';
 import { compileWithUiFeedback } from './ui-feedback-harness.mjs';
 import { loadBrowserRows } from '../../entry/src/main/ets/model/BrowserSearchSession.ts';
+import { setCardFlags } from '../../entry/src/main/ets/model/CardMarking.ts';
+import { toggleBrowserCardState } from '../../entry/src/main/ets/model/BrowserCardState.ts';
 import { loadNoteEditor } from '../../entry/src/main/ets/model/NoteEditorLoader.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { resolveBrowserCardIds, resolveBrowserNoteIds, snapshotNotetypeChange } from '../../entry/src/main/ets/model/BrowserSelection.ts';
@@ -20,6 +22,9 @@ import { CloudDeckImportController } from '../../entry/src/main/ets/model/CloudD
 import { ExternalDeckOpenQueue } from '../../entry/src/main/ets/model/ExternalDeckOpen.ts';
 import { HomeSyncController } from '../../entry/src/main/ets/model/HomeSyncController.ts';
 import { SyncActivity } from '../../entry/src/main/ets/model/SyncSettings.ts';
+import { AppInterfaceTracker } from '../../entry/src/main/ets/model/AppInterface.ts';
+import { OFFICIAL_ANNOUNCEMENTS_ENABLED } from '../../entry/src/main/ets/model/官方公告配置.ts';
+import { isDoubleColumnDeckListStyle } from '../../entry/src/main/ets/model/DeckListAppearance.ts';
 
 const deferred = () => { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; }); return { promise, resolve, reject }; };
 const settle = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
@@ -71,16 +76,17 @@ test('browser editor cancellation preserves preview, while a saved note refreshe
   assert.deepEqual(refreshes, [true]); assert.equal(page.预览刷新版本, 1);
 });
 
-function homeHarness() {
+function homeHarness(announcementsEnabled = true) {
   const response = deferred(), timers = new Map(); let next = 0;
-  const events = [];
-  const Page = pageMethods('首页', ['homeActivity', 'canPresentStartupPrompt', 'publishHomeInterface', 'homeActivityChanged', 'startupHost',
+  const events = [], interfaceTracker = new AppInterfaceTracker();
+  const Page = pageMethods('首页', ['homeActivity', 'canPresentStartupPrompt', 'homeActionControls', 'publishHomeInterface', 'homeActivityChanged', 'startupHost',
     '尝试显示官方公告', '尝试展示待展示官方公告', '请求主页官方公告检查', '暂停主页官方公告检查',
     '继续首次弹窗序列', '显示欢迎弹窗一次', 'closeHomeIntro', 'onBackPress', 'autoSyncCollectionFinished', 'presentPendingSyncWarning'], {
     canPresentHomePrompt, bundleManager: { BundleFlag: {}, getBundleInfoForSelf: async () => ({ versionName: 'test' }) },
     后端会话: { 获取实例: () => ({ 是否就绪: () => true }) }, 当前语言模式: () => 'zh',
     是否已确认官方公告: async () => false, 是否已完成云端牌组引导: async () => false,
-    CLOUD_DECK_CHANNEL_ENABLED: false, appInterface: { observe() {} },
+    CLOUD_DECK_CHANNEL_ENABLED: false, OFFICIAL_ANNOUNCEMENTS_ENABLED: announcementsEnabled,
+    appInterface: interfaceTracker, isDoubleColumnDeckListStyle,
     isHomeIntroCompleted: async () => false, completeHomeIntro: async () => events.push('welcome-persist'),
     isIridescentGiftNoticeCompleted: async () => true,
     官方公告检查延迟毫秒: () => 600000,
@@ -92,11 +98,11 @@ function homeHarness() {
   page.transfer = initialTransferState();
   page.牌组数据源 = { snapshotDecks: () => [] };
   Object.assign(page, { announcementController: new HomeAnnouncementController(), homeDisposed: false,
-    syncScheduler: new AutoSyncScheduler(),
+    syncScheduler: new AutoSyncScheduler(), deckLevelMenuId: '',
     syncForeground: true, 页面栈: { size: () => 0 }, 主页允许公告检查: true, 加载状态: 'ready',
-    startupSequence: new HomeStartupSequence(), homeWork: new HomeWorkCoordinator(new ExternalDeckOpenQueue(), { schedule: fn => { const id = ++next; timers.set(id, { fn, delay: 0 }); return id; }, cancel: id => timers.delete(id) }), 官方公告延迟检查任务: -1, 官方公告检查中: false, 主页公告检查已激活: true,
+    startupSequence: new HomeStartupSequence(), homeWork: new HomeWorkCoordinator(new ExternalDeckOpenQueue(), { schedule: fn => { const id = ++next; timers.set(id, { fn, delay: 0 }); return id; }, cancel: id => timers.delete(id) }), 官方公告延迟检查任务: -1, 主页公告检查已激活: true,
     官方公告服务实例: { 加载公告: () => response.promise }, 显示官方公告: false,
-    scheduleAutoSyncCheck() { events.push('sync-check'); }, flushSyncAction() {},
+    scheduleAutoSyncCheck() { events.push('sync-check'); }, flushSyncAction() {}, presentDeckWidthHint: () => false,
     加载主页数据: async () => {}, 同步后检查FSRS: async () => {},
     打开云端牌组弹窗() { page.显示云端牌组弹窗 = true; events.push('cloud'); }
   });
@@ -112,8 +118,50 @@ function homeHarness() {
     refreshAfterCollection: async () => { await page.加载主页数据(); },
     presentFsrsWarning: async () => { await page.同步后检查FSRS(true); }, activityChanged: () => page.homeActivityChanged()
   }), { now: () => Date.now(), setTimeout: (fn, delay) => { const id = ++next; timers.set(id, { fn, delay }); return id; }, clearTimeout: id => timers.delete(id) });
-  return { page, response, timers, events, tick: () => { for (const [id, timer] of [...timers]) if (timer.delay === 0) { timers.delete(id); timer.fn(); } } };
+  return { page, response, timers, events, interfaceTracker, tick: () => { for (const [id, timer] of [...timers]) if (timer.delay === 0) { timers.delete(id); timer.fn(); } } };
 }
+
+test('home startup wake waits for the active preference read instead of continually scheduling itself', async () => {
+  for (const stage of ['cloud', 'intro', 'gift']) {
+    const { page, timers, tick } = homeHarness(false);
+    const gate = deferred();
+    let reads = 0;
+    const host = page.startupHost();
+    host[stage + 'Completed'] = () => { reads++; return gate.promise; };
+    page.startupHost = () => host;
+    const pending = stage === 'cloud' ? page.startupSequence.continue(host) :
+      stage === 'intro' ? page.startupSequence.welcome(host) : page.startupSequence.gift(host);
+    page.homeActivityChanged();
+    tick(); await settle();
+    assert.equal(reads, 1);
+    assert.equal(timers.size, 0, stage + ': an unfinished read must not create an immediate wake loop');
+    page.syncForeground = false;
+    gate.resolve(true); await pending;
+    page.syncForeground = true;
+    page.homeActivityChanged(); tick(); await settle();
+    assert.equal(page.startupSequence.hasPending(), false, stage + ': returning home can resume deferred presentation');
+  }
+});
+
+test('paused remote announcements perform no checks or scheduling and still show the local intro', async () => {
+  assert.equal(OFFICIAL_ANNOUNCEMENTS_ENABLED, false);
+  const { page, interfaceTracker } = homeHarness(OFFICIAL_ANNOUNCEMENTS_ENABLED);
+  const forbidden = () => { assert.fail('paused announcements must not load, check, present or schedule'); };
+  page.官方公告服务实例.加载公告 = forbidden;
+  page.announcementController.check = forbidden;
+  page.announcementController.request = forbidden;
+  page.announcementController.takePending = forbidden;
+  assert.equal(await page.尝试显示官方公告(), false);
+  assert.equal(page.尝试展示待展示官方公告(), false);
+  page.请求主页官方公告检查();
+  await page.startupSequence.start(page.startupHost());
+  assert.equal(page.主页公告检查已激活, false);
+  assert.equal(page.显示官方公告, false);
+  assert.equal(page.显示欢迎弹窗, true);
+  page.publishHomeInterface();
+  assert.equal(interfaceTracker.snapshot().find(v => v.surface === 'home').values
+    .find(v => v.id === 'official_announcements_enabled').value, 'false');
+});
 
 test('manual sync is considered before an unseen announcement can occupy the home dialog slot', async () => {
   const { page, response, events, tick } = homeHarness();
@@ -232,11 +280,12 @@ function browserHarness() {
   const scheduler = new AutoSyncScheduler(), broadcasts = [], calls = [];
   const Page = pageMethods('浏览页', ['runBrowserOperation', 'runBatchOperation', 'captureBrowserSelection',
     'isBrowserSelectionCurrent', '退出多选', '解析选中为卡片ID', '解析选中笔记的卡片ID', '解析选中为笔记ID',
-    '执行批量改牌组', '执行批量删除', '执行批量设置标志', '执行批量挂起', '执行批量恢复',
+    '执行批量改牌组', '执行批量删除', '执行批量设置标志', '执行批量挂起', '执行批量搁置', 'cardStateBackend',
     '执行批量设置到期日', '执行批量重新定位', '执行批量更改笔记类型', '执行查找替换',
     '行点击',
     '打开卡片信息', '关闭卡片信息', '加载更多', '打开改牌组弹层', '切换模式'], {
     autoSyncScheduler: scheduler, AppStorage: { setOrCreate: (...args) => broadcasts.push(args) },
+    setCardFlags, toggleBrowserCardState,
     $r: key => key, console: { info() {} }, BURY_SUSPEND_MODE_SUSPEND: 2
   });
   const page = new Page();
@@ -246,13 +295,14 @@ function browserHarness() {
     多选模式值: true, 退出多选信号: 0, 批量忙碌: false, 批量错误: '', mutationBusy: false,
     行列表: [], 结果ID列表: [101, 102], consumedRowCount: 0, suspendedRowIds: new Set(), 阶段: 'list',
     取本地化文案: key => key, 执行搜索: async () => { calls.push('search'); page.searchVersion++; }, sortableColumns: () => [],
-    卡片服务实例: { 获取卡片: async id => ({ noteId: id + 1000 }), 设置牌组: async (ids, deck) => calls.push(['move', ids, deck]) },
+    卡片服务实例: { 获取卡片: async id => ({ noteId: id + 1000, queue: 0 }), 设置牌组: async (ids, deck) => calls.push(['move', ids, deck]) },
     笔记服务实例: { 获取笔记的卡片: async id => [id + 100], 更新笔记: async () => {} },
     笔记类型服务实例: {}, getUIContext: () => ({ getPromptAction: () => ({ showToast() {} }) })
   });
   page.noteReader = { card: id => page.卡片服务实例.获取卡片(id), note: id => page.笔记服务实例.获取笔记(id),
     notetype: id => page.笔记类型服务实例.获取笔记类型(id) };
   page.editor = initialNoteEditorState();
+  page.markingBackend = { setFlag: (ids, flag) => page.卡片服务实例.设置标志(ids, flag) };
   page.editorSession = new NoteEditorSession(page.noteReader, state => { page.editor = state; });
   return { page, scheduler, calls, broadcasts };
 }
@@ -270,7 +320,7 @@ test('old batch preserves new mode/selection and rejects concurrent writes', asy
   assert.equal(page.mutationBusy, false); assert.equal(scheduler.canSync(), true); assert.equal(scheduler.hasPending(), true);
 });
 
-for (const action of ['执行批量删除', '执行批量设置标志', '执行批量挂起', '执行批量恢复',
+for (const action of ['执行批量删除', '执行批量设置标志', '执行批量挂起', '执行批量搁置',
   '执行批量设置到期日', '执行批量重新定位', '执行批量更改笔记类型']) {
   test(`${action} keeps its original inputs while selection changes`, async () => {
     const { page } = browserHarness(), gate = deferred(), writes = [];

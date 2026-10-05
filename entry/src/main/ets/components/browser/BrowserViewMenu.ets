@@ -3,11 +3,12 @@ import { AnchoredMenu } from '../common/AnchoredMenu';
 import { AnchoredMenuItem } from '../common/MenuItem';
 import { AppInterfaceControl } from '../../model/AppInterface';
 import { appInterface } from '../../backend/AppInterfaceService';
-import { namedResourceText, resourceText } from '../../utils/UiFeedback';
+import { resourceText, namedResourceText } from '../../utils/UiFeedback';
 
 /** 合并选择框一次只展示被点击的选值区；选项不再套分类或折叠层。 */
 @Component
 export struct BrowserViewMenu {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('publishInterface') group: string = 'mode';
   @Prop menuWidth: number = 240;
   @Prop @Watch('publishInterface') notes: boolean = false;
@@ -26,7 +27,7 @@ export struct BrowserViewMenu {
   aboutToAppear(): void { this.interfaceMounted = true; this.publishInterface(); }
   aboutToDisappear(): void { this.interfaceMounted = false; appInterface.leave('browser_view'); }
 
-  private publishInterface(): void {
+  private publishInterface(_locale: string = this.uiLanguage): void {
     if (!this.interfaceMounted) return;
     const modeKeys: string[] = ['browser_mode_cards', 'browser_mode_notes'];
     const labels: string[] = this.group === 'mode' ?

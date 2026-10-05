@@ -30,6 +30,8 @@
 
 import { 协议读取器 } from '../core/ProtoReader';
 import { 协议写入器 } from '../core/ProtoWriter';
+import { encodeExportSubset } from './ExportLimitMessages';
+import type { ExportSubset } from './ExportLimitMessages';
 
 export enum ImportAnkiPackageUpdateCondition {
   IF_NEWER = 0,
@@ -110,14 +112,18 @@ export function encodeImportAnkiPackageRequest(
 export function encodeExportAnkiPackageRequest(
   outPath: string,
   deckId: number,
-  options: ExportAnkiPackageOptions = DEFAULT_EXPORT_ANKI_PACKAGE_OPTIONS
+  options: ExportAnkiPackageOptions = DEFAULT_EXPORT_ANKI_PACKAGE_OPTIONS,
+  subset?: ExportSubset
 ): Uint8Array {
   const w = new 协议写入器();
   if (outPath !== '') w.写入字符串(1, outPath);
   w.写入子消息(2, encodeExportAnkiPackageOptions(options));
-  const limit = new 协议写入器();
-  limit.写入64位整数(2, deckId);
-  w.写入子消息(3, limit);
+  if (subset !== undefined) w.写入字节(3, encodeExportSubset(subset));
+  else {
+    const limit = new 协议写入器();
+    limit.写入64位整数(2, deckId);
+    w.写入子消息(3, limit);
+  }
   return w.转为字节();
 }
 
@@ -139,6 +145,31 @@ export function encodeExportCollectionPackageRequest(
   if (options.includeMedia) w.写入布尔(2, options.includeMedia);
   if (options.legacy) w.写入布尔(3, options.legacy);
   return w.转为字节();
+}
+
+export function decodeImportAnkiPackageOptions(bytes: Uint8Array): ImportAnkiPackageOptions {
+  const reader = new 协议读取器(bytes);
+  const options: ImportAnkiPackageOptions = copyImportAnkiPackageOptions(DEFAULT_IMPORT_ANKI_PACKAGE_OPTIONS);
+  let tag;
+  while ((tag = reader.读取标签()) !== null) {
+    switch (tag.字段号) {
+      case 1: options.mergeNotetypes = reader.读取布尔(); break;
+      case 2: options.updateNotes = reader.读取变长整数(); break;
+      case 3: options.updateNotetypes = reader.读取变长整数(); break;
+      case 4: options.withScheduling = reader.读取布尔(); break;
+      case 5: options.withDeckConfigs = reader.读取布尔(); break;
+      default: reader.跳过字段(tag.线类型);
+    }
+  }
+  if (options.updateNotes < 0 || options.updateNotes > 2 || options.updateNotetypes < 0 || options.updateNotetypes > 2) {
+    throw new Error('Invalid package import update condition');
+  }
+  return options;
+}
+
+export function copyImportAnkiPackageOptions(options: ImportAnkiPackageOptions): ImportAnkiPackageOptions {
+  return { mergeNotetypes: options.mergeNotetypes, updateNotes: options.updateNotes,
+    updateNotetypes: options.updateNotetypes, withScheduling: options.withScheduling, withDeckConfigs: options.withDeckConfigs };
 }
 
 function encodeImportAnkiPackageOptions(options: ImportAnkiPackageOptions): 协议写入器 {

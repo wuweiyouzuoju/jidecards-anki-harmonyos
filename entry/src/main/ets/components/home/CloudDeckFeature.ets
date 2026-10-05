@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { resourceText, showToastSafely } from '../../utils/UiFeedback';
+import { showToastSafely, resourceText } from '../../utils/UiFeedback';
 import { common } from '@kit.AbilityKit';
 import { promptAction } from '@kit.ArkUI';
 import { pasteboard } from '@kit.BasicServicesKit';
@@ -15,6 +15,7 @@ const 云端牌组最多选择数量: number = 3;
 
 @Component
 export struct CloudDeckFeature {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop isDark: boolean = false;
   云端牌组从菜单打开: boolean = false;
   @Prop @Watch('backChanged') backRequest: number = 0;
@@ -47,9 +48,9 @@ export struct CloudDeckFeature {
   private 取能力上下文(): common.UIAbilityContext | null {
     return AppStorage.get<common.UIAbilityContext>('abilityContext') ?? null;
   }
-  private 显示提示(message: Resource): void { if (!this.disposed) showToastSafely(this.getUIContext(), { message: resourceText(this.getUIContext(), message) }); }
-  private 取本地化文本(resource: Resource): string { return resourceText(this.getUIContext(), resource); }
-  private 云端牌组错误文案(error: Error): string {
+  private 显示提示(message: Resource, _locale: string = this.uiLanguage): void { if (!this.disposed) showToastSafely(this.getUIContext(), { message: resourceText(this.getUIContext(), message) }); }
+  private 取本地化文本(resource: Resource, _locale: string = this.uiLanguage): string { return resourceText(this.getUIContext(), resource); }
+  private 云端牌组错误文案(error: Error, _locale: string = this.uiLanguage): string {
     let resource: Resource = $r('app.string.cloud_deck_load_failed');
     if (error instanceof 云端牌组服务错误) {
       if (error.code === 'not_configured') {

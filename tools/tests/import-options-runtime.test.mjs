@@ -5,7 +5,7 @@ import { DataTransferSession } from '../../entry/src/main/ets/model/home/DataTra
 import { ImportOperation, ImportCancelled } from '../../entry/src/main/ets/model/ImportOperation.ts';
 import { validateCsvMapping, copyCsvMetadata } from '../../entry/src/main/ets/model/CsvImport.ts';
 import { emptyCsvMetadata, decodeCsvMetadata, encodeCsvImport, encodeCsvMetadataRequest } from '../../entry/src/main/ets/proto/messages/CsvImportMessages.ts';
-import { decodeImportResponse } from '../../entry/src/main/ets/proto/messages/ImportExportMessages.ts';
+import { decodeImportResponse, decodeImportAnkiPackageOptions, copyImportAnkiPackageOptions } from '../../entry/src/main/ets/proto/messages/ImportExportMessages.ts';
 import { 协议读取器 as Reader } from '../../entry/src/main/ets/proto/core/ProtoReader.ts';
 import { 协议写入器 as Writer } from '../../entry/src/main/ets/proto/core/ProtoWriter.ts';
 import { loadPlatformModule, loadComponentLogic } from './platform-module-harness.mjs';
@@ -13,6 +13,15 @@ import { DEFAULT_IMPORT_ANKI_PACKAGE_OPTIONS } from '../../entry/src/main/ets/pr
 import { 后端错误 } from '../../entry/src/main/ets/backend/错误类型.ts';
 import { importFileKind, importFileName } from '../../entry/src/main/ets/model/ImportFile.ts';
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
+test('saved package options decode explicit false and enum zero without frontend defaults',()=>{
+ const wire=new Writer();wire.写入布尔(1,false);wire.写入变长整数(2,2);wire.写入变长整数(3,0);
+ wire.写入布尔(4,true);wire.写入布尔(5,false);
+ const options=decodeImportAnkiPackageOptions(wire.转为字节());
+ assert.deepEqual(options,{mergeNotetypes:false,updateNotes:2,updateNotetypes:0,withScheduling:true,withDeckConfigs:false});
+ const copy=copyImportAnkiPackageOptions(options);copy.updateNotes=1;assert.equal(options.updateNotes,2);
+ const invalid=new Writer();invalid.写入变长整数(2,3);
+ assert.throws(()=>decodeImportAnkiPackageOptions(invalid.转为字节()),/Invalid package import update condition/);
+});
 test('package option remounts restore the submitted draft instead of displaying defaults',()=>{
  const Options=loadComponentLogic('components/import/PackageImportOptions.ets','PackageImportOptions',{DEFAULT_IMPORT_ANKI_PACKAGE_OPTIONS});
  const panel=new Options();panel.options={withScheduling:true,withDeckConfigs:true,mergeNotetypes:true,updateNotes:2,updateNotetypes:1};
@@ -21,11 +30,32 @@ test('package option remounts restore the submitted draft instead of displaying 
  assert.deepEqual(published,{...panel.options,updateNotetypes:0});
 });
 function harness(overrides={}) {
- const states=[],events=[];const backend={pickDeck:async()=>'/deck',pickText:async()=>'/text',discardCsv:async()=>events.push('discard'),
+ const states=[],events=[];const backend={importPackagePresets:async()=>({...DEFAULT_IMPORT_ANKI_PACKAGE_OPTIONS}),
+ pickDeck:async()=>'/deck',pickText:async()=>'/text',discardCsv:async()=>events.push('discard'),
  importDeck:async()=>decodeImportResponse(new Uint8Array()),committed:()=>events.push('committed'),...overrides};
  const session=new DataTransferSession(backend,s=>states.push(s),async()=>events.push('refresh'),()=>events.push('success'));
  return {session,states,events};
 }
+test('each package opening reads the saved presets and freezes them before submission',async()=>{
+ const saved={mergeNotetypes:false,updateNotes:2,updateNotetypes:0,withScheduling:true,withDeckConfigs:false};
+ let reads=0;const received=[];const h=harness({importPackagePresets:async()=>{reads++;return saved;},
+  importDeck:async(_uri,_progress,options)=>{received.push(options);return decodeImportResponse(new Uint8Array());}});
+ await h.session.open('importDeck',0,false);assert.deepEqual(h.states.at(-1).importOptions,saved);
+ saved.withScheduling=false;await h.session.execute({kind:'importDeck'});assert.equal(received[0].withScheduling,true);
+ h.session.close();await h.session.open('importDeck',0,false);
+ assert.equal(h.states.at(-1).importOptions.withScheduling,false);assert.equal(reads,2);
+});
+test('failed or pending preset reads block package submission, and disposal releases external input',async()=>{
+ const gate=deferred();let writes=0,finished=false;
+ const h=harness({importPackagePresets:()=>gate.promise,importDeck:async()=>{writes++;}});
+ const work=h.session.importUri('provider://deck',true).then(()=>{finished=true;});
+ await h.session.execute({kind:'importDeck',options:DEFAULT_IMPORT_ANKI_PACKAGE_OPTIONS});assert.equal(writes,0);
+ h.session.dispose();const count=h.states.length;gate.resolve(DEFAULT_IMPORT_ANKI_PACKAGE_OPTIONS);await work;
+ assert.equal(finished,true);assert.equal(writes,0);assert.equal(h.states.length,count);
+ const failed=harness({importPackagePresets:async()=>{throw Error('preset unavailable');},importDeck:async()=>{writes++;}});
+ await failed.session.open('importDeck',0,false);assert.equal(failed.states.at(-1).error,'preset unavailable');
+ await failed.session.execute({kind:'importDeck',options:DEFAULT_IMPORT_ANKI_PACKAGE_OPTIONS});assert.equal(writes,0);
+});
 test('unified picker selects APKG before options and imports its granted URI exactly once',async()=>{
  let picked=0,writes=0;const options={...DEFAULT_IMPORT_ANKI_PACKAGE_OPTIONS,withScheduling:true};
  const h=harness({pickImportFile:async()=>{picked++;return {uri:'file://docs/deck%20one.APKG',name:'deck one.APKG'};},
@@ -69,7 +99,7 @@ test('package settings reach the backend and the result remains visible without 
  const options={mergeNotetypes:true,updateNotes:1,updateNotetypes:2,withScheduling:true,withDeckConfigs:true};
  let imports=0;const result={...decodeImportResponse(new Uint8Array()),newNotes:4,updatedNotes:2,foundNotes:6};
  const h=harness({importDeck:async(_uri,_progress,value)=>{imports++;assert.deepEqual(value,options);return result;}});
- h.session.open('importDeck',0,false);await h.session.execute({kind:'importDeck',options});
+ await h.session.open('importDeck',0,false);await h.session.execute({kind:'importDeck',options});
  assert.equal(h.states.at(-1).visible,true);assert.deepEqual(h.states.at(-1).result,result);
  await h.session.execute({kind:'importDeck',options});assert.equal(imports,1);
  assert.deepEqual(h.events,['committed','refresh','success']);h.session.close();assert.equal(h.states.at(-1).visible,false);
@@ -87,7 +117,7 @@ test('external open waits for options, keeps the queue lease, and submits withou
 });
 for(const exit of ['close','dispose']) test(`external options ${exit} releases the queued file without writing`,async()=>{
  let imported=0;const h=harness({importDeck:async()=>{imported++;}});const work=h.session.importUri('provider://deck',true);
- h.session[exit]();await work;assert.equal(imported,0);
+ await new Promise(resolve=>setImmediate(resolve));h.session[exit]();await work;assert.equal(imported,0);
 });
 test('cancellation holds occupancy until work settles and does not report a committed success',async()=>{
  const gate=deferred();let operation;

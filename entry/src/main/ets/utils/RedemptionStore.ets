@@ -5,10 +5,8 @@ import { preferences } from '@kit.ArkData';
 import { util } from '@kit.ArkTS';
 import { cryptoFramework } from '@kit.CryptoArchitectureKit';
 import { REDEMPTION_PUBLIC_KEY } from '../model/RedemptionPublicKey';
-import {
-  RedemptionToken, parseRedemption, normalizeFingerprint, mergeRedemption, isSupportedContent,
-  THEME_MOTION_KEY
-} from '../model/Redemption';
+import { RedemptionToken, parseRedemption, normalizeFingerprint, mergeRedemption, isSupportedContent } from '../model/Redemption';
+import { THEME_MOTION_KEY } from '../model/ThemeCatalog';
 
 export type RedemptionResult = 'success' | 'already' | 'invalid' | 'wrong_installation' | 'unsupported';
 let initialization: Promise<void> | undefined = undefined;

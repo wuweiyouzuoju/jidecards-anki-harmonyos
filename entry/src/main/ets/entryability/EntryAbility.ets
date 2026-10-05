@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { APP_FOREGROUND_KEY } from '../model/Redemption';
+import { APP_FOREGROUND_KEY } from '../model/AppLifecycleState';
 import {
   AbilityConstant,
   common,
@@ -25,6 +25,8 @@ import { initializeStudyHaptics } from '../utils/StudyHaptics';
 import { initializeSimpleMode } from '../model/简洁模式存储';
 import { syncActivity } from '../model/SyncSettings';
 import { externalDeckUri, externalDeckOpens, EXTERNAL_DECK_OPEN_REVISION_KEY } from '../model/ExternalDeckOpen';
+import { windowSafeInsets, WINDOW_SAFE_TOP_KEY, WINDOW_SAFE_BOTTOM_KEY, WINDOW_SAFE_LEFT_KEY,
+  WINDOW_SAFE_RIGHT_KEY, WINDOW_HEIGHT_KEY } from '../model/WindowSafeLayout';
 
 const DOMAIN: number = 0x4342;
 
@@ -124,11 +126,9 @@ export default class EntryAbility extends UIAbility {
     this.refreshSystemDarkMode();
     // 系统语言变化时同步刷新 AppStorage，否则组件读到的还是上次启动时的旧值，
     // 主页摘要卡、桌面卡片注入的语言字段全部不会跟随系统切换。
-    // language 字段为空时回退到 i18n.System.getAppPreferredLanguage() 兜底。
+    // 应用语言优先，不能让主题通知中的系统 language 覆盖应用偏好。
     try {
-      const 语言: string = configuration.language && configuration.language.length > 0
-        ? configuration.language
-        : i18n.System.getAppPreferredLanguage();
+      const 语言: string = i18n.System.getAppPreferredLanguage();
       AppStorage.setOrCreate<string>('系统语言', 语言.startsWith('en') ? 'en' : 'zh-Hans');
     } catch (_e) {
       // 读取失败保留旧值，不阻塞其他配置更新流程
@@ -177,6 +177,7 @@ export default class EntryAbility extends UIAbility {
         this.主窗口.on('avoidAreaChange', (): void => {
           this.同步规避区高度();
         });
+        this.主窗口.on('windowRectChange', (): void => { this.同步规避区高度(); });
         // 兜底：部分设备启动时规避区尚未计算完成（getWindowAvoidArea 返回 0）且
         // avoidAreaChange 不触发，会导致状态栏高度一直是 0、顶栏按钮与状态栏重合。
         // 延迟再同步一次（幂等，值无变化时 setOrCreate 不产生额外刷新）。
@@ -200,6 +201,15 @@ export default class EntryAbility extends UIAbility {
     try {
       const 系统栏区 = this.主窗口.getWindowAvoidArea(window.AvoidAreaType.TYPE_SYSTEM);
       const 导航条区 = this.主窗口.getWindowAvoidArea(window.AvoidAreaType.TYPE_NAVIGATION_INDICATOR);
+      const 挖孔区 = this.主窗口.getWindowAvoidArea(window.AvoidAreaType.TYPE_CUTOUT);
+      const bounds = this.主窗口.getWindowProperties().windowRect;
+      const safe = windowSafeInsets(系统栏区, 挖孔区, 导航条区, bounds.width, bounds.height);
+      const ui = this.主窗口.getUIContext();
+      AppStorage.setOrCreate<number>(WINDOW_SAFE_TOP_KEY, ui.px2vp(safe.top));
+      AppStorage.setOrCreate<number>(WINDOW_SAFE_BOTTOM_KEY, ui.px2vp(safe.bottom));
+      AppStorage.setOrCreate<number>(WINDOW_SAFE_LEFT_KEY, ui.px2vp(safe.left));
+      AppStorage.setOrCreate<number>(WINDOW_SAFE_RIGHT_KEY, ui.px2vp(safe.right));
+      AppStorage.setOrCreate<number>(WINDOW_HEIGHT_KEY, ui.px2vp(bounds.height));
       AppStorage.setOrCreate<number>('状态栏高度', this.主窗口.getUIContext().px2vp(系统栏区.topRect.height));
       AppStorage.setOrCreate<number>('导航条高度', this.主窗口.getUIContext().px2vp(导航条区.bottomRect.height));
     } catch (e) {

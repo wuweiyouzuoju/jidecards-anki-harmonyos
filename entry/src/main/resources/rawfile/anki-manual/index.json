@@ -1,0 +1,3292 @@
+{
+  "formatVersion": 1,
+  "title": "Anki Manual",
+  "language": "en",
+  "repository": "https://github.com/ankitects/anki",
+  "revision": "fe4f9e039a4e283b71e611fc1ffb87029b1cdc05",
+  "commitDate": "2026-10-02T23:08:25+01:00",
+  "website": "https://anki.mintlify.app",
+  "licenseId": "CC-BY-SA-4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+  "licenseSha256": "23ee78c8bae49cf08ea2f0c84945c66b987ebe4520881fb51b3dad4fb43d07c2",
+  "attribution": "Anki Manual by Anki contributors. Original chapter text retained; Chinese search aliases and section index added by jidecards.",
+  "topics": [
+    {
+      "id": "intro",
+      "title": "Introduction",
+      "path": "intro",
+      "url": "https://anki.mintlify.app/manual/intro",
+      "sourceUrl": "https://github.com/ankitects/anki/blob/fe4f9e039a4e283b71e611fc1ffb87029b1cdc05/docs-site/manual/intro.mdx",
+      "keywords": [
+        "Anki",
+        "入门",
+        "手册",
+        "教程",
+        "介绍"
+      ],
+      "characters": 2009,
+      "sha256": "2867e08500a83edf2ca8a638a39142d52dcfff598e4f81cfec43bb324ceb89c4",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Overview",
+          "level": 0,
+          "start": 30,
+          "end": 31,
+          "keywords": []
+        },
+        {
+          "id": "mobile-clients",
+          "title": "Mobile Clients",
+          "level": 2,
+          "start": 31,
+          "end": 275,
+          "keywords": []
+        },
+        {
+          "id": "quickstart",
+          "title": "Quickstart",
+          "level": 2,
+          "start": 275,
+          "end": 358,
+          "keywords": []
+        },
+        {
+          "id": "getting-help",
+          "title": "Getting Help",
+          "level": 2,
+          "start": 358,
+          "end": 430,
+          "keywords": []
+        },
+        {
+          "id": "translations",
+          "title": "Translations",
+          "level": 2,
+          "start": 430,
+          "end": 1733,
+          "keywords": []
+        },
+        {
+          "id": "legacy-documentation",
+          "title": "Legacy Documentation",
+          "level": 2,
+          "start": 1733,
+          "end": 2009,
+          "keywords": []
+        }
+      ]
+    },
+    {
+      "id": "background",
+      "title": "Background",
+      "path": "background",
+      "url": "https://anki.mintlify.app/manual/background",
+      "sourceUrl": "https://github.com/ankitects/anki/blob/fe4f9e039a4e283b71e611fc1ffb87029b1cdc05/docs-site/manual/background.mdx",
+      "keywords": [
+        "间隔重复",
+        "主动回忆",
+        "记忆",
+        "学习原理"
+      ],
+      "characters": 7581,
+      "sha256": "e44f0f3e8845c16c8dd592ec52ac9580a6f8c13325577c52d01467ae208aaa6b",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Overview",
+          "level": 0,
+          "start": 28,
+          "end": 1635,
+          "keywords": []
+        },
+        {
+          "id": "active-recall-testing",
+          "title": "Active Recall Testing",
+          "level": 2,
+          "start": 1635,
+          "end": 3009,
+          "keywords": []
+        },
+        {
+          "id": "use-it-or-lose-it",
+          "title": "Use It or Lose It",
+          "level": 2,
+          "start": 3009,
+          "end": 4219,
+          "keywords": []
+        },
+        {
+          "id": "spaced-repetition",
+          "title": "Spaced Repetition",
+          "level": 2,
+          "start": 4219,
+          "end": 6455,
+          "keywords": []
+        },
+        {
+          "id": "why-anki",
+          "title": "Why Anki?",
+          "level": 2,
+          "start": 6455,
+          "end": 7581,
+          "keywords": []
+        }
+      ]
+    },
+    {
+      "id": "getting-started",
+      "title": "Getting Started",
+      "path": "getting-started",
+      "url": "https://anki.mintlify.app/manual/getting-started",
+      "sourceUrl": "https://github.com/ankitects/anki/blob/fe4f9e039a4e283b71e611fc1ffb87029b1cdc05/docs-site/manual/getting-started.mdx",
+      "keywords": [
+        "开始",
+        "入门",
+        "笔记",
+        "卡片",
+        "牌组",
+        "笔记类型"
+      ],
+      "characters": 14366,
+      "sha256": "15206002e7698af69fdbcd7cbc111c13af7acc67f7840662546704f77750580a",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Overview",
+          "level": 0,
+          "start": 33,
+          "end": 34,
+          "keywords": []
+        },
+        {
+          "id": "installing-upgrading",
+          "title": "Installing & Upgrading",
+          "level": 2,
+          "start": 34,
+          "end": 428,
+          "keywords": []
+        },
+        {
+          "id": "videos",
+          "title": "Videos",
+          "level": 2,
+          "start": 428,
+          "end": 1012,
+          "keywords": []
+        },
+        {
+          "id": "key-concepts",
+          "title": "Key Concepts",
+          "level": 2,
+          "start": 1012,
+          "end": 11936,
+          "keywords": []
+        },
+        {
+          "id": "cards",
+          "title": "Cards",
+          "level": 3,
+          "start": 1029,
+          "end": 2547,
+          "keywords": []
+        },
+        {
+          "id": "card-states",
+          "title": "Card States",
+          "level": 4,
+          "start": 1850,
+          "end": 2547,
+          "keywords": []
+        },
+        {
+          "id": "decks",
+          "title": "Decks",
+          "level": 3,
+          "start": 2547,
+          "end": 4492,
+          "keywords": []
+        },
+        {
+          "id": "notes-fields",
+          "title": "Notes & Fields",
+          "level": 3,
+          "start": 4492,
+          "end": 6941,
+          "keywords": []
+        },
+        {
+          "id": "card-types",
+          "title": "Card Types",
+          "level": 3,
+          "start": 6941,
+          "end": 8980,
+          "keywords": []
+        },
+        {
+          "id": "note-types",
+          "title": "Note Types",
+          "level": 3,
+          "start": 8980,
+          "end": 11802,
+          "keywords": []
+        },
+        {
+          "id": "collection",
+          "title": "Collection",
+          "level": 3,
+          "start": 11802,
+          "end": 11936,
+          "keywords": []
+        },
+        {
+          "id": "shared-decks",
+          "title": "Shared Decks",
+          "level": 2,
+          "start": 11936,
+          "end": 14366,
+          "keywords": []
+        }
+      ]
+    },
+    {
+      "id": "studying",
+      "title": "Studying",
+      "path": "studying",
+      "url": "https://anki.mintlify.app/manual/studying",
+      "sourceUrl": "https://github.com/ankitects/anki/blob/fe4f9e039a4e283b71e611fc1ffb87029b1cdc05/docs-site/manual/studying.mdx",
+      "keywords": [
+        "学习",
+        "复习",
+        "评分",
+        "再次",
+        "困难",
+        "简单",
+        "搁置",
+        "暂停",
+        "旗标",
+        "标记"
+      ],
+      "characters": 12452,
+      "sha256": "f9a6dda254be15c8e36b2fe475f16505c8f0e1729bf65697d726d4643020bab8",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Overview",
+          "level": 0,
+          "start": 26,
+          "end": 119,
+          "keywords": []
+        },
+        {
+          "id": "decks",
+          "title": "Decks",
+          "level": 2,
+          "start": 119,
+          "end": 976,
+          "keywords": []
+        },
+        {
+          "id": "study-overview",
+          "title": "Study Overview",
+          "level": 2,
+          "start": 976,
+          "end": 1752,
+          "keywords": []
+        },
+        {
+          "id": "questions",
+          "title": "Questions",
+          "level": 2,
+          "start": 1752,
+          "end": 2178,
+          "keywords": []
+        },
+        {
+          "id": "answer-buttons",
+          "title": "Answer Buttons",
+          "level": 2,
+          "start": 2178,
+          "end": 3831,
+          "keywords": []
+        },
+        {
+          "id": "fuzz-factor",
+          "title": "Fuzz Factor",
+          "level": 2,
+          "start": 3831,
+          "end": 4301,
+          "keywords": []
+        },
+        {
+          "id": "editing-and-more",
+          "title": "Editing and More",
+          "level": 2,
+          "start": 4301,
+          "end": 7906,
+          "keywords": []
+        },
+        {
+          "id": "display-order",
+          "title": "Display Order",
+          "level": 2,
+          "start": 7906,
+          "end": 9399,
+          "keywords": []
+        },
+        {
+          "id": "siblings-and-burying",
+          "title": "Siblings and Burying",
+          "level": 2,
+          "start": 9399,
+          "end": 10696,
+          "keywords": []
+        },
+        {
+          "id": "keyboard-shortcuts",
+          "title": "Keyboard Shortcuts",
+          "level": 2,
+          "start": 10696,
+          "end": 11864,
+          "keywords": []
+        },
+        {
+          "id": "falling-behind",
+          "title": "Falling Behind",
+          "level": 2,
+          "start": 11864,
+          "end": 12452,
+          "keywords": []
+        }
+      ]
+    },
+    {
+      "id": "deck-options",
+      "title": "Deck Options",
+      "path": "deck-options",
+      "url": "https://anki.mintlify.app/manual/deck-options",
+      "sourceUrl": "https://github.com/ankitects/anki/blob/fe4f9e039a4e283b71e611fc1ffb87029b1cdc05/docs-site/manual/deck-options.mdx",
+      "keywords": [
+        "牌组选项",
+        "调度",
+        "FSRS",
+        "保留率",
+        "复习间隔",
+        "学习步长",
+        "每日限额"
+      ],
+      "characters": 39009,
+      "sha256": "9ea906790544d7ac629aec6923d5ec60e3ef5191b392b4b05a5f09d9c1fc72aa",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Overview",
+          "level": 0,
+          "start": 30,
+          "end": 905,
+          "keywords": []
+        },
+        {
+          "id": "presets",
+          "title": "Presets",
+          "level": 2,
+          "start": 905,
+          "end": 2162,
+          "keywords": []
+        },
+        {
+          "id": "subdecks",
+          "title": "Subdecks",
+          "level": 2,
+          "start": 2162,
+          "end": 3679,
+          "keywords": []
+        },
+        {
+          "id": "daily-limits",
+          "title": "Daily Limits",
+          "level": 2,
+          "start": 3679,
+          "end": 7449,
+          "keywords": []
+        },
+        {
+          "id": "new-cardsday",
+          "title": "New Cards/Day",
+          "level": 3,
+          "start": 3696,
+          "end": 4906,
+          "keywords": []
+        },
+        {
+          "id": "maximum-reviewsday",
+          "title": "Maximum Reviews/Day",
+          "level": 3,
+          "start": 4906,
+          "end": 5791,
+          "keywords": []
+        },
+        {
+          "id": "per-deck-daily-limits",
+          "title": "Per-Deck Daily Limits",
+          "level": 3,
+          "start": 5791,
+          "end": 6261,
+          "keywords": []
+        },
+        {
+          "id": "new-cards-ignore-review-limit",
+          "title": "New Cards Ignore Review Limit",
+          "level": 3,
+          "start": 6261,
+          "end": 6736,
+          "keywords": []
+        },
+        {
+          "id": "limits-start-from-top",
+          "title": "Limits Start From Top",
+          "level": 3,
+          "start": 6736,
+          "end": 7449,
+          "keywords": []
+        },
+        {
+          "id": "new-cards",
+          "title": "New Cards",
+          "level": 2,
+          "start": 7449,
+          "end": 10755,
+          "keywords": []
+        },
+        {
+          "id": "learning-steps",
+          "title": "Learning Steps",
+          "level": 3,
+          "start": 7687,
+          "end": 9745,
+          "keywords": [
+            "学习步长"
+          ]
+        },
+        {
+          "id": "day-boundaries",
+          "title": "Day Boundaries",
+          "level": 4,
+          "start": 9212,
+          "end": 9745,
+          "keywords": []
+        },
+        {
+          "id": "graduating-interval",
+          "title": "Graduating Interval",
+          "level": 3,
+          "start": 9745,
+          "end": 10040,
+          "keywords": []
+        },
+        {
+          "id": "easy-interval",
+          "title": "Easy Interval",
+          "level": 3,
+          "start": 10040,
+          "end": 10423,
+          "keywords": []
+        },
+        {
+          "id": "insertion-order",
+          "title": "Insertion Order",
+          "level": 3,
+          "start": 10423,
+          "end": 10755,
+          "keywords": []
+        },
+        {
+          "id": "lapses",
+          "title": "Lapses",
+          "level": 2,
+          "start": 10755,
+          "end": 11512,
+          "keywords": []
+        },
+        {
+          "id": "relearning-steps",
+          "title": "Relearning Steps",
+          "level": 3,
+          "start": 10884,
+          "end": 11204,
+          "keywords": []
+        },
+        {
+          "id": "minimum-interval",
+          "title": "Minimum Interval",
+          "level": 3,
+          "start": 11204,
+          "end": 11409,
+          "keywords": []
+        },
+        {
+          "id": "leeches",
+          "title": "Leeches",
+          "level": 3,
+          "start": 11409,
+          "end": 11512,
+          "keywords": []
+        },
+        {
+          "id": "display-order",
+          "title": "Display Order",
+          "level": 2,
+          "start": 11512,
+          "end": 16537,
+          "keywords": []
+        },
+        {
+          "id": "new-card-gather-order",
+          "title": "New Card Gather Order",
+          "level": 3,
+          "start": 11762,
+          "end": 13123,
+          "keywords": []
+        },
+        {
+          "id": "new-card-sort-order",
+          "title": "New Card Sort Order",
+          "level": 3,
+          "start": 13123,
+          "end": 14181,
+          "keywords": []
+        },
+        {
+          "id": "newreview-order",
+          "title": "New/Review Order",
+          "level": 3,
+          "start": 14181,
+          "end": 14300,
+          "keywords": []
+        },
+        {
+          "id": "interday-learningreview-order",
+          "title": "Interday Learning/Review Order",
+          "level": 3,
+          "start": 14300,
+          "end": 14669,
+          "keywords": []
+        },
+        {
+          "id": "review-sort-order",
+          "title": "Review Sort Order",
+          "level": 3,
+          "start": 14669,
+          "end": 16537,
+          "keywords": []
+        },
+        {
+          "id": "burying",
+          "title": "Burying",
+          "level": 2,
+          "start": 16537,
+          "end": 17688,
+          "keywords": []
+        },
+        {
+          "id": "audio",
+          "title": "Audio",
+          "level": 2,
+          "start": 17688,
+          "end": 18258,
+          "keywords": []
+        },
+        {
+          "id": "timers",
+          "title": "Timers",
+          "level": 2,
+          "start": 18258,
+          "end": 19482,
+          "keywords": []
+        },
+        {
+          "id": "internal-timer",
+          "title": "Internal Timer",
+          "level": 3,
+          "start": 18455,
+          "end": 19011,
+          "keywords": []
+        },
+        {
+          "id": "on-screen-timer",
+          "title": "On-screen Timer",
+          "level": 3,
+          "start": 19011,
+          "end": 19482,
+          "keywords": []
+        },
+        {
+          "id": "auto-advance",
+          "title": "Auto Advance",
+          "level": 2,
+          "start": 19482,
+          "end": 19853,
+          "keywords": []
+        },
+        {
+          "id": "easy-days",
+          "title": "Easy Days",
+          "level": 2,
+          "start": 19853,
+          "end": 20465,
+          "keywords": []
+        },
+        {
+          "id": "fsrs",
+          "title": "FSRS",
+          "level": 2,
+          "start": 20465,
+          "end": 32017,
+          "keywords": [
+            "调度"
+          ]
+        },
+        {
+          "id": "a-short-guide",
+          "title": "A Short Guide",
+          "level": 3,
+          "start": 21374,
+          "end": 23289,
+          "keywords": []
+        },
+        {
+          "id": "desired-retention",
+          "title": "Desired Retention",
+          "level": 3,
+          "start": 23289,
+          "end": 24418,
+          "keywords": [
+            "期望保留率",
+            "保留率"
+          ]
+        },
+        {
+          "id": "help-me-decide",
+          "title": "Help Me Decide",
+          "level": 3,
+          "start": 24418,
+          "end": 25462,
+          "keywords": []
+        },
+        {
+          "id": "fsrs-parameters",
+          "title": "FSRS Parameters",
+          "level": 3,
+          "start": 25462,
+          "end": 27268,
+          "keywords": []
+        },
+        {
+          "id": "reschedule-cards-on-change",
+          "title": "Reschedule Cards on Change",
+          "level": 3,
+          "start": 27268,
+          "end": 28147,
+          "keywords": []
+        },
+        {
+          "id": "compute-minimum-recommended-retention-lt2507-compute-minimum-recommended-retention",
+          "title": "Compute Minimum Recommended Retention (&lt;25.07) {#compute-minimum-recommended-retention}",
+          "level": 3,
+          "start": 28147,
+          "end": 28894,
+          "keywords": []
+        },
+        {
+          "id": "the-simulator",
+          "title": "The Simulator",
+          "level": 3,
+          "start": 28894,
+          "end": 32017,
+          "keywords": []
+        },
+        {
+          "id": "learning-and-relearning-steps",
+          "title": "Learning and Relearning Steps",
+          "level": 4,
+          "start": 29989,
+          "end": 31347,
+          "keywords": []
+        },
+        {
+          "id": "add-on-compatibility",
+          "title": "Add-On Compatibility",
+          "level": 4,
+          "start": 31347,
+          "end": 31695,
+          "keywords": []
+        },
+        {
+          "id": "more",
+          "title": "More",
+          "level": 4,
+          "start": 31695,
+          "end": 32017,
+          "keywords": []
+        },
+        {
+          "id": "advanced",
+          "title": "Advanced",
+          "level": 2,
+          "start": 32017,
+          "end": 39009,
+          "keywords": []
+        },
+        {
+          "id": "maximum-interval",
+          "title": "Maximum Interval",
+          "level": 3,
+          "start": 32030,
+          "end": 32423,
+          "keywords": []
+        },
+        {
+          "id": "historical-retention",
+          "title": "Historical Retention",
+          "level": 3,
+          "start": 32423,
+          "end": 33178,
+          "keywords": []
+        },
+        {
+          "id": "ignore-cards-reviewed-before",
+          "title": "Ignore Cards Reviewed Before",
+          "level": 3,
+          "start": 33178,
+          "end": 33429,
+          "keywords": []
+        },
+        {
+          "id": "starting-ease",
+          "title": "Starting Ease",
+          "level": 3,
+          "start": 33429,
+          "end": 33914,
+          "keywords": []
+        },
+        {
+          "id": "easy-bonus",
+          "title": "Easy Bonus",
+          "level": 3,
+          "start": 33914,
+          "end": 34199,
+          "keywords": []
+        },
+        {
+          "id": "interval-modifier",
+          "title": "Interval Modifier",
+          "level": 3,
+          "start": 34199,
+          "end": 36675,
+          "keywords": []
+        },
+        {
+          "id": "hard-interval",
+          "title": "Hard Interval",
+          "level": 3,
+          "start": 36675,
+          "end": 36887,
+          "keywords": []
+        },
+        {
+          "id": "new-interval",
+          "title": "New Interval",
+          "level": 3,
+          "start": 36887,
+          "end": 37662,
+          "keywords": []
+        },
+        {
+          "id": "custom-scheduling",
+          "title": "Custom Scheduling",
+          "level": 3,
+          "start": 37662,
+          "end": 39009,
+          "keywords": []
+        }
+      ]
+    },
+    {
+      "id": "editing",
+      "title": "Adding/Editing",
+      "path": "editing",
+      "url": "https://anki.mintlify.app/manual/editing",
+      "sourceUrl": "https://github.com/ankitects/anki/blob/fe4f9e039a4e283b71e611fc1ffb87029b1cdc05/docs-site/manual/editing.mdx",
+      "keywords": [
+        "编辑",
+        "添加",
+        "填空",
+        "挖空",
+        "图片遮罩",
+        "图片遮挡",
+        "字段",
+        "标签",
+        "重复笔记"
+      ],
+      "characters": 27704,
+      "sha256": "e849441bfd02c8aa2f5bc62c6124c062387c345f67e4d20fa034c564bd5d36fe",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Overview",
+          "level": 0,
+          "start": 32,
+          "end": 33,
+          "keywords": []
+        },
+        {
+          "id": "adding-cards-and-notes",
+          "title": "Adding Cards and Notes",
+          "level": 2,
+          "start": 33,
+          "end": 3406,
+          "keywords": []
+        },
+        {
+          "id": "duplicate-check",
+          "title": "Duplicate Check",
+          "level": 3,
+          "start": 1910,
+          "end": 2460,
+          "keywords": []
+        },
+        {
+          "id": "effective-learning",
+          "title": "Effective Learning",
+          "level": 3,
+          "start": 2460,
+          "end": 3406,
+          "keywords": []
+        },
+        {
+          "id": "adding-a-note-type",
+          "title": "Adding a Note Type",
+          "level": 2,
+          "start": 3406,
+          "end": 5155,
+          "keywords": []
+        },
+        {
+          "id": "customizing-fields",
+          "title": "Customizing Fields",
+          "level": 2,
+          "start": 5155,
+          "end": 8141,
+          "keywords": []
+        },
+        {
+          "id": "changing-deck-note-type",
+          "title": "Changing Deck / Note Type",
+          "level": 2,
+          "start": 8141,
+          "end": 8418,
+          "keywords": []
+        },
+        {
+          "id": "organizing-content",
+          "title": "Organizing Content",
+          "level": 2,
+          "start": 8418,
+          "end": 13398,
+          "keywords": []
+        },
+        {
+          "id": "using-decks-appropriately",
+          "title": "Using Decks Appropriately",
+          "level": 3,
+          "start": 8441,
+          "end": 9645,
+          "keywords": []
+        },
+        {
+          "id": "using-tags",
+          "title": "Using Tags",
+          "level": 3,
+          "start": 9645,
+          "end": 11222,
+          "keywords": []
+        },
+        {
+          "id": "using-flags",
+          "title": "Using Flags",
+          "level": 3,
+          "start": 11222,
+          "end": 11956,
+          "keywords": []
+        },
+        {
+          "id": "the-marked-tag",
+          "title": "The \"Marked\" Tag",
+          "level": 3,
+          "start": 11956,
+          "end": 12432,
+          "keywords": []
+        },
+        {
+          "id": "using-fields",
+          "title": "Using Fields",
+          "level": 3,
+          "start": 12432,
+          "end": 12739,
+          "keywords": []
+        },
+        {
+          "id": "custom-study-and-filtered-decks",
+          "title": "Custom Study and Filtered Decks",
+          "level": 3,
+          "start": 12739,
+          "end": 13398,
+          "keywords": []
+        },
+        {
+          "id": "editing-features",
+          "title": "Editing Features",
+          "level": 2,
+          "start": 13398,
+          "end": 15923,
+          "keywords": []
+        },
+        {
+          "id": "cloze-deletion",
+          "title": "Cloze Deletion",
+          "level": 2,
+          "start": 15923,
+          "end": 20661,
+          "keywords": []
+        },
+        {
+          "id": "image-occlusion",
+          "title": "Image Occlusion",
+          "level": 2,
+          "start": 20661,
+          "end": 22545,
+          "keywords": []
+        },
+        {
+          "id": "adding-an-image",
+          "title": "Adding an image",
+          "level": 3,
+          "start": 20984,
+          "end": 21320,
+          "keywords": []
+        },
+        {
+          "id": "adding-io-cards",
+          "title": "Adding IO cards",
+          "level": 3,
+          "start": 21320,
+          "end": 22545,
+          "keywords": []
+        },
+        {
+          "id": "editing-io-notes",
+          "title": "Editing IO notes",
+          "level": 2,
+          "start": 22545,
+          "end": 24065,
+          "keywords": []
+        },
+        {
+          "id": "inputting-non-latin-characters-and-accents",
+          "title": "Inputting Non-Latin Characters and Accents",
+          "level": 2,
+          "start": 24065,
+          "end": 26537,
+          "keywords": []
+        },
+        {
+          "id": "adding-international-keyboard-layouts",
+          "title": "Adding international keyboard layouts",
+          "level": 3,
+          "start": 24731,
+          "end": 25494,
+          "keywords": []
+        },
+        {
+          "id": "adding-keyboard-layouts-for-specific-languages",
+          "title": "Adding keyboard layouts for specific languages",
+          "level": 3,
+          "start": 25494,
+          "end": 26063,
+          "keywords": []
+        },
+        {
+          "id": "right-to-left-languages",
+          "title": "Right-to-left Languages",
+          "level": 3,
+          "start": 26063,
+          "end": 26273,
+          "keywords": []
+        },
+        {
+          "id": "limitations",
+          "title": "Limitations",
+          "level": 3,
+          "start": 26273,
+          "end": 26537,
+          "keywords": []
+        },
+        {
+          "id": "unicode-normalization",
+          "title": "Unicode Normalization",
+          "level": 2,
+          "start": 26537,
+          "end": 27704,
+          "keywords": []
+        }
+      ]
+    },
+    {
+      "id": "browsing",
+      "title": "Browsing",
+      "path": "browsing",
+      "url": "https://anki.mintlify.app/manual/browsing",
+      "sourceUrl": "https://github.com/ankitects/anki/blob/fe4f9e039a4e283b71e611fc1ffb87029b1cdc05/docs-site/manual/browsing.mdx",
+      "keywords": [
+        "浏览",
+        "卡片管理",
+        "笔记管理",
+        "批量",
+        "旗标",
+        "标记",
+        "标签"
+      ],
+      "characters": 24495,
+      "sha256": "4d9a44d0c75db7d60e6150ca1089ba6534d2f65aeef2744a457d7ab429df1cf2",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Overview",
+          "level": 0,
+          "start": 26,
+          "end": 468,
+          "keywords": []
+        },
+        {
+          "id": "table-modes",
+          "title": "Table Modes",
+          "level": 2,
+          "start": 468,
+          "end": 1131,
+          "keywords": []
+        },
+        {
+          "id": "sidebar",
+          "title": "Sidebar",
+          "level": 2,
+          "start": 1131,
+          "end": 4906,
+          "keywords": []
+        },
+        {
+          "id": "search-tool",
+          "title": "Search Tool",
+          "level": 3,
+          "start": 1505,
+          "end": 3177,
+          "keywords": []
+        },
+        {
+          "id": "selection-tool",
+          "title": "Selection Tool",
+          "level": 3,
+          "start": 3177,
+          "end": 4161,
+          "keywords": []
+        },
+        {
+          "id": "saved-searches",
+          "title": "Saved Searches",
+          "level": 3,
+          "start": 4161,
+          "end": 4493,
+          "keywords": []
+        },
+        {
+          "id": "editing-items",
+          "title": "Editing Items",
+          "level": 3,
+          "start": 4493,
+          "end": 4789,
+          "keywords": []
+        },
+        {
+          "id": "finding-items",
+          "title": "Finding Items",
+          "level": 3,
+          "start": 4789,
+          "end": 4906,
+          "keywords": []
+        },
+        {
+          "id": "search-box",
+          "title": "Search Box",
+          "level": 2,
+          "start": 4906,
+          "end": 5085,
+          "keywords": []
+        },
+        {
+          "id": "cardnote-table",
+          "title": "Card/Note Table",
+          "level": 2,
+          "start": 5085,
+          "end": 10383,
+          "keywords": []
+        },
+        {
+          "id": "rows",
+          "title": "Rows",
+          "level": 3,
+          "start": 5264,
+          "end": 6468,
+          "keywords": []
+        },
+        {
+          "id": "columns",
+          "title": "Columns",
+          "level": 3,
+          "start": 6468,
+          "end": 10383,
+          "keywords": []
+        },
+        {
+          "id": "editing-area",
+          "title": "Editing Area",
+          "level": 2,
+          "start": 10383,
+          "end": 10988,
+          "keywords": []
+        },
+        {
+          "id": "menus-and-actions",
+          "title": "Menus and Actions",
+          "level": 2,
+          "start": 10988,
+          "end": 21617,
+          "keywords": []
+        },
+        {
+          "id": "edit",
+          "title": "Edit",
+          "level": 3,
+          "start": 11157,
+          "end": 12901,
+          "keywords": []
+        },
+        {
+          "id": "notes",
+          "title": "Notes",
+          "level": 3,
+          "start": 12901,
+          "end": 15503,
+          "keywords": []
+        },
+        {
+          "id": "cards",
+          "title": "Cards",
+          "level": 3,
+          "start": 15503,
+          "end": 21483,
+          "keywords": []
+        },
+        {
+          "id": "go",
+          "title": "Go",
+          "level": 3,
+          "start": 21483,
+          "end": 21617,
+          "keywords": []
+        },
+        {
+          "id": "find-and-replace",
+          "title": "Find and Replace",
+          "level": 2,
+          "start": 21617,
+          "end": 23091,
+          "keywords": []
+        },
+        {
+          "id": "finding-duplicates",
+          "title": "Finding Duplicates",
+          "level": 2,
+          "start": 23091,
+          "end": 24495,
+          "keywords": []
+        }
+      ]
+    },
+    {
+      "id": "searching",
+      "title": "Searching",
+      "path": "searching",
+      "url": "https://anki.mintlify.app/manual/searching",
+      "sourceUrl": "https://github.com/ankitects/anki/blob/fe4f9e039a4e283b71e611fc1ffb87029b1cdc05/docs-site/manual/searching.mdx",
+      "keywords": [
+        "搜索",
+        "查询",
+        "搜索语法",
+        "筛选",
+        "标签",
+        "通配符",
+        "正则",
+        "到期"
+      ],
+      "characters": 15421,
+      "sha256": "9cf9910035293b2c06528b451a7d0ba35335a9a2f7a988dca8f819bb45c2d0d6",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Overview",
+          "level": 0,
+          "start": 27,
+          "end": 210,
+          "keywords": []
+        },
+        {
+          "id": "simple-searches",
+          "title": "Simple searches",
+          "level": 2,
+          "start": 210,
+          "end": 3442,
+          "keywords": []
+        },
+        {
+          "id": "limiting-to-a-field",
+          "title": "Limiting to a field",
+          "level": 2,
+          "start": 3442,
+          "end": 4296,
+          "keywords": []
+        },
+        {
+          "id": "tags-decks-cards-and-notes",
+          "title": "Tags, decks, cards and notes",
+          "level": 2,
+          "start": 4296,
+          "end": 5419,
+          "keywords": []
+        },
+        {
+          "id": "ignoring-accentscombining-characters",
+          "title": "Ignoring accents/combining characters",
+          "level": 2,
+          "start": 5419,
+          "end": 5939,
+          "keywords": []
+        },
+        {
+          "id": "searching-in-cloze-deletions",
+          "title": "Searching in cloze deletions",
+          "level": 2,
+          "start": 5939,
+          "end": 6381,
+          "keywords": []
+        },
+        {
+          "id": "regular-expressions",
+          "title": "Regular expressions",
+          "level": 2,
+          "start": 6381,
+          "end": 8152,
+          "keywords": []
+        },
+        {
+          "id": "card-state",
+          "title": "Card state",
+          "level": 2,
+          "start": 8152,
+          "end": 9065,
+          "keywords": []
+        },
+        {
+          "id": "flags",
+          "title": "Flags",
+          "level": 2,
+          "start": 9065,
+          "end": 9363,
+          "keywords": []
+        },
+        {
+          "id": "card-properties",
+          "title": "Card properties",
+          "level": 2,
+          "start": 9363,
+          "end": 10216,
+          "keywords": []
+        },
+        {
+          "id": "recent-events",
+          "title": "Recent Events",
+          "level": 2,
+          "start": 10216,
+          "end": 11368,
+          "keywords": []
+        },
+        {
+          "id": "added",
+          "title": "Added",
+          "level": 3,
+          "start": 10234,
+          "end": 10514,
+          "keywords": []
+        },
+        {
+          "id": "edited",
+          "title": "Edited",
+          "level": 3,
+          "start": 10514,
+          "end": 10653,
+          "keywords": []
+        },
+        {
+          "id": "answered",
+          "title": "Answered",
+          "level": 3,
+          "start": 10653,
+          "end": 11187,
+          "keywords": []
+        },
+        {
+          "id": "first-answered",
+          "title": "First Answered",
+          "level": 3,
+          "start": 11187,
+          "end": 11368,
+          "keywords": []
+        },
+        {
+          "id": "matching-special-characters",
+          "title": "Matching special characters",
+          "level": 2,
+          "start": 11368,
+          "end": 14305,
+          "keywords": []
+        },
+        {
+          "id": "raw-input",
+          "title": "Raw input",
+          "level": 3,
+          "start": 13880,
+          "end": 14305,
+          "keywords": []
+        },
+        {
+          "id": "object-ids",
+          "title": "Object IDs",
+          "level": 2,
+          "start": 14305,
+          "end": 14617,
+          "keywords": []
+        },
+        {
+          "id": "custom-data",
+          "title": "Custom Data",
+          "level": 2,
+          "start": 14617,
+          "end": 15155,
+          "keywords": []
+        },
+        {
+          "id": "other-searches",
+          "title": "Other Searches",
+          "level": 2,
+          "start": 15155,
+          "end": 15421,
+          "keywords": []
+        }
+      ]
+    },
+    {
+      "id": "templates-intro",
+      "title": "Card Templates",
+      "path": "templates/intro",
+      "url": "https://anki.mintlify.app/manual/templates/intro",
+      "sourceUrl": "https://github.com/ankitects/anki/blob/fe4f9e039a4e283b71e611fc1ffb87029b1cdc05/docs-site/manual/templates/intro.mdx",
+      "keywords": [
+        "模板",
+        "正面",
+        "背面",
+        "卡片类型"
+      ],
+      "characters": 2520,
+      "sha256": "a777dd845b9d0a9c7339648171c0a115fee24acaa56333e1af5f54ac92e54092",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Overview",
+          "level": 0,
+          "start": 32,
+          "end": 592,
+          "keywords": []
+        },
+        {
+          "id": "the-templates-screen",
+          "title": "The Templates Screen",
+          "level": 2,
+          "start": 592,
+          "end": 2520,
+          "keywords": []
+        }
+      ]
+    },
+    {
+      "id": "templates-fields",
+      "title": "Field Replacements",
+      "path": "templates/fields",
+      "url": "https://anki.mintlify.app/manual/templates/fields",
+      "sourceUrl": "https://github.com/ankitects/anki/blob/fe4f9e039a4e283b71e611fc1ffb87029b1cdc05/docs-site/manual/templates/fields.mdx",
+      "keywords": [
+        "字段替换",
+        "输入答案",
+        "填空",
+        "挖空",
+        "条件替换"
+      ],
+      "characters": 15940,
+      "sha256": "bcbeb8ea0846ecf5c790d6d9f4df15788a6553245f776c6b95e77ace67a92f26",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Overview",
+          "level": 0,
+          "start": 36,
+          "end": 37,
+          "keywords": []
+        },
+        {
+          "id": "basic-replacements",
+          "title": "Basic Replacements",
+          "level": 2,
+          "start": 37,
+          "end": 1340,
+          "keywords": []
+        },
+        {
+          "id": "newlines",
+          "title": "Newlines",
+          "level": 2,
+          "start": 1340,
+          "end": 1907,
+          "keywords": []
+        },
+        {
+          "id": "text-to-speech-for-individual-fields",
+          "title": "Text to Speech for individual fields",
+          "level": 2,
+          "start": 1907,
+          "end": 4162,
+          "keywords": []
+        },
+        {
+          "id": "text-to-speech-for-multiple-fields-and-static-text",
+          "title": "Text to Speech for multiple fields and static text",
+          "level": 2,
+          "start": 4162,
+          "end": 4594,
+          "keywords": []
+        },
+        {
+          "id": "special-fields",
+          "title": "Special Fields",
+          "level": 2,
+          "start": 4594,
+          "end": 5371,
+          "keywords": []
+        },
+        {
+          "id": "hint-fields",
+          "title": "Hint Fields",
+          "level": 2,
+          "start": 5371,
+          "end": 7304,
+          "keywords": []
+        },
+        {
+          "id": "dictionary-links",
+          "title": "Dictionary Links",
+          "level": 2,
+          "start": 7304,
+          "end": 7926,
+          "keywords": []
+        },
+        {
+          "id": "html-stripping",
+          "title": "HTML Stripping",
+          "level": 2,
+          "start": 7926,
+          "end": 8979,
+          "keywords": []
+        },
+        {
+          "id": "right-to-left-text",
+          "title": "Right To Left Text",
+          "level": 2,
+          "start": 8979,
+          "end": 9169,
+          "keywords": []
+        },
+        {
+          "id": "ruby-characters",
+          "title": "Ruby Characters",
+          "level": 2,
+          "start": 9169,
+          "end": 11624,
+          "keywords": []
+        },
+        {
+          "id": "additional-ruby-character-filters",
+          "title": "Additional Ruby Character Filters",
+          "level": 3,
+          "start": 10690,
+          "end": 11624,
+          "keywords": []
+        },
+        {
+          "id": "media-latex",
+          "title": "Media & LaTeX",
+          "level": 2,
+          "start": 11624,
+          "end": 12730,
+          "keywords": []
+        },
+        {
+          "id": "static-soundsimages",
+          "title": "Static Sounds/Images",
+          "level": 3,
+          "start": 11782,
+          "end": 12253,
+          "keywords": []
+        },
+        {
+          "id": "field-references",
+          "title": "Field References",
+          "level": 3,
+          "start": 12253,
+          "end": 12730,
+          "keywords": []
+        },
+        {
+          "id": "checking-your-answer",
+          "title": "Checking Your Answer",
+          "level": 2,
+          "start": 12730,
+          "end": 15940,
+          "keywords": []
+        },
+        {
+          "id": "ignoring-diacritics",
+          "title": "Ignoring Diacritics",
+          "level": 3,
+          "start": 15550,
+          "end": 15940,
+          "keywords": []
+        }
+      ]
+    },
+    {
+      "id": "templates-styling",
+      "title": "Styling & HTML",
+      "path": "templates/styling",
+      "url": "https://anki.mintlify.app/manual/templates/styling",
+      "sourceUrl": "https://github.com/ankitects/anki/blob/fe4f9e039a4e283b71e611fc1ffb87029b1cdc05/docs-site/manual/templates/styling.mdx",
+      "keywords": [
+        "样式",
+        "CSS",
+        "字体",
+        "颜色",
+        "背景",
+        "排版",
+        "深色"
+      ],
+      "characters": 13627,
+      "sha256": "ac700c136fbf31161c9db3b10e2763971e55b9630c3ad37f6fcc2eb76d392aa0",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Overview",
+          "level": 0,
+          "start": 32,
+          "end": 33,
+          "keywords": []
+        },
+        {
+          "id": "card-styling",
+          "title": "Card Styling",
+          "level": 2,
+          "start": 33,
+          "end": 1969,
+          "keywords": []
+        },
+        {
+          "id": "image-resizing",
+          "title": "Image Resizing",
+          "level": 2,
+          "start": 1969,
+          "end": 3021,
+          "keywords": []
+        },
+        {
+          "id": "field-styling",
+          "title": "Field Styling",
+          "level": 2,
+          "start": 3021,
+          "end": 5168,
+          "keywords": []
+        },
+        {
+          "id": "audio-replay-buttons",
+          "title": "Audio Replay Buttons",
+          "level": 2,
+          "start": 5168,
+          "end": 5709,
+          "keywords": []
+        },
+        {
+          "id": "text-direction",
+          "title": "Text Direction",
+          "level": 2,
+          "start": 5709,
+          "end": 6250,
+          "keywords": []
+        },
+        {
+          "id": "displaying-code-snippets",
+          "title": "Displaying Code Snippets",
+          "level": 2,
+          "start": 6250,
+          "end": 6709,
+          "keywords": []
+        },
+        {
+          "id": "inline-code",
+          "title": "Inline code",
+          "level": 3,
+          "start": 6447,
+          "end": 6558,
+          "keywords": []
+        },
+        {
+          "id": "code-blocks",
+          "title": "Code blocks",
+          "level": 3,
+          "start": 6558,
+          "end": 6709,
+          "keywords": []
+        },
+        {
+          "id": "other-html",
+          "title": "Other HTML",
+          "level": 2,
+          "start": 6709,
+          "end": 7288,
+          "keywords": []
+        },
+        {
+          "id": "browser-appearance",
+          "title": "Browser Appearance",
+          "level": 2,
+          "start": 7288,
+          "end": 8077,
+          "keywords": []
+        },
+        {
+          "id": "platform-specific-css",
+          "title": "Platform-Specific CSS",
+          "level": 2,
+          "start": 8077,
+          "end": 9123,
+          "keywords": []
+        },
+        {
+          "id": "installing-fonts",
+          "title": "Installing Fonts",
+          "level": 2,
+          "start": 9123,
+          "end": 11214,
+          "keywords": []
+        },
+        {
+          "id": "add-font-to-media-folder",
+          "title": "Add Font to Media Folder",
+          "level": 3,
+          "start": 9481,
+          "end": 10155,
+          "keywords": []
+        },
+        {
+          "id": "update-template-to-use-that-font",
+          "title": "Update Template to Use That Font",
+          "level": 3,
+          "start": 10155,
+          "end": 11214,
+          "keywords": []
+        },
+        {
+          "id": "night-mode",
+          "title": "Night Mode",
+          "level": 2,
+          "start": 11214,
+          "end": 11618,
+          "keywords": []
+        },
+        {
+          "id": "fading-and-scrolling",
+          "title": "Fading and Scrolling",
+          "level": 2,
+          "start": 11618,
+          "end": 12214,
+          "keywords": []
+        },
+        {
+          "id": "javascript",
+          "title": "Javascript",
+          "level": 2,
+          "start": 12214,
+          "end": 13627,
+          "keywords": []
+        }
+      ]
+    },
+    {
+      "id": "templates-generation",
+      "title": "Card Generation",
+      "path": "templates/generation",
+      "url": "https://anki.mintlify.app/manual/templates/generation",
+      "sourceUrl": "https://github.com/ankitects/anki/blob/fe4f9e039a4e283b71e611fc1ffb87029b1cdc05/docs-site/manual/templates/generation.mdx",
+      "keywords": [
+        "卡片生成",
+        "空卡",
+        "选择性生成"
+      ],
+      "characters": 7225,
+      "sha256": "050cc672167d33ce03e9644df7d29c628e3b03f94e15b31cdfcc7792c45e0b7b",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Overview",
+          "level": 0,
+          "start": 33,
+          "end": 34,
+          "keywords": []
+        },
+        {
+          "id": "reverse-cards",
+          "title": "Reverse Cards",
+          "level": 2,
+          "start": 34,
+          "end": 968,
+          "keywords": []
+        },
+        {
+          "id": "card-generation-deletion",
+          "title": "Card Generation & Deletion",
+          "level": 2,
+          "start": 968,
+          "end": 2158,
+          "keywords": []
+        },
+        {
+          "id": "selective-card-generation",
+          "title": "Selective Card Generation",
+          "level": 2,
+          "start": 2158,
+          "end": 2661,
+          "keywords": []
+        },
+        {
+          "id": "conditional-replacement",
+          "title": "Conditional Replacement",
+          "level": 2,
+          "start": 2661,
+          "end": 4905,
+          "keywords": []
+        },
+        {
+          "id": "blank-back-sides",
+          "title": "Blank Back Sides",
+          "level": 2,
+          "start": 4905,
+          "end": 5540,
+          "keywords": []
+        },
+        {
+          "id": "adding-empty-notes",
+          "title": "Adding Empty Notes",
+          "level": 2,
+          "start": 5540,
+          "end": 5920,
+          "keywords": []
+        },
+        {
+          "id": "cloze-templates",
+          "title": "Cloze Templates",
+          "level": 2,
+          "start": 5920,
+          "end": 7225,
+          "keywords": []
+        }
+      ]
+    },
+    {
+      "id": "templates-errors",
+      "title": "Checks and Errors",
+      "path": "templates/errors",
+      "url": "https://anki.mintlify.app/manual/templates/errors",
+      "sourceUrl": "https://github.com/ankitects/anki/blob/fe4f9e039a4e283b71e611fc1ffb87029b1cdc05/docs-site/manual/templates/errors.mdx",
+      "keywords": [
+        "模板错误",
+        "字段不存在",
+        "模板排错"
+      ],
+      "characters": 5932,
+      "sha256": "bfd61d682cf9b042d7d33295e917a3d114a3afd1c76243fa4e9bc0d7eabbe4ce",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Overview",
+          "level": 0,
+          "start": 35,
+          "end": 274,
+          "keywords": []
+        },
+        {
+          "id": "basics",
+          "title": "Basics",
+          "level": 2,
+          "start": 274,
+          "end": 812,
+          "keywords": []
+        },
+        {
+          "id": "specific-issues",
+          "title": "Specific Issues",
+          "level": 2,
+          "start": 812,
+          "end": 5932,
+          "keywords": []
+        },
+        {
+          "id": "template-syntax-error",
+          "title": "Template Syntax Error",
+          "level": 3,
+          "start": 832,
+          "end": 2770,
+          "keywords": []
+        },
+        {
+          "id": "identical-front-sides",
+          "title": "Identical Front Sides",
+          "level": 3,
+          "start": 2770,
+          "end": 3310,
+          "keywords": []
+        },
+        {
+          "id": "front-of-card-is-blank",
+          "title": "Front of Card is Blank",
+          "level": 3,
+          "start": 3310,
+          "end": 4288,
+          "keywords": []
+        },
+        {
+          "id": "no-cloze-filter-on-cloze-note-type",
+          "title": "No Cloze Filter on Cloze Note Type",
+          "level": 3,
+          "start": 4288,
+          "end": 5932,
+          "keywords": []
+        },
+        {
+          "id": "single-empty-cards",
+          "title": "Single empty cards",
+          "level": 4,
+          "start": 4574,
+          "end": 5445,
+          "keywords": []
+        },
+        {
+          "id": "all-cloze-cards-empty",
+          "title": "All cloze cards empty",
+          "level": 4,
+          "start": 5445,
+          "end": 5932,
+          "keywords": []
+        }
+      ]
+    },
+    {
+      "id": "filtered-decks",
+      "title": "Filtered Decks & Cramming",
+      "path": "filtered-decks",
+      "url": "https://anki.mintlify.app/manual/filtered-decks",
+      "sourceUrl": "https://github.com/ankitects/anki/blob/fe4f9e039a4e283b71e611fc1ffb87029b1cdc05/docs-site/manual/filtered-decks.mdx",
+      "keywords": [
+        "过滤牌组",
+        "筛选牌组",
+        "自定义学习",
+        "预习",
+        "积压"
+      ],
+      "characters": 11037,
+      "sha256": "6a2df8f29a52d81c862824501ec65edc3f5508d1fde3eefde9ffdf5c46447b40",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Overview",
+          "level": 0,
+          "start": 104,
+          "end": 871,
+          "keywords": []
+        },
+        {
+          "id": "custom-study",
+          "title": "Custom Study",
+          "level": 2,
+          "start": 871,
+          "end": 2870,
+          "keywords": []
+        },
+        {
+          "id": "home-decks",
+          "title": "Home Decks",
+          "level": 2,
+          "start": 2870,
+          "end": 3706,
+          "keywords": []
+        },
+        {
+          "id": "creating-manually",
+          "title": "Creating Manually",
+          "level": 2,
+          "start": 3706,
+          "end": 5420,
+          "keywords": []
+        },
+        {
+          "id": "order",
+          "title": "Order",
+          "level": 2,
+          "start": 5420,
+          "end": 7090,
+          "keywords": []
+        },
+        {
+          "id": "steps-returning",
+          "title": "Steps & Returning",
+          "level": 2,
+          "start": 7090,
+          "end": 7793,
+          "keywords": []
+        },
+        {
+          "id": "due-reviews",
+          "title": "Due Reviews",
+          "level": 2,
+          "start": 7793,
+          "end": 8293,
+          "keywords": []
+        },
+        {
+          "id": "reviewing-ahead",
+          "title": "Reviewing Ahead",
+          "level": 2,
+          "start": 8293,
+          "end": 9452,
+          "keywords": []
+        },
+        {
+          "id": "rescheduling",
+          "title": "Rescheduling",
+          "level": 2,
+          "start": 9452,
+          "end": 9839,
+          "keywords": []
+        },
+        {
+          "id": "catching-up",
+          "title": "Catching Up",
+          "level": 2,
+          "start": 9839,
+          "end": 11037,
+          "keywords": []
+        }
+      ]
+    },
+    {
+      "id": "leeches",
+      "title": "Leeches",
+      "path": "leeches",
+      "url": "https://anki.mintlify.app/manual/leeches",
+      "sourceUrl": "https://github.com/ankitects/anki/blob/fe4f9e039a4e283b71e611fc1ffb87029b1cdc05/docs-site/manual/leeches.mdx",
+      "keywords": [
+        "难记卡",
+        "记忆负担",
+        "遗忘",
+        "反复忘记"
+      ],
+      "characters": 2603,
+      "sha256": "d6ca87c2ef5ce7065d17fe400e839bd3f2ea4a2853ae77cb95331dcb529b2b4a",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Overview",
+          "level": 0,
+          "start": 25,
+          "end": 815,
+          "keywords": []
+        },
+        {
+          "id": "editing",
+          "title": "Editing",
+          "level": 2,
+          "start": 815,
+          "end": 1530,
+          "keywords": []
+        },
+        {
+          "id": "deleting",
+          "title": "Deleting",
+          "level": 2,
+          "start": 1530,
+          "end": 1887,
+          "keywords": []
+        },
+        {
+          "id": "waiting",
+          "title": "Waiting",
+          "level": 2,
+          "start": 1887,
+          "end": 2603,
+          "keywords": []
+        }
+      ]
+    },
+    {
+      "id": "stats",
+      "title": "Card Info, Graphs and Statistics",
+      "path": "stats",
+      "url": "https://anki.mintlify.app/manual/stats",
+      "sourceUrl": "https://github.com/ankitects/anki/blob/fe4f9e039a4e283b71e611fc1ffb87029b1cdc05/docs-site/manual/stats.mdx",
+      "keywords": [
+        "统计",
+        "学习进度",
+        "预测",
+        "保留率",
+        "记忆率"
+      ],
+      "characters": 12449,
+      "sha256": "57a95ceb3da8f9fc67a874333a5dbc6ef6f8caf65f6688b30591de536850bd06",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Overview",
+          "level": 0,
+          "start": 103,
+          "end": 104,
+          "keywords": []
+        },
+        {
+          "id": "card-info",
+          "title": "Card Info",
+          "level": 2,
+          "start": 104,
+          "end": 1122,
+          "keywords": []
+        },
+        {
+          "id": "statistics",
+          "title": "Statistics",
+          "level": 2,
+          "start": 1122,
+          "end": 1309,
+          "keywords": []
+        },
+        {
+          "id": "selecting-decks-collection",
+          "title": "Selecting Decks / Collection",
+          "level": 2,
+          "start": 1309,
+          "end": 2693,
+          "keywords": []
+        },
+        {
+          "id": "deck",
+          "title": "Deck",
+          "level": 3,
+          "start": 1342,
+          "end": 1648,
+          "keywords": []
+        },
+        {
+          "id": "collection",
+          "title": "Collection",
+          "level": 3,
+          "start": 1648,
+          "end": 1856,
+          "keywords": []
+        },
+        {
+          "id": "history",
+          "title": "History",
+          "level": 3,
+          "start": 1856,
+          "end": 2085,
+          "keywords": []
+        },
+        {
+          "id": "more",
+          "title": "More",
+          "level": 3,
+          "start": 2085,
+          "end": 2693,
+          "keywords": []
+        },
+        {
+          "id": "today",
+          "title": "Today",
+          "level": 2,
+          "start": 2693,
+          "end": 4016,
+          "keywords": []
+        },
+        {
+          "id": "again-count",
+          "title": "Again Count",
+          "level": 3,
+          "start": 3090,
+          "end": 3318,
+          "keywords": []
+        },
+        {
+          "id": "learn-review-relearn-filtered",
+          "title": "Learn, Review, Relearn, Filtered",
+          "level": 3,
+          "start": 3318,
+          "end": 4016,
+          "keywords": []
+        },
+        {
+          "id": "the-graphs",
+          "title": "The Graphs",
+          "level": 2,
+          "start": 4016,
+          "end": 9763,
+          "keywords": []
+        },
+        {
+          "id": "future-due",
+          "title": "Future Due",
+          "level": 3,
+          "start": 4031,
+          "end": 5302,
+          "keywords": []
+        },
+        {
+          "id": "calendar",
+          "title": "Calendar",
+          "level": 3,
+          "start": 5302,
+          "end": 5517,
+          "keywords": []
+        },
+        {
+          "id": "reviews",
+          "title": "Reviews",
+          "level": 3,
+          "start": 5517,
+          "end": 6205,
+          "keywords": []
+        },
+        {
+          "id": "card-counts",
+          "title": "Card Counts",
+          "level": 3,
+          "start": 6205,
+          "end": 6514,
+          "keywords": []
+        },
+        {
+          "id": "review-time",
+          "title": "Review Time",
+          "level": 3,
+          "start": 6514,
+          "end": 6686,
+          "keywords": []
+        },
+        {
+          "id": "review-intervals",
+          "title": "Review Intervals",
+          "level": 3,
+          "start": 6686,
+          "end": 7219,
+          "keywords": []
+        },
+        {
+          "id": "card-ease",
+          "title": "Card Ease",
+          "level": 3,
+          "start": 7219,
+          "end": 7377,
+          "keywords": []
+        },
+        {
+          "id": "card-stability",
+          "title": "Card Stability",
+          "level": 3,
+          "start": 7377,
+          "end": 7541,
+          "keywords": []
+        },
+        {
+          "id": "card-difficulty",
+          "title": "Card Difficulty",
+          "level": 3,
+          "start": 7541,
+          "end": 7671,
+          "keywords": []
+        },
+        {
+          "id": "card-retrievability",
+          "title": "Card Retrievability",
+          "level": 3,
+          "start": 7671,
+          "end": 7994,
+          "keywords": []
+        },
+        {
+          "id": "hourly-breakdown",
+          "title": "Hourly Breakdown",
+          "level": 3,
+          "start": 7994,
+          "end": 8503,
+          "keywords": []
+        },
+        {
+          "id": "answer-buttons",
+          "title": "Answer Buttons",
+          "level": 3,
+          "start": 8503,
+          "end": 8771,
+          "keywords": []
+        },
+        {
+          "id": "true-retention-table",
+          "title": "True Retention Table",
+          "level": 3,
+          "start": 8771,
+          "end": 9763,
+          "keywords": []
+        },
+        {
+          "id": "manual-analysis",
+          "title": "Manual Analysis",
+          "level": 2,
+          "start": 9763,
+          "end": 12449,
+          "keywords": []
+        }
+      ]
+    },
+    {
+      "id": "syncing",
+      "title": "Syncing with AnkiWeb",
+      "path": "syncing",
+      "url": "https://anki.mintlify.app/manual/syncing",
+      "sourceUrl": "https://github.com/ankitects/anki/blob/fe4f9e039a4e283b71e611fc1ffb87029b1cdc05/docs-site/manual/syncing.mdx",
+      "keywords": [
+        "同步",
+        "AnkiWeb",
+        "冲突",
+        "单向同步",
+        "媒体同步"
+      ],
+      "characters": 11184,
+      "sha256": "016b54bde588e99505f0ce3881eb145c22352fd6a74716a23a59cd1a76a241d5",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Overview",
+          "level": 0,
+          "start": 38,
+          "end": 245,
+          "keywords": []
+        },
+        {
+          "id": "intro-videos",
+          "title": "Intro Videos",
+          "level": 2,
+          "start": 245,
+          "end": 432,
+          "keywords": []
+        },
+        {
+          "id": "setup",
+          "title": "Setup",
+          "level": 2,
+          "start": 432,
+          "end": 1617,
+          "keywords": []
+        },
+        {
+          "id": "automatic-syncing",
+          "title": "Automatic Syncing",
+          "level": 2,
+          "start": 1617,
+          "end": 1868,
+          "keywords": []
+        },
+        {
+          "id": "button-color",
+          "title": "Button Color",
+          "level": 2,
+          "start": 1868,
+          "end": 1992,
+          "keywords": []
+        },
+        {
+          "id": "media",
+          "title": "Media",
+          "level": 2,
+          "start": 1992,
+          "end": 3213,
+          "keywords": []
+        },
+        {
+          "id": "conflicts",
+          "title": "Conflicts",
+          "level": 2,
+          "start": 3213,
+          "end": 5668,
+          "keywords": []
+        },
+        {
+          "id": "merging-conflicts",
+          "title": "Merging Conflicts",
+          "level": 2,
+          "start": 5668,
+          "end": 7545,
+          "keywords": []
+        },
+        {
+          "id": "ankiweb-data-deletion",
+          "title": "AnkiWeb Data Deletion",
+          "level": 2,
+          "start": 7545,
+          "end": 8777,
+          "keywords": []
+        },
+        {
+          "id": "what-gets-deleted",
+          "title": "What Gets Deleted",
+          "level": 3,
+          "start": 7786,
+          "end": 8090,
+          "keywords": []
+        },
+        {
+          "id": "returning-to-ankiweb",
+          "title": "Returning to AnkiWeb",
+          "level": 3,
+          "start": 8090,
+          "end": 8296,
+          "keywords": []
+        },
+        {
+          "id": "avoiding-data-deletion",
+          "title": "Avoiding Data Deletion",
+          "level": 3,
+          "start": 8296,
+          "end": 8777,
+          "keywords": []
+        },
+        {
+          "id": "firewalls",
+          "title": "Firewalls",
+          "level": 2,
+          "start": 8777,
+          "end": 9390,
+          "keywords": []
+        },
+        {
+          "id": "proxies",
+          "title": "Proxies",
+          "level": 2,
+          "start": 9390,
+          "end": 11184,
+          "keywords": []
+        }
+      ]
+    },
+    {
+      "id": "backups",
+      "title": "Backups",
+      "path": "backups",
+      "url": "https://anki.mintlify.app/manual/backups",
+      "sourceUrl": "https://github.com/ankitects/anki/blob/fe4f9e039a4e283b71e611fc1ffb87029b1cdc05/docs-site/manual/backups.mdx",
+      "keywords": [
+        "备份",
+        "恢复",
+        "数据丢失"
+      ],
+      "characters": 3394,
+      "sha256": "e77c63474d5c05831f9e6833ce00aa216ac687e553381d1563cba9894d0e09e9",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Overview",
+          "level": 0,
+          "start": 25,
+          "end": 26,
+          "keywords": []
+        },
+        {
+          "id": "automatic-backups",
+          "title": "Automatic backups",
+          "level": 2,
+          "start": 26,
+          "end": 1623,
+          "keywords": []
+        },
+        {
+          "id": "restoring",
+          "title": "Restoring",
+          "level": 3,
+          "start": 501,
+          "end": 997,
+          "keywords": []
+        },
+        {
+          "id": "creating",
+          "title": "Creating",
+          "level": 3,
+          "start": 997,
+          "end": 1623,
+          "keywords": []
+        },
+        {
+          "id": "manual-colpkg-backups",
+          "title": "Manual colpkg backups",
+          "level": 2,
+          "start": 1623,
+          "end": 2346,
+          "keywords": []
+        },
+        {
+          "id": "restoring-2",
+          "title": "Restoring",
+          "level": 3,
+          "start": 1649,
+          "end": 1733,
+          "keywords": []
+        },
+        {
+          "id": "creating-2",
+          "title": "Creating",
+          "level": 3,
+          "start": 1733,
+          "end": 2346,
+          "keywords": []
+        },
+        {
+          "id": "ankiweb",
+          "title": "AnkiWeb",
+          "level": 2,
+          "start": 2346,
+          "end": 2655,
+          "keywords": []
+        },
+        {
+          "id": "deletion-log",
+          "title": "Deletion log",
+          "level": 2,
+          "start": 2655,
+          "end": 3394,
+          "keywords": []
+        }
+      ]
+    },
+    {
+      "id": "importing-intro",
+      "title": "Importing",
+      "path": "importing/intro",
+      "url": "https://anki.mintlify.app/manual/importing/intro",
+      "sourceUrl": "https://github.com/ankitects/anki/blob/fe4f9e039a4e283b71e611fc1ffb87029b1cdc05/docs-site/manual/importing/intro.mdx",
+      "keywords": [
+        "导入",
+        "共享牌组",
+        "下载牌组"
+      ],
+      "characters": 192,
+      "sha256": "15192633e95cbc63b2d4cab5a663cd614104f395da950d96b6ae705b406e0dc1",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Overview",
+          "level": 0,
+          "start": 27,
+          "end": 192,
+          "keywords": []
+        }
+      ]
+    },
+    {
+      "id": "importing-text-files",
+      "title": "Text Files",
+      "path": "importing/text-files",
+      "url": "https://anki.mintlify.app/manual/importing/text-files",
+      "sourceUrl": "https://github.com/ankitects/anki/blob/fe4f9e039a4e283b71e611fc1ffb87029b1cdc05/docs-site/manual/importing/text-files.mdx",
+      "keywords": [
+        "文本导入",
+        "CSV",
+        "TSV",
+        "导入字段",
+        "导入标签"
+      ],
+      "characters": 12456,
+      "sha256": "4314bbf7c70ffd93c8d05a06f22076cd561eb5d3588dae3dedb9573fd426927c",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Overview",
+          "level": 0,
+          "start": 28,
+          "end": 2928,
+          "keywords": []
+        },
+        {
+          "id": "spreadsheets-and-utf-8",
+          "title": "Spreadsheets and UTF-8",
+          "level": 2,
+          "start": 2928,
+          "end": 3723,
+          "keywords": []
+        },
+        {
+          "id": "html",
+          "title": "HTML",
+          "level": 2,
+          "start": 3723,
+          "end": 4448,
+          "keywords": []
+        },
+        {
+          "id": "importing-media",
+          "title": "Importing Media",
+          "level": 2,
+          "start": 4448,
+          "end": 5598,
+          "keywords": []
+        },
+        {
+          "id": "bulk-media",
+          "title": "Bulk Media",
+          "level": 2,
+          "start": 5598,
+          "end": 6143,
+          "keywords": []
+        },
+        {
+          "id": "duplicates-and-updating",
+          "title": "Duplicates and Updating",
+          "level": 2,
+          "start": 6143,
+          "end": 7517,
+          "keywords": []
+        },
+        {
+          "id": "file-headers",
+          "title": "File Headers",
+          "level": 2,
+          "start": 7517,
+          "end": 12456,
+          "keywords": []
+        },
+        {
+          "id": "notetype-column",
+          "title": "Notetype Column",
+          "level": 3,
+          "start": 10628,
+          "end": 11160,
+          "keywords": []
+        },
+        {
+          "id": "deck-column",
+          "title": "Deck Column",
+          "level": 3,
+          "start": 11160,
+          "end": 11477,
+          "keywords": []
+        },
+        {
+          "id": "guid-column",
+          "title": "GUID Column",
+          "level": 3,
+          "start": 11477,
+          "end": 12456,
+          "keywords": []
+        }
+      ]
+    },
+    {
+      "id": "importing-packaged-decks",
+      "title": "Packaged Decks",
+      "path": "importing/packaged-decks",
+      "url": "https://anki.mintlify.app/manual/importing/packaged-decks",
+      "sourceUrl": "https://github.com/ankitects/anki/blob/fe4f9e039a4e283b71e611fc1ffb87029b1cdc05/docs-site/manual/importing/packaged-decks.mdx",
+      "keywords": [
+        "apkg",
+        "colpkg",
+        "打包牌组",
+        "牌组导入"
+      ],
+      "characters": 2469,
+      "sha256": "ec5bf3c2ccef28fca45d90d5f7d493a1c446af45bc1a2a163626396d8326cac0",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Overview",
+          "level": 0,
+          "start": 32,
+          "end": 210,
+          "keywords": []
+        },
+        {
+          "id": "scheduling",
+          "title": "Scheduling",
+          "level": 2,
+          "start": 210,
+          "end": 952,
+          "keywords": []
+        },
+        {
+          "id": "updating",
+          "title": "Updating",
+          "level": 2,
+          "start": 952,
+          "end": 2469,
+          "keywords": []
+        },
+        {
+          "id": "anki-2310-and-later",
+          "title": "Anki 23.10 and Later",
+          "level": 3,
+          "start": 1550,
+          "end": 2469,
+          "keywords": []
+        },
+        {
+          "id": "note-to-deck-authors",
+          "title": "Note to Deck Authors",
+          "level": 4,
+          "start": 2035,
+          "end": 2469,
+          "keywords": []
+        }
+      ]
+    },
+    {
+      "id": "exporting",
+      "title": "Exporting",
+      "path": "exporting",
+      "url": "https://anki.mintlify.app/manual/exporting",
+      "sourceUrl": "https://github.com/ankitects/anki/blob/fe4f9e039a4e283b71e611fc1ffb87029b1cdc05/docs-site/manual/exporting.mdx",
+      "keywords": [
+        "导出",
+        "apkg",
+        "colpkg",
+        "分享牌组"
+      ],
+      "characters": 4453,
+      "sha256": "18309e6570a5624935ff55e24183daa27995d93483ecb9abdea4dd0007d2bb3e",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Overview",
+          "level": 0,
+          "start": 27,
+          "end": 174,
+          "keywords": []
+        },
+        {
+          "id": "text-files",
+          "title": "Text Files",
+          "level": 2,
+          "start": 174,
+          "end": 956,
+          "keywords": []
+        },
+        {
+          "id": "packaged-decks",
+          "title": "Packaged Decks",
+          "level": 2,
+          "start": 956,
+          "end": 4453,
+          "keywords": []
+        },
+        {
+          "id": "collection-colpkg",
+          "title": "Collection (.colpkg)",
+          "level": 3,
+          "start": 1265,
+          "end": 2550,
+          "keywords": []
+        },
+        {
+          "id": "what-happens-on-import",
+          "title": "What Happens on Import?",
+          "level": 4,
+          "start": 1656,
+          "end": 2044,
+          "keywords": []
+        },
+        {
+          "id": "export-options",
+          "title": "Export Options",
+          "level": 4,
+          "start": 2044,
+          "end": 2550,
+          "keywords": []
+        },
+        {
+          "id": "include-media",
+          "title": "Include Media",
+          "level": 5,
+          "start": 2065,
+          "end": 2201,
+          "keywords": []
+        },
+        {
+          "id": "support-older-anki-versions-slowerlarger-files",
+          "title": "Support older Anki versions (slower/larger files)",
+          "level": 5,
+          "start": 2201,
+          "end": 2550,
+          "keywords": []
+        },
+        {
+          "id": "deck-apkg",
+          "title": "Deck (.apkg)",
+          "level": 3,
+          "start": 2550,
+          "end": 4453,
+          "keywords": []
+        },
+        {
+          "id": "what-happens-on-import-2",
+          "title": "What Happens on Import?",
+          "level": 4,
+          "start": 2845,
+          "end": 3552,
+          "keywords": []
+        },
+        {
+          "id": "export-options-2",
+          "title": "Export Options",
+          "level": 4,
+          "start": 3552,
+          "end": 4453,
+          "keywords": []
+        },
+        {
+          "id": "include-scheduling-information",
+          "title": "Include Scheduling Information",
+          "level": 5,
+          "start": 3573,
+          "end": 3902,
+          "keywords": []
+        },
+        {
+          "id": "include-deck-presets",
+          "title": "Include Deck Presets",
+          "level": 5,
+          "start": 3902,
+          "end": 3971,
+          "keywords": []
+        },
+        {
+          "id": "include-media-2",
+          "title": "Include Media",
+          "level": 5,
+          "start": 3971,
+          "end": 4105,
+          "keywords": []
+        },
+        {
+          "id": "support-older-anki-versions-slowerlarger-files-2",
+          "title": "Support older Anki versions (slower/larger files)",
+          "level": 5,
+          "start": 4105,
+          "end": 4453,
+          "keywords": []
+        }
+      ]
+    },
+    {
+      "id": "media",
+      "title": "Media",
+      "path": "media",
+      "url": "https://anki.mintlify.app/manual/media",
+      "sourceUrl": "https://github.com/ankitects/anki/blob/fe4f9e039a4e283b71e611fc1ffb87029b1cdc05/docs-site/manual/media.mdx",
+      "keywords": [
+        "媒体",
+        "图片",
+        "音频",
+        "视频",
+        "缺失媒体"
+      ],
+      "characters": 3214,
+      "sha256": "e2969095d57060f879c10cff1817b4abd530bd7ab7dae9131db4bf6fa95758e5",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Overview",
+          "level": 0,
+          "start": 23,
+          "end": 1129,
+          "keywords": []
+        },
+        {
+          "id": "checking-media",
+          "title": "Checking Media",
+          "level": 2,
+          "start": 1129,
+          "end": 2051,
+          "keywords": []
+        },
+        {
+          "id": "manually-adding-media",
+          "title": "Manually Adding Media",
+          "level": 2,
+          "start": 2051,
+          "end": 2906,
+          "keywords": []
+        },
+        {
+          "id": "supported-formats",
+          "title": "Supported Formats",
+          "level": 2,
+          "start": 2906,
+          "end": 3214,
+          "keywords": []
+        }
+      ]
+    },
+    {
+      "id": "math",
+      "title": "Math and Symbols",
+      "path": "math",
+      "url": "https://anki.mintlify.app/manual/math",
+      "sourceUrl": "https://github.com/ankitects/anki/blob/fe4f9e039a4e283b71e611fc1ffb87029b1cdc05/docs-site/manual/math.mdx",
+      "keywords": [
+        "数学",
+        "公式",
+        "MathJax",
+        "LaTeX"
+      ],
+      "characters": 11690,
+      "sha256": "a3bed8560030cf76d635e34127dedbfd0408c3e55063e3c79529fc6201d4fd2b",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Overview",
+          "level": 0,
+          "start": 95,
+          "end": 96,
+          "keywords": []
+        },
+        {
+          "id": "mathjax",
+          "title": "MathJax",
+          "level": 2,
+          "start": 96,
+          "end": 2230,
+          "keywords": []
+        },
+        {
+          "id": "customize-mathjax",
+          "title": "Customize MathJax",
+          "level": 3,
+          "start": 1687,
+          "end": 2230,
+          "keywords": []
+        },
+        {
+          "id": "latex",
+          "title": "LaTeX",
+          "level": 2,
+          "start": 2230,
+          "end": 11690,
+          "keywords": []
+        },
+        {
+          "id": "enable-latex",
+          "title": "Enable LaTeX",
+          "level": 3,
+          "start": 2839,
+          "end": 3600,
+          "keywords": []
+        },
+        {
+          "id": "assumed-knowledge",
+          "title": "Assumed Knowledge",
+          "level": 3,
+          "start": 3600,
+          "end": 4894,
+          "keywords": []
+        },
+        {
+          "id": "webmobile",
+          "title": "Web/Mobile",
+          "level": 3,
+          "start": 4894,
+          "end": 5474,
+          "keywords": []
+        },
+        {
+          "id": "example",
+          "title": "Example",
+          "level": 3,
+          "start": 5474,
+          "end": 7125,
+          "keywords": []
+        },
+        {
+          "id": "packages",
+          "title": "Packages",
+          "level": 3,
+          "start": 7125,
+          "end": 9111,
+          "keywords": []
+        },
+        {
+          "id": "template-conflicts",
+          "title": "Template Conflicts",
+          "level": 3,
+          "start": 9111,
+          "end": 9991,
+          "keywords": []
+        },
+        {
+          "id": "cloze-conflicts",
+          "title": "Cloze Conflicts",
+          "level": 3,
+          "start": 9991,
+          "end": 11147,
+          "keywords": []
+        },
+        {
+          "id": "unsafe-commands",
+          "title": "Unsafe Commands",
+          "level": 3,
+          "start": 11147,
+          "end": 11690,
+          "keywords": []
+        }
+      ]
+    },
+    {
+      "id": "preferences",
+      "title": "Preferences",
+      "path": "preferences",
+      "url": "https://anki.mintlify.app/manual/preferences",
+      "sourceUrl": "https://github.com/ankitects/anki/blob/fe4f9e039a4e283b71e611fc1ffb87029b1cdc05/docs-site/manual/preferences.mdx",
+      "keywords": [
+        "偏好",
+        "设置",
+        "语言",
+        "显示"
+      ],
+      "characters": 6752,
+      "sha256": "14307ff10a46709812cd5eb5ffa2d2a70aa5d361026ef085250831c099185adc",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Overview",
+          "level": 0,
+          "start": 29,
+          "end": 134,
+          "keywords": []
+        },
+        {
+          "id": "appearance",
+          "title": "Appearance",
+          "level": 2,
+          "start": 134,
+          "end": 1662,
+          "keywords": []
+        },
+        {
+          "id": "general",
+          "title": "General",
+          "level": 3,
+          "start": 149,
+          "end": 285,
+          "keywords": []
+        },
+        {
+          "id": "user-interface",
+          "title": "User Interface",
+          "level": 3,
+          "start": 285,
+          "end": 1285,
+          "keywords": []
+        },
+        {
+          "id": "distractions",
+          "title": "Distractions",
+          "level": 3,
+          "start": 1285,
+          "end": 1662,
+          "keywords": []
+        },
+        {
+          "id": "review",
+          "title": "Review",
+          "level": 2,
+          "start": 1662,
+          "end": 3650,
+          "keywords": []
+        },
+        {
+          "id": "scheduler",
+          "title": "Scheduler",
+          "level": 3,
+          "start": 1673,
+          "end": 3035,
+          "keywords": []
+        },
+        {
+          "id": "review-2",
+          "title": "Review",
+          "level": 3,
+          "start": 3035,
+          "end": 3650,
+          "keywords": []
+        },
+        {
+          "id": "editing",
+          "title": "Editing",
+          "level": 2,
+          "start": 3650,
+          "end": 5199,
+          "keywords": []
+        },
+        {
+          "id": "editing-2",
+          "title": "Editing",
+          "level": 3,
+          "start": 3662,
+          "end": 4902,
+          "keywords": []
+        },
+        {
+          "id": "browsing",
+          "title": "Browsing",
+          "level": 3,
+          "start": 4902,
+          "end": 5199,
+          "keywords": []
+        },
+        {
+          "id": "syncing",
+          "title": "Syncing",
+          "level": 2,
+          "start": 5199,
+          "end": 6677,
+          "keywords": []
+        },
+        {
+          "id": "synchronisation",
+          "title": "Synchronisation",
+          "level": 3,
+          "start": 5271,
+          "end": 6489,
+          "keywords": []
+        },
+        {
+          "id": "ankiweb-account",
+          "title": "AnkiWeb Account",
+          "level": 3,
+          "start": 6489,
+          "end": 6569,
+          "keywords": []
+        },
+        {
+          "id": "self-hosted-sync-server",
+          "title": "Self-hosted Sync Server",
+          "level": 3,
+          "start": 6569,
+          "end": 6677,
+          "keywords": []
+        },
+        {
+          "id": "backups",
+          "title": "Backups",
+          "level": 2,
+          "start": 6677,
+          "end": 6752,
+          "keywords": []
+        }
+      ]
+    },
+    {
+      "id": "troubleshooting",
+      "title": "Troubleshooting",
+      "path": "troubleshooting",
+      "url": "https://anki.mintlify.app/manual/troubleshooting",
+      "sourceUrl": "https://github.com/ankitects/anki/blob/fe4f9e039a4e283b71e611fc1ffb87029b1cdc05/docs-site/manual/troubleshooting.mdx",
+      "keywords": [
+        "故障",
+        "排错",
+        "数据库检查"
+      ],
+      "characters": 3078,
+      "sha256": "370057c8b9a7ef1ada59f52f1df205c848c5e5bbd656dda3e5ea8670753f2394",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Overview",
+          "level": 0,
+          "start": 33,
+          "end": 114,
+          "keywords": []
+        },
+        {
+          "id": "1-restart-anki",
+          "title": "1. Restart Anki",
+          "level": 3,
+          "start": 114,
+          "end": 487,
+          "keywords": []
+        },
+        {
+          "id": "2-check-add-ons",
+          "title": "2. Check add-ons",
+          "level": 3,
+          "start": 487,
+          "end": 1175,
+          "keywords": []
+        },
+        {
+          "id": "3-check-your-anki-version",
+          "title": "3. Check your Anki version",
+          "level": 3,
+          "start": 1175,
+          "end": 1718,
+          "keywords": []
+        },
+        {
+          "id": "4-check-your-database",
+          "title": "4. Check your database",
+          "level": 3,
+          "start": 1718,
+          "end": 1871,
+          "keywords": []
+        },
+        {
+          "id": "5-restart-your-computer",
+          "title": "5. Restart your computer",
+          "level": 3,
+          "start": 1871,
+          "end": 1947,
+          "keywords": []
+        },
+        {
+          "id": "6-change-the-video-driver",
+          "title": "6. Change the Video Driver",
+          "level": 3,
+          "start": 1947,
+          "end": 2687,
+          "keywords": []
+        },
+        {
+          "id": "7-reset-window-sizes",
+          "title": "7. Reset window sizes",
+          "level": 3,
+          "start": 2687,
+          "end": 2833,
+          "keywords": []
+        },
+        {
+          "id": "8-if-the-problem-remains",
+          "title": "8. If the problem remains",
+          "level": 3,
+          "start": 2833,
+          "end": 3078,
+          "keywords": []
+        }
+      ]
+    },
+    {
+      "id": "getting-help",
+      "title": "Getting help",
+      "path": "getting-help",
+      "url": "https://anki.mintlify.app/manual/getting-help",
+      "sourceUrl": "https://github.com/ankitects/anki/blob/fe4f9e039a4e283b71e611fc1ffb87029b1cdc05/docs-site/manual/getting-help.mdx",
+      "keywords": [
+        "帮助",
+        "反馈",
+        "社区"
+      ],
+      "characters": 2547,
+      "sha256": "c91c063395b9fdb9abe9b1eff71757a8e284ddcc1b7d5b7a0e29ebb5e0f0edeb",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "Overview",
+          "level": 0,
+          "start": 30,
+          "end": 31,
+          "keywords": []
+        },
+        {
+          "id": "asking-good-questions",
+          "title": "Asking good questions",
+          "level": 2,
+          "start": 31,
+          "end": 1811,
+          "keywords": []
+        },
+        {
+          "id": "anki-desktop-the-computer-version-and-ankiweb",
+          "title": "Anki Desktop (the computer version) and AnkiWeb",
+          "level": 2,
+          "start": 1811,
+          "end": 2084,
+          "keywords": []
+        },
+        {
+          "id": "ankidroid-android-devices",
+          "title": "AnkiDroid (Android devices)",
+          "level": 2,
+          "start": 2084,
+          "end": 2187,
+          "keywords": []
+        },
+        {
+          "id": "ankimobile-iphoneipad",
+          "title": "AnkiMobile (iPhone/iPad)",
+          "level": 2,
+          "start": 2187,
+          "end": 2271,
+          "keywords": []
+        },
+        {
+          "id": "private-questions",
+          "title": "Private questions",
+          "level": 2,
+          "start": 2271,
+          "end": 2547,
+          "keywords": []
+        }
+      ]
+    }
+  ]
+}

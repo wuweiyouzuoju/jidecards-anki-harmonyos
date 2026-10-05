@@ -47,6 +47,105 @@ export interface FsrsWorkloadOutput {
   reviewlessEndMemorized: number;
 }
 
+export interface EvaluateFsrsInput { params: number[]; search: string; ignoreRevlogsBeforeMs: number; }
+export interface EvaluateFsrsOutput { logLoss: number; rmseBins: number; }
+export interface FsrsMemoryOutput {
+  state: FsrsMemoryState | null;
+  desiredRetention: number;
+  decay: number;
+}
+export interface FsrsMemoryState { stability: number; difficulty: number; }
+export interface FsrsHistoryCount { included: number; total: number; }
+export interface FsrsDailyOutput {
+  accumulatedKnowledge: number[];
+  dailyReviews: number[];
+  dailyNew: number[];
+  dailyTimeSeconds: number[];
+}
+
+export function encodeEvaluateFsrs(input: EvaluateFsrsInput): Uint8Array {
+  const w = new 协议写入器();
+  w.写入打包浮点(1, input.params); w.写入字符串(2, input.search);
+  w.写入64位整数(3, input.ignoreRevlogsBeforeMs);
+  return w.转为字节();
+}
+
+export function decodeEvaluateFsrs(bytes: Uint8Array): EvaluateFsrsOutput {
+  const r = new 协议读取器(bytes);
+  const out: EvaluateFsrsOutput = { logLoss: 0, rmseBins: 0 };
+  let tag;
+  while ((tag = r.读取标签()) !== null) {
+    if (tag.字段号 === 1) out.logLoss = r.读取浮点();
+    else if (tag.字段号 === 2) out.rmseBins = r.读取浮点();
+    else r.跳过字段(tag.线类型);
+  }
+  if (!Number.isFinite(out.logLoss) || !Number.isFinite(out.rmseBins) || out.logLoss < 0 || out.rmseBins < 0) {
+    throw new Error('Invalid FSRS evaluation response');
+  }
+  return out;
+}
+
+export function decodeFsrsMemory(bytes: Uint8Array): FsrsMemoryOutput {
+  const r = new 协议读取器(bytes);
+  const out: FsrsMemoryOutput = { state: null, desiredRetention: 0, decay: 0 };
+  let tag;
+  while ((tag = r.读取标签()) !== null) {
+    if (tag.字段号 === 1) {
+      const state = new 协议读取器(r.读取字节());
+      const value: FsrsMemoryState = { stability: 0, difficulty: 0 };
+      let field;
+      while ((field = state.读取标签()) !== null) {
+        if (field.字段号 === 1) value.stability = state.读取浮点();
+        else if (field.字段号 === 2) value.difficulty = state.读取浮点();
+        else state.跳过字段(field.线类型);
+      }
+      if (!Number.isFinite(value.stability) || !Number.isFinite(value.difficulty)) throw new Error('Invalid FSRS memory state');
+      out.state = value;
+    } else if (tag.字段号 === 2) out.desiredRetention = r.读取浮点();
+    else if (tag.字段号 === 3) out.decay = r.读取浮点();
+    else r.跳过字段(tag.线类型);
+  }
+  if (!Number.isFinite(out.desiredRetention) || !Number.isFinite(out.decay)) throw new Error('Invalid FSRS memory response');
+  return out;
+}
+
+export function encodeFsrsHistoryCount(date: string, search: string): Uint8Array {
+  const w = new 协议写入器(); w.写入字符串(1, date); w.写入字符串(2, search); return w.转为字节();
+}
+export function decodeFsrsHistoryCount(bytes: Uint8Array): FsrsHistoryCount {
+  const r = new 协议读取器(bytes); const out: FsrsHistoryCount = { included: 0, total: 0 }; let tag;
+  while ((tag = r.读取标签()) !== null) {
+    if (tag.字段号 === 1) out.included = r.读取64位整数();
+    else if (tag.字段号 === 2) out.total = r.读取64位整数();
+    else r.跳过字段(tag.线类型);
+  }
+  if (!Number.isSafeInteger(out.included) || !Number.isSafeInteger(out.total) || out.included < 0 || out.total < out.included) {
+    throw new Error('Invalid FSRS history count');
+  }
+  return out;
+}
+
+export function decodeFsrsDaily(bytes: Uint8Array, days: number): FsrsDailyOutput {
+  const r = new 协议读取器(bytes);
+  const out: FsrsDailyOutput = { accumulatedKnowledge: [], dailyReviews: [], dailyNew: [], dailyTimeSeconds: [] };
+  let tag;
+  while ((tag = r.读取标签()) !== null) {
+    switch (tag.字段号) {
+      case 1: out.accumulatedKnowledge.push(...(tag.线类型 === 2 ? r.读取打包浮点() : [r.读取浮点()])); break;
+      case 2: out.dailyReviews.push(...(tag.线类型 === 2 ? r.读取打包64位整数() : [r.读取变长整数()])); break;
+      case 3: out.dailyNew.push(...(tag.线类型 === 2 ? r.读取打包64位整数() : [r.读取变长整数()])); break;
+      case 4: out.dailyTimeSeconds.push(...(tag.线类型 === 2 ? r.读取打包浮点() : [r.读取浮点()])); break;
+      default: r.跳过字段(tag.线类型);
+    }
+  }
+  for (const values of [out.accumulatedKnowledge, out.dailyReviews, out.dailyNew, out.dailyTimeSeconds]) {
+    if (values.length !== days || values.some((value: number): boolean => !Number.isFinite(value) || value < 0)) {
+      throw new Error('Incomplete FSRS daily simulation response');
+    }
+  }
+  return out;
+}
+
 export function encodeComputeFsrsParams(input: ComputeFsrsParamsInput): Uint8Array {
   const w = new 协议写入器();
   w.写入字符串(1, input.search);

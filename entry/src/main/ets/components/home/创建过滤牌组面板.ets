@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { FormInputStyle } from '../../utils/FormInputStyle';
 import { DialogBackdrop } from '../common/DialogBackdrop';
-import { resourceText, showToastSafely } from '../../utils/UiFeedback';
+import { showToastSafely, resourceText } from '../../utils/UiFeedback';
 import { FormSelectRow } from '../common/FormSelectRow';
 
 import { DialogHeader } from '../common/DialogHeader';
@@ -47,6 +48,7 @@ interface 排序选项 {
 
 @Component
 export struct 创建过滤牌组面板 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
 
   private handleBackRequest(): void {
@@ -81,7 +83,7 @@ export struct 创建过滤牌组面板 {
     { 值: 过滤牌组排序.相对逾期程度, 标签资源: $r('app.string.filtered_deck_order_relative') }
   ];
 
-  private 取本地化文本(资源: Resource): string {
+  private 取本地化文本(资源: Resource, _locale: string = this.uiLanguage): string {
     return resourceText(this.getUIContext(), 资源);
   }
 
@@ -227,7 +229,7 @@ export struct 创建过滤牌组面板 {
       .constraintSize({ maxWidth: 480, maxHeight: '88%' })
       .padding(应用尺寸.面板内边距)
       .backgroundColor($r('app.color.surface_card'))
-      .borderRadius(应用尺寸.圆角_卡片)
+      .borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
       .onClick(() => {})
       .transition(TransitionEffect.asymmetric(
         TransitionEffect.opacity(0)

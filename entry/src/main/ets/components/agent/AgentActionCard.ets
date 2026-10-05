@@ -1,21 +1,28 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PrimaryActionButton } from '../common/PrimaryActionButton';
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { 按下态按钮 } from '../common/按下态按钮';
 
 import type { AgentAction } from '../../model/agent/AgentAction';
+import type { DeckReparentPlan, DeckPathChange } from '../../model/DeckReparent';
+import type { DeckRenamePlan } from '../../model/DeckRename';
 import type { AgentExtensionArguments } from '../../model/agent/AgentExtensionTools';
 import type { AgentMemoryChange } from '../../model/agent/AgentMemory';
 import type { AgentSettingChange } from '../../model/agent/AgentSettingsTools';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 颜色键 } from '../../model/颜色主题';
 import { AgentStylePreview } from './AgentStylePreview';
+import type { DeckReorderPlan, DeckOrderEntry } from '../../model/DeckReorder';
 import { resourceText, namedResourceText } from '../../utils/UiFeedback';
+import { maintenancePreviewRows } from '../../model/agent/AgentMaintenancePreview';
+import type { MaintenancePreviewRow } from '../../model/agent/AgentMaintenancePreview';
 
 interface AnalysisPreview { query: string; totalMatched: number; alreadyRead: number; }
 
 /** 用户确认的是可见提案内容，技术参数不进入默认确认界面。 */
 @Component
 export struct AgentActionCard {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop action: AgentAction;
   @Prop disabled: boolean = false;
   @StorageProp(颜色键.主色按钮背景) private primaryBackground: string = '#2F5FD0';
@@ -25,12 +32,22 @@ export struct AgentActionCard {
 
   private title(): ResourceStr {
     if (this.action.kind === 'create_deck') { return $r('app.string.ai_agent_action_deck'); }
+    if (this.action.kind === 'reparent_decks') { return $r('app.string.deck_move_title'); }
+    if (this.action.kind === 'rename_deck') { return $r('app.string.deck_rename_title'); }
+    if (this.action.kind === 'reorder_decks') { return $r('app.string.deck_menu_reorder'); }
     if (this.action.kind === 'create_notetype') { return $r('app.string.ai_agent_action_notetype'); }
     if (this.action.kind === 'memory_change') { return $r('app.string.ai_agent_action_memory'); }
     if (this.action.kind === 'setting_change') { return $r('app.string.ai_agent_action_setting'); }
+    if (this.action.kind === 'collection_preferences' || this.action.kind === 'study_controls') { return $r('app.string.ai_agent_action_advanced'); }
+    if (this.action.kind === 'export_subset') { return $r('app.string.ai_agent_action_export_subset'); }
+    if (this.action.kind === 'fsrs_simulation') { return $r('app.string.agent_tool_simulate_fsrs'); }
+    if (this.action.kind === 'deck_options_change') { return $r('app.string.deck_options_title'); }
     return $r('app.string.ai_agent_action_analysis');
   }
   private design(): AgentExtensionArguments { return JSON.parse(this.action.payloadJson) as AgentExtensionArguments; }
+  private reparent(): DeckReparentPlan { return JSON.parse(this.action.payloadJson) as DeckReparentPlan; }
+  private rename(): DeckRenamePlan { return JSON.parse(this.action.payloadJson) as DeckRenamePlan; }
+  private reorder(): DeckReorderPlan { return JSON.parse(this.action.payloadJson) as DeckReorderPlan; }
   private memory(): AgentMemoryChange { return JSON.parse(this.action.payloadJson) as AgentMemoryChange; }
   private analysis(): AnalysisPreview { return JSON.parse(this.action.payloadJson) as AnalysisPreview; }
   private setting(): AgentSettingChange { return JSON.parse(this.action.payloadJson) as AgentSettingChange; }
@@ -38,7 +55,7 @@ export struct AgentActionCard {
     const id: string = this.setting().settingId;
     if (id === 'color_theme') { return $r('app.string.appearance_color_theme'); }
     if (id === 'card_text_size') { return $r('app.string.card_text_size'); }
-    if (id === 'deck_list_narrow') { return $r('app.string.deck_width'); }
+    if (id === 'deck_list_style') { return $r('app.string.deck_width'); }
     if (id === 'study_haptics') { return $r('app.string.settings_study_haptics'); }
     return $r('app.string.settings_fsrs_label');
   }
@@ -51,16 +68,16 @@ export struct AgentActionCard {
     }
     return $r('app.string.ai_agent_setting_device_scope');
   }
-  private settingValue(value: string): string {
+  private settingValue(value: string, _locale: string = this.uiLanguage): string {
     if (this.setting().settingId === 'card_text_size') { return `${value}%`; }
-    if (this.setting().settingId === 'deck_list_narrow') {
-      return resourceText(this.getUIContext(), value === 'true' ? $r('app.string.deck_width_narrow') : $r('app.string.deck_width_wide'));
+    if (this.setting().settingId === 'deck_list_style') {
+      return namedResourceText(this.getUIContext(), 'deck_style_' + value);
     }
     return this.setting().settingId === 'color_theme' ? namedResourceText(this.getUIContext(), 'theme_color_' + value) :
       resourceText(this.getUIContext(), value === 'true' ? $r('app.string.ai_agent_setting_on') : $r('app.string.ai_agent_setting_off'));
   }
 
-  private layoutText(back: boolean): string {
+  private layoutText(back: boolean, _locale: string = this.uiLanguage): string {
     const design: AgentExtensionArguments = this.design();
     const front: string = design.kind === 'cloze' ? resourceText(this.getUIContext(),
       back ? $r('app.string.ai_agent_cloze_back_sample') : $r('app.string.ai_agent_cloze_front_sample'),
@@ -76,8 +93,42 @@ export struct AgentActionCard {
 
   @Builder
   private preview() {
-    if (this.action.kind === 'create_deck') {
+    if (this.action.kind === 'deck_options_change' || this.action.kind === 'collection_preferences' || this.action.kind === 'study_controls' || this.action.kind === 'export_subset' || this.action.kind === 'fsrs_simulation') {
+      ForEach(maintenancePreviewRows(this.action, (key: string): string => namedResourceText(this.getUIContext(), key)),
+        (row: MaintenancePreviewRow) => {
+          Text(row.title).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+          Text(row.before === '' ? row.after : this.maintenanceBeforeAfter(row.before, row.after))
+            .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary')).width('100%')
+        }, (row: MaintenancePreviewRow): string => row.title)
+      Text(this.action.kind === 'deck_options_change' ? $r('app.string.agent_deck_options_change_hint') : this.action.kind === 'fsrs_simulation' ? $r('app.string.agent_fsrs_simulation_hint') :
+        this.action.kind === 'export_subset' ? $r('app.string.agent_export_subset_hint') :
+        this.action.kind === 'collection_preferences' ? $r('app.string.agent_collection_preferences_hint') : $r('app.string.ai_agent_setting_device_scope'))
+        .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+    } else if (this.action.kind === 'create_deck') {
       Text(this.design().name).fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary'))
+    } else if (this.action.kind === 'reorder_decks') {
+      Text($r('app.string.deck_reorder_local_hint')).fontSize(应用尺寸.字号_正文_小)
+        .fontColor($r('app.color.text_secondary')).width('100%')
+      Text($r('app.string.deck_reorder_before')).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
+      Text(this.reorder().before.map((entry: DeckOrderEntry): string => entry.path).join('\n'))
+        .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary')).width('100%')
+      Text($r('app.string.deck_reorder_after')).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
+      Text(this.reorder().after.map((entry: DeckOrderEntry): string => entry.path).join('\n'))
+        .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary')).width('100%')
+    } else if (this.action.kind === 'rename_deck') {
+      Text($r('app.string.deck_rename_hint')).fontSize(应用尺寸.字号_正文_小)
+        .fontColor($r('app.color.text_secondary')).width('100%')
+      ForEach(this.rename().changes, (change: DeckPathChange) => {
+        Text(`${change.before} → ${change.after}`).fontSize(应用尺寸.字号_正文)
+          .fontColor($r('app.color.text_primary')).width('100%').copyOption(CopyOptions.LocalDevice)
+      }, (change: DeckPathChange): string => String(change.id))
+    } else if (this.action.kind === 'reparent_decks') {
+      Text($r('app.string.deck_move_hint')).fontSize(应用尺寸.字号_正文_小)
+        .fontColor($r('app.color.text_secondary')).width('100%')
+      ForEach(this.reparent().changes, (change: DeckPathChange) => {
+        Text(`${change.before} → ${change.after}`).fontSize(应用尺寸.字号_正文)
+          .fontColor($r('app.color.text_primary')).width('100%').copyOption(CopyOptions.LocalDevice)
+      }, (change: DeckPathChange): string => String(change.id))
     } else if (this.action.kind === 'create_notetype') {
       Text(this.design().name).fontSize(应用尺寸.字号_标题).fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.text_primary')).width('100%')
@@ -132,6 +183,10 @@ export struct AgentActionCard {
     }
   }
 
+  private maintenanceBeforeAfter(before: string, after: string): string {
+    return resourceText(this.getUIContext(), $r('app.string.ai_agent_setting_before_after'), before, after);
+  }
+
   build() {
     Column({ space: 应用尺寸.间距_8 }) {
       Text(this.title()).fontSize(应用尺寸.字号_正文).fontWeight(FontWeight.Bold)
@@ -156,7 +211,7 @@ export struct AgentActionCard {
       }
     }
     .width('100%').alignItems(HorizontalAlign.Start).padding(应用尺寸.卡片内边距)
-    .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+    .border(SurfaceBorder.options())
     .borderRadius(应用尺寸.圆角_面板)
     .backgroundColor($r('app.color.surface_card'))
   }

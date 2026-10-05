@@ -5,11 +5,12 @@ import { NotetypeTemplatePreview } from '../settings/NotetypeTemplatePreview';
 import { DialogFrame } from './DialogFrame';
 import { DialogHeader } from './DialogHeader';
 import { NoteEditorHeader } from './NoteEditorHeader';
-import { namedResourceText } from '../../utils/UiFeedback';
+import { localizedNamedResourceText } from '../../utils/UiFeedback';
 
 /** 新增、编辑与模板样例共用 Core 预览；外壳切换不改变草稿或媒体责任。 */
 @Component
 export struct NoteDraftPreview {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop input: NoteDraftPreviewInput;
   @Prop isDark: boolean = false;
   @Prop fullScreen: boolean = false;
@@ -33,7 +34,7 @@ export struct NoteDraftPreview {
     Column({ space: 8 }) {
       if (this.state.busy) { LoadingProgress().width(32).height(32) }
       if (this.state.error !== '') {
-        Text(this.state.error.startsWith('note_preview_') ? namedResourceText(this.getUIContext(), this.state.error) : this.state.error)
+        Text(this.state.error.startsWith('note_preview_') ? localizedNamedResourceText(this.getUIContext(), this.uiLanguage, this.state.error) : this.state.error)
           .fontColor($r('app.color.error_text'))
       }
     }.width('100%')

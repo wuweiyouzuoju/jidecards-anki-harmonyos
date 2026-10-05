@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../utils/PressFeedback';
+import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { DialogBackdrop } from './common/DialogBackdrop';
-import { resourceText, namedResourceText } from '../utils/UiFeedback';
+import { localizedNamedResourceText, resourceText, namedResourceText } from '../utils/UiFeedback';
 import { SelectStyle } from '../utils/SelectStyle';
 import { ThemeTextSpans } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
@@ -46,6 +47,7 @@ import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时
 
 @Component
 export struct 提醒编辑面板 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
   @Prop @Watch('publishInterface') busy: boolean = false;
@@ -98,12 +100,12 @@ export struct 提醒编辑面板 {
 
   private interfaceControls(): AppInterfaceMenuItem[] { return reminderEditorControls(this.是否新建, this.busy); }
   private interfaceLabel(id: string): string {
-    return interfaceControlText(this.getUIContext(), this.interfaceControls(), id);
+    return interfaceControlText(this.getUIContext(), this.interfaceControls(), id, this.uiLanguage);
   }
   private interfaceEnabled(id: string): boolean {
     return this.interfaceControls().find((item): boolean => item.id === id)?.enabled ?? false;
   }
-  private publishInterface(): void {
+  private publishInterface(_locale: string = this.uiLanguage): void {
     if (!this.interfaceMounted) return;
     const controls: AppInterfaceControl[] = this.interfaceControls().map((item): AppInterfaceControl =>
       ({ id: item.id, title: namedResourceText(this.getUIContext(), item.titleKey), titleKey: item.titleKey,
@@ -148,7 +150,7 @@ export struct 提醒编辑面板 {
     return 选项;
   }
 
-  private 取本地化文本(resource: Resource): string {
+  private 取本地化文本(resource: Resource, _locale: string = this.uiLanguage): string {
     return resourceText(this.getUIContext(), resource);
   }
 
@@ -169,7 +171,7 @@ export struct 提醒编辑面板 {
 
       Column({ space: 应用尺寸.间距_16 }) {
         DialogHeader({
-          title: namedResourceText(this.getUIContext(), reminderEditorTitle(this.是否新建)),
+          title: localizedNamedResourceText(this.getUIContext(), this.uiLanguage, reminderEditorTitle(this.是否新建)),
           actionLabel: this.interfaceLabel('confirm'),
           actionEnabled: this.interfaceEnabled('confirm'),
           closeLabel: this.interfaceLabel('cancel'),
@@ -203,7 +205,7 @@ export struct 提醒编辑面板 {
                 .optionFont(SelectStyle.optionFont)
                 .selectedOptionFont(SelectStyle.selectedOptionFont)
                 .textModifier(SelectStyle.labelText())
-                .borderRadius(SelectStyle.controlRadius)
+                .borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
                 .onSelect((index: number): void => {
                   this.小时 = index;
                 })
@@ -224,7 +226,7 @@ export struct 提醒编辑面板 {
                 .optionFont(SelectStyle.optionFont)
                 .selectedOptionFont(SelectStyle.selectedOptionFont)
                 .textModifier(SelectStyle.labelText())
-                .borderRadius(SelectStyle.controlRadius)
+                .borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
                 .onSelect((index: number): void => {
                   this.分钟 = index;
                 })
@@ -243,7 +245,7 @@ export struct 提醒编辑面板 {
               .fontColor($r('app.color.text_primary'))
               .placeholderColor($r('app.color.text_tertiary'))
               .backgroundColor($r('app.color.surface_page'))
-              .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
+              .border(SurfaceBorder.options())
               .borderRadius(应用尺寸.圆角_面板)
               .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
                 .enabled(this.interfaceEnabled('title'))
@@ -263,7 +265,7 @@ export struct 提醒编辑面板 {
               .fontColor($r('app.color.text_primary'))
               .placeholderColor($r('app.color.text_tertiary'))
               .backgroundColor($r('app.color.surface_page'))
-              .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
+              .border(SurfaceBorder.options())
               .borderRadius(应用尺寸.圆角_面板)
               .padding(应用尺寸.间距_8)
               .enabled(this.interfaceEnabled('content'))
@@ -273,7 +275,7 @@ export struct 提醒编辑面板 {
 
             // 快捷插入标签：点一下把占位符追加到内容末尾
             Row({ space: 应用尺寸.间距_8 }) {
-                Text() { ThemeTextSpans(this.interfaceLabel('insert_new'), this.themeAccentColors, this.getUIContext()) }
+                Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(this.interfaceLabel('insert_new'), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }
                 .fontSize(应用尺寸.字号_正文_小)
                 .fontColor(this.主色按钮背景)
                 .padding({ left: 应用尺寸.间距_12, right: 应用尺寸.间距_12, top: 6, bottom: 6 })
@@ -283,7 +285,7 @@ export struct 提醒编辑面板 {
                 .onClick((): void => {
                   this.插入占位符($r('app.string.reminder_edit_token_new'));
                 })
-                Text() { ThemeTextSpans(this.interfaceLabel('insert_review'), this.themeAccentColors, this.getUIContext()) }
+                Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(this.interfaceLabel('insert_review'), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }
                 .fontSize(应用尺寸.字号_正文_小)
                 .fontColor(this.主色按钮背景)
                 .padding({ left: 应用尺寸.间距_12, right: 应用尺寸.间距_12, top: 6, bottom: 6 })
@@ -341,7 +343,7 @@ export struct 提醒编辑面板 {
       .constraintSize({ maxWidth: 480 })
       .padding(应用尺寸.面板内边距)
       .backgroundColor($r('app.color.surface_card'))
-      .borderRadius(应用尺寸.圆角_卡片)
+      .borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
       .onClick(() => {
         // 阻断点击穿透到遮罩
       })

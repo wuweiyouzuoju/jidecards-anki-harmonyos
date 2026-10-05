@@ -1,14 +1,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { STUDY_LAYOUT_MODES } from '../StudyLayout';
+import { DECK_LIST_STYLES, DECK_LIST_STYLE_KEY, isDeckListStyle } from '../DeckListAppearance';
 export type AgentPreferenceValue = boolean | number | string;
 
 /** 只公开已经共用保存入口的设备偏好；新增项须同时接通执行器与确认预览。 */
 export function agentWritablePreferenceIds(): string[] {
-  return ['card_text_size', 'deck_list_narrow', 'study_haptics'];
+  return ['card_text_size', 'deck_list_style', 'study_haptics'];
 }
 
 /** @throws {Error} 模型只能提交白名单设置的规范值，不能选择底层存储键。 */
 export function decodeWritablePreference(id: string, value: string): AgentPreferenceValue {
   if (!agentWritablePreferenceIds().includes(id)) { throw new Error('unsupported_setting_write'); }
+  if (id === 'deck_list_style') {
+    if (!isDeckListStyle(value)) { throw new Error('invalid_setting_value'); }
+    return value;
+  }
   if (id === 'card_text_size') {
     const number: number = Number(value);
     if (!Number.isInteger(number) || number < 50 || number > 200 || `${number}` !== value) {
@@ -37,8 +43,8 @@ export function agentPreferenceDefinitions(): AgentPreferenceDefinition[] {
     { id: 'home_today_summary', description: '首页是否展示今日学习进度。', store: 'jidecards_settings', key: 'home_show_today_summary', defaultValue: true, allowedValues: [], encoding: 'native' },
     { id: 'study_haptics', description: '学习操作触觉反馈偏好，不保证设备支持振动。', store: 'jidecards_settings', key: 'studyHapticsEnabled', defaultValue: true, allowedValues: [], encoding: 'native' },
     { id: 'card_text_size', description: '卡片文字缩放百分比，50–200；模板可以有自己的字号。', store: 'jidecards_settings', key: 'cardTextSizePercent', defaultValue: 100, allowedValues: [], encoding: 'native' },
-    { id: 'deck_list_narrow', description: '牌组列表是否使用紧凑宽度。', store: 'jidecards_settings', key: 'deckListNarrow', defaultValue: false, allowedValues: [], encoding: 'native' },
-    { id: 'study_layout', description: '学习工具栏位置：bottom 底部，float 浮动。', store: 'jidecards_study_layout', key: 'study_layout_mode', defaultValue: 'bottom', allowedValues: ['bottom', 'float'], encoding: 'native' },
+    { id: 'deck_list_style', description: '外观中的牌组样式：single_wide 单列宽、single_narrow 单列窄、double_wide 双列宽、double_narrow 双列窄；双列按顶级牌组整棵子树分栏，隐藏新/学/复计数，名称最多两行；排序时临时单列。窄样式同步紧凑页面间距。', store: 'jidecards_settings', key: DECK_LIST_STYLE_KEY, defaultValue: 'single_wide', allowedValues: DECK_LIST_STYLES, encoding: 'native' },
+    { id: 'study_layout', description: '普通闪卡工具栏：bottom 底部，float 自由拖动，smart 智感握姿自动换边；需要设备支持并开启系统智感握姿，不支持时仍可拖动。选择题与白板沿用原操作区。', store: 'jidecards_study_layout', key: 'study_layout_mode', defaultValue: 'bottom', allowedValues: STUDY_LAYOUT_MODES, encoding: 'native' },
     { id: 'theme_motion', description: '主题背景动效偏好。', store: 'jidecards_redemption', key: 'motion', defaultValue: true, allowedValues: [], encoding: 'native' },
     { id: 'automatic_backups', description: '本地自动备份开关，不表示已有备份数量。', store: 'jidecards_settings', key: 'automatic_backups', defaultValue: true, allowedValues: [], encoding: 'native' },
     { id: 'auto_sync', description: '首页自动同步开关，不表示已登录或同步成功。', store: 'jidecards_sync', key: 'auto_sync_enabled_v2', defaultValue: false, allowedValues: [], encoding: 'native' },

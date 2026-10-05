@@ -12,6 +12,6 @@
 
 ## 验证
 
-- 至少运行 `npm run verify -- native`，覆盖环境、全部 Node、Rust fmt/clippy 和主机测试。
+- 运行受影响的真实 Core/沙箱行为测试及必要 fmt/clippy，不附带无关的全部 Node 测试。Core 主机完整入口为 `powershell -NoProfile -ExecutionPolicy Bypass -File tools/build-native.ps1 -Target host-test`；沙箱使用 `build-agent-sandbox.ps1 -Target host`。
 - 涉及 RPC、生成接口或 Anki checkout 时，同时运行 `node tools/verify-rpc-index.mjs`，并报告上游依赖是否可用。
-- 需要 HAP 集成的改动补运行 `npm run verify`；设备行为仍需单独验收。
+- 需要 HAP 集成时补一次增量构建；FFI、协议、工具链/依赖升级或大范围集成按[分级验证](../../../docs/development/verification.md#按变更路径选择验证)运行完整 `verify`。设备行为仍需单独验收。

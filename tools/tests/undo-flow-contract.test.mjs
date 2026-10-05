@@ -4,7 +4,7 @@
 // - 集合服务 只经 后端会话 走 后端集合(3) 的 7/8/9 方法索引；
 // - UndoStatus/OpChangesAfterUndo 解码器字段符合 collection.proto；
 // - StudyPage 撤销按钮真实接线 撤销()，撤销后重新取卡，失败走 errorDetail；
-// - 重做 仅服务层封装备用，UI 不暴露（上游移动端惯例）。
+// - 首页/浏览提供集合重做；学习页保持仅撤销。
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -106,7 +106,7 @@ test('study page undo button is wired to undo then refetch', () => {
 
   // 2026-07-28：撤销按钮从顶部条独立 Button 改为「更多」菜单项。
   // 菜单项 enabled 跟随 可撤销 状态（无可撤销时灰色不可点），点击触发 撤销上次()。
-  assert.match(page, /更多菜单\(\): MenuElement\[\]/, 'more menu builder exists');
+  assert.match(page, /更多菜单\(\): CardActionMenuEntry\[\]/, 'more menu builder exists');
   assert.match(read('entry/src/main/ets/model/AppInterface.ts'), /id: 'undo', titleKey: 'study_undo'/, 'undo label is shared');
   assert.match(page, /canUndo: this\.可撤销/, 'undo menu availability follows 可撤销 through shared model');
   assert.match(page, /this\.撤销上次\(\);/, 'menu item taps into undo handler');
@@ -121,7 +121,7 @@ test('study page undo button is wired to undo then refetch', () => {
     'undo failure surfaces through existing error state');
 });
 
-test('redo stays service-only and undo strings are resourced', () => {
+test('study keeps undo-only and undo strings are resourced', () => {
   const page = read(STUDY_PAGE);
   assert.doesNotMatch(page, /集合服务实例\.重做\(/, 'redo must not be exposed in study UI');
 

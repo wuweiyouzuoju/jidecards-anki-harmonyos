@@ -20,6 +20,7 @@ test('renderer starts unanchored answers at the top and preserves answer anchors
       const scrolls = [];
       const qa = { innerHTML: '', querySelectorAll: () => [] };
       const document = {
+        createElement: () => ({ getContext: () => null }),
         body: { className: 'card', scrollHeight: 3200 },
         querySelectorAll: () => [],
         getElementById: id => id === 'qa' ? qa : scenario.anchored
@@ -27,6 +28,7 @@ test('renderer starts unanchored answers at the top and preserves answer anchors
       };
       let onLoad, acknowledge;
       const window = {
+        requestAnimationFrame: callback => setImmediate(callback),
         addEventListener: (_event, callback) => { onLoad = callback; },
         scrollTo: (x, y) => scrolls.push(['top', x, y]),
         jideCardRuntime: { onRendered: (_id, _revision, error) => acknowledge(error) }
@@ -49,7 +51,7 @@ test('renderer starts unanchored answers at the top and preserves answer anchors
 });
 
 function harness() {
-  const loads = [], updates = [], shown = [], errors = [];
+  const loads = [], updates = [], shown = [], errors = [], backgrounds = [];
   const session = new CardWebSession({
     load: text => {
       const [, id, revision] = text.match(/\.start\((\d+),(\d+),/);
@@ -58,11 +60,43 @@ function harness() {
     evaluate: async script => vm.runInNewContext(script, { window: { __jideCardReviewer: {
       update: (id, revision, text, side, scroll) => updates.push({ id, revision, text, side, scroll })
     } } }),
-    shown: () => shown.push(true), failed: message => errors.push(message)
+    shown: background => { shown.push(true); backgrounds.push(background); }, failed: message => errors.push(message)
   });
-  const done = (item, error = '') => session.rendered(item.id, item.revision, error);
-  return { session, loads, updates, shown, errors, done };
+  const done = (item, error = '', background = '') => session.rendered(item.id, item.revision, error, background);
+  return { session, loads, updates, shown, errors, backgrounds, done };
 }
+
+test('only the current completed surface publishes a validated opaque background', () => {
+  const h = harness();
+  h.session.show(html('dark'), 1, 'question');
+  h.done(h.loads[0], '', '#101820');
+  h.session.show(html('answer'), 1, 'answer');
+  h.done(h.loads[0], '', '#ffffff');
+  assert.deepEqual(h.backgrounds, ['#101820'], 'old side does not replace the active background');
+  h.done(h.updates[0], '', '#203040');
+  h.session.show(html('next'), 2, 'question');
+  h.done(h.loads[1], '', 'url(untrusted)');
+  assert.deepEqual(h.backgrounds, ['#101820', '#203040', '']);
+  h.session.reset();
+  h.done(h.loads[1], '', '#ffffff');
+  assert.equal(h.backgrounds.length, 3, 'invalidated document cannot publish a background');
+});
+
+test('render acknowledgement waits for two animation frames after asynchronous hooks', async () => {
+  const frames = [], acknowledgements = [];
+  let load;
+  const document = { createElement: () => ({ getContext: () => null }),
+    getElementById: () => ({}), body: {}, querySelectorAll: () => [] };
+  const window = { addEventListener: (_event, callback) => { load = callback; }, scrollTo() {},
+    requestAnimationFrame: callback => frames.push(callback),
+    jideCardRuntime: { onRendered: (...args) => acknowledgements.push(args) } };
+  vm.runInNewContext(CARD_REVIEWER_RUNTIME, { window, document });
+  window.__jideCardReviewer.start(7, 12, 'question', false); load();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(frames.length, 1); assert.deepEqual(acknowledgements, []);
+  frames.shift()(); assert.deepEqual(acknowledgements, []);
+  frames.shift()(); assert.deepEqual(acknowledgements, [[7, 12, '', '']]);
+});
 
 test('same card flips through JavaScript, a new card or reset gets a new document', () => {
   const h = harness();
@@ -115,6 +149,7 @@ test('old completions cannot flush a new document; current script errors stay vi
 test('ArkWeb adapter installs its bridge before loading and shares the media origin', async () => {
   const loads = [], scripts = [];
   let proxy, shown = 0;
+  const backgrounds = [];
   const View = loadPlatformModule('utils/CardWebView.ets', 'CardWebView', {
     CardWebSession, 媒体基地址: 'https://jidecards-media.local/'
   });
@@ -123,12 +158,13 @@ test('ArkWeb adapter installs its bridge before loading and shares the media ori
       proxy = p; assert.equal(name, 'jideCardRuntime'); assert.deepEqual(methods, ['onRendered']);
     },
     loadData: (...args) => loads.push(args), runJavaScript: async script => { scripts.push(script); return ''; }
-  }, () => shown++, assert.fail);
+  }, background => { shown++; backgrounds.push(background); }, assert.fail);
   view.attach(); view.show(html('q'), 1, 'question');
   assert.equal(loads[0][3], 'https://jidecards-media.local/');
   const [, id, revision] = loads[0][0].match(/\.start\((\d+),(\d+),/);
-  proxy.onRendered(+id, +revision, '');
+  proxy.onRendered(+id, +revision, '', '#101820');
   assert.equal(shown, 1);
+  assert.deepEqual(backgrounds, ['#101820']);
   view.show(html('a'), 1, 'answer');
   assert.equal(loads.length, 1); assert.equal(scripts.length, 1);
 });

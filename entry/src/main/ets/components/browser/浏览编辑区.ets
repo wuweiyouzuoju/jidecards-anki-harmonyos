@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { FormInputStyle } from '../../utils/FormInputStyle';
+import { NoteTagsField } from '../common/NoteTagsField';
 import { common } from '@kit.AbilityKit';
 import { 图片遮罩编辑器 } from '../图片遮罩编辑器';
 import { 遮罩描述, parseOcclusionMasks, serializeOcclusionDocument } from '../../model/图片遮罩模型';
@@ -10,17 +10,18 @@ import { NoteEditorHeader } from '../common/NoteEditorHeader';
 import { PrimaryActionButton } from '../common/PrimaryActionButton';
 import { NoteDraftPreviewInput } from '../../model/NoteDraftPreview';
 import { EditableNote } from '../../proto/messages/NoteMessages';
+import { NotetypeField } from '../../proto/messages/NotetypeMessages';
 import { PAGE_SURFACE_KEY } from '../../model/ThemeCatalog';
-import { DECK_LIST_NARROW_KEY } from '../../model/DeckListAppearance';
+import { PAGE_COMPACT_LAYOUT_KEY } from '../../model/AppLayoutState';
 import { NoteFieldImage } from '../../model/NoteImageDraft';
-import { NoteFieldAudio } from '../../model/NoteAudioDraft';
+import { NoteFieldAudio, NoteAudioStatus } from '../../model/NoteAudioDraft';
 import { NoteAudioPreview } from '../../utils/NoteAudioPreview';
 import { discardNoteRecordings } from '../../utils/NoteAudioRecorder';
 import { noteDraftChanged, parseNoteTags } from '../../model/NoteFieldEditing';
 import { confirmNoteDiscard } from '../../utils/ConfirmNoteDiscard';
 import { resourceText, namedResourceText } from '../../utils/UiFeedback';
 import { appInterface } from '../../backend/AppInterfaceService';
-import { noteEditInterfaceControls, AppInterfaceMenuItem, AppInterfaceControl } from '../../model/AppInterface';
+import { noteEditInterfaceControls, noteAudioInterfaceObservation, AppInterfaceMenuItem, AppInterfaceControl } from '../../model/AppInterface';
 import { interfaceControlText } from '../../utils/AppInterfaceText';
 import { noteFieldText } from '../../utils/NoteTypeText';
 import { noteFieldDisplayKey } from '../../model/NoteTypePresentation';
@@ -33,8 +34,9 @@ import { 颜色键 } from '../../model/颜色主题';
 
 @Component
 export struct 浏览编辑区 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(PAGE_SURFACE_KEY) private pageSurface: string = '#F5F7FA';
-  @StorageProp(DECK_LIST_NARROW_KEY) private narrow: boolean = false;
+  @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrow: boolean = false;
   @StorageProp('导航条高度') private navigationBarHeight: number = 0;
   @Prop @Watch('requestClose') backRequest: number = 0;
   @Prop @Watch('restoreAfterPreview') previewReturnRequest: number = 0;
@@ -58,6 +60,7 @@ export struct 浏览编辑区 {
   @Prop @Watch('publishInterface') errorMessage: string = '';
   @Prop @Watch('publishInterface') originalStockKind: number = 0;
   @Prop @Watch('publishInterface') fieldNames: string[] = [];
+  @Prop fieldConfigs: NotetypeField[] = [];
   @Prop initialFieldValues: string[] = [];
   @Prop initialTags: string = '';
   @Prop note: EditableNote | null = null;
@@ -89,6 +92,7 @@ export struct 浏览编辑区 {
     this.disposed = true;
     this.interfaceMounted = false;
     appInterface.leave('edit_note_form');
+    appInterface.leave('note_audio_manage');
     this.audioPreview.dispose().catch((): void => {});
     if (!this.busy) discardNoteRecordings(this.audios).catch((): void => {});
   }
@@ -96,11 +100,15 @@ export struct 浏览编辑区 {
   private interfaceControls(): AppInterfaceMenuItem[] {
     return noteEditInterfaceControls(this.busy, this.busy || this.audioBusy || this.confirmingClose, this.fieldNames.length);
   }
-  private interfaceLabel(id: string): string { return interfaceControlText(this.getUIContext(), this.interfaceControls(), id); }
+  private publishAudioStatus(status: NoteAudioStatus | null): void {
+    if (status === null || this.disposed || !this.interfaceMounted) appInterface.leave('note_audio_manage');
+    else appInterface.observe(noteAudioInterfaceObservation(status));
+  }
+  private interfaceLabel(id: string): string { return interfaceControlText(this.getUIContext(), this.interfaceControls(), id, this.uiLanguage); }
   private interfaceEnabled(id: string): boolean {
     return this.interfaceControls().find((item): boolean => item.id === id)?.enabled ?? false;
   }
-  private publishInterface(): void {
+  private publishInterface(_locale: string = this.uiLanguage): void {
     if (!this.interfaceMounted || this.disposed) return;
     const controls: AppInterfaceControl[] = this.interfaceControls().map((item): AppInterfaceControl =>
       ({ id: item.id, title: namedResourceText(this.getUIContext(), item.titleKey), titleKey: item.titleKey,
@@ -174,7 +182,7 @@ export struct 浏览编辑区 {
     if (discard && !this.disposed && !this.busy) this.onCancel();
   }
 
-  private openPreview(): void {
+  private openPreview(_locale: string = this.uiLanguage): void {
     if (this.disposed || this.preview !== null || this.showingMasks || this.busy || this.audioBusy || this.confirmingClose || this.note === null) return;
     this.audioPreview.stop().catch((): void => {});
     const input: NoteDraftPreviewInput = { notetypeId: this.note.notetypeId, note: this.note,
@@ -189,7 +197,7 @@ export struct 浏览编辑区 {
     this.preview = null;
   }
 
-  private openMasks(): void {
+  private openMasks(_locale: string = this.uiLanguage): void {
     if (this.busy || this.audioBusy || this.confirmingClose || this.imageOcclusionFields.length !== 4) return;
     const imageField: number = this.imageOcclusionFields[1];
     const image: NoteMediaPart | undefined = noteMediaParts(this.fieldValues[imageField] ?? '')
@@ -232,6 +240,7 @@ export struct 浏览编辑区 {
           }
           ForEach(this.fieldNames, (name: string, index: number) => {
             NoteFieldCard({ fieldName: name, fieldIndex: index, originalStockKind: this.originalStockKind, value: this.fieldValues[index] ?? '',
+              fieldConfig: this.fieldConfigs[index] ?? null,
               disabled: this.busy || this.audioBusy || this.confirmingClose,
               reverseToggle: index === this.optionalReverseFieldOrd, editing: true,
               isDark: this.isDark, accent: this.主色按钮背景,
@@ -243,6 +252,7 @@ export struct 浏览编辑区 {
                 this.applyFieldMedia(index, value, images, audios);
               },
               onAudioBusy: (busy: boolean): void => { this.audioBusy = busy; },
+              onAudioStatus: (status: NoteAudioStatus | null): void => { this.publishAudioStatus(status); },
               onRemoveAudio: (id: number): void => {
                 const removed: NoteFieldAudio[] = this.audios.filter((item: NoteFieldAudio): boolean => item.id === id);
                 this.audios = this.audios.filter((item: NoteFieldAudio): boolean => item.id !== id);
@@ -256,10 +266,8 @@ export struct 浏览编辑区 {
           Column({ space: 应用尺寸.间距_8 }) {
             Text(this.interfaceLabel('tags')).fontSize(应用尺寸.字号_正文_小)
               .fontColor($r('app.color.text_secondary')).width('100%')
-            TextInput({ placeholder: $r('app.string.browser_detail_tags_placeholder'), text: this.tags })
-              .attributeModifier(new FormInputStyle())
-              .enabled(this.interfaceEnabled('tags'))
-              .onChange((value: string): void => { this.tags = value; })
+            NoteTagsField({ text: this.tags, isInteractive: this.interfaceEnabled('tags'),
+              onChange: (value: string): void => { this.tags = value; } })
           }.width('100%')
         }.width('100%')
       }.width('100%').layoutWeight(1).scrollBar(BarState.Auto).edgeEffect(EdgeEffect.Spring)

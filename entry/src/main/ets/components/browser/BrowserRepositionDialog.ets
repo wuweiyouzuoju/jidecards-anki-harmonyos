@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { DialogFrame } from '../common/DialogFrame';
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { DialogHeader } from '../common/DialogHeader';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 调度器服务 } from '../../backend/调度器服务';
@@ -59,6 +60,7 @@ export struct BrowserRepositionDialog {
         .fontColor($r('app.color.text_primary'))
         .layoutWeight(1)
       TextInput({ text: this.重新定位起始.toString() })
+        .border(SurfaceBorder.options())
         .width(80)
         .height(应用尺寸.按钮高度)
         .fontSize(应用尺寸.字号_正文)
@@ -80,6 +82,7 @@ export struct BrowserRepositionDialog {
         .fontColor($r('app.color.text_primary'))
         .layoutWeight(1)
       TextInput({ text: this.重新定位步长.toString() })
+        .border(SurfaceBorder.options())
         .width(80)
         .height(应用尺寸.按钮高度)
         .fontSize(应用尺寸.字号_正文)

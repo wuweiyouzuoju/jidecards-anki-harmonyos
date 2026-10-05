@@ -37,7 +37,7 @@ function harness(mode = 'system', systemDark = false) {
   const readSystemDarkMode = new Function('resourceManager', controllerJs + '\nreturn readSystemDarkMode;')(resources);
   const abilityDependencies = { ...dependencies, 应用颜色主题: applyColors, readSystemDarkMode,
     ConfigurationConstant: { ColorMode: { COLOR_MODE_DARK: 0, COLOR_MODE_LIGHT: 1, COLOR_MODE_NOT_SET: -1 } },
-    i18n: { System: { getAppPreferredLanguage: () => 'zh-Hans' } },
+    i18n: { System: { getAppPreferredLanguage: () => reads.language ?? 'zh-Hans' } },
     刷新桌面卡片数据: async () => {}, hilog: { error() {} }, DOMAIN: 0, APP_FOREGROUND_KEY: 'appForeground' };
   const Ability = new Function(...Object.keys(abilityDependencies),
     stripTypeScriptTypes(`class Ability { ${methods.join('\n')} }`, { mode: 'transform' }) + '\nreturn Ability;')(...Object.values(abilityDependencies));
@@ -69,7 +69,8 @@ test('configuration updates respect explicit app light/dark mode while system mo
 
 test('language and unspecified-color events do not reset the known system color mode', () => {
   for (const mode of ['light', 'dark', 'system']) {
-    const { ability, store, bars } = harness(mode, true);
+    const { ability, store, bars, reads } = harness(mode, true);
+    reads.language = 'en';
     for (const colorMode of [undefined, -1]) {
       ability.onConfigurationUpdate({ colorMode, language: 'en-US' });
       assert.equal(store.get('systemDarkMode'), true);

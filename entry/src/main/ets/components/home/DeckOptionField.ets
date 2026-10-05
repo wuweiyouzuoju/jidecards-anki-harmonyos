@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../../utils/PressFeedback';
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { 字段帮助对话框 } from '../字段帮助面板';
 import { DeckOptionRow } from './DeckOptionRow';
 import { DialogHeader } from '../common/DialogHeader';
+import { 按下态按钮 } from '../common/按下态按钮';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 
 export interface DeckOptionChoice {
@@ -17,6 +19,7 @@ export struct DeckOptionEditor {
   title: ResourceStr = '';
   help: ResourceStr = '';
   initialValue: string = '';
+  defaultValue: string | undefined = undefined;
   choices: DeckOptionChoice[] = [];
   validate: (value: string) => string = (_value: string): string => '';
   onConfirm: (value: string) => void = (_value: string): void => {};
@@ -41,11 +44,16 @@ export struct DeckOptionEditor {
           onClose: (): void => { this.controller?.close(); }, onAction: (): void => { this.confirm(); } })
         Scroll() {
           Column({ space: 应用尺寸.间距_12 }) {
+            if (this.defaultValue !== undefined) {
+              按下态按钮({ 文案: $r('app.string.deck_option_restore_default'), 点击回调: (): void => {
+                this.draft = this.defaultValue!; this.error = '';
+              } })
+            }
             if (this.choices.length === 0) {
               TextInput({ text: this.draft })
                 .width('100%').height(应用尺寸.按钮高度).fontSize(应用尺寸.字号_正文)
                 .backgroundColor($r('app.color.surface_card'))
-                .border({ width: 1, color: $r('app.color.border_input') }).borderRadius(应用尺寸.圆角_面板)
+                .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
                 .onChange((value: string): void => { this.draft = value; this.error = ''; })
             } else {
               ForEach(this.choices, (choice: DeckOptionChoice) => {
@@ -66,7 +74,7 @@ export struct DeckOptionEditor {
         }.width('100%').constraintSize({ maxHeight: 360 }).scrollBar(BarState.Auto)
       }
       .width('88%').constraintSize({ maxWidth: 480, maxHeight: '85%' })
-      .padding(应用尺寸.卡片内边距).backgroundColor($r('app.color.surface_card')).borderRadius(应用尺寸.圆角_卡片)
+      .padding(应用尺寸.卡片内边距).backgroundColor($r('app.color.surface_card')).borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
     }.width('100%').alignItems(HorizontalAlign.Center)
   }
 }
@@ -80,6 +88,7 @@ export struct DeckOptionField {
   @Prop choices: DeckOptionChoice[] = [];
   @Prop busy: boolean = false;
   @Prop error: string = '';
+  @Prop defaultValue: string | undefined = undefined;
   validate: (value: string) => string = (_value: string): string => '';
   onChange: (value: string) => void = (_value: string): void => {};
   @State private displayValue: string = '';
@@ -111,6 +120,7 @@ export struct DeckOptionField {
     if (this.busy) return;
     this.dialog = new CustomDialogController({
       builder: DeckOptionEditor({ title: this.title, help: this.help, initialValue: this.displayValue,
+        defaultValue: this.defaultValue,
         onHelp: (): void => { this.openHelp(); },
         choices: this.choices, validate: (value: string): string => this.validate(value),
         onConfirm: (value: string): void => {

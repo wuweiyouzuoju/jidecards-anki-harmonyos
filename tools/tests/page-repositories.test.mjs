@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { stripTypeScriptTypes } from 'node:module';
 import { loadPlatformModule } from './platform-module-harness.mjs';
 import { parseBrowserSavedSearches, loadBrowserSidebar, removeBrowserSavedSearch, serializeBrowserSavedSearches, upsertBrowserSavedSearch } from '../../entry/src/main/ets/model/BrowserSidebar.ts';
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
@@ -20,6 +22,98 @@ test('saved searches use the Anki savedFilters map and preserve CRUD semantics',
   if (renamed.ok) assert.deepEqual(renamed.items, [{ name: 'Today', search: 'is:due' }, { name: 'Marked', search: 'tag:marked' }]);
   const removed = removeBrowserSavedSearch(items, 'Marked');
   assert.equal(removed.ok, true);
+});
+
+function savedSearchAdapter(initialConfig = {}) {
+  const config = structuredClone(initialConfig), writes = [];
+  const failures = { read: null, write: null };
+  const Adapter = loadPlatformModule('backend/AnkiBrowserSidebar.ts', 'AnkiBrowserSidebar', {
+    牌组服务: class {}, 标签服务: class {},
+    配置服务: class {
+      async 获取配置JSON(key) {
+        if (failures.read) throw failures.read;
+        // Core GetConfigJson rejects absent keys on a collection with no saved searches.
+        if (!Object.hasOwn(config, key)) throw new Error('NotFound');
+        return JSON.stringify(config[key]);
+      }
+      async 获取全部配置() {
+        if (failures.read) throw failures.read;
+        return JSON.stringify(config);
+      }
+      async 设置配置JSON(request) {
+        if (failures.write) throw failures.write;
+        writes.push(request);
+        config[request.key] = JSON.parse(request.valueJson);
+      }
+    }
+  });
+  return { adapter: new Adapter(), reopen: () => new Adapter(), config, writes, failures };
+}
+
+test('first saved search initializes missing collection config and survives reopen, rename and delete', async () => {
+  const h = savedSearchAdapter({ flagLabels: { '1': '重点' } });
+  const empty = parseBrowserSavedSearches(await h.adapter.savedSearches());
+  assert.deepEqual(empty, []);
+  const saved = upsertBrowserSavedSearch(empty, '重点复习', 'deck:"英语" flag:1');
+  assert.equal(saved.ok, true);
+  await h.adapter.saveSavedSearches(serializeBrowserSavedSearches(saved.items));
+  const reopened = parseBrowserSavedSearches(await h.reopen().savedSearches());
+  assert.deepEqual(reopened, [{ name: '重点复习', search: 'deck:"英语" flag:1' }]);
+  const renamed = upsertBrowserSavedSearch(reopened, '英语重点', reopened[0].search, reopened[0].name);
+  await h.adapter.saveSavedSearches(serializeBrowserSavedSearches(renamed.items));
+  const removed = removeBrowserSavedSearch(parseBrowserSavedSearches(await h.adapter.savedSearches()), '英语重点');
+  await h.adapter.saveSavedSearches(serializeBrowserSavedSearches(removed.items));
+  assert.deepEqual(parseBrowserSavedSearches(await h.reopen().savedSearches()), []);
+  assert.deepEqual(h.config.flagLabels, { '1': '重点' });
+  assert.ok(h.writes.every(write => write.key === 'savedFilters' && write.undoable === false));
+});
+
+function savedSearchPage(adapter) {
+  const source = readFileSync(new URL('../../entry/src/main/ets/pages/浏览页.ets', import.meta.url), 'utf8');
+  const start = source.indexOf('  private async 提交保存搜索(');
+  const method = source.slice(start, source.indexOf('\n  }', start) + 4);
+  const Page = new Function('parseBrowserSavedSearches', 'upsertBrowserSavedSearch', 'serializeBrowserSavedSearches',
+    'showToastSafely', '$r', stripTypeScriptTypes(`class Page { ${method} }`, { mode: 'transform' }) + ';return Page;')(
+    parseBrowserSavedSearches, upsertBrowserSavedSearch, serializeBrowserSavedSearches, () => {}, key => key);
+  return Object.assign(new Page(), { sidebarBackend: adapter, 保存搜索忙碌: false, 显示保存搜索: true,
+    保存搜索编辑项: null, 保存搜索初始查询: 'is:due', 保存搜索错误: '', 已保存搜索列表: [],
+    operations: { isAlive: () => true }, 取本地化文案: key => key, getUIContext: () => ({}) });
+}
+
+test('save-search page creates first search, preserves existing searches and can reload its result', async () => {
+  const h = savedSearchAdapter(), page = savedSearchPage(h.adapter);
+  await page.提交保存搜索('今日到期');
+  assert.equal(page.保存搜索错误, '');
+  assert.equal(page.显示保存搜索, false);
+  assert.equal(page.保存搜索忙碌, false);
+  page.显示保存搜索 = true;
+  page.保存搜索初始查询 = 'flag:1';
+  await page.提交保存搜索('重点');
+  assert.deepEqual(page.已保存搜索列表, [
+    { name: '今日到期', search: 'is:due' }, { name: '重点', search: 'flag:1' }
+  ]);
+  assert.deepEqual(parseBrowserSavedSearches(await h.reopen().savedSearches()), page.已保存搜索列表);
+});
+
+test('save-search read and write failures retain the dialog for retry without overwriting existing searches', async () => {
+  const h = savedSearchAdapter({ savedFilters: { Existing: 'is:new' } }), page = savedSearchPage(h.adapter);
+  h.failures.read = new Error('collection unavailable');
+  await assert.rejects(h.adapter.savedSearches(), /collection unavailable/);
+  await page.提交保存搜索('今日到期');
+  assert.equal(page.保存搜索错误, 'app.string.browser_saved_search_save_error');
+  assert.equal(page.显示保存搜索, true);
+  assert.equal(h.writes.length, 0);
+  h.failures.read = null;
+  h.failures.write = new Error('disk failure');
+  await page.提交保存搜索('今日到期');
+  assert.equal(page.显示保存搜索, true);
+  assert.equal(page.保存搜索忙碌, false);
+  assert.deepEqual(h.config.savedFilters, { Existing: 'is:new' });
+  h.failures.write = null;
+  await page.提交保存搜索('今日到期');
+  assert.equal(page.显示保存搜索, false);
+  assert.equal(page.保存搜索错误, '');
+  assert.deepEqual(h.config.savedFilters, { Existing: 'is:new', 今日到期: 'is:due' });
 });
 test('sidebar tolerates missing preferences independently and retains cached decks without rereading', async () => {
   const cached = { id: 1 }, backend = { decks: async () => { throw new Error('should not read'); },

@@ -11,6 +11,7 @@
 // Invariants: separateInactive=true 时用 excludingInactive（暂停/埋藏单独计数）。
 
 import type { CardCounts, CardCountsBreakdown } from '../../proto/messages/StatsMessages';
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 颜色键 } from '../../model/颜色主题';
 import {
@@ -163,7 +164,7 @@ export struct 卡片状态分布 {
             }
             .width('100%')
             .padding({ top: 应用尺寸.间距_4 })
-            .border({ width: { top: 0.5 }, color: { top: $r('app.color.border_subtle') } })
+            .border(SurfaceBorder.options({ top: 0.5 }))
           }
           .width('100%')
         }

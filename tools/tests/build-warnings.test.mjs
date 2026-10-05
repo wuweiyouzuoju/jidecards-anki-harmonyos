@@ -69,6 +69,17 @@ test('complete verification rejects incomplete, appended, failed and incremental
   assert.equal(inspectBuildLog(clean + success, root, baseline, true).reduced.length, 1);
 });
 
+test('signing JVM heap announcement is informational while other launcher warnings remain visible', () => {
+  const note = '> hvigor WARN: Picked up JAVA_TOOL_OPTIONS: -Xmx2048m';
+  const result = inspectBuildLog(diagnostic() + '\n' + note + '\n' + success, root, baseline);
+  assert.equal(result.accepted, 1);
+  assert.deepEqual(result.unexpected, []);
+  for (const extra of [' -Dother=value', ' warning: invalid heap', '0m']) {
+    const text = extra === '0m' ? note.replace('2048m', extra) : note + extra;
+    assert.equal(inspectBuildLog(text + '\n' + success, root, baseline).unexpected.length, 1);
+  }
+});
+
 test('baselined resource merge must contain identical values, not a genuine override', t => {
   const root = mkdtempSync(join(tmpdir(), 'jidecards-warning-resources-'));
   t.after(() => {
@@ -106,6 +117,18 @@ test('checked-in baseline only allows documented dependency or SDK diagnostics',
   for (const warning of actual.warnings) assert.ok(actual.reasons[warning.reason]);
   assert.equal(actual.warnings.filter(w => w.reason === 'sdk-napi').length, 1);
   assert.match(readFileSync(new URL('../verify.mjs', import.meta.url), 'utf8'), /build-app\.ps1', '-Clean'/);
+});
+
+test('release SDK obfuscation advisory has an exact, single-occurrence allowance', () => {
+  const actual = JSON.parse(readFileSync(new URL('../build-warning-baseline.json', import.meta.url), 'utf8'));
+  const notice = actual.warnings.find(w => w.reason === 'sdk-obfuscation');
+  assert.ok(notice);
+  assert.equal(compareWarnings([notice], actual).unexpected.length, 0);
+  assert.equal(compareWarnings([notice, notice], actual).unexpected.length, 1);
+  assert.equal(compareWarnings([{...notice, message: notice.message + ' Extra diagnostic'}], actual).unexpected.length, 1);
+  assert.equal(compareWarnings([{...notice, file: 'entry/src/main/ets/pages/HomePage.ets'}], actual).unexpected.length, 1);
+  const log = '> hvigor WARN: ' + notice.message + '\n               Properly configure obfuscation rules to avoid runtime issues.\n' + success;
+  assert.equal(inspectBuildLog(log, root, actual).unexpected.length, 0);
 });
 
 test('dependency resolution, installed version, integrity and target SDK are all checked', t => {

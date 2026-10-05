@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { deckRenameName } from '../DeckRename';
 
 import type { ProviderFunctionTool } from './ProviderProtocol';
 import type { ToolRisk } from './AgentTypes';
 import type { AgentCardStyle } from './AgentCardStyle';
 import { AGENT_CARD_STYLE_SCHEMA, validateAgentCardStyle } from './AgentCardStyle';
+import { validateDeckReparentIds } from '../DeckReparent';
+import { validateDeckReorderIds } from '../DeckReorder';
 
 export interface AgentExtensionArguments {
   style?: AgentCardStyle;
@@ -13,6 +16,8 @@ export interface AgentExtensionArguments {
   frontFields: string[];
   backFields: string[];
   deckId: number;
+  deckIds: number[];
+  parentId: number;
   notetypeId: number;
   query: string;
   operation: string;
@@ -29,6 +34,8 @@ interface RawExtensionArguments {
   frontFields?: string[];
   backFields?: string[];
   deckId?: number;
+  deckIds?: number[];
+  parentId?: number;
   notetypeId?: number;
   query?: string;
   operation?: string;
@@ -57,6 +64,16 @@ export function agentExtensionTools(): ProviderFunctionTool[] {
       `"deckId":${id},"notetypeId":${id}`, '"deckId","notetypeId"', '{"deckId":1,"notetypeId":1}'),
     extensionTool('propose_create_deck', '提出新建牌组；用户确认后创建并选为生成目标。',
       '"name":{"type":"string","minLength":1,"maxLength":200}', '"name"', '{"name":"英语::词汇"}'),
+    extensionTool('propose_rename_deck', '提出真实牌组改名。先用 list_decks 发现 deckId；name 仅为当前层新名称，不能含 ::，移动父级用 propose_reparent_decks。展示该牌组及全部子牌组的前后路径，等待用户确认后调用 Core RenameDeck，可通过集合历史撤销，导出与同步使用新名称。本机显示名称保持不变。',
+      `"deckId":${id},"name":{"type":"string","minLength":1,"maxLength":200}`, '"deckId","name"', '{"deckId":1,"name":"词汇"}'),
+    extensionTool('get_deck_order', '读取与主页拖动排序一致的本机同级顺序，包含隐藏牌组；parentId=0 为顶级，其他父级先用 list_decks 发现。返回真实 ID 与完整路径。只读，本机顺序不同步到其他设备。',
+      '"parentId":{"type":"integer","minimum":0}', '"parentId"', '{"parentId":0}'),
+    extensionTool('propose_reorder_decks', '调整与主页拖动排序一致的本机同级顺序。先用 get_deck_order 读取当前排列，deckIds 必须包含该父级全部直接子牌组且不重复，顺序即最终显示顺序；parentId=0 为顶级。展示前后排列，等待用户确认；子树随父牌组显示，不改变层级或卡片归属，本机顺序不同步。跨父级使用 propose_reparent_decks。',
+      `"deckIds":{"type":"array","items":${id},"minItems":1,"maxItems":1000},"parentId":{"type":"integer","minimum":0}`,
+      '"deckIds","parentId"', '{"deckIds":[3,2,1],"parentId":0}'),
+    extensionTool('propose_reparent_decks', '提出调整已有牌组的父级，连同子牌组一起移动；parentId=0 提升为顶级。先用 list_decks 发现源与目标 ID。展示完整路径并等待用户确认，不移动卡片到其他牌组，也不修改本机别名。父子重叠选择合并；禁止移入自身、后代或筛选牌组，名称冲突须先解决。',
+      `"deckIds":{"type":"array","items":${id},"minItems":1,"maxItems":1000},"parentId":{"type":"integer","minimum":0}`,
+      '"deckIds","parentId"', '{"deckIds":[2,3],"parentId":1}'),
     extensionTool('propose_create_note_type', '设计新笔记类型并展示字段和正反面布局，用户确认后创建并选用。可用 style 指定背景色、文字颜色和排版。kind=normal 或 cloze；cloze 的 frontFields 必须只有一个填空字段。',
       `"name":{"type":"string","minLength":1,"maxLength":100},"kind":{"type":"string","enum":["normal","cloze"]},"fields":${fields},"frontFields":${fields},"backFields":${fields},"style":${AGENT_CARD_STYLE_SCHEMA}`,
       '"name","kind","fields","frontFields","backFields"',
@@ -72,8 +89,8 @@ export function agentExtensionTools(): ProviderFunctionTool[] {
 }
 
 export function extensionToolRisk(name: string): ToolRisk {
-  if (name === 'configure_create_target' || name === 'search_memory') { return 'read'; }
-  if (name === 'propose_create_deck' || name === 'propose_create_note_type' ||
+  if (name === 'configure_create_target' || name === 'search_memory' || name === 'get_deck_order') { return 'read'; }
+  if (name === 'propose_create_deck' || name === 'propose_rename_deck' || name === 'propose_reparent_decks' || name === 'propose_reorder_decks' || name === 'propose_create_note_type' ||
     name === 'propose_memory_change' || name === 'propose_analysis') { return 'write'; }
   return 'blocked';
 }
@@ -115,11 +132,18 @@ export function decodeExtensionArguments(name: string, json: string): AgentExten
     name: boundedString(raw.name, 200), kind: boundedString(raw.kind, 20),
     fields: stringList(raw.fields), frontFields: stringList(raw.frontFields), backFields: stringList(raw.backFields),
     deckId: raw.deckId ?? 0, notetypeId: raw.notetypeId ?? 0, query: boundedString(raw.query, 2000),
+    deckIds: raw.deckIds ?? [], parentId: raw.parentId ?? -1,
     operation: boundedString(raw.operation, 20), memoryId: boundedString(raw.memoryId, 200),
     text: boundedString(raw.text, 2000), scope: boundedString(raw.scope, 100)
   };
   if (name === 'configure_create_target' && (!Number.isSafeInteger(args.deckId) || args.deckId <= 0 ||
     !Number.isSafeInteger(args.notetypeId) || args.notetypeId <= 0)) { throw new Error('invalid_tool_arguments'); }
+  if (name === 'propose_reparent_decks') validateDeckReparentIds(args.deckIds, args.parentId);
+  if (name === 'propose_rename_deck') args.name = deckRenameName(args.deckId, args.name);
+  if (name === 'propose_reorder_decks') validateDeckReorderIds(args.deckIds, args.parentId);
+  if (name === 'get_deck_order' && (!Number.isSafeInteger(args.parentId) || args.parentId < 0)) {
+    throw new Error('invalid_tool_arguments');
+  }
   if ((name === 'propose_create_deck' || name === 'propose_create_note_type') && args.name.length === 0) {
     throw new Error('invalid_tool_arguments');
   }

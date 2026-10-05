@@ -70,7 +70,8 @@ export function buildFailedOperationsRetryDraft(original: ChangeDraft,
     operations.some((value: DraftOperation): boolean =>
       value.kind === 'update_field' || value.kind === 'update_tags');
   const retriesSharedType: boolean = operations.some((value: DraftOperation): boolean =>
-    value.kind === 'update_template' || value.kind === 'change_note_type' || value.kind === 'delete_note_type');
+    value.kind === 'update_template' || value.kind === 'change_note_type' || value.kind === 'delete_note_type' ||
+    value.kind === 'update_notetype_fields' || value.kind === 'restore_notetype' || value.kind === 'update_notetype_latex');
   return {
     id: retryId, risk: original.risk,
     summary: original.summary,
@@ -79,6 +80,9 @@ export function buildFailedOperationsRetryDraft(original: ChangeDraft,
     affectedCardIds: retriesNoteMutation || retriesSharedType ? original.affectedCardIds.slice() : uniquePositive(cardIds),
     affectedDeckIds: deckIds.length > 0 ? uniquePositive(deckIds) : original.affectedDeckIds.slice(),
     affectedNotetypeIds: original.affectedNotetypeIds.slice(), operations: operations,
-    imageAttachments: imageAttachments.length > 0 ? imageAttachments : undefined
+    imageAttachments: imageAttachments.length > 0 ? imageAttachments : undefined,
+    duplicateSource: original.duplicateSource === undefined ? undefined :
+      { noteId: original.duplicateSource.noteId, snapshot: original.duplicateSource.snapshot,
+        notetypeJson: original.duplicateSource.notetypeJson }
   };
 }

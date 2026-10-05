@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { GlassSurface } from '../utils/GlassSurface';
+import { GesturePointer, gesturePointer } from '../model/GesturePointer';
 import { GLASS_COLORS_KEY, GLASS_HIGHLIGHT_COLORS } from '../model/ThemeCatalog';
 //
 // 复习页浮动工具栏：可拖动，松手吸附到最近侧边（竖版贴左/右）。
@@ -7,14 +8,21 @@ import { GLASS_COLORS_KEY, GLASS_HIGHLIGHT_COLORS } from '../model/ThemeCatalog'
 // 避免形态跳变（曾实现拖动中横版/吸附后竖版双形态，已砍掉）。
 // 主工具栏（main）：question 阶段显示「显示答案」；answer 阶段显示 4 个评分按钮。
 // 位置以 vp 为单位持久化（StudyLayoutStore），未持久化时使用默认位置（右侧居中）。
-// 监听 display.on('change') 自动适配屏幕尺寸变化与横竖屏切换。
+// 父层提供实测容器尺寸与安全区；智感模式仅调整吸附侧，独立保存高度。
 
-import { display } from '@kit.ArkUI';
+import { StudyGripSensor } from '../backend/StudyGripSensor';
+import { StudyGripSession } from '../model/StudyGripSession';
+import { StudyGripAvailability, StudyToolbarSide, StudyToolbarBounds, studyToolbarBounds,
+  clampStudyToolbar } from '../model/StudyLayout';
+import { THEME_MOTION_KEY } from '../model/ThemeCatalog';
+import { showToastSafely } from '../utils/UiFeedback';
 import {
   加载工具栏位置,
   保存工具栏位置,
   学习工具栏标识,
-  工具栏位置
+  工具栏位置,
+  loadStudyGripHeight,
+  saveStudyGripHeight
 } from '../model/学习布局存储';
 import { 应用尺寸 } from '../utils/应用尺寸';
 import {
@@ -24,19 +32,11 @@ import {
   RATING_HARD
 } from '../proto/messages/SchedulerMessages';
 import {
-  边缘留白,
   工具栏宽度,
   工具栏高度,
   吸附侧
 } from '../utils/工具栏尺寸';
-import {
-  学习阶段,
-  吸附结果,
-  夹紧X方向,
-  夹紧Y方向,
-  吸附到侧边,
-  推断吸附侧
-} from '../utils/吸附计算器';
+import { 学习阶段 } from '../utils/吸附计算器';
 import { 颜色键 } from '../model/颜色主题';
 import { ThemeTextSpans } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
@@ -73,6 +73,7 @@ import { PRIMARY_GLASS_KEY, PrimaryGlassStyle, themePrimaryGlass } from '../mode
 
 @Component
 export struct 学习浮动工具栏 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @StorageProp(GLASS_COLORS_KEY) private glassColors: string[] = GLASS_HIGHLIGHT_COLORS;
   /** 沿用主工具栏的位置键，保留用户保存的拖动位置。 */
@@ -84,6 +85,27 @@ export struct 学习浮动工具栏 {
   @Prop 评分按钮文案: string[] = [];
   /** 暗色模式：与 StudyPage 同步，决定浮卡底色。 */
   @Prop 是否深色: boolean = false;
+  @Prop @Watch('gripActivityChanged') isGripLayout: boolean = false;
+  @Prop @Watch('gripActivityChanged') isGripActive: boolean = false;
+  @Prop @Watch('viewportChanged') viewportWidth: number = 0;
+  @Prop @Watch('viewportChanged') viewportHeight: number = 0;
+  @Prop @Watch('viewportChanged') topInset: number = 0;
+  @Prop @Watch('viewportChanged') bottomInset: number = 0;
+  @StorageProp(THEME_MOTION_KEY) private isMotionEnabled: boolean = true;
+  onGripState: (availability: StudyGripAvailability, side: StudyToolbarSide) => void =
+    (_availability: StudyGripAvailability, _side: StudyToolbarSide): void => {};
+  private gripAvailability: StudyGripAvailability = 'unchecked';
+  private mounted: boolean = false;
+  private touchIds: number[] = [];
+  private gripSession: StudyGripSession = new StudyGripSession(new StudyGripSensor(), {
+    schedule: (callback: () => void, delay: number): number => setTimeout(callback, delay),
+    cancel: (timer: number): void => { clearTimeout(timer); },
+    move: (side: StudyToolbarSide): void => { this.moveToGripSide(side); },
+    report: (availability: StudyGripAvailability): void => {
+      this.gripAvailability = availability;
+      if (this.mounted) this.onGripState(availability, this.当前吸附侧);
+    }
+  });
 
   /** 按钮回调：与 StudyPage 同名方法一一对应。 */
   显示答案回调: () => void = (): void => {};
@@ -103,11 +125,9 @@ export struct 学习浮动工具栏 {
   /** 拖动手势起点（手指落点 vp）和对应工具栏起点（左上角 vp），用于增量计算。 */
   private 拖动起点手指X: number = 0;
   private 拖动起点手指Y: number = 0;
+  private dragPointerId: number = -1;
   private 拖动起点位置X: number = 0;
   private 拖动起点位置Y: number = 0;
-
-  /** display.on('change') 回调引用，用于 aboutToDisappear 时 off。 */
-  private 屏幕变化回调: ((id: number) => void) | null = null;
 
   // 跟随用户选择的颜色主题（极光蓝/仙野绿/暗夜紫/碧涛青/活力橙/柠檬金）
   @StorageProp(颜色键.动作主色) private 动作主色: string = '#2F5FD0';
@@ -118,93 +138,92 @@ export struct 学习浮动工具栏 {
   @StorageProp(颜色键.主色边框) private 主色边框: string = '#B8CEFA';
 
   async aboutToAppear(): Promise<void> {
+    this.mounted = true;
     this.读取屏幕尺寸();
     await this.加载初始位置();
-    this.注册屏幕变化监听();
+    if (this.mounted) this.gripActivityChanged();
   }
 
   aboutToDisappear(): void {
-    this.注销屏幕变化监听();
+    this.mounted = false;
+    this.dragPointerId = -1;
+    this.touchIds = [];
+    this.gripSession.dispose();
   }
 
   // ========================================================
   // @块ID COMP-STUDY-TOOLBAR-002
-  // @名称 屏幕尺寸读取与变化监听
+  // @名称 窗口边界与握姿监听
   //
   // @作用
-  // 读取屏幕宽高（px→vp），注册 display.on('change') 监听屏幕旋转/分屏/缩放；
-  // 屏幕变化时按当前吸附侧重新贴边并夹紧位置，保证工具栏始终在可见区域内。
+  // 使用父容器实测尺寸，窗口变化时重新贴边；握姿会话只在可操作前台学习状态订阅。
   //
   // @输入
-  // 读取屏幕尺寸：无；注册监听：无；注销监听：无（读 this.屏幕变化回调）。
-  // 监听回调内读 this.屏幕宽vp / this.屏幕高vp / this.当前吸附侧 / this.工具栏类型 / this.当前阶段 / this.位置Y。
+  // 父层容器尺寸、安全区与可操作状态；握姿事件和工具栏触摸。
   //
   // @输出
-  // 更新 this.屏幕宽vp / this.屏幕高vp / this.位置X / this.位置Y / this.屏幕变化回调。
+  // 更新容器宽高、工具栏位置与真实握姿能力状态。
   //
   // @业务规则
-  // 取不到屏幕尺寸时用保守值 360×720，避免除零。
-  // 屏幕尺寸未变化时不处理（避免无谓重夹紧）。
-  // 按 当前吸附侧 重新贴到对应边：left/right 用 边缘留白，Y 经 夹紧Y方向。
+  // 容纳不下完整评分栏时由父层回退底部操作区；真实安全区只贡献一次。
   //
   // @副作用
-  // display.on('change') / display.off('change')；写入响应式 位置X/位置Y 触发重 build。
+  // 订阅/取消握姿事件，写入响应式位置并发布真实能力状态。
   // ========================================================
 
-  /** 同步读屏幕尺寸：display.getDefaultDisplaySync 返回 px，转 vp 后保存。 */
+  /** 使用父层实测窗口容器尺寸；分屏不再误用物理整屏尺寸。 */
   private 读取屏幕尺寸(): void {
-    try {
-      const 显示器: display.Display = display.getDefaultDisplaySync();
-      this.屏幕宽vp = this.getUIContext().px2vp(显示器.width);
-      this.屏幕高vp = this.getUIContext().px2vp(显示器.height);
-    } catch (error) {
-      // 取不到屏幕尺寸时用一个保守值，避免除零；后续拖动夹紧按 360×720 估。
-      this.屏幕宽vp = 360;
-      this.屏幕高vp = 720;
+    this.屏幕宽vp = this.viewportWidth;
+    this.屏幕高vp = this.viewportHeight;
+  }
+
+  private toolbarBounds(): StudyToolbarBounds {
+    return studyToolbarBounds(this.屏幕宽vp, this.屏幕高vp, this.topInset, this.bottomInset,
+      工具栏宽度(this.工具栏类型), 工具栏高度(this.工具栏类型, this.当前阶段));
+  }
+
+  private viewportChanged(): void {
+    this.读取屏幕尺寸();
+    if (!this.位置已加载) return;
+    this.cancelDrag();
+    this.gripSession.setTouching(this.touchIds.length > 0);
+    const bounds: StudyToolbarBounds = this.toolbarBounds();
+    this.位置X = this.当前吸附侧 === 'left' ? bounds.left : bounds.right;
+    this.位置Y = clampStudyToolbar(this.位置Y, bounds.top, bounds.bottom);
+    this.gripActivityChanged();
+  }
+
+  private gripActivityChanged(): void {
+    this.gripSession.setActive(this.mounted && this.位置已加载 && this.isGripLayout && this.isGripActive &&
+      this.toolbarBounds().fits && (this.当前阶段 === 'question' || this.当前阶段 === 'answer'));
+    if (!this.isGripActive) {
+      this.cancelDrag(); this.touchIds = []; this.gripSession.setTouching(false);
     }
   }
 
-  /** 注册屏幕变化监听：旋转、分屏、窗口缩放时重新读屏幕尺寸并夹紧位置。 */
-  private 注册屏幕变化监听(): void {
-    if (this.屏幕变化回调 !== null) {
-      return;
-    }
-    const 屏幕变化回调函数: (id: number) => void = (_id: number): void => {
-      const 旧宽: number = this.屏幕宽vp;
-      const 旧高: number = this.屏幕高vp;
-      this.读取屏幕尺寸();
-      // 屏幕尺寸未变化时不处理（避免无谓重夹紧）
-      if (this.屏幕宽vp === 旧宽 && this.屏幕高vp === 旧高) {
-        return;
-      }
-      // 按 当前吸附侧 重新贴到对应边
-      const 宽: number = 工具栏宽度(this.工具栏类型);
-      if (this.当前吸附侧 === 'left') {
-        this.位置X = 边缘留白;
-      } else {
-        this.位置X = Math.max(边缘留白, this.屏幕宽vp - 宽 - 边缘留白);
-      }
-      this.位置Y = 夹紧Y方向(this.位置Y, this.屏幕高vp, this.工具栏类型, this.当前阶段);
+  private moveToGripSide(side: StudyToolbarSide): void {
+    if (!this.mounted || !this.isGripActive) return;
+    const bounds: StudyToolbarBounds = this.toolbarBounds();
+    const move: () => void = (): void => {
+      this.当前吸附侧 = side;
+      this.位置X = side === 'left' ? bounds.left : bounds.right;
+      this.位置Y = clampStudyToolbar(this.位置Y, bounds.top, bounds.bottom);
     };
-    try {
-      display.on('change', 屏幕变化回调函数);
-      this.屏幕变化回调 = 屏幕变化回调函数;
-    } catch (error) {
-      // 监听失败不阻塞，仅丢失自动适配能力
-      this.屏幕变化回调 = null;
-    }
+    if (this.isMotionEnabled) this.getUIContext().animateTo({ duration: 150, curve: Curve.EaseOut }, move);
+    else move();
+    this.onGripState(this.gripAvailability, side);
   }
 
-  private 注销屏幕变化监听(): void {
-    if (this.屏幕变化回调 === null) {
-      return;
+  private handleToolbarTouch(event: TouchEvent): void {
+    if (event.type === TouchType.Cancel) this.touchIds = [];
+    else {
+      for (const point of event.changedTouches) {
+        if (point === undefined || point === null) continue;
+        if (event.type === TouchType.Down && !this.touchIds.includes(point.id)) this.touchIds.push(point.id);
+        if (event.type === TouchType.Up) this.touchIds = this.touchIds.filter((id: number): boolean => id !== point.id);
+      }
     }
-    try {
-      display.off('change', this.屏幕变化回调);
-    } catch (error) {
-      // ignore
-    }
-    this.屏幕变化回调 = null;
+    this.gripSession.setTouching(this.touchIds.length > 0 || this.dragPointerId >= 0);
   }
 
   // ========================================================
@@ -237,38 +256,42 @@ export struct 学习浮动工具栏 {
    *  推断 当前吸附侧 时按中心点 X 判断贴左还是贴右。 */
   private async 加载初始位置(): Promise<void> {
     const 已保存位置: 工具栏位置 | null = await 加载工具栏位置(this.工具栏类型);
-    if (已保存位置 !== null) {
-      const 推断结果 = 推断吸附侧(
-        已保存位置.x, 已保存位置.y,
-        this.屏幕宽vp, this.屏幕高vp,
-        this.工具栏类型, this.当前阶段
-      );
-      this.当前吸附侧 = 推断结果.吸附侧;
-      this.位置X = 夹紧X方向(已保存位置.x, this.屏幕宽vp, this.工具栏类型);
-      this.位置Y = 夹紧Y方向(已保存位置.y, this.屏幕高vp, this.工具栏类型, this.当前阶段);
-    } else {
-      const 默认位置值: 工具栏位置 = this.默认位置();
-      this.位置X = 默认位置值.x;
-      this.位置Y = 默认位置值.y;
-      this.当前吸附侧 = 'right';
+    let gripY: number | null = null;
+    if (this.isGripLayout) {
+      try { gripY = await loadStudyGripHeight(); }
+      catch (error) {
+        if (this.mounted) showToastSafely(this.getUIContext(), { message: $r('app.string.settings_study_grip_load_failed') });
+      }
     }
+    if (!this.mounted) return;
+    const bounds: StudyToolbarBounds = this.toolbarBounds();
+    this.当前吸附侧 = 已保存位置 !== null &&
+      已保存位置.x + 工具栏宽度(this.工具栏类型) / 2 < this.屏幕宽vp / 2 ? 'left' : 'right';
+    this.位置X = this.当前吸附侧 === 'left' ? bounds.left : bounds.right;
+    this.位置Y = clampStudyToolbar(gripY ?? 已保存位置?.y ?? this.默认位置().y, bounds.top, bounds.bottom);
+    this.gripSession.restoreSide(this.当前吸附侧);
     this.位置已加载 = true;
   }
 
   /** 默认位置：贴右侧垂直居中。 */
   private 默认位置(): 工具栏位置 {
-    const 宽: number = 工具栏宽度(this.工具栏类型);
     const 高: number = 工具栏高度(this.工具栏类型, this.当前阶段);
+    const bounds: StudyToolbarBounds = this.toolbarBounds();
     const 位置: 工具栏位置 = {
-      x: 夹紧X方向(this.屏幕宽vp - 宽 - 边缘留白, this.屏幕宽vp, this.工具栏类型),
-      y: 夹紧Y方向((this.屏幕高vp - 高) / 2, this.屏幕高vp, this.工具栏类型, this.当前阶段)
+      x: bounds.right,
+      y: clampStudyToolbar((this.屏幕高vp - 高) / 2, bounds.top, bounds.bottom)
     };
     return 位置;
   }
 
   /** 持久化当前位置（fire-and-forget）。 */
-  private 持久化位置(): void {
-    保存工具栏位置(this.工具栏类型, this.位置X, this.位置Y);
+  private async 持久化位置(): Promise<void> {
+    try {
+      if (this.isGripLayout) await saveStudyGripHeight(this.位置Y);
+      else await 保存工具栏位置(this.工具栏类型, this.位置X, this.位置Y);
+    } catch (error) {
+      if (this.mounted) showToastSafely(this.getUIContext(), { message: $r('app.string.settings_study_grip_save_failed') });
+    }
   }
 
   // ========================================================
@@ -298,33 +321,54 @@ export struct 学习浮动工具栏 {
   /** PanGesture 起点：记录手指落点和工具栏起点。
    *  松手时按中心点 X 贴到左/右较近一侧。 */
   private 拖动开始(event: GestureEvent): void {
-    this.拖动起点手指X = event.fingerList[0].localX;
-    this.拖动起点手指Y = event.fingerList[0].localY;
+    const point: GesturePointer | null = gesturePointer(event.fingerInfos, event.fingerList);
+    if (point === null) return;
+    this.dragPointerId = point.id;
+    this.gripSession.setTouching(true);
+    this.拖动起点手指X = point.localX;
+    this.拖动起点手指Y = point.localY;
     this.拖动起点位置X = this.位置X;
     this.拖动起点位置Y = this.位置Y;
   }
 
   /** PanGesture 移动：按手指偏移量更新工具栏位置（vp）。 */
   private 拖动更新(event: GestureEvent): void {
-    const 手指X_vp: number = event.fingerList[0].localX;
-    const 手指Y_vp: number = event.fingerList[0].localY;
+    if (this.dragPointerId < 0) return;
+    const point: GesturePointer | null = gesturePointer(event.fingerInfos, event.fingerList, this.dragPointerId);
+    if (point === null) return;
+    const 手指X_vp: number = point.localX;
+    const 手指Y_vp: number = point.localY;
     const 增量X: number = 手指X_vp - this.拖动起点手指X;
     const 增量Y: number = 手指Y_vp - this.拖动起点手指Y;
-    this.位置X = 夹紧X方向(this.拖动起点位置X + 增量X, this.屏幕宽vp, this.工具栏类型);
-    this.位置Y = 夹紧Y方向(this.拖动起点位置Y + 增量Y, this.屏幕高vp, this.工具栏类型, this.当前阶段);
+    const bounds: StudyToolbarBounds = this.toolbarBounds();
+    if (!this.isGripLayout || this.gripAvailability !== 'available') {
+      this.位置X = clampStudyToolbar(this.拖动起点位置X + 增量X, bounds.left, bounds.right);
+    }
+    this.位置Y = clampStudyToolbar(this.拖动起点位置Y + 增量Y, bounds.top, bounds.bottom);
   }
 
   /** PanGesture 结束：吸附到最近侧边（左/右）并持久化。 */
   private 拖动结束(): void {
-    const 吸附结果值: 吸附结果 = 吸附到侧边(
-      this.位置X, this.位置Y,
-      this.屏幕宽vp, this.屏幕高vp,
-      this.工具栏类型, this.当前阶段
-    );
-    this.位置X = 吸附结果值.x;
-    this.位置Y = 吸附结果值.y;
-    this.当前吸附侧 = 吸附结果值.吸附侧;
+    if (this.dragPointerId < 0) return;
+    this.dragPointerId = -1;
+    const bounds: StudyToolbarBounds = this.toolbarBounds();
+    if (!this.isGripLayout || this.gripAvailability !== 'available') {
+      this.当前吸附侧 = this.位置X + 工具栏宽度(this.工具栏类型) / 2 < this.屏幕宽vp / 2 ? 'left' : 'right';
+    }
+    this.位置X = this.当前吸附侧 === 'left' ? bounds.left : bounds.right;
+    this.位置Y = clampStudyToolbar(this.位置Y, bounds.top, bounds.bottom);
+    this.gripSession.restoreSide(this.当前吸附侧);
+    this.gripSession.setTouching(this.touchIds.length > 0);
+    if (this.isGripLayout) this.onGripState(this.gripAvailability, this.当前吸附侧);
     this.持久化位置();
+  }
+
+  private cancelDrag(): void {
+    if (this.dragPointerId < 0) return;
+    this.dragPointerId = -1;
+    this.位置X = this.拖动起点位置X;
+    this.位置Y = this.拖动起点位置Y;
+    this.gripSession.setTouching(this.touchIds.length > 0);
   }
 
   /** 阶段切换回调（@Watch 当前阶段）：main 工具栏高度随阶段变化
@@ -334,8 +378,7 @@ export struct 学习浮动工具栏 {
     if (!this.位置已加载) {
       return;
     }
-    this.位置X = 夹紧X方向(this.位置X, this.屏幕宽vp, this.工具栏类型);
-    this.位置Y = 夹紧Y方向(this.位置Y, this.屏幕高vp, this.工具栏类型, this.当前阶段);
+    this.viewportChanged();
   }
 
   // ========================================================
@@ -406,7 +449,7 @@ export struct 学习浮动工具栏 {
   @Builder
   private 竖版显示答案按钮() {
     Button({ type: ButtonType.Normal }) {
-      Text() { ThemeTextSpans($r('app.string.study_show_answer'), this.themeAccentColors, this.getUIContext()) }
+      Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans($r('app.string.study_show_answer'), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }
         .maxLines(2)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
         .textAlign(TextAlign.Center)
@@ -523,6 +566,7 @@ export struct 学习浮动工具栏 {
       .width(工具栏宽度(this.工具栏类型))
       .height(工具栏高度(this.工具栏类型, this.当前阶段))
       .position({ x: this.位置X, y: this.位置Y })
+      .onTouch((event: TouchEvent): void => { this.handleToolbarTouch(event); })
       .gesture(
         PanGesture()
           .onActionStart((event: GestureEvent): void => {
@@ -534,6 +578,7 @@ export struct 学习浮动工具栏 {
           .onActionEnd((): void => {
             this.拖动结束();
           })
+          .onActionCancel((): void => { this.cancelDrag(); })
       )
     }
   }

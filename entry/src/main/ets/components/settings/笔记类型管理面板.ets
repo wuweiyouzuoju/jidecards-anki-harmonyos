@@ -2,7 +2,7 @@
 import { noteTypeText } from '../../utils/NoteTypeText';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PressFeedback } from '../../utils/PressFeedback';
-import { resourceText, showToastSafely } from '../../utils/UiFeedback';
+import { showToastSafely, resourceText } from '../../utils/UiFeedback';
 import { ThemeTextSpans } from '../common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
@@ -50,6 +50,7 @@ import type { NotetypeNameId } from '../../proto/messages/NotetypeMessages';
 
 @Component
 export struct 笔记类型管理面板 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
 
   private handleBackRequest(): void {
@@ -89,7 +90,7 @@ export struct 笔记类型管理面板 {
 
   aboutToDisappear(): void { this.mounted = false; this.readVersion++; this.writes.dispose(); }
 
-  private 取本地化文本(资源: Resource): string {
+  private 取本地化文本(资源: Resource, _locale: string = this.uiLanguage): string {
     return resourceText(this.getUIContext(), 资源);
   }
 
@@ -185,7 +186,7 @@ export struct 笔记类型管理面板 {
       按下态按钮({ 文案: $r('app.string.notetype_clone'), 是否启用: !this.加载中 && !this.处理中,
         点击回调: (): void => { this.openCreate(类型.id, 类型.name); } })
       // 编辑按钮
-      Text() { ThemeTextSpans($r('app.string.notetype_mgmt_edit'), this.themeAccentColors, this.getUIContext()) }
+      Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans($r('app.string.notetype_mgmt_edit'), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }
         .fontSize(应用尺寸.字号_正文_小)
         .fontColor(this.主色按钮背景)
         .padding({ left: 12, right: 12, top: 6, bottom: 6 })

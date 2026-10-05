@@ -30,3 +30,18 @@ test('a new search invalidates old pagination and old finally cannot unlock its 
   const first = h.session.more(() => true); assert.equal(await h.session.more(() => true), null);
   load.resolve({cells: [], color: 0}); assert.equal((await first).consumed, 300);
 });
+
+test('star is independent of flag and suspension, survives pagination and uses the selected ID mode', async () => {
+  const h=harness(),modes=[];
+  h.backend.markedIds=async notes=>{modes.push(notes);return [1,201,303];};
+  h.backend.row=async()=>({cells:[],color:9});
+  h.backend.search=async request=>request.search==='suspended'?[1,201]:Array.from({length:303},(_,i)=>i+1);
+  const first=await h.session.search({...query,notes:true},()=>true);
+  assert.deepEqual(first.rows[0],{id:1,cells:[],color:9,hasSuspendedCards:true,marked:true});
+  assert.equal(first.rows[1].marked,false);
+  const next=await h.session.more(()=>true);assert.equal(next.rows.find(x=>x.id===201).marked,true);
+  const last=await h.session.more(()=>true);assert.equal(last.rows.find(x=>x.id===303).marked,true);
+  assert.deepEqual(modes,[true]);
+  h.backend.markedIds=async()=>{throw Error('marks unreadable');};
+  await assert.rejects(h.session.search(query,()=>true),/marks unreadable/);
+});

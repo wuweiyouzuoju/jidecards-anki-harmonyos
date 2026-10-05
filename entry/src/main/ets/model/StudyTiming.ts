@@ -2,6 +2,7 @@
 
 /** 当前卡片所属牌组的学习展示选项；调度算法仍完全由 Core 执行。 */
 export class StudyOptions {
+  customSchedulingScript: string = '';
   autoplay: boolean = true;
   skipQuestionWhenReplayingAnswer: boolean = false;
   waitForAudio: boolean = true;
@@ -25,6 +26,7 @@ export class StudyAutoAdvanceSettings {
 
   resolve(base: StudyOptions): StudyOptions {
     return {
+      customSchedulingScript: base.customSchedulingScript,
       autoplay: base.autoplay,
       skipQuestionWhenReplayingAnswer: base.skipQuestionWhenReplayingAnswer,
       waitForAudio: base.waitForAudio,

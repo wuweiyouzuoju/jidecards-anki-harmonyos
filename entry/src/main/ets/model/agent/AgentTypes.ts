@@ -5,7 +5,7 @@
 export type AgentMode = 'create' | 'edit' | 'assistant';
 export type ProviderId = 'deepseek' | 'openai' | 'custom';
 export type SearchMode = 'auto' | 'always' | 'off';
-export type ToolRisk = 'read' | 'setting_write' | 'write' | 'high_risk' | 'blocked';
+export type ToolRisk = 'read' | 'navigation' | 'setting_write' | 'write' | 'high_risk' | 'blocked';
 
 export interface ProviderCapabilities {
   text: boolean;
@@ -106,7 +106,7 @@ export interface AgentEvent {
 export type DraftOperationKind =
   'create_note' | 'update_field' | 'update_tags' | 'move_card' |
   'change_note_type' | 'update_template' | 'delete_note' | 'delete_card' |
-  'delete_deck' | 'delete_note_type';
+  'delete_deck' | 'delete_note_type' | 'update_notetype_fields' | 'restore_notetype' | 'update_notetype_latex';
 
 export type ChangeDraftStatus = 'pending' | 'prepared' | 'executing' |
   'partial' | 'completed' | 'conflict' | 'failed';
@@ -122,6 +122,7 @@ export interface DraftOperation {
 }
 
 export interface ChangeDraft {
+  duplicateSource?: DuplicateNoteSource;
   id: string;
   risk: ToolRisk;
   summary: string;
@@ -136,6 +137,8 @@ export interface ChangeDraft {
   /** 兼容旧草稿；新建/更新图片草稿会填充此数组。 */
   imageAttachments?: AgentImageAttachment[];
 }
+
+export interface DuplicateNoteSource { noteId: number; snapshot: string; notetypeJson: string; }
 
 export interface AgentTurnLimits {
   maxProviderCalls: number;

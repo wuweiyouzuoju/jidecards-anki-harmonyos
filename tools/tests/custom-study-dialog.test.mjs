@@ -75,6 +75,21 @@ test('custom study accepts negative limit deltas and rejects decimal/zero input'
   assert.equal(h.preferences.size, 0);
 });
 
+test('zero defaults or available count do not block a positive new-card extension', async () => {
+  for (const availableNew of [0, 12]) {
+    const h = harness();
+    h.scheduler.获取自定义学习默认值 = async () => ({ ...defaults, extendNew: 0, availableNew });
+    await h.dialog.加载默认值();
+    assert.equal(h.dialog.输入值, '0');
+    assert.equal(h.dialog.可提交(), false);
+    h.dialog.输入值 = '10';
+    assert.equal(h.dialog.可提交(), true);
+    await h.dialog.执行提交();
+    assert.deepEqual(h.calls, [[123, 2, 10], 'success', 'close']);
+    assert.equal(h.dialog.错误信息, '');
+  }
+});
+
 test('custom study preference failure does not report the accepted creation as failed', async () => {
   const h = harness(); await h.dialog.加载默认值(); h.dialog.切换预设(5);
   h.store.save = async () => { throw Error('disk full'); };

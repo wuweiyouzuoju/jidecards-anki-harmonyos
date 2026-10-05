@@ -1,29 +1,29 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { settingsItemText } from '../../utils/SettingsStructureText';
-import { DECK_LIST_NARROW_KEY } from '../../model/DeckListAppearance';
-import { saveDeckListNarrow } from '../../utils/DeckListAppearanceStore';
-import { SelectStyle } from '../../utils/SelectStyle';
-import { resourceText } from '../../utils/UiFeedback';
+import { DECK_LIST_STYLE_KEY, DECK_LIST_STYLES, deckListStyleTitleKey } from '../../model/DeckListAppearance';
+import { saveDeckListStyle } from '../../utils/DeckListAppearanceStore';
+import { FormSelectRow } from '../common/FormSelectRow';
+import { localizedNamedResourceText } from '../../utils/UiFeedback';
 
 @Component
 export struct DeckWidthControl {
-  @StorageProp(DECK_LIST_NARROW_KEY) private narrow: boolean = false;
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
+  @StorageProp(DECK_LIST_STYLE_KEY) private style: string = 'single_wide';
   @State private saving: boolean = false;
   @State private saveFailed: boolean = false;
 
-  private options(): SelectOption[] {
-    return [
-      { value: resourceText(this.getUIContext(), $r('app.string.deck_width_wide')) },
-      { value: resourceText(this.getUIContext(), $r('app.string.deck_width_narrow')) }
-    ];
+  private options(_locale: string = this.uiLanguage): SelectOption[] {
+    return DECK_LIST_STYLES.map((style: string): SelectOption => {
+      return { value: localizedNamedResourceText(this.getUIContext(), _locale, deckListStyleTitleKey(style)) };
+    });
   }
 
   private async selectWidth(index: number): Promise<void> {
-    if (this.saving || index < 0 || index > 1 || (index === 1) === this.narrow) return;
+    if (this.saving || index < 0 || index >= DECK_LIST_STYLES.length || DECK_LIST_STYLES[index] === this.style) return;
     this.saving = true;
     this.saveFailed = false;
     try {
-      await saveDeckListNarrow(index === 1);
+      await saveDeckListStyle(DECK_LIST_STYLES[index]);
     } catch (error) {
       this.saveFailed = true;
     } finally {
@@ -33,31 +33,10 @@ export struct DeckWidthControl {
 
   build() {
     Column({ space: 4 }) {
-      Row() {
-        Text(settingsItemText(this.getUIContext(), 'deck_list_narrow'))
-          .fontSize(15)
-          .fontColor($r('app.color.text_primary'))
-          .layoutWeight(1)
-        Select(this.options())
-          .selected(this.narrow ? 1 : 0)
-          .value(resourceText(this.getUIContext(), this.narrow
-            ? $r('app.string.deck_width_narrow') : $r('app.string.deck_width_wide')))
-          .attributeModifier(new SelectStyle())
-          .height(SelectStyle.controlHeight)
-          .padding(SelectStyle.controlPadding)
-          .space(SelectStyle.controlSpace)
-          .width(SelectStyle.fieldWidth)
-          .constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
-          .font(SelectStyle.controlFont)
-          .optionFont(SelectStyle.optionFont)
-          .selectedOptionFont(SelectStyle.selectedOptionFont)
-          .textModifier(SelectStyle.labelText())
-          .borderRadius(SelectStyle.controlRadius)
-          .enabled(!this.saving)
-          .onSelect((index: number): void => { this.selectWidth(index); })
-      }
-      .width('100%')
-      .height(48)
+      FormSelectRow({ label: settingsItemText(this.getUIContext(), 'deck_list_style', this.uiLanguage),
+        options: this.options(), selectedIndex: DECK_LIST_STYLES.indexOf(this.style),
+        value: localizedNamedResourceText(this.getUIContext(), this.uiLanguage, deckListStyleTitleKey(this.style)),
+        isInteractive: !this.saving, onSelect: (index: number): void => { this.selectWidth(index); } })
       if (this.saveFailed) {
         Text($r('app.string.deck_width_save_failed'))
           .fontSize(12)

@@ -175,24 +175,21 @@ export async function 加载牌组别名映射(牌组ID列表: string[]): Promis
  * 名称为空串时删除键（表示用户改回原名，不再覆盖）。
  * 注意：本函数只写本地 preferences，不调后端 rename_deck，因此后端真实 deck name 保持不变，
  * 导出 apkg/同步到其他设备时仍显示后端原名。
+ * @throws {Error} 偏好不可用或写入失败，调用方保留草稿并报告失败。
  */
 export async function 保存牌组别名(牌组ID: string, 名称: string): Promise<void> {
   const 上下文: common.UIAbilityContext | null = 获取能力上下文();
   if (上下文 === null) {
-    return;
+    throw new Error('deck_alias_storage_unavailable');
   }
-  try {
-    const 存储: preferences.Preferences = await preferences.getPreferences(上下文, 存储名);
-    const 去除首尾空格: string = 名称.trim();
-    if (去除首尾空格 === '') {
-      await 存储.delete(别名键(牌组ID));
-    } else {
-      await 存储.put(别名键(牌组ID), 去除首尾空格);
-    }
-    await 存储.flush();
-  } catch (错误) {
-    // 偏好不可用时仅丢失持久化，不阻塞 UI。
+  const 存储: preferences.Preferences = await preferences.getPreferences(上下文, 存储名);
+  const 去除首尾空格: string = 名称.trim();
+  if (去除首尾空格 === '') {
+    await 存储.delete(别名键(牌组ID));
+  } else {
+    await 存储.put(别名键(牌组ID), 去除首尾空格);
   }
+  await 存储.flush();
 }
 
 /**

@@ -8,6 +8,7 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 
 @Component
 export struct PackageImportOptions {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('loadOptions') options: ImportAnkiPackageOptions = DEFAULT_IMPORT_ANKI_PACKAGE_OPTIONS;
   @Prop isInteractive: boolean = true;
   @Prop isDark: boolean = false;
@@ -26,7 +27,7 @@ export struct PackageImportOptions {
     this.onChange({ withScheduling: this.scheduling, withDeckConfigs: this.configs,
       mergeNotetypes: this.merge, updateNotes: this.notes, updateNotetypes: this.notetypes });
   }
-  private text(value: Resource): string { return resourceText(this.getUIContext(), value); }
+  private text(value: Resource, _locale: string = this.uiLanguage): string { return resourceText(this.getUIContext(), value); }
   private updateLabels(): string[] {
     return [this.text($r('app.string.transfer_update_newer')), this.text($r('app.string.transfer_update_always')),
       this.text($r('app.string.transfer_update_never'))];

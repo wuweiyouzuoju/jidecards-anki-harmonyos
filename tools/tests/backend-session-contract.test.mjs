@@ -38,27 +38,28 @@ test('method ids match the generated backend.rs dispatch table', () => {
   });
   assert.deepEqual({ ...牌组方法 }, {
     新建牌组: 0, 添加牌组: 1, 牌组树: 4, 获取牌组名: 13,
-    删除牌组: 16, 重命名牌组: 18,
+    删除牌组: 16, 调整牌组父级: 17, 重命名牌组: 18,
     获取或创建过滤牌组: 19, 添加或更新过滤牌组: 20, 过滤牌组排序标签: 21,
     设置当前牌组: 22, 获取当前牌组: 23, getAllDecksLegacy: 6
   });
   assert.deepEqual({ ...牌组配置方法 }, {
-    获取牌组配置: 1, 获取牌组配置编辑视图: 6, 更新牌组配置: 7
+    获取牌组配置: 1, 获取牌组配置编辑视图: 6, 更新牌组配置: 7, getIgnoredBeforeCount: 8
   });
   assert.deepEqual({ ...调度器方法 }, {
     获取队首卡片: 3, 提交评分: 4, 今日计时: 5,
     牌组今日计数: 10, 完成页信息: 11,
     恢复埋藏与暂停: 12, 按牌组恢复埋藏: 13, 埋藏或暂停: 14,
-    清空过滤牌组: 15, 重建过滤牌组: 16,
+    清空过滤牌组: 15, 重建过滤牌组: 16, scheduleCardsAsNew: 17, scheduleCardsAsNewDefaults: 18,
     设置到期日: 19, 排序卡片: 21,
     描述下一档状态: 24, 自定义学习: 27, 自定义学习默认值: 28,
-    重新定位默认值: 29, computeFsrsParams: 30, simulateFsrsWorkload: 34
+    重新定位默认值: 29, computeFsrsParams: 30, simulateFsrsWorkload: 34,
+    evaluateParamsLegacy: 36, computeMemoryState: 37, simulateFsrsReview: 33
   });
   assert.deepEqual({ ...卡片渲染方法 }, { 提取音视频标签: 3, extractLatex: 4, 获取空卡: 5, 渲染既有卡片: 6,
-    renderUncommittedCardLegacy: 8 });
+    renderUncommittedCardLegacy: 8, encodeIriPaths: 11, compareAnswer: 15, extractClozeForTyping: 16 });
   assert.deepEqual({ ...导入导出方法 }, {
     导入集合包: 0, 导出集合包: 1,
-    导入Anki包: 2, 导出Anki包: 4, 获取CSV元数据: 5, 导入CSV: 6, exportNoteCsv: 7, exportCardCsv: 8
+    导入Anki包: 2, getImportAnkiPackagePresets: 3, 导出Anki包: 4, 获取CSV元数据: 5, 导入CSV: 6, exportNoteCsv: 7, exportCardCsv: 8
   });
   // Type-in-the-Answer 翻面拉取笔记字段：笔记方法.获取笔记=6 + 笔记类型方法.获取笔记类型=6
   // 浏览编辑区 T7 保存修改：笔记方法.更新笔记=5（UpdateNotes RPC，返回 OpChanges）
@@ -71,7 +72,7 @@ test('method ids match the generated backend.rs dispatch table', () => {
   assert.deepEqual({ ...笔记类型方法 }, {
     添加笔记类型旧版: 2, 更新笔记类型旧版: 3, 获取标准笔记类型JSON: 5,
     获取笔记类型: 6, 获取笔记类型旧版: 7, 获取笔记类型名列表: 8, 移除笔记类型: 11,
-    获取变更笔记类型信息: 14, 变更笔记类型: 15, 获取填空字段序号: 18
+    获取变更笔记类型信息: 14, 变更笔记类型: 15, restoreNotetypeToStock: 17, 获取填空字段序号: 18
   });
 });
 

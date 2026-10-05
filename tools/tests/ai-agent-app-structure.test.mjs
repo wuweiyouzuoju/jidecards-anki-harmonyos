@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { APP_INTERFACE_SURFACES, AppInterfaceTracker, visibleInterfaceItems } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { appInterfaceSurfaceIds, browserInterfaceMenu, studyInterfaceMenu } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { agentInterfaceControls, agentInterfaceTitle, agentImportLabelKey, reminderEditorControls, reminderEditorTitle } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { stripTypeScriptTypes } from 'node:module';
 import { SETTINGS_GROUPS, settingsItem, visibleSettingsGroups } from '../../entry/src/main/ets/model/SettingsStructure.ts';
-import { buildAgentAppStructure } from '../../entry/src/main/ets/model/agent/AgentAppStructure.ts';
+import { buildAgentAppStructure, agentInterfaceRevision } from '../../entry/src/main/ets/model/agent/AgentAppStructure.ts';
+import { isDoubleColumnDeckListStyle } from '../../entry/src/main/ets/model/DeckListAppearance.ts';
+import { OFFICIAL_ANNOUNCEMENTS_ENABLED } from '../../entry/src/main/ets/model/官方公告配置.ts';
 import { agentSettingDefinitions, decodeSettingsArguments } from '../../entry/src/main/ets/model/agent/AgentSettingsTools.ts';
 import { agentFunctionTools } from '../../entry/src/main/ets/model/agent/AgentToolCatalog.ts';
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
+import { appInterfaceDependencies, studyInterfaceMethods } from './app-interface-harness.mjs';
 import { loadUiFeedback } from './ui-feedback-harness.mjs';
 
 const read = path => readFileSync(new URL('../../entry/src/main/ets/' + path, import.meta.url),'utf8');
@@ -21,9 +24,75 @@ const localize = key => { assert.ok(zh.has(key), 'missing UI resource: '+key); r
 const tools = agentFunctionTools(100,'assistant');
 const structure = (state=context, surface='app', section='') => buildAgentAppStructure(state,surface,section,localize,agentSettingDefinitions(),tools,[]);
 
+test('JIDE reads current Core rendering ownership and the same supported TTS parameters as the player',()=>{
+  const support=structure().cardRendering;
+  assert.equal(support.mediaPaths,'anki-core');
+  assert.equal(support.answerComparison,'anki-core');
+  assert.equal(support.clozeTyping,'anki-core');
+  assert.equal(support.tts.backend,'HarmonyOS CoreSpeechKit');
+  assert.equal(support.tts.voicePrefix,'HarmonyOS_');
+  assert.deepEqual([support.tts.minimumSpeed,support.tts.maximumSpeed],[0.5,2]);
+  assert.deepEqual(support.tts.otherArguments,['volume','pitch']);
+  assert.equal(support.tts.voiceAvailability,'device-installed voices only');
+  assert.equal(support.avOrder,'core-tag-order; adjacent same-kind items may be batched');
+  const editor=structure().noteEditing;
+  assert.deepEqual(editor.fieldOptions,['rtl','font','size','description','plainText','collapsed']);
+  assert.equal(editor.plainTextMeaning,'default_html_source_preserving_formatting');
+  assert.deepEqual([editor.minimumFontSize,editor.maximumFontSize],[5,300]);
+});
+
+test('JIDE uses the editor button instruction resource for selection formatting in both languages',()=>{
+  for(const labels of [zh,en]){
+    for(const id of ['add_note','edit_note_form']){
+      const declaration=APP_INTERFACE_SURFACES.find(surface=>surface.id===id);
+      assert.equal(declaration.instructionsKey,'note_editor_format_action');
+      const app=buildAgentAppStructure(context,id,'',key=>labels.get(key),agentSettingDefinitions(),tools,[]);
+      assert.equal(app.surfaces.find(surface=>surface.id===id).instructions,labels.get('note_editor_format_action'));
+    }
+  }
+});
+
+// 只检查实际静态调用；注释、字符串示例和非字面量参数不冒充可验证的绑定。
+function settingsLabelBindings(source) {
+  const tokens=[...source.matchAll(/\/\*[\s\S]*?\*\/|\/\/[^\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|[\p{L}_$][\p{L}\p{N}_$]*|[^\s]/gu)]
+    .map(x=>x[0]).filter(x=>!x.startsWith('//')&&!x.startsWith('/*'));
+  const ids=[];
+  for(let index=0;index<tokens.length;index++) {
+    if(tokens[index]!=='settingsItemText'||tokens[index+1]!=='(')continue;
+    let depth=1;
+    for(let cursor=index+2;cursor<tokens.length;cursor++) {
+      if(tokens[cursor]==='(')depth++;
+      if(tokens[cursor]===')'&&--depth===0)break;
+      if(tokens[cursor]!==','||depth!==1)continue;
+      const value=tokens[cursor+1];
+      if(/^(['"])[^'"\\]+\1$/.test(value??'')&&[',',')'].includes(tokens[cursor+2]))ids.push(value.slice(1,-1));
+      break;
+    }
+  }
+  return ids;
+}
+
+function assertRegisteredSettingsLabels(sources, ids) {
+  for(const {path,source} of sources)for(const id of settingsLabelBindings(source))
+    assert.ok(ids.has(id),`${path}: unregistered settingsItemText ID: ${id}`);
+}
+
+test('the real browser batch menu respects the current Agent capability gate', () => {
+  const tracker = new AppInterfaceTracker();
+  const Batch = loadComponentLogic('components/browser/批量操作栏.ets', '批量操作栏',
+    { ...appInterfaceDependencies(), appInterface: tracker, visibleInterfaceItems, namedResourceText: (_, key) => localize(key) });
+  const batch = new Batch();batch.getUIContext = () => ({});batch.选中数 = 1;
+  batch.aboutToAppear();assert.ok(!tracker.snapshot()[0].optionIds.includes('agent'));
+  batch.selectItem('agent');
+  let called = 0;batch.onAI改卡 = () => called++;batch.Agent入口已启用 = true;batch.publishInterface();
+  assert.ok(tracker.snapshot()[0].optionIds.includes('agent'));
+  batch.selectItem('agent');assert.equal(called, 1);
+  batch.busy = true;batch.selectItem('agent');assert.equal(called, 1);
+});
+
 test('settings card counts and item visibility use the UI mode and current theme, without inventing conditional states', () => {
   const simple=structure(context,'settings','scheduler');
-  assert.equal(simple.visibleSettingsSectionCount,9); assert.equal(simple.sections[0].cardCount,3);
+  assert.equal(simple.visibleSettingsSectionCount,9); assert.equal(simple.sections[0].cardCount,2);
   assert.equal(simple.sections[0].cards.find(x=>x.id==='algorithm').visible,false);
   const full=structure({...context,simple:false},'settings','scheduler');
   assert.equal(full.visibleSettingsSectionCount,10); assert.equal(full.sections[0].cardCount,4);
@@ -42,6 +111,10 @@ test('settings card counts and item visibility use the UI mode and current theme
 test('setting knowledge and the current tool declarations remain separate from permission to act', () => {
   const view=structure(context,'settings','appearance');
   const items=view.sections[0].cards[0].items;
+  assert.equal(items.find(x=>x.id==='deck_list_style').title,zh.get('deck_width'));
+  assert.equal(items.find(x=>x.id==='deck_list_style').readTool,'get_settings');
+  assert.equal(items.find(x=>x.id==='deck_list_style').writeTool,'propose_set_setting');
+  assert.equal(items.some(x=>x.id==='deck_list_narrow'),false);
   assert.equal(items.find(x=>x.id==='theme_mode').writeTool,'set_theme_mode');
   assert.equal(items.find(x=>x.id==='theme_motion').writeTool,'');
   const limited=buildAgentAppStructure(context,'settings','appearance',localize,agentSettingDefinitions(),[],[]);
@@ -55,13 +128,14 @@ test('setting knowledge and the current tool declarations remain separate from p
   assert.throws(()=>decodeSettingsArguments('get_app_structure','{"surface":"app","token":"secret"}'));
   assert.equal(decodeSettingsArguments('get_app_structure','{}').surface,'app');
   assert.ok(view.coverage.includes('browser'));
-  assert.ok(!view.coverage.includes('deck_options'),'a known destination is not a detailed page description');
+  assert.ok(view.coverage.includes('deck_options'));
+  assert.ok(!view.coverage.includes('deck_options_advanced'),'unregistered nested UI is not detailed coverage');
   for (const surface of appInterfaceSurfaceIds()) assert.equal(decodeSettingsArguments('get_app_structure',JSON.stringify({surface})).surface,surface);
 });
 
 test('real menu components enumerate the same options as JIDE and dispatch every callback exactly once', () => {
   for(const [file,name,surface,callbacks] of [
-    ['components/home/主页更多面板.ets','主页更多面板','home_more',{settings:'设置回调',agent:'onAgent',sync:'onSync',browser:'浏览回调',stats:'统计回调',reminders:'提醒回调',intro:'onIntro'}],
+    ['components/home/主页更多面板.ets','主页更多面板','home_more',{history:'onHistory',settings:'设置回调',stats:'统计回调',reminders:'提醒回调',intro:'onIntro'}],
     ['components/主页操作面板.ets','主页操作面板','home_create',{create_deck:'创建牌组回调',filtered_deck:'onCreateFilteredDeck',import:'导入牌组回调',cloud_deck:'获取直链牌组回调'}]
   ]) {
     const tracker=new AppInterfaceTracker();
@@ -92,6 +166,25 @@ test('shared label edits and localized resources flow to UI labels and JIDE on t
   assert.equal(interfaceItemText(ui,'home','more'),localize('study_more'));
   const english=buildAgentAppStructure(context,'home_more','',key=>en.get(key),agentSettingDefinitions(),[],[]);
   assert.equal(english.surfaces[0].items[0].title,en.get('top_settings'));
+});
+
+test('new settings, renames, visibility changes and removals flow from the shared declaration without a separate JIDE directory', () => {
+  const group=SETTINGS_GROUPS.find(x=>x.id==='general_display');const before=agentInterfaceRevision(tools);
+  const item={id:'future_setting',titleKey:'deck_width'};
+  const settingsItemText=loadPlatformModule('utils/SettingsStructureText.ets','settingsItemText',
+    {SETTINGS_GROUPS,settingsItem,namedResourceText:(_context,key)=>localize(key)});
+  const get=(state=context)=>structure(state,'settings','general').sections[0].cards.find(x=>x.id===group.id).items.find(x=>x.id===item.id);
+  group.items.push(item);
+  try {
+    assert.equal(settingsItemText({},item.id),localize(item.titleKey));assert.equal(get().title,localize(item.titleKey));
+    assert.equal(get().visibility,'available_in_section');assert.equal(get().readTool,'');assert.equal(get().writeTool,'');
+    assert.notEqual(agentInterfaceRevision(tools),before);
+    const added=agentInterfaceRevision(tools);item.titleKey='settings_title';
+    assert.equal(get().title,settingsItemText({},item.id));assert.notEqual(agentInterfaceRevision(tools),added);
+    item.fullOnly=true;assert.equal(get().visibility,'hidden');assert.equal(get({...context,simple:false}).visibility,'available_in_section');
+    group.items.pop();assert.equal(get(),undefined);assert.equal(settingsItemText({},item.id),'[future_setting]');
+    assert.equal(agentInterfaceRevision(tools),before);
+  } finally {if(group.items.includes(item))group.items.splice(group.items.indexOf(item),1);}
 });
 
 test('live observations copy mutable state, replace changed options and remove closed views', () => {
@@ -167,35 +260,65 @@ function pageMethods(file,names,deps) {
   return new Function(...Object.keys(deps),stripTypeScriptTypes('class Page {'+methods.join('\n')+'}',{mode:'transform'})+';return Page;')(...Object.values(deps));
 }
 
-test('study UI keeps action ordering and dispatch, and publishes fresh card phases and menu states', () => {
+test('study UI preserves actions and JIDE observes expanded left groups and flags without invented Back controls', () => {
   const tracker=new AppInterfaceTracker();
-  const Page=pageMethods('pages/学习页.ets',['interfaceMenuItems','更多菜单','executeMenuAction','publishInterface'],{
-    studyInterfaceMenu,visibleInterfaceItems,appInterface:tracker,namedResourceText:(_,key)=>localize(key),
+  const deps=appInterfaceDependencies();
+  const Page=pageMethods('pages/学习页.ets',['interfaceMenuItems','更多菜单','flagMenuItems','toggleStudyMenuBranch','studyMenuEntry','studyMenuIcon','executeMenuAction','publishInterface','publishStudyMenu'],{
+    ...deps, appInterface:tracker,namedResourceText:(_,key)=>localize(key),
+    flagMenuChoices:loadPlatformModule('components/common/FlagMenuChoices.ets','flagMenuChoices',{
+      ...deps, customFlagLabel:(labels,flag)=>labels[String(flag)]??'', namedResourceText:(_,key)=>localize(key)}),
     BURY_SUSPEND_MODE_BURY_USER:0,BURY_SUSPEND_MODE_SUSPEND:1});
   const page=new Page(),calls=[];
-  Object.assign(page,{getUIContext:()=>({}),mounted:true,页面已显示:true,studyMenuOpen:true,阶段:'question',评分中:false,
-    当前卡片:{cardId:42},有音频:false,可撤销:false,Agent入口已启用:true,简洁模式:true,choiceQuestion:null,
+  Object.assign(page,{getUIContext:()=>({}),mounted:true,页面已显示:true,studyMenuOpen:true,studyExpandedIds:['marking','card_actions'],flagLabels:{'7':'Custom purple'},阶段:'question',评分中:false,
+    当前卡片:{cardId:42},currentMarking:{flag:7,marked:false},有音频:false,可撤销:false,Agent入口已启用:true,简洁模式:true,choiceQuestion:null,
     牌组名:'Deck',新卡剩余:1,学习中剩余:2,复习剩余:3,
     openNoteEditor:()=>calls.push('edit'),playStudyAudio:()=>calls.push('audio'),showStudyGuide:()=>calls.push('guide'),
     撤销上次:()=>calls.push('undo'),埋藏或暂停当前卡:mode=>calls.push(mode===0?'bury':'suspend'),请求删除当前卡:()=>calls.push('delete'),
+    changeMarking:()=>calls.push('mark'),loadFlagLabels:()=>calls.push('flag'),
     打开AI改卡:()=>calls.push('agent'),stopStudyTimers:()=>calls.push('handwrite'),configureAutoAdvance:()=>calls.push('auto_advance')});
-  const ids=['edit','audio','guide','undo','bury','suspend','delete','agent','handwrite','auto_advance'];
+  const ids=['edit','agent','undo','marking','audio','card_actions','handwrite','guide'];
   assert.deepEqual(page.interfaceMenuItems().map(x=>x.id),ids);
   assert.equal(page.更多菜单()[0].value,localize('study_edit_note'));
-  assert.equal(page.更多菜单().at(-1).value,localize('study_auto_advance_title'));
-  page.有音频=true;page.可撤销=true;for(const item of page.更多菜单())item.action();assert.deepEqual(calls,ids);
-  page.publishInterface();let result=buildAgentAppStructure(context,'study_more','',localize,[],[],tracker.snapshot(),'study');
-  assert.equal(result.surfaces[0].items.find(x=>x.id==='edit').enabled,true);
-  page.评分中=true;page.publishInterface();result=buildAgentAppStructure(context,'study_more','',localize,[],[],tracker.snapshot());
+  page.有音频=true;page.可撤销=true;
+  for(const item of page.更多菜单()) { for(const action of item.children??[item]) action.action(); }
+  assert.deepEqual(calls,['edit','agent','undo','mark','flag','audio','bury','suspend','delete','auto_advance','handwrite','guide']);
+  assert.equal(page.flagNamesOpen,true);
+  for(const [expanded,surfaces] of [
+    [[],['study_more']],
+    [['marking','card_actions'],['study_more','study_marking','study_card_actions']],
+    [['marking','card_actions','flag'],['study_more','study_marking','study_card_actions','study_flags']]]) {
+    page.studyExpandedIds=expanded;page.publishInterface();
+    const menus=tracker.snapshot().filter(x=>x.surface!=='study');
+    assert.deepEqual(menus.map(x=>x.surface).sort(),surfaces.sort());
+    for(const surface of surfaces) {
+      const observed=buildAgentAppStructure(context,surface,'',localize,[],[],tracker.snapshot(),'study');
+      assert.ok(observed.surfaces[0].items.every(x=>x.visibility==='observed'));
+      assert.ok(!observed.surfaces[0].items.some(x=>x.id==='back'));
+      if(surface==='study_flags') {
+        assert.deepEqual(menus.find(x=>x.surface===surface).optionIds,['0','1','2','3','4','5','6','7']);
+        const purple=observed.surfaces[0].items.find(x=>x.id==='7');
+        assert.equal(purple.title,'Custom purple');assert.equal(purple.selected,true);
+      }
+    }
+  }
+  page.studyPrimaryObscured=true;page.publishInterface();
+  assert.deepEqual(tracker.snapshot().filter(x=>x.surface!=='study').map(x=>x.surface).sort(),
+    ['study_card_actions','study_flags','study_marking'],'color overlay removes covered More menu and retains left groups');
+  page.studyPrimaryObscured=false;page.publishInterface();
+  assert.deepEqual(tracker.snapshot().filter(x=>x.surface!=='study').map(x=>x.surface).sort(),
+    ['study_card_actions','study_flags','study_marking','study_more'],'closing colors restores the primary menu');
+  page.评分中=true;page.publishInterface();
+  assert.ok(tracker.snapshot().filter(x=>x.surface!=='study').every(x=>x.items.every(item=>!item.enabled)),'all visible actions are disabled consistently while busy');
+  let result=buildAgentAppStructure(context,'study_more','',localize,[],[],tracker.snapshot());
   assert.equal(result.surfaces[0].items.find(x=>x.id==='edit').enabled,false);
   page.阶段='done';page.publishInterface();result=buildAgentAppStructure(context,'study_more','',localize,[],[],tracker.snapshot());
   assert.equal(result.surfaces[0].items.find(x=>x.id==='agent').visibility,'hidden');
   assert.equal(result.surfaces[0].items.find(x=>x.id==='handwrite').visibility,'hidden');
-  page.studyMenuOpen=false;page.publishInterface();assert.ok(!tracker.snapshot().some(x=>x.surface==='study_more'));
-  const current=tracker.snapshot().find(x=>x.surface==='study');assert.equal(current.selectedId,'42');
+  page.studyMenuOpen=false;page.publishInterface();
+  assert.deepEqual(tracker.snapshot().map(x=>x.surface),['study']);
+  const current=tracker.snapshot()[0];assert.equal(current.selectedId,'42');
   assert.equal(current.values.find(x=>x.id==='phase').value,'done');
-  assert.equal(buildAgentAppStructure(context,'browser','',localize,[],[],tracker.snapshot()).observations.length,0,'targeted reads avoid unrelated page contents');
-  assert.ok(buildAgentAppStructure(context,'app','',localize,[],[],tracker.snapshot()).surfaces.every(x=>x.items.length===0),'directory reads do not repeat every control description');
+  assert.equal(buildAgentAppStructure(context,'browser','',localize,[],[],tracker.snapshot()).observations.length,0);
 });
 
 test('deck detail observations follow the real snapshot, expansion and loading state', () => {
@@ -220,13 +343,34 @@ test('deck detail observations follow the real snapshot, expansion and loading s
 
 test('home selection refreshes knowledge without waking unrelated collection work', () => {
   const tracker=new AppInterfaceTracker();
-  const Page=pageMethods('pages/首页.ets',['previewDeckChanged','publishHomeInterface'],{appInterface:tracker});
+  const Page=pageMethods('pages/首页.ets',['previewDeckChanged','homeActionControls','publishHomeInterface'],{appInterface:tracker,OFFICIAL_ANNOUNCEMENTS_ENABLED,isDoubleColumnDeckListStyle});
   const page=new Page();let invalidations=0;
-  Object.assign(page,{homeDisposed:false,选中的牌组ID:'d2',牌组数据源:{snapshotDecks:()=>[{id:'d1',name:'Visible'}]},
+  Object.assign(page,{homeDisposed:false,加载状态:'ready',当前断点:'xs',deckListStyle:'single_wide',显示今日进度卡:true,homeAgentEnabled:true,选中的牌组ID:'d2',牌组数据源:{snapshotDecks:()=>[{id:'d1',name:'Visible'}]},
     homeActivity:()=>({collectionBusy:false}),deckPreviewSession:{invalidate:()=>invalidations++},
     homeActivityChanged:()=>assert.fail('read-only interface publication must not wake startup/sync/import work')});
   page.previewDeckChanged();assert.equal(invalidations,1);
+  assert.deepEqual(page.homeActionControls().slice(0,6).map(item=>item.id),['more','agent','search','browser','sync','create']);
+  assert.deepEqual(visibleInterfaceItems('home',context).slice(0,6).map(item=>item.id),['more','agent','search','browser','sync','create']);
+  assert.ok(!visibleInterfaceItems('home_more',context).some(item=>item.id==='sync'||item.id==='browser'));
   assert.equal(tracker.snapshot()[0].selectedId,'d2');assert.deepEqual(tracker.snapshot()[0].optionIds,['d1']);
+  const structure=buildAgentAppStructure(context,'home','',localize,[],[],tracker.snapshot());
+  assert.equal(structure.observations.find(v=>v.surface==='home').values.find(v=>v.id==='official_announcements_enabled').value,'false');
+  for (const style of ['single_wide','single_narrow','double_wide','double_narrow']) {
+    page.deckListStyle=style; page.publishHomeInterface();
+    const values=new Map(tracker.snapshot()[0].values.map(value=>[value.id,value.value]));
+    assert.equal(values.get('home_action_position'),'above_summary');
+    assert.equal(values.get('home_header_layout'),'one_row');
+    assert.equal(values.has('home_action_side'),false);
+    assert.equal(values.has('home_grip_availability'),false);
+    assert.equal(values.get('deck_list_style'),style);
+    assert.equal(values.get('deck_list_grouping'),'top_level_subtree');
+    assert.equal(values.get('deck_list_columns'),style.startsWith('double')?'2':'1');
+    assert.equal(values.get('deck_study_counts_visible'),String(!style.startsWith('double')));
+  }
+  for(const breakpoint of ['sm','md']) {
+    page.当前断点=breakpoint;page.publishHomeInterface();
+    assert.equal(tracker.snapshot()[0].values.find(value=>value.id==='home_action_position').value,'above_summary');
+  }
   page.homeDisposed=true;page.previewDeckChanged();assert.equal(tracker.snapshot()[0].selectedId,'d2');
 });
 
@@ -352,15 +496,31 @@ test('reminder form shares its mode labels, actual time options, draft metadata 
 });
 
 test('all shared settings labels have UI bindings and resources; all card branches remain implemented', () => {
-  const files=['GeneralSettings','ReviewControlsSettings','ReviewPreferencesSettings','布局分组','调度器分组','同步分组','外观分组','数据分组','术语分组','AIAgent设置分组','AgentWebSettingsSection','RedemptionPanel','AboutSettings','开发者调试分组','ThemeMotionControl','DeckWidthControl','CardTextSizeControl'];
-  const ui=files.map(name=>read('components/settings/'+name+'.ets')).join('\n');
+  const directory=new URL('../../entry/src/main/ets/components/settings/',import.meta.url);
+  const sources=readdirSync(directory,{recursive:true}).filter(x=>x.endsWith('.ets')).map(name=>{
+    const path='components/settings/'+name.replaceAll('\\','/');return {path,source:read(path)};
+  });
+  const ui=sources.map(x=>x.source).join('\n');
   const ids=new Set(SETTINGS_GROUPS.flatMap(x=>x.items.map(x=>x.id)));
+  assert.equal(ids.size,SETTINGS_GROUPS.reduce((count,group)=>count+group.items.length,0),'setting UI IDs must be unique');
+  const readableIds=new Set(agentSettingDefinitions().map(x=>x.id));
   for(const group of SETTINGS_GROUPS) for(const item of group.items) {
     assert.ok(zh.has(item.titleKey)&&en.has(item.titleKey),item.titleKey);
-    assert.ok(ui.includes(`'${item.id}'`), 'missing UI binding: '+item.id);
+    assert.ok(ui.includes(`'${item.id}'`)||ui.includes(`"${item.id}"`), 'missing UI binding: '+item.id);
+    if(item.settingId!==undefined)assert.ok(readableIds.has(item.settingId),'missing setting reader declaration: '+item.settingId);
   }
-  for(const binding of ui.matchAll(/settingsItemText\(this\.getUIContext\(\), '([^']+)'\)/g)) assert.ok(ids.has(binding[1]),binding[1]);
+  assertRegisteredSettingsLabels(sources,ids);
   const panel=read('components/设置面板.ets');
   assert.deepEqual(new Set([...panel.matchAll(/group\.id === '([^']+)'/g)].map(x=>x[1])),new Set(SETTINGS_GROUPS.map(x=>x.id)));
   assert.match(panel,/ForEach\(this\.sectionGroups\(\)/);
+});
+
+test('settings binding audit rejects an unregistered new component with locale arguments and ignores examples/comments', () => {
+  const known="settingsItemText(this.getUIContext(), 'language', this.uiLanguage)";
+  assert.deepEqual(settingsLabelBindings(known),['language']);
+  assert.deepEqual(settingsLabelBindings(`// ${known}\n/* ${known} */\nconst example=${JSON.stringify(known)};\nsettingsItemText(ctx, item.id);`),[]);
+  const ids=new Set(SETTINGS_GROUPS.flatMap(x=>x.items.map(x=>x.id)));
+  assert.doesNotThrow(()=>assertRegisteredSettingsLabels([{path:'NewSettings.ets',source:known}],ids));
+  assert.throws(()=>assertRegisteredSettingsLabels([{path:'new/NestedSettings.ets',source:
+    "SettingsToggleRow({ title: settingsItemText(this.getUIContext(), 'forgotten_setting', this.uiLanguage) })"}],ids),/unregistered.*forgotten_setting/);
 });

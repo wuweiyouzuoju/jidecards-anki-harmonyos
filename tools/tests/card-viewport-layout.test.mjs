@@ -25,9 +25,11 @@ test('study and preview share responsive widths and the same card surface', () =
     const source = readFileSync(new URL(`../../entry/src/main/ets/${file}`, import.meta.url), 'utf8');
     assert.match(source, /CardViewport\(\{ content: \(\) => \{ this\.cardViewportContent\(\); \} \}\)/,
       'builder retains the page owner for card state and actions');
-    assert.doesNotMatch(source, /cardContentWidth|onAreaChange/, 'no post-render width correction');
+    assert.doesNotMatch(source, /cardContentWidth/, 'no post-render width correction');
+    assert.doesNotMatch(source, /CardViewport\([^\n]+\)\s*\.onAreaChange/,
+      'toolbar bounds may observe the parent; card width remains owned by CardViewport measurement');
     assert.match(source, /borderRadius\(应用尺寸\.圆角_卡片\)/);
-    assert.match(source, /border\(\{ width: 应用尺寸\.卡片边框, color: \$r\('app.color.border_subtle'\) \}\)/);
+    assert.match(source, /border\(SurfaceBorder\.options\(\)\)/);
     assert.doesNotMatch(source, /border\(\{ width: 1\.5, color: \$r\('app.color.border_input'\)/);
     assert.doesNotMatch(source, /shadow\(ShadowStyle\.OUTER_DEFAULT_XS\)/);
   }
@@ -86,9 +88,11 @@ test('narrow deck appearance drives page, deck-list and menu spacing from one de
   const home = readFileSync(new URL('../../entry/src/main/ets/pages/首页.ets', import.meta.url), 'utf8');
   const deckList = readFileSync(new URL('../../entry/src/main/ets/components/home/主页牌组列表.ets', import.meta.url), 'utf8');
   const menu = readFileSync(new URL('../../entry/src/main/ets/components/common/AnchoredMenu.ets', import.meta.url), 'utf8');
-  for (const source of [home, deckList, menu]) assert.match(source, /DECK_LIST_NARROW_KEY/);
+  for (const source of [home, menu]) assert.match(source, /PAGE_COMPACT_LAYOUT_KEY/);
+  assert.match(deckList, /DECK_LIST_NARROW_KEY/);
   assert.match(home, /页面分组间距\(this\.narrowDeckLayout\)/);
   assert.match(deckList, /页面分组间距\(this\.narrow\)/);
-  assert.match(menu, /margin\(\{ top: this\.topOffset/);
+  assert.match(menu, /margin\(\{ top: this\.menuGeometry\(\)\.top/);
+  assert.match(menu, /safeMenuGeometry\(this\.viewportHeight, this\.topOffset, this\.safeTop, this\.safeBottom,\s*应用尺寸\.页面底部间距\(this\.narrowDeckLayout\)/);
   assert.doesNotMatch(menu, /effectiveTopOffset/);
 });

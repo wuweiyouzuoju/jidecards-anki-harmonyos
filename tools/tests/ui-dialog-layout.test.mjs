@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
+import { safeDialogMaxHeight } from '../../entry/src/main/ets/model/WindowSafeLayout.ts';
 
 const root = new URL('../../entry/src/main/ets/', import.meta.url);
 const read = path => readFileSync(new URL(path, root), 'utf8').replaceAll('\r\n', '\n');
@@ -133,27 +134,24 @@ test('settings forwards Back to the top child before navigating out of its categ
   assert.equal(page.activeSection, '');
 });
 
-test('deck options preserve the form while Back leaves help, section and advanced panel', () => {
+test('deck options preserve the shared draft, close help first and protect saving while computing may leave', () => {
   let closes = 0;
-  const panel = instance('components/高级牌组选项面板.ets', ['handleBackRequest', 'closeSection'], {
-    showHelp: true, newExpanded: true, form: { learningSteps: '1 10' },
-    hasActiveSection() { return this.newExpanded; }, onClose() { closes++; }
+  const form = { learningSteps: '1 10' }, options = { fsrsEnabled: true };
+  const panel = instance('components/牌组选项面板.ets', ['handleBackRequest'], {
+    showHelp: true, busy: true, computing: false, form, options, onCancel() { closes++; }
   });
   panel.handleBackRequest();
   assert.equal(panel.showHelp, false);
-  assert.equal(panel.newExpanded, true);
-  panel.handleBackRequest();
-  assert.equal(panel.newExpanded, false);
   assert.equal(closes, 0);
   panel.handleBackRequest();
+  assert.equal(closes, 0, 'accepted saving protects the shared draft');
+  panel.computing = true; panel.handleBackRequest();
   assert.equal(closes, 1);
-  assert.deepEqual(panel.form, { learningSteps: '1 10' });
-  const parent = instance('components/牌组选项面板.ets', ['handleBackRequest'], {
-    showAdvanced: true, advancedBackRequest: 0, onCancel() { closes++; }
-  });
-  parent.handleBackRequest();
-  assert.equal(parent.advancedBackRequest, 1);
-  assert.equal(closes, 1);
+  panel.computing = false; panel.busy = false; panel.handleBackRequest();
+  assert.equal(closes, 2);
+  assert.equal(panel.form, form); assert.equal(panel.options, options);
+  const source = read('components/牌组选项面板.ets');
+  assert.match(source, /高级牌组选项面板\(\{ form: this\.form, options: this\.options, busy: this\.busy/);
 });
 
 test('Back cancels cropping without closing or discarding the deck customization draft', () => {
@@ -216,14 +214,16 @@ test('shared chrome owns theme, scroll limits and safe areas; slots retain their
 
 test('preview fill mode and ordinary form scrolling share the available height after header and padding', () => {
   const dimensions=loadPlatformModule('utils/应用尺寸.ets','应用尺寸',{});
-  const Frame=loadComponentLogic('components/common/DialogFrame.ets','DialogFrame',{应用尺寸:dimensions});
+  const Frame=loadComponentLogic('components/common/DialogFrame.ets','DialogFrame',{应用尺寸:dimensions,safeDialogMaxHeight});
   const frame=new Frame();
   assert.equal(frame.fillBody,false,'ordinary dialogs keep content-sized scrolling by default');
-  for(const [viewport,header,expected] of [[800,56,604],[400,56,252],[400,112,196],[240,112,55.2],[120,112,0]]) {
+  for(const [viewport,header,expected] of [[800,56,589.92],[400,56,237.92],[400,112,181.92],[240,112,41.12],[120,112,0]]) {
     frame.viewportHeight=viewport;frame.headerHeight=header;
     assert.ok(Math.abs(frame.bodyHeight()-expected)<0.00001,`viewport ${viewport}, header ${header}`);
     assert.ok(frame.bodyHeight()>=0);
   }
+  frame.viewportHeight=400; frame.headerHeight=56; frame.safeTop=36; frame.safeBottom=24;
+  assert.ok(Math.abs(frame.bodyHeight()-185.12)<0.00001, 'body reserves both system insets and frame gaps');
   const source=read('components/settings/NotetypeTemplatePreview.ets');
   assert.match(source,/fillBody: true/);
   assert.match(source,/Web\([\s\S]*\.layoutWeight\(1\)/);

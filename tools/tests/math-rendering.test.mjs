@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { stripTypeScriptTypes } from 'node:module';
 import vm from 'node:vm';
-import { 构建卡片HTML } from '../../entry/src/main/ets/model/学习卡片HTML构建器.ts';
+import { 构建卡片HTML, 原始侧HTML } from '../../entry/src/main/ets/model/学习卡片HTML构建器.ts';
 import { MATH_ASSET_BASE } from '../../entry/src/main/ets/model/MathRendering.ts';
 import * as codec from '../../entry/src/main/ets/proto/messages/CardRenderingMessages.ts';
 import { 协议写入器 } from '../../entry/src/main/ets/proto/core/ProtoWriter.ts';
@@ -109,6 +109,7 @@ test('render service resolves legacy nodes on both sides and preserves ordinary 
   const session = { async 调用(service, method, bytes) {
     calls.push({ service, method, bytes });
     if (method === 6) return w.转为字节();
+    if (method === 卡片渲染方法.encodeIriPaths) return bytes;
     const response = new 协议写入器();
     response.写入字符串(1, '<img class=latex alt="x" src="latex-upstream.svg">');
     return response.转为字节();
@@ -116,12 +117,12 @@ test('render service resolves legacy nodes on both sides and preserves ordinary 
   const source = read('entry/src/main/ets/backend/卡片渲染服务.ts')
     .replace(/^import[\s\S]*?;\r?\n/gm, '')
     .replace('export class 卡片渲染服务', 'class 卡片渲染服务') + '\nglobalThis.Service = 卡片渲染服务;';
-  const context = { ...codec, 服务号, 卡片渲染方法, 后端会话: { 获取实例: () => session } };
+  const context = { ...codec, 原始侧HTML, 服务号, 卡片渲染方法, 后端会话: { 获取实例: () => session } };
   vm.createContext(context);
   vm.runInContext(stripTypeScriptTypes(source), context);
   const service = new context.Service();
   const rendered = await service.渲染既有卡片(123);
-  assert.deepEqual(calls.map((c) => [c.service, c.method]), [[27, 6], [27, 4], [27, 4]]);
+  assert.deepEqual(calls.map((c) => [c.service, c.method]), [[27, 6], [27, 4], [27, 4], [27, 11], [27, 11]]);
   assert.deepEqual([...calls[1].bytes], [...codec.encodeExtractLatexRequest('[$]x[/$]', true)]);
   for (const side of ['question', 'answer']) {
     const html = 构建卡片HTML(rendered, side);

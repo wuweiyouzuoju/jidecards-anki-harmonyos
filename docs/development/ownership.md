@@ -6,7 +6,7 @@
 
 ## `entry`
 
-JIDE 空会话文案的顺序由 `model/agent/AgentSuggestions.ts` 拥有，文字归中英文资源；`components/agent/AgentEmptySuggestions.ets` 独占轮换、手势和剪贴板，页面仅在空会话装配并传入目的地可见状态。入口与验证见 [空会话提示](agent.md#jide-空会话提示)。
+JIDE 通用空会话文案顺序归 `model/agent/AgentSuggestions.ts`，场景建议规则与能力筛选归 `AgentAppRecommendations.ts`，文字归中英文资源。`AppInterfaceTracker` 独占最近非 JIDE 页的上下文与销毁释放；结构工具和提示共用纯建议模型。`AgentEmptySuggestions.ets` 独占轮换、手势和剪贴板，页面只装配可见状态与读取回调。入口与验证见 [空会话提示](agent.md#jide-空会话提示)。
 
 应用内 Agent 的数学/化学显示由 `model/agent/AgentMath.ts` 拥有分隔符、转义、排版队列和尺寸回执校验，`AgentMathDocument.ts` 用共同 Markdown 解析器组合整段安全表格文档，`components/agent/AgentMathText.ets` 拥有单个 ArkWeb 生命周期与内容高度；正文、表格与含公式思考经 `AgentMarkdownText` 组合。沿用学习/预览的离线资源响应，保持各自输入信任边界。入口、验证与设备范围见 [对话公式](agent.md#对话中的数学与化学公式)。
 
@@ -19,7 +19,15 @@ JIDE 空会话文案的顺序由 `model/agent/AgentSuggestions.ts` 拥有，文�
 | `entry/src/main/ets/stores/` | 明确声明的持久化状态和读取协调 | 成为所有模块的无边界共享状态 |
 | `entry/src/main/ets/proto/`、`entry/src/main/cpp/types/`、`native/napi_bridge/` | 跨 ArkTS/Native 的协议、声明和桥接 | 在页面或工具脚本中复制协议定义 |
 
+页面密度定义归 `model/AppLayoutState.ts`，持久化仍归 DeckListAppearanceStore；前后台键归 `model/AppLifecycleState.ts`，发布者是 EntryAbility；主题动画键归 ThemeCatalog，保存入口保持 RedemptionStore。公共组件直接依赖与既有业务 UI 迁移例外由 `common-boundary.test.mjs` 管理，索引见 [公共 UI](../../entry/src/main/ets/components/common/README.md)。
+
 ### 状态所有者
+
+牌组层级调整的 ID、路径快照和父子合并规则归 `model/DeckReparent.ts`；同级排列、升级/降级目标与展开子树重排归 `model/DeckReorder.ts`。`backend/DeckHierarchyCommands.ets` 串行层级/排序写入，独占提交前重查、同步占用、Core ReparentDecks 和原本机顺序存储入口。`DeckReparentFeature` 拥有手动选择/预览与返回策略；首页拥有排序模式、保存占用和唯一右侧层级菜单行 ID，`牌组列表项` 复用既有 Popup/MenuSurface/ActionMenuList。JIDE 仍通过原 `AgentAuxiliaryTools` 读取/提案和 `AgentActionExecutor` 确认执行。菜单及当前表单状态与 JIDE 共用 AppInterface；见[首页](home.md#牌组展开记忆与手机详情)及[牌组层级操作](agent.md#牌组层级操作)。
+
+白板宿主 `components/学习手写白板层.ets` 拥有引擎选择、原版 `StudyWhiteboard` 草稿、官方初始化代次与超时；套件缺失、不可访问、加载失败或超时自动回退原版，当前学习会话内不反复尝试失败的套件。官方笔迹、笔刷、擦除、套索和历史归 `HandwriteComponent`；`StudyPenCanvas.ets` 每个实例拥有一个 Controller，`StudyPenCanvasHost.ets` 拥有动态加载和 BuilderNode 创建/释放，参数共用 `StudyPenCanvasParameters.ts`。`backend/StudyPenKitAvailability.ets` 在导入前检查 SysCap 与系统 HSP 映射，防止缺包引起原生 abort。原版 `model/StudyWhiteboard.ts` 只管理笔迹与有界历史，`StudyLocalWhiteboard.ets` 拥有 Canvas、触摸和工具 UI。学习页拥有挂载、显隐、按键和下一题通知；收起/翻面保留画布，下一题清空，完成/退出释放。JIDE 共用 `AppInterface.WHITEBOARD_INTERFACE_ITEMS`，各渲染器发布自身真实状态，官方内部值与两种引擎的笔迹内容均不冒充可读取。入口与检查边界见[手写白板](study-media.md#手写白板)。
+
+Anki 官方教程的选章与检索别名归 `tools/anki-manual-topics.json`，原文/版本/许可证由 `tools/vendor-anki-manual.mjs` 从官方已提交版本生成到 rawfile。`model/agent/AgentAnkiHelp.ts` 独占检索、分段范围和读取代次，`backend/agent/AgentAnkiHelpTools.ets` 适配 ResourceManager；不借用用户附件授权或持久会话缓存，不持有写入执行器。更新与验证见 [官方教程](agent.md#anki-官方教程按需读取)。
 
 笔记类型管理/编辑的草稿和读取代次由对应设置组件拥有；`model/NotetypeManagement.ts` 独占模板身份序列化、克隆及集合保护下的写入会话，Core 负责生成/移除卡片。预览经共用 `NoteDraftPreview`，文本导出经原有 `DataTransferSession` 和 `DataExportWorkflow`；详见[浏览与编辑](browser-stats.md)和[数据迁移](import-data.md)。
 
@@ -27,7 +35,13 @@ JIDE 空会话文案的顺序由 `model/agent/AgentSuggestions.ts` 拥有，文�
 
 界面结构由 `model/AppInterface.ts`、`SettingsNavigation.ts` 和 `SettingsStructure.ts` 共同声明；UI 的菜单/设置卡片枚举与 JIDE 的只读结构工具共用入口。`backend/AppInterfaceService.ets` 独占已挂载界面的语义观察，组件更新/离开负责登记/释放；不承载业务写入或凭证。当前覆盖和扩展方式见 [软件界面认知](agent.md#软件界面认知)。
 
-卡片缩放、牌组宽度和触感的写入分别经 `CardTextSizeStore`、`DeckListAppearanceStore`、`StudyHaptics`；`utils/LocalPreferenceWrite.ets` 拥有三项共享保存队列、原值校验和保存后广播，设置页与 JIDE 共用。助手支持项在 `AgentPreferenceSettings.agentWritablePreferenceIds()`，提案/确认仍归 `AgentAppSettingsTools` / `AgentActionExecutor`。入口与行为测试见 [应用内 Agent 设置](agent.md#应用设置读取与修改)。
+页面标识、JIDE 导航动作、动作参数和清栈约束由 `model/navigation/AppNavigation.ts` 共同声明，`HomeDestinations` 使用真实目的地，`AgentAppStructure` / `AgentSessionContext` 重建本次能力目录与指纹。`AgentAppNavigationSession` 拥有单页导航队列、代次与当前宿主就绪状态读取，结构工具不缓存占用事实；`AgentAppNavigationTools.readNavigationTarget` 适配真实对象读取，Scope 保持只读，成功回复收尾后通过类型化回调交给首页 Navigation 执行。编辑复用 `EditNotePage`，卡片预览复用浏览页的初始搜索和原预览，牌组详情/选项复用首页选择与原 `DeckOptionsFeature`；导航不持有页面或卡库写入执行器，不替代学习调度与表单保存。行为与扩展见[自动页面操作](agent.md#自动页面操作)。
+
+平面动作菜单的条目渲染与选择守卫由 [ActionMenuList](../../entry/src/main/ets/components/common/ActionMenuList.ets) 负责，复用 `AnchoredMenuItem` 的行样式和默认主题色；定位/表面仍归 `AnchoredMenu` / `MenuSurface`。首页两菜单负责 registry 显隐、本地化、图标语义和业务回调，公共列表不依赖首页模型或全局业务状态。回归入口：`ui-shell-action-menu-list.test.mjs`；范围与设备验收见 [首页](home.md)。
+
+原生中性轮廓只由 [SurfaceBorder](../../entry/src/main/ets/utils/SurfaceBorder.ets) 和 `surface_border` 明暗资源拥有；菜单表面、统计/详情/设置/字段卡片、弹窗、输入框、下拉框与玻璃按钮共用边框参数，分隔线和设置色板共用颜色入口。宿主继续拥有底色、圆角、布局、输入行为与选中状态；图片灰底可传对应轮廓色。回归入口：`ui-surface-border.test.mjs`、`ui-shell-controls.test.mjs`、`ui-select-layout.test.mjs`、`theme-text.test.mjs`；边界与合理差异见 [界面](appearance.md)。
+
+卡片缩放、牌组样式和触感的写入分别经 `CardTextSizeStore`、`DeckListAppearanceStore`、`StudyHaptics`；`utils/LocalPreferenceWrite.ets` 拥有三项共享保存队列、原值校验和保存后广播，设置页与 JIDE 共用。助手支持项在 `AgentPreferenceSettings.agentWritablePreferenceIds()`，提案/确认仍归 `AgentAppSettingsTools` / `AgentActionExecutor`。入口与行为测试见 [应用内 Agent 设置](agent.md#应用设置读取与修改)。
 
 应用主题修改由 `backend/AppThemeService.ets` 中的 `appThemeSession` 唯一串行处理，纯策略在 `model/settings/ThemeModeSession.ts`；设置页、应用内 Agent 和撤销共用入口。主题色的 `appThemeColorSession` / `ThemeColorSession.ts` 同样由设置页与助手共用；FSRS 初始化和修改归 `model/FSRS控制器.ets` 的串行入口。系统颜色通知和启动初始化继续由 EntryAbility/首页负责。助手能力目录与单轮许可在 `AgentSettingsTools.ts` / `AgentAppSettingsTools.ets`，不持有卡库确认执行器。验证入口：`theme-mode-session.test.mjs`、`ai-agent-app-settings.test.mjs`；行为说明见 [应用内 Agent 设置](agent.md#应用设置读取与修改)。
 
@@ -37,6 +51,7 @@ JIDE 空会话文案的顺序由 `model/agent/AgentSuggestions.ts` 拥有，文�
 
 | 状态或资源 | 所有者 / 生命周期 | 直接验证入口 |
 | --- | --- | --- |
+| 标签层级、三态选择与批量差量 | [NoteTags](../../entry/src/main/ets/model/NoteTags.ts) 拥有完整路径和选择基线；[TagPicker](../../entry/src/main/ets/components/common/TagPicker.ets) 拥有读取代次与临时草稿；宿主拥有保存，浏览提交归 BrowserOperationController | [browser-note-tags](../../tools/tests/browser-note-tags.test.mjs)、[Core 标签](../../native/rsharmony/tests/note_tags.rs)；[标签边界](browser-stats.md#标签选择与管理) |
 | 首页牌组展开记忆 | [HomeDeckExpansion](../../entry/src/main/ets/model/HomeDeckExpansion.ts) 协调 ID；[HomeDeckExpansionStore](../../entry/src/main/ets/utils/HomeDeckExpansionStore.ets) 唯一偏好入口，串行落盘独立于页面生命周期 | [home-deck-expansion](../../tools/tests/home-deck-expansion.test.mjs)；手机透明详情的底层显隐见 [首页](home.md#牌组展开记忆与手机详情) |
 | 首页目的地与详情装配 | [HomeDestinations](../../entry/src/main/ets/pages/navigation/HomeDestinations.ets)、[HomeDeckDetails](../../entry/src/main/ets/components/home/HomeDeckDetails.ets)；页面栈、选择及动作仍由首页持有 | [home-composition](../../tools/tests/home-composition.test.mjs) |
 | 首页导航转场 | [HomeNavigationTransition](../../entry/src/main/ets/utils/HomeNavigationTransition.ets)；持有代次、淡入顺序与背景冻结回调 | [iridescent-rendering](../../tools/tests/iridescent-rendering.test.mjs) |
@@ -67,6 +82,7 @@ JIDE 空会话文案的顺序由 `model/agent/AgentSuggestions.ts` 拥有，文�
 | 学习卡片/队列代次与接受后的操作 | [StudySessionController](../../entry/src/main/ets/model/StudySessionController.ts)；过期读取不得覆盖新会话 | [study-session-controller](../../tools/tests/study-session-controller.test.mjs) |
 | 同卡翻面的 Web 文档与脚本执行 | [CardWebSession](../../entry/src/main/ets/model/CardWebSession.ts) 拥有文档、卡面版本和更新队列；[CardWebView](../../entry/src/main/ets/utils/CardWebView.ets) 适配 ArkWeb，学习/预览共同使用；新卡或编辑重新加载时隔离旧全局状态 | [card-web-session](../../tools/tests/card-web-session.test.mjs)、[真实浏览器翻面](../../tools/test-card-flip-browser.mjs)；设备范围见 [学习与媒体](study-media.md#卡片模板脚本与样式) |
 | 浏览批量快照与操作占用 | [BrowserOperationController](../../entry/src/main/ets/model/BrowserOperationController.ts)；离页禁止 UI 回写但不取消已接受写入 | [browser-operation-model](../../tools/tests/browser-operation-model.test.mjs) |
+| 浏览暂停、今日跳过的整组选中状态切换 | [BrowserCardState](../../entry/src/main/ets/model/BrowserCardState.ts) 读取全部最新 queue，决定解除或统一设置；BrowserSelection 展开笔记兄弟卡，服务适配仍归页面，Core 独占恢复队列与调度 | [状态切换](../../tools/tests/browser-card-state.test.mjs)、[真实 Core 恢复](../../native/rsharmony/tests/scheduler_restore.rs)；[浏览边界](browser-stats.md) |
 | 笔记编辑读取、草稿快照与写入代次 | [NoteEditorSession](../../entry/src/main/ets/model/NoteEditorSession.ts)；EditNotePage 持有读取/写入会话，AnkiNoteUpdate 适配媒体和更新；来源只传 ID，关闭/离页不撤销已接受写入 | [note-editor-session](../../tools/tests/note-editor-session.test.mjs) |
 | 图片遮罩图形、原始片段与撤销历史 | [图片遮罩模型](../../entry/src/main/ets/model/图片遮罩模型.ts) 持有无损序列化及独立快照；图形编辑器只回传草稿，已有笔记复用 NoteEditorSession，学习/预览共用 ImageOcclusionRendering | [编辑行为](../../tools/tests/图片遮罩编辑器.test.mjs)、[渲染](../../tools/tests/image-occlusion-rendering.test.mjs)、[真实 Core](../../native/rsharmony/tests/image_occlusion_editing.rs) |
 | 笔记媒体预览与管理弹层 | NoteFieldCard 组合预览与固定新增入口；NoteMediaParts 负责无损识别和位置替换，NoteMediaSession 拥有弹层副本，NoteMediaDialog 拥有忙碌/退出；完成后宿主重新分配附件 ID 并保留其他字段 | [note-media-management](../../tools/tests/note-media-management.test.mjs)；[媒体管理边界](browser-stats.md#编辑媒体预览与独立管理2026-10-01) |
@@ -107,3 +123,5 @@ JIDE 空会话文案的顺序由 `model/agent/AgentSuggestions.ts` 拥有，文�
 | `docs/development/` | 当前领域入口、事实来源和验证路径 | 不复制未经验证的动态统计 |
 | `docs/decisions/` | 当前长期决策及其影响 | 不替代源码、测试或临时排查记录 |
 | `docs/superpowers/`、发布记录 | 历史背景和归档材料 | 不发出当前执行指令 |
+
+首页首行布局归 `HomeSummaryHeader` / `HomeHeaderLayout`，统计数据和菜单状态归首页；更多/新建组件仅提供 ActionMenuList 正文，原生尖角锚点归首行。搜索筛选归纯模型 `HomeDeckSearch`，输入和实际候选观察归 `HomeDeckSearchDialog`，选择复用首页。握姿复用 StudyGripSession 和可指定能力键的 StudyGripSensor，不修改学习偏好或导航契约；见[首页](home.md)。

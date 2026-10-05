@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { loadPlatformModule } from './platform-module-harness.mjs';
+import { OFFICIAL_ANNOUNCEMENTS_ENABLED, 官方公告地址 } from '../../entry/src/main/ets/model/官方公告配置.ts';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
@@ -19,6 +21,17 @@ test('announcement hosting has one public URL and no management credential', () 
   const source = read('../../entry/src/main/ets/model/官方公告配置.ts');
   assert.match(source, /https:\/\/4001784660\.cdn\.123clouddisk\.com\/4001784660\/CET%E5%9B%9B%E5%85%AD%E7%BA%A7\/announcement\.json/);
   assert.doesNotMatch(source, /(clientSecret|clientID|accessToken|refreshToken|password|管理密钥)/i);
+});
+
+test('paused announcement service does not create an HTTP client', async () => {
+  assert.equal(OFFICIAL_ANNOUNCEMENTS_ENABLED, false);
+  const Service = loadPlatformModule('backend/官方公告服务.ets', '官方公告服务', {
+    OFFICIAL_ANNOUNCEMENTS_ENABLED, 官方公告地址,
+    http: { createHttp: () => { assert.fail('paused announcements must not access the network'); } }
+  });
+  for (const service of [new Service(), new Service('https://example.com/announcement.json')]) {
+    assert.equal(await service.加载公告('2.9.10', 'zh'), null);
+  }
 });
 
 test('announcement service performs one uncached GET under a hard two-second deadline', () => {

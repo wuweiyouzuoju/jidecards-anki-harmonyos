@@ -3,19 +3,39 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { loadPlatformModule } from './platform-module-harness.mjs';
 
 function read(path) {
   return readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 }
 
 test('small anchored menus share the restrained 150ms transition', () => {
-  const shared = read('entry/src/main/ets/components/common/AnchoredMenu.ets');
-  assert.match(shared, /TransitionEffect\.scale\(\{ x: 0\.98, y: 0\.98 \}\)/);
-  assert.equal((shared.match(/duration: 150/g) ?? []).length, 2);
-  assert.equal((shared.match(/curve: Curve\.EaseOut/g) ?? []).length, 2);
+  const effect = (kind, value) => ({ kind, value,
+    combine(other) { this.combined = other; return this; },
+    animation(options) { this.options = options; return this; }
+  });
+  const MenuSurface = loadPlatformModule('components/common/MenuSurface.ets', 'MenuSurface', {
+    TransitionEffect: { opacity: value => effect('opacity', value), scale: value => effect('scale', value),
+      asymmetric: (enter, exit) => ({ enter, exit }) }, Curve: { EaseOut: 'ease-out' }
+  });
+  const transition = MenuSurface.popupTransition();
+  assert.equal(transition.enter.kind, 'opacity'); assert.equal(transition.enter.value, 0);
+  assert.deepEqual(transition.enter.combined.value, { x: 0.98, y: 0.98 });
+  assert.equal(transition.exit.kind, 'opacity'); assert.equal(transition.exit.value, 0);
+  assert.equal(transition.exit.combined, undefined, 'closing only fades');
+  for (const branch of [transition.enter, transition.exit]) {
+    assert.deepEqual(branch.options, { duration: 150, curve: 'ease-out' });
+  }
+  assert.match(read('entry/src/main/ets/components/common/AnchoredMenu.ets'), /\.transition\(MenuSurface\.popupTransition\(\)\)/);
+  for (const path of ['entry/src/main/ets/components/牌组列表项.ets',
+    'entry/src/main/ets/components/home/HomeSummaryHeader.ets', 'entry/src/main/ets/components/牌组详情面板.ets', 'entry/src/main/ets/components/home/HomeDeckDetails.ets']) {
+    const source = read(path);
+    const arrows = (source.match(/enableArrow: true/g) ?? []).length;
+    assert.equal((source.match(/arrowWidth: MenuSurface.pointerSpan/g) ?? []).length, arrows, path);
+    assert.equal((source.match(/arrowHeight: MenuSurface.pointerDepth/g) ?? []).length, arrows, path);
+    assert.equal((source.match(/transition: MenuSurface.popupTransition\(\)/g) ?? []).length, arrows, path);
+  }
   for (const path of [
-    'entry/src/main/ets/components/主页操作面板.ets',
-    'entry/src/main/ets/components/home/主页更多面板.ets',
     'entry/src/main/ets/components/settings/模式切换菜单.ets',
     'entry/src/main/ets/components/browser/BrowserMoreMenu.ets',
     'entry/src/main/ets/components/browser/BrowserViewMenu.ets',
@@ -67,10 +87,11 @@ test('navigation applies one fade transition including the home boundary', () =>
 
 test('plain buttons share PressFeedback without a second touch animation', () => {
   const batch = read('entry/src/main/ets/components/browser/批量操作栏.ets');
-  assert.equal((batch.match(/Button\(/g) ?? []).length, 9);
+  assert.match(batch, /CardActionMenu\(/);
   assert.doesNotMatch(batch, /onTouch\(|已按下|\.animation\(/);
-  assert.equal((batch.match(/\.enabled\(!this.busy\)/g) ?? []).length, 9);
-  assert.equal((batch.match(/new PressFeedback\(/g) ?? []).length, 9);
+  const menuItem = read('entry/src/main/ets/components/common/MenuItem.ets');
+  assert.match(menuItem, /\.enabled\(this.available\)/);
+  assert.match(menuItem, /new PressFeedback\(/);
   const info = read('entry/src/main/ets/components/browser/卡片信息.ets');
   assert.match(info, /DialogHeader\(\{/);
   const header = read('entry/src/main/ets/components/common/DialogHeader.ets');

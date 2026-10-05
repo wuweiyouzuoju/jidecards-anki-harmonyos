@@ -7,7 +7,7 @@
 // @作用
 // 集中托管首页视觉尺寸 token：字号、圆角、卡片尺寸、页面骨架、
 // 宽屏限宽、日历、卡组列表、进度条、堆叠间距等。
-// 与颜色、字符串资源同级管理；页面与组件不再出现魔法数字。
+// 与颜色、字符串资源同级管理；共享且随设计变化的值集中为 token。
 //
 // @输入
 // 无（纯常量定义）。
@@ -54,11 +54,12 @@ export class 应用尺寸 {
   static readonly 字号_主视觉: number = 42; // 记忆状态百分比
 
   // ---- 圆角 ----
+  static readonly radiusLg: number = 16; // 通用大圆角；业务 alias 可独立调整。
   static readonly 圆角_色条: number = 3; // 卡组色条
   static readonly 圆角_进度条: number = 4; // 进度条
   static readonly 圆角_单元格: number = 6; // 日历格
   static readonly 圆角_牌组行: number = 15; // 卡组行
-  static readonly 圆角_指标卡: number = 16; // 详情指标卡
+  static readonly 圆角_指标卡: number = 应用尺寸.radiusLg; // 详情指标卡
   static readonly 圆角_卡片: number = 18; // 摘要卡
   static readonly 圆角_面板: number = 12; // 弹层面板
   static readonly 面板内边距: number = 20; // 居中浮卡内边距（纵向呼吸感）
@@ -70,6 +71,7 @@ export class 应用尺寸 {
   // 卡片高度 用于今日摘要卡（内容较紧凑 ~150px）。
   // 月份日历卡 不再用此常量，改用 卡片高度() 按 周数 动态算（220-261px）。
   static readonly 卡片高度: number = 204;
+  static readonly noteMediaPreviewHeight: number = 204; // 笔记缩略图，与今日摘要卡独立。
   static readonly 卡片内边距: number = 16;
   static readonly 卡片边框: number = 1;
   // 滑动器高度 必须容下最高的 月份日历卡（6 行 + hasActivity=false 时 ≈261），
@@ -138,11 +140,13 @@ export class 应用尺寸 {
   static readonly 按钮高度: number = 44;
   static readonly 行动按钮高度: number = 52;
   // 下拉菜单与长按菜单共用紧凑尺寸，长文案入口使用较宽档。
-  static readonly compactMenuWidth: number = 112;
-  static readonly extendedMenuWidth: number = 160;
-  static readonly contextMenuWidth: number = 144;
+  static readonly compactMenuWidth: number = 104;
+  static readonly cardActionMenuWidth: number = 168;
+  static readonly cardActionGroupWidth: number = 136;
+  static readonly extendedMenuWidth: number = 152;
+  static readonly contextMenuWidth: number = 136;
   static readonly menuItemHeight: number = 44;
-  static readonly menuHorizontalPadding: number = 12;
+  static readonly menuHorizontalPadding: number = 10;
 
   // ---- 宽屏限宽 ----
   static readonly 内容最大宽度: number = 1200; // 首页超宽屏内容限宽，超出居中留白
@@ -164,6 +168,13 @@ export class 应用尺寸 {
   // 用于 牌组定制面板 预览框，保证用户裁剪选区与实际渲染一致
   static readonly 牌组行高度: number = 92;
   static readonly narrowDeckRowHeight: number = 60;
+  static readonly narrowDoubleDeckRowHeight: number = 76;
+
+  /** 双列名称允许两行，紧凑版也为描述保留完整空间。 */
+  static deckRowHeight(narrow: boolean, doubleColumn: boolean = false): number {
+    return narrow ? (doubleColumn ? 应用尺寸.narrowDoubleDeckRowHeight : 应用尺寸.narrowDeckRowHeight) :
+      应用尺寸.牌组行高度;
+  }
 
   // ---- 进度条 ----
   static readonly 进度条高度: number = 7;

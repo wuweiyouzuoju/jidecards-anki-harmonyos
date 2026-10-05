@@ -1,15 +1,31 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { AgentDocumentStore } from '../backend/agent/AgentDocumentStore';
 import { appInterface } from '../backend/AppInterfaceService';
 import { agentInterfaceControls, agentInterfaceTitle, agentImportLabelKey, AppInterfaceMenuItem, AppInterfaceControl } from '../model/AppInterface';
 import { interfaceControlText } from '../utils/AppInterfaceText';
-import { namedResourceText } from '../utils/UiFeedback';
+import { localizedNamedResourceText, namedResourceText } from '../utils/UiFeedback';
 import { registerAgentDocumentTools } from '../backend/agent/AgentDocumentTools';
+import { AgentAnkiHelpTools } from '../backend/agent/AgentAnkiHelpTools';
+import { isAgentAnkiHelpTool } from '../model/agent/AgentAnkiHelp';
 import { AgentDocumentAccess, isAgentDocumentTool } from '../model/agent/AgentDocuments';
 import { providerSupportsImages } from '../model/agent/ProviderCatalog';
 import { PressFeedback } from '../utils/PressFeedback';
 import { AgentHistoryCoordinator } from '../model/agent/AgentHistoryCoordinator';
 import { AgentAppSettingsTools } from '../backend/agent/AgentAppSettingsTools';
+import { AgentMaintenanceTools } from '../backend/agent/AgentMaintenanceTools';
+import { AgentFsrsTools } from '../backend/agent/AgentFsrsTools';
+import { AgentDeckOptionsTools } from '../backend/agent/AgentDeckOptionsTools';
+import { agentNotetypeFieldPreview, agentNotetypeLayout } from '../model/agent/AgentNotetypeFields';
+import { agentNotetypeLatexPreview } from '../model/agent/AgentNotetypeLatex';
+import type { NotetypeFieldPreview } from '../model/agent/AgentNotetypeFields';
+import type { RestoreNotetypeAction } from '../model/agent/AgentMaintenanceActions';
+import { AgentAppNavigationSession } from '../model/agent/AgentAppNavigation';
+import { AgentAppNavigationTools, readNavigationTarget } from '../backend/agent/AgentAppNavigationTools';
+import type { AppNavigationArguments, AppNavigationRequest } from '../model/navigation/AppNavigation';
+import { APP_FOREGROUND_KEY } from '../model/AppLifecycleState';
+import { syncActivity } from '../model/SyncSettings';
+import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../model/ReleaseFeatures';
 import type { ThemeModeChange } from '../model/settings/ThemeModeSession';
 import { PrimaryActionButton } from '../components/common/PrimaryActionButton';
 import { LabeledActionRow } from '../components/common/LabeledActionRow';
@@ -18,6 +34,8 @@ import { DialogHeader } from '../components/common/DialogHeader';
 import { AgentSessionState } from '../model/agent/AgentSessionState';
 import { AgentHistoryList } from '../components/agent/AgentHistoryList';
 import { AgentEmptySuggestions } from '../components/agent/AgentEmptySuggestions';
+import { buildAgentAppRecommendations } from '../model/agent/AgentAppRecommendations';
+import type { AgentAppRecommendation } from '../model/agent/AgentAppRecommendations';
 import { createAgentMessage, cloneAgentCard, cloneAgentTrace, cloneAgentMessage } from '../model/agent/AgentConversationView';
 import type { 卡片草稿, 聊天消息 } from '../model/agent/AgentConversationView';
 import { AgentEditableCard } from '../components/agent/AgentEditableCard';
@@ -27,7 +45,7 @@ import { buildProviderDraftContext, limitProviderInput } from '../model/agent/Ag
 import { ThemeTextSpans } from '../components/common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
-import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
+import { PAGE_COMPACT_LAYOUT_KEY } from '../model/AppLayoutState';
 
 // AI 制卡/改卡共享页：带结构化工具、可编辑草稿与显式确认的轻量 Agent。
 // 由 首页.ets 通过 Navigation pathStack 以 NavDestination 形式入栈（与 添加笔记页 同机制）。
@@ -182,7 +200,8 @@ class 页面Agent观察者 implements AgentRunObserver {
 
 @Component
 export struct AI制卡页 {
-  @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
+  @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   /** Navigation 入栈参数 */
   pageDeckId: string = '';
@@ -194,6 +213,8 @@ export struct AI制卡页 {
   pageTemplateIdx: number = -1;
   /** 页面栈：关闭时 pop 返回首页 */
   pathStack: NavPathStack = new NavPathStack();
+  onNavigateApp?: (request: AppNavigationRequest) => void;
+  private navigationSession: AgentAppNavigationSession | null = null;
 
   private readonly 笔记服务实例: 笔记服务 = new 笔记服务();
   private readonly 笔记类型服务实例: 笔记类型服务 = new 笔记类型服务();
@@ -217,6 +238,7 @@ export struct AI制卡页 {
   private checkpointStore: AgentCheckpointStore | null = null;
   private documentStore: AgentDocumentStore | null = null;
   private documentAccess: AgentDocumentAccess | null = null;
+  private ankiHelpTools: AgentAnkiHelpTools | null = null;
   private workspaceStore: AgentWorkspaceStore | null = null;
   private 本地范围卡片IDs: number[] = [];
   private 本地范围笔记IDs: number[] = [];
@@ -320,15 +342,51 @@ export struct AI制卡页 {
       await this.restoreCreateSelection();
     }
     const registry: AgentToolRegistry = new AgentToolRegistry();
+    if (abilityContext !== null) {
+      this.ankiHelpTools = new AgentAnkiHelpTools(abilityContext.resourceManager);
+      this.ankiHelpTools.register(registry);
+    }
+    if (this.onNavigateApp !== undefined) {
+      this.navigationSession = new AgentAppNavigationSession({
+        context: () => ({ simple: AppStorage.get<boolean>('simpleMode') ?? true,
+          agent: AppStorage.get<boolean>(AI_AGENT_CHANNELS_APP_STORAGE_KEY) ?? false,
+          cloudDeck: false, themeHasTextures: false }),
+        canNavigate: (): boolean => !this.pageDisposed && this.isAgentPageVisible &&
+          AppStorage.get<boolean>(APP_FOREGROUND_KEY) !== false && !this.cardBatch.isRunning() &&
+          !this.hasPendingAction() && !this.hasPendingClarification() && !this.文件解析中 &&
+          !this.themeUndoBusy && !this.targetSelectionBusy && this.targetSelectionMessage < 0 && !this.显示历史区 &&
+          this.输入草稿.trim() === '' &&
+          !this.消息列表.some((message: 聊天消息): boolean =>
+            message.变更草稿列表.some((draft: ChangeDraft): boolean =>
+              draft.status === 'pending' || draft.status === 'prepared' || draft.status === 'executing')),
+        collectionBusy: (): boolean => syncActivity.isCollectionBusy(),
+        pathNames: (): string[] => this.pathStack.getAllPathName(),
+        assertReadableTarget: (args: AppNavigationArguments): void => {
+          if (args.deckId !== undefined) this.agentScope.assertReadableDeckIds([args.deckId]);
+          if (args.noteId !== undefined) this.agentScope.assertReadableNoteIds([args.noteId]);
+          if (args.cardId !== undefined) this.agentScope.assertReadableCardIds([args.cardId]);
+        },
+        readTarget: (args: AppNavigationArguments): Promise<string> => readNavigationTarget(args),
+        navigate: (request: AppNavigationRequest): void => {
+          if (this.onNavigateApp === undefined) throw new Error('navigation_unavailable');
+          this.onNavigateApp(request);
+        }
+      });
+      new AgentAppNavigationTools(this.navigationSession).register(registry);
+    }
     new AgentCodeTool().register(registry);
     new AgentWebTools().register(registry);
     if (this.documentAccess !== null) registerAgentDocumentTools(registry, this.documentAccess);
     new CardAgentTools(this.agentScope, this.documentAccess).register(registry, this.pageMode);
     new HighRiskAgentTools(this.agentScope).register(registry, this.pageMode);
+    new AgentMaintenanceTools(this.agentScope).register(registry);
+    new AgentFsrsTools(this.agentScope).register(registry);
+    new AgentDeckOptionsTools(this.agentScope).register(registry);
     this.appSettingsTools = new AgentAppSettingsTools(this.agentScope, (change: ThemeModeChange): void => {
       this.receiveThemeChange(change);
     });
     this.appSettingsTools.register(registry);
+    this.appSettingsTools.setNavigationReadiness(() => this.navigationSession?.readiness() ?? []);
     this.agentRunner = new AgentRunner(registry);
     if (this.workspaceStore !== null) {
       const auxiliary: AgentAuxiliaryTools = new AgentAuxiliaryTools(this.agentScope, this.workspaceStore);
@@ -343,6 +401,7 @@ export struct AI制卡页 {
     this.interfaceMounted = false;
     appInterface.hidePage('agent');
     appInterface.leave('agent');
+    this.navigationSession?.cancel();
     this.pageDisposed = true;
     this.agentTurnVersion++;
     this.history.dispose();
@@ -547,7 +606,7 @@ export struct AI制卡页 {
   }
 
   /** 读取本地化文案，context 不可用时回退空串。 */
-  private 取本地化文案(资源: Resource): string {
+  private 取本地化文案(资源: Resource, _locale: string = this.uiLanguage): string {
     const 上下文: common.UIAbilityContext | null = this.取能力上下文();
     if (上下文 === null) {
       return '';
@@ -560,7 +619,7 @@ export struct AI制卡页 {
   }
 
   /** 交由 ResourceManager 处理 %s、%d 和带序号的本地化占位符。 */
-  private 取本地化格式(资源: Resource, 参数: Array<string | number>): string {
+  private 取本地化格式(资源: Resource, 参数: Array<string | number>, _locale: string = this.uiLanguage): string {
     const 上下文: common.UIAbilityContext | null = this.取能力上下文();
     if (上下文 === null) { return ''; }
     try {
@@ -643,14 +702,14 @@ export struct AI制卡页 {
   }
 
   private interfaceLabel(id: string): string {
-    return interfaceControlText(this.getUIContext(), this.interfaceControls(), id);
+    return interfaceControlText(this.getUIContext(), this.interfaceControls(), id, this.uiLanguage);
   }
 
   private interfaceEnabled(id: string): boolean {
     return this.interfaceControls().find((item): boolean => item.id === id)?.enabled ?? false;
   }
 
-  private publishInterface(): void {
+  private publishInterface(_locale: string = this.uiLanguage): void {
     if (!this.interfaceMounted || this.pageDisposed) return;
     const controls: AppInterfaceControl[] = this.interfaceControls().map((item): AppInterfaceControl =>
       ({ id: item.id, title: namedResourceText(this.getUIContext(), item.titleKey), titleKey: item.titleKey,
@@ -717,11 +776,18 @@ export struct AI制卡页 {
   /** 每轮声明完整只读工具；可读搜索结果不会自动获得写入权限。 */
   private providerFunctionToolsForTurn(allowWeb: boolean = true): ProviderFunctionTool[] {
     return filterAgentWebTools(agentFunctionTools(this.agentSettings.batchLimit, this.pageMode), allowWeb).filter(
-      (tool: ProviderFunctionTool): boolean => this.documentAccess !== null || !isAgentDocumentTool(tool.name));
+      (tool: ProviderFunctionTool): boolean => (this.documentAccess !== null || !isAgentDocumentTool(tool.name)) &&
+        (this.ankiHelpTools !== null || !isAgentAnkiHelpTool(tool.name)) &&
+        (this.navigationSession !== null || tool.name !== 'navigate_app'));
   }
 
   private currentModelSupportsImages(): boolean {
     return providerSupportsImages(this.agentSettings.selectedProvider, this.AI配置.model, this.agentSettings.customVisionEnabled === true);
+  }
+
+  private emptyRecommendations(): AgentAppRecommendation[] {
+    return buildAgentAppRecommendations(this.providerFunctionToolsForTurn(false), appInterface.snapshot(),
+      AppStorage.get<boolean>(APP_FOREGROUND_KEY) === false ? '' : appInterface.currentPage(), appInterface.currentContextPage());
   }
 
   private 选择笔记类型(notetypeId: number): void {
@@ -958,6 +1024,7 @@ export struct AI制卡页 {
   }
 
   private 取消当前请求(): void {
+    this.navigationSession?.cancel();
     this.agentTurnVersion++;
     if (this.agentRunner !== null) { this.agentRunner.cancel(); }
     this.cancelPendingClarifications();
@@ -1030,6 +1097,8 @@ export struct AI制卡页 {
     existingUserMessageId: number = 0, intentText: string = visibleUserText, resumeOutput: string = ''): Promise<AgentRunResult | null> {
     if (this.pageDisposed || this.cardBatch.isRunning() || this.处理中 || this.themeUndoBusy || this.agentRunner === null || this.sessionController === null) { return null; }
     this.appSettingsTools?.beginTurn(existingUserMessageId === 0 && resumeOutput.length === 0 ? intentText : '');
+    const navigationGeneration: number = this.navigationSession?.beginTurn(
+      existingUserMessageId === 0 && resumeOutput.length === 0 ? intentText : '') ?? 0;
     this.重建本轮AgentScope();
     this.documentAccess?.bind(this.conversationId, this.currentModelSupportsImages());
     this.agentScope.configureCreateConstraints(this.pageMode !== 'edit' &&
@@ -1063,6 +1132,7 @@ export struct AI制卡页 {
     const aiIndex: number = this.消息列表.length - 1;
     const conversationId: string = this.conversationId;
     const turnVersion: number = ++this.agentTurnVersion;
+    let navigationSuccess: boolean = false;
     try {
       const allowWeb: boolean = !explicitWebSearchForbidden(intentText) && await loadAgentWebEnabled();
       if (this.pageDisposed || turnVersion !== this.agentTurnVersion ||
@@ -1109,6 +1179,7 @@ export struct AI制卡页 {
         }
         this.接收Agent草稿(aiIndex, result.drafts);
       }
+      navigationSuccess = result.status === 'completed';
       return result;
     } catch (错误) {
       if (this.currentMessageIndex(conversationId, aiMessage.id) < 0) return null;
@@ -1130,6 +1201,25 @@ export struct AI制卡页 {
         this.更新消息(aiIndex, (message: 聊天消息): void => { message.streaming = false; });
         this.处理中 = false;
         await this.保存当前会话历史();
+        try {
+          await this.navigationSession?.finish(navigationSuccess && turnVersion === this.agentTurnVersion, navigationGeneration);
+        } catch (error) {
+          if (this.currentMessageIndex(conversationId, aiMessage.id) >= 0) {
+            const reason: string = error instanceof Error ? error.message : 'navigation_unavailable';
+            console.info('JIDE navigation did not execute: ' + reason);
+            const detail: Resource = reason === 'navigation_collection_busy' ? $r('app.string.ai_agent_navigation_busy') :
+              reason === 'navigation_deck_missing' ? $r('app.string.ai_agent_navigation_deck_missing') :
+                reason === 'navigation_study_active' ? $r('app.string.ai_agent_navigation_study_active') :
+                  reason === 'navigation_unsaved_page' ? $r('app.string.ai_agent_navigation_unsaved') :
+                  $r('app.string.ai_agent_navigation_unavailable');
+            const text: string = this.取本地化格式($r('app.string.ai_agent_navigation_failed'), [this.取本地化文案(detail)]);
+            this.更新消息(aiIndex, (message: 聊天消息): void => {
+              message.正文 = message.正文.length > 0 ? message.正文 + '\n\n' + text : text;
+              appendAgentTimelineText(message.timeline, 'text', text);
+            });
+            await this.保存当前会话历史();
+          }
+        }
       }
     }
   }
@@ -1893,7 +1983,7 @@ export struct AI制卡页 {
         })
       }
       .width('35%')
-      Text(namedResourceText(this.getUIContext(), agentInterfaceTitle(this.pageMode, this.显示历史区)))
+      Text(localizedNamedResourceText(this.getUIContext(), this.uiLanguage, agentInterfaceTitle(this.pageMode, this.显示历史区)))
         .fontSize(应用尺寸.字号_标题)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.text_primary'))
@@ -2002,7 +2092,26 @@ export struct AI制卡页 {
             if (agentDraftAppearance(operation) !== null) {
               AgentStylePreview({ style: agentDraftAppearance(operation) ?? {} })
             }
-            if (operation.kind === 'delete_deck') {
+            if (operation.kind === 'update_notetype_fields' || operation.kind === 'update_notetype_latex') {
+              ForEach(operation.kind === 'update_notetype_latex' ?
+                agentNotetypeLatexPreview(operation.before, operation.after,
+                  (key: string): string => namedResourceText(this.getUIContext(), key)) :
+                agentNotetypeFieldPreview(operation.before, operation.after,
+                  (key: string): string => namedResourceText(this.getUIContext(), key)), (row: NotetypeFieldPreview) => {
+                Text(row.title).fontSize(应用尺寸.字号_正文_小).width('100%')
+                Text(this.取本地化格式($r('app.string.ai_agent_setting_before_after'), [row.before, row.after]))
+                  .fontSize(应用尺寸.字号_正文_小).width('100%')
+              }, (row: NotetypeFieldPreview): string => row.title)
+              if (operation.kind === 'update_notetype_latex') {
+                Text($r('app.string.agent_latex_config_only'))
+                  .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+              }
+            } else if (operation.kind === 'restore_notetype') {
+              Text($r('app.string.agent_restore_structure_warning'))
+                .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.error_text')).width('100%')
+              Text(this.notetypeRestoreLayout(operation))
+                .fontSize(应用尺寸.字号_正文_小).width('100%').copyOption(CopyOptions.LocalDevice)
+            } else if (operation.kind === 'delete_deck') {
               Text(this.deckDeletionDescription(operation))
                 .fontSize(应用尺寸.字号_正文_小).width('100%').copyOption(CopyOptions.LocalDevice)
             } else {
@@ -2040,8 +2149,15 @@ export struct AI制卡页 {
         .onClick((): void => { this.准备执行草稿(ctx.messageIndex, ctx.itemIndex); })
     }
     .width('100%').padding(应用尺寸.间距_10)
-    .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+    .border(SurfaceBorder.options())
     .borderRadius(应用尺寸.圆角_卡片)
+  }
+
+  private notetypeRestoreLayout(operation: DraftOperation): string {
+    const payload: RestoreNotetypeAction = JSON.parse(operation.after) as RestoreNotetypeAction;
+    const before: string[] = agentNotetypeLayout(operation.before);
+    const after: string[] = agentNotetypeLayout(payload.stockJson);
+    return this.取本地化格式($r('app.string.agent_restore_layout'), [before[0], before[1], after[0], after[1]]);
   }
 
   private 工具状态文案(status: AgentToolTraceStatus): string {
@@ -2055,10 +2171,26 @@ export struct AI制卡页 {
   private 工具显示名(toolName: string): string {
     switch (toolName) {
       case 'get_app_structure': return this.取本地化文案($r('app.string.ai_agent_tool_app_structure'));
+      case 'navigate_app': return this.取本地化文案($r('app.string.ai_agent_tool_navigate'));
+      case 'search_anki_help': return this.取本地化文案($r('app.string.ai_agent_tool_search_anki_help'));
+      case 'read_anki_help': return this.取本地化文案($r('app.string.ai_agent_tool_read_anki_help'));
       case 'list_theme_colors': return this.取本地化文案($r('app.string.ai_agent_tool_theme_colors'));
       case 'propose_set_theme_color': return this.取本地化文案($r('app.string.ai_agent_tool_theme_color_change'));
       case 'propose_set_fsrs': return this.取本地化文案($r('app.string.ai_agent_tool_fsrs_change'));
+      case 'propose_update_deck_options': return this.取本地化文案($r('app.string.ai_agent_tool_deck_options_change'));
       case 'propose_set_setting': return this.取本地化文案($r('app.string.ai_agent_tool_setting_change'));
+      case 'get_advanced_settings': return this.取本地化文案($r('app.string.agent_tool_advanced_settings'));
+      case 'propose_update_collection_preferences': return this.取本地化文案($r('app.string.agent_tool_collection_preferences'));
+      case 'propose_update_study_controls': return this.取本地化文案($r('app.string.agent_tool_study_controls'));
+      case 'propose_export_subset': return this.取本地化文案($r('app.string.agent_tool_export_subset'));
+      case 'evaluate_fsrs': return this.取本地化文案($r('app.string.agent_tool_evaluate_fsrs'));
+      case 'get_fsrs_history_count': return this.取本地化文案($r('app.string.agent_tool_fsrs_history'));
+      case 'compute_fsrs_memory_state': return this.取本地化文案($r('app.string.agent_tool_fsrs_memory'));
+      case 'propose_simulate_fsrs': return this.取本地化文案($r('app.string.agent_tool_simulate_fsrs'));
+      case 'propose_duplicate_note': return this.取本地化文案($r('app.string.agent_tool_duplicate_note'));
+      case 'propose_update_notetype_fields': return this.取本地化文案($r('app.string.agent_tool_notetype_fields'));
+      case 'propose_update_notetype_latex': return this.取本地化文案($r('app.string.agent_tool_notetype_latex'));
+      case 'propose_restore_notetype': return this.取本地化文案($r('app.string.agent_tool_restore_notetype'));
       case 'list_documents': return this.取本地化文案($r('app.string.ai_agent_tool_list_documents'));
       case 'read_document_page': return this.取本地化文案($r('app.string.ai_agent_tool_read_document_page'));
       case 'ocr_document_page': return this.取本地化文案($r('app.string.ai_agent_tool_ocr_document_page'));
@@ -2071,6 +2203,10 @@ export struct AI制卡页 {
       case 'configure_create_target': return this.取本地化文案($r('app.string.ai_agent_tool_configure_create_target'));
       case 'search_memory': return this.取本地化文案($r('app.string.ai_agent_tool_search_memory'));
       case 'propose_create_deck': return this.取本地化文案($r('app.string.ai_agent_tool_propose_create_deck'));
+      case 'propose_rename_deck': return this.取本地化文案($r('app.string.deck_rename_title'));
+      case 'propose_reparent_decks': return this.取本地化文案($r('app.string.deck_move_title'));
+      case 'get_deck_order': return this.取本地化文案($r('app.string.deck_reorder_read'));
+      case 'propose_reorder_decks': return this.取本地化文案($r('app.string.deck_menu_reorder'));
       case 'propose_create_note_type': return this.取本地化文案($r('app.string.ai_agent_tool_propose_create_note_type'));
       case 'propose_memory_change': return this.取本地化文案($r('app.string.ai_agent_tool_propose_memory_change'));
       case 'propose_analysis': return this.取本地化文案($r('app.string.ai_agent_tool_propose_analysis'));
@@ -2295,7 +2431,7 @@ export struct AI制卡页 {
         if (ctx.message.来源列表.length > 0) {
           Text($r('app.string.ai_agent_sources')).fontSize(应用尺寸.字号_正文_小).fontWeight(FontWeight.Medium)
           ForEach(ctx.message.来源列表, (source: SearchSource) => {
-            Text() { ThemeTextSpans(`${source.title}\n${source.url}`, this.themeAccentColors, this.getUIContext()) }.fontSize(应用尺寸.字号_正文_小)
+            Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(`${source.title}\n${source.url}`, this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }.fontSize(应用尺寸.字号_正文_小)
               .fontColor(this.动作主色).width('100%')
               .copyOption(CopyOptions.LocalDevice)
           }, (source: SearchSource): string => source.url)
@@ -2357,7 +2493,7 @@ export struct AI制卡页 {
         }
 
         if (ctx.message.批次结果 !== '') {
-          Text() { ThemeTextSpans(ctx.message.批次结果, this.themeAccentColors, this.getUIContext()) }
+          Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(ctx.message.批次结果, this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }
             .fontSize(应用尺寸.字号_正文_小)
             .fontColor(this.动作主色)
             .width('100%')
@@ -2569,7 +2705,7 @@ export struct AI制卡页 {
                 .layoutWeight(1)
                 .alignItems(HorizontalAlign.Start)
                 Button() {
-                  Text() { ThemeTextSpans($r('app.string.ai_agent_file_remove'), this.themeAccentColors, this.getUIContext()) }.fontSize(应用尺寸.字号_正文_小).fontColor(this.动作主色)
+                  Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans($r('app.string.ai_agent_file_remove'), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }.fontSize(应用尺寸.字号_正文_小).fontColor(this.动作主色)
                 }
                   .height(32)
                   .fontSize(应用尺寸.字号_正文_小)
@@ -2582,7 +2718,7 @@ export struct AI制卡页 {
               .width('100%')
               .padding({ left: 应用尺寸.间距_12, right: 应用尺寸.间距_12, top: 4, bottom: 4 })
               .backgroundColor($r('app.color.surface_card'))
-              .borderRadius(应用尺寸.圆角_卡片)
+              .borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
             }, (file: AgentImportedFile): string => file.id)
           }
           .width('100%')
@@ -2610,11 +2746,11 @@ export struct AI制卡页 {
             Stack() {
               // 两条文案都常驻布局、只切透明度：解析态显示「…」（窄于「导入」），
               // 按钮宽度恒为「导入」两字，与右侧发送按钮等宽，解析切换不抖动。
-              Text() { ThemeTextSpans(namedResourceText(this.getUIContext(), agentImportLabelKey(false)), this.themeAccentColors, this.getUIContext()) }
+              Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(localizedNamedResourceText(this.getUIContext(), this.uiLanguage, agentImportLabelKey(false)), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }
                 .fontSize(应用尺寸.字号_按钮)
                 .fontColor(this.动作主色)
                 .opacity(this.文件解析中 ? 0 : 1)
-              Text() { ThemeTextSpans(namedResourceText(this.getUIContext(), agentImportLabelKey(true)), this.themeAccentColors, this.getUIContext()) }
+              Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(localizedNamedResourceText(this.getUIContext(), this.uiLanguage, agentImportLabelKey(true)), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }
                 .fontSize(应用尺寸.字号_按钮)
                 .fontColor(this.动作主色)
                 .opacity(this.文件解析中 ? 1 : 0)
@@ -2627,7 +2763,7 @@ export struct AI制卡页 {
             .fontSize(应用尺寸.字号_按钮)
             .fontColor(this.动作主色)
             .backgroundColor($r('app.color.surface_card'))
-            .borderRadius(应用尺寸.圆角_胶囊)
+            .borderRadius(应用尺寸.圆角_胶囊).border(SurfaceBorder.options())
             .enabled(this.interfaceEnabled('import'))
             .attributeModifier(new PressFeedback())
             .stateEffect(false)
@@ -2670,7 +2806,8 @@ export struct AI制卡页 {
           this.历史区()
         } else {
           if (this.pageMode === 'assistant' && this.消息列表.length === 0) {
-            AgentEmptySuggestions({ isPageVisible: this.isAgentPageVisible }).layoutWeight(1)
+            AgentEmptySuggestions({ isPageVisible: this.isAgentPageVisible,
+              loadRecommendations: (): AgentAppRecommendation[] => this.emptyRecommendations() }).layoutWeight(1)
           } else {
             this.消息流()
           }
@@ -2697,7 +2834,7 @@ export struct AI制卡页 {
     .hideTitleBar(true)
     .backgroundColor(Color.Transparent)
     .onShown((): void => { appInterface.showPage('agent'); this.isAgentPageVisible = true; this.publishInterface(); })
-    .onHidden((): void => { appInterface.hidePage('agent'); this.isAgentPageVisible = false; })
+    .onHidden((): void => { appInterface.hidePage('agent'); this.isAgentPageVisible = false; this.navigationSession?.cancel(); })
     .opacity(this.转场透明度)
     .onBackPressed((): boolean => {
       if (this.targetSelectionMessage < 0) return false;

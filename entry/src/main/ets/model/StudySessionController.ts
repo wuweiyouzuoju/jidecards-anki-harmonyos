@@ -7,6 +7,7 @@ import { SyncActivity, syncActivity } from './SyncSettings';
 import { StudyOptions } from './StudyTiming';
 import type { JideChoiceQuestion } from './JideChoice';
 import { ReviewPreferences } from '../proto/messages/PreferencesMessages';
+import type { CardMarkingState, FlagLabels } from './CardMarking';
 
 /** 显式后端边界，允许在不加载 NAPI/ArkUI 的测试中验证学习会话。 */
 export interface StudySessionBackend {
@@ -24,6 +25,10 @@ export interface StudySessionBackend {
   undo(): Promise<void>;
   congrats(): Promise<CongratsInfo>;
   choiceQuestion?(noteId: number): Promise<JideChoiceQuestion | null>;
+  marking?(cardId: number): Promise<CardMarkingState>;
+  flagLabels?(): Promise<FlagLabels>;
+  setCardFlag?(cardId: number, flag: number): Promise<void>;
+  setNoteMarked?(noteId: number, marked: boolean): Promise<void>;
 }
 
 export interface StudySnapshot {
@@ -35,7 +40,11 @@ export interface StudySnapshot {
   options: StudyOptions;
   choiceQuestion: JideChoiceQuestion | null;
   preferences: ReviewPreferences;
+  marking: CardMarkingState | null;
+  flagLabels: FlagLabels;
 }
+
+export interface StudyMarkingSnapshot { rendered: RenderedCard; marking: CardMarkingState | null; }
 
 export interface StudyTimeboxNotice { seconds: number; answers: number; }
 
@@ -53,6 +62,15 @@ export class StudySessionController {
   private timeboxStarted: number | null = null;
   private timeboxAnswers: number = 0;
   private timeboxNotice: StudyTimeboxNotice | null = null;
+  private customSchedulingScript: string = '';
+  private acknowledgedScript: string = '';
+
+  needsCustomSchedulingAcknowledgement(): boolean {
+    return this.customSchedulingScript.trim() !== '' && this.customSchedulingScript !== this.acknowledgedScript;
+  }
+  acknowledgeCustomScheduling(): void {
+    if (!this.disposed) this.acknowledgedScript = this.customSchedulingScript;
+  }
 
   constructor(backend: StudySessionBackend, scheduler: AutoSyncScheduler = autoSyncScheduler,
     activity: SyncActivity = syncActivity, now: () => number = (): number => Date.now()) {
@@ -95,7 +113,7 @@ export class StudySessionController {
       const queue: QueuedCardsView = await this.backend.queuedCards(deckId);
       if (this.disposed || !isCurrent()) return null;
       const card: StudyCard | null = queue.cards.length === 0 ? null : queue.cards[0];
-      if (card === null) return { queue: queue, canUndo: canUndo, card: null, rendered: null, labels: [], options: new StudyOptions(), choiceQuestion: null, preferences: preferences };
+      if (card === null) return { queue: queue, canUndo: canUndo, card: null, rendered: null, labels: [], options: new StudyOptions(), choiceQuestion: null, preferences: preferences, marking: null, flagLabels: {} };
       const rendered: RenderedCard = await this.backend.renderCard(card.cardId);
       if (this.disposed || !isCurrent()) return null;
       const options: StudyOptions = await this.backend.studyOptions(card.cardId);
@@ -105,8 +123,13 @@ export class StudySessionController {
       const choiceQuestion: JideChoiceQuestion | null = this.backend.choiceQuestion === undefined
         ? null : await this.backend.choiceQuestion(card.noteId);
       if (this.disposed || !isCurrent()) return null;
+      const marking: CardMarkingState | null = this.backend.marking === undefined ? null : await this.backend.marking(card.cardId);
+      if (this.disposed || !isCurrent()) return null;
+      const flagLabels: FlagLabels = this.backend.flagLabels === undefined ? {} : await this.backend.flagLabels();
+      if (this.disposed || !isCurrent()) return null;
+      this.customSchedulingScript = options.customSchedulingScript ?? '';
       return { queue: queue, canUndo: canUndo, card: card, rendered: rendered, labels: labels, options: options,
-        choiceQuestion: choiceQuestion, preferences: preferences };
+        choiceQuestion: choiceQuestion, preferences: preferences, marking: marking, flagLabels: flagLabels };
     } finally {
       this.endOperation();
     }
@@ -130,6 +153,7 @@ export class StudySessionController {
   }
 
   async answer(card: StudyCard, rating: number, now: number, shownAt: number): Promise<void> {
+    if (this.needsCustomSchedulingAcknowledgement()) throw new Error('Custom scheduling requires acknowledgement');
     if (!Number.isInteger(rating) || rating < 0 || rating > 3) throw new Error('Invalid rating');
     const states: SchedulingStatesRaw = card.states;
     const next: Uint8Array[] = [states.again, states.hard, states.good, states.easy];
@@ -178,6 +202,32 @@ export class StudySessionController {
 
   undo(): Promise<void> {
     return this.commitChange((): Promise<void> => this.backend.undo());
+  }
+
+  setCardFlag(cardId: number, flag: number): Promise<void> {
+    return this.commitChange(async (): Promise<void> => {
+      if (this.backend.setCardFlag === undefined) throw new Error('Card marking unavailable');
+      await this.backend.setCardFlag(cardId, flag);
+    });
+  }
+
+  setNoteMarked(noteId: number, marked: boolean): Promise<void> {
+    return this.commitChange(async (): Promise<void> => {
+      if (this.backend.setNoteMarked === undefined) throw new Error('Note marking unavailable');
+      await this.backend.setNoteMarked(noteId, marked);
+    });
+  }
+
+  async refreshMarking(cardId: number, isCurrent: () => boolean): Promise<StudyMarkingSnapshot | null> {
+    this.beginOperation();
+    try {
+      await this.activity.waitForCollection();
+      if (this.disposed || !isCurrent()) return null;
+      const rendered: RenderedCard = await this.backend.renderCard(cardId);
+      if (this.disposed || !isCurrent()) return null;
+      const marking: CardMarkingState | null = this.backend.marking === undefined ? null : await this.backend.marking(cardId);
+      return this.disposed || !isCurrent() ? null : { rendered: rendered, marking: marking };
+    } finally { this.endOperation(); }
   }
 
   saveNote(note: EditableNote, fields: string[], tags: string[],

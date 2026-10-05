@@ -122,7 +122,7 @@ test('study keeps default cards opaque without replacing template backgrounds wh
   assert.doesNotMatch(html, /background: #E8EEFC !important/);
   const page = read(STUDY_PAGE);
   assert.match(page, /构建卡片HTML\(rendered, 'question', this\.是否深色\(\)\)/);
-  assert.match(page, /Web\(\{ src: '', controller: this\.网页控制器 \}\)\s*\.backgroundColor\(\$r\('app\.color\.surface_card'\)\)/);
+  assert.match(page, /Web\(\{ src: '', controller: this\.网页控制器 \}\)\s*\.backgroundColor\(this\.cardSurfaceBackground \|\| \$r\('app\.color\.surface_card'\)\)/);
   assert.match(page, /\.backgroundColor\(this\.页面底色微染值\)/);
   const cardArea = page.slice(page.indexOf('private 卡片区()'), page.indexOf('private 答案条()'));
   const answerBar = page.slice(page.indexOf('private 答案条()'), page.indexOf('\n  build()'));
@@ -358,10 +358,10 @@ test('study page reconciles the current card and queue after an Agent edit', () 
 
   // 返回后先核对真实队首：普通改字段保留当前阶段；删除/移走当前卡则加载新队首。
   const refresh = page.match(/private async 刷新编辑后当前卡\(\)[\s\S]*?\n  \}/)?.[0] ?? '';
-  assert.match(refresh, /await this\.加载下一张卡\(\)/);
+  assert.match(refresh, /await this\.加载下一张卡\(currentCardId\)/);
   assert.match(refresh, /wasAnswer && this\.当前卡片\?\.cardId === currentCardId/);
   assert.match(refresh, /await this\.显示答案\(\)/);
-  const load = page.match(/private async 加载下一张卡\(\)[\s\S]*?\n  \}/)?.[0] ?? '';
+  const load = page.match(/private async 加载下一张卡\([^)]*\)[\s\S]*?\n  \}/)?.[0] ?? '';
   assert.match(load, /studySession\.loadNext/);
   assert.match(load, /snapshot\.rendered/);
   assert.match(load, /this\.新卡剩余 = snapshot\.queue\.newCount/);

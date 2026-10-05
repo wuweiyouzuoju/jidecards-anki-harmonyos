@@ -36,6 +36,10 @@ export interface AgentSettingToolHandler {
   execute(argumentsJson: string): Promise<string>;
 }
 
+export interface AgentNavigationToolHandler {
+  execute(argumentsJson: string): Promise<string>;
+}
+
 interface SharedTemplateDraftOutput {
   status: string;
   draftId: string;
@@ -47,7 +51,7 @@ interface SharedTemplateDraftOutput {
 }
 
 function highRiskDraftOutput(draft: ChangeDraft): string {
-  if (draft.operations.length !== 1 || draft.operations[0].kind !== 'update_template') {
+  if (draft.operations.length !== 1 || !['update_template', 'update_notetype_fields', 'restore_notetype', 'update_notetype_latex'].includes(draft.operations[0].kind)) {
     return JSON.stringify(draft);
   }
   // The app keeps the exact ID set for confirmation; the model only needs the shared update and counts.
@@ -70,6 +74,13 @@ export class AgentToolRegistryError extends Error {
 
 /** 卡库写入只生成提案；可逆本机设置使用独立注册和宿主授权。 */
 export class AgentToolRegistry {
+  private readonly navigationHandlers: Map<string, AgentNavigationToolHandler> = new Map<string, AgentNavigationToolHandler>();
+  private navigationBusy: boolean = false;
+
+  registerNavigation(name: string, handler: AgentNavigationToolHandler): void {
+    if (toolRiskOf(name) !== 'navigation') throw new AgentToolRegistryError('tool_registration_rejected');
+    this.navigationHandlers.set(name, handler);
+  }
   private readonly settingHandlers: Map<string, AgentSettingToolHandler> = new Map<string, AgentSettingToolHandler>();
   private settingBusy: boolean = false;
 
@@ -138,6 +149,14 @@ export class AgentToolRegistry {
       };
     }
     const risk: ToolRisk = toolRiskOf(call.name);
+    if (risk === 'navigation') {
+      const handler: AgentNavigationToolHandler | undefined = this.navigationHandlers.get(call.name);
+      if (handler === undefined) throw new AgentToolRegistryError('tool_unavailable');
+      if (this.navigationBusy) throw new AgentToolRegistryError('tool_busy');
+      this.navigationBusy = true;
+      try { return { outputJson: await handler.execute(call.argumentsJson), draft: null, clarification: null }; }
+      finally { this.navigationBusy = false; }
+    }
     if (risk === 'setting_write') {
       const handler: AgentSettingToolHandler | undefined = this.settingHandlers.get(call.name);
       if (handler === undefined) { throw new AgentToolRegistryError('tool_unavailable'); }

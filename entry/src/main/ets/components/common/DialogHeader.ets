@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../../utils/PressFeedback';
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { HelpLabel } from './HelpLabel';
 import { ThemeLabelGlyph, themeLabelGlyphs } from './ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
@@ -9,12 +10,13 @@ import { 颜色键 } from '../../model/颜色主题';
 /** 弹窗的固定操作栏：退出在左，标题居中，主操作在右；业务校验由调用方传入。 */
 @Component
 export struct DialogHeader {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop title: ResourceStr = '';
   @Prop highlightLabel: ResourceStr = '';
   @Prop highlightColors: string[] = [];
   @Prop actionLabel: ResourceStr = $r('app.string.done');
-  @Prop closeLabel: ResourceStr = $r('app.string.create_deck_cancel');
+  @Prop closeLabel: ResourceStr = $r('app.string.cancel');
   @Prop actionEnabled: boolean = true;
   @Prop closeEnabled: boolean = true;
   @Prop showClose: boolean = true;
@@ -57,7 +59,7 @@ export struct DialogHeader {
       Button() {
         Text() {
           if (!this.destructive && this.themeAccentColors.length > 0) {
-            ForEach(themeLabelGlyphs(this.actionLabel, this.themeAccentColors, this.getUIContext()), (glyph: ThemeLabelGlyph) => {
+            ForEach(themeLabelGlyphs(this.actionLabel, this.themeAccentColors, this.getUIContext(), this.uiLanguage), (glyph: ThemeLabelGlyph) => {
               Span(glyph.letter).fontColor(glyph.color)
             }, (glyph: ThemeLabelGlyph, index: number): string => `${index}-${glyph.letter}-${glyph.color}`)
           } else {
@@ -93,6 +95,6 @@ export struct DialogHeader {
     .width('100%')
     .constraintSize({ minHeight: 48 })
     .padding({ bottom: 8 })
-    .border({ width: { bottom: this.showDivider ? 0.5 : 0 }, color: $r('app.color.border_input') })
+    .border(SurfaceBorder.options({ bottom: this.showDivider ? 0.5 : 0 }))
   }
 }

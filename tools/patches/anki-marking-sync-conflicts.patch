@@ -1,0 +1,229 @@
+diff --git a/rslib/src/backend/mod.rs b/rslib/src/backend/mod.rs
+index cb0e412..a355911 100644
+--- a/rslib/src/backend/mod.rs
++++ b/rslib/src/backend/mod.rs
+@@ -19,6 +19,7 @@ mod sync;
+ 
+ use std::ops::Deref;
+ use std::result;
++use std::sync::atomic::{AtomicBool, Ordering};
+ use std::sync::Arc;
+ use std::sync::Mutex;
+ use std::sync::OnceLock;
+@@ -53,6 +54,7 @@ pub struct BackendInner {
+     col: Mutex<Option<Collection>>,
+     pub(crate) tr: I18n,
+     server: bool,
++    marking_sync_priority: AtomicBool,
+     sync_abort: Mutex<Option<AbortHandle>>,
+     progress_state: Arc<Mutex<ProgressState>>,
+     runtime: OnceLock<Runtime>,
+@@ -85,6 +87,7 @@ impl Backend {
+             col: Mutex::new(None),
+             tr,
+             server,
++            marking_sync_priority: AtomicBool::new(false),
+             sync_abort: Mutex::new(None),
+             progress_state: Arc::new(Mutex::new(ProgressState {
+                 want_abort: false,
+@@ -98,6 +101,11 @@ impl Backend {
+         }))
+     }
+ 
++    /// Set before opening a collection. This is local policy, never synced config.
++    pub fn set_marking_sync_priority(&self, enabled: bool) {
++        self.marking_sync_priority.store(enabled, Ordering::Relaxed);
++    }
++
+     pub fn i18n(&self) -> &I18n {
+         &self.tr
+     }
+diff --git a/rslib/src/backend/collection.rs b/rslib/src/backend/collection.rs
+index 5cef743..b22d402 100644
+--- a/rslib/src/backend/collection.rs
++++ b/rslib/src/backend/collection.rs
+@@ -1,6 +1,7 @@
+ // Copyright: Ankitects Pty Ltd and contributors
+ // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
+ 
++use std::sync::atomic::Ordering;
+ use std::sync::MutexGuard;
+ 
+ use anki_proto::generic;
+@@ -21,6 +22,7 @@ impl BackendCollectionService for Backend {
+         builder
+             .set_media_paths(input.media_folder_path, input.media_db_path)
+             .set_server(self.server)
++            .set_marking_sync_priority(self.marking_sync_priority.load(Ordering::Relaxed))
+             .set_tr(self.tr.clone())
+             .set_shared_progress_state(self.progress_state.clone());
+ 
+diff --git a/rslib/src/collection/mod.rs b/rslib/src/collection/mod.rs
+index 8acefd4..111cb17 100644
+--- a/rslib/src/collection/mod.rs
++++ b/rslib/src/collection/mod.rs
+@@ -40,6 +40,7 @@ pub struct CollectionBuilder {
+     server: Option<bool>,
+     tr: Option<I18n>,
+     check_integrity: bool,
++    marking_sync_priority: bool,
+     progress_handler: Option<Arc<Mutex<ProgressState>>>,
+ }
+ 
+@@ -70,6 +71,7 @@ impl CollectionBuilder {
+             tr,
+             server,
+             state: CollectionState {
++                marking_sync_priority: self.marking_sync_priority && !server,
+                 progress: self.progress_handler.clone().unwrap_or_default(),
+                 ..Default::default()
+             },
+@@ -105,6 +107,11 @@ impl CollectionBuilder {
+         self
+     }
+ 
++    pub fn set_marking_sync_priority(&mut self, enabled: bool) -> &mut Self {
++        self.marking_sync_priority = enabled;
++        self
++    }
++
+     pub fn set_tr(&mut self, tr: I18n) -> &mut Self {
+         self.tr = Some(tr);
+         self
+@@ -125,6 +132,7 @@ impl CollectionBuilder {
+ 
+ #[derive(Debug, Default)]
+ pub struct CollectionState {
++    pub(crate) marking_sync_priority: bool,
+     pub(crate) undo: UndoManager,
+     pub(crate) notetype_cache: HashMap<NotetypeId, Arc<Notetype>>,
+     pub(crate) deck_cache: HashMap<DeckId, Arc<Deck>>,
+@@ -164,6 +172,7 @@ impl Collection {
+         builder
+             .set_media_paths(self.media_folder.clone(), self.media_db.clone())
+             .set_server(self.server)
++            .set_marking_sync_priority(self.state.marking_sync_priority)
+             .set_tr(self.tr.clone())
+             .set_shared_progress_state(self.state.progress.clone());
+         builder
+diff --git a/rslib/src/sync/collection/chunks.rs b/rslib/src/sync/collection/chunks.rs
+index 7873c89..c035c29 100644
+--- a/rslib/src/sync/collection/chunks.rs
++++ b/rslib/src/sync/collection/chunks.rs
+@@ -121,6 +121,7 @@ impl NormalSyncer<'_> {
+         &mut self,
+         state: &ClientSyncState,
+     ) -> Result<()> {
++        self.col.prepare_marking_sync_revisions(state.pending_usn)?;
+         let mut ids = self.col.get_chunkable_ids(state.pending_usn)?;
+ 
+         loop {
+@@ -181,6 +182,24 @@ impl Collection {
+ 
+     fn add_or_update_card_if_newer(&self, entry: CardEntry, pending_usn: Usn) -> Result<()> {
+         let proceed = if let Some(existing_card) = self.storage.get_card(entry.id)? {
++            if self.state.marking_sync_priority
++                && existing_card.usn.is_pending_sync(pending_usn)
++                && existing_card.flags & 7 != entry.flags & 7
++            {
++                let local_flag = existing_card.flags & 7;
++                let mtime = existing_card.mtime.max(entry.mtime);
++                // Keep upstream's record winner, then preserve only the local flag.
++                let mut card: Card = if existing_card.mtime < entry.mtime {
++                    entry.into()
++                } else {
++                    existing_card
++                };
++                card.flags = (card.flags & !7) | local_flag;
++                card.mtime = mtime;
++                card.usn = pending_usn;
++                self.storage.add_or_update_card(&card)?;
++                return Ok(());
++            }
+             !existing_card.usn.is_pending_sync(pending_usn) || existing_card.mtime < entry.mtime
+         } else {
+             true
+@@ -201,6 +220,36 @@ impl Collection {
+ 
+     fn add_or_update_note_if_newer(&mut self, entry: NoteEntry, pending_usn: Usn) -> Result<()> {
+         let proceed = if let Some(existing_note) = self.storage.get_note(entry.id)? {
++            let local_mark = existing_note
++                .tags
++                .iter()
++                .find(|tag| tag.eq_ignore_ascii_case("marked"))
++                .cloned();
++            let remote_marked =
++                split_tags(&entry.tags).any(|tag| tag.eq_ignore_ascii_case("marked"));
++            if self.state.marking_sync_priority
++                && existing_note.usn.is_pending_sync(pending_usn)
++                && local_mark.is_some() != remote_marked
++            {
++                let mtime = existing_note.mtime.max(entry.mtime);
++                let mut note: Note = if existing_note.mtime < entry.mtime {
++                    entry.into()
++                } else {
++                    existing_note
++                };
++                note.tags.retain(|tag| !tag.eq_ignore_ascii_case("marked"));
++                if let Some(tag) = local_mark {
++                    note.tags.push(tag);
++                }
++                note.mtime = mtime;
++                note.usn = pending_usn;
++                let nt = self
++                    .get_notetype(note.notetype_id)?
++                    .or_invalid("note missing notetype")?;
++                note.prepare_for_update(&nt, false)?;
++                self.storage.add_or_update_note(&note)?;
++                return Ok(());
++            }
+             !existing_note.usn.is_pending_sync(pending_usn) || existing_note.mtime < entry.mtime
+         } else {
+             true
+@@ -219,6 +268,46 @@ impl Collection {
+     // Local->remote chunks
+     //----------------------------------------------------------------
+ 
++    fn prepare_marking_sync_revisions(&self, pending_usn: Usn) -> Result<()> {
++        if !self.state.marking_sync_priority {
++            return Ok(());
++        }
++        // SetFlag deliberately leaves mtime unchanged. An unmodified peer/server
++        // requires strictly newer revisions to accept pending marker changes.
++        // With no per-field history, every remaining pending row needs a revision.
++        // This runs inside the normal sync transaction, after queues are cleared.
++        let now = TimestampSecs::now();
++        for id in self.storage.objects_pending_sync("cards", pending_usn)? {
++            let mut card = self
++                .storage
++                .get_card(CardId(id))?
++                .or_invalid("pending card missing")?;
++            card.mtime = TimestampSecs(
++                card.mtime
++                    .max(now)
++                    .0
++                    .checked_add(1)
++                    .or_invalid("card sync revision overflow")?,
++            );
++            self.storage.update_card(&card)?;
++        }
++        for id in self.storage.objects_pending_sync("notes", pending_usn)? {
++            let mut note = self
++                .storage
++                .get_note(NoteId(id))?
++                .or_invalid("pending note missing")?;
++            note.mtime = TimestampSecs(
++                note.mtime
++                    .max(now)
++                    .0
++                    .checked_add(1)
++                    .or_invalid("note sync revision overflow")?,
++            );
++            self.storage.update_note(&note)?;
++        }
++        Ok(())
++    }
++
+     pub(in crate::sync) fn get_chunkable_ids(&self, pending_usn: Usn) -> Result<ChunkableIds> {
+         Ok(ChunkableIds {
+             revlog: self.storage.objects_pending_sync("revlog", pending_usn)?,

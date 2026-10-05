@@ -4,19 +4,22 @@ import { AnchoredMenuItem } from '../common/MenuItem';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { AppInterfaceMenuItem, AppInterfaceControl, browserInterfaceMenu } from '../../model/AppInterface';
 import { appInterface } from '../../backend/AppInterfaceService';
-import { namedResourceText } from '../../utils/UiFeedback';
+import { localizedNamedResourceText, namedResourceText } from '../../utils/UiFeedback';
 
 /** 沿用设置模式菜单的居中条目、主题色标记和透明承接层。 */
 @Component
 export struct BrowserMoreMenu {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('publishInterface') filterActive: boolean = false;
   @Prop @Watch('publishInterface') available: boolean = true;
   @Prop @Watch('publishInterface') subtitleIndex: number = 1;
   @Prop topOffset: number = 68;
   onClose: () => void = (): void => {};
+  onHistory: () => void = (): void => {};
   onFilter: () => void = (): void => {};
   onFindReplace: () => void = (): void => {};
   onSaveSearch: () => void = (): void => {};
+  onFlagNames: () => void = (): void => {};
   onSubtitle: (index: number) => void = (_index: number): void => {};
   private interfaceMounted: boolean = false;
 
@@ -27,7 +30,7 @@ export struct BrowserMoreMenu {
     return browserInterfaceMenu(this.available, this.filterActive, this.subtitleIndex);
   }
 
-  private publishInterface(): void {
+  private publishInterface(_locale: string = this.uiLanguage): void {
     if (!this.interfaceMounted) return;
     const items: AppInterfaceMenuItem[] = this.menuItems();
     appInterface.observe({ surface: 'browser_more', sectionId: '', selectedId: '', busy: !this.available,
@@ -41,9 +44,11 @@ export struct BrowserMoreMenu {
   private selectItem(id: string): void {
     const item: AppInterfaceMenuItem | undefined = this.menuItems().find((entry: AppInterfaceMenuItem): boolean => entry.id === id);
     if (item === undefined || !item.enabled) return;
-    if (id === 'filter') this.onFilter();
+    if (id === 'history') this.onHistory();
+    else if (id === 'filter') this.onFilter();
     else if (id === 'find_replace') this.onFindReplace();
     else if (id === 'save_search') this.onSaveSearch();
+    else if (id === 'flag_names') this.onFlagNames();
     else if (id === 'subtitle_deck') this.onSubtitle(1);
     else if (id === 'subtitle_answer') this.onSubtitle(4);
     else if (id === 'subtitle_due') this.onSubtitle(2);
@@ -53,7 +58,7 @@ export struct BrowserMoreMenu {
     AnchoredMenu({ menuWidth: 应用尺寸.extendedMenuWidth, topOffset: this.topOffset,
       onClose: (): void => { this.onClose(); } }) {
       ForEach(this.menuItems(), (item: AppInterfaceMenuItem, index: number) => {
-        AnchoredMenuItem({ label: namedResourceText(this.getUIContext(), item.titleKey), divider: index > 0,
+        AnchoredMenuItem({ label: localizedNamedResourceText(this.getUIContext(), this.uiLanguage, item.titleKey), divider: index > 0,
           available: item.enabled, selected: item.selected, onSelect: (): void => { this.selectItem(item.id); } })
       }, (item: AppInterfaceMenuItem): string => item.id)
     }

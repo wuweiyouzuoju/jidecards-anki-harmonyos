@@ -4,9 +4,11 @@ import { buildDeckConfigRequest, copyDeckConfig } from '../DeckConfigSave';
 import type { DeckConfigRequestOptions } from '../DeckConfigSave';
 import { applyFsrsParams, fsrsOptimizeInput, fsrsWorkloadInput } from '../FsrsOptions';
 import type { ComputeFsrsParamsInput, ComputeFsrsParamsOutput, SimulateFsrsInput,
-  FsrsWorkloadOutput } from '../../proto/messages/FsrsMessages';
+  FsrsWorkloadOutput, EvaluateFsrsInput, EvaluateFsrsOutput, FsrsHistoryCount } from '../../proto/messages/FsrsMessages';
 import { AutoSyncScheduler, autoSyncScheduler } from '../AutoSyncScheduler';
 import { SyncActivity, syncActivity } from '../SyncSettings';
+import { DeckOptionsPresets } from '../DeckOptionsPresets';
+import type { DeckOptionsPresetEntry } from '../DeckOptionsPresets';
 
 // A reopened panel must wait for the previous panel's real Core call, including a failed call.
 let deckOptionsWorkTail: Promise<void> = Promise.resolve();
@@ -30,6 +32,10 @@ export class DeckOptionsFsrsState {
   workload: FsrsWorkloadOutput | null = null;
   workloadDays: number = 0;
   error: string = '';
+  evaluation: EvaluateFsrsOutput | null = null;
+  evaluationSearch: string = '';
+  evaluationDate: string = '';
+  historyCount: FsrsHistoryCount | null = null;
 }
 
 export interface DeckOptionsBackend {
@@ -39,6 +45,8 @@ export interface DeckOptionsBackend {
   optimize?(input: ComputeFsrsParamsInput): Promise<ComputeFsrsParamsOutput>;
   workload?(input: SimulateFsrsInput): Promise<FsrsWorkloadOutput>;
   presetSearch?(id: number): Promise<string>;
+  evaluate?(input: EvaluateFsrsInput): Promise<EvaluateFsrsOutput>;
+  historyCount?(date: string, search: string): Promise<FsrsHistoryCount>;
 }
 
 export interface DeckOptionsSnapshot {
@@ -47,6 +55,9 @@ export interface DeckOptionsSnapshot {
   config: DeckConfig | null;
   error: string;
   fsrs: DeckOptionsFsrsState;
+  presets?: DeckOptionsPresetEntry[];
+  presetKey?: string;
+  presetAssignmentsChanged?: boolean;
 }
 
 /** 一个弹层实例拥有一次编辑会话。已接受写入继续，销毁后不再通知 UI。 */
@@ -63,6 +74,7 @@ export class DeckOptionsSession {
   private original: DeckConfig | null = null;
   private fsrs: DeckOptionsFsrsState = new DeckOptionsFsrsState();
   private optimized: DeckConfig[] = [];
+  private presets: DeckOptionsPresets | null = null;
   private scheduler: AutoSyncScheduler;
   private activity: SyncActivity;
 
@@ -92,6 +104,7 @@ export class DeckOptionsSession {
       if (entry === undefined || entry.config.config === null) throw new Error('deck config not found');
       this.view = view;
       this.original = copyDeckConfig(entry.config);
+      this.presets = new DeckOptionsPresets(view);
       this.optimized = [];
       this.fsrs = new DeckOptionsFsrsState();
       this.loading = false;
@@ -112,6 +125,14 @@ export class DeckOptionsSession {
     // Current config must stay last: Core uses it to bind targetDeckId.
     request.configs = this.optimized.filter(config => config.id !== request.configs[0].id)
       .map(config => copyDeckConfig(config)).concat(request.configs);
+    if (this.presets !== null) {
+      const staged = this.presets.modifiedExceptCurrent();
+      const current = request.configs[request.configs.length - 1];
+      const others = request.configs.slice(0, -1).filter(config => !this.presets!.removedIds.includes(config.id))
+        .map(config => staged.find(item => item.id !== 0 && item.id === config.id) ?? config);
+      request.configs = others.concat(staged.filter(config => config.id === 0 || !others.some(item => item.id === config.id)), [current]);
+      request.removedConfigIds = this.presets.removedIds.slice();
+    }
     this.saving = true;
     this.emit('saving', '');
     try {
@@ -133,6 +154,22 @@ export class DeckOptionsSession {
 
   dispose(): void { this.alive = false; this.version++; }
 
+  editPreset(action: string, value: string, draft: DeckConfig): boolean {
+    if (!this.canOperate() || this.presets === null) return false;
+    switch (action) {
+      case 'select': this.presets.select(value, draft); break;
+      case 'rename': this.presets.rename(value, draft); break;
+      case 'create': this.presets.add(value, draft, false); break;
+      case 'clone': this.presets.add(value, draft, true); break;
+      case 'remove': this.presets.remove(draft); break;
+      default: return false;
+    }
+    this.original = copyDeckConfig(this.presets.current().config);
+    this.fsrs.workload = null; this.fsrs.evaluation = null; this.fsrs.historyCount = null;
+    this.emit('ready', '');
+    return true;
+  }
+
   private canOperate(): boolean {
     return this.alive && !this.loading && !this.saving && !this.fsrs.busy && !this.completed && this.view !== null && this.original !== null;
   }
@@ -140,7 +177,7 @@ export class DeckOptionsSession {
   /** Pure computation is staged; only save() submits deck configurations. */
   async optimize(draft: DeckConfig, options: DeckConfigRequestOptions, all: boolean,
     retryFailures: boolean = false): Promise<number[] | null> {
-    if (!this.canOperate() || !options.fsrs || this.backend.optimize === undefined) return null;
+    if (!this.canOperate() || !options.fsrs || this.backend.optimize === undefined || this.presets?.assignmentsChanged) return null;
     const current = copyDeckConfig(draft);
     const targets: DeckConfig[] = [];
     const seen = new Set<number>();
@@ -188,6 +225,8 @@ export class DeckOptionsSession {
                 applyFsrsParams(staged.config!, response.params);
                 this.optimized = this.optimized.filter(item => item.id !== config.id).concat([staged]);
                 this.fsrs.batchDraft = true;
+                const entry = this.presets?.entries.find(item => item.config.id === config.id);
+                if (entry !== undefined) applyFsrsParams(entry.config.config!, response.params);
               }
               if (config.id === current.id) currentParams = response.params.slice();
             }
@@ -206,6 +245,31 @@ export class DeckOptionsSession {
       this.emit('ready', '');
     }
     return this.alive && version === this.version ? currentParams : null;
+  }
+
+  async evaluate(draft: DeckConfig): Promise<void> {
+    if (!this.canOperate()) return;
+    if (this.backend.evaluate === undefined || this.backend.historyCount === undefined) throw new Error('FSRS evaluation is unavailable');
+    const frozen = copyDeckConfig(draft);
+    const request = fsrsOptimizeInput(frozen, false, 'did:0 -is:suspended');
+    const version: number = ++this.version;
+    this.fsrs.busy = true; this.fsrs.operation = 'evaluate'; this.fsrs.error = '';
+    this.fsrs.evaluation = null; this.fsrs.historyCount = null; this.emit('ready', '');
+    try {
+      await this.runWork(async (): Promise<void> => {
+        if (!this.alive || version !== this.version) return;
+        const search: string = frozen.config!.paramSearch.trim() === '' ? await this.presetSearch(frozen.id) : frozen.config!.paramSearch;
+        if (!this.alive || version !== this.version) return;
+        this.fsrs.evaluationSearch = search; this.fsrs.evaluationDate = frozen.config!.ignoreRevlogsBeforeDate;
+        const count = await this.backend.historyCount!(this.fsrs.evaluationDate, search);
+        if (!this.alive || version !== this.version) return;
+        this.fsrs.historyCount = count;
+        const result = await this.backend.evaluate!({ params: request.currentParams, search: search,
+          ignoreRevlogsBeforeMs: request.ignoreRevlogsBeforeMs });
+        if (this.alive && version === this.version) this.fsrs.evaluation = result;
+      });
+    } catch (error) { this.fsrs.error = error instanceof Error ? error.message : String(error); }
+    finally { this.fsrs.busy = false; this.emit('ready', ''); }
   }
 
   async simulate(draft: DeckConfig, options: DeckConfigRequestOptions, days: number): Promise<void> {
@@ -264,6 +328,10 @@ export class DeckOptionsSession {
     fsrs.results = this.fsrs.results.slice(); fsrs.batchDraft = this.fsrs.batchDraft;
     fsrs.allPresets = this.fsrs.allPresets;
     fsrs.workload = this.fsrs.workload; fsrs.workloadDays = this.fsrs.workloadDays; fsrs.error = this.fsrs.error;
-    this.publish({ phase: phase, view: this.view, config: this.original, error: error, fsrs: fsrs });
+    fsrs.evaluation = this.fsrs.evaluation; fsrs.historyCount = this.fsrs.historyCount;
+    fsrs.evaluationSearch = this.fsrs.evaluationSearch; fsrs.evaluationDate = this.fsrs.evaluationDate;
+    this.publish({ phase: phase, view: this.view, config: this.original, error: error, fsrs: fsrs,
+      presets: this.presets?.entries.map(entry => ({ key: entry.key, config: copyDeckConfig(entry.config), useCount: entry.useCount })),
+      presetKey: this.presets?.selectedKey, presetAssignmentsChanged: this.presets?.assignmentsChanged });
   }
 }

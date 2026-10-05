@@ -1,0 +1,11 @@
+Anki Manual — Anki contributors
+Source: https://github.com/ankitects/anki/tree/fe4f9e039a4e283b71e611fc1ffb87029b1cdc05/docs-site/manual
+Revision: fe4f9e039a4e283b71e611fc1ffb87029b1cdc05
+Commit date: 2026-10-02T23:08:25+01:00
+License: CC-BY-SA-4.0 (https://creativecommons.org/licenses/by-sa/4.0/)
+Anki Manual by Anki contributors. Original chapter text retained; Chinese search aliases and section index added by jidecards.
+
+This offline snapshot describes upstream Anki. jidecards UI and available actions are provided by the current app interface catalog.
+Only selected original English chapters are bundled. Images and remote resources are not bundled. Relative links use https://anki.mintlify.app/manual/ as their base.
+Update: node tools/vendor-anki-manual.mjs --write --source-dir <official-Anki-checkout>
+Verify offline: node tools/vendor-anki-manual.mjs --check

@@ -57,12 +57,12 @@ test('confirmation previews use actual localized names and values for font, widt
       `../../entry/src/main/resources/${locale}/element/string.json`,import.meta.url),'utf8')).string.map(x => [x.name,x.value]));
     const Control = loadComponentLogic('components/agent/AgentActionCard.ets','AgentActionCard', {
       $r: name => name.split('.').at(-1),
-      resourceText: (_context,key) => resources.get(key)
+      resourceText: (_context,key) => resources.get(key), namedResourceText: (_context,key) => resources.get(key)
     });
     const control = new Control(); control.getUIContext = () => ({});
     for (const [id,before,after,label,beforeText,afterText] of [
       ['card_text_size','100','130','card_text_size','100%','130%'],
-      ['deck_list_narrow','false','true','deck_width',resources.get('deck_width_wide'),resources.get('deck_width_narrow')],
+      ['deck_list_style','single_wide','double_narrow','deck_width',resources.get('deck_style_single_wide'),resources.get('deck_style_double_narrow')],
       ['study_haptics','true','false','settings_study_haptics',resources.get('ai_agent_setting_on'),resources.get('ai_agent_setting_off')]
     ]) {
       control.action = {kind:'setting_change',payloadJson:JSON.stringify({settingId:id,before,after})};

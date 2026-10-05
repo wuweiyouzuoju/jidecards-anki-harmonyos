@@ -1,5 +1,7 @@
+import { IconActionButton } from '../common/IconActionButton';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../../utils/PressFeedback';
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { LengthMetrics } from '@kit.ArkUI';
 import { NoteDraftPreview } from '../common/NoteDraftPreview';
 import { NoteDraftPreviewInput } from '../../model/NoteDraftPreview';
@@ -10,7 +12,7 @@ import { NotetypeTemplateDraft as 模板项, serializeNotetypeTemplates, preview
   NotetypeOperationSession, notetypeStructureChanges } from '../../model/NotetypeManagement';
 import { DialogFrame } from '../common/DialogFrame';
 import { AnchoredMenuItem } from '../common/MenuItem';
-import { resourceText, showToastSafely } from '../../utils/UiFeedback';
+import { showToastSafely, resourceText } from '../../utils/UiFeedback';
 import { FormSelectRow } from '../common/FormSelectRow';
 import { ThemeTextSpans } from '../common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
@@ -55,6 +57,7 @@ import { NotetypeFieldDraft as 字段项, serializeNotetypeFields } from '../../
 
 @Component
 export struct 笔记类型编辑器 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
 
   private handleBackRequest(): void {
@@ -104,7 +107,7 @@ export struct 笔记类型编辑器 {
 
   aboutToDisappear(): void { this.mounted = false; this.readVersion++; this.writes.dispose(); }
 
-  private 取本地化文本(资源: Resource): string {
+  private 取本地化文本(资源: Resource, _locale: string = this.uiLanguage): string {
     return resourceText(this.getUIContext(), 资源);
   }
 
@@ -380,44 +383,26 @@ export struct 笔记类型编辑器 {
         .fontSize(应用尺寸.字号_正文_小)
         .height(应用尺寸.按钮高度)
         .backgroundColor($r('app.color.surface_card'))
-        .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
+        .border(SurfaceBorder.options())
         .borderRadius(应用尺寸.圆角_面板)
         .layoutWeight(1)
         .onChange((值: string) => { this.更新字段名(索引, 值); })
-      // 上移
-      Text() { ThemeTextSpans('↑', (索引 > 0) ? this.themeAccentColors : [], this.getUIContext()) }
-        .fontSize(16)
-        .fontColor(索引 > 0 ? this.主色按钮背景 : 设置面板色板_取(this.isDark).弱化文字)
-        .width(28)
-        .height(28)
-        .textAlign(TextAlign.Center)
-        .attributeModifier(new PressFeedback())
-        .onClick(() => { this.上移字段(索引); })
-      // 下移
-      Text() { ThemeTextSpans('↓', (索引 < this.字段列表.length - 1) ? this.themeAccentColors : [], this.getUIContext()) }
-        .fontSize(16)
-        .fontColor(索引 < this.字段列表.length - 1 ? this.主色按钮背景 : 设置面板色板_取(this.isDark).弱化文字)
-        .width(28)
-        .height(28)
-        .textAlign(TextAlign.Center)
-        .attributeModifier(new PressFeedback())
-        .onClick(() => { this.下移字段(索引); })
-      // 删除
-      Text('×')
-        .fontSize(18)
-        .fontColor($r('app.color.error_text'))
-        .width(28)
-        .height(28)
-        .textAlign(TextAlign.Center)
-        .attributeModifier(new PressFeedback())
-        .onClick(() => { this.删除字段(索引); })
+      IconActionButton({ source: $r('app.media.ic_common_arrow_up'), label: $r('app.string.icon_field_up'),
+        glyphColor: this.主色按钮背景, isInteractive: 索引 > 0,
+        onAction: (): void => { this.上移字段(索引); } })
+      IconActionButton({ source: $r('app.media.ic_common_arrow_down'), label: $r('app.string.icon_field_down'),
+        glyphColor: this.主色按钮背景, isInteractive: 索引 < this.字段列表.length - 1,
+        onAction: (): void => { this.下移字段(索引); } })
+      IconActionButton({ source: $r('app.media.ic_study_delete'), label: $r('app.string.icon_field_delete'),
+        iconFill: $r('app.color.error_text'),
+        onAction: (): void => { this.删除字段(索引); } })
     }
     .width('100%')
   }
 
   @Builder
   private 字段令牌行(字段名: string) {
-    Text() { ThemeTextSpans(`{{${字段名}}}`, this.themeAccentColors, this.getUIContext()) }
+    Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(`{{${字段名}}}`, this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }
       .fontSize(应用尺寸.字号_正文_小)
       .fontColor(this.主色按钮背景)
       .backgroundColor(设置面板色板_取(this.isDark).标签背景)
@@ -482,7 +467,7 @@ export struct 笔记类型编辑器 {
             .height(应用尺寸.按钮高度)
             .fontSize(应用尺寸.字号_正文)
             .backgroundColor($r('app.color.surface_card'))
-            .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
+            .border(SurfaceBorder.options())
             .borderRadius(应用尺寸.圆角_面板)
             .onChange((值: string) => { this.类型名 = 值; })
         }
@@ -500,7 +485,7 @@ export struct 笔记类型编辑器 {
           // === 字段区 ===
           Column({ space: 应用尺寸.间距_5 }) {
             Row() {
-              Text() { ThemeTextSpans($r('app.string.notetype_editor_add_field'), this.themeAccentColors, this.getUIContext()) }
+              Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans($r('app.string.notetype_editor_add_field'), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }
                 .fontSize(应用尺寸.字号_正文_小)
                 .fontColor(this.主色按钮背景)
                 .attributeModifier(new PressFeedback())
@@ -562,7 +547,7 @@ export struct 笔记类型编辑器 {
               .height(应用尺寸.按钮高度)
               .fontSize(应用尺寸.字号_正文_小)
               .backgroundColor($r('app.color.surface_card'))
-              .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
+              .border(SurfaceBorder.options())
               .borderRadius(应用尺寸.圆角_面板)
               .onChange((值: string) => { this.更新模板名(值); })
 
@@ -588,7 +573,7 @@ export struct 笔记类型编辑器 {
             TextArea({ text: this.当前模板().qfmt })
               .fontSize(应用尺寸.字号_正文_小)
               .backgroundColor($r('app.color.surface_card'))
-              .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
+              .border(SurfaceBorder.options())
               .borderRadius(应用尺寸.圆角_面板)
               .constraintSize({ minHeight: 80 })
               .width('100%')
@@ -602,7 +587,7 @@ export struct 笔记类型编辑器 {
             TextArea({ text: this.当前模板().afmt })
               .fontSize(应用尺寸.字号_正文_小)
               .backgroundColor($r('app.color.surface_card'))
-              .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
+              .border(SurfaceBorder.options())
               .borderRadius(应用尺寸.圆角_面板)
               .constraintSize({ minHeight: 80 })
               .width('100%')
@@ -625,7 +610,7 @@ export struct 笔记类型编辑器 {
             TextArea({ text: this.CSS文本 })
               .fontSize(应用尺寸.字号_正文_小)
               .backgroundColor($r('app.color.surface_card'))
-              .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
+              .border(SurfaceBorder.options())
               .borderRadius(应用尺寸.圆角_面板)
               .constraintSize({ minHeight: 100 })
               .width('100%')

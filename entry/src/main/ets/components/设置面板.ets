@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { PressFeedback } from '../utils/PressFeedback';
-import { DisclosureChevron } from './common/DisclosureChevron';
-import { namedResourceText, resourceText, showToastSafely } from '../utils/UiFeedback';
+import { SurfaceBorder } from '../utils/SurfaceBorder';
+import { SettingsActionRow } from './common/SettingsActionRow';
+import { settingsIcon } from '../utils/SettingsIcons';
+import { showToastSafely, resourceText, namedResourceText } from '../utils/UiFeedback';
 import { ThemeTextSpans } from './common/ThemeText';
 import { SettingsGroup, visibleSettingsGroups } from '../model/SettingsStructure';
 import { appInterface } from '../backend/AppInterfaceService';
@@ -9,7 +10,7 @@ import { SettingsEntry, filterSettingsEntries, SETTINGS_ENTRIES } from '../model
 import { syncActivity } from '../model/SyncSettings';
 import { OFFICIAL_QQ_GROUP } from '../model/OfficialCommunity';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
-import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
+import { PAGE_COMPACT_LAYOUT_KEY } from '../model/AppLayoutState';
 
 import { common } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
@@ -72,6 +73,7 @@ import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../model/ReleaseFeatures';
 // ========================================================
 @Component
 export struct 设置面板 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
   @State private notetypeEditorBackRequest: number = 0;
   @State private notetypeManagerBackRequest: number = 0;
@@ -92,10 +94,11 @@ export struct 设置面板 {
     this.navigateBack();
   }
 
-  @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
+  @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
   @Link @Watch('publishInterface') activeSection: string;
   @State private settingsQuery: string = '';
   @Prop openAiSettings: boolean = false;
+  @Prop initialSectionId: string = '';
   @Prop 当前主题模式: 主题模式 = 'system';
   @Prop 是否深色: boolean = false;
   @Prop 当前颜色主题: 颜色主题 = 'aurora';
@@ -192,6 +195,10 @@ export struct 设置面板 {
         }
       }, 50);
     }
+    if (!this.openAiSettings && this.initialSectionId !== '' &&
+      this.directoryEntries().some((entry: SettingsEntry): boolean => entry.id === this.initialSectionId)) {
+      this.openSection(this.initialSectionId);
+    }
   }
 
   aboutToDisappear(): void {
@@ -212,7 +219,7 @@ export struct 设置面板 {
     this.内容滚动器.scrollToIndex(0);
   }
 
-  private sectionText(key: string): string {
+  private sectionText(key: string, _locale: string = this.uiLanguage): string {
     return namedResourceText(this.getUIContext(), key);
   }
 
@@ -253,6 +260,7 @@ export struct 设置面板 {
   @Builder
   private settingsSearchField(): void {
     TextInput({ text: this.settingsQuery, placeholder: $r('app.string.settings_search_placeholder') })
+      .border(SurfaceBorder.options())
       .width('100%')
       .height(应用尺寸.searchFieldHeight)
       .fontSize(应用尺寸.字号_正文)
@@ -266,33 +274,21 @@ export struct 设置面板 {
     Column() {
       Column() {
         ForEach(this.directoryEntries(), (entry: SettingsEntry) => {
-          Button() {
-            Row({ space: 12 }) {
-              Column({ space: 4 }) {
-                Text(this.sectionText(entry.titleKey))
-                  .fontSize(应用尺寸.字号_正文).fontWeight(FontWeight.Medium)
-                  .fontColor($r('app.color.text_primary')).width('100%')
-                Text(this.sectionText(this.简洁模式 ? (entry.simpleDescriptionKey ?? entry.descriptionKey) : entry.descriptionKey))
-                  .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
-                  .width('100%')
-              }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-              DisclosureChevron({ tint: $r('app.color.text_secondary') })
-            }.width('100%').padding({ left: 16, right: 16, top: 14, bottom: 14 })
-          }
-          .type(ButtonType.Normal).width('100%').backgroundColor(Color.Transparent)
-          .attributeModifier(new PressFeedback())
-          .stateEffect(false).onClick((): void => { this.openSection(entry.id); })
-          Divider().color($r('app.color.border_subtle')).margin({ left: 16, right: 16 })
+          SettingsActionRow({ title: this.sectionText(entry.titleKey), icon: settingsIcon(entry.id),
+            hint: this.sectionText(this.简洁模式 ? (entry.simpleDescriptionKey ?? entry.descriptionKey) : entry.descriptionKey),
+            onAction: (): void => { this.openSection(entry.id); } })
+            .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
+          Divider().color(SurfaceBorder.color()).margin({ left: 16, right: 16 })
         }, (entry: SettingsEntry): string => entry.id)
         if (this.directoryEntries().length === 0) {
           Text($r('app.string.settings_search_empty')).fontSize(应用尺寸.字号_正文)
             .fontColor($r('app.color.text_secondary')).padding(20)
         }
-      }.width('100%').backgroundColor($r('app.color.surface_card')).borderRadius(16).clip(true)
+      }.width('100%').backgroundColor($r('app.color.surface_card')).border(SurfaceBorder.options()).borderRadius(16).clip(true)
     }.width('100%')
   }
 
-  private 取本地化文本(资源: Resource): string {
+  private 取本地化文本(资源: Resource, _locale: string = this.uiLanguage): string {
     return resourceText(this.getUIContext(), 资源);
   }
 
@@ -472,7 +468,10 @@ export struct 设置面板 {
             }
             else if (group.id === 'global_review' || group.id === 'study_display') {
               ListItem() {
-                ReviewPreferencesSettings({ 是否深色: this.是否深色, displayOptions: group.id === 'study_display' })
+                ReviewPreferencesSettings({ 是否深色: this.是否深色, displayOptions: group.id === 'study_display',
+                  打开说明回调: (标题: Resource, 正文: Resource): void => {
+                    this.说明标题 = 标题; this.说明正文 = 正文; this.显示说明浮层 = true;
+                  } })
               }
             }
             else if (group.id === 'study_layout') {
@@ -667,6 +666,7 @@ export struct 设置面板 {
       if (this.显示媒体管理) {
         媒体管理面板({
           backRequest: this.mediaBackRequest,
+          onBrowse: (query: string): void => { this.显示媒体管理 = false; this.跳转浏览页回调(query); },
           isDark: this.是否深色,
           onClose: (): void => { this.显示媒体管理 = false; }
         })

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { NoteCreationSession } from '../../entry/src/main/ets/model/NoteCreationSession.ts';
-import { noteDraftChanged } from '../../entry/src/main/ets/model/NoteFieldEditing.ts';
+import { noteDraftChanged, parseNoteTags } from '../../entry/src/main/ets/model/NoteFieldEditing.ts';
 import { NoteTypeCatalog } from '../../entry/src/main/ets/model/NoteTypeCatalog.ts';
 import { noteImagePreviewSource } from '../../entry/src/main/ets/model/NoteMediaParts.ts';
 import { 生成Occlusions字符串 } from '../../entry/src/main/ets/model/图片遮罩模型.ts';
@@ -28,7 +28,7 @@ export function creationPageHarness(overrides = {}) {
     NoteCreationSession, AnkiNoteCreation: class {constructor() {return backend;}},
     NoteAudioPreview: class {async stop() {} async dispose() {}},
     ExpansionReveal: class {cancel() {}}, NavPathStack: class {},
-    $r: key => key, NoteTypeCatalog, noteDraftChanged, noteImagePreviewSource,
+    $r: key => key, NoteTypeCatalog, noteDraftChanged, parseNoteTags, noteImagePreviewSource,
     namedResourceText: (_ctx, key) => key,
     showToastSafely: (_ctx, options) => toasts.push(options),
     discardNoteRecordings: async audios => cleanups.push(audios.slice()),

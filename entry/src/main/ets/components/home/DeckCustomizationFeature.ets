@@ -2,10 +2,11 @@
 import { HomeDeckCommands } from '../../backend/HomeDeckCommands';
 import { 牌组定制面板, 牌组定制结果 } from '../牌组定制面板';
 import { 牌组汇总, 空牌组汇总 } from '../../model/主页模型';
-import { resourceText, showToastSafely } from '../../utils/UiFeedback';
+import { showToastSafely, resourceText } from '../../utils/UiFeedback';
 
 @Component
 export struct DeckCustomizationFeature {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop backRequest: number = 0;
   @Prop isDark: boolean = false;
   @Prop deck: 牌组汇总 = 空牌组汇总;
@@ -19,12 +20,8 @@ export struct DeckCustomizationFeature {
 
   aboutToDisappear(): void { this.disposed = true; }
 
-  private async save(result: 牌组定制结果): Promise<void> {
+  private async save(result: 牌组定制结果, _locale: string = this.uiLanguage): Promise<void> {
     if (this.busy || this.disposed) return;
-    if (result.新名.trim() === '') {
-      this.error = resourceText(this.getUIContext(), $r('app.string.deck_customize_name_empty'));
-      return;
-    }
     const deck: 牌组汇总 = this.deck;
     this.busy = true;
     this.error = '';
@@ -44,8 +41,7 @@ export struct DeckCustomizationFeature {
       if (!this.disposed) this.onClose();
     } catch (error) {
       if (this.disposed) return;
-      this.error = error instanceof Error ? error.message : `${error}`;
-      if (this.error === '') this.error = resourceText(this.getUIContext(), $r('app.string.deck_customize_rename_failed'));
+      this.error = resourceText(this.getUIContext(), $r('app.string.deck_customize_rename_failed'));
     } finally {
       if (!this.disposed) { this.busy = false; this.onBusy(false); }
     }

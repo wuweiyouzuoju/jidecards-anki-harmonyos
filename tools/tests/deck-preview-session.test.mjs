@@ -9,19 +9,22 @@ import { 协议读取器 } from '../../entry/src/main/ets/proto/core/ProtoReader
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
 import { appInterfaceDependencies } from './app-interface-harness.mjs';
 import { componentMethods } from './sync-panel-harness.mjs';
+import { isDoubleColumnDeckListStyle } from '../../entry/src/main/ets/model/DeckListAppearance.ts';
 
 const deferred = () => { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; }); return { promise, resolve, reject }; };
 const scopes = [DeckPreviewScope.TodayRemaining, DeckPreviewScope.Due, DeckPreviewScope.StudiedToday, DeckPreviewScope.All];
 
 test('home cancels pending preview across background/return, deck reselection and back', async () => {
   const source = readFileSync(new URL('../../entry/src/main/ets/pages/首页.ets', import.meta.url), 'utf8');
-  const Page = componentMethods(source, ['打开牌组预览', 'syncForegroundChanged', 'previewDeckChanged', 'publishHomeInterface', 'onBackPress'], {
-    ...appInterfaceDependencies(), $r: key => key
+  const Page = componentMethods(source, ['打开牌组预览', 'syncForegroundChanged', 'previewDeckChanged', 'homeActionControls', 'publishHomeInterface', 'onBackPress'], {
+    ...appInterfaceDependencies(), isDoubleColumnDeckListStyle, $r: key => key
   });
+  Page.prototype.closeHomeActions = new Function(source.match(/private closeHomeActions\(\): void \{([^\n]*)\}/)[1]);
   for (const reason of ['background', 'deck', 'back']) {
     const pending = deferred(), toasts = [];
     const page = new Page();
     Object.assign(page, {
+      deckLevelMenuId: '',
       deckPreviewSession: new DeckPreviewSession({ cardIds: () => pending.promise }),
       syncController: { foregroundChanged() {}, cancel() {} }, backupController: { schedule() {}, stop() {} },
       syncForeground: true, transfer: { phase: 'idle' }, homeDisposed: false, 选中的牌组ID: '1',

@@ -1,16 +1,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { pasteboard } from '@kit.BasicServicesKit';
 import { 应用尺寸 } from '../../utils/应用尺寸';
-import { namedResourceText, resourceText, showToastSafely } from '../../utils/UiFeedback';
+import { showToastSafely, resourceText, namedResourceText } from '../../utils/UiFeedback';
 import { agentSuggestionKey, AGENT_SUGGESTION_COUNT, AGENT_SUGGESTION_HOLD_MS,
   AGENT_SUGGESTION_FADE_MS } from '../../model/agent/AgentSuggestions';
+import type { AgentAppRecommendation } from '../../model/agent/AgentAppRecommendations';
 
 /** 空会话的单句提示；组件独占计时器，复制只写剪贴板。 */
 @Component
 export struct AgentEmptySuggestions {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('visibilityChanged') isPageVisible: boolean = false;
   @State private suggestionIndex: number = 0;
   @State private textOpacity: number = 1;
+  @State private contextualKeys: string[] = [];
+  loadRecommendations: () => AgentAppRecommendation[] = (): AgentAppRecommendation[] => [];
   private isMounted: boolean = false;
   private isHovered: boolean = false;
   private isPressed: boolean = false;
@@ -22,6 +26,7 @@ export struct AgentEmptySuggestions {
   aboutToAppear(): void {
     this.isMounted = true;
     this.suggestionIndex = Math.floor(Math.random() * AGENT_SUGGESTION_COUNT);
+    this.refreshRecommendations();
     this.restartRotation();
   }
 
@@ -32,6 +37,15 @@ export struct AgentEmptySuggestions {
 
   private canRotate(): boolean {
     return this.isMounted && this.isPageVisible && !this.isHovered && !this.isPressed && !this.isCopying;
+  }
+
+  private refreshRecommendations(): boolean {
+    if (!this.isMounted || !this.isPageVisible) return false;
+    const keys: string[] = this.loadRecommendations().slice(0, 3).map((item): string => item.promptKey);
+    if (keys.join('|') === this.contextualKeys.join('|')) return false;
+    this.contextualKeys = keys;
+    this.suggestionIndex = 0;
+    return true;
   }
 
   private cancelRotation(): void {
@@ -55,7 +69,9 @@ export struct AgentEmptySuggestions {
       this.fadeTimer = setTimeout((): void => {
         if (version !== this.rotationVersion || !this.canRotate()) return;
         this.fadeTimer = -1;
-        this.suggestionIndex = (this.suggestionIndex + 1) % AGENT_SUGGESTION_COUNT;
+        if (!this.refreshRecommendations()) {
+          this.suggestionIndex = (this.suggestionIndex + 1) % (AGENT_SUGGESTION_COUNT + this.contextualKeys.length);
+        }
         this.restartRotation();
       }, AGENT_SUGGESTION_FADE_MS);
     }, AGENT_SUGGESTION_HOLD_MS);
@@ -66,6 +82,7 @@ export struct AgentEmptySuggestions {
       this.isHovered = false;
       this.isPressed = false;
     }
+    this.refreshRecommendations();
     this.restartRotation();
   }
 
@@ -81,11 +98,13 @@ export struct AgentEmptySuggestions {
     this.restartRotation();
   }
 
-  private suggestionText(): string {
-    return namedResourceText(this.getUIContext(), agentSuggestionKey(this.suggestionIndex));
+  private suggestionText(_locale: string = this.uiLanguage): string {
+    const key: string = this.suggestionIndex < this.contextualKeys.length ? this.contextualKeys[this.suggestionIndex] :
+      agentSuggestionKey(this.suggestionIndex - this.contextualKeys.length);
+    return namedResourceText(this.getUIContext(), key);
   }
 
-  private displayedSuggestionText(): string {
+  private displayedSuggestionText(_locale: string = this.uiLanguage): string {
     return resourceText(this.getUIContext(), $r('app.string.ai_agent_suggestion_quote'), this.suggestionText());
   }
 

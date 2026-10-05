@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { noteTypeText } from '../../utils/NoteTypeText';
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { DialogBackdrop } from '../common/DialogBackdrop';
 
 import { DialogHeader } from '../common/DialogHeader';
@@ -14,6 +15,7 @@ import { ReviewKind } from '../../proto/messages/StatsMessages';
 
 @Component
 export struct 卡片信息 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop isDark: boolean = false;
   @Prop @Watch('load') cardId: number = 0;
   @State private stats: CardStatsView | null = null;
@@ -25,7 +27,7 @@ export struct 卡片信息 {
   aboutToAppear(): void { this.load(); }
   aboutToDisappear(): void { this.disposed = true; this.version++; }
 
-  private async load(): Promise<void> {
+  private async load(_locale: string = this.uiLanguage): Promise<void> {
     if (this.disposed || this.cardId <= 0) return;
     const version: number = ++this.version;
     this.stats = null;
@@ -72,7 +74,7 @@ export struct 卡片信息 {
   }
 
   /** 天数 + 间隔类型转可读串（如 "12天" / "1.5月"）。 */
-  private 格式化间隔(天: number): string {
+  private 格式化间隔(天: number, _locale: string = this.uiLanguage): string {
     if (天 === 0) {
       return resourceText(this.getUIContext(), $r('app.string.browser_info_interval_today'));
     }
@@ -259,9 +261,7 @@ export struct 卡片信息 {
                       top: 应用尺寸.间距_4,
                       bottom: 应用尺寸.间距_4
                     })
-                    .border(index < this.stats!.revlog.length - 1
-                      ? { width: { bottom: 0.5 }, color: { bottom: $r('app.color.divider') } }
-                      : { width: 0 })
+                    .border(SurfaceBorder.options(index < this.stats!.revlog.length - 1 ? { bottom: 0.5 } : 0))
                   }, (条目: StatsRevlogEntry, index: number): string => `${条目.time}-${index}`)
                 }
                 .width('100%')
@@ -299,7 +299,7 @@ export struct 卡片信息 {
       .alignItems(HorizontalAlign.Start)
       .padding(应用尺寸.卡片内边距)
       .backgroundColor($r('app.color.surface_card'))
-      .borderRadius(应用尺寸.圆角_卡片)
+      .borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
     }
     .width('100%')
     .height('100%')

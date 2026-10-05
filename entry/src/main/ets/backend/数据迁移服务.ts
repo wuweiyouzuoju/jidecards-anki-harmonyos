@@ -19,6 +19,7 @@ import { 后端会话 } from './后端会话';
 import { 导入导出方法, 服务号 } from './服务索引';
 import type { TextExportOptions } from '../proto/messages/TextExportMessages';
 import { encodeTextExportRequest } from '../proto/messages/TextExportMessages';
+import type { ExportSubset } from '../proto/messages/ExportLimitMessages';
 import type { ImportSummary, ImportAnkiPackageOptions } from '../proto/messages/ImportExportMessages';
 import {
   decodeImportResponse,
@@ -122,6 +123,23 @@ export async function exportText(filesDir: string, deckId: number, options: Text
     await 静默删除(path);
     throw error;
   }
+}
+
+/** JIDE 的确认子集使用 Core 原生范围，临时文件仍归现有导出生命周期。
+ * @throws {Error} 路径或 Core 导出失败交给确认执行器；临时文件仍清理。 */
+export async function exportSubset(filesDir: string, subset: ExportSubset, format: string,
+  withMedia: boolean, withScheduling: boolean): Promise<string> {
+  if (format !== 'apkg' && format !== 'text') throw new Error('invalid_export_format');
+  const path = await 生成输出路径(filesDir, 'subset', format === 'apkg' ? 'apkg' : 'txt');
+  try {
+    const bytes: Uint8Array = format === 'apkg' ? encodeExportAnkiPackageRequest(path, 0,
+      { withScheduling: withScheduling, withMedia: withMedia, withDeckConfigs: withScheduling, legacy: false }, subset) :
+      encodeTextExportRequest(path, 0, { kind: subset.mode === 'notes' ? 'notes' : 'cards',
+        withHtml: true, withTags: true, withDeck: true, withNotetype: true, withGuid: true }, subset);
+    await 后端会话.获取实例().调用(服务号.后端导入导出, format === 'apkg' ? 导入导出方法.导出Anki包 :
+      subset.mode === 'notes' ? 导入导出方法.exportNoteCsv : 导入导出方法.exportCardCsv, bytes);
+    return path;
+  } catch (error) { await 静默删除(path); throw error; }
 }
 
 /** Exports all personal Anki data into a sandbox .colpkg file. */

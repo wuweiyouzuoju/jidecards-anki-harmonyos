@@ -12,6 +12,15 @@ function harness() {
   return {session,backend,events,get state(){return state;}};
 }
 
+test('field metadata stays aligned and survives failed saves without sharing backend objects',async()=>{
+ const h=harness(),fields=[{ord:0,name:'Front',rtl:true,fontName:'Font',fontSize:24,
+  description:'Hint',plainText:true,collapsed:true},{ord:1,name:'Back',sticky:true}];
+ h.backend.notetype=async()=>({fieldNames:['Front','Back'],fields});
+ await h.session.open(1,true,()=>true);const expected=structuredClone(h.state.fieldConfigs);
+ fields[0].description='mutated';assert.equal(h.state.fieldConfigs[0].description,'Hint');
+ await h.session.save(['front','back'],[],async()=>false);assert.deepEqual(h.state.fieldConfigs,expected);
+});
+
 test('IO 编辑能力按 Core 字段索引复制，失败保存仍可继续图形编辑', async () => {
   const h = harness(), indexes = [2,0,3,1];
   h.backend.notetype = async () => ({ fieldNames: ['Renamed image','Extra','Masks','Header'], imageOcclusionFields: indexes });

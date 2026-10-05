@@ -30,6 +30,7 @@ import { SettingsToggleRow } from '../common/SettingsToggleRow';
 // ========================================================
 @Component
 export struct 调度器分组 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop 是否深色: boolean = false;
   // ⓘ 按钮上抛：由父组件 SettingsPanel 统一渲染 FieldHelpPanel 浮层，避免嵌在分组卡片内
   打开说明回调: (标题: Resource, 正文: Resource) => void = (_标题: Resource, _正文: Resource): void => {};
@@ -111,7 +112,7 @@ export struct 调度器分组 {
     }
   }
 
-  private 取本地化文本(资源: Resource): string {
+  private 取本地化文本(资源: Resource, _locale: string = this.uiLanguage): string {
     return resourceText(this.getUIContext(), 资源);
   }
 
@@ -131,20 +132,20 @@ export struct 调度器分组 {
       打开说明回调: this.打开说明回调
     }) {
       Column({ space: 8 }) {
-          Text(settingsItemText(this.getUIContext(), 'algorithm_scope'))
+          Text(settingsItemText(this.getUIContext(), 'algorithm_scope', this.uiLanguage))
             .fontSize(13).fontColor(设置面板色板_取(this.是否深色).次文字).width('100%')
-          Text(settingsItemText(this.getUIContext(), 'algorithm_deck_options'))
+          Text(settingsItemText(this.getUIContext(), 'algorithm_deck_options', this.uiLanguage))
             .fontSize(13).fontColor(设置面板色板_取(this.是否深色).次文字).width('100%')
           if (this.是否启用FSRS === null) {
             Row() {
-              Text(settingsItemText(this.getUIContext(), 'fsrs_enabled'))
+              Text(settingsItemText(this.getUIContext(), 'fsrs_enabled', this.uiLanguage))
                 .fontSize(15).fontColor(设置面板色板_取(this.是否深色).主文字).layoutWeight(1)
               Text($r('app.string.settings_fsrs_loading'))
                 .fontSize(13)
                 .fontColor(设置面板色板_取(this.是否深色).三级文字)
             }.width('100%').constraintSize({ minHeight: 48 })
           } else {
-            SettingsToggleRow({ title: settingsItemText(this.getUIContext(), 'fsrs_enabled'), isOn: this.是否启用FSRS,
+            SettingsToggleRow({ title: settingsItemText(this.getUIContext(), 'fsrs_enabled', this.uiLanguage), isOn: this.是否启用FSRS,
               tint: this.解析主色按钮背景(), isDark: this.是否深色, isInteractive: !this.FSRS操作中,
               onChange: (值: boolean): void => { this.切换FSRS开关(值); } })
           }

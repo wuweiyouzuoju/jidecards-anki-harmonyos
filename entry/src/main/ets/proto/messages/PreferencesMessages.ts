@@ -11,7 +11,8 @@ export function encodeCreateBackup(folder: string, force: boolean): Uint8Array {
 }
 
 /** 字段号以 UPSTREAM.lock 的 Anki 26.05 config.proto 为准。 */
-export enum ReviewPreferenceField { Rollover, LearnAheadSecs, TimeLimitSecs, ShowRemaining, ShowIntervals }
+export enum ReviewPreferenceField { Rollover, LearnAheadSecs, TimeLimitSecs, ShowRemaining, ShowIntervals,
+  LoadBalancer, ShortTermWithSteps, BackupDaily, BackupWeekly, BackupMonthly, BackupInterval }
 
 export interface ReviewPreferenceEdit {
   field: ReviewPreferenceField;
@@ -24,10 +25,17 @@ export class ReviewPreferences {
   timeLimitSecs: number = 0;
   showRemaining: boolean = false;
   showIntervals: boolean = false;
+  loadBalancer: boolean = false;
+  shortTermWithSteps: boolean = false;
+  backupDaily: number = 0;
+  backupWeekly: number = 0;
+  backupMonthly: number = 0;
+  backupInterval: number = 0;
 }
 
 export function preferenceSection(field: ReviewPreferenceField): number {
-  return field === ReviewPreferenceField.Rollover || field === ReviewPreferenceField.LearnAheadSecs ? 1 : 2;
+  return field >= ReviewPreferenceField.BackupDaily ? 4 :
+    field === ReviewPreferenceField.Rollover || field === ReviewPreferenceField.LearnAheadSecs ? 1 : 2;
 }
 
 export function preferenceTag(field: ReviewPreferenceField): number {
@@ -37,6 +45,12 @@ export function preferenceTag(field: ReviewPreferenceField): number {
     case ReviewPreferenceField.ShowRemaining: return 3;
     case ReviewPreferenceField.ShowIntervals: return 4;
     case ReviewPreferenceField.TimeLimitSecs: return 5;
+    case ReviewPreferenceField.LoadBalancer: return 6;
+    case ReviewPreferenceField.ShortTermWithSteps: return 7;
+    case ReviewPreferenceField.BackupDaily: return 1;
+    case ReviewPreferenceField.BackupWeekly: return 2;
+    case ReviewPreferenceField.BackupMonthly: return 3;
+    case ReviewPreferenceField.BackupInterval: return 4;
     default: throw new Error('invalid_review_preference');
   }
 }
@@ -44,7 +58,8 @@ export function preferenceTag(field: ReviewPreferenceField): number {
 export function validatePreferenceEdit(edit: ReviewPreferenceEdit): void {
   preferenceTag(edit.field);
   const max: number = edit.field === ReviewPreferenceField.Rollover ? 23 :
-    (edit.field === ReviewPreferenceField.ShowRemaining || edit.field === ReviewPreferenceField.ShowIntervals ? 1 : 4294967295);
+    ([ReviewPreferenceField.ShowRemaining, ReviewPreferenceField.ShowIntervals, ReviewPreferenceField.LoadBalancer,
+      ReviewPreferenceField.ShortTermWithSteps].includes(edit.field) ? 1 : 4294967295);
   if (!Number.isInteger(edit.value) || edit.value < 0 || edit.value > max) {
     throw new Error('invalid_review_preference_value');
   }
@@ -56,7 +71,7 @@ export function decodeReviewPreferences(bytes: Uint8Array): ReviewPreferences {
   const reader = new 协议读取器(bytes);
   while (!reader.已读完) {
     const tag = reader.读取标签()!;
-    if ((tag.字段号 === 1 || tag.字段号 === 2) && tag.线类型 === 2) {
+    if ((tag.字段号 === 1 || tag.字段号 === 2 || tag.字段号 === 4) && tag.线类型 === 2) {
       const nested = new 协议读取器(reader.读取字节());
       while (!nested.已读完) {
         const child = nested.读取标签()!;
@@ -65,6 +80,12 @@ export function decodeReviewPreferences(bytes: Uint8Array): ReviewPreferences {
         else if (child.线类型 === 0 && tag.字段号 === 2 && child.字段号 === 3) result.showRemaining = nested.读取布尔();
         else if (child.线类型 === 0 && tag.字段号 === 2 && child.字段号 === 4) result.showIntervals = nested.读取布尔();
         else if (child.线类型 === 0 && tag.字段号 === 2 && child.字段号 === 5) result.timeLimitSecs = nested.读取变长整数();
+        else if (child.线类型 === 0 && tag.字段号 === 2 && child.字段号 === 6) result.loadBalancer = nested.读取布尔();
+        else if (child.线类型 === 0 && tag.字段号 === 2 && child.字段号 === 7) result.shortTermWithSteps = nested.读取布尔();
+        else if (child.线类型 === 0 && tag.字段号 === 4 && child.字段号 === 1) result.backupDaily = nested.读取变长整数();
+        else if (child.线类型 === 0 && tag.字段号 === 4 && child.字段号 === 2) result.backupWeekly = nested.读取变长整数();
+        else if (child.线类型 === 0 && tag.字段号 === 4 && child.字段号 === 3) result.backupMonthly = nested.读取变长整数();
+        else if (child.线类型 === 0 && tag.字段号 === 4 && child.字段号 === 4) result.backupInterval = nested.读取变长整数();
         else nested.跳过字段(child.线类型);
       }
     } else reader.跳过字段(tag.线类型);
@@ -96,7 +117,7 @@ export function patchReviewPreferences(bytes: Uint8Array, edits: ReviewPreferenc
       writer.写入原始字节(reader.截取片段(start));
     }
   }
-  for (const section of [1, 2]) {
+  for (const section of [1, 2, 4]) {
     const changes: ReviewPreferenceEdit[] = edits.filter((edit: ReviewPreferenceEdit): boolean => preferenceSection(edit.field) === section);
     if (changes.length === 0) continue;
     const index: number = sections.indexOf(section);

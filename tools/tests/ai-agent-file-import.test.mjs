@@ -105,7 +105,7 @@ test('Agent composer shows per-file results and sends only successful parsed tex
   const composer = page.match(/private 输入区\(\)[\s\S]*?\n  build\(\)/)?.[0] ?? '';
   assert.match(composer, /Column\(\{ space: 应用尺寸\.间距_8 \}\) \{[\s\S]*?agentImportLabelKey\(false\)[\s\S]*?Button\(this\.interfaceLabel\('submit'\)\)/);
   assert.match(composer, /height\(应用尺寸\.按钮高度 \* 2 \+ 应用尺寸\.间距_8\)/);
-  assert.match(composer, /ThemeTextSpans\(namedResourceText\(this\.getUIContext\(\), agentImportLabelKey\(true\)\), this\.themeAccentColors/);
+  assert.match(composer, /ThemeTextSpans\(localizedNamedResourceText\(this\.getUIContext\(\), this\.uiLanguage, agentImportLabelKey\(true\)\), this\.themeAccentColors/);
   assert.match(composer, /opacity\(this\.文件解析中 \? 0 : 1\)/);
   assert.match(composer, /opacity\(this\.文件解析中 \? 1 : 0\)/);
   assert.match(composer, /\.alignItems\(VerticalAlign\.Top\)/);

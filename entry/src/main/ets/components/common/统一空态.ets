@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { PressFeedback } from '../../utils/PressFeedback';
+import { 按下态按钮 } from './按下态按钮';
 
 // ========================================================
 // @块ID UI-COMMON-EMPTY-001
@@ -49,14 +49,7 @@ export struct 统一空态 {
           .textAlign(TextAlign.Center)
       }
       if (this.动作文案 !== '') {
-        Button(this.动作文案)
-          .type(ButtonType.Capsule)
-          .height(应用尺寸.按钮高度)
-          .padding({ left: 应用尺寸.间距_16, right: 应用尺寸.间距_16 })
-          .fontSize(应用尺寸.字号_按钮)
-          .attributeModifier(new PressFeedback())
-          .stateEffect(false)
-          .onClick(() => this.onAction())
+        按下态按钮({ 文案: this.动作文案, 点击回调: (): void => { this.onAction(); } })
       }
     }
     .width('100%')

@@ -31,7 +31,7 @@ test('automatic lifecycle and manual settings requests share the root task host'
 function homeHarness() {
   const state = { enabled: true, ready: true, auth: { hkey: 'test-key', endpoint: 'http://lan:8080/', username: 'u' }, timers: new Map(), seq: 0, navigation: [], toasts: 0 };
   const gate = new SyncActivity();
-  const Page = componentMethods(read('pages/首页.ets'), ['requestManualSync', 'startSyncFromMenu', 'updatePendingSyncStatus', 'homeActivity', 'requestAutoSync', 'scheduleAutoSyncCheck', 'isAutoSyncLocationSafe', 'stopAutoSyncTimer', 'tryAutoSync', 'syncForegroundChanged', 'onPageHide', 'onBackPress', 'deferForSync', 'flushSyncAction', 'autoSyncCollectionFinished', 'autoSyncStateChanged', '选择牌组', '开始学习', 'openCreateDeck', 'openSettings', 'openReminders', 'syncYielded', 'presentPendingSyncWarning'], {
+  const Page = componentMethods(read('pages/首页.ets'), ['closeHomeActions', 'requestManualSync', 'startSyncFromMenu', 'updatePendingSyncStatus', 'homeActivity', 'requestAutoSync', 'scheduleAutoSyncCheck', 'isAutoSyncLocationSafe', 'stopAutoSyncTimer', 'tryAutoSync', 'syncForegroundChanged', 'onPageHide', 'onBackPress', 'deferForSync', 'flushSyncAction', 'autoSyncCollectionFinished', 'autoSyncStateChanged', '选择牌组', '开始学习', 'openCreateDeck', 'openSettings', 'openReminders', 'syncYielded', 'presentPendingSyncWarning'], {
     decideHomeSync, canStartHomeAutoSync, externalDeckOpens: { hasPending: () => state.externalDeckPending === true },
     AppStorage: { get() {}, setOrCreate() {} },
     loadAutoSyncEnabled: () => state.enabled, loadVisibleSyncAuth: () => state.auth,
@@ -63,7 +63,7 @@ function homeHarness() {
   });
   Object.assign(page, { startupSequence: new HomeStartupSequence(), announcementController: new HomeAnnouncementController(), homeActivityChanged() {}, homeDisposed: false, syncForeground: true, autoSyncStartupReady: true, syncScheduler: new AutoSyncScheduler(), autoSyncTimer: -1,
     页面栈: { size: () => 0, pushPath: path => state.navigation.push(path) }, 加载状态: 'ready', 显示同步面板: false,
-    autoSyncCollectionBusy: false, autoSyncModal: false,
+    autoSyncCollectionBusy: false, autoSyncModal: false, deckLevelMenuId: '',
     syncDetailsRequest: 0, getUIContext: () => ({ getHostContext: () => ({ resourceManager: { getStringSync: key => key } }) }),
     显示提示: () => { state.toasts++; }, 已选中牌组: () => true, 选中牌组: () => ({ id: 'deck', name: 'deck' }), 展开牌组路径() {}, 当前断点: 'xs',
     加载主页数据: async () => {}, 同步后检查FSRS: async () => {}, 暂停主页官方公告检查() {} });
@@ -129,7 +129,7 @@ test('manual request survives settings pop before navigation finishes', () => {
 test('manual sync takes priority over unseen startup work but still waits for an open dialog', () => {
   const { page, tick } = homeHarness();
   page.autoSyncStartupReady = false;
-  page.官方公告检查中 = true;
+  page.announcementController.check(() => new Promise(() => {}), async () => false);
   page.startupSequence.continue({ canPresent: () => false });
   page.显示牌组选项 = true;
   page.syncScheduler.requestManual();
@@ -218,7 +218,7 @@ test('auto sync does not poll during study/background and resumes on the next fo
 
 test('editing, import, sorting, startup prompts and manual sync defer automatic work', () => {
   for (const field of ['显示创建牌组', '显示牌组选项', '显示自定义学习', '显示过滤牌组面板',
-    '显示牌组定制', '官方公告检查中', '显示官方公告', '显示云端牌组弹窗',
+    '显示牌组定制', '显示官方公告', '显示云端牌组弹窗',
     '显示欢迎弹窗', '显示主页操作', '显示更多菜单', '排序模式中', '刷新中', '云端牌组忙碌', 'fsrsPromptActive']) {
     const { page, tick } = homeHarness();
     page[field] = true; page.requestAutoSync(); tick();
@@ -231,6 +231,19 @@ test('editing, import, sorting, startup prompts and manual sync defer automatic 
   assert.equal(page.显示同步面板, false);
   gate.release(manual, Date.now()); tick();
   assert.equal(page.显示同步面板, false, 'manual sync release starts a cooldown');
+});
+
+test('automatic sync waits for the real announcement request and resumes when it finishes', async () => {
+  const { page, tick } = homeHarness();
+  let finish;
+  const checking = page.announcementController.check(() => new Promise(resolve => { finish = resolve; }), async () => false);
+  assert.equal(page.homeActivity().startupChecking, true);
+  page.requestAutoSync(); tick();
+  assert.equal(page.显示同步面板, false);
+  finish(null); await checking;
+  assert.equal(page.homeActivity().startupChecking, false);
+  tick();
+  assert.equal(page.显示同步面板, true);
 });
 
 test('transfer dialog and every active phase block automatic sync until released', () => {
@@ -507,8 +520,17 @@ test('the server entry lives inside the sync card and the editor is a centered c
   assert.ok(source.includes('@CustomDialog'), 'server editor must be a @CustomDialog');
   assert.ok(source.includes('struct 自定义服务器弹窗'), 'server dialog struct must exist');
   assert.ok(source.includes('alignment: DialogAlignment.Center'), 'server dialog must be centered');
-  const entryLine = source.split(/\r?\n/).find(line => line.includes("settingsItemText(this.getUIContext(), 'sync_custom_server')"));
-  assert.ok(entryLine !== undefined && entryLine.startsWith(' '.repeat(14)),
+  const card = source.search(/设置分组卡片\(\{\s*groupId: 'sync'/);
+  assert.ok(card >= 0);
+  const body = source.indexOf(') {', card) + 2;
+  let cursor = body + 1, depth = 1;
+  while (depth && cursor < source.length) {
+    if (source[cursor] === '{') depth++;
+    if (source[cursor] === '}') depth--;
+    cursor++;
+  }
+  assert.equal(depth, 0);
+  assert.ok(source.slice(body, cursor).includes("settingsItemText(this.getUIContext(), 'sync_custom_server', this.uiLanguage)"),
     'entry must be nested in the sync card content');
 });
 
@@ -738,23 +760,20 @@ test('sync indicator distinguishes transfer, attention, waiting, completion and 
   assert.equal(state.status, 'app.string.sync_aborted');
 });
 
-test('sync icon stays inline with accessible details and preserves error/conflict recovery', () => {
+test('sync status stays on the dedicated Sync button and preserves accessible details and error/conflict recovery', () => {
   const home = read('pages/首页.ets'), panel = read('components/同步面板.ets');
   assert.ok(home.indexOf('同步面板({') > home.indexOf('.navDestination(this.页面映射)'));
   assert.match(panel, /HitTestMode.Transparent : HitTestMode.Default/);
-  const toolbar = read('components/home/主页顶部工具栏.ets');
+  const header = read('components/home/HomeSummaryHeader.ets');
   assert.match(home, /syncStatusText: this.syncStatusText/);
   assert.match(home, /syncIndicator: this.syncIndicator/);
-  assert.match(home, /onSyncDetails:[\s\S]*?this.syncDetailsRequest\+\+/);
-  assert.match(home, /else showToastSafely\(this.getUIContext\(\), \{ message: this.syncStatusText \}\)/);
-  assert.match(toolbar, /accessibilityText\(this.syncStatusText\)/);
-  assert.doesNotMatch(toolbar, /\bText\(this.syncStatusText\)/);
-  assert.match(toolbar, /this\.syncIndicator === 'syncing' \|\| this\.syncIndicator === 'attention'/);
-  assert.match(toolbar, /if \(this\.syncIndicator === 'syncing'\)\s*\{\s*LoadingProgress\(\)/);
-  assert.match(toolbar, /Text\('!'\)[\s\S]*?\.width\(24\)\.height\(24\)[\s\S]*?\.fontColor\(\$r\('app.color.error_text'\)\)[\s\S]*?\.border\(\{ width: 2, color: \$r\('app.color.error_text'\), radius: 12 \}\)/);
-  assert.doesNotMatch(toolbar, /Text\('⚠'\)/);
-  assert.ok(toolbar.indexOf('LoadingProgress()') > toolbar.indexOf("'home', 'more'"));
-  assert.ok(toolbar.indexOf('LoadingProgress()') < toolbar.indexOf("'home', 'create'"));
+  assert.match(home, /onSync:[\s\S]*?this.syncDetailsRequest\+\+/);
+  assert.match(header, /accessibilityText\(this.syncStatusText\)/);
+  assert.ok(header.indexOf('app.media.ic_home_sync') < header.indexOf('accessibilityText(this.syncStatusText)'));
+  assert.doesNotMatch(header, /\bText\(this.syncStatusText\)/);
+  assert.match(header, /if \(this\.syncIndicator === 'syncing'\)\s*\{\s*LoadingProgress\(\)/);
+  assert.match(header, /syncIndicator === 'attention'[\s\S]*?Text\('!'\)[\s\S]*?app.color.error_text/);
+  assert.doesNotMatch(header, /Text\('⚠'\)/);
   assert.match(panel, /this\.statusChanged\(text, indicator\)/);
   assert.match(panel, /if \(this.state.detailsVisible\)/);
 });

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../../utils/PressFeedback';
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
 
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { DisclosureChevron } from '../common/DisclosureChevron';
@@ -53,13 +54,13 @@ export struct AgentDisclosureCard {
         }
         .width('100%').constraintSize({ maxHeight: 240 })
         .align(Alignment.TopStart).scrollBar(BarState.Auto)
-        .border({ width: { top: 应用尺寸.卡片边框 }, color: $r('app.color.border_subtle') })
+        .border(SurfaceBorder.options({ top: 应用尺寸.卡片边框 }))
       }
     }
     .width('100%')
     .alignItems(HorizontalAlign.Start)
     .backgroundColor($r('app.color.surface_card'))
-    .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+    .border(SurfaceBorder.options())
     .borderRadius(应用尺寸.圆角_面板)
     .clip(true)
   }

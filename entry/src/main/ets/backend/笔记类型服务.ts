@@ -28,6 +28,7 @@ import { 图片遮罩服务 } from './图片遮罩服务';
 import { optionalReverseField } from '../model/NoteTypePresentation';
 import { updateNotetypeFieldSticky } from '../model/NotetypeFieldDraft';
 import { 后端会话 } from './后端会话';
+import { 协议写入器 } from '../proto/core/ProtoWriter';
 import { 搜索服务 } from './搜索服务';
 import type { NotetypeImpact } from '../model/NotetypeManagement';
 import { decodeOpChangesWithId } from '../proto/messages/CollectionMessages';
@@ -57,6 +58,13 @@ import {
 
 /** AddNotePanel 所属页面使用的 Anki 笔记类型边界。 */
 export class 笔记类型服务 {
+  async restoreNotetypeToStock(id: number, forceKind?: number): Promise<void> {
+    const writer = new 协议写入器();
+    const target = new 协议写入器(); target.写入64位整数(1, id);
+    writer.写入子消息(1, target);
+    if (forceKind !== undefined) writer.写入变长整数(2, forceKind);
+    await this.会话.调用(服务号.后端笔记类型, 笔记类型方法.restoreNotetypeToStock, writer.转为字节());
+  }
   private readonly 会话: 后端会话 = 后端会话.获取实例();
 
   /** 影响确认使用真实 ID 和旧模板序号；新增数量由 Core 保存时按字段条件决定。 */

@@ -9,47 +9,50 @@ import { AI制卡页, AI制卡页参数 } from '../AI制卡页';
 import { 学习提醒页 } from '../学习提醒页';
 import { 设置页 } from '../设置页';
 import { 设置页参数, 浏览页参数, EditNotePageParams, NoteDraftPreviewPageParams } from '../../model/navigation/PageParams';
+import { appPageName, AppNavigationRequest } from '../../model/navigation/AppNavigation';
 
 export interface HomeDestinationContext {
   pathStack: NavPathStack;
   onManualSync: () => void;
+  onNavigateApp?: (request: AppNavigationRequest) => void;
 }
 
 /** 只映射参数并渲染目的地，导航时机及返回效果由首页宿主持有。 */
 @Builder
 export function HomeDestinations(name: string, param: ESObject, context: HomeDestinationContext) {
-  if (name === 'StudyPage') {
+  if (name === appPageName('study')) {
     学习页({
       pageDeckId: (param as 学习页参数).deckId ?? '',
       pageDeckName: (param as 学习页参数).deckName ?? '',
       pathStack: context.pathStack
     })
-  } else if (name === 'BrowserPage') {
+  } else if (name === appPageName('browser')) {
     浏览页({
       pageDeckId: (param as 浏览页参数).deckId ?? '',
       pageInitialSearch: (param as 浏览页参数).initialSearch ?? '',
       pageInitialNotesMode: (param as 浏览页参数).initialNotesMode ?? false,
+      pageInitialPreviewCardId: (param as 浏览页参数).initialPreviewCardId ?? 0,
       pageSelectForAgentEdit: (param as 浏览页参数).selectForAgentEdit ?? false,
       pathStack: context.pathStack
     })
-  } else if (name === 'EditNotePage') {
+  } else if (name === appPageName('edit_note')) {
     EditNotePage({ targetId: (param as EditNotePageParams).targetId,
       isNote: (param as EditNotePageParams).isNote, pathStack: context.pathStack })
-  } else if (name === 'NoteDraftPreviewPage') {
+  } else if (name === appPageName('note_draft_preview')) {
     NoteDraftPreviewPage({ input: (param as NoteDraftPreviewPageParams).input, pathStack: context.pathStack })
-  } else if (name === 'StatsPage') {
+  } else if (name === appPageName('stats')) {
     统计页({
       pathStack: context.pathStack,
       initialSnapshot: param as 统计页参数
     })
-  } else if (name === 'AddNotePage') {
+  } else if (name === appPageName('add_note')) {
     添加笔记页({
       pageDeckId: (param as 添加笔记页参数).deckId ?? '',
       pageDeckName: (param as 添加笔记页参数).deckName ?? '',
       pageDeckOptions: (param as 添加笔记页参数).deckOptions ?? [],
       pathStack: context.pathStack
     })
-  } else if (name === 'AiCardPage') {
+  } else if (name === appPageName('agent')) {
     AI制卡页({
       pageMode: (param as AI制卡页参数).mode ?? 'create',
       pageDeckId: (param as AI制卡页参数).deckId ?? '',
@@ -58,15 +61,17 @@ export function HomeDestinations(name: string, param: ESObject, context: HomeDes
       pageCardIds: (param as AI制卡页参数).cardIds ?? [],
       pageNoteIds: (param as AI制卡页参数).noteIds ?? [],
       pageTemplateIdx: (param as AI制卡页参数).templateIdx ?? -1,
+      onNavigateApp: context.onNavigateApp,
       pathStack: context.pathStack
     })
-  } else if (name === 'ReminderPage') {
+  } else if (name === appPageName('reminders')) {
     学习提醒页({
       pathStack: context.pathStack
     })
-  } else if (name === 'SettingsPage') {
+  } else if (name === appPageName('settings')) {
     设置页({
       openAiSettings: (param as 设置页参数).openAiSettings ?? false,
+      initialSectionId: (param as 设置页参数).sectionId ?? '',
       onManualSync: (): void => { context.onManualSync(); },
       pathStack: context.pathStack
     })

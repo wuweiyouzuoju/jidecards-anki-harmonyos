@@ -4,6 +4,7 @@ import { preferences } from '@kit.ArkData';
 import { UNLOCKED_CONTENTS_KEY, isThemeAvailable } from '../model/ThemeCatalog';
 import { initializeRedemption } from './RedemptionStore';
 
+// 文案版本更新沿用此键，不能再次打扰已确认过赠送提醒的用户。
 const NOTICE_KEY: string = 'iridescent_gift_notice_299_completed';
 
 /** @throws {Error} 提醒偏好不可用，交由首页显示失败并在下次启动重试。 */

@@ -19,6 +19,7 @@
       "牌组树": "deck_tree",
       "获取牌组名": "get_deck_names",
       "删除牌组": "remove_decks",
+      "调整牌组父级": "reparent_decks",
       "重命名牌组": "rename_deck",
       "获取或创建过滤牌组": "get_or_create_filtered_deck",
       "添加或更新过滤牌组": "add_or_update_filtered_deck",
@@ -30,7 +31,8 @@
     "牌组配置方法": {
       "获取牌组配置": "get_deck_config",
       "获取牌组配置编辑视图": "get_deck_configs_for_update",
-      "更新牌组配置": "update_deck_configs"
+      "更新牌组配置": "update_deck_configs",
+      "getIgnoredBeforeCount": "get_ignored_before_count"
     },
     "调度器方法": {
       "获取队首卡片": "get_queued_cards",
@@ -50,14 +52,22 @@
       "自定义学习": "custom_study",
       "自定义学习默认值": "custom_study_defaults",
       "computeFsrsParams": "compute_fsrs_params",
-      "simulateFsrsWorkload": "simulate_fsrs_workload"
+      "evaluateParamsLegacy": "evaluate_params_legacy",
+      "computeMemoryState": "compute_memory_state",
+      "simulateFsrsReview": "simulate_fsrs_review",
+      "simulateFsrsWorkload": "simulate_fsrs_workload",
+      "scheduleCardsAsNew": "schedule_cards_as_new",
+      "scheduleCardsAsNewDefaults": "schedule_cards_as_new_defaults"
     },
     "卡片渲染方法": {
       "提取音视频标签": "extract_av_tags",
       "extractLatex": "extract_latex",
       "获取空卡": "get_empty_cards",
       "渲染既有卡片": "render_existing_card",
-      "renderUncommittedCardLegacy": "render_uncommitted_card_legacy"
+      "renderUncommittedCardLegacy": "render_uncommitted_card_legacy",
+      "encodeIriPaths": "encode_iri_paths",
+      "compareAnswer": "compare_answer",
+      "extractClozeForTyping": "extract_cloze_for_typing"
     },
     "笔记类型方法": {
       "添加笔记类型旧版": "add_notetype_legacy",
@@ -69,7 +79,8 @@
       "移除笔记类型": "remove_notetype",
       "获取变更笔记类型信息": "get_change_notetype_info",
       "变更笔记类型": "change_notetype",
-      "获取填空字段序号": "get_cloze_field_ords"
+      "获取填空字段序号": "get_cloze_field_ords",
+      "restoreNotetypeToStock": "restore_notetype_to_stock"
     },
     "笔记方法": {
       "新建笔记": "new_note",
@@ -86,6 +97,7 @@
       "导入集合包": "import_collection_package",
       "导出集合包": "export_collection_package",
       "导入Anki包": "import_anki_package",
+      "getImportAnkiPackagePresets": "get_import_anki_package_presets",
       "导出Anki包": "export_anki_package",
       "获取CSV元数据": "get_csv_metadata",
       "导入CSV": "import_csv",

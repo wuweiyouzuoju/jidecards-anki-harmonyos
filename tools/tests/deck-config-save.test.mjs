@@ -54,7 +54,7 @@ function fixture(id = 1, useCount = 2) {
       newPerDay: 20, reviewsPerDay: 200, initialEase: 2.5, easyMultiplier: 1.3,
       hardMultiplier: 1.2, intervalMultiplier: 1, maximumReviewInterval: 36500,
       minimumLapseInterval: 1, graduatingIntervalGood: 1, graduatingIntervalEasy: 4,
-      leechThreshold: 8, capAnswerTimeToSecs: 60, desiredRetention: 0.9,
+      leechThreshold: 8, capAnswerTimeToSecs: 60, desiredRetention: 0.9, historicalRetention: 0.9,
       fsrsParams6: Array(21).fill(0.5), other: new Uint8Array([8, 1]),
       preserved: [unknown.转为字节()] }
   });
@@ -93,11 +93,13 @@ function saveHarness(id = 1, useCount = 2) {
   const form = 牌组配置表单.从配置创建(original.config);
   const options = 牌组选项编辑.从视图创建(view.currentDeck.limits, true, true, true, true);
   options.sharedDeckCount = deckConfigUseCount(view, id);
+  // Retain coverage for the explicit isolation policy; the UI now edits shared presets by default.
+  options.applyToSharedDecks = false;
   assert.deepEqual(form.校验(), []);
   return { state, original, view, form, options, calls };
 }
 
-test('editing a shared preset defaults to a new config bound only to the selected deck', async () => {
+test('explicit isolation creates a new config bound only to the selected deck', async () => {
   const { state, original, form, options, calls } = saveHarness(42, 3);
   const before = encodeDeckConfig(original);
   form.每日新卡数文本 = '10';
@@ -152,7 +154,7 @@ test('explicit shared editing updates the shared preset while limits stay deck-s
   assert.equal(calls[0].limits.newToday, 5);
   assert.equal(calls[0].targetDeckId, 10);
   assert.equal(calls[0].mode, 0);
-  assert.equal(牌组选项编辑.从视图创建(null, false, false, false, false).applyToSharedDecks, false);
+  assert.equal(牌组选项编辑.从视图创建(null, false, false, false, false).applyToSharedDecks, true);
 });
 
 test('unchanged saves, reverted edits and deck-limit-only saves do not create presets', async () => {
@@ -210,23 +212,16 @@ test('editing or discarding drafts without saving leaves collection data untouch
   assert.deepEqual(encodeDeckConfig(original), before);
 });
 
-test('deck scope is available from the header help and global controls stay separate', () => {
-  const home = read('entry/src/main/ets/components/home/DeckOptionsFeature.ets');
+test('deck scope is available from the header and shared editing exposes explicit preset cloning', () => {
+  const feature = read('entry/src/main/ets/components/home/DeckOptionsFeature.ets');
   const panel = read('entry/src/main/ets/components/牌组选项面板.ets');
-  const advanced = read('entry/src/main/ets/components/高级牌组选项面板.ets');
-  assert.match(home, /sharedDeckCount = deckConfigUseCount\(view, state.config.id\)/);
-  assert.match(panel, /private openScopeHelp\(\): void \{[\s\S]*?this\.options\.applyToSharedDecks[\s\S]*?deck_save_scope_shared/);
-  assert.match(panel, /deck_options_scope_help_title', this\.deckName/);
-  assert.match(panel, /DialogHeader\(\{[\s\S]*?showHelp: true[\s\S]*?onHelp: \(\) => this\.openScopeHelp\(\)/);
-  assert.doesNotMatch(panel, /Text\(this\.deckName\)/);
-  assert.match(advanced, /if \(this.options.sharedDeckCount > 1\)/);
-  const start = advanced.indexOf('if (this.globalExpanded)');
-  const end = advanced.indexOf("app.string.deck_group_advanced'", start);
-  const globals = advanced.slice(start, end);
-  for (const key of ['fsrsEnabled', 'fsrsHealthCheck', 'newCardsIgnoreReviewLimit', 'applyAllParentLimits']) {
-    assert.ok(globals.includes(`deck_${key}_label`));
-    assert.equal(advanced.split(`deck_${key}_label`).length - 1, 1);
-  }
+  const full = read('entry/src/main/ets/components/高级牌组选项面板.ets');
+  assert.match(feature, /sharedDeckCount = deckConfigUseCount\(view, state.config.id\)/);
+  assert.match(panel, /private openScopeHelp\(\): void \{[\s\S]*?deck_save_scope_shared/);
+  assert.match(panel, /onHelp: \(\) => this\.openScopeHelp\(\)/);
+  assert.match(panel, /this\.onPreset\('clone', value\)/);
+  assert.match(full, /private scopedKey/);
+  assert.match(full, /scope === 1 \? 'newLimit' : 'newToday'/);
 });
 
 test('configuration request snapshots limits and config bytes without mutating shared preset inputs', () => {

@@ -2,6 +2,7 @@
 
 /** 搜索输入独占一行；仅持有未提交的本地输入，模式选择由浏览页负责。 */
 import { 应用尺寸 } from '../../utils/应用尺寸';
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
 
 @Component
 export struct 搜索框 {
@@ -27,6 +28,7 @@ export struct 搜索框 {
         text: this.当前输入,
         placeholder: $r('app.string.browser_search_placeholder')
       })
+        .border(SurfaceBorder.options())
         .layoutWeight(1)
         .height(应用尺寸.searchFieldHeight)
         .fontSize(应用尺寸.字号_正文)

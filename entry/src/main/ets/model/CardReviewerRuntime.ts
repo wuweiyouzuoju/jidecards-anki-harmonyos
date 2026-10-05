@@ -6,8 +6,33 @@ export const CARD_REVIEWER_RUNTIME: string = String.raw`
   var documentId = 0, revision = 0;
   window.onUpdateHook = [];
   window.onShownHook = [];
+  function surfaceBackground() {
+    // Composite transparent body colors over the HTML fallback; emit an ArkUI-compatible opaque color.
+    var canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 1;
+    var context = canvas.getContext('2d');
+    if (!context) return '';
+    [document.documentElement, document.body].forEach(function (element) {
+      context.fillStyle = getComputedStyle(element).backgroundColor;
+      context.fillRect(0, 0, 1, 1);
+    });
+    var pixel = context.getImageData(0, 0, 1, 1).data;
+    if (pixel[3] !== 255) return '';
+    return '#' + Array.from(pixel.slice(0, 3)).map(function (value) {
+      return value.toString(16).padStart(2, '0');
+    }).join('');
+  }
   function report(error) {
-    window.jideCardRuntime.onRendered(documentId, revision, error ? String(error) : '');
+    if (error) {
+      window.jideCardRuntime.onRendered(documentId, revision, String(error), '');
+      return;
+    }
+    // Keep the native loading surface until layout and the first content frame have completed.
+    window.requestAnimationFrame(function () {
+      window.requestAnimationFrame(function () {
+        window.jideCardRuntime.onRendered(documentId, revision, '', surfaceBackground());
+      });
+    });
   }
   async function hooks(list) {
     await Promise.allSettled(list.map(function (hook) { return Promise.resolve().then(hook); }));

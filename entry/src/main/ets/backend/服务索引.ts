@@ -46,6 +46,7 @@ export const 牌组方法 = {
   牌组树: 4,
   获取牌组名: 13,
   删除牌组: 16,
+  调整牌组父级: 17,
   重命名牌组: 18,
   获取或创建过滤牌组: 19,
   添加或更新过滤牌组: 20,
@@ -58,7 +59,8 @@ export const 牌组方法 = {
 export const 牌组配置方法 = {
   获取牌组配置: 1,
   获取牌组配置编辑视图: 6,
-  更新牌组配置: 7
+  更新牌组配置: 7,
+  getIgnoredBeforeCount: 8
 } as const;
 
 export const 调度器方法 = {
@@ -79,7 +81,12 @@ export const 调度器方法 = {
   自定义学习: 27,
   自定义学习默认值: 28,
   computeFsrsParams: 30,
-  simulateFsrsWorkload: 34
+  evaluateParamsLegacy: 36,
+  computeMemoryState: 37,
+  simulateFsrsReview: 33,
+  simulateFsrsWorkload: 34,
+  scheduleCardsAsNew: 17,
+  scheduleCardsAsNewDefaults: 18
 } as const;
 
 export const 卡片渲染方法 = {
@@ -87,7 +94,10 @@ export const 卡片渲染方法 = {
   extractLatex: 4,
   获取空卡: 5,
   渲染既有卡片: 6,
-  renderUncommittedCardLegacy: 8
+  renderUncommittedCardLegacy: 8,
+  encodeIriPaths: 11,
+  compareAnswer: 15,
+  extractClozeForTyping: 16
 } as const;
 
 export const 笔记类型方法 = {
@@ -100,7 +110,8 @@ export const 笔记类型方法 = {
   移除笔记类型: 11,
   获取变更笔记类型信息: 14,
   变更笔记类型: 15,
-  获取填空字段序号: 18
+  获取填空字段序号: 18,
+  restoreNotetypeToStock: 17
 } as const;
 
 export const 笔记方法 = {
@@ -119,6 +130,7 @@ export const 导入导出方法 = {
   导入集合包: 0,
   导出集合包: 1,
   导入Anki包: 2,
+  getImportAnkiPackagePresets: 3,
   导出Anki包: 4,
   获取CSV元数据: 5,
   导入CSV: 6,

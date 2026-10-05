@@ -5,13 +5,14 @@ import { DialogHeader } from '../common/DialogHeader';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { SelectStyle } from '../../utils/SelectStyle';
 import { FormSelectRow } from '../common/FormSelectRow';
-import { resourceText } from '../../utils/UiFeedback';
+import { localizedResourceText, resourceText } from '../../utils/UiFeedback';
 import type { NotetypeNameId, 变更笔记类型请求 } from '../../proto/messages/NotetypeMessages';
 import { BrowserNotetypeSession, BrowserNotetypeState, initialNotetypeState } from '../../model/browser/BrowserNotetypeSession';
 import { AnkiBrowserNotetype } from '../../backend/AnkiBrowserNotetype';
 
 @Component
 export struct BrowserNotetypeFeature {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
 
   private handleBackRequest(): void {
@@ -40,7 +41,7 @@ export struct BrowserNotetypeFeature {
     if (this.busy || this.state.busy || index < 0 || index >= this.state.names.length) return;
     this.session?.select(this.state.names[index].id);
   }
-  private 构建映射选项列表(旧名列表: string[]): SelectOption[] {
+  private 构建映射选项列表(旧名列表: string[], _locale: string = this.uiLanguage): SelectOption[] {
     const 选项: SelectOption[] = [];
     选项.push({
       value: resourceText(this.getUIContext(), $r('app.string.browser_action_change_notetype_no_map'))
@@ -101,7 +102,7 @@ export struct BrowserNotetypeFeature {
             Select(this.构建映射选项列表(this.state.info!.oldFieldNames))
               .selected(this.state.fields[索引] === -1 ? 0 : this.state.fields[索引] + 1)
               .value(this.state.fields[索引] === -1 ?
-                resourceText(this.getUIContext(), $r('app.string.browser_action_change_notetype_no_map')) :
+                localizedResourceText(this.getUIContext(), this.uiLanguage, $r('app.string.browser_action_change_notetype_no_map')) :
                 this.state.info!.oldFieldNames[this.state.fields[索引]])
               .width('50%')
               .attributeModifier(new SelectStyle())
@@ -112,7 +113,7 @@ export struct BrowserNotetypeFeature {
               .optionFont(SelectStyle.optionFont)
               .selectedOptionFont(SelectStyle.selectedOptionFont)
               .textModifier(SelectStyle.labelText())
-              .borderRadius(SelectStyle.controlRadius)
+              .borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
               .enabled(!this.busy && !this.state.busy)
               .onSelect((选索引: number): void => {
                 if (this.busy || this.state.busy) return;
@@ -140,7 +141,7 @@ export struct BrowserNotetypeFeature {
               Select(this.构建映射选项列表(this.state.info!.oldTemplateNames))
                 .selected(this.state.templates[索引] === -1 ? 0 : this.state.templates[索引] + 1)
                 .value(this.state.templates[索引] === -1 ?
-                  resourceText(this.getUIContext(), $r('app.string.browser_action_change_notetype_no_map')) :
+                  localizedResourceText(this.getUIContext(), this.uiLanguage, $r('app.string.browser_action_change_notetype_no_map')) :
                   this.state.info!.oldTemplateNames[this.state.templates[索引]])
                 .width('50%')
                 .attributeModifier(new SelectStyle())
@@ -151,7 +152,7 @@ export struct BrowserNotetypeFeature {
                 .optionFont(SelectStyle.optionFont)
                 .selectedOptionFont(SelectStyle.selectedOptionFont)
                 .textModifier(SelectStyle.labelText())
-                .borderRadius(SelectStyle.controlRadius)
+                .borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
                 .enabled(!this.busy && !this.state.busy)
                 .onSelect((选索引: number): void => {
                   if (this.busy || this.state.busy) return;

@@ -10,7 +10,7 @@
 // 串行语义：播放队列 / 重播 先停后播；onComplete 自动接续下一首；代次防旧回调污染。
 //
 // @输入
-// 一组 TtsItem（text + language）
+// 一组 TtsItem（文本、语种、模板候选音色、语速与附加参数）
 //
 // @输出
 // 通过内置 TextToSpeechEngine 播放音频；无返回值。
@@ -21,7 +21,7 @@
 // - listVoices 探测音色状态：未 INSTALLED 的语言降级到 zh-CN（zh-CN 引擎也能读英文）。
 // - person=0 是 CN_FEMALE_DEFAULT 聆小珊女声默认音色，非"系统自动选"。
 // - 劳拉女声（person=8）无法播放中文文本，zh-CN 永远不能返回 8。
-// - 优先用用户在设置页选定的 person；未选定时再用 按语言取音色人物 兜底。
+// - 模板中可用的 HarmonyOS 音色优先，其次为本机偏好，最后按语言兜底。
 //
 // @副作用
 // 创建 / 销毁 TextToSpeechEngine；通过 hilog 输出全链路诊断日志（tag=TtsPlayer）。
@@ -39,6 +39,7 @@ import { 加载语音人物, 获取语音版本号 } from '../model/TTS语音存
 import { AudioFocusCoordinator } from './AudioFocusCoordinator';
 import { AudioQueuePlayer } from '../model/CardAudioSession';
 import { AudioQueueCompletion } from '../model/AudioQueueCompletion';
+import { harmonyTtsVoiceName, ttsSpeakOptions, TtsSpeakOptions } from '../model/CardRenderingSupport';
 
 const 域: number = 0x0001;
 const 标签: string = 'TtsPlayer';
@@ -275,17 +276,45 @@ export class TTS播放器 implements AudioQueuePlayer<TtsItem> {
     }
   }
 
+  /**
+   * 模板按候选顺序选择本机已安装音色；其他平台音色不能假装映射成功。
+   * @throws {BusinessError} 查询失败由确保引擎记录诊断并回退本机音色。
+   */
+  private async 选取模板音色(语种: string, 候选: string[]): Promise<number | null> {
+    if (候选.length === 0) return null;
+    const 查询: textToSpeech.VoiceQuery = { requestId: `template-${Date.now()}`, online: 1 };
+    const 音色列表: textToSpeech.VoiceInfo[] = await textToSpeech.listVoices(查询);
+    for (const 名称 of 候选) {
+      for (const 音色 of 音色列表) {
+        if (音色是否已安装(音色, 语种) && 名称 === harmonyTtsVoiceName(音色.person)) return 音色.person;
+      }
+    }
+    记录警告('template voices unavailable for %{public}s: %{public}s; use local voice', 语种, 候选.join(','));
+    return null;
+  }
+
+  /** Core 保留模板参数；平台仅映射 SDK 声明支持的语速、音量和音调。 */
+  private 朗读附加参数(条目: TtsItem): Record<string, Object> {
+    const 参数: TtsSpeakOptions = ttsSpeakOptions(条目);
+    if (参数.speedAdjusted) 记录警告('template speed %{public}s limited to %{public}s', 条目.speed, 参数.extraParams['speed'] as number);
+    for (const 项 of 参数.unsupported) 记录警告('unsupported template TTS argument: %{public}s', 项);
+    return 参数.extraParams;
+  }
+
   /** @throws {Error} 语音引擎创建失败，交由朗读入口处理。 */
-  private async 确保引擎(语种: string): Promise<textToSpeech.TextToSpeechEngine> {
+  private async 确保引擎(语种: string, 候选音色: string[]): Promise<textToSpeech.TextToSpeechEngine> {
     // 鸿蒙 CoreSpeechKit 多数设备只预装 zh-CN 音色；en-US 等需用户在系统设置下载后才能 createEngine。
     // 这里先按 listVoices 探测音色状态，未 INSTALLED 的语言直接降级到 zh-CN（zh-CN 引擎也能读英文，发音不标准但出声）。
     const 兜底语种: string = await this.选取可用语言(语种);
-    // 优先用用户在设置页选定的 person（聆小珊 13 / 凌飞哲 21 等）；未选定时再用 按语言取音色人物 兜底。
+    // 模板音色不可用时，采用设置页选定的 person，再用 按语言取音色人物 兜底。
     // 注意：若用户选定的 person 不在 兜底语种 对应的音色列表中（比如选定 en-US 的 person=8 但降级到 zh-CN），
     // createEngine 会报错 1002300003 person not support。这里按 兜底语种 读取选定的 person；
     // 若该 language 没有选定（返回 0），再用 按语言取音色人物 兜底，避免传入无效 person。
     const 已存储音色人物: number = await 加载语音人物(兜底语种);
-    const 音色人物: number = 已存储音色人物 !== 0 ? 已存储音色人物 : 按语言取音色人物(兜底语种);
+    let 模板音色: number | null = null;
+    try { 模板音色 = await this.选取模板音色(兜底语种, 候选音色); }
+    catch (错误) { 记录警告('template voice lookup failed: %{public}s; use local voice', 错误文本(错误 as BusinessError)); }
+    const 音色人物: number = 模板音色 ?? (已存储音色人物 !== 0 ? 已存储音色人物 : 按语言取音色人物(兜底语种));
     const 当前语音版本号: number = 获取语音版本号();
     // 缓存命中条件：engine 存在 + language 一致 + person 一致 + voiceVersion 没变。
     // person 与 voiceVersion 都必须参与缓存 key，否则 VoiceGroup 切换同语种音色后引擎不会重建（2026-07-21 修）。
@@ -367,7 +396,7 @@ export class TTS播放器 implements AudioQueuePlayer<TtsItem> {
 
     let 当前引擎: textToSpeech.TextToSpeechEngine;
     try {
-      当前引擎 = await this.确保引擎(鸿蒙语种);
+      当前引擎 = await this.确保引擎(鸿蒙语种, 当前条目.voices);
     } catch (错误) {
       记录错误('startAt[%{public}d]: ensureEngine FAILED %{public}s', 位置, 错误文本(错误 as BusinessError | undefined));
       // 引擎创建失败（如系统不支持此语言）：跳到下一项
@@ -383,7 +412,7 @@ export class TTS播放器 implements AudioQueuePlayer<TtsItem> {
     this.activeRequestId = 请求ID;
     const 朗读参数: textToSpeech.SpeakParams = {
       requestId: 请求ID,
-      extraParams: {}
+      extraParams: this.朗读附加参数(当前条目)
     };
     try {
       当前引擎.speak(当前条目.text, 朗读参数);

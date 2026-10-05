@@ -18,7 +18,7 @@ export function deckConfigUseCount(view: DeckConfigsForUpdateView, configId: num
 }
 
 /**
- * 默认按牌组隔离预设修改；显式选择共享时才更新原预设。
+ * 按显式范围保存：UI 默认更新共享预设，单牌组提案按需隔离。
  * Invariants: 原配置不变；无修改不分离；ID 1 留给未来新牌组；ID 0 由后端原子创建并绑定。
  */
 export function prepareDeckConfigForSave(view: DeckConfigsForUpdateView, original: DeckConfig,
@@ -43,6 +43,7 @@ export interface DeckConfigRequestOptions {
   applyAllParentLimits: boolean;
   fsrsReschedule: boolean;
   fsrsHealthCheck: boolean;
+  mode?: number;
 }
 
 /** Core 只按今日数值是否存在保存覆盖；Active 是读取状态，不是停用指令。 */
@@ -63,7 +64,7 @@ export function buildDeckConfigRequest(targetDeckId: number, view: DeckConfigsFo
   const request: UpdateDeckConfigsInput = {
     targetDeckId: targetDeckId,
     configs: [prepareDeckConfigForSave(view, original, copyDeckConfig(draft), applyToSharedDecks)],
-    removedConfigIds: [], mode: UPDATE_DECK_CONFIGS_MODE_NORMAL, cardStateCustomizer: view.cardStateCustomizer,
+    removedConfigIds: [], mode: edited.mode ?? UPDATE_DECK_CONFIGS_MODE_NORMAL, cardStateCustomizer: view.cardStateCustomizer,
     limits: limitsForSave(edited.limits), newCardsIgnoreReviewLimit: edited.newCardsIgnoreReviewLimit,
     fsrs: edited.fsrs, applyAllParentLimits: edited.applyAllParentLimits,
     fsrsReschedule: edited.fsrsReschedule, fsrsHealthCheck: edited.fsrsHealthCheck

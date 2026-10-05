@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { interfaceItemText } from '../utils/AppInterfaceText';
 import { appInterface } from '../backend/AppInterfaceService';
 import { FormInputStyle } from '../utils/FormInputStyle';
@@ -46,6 +47,7 @@ import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时
 
 @Component
 export struct 创建牌组面板 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
   @Prop @Watch('publishInterface') busy: boolean = false;
@@ -76,7 +78,7 @@ export struct 创建牌组面板 {
   private publishInterface(): void {
     appInterface.observe({ surface: 'create_deck', sectionId: '', selectedId: this.parentId,
       optionIds: [''].concat(this.parentOptions.slice(0, 100).map((deck: 牌组汇总): string => deck.id)),
-      optionLabels: [interfaceItemText(this.getUIContext(), 'create_deck', 'top_level')].concat(
+      optionLabels: [interfaceItemText(this.getUIContext(), 'create_deck', 'top_level', this.uiLanguage)].concat(
         this.parentOptions.slice(0, 100).map((deck: 牌组汇总): string => deck.name)),
       optionsTotal: this.parentOptions.length + 1, busy: this.busy });
   }
@@ -123,7 +125,7 @@ export struct 创建牌组面板 {
   // @副作用
   // 无。
   // ========================================================
-  private 取本地化文本(resource: Resource): string {
+  private 取本地化文本(resource: Resource, _locale: string = this.uiLanguage): string {
     return resourceText(this.getUIContext(), resource);
   }
 
@@ -252,7 +254,7 @@ export struct 创建牌组面板 {
   private 父牌组候选行(id: string, label: string, depth: number) {
     Row() {
       Row() {
-        Text() { ThemeTextSpans(label, (this.parentId === id) ? this.themeAccentColors : [], this.getUIContext()) }
+        Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(label, (this.parentId === id) ? this.themeAccentColors : [], this.getUIContext()) }, (_locale: string): string => _locale) }
           .fontSize(应用尺寸.字号_正文)
           .fontColor(this.parentId === id ? this.动作主色 : $r('app.color.text_primary'))
           .fontWeight(this.parentId === id ? FontWeight.Bold : FontWeight.Medium)
@@ -299,9 +301,9 @@ export struct 创建牌组面板 {
         // 标题行
         DialogHeader({
           title: $r('app.string.create_deck_title'),
-          actionLabel: this.busy ? $r('app.string.create_deck_creating') : interfaceItemText(this.getUIContext(), 'create_deck', 'confirm'),
+          actionLabel: this.busy ? $r('app.string.create_deck_creating') : interfaceItemText(this.getUIContext(), 'create_deck', 'confirm', this.uiLanguage),
           actionEnabled: this.canSubmit(),
-          closeLabel: interfaceItemText(this.getUIContext(), 'create_deck', 'cancel'),
+          closeLabel: interfaceItemText(this.getUIContext(), 'create_deck', 'cancel', this.uiLanguage),
           closeEnabled: !this.busy,
           onClose: () => {
             this.onCancel();
@@ -312,7 +314,7 @@ export struct 创建牌组面板 {
         })
 
         // 牌组名称输入框上移到标题下方（先填名称 → 再选父牌组 → 看预览 → 提交）
-        TextInput({ placeholder: interfaceItemText(this.getUIContext(), 'create_deck', 'name'), text: this.deckName })
+        TextInput({ placeholder: interfaceItemText(this.getUIContext(), 'create_deck', 'name', this.uiLanguage), text: this.deckName })
           .attributeModifier(new FormInputStyle(应用尺寸.卡片内边距))
           .enabled(!this.busy)
           .onChange((value: string) => {
@@ -377,7 +379,7 @@ export struct 创建牌组面板 {
       .constraintSize({ maxWidth: 480, minHeight: '65%' })
       .padding(应用尺寸.面板内边距)
       .backgroundColor($r('app.color.surface_card'))
-      .borderRadius(应用尺寸.圆角_卡片)
+      .borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
       .onClick(() => {
         // 阻断点击穿透到遮罩
       })

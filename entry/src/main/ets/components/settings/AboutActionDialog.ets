@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { DialogHeader } from '../common/DialogHeader';
 import { 按下态按钮 } from '../common/按下态按钮';
 import { 应用尺寸 } from '../../utils/应用尺寸';
@@ -57,7 +58,7 @@ export struct AboutActionDialog {
       .constraintSize({ maxWidth: 480, maxHeight: '85%' })
       .padding(应用尺寸.卡片内边距)
       .backgroundColor($r('app.color.surface_card'))
-      .borderRadius(应用尺寸.圆角_卡片)
+      .borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
     }
     .width('100%')
     .alignItems(HorizontalAlign.Center)

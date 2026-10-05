@@ -1,8 +1,11 @@
 // SPDX-License-Identifier-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../../utils/PressFeedback';
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { HelpButton } from '../common/HelpButton';
+import { CardMarkingBadge } from '../common/CardMarkingBadge';
+import { CARD_FLAGS, FlagLabels, browserRowFlag } from '../../model/CardMarking';
 import type { BrowserDisplayRow as 浏览行数据 } from '../../model/BrowserSearchSession';
-import { DECK_LIST_NARROW_KEY } from '../../model/DeckListAppearance';
+import { PAGE_COMPACT_LAYOUT_KEY } from '../../model/AppLayoutState';
 
 // ========================================================
 // @块ID UI-BROWSER-TABLE-001
@@ -78,12 +81,13 @@ export type { BrowserDisplayRow as 浏览行数据 } from '../../model/BrowserSe
 
 @Component
 export struct 卡片表格 {
-  @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
+  @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
   @Prop @Watch('同步行数据源') 行列表: 浏览行数据[] = [];
   @Prop 结果总数: number = 0;
   @Prop 已加载行数: number = 0;
   @Prop subtitleIndex: number = 1;
   @Prop notesMode: boolean = false;
+  @Prop flagLabels: FlagLabels = {};
   /** 从 Agent 改卡入口进入时，首次挂载即显示多选框。 */
   @Prop 多选模式: boolean = false;
   @Prop 选中IDs: number[] = [];
@@ -132,16 +136,18 @@ export struct 卡片表格 {
 
   /** 行标志色：根据 BrowserRowColor 返回色条颜色，无标志返回透明。 */
   private 取行标志色(行: 浏览行数据): string {
-    switch (行.color) {
-      case BrowserRowColor.COLOR_FLAG_RED: return '#D92D20';
-      case BrowserRowColor.COLOR_FLAG_ORANGE: return '#D97A1C';
-      case BrowserRowColor.COLOR_FLAG_GREEN: return '#238463';
-      case BrowserRowColor.COLOR_FLAG_BLUE: return '#2F5FD0';
-      case BrowserRowColor.COLOR_FLAG_PINK: return '#D9408F';
-      case BrowserRowColor.COLOR_FLAG_TURQUOISE: return '#1CA7A0';
-      case BrowserRowColor.COLOR_FLAG_PURPLE: return '#7B2CBF';
-      default: return 'transparent';
-    }
+    return CARD_FLAGS[browserRowFlag(行.color)].color;
+  }
+
+  /** 旗标只覆盖左侧色条，四周中性轮廓始终保留。 */
+  private rowBorder(row: 浏览行数据): BorderOptions {
+    const flagColor: string = this.取行标志色(row);
+    if (flagColor === 'transparent') return SurfaceBorder.options();
+    const outline: ResourceColor = SurfaceBorder.color();
+    const widths: EdgeWidths = { top: 应用尺寸.卡片边框, right: 应用尺寸.卡片边框,
+      bottom: 应用尺寸.卡片边框, left: 4 };
+    const colors: EdgeColors = { top: outline, right: outline, bottom: outline, left: flagColor };
+    return SurfaceBorder.options(widths, colors);
   }
 
   /** 暂停状态独立于旗标颜色，用于弱化行背景。 */
@@ -226,12 +232,15 @@ export struct 卡片表格 {
                       .fontColor($r('app.color.text_primary'))
                       .padding({ left: 6, right: 6, top: 2, bottom: 2 })
                       .backgroundColor($r('app.color.surface_card'))
-                      .border({ width: 0.5, color: $r('app.color.border_subtle') })
+                      .border(SurfaceBorder.options(0.5))
                       .borderRadius(4)
                   }
                 }
                 .alignItems(HorizontalAlign.Start)
                 .layoutWeight(1)
+
+                CardMarkingBadge({ flag: this.notesMode ? 0 : browserRowFlag(行.color),
+                  marked: 行.marked === true, labels: this.flagLabels })
 
                 // T11 卡片信息按钮：非多选模式下显示，点击触发 onInfoClick
                 // 独立信息动作保留在行尾；公共按钮独占点击，不进入编辑。
@@ -249,11 +258,7 @@ export struct 卡片表格 {
                 bottom: 应用尺寸.间距_12
               })
               .backgroundColor($r('app.color.surface_card'))
-              // 有标志时加 4px 左边框作色条（不增加子元素，不影响布局高度）
-              .border(this.取行标志色(行) !== 'transparent' ? {
-                width: { left: 4 },
-                color: { left: this.取行标志色(行) }
-              } : { width: 0 })
+              .border(this.rowBorder(行))
               .borderRadius(应用尺寸.圆角_指标卡)
               .attributeModifier(new PressFeedback())
               .onClick((): void => this.处理行点击(行.id))

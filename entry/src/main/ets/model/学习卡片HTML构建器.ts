@@ -348,7 +348,8 @@ const 可折叠字段脚本: string = `<script>
 // ========================================================
 export function 构建卡片HTML(渲染结果: RenderedCard, 侧面: 卡片正反面, isDark: boolean = false,
   cardBackground: string = isDark ? '#18202B' : '#FFFFFF'): string {
-  const 正文: string = 剥除音频标签(原始侧HTML(渲染结果, 侧面));
+  const 卡面: string | undefined = 侧面 === 'question' ? 渲染结果.questionHtml : 渲染结果.answerHtml;
+  const 正文: string = 剥除音频标签(卡面 ?? 原始侧HTML(渲染结果, 侧面));
   // 底色只作兜底；单独强制替换模板底色会让黑字白底卡片变成黑字深色底。
   const 默认配色: string = `html { background: ${cardBackground}; }
 body { color: ${isDark ? '#E6E6E6' : '#1A1A1A'}; background: ${cardBackground}; }`;

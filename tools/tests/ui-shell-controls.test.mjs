@@ -26,10 +26,37 @@ test('primary actions and switches block disabled callbacks without owning busin
   assert.equal(actions, 2); assert.deepEqual(changes, [true, true]);
 });
 
+test('shared secondary buttons retain ordinary colors and stable selection borders', () => {
+  const SurfaceBorder = loadPlatformModule('utils/SurfaceBorder.ets', 'SurfaceBorder', {
+    应用尺寸: dimensions, $r: resource
+  });
+  const Button = loadComponentLogic('components/common/按下态按钮.ets', '按下态按钮', {
+    应用尺寸: dimensions, $r: resource, SurfaceBorder, GLASS_HIGHLIGHT_COLORS: []
+  });
+  const button = new Button();
+  button.字色 = 'danger'; button.selectionColor = 'cyan';
+  button.selected = true;
+  assert.equal(button.labelColor(), 'danger', 'ordinary actions ignore selection state');
+  assert.deepEqual(button.buttonBorder(), { width: dimensions.卡片边框, color: 'app.color.surface_border' });
+  button.selectable = true;
+  assert.equal(button.labelColor(), 'cyan');
+  assert.deepEqual(button.buttonBorder(), { width: 2, color: 'cyan' });
+  button.selected = false;
+  assert.equal(button.labelColor(), 'danger');
+  assert.deepEqual(button.buttonBorder(), { width: 2, color: 'app.color.surface_border' });
+  let clicks = 0; button.点击回调 = () => clicks++;
+  button.是否启用 = false; button.activate();
+  button.是否启用 = true; button.activate();
+  assert.equal(clicks, 1);
+});
+
 test('form input style applies real geometry/resources while leaving input behavior untouched', () => {
   let theme = 'light';
-  const Style = loadPlatformModule('utils/FormInputStyle.ets', 'FormInputStyle', {
+  const SurfaceBorder = loadPlatformModule('utils/SurfaceBorder.ets', 'SurfaceBorder', {
     应用尺寸: dimensions, $r: key => `${theme}:${key}`
+  });
+  const Style = loadPlatformModule('utils/FormInputStyle.ets', 'FormInputStyle', {
+    应用尺寸: dimensions, $r: key => `${theme}:${key}`, SurfaceBorder
   });
   for (const padding of [undefined, dimensions.卡片内边距]) {
     const attributes = { type: 'password', text: 'draft', inputFilter: 'filter', enabled: false, onSubmit: 'handler' };
@@ -44,13 +71,42 @@ test('form input style applies real geometry/resources while leaving input behav
       assert.equal(attributes.fontSize, dimensions.字号_正文);
       assert.equal(attributes.borderRadius, dimensions.圆角_面板);
       assert.deepEqual(attributes.padding, { left: padding ?? dimensions.间距_10, right: padding ?? dimensions.间距_10 });
-      assert.deepEqual(attributes.border, { width: dimensions.卡片边框, color: `${theme}:app.color.border_input` });
+      assert.deepEqual(attributes.border, { width: dimensions.卡片边框, color: `${theme}:app.color.surface_border` });
       assert.equal(attributes.backgroundColor, `${theme}:app.color.surface_card`);
       assert.equal(attributes.fontColor, `${theme}:app.color.text_primary`);
       assert.equal(attributes.placeholderColor, `${theme}:app.color.text_tertiary`);
       assert.deepEqual([attributes.type, attributes.text, attributes.inputFilter, attributes.enabled, attributes.onSubmit],
         ['password', 'draft', 'filter', false, 'handler']);
     }
+  }
+});
+
+test('image surfaces share theme resources without changing image or gesture geometry', () => {
+  const SurfaceBorder = loadPlatformModule('utils/SurfaceBorder.ets', 'SurfaceBorder', {
+    应用尺寸: dimensions, $r: resource
+  });
+  const Style = loadPlatformModule('utils/ImageSurfaceStyle.ets', 'ImageSurfaceStyle', {
+    应用尺寸: dimensions, $r: resource, SurfaceBorder
+  });
+  const attributes = { width: 320, height: 210, padding: 0, onTouch: 'image-handler' }, node = {};
+  for (const key of ['backgroundColor', 'border', 'borderRadius', 'clip']) {
+    node[key] = value => { attributes[key] = value; return node; };
+  }
+  new Style().applyNormalAttribute(node);
+  assert.equal(attributes.backgroundColor, 'app.color.surface_image');
+  assert.deepEqual(attributes.border, { width: dimensions.卡片边框, color: 'app.color.border_image' });
+  assert.equal(attributes.clip, true);
+  assert.deepEqual([attributes.width, attributes.height, attributes.padding, attributes.onTouch], [320,210,0,'image-handler']);
+  for (const file of ['components/common/NoteImagePreview.ets', 'components/图片遮罩编辑器.ets']) {
+    assert.match(read(file), /attributeModifier\(new ImageSurfaceStyle\(\)\)/);
+  }
+  assert.match(read('pages/添加笔记页.ets'), /NoteImagePreview\(\{ source: this\.图片遮盖_源图Uri \}\)/);
+  for (const theme of ['base', 'dark']) {
+    const colors = JSON.parse(readFileSync(new URL(`../../entry/src/main/resources/${theme}/element/color.json`, import.meta.url), 'utf8')).color;
+    const color = key => colors.find(item => item.name === key)?.value;
+    assert.ok(color('surface_image')); assert.ok(color('border_image'));
+    assert.notEqual(color('surface_image'), color('surface_page'));
+    assert.notEqual(color('border_image'), color('border_subtle'));
   }
 });
 
@@ -79,7 +135,7 @@ test('settings switches share geometry; help, hint and host failure states remai
   assert.match(row, /this.hint === '' \? 0 : 应用尺寸.间距_12/g);
   assert.match(row, /if \(this.hint !== ''\)/);
   assert.match(row, /HelpLabel\(\{[\s\S]*?isHelpEnabled: this.isHelpEnabled, onHelp: this.onHelp/);
-  assert.doesNotMatch(row, /@State|@Storage|margin\(|offset\(/);
+  assert.doesNotMatch(row.replace(/@StorageProp\('系统语言'\)[^;]*;/, ''), /@State|@Storage|margin\(|offset\(/);
   const scheduler = read('components/settings/调度器分组.ets');
   assert.match(scheduler, /if \(this.是否启用FSRS === null\)[\s\S]*settings_fsrs_loading[\s\S]*else \{\s*SettingsToggleRow/);
   assert.match(read('components/settings/外观分组.ets'), /ThemeMotionControl\(\{ isDark: this.是否深色 \}\)/);

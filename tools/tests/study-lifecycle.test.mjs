@@ -10,7 +10,7 @@ import { stripTypeScriptTypes } from 'node:module';
 
 // Execute unchanged production methods with controllable backend/player delays.
 const source = fs.readFileSync(new URL('../../entry/src/main/ets/pages/学习页.ets', import.meta.url), 'utf8');
-const names = ['请求删除当前卡', '确认删除当前卡', '加载下一张卡', '显示答案', '埋藏或暂停当前卡', '评分', 'invalidateCardWork', 'isCurrentRequest', 'studyActivityChanged', 'applyStudyHtml', 'playStudyAudio', 'studyWebAttached', 'aboutToDisappear', '消费待重渲染', '刷新编辑后当前卡', '撤销上次', '加载完成页信息', 'clearChoiceAutoAdvance', 'scheduleChoiceAutoAdvance', 'choiceAutoAdvanceSeconds'];
+const names = ['请求删除当前卡', '确认删除当前卡', '加载下一张卡', '显示答案', '埋藏或暂停当前卡', '评分', 'invalidateCardWork', 'isCurrentRequest', 'studyActivityChanged', 'updateScreenAwake', 'applyStudyHtml', 'playStudyAudio', 'studyWebAttached', 'aboutToDisappear', '消费待重渲染', '刷新编辑后当前卡', '撤销上次', '加载完成页信息', 'clearChoiceAutoAdvance', 'scheduleChoiceAutoAdvance', 'choiceAutoAdvanceSeconds'];
 const methods = names.map(name => {
   const start = source.search(new RegExp(`  (?:private )?(?:async )?${name}\\(`));
   assert.ok(start >= 0);
@@ -32,7 +32,7 @@ function harness() {
   const page = new Page(), displayed = [], sounds = [], events = [], answers = [];
   let id = 'A';
   Object.assign(page, {
-    mounted:true, sessionReady:true, foreground:true, requestVersion:0, loadingVersion:-1, flipPending:false, controllerReady:true, pendingHtml:'', 媒体目录:'',
+    screenAwake:null,mounted:true, sessionReady:true, foreground:true, requestVersion:0, loadingVersion:-1, flipPending:false, controllerReady:true, pendingHtml:'', 媒体目录:'',
     页面已显示:true, 阶段:'question', 评分中:false, studyGuideVisible:false,
     choiceQuestion:null, choiceGrade:null, choiceAutoAdvanceTimer:-1, choiceFeedbackDeadline:0, studyMenuOpen:false,
     contentRefreshInFlight:false, 待重渲染当前卡:false, 可撤销:true,
@@ -57,6 +57,37 @@ function harness() {
   attachStudySession(page);
   return {page, displayed, sounds, events, answers};
 }
+
+test('whiteboard survives answer reveal, resets only after an accepted next question and stays enabled', async () => {
+  const { page } = harness();
+  page.手写模式 = true;
+  page.whiteboardMounted = true;
+  await page.显示答案();
+  assert.equal(page.whiteboardResetTick, 0, 'answer reveal keeps the same official canvas');
+  assert.equal(page.手写模式, true);
+  assert.equal(page.阶段, 'answer');
+  await page.评分(3);
+  assert.equal(page.阶段, 'question');
+  assert.equal(page.当前卡片.cardId, 'B');
+  assert.equal(page.手写模式, true);
+  assert.equal(page.whiteboardMounted, true);
+  assert.equal(page.whiteboardResetTick, 1);
+  await page.加载下一张卡();
+  assert.equal(page.whiteboardResetTick, 2, 'new question replaces the canvas even if Core returns the same card');
+});
+
+test('same-card refresh preserves whiteboard but a changed queue head clears it', async () => {
+  const { page } = harness();
+  page.whiteboardMounted = true;
+  await page.刷新编辑后当前卡();
+  assert.equal(page.当前卡片.cardId, 'A');
+  assert.equal(page.whiteboardMounted, true, 'foreground or editor return retains the official canvas');
+  assert.equal(page.whiteboardResetTick, 0);
+  await page.调度器服务实例.埋藏或暂停卡片();
+  await page.刷新编辑后当前卡();
+  assert.equal(page.当前卡片.cardId, 'B');
+  assert.equal(page.whiteboardResetTick, 1);
+});
 
 test('manual answer replay includes the question only when configured and autoplay never adds it', async () => {
   for (const skip of [true, false]) {
@@ -204,6 +235,30 @@ test('repeat flips issue only one spelling read and never allow early rating', a
   assert.equal(page.阶段,'answer');
 });
 
+test('rendering retains the dark surface and blocks answers, ratings and timers until acknowledgement', async () => {
+  const { page, displayed, answers, sounds } = harness();
+  page.cardSurfaceBackground = '#101820';
+  page.cardWeb.show = html => displayed.push(html); // Deliberately delay the rendering port's acknowledgement.
+  await page.加载下一张卡();
+  assert.equal(page.cardRenderPending, true);
+  assert.equal(page.cardSurfaceBackground, '#101820');
+  assert.equal(page.studyTimerState().active, false);
+  await page.显示答案(); assert.equal(page.阶段, 'question');
+  assert.deepEqual(sounds, []);
+  page.阶段 = 'answer'; await page.评分(2); assert.deepEqual(answers, []);
+  page.阶段 = 'question'; page.studyCardShown('#202830');
+  assert.equal(page.cardRenderPending, false);
+  assert.equal(page.cardSurfaceBackground, '#202830');
+  assert.equal(page.studyTimerState().active, true);
+  await new Promise(resolve => setImmediate(resolve)); assert.equal(sounds.length, 1);
+  const start = page.展示时刻毫秒;
+  page.studyCardShown(''); assert.equal(page.展示时刻毫秒, start, 'interaction refresh does not restart the card');
+  page.invalidateCardWork();
+  assert.equal(page.cardSurfaceBackground, '#202830', 'next card retains the acknowledged background');
+  page.mounted = false; page.studyCardShown('#ffffff');
+  assert.equal(page.cardRenderPending, true); assert.equal(page.cardSurfaceBackground, '#202830');
+});
+
 test('Web attach consumes only the current cached question and errors are recoverable', async () => {
   const {page,displayed,sounds}=harness();
   page.controllerReady=false;
@@ -269,11 +324,13 @@ test('rating remains single-submit, uses the shown card, and undo reloads availa
 
 test('empty queue stops old audio; congrats errors degrade and stale results do not replace new state', async () => {
   const {page,displayed,events}=harness();
+  page.手写模式=true;page.whiteboardMounted=true;
   page.调度器服务实例.获取队首卡片=async()=>({cards:[],newCount:0,learningCount:0,reviewCount:0});
   page.调度器服务实例.获取完成页信息=async()=>{throw new Error('congrats unavailable');};
   await page.加载下一张卡();
   assert.equal(page.阶段,'done');assert.equal(page.完成页数据已加载,false);
   assert.equal(page.当前卡片,null);assert.equal(page.已渲染,null);
+  assert.equal(page.手写模式,false);assert.equal(page.whiteboardMounted,false,'completion releases the native sheet');
   assert.match(displayed.at(-1),/^<!DOCTYPE html>/);assert.ok(events.includes('stop'));
   const gate=deferred();page.调度器服务实例.获取完成页信息=()=>gate.promise;
   const old=page.加载完成页信息();page.invalidateCardWork();page.完成页有埋藏=false;

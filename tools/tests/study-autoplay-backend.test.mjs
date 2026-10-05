@@ -13,6 +13,18 @@ const hook = `export function resolve(s,c,n){if(s==='libjidecards.so')return {ur
 register('data:text/javascript,' + encodeURIComponent(hook), import.meta.url);
 const { AnkiStudySessionBackend: Backend } = await import('../../entry/src/main/ets/backend/StudySessionBackend.ts');
 
+test('marking adapter distinguishes missing names from unreadable or malformed configuration',async()=>{
+  const backend=new Backend();
+  backend.markingBackend.config={获取全部配置:async()=>'{"other":{"nested":[true]}}'};
+  assert.deepEqual(await backend.flagLabels(),{});
+  backend.markingBackend.config.获取全部配置=async()=>'{"flagLabels":{"7":"Check","future":{"v":1}}}';
+  assert.deepEqual(await backend.flagLabels(),{'7':'Check',future:{v:1}});
+  backend.markingBackend.config.获取全部配置=async()=>'{"flagLabels":[]}';
+  await assert.rejects(backend.flagLabels(),/Invalid flag labels/);
+  backend.markingBackend.config.获取全部配置=async()=>{throw Error('collection read failed');};
+  await assert.rejects(backend.flagLabels(),/collection read failed/);
+});
+
 test('global review preferences come from the Core service and refresh independently of card deck options', async () => {
   const backend=new Backend();let calls=0;
   const reviewing=new 协议写入器();reviewing.写入布尔(3,true);reviewing.写入布尔(4,false);reviewing.写入变长整数(5,61);
@@ -21,7 +33,8 @@ test('global review preferences come from the Core service and refresh independe
   backend.config={getPreferences:async()=>{calls++;return preferences.转为字节();}};
   backend.deckConfigs={获取牌组配置编辑视图:async()=>assert.fail('global preferences must not read a deck preset')};
   assert.deepEqual({...await backend.reviewPreferences()},
-    {rollover:7,learnAheadSecs:60,timeLimitSecs:61,showRemaining:true,showIntervals:false});
+    {rollover:7,learnAheadSecs:60,timeLimitSecs:61,showRemaining:true,showIntervals:false,
+      loadBalancer:false,shortTermWithSteps:false,backupDaily:0,backupWeekly:0,backupMonthly:0,backupInterval:0});
   await backend.reviewPreferences();assert.equal(calls,2);
   backend.config.getPreferences=async()=>{throw Error('Core preferences failed');};
   await assert.rejects(backend.reviewPreferences(),/Core preferences failed/);

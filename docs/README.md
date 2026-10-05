@@ -4,7 +4,7 @@
 
 - [项目 README](../README.md)：下载、功能、兼容范围、数据与构建入口。
 - [贡献指南](../CONTRIBUTING.md)：报告问题、开发环境、验证与提交要求。
-- [更新记录](../CHANGELOG.md)与[2.9.9 源码变更说明](releases/2.9.9.md)：源码变化及发布边界。
+- [更新记录](../CHANGELOG.md)与[2.9.10 源码变更说明](releases/2.9.10.md)：源码变化及发布边界。
 - [使用指南](https://jidecards.com/guides/harmonyos-anki/)：导入牌组、同步与复习入门。
 
 ## 当前文档
@@ -14,6 +14,8 @@
 - [数据导入、导出与恢复](development/import-data.md)：APKG 选项、CSV 映射、笔记/卡片文本导出、取消、结果与中断恢复。
 - [Anki / AnkiDroid 核心互通回归](development/core-interop.md)：隔离样本、真实 Core 往返、取消与恢复、设备和在线未验证范围。
 - [本轮 Anki 补齐成果审查](development/anki-parity-review-2026-10-02.md)：2026-10-02 对七项成果、版本约束、实现问题和验收边界的检查记录。
+- [Anki Core 全量接入盘点](development/ankicore-integration-audit-2026-10-04.md)：剩余功能、JIDE/平台边界和全部 232 个 RPC 明细，已排除本轮已补齐事项。
+- [剩余接入的 UI 与 JIDE 分工](decisions/2026-10-04-ankicore-ui-routing.md)：较复杂 UI 通过 JIDE 接入，极简或无需新增 UI 的事项单独整理。
 
 - [项目 README](../README.md)：产品、当前源码版本、构建入口。
 - [2.7.9 更新说明](releases/2.7.9.md)：相对 2.7.0 的功能、修复和验证边界。

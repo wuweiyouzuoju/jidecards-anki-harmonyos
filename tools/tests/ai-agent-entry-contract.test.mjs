@@ -5,7 +5,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { loadPlatformModule } from './platform-module-harness.mjs';
+import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
+import { visibleInterfaceItems } from '../../entry/src/main/ets/model/AppInterface.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
@@ -49,7 +50,7 @@ test('developer debug key persistently unlocks every hidden Agent channel throug
   assert.match(entryAbility, /initializeAiAgentChannels\(\)/);
   assert.match(developerGroup, /InputType\.Password/);
   assert.match(developerGroup, /enableAiAgentChannels\(this\.开发者密钥\)/);
-  assert.match(developerGroup, /settingsItemText\(this\.getUIContext\(\), 'developer_contact'\)/);
+  assert.match(developerGroup, /settingsItemText\(this\.getUIContext\(\), 'developer_contact', this\.uiLanguage\)/);
   assert.match(developerGroup,
     /if \(this\.Agent入口已启用\) \{[\s\S]*?'agent_enabled'[\s\S]*?\.maxLines\(1\)/);
   assert.doesNotMatch(developerGroup, /settings_developer_debug_enabled_hint|settings_developer_debug_success/,
@@ -68,29 +69,35 @@ test('developer debug key persistently unlocks every hidden Agent channel throug
     'Join the official QQ group 726837065 to request developer debug access.');
 
   for (const relative of [
-    'entry/src/main/ets/components/home/主页更多面板.ets',
+    'entry/src/main/ets/pages/首页.ets',
     'entry/src/main/ets/pages/学习页.ets',
     'entry/src/main/ets/components/browser/批量操作栏.ets',
     'entry/src/main/ets/components/设置面板.ets',
   ]) {
     const source = read(relative);
     assert.match(source, /AI_AGENT_CHANNELS_APP_STORAGE_KEY/);
-    assert.match(source,
-      /@StorageLink\(AI_AGENT_CHANNELS_APP_STORAGE_KEY\)[^\n]*Agent入口已启用:\s*boolean\s*=\s*false/);
-    if (relative.includes('主页更多面板')) assert.match(source, /visibleInterfaceItems\('home_more',[\s\S]*?agent: this\.Agent入口已启用/);
+    if (relative.includes('首页')) {
+      assert.match(source, /@StorageProp\(AI_AGENT_CHANNELS_APP_STORAGE_KEY\)[^\n]*homeAgentEnabled: boolean = false/);
+      assert.match(source, /agentEnabled: this.homeAgentEnabled/);
+    } else assert.match(source, /@StorageLink\(AI_AGENT_CHANNELS_APP_STORAGE_KEY\)[^\n]*Agent入口已启用:\s*boolean\s*=\s*false/);
+    if (relative.includes('首页')) assert.match(source, /onAgent:[\s\S]*?if \(this.homeAgentEnabled\)/);
     else if (relative.includes('设置面板')) assert.match(source, /visibleSettingsGroups\(this\.activeSection, this\.简洁模式, this\.Agent入口已启用\)/);
     else if (relative.includes('学习页')) assert.match(source, /studyInterfaceMenu\([\s\S]*agent: this\.Agent入口已启用/);
-    else assert.match(source, /if \(this\.Agent入口已启用\) \{/);
+    else assert.match(source, /visibleInterfaceItems\('browser_batch',[\s\S]*?agent: this\.Agent入口已启用/);
   }
 });
 
-test('home exposes one AI conversation in More and removes both new-deck menu entries', () => {
+test('home exposes one gated standalone JIDE conversation and removes it from both menus', () => {
   const panel = read('entry/src/main/ets/components/主页操作面板.ets');
-  const more = read('entry/src/main/ets/components/home/主页更多面板.ets');
   const home = read('entry/src/main/ets/pages/首页.ets');
   assert.doesNotMatch(panel, /AI制卡回调|AI改卡回调|ai_card_title|ai_card_edit/);
-  assert.match(more, /ForEach\(this\.menuItems\(\)/);
-  assert.match(more, /case 'agent': this\.onAgent\(\)/);
+  for (const agent of [false,true]) {
+    const context = {simple:false,agent,cloudDeck:false,themeHasTextures:false};
+    assert.equal(visibleInterfaceItems('home',context).filter(item=>item.id==='agent').length, agent ? 1 : 0);
+    assert.equal(visibleInterfaceItems('home_more',context).filter(item=>item.id==='agent').length, 0);
+    assert.equal(visibleInterfaceItems('home_create',context).filter(item=>item.id==='agent').length, 0);
+  }
+  assert.doesNotMatch(read('entry/src/main/ets/components/home/主页更多面板.ets'), /onAgent|Agent入口已启用/);
   for (const locale of ['base', 'en_US']) {
     const strings = JSON.parse(read(`entry/src/main/resources/${locale}/element/string.json`)).string;
     assert.equal(strings.find(item => item.name === 'ai_agent_title')?.value, 'JIDE');
@@ -221,7 +228,9 @@ test('study current-card entry passes stable context and reconciles the queue on
   assert.match(study, /templateIdx:\s*this\.当前卡片\.templateIdx/);
   assert.match(study, /刷新编辑后当前卡/);
   const refresh = study.match(/private async 刷新编辑后当前卡\(\): Promise<void> \{([\s\S]*?)\n  \}/)?.[1] ?? '';
-  assert.match(refresh, /await this\.加载下一张卡\(\)/);
+  // 同卡刷新保留手写内容的参数语义由 study-lifecycle.test.mjs 直接验证；入口只约束重读 Core 队列。
+  assert.match(refresh, /await this\.加载下一张卡\(/,
+    'returning from Agent editing must reload the Core queue, including refreshes that preserve the current whiteboard');
   assert.match(refresh, /await this\.显示答案\(\)/);
   assert.doesNotMatch(refresh, /回答卡片|埋藏|暂停/);
 });
@@ -375,7 +384,7 @@ test('settings API key, custom endpoint and custom model inputs share one visual
   assert.equal((settings.match(/new FormInputStyle\(\)/g) ?? []).length, 3);
   const style = read('entry/src/main/ets/utils/FormInputStyle.ets');
   assert.match(style, /backgroundColor\(\$r\('app\.color\.surface_card'\)\)/);
-  assert.match(style, /app\.color\.border_input/);
+  assert.match(style, /\.border\(SurfaceBorder\.options\(\)\)/);
 });
 
 test('an in-flight Agent turn is cancellable from the send button and exposes localized failures', () => {

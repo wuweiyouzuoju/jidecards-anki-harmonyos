@@ -9,8 +9,8 @@
 // 替换各处散写的 if (loading) Progress() + Text() 组合。
 //
 // @输入
-// 文案：可选，默认"加载中…"
-// 尺寸：可选，LoadingProgress 直径，默认 40vp
+// 文案：可选，默认本地化加载文案
+// 尺寸：可选，默认公共加载指示器尺寸
 //
 // @输出
 // 渲染居中的加载指示器与文案
@@ -23,8 +23,8 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 
 @Component
 export struct 统一加载态 {
-  @Prop 文案: ResourceStr = '加载中…';
-  @Prop 尺寸: number = 40;
+  @Prop 文案: ResourceStr = $r('app.string.common_loading');
+  @Prop 尺寸: number = 应用尺寸.加载指示器尺寸;
 
   build() {
     Column({ space: 应用尺寸.间距_8 }) {

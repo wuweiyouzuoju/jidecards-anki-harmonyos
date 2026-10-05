@@ -3,6 +3,7 @@
 import type { AgentTaskSetup } from './AgentTaskContext';
 import type { ProviderFunctionTool } from './ProviderProtocol';
 import type { AgentTurnLimits } from './AgentTypes';
+import { agentInterfaceRuntimeSummary } from './AgentAppStructure';
 
 /** 宿主与上游关系的唯一提示来源；普通会话和兼容制卡服务共用。 */
 export const AGENT_IDENTITY_INSTRUCTIONS: string =
@@ -17,7 +18,12 @@ export function buildAgentRuntimeInstructions(tools: ProviderFunctionTool[], pro
   toolCalls: number, limits: AgentTurnLimits): string {
   const names: string[] = tools.map((tool: ProviderFunctionTool): string => tool.name);
   return '\n执行环境（应用提供）：\n' +
+    agentInterfaceRuntimeSummary(tools) + '\n' +
     `本轮可用工具：${names.join(', ')}。工具参数直接使用各工具声明的 JSON 对象，不加 arguments 外壳。\n` +
+    (names.includes('search_anki_help') && names.includes('read_anki_help') ?
+      '解释 Anki 学习、FSRS、搜索语法或模板时，优先 search_anki_help 查官方手册，再 read_anki_help 读取有关原文，用用户语言解释并引用返回的来源链接。' +
+      '这是随应用发布的离线原文快照，每次返回当前 revision；旧会话引用需重新核对，不声称它是联网最新版本。' +
+      '手册描述上游 Anki；本应用的界面与可执行动作仍以 get_app_structure 和当前工具为准。\n' : '') +
     (names.indexOf('execute_code') >= 0 ?
       'execute_code 是本机一次性 JavaScript 纯计算沙箱，不是终端、Python 或 Node.js；每次调用状态独立。' +
       'source 是函数体，inputJson 是 JSON 字符串，在代码中以 input 读取并用 return 返回结果。' +
@@ -39,13 +45,25 @@ export function buildAgentSessionInstructions(setup: AgentTaskSetup, batchLimit:
     '用户明确指定名称时可读取真实候选并 configure_create_target；新建类型仍用 propose_create_note_type，经确认得到真实 ID 后继续。' +
     '改卡用 list_notetypes/get_notetype_details 和 search_cards/search_notes 找到用户指定类型或闪卡，读取真实内容后提出可预览草稿；不要要求先到浏览页选卡。' +
     '介绍软件界面、入口、菜单或设置分组时，先 get_app_structure 读取与当前版本界面共用的结构；设置详情用 surface=settings 和 sectionId。' +
-    '它也返回当前已挂载界面的观察和本轮工具目录；coverage 以外的页面细节未知，conditional 不是当前已显示，软件有入口不等于你能点击或执行。' +
+    '它也返回当前已挂载界面的观察、真实页面目录、动作能力和本轮工具目录；coverage 以外的页面细节未知，conditional 不是当前已显示。' +
+    '用户询问下一步、怎样用软件或学习建议时，先读取 get_app_structure 的 contextSurface 和 recommendations；前台是 JIDE 时，上下文可属于进入助手前的页面。' +
+    '回答当前问题后，如确有帮助，可附一条与本次目标相关的下一步建议，并说明实际依据；没有相关依据就直接结束，不必每轮推荐。' +
+    'recommendations 是可选建议，不是用户命令；不要据此自动跳转、读取大批内容或写入，也不要重复用户已拒绝的方向。' +
+    '建议中的牌组 ID 仍需 list_decks 发现；界面计数为零不证明没有到期卡或已达到限额，需真实统计和牌组选项核实。' +
+    '用户要求打开页面、返回首页、查看指定牌组详情或学习选项、进入设置分组、浏览搜索、预览卡片、进入笔记编辑或开始指定牌组学习时，主动使用 navigate_app。' +
+    '先按动作所需 ID 用 list_decks/search_notes/search_cards 发现真实对象，名称或搜索结果不唯一时澄清；requiredArguments/optionalArguments 来自当前共同声明。' +
+    '打开笔记编辑供用户手动编辑，预览复用浏览页且不进入复习；导航不等于保存、评分或取得写入权限。' +
+    'open_deck_details 选中真实牌组并显示首页详情，open_deck_options 打开原学习选项表单供用户手动修改，不会保存设置。' +
+    'actions.available 说明工具已注册，executionState 和 blockedReason 说明当前执行条件；ready 仍需用户意图与真实目标。blocked 时先解释实际阻塞，unknown 时不能声称当前可执行。' +
+    '只执行 actions 中可用动作，一轮最多一个目的地；不需要用户再手动点击。queued 表示回复结束后将跳转，不是已打开或已经复习，失败/取消不会跳转。' +
     '你也能读取已接通的应用设置和牌组选项；先 list_settings 了解支持范围，再 get_settings 读取真实状态。' +
     '学习进度、复习负担和积压问题优先用 get_learning_overview 读取指定范围的真实聚合统计，说明返回的搜索范围和天数。' +
     '复习次数不是不同卡片数；到期预测不是受每日限额控制的可学队列。缺失数据不能当零，统计不代表已读笔记或完成内容分析。' +
     '用户明确要求切换应用深浅色时用 set_theme_mode，区别于闪卡模板 CSS；这是可撤销本机设置，应用提供撤销按钮。' +
     '主题工具只接受当前用户明确切换指令；缺少许可时请用户直接说明切换到深色、浅色或跟随系统。' +
-    '结果 saved/applied 分别代表持久化及应用，partial 不是全部完成，不盲目重试。牌组选项只读，不能声称已经修改。' +
+    '结果 saved/applied 分别代表持久化及应用，partial 不是全部完成，不盲目重试。' +
+    '用户要求修改轻松日等学习选项时，先 get_deck_options，再用 propose_update_deck_options 展示改动；确认后应用直接写入 Core，无需用户进入页面重填。' +
+    '说明共享预设、仅此牌组覆盖及集合开关的实际范围；确认结果 completed 且 saved=true 才能声称已保存。简洁模式隐藏复杂配置不影响工具能力。' +
     '用户可以先聊天、讨论学习方法或逐步确定方向，正常文字回复也是合法结果，不必每轮生成草稿。' +
     '材料和目标明确时，自行选择合理数量和卡片形式并生成可编辑草稿，不要逐项询问非关键参数。' +
     '只有缺少的答案会明显改变内容、难度或范围时，调用 request_clarification；一次问一两个关键点。' +

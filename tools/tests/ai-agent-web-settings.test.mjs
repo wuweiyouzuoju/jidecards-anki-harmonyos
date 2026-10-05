@@ -122,7 +122,7 @@ test('switching search services loads only its own key and purchase link follows
 test('configuration fields are conditional on the switch and purchase action has its own labeled row',()=>{
   const source=readFileSync(new URL('../../entry/src/main/ets/components/settings/AgentWebSettingsSection.ets',import.meta.url),'utf8');
   assert.match(source,/if \(this.webEnabled\) \{[\s\S]*FormSelectRow\([\s\S]*TextInput\(/);
-  assert.match(source,/FormSelectRow\([\s\S]*LabeledActionRow\([\s\S]*actionLabel: settingsItemText\(this\.getUIContext\(\), 'ai_web_purchase'\)/);
+  assert.match(source,/FormSelectRow\([\s\S]*LabeledActionRow\([\s\S]*actionLabel: settingsItemText\(this\.getUIContext\(\), 'ai_web_purchase', this\.uiLanguage\)/);
   assert.match(source,/onAction:.*this\.openPurchase\(\)/);
 });
 

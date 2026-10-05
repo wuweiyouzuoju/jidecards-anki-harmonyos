@@ -8,7 +8,7 @@ import { LabeledActionRow } from '../common/LabeledActionRow';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { loadAgentWebEnabled, saveAgentWebEnabled, loadAgentSearchProvider, saveAgentSearchProvider } from '../../backend/agent/AgentSettingsStore';
 import { loadAgentSearchSecret, saveAgentSearchSecret } from '../../backend/agent/AgentSecretStore';
-import { resourceText } from '../../utils/UiFeedback';
+import { localizedResourceText, resourceText } from '../../utils/UiFeedback';
 import { agentSearchPurchaseUrl } from '../../model/agent/AgentSearchProvider';
 import type { AgentSearchProvider } from '../../model/agent/AgentSearchProvider';
 import { common } from '@kit.AbilityKit';
@@ -16,6 +16,7 @@ import { pasteboard } from '@kit.BasicServicesKit';
 
 @Component
 export struct AgentWebSettingsSection {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop isDark: boolean = false;
   @Prop tint: ResourceColor = $r('app.color.text_primary');
   @State private webEnabled: boolean = false;
@@ -54,12 +55,12 @@ export struct AgentWebSettingsSection {
     this.message = '';
   }
 
-  private providerLabel(): string {
+  private providerLabel(_locale: string = this.uiLanguage): string {
     return this.searchProvider === 'doubao' ?
       resourceText(this.getUIContext(), $r('app.string.ai_web_provider_doubao')) : 'Brave Search';
   }
 
-  private async switchProvider(index: number): Promise<void> {
+  private async switchProvider(index: number, _locale: string = this.uiLanguage): Promise<void> {
     if (!this.ready || this.saving || this.providerLoading || this.disposed) { return; }
     const provider: AgentSearchProvider = index === 1 ? 'brave' : 'doubao';
     if (provider === this.searchProvider) { return; }
@@ -81,7 +82,7 @@ export struct AgentWebSettingsSection {
     }
   }
 
-  private async openPurchase(): Promise<void> {
+  private async openPurchase(_locale: string = this.uiLanguage): Promise<void> {
     if (!this.ready || this.saving || this.providerLoading || this.disposed) { return; }
     const url: string = agentSearchPurchaseUrl(this.searchProvider);
     const generation: number = this.generation;
@@ -100,7 +101,7 @@ export struct AgentWebSettingsSection {
     }
   }
 
-  private async save(): Promise<void> {
+  private async save(_locale: string = this.uiLanguage): Promise<void> {
     if (!this.ready || this.saving || this.providerLoading || this.disposed) { return; }
     if (this.webEnabled && this.secret.trim().length === 0) {
       this.message = resourceText(this.getUIContext(), $r('app.string.ai_web_key_required'));
@@ -127,27 +128,26 @@ export struct AgentWebSettingsSection {
 
   build() {
     Column({ space: 应用尺寸.间距_10 }) {
-      SettingsToggleRow({ title: settingsItemText(this.getUIContext(), 'ai_web_enabled'), hint: $r('app.string.ai_web_hint'),
+      SettingsToggleRow({ title: settingsItemText(this.getUIContext(), 'ai_web_enabled', this.uiLanguage), hint: $r('app.string.ai_web_hint'),
         isOn: this.webEnabled, isInteractive: this.ready && !this.saving && !this.providerLoading, isDark: this.isDark, tint: this.tint,
         onChange: (value: boolean): void => { this.changeEnabled(value); } })
       if (this.webEnabled) {
-        FormSelectRow({ label: settingsItemText(this.getUIContext(), 'ai_web_provider'),
-          options: [{ value: resourceText(this.getUIContext(), $r('app.string.ai_web_provider_doubao')) }, { value: 'Brave Search' }],
+        FormSelectRow({ label: settingsItemText(this.getUIContext(), 'ai_web_provider', this.uiLanguage), options: [{ value: localizedResourceText(this.getUIContext(), this.uiLanguage, $r('app.string.ai_web_provider_doubao')) }, { value: 'Brave Search' }],
           selectedIndex: this.searchProvider === 'doubao' ? 0 : 1, value: this.providerLabel(),
           isInteractive: this.ready && !this.saving && !this.providerLoading,
           onSelect: (index: number): void => { this.switchProvider(index); } })
         LabeledActionRow({ label: this.searchProvider === 'doubao' ? $r('app.string.ai_web_doubao_hint') :
-          $r('app.string.ai_web_purchase_hint'), actionLabel: settingsItemText(this.getUIContext(), 'ai_web_purchase'),
+          $r('app.string.ai_web_purchase_hint'), actionLabel: settingsItemText(this.getUIContext(), 'ai_web_purchase', this.uiLanguage),
           tint: this.tint, textColor: $r('app.color.text_secondary'),
           isInteractive: this.ready && !this.saving && !this.providerLoading,
           onAction: (): void => { this.openPurchase(); } })
-        TextInput({ placeholder: settingsItemText(this.getUIContext(), 'ai_web_key'), text: this.secret })
+        TextInput({ placeholder: settingsItemText(this.getUIContext(), 'ai_web_key', this.uiLanguage), text: this.secret })
           .type(InputType.Password)
           .attributeModifier(new FormInputStyle())
           .enabled(this.ready && !this.saving && !this.providerLoading)
           .onChange((value: string): void => { this.secret = value; })
       }
-      PrimaryActionButton({ label: this.saving ? $r('app.string.ai_card_generating') : settingsItemText(this.getUIContext(), 'ai_web_save'),
+      PrimaryActionButton({ label: this.saving ? $r('app.string.ai_card_generating') : settingsItemText(this.getUIContext(), 'ai_web_save', this.uiLanguage),
         tint: this.tint, isInteractive: this.ready && !this.saving && !this.providerLoading,
         onAction: (): void => { this.save(); } })
       if (this.message !== '') {

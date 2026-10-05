@@ -5,7 +5,7 @@
 // @名称 复习页布局持久化
 //
 // @作用
-// 复习页布局持久化：布局模式（底部默认 / 浮动模式）+ 两个浮动工具栏的拖动位置。
+// 复习页布局持久化：底部 / 浮动 / 智感模式与工具栏位置。
 // 用 preferences（@kit.ArkData）存储，与 DeckMetaStore 同一 store 但 key 前缀独立。
 // 浮动模式下的工具栏位置以 vp 为单位，避免与屏幕分辨率耦合；
 // 拖出屏幕外时由调用方夹紧。
@@ -20,7 +20,7 @@
 // 保存工具栏位置(toolbarId, x, y): Promise<void>
 //
 // @业务规则
-// 'bottom' / 'float' / 'main' / 'aux' 是字符串字面量联合类型的值，
+// 'bottom' / 'float' / 'smart' / 'main' / 'aux' 是字符串字面量联合类型的值，
 // 同时也是持久化协议字段，保留英文，不可中文化。
 //
 // @副作用
@@ -35,6 +35,7 @@
 
 import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
+import { StudyLayoutMode, decodeStudyLayout } from './StudyLayout';
 
 const 存储名: string = 'jidecards_study_layout';
 const 布局模式键: string = 'study_layout_mode';
@@ -43,6 +44,7 @@ const 主工具栏Y键: string = 'study_main_toolbar_y';
 const 辅工具栏X键: string = 'study_aux_toolbar_x';
 const 辅工具栏Y键: string = 'study_aux_toolbar_y';
 const 上下文键: string = 'abilityContext';
+let gripHeightWrite: Promise<void> = Promise.resolve();
 
 // ========================================================
 // @块ID MODEL-STUDY-LAYOUT-002
@@ -55,17 +57,18 @@ const 上下文键: string = 'abilityContext';
 // 无（类型定义）
 //
 // @输出
-// 字符串字面量联合类型：'bottom' | 'float'
+// 字符串字面量联合类型：'bottom' | 'float' | 'smart'
 // - 'bottom' = 贴底部（默认，保持原体验）
 // - 'float' = 浮动可拖动
+// - 'smart' = 智感握姿换边，独立保存高度
 //
 // @业务规则
-// 'bottom' / 'float' 是持久化协议字段值，保留英文。
+// 'bottom' / 'float' / 'smart' 是持久化协议字段值，保留英文。
 //
 // @副作用
 // 无
 // ========================================================
-export type 学习布局模式 = 'bottom' | 'float';
+export type 学习布局模式 = StudyLayoutMode;
 
 // ========================================================
 // @块ID MODEL-STUDY-LAYOUT-003
@@ -143,10 +146,7 @@ export async function 加载学习布局模式(): Promise<学习布局模式> {
   try {
     const 存储: preferences.Preferences = await preferences.getPreferences(上下文, 存储名);
     const 值: preferences.ValueType = await 存储.get(布局模式键, 'bottom');
-    if (typeof 值 === 'string' && (值 === 'bottom' || 值 === 'float')) {
-      return 值;
-    }
-    return 'bottom';
+    return typeof 值 === 'string' ? decodeStudyLayout(值) : 'bottom';
   } catch (错误) {
     return 'bottom';
   }
@@ -180,6 +180,31 @@ export async function 保存学习布局模式(模式: 学习布局模式): Prom
   } catch (错误) {
     // 偏好不可用时仅丢失持久化，不阻塞 UI。
   }
+}
+
+/** 自动换边不覆盖自由拖动 X/Y；智感模式只保存独立高度。
+ * @throws {Error} 读取失败由工具栏提示，不当作首次使用。 */
+export async function loadStudyGripHeight(): Promise<number | null> {
+  const context: common.UIAbilityContext | null = 取上下文();
+  if (context === null) return null;
+  await gripHeightWrite;
+  const store: preferences.Preferences = await preferences.getPreferences(context, 存储名);
+  const value: preferences.ValueType = await store.get('study_grip_toolbar_y', -1);
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+/** @throws {Error} 保存失败由工具栏显示重试提示。 */
+export async function saveStudyGripHeight(y: number): Promise<void> {
+  const context: common.UIAbilityContext | null = 取上下文();
+  if (context === null) throw new Error('ability_context_unavailable');
+  const work: Promise<void> = gripHeightWrite.then(async (): Promise<void> => {
+    const store: preferences.Preferences = await preferences.getPreferences(context, 存储名);
+    await store.put('study_grip_toolbar_y', y);
+    await store.flush();
+  });
+  // 调用者仍收到原始失败；队列尾恢复，后续拖动可以重试。
+  gripHeightWrite = work.catch((): void => {});
+  return work;
 }
 
 // ========================================================

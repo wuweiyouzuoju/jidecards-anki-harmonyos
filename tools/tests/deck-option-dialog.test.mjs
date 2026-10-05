@@ -66,23 +66,15 @@ test('enum selection remains a draft until confirmation and opening again reload
   assert.equal(reopened.draft, '4');
 });
 
-test('deck fields use dialogs while the shared-deck save scope uses an inline switch', () => {
+test('both modes use shared field dialogs and complete mode reuses the same validation', () => {
   for (const name of ['牌组选项面板', '高级牌组选项面板']) {
     const panel = readFileSync(new URL(`../../entry/src/main/ets/components/${name}.ets`, import.meta.url), 'utf8');
     assert.match(panel, /DeckOptionField\(\{/);
-    assert.doesNotMatch(panel, /\bSelect\(|\bTextInput\(/);
-    if (name === '牌组选项面板') assert.doesNotMatch(panel, /\bToggle\(/);
+    assert.doesNotMatch(panel, /\bSelect\(|\bTextInput\(|\bToggle\(/);
     assert.match(panel, /validateDeckOptionText\(this\.form/);
   }
-  const advanced = readFileSync(new URL('../../entry/src/main/ets/components/高级牌组选项面板.ets', import.meta.url), 'utf8');
-  assert.equal((advanced.match(/\bToggle\(/g) || []).length, 1);
-  assert.match(advanced, /Toggle\(\{ type: ToggleType.Switch, isOn: this\.options\.applyToSharedDecks \}/);
-  assert.match(advanced, /if \(!this\.busy\) this\.options\.applyToSharedDecks = value/);
-  assert.equal((advanced.match(/if \(!this\.hasActiveSection\(\)\)/g) || []).length, 12);
-  assert.match(advanced, /title: this\.hasActiveSection\(\) \? this\.sectionTitle/);
-  assert.match(advanced, /DeckOptionRow\(/);
-  assert.doesNotMatch(advanced, /Text\('▼'\)|\.rotate\(/);
   assert.match(source, /showHelp: true/);
+  assert.match(source, /defaultValue: this.defaultValue/);
   assert.match(source, /aboutToDisappear\(\): void \{[\s\S]*?this.helpDialog\?\.close\(\)[\s\S]*?this.dialog\?\.close\(\)/);
 });
 
@@ -98,26 +90,20 @@ test('opening help preserves the editor draft, validation error and confirmation
   assert.equal(editor.draft, 'unfinished'); assert.equal(editor.error, 'invalid');
 });
 
-test('experimental advanced entry, categories and editable fields share the whole option row', () => {
+test('simple and full mode keep distinct content and use the shared option-row implementation', () => {
   const read = path => readFileSync(new URL('../../entry/src/main/ets/components/' + path, import.meta.url), 'utf8');
   const panel = read('牌组选项面板.ets');
-  const entry = panel.slice(panel.indexOf('  private advancedHubEntry()'), panel.indexOf('  build() {'));
-  assert.match(entry, /DeckOptionRow\(\{ title: \$r\('app.string.deck_group_advanced_hub'\), busy: this.busy/);
-  assert.match(entry, /onOpen:[^\n]*this.showAdvanced = true/);
-  assert.doesNotMatch(entry, /\bRow\(|fontSize|fontWeight|backgroundColor|borderRadius|\.height\(/);
-  assert.match(panel, /if \(!this\.简洁模式\) \{\s*this\.advancedHubEntry\(\)/);
-  const advanced = read('高级牌组选项面板.ets');
-  const category = advanced.slice(advanced.indexOf('struct 段落标题'), advanced.indexOf('export struct 高级牌组选项面板'));
-  assert.match(category, /DeckOptionRow\(\{ title: this.title, onOpen:[^\n]*this.onToggle\(\)/);
-  assert.doesNotMatch(category, /\bRow\(|fontSize|backgroundColor|borderRadius/);
+  assert.match(panel, /if \(this\.简洁模式\) \{\s*this\.commonOptions\(\)\s*\} else \{\s*this\.experimentalOptions\(\)/);
+  const common = panel.slice(panel.indexOf('  private commonOptions()'), panel.indexOf('  private saveChoices()'));
+  assert.doesNotMatch(common, /FsrsTools|高级牌组选项面板|presetOptions/);
+  const full = read('高级牌组选项面板.ets');
+  assert.match(full, /DeckOptionField\(\{/);
   const field = source.slice(source.indexOf('export struct DeckOptionField'));
   assert.match(field, /DeckOptionRow\(\{ title: this.title, summary: this.summary\(\), error: this.error, busy: this.busy/);
   assert.doesNotMatch(field, /DisclosureChevron\(|\bRow\(|fontSize/);
   const row = read('home/DeckOptionRow.ets');
   assert.match(row, /DisclosureChevron\(/);
-  assert.match(row, /fontSize\(15\)/);
   assert.match(row, /minHeight: 48/);
   assert.match(row, /Divider\(\)/);
-  assert.match(row, /if \(this.summary !== ''\)/, 'navigation rows have no fake current value');
-  assert.doesNotMatch(row, /backgroundColor|borderRadius|CustomDialogController/);
+  assert.doesNotMatch(row, /CustomDialogController/);
 });

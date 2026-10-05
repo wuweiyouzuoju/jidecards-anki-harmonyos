@@ -4,11 +4,11 @@ import test from 'node:test';
 import { renderStudyAnswer } from '../../entry/src/main/ets/model/StudyAnswerRenderer.ts';
 import { parseNoteRichText, serializeNoteRichText } from '../../entry/src/main/ets/model/NoteRichText.ts';
 import { 构建卡片HTML } from '../../entry/src/main/ets/model/学习卡片HTML构建器.ts';
-import { 比对答案 } from '../../entry/src/main/ets/model/拼写比对器.ts';
+import { coreTyping } from './core-rendering-harness.mjs';
 
 const field = '<mark><b>浮、熔、游、响、红</b></mark>。<br>浮：密度比水小';
 const request = {noteId: 1, fieldName: 'Back', cloze: false, ordinal: 0, input: '', combining: true};
-const backend = { note: async () => ({notetypeId: 2, fields: ['Question', field]}),
+const backend = { ...coreTyping, note: async () => ({notetypeId: 2, fields: ['Question', field]}),
   notetype: async () => ({fieldNames: ['Front', 'Back']}) };
 
 test('normal field replacement preserves editor HTML in light and dark card documents', async () => {
@@ -24,7 +24,7 @@ test('normal field replacement preserves editor HTML in light and dark card docu
 
 test('standard typing compares plain text even without input, as in locked Anki Core', async () => {
   const noInput = await renderStudyAnswer('Q<hr>[[type:Back]]', request, backend);
-  assert.equal(noInput, `Q<hr>${比对答案(field, '', true)}`);
+  assert.equal(noInput, 'Q<hr><code id=typeans>浮、熔、游、响、红。 浮：密度比水小</code>');
   assert.doesNotMatch(noInput, /<mark>|<b>|jide-typed-answer/);
   const result = await renderStudyAnswer('Q<hr>[[type:Back]]', {...request, input: 'wrong'}, backend);
   assert.match(result, /typeBad/); assert.match(result, /typeMissed/);

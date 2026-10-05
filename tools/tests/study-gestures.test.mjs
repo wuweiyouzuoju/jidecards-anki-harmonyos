@@ -7,6 +7,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import { buildStudyGestureScript, resolveStudyGesture, StudyQuickAnswerMode,
   resolveStudyQuickAnswerMode } from '../../entry/src/main/ets/model/StudyGestures.ts';
 import { loadPlatformModule, loadComponentLogic } from './platform-module-harness.mjs';
+import { defaultStudyControls, validateStudyControls, mappedStudyCommand } from '../../entry/src/main/ets/model/StudyControls.ts';
 
 const state = { phase: 'answer', gestures: true, tapZones: false, choice: false, blocked: false };
 test('requested mappings preserve phase and choice rules, four zones and disabled inputs', () => {
@@ -177,7 +178,7 @@ test('settings selection disables duplicate input and restores actual mode after
 
 const pageSource = readFileSync(new URL('../../entry/src/main/ets/pages/学习页.ets', import.meta.url), 'utf8');
 function pageHarness() {
-  const names = ['get gesturesEnabled', 'get TapZones开关', 'handleStudyGesture', 'maybeShowTapZonesGuide', 'closeTapZonesGuide'];
+  const names = ['controls', 'isStudyGesturesEnabled', 'isTapZonesEnabled', 'handleStudyGesture', 'maybeShowTapZonesGuide', 'closeTapZonesGuide'];
   const methods = names.map(name => {
     const start = pageSource.indexOf('  private ' + name + '('); assert.notEqual(start, -1);
     return pageSource.slice(start, pageSource.indexOf('\n  }', start) + 4);
@@ -185,11 +186,11 @@ function pageHarness() {
   let now = 1000, completed = false, saved = 0;
   const commands = [], scripts = [];
   const Host = new Function('StudyQuickAnswerMode', 'resolveStudyGesture', 'isTapZonesGuideCompleted', 'completeTapZonesGuide', 'Date',
-    'RATING_AGAIN', 'RATING_HARD', 'RATING_GOOD', 'RATING_EASY',
+    'RATING_AGAIN', 'RATING_HARD', 'RATING_GOOD', 'RATING_EASY', 'validateStudyControls', 'mappedStudyCommand',
     stripTypeScriptTypes('class Host {' + methods + '}', { mode: 'transform' }) + ';return Host;')(
-    StudyQuickAnswerMode, resolveStudyGesture, () => completed, async () => { saved++; completed = true; }, { now: () => now }, 0, 1, 2, 3);
+    StudyQuickAnswerMode, resolveStudyGesture, () => completed, async () => { saved++; completed = true; }, { now: () => now }, 0, 1, 2, 3,validateStudyControls,mappedStudyCommand);
   const page = Object.assign(new Host(), { timeboxNotice: null, 阶段: 'question', requestVersion: 1, interactionVersion: 1,
-    quickAnswerMode: StudyQuickAnswerMode.TapZones, choiceQuestion: null, pendingHtml: '', controllerReady: true,
+    controlsJson:JSON.stringify(defaultStudyControls()),quickAnswerMode: StudyQuickAnswerMode.TapZones, choiceQuestion: null, pendingHtml: '', controllerReady: true,
     展示时刻毫秒: 500, isCurrentRequest: v => v === 1, stopStudyTimers() {}, startStudyTimers() {}, clearChoiceAutoAdvance() {},
     studyCardShown() { scripts.push(this.interactionVersion); }, 显示答案() { commands.push('flip'); },
     评分: rating => commands.push(rating), 继续选择题反馈: () => commands.push('continue') });
@@ -227,11 +228,11 @@ test('onboarding waits for a usable regular card and unified input rejects each 
   assert.deepEqual(commands, [2, 1]);
 });
 
-test('the actual page getters enable exactly one shortcut and tap zones respond immediately', () => {
+test('the actual page enables exactly one shortcut and tap zones respond immediately', () => {
   for (const mode of [0, 1, 2]) {
     const { page, commands } = pageHarness(); page.quickAnswerMode = mode; page.阶段 = 'answer';
-    assert.equal(page.TapZones开关, mode === 1); assert.equal(page.gesturesEnabled, mode === 2);
-    const d = dom(); d.install(1, 1, page.gesturesEnabled);
+    assert.equal(page.isTapZonesEnabled(), mode === 1); assert.equal(page.isStudyGesturesEnabled(), mode === 2);
+    const d = dom(); d.install(1, 1, page.isStudyGesturesEnabled());
     d.window.jideStudyInput.onAction = (...args) => page.handleStudyGesture(...args);
     d.click(d.plain, 80, 160);
     if (mode === 1) assert.deepEqual(commands, [0], 'tap zones grade without a 320ms delay');
@@ -241,4 +242,15 @@ test('the actual page getters enable exactly one shortcut and tap zones respond 
     d.start(); d.end(100, 200);
     assert.deepEqual(commands, mode === 1 ? [0] : mode === 2 ? [2] : []);
   }
+});
+
+test('JIDE gesture overrides apply to the actual page while choice feedback and blocked input keep their policy',()=>{
+  const {page,commands}=pageHarness();
+  page.controlsJson=JSON.stringify({...defaultStudyControls(),gestureMode:'gestures',gestures:[{input:'left',command:'easy'}]});
+  page.阶段='answer';page.handleStudyGesture('left',0,0,1,1);assert.deepEqual(commands,[3]);commands.length=0;
+  page.阶段='question';page.handleStudyGesture('left',0,0,1,1);assert.deepEqual(commands,[]);
+  page.choiceQuestion={};page.阶段='answer';page.handleStudyGesture('right',0,0,1,1);assert.deepEqual(commands,['continue']);commands.length=0;
+  page.choiceQuestion=null;page.studyMenuOpen=true;page.handleStudyGesture('left',0,0,1,1);assert.deepEqual(commands,[]);
+  page.studyMenuOpen=false;page.controlsJson=JSON.stringify({...defaultStudyControls(),gestureMode:'off'});
+  assert.equal(page.isStudyGesturesEnabled(),false);assert.equal(page.isTapZonesEnabled(),false);
 });

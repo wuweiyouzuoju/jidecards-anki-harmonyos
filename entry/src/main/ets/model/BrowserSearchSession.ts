@@ -8,6 +8,7 @@ export interface BrowserDisplayRow {
   cells: BrowserCell[];
   color: BrowserRowColor;
   hasSuspendedCards: boolean;
+  marked?: boolean;
 }
 export interface BrowserSearchBackend {
   open(filesDir: string): Promise<void>;
@@ -17,6 +18,7 @@ export interface BrowserSearchBackend {
   buildSearch(node: SearchNode): Promise<string>;
   search(request: SearchRequest, notes: boolean): Promise<number[]>;
   row(id: number): Promise<BrowserRow>;
+  markedIds?(notes: boolean): Promise<number[]>;
 }
 export interface BrowserQuery {
   filesDir: string;
@@ -30,6 +32,7 @@ export interface BrowserSearchResult {
   columns: BrowserColumn[];
   ids: number[];
   suspended: Set<number>;
+  marked: Set<number>;
   rows: BrowserDisplayRow[];
   consumed: number;
 }
@@ -42,13 +45,15 @@ function serializeBrowserRead<T>(read: () => Promise<T>): Promise<T> {
   return result;
 }
 export function loadBrowserRows(ids: number[], suspended: Set<number>,
-  rowForId: (id: number) => Promise<BrowserRow>, current: () => boolean): Promise<BrowserDisplayRow[]> {
-  return serializeBrowserRead((): Promise<BrowserDisplayRow[]> => readBrowserRows(ids, suspended, rowForId, current));
+  rowForId: (id: number) => Promise<BrowserRow>, current: () => boolean,
+  marked: Set<number> = new Set<number>()): Promise<BrowserDisplayRow[]> {
+  return serializeBrowserRead((): Promise<BrowserDisplayRow[]> => readBrowserRows(ids, suspended, rowForId, current, marked));
 }
 
 /** 固定并发上限，失败行也由调用方消费游标；不以成功行数计算下一页。 */
 async function readBrowserRows(ids: number[], suspended: Set<number>,
-  rowForId: (id: number) => Promise<BrowserRow>, current: () => boolean): Promise<BrowserDisplayRow[]> {
+  rowForId: (id: number) => Promise<BrowserRow>, current: () => boolean,
+  marked: Set<number>): Promise<BrowserDisplayRow[]> {
   const rows: BrowserDisplayRow[] = [];
   for (let offset = 0; offset < ids.length; offset += 20) {
     if (!current()) return [];
@@ -58,7 +63,8 @@ async function readBrowserRows(ids: number[], suspended: Set<number>,
     if (!current()) return [];
     batch.forEach((id: number, index: number): void => {
       const row: BrowserRow | null = loaded[index];
-      if (row !== null) rows.push({ id: id, cells: row.cells, color: row.color, hasSuspendedCards: suspended.has(id) });
+      if (row !== null) rows.push({ id: id, cells: row.cells, color: row.color,
+        hasSuspendedCards: suspended.has(id), marked: marked.has(id) });
     });
   }
   return rows;
@@ -97,9 +103,9 @@ export class BrowserSearchSession {
     this.loadingMore = true;
     try {
       const rows = await loadBrowserRows(ids, result.suspended,
-        (id: number): Promise<BrowserRow> => this.backend.row(id), valid);
+        (id: number): Promise<BrowserRow> => this.backend.row(id), valid, result.marked);
       if (!valid()) return null;
-      this.result = { columns: result.columns, ids: result.ids, suspended: result.suspended,
+      this.result = { columns: result.columns, ids: result.ids, suspended: result.suspended, marked: result.marked,
         rows: result.rows.concat(rows), consumed: result.consumed + ids.length };
       return this.result;
     } finally {
@@ -131,9 +137,12 @@ export class BrowserSearchSession {
     const suspendedIds: number[] = await this.backend.search({ search: suspendedSearch, order: { kind: 'none' } }, query.notes);
     if (!current()) return null;
     const suspended: Set<number> = new Set<number>(suspendedIds);
-    const rows: BrowserDisplayRow[] = await readBrowserRows(ids.slice(0, 200), suspended,
-      (id: number): Promise<BrowserRow> => this.backend.row(id), current);
+    const marked: Set<number> = new Set<number>(this.backend.markedIds === undefined ? [] : await this.backend.markedIds(query.notes));
     if (!current()) return null;
-    return { columns: this.columnsCache.slice(), ids: ids, suspended: suspended, rows: rows, consumed: Math.min(200, ids.length) };
+    const rows: BrowserDisplayRow[] = await readBrowserRows(ids.slice(0, 200), suspended,
+      (id: number): Promise<BrowserRow> => this.backend.row(id), current, marked);
+    if (!current()) return null;
+    return { columns: this.columnsCache.slice(), ids: ids, suspended: suspended, marked: marked,
+      rows: rows, consumed: Math.min(200, ids.length) };
   }
 }

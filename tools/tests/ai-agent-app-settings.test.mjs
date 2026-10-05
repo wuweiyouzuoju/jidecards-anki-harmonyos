@@ -13,7 +13,8 @@ import { ThemeColorSession, isThemeId } from '../../entry/src/main/ets/model/set
 import { agentPreferenceDefinitions, agentWritablePreferenceIds, decodeWritablePreference, decodeAgentPreference } from '../../entry/src/main/ets/model/agent/AgentPreferenceSettings.ts';
 import { localPreferenceApi } from './local-preference-harness.mjs';
 import { CARD_TEXT_SIZE_KEY, DEFAULT_CARD_TEXT_SIZE, normalizeCardTextSize } from '../../entry/src/main/ets/model/CardTextSize.ts';
-import { DECK_LIST_NARROW_KEY } from '../../entry/src/main/ets/model/DeckListAppearance.ts';
+import * as deckAppearance from '../../entry/src/main/ets/model/DeckListAppearance.ts';
+const { DECK_LIST_NARROW_KEY, DECK_LIST_STYLE_KEY } = deckAppearance;
 import { buildAgentDeckSettings } from '../../entry/src/main/ets/model/agent/AgentDeckSettings.ts';
 import { emptyDeckConfigSettings } from '../../entry/src/main/ets/proto/messages/DeckConfigMessages.ts';
 import { AgentApprovalRequired, createAgentAction, AgentActionLedger } from '../../entry/src/main/ets/model/agent/AgentAction.ts';
@@ -21,6 +22,7 @@ import { loadPlatformModule } from './platform-module-harness.mjs';
 import { buildAgentAppStructure } from '../../entry/src/main/ets/model/agent/AgentAppStructure.ts';
 import { AppInterfaceTracker } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { themeDefinition } from '../../entry/src/main/ets/model/ThemeCatalog.ts';
+import { AgentAppNavigationSession } from '../../entry/src/main/ets/model/agent/AgentAppNavigation.ts';
 
 function fixture() {
   const state = { color: 'aurora', activeColor: 'aurora', fsrs: false, colorWrites: [], fsrsWrites: [], locked: true, mode: 'system', active: 'system', writes: [], changes: [], reads: [], failSave: false };
@@ -43,12 +45,12 @@ function fixture() {
   };
   const localDependencies = { ...localApi, AppStorage: localStorage,
     preferences: {getPreferencesSync: () => localStore},
-    CARD_TEXT_SIZE_KEY, DEFAULT_CARD_TEXT_SIZE, normalizeCardTextSize, DECK_LIST_NARROW_KEY };
+    CARD_TEXT_SIZE_KEY, DEFAULT_CARD_TEXT_SIZE, normalizeCardTextSize, ...deckAppearance };
   const saveCardTextSize = loadPlatformModule('utils/CardTextSizeStore.ets','saveCardTextSize',localDependencies);
-  const saveDeckListNarrow = loadPlatformModule('utils/DeckListAppearanceStore.ets','saveDeckListNarrow',localDependencies);
+  const { saveDeckListStyle, legacyDeckListStyle } = loadPlatformModule('utils/DeckListAppearanceStore.ets','({saveDeckListStyle, legacyDeckListStyle})',localDependencies);
   const saveStudyHaptics = loadPlatformModule('utils/StudyHaptics.ets','saveStudyHaptics',localDependencies);
   const readAgentPreference = loadPlatformModule('backend/agent/AgentPreferenceReader.ets','readAgentPreference', {
-    ...localApi, agentPreferenceDefinitions, agentWritablePreferenceIds, decodeAgentPreference,
+    ...localApi, agentPreferenceDefinitions, agentWritablePreferenceIds, decodeAgentPreference, legacyDeckListStyle,
     AppStorage: localStorage, preferences: {getPreferences: async () => localStore}
   });
   const themes = new ThemeModeSession({
@@ -76,7 +78,7 @@ function fixture() {
     readAgentPreference,
     统计服务: class { async 获取图表偏好() { return {calendarFirstDayOfWeek:1,cardCountsSeparateInactive:true,browserLinksSupported:false,futureDueShowBacklog:true}; } },
     AppStorage: { get: key => {
-      if (key === 'abilityContext') return { resourceManager: { getStringByNameSync: key => {state.resourceReads.push(key);return key;} } };
+      if (key === 'abilityContext') return { resourceManager: { getStringByNameSync: key => {state.resourceReads.push(key);return state.resourceLabels?.get(key) ?? key;} } };
       if (key === 'simpleMode') return state.simple;
       if (key === 'aiAgentChannelsEnabled') return state.agent;
       if (key === 'appForeground') return state.foreground;
@@ -96,7 +98,7 @@ function fixture() {
   const call = (name,args) => registry.execute({id:'call',name,argumentsJson:JSON.stringify(args)});
   const Executor = loadPlatformModule('backend/agent/AgentActionExecutor.ets', 'AgentActionExecutor', {
     牌组服务: class {}, 笔记类型服务: class {}, AgentActionLedger, decodeSettingChange, appThemeColorSession: colors,
-    LocalPreferenceWriteError: localApi.LocalPreferenceWriteError, saveCardTextSize, saveDeckListNarrow, saveStudyHaptics,
+    LocalPreferenceWriteError: localApi.LocalPreferenceWriteError, saveCardTextSize, saveDeckListStyle, saveStudyHaptics,
     设置FSRS开启状态: async (enabled, expected) => {
       if (state.fsrs !== expected) throw Error('setting_changed_since_proposal');
       if (state.fsrs !== enabled) state.fsrsWrites.push(enabled);
@@ -104,14 +106,14 @@ function fixture() {
     }
   });
   const executor = new Executor({...scope, currentCreateTarget: () => [0,0]}, {});
-  return {state,themes,colors,tools,registry,call,executor,saveCardTextSize,saveDeckListNarrow,saveStudyHaptics,views};
+  return {state,themes,colors,tools,registry,call,executor,saveCardTextSize,saveDeckListStyle,saveStudyHaptics,views};
 }
 
 test('the registered app interface tool reads fresh UI mode, observations and actual turn tool capabilities without writes', async () => {
   const f=fixture();f.tools.setInterfaceTools(agentFunctionTools(100,'assistant'));
   f.views.observe({surface:'home_more',sectionId:'',selectedId:'',optionIds:['settings'],optionLabels:['Settings'],busy:false});
   let view=JSON.parse((await f.call('get_app_structure',{surface:'settings',sectionId:'scheduler'})).outputJson);
-  assert.equal(view.sections[0].cardCount,3); assert.deepEqual(view.observations,[]);
+  assert.equal(view.sections[0].cardCount,2); assert.deepEqual(view.observations,[]);
   f.views.showPage('agent');
   const current=JSON.parse((await f.call('get_app_structure',{surface:'home_more'})).outputJson);
   assert.equal(current.observations[0].surface,'home_more');assert.equal(current.foregroundSurface,'agent');
@@ -127,6 +129,47 @@ test('the registered app interface tool reads fresh UI mode, observations and ac
   assert.equal(view.sections[0].cards.find(x=>x.id==='algorithm').items.find(x=>x.id==='fsrs_enabled').writeTool,'');
   assert.deepEqual(f.state.writes,[]);assert.deepEqual(f.state.localWrites,[]);assert.deepEqual(f.state.fsrsWrites,[]);
   await assert.rejects(f.call('get_app_structure',{surface:'unknown'}),/invalid_tool_arguments/);
+});
+
+test('registered app structure supplies the deck operation teaching guide from current language resources without writes', async () => {
+  const f=fixture();f.tools.setInterfaceTools(agentFunctionTools(100,'assistant'));
+  for(const locale of ['base','en_US']) {
+    f.state.resourceLabels=new Map(JSON.parse(readFileSync(new URL(`../../entry/src/main/resources/${locale}/element/string.json`,import.meta.url))).string.map(item=>[item.name,item.value]));
+    const catalog=JSON.parse((await f.call('get_app_structure',{})).outputJson);
+    const sort=catalog.surfaces.find(item=>item.id==='deck_reorder');
+    assert.equal(catalog.surfaces.some(item=>item.id==='deck_level_menu'),false);
+    assert.equal(sort.instructions,f.state.resourceLabels.get('deck_reorder_instructions'));
+    for(const key of ['deck_menu_reorder','deck_reorder_exit','deck_reorder_done'])
+      assert.ok(sort.instructions.includes(f.state.resourceLabels.get(key)),`${locale}: teach the currently displayed label ${key}`);
+    assert.match(sort.instructions,locale==='base'?/同一个父牌组.*顶级牌组/:/same parent.*top-level decks/);
+    assert.match(sort.instructions,locale==='base'?/牌组详情的“更多”.*调整牌组层级/:/More in its deck details.*Change deck hierarchy/);
+    const detail=JSON.parse((await f.call('get_app_structure',{surface:'deck_reorder'})).outputJson);
+    assert.equal(detail.surfaces[0].instructions,sort.instructions);
+    assert.notEqual(detail.surfaces[0].items.find(item=>item.id==='decks').opens,'deck_level_menu');
+    assert.deepEqual(detail.observations,[],'instructions do not fabricate an open menu or enabled controls');
+  }
+  assert.deepEqual(f.state.writes,[]);assert.deepEqual(f.state.localWrites,[]);assert.deepEqual(f.state.reads,[]);
+});
+
+test('registered app structure reports current navigation readiness without caching runtime state or granting permission', async () => {
+  const f=fixture();f.tools.setInterfaceTools(agentFunctionTools(100,'assistant'));f.views.showPage('agent');
+  const host={busy:false,names:['AiCardPage']};
+  const session=new AgentAppNavigationSession({context:()=>({simple:true,agent:true,cloudDeck:false,themeHasTextures:false}),
+    canNavigate:()=>true,collectionBusy:()=>host.busy,pathNames:()=>host.names,
+    assertReadableTarget(){throw Error('must_not_discover');},readTarget:async()=>{throw Error('must_not_read');},
+    navigate(){throw Error('must_not_navigate');}});
+  f.tools.setNavigationReadiness(()=>session.readiness());
+  const read=async()=>JSON.parse((await f.call('get_app_structure',{})).outputJson);
+  const first=await read();assert.ok(first.actions.every(x=>x.available&&x.executionState==='ready'));
+  host.busy=true;let next=await read();assert.equal(next.revision,first.revision,'runtime occupancy is not a capability change');
+  assert.ok(next.actions.every(x=>x.executionState==='blocked'&&x.blockedReason==='navigation_collection_busy'));
+  host.busy=false;host.names=['EditNotePage','AiCardPage'];next=await read();
+  assert.equal(next.actions.find(x=>x.id==='open_deck_options').blockedReason,'navigation_unsaved_page');
+  assert.equal(next.actions.find(x=>x.id==='open_stats').executionState,'ready');
+  f.state.foreground=false;assert.ok((await read()).actions.every(x=>x.executionState==='blocked'));
+  f.tools.setInterfaceTools([]);next=await read();assert.notEqual(next.revision,first.revision);
+  assert.ok(next.actions.every(x=>!x.available&&x.executionState==='unavailable'&&x.tool===''));
+  assert.deepEqual(f.state.reads,[]);assert.deepEqual(f.state.writes,[]);assert.deepEqual(f.state.localWrites,[]);
 });
 
 test('both modes advertise executable setting tools with strict examples and explicit write classification', async () => {
@@ -146,6 +189,25 @@ test('both modes advertise executable setting tools with strict examples and exp
   const state = JSON.parse((await f.call('get_settings', {ids:['theme_mode']})).outputJson);
   assert.equal(state.themeMode,'system'); assert.equal(state.effectiveDark,true);
   assert.deepEqual(f.state.writes, []);
+});
+
+test('registered structure recommendations use the actual source page and current tools without acquiring write scope', async () => {
+  const f = fixture(); f.tools.setInterfaceTools(agentFunctionTools(100, 'assistant'));
+  f.views.showPage('browser');
+  f.views.observe({surface:'browser', sectionId:'list', selectedId:'cards', optionIds:[], optionLabels:[], optionsTotal:0, busy:false});
+  f.views.hidePage('browser'); f.views.showPage('agent');
+  let value = JSON.parse((await f.call('get_app_structure', {})).outputJson);
+  assert.equal(value.contextSurface, 'browser');
+  assert.deepEqual(value.recommendations.map(x=>x.id), ['browser_empty']);
+  assert.deepEqual(value.recommendations[0].evidence, [{id:'results_total', value:'0'}]);
+  assert.equal(value.recommendations[0].requiresUserRequest, true);
+  f.state.foreground = false;
+  value = JSON.parse((await f.call('get_app_structure', {})).outputJson);
+  assert.equal(value.contextSurface, ''); assert.deepEqual(value.recommendations, []);
+  f.state.foreground = true; f.tools.setInterfaceTools([]);
+  assert.deepEqual(JSON.parse((await f.call('get_app_structure', {})).outputJson).recommendations, []);
+  assert.deepEqual(f.state.reads, []); assert.deepEqual(f.state.writes, []);
+  assert.deepEqual(f.state.localWrites, []); assert.deepEqual(f.state.fsrsWrites, []);
 });
 
 test('only a fresh matching user command authorizes one theme write; scope data and history cannot', async () => {
@@ -328,7 +390,7 @@ test('local setting proposals execute real shared stores only after one exact co
   assert.throws(() => f.registry.registerRead('propose_set_setting',{}), /tool_registration_rejected/);
   for (const [settingId,value,key,stored] of [
     ['card_text_size','130',CARD_TEXT_SIZE_KEY,130],
-    ['deck_list_narrow','true',DECK_LIST_NARROW_KEY,true],
+    ['deck_list_style','double_narrow',DECK_LIST_STYLE_KEY,'double_narrow'],
     ['study_haptics','false','studyHapticsEnabled',false]
   ]) {
     const action = (await f.call('propose_set_setting',{settingId,value})).action;
@@ -359,7 +421,7 @@ test('manual changes invalidate local proposals and unsupported or malformed set
   const f = fixture();
   const cases = [
     ['card_text_size','140',() => f.saveCardTextSize(110)],
-    ['deck_list_narrow','true',() => f.saveDeckListNarrow(true)],
+    ['deck_list_style','single_narrow',() => f.saveDeckListStyle('double_wide')],
     ['study_haptics','false',() => f.saveStudyHaptics(false)]
   ];
   for (const [settingId,value,manual] of cases) {
@@ -372,7 +434,7 @@ test('manual changes invalidate local proposals and unsupported or malformed set
   const writes = f.state.localWrites.length;
   for (const [settingId,value] of [['language','en'],['api_key','secret'],['card_text_size','49'],
     ['card_text_size','201'],['card_text_size','100.5'],['card_text_size','1e2'],
-    ['card_text_size','0100'],['study_haptics','1'],['deck_list_narrow','on']]) {
+    ['card_text_size','0100'],['study_haptics','1'],['deck_list_style','true']]) {
     assert.throws(() => decodeSettingsArguments('propose_set_setting',JSON.stringify({settingId,value})));
     assert.throws(() => decodeSettingChange(JSON.stringify({settingId,before:value,after:value})));
     await assert.rejects(f.call('propose_set_setting',{settingId,value}),/invalid_tool_arguments/);
@@ -400,4 +462,24 @@ test('local save and application failures report distinct partial outcomes and c
   assert.equal(result.status,'partial'); assert.equal(result.saved,true); assert.equal(result.applied,false);
   assert.equal(f.state.localDisk.get(CARD_TEXT_SIZE_KEY),150);
   assert.equal(action.status,'failed');
+});
+
+
+test('JIDE reads migrated narrow preference and confirms all four styles through the shared store', async () => {
+  const f = fixture();
+  f.state.localCache.set(DECK_LIST_NARROW_KEY,true);
+  const migrated = JSON.parse((await f.call('get_settings',{ids:['deck_list_style']})).outputJson);
+  assert.equal(migrated.preferences[0].value,'single_narrow');
+  for (const style of deckAppearance.DECK_LIST_STYLES) {
+    const action = (await f.call('propose_set_setting',{settingId:'deck_list_style',value:style})).action;
+    f.executor.registerPending(action);
+    const result = JSON.parse(await f.executor.executeConfirmed(action));
+    assert.equal(result.status,'completed');
+    assert.equal(f.state.localDisk.get(DECK_LIST_STYLE_KEY),style);
+    assert.equal(f.state.localActive.get(DECK_LIST_STYLE_KEY),style);
+    assert.equal(f.state.localActive.get(DECK_LIST_NARROW_KEY),deckAppearance.isNarrowDeckListStyle(style));
+  }
+  f.state.localCache.set(DECK_LIST_NARROW_KEY,'corrupt obsolete density');
+  const current = JSON.parse((await f.call('get_settings',{ids:['deck_list_style']})).outputJson);
+  assert.equal(current.preferences[0].value,'double_narrow','new style is the single source of truth');
 });

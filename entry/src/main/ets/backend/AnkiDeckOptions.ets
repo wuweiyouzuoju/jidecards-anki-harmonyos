@@ -5,7 +5,7 @@ import { 牌组配置服务 } from './牌组配置服务';
 import { notifyFsrsStateChanged } from '../model/FSRS控制器';
 import { FsrsService } from './FsrsService';
 import { ComputeFsrsParamsInput, ComputeFsrsParamsOutput, SimulateFsrsInput,
-  FsrsWorkloadOutput } from '../proto/messages/FsrsMessages';
+  FsrsWorkloadOutput, EvaluateFsrsInput, EvaluateFsrsOutput, FsrsHistoryCount } from '../proto/messages/FsrsMessages';
 
 export class AnkiDeckOptions implements DeckOptionsBackend {
   private service: 牌组配置服务 = new 牌组配置服务();
@@ -15,6 +15,8 @@ export class AnkiDeckOptions implements DeckOptionsBackend {
   optimize(input: ComputeFsrsParamsInput): Promise<ComputeFsrsParamsOutput> { return this.fsrs.optimize(input); }
   workload(input: SimulateFsrsInput): Promise<FsrsWorkloadOutput> { return this.fsrs.workload(input); }
   presetSearch(id: number): Promise<string> { return this.fsrs.presetSearch(id); }
+  evaluate(input: EvaluateFsrsInput): Promise<EvaluateFsrsOutput> { return this.fsrs.evaluate(input); }
+  historyCount(date: string, search: string): Promise<FsrsHistoryCount> { return this.fsrs.historyCount(date, search); }
   committed(): void {
     notifyFsrsStateChanged();
     AppStorage.setOrCreate<number>('需要刷新主页', Date.now());

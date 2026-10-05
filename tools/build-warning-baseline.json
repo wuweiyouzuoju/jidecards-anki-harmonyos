@@ -11,9 +11,11 @@
     "ibest-declarations": "Published 2.2.7 HAR declarations; retain the image cropper, do not edit dependency caches.",
     "ibest-resource-merge": "Published 2.2.7 HAR resource strings are also emitted by the SDK resource merger.",
     "ibest-metadata": "Published 2.2.7 HAR omits sourceMapsPath.",
-    "sdk-napi": "SDK cannot verify NAPI imports yet; project supplies libjidecards.so declarations and native bridge tests."
+    "sdk-napi": "SDK cannot verify NAPI imports yet; project supplies libjidecards.so declarations and native bridge tests.",
+    "sdk-obfuscation": "Release SDK advisory: entry/build-profile.json5 deliberately disables obfuscation to retain readable crash stacks in this AGPL project. Only this exact notice is accepted once."
   },
   "warnings": [
+    {"file":"","message":"If obfuscation is needed, enable obfuscation settings in this build process; failing to do so may prevent future obfuscation.","count":1,"reason":"sdk-obfuscation"},
     {"file":"","message":"ArkTS:WARN Property 'sourceMapsPath' not found in '@ibestservices/ibest-ui'.","count":1,"reason":"ibest-metadata"},
     {"file":"entry/src/main/ets/backend/后端客户端.ts","message":"Currently module for 'libjidecards.so' is not verified. If you're importing napi, its verification will be enabled in later SDK version. Please make sure the corresponding .d.ts file is provided and the napis are correctly declared.","count":1,"reason":"sdk-napi"},
     {"file":"oh_modules/.ohpm/@ibestservices+ibest-ui@2.2.7/oh_modules/@ibestservices/ibest-ui/Index.d.ets","message":"\"typeof\" operator is allowed only in expression contexts (arkts-no-type-query)","count":2,"reason":"ibest-declarations"},

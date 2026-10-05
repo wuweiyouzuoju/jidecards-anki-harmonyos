@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { DialogFrame } from '../common/DialogFrame';
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { DialogHeader } from '../common/DialogHeader';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { resourceText, namedResourceText } from '../../utils/UiFeedback';
@@ -39,6 +40,7 @@ export struct BrowserDueDialog {
       .width('100%')
 
     TextInput({ text: this.days, placeholder: $r('app.string.browser_action_set_due_placeholder') })
+      .border(SurfaceBorder.options())
       .width('100%')
       .height(应用尺寸.按钮高度)
       .fontSize(应用尺寸.字号_正文)

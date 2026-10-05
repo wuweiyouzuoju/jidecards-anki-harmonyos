@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { DialogBackdrop } from './common/DialogBackdrop';
 import { showToastSafely } from '../utils/UiFeedback';
 import { DialogHeader } from './common/DialogHeader';
@@ -146,7 +147,7 @@ export struct HomeIntroPanel {
       .width('90%')
       .constraintSize({ maxWidth: 520 })
       .backgroundColor($r('app.color.surface_card'))
-      .borderRadius(应用尺寸.圆角_卡片)
+      .borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
     }
     .width('100%')
     .height('100%')

@@ -15,12 +15,12 @@ function files(dir) {
 function hasTextChevron(source) {
   const decoded = source.replace(/\\u(?:\{([0-9a-f]+)\}|([0-9a-f]{4}))/gi,
     (_match, brace, plain) => String.fromCodePoint(parseInt(brace || plain, 16)));
-  return /\b(?:Text|Button)\s*\([^\n]*(['"])\s*[>›❯»⌃⌄]\s*\1/.test(decoded);
+  return /\b(?:Text|Button)\s*\([^\n]*(['"])\s*[>›❯»⌃⌄▼▶◀]\s*\1/.test(decoded);
 }
 
 test('disclosure scan catches alternative glyphs and escaped copies', () => {
   for (const source of ["Text('›')", 'Text ("> ")',
-    "Button('❯')", "Text(this.expanded ? '⌃' : '⌄')", "Text('⌄')", String.raw`Text('\u203a')`, String.raw`Text('\u{203a}')`]) {
+    "Button('❯')", "Text(this.expanded ? '⌃' : '⌄')", "Text('⌄')", "Text('▼')", "Text('▶')", String.raw`Text('\u203a')`, String.raw`Text('\u{203a}')`]) {
     assert.ok(hasTextChevron(source), source);
   }
   assert.equal(hasTextChevron("Text('正文')"), false);

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { AgentMarkdownBlock, AgentMarkdownRow, parseAgentMarkdown } from '../../model/agent/AgentMarkdown';
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { AgentTextRun, parseAgentBoldRuns } from '../../model/agent/AgentTextFormatting';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { hasAgentMath } from '../../model/agent/AgentMath';
@@ -64,7 +65,7 @@ export struct AgentMarkdownText {
     }.alignItems(VerticalAlign.Top)
     .width(this.columnWidth(ctx.blockIndex) * this.blocks[ctx.blockIndex].alignments.length)
     .backgroundColor(ctx.rowIndex === 0 ? $r('app.color.surface_page') : $r('app.color.surface_card'))
-    .border({ width: { bottom: 1 }, color: $r('app.color.border_subtle') })
+    .border(SurfaceBorder.options({ bottom: 1 }))
   }
 
   @Builder
@@ -74,7 +75,7 @@ export struct AgentMarkdownText {
         ForEach(this.blocks[ctx.blockIndex].rows, (_row: AgentMarkdownRow, rowIndex: number) => {
           this.tableRow({ blockIndex: ctx.blockIndex, rowIndex: rowIndex, columnIndex: -1 })
         }, (_row: AgentMarkdownRow, rowIndex: number): string => `${rowIndex}`)
-      }.border({ width: 1, color: $r('app.color.border_subtle') })
+      }.border(SurfaceBorder.options())
     }.scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Auto).width('100%')
   }
 

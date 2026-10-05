@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SurfaceBorder } from '../utils/SurfaceBorder';
+import { MenuSurface } from './common/MenuSurface';
 import { PressFeedback } from '../utils/PressFeedback';
 import { AppInterfaceItem, AppInterfaceControl, visibleInterfaceItems } from '../model/AppInterface';
 import { appInterface } from '../backend/AppInterfaceService';
@@ -12,7 +14,7 @@ import { ThemeTextSpans } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 import { DeckStudyHistoryCard } from './DeckStudyHistoryCard';
 import { deckHistorySearch } from '../model/DeckStudyHistory';
-import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
+import { PAGE_COMPACT_LAYOUT_KEY } from '../model/AppLayoutState';
 import { DeckPreviewScopeMenu } from './home/DeckPreviewScopeMenu';
 import { DeckPreviewScope } from '../model/DeckPreviewSession';
 
@@ -55,7 +57,8 @@ import { 颜色键 } from '../model/颜色主题';
 // ========================================================
 @Component
 export struct 牌组详情面板 {
-  @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
+  @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @StorageProp(GLASS_COLORS_KEY) private glassColors: string[] = GLASS_HIGHLIGHT_COLORS;
   @StorageLink(AI_AGENT_CHANNELS_APP_STORAGE_KEY) @Watch('publishInterface') private Agent入口已启用: boolean = false;
@@ -77,6 +80,8 @@ export struct 牌组详情面板 {
   添加卡片: () => void = (): void => {
   };
   onCreateWithAI: () => void = (): void => {};
+  onMoveDeck: () => void = (): void => {};
+  onRenameDeck: () => void = (): void => {};
   创建子牌组: () => void = (): void => {
   };
   导出牌组: () => void = (): void => {
@@ -115,18 +120,19 @@ export struct 牌组详情面板 {
     if (deck === undefined) { appInterface.leave('deck_details'); appInterface.leave('deck_details_more'); return; }
     appInterface.observe({ surface: 'deck_details', sectionId: this.showHeaderActions ? 'wide' : 'compact',
       selectedId: deck.id, optionIds: [], optionLabels: [], busy: this.牌组选项加载中,
-      values: [{ id: 'name', value: 牌组显示名(deck) }, { id: 'description', value: deck.description },
+      values: [{ id: 'name', value: 牌组显示名(deck) }, { id: 'core_name', value: deck.fullName },
+        { id: 'local_display_name', value: deck.displayName }, { id: 'description', value: deck.description },
         { id: 'total', value: String(deck.totalCards) }, { id: 'new', value: String(deck.newCount) },
         { id: 'learning', value: String(deck.learningCount) }, { id: 'review', value: String(deck.reviewCount) }] });
     if (!this.显示更多) { appInterface.leave('deck_details_more'); return; }
     const items: AppInterfaceItem[] = this.moreItems();
     appInterface.observe({ surface: 'deck_details_more', sectionId: '', selectedId: deck.id,
       optionIds: items.map((item: AppInterfaceItem): string => item.id),
-      optionLabels: items.map((item: AppInterfaceItem): string => interfaceItemText(this.getUIContext(), 'deck_details_more', item.id)),
+      optionLabels: items.map((item: AppInterfaceItem): string => interfaceItemText(this.getUIContext(), 'deck_details_more', item.id, this.uiLanguage)),
       busy: this.牌组选项加载中,
       items: items.map((item: AppInterfaceItem): AppInterfaceControl => ({ id: item.id,
         titleKey: item.titleKey,
-        title: interfaceItemText(this.getUIContext(), 'deck_details_more', item.id),
+        title: interfaceItemText(this.getUIContext(), 'deck_details_more', item.id, this.uiLanguage),
         enabled: item.id !== 'options' || !this.牌组选项加载中, selected: false })) });
   }
 
@@ -134,6 +140,8 @@ export struct 牌组详情面板 {
     if (id === 'options' && this.牌组选项加载中) return;
     this.closeMore();
     if (id === 'create_child') this.创建子牌组();
+    else if (id === 'move') this.onMoveDeck();
+    else if (id === 'rename') this.onRenameDeck();
     else if (id === 'options') this.打开牌组选项();
     else if (id === 'export') this.导出牌组();
   }
@@ -155,7 +163,7 @@ export struct 牌组详情面板 {
         if (secondary) {
           Span(label)
         } else {
-          ThemeTextSpans(label, this.themeAccentColors, this.getUIContext())
+          ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(label, this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale)
         }
       }
       .fontSize(应用尺寸.字号_按钮)
@@ -220,12 +228,12 @@ export struct 牌组详情面板 {
             // 直接展示详情时操作在名称上方；手机操作由顶栏菜单承接。
             if (this.showHeaderActions) {
               Row({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout) }) {
-                this.creationAction(interfaceItemText(this.getUIContext(), 'deck_details', 'add_note'), (): void => { this.添加卡片(); })
+                this.creationAction(interfaceItemText(this.getUIContext(), 'deck_details', 'add_note', this.uiLanguage), (): void => { this.添加卡片(); })
                 if (this.Agent入口已启用) {
-                  this.creationAction(interfaceItemText(this.getUIContext(), 'deck_details', 'agent'), (): void => { this.onCreateWithAI(); })
+                  this.creationAction(interfaceItemText(this.getUIContext(), 'deck_details', 'agent', this.uiLanguage), (): void => { this.onCreateWithAI(); })
                 }
                 Row() {
-                  this.creationAction(interfaceItemText(this.getUIContext(), 'deck_details', 'preview'), (): void => { this.预览(); }, true)
+                  this.creationAction(interfaceItemText(this.getUIContext(), 'deck_details', 'preview', this.uiLanguage), (): void => { this.预览(); }, true)
                 }
                 .layoutWeight(1)
                 .constraintSize({ minWidth: 0 })
@@ -233,8 +241,12 @@ export struct 牌组详情面板 {
                 .bindPopup(this.previewMenuOpen, {
                   builder: this.previewScopes,
                   placement: Placement.Bottom,
-                  popupColor: $r('app.color.surface_card'),
+                  popupColor: $r('app.color.menu_surface'),
                   enableArrow: true,
+                  arrowWidth: MenuSurface.pointerSpan,
+                  arrowHeight: MenuSurface.pointerDepth,
+                  radius: 应用尺寸.圆角_指标卡,
+                  transition: MenuSurface.popupTransition(),
                   onStateChange: (event: PopupStateChangeParam): void => {
                     if (!event.isVisible) this.onPreviewMenuClose();
                   }
@@ -243,7 +255,7 @@ export struct 牌组详情面板 {
               .width('100%')
               .alignItems(VerticalAlign.Center)
             }
-            Text(牌组显示名(deck))
+            Text(牌组显示名(deck, this.uiLanguage))
               .fontSize(应用尺寸.字号_牌组标题)
               .fontWeight(FontWeight.Bold)
               .fontColor($r('app.color.text_primary'))
@@ -257,7 +269,7 @@ export struct 牌组详情面板 {
             }
             Column({ space: 应用尺寸.间距_15 }) {
               Row() {
-                Text(interfaceItemText(this.getUIContext(), 'deck_details', 'total'))
+                Text(interfaceItemText(this.getUIContext(), 'deck_details', 'total', this.uiLanguage))
                   .fontSize(应用尺寸.字号_正文)
                   .fontColor($r('app.color.text_secondary'))
                 Blank()
@@ -268,7 +280,7 @@ export struct 牌组详情面板 {
               }
               .width('100%')
               Row() {
-                Text(interfaceItemText(this.getUIContext(), 'deck_details', 'new'))
+                Text(interfaceItemText(this.getUIContext(), 'deck_details', 'new', this.uiLanguage))
                   .fontSize(应用尺寸.字号_正文)
                   .fontColor($r('app.color.text_secondary'))
                 Blank()
@@ -279,7 +291,7 @@ export struct 牌组详情面板 {
               }
               .width('100%')
               Row() {
-                Text(interfaceItemText(this.getUIContext(), 'deck_details', 'learning'))
+                Text(interfaceItemText(this.getUIContext(), 'deck_details', 'learning', this.uiLanguage))
                   .fontSize(应用尺寸.字号_正文)
                   .fontColor($r('app.color.text_secondary'))
                 Blank()
@@ -290,7 +302,7 @@ export struct 牌组详情面板 {
               }
               .width('100%')
               Row() {
-                Text(interfaceItemText(this.getUIContext(), 'deck_details', 'review'))
+                Text(interfaceItemText(this.getUIContext(), 'deck_details', 'review', this.uiLanguage))
                   .fontSize(应用尺寸.字号_正文)
                   .fontColor($r('app.color.text_secondary'))
                 Blank()
@@ -304,7 +316,7 @@ export struct 牌组详情面板 {
             .width('100%')
             .padding(应用尺寸.卡片内边距)
             .backgroundColor($r('app.color.surface_card'))
-            .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+            .border(SurfaceBorder.options())
             .borderRadius(应用尺寸.圆角_指标卡)
 
             DeckStudyHistoryCard({
@@ -316,7 +328,7 @@ export struct 牌组详情面板 {
               DisclosureChevron()
                 .rotate({ angle: this.显示更多 ? 90 : 0 })
                 .animation({ duration: 150, curve: Curve.EaseOut })
-              Text(interfaceItemText(this.getUIContext(), 'deck_details', 'more'))
+              Text(interfaceItemText(this.getUIContext(), 'deck_details', 'more', this.uiLanguage))
                 .fontSize(应用尺寸.字号_按钮)
                 .fontColor($r('app.color.text_primary'))
                 .layoutWeight(1)
@@ -337,7 +349,7 @@ export struct 牌组详情面板 {
               Column({ space: 应用尺寸.间距_8 }) {
                 ForEach(this.moreItems(), (item: AppInterfaceItem) => {
                 Button(item.id === 'options' && this.牌组选项加载中 ? $r('app.string.deck_options_loading') :
-                  interfaceItemText(this.getUIContext(), 'deck_details_more', item.id))
+                  interfaceItemText(this.getUIContext(), 'deck_details_more', item.id, this.uiLanguage))
                   .width('100%')
                   .height(应用尺寸.按钮高度)
                   .fontSize(应用尺寸.字号_按钮)
@@ -384,7 +396,7 @@ export struct 牌组详情面板 {
       .scrollBar(BarState.Off)
       .edgeEffect(EdgeEffect.Spring)
       .backgroundColor($r('app.color.surface_card'))
-      .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+      .border(SurfaceBorder.options())
       .borderRadius(应用尺寸.圆角_卡片)
       .clip(true)
       // 操作区自己贡献唯一的区块间距，避免卡片 margin 与按钮 padding 叠加。

@@ -53,19 +53,20 @@ test('study actions use isolated native press surfaces without touch-driven comp
 test('help buttons use the shared press feedback as the sole feedback owner', () => {
   for (const path of [
     'entry/src/main/ets/components/settings/设置分组卡片.ets',
-    'entry/src/main/ets/components/settings/布局分组.ets',
+    'entry/src/main/ets/components/common/FormSelectRow.ets',
     'entry/src/main/ets/components/common/SettingsToggleRow.ets',
   ]) {
     const source = read(path);
     assert.match(source, /HelpLabel\(/, `${path}: expected shared help label`);
   }
+  assert.match(read('entry/src/main/ets/components/settings/布局分组.ets'), /FormSelectRow\(\{[\s\S]*?showHelp: true[\s\S]*?onHelp:/);
   for (const path of ['GeneralSettings']) {
     assert.match(read(`entry/src/main/ets/components/settings/${path}.ets`),
       /SettingsToggleRow\(\{[\s\S]*?showHelp: true[\s\S]*?onHelp:/,
       `${path}: settings help must be wired through the shared switch row`);
   }
   const review = read('entry/src/main/ets/components/settings/ReviewControlsSettings.ets');
-  assert.match(review, /HelpLabel\(\{ title: settingsItemText\(this\.getUIContext\(\), 'study_quick_answer'\), onHelp:/);
+  assert.match(review, /FormSelectRow\(\{ label: settingsItemText\(this\.getUIContext\(\), 'study_quick_answer', this\.uiLanguage\),[\s\S]*?showHelp: true,[\s\S]*?onHelp:/);
   assert.match(review, /this\.打开说明回调\(\$r\('app.string.settings_quick_answer'\), \$r\('app.string.settings_quick_answer_help'\)\)/);
   const button = read('entry/src/main/ets/components/common/HelpButton.ets');
   assert.match(button, /\.onClick\(/);
@@ -78,7 +79,7 @@ test('all custom press surfaces use one native feedback owner', () => {
   for (const file of ['components/common/按下态按钮.ets', 'components/StudyActionButton.ets',
     'components/开始学习按钮.ets', 'components/学习浮动工具栏.ets', 'components/牌组详情面板.ets']) {
     const source = read('entry/src/main/ets/' + file);
-    assert.doesNotMatch(source, /onTouch\(|duration: 80/, file);
+    assert.doesNotMatch(source, /duration: 80/, file);
     const surfaces = [...source.matchAll(/\.attributeModifier\(new (?:Primary)?GlassSurface\([^\n]+\)\)([\s\S]*?)\.onClick/g)];
     assert.ok(surfaces.length > 0, file);
     // Deck 'More' is a clickable Row; its following ForEach owns all three native Buttons.
@@ -88,6 +89,9 @@ test('all custom press surfaces use one native feedback owner', () => {
       assert.match(source, /ForEach\(this.moreItems\(\), \(item: AppInterfaceItem\) => \{\s*Button/);
       assert.doesNotMatch(surfaces[0][1], /stateEffect/);
     }
-    for (const surface of buttons) assert.match(surface[1], /\.stateEffect\(false\)/, file);
+    for (const surface of buttons) {
+      assert.doesNotMatch(surface[1], /onTouch\(/, file);
+      assert.match(surface[1], /\.stateEffect\(false\)/, file);
+    }
   }
 });

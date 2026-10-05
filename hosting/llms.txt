@@ -9,9 +9,13 @@
 - 首页：https://jidecards.com/
 - 下载与功能：https://jidecards.com/works/jidecards/
 - 使用指南：https://jidecards.com/guides/harmonyos-anki/
+- JIDE：软件内的全能助手：https://jidecards.com/works/jidecards/#jide
+- JIDE 状态：当前 JIDE 为开发者调试功能，发布配置默认隐藏入口。需解锁并配置模型服务后使用；联网检索另需开启应用端联网并配置搜索凭据。具体能力以当前应用、工具与发布说明为准。
 - 开发文档：https://jidecards.com/developers/
 - 作者：https://jidecards.com/about/
 - 源码：https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos
+- Gitee 源码：https://gitee.com/wuweiyouzuoju/jidecards-anki-harmonyos
+- GitCode 源码：https://gitcode.com/wuweiyouzuoju/jidecards-anki-harmonyos
 - JSON：https://jidecards.com/data/works.json
 - 完整资料：https://jidecards.com/llms-full.txt
 

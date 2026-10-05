@@ -16,7 +16,7 @@
 
 ## APKG 与文本
 
-- APKG 复用 Anki `ImportAnkiPackage`，开放笔记/笔记类型的较新才更新、始终更新、保留，以及复习进度、牌组配置、类型合并。默认继续沿用原应用的 Core 默认值（不导入调度和牌组配置、不合并类型、仅更新较新内容）。任一更新策略选为“始终更新”时才显示覆盖本地修改的小字说明；两项都改回其他策略后隐藏。
+- APKG 复用 Anki `ImportAnkiPackage`，开放笔记/笔记类型的较新才更新、始终更新、保留，以及复习进度、牌组配置、类型合并。面板打开或选中文件后先读取 Core 保存的五项选项，不用本机硬编码默认值覆盖它们；每次打开重新读取，本次草稿独立复制。读取失败保留错误并禁用提交，可关闭后重新打开或重新选文件。加载选项与系统选择文件是不同阶段；外部 URI 在选项加载/确认期间保持租约，离页后迟到结果不能导入。内部直接 `importUri(uri)` 保留 Core 自行决定选项的行为。任一更新策略选为“始终更新”时才显示覆盖本地修改的小字说明；两项都改回其他策略后隐藏。
 - CSV / TSV / TXT 使用 UTF-8，`GetCsvMetadata` 负责分隔符检测、Anki 文件头、带引号/多行字段及前五行预览；`ImportCsv` 负责实际解析、重复匹配和写入。应用不另写 CSV 解析器。可选择牌组、笔记类型、字段列、标签/GUID 列、重复处理、匹配范围和 HTML。文件指定的逐行牌组/笔记类型可保留；改变分隔符或类型会重新读取预览与映射，界面有重置说明。HTML 媒体引用不会自动复制文本旁的文件。
 - 协议以锁定 `third_party/anki/proto/anki/import_export.proto` 为准。`CsvImportMessages.ts` 保留 deck/notetype oneof 和字段列的 1-based 索引，0 表示未映射；`CsvImport.ts` 检查映射范围并复制草稿。新增 RPC 别名从 `tools/rpc-index-methods.json` 生成，不能手写编号。
 - 成功后保留 `ImportSummary` 结果页，显示读取、新增、更新、重复、类型冲突、首字段匹配、缺失类型/牌组及空首字段数量。数量单位是笔记；一条笔记可能生成多张卡片。结果页禁止再次提交，避免重复操作。失败保留错误并允许重选文件。
@@ -28,6 +28,12 @@
 `TextExportMessages.ts` 只编码格式与选项，`DataTransferIntent.ts` 的 `exportText` 经原有 `DataTransferSession`、`AnkiDataTransfer` 和 `DataExportWorkflow` 执行。仍用系统保存选择器，取消不显示成功；暂存文件在保存、取消或失败后清理。文本不携带媒体文件和复习进度，HTML 媒体引用须另行管理。导出期间保持原集合占用，不引入第二套迁移状态。
 
 `tools/tests/text-export.test.mjs` 验证实际协议、面板意图、保存取消及清理；进入 `npm test -- sync`。真实 Core 导出内容见原生回归，设备选择器、中文路径和长文本布局另需设备验收。
+
+## JIDE 子集导出（2026-10-04）
+
+`propose_export_subset` 仅在 JIDE 暴露，不新增菜单入口。Scope 要求全部 ID 已发现，非空、唯一、正安全整数，最多1000项；notes/cards 分别使用 Core `ExportLimit.note_ids/card_ids`，空列表不能编码成整库。APKG 可选媒体和调度；文本按 mode 导出原始笔记字段或渲染卡面，不携带媒体文件/调度。
+
+提案保存实际目标快照，卡片快照同时包含关联笔记，确认前修改内容也会拒绝旧提案。`AgentActionExecutor` 在原集合占用下复查并调用 `数据迁移服务.exportSubset`，然后释放占用再复用 `完成导出` 的保存选择器与临时文件清理；取消返回 cancelled/saved=false，不修改牌组归属。`ExportLimitMessages` 共用 notes/cards oneof 编码，原整牌组导出保持既有参数。协议及取消回归见 `text-export.test.mjs`、`ai-agent-maintenance.test.mjs`，真实 Core 文件内容/范围和源集合不变见 `jide_maintenance.rs`。
 
 ## 进度和取消
 

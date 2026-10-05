@@ -13,6 +13,7 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 
 @Component
 export struct 今日计数卡 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('数据已变') 今日数据: TodayCounts | null = null;
   /** 渲染哨兵：@Prop 变化经 @Watch 递增，驱动本组件重新渲染
    *  （@Prop 直连 UI 在统计图表分区尾闭包内不触发刷新，实测 2026-08-29） */
@@ -30,7 +31,7 @@ export struct 今日计数卡 {
     return ctx === undefined ? null : ctx;
   }
 
-  private 格式化用时(毫秒: number): string {
+  private 格式化用时(毫秒: number, _locale: string = this.uiLanguage): string {
     const 总秒: number = Math.floor(毫秒 / 1000);
     if (总秒 < 1) return '0s';
     const 分钟: number = Math.floor(总秒 / 60);

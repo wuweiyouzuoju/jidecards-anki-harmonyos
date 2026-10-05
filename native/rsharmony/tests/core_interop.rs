@@ -1,6 +1,81 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #![cfg(feature = "anki-core")]
 
+#[test]
+fn package_roundtrip_preserves_flags_and_exact_marks_only_with_scheduling() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path();
+    let source = root.join("source");
+    let mut src = seed(&source);
+    src.storage
+        .db()
+        .execute_batch(
+            "UPDATE cards SET flags=7; UPDATE notes SET tags=' marked marked::child topic ';",
+        )
+        .unwrap();
+    let labels = json!({"1":"待修改","7":"重点","future":{"nested":[true,7]}});
+    src.set_config_json("flagLabels", &labels, false).unwrap();
+    for (legacy, scheduling) in [(false, false), (false, true), (true, false), (true, true)] {
+        let package = root.join(format!("markings-{legacy}-{scheduling}.apkg"));
+        export(&mut src, &package, legacy, scheduling, true);
+        let target = root.join(format!("target-{legacy}-{scheduling}"));
+        let native = Native::new();
+        native.open(&target);
+        native.import(&package, options(true)).unwrap();
+        native.close();
+        assert_eq!(
+            rows(&target, "SELECT DISTINCT flags FROM cards"),
+            json!([[if scheduling { 7 } else { 0 }]])
+        );
+        assert_eq!(
+            rows(
+                &target,
+                "SELECT count(*) FROM notes WHERE tags LIKE '% marked %'"
+            ),
+            json!([[if scheduling { 7 } else { 0 }]])
+        );
+        assert_eq!(
+            rows(
+                &target,
+                "SELECT count(*) FROM notes WHERE tags LIKE '% marked::child %'"
+            ),
+            json!([[7]])
+        );
+        assert_eq!(
+            rows(
+                &target,
+                "SELECT count(*) FROM config WHERE key='flagLabels'"
+            ),
+            json!([[0]]),
+            "APKG does not replace global collection configuration"
+        );
+    }
+    for legacy in [false, true] {
+        let package = root.join(format!("markings-{legacy}.colpkg"));
+        src.export_colpkg(&package, false, legacy).unwrap();
+        src = open(&source);
+        let target = root.join(format!("collection-{legacy}"));
+        fs::create_dir_all(&target).unwrap();
+        Native::new().restore(&target, &package).unwrap();
+        assert_eq!(
+            rows(&target, "SELECT DISTINCT flags FROM cards"),
+            json!([[7]])
+        );
+        assert_eq!(
+            rows(
+                &target,
+                "SELECT count(*) FROM notes WHERE tags LIKE '% marked %'"
+            ),
+            json!([[7]])
+        );
+        assert_eq!(
+            rows(&target, "SELECT val FROM config WHERE key='flagLabels'"),
+            json!([[labels.clone()]])
+        );
+    }
+    src.close(None).unwrap();
+}
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};

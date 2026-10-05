@@ -16,17 +16,18 @@
 
 1. 沿用户入口、领域服务和测试确认责任边界，保留当前工作树中已有的修改。
 2. 复用公共实现，保持包名、签名身份、用户数据和锁定 Core 协议；调度不在前端重写。
-3. 用领域测试取得快速反馈，交付前运行完整门禁。新增行为附能验证结果的回归，文档修改检查链接和事实来源。
+3. 按[分级验证](docs/development/verification.md#按变更路径选择验证)检查受影响范围：小文案/样式检查资源与引用，行为改动运行相关测试，新增编译边界补增量 HAP；大范围集成、依赖/SDK 升级和发布才做完整验收。新增行为附能验证结果的回归，纯文档只检查链接和事实来源。
 4. 更新对应领域文档；涉及长期边界时在 `docs/decisions/` 记录理由、范围和验证入口。
 
 常用命令：
 
 ```bash
-npm ci
+npm ci                    # 首次准备或依赖锁变化时
 npm run impact
-npm test -- agent          # 根据任务换成 home / study / browser / sync 等领域
-npm run verify -- repo    # 仓库、文档与全部 Node 回归
-npm run verify            # Windows DevEco 主机：原生、双架构与 clean 签名 HAP
+npm test -- agent          # 只运行受影响领域，也可选择具体测试文件
+npm run build:app          # 有编译需求或需要安装体验时增量构建
+npm run verify -- repo     # 需要完整仓库验收时：文档与全部 Node 回归
+npm run verify             # 集成/发布：原生、双架构与 clean 签名 HAP
 ```
 
 具体适用范围见[验证说明](docs/development/verification.md)。UI、权限、媒体、网络和生命周期的设备验收独立记录；未执行的检查写明原因。设备只能覆盖安装，使用 `hdc -t <connect-key> install -r <signed-hap>`，保留集合与媒体。

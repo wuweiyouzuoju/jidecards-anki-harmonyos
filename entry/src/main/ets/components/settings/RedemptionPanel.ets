@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { settingsItemText } from '../../utils/SettingsStructureText';
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { LabeledActionRow } from '../common/LabeledActionRow';
 import { HelpLabel } from '../common/HelpLabel';
 import { 字段帮助对话框 } from '../字段帮助面板';
 import { DisclosureChevron } from '../common/DisclosureChevron';
-import { resourceText, namedResourceText, showToastSafely } from '../../utils/UiFeedback';
+import { showToastSafely, resourceText, namedResourceText } from '../../utils/UiFeedback';
 import { ThemeTextSpans } from '../common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 import { pasteboard } from '@kit.BasicServicesKit';
@@ -19,6 +20,7 @@ import { 颜色主题, 颜色键 } from '../../model/颜色主题';
 /** 两种模式共用的独立兑换分类，直接展示识别码与主题兑换入口。 */
 @Component
 export struct RedemptionPanel {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop developerGroup: string = '';
   onUseTheme: (theme: 颜色主题) => void = (): void => {};
@@ -74,24 +76,24 @@ export struct RedemptionPanel {
         .fontSize(16).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary')).width('100%')
       Text($r('app.string.redemption_contents_eligibility'))
         .fontSize(14).fontColor($r('app.color.text_secondary')).width('100%')
-      Divider().color($r('app.color.border_subtle'))
+      Divider().color(SurfaceBorder.color())
       Text($r('app.string.redemption_contact_developer'))
         .fontSize(13).fontColor($r('app.color.text_secondary')).width('100%')
       Button() {
         Row({ space: 8 }) {
           Text($r('app.string.about_qq_group_title')).fontSize(14).fontColor($r('app.color.text_secondary'))
-          Text() { ThemeTextSpans(this.developerGroup, this.themeAccentColors, this.getUIContext()) }.fontSize(16).fontWeight(FontWeight.Medium).fontColor(this.primary).layoutWeight(1)
-          Text() { ThemeTextSpans(settingsItemText(this.getUIContext(), 'fingerprint_copy'), this.themeAccentColors, this.getUIContext()) }.fontSize(14).fontColor(this.primary)
+          Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(this.developerGroup, this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }.fontSize(16).fontWeight(FontWeight.Medium).fontColor(this.primary).textAlign(TextAlign.Start).layoutWeight(1)
+          Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(settingsItemText(this.getUIContext(), 'fingerprint_copy', this.uiLanguage), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }.fontSize(14).fontColor(this.primary)
         }.width('100%')
       }
-      .width('100%').height(48).padding({ left: 14, right: 14 }).borderRadius(12)
+      .width('100%').height(48).padding({ left: 14, right: 14 }).borderRadius(12).border(SurfaceBorder.options())
       .backgroundColor($r('app.color.surface_page')).attributeModifier(new PressFeedback())
       .stateEffect(false)
       .onClick((): void => { this.copyDeveloperGroup(); })
     }.width('100%')
   }
 
-  private resultMessage(resource: Resource): string {
+  private resultMessage(resource: Resource, _locale: string = this.uiLanguage): string {
     return resourceText(this.getUIContext(), resource,
       namedResourceText(this.getUIContext(), 'theme_color_' + this.unlockedTheme));
   }
@@ -138,7 +140,7 @@ export struct RedemptionPanel {
   private redemptionForm() {
     Column({ space: 16 }) {
       DialogHeader({
-        title: settingsItemText(this.getUIContext(), 'redemption'), actionLabel: $r('app.string.redemption_submit'),
+        title: settingsItemText(this.getUIContext(), 'redemption', this.uiLanguage), actionLabel: $r('app.string.redemption_submit'),
         actionEnabled: !this.busy && this.code.trim() !== '', closeEnabled: !this.busy,
         onClose: (): void => { this.closeRedemption(); },
         onAction: (): void => { this.redeem(); }
@@ -146,6 +148,7 @@ export struct RedemptionPanel {
       Text($r('app.string.redemption_form_hint'))
         .fontSize(13).fontColor($r('app.color.text_secondary')).width('100%')
       TextArea({ text: this.code, placeholder: $r('app.string.redemption_placeholder') })
+        .border(SurfaceBorder.options())
         .height(108).maxLength(1024).enabled(!this.busy).fontSize(14)
         .fontColor($r('app.color.text_primary')).placeholderColor($r('app.color.text_tertiary'))
         .backgroundColor($r('app.color.surface_page')).borderRadius(14).padding(14)
@@ -165,10 +168,11 @@ export struct RedemptionPanel {
   private redemptionDetails() {
     Column({ space: 12 }) {
       Row() {
-        Text(settingsItemText(this.getUIContext(), 'installation_fingerprint'))
-          .fontSize(15).fontColor($r('app.color.text_primary')).layoutWeight(1)
+
+        Text(settingsItemText(this.getUIContext(), 'installation_fingerprint', this.uiLanguage))
+          .fontSize(15).fontColor($r('app.color.text_primary')).textAlign(TextAlign.Start).layoutWeight(1)
         Button() {
-          Text() { ThemeTextSpans(settingsItemText(this.getUIContext(), 'fingerprint_copy'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.primary)
+          Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(settingsItemText(this.getUIContext(), 'fingerprint_copy', this.uiLanguage), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }.fontColor(this.primary)
         }
           .fontColor(this.primary).backgroundColor(Color.Transparent)
           .enabled(this.fingerprint !== '').attributeModifier(new PressFeedback())
@@ -180,7 +184,7 @@ export struct RedemptionPanel {
           .fontSize(14).fontFamily('monospace').fontColor($r('app.color.text_secondary')).width('100%')
         Text(this.fingerprintLine(5))
           .fontSize(14).fontFamily('monospace').fontColor($r('app.color.text_secondary')).width('100%')
-      }.width('100%').padding(12).borderRadius(12).backgroundColor($r('app.color.surface_page'))
+      }.width('100%').padding(12).borderRadius(12).border(SurfaceBorder.options()).backgroundColor($r('app.color.surface_page'))
       HelpLabel({ title: $r('app.string.redemption_fingerprint_hint'), textSize: 12,
         textColor: $r('app.color.text_secondary'),
         onHelp: (): void => { this.contentHelp.open(); }
@@ -191,10 +195,11 @@ export struct RedemptionPanel {
           .stateEffect(false)
           .onClick((): void => { this.loadFingerprint(); })
       }
-      Divider().color($r('app.color.border_subtle')).margin({ top: 4 })
+      Divider().color(SurfaceBorder.color()).margin({ top: 4 })
       Button() {
         Row() {
-          Text() { ThemeTextSpans(settingsItemText(this.getUIContext(), 'redemption'), this.themeAccentColors, this.getUIContext()) }.fontSize(15).fontColor(this.primary).layoutWeight(1)
+
+          Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(settingsItemText(this.getUIContext(), 'redemption', this.uiLanguage), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }.fontSize(15).fontColor(this.primary).textAlign(TextAlign.Start).layoutWeight(1)
           DisclosureChevron({ tint: $r('app.color.text_tertiary') })
         }.width('100%')
       }
@@ -212,7 +217,7 @@ export struct RedemptionPanel {
         })
 
     }
-    .padding(16).width('100%').borderRadius(20).backgroundColor($r('app.color.surface_card'))
+    .padding(16).width('100%').borderRadius(20).border(SurfaceBorder.options()).backgroundColor($r('app.color.surface_card'))
   }
   build() {
     this.redemptionDetails()

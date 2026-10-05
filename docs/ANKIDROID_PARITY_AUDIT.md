@@ -29,7 +29,7 @@
 | 手势、硬件键、自定义复习动作 | `reviewer/GestureMapper.kt`、`BindingMap.kt`、`preferences/ControlsSettingsFragment.kt` | `ReviewControlsSettings.ets`、`model/PreviewInteraction.ts`、Tap Zones | **部分实现**；已有固定点击区域和部分键盘交互，尚不是 AnkiDroid 的完整可配置映射 |
 | 白板/手写 | `ui/windows/reviewer/whiteboard/*` | `components/学习手写白板层.ets`、`study-menu-actions`、`ui-shell-contract` | **已实现核心入口**；笔刷和真机触控体验待设备验收 |
 | 卡片 HTML/CSS/模板预览 | `previewer/*`、`cardviewer/*`、`web/*` | `model/学习卡片HTML构建器.ts`、`backend/卡片渲染服务.ts`、`preview-runtime`、`card-template-style` | **已实现**；不承诺兼容所有 Android 插件或 WebView 专属行为 |
-| MathJax、化学公式、填空和输入答案 | `noteeditor/MathJaxFormat.kt`、`previewer/TypeAnswer.kt` | `math-rendering`、`cloze-parser`、`type-answer-comparer`、内置 MathJax 资源 | **已实现常用类型**；复杂第三方脚本牌组仍需单独回归 |
+| MathJax、化学公式、填空和输入答案 | `noteeditor/MathJaxFormat.kt`、`previewer/TypeAnswer.kt` | `math-rendering`、`card-rendering-core`、真实 Core `card_rendering.rs`、内置 MathJax 资源 | **已实现常用类型**；输入答案比较和填空提取直接使用 Core，复杂第三方脚本牌组仍需单独回归 |
 | 图片遮罩 | AnkiDroid 源码包含对应笔记/模板能力 | `图片遮罩服务.ts`、`图片遮罩编辑器.ets`；`图片遮罩服务.test.mjs`、`图片遮罩编辑器.test.mjs` | **已实现**；已有 Core RPC、绘制、重排和坐标边界测试 |
 | 添加笔记、字段、标签、媒体 | `noteeditor/*`、`multimedia/*`、`instantnoteeditor/*` | `pages/添加笔记页.ets`、`backend/AnkiNoteEditor.ts`、`backend/笔记服务.ts`；`add-note-contract`、`note-image-media`、`note-save-lifecycle` | **已实现核心流程**；字段媒体和失败重试已有测试 |
 | 笔记类型、模板和卡片类型管理 | `notetype/*`、`ManageNotetypes.kt` | `backend/笔记类型服务.ts`、`proto/messages/NotetypeMessages.ts`、实验版设置和 Agent 笔记类型工具 | **部分实现**；已有读取、编辑和部分入口，需继续核对完整增删改、模板 CSS 和卡片模板顺序 |

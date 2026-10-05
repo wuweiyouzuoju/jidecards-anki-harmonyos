@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { PressFeedback } from '../utils/PressFeedback';
 import { DialogBackdrop } from './common/DialogBackdrop';
 import { ThemeTextSpans } from './common/ThemeText';
@@ -18,6 +19,7 @@ import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时
  */
 @Component
 export struct 云端牌组弹窗 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
   /** true 表示从首页右上角菜单进入，此时主按钮为「关闭」，不再显示首次引导说明。 */
@@ -146,10 +148,8 @@ export struct 云端牌组弹窗 {
     .width('100%')
     .padding(应用尺寸.间距_8)
     .backgroundColor(this.已选中(deck.id) ? this.选中背景色 : $r('app.color.surface_page'))
-    .border({
-      width: 应用尺寸.卡片边框,
-      color: this.已选中(deck.id) ? this.动作主色 : $r('app.color.border_subtle')
-    })
+    .border(SurfaceBorder.options(应用尺寸.卡片边框,
+      this.已选中(deck.id) ? this.动作主色 : SurfaceBorder.color()))
     .borderRadius(应用尺寸.圆角_面板)
     .attributeModifier(new PressFeedback())
     .onClick((): void => {
@@ -191,7 +191,7 @@ export struct 云端牌组弹窗 {
             .width('100%')
         }
 
-        Text() { ThemeTextSpans($r('app.string.cloud_deck_qq_group_entry', '726837065'), [], this.getUIContext()) }
+        Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans($r('app.string.cloud_deck_qq_group_entry', '726837065'), [], this.getUIContext()) }, (_locale: string): string => _locale) }
           .fontSize(应用尺寸.字号_说明)
           .fontColor(this.动作主色)
           .width('100%')
@@ -217,12 +217,12 @@ export struct 云端牌组弹窗 {
               .fontColor($r('app.color.error_text'))
               .textAlign(TextAlign.Center)
             Button() {
-              Text() { ThemeTextSpans($r('app.string.cloud_deck_retry'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.动作主色)
+              Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans($r('app.string.cloud_deck_retry'), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }.fontColor(this.动作主色)
             }
               .type(ButtonType.Normal)
               .fontColor(this.动作主色)
               .backgroundColor($r('app.color.surface_page'))
-              .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+              .border(SurfaceBorder.options())
               .borderRadius(应用尺寸.圆角_面板)
               .attributeModifier(new PressFeedback())
               .stateEffect(false)
@@ -275,7 +275,7 @@ export struct 云端牌组弹窗 {
       .constraintSize({ maxWidth: 560, maxHeight: '72%' })
       .padding(应用尺寸.间距_16)
       .backgroundColor($r('app.color.surface_card'))
-      .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+      .border(SurfaceBorder.options())
       .borderRadius(应用尺寸.圆角_卡片)
       .transition(TransitionEffect.asymmetric(
         TransitionEffect.opacity(0).combine(TransitionEffect.scale({ x: 0.96, y: 0.96 }))

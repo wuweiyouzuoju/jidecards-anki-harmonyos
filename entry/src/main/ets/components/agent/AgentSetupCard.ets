@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { noteTypeText } from '../../utils/NoteTypeText';
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { SelectStyle } from '../../utils/SelectStyle';
 
 import type { AgentMode } from '../../model/agent/AgentTypes';
@@ -58,7 +59,7 @@ export struct AgentSetupCard {
           .optionFont(SelectStyle.optionFont)
           .selectedOptionFont(SelectStyle.selectedOptionFont)
           .textModifier(SelectStyle.labelText())
-          .borderRadius(SelectStyle.controlRadius)
+          .borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
           .onSelect((index: number): void => {
             if (index >= 0 && index < this.deckOptions.length) {
               this.onDeckSelected(this.deckOptions[index].id);
@@ -82,7 +83,7 @@ export struct AgentSetupCard {
           .optionFont(SelectStyle.optionFont)
           .selectedOptionFont(SelectStyle.selectedOptionFont)
           .textModifier(SelectStyle.labelText())
-          .borderRadius(SelectStyle.controlRadius)
+          .borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
           .onSelect((index: number): void => {
             if (index >= 0 && index < this.notetypeOptions.length) {
               this.onNotetypeSelected(this.notetypeOptions[index].id);
@@ -107,7 +108,7 @@ export struct AgentSetupCard {
           .optionFont(SelectStyle.optionFont)
           .selectedOptionFont(SelectStyle.selectedOptionFont)
           .textModifier(SelectStyle.labelText())
-          .borderRadius(SelectStyle.controlRadius)
+          .borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
           .onSelect((index: number): void => {
             if (index === 0) { this.onDeckSelected(0); }
             else if (index > 0 && index <= this.deckOptions.length) {
@@ -132,7 +133,7 @@ export struct AgentSetupCard {
           .optionFont(SelectStyle.optionFont)
           .selectedOptionFont(SelectStyle.selectedOptionFont)
           .textModifier(SelectStyle.labelText())
-          .borderRadius(SelectStyle.controlRadius)
+          .borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
           .onSelect((index: number): void => {
             if (index === 0) { this.onNotetypeSelected(0); }
             else if (index > 0 && index <= this.notetypeOptions.length) {
@@ -153,7 +154,7 @@ export struct AgentSetupCard {
     }
     .alignItems(HorizontalAlign.Start)
     .backgroundColor($r('app.color.surface_card'))
-    .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+    .border(SurfaceBorder.options())
     .borderRadius(应用尺寸.圆角_面板)
     .padding(应用尺寸.卡片内边距)
     .width('100%')

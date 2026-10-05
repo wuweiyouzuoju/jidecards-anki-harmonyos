@@ -6,6 +6,8 @@ import { encodeComputeFsrsParams, decodeComputeFsrsParams, encodeSimulateFsrs, d
 import { 协议写入器 } from '../../entry/src/main/ets/proto/core/ProtoWriter.ts';
 import { 协议读取器 } from '../../entry/src/main/ets/proto/core/ProtoReader.ts';
 import { 调度器方法, 牌组方法 } from '../../entry/src/main/ets/backend/服务索引.ts';
+import { encodeEvaluateFsrs, decodeEvaluateFsrs, decodeFsrsMemory, encodeFsrsHistoryCount,
+  decodeFsrsHistoryCount, decodeFsrsDaily } from '../../entry/src/main/ets/proto/messages/FsrsMessages.ts';
 
 export const optimizeInput={search:'did:1 -is:suspended',currentParams:[],ignoreRevlogsBeforeMs:0,numOfRelearningSteps:1,healthCheck:true};
 export const simulateInput={params:[],desiredRetention:0.9,deckSize:0,daysToSimulate:30,newLimit:10,reviewLimit:100,
@@ -18,6 +20,27 @@ test('request golden wire bytes are consumed by real Core Rust tests, with exact
   }
   assert.equal(调度器方法.computeFsrsParams,30);assert.equal(调度器方法.simulateFsrsWorkload,34);assert.equal(牌组方法.getAllDecksLegacy,6);
   assert.equal(Object.keys(调度器方法).some(x=>/optimal|minimum/i.test(x)),false);
+});
+
+test('diagnostic golden requests and daily response use the real Core wire layouts',()=>{
+ for(const [name,bytes] of [['evaluate',encodeEvaluateFsrs({params:[],search:'did:1 -is:suspended',ignoreRevlogsBeforeMs:0})],
+  ['history-count',encodeFsrsHistoryCount('2099-01-01','did:1 -is:suspended')]])
+  assert.equal(Buffer.from(bytes).toString('hex'),readFileSync(new URL(`./fixtures/fsrs-${name}.hex`,import.meta.url),'utf8').trim());
+ const response=new 协议写入器();response.写入打包浮点(1,[1.5,2.5]);response.写入打包64位整数(2,[3,0]);
+ response.写入变长整数(3,0);response.写入变长整数(3,4);response.写入打包浮点(4,[12.5,0]);
+ const result=decodeFsrsDaily(response.转为字节(),2);
+ assert.deepEqual(result,{accumulatedKnowledge:[1.5,2.5],dailyReviews:[3,0],dailyNew:[0,4],dailyTimeSeconds:[12.5,0]});
+ assert.throws(()=>decodeFsrsDaily(response.转为字节(),3),/Incomplete/);
+ const count=new 协议写入器();count.写入64位整数(1,0);count.写入64位整数(2,6);
+ assert.deepEqual(decodeFsrsHistoryCount(count.转为字节()),{included:0,total:6});
+ count.写入64位整数(1,7);assert.throws(()=>decodeFsrsHistoryCount(count.转为字节()),/Invalid/);
+ const memory=new 协议写入器();memory.写入浮点(2,0.9);memory.写入浮点(3,-0.5);
+ assert.equal(decodeFsrsMemory(memory.转为字节()).state,null);
+ const state=new 协议写入器();state.写入浮点(1,8);state.写入浮点(2,5);memory.写入子消息(1,state);
+ assert.deepEqual(decodeFsrsMemory(memory.转为字节()).state,{stability:8,difficulty:5});
+ const evaluation=new 协议写入器();evaluation.写入浮点(1,0.5);evaluation.写入浮点(2,0.125);
+ assert.deepEqual(decodeEvaluateFsrs(evaluation.转为字节()),{logLoss:0.5,rmseBins:0.125});
+ evaluation.写入浮点(2,Number.NaN);assert.throws(()=>decodeEvaluateFsrs(evaluation.转为字节()),/Invalid/);
 });
 
 test('optimization response accepts packed and unpacked floats, skips unknown fields, distinguishes optional false from absent',()=>{

@@ -7,6 +7,11 @@ import { agentExtensionTools } from './AgentExtensionTools';
 import { AGENT_CARD_STYLE_SCHEMA } from './AgentCardStyle';
 import { agentSettingsFunctionTools } from './AgentSettingsTools';
 import { agentDocumentTools } from './AgentDocuments';
+import { agentAppNavigationTools } from './AgentAppNavigation';
+import { agentAnkiHelpTools } from './AgentAnkiHelp';
+import { agentMaintenanceTools } from './AgentMaintenanceTools';
+import { agentFsrsTools } from './AgentFsrsTools';
+import { agentDeckOptionsFunctionTools } from './AgentDeckOptionsTools';
 
 function exampleArgumentsFor(name: string): string {
   switch (name) {
@@ -197,10 +202,10 @@ export function agentFunctionTools(batchLimit: number = 100, mode: AgentMode = '
       '"notetypeIds":{"type":"array","items":{"type":"integer","minimum":1},"minItems":1,"maxItems":1},' +
       `"draftId":${TEXT},"reason":${TEXT}`, '"notetypeIds","draftId","reason"')
   ];
-  if (mode === 'assistant') { return tools.concat(agentExtensionTools(), agentSettingsFunctionTools(), agentDocumentTools()); }
+  if (mode === 'assistant') { return tools.concat(agentExtensionTools(), agentSettingsFunctionTools(), agentDocumentTools(), agentAppNavigationTools(), agentAnkiHelpTools(), agentMaintenanceTools(), agentFsrsTools(), agentDeckOptionsFunctionTools()); }
   if (mode === 'edit') {
     return tools.filter((value: ProviderFunctionTool): boolean => value.name !== 'create_flashcards')
-      .concat(agentExtensionTools(), agentSettingsFunctionTools(), agentDocumentTools());
+      .concat(agentExtensionTools(), agentSettingsFunctionTools(), agentDocumentTools(), agentAppNavigationTools(), agentAnkiHelpTools(), agentMaintenanceTools(), agentFsrsTools(), agentDeckOptionsFunctionTools());
   }
   const createTools: ProviderFunctionTool[] = [];
   for (const value of tools) {
@@ -209,5 +214,5 @@ export function agentFunctionTools(batchLimit: number = 100, mode: AgentMode = '
       createTools.push(value);
     }
   }
-  return createTools.concat(agentExtensionTools(), agentSettingsFunctionTools(), agentDocumentTools());
+  return createTools.concat(agentExtensionTools(), agentSettingsFunctionTools(), agentDocumentTools(), agentAppNavigationTools(), agentAnkiHelpTools(), agentMaintenanceTools(), agentFsrsTools(), agentDeckOptionsFunctionTools());
 }

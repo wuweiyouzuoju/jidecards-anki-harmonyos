@@ -12,6 +12,16 @@
 
 ## 有效决策
 
+- [Anki 剩余接入的 UI 与 JIDE 分工](2026-10-04-ankicore-ui-routing.md)：复杂配置交给 JIDE，简单入口复用原界面；逐项覆盖 22 组剩余事项及平台边界。
+
+- [软件开发同时维护 JIDE 认知](2026-10-04-jide-cognition-sync.md)：普通开发任务默认同步认知，共同声明自动传递升级，设置登记检查与运行时自动发现的边界。
+
+- [多 Agent 的任务归属与失败处理](2026-10-03-multi-agent-ownership.md)：共享文件写入负责人、失败归因、禁止占位过关与集中联合验收。
+
+- [JIDE 当前软件认知与自动导航](2026-10-03-agent-app-navigation.md)：共同页面声明、每轮能力指纹、受控导航队列及原学习流程。
+
+- [旗标与标星冲突默认 JideCards 优先](2026-10-03-marking-sync-priority.md)：社区调查后的兼容兜底、混合客户端及两个 JideCards 的决胜规则与验证边界。
+
 - [JIDE 按页资料读取与 OCR](2026-10-01-agent-document-reading.md)：API 21、通用模型工具链、页笔记与来源引用。
 
 - [首页范围预览使用独立集合快照](2026-10-01-deck-preview-snapshot.md)：四种范围、只读数据边界、锁定 Core 补丁与真实队列验证。

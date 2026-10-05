@@ -192,6 +192,58 @@ fn legacy_clone_and_unsaved_template_preview_are_read_only_for_existing_notes() 
 }
 
 #[test]
+fn latex_configuration_roundtrip_preserves_type_identity_unknown_data_and_card_scheduling() {
+    let f = Fixture::new();
+    let original = f.notetype(f.ntid);
+    let mut changed = original.clone();
+    changed["latexPre"] = json!("\\documentclass{standalone}\n% preserve source");
+    changed["latexPost"] = json!("");
+    changed["latexsvg"] = json!(false);
+    changed["jide_latex_test_external"] = json!({"keep": true});
+    f.backend
+        .run_service_method(
+            23,
+            3,
+            &UpdateNotetypeLegacyRequest {
+                json: serde_json::to_vec(&changed).unwrap(),
+                skip_checks: false,
+            }
+            .encode_to_vec(),
+        )
+        .unwrap();
+    let actual = f.notetype(f.ntid);
+    for key in ["id", "name", "flds", "tmpls", "css"] {
+        assert_eq!(actual[key], original[key], "unexpected change to {key}");
+    }
+    for key in [
+        "latexPre",
+        "latexPost",
+        "latexsvg",
+        "jide_latex_test_external",
+    ] {
+        assert_eq!(actual[key], changed[key], "LaTeX roundtrip lost {key}");
+    }
+    assert!(actual.get("latexpre").is_none());
+    assert!(actual.get("latexpost").is_none());
+    f.backend.run_service_method(3, 1, &[]).unwrap();
+    let col = CollectionBuilder::new(f.root.path().join("collection.anki2"))
+        .build()
+        .unwrap();
+    let cards = col
+        .storage
+        .all_cards_of_note(anki::notes::NoteId(f.note))
+        .unwrap();
+    assert_eq!(cards.len(), f.cards.len());
+    for card in cards {
+        assert!(f.cards.contains(&card.id().0));
+        let card: anki_proto::cards::Card = card.into();
+        assert_eq!(card.interval, 20);
+        assert_eq!(card.reps, 3);
+        assert_eq!(card.due, 10);
+    }
+}
+
+#[test]
 fn removing_middle_template_keeps_surviving_card_ids_and_scheduling() {
     let f = Fixture::new();
     let mut nt = f.notetype(f.ntid);

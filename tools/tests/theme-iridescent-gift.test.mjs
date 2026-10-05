@@ -8,9 +8,22 @@ import { THEME_CATALOG, isThemeAvailable, UNLOCKED_CONTENTS_KEY } from '../../en
 import { OFFICIAL_QQ_GROUP } from '../../entry/src/main/ets/model/OfficialCommunity.ts';
 import { themeDefinition } from '../../entry/src/main/ets/model/ThemeCatalog.ts';
 import { 规范化主题模式, 解析是否深色 } from '../../entry/src/main/ets/model/主题设置.ets';
+import JSON5 from 'json5';
+import { HomeStartupSequence } from '../../entry/src/main/ets/model/HomeStartupSequence.ts';
 
 const resource = key => ({ id: key, type: 10003, params: [key] });
 const read = path => readFileSync(new URL('../../' + path, import.meta.url), 'utf8');
+
+test('both languages use the current application version in gift and eligibility text', () => {
+  const version = JSON5.parse(read('AppScope/app.json5')).app.versionName;
+  for (const locale of ['base', 'en_US']) {
+    const labels = new Map(JSON.parse(read(`entry/src/main/resources/${locale}/element/string.json`)).string.map(x => [x.name, x.value]));
+    for (const key of ['iridescent_gift_announcement', 'redemption_contents_eligibility']) {
+      assert.ok(labels.get(key).includes(version), `${locale}/${key} must describe the current version`);
+      assert.ok(labels.get(key).includes('3.0.0'), 'gift eligibility remains unchanged');
+    }
+  }
+});
 
 test('overview and both gift dialog modes share the existing theme screenshot renderer', () => {
   const preview = read('entry/src/main/ets/components/common/IridescentThemePreview.ets');
@@ -125,6 +138,23 @@ test('notice waits for verified entitlement and skips existing owners', async ()
   h.storage.set(UNLOCKED_CONTENTS_KEY, ['theme-iridescent']); finish();
   assert.equal(await pending, true);
   assert.equal(h.values.size, 0);
+});
+
+test('the original 2.9.9 notice record suppresses the gift after the wording version changes', async () => {
+  const h = noticeHarness();
+  h.values.set('iridescent_gift_notice_299_completed', true);
+  for (let launch = 0; launch < 2; launch++) {
+    const sequence = new HomeStartupSequence();
+    await sequence.start({
+      canPresent: () => true, checkAnnouncement: async () => false, activateAnnouncementChecks() {},
+      cloudCompleted: async () => true, introCompleted: async () => true,
+      giftCompleted: h.api.isIridescentGiftNoticeCompleted,
+      showCloud: () => assert.fail('cloud intro is complete'), showIntro: () => assert.fail('intro is complete'),
+      showGift: () => assert.fail('users with the original seen record must not see the gift again')
+    });
+    assert.equal(sequence.hasPending(), false);
+  }
+  assert.deepEqual([...h.values], [['iridescent_gift_notice_299_completed', true]]);
 });
 
 test('unowned users get one notice; failed confirmation rolls back and remains retryable', async () => {

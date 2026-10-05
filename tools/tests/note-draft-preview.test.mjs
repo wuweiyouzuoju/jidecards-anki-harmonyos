@@ -61,6 +61,56 @@ test('sample rendering is explicit, uses draft template metadata and CSS and emp
   assert.equal(empty.states.at(-1).error,'note_preview_no_cloze');assert.equal(empty.calls.some(c=>c[0]==='render'),false);
 });
 
+function occlusionFixture({legacy=false}={}) {
+  const h=fixture({cloze:true});
+  h.backend.notetypeJson=async()=>JSON.stringify({type:1,originalStockKind:6,name:'Renamed image type',css:'.card{}',
+    flds:legacy?[{name:'Masks'},{name:'Image'},{name:'Header'},{name:'Extra'}]:
+      [{name:'Title',tag:2},{name:'Extra',tag:3},{name:'Masks',tag:0},{name:'Photo',tag:1}],
+    tmpls:[{ord:0,name:'Image card',qfmt:'{{cloze:Masks}}',afmt:'{{FrontSide}}'}]});
+  h.backend.clozeFields=async()=>legacy?[0]:[2];
+  h.backend.clozeNumbers=async value=>{h.calls.push(['numbers',structuredClone(value)]);return [];};
+  return h;
+}
+
+test('image occlusion without a source image asks for an image before preparing media or checking clozes',async()=>{
+  for(const legacy of [false,true]) {
+    const h=occlusionFixture({legacy});const draft=input();
+    draft.fields=legacy?['','','header','extra']:['header','extra','',''];
+    draft.images=[{id:1,fieldIndex:legacy?2:0,uri:'photo://other-field',filename:''}];
+    await h.session.open(draft);
+    assert.equal(h.states.at(-1).error,'note_preview_no_image');
+    assert.equal(h.calls.some(c=>['media','numbers','render'].includes(c[0])),false);
+    await h.session.dispose();assert.equal(h.calls.at(-1)[0],'release');
+  }
+});
+
+test('image occlusion with an existing or pending image and no masks asks to draw masks',async()=>{
+  for(const pending of [false,true]) {
+    const h=occlusionFixture();const draft=input();draft.fields=['header','extra','',''];
+    draft.images=pending?[{id:1,fieldIndex:3,uri:'photo://source',filename:''}]:[];
+    if(!pending)draft.fields[3]='<img src="existing.png">';
+    await h.session.open(draft);
+    assert.equal(h.states.at(-1).error,'note_preview_no_occlusion');
+    assert.equal(h.calls.some(c=>c[0]==='render'),false);
+  }
+  const sample=occlusionFixture();const draft=input();draft.fields=['','','',''];draft.images=[];draft.sample=true;
+  await sample.session.open(draft);assert.equal(sample.states.at(-1).error,'');
+  assert.equal(sample.calls.find(c=>c[0]==='render')[1][4],true,'template samples still fill empty fields');
+});
+
+test('confirmed image masks keep Core c1/c6 options and render the frozen image draft',async()=>{
+  const h=occlusionFixture();const draft=input();
+  draft.fields=['header','extra','{{c1::image-occlusion:rect:left=.1:top=.1:width=.2:height=.2}}'+
+    '{{c6::image-occlusion:ellipse:left=.4:top=.4:rx=.1:ry=.1}}','<img src="source.png">'];draft.images=[];
+  h.backend.clozeNumbers=async value=>{h.calls.push(['numbers',structuredClone(value)]);return [1,6];};
+  await h.session.open(draft);
+  assert.equal(h.states.at(-1).error,'');
+  assert.deepEqual(h.calls.find(c=>c[0]==='numbers')[1].fields,['','',draft.fields[2],'']);
+  assert.deepEqual(h.states.at(-1).options.map(o=>o.ordinal),[0,5]);
+  await h.session.select(1);const rendered=h.calls.filter(c=>c[0]==='render').at(-1)[1];
+  assert.equal(rendered[1],5);assert.deepEqual(rendered[0].fields,draft.fields);assert.equal(rendered[4],false);
+});
+
 test('disposal rejects late reads and releases partial temporary media only after preparation finishes',async()=>{
   const h=fixture(),gate=deferred();h.backend.prepareMedia=async()=>{await gate.promise;return {fields:['late'],directory:'owned',filenames:['a']};};
   const pending=h.session.open(input());await new Promise(r=>setImmediate(r));const count=h.states.length;
@@ -151,7 +201,7 @@ test('showing the retained editor clears preview guards even when the pop callba
 test('draft preview is a registered destination and editor headers open it outside the form Scroll',()=>{
   const read=path=>readFileSync(new URL('../../entry/src/main/ets/'+path,import.meta.url),'utf8');
   const destinations=read('pages/navigation/HomeDestinations.ets');
-  assert.match(destinations,/name === 'NoteDraftPreviewPage'[\s\S]*NoteDraftPreviewPage\(/);
+  assert.match(destinations,/name === appPageName\('note_draft_preview'\)[\s\S]*NoteDraftPreviewPage\(/);
   const page=read('pages/NoteDraftPreviewPage.ets');assert.match(page,/NavDestination\(\)/);assert.match(page,/fullScreen: true/);
   assert.match(page,/onBackPressed\(\(\): boolean => \{ this.close\(\); return true;/);
   for(const path of ['pages/添加笔记页.ets','components/browser/浏览编辑区.ets']) {

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { agentSettingDefinitions, decodeSettingsArguments, requestedThemeMode } from '../../model/agent/AgentSettingsTools';
-import { APP_FOREGROUND_KEY } from '../../model/Redemption';
+import { APP_FOREGROUND_KEY } from '../../model/AppLifecycleState';
 import { isAppThemeMode } from '../../model/settings/ThemeModeSession';
 import { AgentToolSchemaError } from '../../model/agent/AgentToolSchemas';
 import type { DecodedSettingsArguments, AgentSettingChange } from '../../model/agent/AgentSettingsTools';
@@ -32,6 +32,7 @@ import type { AgentReadToolHandler, AgentSettingToolHandler, AgentActionToolHand
 import { common } from '@kit.AbilityKit';
 import type { ProviderFunctionTool } from '../../model/agent/ProviderProtocol';
 import { buildAgentAppStructure } from '../../model/agent/AgentAppStructure';
+import type { AgentNavigationReadiness } from '../../model/agent/AgentAppNavigation';
 import { appInterface } from '../AppInterfaceService';
 import { AI_AGENT_CHANNELS_APP_STORAGE_KEY, CLOUD_DECK_CHANNEL_ENABLED } from '../../model/ReleaseFeatures';
 import { themeDefinition } from '../../model/ThemeCatalog';
@@ -91,8 +92,10 @@ export class AgentAppSettingsTools {
   private readonly onThemeChange: (change: ThemeModeChange) => void;
   private allowedMode: AppThemeMode | null = null;
   private interfaceTools: ProviderFunctionTool[] = [];
+  private navigationReadiness: () => AgentNavigationReadiness[] = (): AgentNavigationReadiness[] => [];
 
   setInterfaceTools(tools: ProviderFunctionTool[]): void { this.interfaceTools = tools.slice(); }
+  setNavigationReadiness(read: () => AgentNavigationReadiness[]): void { this.navigationReadiness = read; }
 
   constructor(scope: AgentScope, onThemeChange: (change: ThemeModeChange) => void,
     themes: ThemeModeSession = appThemeSession, colors: ThemeColorSession = appThemeColorSession) {
@@ -129,7 +132,8 @@ export class AgentAppSettingsTools {
         cloudDeck: CLOUD_DECK_CHANNEL_ENABLED, themeHasTextures: themeDefinition(activeColor).backgroundTextures.length > 0 },
         args.surface, args.sectionId, (key: string): string => context.resourceManager.getStringByNameSync(key),
         agentSettingDefinitions(), this.interfaceTools, appInterface.snapshot(),
-        AppStorage.get<boolean>(APP_FOREGROUND_KEY) === false ? '' : appInterface.currentPage()));
+        AppStorage.get<boolean>(APP_FOREGROUND_KEY) === false ? '' : appInterface.currentPage(),
+        appInterface.currentContextPage(), this.navigationReadiness()));
     }
     if (name === 'list_settings') { return JSON.stringify({ settings: agentSettingDefinitions() }); }
     if (name === 'list_theme_colors') {

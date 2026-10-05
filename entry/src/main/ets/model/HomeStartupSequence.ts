@@ -41,10 +41,14 @@ export class HomeStartupSequence {
     await this.continue(host);
   }
 
-  async resume(host: HomeStartupHost): Promise<void> {
+  /** 已在读取或被弹层阻挡时不推进；宿主不能把这种立即返回当作完成并再次唤醒。 */
+  async resume(host: HomeStartupHost): Promise<boolean> {
+    if (this.disposed || this.continuationRunning || this.introRunning || this.giftRunning || !host.canPresent()) return false;
     if (this.continuationPending) await this.continue(host);
     else if (this.introPending) await this.welcome(host);
     else if (this.giftPending) await this.gift(host);
+    else return false;
+    return true;
   }
 
   async continue(host: HomeStartupHost): Promise<void> {

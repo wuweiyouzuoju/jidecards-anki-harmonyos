@@ -4,11 +4,13 @@ import assert from 'node:assert/strict';
 import { agentPreferenceDefinitions, agentWritablePreferenceIds, decodeAgentPreference } from '../../entry/src/main/ets/model/agent/AgentPreferenceSettings.ts';
 import { localPreferenceApi } from './local-preference-harness.mjs';
 import { loadPlatformModule } from './platform-module-harness.mjs';
+import * as appearance from '../../entry/src/main/ets/model/DeckListAppearance.ts';
+const legacyDeckListStyle = loadPlatformModule('utils/DeckListAppearanceStore.ets', 'legacyDeckListStyle', appearance);
 
 test('real preference reader reads only requested catalog keys, distinguishes missing defaults from IO failure, and never writes', async () => {
   const state = { context: {}, calls: [], value: undefined, fail: false };
   const read = loadPlatformModule('backend/agent/AgentPreferenceReader.ets', 'readAgentPreference', {
-    agentPreferenceDefinitions, agentWritablePreferenceIds, decodeAgentPreference,
+    agentPreferenceDefinitions, agentWritablePreferenceIds, decodeAgentPreference, legacyDeckListStyle,
     ...localPreferenceApi({}),
     AppStorage: {get: () => state.context},
     preferences: {async getPreferences(context,name) {

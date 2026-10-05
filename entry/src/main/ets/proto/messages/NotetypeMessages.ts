@@ -22,13 +22,14 @@
 // 解码：NotetypeView / NotetypeNameId[]
 // 编码：UpdateNotetypeLegacyRequest（JSON 路径整体更新，不走完整 Notetype proto 编码）
 // NotetypeField.ord 解码后用作排序键，确保字段顺序与 Anki 桌面端一致。
-// Field config 只读取编辑器使用的 sticky，其余配置由 Core 保持。
+// Field config 读取字段编辑配置；写入仍保留 Core 的完整类型数据。
 //
 // @副作用
 // 无
 // ========================================================
 
 import { 协议读取器 } from '../core/ProtoReader';
+import type { NoteFieldEditingOptions } from '../../model/NoteFieldEditing';
 import { 协议写入器, 线类型_长度分隔, 线类型_变长整数 } from '../core/ProtoWriter';
 
 /** `anki.notetypes.Notetype.Config.Kind` values. */
@@ -40,7 +41,7 @@ export interface NotetypeNameId {
   name: string;
 }
 
-export interface NotetypeField {
+export interface NotetypeField extends NoteFieldEditingOptions {
   ord: number;
   name: string;
   sticky?: boolean;
@@ -159,8 +160,16 @@ function decodeNotetypeField(bytes: Uint8Array): NotetypeField {
       const config = new 协议读取器(reader.读取字节());
       let configTag;
       while ((configTag = config.读取标签()) !== null) {
-        if (configTag.字段号 === 1) field.sticky = config.读取布尔();
-        else config.跳过字段(configTag.线类型);
+        switch (configTag.字段号) {
+          case 1: field.sticky = config.读取布尔(); break;
+          case 2: field.rtl = config.读取布尔(); break;
+          case 3: field.fontName = config.读取字符串(); break;
+          case 4: field.fontSize = config.读取变长整数(); break;
+          case 5: field.description = config.读取字符串(); break;
+          case 6: field.plainText = config.读取布尔(); break;
+          case 7: field.collapsed = config.读取布尔(); break;
+          default: config.跳过字段(configTag.线类型);
+        }
       }
     } else {
       // Field config and any future fields are read-only for this flow.

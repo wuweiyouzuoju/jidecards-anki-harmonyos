@@ -6,7 +6,7 @@
 
 jidecards（中文名“记得闪卡”）是面向 HarmonyOS NEXT 的开源闪卡学习应用，支持鸿蒙手机、平板和电脑。导入 Anki 牌组后，可以离线复习、编辑资料、查看学习统计，并通过 AnkiWeb 同步。原生界面由 ArkTS/ArkUI 实现，集合、模板渲染、调度和同步复用锁定版本的 Anki Rust Core。
 
-**当前源码版本：2.9.9（versionCode 2990）**
+**当前源码版本：2.9.10（versionCode 2991）**
 
 应用可在[华为应用市场](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare)搜索“记得闪卡”下载安装。仓库构建版本的唯一事实来源是 [AppScope/app.json5](AppScope/app.json5)；商店实际上架版本以 AppGallery 页面为准。
 
@@ -176,7 +176,7 @@ npm run build:app
 npm test
 ```
 
-常用验证入口：
+日常修改按[分级验证](docs/development/verification.md#按变更路径选择验证)运行资源检查或受影响测试；新增类型、组件、导入或平台 API 补增量构建，不因新对话重复全量验证。完整验收入口保留：
 
 ```bash
 npm run verify -- repo     # 可移植仓库与文档门禁
@@ -222,7 +222,7 @@ npm run verify             # 完整测试、双架构构建与签名 HAP
 
 ## 版本与发布
 
-当前源码版本由 [AppScope/app.json5](AppScope/app.json5) 中的 `versionName` 和 `versionCode` 定义。查看[更新记录](CHANGELOG.md)及[2.9.9 源码变更说明](docs/releases/2.9.9.md)；历史说明保留在 [docs/releases/](docs/releases/) 中。商店版本与源码版本分别维护，商店版本只在确认上架后更新。
+当前源码版本由 [AppScope/app.json5](AppScope/app.json5) 中的 `versionName` 和 `versionCode` 定义。查看[更新记录](CHANGELOG.md)及[2.9.10 源码变更说明](docs/releases/2.9.10.md)；历史说明保留在 [docs/releases/](docs/releases/) 中。商店版本与源码版本分别维护，商店版本只在确认上架后更新。
 
 发布前的构建、测试和设备验收要求见[开发状态与发布门禁](docs/DEVELOPMENT_PLAN.md)。CI 检查结果不代替实体设备验收；源码中的能力以当前发布开关为准。
 

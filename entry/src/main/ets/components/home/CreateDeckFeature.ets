@@ -3,10 +3,11 @@ import { common } from '@kit.AbilityKit';
 import { HomeDeckCommands } from '../../backend/HomeDeckCommands';
 import { 创建牌组面板 } from '../创建牌组面板';
 import type { 牌组汇总 } from '../../model/主页模型';
-import { resourceText, showToastSafely } from '../../utils/UiFeedback';
+import { showToastSafely, resourceText } from '../../utils/UiFeedback';
 
 @Component
 export struct CreateDeckFeature {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop isDark: boolean = false;
   @Prop parentId: string = '';
   @Prop decks: 牌组汇总[] = [];
@@ -20,7 +21,7 @@ export struct CreateDeckFeature {
 
   aboutToDisappear(): void { this.disposed = true; }
 
-  private async create(name: string): Promise<void> {
+  private async create(name: string, _locale: string = this.uiLanguage): Promise<void> {
     if (this.busy || this.disposed) return;
     this.busy = true;
     this.error = '';

@@ -52,6 +52,8 @@ export class LocalBackups implements BackupBackend {
     try {
       await this.create(true);
       await 替换集合(this.filesDir, staged, true);
+      AppStorage.setOrCreate<number>('需要刷新主页',
+        (AppStorage.get<number>('需要刷新主页') ?? 0) + 1);
       AppStorage.setOrCreate<number>('cardContentChangedTick',
         (AppStorage.get<number>('cardContentChangedTick') ?? 0) + 1);
     } finally {

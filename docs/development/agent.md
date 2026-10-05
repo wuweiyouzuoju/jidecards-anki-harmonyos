@@ -4,23 +4,55 @@
 
 - 本页只描述产品运行时的应用内 Agent，不描述负责修改仓库的编程 Agent；编程 Agent 规则见 [编程 Agent](coding-agent.md) 和根 [AGENTS.md](../../AGENTS.md)。
 - 代码路径以下均相对 `entry/src/main/ets/`。
-- 责任链：UI → 会话/Runner → 读取与提案；用户确认 → DraftExecutor / ActionExecutor → Service 或受控存储。
+- 责任链：UI → 会话/Runner → 读取、导航排队与提案；成功回复收尾 → 首页 Navigation；用户确认 → DraftExecutor / ActionExecutor → Service 或受控存储。
 - 快速反馈：`npm test -- agent`；完整验收见 [验证说明](verification.md)。
 - `execute_code` 已接入本地纯计算：QuickJS-NG + wasmi、独立异步 NAPI、固定资源预算及贯通取消，不获得卡库或工具权限。入口与验收见[沙箱模块](../../native/agent-sandbox/README.md)，当前验证范围见[决策记录](../decisions/2026-09-30-agent-local-sandbox.md)。
 
 ## 助手身份与产品表述
 
+### JIDE 专用高级能力（2026-10-04）
+
+以下能力仅通过 JIDE 的实际工具暴露，不增加设置、浏览器菜单或学习菜单入口。声明来自 `model/agent/AgentMaintenanceTools.ts`，三个模式共用；`backend/agent/AgentMaintenanceTools.ets` 在页面实际注册，只负责读取和准备提案。现有确认卡展示前后值、范围及风险，执行仍由 `AgentActionExecutor` / `AgentDraftExecutor` 消费应用登记的确认，不接受模型传入确认凭证。
+
+| 工具 | 实际能力与边界 |
+| --- | --- |
+| `get_advanced_settings` | collection 读取真实 Core FSRS 高级偏好和历史备份策略；study 读取本机学习操作配置，不读取凭证 |
+| `propose_update_collection_preferences` | 修改负担均衡、带步骤的短期调度、每日/每周/每月备份保留数与最小间隔，单位为数量/分钟。共用 `ReviewPreferencesStore` 队列，确认时检查旧值，仅修改白名单 wire 字段，保留未知字段；不主动重排卡片 |
+| `propose_update_study_controls` | 常亮、手势模式和允许的键盘/手势动作映射。共用本机偏好保存队列；空映射沿用默认，评分只在答案面生效，系统返回、Escape、修饰键、删除键保持原保护 |
+| `propose_export_subset` | 已发现的精确 notes/cards ID 子集导出 APKG/文本，最多1000项；notes 包含兄弟卡，cards 由 Core 决定相关笔记。确认时复查卡片/笔记及关联内容，Core 导出结束后释放集合再打开保存选择器，取消不会报告已保存 |
+| `propose_duplicate_note` | 已发现笔记复制为新增草稿，保留字段、标签和媒体引用；确认时检查来源和类型未变，Core 分配新身份，不复制调度/日志 |
+| `propose_update_notetype_fields` | 修改 sticky、rtl、font、size、description、plainText、collapsed、excludeFromSearch 及排序字段；保留名称、顺序、身份和未知属性，展示跨牌组完整影响数量，高风险双重确认，不改变结构 |
+| `propose_restore_notetype` | 调用真实 Core 标准恢复，先展示当前/目标字段与模板，明确额外字段内容及模板卡片可能删除。完整影响范围和类型 JSON 在确认时复查，受批量上限约束；禁止 normal/cloze 互换，恢复后校验标准结构、模板定义与 CSS |
+
+写入失败、保存未确认、保存完成但应用失败、文件取消分别返回实际状态，旧提案和重复确认不能写入。大量共享类型影响 ID 留在应用侧，工具只返回完整数量。没有通用 RPC、任意配置键或文件路径权限。高级设置不存在手动入口，因此 JIDE 应引用工具能力，不能教用户寻找不存在的开关。
+
+平台常亮及输入规则见[学习与媒体](study-media.md#jide-专用学习操作配置2026-10-04)，子集文件语义见[数据导出](import-data.md#jide-子集导出2026-10-04)。通用字段增删/改名/重排后的未保存结构渲染仍不支持，不能把标准恢复的结构说明当作该渲染能力；当前 Core 未保存模板接口仍使用已保存类型的字段结构。
+
+验证入口：`ai-agent-maintenance.test.mjs` 直接执行 Registry、提案和确认执行器；`study-maintenance-controls.test.mjs` 检查真实平台适配和实际页面方法；真实 Core 偏好、字段属性、恢复及子集导出见 `native/rsharmony/tests/jide_maintenance.rs`。这些验证不代替真机常亮、硬件输入、ArkUI 确认布局或系统保存选择器验收。
+
 ### 软件界面认知
 
-`get_app_structure` 默认返回界面目录，指定 `surface` 才展开条目，详细设置再传 `sectionId`。`AppInterface.ts` 共用于主页/新建、牌组详情/展开/预览范围、浏览/更多/视图选项、学习/更多、JIDE/历史、提醒/编辑、统计分区和笔记新增/编辑；菜单列表、顺序与禁用判定由实际 UI 和 JIDE 共用，浏览筛选/排序直接观察 UI 真实选项。工具的 surface enum 从目录生成。`SettingsNavigation.ts`、`SettingsStructure.ts` 共同拥有设置目录、卡片顺序、名称与显隐。
+`model/navigation/AppNavigation.ts` 是页面名称与 JIDE 导航动作的共同声明，`HomeDestinations` 用它映射真实目的地。`AgentAppStructure` 每次从页面、菜单、设置和**本轮实际工具**重建 `revision`、`destinations`、`actions`；Runner 每次请求自动加入当前目录与能力指纹，恢复的旧历史不能覆盖当前版本。共同声明、设置项或工具协议变化都会改变指纹，无须清空会话或手工更新长期记忆。指纹不含用户实时状态，不是应用版本号或安全签名；未登记的 UI 仍不能自动发现。
+
+`destinations.detailed` 明确区分真实页面入口与已接通的界面详情。`actions.available` 只表示当前宿主注册了导航工具，执行时还需满足前台、草稿、集合占用等条件；读到界面控件不自动得到任意点击权限。入口、显隐与状态仍从共同声明和实际观察获得，不使用另一份手写软件说明。
+
+`get_app_structure` 默认返回界面目录，指定 `surface` 才展开条目，详细设置再传 `sectionId`。`AppInterface.ts` 共用于主页/新建/牌组搜索、牌组详情/展开/预览范围、浏览/更多/视图选项、学习/更多、JIDE/历史、提醒/编辑、统计分区和笔记新增/编辑；菜单列表、顺序与禁用判定由实际 UI 和 JIDE 共用，浏览筛选/排序直接观察 UI 真实选项。工具的 surface enum 从目录生成。`SettingsNavigation.ts`、`SettingsStructure.ts` 共同拥有设置目录、卡片顺序、名称与显隐。
+
+应用操作教学也存放在共同界面声明中：`AppInterfaceSurface.instructionsKey` 指向当前中英文 `string.json` 的说明正文，`AgentAppStructure` 每次读取资源生成 `surfaces.instructions`，默认目录和指定界面都能读取。主页排序仅登记 `deck_reorder`，正文键为 `deck_reorder_instructions`，覆盖长按 → 选择拖动排序 → 同级/顶级拖动、本机保存范围，以及牌组详情 → 更多 → 调整牌组层级。排序的升级/降级菜单已移除，不登记该界面或操作。固定教学说明不证明排序当前打开或控件可用，仍须读取实际观察的 `enabled`。该说明属于应用自身知识，不能用 Anki 上游手册推断原生 UI，也不靠会话记忆或仅供开发者阅读的 Markdown。当前排序目录和观察回归见 `home-deck-order.test.mjs`；真实 Registry 读取中英文正文且零写入的回归见 `ai-agent-app-settings.test.mjs`。
 
 `backend/AppInterfaceService.ets` 唯一拥有观察；组件挂载登记、Watch 更新、销毁移除，菜单关闭清理。`foregroundSurface` 来自 Navigation/NavDestination 显隐回调，迟到的旧页 hide 不清除新页；应用后台返回空值。`observations` 是挂载状态，可能属于被遮住的页面；指定 surface 只返回该界面观察。包括选中项、禁用项、忙碌、牌组名称/说明/计数、浏览模式/结果数量及学习阶段，不包含凭证或卡面正文。主页行、父牌组候选、浏览结果 ID 各最多100项，`optionsTotal` 表示总数。`coverage` 之外的目的地详情未知，空前台值表示未知/后台，不猜测像素或未登记内容。
 
 能力来自本轮实际 `functionTools`，设置读写入口与当前声明取交集；知道入口不授予执行权限。结构与静态标签每次读取重建，不存长期记忆。默认目录只带挂载界面的选择/忙碌/总数摘要，`observationDetailsIncluded=false`；控件、选项和值在指定 surface 后展开，不修改原观察。工具清单不重复 schema/规则。
 
+学习布局的 `smart`（智感握姿）与 UI 共用 `StudyLayout.STUDY_LAYOUT_MODES`，当前保存值由原 `AgentPreferenceReader` 读取；`study_layout` 未开放 JIDE 写入。学习观察中的 `study_layout`、`grip_availability`、`grip_side` 来自学习页和浮动栏：能力结果表示最近订阅是否可用，不能据此宣称系统开关已开启。普通闪卡、选择题/白板差异与窗口空间降级见[学习布局](study-media.md#智感握姿学习布局2026-10-04)。直接认知回归包含于 `study-grip-layout.test.mjs`。
+
+手写白板优先使用华为 Pen Kit 完整套件，不可用或初始化失败时自动回退原版透明覆盖白板。`study_whiteboard` 共用控件目录，中英 `study_whiteboard_instructions` 说明两种引擎、原版布局与回退规则。观察中的 `engine` 区分 `huawei_pen_kit` 和 `local_canvas`：官方仅发布支持/初始化/失败/缩放与宿主按钮，工具栏内部笔刷、颜色、笔宽、弹窗和历史未通过公开接口接入，保持 `controlsComplete=false`；原版发布真实笔刷选择、工具设置、历史可用性和是否有笔迹，`controlsComplete=true`，只展示当前可用的控件。不能据静态说明声称可读取或修改官方内部状态。两种白板的笔迹和文字均未接入内容识别与 JIDE 工具，不能读取或判题。认知边界与真实结构生成回归见 `study-whiteboard.test.mjs`、`study-whiteboard-local.test.mjs`，实现入口见[手写白板](study-media.md#手写白板)。
+
 JIDE 页发布当前模式、历史/对话分区、发送/停止、文件解析和输入可用状态；历史组件发布实际会话名称和选中项，提醒页发布时间/标题及独立开关，编辑组件发布真实24小时/60分钟选项与新建/编辑、保存/删除状态。历史和文件名称、提醒列表均最多100项；用户名称最多160字符，`optionsTotal` 保留总数。聊天、文件正文、错误正文和表单草稿不复制到观察，仅登记数量、长度或存在状态。提醒的占位符标签目前在忙碌时仍可点击，观察保持实际行为。
 
 统计页遍历 `STATS_INTERFACE_SECTIONS`，显隐和难度标题由 `statsInterfaceSections` 决定；`stats_sections` 描述实际分区，`stats_<分区ID>` 由原图表组件发布真实范围选项、选中项和空数据状态，重载时保留的图表明确禁用。新增/编辑笔记发布真实字段、类型选项和保存/返回状态；字段显示复用 `NoteTypePresentation` / `NoteTypeText`，图片遮盖只列实际标题/额外输入。候选最多100项，正文、草稿和媒体 URI 不进入观察。表单与加载页分别拥有 `edit_note_form` / `edit_note`，不覆盖彼此状态。
+
+牌组选项由 `DeckOptionsFeature` 发布 `deck_options` 的加载/错误/表单入口、目标和预设 ID、提交/FSRS 占用；`牌组选项面板` 发布 `deck_options_form` 的标题栏、预设操作、简洁模式和真实校验/忙碌状态。完整模式的 `deck_options_group_<id>` 从 `DeckOptionsCatalog.ts` 共用字段名称、调度器显隐及分组，真实组件发布上限范围等状态。观察不含牌组/预设名称、字段草稿或错误正文，也不将打开表单标记为已有未保存改动。FSRS 工具仍由自己的组件发布状态；帮助正文与未登记编辑器控件保留 `controlsComplete=false`。结构认知和 Core 字段修改是两条明确接通的能力，不能推断任意按钮可点击。
 
 `titleKey` 支持页面/表单实际标题随模式变化；`controlsComplete` 只表示发布者已列全该界面的当前**声明控件**，据此将未出现的声明项标记隐藏，不声称已发现嵌套消息卡等未登记区域。部分观察不允许推断未列条目隐藏。同步、导入和嵌套媒体/遮罩/帮助弹层等剩余界面仍需各自 UI 状态拥有者接入，不维护另一份手写功能说明。
 
@@ -30,10 +62,32 @@ JIDE 页发布当前模式、历史/对话分区、发送/停止、文件解析�
 - 产品与上游事实以[项目说明](../../README.md)和 [UPSTREAM.lock](../../UPSTREAM.lock) 为依据：记得闪卡基于 Anki Rust Core 的集合、模板渲染、调度和同步基础，提供 HarmonyOS 原生界面与应用内 AI 工具，受益于上游作者和开源社区贡献。
 - 每轮按当前宿主生成系统指令，包括旧历史恢复后的继续和 Runner 的工具接续；旧回复里的“Anki 助手”仅保留为历史数据，不能覆盖当前身份。回归见 `ai-agent-v2-runtime.test.mjs` 与 `ai-agent-notetype-foundation.test.mjs`，执行真实提示构建与 Runner/Session 接续；提示注入正确不等于真实模型一定按要求表述。
 
+### 软件升级时的认知同步
+
+软件更新后，JIDE 从当前共同声明、工具和真实状态生成认知，旧会话继续也使用当前运行代码。编程 Agent 的接入责任、设置开发步骤及漏登记检查统一见[软件升级时的认知同步](coding-agent.md#软件升级时的认知同步)。任意手写 UI 仍需开发接入，不承诺运行时自动理解全部新界面。
+
+### 自动页面操作
+
+`navigate_app` 的动作及必需/可选参数由 `AppNavigation.APP_NAVIGATION_ACTIONS` 唯一声明；参数校验、工具 action enum/参数说明和 `get_app_structure.actions.requiredArguments/optionalArguments` 同时从它生成。后续改动这份声明即可更新 JIDE 的当前认知和工具契约，不维护另一份动作参数表。每轮 Provider 接续仍重新生成当前目录和能力指纹，恢复旧会话也使用新代码的声明。
+
+`actions.available` 保留“导航工具已注册”的含义；`executionState` / `blockedReason` 每次结构读取调用当前 Session，从宿主前台、占用、导航栈和本轮排队事实重算。`ready` 仅表示已知宿主检查通过，真实目标、用户意图和最终执行仍另行验证；`blocked` 附阻止原因，未提供完整宿主事实为 `unknown`，工具未接通为 `unavailable`。动态忙碌不改变能力指纹；共同声明、参数或真实工具变化会改变指纹。读取就绪状态不查询卡库目标、不消耗导航许可、不执行动作。
+
+现有动作包括 `start_study`、`open_browser`、`open_settings`、`open_stats`、`open_reminders`、`open_add_note`、`open_home`、`open_edit_note`、`open_card_preview`、`open_deck_details`、`open_deck_options`。开始学习、添加笔记和牌组详情/选项需要会话已发现的真实 `deckId`；浏览可指定牌组、搜索和笔记模式，牌组搜索由 `did:<ID>` 与用户查询组合，避免仅传页面 deckId 却未限定结果。设置通过 `sectionId` 展开当前模式可见的分组，复用设置面板的 `openSection`，不写设置。
+
+打开编辑需要 `search_notes` 等已发现的 `noteId`，只把 ID 交给原 `EditNotePage`；用户手动修改和保存继续由原页面拥有。卡片预览需要已发现的 `cardId`，通过 `cid:<ID>` 和 `initialPreviewCardId` 进入原浏览预览，不复制预览页面、不调用复习评分；初始搜索失败、目标不在结果、模式改变、读取过期或页面销毁时不会自动打开预览。返回首页复用根 Navigation 清栈与首页刷新；下层存在编辑/新增表单时拒绝清栈，保留用户输入。
+
+牌组详情复用首页 `选择牌组`，展开父级路径并保留原选择记忆；手机打开原详情层，宽屏选择已有详情区域。牌组选项接着打开原 `DeckOptionsFeature`，只导航，不改配置或保存。根宿主在副作用前核对首页快照目标和已有选项表单/占用，目标尚未进入首页快照或已有选项表单时拒绝切换。所有 `resetsStack=true` 动作通过共同的 `appNavigationStackBlockReason` 保护下层编辑/新增表单，Session 与首页使用同一规则。异步读取前后均重查模式和栈，避免读取期间条件改变后仍排队/执行。
+
+`AgentAppNavigationSession` 独占当前 JIDE 页的一次性导航队列与读取代次；Registry 用独立的 `navigation` 类别注册，不能伪装成只读、卡库草稿或确认动作。只根据当前新用户消息的导航/开始学习意图接受请求；介绍用法、历史/附件、取消和自动恢复接续不能独立触发导航。一轮只接受一个目的地，`queued/completed=false` 表示排队而非已进入页面。成功回复保存历史后，页面才执行队列；模型失败、预算暂停、等待确认/澄清、取消、被遮住或离页会丢弃请求。
+
+接受与执行均检查页面可见、应用前台、文件解析/目标弹窗/确认内容及卡库占用；回复期间新输入的未发送消息也阻止跳转。牌组/笔记/卡片 ID 必须在只读 Scope 内，`readNavigationTarget` 两次读取真实对象，不把正文写进导航结果，也不提升写入权限；牌组删除后拒绝执行，改名后使用当前名称。旧轮次收尾不能消费新轮次队列。首页是 Navigation 唯一执行宿主，经类型化回调接收语义意图，保留返回后的数据刷新，不把页面实例或 NavPathStack 交给后端工具。已有学习页时拒绝再建学习会话；开始学习只进入原学习页，队列、每日限额、完成判定和评分继续由 `StudySessionController` / Anki Core 拥有。
+
+主机回归：`ai-agent-navigation.test.mjs` 直接执行 Session、Registry、平台适配器、真实首页导航/牌组选择及隐藏回调，并覆盖逐动作就绪状态、异步模式/栈变化、宽窄屏分支、浏览初始搜索、未发送输入、声明变化后的指纹/参数更新；`ai-agent-app-settings.test.mjs` 验证真实结构工具读到变化且零写入，`ai-agent-page-awareness.test.mjs` 执行牌组选项加载会话及原表单观察，覆盖校验、忙碌、嵌套遮挡和退出后的迟到回调。`ai-agent-v2-runtime.test.mjs` 用真实 Runner/Session/Registry 发现牌组、笔记和卡片并完成工具接续，`home-composition.test.mjs` 验证页面路由都映射真实页面及参数。新增动作必须接通根宿主分支，现有逐声明行为回归会拦截缺失分支；新增页面同时接入 `HomeDestinations` 和自己的界面观察。未登记 UI 不会自动被发现，任意按钮、评分、删除、同步、表单保存没有获得通用点击权限。真实模型规划、Navigation 动画及设备交互须单独验收。边界选择见[导航决策](../decisions/2026-10-03-agent-app-navigation.md)。
+
 ## 统一 AI 对话入口
 
 - 回复期间输入框可继续编辑下一条消息，发送按钮仍显示停止；本轮请求在发送时取得快照并清空已发送草稿，回复完成不清空随后输入的内容。等待澄清时仍使用既有澄清入口。
-- 首页新建牌组菜单移除 AI 制卡和 AI 改卡；“更多”只保留一个名称为“JIDE”的入口，仍遵循已有开发者开关、同步等待和配置预检。该入口以 `assistant` 模式打开既有 `AiCardPage`，对话区为空，不默认选择目标或先选制卡/改卡模式。牌组详情、浏览和学习页保留带上下文的既有快捷操作。
+- 首页新建牌组菜单移除 AI 制卡和 AI 改卡；统计卡旁的独立纯图标 JIDE 按钮打开对话，更多菜单不再包含 JIDE，仍遵循已有开发者开关、同步等待和配置预检。该入口以 `assistant` 模式打开既有 `AiCardPage`，对话区为空，不默认选择目标或先选制卡/改卡模式。牌组详情、浏览和学习页保留带上下文的既有快捷操作。
 - `assistant` 在同一 Runner/Registry 注册制卡、改卡和读取工具；普通聊天不要求草稿。素材、目的不明确时使用既有澄清；缺少制卡目标时 `request_create_target` 通过澄清暂停协议弹出已有 `DialogFrame` / `AgentSetupCard`。模型只提供问题，不提供选择框候选 ID，页面读取真实牌组和笔记类型。
 - 用户确认选择后经既有 `configure_create_target` 校验真实目标，再接续同一会话。关闭选择框恢复此前目标，不持久化未确认的选择；“新建笔记类型”清空类型后让 Agent 提案，经既有确认执行器创建并取得真实 ID。改卡复用 `list_notetypes`、`search_cards` / `search_notes`、`get_note_context` 和改卡草稿；制卡与改卡继续使用原有预览及写入确认。
 - 统一入口的历史列表可读取已有制卡/改卡会话，带上下文入口仍按原模式筛选。直接回归见 `ai-agent-v2-runtime.test.mjs`、`agent-history-coordinator.test.mjs` 与 `ai-agent-entry-contract.test.mjs`；模拟模型工具序列验证实际工具和接续逻辑，不代表真实模型决策质量或设备布局已验收。
@@ -41,11 +95,25 @@ JIDE 页发布当前模式、历史/对话分区、发送/停止、文件解析�
 
 ## JIDE 空会话提示
 
-- 统一 `assistant` 入口在消息为空时显示 `components/agent/AgentEmptySuggestions.ets`；有消息或打开历史后卸载。制卡/改卡的目标配置保持原入口。页面只提供 NavDestination 的可见状态，组件拥有轮换、手势、剪贴板及计时器释放，不发送请求、不填写输入框。
+- 统一 `assistant` 入口在消息为空时显示 `components/agent/AgentEmptySuggestions.ets`；有消息或打开历史后卸载。制卡/改卡的目标配置保持原入口。页面只提供 NavDestination 可见状态和纯建议读取回调，组件拥有轮换、手势、剪贴板及计时器释放，不发送请求、不填写输入框。
 - `model/agent/AgentSuggestions.ts` 交错轮换十类、共60条本地化建议，中英文内容在资源中。每条停留10秒，300ms淡出后切换并淡入；首次随机起点，完整循环前不重复。文案覆盖已接通的设置、学习统计、资料识别、制卡改卡、类型外观与偏好记忆，按用户要求排除联网搜索、网页读取和在线配图。
 - 中央仅显示一句文字；中文显示包裹“”引号，英文使用对应双引号，显示格式归本地化资源。长按500ms复制不含装饰引号的完整原句，方便直接作为请求发送；成功提示“已复制”，失败使用已有复制失败提示。按住、鼠标悬停、复制中或目的地隐藏时取消轮换及切换任务，恢复后重新停留10秒；卸载与代次校验阻止迟到任务修改文案。
 - 组件居中于顶栏和输入区之间的剩余区域，水平留白由组件独占20vp，文字最多560vp、随窄屏换行，不叠加消息流内边距。上下安全区仍由现有顶栏/输入区拥有；键盘RESIZE时在剩余空间重新居中。提示使用主题文字色，辅助复制说明仅供无障碍读取。
 - 验证入口：`tools/tests/agent-suggestions.test.mjs` 执行组件真实计时、复制与销毁逻辑，校验60条中英文覆盖和联网文案排除；ArkUI观察更新、宽窄屏/深浅色、键盘、长按和悬停的最终效果须另做设备验收。
+
+### 当前场景与主动建议
+
+`model/agent/AgentAppRecommendations.ts` 是建议声明、条件和能力筛选的唯一入口。`buildAgentAppRecommendations` 只消费实际工具及已登记 UI 观察，同用于 `get_app_structure.recommendations` 和空会话提示，不请求模型、扫描卡面或读取数据库。`AppInterfaceTracker` 独占最近非 JIDE 页的 `contextPage`：页面隐藏保留上下文，销毁时 `leave` 清除；前台不是 JIDE 时只使用真正的当前页。返回的 `contextSurface` 说明进入助手前的页面，不把隐藏页面当成前台。未知/后台不生成建议。
+
+建议至多三条，附 `sourceSurface`、`contextSurface`、有限数值 `evidence`、`requiredTools` 和可选导航 `action`。附件只登记数量；牌组名、说明、正文、草稿和凭证不复制进建议。首页需牌组详情与首页选中 ID 一致且计数有效；学习读取实际 question/answer/done，浏览只在 list 阶段判断空结果。忙碌、错误、缺失和非法数字不伪装成零。已有学习/新增/编辑页时不推荐再开学习。零剩余仅建议核对统计和选项，不推断到期状态、调度结果或每日限额原因。
+
+工具缺失时移除相关建议，导航动作还需存在于 `APP_NAVIGATION_ACTIONS`。建议目录参与能力指纹，当前工具与声明变化会刷新指纹，用户计数不参与。建议不是用户命令、发现 ID 或授权；后续执行仍先发现真实对象，服从原 Scope、导航和确认边界。`AgentSessionContext` 让 JIDE 在用户询问下一步时读取当前结构；只有帮助本次目标时才补充一条建议，不必每轮推荐，已拒绝方向由当前对话约束。提示规则不保证真实模型一定采纳。
+
+空会话有场景建议时从它们开始，再接原60条通用提示；显示/重新进入和轮播切换时重新读取，不新增计时器或订阅。按住、悬停、复制及隐藏仍暂停切换，长按复制当前本地化请求。最多在下一次轮播切换更新场景，通用文案保留原入口。
+
+新增场景：先让实际 UI 状态拥有者发布必要语义事实，再在 `AGENT_APP_RECOMMENDATIONS` 登记所需工具与资源键，并在同文件条件分支消费这些事实；无需新增工具、后端注册或页面业务分支。中英文资源同步，行为回归在 `ai-agent-app-recommendations.test.mjs`；该测试执行真实牌组详情发布者、目录变化与上下文释放，`ai-agent-app-settings.test.mjs` 执行真实 Registry 零写入读取，`agent-suggestions.test.mjs` 执行显示/刷新/复制生命周期。未登记界面仍需接入原观察入口，不能声称自动识别全部手写 UI。
+
+本轮场景建议验收：`npm test -- agent`、资源/文档/架构/公共边界/组件字段检查及 `npm run build:app -- -SkipRust` 通过，增量警告门禁新增为零。原生源码未由本任务改动，复用已构建的双架构静态库；主机回归不证明真实模型会采纳建议，也不代替设备的 NavDestination 回调顺序、主题/尺寸、附件解析后提示刷新和长按体验。未安装设备、未调用真实提供商、未执行全库集成验收。
 
 ## 学习概览与复习负担
 
@@ -61,9 +129,12 @@ JIDE 页发布当前模式、历史/对话分区、发送/停止、文件解析�
 - `get_settings` 支持 20 项：深浅色、系统颜色、主题色、全库 FSRS、简洁模式、首页今日进度、触觉反馈、卡片字号、牌组列表宽度、学习布局、主题动效、自动备份、自动同步、媒体同步及待同步状态、统计小时/历史窗口、语言、学习快捷操作和图表偏好。语义 ID 与范围来自目录；持久化键和默认值白名单在 `AgentPreferenceSettings.ts`，平台只读适配在 `AgentPreferenceReader.ets`。默认值仅用于不存在的保存项，IO/类型失败上抛；不枚举任意 preference/RPC，不返回密钥、同步凭证或兑换码。偏好不等于设备能力、已登录、备份数量或正在同步，跨项读取也不是事务快照。
 - 主题读取区分持久化 `themeMode/colorTheme`、内存 `activeMode/activeColorTheme` 与实际 `effectiveDark`；`list_theme_colors` 返回合法 ID、种子色及当前权益可用状态。快捷操作共用设置页的兼容解析与保存队列，读取不广播 UI；图表偏好来自 Core。
 - `get_deck_options` 由 Scope 校验真实 ID；保留共享预设使用数量、牌组零限额、今日覆盖开关、父预设 ID 与全局 FSRS。`AgentDeckSettings.ts` 明确列出全部公开预设字段，包含学习/重学步骤、FSRS 参数/保留率、调度顺序/间隔/限额、兄弟卡埋藏、音频、计时器和自动推进；未知原始字节不发送。数组最多 64 项、文字最多 2000 字符，`truncatedFields` 明确标记局部结果。不能把预设上限称为今日实际排程数量，也不推断调度算法。
+- `propose_update_deck_options` 在助手、制卡、改卡共用真实注册，字段白名单由 `DeckOptionsCatalog.ts` 生成；`AgentDeckOptionsDraft.ets` 与 UI 共用字段编辑、校验和草稿构造。JIDE 先读取已发现的牌组，给出前后值、共享预设数量和作用范围；应用确认后经 `AgentDeckOptionsTools.ets` → `DeckOptionsSession` → `AnkiDeckOptions` 直接保存 Core，无需手动跳转。`preset` 修改共享预设，`deck` 在预设字段变化时克隆；牌组/今日覆盖只作用于当前牌组，全局开关在两种范围下都影响全库。简洁模式隐藏字段不影响这项已接通能力。
+- JIDE 参数使用 Core 单位：保持率为小数，SM-2 易度/倍率为倍数，步骤支持 s/m/h/d 或分钟，轻松日按周一至周日提交七个 0/0.5/1；未编辑的原有轻松日中间值仍保留。空覆盖清除，零每日限额禁用。确认执行核对登记载荷、真实配置指纹，并在共享队列内提交前重新读取；过期、篡改、重复确认或保存失败不能报告成功。只有执行结果 `completed` 且 `saved=true` 才可声称保存。未知协议字段保留在应用内，不给模型；工具不接受原始 RPC、自定义调度脚本或预设删除。
+- 确认卡显示目标牌组、预设及共享范围，保持率使用百分比，开关和枚举使用共同目录的本地化名称，轻松日逐星期显示最低/减少/正常，清除显示未设置；确认展示不改变登记的 Core 参数。`ai-agent-deck-options.test.mjs` 执行真实 Registry、确认执行器、会话及请求编解码，覆盖 SM-2 轻松日、单牌组克隆、零限额/清除、全局范围、未知字段保留、过期及失败。Core 在该测试中是注入边界，测试不证明设备保存或真实模型规划；HAP 和设备验收单独记录。升级依据及门禁见[牌组选项与 Core 升级](browser-stats.md#牌组选项与-core-升级)。
 - `propose_set_theme_color` 与 `propose_set_fsrs` 风险为 `write`，只生成 `setting_change` 动作。确认卡复用 `AgentActionCard`，显示前后值和范围；FSRS 开启说明全库重新调度，关闭不恢复原排程。`AgentActionExecutor` 消费登记的同一载荷，再校验设置 ID/类型及原值，主题权益在提交时重查。过期、篡改、重复确认失败；失败后的新提案须先重新读取，不盲目重试。
-- `propose_set_setting` 在 assistant/create/edit 共用一个严格工具，只支持 `AgentPreferenceSettings.agentWritablePreferenceIds()` 中已接通的三项：`card_text_size`（50–200 的整数百分比）、`deck_list_narrow` 和 `study_haptics`（开关）。参数 `value` 使用规范字符串，例如 `"130"`、`"true"`；其余设置仍只读。它读取当前值后生成既有 `setting_change`，确认卡显示本地化名称、百分比或宽/窄、前后值及本机范围，确认前零写入。
-- 三项修改复用设置页的 `saveCardTextSize`、`saveDeckListNarrow`、`saveStudyHaptics`。`utils/LocalPreferenceWrite.ets` 拥有这些键的共享串行队列，保存函数接受可选原值；确认执行在队列内重查原值，同状态不落盘，flush 与回读成功后才广播。助手读取等待已接受的保存。字号控件订阅公共值，学习/预览、牌组列表和触感继续消费既有 AppStorage 键；不改模板、调度、设备振动能力或存储协议。已有手动调用签名兼容。
+- `propose_set_setting` 在 assistant/create/edit 共用一个严格工具，只支持 `AgentPreferenceSettings.agentWritablePreferenceIds()` 中已接通的三项：`card_text_size`（50–200 的整数百分比）、`deck_list_style`（single_wide / single_narrow / double_wide / double_narrow）和 `study_haptics`（开关）。参数 `value` 使用规范字符串，例如 `"130"`、`"true"`；其余设置仍只读。它读取当前值后生成既有 `setting_change`，确认卡显示本地化名称、百分比或四种牌组样式、前后值及本机范围，确认前零写入。
+- 三项修改复用设置页的 `saveCardTextSize`、`saveDeckListStyle`、`saveStudyHaptics`。`utils/LocalPreferenceWrite.ets` 拥有这些键的共享串行队列，保存函数接受可选原值；确认执行在队列内重查原值，同状态不落盘，flush 与回读成功后才广播。助手读取等待已接受的保存。字号控件订阅公共值，学习/预览、牌组列表和触感继续消费既有 AppStorage 键；不改模板、调度或设备振动能力。牌组样式从旧宽窄键迁移，当前值与写入共用唯一存储入口；双列隐藏牌组计数、名称允许两行，窄样式保留页面密度联动。
 - 本机偏好结果区分 `saved/applied`：保存未确认或回读失败返回 `partial, saved=false`，已确认保存但广播失败返回 `partial, saved=true, applied=false`；只恢复偏好缓存，不声称磁盘已回滚。失败确认已消费，须重新读取再提案。`ai-agent-app-settings.test.mjs` 执行真实 Registry、读取适配、确认执行器及三项保存入口；`ai-agent-local-preference-write.test.mjs` 覆盖手动写入与确认的竞争、读取等待和回读失败。Node 不证明真实模型选择工具、ArkUI 观察更新或设备交互，需独立验收。
 - `AppThemeService` 的 `ThemeColorSession` 是设置页与助手共用的串行保存/回读/应用入口，深浅色与主题色使用不同键并在应用时读取另一维度；结果区分 `saved/applied/completed/partial`，部分成功保留失败状态。全库 FSRS 共用 `FSRS控制器.ets` 的串行变更入口，保留其余配置与未知协议字节，保存后回读、通知页面；同状态请求不写入、不重排。后台初始化与手动/助手切换共用队列。
 - `set_theme_mode` 风险为 `setting_write`，不能注册为 read、普通草稿或卡库写入。明确切换指令来自页面传入的本轮原始用户意图，不扫描模板、附件、记忆或 Provider 上下文。许可仅本轮一次使用；问题、否定、引用和卡片模板请求不授予直接写入。历史恢复、暂停继续和旧澄清回放不恢复许可；识别不到时要求明确切换命令。
@@ -182,6 +253,19 @@ JIDE 无公式正文与表格单元格在 `AgentMarkdownText` 的统一 Text 入
 - 2026-10-02 长输出修复的完整 `npm run verify` 通过（1964 项 Node 测试、原生/沙箱/RPC、clean 签名 HAP，268 项既有警告、新增0）；文档更新后的 `npm run verify -- repo` 再次通过。离线 Edge 共6组页面通过，长表格各行自然高度，短内容回执为21vp，不受844px viewport撑高；100次排版积压只新增两次必要排版且保留已有公式。此项仍不证明真机长输出流畅度或嵌套手势。
 - 本次设备覆盖安装尝试：连接的SLG-W50执行 `hdc -t <connect-key> install -r <signed-hap>` 被拒绝，错误9568322（签名验证失败，应用来源不受信任）。未更换签名、卸载或清数据，未重启旧应用；修复尚未安装，实际思考显示、高度与手势未验收。生成包为 `entry/build/default/outputs/default/entry-default-signed.hap`，后续需处理设备对既有本机签名配置的信任再覆盖安装。
 
+## Anki 官方教程按需读取
+
+JIDE 优先用已有官方资料解释 Anki 概念、学习、FSRS、搜索和模板。`search_anki_help` 只搜索章节标题、小节和中英文检索别名；空 query 分页列目录。`read_anki_help` 按返回的 topicId、可选 sectionId 读取原文，offset 相对所选范围，默认6000、最多12000字符，nextOffset=-1 仅表示该范围读完。先搜索再读有关段落，不预装整本手册，不把目录数量当阅读覆盖。
+
+- 单一资料来源是 [Anki 主仓库的官方手册](https://github.com/ankitects/anki/tree/main/docs-site/manual)，在线入口为 [Anki Docs](https://anki.mintlify.app/manual/intro)。旧 anki-manual 仓库正在迁移；当前选章与中文检索别名在 `tools/anki-manual-topics.json`，官方英文 MDX 原字节保存在 `resources/rawfile/anki-manual/topics/`。正文未翻译或改写，由 JIDE 用用户语言解释并引用返回的链接。
+- `index.json` 记录完整 Git revision、提交日期、原文 SHA-256、章节范围、来源链接及 CC BY-SA 4.0 许可证。NOTICE 和完整 LICENSE 随资源打包；原文、许可证或索引不一致时离线检查失败。图片与外链资源未打包，MDX 只作为文本参考，不运行组件或脚本。
+- `model/agent/AgentAnkiHelp.ts` 拥有参数、搜索、分页、读取代次和工具声明；`backend/agent/AgentAnkiHelpTools.ets` 只适配 ResourceManager。assistant/create/edit 共用两个只读工具，离线可用，不依赖联网开关。无能力上下文时页面不向模型声明它们；资源错误保留为工具失败。
+- 每次调用读取当前随包索引并返回 revision，恢复会话不冻结旧资料版本；每轮运行时指令要求旧引用重新核对。官方手册描述上游桌面 Anki，本应用界面、动作与设置支持仍从当前 `get_app_structure` / 工具声明读取。教程文字不授予操作权限。
+
+后续发布需要更新资料时，从官方 Git checkout 执行 `node tools/vendor-anki-manual.mjs --write --source-dir <checkout>`；脚本读取该 checkout 的已提交 HEAD 原文，不读取工作区改稿、不更新 Anki Core 锁、不隐式联网。默认校验使用显式 `--check`，更新流程见 [工具入口](../../tools/README.md)。快照随应用更新，不承诺运行时自动抓取公网最新内容。
+
+验证：`ai-agent-anki-help.test.mjs` 检查真实资源完整性、中文/英文查询、分段续读、取消、损坏失败和真实 ResourceManager/Registry 适配；`ai-agent-v2-runtime.test.mjs` 执行真实 Runner/Session 的搜索→读取→回复，以及恢复后读取新版 revision。新平台接口需增量 HAP；模型是否主动选择合适章节、真机读取与中文解释质量需另做验收。
+
 ## 文件资料与按页制卡
 
 输入区上方的文件状态卡片共用左右12vp内边距，成功、不支持和解析失败状态使用同一布局；右侧“移除”保留紧凑行内操作，卡片负责与边框的距离，输入区外层负责页面和底部安全区留白。
@@ -195,6 +279,18 @@ JIDE 的文件入口沿用 `AgentFileImportService.ets`，支持格式以 `Agent
 - `create_flashcards.cards[].sources` 接受实际读取的资料页；CardAgentTools 把经过转义的文件名和页码加入最后一个字段，用户可在既有草稿预览中编辑。原来的目标选择、草稿确认与卡库写入边界继续适用。
 
 直接测试：`npm test -- agent`，重点为 `ai-agent-documents.test.mjs` 和 `ai-agent-v2-runtime.test.mjs`，实际运行 Store/Registry/Runner/Session；平台支架故意不提供 API 23 方法。完整验证：`npm run verify`。原生合成 PDF/OCR 测试：先覆盖安装当前主 HAP，`npm run build:app -- -SkipRust -Test` 后 `node tools/test-agent-documents-device.mjs <connect-key>`（通过 DEVECO_HOME 定位 SDK）；测试不调用模型、不访问卡库。此次用户要求仅安装，具体平板操作交由用户，未验收真机 OCR 准确率、API 21 真机或真实提供商制卡效果。决策见 [按页资料读取](../decisions/2026-10-01-agent-document-reading.md)。
+
+## 牌组层级操作
+
+`propose_rename_deck(deckId, name)` 通过 `list_decks` 发现真实 ID 后提出改名，`name` 只允许当前层名称，移动父级用层级提案。工具必须单独调用，准备阶段只读；确认卡显示所选牌组及全部后代的前后路径。`AgentActionExecutor` 消费原确认账本的单次许可，将同一 `DeckRenamePlan` 交给手动入口共用的 `DeckHierarchyCommands.executeRename`，校验过期、冲突和同步占用后只调用一次 Core RenameDeck。取消、伪造、重复确认不会写入；旧计划不能覆盖刚发生的层级变化。改名支持集合撤销，本机别名保持不变。`AppInterface` 共用菜单说明及 `deck_rename` / `deck_customize` 实际状态；详情同时发布真实名称与别名，不能把别名当 Core 路径。回归为 `home-deck-rename.test.mjs`、`ai-agent-v2-runtime.test.mjs` 和真实 Core `deck_rename.rs`；手动交互见[真实改名](home.md#牌组真实改名与本机显示名称)。
+
+JIDE 与主页拖动排序共用 `DeckHierarchyCommands.ets` 和原本机牌组顺序偏好。`get_deck_order(parentId)` 读取实际同级顺序和完整路径（含隐藏牌组），将直接子牌组 ID 登记到 Scope；0 表示顶级，其他父级必须先发现。`propose_reorder_decks` 提交该父级全部直接子牌组的一次完整排列，不能缺失、重复或混入其他父级；确认卡展示前后顺序与本机保存范围。提案只读，必须单独调用；确认执行时重查父级路径、直接子牌组与本机顺序指纹，单次保存后明确返回 `scope=device` / `synced=false`。存储失败、过期或伪造确认不返回成功。层级仍使用下述明确父级的提案；排序不提供层级写入。共同声明和真实首页发布的 `deck_reorder` 包含当前行序及可用状态。回归见 `home-deck-order.test.mjs`、`ai-agent-v2-runtime.test.mjs` 的读取 → 提案 → 确认链。
+
+`propose_reparent_decks` 接受已发现的 `deckIds` 和 `parentId`，父级为 0 表示提升至顶级；其他目标 ID 也必须由 `list_decks` 等读取进入 Scope。这是已有牌组的层级调整，区别于 `propose_move_cards` 移动卡片和 `propose_create_deck` 新建牌组。工具通过 `AgentExtensionTools` 同时声明参数、示例和确认风险，当前工具目录与能力指纹自动更新；不能在一轮中与其他工具并发调用。
+
+`AgentAuxiliaryTools` 只调用纯模型 `DeckReparent.planDeckReparent` 读取和准备 `reparent_decks` 提案，不持有确认执行器。确认卡显示完整前后路径及包含子牌组的说明；不以本机显示别名充当 Core 路径。用户确认后，`AgentActionExecutor` 消费绑定载荷的一次性许可，再交给与手动界面共用的 `DeckHierarchyCommands.execute` 重查子树/目标、冲突和同步占用，最终只调用一次 Core ReparentDecks。恢复 pending 提案重新登记原载荷，执行前仍校验当前层级；executing 崩溃恢复保持结果未知，不重放写入。拒绝、取消、过期及失败都不能宣称移动成功。
+
+手动入口与当前候选、忙碌和按钮可用状态由 `AppInterface` / `DeckReparentFeature` 发布；读取到 UI 控件不赋予任意点击权限。行为和返回/退出边界见[首页](home.md#牌组展开记忆与手机详情)。`ai-agent-v2-runtime.test.mjs` 执行真实 Registry / Runner / Session / 确认执行器，覆盖读取发现、父子重叠、批量提案、确认、防伪造、过期、取消和单独调用；Core 保留卡片与记录、撤销的验证在 `native/rsharmony/tests/deck_reparent.rs`。真实模型与设备交互单独验收。
 
 ## 多牌组删除
 
@@ -210,3 +306,24 @@ JIDE 的文件入口沿用 `AgentFileImportService.ets`，支持格式以 `Agent
 
 
 JIDE 目标澄清的“选择”、目标弹窗的“新建笔记类型”、主题结果的“撤销”及联网配置的购买入口使用 LabeledActionRow，说明/状态左侧可换行、辅助按钮右侧限宽省略。联网提供商使用 FormSelectRow，额度购买说明单独一行，避免标签/提供商/购买按钮三者互挤。处理、目标加载、撤销及服务加载的禁用条件与原业务回调保留；纯布局改变不触发提供商请求。
+
+## FSRS 评价与逐日模拟（2026-10-05）
+
+共同声明在 [AgentFsrsTools.ts](../../entry/src/main/ets/model/agent/AgentFsrsTools.ts)，运行时在 [AgentFsrsTools.ets](../../entry/src/main/ets/backend/agent/AgentFsrsTools.ets)。三个模式使用同一声明、风险登记与真实注册；get_app_structure 的工具清单和指纹自动包含这些能力。
+
+- `evaluate_fsrs`：评价给定的17/19/21个参数或已存参数；空数组使用 Core 默认。走 EvaluateParamsLegacy，返回历史拟合 log loss/RMSE 与实际参数、预设、搜索、截止日期。不是独立测试或健康检查，不保存参数。
+- `get_fsrs_history_count`：沿用同一预设/paramSearch 和历史日期，返回 included/total，单位是非新卡卡片数。
+- `compute_fsrs_memory_state`：只读计算已发现卡片的历史状态；state=null 表示无可用历史。标记 computed_from_history/saved=false。
+- `propose_simulate_fsrs`：只创建提案，1–365 天，可以覆盖保持率和新卡/复习限额。原确认卡显示范围、天数和情景；AgentActionExecutor 确认后复查配置快照并调用真实 Core，逐日返回复习数、新卡数、秒数及记忆量。Core 模拟可能补存缺失 memory_state，因此不注册成只读；不保存情景参数或修改到期日。卡片/历史在提案后仍可自然变化，结果反映执行时集合；配置变化拒绝旧提案。
+
+原 FSRS 手动面板增加单次草稿评价，直接复用 FsrsService 和集合占用、离页代次。`deck_options_fsrs` 共同 UI 声明与真实挂载观察发布当前搜索、日期、计数和评价结果；不会把待计算显示成零。字段编辑支持在 get_app_structure.noteEditing 读取，plainText 明确为默认 HTML 源码模式，字体仅使用已安装字体和系统回退。音频顺序在 cardRendering.avOrder 声明。
+
+## 类型级 LaTeX 配置（2026-10-05）
+
+复杂源码配置通过 JIDE 提供，复用原双重确认卡，不新增配置页面。先用 `get_notetype_details` 读取已发现类型的真实 JSON；`propose_update_notetype_latex` 接受 `notetypeId`、可选 `latexPre/latexPost/latexSvg` 与草稿理由，至少修改一项。源码各最多30000字符，省略保留，显式空串清空，false 保留为明确关闭。锁定 Core 的旧版 JSON 使用 `latexPre/latexPost/latexsvg`，工具的 `latexSvg` 映射最后一项，不能写成旧盘点中的全小写 latexpre/latexpost。
+
+`AgentNotetypeLatex.ts` 拥有补丁、差异和回读比较；`AgentMaintenanceTools` 只读取快照及跨牌组影响、准备高风险草稿。确认卡显示真实源码及 SVG 前后值。`AgentDraftExecutor` 提交前重查完整类型快照、笔记和卡片 ID 集合，双重确认后走既有 UpdateNotetypeLegacy 并回读；未保存、回读不一致或 Core 拒绝均报告失败。字段、模板、CSS、身份及未知属性从真实原始类型保留。修改配置不会提供设备 TeX 编译或生成图片预览，已有 MathJax 与外部生成图片使用原路径。
+
+回归见 `ai-agent-maintenance.test.mjs`：无写入提案、空串/false、两次确认、过期类型、影响变化、重复执行、失败回读、中英文差异和失败重试范围。真实 Core 往返用 `native/rsharmony/tests/notetype_text_export.rs` 验证配置、身份、未知属性及卡片调度；本轮主机执行结果见 [实施验收](../decisions/2026-10-04-ankicore-ui-routing.md#实施验收)。
+
+回归：`ai-agent-fsrs-tools.test.mjs`、`deck-options-fsrs.test.mjs`、`deck-options-fsrs-protocol.test.mjs`、`ai-agent-app-structure.test.mjs`；真实 Core 见 `native/rsharmony/tests/fsrs.rs`，设备验收独立记录。

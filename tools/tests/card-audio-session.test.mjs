@@ -15,6 +15,47 @@ const deferred = () => {
   return { promise, resolve, reject };
 };
 const tags = name => ({ soundFiles: [name], ttsItems: [{ text: name, language: 'en_US' }] });
+
+function mixedTags() {
+  const wire = new 协议写入器();
+  for (const item of ['a.mp3', { text: 'middle', language: 'en_US' }, 'c.mp3', 'd.mp3']) {
+    const tag = new 协议写入器();
+    if (typeof item === 'string') tag.写入字符串(1, item);
+    else {
+      const tts = new 协议写入器();
+      tts.写入字符串(1, item.text); tts.写入字符串(2, item.language);
+      tag.写入子消息(2, tts);
+    }
+    wire.写入子消息(2, tag);
+  }
+  return decodeExtractAvTagsResponse(wire.转为字节());
+}
+
+test('Core AV order reaches playback and only adjacent sounds are batched', async () => {
+  const decoded = mixedTags();
+  assert.deepEqual(decoded.items.map(item => item.soundFile ?? item.tts.text), ['a.mp3', 'middle', 'c.mp3', 'd.mp3']);
+  const { session, played } = harness(async () => decoded);
+  await session.play('mixed', true, '/media');
+  assert.deepEqual(played(), [
+    ['sound', ['/media/a.mp3']], ['tts', [{ text: 'middle', language: 'en_US', voices: [], speed: 1, otherArgs: [] }]],
+    ['sound', ['/media/c.mp3', '/media/d.mp3']]
+  ]);
+});
+
+test('cancelling during the middle TTS segment prevents later sound playback', async () => {
+  const { session, tts, played } = harness(async () => mixedTags());
+  const done = new AudioQueueCompletion();
+  const play = tts.播放队列;
+  tts.播放队列 = async items => { done.begin(); await play(items); };
+  tts.waitForCompletion = () => done.wait();
+  tts.停止 = async () => done.finish();
+  const pending = session.play('mixed', true, '/media');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(played().length, 2);
+  await session.stop();
+  assert.equal(await pending, null);
+  assert.equal(played().length, 2);
+});
 function harness(extract = async html => tags(html)) {
   const events = [];
   const player = label => ({

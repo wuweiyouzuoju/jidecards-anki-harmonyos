@@ -37,6 +37,8 @@ export class SearchExecutionError extends Error {
 
 export function toolRiskOf(toolName: string): ToolRisk {
   switch (toolName) {
+    case 'navigate_app':
+      return 'navigation';
     case 'set_theme_mode':
       return 'setting_write';
     case 'list_documents':
@@ -44,10 +46,16 @@ export function toolRiskOf(toolName: string): ToolRisk {
     case 'ocr_document_page':
     case 'save_document_notes':
     case 'get_app_structure':
+    case 'search_anki_help':
+    case 'read_anki_help':
     case 'list_settings':
     case 'get_settings':
     case 'list_theme_colors':
     case 'get_deck_options':
+    case 'evaluate_fsrs':
+    case 'get_fsrs_history_count':
+    case 'compute_fsrs_memory_state':
+    case 'get_advanced_settings':
     case 'execute_code':
     case 'get_note_type_capabilities':
     case 'get_note_context':
@@ -71,7 +79,13 @@ export function toolRiskOf(toolName: string): ToolRisk {
     case 'propose_move_cards':
     case 'propose_set_theme_color':
     case 'propose_set_fsrs':
+    case 'propose_update_deck_options':
+    case 'propose_simulate_fsrs':
     case 'propose_set_setting':
+    case 'propose_update_collection_preferences':
+    case 'propose_update_study_controls':
+    case 'propose_export_subset':
+    case 'propose_duplicate_note':
       return 'write';
     case 'remove_notes':
     case 'remove_cards':
@@ -86,6 +100,9 @@ export function toolRiskOf(toolName: string): ToolRisk {
     case 'propose_change_note_type':
     case 'propose_update_note_type_templates':
     case 'propose_update_card_style':
+    case 'propose_update_notetype_fields':
+    case 'propose_update_notetype_latex':
+    case 'propose_restore_notetype':
       return 'high_risk';
     default:
       return extensionToolRisk(toolName);

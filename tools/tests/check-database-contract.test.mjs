@@ -61,7 +61,7 @@ test('settings panel wires check database entry to the service with busy guard',
   assert.match(read(DATA_GROUP), /this\.onCheckDatabase\(\)/);
 
   const group = read(DATA_GROUP);
-  assert.match(group, /\.enabled\(!this\.databaseBusy\)/, 'row disabled while busy');
+  assert.match(group, /isInteractive: !this\.databaseBusy/, 'row disabled while busy');
   assert.match(group, /this\.databaseBusy \? \$r\('app\.string\.check_db_running'\)/,
     'busy state visible on the row');
 });

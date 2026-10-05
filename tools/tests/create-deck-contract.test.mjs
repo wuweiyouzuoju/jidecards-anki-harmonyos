@@ -85,7 +85,7 @@ test('create deck panel uses shared dimension tokens and string resources', () =
   for (const key of ['create_deck_title', 'create_deck_creating']) {
     assert.match(panel, new RegExp(`app\\.string\\.${key}`), `panel must use ${key}`);
   }
-  for (const id of ['name', 'confirm', 'cancel']) assert.ok(panel.includes(`interfaceItemText(this.getUIContext(), 'create_deck', '${id}')`));
+  for (const id of ['name', 'confirm', 'cancel']) assert.ok(panel.includes(`interfaceItemText(this.getUIContext(), 'create_deck', '${id}', this.uiLanguage)`));
 });
 
 test('deck service creates decks via NewDeck template then AddDeck', () => {

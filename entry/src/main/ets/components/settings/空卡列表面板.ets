@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { DialogBackdrop } from '../common/DialogBackdrop';
 import { resourceText } from '../../utils/UiFeedback';
@@ -44,6 +45,7 @@ import type { 笔记空卡 } from '../../proto/messages/CardRenderingMessages';
 
 @Component
 export struct 空卡列表面板 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
 
   private handleBackRequest(): void {
@@ -69,11 +71,11 @@ export struct 空卡列表面板 {
     this.执行检查();
   }
 
-  private 取本地化文本(资源: Resource): string {
+  private 取本地化文本(资源: Resource, _locale: string = this.uiLanguage): string {
     return resourceText(this.getUIContext(), 资源);
   }
 
-  private 取本地化带参文本(资源: Resource, 参数: Array<string | number>): string {
+  private 取本地化带参文本(资源: Resource, 参数: Array<string | number>, _locale: string = this.uiLanguage): string {
     return resourceText(this.getUIContext(), 资源, ...参数);
   }
 
@@ -279,7 +281,7 @@ export struct 空卡列表面板 {
                   .layoutWeight(1)
                 if (this.笔记列表.length > 0) {
                   Button() {
-                    Text() { ThemeTextSpans(this.全选状态() ? $r('app.string.empty_cards_deselect_all') : $r('app.string.empty_cards_select_all'), this.themeAccentColors, this.getUIContext()) }.fontColor(this.主色按钮背景).fontSize(应用尺寸.字号_正文_小)
+                    Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(this.全选状态() ? $r('app.string.empty_cards_deselect_all') : $r('app.string.empty_cards_select_all'), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }.fontColor(this.主色按钮背景).fontSize(应用尺寸.字号_正文_小)
                   }
                     .type(ButtonType.Normal)
                     .backgroundColor(Color.Transparent)
@@ -345,7 +347,7 @@ export struct 空卡列表面板 {
       .constraintSize({ maxWidth: 480, maxHeight: '88%' })
       .padding(应用尺寸.面板内边距)
       .backgroundColor($r('app.color.surface_card'))
-      .borderRadius(应用尺寸.圆角_卡片)
+      .borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
       .onClick(() => {})
       .transition(TransitionEffect.asymmetric(
         TransitionEffect.opacity(0)

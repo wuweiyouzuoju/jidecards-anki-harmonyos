@@ -44,16 +44,50 @@
 
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { 牌组列表项 } from '../牌组列表项';
-import { DECK_LIST_NARROW_KEY, deckListOverflows } from '../../model/DeckListAppearance';
+import { DECK_LIST_NARROW_KEY, DECK_LIST_STYLE_KEY, isDoubleColumnDeckListStyle,
+  deckListOverflows, groupDeckListRows, groupedDeckListOverflows, DeckListGroup } from '../../model/DeckListAppearance';
 import { 统一加载态 } from '../common/统一加载态';
 import { 统一空态 } from '../common/统一空态';
 import { 统一错误态 } from '../common/统一错误态';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 牌组列表数据源, 牌组汇总, 牌组色调, 主页加载状态 } from '../../model/主页模型';
 
+interface HomeDeckGroup {
+  rootId: string;
+  decks: 牌组汇总[];
+}
+
+/** 展示适配器只拥有顶级分组快照；持久顺序和展开状态仍归原数据源。 */
+class HomeDeckGroupSource implements IDataSource {
+  private groups: HomeDeckGroup[] = [];
+  private listeners: DataChangeListener[] = [];
+
+  totalCount(): number { return this.groups.length; }
+  getData(index: number): HomeDeckGroup { return this.groups[index]; }
+  groupCounts(): number[] { return this.groups.map((group: HomeDeckGroup): number => group.decks.length); }
+
+  replaceDecks(decks: 牌组汇总[]): void {
+    const ranges: DeckListGroup[] = groupDeckListRows(decks.map((deck: 牌组汇总): string =>
+      deck.ancestorIds.length > 0 ? deck.ancestorIds[0] : deck.id));
+    this.groups = ranges.map((range: DeckListGroup): HomeDeckGroup => {
+      return { rootId: range.rootId, decks: decks.slice(range.start, range.start + range.count) };
+    });
+    for (const listener of this.listeners) { listener.onDataReloaded(); }
+  }
+
+  registerDataChangeListener(listener: DataChangeListener): void {
+    if (!this.listeners.includes(listener)) { this.listeners.push(listener); }
+  }
+  unregisterDataChangeListener(listener: DataChangeListener): void {
+    const index: number = this.listeners.indexOf(listener);
+    if (index >= 0) { this.listeners.splice(index, 1); }
+  }
+}
+
 @Component
 export struct 主页牌组列表 {
   @StorageProp(DECK_LIST_NARROW_KEY) @Watch('reportOverflow') private narrow: boolean = false;
+  @StorageProp(DECK_LIST_STYLE_KEY) @Watch('reportOverflow') private style: string = 'single_wide';
   // 引用类型字段：保持引用同一性，不深拷贝。
   // 牌组数据源 内部维护 DataChangeListener，LazyForEach 通过它自刷新；@Prop 深拷贝会破坏监听关系。
   牌组数据源: 牌组列表数据源 = new 牌组列表数据源([]);
@@ -63,7 +97,8 @@ export struct 主页牌组列表 {
   @Prop 展开的牌组ID集合: Set<string> = new Set<string>();
 
   @Prop 选中的牌组ID: string = '';
-  @Prop 排序模式中: boolean = false;
+  @Prop @Watch('reportOverflow') 排序模式中: boolean = false;
+  @Prop reorderBusy: boolean = false;
   @Prop @Watch('reportOverflow') 加载状态: 主页加载状态 = 'loading';
   @Prop 动作主色: string = '#2F5FD0';
   @Prop 主色按钮背景色: string = '#2F5FD0';
@@ -77,6 +112,7 @@ export struct 主页牌组列表 {
   onItemToneChange: (deckId: string, tone: 牌组色调) => void
     = (deckId: string, tone: 牌组色调): void => {};
   onItemCustomize: (deckId: string) => void = (deckId: string): void => {};
+  onItemRename: (deckId: string) => void = (_deckId: string): void => {};
   onItemEnterReorder: (deckId: string) => void = (deckId: string): void => {};
   onItemDelete: (deckId: string) => void = (deckId: string): void => {};
   onItemHide: (deckId: string) => void = (deckId: string): void => {};
@@ -86,28 +122,42 @@ export struct 主页牌组列表 {
   onRetry: () => void = (): void => {};
   onOverflowChange: (overflow: boolean) => void = (_overflow: boolean): void => {};
   private viewportHeight: number = 0;
+  private readonly groupSource: HomeDeckGroupSource = new HomeDeckGroupSource();
   private readonly overflowListener: DataChangeListener = {
-    onDataReloaded: (): void => { this.reportOverflow(); },
-    onDataAdded: (_index: number): void => { this.reportOverflow(); },
-    onDataChanged: (_index: number): void => { this.reportOverflow(); },
-    onDataDeleted: (_index: number): void => { this.reportOverflow(); },
-    onDataMoved: (_from: number, _to: number): void => { this.reportOverflow(); },
-    onDataAdd: (_index: number): void => { this.reportOverflow(); },
-    onDataChange: (_index: number): void => { this.reportOverflow(); },
-    onDataDelete: (_index: number): void => { this.reportOverflow(); },
-    onDataMove: (_from: number, _to: number): void => { this.reportOverflow(); },
-    onDatasetChange: (_operations: DataOperation[]): void => { this.reportOverflow(); }
+    onDataReloaded: (): void => { this.refreshDeckGroups(); },
+    onDataAdded: (_index: number): void => { this.refreshDeckGroups(); },
+    onDataChanged: (_index: number): void => { this.refreshDeckGroups(); },
+    onDataDeleted: (_index: number): void => { this.refreshDeckGroups(); },
+    onDataMoved: (_from: number, _to: number): void => { this.refreshDeckGroups(); },
+    onDataAdd: (_index: number): void => { this.refreshDeckGroups(); },
+    onDataChange: (_index: number): void => { this.refreshDeckGroups(); },
+    onDataDelete: (_index: number): void => { this.refreshDeckGroups(); },
+    onDataMove: (_from: number, _to: number): void => { this.refreshDeckGroups(); },
+    onDatasetChange: (_operations: DataOperation[]): void => { this.refreshDeckGroups(); }
   };
 
+  private refreshDeckGroups(): void {
+    this.groupSource.replaceDecks(this.牌组数据源.snapshotDecks());
+    this.reportOverflow();
+  }
+
   private reportOverflow(): void {
-    this.onOverflowChange(this.加载状态 === 'ready' && deckListOverflows(
-      this.牌组数据源.totalCount(),
-      this.narrow ? 应用尺寸.narrowDeckRowHeight : 应用尺寸.牌组行高度,
-      应用尺寸.页面分组间距(this.narrow), this.viewportHeight));
+    const rowHeight: number = 应用尺寸.deckRowHeight(this.narrow, isDoubleColumnDeckListStyle(this.style));
+    const gap: number = 应用尺寸.页面分组间距(this.narrow);
+    const overflow: boolean = this.columnCount() === 2 ? groupedDeckListOverflows(
+      this.groupSource.groupCounts(), rowHeight, gap, this.viewportHeight) : deckListOverflows(
+        this.牌组数据源.totalCount(), rowHeight, gap, this.viewportHeight);
+    this.onOverflowChange(this.加载状态 === 'ready' && overflow);
+  }
+
+  private columnCount(): number {
+    // 排序需要每个牌组的原始索引，临时恢复单列；退出后仍保留所选样式。
+    return isDoubleColumnDeckListStyle(this.style) && !this.排序模式中 && this.加载状态 === 'ready' ? 2 : 1;
   }
 
   aboutToAppear(): void {
     this.牌组数据源.registerDataChangeListener(this.overflowListener);
+    this.refreshDeckGroups();
   }
 
   aboutToDisappear(): void {
@@ -116,6 +166,7 @@ export struct 主页牌组列表 {
   }
 
   private async refreshDecks(): Promise<void> {
+    if (this.排序模式中 || this.reorderBusy) return;
     this.刷新指示器开关 = true;
     try {
       await this.onRefresh();
@@ -125,52 +176,76 @@ export struct 主页牌组列表 {
     }
   }
 
+  private deckKey(deck: 牌组汇总): string {
+    return `${deck.id}_${deck.fullName}_${deck.hasChildren}_${deck.tone}_${deck.displayName}_${deck.description}_${deck.newCount}_${deck.learningCount}_${deck.reviewCount}_${deck.totalCards}_${deck.backgroundImage}`;
+  }
+
+  @Builder
+  private deckItem(deck: 牌组汇总) {
+    牌组列表项({
+      deck: deck,
+      hideStudyCounts: isDoubleColumnDeckListStyle(this.style),
+      selected: deck.id === this.选中的牌组ID,
+      reorderMode: this.排序模式中,
+      onSelect: (deckId: string): void => {
+        this.onItemSelect(deckId);
+      },
+      expanded: this.展开的牌组ID集合.has(deck.id),
+      onToggle: (deckId: string): void => {
+        this.onItemToggle(deckId);
+      },
+      onToneChange: (deckId: string, tone: 牌组色调): void => {
+        this.onItemToneChange(deckId, tone);
+      },
+      onCustomizeDeck: (deckId: string): void => {
+        this.onItemCustomize(deckId);
+      },
+      onRenameDeck: (deckId: string): void => { this.onItemRename(deckId); },
+      onEnterReorder: (deckId: string): void => {
+        this.onItemEnterReorder(deckId);
+      },
+      onDeleteDeck: (deckId: string): void => {
+        this.onItemDelete(deckId);
+      },
+      onHideDeck: (deckId: string): void => {
+        this.onItemHide(deckId);
+      },
+      onDoubleTap: (deckId: string): void => {
+        this.onItemDoubleTap(deckId);
+      },
+      onCustomStudy: (deckId: string): void => {
+        this.onItemCustomStudy(deckId);
+      }
+    })
+  }
+
   build() {
     Column({ space: 应用尺寸.间距_10 }) {
       // 排序模式的退出/完成入口在顶部工具栏（主页顶部工具栏 排序模式分支），此处不再渲染操作行。
       // 指示器等待刷新 Promise 落定，成功、失败或跳过都收起。
       Refresh({ refreshing: $$this.刷新指示器开关 }) {
         List({ scroller: this.牌组列表滚动器, space: 应用尺寸.页面分组间距(this.narrow) }) {
-          LazyForEach(this.牌组数据源, (deck: 牌组汇总) => {
-            ListItem() {
-              牌组列表项({
-                deck: deck,
-                selected: deck.id === this.选中的牌组ID,
-                reorderMode: this.排序模式中,
-                onSelect: (deckId: string): void => {
-                  this.onItemSelect(deckId);
-                },
-                expanded: this.展开的牌组ID集合.has(deck.id),
-                onToggle: (deckId: string): void => {
-                  this.onItemToggle(deckId);
-                },
-                onToneChange: (deckId: string, tone: 牌组色调): void => {
-                  this.onItemToneChange(deckId, tone);
-                },
-                onCustomizeDeck: (deckId: string): void => {
-                  this.onItemCustomize(deckId);
-                },
-                onEnterReorder: (deckId: string): void => {
-                  this.onItemEnterReorder(deckId);
-                },
-                onDeleteDeck: (deckId: string): void => {
-                  this.onItemDelete(deckId);
-                },
-                onHideDeck: (deckId: string): void => {
-                  this.onItemHide(deckId);
-                },
-                onDoubleTap: (deckId: string): void => {
-                  this.onItemDoubleTap(deckId);
-                },
-                onCustomStudy: (deckId: string): void => {
-                  this.onItemCustomStudy(deckId);
+          if (this.columnCount() === 2) {
+            LazyForEach(this.groupSource, (group: HomeDeckGroup) => {
+              ListItem() {
+                Column({ space: 应用尺寸.页面分组间距(this.narrow) }) {
+                  ForEach(group.decks, (deck: 牌组汇总) => {
+                    this.deckItem(deck)
+                  }, (deck: 牌组汇总): string => this.deckKey(deck))
                 }
-              })
-            }
-          }, (deck: 牌组汇总) => `${deck.id}_${deck.tone}_${deck.displayName}_${deck.newCount}_${deck.learningCount}_${deck.reviewCount}_${deck.totalCards}_${deck.backgroundImage}_${this.排序模式中 ? 1 : 0}`)
-          .onMove((from: number, to: number): void => {
-            this.onMove(from, to);
-          })
+                .width('100%')
+                .alignItems(HorizontalAlign.Start)
+              }
+            }, (group: HomeDeckGroup): string => group.rootId + ':' +
+              group.decks.map((deck: 牌组汇总): string => this.deckKey(deck)).join('|'))
+          } else {
+            LazyForEach(this.牌组数据源, (deck: 牌组汇总) => {
+              ListItem() {
+                this.deckItem(deck)
+              }
+            }, (deck: 牌组汇总) => `${deck.id}_${deck.fullName}_${deck.hasChildren}_${deck.tone}_${deck.displayName}_${deck.newCount}_${deck.learningCount}_${deck.reviewCount}_${deck.totalCards}_${deck.backgroundImage}_${this.排序模式中 ? 1 : 0}`)
+            .onMove(this.排序模式中 && !this.reorderBusy ? this.onMove : undefined)
+          }
 
           // 三态 ListItem：加载 / 错误 / 空。统一使用 共用积木 组件，
           // 外层 Row + padding 控制高度（统一三态积木自身 height 100% 会撑满，padding 吸收垂直空间）。
@@ -217,6 +292,7 @@ export struct 主页牌组列表 {
           }
         }
         .width('100%')
+        .lanes(this.columnCount(), 应用尺寸.页面分组间距(this.narrow))
         .layoutWeight(1)
         .scrollBar(BarState.Auto)
         .edgeEffect(EdgeEffect.Spring)

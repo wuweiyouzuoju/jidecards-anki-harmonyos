@@ -42,7 +42,7 @@ test('DeckConfig form enforces Anki 26.05 field bounds and FSRS array shapes ato
   const { emptyDeckConfigSettings } = await import('../../entry/src/main/ets/proto/messages/DeckConfigMessages.ts');
   const settings = emptyDeckConfigSettings();
   const form = 牌组配置表单.从配置创建(settings);
-  form.每日新卡数文本 = '10000'; form.设置数值字段('initialEase', '1.3'); form.设置数值字段('historicalRetention', '0.98');
+  form.每日新卡数文本 = '10000'; form.设置数值字段('initialEase', '1.3'); form.设置数值字段('historicalRetention', '0.49');
   form.设置浮点数组字段('easyDaysPercentages', '1 1 1'); form.设置浮点数组字段('fsrsParams6', Array.from({ length: 20 }, () => '1').join(' '));
   const before = JSON.stringify(settings);
   const keys = form.校验().map((issue) => issue.字段键);

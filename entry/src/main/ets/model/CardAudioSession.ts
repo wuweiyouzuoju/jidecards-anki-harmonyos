@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import type { AvTagsResult, TtsItem } from '../proto/messages/CardRenderingMessages';
+import type { AvTagsResult, AvItem, TtsItem } from '../proto/messages/CardRenderingMessages';
+import { orderedAvItems } from '../proto/messages/CardRenderingMessages';
 
 /** 原生播放器与行为测试共用的最小队列边界。 */
 export interface AudioQueuePlayer<T> {
@@ -64,22 +65,36 @@ export class CardAudioSession {
       const tags: AvTagsResult = await this.extract(html, question);
       if (!this.isCurrent(version)) { return null; }
       groups.push(tags);
-      const hasAudio: boolean = groups.some((group: AvTagsResult): boolean => group.soundFiles.length > 0 || group.ttsItems.length > 0);
+      const hasAudio: boolean = groups.some((group: AvTagsResult): boolean => orderedAvItems(group).length > 0);
       onReady(hasAudio);
       if (!autoplay) { return hasAudio; }
       const playback: Promise<void> = this.work.then(async (): Promise<void> => {
         for (const group of groups) {
           if (!this.isCurrent(version)) { return; }
-          const paths: string[] = group.soundFiles.map((name: string): string => {
-            let decoded: string = name;
-            try { decoded = decodeURIComponent(name); } catch (_) { /* 文件名可以含非编码的 %。 */ }
-            return this.soundPath(mediaDirectory, decoded);
-          });
-          await this.sound.播放队列(paths);
-          await this.sound.waitForCompletion();
-          if (!this.isCurrent(version)) { return; }
-          await this.tts.播放队列(group.ttsItems);
-          await this.tts.waitForCompletion();
+          const items: AvItem[] = orderedAvItems(group);
+          let index: number = 0;
+          // 只合并相邻同类项目；跨播放器切换必须等待上一段真正结束。
+          while (index < items.length) {
+            if (!this.isCurrent(version)) return;
+            const sounds: string[] = [];
+            const speech: TtsItem[] = [];
+            const isSound: boolean = items[index].soundFile !== null;
+            while (index < items.length && (items[index].soundFile !== null) === isSound) {
+              const item: AvItem = items[index++];
+              if (item.soundFile !== null) {
+                let decoded: string = item.soundFile;
+                try { decoded = decodeURIComponent(decoded); } catch (_) { /* 保留文件名中的字面 %。 */ }
+                sounds.push(this.soundPath(mediaDirectory, decoded));
+              } else if (item.tts !== null) speech.push(item.tts);
+            }
+            if (isSound) {
+              await this.sound.播放队列(sounds);
+              await this.sound.waitForCompletion();
+            } else {
+              await this.tts.播放队列(speech);
+              await this.tts.waitForCompletion();
+            }
+          }
         }
       });
       // 保持队列可继续使用，错误仍通过本次 play 返回调用页面。

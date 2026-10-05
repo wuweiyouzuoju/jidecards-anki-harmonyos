@@ -2,6 +2,12 @@
 
 [返回任务索引](../../PROJECT_CONTEXT.md)
 
+旗标与标星的实现、协议边界及验证记录见 [2026-10-03 对接记录](flags-marking-audit-2026-10-03.md)。
+
+浏览器支持无旗标、七色旗标、已标星及未标星快捷筛选，AND 组合原搜索。星标筛选使用 `tag:re:^marked$`，与 Core 的完整标签判断一致；用户输入的 `tag:marked` 保留 Anki 包含子标签的搜索语义。行快照分别保留星标、旗标颜色和暂停状态，分页沿用同一份标记集合；笔记行显示笔记星标，不把兄弟卡的某一种旗标误表示为整个笔记的旗标。
+
+批量“标星／取消标星”先解析、去重笔记 ID，再读取最新笔记，只增删完整 `marked` 标签并一次提交可撤销的 UpdateNotes，保留字段和 `marked::child`。旗标复用 SetFlag，笔记模式展开全部兄弟卡。菜单中的旗标名称使用 Anki 的 `flagLabels` 配置，仅写入编辑过的颜色，留空删除该键恢复默认，保留其他颜色和未知配置值。写入仍由 BrowserOperationController 等待集合、冻结选择、请求同步和刷新搜索，离页不撤回已接受写入。
+
 统计/笔记界面认知入口见 [软件界面认知](agent.md#软件界面认知)。统计页直接遍历共用分区定义，原图表组件发布范围/空数据/禁用状态；新增页、编辑加载页与编辑表单各自发布实际状态，不触碰查询、草稿或写入会话。新增回归为 `ai-agent-page-awareness.test.mjs`，编辑与统计原生命周期回归仍保留。
 
 - 代码路径以下均相对 `entry/src/main/ets/`。
@@ -10,13 +16,47 @@
 
 ## 浏览列表
 
+结果卡片通过 `卡片表格.rowBorder()` 复用 `SurfaceBorder` 的完整1vp轮廓；无旗标、标星、暂停和埋藏都不取消边框。有旗标时左侧保留4vp色条，其余三边保持公共中性描边，宽度与颜色分别用 EdgeWidths / EdgeColors 组合。此样式不拥有搜索、选择或分页状态；回归见 `ui-surface-border.test.mjs` 的实际行样式执行。
+
+筛选侧栏的牌组树由 `BrowserSidebar.browserDeckRows` 重建完整路径，保留 Core 的末级显示名称、层级、计数和折叠状态。点击替换搜索与长按追加条件都传 `fullName`，不能使用 `DeckTreeNode.name` 搜索子牌组，否则 `父牌组::子牌组` 会被误搜成顶层 `子牌组`，显示零结果或命中同名牌组。批量改牌组继续按牌组 ID 操作；首页和统计的树展示沿用各自模型。回归见 [browser-sidebar-decks.test.mjs](../../tools/tests/browser-sidebar-decks.test.mjs)，执行真实模型、组件映射与两种点击回调。
+
+### 标签选择与管理
+
+标签交互参考 AnkiDroid 的 `TagsList`、`TagsDialogViewModel` 和 `ManageTagsViewModel`；本地参考源码在 `D:/Projects/AnkiDroid`。层级名称、大小写去重、三态草稿、搜索过滤及批量差量更新由 [NoteTags.ts](../../entry/src/main/ets/model/NoteTags.ts) 负责；实际读写继续使用锁定 Anki Core，不引入第二套标签存储。
+
+新增笔记、已有笔记（包含学习页跳转编辑与图片遮罩类型）、兼容新增面板共用 `NoteTagsField` → `TagPicker` → `TagTreeList`。手输框用空白分隔多个标签；“选择标签”支持忽略大小写的层级搜索，新建单个标签时空白转换为 `::`。新标签及选择只写草稿，取消笔记编辑不会注册标签。Core 子节点的 `name` 只有末级，公共模型重建 `fullName`，搜索、折叠、重命名和删除均使用完整路径；搜索命中保留祖先、临时展开祖先，清空搜索恢复 Core 折叠状态。
+
+浏览器多选“编辑标签”加载所选笔记标签，卡片模式先解析并去重笔记 ID。✓ 表示全部笔记都有，− 表示仅部分笔记有；混合标签可循环为全部有、全部无、恢复混合。未操作的混合标签和虚拟父标签不写入；选父标签不隐式选择子标签。提交在 `BrowserOperationController` 内重新读取最新笔记，只应用冻结的标签变更，全部读取成功后一次 `UpdateNotes(skipUndoEntry=false)`；字段、其他标签及同名前缀子标签保留。失败保留选择与草稿，空选择不写入，离页继续已接受提交，写入后的刷新失败沿用独立错误语义。
+
+筛选侧栏支持标签搜索、节点展开/收起持久化、前缀重命名/删除和确认清除未用标签。成功后保留侧栏与过滤词，刷新 Core 树；移除了只提示匹配数量的“补全”菜单。标签条件通过 Core `SearchNode.tag` 构建，转义引号、反斜杠和通配符；追加使用 AND 分组，保留原搜索 OR 含义。
+
+列表在固定 260vp 可视区使用 `IDataSource` + `LazyForEach`，避免万级标签一次性建节点；无匹配时只显示提示，不保留空列表高度。标签行自身拥有层级缩进（最多六级视觉缩进，完整路径和实际层级保留）、44vp 展开点击区及文本点击区；列表不叠加水平 margin。筛选侧栏的标签内容 Column 独占 16vp 卡片内边距，搜索输入继续用 `FormInputStyle`，因此输入外缘距白色卡片左右各 16vp；外层页面边距和安全区只移动整张卡片，不叠加输入间距。批量弹窗复用 `DialogFrame` 的内边距、限高正文与固定标题，键盘或窄屏下正文可滚动。选取界面的显隐、加载、禁用和错误通过 `AppInterface` 共用声明登记，离开移除观察。
+
+行为回归：[browser-note-tags.test.mjs](../../tools/tests/browser-note-tags.test.mjs)；Core 完整路径/特殊字符搜索、层级管理撤销、折叠与清理由 [note_tags.rs](../../native/rsharmony/tests/note_tags.rs) 验证。没有增加拖拽重挂父标签、标签专用查找替换或筛选全选；这些是独立交互，不能把当前三态编辑当成已完成这些能力。2026-10-03 已运行完整 `npm run verify`、真实 Core 标签测试，以及签名 HAP 覆盖安装；模拟器确认原牌组保留、筛选侧栏、多选标签加载、空态、无改动禁用确认和系统返回保留多选。用户指出侧栏输入贴边后补上内容内边距，图片容器同时改用共用样式。修正后的最终外观、深浅色、宽窄屏、键盘、标签创建/选择/管理由用户在设备上验收，自动测试与构建不代替这部分验收。
+
 浏览结果每条采用独立圆角卡片，左右沿用页面内边距，条目间距沿用设置分组；信息入口、多选、旗标和分页仍在 `卡片表格` 中。表格通过 `IDataSource` + `LazyForEach` 消费行快照，行 key 使用稳定业务字段，避免大列表状态变化时按整数组重建；分页加载态跟随宿主 `Promise` 结束，不使用固定延时。应用所有原生 Select 共用 `utils/SelectStyle.ets` 的高度、字重、16vp 卡片圆角及明暗资源配色，页面独立选择框传入 surface_card（浅色白、深色卡片底），卡片内默认 surface_sidebar；调用方直接声明共享 font、optionFont、selectedOptionFont、borderRadius、height、padding、space，避免 AttributeModifier 差分跳过未变值后残留系统默认外观。按钮、未选菜单项和选中菜单项使用相同字号；字重区分选中态。labelText 只负责单行省略，不重复设置字号、字重或颜色。不能把菜单字体移回 AttributeModifier，否则原生菜单项重建后可能只有访问过的项应用指定字号。每处选择框以固定宽度、百分比或 layoutWeight 预留空间；行内字段选择采用 auto 宽度并限制为行宽 56%，长名称单行省略，切换选项不改变字号；历史范围使用共享宽度，表单默认占行宽一半。配色继续由 modifier 提供，菜单对齐和业务绑定仍属于调用方。统计页 FSRS 状态位于顶栏右侧，历史范围位于牌组选择右侧。牌组长按菜单直接显示满宽颜色选择框；设置模式菜单沿用首页更多的 compactMenuWidth。
 
 `AnchoredMenu` 与 `MenuItem` 由首页更多、新建牌组动作菜单、设置模式及浏览菜单共用，统一圆角、分隔线、居中文字、150ms 动效和主题色选中态。浏览搜索独占一行；下一行左侧为一个外框中的模式、状态、排序三个选值区，右侧显示完整结果数量。点击某个选值区只打开该组的选项，菜单宽度跟随整个选择框，不再套分类折叠或混列其他组；排序“默认”与各列选项同级。筛选分区使用相同菜单展开行，标题与展开内容属于同一张圆角卡片，分区之间沿用 pageSectionGap。折叠偏好和筛选协议不变。回归见 `ui-select-layout.test.mjs`，实际尺寸及点击行为另做设备验收。
 
 笔记模式批量删除/改牌组/标志复用 `笔记服务.获取笔记的卡片` 展开全部兄弟卡并去重；删除后重新查询后端结果，失败保留选择。不要回到空卡片列表调用后本地移除行的做法。回归见 `browser-batch-runtime.test.mjs`。
 
+多选时顶栏中央显示“已选 X 项”，右上角显示“操作”；进入多选不自动打开菜单，点击“操作”手动切换。删除始终位于菜单最底部，退出多选在其上一项，顺序只由 `AppInterface.browser_batch` 声明。`批量操作栏` 仅作为回调适配器复用学习/预览的 `CardActionMenu`，由公共 `AnchoredMenu` 和 `MenuItem` 负责布局，不再在底部占用列表空间。锚点使用 `pageContentTop(状态栏高度, narrowDeckLayout)`，公共定位层不重复扣除密度偏移；宽度沿用 `cardActionMenuWidth`。公共 Scroll 按实际窗口高度减去锚点和底部留白限制最大高度，短屏、横屏或大字体导致菜单过长时自动滚动，长屏按内容自然高度显示。外部点击和系统返回先关旗标颜色窗，再关菜单，始终保留选择；退出多选由返回或“退出多选”菜单项负责。笔记模式不显示到期日、重排位置；Agent 显隐继续沿用运行时开关。界面声明与实际打开状态登记到 `AppInterface.browser_batch`、`browser_batch_marking`、`browser_batch_flags`，销毁移除观察。
+
+“标记”默认收起，点击后展开学习页同款小菜单，包含标星、取消标星、设置旗标和自定义名称。旗标颜色再次使用同款小弹窗；学习和浏览的七色/清除、用户名称、图标透明填色及清除中性样式由 `FlagMenuChoices.ets` 统一生成。批量星标显式设置所选笔记的 `marked` 标签，不猜测混合状态；旗标处理所选卡片，笔记模式展开全部兄弟卡。颜色选择窗和主菜单都按实际设备限高滚动，已关闭/忙碌/空选的迟到点击不写入；选择具体颜色先关窗再进入原批量写入边界。
+
+`BrowserCardState.ts` 按所选卡片最新 queue 判断整个集合：全部 queue=-1 才取消暂停，否则统一暂停；全部 queue=-2/-3 才取消今日跳过，否则统一今日跳过。与 AnkiDroid `CardBrowserViewModel.toggleSuspendCards/toggleBury` 一致，笔记模式先展开全部兄弟卡，全部读取成功后才一次写入。今日跳过不会解除暂停卡；解除状态经 Core 原有 `RestoreBuriedAndSuspendedCards` 恢复原类型对应队列，保留到期日、间隔、评分历史及旗标，不重置为新卡，也不保证立刻进入学习（仍受原到期日、牌组范围和每日限额影响）。菜单移除了笼统的“恢复卡片”；帮助已说明混合选择统一设置状态，建议按状态筛选后解除。
+
+直接回归见 `browser-card-state.test.mjs`、`browser-batch-menu.test.mjs` 和 `browser-batch-runtime.test.mjs`：冻结选择、全部/混合状态、读写失败、原动作回调、中文/英文完整文案、禁用及迟到点击、返回保留多选。`native/rsharmony/tests/scheduler_restore.rs` 在真实 Core 中验证不同卡片类型的队列恢复、真实答题后的历史保留、未选卡片不变、暂停卡不被今日跳过解除及撤销。实际锚点、滚动、字号与主题外观由用户设备验收。
+
+2026-10-03 最终菜单、标记复用、标签留白与图片表面修改后，全仓发现的 2222 项 Node 回归通过（`--test-concurrency=2`，此前默认并发触发主机内存不足）；`build-native.ps1 -Target host-test` 完整主机测试通过，包含标签与恢复的真实 Core 回归。沙箱主机验证、22 服务/22 方法表协议核对、双架构 Native 和 clean 签名 HAP 构建通过，构建警告基线 268、额外警告 0。界面验收由用户负责，未替用户执行最终外观与数据写入操作。安装使用覆盖安装，正式配置在实体设备报 9568322 时按[既有设备签名](signing.md)切换已有 `ceshi` 测试配置，保留默认发布配置和已安装应用身份。
+
+最终签名包已通过 `hdc install -r` 成功覆盖安装到实体设备 `7JDUN26418G04789` 和模拟器 `127.0.0.1:5555`；以安装器成功消息确认，未使用卸载或清除数据。最终菜单与标记弹窗、滚动和图片边界等待用户手动验收。
+
 浏览页沿用牌组/标签/保存搜索和批量操作；题目最多两行，“更多”内选择副标题（末级牌组、答案、到期）并进入查找替换。结果数使用完整搜索 ID 数量，排序入口仅列出后端声明支持当前 Cards/Notes 模式的列，通过 builtin SortOrder 排序完整结果。浏览行查询前同步 BrowserTableShowNotesMode；暂停标记来自独立的后端 is:suspended 搜索，不能从优先展示旗标的行颜色推断，笔记行明确标为“含暂停卡片”。搜索代次阻止旧查询和分页结果回写。
+
+保存搜索参照 AnkiDroid `browser/search/SavedSearches.kt` 的 `Config.savedFilters`：集合配置 `savedFilters` 存储名称到查询的 JSON 映射，名称区分大小写、重复名称拒绝保存，查询去除首尾空白，写入 `undoable=false`。AnkiDroid `libanki/Config.kt` 将缺失键的 `BackendNotFoundException` 转为 `null`，搜索列表再 `orEmpty()`；本机 `AnkiBrowserSidebar.savedSearches()` 从 `GetAllConfig` 读取，仅缺失 `savedFilters` 时返回空映射，真实读取失败仍上抛，避免首次保存前重读配置就失败。首次创建、保留已有项、重开读取、改名/删除和读写失败重试由 [page-repositories.test.mjs](../../tools/tests/page-repositories.test.mjs) 执行真实适配器及页面提交入口验证。入口与 JIDE 的共同声明仍为 `AppInterface.browser_more.save_search`，本次修复只恢复已有操作的持久化行为。
+
+2026-10-04 首次保存修复验收：`page-repositories`、`browser-flow-contract`、`ai-agent-app-structure`、`documentation-contract` 共 93 项通过；`npm run build:app` 完成双架构原生、增量 ArkTS 与签名 HAP 构建，警告门禁 `unexpected=0`。未覆盖安装或操作设备；真机首次保存、从侧栏重新调用及跨端同步仍需设备验收。
 
 
 ## 牌组学习记录
@@ -41,7 +81,7 @@
 
 设置页的集合维护由 `model/settings/CollectionMaintenanceSession.ts` 持有检查结果和操作占用，面板订阅独立快照并适配服务调用及确认提示。离页解除订阅，已接受的检查/标签清理仍完成；重新挂载取得真实状态，重复请求不能越过正在执行的操作。行为回归见 `settings-maintenance.test.mjs`，UI 测试只检查状态和动作接线，不规定业务必须内联在主壳。
 
-浏览页是多选模式和 ID 集合的唯一所有者；`卡片表格` 通过 Prop 展示选择、通过回调提交意图，不再维护第二份集合或退出计数信号。七种批量弹层由一个 `batchDialog` 槽互斥显示。到期、改标签、重新定位的表单草稿属于各自 Dialog；重新定位默认值读取随 Dialog 销毁失效。
+浏览页是多选模式和 ID 集合的唯一所有者；`卡片表格` 通过 Prop 展示选择、通过回调提交意图，不再维护第二份集合或退出计数信号。批量表单由一个 `batchDialog` 槽互斥显示，动作菜单先关闭再转交表单或写入。到期、改标签、重新定位的表单草稿属于各自 Dialog；重新定位默认值读取随 Dialog 销毁失效。
 
 `components/browser/BrowserNotetypeFeature.ets` 与 `model/browser/BrowserNotetypeSession.ts` 拥有类型列表、映射加载及草稿。切换类型丢弃旧请求，提交时输出不可变映射快照，写入仍回到页面的统一操作边界。关闭弹层、切换选择或模式都会结束旧表单；页面不再复制映射状态。对应行为测试为 `browser-notetype-session`、`browser-selection-view`，页面 `build()` 按结果、检查、搜索和变更面板装配。
 
@@ -51,13 +91,21 @@
 
 牌组选项通过 `DeckConfigSave.ts` 将未启用的今日限额转为 null，再构造保存请求；协议的 Active 字段只描述读取状态，不能靠发送 false 停用覆盖。编辑框中的关闭值仅保留到本次编辑结束，保存清除覆盖。`DeckConfigMessages.encodeLimits` 保留 optional 数值 0 的字段存在性，0 与 null 不等价；回归见 `deck-config-save.test.mjs`。说明正文及对应实现索引见 [应用内帮助](in-app-help.md)。
 
+### 牌组选项与 Core 升级
+
+官方基线是 `UPSTREAM.lock` 锁定的 Anki 26.05（e64c6b1）。共同目录 `model/DeckOptionsCatalog.ts` 拥有分组、字段、调度器显隐、枚举顺序、步幅单位和轻松日映射，UI 与 JIDE 使用同一声明；数值边界由 `牌组配置表单.ets` 校验，Core 默认值来自真实读取结果。轻松日是独立分组，对 SM-2 和 FSRS 均可设置，按周一至周日显示最低/减少/正常；通常作用于未来间隔，FSRS 重新排程由单独开关控制。完整模式提供预设管理、预设/牌组/今日上限与保持率覆盖、单项恢复默认和官方保存模式。FSRS 参数展示一个有效向量，读取顺序 6→5→4；编辑后清除旧代际向量以恢复明确语义。自定义调度脚本在当前平台不能执行，界面如实标记不可用，保存仍保留原脚本；不能宣称全部官方运行时能力已实现。
+
+`deck-options-parity.test.mjs` 首先比较 `DECK_OPTIONS_UPSTREAM` 与 `UPSTREAM.lock`：升级 tag/commit 后先失败，必须重新核对官方 deck-options 界面、FTL、proto 和 Core 的字段、默认值、条件、取值、范围与保存模式，再同时更新 UI/JIDE 共同目录、编解码、校验、测试及基线。禁止只改版本断言以消除失败；未知字段仍须保真，新增字段明确接入或标明不可用。RPC 升级还要执行[协议门禁](verification.md#rpc-协议门禁)，按升级级别完成真实 Core、HAP 和设备验证。该版本门禁只能提醒审查，不会自动适配未来协议。
+
+直接行为回归覆盖分组条件、单位与边界、轻松日、预设暂存/取消/失败重试、多配置保存、未知字段、真实字段回调以及简洁模式；数值边界包括 float32 协议读回，合法的 70%/99% 与 SM-2 易度边界不能因舍入被拒绝。保持率字段沿用官方 SpinBox 的整数百分比显示，确认卡保留必要的小数以准确展示改动。JIDE 的确认写入另见 `ai-agent-deck-options.test.mjs` 和[助手说明](agent.md#应用设置读取与修改)。主机测试不证明布局或真实模型规划，设备仍需验收深浅主题、宽窄屏、大字体、模式切换、字段编辑/恢复默认、共享范围、确认/取消、返回和保存失败。
+
 ### FSRS 参数优化与学习负担模拟
 
-责任链为 `components/home/FsrsTools.ets` → `DeckOptionsFeature` → `model/home/DeckOptionsSession.ts` → `backend/AnkiDeckOptions.ets` / `FsrsService.ts` → 锁定 Anki 26.05 Core。UI 复用 `DeckOptionRow`、`DeckOptionField` 和加载态，放在牌组选项的目标保持率下方，简洁模式也可使用；字段草稿、取消和唯一保存入口不变。Core 计算经 `ComputeFsrsParams` 与 `SimulateFsrsWorkload`，本地只映射输入、汇总展示和编排，不实现 FSRS 算法，也不接入已移除的“最低推荐保持率”。
+责任链为 `components/home/FsrsTools.ets` → `DeckOptionsFeature` → `model/home/DeckOptionsSession.ts` → `backend/AnkiDeckOptions.ets` / `FsrsService.ts` → 锁定 Anki 26.05 Core。UI 复用 `DeckOptionRow`、`DeckOptionField` 和加载态，放在完整牌组选项的 FSRS 分组；简洁版继续只展示四个常用选项，分区入口见[首页说明](home.md#数据与牌组修改入口)。字段草稿、取消和唯一保存入口不变。Core 计算经 `ComputeFsrsParams` 与 `SimulateFsrsWorkload`，本地只映射输入、汇总展示和编排，不实现 FSRS 算法，也不接入已移除的“最低推荐保持率”。
 
 当前预设优化使用最新表单参数、忽略历史的 UTC 日期、重学步数和健康检查开关。默认按预设 ID 从 Core 全部牌组数据构造 `did:… -is:suspended`，涵盖共享牌组及过滤牌组中的原始卡片，不按名称匹配或扩大到使用别的预设的子牌组；空范围使用 `did:0`，解析失败反馈错误，不能变为全库或名称搜索。高级设置的自定义参数搜索原样交给 Core。参数选择顺序与 Core 一致：6、5、4，全部为空时使用 Core 默认值；响应按实际长度写入对应字段。零有效记录保持参数不变；有有效记录时 Core 也可能保留空参数表示，此时清除三个代际字段，继续使用 Core 默认值。少于 400 条有效训练记录显示样本不足提示，仍接受 Core 结果。健康检查保留未评估/通过/失败三态，失败不伪装为成功。
 
-“优化全部预设”以配置 ID 去重，每个预设独立计算和反馈。成功参数暂存为共享预设草稿，失败保留错误并可仅重试失败项；未保存不会更新预设。普通当前优化遵循原有默认分离/显式共享规则。批量保存只共享各预设参数；当前牌组的其他编辑仍遵循用户所选范围，必要时先更新共享参数再创建当前牌组独立预设。所有配置在一次正常 `UpdateDeckConfigs` 中提交，当前牌组选中的配置必须最后；全局选项、限额、未建模字段与重调度开关沿用现有保存契约。批量提示说明默认预设和共享牌组也受影响，取消丢弃暂存参数。
+“优化全部预设”以配置 ID 去重，每个预设独立计算和反馈。成功参数暂存为共享预设草稿，失败保留错误并可仅重试失败项；未保存不会更新预设。普通当前优化默认编辑共享预设；需要分离时先明确克隆。修改预设分配后先保存，再执行优化或模拟，避免用尚未保存的分配计算范围。批量保存共享各预设参数，当前牌组的其他编辑仍遵循用户所选范围；暂存的其他预设编辑也在同次提交，当前牌组选中的配置必须最后。全局选项、限额、未建模字段与重调度开关沿用现有保存契约。批量提示说明默认预设和共享牌组也受影响，取消丢弃暂存参数。
 
 学习负担模拟使用最新参数草稿、预设的新卡/复习限额、最大间隔、学习/重学步数、历史保持率、轻松日、复习排序、水蛭暂停策略与全局新卡忽略复习限额开关；范围为该预设，不使用单牌组/今日覆盖，不额外添加新卡。天数可选 1–3650，默认 365。Core 一次返回 70%–99% 的总耗时（秒）、期末记住的卡片数及新卡学习加复习次数；UI 展示每日平均分钟/答题数、固定参考档与用户选择档。结果是本次模拟快照，修改草稿后须重跑；“使用所选保持率”只填入预设草稿，保存后生效。单牌组保持率覆盖仍有优先权。
 
@@ -93,10 +141,18 @@
 
 `backend/StatsWidgetPublisher.ets` 统一全库桌面卡片聚合和发布队列：首页仓库、统计页和 FSRS 刷新复用同一入口。调用方负责范围与请求代次校验；单牌组查询不发布，已接受推送按队列完整结束，失败不阻塞后续发布。它不决定哪个来源的数据更新，只保证接受顺序。布局及统计口径仍由现有组件和 Core 决定。回归为 `stats-session`、`stats-entry-runtime`、`home-data-repository` 和 `home-sync-refresh-runtime`。
 
-`components/settings/AboutSettings.ets` 接管关于分组的链接、剪贴板、反馈/赞赏弹窗；许可证导航回调仍交设置壳。继续复用 `AboutActionDialog`、`ThemeTextSpans`、`DisclosureChevron` 和 `utils/好评引导.ets`，不新建通用 UI 体系。`settings-about-runtime` 验证外链降级、好评委托和弹窗释放；真实系统弹窗、剪贴板及视觉需设备验收。
+`components/settings/AboutSettings.ets` 接管关于分组的链接、剪贴板、反馈/赞赏弹窗；许可证导航回调仍交设置壳。入口行复用 `SettingsActionRow`，图标统一取自 `SettingsIcons`；继续复用 `AboutActionDialog`、`ThemeTextSpans` 和 `utils/好评引导.ets`，QQ群号富说明保留复制并可换行。`settings-about-runtime` 验证外链降级、好评委托和弹窗释放，`ui-settings-components` 检查公共行与图标覆盖；真实系统弹窗、剪贴板及视觉需设备验收。
 
 
 ## 基础字段编辑与草稿保护
+
+2026-10-03 补齐长字段与格式工具：公共 `NoteFieldEditor` 提供原位“展开输入框/收起输入框”（112vp / 336vp），只改变高度，不重建输入组件、不修改草稿或输入格式/选区。“更多格式”按需展开项目列表、编号列表、链接、上下标及清除格式，沿用自动换行工具组。新增、已有笔记、音频相邻文本与 Agent 草稿共用此入口。
+
+可视编辑的加粗、斜体、下划线、荧光、上下标和清除格式统一经 `applySelectionStyle` 更新，再用 SDK `setSelection` 保留原 UTF-16 选区；隐藏系统选择菜单，不把选区收成末尾光标。样式更新期间忽略临时选区通知并只发布最终草稿，用户可连续调整同一段文字或再次点击荧光去掉底色，持续输入格式不变。用户重新点光标后按新位置处理，禁用/离页后不恢复旧选区。换行、公式、挖空、列表及链接仍有各自的内容/选区策略，不强行套用纯样式更新。新增与编辑表单的 `AppInterface.instructionsKey` 复用工具按钮的 `note_editor_format_action` 资源，JIDE 读取同一份操作说明。回归：`note-rich-editor` 的连续操作、代理对、临时回调与销毁保护；原生选择高亮、手柄和键盘仍需设备验收。
+
+`NoteRichText.ts` 接管无额外属性的标准链接和 sup/sub；链接经 SDK `urlStyle` 保留地址，上下标经 `fontFeature` 显示并序列化成标准标签，原生字形取决于设备字体。未知属性、列表、表格等继续使用源码，未修改内容不重写。`NoteHtmlTools.ts` 拥有 UTF-16 选区切片、列表逐行序列化、地址转义及源码边界检查；列表操作对选区或光标所在行生成 ul/ol/li 后切到源码，预览使用既有 Core 链。源码工具拒绝半个标签、实体、代理对及无法理解的片段，保留未知 HTML 和共享媒体。
+
+链接弹窗复用 `DialogFrame` / `DialogHeader` / `FormInputStyle`，冻结打开时的草稿与选区；确认前仅持有地址副本，取消不修改，离页/禁用/原草稿变化后忽略回调。可视清除格式只作用选区（包括链接），无选区时重置后续输入开关；源码清除要求选中完整基础格式片段，保留文字、实体和换行。纯模型回归为 `note-html-tools.test.mjs`，原生控制器、展开状态与弹窗生命周期回归在 `note-rich-editor.test.mjs`。实际中文输入、选择范围、字体上下标、键盘、窄宽屏/深浅色仍需设备验收；构建和测试结果以本次交付为准。
 
 新增、浏览和学习共用 `components/common/NoteFieldEditor.ets`。`NoteRichText.ts` 负责文字/基础 HTML 往返，原生 RichEditor 显示加粗、斜体、下划线和荧光；无选区时按钮切换持续输入格式，有选区时只改选区。`NoteFieldEditing.ts` 仍处理源码选区和挖空编号。字段卡片分离标准 img/sound 引用作媒体预览，其余未知标签/属性保留源码模式，未修改的 HTML 不重写；公式、挖空保留标记，学习时渲染。首次学习和交互规范见 [应用内帮助](in-app-help.md#编辑工具首次学习与当前界面文案)。`笔记类型服务.获取编辑笔记类型` 读取 Core kind、originalStockKind、clozeFieldOrds 和 IO 字段索引，改名不影响功能；标准可选反向模板由 `NoteTypePresentation.ts` 检查，按真实字段引用找开关序号并通过 NoteEditorSession 传给三个编辑入口；定制模板保留文本字段。友好类型名只用于展示，不改用户数据库。
 
@@ -147,13 +203,29 @@
 
 字段提供固定“新增音频”入口，独立媒体弹层提供音频选择、替换和录音。AudioViewPicker 返回的 provider URI 经 `backend/NoteAudioImport.ets` 按描述符完整读取、校验实际文件头并复制到应用缓存；不申请公共音频目录读写权限。支持 MP3、M4A、AAC、WAV、OGG、FLAC 容器，单文件上限 64 MiB；实际解码取决于设备。录音在点击时申请 MICROPHONE，以 AAC/单声道/44.1kHz 的 M4A 保存缓存，完成才加入附件，取消和后台中断不生成附件，最长 300 秒。AVRecorder 的 prepare 使用同一 API 的 callback 重载：当前 SDK Promise 重载将解释文字并入 @permission 导致误报，未修改 SDK、关闭检查或扩大警告基线。
 
-表单拥有 `NoteFieldAudio[]` 和一条 NoteAudioPreview。新试听停止旧音频，缺失文件和播放器错误可见，进入后台/离页停止，表单销毁释放。录音/选音期间字段、保存、类型切换、选图和退出均禁用；录音完成/取消按钮仍可操作。写入仍在 NoteCreationSession/BrowserOperationController 的已有集合保护内，先导入 Core 媒体库，再以实际返回名生成 sound 引用。部分失败保留已导入名称，重试不会重复导入；已接受写入离页后仍完成。移除仅删除笔记引用/待存附件，不直接删除 collection.media，避免影响共享引用。仅本功能拥有的缓存副本在移除、放弃或保存成功后清理。
+音频弹层从上到下为整行操作、附件、保存说明。新增/录音及录音完成、暂停/继续、取消复用 `SettingsActionRow`：完整行可点击，标题与录音秒数可换行，行间使用公共轮廓色的1vp分隔线。录音主行尾部显示当前状态：空闲为普通麦克风，录制中为带红色声波的麦克风，暂停后“完成录音”为斜杠麦克风。独立的暂停/继续行分别使用两杠和播放图标，不把暂停图标放到完成入口。暂停后显示继续和已暂停秒数，暂停期间计时停止，继续保留同一录音文件。每个附件独立分组，文件名与播放/停止、替换放在一行，操作复用 `按下态按钮`；长文件名单行省略，原名称与播放目标保留。删除采用右上角公共叉号 `IconActionButton`，44vp 点击区提供完整的本地化无障碍名称，忙碌/录音时禁用并阻止迟到点击。`NoteAudioField` 拥有操作与附件排列，`NoteMediaDialog` 只将音频保存说明放在正文末尾，IO 与原禁用条件保持原责任。
+
+弹层16vp内边距只由 `DialogFrame` 提供，操作行不叠加水平边距；附件左右12vp、上下各8vp，内容按钮44vp，附件常规高度60vp。有删除入口时只在内容右侧额外预留44vp，删除热区距上/右各4vp；公共 `IconActionButton.cornerAligned` 使18vp图标在热区内靠右上并留4vp，因此图标自身距附件上/右各8vp，不占第二行或覆盖播放/替换。其他调用方保持默认居中。附件行和附件间距8vp，说明与音频区之间12vp分别由附件、字段和外壳拥有。弹层宽度为88%、最大560vp，系统安全区与宽窄变化只改变外壳可用范围。图片管理的说明/新增行保持其既有 `LabeledActionRow`，其操作语义只有单个新增入口。
+
+录音状态由 `NoteAudioRecorder` 拥有，暂停只接受原生 started、继续只接受 paused；原生操作成功后组件才更新状态。取消期间保持忙碌并合并重复取消，防止释放与完成/暂停/重新开始重叠；被取消的启动返回 false，不再把界面设为录音中。录音错误记录原生错误码与发生阶段，不记录字段内容或媒体路径；UI 区分权限拒绝、5400107 中断与其他错误码，不将全部失败归为麦克风权限。历史间歇失败的原生日志未保留，不能据此认定模拟器是唯一原因。
+
+JIDE 的 `AppInterface.note_audio_manage` 声明由真实字段状态驱动：暂停/继续、完成/取消、附件播放/停止、替换和删除的显隐/禁用同步实际 UI。common 组件通过 `NoteAudioStatus` 回调传递状态，新增页和浏览编辑区拥有观察发布与离页清理；不让 common 新增后端依赖。观察只包含状态、录音秒数、错误是否存在和附件位置 ID，不含文件名、媒体 URI 或字段正文，也不授予 JIDE 通用点击/录音权限。
+
+2026-10-04 录音与布局修正验证：音频、媒体管理、公共控件、common 依赖、JIDE 页面观察、宿主编辑流程、资源和文档共123项相关测试通过；最后的 ArkTS 异常边界修正后重跑音频/媒体管理36项通过。使用已有 `.local/tablet-signing.json` 的 ceshi 配置执行增量 `npm run build:app -- -SkipRust`，签名 HAP 构建和警告门禁通过（unexpected=0）。设备安装与实际交互结果另记，测试和编译不代替真机验收。
+
+本次签名包 `.local/audio-recorder-fix-20261004/jidecards-recorder-ceshi-signed.hap` 已通过 `hdc -t 7JDUN26418G04789 install -r` 成功覆盖安装到 SLG-W50 平板，未卸载或清除数据。安装后已 force-stop 旧进程；启动被锁屏阻止（10106102），所以平板录音、暂停/继续、试听、叉号点击和宽窄/大字/主题外观仍待解锁后验收。没有覆盖仍保留录音草稿的模拟器，也没有把构建或模拟测试作为间歇失败根因的设备证据。
+
+同日后续外观修正：读取平板截图和布局确认叉号仍居中在44vp热区，视觉上贴近内容行，补上上述 `cornerAligned`；录制中图标改为当前状态，移除斜杠麦克风资源。媒体管理、公共控件/按压、主题资源、ArkTS字段与common边界42项检查通过，ceshi 增量签名包 `.local/audio-recorder-fix-20261004/jidecards-audio-corner-ceshi-signed.hap` 构建通过（unexpected=0）。发现音频弹层有4段未保存录音后先保留现场；用户明确回复“安装”后，该包通过 `hdc -t 7JDUN26418G04789 install -r` 成功覆盖安装到平板，旧进程停止后 `aa start` 成功启动新版。未卸载或清除应用数据，修正后实际几何与录制/暂停图标由用户验收。
+
+暂停图标后续修正：恢复斜杠麦克风的成对明暗资源，仅用于暂停后的完成录音入口；独立暂停/继续入口保留原图标。真实行属性回归覆盖录制→暂停→继续三种图标及原禁用/回调语义；媒体管理、公共设置图标和i18n共27项检查通过。ceshi 增量签名包 `.local/audio-recorder-fix-20261004/jidecards-audio-pause-icon-ceshi-signed.hap` 构建通过（unexpected=0）。读取平板时仍处于暂停录音，另有3段未保存音频；先保留现场。用户回复“草稿已处理，继续安装”后，该包通过 `hdc -t 7JDUN26418G04789 install -r` 成功覆盖安装，停止旧进程后启动新版成功。未卸载或清除应用数据，暂停图标最终观感仍由用户验收。
+
+表单拥有 `NoteFieldAudio[]` 和一条 NoteAudioPreview。新试听停止旧音频，缺失文件和播放器错误可见，进入后台/离页停止，表单销毁释放。录音/选音期间字段、保存、类型切换、选图和退出均禁用；原生操作未在执行时，录音完成、暂停/继续、取消按钮仍可操作。写入仍在 NoteCreationSession/BrowserOperationController 的已有集合保护内，先导入 Core 媒体库，再以实际返回名生成 sound 引用。部分失败保留已导入名称，重试不会重复导入；已接受写入离页后仍完成。移除仅删除笔记引用/待存附件，不直接删除 collection.media，避免影响共享引用。仅本功能拥有的缓存副本在移除、放弃或保存成功后清理。
 
 验证入口：[音频回归](../../tools/tests/note-audio.test.mjs)、`npm test -- media`、`npm test -- browser`、`npm run verify`。设备需单独验收权限允许/拒绝、AudioViewPicker、录音完成/取消/后台中断、两字段互斥试听、保存后学习和同步；HAP 构建不代替这些行为。
 
 参考：[Anki 26.05 编辑器](https://github.com/ankitects/anki/blob/26.05/qt/aqt/editor.py) 的 onRecSound/_addMedia/fnameToLink、AnkiDroid AudioField/AudioRecordingController，以及 [HarmonyOS AVRecorder 指导](https://developer.huawei.com/consumer/cn/doc/harmonyos-guides/using-avrecorder-for-recording)。当前不包含波形剪辑、外部网络音频下载、模板生成的 TTS 音频编辑或任意 HTML audio 标签的可视改写。
 
-本轮验收：`npm run verify` 的仓库、原生主机/沙箱及 clean 签名 HAP 阶段通过；最后兼容细节完成后再次运行 `npm run verify -- repo`，当前工作树 1700 项测试全通过，并运行 `npm run build:app -- -Clean`，警告门禁 unexpected=0。音频专项 17 项通过。未执行覆盖安装或真机权限/录音/播放操作；已连接设备不代表设备验收完成。UI 音频区的内间距由 NoteAudioField 的 8vp Column/Flex 拥有，字段卡片和页面继续使用现有外间距/安全区，录音按钮在窄屏换行，宽窄屏实机仍待验收。
+2026-10-01 初版验收：`npm run verify` 的仓库、原生主机/沙箱及 clean 签名 HAP 阶段通过；最后兼容细节完成后再次运行 `npm run verify -- repo`，当时工作树 1700 项测试全通过，并运行 `npm run build:app -- -Clean`，警告门禁 unexpected=0。音频专项 17 项通过。当时未执行覆盖安装或真机权限/录音/播放操作；已连接设备不代表设备验收完成。UI 音频区的内间距由 NoteAudioField 的 8vp Column/Flex 拥有，字段卡片和页面继续使用现有外间距/安全区；后续布局和安装结果见上方 2026-10-04 记录。
 
 
 ## 编辑媒体预览与独立管理（2026-10-01）
@@ -198,6 +270,8 @@ UI 复用 DialogFrame、DialogHeader、SelectStyle、FormInputStyle。内边距�
 
 ## 未保存笔记草稿预览（2026-10-02）
 
+图片遮罩类型按 Core 的 `originalStockKind=6` 判断，源图字段使用完整的 Core 字段 tag 映射，旧类型缺少映射时沿用默认位置，不依赖可修改的类型名/字段名。草稿未放图片时提示先添加图片；已有源图但没有考查遮罩时提示先绘制遮罩并确认，不再套用普通填空题的挖空提示。待存附件仅在对应源图字段计入检查；模板样例预览保留填充空字段的既有行为。回归覆盖重新排列的字段、旧类型、错误字段的附件及有效 c1/c6 遮罩。
+
 新增和已有笔记的“预览草稿”入口位于 `NoteEditorHeader` 右侧，使用与“返回”相同的 `text_primary`，不启用主题渐变文字；编辑保存固定在底部，字段 Scroll 不再为预览入口占一行。两者把冻结的数据经 `model/navigation/PageParams.ts` 传给 `pages/NoteDraftPreviewPage.ets`，由 `HomeDestinations` 注册为独立 `NavDestination`，对照本地 AnkiDroid 的 `NoteEditorFragment → TemplatePreviewerPage → TemplatePreviewerFragment`。导航页拥有显隐，不再用预览状态对整个编辑表单调用 `.enabled(false)`。返回时由原页 `onShown` 解除预览守卫，已有笔记经 `previewReturnRequest` 通知当前表单；`onPop` 只作为补充，不依赖它一定送达。恢复只清预览标志，不销毁字段和附件草稿；连续点击不能重复入栈，导航失败恢复原表单并显示错误。
 
 独立页通过 `NoteDraftPreview(fullScreen=true)` 复用 `NotetypeTemplatePreview` 的卡片视口、翻面、媒体和 Core 会话。顶栏唯一负责状态栏安全区及宽/窄工具栏间距；正文左右各一个 `页面内边距_水平`，顶部仅一个 `页面内容顶部间距`，底部仅 `间距_8 + 导航条高度`，无弹窗 88% 限宽/限高。操作区最多占正文 40%，与 Web 之间只有 8vp；Web 使用剩余高度并自行滚动卡面。编辑保存栏与新增页共用 `操作区顶部间距`、`操作区底部间距`，没有额外占位 Column 或子按钮外边距。
@@ -222,3 +296,13 @@ UI 复用 DialogFrame、DialogHeader、SelectStyle、FormInputStyle。内边距�
 笔记类型管理的列表主体改用 DialogFrame：普通列表按内容收缩、超出外壳限高后滚动，标题操作固定。每个类型的名称和操作按内容占高，行内禁止纵向 layoutWeight；克隆/编辑/删除使用可换行的 Flex，消除单条类型被撑至整屏的空白。加载、关闭、创建草稿、克隆、编辑及删除确认仍由原管理会话持有。更改类型、标准来源、当前模板与预览卡片使用 FormSelectRow；模板预览的音频重播与说明共用 LabeledActionRow。媒体新增移到弹窗说明右侧，原有预览、替换和删除保留。
 
 今日统计的“详情”放到统计分区标题右侧，展开状态由统计页持有并传入今日计数卡；仍只在有答题时显示入口和正文，数据与展开状态经原 Watch 渲染哨兵刷新。分区标题动作按共享限宽排列，忙碌时禁止执行，并进入 AppInterface 控件快照。旧添加笔记面板目前无组件调用，本次同时将其牌组/类型选择行紧凑化，保留旧源码而未删除。回归见 `ui-compact-controls.test.mjs`、`ui-dialog-layout.test.mjs` 和既有类型、媒体、统计行为测试；本轮未操作设备界面。
+
+## 重置为新卡
+
+浏览多选 reset 打开 BrowserResetDialog，读取 Core 的 Browser 默认选项；读取失败禁用提交并支持重试。页面在打开时固定选择，提交前校验模式／选择／查询代次，Cards 仅所选卡，Notes 展开全部兄弟卡。写入复用 BrowserOperationController，调用 ScheduleCardsAsNew；wire 显式发送 optional BROWSER=0、log=true 及位置／计数选项。身份和既有日志由 Core 保留，默认值保存、队列与撤销由 Core 事务管理。JIDE 的 browser_reset 观察登记实际选项、可操作性与 Notes 范围。
+
+## 字段编辑配置的实际消费（2026-10-05）
+
+NotetypeMessages 解码 Field.config，NoteEditorLoader/NoteEditorSession 复制并贯通到独立编辑页；新增页从 NoteCreationSession 的真实类型视图读取。NoteFieldCard/NoteFieldEditor 共用 NoteFieldEditingOptions，公共组件不直接依赖 Core 协议。RTL 使用组件方向及 TextAlign.Start，避免调用目标 SDK 不存在的 Left/Right 或 API23 段落方向属性；字体仅使用本机已安装名称，字号限制与 JIDE 共用 NOTE_FIELD_EDITING_SUPPORT。
+
+description 作输入提示；plainText 是 Anki 的默认 HTML 源码模式，保留 HTML 和格式；collapsed 决定字段初始折叠，并用公共 DisclosureChevron 展开。图片遮罩标题/补充字段复用相同字段卡片，关闭其新增媒体入口；图像、遮罩和可选反向开关保持原专用语义。改变编辑外观不改写字段 HTML，加载失败或保存失败不会清空配置/草稿。设备原生 RTL、字体回退、折叠和输入法尚未验收。

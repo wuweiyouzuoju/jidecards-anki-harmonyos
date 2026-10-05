@@ -2,7 +2,7 @@
 
 [返回任务索引](../../PROJECT_CONTEXT.md)
 
-不依赖账号的 Anki / AnkiDroid 核心回归见[核心互通](core-interop.md)：`npm run test:interop` 生成隔离 APKG/COLPKG 与结果报告。它不证明线上同步通过；增量、全量和媒体同步需要用户另行提供隔离测试账号，未提供前保持未验证。
+不依赖账号的 Anki / AnkiDroid 核心回归见[核心互通](core-interop.md)：`npm run test:interop` 生成隔离 APKG/COLPKG 与结果报告。它不证明线上同步通过；真实 AnkiWeb 增量、全量和媒体同步需要隔离测试账号，未提供前保持未验证。旗标／星标另有 [card_marking.rs](../../native/rsharmony/tests/card_marking.rs) 的临时 SimpleServer＋两个独立 Core Backend HTTP 同步回归，覆盖普通双向修改、全量、撤销、失败重试与重开；这是本机协议证据，未运行 Android/HarmonyOS 应用。社区调查未找到可直接采用的标记冲突修复后，按用户选择启用 JideCards 待同步标记优先：混合客户端冲突保留 JideCards 旗标／exact marked，整体记录仍按上游 mtime 选择；两个 JideCards 均待同步时由后同步端的标记胜出并传播。上传前为剩余待同步卡片／笔记准备更大的标准修订时间，故不是纯字段时间戳合并。名称仍走原集合配置规则，两个未修改 AnkiDroid 之间不受影响。见[源码对照](flags-marking-audit-2026-10-03.md)和[当前决策及社区来源](../decisions/2026-10-03-marking-sync-priority.md)。
 
 - 代码路径以下均相对 `entry/src/main/ets/`。
 - 责任链：AutoSyncScheduler 保存意图；SyncActivity 拥有集合占用；SyncSession 执行同步，根同步面板展示快照。
@@ -51,6 +51,8 @@
 同步宿主被销毁时，`SyncSession` 保留正在执行的集合/全量任务和媒体启动 Promise，待提交或回滚及取消调用落定后才释放 `SyncActivity`。Core 的 AbortMediaSync 只发取消信号，清理还需重复查询直至 `active=false`；一次查询失败不能当作完成。离页后不启动尚未接受的全量替换、不回调旧页面，已提交结果仍保存端点/媒体待同步标志并广播 FSRS 刷新。媒体待同步标志在集合提交后、读取 FSRS 前保存，避免后续读取期间离页丢失恢复信息。对应竞态由 `sync-disposal.test.mjs` 执行真实会话覆盖，通用测试支架为 `sync-panel-harness.mjs`。
 
 备份状态见 [易混淆功能状态](../FEATURE_STATUS.md)：Core `create_backup/maybe_backup` 负责间隔、变更检测和 daily/weekly/monthly 保留；首页安全空闲时触发自动备份，设置页提供开关、立即创建和历史恢复。恢复前先保存当前集合，完成后通过现有替换链刷新集合和媒体路径。备份与同步共享 `AutoSyncScheduler` 操作占用，不能并发读写 collection。
+
+历史恢复提交后由 `LocalBackups` 同时发布首页刷新与卡片内容刷新，失败不发布。备份面板确认时固定并显示所选文件名，执行防重入；结果和实际错误置于正文顶部并即时提示，提交后列表读取失败仍保留“已恢复”，不误报为可重复恢复。`backup_management` 将所选文件、忙碌、结果及错误交给 JIDE 的同一实时观察，设置目录共用对应入口声明。回归：`local-backups-runtime.test.mjs` 执行真实适配器/组件逻辑，覆盖保留选中副本、失败不刷新、具名确认、防重复提交与提交后读取失败。
 
 FSRS 的全局开关、牌组高级选项中的“启用 FSRS”和统计页状态统一来自 Anki collection 的 `BoolKey::Fsrs`；参数及重排选项不代表开关。首次启动自动开启仅执行一次。SyncSession 在集合同步前后读取实际值，仅将 `true→false` 上报为关闭变化；媒体失败不丢失已提交集合的结果。`FSRS控制器` 的 `FSRS_STATE_REVISION_KEY` 仅通知设置/统计页重新读取，不缓存或覆盖开关；牌组选项保存也发送通知。自建服务器复现可核对 `sync: FSRS before/after` 日志，缺失字段在底层默认关闭，不能据弹窗断言用户主动关闭。
 

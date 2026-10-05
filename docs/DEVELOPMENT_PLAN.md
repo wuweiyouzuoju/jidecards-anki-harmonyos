@@ -19,7 +19,7 @@
 
 | 项目 | 当前值 | 事实来源 |
 | --- | --- | --- |
-| 应用版本 | 2.9.9 / versionCode 2990 | `AppScope/app.json5` |
+| 应用版本 | 2.9.10 / versionCode 2991 | `AppScope/app.json5` |
 | 最低兼容 SDK | HarmonyOS 6.0.1（API 21） | `build-profile.json5` 的 `compatibleSdkVersion` |
 | 目标 SDK | HarmonyOS 6.1.0（API 23） | `build-profile.json5` 的 `targetSdkVersion` |
 | 编译 SDK | DevEco Studio 当前配套 6.1.0.105（API 23） | 本机 SDK 与 `UPSTREAM.lock` |
@@ -47,7 +47,7 @@ phone、tablet 和 2in1，但声明设备类型不等于已完成所有形态的
 - 笔记音频与草稿预览、类型管理、字段查重、文本导出、CSV 映射及整库中断恢复。
 - FSRS 优化与负担模拟、Core 全局复习偏好、牌组预览，以及隔离 Core 互通回归。
 
-本轮源码整理见 [2.9.9 变更说明](releases/2.9.9.md)，可重复验证及已验收范围按领域文档查询。
+当前交互修复见 [2.9.10 变更说明](releases/2.9.10.md)，此前源码整理见 [2.9.9 变更说明](releases/2.9.9.md)；可重复验证及已验收范围按领域文档查询。
 
 以上只表示代码路径存在并受契约测试覆盖，不等于与桌面 Anki 的全部功能、全部
 历史 schema 或所有设备行为完全等价。对外介绍应使用“复用 Anki 26.05 Rust

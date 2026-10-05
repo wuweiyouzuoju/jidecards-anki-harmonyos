@@ -8,6 +8,19 @@ import { AutoSyncScheduler } from '../../entry/src/main/ets/model/AutoSyncSchedu
 import { SyncActivity } from '../../entry/src/main/ets/model/SyncSettings.ts';
 
 const turn = () => new Promise(resolve => setImmediate(resolve));
+
+test('custom scheduling requires explicit acknowledgement for each changed script and preserves raw states', async () => {
+  const h = harness(); let script='states.good.customData = "test";';
+  h.backend.studyOptions = async () => Object.assign(new StudyOptions(), {customSchedulingScript: script});
+  await h.session.loadNext(1,()=>true);
+  assert.equal(h.session.needsCustomSchedulingAcknowledgement(),true);
+  await assert.rejects(h.session.answer(h.card,2,200,100), /requires acknowledgement/); assert.equal(h.calls.length,0);
+  h.session.acknowledgeCustomScheduling(); await h.session.answer(h.card,2,200,100);
+  assert.equal(h.calls[0].newState,h.card.states.good);
+  await h.session.loadNext(1,()=>true); assert.equal(h.session.needsCustomSchedulingAcknowledgement(),false);
+  script='different script'; await h.session.loadNext(1,()=>true); assert.equal(h.session.needsCustomSchedulingAcknowledgement(),true);
+  script='  '; await h.session.loadNext(1,()=>true); assert.equal(h.session.needsCustomSchedulingAcknowledgement(),false);
+});
 function deferred() {
   let resolve, reject;
   const promise = new Promise((a, b) => { resolve = a; reject = b; });
@@ -56,6 +69,33 @@ test('Core preferences are read before the queue and a failed read cannot publis
   await assert.rejects(session.loadNext(1,()=>true),/preferences unavailable/);
   assert.equal(queued,1);
 });
+
+test('study snapshot rereads received flags, stars and names after collection sync releases ownership', async () => {
+  const { session, backend, activity } = harness();
+  let marking = { flag: 1, marked: false }, flagLabels = { '1': 'old' }, reads = 0;
+  backend.marking = async id => { assert.equal(id, 42); reads++; return { ...marking }; };
+  backend.flagLabels = async () => ({ ...flagLabels });
+  assert.deepEqual((await session.loadNext(1, () => true)).marking, marking);
+  activity.reserveCollection();
+  const pending = session.loadNext(1, () => true); await turn(); assert.equal(reads, 1);
+  marking = { flag: 7, marked: true }; flagLabels = { '7': 'received from Droid' };
+  activity.cancelReservation();
+  const snapshot = await pending;
+  assert.deepEqual(snapshot.marking, marking); assert.deepEqual(snapshot.flagLabels, flagLabels);
+  assert.equal(reads, 2);
+});
+
+for (const phase of ['marking', 'flagLabels']) {
+  test(`late ${phase} reads cannot publish markers from a previous study generation`, async () => {
+    const { session, backend, scheduler } = harness(), gate = deferred();
+    backend.marking = async () => ({ flag: 7, marked: true }); backend.flagLabels = async () => ({ '7': 'received' });
+    const original = backend[phase]; backend[phase] = async () => { await gate.promise; return original(); };
+    let current = true;
+    const pending = session.loadNext(1, () => current); await turn();
+    current = false; session.dispose(); gate.resolve();
+    assert.equal(await pending, null); assert.equal(scheduler.canSync(), true);
+  });
+}
 
 test('each successful rating preserves raw bytes and queues one coalesced intent without starting sync', async () => {
   const { session, card, calls, scheduler } = harness();

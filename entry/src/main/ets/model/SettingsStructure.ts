@@ -5,6 +5,7 @@ export interface SettingsItem {
   id: string;
   titleKey: string;
   settingId?: string;
+  opens?: string;
   fullOnly?: boolean;
   /** 状态相关内容保留条件，不把尚未读取的账号/提供商状态当成已显示。 */
   condition?: string;
@@ -28,7 +29,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     { id: 'study_haptics', titleKey: 'settings_study_haptics', settingId: 'study_haptics' },
     { id: 'study_quick_answer', titleKey: 'settings_quick_answer', settingId: 'study_quick_answer' }
   ] },
-  { id: 'global_review', sectionId: 'scheduler', titleKey: 'settings_core_review', items: [
+  { id: 'global_review', sectionId: 'scheduler', titleKey: 'settings_core_review', fullOnly: true, items: [
     { id: 'rollover', titleKey: 'settings_rollover' },
     { id: 'learn_ahead', titleKey: 'settings_learn_ahead' },
     { id: 'timebox', titleKey: 'settings_timebox' }
@@ -58,7 +59,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     { id: 'theme_mode', titleKey: 'appearance_theme', settingId: 'theme_mode' },
     { id: 'color_theme', titleKey: 'appearance_color_theme', settingId: 'color_theme' },
     { id: 'theme_motion', titleKey: 'iridescent_motion', settingId: 'theme_motion', condition: 'theme_has_textures' },
-    { id: 'deck_list_narrow', titleKey: 'deck_width', settingId: 'deck_list_narrow' },
+    { id: 'deck_list_style', titleKey: 'deck_width', settingId: 'deck_list_style' },
     { id: 'card_text_size', titleKey: 'card_text_size', settingId: 'card_text_size' }
   ] },
   { id: 'study_display', sectionId: 'appearance', titleKey: 'settings_study_display', items: [
@@ -69,10 +70,10 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
   { id: 'data', sectionId: 'data', titleKey: 'settings_data_management', items: [
     { id: 'import', titleKey: 'transfer_import_file' },
     { id: 'export_deck', titleKey: 'transfer_export_deck' },
-    { id: 'backups', titleKey: 'backup_hub_title' },
+    { id: 'backups', titleKey: 'backup_hub_title', opens: 'backup_management' },
     { id: 'notetypes', titleKey: 'notetype_mgmt_entry', fullOnly: true },
     { id: 'hidden_decks', titleKey: 'hidden_decks_entry' },
-    { id: 'media_management', titleKey: 'settings_media_management' },
+    { id: 'media_management', titleKey: 'settings_media_management', opens: 'media_maintenance' },
     { id: 'check_database', titleKey: 'check_db_title', fullOnly: true },
     { id: 'empty_cards', titleKey: 'empty_cards_entry', fullOnly: true },
     { id: 'duplicate_notes', titleKey: 'find_dupes_entry', fullOnly: true },

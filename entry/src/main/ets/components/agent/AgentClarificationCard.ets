@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../../utils/PressFeedback';
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { FormTextAreaStyle } from '../../utils/FormTextAreaStyle';
 import { PrimaryActionButton } from '../common/PrimaryActionButton';
 
@@ -77,8 +78,8 @@ export struct AgentClarificationCard {
       .padding(应用尺寸.间距_10)
       .backgroundColor(option.id === this.clarification.selectedOptionId ?
         $r('app.color.surface_page') : $r('app.color.surface_card'))
-      .border({ width: 2, color: option.id === this.clarification.selectedOptionId ?
-        this.primaryBackground : $r('app.color.border_input') })
+      .border(SurfaceBorder.options(2, option.id === this.clarification.selectedOptionId ?
+        this.primaryBackground : SurfaceBorder.color()))
       .borderRadius(应用尺寸.圆角_卡片)
       .enabled(this.isEditable())
       .attributeModifier(new PressFeedback())
@@ -129,7 +130,7 @@ export struct AgentClarificationCard {
     .width('100%').alignItems(HorizontalAlign.Start)
     .padding(应用尺寸.卡片内边距)
     .backgroundColor($r('app.color.surface_card'))
-    .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+    .border(SurfaceBorder.options())
     .borderRadius(应用尺寸.圆角_面板)
   }
 }

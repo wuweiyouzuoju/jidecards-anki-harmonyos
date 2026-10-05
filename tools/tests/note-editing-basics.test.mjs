@@ -49,6 +49,21 @@ test('renamed IO stock identity is decoded from Core config, independent of name
   const view=decodeNotetype(type.转为字节());assert.equal(view.kind,1);assert.equal(view.originalStockKind,6);
 });
 
+test('field configuration decodes with Core ordering and preserves every editor option',()=>{
+ const type=new 协议写入器();
+ for(const ord of [1,0]){
+  const field=new 协议写入器(),order=new 协议写入器(),config=new 协议写入器();order.写入变长整数(1,ord);
+  field.写入子消息(1,order);field.写入字符串(2,'Field '+ord);
+  config.写入布尔(1,true);config.写入布尔(2,true);config.写入字符串(3,'Arabic Font');config.写入变长整数(4,27);
+  config.写入字符串(5,'Hint');config.写入布尔(6,true);config.写入布尔(7,true);field.写入子消息(5,config);
+  type.写入子消息(8,field);
+ }
+ const fields=decodeNotetype(type.转为字节()).fields;
+ assert.deepEqual(fields.map(f=>f.ord),[0,1]);
+ assert.deepEqual(fields[0],{ord:0,name:'Field 0',sticky:true,rtl:true,fontName:'Arabic Font',fontSize:27,
+  description:'Hint',plainText:true,collapsed:true});
+});
+
 function panel(confirm=async()=>false,picker=async()=>null) {
   const Panel=loadComponentLogic('components/browser/浏览编辑区.ets','浏览编辑区',{
     ...noteInterfaceDependencies(),

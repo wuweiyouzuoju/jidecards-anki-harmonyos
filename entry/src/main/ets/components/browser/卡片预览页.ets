@@ -1,5 +1,10 @@
+import { actionIcon } from '../../utils/ActionIcons';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../../utils/PressFeedback';
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
+import { CardMarkingBadge } from '../common/CardMarkingBadge';
+import { AnkiCardMarking } from '../../backend/AnkiCardMarking';
+import { CardMarkingState, FlagLabels, parseFlagLabels, readCardMarking } from '../../model/CardMarking';
 import { resourceText } from '../../utils/UiFeedback';
 
 // ========================================================
@@ -63,14 +68,14 @@ import { 按下态按钮 } from '../common/按下态按钮';
 import { 声音播放器 } from '../../utils/声音播放器';
 import { TTS播放器 } from '../../utils/TTS播放器';
 import { CardAudioSession } from '../../model/CardAudioSession';
-import { APP_FOREGROUND_KEY } from '../../model/Redemption';
+import { APP_FOREGROUND_KEY } from '../../model/AppLifecycleState';
 import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../../model/ReleaseFeatures';
 import { buildPreviewInteractionScript } from '../../model/PreviewInteraction';
 import { CardViewport } from '../common/CardViewport';
 import { CardActionMenu } from '../common/CardActionMenu';
 import { studyKeyName } from '../../utils/StudyKeyAdapter';
 import { PAGE_SURFACE_KEY } from '../../model/ThemeCatalog';
-import { DECK_LIST_NARROW_KEY } from '../../model/DeckListAppearance';
+import { PAGE_COMPACT_LAYOUT_KEY } from '../../model/AppLayoutState';
 import { ThemeBackground } from '../common/ThemeBackground';
 
 /** 仅向预览转发显示操作，文档版本由组件校验。 */
@@ -86,7 +91,11 @@ type 预览面 = 'question' | 'answer';
 
 @Component
 export struct 卡片预览页 {
-  @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
+  @State private currentMarking: CardMarkingState | null = null;
+  @State private flagLabels: FlagLabels = {};
+  private markingBackend: AnkiCardMarking = new AnkiCardMarking();
+  @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
   @State private moreMenuOpen: boolean = false;
   private initialFocusPending: boolean = true;
   private readonly desktopPreview: boolean = deviceInfo.deviceType === '2in1' || deviceInfo.deviceType === 'pc';
@@ -107,8 +116,10 @@ export struct 卡片预览页 {
   onEditWithAgent: (cardId: number) => void = (_cardId: number): void => {};
 
   private readonly 网页控制器: webview.WebviewController = new webview.WebviewController();
+  @State private cardSurfaceBackground: string = '';
+  @State private cardRenderPending: boolean = false;
   private readonly cardWeb: CardWebView = new CardWebView(this.网页控制器,
-    (): void => { this.focusPreviewCard(); }, (_message: string): void => { this.webFailed(); });
+    (background: string): void => { this.previewCardShown(background); }, (_message: string): void => { this.webFailed(); });
   private readonly 卡片渲染服务实例: 卡片渲染服务 = new 卡片渲染服务();
   private readonly 卡片服务实例: 卡片服务 = new 卡片服务();
   private readonly 笔记服务实例: 笔记服务 = new 笔记服务();
@@ -281,16 +292,26 @@ export struct 卡片预览页 {
     this.已渲染 = null;
     this.待加载HTML = '';
     try {
+      this.currentMarking = null;
+      const marking: CardMarkingState = await readCardMarking(this.markingBackend, 卡片ID);
+      if (!this.mounted || version !== this.loadVersion) return;
+      const labels: FlagLabels = parseFlagLabels(await this.markingBackend.labels());
+      if (!this.mounted || version !== this.loadVersion) return;
       const rendered: RenderedCard = await this.卡片渲染服务实例.渲染既有卡片(卡片ID);
       if (!this.mounted || version !== this.loadVersion) return;
       const answerHtml: string = await renderPreviewAnswer(构建卡片HTML(rendered, 'answer', this.isDark),
         rendered, 卡片ID, {
           card: (id: number): Promise<Card> => this.卡片服务实例.获取卡片(id),
           note: (id: number): Promise<EditableNote> => this.笔记服务实例.获取笔记(id),
-          notetype: (id: number): Promise<StudyAnswerNotetype> => this.笔记类型服务实例.获取笔记类型(id)
+          notetype: (id: number): Promise<StudyAnswerNotetype> => this.笔记类型服务实例.获取笔记类型(id),
+          compareAnswer: (expected: string, provided: string, combining: boolean): Promise<string> =>
+            this.卡片渲染服务实例.compareAnswer(expected, provided, combining),
+          extractClozeForTyping: (text: string, ordinal: number): Promise<string> =>
+            this.卡片渲染服务实例.extractClozeForTyping(text, ordinal)
         });
       if (!this.mounted || version !== this.loadVersion) return;
       this.已渲染 = rendered;
+      this.currentMarking = marking; this.flagLabels = labels;
       this.正面HTML = 剥除拼写标记(构建卡片HTML(this.已渲染, 'question', this.isDark));
       this.背面HTML = answerHtml;
       this.应用HTML(this.当前面 === 'question' ? this.正面HTML : this.背面HTML);
@@ -309,6 +330,7 @@ export struct 卡片预览页 {
    * Web 未 attach 的白屏时序坑（PROJECT_CONTEXT.md「Web 组件 attach 时序」）。
    */
   private 应用HTML(html: string): void {
+    this.cardRenderPending = true;
     const version: number = ++this.documentVersion;
     const document: string = html.replace('</div></body>',
       `<script>${buildPreviewInteractionScript(version)}</script></div></body>`);
@@ -316,7 +338,6 @@ export struct 卡片预览页 {
       try {
         this.installActionBridge();
         this.cardWeb.show(document, this.loadVersion, this.当前面);
-        this.playCurrentAudio();
       } catch (错误) {
         this.错误详情 = this.取本地化文案($r('app.string.browser_preview_load_error'));
         this.stopAudio();
@@ -334,6 +355,7 @@ export struct 卡片预览页 {
     this.loadVersion += 1;
     this.documentVersion += 1;
     this.忙碌 = false;
+    this.cardRenderPending = false;
     this.错误详情 = this.取本地化文案($r('app.string.browser_preview_load_error'));
     this.stopAudio();
   }
@@ -370,7 +392,6 @@ export struct 卡片预览页 {
       try {
         this.installActionBridge();
         this.cardWeb.show(缓存, this.loadVersion, this.当前面);
-        this.playCurrentAudio();
       } catch (错误) {
         this.错误详情 = this.取本地化文案($r('app.string.browser_preview_load_error'));
         console.info(`卡片预览页: onControllerAttached loadData 失败 错误=${错误}`);
@@ -383,7 +404,7 @@ export struct 卡片预览页 {
    * 答案 → 题目只由 上一张 负责，与 Anki Previewer._on_prev/_on_next 的按键语义一致。
    */
   private 翻面(): void {
-    if (!this.interactionEnabled || !this.foreground || this.忙碌
+    if (!this.interactionEnabled || !this.foreground || this.忙碌 || this.cardRenderPending
       || this.错误详情 !== '' || this.当前面 === 'answer') {
       return;
     }
@@ -400,7 +421,7 @@ export struct 卡片预览页 {
     if (!this.interactionEnabled) {
       return;
     }
-    if (!this.忙碌 && this.错误详情 === '' && this.当前面 === 'answer') {
+    if (!this.忙碌 && !this.cardRenderPending && this.错误详情 === '' && this.当前面 === 'answer') {
       this.当前面 = 'question';
       this.onPositionChanged(this.当前索引值);
       this.应用HTML(this.正面HTML);
@@ -421,7 +442,7 @@ export struct 卡片预览页 {
     if (!this.interactionEnabled) {
       return;
     }
-    if (!this.忙碌 && this.错误详情 === '' && this.当前面 === 'question') {
+    if (!this.忙碌 && !this.cardRenderPending && this.错误详情 === '' && this.当前面 === 'question') {
       this.翻面();
       return;
     }
@@ -435,7 +456,7 @@ export struct 卡片预览页 {
   /** 编辑字段：经 onEditField 回调上抛当前卡片ID，由父级打开 浏览编辑区。 */
   private 请求编辑字段(): void {
     const 卡片ID: number = this.取当前卡片ID();
-    if (卡片ID === 0 || this.忙碌 || !this.interactionEnabled || this.错误详情 !== '') {
+    if (卡片ID === 0 || this.忙碌 || this.cardRenderPending || !this.interactionEnabled || this.错误详情 !== '') {
       return;
     }
     this.stopAudio();
@@ -452,6 +473,14 @@ export struct 卡片预览页 {
     }
   }
 
+  private previewCardShown(background: string): void {
+    if (!this.mounted) return;
+    if (background !== '') this.cardSurfaceBackground = background;
+    this.cardRenderPending = false;
+    this.playCurrentAudio();
+    this.focusPreviewCard();
+  }
+
   private 请求AI改卡(): void {
     const cardId: number = this.取当前卡片ID();
     if (!this.agentEnabled || cardId === 0 || this.忙碌 || !this.interactionEnabled || this.错误详情 !== '') return;
@@ -460,7 +489,7 @@ export struct 卡片预览页 {
   }
 
   /** 读取本地化文案，context 不可用时回退空串。 */
-  private 取本地化文案(资源: Resource): string {
+  private 取本地化文案(资源: Resource, _locale: string = this.uiLanguage): string {
     try {
       return resourceText(this.getUIContext(), 资源);
     } catch (_错误) {
@@ -506,11 +535,13 @@ export struct 卡片预览页 {
     const items: MenuElement[] = [
       {
         value: this.取本地化文案($r('app.string.study_edit_note')),
+        icon: actionIcon('edit'),
         action: (): void => { this.请求编辑字段(); },
         enabled: canManageCard
       },
       {
         value: this.取本地化文案($r('app.string.study_replay_sound')),
+        icon: actionIcon('audio'),
         action: (): void => { this.playCurrentAudio(); },
         enabled: canManageCard && (this.hasAudio || this.audioError !== '')
       }
@@ -518,6 +549,7 @@ export struct 卡片预览页 {
     if (this.agentEnabled) {
       items.push({
         value: this.取本地化文案($r('app.string.ai_card_edit')),
+        icon: actionIcon('agent'),
         action: (): void => { this.请求AI改卡(); },
         enabled: canManageCard
       });
@@ -542,18 +574,15 @@ export struct 卡片预览页 {
           点击回调: (): void => { this.onClose(); }
         })
         Blank()
-        Button($r('app.string.study_more'))
-          .height(应用尺寸.按钮高度)
-          .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
-          .constraintSize({ minWidth: 0 })
-          .fontSize(应用尺寸.字号_按钮)
-          .fontColor($r('app.color.text_primary'))
-          .backgroundColor($r('app.color.surface_card'))
-          .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
-          .borderRadius(应用尺寸.圆角_胶囊)
-          .attributeModifier(new PressFeedback())
-          .stateEffect(false)
-          .onClick((): void => { this.moreMenuOpen = true; })
+        if (this.currentMarking !== null) {
+          CardMarkingBadge({ flag: this.currentMarking.flag, marked: this.currentMarking.marked, labels: this.flagLabels })
+            .margin({ right: 应用尺寸.间距_8 }).hitTestBehavior(HitTestMode.None)
+        }
+        按下态按钮({
+          文案: $r('app.string.study_more'),
+          字色: $r('app.color.text_primary'),
+          点击回调: (): void => { this.moreMenuOpen = true; }
+        })
       }
       .width('100%')
       .height('100%')
@@ -575,7 +604,7 @@ export struct 卡片预览页 {
     Stack() {
       // Web 组件：src 必须为空字符串（BUG-008 修复），baseUrl=媒体基地址 由 loadData 传入。
       Web({ src: '', controller: this.网页控制器 })
-        .backgroundColor($r('app.color.surface_card'))
+        .backgroundColor(this.cardSurfaceBackground || $r('app.color.surface_card'))
         .textZoomRatio(this.cardTextSizePercent)
         .javaScriptAccess(true)
         .fileAccess(true)
@@ -598,7 +627,7 @@ export struct 卡片预览页 {
         // 不在 Web 上挂 ArkUI 手势：ArkWeb 先消费触摸，SwipeGesture 收不到左右滑。
 
       // Loading 覆盖层
-      if (this.忙碌) {
+      if (this.错误详情 === '' && (this.忙碌 || this.cardRenderPending)) {
         Column() {
           LoadingProgress()
             .width(应用尺寸.加载指示器尺寸)
@@ -608,7 +637,7 @@ export struct 卡片预览页 {
         .width('100%')
         .height('100%')
         .justifyContent(FlexAlign.Center)
-        .backgroundColor(this.isDark ? 'rgba(0,0,0,0.40)' : 'rgba(255,255,255,0.60)')
+        .backgroundColor(this.cardSurfaceBackground || $r('app.color.surface_card'))
         .hitTestBehavior(HitTestMode.Block)
       }
 
@@ -638,7 +667,7 @@ export struct 卡片预览页 {
     .backgroundColor($r('app.color.surface_card'))
     .borderRadius(应用尺寸.圆角_卡片)
     .clip(true)
-    .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+    .border(SurfaceBorder.options())
     }
     .width('100%')
     .layoutWeight(1)

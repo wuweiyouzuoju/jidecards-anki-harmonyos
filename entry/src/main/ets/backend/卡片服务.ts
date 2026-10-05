@@ -28,6 +28,7 @@
 // ========================================================
 
 import { 后端会话 } from './后端会话';
+import { validateCardFlag } from '../model/CardMarking';
 import { 卡片方法, 服务号 } from './服务索引';
 import type { Card } from '../proto/messages/CardsMessages';
 import {
@@ -91,11 +92,12 @@ export class 卡片服务 {
   }
 
   /**
-   * 设置卡片标志（红/橙/绿/蓝）。
-   * Anki flag 取值：0=无 / 1=红 / 2=橙 / 3=绿 / 4=蓝
+   * 设置卡片旗标（七色或清除），只改 Core flags 低三位。
+   * Anki flag：0=无 / 1=红 / 2=橙 / 3=绿 / 4=蓝 / 5=粉 / 6=青 / 7=紫
    * @returns 实际设置标志的卡片数
    */
   async 设置标志(卡片ID列表: number[], 标志: number): Promise<number> {
+    validateCardFlag(标志);
     const 响应字节 = await this.会话.调用(
       服务号.后端卡片, 卡片方法.设置标志, encodeSetFlagRequest(卡片ID列表, 标志));
     return decodeSetFlagResponse(响应字节);

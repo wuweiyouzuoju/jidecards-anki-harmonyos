@@ -18,9 +18,17 @@ import type { JideChoiceQuestion } from '../model/JideChoice';
 import { 配置服务 } from './配置服务';
 import { ReviewPreferences, decodeReviewPreferences } from '../proto/messages/PreferencesMessages';
 import { 笔记类型服务 } from './笔记类型服务';
+import { AnkiCardMarking } from './AnkiCardMarking';
+import type { CardMarkingState, FlagLabels } from '../model/CardMarking';
+import { readCardMarking, parseFlagLabels, setCardFlags, setMarkedNotes } from '../model/CardMarking';
 
 /** 复用既有 RPC 编解码，不在应用层重建调度状态。 */
 export class AnkiStudySessionBackend implements StudySessionBackend {
+  private markingBackend: AnkiCardMarking = new AnkiCardMarking();
+  marking(cardId: number): Promise<CardMarkingState> { return readCardMarking(this.markingBackend, cardId); }
+  async flagLabels(): Promise<FlagLabels> { return parseFlagLabels(await this.markingBackend.labels()); }
+  setCardFlag(cardId: number, flag: number): Promise<void> { return setCardFlags(this.markingBackend, [cardId], flag); }
+  setNoteMarked(noteId: number, marked: boolean): Promise<void> { return setMarkedNotes(this.markingBackend, [noteId], marked); }
   private scheduler: 调度器服务;
   private renderer: 卡片渲染服务;
   private collection: 集合服务;
@@ -62,6 +70,7 @@ export class AnkiStudySessionBackend implements StudySessionBackend {
       if (entry.config.id === configId && entry.config.config !== null) {
         const config = entry.config.config;
         const options: StudyOptions = new StudyOptions();
+        options.customSchedulingScript = view.cardStateCustomizer ?? '';
         options.autoplay = !config.disableAutoplay;
         options.skipQuestionWhenReplayingAnswer = config.skipQuestionWhenReplayingAnswer;
         options.waitForAudio = config.waitForAudio;

@@ -8,6 +8,7 @@ import { saveCardTextSize } from '../../utils/CardTextSizeStore';
 /** 在外观设置内统一调整卡片文字大小。 */
 @Component
 export struct CardTextSizeControl {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(CARD_TEXT_SIZE_KEY) @Watch('syncSavedSize') private savedSize: number = DEFAULT_CARD_TEXT_SIZE;
   @State private selectedSize: number = DEFAULT_CARD_TEXT_SIZE;
   @StorageProp(颜色键.主色按钮背景) private actionColor: string = '#2F5FD0';
@@ -41,10 +42,11 @@ export struct CardTextSizeControl {
   build() {
     Column({ space: 8 }) {
       Row() {
-        Text(settingsItemText(this.getUIContext(), 'card_text_size'))
+
+        Text(settingsItemText(this.getUIContext(), 'card_text_size', this.uiLanguage))
           .fontSize(15)
           .fontColor($r('app.color.text_primary'))
-          .layoutWeight(1)
+          .textAlign(TextAlign.Start).layoutWeight(1)
         Text(`${this.selectedSize}%`)
           .fontSize(15)
           .fontColor($r('app.color.text_secondary'))

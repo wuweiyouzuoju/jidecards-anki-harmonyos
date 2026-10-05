@@ -140,12 +140,12 @@ test('storage failures never grant an entitlement or change animation preference
   assert.equal(store.app.get(catalog.UNLOCKED_CONTENTS_KEY).includes(content), false);
   assert.equal(store.snapshot().tokens, undefined);
   await assert.rejects(store.saveThemeMotion(false));
-  assert.equal(store.app.get(protocol.THEME_MOTION_KEY), true);
+  assert.equal(store.app.get(catalog.THEME_MOTION_KEY), true);
   store.setFailure(false);
   await store.saveThemeMotion(false);
   assert.equal(store.snapshot().tokens || '', '', 'failed receipt must not leak through a later flush');
   assert.equal(await store.redeemContent(makeCode()), 'success');
-  assert.equal(store.app.get(protocol.THEME_MOTION_KEY), false);
+  assert.equal(store.app.get(catalog.THEME_MOTION_KEY), false);
 });
 
 test('multi-content receipts stay separate and unknown content cannot grant iridescent', async () => {

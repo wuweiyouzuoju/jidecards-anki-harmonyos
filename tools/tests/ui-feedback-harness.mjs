@@ -6,7 +6,7 @@ const source = readFileSync(new URL('../../entry/src/main/ets/utils/UiFeedback.e
 const js = stripTypeScriptTypes(source.replace(/^import .*$/gm, '').replace(/^export /gm, ''), { mode: 'transform' });
 
 export function loadUiFeedback(hilog = { error() {}, warn() {} }) {
-  return new Function('hilog', js + '\nreturn { resourceText, namedResourceText, showToastSafely };')(hilog);
+  return new Function('hilog', js + '\nreturn { resourceText, namedResourceText, localizedResourceText, localizedNamedResourceText, showToastSafely };')(hilog);
 }
 
 export const uiFeedback = loadUiFeedback();

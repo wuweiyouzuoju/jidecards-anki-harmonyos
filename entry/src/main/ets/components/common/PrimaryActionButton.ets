@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../../utils/PressFeedback';
 import { 应用尺寸 } from '../../utils/应用尺寸';
-import { resourceText } from '../../utils/UiFeedback';
+import { localizedResourceText } from '../../utils/UiFeedback';
 
 /** 主操作按钮统一几何与反馈；宿主决定可用状态、忙碌文案及业务动作。 */
 @Component
 export struct PrimaryActionButton {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop label: ResourceStr = '';
   @Prop isInteractive: boolean = true;
-  @Prop tint: ResourceColor = '#2F5FD0';
+  @Prop tint: ResourceColor = $r('app.color.action_primary');
   onAction: () => void = (): void => {};
 
   private activate(): void {
@@ -27,7 +28,7 @@ export struct PrimaryActionButton {
       .opacity(this.isInteractive ? 1 : 0.6)
       .attributeModifier(new PressFeedback(this.isInteractive ? 1 : 0.6))
       .stateEffect(false)
-      .accessibilityText(typeof this.label === 'string' ? this.label : resourceText(this.getUIContext(), this.label))
+      .accessibilityText(typeof this.label === 'string' ? this.label : localizedResourceText(this.getUIContext(), this.uiLanguage, this.label))
       .onClick((): void => { this.activate(); })
   }
 }

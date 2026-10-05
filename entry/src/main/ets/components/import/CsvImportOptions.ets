@@ -9,6 +9,7 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 
 @Component
 export struct CsvImportOptions {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('loadPreview') preview: CsvImportPreview = { metadata: emptyCsvMetadata(), notetypes: [] };
   @Prop decks: 导出牌组选项[] = [];
   @Prop isInteractive: boolean = true;
@@ -19,7 +20,7 @@ export struct CsvImportOptions {
   aboutToAppear(): void { this.loadPreview(); }
   private loadPreview(): void { this.draft = copyCsvMetadata(this.preview.metadata); this.changed(); }
   private changed(): void { this.draft = copyCsvMetadata(this.draft); this.onChange(copyCsvMetadata(this.draft)); }
-  private text(value: Resource): string { return resourceText(this.getUIContext(), value); }
+  private text(value: Resource, _locale: string = this.uiLanguage): string { return resourceText(this.getUIContext(), value); }
   private columns(): string[] {
     const labels: string[] = [this.text($r('app.string.transfer_csv_unmapped'))];
     for (let i: number = 0; i < this.draft.columnLabels.length; i++) {

@@ -10,7 +10,7 @@ test('deck detail preview loads the selected native snapshot and mounts the exis
   const home = read('entry/src/main/ets/pages/首页.ets');
   const preview = read('entry/src/main/ets/components/browser/卡片预览页.ets');
   const browser = read('entry/src/main/ets/pages/浏览页.ets');
-  assert.match(panel, /interfaceItemText\(this.getUIContext\(\), 'deck_details', 'preview'\)/);
+  assert.match(panel, /interfaceItemText\(this.getUIContext\(\), 'deck_details', 'preview', this.uiLanguage\)/);
   assert.match(panel, /预览: \(\) => void/);
   assert.match(home, /打开牌组预览/);
   assert.match(home, /deckPreviewSession\.load\(deck.id, scope\)/);
@@ -55,12 +55,12 @@ test('deck preview resources exist in both base and en_US', () => {
 test('deck title wraps at full width below the preview action row without a current-deck label', () => {
   const panel = read('entry/src/main/ets/components/牌组详情面板.ets');
   assert.doesNotMatch(panel, /app\.string\.selected_deck/);
-  const header = panel.slice(panel.indexOf('Text(牌组显示名(deck))'), panel.indexOf("if (deck.description !== '')"));
+  const header = panel.slice(panel.indexOf('Text(牌组显示名(deck, this.uiLanguage))'), panel.indexOf("if (deck.description !== '')"));
   assert.match(header, /\.width\('100%'\)/);
   assert.match(header, /\.wordBreak\(WordBreak\.BREAK_ALL\)/);
   assert.doesNotMatch(header, /\.maxLines\(|TextOverflow\.Ellipsis/);
-  const actions = panel.slice(panel.lastIndexOf('Row({ space:', panel.indexOf('Text(牌组显示名(deck))')),
-    panel.indexOf('Text(牌组显示名(deck))'));
+  const actions = panel.slice(panel.lastIndexOf('Row({ space:', panel.indexOf('Text(牌组显示名(deck, this.uiLanguage))')),
+    panel.indexOf('Text(牌组显示名(deck, this.uiLanguage))'));
   assert.match(actions, /'deck_details', 'add_note'[\s\S]*'deck_details', 'agent'[\s\S]*'deck_details', 'preview'/);
   assert.doesNotMatch(actions, /Column\(/);
 });

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../../utils/PressFeedback';
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { NoteFieldEditor } from '../common/NoteFieldEditor';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 颜色键 } from '../../model/颜色主题';
@@ -8,6 +9,7 @@ import { ThemeTextSpans } from '../common/ThemeText';
 import type { 卡片草稿 } from '../../model/agent/AgentConversationView';
 @Component
 export struct AgentEditableCard {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop card: 卡片草稿 = { fields: [], 已选中: true, 状态: 'draft', 失败提示: '' };
   @Prop fieldNames: string[] = [];
   @Prop busy: boolean = false;
@@ -52,7 +54,7 @@ export struct AgentEditableCard {
           .opacity(this.card.已选中 ? 1 : 0.5)
 
         if (this.card.状态 === 'saved') {
-          Text() { ThemeTextSpans($r('app.string.ai_card_saved'), this.themeAccentColors, this.getUIContext()) }
+          Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans($r('app.string.ai_card_saved'), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }
             .fontSize(应用尺寸.字号_正文_小)
             .fontColor(this.动作主色)
         } else if (this.card.状态 === 'failed') {
@@ -95,7 +97,7 @@ export struct AgentEditableCard {
     .width('100%')
     .padding(应用尺寸.间距_10)
     .backgroundColor($r('app.color.surface_page'))
-    .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
+    .border(SurfaceBorder.options())
     .borderRadius(应用尺寸.圆角_面板)
   }
 }

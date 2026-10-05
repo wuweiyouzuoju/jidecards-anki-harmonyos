@@ -16,6 +16,7 @@ import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 // 开始学习与固定显示答案共用的主按钮；调用方只传文案与动作。
 // 默认使用不透明卡片底色（浅色为白），不透出页面彩雾。
 // 深色模式沿用卡片底色；按下时叠加主题反馈，抬起恢复。
+// 边框通过 PrimaryGlassSurface 复用 SurfaceBorder，深浅色均保留完整轮廓。
 // 共用 PrimaryGlassSurface，不逐帧模糊。
 // 文案沿用主题强调色，幻彩逐字配色。
 //
@@ -37,6 +38,7 @@ import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 // ========================================================
 @Component
 export struct 开始学习按钮 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop 文案: Resource = $r('app.string.start_study');
   @Prop isAvailable: boolean = true;
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
@@ -74,7 +76,7 @@ export struct 开始学习按钮 {
       Row() {
         Text() {
           if (this.isAvailable) {
-            ThemeTextSpans(this.文案, this.themeAccentColors, this.getUIContext())
+            ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(this.文案, this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale)
           } else {
             Span(this.文案).fontColor($r('app.color.text_secondary'))
           }

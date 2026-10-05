@@ -26,7 +26,7 @@
 // 服务号 9（后端配置），方法号 0/1/5/6/9/10。
 // saved searches 在 Anki/AnkiDroid 共享 config 表的 "savedFilters" key 下，为名称到查询的 JSON 映射。
 // 折叠状态走 ConfigKey.Bool 枚举（COLLAPSE_TAGS=4 / COLLAPSE_DECKS=6 / COLLAPSE_SAVED_SEARCHES=7）。
-// GetConfigJson 返回空串表示该 key 不存在（Anki 后端对缺失 key 返回空 JSON）。
+// GetConfigJson 对缺失 key 返回 NotFound；需要默认值时使用 GetAllConfig 区分缺失与读取故障。
 //
 // @副作用
 // 通过 后端会话 间接调用 NAPI 桥；GetConfig* 仅读取，SetConfig* 会写配置表。
@@ -63,12 +63,17 @@ export class 配置服务 {
    * 获取配置JSON（GetConfigJson）。按字符串 key 读 JSON 字符串。
    * 用于 saved searches 等自定义配置（非枚举 key）。
    * @param key 配置 key（如 "savedSearches"）
-   * @returns JSON 字符串（空串表示 key 不存在或值为空）
+   * @returns Core JSON 字符串；缺失 key 抛出 NotFound，不返回空 JSON
    */
   async 获取配置JSON(key: string): Promise<string> {
     const 响应字节 = await this.会话.调用(
       服务号.后端配置, 配置方法.获取配置JSON, encodeStringRequest(key));
     return decodeJsonResponse(响应字节);
+  }
+
+  /** 缺失的自定义 key 在 Core 中返回 NotFound；从完整配置读取可区分缺失与读取失败。 */
+  async 获取全部配置(): Promise<string> {
+    return decodeJsonResponse(await this.会话.调用(服务号.后端配置, 配置方法.获取全部配置, new Uint8Array()));
   }
 
   /**

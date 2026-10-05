@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { PressFeedback } from '../utils/PressFeedback';
+import { ImageSurfaceStyle } from '../utils/ImageSurfaceStyle';
 import { LengthMetrics } from '@kit.ArkUI';
-import { FormInputStyle } from '../utils/FormInputStyle';
+import { GesturePointer, gesturePointer } from '../model/GesturePointer';
+import { FormTextAreaStyle } from '../utils/FormTextAreaStyle';
 import { 按下态按钮 } from './common/按下态按钮';
 import { confirmNoteDiscard } from '../utils/ConfirmNoteDiscard';
-import { copyMask, maskNumber, maskProperty, maskPoints, setMaskProperty, nextOcclusionOrdinal,
+import { copyMask, maskNumber, maskProperty, maskPoints, setMaskProperty,
+  occlusionOrdinals, polygonImagePoints, setPolygonImagePoints, occlusionPolygonArea,
   OcclusionPoint, OcclusionHistory } from '../model/图片遮罩模型';
+import { OcclusionEditorSize, OcclusionTextExtent, OcclusionTextLayout, occlusionStageSize,
+  occlusionTextLayout, clampOcclusionOrigin } from '../model/ImageOcclusionEditorGeometry';
 
 import { DialogHeader } from './common/DialogHeader';
 // ========================================================
@@ -28,9 +32,9 @@ import { DialogHeader } from './common/DialogHeader';
 //
 // @业务规则
 // 坐标以原图归一化，序列化由纯模型负责，导入属性不会在编辑时重建。
-// 编号窗口随当前编号移动，同编号一起考查，c0 文字仅作标注。
+// 默认直接提供七色组；导入的更大编号保留，同编号一起考查，c0 文字仅作标注。
 // 图片完整居中显示；绘制和触摸均以 Contain 后的图像区域换算，排除留白。
-// 删除遮罩走顶部"撤销/清空"按钮，不在遮罩右上角画 × 删除按钮（2026-07-28 改）。
+// 图片位于工具与遮盖模式下方，文字和撤销/清空在图片下方。
 //
 // @副作用
 // 仅通过 onConfirm / onCancel 回调上抛结果；不直接落盘、不调后端。
@@ -55,6 +59,7 @@ export struct 图片遮罩编辑器 {
   aboutToAppear(): void {
     this.disposed = false;
     this.遮罩列表 = this.initialMasks.map(copyMask);
+    this.当前选中编号 = occlusionOrdinals(this.遮罩列表, 0)[0] ?? 1;
     const masks: 遮罩描述[] = this.遮罩列表.filter((mask: 遮罩描述): boolean => mask.形状 !== 'text');
     this.newInactiveMode = masks.length > 0 && masks.every((mask: 遮罩描述): boolean => maskNumber(mask, 'oi') === 1) ? 1 : 0;
   }
@@ -76,6 +81,8 @@ export struct 图片遮罩编辑器 {
   @State private canRedo: boolean = false;
   @State private imageFailed: boolean = false;
   @State private newInactiveMode: number = 0;
+  @State private viewportWidth: number = 320;
+  @State private viewportHeight: number = 480;
   private history: OcclusionHistory = new OcclusionHistory();
   private dragSnapshot: 遮罩描述[] | null = null;
   private confirmingClose: boolean = false;
@@ -88,8 +95,10 @@ export struct 图片遮罩编辑器 {
   @State 画布高: number = 0;
   @State 画布就绪: boolean = false;
 
-  // 拖动状态：0=空闲 1=创建中 2=移动中
+  // 拖动状态：0=空闲 1=创建中 2=移动中 3=多边形顶点移动
   @State 拖动模式: number = 0;
+  private dragPointerId: number = -1;
+  private polygonVertexIndex: number = -1;
   @State 创建起点归一化X: number = 0;
   @State 创建起点归一化Y: number = 0;
   @State 创建中矩形: 遮罩描述 | null = null;
@@ -118,11 +127,13 @@ export struct 图片遮罩编辑器 {
 
   /** 手势取消或窗口改变时丢弃未完成的矩形，保留已落定遮罩。 */
   private cancelDrag(): void {
-    if (this.dragSnapshot !== null && this.拖动模式 === 2) this.遮罩列表 = this.dragSnapshot.map(copyMask);
+    this.dragPointerId = -1;
+    if (this.dragSnapshot !== null && this.拖动模式 >= 2) this.遮罩列表 = this.dragSnapshot.map(copyMask);
     this.dragSnapshot = null;
     this.拖动模式 = 0;
     this.创建中矩形 = null;
     this.移动中索引 = -1;
+    this.polygonVertexIndex = -1;
     this.重绘();
   }
 
@@ -139,20 +150,19 @@ export struct 图片遮罩编辑器 {
   // @名称 编号候选列表
   //
   // @作用
-  // 顶部按钮组展示当前编号附近的 5 个 ordinal。
+  // 顶部直接提供七组，同时保留已存在的更大编号。
   //
   // @输入
   // 无。
   //
   // @输出
-  // 随当前编号移动的 number[]。
+  // 实际卡片组的 number[]。
   //
   // @副作用
   // 无。
   // ========================================================
   private 编号候选列表(): number[] {
-    const start: number = Math.max(1, this.当前选中编号 - 2);
-    return [start, start + 1, start + 2, start + 3, start + 4];
+    return occlusionOrdinals(this.遮罩列表, this.当前选中编号, 7);
   }
 
   // ========================================================
@@ -214,10 +224,12 @@ export struct 图片遮罩编辑器 {
       const rect: ImageContentRect = this.imageContentRect();
       const bounds: ImageContentRect = this.maskBounds(m);
       const width: number = bounds.width / rect.width, height: number = bounds.height / rect.height;
+      const offsetX: number = (bounds.left - rect.left) / rect.width - m.左;
+      const offsetY: number = (bounds.top - rect.top) / rect.height - m.顶;
       // Rotate in displayed pixels: normalized X/Y have different scales on non-square images.
       const x: number = (dx * rect.width * Math.cos(angle) + dy * rect.height * Math.sin(angle)) / rect.width;
       const y: number = (-dx * rect.width * Math.sin(angle) + dy * rect.height * Math.cos(angle)) / rect.height;
-      if (x < 0 || y < 0 || x > width || y > height) continue;
+      if (x < offsetX || y < offsetY || x > offsetX + width || y > offsetY + height) continue;
       if (m.形状 === 'ellipse') {
         if (m.宽 <= 0 || m.高 <= 0) continue;
         if (Math.pow((x - m.宽 / 2) / (m.宽 / 2), 2) + Math.pow((y - m.高 / 2) / (m.高 / 2), 2) > 1) continue;
@@ -248,7 +260,7 @@ export struct 图片遮罩编辑器 {
   //   2. 命中空白区 → 进入创建模式，初始化零尺寸矩形
   //
   // @输入
-  // GestureEvent（含 fingerList[0].localX/localY，vp 单位）
+  // GestureEvent（按触点 ID 读取 localX/localY，vp 单位）
   //
   // @输出
   // 修改 拖动模式 / 创建中矩形 / 移动中索引
@@ -260,14 +272,26 @@ export struct 图片遮罩编辑器 {
   // 2026-07-28 起遮罩右上方不再画 × 删除按钮，删除走顶部"撤销/清空"按钮。
   // ========================================================
   private 拖动开始(event: GestureEvent): void {
+    const point: GesturePointer | null = gesturePointer(event.fingerInfos, event.fingerList);
     if (!this.画布就绪 || this.画布宽 <= 0 || this.画布高 <= 0
-      || this.图片宽高比 <= 0 || event.fingerList.length === 0) {
+      || this.图片宽高比 <= 0 || point === null) {
       return;
     }
     // Pan 达到识别距离才回调，减去累计位移以还原按下点，避免起点及命中目标偏移。
-    const x: number = this.归一化X(event.fingerList[0].localX - event.offsetX);
-    const y: number = this.归一化Y(event.fingerList[0].localY - event.offsetY);
+    const x: number = this.归一化X(point.localX - event.offsetX);
+    const y: number = this.归一化Y(point.localY - event.offsetY);
     if (x < 0 || x > 1 || y < 0 || y > 1) {
+      return;
+    }
+    this.dragPointerId = point.id;
+
+    const vertex: number = this.hitPolygonVertex(x, y);
+    if (vertex >= 0) {
+      this.dragSnapshot = this.遮罩列表.map(copyMask);
+      this.移动中索引 = this.selectedMask;
+      this.polygonVertexIndex = vertex;
+      this.拖动模式 = 3;
+      this.拖动更新(event);
       return;
     }
 
@@ -325,11 +349,22 @@ export struct 图片遮罩编辑器 {
   // 无。
   // ========================================================
   private 拖动更新(event: GestureEvent): void {
-    if (this.拖动模式 === 0 || event.fingerList.length === 0) {
+    const point: GesturePointer | null = gesturePointer(event.fingerInfos, event.fingerList, this.dragPointerId);
+    if (this.拖动模式 === 0 || point === null) {
       return;
     }
-    const x: number = Math.max(0, Math.min(1, this.归一化X(event.fingerList[0].localX)));
-    const y: number = Math.max(0, Math.min(1, this.归一化Y(event.fingerList[0].localY)));
+    const x: number = Math.max(0, Math.min(1, this.归一化X(point.localX)));
+    const y: number = Math.max(0, Math.min(1, this.归一化Y(point.localY)));
+
+    if (this.拖动模式 === 3 && this.移动中索引 >= 0 && this.dragSnapshot !== null) {
+      const original: 遮罩描述 = this.dragSnapshot[this.移动中索引];
+      const points: OcclusionPoint[] = polygonImagePoints(original);
+      points[this.polygonVertexIndex] = { x: x, y: y };
+      if (occlusionPolygonArea(points) < 0.00001) return;
+      const masks: 遮罩描述[] = this.遮罩列表.map(copyMask);
+      setPolygonImagePoints(masks[this.移动中索引], points);
+      this.遮罩列表 = masks; this.重绘(); return;
+    }
 
     if (this.拖动模式 === 1 && this.创建中矩形 !== null) {
       this.创建中矩形 = {
@@ -346,8 +381,9 @@ export struct 图片遮罩编辑器 {
 
     if (this.拖动模式 === 2 && this.移动中索引 >= 0) {
       const m: 遮罩描述 = this.遮罩列表[this.移动中索引];
-      const 新左: number = Math.max(0, Math.min(1 - m.宽, x - this.移动偏移归一化X));
-      const 新顶: number = Math.max(0, Math.min(1 - m.高, y - this.移动偏移归一化Y));
+      const position: OcclusionPoint = this.positionInsideImage(m, x - this.移动偏移归一化X, y - this.移动偏移归一化Y);
+      const 新左: number = position.x;
+      const 新顶: number = position.y;
       const 新列表: 遮罩描述[] = [];
       for (let i: number = 0; i < this.遮罩列表.length; i++) {
         if (i === this.移动中索引) {
@@ -382,6 +418,7 @@ export struct 图片遮罩编辑器 {
   // 无。
   // ========================================================
   private 拖动结束(): void {
+    this.dragPointerId = -1;
     if (this.拖动模式 === 1 && this.创建中矩形 !== null) {
       if (this.创建中矩形.宽 >= this.最小拖动距离 && this.创建中矩形.高 >= this.最小拖动距离) {
         if (this.newInactiveMode === 1) setMaskProperty(this.创建中矩形, 'oi', '1');
@@ -400,6 +437,7 @@ export struct 图片遮罩编辑器 {
     this.dragSnapshot = null;
     this.拖动模式 = 0;
     this.移动中索引 = -1;
+    this.polygonVertexIndex = -1;
     this.重绘();
   }
 
@@ -447,7 +485,31 @@ export struct 图片遮罩编辑器 {
         ctx.lineTo(rect.left + this.polygonPoints[i].x * rect.width, rect.top + this.polygonPoints[i].y * rect.height);
       }
       ctx.stroke(); ctx.restore();
+      this.drawPolygonVertices(this.polygonPoints);
+    } else if (this.selectedMask >= 0 && this.遮罩列表[this.selectedMask].形状 === 'polygon') {
+      this.drawPolygonVertices(polygonImagePoints(this.遮罩列表[this.selectedMask]));
     }
+  }
+
+  private drawPolygonVertices(points: OcclusionPoint[]): void {
+    const rect: ImageContentRect = this.imageContentRect();
+    const ctx: CanvasRenderingContext2D = this.上下文;
+    ctx.save(); ctx.fillStyle = '#FFFFFF'; ctx.strokeStyle = 编号颜色(this.当前选中编号); ctx.lineWidth = 2;
+    for (const point of points) {
+      ctx.beginPath(); ctx.arc(rect.left + point.x * rect.width, rect.top + point.y * rect.height, 5, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  private hitPolygonVertex(x: number, y: number): number {
+    if (this.selectedMask < 0 || this.polygonPoints.length > 0 || this.遮罩列表[this.selectedMask].形状 !== 'polygon') return -1;
+    const points: OcclusionPoint[] = polygonImagePoints(this.遮罩列表[this.selectedMask]);
+    const rect: ImageContentRect = this.imageContentRect();
+    for (let i: number = 0; i < points.length; i++) {
+      if (Math.hypot((points[i].x - x) * rect.width, (points[i].y - y) * rect.height) <= 14) return i;
+    }
+    return -1;
   }
 
   // ========================================================
@@ -515,10 +577,11 @@ export struct 图片遮罩编辑器 {
       const size: number = maskNumber(遮罩, 'fs', 40 / this.sourceHeight) * rect.height * maskNumber(遮罩, 'scale', 1);
       ctx.font = String(size) + 'px Arial'; ctx.textBaseline = 'top';
       const lines: string[] = maskProperty(遮罩, 'text').split('\n');
-      for (let i: number = 0; i < lines.length; i++) ctx.fillText(lines[i], 像素左, 像素顶 + i * size * 1.5);
+      const layout: OcclusionTextLayout = this.textLayout(遮罩);
+      for (let i: number = 0; i < lines.length; i++) ctx.fillText(lines[i], 像素左, 像素顶 + i * layout.lineHeight);
     }
     if (this.selectedMask >= 0 && this.遮罩列表[this.selectedMask] === 遮罩) {
-      ctx.globalAlpha = 1; ctx.setLineDash([4, 3]); ctx.strokeRect(像素左, 像素顶, 像素宽, 像素高);
+      ctx.globalAlpha = 1; ctx.setLineDash([4, 3]); ctx.strokeRect(bounds.left, bounds.top, bounds.width, bounds.height);
     }
     ctx.restore();
   }
@@ -527,16 +590,34 @@ export struct 图片遮罩编辑器 {
     const rect: ImageContentRect = this.imageContentRect();
     let width: number = mask.宽 * rect.width, height: number = mask.高 * rect.height;
     if (mask.形状 === 'text') {
-      const size: number = maskNumber(mask, 'fs', 40 / this.sourceHeight) * rect.height * maskNumber(mask, 'scale', 1);
-      const lines: string[] = maskProperty(mask, 'text').split('\n');
-      this.上下文.save(); this.上下文.font = String(size) + 'px Arial';
-      width = 0;
-      for (const line of lines) width = Math.max(width, this.上下文.measureText(line).width);
-      width += 5 * rect.height / this.sourceHeight;
-      height = lines.length * size * 1.5 + 5 * rect.height / this.sourceHeight;
-      this.上下文.restore();
+      const layout: OcclusionTextLayout = this.textLayout(mask);
+      return { left: rect.left + mask.左 * rect.width + layout.left, top: rect.top + mask.顶 * rect.height + layout.top,
+        width: layout.width, height: layout.height };
     }
     return { left: rect.left + mask.左 * rect.width, top: rect.top + mask.顶 * rect.height, width: width, height: height };
+  }
+
+  private textLayout(mask: 遮罩描述): OcclusionTextLayout {
+    const rect: ImageContentRect = this.imageContentRect();
+    const size: number = maskNumber(mask, 'fs', 40 / this.sourceHeight) * rect.height * maskNumber(mask, 'scale', 1);
+    const ctx: CanvasRenderingContext2D = this.上下文;
+    ctx.save(); ctx.font = String(size) + 'px Arial'; ctx.textBaseline = 'top';
+    const reference: TextMetrics = ctx.measureText('M');
+    const extents: OcclusionTextExtent[] = maskProperty(mask, 'text').split('\n').map((line: string): OcclusionTextExtent => {
+      const metrics: TextMetrics = ctx.measureText(line);
+      return { width: metrics.width, ascent: metrics.actualBoundingBoxAscent, descent: metrics.actualBoundingBoxDescent };
+    });
+    ctx.restore();
+    return occlusionTextLayout(extents, size, reference.actualBoundingBoxAscent + reference.actualBoundingBoxDescent);
+  }
+
+  private positionInsideImage(mask: 遮罩描述, left: number, top: number): OcclusionPoint {
+    const rect: ImageContentRect = this.imageContentRect();
+    const bounds: ImageContentRect = this.maskBounds(mask);
+    return clampOcclusionOrigin(left, top,
+      { left: bounds.left - rect.left - mask.左 * rect.width, top: bounds.top - rect.top - mask.顶 * rect.height,
+        width: bounds.width, height: bounds.height }, rect,
+      mask.形状 === 'polygon' ? 0 : maskNumber(mask, 'angle') * Math.PI * 2 / 10000);
   }
 
   // ========================================================
@@ -556,6 +637,7 @@ export struct 图片遮罩编辑器 {
   // 列表为空时不操作。
   // ========================================================
   private 撤销最后一个(): void {
+    if (this.polygonPoints.length > 0) { this.polygonPoints = this.polygonPoints.slice(0, -1); this.重绘(); return; }
     this.cancelDrag(); this.遮罩列表 = this.history.undo(this.遮罩列表);
     this.selectedMask = -1; this.annotationText = ''; this.updateHistory();
     this.重绘();
@@ -578,16 +660,22 @@ export struct 图片遮罩编辑器 {
   // 触发 Canvas 重绘。
   // ========================================================
   private 清空全部(): void {
-    this.cancelDrag(); this.history.remember(this.遮罩列表);
+    this.cancelDrag();
+    if (this.遮罩列表.length > 0) this.history.remember(this.遮罩列表);
     this.遮罩列表 = [];
     this.创建中矩形 = null;
     this.拖动模式 = 0;
     this.移动中索引 = -1;
+    this.polygonPoints = []; this.annotationText = '';
     this.selectedMask = -1; this.updateHistory();
     this.重绘();
   }
 
-  private updateHistory(): void { this.canUndo = this.history.canUndo(); this.canRedo = this.history.canRedo(); }
+  private updateHistory(): void {
+    this.canUndo = this.history.canUndo(); this.canRedo = this.history.canRedo();
+    const masks: 遮罩描述[] = this.遮罩列表.filter((mask: 遮罩描述): boolean => mask.形状 !== 'text');
+    if (masks.length > 0) this.newInactiveMode = masks.every((mask: 遮罩描述): boolean => maskNumber(mask, 'oi') === 1) ? 1 : 0;
+  }
   private redo(): void {
     this.cancelDrag(); this.遮罩列表 = this.history.redo(this.遮罩列表);
     this.selectedMask = -1; this.annotationText = ''; this.updateHistory(); this.重绘();
@@ -601,10 +689,6 @@ export struct 图片遮罩编辑器 {
     list[this.selectedMask].编号 = ordinal; list[this.selectedMask].ordinalText = undefined; this.遮罩列表 = list;
     this.updateHistory(); this.重绘();
   }
-  private addOrdinal(): void {
-    this.selectedMask = -1;
-    this.当前选中编号 = nextOcclusionOrdinal(this.遮罩列表);
-  }
   private deleteSelected(): void {
     if (this.selectedMask < 0) return;
     this.history.remember(this.遮罩列表);
@@ -615,11 +699,16 @@ export struct 图片遮罩编辑器 {
     this.cancelDrag(); this.shapeKind = kind; this.polygonPoints = []; this.selectedMask = -1; this.annotationText = ''; this.重绘();
   }
   private tapImage(event: GestureEvent): void {
-    if (this.imageFailed || this.图片宽高比 <= 0 || event.fingerList.length === 0) return;
-    const x: number = this.归一化X(event.fingerList[0].localX), y: number = this.归一化Y(event.fingerList[0].localY);
+    const point: GesturePointer | null = gesturePointer(event.fingerInfos, event.fingerList);
+    if (this.imageFailed || this.图片宽高比 <= 0 || point === null) return;
+    const x: number = this.归一化X(point.localX), y: number = this.归一化Y(point.localY);
     if (x < 0 || y < 0 || x > 1 || y > 1) return;
-    if (this.shapeKind === 'polygon') { this.polygonPoints = this.polygonPoints.concat([{ x: x, y: y }]); this.重绘(); return; }
-    this.selectedMask = this.命中遮罩(x, y);
+    const hit: number = this.命中遮罩(x, y);
+    if (this.shapeKind === 'polygon' && (this.polygonPoints.length > 0 || hit < 0)) {
+      this.selectedMask = -1;
+      this.polygonPoints = this.polygonPoints.concat([{ x: x, y: y }]); this.重绘(); return;
+    }
+    this.selectedMask = hit;
     if (this.selectedMask >= 0) {
       const mask: 遮罩描述 = this.遮罩列表[this.selectedMask];
       if (mask.编号 > 0) this.当前选中编号 = mask.编号;
@@ -628,7 +717,7 @@ export struct 图片遮罩编辑器 {
     this.重绘();
   }
   private finishPolygon(): void {
-    if (this.polygonPoints.length < 3) return;
+    if (this.polygonPoints.length < 3 || occlusionPolygonArea(this.polygonPoints) < 0.00001) return;
     const points: OcclusionPoint[] = this.polygonPoints;
     const left: number = Math.min(...points.map((p: OcclusionPoint): number => p.x));
     const top: number = Math.min(...points.map((p: OcclusionPoint): number => p.y));
@@ -639,7 +728,7 @@ export struct 图片遮罩编辑器 {
     setMaskProperty(mask, 'oi', String(this.newInactiveMode));
     setMaskProperty(mask, 'points', points.map((p: OcclusionPoint): string => String(p.x) + ',' + String(p.y)).join(' '));
     this.history.remember(this.遮罩列表); this.遮罩列表 = this.遮罩列表.concat([mask]);
-    this.polygonPoints = []; this.updateHistory(); this.重绘();
+    this.polygonPoints = []; this.selectedMask = this.遮罩列表.length - 1; this.updateHistory(); this.重绘();
   }
   private addText(): void {
     if (this.annotationText.trim() === '') return;
@@ -657,10 +746,15 @@ export struct 图片遮罩编辑器 {
   }
 
   private setInactiveMode(hideOthers: boolean): void {
+    if (this.confirmingClose || this.disposed) return;
+    this.cancelDrag();
     this.newInactiveMode = hideOthers ? 1 : 0;
-    this.cancelDrag(); this.history.remember(this.遮罩列表);
     const masks: 遮罩描述[] = this.遮罩列表.map(copyMask);
-    for (const mask of masks) if (mask.形状 !== 'text') setMaskProperty(mask, 'oi', hideOthers ? '1' : '0');
+    const changed: boolean = masks.some((mask: 遮罩描述): boolean =>
+      mask.形状 !== 'text' && maskNumber(mask, 'oi') !== this.newInactiveMode);
+    if (!changed) return;
+    this.history.remember(this.遮罩列表);
+    for (const mask of masks) if (mask.形状 !== 'text') setMaskProperty(mask, 'oi', String(this.newInactiveMode));
     this.遮罩列表 = masks; this.updateHistory(); this.重绘();
   }
 
@@ -671,16 +765,9 @@ export struct 图片遮罩编辑器 {
   }
 
   @Builder
-  private tool(key: string, label: Resource, action: () => void) {
-    Button(label).type(ButtonType.Normal).fontSize(应用尺寸.字号_正文_小)
-      .height(应用尺寸.按钮高度).padding({ left: 应用尺寸.间距_8, right: 应用尺寸.间距_8 })
-      .fontColor(this.toolSelected(key) ? $r('app.color.action_primary') : $r('app.color.text_primary'))
-      .backgroundColor($r('app.color.surface_card'))
-      .border({ width: 应用尺寸.卡片边框,
-        color: this.toolSelected(key) ? $r('app.color.action_primary') : $r('app.color.border_subtle') })
-      .borderRadius(应用尺寸.圆角_胶囊).attributeModifier(new PressFeedback()).stateEffect(false)
-      .flexShrink(0).enabled(!this.confirmingClose)
-      .onClick((): void => { if (!this.confirmingClose) action(); })
+  private choice(key: string, label: Resource, action: () => void) {
+    按下态按钮({ 文案: label, selectable: true, selected: this.toolSelected(key),
+      是否启用: !this.confirmingClose, 点击回调: action })
   }
 
   private toolSelected(key: string): boolean {
@@ -688,17 +775,27 @@ export struct 图片遮罩编辑器 {
     if (key === 'hide_all') return this.inactiveMode(true);
     return key === this.shapeKind;
   }
+
+  private modeHint(): Resource {
+    if (this.inactiveMode(false)) return $r('app.string.io_mode_one_hint');
+    if (this.inactiveMode(true)) return $r('app.string.io_mode_all_hint');
+    return $r('app.string.io_mode_mixed_hint');
+  }
   private resizeSelected(factor: number): void {
     if (this.selectedMask < 0) return;
     const original: 遮罩描述 = this.遮罩列表[this.selectedMask];
     if (!['rect', 'ellipse', 'polygon', 'text'].includes(original.形状)) return;
-    if (original.宽 * factor > 1 - original.左 || original.高 * factor > 1 - original.顶) return;
+    const rect: ImageContentRect = this.imageContentRect();
+    const bounds: ImageContentRect = this.maskBounds(original);
+    if (bounds.width * factor > rect.width || bounds.height * factor > rect.height) return;
     this.history.remember(this.遮罩列表);
     const masks: 遮罩描述[] = this.遮罩列表.map(copyMask), mask: 遮罩描述 = masks[this.selectedMask];
     mask.宽 *= factor; mask.高 *= factor;
     if (mask.形状 === 'polygon') {
       setMaskProperty(mask, 'points', maskPoints(mask).map((p: OcclusionPoint): string => String(p.x * factor) + ',' + String(p.y * factor)).join(' '));
     } else if (mask.形状 === 'text') setMaskProperty(mask, 'scale', String(maskNumber(mask, 'scale', 1) * factor));
+    const position: OcclusionPoint = this.positionInsideImage(mask, mask.左, mask.顶);
+    mask.左 = position.x; mask.顶 = position.y;
     this.遮罩列表 = masks; this.updateHistory(); this.重绘();
   }
 
@@ -726,6 +823,115 @@ export struct 图片遮罩编辑器 {
     return this.selectedMask < 0 || this.annotationText !== maskProperty(this.遮罩列表[this.selectedMask], 'text');
   }
 
+  private stageSize(): OcclusionEditorSize {
+    return occlusionStageSize(this.viewportWidth, this.viewportHeight, this.图片宽高比);
+  }
+
+  private cancelPolygon(): void {
+    this.polygonPoints = []; this.重绘();
+  }
+
+  @Builder
+  private groupControls() {
+    Flex({ wrap: FlexWrap.Wrap, space: { main: LengthMetrics.vp(应用尺寸.间距_8), cross: LengthMetrics.vp(应用尺寸.间距_8) } }) {
+      ForEach(this.编号候选列表(), (ordinal: number) => {
+        按下态按钮({ 文案: `c${ordinal}`, selectable: true, selected: this.当前选中编号 === ordinal,
+          // 色点标识分组，标签与选中描边沿用主题色，避免黄色文字在浅色底上难以辨认。
+          markerColor: 编号颜色(ordinal),
+          是否启用: !this.confirmingClose, 点击回调: (): void => { this.selectOrdinal(ordinal); } })
+      }, (ordinal: number): string => `ordinal-btn-${ordinal}`)
+    }.width('100%')
+  }
+
+  @Builder
+  private imageStage() {
+    Row() {
+      Stack() {
+        Image(this.源图Uri)
+          .width('100%').height('100%').objectFit(ImageFit.Contain)
+          .onError((): void => { this.imageFailed = true; this.图片宽高比 = 0; })
+          .onComplete((e: ImageLoadResult) => {
+            if (e.width > 0 && e.height > 0) {
+              this.imageFailed = false; this.sourceHeight = e.height;
+              this.图片宽高比 = e.width / e.height; this.重绘();
+            }
+          })
+        Canvas(this.上下文)
+          .width('100%').height('100%')
+          .onReady((): void => { this.refreshCanvas(); })
+          .onAreaChange((): void => { this.refreshCanvas(); })
+          // 绘图优先于正文滚动；用户可在图片外滚动到下方的文字和操作区。
+          .priorityGesture(
+            GestureGroup(GestureMode.Exclusive,
+              PanGesture({ fingers: 1, distance: 5 })
+                .onActionStart((event: GestureEvent): void => { this.拖动开始(event); })
+                .onActionUpdate((event: GestureEvent): void => { this.拖动更新(event); })
+                .onActionEnd((event: GestureEvent): void => { this.拖动更新(event); this.拖动结束(); })
+                .onActionCancel((): void => { this.cancelDrag(); }),
+              TapGesture().onAction((event: GestureEvent): void => { this.tapImage(event); })
+            )
+          )
+      }
+      .width(this.stageSize().width).height(this.stageSize().height)
+      .attributeModifier(new ImageSurfaceStyle())
+    }.width('100%').justifyContent(FlexAlign.Center)
+  }
+
+  @Builder
+  private editorActions() {
+    Column({ space: 应用尺寸.间距_8 }) {
+      if (this.shapeKind === 'polygon') {
+        Text(this.polygonPoints.length > 0 ? $r('app.string.io_polygon_points', this.polygonPoints.length) :
+          $r('app.string.io_polygon_hint')).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
+        Flex({ wrap: FlexWrap.Wrap, space: { main: LengthMetrics.vp(应用尺寸.间距_8), cross: LengthMetrics.vp(应用尺寸.间距_8) } }) {
+          按下态按钮({ 文案: $r('app.string.io_finish_polygon'),
+            是否启用: !this.confirmingClose && this.polygonPoints.length >= 3 && occlusionPolygonArea(this.polygonPoints) >= 0.00001,
+            点击回调: (): void => { this.finishPolygon(); } })
+          按下态按钮({ 文案: $r('app.string.io_cancel_polygon'),
+            是否启用: !this.confirmingClose && this.polygonPoints.length > 0,
+            点击回调: (): void => { this.cancelPolygon(); } })
+        }.width('100%')
+      }
+      if (this.shapeKind === 'text') {
+        Text($r('app.string.io_text_hint')).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
+        TextArea({ text: this.annotationText, placeholder: $r('app.string.io_text') })
+          .attributeModifier(new FormTextAreaStyle()).height(应用尺寸.按钮高度 * 2).enabled(!this.confirmingClose)
+          .onChange((text: string): void => { this.annotationText = text; })
+        按下态按钮({ 文案: this.selectedMask >= 0 && this.遮罩列表[this.selectedMask].形状 === 'text' ?
+          $r('app.string.io_update_text') : $r('app.string.io_add_text'),
+          是否启用: !this.confirmingClose && this.annotationText.trim() !== '' && this.hasPendingText(),
+          点击回调: (): void => { this.addText(); } })
+      }
+      if (this.selectedMask >= 0) {
+        Flex({ wrap: FlexWrap.Wrap, space: { main: LengthMetrics.vp(应用尺寸.间距_8), cross: LengthMetrics.vp(应用尺寸.间距_8) } }) {
+          按下态按钮({ 文案: $r('app.string.io_smaller'), 是否启用: !this.confirmingClose,
+            点击回调: (): void => { this.resizeSelected(0.9); } })
+          按下态按钮({ 文案: $r('app.string.io_larger'), 是否启用: !this.confirmingClose,
+            点击回调: (): void => { this.resizeSelected(1.1); } })
+          if (this.遮罩列表[this.selectedMask].形状 !== 'polygon') {
+            按下态按钮({ 文案: $r('app.string.io_rotate'), 是否启用: !this.confirmingClose,
+              点击回调: (): void => { this.rotateSelected(); } })
+          }
+          按下态按钮({ 文案: $r('app.string.io_delete_selected'), 字色: $r('app.color.error_text'),
+            是否启用: !this.confirmingClose, 点击回调: (): void => { this.deleteSelected(); } })
+        }.width('100%')
+      }
+      Flex({ wrap: FlexWrap.Wrap, space: { main: LengthMetrics.vp(应用尺寸.间距_8), cross: LengthMetrics.vp(应用尺寸.间距_8) } }) {
+        按下态按钮({ 文案: $r('app.string.image_occlusion_undo'),
+          是否启用: !this.confirmingClose && (this.canUndo || this.polygonPoints.length > 0),
+          点击回调: (): void => { this.撤销最后一个(); } })
+        按下态按钮({ 文案: $r('app.string.io_redo'), 是否启用: !this.confirmingClose && this.canRedo,
+          点击回调: (): void => { this.redo(); } })
+        按下态按钮({ 文案: $r('app.string.image_occlusion_clear'), 字色: $r('app.color.error_text'),
+          是否启用: !this.confirmingClose && (this.遮罩列表.length > 0 || this.polygonPoints.length > 0 || this.annotationText !== ''),
+          点击回调: (): void => { this.清空全部(); } })
+      }.width('100%')
+      Text($r('app.string.io_group_hint')).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
+      Text($r('app.string.image_occlusion_hint')).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
+      if (this.imageFailed) Text($r('app.string.note_image_preview_failed')).fontColor($r('app.color.error_text'))
+    }.width('100%').alignItems(HorizontalAlign.Start)
+  }
+
   build() {
     Column({ space: 应用尺寸.间距_12 }) {
       DialogHeader({
@@ -736,156 +942,28 @@ export struct 图片遮罩编辑器 {
         onClose: (): void => { this.requestClose(); },
         onAction: (): void => { this.onConfirm(this.遮罩列表.map(copyMask)); }
       })
-      // 工具可独立滚动，窄屏、英文及文字输入时仍为绘图区保留空间。
       Scroll() {
         Column({ space: 应用尺寸.间距_8 }) {
-          // 编号与操作分行，避免窄屏及英文按钮的固有宽度挤出清空按钮。
-          Row({ space: 应用尺寸.间距_8 }) {
-            ForEach(this.编号候选列表(), (编号: number) => {
-              Button(`c${编号}`)
-                .type(ButtonType.Normal)
-                .layoutWeight(1)
-                .padding({ left: 0, right: 0 })
-                .height(应用尺寸.按钮高度)
-                .fontSize(应用尺寸.字号_按钮)
-                .fontColor('#FFFFFF')
-                .backgroundColor(编号颜色(编号))
-                .border({
-                  width: 3,
-                  color: this.当前选中编号 === 编号 ? Color.White : Color.Transparent
-                })
-                .borderRadius(应用尺寸.圆角_胶囊)
-                .attributeModifier(new PressFeedback())
-                .stateEffect(false)
-                .onClick((): void => {
-                  this.selectOrdinal(编号);
-                })
-            }, (编号: number): string => `ordinal-btn-${编号}`)
-          }
-          .width('100%')
-
+          this.groupControls()
           Flex({ wrap: FlexWrap.Wrap, space: { main: LengthMetrics.vp(应用尺寸.间距_8), cross: LengthMetrics.vp(应用尺寸.间距_8) } }) {
-            this.tool('rect', $r('app.string.io_rect'), (): void => { this.changeTool('rect'); })
-            this.tool('ellipse', $r('app.string.io_ellipse'), (): void => { this.changeTool('ellipse'); })
-            this.tool('polygon', $r('app.string.io_polygon'), (): void => { this.changeTool('polygon'); })
-            this.tool('text', $r('app.string.io_text'), (): void => { this.changeTool('text'); })
-            this.tool('group', $r('app.string.io_new_group'), (): void => { this.addOrdinal(); })
-            if (this.canRedo) this.tool('redo', $r('app.string.io_redo'), (): void => { this.redo(); })
-            if (this.selectedMask >= 0) {
-              this.tool('smaller', $r('app.string.io_smaller'), (): void => { this.resizeSelected(0.9); })
-              this.tool('larger', $r('app.string.io_larger'), (): void => { this.resizeSelected(1.1); })
-              if (this.遮罩列表[this.selectedMask].形状 !== 'polygon') {
-                this.tool('rotate', $r('app.string.io_rotate'), (): void => { this.rotateSelected(); })
-              }
-              this.tool('delete', $r('app.string.io_delete_selected'), (): void => { this.deleteSelected(); })
-            }
+            this.choice('rect', $r('app.string.io_rect'), (): void => { this.changeTool('rect'); })
+            this.choice('ellipse', $r('app.string.io_ellipse'), (): void => { this.changeTool('ellipse'); })
+            this.choice('polygon', $r('app.string.io_polygon'), (): void => { this.changeTool('polygon'); })
+            this.choice('text', $r('app.string.io_text'), (): void => { this.changeTool('text'); })
           }.width('100%')
           Flex({ wrap: FlexWrap.Wrap, space: { main: LengthMetrics.vp(应用尺寸.间距_8), cross: LengthMetrics.vp(应用尺寸.间距_8) } }) {
-            this.tool('hide_one', $r('app.string.io_hide_one'), (): void => { this.setInactiveMode(false); })
-            this.tool('hide_all', $r('app.string.io_hide_all'), (): void => { this.setInactiveMode(true); })
+            this.choice('hide_one', $r('app.string.io_hide_one'), (): void => { this.setInactiveMode(false); })
+            this.choice('hide_all', $r('app.string.io_hide_all'), (): void => { this.setInactiveMode(true); })
           }.width('100%')
-          if (this.shapeKind === 'polygon') {
-            按下态按钮({ 文案: $r('app.string.io_finish_polygon'), 是否启用: !this.confirmingClose && this.polygonPoints.length >= 3,
-              点击回调: (): void => { this.finishPolygon(); } })
-          }
-          if (this.shapeKind === 'text') {
-            Column({ space: 应用尺寸.间距_8 }) {
-              TextInput({ text: this.annotationText, placeholder: $r('app.string.io_text') })
-                .attributeModifier(new FormInputStyle()).enabled(!this.confirmingClose)
-                .onChange((text: string): void => { this.annotationText = text; })
-              按下态按钮({ 文案: this.selectedMask >= 0 && this.遮罩列表[this.selectedMask].形状 === 'text' ?
-                $r('app.string.io_update_text') : $r('app.string.io_add_text'),
-                是否启用: !this.confirmingClose && this.annotationText.trim() !== '',
-                点击回调: (): void => { this.addText(); } })
-            }.width('100%')
-          }
-
-          Row({ space: 应用尺寸.间距_8 }) {
-            Button($r('app.string.image_occlusion_undo'))
-              .type(ButtonType.Normal)
-              .layoutWeight(1)
-              .height(应用尺寸.按钮高度)
-              .fontSize(应用尺寸.字号_按钮)
-              .fontColor($r('app.color.text_primary'))
-              .backgroundColor($r('app.color.surface_card'))
-              .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
-              .borderRadius(应用尺寸.圆角_胶囊)
-              .enabled(this.canUndo)
-              .attributeModifier(new PressFeedback())
-              .stateEffect(false)
-              .onClick((): void => { this.撤销最后一个(); })
-
-            Button($r('app.string.image_occlusion_clear'))
-              .type(ButtonType.Normal)
-              .layoutWeight(1)
-              .height(应用尺寸.按钮高度)
-              .fontSize(应用尺寸.字号_按钮)
-              .fontColor($r('app.color.error_text'))
-              .backgroundColor($r('app.color.surface_card'))
-              .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
-              .borderRadius(应用尺寸.圆角_胶囊)
-              .enabled(this.遮罩列表.length > 0)
-              .attributeModifier(new PressFeedback())
-              .stateEffect(false)
-              .onClick((): void => { this.清空全部(); })
-          }
-          .width('100%')
-
-          // ---- 提示文本 ----
-          Text($r('app.string.image_occlusion_hint'))
-            .fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_secondary'))
-            .width('100%')
-          if (this.imageFailed) Text($r('app.string.note_image_preview_failed')).fontColor($r('app.color.error_text'))
-        }.width('100%')
-      }.layoutWeight(1).width('100%').scrollBar(BarState.Auto)
-
-      // ---- 图片底图 + Canvas 覆盖层 ----
-      // 宽高同时受剩余可视区域约束，横图、长图均完整显示。
-      Stack() {
-        Image(this.源图Uri)
-          .width('100%')
-          .height('100%')
-          .objectFit(ImageFit.Contain)
-          .onError((): void => { this.imageFailed = true; this.图片宽高比 = 0; })
-          .onComplete((e: ImageLoadResult) => {
-            if (e.width > 0 && e.height > 0) {
-              this.imageFailed = false;
-              this.sourceHeight = e.height;
-              this.图片宽高比 = e.width / e.height;
-              this.重绘();
-            }
-          })
-
-        Canvas(this.上下文)
-          .width('100%')
-          .height('100%')
-          .onReady((): void => {
-            this.refreshCanvas();
-          })
-          .onAreaChange((): void => { this.refreshCanvas(); })
-          .gesture(
-            GestureGroup(GestureMode.Exclusive,
-            PanGesture()
-              .onActionStart((event: GestureEvent): void => { this.拖动开始(event); })
-              .onActionUpdate((event: GestureEvent): void => { this.拖动更新(event); })
-              .onActionEnd((event: GestureEvent): void => {
-                this.拖动更新(event);
-                this.拖动结束();
-              })
-              .onActionCancel((): void => { this.cancelDrag(); }),
-            TapGesture().onAction((event: GestureEvent): void => { this.tapImage(event); }))
-          )
-      }
-      .layoutWeight(1.4)
-      .width('100%')
-      .backgroundColor(this.是否深色 ? '#000000' : '#F5F5F5')
-      .borderRadius(应用尺寸.圆角_面板)
-      .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
-
+          Text(this.modeHint()).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
+          this.imageStage()
+          this.editorActions()
+        }.width('100%').alignItems(HorizontalAlign.Start)
+      }.layoutWeight(1).width('100%').scrollBar(BarState.Auto).align(Alignment.TopStart)
+        .onAreaChange((_old: Area, area: Area): void => {
+          this.viewportWidth = Number(area.width); this.viewportHeight = Number(area.height);
+        })
     }
-    .width('100%')
-    .height('100%')
-    .padding(应用尺寸.卡片内边距)
+    .width('100%').height('100%').padding(应用尺寸.卡片内边距)
   }
 }

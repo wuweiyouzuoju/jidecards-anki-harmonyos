@@ -69,9 +69,10 @@ function 顺序键(父ID: string): string {
 // @副作用
 // 只读 preferences，不写入。
 // ========================================================
-export async function 加载牌组顺序(父ID: string): Promise<string[] | null> {
+export async function 加载牌组顺序(父ID: string, strict: boolean = false): Promise<string[] | null> {
   const 上下文: common.UIAbilityContext | null = 取上下文();
   if (上下文 === null) {
+    if (strict) throw new Error('deck_reorder_storage_unavailable');
     return null;
   }
   try {
@@ -82,10 +83,12 @@ export async function 加载牌组顺序(父ID: string): Promise<string[] | null
     }
     const 值: preferences.ValueType = await 存储.get(顺序键(父ID), '');
     if (typeof 值 !== 'string' || 值 === '') {
+      if (strict) throw new Error('deck_reorder_storage_unavailable');
       return null;
     }
     const 解析结果: object = JSON.parse(值);
     if (!Array.isArray(解析结果)) {
+      if (strict) throw new Error('deck_reorder_storage_unavailable');
       return null;
     }
     const 结果: string[] = [];
@@ -97,6 +100,7 @@ export async function 加载牌组顺序(父ID: string): Promise<string[] | null
     }
     return 结果;
   } catch (错误) {
+    if (strict) throw new Error('deck_reorder_storage_unavailable');
     return null;
   }
 }
@@ -161,22 +165,24 @@ export async function 加载全部牌组顺序(父ID列表: string[]): Promise<M
 // Promise<void>
 //
 // @业务规则
-// 调用方应在用户拖动结束后调用一次，而非每次拖动中都写入。
+// 调用方在原 onMove 松手回调中调用；共同命令串行写入，冻结输入后 await 落盘。
+// 保存失败抛出，不能向主页或 JIDE 报告未落盘的成功。
 //
 // @副作用
 // 写入 preferences 的 deck_order_<parentId> 并 flush 落盘。
 // ========================================================
 export async function 保存牌组顺序(父ID: string, 子ID列表: string[]): Promise<void> {
+  const accepted: string = JSON.stringify(子ID列表);
   const 上下文: common.UIAbilityContext | null = 取上下文();
   if (上下文 === null) {
-    return;
+    throw new Error('deck_reorder_storage_unavailable');
   }
   try {
     const 存储: preferences.Preferences = await preferences.getPreferences(上下文, 存储名);
-    await 存储.put(顺序键(父ID), JSON.stringify(子ID列表));
+    await 存储.put(顺序键(父ID), accepted);
     await 存储.flush();
   } catch (错误) {
-    // 偏好不可用时仅丢失持久化，不阻塞 UI。
+    throw new Error('deck_reorder_storage_unavailable');
   }
 }
 

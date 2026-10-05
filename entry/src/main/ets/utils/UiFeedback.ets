@@ -35,6 +35,19 @@ export function namedResourceText(context: UIContext, name: string, ...args: Arr
   }
 }
 
+/** 普通字符串不享有 $r 的配置刷新；调用方传入 @StorageProp 语言以建立渲染依赖。
+ * 语言只用于失效，不作为资源占位符；读取发生在配置通知更新资源管理器之后。
+ */
+export function localizedResourceText(context: UIContext, _locale: string, resource: Resource,
+  ...args: Array<string | number>): string {
+  return resourceText(context, resource, ...args);
+}
+
+export function localizedNamedResourceText(context: UIContext, _locale: string, name: string,
+  ...args: Array<string | number>): string {
+  return namedResourceText(context, name, ...args);
+}
+
 /** Toast 是尽力展示的反馈，不得把已完成的数据写入变成失败或制造未处理拒绝。 */
 export function showToastSafely(context: UIContext, options: promptAction.ShowToastOptions): void {
   try {

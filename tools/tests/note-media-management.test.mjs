@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { stripTypeScriptTypes } from 'node:module';
 import { NoteMediaSession } from '../../entry/src/main/ets/model/NoteMediaSession.ts';
 import { noteMediaParts, replaceNoteMediaPart, noteImagePreviewSource, assertNoteMediaResolved } from '../../entry/src/main/ets/model/NoteMediaParts.ts';
 import { prepareNoteImageFields } from '../../entry/src/main/ets/model/NoteImageDraft.ts';
@@ -161,8 +162,8 @@ test('media UI keeps fixed Add labels and main previews expose deletion independ
   assert.equal(noteAudioParts('[sound:one.mp3]')[1].filename, 'one.mp3');
 });
 
-test('all filled media actions consume the live theme button color, including recording and image management', () => {
-  for (const [name, expected] of [['NoteAudioField',5], ['NoteMediaDialog',1]]) {
+test('filled image actions consume the live theme button color', () => {
+  for (const [name, expected] of [['NoteMediaDialog',1]]) {
     const source = readFileSync(new URL(`../../entry/src/main/ets/components/common/${name}.ets`, import.meta.url), 'utf8');
     assert.match(source, /@StorageProp\(颜色键.主色按钮背景\) private buttonColor/);
     const buttons = arkuiClickTargets(source).filter(target => target.kind === 'Button' &&
@@ -184,4 +185,82 @@ test('all filled media actions consume the live theme button color, including re
       assert.match(button.modifiers, /new PressFeedback\(\)/);
     }
   }
+});
+
+test('audio operation rows keep recording status and exit actions available while the host is disabled', () => {
+  const source = readFileSync(new URL('../../entry/src/main/ets/components/common/NoteAudioField.ets', import.meta.url), 'utf8');
+  const controls = [...source.matchAll(/SettingsActionRow\((\{[\s\S]*?\})\)/g)].map(match =>
+    new Function('$r', 'localizedResourceText', stripTypeScriptTypes(`const props = ${match[1]};`, { mode: 'transform' }) + 'return props;'));
+  const Row = loadComponentLogic('components/common/SettingsActionRow.ets', 'SettingsActionRow', { $r: key => key });
+  const events = [], state = { disabled: false, working: false, paused: false, uiLanguage: 'zh-Hans', seconds: 14,
+    getUIContext: () => ({}),
+    pick: () => events.push('add'), record: () => events.push('record'),
+    finishRecording: () => events.push('done'), togglePause: () => events.push('pause'), cancelRecording: () => events.push('cancel') };
+  const props = create => create.call(state, key => key, (_context, _locale, key, seconds) => `${key}:${seconds}`);
+  assert.equal(controls.length, 5);
+  assert.deepEqual(controls.map(create => props(create).title), [
+    'app.string.note_audio_record_done', 'app.string.note_audio_pause', 'app.string.note_audio_record_cancel',
+    'app.string.note_audio_add', 'app.string.note_audio_record'
+  ]);
+  assert.equal(props(controls[0]).hint, 'app.string.note_audio_recording:14');
+  state.seconds = 15;
+  assert.equal(props(controls[0]).hint, 'app.string.note_audio_recording:15');
+  assert.equal(props(controls[4]).trailingIcon, 'app.media.ic_audio_record_on');
+  assert.equal(props(controls[0]).trailingIcon, 'app.media.ic_audio_recording');
+  assert.equal(props(controls[1]).trailingIcon, 'app.media.ic_audio_pause');
+  state.paused = true;
+  assert.equal(props(controls[0]).trailingIcon, 'app.media.ic_audio_record_off');
+  assert.equal(props(controls[0]).hint, 'app.string.note_audio_paused:15');
+  assert.equal(props(controls[1]).title, 'app.string.note_audio_resume');
+  assert.equal(props(controls[1]).trailingIcon, 'app.media.ic_audio_resume');
+  state.disabled = true;
+  for (const create of controls) Object.assign(new Row(), props(create)).activate();
+  assert.deepEqual(events, ['done', 'pause', 'cancel'], 'host busy while recording must still allow finish, pause and cancel');
+  state.working = true;
+  for (const create of controls) Object.assign(new Row(), props(create)).activate();
+  assert.deepEqual(events, ['done', 'pause', 'cancel']);
+  state.working = state.disabled = false;
+  state.paused = false;
+  assert.equal(props(controls[0]).trailingIcon, 'app.media.ic_audio_recording');
+  assert.equal(props(controls[1]).trailingIcon, 'app.media.ic_audio_pause');
+  for (const create of controls) Object.assign(new Row(), props(create)).activate();
+  assert.deepEqual(events, ['done', 'pause', 'cancel', 'done', 'pause', 'cancel', 'add', 'record']);
+});
+
+test('audio playback uses the common button with current filename, theme, and disabled guard', () => {
+  const source = readFileSync(new URL('../../entry/src/main/ets/components/common/NoteAudioField.ets', import.meta.url), 'utf8');
+  const match = source.match(/按下态按钮\((\{[\s\S]*?\})\)/);
+  assert.ok(match);
+  const create = new Function('key', 'label', 'filename', 'uri', 'partIndex', '$r',
+    stripTypeScriptTypes(`const props = ${match[1]};`, { mode: 'transform' }) + 'return props;');
+  const Button = loadComponentLogic('components/common/按下态按钮.ets', '按下态按钮', {
+    $r: key => key, 应用尺寸: { 字号_按钮: 15 }, GLASS_HIGHLIGHT_COLORS: []
+  });
+  const events = [], state = { disabled: false, working: false, playingKey: '', buttonColor: '#7C3AED',
+    partLabel: () => '当前音频', partFilename: () => 'current.mp3', partUri: () => '/cache/current.mp3',
+    play: (...args) => events.push(args) };
+  const props = () => create.call(state, 'existing-1', 'old label', 'old.mp3', '/cache/old.mp3', 1, key => key);
+  for (const color of ['#7C3AED', '#16A34A', '#2F5FD0']) {
+    state.buttonColor = color; assert.equal(props().字色, color);
+  }
+  const button = Object.assign(new Button(), props());
+  assert.equal(button.文案, 'app.string.note_audio_play');
+  state.partFilename = () => 'latest.mp3'; button.activate();
+  assert.deepEqual(events, [['existing-1', 'latest.mp3', '/cache/current.mp3']]);
+  state.playingKey = 'existing-1'; assert.equal(props().文案, 'app.string.note_audio_stop');
+  state.disabled = true; Object.assign(new Button(), props()).activate(); assert.equal(events.length, 1);
+
+  const deletion = source.match(/IconActionButton\((\{[\s\S]*?\})\)/);
+  assert.ok(deletion);
+  const Icon = loadComponentLogic('components/common/IconActionButton.ets', 'IconActionButton', {
+    Color: { Transparent: 'transparent' }, 应用尺寸: { 按钮高度: 44 }
+  });
+  const createDelete = new Function('remove', '$r', stripTypeScriptTypes(`const props = ${deletion[1]};`, { mode: 'transform' }) + 'return props;');
+  assert.equal(createDelete.call(state, () => {}, key => key).cornerAligned, true);
+  state.recording = false;
+  const remove = () => Object.assign(new Icon(), createDelete.call(state, () => events.push('remove'), key => key)).activate();
+  remove(); assert.equal(events.length, 1);
+  state.disabled = false; state.working = true; remove(); assert.equal(events.length, 1);
+  state.working = false; state.recording = true; remove(); assert.equal(events.length, 1);
+  state.recording = false; remove(); assert.equal(events.at(-1), 'remove');
 });

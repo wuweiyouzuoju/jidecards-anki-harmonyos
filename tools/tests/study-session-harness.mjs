@@ -8,10 +8,20 @@ import { StudyOptions, StudyTiming, StudyAdvanceAction, StudyAutoAdvanceSettings
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { SyncActivity } from '../../entry/src/main/ets/model/SyncSettings.ts';
+import { buildStudyGestureScript, StudyQuickAnswerMode } from '../../entry/src/main/ets/model/StudyGestures.ts';
+import {defaultStudyControls,validateStudyControls} from '../../entry/src/main/ets/model/StudyControls.ts';
 
 export function attachStudySession(page) {
+  page.whiteboardMounted = false;
+  page.whiteboardResetTick = 0;
   // These tests isolate study orchestration. CardWebSession has separate runtime/browser coverage.
-  page.cardWeb = { reset() {}, attach() {}, show: html => page.网页控制器.loadData(html) };
+  page.cardRenderPending = false;
+  // Onboarding has its own page/gesture tests; these hosts only exercise the study session.
+  page.maybeShowTapZonesGuide ??= () => {};
+  page.cardWeb = { reset() {}, attach() {}, show: html => {
+    page.网页控制器.loadData(html);
+    page.studyCardShown('');
+  } };
   page.noteReader = {
     card: id => page.卡片服务实例.获取卡片(id), note: id => page.笔记服务实例.获取笔记(id),
     notetype: id => page.笔记类型服务实例.获取笔记类型(id)
@@ -28,15 +38,17 @@ export function attachStudySession(page) {
   page.autoAdvanceEnabled = false;
   page.autoAdvanceSettings = new StudyAutoAdvanceSettings();
   page.studyMenuOpen = false;
+  page.controlsJson ??= JSON.stringify(defaultStudyControls());
   const source = readFileSync(new URL('../../entry/src/main/ets/pages/学习页.ets', import.meta.url), 'utf8');
-  const names = ['startStudyTimers', 'stopStudyTimers', 'studyTimerState', 'applyTimedAction', 'toggleAutoAdvance'];
+  const names = ['startStudyTimers', 'stopStudyTimers', 'studyTimerState', 'applyTimedAction', 'toggleAutoAdvance',
+    'resetWhiteboard', 'studyCardShown', 'refreshStudyGestureScript', 'controls', 'isStudyGesturesEnabled'];
   const methods = names.map(name => {
     const start = source.indexOf('  private ' + name + '(');
     return source.slice(start, source.indexOf('\n  }', start) + 4);
   });
-  const TimingPage = new Function('StudyAdvanceAction', 'BURY_SUSPEND_MODE_BURY_USER', '$r',
+  const TimingPage = new Function('StudyAdvanceAction', 'BURY_SUSPEND_MODE_BURY_USER', '$r', 'buildStudyGestureScript', 'StudyQuickAnswerMode', 'validateStudyControls',
     stripTypeScriptTypes('class TimingPage {' + methods.join('\n') + '}', { mode: 'transform' }) + '; return TimingPage;')(
-    StudyAdvanceAction, 2, key => key);
+    StudyAdvanceAction, 2, key => key, buildStudyGestureScript, StudyQuickAnswerMode,validateStudyControls);
   for (const name of names) page[name] = TimingPage.prototype[name];
   page.timerHandles = new Map(); let nextTimer = 0;
   page.studyTimer = new StudyTimerController({ state: () => page.studyTimerState(),

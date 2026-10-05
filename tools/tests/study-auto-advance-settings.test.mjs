@@ -33,7 +33,7 @@ function harness(choice = false) {
   const events = [];
   Object.assign(page, {
     getUIContext: () => ({}),
-    当前卡片: {}, 阶段: 'answer', 评分中: false, requestVersion: 1, autoAdvanceSettingsOpen: false,
+    当前卡片: {}, 阶段: 'answer', 评分中: false, requestVersion: 1, autoAdvanceSettingsOpen: false, flagLabels: {},
     choiceQuestion: choice ? { feedbackSeconds: 5 } : null, choiceGrade: choice ? {} : null,
     choiceFeedbackSecondsOverride: -1, choiceFeedbackDeadline: Date.now() + 5000,
     studyOptions: new StudyOptions(), autoAdvanceSettings: new StudyAutoAdvanceSettings(),
@@ -68,17 +68,20 @@ test('session overrides keep zero as off, preserve per-card defaults and never m
   assert.deepEqual(new StudyAutoAdvanceSettings().resolve(base), { ...base }, 'new session restores deck defaults');
 });
 
-test('edit stays first and unified settings stay last and available with both timers off', () => {
+test('edit stays first, guide stays last and unified settings remain available with both timers off', () => {
   for (const choice of [false, true]) {
     for (const agent of [false, true]) {
       const { page } = harness(choice);
       page.Agent入口已启用 = agent;
       const menu = page.更多菜单();
       assert.equal(menu[0].value, 'app.string.study_edit_note');
-      assert.equal(menu.at(-1).value, 'app.string.study_auto_advance_title');
-      assert.equal(menu.at(-1).enabled, true);
+      assert.equal(menu.at(-1).value, 'app.string.study_guide_title');
+      const autoAdvance = () => page.更多菜单().find(item => item.value === 'app.string.study_card_actions_title')
+        .children.find(item => item.value === 'app.string.study_auto_advance_title');
+      assert.equal(autoAdvance().enabled, true);
       page.评分中 = true;
       assert.equal(page.更多菜单().at(-1).enabled, false);
+      assert.equal(autoAdvance().enabled, false);
     }
   }
 });

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, copyFileSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, copyFileSync, rmSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
@@ -37,7 +37,8 @@ test('Windows PowerShell build wrapper tolerates stderr warnings but rejects uns
         scenario === 'new-warning' ? 'WARN: new diagnostic' : 'WARN: fixture warning';
       writeFileSync(join(devEco, 'tools/hvigor/bin/hvigorw.bat'), `@echo off\r\necho ${warning} 1>&2\r\necho ARGS=%*>>"${join(root, 'hvigor-args.log')}"\r\n` +
         `exit /b ${scenario === 'failure' ? 7 : 0}\r\n`);
-      const result = spawnSync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', join(tools, 'build-app.ps1'), '-SkipRust'], {
+      const artifact = join(root, 'artifacts', scenario);
+      const result = spawnSync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', join(tools, 'build-app.ps1'), '-SkipRust', '-ArtifactDirectory', artifact], {
         cwd: root, env: { ...process.env, DEVECO_HOME: devEco }, encoding: 'utf8'
       });
       assert.equal(result.error, undefined);
@@ -46,30 +47,40 @@ test('Windows PowerShell build wrapper tolerates stderr warnings but rejects uns
       assert.equal(JSON.parse(readFileSync(join(root, '.hvigor/build-warning-report.json'), 'utf8')).status, 'not-run',
         'each invocation clears previous gate status; this fixture verifier does not publish a report');
       if (scenario === 'warning') {
+        assert.equal(readFileSync(join(artifact, 'entry-default-signed.hap'), 'utf8'), 'fixture');
+        assert.match(readFileSync(join(artifact, 'build.log'), 'utf8'), /WARN: fixture warning/);
+        assert.equal(JSON.parse(readFileSync(join(artifact, 'build-warning-report.json'), 'utf8')).status, 'not-run');
         assert.match(readFileSync(join(root, 'hvigor-args.log'), 'utf8'), /ARGS=.*(?:^| )assembleHap(?: |$)/,
           'Hvigor must receive assembleHap as one argument');
-      }
+      } else assert.equal(existsSync(artifact), false, 'failed builds never publish an artifact');
     }
     writeFileSync(join(tools, 'build-agent-sandbox.ps1'), '$global:LASTEXITCODE = 0\n');
     writeFileSync(signed, 'fixture');
-    writeFileSync(join(root, 'concurrency.mjs'), `import { openSync, closeSync, unlinkSync, appendFileSync } from 'node:fs';
+    writeFileSync(join(root, 'concurrency.mjs'), `import { openSync, closeSync, unlinkSync, appendFileSync, writeFileSync } from 'node:fs';
       const fd = openSync('exclusive-build', 'wx');
       appendFileSync('build-order.log', 'start\\n');
       await new Promise(resolve => setTimeout(resolve, 1000));
+      writeFileSync('entry/build/default/outputs/default/entry-default-signed.hap', String(process.pid));
+      console.log('artifact=' + process.pid);
       appendFileSync('build-order.log', 'end\\n');
       closeSync(fd); unlinkSync('exclusive-build');`);
     writeFileSync(join(devEco, 'tools/hvigor/bin/hvigorw.bat'),
       '@echo off\r\necho WARN: fixture warning 1>&2\r\nnode concurrency.mjs\r\nexit /b %ERRORLEVEL%\r\n');
-    const invoke = () => new Promise((fulfill, reject) => {
+    const invoke = artifact => new Promise((fulfill, reject) => {
       const child = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
-        join(tools, 'build-app.ps1'), '-SkipRust'], { cwd: root, env: { ...process.env, DEVECO_HOME: devEco } });
+        join(tools, 'build-app.ps1'), '-SkipRust', '-ArtifactDirectory', artifact], { cwd: root, env: { ...process.env, DEVECO_HOME: devEco } });
       let output = '';
       child.stdout.on('data', data => { output += data; });
       child.stderr.on('data', data => { output += data; });
       child.once('error', reject);
       child.once('close', code => fulfill({ code, output }));
     });
-    const results = await Promise.all([invoke(), invoke()]);
+    const archives = [join(root, 'parallel-a'), join(root, 'parallel-b')];
+    const results = await Promise.all(archives.map(invoke));
     for (const result of results) assert.equal(result.code, 0, result.output);
+    for (const artifact of archives) {
+      const packageId = readFileSync(join(artifact, 'entry-default-signed.hap'), 'utf8');
+      assert.match(readFileSync(join(artifact, 'build.log'), 'utf8'), new RegExp('artifact=' + packageId));
+    }
     assert.equal(readFileSync(join(root, 'build-order.log'), 'utf8'), 'start\nend\nstart\nend\n');
   });

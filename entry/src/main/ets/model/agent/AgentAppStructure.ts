@@ -6,6 +6,40 @@ import { APP_INTERFACE_SURFACES, visibleInterfaceItems } from '../AppInterface';
 import type { AppInterfaceContext, AppInterfaceObservation, AppInterfaceControl } from '../AppInterface';
 import type { AgentSettingDefinition } from './AgentSettingsTools';
 import type { ProviderFunctionTool } from './ProviderProtocol';
+import { APP_PAGE_ROUTES, APP_NAVIGATION_ACTIONS } from '../navigation/AppNavigation';
+import { AGENT_APP_RECOMMENDATIONS, buildAgentAppRecommendations } from './AgentAppRecommendations';
+import type { AgentAppRecommendation } from './AgentAppRecommendations';
+import type { AgentNavigationReadiness } from './AgentAppNavigation';
+import { CARD_RENDERING_SUPPORT } from '../CardRenderingSupport';
+import type { CardRenderingSupport } from '../CardRenderingSupport';
+import { NOTE_FIELD_EDITING_SUPPORT } from '../NoteFieldEditing';
+import type { NoteFieldEditingSupport } from '../NoteFieldEditing';
+
+export interface AgentNavigationCapability {
+  id: string; surface: string; title: string; tool: string; available: boolean; requiresDeck: boolean;
+  requiredArguments: string[]; optionalArguments: string[];
+  resetsStack: boolean; executionState: 'ready' | 'blocked' | 'unknown' | 'unavailable'; blockedReason: string;
+}
+export interface AgentPageDestination {
+  surface: string; title: string; detailed: boolean;
+}
+
+/** 指纹覆盖共同声明与本轮能力；不是持久缓存，也不把用户状态写入长期记忆。 */
+export function agentInterfaceRevision(tools: ProviderFunctionTool[]): string {
+  const source: string = JSON.stringify([APP_PAGE_ROUTES, APP_INTERFACE_SURFACES, SETTINGS_ENTRIES,
+    SETTINGS_GROUPS, APP_NAVIGATION_ACTIONS, AGENT_APP_RECOMMENDATIONS, CARD_RENDERING_SUPPORT, NOTE_FIELD_EDITING_SUPPORT, tools]);
+  let hash: number = 2166136261;
+  for (let index: number = 0; index < source.length; index++) { hash = Math.imul(hash ^ source.charCodeAt(index), 16777619); }
+  return (hash >>> 0).toString(16);
+}
+
+export function agentInterfaceRuntimeSummary(tools: ProviderFunctionTool[]): string {
+  return `当前软件能力指纹=${agentInterfaceRevision(tools)}；页面目录=${APP_PAGE_ROUTES.map((route): string => route.surface).join(',')}；` +
+    `设置分组=${SETTINGS_ENTRIES.map((entry): string => entry.id).join(',')}。` +
+    (tools.some((tool): boolean => tool.name === 'navigate_app') ?
+      `可主动导航动作=${APP_NAVIGATION_ACTIONS.map((action): string => action.id).join(',')}。` : '') +
+    '这是本次运行从软件共同声明重新生成的目录；旧历史和记忆不能覆盖它。具体名称、状态、条件和操作能力先读 get_app_structure。';
+}
 
 export interface AgentInterfaceItem {
   id: string; title: string; opens: string; visibility: string; condition: string;
@@ -20,21 +54,29 @@ export interface AgentInterfaceSection {
   cardCount: number; cards: AgentInterfaceGroup[];
 }
 export interface AgentInterfaceSurface {
-  id: string; title: string; parent: string; declaredItemCount: number; items: AgentInterfaceItem[];
+  id: string; title: string; instructions: string; parent: string; declaredItemCount: number; items: AgentInterfaceItem[];
 }
 export interface AgentAppStructure {
+  cardRendering: CardRenderingSupport;
+  noteEditing: NoteFieldEditingSupport;
+  revision: string; destinations: AgentPageDestination[]; actions: AgentNavigationCapability[];
   source: string; coverage: string[]; limitation: string; simpleMode: boolean;
   observations: AppInterfaceObservation[]; tools: AgentInterfaceTool[];
   surfaces: AgentInterfaceSurface[]; visibleSettingsSectionCount: number; sections: AgentInterfaceSection[];
   foregroundSurface: string;
+  contextSurface: string;
+  recommendations: AgentInterfaceRecommendation[];
   observationDetailsIncluded: boolean;
 }
+export interface AgentInterfaceRecommendation extends AgentAppRecommendation { prompt: string; reason: string; }
 export interface AgentInterfaceTool { name: string; description: string; }
 
 /** 每次调用从当前界面共同声明、资源语言和真实工具声明重新构建；不写入模型记忆。 */
 export function buildAgentAppStructure(context: AppInterfaceContext, surfaceId: string, sectionId: string,
   localize: (key: string) => string, settings: AgentSettingDefinition[], tools: ProviderFunctionTool[],
-  observations: AppInterfaceObservation[], foregroundSurface: string = ''): AgentAppStructure {
+  observations: AppInterfaceObservation[], foregroundSurface: string = '',
+  contextSurface: string = foregroundSurface, navigationReadiness: AgentNavigationReadiness[] = []): AgentAppStructure {
+  const sourceSurface: string = foregroundSurface === 'agent' ? contextSurface : foregroundSurface;
   const views: AppInterfaceObservation[] = observations.map((view: AppInterfaceObservation): AppInterfaceObservation => {
     const declaration = APP_INTERFACE_SURFACES.find((surface): boolean => surface.id === view.surface);
     const controls: AppInterfaceControl[] | undefined = view.items?.map((item: AppInterfaceControl): AppInterfaceControl =>
@@ -66,7 +108,7 @@ export function buildAgentAppStructure(context: AppInterfaceContext, surfaceId: 
             if (visibility !== 'hidden' && item.condition === 'agent_enabled' && !context.agent) visibility = 'hidden';
             if (visibility !== 'hidden' && item.condition !== undefined &&
               !['theme_has_textures', 'agent_enabled', 'agent_disabled'].includes(item.condition)) visibility = 'conditional';
-            return { id: item.id, title: localize(item.titleKey), opens: '', visibility: visibility,
+            return { id: item.id, title: localize(item.titleKey), opens: item.opens ?? '', visibility: visibility,
               condition: item.condition ?? '', settingId: item.settingId ?? '',
               readTool: capability !== undefined && names.includes('get_settings') ? 'get_settings' : '',
               writeTool: capability?.writable && names.includes(capability.writeTool) ? capability.writeTool : '',
@@ -85,13 +127,14 @@ export function buildAgentAppStructure(context: AppInterfaceContext, surfaceId: 
     const visibleIds: string[] = visibleInterfaceItems(surface.id, context).map((item): string => item.id);
     const observation = views.find((view: AppInterfaceObservation): boolean => view.surface === surface.id);
     surfaces.push({ id: surface.id, title: localize(observation?.titleKey ?? surface.titleKey), parent: surface.parent,
+      instructions: surface.instructionsKey === undefined ? '' : localize(surface.instructionsKey),
       declaredItemCount: surface.items.length,
       items: surfaceId === 'app' ? [] : surface.items.map((item): AgentInterfaceItem => {
         const control = observation?.items?.find((entry): boolean => entry.id === item.id);
         const liveMenu: boolean = ['home_create', 'study_more'].includes(surface.id) && observation !== undefined;
         const absentControl: boolean = control === undefined && (observation?.controlsComplete === true ||
           (surface.id === 'study' && item.condition !== undefined && observation?.items !== undefined));
-        return { id: item.id, title: localize(control?.titleKey ?? item.titleKey), opens: item.opens ?? '',
+        return { id: item.id, title: control?.title ?? localize(item.titleKey), opens: item.opens ?? '',
           visibility: !visibleIds.includes(item.id) || absentControl || (liveMenu && observation !== undefined && !observation.optionIds.includes(item.id)) ? 'hidden' :
             control !== undefined ? 'observed' : (item.condition === undefined ? 'available_in_surface' : 'conditional'),
           condition: item.condition ?? '', enabled: control?.enabled, selected: control?.selected,
@@ -100,10 +143,32 @@ export function buildAgentAppStructure(context: AppInterfaceContext, surfaceId: 
         .map((control): AgentInterfaceItem => ({ id: control.id, title: control.title, opens: '', visibility: 'observed', condition: '',
           enabled: control.enabled, selected: control.selected, settingId: '', readTool: '', writeTool: '', sensitive: false }))) });
   }
-  return { source: 'shared_ui_declarations_and_live_observations',
+  return { source: 'shared_ui_declarations_and_live_observations', cardRendering: CARD_RENDERING_SUPPORT,
+    noteEditing: NOTE_FIELD_EDITING_SUPPORT,
+    revision: agentInterfaceRevision(tools),
+    destinations: APP_PAGE_ROUTES.map((route): AgentPageDestination => ({ surface: route.surface,
+      title: localize(route.titleKey), detailed: route.surface === 'settings' || APP_INTERFACE_SURFACES.some((surface): boolean => surface.id === route.surface) })),
+    actions: APP_NAVIGATION_ACTIONS.map((action): AgentNavigationCapability => {
+      const registered: boolean = names.includes('navigate_app');
+      const readiness = navigationReadiness.find((item): boolean => item.action === action.id);
+      return { id: action.id, surface: action.surface,
+        title: localize(action.titleKey), tool: registered ? 'navigate_app' : '',
+        available: registered, requiresDeck: action.required.includes('deckId'), resetsStack: action.resetsStack === true,
+        executionState: !registered ? 'unavailable' : foregroundSurface === '' ? 'blocked' : readiness?.executionState ?? 'unknown',
+        blockedReason: !registered ? 'navigation_tool_unavailable' : foregroundSurface === '' ? 'navigation_unavailable' : readiness?.blockedReason ?? '',
+        requiredArguments: action.required.slice(), optionalArguments: action.optional.slice() };
+    }),
     coverage: APP_INTERFACE_SURFACES.map((surface): string => surface.id).concat(['settings']),
     limitation: 'Semantic interface structure, not a pixel screenshot. foregroundSurface comes from page visibility callbacks; empty means unknown or background. Observations describe mounted registered surfaces and can belong to a hidden page. observed/disabled controls are UI facts, not agent permissions. Conditional content without observation remains unknown. Destinations outside coverage have no detailed interface description. Secret values are never included.',
-    foregroundSurface: foregroundSurface, simpleMode: context.simple,
+    foregroundSurface: foregroundSurface, contextSurface: sourceSurface,
+    recommendations: buildAgentAppRecommendations(tools, observations, foregroundSurface, contextSurface)
+      .filter((item: AgentAppRecommendation): boolean => surfaceId === 'app' ||
+        item.sourceSurface === surfaceId || item.contextSurface === surfaceId)
+      .map((item: AgentAppRecommendation): AgentInterfaceRecommendation => ({ id: item.id,
+        promptKey: item.promptKey, reasonKey: item.reasonKey, prompt: localize(item.promptKey), reason: localize(item.reasonKey),
+        sourceSurface: item.sourceSurface, contextSurface: item.contextSurface, evidence: item.evidence,
+        requiredTools: item.requiredTools, action: item.action, requiresUserRequest: item.requiresUserRequest })),
+    simpleMode: context.simple,
     observationDetailsIncluded: surfaceId !== 'app',
     observations: surfaceId === 'app' ? views.map((view): AppInterfaceObservation =>
       ({ surface: view.surface, titleKey: view.titleKey, sectionId: view.sectionId, selectedId: view.selectedId,

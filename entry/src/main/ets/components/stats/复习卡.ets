@@ -29,6 +29,7 @@ interface 复习柱 {
 
 @Component
 export struct 复习卡 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('更新缓存') 复习计数: Map<number, ReviewKindCounts> | null = null;
   /** 每日答题用时（毫秒）：「时间」模式数据源（Anki ReviewsGraph reviewTime） */
   @Prop @Watch('更新缓存') 复习时间: Map<number, ReviewKindCounts> | null = null;
@@ -223,7 +224,7 @@ export struct 复习卡 {
   }
 
   /** 毫秒 → 本地化时长（X小时Y分 / X分Y秒），复用今日计数卡的格式化资源 */
-  private 格式化时长(毫秒: number): string {
+  private 格式化时长(毫秒: number, _locale: string = this.uiLanguage): string {
     const 总秒: number = Math.floor(毫秒 / 1000);
     const 小时: number = Math.floor(总秒 / 3600);
     const 分: number = Math.floor((总秒 % 3600) / 60);

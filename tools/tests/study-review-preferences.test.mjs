@@ -14,7 +14,7 @@ import { loadUiFeedback } from './ui-feedback-harness.mjs';
 
 const source=readFileSync(new URL('../../entry/src/main/ets/pages/学习页.ets',import.meta.url),'utf8');
 const methods=['startStudyTimers','stopStudyTimers','studyTimerState','maybeShowTimebox','closeTimebox','openStudyMenu','closeStudyMenu','按钮文案位',
-  '撤销上次','刷新编辑后当前卡','埋藏或暂停当前卡','确认删除当前卡','恢复埋藏','评分','提交选择题','studyActivityChanged'];
+  '撤销上次','刷新编辑后当前卡','埋藏或暂停当前卡','确认删除当前卡','恢复埋藏','评分','提交选择题','studyActivityChanged','updateScreenAwake'];
 const body=methods.map(name=>{
   const match=new RegExp('  private (?:async )?'+name+'\\(').exec(source);assert.ok(match,name);
   return source.slice(match.index,source.indexOf('\n  }',match.index)+4);
@@ -33,7 +33,7 @@ function harness() {
   const controller=new StudySessionController(backend,new AutoSyncScheduler(),new SyncActivity(),()=>now);
   const Page=new Function('Date','playStudyHaptic','gradeJideChoice','RATING_GOOD','RATING_HARD',
     stripTypeScriptTypes('class Page {'+body+'}',{mode:'transform'})+';return Page;')({now:()=>now},()=>{},gradeJideChoice,2,1);
-  const page=Object.assign(new Page(),{mounted:true,页面已显示:true,foreground:true,requestVersion:1,
+  const page=Object.assign(new Page(),{screenAwake:null,mounted:true,页面已显示:true,foreground:true,requestVersion:1,
     controllerReady:true,studyMenuOpen:false,autoAdvanceSettingsOpen:false,editingPageOpen:false,
     studyGuideVisible:false,tapZonesGuideVisible:false,手写模式:false,评分中:false,flipPending:false,
     阶段:'question',choiceQuestion:null,timeboxNotice:null,choiceFeedbackDeadline:0,展示时刻毫秒:0,

@@ -36,6 +36,7 @@ import {
   encodeDeckTreeRequest,
   encodeDeckId,
   encodeRenameDeckRequest,
+  encodeReparentDecksRequest,
   encode过滤牌组更新
 } from '../proto/messages/DeckMessages';
 import { decodeOpChanges, decodeOpChangesWithCount, decodeOpChangesWithId } from '../proto/messages/CollectionMessages';
@@ -73,10 +74,14 @@ export class 牌组服务 {
     return decodeOpChangesWithId(已添加);
   }
 
-  /**
-   * 重命名牌组：调用后端 rename_deck（method 18），自动级联重命名子牌组前缀。
-   * 名称冲突等失败以 BackendError 抛出，message 可直接展示。
-   */
+  /** ReparentDecks（method 17）；父 ID=0 表示顶级，Core 在同一事务中级联子牌组。 */
+  async 调整牌组父级(牌组ID列表: number[], 父牌组ID: number): Promise<number> {
+    const 响应: Uint8Array = await this.会话.调用(服务号.后端牌组, 牌组方法.调整牌组父级,
+      encodeReparentDecksRequest(牌组ID列表, 父牌组ID));
+    return decodeOpChangesWithCount(响应);
+  }
+
+  /** 重命名（method 18）级联子牌组前缀；失败以 BackendError 上抛。 */
   async 重命名牌组(牌组ID: number, 新名称: string): Promise<void> {
     const 请求: Uint8Array = encodeRenameDeckRequest(牌组ID, 新名称);
     await this.会话.调用(

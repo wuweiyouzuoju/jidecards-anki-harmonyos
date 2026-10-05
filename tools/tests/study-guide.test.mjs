@@ -1,6 +1,7 @@
 import { resolveStudyKey } from '../../entry/src/main/ets/model/StudyInputPolicy.ts';
-import { resolveStudyGesture } from '../../entry/src/main/ets/model/StudyGestures.ts';
+import { resolveStudyGesture, StudyQuickAnswerMode } from '../../entry/src/main/ets/model/StudyGestures.ts';
 import { loadNoteEditor } from '../../entry/src/main/ets/model/NoteEditorLoader.ts';
+import {defaultStudyControls,validateStudyControls,mappedStudyCommand} from '../../entry/src/main/ets/model/StudyControls.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -10,6 +11,7 @@ import test from 'node:test';
 
 const read = path => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 const pageSource = read('entry/src/main/ets/pages/学习页.ets');
+const guideSource = read('entry/src/main/ets/components/StudyGuideDialog.ets');
 
 function storeHarness() {
   let memory = new Map();
@@ -33,35 +35,58 @@ function storeHarness() {
   return { context, restart: () => { memory = new Map(disk); }, fail: () => { fail = true; } };
 }
 
-function pageHarness(completed = false) {
+function pageHarness(completed = false, failOpen = false) {
   let now = 1000;
   const dialogs = [];
   let saves = 0;
-  const context = vm.createContext({ resolveStudyKey, resolveStudyGesture, loadNoteEditor, studyKeyName: key => String(key), KeyType: { Down: 0 },
+  const context = vm.createContext({ validateStudyControls,mappedStudyCommand,resolveStudyKey, resolveStudyGesture, StudyQuickAnswerMode, loadNoteEditor, studyKeyName: key => String(key), KeyType: { Down: 0 },
     Date: { now: () => now }, $r: key => key, isTapZonesGuideCompleted: () => false,
     DialogAlignment: { Center: 0 },
+    StudyGuideDialog: options => options,
+    CustomDialogController: class {
+      constructor(options) { this.options = options; }
+      open() { if (failOpen) throw new Error('dialog unavailable'); dialogs.push(this.options); }
+      close() { this.options.builder.onClose(); }
+    },
+    showToastSafely: () => {},
     hilog: { warn: () => {} },
     isStudyGuideCompleted: () => completed,
     playStudyHaptic: () => {},
     completeStudyGuide: async () => { saves++; completed = true; }
   });
-  const methods = ['maybeShowStudyGuide', 'maybeShowTapZonesGuide', 'showStudyGuide', '处理按键', 'handleStudyGesture', '评分', 'clearChoiceAutoAdvance', 'scheduleChoiceAutoAdvance', 'choiceAutoAdvanceSeconds'].map(name => {
+  const methods = ['controls','isStudyGesturesEnabled', 'isTapZonesEnabled', 'maybeShowStudyGuide', 'maybeShowTapZonesGuide', 'showStudyGuide', 'invalidateCardWork', '处理按键', 'handleStudyGesture', '评分', 'clearChoiceAutoAdvance', 'scheduleChoiceAutoAdvance', 'choiceAutoAdvanceSeconds'].map(name => {
     const start = pageSource.search(new RegExp(`  private (?:async )?${name}\\(`));
     assert.notEqual(start, -1);
     return pageSource.slice(start, pageSource.indexOf('\n  }', start) + 4);
   });
   vm.runInContext(stripTypeScriptTypes(`globalThis.Harness = class { ${methods.join('\n')} }`), context);
   const page = new context.Harness();
-  Object.assign(page, { timeboxNotice: null, editor: { visible: false, busy: false },
+  Object.assign(page, { controlsJson:JSON.stringify(defaultStudyControls()),quickAnswerMode: StudyQuickAnswerMode.Off, timeboxNotice: null, editor: { visible: false, busy: false },
     取文案: key => key,
     studyGuideChecked: false, studyGuideVisible: false, stopStudyTimers() {}, startStudyTimers() {}, controllerReady: true, pendingHtml: '',
-    isCurrentRequest: () => true, requestVersion: 1, interactionVersion: 1,
+    isCurrentRequest: version => page.mounted && page.页面已显示 && page.foreground && version === page.requestVersion,
+    requestVersion: 1, interactionVersion: 1, mounted: true, foreground: true,
+    cardWeb: { reset() {} }, audioSession: { stop() {} }, studyGuideClose() {},
     choiceQuestion: null, choiceGrade: null, choiceAutoAdvanceTimer: -1, choiceFeedbackDeadline: 0, studyMenuOpen: false,
     页面已显示: false, 阶段: 'loading', 当前卡片: {}, 展示时刻毫秒: 500,
     getUIContext: () => ({ showAlertDialog: options => dialogs.push(options) })
   });
   return { page, dialogs, advance: ms => { now += ms; }, saves: () => saves };
 }
+
+test('rendering blocks review shortcuts while Escape can still leave the study page', () => {
+  const { page } = pageHarness(true);
+  page.页面已显示 = true; page.阶段 = 'answer'; page.cardRenderPending = true;
+  const commands = [];
+  page.返回 = () => commands.push('back');
+  page.显示答案 = () => commands.push('flip');
+  page.评分 = () => commands.push('rating');
+  page.playStudyAudio = () => commands.push('replay');
+  for (const keyCode of ['space', '1', 'r']) page.处理按键({ keyCode, type: 0 });
+  assert.deepEqual(commands, []);
+  assert.equal(page.处理按键({ keyCode: 'escape', type: 0 }), true);
+  assert.deepEqual(commands, ['back']);
+});
 
 test('guide completion survives restart and failed persistence restores the unread state', async () => {
   const fresh = storeHarness();
@@ -119,7 +144,8 @@ test('confirmation saves completion and excludes reading time without allowing r
   page.handleStudyGesture('tap', 0, 0, 1, 1);
   await page.评分(0);
   advance(60000);
-  dialogs[0].confirm.action();
+  dialogs[0].builder.onConfirm();
+  dialogs[0].builder.onClose();
   assert.equal(page.studyGuideVisible, false);
   assert.equal(page.展示时刻毫秒, 60500);
   assert.equal(saves(), 1);
@@ -153,17 +179,63 @@ test('manual guide cannot open during loading or while a rating is being submitt
   assert.equal(page.studyGuideVisible, false);
 });
 
-test('study guide includes the shared keyboard shortcuts in both languages', () => {
+test('card invalidation closes the guide without marking it read or resuming old timers', () => {
+  const { page, dialogs, saves } = pageHarness();
+  page.页面已显示 = true;
+  page.阶段 = 'question';
+  let resumes = 0;
+  page.startStudyTimers = () => { resumes++; };
+  page.showStudyGuide();
+  page.invalidateCardWork();
+  assert.equal(page.studyGuideVisible, false);
+  assert.equal(page.studyGuideDialog, null);
+  assert.equal(resumes, 0);
+  dialogs[0].builder.onConfirm();
+  dialogs[0].builder.onClose();
+  assert.equal(saves(), 0, 'late confirmation cannot consume the unread state');
+  assert.equal(resumes, 0);
+});
+
+test('failed dialog opening releases the input guard and resumes study', () => {
+  const { page, dialogs, saves } = pageHarness(false, true);
+  page.页面已显示 = true;
+  page.阶段 = 'question';
+  let resumes = 0;
+  page.startStudyTimers = () => { resumes++; };
+  page.showStudyGuide();
+  assert.equal(dialogs.length, 0);
+  assert.equal(page.studyGuideVisible, false);
+  assert.equal(page.studyGuideDialog, null);
+  assert.equal(resumes, 1);
+  assert.equal(saves(), 0);
+});
+
+test('late callbacks from a closed guide cannot close or confirm a newly opened guide', () => {
+  const { page, dialogs, saves } = pageHarness();
+  page.页面已显示 = true;
+  page.阶段 = 'question';
+  page.showStudyGuide();
+  dialogs[0].builder.onClose();
+  page.showStudyGuide();
+  const currentDialog = page.studyGuideDialog;
+  dialogs[0].builder.onClose();
+  dialogs[0].builder.onConfirm();
+  assert.equal(page.studyGuideVisible, true);
+  assert.equal(page.studyGuideDialog, currentDialog);
+  assert.equal(saves(), 0);
+  dialogs[1].builder.onConfirm();
+  assert.equal(saves(), 1);
+});
+
+test('structured study guide includes the shared keyboard and quick answer help in both languages', () => {
   for (const locale of ['base', 'en_US']) {
     const strings = new Map(JSON.parse(read(`entry/src/main/resources/${locale}/element/string.json`)).string.map(item => [item.name, item.value]));
-    const { page, dialogs } = pageHarness();
-    page.取文案 = key => strings.get(key.replace('app.string.', ''));
-    page.页面已显示 = true;
-    page.阶段 = 'question';
-    page.maybeShowStudyGuide();
-    assert.equal(dialogs[0].message, ['study_guide_message', 'glossary_shortcuts_help',
-      'study_gestures_help', 'settings_tap_zones_hint'].map(key => strings.get(key)).join('\n\n'));
-    for (const key of ['Enter', 'Ctrl+Z', 'Delete', 'Esc']) assert.ok(dialogs[0].message.includes(key));
+    const contentKeys = [...guideSource.matchAll(/\$r\('app\.string\.([^']+)'\)/g)].map(match => match[1]);
+    for (const key of contentKeys) assert.ok(strings.get(key), `${locale}: missing ${key}`);
+    for (const key of ['glossary_shortcuts_help', 'study_gestures_help', 'settings_tap_zones_hint']) {
+      assert.ok(contentKeys.includes(key), `reuse ${key}`);
+    }
+    for (const key of ['Enter', 'Ctrl+Z', 'Delete', 'Esc']) assert.ok(strings.get('glossary_shortcuts_help').includes(key));
     if (locale === 'base') assert.equal(strings.get('study_undo'), '撤销操作');
   }
 });
@@ -198,15 +270,17 @@ test('both review layouts preserve rating identity while displaying backend inte
 test('first-use guide and settings use the same rating, interval, bury and suspend explanations', () => {
   for (const locale of ['base', 'en_US']) {
     const strings = new Map(JSON.parse(read(`entry/src/main/resources/${locale}/element/string.json`)).string.map(item => [item.name, item.value]));
-    const guide = strings.get('study_guide_message');
-    for (const key of ['glossary_bury_help', 'glossary_suspend_help']) {
-      assert.ok(guide.includes(strings.get(key).split('\n\n')[0]));
+    for (const action of ['bury', 'suspend']) {
+      assert.equal(strings.get(`study_guide_${action}`), strings.get(`glossary_${action}_help`).split('\n\n')[0]);
     }
     const ratingsHelp = strings.get('glossary_ratings_help').split('\n\n');
-    assert.ok(guide.includes(ratingsHelp[1]), 'identical rating definitions');
-    assert.ok(guide.includes(ratingsHelp[2]), 'identical interval explanation');
-    for (const key of ['rating_again', 'rating_hard', 'rating_good', 'rating_easy', 'study_bury', 'study_suspend']) {
-      assert.ok(guide.includes(strings.get(key)), key);
+    const separator = locale === 'base' ? '：' : ': ';
+    const definitions = ['again', 'hard', 'good', 'easy'].map(rating =>
+      `${strings.get(`rating_${rating}`)}${separator}${strings.get(`study_guide_${rating}`)}`).join('\n');
+    assert.equal(definitions, ratingsHelp[1], 'identical rating definitions');
+    assert.ok(ratingsHelp[2].includes(strings.get('study_guide_interval')), 'identical interval advice');
+    for (const rating of ['again', 'hard', 'good', 'easy']) {
+      assert.match(guideSource, new RegExp(`rating_${rating}'[\\s\\S]*?study_guide_${rating}'[\\s\\S]*?study_${rating}_background'[\\s\\S]*?study_${rating}_text'`));
     }
     if (locale === 'base') {
       for (const [key, value] of strings) {

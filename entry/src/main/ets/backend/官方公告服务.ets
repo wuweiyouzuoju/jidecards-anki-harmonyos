@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { http } from '@kit.NetworkKit';
-import { 官方公告地址 } from '../model/官方公告配置';
+import { 官方公告地址, OFFICIAL_ANNOUNCEMENTS_ENABLED } from '../model/官方公告配置';
 import {
   构建官方公告请求地址,
   官方公告截止剩余毫秒,
@@ -27,7 +27,7 @@ export class 官方公告服务 {
     language: 官方公告语言,
     nowMs: number = Date.now()
   ): Promise<官方公告展示项 | null> {
-    if (!HTTPS地址有效(this.manifestUrl)) return null;
+    if (!OFFICIAL_ANNOUNCEMENTS_ENABLED || !HTTPS地址有效(this.manifestUrl)) return null;
     const startMs: number = Date.now();
     const client: http.HttpRequest = http.createHttp();
     const options: http.HttpRequestOptions = {

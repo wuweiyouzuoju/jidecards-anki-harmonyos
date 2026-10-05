@@ -2,9 +2,11 @@
 import { KeyCode } from '@kit.InputKit';
 export function studyKeyName(code: number): string {
   switch (code) {
+    case KeyCode.KEYCODE_BACK: return 'back';
     case KeyCode.KEYCODE_CTRL_LEFT: return 'control';
     case KeyCode.KEYCODE_CTRL_RIGHT: return 'control';
     case KeyCode.KEYCODE_Z: return 'z';
+    case KeyCode.KEYCODE_Y: return 'y';
     case KeyCode.KEYCODE_ESCAPE: return 'escape';
     case KeyCode.KEYCODE_FORWARD_DEL: return 'delete';
     case KeyCode.KEYCODE_STAR: return 'star';

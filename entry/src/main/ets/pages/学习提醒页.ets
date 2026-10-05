@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { PressFeedback } from '../utils/PressFeedback';
 import { CustomTransition } from '../utils/自定义转场';
 import { ThemeTextSpans } from '../components/common/ThemeText';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
-import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
+import { PAGE_COMPACT_LAYOUT_KEY } from '../model/AppLayoutState';
 
 import { 加载学习提醒设置, 保存学习提醒设置, 提醒项, 生成提醒项ID } from '../model/学习提醒存储';
 import { 刷新学习提醒, 首次引导通知设置 } from '../model/学习提醒服务';
@@ -36,7 +37,8 @@ import { namedResourceText } from '../utils/UiFeedback';
 
 @Component
 export struct 学习提醒页 {
-  @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
+  @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
   @State private 转场透明度: number = 1;
   pathStack?: NavPathStack;
 
@@ -95,7 +97,7 @@ export struct 学习提醒页 {
     CustomTransition.getInstance().注销NavParam('ReminderPage');
   }
 
-  private publishInterface(): void {
+  private publishInterface(_locale: string = this.uiLanguage): void {
     if (!this.interfaceMounted) return;
     const reminders: 提醒项[] = this.已加载 ? this.提醒项列表.slice(0, 100) : [];
     const controls: AppInterfaceControl[] = visibleInterfaceItems('reminders',
@@ -285,14 +287,14 @@ export struct 学习提醒页 {
       // 左返回 + 右新建按钮，铺满
       Row() {
         按下态按钮({
-          文案: interfaceItemText(this.getUIContext(), 'reminders', 'back'),
+          文案: interfaceItemText(this.getUIContext(), 'reminders', 'back', this.uiLanguage),
           字色: $r('app.color.text_primary'),
           点击回调: (): void => { this.返回(); }
         })
         Blank()
           .hitTestBehavior(HitTestMode.Transparent)
         按下态按钮({
-          文案: interfaceItemText(this.getUIContext(), 'reminders', 'create'),
+          文案: interfaceItemText(this.getUIContext(), 'reminders', 'create', this.uiLanguage),
           字色: this.动作主色,
           themeText: true,
           点击回调: (): void => { this.新建提醒(); }
@@ -322,7 +324,7 @@ export struct 学习提醒页 {
       Row() {
         // 左侧时间大字
         Column() {
-          Text() { ThemeTextSpans(this.格式化时间(项.小时, 项.分钟), [], this.getUIContext()) }
+          Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(this.格式化时间(项.小时, 项.分钟), [], this.getUIContext()) }, (_locale: string): string => _locale) }
             .fontSize(28)
             .fontWeight(FontWeight.Bold)
             .fontColor(项.开启 ? this.解析主色按钮背景() : 设置面板色板_取(this.是否深色).弱化文字)
@@ -368,7 +370,7 @@ export struct 学习提醒页 {
     .width('100%')
     .padding(应用尺寸.卡片内边距)
     .backgroundColor($r('app.color.surface_card'))
-    .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+    .border(SurfaceBorder.options())
     .borderRadius(应用尺寸.圆角_卡片)
   }
 

@@ -1,19 +1,21 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { settingsItemText } from '../../utils/SettingsStructureText';
-import { HelpLabel } from '../common/HelpLabel';
 import { resourceText } from '../../utils/UiFeedback';
-import { SelectStyle } from '../../utils/SelectStyle';
+import { FormSelectRow } from '../common/FormSelectRow';
 
 import { 加载学习布局模式, 保存学习布局模式, 学习布局模式 } from '../../model/学习布局存储';
-import { 设置面板色板_取 } from '../../utils/设置面板配色';
 import { 设置分组卡片 } from './设置分组卡片';
+import { STUDY_LAYOUT_MODES, STUDY_GRIP_AVAILABILITY_KEY, StudyGripAvailability,
+  studyLayoutIndex, studyGripHintKey } from '../../model/StudyLayout';
+import { namedResourceText } from '../../utils/UiFeedback';
+import { 应用尺寸 } from '../../utils/应用尺寸';
 
 // ========================================================
 // @块ID UI-LAYOUT-001
 // @名称 学习页布局分组
 //
 // @作用
-// 提供底部固定 / 浮动可拖 两种学习页布局模式切换，
+// 提供底部固定 / 浮动可拖 / 智感握姿三种学习页布局模式切换，
 // 首页进度移至常规，评分振动移至复习；这里只保留复习界面的布局。
 // 当前布局模式 = null 表示加载中；加载失败回退 'bottom'。
 // 切换后立即生效（下次进入学习页）。
@@ -30,6 +32,7 @@ import { 设置分组卡片 } from './设置分组卡片';
 // ========================================================
 @Component
 export struct 布局分组 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop 是否深色: boolean = false;
   // ⓘ 上抛：点击布局行的 ⓘ 时，由父级（设置面板）弹出 字段帮助面板
   打开说明回调: (标题: Resource, 正文: Resource) => void = (标题: Resource, 正文: Resource): void => {};
@@ -39,6 +42,7 @@ export struct 布局分组 {
   @StorageProp('themeMode') private 主题模式监听: string = 'system';
 
   @State private 当前布局模式: 学习布局模式 | null = null;
+  @StorageProp(STUDY_GRIP_AVAILABILITY_KEY) private gripAvailability: StudyGripAvailability = 'unchecked';
   async aboutToAppear(): Promise<void> {
     // 失败回退到 'bottom'（默认），保证 chip 一直可选。
     try {
@@ -48,29 +52,37 @@ export struct 布局分组 {
     }
   }
 
-  private 取本地化文本(资源: Resource): string {
+  private 取本地化文本(资源: Resource, _locale: string = this.uiLanguage): string {
     return resourceText(this.getUIContext(), 资源);
   }
 
-  /** 学习页布局模式标签：bottom=底部固定；float=浮动可拖。 */
+  /** 学习页布局模式的本地化标签。 */
   private 布局模式标签(模式: 学习布局模式): string {
+    if (模式 === 'smart') {
+      return this.取本地化文本($r('app.string.settings_study_layout_smart'));
+    }
     if (模式 === 'float') {
       return this.取本地化文本($r('app.string.settings_study_layout_float'));
     }
     return this.取本地化文本($r('app.string.settings_study_layout_bottom'));
   }
 
-  /** Select 选项：底部固定 / 浮动可拖 */
+  /** 顺序与 STUDY_LAYOUT_MODES 相同。 */
   private 布局模式选项(): SelectOption[] {
     return [
       { value: this.取本地化文本($r('app.string.settings_study_layout_bottom')) },
-      { value: this.取本地化文本($r('app.string.settings_study_layout_float')) }
+      { value: this.取本地化文本($r('app.string.settings_study_layout_float')) },
+      { value: this.取本地化文本($r('app.string.settings_study_layout_smart')) }
     ];
   }
 
-  /** Select 当前选中索引：float=1；bottom=0；null 加载中按 0 */
+  /** 加载中使用默认选项。 */
   private 布局模式索引(): number {
-    return this.当前布局模式 === 'float' ? 1 : 0;
+    return studyLayoutIndex(this.当前布局模式);
+  }
+
+  private gripHint(_locale: string = this.uiLanguage): string {
+    return namedResourceText(this.getUIContext(), studyGripHintKey(this.gripAvailability));
   }
 
   /** 切换布局模式：乐观更新 UI + 异步持久化；持久化失败仅丢失下次启动后的值，不回滚 UI。 */
@@ -101,39 +113,22 @@ export struct 布局分组 {
       是否深色: this.是否深色
     }) {
       Column({ space: 8 }) {
-          // 第 1 行：学习页布局（左侧标题+ⓘ，右侧 Select 选择框——与「当前模式」行同款对齐）
-          Row() {
-            HelpLabel({ title: settingsItemText(this.getUIContext(), 'study_layout'),
-              textColor: 设置面板色板_取(this.是否深色).主文字,
-              onHelp: (): void => {
-                this.打开说明回调($r('app.string.settings_study_layout_row'), $r('app.string.settings_study_layout_help'));
-              }
-            })
-            .layoutWeight(1)
-            Select(this.布局模式选项())
-              .selected(this.布局模式索引())
-              .value(this.当前布局模式 !== null
-                ? this.布局模式标签(this.当前布局模式)
-                : this.取本地化文本($r('app.string.settings_study_layout_bottom')))
-              .attributeModifier(new SelectStyle())
-              .height(SelectStyle.controlHeight)
-              .padding(SelectStyle.controlPadding)
-              .space(SelectStyle.controlSpace)
-              .width(SelectStyle.fieldWidth)
-              .constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
-              .font(SelectStyle.controlFont)
-              .optionFont(SelectStyle.optionFont)
-              .selectedOptionFont(SelectStyle.selectedOptionFont)
-              .textModifier(SelectStyle.labelText())
-              .borderRadius(SelectStyle.controlRadius)
-              .onSelect((索引: number): void => {
-                const 模式列表: 学习布局模式[] = ['bottom', 'float'];
-                this.切换布局(模式列表[索引]);
-              })
+          FormSelectRow({ label: settingsItemText(this.getUIContext(), 'study_layout', this.uiLanguage),
+            showHelp: true,
+            onHelp: (): void => {
+              this.打开说明回调($r('app.string.settings_study_layout_row'), $r('app.string.settings_study_layout_help'));
+            }, options: this.布局模式选项(), selectedIndex: this.布局模式索引(),
+            value: this.当前布局模式 !== null ? this.布局模式标签(this.当前布局模式) :
+              this.取本地化文本($r('app.string.settings_study_layout_bottom')),
+            onSelect: (索引: number): void => {
+              if (索引 >= 0 && 索引 < STUDY_LAYOUT_MODES.length) this.切换布局(STUDY_LAYOUT_MODES[索引]);
+            } })
+          if (this.当前布局模式 === 'smart') {
+            Text(this.gripHint())
+              .fontSize(应用尺寸.字号_正文_中)
+              .fontColor($r('app.color.text_secondary'))
+              .width('100%')
           }
-          .width('100%')
-          .height(48)
-
       }
       .width('100%')
     }

@@ -20,4 +20,7 @@ export class AnkiBrowserSearch implements BrowserSearchBackend {
     return notes ? this.searchService.搜索笔记(request) : this.searchService.搜索卡片(request);
   }
   row(id: number): Promise<BrowserRow> { return this.searchService.浏览器行按ID(id); }
+  markedIds(notes: boolean): Promise<number[]> {
+    return this.search({ search: 'tag:re:^marked$', order: { kind: 'none' } }, notes);
+  }
 }

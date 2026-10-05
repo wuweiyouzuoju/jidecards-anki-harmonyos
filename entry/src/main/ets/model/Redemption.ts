@@ -2,8 +2,6 @@
 import { themeForContent } from './ThemeCatalog';
 
 export const IRIDESCENT_CONTENT: string = 'theme-iridescent';
-export const THEME_MOTION_KEY: string = 'themeMotion';
-export const APP_FOREGROUND_KEY: string = 'appForeground';
 
 export interface RedemptionToken {
   fingerprint: string;

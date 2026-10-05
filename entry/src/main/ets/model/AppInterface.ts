@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { CARD_FLAGS } from './CardMarking';
+import { DECK_OPTION_GROUPS } from './DeckOptionsCatalog';
+import type { NoteAudioStatus } from './NoteAudioDraft';
 export interface AppInterfaceContext {
   simple: boolean;
   agent: boolean;
@@ -17,6 +20,7 @@ export interface AppInterfaceItem {
 export interface AppInterfaceSurface {
   id: string;
   titleKey: string;
+  instructionsKey?: string;
   parent: string;
   items: AppInterfaceItem[];
 }
@@ -37,22 +41,65 @@ export const STATS_INTERFACE_SECTIONS: AppInterfaceItem[] = [
   { id: 'added', titleKey: 'stats_section_added', opens: 'stats_added' }
 ];
 
+export const WHITEBOARD_INTERFACE_ITEMS: AppInterfaceItem[] = [
+  { id: 'close', titleKey: 'study_whiteboard_close' },
+  { id: 'official_tools', titleKey: 'study_whiteboard_official_tools', condition: 'official_suite' },
+  { id: 'undo', titleKey: 'image_occlusion_undo', condition: 'local_suite' },
+  { id: 'redo', titleKey: 'study_whiteboard_redo', condition: 'local_suite' },
+  { id: 'clear', titleKey: 'study_whiteboard_clear', condition: 'local_suite' },
+  { id: 'pen', titleKey: 'study_whiteboard_pen', condition: 'local_suite' },
+  { id: 'eraser', titleKey: 'study_whiteboard_eraser', condition: 'local_suite' },
+  { id: 'color_0', titleKey: 'study_whiteboard_auto_color', condition: 'pen_settings' },
+  { id: 'color_1', titleKey: 'study_whiteboard_red', condition: 'pen_settings' },
+  { id: 'color_2', titleKey: 'study_whiteboard_blue', condition: 'pen_settings' },
+  { id: 'color_3', titleKey: 'study_whiteboard_green', condition: 'pen_settings' },
+  { id: 'width_0', titleKey: 'study_whiteboard_thin', condition: 'pen_settings' },
+  { id: 'width_1', titleKey: 'study_whiteboard_medium', condition: 'pen_settings' },
+  { id: 'width_2', titleKey: 'study_whiteboard_thick', condition: 'pen_settings' },
+  { id: 'eraser_width_0', titleKey: 'study_whiteboard_small', condition: 'eraser_settings' },
+  { id: 'eraser_width_1', titleKey: 'study_whiteboard_medium_size', condition: 'eraser_settings' },
+  { id: 'eraser_width_2', titleKey: 'study_whiteboard_large', condition: 'eraser_settings' },
+  { id: 'stylus', titleKey: 'study_whiteboard_stylus', condition: 'tool_settings' },
+  { id: 'settings_close', titleKey: 'done', condition: 'tool_settings' },
+  { id: 'retry', titleKey: 'study_whiteboard_retry', condition: 'failed' },
+  { id: 'show_answer', titleKey: 'study_show_answer', condition: 'question' },
+  { id: 'again', titleKey: 'rating_again', condition: 'answer' },
+  { id: 'hard', titleKey: 'rating_hard', condition: 'answer' },
+  { id: 'good', titleKey: 'rating_good', condition: 'answer' },
+  { id: 'easy', titleKey: 'rating_easy', condition: 'answer' }
+];
+
 /** 菜单直接遍历这里的条目；标签、顺序和显隐由 UI 与 JIDE 共用。 */
 export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
-  { id: 'home', titleKey: 'home_interface_title', parent: '', items: [
+  { id: 'home', titleKey: 'home_interface_title', instructionsKey: 'home_actions_instructions', parent: '', items: [
     { id: 'more', titleKey: 'study_more', opens: 'home_more' },
+    { id: 'agent', titleKey: 'ai_agent_title', opens: 'agent', agentOnly: true },
+    { id: 'search', titleKey: 'home_search_title', opens: 'home_search' },
+    { id: 'browser', titleKey: 'browser_title', opens: 'browser' },
+    { id: 'sync', titleKey: 'home_sync', opens: 'sync' },
     { id: 'create', titleKey: 'create_deck', opens: 'home_create' },
     { id: 'today', titleKey: 'settings_home_today_summary', condition: 'home_today_summary' },
-    { id: 'decks', titleKey: 'home_interface_decks', opens: 'deck_details' }
+    { id: 'decks', titleKey: 'home_interface_decks', opens: 'deck_details' },
+    { id: 'deck_menu', titleKey: 'deck_more', opens: 'deck_row_menu', condition: 'deck_long_press' },
+    { id: 'reorder', titleKey: 'deck_menu_reorder', opens: 'deck_reorder', condition: 'deck_long_press' }
+  ] },
+  { id: 'deck_reorder', titleKey: 'deck_menu_reorder', instructionsKey: 'deck_reorder_instructions', parent: 'home', items: [
+    { id: 'exit', titleKey: 'deck_reorder_exit' },
+    { id: 'done', titleKey: 'deck_reorder_done' },
+    { id: 'decks', titleKey: 'home_interface_decks', condition: 'drag_sibling_decks_in_reorder_mode' }
   ] },
   { id: 'home_more', titleKey: 'study_more', parent: 'home', items: [
     { id: 'settings', titleKey: 'top_settings', opens: 'settings' },
-    { id: 'agent', titleKey: 'ai_agent_title', opens: 'agent', agentOnly: true },
-    { id: 'sync', titleKey: 'home_sync', opens: 'sync' },
-    { id: 'browser', titleKey: 'browser_title', opens: 'browser' },
+    { id: 'history', titleKey: 'collection_history_title', opens: 'collection_history' },
     { id: 'stats', titleKey: 'stats_page_title', opens: 'stats' },
     { id: 'reminders', titleKey: 'reminder_list_title', opens: 'reminders' },
     { id: 'intro', titleKey: 'home_intro_menu_title', opens: 'intro' }
+  ] },
+  { id: 'home_search', titleKey: 'home_search_title', instructionsKey: 'home_search_instructions', parent: 'home', items: [
+    { id: 'query', titleKey: 'home_search_placeholder' },
+    { id: 'results', titleKey: 'home_interface_decks', opens: 'deck_details' },
+    { id: 'retry', titleKey: 'common_retry', condition: 'error' },
+    { id: 'close', titleKey: 'close' }
   ] },
     { id: 'home_create', titleKey: 'create_deck', parent: 'home', items: [
       { id: 'create_deck', titleKey: 'create_deck_title', opens: 'create_deck' },
@@ -79,10 +126,59 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'study', titleKey: 'start_study', opens: 'study' }
   ] },
   { id: 'deck_actions', titleKey: 'deck_more', parent: 'deck_details', items: [] },
+  { id: 'deck_options', titleKey: 'deck_options_title', parent: 'deck_details', items: [
+    { id: 'close', titleKey: 'create_deck_cancel' },
+      { id: 'retry', titleKey: 'common_retry', condition: 'error' },
+    { id: 'form', titleKey: 'deck_options_title', opens: 'deck_options_form', condition: 'ready' }
+  ] },
+  { id: 'deck_options_form', titleKey: 'deck_options_title', parent: 'deck_options', items: [
+    { id: 'cancel', titleKey: 'create_deck_cancel' },
+    { id: 'save', titleKey: 'deck_options_save' },
+      { id: 'help', titleKey: 'field_help_button' },
+    { id: 'newPerDay', titleKey: 'deck_newPerDay_label', condition: 'simple_mode' },
+    { id: 'reviewsPerDay', titleKey: 'deck_reviewsPerDay_label', condition: 'simple_mode' },
+    { id: 'learnSteps', titleKey: 'deck_learnSteps_label', condition: 'simple_mode' },
+    { id: 'reviewOrder', titleKey: 'deck_reviewOrder_label', condition: 'simple_mode' },
+    { id: 'preset', titleKey: 'deck_preset_label', fullOnly: true },
+    { id: 'rename_preset', titleKey: 'deck_preset_rename', fullOnly: true },
+    { id: 'create_preset', titleKey: 'deck_preset_create', fullOnly: true },
+    { id: 'clone_preset', titleKey: 'deck_preset_clone', fullOnly: true },
+    { id: 'remove_preset', titleKey: 'deck_preset_remove', fullOnly: true },
+    { id: 'save_mode', titleKey: 'deck_save_mode_label', fullOnly: true },
+    ...DECK_OPTION_GROUPS.map((group): AppInterfaceItem => ({ id: group.id, titleKey: group.titleKey,
+      opens: 'deck_options_group_' + group.id, fullOnly: true }))
+  ] },
+  ...DECK_OPTION_GROUPS.map((group): AppInterfaceSurface => ({ id: 'deck_options_group_' + group.id, titleKey: group.titleKey,
+    parent: 'deck_options_form', items: group.fields.map((field): AppInterfaceItem => ({ id: field.key,
+      titleKey: field.titleKey, fullOnly: true, condition: field.scheduler === '' ? undefined : field.scheduler })) })),
   { id: 'deck_details_more', titleKey: 'deck_more', parent: 'deck_details', items: [
     { id: 'create_child', titleKey: 'deck_create_subdeck', opens: 'create_deck' },
+    { id: 'rename', titleKey: 'deck_rename_title', opens: 'deck_rename' },
+    { id: 'move', titleKey: 'deck_move_title', opens: 'deck_move' },
     { id: 'options', titleKey: 'deck_options_title', opens: 'deck_options' },
     { id: 'export', titleKey: 'deck_export_this', opens: 'export' }
+  ] },
+  { id: 'deck_move', titleKey: 'deck_move_title', parent: 'deck_details_more', items: [
+    { id: 'parent', titleKey: 'deck_move_parent' },
+    { id: 'confirm', titleKey: 'deck_move_confirm' },
+    { id: 'cancel', titleKey: 'cancel' },
+    { id: 'reload', titleKey: 'deck_move_reload' }
+  ] },
+  { id: 'deck_rename', titleKey: 'deck_rename_title', instructionsKey: 'deck_rename_hint', parent: 'deck_details_more', items: [
+    { id: 'name', titleKey: 'deck_rename_name' },
+    { id: 'confirm', titleKey: 'deck_rename_confirm' },
+    { id: 'cancel', titleKey: 'cancel' },
+    { id: 'reload', titleKey: 'common_retry' }
+  ] },
+  { id: 'deck_customize', titleKey: 'deck_customize_title', instructionsKey: 'deck_customize_alias_hint', parent: 'home', items: [
+    { id: 'name', titleKey: 'deck_customize_name_label' },
+    { id: 'background', titleKey: 'deck_customize_background_label' },
+    { id: 'confirm', titleKey: 'deck_customize_save' },
+    { id: 'cancel', titleKey: 'cancel' }
+  ] },
+  { id: 'deck_row_menu', titleKey: 'deck_more', parent: 'home', items: [
+    { id: 'rename', titleKey: 'deck_rename_title', opens: 'deck_rename' },
+    { id: 'customize', titleKey: 'deck_customize', opens: 'deck_customize' }
   ] },
   { id: 'deck_preview_scope', titleKey: 'deck_preview', parent: 'deck_details', items: [
     { id: '0', titleKey: 'deck_preview_remaining', opens: 'preview' },
@@ -90,25 +186,73 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: '2', titleKey: 'deck_preview_studied', opens: 'preview' },
     { id: '3', titleKey: 'deck_preview_all', opens: 'preview' }
   ] },
-  { id: 'browser', titleKey: 'browser_title', parent: 'home_more', items: [
+  { id: 'browser', titleKey: 'browser_title', parent: 'home', items: [
     { id: 'search', titleKey: 'browser_search_placeholder' },
     { id: 'cards', titleKey: 'browser_mode_cards', opens: 'browser_view' },
     { id: 'notes', titleKey: 'browser_mode_notes', opens: 'browser_view' },
     { id: 'filter', titleKey: 'browser_action_sidebar', opens: 'browser_view' },
     { id: 'sort', titleKey: 'browser_sort_default', opens: 'browser_view' },
-    { id: 'more', titleKey: 'study_more', opens: 'browser_more' }
+    { id: 'more', titleKey: 'study_more', opens: 'browser_more' },
+    { id: 'selection', titleKey: 'browser_selection_actions', opens: 'browser_batch' }
   ] },
   { id: 'browser_more', titleKey: 'study_more', parent: 'browser', items: [
     { id: 'filter', titleKey: 'browser_action_sidebar', opens: 'browser_sidebar' },
     { id: 'find_replace', titleKey: 'browser_action_find_replace', opens: 'browser_find_replace' },
     { id: 'save_search', titleKey: 'browser_saved_search_save', opens: 'browser_save_search' },
+    { id: 'flag_names', titleKey: 'card_mark_flag_names' },
+    { id: 'history', titleKey: 'collection_history_title', opens: 'collection_history' },
     { id: 'subtitle_deck', titleKey: 'browser_subtitle_deck' },
     { id: 'subtitle_answer', titleKey: 'browser_subtitle_answer' },
     { id: 'subtitle_due', titleKey: 'browser_subtitle_due' }
   ] },
+  { id: 'browser_batch', titleKey: 'browser_help_batch_title', parent: 'browser', items: [
+    { id: 'reset', titleKey: 'browser_reset_title', opens: 'browser_reset' },
+    { id: 'suspend', titleKey: 'browser_action_toggle_suspend' },
+    { id: 'bury', titleKey: 'browser_action_toggle_bury' },
+    { id: 'notetype', titleKey: 'browser_action_change_notetype' },
+    { id: 'deck', titleKey: 'browser_action_change_deck' },
+    { id: 'reposition', titleKey: 'browser_action_reposition' },
+    { id: 'due', titleKey: 'browser_action_set_due' },
+    { id: 'tags', titleKey: 'tags_batch_title', opens: 'tag_picker' },
+    { id: 'marking', titleKey: 'study_marking_title', opens: 'browser_batch_marking' },
+    { id: 'agent', titleKey: 'ai_card_edit', agentOnly: true },
+    { id: 'help', titleKey: 'browser_help_batch_title' },
+    { id: 'exit', titleKey: 'browser_exit_selection' },
+    { id: 'delete', titleKey: 'browser_action_delete' }
+  ] },
+  { id: 'media_maintenance', titleKey: 'settings_media_management', parent: 'settings', items: [
+    { id: 'check', titleKey: 'media_check' }, { id: 'trash_unused', titleKey: 'media_trash_all_unused' },
+    { id: 'view_missing', titleKey: 'media_view_missing', opens: 'browser' }, { id: 'tag_missing', titleKey: 'media_tag_missing' },
+    { id: 'empty', titleKey: 'media_empty_trash' }, { id: 'restore', titleKey: 'media_restore_trash' }, { id: 'close', titleKey: 'close' }
+  ] },
+  { id: 'collection_history', titleKey: 'collection_history_title', parent: 'home_more', items: [
+    { id: 'undo', titleKey: 'collection_history_undo' }, { id: 'redo', titleKey: 'collection_history_redo' },
+    { id: 'reload', titleKey: 'collection_history_reload' }, { id: 'close', titleKey: 'browser_detail_cancel' }
+  ] },
+  { id: 'backup_management', titleKey: 'backup_hub_title', parent: 'settings', items: [
+    { id: 'export_collection', titleKey: 'transfer_export_personal' },
+    { id: 'import_collection', titleKey: 'transfer_import_personal' },
+    { id: 'automatic', titleKey: 'backup_management_auto' },
+    { id: 'create', titleKey: 'backup_management_create' },
+    { id: 'restore', titleKey: 'backup_management_restore' }, { id: 'close', titleKey: 'close' }
+  ] },
+  { id: 'browser_reset', titleKey: 'browser_reset_title', parent: 'browser_batch', items: [
+    { id: 'restore_position', titleKey: 'browser_reset_restore_position' }, { id: 'reset_counts', titleKey: 'browser_reset_reset_counts' },
+    { id: 'confirm', titleKey: 'browser_detail_confirm' }, { id: 'close', titleKey: 'browser_detail_cancel' },
+    { id: 'retry', titleKey: 'common_retry', condition: 'error' }
+  ] },
+  { id: 'browser_batch_marking', titleKey: 'study_marking_title', parent: 'browser_batch', items: [
+    { id: 'mark', titleKey: 'card_mark_mark' },
+    { id: 'unmark', titleKey: 'card_mark_unmark' },
+    { id: 'flag', titleKey: 'browser_action_set_flag', opens: 'browser_batch_flags' },
+    { id: 'flag_names', titleKey: 'card_mark_flag_names' }
+  ] },
+  { id: 'browser_batch_flags', titleKey: 'browser_action_set_flag', parent: 'browser_batch_marking', items: [
+    ...CARD_FLAGS.map((flag): AppInterfaceItem => ({ id: String(flag.value), titleKey: flag.labelKey }))
+  ] },
   // 筛选与排序的选项由浏览页真实列/筛选模型提供，不能在这里另抄一份。
   { id: 'browser_view', titleKey: 'browser_title', parent: 'browser', items: [] },
-  { id: 'agent', titleKey: 'ai_agent_title', parent: 'home_more', items: [
+  { id: 'agent', titleKey: 'ai_agent_title', parent: 'home', items: [
     { id: 'back', titleKey: 'study_back' },
     { id: 'history', titleKey: 'ai_agent_history', opens: 'agent_history', condition: 'conversation' },
     { id: 'new', titleKey: 'ai_agent_history_new', condition: 'history' },
@@ -145,12 +289,12 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     id: 'stats_' + item.id, titleKey: item.titleKey, parent: 'stats_sections',
     items: [{ id: 'help', titleKey: 'field_help_button' }]
   })),
-  { id: 'add_note', titleKey: 'add_note_title', parent: 'deck_details', items: [
+  { id: 'add_note', titleKey: 'add_note_title', instructionsKey: 'note_editor_format_action', parent: 'deck_details', items: [
     { id: 'back', titleKey: 'study_back' }, { id: 'save', titleKey: 'add_note_save_continue' },
     { id: 'save_return', titleKey: 'add_note_save_return' },
     { id: 'type', titleKey: 'add_note_notetype', opens: 'add_note_types' },
     { id: 'tags_entry', titleKey: 'add_note_tags', fullOnly: true },
-    { id: 'tags', titleKey: 'add_note_tags', fullOnly: true, condition: 'tags_expanded' },
+    { id: 'tags', titleKey: 'add_note_tags', opens: 'tag_picker', fullOnly: true, condition: 'tags_expanded' },
     { id: 'image', titleKey: 'add_note_image_occlusion_pick_image', condition: 'image_occlusion' },
     { id: 'masks', titleKey: 'add_note_image_occlusion_edit_masks', condition: 'image_source' }
   ] },
@@ -161,9 +305,31 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'retry', titleKey: 'note_editor_retry', condition: 'load_failed' },
     { id: 'form', titleKey: 'note_editor_edit_title', opens: 'edit_note_form', condition: 'loaded' }
   ] },
-  { id: 'edit_note_form', titleKey: 'note_editor_edit_title', parent: 'edit_note', items: [
+  { id: 'edit_note_form', titleKey: 'note_editor_edit_title', instructionsKey: 'note_editor_format_action', parent: 'edit_note', items: [
     { id: 'back', titleKey: 'study_back' }, { id: 'save', titleKey: 'browser_detail_save' },
-    { id: 'tags', titleKey: 'browser_detail_tags' }
+    { id: 'tags', titleKey: 'browser_detail_tags', opens: 'tag_picker' }
+  ] },
+  { id: 'note_audio_manage', titleKey: 'note_audio_manage', parent: '', items: [
+    { id: 'close', titleKey: 'cancel' }, { id: 'apply', titleKey: 'done' },
+    { id: 'add', titleKey: 'note_audio_add' }, { id: 'record', titleKey: 'note_audio_record' },
+    { id: 'pause', titleKey: 'note_audio_pause', condition: 'recording' },
+    { id: 'cancel_recording', titleKey: 'note_audio_record_cancel', condition: 'recording' }
+  ] },
+  { id: 'tag_picker', titleKey: 'tags_choose', parent: '', items: [
+    { id: 'search', titleKey: 'tags_search_hint' },
+    { id: 'tags', titleKey: 'tags_choose' },
+    { id: 'create', titleKey: 'tags_create' },
+    { id: 'retry', titleKey: 'home_retry' }
+  ] },
+  { id: 'deck_options_fsrs', titleKey: 'deck_fsrs_tools_title', parent: 'deck_options_form', items: [
+    { id: 'optimize_current', titleKey: 'deck_fsrs_optimize_current' },
+    { id: 'optimize_all', titleKey: 'deck_fsrs_optimize_all' },
+    { id: 'evaluate', titleKey: 'deck_fsrs_evaluate_current' },
+    { id: 'retry', titleKey: 'deck_fsrs_retry_failed' },
+    { id: 'days', titleKey: 'deck_fsrs_days' },
+    { id: 'simulate', titleKey: 'deck_fsrs_simulate' },
+    { id: 'compare_retention', titleKey: 'deck_fsrs_compare_retention' },
+    { id: 'use_retention', titleKey: 'deck_fsrs_use_retention' }
   ] },
   { id: 'study', titleKey: 'start_study', parent: 'deck_details', items: [
     { id: 'back', titleKey: 'study_back' },
@@ -174,16 +340,33 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'good', titleKey: 'rating_good', condition: 'answer' },
     { id: 'easy', titleKey: 'rating_easy', condition: 'answer' }
   ] },
+  { id: 'custom_scheduling_warning', titleKey: 'custom_scheduling_title', parent: 'study', items: [
+    { id: 'exit', titleKey: 'custom_scheduling_exit' }, { id: 'continue', titleKey: 'custom_scheduling_continue' }
+  ] },
   { id: 'study_more', titleKey: 'study_more', parent: 'study', items: [
     { id: 'edit', titleKey: 'study_edit_note', opens: 'edit_note' },
-    { id: 'audio', titleKey: 'study_replay_sound' },
-    { id: 'guide', titleKey: 'study_guide_title' },
+    { id: 'agent', titleKey: 'ai_card_edit', opens: 'agent', agentOnly: true, condition: 'has_card_phase' },
     { id: 'undo', titleKey: 'study_undo' },
+    { id: 'marking', titleKey: 'study_marking_title', opens: 'study_marking' },
+    { id: 'audio', titleKey: 'study_replay_sound' },
+    { id: 'card_actions', titleKey: 'study_card_actions_title', opens: 'study_card_actions' },
+    { id: 'handwrite', titleKey: 'study_handwrite', opens: 'study_whiteboard', condition: 'has_card_phase' },
+    { id: 'guide', titleKey: 'study_guide_title' }
+  ] },
+  { id: 'study_whiteboard', titleKey: 'study_handwrite', instructionsKey: 'study_whiteboard_instructions',
+    parent: 'study_more', items: WHITEBOARD_INTERFACE_ITEMS },
+  { id: 'study_marking', titleKey: 'study_marking_title', parent: 'study_more', items: [
+    { id: 'mark', titleKey: 'card_mark_mark', condition: 'has_card_phase' },
+    { id: 'flag', titleKey: 'browser_action_set_flag', opens: 'study_flags', condition: 'has_card_phase' },
+    { id: 'flag_names', titleKey: 'card_mark_flag_names' }
+  ] },
+  { id: 'study_flags', titleKey: 'browser_action_set_flag', parent: 'study_marking', items: [
+    ...CARD_FLAGS.map((flag): AppInterfaceItem => ({ id: String(flag.value), titleKey: flag.labelKey }))
+  ] },
+  { id: 'study_card_actions', titleKey: 'study_card_actions_title', parent: 'study_more', items: [
     { id: 'bury', titleKey: 'study_bury' },
     { id: 'suspend', titleKey: 'study_suspend' },
     { id: 'delete', titleKey: 'study_delete_card' },
-    { id: 'agent', titleKey: 'ai_card_edit', opens: 'agent', agentOnly: true, condition: 'has_card_phase' },
-    { id: 'handwrite', titleKey: 'study_handwrite', condition: 'has_card_phase' },
     { id: 'auto_advance', titleKey: 'study_auto_advance_title' }
   ] }
 ];
@@ -219,9 +402,13 @@ export interface AppInterfaceControl {
   selected: boolean;
 }
 export interface AppInterfaceValue { id: string; value: string; }
-export interface AppInterfaceMenuItem extends AppInterfaceItem { enabled: boolean; selected: boolean; }
+export interface AppInterfaceMenuItem extends AppInterfaceItem {
+  enabled: boolean;
+  selected: boolean;
+  children?: AppInterfaceMenuItem[];
+}
 export interface StudyInterfaceContext {
-  phase: string; busy: boolean; hasCard: boolean; hasAudio: boolean; canUndo: boolean; agent: boolean;
+  phase: string; busy: boolean; hasCard: boolean; hasAudio: boolean; canUndo: boolean; agent: boolean; marked?: boolean;
 }
 
 export interface AgentInterfaceContext {
@@ -288,6 +475,33 @@ export function addNoteInterfaceControls(context: AddNoteInterfaceContext): AppI
         !context.blocked && (item.id !== 'type' || context.hasTypes) }));
 }
 
+/** 音频弹层发布真实状态；不给 JIDE 暴露字段正文、录音文件或原始错误。 */
+export function noteAudioInterfaceObservation(status: NoteAudioStatus): AppInterfaceObservation {
+  const surface = APP_INTERFACE_SURFACES.find((entry): boolean => entry.id === 'note_audio_manage');
+  const items: AppInterfaceControl[] = (surface?.items ?? [])
+    .filter((item): boolean => item.id !== 'add' || !status.recording)
+    .filter((item): boolean => item.condition !== 'recording' || status.recording)
+    .map((item): AppInterfaceControl => ({ id: item.id, title: '',
+      titleKey: item.id === 'record' && status.recording ? 'note_audio_record_done' :
+        item.id === 'pause' && status.paused ? 'note_audio_resume' : item.titleKey,
+      enabled: !status.working && (item.id === 'close' || item.id === 'apply' ? !status.recording && !status.disabled :
+        status.recording || !status.disabled), selected: item.id === 'record' && status.recording }));
+  for (const attachment of status.attachments) {
+    items.push({ id: attachment.id + '-play', title: '',
+      titleKey: attachment.playing ? 'note_audio_stop' : 'note_audio_play',
+      enabled: !status.working && !status.disabled, selected: attachment.playing });
+    if (attachment.replace) items.push({ id: attachment.id + '-replace', title: '', titleKey: 'note_media_replace',
+      enabled: !status.working && !status.disabled && !status.recording, selected: false });
+    if (attachment.remove) items.push({ id: attachment.id + '-remove', title: '', titleKey: 'note_audio_remove',
+      enabled: !status.working && !status.disabled && !status.recording, selected: false });
+  }
+  return { surface: 'note_audio_manage', sectionId: status.paused ? 'paused' : status.recording ? 'recording' : 'idle',
+    selectedId: '', optionIds: items.map((item): string => item.id), optionLabels: [], optionsTotal: items.length,
+    busy: status.working, controlsComplete: items.length <= 100, items: items,
+    values: [{ id: 'recording', value: String(status.recording) }, { id: 'paused', value: String(status.paused) },
+      { id: 'recorded_seconds', value: String(status.seconds) }, { id: 'has_error', value: String(status.hasError) }] };
+}
+
 export function noteEditInterfaceControls(busy: boolean, blocked: boolean, fieldCount: number): AppInterfaceMenuItem[] {
   return visibleInterfaceItems('edit_note_form', { simple: false, agent: false, cloudDeck: false, themeHasTextures: false })
     .map((item): AppInterfaceMenuItem => ({ id: item.id,
@@ -296,16 +510,19 @@ export function noteEditInterfaceControls(busy: boolean, blocked: boolean, field
 }
 
 /** 实际菜单与 JIDE 读取同一份显隐/禁用判定；动作执行仍由各自页面负责。 */
-export function studyInterfaceMenu(context: StudyInterfaceContext): AppInterfaceMenuItem[] {
+export function studyInterfaceMenu(context: StudyInterfaceContext, surfaceId: string = 'study_more'): AppInterfaceMenuItem[] {
   const cardPhase: boolean = context.phase === 'question' || context.phase === 'answer';
   const canManage: boolean = cardPhase && context.hasCard && !context.busy;
-  return visibleInterfaceItems('study_more', { simple: false, agent: context.agent, cloudDeck: false, themeHasTextures: false })
+  return visibleInterfaceItems(surfaceId, { simple: false, agent: context.agent, cloudDeck: false, themeHasTextures: false })
     .filter((item: AppInterfaceItem): boolean => item.condition !== 'has_card_phase' || cardPhase)
-    .map((item: AppInterfaceItem): AppInterfaceMenuItem => ({ id: item.id, titleKey: item.titleKey, opens: item.opens,
-      condition: item.condition, enabled: item.id === 'audio' ? context.hasAudio && canManage :
+    .map((item: AppInterfaceItem): AppInterfaceMenuItem => ({ id: item.id,
+      titleKey: item.id === 'mark' && context.marked === true ? 'card_mark_unmark' : item.titleKey, opens: item.opens,
+      condition: item.condition, enabled: !context.busy && (item.id === 'audio' ? context.hasAudio && canManage :
         item.id === 'guide' ? context.phase !== 'loading' && !context.busy : item.id === 'undo' ? context.canUndo :
-          item.id === 'delete' ? cardPhase : item.id === 'agent' ? context.hasCard : item.id === 'handwrite' ? true : canManage,
-      selected: false }));
+          item.id === 'delete' ? cardPhase : item.id === 'agent' ? context.hasCard : item.id === 'handwrite' ? true : canManage),
+      selected: item.id === 'mark' && context.marked === true,
+      children: item.opens === 'study_marking' || item.opens === 'study_card_actions' ?
+        studyInterfaceMenu(context, item.opens) : undefined }));
 }
 
 export function browserInterfaceMenu(available: boolean, filterActive: boolean, subtitleIndex: number): AppInterfaceMenuItem[] {
@@ -326,9 +543,15 @@ export function appInterfaceSurfaceIds(): string[] {
 export class AppInterfaceTracker {
   private readonly views: Map<string, AppInterfaceObservation> = new Map<string, AppInterfaceObservation>();
   private shownPage: string = '';
-  showPage(surface: string): void { this.shownPage = surface; }
+  private contextPage: string = '';
+  showPage(surface: string): void {
+    this.shownPage = surface;
+    if (surface !== 'agent') this.contextPage = surface;
+  }
   hidePage(surface: string): void { if (this.shownPage === surface) this.shownPage = ''; }
   currentPage(): string { return this.shownPage; }
+  /** JIDE 使用最近的非助手页面；hide 保留上下文，真实销毁才移除。 */
+  currentContextPage(): string { return this.shownPage === 'agent' ? this.contextPage : this.shownPage; }
   observe(view: AppInterfaceObservation): void {
     this.views.set(view.surface, { surface: view.surface, titleKey: view.titleKey, sectionId: view.sectionId,
       selectedId: view.selectedId, optionIds: view.optionIds.slice(), optionLabels: view.optionLabels.slice(),
@@ -336,7 +559,10 @@ export class AppInterfaceTracker {
       items: view.items?.map((item: AppInterfaceControl): AppInterfaceControl => ({ id: item.id, title: item.title, titleKey: item.titleKey, enabled: item.enabled, selected: item.selected })),
       values: view.values?.map((value: AppInterfaceValue): AppInterfaceValue => ({ id: value.id, value: value.value })) });
   }
-  leave(surface: string): void { this.views.delete(surface); }
+  leave(surface: string): void {
+    this.views.delete(surface);
+    if (this.contextPage === surface) this.contextPage = '';
+  }
   snapshot(): AppInterfaceObservation[] {
     return Array.from(this.views.values()).map((view: AppInterfaceObservation): AppInterfaceObservation =>
       ({ surface: view.surface, titleKey: view.titleKey, sectionId: view.sectionId, selectedId: view.selectedId,

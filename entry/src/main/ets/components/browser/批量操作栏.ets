@@ -1,207 +1,150 @@
+import { actionIcon } from '../../utils/ActionIcons';
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { PressFeedback } from '../../utils/PressFeedback';
-import { HelpLabel } from '../common/HelpLabel';
-
-// ========================================================
-// @名称 批量操作栏
-//
-// @作用
-// 浏览页 T8 批量操作栏：多选模式下固定在底部的按钮组。
-// 阶段 3 实现 5 个已有后端能力的操作：改牌组 / 设置标志 / 挂起 / 恢复 / 删除。
-// 阶段 4 扩展 3 个对齐 AnkiDroid 的操作：设置到期日 / 重新定位 / 更改笔记类型。
-//
-// @输入
-// isDark: 是否深色主题（预留，当前按钮配色走 color 资源）
-// busy: 父级是否正在执行批量操作（禁用所有按钮）
-// 选中数: 当前选中行数（按钮文案展示用）
-//
-// @输出
-// on改牌组 / on设置标志 / on挂起 / on恢复 / on删除: 五个核心操作回调
-// on设置到期日 / on重新定位 / on更改笔记类型: 三个 AnkiDroid 对齐操作回调
-// 父级负责弹层确认与落盘
-//
-// @Invariants
-// - 本组件不直接调后端，所有操作经回调上抛
-// - busy=true 时所有按钮禁用，防止重复点击
-// - 选中数 === 0 时不应显示本组件（由父级 if 控制）
-//
-// @Extension Points
-// - 后续可继续扩展（如 添加/移除标签 等需要独立弹层的操作）
-// - 按钮文案走 i18n，新增按钮只需加 browser_action_* key
-//
-// @副作用
-// 仅通过外部回调引发后端写入；本组件不直接落盘。
-// ========================================================
-
+import { CardActionMenu, CardActionMenuEntry } from '../common/CardActionMenu';
+import { actionMenuRows, toggleActionMenuBranch, ActionMenuRow } from '../common/ActionMenuTree';
+import { flagMenuChoices } from '../common/FlagMenuChoices';
+import { FlagLabels, CARD_FLAGS, CardFlagDefinition, customFlagLabel } from '../../model/CardMarking';
+import { visibleInterfaceItems, AppInterfaceItem, AppInterfaceControl } from '../../model/AppInterface';
+import { appInterface } from '../../backend/AppInterfaceService';
+import { namedResourceText } from '../../utils/UiFeedback';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../../model/ReleaseFeatures';
 
+/** 多选动作锚定“已选 X 项”下方；保留既有回调，公共菜单拥有几何、滚动和按压反馈。 */
 @Component
 export struct 批量操作栏 {
-  @StorageLink(AI_AGENT_CHANNELS_APP_STORAGE_KEY) private Agent入口已启用: boolean = false;
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
+  @StorageLink(AI_AGENT_CHANNELS_APP_STORAGE_KEY) @Watch('publishInterface') private Agent入口已启用: boolean = false;
   @Prop isDark: boolean = false;
-  @Prop busy: boolean = false;
-  @Prop 选中数: number = 0;
+  @Prop @Watch('publishInterface') busy: boolean = false;
+  @Prop @Watch('publishInterface') 选中数: number = 0;
+  @Prop @Watch('publishInterface') notesMode: boolean = false;
+  @Prop topOffset: number = 68;
+  @Prop @Watch('handleBackRequest') backRequest: number = 0;
+  @Prop @Watch('publishInterface') labels: FlagLabels = {};
+  @State @Watch('publishInterface') private primaryObscured: boolean = false;
+  @State @Watch('publishInterface') private expandedIds: string[] = ['marking'];
   on改牌组: () => void = (): void => {};
   on设置标志: () => void = (): void => {};
+  onFlag: (flag: number) => void = (_flag: number): void => {};
+  onFlagNames: () => void = (): void => {};
+  onMark: (marked: boolean) => void = (_marked: boolean): void => {};
+  onTags: () => void = (): void => {};
   on挂起: () => void = (): void => {};
-  on恢复: () => void = (): void => {};
+  onReset: () => void = (): void => {};
+  onBury: () => void = (): void => {};
   on删除: () => void = (): void => {};
   on设置到期日: () => void = (): void => {};
   on重新定位: () => void = (): void => {};
   on更改笔记类型: () => void = (): void => {};
   onAI改卡: () => void = (): void => {};
-  // 帮助按钮上抛：由父组件（浏览页）统一渲染 字段帮助面板
   onHelp: () => void = (): void => {};
+  onExit: () => void = (): void => {};
+  onClose: () => void = (): void => {};
+  private mounted: boolean = false;
 
-  // 手势导航条高度（沉浸式全屏下底部固定控件需抬高避让，EntryAbility 动态写入）
-  @StorageProp('导航条高度') private 导航条高度: number = 0;
+  aboutToAppear(): void { this.mounted = true; this.publishInterface(); }
+  aboutToDisappear(): void {
+    this.mounted = false;
+    appInterface.leave('browser_batch'); appInterface.leave('browser_batch_marking'); appInterface.leave('browser_batch_flags');
+  }
 
-  build() {
-    // 两行布局：每行 4 个按钮，对称美观且窄屏能塞下中文文案。
-    // 字号统一用 字号_正文_小（12vp）+ padding 左右 4vp 压缩内边距，
-    // 保证「设置标志」「更改笔记类型」等 4-6 字文案在 360vp 窄屏不被省略。
-    Column({ space: 应用尺寸.间距_4 }) {
-      HelpLabel({ title: $r('app.string.browser_help_batch_title'), textSize: 应用尺寸.字号_正文_小,
-        textColor: $r('app.color.text_secondary'), onHelp: (): void => { this.onHelp(); }
-      }).width('100%')
-      Row({ space: 应用尺寸.间距_8 }) {
-        Button($r('app.string.browser_action_change_deck'))
-          .layoutWeight(1)
-          .height(应用尺寸.按钮高度)
-          .padding({ left: 应用尺寸.间距_4, right: 应用尺寸.间距_4 })
-          .fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_primary'))
-          .backgroundColor($r('app.color.surface_card'))
-          .borderRadius(应用尺寸.圆角_胶囊)
-          .attributeModifier(new PressFeedback())
-          .stateEffect(false)
-          .enabled(!this.busy)
-          .onClick((): void => { this.on改牌组(); })
+  private handleBackRequest(): void {
+    if (this.expandedIds.includes('flag')) this.expandedIds = this.expandedIds.filter((id: string): boolean => id !== 'flag');
+    else this.onClose();
+  }
+  private markingItems(): AppInterfaceItem[] {
+    return visibleInterfaceItems('browser_batch_marking', { simple: false, agent: false, cloudDeck: false, themeHasTextures: false });
+  }
+  private toggleBranch(id: string): void {
+    if (this.busy || this.选中数 === 0) return;
+    const expanded: string[] = toggleActionMenuBranch(this.entries(), this.expandedIds, id);
+    const openingFlags: boolean = id === 'flag' && !this.expandedIds.includes('flag') && expanded.includes('flag');
+    this.expandedIds = expanded;
+    if (openingFlags) this.on设置标志();
+  }
 
-        Button($r('app.string.browser_action_set_flag'))
-          .layoutWeight(1)
-          .height(应用尺寸.按钮高度)
-          .padding({ left: 应用尺寸.间距_4, right: 应用尺寸.间距_4 })
-          .fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_primary'))
-          .backgroundColor($r('app.color.surface_card'))
-          .borderRadius(应用尺寸.圆角_胶囊)
-          .attributeModifier(new PressFeedback())
-          .stateEffect(false)
-          .enabled(!this.busy)
-          .onClick((): void => { this.on设置标志(); })
+  private menuItems(): AppInterfaceItem[] {
+    return visibleInterfaceItems('browser_batch', { simple: false, agent: this.Agent入口已启用,
+      cloudDeck: false, themeHasTextures: false }).filter((item: AppInterfaceItem): boolean =>
+        !this.notesMode || (item.id !== 'due' && item.id !== 'reposition'));
+  }
+  private entries(): CardActionMenuEntry[] { return this.menuItems().map((item: AppInterfaceItem): CardActionMenuEntry => this.menuEntry(item)); }
+  private menuEntry(item: AppInterfaceItem, _locale: string = this.uiLanguage): CardActionMenuEntry {
+    return { id: item.id, value: namedResourceText(this.getUIContext(), item.titleKey),
+      destructive: item.id === 'delete', enabled: !this.busy && this.选中数 > 0,
+      icon: actionIcon(item.id),
+      children: item.id === 'marking' ? this.markingItems().map((child: AppInterfaceItem): CardActionMenuEntry => this.menuEntry(child)) :
+        item.id === 'flag' ? this.flagEntries() : undefined,
+      action: (): void => { this.selectItem(item.id); } };
+  }
+  private flagEntries(): CardActionMenuEntry[] {
+    return flagMenuChoices(this.getUIContext(), this.labels, -1, this.busy || this.选中数 === 0,
+      (flag: number): void => { this.submitFlag(flag); });
+  }
+  private submitFlag(flag: number): void {
+    if (!this.expandedIds.includes('flag') || !this.expandedIds.includes('marking') || this.busy || this.选中数 === 0 || !CARD_FLAGS.some((item: CardFlagDefinition): boolean => item.value === flag)) return;
+    this.expandedIds = [];
+    this.onClose(); this.onFlag(flag);
+  }
+  private publishInterface(): void {
+    if (!this.mounted) return;
+    if (!this.primaryObscured) this.publishSurface('browser_batch', this.menuItems());
+    else appInterface.leave('browser_batch');
+    if (this.expandedIds.includes('marking')) this.publishSurface('browser_batch_marking', this.markingItems());
+    else appInterface.leave('browser_batch_marking');
+    if (this.expandedIds.includes('marking') && this.expandedIds.includes('flag')) {
+      const items: AppInterfaceControl[] = this.flagEntries().map((item: CardActionMenuEntry, index: number): AppInterfaceControl => ({
+        id: String(index), titleKey: customFlagLabel(this.labels, index) ? undefined : CARD_FLAGS[index].labelKey,
+        title: typeof item.value === 'string' ? item.value : '', selected: false, enabled: item.enabled !== false }));
+      this.observeSurface('browser_batch_flags', items);
+    } else appInterface.leave('browser_batch_flags');
+  }
+  private publishSurface(surface: string, definitions: AppInterfaceItem[], _locale: string = this.uiLanguage): void {
+    const items: AppInterfaceControl[] = definitions.map((item: AppInterfaceItem): AppInterfaceControl => ({
+      id: item.id, titleKey: item.titleKey, title: namedResourceText(this.getUIContext(), item.titleKey),
+      selected: false, enabled: !this.busy && this.选中数 > 0 }));
+    this.observeSurface(surface, items);
+  }
 
-        Button($r('app.string.browser_action_suspend'))
-          .layoutWeight(1)
-          .height(应用尺寸.按钮高度)
-          .padding({ left: 应用尺寸.间距_4, right: 应用尺寸.间距_4 })
-          .fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_primary'))
-          .backgroundColor($r('app.color.surface_card'))
-          .borderRadius(应用尺寸.圆角_胶囊)
-          .attributeModifier(new PressFeedback())
-          .stateEffect(false)
-          .enabled(!this.busy)
-          .onClick((): void => { this.on挂起(); })
 
-        Button($r('app.string.browser_action_restore'))
-          .layoutWeight(1)
-          .height(应用尺寸.按钮高度)
-          .padding({ left: 应用尺寸.间距_4, right: 应用尺寸.间距_4 })
-          .fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_primary'))
-          .backgroundColor($r('app.color.surface_card'))
-          .borderRadius(应用尺寸.圆角_胶囊)
-          .attributeModifier(new PressFeedback())
-          .stateEffect(false)
-          .enabled(!this.busy)
-          .onClick((): void => { this.on恢复(); })
-      }
-      .width('100%')
-
-      Row({ space: 应用尺寸.间距_8 }) {
-        // 第二行 4 按钮：删除 + 3 个 AnkiDroid 对齐操作，与第一行 4 按钮列对齐
-        // （第一行最左是帮助 Text 占自然宽度，第二行最左是删除按钮 layoutWeight(1)，
-        // 视觉上两行 4 按钮宽度一致，帮助 Text 占位 ≈ 删除按钮留白）
-        Button($r('app.string.browser_action_delete'))
-          .layoutWeight(1)
-          .height(应用尺寸.按钮高度)
-          .padding({ left: 应用尺寸.间距_4, right: 应用尺寸.间距_4 })
-          .fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.error_text'))
-          .backgroundColor($r('app.color.surface_card'))
-          .borderRadius(应用尺寸.圆角_胶囊)
-          .attributeModifier(new PressFeedback())
-          .stateEffect(false)
-          .enabled(!this.busy)
-          .onClick((): void => { this.on删除(); })
-
-        Button($r('app.string.browser_action_set_due'))
-          .layoutWeight(1)
-          .height(应用尺寸.按钮高度)
-          .padding({ left: 应用尺寸.间距_4, right: 应用尺寸.间距_4 })
-          .fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_primary'))
-          .backgroundColor($r('app.color.surface_card'))
-          .borderRadius(应用尺寸.圆角_胶囊)
-          .attributeModifier(new PressFeedback())
-          .stateEffect(false)
-          .enabled(!this.busy)
-          .onClick((): void => { this.on设置到期日(); })
-
-        Button($r('app.string.browser_action_reposition'))
-          .layoutWeight(1)
-          .height(应用尺寸.按钮高度)
-          .padding({ left: 应用尺寸.间距_4, right: 应用尺寸.间距_4 })
-          .fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_primary'))
-          .backgroundColor($r('app.color.surface_card'))
-          .borderRadius(应用尺寸.圆角_胶囊)
-          .attributeModifier(new PressFeedback())
-          .stateEffect(false)
-          .enabled(!this.busy)
-          .onClick((): void => { this.on重新定位(); })
-
-        Button($r('app.string.browser_action_change_notetype'))
-          .layoutWeight(1)
-          .height(应用尺寸.按钮高度)
-          .padding({ left: 应用尺寸.间距_4, right: 应用尺寸.间距_4 })
-          .fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_primary'))
-          .backgroundColor($r('app.color.surface_card'))
-          .borderRadius(应用尺寸.圆角_胶囊)
-          .attributeModifier(new PressFeedback())
-          .stateEffect(false)
-          .enabled(!this.busy)
-          .onClick((): void => { this.on更改笔记类型(); })
-      }
-      .width('100%')
-
-      if (this.Agent入口已启用) {
-        Button($r('app.string.ai_card_edit'))
-          .width('100%')
-          .height(应用尺寸.按钮高度)
-          .fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_primary'))
-          .backgroundColor($r('app.color.surface_card'))
-
-          .borderRadius(应用尺寸.圆角_胶囊)
-          .attributeModifier(new PressFeedback())
-          .stateEffect(false)
-          .enabled(!this.busy)
-          .onClick((): void => { this.onAI改卡(); })
-      }
+  private observeSurface(surface: string, items: AppInterfaceControl[]): void {
+    appInterface.observe({ surface: surface, sectionId: '', selectedId: '', busy: this.busy,
+      optionIds: items.map((item: AppInterfaceControl): string => item.id),
+      optionLabels: items.map((item: AppInterfaceControl): string => item.title), items: items,
+      values: [{ id: 'selected_count', value: String(this.选中数) }], controlsComplete: true });
+  }
+  private selectItem(id: string): void {
+    if (this.busy || this.选中数 === 0) return;
+    const row: ActionMenuRow | undefined = actionMenuRows(this.entries(), this.expandedIds)
+      .find((item: ActionMenuRow): boolean => item.node.id === id);
+    if (row === undefined || !row.enabled || (this.primaryObscured && row.depth === 0)) return;
+    if (row.node.children !== undefined) { this.toggleBranch(id); return; }
+    this.expandedIds = [];
+    this.onClose();
+    switch (id) {
+      case 'suspend': this.on挂起(); break;
+      case 'reset': this.onReset(); break;
+      case 'bury': this.onBury(); break;
+      case 'notetype': this.on更改笔记类型(); break;
+      case 'deck': this.on改牌组(); break;
+      case 'reposition': this.on重新定位(); break;
+      case 'due': this.on设置到期日(); break;
+      case 'tags': this.onTags(); break;
+      case 'flag_names': this.onFlagNames(); break;
+      case 'mark': this.onMark(true); break;
+      case 'unmark': this.onMark(false); break;
+      case 'delete': this.on删除(); break;
+      case 'agent': this.onAI改卡(); break;
+      case 'help': this.onHelp(); break;
+      case 'exit': this.onExit(); break;
     }
-    .width('100%')
-    .padding({
-      left: 应用尺寸.间距_16,
-      right: 应用尺寸.间距_16,
-      top: 应用尺寸.间距_8,
-      // 抬高避让手势导航条（AppGallery 导航栏适配要求）
-      bottom: 应用尺寸.间距_8 + this.导航条高度
-    })
-    .backgroundColor($r('app.color.surface_page'))
-    .border({ width: 0.5, color: $r('app.color.divider') })
+  }
+  build() {
+    CardActionMenu({ items: this.entries(), menuWidth: 应用尺寸.cardActionMenuWidth, topOffset: this.topOffset,
+      expandedIds: this.expandedIds, onPrimaryObscured: (obscured: boolean): void => { this.primaryObscured = obscured; },
+      onToggleBranch: (item: CardActionMenuEntry): void => { this.toggleBranch(item.id ?? ''); },
+      onClose: (): void => { this.onClose(); },
+      onSelect: (item: CardActionMenuEntry): void => { item.action?.(); } })
   }
 }

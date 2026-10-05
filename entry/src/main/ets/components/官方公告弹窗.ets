@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { PressFeedback } from '../utils/PressFeedback';
 import { DialogBackdrop } from './common/DialogBackdrop';
 import { resourceText } from '../utils/UiFeedback';
@@ -14,6 +15,7 @@ import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时
 /** 官方启动公告弹窗：纯展示层；确认与详情动作经回调上抛，返回键与遮罩点击不关闭。 */
 @Component
 export struct 官方公告弹窗 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop announcement: 官方公告展示项;
   @Prop isDark: boolean = false;
@@ -26,7 +28,7 @@ export struct 官方公告弹窗 {
     return this.announcement.publishedAt.substring(0, 10);
   }
 
-  private 本地化发布时间(): string {
+  private 本地化发布时间(_locale: string = this.uiLanguage): string {
     return resourceText(this.getUIContext(),
       $r('app.string.official_announcement_published_at'), this.发布日期());
   }
@@ -67,7 +69,7 @@ export struct 官方公告弹窗 {
         Row({ space: 应用尺寸.间距_12 }) {
           if (this.announcement.actionUrl.length > 0) {
             Button() {
-              Text() { ThemeTextSpans($r('app.string.official_announcement_details'), this.themeAccentColors, this.getUIContext()) }.fontColor($r('app.color.action_primary'))
+              Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans($r('app.string.official_announcement_details'), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }.fontColor($r('app.color.action_primary'))
             }
               .type(ButtonType.Normal)
               .layoutWeight(1)
@@ -88,7 +90,7 @@ export struct 官方公告弹窗 {
       .padding(应用尺寸.间距_16)
       .backgroundColor($r('app.color.surface_card'))
       .borderRadius(应用尺寸.圆角_卡片)
-      .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+      .border(SurfaceBorder.options())
       .transition(TransitionEffect.asymmetric(
         TransitionEffect.opacity(0).combine(TransitionEffect.scale({ x: 0.96, y: 0.96 }))
           .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }),

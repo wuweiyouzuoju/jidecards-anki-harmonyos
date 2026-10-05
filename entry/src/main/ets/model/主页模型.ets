@@ -92,6 +92,7 @@ export interface 牌组汇总 {
   parentId: string;
   hasChildren: boolean;
   ancestorIds: string[];
+  filtered?: boolean;
   description: string;
   newCount: number;
   learningCount: number;
@@ -215,13 +216,12 @@ export function 待办数(牌组: 牌组汇总): number {
 
 /** UI 显示用的牌组名：有 displayName 覆盖时优先用，否则回退到后端真实 name。
  *  默认牌组（id=1）名跟随系统语言：中文显示"默认牌组"，英文显示"Default"。 */
-export function 牌组显示名(牌组: 牌组汇总): string {
+export function 牌组显示名(牌组: 牌组汇总, 语言: string = AppStorage.get<string>('系统语言') ?? 'zh-Hans'): string {
   if (牌组.displayName !== '') {
     return 牌组.displayName;
   }
   // 默认牌组本地化：数据库里存的是 "Default"，前端按系统语言显示
   if (牌组.id === '1') {
-    const 语言: string = AppStorage.get<string>('系统语言') ?? 'zh-Hans';
     return 语言.startsWith('en') ? 'Default' : '默认牌组';
   }
   return 牌组.name;

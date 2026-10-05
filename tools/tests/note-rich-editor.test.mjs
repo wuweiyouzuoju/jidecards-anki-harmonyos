@@ -3,9 +3,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as rich from '../../entry/src/main/ets/model/NoteRichText.ts';
+import * as htmlTools from '../../entry/src/main/ets/model/NoteHtmlTools.ts';
 import { optionalReverseField, noteTypeDisplayKey } from '../../entry/src/main/ets/model/NoteTypePresentation.ts';
 import { nextClozeNumber, wrapFieldSelection } from '../../entry/src/main/ets/model/NoteFieldEditing.ts';
 import { NoteEditorSession } from '../../entry/src/main/ets/model/NoteEditorSession.ts';
+import { NOTE_FIELD_EDITING_SUPPORT } from '../../entry/src/main/ets/model/NoteFieldEditing.ts';
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
 
 test('supported rich text preserves combined styles, entities, line breaks, Chinese and emoji', () => {
@@ -31,35 +33,48 @@ test('selected format checks only intersecting runs and handles mixed text and S
   for(const weight of [5,6,7,8,9,11,600,700]) assert.equal(rich.richResultIsBold(weight),true);
 });
 
-function editor(html='') {
-  const changes=[], seen=new Set(), dialogs=[], patches=[], typing=[];
+function editor(html='',fieldConfig=null) {
+  const changes=[], seen=new Set(), dialogs=[], patches=[], typing=[], selections=[];
   let spans=[], caret=0;
   const normal={fontWeight:10,fontStyle:0,decoration:{type:0},textBackgroundStyle:{color:'#00000000'}};
   const controller={
     deleteSpans(){spans=[];},
-    addTextSpan(value,{style,offset}={}) {
+    addTextSpan(value,{style,offset,urlStyle,paragraphStyle}={}) {
       // Tests use append load; insert boundary behavior is verified separately below.
       assert.equal(offset,undefined);
-      spans.push({value,offsetInSpan:[0,value.length],textStyle:{...normal,...style}});
+      spans.push({value,offsetInSpan:[0,value.length],textStyle:{...normal,...style},urlStyle,paragraphStyle});
     },
     getSpans(){return spans;}, getCaretOffset(){return caret;}, setCaretOffset(value){caret=value;},
+    setSelection(start,end,options){selections.push({start,end,...options});},
     setTypingStyle(style){typing.push(style);}, updateSpanStyle(patch){patches.push(patch);}
   };
   const Editor=loadComponentLogic('components/common/NoteFieldEditor.ets','NoteFieldEditor',{
-    ...rich, nextClozeNumber,wrapFieldSelection,
+    ...rich, ...htmlTools, nextClozeNumber,wrapFieldSelection,NOTE_FIELD_EDITING_SUPPORT,NoteLinkDialog: options=>options,
     TextAreaController:class {},RichEditorController:class {constructor(){return controller;}},
-    FontWeight:{Bold:9,Normal:10},FontStyle:{Italic:1,Normal:0},TextDecorationType:{Underline:1,None:0},
-    Color:{Transparent:'#00000000'},DialogAlignment:{Center:0},应用尺寸:{字号_正文:16},
+    FontWeight:{Bold:9,Normal:10},FontStyle:{Italic:1,Normal:0},TextDecorationType:{Underline:1,None:0},TextAlign:{Start:0},
+    Color:{Transparent:'#00000000'},MenuPolicy:{HIDE:1},DialogAlignment:{Center:0},应用尺寸:{字号_正文:16},
     hasNoteEditingHint:key=>seen.has(key), completeNoteEditingHint:async key=>{seen.add(key);},
     CustomDialogController:class {constructor(options){this.options=options;dialogs.push(this);} open(){} close(){}},
     字段帮助对话框:options=>options, namedResourceText:(_ctx,key)=>key,
     resourceText:(_ctx,key)=>key,showToastSafely(){},$r:key=>key
   });
-  const instance=new Editor();Object.assign(instance,{value:html,onChange:value=>changes.push(value),getUIContext:()=>({})});
+  const instance=new Editor();Object.assign(instance,{value:html,fieldConfig,onChange:value=>changes.push(value),getUIContext:()=>({})});
   instance.aboutToAppear();instance.ready=!instance.sourceMode;
   if(instance.ready)instance.loadRich(rich.parseNoteRichText(html));
-  return {instance,controller,changes,seen,dialogs,patches,typing,set spans(value){spans=value;}};
+  return {instance,controller,changes,seen,dialogs,patches,typing,selections,set spans(value){spans=value;}};
 }
+
+test('field editing metadata applies font, direction and hint while source default preserves HTML',()=>{
+ const config={ord:0,name:'Front',fontName:'Noto Sans Arabic',fontSize:28,rtl:true,description:'تلميح',plainText:true};
+ const source=editor('<b>مرحبا</b>',config);assert.equal(source.instance.sourceMode,true);
+ assert.equal(source.instance.placeholderText(),'تلميح');assert.deepEqual(source.changes,[]);
+ source.instance.switchMode();source.instance.richReady();const span=source.controller.getSpans()[0];
+ assert.equal(span.textStyle.fontFamily,config.fontName);assert.equal(span.textStyle.fontSize,28);
+ assert.equal(span.paragraphStyle.textAlign,0);assert.deepEqual(source.changes,[]);
+ const visual=editor('hello',{...config,rtl:false,plainText:false,fontSize:0});
+ assert.equal(visual.instance.sourceMode,false);assert.equal(visual.controller.getSpans()[0].paragraphStyle.textAlign,0);
+ assert.equal(visual.instance.editingFontSize(),16);
+});
 
 test('a cleared or new-type editor cannot receive late source/ready callbacks from the disposed editor', () => {
   const old=editor('<table><tr><td>source draft</td></tr></table>');
@@ -96,10 +111,61 @@ test('typing formats toggle without altering text; selection formatting preserve
   h.instance.applyFormat(8);assert.equal(h.instance.typingFormat,9);assert.equal(h.typing.at(-1).textBackgroundStyle.color,'#FFF176');
   h.instance.selectionStart=0;h.instance.selectionEnd=4;h.instance.applyFormat(2);
   assert.deepEqual(h.patches,[{start:0,end:4,textStyle:{fontStyle:1}}]);assert.equal(h.instance.typingFormat,9);
+  assert.equal(h.instance.selectionStart,0);assert.equal(h.instance.selectionEnd,4);
+  h.instance.richSelectionChanged({start:4,end:4});
   h.instance.applyFormat(1);assert.equal(h.instance.typingFormat,8);h.instance.applyFormat(8);assert.equal(h.instance.typingFormat,0);
   assert.deepEqual(h.changes,[]);
   const selected=editor('<b>word</b>');selected.instance.selectionStart=0;selected.instance.selectionEnd=4;
   selected.instance.applyFormat(1);assert.equal(selected.patches[0].textStyle.fontWeight,10);assert.equal(selected.instance.typingFormat,0);
+});
+
+test('highlight, bold, highlight removal and clear format retain the same UTF-16 selection for consecutive actions', () => {
+  const h=editor('前甲😀乙后');
+  const span=value=>({value,offsetInSpan:[0,value.length],textStyle:{fontWeight:10,fontStyle:0,
+    decoration:{type:0},textBackgroundStyle:{color:'#00000000'}}});
+  const spans=[span('前'),span('甲😀乙'),span('后')];h.spans=spans;
+  h.instance.typingFormat=rich.FORMAT_ITALIC;
+  h.instance.richSelectionChanged({start:1,end:5});
+  h.controller.setCaretOffset=()=>assert.fail('formatting must retain the range rather than replace it with a caret');
+  h.controller.updateSpanStyle=patch=>{
+    h.patches.push(patch);assert.equal(patch.start,1);assert.equal(patch.end,5);
+    Object.assign(spans[1].textStyle,patch.textStyle);
+    if(patch.urlStyle)spans[1].urlStyle=patch.urlStyle;
+    // 平台样式更新可能通知临时收起；不能覆盖本次格式操作捕获的选区。
+    h.instance.richSelectionChanged({start:5,end:5});
+  };
+  const retained=()=>{
+    assert.equal(h.instance.selectionStart,1);assert.equal(h.instance.selectionEnd,5);
+    assert.deepEqual(h.selections.at(-1),{start:1,end:5,menuPolicy:1});
+    assert.equal(h.instance.typingFormat,rich.FORMAT_ITALIC);
+  };
+  h.instance.applyFormat(rich.FORMAT_HIGHLIGHT);retained();
+  assert.equal(h.changes.at(-1),'前<mark>甲😀乙</mark>后');
+  h.instance.applyFormat(rich.FORMAT_BOLD);retained();
+  assert.equal(h.changes.at(-1),'前<b><mark>甲😀乙</mark></b>后');
+  h.instance.applyFormat(rich.FORMAT_HIGHLIGHT);retained();
+  assert.equal(h.changes.at(-1),'前<b>甲😀乙</b>后');
+  h.instance.clearFormat();retained();
+  assert.equal(h.changes.at(-1),'前甲😀乙后');assert.equal(h.changes.length,4);
+  h.instance.richSelectionChanged({start:6,end:6});
+  h.instance.applyFormat(rich.FORMAT_HIGHLIGHT);
+  assert.equal(h.instance.typingFormat,rich.FORMAT_ITALIC|rich.FORMAT_HIGHLIGHT);
+  assert.equal(h.patches.length,4,'a new caret must leave the old selection behind');
+});
+
+test('every visual style preserves selection, while disabled and disposed editors cannot restore it', () => {
+  for(const flag of [rich.FORMAT_BOLD,rich.FORMAT_ITALIC,rich.FORMAT_UNDERLINE,
+    rich.FORMAT_HIGHLIGHT,rich.FORMAT_SUPERSCRIPT,rich.FORMAT_SUBSCRIPT]){
+    const h=editor('甲😀乙');h.instance.richSelectionChanged({start:1,end:3});
+    h.instance.applyFormat(flag);
+    assert.deepEqual(h.selections,[{start:1,end:3,menuPolicy:1}]);
+    assert.equal(h.instance.typingFormat,0);
+    h.instance.disabled=true;h.instance.applyFormat(flag);h.instance.clearFormat();
+    h.instance.disabled=false;h.instance.aboutToDisappear();
+    h.instance.applyFormat(flag);h.instance.clearFormat();h.instance.richSelectionChanged({start:0,end:4});
+    assert.equal(h.selections.length,1);assert.equal(h.patches.length,1);
+    assert.equal(h.instance.selectionStart,1);assert.equal(h.instance.selectionEnd,3);
+  }
 });
 
 test('loading unchanged HTML never rewrites a draft; changed native spans serialize visible styles', () => {
@@ -209,4 +275,61 @@ test('cloze text has no automatic background and retains explicit highlight and 
    assert.deepEqual(h.patches,[]);assert.deepEqual(h.changes,[]);
    assert.equal(h.instance.typingFormat,0);
  }
+});
+
+test('expanded input and more-format disclosure retain draft, native controller, selection and typing state',()=>{
+  for(const html of ['<b>长内容😀</b>','<table><tr><td>source</td></tr></table>']) {
+    const h=editor(html),controller=h.instance.richController,mode=h.instance.sourceMode;
+    h.instance.selectionStart=1;h.instance.selectionEnd=3;h.instance.typingFormat=3;
+    h.instance.toggleExpanded();h.instance.toggleMoreFormats();
+    assert.equal(h.instance.expanded,true);assert.equal(h.instance.moreFormats,true);
+    assert.equal(h.instance.sourceMode,mode);assert.equal(h.instance.richController,controller);
+    assert.equal(h.instance.selectionStart,1);assert.equal(h.instance.selectionEnd,3);assert.equal(h.instance.typingFormat,3);
+    assert.deepEqual(h.changes,[]);h.instance.toggleExpanded();assert.equal(h.instance.expanded,false);
+    h.instance.disabled=true;h.instance.toggleExpanded();h.instance.toggleMoreFormats();
+    assert.equal(h.instance.expanded,false);assert.equal(h.instance.moreFormats,true);
+    h.instance.disabled=false;h.instance.aboutToDisappear();h.instance.toggleExpanded();assert.equal(h.instance.expanded,false);
+  }
+});
+
+test('native scripts and links preserve unchanged HTML and selection actions do not change persistent typing toggles',()=>{
+  const html='<sup>2</sup> H<sub>2</sub>O <a href="https://example.com"><b>链接😀</b></a>';
+  const h=editor(html);h.instance.publishRich();assert.deepEqual(h.changes,[]);
+  assert.equal(rich.serializeNoteRichText(h.instance.richRuns()),html);
+  h.instance.applyFormat(16);assert.equal(h.instance.typingFormat,16);assert.equal(h.typing.at(-1).fontFeature,'"sups" 1');
+  h.instance.applyFormat(32);assert.equal(h.instance.typingFormat,32);assert.equal(h.typing.at(-1).fontFeature,'"subs" 1');
+  h.instance.selectionStart=0;h.instance.selectionEnd=1;h.instance.applyFormat(16);
+  assert.equal(h.instance.typingFormat,32);assert.equal(h.patches.at(-1).textStyle.fontFeature,'"sups" 0, "subs" 0');
+  h.instance.selectionStart=0;h.instance.selectionEnd=1;h.instance.clearFormat();
+  assert.equal(h.instance.typingFormat,32);assert.deepEqual(h.patches.at(-1).urlStyle,{url:''});
+  assert.equal(h.patches.at(-1).textStyle.fontWeight,10);
+  h.instance.selectionStart=1;h.instance.selectionEnd=1;h.instance.clearFormat();assert.equal(h.instance.typingFormat,0);
+});
+
+test('list action handles selection and caret line, keeps drafts on unsupported source, and refuses late or disabled actions',()=>{
+  const h=editor('前<br><b>甲😀<br>乙</b><br>后');
+  h.instance.selectionStart=2;h.instance.selectionEnd=7;h.instance.list(false);
+  assert.equal(h.changes.at(-1),'前<br><ul><li><b>甲😀</b></li><li><b>乙</b></li></ul><br>后');
+  assert.equal(h.instance.sourceMode,true);assert.equal(h.instance.ready,false);
+  const caret=editor('甲<br>乙<br>丙');caret.instance.selectionStart=3;caret.instance.selectionEnd=3;caret.instance.list(true);
+  assert.equal(caret.changes.at(-1),'甲<br><ol><li>乙</li></ol><br>丙');
+  const source=editor('<table>unknown</table>');source.instance.selectionStart=0;source.instance.selectionEnd=source.instance.value.length;
+  source.instance.list(false);source.instance.clearFormat();assert.deepEqual(source.changes,[]);
+  const late=editor('word');late.instance.disabled=true;late.instance.list(false);late.instance.clearFormat();late.instance.openLink();
+  late.instance.disabled=false;late.instance.aboutToDisappear();late.instance.list(false);late.instance.clearFormat();late.instance.openLink();
+  assert.deepEqual(late.changes,[]);assert.deepEqual(late.dialogs,[]);
+});
+
+test('link dialog freezes selection, cancellation does not edit, valid apply preserves selected styles, and departed callbacks are ignored',()=>{
+  const h=editor('<b>甲😀</b>乙');h.instance.selectionStart=0;h.instance.selectionEnd=3;h.instance.openLink();
+  const canceled=h.dialogs.at(-1);assert.equal(canceled.options.builder.selectedText,'甲😀');
+  canceled.options.builder.onClose();assert.deepEqual(h.changes,[]);assert.equal(h.instance.linkDialog,null);
+  h.instance.openLink();h.instance.selectionStart=4;h.instance.selectionEnd=4;
+  h.dialogs.at(-1).options.builder.onApply('https://example.com','ignored');
+  assert.equal(h.changes.at(-1),'<a href="https://example.com"><b>甲😀</b></a>乙');
+  assert.equal(h.instance.selectionStart,3);assert.equal(h.instance.sourceMode,false);
+  const late=editor('草稿');late.instance.openLink();const callback=late.dialogs.at(-1).options.builder.onApply;
+  late.instance.aboutToDisappear();callback('https://example.com','文字');assert.deepEqual(late.changes,[]);
+  const stale=editor('旧');stale.instance.openLink();stale.instance.value='新';
+  stale.dialogs.at(-1).options.builder.onApply('https://example.com','文字');assert.deepEqual(stale.changes,[]);
 });

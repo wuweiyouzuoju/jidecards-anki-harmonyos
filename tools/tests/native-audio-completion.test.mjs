@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { AudioQueueCompletion } from '../../entry/src/main/ets/model/AudioQueueCompletion.ts';
+import { harmonyTtsVoiceName, ttsSpeakOptions } from '../../entry/src/main/ets/model/CardRenderingSupport.ts';
 import { loadPlatformModule } from './platform-module-harness.mjs';
 
 const turn = () => new Promise(resolve => setImmediate(resolve));
@@ -12,6 +13,7 @@ function loadPlayer(name, dependencies) {
     .replace(/^import .*\r?\n/gm, '').replace(/^export /gm, '');
   const globals = {
     AudioQueueCompletion,
+    harmonyTtsVoiceName, ttsSpeakOptions,
     hilog: { info() {}, warn() {}, error() {} },
     AudioFocusCoordinator: { getInstance: () => ({ beginPlayback: async () => {}, endPlayback: async () => {} }) },
     ...dependencies
@@ -125,7 +127,7 @@ test('native TTS completion ignores stale request ids and advances each item exa
     textToSpeech: { listVoices: async () => { throw new Error('use requested language'); }, createEngine: async () => engine },
     util: {}, 加载语音人物: async () => 8, 获取语音版本号: () => 0
   });
-  const item = { text: 'hello', language: 'en_US' };
+  const item = { text: 'hello', language: 'en_US', voices: [], otherArgs: [], speed: 1 };
   await player.播放队列([item, item]);
   let completed = false;
   const done = player.waitForCompletion().then(() => { completed = true; });

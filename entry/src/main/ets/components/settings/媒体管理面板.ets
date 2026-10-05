@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import type { AppInterfaceControl } from '../../model/AppInterface';
+import { appInterface } from '../../backend/AppInterfaceService';
+import { DataActionRow } from './DataActionRow';
 import { PressFeedback } from '../../utils/PressFeedback';
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { DialogBackdrop } from '../common/DialogBackdrop';
-import { resourceText } from '../../utils/UiFeedback';
+import { namedResourceText, resourceText } from '../../utils/UiFeedback';
 import { ThemeTextSpans } from '../common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
@@ -42,6 +46,7 @@ import { MediaMaintenanceSession, MediaMaintenanceState } from '../../model/sett
 
 @Component
 export struct 媒体管理面板 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
 
   private handleBackRequest(): void {
@@ -52,6 +57,9 @@ export struct 媒体管理面板 {
   @StorageProp(颜色键.动作主色) private dialogActionColor: string = '#2F5FD0';
   @Prop isDark: boolean = false;
   onClose: () => void = (): void => {};
+  onBrowse: (query: string) => void = (_query: string): void => {};
+  @State private missingNoteCount: number = 0;
+  @State private taggedCount: number = -1;
 
   @StorageProp(颜色键.主色按钮背景) private 主色按钮背景: string = '#2F5FD0';
   @State private 检查中: boolean = false;
@@ -75,6 +83,12 @@ export struct 媒体管理面板 {
     releaseSnapshot: (token: number) => this.媒体服务实例.releaseSnapshot(token),
     emptyTrash: () => this.媒体服务实例.清空回收站(),
     restoreTrash: () => this.媒体服务实例.恢复回收站(),
+    missingNotesPage: (token: number, offset: number) => this.媒体服务实例.missingNotesPage(token, offset),
+    tagMissingNotes: (token: number) => this.媒体服务实例.tagMissingNotes(token),
+    changed: (): void => {
+      AppStorage.setOrCreate<number>('需要刷新主页', Date.now());
+      AppStorage.setOrCreate<number>('cardContentChangedTick', Date.now());
+    },
     isSyncing: async (): Promise<boolean> => syncActivity.isActive()
   }, (state: MediaMaintenanceState): void => {
     this.检查中 = state.busy && !state.checked; this.处理中 = state.busy; this.已检查 = state.checked;
@@ -82,15 +96,18 @@ export struct 媒体管理面板 {
     this.回收站有内容 = state.haveTrash;
     this.reportRevision = state.revision;
     this.reportChunks = state.reports; this.hasMoreReport = state.next;
-    this.错误信息 = state.error;
+    this.错误信息 = state.error === 'media_tag_refresh_error' ?
+      namedResourceText(this.getUIContext(), state.error) : state.error;
+    this.missingNoteCount = state.missingNoteCount; this.taggedCount = state.taggedCount;
+    this.publishInterface();
   });
 
   private visible: boolean = false;
-  aboutToDisappear(): void { this.visible = false; this.maintenance.dispose(); }
+  aboutToDisappear(): void { this.visible = false; this.maintenance.dispose(); appInterface.leave('media_maintenance'); }
 
   aboutToAppear(): void {
     this.visible = true;
-    this.检查媒体同步状态();
+    this.检查媒体同步状态(); this.publishInterface();
   }
 
   /**
@@ -103,12 +120,42 @@ export struct 媒体管理面板 {
     if (this.visible) this.媒体同步中 = syncActivity.isActive();
   }
 
-  private 取本地化文本(资源: Resource): string {
+  private 取本地化文本(资源: Resource, _locale: string = this.uiLanguage): string {
     return resourceText(this.getUIContext(), 资源);
   }
 
-  private 取本地化带参文本(资源: Resource, 参数: Array<string | number>): string {
+  private 取本地化带参文本(资源: Resource, 参数: Array<string | number>, _locale: string = this.uiLanguage): string {
     return resourceText(this.getUIContext(), 资源, ...参数);
+  }
+
+  private publishInterface(): void {
+    if (!this.visible) return;
+    const busy: boolean = this.检查中 || this.处理中;
+    const ids: string[] = ['check', 'close'].concat(this.已检查 ?
+      ['trash_unused', 'view_missing', 'tag_missing', 'empty', 'restore'] : []);
+    appInterface.observe({ surface: 'media_maintenance', sectionId: '', selectedId: '', busy: busy,
+      optionIds: [], optionLabels: [], controlsComplete: true,
+      items: ids.map((id: string): AppInterfaceControl => ({
+        id: id, title: '', titleKey: id === 'check' ? 'media_check' : id === 'trash_unused' ? 'media_trash_all_unused' :
+          id === 'view_missing' ? 'media_view_missing' : id === 'tag_missing' ? 'media_tag_missing' :
+          id === 'empty' ? 'media_empty_trash' : id === 'restore' ? 'media_restore_trash' : 'close',
+        enabled: !busy && (id === 'view_missing' || id === 'tag_missing' ?
+          this.missingNoteCount > 0 && !this.媒体同步中 : id === 'trash_unused' ? this.未使用总数 > 0 :
+          id === 'empty' || id === 'restore' ? this.回收站有内容 : true), selected: false })),
+      values: [{ id: 'missing_notes', value: String(this.missingNoteCount) }, { id: 'checked', value: String(this.已检查) },
+        { id: 'tagged_notes', value: String(this.taggedCount) }, { id: 'has_error', value: String(this.错误信息 !== '') }] });
+  }
+  private async viewMissing(): Promise<void> {
+    const query: string = await this.maintenance.missingNotesSearch();
+    if (this.visible && query !== '') this.onBrowse(query);
+  }
+  private confirmTagMissing(): void {
+    if (!this.visible || this.处理中 || !this.已检查 || this.missingNoteCount === 0) return;
+    this.getUIContext().showAlertDialog({ title: this.取本地化文本($r('app.string.media_tag_missing')),
+      message: this.取本地化文本($r('app.string.media_tag_missing_confirm')), autoCancel: true,
+      primaryButton: { value: this.取本地化文本($r('app.string.cancel')), action: (): void => {} },
+      secondaryButton: { value: this.取本地化文本($r('app.string.browser_detail_confirm')),
+        action: (): void => { this.maintenance.tagMissing(); } } });
   }
 
   private async 执行检查媒体(): Promise<void> {
@@ -219,6 +266,12 @@ export struct 媒体管理面板 {
             .width('100%')
         }
 
+        if (this.taggedCount >= 0) {
+          Text(this.取本地化带参文本($r('app.string.media_tagged_notes_count'), [this.taggedCount]))
+            .fontColor($r('app.color.text_secondary')).fontSize(应用尺寸.字号_正文_小)
+            .width('100%')
+        }
+
         // 检查结果
         if (this.已检查) {
           Scroll() {
@@ -248,7 +301,7 @@ export struct 媒体管理面板 {
                   .fontColor(this.未使用总数 > 0 && !this.处理中 ?
                     $r('app.color.error_text') : $r('app.color.text_secondary'))
                   .backgroundColor($r('app.color.surface_card'))
-                  .border({ width: 0.5, color: $r('app.color.border_input') })
+                  .border(SurfaceBorder.options(0.5))
                   .borderRadius(10)
                   .enabled(this.未使用总数 > 0 && !this.检查中 && !this.处理中)
                   .stateStyles({ disabled: { .opacity(1) } })
@@ -261,7 +314,7 @@ export struct 媒体管理面板 {
               .alignItems(HorizontalAlign.Start)
               .padding(12)
               .backgroundColor($r('app.color.surface_page'))
-              .borderRadius(12)
+              .borderRadius(12).border(SurfaceBorder.options())
 
               // 缺失媒体区
               Column({ space: 应用尺寸.间距_4 }) {
@@ -270,6 +323,13 @@ export struct 媒体管理面板 {
                   .fontColor($r('app.color.text_primary'))
                   .fontWeight(FontWeight.Medium)
                   .width('100%')
+                DataActionRow({ title: $r('app.string.media_view_missing'),
+                  hint: this.取本地化带参文本($r('app.string.media_missing_notes_count'), [this.missingNoteCount]),
+                  isInteractive: this.missingNoteCount > 0 && !this.处理中 && !this.媒体同步中,
+                  onAction: (): void => { this.viewMissing(); } })
+                DataActionRow({ title: $r('app.string.media_tag_missing'),
+                  isInteractive: this.missingNoteCount > 0 && !this.处理中 && !this.媒体同步中,
+                  onAction: (): void => { this.confirmTagMissing(); } })
                 if (this.缺失总数 === 0) {
                   Text($r('app.string.media_no_missing'))
                     .fontSize(应用尺寸.字号_正文_小)
@@ -281,7 +341,7 @@ export struct 媒体管理面板 {
               .alignItems(HorizontalAlign.Start)
               .padding(12)
               .backgroundColor($r('app.color.surface_page'))
-              .borderRadius(12)
+              .borderRadius(12).border(SurfaceBorder.options())
 
               // 连续滚动按需追加报告块；分页仅存在于传输边界。
               Column({ space: 应用尺寸.间距_4 }) {
@@ -301,7 +361,7 @@ export struct 媒体管理面板 {
               .width('100%')
               .padding(12)
               .backgroundColor($r('app.color.surface_page'))
-              .borderRadius(12)
+              .borderRadius(12).border(SurfaceBorder.options())
 
               // 回收站状态
               Column({ space: 12 }) {
@@ -317,7 +377,7 @@ export struct 媒体管理面板 {
                 .width('100%')
                 Row({ space: 8 }) {
                   Button() {
-                    Text() { ThemeTextSpans($r('app.string.media_restore_trash'), (this.回收站有内容 && !this.处理中) ? this.themeAccentColors : [], this.getUIContext()) }.fontSize(14).fontColor(this.回收站有内容 && !this.处理中 ?
+                    Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans($r('app.string.media_restore_trash'), (this.回收站有内容 && !this.处理中) ? this.themeAccentColors : [], this.getUIContext()) }, (_locale: string): string => _locale) }.fontSize(14).fontColor(this.回收站有内容 && !this.处理中 ?
                       this.dialogActionColor : $r('app.color.text_secondary'))
                   }
                     .type(ButtonType.Normal)
@@ -327,7 +387,7 @@ export struct 媒体管理面板 {
                     .fontColor(this.回收站有内容 && !this.处理中 ?
                       this.dialogActionColor : $r('app.color.text_secondary'))
                     .backgroundColor($r('app.color.surface_card'))
-                    .border({ width: 0.5, color: $r('app.color.border_input') })
+                    .border(SurfaceBorder.options(0.5))
                     .borderRadius(10)
                     .enabled(this.回收站有内容 && !this.检查中 && !this.处理中)
                     .stateStyles({ disabled: { .opacity(1) } })
@@ -343,7 +403,7 @@ export struct 媒体管理面板 {
                     .fontColor(this.回收站有内容 && !this.处理中 ?
                       $r('app.color.error_text') : $r('app.color.text_secondary'))
                     .backgroundColor($r('app.color.surface_card'))
-                    .border({ width: 0.5, color: $r('app.color.border_input') })
+                    .border(SurfaceBorder.options(0.5))
                     .borderRadius(10)
                     .enabled(this.回收站有内容 && !this.检查中 && !this.处理中)
                     .stateStyles({ disabled: { .opacity(1) } })
@@ -356,7 +416,7 @@ export struct 媒体管理面板 {
               .width('100%')
               .padding(12)
               .backgroundColor($r('app.color.surface_page'))
-              .borderRadius(12)
+              .borderRadius(12).border(SurfaceBorder.options())
             }
             .width('100%')
           }
@@ -388,7 +448,7 @@ export struct 媒体管理面板 {
       .constraintSize({ maxWidth: 480, maxHeight: '88%' })
       .padding(应用尺寸.面板内边距)
       .backgroundColor($r('app.color.surface_card'))
-      .borderRadius(应用尺寸.圆角_卡片)
+      .borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
       .onClick(() => {})
       .transition(TransitionEffect.asymmetric(
         TransitionEffect.opacity(0)

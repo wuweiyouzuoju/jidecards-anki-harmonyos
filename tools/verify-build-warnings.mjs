@@ -6,6 +6,7 @@ import JSON5 from 'json5';
 
 export const NAPI_NOTICE = "Currently module for 'libjidecards.so' is not verified. If you're importing napi, its verification will be enabled in later SDK version. Please make sure the corresponding .d.ts file is provided and the napis are correctly declared.";
 export const SOURCE_MAP_NOTICE = "ArkTS:WARN Property 'sourceMapsPath' not found in '@ibestservices/ibest-ui'.";
+export const OBFUSCATION_NOTICE = 'If obfuscation is needed, enable obfuscation settings in this build process; failing to do so may prevent future obfuscation.';
 const dependencyRoot = 'oh_modules/.ohpm/@ibestservices+ibest-ui@2.2.7/oh_modules/@ibestservices/ibest-ui/';
 const key = warning => JSON.stringify([warning.file, warning.message]);
 
@@ -14,7 +15,10 @@ export function parseWarnings(text, root) {
   const normalize = text => text.replaceAll('\\', '/').split(prefix).join('');
   // stdout task progress can interleave with a multi-line stderr diagnostic.
   const rawLines = text.replace(/\x1b\[[0-9;]*m/g, '').split(/\r?\n/)
-    .map(line => line.trim()).filter(line => !/^> hvigor (?:Finished |UP-TO-DATE |TYPE CHECK |BUILD SUCCESSFUL)/.test(line));
+    .map(line => line.trim()).filter(line => !/^> hvigor (?:Finished |UP-TO-DATE |TYPE CHECK |BUILD SUCCESSFUL)/.test(line) &&
+      // The Java launcher announces the signing heap; Hvigor labels all its stderr as WARN.
+      // Only a lone valid heap setting is informational. Other diagnostics still fail the gate.
+      !/^> hvigor WARN: Picked up JAVA_TOOL_OPTIONS: -Xmx[1-9][0-9]*[mMgG]$/.test(line));
   const lines = rawLines.map(line => line.replace(/^> hvigor\s+/, '').replace(/^(?:WARN:\s*)+/, ''));
   const warnings = [];
   for (let index = 0; index < lines.length; index++) {
@@ -58,6 +62,7 @@ export function aggregateWarnings(warnings) {
 export function baselineCategory(warning) {
   if (warning.file === 'entry/src/main/ets/backend/后端客户端.ts' && warning.message === NAPI_NOTICE) return 'sdk-napi';
   if (warning.file === '' && warning.message === SOURCE_MAP_NOTICE) return 'ibest-metadata';
+  if (warning.file === '' && warning.message === OBFUSCATION_NOTICE) return 'sdk-obfuscation';
   if (!warning.file.startsWith(dependencyRoot)) return null;
   if (/^(?:src\/main\/ets\/.+|Index)\.d\.(?:ets|ts)$/.test(warning.file.slice(dependencyRoot.length))) return 'ibest-declarations';
   if (/^src\/main\/resources\/(?:base|en)\/element\/string\.json$/.test(warning.file.slice(dependencyRoot.length)) &&

@@ -487,7 +487,7 @@ export function encodeSearchNode(node: SearchNode): 协议写入器 {
       }
       break;
     case 'flag':
-      if (node.flag !== undefined && node.flag !== SearchNodeFlag.FLAG_NONE) {
+      if (node.flag !== undefined) {
         w.写入变长整数(11, node.flag);
       }
       break;

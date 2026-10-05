@@ -2,7 +2,7 @@
 import { settingsItemText } from '../../utils/SettingsStructureText';
 import { PrimaryActionButton } from '../common/PrimaryActionButton';
 import { FormInputStyle } from '../../utils/FormInputStyle';
-import { SelectStyle } from '../../utils/SelectStyle';
+import { FormSelectRow } from '../common/FormSelectRow';
 
 import type { ProviderId } from '../../model/agent/AgentTypes';
 import { common } from '@kit.AbilityKit';
@@ -25,6 +25,7 @@ interface SelectItem { value: string; }
 
 @Component
 export struct AIAgent设置分组 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop 是否深色: boolean = false;
 
   @State private provider: ProviderId = 'deepseek';
@@ -113,81 +114,33 @@ export struct AIAgent设置分组 {
       是否深色: this.是否深色
     }) {
       Column({ space: 应用尺寸.间距_10 }) {
-          Row() {
-            Text(settingsItemText(this.getUIContext(), 'ai_provider')).layoutWeight(1)
-            Select([{ value: 'DeepSeek' },
-              { value: this.getString($r('app.string.ai_agent_provider_custom')) }])
-              .selected(this.providerIndex())
-              .value(this.provider === 'custom' ?
-                this.getString($r('app.string.ai_agent_provider_custom')) : 'DeepSeek')
-              .attributeModifier(new SelectStyle())
-              .height(SelectStyle.controlHeight)
-              .padding(SelectStyle.controlPadding)
-              .space(SelectStyle.controlSpace)
-              .width(SelectStyle.fieldWidth)
-              .constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
-              .font(SelectStyle.controlFont)
-              .optionFont(SelectStyle.optionFont)
-              .selectedOptionFont(SelectStyle.selectedOptionFont)
-              .textModifier(SelectStyle.labelText())
-              .borderRadius(SelectStyle.controlRadius)
-              .onSelect((index: number): void => { this.switchProvider(index); })
-          }.width('100%')
+          FormSelectRow({ label: settingsItemText(this.getUIContext(), 'ai_provider', this.uiLanguage), options: [{ value: 'DeepSeek' }, { value: this.getString($r('app.string.ai_agent_provider_custom')) }],
+            selectedIndex: this.providerIndex(), value: this.provider === 'custom' ?
+              this.getString($r('app.string.ai_agent_provider_custom')) : 'DeepSeek',
+            onSelect: (index: number): void => { this.switchProvider(index); } })
           if (this.provider !== 'custom') {
-            Row() {
-              Text(settingsItemText(this.getUIContext(), 'ai_model')).layoutWeight(1)
-              Select(this.modelOptions()).selected(this.modelIndex())
-                .value(this.deepseekModel)
-                .attributeModifier(new SelectStyle())
-                .height(SelectStyle.controlHeight)
-                .padding(SelectStyle.controlPadding)
-                .space(SelectStyle.controlSpace)
-                .width(SelectStyle.fieldWidth)
-                .constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
-                .font(SelectStyle.controlFont)
-                .optionFont(SelectStyle.optionFont)
-                .selectedOptionFont(SelectStyle.selectedOptionFont)
-                .textModifier(SelectStyle.labelText())
-                .borderRadius(SelectStyle.controlRadius)
-                .onSelect((index: number): void => {
-                  this.deepseekModel = DEEPSEEK_PROVIDER.models[index];
-                })
-            }.width('100%')
+            FormSelectRow({ label: settingsItemText(this.getUIContext(), 'ai_model', this.uiLanguage), options: this.modelOptions(), selectedIndex: this.modelIndex(), value: this.deepseekModel,
+              onSelect: (index: number): void => { this.deepseekModel = DEEPSEEK_PROVIDER.models[index]; } })
           } else {
-            TextInput({ placeholder: settingsItemText(this.getUIContext(), 'ai_custom_url'), text: this.customBaseUrl })
+            TextInput({ placeholder: settingsItemText(this.getUIContext(), 'ai_custom_url', this.uiLanguage), text: this.customBaseUrl })
               .attributeModifier(new FormInputStyle())
               .onChange((value: string): void => { this.customBaseUrl = value; })
-            TextInput({ placeholder: settingsItemText(this.getUIContext(), 'ai_custom_model'), text: this.customModel })
+            TextInput({ placeholder: settingsItemText(this.getUIContext(), 'ai_custom_model', this.uiLanguage), text: this.customModel })
               .attributeModifier(new FormInputStyle())
               .onChange((value: string): void => { this.customModel = value; })
-            SettingsToggleRow({ title: settingsItemText(this.getUIContext(), 'ai_vision'),
-              hint: $r('app.string.ai_agent_custom_vision_hint'), isOn: this.customVisionEnabled,
+            SettingsToggleRow({ title: settingsItemText(this.getUIContext(), 'ai_vision', this.uiLanguage), hint: $r('app.string.ai_agent_custom_vision_hint'), isOn: this.customVisionEnabled,
               isInteractive: !this.saving, isDark: this.是否深色, tint: this.解析主色按钮背景(),
               onChange: (value: boolean): void => { this.customVisionEnabled = value; } })
           }
-          TextInput({ placeholder: settingsItemText(this.getUIContext(), 'ai_key'), text: this.secret })
+          TextInput({ placeholder: settingsItemText(this.getUIContext(), 'ai_key', this.uiLanguage), text: this.secret })
             .type(InputType.Password)
             .attributeModifier(new FormInputStyle())
             .onChange((value: string): void => { this.secret = value; })
-          Row() {
-            Text(settingsItemText(this.getUIContext(), 'ai_batch_limit')).layoutWeight(1)
-            Select([{ value: '100' }, { value: '250' }, { value: '500' }, { value: '1000' }])
-              .selected(this.batchLimit === 100 ? 0 : (this.batchLimit === 250 ? 1 : (this.batchLimit === 500 ? 2 : 3)))
-              .value(this.batchLimit.toString())
-              .attributeModifier(new SelectStyle())
-              .height(SelectStyle.controlHeight)
-              .padding(SelectStyle.controlPadding)
-              .space(SelectStyle.controlSpace)
-              .width(SelectStyle.fieldWidth)
-              .constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
-              .font(SelectStyle.controlFont)
-              .optionFont(SelectStyle.optionFont)
-              .selectedOptionFont(SelectStyle.selectedOptionFont)
-              .textModifier(SelectStyle.labelText())
-              .borderRadius(SelectStyle.controlRadius)
-              .onSelect((index: number): void => { this.batchLimit = [100, 250, 500, 1000][index]; })
-          }.width('100%')
-          PrimaryActionButton({ label: this.saving ? $r('app.string.ai_card_generating') : settingsItemText(this.getUIContext(), 'ai_save'),
+          FormSelectRow({ label: settingsItemText(this.getUIContext(), 'ai_batch_limit', this.uiLanguage), options: [{ value: '100' }, { value: '250' }, { value: '500' }, { value: '1000' }],
+            selectedIndex: this.batchLimit === 100 ? 0 : (this.batchLimit === 250 ? 1 : (this.batchLimit === 500 ? 2 : 3)),
+            value: this.batchLimit.toString(),
+            onSelect: (index: number): void => { this.batchLimit = [100, 250, 500, 1000][index]; } })
+          PrimaryActionButton({ label: this.saving ? $r('app.string.ai_card_generating') : settingsItemText(this.getUIContext(), 'ai_save', this.uiLanguage),
             tint: this.解析主色按钮背景(), isInteractive: !this.saving,
             onAction: (): void => { this.save(); } })
           if (this.message !== '') { Text(this.message).fontSize(12).fontColor($r('app.color.text_secondary')) }

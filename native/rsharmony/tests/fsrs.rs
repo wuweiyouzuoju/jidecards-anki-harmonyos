@@ -119,6 +119,7 @@ struct Fixture {
     backend: Backend,
     shared_deck: i64,
     foreign_deck: i64,
+    cards: Vec<i64>,
 }
 
 impl Drop for Fixture {
@@ -158,6 +159,7 @@ fn fixture() -> Fixture {
         .unwrap()
         .as_secs() as i64;
     let timing = col.timing_today().unwrap();
+    let mut cards = Vec::new();
     for index in 0..36 {
         let deck = if index < 12 {
             DeckId(1)
@@ -170,6 +172,12 @@ fn fixture() -> Fixture {
         note.set_field(0, &format!("FSRS {index}")).unwrap();
         note.set_field(1, "Answer").unwrap();
         col.add_note(&mut note, deck).unwrap();
+        cards.push(
+            col.storage
+                .all_card_ids_of_note_in_template_order(note.id)
+                .unwrap()[0]
+                .0,
+        );
         if index % 2 == 0 {
             let cid = col
                 .storage
@@ -210,6 +218,7 @@ fn fixture() -> Fixture {
         backend,
         shared_deck: shared_deck.0,
         foreign_deck: foreign_deck.0,
+        cards,
     }
 }
 
@@ -230,6 +239,99 @@ fn view(f: &Fixture, deck: i64) -> View {
             .as_slice(),
     )
     .unwrap()
+}
+
+#[test]
+fn fsrs_diagnostics_and_daily_simulation_use_locked_core_semantics() {
+    use anki_proto::cards::CardId;
+    use anki_proto::deck_config::GetIgnoredBeforeCountResponse;
+    use anki_proto::scheduler::{
+        ComputeMemoryStateResponse, EvaluateParamsResponse, SimulateFsrsReviewResponse,
+    };
+    let f = fixture();
+    let before = view(&f, 1);
+    let evaluation = EvaluateParamsResponse::decode(
+        f.backend
+            .run_service_method(
+                13,
+                36,
+                &hex(include_str!(
+                    "../../../tools/tests/fixtures/fsrs-evaluate.hex"
+                )),
+            )
+            .unwrap()
+            .as_slice(),
+    )
+    .unwrap();
+    assert!(evaluation.log_loss.is_finite() && evaluation.log_loss >= 0.0);
+    assert!(evaluation.rmse_bins.is_finite() && evaluation.rmse_bins >= 0.0);
+    let count = GetIgnoredBeforeCountResponse::decode(
+        f.backend
+            .run_service_method(
+                11,
+                8,
+                &hex(include_str!(
+                    "../../../tools/tests/fixtures/fsrs-history-count.hex"
+                )),
+            )
+            .unwrap()
+            .as_slice(),
+    )
+    .unwrap();
+    assert_eq!(
+        count.total, 6,
+        "count measures non-new cards, not the 18 revlog entries"
+    );
+    assert_eq!(
+        count.included, 0,
+        "future cutoff excludes every historical card"
+    );
+    for (index, expected) in [(0, true), (1, false)] {
+        let memory = ComputeMemoryStateResponse::decode(
+            f.backend
+                .run_service_method(
+                    13,
+                    37,
+                    &CardId {
+                        cid: f.cards[index],
+                    }
+                    .encode_to_vec(),
+                )
+                .unwrap()
+                .as_slice(),
+        )
+        .unwrap();
+        assert_eq!(memory.state.is_some(), expected);
+        assert!(memory.desired_retention.is_finite());
+        assert!(memory.decay.is_finite());
+    }
+    let daily = SimulateFsrsReviewResponse::decode(
+        f.backend
+            .run_service_method(
+                13,
+                33,
+                &hex(include_str!(
+                    "../../../tools/tests/fixtures/fsrs-workload.hex"
+                )),
+            )
+            .unwrap()
+            .as_slice(),
+    )
+    .unwrap();
+    assert_eq!(daily.daily_review_count.len(), 30);
+    assert_eq!(daily.daily_new_count.len(), 30);
+    assert_eq!(daily.daily_time_cost.len(), 30);
+    assert_eq!(daily.accumulated_knowledge_acquisition.len(), 30);
+    assert!(daily.daily_review_count.iter().any(|value| *value > 0));
+    assert!(daily
+        .daily_time_cost
+        .iter()
+        .all(|value| value.is_finite() && *value >= 0.0));
+    assert_eq!(
+        view(&f, 1),
+        before,
+        "diagnostics and simulation do not save preset scenarios"
+    );
 }
 
 #[test]

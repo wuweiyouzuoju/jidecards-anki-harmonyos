@@ -37,6 +37,8 @@
 
 组件字段不得与 ArkUI 继承的属性方法同名，例如 `enabled`、`width`、`height`、`visibility`；布尔状态使用语义明确的 `isAdvanceEnabled` 等名称。`arkts-component-fields.test.mjs` 提前拦截常见装饰器字段冲突，但只覆盖常见名称，实际 HAP 编译仍是完成条件。纯逻辑测试通过不得报告为组件编译通过。
 
+组件 `struct` 的状态派生使用普通方法或直接调用已有控制器方法，避免 getter：本仓库目标编译器曾遗漏学习页和首页的 getter，却保留读取点，导致运行时读到 `undefined`。`arkts-component-fields.test.mjs` 拦截此写法；普通模型 `class` 的 getter 不在此限制内。编译产物与设备运行仍是最终依据。
+
 ```typescript
 @Component
 export struct XxxComponent {
@@ -79,7 +81,7 @@ this.localizedFmt($r('app.string.xxx_lang'), [arg1, arg2]);
 
 ## 语言切换机制
 
-- `GeneralSettings.ets` 去重后调用 `setAppPreferredLanguage`，系统配置更新负责重渲染；当前实现不主动重启应用。
+- `GeneralSettings.ets` 去重后调用 `setAppPreferredLanguage`，配置通知后发布应用偏好语言；提前解析的字符串须观察“系统语言”，Span 按语言重建文字子节点；不主动重启应用。
 - 系统设置失败时显示失败提示；配置更新期间 Select 重建不得重复触发语言切换。
 - 即时刷新与页面重建效果需做设备验证，编译和 Node 测试不能替代。
 - [扩展入口](../../docs/development/extension-points.md) 列出新增语言的入口
@@ -111,7 +113,7 @@ this.localizedFmt($r('app.string.xxx_lang'), [arg1, arg2]);
 - 装机用 `hdc -t <connect-key> install -r <hap>`（不是 `-s`，与 adb 不同）
 - 装后需 `hdc -t <connect-key> shell aa force-stop com.jide.kapian` 再启动当前包以加载新代码
 - **绝不 uninstall 清数据**：collection.anki2 + collection.media 在 sandbox 目录，uninstall 即永久删除
-- 命令行构建：`npm run build:app`，通过仓库入口检查工具链、本机签名与最终 signed HAP；完整验收用 `npm run verify`
+- 命令行增量构建：`npm run build:app`；确认原生输入未变且目标库有效时可加 `-SkipRust`。新增类型、组件、导入或平台 API 时补编译；普通文案/样式不自动构建。集成与发布按[分级验证](../../docs/development/verification.md#按变更路径选择验证)选择完整 `npm run verify`。
 
 ## 测试限制
 

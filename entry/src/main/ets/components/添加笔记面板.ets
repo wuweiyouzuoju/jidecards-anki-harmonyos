@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { FormInputStyle } from '../utils/FormInputStyle';
+import { parseNoteTags } from '../model/NoteFieldEditing';
+import { SurfaceBorder } from '../utils/SurfaceBorder';
+import { NoteTagsField } from './common/NoteTagsField';
 import { noteTypeText, noteFieldText } from '../utils/NoteTypeText';
 import { PressFeedback } from '../utils/PressFeedback';
 import { HelpLabel } from './common/HelpLabel';
@@ -63,6 +65,7 @@ interface 添加笔记下拉选项 {
 
 @Component
 export struct 添加笔记面板 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop originalStockKind: number = 0;
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
@@ -269,14 +272,7 @@ export struct 添加笔记面板 {
   // 无。
   // ========================================================
   private 解析标签(): string[] {
-    const 已见: string[] = [];
-    for (const 标签 of this.tags.split(/\s+/)) {
-      const 修剪后 = 标签.trim();
-      if (修剪后 !== '' && 已见.indexOf(修剪后) < 0) {
-        已见.push(修剪后);
-      }
-    }
-    return 已见;
+    return parseNoteTags(this.tags);
   }
 
   // ========================================================
@@ -383,7 +379,7 @@ export struct 添加笔记面板 {
               .optionFont(SelectStyle.optionFont)
               .selectedOptionFont(SelectStyle.selectedOptionFont)
               .textModifier(SelectStyle.labelText())
-              .borderRadius(SelectStyle.controlRadius)
+              .borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
               .onSelect((index: number): void => {
                 if (!this.busy && Number.isInteger(index) && index >= 0 && index < this.deckOptions.length) {
                   this.onSelectDeck(this.deckOptions[index].id);
@@ -408,7 +404,7 @@ export struct 添加笔记面板 {
               .optionFont(SelectStyle.optionFont)
               .selectedOptionFont(SelectStyle.selectedOptionFont)
               .textModifier(SelectStyle.labelText())
-              .borderRadius(SelectStyle.controlRadius)
+              .borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
               .onSelect((index: number): void => {
                 if (!this.busy && Number.isInteger(index) && index >= 0 && index < this.notetypeOptions.length) {
                   this.onSelectNotetype(this.notetypeOptions[index].id);
@@ -430,7 +426,7 @@ export struct 添加笔记面板 {
                   .fontColor($r('app.color.text_primary'))
                   .placeholderColor($r('app.color.text_tertiary'))
                   .backgroundColor($r('app.color.surface_card'))
-                  .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
+                  .border(SurfaceBorder.options())
                   .borderRadius(应用尺寸.圆角_面板)
                   .padding(应用尺寸.间距_10)
                   .enabled(!this.busy)
@@ -442,7 +438,7 @@ export struct 添加笔记面板 {
             }, (字段名: string, index: number): string => `${index}-${字段名}`)
 
             Button() {
-              Text() { ThemeTextSpans(this.高级已展开 ? $r('app.string.add_note_advanced_hide') : $r('app.string.add_note_advanced'), this.themeAccentColors, this.getUIContext()) }.fontSize(应用尺寸.字号_按钮).fontColor(this.动作主色)
+              Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(this.高级已展开 ? $r('app.string.add_note_advanced_hide') : $r('app.string.add_note_advanced'), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }.fontSize(应用尺寸.字号_按钮).fontColor(this.动作主色)
             }
               .width('100%')
               .height(应用尺寸.按钮高度)
@@ -450,7 +446,7 @@ export struct 添加笔记面板 {
               .fontSize(应用尺寸.字号_按钮)
               .fontColor(this.动作主色)
               .backgroundColor($r('app.color.surface_page'))
-              .borderRadius(应用尺寸.圆角_面板)
+              .borderRadius(应用尺寸.圆角_面板).border(SurfaceBorder.options())
               .enabled(!this.busy)
               .attributeModifier(new PressFeedback())
               .stateEffect(false)
@@ -461,12 +457,8 @@ export struct 添加笔记面板 {
             if (this.高级已展开) {
               Column({ space: 应用尺寸.间距_5 }) {
                 this.带帮助的标签($r('app.string.add_note_tags'), $r('app.string.add_note_tags_help'))
-                TextInput({ placeholder: $r('app.string.add_note_tags_placeholder'), text: this.tags })
-                  .attributeModifier(new FormInputStyle())
-                  .enabled(!this.busy)
-                  .onChange((value: string): void => {
-                    this.tags = value;
-                  })
+                NoteTagsField({ text: this.tags, isInteractive: !this.busy,
+                  onChange: (value: string): void => { this.tags = value; } })
                 Text($r('app.string.add_note_duplicate_rejected'))
                   .fontSize(应用尺寸.字号_正文_小)
                   .fontColor($r('app.color.text_tertiary'))
@@ -499,7 +491,7 @@ export struct 添加笔记面板 {
       .constraintSize({ maxWidth: 520, maxHeight: '88%' })
       .padding(应用尺寸.卡片内边距)
       .backgroundColor($r('app.color.surface_card'))
-      .borderRadius(应用尺寸.圆角_卡片)
+      .borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
       .onClick(() => {
       })
 

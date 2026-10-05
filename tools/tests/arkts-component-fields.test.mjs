@@ -12,6 +12,12 @@ function collisions(source) {
   const fields = source.matchAll(/(?:@(?:State|Prop|Link|StorageProp|StorageLink|Provide|Consume|Watch)(?:\([^\n]*?\))?\s*)+(?:(?:private|public)\s+)?(\w+)\s*:/g);
   return [...fields].map(match => match[1]).filter(name => inherited.has(name));
 }
+function componentGetters(source) {
+  const components = source.matchAll(/(?:^|\n)(?:export\s+)?struct\s+[^\s{]+\s*\{([\s\S]*?)^\}/gm);
+  return [...components].flatMap(component =>
+    [...component[1].matchAll(/^\s*(?:(?:private|public|protected)\s+)?get\s+([^\s(]+)\s*\(/gm)]
+      .map(getter => getter[1]));
+}
 function sources(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
     const path = join(directory, entry.name);
@@ -24,5 +30,14 @@ test('state fields cannot shadow common ArkUI component attribute methods', () =
   const root = fileURLToPath(new URL('../../entry/src/main/ets/', import.meta.url));
   for (const path of sources(root)) {
     assert.deepEqual(collisions(readFileSync(path, 'utf8')), [], path);
+  }
+});
+
+test('ArkUI component getters cannot silently disappear from compiled pages', () => {
+  assert.deepEqual(componentGetters('@Component\nstruct Page {\n  private get enabledMode(): boolean { return true; }\n}\n'), ['enabledMode']);
+  assert.deepEqual(componentGetters('@Component\nstruct Page {\n  private isEnabled(): boolean { return true; }\n}\nclass Model { get enabled(): boolean { return true; } }'), []);
+  const root = fileURLToPath(new URL('../../entry/src/main/ets/', import.meta.url));
+  for (const path of sources(root)) {
+    assert.deepEqual(componentGetters(readFileSync(path, 'utf8')), [], path);
   }
 });

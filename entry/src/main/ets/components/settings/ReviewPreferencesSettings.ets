@@ -13,8 +13,10 @@ import { 设置分组卡片 } from './设置分组卡片';
 /** 两个分类复用集合偏好保存入口；草稿只记录用户实际编辑的字段。 */
 @Component
 export struct ReviewPreferencesSettings {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop 是否深色: boolean = false;
   @Prop displayOptions: boolean = false;
+  打开说明回调: (标题: Resource, 正文: Resource) => void = (_标题: Resource, _正文: Resource): void => {};
   @StorageProp(颜色键.动作主色) private actionColor: string = '#2F5FD0';
   @State private loaded: boolean = false;
   @State private busy: boolean = false;
@@ -113,16 +115,16 @@ export struct ReviewPreferencesSettings {
   }
 
   private fieldTitle(field: ReviewPreferenceField): string {
-    if (field === ReviewPreferenceField.Rollover) return settingsItemText(this.getUIContext(), 'rollover');
-    if (field === ReviewPreferenceField.LearnAheadSecs) return settingsItemText(this.getUIContext(), 'learn_ahead');
-    return settingsItemText(this.getUIContext(), 'timebox');
+    if (field === ReviewPreferenceField.Rollover) return settingsItemText(this.getUIContext(), 'rollover', this.uiLanguage);
+    if (field === ReviewPreferenceField.LearnAheadSecs) return settingsItemText(this.getUIContext(), 'learn_ahead', this.uiLanguage);
+    return settingsItemText(this.getUIContext(), 'timebox', this.uiLanguage);
   }
 
   @Builder
   private numberField(field: ReviewPreferenceField) {
     Row({ space: 应用尺寸.间距_16 }) {
       Text(this.fieldTitle(field)).fontSize(应用尺寸.字号_按钮)
-        .fontColor($r('app.color.text_primary')).layoutWeight(1)
+        .fontColor($r('app.color.text_primary')).textAlign(TextAlign.Start).layoutWeight(1)
       TextInput({ text: field === ReviewPreferenceField.Rollover ? this.rollover :
         (field === ReviewPreferenceField.LearnAheadSecs ? this.learnAhead : this.timeLimit) })
         .attributeModifier(new FormInputStyle()).width(96)
@@ -136,17 +138,17 @@ export struct ReviewPreferencesSettings {
   }
 
   build() {
-    设置分组卡片({ groupId: this.displayOptions ? 'study_display' : 'global_review', 是否深色: this.是否深色 }) {
+    设置分组卡片({ groupId: this.displayOptions ? 'study_display' : 'global_review', 是否深色: this.是否深色,
+      帮助标题: this.displayOptions ? null : $r('app.string.settings_core_review'),
+      帮助正文: this.displayOptions ? null : $r('app.string.settings_core_review_help'), 打开说明回调: this.打开说明回调 }) {
       Column({ space: 应用尺寸.间距_8 }) {
         Text($r('app.string.settings_core_review_scope')).fontSize(应用尺寸.字号_正文_小)
           .fontColor($r('app.color.text_secondary')).width('100%')
         if (this.displayOptions) {
-          SettingsToggleRow({ title: settingsItemText(this.getUIContext(), 'show_remaining'),
-            isOn: this.remaining, tint: this.actionColor, isDark: this.是否深色,
+          SettingsToggleRow({ title: settingsItemText(this.getUIContext(), 'show_remaining', this.uiLanguage), isOn: this.remaining, tint: this.actionColor, isDark: this.是否深色,
             isInteractive: this.loaded && !this.busy,
             onChange: (value: boolean): void => { this.changeDisplay(ReviewPreferenceField.ShowRemaining, value); } })
-          SettingsToggleRow({ title: settingsItemText(this.getUIContext(), 'show_intervals'),
-            isOn: this.intervals, tint: this.actionColor, isDark: this.是否深色,
+          SettingsToggleRow({ title: settingsItemText(this.getUIContext(), 'show_intervals', this.uiLanguage), isOn: this.intervals, tint: this.actionColor, isDark: this.是否深色,
             isInteractive: this.loaded && !this.busy,
             onChange: (value: boolean): void => { this.changeDisplay(ReviewPreferenceField.ShowIntervals, value); } })
         } else {

@@ -4,13 +4,13 @@
 
 ## 环境与命令
 
-Node 24.x 与 `package.json` / CI 一致。首次进入或 lockfile 变化后运行 `npm ci`。
+Node 24.x 与 `package.json` / CI 一致。首次准备或 lockfile 变化后运行 `npm ci`；新对话不重复安装依赖或诊断已可用环境。
 `npm test` 先检查 Node 版本与实际类型转换能力，再自动发现全部测试，不靠手写完整文件名单。
 
 | 命令 | 能证明什么 | 不能替代什么 |
 | --- | --- | --- |
 | `npm test -- --list` | 当前可选领域及测试文件数 | 测试执行 |
-| `npm test -- home`（或 study/sync/browser/media/agent/ui/tooling/repo） | 领域内快速反馈 | 完整回归、编译、真机 |
+| `npm test -- home`（或 study/sync/browser/media/agent/ui/tooling/repo） | 受影响领域的局部验证 | 未覆盖领域、编译、真机 |
 | `npm test` | 全部 Node 行为与静态约束测试 | ArkTS 类型检查、Kit/ArkUI 实际行为 |
 | `npm run test:interop` | 锁定 Core 的隔离 APKG/COLPKG、ID/历史/未知配置、取消及进程恢复；生成样本和报告，见[核心互通](core-interop.md) | Android/HarmonyOS 设备、Anki 桌面 GUI、真实在线同步 |
 | `npm run verify -- repo` | 可移植仓库门禁，CI 使用同一入口 | Rust、HAP、设备 |
@@ -20,7 +20,7 @@ Node 24.x 与 `package.json` / CI 一致。首次进入或 lockfile 变化后运
 | `npm run build:app` | 当前配置的完整应用构建 | 行为测试 |
 | `npm run test:release` | 源码导出安全性、字节保真、签名配置合并与脱敏回归 | 已生成副本自身的完整验证 |
 
-领域筛选是显式的开发反馈，不是完整依赖影响分析。`all` 总从磁盘发现测试；新增测试无须登记进完整清单。
+领域筛选是按任务选择的验证，不是完整依赖影响分析。也可直接执行受影响测试文件：`node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs --test tools/tests/<名称>.test.mjs`。`all` 总从磁盘发现测试；新增测试无须登记进完整清单。
 增加新的业务领域或代表性测试名称时调整 `tools/test-suites.mjs`。既有混合行为/静态测试逐步按真实改动迁移，不靠文件名声称全部是 runtime 测试。
 
 `platform-module-harness.mjs` 可注入平台依赖执行 `.ets` 模块或组件的真实非渲染逻辑；组件装饰器与 build 被去除，因此不证明 ArkUI 观察、Prop 更新或布局行为。不要在测试中重新实现会话规则，也不能用该 harness 代替 HAP 和设备验证。
@@ -32,6 +32,8 @@ Node 24.x 与 `package.json` / CI 一致。首次进入或 lockfile 变化后运
 - `tools/tests/architecture-boundaries.test.mjs` 自动发现应用 `.ts/.ets`，检查字面量导入/再导出的可解析性、依赖环、UI 反向依赖、纯模型平台隔离及应用内 Agent 工具到确认执行器的传递依赖。含故意破坏边界的测试样例；它不是完整解析器，不分析计算型加载、方法能力或运行时数据流。
 - `tools/tests/documentation-contract.test.mjs` 自动发现 `.agents/`、`docs/`（历史计划除外）和应用目录中的 Markdown，检查相对文件链接；核对当前规则入口、发布配置、归档标识及失效知识入口。不会验证链接锚点、外网内容或所有自然语言语义。
 - 两者均进入完整 `npm test` / `verify`。新增边界先补能失败的反例，新增领域规则同时维护 [责任表](ownership.md)，不以“源码出现了类名”证明行为正确。
+
+公共 UI 另有 `tools/tests/common-boundary.test.mjs`：扫描 common 的字面量直接依赖，禁止新增业务/平台 IO 依赖，逐条保留既有迁移例外并拒绝失效例外；公开 `.ets` 必须在 common README 有文件链接，内部实现可标 `@internal`。用 `npm test -- repo` 或单独执行该测试；环境与完整测试一致，不依赖设备。它不分析计算型导入、传递平台能力或渲染效果，完整依赖和编译仍由 architecture/HAP 验证。
 
 ## RPC 协议门禁
 
@@ -51,10 +53,10 @@ Node 24.x 与 `package.json` / CI 一致。首次进入或 lockfile 变化后运
 
 `build-app.ps1` 在任何产物或日志改动前取得按仓库目录区分的 Windows 命名互斥锁，覆盖原生构建、clean、签名及警告核验。共享工作树中的其他脚本构建等待最多 10 分钟，超时失败；异常和进程退出释放锁，不删除他人的产物。它不冻结源码，也不能约束直接绕过该入口启动的 IDE/Hvigor 构建；并行改码仍需在最终联合验收前稳定工作树。
 
-- `npm run build:app` 是增量反馈，只验证本次出现的警告，不证明全项目无新增警告。
-- `npm run build:app -- -Clean` 清理 HAP 构建缓存后验证；`npm run verify` 强制使用此模式，并保留双架构 Rust 构建及签名检查。
+- `npm run build:app` 是日常增量构建，只验证本次出现的警告，不证明全项目无新增警告。原生输入未变、目标架构库与输入匹配时可加 `-SkipRust`；否则使用普通构建。`-SkipRust` 仍检查小型沙箱库，不跳过签名或警告检查。需要体验时可用 `-Architecture arm64` 或 `x64` 指定目标，完整验收保留双架构。
+- `npm run build:app -- -Clean` 清理 HAP 构建缓存后验证，用于完整验收、构建配置/SDK 升级或具体缓存异常；日常小改动不自动 clean。完整 `npm run verify` 继续强制此模式，并保留双架构 Rust 构建及签名检查。
 - `node tools/verify-build-warnings.mjs .hvigor/last-build.log --require-clean` 可复核当前日志；仅重放日志不代表源码再次构建过。缺失成功标记、多次构建拼接或缺少 clean 标记均失败。
-- 基线仅允许已审查的 ibest-ui 2.2.7 声明、资源合并、缺少 sourceMapsPath，以及后端客户端导入处的一条 SDK NAPI 暂不支持校验提示。保留图片裁剪功能和依赖是用户明确选择，不允许将项目异常警告加入基线。
+- 基线仅允许已审查的 ibest-ui 2.2.7 声明、资源合并、缺少 sourceMapsPath，以及后端客户端导入处的一条 SDK NAPI 暂不支持校验提示。release 模式另接受一次 SDK 混淆建议的精确原文：`entry/build-profile.json5` 已明确为保留可读崩溃堆栈关闭混淆，AGPL 源码公开；消息改变或次数增加仍失败。保留图片裁剪功能和依赖是用户明确选择，不允许将项目异常警告加入基线。
 - 基线中的资源合并还必须逐键比较依赖原文件与本次合并产物：缺少键或值不同仍失败，不能用相同警告文本掩盖真实覆盖。
 - 依赖实际安装版本、锁文件选中的版本和完整性、目标 SDK 必须匹配。升级后先完整编译并检查差异，人工审查/更新基线和原因，再完整验证；没有自动接纳新警告的选项。完整构建中减少或消失的旧项会提示复查移除。
 
@@ -64,15 +66,33 @@ Node 24 测试使用内置 TypeScript 转换，运行时可能输出 `Experiment
 
 ## 按变更路径选择验证
 
+日常任务选择最少必要检查，按实际 diff、调用关系和变更性质升级；模型等级、新对话和文件数量不是全量验收的触发条件。
+领域文档中的历史全量验收记录不构成每次修改的执行要求；专项命令仅在影响对应边界时选择。本节统一决定日常验证强度。
+
+| 改动性质 | 默认检查 | 升级条件 |
+| --- | --- | --- |
+| 文案、图标、颜色、简单间距（cosmetic） | 检查相关资源语法、引用和效果；字符串运行 i18n 契约，文档运行文档契约 | 同时改变回调、状态或业务时增加相应行为测试；新增编译边界时补增量 HAP |
+| 局部行为（behavior） | 运行受影响测试文件或领域测试，核对公共实现的相关调用 | 原生/协议、广泛集成或持久化格式变化按边界升级 |
+| 新类型、组件、导入或平台 API（compile） | 相关测试与一次增量 HAP | 原生库输入不确定时不用 `-SkipRust`；构建输入/SDK 升级做完整验收 |
+| 原生核心或沙箱 | 受影响真实行为测试与必要 fmt/clippy；主机入口见目录规则 | FFI、RPC 编码、上游锁定协议升级或 HAP 集成补对应检查 |
+| 大范围集成、依赖/SDK 升级、正式发布（integration/release） | 一次完整 `npm run verify`，含 clean、双架构与签名 | 设备交互另行记录 |
+
+纯资源/样式任务不默认全量 Node、Rust、HAP、环境诊断或设备安装。小改动不新增锁死措辞、方法位置或等价语法的测试；真实 bug 和新行为的回归应能抓住故障。检查失败后定位受影响入口，不借任务扩大无关修复。
+需要用户安装体验或确认编译兼容性时才打包；设备操作遵循用户的操作权约定。新资源仍需检查格式与所有引用，路径建议不代替实际审查。
+
+已通过检查的相关源码、测试、依赖、配置和工具链输入未变时复用结果，简短注明命令及适用范围；无法确认输入一致时重跑受影响检查。没有自动缓存认证，旧日志或同名 HAP 文件本身不能证明可复用。补充文档只补文档检查，不重跑业务或构建；完整 verify 已包含的检查不在收尾重复执行。
+多个对话共享目录时用 `--paths` 检查本任务及受影响公共入口；其他任务的原生改动会影响库是否可复用。一批改动稳定后集中完整验收一次，不要求各对话都做一遍；发布前需验收实际联合工作树。
+共享验证失败按[多 Agent 协作](coding-agent.md#多-agent-协作)归因并交接；构建成功的要求不授予修改其他任务实现或掩盖失败的权限。
+
 | 变更路径 | 必读入口 | 快速验证 | 完成验证 |
 | --- | --- | --- | --- |
-| `entry/` 页面、组件、模型或应用内 Agent | `.agents/rules/paths/entry.md`、对应领域文档 | 对应领域测试 | ArkTS/结构改动运行 `npm run verify`；设备行为单独记录 |
-| `native/`、FFI 或上游接口 | `.agents/rules/paths/native.md` | `npm run verify -- native` | 需要集成时运行 `npm run verify`，并做 RPC/设备验收 |
-| `tools/`、测试发现或 CI | `.agents/rules/paths/tools.md` | `npm test` | `npm run verify -- repo`，必要时实际执行受影响脚本 |
-| `docs/`、`.agents/`、决策或规则 | `.agents/rules/paths/docs.md` | 相关文档检查 | `npm run verify -- repo` |
-| 多个区域 | 所有匹配规则 | 合并所有领域测试 | 按最高风险区域完成全部门禁 |
+| `entry/` 页面、组件、模型或应用内 Agent | `.agents/rules/paths/entry.md`、对应领域文档 | 资源检查或受影响领域测试 | 按性质选择局部验证、增量 HAP 或完整验收；设备行为单独记录 |
+| `native/`、FFI 或上游接口 | `.agents/rules/paths/native.md` | 受影响 Core/沙箱主机测试 | 原生业务不附带全部 Node；桥接、协议及升级补集成 |
+| `tools/`、测试发现或 CI | `.agents/rules/paths/tools.md` | 对应工具测试 | 实际执行受影响命令；完整构建入口变更补集成 |
+| `docs/`、`.agents/`、决策或规则 | `.agents/rules/paths/docs.md` | 文档契约检查 | `node --test tools/tests/documentation-contract.test.mjs`；其他已运行检查包含此项时不重复 |
+| 多个区域 | 所有匹配规则 | 合并受影响检查 | 不因跨目录自动全量；大范围集成或高影响边界升级 |
 
-这张表是影响分析的最低要求，不能用来缩小实际影响范围。无法执行的验证必须在交付报告中写明原因。
+这张表提供默认范围，仍需审查实际依赖和行为。局部验证不声称全库通过；未执行范围简短记录，普通任务不强制另建计划或交接文件。
 
 ### 自动生成变更计划
 
@@ -82,8 +102,10 @@ Node 24 测试使用内置 TypeScript 转换，运行时可能输出 `Experiment
 - `npm run impact -- --base main`：在上述范围外，加入 `main` 与当前 HEAD 的共同祖先之后的分支改动。不执行 fetch，基线 ref 必须在本地存在。
 - `npm run impact -- --json`：输出结构化计划。机器直接解析 stdout 时使用 `node tools/change-impact.mjs --json`，避开 npm 的命令标题。
 - `npm run impact -- --json --paths tools/change-impact.mjs tools/tests/change-impact.test.mjs`：仅分析指定的仓库相对路径，使用正斜杠；适用于共享工作树或无 Git 的导出副本。`--paths` 后均为路径，不与 `--base` 合用。
+- `npm run impact -- --kind cosmetic --paths entry/src/main/ets/components/StudyGuideDialog.ets`：经实际 diff 审查确认仅文案/样式时，选择局部资源/引用检查，不自动领域测试或 HAP。资源字符串和文档仍保留相应契约；原生、桥接和构建输入检查不会被 cosmetic 降级。
+- `--kind behavior` 选择相关领域测试；`--kind compile` 额外建议一次增量 HAP；`--kind integration` / `release` 选择完整 verify。默认 `auto` 将仅文档、字符串/颜色和常用图片资源识别为 cosmetic，其余按 behavior 路由；脚本不读取正文推断语义，页面内的小样式需主动指定 kind。选项必须放在 `--paths` 前。
 
-计划合并所有匹配规则，取最高验证级别。未知路径列入 `unknownPaths` 并以完整验证兜底；所有 `entry/` 改动保守建议完整构建。领域推荐来自路径命名或既有测试筛选，不是传递依赖分析。新增模块仍须核对调用点、责任表和设备影响，不能仅靠文件名判断。
+计划合并相关领域；`requiredCommands` 是所选范围，`changeKind` 和 `validationMode` 说明性质与级别，普通 entry 不再强制完整构建。构建/依赖、协议与 FFI 输入保守建议完整 verify；原生普通路径建议主机检查。未知路径列入 `unknownPaths`，要求明确所有权、调用关系并选择检查，不仅因未归类就自动全量。没有适合的现成命令不等于无需检查。领域推荐来自路径命名和测试筛选，不是传递依赖分析。
 
 退出码 0 只说明计划成功生成，`verificationStatus` 始终为 `not-run`；Git、参数错误返回非零。实际通过与否由 `verify` 的退出码及任务报告证明。设备范围、责任归属和长期决策的语义完整性仍需审查，工具不会声称已自动检查。
 

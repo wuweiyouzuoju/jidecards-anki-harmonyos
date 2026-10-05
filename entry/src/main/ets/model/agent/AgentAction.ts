@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 /** 辅助操作提案；确认只能针对应用保存的同一份 payload，不能由模型声明已经确认。 */
-export type AgentActionKind = 'create_deck' | 'create_notetype' | 'memory_change' | 'analysis' | 'setting_change';
+export type AgentActionKind = 'create_deck' | 'rename_deck' | 'reparent_decks' | 'reorder_decks' | 'create_notetype' | 'memory_change' | 'analysis' | 'setting_change' |
+  'collection_preferences' | 'study_controls' | 'export_subset' | 'fsrs_simulation' | 'deck_options_change';
 export interface AgentAction {
   id: string;
   kind: AgentActionKind;

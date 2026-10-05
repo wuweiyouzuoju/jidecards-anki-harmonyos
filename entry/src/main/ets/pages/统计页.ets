@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { appInterface } from '../backend/AppInterfaceService';
 import { statsInterfaceSections, visibleInterfaceItems, AppInterfaceItem, AppInterfaceControl } from '../model/AppInterface';
-import { namedResourceText, resourceText } from '../utils/UiFeedback';
+import { resourceText, namedResourceText } from '../utils/UiFeedback';
 import { interfaceItemText } from '../utils/AppInterfaceText';
 import { StatsSession, StatsSnapshot, StatsRequest } from '../model/StatsSession';
 import { AnkiStatsSession } from '../backend/AnkiStatsSession';
 import { SelectStyle } from '../utils/SelectStyle';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
-import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
+import { PAGE_COMPACT_LAYOUT_KEY } from '../model/AppLayoutState';
 
 // 页面保留范围、布局和交互；StatsSession 拥有查询代次、偏好写入及快照发布。
 
@@ -61,7 +61,8 @@ function 默认偏好(): GraphPreferences {
 
 @Component
 export struct 统计页 {
-  @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
+  @StorageProp('系统语言') @Watch('refreshDeckLocale') private uiLanguage: string = 'zh-Hans';
+  @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
   /** 页面栈：返回主页时 pop */
   pathStack: NavPathStack = new NavPathStack();
   initialSnapshot: 统计页参数 = { graphs: null, days: 365 };
@@ -186,6 +187,13 @@ export struct 统计页 {
     if (this.fsrsRefreshReady) this.加载统计数据();
   }
 
+  private refreshDeckLocale(): void {
+    if (this.牌组选项.length === 0) return;
+    const options: SelectOption[] = this.牌组选项.slice();
+    options[0] = { value: resourceText(this.getUIContext(), $r('app.string.stats_deck_all')) };
+    this.牌组选项 = options;
+  }
+
   /** 顶部条牌组下拉选项：全部牌组 + 全库牌组全名（平铺牌组树前序） */
   private async 加载牌组列表(): Promise<void> {
     await syncActivity.waitForCollection();
@@ -289,7 +297,7 @@ export struct 统计页 {
     return this.图表数据 === null ? [] : statsInterfaceSections(this.图表数据.fsrs);
   }
 
-  private publishInterface(): void {
+  private publishInterface(_locale: string = this.uiLanguage): void {
     if (!this.pageActive) return;
     const hasCharts: boolean = this.图表数据 !== null;
     const controls: AppInterfaceControl[] = visibleInterfaceItems('stats',
@@ -392,7 +400,7 @@ export struct 统计页 {
         .maxLines(1).hitTestBehavior(HitTestMode.None)
       Row() {
         按下态按钮({
-          文案: interfaceItemText(this.getUIContext(), 'stats', 'back'),
+          文案: interfaceItemText(this.getUIContext(), 'stats', 'back', this.uiLanguage),
           字色: $r('app.color.text_primary'),
           点击回调: (): void => this.返回()
         })
@@ -447,7 +455,7 @@ export struct 统计页 {
               .optionFont(SelectStyle.optionFont)
               .selectedOptionFont(SelectStyle.selectedOptionFont)
               .textModifier(SelectStyle.labelText())
-              .borderRadius(SelectStyle.controlRadius)
+              .borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
               .onSelect((索引: number) => {
                 this.on牌组切换(索引);
               })

@@ -29,14 +29,14 @@ test('home and settings keep the same gap below their toolbar buttons', () => {
   }
   // a uses the explicit optical estimate. This test cannot measure system glyph pixels.
   for (const path of ['entry/src/main/ets/pages/首页.ets', 'entry/src/main/ets/components/设置面板.ets']) {
-    assert.match(read(path), /left: 应用尺寸\.页面内边距_水平,\s*right: 应用尺寸\.页面内边距_水平,\s*top: 应用尺寸\.页面内容顶部间距\(this\.narrowDeckLayout\)/, path);
+    assert.match(read(path), /left: 应用尺寸\.页面内边距_水平,\s*right: 应用尺寸\.页面内边距_水平,\s*top: (?:this.排序模式中 \? )?应用尺寸\.页面内容顶部间距\(this\.narrowDeckLayout\)/, path);
   }
 });
 
 test('every primary page consumes the shared first-content and toolbar spacing', () => {
   for (const name of ['首页', '统计页', '学习提醒页', '浏览页', '学习页', '添加笔记页', 'AI制卡页']) {
     const page = read(`entry/src/main/ets/pages/${name}.ets`);
-    assert.match(page, /top: 应用尺寸\.页面内容顶部间距\(this\.narrowDeckLayout\)/, name);
+    assert.match(page, /top: (?:this.排序模式中 \? )?应用尺寸\.页面内容顶部间距\(this\.narrowDeckLayout\)/, name);
     const toolbar = name === '首页' ? read('entry/src/main/ets/components/home/HomeDeckDetails.ets') : name === '添加笔记页' ? read('entry/src/main/ets/components/common/NoteEditorHeader.ets').replaceAll('this.statusBarHeight', 'this.状态栏高度').replaceAll('this.narrow', 'this.narrowDeckLayout') : page;
     assert.match(toolbar, /top: 应用尺寸\.pageToolbarTop\(this\.状态栏高度, this\.narrowDeckLayout\)/, name);
     assert.match(toolbar, /bottom: 0/, name);
@@ -81,7 +81,7 @@ test('note creation and editing share home gaps with one card padding owner', ()
     const gap = scroll.match(/Column\(\{ space: (应用尺寸\.页面分组间距\([^)]+\)) \}\)/)[1];
     const top = scroll.match(/top: (应用尺寸\.页面内容顶部间距\([^)]+\))/)[1];
     assert.doesNotMatch(scroll, /Column\(\{ space: 应用尺寸.间距_14/);
-    assert.match(source, new RegExp(`@StorageProp\\(DECK_LIST_NARROW_KEY\\) private ${density}: boolean`));
+    assert.match(source, new RegExp(`@StorageProp\\(PAGE_COMPACT_LAYOUT_KEY\\) private ${density}: boolean`));
     for (const statusBarHeight of [0, 40]) {
       for (const narrow of [false, true, false]) {
         const state = { statusBarHeight, narrow, [density]: narrow };
@@ -111,7 +111,7 @@ test('fixed action bars and browser result boundaries use the shared responsive 
   assert.match(detail, /bottom: 应用尺寸\.操作区底部间距\(this\.narrowDeckLayout, this\.navigationBottomInset\)/);
   assert.match(study, /top: 应用尺寸\.操作区顶部间距\(this\.narrowDeckLayout\)/);
   assert.match(study, /bottom: 应用尺寸\.操作区底部间距\(this\.narrowDeckLayout, this\.导航条高度\)/);
-  assert.match(study, /bottom: this\.学习布局模式值 === 'bottom' \? 0 : 应用尺寸\.页面分组间距\(this\.narrowDeckLayout\)/,
+  assert.match(study, /bottom: this\.isFloatingStudyLayout\(\) \? 应用尺寸\.页面分组间距\(this\.narrowDeckLayout\) : 0/,
     'bottom study mode must not double the card-to-action gap');
   assert.match(browser, /bottom: 应用尺寸\.页面分组间距\(this\.narrowDeckLayout\) \}\)/,
     'search and filter boundaries must use the responsive section gap');
@@ -155,17 +155,19 @@ test('study answer input shares the action pill silhouette without a second inse
   const evaluate = (expression, state) => new Function('应用尺寸', `return ${expression}`).call(state, 应用尺寸);
   const inputTop = wrapper.match(/top: ([^\n]+),/)[1];
   const inputBottom = wrapper.match(/bottom: ([^\n]+)/)[1];
-  const parentBottom = inputArea.match(/bottom: (this\.学习布局模式值 === 'bottom'[^\n]+)/)[1];
+  const parentArea = inputArea.slice(inputArea.lastIndexOf('.layoutWeight(1)'));
+  const parentBottom = parentArea.match(/bottom: ([^\n]+)/)[1];
   const actionArea = study.slice(end, study.indexOf('  private cardViewportContent()', end));
   const actionTop = actionArea.match(/top: ([^\n]+),/)[1];
   const actionBottom = actionArea.match(/bottom: ([^\n]+)/)[1];
-  for (const narrow of [false, true]) for (const nav of [0, 24]) {
-    const state = { narrowDeckLayout: narrow, 导航条高度: nav, 学习布局模式值: 'bottom' };
+  for (const mode of ['bottom', 'float', 'smart']) for (const narrow of [false, true]) for (const nav of [0, 24]) {
+    const state = { narrowDeckLayout: narrow, 导航条高度: nav, 学习布局模式值: mode, isFloatingStudyLayout: () => false };
     const gap = 应用尺寸.页面分组间距(narrow);
     assert.equal(evaluate(inputTop, state), gap);
     assert.equal(evaluate(inputBottom, state) + evaluate(parentBottom, state) + evaluate(actionTop, state), gap);
     assert.equal(evaluate(actionBottom, state), 应用尺寸.操作区底部间距(narrow, nav));
     state.学习布局模式值 = 'float';
+    state.isFloatingStudyLayout = () => true;
     assert.equal(evaluate(inputBottom, state) + evaluate(parentBottom, state),
       应用尺寸.页面内边距_水平 + nav + gap, 'preserve floating-mode safe-area clearance');
   }
@@ -179,19 +181,16 @@ function readJson(relativePath) {
   return JSON.parse(read(relativePath));
 }
 
-test('home popup menus start below the status-aware toolbar', () => {
-  const moreMenu = read('entry/src/main/ets/components/home/主页更多面板.ets');
-  const actionMenu = read('entry/src/main/ets/components/主页操作面板.ets');
-  for (const menu of [moreMenu, actionMenu]) {
-    assert.match(menu, /@StorageProp\('状态栏高度'\)\s+private\s+状态栏高度:\s*number\s*=\s*0/);
-    assert.match(menu,
-      /topOffset: 应用尺寸\.pageContentTop\(this\.状态栏高度, this\.narrowDeckLayout\)/);
-    assert.doesNotMatch(menu, /margin\(\{\s*top:\s*64/);
+test('home menus use their real button anchors and a shared pointed popup surface', () => {
+  const header = read('entry/src/main/ets/components/home/HomeSummaryHeader.ets');
+  assert.equal((header.match(/\.bindPopup\(/g) ?? []).length, 2);
+  assert.equal((header.match(/enableArrow: true/g) ?? []).length, 2);
+  assert.equal((header.match(/transition: MenuSurface.popupTransition\(\)/g) ?? []).length, 2);
+  assert.match(header, /placement: Placement.BottomLeft/);
+  assert.match(header, /placement: Placement.BottomRight/);
+  for (const p of ['entry/src/main/ets/components/home/主页更多面板.ets','entry/src/main/ets/components/主页操作面板.ets']) {
+    const menu=read(p); assert.match(menu,/ActionMenuList\(/); assert.doesNotMatch(menu,/AnchoredMenu\(|topOffset|状态栏高度/);
   }
-  const shell = read('entry/src/main/ets/components/common/AnchoredMenu.ets');
-  assert.match(shell, /@StorageProp\(DECK_LIST_NARROW_KEY\)/);
-  assert.doesNotMatch(shell, /effectiveTopOffset|pageToolbarHeight|pageContentTop\(/);
-  assert.match(shell, /margin\(\{ top: this\.topOffset/);
 });
 
 test('regular settings entry always supplies a non-AI navigation parameter', () => {
@@ -298,16 +297,16 @@ test('home error state offers an in-place retry path', () => {
   assert.match(page, /onRetry: \(\): void => \{\s*this\.加载主页数据\(\);?\s*\}/);
 });
 
-test('revised home uses a full-window toolbar without greeting or bottom navigation', () => {
+test('home uses a summary action group and retains split details without greeting or bottom navigation', () => {
   const page = (read('entry/src/main/ets/pages/首页.ets') + read('entry/src/main/ets/backend/HomeDataRepository.ets'));
   const toolbar = read('entry/src/main/ets/components/home/主页顶部工具栏.ets');
 
   assert.doesNotMatch(page, /app\.string\.home_title|app\.string\.home_subtitle/);
   assert.doesNotMatch(page, /bottomNavigation|bottomNavItem|sidePane|sideNavItem/);
-  // 顶部工具栏按钮文案移至 主页顶部工具栏 积木组件
-  // 2026-07-20 后：原设置/浏览/统计 3 按钮合并为「更多」按钮（study_more），右侧保留「创建牌组」
-  assert.match(toolbar, /interfaceItemText\(this\.getUIContext\(\), 'home', 'more'\)/);
-  assert.match(toolbar, /interfaceItemText\(this\.getUIContext\(\), 'home', 'create'\)/);
+  const header=read('entry/src/main/ets/components/home/HomeSummaryHeader.ets');
+  assert.match(header, /app.string.study_more/); assert.match(header, /app.string.create_deck/);
+  assert.match(page, /if \(this.排序模式中\) \{\s*主页顶部工具栏/);
+  assert.match(page, /HomeSummaryHeader\(/);
   assert.match(page, /span:\s*\{\s*xs:\s*4,\s*sm:\s*5,\s*md:\s*8\s*\}/);
   assert.match(page, /span:\s*\{\s*xs:\s*0,\s*sm:\s*3,\s*md:\s*4\s*\}/);
   assert.match(page, /if\s*\(this\.当前断点 !== 'xs'\)\s*\{\s*GridCol/);
@@ -454,9 +453,11 @@ test('primary pages share one shell gutter and common visual primitives', () => 
   assert.match(reminders, /统一空态\(\{[\s\S]*?reminder_list_empty[\s\S]*?reminder_list_empty_hint/,
     'reminders must use the common empty-state component');
 
-  assert.equal((appearance.match(/new SelectStyle\(\)/g) ?? []).length, 2);
-  assert.match(read('entry/src/main/ets/components/settings/GeneralSettings.ets'), /new SelectStyle\(\)/);
-  assert.equal((agentSettings.match(/new SelectStyle\(\)/g) ?? []).length, 3,
+  assert.equal((appearance.match(/new SelectStyle\(\)/g) ?? []).length, 1);
+  assert.match(appearance, /FormSelectRow\(\{/);
+  assert.match(read('entry/src/main/ets/components/settings/GeneralSettings.ets'), /FormSelectRow\(\{/);
+  assert.match(read('entry/src/main/ets/components/common/FormSelectRow.ets'), /new SelectStyle\(/);
+  assert.equal((agentSettings.match(/FormSelectRow\(\{/g) ?? []).length, 3,
     'all Agent settings selects must match the other settings selects');
   assert.equal((syncSettings.match(/borderRadius\(应用尺寸\.圆角_面板\)/g) ?? []).length >= 2, true,
     'sync inputs must use the same form-field radius as Agent settings');

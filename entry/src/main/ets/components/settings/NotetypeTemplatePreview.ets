@@ -17,8 +17,8 @@ import { CardAudioSession } from '../../model/CardAudioSession';
 import { 声音播放器 } from '../../utils/声音播放器';
 import { TTS播放器 } from '../../utils/TTS播放器';
 import { 卡片渲染服务 } from '../../backend/卡片渲染服务';
-import { APP_FOREGROUND_KEY } from '../../model/Redemption';
-import { DECK_LIST_NARROW_KEY } from '../../model/DeckListAppearance';
+import { APP_FOREGROUND_KEY } from '../../model/AppLifecycleState';
+import { PAGE_COMPACT_LAYOUT_KEY } from '../../model/AppLayoutState';
 
 /** 草稿卡片只读预览；离线资源、翻面和 Web 生命周期复用学习渲染链。 */
 @Component
@@ -29,7 +29,7 @@ export struct NotetypeTemplatePreview {
   @Prop sample: boolean = true;
   @Prop fullScreen: boolean = false;
   @Prop @Watch('stopHiddenAudio') isVisible: boolean = true;
-  @StorageProp(DECK_LIST_NARROW_KEY) private narrow: boolean = false;
+  @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrow: boolean = false;
   @StorageProp('导航条高度') private navigationBarHeight: number = 0;
   @Prop media: DraftPreviewMedia = { fields: [], directory: '', filenames: [] };
   onSelect: (index: number) => void = (_index: number): void => {};

@@ -1,19 +1,22 @@
+import { IconActionButton } from './common/IconActionButton';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { PressFeedback } from '../utils/PressFeedback';
 import { LabeledActionRow } from './common/LabeledActionRow';
 import { DialogBackdrop } from './common/DialogBackdrop';
 
 import type { 牌组背景动作, 牌组定制结果 } from '../model/DeckCustomization';
 import { DialogHeader } from './common/DialogHeader';
-import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
+import { appInterface } from '../backend/AppInterfaceService';
+import { interfaceItemText } from '../utils/AppInterfaceText';
+import { DECK_LIST_NARROW_KEY, DECK_LIST_STYLE_KEY, isDoubleColumnDeckListStyle } from '../model/DeckListAppearance';
 // ========================================================
 // @块ID UI-DECK-CUSTOMIZE-001
 // @名称 牌组定制面板
 //
 // @作用
 // 牌组自定义弹层（全屏磨砂覆盖层）。承载两件事：
-//   1. 牌组改名（保留原 fullName 含 :: 以编辑层级；走本地 displayName
-//      覆盖，不动后端）
+//   1. 本机显示名称（清空后显示 Core 名称；真实改名由 DeckRenameFeature 负责）
 //   2. 牌组背景图：PhotoViewPicker 选图 → IBestImageCropper 裁剪 →
 //      PixelMap 上抛父级落盘
 //
@@ -57,6 +60,7 @@ export type { 牌组背景动作, 牌组定制结果 } from '../model/DeckCustom
 
 @Component
 export struct 牌组定制面板 {
+  @StorageProp('系统语言') @Watch('publishInterface') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
 
   private handleBackRequest(): void {
@@ -66,6 +70,7 @@ export struct 牌组定制面板 {
   }
 
   @StorageProp(DECK_LIST_NARROW_KEY) private narrow: boolean = false;
+  @StorageProp(DECK_LIST_STYLE_KEY) private style: string = 'single_wide';
   @Prop isDark: boolean = false;
   @Prop deck: 牌组汇总 = {
     id: '', name: '', fullName: '', depth: 0, parentId: '', hasChildren: false, ancestorIds: [],
@@ -75,7 +80,7 @@ export struct 牌组定制面板 {
     displayName: '',
     backgroundImage: ''
   };
-  @Prop busy: boolean = false;
+  @Prop @Watch('publishInterface') busy: boolean = false;
   @Prop errorMessage: string = '';
   onClose: () => void = (): void => {};
   onSave: (结果: 牌组定制结果) => void = (_r: 牌组定制结果): void => {};
@@ -85,14 +90,14 @@ export struct 牌组定制面板 {
 
   @State private 编辑中名称: string = '';
   // 选图后等待裁剪的源图 uri（PhotoViewPicker 返回的 provider uri）
-  @State private 待裁剪Uri: string = '';
+  @State @Watch('publishInterface') private 待裁剪Uri: string = '';
   // 是否进入裁剪模式（全屏覆盖原面板）
-  @State private 裁剪模式: boolean = false;
+  @State @Watch('publishInterface') private 裁剪模式: boolean = false;
   // 裁剪框尺寸（由预览区 onAreaChange 测量得到，未测量前用 0 占位，0 时 cropper 不渲染）
   @State private 预览宽度: number = 0;
   @State private 预览高度: number = 0;
   // 用户在裁剪模式按"取消"前的背景图动作意图：用于区分"用户主动移除"与"保留原状"
-  @State private 背景动作: 牌组背景动作 = 'keep';
+  @State @Watch('publishInterface') private 背景动作: 牌组背景动作 = 'keep';
   // 裁剪后的 PixelMap（仅 replace 时非空）；@State 持有让 Image 预览能响应刷新
   @State private 已裁剪像素图: PixelMap | null = null;
   // 原背景图（keep 态显示）异步加载的 PixelMap；与牌组列表项同款方式：
@@ -100,6 +105,7 @@ export struct 牌组定制面板 {
   @State private 原像素图: PixelMap | null = null;
 
   private readonly 裁剪器控制器: IBestImageCropperController = new IBestImageCropperController();
+  private disposed: boolean = false;
   @StorageProp(颜色键.动作主色) private 动作主色: string = '#2F5FD0';
   @StorageProp(颜色键.动作主色按下) private 动作主色按下: string = '#1E4FB8';
   // 2.1.4.1 对比度：按钮背景专用档（配 #FFFFFF 文字 ≥ 4.5:1）
@@ -107,10 +113,26 @@ export struct 牌组定制面板 {
   @StorageProp(颜色键.主色按钮按下) private 主色按钮按下: string = '#1E4FB8';
 
   aboutToAppear(): void {
-    this.编辑中名称 = 牌组显示名(this.deck);
+    this.编辑中名称 = this.deck.displayName;
     // 已有背景图：保留态；无背景图：保留态（不修改）。用户操作后切到 remove/replace。
     this.背景动作 = 'keep';
     this.加载原像素图();
+    this.publishInterface();
+  }
+
+  aboutToDisappear(): void { this.disposed = true; appInterface.leave('deck_customize'); }
+
+  private publishInterface(): void {
+    if (this.disposed) return;
+    appInterface.observe({ surface: 'deck_customize', sectionId: this.裁剪模式 ? 'crop' : '', selectedId: this.deck.id,
+      optionIds: [], optionLabels: [], busy: this.busy, controlsComplete: true,
+      items: this.裁剪模式 ? [] : [
+        { id: 'name', titleKey: 'deck_customize_name_label', title: '', enabled: !this.busy, selected: false },
+        { id: 'background', titleKey: 'deck_customize_background_label', title: '', enabled: !this.busy, selected: false },
+        { id: 'confirm', titleKey: 'deck_customize_save', title: '', enabled: this.可提交(), selected: false },
+        { id: 'cancel', titleKey: 'cancel', title: '', enabled: !this.busy, selected: false }
+      ], values: [{ id: 'local_display_name', value: this.编辑中名称 }, { id: 'core_name', value: this.deck.fullName },
+        { id: 'background_action', value: this.背景动作 }] });
   }
 
   /** 异步加载牌组原有背景图为 PixelMap（与牌组列表项.loadBackgroundPixelMap 同款）。
@@ -140,9 +162,6 @@ export struct 牌组定制面板 {
 
   private 可提交(): boolean {
     if (this.busy) {
-      return false;
-    }
-    if (this.编辑中名称.trim().length === 0) {
       return false;
     }
     // 替换背景必须先完成裁剪（待裁剪Uri === '' 表示已裁剪完成或未选图）
@@ -265,9 +284,9 @@ export struct 牌组定制面板 {
           onAction: () => { this.提交带像素图(); }
         })
 
-        // 牌组名输入：保留原 fullName（含 ::）以编辑层级
+        // 空别名恢复真实名称，不写入 Core。
         Column({ space: 应用尺寸.间距_5 }) {
-          Text($r('app.string.deck_customize_name_label'))
+          Text(interfaceItemText(this.getUIContext(), 'deck_customize', 'name', this.uiLanguage))
             .fontSize(应用尺寸.字号_正文_小)
             .fontColor($r('app.color.text_secondary'))
             .width('100%')
@@ -276,10 +295,12 @@ export struct 牌组定制面板 {
             .height(应用尺寸.按钮高度)
             .fontSize(应用尺寸.字号_正文)
             .backgroundColor($r('app.color.surface_card'))
-            .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
+            .border(SurfaceBorder.options())
             .borderRadius(应用尺寸.圆角_面板)
             .enabled(!this.busy)
-            .onChange((值: string) => { this.编辑中名称 = 值; })
+            .onChange((值: string) => { if (!this.busy) { this.编辑中名称 = 值; this.publishInterface(); } })
+          Text($r('app.string.deck_customize_alias_hint')).fontSize(应用尺寸.字号_说明)
+            .fontColor($r('app.color.text_tertiary')).width('100%')
         }.width('100%')
 
         // 背景图预览与操作区
@@ -320,19 +341,9 @@ export struct 牌组定制面板 {
                 .borderRadius(应用尺寸.圆角_面板)
               // 右上角 × 删除：markAnchor 锚定元素右上角，position 锚定 Stack 右上角，
               // translate 推 4px 内边距；避免 position('88%') 在不同预览宽度下距右边漂移
-              Button('×')
-                .type(ButtonType.Circle)
-                .width(24)
-                .height(24)
-                .fontSize(应用尺寸.字号_正文)
-                .fontColor($r('app.color.text_primary'))
-                .backgroundColor('rgba(0,0,0,0.45)')
-                .markAnchor({ x: '100%', y: '0%' })
-                .position({ x: '100%', y: 0 })
-                .translate({ x: -4, y: 4 })
-                .attributeModifier(new PressFeedback())
-                .stateEffect(false)
-                .onClick(() => { this.标记移除(); })
+              IconActionButton({ source: $r('app.media.ic_common_close'), label: $r('app.string.icon_background_remove'),
+                glyphColor: '#FFFFFF', surface: '#CC000000', onAction: (): void => { this.标记移除(); } })
+                .markAnchor({ x: '100%', y: '0%' }).position({ x: '100%', y: 0 }).translate({ x: -4, y: 4 })
             } else if (this.原像素图 !== null) {
               // 沿用原背景图（用 PixelMap 渲染，避免沙盒路径白屏）
               Image(this.原像素图)
@@ -340,19 +351,9 @@ export struct 牌组定制面板 {
                 .height('100%')
                 .objectFit(ImageFit.Cover)
                 .borderRadius(应用尺寸.圆角_面板)
-              Button('×')
-                .type(ButtonType.Circle)
-                .width(24)
-                .height(24)
-                .fontSize(应用尺寸.字号_正文)
-                .fontColor($r('app.color.text_primary'))
-                .backgroundColor('rgba(0,0,0,0.45)')
-                .markAnchor({ x: '100%', y: '0%' })
-                .position({ x: '100%', y: 0 })
-                .translate({ x: -4, y: 4 })
-                .attributeModifier(new PressFeedback())
-                .stateEffect(false)
-                .onClick(() => { this.标记移除(); })
+              IconActionButton({ source: $r('app.media.ic_common_close'), label: $r('app.string.icon_background_remove'),
+                glyphColor: '#FFFFFF', surface: '#CC000000', onAction: (): void => { this.标记移除(); } })
+                .markAnchor({ x: '100%', y: '0%' }).position({ x: '100%', y: 0 }).translate({ x: -4, y: 4 })
             } else {
               // 无背景图：空态
               Column()
@@ -363,13 +364,10 @@ export struct 牌组定制面板 {
             }
           }
           .width('100%')
-          .height(this.narrow ? 应用尺寸.narrowDeckRowHeight : 应用尺寸.牌组行高度)
+          .height(应用尺寸.deckRowHeight(this.narrow, isDoubleColumnDeckListStyle(this.style)))
           .backgroundColor($r('app.color.surface_page'))
           .borderRadius(应用尺寸.圆角_面板)
-          .border({
-            width: 应用尺寸.卡片边框,
-            color: $r('app.color.border_subtle')
-          })
+          .border(SurfaceBorder.options())
           .onAreaChange((_旧: Area, 新区域: Area) => {
             // Area.width/height 在 ArkTS 里是 Length 类型（string|number），需转 number
             const 宽: number = typeof 新区域.width === 'number'
@@ -406,7 +404,7 @@ export struct 牌组定制面板 {
       .constraintSize({ maxWidth: 480, maxHeight: '88%' })
       .padding(应用尺寸.卡片内边距)
       .backgroundColor($r('app.color.surface_card'))
-      .borderRadius(应用尺寸.圆角_卡片)
+      .borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
       .onClick(() => {
         // 阻断点击穿透到遮罩
       })
@@ -468,7 +466,7 @@ export struct 牌组定制面板 {
         .constraintSize({ maxWidth: 560 })
         .padding(应用尺寸.卡片内边距)
         .backgroundColor($r('app.color.surface_card'))
-        .borderRadius(应用尺寸.圆角_卡片)
+        .borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
         .transition(TransitionEffect.asymmetric(
           TransitionEffect.opacity(0)
             .combine(TransitionEffect.scale({ x: 0.96, y: 0.96 }))

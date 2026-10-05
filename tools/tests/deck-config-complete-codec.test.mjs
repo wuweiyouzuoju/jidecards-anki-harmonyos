@@ -103,20 +103,13 @@ test('DeckConfig form retains invalid float-array input until it can be correcte
   assert.equal(form.应用到配置(settings), false);
 });
 
-test('deck options keep five common fields visible and fold the rest into advanced settings', () => {
+test('simple mode keeps four fields while full mode mounts the official catalog', () => {
   const panel = readFileSync(new URL('../../entry/src/main/ets/components/牌组选项面板.ets', import.meta.url), 'utf8');
-  const advanced = readFileSync(new URL('../../entry/src/main/ets/components/高级牌组选项面板.ets', import.meta.url), 'utf8');
-  // 7 个分组随高级设置移入 高级牌组选项面板（独立全屏磨砂覆盖层）
-  for (const group of ['New', 'Lapses', 'Burying', 'Audio', 'Timer', 'FSRS', 'Advanced']) {
-    assert.match(advanced, new RegExp(group, 'i'));
-  }
-  assert.match(panel, /deck_group_advanced_hub/);
-  // 牌组选项面板 入口触发 showAdvanced；7 个分组及 expanded 状态在 高级牌组选项面板
-  assert.match(panel, /@State private showAdvanced: boolean = false/);
-  assert.match(advanced, /@State private newExpanded: boolean = false/);
-  assert.match(advanced, /@State private fsrsExpanded: boolean = false/);
-  assert.doesNotMatch(panel, /commonExpanded|displayOrderExpanded/);
-  assert.match(panel, /字段帮助面板/);
-  assert.doesNotMatch(panel, /learnStepsHint/);
-  assert.match(panel, /deck_learn_steps_help/);
+  const full = readFileSync(new URL('../../entry/src/main/ets/components/高级牌组选项面板.ets', import.meta.url), 'utf8');
+  assert.match(panel, /if \(this\.简洁模式\) \{\s*this\.commonOptions\(\)\s*\} else \{\s*this\.experimentalOptions\(\)/);
+  assert.match(panel, /高级牌组选项面板\(\{ form: this.form, options: this.options/);
+  assert.match(full, /ForEach\(DECK_OPTION_GROUPS/);
+  assert.match(full, /this\.fields\(group\)/);
+  assert.match(full, /DeckOptionField\(\{/);
+  assert.doesNotMatch(full, /DialogBackdrop|DialogHeader|更新牌组配置/);
 });

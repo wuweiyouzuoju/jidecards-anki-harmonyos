@@ -20,7 +20,7 @@
 // 链路语义（与桌面 Anki reviewer.py 一致）：
 //   - UndoStatus.undo/redo 为可撤销/重做操作的本地化描述文案，空串表示该方向不可操作；
 //   - 撤销 撤销最近一次操作（如评分），被撤销的卡片由 Rust core 放回学习队列顶部，调用方撤销后应重新取卡；
-//   - 重做 仅在服务层封装备用，UI 不暴露（上游移动端惯例）。
+//   - 首页/浏览共用历史弹层提供重做，带显示状态校验。
 // 检查数据库 返回本地化问题列表，空数组表示检查通过。
 //
 // @副作用
@@ -64,7 +64,7 @@ export class 集合服务 {
     return decodeOpChangesAfterUndo(响应字节);
   }
 
-  /** 重做最近一次被撤销的操作；仅服务层备用，UI 不暴露。 */
+  /** 重做最近一次被撤销的操作。 */
   async 重做(): Promise<OpChangesAfterUndo> {
     const 响应字节: Uint8Array = await this.会话.调用(
       服务号.后端集合, 集合方法.重做, new Uint8Array(0));

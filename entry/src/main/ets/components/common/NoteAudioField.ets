@@ -1,31 +1,34 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { common } from '@kit.AbilityKit';
 import { picker } from '@kit.CoreFileKit';
-import { LengthMetrics } from '@kit.ArkUI';
 import { NoteFieldEditor } from './NoteFieldEditor';
-import { NoteFieldAudio, NoteAudioPart, noteAudioParts, replaceNoteAudioPart, localNoteAudioPath } from '../../model/NoteAudioDraft';
+import { 按下态按钮 } from './按下态按钮';
+import { SettingsActionRow } from './SettingsActionRow';
+import { IconActionButton } from './IconActionButton';
+import { NoteFieldAudio, NoteAudioPart, NoteAudioStatus, NoteAudioAttachmentStatus, noteAudioParts, replaceNoteAudioPart, localNoteAudioPath } from '../../model/NoteAudioDraft';
 import { NoteAudioPreview } from '../../utils/NoteAudioPreview';
 import { stageNoteAudio } from '../../backend/NoteAudioImport';
 import { NoteAudioRecorder, discardNoteRecordings } from '../../utils/NoteAudioRecorder';
-import { resourceText } from '../../utils/UiFeedback';
+import { localizedResourceText, resourceText } from '../../utils/UiFeedback';
 import { 颜色键 } from '../../model/颜色主题';
-import { PressFeedback } from '../../utils/PressFeedback';
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { 应用尺寸 } from '../../utils/应用尺寸';
-import { APP_FOREGROUND_KEY } from '../../model/Redemption';
+import { APP_FOREGROUND_KEY } from '../../model/AppLifecycleState';
 
 /** 共用音频字段：原有 sound 引用按位置展示；附件仍由表单和写入边界持有。 */
 @Component
 export struct NoteAudioField {
-  @Prop value: string = '';
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
+  @Prop @Watch('publishStatus') value: string = '';
   @Prop fieldName: string = '';
-  @Prop disabled: boolean = false;
+  @Prop @Watch('publishStatus') disabled: boolean = false;
   @Prop clozeEnabled: boolean = false;
   @Prop allFields: string[] = [];
-  @Prop audios: NoteFieldAudio[] = [];
+  @Prop @Watch('publishStatus') audios: NoteFieldAudio[] = [];
   @Prop mediaOnly: boolean = false;
   @Prop controlsVisible: boolean = true;
-  @Prop removalsVisible: boolean = true;
-  @Prop replacementsVisible: boolean = false;
+  @Prop @Watch('publishStatus') removalsVisible: boolean = true;
+  @Prop @Watch('publishStatus') replacementsVisible: boolean = false;
   onReplace: (partIndex: number, id: number, uri: string, label: string, temporary: boolean) => void =
     (_partIndex: number, _id: number, _uri: string, _label: string, _temporary: boolean): void => {};
   preview: NoteAudioPreview = new NoteAudioPreview();
@@ -34,17 +37,39 @@ export struct NoteAudioField {
     (_uri: string, _label: string, _temporary: boolean): void => {};
   onRemove: (id: number) => void = (_id: number): void => {};
   onBusy: (busy: boolean) => void = (_busy: boolean): void => {};
+  onStatus: (status: NoteAudioStatus) => void = (_status: NoteAudioStatus): void => {};
   @StorageProp(颜色键.主色按钮背景) private buttonColor: string = '#2F5FD0';
-  @State private working: boolean = false;
-  @State private recording: boolean = false;
-  @State private playingKey: string = '';
-  @State private errorMessage: string = '';
-  @State private seconds: number = 0;
+  @State @Watch('publishStatus') private working: boolean = false;
+  @State @Watch('publishStatus') private recording: boolean = false;
+  @State @Watch('publishStatus') private paused: boolean = false;
+  @State @Watch('publishStatus') private playingKey: string = '';
+  @State @Watch('publishStatus') private errorMessage: string = '';
+  @State @Watch('publishStatus') private seconds: number = 0;
   @StorageProp(APP_FOREGROUND_KEY) @Watch('backgroundChanged') private foreground: boolean = true;
   private recorder: NoteAudioRecorder = new NoteAudioRecorder();
   private disposed: boolean = false;
   private capturePending: boolean = false;
+  private cancelling: Promise<void> | null = null;
   private timer: number = -1;
+
+  aboutToAppear(): void { this.publishStatus(); }
+
+  private publishStatus(): void {
+    if (this.disposed || !this.controlsVisible) return;
+    const attachments: NoteAudioAttachmentStatus[] = [];
+    noteAudioParts(this.value).forEach((part: NoteAudioPart, index: number): void => {
+      if (part.filename !== '') attachments.push(this.attachmentStatus(`existing-${index}`));
+    });
+    this.audios.forEach((item: NoteFieldAudio): void => {
+      if (item.reference === undefined) attachments.push(this.attachmentStatus(`pending-${item.id}`));
+    });
+    this.onStatus({ recording: this.recording, paused: this.paused, working: this.working,
+      disabled: this.disabled, seconds: this.seconds, hasError: this.errorMessage !== '', attachments: attachments });
+  }
+
+  private attachmentStatus(id: string): NoteAudioAttachmentStatus {
+    return { id: id, playing: this.playingKey === id, replace: this.replacementsVisible, remove: this.removalsVisible };
+  }
 
   aboutToDisappear(): void {
     this.disposed = true;
@@ -55,9 +80,29 @@ export struct NoteAudioField {
   }
 
   private context(): common.UIAbilityContext { return this.getUIContext().getHostContext() as common.UIAbilityContext; }
-  private error(key: Resource): void { if (!this.disposed) this.errorMessage = resourceText(this.getUIContext(), key); }
-  private busy(value: boolean): void { if (!this.disposed) { this.working = value; this.onBusy(value || this.recording); } }
+  private error(key: Resource, _locale: string = this.uiLanguage): void { if (!this.disposed) this.errorMessage = resourceText(this.getUIContext(), key); }
+  private busy(value: boolean): void {
+    if (!this.disposed) { this.working = value || this.cancelling !== null; this.onBusy(this.working || this.recording); }
+  }
   private clearTimer(): void { if (this.timer >= 0) clearInterval(this.timer); this.timer = -1; }
+
+  private startTimer(): void {
+    this.clearTimer();
+    this.timer = setInterval((): void => {
+      if (!this.recording || this.paused || this.working) return;
+      this.seconds++;
+      if (this.seconds >= 300) this.finishRecording();
+    }, 1000);
+  }
+
+  private recordingFailure(_locale: string = this.uiLanguage): void {
+    if (this.disposed) return;
+    const code: number = this.recorder.failureCode();
+    this.errorMessage = code === 201 ? resourceText(this.getUIContext(), $r('app.string.note_audio_permission_denied')) :
+      code === 5400107 ? resourceText(this.getUIContext(), $r('app.string.note_audio_interrupted')) :
+      code > 0 ? resourceText(this.getUIContext(), $r('app.string.note_audio_record_failed_code'), code) :
+      resourceText(this.getUIContext(), $r('app.string.note_audio_record_failed'));
+  }
 
   private async pick(partIndex: number = -1, id: number = -1): Promise<void> {
     if (this.disabled || this.working || this.recording || this.disposed) return;
@@ -83,26 +128,23 @@ export struct NoteAudioField {
   }
 
   private async record(): Promise<void> {
-    if (this.disabled || this.working || this.recording || this.disposed) return;
+    if (this.disabled || this.working || this.recording || this.disposed || !this.foreground) return;
     this.capturePending = true; this.busy(true); this.errorMessage = '';
     try {
       await this.preview.stop();
-      await this.recorder.start(this.context(), (): void => {
-        this.error($r('app.string.note_audio_record_failed'));
+      const started: boolean = await this.recorder.start(this.context(), (): void => {
+        this.recordingFailure();
         this.cancelRecording();
       });
+      if (!started) return;
       if (this.disposed || !this.foreground) { await this.recorder.cancel(); return; }
-      this.recording = true; this.seconds = 0;
-      this.timer = setInterval((): void => {
-        this.seconds++;
-        // 移动制卡的短录音上限，防止忘记停止后无限占用麦克风和缓存。
-        if (this.seconds >= 300) this.finishRecording();
-      }, 1000);
-    } catch (error) { this.error($r('app.string.note_audio_record_failed')); }
+      this.recording = true; this.paused = false; this.seconds = 0;
+      this.startTimer();
+    } catch (error) { this.recordingFailure(); }
     finally { this.capturePending = false; this.busy(false); }
   }
 
-  private async finishRecording(): Promise<void> {
+  private async finishRecording(_locale: string = this.uiLanguage): Promise<void> {
     if (!this.recording || this.working || this.disposed) return;
     this.clearTimer(); this.busy(true);
     try {
@@ -112,15 +154,38 @@ export struct NoteAudioField {
         return;
       }
       this.onAdd(path, resourceText(this.getUIContext(), $r('app.string.note_audio_recorded'), this.seconds), true);
-    } catch (error) { this.error($r('app.string.note_audio_record_failed')); }
-    finally { if (!this.disposed) this.recording = false; this.busy(false); }
+    } catch (error) { this.recordingFailure(); }
+    finally { if (!this.disposed) { this.recording = false; this.paused = false; } this.busy(false); }
   }
 
   private async cancelRecording(): Promise<void> {
-    this.clearTimer();
-    try { await this.recorder.cancel(); }
-    catch (error) { this.error($r('app.string.note_audio_record_failed')); }
-    finally { if (!this.disposed) this.recording = false; this.busy(false); }
+    if (this.cancelling !== null) {
+      try { await this.cancelling; } catch (error) { /* 首次取消拥有错误提示。 */ }
+      return;
+    }
+    this.clearTimer(); this.busy(true);
+    try {
+      this.cancelling = this.recorder.cancel();
+      await this.cancelling;
+    }
+    catch (error) { this.recordingFailure(); }
+    finally {
+      this.cancelling = null;
+      if (!this.disposed) { this.recording = false; this.paused = false; }
+      this.busy(false);
+    }
+  }
+
+  private async togglePause(): Promise<void> {
+    if (!this.recording || this.working || this.disposed) return;
+    this.busy(true);
+    try {
+      if (this.paused) await this.recorder.resume(); else await this.recorder.pause();
+      if (this.disposed || this.cancelling !== null || !this.recording) return;
+      this.paused = !this.paused;
+      if (this.paused) this.clearTimer(); else this.startTimer();
+    } catch (error) { this.recordingFailure(); await this.cancelRecording(); }
+    finally { this.busy(false); }
   }
 
   private backgroundChanged(): void {
@@ -161,33 +226,67 @@ export struct NoteAudioField {
 
   @Builder
   private audioRow(key: string, label: string, filename: string, uri: string, remove: () => void, partIndex: number = -1, id: number = -1) {
-    Row({ space: 8 }) {
-      Button(this.playingKey === key ? $r('app.string.note_audio_stop') : $r('app.string.note_audio_play'))
-        .height(应用尺寸.紧凑控件高度).fontSize(应用尺寸.字号_正文_小)
-        .fontColor(Color.White).backgroundColor(this.buttonColor)
-        .attributeModifier(new PressFeedback()).stateEffect(false).enabled(!this.disabled && !this.working)
-        .onClick((): void => { this.play(key, partIndex >= 0 ? this.partFilename(partIndex) : filename,
-          partIndex >= 0 ? this.partUri(partIndex) : uri); })
-      Text(partIndex >= 0 ? this.partLabel(partIndex) : label)
-        .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
-        .layoutWeight(1).maxLines(2).wordBreak(WordBreak.BREAK_ALL)
-      if (this.replacementsVisible) {
-        Button($r('app.string.note_media_replace')).height(应用尺寸.紧凑控件高度)
-          .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).backgroundColor(Color.Transparent)
-          .attributeModifier(new PressFeedback()).stateEffect(false).enabled(!this.disabled && !this.working && !this.recording)
-          .onClick((): void => { this.pick(partIndex, id); })
-      }
+    Stack({ alignContent: Alignment.TopEnd }) {
+      Row({ space: 应用尺寸.间距_8 }) {
+        Text(partIndex >= 0 ? this.partLabel(partIndex) : label)
+          .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary'))
+          .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+          .layoutWeight(1).constraintSize({ minWidth: 0 })
+        按下态按钮({ 文案: this.playingKey === key ? $r('app.string.note_audio_stop') : $r('app.string.note_audio_play'),
+          字色: this.buttonColor, singleLine: true, 是否启用: !this.disabled && !this.working,
+          点击回调: (): void => { this.play(key, partIndex >= 0 ? this.partFilename(partIndex) : filename,
+            partIndex >= 0 ? this.partUri(partIndex) : uri); } }).flexShrink(0)
+        if (this.replacementsVisible) {
+          按下态按钮({ 文案: $r('app.string.note_media_replace'), singleLine: true,
+            是否启用: !this.disabled && !this.working && !this.recording,
+            点击回调: (): void => { this.pick(partIndex, id); } }).flexShrink(0)
+        }
+      }.width('100%')
+        .padding({ left: 应用尺寸.间距_12, right: 应用尺寸.间距_12 + (this.removalsVisible ? 应用尺寸.按钮高度 : 0),
+          top: 应用尺寸.间距_8,
+          bottom: 应用尺寸.间距_8 })
       if (this.removalsVisible) {
-      Button($r('app.string.note_audio_remove')).height(应用尺寸.紧凑控件高度)
-        .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).backgroundColor(Color.Transparent)
-        .attributeModifier(new PressFeedback()).stateEffect(false).enabled(!this.disabled && !this.working && !this.recording)
-        .onClick(remove)
+        IconActionButton({ source: $r('app.media.ic_common_close'), label: $r('app.string.note_audio_remove'),
+          cornerAligned: true,
+          isInteractive: !this.disabled && !this.working && !this.recording, onAction: remove })
+          .margin({ right: 应用尺寸.间距_4, top: 应用尺寸.间距_4 })
+      }
+    }.width('100%')
+      .backgroundColor($r('app.color.surface_sidebar'))
+      .borderRadius(应用尺寸.圆角_面板).border(SurfaceBorder.options())
+  }
+
+  @Builder
+  private controlRows() {
+    Column() {
+      if (this.recording) {
+        SettingsActionRow({ title: $r('app.string.note_audio_record_done'),
+          trailingIcon: this.paused ? $r('app.media.ic_audio_record_off') : $r('app.media.ic_audio_recording'),
+          hint: localizedResourceText(this.getUIContext(), this.uiLanguage,
+            this.paused ? $r('app.string.note_audio_paused') : $r('app.string.note_audio_recording'), this.seconds),
+          isInteractive: !this.working, onAction: (): void => { this.finishRecording(); } })
+        Divider().strokeWidth(1).color(SurfaceBorder.color())
+        SettingsActionRow({ title: this.paused ? $r('app.string.note_audio_resume') : $r('app.string.note_audio_pause'),
+          trailingIcon: this.paused ? $r('app.media.ic_audio_resume') : $r('app.media.ic_audio_pause'),
+          isInteractive: !this.working, onAction: (): void => { this.togglePause(); } })
+        Divider().strokeWidth(1).color(SurfaceBorder.color())
+        SettingsActionRow({ title: $r('app.string.note_audio_record_cancel'),
+          trailingIcon: $r('app.media.ic_common_close'),
+          isInteractive: !this.working, onAction: (): void => { this.cancelRecording(); } })
+      } else {
+        SettingsActionRow({ title: $r('app.string.note_audio_add'),
+          isInteractive: !this.disabled && !this.working, onAction: (): void => { this.pick(); } })
+        Divider().strokeWidth(1).color(SurfaceBorder.color())
+        SettingsActionRow({ title: $r('app.string.note_audio_record'),
+          trailingIcon: $r('app.media.ic_audio_record_on'),
+          isInteractive: !this.disabled && !this.working, onAction: (): void => { this.record(); } })
       }
     }.width('100%')
   }
 
   build() {
     Column({ space: 应用尺寸.间距_8 }) {
+      if (this.controlsVisible) { this.controlRows() }
       ForEach(noteAudioParts(this.value), (part: NoteAudioPart, index: number) => {
         if (this.partFilename(index) !== '') {
           this.audioRow(`existing-${index}`, '', '', '', (): void => { this.removePart(index); }, index)
@@ -202,35 +301,6 @@ export struct NoteAudioField {
           this.preview.stop().catch((): void => {}); this.onRemove(item.id);
         }, -1, item.id)
       }, (item: NoteFieldAudio): string => `${item.id}`)
-      if (this.controlsVisible) {
-      Flex({ wrap: FlexWrap.Wrap, space: { main: LengthMetrics.vp(8), cross: LengthMetrics.vp(8) } }) {
-        if (this.recording) {
-          Text(resourceText(this.getUIContext(), $r('app.string.note_audio_recording'), this.seconds))
-            .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.error_text')).width('100%')
-          Button($r('app.string.note_audio_record_done')).enabled(!this.working)
-            .height(应用尺寸.紧凑控件高度).fontSize(应用尺寸.字号_正文_小)
-            .fontColor(Color.White).backgroundColor(this.buttonColor)
-            .attributeModifier(new PressFeedback()).stateEffect(false)
-            .onClick((): void => { this.finishRecording(); })
-          Button($r('app.string.note_audio_record_cancel')).enabled(!this.working)
-            .height(应用尺寸.紧凑控件高度).fontSize(应用尺寸.字号_正文_小)
-            .fontColor(Color.White).backgroundColor(this.buttonColor)
-            .attributeModifier(new PressFeedback()).stateEffect(false)
-            .onClick((): void => { this.cancelRecording(); })
-        } else {
-          Button($r('app.string.note_audio_add')).enabled(!this.disabled && !this.working)
-            .height(应用尺寸.紧凑控件高度).fontSize(应用尺寸.字号_正文_小)
-            .fontColor(Color.White).backgroundColor(this.buttonColor)
-            .attributeModifier(new PressFeedback()).stateEffect(false)
-            .onClick((): void => { this.pick(); })
-          Button($r('app.string.note_audio_record')).enabled(!this.disabled && !this.working)
-            .height(应用尺寸.紧凑控件高度).fontSize(应用尺寸.字号_正文_小)
-            .fontColor(Color.White).backgroundColor(this.buttonColor)
-            .attributeModifier(new PressFeedback()).stateEffect(false)
-            .onClick((): void => { this.record(); })
-        }
-      }.width('100%')
-      }
       if (this.errorMessage !== '') {
         Text(this.errorMessage).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.error_text')).width('100%')
       }

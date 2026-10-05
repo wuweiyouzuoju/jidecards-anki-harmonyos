@@ -12,7 +12,7 @@ import { EditableNote } from '../proto/messages/NoteMessages';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
 import { 解析是否深色, 主题模式 } from '../model/主题设置';
 import { 加载主题模式 } from '../model/主题存储';
-import { resourceText } from '../utils/UiFeedback';
+import { localizedResourceText } from '../utils/UiFeedback';
 import { CustomTransition } from '../utils/自定义转场';
 import { appInterface } from '../backend/AppInterfaceService';
 import { visibleInterfaceItems, AppInterfaceControl } from '../model/AppInterface';
@@ -23,6 +23,7 @@ import { NoteDraftPreviewPageParams } from '../model/navigation/PageParams';
 /** 导航只传 ID；此页持有读取会话和写入保护，来源页面仅刷新返回结果。 */
 @Component
 export struct EditNotePage {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   targetId: number = 0;
   isNote: boolean = false;
   pathStack: NavPathStack = new NavPathStack();
@@ -78,7 +79,7 @@ export struct EditNotePage {
     const controls: AppInterfaceControl[] = visibleInterfaceItems('edit_note',
       { simple: false, agent: false, cloudDeck: false, themeHasTextures: false })
       .filter((item): boolean => loaded ? item.id === 'form' : item.id !== 'form' && (item.id !== 'retry' || !this.editor.busy))
-      .map((item): AppInterfaceControl => ({ id: item.id, title: interfaceItemText(this.getUIContext(), 'edit_note', item.id),
+      .map((item): AppInterfaceControl => ({ id: item.id, title: interfaceItemText(this.getUIContext(), 'edit_note', item.id, this.uiLanguage),
         titleKey: item.titleKey, enabled: item.id !== 'save', selected: false }));
     appInterface.observe({ surface: 'edit_note', sectionId: loaded ? 'loaded' : this.editor.busy ? 'loading' : 'error',
       selectedId: String(this.targetId), optionIds: [], optionLabels: [], busy: this.editor.busy,
@@ -110,8 +111,9 @@ export struct EditNotePage {
     NavDestination() {
       if (this.editor.note !== null) {
         浏览编辑区({ isDark: 解析是否深色(this.theme, this.systemDark), busy: this.editor.busy,
-          errorMessage: this.editor.error === '' ? '' : resourceText(this.getUIContext(), $r('app.string.browser_detail_save_error')),
+          errorMessage: this.editor.error === '' ? '' : localizedResourceText(this.getUIContext(), this.uiLanguage, $r('app.string.browser_detail_save_error')),
           originalStockKind: this.editor.originalStockKind, fieldNames: this.editor.fieldNames, clozeFieldOrds: this.editor.clozeFieldOrds,
+          fieldConfigs: this.editor.fieldConfigs,
           optionalReverseFieldOrd: this.editor.optionalReverseFieldOrd, backRequest: this.backRequest,
           previewReturnRequest: this.previewReturnRequest,
           imageOcclusionFields: this.editor.imageOcclusionFields ?? [],
@@ -127,7 +129,7 @@ export struct EditNotePage {
           if (this.editor.busy) { LoadingProgress().width(40).height(40) }
           else {
             Text($r('app.string.browser_detail_load_error')).fontColor($r('app.color.error_text'))
-            Button(interfaceItemText(this.getUIContext(), 'edit_note', 'retry')).attributeModifier(new PressFeedback())
+            Button(interfaceItemText(this.getUIContext(), 'edit_note', 'retry', this.uiLanguage)).attributeModifier(new PressFeedback())
             .stateEffect(false)
             .onClick((): void => { this.load(); })
           }

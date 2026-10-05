@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { AnchoredMenuItem } from './common/MenuItem';
+import { interfaceItemText } from '../utils/AppInterfaceText';
 import { PressFeedback } from '../utils/PressFeedback';
 import { DisclosureChevron } from './common/DisclosureChevron';
+import { ActionIcon } from './common/ActionIcon';
+import { MenuSurface } from './common/MenuSurface';
+import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
 import { resourceText } from '../utils/UiFeedback';
 import { ThemeDefinition, themeDefinition, THEME_VISUALS_KEY, THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
@@ -64,6 +69,7 @@ interface 色条选项 {
 
 @Component
 export struct 牌组列表项 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(DECK_LIST_NARROW_KEY) private narrow: boolean = false;
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @StorageProp(GLASS_COLORS_KEY) private glassColors: string[] = GLASS_HIGHLIGHT_COLORS;
@@ -78,6 +84,7 @@ export struct 牌组列表项 {
     backgroundImage: ''
   };
   @Prop selected: boolean = false;
+  @Prop hideStudyCounts: boolean = false;
   @Prop expanded: boolean = false;
   // 排序模式：true 时左侧显示≡手柄、行高亮描边、onClick 不触发选牌、长按不弹菜单。
   // 用户通过 牌组列表项 长按菜单的「拖动排序」项进入；Index.ets 顶部 Bar 上的「完成」退出。
@@ -101,6 +108,7 @@ export struct 牌组列表项 {
   };
   onCustomizeDeck: (deckId: string) => void = (deckId: string): void => {
   };
+  onRenameDeck: (deckId: string) => void = (_deckId: string): void => {};
   // 用户在长按菜单选「拖动排序」时触发；Index.ets 进入 isReorderMode=true 状态。
   onEnterReorder: (deckId: string) => void = (deckId: string): void => {
   };
@@ -224,7 +232,7 @@ export struct 牌组列表项 {
   ];
 
   /** 颜色子菜单使用本地化名称，不修改持久化色调值。 */
-  private toneOptions(): SelectOption[] {
+  private toneOptions(_locale: string = this.uiLanguage): SelectOption[] {
     return this.色条选项列表.map((option: 色条选项): SelectOption => ({
       value: resourceText(this.getUIContext(), option.labelResource)
     }));
@@ -236,7 +244,7 @@ export struct 牌组列表项 {
   }
 
   /** 旧黑色色条不误标成蓝色。 */
-  private toneLabel(): string {
+  private toneLabel(_locale: string = this.uiLanguage): string {
     const index: number = this.toneIndex();
     const label: Resource = index >= 0 ? this.色条选项列表[index].labelResource : $r('app.string.deck_tone_black');
     return resourceText(this.getUIContext(), label);
@@ -285,7 +293,7 @@ export struct 牌组列表项 {
         Row() {
           Text() {
             if (option.tone === this.deck.tone && this.themeAccentColors.length > 0) {
-              ForEach(themeLabelGlyphs(option.labelResource, this.themeAccentColors, this.getUIContext()),
+              ForEach(themeLabelGlyphs(option.labelResource, this.themeAccentColors, this.getUIContext(), this.uiLanguage),
                 (glyph: ThemeLabelGlyph) => {
                   Span(glyph.letter).fontColor(glyph.color)
                 }, (glyph: ThemeLabelGlyph, index: number): string => `${index}-${glyph.letter}-${glyph.color}`)
@@ -307,8 +315,7 @@ export struct 牌组列表项 {
       }, (option: 色条选项): string => `${option.tone}`)
     }
     .width(应用尺寸.contextMenuWidth)
-    .backgroundColor($r('app.color.surface_card'))
-    .borderRadius(应用尺寸.圆角_面板)
+    .attributeModifier(new MenuSurface())
   }
 
   /** 主菜单：色条文字入口与牌组操作入口。 */
@@ -330,8 +337,12 @@ export struct 牌组列表项 {
       .bindPopup(this.显示色条菜单, {
         builder: this.色条菜单,
         placement: Placement.Right,
-        popupColor: $r('app.color.surface_card'),
+        popupColor: $r('app.color.menu_surface'),
         enableArrow: true,
+        arrowWidth: MenuSurface.pointerSpan,
+        arrowHeight: MenuSurface.pointerDepth,
+        radius: 应用尺寸.圆角_指标卡,
+        transition: MenuSurface.popupTransition(),
         onStateChange: (event: 色条弹层状态事件): void => {
           if (!event.isVisible) {
             this.显示色条菜单 = false;
@@ -354,8 +365,13 @@ export struct 牌组列表项 {
         this.显示牌组菜单 = false;
         this.onEnterReorder(this.deck.id);
       })
+      AnchoredMenuItem({ label: interfaceItemText(this.getUIContext(), 'deck_row_menu', 'rename', this.uiLanguage),
+        labelAlignment: TextAlign.Start, onSelect: (): void => {
+          this.显示牌组菜单 = false;
+          this.onRenameDeck(this.deck.id);
+        } })
       Row() {
-        Text($r('app.string.deck_customize'))
+        Text(interfaceItemText(this.getUIContext(), 'deck_row_menu', 'customize', this.uiLanguage))
           .fontSize(应用尺寸.字号_正文)
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1)
@@ -415,11 +431,9 @@ export struct 牌组列表项 {
       })
     }
     .width(应用尺寸.contextMenuWidth)
-    .backgroundColor($r('app.color.surface_card'))
-    .borderRadius(应用尺寸.圆角_面板)
+    .attributeModifier(new MenuSurface())
   }
 
-  /** Popup 内容与页面其他菜单保持相同容器。 */
   @Builder
   private 弹层内容() {
     Column() {
@@ -452,18 +466,19 @@ export struct 牌组列表项 {
   // @副作用
   // 无。仅上抛回调。
   // ========================================================
+  private expansionLabel(_locale: string = this.uiLanguage): string {
+    const label: Resource = this.expanded ? $r('app.string.deck_collapse') : $r('app.string.deck_expand');
+    return resourceText(this.getUIContext(), label, 牌组显示名(this.deck, this.uiLanguage));
+  }
+
   @Builder
   private expansionControl() {
     Column() {
       if (this.reorderMode) {
-        Text('≡')
-          .fontSize(this.narrow ? 应用尺寸.字号_强调 : 应用尺寸.字号_标题)
-          .fontColor($r('app.color.text_secondary'))
+        ActionIcon({ source: $r('app.media.ic_common_drag'), tint: Color.Transparent })
       } else if (this.deck.hasChildren) {
-        Text('▼')
-          .fontSize(this.narrow ? 应用尺寸.字号_强调 : 应用尺寸.字号_标题)
-          .fontColor($r('app.color.text_secondary'))
-          .rotate({ angle: this.expanded ? 0 : -90 })
+        DisclosureChevron()
+          .rotate({ angle: this.expanded ? 90 : 0 })
           .animation({ duration: 150, curve: Curve.EaseOut })
       }
     }
@@ -472,6 +487,8 @@ export struct 牌组列表项 {
     .justifyContent(FlexAlign.Center)
     .alignItems(HorizontalAlign.Center)
     .margin({ left: this.narrow ? 0 : -应用尺寸.间距_10 })
+    .accessibilityText(this.expansionLabel())
+    .accessibilityLevel(!this.reorderMode && this.deck.hasChildren ? 'yes' : 'no')
     .attributeModifier(new PressFeedback())
     .onClick(() => {
       if (!this.reorderMode && this.deck.hasChildren) {
@@ -506,15 +523,17 @@ export struct 牌组列表项 {
             .borderRadius(应用尺寸.圆角_色条)
         }
         Column({ space: this.narrow ? 应用尺寸.间距_3 : 应用尺寸.间距_5 }) {
-          Text(牌组显示名(this.deck))
+          Text(牌组显示名(this.deck, this.uiLanguage))
             .fontSize(this.narrow ? 应用尺寸.字号_强调 : 应用尺寸.字号_标题)
+            .lineHeight(this.narrow ? 20 : 22)
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.text_primary'))
-            .maxLines(1)
+            .maxLines(this.hideStudyCounts ? 2 : 1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
           if (!this.narrow || this.deck.description.trim().length > 0) {
             Text(this.deck.description)
               .fontSize(this.narrow ? 应用尺寸.字号_正文_小 : 应用尺寸.字号_正文_中)
+              .lineHeight(16)
               .fontColor($r('app.color.text_secondary'))
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -522,20 +541,22 @@ export struct 牌组列表项 {
         }
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1)
-        Column({ space: 应用尺寸.间距_5 }) {
-          Row({ space: this.narrow ? 应用尺寸.间距_6 : 应用尺寸.间距_8 }) {
-            Text($r('app.string.deck_new_short', this.deck.newCount))
-              .fontSize(this.narrow ? 应用尺寸.字号_说明 : 应用尺寸.字号_正文_小)
-              .fontColor(this.新卡计数色)
-            Text($r('app.string.deck_learning_short', this.deck.learningCount))
-              .fontSize(this.narrow ? 应用尺寸.字号_说明 : 应用尺寸.字号_正文_小)
-              .fontColor(this.学习中计数色)
-            Text($r('app.string.deck_review_short', this.deck.reviewCount))
-              .fontSize(this.narrow ? 应用尺寸.字号_说明 : 应用尺寸.字号_正文_小)
-              .fontColor(this.复习中计数色)
+        if (!this.hideStudyCounts) {
+          Column({ space: 应用尺寸.间距_5 }) {
+            Row({ space: this.narrow ? 应用尺寸.间距_6 : 应用尺寸.间距_8 }) {
+              Text($r('app.string.deck_new_short', this.deck.newCount))
+                .fontSize(this.narrow ? 应用尺寸.字号_说明 : 应用尺寸.字号_正文_小)
+                .fontColor(this.新卡计数色)
+              Text($r('app.string.deck_learning_short', this.deck.learningCount))
+                .fontSize(this.narrow ? 应用尺寸.字号_说明 : 应用尺寸.字号_正文_小)
+                .fontColor(this.学习中计数色)
+              Text($r('app.string.deck_review_short', this.deck.reviewCount))
+                .fontSize(this.narrow ? 应用尺寸.字号_说明 : 应用尺寸.字号_正文_小)
+                .fontColor(this.复习中计数色)
+            }
           }
+          .alignItems(HorizontalAlign.End)
         }
-        .alignItems(HorizontalAlign.End)
       }
       .width('100%')
       .padding({
@@ -546,10 +567,7 @@ export struct 牌组列表项 {
       })
       .attributeModifier(new PressFeedback())
       .onClick(() => {
-        // 排序模式下不触发选牌；长按手柄+拖动才是预期操作
-        if (this.reorderMode) {
-          return;
-        }
+        if (this.reorderMode) return;
         // 双击检测：两次点击间隔 < 300ms 且当前牌组有子牌组时，触发递归展开/折叠。
         // 第一次点击走 onSelect（选牌），第二次点击（间隔内）走 onDoubleTap（递归展开）。
         const 当前时间: number = Date.now();
@@ -562,10 +580,9 @@ export struct 牌组列表项 {
         this.上次点击时间 = 当前时间;
         this.onSelect(this.deck.id);
       })
-      // 排序模式下把 LongPressGesture 的 duration 改到极大值（等效禁用），
-      // 避免子组件的长按手势偷走 List.onMove 的事件；onAction 内再加守卫兜底。
-      .gesture(
-        LongPressGesture({ repeat: false, duration: this.reorderMode ? 99999999 : 500 })
+      // 与列表内置拖动并行；排序时长按不再打开菜单，也不拦截父级识别器。
+      .parallelGesture(
+        LongPressGesture({ repeat: false, duration: 500 })
           .onAction(() => {
             if (this.reorderMode) {
               return;
@@ -573,11 +590,15 @@ export struct 牌组列表项 {
             this.显示牌组菜单 = true;
           })
       )
-      .bindPopup(this.显示牌组菜单, {
+      .bindPopup(!this.reorderMode && this.显示牌组菜单, {
         builder: this.弹层内容,
         placement: Placement.Bottom,
-        popupColor: $r('app.color.surface_card'),
+        popupColor: $r('app.color.menu_surface'),
         enableArrow: true,
+        arrowWidth: MenuSurface.pointerSpan,
+        arrowHeight: MenuSurface.pointerDepth,
+        radius: 应用尺寸.圆角_指标卡,
+        transition: MenuSurface.popupTransition(),
         onStateChange: (event: 弹层状态事件): void => {
           if (!event.isVisible) {
             this.显示牌组菜单 = false;
@@ -586,7 +607,7 @@ export struct 牌组列表项 {
       })
     }
     .width('100%')
-    .height(this.narrow ? 应用尺寸.narrowDeckRowHeight : 应用尺寸.牌组行高度)
+    .height(应用尺寸.deckRowHeight(this.narrow, this.hideStudyCounts))
     .clip(true)
     .borderRadius(应用尺寸.圆角_牌组行)
     .linearGradient({ angle: 110, colors: this.visual.selectedColors.length > 0 && this.selected
@@ -598,13 +619,12 @@ export struct 牌组列表项 {
       : $r('app.color.surface_card'))
     .shadow({ radius: this.selected && this.visual.selectedColors.length > 0 ? 8 : 0,
       color: '#140F2350', offsetY: 2 })
-    .border({
-      width: 应用尺寸.卡片边框,
+    .border(SurfaceBorder.options(应用尺寸.卡片边框,
       // 排序模式下行描边用 动作主色 高亮，让用户感知「现在可拖」；
       // 选中态用 主色边框色（比 动作主色 浅，避免选中行视觉过重）
-      color: this.reorderMode
+      this.reorderMode
         ? this.动作主色 : (this.selected ?
-          (this.visual.selectedColors.length > 0 ? '#80FFFFFF' : this.主色边框色) : $r('app.color.border_subtle'))
-    })
+          (this.visual.selectedColors.length > 0 ? '#80FFFFFF' : this.主色边框色) : SurfaceBorder.color())
+    ))
   }
 }

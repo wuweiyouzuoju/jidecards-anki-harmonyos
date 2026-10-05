@@ -4,7 +4,7 @@
 
 主题偏好修改（设置页与助手）共用 `backend/AppThemeService.ets` / `model/settings/ThemeModeSession.ts`，先严格保存和回读再应用；失败区分保存未确认与已保存但应用失败。页面通过 `themeMode` 订阅公共状态。启动/系统通知仍由既有入口负责。测试：`theme-mode-session.test.mjs`；助手工具和撤销边界见 [应用内 Agent](agent.md#应用设置读取与修改)。
 
-卡片文字缩放、牌组列表宽度和学习触感保留各自的 `CardTextSizeStore`、`DeckListAppearanceStore`、`StudyHaptics` 保存入口，共用 `utils/LocalPreferenceWrite.ets` 串行保存、原值校验、回读与广播。JIDE 经同一入口确认修改；手动操作不需要提案，设置控件和学习/预览消费既有公共值。保存失败只恢复偏好缓存，磁盘结果未确认时不声称回滚。验证入口：`ai-agent-app-settings.test.mjs`、`ai-agent-local-preference-write.test.mjs` 及各设置原有行为回归；最终观察与交互需设备验收。
+卡片文字缩放、牌组样式和学习触感保留各自的 `CardTextSizeStore`、`DeckListAppearanceStore`、`StudyHaptics` 保存入口，共用 `utils/LocalPreferenceWrite.ets` 串行保存、原值校验、回读与广播。JIDE 经同一入口确认修改；手动操作不需要提案，设置控件和学习/预览消费既有公共值。保存失败只恢复偏好缓存，磁盘结果未确认时不声称回滚。验证入口：`ai-agent-app-settings.test.mjs`、`ai-agent-local-preference-write.test.mjs` 及各设置原有行为回归；最终观察与交互需设备验收。
 
 - 代码路径以下均相对 `entry/src/main/ets/`。
 - 责任链：EntryAbility 配置 → 主题管理器 → AppStorage → 组件响应式刷新。
@@ -23,17 +23,41 @@
 
 ## 公共表单控件
 
+学习与浏览多选菜单共用 `CardActionMenu`：右侧主菜单保持紧凑，标记和卡片操作默认向左展开。左侧面板根据实测行高与面板高度避让，尖角追随对应触发行，右侧不插入空白或改变行距。旗标颜色以 `MenuSurface` 直接覆盖右侧主菜单，与主菜单同宽、同锚点，不新增列或移动已有面板；左侧分组保留原位和可操作性。被覆盖的主菜单禁用并释放 JIDE 观察，颜色收起后恢复。`ActionMenuTree.ts` 负责可见树、展开切换和父级禁用传播；`ActionMenuLayout.ts` 拥有面板定位和轮廓几何，`MenuBubble` 将轮廓坐标按当前密度转换为 px，并模糊同一轮廓形成阴影，避免矩形残影。宿主拥有展开状态、动作和实际可操作分组的 JIDE 观察，外部点击与整组滚动归 `AnchoredMenu`。
+
+菜单表面与动效由 `MenuSurface` 拥有。展开箭头复用 `AnchoredMenuItem` 与 `DisclosureChevron`，围绕自身中心旋转且不平移；左侧组标题使用向下/向左，旗标分支使用公共默认向右/向下。原生牌组预览保留系统定位，内容不叠加第二层边框和阴影；原生 Popup 保留20vp宽、6vp深的短圆尖、16vp圆角和150ms动画。`study-menu.test.mjs` 执行左右分组、旗标收起、禁用和延迟点击回归；`ui-select-layout.test.mjs` 检查展开角度和固定旋转中心，`motion-style-contract.test.mjs` 验证原生动效接线。实际布局仍须 HAP/设备验收。
+
+设置目录、数据/备份、关于、术语和同步服务器入口共用 `components/common/SettingsActionRow.ets`；`DataActionRow` 只转交内容和回调。公共行提供18vp图标、12vp图文间隔、15fp标题、12fp说明、右箭头与禁用回调守卫，无说明最小48vp、有说明最小58vp且上下各8vp，长说明可撑高。目录卡片和分组卡片拥有左右16vp内边距，公共行不再贡献水平边距；页面仍拥有宽/窄分组间距及安全区，所以这两种布局、导航条有/无时不会叠加新的外边距。QQ群号的富说明由关于宿主 Builder 保留复制行为，并按可用宽度换行。
+
+设置图标按层级使用：一级目录和数据维护、关于、帮助等操作入口保留图标；二级分组标题、开关、普通选择、数字偏好、字体滑块及识别码标签暂不显示装饰图标。调用方省略可选 `icon`，资源和语义映射仍保留，帮助按钮和展开箭头继续显示。联网资源 `ic_settings_web` 使用无外伸箭头的普通地球，避免与男性符号混淆。
+
+图文操作行的标题和说明显式 `TextAlign.Start`，图标、文字列和尾部控件保持左右顺序。`HelpLabel` 的实际 Row 始终填满调用方分配的宽度，通过 `justifyContent` 决定起始或居中；仅设置自定义组件外层的 `layoutWeight` / `width` 不能替代内部对齐。此修正同时覆盖设置分组、开关/选择行、新增笔记、统计标题、查找替换、导出兼容与高级牌组选项；普通表单靠左，`DialogHeader(centered=true)` 的标题与帮助整组居中。卡片菜单使用左对齐图文，菜单按 labelAlignment 将图标和文字作为一组靠左或居中。卡片16vp内边距、公共行图文12vp间隔（开关16vp）、尾部控件和安全区各自保持原有唯一责任，隐藏图标不留下空槽位；宽/窄布局与安全区有无只改变宿主可用宽度。
+
+`ActionIcon` 是菜单、设置与状态徽标的图标几何入口。`utils/SettingsIcons.ets` 维护设置语义，`utils/ActionIcons.ets` 维护学习、预览与浏览多选动作；同义动作复用首页/学习资源，触控、联网、搜索、复习参数和外观各设置按实际含义区分。新增 SVG 必须同时提供 base/dark 且几何一致；未知设置使用中性信息图标，未知动作不猜测图标。图标默认18vp，徽标14vp；`tint` 只管理内填色，六位十六进制 `strokeColor` 通过保留透明度的颜色矩阵统一染色，用于旗标和图片上的白色关闭。
+
+`IconActionButton` 统一字段移动/删除、年份导航、侧栏关闭和图片移除的44vp点击区、按压反馈、完整本地化朗读名称与禁用守卫；年份/字段边界及写入回调仍由宿主持有。图片上的移除使用白色叉与深色圆底，避免背景图改变时失去对比；牌组展开使用 `DisclosureChevron`，拖动手柄与标记/旗标使用 SVG，迁移警告保留系统警告符号。
+
+设置开关和普通选择行通过 `SettingsToggleRow` / `FormSelectRow` 的可选 `icon` 参数使用同一入口；选择行帮助仍由内部 `HelpLabel` 提供。颜色主题行保留渐变色样与拒绝选择后重建机制，兑换入口保留原生 bindSheet 的窗口/关闭策略，数字偏好和文字缩放保留原生输入/Slider；这些专用控件只复用图标和已有样式，不改保存协议。检查入口：`ui-settings-components.test.mjs`、`ui-compact-controls.test.mjs`、学习/预览/批量菜单及既有设置行为回归；HAP 验证编译，深浅色、窄/宽屏、大字体及系统返回的最终显示与交互仍须设备验收。
+
+原生面板、卡片、菜单、按钮和表单的外轮廓由 `utils/SurfaceBorder.ets` 的 `options()` 统一提供，中性颜色只由 `surface_border` 明暗资源拥有。`MenuSurface`、`GlassSurface`、普通 `DialogFrame`、设置分组、详情/统计/摘要卡片、笔记字段卡片及各类表单共用；菜单指向三角和分隔线使用同一 `color()`。`FormInputStyle`、`FormTextAreaStyle` 与 `SelectStyle.controlBorder` 委托公共轮廓，定制的搜索、同步登录及数字输入只接入边框，保留自身尺寸与输入行为。分隔线通过单边参数保留原0.5/1vp线宽。公共轮廓不接管底色、圆角、内外边距或按压状态；选中/排序状态保留原来的状态色。`ImageSurfaceStyle` 共用参数但保留适合灰底的 `border_image`；卡面内填空、用户卡片 HTML 和白板笔迹保持各自语义。深色轮廓与菜单/卡片/页面/侧栏底色的对比度由 `ui-surface-border.test.mjs` 检查，实际设备观感由用户验收。
+
 白字实底主操作统一使用 `components/common/PrimaryActionButton.ets`。登录、配置保存和开发者启用的完整可用条件由宿主传入，忙碌文案也归宿主；组件只管理44vp高度、15fp字号、22vp圆角、主题色底、按压反馈与禁用回调守卫。工具栏玻璃按钮、学习评分和危险操作按各自语义保留入口，不给主操作按钮增加业务模式。
 
 设置中的 Switch 行共用 `SettingsToggleRow`，支持无说明、长说明及标题后的帮助。右侧开关固定40×24vp且不收缩，与文本列相距16vp；无说明行最小48vp、无额外上下内边距，文字/帮助垂直居中；有说明行上下各12vp、标题到说明4vp，可随大字体与长文字增长。行不设置水平内边距、外边距或安全区偏移，卡片/弹窗拥有水平边距，分组 Column 拥有行间距；页面继续拥有宽/窄布局和安全区，避免重复贡献边距。FSRS 未取得确认值时保留加载文案，不伪造关闭状态；保存、失败恢复、帮助开关与错误提示仍由宿主负责。
 
-完整卡片底色的单行表单输入通过 `utils/FormInputStyle.ets` 统一44vp高度、正文/提示色、边框与圆角，默认左右10vp；创建牌组、过滤牌组和自定义学习沿用 `应用尺寸.卡片内边距`。宿主保留原生 TextInput 的密码/数字类型、过滤、提交、禁用和焦点接口，不再重复完整样式。同步登录的无边框内嵌输入、搜索、提醒的页面底色输入、多行/富文本编辑保持既有外观与交互；公共样式不为这些差异增加业务分支。
+完整卡片底色的单行表单输入通过 `utils/FormInputStyle.ets` 统一44vp高度、正文/提示色、公共边框与圆角，默认左右10vp；创建牌组、过滤牌组和自定义学习沿用 `应用尺寸.卡片内边距`。宿主保留原生 TextInput 的密码/数字类型、过滤、提交、禁用和焦点接口，不再重复完整样式。同步登录的内嵌输入、搜索、提醒的页面底色输入、多行/富文本编辑保持各自尺寸、底色和交互，轮廓接入 SurfaceBorder；公共样式不为这些差异增加业务分支。
 
 回归入口 `tools/tests/ui-shell-controls.test.mjs` 执行公共回调守卫和真实输入样式、扫描设置 Switch 与同类散写；既有业务回归保留保存失败与确认值恢复验证。设备验收覆盖深浅色/主题切换、宽窄屏/安全区、大字体与长说明、帮助点击、密码/数字键盘及提交、忙碌时点击和失败后重试；Node 与 HAP 不证明最终布局和观察更新。
 
+菜单图标与标题通过 AnchoredMenuItem 的同一个 Row 排列，`labelAlignment` 同时控制文字及整组位置，禁止叠放图标后用文字 padding 补偿。首页更多和新建动作菜单默认整组居中；卡片动作主行、标记/操作分组与旗标颜色显式整组靠左；设置、表单与浏览分区标题按各自列表语义靠左。图标18vp、图文间隔8vp，由公共 Row 唯一拥有；带箭头行右侧预留 `menuHorizontalPadding + 24 + 8`，完整容纳24vp Chevron与8vp间隔；居中行对称预留左右空间。文字保持可收缩换行，图标不压缩。行上下8vp，菜单与宽窄布局只改变整行位置和可用宽度，安全区由外层拥有。回归见 `ui-select-layout.test.mjs`；设备核对首页菜单、长旗标名及窄屏。
+
+固定宽度菜单共用应用尺寸的104/152vp紧凑与扩展档、168vp卡片主菜单、136vp子菜单/长按档，左右留白统一10vp，44vp点击行高保留。首页新建与更多菜单按真实图标上缘向内侧锚定，位置与滚动高度由窗口安全边界限制；正文不重复贡献安全区。浏览筛选菜单继续跟随触发分段控件的实测宽度，内部留白也使用公共值，避免改变分段选值与锚点语义。
+
 ## 编辑格式的交互规范
 
-`NoteFieldEditor` 统一管理新增、浏览和学习编辑。格式按钮无选区时按亮/取消，组合样式只影响后续输入；有选区时修改选中文字，不改变输入开关。当前可视样式为加粗、斜体、下划线、荧光，公式/换行/挖空保持一次动作。工具 Flex 自动换行，按钮不收缩、无横向拖动条；36vp 高度、左右 10vp 内边距，输入框与工具组间距 5vp，横纵按钮间距固定 8vp，源码/可视切换必须调用相同按钮实现，点亮时不改变几何；父页面负责卡片外边距和系统安全区。挖空文字和编号按普通文本显示，不自动添加背景；用户明确设置的荧光仍按原格式显示并保存。编辑器不再解析挖空范围或在输入后补写装饰。输入框提示使用“输入〈字段名〉”和 text_tertiary。复杂 HTML 自动使用源码模式，明确提示其格式操作插入标签。
+长字段展开只调整原输入组件的高度（112vp → 336vp），不卸载编辑器，保留当前选区、光标、格式与源码状态；父页面仍拥有滚动、卡片16vp内边距和安全区。更多格式在同一 Flex 中按需显示，沿用36vp工具高度、左右10vp内边距和横纵8vp间隔，不新增第二层工具组边距。上下标输入开关互斥，有选区时只改选区；列表生成标准 HTML 后继续源码编辑，链接用公共表单弹窗，清除格式保留内容。
+
+`NoteFieldEditor` 统一管理新增、浏览和学习编辑。格式按钮无选区时按亮/取消，组合样式只影响后续输入；有选区时修改选中文字，不改变输入开关。当前可视样式为加粗、斜体、下划线、荧光、上标和下标，公式/换行/挖空保持一次动作。工具 Flex 自动换行，按钮不收缩、无横向拖动条；36vp 高度、左右 10vp 内边距，输入框与工具组间距 5vp，横纵按钮间距固定 8vp，源码/可视切换必须调用相同按钮实现，点亮时不改变几何；父页面负责卡片外边距和系统安全区。挖空文字和编号按普通文本显示，不自动添加背景；用户明确设置的荧光仍按原格式显示并保存。编辑器不再解析挖空范围或在输入后补写装饰。输入框提示使用“输入〈字段名〉”和 text_tertiary。复杂 HTML 自动使用源码模式，明确提示其格式操作插入标签。
 
 ## 设置弹窗开发入口
 
@@ -49,11 +73,13 @@
 
 悬浮短提示统一通过 `utils/UiFeedback.ets` 的 `showToastSafely` 展示，中英文均不带末尾句号；保留省略号及正文内部标点。资源形式的消息先按当前语言解析并保留格式参数，再使用同一格式规则。同步完成状态资源本身也不带句号，确保面板与悬浮提示一致。回归入口：`tools/tests/ui-feedback.test.mjs`。
 
-“外观 → 牌组宽度”由 `components/settings/DeckWidthControl.ets` 提供宽/窄选择。`utils/DeckListAppearanceStore.ets` 是本机偏好 `deckListNarrow` 的唯一读写入口，EntryAbility 在首屏前恢复，未设置默认宽；落盘成功后通过 AppStorage 通知列表、列表项及背景裁剪预览，失败保留原值并在设置中提示。宽版保留 92vp 行高与 12vp 间距；窄版为 60vp / 8vp，名称/描述/计数字号各缩小 1fp（16/12/11fp），移除色条及占位、空描述不占行，上下内边距 6vp、左右 12vp（子牌组仅另加层级缩进），切回宽版恢复已存色调。行高共用 `应用尺寸`，背景裁剪预览跟随当前模式。查找入口：`rg -n 'DECK_LIST_NARROW_KEY|narrowDeckRowHeight' entry/src/main/ets`；回归 `tools/tests/deck-width-layout.test.mjs` 覆盖默认值、重启恢复、写入失败与布局接线。设备验收需检查宽窄切换、长名称/描述、父子牌组、排序和背景图。
+“外观 → 牌组样式”由 `components/settings/DeckWidthControl.ets` 提供单列宽、单列窄、双列宽、双列窄。`utils/DeckListAppearanceStore.ets` 是 `deckListStyle` 的唯一写入入口；EntryAbility 在首屏前恢复，缺少新键时从旧 `deckListNarrow` 派生单列样式，默认单列宽。保存经共享队列落盘、回读后广播样式，再发布兼容的页面密度 `DECK_LIST_NARROW_KEY`；页面不直接写这个派生值，旧宽窄偏好仅用作迁移回退。失败保留原值并提示，已保存但应用失败仍报告 partial。JIDE 的 `deck_list_style` 读取同一迁移回退和存储，通过原确认流程调用 `saveDeckListStyle`。
+
+列表继续使用同一 List/LazyForEach，双列时 `HomeDeckGroupSource` 从原可见数据源派生顶级分组，每个 ListItem 包含顶级牌组及全部可见后代，`lanes` 把完整分组排成两列；同一对子树顶端对齐，下一对从较高的一组下方开始，不拆散子树。横向列间距与纵向行间距均为宽12vp/窄8vp；卡片不另加外边距，现有页面外缘与安全区贡献保持原入口。双列隐藏每个牌组的新/学/复计数，名称最多两行，单列仍为一行；描述保留一行。行高由 `应用尺寸.deckRowHeight` 统一提供：宽版92vp、单列窄60vp、双列窄76vp，背景裁剪预览和溢出测量共用。双列宽名称两行44vp + 描述16vp + 间距5vp + 上下内边距26vp = 91vp；双列窄为40 + 16 + 3 + 12 = 71vp，均可完整容纳。窄样式沿用16/12/11fp字号，移除色条及占位，空描述不占行，左右12vp（子牌组另加层级缩进）；切回宽样式恢复已存色调。展开继续消费原数据源；拖动排序临时使用原单列与每个牌组的原始索引，完成或退出后恢复所选样式，切换列数不重排数据。查找入口：`rg -n 'DECK_LIST_STYLE_KEY|deckRowHeight|deckListOverflows' entry/src/main/ets`；回归 `tools/tests/deck-width-layout.test.mjs`。
 
 窄版左侧统一保留 24vp 的展开/排序槽位，无三角形的同级牌组也保留空槽，名称起点一致；仅父子层级增加缩进。宽窄版复用 `牌组列表项.expansionControl` 的既有 150ms EaseOut 旋转动画。`主页牌组列表` 用 `@Prop` 接收首页的展开集合，更新已有行的 `expanded`；不能用普通字段接收（会停留在旧角度），也不能把展开状态加进 LazyForEach key（重建行会跳过旋转过渡）。
 
-首次宽版牌组列表超出当前可视区域时，首页提示是否切换为“窄”，弹窗说明“更多 → 设置 → 外观 → 牌组宽度”。确认复用 `saveDeckListNarrow(true)`，落盘成功后立即同步布局；“保持宽”或返回不修改宽度。已处理的建议由同一偏好存储记录 `deckWidthHintHandled`，重启不再提示；写入失败有提示，本次会话仍不重复弹出。`主页牌组列表` 用实际 List 视口高度、可见牌组数据源（含已展开子牌组）和共享行高/间距调用 `DeckListAppearance.deckListOverflows`，数据变化监听在离页时释放；恰好放下、未测量和非ready状态不触发。`HomeWorkCoordinator` 在导入、手动同步、公告和启动引导之后分配提示时机，不与现有弹窗重叠。回归：`home-deck-width-layout-suggestion.test.mjs`、`home-work-coordinator.test.mjs`；设备由用户检查首次溢出、确认生效、取消、旋转及返回首页。
+单列宽首次溢出时，首页提示切到单列窄；单列窄仍溢出时，复用同一原生弹窗提示切到双列窄，并说明双列隐藏新/学/复计数以及“更多 → 设置 → 外观 → 牌组样式”的位置。确认调用 `saveDeckListStyle`，取消或返回只记录回复；两级记录分别为旧 `deckWidthHintHandled` 与新 `deckDoubleColumnHintHandled`，已有旧记录不屏蔽新提示，每级在当前会话至多弹出一次。双列样式不再提示切换。`主页牌组列表` 按已展开数据源、实测 List 视口、共享行高/间距检查溢出；单列用可见行数，双列用每对整组的较高高度之和加组间距，数据变化监听离页释放；恰好放下、未测量与非ready状态不触发。密度和样式变化唤醒 `HomeWorkCoordinator`，沿用导入、手动同步、公告和启动引导之后的提示时机。回归：`home-deck-width-layout-suggestion.test.mjs`、`home-work-coordinator.test.mjs`。2026-10-05 完成本机行为检查和增量 HAP；尚未做设备验收，需覆盖四种样式、长名称/描述、父子展开、双列进入/退出排序、背景裁剪、旋转、两级提示确认/取消/返回与重启。
 
 同类 UI 的唯一实现和扫描入口见 [公共 UI 代码索引](../../entry/src/main/ets/components/common/README.md)。详情/展开箭头使用 `DisclosureChevron`：24vp 固定绘制区内几何居中，不再依赖文本 `›` 的字体基线。颜色由调用方传入，点击与无障碍名称仍属于整行。修改此类控件先全仓查找已有公共调用及散写，再统一替换；`ui-disclosure-contract.test.mjs` 扫描全部 ArkTS，禁止新出现文字箭头并验证公共几何。
 
@@ -73,7 +99,7 @@
 
 从学习页返回时，首页刷新保留 ready/empty 快照；同牌组同一天的历史图表刷新保留原图，切换范围或日切才隐藏旧数据，失败仍显示错误。学习页进度圈通过 `DelayedLoadingIndicator` 延迟 250ms，短请求完成即卸载并取消任务，慢请求保持反馈。回归入口为 `ui-loading-feedback.test.mjs` 与 `deck-study-history.test.mjs`。
 
-学习与卡片预览右上角动作菜单通过 `components/common/CardActionMenu.ets` 复用首页的 `AnchoredMenu` 与 `MenuItem`，菜单顶部通过 `应用尺寸.pageContentTop(statusBarHeight, narrow)` 与首卡上缘对齐，定位宽度复用工具栏的 `CardViewportLayout.cardViewportWidth` 策略，菜单在 build 中直接挂载，不能再穿过自定义测量组件的嵌套 Builder。菜单表面、居中文字、分隔线、透明外部关闭层和 150ms 动效均由公共组件负责；长菜单按实际窗口剩余高度滚动。不能用系统 `bindMenu` 默认位置替代该入口。回归见 `tools/tests/study-menu.test.mjs` 和 `motion-style-contract.test.mjs`，设备验收对照首页菜单、学习长菜单和横屏边界。本项执行既有[同类变更闭环](coding-agent.md#同类变更闭环)，不另建治理规则。
+学习与卡片预览右上角动作菜单通过 `components/common/CardActionMenu.ets` 复用首页的 `AnchoredMenu` 与 `MenuItem`，菜单顶部通过 `应用尺寸.pageContentTop(statusBarHeight, narrow)` 与首卡上缘对齐，定位宽度复用工具栏的 `CardViewportLayout.cardViewportWidth` 策略，菜单在 build 中直接挂载，不能再穿过自定义测量组件的嵌套 Builder。菜单表面、图文成组对齐、分隔线、透明外部关闭层和 150ms 动效均由公共组件负责；长菜单按实际窗口剩余高度滚动。不能用系统 `bindMenu` 默认位置替代该入口。回归见 `tools/tests/study-menu.test.mjs` 和 `motion-style-contract.test.mjs`，设备验收对照首页菜单、学习长菜单和横屏边界。本项执行既有[同类变更闭环](coding-agent.md#同类变更闭环)，不另建治理规则。
 
 设置项选择弹窗和备份选择列表的选中项只保留背景色，不叠加勾号。牌组选项统一从 `components/home/DeckOptionField.ets` 修改该样式；新增同类选择弹窗先复用现有入口，保持相同选中态。
 
@@ -98,19 +124,19 @@ EntryAbility 的配置更新及返回前台通过 `refreshThemeColors()` 使用�
 
 安装指纹和离线兑换入口位于“设置 → 应用指纹与兑换”独立分类，简洁版与实验版均可访问，由 `components/settings/RedemptionPanel.ets` 直接展示识别码、复制及主题兑换入口；底层指纹协议不变。`model/Redemption.ts` 固定 JCR1 单内容签名协议；`utils/RedemptionStore.ets` 负责随机指纹落盘、Ed25519 验签、凭证持久化与权益派生。应用只包含 `RedemptionPublicKey.ts` 公钥，私钥由用户目录外置发行工具保管。新增内容在协议白名单、凭证权益派生和工具内容选项中分别增加独立编号；使用流程见 `docs/REDEMPTION.md`。
 
-幻彩只在有效权益下实际应用；ⓘ 与锁定选项明示其赠送给所有 3.0.0 之前用户，并复用官方 QQ 群号。`ThemeCatalog.ts` 统一主题种子色、装饰、背景、权益与发行工具选项，新增主题只登记配置和中英文名称（专属主题另外更新赠送说明）。`ThemeBackground.ets` 在 `Navigation` 外仅创建一次，三张透明纹理每 6 秒向系统合成动画提交平移/缩放/透明度目标，不使用逐帧 ArkTS 更新或运行时色相滤镜；切页不重建、不改变亮度；首页通过 transitionActive 在导航转场期间冻结当前构图，先隐藏退出页再淡入进入页，避免透明 NavDestination 与彩雾根层合成出旧页面残影；onTransitionEnd 解除暂停，转场代次阻止旧结束事件提前恢复。前后台与根可见性控制暂停，轮次号阻止旧完成回调复活动画。页面订阅 `PAGE_SURFACE_KEY`，导航容器透明。`ThemeBackgroundMotion.ts` 提供运动目标，`ThemeVisuals.ets` 转换渐变，牌组色条由长按菜单中的原生 Select 选择六色或无色条；None 在包括幻彩在内的所有主题下保持透明占位，刷新沿用已保存选择，不自动补渐变色条，不改变学习计数语义色。`ThemeText.ets` 的共享 Span 构建器统一主题强调文字，订阅 `THEME_TEXT_COLORS_KEY`，保留普通/禁用/危险文字语义。`GlassSurface.ets` 统一轻操作和评分按钮按下态，与选中牌组共用加厚的深浅玻璃配色；以半透明材料呈现已有柔化背景，不使用实时 backdropBlur。开始学习和两种显示答案通过 PrimaryGlassSurface 共用不透明 surface_card 底色（浅色为白，深色随卡片外观），默认不叠加渐变、无描边；仅按下时叠加主题反馈，文字按当前主题着色；文字节点key包含色值，新建牌组组件内直接绘制Span。导航透明度使用 EaseOut，背景请求 30fps（15–30fps 范围），导航独立请求 60fps；首页与设置的按钮到首卡距离共用页面分组间距，宽版12vp、窄版8vp。扩展步骤见 `docs/REDEMPTION.md`。
+幻彩只在有效权益下实际应用；ⓘ 与锁定选项明示其赠送给所有 3.0.0 之前用户，并复用官方 QQ 群号。`ThemeCatalog.ts` 统一主题种子色、装饰、背景、权益与发行工具选项，新增主题只登记配置和中英文名称（专属主题另外更新赠送说明）。`ThemeBackground.ets` 在 `Navigation` 外仅创建一次，三张透明纹理每 6 秒向系统合成动画提交平移/缩放/透明度目标，不使用逐帧 ArkTS 更新或运行时色相滤镜；切页不重建、不改变亮度；首页通过 transitionActive 在导航转场期间冻结当前构图，先隐藏退出页再淡入进入页，避免透明 NavDestination 与彩雾根层合成出旧页面残影；onTransitionEnd 解除暂停，转场代次阻止旧结束事件提前恢复。前后台与根可见性控制暂停，轮次号阻止旧完成回调复活动画。页面订阅 `PAGE_SURFACE_KEY`，导航容器透明。`ThemeBackgroundMotion.ts` 提供运动目标，`ThemeVisuals.ets` 转换渐变，牌组色条由长按菜单中的原生 Select 选择六色或无色条；None 在包括幻彩在内的所有主题下保持透明占位，刷新沿用已保存选择，不自动补渐变色条，不改变学习计数语义色。`ThemeText.ets` 的共享 Span 构建器统一主题强调文字，订阅 `THEME_TEXT_COLORS_KEY`，保留普通/禁用/危险文字语义。`GlassSurface.ets` 统一轻操作和评分按钮按下态，与选中牌组共用加厚的深浅玻璃配色；以半透明材料呈现已有柔化背景，不使用实时 backdropBlur。开始学习和两种显示答案通过 PrimaryGlassSurface 共用不透明 surface_card 底色（浅色为白，深色随卡片外观），默认不叠加渐变，边框复用 SurfaceBorder；仅按下时叠加主题反馈，文字按当前主题着色；文字节点key包含色值，新建牌组组件内直接绘制Span。导航透明度使用 EaseOut，背景请求 30fps（15–30fps 范围），导航独立请求 60fps；首页与设置的按钮到首卡距离共用页面分组间距，宽版12vp、窄版8vp。扩展步骤见 `docs/REDEMPTION.md`。
 
 页面间距要求为 **a=b=c=d**：系统时间文字下缘→顶部按钮上缘、按钮下缘→今日进度上缘、今日进度下缘→首个牌组上缘、牌组之间。四段共用 `应用尺寸.页面分组间距(narrow)`，宽版12vp、窄版8vp。`pageToolbarTop` / `pageToolbarHeight` 决定顶栏，顶栏在44vp按钮下缘结束（底padding为0），`页面内容顶部间距` 只贡献一次b。首页、设置、统计、浏览、学习、预览、添加笔记、提醒与Agent页面使用同一几何入口；内部表单/聊天/闪卡HTML保留各自布局。菜单调用方传入 `pageContentTop` 最终坐标；`AnchoredMenu` 不再二次扣除窄版偏移。浏览页的搜索、筛选和首张结果卡也必须按同一 `页面分组间距` 排列，筛选容器不能再叠加私有底边距；结果卡之间沿用同一值。
 
 **a 的平台限制与待验收项**：`getWindowAvoidArea(TYPE_SYSTEM).topRect` 是系统避让区，不是状态栏时间字形边界。当前 `statusTextBottomInset=6vp` 是依据用户截图的初始光学校准估计，不是API实测，也没有证明适用于其他设备/字体/横屏。`statusTextBottom` 将此估计与安全区明确分开，无状态栏时钳制为0。须由用户在设备上检查实际时间文字下缘；不能以数学回归通过声称真实a已达标。不得将顶部胶囊内部文字作为参照，也不得为读取系统字形引入截图权限或另绘系统时钟。具体坐标和验收见 [页面间距](../UI_SPACING.md)。
 
-宽/窄偏好仍由 `DeckListAppearanceStore` 唯一持久化，`DECK_LIST_NARROW_KEY` 通知顶栏、同级卡片、牌组列表及菜单调用方同步重算。`ui-shell-contract.test.mjs` 执行实际尺寸函数和首页顶栏表达式，验证宽→窄→宽的四段等式（a针对光学估计），并锁定工具栏无额外底留白、菜单不二次偏移；系统字形精度仍需设备验收。
+牌组样式仍由 `DeckListAppearanceStore` 唯一持久化并派生宽/窄密度，`DECK_LIST_NARROW_KEY` 通知顶栏、同级卡片、牌组列表及菜单调用方同步重算。`ui-shell-contract.test.mjs` 执行实际尺寸函数和首页顶栏表达式，验证宽→窄→宽的四段等式（a针对光学估计），并锁定工具栏无额外底留白、菜单不二次偏移；系统字形精度仍需设备验收。
 
 首页顶部工具栏将左右操作区设置为相同 `layoutWeight`，中间状态组按内容宽度排列、两侧各留 8vp；单个图标对准屏幕中线，组内多个元素以整体中心对齐。不可用两个 Blank 夹住状态或绝对定位覆盖操作区，否则左右按钮标签长度不同会导致偏移或重叠。工具栏按钮启用 `按下态按钮.singleLine`，宽度不超过侧栏，长标签单行省略并保留完整无障碍名称；其他按钮维持原多行行为。同步圆圈固定为 24vp，点击区为 44vp；实际同步中显示圆圈，冲突或错误显示同一点击区内的红色圆圈感叹号，其余状态隐藏，避免等待用户处理的任务完全没有入口。
 
 
 
-首页两个菜单通过 `AnchoredMenu.contentMaxWidth` 与工具栏共用 `应用尺寸.内容最大宽度`，定位容器居中限宽，外部点击层仍覆盖窗口。设置与浏览搜索框直接声明共享 `searchFieldHeight`/`searchFieldRadius`，避免系统默认圆角随设备变化。学习术语使用整行可点的 › 箭头，仍打开原说明弹窗。牌组详情在所有屏宽隐藏“当前牌组”，平板等直接展示的详情最上方用同一行等宽44vp操作排列制卡、JIDE、预览，三个入口共用15fp字号、对称4vp内边距和居中文字，相邻点击区由页面分组间距提供常规12vp/紧凑8vp，无额外外边距；预览保留次级文字色。单行标签超宽省略；名称在下方独占整行，自然换行。AI 制卡沿用既有入口开关，未启用时其余两项平分宽度；手机详情顶栏为返回和右上角更多，三个入口使用与首页更多相同的公共 `AnchoredMenu` / `AnchoredMenuItem` 收进无箭头的更多菜单，菜单沿用工具栏下方锚点、统一宽度、行高、分隔线及动效；只有预览范围子弹窗保留箭头，锚定父菜单中的预览行；系统返回先关闭菜单，选择动作、外部点击、退出详情或切换布局均关闭菜单。JIDE 入口仍进入“JIDE 制卡”页面，入口与页面标题分别使用 `ai_agent_title` / `ai_card_title`。空描述不再占一行。牌组详情的开始学习操作区位于滚动内容卡片外、下方，卡片到按钮间距通过 `应用尺寸.操作区顶部间距` 只贡献一次；底部通过 `操作区底部间距(窄版, 导航条高度)` 自动避让导航条。学习页固定显示答案使用同一操作区公式，无导航条时仍保留页面底部留白。手机详情与宽屏侧栏共用这一布局。开始学习和固定显示答案直接复用 components/开始学习按钮.ets，由文案和回调区分动作，共用字号、尺寸、不透明白底及按压效果，与浮动显示答案统一不显示描边。学习与预览采用牌组详情相同的 surface_card / border_subtle 浅边框，并共用 CardViewportLayout 的窗口限宽规则与同款卡片外框，横屏随窗口放宽，保留牌组模板自己的排版。
+首页动作在统计卡上方始终单排，从左到右为更多、JIDE、搜索、浏览、同步、＋新建，更多与新建固定首行左右两端；手机与详情分栏使用同一规则。HomeHeaderLayout 按可用宽度同时调整六个等宽按钮、五处间距与图标大小，不换行；统计卡占满下方宽度，保留168vp高度。图标按钮统一复用 IconActionButton；先设置 border 再设置 borderRadius，避免平台 border 的默认圆角覆盖自定义值。八页统计共用独立的圆点留白、24vp标题槽与居中正文区，四张柱图共用基线和刻度高度。更多与新建通过 BottomLeft/BottomRight 在对应按钮下方展开，尖角朝上，正文滚动高度计入按钮高度、间距、箭头和安全区域；WindowSafeLayout 由 EntryAbility 的系统栏、挖孔、导航条并集发布，首页使用真实安全上缘。公共 AnchoredMenu 同样限制安全区域内的位置和高度。主页不使用握姿监听。设置与浏览搜索框直接声明共享 `searchFieldHeight`/`searchFieldRadius`，避免系统默认圆角随设备变化。学习术语使用整行可点的 › 箭头，仍打开原说明弹窗。牌组详情在所有屏宽隐藏“当前牌组”，平板等直接展示的详情最上方用同一行等宽44vp操作排列制卡、JIDE、预览，三个入口共用15fp字号、对称4vp内边距和居中文字，相邻点击区由页面分组间距提供常规12vp/紧凑8vp，无额外外边距；预览保留次级文字色。单行标签超宽省略；名称在下方独占整行，自然换行。AI 制卡沿用既有入口开关，未启用时其余两项平分宽度；手机详情顶栏为返回和右上角更多，三个入口使用公共 `AnchoredMenu` / `AnchoredMenuItem` 收进无箭头的更多菜单，菜单沿用工具栏下方锚点、统一宽度、行高、分隔线及动效；只有预览范围子弹窗保留箭头，锚定父菜单中的预览行；系统返回先关闭菜单，选择动作、外部点击、退出详情或切换布局均关闭菜单。JIDE 入口仍进入“JIDE 制卡”页面，入口与页面标题分别使用 `ai_agent_title` / `ai_card_title`。空描述不再占一行。牌组详情的开始学习操作区位于滚动内容卡片外、下方，卡片到按钮间距通过 `应用尺寸.操作区顶部间距` 只贡献一次；底部通过 `操作区底部间距(窄版, 导航条高度)` 自动避让导航条。学习页固定显示答案使用同一操作区公式，无导航条时仍保留页面底部留白。手机详情与宽屏侧栏共用这一布局。开始学习和固定显示答案直接复用 components/开始学习按钮.ets，由文案和回调区分动作，共用字号、尺寸、不透明白底及按压效果，与浮动显示答案统一复用 SurfaceBorder 描边。学习与预览采用牌组详情相同的 surface_card 底色与 SurfaceBorder 公共边框，并共用 CardViewportLayout 的窗口限宽规则与同款卡片外框，横屏随窗口放宽，保留牌组模板自己的排版。
 
 
 新增/编辑页布局统一由 `NoteEditorHeader`（左右 28%、中央标题 44%，状态栏避让沿用 pageToolbarTop）与 `NoteFieldCard`（内边距 16vp、内部间距 8vp）持有。外层滚动区域使用同一页面水平边距、顶部内容间距，底部留 8vp 加导航条高度。编辑页是 NavDestination，不在旧弹窗内再套页面；读取错误和忙态也复用同一顶栏。`editor-page` 与 `ui-shell-contract` 验证接线，真实键盘、字体缩放和换行边界仍需设备验收。
@@ -139,3 +165,23 @@ EntryAbility 的配置更新及返回前台通过 `refreshThemeColors()` 使用�
 `LabeledActionRow.ets` 复用同样的标签宽度、间隔和右侧限宽，内部使用按下态按钮；JIDE 目标选择、主题撤销、新建类型、联网额度购买、背景选择、兑换使用、媒体新增和音频重播共用此行。辅助按钮文案允许尾部省略，保留完整无障碍名称。保存、提交、危险确认等原表单操作不受这次紧凑化影响。禁用守卫、越界选项和完整值回归见 `ui-compact-controls.test.mjs`；共享选择几何继续由 `ui-select-layout.test.mjs` 全调用扫描。宽/窄屏、长中英文标签、大字号及安全区变化仍需设备验收，Node 测试与签名构建不代表像素验收。
 
 本轮 `npm run verify` 完整通过：Node 2114 项、Rust/真实 Core 测试、沙箱与 RPC 校验、双架构原生及签名 HAP 均通过；构建警告 accepted=268、unexpected=0。最后一次源码与文档调整后再次运行 `npm test`，2114 项通过。本次未安装到平板，也未操作设备界面。
+
+## 公共组件边界与状态入口
+
+通用页面密度键由 `model/AppLayoutState.ts` 定义，沿用 `deckListNarrow` 作为 AppStorage 兼容键，由 `DeckListAppearanceStore` 从持久化牌组样式派生；旧持久化宽窄键仅用于迁移。牌组专用调用沿用 `DECK_LIST_NARROW_KEY` 兼容别名；页面、菜单和笔记顶栏订阅 `PAGE_COMPACT_LAYOUT_KEY`。原有宽/窄联动、12/8vp 分组间距及安全区贡献不变。
+
+前后台键由 `model/AppLifecycleState.ts` 定义，EntryAbility 唯一发布；同步、录音、学习和预览订阅同一 `appForeground`。动画键移到已有主题键集合 `ThemeCatalog.ts`，沿用 `themeMotion`；保存仍经 RedemptionStore 的原偏好和失败恢复入口，不迁移存储文件。
+
+表单行间距、最小高度和右侧限宽由 `utils/FormRowLayout.ets` 拥有；SelectStyle 只保留原生控件的视觉参数，并转用该限宽。菜单和 Select 使用底层 `radiusLg`，指标卡圆角是可独立调整的业务 alias；笔记图片使用 `noteMediaPreviewHeight`，不能借用今日摘要卡高度。这些尺寸保持原值，宿主继续独占水平边距和安全区，未增加外层 padding/margin。
+
+统一加载/错误态的默认文案经 `common_loading` / `common_retry` 中英资源，加载尺寸共用公共 token；错误态仅在提供 `onRetry` 时渲染重试按钮。空态与错误态动作复用按下态按钮，错误图标为不参与读屏的 SymbolGlyph。公共 Switch 行使用 text_primary/text_secondary，允许宿主显式传入文字颜色；默认主操作色与取消文字也使用通用资源。
+
+新增基础 common 组件只直接依赖 common、通用模型和 UI 工具。现有笔记/标签/标记业务 UI 的逐条迁移例外及索引完整性由 `common-boundary.test.mjs` 检查，迁出后删除例外；不按文件名给未来 Note 组件放行。完整依赖解析仍经 architecture-boundaries。相关回归：`ui-common-state.test.mjs`、`ui-compact-controls.test.mjs`、`ui-select-layout.test.mjs`、`ui-shell-contract.test.mjs`、原牌组偏好/兑换/音频测试。Node 不证明 ArkUI 观察和最终布局，需增量 HAP；宽窄、深浅色、空态/错误动作、读屏与前后台体验另需设备验收。
+
+## 即时语言刷新
+
+EntryAbility 在配置通知后读取应用偏好语言，发布既有“系统语言”键；主题通知不能用系统语言覆盖应用偏好。UI 中提前解析成普通字符串的标题、菜单与 Select 选项显式观察此键，由 UiFeedback 和目录文字入口重新解析；本地辅助方法的 `_locale` 默认参数负责读到响应式语言。原生 `$r` 继续由系统刷新。帮助 i 改用18vp居中 SVG，保留44vp点击区，不依赖字体基线。`ui-locale-refresh.test.mjs` 验证真实资源与控件内容重算，`theme-configuration.test.mjs` 验证配置通知来源；Node/HAP 不能替代设备上的即时刷新验收。
+
+渐变 Span Builder 的按值参数会保留旧字符，因此宿主用仅包裹文字子节点的 `ForEach([this.uiLanguage])` 按语言重建 Span；不重建表单或页面。统计页语言 watcher 只替换缓存的“全部牌组”标签，保留牌组筛选；统计范围选择与默认牌组名也直接依赖同一语言。
+
+2026-10-03 此批验收：定位、连续轮廓、语言刷新、帮助几何、主题配置、公共入口及文档的聚焦测试62项通过；增量签名HAP通过，unexpected warnings=0。实际 MenuBubble Path 已按深浅色、两种方向和44/132/176vp高度渲染检查，产物在忽略的 `.local/menu-bubble-geometry.*`。全量Node另外保留3项既有失败：`ai-agent-conversational-ui-contract` 仍期待散写分隔边框，`ai-agent-high-risk-ui-contract` 仍期待原生Select，`ai-agent-math` 的测试宿主缺少SurfaceBorder依赖；没有修改这些任务的实现或降低断言。本次未安装设备，Node与路径渲染不能证明实际ArkUI观察、长文字布局及触屏交互。

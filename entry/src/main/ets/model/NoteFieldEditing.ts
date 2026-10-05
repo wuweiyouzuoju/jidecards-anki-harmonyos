@@ -23,8 +23,10 @@ export function nextClozeNumber(fields: string[], same: boolean): number {
 
 export function parseNoteTags(value: string): string[] {
   const result: string[] = [];
+  const seen: Set<string> = new Set<string>();
   for (const tag of value.split(new RegExp('\\s+'))) {
-    if (tag !== '' && result.indexOf(tag) < 0) result.push(tag);
+    const key: string = tag.toLowerCase();
+    if (tag !== '' && !seen.has(key)) { result.push(tag); seen.add(key); }
   }
   return result;
 }
@@ -33,3 +35,26 @@ export function noteDraftChanged(fields: string[], original: string[], tags: str
   return fields.length !== original.length || fields.some((value: string, index: number): boolean => value !== original[index])
     || parseNoteTags(tags).join(' ') !== parseNoteTags(originalTags).join(' ');
 }
+/** 公共字段输入的外观与初始模式，不包含 Core 字段身份。 */
+export interface NoteFieldEditingOptions {
+  rtl?: boolean;
+  fontName?: string;
+  fontSize?: number;
+  description?: string;
+  /** Anki 的历史命名：默认 HTML 源码模式，保留格式。 */
+  plainText?: boolean;
+  collapsed?: boolean;
+}
+
+export interface NoteFieldEditingSupport {
+  fieldOptions: string[];
+  minimumFontSize: number;
+  maximumFontSize: number;
+  plainTextMeaning: string;
+  fontAvailability: string;
+}
+export const NOTE_FIELD_EDITING_SUPPORT: NoteFieldEditingSupport = {
+  fieldOptions: ['rtl', 'font', 'size', 'description', 'plainText', 'collapsed'],
+  minimumFontSize: 5, maximumFontSize: 300, plainTextMeaning: 'default_html_source_preserving_formatting',
+  fontAvailability: 'installed fonts with system fallback; font file import is not available'
+};

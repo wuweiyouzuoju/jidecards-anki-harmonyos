@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { settingsItemText } from '../../utils/SettingsStructureText';
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { PrimaryActionButton } from '../common/PrimaryActionButton';
 import { OFFICIAL_ANKIWEB_SYNC_UI_ENABLED } from '../../model/ReleaseFeatures';
 import { PressFeedback } from '../../utils/PressFeedback';
-import { resourceText, showToastSafely } from '../../utils/UiFeedback';
+import { showToastSafely, resourceText } from '../../utils/UiFeedback';
 import { ThemeTextSpans } from '../common/ThemeText';
 import { DialogHeader } from '../common/DialogHeader';
 import { SettingsToggleRow } from '../common/SettingsToggleRow';
-import { DisclosureChevron } from '../common/DisclosureChevron';
+import { SettingsActionRow } from '../common/SettingsActionRow';
+import { settingsIcon } from '../../utils/SettingsIcons';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
 import { common } from '@kit.AbilityKit';
@@ -61,6 +63,7 @@ import { 设置分组卡片 } from './设置分组卡片';
 // ========================================================
 @Component
 export struct 同步分组 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop 简洁模式: boolean = true;
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop 是否深色: boolean = false;
@@ -248,7 +251,7 @@ export struct 同步分组 {
     }
   }
 
-  private 取本地化文本(资源: Resource): string {
+  private 取本地化文本(资源: Resource, _locale: string = this.uiLanguage): string {
     return resourceText(this.getUIContext(), 资源);
   }
 
@@ -426,7 +429,7 @@ export struct 同步分组 {
           .fontSize(12)
           .fontColor(色板.三级文字)
           .layoutWeight(1)
-        Text() { ThemeTextSpans(settingsItemText(this.getUIContext(), 'sync_register'), this.themeAccentColors, this.getUIContext()) }
+        Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(settingsItemText(this.getUIContext(), 'sync_register', this.uiLanguage), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }
           .fontSize(12)
           .fontWeight(FontWeight.Medium)
           .fontColor(this.解析主色按钮背景())
@@ -437,8 +440,9 @@ export struct 同步分组 {
       }
       .width('100%')
     }
-    TextInput({ placeholder: this.savedServer === '' ? settingsItemText(this.getUIContext(), 'sync_username') :
+    TextInput({ placeholder: this.savedServer === '' ? settingsItemText(this.getUIContext(), 'sync_username', this.uiLanguage) :
       $r('app.string.sync_custom_username_hint'), text: this.用户名输入 })
+      .border(SurfaceBorder.options())
       .width('100%')
       .height(44)
       .fontSize(14)
@@ -451,7 +455,8 @@ export struct 同步分组 {
       .onChange((值: string) => {
         this.用户名输入 = 值;
       })
-    TextInput({ placeholder: settingsItemText(this.getUIContext(), 'sync_password'), text: this.密码输入 })
+    TextInput({ placeholder: settingsItemText(this.getUIContext(), 'sync_password', this.uiLanguage), text: this.密码输入 })
+      .border(SurfaceBorder.options())
       .width('100%')
       .height(44)
       .fontSize(14)
@@ -468,7 +473,7 @@ export struct 同步分组 {
       .onSubmit((): void => {
         this.点击登录();
       })
-    PrimaryActionButton({ label: this.登录中 ? $r('app.string.sync_logging_in') : settingsItemText(this.getUIContext(), 'sync_login'),
+    PrimaryActionButton({ label: this.登录中 ? $r('app.string.sync_logging_in') : settingsItemText(this.getUIContext(), 'sync_login', this.uiLanguage),
       tint: this.解析主色按钮背景(),
       isInteractive: this.serverLoaded && !this.登录中 && !this.settingsSaving && this.serverInput === this.savedServer,
       onAction: (): void => { this.点击登录(); } })
@@ -503,7 +508,7 @@ export struct 同步分组 {
   @Builder
   private 已登录内容(色板: 设置面板色板) {
     Column({ space: 应用尺寸.间距_4 }) {
-      Text(settingsItemText(this.getUIContext(), 'sync_account'))
+      Text(settingsItemText(this.getUIContext(), 'sync_account', this.uiLanguage))
         .fontSize(应用尺寸.字号_正文_小)
         .fontColor(色板.次文字)
       Text(this.账号名)
@@ -520,8 +525,7 @@ export struct 同步分组 {
     // 媒体同步开关（对齐 Anki 桌面端 Preferences → Sync → "Sync media"）。
     // 关闭后 syncCollection 传 syncMedia=false，跳过媒体阶段。
     SettingsToggleRow({
-      title: settingsItemText(this.getUIContext(), 'sync_media'),
-      hint: $r('app.string.settings_sync_media_toggle_hint'),
+      title: settingsItemText(this.getUIContext(), 'sync_media', this.uiLanguage), hint: $r('app.string.settings_sync_media_toggle_hint'),
       isOn: this.媒体同步开启,
       isDark: this.是否深色,
       tint: this.解析主色按钮背景(),
@@ -532,7 +536,7 @@ export struct 同步分组 {
     })
     Divider().color(色板.分隔线).margin({ bottom: 应用尺寸.间距_16 })
     Row({ space: 8 }) {
-      Button(settingsItemText(this.getUIContext(), 'sync_backup_first'))
+      Button(settingsItemText(this.getUIContext(), 'sync_backup_first', this.uiLanguage))
         .layoutWeight(1)
         .height(40)
         .fontSize(12)
@@ -545,7 +549,7 @@ export struct 同步分组 {
         .onClick((): void => {
           this.点击导出数据回调();
         })
-      Button(settingsItemText(this.getUIContext(), 'sync_now'))
+      Button(settingsItemText(this.getUIContext(), 'sync_now', this.uiLanguage))
         .layoutWeight(1)
         .height(40)
         .fontSize(12)
@@ -558,7 +562,7 @@ export struct 同步分组 {
         .onClick((): void => {
           this.点击立即同步();
         })
-      Button(settingsItemText(this.getUIContext(), 'sync_logout'))
+      Button(settingsItemText(this.getUIContext(), 'sync_logout', this.uiLanguage))
         .layoutWeight(1)
         .height(40)
         .fontSize(12)
@@ -610,26 +614,9 @@ export struct 同步分组 {
             this.已登录内容(设置面板色板_取(this.是否深色))
           }
           Divider().color(设置面板色板_取(this.是否深色).分隔线)
-          Button() {
-            Row({ space: 应用尺寸.间距_12 }) {
-              Text(settingsItemText(this.getUIContext(), 'sync_custom_server'))
-                .fontSize(应用尺寸.字号_正文_中)
-                .fontColor(设置面板色板_取(this.是否深色).次文字)
-                .layoutWeight(1)
-                .textAlign(TextAlign.Start)
-              DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).三级文字 })
-            }
-            .width('100%')
-          }
-          .type(ButtonType.Normal)
-          .backgroundColor(Color.Transparent)
-          .width('100%')
-          .constraintSize({ minHeight: 应用尺寸.按钮高度 })
-          .padding({ top: 应用尺寸.间距_8, bottom: 应用尺寸.间距_8 })
-          .enabled(!this.登录中 && !this.settingsSaving)
-          .attributeModifier(new PressFeedback())
-          .stateEffect(false)
-          .onClick((): void => { this.openServerDialog(); })
+          SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'sync_custom_server', this.uiLanguage),
+            icon: settingsIcon('sync'), isInteractive: !this.登录中 && !this.settingsSaving,
+            onAction: (): void => { this.openServerDialog(); } })
         }
         .width('100%')
       }
@@ -642,8 +629,7 @@ export struct 同步分组 {
   @Builder
   private autoSyncSetting() {
     SettingsToggleRow({
-      title: settingsItemText(this.getUIContext(), 'auto_sync'),
-      hint: $r('app.string.sync_auto_hint'),
+      title: settingsItemText(this.getUIContext(), 'auto_sync', this.uiLanguage), hint: $r('app.string.sync_auto_hint'),
       isOn: this.autoSyncEnabled,
       isInteractive: !this.settingsSaving && !this.登录中,
       isDark: this.是否深色,
@@ -717,7 +703,7 @@ struct 自定义服务器弹窗 {
       .padding(应用尺寸.间距_16)
       .backgroundColor($r('app.color.surface_card'))
       .borderRadius(应用尺寸.圆角_卡片)
-      .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+      .border(SurfaceBorder.options())
     }
     .width('100%')
     .alignItems(HorizontalAlign.Center)
@@ -730,6 +716,7 @@ struct 自定义服务器弹窗 {
       .fontColor(色板.次文字)
       .width('100%')
     TextInput({ text: this.serverInput, placeholder: OFFICIAL_ANKIWEB_SYNC_UI_ENABLED ? $r('app.string.sync_server_placeholder') : $r('app.string.sync_custom_server_placeholder') })
+      .border(SurfaceBorder.options())
       .fontSize(14)
       .fontColor(色板.主文字)
       .placeholderColor(色板.弱化文字)

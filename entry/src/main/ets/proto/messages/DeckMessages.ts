@@ -278,12 +278,15 @@ export function encodeDeck(deck: Deck): Uint8Array {
   return w.转为字节();
 }
 
-/**
- * 编码 RenameDeckRequest（decks.proto）：
- * - field 1: int64 deck_id
- * - field 2: string new_name
- * 仅在 deckId 非 0、newName 非空时编码；后端 rename_deck 会自动级联重命名子牌组前缀。
- */
+/** ReparentDecksRequest：field 1 repeated int64 deck_ids，field 2 int64 new_parent（0=顶级）。 */
+export function encodeReparentDecksRequest(deckIds: number[], parentId: number): Uint8Array {
+  const w = new 协议写入器();
+  for (const id of deckIds) w.写入64位整数(1, id);
+  if (parentId !== 0) w.写入64位整数(2, parentId);
+  return w.转为字节();
+}
+
+/** RenameDeckRequest：field 1 int64 deck_id，field 2 string new_name；Core 级联子牌组。 */
 export function encodeRenameDeckRequest(deckId: number, newName: string): Uint8Array {
   const w = new 协议写入器();
   if (deckId !== 0) {

@@ -24,8 +24,8 @@ test('About keeps copyright and licenses entry, stays free of heavy legal wordin
   for (const key of ['app_about_copyright']) {
     assert.match(panel, new RegExp(`app\\.string\\.${key}`));
   }
-  assert.match(panel, /settingsItemText\(this\.getUIContext\(\), 'app_information'\)/);
-  assert.match(panel, /settingsItemText\(this\.getUIContext\(\), 'licenses'\)/);
+  assert.match(panel, /settingsItemText\(this\.getUIContext\(\), 'app_information', this\.uiLanguage\)/);
+  assert.match(panel, /settingsItemText\(this\.getUIContext\(\), 'licenses', this\.uiLanguage\)/);
   assert.doesNotMatch(panel, /Copyright ©/);
   assert.doesNotMatch(panel, /按“现状”提供/);
   assert.doesNotMatch(panel, /法律强制规定不得排除的责任除外/);

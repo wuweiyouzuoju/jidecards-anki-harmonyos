@@ -3,6 +3,7 @@ import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
 import { agentPreferenceDefinitions, agentWritablePreferenceIds, decodeAgentPreference } from '../../model/agent/AgentPreferenceSettings';
 import { readLocalPreference } from '../../utils/LocalPreferenceWrite';
+import { legacyDeckListStyle } from '../../utils/DeckListAppearanceStore';
 import type { AgentPreferenceDefinition, AgentPreferenceValue } from '../../model/agent/AgentPreferenceSettings';
 
 export interface AgentPreferenceState { id: string; value: AgentPreferenceValue; source: string; }
@@ -15,9 +16,10 @@ export async function readAgentPreference(id: string): Promise<AgentPreferenceSt
   const context: common.UIAbilityContext | undefined = AppStorage.get<common.UIAbilityContext>('abilityContext');
   if (context === undefined) { throw new Error('ability_context_unavailable'); }
   const store: preferences.Preferences = await preferences.getPreferences(context, definition.store);
+  const fallback: preferences.ValueType = id === 'deck_list_style' ? legacyDeckListStyle(store) : definition.defaultValue;
   const stored: preferences.ValueType = agentWritablePreferenceIds().includes(id) ?
-    await readLocalPreference(store, definition.key, definition.defaultValue) :
-    await store.get(definition.key, definition.defaultValue);
+    await readLocalPreference(store, definition.key, fallback) :
+    await store.get(definition.key, fallback);
   if (typeof stored !== 'string' && typeof stored !== 'boolean' && typeof stored !== 'number') {
     throw new Error('invalid_saved_setting:' + id);
   }

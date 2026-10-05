@@ -1,11 +1,15 @@
 import { PressFeedback } from '../utils/PressFeedback';
+import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { EditNotePageParams } from '../model/navigation/PageParams';
+import { CollectionHistoryDialog } from '../components/CollectionHistoryDialog';
+import { BrowserResetDialog } from '../components/browser/BrowserResetDialog';
+import type { ScheduleCardsAsNewOptions } from '../proto/messages/SchedulerMessages';
 import { BrowserMoreMenu } from '../components/browser/BrowserMoreMenu';
 import { appInterface } from '../backend/AppInterfaceService';
 import { BrowserNotetypeFeature } from '../components/browser/BrowserNotetypeFeature';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { DialogBackdrop } from '../components/common/DialogBackdrop';
-import { namedResourceText, showToastSafely } from '../utils/UiFeedback';
+import { showToastSafely, localizedNamedResourceText, namedResourceText } from '../utils/UiFeedback';
 import { loadBrowserSidebar, parseBrowserSavedSearches, removeBrowserSavedSearch, serializeBrowserSavedSearches, upsertBrowserSavedSearch } from '../model/BrowserSidebar';
 import type { BrowserSavedSearch } from '../model/BrowserSidebar';
 import { AnkiBrowserSidebar } from '../backend/AnkiBrowserSidebar';
@@ -15,15 +19,22 @@ import { resolveBrowserCardIds, resolveBrowserNoteIds } from '../model/BrowserSe
 import type { 变更笔记类型请求 } from '../proto/messages/NotetypeMessages';
 import { SelectStyle } from '../utils/SelectStyle';
 import { BrowserOperationContext, BrowserOperationController } from '../model/BrowserOperationController';
+import { BrowserCardStateBackend, toggleBrowserCardState } from '../model/BrowserCardState';
 import { autoSyncScheduler } from '../model/AutoSyncScheduler';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
-import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
+import { PAGE_COMPACT_LAYOUT_KEY } from '../model/AppLayoutState';
 
 import { BrowserDueDialog } from '../components/browser/BrowserDueDialog';
 import { BrowserRenameTagDialog } from '../components/browser/BrowserRenameTagDialog';
+import { BrowserTagsDialog } from '../components/browser/BrowserTagsDialog';
+import { TagSelectionChange, TagRow, flattenTagTree, newTagName, tagSearchNode, updateSelectedNoteTags } from '../model/NoteTags';
+import { EditableNote } from '../proto/messages/NoteMessages';
 import { BrowserSavedSearchDialog } from '../components/browser/BrowserSavedSearchDialog';
 import { BrowserDeckDialog } from '../components/browser/BrowserDeckDialog';
-import { BrowserFlagDialog } from '../components/browser/BrowserFlagDialog';
+import { FlagNamesDialog } from '../components/browser/FlagNamesDialog';
+import { AnkiCardMarking } from '../backend/AnkiCardMarking';
+import { FlagLabels, parseFlagLabels, customFlagLabel, setMarkedNotes, setCardFlags } from '../model/CardMarking';
+import { syncActivity } from '../model/SyncSettings';
 import { BrowserBatchConfirm } from '../components/browser/BrowserBatchConfirm';
 import { BrowserRepositionDialog, BrowserRepositionInput } from '../components/browser/BrowserRepositionDialog';
 // 页面负责导航、表单和 UI 事件；搜索/行读取、侧栏、编辑器读取各有独立模型。
@@ -48,7 +59,6 @@ import type { DeckTreeNode } from '../proto/messages/DeckMessages';
 import type { TagTreeNode } from '../proto/messages/TagsMessages';
 
 import { ConfigKeyBool } from '../proto/messages/ConfigMessages';
-import { BURY_SUSPEND_MODE_SUSPEND } from '../proto/messages/SchedulerMessages';
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { CustomTransition } from '../utils/自定义转场';
 import { 统一加载态 } from '../components/common/统一加载态';
@@ -81,18 +91,27 @@ type 浏览阶段 = 'loading' | 'list' | 'error';
 
 /** 浏览模式：cards=卡片列表，notes=笔记列表 */
 type 浏览模式 = 'cards' | 'notes';
+interface MarkingReadToken { version: number; }
 
 /** T8 改牌组选择器列表项（扁平化后的牌组树节点）。 */
 
 @Component
 export struct 浏览页 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
+  @State private flagLabels: FlagLabels = {};
+  @State private flagNamesOpen: boolean = false;
+  @State private flagNamesBackRequest: number = 0;
+  private readonly markingBackend: AnkiCardMarking = new AnkiCardMarking();
+  private flagLabelsVersion: number = 0;
   @State private batchBackRequest: number = 0;
-  @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
+  @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
   /** Navigation 入栈参数：牌组 ID（空=全库） */
   pageDeckId: string = '';
   /** Navigation 入栈参数：初始搜索串（空=默认搜索；查找重复对话框跳转时传入） */
   pageInitialSearch: string = '';
   pageInitialNotesMode: boolean = false;
+  /** 进入后复用浏览预览；只匹配本次初始搜索的真实结果。 */
+  pageInitialPreviewCardId: number = 0;
   /** Navigation 入栈参数：是否为 Agent 改卡直接进入多选。 */
   pageSelectForAgentEdit: boolean = false;
   /** 页面栈：返回主页时 pop */
@@ -116,7 +135,11 @@ export struct 浏览页 {
   @State private 行列表: 浏览行数据[] = [];
   @State private 列定义: BrowserColumn[] = [];
   @State private subtitleIndex: number = 1;
+  @State private collectionHistoryOpen: boolean = false;
+  @State private collectionHistoryBackRequest: number = 0;
+  private resetSelection: BrowserOperationContext | null = null;
   @State private showMoreMenu: boolean = false;
+  @State private showBatchMenu: boolean = false;
   @State private showViewMenu: boolean = false;
   @State private viewMenuGroup: string = 'mode';
   @State private viewMenuWidth: number = 240;
@@ -150,6 +173,8 @@ export struct 浏览页 {
   @State @Watch('publishInterface') private 选中ID列表: number[] = [];
   // 退出多选信号：每次退出多选 +1，经 @Watch 触发 卡片表格 清内部选中（组件内部状态不可外部直改）
   @State private batchDialog: string = 'none';
+  @State private batchNoteTags: string[][] = [];
+  private batchTagSelection: BrowserOperationContext | null = null;
   @State private 批量忙碌: boolean = false;
   @State private 批量错误: string = '';
   @State private 牌组树: DeckTreeNode | null = null;
@@ -208,6 +233,7 @@ export struct 浏览页 {
   async aboutToAppear(): Promise<void> {
     this.interfaceMounted = true;
     this.publishInterface();
+    this.loadFlagLabels();
     this.多选模式值 = this.pageSelectForAgentEdit;
     // 注册自定义转场回调：首页 Navigation.customNavContentTransition 通过此 name 查找回调，
     // 在 animateTo 内调用起点/终点回调修改 转场透明度，实现淡入淡出（替代系统默认左右平移）。
@@ -235,8 +261,13 @@ export struct 浏览页 {
     if (this.pageSelectForAgentEdit) {
       this.多选模式值 = true;
     }
+    const initialSearchVersion: number = this.searchVersion + 1;
     await this.执行搜索();
     if (!this.operations.isAlive()) return;
+    if (this.pageInitialPreviewCardId > 0 && this.searchVersion === initialSearchVersion &&
+      this.阶段 === 'list' && this.浏览模式值 === 'cards' && this.结果ID列表.includes(this.pageInitialPreviewCardId)) {
+      this.打开预览(this.pageInitialPreviewCardId);
+    }
     // 顶部牌组选择器：加载牌组树（失败不阻塞搜索，Select 仅显示"全部"）
     this.加载牌组树().catch((错误: ESObject): void => {
       console.info(`BrowserPage: aboutToAppear 加载牌组树失败 错误=${错误}`);
@@ -259,7 +290,7 @@ export struct 浏览页 {
   }
 
   /** 读取本地化文案，context 不可用时回退空串。 */
-  private 取本地化文案(资源: Resource): string {
+  private 取本地化文案(资源: Resource, _locale: string = this.uiLanguage): string {
     const 上下文: common.UIAbilityContext | null = this.取能力上下文();
     if (上下文 === null) {
       return '';
@@ -306,9 +337,12 @@ export struct 浏览页 {
    * Extension Points: 新增弹窗时在此链中按层级插入对应 @State 判断。
    */
   onBackPress(): boolean {
+    if (this.collectionHistoryOpen) { this.collectionHistoryBackRequest++; return true; }
+    if (this.flagNamesOpen) { this.flagNamesBackRequest++; return true; }
     if (this.显示说明浮层) { this.显示说明浮层 = false; return true; }
     if (this.showViewMenu) { this.showViewMenu = false; return true; }
     if (this.showMoreMenu) { this.showMoreMenu = false; return true; }
+    if (this.showBatchMenu) { this.batchBackRequest++; return true; }
     if (this.batchDialog !== 'none') { if (!this.mutationBusy) this.batchBackRequest++; return true; }
     if (this.显示标签重命名) { if (!this.标签重命名忙碌 && !this.mutationBusy) this.显示标签重命名 = false; return true; }
     if (this.显示保存搜索) { if (!this.保存搜索忙碌) this.显示保存搜索 = false; return true; }
@@ -333,6 +367,28 @@ export struct 浏览页 {
   }
 
   /** 将查询快照交给搜索会话；一次性发布完整首屏，旧请求不修改 UI。 */
+  private async loadFlagLabels(): Promise<void> {
+    const version: number = ++this.flagLabelsVersion;
+    const owner: MarkingReadToken = { version: version };
+    autoSyncScheduler.beginOperation(owner);
+    try {
+      await syncActivity.waitForCollection();
+      if (!this.interfaceMounted || version !== this.flagLabelsVersion) return;
+      const labels: FlagLabels = parseFlagLabels(await this.markingBackend.labels());
+      if (this.interfaceMounted && version === this.flagLabelsVersion) this.flagLabels = labels;
+    } catch (error) {
+      if (this.interfaceMounted && version === this.flagLabelsVersion)
+        showToastSafely(this.getUIContext(), { message: this.取本地化文案($r('app.string.card_mark_load_error')) });
+    } finally { autoSyncScheduler.endOperation(owner); }
+  }
+
+  private async 执行批量标星(marked: boolean): Promise<void> {
+    await this.runBatchOperation(async (context: BrowserOperationContext): Promise<void> => {
+      const ids: number[] = await this.解析选中为笔记ID(context);
+      await setMarkedNotes(this.markingBackend, ids, marked);
+    }, $r('app.string.card_mark_save_error'));
+  }
+
   private async 执行搜索(keepRows: boolean = false): Promise<void> {
     if (!this.operations.isAlive()) return;
     const version: number = ++this.searchVersion;
@@ -566,30 +622,63 @@ export struct 浏览页 {
     }, $r('app.string.browser_action_deck_error'));
   }
 
-  /** 执行批量设置标志：flag 取值 0=无/1=红/2=橙/3=绿/4=蓝。 */
+  /** 批量设置七色旗标或清除；笔记模式展开全部兄弟卡。 */
   private async 执行批量设置标志(标志: number): Promise<void> {
     this.batchDialog = 'none';
     await this.runBatchOperation(async (selection: BrowserOperationContext): Promise<void> => {
       const 卡片IDs: number[] = await this.解析选中为卡片ID(selection);
-      if (卡片IDs.length > 0) await this.卡片服务实例.设置标志(卡片IDs, 标志);
+      await setCardFlags(this.markingBackend, 卡片IDs, 标志);
     }, $r('app.string.browser_action_flag_error'));
   }
 
-  /** Cards 模式暂停所选卡片；Notes 模式由 Anki Core 暂停所选笔记生成的全部卡片。 */
+  /** AnkiDroid 切换规则读取全部所选卡片，混合选择统一暂停。 */
   private async 执行批量挂起(): Promise<void> {
-    this.batchDialog = 'none';
     await this.runBatchOperation(async (selection: BrowserOperationContext): Promise<void> => {
-      if (selection.mode === 'notes') await this.调度器服务实例.批量埋藏或暂停笔记(selection.ids, BURY_SUSPEND_MODE_SUSPEND);
-      else await this.调度器服务实例.批量埋藏或暂停卡片(selection.ids, BURY_SUSPEND_MODE_SUSPEND);
+      const ids: number[] = await this.解析选中为卡片ID(selection);
+      await toggleBrowserCardState(this.cardStateBackend(), ids, 'suspend');
     }, $r('app.string.browser_action_suspend_error'));
   }
 
-  /** 恢复所选卡片；Notes 模式先解析每条笔记实际生成的全部卡片。 */
-  private async 执行批量恢复(): Promise<void> {
+  /** 全部已今日跳过才解除；混合选择统一今日跳过，Core 不会解除暂停卡。 */
+  private async 执行批量搁置(): Promise<void> {
     await this.runBatchOperation(async (selection: BrowserOperationContext): Promise<void> => {
       const ids: number[] = await this.解析选中为卡片ID(selection);
-      if (ids.length > 0) await this.调度器服务实例.恢复埋藏与暂停的卡片(ids);
-    }, $r('app.string.browser_action_restore_error'));
+      await toggleBrowserCardState(this.cardStateBackend(), ids, 'bury');
+    }, $r('app.string.browser_action_bury_error'));
+  }
+
+  private async refreshAfterHistory(): Promise<void> {
+    if (!this.operations.isAlive()) return;
+    this.退出多选(); this.显示预览 = false; this.显示卡片信息 = false;
+    this.牌组树 = null; this.标签树 = null;
+    await this.执行搜索();
+    if (!this.operations.isAlive()) return;
+    const version: number = this.searchVersion;
+    const decks: DeckTreeNode = await this.牌组服务实例.获取牌组树();
+    const tags: TagTreeNode = await this.标签服务实例.标签树();
+    if (!this.operations.isAlive() || version !== this.searchVersion) return;
+    this.牌组树 = decks; this.标签树 = tags;
+    await this.loadFlagLabels();
+    if (this.阶段 === 'error') throw new Error('Browser refresh failed');
+  }
+
+  private async resetCards(options: ScheduleCardsAsNewOptions): Promise<void> {
+    const selection: BrowserOperationContext | null = this.resetSelection;
+    if (selection === null || !this.isBrowserSelectionCurrent(selection) || this.operations.isBusy()) return;
+    this.batchDialog = 'none';
+    const frozen: ScheduleCardsAsNewOptions = { restorePosition: options.restorePosition, resetCounts: options.resetCounts };
+    await this.runBatchOperation(async (context: BrowserOperationContext): Promise<void> => {
+      const ids: number[] = await this.解析选中为卡片ID(context);
+      await this.调度器服务实例.scheduleCardsAsNew(ids, frozen);
+    }, $r('app.string.browser_reset_error'));
+  }
+
+  private cardStateBackend(): BrowserCardStateBackend {
+    return {
+      queue: async (id: number): Promise<number> => (await this.卡片服务实例.获取卡片(id)).queue,
+      buryOrSuspend: (ids: number[], mode: number): Promise<void> => this.调度器服务实例.批量埋藏或暂停卡片(ids, mode),
+      restore: (ids: number[]): Promise<void> => this.调度器服务实例.恢复埋藏与暂停的卡片(ids)
+    };
   }
 
   /** 将所选笔记展开为全部兄弟卡 ID，并去重供批量操作使用。 */
@@ -686,6 +775,7 @@ export struct 浏览页 {
 
   /** 退出多选模式：清空选中 + 多选模式值 + 翻转信号触发 卡片表格 清内部状态。 */
   private 退出多选(): void {
+    this.showBatchMenu = false;
     this.selectionVersion++;
     this.选中ID列表 = [];
     this.多选模式值 = false;
@@ -816,9 +906,7 @@ export struct 浏览页 {
 
   /** 侧边栏点标签 → 替换搜索为 tag:"xxx"。 */
   private 选标签节点(标签名: string): void {
-    this.搜索文本 = `tag:"${标签名}"`;
-    this.显示侧边栏 = false;
-    this.执行搜索();
+    this.应用标签搜索(标签名, false);
   }
 
   /** 侧边栏点已保存搜索 → 替换搜索文本为已保存的搜索串。 */
@@ -907,16 +995,109 @@ export struct 浏览页 {
 
   /** 侧边栏长按标签 → 追加 AND tag:"xxx" 到搜索文本。 */
   private 追加标签条件(标签名: string): void {
-    const 条件: string = `tag:"${标签名}"`;
-    this.搜索文本 = this.搜索文本 === '' ? 条件 : `${this.搜索文本} ${条件}`;
-    this.显示侧边栏 = false;
-    this.执行搜索();
+    this.应用标签搜索(标签名, true);
+  }
+
+  private async 应用标签搜索(name: string, append: boolean): Promise<void> {
+    const original: string = this.搜索文本;
+    const version: number = ++this.sidebarVersion;
+    try {
+      const query: string = await this.搜索服务实例.构建搜索串(tagSearchNode(name, append ? original : ''));
+      if (!this.operations.isAlive() || !this.显示侧边栏 || version !== this.sidebarVersion || original !== this.搜索文本) return;
+      this.搜索文本 = query; this.显示侧边栏 = false; this.执行搜索();
+    } catch (error) {
+      if (this.operations.isAlive() && version === this.sidebarVersion) {
+        this.侧边栏错误 = this.取本地化文案($r('app.string.tags_search_error'));
+      }
+    }
+  }
+
+  private async 打开批量标签(): Promise<void> {
+    if (this.operations.isBusy() || this.批量忙碌 || this.选中ID列表.length === 0) return;
+    const selection: BrowserOperationContext = this.captureBrowserSelection();
+    this.批量忙碌 = true; this.批量错误 = '';
+    try {
+      await syncActivity.waitForCollection();
+      const ids: number[] = await this.解析选中为笔记ID(selection);
+      const tags: string[][] = [];
+      for (const id of new Set<number>(ids)) tags.push((await this.笔记服务实例.获取笔记(id)).tags.slice());
+      if (!this.isBrowserSelectionCurrent(selection)) return;
+      this.batchTagSelection = selection; this.batchNoteTags = tags; this.batchDialog = 'tags';
+    } catch (error) {
+      if (this.isBrowserSelectionCurrent(selection)) this.批量错误 = this.取本地化文案($r('app.string.tags_load_error'));
+    } finally {
+      if (this.operations.isAlive()) this.批量忙碌 = false;
+    }
+  }
+
+  private async 提交批量标签(changes: TagSelectionChange[]): Promise<void> {
+    const selection: BrowserOperationContext | null = this.batchTagSelection;
+    if (this.operations.isBusy() || selection === null || !this.isBrowserSelectionCurrent(selection) || changes.length === 0) return;
+    const snapshot: TagSelectionChange[] = changes.map((change: TagSelectionChange): TagSelectionChange =>
+      ({ name: change.name, selected: change.selected }));
+    this.批量忙碌 = true; this.批量错误 = '';
+    try {
+      await this.runBrowserOperation(async (context: BrowserOperationContext): Promise<void> => {
+        const ids: number[] = await this.解析选中为笔记ID(context);
+        await updateSelectedNoteTags(ids, snapshot,
+          (id: number): Promise<EditableNote> => this.笔记服务实例.获取笔记(id),
+          async (notes: EditableNote[]): Promise<void> => { await this.笔记服务实例.更新笔记(notes, false); });
+        if (this.isBrowserSelectionCurrent(selection) && this.batchDialog === 'tags') this.batchDialog = 'none';
+      }, (_error: Error): void => {
+        if (this.isBrowserSelectionCurrent(selection)) this.批量错误 = this.取本地化文案($r('app.string.tags_save_error'));
+      }, true);
+    } finally { if (this.operations.isAlive()) this.批量忙碌 = false; }
+  }
+
+  private async 切换标签折叠(name: string): Promise<void> {
+    if (this.operations.isBusy() || this.标签树 === null) return;
+    const version: number = this.sidebarVersion;
+    const row = flattenTagTree(this.标签树).find((item: TagRow): boolean => item.fullName === name);
+    if (row === undefined || !row.hasChildren) return;
+    await this.runBrowserOperation(async (): Promise<void> => {
+      await this.标签服务实例.设置标签折叠({ name, collapsed: !row.collapsed });
+    }, (_error: Error): void => {
+      this.侧边栏错误 = this.取本地化文案($r('app.string.tags_collapse_error'));
+    }, false);
+    await this.刷新侧栏标签(version);
+  }
+
+  private async 刷新侧栏标签(version: number): Promise<void> {
+    if (!this.operations.isAlive() || !this.显示侧边栏 || version !== this.sidebarVersion) return;
+    try {
+      const tree: TagTreeNode = await this.标签服务实例.标签树();
+      if (this.operations.isAlive() && this.显示侧边栏 && version === this.sidebarVersion) this.标签树 = tree;
+    } catch (error) {
+      if (this.operations.isAlive() && version === this.sidebarVersion) this.侧边栏错误 = this.取本地化文案($r('app.string.tags_load_error'));
+    }
+  }
+
+  private 请求清除未用标签(): void {
+    if (this.operations.isBusy()) return;
+    this.getUIContext().showAlertDialog({ title: this.取本地化文案($r('app.string.settings_clear_unused_tags')),
+      message: this.取本地化文案($r('app.string.settings_clear_unused_tags_confirm')),
+      primaryButton: { value: $r('app.string.cancel'), action: (): void => {} },
+      secondaryButton: { value: $r('app.string.browser_detail_confirm'), action: (): void => { this.清除侧栏未用标签(); } } });
+  }
+
+  private async 清除侧栏未用标签(): Promise<void> {
+    const version: number = this.sidebarVersion;
+    let count: number = 0;
+    const done: boolean = await this.runBrowserOperation(async (): Promise<void> => {
+      count = await this.标签服务实例.清除未用标签();
+    }, (_error: Error): void => {
+      this.侧边栏错误 = this.取本地化文案($r('app.string.settings_clear_unused_tags_error'));
+    }, false);
+    if (!this.operations.isAlive()) return;
+    if (done) showToastSafely(this.getUIContext(), { message:
+      this.取本地化文案($r('app.string.settings_clear_unused_tags_success')).replace('%d', String(count)) });
+    await this.刷新侧栏标签(version);
   }
 
   // T6 标签管理
   // - 重命名：currentPrefix=原标签名，newPrefix=用户输入
   // - 删除：按前缀删除标签及子标签，返回受影响笔记数
-  // - 补全：input=标签名，matchLimit=20，返回匹配列表（当前仅 toast 结果）
+  // - 选择/新建由公共 TagPicker 回写草稿，管理操作仍由统一写入边界提交
   // - 操作成功后刷新标签树，失败在标签重命名错误条或 toast 显示
 
   /** 标签菜单「重命名」→ 打开重命名对话框。 */
@@ -931,7 +1112,9 @@ export struct 浏览页 {
   /** 执行重命名标签：调后端 RenameTags，成功后刷新标签树。 */
   private async 执行重命名标签(name: string): Promise<void> {
     if (this.operations.isBusy()) return;
+    const sidebarVersion: number = this.sidebarVersion;
     const original: string = this.重命名原标签名;
+    name = newTagName(name);
     if (name === '' || name === original) {
       this.标签重命名错误 = this.取本地化文案($r('app.string.browser_tag_rename_empty'));
       return;
@@ -943,8 +1126,6 @@ export struct 浏览页 {
       count = await this.标签服务实例.重命名标签({ currentPrefix: original, newPrefix: name });
       if (this.operations.isAlive()) {
         this.显示标签重命名 = false;
-        this.显示侧边栏 = false;
-        this.标签树 = null;
       }
     }, (_error: Error): void => {
       this.标签重命名错误 = this.取本地化文案($r('app.string.browser_tag_rename_error'));
@@ -954,10 +1135,12 @@ export struct 浏览页 {
     if (done) showToastSafely(this.getUIContext(), {
       message: this.取本地化文案($r('app.string.browser_tag_rename_success')).replace('%d', String(count))
     });
+    if (done) await this.刷新侧栏标签(sidebarVersion);
   }
 
   /** 标签菜单「删除」→ 弹 AlertDialog 二次确认。 */
   private 请求删除标签(标签名: string): void {
+    if (this.operations.isBusy() || !this.operations.isAlive()) return;
     const message: string = this.取本地化文案($r('app.string.browser_tag_delete_confirm'))
       .replace('%s', 标签名);
     this.getUIContext().showAlertDialog({
@@ -980,11 +1163,11 @@ export struct 浏览页 {
   /** 执行删除标签：调后端 RemoveTags，成功后刷新标签树。 */
   private async 执行删除标签(标签名: string): Promise<void> {
     if (this.operations.isBusy()) return;
+    const sidebarVersion: number = this.sidebarVersion;
     this.标签操作忙碌 = true;
     let count: number = 0;
     const done: boolean = await this.runBrowserOperation(async (_selection: BrowserOperationContext): Promise<void> => {
       count = await this.标签服务实例.移除标签(标签名);
-      if (this.operations.isAlive()) { this.显示侧边栏 = false; this.标签树 = null; }
     }, (_error: Error): void => {
       showToastSafely(this.getUIContext(), {
         message: this.取本地化文案($r('app.string.browser_tag_delete_error'))
@@ -995,24 +1178,7 @@ export struct 浏览页 {
     if (done) showToastSafely(this.getUIContext(), {
       message: this.取本地化文案($r('app.string.browser_tag_delete_success')).replace('%d', String(count))
     });
-  }
-
-  /** 标签菜单「补全」→ 调后端 CompleteTag，toast 显示匹配结果。 */
-  private async 执行补全标签(标签名: string): Promise<void> {
-    this.标签操作忙碌 = true;
-    try {
-      const 响应 = await this.标签服务实例.补全标签({ input: 标签名, matchLimit: 20 });
-      const count: number = 响应.tags.length;
-      showToastSafely(this.getUIContext(), {
-        message: this.取本地化文案($r('app.string.browser_tag_complete_success')).replace('%d', String(count))
-      });
-    } catch (错误) {
-      console.info(`BrowserPage: 补全标签失败 错误=${错误}`);
-      showToastSafely(this.getUIContext(), {
-        message: this.取本地化文案($r('app.string.browser_tag_complete_error'))
-      });
-    }
-    this.标签操作忙碌 = false;
+    if (done) await this.刷新侧栏标签(sidebarVersion);
   }
 
   /** 顶栏返回：多选态优先退出多选，普通浏览态才返回主页。 */
@@ -1085,10 +1251,10 @@ export struct 浏览页 {
     this.pathStack.pushPath({ name: 'SettingsPage', param: params });
   }
 
-  /** 顶栏选中计数：使用可变长字符串，让两位及以上数量自然撑宽同款按钮。 */
+  /** 多选标题随当前选择数量更新，中英沿用同一计数资源。 */
   private 取选中计数文案(): string {
     const 模板: string = this.取本地化文案($r('app.string.browser_select_count'));
-    return `${模板.replace('%d', `${this.选中ID列表.length}`)} ×`;
+    return 模板.replace('%d', `${this.选中ID列表.length}`);
   }
 
   /** 只提供当前卡片/笔记模式下后端支持的排序。 */
@@ -1146,10 +1312,14 @@ export struct 浏览页 {
   @Builder
   private browserMoreMenu() {
     if (this.showMoreMenu) {
-      BrowserMoreMenu({ filterActive: this.搜索文本.trim() !== '' || this.quickFilter !== 'all', available: this.阶段 === 'list',
+      BrowserMoreMenu({ filterActive: this.搜索文本.trim() !== '' || this.quickFilter !== 'all', available: !this.mutationBusy && this.阶段 === 'list',
         subtitleIndex: this.subtitleIndex,
         topOffset: 应用尺寸.pageContentTop(this.状态栏高度, this.narrowDeckLayout),
         onClose: (): void => { this.showMoreMenu = false; },
+        onHistory: (): void => {
+          if (this.mutationBusy || this.operations.isBusy()) return;
+          this.showMoreMenu = false; this.collectionHistoryOpen = true;
+        },
         onFilter: (): void => {
           if (this.阶段 !== 'list') return;
           this.showMoreMenu = false;
@@ -1163,6 +1333,7 @@ export struct 浏览页 {
           this.显示查找替换 = true;
         },
         onSaveSearch: (): void => { this.showMoreMenu = false; this.打开保存搜索(null); },
+        onFlagNames: (): void => { this.showMoreMenu = false; this.flagNamesOpen = true; },
         onSubtitle: (index: number): void => { this.subtitleIndex = index; this.showMoreMenu = false; }
       })
     }
@@ -1177,12 +1348,12 @@ export struct 浏览页 {
 
   @Builder
   private 顶部条() {
-    // 普通模式提供返回和更多；多选模式沿用选中计数退出按钮。
+    // 多选时标题显示计数，右侧保留明确的手动操作入口。
     Stack({ alignContent: Alignment.Center }) {
-      Text($r('app.string.browser_title'))
+      Text(this.多选模式值 ? this.取选中计数文案() : $r('app.string.browser_title'))
         .fontSize(应用尺寸.字号_标题).fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.text_primary')).width('44%').textAlign(TextAlign.Center)
-        .maxLines(1).hitTestBehavior(HitTestMode.None)
+        .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).hitTestBehavior(HitTestMode.None)
       Row() {
       按下态按钮({
         文案: $r('app.string.study_back'),
@@ -1194,23 +1365,18 @@ export struct 浏览页 {
       if (this.多选模式值) {
 
         按下态按钮({
-          文案: this.取选中计数文案(),
+          文案: $r('app.string.browser_selection_actions'),
           字色: $r('app.color.text_primary'),
-          点击回调: (): void => this.退出多选()
+          是否启用: !this.批量忙碌 && !this.mutationBusy && this.选中ID列表.length > 0,
+          点击回调: (): void => { this.showBatchMenu = !this.showBatchMenu; }
         })
       } else {
 
-        Button($r('app.string.study_more'))
-          .height(应用尺寸.按钮高度)
-          .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
-          .fontSize(应用尺寸.字号_按钮)
-          .fontColor($r('app.color.text_primary'))
-          .backgroundColor($r('app.color.surface_card'))
-          .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
-          .borderRadius(应用尺寸.圆角_胶囊)
-          .attributeModifier(new PressFeedback())
-          .stateEffect(false)
-          .onClick((): void => { this.showMoreMenu = !this.showMoreMenu; })
+        按下态按钮({
+          文案: $r('app.string.study_more'),
+          字色: $r('app.color.text_primary'),
+          点击回调: (): void => { this.showMoreMenu = !this.showMoreMenu; }
+        })
       }
       }.width('100%').height('100%').alignItems(VerticalAlign.Center)
     }
@@ -1227,9 +1393,10 @@ export struct 浏览页 {
   }
 
   /** 状态筛选保留原始搜索，由合并选择框的状态区域打开。 */
-  private quickFilterOptions(): SelectOption[] {
+  private quickFilterOptions(_locale: string = this.uiLanguage): SelectOption[] {
     return BROWSER_QUICK_FILTERS.map((filter: BrowserQuickFilter): SelectOption => ({
-      value: namedResourceText(this.getUIContext(), filter.labelKey)
+      value: (filter.id.startsWith('flag_') ? customFlagLabel(this.flagLabels, Number(filter.id.substring(5))) : '') ||
+        namedResourceText(this.getUIContext(), filter.labelKey)
     }));
   }
 
@@ -1273,14 +1440,14 @@ export struct 浏览页 {
       Row() {
         this.viewChoice(this.浏览模式值 === 'cards' ? this.取本地化文案($r('app.string.browser_mode_cards')) :
           this.取本地化文案($r('app.string.browser_mode_notes')), 'mode')
-        Divider().vertical(true).height(16).strokeWidth(0.5).color($r('app.color.border_subtle'))
-        this.viewChoice(namedResourceText(this.getUIContext(), BROWSER_QUICK_FILTERS[this.quickFilterIndex()].labelKey), 'filter')
-        Divider().vertical(true).height(16).strokeWidth(0.5).color($r('app.color.border_subtle'))
+        Divider().vertical(true).height(16).strokeWidth(0.5).color(SurfaceBorder.color())
+        this.viewChoice(localizedNamedResourceText(this.getUIContext(), this.uiLanguage, BROWSER_QUICK_FILTERS[this.quickFilterIndex()].labelKey), 'filter')
+        Divider().vertical(true).height(16).strokeWidth(0.5).color(SurfaceBorder.color())
         this.viewChoice(this.sortLabel(), 'sort')
       }
       .id('browser-view-selector')
       .layoutWeight(7).height(SelectStyle.controlHeight)
-      .backgroundColor($r('app.color.surface_card')).borderRadius(SelectStyle.controlRadius).clip(true)
+      .backgroundColor($r('app.color.surface_card')).borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder).clip(true)
       .onAreaChange((_oldArea: Area, area: Area): void => { this.viewMenuWidth = Number(area.width); })
       Text(this.阶段 === 'loading' ? $r('app.string.browser_loading') : this.resultCountLabel())
         .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
@@ -1323,6 +1490,7 @@ export struct 浏览页 {
           行列表: this.行列表,
           subtitleIndex: this.subtitleIndex,
           notesMode: this.浏览模式值 === 'notes',
+          flagLabels: this.flagLabels,
           结果总数: this.结果ID列表.length,
           已加载行数: this.consumedRowCount,
           多选模式: this.多选模式值,
@@ -1331,45 +1499,11 @@ export struct 浏览页 {
           onLongPress: (): void => {},
           onLoadMore: (): Promise<void> => this.加载更多(),
           onInfoClick: (行ID: number): void => { this.打开卡片信息(行ID); },
-          onSelectionChange: (选中IDs: number[]): void => { this.batchDialog = 'none'; this.selectionVersion++; this.选中ID列表 = 选中IDs.slice(); },
+          onSelectionChange: (选中IDs: number[]): void => { this.showBatchMenu = false; this.batchDialog = 'none'; this.selectionVersion++; this.选中ID列表 = 选中IDs.slice(); },
           onMultiSelectChange: (多选: boolean): void => { this.多选模式值 = 多选; }
         })
       }
 
-      // T8 批量操作栏：多选模式下固定在底部
-      if (this.多选模式值 && this.选中ID列表.length > 0) {
-        批量操作栏({
-          isDark: this.是否深色(),
-          busy: this.批量忙碌 || this.mutationBusy,
-          选中数: this.选中ID列表.length,
-          on改牌组: (): void => { this.打开改牌组弹层(); },
-          on设置标志: (): void => {
-            this.批量错误 = '';
-            this.batchDialog = 'flag';
-          },
-          on挂起: (): void => {
-            this.批量错误 = '';
-            this.batchDialog = 'suspend';
-          },
-          on恢复: (): void => {
-            this.批量错误 = '';
-            this.执行批量恢复();
-          },
-          on删除: (): void => {
-            this.批量错误 = '';
-            this.batchDialog = 'delete';
-          },
-          on设置到期日: (): void => { this.打开设置到期日弹层(); },
-          on重新定位: (): void => { this.打开重新定位弹层(); },
-          on更改笔记类型: (): void => { this.打开更改笔记类型弹层(); },
-          onAI改卡: (): void => { this.打开AI改卡(); },
-          onHelp: (): void => {
-            this.说明标题 = $r('app.string.browser_help_batch_title');
-            this.说明正文 = $r('app.string.browser_help_batch_body');
-            this.显示说明浮层 = true;
-          }
-        })
-      }
 
       // T8 批量操作错误提示（顶部告警条，不遮挡悬浮窗交互）
       if (this.批量错误 !== '') {
@@ -1480,7 +1614,9 @@ export struct 浏览页 {
         onAppendTag: (标签名: string): void => { this.追加标签条件(标签名); },
         onRenameTag: (标签名: string): void => { this.请求重命名标签(标签名); },
         onDeleteTag: (标签名: string): void => { this.请求删除标签(标签名); },
-        onCompleteTag: (标签名: string): void => { this.执行补全标签(标签名); },
+        tagWriteBusy: this.mutationBusy,
+        onToggleTag: (name: string): void => { this.切换标签折叠(name); },
+        onClearUnusedTags: (): void => { this.请求清除未用标签(); },
         onToggle折叠: (分区: 'decks' | 'tags' | 'saved_searches'): void => {
           this.切换侧边栏折叠(分区);
         }
@@ -1497,6 +1633,61 @@ export struct 浏览页 {
 
   @Builder
   private browserMutationPanels() {
+    if (this.collectionHistoryOpen) {
+      CollectionHistoryDialog({ backRequest: this.collectionHistoryBackRequest,
+        onBusy: (busy: boolean): void => { this.mutationBusy = busy; },
+        onClose: (): void => { this.collectionHistoryOpen = false; },
+        onChanged: async (): Promise<void> => {
+          await this.refreshAfterHistory();
+        } })
+    }
+    if (this.batchDialog === 'reset') {
+      BrowserResetDialog({ backRequest: this.batchBackRequest, busy: this.批量忙碌 || this.mutationBusy,
+        notes: this.浏览模式值 === 'notes', onClose: (): void => { this.batchDialog = 'none'; },
+        onSubmit: (options: ScheduleCardsAsNewOptions): void => { this.resetCards(options); } })
+    }
+    if (this.showBatchMenu && this.多选模式值 && this.选中ID列表.length > 0) {
+      批量操作栏({
+        isDark: this.是否深色(), busy: this.批量忙碌 || this.mutationBusy,
+        backRequest: this.batchBackRequest, labels: this.flagLabels,
+        选中数: this.选中ID列表.length, notesMode: this.浏览模式值 === 'notes',
+        topOffset: 应用尺寸.pageContentTop(this.状态栏高度, this.narrowDeckLayout),
+        onClose: (): void => { this.showBatchMenu = false; },
+        onExit: (): void => { this.退出多选(); },
+        on改牌组: (): void => { this.打开改牌组弹层(); },
+        onTags: (): void => { this.打开批量标签(); },
+        onMark: (marked: boolean): void => { this.执行批量标星(marked); },
+        on设置标志: (): void => { this.loadFlagLabels(); },
+        onFlag: (flag: number): void => { this.执行批量设置标志(flag); },
+        onFlagNames: (): void => { this.flagNamesOpen = true; },
+        on挂起: (): void => { this.执行批量挂起(); },
+        onBury: (): void => { this.执行批量搁置(); },
+        onReset: (): void => {
+          this.resetSelection = this.captureBrowserSelection(); this.批量错误 = ''; this.batchDialog = 'reset';
+        },
+        on删除: (): void => { this.批量错误 = ''; this.batchDialog = 'delete'; },
+        on设置到期日: (): void => { this.打开设置到期日弹层(); },
+        on重新定位: (): void => { this.打开重新定位弹层(); },
+        on更改笔记类型: (): void => { this.打开更改笔记类型弹层(); },
+        onAI改卡: (): void => { this.打开AI改卡(); },
+        onHelp: (): void => {
+          this.说明标题 = $r('app.string.browser_help_batch_title');
+          this.说明正文 = $r('app.string.browser_help_batch_body');
+          this.显示说明浮层 = true;
+        }
+      })
+    }
+    if (this.batchDialog === 'tags') {
+      BrowserTagsDialog({ backRequest: this.batchBackRequest, busy: this.批量忙碌 || this.mutationBusy,
+        noteTags: this.batchNoteTags, error: this.批量错误,
+        onClose: (): void => { if (!this.mutationBusy) this.batchDialog = 'none'; },
+        onSubmit: (changes: TagSelectionChange[]): void => { this.提交批量标签(changes); } })
+    }
+    if (this.flagNamesOpen) {
+      FlagNamesDialog({ backRequest: this.flagNamesBackRequest,
+        onClose: (): void => { this.flagNamesOpen = false; },
+        onChanged: (): void => { this.loadFlagLabels(); } })
+    }
     if (this.显示标签重命名) {
       BrowserRenameTagDialog({ isDark: this.是否深色(), busy: this.标签重命名忙碌, original: this.重命名原标签名, error: this.标签重命名错误,
         onClose: (): void => { this.显示标签重命名 = false; },
@@ -1510,17 +1701,6 @@ export struct 浏览页 {
         onSubmit: (id: number): void => { this.执行批量改牌组(id); } })
     }
 
-    // T8 标志选择器弹层（无/红/橙/绿/蓝）
-    if (this.batchDialog === 'flag') {
-      BrowserFlagDialog({ backRequest: this.batchBackRequest, isDark: this.是否深色(), busy: this.批量忙碌, onClose: (): void => { this.batchDialog = 'none'; },
-        onSubmit: (flag: number): void => { this.执行批量设置标志(flag); } })
-    }
-
-    // T8 挂起确认弹层
-    if (this.batchDialog === 'suspend') {
-      BrowserBatchConfirm({ backRequest: this.batchBackRequest, isDark: this.是否深色(), busy: this.批量忙碌, onClose: (): void => { this.batchDialog = 'none'; },
-        onSubmit: (): void => { this.执行批量挂起(); } })
-    }
 
     // T8 删除确认弹层
     if (this.batchDialog === 'delete') {
@@ -1611,7 +1791,8 @@ export struct 浏览页 {
     .hideTitleBar(true)
     .backgroundColor(Color.Transparent)
     .onBackPressed((): boolean => this.onBackPress())
-    .onShown((): void => { appInterface.showPage('browser'); this.returnFromEditor(); this.publishInterface(); })
+    .onShown((): void => { appInterface.showPage('browser'); this.returnFromEditor(); this.publishInterface();
+      if (this.interfaceMounted) this.loadFlagLabels(); })
     .onHidden((): void => { appInterface.hidePage('browser'); })
     .opacity(this.转场透明度)
   }

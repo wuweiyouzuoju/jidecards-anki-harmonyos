@@ -14,6 +14,7 @@ import { 牌组选项编辑 } from '../../entry/src/main/ets/model/牌组选项�
 import { prepareDeckOptionsDraft } from '../../entry/src/main/ets/model/DeckOptionsDraft.ets';
 import { loadComponentLogic } from './platform-module-harness.mjs';
 import { loadUiFeedback } from './ui-feedback-harness.mjs';
+import { appInterfaceDependencies } from './app-interface-harness.mjs';
 
 const flush = () => new Promise(resolve => setImmediate(resolve));
 const deferred = () => { let resolve, reject; const promise = new Promise((a,b) => { resolve=a; reject=b; }); return {promise,resolve,reject}; };
@@ -22,7 +23,7 @@ function harness() {
   const current = {id:1,name:'Shared',mtimeSecs:3,usn:-1,config:{...emptyDeckConfigSettings(),
     newPerDay:10,reviewsPerDay:100,desiredRetention:0.9,historicalRetention:0.9,maximumReviewInterval:36500,
     initialEase:2.5,easyMultiplier:1.3,hardMultiplier:1.2,intervalMultiplier:1,minimumLapseInterval:1,
-    graduatingIntervalGood:1,graduatingIntervalEasy:4,leechThreshold:8,
+    graduatingIntervalGood:1,graduatingIntervalEasy:4,leechThreshold:8,capAnswerTimeToSecs:60,
     learnSteps:[1,10],relearnSteps:[10],preserved:[Uint8Array.from([0xc0,0x0c,42])],other:Uint8Array.from([1,2])}};
   const other = copyDeckConfig(current); other.id=2; other.name='Other'; other.config.paramSearch='tag:other';
   const view={allConfigs:[{config:other,useCount:2},{config:current,useCount:3}],currentDeck:{name:'Target',configId:1,parentConfigIds:[],limits:null},
@@ -39,7 +40,33 @@ function harness() {
   return {current,other,view,options,states,writes,computes,simulations,scopes,backend,session,scheduler,activity,committed:()=>committed};
 }
 
-test('current preset optimization consumes the edited draft, stages without writes, then uses existing isolated save',async()=>{
+test('evaluation freezes the edited parameters, scope and date, keeps real history counts on failure and never saves',async()=>{
+  const h=harness();await h.session.load();const evaluations=[],counts=[],gate=deferred();
+  h.backend.historyCount=async(date,search)=>{counts.push({date,search});return {included:3,total:6};};
+  h.backend.evaluate=async input=>{evaluations.push(input);await gate.promise;return {logLoss:0.4,rmseBins:0.05};};
+  const draft=copyDeckConfig(h.current);draft.config.fsrsParams6=params.slice();draft.config.paramSearch='tag:training';
+  draft.config.ignoreRevlogsBeforeDate='2026-01-02';const work=h.session.evaluate(draft);
+  draft.config.paramSearch='changed';draft.config.fsrsParams6[0]=999;await flush();
+  try {
+    assert.deepEqual(counts,[{date:'2026-01-02',search:'tag:training'}]);
+    assert.deepEqual(evaluations,[{params:params.map(Math.fround),search:'tag:training',ignoreRevlogsBeforeMs:Date.UTC(2026,0,2)}]);
+    assert.equal(h.states.at(-1).fsrs.busy,true);await h.session.evaluate(draft);assert.equal(evaluations.length,1);
+  } finally { gate.resolve();await work; }
+  assert.deepEqual(h.states.at(-1).fsrs.evaluation,{logLoss:0.4,rmseBins:0.05});
+  assert.deepEqual(h.states.at(-1).fsrs.historyCount,{included:3,total:6});assert.equal(h.writes.length,0);
+  h.backend.evaluate=async()=>{throw Error('no usable history');};await h.session.evaluate(h.current);
+  assert.equal(h.states.at(-1).fsrs.evaluation,null);assert.equal(h.states.at(-1).fsrs.error,'no usable history');
+  assert.deepEqual(h.states.at(-1).fsrs.historyCount,{included:3,total:6});assert.equal(h.states.at(-1).fsrs.evaluationSearch,'did:1 -is:suspended');
+});
+
+test('departed evaluation cannot start after a pending history read',async()=>{
+ const h=harness();await h.session.load();const gate=deferred();let evaluations=0;
+ h.backend.historyCount=()=>gate.promise;h.backend.evaluate=async()=>{evaluations++;return {logLoss:0,rmseBins:0};};
+ const work=h.session.evaluate(h.current);await flush();h.session.dispose();const count=h.states.length;
+ gate.resolve({included:0,total:6});await work;assert.equal(evaluations,0);assert.equal(h.states.length,count);
+});
+
+test('current preset optimization consumes the edited draft, stages without writes, then saves the shared preset as in Anki',async()=>{
   const h=harness(); await h.session.load();
   const form=牌组配置表单.从配置创建(h.current.config),options=牌组选项编辑.从视图创建(null,true,true,true,true);
   form.每日新卡数文本='15'; form.重学步骤文本='1 10'; form.设置文本字段('ignoreRevlogsBeforeDate','2026-01-02');
@@ -51,7 +78,7 @@ test('current preset optimization consumes the edited draft, stages without writ
   form.设置浮点数组字段('fsrsParams6',result.join(' '));
   const saved=prepareDeckOptionsDraft(h.current,form,options);
   await h.session.save(saved.config,saved.shared,saved.options);
-  assert.equal(h.writes[0].configs[0].id,0); assert.equal(h.writes[0].configs[0].config.newPerDay,15);
+  assert.equal(h.writes[0].configs[0].id,1); assert.equal(h.writes[0].configs[0].config.newPerDay,15);
   assert.deepEqual(h.writes[0].configs[0].config.preserved,h.current.config.preserved);
   assert.deepEqual(h.current.config.fsrsParams6,[]); assert.equal(h.committed(),1);
 });
@@ -213,7 +240,7 @@ test('FSRS UI renders actual bilingual resources, compares Core points, and sele
 test('feature applies actual Core generations to the existing form, preserves unrelated edits, and ignores late UI continuations',async()=>{
   const h=harness();
   const Feature=loadComponentLogic('components/home/DeckOptionsFeature.ets','DeckOptionsFeature',{
-    DeckOptionsFsrsState,prepareDeckOptionsDraft,namedResourceText:(_context,key)=>key});
+    ...appInterfaceDependencies(),DeckOptionsFsrsState,prepareDeckOptionsDraft,namedResourceText:(_context,key)=>key});
   const ui=new Feature();ui.active=true;ui.getUIContext=()=>({});
   ui.state={phase:'ready',config:h.current,fsrs:new DeckOptionsFsrsState()};
   ui.form=牌组配置表单.从配置创建(h.current.config);
@@ -240,13 +267,13 @@ test('system Back reaches computing deck options while saving and other collecti
   const Home=compile(method('pages/首页.ets','  onBackPress(): boolean'));
   const Panel=compile(method('components/牌组选项面板.ets','  private handleBackRequest(): void'));
   for(const computing of [true,false]){
-    const home=new Home();Object.assign(home,{transfer:{phase:'idle',visible:false},deckOptionsBusy:true,
+    const home=new Home();Object.assign(home,{deckLevelMenuId:'',transfer:{phase:'idle',visible:false},deckOptionsBusy:true,
       显示牌组选项:true,deckOptionsBackRequest:0,syncController:{cancel:()=>{}}});
     const panel=new Panel();Object.assign(panel,{busy:true,computing,showHelp:false,showAdvanced:false,
       onCancel:()=>{home.显示牌组选项=false;home.deckOptionsBusy=false;}});
     assert.equal(home.onBackPress(),true);assert.equal(home.deckOptionsBackRequest,1);
     panel.handleBackRequest();assert.equal(home.显示牌组选项,!computing);
   }
-  const home=new Home();Object.assign(home,{transfer:{phase:'saving'},显示牌组选项:true,deckOptionsBackRequest:0});
+  const home=new Home();Object.assign(home,{deckLevelMenuId:'',transfer:{phase:'saving'},显示牌组选项:true,deckOptionsBackRequest:0});
   assert.equal(home.onBackPress(),true);assert.equal(home.deckOptionsBackRequest,0);
 });

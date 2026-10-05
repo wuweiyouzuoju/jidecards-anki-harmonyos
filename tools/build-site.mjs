@@ -14,6 +14,8 @@ const origin = 'https://jidecards.com';
 const repo = work.repository;
 const esc = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const json = value => JSON.stringify(value).replace(/</g, '\\u003c');
+const repositories = [{ name: 'GitHub', url: repo }, ...work.repositoryMirrors];
+const repositoryLinks = repositories.map(repository => `<a href="${esc(repository.url)}">${esc(repository.name)}</a>`).join(' · ');
 const sourceLink = (file, label) => `<a href="${esc(repo)}/blob/main/${esc(file)}">${esc(label)}</a>`;
 const nav = [ ['/works/jidecards/#download', '下载'], ['/works/jidecards/', '功能'], [guide.pathname, '指南'], ['/developers/', '开发'], ['/about/', '作者'] ];
 const person = { '@type': 'Person', '@id': `${origin}/#author`, name: author.name, url: author.url, sameAs: [author.github] };
@@ -62,7 +64,7 @@ function page({ title, description, pathname, body, graph = [], noindex = false,
     <div class="nav-links">${nav.map(([url, label]) => `<a href="${url}"${url === pathname ? ' aria-current="page"' : ''}>${label}</a>`).join('')}<a href="${esc(repo)}">GitHub ↗</a></div>
   </nav></header>
   <main id="content" class="wrap">${trail.length ? `<nav class="breadcrumb" aria-label="面包屑"><a href="/">首页</a><span aria-hidden="true">/</span><span aria-current="page">${esc(breadcrumbTitle)}</span></nav>` : ''}${body}</main>
-  <footer class="footer"><div class="wrap footer-inner"><a href="/about/">${esc(author.name)}</a><div><a href="/data/works.json">JSON</a><a href="/llms.txt">llms.txt</a><span>${esc(work.license)}</span></div></div></footer>
+  <footer class="footer"><div class="wrap footer-inner"><a href="/about/">${esc(author.name)}</a><div><span>${repositoryLinks}</span><a href="/data/works.json">JSON</a><a href="/llms.txt">llms.txt</a><span>${esc(work.license)}</span></div></div></footer>
 </body>
 </html>
 `;
@@ -70,6 +72,7 @@ function page({ title, description, pathname, body, graph = [], noindex = false,
 
 const download = `<div class="actions"><a class="button" href="${esc(work.marketplace.url)}">打开华为应用市场 <span aria-hidden="true">↗</span></a><span class="meta">搜索「记得闪卡」 · 正式版 ${esc(work.releaseVersion)}${work.marketplace.price === 0 ? ' · 免费下载' : ''}</span></div>`;
 const theme = `<div class="theme-note"><span class="theme-swatch" aria-hidden="true"></span><p><strong>${esc(work.promotion.title)}</strong><span>${esc(work.promotion.description)}</span></p><a href="/works/jidecards/#appearance">详情 →</a></div>`;
+const jide = work.detailSections.find(section => section.id === 'jide');
 const home = page({
   title: work.seo.homeTitle, description: work.summary, pathname: '/',
   graph: [{ '@type': 'WebSite', name: '记得闪卡 · jidecards', url: origin, author: { '@id': `${origin}/#author` } }, application],
@@ -78,26 +81,26 @@ const home = page({
     ${theme}
     <nav class="entry-grid" aria-label="站点入口">
       <a class="entry" href="/works/jidecards/"><strong>功能与截图 <span aria-hidden="true">→</span></strong><span>学习、同步、卡片管理与外观</span></a>
-      <a class="entry" href="${esc(repo)}"><strong>开源代码 <span aria-hidden="true">↗</span></strong><span>源码、版本记录与问题反馈</span></a>
+      <div class="entry"><strong>开源代码 <span aria-hidden="true">↗</span></strong><span>源码、版本记录与问题反馈</span><span>${repositoryLinks}</span></div>
       <a class="entry" href="/developers/"><strong>开发文档 <span aria-hidden="true">→</span></strong><span>项目结构、构建与制卡规范</span></a>
     </nav>
-    <section class="quick-facts" aria-label="应用概览"><p><strong>用途</strong> <a href="/works/jidecards/#learning">背单词 · 记忆知识点 · 间隔复习</a></p><p><strong>学习</strong> 用问答、填空和图片遮挡练习回忆，由 FSRS 安排间隔复习。</p><p><strong>资料</strong> 导入 Anki APKG 牌组，通过 AnkiWeb 同步卡片与学习进度，备份与恢复学习资料。</p><p><strong>作者</strong> <a href="/about/">${esc(author.name)}</a></p></section>`
+    <section class="quick-facts" aria-label="应用概览"><p><strong>用途</strong> <a href="/works/jidecards/#learning">背单词 · 记忆知识点 · 间隔复习</a></p><p><strong>学习</strong> 用问答、填空和图片遮挡练习回忆，由 FSRS 安排间隔复习。</p><p><strong>资料</strong> 导入 Anki APKG 牌组，通过 AnkiWeb 同步卡片与学习进度，备份与恢复学习资料。</p><p><strong>助手</strong> <a href="/works/jidecards/#jide">${esc(jide.title)}</a> · 当前为默认隐藏的开发者调试功能。</p><p><strong>作者</strong> <a href="/about/">${esc(author.name)}</a></p></section>`
 });
 
 const features = work.featureGroups.map(group => `<div><dt>${esc(group.name)}</dt><dd>${esc(group.description)}</dd></div>`).join('\n');
 const useCases = work.useCases.map(item => `<div><dt>${esc(item.name)}</dt><dd>${esc(item.description)}</dd></div>`).join('\n');
 const product = page({
   title: work.seo.productTitle, description: work.summary, pathname: '/works/jidecards/', breadcrumbTitle: '下载与功能',
-  graph: [application, { '@type': 'SoftwareSourceCode', name: 'jidecards', codeRepository: repo, programmingLanguage: ['ArkTS', 'Rust', 'C++'], license: 'https://spdx.org/licenses/AGPL-3.0-or-later.html' }],
+  graph: [application, { '@type': 'SoftwareSourceCode', name: 'jidecards', codeRepository: repositories.map(repository => repository.url), programmingLanguage: ['ArkTS', 'Rust', 'C++'], license: 'https://spdx.org/licenses/AGPL-3.0-or-later.html' }],
   body: `<p class="eyebrow">功能与下载</p><h1>记得闪卡 <small>${esc(work.releaseVersion)}</small></h1><p class="lede">${esc(work.summary)}</p>
     <section id="download" class="download-block"><h2>下载</h2>${download}<p class="meta">适用于 ${esc(work.platform)}。应用已上架华为应用市场。</p></section>
     <section id="learning"><h2>在鸿蒙端用闪卡学习</h2><dl class="feature-list">${useCases}</dl></section>
     <section id="features"><h2>功能</h2><dl class="feature-list">${features}</dl></section>
-    <section class="product-details"><h2>进一步了解记得闪卡</h2><nav class="toc" aria-label="功能目录"><ul>${work.detailSections.map(section => `<li><a href="#${esc(section.id)}">${esc(section.title)}</a></li>`).join('')}</ul></nav>${work.detailSections.map(section => `<section id="${esc(section.id)}"><h3>${esc(section.title)}</h3>${section.paragraphs.map(paragraph => `<p>${esc(paragraph)}</p>`).join('')}</section>`).join('')}</section>
+    <section class="product-details"><h2>进一步了解记得闪卡</h2><nav class="toc" aria-label="功能目录"><ul>${work.detailSections.map(section => `<li><a href="#${esc(section.id)}">${esc(section.title)}</a></li>`).join('')}</ul></nav>${work.detailSections.map(section => `<section id="${esc(section.id)}"><h3>${esc(section.title)}</h3>${section.paragraphs.map(paragraph => `<p>${esc(paragraph)}</p>`).join('')}${section.availability ? `<p class="note">${esc(section.availability)}</p>` : ''}${section.items ? `<dl class="questions">${section.items.map(item => `<div><dt>${esc(item.name)}</dt><dd>${esc(item.description)}${item.example ? `<p class="meta">可以这样说：“${esc(item.example)}”</p>` : ''}</dd></div>`).join('')}</dl>` : ''}</section>`).join('')}</section>
     <section class="guide-entry"><h2>第一次在鸿蒙端使用 Anki 牌组？</h2><p>按实际步骤完成 APKG 导入或 AnkiWeb 同步，再开始 FSRS 间隔复习。</p><a href="${guide.pathname}">${esc(guide.navTitle)} →</a></section>
     <section id="appearance"><h2>${esc(work.promotion.title)}</h2><p>${esc(work.promotion.description)}</p><p class="meta">${esc(work.promotion.details)}</p></section>
-    <section id="screenshots"><h2>应用截图</h2><div class="media-grid">${work.screenshots.map(item => `<figure><a href="${esc(item.path)}"><img src="${esc(item.path)}" alt="记得闪卡${esc(item.caption)}" width="540" height="1168" loading="lazy"></a><figcaption>${esc(item.caption)}</figcaption></figure>`).join('')}</div></section>
-    <section><h2>源码与反馈</h2><p><a href="${esc(repo)}">GitHub 仓库</a> · <a href="${esc(repo)}/issues">反馈问题</a> · <a href="/developers/">开发文档</a></p><p class="meta">${esc(work.license)}。独立开源项目，非 Anki 官方客户端。</p></section>`
+    <section id="screenshots"><h2>应用截图</h2><div class="media-grid">${work.screenshots.map(item => `<figure><a href="${esc(item.path)}"><img src="${esc(item.path)}" alt="记得闪卡${esc(item.caption)}" width="${item.width}" height="${item.height}" loading="lazy"></a><figcaption>${esc(item.caption)} · <a href="${esc(item.sourceUrl)}">仓库原图 ↗</a></figcaption></figure>`).join('')}</div></section>
+    <section><h2>源码与反馈</h2><p>${repositoryLinks} · <a href="${esc(repo)}/issues">反馈问题</a> · <a href="/developers/">开发文档</a></p><p class="meta">${esc(work.license)}。独立开源项目，非 Anki 官方客户端。</p></section>`
 });
 
 const guidePage = page({
@@ -108,7 +111,7 @@ const guidePage = page({
   body: `<article class="guide"><header><p class="eyebrow">使用指南 · HarmonyOS NEXT</p><h1>${esc(guide.title)}</h1><p class="lede">${esc(guide.intro)}</p><p class="meta">作者：${esc(author.name)} · 更新于 <time datetime="${guide.updatedAt}">${guide.updatedAt}</time></p></header>
     <nav class="toc" aria-label="文章目录"><strong>这篇指南包含</strong><ol>${guide.sections.map(section => `<li><a href="#${esc(section.id)}">${esc(section.title)}</a></li>`).join('')}</ol></nav>
     ${guide.sections.map(section => `<section id="${esc(section.id)}"><h2>${esc(section.title)}</h2>${(section.paragraphs ?? []).map(paragraph => `<p>${esc(paragraph)}</p>`).join('')}${section.table ? `<div class="table-wrap"><table><thead><tr>${section.table.headers.map(header => `<th scope="col">${esc(header)}</th>`).join('')}</tr></thead><tbody>${section.table.rows.map(row => `<tr>${row.map(cell => `<td>${esc(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>` : ''}${section.steps ? `<ol class="steps">${section.steps.map(step => `<li>${esc(step)}</li>`).join('')}</ol>` : ''}${section.items ? `<dl class="questions">${section.items.map(item => `<div><dt>${esc(item.name)}</dt><dd>${esc(item.description)}</dd></div>`).join('')}</dl>` : ''}${(section.after ?? []).map(paragraph => `<p>${esc(paragraph)}</p>`).join('')}</section>`).join('')}
-    <section><h2>进一步阅读与反馈</h2><ul>${guide.references.map(reference => `<li><a href="${esc(reference.url)}">${esc(reference.title)}</a></li>`).join('')}<li>${sourceLink('README.md', '记得闪卡源码与功能说明')}</li><li><a href="${esc(repo)}/issues">记得闪卡问题反馈</a></li></ul><p class="meta">本文结合记得闪卡公开功能说明、项目源码与 Anki 官方手册，由 AI 辅助整理。界面与具体选项以当前正式版为准。记得闪卡是独立开源项目，非 Anki 官方客户端。</p></section>
+    <section><h2>进一步阅读与反馈</h2><ul>${guide.references.map(reference => `<li><a href="${esc(reference.url)}">${esc(reference.title)}</a></li>`).join('')}<li>${sourceLink('README.md', '记得闪卡源码与功能说明')}</li><li>源码仓库：${repositoryLinks}</li><li><a href="${esc(repo)}/issues">记得闪卡问题反馈</a></li></ul><p class="meta">本文结合记得闪卡公开功能说明、项目源码与 Anki 官方手册，由 AI 辅助整理。界面与具体选项以当前正式版为准。记得闪卡是独立开源项目，非 Anki 官方客户端。</p></section>
     <section class="guide-entry"><h2>下载记得闪卡</h2><p>在 HarmonyOS NEXT 上导入牌组、复习和同步。</p>${download}<a href="/works/jidecards/">查看完整功能与截图 →</a></section></article>`
 });
 
@@ -116,11 +119,12 @@ const developers = page({
   title: '开发文档｜记得闪卡', description: '记得闪卡的源码、构建文档与 Agent 开发入口。', pathname: '/developers/',
   body: `<p class="eyebrow">开发</p><h1>开发文档</h1><p class="lede">项目优先服务 Agent 开发。</p><p>这里的 Agent 指参与仓库开发的编程 Agent。</p>
     <dl class="feature-list link-list">
+      <div><dt>源码仓库</dt><dd>${repositoryLinks}</dd></div>
       <div><dt>从这里开始</dt><dd>${sourceLink('AGENTS.md', '开发约定')} · ${sourceLink('PROJECT_CONTEXT.md', '项目索引')}</dd></div>
       <div><dt>构建与验证</dt><dd>${sourceLink('README.md', '环境与构建')} · ${sourceLink('docs/development/verification.md', '验证命令')}</dd></div>
       <div><dt>修改代码</dt><dd>${sourceLink('docs/development/ownership.md', '模块边界')} · ${sourceLink('docs/development/extension-points.md', '扩展点')}</dd></div>
       <div><dt>制作选择题卡</dt><dd>${sourceLink('docs/choice-authoring.md', '制卡指南')} · ${sourceLink('docs/choice-apkg-v1.md', 'APKG 扩展规范')}</dd></div>
-      <div><dt>应用内 AI</dt><dd>发布包默认隐藏入口；开发开关见 ${sourceLink('entry/src/main/ets/model/ReleaseFeatures.ets', 'ReleaseFeatures')}。</dd></div>
+      <div><dt>JIDE 应用内助手</dt><dd><a href="/works/jidecards/#jide">${esc(jide.title)}</a> · ${sourceLink('docs/development/agent.md', '实现与验证')}。${esc(jide.availability)} 开发开关见 ${sourceLink('entry/src/main/ets/model/ReleaseFeatures.ets', 'ReleaseFeatures')}。</dd></div>
       <div><dt>机器读取</dt><dd><a href="/data/works.json">项目 JSON</a> · <a href="/llms-full.txt">纯文本资料</a> · <a href="/sitemap.xml">网站地图</a></dd></div>
     </dl><p class="meta">ArkUI → Node-API → Rust / Anki Core。许可证：${esc(work.license)}。</p>`
 });
@@ -140,9 +144,12 @@ ${work.summary}
 - 首页：${origin}/
 - 下载与功能：${work.url}
 - 使用指南：${origin}${guide.pathname}
+- ${jide.title}：${work.url}#jide
+- JIDE 状态：${jide.availability}
 - 开发文档：${origin}/developers/
 - 作者：${author.url}
 - 源码：${repo}
+${work.repositoryMirrors.map(repository => `- ${repository.name} 源码：${repository.url}`).join('\n')}
 - JSON：${origin}/data/works.json
 - 完整资料：${origin}/llms-full.txt
 
@@ -160,7 +167,11 @@ ${work.featureGroups.map(group => `- ${group.name}：${group.description}`).join
 
 ## 详细功能
 
-${work.detailSections.map(section => `### ${section.title}\n\n${section.paragraphs.join('\n\n')}`).join('\n\n')}
+${work.detailSections.map(section => `### ${section.title}\n\n${section.paragraphs.join('\n\n')}${section.availability ? `\n\n${section.availability}` : ''}${section.items ? `\n\n${section.items.map(item => `- ${item.name}：${item.description}${item.example ? ` 示例：“${item.example}”` : ''}`).join('\n')}` : ''}`).join('\n\n')}
+
+## 应用截图
+
+${work.screenshots.map(item => `- ${item.caption}：${origin}${item.path}\n  开源仓库原图：${item.sourceUrl}`).join('\n')}
 
 ## ${guide.title}
 
@@ -174,7 +185,8 @@ ${guide.references.map(reference => `- ${reference.title}：${reference.url}`).j
 
 - 开发约定：${repo}/blob/main/AGENTS.md
 - 项目索引：${repo}/blob/main/PROJECT_CONTEXT.md
-- 应用内 AI：发布包默认隐藏入口，开关以 ReleaseFeatures.ets 为准。
+- JIDE 应用内助手：${repo}/blob/main/docs/development/agent.md
+- JIDE 状态：${jide.availability}
 - 幻彩主题说明：${work.promotion.details}
 - 信息更新：${data.updatedAt}
 `;

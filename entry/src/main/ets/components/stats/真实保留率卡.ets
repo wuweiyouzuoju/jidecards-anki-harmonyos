@@ -8,6 +8,7 @@
 // Invariants: build 单根 Column；全部时间行仅在统计天数=全部（days=0）时显示（Anki revlogRange 语义）。
 
 import type { TrueRetention, TrueRetentionStats } from '../../proto/messages/StatsMessages';
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 色保留率_年轻, 色保留率_成熟 } from '../../model/统计色板';
 
@@ -141,7 +142,7 @@ export struct 真实保留率卡 {
     }
     .width('100%')
     .padding({ top: 应用尺寸.间距_5, bottom: 应用尺寸.间距_5 })
-    .border({ width: { bottom: 0.5 }, color: { bottom: $r('app.color.border_subtle') } })
+    .border(SurfaceBorder.options({ bottom: 0.5 }))
   }
 
   @Builder
@@ -198,7 +199,7 @@ export struct 真实保留率卡 {
     }
     .width('100%')
     .padding({ top: 应用尺寸.间距_5, bottom: 应用尺寸.间距_5 })
-    .border({ width: { bottom: 0.5 }, color: { bottom: $r('app.color.border_subtle') } })
+    .border(SurfaceBorder.options({ bottom: 0.5 }))
   }
 
   /** 空数据占位格（—） */

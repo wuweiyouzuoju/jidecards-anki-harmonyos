@@ -1,13 +1,15 @@
 import { PressFeedback } from '../utils/PressFeedback';
-import { FormInputStyle } from '../utils/FormInputStyle';
+import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { ExpansionReveal } from '../utils/ExpansionReveal';
 import { NoteFieldCard } from '../components/common/NoteFieldCard';
 import { SettingsToggleRow } from '../components/common/SettingsToggleRow';
 import { PrimaryActionButton } from '../components/common/PrimaryActionButton';
 import { 按下态按钮 } from '../components/common/按下态按钮';
-import { noteDraftChanged } from '../model/NoteFieldEditing';
+import { noteDraftChanged, parseNoteTags } from '../model/NoteFieldEditing';
+import { NoteTagsField } from '../components/common/NoteTagsField';
+import { NoteImagePreview } from '../components/common/NoteImagePreview';
 import { noteImagePreviewSource } from '../model/NoteMediaParts';
-import { NoteFieldAudio } from '../model/NoteAudioDraft';
+import { NoteFieldAudio, NoteAudioStatus } from '../model/NoteAudioDraft';
 import { NoteAudioPreview } from '../utils/NoteAudioPreview';
 import { discardNoteRecordings } from '../utils/NoteAudioRecorder';
 import { NoteEditorHeader } from '../components/common/NoteEditorHeader';
@@ -20,17 +22,17 @@ import { 浏览页参数, NoteDraftPreviewPageParams } from '../model/navigation
 import { NoteTypeCatalog } from '../model/NoteTypeCatalog';
 import { noteTypeText, noteFieldText } from '../utils/NoteTypeText';
 import { appInterface } from '../backend/AppInterfaceService';
-import { addNoteInterfaceControls, AppInterfaceMenuItem, AppInterfaceControl } from '../model/AppInterface';
+import { addNoteInterfaceControls, noteAudioInterfaceObservation, AppInterfaceMenuItem, AppInterfaceControl } from '../model/AppInterface';
 import { interfaceControlText } from '../utils/AppInterfaceText';
 import { noteFieldDisplayKey, noteTypeDisplayKey } from '../model/NoteTypePresentation';
 import { AnkiNoteCreation } from '../backend/AnkiNoteCreation';
-import { namedResourceText, showToastSafely } from '../utils/UiFeedback';
+import { showToastSafely, namedResourceText } from '../utils/UiFeedback';
 import { HelpLabel } from '../components/common/HelpLabel';
 import { SelectStyle } from '../utils/SelectStyle';
 import { ThemeTextSpans } from '../components/common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
-import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
+import { PAGE_COMPACT_LAYOUT_KEY } from '../model/AppLayoutState';
 import { 简洁模式AppStorage键, 加载简洁模式 } from '../model/简洁模式存储';
 
 // 添加笔记页：独立全屏建卡页（Task 9）。
@@ -52,7 +54,7 @@ import { 从图库选取图片 } from '../utils/文件导入助手';
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { 颜色键 } from '../model/颜色主题';
 import { CustomTransition } from '../utils/自定义转场';
-import type { NotetypeNameId, NotetypeView } from '../proto/messages/NotetypeMessages';
+import type { NotetypeNameId, NotetypeView, NotetypeField } from '../proto/messages/NotetypeMessages';
 
 /** 建卡目标牌组候选（通过 Navigation param 传入） */
 export interface 添加笔记牌组选项 {
@@ -80,7 +82,8 @@ export interface 添加笔记页参数 {
 
 @Component
 export struct 添加笔记页 {
-  @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
+  @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
   @StorageProp(简洁模式AppStorage键) @Watch('publishInterface') private isSimpleMode: boolean = true;
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @StorageProp(PAGE_SURFACE_KEY) private pageSurface: string = '#F5F7FA';
@@ -101,6 +104,7 @@ export struct 添加笔记页 {
   @State private 字段值列表: string[] = [];
   // Core fields.sticky 的渲染快照；配置写入与保留决策仍由会话使用类型属性。
   @State private fieldSticky: boolean[] = [];
+  @State private fieldConfigs: NotetypeField[] = [];
   @State private stickySaving: boolean = false;
   @State private fieldEditorVersion: number = 0;
   private draftBaseline: string[] = [];
@@ -193,6 +197,7 @@ export struct 添加笔记页 {
   aboutToDisappear(): void {
     this.pageActive = false;
     appInterface.hidePage('add_note'); appInterface.leave('add_note'); appInterface.leave('add_note_types');
+    appInterface.leave('note_audio_manage');
     this.tagsReveal.cancel();
     this.audioPreview.dispose().catch((): void => {});
     if (!this.处理中) discardNoteRecordings(this.fieldAudios).catch((): void => {});
@@ -227,7 +232,7 @@ export struct 添加笔记页 {
   }
 
   /** 读取本地化文案，context 不可用时回退空串。 */
-  private 取本地化文案(资源: Resource): string {
+  private 取本地化文案(资源: Resource, _locale: string = this.uiLanguage): string {
     const 上下文: common.UIAbilityContext | null = this.取能力上下文();
     if (上下文 === null) {
       return '';
@@ -239,7 +244,7 @@ export struct 添加笔记页 {
     }
   }
 
-  private applyCreationState(state: NoteCreationState): void {
+  private applyCreationState(state: NoteCreationState, _locale: string = this.uiLanguage): void {
     if (!this.pageActive) return;
     this.duplicateSearch = state.duplicateSearch ?? '';
     this.处理中 = state.busy || this.duplicateSearch !== '';
@@ -247,6 +252,7 @@ export struct 添加笔记页 {
       (state.error.startsWith('add_note_') || state.error.startsWith('note_audio_')) ? namedResourceText(this.getUIContext(), state.error) : state.error;
     this.笔记类型选项 = state.types;
     this.fieldSticky = (state.view?.fields ?? []).map((field): boolean => field.sticky === true);
+    this.fieldConfigs = (state.view?.fields ?? []).slice();
     this.stickySaving = state.stickySaving;
     if (state.view !== this.displayedType) {
       this.displayedType = state.view;
@@ -376,14 +382,7 @@ export struct 添加笔记页 {
   }
 
   private 解析标签(): string[] {
-    const 已见: string[] = [];
-    for (const 标签 of this.标签.split(/\s+/)) {
-      const 已修剪 = 标签.trim();
-      if (已修剪 !== '' && 已见.indexOf(已修剪) < 0) {
-        已见.push(已修剪);
-      }
-    }
-    return 已见;
+    return parseNoteTags(this.标签);
   }
 
   /** 多挖空字段中至少一处包含有效编号才可保存。 */
@@ -421,7 +420,7 @@ export struct 添加笔记页 {
     return this.fieldImages.filter((attachment: NoteFieldImage): boolean => attachment.fieldIndex === fieldIndex);
   }
 
-  private async 选取图片遮盖源图(): Promise<void> {
+  private async 选取图片遮盖源图(_locale: string = this.uiLanguage): Promise<void> {
     if (this.处理中 || this.pickingFieldImage || this.audioBusy || this.confirmingDiscard) {
       return;
     }
@@ -525,11 +524,16 @@ export struct 添加笔记页 {
   private restoreEditorAfterPreview(): void {
     this.draftPreview = null;
   }
-  private interfaceLabel(id: string): string { return interfaceControlText(this.getUIContext(), this.interfaceControls(), id); }
+  private interfaceLabel(id: string): string { return interfaceControlText(this.getUIContext(), this.interfaceControls(), id, this.uiLanguage); }
   private interfaceEnabled(id: string): boolean {
     return this.interfaceControls().find((item): boolean => item.id === id)?.enabled ?? false;
   }
-  private publishInterface(): void {
+  private publishAudioStatus(status: NoteAudioStatus | null): void {
+    if (status === null || !this.pageActive) appInterface.leave('note_audio_manage');
+    else appInterface.observe(noteAudioInterfaceObservation(status));
+  }
+
+  private publishInterface(_locale: string = this.uiLanguage): void {
     if (!this.pageActive) return;
     const controls: AppInterfaceControl[] = this.interfaceControls().map((item): AppInterfaceControl =>
       ({ id: item.id, title: namedResourceText(this.getUIContext(), item.titleKey), titleKey: item.titleKey,
@@ -597,12 +601,9 @@ export struct 添加笔记页 {
   private 标签字段块() {
     Column({ space: 应用尺寸.间距_5 }) {
       this.带帮助的标签($r('app.string.add_note_tags'), (): Resource => $r('app.string.add_note_tags_help'))
-      TextInput({ placeholder: $r('app.string.add_note_tags_placeholder'), text: this.标签 })
-        .attributeModifier(new FormInputStyle())
-        .enabled(!this.处理中 && !this.pickingFieldImage && !this.audioBusy && !this.confirmingDiscard)
-        .onChange((值: string): void => {
-          this.updateTags(值);
-        })
+      NoteTagsField({ text: this.标签,
+        isInteractive: !this.处理中 && !this.pickingFieldImage && !this.audioBusy && !this.confirmingDiscard,
+        onChange: (value: string): void => { this.updateTags(value); } })
       Text($r('app.string.add_note_duplicate_policy'))
         .fontSize(应用尺寸.字号_正文_小)
         .fontColor($r('app.color.text_tertiary'))
@@ -686,7 +687,7 @@ export struct 添加笔记页 {
                 .optionFont(SelectStyle.optionFont)
                 .selectedOptionFont(SelectStyle.selectedOptionFont)
                 .textModifier(SelectStyle.labelText())
-                .borderRadius(SelectStyle.controlRadius)
+                .borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
                 .onSelect((索引: number): void => {
                   this.加载笔记类型(this.笔记类型选项[索引].id);
                 })
@@ -702,7 +703,7 @@ export struct 添加笔记页 {
                   .fontSize(应用尺寸.字号_正文)
                   .fontColor(this.动作主色)
                   .backgroundColor($r('app.color.surface_card'))
-                  .borderRadius(应用尺寸.圆角_面板)
+                  .borderRadius(应用尺寸.圆角_面板).border(SurfaceBorder.options())
                   .enabled(!this.处理中 && !this.pickingFieldImage && !this.audioBusy && !this.confirmingDiscard)
                   .attributeModifier(new PressFeedback())
                   .stateEffect(false)
@@ -713,7 +714,7 @@ export struct 添加笔记页 {
                     .fontSize(应用尺寸.字号_正文)
                     .fontColor(this.动作主色)
                     .backgroundColor($r('app.color.surface_card'))
-                    .borderRadius(应用尺寸.圆角_面板)
+                    .borderRadius(应用尺寸.圆角_面板).border(SurfaceBorder.options())
                     .enabled(!this.处理中 && !this.pickingFieldImage && !this.audioBusy && !this.confirmingDiscard)
                     .attributeModifier(new PressFeedback())
                     .stateEffect(false)
@@ -724,12 +725,7 @@ export struct 添加笔记页 {
 
               // ② 图片预览 + 编辑遮罩入口
               if (this.图片遮盖_源图Uri !== '') {
-                Image(this.图片遮盖_源图Uri)
-                  .width('100%')
-                  .height(应用尺寸.卡片高度)
-                  .objectFit(ImageFit.Contain)
-                  .borderRadius(应用尺寸.圆角_面板)
-                  .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+                NoteImagePreview({ source: this.图片遮盖_源图Uri })
               }
 
               // ③ Header / Back Extra 输入（用 字段名列表 中查到的字段名做 placeholder 变量）
@@ -742,64 +738,22 @@ export struct 添加笔记页 {
                 isDark: this.是否深色(), tint: this.动作主色, isInteractive: this.interfaceEnabled('back') && !this.stickySaving,
                 onChange: (sticky: boolean): void => { this.changeFieldSticky(this.imageOcclusionFields[0], sticky); } })
               if (this.图片遮盖_标题字段索引() >= 0) {
-                Column({ space: 应用尺寸.间距_5 }) {
-                  Text(noteFieldText(this.getUIContext(), this.字段名列表[this.图片遮盖_标题字段索引()], this.originalStockKind))
-                    .fontSize(应用尺寸.字号_正文_小)
-                    .fontColor($r('app.color.text_secondary'))
-                    .width('100%')
-                  TextArea({
-                    placeholder: noteFieldText(this.getUIContext(), this.字段名列表[this.图片遮盖_标题字段索引()], this.originalStockKind),
-                    text: this.图片遮盖_标题
-                  })
-                    .width('100%')
-                    .height(56)
-                    .fontSize(应用尺寸.字号_正文)
-                    .fontColor($r('app.color.text_primary'))
-                    .placeholderColor($r('app.color.text_tertiary'))
-                    .backgroundColor($r('app.color.surface_card'))
-                    .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
-                    .borderRadius(应用尺寸.圆角_面板)
-                    .padding(应用尺寸.间距_10)
-                    .enabled(!this.处理中 && !this.pickingFieldImage && !this.audioBusy && !this.confirmingDiscard)
-                    .onChange((值: string): void => {
-                      this.updateOcclusionText(值, true);
-                    })
-                  SettingsToggleRow({ title: $r('app.string.note_field_sticky'),
-                    hint: $r('app.string.note_field_sticky_hint'), isOn: this.fieldSticky[this.图片遮盖_标题字段索引()] ?? false,
-                    isDark: this.是否深色(), tint: this.动作主色, isInteractive: this.interfaceEnabled('back') && !this.stickySaving,
-                    onChange: (sticky: boolean): void => { this.changeFieldSticky(this.图片遮盖_标题字段索引(), sticky); } })
-                }
-                .width('100%')
+                NoteFieldCard({ fieldName: this.字段名列表[this.图片遮盖_标题字段索引()], fieldIndex: this.图片遮盖_标题字段索引(),
+                  originalStockKind: this.originalStockKind, value: this.图片遮盖_标题,
+                  fieldConfig: this.fieldConfigs[this.图片遮盖_标题字段索引()] ?? null, mediaEditable: false,
+                  disabled: !this.interfaceEnabled('back'), isDark: this.是否深色(), accent: this.动作主色,
+                  stickyEditable: true, stickyInteractive: !this.stickySaving, sticky: this.fieldSticky[this.图片遮盖_标题字段索引()] ?? false,
+                  onStickyChange: (sticky: boolean): void => { this.changeFieldSticky(this.图片遮盖_标题字段索引(), sticky); },
+                  onChange: (value: string): void => { this.updateOcclusionText(value, true); } })
               }
               if (this.图片遮盖_额外字段索引() >= 0) {
-                Column({ space: 应用尺寸.间距_5 }) {
-                  Text(noteFieldText(this.getUIContext(), this.字段名列表[this.图片遮盖_额外字段索引()], this.originalStockKind))
-                    .fontSize(应用尺寸.字号_正文_小)
-                    .fontColor($r('app.color.text_secondary'))
-                    .width('100%')
-                  TextArea({
-                    placeholder: noteFieldText(this.getUIContext(), this.字段名列表[this.图片遮盖_额外字段索引()], this.originalStockKind),
-                    text: this.图片遮盖_额外
-                  })
-                    .width('100%')
-                    .height(56)
-                    .fontSize(应用尺寸.字号_正文)
-                    .fontColor($r('app.color.text_primary'))
-                    .placeholderColor($r('app.color.text_tertiary'))
-                    .backgroundColor($r('app.color.surface_card'))
-                    .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
-                    .borderRadius(应用尺寸.圆角_面板)
-                    .padding(应用尺寸.间距_10)
-                    .enabled(!this.处理中 && !this.pickingFieldImage && !this.audioBusy && !this.confirmingDiscard)
-                    .onChange((值: string): void => {
-                      this.updateOcclusionText(值, false);
-                    })
-                  SettingsToggleRow({ title: $r('app.string.note_field_sticky'),
-                    hint: $r('app.string.note_field_sticky_hint'), isOn: this.fieldSticky[this.图片遮盖_额外字段索引()] ?? false,
-                    isDark: this.是否深色(), tint: this.动作主色, isInteractive: this.interfaceEnabled('back') && !this.stickySaving,
-                    onChange: (sticky: boolean): void => { this.changeFieldSticky(this.图片遮盖_额外字段索引(), sticky); } })
-                }
-                .width('100%')
+                NoteFieldCard({ fieldName: this.字段名列表[this.图片遮盖_额外字段索引()], fieldIndex: this.图片遮盖_额外字段索引(),
+                  originalStockKind: this.originalStockKind, value: this.图片遮盖_额外,
+                  fieldConfig: this.fieldConfigs[this.图片遮盖_额外字段索引()] ?? null, mediaEditable: false,
+                  disabled: !this.interfaceEnabled('back'), isDark: this.是否深色(), accent: this.动作主色,
+                  stickyEditable: true, stickyInteractive: !this.stickySaving, sticky: this.fieldSticky[this.图片遮盖_额外字段索引()] ?? false,
+                  onStickyChange: (sticky: boolean): void => { this.changeFieldSticky(this.图片遮盖_额外字段索引(), sticky); },
+                  onChange: (value: string): void => { this.updateOcclusionText(value, false); } })
               }
 
               // ④ Tags 折叠在「高级设置」里，与其他笔记类型保持一致（BUG-004 修复）
@@ -807,6 +761,7 @@ export struct 添加笔记页 {
             } else {
               ForEach(this.字段名列表, (字段名: string, 索引: number) => {
                 NoteFieldCard({ fieldName: 字段名, fieldIndex: 索引, originalStockKind: this.originalStockKind, value: this.字段值列表[索引],
+                  fieldConfig: this.fieldConfigs[索引] ?? null,
                   stickyEditable: true, stickyInteractive: !this.stickySaving, sticky: this.fieldSticky[索引] ?? false,
                   onStickyChange: (sticky: boolean): void => { this.changeFieldSticky(索引, sticky); },
                   disabled: !this.interfaceEnabled('back'),
@@ -819,6 +774,7 @@ export struct 添加笔记页 {
                     this.applyFieldMedia(索引, value, images, audios);
                   },
                   onAudioBusy: (busy: boolean): void => { this.audioBusy = busy; },
+                  onAudioStatus: (status: NoteAudioStatus | null): void => { this.publishAudioStatus(status); },
                   onRemoveAudio: (id: number): void => {
                     const removed: NoteFieldAudio[] = this.fieldAudios.filter((item: NoteFieldAudio): boolean => item.id === id);
                     this.fieldAudios = this.fieldAudios.filter((item: NoteFieldAudio): boolean => item.id !== id);

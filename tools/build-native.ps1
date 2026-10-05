@@ -16,7 +16,7 @@ if ($Profile -eq 'release') { $ReleaseArgs = @('--release') }
 # compiling so large APKG files do not retain and bridge a second full copy of
 # all note text. third_party/ is intentionally gitignored and may be recloned.
 $AnkiRoot = Join-Path $Workspace 'third_party\anki'
-$AnkiPatches = @('anki-compact-import-log.patch', 'anki-deck-preview.patch', 'anki-fsrs-workload-params.patch')
+$AnkiPatches = @('anki-compact-import-log.patch', 'anki-deck-preview.patch', 'anki-fsrs-workload-params.patch', 'anki-marking-sync-conflicts.patch')
 if (-not (Test-Path $AnkiRoot)) {
     throw 'third_party\anki is missing; clone the Anki source before building native code.'
 }

@@ -32,6 +32,7 @@ function harness(phase = 'question') {
     choiceQuestion: null, choiceAutoAdvanceSeconds: () => 5, clearChoiceAutoAdvance: () => {},
     noteEditorBusy: false, noteEditorError: '', editingNote: null, editorBackRequest: 0, 展示时刻毫秒: 500,
     当前卡片: { cardId: 7, noteId: 42, states: 'original' }, 已渲染: {}, Ctrl按下: false,
+    flagLabels: {}, currentMarking: null,
     取文案: key => key,
     声音播放器实例: { 停止: async () => {} }, TTS播放器实例: { 停止: async () => {} },
     笔记服务实例: {

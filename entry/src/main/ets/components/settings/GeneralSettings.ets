@@ -1,23 +1,23 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { settingsItemText } from '../../utils/SettingsStructureText';
 import { SettingsToggleRow } from '../common/SettingsToggleRow';
-import { resourceText, showToastSafely } from '../../utils/UiFeedback';
-import { SelectStyle } from '../../utils/SelectStyle';
+import { showToastSafely, resourceText } from '../../utils/UiFeedback';
+import { FormSelectRow } from '../common/FormSelectRow';
 import { 当前语言模式, 语言模式, 设置语言模式 } from '../../model/语言存储';
 import { 保存显示今日进度卡, 主页今日进度卡AppStorage键 } from '../../model/主页偏好';
-import { 设置面板色板_取 } from '../../utils/设置面板配色';
 import { 颜色键 } from '../../model/颜色主题';
 import { 设置分组卡片 } from './设置分组卡片';
 
 /** 常规设置沿用原语言与首页偏好的保存协议。 */
 @Component
 export struct GeneralSettings {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop 是否深色: boolean = false;
   @StorageLink(主页今日进度卡AppStorage键) private 显示今日进度卡: boolean = true;
   @StorageProp(颜色键.主色按钮背景) private actionColor: string = '#2F5FD0';
   打开说明回调: (标题: Resource, 正文: Resource) => void = (_标题: Resource, _正文: Resource): void => {};
 
-  private 取本地化文本(资源: Resource): string {
+  private 取本地化文本(资源: Resource, _locale: string = this.uiLanguage): string {
     return resourceText(this.getUIContext(), 资源);
   }
   private 切换今日进度卡(开启: boolean): void { 保存显示今日进度卡(开启); }
@@ -57,35 +57,13 @@ export struct GeneralSettings {
   build() {
     设置分组卡片({ groupId: 'general_display', 是否深色: this.是否深色 }) {
       Column({ space: 4 }) {
-          // 语言行 Select（zh-Hans/en）
-          Row() {
-            Text(settingsItemText(this.getUIContext(), 'language'))
-              .fontSize(15)
-              .fontColor(设置面板色板_取(this.是否深色).主文字)
-              .layoutWeight(1)
-            Select(this.语言选项())
-              .selected(this.语言索引())
-              .value(this.取本地化文本(this.语言模式标签(当前语言模式())))
-              .attributeModifier(new SelectStyle())
-              .height(SelectStyle.controlHeight)
-              .padding(SelectStyle.controlPadding)
-              .space(SelectStyle.controlSpace)
-              .width(SelectStyle.fieldWidth)
-              .constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
-              .font(SelectStyle.controlFont)
-              .optionFont(SelectStyle.optionFont)
-              .selectedOptionFont(SelectStyle.selectedOptionFont)
-              .textModifier(SelectStyle.labelText())
-              .borderRadius(SelectStyle.controlRadius)
-              .onSelect((索引: number): void => {
-                const 模式列表: 语言模式[] = ['zh-Hans', 'en'];
-                this.选择语言(模式列表[索引]);
-              })
-          }
-          .width('100%')
-          .height(48)
-          SettingsToggleRow({ title: settingsItemText(this.getUIContext(), 'home_today_summary'),
-              isOn: this.显示今日进度卡, tint: this.actionColor, isDark: this.是否深色, showHelp: true,
+          FormSelectRow({ label: settingsItemText(this.getUIContext(), 'language', this.uiLanguage), options: this.语言选项(), selectedIndex: this.语言索引(),
+            value: this.取本地化文本(this.语言模式标签(当前语言模式())),
+            onSelect: (索引: number): void => {
+              const 模式列表: 语言模式[] = ['zh-Hans', 'en'];
+              this.选择语言(模式列表[索引]);
+            } })
+          SettingsToggleRow({ title: settingsItemText(this.getUIContext(), 'home_today_summary', this.uiLanguage), isOn: this.显示今日进度卡, tint: this.actionColor, isDark: this.是否深色, showHelp: true,
               onHelp: (): void => {
                 this.打开说明回调($r('app.string.settings_home_today_summary'), $r('app.string.settings_home_today_summary_hint'));
               },

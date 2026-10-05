@@ -10,6 +10,9 @@ export interface MediaMaintenanceBackend {
   emptyTrash(): Promise<void>;
   restoreTrash(): Promise<void>;
   isSyncing(): Promise<boolean>;
+  missingNotesPage?(token: number, offset: number): Promise<MediaSnapshotPage>;
+  tagMissingNotes?(token: number): Promise<number>;
+  changed?(): void;
 }
 export class MediaMaintenanceState {
   revision: number = 0;
@@ -17,6 +20,8 @@ export class MediaMaintenanceState {
   checked: boolean = false;
   unusedCount: number = 0;
   missingCount: number = 0;
+  missingNoteCount: number = 0;
+  taggedCount: number = -1;
   reports: string[] = [];
   haveTrash: boolean = false;
   next: boolean = false;
@@ -46,6 +51,7 @@ export class MediaMaintenanceSession {
     state.revision = this.token;
     state.busy = this.state.busy; state.checked = this.state.checked;
     state.unusedCount = this.state.unusedCount; state.missingCount = this.state.missingCount;
+    state.missingNoteCount = this.state.missingNoteCount; state.taggedCount = this.state.taggedCount;
     state.reports = this.state.reports.slice(); state.haveTrash = this.state.haveTrash;
     state.next = this.nextOffset !== 0;
     state.error = this.state.error;
@@ -64,18 +70,49 @@ export class MediaMaintenanceSession {
     this.state.checked = true;
     this.state.unusedCount = page.unusedCount;
     this.state.missingCount = page.missingCount;
+    this.state.missingNoteCount = page.missingNoteCount ?? 0;
     this.state.haveTrash = page.haveTrash;
   }
   async check(): Promise<void> { await this.run('check'); }
   async trash(): Promise<void> { if (this.token !== 0) await this.run('trash'); }
   async empty(): Promise<void> { await this.run('empty'); }
   async restore(): Promise<void> { await this.run('restore'); }
+  async tagMissing(): Promise<void> { if (this.token !== 0) await this.run('tag'); }
+  /** Bounded native pages; the final browser query uses its existing complete-ID search path. */
+  async missingNotesSearch(): Promise<string> {
+    if (this.disposed || this.state.busy || this.token === 0 || this.backend.missingNotesPage === undefined) return '';
+    this.state.busy = true; this.state.error = ''; this.emit();
+    const token: number = this.token;
+    const ids: number[] = [];
+    let offset: number = 0;
+    autoSyncScheduler.beginOperation(this);
+    try {
+      do {
+        const page: MediaSnapshotPage = await this.backend.missingNotesPage(token, offset);
+        if (this.disposed) return '';
+        if (page.token !== token || (page.nextOffset !== 0 && page.nextOffset <= offset)) throw new Error('Media snapshot expired');
+        for (const id of page.noteIds ?? []) {
+          if (!Number.isSafeInteger(id) || id <= 0) throw new Error('Invalid missing note ID');
+          ids.push(id);
+        }
+        offset = page.nextOffset;
+      } while (offset !== 0);
+      return ids.length === 0 ? '' : 'nid:' + ids.join(',');
+    } catch (error) {
+      this.state.error = error instanceof Error ? error.message : `${error}`;
+      this.state.checked = false; await this.release(); return '';
+    } finally {
+      this.state.busy = false; autoSyncScheduler.endOperation(this);
+      if (this.disposed) await this.release(); else this.emit();
+    }
+  }
   async loadMore(): Promise<void> {
     if (this.nextOffset !== 0) await this.run('next');
   }
   private async run(action: string): Promise<void> {
     if (this.disposed || this.state.busy) return;
     this.state.busy = true; this.state.error = '';
+    if (action !== 'next') this.state.taggedCount = -1;
     autoSyncScheduler.beginOperation(this);
     this.emit();
     try {
@@ -90,13 +127,20 @@ export class MediaMaintenanceSession {
         if (action === 'trash') await this.backend.trashSnapshot(this.token);
         if (action === 'empty') await this.backend.emptyTrash();
         if (action === 'restore') await this.backend.restoreTrash();
+        if (action === 'tag') {
+          if (this.backend.tagMissingNotes === undefined) throw new Error('Missing media tagging unavailable');
+          this.state.taggedCount = await this.backend.tagMissingNotes(this.token);
+          autoSyncScheduler.request();
+          if (this.backend.changed !== undefined) this.backend.changed();
+        }
         if (!this.disposed) {
           const page = await this.backend.createSnapshot();
           this.apply(page); this.state.reports = [page.report];
         }
       }
     } catch (error) {
-      this.state.error = error instanceof Error ? error.message : `${error}`;
+      this.state.error = action === 'tag' && this.state.taggedCount >= 0 ? 'media_tag_refresh_error' :
+        error instanceof Error ? error.message : `${error}`;
       this.state.checked = false;
       await this.release();
     } finally {

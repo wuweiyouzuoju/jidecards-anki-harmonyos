@@ -1,4 +1,22 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+/** 音频操作状态，不包含字段正文、文件名、URI 或录音内容。 */
+export interface NoteAudioAttachmentStatus {
+  id: string;
+  playing: boolean;
+  replace: boolean;
+  remove: boolean;
+}
+
+export interface NoteAudioStatus {
+  recording: boolean;
+  paused: boolean;
+  working: boolean;
+  disabled: boolean;
+  seconds: number;
+  hasError: boolean;
+  attachments: NoteAudioAttachmentStatus[];
+}
+
 import { noteMediaParts } from './NoteMediaParts';
 export interface NoteFieldAudio {
   id: number;

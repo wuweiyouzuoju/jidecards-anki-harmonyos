@@ -2,10 +2,13 @@
 import { DialogFrame } from '../common/DialogFrame';
 import { DialogHeader } from '../common/DialogHeader';
 import { 应用尺寸 } from '../../utils/应用尺寸';
-import { resourceText, namedResourceText } from '../../utils/UiFeedback';
+import { namedResourceText, localizedResourceText } from '../../utils/UiFeedback';
+import { FormInputStyle } from '../../utils/FormInputStyle';
+import { newTagName } from '../../model/NoteTags';
 
 @Component
 export struct BrowserRenameTagDialog {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop isDark: boolean = false;
   @Prop busy: boolean = false;
   onClose: () => void = (): void => {};
@@ -25,7 +28,7 @@ export struct BrowserRenameTagDialog {
         this.onClose();
       },
       actionLabel: this.busy ? $r('app.string.browser_tag_rename_running') : $r('app.string.browser_detail_confirm'),
-      actionEnabled: !this.busy,
+      actionEnabled: !this.busy && newTagName(this.name) !== '' && newTagName(this.name) !== this.original,
       onAction: (): void => {
         this.onSubmit(this.name);
       }
@@ -50,13 +53,8 @@ export struct BrowserRenameTagDialog {
       Text($r('app.string.browser_tag_rename_new'))
         .fontSize(应用尺寸.字号_正文_小)
         .fontColor($r('app.color.text_secondary'))
-      TextInput({ text: this.name, placeholder: resourceText(this.getUIContext(), $r('app.string.browser_tag_rename_placeholder')) })
-        .fontSize(应用尺寸.字号_正文)
-        .fontColor($r('app.color.text_primary'))
-        .backgroundColor($r('app.color.surface_page'))
-        .borderRadius(应用尺寸.圆角_面板)
-        .height(应用尺寸.按钮高度)
-        .width('100%')
+      TextInput({ text: this.name, placeholder: localizedResourceText(this.getUIContext(), this.uiLanguage, $r('app.string.browser_tag_rename_placeholder')) })
+        .attributeModifier(new FormInputStyle())
         .enabled(!this.busy)
         .onChange((值: string): void => {
           this.name = 值;

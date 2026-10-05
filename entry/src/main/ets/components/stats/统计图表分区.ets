@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { HelpLabel } from '../common/HelpLabel';
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { 按下态按钮 } from '../common/按下态按钮';
 import { SelectStyle } from '../../utils/SelectStyle';
 
@@ -12,10 +13,11 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 范围切换条 } from './范围切换条';
 import { appInterface } from '../../backend/AppInterfaceService';
 import { AppInterfaceControl } from '../../model/AppInterface';
-import { namedResourceText, resourceText } from '../../utils/UiFeedback';
+import { localizedNamedResourceText, resourceText, namedResourceText } from '../../utils/UiFeedback';
 
 @Component
 export struct 统计图表分区 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop 标题: ResourceStr = $r('app.string.stats_no_data');
   @Prop @Watch('publishInterface') interfaceTitleKey: string = '';
   @Prop interfaceId: string = '';
@@ -35,7 +37,7 @@ export struct 统计图表分区 {
   private interfaceMounted: boolean = false;
   aboutToAppear(): void { this.interfaceMounted = true; this.publishInterface(); }
   aboutToDisappear(): void { this.interfaceMounted = false; appInterface.leave('stats_' + this.interfaceId); }
-  private publishInterface(): void {
+  private publishInterface(_locale: string = this.uiLanguage): void {
     if (!this.interfaceMounted || this.interfaceId === '') return;
     const controls: AppInterfaceControl[] = [];
     if (this.actionTitleKey !== '') controls.push({ id: 'details',
@@ -64,12 +66,12 @@ export struct 统计图表分区 {
   build() {
     Column({ space: 应用尺寸.间距_8 }) {
       Row({ space: 应用尺寸.间距_12 }) {
-        HelpLabel({ title: this.interfaceTitleKey === '' ? this.标题 : namedResourceText(this.getUIContext(), this.interfaceTitleKey), textSize: 18, textWeight: FontWeight.Bold,
+        HelpLabel({ title: this.interfaceTitleKey === '' ? this.标题 : localizedNamedResourceText(this.getUIContext(), this.uiLanguage, this.interfaceTitleKey), textSize: 18, textWeight: FontWeight.Bold,
           showHelp: this.帮助标题 !== null && this.帮助正文 !== null,
           onHelp: (): void => { this.onHelp(this.帮助标题 as Resource, this.帮助正文 as Resource); }
         }).layoutWeight(1)
         if (this.actionTitleKey !== '') {
-          按下态按钮({ 文案: namedResourceText(this.getUIContext(), this.actionTitleKey), singleLine: true,
+          按下态按钮({ 文案: localizedNamedResourceText(this.getUIContext(), this.uiLanguage, this.actionTitleKey), singleLine: true,
             是否启用: this.isInteractive && this.actionEnabled,
             点击回调: (): void => { if (this.isInteractive && this.actionEnabled) this.onAction(); } })
             .constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
@@ -98,7 +100,7 @@ export struct 统计图表分区 {
     .width('100%')
     .padding(应用尺寸.卡片内边距)
     .backgroundColor($r('app.color.surface_card'))
-    .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+    .border(SurfaceBorder.options())
     .borderRadius(应用尺寸.圆角_指标卡)
   }
 }

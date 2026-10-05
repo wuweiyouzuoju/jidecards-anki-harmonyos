@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { FormInputStyle } from '../../utils/FormInputStyle';
 import { HelpLabel } from '../common/HelpLabel';
 import { DialogBackdrop } from '../common/DialogBackdrop';
@@ -44,6 +45,7 @@ import { 取全屏转场时长, 取全屏转场曲线 } from '../../utils/转场
 
 @Component
 export struct 查找替换对话框 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop isDark: boolean = false;
   @Prop busy: boolean = false;
   @Prop errorMessage: string = '';
@@ -117,7 +119,7 @@ export struct 查找替换对话框 {
   }
 
   /** 读取本地化文案，context 不可用时回退空串。 */
-  private 取本地化文案(资源: Resource): string {
+  private 取本地化文案(资源: Resource, _locale: string = this.uiLanguage): string {
     try {
       return resourceText(this.getUIContext(), 资源);
     } catch (_错误) {
@@ -288,7 +290,7 @@ export struct 查找替换对话框 {
       .constraintSize({ maxWidth: 480, maxHeight: '88%' })
       .padding(应用尺寸.卡片内边距)
       .backgroundColor($r('app.color.surface_card'))
-      .borderRadius(应用尺寸.圆角_卡片)
+      .borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
       // 居中浮卡：缩放+淡入过渡（入：opacity(0)+scale(0.96,0.96)，出：opacity(0)）
       .transition(TransitionEffect.asymmetric(
         TransitionEffect.opacity(0)

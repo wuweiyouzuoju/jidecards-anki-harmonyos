@@ -231,6 +231,19 @@ test('coding Agent navigation has scoped rules, ownership, and a task contract',
   assert.match(taskContract, /不能只存在聊天上下文/);
 });
 
+test('ordinary settings and interface tasks require JIDE cognition synchronization through current development rules', () => {
+  const guide='docs/development/coding-agent.md';const anchor='软件升级时的认知同步';
+  for(const file of ['AGENTS.md','.agents/rules/paths/entry.md','docs/development/task-contract.md','docs/development/extension-points.md']) {
+    const links=[...read(file).matchAll(/\[[^\]]+\]\(([^)]+)#软件升级时的认知同步\)/g)];
+    assert.ok(links.some(link=>path.resolve(root,path.dirname(file),link[1])===path.resolve(root,guide)),file);
+  }
+  assert.match(read('AGENTS.md'),/必须同时维护 JIDE 的软件认知[\s\S]*不依赖用户另行提醒/);
+  const source=read(guide);assert.ok(source.includes('## '+anchor));
+  assert.match(source,/SettingsStructure[\s\S]*当前状态[\s\S]*操作能力[\s\S]*验证与交付/);
+  assert.match(source,/不能证明任意手写/);
+  assert.match(source,/ai-agent-app-structure\.test\.mjs/);
+});
+
 test('same-kind change guidance is reachable from entry, workflow, acceptance and decision index', () => {
   const guide = 'docs/development/coding-agent.md';
   const decision = 'docs/decisions/2026-09-26-consistent-change-coverage.md';

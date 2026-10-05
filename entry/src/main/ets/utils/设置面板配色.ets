@@ -35,6 +35,7 @@
 // ========================================================
 
 import { 颜色键 } from '../model/颜色主题';
+import { SurfaceBorder } from './SurfaceBorder';
 import { 规范化主题模式, 解析是否深色 } from '../model/主题设置';
 
 /**
@@ -47,7 +48,7 @@ export interface 设置面板色板 {
   次文字: string;
   三级文字: string;
   弱化文字: string;
-  分隔线: string;
+  分隔线: ResourceColor;
   标签背景: string;
   主色: string;
   /** 按钮背景专用主色（配 #FFFFFF 文字 ≥ 4.5:1）。2.1.4.1 深色模式修复。 */
@@ -299,7 +300,7 @@ export function 设置面板色板_取(回退是否深色: boolean): 设置面�
     // 原值配 标签背景 仅 4.04/3.22:1，用于 同步分组 placeholder / 语音分组 状态标签时不达标。
     三级文字: '#AEBBCE',
     弱化文字: '#9FB3CC',
-    分隔线: '#334155',
+    分隔线: SurfaceBorder.color(),
     标签背景: 解析标签背景(是否深色),
     主色: 解析主色(是否深色),
     主色按钮背景: 解析主色按钮背景(是否深色),
@@ -315,7 +316,7 @@ export function 设置面板色板_取(回退是否深色: boolean): 设置面�
     // 原值配 标签背景 仅 4.35/4.45:1，用于 同步分组 placeholder / 语音分组 状态标签时不达标。
     三级文字: '#616A78',
     弱化文字: '#656E7C',
-    分隔线: '#F1F5F9',
+    分隔线: SurfaceBorder.color(),
     标签背景: 解析标签背景(是否深色),
     主色: 解析主色(是否深色),
     主色按钮背景: 解析主色按钮背景(是否深色),

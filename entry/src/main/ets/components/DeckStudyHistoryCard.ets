@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { PressFeedback } from '../utils/PressFeedback';
 import { 统计服务 } from '../backend/统计服务';
 import { GraphsView } from '../proto/messages/StatsMessages';
@@ -6,13 +7,13 @@ import { DeckStudyDay, DeckStudyHistory, buildDeckStudyHistory, historyStudyDayK
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 import { 颜色键 } from '../model/颜色主题';
 import { 应用尺寸 } from '../utils/应用尺寸';
-import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
+import { PAGE_COMPACT_LAYOUT_KEY } from '../model/AppLayoutState';
 import { themeGradient } from '../utils/ThemeVisuals';
 
 /** 同牌组同一天刷新保留已展示图表；切换范围隐藏旧值，迟到结果丢弃。 */
 @Component
 export struct DeckStudyHistoryCard {
-  @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
+  @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
   @Prop @Watch('reload') search: string = '';
   @Prop @Watch('reload') refreshToken: number = 0;
   @StorageProp(颜色键.动作主色) private accent: string = '#2F5FD0';
@@ -172,7 +173,7 @@ export struct DeckStudyHistoryCard {
     .width('100%')
     .padding(应用尺寸.卡片内边距)
     .backgroundColor($r('app.color.surface_card'))
-    .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+    .border(SurfaceBorder.options())
     .borderRadius(应用尺寸.圆角_指标卡)
     .onVisibleAreaChange([0], (visible: boolean): void => { this.setVisible(visible); })
   }

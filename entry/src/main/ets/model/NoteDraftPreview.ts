@@ -76,6 +76,18 @@ export class NoteDraftPreviewSession {
       if (!this.current(version)) return;
       const json = JSON.parse(await this.backend.notetypeJson(input.notetypeId)) as Record<string, Object>;
       if (!this.current(version)) return;
+      const imageOcclusion: boolean = json['originalStockKind'] === 6;
+      if (imageOcclusion && !(input.sample ?? false)) {
+        // Core 优先使用完整字段 tag，旧类型缺少 tag 时沿用默认字段位置。
+        const definitions = json['flds'] as Record<string, Object>[];
+        const indexes = [0, 1, 2, 3].map((tag: number): number =>
+          definitions.findIndex((field: Record<string, Object>): boolean => field['tag'] === tag));
+        const imageIndex: number = indexes.every((index: number): boolean => index >= 0) ? indexes[1] : 1;
+        const hasImage: boolean = (input.fields[imageIndex] ?? '').trim() !== '' ||
+          input.images.some((image: NoteFieldImage): boolean => image.fieldIndex === imageIndex &&
+            (image.uri !== '' || image.filename !== ''));
+        if (!hasImage) throw new Error('note_preview_no_image');
+      }
       const note: EditableNote = input.note ?? await this.backend.newNote(input.notetypeId);
       if (!this.current(version)) return;
       const media = await this.backend.prepareMedia(input);
@@ -110,7 +122,7 @@ export class NoteDraftPreviewSession {
         });
       }
       this.state.media = media; this.state.options = options;
-      if (options.length === 0) throw new Error('note_preview_no_cloze');
+      if (options.length === 0) throw new Error(imageOcclusion ? 'note_preview_no_occlusion' : 'note_preview_no_cloze');
       await this.render(0, version);
     } catch (error) {
       if (this.current(version)) this.state.error = error instanceof Error ? error.message : String(error);

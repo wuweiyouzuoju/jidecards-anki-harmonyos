@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { HelpLabel } from './common/HelpLabel';
 import { 字段帮助对话框 } from './字段帮助面板';
 import { DialogBackdrop } from './common/DialogBackdrop';
@@ -14,7 +15,8 @@ import { DialogFrame } from './common/DialogFrame';
 import { PackageImportOptions } from './import/PackageImportOptions';
 import { CsvImportOptions } from './import/CsvImportOptions';
 import { ImportResult } from './import/ImportResult';
-import { ImportAnkiPackageOptions, ImportSummary, DEFAULT_IMPORT_ANKI_PACKAGE_OPTIONS } from '../proto/messages/ImportExportMessages';
+import { ImportAnkiPackageOptions, ImportSummary, DEFAULT_IMPORT_ANKI_PACKAGE_OPTIONS,
+  copyImportAnkiPackageOptions } from '../proto/messages/ImportExportMessages';
 import { CsvMetadata } from '../proto/messages/CsvImportMessages';
 import { CsvImportPreview, validateCsvMapping } from '../model/CsvImport';
 import { ImportProgress } from '../model/ImportOperation';
@@ -37,6 +39,7 @@ class 牌组选择项 {
 /** Presentation-only data management panel. File and backend work stay with its owner. */
 @Component
 export struct 数据迁移面板 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop deckId: number = 0;
   @Prop @Watch('syncMode') initialMode: 数据迁移模式 = 'exportDeck';
@@ -44,6 +47,7 @@ export struct 数据迁移面板 {
   @Prop allowDeckSelection: boolean = false;
   @Prop busy: boolean = false;
   @Prop picking: boolean = false;
+  @Prop loadingPresets: boolean = false;
   @Prop errorMessage: string = '';
   @Prop personalReplacementStep: number = 0;
   @Prop stage: number = -1;
@@ -55,6 +59,7 @@ export struct 数据迁移面板 {
   @Prop cancelled: boolean = false;
   @Prop externalInput: boolean = false;
   @Prop fileName: string = '';
+  @Prop @Watch('loadImportOptions') packagePresets: ImportAnkiPackageOptions | null = null;
   @State private importOptions: ImportAnkiPackageOptions = DEFAULT_IMPORT_ANKI_PACKAGE_OPTIONS;
   @State private csvDraft: CsvMetadata | null = null;
   onCancel: () => void = (): void => {};
@@ -77,6 +82,7 @@ export struct 数据迁移面板 {
   onClose: () => void = (): void => {};
 
   aboutToAppear(): void {
+    this.loadImportOptions();
     this.模式 = this.initialMode;
     this.已选导出牌组Id = this.deckId;
     if (this.已选导出牌组Id <= 0 && this.deckOptions.length > 0) {
@@ -85,6 +91,10 @@ export struct 数据迁移面板 {
   }
 
   private syncMode(): void { this.模式 = this.initialMode; this.csvDraft = null; }
+
+  private loadImportOptions(): void {
+    if (this.packagePresets !== null) this.importOptions = copyImportAnkiPackageOptions(this.packagePresets);
+  }
 
   private 已选牌组索引(): number {
     const 索引 = this.deckOptions.findIndex((牌组: 导出牌组选项): boolean => 牌组.id === this.已选导出牌组Id);
@@ -111,7 +121,7 @@ export struct 数据迁移面板 {
 
   // 官方 Select 文档：selected 仅控制菜单初始高亮，按钮文本需由 value 提供，否则框内空白。
   // value 必须传 string：传 Resource 时按钮文本不显示（同 高级牌组选项面板 同款 bug）。
-  private 解析文本(资源: Resource): string { return resourceText(this.getUIContext(), 资源); }
+  private 解析文本(资源: Resource, _locale: string = this.uiLanguage): string { return resourceText(this.getUIContext(), 资源); }
   private 模式标签(模式: 数据迁移模式): string {
     if (模式 === 'importFile') return this.解析文本($r('app.string.transfer_import_file'));
     if (模式 === 'importText') return this.解析文本($r('app.string.transfer_import_text'));
@@ -145,6 +155,7 @@ export struct 数据迁移面板 {
   }
 
   private 忙碌文案(): string {
+    if (this.loadingPresets) return this.解析文本($r('app.string.transfer_loading_presets'));
     if (this.picking) return this.解析文本($r('app.string.transfer_selecting_file'));
     if (this.模式 === 'exportDeck' || this.模式 === 'exportPersonalData') {
       return this.解析文本($r('app.string.transfer_exporting'));
@@ -188,6 +199,7 @@ export struct 数据迁移面板 {
 
   private 可提交(): boolean {
     if (this.result !== null) return true;
+    if (this.模式 === 'importDeck') return this.packagePresets !== null;
     if (this.模式 === 'importText' && this.csv !== null) return this.csvDraft !== null && validateCsvMapping(this.csvDraft);
     if (this.模式 === 'exportDeck') return this.已选导出牌组Id > 0;
     if (this.模式 === 'importPersonalData') return this.已确认替换个人数据;
@@ -228,6 +240,7 @@ export struct 数据迁移面板 {
       return;
     }
     if (this.模式 === 'importDeck') {
+      if (this.packagePresets === null) return;
       const 意图: 导入牌组意图 = { kind: 'importDeck', options: this.importOptions };
       this.onIntent(意图);
       return;
@@ -337,7 +350,7 @@ export struct 数据迁移面板 {
             .optionFont(SelectStyle.optionFont)
             .selectedOptionFont(SelectStyle.selectedOptionFont)
             .textModifier(SelectStyle.labelText())
-            .borderRadius(SelectStyle.controlRadius)
+            .borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
             .onSelect((索引: number): void => {
               this.已选导出牌组Id = this.deckOptions[索引].id;
             })
@@ -345,7 +358,7 @@ export struct 数据迁移面板 {
         .width('100%')
       }
 
-      if (this.模式 === 'importDeck') {
+      if (this.模式 === 'importDeck' && this.packagePresets !== null) {
         PackageImportOptions({ options: this.importOptions, isInteractive: !this.busy, isDark: this.isDark,
           onChange: (options: ImportAnkiPackageOptions): void => { this.importOptions = options; } })
       }
@@ -384,6 +397,8 @@ export struct 数据迁移面板 {
           if (this.模式 === 'exportDeck') {
             this.选项行(this.解析文本($r('app.string.transfer_include_scheduling')),
               this.包含调度信息, (值: boolean) => { this.包含调度信息 = 值; })
+            Text($r('app.string.card_mark_export_hint')).fontSize(应用尺寸.字号_正文_小)
+              .fontColor($r('app.color.text_secondary'))
             this.选项行(this.解析文本($r('app.string.transfer_include_deck_configs')),
               this.包含牌组配置, (值: boolean) => { this.包含牌组配置 = 值; })
           }
@@ -407,9 +422,9 @@ export struct 数据迁移面板 {
       if (this.模式 === 'importPersonalData') {
         Column({ space: 应用尺寸.间距_8 }) {
           Row({ space: 应用尺寸.间距_8 }) {
-            Text('⚠')
+            SymbolGlyph($r('sys.symbol.exclamationmark_triangle'))
               .fontSize(应用尺寸.字号_标题)
-              .fontColor($r('app.color.error_text'))
+              .fontColor([$r('app.color.error_text')]).accessibilityLevel('no')
             Text(this.解析文本($r('app.string.transfer_personal_replace_warning')))
               .fontSize(应用尺寸.字号_正文_中)
               .fontColor($r('app.color.error_text'))
@@ -430,7 +445,7 @@ export struct 数据迁移面板 {
         .width('100%')
         .padding(应用尺寸.间距_12)
         .backgroundColor($r('app.color.surface_page'))
-        .borderRadius(应用尺寸.圆角_面板)
+        .borderRadius(应用尺寸.圆角_面板).border(SurfaceBorder.options())
       }
 
       // === 错误信息（红字）===

@@ -33,7 +33,7 @@ test('card preview keeps its position header and preserves preview while editing
   // 顶部条统一为「关闭 / N/N / 更多」，更多菜单里是编辑 + Agent 改卡（浏览页与牌组预览同一套）
   assert.match(preview, /Text\(this\.取位置文案\(\)\)/);
   assert.match(preview, /文案: \$r\('app\.string\.browser_preview_close'\)/);
-  assert.match(preview, /Button\(\$r\('app\.string\.study_more'\)\)/);
+  assert.match(preview, /文案: \$r\('app\.string\.study_more'\)/);
   assert.match(preview, /CardActionMenu\(\{ items: this\.预览更多菜单\(\)/);
   assert.doesNotMatch(preview, /DialogHeader\(/);
   assert.match(preview, /@Prop\s+@Watch\('预览刷新版本变化'\)\s+刷新版本:\s*number/);
@@ -184,29 +184,28 @@ test('浏览编辑区 component preserves T7 presentation-only invariants', () =
 // 卡片表格必须上抛 onSelectionChange/onMultiSelectChange 回调。
 // ============================================================
 
-test('BrowserPage wires T8 batch actions: imports 批量操作栏 + 牌组服务 + 调度器服务 + DeckTreeNode + BURY_SUSPEND_MODE_SUSPEND', () => {
+test('BrowserPage wires batch actions to the shared menu and the state toggle model', () => {
   const page = read('entry/src/main/ets/pages/浏览页.ets');
   assert.match(page, /import\s+\{[^}]*批量操作栏[^}]*\}\s*from\s*['"][^'"]*批量操作栏['"]/);
   assert.match(page, /import\s+\{[^}]*牌组服务[^}]*\}\s*from\s*['"][^'"]*牌组服务['"]/);
   assert.match(page, /import\s+\{[^}]*调度器服务[^}]*\}\s*from\s*['"][^'"]*调度器服务['"]/);
   assert.match(page, /import\s+type\s+\{[^}]*DeckTreeNode[^}]*\}\s*from\s*['"][^'"]*DeckMessages['"]/);
-  assert.match(page, /import\s+\{[^}]*BURY_SUSPEND_MODE_SUSPEND[^}]*\}\s*from\s*['"][^'"]*SchedulerMessages['"]/);
+  assert.match(page, /import\s+\{[^}]*toggleBrowserCardState[^}]*\}\s*from\s*['"][^'"]*BrowserCardState['"]/);
 });
 
 test('browser batch forms have separate owners and one mutually exclusive display slot', () => {
   const page=read('entry/src/main/ets/pages/浏览页.ets');
-  for (const name of ['BrowserDeckDialog','BrowserFlagDialog','BrowserDueDialog','BrowserBatchConfirm','BrowserNotetypeFeature'])
+  for (const name of ['BrowserDeckDialog','BrowserDueDialog','BrowserBatchConfirm','BrowserNotetypeFeature'])
     assert.ok(page.includes(name+'({'), name);
   assert.doesNotMatch(page, /@State[^\n]*(?:字段映射|模板映射|到期日输入)/);
   assert.match(page, /@State private batchDialog:/);
 });
 
-test('Browser suspend and restore use captured selection and the common completion boundary', () => {
+test('Browser suspend and bury toggles use captured selection and the common completion boundary', () => {
   const page = read('entry/src/main/ets/pages/浏览页.ets');
   const body = page.match(/private async 执行批量挂起[\s\S]*?\n  \}/)[0];
-  assert.match(body, /selection\.mode === 'notes'/);
-  assert.match(body, /批量埋藏或暂停笔记\(selection\.ids/);
-  assert.match(body, /批量埋藏或暂停卡片\(selection\.ids/);
+  assert.match(body, /解析选中为卡片ID\(selection\)/);
+  assert.match(body, /toggleBrowserCardState\(this.cardStateBackend\(\), ids, 'suspend'\)/);
   assert.match(body, /runBatchOperation/);
   assert.match(page, /operations\.isCurrent[\s\S]*?this\.退出多选\(\)/);
   assert.match(page, /resolveBrowserCardIds\(selection,/);
@@ -215,8 +214,9 @@ test('Browser suspend and restore use captured selection and the common completi
 
 test('browser batch bar requires a nonempty selection and dispatches to separate forms', () => {
   const page=read('entry/src/main/ets/pages/浏览页.ets');
-  assert.match(page, /if\s*\(this\.多选模式值\s*&&\s*this\.选中ID列表\.length\s*>\s*0\)/);
-  for (const kind of ['deck','flag','suspend','delete']) assert.ok(page.includes("this.batchDialog === '"+kind+"'"));
+  assert.match(page, /if\s*\(this\.showBatchMenu\s*&&\s*this\.多选模式值\s*&&\s*this\.选中ID列表\.length\s*>\s*0\)/);
+  for (const kind of ['deck','delete']) assert.ok(page.includes("this.batchDialog === '"+kind+"'"));
+  assert.doesNotMatch(page, /this.batchDialog === 'suspend'/);
 });
 
 test('批量操作栏 component preserves T8 presentation-only invariants', () => {
@@ -225,25 +225,23 @@ test('批量操作栏 component preserves T8 presentation-only invariants', () =
   assert.doesNotMatch(bar, /后端会话|卡片服务|笔记服务|牌组服务|调度器服务|\.run\(/);
   // 必备 @Prop 与回调签名
   assert.match(bar, /@Prop\s+isDark:\s*boolean/);
-  assert.match(bar, /@Prop\s+busy:\s*boolean/);
-  assert.match(bar, /@Prop\s+选中数:\s*number/);
+  assert.match(bar, /@Prop\s+@Watch\('publishInterface'\)\s+busy:\s*boolean/);
+  assert.match(bar, /@Prop\s+@Watch\('publishInterface'\)\s+选中数:\s*number/);
   assert.match(bar, /on改牌组:\s*\(\)\s*=>\s*void/);
   assert.match(bar, /on设置标志:\s*\(\)\s*=>\s*void/);
   assert.match(bar, /on挂起:\s*\(\)\s*=>\s*void/);
   assert.match(bar, /on删除:\s*\(\)\s*=>\s*void/);
-  // 4 个按钮文案走 i18n
-  assert.match(bar, /app\.string\.browser_action_change_deck/);
-  assert.match(bar, /app\.string\.browser_action_set_flag/);
-  assert.match(bar, /app\.string\.browser_action_suspend/);
-  assert.match(bar, /app\.string\.browser_action_delete/);
+  assert.match(bar, /visibleInterfaceItems\('browser_batch'/);
+  assert.match(bar, /namedResourceText/);
+  assert.match(bar, /CardActionMenu\(/);
+  assert.doesNotMatch(bar, /Button\(|\.backgroundColor\(|\.fontSize\(/);
 });
 
 test('批量操作栏 AI 改卡 uses the same neutral color treatment as ordinary actions', () => {
   const bar = read('entry/src/main/ets/components/browser/批量操作栏.ets');
-  const aiButton = bar.match(/Button\(\$r\('app\.string\.ai_card_edit'\)\)[\s\S]*?\.onClick\(\(\): void => \{ this\.onAI改卡\(\); \}\)/)?.[0] ?? '';
-  assert.match(aiButton, /fontColor\(\$r\('app\.color\.text_primary'\)\)/);
-  assert.match(aiButton, /backgroundColor\(\$r\('app\.color\.surface_card'\)\)/);
-  assert.doesNotMatch(aiButton, /action_primary|action_on_primary|颜色键/);
+  assert.match(bar, /case 'agent': this.onAI改卡\(\)/);
+  assert.match(bar, /destructive: item.id === 'delete'/);
+  assert.doesNotMatch(bar, /action_primary|action_on_primary|颜色键|\.fontColor\(/);
 });
 
 test('卡片表格 component exposes onSelectionChange + onMultiSelectChange callbacks', () => {
@@ -257,11 +255,15 @@ test('卡片表格 component exposes onSelectionChange + onMultiSelectChange cal
   assert.doesNotMatch(table, /@State[^\n]*(?:选中ID集合|多选模式)/);
 });
 
-test('Browser multi-select moves count and close action into the top toolbar', () => {
+test('Browser multi-select count opens the menu below the top toolbar and back first closes that menu', () => {
   const page = read('entry/src/main/ets/pages/浏览页.ets');
   const table = read('entry/src/main/ets/components/browser/卡片表格.ets');
-  assert.match(page, /if \(this\.多选模式值\) \{[\s\S]*?文案: this\.取选中计数文案\(\)[\s\S]*?点击回调: \(\): void => this\.退出多选\(\)/);
-  assert.match(page, /return `\$\{模板\.replace\('%d', `\$\{this\.选中ID列表\.length\}`\)\} ×`/);
+  assert.match(page, /Text\(this\.多选模式值 \? this\.取选中计数文案\(\) : \$r\('app\.string\.browser_title'\)\)/);
+  assert.match(page, /if \(this\.多选模式值\) \{[\s\S]*?文案: \$r\('app\.string\.browser_selection_actions'\)[\s\S]*?点击回调: \(\): void => \{ this\.showBatchMenu = !this\.showBatchMenu; \}/);
+  assert.match(page, /return 模板\.replace\('%d', `\$\{this\.选中ID列表\.length\}`\)/);
+  assert.match(page, /onExit: \(\): void => \{ this\.退出多选\(\); \}/);
+  assert.match(page, /if \(this.showBatchMenu\) \{ this.batchBackRequest\+\+; return true; \}/);
+  assert.match(page, /topOffset: 应用尺寸.pageContentTop\(this.状态栏高度, this.narrowDeckLayout\)/);
   assert.doesNotMatch(table, /private 选中计数条\(|Text\('✕'\)/);
   assert.match(table, /@Prop 多选模式: boolean = false/);
   assert.match(page, /多选模式: this\.多选模式值/);
@@ -285,11 +287,13 @@ test('Browser suspension copy matches the implemented Anki semantics', () => {
   const zh = JSON.parse(read('entry/src/main/resources/base/element/string.json')).string;
   const byName = new Map(zh.map((item) => [item.name, item.value]));
   assert.equal(byName.get('browser_action_suspend'), '暂停');
-  assert.equal(byName.get('browser_action_restore'), '恢复卡片');
+  assert.equal(byName.get('browser_action_toggle_suspend'), '暂停／取消暂停');
+  assert.equal(byName.get('browser_action_toggle_bury'), '今日跳过／取消跳过');
   assert.match(byName.get('browser_action_suspend_confirm'), /笔记模式.*全部卡片/);
-  assert.match(byName.get('glossary_suspend_help'), /浏览页选中卡片后使用「恢复卡片」/);
+  assert.match(byName.get('glossary_suspend_help'), /暂停／取消暂停/);
   assert.doesNotMatch(byName.get('browser_help_batch_body'), /没有 noteId|RPC/);
-  assert.match(byName.get('browser_help_batch_body'), /暂停和恢复卡片可在卡片、笔记两种模式中使用/);
+  assert.match(byName.get('browser_help_batch_body'), /全部.*暂停.*取消暂停/);
+  assert.match(byName.get('browser_help_batch_body'), /不会重置学习进度/);
 });
 
 test('T8 i18n keys exist in both base and en_US string.json', () => {
@@ -301,6 +305,10 @@ test('T8 i18n keys exist in both base and en_US string.json', () => {
     'browser_action_deck_error',
     'browser_action_flag_error',
     'browser_action_suspend_error',
+    'browser_action_toggle_suspend',
+    'browser_action_toggle_bury',
+    'browser_action_bury_error',
+    'browser_exit_selection',
     'browser_action_delete_error',
     'browser_action_notes_mode_hint',
     'browser_action_suspend_confirm',
@@ -584,9 +592,8 @@ test('BrowserPage has T6 sidebar methods', () => {
   assert.match(page, /private\s+选已保存搜索\s*\(/);
   assert.match(page, /private\s+追加牌组条件\s*\(/);
   assert.match(page, /private\s+追加标签条件\s*\(/);
-  // 调用 标签服务.标签树 + 配置服务.获取配置JSON/获取配置布尔/设置配置布尔
+  // 配置缺失与首次保存由 page-repositories.test.mjs 执行真实适配器验证。
   assert.match(sidebar, /this\.tagService\.标签树\s*\(/);
-  assert.match(sidebar, /this\.config\.获取配置JSON\s*\(/);
   assert.match(sidebar, /this\.config\.获取配置布尔\s*\(/);
   assert.match(page, /this\.配置服务实例\.设置配置布尔\s*\(/);
 });
@@ -599,7 +606,7 @@ test('BrowserPage more menu owns the T6 sidebar entry', () => {
   assert.match(menu, /filterActive: this\.搜索文本\.trim\(\) !== ''/);
   assert.match(component, /browserInterfaceMenu\(this.available, this.filterActive, this.subtitleIndex\)/);
   assert.match(read('entry/src/main/ets/model/AppInterface.ts'), /item.id === 'filter' && filterActive \? 'browser_filter_active' : item.titleKey/);
-  assert.match(menu, /available: this\.阶段 === 'list'/);
+  assert.match(menu, /available: !this\.mutationBusy && this\.阶段 === 'list'/);
   assert.match(menu, /this\.打开侧边栏\s*\(/);
   assert.doesNotMatch(topBar, /browser_action_sidebar|browser_filter_active|this\.打开侧边栏/);
   assert.match(topBar, /this\.showMoreMenu = !this\.showMoreMenu/);
@@ -646,11 +653,11 @@ test('BrowserPage wires 查找替换对话框 onHelp to 字段帮助面板', () 
   assert.match(page, /browser_help_find_replace_body/);
 });
 
-test('批量操作栏 has onHelp callback and renders ⓘ button', () => {
+test('batch menu preserves the help callback as a shared menu entry', () => {
   const bar = read('entry/src/main/ets/components/browser/批量操作栏.ets');
   assert.match(bar, /onHelp:\s*\(\)\s*=>\s*void/);
-  assert.match(bar, /HelpLabel\(\{ title: \$r\('app.string.browser_help_batch_title'\)/);
-  assert.match(bar, /onHelp:.*this.onHelp\(\)/);
+  assert.match(bar, /case 'help': this.onHelp\(\)/);
+  assert.match(read('entry/src/main/ets/model/AppInterface.ts'), /id: 'help', titleKey: 'browser_help_batch_title'/);
 });
 
 test('BrowserPage build renders 浏览侧边栏 conditionally on 显示侧边栏', () => {

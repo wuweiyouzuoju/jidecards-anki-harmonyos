@@ -56,9 +56,9 @@ Agent-first 原则与开发约束见 [AGENTS.md](AGENTS.md)，本页只提供任
 
 ## 验证与交付
 
-`npm ci` 安装锁定的开发工具依赖。`npm test -- <领域>` 用于快速反馈；`npm test` 自动发现全部测试。
-`npm run impact` 根据暂存、未暂存和未忽略的新文件列出必读规则与最低验证范围；`--base <ref>` 合并分支差异，`--json` 输出结构化计划。命令成功不代表任何测试通过，详见验证说明。
-`npm run verify -- repo` 验证仓库；Windows DevEco 主机上 `npm run verify` 依次执行诊断、全部测试、Rust 主机测试、双架构与签名 HAP 构建，失败即停。
+`npm ci` 仅首次准备或依赖锁变化后安装开发工具。日常任务按[分级验证](docs/development/verification.md#按变更路径选择验证)选择相关测试；`npm test` 保留全部测试入口。
+`npm run impact` 列出必读规则与相关检查；`--kind cosmetic|behavior|compile|integration|release` 指定改动性质，`--paths` 限定本任务，`--base <ref>` 合并分支差异，`--json` 输出计划。命令成功不代表任何测试通过。
+`npm run verify -- repo` 是完整仓库验收；Windows DevEco 主机上 `npm run verify` 执行全部测试、原生与 clean 签名 HAP。完整入口供集成、依赖/SDK 升级、发布或用户明确要求时使用，不是每个对话的默认收尾。
 设备验收独立记录，构建成功不能代替实际交互验证。详细范围与失败分类见 [验证说明](docs/development/verification.md)。
 修改 `entry/`、`native/`、`tools/` 或文档规则时，先读取对应的 [目录级规则](.agents/rules/paths/)，再按 [模块责任与边界](docs/development/ownership.md) 判断入口和验证范围。
 

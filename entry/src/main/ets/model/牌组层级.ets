@@ -31,6 +31,7 @@
 import type { DeckTreeNode } from '../proto/messages/DeckMessages';
 import { 牌组色调 } from './主页模型';
 import type { 牌组汇总 } from './主页模型';
+import { orderDeckChildren } from './DeckReorder';
 
 const 色调轮转池: 牌组色调[] = [牌组色调.Blue, 牌组色调.Purple, 牌组色调.Mint, 牌组色调.Amber];
 
@@ -97,6 +98,7 @@ export function 平铺牌组树(根节点: DeckTreeNode,
       parentId: 父ID,
       hasChildren: 节点.children.length > 0,
       ancestorIds: 祖先ID列表,
+      filtered: 节点.filtered,
       description: '',
       newCount: 节点.newCount,
       learningCount: 节点.learnCount,
@@ -131,41 +133,7 @@ export function 平铺牌组树(根节点: DeckTreeNode,
  */
 function 重排子节点(子节点列表: DeckTreeNode[], 父ID: string,
   顺序覆盖: Map<string, string[]> | null): DeckTreeNode[] {
-  if (顺序覆盖 === null || 子节点列表.length <= 1) {
-    return 子节点列表;
-  }
-  const 顺序项: string[] | undefined = 顺序覆盖.get(父ID);
-  if (顺序项 === undefined || 顺序项.length === 0) {
-    return 子节点列表;
-  }
-  // 以 deckId 为索引建子节点查找表
-  const 按ID索引: Map<string, DeckTreeNode> = new Map<string, DeckTreeNode>();
-  for (let i: number = 0; i < 子节点列表.length; i++) {
-    按ID索引.set(子节点列表[i].deckId.toString(), 子节点列表[i]);
-  }
-  const 输出: DeckTreeNode[] = [];
-  const 已用: Set<string> = new Set<string>();
-  // 先按用户顺序追加
-  for (let i: number = 0; i < 顺序项.length; i++) {
-    const 当前ID: string = 顺序项[i];
-    if (已用.has(当前ID)) {
-      continue;
-    }
-    const 命中节点: DeckTreeNode | undefined = 按ID索引.get(当前ID);
-    if (命中节点 !== undefined) {
-      输出.push(命中节点);
-      已用.add(当前ID);
-    }
-  }
-  // 再追加未在 entry 中出现的子节点（按原顺序，防止新增牌组被丢失）
-  for (let i: number = 0; i < 子节点列表.length; i++) {
-    const 当前ID: string = 子节点列表[i].deckId.toString();
-    if (!已用.has(当前ID)) {
-      输出.push(子节点列表[i]);
-      已用.add(当前ID);
-    }
-  }
-  return 输出;
+  return orderDeckChildren(子节点列表, 顺序覆盖?.get(父ID) ?? null);
 }
 
 /** 返回祖先路径已全部展开的前序行。

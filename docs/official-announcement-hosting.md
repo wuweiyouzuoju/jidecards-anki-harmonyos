@@ -3,6 +3,10 @@
 > 现行运维文档。公告 Schema 以 `entry/src/main/ets/model/官方公告模型.ts` 为准，
 > 当前发布内容以 `hosting/announcement.json` 为准。
 
+## 当前状态
+
+123 云盘远程公告暂不投入使用。客户端唯一开关为 `entry/src/main/ets/model/官方公告配置.ts` 的 `OFFICIAL_ANNOUNCEMENTS_ENABLED = false`；首页不发起公告检查、不安排检查定时器、不展示待展示公告，网络服务也在创建 HTTP 客户端之前返回。保留地址、解析和已读 ID 记录，后续启用时无需清理用户偏好。本地入门与幻彩赠送提醒独立运行。以下接入、发布及送达说明仅在该开关启用后适用。
+
 应用通过 123 云盘为 `announcement.json` 实际生成的公开 HTTPS 长链读取公告。不得根据 UID、目录名或 CDN 主域名自行拼接地址，客户端不得包含 Client ID、Client Secret、Token 或上传凭据。
 
 ## 首次接入：验证固定文件路径

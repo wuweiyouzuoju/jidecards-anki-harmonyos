@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { settingsItemText } from '../../utils/SettingsStructureText';
-import { PressFeedback } from '../../utils/PressFeedback';
-import { DisclosureChevron } from '../common/DisclosureChevron';
+import { SettingsActionRow } from '../common/SettingsActionRow';
+import { settingsIcon } from '../../utils/SettingsIcons';
 import { resourceText } from '../../utils/UiFeedback';
 
-import { 设置面板色板_取, 设置面板色板 } from '../../utils/设置面板配色';
 import { 设置分组卡片 } from './设置分组卡片';
 
 // ========================================================
@@ -34,6 +33,7 @@ import { 设置分组卡片 } from './设置分组卡片';
 // ========================================================
 @Component
 export struct 术语分组 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop 是否深色: boolean = false;
   // 术语行上抛：由父组件 SettingsPanel 统一渲染 FieldHelpPanel 浮层，避免嵌在分组卡片内
   打开说明回调: (标题: Resource, 正文: Resource) => void = (_标题: Resource, _正文: Resource): void => {};
@@ -143,7 +143,7 @@ export struct 术语分组 {
     }
   ];
 
-  private 取本地化文本(资源: Resource): string {
+  private 取本地化文本(资源: Resource, _locale: string = this.uiLanguage): string {
     return resourceText(this.getUIContext(), 资源);
   }
 
@@ -155,8 +155,7 @@ export struct 术语分组 {
   // 渲染单条术语行：名称 + › 箭头，点击行 上抛 打开说明回调 显示该术语的详细说明。
   //
   // @输入
-  // 色板：当前色板。
-  // 条目：术语条目数据（含 标签资源 / 帮助标题资源 / 帮助正文资源）。
+    // 条目：术语条目数据（含 标签资源 / 帮助标题资源 / 帮助正文资源）。
   //
   // @输出
   // 渲染单行；点击术语行时上抛 打开说明回调。
@@ -165,20 +164,10 @@ export struct 术语分组 {
   // 无。
   // ========================================================
   @Builder
-  private 术语行(色板: 设置面板色板, 条目: 术语条目) {
-    Row() {
-      Text(settingsItemText(this.getUIContext(), 条目.目录ID))
-        .fontSize(15)
-        .fontColor(色板.主文字)
-        .layoutWeight(1)
-      DisclosureChevron({ tint: 色板.次文字 })
-    }
-    .width('100%')
-    .height(44)
-    .attributeModifier(new PressFeedback())
-    .onClick((): void => {
-      this.打开说明回调(条目.帮助标题资源, 条目.帮助正文资源);
-    })
+  private 术语行(条目: 术语条目) {
+    SettingsActionRow({ title: settingsItemText(this.getUIContext(), 条目.目录ID, this.uiLanguage),
+      icon: settingsIcon(条目.目录ID),
+      onAction: (): void => { this.打开说明回调(条目.帮助标题资源, 条目.帮助正文资源); } })
   }
 
   build() {
@@ -188,7 +177,7 @@ export struct 术语分组 {
     }) {
       Column() {
         ForEach(this.条目列表, (条目: 术语条目) => {
-          this.术语行(设置面板色板_取(this.是否深色), 条目)
+          this.术语行(条目)
         }, (条目: 术语条目): string => this.取本地化文本(条目.标签资源))
       }
       .width('100%')

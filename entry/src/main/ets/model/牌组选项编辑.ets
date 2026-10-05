@@ -34,6 +34,7 @@
 
 import type { DeckLimits } from '../proto/messages/DeckConfigMessages';
 import type { 校验问题 } from './牌组配置表单';
+import { deckOptionFloatInRange } from './DeckOptionsCatalog';
 
 export class 牌组选项请求字段 {
   limits: DeckLimits | null = null;
@@ -42,6 +43,7 @@ export class 牌组选项请求字段 {
   applyAllParentLimits: boolean = false;
   fsrsReschedule: boolean = false;
   fsrsHealthCheck: boolean = false;
+  mode: number = 0;
 }
 
 class 限额草稿 implements DeckLimits {
@@ -58,14 +60,15 @@ function 复制限额(源限额: DeckLimits): 限额草稿 {
   const 目标 = new 限额草稿(); 目标.review = 源限额.review; 目标.new = 源限额.new; 目标.reviewToday = 源限额.reviewToday; 目标.newToday = 源限额.newToday; 目标.reviewTodayActive = 源限额.reviewTodayActive; 目标.newTodayActive = 源限额.newTodayActive; 目标.desiredRetention = 源限额.desiredRetention; return 目标;
 }
 function 限额转文本(值: number | null): string { return 值 === null ? '' : 值.toString(); }
-function 解析无符号32位整数(输入文本: string): number | null { const 去除空白后: string = 输入文本.trim(); if (去除空白后 === '') return null; if (!/^\d+$/.test(去除空白后)) return null; const 解析结果: number = Number(去除空白后); return Number.isSafeInteger(解析结果) && 解析结果 <= 4294967295 ? 解析结果 : null; }
-function 解析保留率(输入文本: string): number | null { const 去除空白后: string = 输入文本.trim(); if (去除空白后 === '') return null; const 解析结果: number = Number(去除空白后); return Number.isFinite(解析结果) && 解析结果 >= 0.7 && 解析结果 <= 0.99 ? 解析结果 : null; }
+function 解析无符号32位整数(输入文本: string): number | null { const 去除空白后: string = 输入文本.trim(); if (去除空白后 === '') return null; if (!/^\d+$/.test(去除空白后)) return null; const 解析结果: number = Number(去除空白后); return Number.isSafeInteger(解析结果) && 解析结果 <= 9999 ? 解析结果 : null; }
+function 解析保留率(输入文本: string): number | null { const 去除空白后: string = 输入文本.trim(); if (去除空白后 === '') return null; const 解析结果: number = Number(去除空白后); return deckOptionFloatInRange(解析结果, 0.7, 0.99) ? 解析结果 : null; }
 
 /** 仅用于 UI 的当前牌组限额与请求级调度器开关草稿。 */
 @Observed
 export class 牌组选项编辑 {
   sharedDeckCount: number = 0;
-  applyToSharedDecks: boolean = false;
+  applyToSharedDecks: boolean = true;
+  保存模式: number = 0;
   复习限额文本: string = '';
   新卡限额文本: string = '';
   今日复习文本: string = '';
@@ -100,5 +103,5 @@ export class 牌组选项编辑 {
     const 下一个限额 = new 限额草稿(); 下一个限额.review = 解析无符号32位整数(this.复习限额文本); 下一个限额.new = 解析无符号32位整数(this.新卡限额文本); 下一个限额.reviewToday = 解析无符号32位整数(this.今日复习文本); 下一个限额.newToday = 解析无符号32位整数(this.今日新卡文本); 下一个限额.reviewTodayActive = this.今日复习启用; 下一个限额.newTodayActive = this.今日新卡启用; 下一个限额.desiredRetention = 解析保留率(this.目标保留率覆盖文本); this.已应用限额 = 下一个限额; return true;
   }
 
-  转换为请求字段(): 牌组选项请求字段 { const 请求字段 = new 牌组选项请求字段(); 请求字段.limits = this.已应用限额 === null ? null : 复制限额(this.已应用限额); 请求字段.newCardsIgnoreReviewLimit = this.新卡忽略复习限额; 请求字段.fsrs = this.是否启用FSRS; 请求字段.applyAllParentLimits = this.应用所有父级限额; 请求字段.fsrsReschedule = this.FSRS重排; 请求字段.fsrsHealthCheck = this.FSRS健康检查; return 请求字段; }
+  转换为请求字段(): 牌组选项请求字段 { const 请求字段 = new 牌组选项请求字段(); 请求字段.limits = this.已应用限额 === null ? null : 复制限额(this.已应用限额); 请求字段.newCardsIgnoreReviewLimit = this.新卡忽略复习限额; 请求字段.fsrs = this.是否启用FSRS; 请求字段.applyAllParentLimits = this.应用所有父级限额; 请求字段.fsrsReschedule = this.FSRS重排; 请求字段.fsrsHealthCheck = this.FSRS健康检查; 请求字段.mode = this.保存模式; return 请求字段; }
 }

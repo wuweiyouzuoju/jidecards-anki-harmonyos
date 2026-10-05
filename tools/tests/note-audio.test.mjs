@@ -128,20 +128,26 @@ test('existing-note save shares sync exclusion and keeps audio names on retry', 
   assert.equal(h.imports.length, 1); assert.equal(h.writes[0][0].fields[0], 'draft[sound:actual.mp3]');
 });
 
-function recorderHarness({ denied = false, gate, stopGate } = {}) {
-  const events = [], listeners = new Map();
-  const recorder = { on: (key, callback) => listeners.set(key, callback),
-    prepare: (config, callback) => { events.push(['prepare', config]); callback(null); }, start: async () => events.push('start'),
-    stop: async () => { events.push('stop'); if (stopGate) await stopGate.promise; }, release: async () => events.push('release') };
+function recorderHarness({ denied = false, gate, stopGate, prepareGate, failure } = {}) {
+  const events = [], logs = [], listeners = new Map();
+  const recorder = { state: 'idle', on: (key, callback) => listeners.set(key, callback),
+    prepare: (config, callback) => { events.push(['prepare', config]);
+      const ready = () => { recorder.state = 'prepared'; callback(null); };
+      if (prepareGate) prepareGate.promise.then(ready); else ready(); },
+    start: async () => { recorder.state = 'started'; events.push('start'); },
+    pause: async () => { recorder.state = 'paused'; events.push('pause'); },
+    resume: async () => { recorder.state = 'started'; events.push('resume'); },
+    stop: async () => { events.push('stop'); if (stopGate) await stopGate.promise; recorder.state = 'stopped'; },
+    release: async () => { recorder.state = 'released'; events.push('release'); } };
   const dependencies = { abilityAccessCtrl: { createAtManager: () => ({ requestPermissionsFromUser: async () => {
     if (gate) await gate.promise; return { authResults: [denied ? -1 : 0] };
-  } }) }, media: { createAVRecorder: async () => recorder, CodecMimeType: { AUDIO_AAC: 'aac' },
+  } }) }, media: { createAVRecorder: async () => { if (failure) throw failure; return recorder; }, CodecMimeType: { AUDIO_AAC: 'aac' },
     ContainerFormatType: { CFT_MPEG_4A: 'm4a' }, AudioSourceType: { AUDIO_SOURCE_TYPE_MIC: 1 } },
   fs: { OpenMode: { READ_WRITE: 1, CREATE: 2, TRUNC: 4 }, open: async path => { events.push(['open', path]); return { fd: 7 }; },
     close: async () => events.push('close'), stat: async () => ({ size: 40 }), unlink: async path => events.push(['unlink', path]) },
-  hilog: { warn() {} } };
+  hilog: { warn() {}, info: (...args) => logs.push(args), error: (...args) => logs.push(args) } };
   const Recorder = loadPlatformModule('utils/NoteAudioRecorder.ets', 'NoteAudioRecorder', dependencies);
-  return { recorder: new Recorder(), events, listeners,
+  return { recorder: new Recorder(), events, logs, listeners,
     discard: loadPlatformModule('utils/NoteAudioRecorder.ets', 'discardNoteRecordings', dependencies) };
 }
 
@@ -158,10 +164,34 @@ test('denied permission and cancellation during permission or finalization never
   assert.equal(denied.events.length, 0);
   const gate = deferred(), h = recorderHarness({ gate });
   const start = h.recorder.start({ cacheDir: '/cache' }, () => {}), cancel = h.recorder.cancel(); gate.resolve();
-  await Promise.all([start, cancel]); assert.equal(h.events.includes('start'), false);
+  assert.deepEqual(await Promise.all([start, cancel]), [false, undefined]); assert.equal(h.events.includes('start'), false);
   const stopGate = deferred(), f = recorderHarness({ stopGate }); await f.recorder.start({ cacheDir: '/cache' }, () => {});
   const finish = f.recorder.finish(); await f.recorder.cancel(); stopGate.resolve();
   await assert.rejects(finish, /interrupted/); assert.ok(f.events.some(e => e[0] === 'unlink'));
+});
+
+test('pause and resume follow recorder state and finish paused audio into the same file', async () => {
+  const h = recorderHarness(); assert.equal(await h.recorder.start({ cacheDir: '/cache' }, () => assert.fail()), true);
+  const path = h.events.find(e => e[0] === 'open')[1];
+  await h.recorder.pause(); await assert.rejects(h.recorder.pause(), /unavailable/);
+  await h.recorder.resume(); await assert.rejects(h.recorder.resume(), /unavailable/);
+  await h.recorder.pause(); assert.equal(await h.recorder.finish(), path);
+  assert.deepEqual(h.events.filter(e => typeof e === 'string'), ['start', 'pause', 'resume', 'pause', 'stop', 'release', 'close']);
+  assert.equal(h.events.some(e => e[0] === 'unlink'), false);
+});
+
+test('cancellation during prepare returns false after cleanup, and platform failures retain their code and stage', async () => {
+  const prepareGate = deferred(), h = recorderHarness({ prepareGate });
+  const start = h.recorder.start({ cacheDir: '/cache' }, () => assert.fail()); await turn();
+  const cancel = h.recorder.cancel(); prepareGate.resolve();
+  assert.equal(await start, false); await cancel;
+  assert.equal(h.events.includes('start'), false);
+  assert.deepEqual(h.events.slice(-3).map(e => typeof e === 'string' ? e : e[0]), ['release', 'close', 'unlink']);
+  const failure = Object.assign(Error('service unavailable'), { code: 5400105 });
+  const f = recorderHarness({ failure }); await assert.rejects(f.recorder.start({ cacheDir: '/cache' }, () => assert.fail()));
+  assert.equal(f.recorder.failureCode(), 5400105);
+  assert.deepEqual(f.logs[0].slice(-2), ['create', 5400105]);
+  assert.deepEqual(f.events.slice(-2).map(e => typeof e === 'string' ? e : e[0]), ['close', 'unlink']);
 });
 
 test('draft cleanup preserves selected originals and collection media even if filenames resemble recordings', async () => {
@@ -175,8 +205,10 @@ function fieldHarness(overrides = {}) {
   const events = [], state = { stopped: 0, recording: false };
   const Field = loadComponentLogic('components/common/NoteAudioField.ets', 'NoteAudioField', {
     APP_FOREGROUND_KEY: 'foreground', NoteAudioPreview: class {},
-    NoteAudioRecorder: class { async start() { state.recording = true; } async finish() { return '/cache/note-recording-1-1.m4a'; }
-      async cancel() { state.recording = false; } },
+    NoteAudioRecorder: class { async start() { state.recording = true; return true; } async finish() { return '/cache/note-recording-1-1.m4a'; }
+      async pause() { state.paused = true; } async resume() { state.paused = false; }
+      failureCode() { return 0; } async cancel() { state.recording = false; } },
+    setInterval: tick => { state.tick = tick; return 1; }, clearInterval: () => {},
     picker: { AudioSelectOptions: class {}, AudioViewPicker: class { async select() { return []; } } },
     discardNoteRecordings: async audios => events.push(['cleanup', audios]), stageNoteAudio: async () => '/cache/note-audio-1-1.mp3',
     resourceText: (_ctx, key) => key, $r: key => key, localNoteAudioPath, replaceNoteAudioPart,
@@ -198,6 +230,38 @@ test('audio field removes only a reference, recording blocks host actions, and c
   assert.equal(h.events.some(e => e[0] === 'add'), false);
   await h.field.record(); await h.field.finishRecording(); assert.deepEqual(h.events.at(-2), ['add', '/cache/note-recording-1-1.m4a', 'app.string.note_audio_recorded', true]);
   h.field.aboutToDisappear();
+});
+
+test('audio field pauses the clock, resumes without a new file, and publishes no private media details', async () => {
+  const h = fieldHarness(), statuses = []; h.field.onStatus = status => statuses.push(status);
+  await h.field.record(); h.state.tick(); h.state.tick();
+  assert.equal(h.field.seconds, 2); await h.field.togglePause();
+  assert.equal(h.field.paused, true); for (let i = 0; i < 6; i++) h.state.tick();
+  assert.equal(h.field.seconds, 2);
+  await h.field.togglePause(); h.state.tick(); assert.equal(h.field.seconds, 3);
+  await h.field.togglePause(); await h.field.finishRecording();
+  assert.equal(h.events.filter(e => e[0] === 'add').length, 1);
+  assert.equal(h.field.paused, false); h.field.publishStatus();
+  assert.deepEqual(Object.keys(statuses[0]).sort(), ['attachments','disabled','hasError','paused','recording','seconds','working']);
+  assert.ok(!JSON.stringify(statuses).includes('/cache'));
+});
+
+test('cancel locks finish, pause, and new recording until resource release completes; cancelled starts stay idle', async () => {
+  const gate = deferred(), calls = [];
+  const h = fieldHarness({ NoteAudioRecorder: class {
+    async start() { calls.push('start'); return true; } async finish() { assert.fail('finish during cancel'); }
+    async pause() { assert.fail('pause during cancel'); } failureCode() { return 0; }
+    async cancel() { calls.push('cancel'); await gate.promise; }
+  } });
+  await h.field.record(); const cancel = h.field.cancelRecording(), second = h.field.cancelRecording();
+  assert.equal(h.field.working, true); h.field.disabled = false;
+  await h.field.finishRecording(); await h.field.togglePause(); await h.field.record();
+  assert.deepEqual(calls, ['start', 'cancel']); h.field.busy(false); assert.equal(h.field.working, true);
+  gate.resolve(); await Promise.all([cancel, second]);
+  assert.equal(h.field.working, false); assert.equal(h.field.recording, false);
+  const cancelled = fieldHarness({ NoteAudioRecorder: class { async start() { return false; } failureCode() { return 0; } } });
+  await cancelled.field.record(); assert.equal(cancelled.field.recording, false);
+  assert.equal(cancelled.field.timer, -1); assert.equal(cancelled.field.working, false);
 });
 
 test('late picker response and staging after departure cannot add audio, new cache copy is cleaned', async () => {

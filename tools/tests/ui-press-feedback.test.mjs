@@ -34,18 +34,23 @@ test('click audit distinguishes nested child styles, strings, comments and event
 });
 
 test('all app button and action-row click targets share one press owner', () => {
-  const root = new URL('../../entry/src/main/ets/', import.meta.url); let count = 0;
+  const root = new URL('../../entry/src/main/ets/', import.meta.url), auditedPaths = new Set();
   for (const file of readdirSync(root, { recursive: true }).filter(f => f.endsWith('.ets'))) {
     const path = file.replaceAll('\\', '/');
     const source = readFileSync(new URL(path, root), 'utf8');
     for (const target of arkuiClickTargets(source)) {
       if (clickFeedbackExemption(path, target)) continue;
-      count++;
+      auditedPaths.add(path);
       const location = `${path}:${target.line} ${target.kind}`;
       assert.match(target.modifiers, /new (?:PressFeedback|GlassSurface|PrimaryGlassSurface)\(/, location);
       if (target.kind === 'Button') assert.match(target.modifiers, /\.stateEffect\(false\)/, location);
       assert.doesNotMatch(target.modifiers, /duration:\s*80|\.onTouch\(/, location);
     }
   }
-  assert.ok(count >= 150, 'audit must include direct controls outside shared components');
+  // 共用菜单减少散写点击节点；以真实入口覆盖检查扫描范围，而不固定按钮数量。
+  for (const path of ['pages/浏览页.ets', 'pages/学习页.ets', 'pages/AI制卡页.ets',
+    'pages/添加笔记页.ets', 'components/common/MenuItem.ets', 'components/common/DialogHeader.ets',
+    'components/common/PrimaryActionButton.ets']) {
+    assert.ok(auditedPaths.has(path), `press audit must include ${path}`);
+  }
 });

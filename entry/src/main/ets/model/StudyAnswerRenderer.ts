@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { 比对答案 } from './拼写比对器';
-import { 提取拼写填空内容 } from './填空解析器';
 import { 注入拼写结果, 剥除拼写标记, 提取拼写标记 } from './学习卡片HTML构建器';
 import type { EditableNote } from '../proto/messages/NoteMessages';
 import type { Card } from '../proto/messages/CardsMessages';
@@ -9,6 +7,8 @@ export interface StudyAnswerNotetype { fieldNames: string[]; }
 export interface StudyAnswerBackend {
   note(id: number): Promise<EditableNote>;
   notetype(id: number): Promise<StudyAnswerNotetype>;
+  compareAnswer(expected: string, provided: string, combining: boolean): Promise<string>;
+  extractClozeForTyping(text: string, ordinal: number): Promise<string>;
 }
 export interface StudyAnswerRequest {
   noteId: number;
@@ -46,19 +46,19 @@ export async function renderStudyAnswer(answerHtml: string, request: StudyAnswer
       // Cloze 卡：从字段值中提取当前 cardOrd 的预期答案；无匹配则降级为剥除标记。
       let expected: string;
       if (request.cloze) {
-        expected = 提取拼写填空内容(fieldValue, request.ordinal + 1);
+        expected = await backend.extractClozeForTyping(fieldValue, request.ordinal + 1);
         if (expected === '') {
           return 剥除拼写标记(answerHtml);
         }
       } else {
         expected = fieldValue;
       }
-      const resultHtml = 比对答案(expected, request.input, request.combining);
+      const resultHtml = await backend.compareAnswer(expected, request.input, request.combining);
       // 注入比对结果；若 answerHtml 不含 [[type:...]] 占位符（标记仅在 questionNodes），
       // 在末尾追加 <hr> + 比对结果，与 Anki 桌面端行为一致。
       const injected = 注入拼写结果(answerHtml, resultHtml);
       if (injected === answerHtml) {
-        return `${answerHtml}<hr><code id=typeans>${resultHtml}</code>`;
+        return `${answerHtml}<hr>${resultHtml}`;
       }
       return injected;
     } catch (error) {

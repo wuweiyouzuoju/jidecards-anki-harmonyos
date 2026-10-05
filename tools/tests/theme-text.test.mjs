@@ -82,11 +82,12 @@ test('theme text identity changes with its color and create-deck draws spans in 
   assert.doesNotMatch(source, /colors\[index % colors\.length\]/, 'per-character palette cycling must not come back');
   assert.match(source, /\$\{index\}-\$\{glyph\.letter\}-\$\{glyph\.color\}/);
   const button = read('components/common/按下态按钮.ets');
-  assert.match(button, /ForEach\(themeLabelGlyphs\(this\.文案, this\.themeAccentColors, this\.getUIContext\(\)\)/);
+  assert.match(button, /ForEach\(themeLabelGlyphs\(this\.文案, this\.themeAccentColors, this\.getUIContext\(\), this\.uiLanguage\)/);
   assert.doesNotMatch(button, /ThemeTextSpans\(/, 'button colors must not be snapshotted by a value-parameter builder');
   assert.match(read('components/common/DialogHeader.ets'), /ForEach\(themeLabelGlyphs\(this\.actionLabel, this\.themeAccentColors/);
   assert.doesNotMatch(button, /index % this\.themeAccentColors\.length/);
-  assert.match(read('components/home/主页顶部工具栏.ets'), /interfaceItemText\(this\.getUIContext\(\), 'home', 'create'\)[\s\S]*?themeText: true/);
+  assert.match(read('components/home/主页顶部工具栏.ets'), /deck_reorder_done'[\s\S]*?themeText: true/);
+  assert.match(read('components/home/HomeSummaryHeader.ets'), /ic_home_new'[\s\S]*?glyphColor: this.actionColor/);
 });
 
 test('data text stays single-color so times, counts and numbers never enter the ramp', () => {
@@ -116,8 +117,9 @@ test('glass presses preserve the backing and geometry, reset on release/disable,
   const deps = { Color: { Transparent: 'transparent' }, $r: name => name, 应用尺寸: { 卡片边框: 1 } };
   const themePressGradient = loadPlatformModule('utils/ThemeVisuals.ets', 'themePressGradient', deps);
   const PressFeedback = loadPlatformModule('utils/PressFeedback.ets', 'PressFeedback', {});
-  const GlassSurface = loadPlatformModule('utils/GlassSurface.ets', 'GlassSurface', { ...deps, themePressGradient, PressFeedback });
-  const PrimaryGlassSurface = loadPlatformModule('utils/PrimaryGlassSurface.ets', 'PrimaryGlassSurface', { ...deps, themePressGradient, PressFeedback });
+  const SurfaceBorder = loadPlatformModule('utils/SurfaceBorder.ets', 'SurfaceBorder', deps);
+  const GlassSurface = loadPlatformModule('utils/GlassSurface.ets', 'GlassSurface', { ...deps, themePressGradient, PressFeedback, SurfaceBorder });
+  const PrimaryGlassSurface = loadPlatformModule('utils/PrimaryGlassSurface.ets', 'PrimaryGlassSurface', { ...deps, themePressGradient, PressFeedback, SurfaceBorder });
   const target = () => {
     const state = {}, node = {};
     for (const key of ['backgroundColor', 'linearGradient', 'border', 'opacity']) {
@@ -130,6 +132,7 @@ test('glass presses preserve the backing and geometry, reset on release/disable,
       const a = target(), b = target();
       surface.applyNormalAttribute(a.node); surface.applyNormalAttribute(b.node);
       const normal = structuredClone(a.state);
+      assert.deepEqual(normal.border, SurfaceBorder.options(), 'primary and ordinary glass share the visible outline');
       // Rapid down/up/cancel cycles never remove the backing, alter geometry or affect another button.
       for (let cycle = 0; cycle < 6; cycle++) {
         surface.applyPressedAttribute(a.node);
@@ -146,6 +149,14 @@ test('glass presses preserve the backing and geometry, reset on release/disable,
       assert.deepEqual(a.state, { ...normal, opacity: 0.4 }, 'disabling a held button clears the press tint');
       assert.ok(normal.linearGradient.colors.every(stop => stop[0] === 'transparent' || stop[0].startsWith('#00')));
     }
+  }
+  const outline=SurfaceBorder.options(2,'#00ACC1');
+  const choice=new GlassSurface(GLASS_HIGHLIGHT_COLORS,'app.color.surface_card',outline);
+  const selected=target();
+  for(const method of ['applyNormalAttribute','applyPressedAttribute','applyDisabledAttribute']) {
+    choice[method](selected.node);
+    assert.deepEqual(selected.state.border,outline,'pressing or disabling keeps the selected outline');
+    assert.equal(selected.state.backgroundColor,'app.color.surface_card');
   }
   for (const path of ['utils/GlassSurface.ets', 'utils/PrimaryGlassSurface.ets']) {
     assert.doesNotMatch(read(path), /backdropBlur|setTimeout|animateTo|\.animation\(/);

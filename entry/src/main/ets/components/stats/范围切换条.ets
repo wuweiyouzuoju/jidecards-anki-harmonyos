@@ -8,13 +8,14 @@ import { SelectStyle } from '../../utils/SelectStyle';
 
 @Component
 export struct 范围切换条 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop 当前索引: number = 0;
   @Prop 标签集: Resource[] = [];
   @Prop surfaceColor: ResourceColor = $r('app.color.surface_sidebar');
   onRangeChange: (索引: number) => void = (): void => {};
 
   /** Select 的 value 使用本地化文字，与选项索引保持一致。 */
-  private options(): SelectOption[] {
+  private options(_locale: string = this.uiLanguage): SelectOption[] {
     return this.标签集.map((label: Resource): SelectOption => ({
       value: this.getUIContext().getHostContext()!.resourceManager.getStringSync(label.id)
     }));
@@ -34,7 +35,7 @@ export struct 范围切换条 {
       .optionFont(SelectStyle.optionFont)
       .selectedOptionFont(SelectStyle.selectedOptionFont)
       .textModifier(SelectStyle.labelText())
-      .borderRadius(SelectStyle.controlRadius)
+      .borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
       .onSelect((index: number): void => { this.onRangeChange(index); })
   }
 }

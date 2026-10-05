@@ -559,7 +559,7 @@ export class AgentRunner {
       appendRoundContinuation(request, collector);
       const hasClarification: boolean = collector.toolCalls.some((call: AgentToolCall): boolean =>
         call.name === 'request_clarification' || call.name === 'request_create_target' || call.name === 'propose_create_deck' ||
-        call.name === 'propose_create_note_type' || call.name === 'propose_memory_change' ||
+        call.name === 'propose_rename_deck' || call.name === 'propose_reparent_decks' || call.name === 'propose_reorder_decks' || call.name === 'propose_create_note_type' || call.name === 'propose_memory_change' ||
         call.name === 'propose_analysis' || call.name === 'configure_create_target');
       if (hasClarification && collector.toolCalls.length > 1) {
         if (toolCalls + collector.toolCalls.length > this.limits.maxToolCalls) {

@@ -5,6 +5,7 @@ import { BrowserSearchSession, loadBrowserRows } from '../../entry/src/main/ets/
 import { loadNoteEditor } from '../../entry/src/main/ets/model/NoteEditorLoader.ts';
 import { resolveStudyKey } from '../../entry/src/main/ets/model/StudyInputPolicy.ts';
 import { renderStudyAnswer } from '../../entry/src/main/ets/model/StudyAnswerRenderer.ts';
+import { coreTyping } from './core-rendering-harness.mjs';
 import { reconcileHomeExpansion } from '../../entry/src/main/ets/model/HomeDeckExpansion.ts';
 import { HomeRefreshQueue } from '../../entry/src/main/ets/model/HomeRefreshQueue.ts';
 import { createAgentMessage, cloneAgentMessage, projectAgentHistory, restoreAgentMessages } from '../../entry/src/main/ets/model/agent/AgentConversationView.ts';
@@ -64,7 +65,7 @@ test('study input covers phases, editor suppression, modifier release during gui
 
 test('answer renderer reads the captured field, handles cloze ordinals, missing placeholders and read failures', async () => {
   const request = { noteId: 7, fieldName: 'Front', ordinal: 1, cloze: true, input: 'two', combining: true };
-  const backend = { note: async id => { assert.equal(id, 7); return { notetypeId: 8, fields: ['{{c1::one}} {{c2::two}}'] }; },
+  const backend = { ...coreTyping, note: async id => { assert.equal(id, 7); return { notetypeId: 8, fields: ['{{c1::one}} {{c2::two}}'] }; },
     notetype: async () => ({ fieldNames: ['Front'] }) };
   const result = await renderStudyAnswer('answer', request, backend);
   assert.match(result, /<hr><code id=typeans>/); assert.match(result, /two/); assert.doesNotMatch(result, /one/);

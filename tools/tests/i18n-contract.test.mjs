@@ -70,7 +70,8 @@ test('English resources are translated and contain no Chinese copy', () => {
   for (const item of JSON.parse(read(english)).string) {
     assert.doesNotMatch(item.value, /[\u4e00-\u9fff]/, `${item.name} must be English`);
     // AI 是用户指定的跨语言入口名称，精确值另有入口回归约束。
-    if (!allowedIdenticalValues.has(item.name) && item.name !== 'ai_agent_title') {
+    const markingSymbols = new Set(['card_mark_star_symbol', 'card_mark_flag_symbol', 'card_mark_selected_symbol']);
+    if (!allowedIdenticalValues.has(item.name) && !markingSymbols.has(item.name) && item.name !== 'ai_agent_title') {
       assert.notEqual(item.value, zhItems.get(item.name), `${item.name} must not copy the base translation`);
     }
   }
@@ -93,17 +94,37 @@ test('pages and components do not embed translated copy in Text, Button, or plac
   assert.deepEqual(violations, [], `resourceize user-facing literals: ${violations.join(', ')}`);
 });
 
-test('pages and components do not embed translated state, toast, a11y, select, or format copy', () => {
-  const forbiddenPatterns = [
-    /(?:showToast|accessibilityDescription|accessibilityText)\s*\([^\n]*(['"])[^'"\n]+\1/,
+const translatedStatePatterns = [
+    /(?:accessibilityDescription|accessibilityText)\s*\(\s*(['"`])[^'"`\n]+\1/,
+    /showToast\s*\(\s*(['"`])[^'"`\n]+\1/,
+    /showToast\s*\(\s*\{[^}]*?\bmessage\s*:\s*(['"`])[^'"`\n]+\1/,
     /this\.\w*(?:Error|Notice|Hint|Detail|Label|Title|Message)\s*=\s*(['"])[^'"\n]+\1/,
     /(?:const|let)\s+\w*(?:LABELS|Labels|Options|OPTIONS)\w*\s*:\s*string\[\]\s*=\s*\[[^\]]*(['"])[^'"\n]+\1/,
     /(?:getStringSync|format)\(\s*(['"])[^'"\n]+\1/
-  ];
+];
+const embedsTranslatedState = source => translatedStatePatterns.some(pattern => pattern.test(source));
+
+test('dynamic copy audit accepts resource-based accessibility and toast messages but rejects literal copy', () => {
+  for (const source of [
+    "Text().accessibilityText($r('app.string.today_recall_rate')).fontColor($r('app.color.text_secondary'))",
+    "Text().accessibilityDescription(resourceText(context, $r('app.string.today_recall_rate')))",
+    "promptAction.showToast({ message: resourceText(context, $r('app.string.today_recall_rate')), duration: 2000 })",
+    "promptAction.showToast({\n message: resourceText(context, $r('app.string.today_recall_rate'))\n})"
+  ]) assert.equal(embedsTranslatedState(source), false, source);
+  for (const source of [
+    "Text().accessibilityText('今日答对率')", "Text().accessibilityDescription('Recall rate')",
+    "promptAction.showToast({ message: '保存成功', duration: 2000 })",
+    "promptAction.showToast({ duration: 2000, message: 'Saved' })",
+    "promptAction.showToast({\n duration: 2000,\n message: 'Saved'\n})",
+    "this.errorMessage = 'Failed'"
+  ]) assert.equal(embedsTranslatedState(source), true, source);
+});
+
+test('pages and components do not embed translated state, toast, a11y, select, or format copy', () => {
   const violations = [];
   for (const relativePath of [...etsFiles('entry/src/main/ets/components'), ...etsFiles('entry/src/main/ets/pages')]) {
     const source = read(relativePath);
-    if (forbiddenPatterns.some((pattern) => pattern.test(source))) {
+    if (embedsTranslatedState(source)) {
       violations.push(relativePath);
     }
   }

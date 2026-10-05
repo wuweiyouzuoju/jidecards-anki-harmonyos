@@ -60,9 +60,19 @@ import {
   自定义学习预设
 } from '../proto/messages/SchedulerMessages';
 import { encodeDeckId } from '../proto/messages/DeckMessages';
+import type { ScheduleCardsAsNewOptions } from '../proto/messages/SchedulerMessages';
+import { encodeScheduleCardsAsNew, decodeScheduleCardsAsNewDefaults } from '../proto/messages/SchedulerMessages';
 import { decodeOpChanges, decodeOpChangesWithCount } from '../proto/messages/CollectionMessages';
 
 export class 调度器服务 {
+  async scheduleCardsAsNew(ids: number[], options: ScheduleCardsAsNewOptions): Promise<void> {
+    if (ids.length === 0) throw new Error('No cards selected');
+    await this.会话.调用(服务号.后端调度器, 调度器方法.scheduleCardsAsNew, encodeScheduleCardsAsNew(ids, options));
+  }
+  async scheduleCardsAsNewDefaults(): Promise<ScheduleCardsAsNewOptions> {
+    return decodeScheduleCardsAsNewDefaults(await this.会话.调用(服务号.后端调度器,
+      调度器方法.scheduleCardsAsNewDefaults, new Uint8Array(0)));
+  }
   private readonly 会话: 后端会话 = 后端会话.获取实例();
 
   /**

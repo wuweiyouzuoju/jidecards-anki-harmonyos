@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { 按下态按钮 } from './按下态按钮';
 import { 应用尺寸 } from '../../utils/应用尺寸';
-import { DECK_LIST_NARROW_KEY } from '../../model/DeckListAppearance';
+import { PAGE_COMPACT_LAYOUT_KEY } from '../../model/AppLayoutState';
 
 /** 新增和编辑共用固定顶栏，标题中心不受两侧文案长度影响。 */
 @Component
@@ -15,7 +15,7 @@ export struct NoteEditorHeader {
   onBack: () => void = (): void => {};
   onSave: () => void = (): void => {};
   @StorageProp('状态栏高度') private statusBarHeight: number = 0;
-  @StorageProp(DECK_LIST_NARROW_KEY) private narrow: boolean = false;
+  @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrow: boolean = false;
 
   build() {
     Stack({ alignContent: Alignment.Center }) {

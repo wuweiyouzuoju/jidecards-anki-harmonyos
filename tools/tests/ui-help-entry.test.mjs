@@ -49,21 +49,22 @@ test('every ArkTS help entry shares the icon, and labelled help cannot float to 
   }
   assert.ok(callers > 0);
   const label = read('components/common/HelpLabel.ets');
-  assert.match(label, /Text\(\)\s*\{\s*ThemeHighlightedTextSpans\(this.title, this.highlightLabel, this.highlightColors, this.getUIContext\(\)\)\s*\}[\s\S]*?flexShrink\(1\)[\s\S]*?HelpButton\(/);
+  assert.match(label, /Text\(\)\s*\{\s*ForEach\(\[this.uiLanguage\][\s\S]*?ThemeHighlightedTextSpans\(this.title, this.highlightLabel, this.highlightColors, this.getUIContext\(\)\)[\s\S]*?flexShrink\(1\)[\s\S]*?HelpButton\(/);
   assert.match(label, /@Prop highlightLabel: ResourceStr = ''/);
   assert.match(label, /@Prop highlightColors: string\[\] = \[\]/);
   assert.doesNotMatch(label, /Blank\(|layoutWeight\(|margin\(|padding\(|Row\(\{/);
   assert.match(label, /alignItems\(VerticalAlign.Center\)/);
-  // ArkUI wraps a custom component in a Common node. Centering that wrapper
-  // alone leaves a content-sized Row at its leading edge (the reported bug).
-  assert.match(label, /\.width\(this\.centered \? '100%' : undefined\)/);
+  // Weighted/full-width callers need the actual Row to fill the Common wrapper
+  // for both leading and centered labels, including labels with no help button.
+  assert.match(label, /\.width\('100%'\)/);
+  assert.doesNotMatch(label, /\.width\(this\.centered \? '100%' : undefined\)/);
   assert.match(label, /justifyContent\(this\.centered \? FlexAlign\.Center : FlexAlign\.Start\)/);
 });
 
 test('help icon geometry, accessibility, press effect and click isolation have one owner', () => {
   const button = read('components/common/HelpButton.ets');
-  const glyph = Number(button.match(/\.fontSize\('(\d+)vp'\)/)[1]);
-  const [, width, height] = button.match(/\.width\((\d+)\)\.height\((\d+)\)/).map(Number);
+  const [, glyph] = button.match(/Image\([\s\S]*?\.width\((\d+)\)\.height\(18\)/).map(Number);
+  const [, width, height] = button.match(/\.width\((44)\)\.height\((44)\)/).map(Number);
   assert.equal(glyph, 18); assert.equal(width, 44); assert.equal(height, 44);
   assert.equal((width - glyph) / 2, 13);
   assert.match(button, /padding\(0\)/);

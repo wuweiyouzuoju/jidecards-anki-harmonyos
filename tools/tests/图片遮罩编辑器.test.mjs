@@ -8,20 +8,25 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import vm from 'node:vm';
+import { gesturePointer } from '../../entry/src/main/ets/model/GesturePointer.ts';
 import {
   生成Occlusions字符串,
   编号颜色,
   识别图片扩展名,
   copyMask, maskNumber, maskProperty, maskPoints, setMaskProperty, nextOcclusionOrdinal, OcclusionHistory,
+  occlusionOrdinals, polygonImagePoints, setPolygonImagePoints, occlusionPolygonArea,
   parseOcclusionMasks, serializeOcclusionDocument, serializeMask
 } from '../../entry/src/main/ets/model/图片遮罩模型.ts';
+import { occlusionStageSize, occlusionTextLayout, clampOcclusionOrigin } from '../../entry/src/main/ets/model/ImageOcclusionEditorGeometry.ts';
 
 const editorSource = readFileSync(new URL('../../entry/src/main/ets/components/图片遮罩编辑器.ets', import.meta.url), 'utf8');
-const editorMethods = [...editorSource.matchAll(/^  private (?:async )?\w*[^\s:(]+\([^]*?^  }/gm)].map(match => match[0]);
+const editorMethods = [...editorSource.matchAll(/^  private (?:async )?\w*[^\s:(]+\([^]*?^  }/gm)]
+  .filter(match => !editorSource.slice(0, match.index).trimEnd().endsWith('@Builder')).map(match => match[0]);
 let discard = false;
 const editorContext = vm.createContext({ 编号颜色, copyMask, maskNumber, maskProperty, maskPoints, setMaskProperty, OcclusionHistory,
-  nextOcclusionOrdinal,
-  confirmNoteDiscard: async () => discard });
+  nextOcclusionOrdinal, gesturePointer, occlusionOrdinals, polygonImagePoints, setPolygonImagePoints, occlusionPolygonArea,
+  occlusionStageSize, occlusionTextLayout, clampOcclusionOrigin,
+  confirmNoteDiscard: async () => discard, $r: key => key });
 vm.runInContext(stripTypeScriptTypes(`globalThis.Editor = class { ${editorMethods.join('\n')} }`), editorContext);
 
 function editor(width, height, ratio) {
@@ -34,7 +39,7 @@ function editor(width, height, ratio) {
     clearRect() { fills.length = 0; paints.length = 0; },
     fillRect(...rect) { fills.push(rect); paints.push([this.fillStyle, this.globalAlpha]); }, strokeRect() {},
     translate() {}, rotate() {}, setLineDash() {}, beginPath() {}, closePath() {}, ellipse() {},
-    moveTo() {}, lineTo() {}, fill() {}, stroke() {}, fillText() {}, measureText(text) { return { width: text.length * 10 }; } };
+    moveTo() {}, lineTo() {}, arc() {}, fill() {}, stroke() {}, fillText() {}, measureText(text) { return { width: text.length * 10 }; } };
   Object.assign(instance, {
     上下文: context, 图片宽高比: ratio, 画布宽: 0, 画布高: 0, 画布就绪: false,
     遮罩列表: [], 当前选中编号: 1, 最小拖动距离: 0.005,
@@ -46,8 +51,24 @@ function editor(width, height, ratio) {
   return { instance, context, fills, paints };
 }
 
-const touch = (x, y, offsetX = 0, offsetY = 0) => ({ offsetX, offsetY, fingerList: [{ localX: x, localY: y }] });
+const touch = (x, y, offsetX = 0, offsetY = 0) => ({ offsetX, offsetY, fingerList: [{ id: 0, localX: x, localY: y }] });
 const plain = value => JSON.parse(JSON.stringify(value));
+
+test('稀疏触点和非零 ID 不崩溃，fingerInfos 重排时仍跟随开始拖动的触点', () => {
+  const { instance } = editor(300, 300, 1);
+  const sparse = new Array(6);
+  sparse[5] = { id: 5, localX: 30, localY: 30 };
+  instance.拖动开始({ fingerList: sparse, offsetX: 0, offsetY: 0 });
+  instance.拖动更新({ fingerList: [], fingerInfos: [
+    { id: 1, localX: 270, localY: 270 }, { id: 5, localX: 90, localY: 90 }
+  ] });
+  instance.拖动结束();
+  assert.equal(instance.遮罩列表.length, 1);
+  assert.ok(Math.abs(instance.遮罩列表[0].宽 - 0.2) < 1e-12);
+  instance.tapImage({ fingerList: sparse });
+  assert.equal(instance.selectedMask, 0);
+  assert.doesNotThrow(() => instance.tapImage({ fingerList: [undefined] }));
+});
 
 test('导入所有图形、多卡编号、转角、文本转义及未知属性无改动时逐字保留', () => {
   const source = '<div>保留字段排版</div>' +
@@ -76,11 +97,162 @@ test('只替换或删除选中图形片段，新图形追加，其他 HTML 和�
   assert.equal(serializeOcclusionDocument(source, [masks[1], extra]), '<p>before</p><hr>' + masks[1].source + 'after' + serializeMask(extra));
 });
 
-test('新编号避开导入多卡遮罩保留的所有编号，不意外合并旧卡片', () => {
+test('七色候选保留导入多卡遮罩的更大编号，选择未画组不改写旧卡片', () => {
   const { instance } = editor(300,300,1);
   instance.遮罩列表 = parseOcclusionMasks('{{c6,20::image-occlusion:rect:left=0.1:top=0.1:width=0.1:height=0.1}}');
-  instance.addOrdinal(); assert.equal(instance.当前选中编号,21);
-  assert.deepEqual(plain(instance.编号候选列表()),[19,20,21,22,23]);
+  const original = 生成Occlusions字符串(instance.遮罩列表);
+  assert.deepEqual(plain(instance.编号候选列表()),[1,2,3,4,5,6,7,20]);
+  instance.selectOrdinal(7); assert.equal(instance.当前选中编号,7);
+  assert.equal(生成Occlusions字符串(instance.遮罩列表),original);
+});
+
+test('空图直接提供七组，未画遮罩也能任意选择颜色并创建相应卡片', () => {
+  const { instance } = editor(300,300,1);
+  assert.deepEqual(plain(instance.编号候选列表()), [1,2,3,4,5,6,7]);
+  for (const ordinal of [7,3,6,1,5]) instance.selectOrdinal(ordinal);
+  assert.equal(instance.遮罩列表.length,0,'选择颜色本身不生成卡片');
+  assert.equal(instance.canUndo,false,'选择待绘制组不产生撤销记录');
+  instance.拖动开始(touch(30,30)); instance.拖动更新(touch(90,90)); instance.拖动结束();
+  assert.equal(instance.遮罩列表[0].编号,5);
+  assert.deepEqual(plain(instance.编号候选列表()), [1,2,3,4,5,6,7]);
+});
+
+test('模式切换有明确选中状态和说明，空图与重复选择不产生无效撤销', () => {
+  const { instance } = editor(300,300,1);
+  instance.setInactiveMode(true);
+  assert.equal(instance.toolSelected('hide_all'),true);
+  assert.equal(instance.modeHint(),'app.string.io_mode_all_hint');
+  assert.equal(instance.canUndo,false);
+  instance.拖动开始(touch(30,30)); instance.拖动更新(touch(90,90)); instance.拖动结束();
+  assert.equal(maskNumber(instance.遮罩列表[0],'oi'),1);
+  instance.history = new OcclusionHistory(); instance.updateHistory();
+  instance.setInactiveMode(false); instance.setInactiveMode(false);
+  assert.equal(instance.modeHint(),'app.string.io_mode_one_hint');
+  assert.equal(maskNumber(instance.遮罩列表[0],'oi'),0);
+  instance.撤销最后一个();
+  assert.equal(instance.canUndo,false,'相同模式的第二次点击没有增加历史');
+  assert.equal(instance.newInactiveMode,1,'撤销同步新遮罩的模式');
+  instance.redo(); assert.equal(instance.newInactiveMode,0);
+  instance.撤销最后一个(); instance.setInactiveMode(true);
+  assert.equal(instance.canRedo,true,'无效点击不能清除重做记录');
+});
+
+test('全部编辑器按钮共用公共组件，普通动作不再混入选择按钮', () => {
+  assert.doesNotMatch(editorSource,/\bButton\s*\(|private tool\(/);
+  assert.doesNotMatch(editorSource,/io_new_group|addOrdinal\(/);
+  const actions=editorSource.slice(editorSource.indexOf('  private editorActions()'),editorSource.lastIndexOf('  build()'));
+  assert.doesNotMatch(actions,/this\.choice\(/);
+  for(const key of ['io_cancel_polygon','io_smaller','io_larger','io_rotate','io_delete_selected','io_redo']) {
+    assert.match(actions,new RegExp('按下态按钮\\(\\{ 文案: \\$r\\(\'app\\.string\\.'+key+'\'\\)'));
+  }
+  assert.doesNotMatch(actions,/if \(this\.canRedo\)/,'重做固定占位，以禁用态表达不可用');
+  const groups=editorSource.slice(editorSource.indexOf('  private groupControls()'),editorSource.indexOf('  private imageStage()'));
+  assert.match(groups,/FlexWrap\.Wrap/);
+  assert.doesNotMatch(groups,/Scroll\(|\.margin\(/);
+});
+
+test('文字选择框按实际字形收紧，拖动可到达图片最右侧并保留原始字体属性', () => {
+  const { instance, context } = editor(400,200,2);
+  context.measureText = text => ({ width: text.length * 5, actualBoundingBoxAscent: -2, actualBoundingBoxDescent: 8 });
+  instance.遮罩列表 = parseOcclusionMasks('{{c0::image-occlusion:text:left=.1:top=.1:text=Hi:fs=.04:scale=1:future=keep}}');
+  const bounds = instance.maskBounds(instance.遮罩列表[0]);
+  assert.ok(bounds.height <= 10, '一行文字不应留下额外的整行高度');
+  instance.拖动开始(touch(44,24));
+  assert.equal(instance.拖动模式, 2);
+  instance.拖动更新(touch(700,24)); instance.拖动结束();
+  assert.ok(instance.遮罩列表[0].左 > .9, '不能用解析时估算的宽度挡住右侧区域');
+  const movedBounds = instance.maskBounds(instance.遮罩列表[0]);
+  assert.ok(Math.abs(movedBounds.left + movedBounds.width - 400) < 1e-9);
+  assert.equal(maskProperty(instance.遮罩列表[0], 'fs'), '.04');
+  assert.equal(maskProperty(instance.遮罩列表[0], 'future'), 'keep');
+});
+
+test('多边形完成后可选中、拖动顶点并撤销，选中现有图形不会开始新多边形', () => {
+  const { instance } = editor(300,300,1);
+  instance.changeTool('polygon');
+  for (const [x,y] of [[60,60],[180,60],[60,180]]) instance.tapImage(touch(x,y));
+  instance.finishPolygon();
+  assert.equal(instance.selectedMask, 0);
+  instance.tapImage(touch(90,90));
+  assert.equal(instance.selectedMask, 0);
+  assert.equal(instance.polygonPoints.length, 0);
+  const original = serializeMask(instance.遮罩列表[0]);
+  instance.拖动开始(touch(60,60)); instance.拖动更新(touch(30,30)); instance.拖动结束();
+  const mask = instance.遮罩列表[0], points = maskPoints(mask);
+  const minX = Math.min(...points.map(p => p.x)), minY = Math.min(...points.map(p => p.y));
+  const actual = points.map(p => [Math.round((mask.左 + p.x - minX) * 300), Math.round((mask.顶 + p.y - minY) * 300)]);
+  assert.deepEqual(plain(actual), [[30,30],[180,60],[60,180]], '只移动命中的顶点');
+  instance.撤销最后一个();
+  assert.equal(serializeMask(instance.遮罩列表[0]), original);
+});
+
+test('多边形草稿撤销最后一个点，清空同时取消草稿和文字输入', () => {
+  const { instance } = editor(300,300,1);
+  instance.changeTool('polygon');
+  instance.tapImage(touch(30,30)); instance.tapImage(touch(90,30));
+  instance.撤销最后一个();
+  assert.equal(instance.polygonPoints.length, 1);
+  instance.annotationText = 'pending'; instance.清空全部();
+  assert.equal(instance.polygonPoints.length, 0);
+  assert.equal(instance.annotationText, '');
+});
+
+test('取消多边形顶点移动恢复原图形，不生成撤销记录或退化多边形', () => {
+  const { instance } = editor(300,300,1);
+  instance.遮罩列表 = parseOcclusionMasks('{{c6,9::image-occlusion:polygon:left=.2:top=.2:points=0,0 .4,0 0,.4:future=kept}}');
+  instance.selectedMask = 0;
+  const original = serializeMask(instance.遮罩列表[0]);
+  instance.拖动开始(touch(60,60)); instance.拖动更新(touch(30,30)); instance.cancelDrag();
+  assert.equal(serializeMask(instance.遮罩列表[0]), original);
+  assert.equal(instance.canUndo, false);
+  instance.changeTool('polygon');
+  for (const [x,y] of [[240,240],[255,255],[270,270]]) instance.tapImage(touch(x,y));
+  instance.finishPolygon();
+  assert.equal(instance.遮罩列表.length, 1, '共线的点不能生成没有面积的图形');
+});
+
+test('图片按可用视口和真实比例安排，手机、横屏、平板及键盘缩小视口都不拉伸或增添留白', () => {
+  for (const [width,height] of [[288,560],[680,240],[760,1100],[1100,650],[288,200]]) {
+    for (const ratio of [.1,.66,1,2,10]) {
+      const size = occlusionStageSize(width,height,ratio);
+      assert.ok(size.width <= width && size.height <= Math.max(160,height*.7));
+      assert.ok(size.width > 0 && size.height > 0);
+      assert.ok(Math.abs(size.width/size.height-ratio)<1e-9);
+    }
+  }
+  assert.deepEqual(occlusionStageSize(300,600,2), {width:300,height:150}, '横图不被撑成大块空白');
+});
+
+test('多行文字按同一绘制行距收紧末行，空白末行不产生几行高的选择框', () => {
+  const extent = {width:50,ascent:-2,descent:8};
+  const one = occlusionTextLayout([extent], 12, 6);
+  const two = occlusionTextLayout([extent,extent], 12, 6);
+  assert.equal(two.height-one.height, two.lineHeight);
+  const blank = {width:0,ascent:0,descent:0};
+  assert.equal(occlusionTextLayout([extent,blank,blank],12,6).height, one.height);
+  assert.equal(one.height,10);
+});
+
+test('旋转后的文字和遮罩按实际外缘限制移动', () => {
+  const bounds = {left:-2,top:2,width:50,height:10}, image = {width:400,height:200};
+  const position = clampOcclusionOrigin(1,1,bounds,image,Math.PI/2);
+  for (const [x,y] of [[-2,2],[48,2],[-2,12],[48,12]]) {
+    assert.ok(position.x*400-y >= -1e-9 && position.x*400-y <= 400+1e-9);
+    assert.ok(position.y*200+x >= -1e-9 && position.y*200+x <= 200+1e-9);
+  }
+});
+
+test('图片紧接遮罩模式，文字和编辑操作位于图片之后，间距不靠权重分配', () => {
+  const build = editorSource.slice(editorSource.lastIndexOf('  build() {'));
+  const mode = build.indexOf("this.choice('hide_all'");
+  assert.ok(mode < build.indexOf('this.imageStage()'));
+  assert.ok(build.indexOf('this.imageStage()') < build.indexOf('this.editorActions()'));
+  assert.doesNotMatch(build, /TextInput|TextArea|image_occlusion_undo|image_occlusion_clear/);
+  const stage = editorSource.slice(editorSource.indexOf('  private imageStage()'), editorSource.indexOf('  private editorActions()'));
+  assert.doesNotMatch(stage, /layoutWeight|\.margin\(|\.padding\(/);
+  assert.match(stage, /priorityGesture/);
+  assert.match(stage, /stageSize\(\)\.height/);
+  assert.match(build, /Column\(\{ space: 应用尺寸\.间距_8 \}\)/, '模式→图片→操作区由正文独占 8vp 间距');
 });
 
 test('移动、编号、调整大小和模式变化可连续撤销重做，取消移动回滚到拖动开始', () => {
@@ -139,9 +311,9 @@ test('关闭编辑器的各入口统一确认，取消保留草稿，确认才�
   discard = false;
 });
 
-test('五种遮罩颜色使用六位 RGB，透明度独立且不污染后续绘制', () => {
+test('七种遮罩颜色使用六位 RGB，透明度独立且不污染后续绘制', () => {
   const { instance, context, paints } = editor(300, 300, 1);
-  for (let ordinal = 1; ordinal <= 5; ordinal++) {
+  for (let ordinal = 1; ordinal <= 7; ordinal++) {
     const mask = { 形状: 'rect', 左: 0.1, 顶: 0.1, 宽: 0.2, 高: 0.2, 编号: ordinal };
     instance.绘制遮罩(mask, false);
     instance.绘制遮罩(mask, true);
@@ -333,19 +505,20 @@ test('生成Occlusions字符串_同ordinal多矩形', () => {
   assert.equal(生成Occlusions字符串(输入), 期望);
 });
 
-test('编号颜色_c1到c5返回固定色', () => {
-  // c1 红 / c2 橙 / c3 黄 / c4 绿 / c5 蓝
+test('编号颜色_c1到c7依次对应红橙黄绿青蓝紫', () => {
   assert.equal(编号颜色(1), '#E53935');
   assert.equal(编号颜色(2), '#FB8C00');
   assert.equal(编号颜色(3), '#FDD835');
   assert.equal(编号颜色(4), '#43A047');
-  assert.equal(编号颜色(5), '#1E88E5');
+  assert.equal(编号颜色(5), '#00ACC1');
+  assert.equal(编号颜色(6), '#1E88E5');
+  assert.equal(编号颜色(7), '#8E24AA');
 });
 
-test('编号颜色_越界返回默认灰', () => {
-  // 越界编号不报错，返回中性灰
+test('所有正编号都有区分色，只有非卡片编号使用中性灰', () => {
   assert.equal(编号颜色(0), '#9E9E9E');
-  assert.equal(编号颜色(6), '#9E9E9E');
+  assert.notEqual(编号颜色(6), '#9E9E9E');
+  assert.notEqual(编号颜色(36), '#9E9E9E');
   assert.equal(编号颜色(-1), '#9E9E9E');
 });
 

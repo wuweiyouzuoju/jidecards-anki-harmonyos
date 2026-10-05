@@ -115,7 +115,7 @@ test('done page renders real congrats data and deck-scoped unbury entry', () => 
   assert.match(page, /\$r\('app\.string\.study_congrats_learn_remaining', this\.完成页学习剩余, this\.完成页下张学习分钟\)/);
   assert.match(page, /if \(this\.完成页复习受限\) \{[\s\S]*?study_congrats_review_limit/);
   assert.match(page, /if \(this\.完成页新卡受限\) \{[\s\S]*?study_congrats_new_limit/);
-  assert.match(page, /if \(this\.完成页有埋藏\) \{[\s\S]*?Button\(\) \{\s*Text\(\) \{ ThemeTextSpans\(\$r\('app\.string\.study_unbury'\)/);
+  assert.match(page, /if \(this\.完成页有埋藏\) \{[\s\S]*?Button\(\) \{\s*Text\(\) \{ ForEach\(\[this.uiLanguage\][\s\S]*?ThemeTextSpans\(\$r\('app\.string\.study_unbury'\)/);
   assert.match(page, /this\.恢复埋藏\(\);/);
 
   const body = page.match(/恢复埋藏\(\): Promise<void> \{[\s\S]*?\n  \}/);

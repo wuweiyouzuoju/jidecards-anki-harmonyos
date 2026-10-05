@@ -5,10 +5,10 @@
 // @名称 卡片渲染服务边界
 //
 // @作用
-// 包装后端卡片渲染服务的 3 个 RPC：渲染既有卡片 / 提取音视频标签 / 获取空卡报告。
+// 包装 Core 卡片渲染、媒体提取、路径编码、拼写比较与空卡报告。
 // 渲染既有卡片 返回正反面模板节点流与 CSS；提取音视频标签 同时承担音频文件名与 TTS 项两路提取；
 // 获取空卡报告 返回因模板缺失或字段为空导致无卡片可渲染的笔记列表（含 will_delete_note 标记）。
-// 不持有 UI 状态；节点流 → HTML 的组装在 model/StudyCardHtmlBuilder（纯函数，可单测）。
+// 不持有 UI 状态；model/学习卡片HTML构建器 合并节点后，展示卡面由 Core 编码媒体路径。
 //
 // @输入
 // 卡片ID / 单侧 HTML文本 / 是否正面 / 无（空卡报告）
@@ -17,10 +17,9 @@
 // Promise<RenderedCard> / Promise<AvTagsResult> / Promise<空卡报告>
 //
 // @业务规则
-// 编号来源：backend.rs run_backend_card_rendering_service_method 分支
-//   3 提取音视频标签 / 5 获取空卡 / 6 渲染既有卡片
+// 编号统一来自 服务索引，按锁定 Core 的 Backend 分派表验证。
 // 渲染既有卡片：browser=false / partial_render=false（学习页语义，非浏览页）；isEmpty=true 表示卡片内容为空（如字段缺失），调用方可跳过展示。
-// extractAudioTags 一次返回声音文件名与 TTS 项，分别保持各自出现顺序。
+// extractAudioTags 一次返回声音文件名与 TTS 项，同时保留混合出现顺序。
 // 获取空卡报告：请求为 generic.Empty（空字节）；返回 EmptyCardsReport，UI 自绘列表展示，不直接渲染后端 HTML 报告。
 //
 // @副作用
@@ -28,6 +27,7 @@
 // ========================================================
 
 import { 后端会话 } from './后端会话';
+import { 原始侧HTML } from '../model/学习卡片HTML构建器';
 import type { EditableNote } from '../proto/messages/NoteMessages';
 import { 卡片渲染方法, 服务号 } from './服务索引';
 import type { RenderedCard, TemplateNode, 空卡报告 } from '../proto/messages/CardRenderingMessages';
@@ -40,12 +40,36 @@ import {
   encodeExtractLatexRequest,
   encodeRenderExistingCardRequest,
   encodeRenderUncommittedCardRequest,
+  encodeRenderingString,
+  encodeCompareAnswerRequest,
+  encodeExtractClozeForTypingRequest,
   encode空请求
 } from '../proto/messages/CardRenderingMessages';
 import type { AvTagsResult } from '../proto/messages/CardRenderingMessages';
 
 export class 卡片渲染服务 {
   private readonly 会话: 后端会话 = 后端会话.获取实例();
+
+  async encodeIriPaths(html: string): Promise<string> {
+    return decodeExtractLatexResponse(await this.会话.调用(服务号.后端卡片渲染,
+      卡片渲染方法.encodeIriPaths, encodeRenderingString(html)));
+  }
+
+  async compareAnswer(expected: string, provided: string, combining: boolean): Promise<string> {
+    return decodeExtractLatexResponse(await this.会话.调用(服务号.后端卡片渲染,
+      卡片渲染方法.compareAnswer, encodeCompareAnswerRequest(expected, provided, combining)));
+  }
+
+  async extractClozeForTyping(text: string, ordinal: number): Promise<string> {
+    return decodeExtractLatexResponse(await this.会话.调用(服务号.后端卡片渲染,
+      卡片渲染方法.extractClozeForTyping, encodeExtractClozeForTypingRequest(text, ordinal)));
+  }
+
+  /** 必须先合并完整卡面，媒体属性可以横跨模板文本与字段节点。 */
+  private async resolveMediaPaths(rendered: RenderedCard): Promise<void> {
+    rendered.questionHtml = await this.encodeIriPaths(原始侧HTML(rendered, 'question'));
+    rendered.answerHtml = await this.encodeIriPaths(原始侧HTML(rendered, 'answer'));
+  }
 
   async renderUncommittedCard(note: EditableNote, ordinal: number, template: string, css: string, fillEmpty: boolean = false): Promise<RenderedCard> {
     const response = await this.会话.调用(服务号.后端卡片渲染, 卡片渲染方法.renderUncommittedCardLegacy,
@@ -54,6 +78,7 @@ export class 卡片渲染服务 {
     rendered.css = css;
     await this.resolveLatexImages(rendered.questionNodes, rendered.latexSvg);
     await this.resolveLatexImages(rendered.answerNodes, rendered.latexSvg);
+    await this.resolveMediaPaths(rendered);
     return rendered;
   }
 
@@ -69,6 +94,7 @@ export class 卡片渲染服务 {
     const rendered: RenderedCard = decodeRenderCardResponse(响应字节);
     await this.resolveLatexImages(rendered.questionNodes, rendered.latexSvg);
     await this.resolveLatexImages(rendered.answerNodes, rendered.latexSvg);
+    await this.resolveMediaPaths(rendered);
     return rendered;
   }
 

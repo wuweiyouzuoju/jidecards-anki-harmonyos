@@ -4,10 +4,10 @@
 
 | 变更路径 | 局部规则 | 主要责任表 | 默认验证 |
 | --- | --- | --- | --- |
-| `entry/` | [entry.md](entry.md) | [模块责任与边界](../../../docs/development/ownership.md#entry) | 对应领域测试；ArkTS/结构改动补 `npm run verify` |
-| `native/` | [native.md](native.md) | [模块责任与边界](../../../docs/development/ownership.md#native) | `npm run verify -- native` |
-| `tools/`、`.github/` | [tools.md](tools.md) | [模块责任与边界](../../../docs/development/ownership.md#tools) | `npm run verify -- repo` |
-| `docs/`、`.agents/` | [docs.md](docs.md) | [知识维护规则](../context.md) | `npm run verify -- repo` |
+| `entry/` | [entry.md](entry.md) | [模块责任与边界](../../../docs/development/ownership.md#entry) | 资源或相关行为检查；新增编译边界补增量 HAP |
+| `native/` | [native.md](native.md) | [模块责任与边界](../../../docs/development/ownership.md#native) | 受影响 Core/沙箱测试；协议、FFI 或升级补集成 |
+| `tools/`、`.github/` | [tools.md](tools.md) | [模块责任与边界](../../../docs/development/ownership.md#tools) | 对应工具测试与受影响命令 |
+| `docs/`、`.agents/` | [docs.md](docs.md) | [知识维护规则](../context.md) | 文档契约检查 |
 
 同时修改多个区域时合并所有对应验证范围；无法执行的范围必须在任务报告中明确说明。
 

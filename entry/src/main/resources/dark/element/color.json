@@ -128,6 +128,12 @@
       "name": "heat_4",
       "value": "#6F96ED"
     },
-    {"name": "home_intro_link", "value": "#8AB4F8"}
+    {"name": "home_intro_link", "value": "#8AB4F8"},
+    {"name": "menu_icon_fill", "value": "#4B5563"},
+    {"name": "menu_surface", "value": "#243140"},
+    {"name": "surface_border", "value": "#77869A"},
+    {"name": "menu_shadow", "value": "#66000000"},
+    {"name": "surface_image", "value": "#2C3745"},
+    {"name": "border_image", "value": "#718298"}
   ]
 }

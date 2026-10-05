@@ -9,6 +9,7 @@ import { namedResourceText } from '../../utils/UiFeedback';
 /** 与牌组长按 Popup 使用相同的菜单几何，手机与宽屏只提供锚点。 */
 @Component
 export struct DeckPreviewScopeMenu {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   onSelect: (scope: DeckPreviewScope) => void = (_scope: DeckPreviewScope): void => {};
   private options(): AppInterfaceItem[] {
     return visibleInterfaceItems('deck_preview_scope', { simple: false, agent: false, cloudDeck: false, themeHasTextures: false });
@@ -21,7 +22,7 @@ export struct DeckPreviewScopeMenu {
   }
   aboutToDisappear(): void { appInterface.leave('deck_preview_scope'); }
 
-  private selectOption(id: string): void { this.onSelect(Number(id) as DeckPreviewScope); }
+  private selectOption(id: string, _locale: string = this.uiLanguage): void { this.onSelect(Number(id) as DeckPreviewScope); }
 
   build() {
     Column({ space: 0 }) {
@@ -40,7 +41,5 @@ export struct DeckPreviewScopeMenu {
       }, (option: AppInterfaceItem): string => option.id)
     }
     .width(应用尺寸.contextMenuWidth)
-    .backgroundColor($r('app.color.surface_card'))
-    .borderRadius(应用尺寸.圆角_面板)
   }
 }

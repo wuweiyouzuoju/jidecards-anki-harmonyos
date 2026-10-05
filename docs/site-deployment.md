@@ -17,6 +17,10 @@ npx --yes wrangler@4.141.0 deploy --config hosting/wrangler.jsonc
 
 生成器同时更新 HTML、JSON-LD、llms 文本和 sitemap，不必逐页修改 HTML。页面结构改 `tools/build-site.mjs`；样式改 `hosting/styles.css`。应用使用的 `announcement.json` 与 `cloud-decks.json` 独立维护。
 
+开源仓库地址也统一维护在 `hosting/data/works.json`：`repository` 是 GitHub 主仓库，用于文档文件与 Issues 链接；`repositoryMirrors` 保存其他平台的名称与仓库 URL。生成器同步输出首页开源入口、功能页、指南页、开发页、公共页脚、源码结构化数据与 llms 文本，不逐页硬编码地址。新增平台前先核对公开仓库及重定向后的有效地址。
+
+应用截图使用开源仓库 README 公开展示的 8 张原图，由 `works.json` 的 `screenshots` 指定官网路径、仓库 `sourceUrl`、说明和真实宽高。图片原字节同步到 `hosting/assets/`，官网直接加载同域文件，每张图保留「仓库原图」链接；不依赖访问者直连第三方图床。更新时先确认仓库图片公开且返回 PNG，再下载到对应路径、核对尺寸和图片说明，运行生成器。不要从本机未发布截图推断公开版本；图标仍复用仓库中的应用图标。
+
 独立长文的事实来源是 `hosting/data/harmonyos-anki-guide.json`，生成到 `/guides/harmonyos-anki/`。文章涵盖安装、牌组迁移、背单词与知识点制卡、FSRS、AnkiWeb、媒体兼容、统计和备份。首页只保留导航入口，文章正文留在指南页；功能页提供相关入口。修改正文后执行同一生成命令，HTML 和 `llms-full.txt` 同时更新。更新日期只随实质内容变更调整。
 
 `tools/site-worker.mjs` 负责域名 301，`hosting/wrangler.jsonc` 的 `assets.run_worker_first=true` 确保重定向先于已有静态文件匹配。新域名 HTTPS 请求直接交给 `ASSETS`，保留静态资源、JSON 与 404 行为。脚本位于资产目录外，不作为网页文件公开。不要改为只在资源不存在时才运行 Worker，否则旧域名已有页面会继续返回 200。

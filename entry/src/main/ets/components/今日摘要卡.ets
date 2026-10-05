@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { ThemeDefinition, themeDefinition, THEME_VISUALS_KEY } from '../model/ThemeCatalog';
 import { themeProgressGradient } from '../utils/ThemeVisuals';
+import { homeSummaryGeometry, HomeSummaryGeometry } from '../model/HomeHeaderLayout';
 
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { 颜色键 } from '../model/颜色主题';
@@ -19,7 +21,7 @@ import { 颜色键 } from '../model/颜色主题';
 // @Prop 已完成数 / 待学数 / 牌组数 / 今日答对率（0-1，-1 表示无数据）。
 //
 // @输出
-// 渲染今日进度摘要卡（固定展开，高度 150）。
+// 渲染今日进度摘要卡（固定展开，高度由宿主提供（默认 150））。
 //
 // @业务规则
 // 三个 计数指标 不能用 @Builder 方法接收 number 参数来实现——ArkUI 的 @Builder 对参数值
@@ -31,6 +33,9 @@ import { 颜色键 } from '../model/颜色主题';
 // ========================================================
 @Component
 export struct 今日摘要卡 {
+  @Prop indicatorSpace: number = 0;
+  @Prop cardHeight: number = 150;
+  @Prop compactCard: boolean = false;
   @StorageProp(THEME_VISUALS_KEY) private visual: ThemeDefinition = themeDefinition('aurora');
   @Prop 已完成数: number = 0;
   @Prop 待学数: number = 0;
@@ -94,93 +99,105 @@ export struct 今日摘要卡 {
   // 全部 @Prop + @StorageProp + 3 个私有方法。
   //
   // @输出
-  // 整张今日摘要卡视觉，固定高度 150。
+  // 整张今日摘要卡视觉，固定高度由宿主提供（默认 150）。
   //
   // @副作用
   // 无。
   // ========================================================
+  private pageGeometry(): HomeSummaryGeometry { return homeSummaryGeometry(this.cardHeight, this.compactCard, this.indicatorSpace); }
+
   build() {
-    Column({ space: 应用尺寸.间距_13 }) {
+    Column({ space: 应用尺寸.间距_8 }) {
       Row() {
-        Column({ space: 应用尺寸.间距_3 }) {
-          Text($r('app.string.today_progress'))
-            .fontSize(应用尺寸.字号_摘要标题)
-            .fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.text_primary'))
-          Text($r('app.string.today_summary_detail', this.已完成数, this.待学数))
-            .fontSize(应用尺寸.字号_正文_中)
-            .fontColor($r('app.color.text_secondary'))
-        }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
-        Blank()
+        Text($r('app.string.today_progress'))
+          .fontSize(this.compactCard ? 应用尺寸.字号_强调 : 应用尺寸.字号_摘要标题)
+          .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.text_primary'))
+          .layoutWeight(1)
         Text($r('app.string.deck_count_summary', this.牌组数))
-          .fontSize(应用尺寸.字号_正文_中)
+          .fontSize(this.compactCard ? 应用尺寸.字号_正文_小 : 应用尺寸.字号_正文_中)
+          .maxLines(1).flexShrink(0).margin({ left: 应用尺寸.间距_4 })
           .fontColor($r('app.color.text_secondary'))
       }
-      .width('100%')
+      .width('100%').height(this.pageGeometry().titleHeight)
 
-      if (this.是否空态()) {
-        // 展开态空态：上下 Blank 撑开居中
-        Blank()
-        Text(this.空态提示())
-          .fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_secondary'))
-          .textAlign(TextAlign.Center)
-          .width('100%')
-        Blank()
-      } else {
-        Progress({ value: this.进度值(), total: 100, type: ProgressType.Linear })
-          .height(应用尺寸.进度条高度)
-          .color(this.visual.progressColors.length > 0 ? themeProgressGradient(this.visual.progressColors) : this.动作主色)
-          .backgroundColor(this.主色容器色)
-          .borderRadius(应用尺寸.圆角_进度条)
+      Column({ space: 应用尺寸.间距_8 }) {
+        if (this.是否空态()) {
+          Text(this.空态提示())
+            .fontSize(应用尺寸.字号_正文)
+            .fontColor($r('app.color.text_secondary'))
+            .textAlign(TextAlign.Center)
+            .width('100%')
+        } else {
+          Progress({ value: this.进度值(), total: 100, type: ProgressType.Linear })
+            .height(应用尺寸.进度条高度)
+            .color(this.visual.progressColors.length > 0 ? themeProgressGradient(this.visual.progressColors) : this.动作主色)
+            .backgroundColor(this.主色容器色)
+            .borderRadius(应用尺寸.圆角_进度条)
 
-        Row({ space: 应用尺寸.间距_10 }) {
-          Column({ space: 应用尺寸.间距_3 }) {
-            Text(this.已完成数.toString())
-              .fontSize(应用尺寸.字号_指标)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(this.新卡计数色)
+          Row({ space: 应用尺寸.间距_10 }) {
+            Column({ space: 应用尺寸.间距_3 }) {
+              Text(this.已完成数.toString())
+                .fontSize(应用尺寸.字号_指标)
+                .minFontSize(应用尺寸.字号_正文).maxFontSize(应用尺寸.字号_指标).maxLines(1)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(this.新卡计数色)
+                .width('100%').textAlign(TextAlign.Center)
             Text($r('app.string.completed_today'))
-              .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_secondary'))
-          }
-          .alignItems(HorizontalAlign.Start)
-          .layoutWeight(1)
+              .fontSize(应用尺寸.字号_正文_小).minFontSize(10).maxFontSize(应用尺寸.字号_正文_小)
+              .height(18).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+                .fontColor($r('app.color.text_secondary'))
+                .width('100%').textAlign(TextAlign.Center)
+            }
+            .alignItems(HorizontalAlign.Center)
+            .layoutWeight(1)
 
-          Column({ space: 应用尺寸.间距_3 }) {
-            Text(this.待学数.toString())
-              .fontSize(应用尺寸.字号_指标)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(this.学习中计数色)
+            Column({ space: 应用尺寸.间距_3 }) {
+              Text(this.待学数.toString())
+                .fontSize(应用尺寸.字号_指标)
+                .minFontSize(应用尺寸.字号_正文).maxFontSize(应用尺寸.字号_指标).maxLines(1)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(this.学习中计数色)
+                .width('100%').textAlign(TextAlign.Center)
             Text($r('app.string.pending_today'))
-              .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_secondary'))
-          }
-          .alignItems(HorizontalAlign.Start)
-          .layoutWeight(1)
+              .fontSize(应用尺寸.字号_正文_小).minFontSize(10).maxFontSize(应用尺寸.字号_正文_小)
+              .height(18).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+                .fontColor($r('app.color.text_secondary'))
+                .width('100%').textAlign(TextAlign.Center)
+            }
+            .alignItems(HorizontalAlign.Center)
+            .layoutWeight(1)
 
-          Column({ space: 应用尺寸.间距_3 }) {
-            Text(this.今日答对率 >= 0 ? `${Math.round(this.今日答对率 * 100)}%` : '-')
-              .fontSize(应用尺寸.字号_指标)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(this.复习中计数色)
-            Text($r('app.string.today_recall_rate'))
-              .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_secondary'))
+            Column({ space: 应用尺寸.间距_3 }) {
+              Text(this.今日答对率 >= 0 ? `${Math.round(this.今日答对率 * 100)}%` : '-')
+                .fontSize(应用尺寸.字号_指标)
+                .minFontSize(应用尺寸.字号_正文).maxFontSize(应用尺寸.字号_指标).maxLines(1)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(this.复习中计数色)
+                .width('100%').textAlign(TextAlign.Center)
+            Text($r('app.string.today_pass_rate_short'))
+              .fontSize(应用尺寸.字号_正文_小).minFontSize(10).maxFontSize(应用尺寸.字号_正文_小)
+              .height(18).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+                .fontColor($r('app.color.text_secondary'))
+                .width('100%').textAlign(TextAlign.Center)
+                .accessibilityText($r('app.string.today_recall_rate'))
+            }
+            .alignItems(HorizontalAlign.Center)
+            .layoutWeight(1)
           }
-          .alignItems(HorizontalAlign.Start)
+          .width('100%')
           .layoutWeight(1)
+          .alignItems(VerticalAlign.Center)
         }
-        .width('100%')
-      }
+      }.width('100%').height(this.pageGeometry().bodyHeight).justifyContent(FlexAlign.Center)
     }
     .width('100%')
-    .height(150)
-    .padding(应用尺寸.卡片内边距)
+    .height(this.cardHeight)
+    .padding({ top: this.pageGeometry().topPadding, bottom: this.pageGeometry().padding,
+      left: this.pageGeometry().padding, right: this.pageGeometry().padding })
     .backgroundColor($r('app.color.surface_card'))
-    .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+    .border(SurfaceBorder.options())
     .borderRadius(应用尺寸.圆角_卡片)
   }
 }

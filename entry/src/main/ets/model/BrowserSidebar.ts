@@ -2,6 +2,31 @@
 import type { DeckTreeNode } from '../proto/messages/DeckMessages';
 import type { TagTreeNode } from '../proto/messages/TagsMessages';
 import { ConfigKeyBool } from '../proto/messages/ConfigMessages';
+
+export interface BrowserDeckRow {
+  name: string;
+  fullName: string;
+  level: number;
+  deckId: number;
+  totalInDeck: number;
+}
+
+/** Core 节点只含末级名称；显示短名，搜索使用完整路径，折叠节点不展开。 */
+export function browserDeckRows(root: DeckTreeNode | null): BrowserDeckRow[] {
+  const rows: BrowserDeckRow[] = [];
+  if (root === null) return rows;
+  const visit = (node: DeckTreeNode, prefix: string): void => {
+    for (const child of node.children) {
+      const fullName: string = prefix === '' ? child.name : `${prefix}::${child.name}`;
+      rows.push({ name: child.name, fullName: fullName, level: child.level,
+        deckId: child.deckId, totalInDeck: child.totalInDeck });
+      if (!child.collapsed) visit(child, fullName);
+    }
+  };
+  visit(root, '');
+  return rows;
+}
+
 export interface BrowserSavedSearch { name: string; search: string; }
 export interface BrowserSidebarBackend {
   decks(): Promise<DeckTreeNode>;

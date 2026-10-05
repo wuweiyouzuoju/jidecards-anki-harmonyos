@@ -7,7 +7,8 @@ import { 选取数据文件 } from '../utils/文件导入助手';
 import { 后端会话 } from './后端会话';
 import { 执行牌组导入, 暂存导入文件, 替换集合 } from './数据迁移服务';
 import { exportPersonalData } from './DataExportWorkflow';
-import { ImportAnkiPackageOptions, ImportSummary, decodeImportResponse } from '../proto/messages/ImportExportMessages';
+import { ImportAnkiPackageOptions, ImportSummary, decodeImportResponse,
+  decodeImportAnkiPackageOptions } from '../proto/messages/ImportExportMessages';
 import { CsvMetadata, decodeCsvMetadata, encodeCsvMetadataRequest, encodeCsvImport } from '../proto/messages/CsvImportMessages';
 import { CsvImportPreview, CsvNotetype } from '../model/CsvImport';
 import { ImportOperation } from '../model/ImportOperation';
@@ -25,6 +26,13 @@ export class AnkiDataTransfer implements DataTransferBackend {
     return context;
   }
   async pickDeck(): Promise<string | null> { return 选取数据文件(this.context(), ['.apkg']); }
+  /** @throws Core 偏好读取失败交由迁移会话显示，不能用本机默认值替代。 */
+  async importPackagePresets(): Promise<ImportAnkiPackageOptions> {
+    const session = 后端会话.获取实例();
+    await session.确保已打开(this.context().filesDir);
+    return decodeImportAnkiPackageOptions(await session.调用(服务号.后端导入导出,
+      导入导出方法.getImportAnkiPackagePresets, new Uint8Array()));
+  }
   /** @throws 选择器错误由 DataTransferSession 展示。 */
   async pickImportFile(): Promise<ImportFile | null> {
     const uri = await 选取数据文件(this.context(), ['.apkg,.csv,.tsv,.txt']);

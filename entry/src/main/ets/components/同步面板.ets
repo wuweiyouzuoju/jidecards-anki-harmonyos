@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../utils/PressFeedback';
 import { DialogBackdrop } from './common/DialogBackdrop';
-import { resourceText, namedResourceText, showToastSafely } from '../utils/UiFeedback';
+import { showToastSafely, resourceText, namedResourceText } from '../utils/UiFeedback';
 import { ThemeTextSpans } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
@@ -12,7 +12,7 @@ import { 设置面板色板_取, 设置面板色板 } from '../utils/设置面�
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时长';
 import { 颜色键 } from '../model/颜色主题';
-import { APP_FOREGROUND_KEY } from '../model/Redemption';
+import { APP_FOREGROUND_KEY } from '../model/AppLifecycleState';
 
 import { SyncSession, SyncSessionSnapshot } from '../model/SyncSession';
 import { createSyncSession } from '../backend/AnkiSyncSession';
@@ -20,6 +20,7 @@ import { createSyncSession } from '../backend/AnkiSyncSession';
 /** 只展示同步快照并转交用户意图；任务和租约由 SyncSession 持有。 */
 @Component
 export struct 同步面板 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @StorageProp(颜色键.动作主色) private dialogActionColor: string = '#2F5FD0';
   @Prop 是否深色: boolean = false;
@@ -66,7 +67,7 @@ export struct 同步面板 {
   private dismissPresentation(): void { this.session?.dismissPresentation(); }
   private syncForegroundChanged(): void { if (this.syncForeground) this.session?.syncForegroundChanged(); }
   private 冲突确认(upload: boolean): void { this.session?.冲突确认(upload); }
-  private 取本地化文案(resource: Resource): string { return resourceText(this.getUIContext(), resource); }
+  private 取本地化文案(resource: Resource, _locale: string = this.uiLanguage): string { return resourceText(this.getUIContext(), resource); }
   private 取色板(): 设置面板色板 { return 设置面板色板_取(this.是否深色); }
 
   @Builder
@@ -132,7 +133,7 @@ export struct 同步面板 {
       // 上传按钮：fullDownload 场景不展示
       if (this.state.当前冲突类型 !== 'fullDownload') {
         Button() {
-          Text() { ThemeTextSpans($r('app.string.sync_conflict_upload'), this.themeAccentColors, this.getUIContext()) }.fontSize(应用尺寸.字号_按钮).fontColor(this.dialogActionColor)
+          Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans($r('app.string.sync_conflict_upload'), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }.fontSize(应用尺寸.字号_按钮).fontColor(this.dialogActionColor)
         }
           .layoutWeight(1)
           .height(44)
@@ -149,7 +150,7 @@ export struct 同步面板 {
       // 下载按钮：fullUpload 场景不展示
       if (this.state.当前冲突类型 !== 'fullUpload') {
         Button() {
-          Text() { ThemeTextSpans($r('app.string.sync_conflict_download'), this.themeAccentColors, this.getUIContext()) }.fontSize(应用尺寸.字号_按钮).fontColor(this.dialogActionColor)
+          Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans($r('app.string.sync_conflict_download'), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }.fontSize(应用尺寸.字号_按钮).fontColor(this.dialogActionColor)
         }
           .layoutWeight(1)
           .height(44)
@@ -171,7 +172,7 @@ export struct 同步面板 {
   @Builder
   private 完成内容() {
     if (this.state.状态文案 !== '') {
-      Text() { ThemeTextSpans(this.state.状态文案, this.themeAccentColors, this.getUIContext()) }
+      Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(this.state.状态文案, this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }
         .fontSize(应用尺寸.字号_正文_小)
         .fontColor(this.取色板().主色)
         .width('100%')

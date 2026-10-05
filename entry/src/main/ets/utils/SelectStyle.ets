@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { TextModifier } from '@kit.ArkUI';
 import { 应用尺寸 } from './应用尺寸';
+import { SurfaceBorder } from './SurfaceBorder';
+import { FormRowLayout } from './FormRowLayout';
 
 /**
  * 统一页面、设置与弹窗中的原生下拉框外观。
@@ -12,14 +14,15 @@ export class SelectStyle implements AttributeModifier<SelectAttribute> {
   static readonly controlFont: Font = { size: 应用尺寸.字号_正文, weight: FontWeight.Medium };
   static readonly optionFont: Font = { size: 应用尺寸.字号_正文, weight: FontWeight.Normal };
   static readonly selectedOptionFont: Font = SelectStyle.controlFont;
-  static readonly controlRadius: number = 应用尺寸.圆角_指标卡;
-  static readonly controlHeight: number = 40;
+  static readonly controlRadius: number = 应用尺寸.radiusLg;
+  static readonly controlBorder: BorderOptions = SurfaceBorder.options();
+  static readonly controlHeight: number = FormRowLayout.controlHeight;
   static readonly controlPadding: Padding = { left: 12, right: 12, top: 0, bottom: 0 };
   static readonly controlSpace: number = 8;
   // Select 按当前选项内容测量，避免短标签占满行并留下大块空白。
   static readonly fieldWidth: string = 'auto';
   // 给同一行的字段标签和帮助入口留出空间，不能由长选项挤占。
-  static readonly fieldConstraint: ConstraintSizeOptions = { maxWidth: '56%' };
+  static readonly fieldConstraint: ConstraintSizeOptions = FormRowLayout.trailingConstraint;
   static readonly rangeWidth: number = 112;
 
   // 只负责截断；字体归 Select.font，避免两套字体设置在节点更新时互相覆盖。

@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { ThemeTextSpans } from '../common/ThemeText';
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
+import { homeSummaryGeometry, HomeSummaryGeometry, HOME_SUMMARY_HEIGHT } from '../../model/HomeHeaderLayout';
 
 // ========================================================
 // @块ID UI-HOME-SUMMARY-001
@@ -64,11 +66,17 @@ struct 计数格组件 {
     Column({ space: 2 }) {
       Text(this.数值.toString())
         .fontSize(应用尺寸.字号_指标)
+        .minFontSize(应用尺寸.字号_正文).maxFontSize(应用尺寸.字号_指标).maxLines(1)
         .fontWeight(FontWeight.Bold)
         .fontColor(this.计数色取(this.色型))
+        .width('100%').textAlign(TextAlign.Center)
       Text(this.标签)
         .fontSize(应用尺寸.字号_正文_小)
+        .minFontSize(10).maxFontSize(应用尺寸.字号_正文_小)
+        .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
         .fontColor($r('app.color.text_secondary'))
+        .width('100%').textAlign(TextAlign.Center)
+        .accessibilityText(this.标签)
     }
     .layoutWeight(1)
     .alignItems(HorizontalAlign.Center)
@@ -83,6 +91,7 @@ struct 计数格组件 {
 // ========================================================
 @Component
 struct 柱状图组件 {
+  @Prop plotHeight: number = 70;
   /** 计数：柱高数据 */
   @Prop 计数: number[] = [];
   /** 键：难度取色用（难度桶百分比），其余色带可传空 */
@@ -106,7 +115,7 @@ struct 柱状图组件 {
     if (值 <= 0) {
       return 2;
     }
-    return Math.max(值 / this.峰值() * 70, 2);
+    return Math.max(值 / this.峰值() * this.plotHeight, 2);
   }
 
   /** 柱色：按色带类型 + 统计页归一化口径取 Anki 官方色 */
@@ -140,13 +149,15 @@ struct 柱状图组件 {
       }, (值: number, 索引: number) => `${索引}_${值}`)
     }
     .width('100%')
-    .height(70)
+    .height(this.plotHeight)
     .alignItems(VerticalAlign.Bottom)
   }
 }
 
 @Component
 export struct 主页摘要分页 {
+  @Prop cardHeight: number = HOME_SUMMARY_HEIGHT;
+  @Prop compactCard: boolean = false;
   @Prop 主页快照数据: 主页快照;
   @Prop 图表快照: 桌面卡片数据 | null = null;
   @StorageProp(颜色键.动作主色) private 动作主色: string = '#2F5FD0';
@@ -156,6 +167,8 @@ export struct 主页摘要分页 {
   @StorageProp(颜色键.复习中计数色) private 复习中计数色: string = '#7056C8';
   @StorageProp('系统语言') private 系统语言: string = 'zh-Hans';
   @State private 当前页: number = 0;
+
+  private pageGeometry(): HomeSummaryGeometry { return homeSummaryGeometry(this.cardHeight, this.compactCard); }
 
   // 本地化文案：系统语言为 en 时返回英，否则返回中
   private t(中: string, 英: string): string {
@@ -167,7 +180,7 @@ export struct 主页摘要分页 {
   // ========================================================
   @Builder
   今日进度页() {
-    今日摘要卡({
+    今日摘要卡({ cardHeight: this.cardHeight, compactCard: this.compactCard, indicatorSpace: 10,
       已完成数: this.主页快照数据.today.completedCount,
       待学数: this.主页快照数据.today.pendingCount,
       牌组数: this.主页快照数据.today.deckCount,
@@ -184,7 +197,8 @@ export struct 主页摘要分页 {
     Column({ space: 应用尺寸.间距_8 }) {
       Row() {
         Text(this.t('可回忆率', 'Retrievability'))
-          .fontSize(应用尺寸.字号_摘要标题)
+          .fontSize(this.compactCard ? 应用尺寸.字号_强调 : 应用尺寸.字号_摘要标题)
+          .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1)
@@ -192,42 +206,46 @@ export struct 主页摘要分页 {
           .fontSize(应用尺寸.字号_正文_小)
           .fontColor($r('app.color.text_secondary'))
       }
-      .width('100%')
+      .width('100%').height(this.pageGeometry().titleHeight)
 
-      if (this.图表快照!.fsrs已启用) {
-        Row() {
-          Text() { ThemeTextSpans(`${Math.round(this.图表快照!.记忆率)}%`, [], this.getUIContext()) }
-            .fontSize(32)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(this.动作主色)
-          Text(this.t('全库平均可回忆率', 'Collection-wide retrievability'))
-            .fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_secondary'))
-            .margin({ left: 8, bottom: 4 })
+      Column({ space: 应用尺寸.间距_8 }) {
+        if (this.图表快照!.fsrs已启用) {
+          Row() {
+            Text() { ForEach([this.系统语言], (_locale: string) => { ThemeTextSpans(`${Math.round(this.图表快照!.记忆率)}%`, [], this.getUIContext()) }, (_locale: string): string => _locale) }
+              .fontSize(32)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(this.动作主色)
+            Text(this.t('全库平均可回忆率', 'Collection-wide retrievability'))
+              .fontSize(应用尺寸.字号_正文_小)
+              .layoutWeight(1).maxLines(3).textOverflow({ overflow: TextOverflow.Ellipsis })
+              .fontColor($r('app.color.text_secondary'))
+              .margin({ left: 8 })
+          }
+          .width('100%')
+          .layoutWeight(1)
+          .alignItems(VerticalAlign.Center)
+        } else {
+          Column() {
+            Text(this.t('未启用 FSRS', 'FSRS not enabled'))
+              .fontSize(应用尺寸.字号_正文)
+              .fontColor($r('app.color.text_secondary'))
+            Text(this.t('开启 FSRS 后显示全库可回忆率', 'Enable FSRS to show retrievability'))
+              .fontSize(应用尺寸.字号_正文_小)
+              .fontColor($r('app.color.text_secondary'))
+              .margin({ top: 4 })
+          }
+          .width('100%')
+          .layoutWeight(1)
+          .justifyContent(FlexAlign.Center)
         }
-        .width('100%')
-        .layoutWeight(1)
-        .alignItems(VerticalAlign.Bottom)
-      } else {
-        Column() {
-          Text(this.t('未启用 FSRS', 'FSRS not enabled'))
-            .fontSize(应用尺寸.字号_正文)
-            .fontColor($r('app.color.text_secondary'))
-          Text(this.t('开启 FSRS 后显示全库可回忆率', 'Enable FSRS to show retrievability'))
-            .fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_secondary'))
-            .margin({ top: 4 })
-        }
-        .width('100%')
-        .layoutWeight(1)
-        .justifyContent(FlexAlign.Center)
-      }
+      }.width('100%').height(this.pageGeometry().bodyHeight).justifyContent(FlexAlign.Center)
     }
     .width('100%')
-    .height(150)
-    .padding(应用尺寸.卡片内边距)
+    .height(this.cardHeight)
+    .padding({ top: this.pageGeometry().topPadding, bottom: this.pageGeometry().padding,
+      left: this.pageGeometry().padding, right: this.pageGeometry().padding })
     .backgroundColor($r('app.color.surface_card'))
-    .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+    .border(SurfaceBorder.options())
     .borderRadius(应用尺寸.圆角_卡片)
   }
 
@@ -239,33 +257,36 @@ export struct 主页摘要分页 {
     Column({ space: 应用尺寸.间距_8 }) {
       Row() {
         Text(this.t('今日', 'Today'))
-          .fontSize(应用尺寸.字号_摘要标题)
+          .fontSize(this.compactCard ? 应用尺寸.字号_强调 : 应用尺寸.字号_摘要标题)
+          .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1)
       }
-      .width('100%')
+      .width('100%').height(this.pageGeometry().titleHeight)
 
-      Row({ space: 应用尺寸.间距_10 }) {
-        计数格组件({ 标签: this.t('答题', 'Reviews'), 数值: this.图表快照!.今日答题数, 色型: 'primary' })
-        计数格组件({ 标签: this.t('评分通过', 'Passed'), 数值: this.图表快照!.今日正确数, 色型: '#238463' })
-      }
-      .width('100%')
+      Column({ space: 应用尺寸.间距_8 }) {
+        Row({ space: 应用尺寸.间距_10 }) {
+          计数格组件({ 标签: this.t('答题', 'Reviews'), 数值: this.图表快照!.今日答题数, 色型: 'primary' })
+          计数格组件({ 标签: this.t('评分通过', 'Passed'), 数值: this.图表快照!.今日正确数, 色型: '#238463' })
+        }
+        .width('100%')
 
-      Row({ space: 应用尺寸.间距_10 }) {
-        计数格组件({ 标签: this.t('学习', 'Learning'), 数值: this.图表快照!.今日新学数, 色型: 'new' })
-        计数格组件({ 标签: this.t('复习', 'Review'), 数值: this.图表快照!.今日复习数, 色型: 'review' })
-        计数格组件({ 标签: this.t('重学', 'Relearn'), 数值: this.图表快照!.今日重学数, 色型: 'learn' })
-      }
-      .width('100%')
+        Row({ space: 应用尺寸.间距_10 }) {
+          计数格组件({ 标签: this.t('学习', 'Learning'), 数值: this.图表快照!.今日新学数, 色型: 'new' })
+          计数格组件({ 标签: this.t('复习', 'Review'), 数值: this.图表快照!.今日复习数, 色型: 'review' })
+          计数格组件({ 标签: this.t('重学', 'Relearn'), 数值: this.图表快照!.今日重学数, 色型: 'learn' })
+        }
+        .width('100%')
+      }.width('100%').height(this.pageGeometry().bodyHeight).justifyContent(FlexAlign.Center)
     }
     .width('100%')
-    .height(150)
-    .padding(应用尺寸.卡片内边距)
+    .height(this.cardHeight)
+    .padding({ top: this.pageGeometry().topPadding, bottom: this.pageGeometry().padding,
+      left: this.pageGeometry().padding, right: this.pageGeometry().padding })
     .backgroundColor($r('app.color.surface_card'))
-    .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+    .border(SurfaceBorder.options())
     .borderRadius(应用尺寸.圆角_卡片)
-    .justifyContent(FlexAlign.Center)
   }
 
   // 难度刻度标签：桶数 >=5 时取五等分点（0/25%/50%/75%/100% 索引）的难度值；
@@ -323,36 +344,39 @@ export struct 主页摘要分页 {
     Column({ space: 应用尺寸.间距_8 }) {
       Row() {
         Text(this.t('卡片数量', 'Card States'))
-          .fontSize(应用尺寸.字号_摘要标题)
+          .fontSize(this.compactCard ? 应用尺寸.字号_强调 : 应用尺寸.字号_摘要标题)
+          .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1)
       }
-      .width('100%')
+      .width('100%').height(this.pageGeometry().titleHeight)
 
-      // 系列色对齐 Anki schemeBlues/Oranges/Reds/Greens（与统计页卡片数量图、桌面卡片一致）
-      Row({ space: 应用尺寸.间距_10 }) {
-        计数格组件({ 标签: this.t('未学习', 'New'), 数值: this.图表快照!.卡片状态.新卡, 色型: 色卡片_新卡 })
-        计数格组件({ 标签: this.t('学习中', 'Learning'), 数值: this.图表快照!.卡片状态.学习中, 色型: 色卡片_学习中 })
-        计数格组件({ 标签: this.t('重学中', 'Relearn'), 数值: this.图表快照!.卡片状态.重学中, 色型: 色卡片_重学中 })
-        计数格组件({ 标签: this.t('欠熟练', 'Young'), 数值: this.图表快照!.卡片状态.年轻, 色型: 色卡片_年轻 })
-      }
-      .width('100%')
+      Column({ space: 应用尺寸.间距_8 }) {
+        // 系列色对齐 Anki schemeBlues/Oranges/Reds/Greens（与统计页卡片数量图、桌面卡片一致）
+        Row({ space: 应用尺寸.间距_10 }) {
+          计数格组件({ 标签: this.t('未学习', 'New'), 数值: this.图表快照!.卡片状态.新卡, 色型: 色卡片_新卡 })
+          计数格组件({ 标签: this.t('学习中', 'Learning'), 数值: this.图表快照!.卡片状态.学习中, 色型: 色卡片_学习中 })
+          计数格组件({ 标签: this.t('重学中', 'Relearn'), 数值: this.图表快照!.卡片状态.重学中, 色型: 色卡片_重学中 })
+          计数格组件({ 标签: this.t('欠熟练', 'Young'), 数值: this.图表快照!.卡片状态.年轻, 色型: 色卡片_年轻 })
+        }
+        .width('100%')
 
-      Row({ space: 应用尺寸.间距_10 }) {
-        计数格组件({ 标签: this.t('已熟练', 'Mature'), 数值: this.图表快照!.卡片状态.成熟, 色型: 色卡片_成熟 })
-        计数格组件({ 标签: this.t('已暂停', 'Suspended'), 数值: this.图表快照!.卡片状态.暂停, 色型: 色卡片_已暂停 })
-        计数格组件({ 标签: this.t('今日跳过', 'Buried for today'), 数值: this.图表快照!.卡片状态.埋藏, 色型: 色卡片_已埋藏 })
-      }
-      .width('100%')
+        Row({ space: 应用尺寸.间距_10 }) {
+          计数格组件({ 标签: this.t('已熟练', 'Mature'), 数值: this.图表快照!.卡片状态.成熟, 色型: 色卡片_成熟 })
+          计数格组件({ 标签: this.t('已暂停', 'Suspended'), 数值: this.图表快照!.卡片状态.暂停, 色型: 色卡片_已暂停 })
+          计数格组件({ 标签: this.t('今日跳过', 'Buried for today'), 数值: this.图表快照!.卡片状态.埋藏, 色型: 色卡片_已埋藏 })
+        }
+        .width('100%')
+      }.width('100%').height(this.pageGeometry().bodyHeight).justifyContent(FlexAlign.Center)
     }
     .width('100%')
-    .height(150)
-    .padding(应用尺寸.卡片内边距)
+    .height(this.cardHeight)
+    .padding({ top: this.pageGeometry().topPadding, bottom: this.pageGeometry().padding,
+      left: this.pageGeometry().padding, right: this.pageGeometry().padding })
     .backgroundColor($r('app.color.surface_card'))
-    .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+    .border(SurfaceBorder.options())
     .borderRadius(应用尺寸.圆角_卡片)
-    .justifyContent(FlexAlign.Center)
   }
 
   // ========================================================
@@ -369,59 +393,62 @@ export struct 主页摘要分页 {
 
   @Builder
   小时分布页() {
-    // 间距收紧为 4：加小时刻度行后 8 间距会超出卡片固定高度 150
-    Column({ space: 应用尺寸.间距_4 }) {
+    Column({ space: 应用尺寸.间距_8 }) {
       Row() {
         Text(this.小时分布窗口标签())
-          .fontSize(应用尺寸.字号_摘要标题)
+          .fontSize(this.compactCard ? 应用尺寸.字号_强调 : 应用尺寸.字号_摘要标题)
+          .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1)
       }
-      .width('100%')
+      .width('100%').height(this.pageGeometry().titleHeight)
 
-      柱状图组件({
-        计数: this.图表快照!.小时分布.map((项: [number, number]): number => 项[0]),
-        键: [],
-        色带: 'hour'
-      })
+      Column({ space: 应用尺寸.间距_4 }) {
+        柱状图组件({ plotHeight: this.pageGeometry().chartHeight,
+          计数: this.图表快照!.小时分布.map((项: [number, number]): number => 项[0]),
+          键: [],
+          色带: 'hour'
+        })
 
-      // 小时刻度：五等分居中，五个数字中心落点 10%/30%/50%/70%/90%，间距严格相等
-      //（与统计页小时分布卡、桌面卡片同款）
-      Row() {
-        Text('0')
-          .fontSize(应用尺寸.字号_说明_小)
-          .fontColor($r('app.color.text_tertiary'))
-          .layoutWeight(1)
-          .textAlign(TextAlign.Center)
-        Text('6')
-          .fontSize(应用尺寸.字号_说明_小)
-          .fontColor($r('app.color.text_tertiary'))
-          .layoutWeight(1)
-          .textAlign(TextAlign.Center)
-        Text('12')
-          .fontSize(应用尺寸.字号_说明_小)
-          .fontColor($r('app.color.text_tertiary'))
-          .layoutWeight(1)
-          .textAlign(TextAlign.Center)
-        Text('18')
-          .fontSize(应用尺寸.字号_说明_小)
-          .fontColor($r('app.color.text_tertiary'))
-          .layoutWeight(1)
-          .textAlign(TextAlign.Center)
-        Text('23')
-          .fontSize(应用尺寸.字号_说明_小)
-          .fontColor($r('app.color.text_tertiary'))
-          .layoutWeight(1)
-          .textAlign(TextAlign.Center)
-      }
-      .width('100%')
+        // 小时刻度：五等分居中，五个数字中心落点 10%/30%/50%/70%/90%，间距严格相等
+        //（与统计页小时分布卡、桌面卡片同款）
+        Row() {
+          Text('0')
+            .fontSize(应用尺寸.字号_说明_小)
+            .fontColor($r('app.color.text_tertiary'))
+            .layoutWeight(1)
+            .textAlign(TextAlign.Center)
+          Text('6')
+            .fontSize(应用尺寸.字号_说明_小)
+            .fontColor($r('app.color.text_tertiary'))
+            .layoutWeight(1)
+            .textAlign(TextAlign.Center)
+          Text('12')
+            .fontSize(应用尺寸.字号_说明_小)
+            .fontColor($r('app.color.text_tertiary'))
+            .layoutWeight(1)
+            .textAlign(TextAlign.Center)
+          Text('18')
+            .fontSize(应用尺寸.字号_说明_小)
+            .fontColor($r('app.color.text_tertiary'))
+            .layoutWeight(1)
+            .textAlign(TextAlign.Center)
+          Text('23')
+            .fontSize(应用尺寸.字号_说明_小)
+            .fontColor($r('app.color.text_tertiary'))
+            .layoutWeight(1)
+            .textAlign(TextAlign.Center)
+        }
+        .width('100%').height(16)
+      }.width('100%').height(this.pageGeometry().bodyHeight).justifyContent(FlexAlign.Center)
     }
     .width('100%')
-    .height(150)
-    .padding(应用尺寸.卡片内边距)
+    .height(this.cardHeight)
+    .padding({ top: this.pageGeometry().topPadding, bottom: this.pageGeometry().padding,
+      left: this.pageGeometry().padding, right: this.pageGeometry().padding })
     .backgroundColor($r('app.color.surface_card'))
-    .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+    .border(SurfaceBorder.options())
     .borderRadius(应用尺寸.圆角_卡片)
   }
 
@@ -430,11 +457,11 @@ export struct 主页摘要分页 {
   // ========================================================
   @Builder
   难度分布页() {
-    // 间距与其他柱图页统一为 4：加刻度行后 8 间距会超出卡片固定高度 150
-    Column({ space: 应用尺寸.间距_4 }) {
+    Column({ space: 应用尺寸.间距_8 }) {
       Row() {
         Text(this.t('卡片易度 / 难度', 'Card ease / difficulty'))
-          .fontSize(应用尺寸.字号_摘要标题)
+          .fontSize(this.compactCard ? 应用尺寸.字号_强调 : 应用尺寸.字号_摘要标题)
+          .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1)
@@ -442,31 +469,34 @@ export struct 主页摘要分页 {
           .fontSize(应用尺寸.字号_正文_小)
           .fontColor($r('app.color.text_secondary'))
       }
-      .width('100%')
+      .width('100%').height(this.pageGeometry().titleHeight)
 
-      柱状图组件({
-        计数: this.图表快照!.难度分布.桶.map((项: [number, number]): number => 项[1]),
-        键: this.图表快照!.难度分布.桶.map((项: [number, number]): number => 项[0]),
-        色带: 'difficulty'
-      })
+      Column({ space: 应用尺寸.间距_4 }) {
+        柱状图组件({ plotHeight: this.pageGeometry().chartHeight,
+          计数: this.图表快照!.难度分布.桶.map((项: [number, number]): number => 项[1]),
+          键: this.图表快照!.难度分布.桶.map((项: [number, number]): number => 项[0]),
+          色带: 'difficulty'
+        })
 
-      // 难度刻度：五等分居中（与小时分布刻度行、桌面卡片同款），柱图基线与其他柱图页统一
-      Row() {
-        ForEach(this.难度刻度标签(), (标签: string) => {
-          Text(标签)
-            .fontSize(应用尺寸.字号_说明_小)
-            .fontColor($r('app.color.text_tertiary'))
-            .layoutWeight(1)
-            .textAlign(TextAlign.Center)
-        }, (标签: string) => 标签)
-      }
-      .width('100%')
+        // 难度刻度：五等分居中（与小时分布刻度行、桌面卡片同款），柱图基线与其他柱图页统一
+        Row() {
+          ForEach(this.难度刻度标签(), (标签: string) => {
+            Text(标签)
+              .fontSize(应用尺寸.字号_说明_小)
+              .fontColor($r('app.color.text_tertiary'))
+              .layoutWeight(1)
+              .textAlign(TextAlign.Center)
+          }, (标签: string) => 标签)
+        }
+        .width('100%').height(16)
+      }.width('100%').height(this.pageGeometry().bodyHeight).justifyContent(FlexAlign.Center)
     }
     .width('100%')
-    .height(150)
-    .padding(应用尺寸.卡片内边距)
+    .height(this.cardHeight)
+    .padding({ top: this.pageGeometry().topPadding, bottom: this.pageGeometry().padding,
+      left: this.pageGeometry().padding, right: this.pageGeometry().padding })
     .backgroundColor($r('app.color.surface_card'))
-    .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+    .border(SurfaceBorder.options())
     .borderRadius(应用尺寸.圆角_卡片)
   }
 
@@ -475,41 +505,44 @@ export struct 主页摘要分页 {
   // ========================================================
   @Builder
   间隔分布页() {
-    // 间距与小时分布/未来到期页统一为 4：翻页时柱图起始高度一致
-    Column({ space: 应用尺寸.间距_4 }) {
+    Column({ space: 应用尺寸.间距_8 }) {
       Row() {
         Text(this.t('复习间隔', 'Review Intervals'))
-          .fontSize(应用尺寸.字号_摘要标题)
+          .fontSize(this.compactCard ? 应用尺寸.字号_强调 : 应用尺寸.字号_摘要标题)
+          .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1)
       }
-      .width('100%')
+      .width('100%').height(this.pageGeometry().titleHeight)
 
-      柱状图组件({
-        计数: this.图表快照!.间隔分布.map((项: [number, number]): number => 项[1]),
-        键: [],
-        色带: 'interval'
-      })
+      Column({ space: 应用尺寸.间距_4 }) {
+        柱状图组件({ plotHeight: this.pageGeometry().chartHeight,
+          计数: this.图表快照!.间隔分布.map((项: [number, number]): number => 项[1]),
+          键: [],
+          色带: 'interval'
+        })
 
-      // 间隔刻度：五等分居中显示间隔天数（与小时分布刻度行、桌面卡片同款），
-      // 柱图基线与其他柱图页统一
-      Row() {
-        ForEach(this.间隔刻度标签(), (标签: string) => {
-          Text(标签)
-            .fontSize(应用尺寸.字号_说明_小)
-            .fontColor($r('app.color.text_tertiary'))
-            .layoutWeight(1)
-            .textAlign(TextAlign.Center)
-        }, (标签: string) => 标签)
-      }
-      .width('100%')
+        // 间隔刻度：五等分居中显示间隔天数（与小时分布刻度行、桌面卡片同款），
+        // 柱图基线与其他柱图页统一
+        Row() {
+          ForEach(this.间隔刻度标签(), (标签: string) => {
+            Text(标签)
+              .fontSize(应用尺寸.字号_说明_小)
+              .fontColor($r('app.color.text_tertiary'))
+              .layoutWeight(1)
+              .textAlign(TextAlign.Center)
+          }, (标签: string) => 标签)
+        }
+        .width('100%').height(16)
+      }.width('100%').height(this.pageGeometry().bodyHeight).justifyContent(FlexAlign.Center)
     }
     .width('100%')
-    .height(150)
-    .padding(应用尺寸.卡片内边距)
+    .height(this.cardHeight)
+    .padding({ top: this.pageGeometry().topPadding, bottom: this.pageGeometry().padding,
+      left: this.pageGeometry().padding, right: this.pageGeometry().padding })
     .backgroundColor($r('app.color.surface_card'))
-    .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+    .border(SurfaceBorder.options())
     .borderRadius(应用尺寸.圆角_卡片)
   }
 
@@ -518,47 +551,51 @@ export struct 主页摘要分页 {
   // ========================================================
   @Builder
   未来到期页() {
-    Column({ space: 应用尺寸.间距_4 }) {
+    Column({ space: 应用尺寸.间距_8 }) {
       Row() {
         Text(this.t('预测', 'Future Due'))
-          .fontSize(应用尺寸.字号_摘要标题)
+          .fontSize(this.compactCard ? 应用尺寸.字号_强调 : 应用尺寸.字号_摘要标题)
+          .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1)
       }
-      .width('100%')
+      .width('100%').height(this.pageGeometry().titleHeight)
 
-      柱状图组件({
-        计数: this.图表快照!.未来到期.map((项: [number, number]): number => 项[1]),
-        键: [],
-        色带: 'future'
-      })
+      Column({ space: 应用尺寸.间距_4 }) {
+        柱状图组件({ plotHeight: this.pageGeometry().chartHeight,
+          计数: this.图表快照!.未来到期.map((项: [number, number]): number => 项[1]),
+          键: [],
+          色带: 'future'
+        })
 
-      // 天数刻度：与小时分布页刻度行同款，今/+15/+29
-      Row() {
-        Text(this.t('今', 'Today'))
-          .fontSize(应用尺寸.字号_说明_小)
-          .fontColor($r('app.color.text_tertiary'))
-          .layoutWeight(1)
-          .textAlign(TextAlign.Start)
-        Text('+15')
-          .fontSize(应用尺寸.字号_说明_小)
-          .fontColor($r('app.color.text_tertiary'))
-          .layoutWeight(1)
-          .textAlign(TextAlign.Center)
-        Text('+29')
-          .fontSize(应用尺寸.字号_说明_小)
-          .fontColor($r('app.color.text_tertiary'))
-          .layoutWeight(1)
-          .textAlign(TextAlign.End)
-      }
-      .width('100%')
+        // 天数刻度：与小时分布页刻度行同款，今/+15/+29
+        Row() {
+          Text(this.t('今', 'Today'))
+            .fontSize(应用尺寸.字号_说明_小)
+            .fontColor($r('app.color.text_tertiary'))
+            .layoutWeight(1)
+            .textAlign(TextAlign.Start)
+          Text('+15')
+            .fontSize(应用尺寸.字号_说明_小)
+            .fontColor($r('app.color.text_tertiary'))
+            .layoutWeight(1)
+            .textAlign(TextAlign.Center)
+          Text('+29')
+            .fontSize(应用尺寸.字号_说明_小)
+            .fontColor($r('app.color.text_tertiary'))
+            .layoutWeight(1)
+            .textAlign(TextAlign.End)
+        }
+        .width('100%').height(16)
+      }.width('100%').height(this.pageGeometry().bodyHeight).justifyContent(FlexAlign.Center)
     }
     .width('100%')
-    .height(150)
-    .padding(应用尺寸.卡片内边距)
+    .height(this.cardHeight)
+    .padding({ top: this.pageGeometry().topPadding, bottom: this.pageGeometry().padding,
+      left: this.pageGeometry().padding, right: this.pageGeometry().padding })
     .backgroundColor($r('app.color.surface_card'))
-    .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+    .border(SurfaceBorder.options())
     .borderRadius(应用尺寸.圆角_卡片)
   }
 

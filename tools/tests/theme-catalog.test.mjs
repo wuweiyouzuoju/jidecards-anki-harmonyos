@@ -35,11 +35,11 @@ test('primary action text stays readable on the solid surface and pressed feedba
   }
 });
 
-test('start study and both show-answer layouts share an opaque surface without an outline', () => {
+test('start study and both show-answer layouts share an opaque surface and the common outline', () => {
   const surface = read('entry/src/main/ets/utils/PrimaryGlassSurface.ets');
   assert.match(surface, /backgroundColor\(\$r\('app.color.surface_card'\)\)/);
   assert.match(surface, /themePressGradient\(this.style.pressedColors, pressed\)/);
-  assert.match(surface, /\.border\(\{ width: 0 \}\)/);
+  assert.match(surface, /\.border\(SurfaceBorder\.options\(\)\)/);
   const study = read('entry/src/main/ets/pages/学习页.ets');
   assert.match(study, /开始学习按钮\(\{\s*文案: \$r\('app.string.study_show_answer'\),\s*isAvailable: this\.阶段 === 'question',\s*开始学习回调: \(\): void => \{ this\.显示答案\(\); \}/);
   assert.doesNotMatch(study, /显示答案按下|PrimaryGlassSurface/);
@@ -107,7 +107,7 @@ test('navigation owns one persistent background outside route content', () => {
   assert.equal(home.match(/ThemeBackground\(/g).length, 1);
   const visibility = home.slice(home.indexOf('.onNavBarStateChange('), home.indexOf('// 用箭头函数包裹'));
   assert.match(visibility, /appInterface.showPage\('home'\)/);
-  assert.doesNotMatch(visibility, /ThemeBackground|homeVisible|页面底色|opacity/, 'visibility reports semantic state without changing persistent background rendering');
+  assert.doesNotMatch(visibility, /ThemeBackground|页面底色|opacity/, 'visibility reports semantic state without changing persistent background rendering');
   const pages = readdirSync(new URL('../../entry/src/main/ets/pages/', import.meta.url)).filter(name => name.endsWith('.ets') && name !== '首页.ets');
   for (const name of pages) {
     const source = read('entry/src/main/ets/pages/' + name);

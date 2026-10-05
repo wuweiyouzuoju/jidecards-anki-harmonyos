@@ -5,6 +5,7 @@ import { resourceText } from '../../utils/UiFeedback';
 /** 帮助/信息共用图标与独立点击区；不把点击转交给所在设置行或卡片行。 */
 @Component
 export struct HelpButton {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop label: ResourceStr = '';
   @Prop isHelpEnabled: boolean = true;
   onHelp: () => void = (): void => {};
@@ -13,15 +14,14 @@ export struct HelpButton {
     if (this.isHelpEnabled) this.onHelp();
   }
 
-  private accessibilityLabel(): string {
+  private accessibilityLabel(_locale: string = this.uiLanguage): string {
     return typeof this.label === 'string' ? this.label : resourceText(this.getUIContext(), this.label);
   }
 
   build() {
     Button() {
-      SymbolGlyph($r('sys.symbol.info_circle'))
-        .fontSize('18vp')
-        .fontColor([$r('app.color.text_secondary')])
+      Image($r('app.media.ic_info'))
+        .width(18).height(18).objectFit(ImageFit.Contain)
         .hitTestBehavior(HitTestMode.None)
         .accessibilityLevel('no')
     }

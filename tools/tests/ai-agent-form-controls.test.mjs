@@ -47,8 +47,11 @@ test('clarification controls preserve host-owned answers and guard stale callbac
 
 test('multiline inputs match form colors and padding without owning height or editing', () => {
   for (const theme of ['light', 'dark']) {
-    const Style = loadPlatformModule('utils/FormTextAreaStyle.ets', 'FormTextAreaStyle', {
+    const SurfaceBorder = loadPlatformModule('utils/SurfaceBorder.ets', 'SurfaceBorder', {
       应用尺寸: dimensions, $r: key => `${theme}:${key}`
+    });
+    const Style = loadPlatformModule('utils/FormTextAreaStyle.ets', 'FormTextAreaStyle', {
+      应用尺寸: dimensions, $r: key => `${theme}:${key}`, SurfaceBorder
     });
     const attributes = { height: 72, text: 'draft', enabled: false, onChange: 'host' };
     const node = {};
@@ -61,7 +64,7 @@ test('multiline inputs match form colors and padding without owning height or ed
     assert.equal(attributes.fontColor, `${theme}:app.color.text_primary`);
     assert.equal(attributes.placeholderColor, `${theme}:app.color.text_tertiary`);
     assert.equal(attributes.backgroundColor, `${theme}:app.color.surface_card`);
-    assert.deepEqual(attributes.border, { width: dimensions.卡片边框, color: `${theme}:app.color.border_input` });
+    assert.deepEqual(attributes.border, { width: dimensions.卡片边框, color: `${theme}:app.color.surface_border` });
     assert.equal(attributes.borderRadius, dimensions.圆角_面板);
     assert.equal(attributes.padding, dimensions.间距_10);
     assert.deepEqual([attributes.height, attributes.text, attributes.enabled, attributes.onChange], [72, 'draft', false, 'host']);
@@ -87,7 +90,7 @@ test('all Agent text areas share appearance; options have explicit selection and
   assert.match(card, /Radio\(\{ value: option.id, group: this.clarification.request.id \}\)/);
   assert.match(card, /\.checked\(option.id === this.clarification.selectedOptionId\)/);
   assert.match(card, /\.width\(20\).height\(20\).margin\(0\).flexShrink\(0\)/);
-  assert.match(card, /\.border\(\{ width: 2, color: option.id === this.clarification.selectedOptionId/);
+  assert.match(card, /\.border\(SurfaceBorder\.options\(2, option.id === this.clarification.selectedOptionId/);
   assert.match(card, /\.onClick\(\(\): void => \{ this.selectOption\(option.id\); \}\)/);
   assert.match(card, /PrimaryActionButton\(\{/);
   assert.doesNotMatch(card, /Button\(option.label\)|\.maxLines\(/);

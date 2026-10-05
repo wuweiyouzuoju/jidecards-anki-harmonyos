@@ -58,7 +58,7 @@ export function themeAccentRampColor(index: number, length: number, colors: stri
 }
 
 /** 逐字颜色在进入 ForEach 前一次算完，避免在 item builder 里按字符重复查资源。 */
-export function themeLabelGlyphs(label: ResourceStr, colors: string[], context: UIContext): ThemeLabelGlyph[] {
+export function themeLabelGlyphs(label: ResourceStr, colors: string[], context: UIContext, _locale: string = ''): ThemeLabelGlyph[] {
   const letters: string[] = themeLabelCharacters(label, context);
   return letters.map((letter: string, index: number): ThemeLabelGlyph => ({
     letter: letter, color: themeAccentRampColor(index, letters.length, colors)

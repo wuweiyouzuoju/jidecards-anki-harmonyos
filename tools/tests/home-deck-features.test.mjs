@@ -35,18 +35,24 @@ test('accepted creation completes after disposal and only broadcasts committed d
   assert.deepEqual(h.events,['busy','broadcast']);
 });
 
-test('customization owns validation and partial background failure; committed retry refreshes before close',async()=>{
+test('customization accepts clearing the alias and reports partial background failure; committed retry refreshes before close',async()=>{
   let saved=false,calls=0;const h=harness('DeckCustomizationFeature',{customize:async()=>{calls++;return saved;}});
-  await h.feature.save({新名:' '});assert.equal(calls,0);
-  await h.feature.save({新名:'alias'});assert.equal(h.feature.error,'app.string.deck_customize_background_save_failed');
+  await h.feature.save({新名:' '});assert.equal(calls,1);
+  assert.equal(h.feature.error,'app.string.deck_customize_background_save_failed');
   assert.ok(!h.events.includes('close'));saved=true;await h.feature.save({新名:'alias'});
-  assert.ok(h.events.indexOf('saved')<h.events.indexOf('close'));assert.equal(h.feature.busy,false);
+  assert.equal(calls,2);assert.ok(h.events.indexOf('saved')<h.events.indexOf('close'));assert.equal(h.feature.busy,false);
 });
 
 test('customization does not notify a destroyed UI when the accepted write completes',async()=>{
   const gate=deferred();const h=harness('DeckCustomizationFeature',{customize:()=>gate.promise});
   const pending=h.feature.save({新名:'alias'});h.feature.aboutToDisappear();gate.resolve(true);await pending;
   assert.deepEqual(h.events,['busy','broadcast']);
+});
+
+test('failed local alias persistence retains the form and does not broadcast a saved change',async()=>{
+  const h=harness('DeckCustomizationFeature',{customize:async()=>{throw Error('flush failed');}});
+  await h.feature.save({新名:''});assert.equal(h.feature.error,'app.string.deck_customize_rename_failed');
+  assert.deepEqual(h.events,['busy','idle']);
 });
 
 test('post-commit refresh failure closes the form without inviting another write',async()=>{

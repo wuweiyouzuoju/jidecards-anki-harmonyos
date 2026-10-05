@@ -9,12 +9,12 @@ export function interfaceItemTitleKey(surfaceId: string, itemId: string): string
   return item?.titleKey ?? '';
 }
 
-export function interfaceItemText(context: UIContext, surfaceId: string, itemId: string): string {
+export function interfaceItemText(context: UIContext, surfaceId: string, itemId: string, _locale: string = ''): string {
   const key: string = interfaceItemTitleKey(surfaceId, itemId);
   return key === '' ? '[' + surfaceId + '/' + itemId + ']' : namedResourceText(context, key);
 }
 
-export function interfaceControlText(context: UIContext, items: AppInterfaceItem[], itemId: string): string {
+export function interfaceControlText(context: UIContext, items: AppInterfaceItem[], itemId: string, _locale: string = ''): string {
   const item = items.find((entry): boolean => entry.id === itemId);
   return item === undefined ? '[' + itemId + ']' : namedResourceText(context, item.titleKey);
 }

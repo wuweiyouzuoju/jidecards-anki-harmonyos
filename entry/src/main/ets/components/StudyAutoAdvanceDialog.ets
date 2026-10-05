@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../utils/PressFeedback';
+import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { DisclosureChevron } from './common/DisclosureChevron';
 import { StudyAutoAdvanceDraft, StudyAdvanceField } from '../model/StudyAutoAdvanceDraft';
 import { StudyOptions } from '../model/StudyTiming';
 import { DialogHeader } from './common/DialogHeader';
 import { 应用尺寸 } from '../utils/应用尺寸';
-import { resourceText, showToastSafely } from '../utils/UiFeedback';
+import { showToastSafely, resourceText } from '../utils/UiFeedback';
 
 @CustomDialog
 export struct StudyAutoAdvanceDialog {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   controller?: CustomDialogController;
   draft: StudyAutoAdvanceDraft = new StudyAutoAdvanceDraft(new StudyOptions(), false, 0);
   choice: boolean = false;
@@ -37,7 +39,7 @@ export struct StudyAutoAdvanceDialog {
     }
   }
 
-  private label(field: StudyAdvanceField, value: number): string {
+  private label(field: StudyAdvanceField, value: number, _locale: string = this.uiLanguage): string {
     if (field === StudyAdvanceField.QuestionAction) {
       return resourceText(this.getUIContext(), value === 1 ?
         $r('app.string.deck_opt_show_reminder') : $r('app.string.deck_opt_show_answer'));
@@ -62,7 +64,7 @@ export struct StudyAutoAdvanceDialog {
     else this.field = StudyAdvanceField.Main;
   }
 
-  private changeAdvance(value: boolean): void {
+  private changeAdvance(value: boolean, _locale: string = this.uiLanguage): void {
     if (value && !this.draft.canEnable()) {
       this.isAdvanceEnabled = false;
       this.draft.enabled = false;
@@ -104,7 +106,7 @@ export struct StudyAutoAdvanceDialog {
     .width('100%').constraintSize({ minHeight: 64 }).padding({ left: 8, right: 8, top: 8, bottom: 8 })
     .attributeModifier(new PressFeedback())
     .onClick((): void => { this.open(field); })
-    Divider().color($r('app.color.border_subtle')).strokeWidth(0.5)
+    Divider().color(SurfaceBorder.color()).strokeWidth(0.5)
   }
 
   build() {
@@ -154,7 +156,7 @@ export struct StudyAutoAdvanceDialog {
           onClose: (): void => { this.back(); }, onAction: (): void => { this.confirm(); } })
       }
       .width('88%').constraintSize({ maxWidth: 480, maxHeight: '85%' })
-      .padding(应用尺寸.卡片内边距).backgroundColor($r('app.color.surface_card')).borderRadius(应用尺寸.圆角_卡片)
+      .padding(应用尺寸.卡片内边距).backgroundColor($r('app.color.surface_card')).borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
     }.width('100%').alignItems(HorizontalAlign.Center)
   }
 }

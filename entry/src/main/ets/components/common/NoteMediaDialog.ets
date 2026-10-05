@@ -2,7 +2,7 @@
 import { common } from '@kit.AbilityKit';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
 import { NoteFieldImage } from '../../model/NoteImageDraft';
-import { NoteFieldAudio } from '../../model/NoteAudioDraft';
+import { NoteFieldAudio, NoteAudioStatus } from '../../model/NoteAudioDraft';
 import { NoteMediaSession } from '../../model/NoteMediaSession';
 import { NoteMediaPart, noteMediaParts, noteImagePreviewSource } from '../../model/NoteMediaParts';
 import { discardNoteRecordings } from '../../utils/NoteAudioRecorder';
@@ -20,6 +20,7 @@ import { NoteAudioField } from './NoteAudioField';
 /** 独立媒体草稿与操作；IO 复用音频字段，确认才一次移交宿主。 */
 @CustomDialog
 export struct NoteMediaDialog {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   controller?: CustomDialogController;
   kind: string = 'image';
   fieldIndex: number = 0;
@@ -30,6 +31,7 @@ export struct NoteMediaDialog {
   onApply: (value: string, images: NoteFieldImage[], audios: NoteFieldAudio[]) => void =
     (_value: string, _images: NoteFieldImage[], _audios: NoteFieldAudio[]): void => {};
   onClosed: () => void = (): void => {};
+  onAudioStatus: (status: NoteAudioStatus) => void = (_status: NoteAudioStatus): void => {};
   onReady: (dismiss: () => void) => void = (_dismiss: () => void): void => {};
   @State private value: string = '';
   @State private images: NoteFieldImage[] = [];
@@ -65,7 +67,7 @@ export struct NoteMediaDialog {
     this.controller?.close();
   }
 
-  private async pickImage(partIndex: number = -1, pendingId: number = -1): Promise<void> {
+  private async pickImage(partIndex: number = -1, pendingId: number = -1, _locale: string = this.uiLanguage): Promise<void> {
     if (this.working || this.disposed) return;
     this.working = true; this.errorMessage = '';
     try {
@@ -115,8 +117,6 @@ export struct NoteMediaDialog {
       LabeledActionRow({ label: $r('app.string.note_media_draft_hint'), actionLabel: $r('app.string.add_note_image_add'),
         tint: this.buttonColor, textColor: $r('app.color.text_secondary'), isInteractive: !this.working,
         onAction: (): void => { this.pickImage(); } })
-    } else {
-      Text($r('app.string.note_media_draft_hint')).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
     }
     if (this.kind === 'image') {
       ForEach(noteMediaParts(this.value), (_part: NoteMediaPart, index: number) => {
@@ -136,6 +136,7 @@ export struct NoteMediaDialog {
     } else {
       NoteAudioField({ value: this.value, audios: this.audios, preview: this.preview, mediaOnly: true,
         disabled: this.working, replacementsVisible: true,
+        onStatus: (status: NoteAudioStatus): void => { if (!this.disposed) this.onAudioStatus(status); },
         onBusy: (busy: boolean): void => { this.working = busy; },
         onChange: (value: string): void => { this.session.changeValue(value); this.sync(); },
         onAdd: (uri: string, label: string, temporary: boolean): void => { this.session.addAudio(uri, label, temporary); this.sync(); },
@@ -146,6 +147,10 @@ export struct NoteMediaDialog {
     }
     if (this.errorMessage !== '') {
       Text(this.errorMessage).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.error_text'))
+    }
+    if (this.kind === 'audio') {
+      Text($r('app.string.note_media_draft_hint')).fontSize(应用尺寸.字号_正文_小)
+        .fontColor($r('app.color.text_secondary')).width('100%').textAlign(TextAlign.Start)
     }
   }
 

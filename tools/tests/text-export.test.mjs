@@ -6,6 +6,8 @@ import { 协议读取器 } from '../../entry/src/main/ets/proto/core/ProtoReader
 import { DataTransferSession } from '../../entry/src/main/ets/model/home/DataTransferSession.ts';
 import { loadPlatformModule,loadComponentLogic } from './platform-module-harness.mjs';
 import { 服务号, 导入导出方法 } from '../../entry/src/main/ets/backend/服务索引.ts';
+import {encodeExportAnkiPackageRequest} from '../../entry/src/main/ets/proto/messages/ImportExportMessages.ts';
+import {encodeExportSubset} from '../../entry/src/main/ets/proto/messages/ExportLimitMessages.ts';
 const options={kind:'notes',withHtml:true,withTags:true,withDeck:true,withNotetype:true,withGuid:true};
 function fields(bytes){const r=new 协议读取器(bytes),out={};let tag;while((tag=r.读取标签())!==null){out[tag.字段号]=tag.线类型===2?r.读取字节():r.读取变长整数();}return out;}
 
@@ -16,6 +18,20 @@ test('note and card text export use official option fields and deck-limit oneof'
   const cards=fields(encodeTextExportRequest('/tmp/cards.txt',123,{...options,kind:'cards',withHtml:false}));
   assert.equal(fields(cards[3])[2],123);assert.equal(cards[2]??0,0);assert.equal(cards[7],undefined);
   assert.throws(()=>encodeTextExportRequest('out',0,options),/deck/);
+});
+
+test('APKG and text subset encoding select the exact NoteIds/CardIds oneof and never fall back to a collection',()=>{
+  const ids=[123,4294967297];
+  for(const mode of ['notes','cards']) {
+    const subset={mode,ids};const limit=fields(encodeExportSubset(subset));
+    assert.deepEqual(Object.keys(limit),[mode==='notes'?'3':'4']);
+    const packed=fields(limit[mode==='notes'?3:4])[1];const reader=new 协议读取器(packed),actual=[];
+    while(!reader.已读完)actual.push(reader.读取64位整数());assert.deepEqual(actual,ids);
+    const apkg=fields(encodeExportAnkiPackageRequest('out',0,undefined,subset));assert.deepEqual(apkg[3],encodeExportSubset(subset));
+    const text=fields(encodeTextExportRequest('out',0,{...options,kind:mode},subset));
+    assert.deepEqual(text[mode==='notes'?7:3],encodeExportSubset(subset));
+  }
+  for(const ids of [[],[1,1],[0],[-1],[Infinity],[1.5]])assert.throws(()=>encodeExportSubset({mode:'notes',ids}),/invalid/);
 });
 
 test('text export shares file-save cleanup and does not report success on picker cancellation',async()=>{

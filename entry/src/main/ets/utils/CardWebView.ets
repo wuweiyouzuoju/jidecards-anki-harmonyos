@@ -6,8 +6,8 @@ import { 媒体基地址 } from '../model/学习卡片HTML构建器';
 class CardRenderProxy {
   private session: CardWebSession;
   constructor(session: CardWebSession) { this.session = session; }
-  onRendered(documentId: number, revision: number, error: string): void {
-    this.session.rendered(documentId, revision, error);
+  onRendered(documentId: number, revision: number, error: string, background: string): void {
+    this.session.rendered(documentId, revision, error, background);
   }
 }
 
@@ -15,7 +15,8 @@ class CardRenderProxy {
 export class CardWebView {
   private controller: webview.WebviewController;
   private session: CardWebSession;
-  constructor(controller: webview.WebviewController, shown: () => void, failed: (message: string) => void) {
+  constructor(controller: webview.WebviewController, shown: (background: string) => void,
+    failed: (message: string) => void) {
     this.controller = controller;
     const host: CardWebHost = {
       load: (html: string): void => { controller.loadData(html, 'text/html', 'UTF-8', 媒体基地址, ' '); },

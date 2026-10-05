@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { 牌组服务 } from '../牌组服务';
+import { planDeckReparent } from '../../model/DeckReparent';
+import { DeckHierarchyCommands } from '../DeckHierarchyCommands';
 import { 笔记类型服务 } from '../笔记类型服务';
 import { 搜索服务 } from '../搜索服务';
 import type { DeckTreeNode } from '../../proto/messages/DeckMessages';
@@ -73,10 +75,10 @@ export class AgentAuxiliaryTools {
   constructor(scope: AgentScope, store: AgentWorkspaceStore) { this.scope = scope; this.store = store; }
 
   register(registry: AgentToolRegistry): void {
-    for (const name of ['configure_create_target', 'search_memory']) {
+    for (const name of ['configure_create_target', 'search_memory', 'get_deck_order']) {
       registry.registerRead(name, new AuxiliaryReadHandler(this, name));
     }
-    for (const name of ['propose_create_deck', 'propose_create_note_type', 'propose_memory_change', 'propose_analysis']) {
+    for (const name of ['propose_create_deck', 'propose_rename_deck', 'propose_reparent_decks', 'propose_reorder_decks', 'propose_create_note_type', 'propose_memory_change', 'propose_analysis']) {
       registry.registerAction(name, new AuxiliaryActionHandler(this, name));
     }
   }
@@ -96,6 +98,13 @@ export class AgentAuxiliaryTools {
   /** @throws {Error} 工作区偏好读取或写入失败，由工具执行边界返回失败结果。 */
   async read(name: string, json: string): Promise<string> {
     const args: AgentExtensionArguments = decodeExtensionArguments(name, json);
+    if (name === 'get_deck_order') {
+      if (args.parentId !== 0) this.scope.assertReadableDeckIds([args.parentId]);
+      const snapshot = await new DeckHierarchyCommands().readOrder(args.parentId);
+      this.scope.registerReadableDeckIds(snapshot.decks.map((entry): number => entry.id));
+      return JSON.stringify({ scope: 'device', parentId: snapshot.parentId, parentName: snapshot.parentName,
+        decks: snapshot.decks, includesHiddenDecks: true, synced: false });
+    }
     if (name === 'search_memory') {
       const memories: AgentMemory[] = (await this.store.load()).memories;
       const query: string = args.query.toLocaleLowerCase();
@@ -115,6 +124,22 @@ export class AgentAuxiliaryTools {
   /** @throws {Error} 工作区偏好读取或写入失败，由工具执行边界返回失败结果。 */
   async propose(name: string, json: string): Promise<AgentAction> {
     const args: AgentExtensionArguments = decodeExtensionArguments(name, json);
+    if (name === 'propose_reparent_decks') {
+      this.scope.assertReadableDeckIds(args.deckIds);
+      if (args.parentId !== 0) this.scope.assertReadableDeckIds([args.parentId]);
+      return createAgentAction('reparent_decks', JSON.stringify(
+        planDeckReparent(await this.decks.获取牌组树(), args.deckIds, args.parentId)));
+    }
+    if (name === 'propose_rename_deck') {
+      this.scope.assertReadableDeckIds([args.deckId]);
+      return createAgentAction('rename_deck', JSON.stringify(await new DeckHierarchyCommands().prepareRename(args.deckId, args.name)));
+    }
+    if (name === 'propose_reorder_decks') {
+      this.scope.assertReadableDeckIds(args.deckIds);
+      if (args.parentId !== 0) this.scope.assertReadableDeckIds([args.parentId]);
+      return createAgentAction('reorder_decks', JSON.stringify(
+        await new DeckHierarchyCommands().prepareReorder(args.parentId, args.deckIds)));
+    }
     if (name === 'propose_create_deck') {
       if (deckNameExists(await this.decks.获取牌组树(), args.name)) { throw new Error('deck_name_exists'); }
       return createAgentAction('create_deck', JSON.stringify(args));

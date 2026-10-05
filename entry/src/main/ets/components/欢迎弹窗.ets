@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { OFFICIAL_QQ_GROUP } from '../model/OfficialCommunity';
 import { DialogBackdrop } from './common/DialogBackdrop';
 import { DialogHeader } from './common/DialogHeader';
@@ -197,7 +198,7 @@ export struct 欢迎弹窗 {
       // maxHeight 百分比（layoutWeight(1)+'88%' 组合会让弹窗永远撑满屏高 88% 不收缩）
       .constraintSize({ maxWidth: 480 })
       .backgroundColor($r('app.color.surface_page'))
-      .borderRadius(应用尺寸.圆角_卡片)
+      .borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
       .transition(TransitionEffect.asymmetric(
         TransitionEffect.opacity(0)
           .combine(TransitionEffect.scale({ x: 0.96, y: 0.96 }))

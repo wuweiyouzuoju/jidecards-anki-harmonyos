@@ -3,7 +3,8 @@ import { ThemeDefinition, themeDefinition, THEME_VISUALS_KEY } from '../../model
 import {
   ThemeBackgroundPose, initialThemeBackgroundPoses, nextThemeBackgroundPoses, sampleThemeBackgroundPoses, DEFAULT_BACKGROUND_CYCLE_MS
 } from '../../model/ThemeBackgroundMotion';
-import { APP_FOREGROUND_KEY, THEME_MOTION_KEY } from '../../model/Redemption';
+import { APP_FOREGROUND_KEY } from '../../model/AppLifecycleState';
+import { THEME_MOTION_KEY } from '../../model/ThemeCatalog';
 import { 颜色键 } from '../../model/颜色主题';
 
 /**

@@ -4,7 +4,7 @@ import { CARD_REVIEWER_RUNTIME } from './CardReviewerRuntime';
 export interface CardWebHost {
   load(html: string): void;
   evaluate(script: string): Promise<string>;
-  shown(): void;
+  shown(background: string): void;
   failed(message: string): void;
 }
 
@@ -53,7 +53,7 @@ export class CardWebSession {
     }
   }
 
-  rendered(documentId: number, revision: number, error: string): void {
+  rendered(documentId: number, revision: number, error: string, background: string = ''): void {
     if (documentId !== this.documentId || revision !== this.inFlight || this.inFlight === 0) return;
     this.inFlight = 0;
     if (error !== '') {
@@ -62,7 +62,7 @@ export class CardWebSession {
     } else if (this.pending !== null) {
       this.flush();
     } else {
-      this.host.shown();
+      this.host.shown(new RegExp('^#[0-9a-fA-F]{6}$').test(background) ? background : '');
     }
   }
 

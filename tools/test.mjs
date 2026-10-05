@@ -15,7 +15,7 @@ try {
     if (problem) throw new Error(problem);
     const suite = args[0] ?? 'all';
     const files = selectTests(root, suite);
-    console.log(`[tests:${suite}] ${files.length} files${suite === 'all' ? '' : ' (focused feedback; final validation requires all)'}`);
+    console.log(`[tests:${suite}] ${files.length} files${suite === 'all' ? '' : ' (focused validation; scope follows actual change impact)'}`);
     const result = spawnSync(process.execPath, ['--experimental-transform-types', '--import', './tools/tests/register-ts-hook.mjs',
       '--test', ...files], { cwd: root, stdio: 'inherit' });
     if (result.error) throw result.error;

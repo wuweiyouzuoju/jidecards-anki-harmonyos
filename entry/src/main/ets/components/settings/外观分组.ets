@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { isSettingsItemVisible } from '../../model/SettingsStructure';
 import { settingsItemText } from '../../utils/SettingsStructureText';
-import { namedResourceText, resourceText } from '../../utils/UiFeedback';
+import { resourceText, namedResourceText } from '../../utils/UiFeedback';
+import { FormSelectRow } from '../common/FormSelectRow';
 import { SelectStyle } from '../../utils/SelectStyle';
 
 import { 主题模式 } from '../../model/主题设置';
@@ -39,6 +40,7 @@ import {
 // ========================================================
 @Component
 export struct 外观分组 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(UNLOCKED_CONTENTS_KEY) private unlockedContents: string[] = [];
   @State private themeSelectionRevision: number = 0;
   private giftDialog: CustomDialogController = new CustomDialogController({
@@ -60,7 +62,7 @@ export struct 外观分组 {
   主题模式切换回调: (模式: 主题模式) => void = (模式: 主题模式): void => {};
   颜色主题切换回调: (主题: 颜色主题) => void = (主题: 颜色主题): void => {};
 
-  private 取本地化文本(资源: Resource): string {
+  private 取本地化文本(资源: Resource, _locale: string = this.uiLanguage): string {
     return resourceText(this.getUIContext(), 资源);
   }
 
@@ -74,7 +76,7 @@ export struct 外观分组 {
     return this.取本地化文本($r('app.string.theme_system'));
   }
 
-  private 颜色主题展示名文本(主题: 颜色主题): string {
+  private 颜色主题展示名文本(主题: 颜色主题, _locale: string = this.uiLanguage): string {
     return namedResourceText(this.getUIContext(), 'theme_color_' + 主题);
   }
 
@@ -112,7 +114,7 @@ export struct 外观分组 {
   }
 
   // ---- 颜色主题 Select 选项 / 索引 ----
-  private 颜色主题选项(): SelectOption[] {
+  private 颜色主题选项(_locale: string = this.uiLanguage): SelectOption[] {
     const 主题列表: 颜色主题[] = this.displayedThemes();
     return 主题列表.map((主题: 颜色主题): SelectOption => ({ value: isThemeAvailable(主题, this.unlockedContents) ?
       this.颜色主题展示名文本(主题) : resourceText(this.getUIContext(), $r('app.string.theme_color_locked'),
@@ -141,40 +143,19 @@ export struct 外观分组 {
       是否深色: this.是否深色
     }) {
       Column({ space: 4 }) {
-          // 主题行 Select（system/light/dark）
-          Row() {
-            Text(settingsItemText(this.getUIContext(), 'theme_mode'))
-              .fontSize(15)
-              .fontColor(设置面板色板_取(this.是否深色).主文字)
-              .layoutWeight(1)
-            Select(this.主题模式选项())
-              .selected(this.主题模式索引())
-              .value(this.主题模式标签(this.当前主题模式))
-              .attributeModifier(new SelectStyle())
-              .height(SelectStyle.controlHeight)
-              .padding(SelectStyle.controlPadding)
-              .space(SelectStyle.controlSpace)
-              .width(SelectStyle.fieldWidth)
-              .constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
-              .font(SelectStyle.controlFont)
-              .optionFont(SelectStyle.optionFont)
-              .selectedOptionFont(SelectStyle.selectedOptionFont)
-              .textModifier(SelectStyle.labelText())
-              .borderRadius(SelectStyle.controlRadius)
-              .onSelect((索引: number): void => {
-                const 模式列表: 主题模式[] = ['system', 'light', 'dark'];
-                this.主题模式切换回调(模式列表[索引]);
-              })
-          }
-          .width('100%')
-          .height(48)
+          FormSelectRow({ label: settingsItemText(this.getUIContext(), 'theme_mode', this.uiLanguage), options: this.主题模式选项(), selectedIndex: this.主题模式索引(), value: this.主题模式标签(this.当前主题模式),
+            onSelect: (索引: number): void => {
+              const 模式列表: 主题模式[] = ['system', 'light', 'dark'];
+              this.主题模式切换回调(模式列表[索引]);
+            } })
 
           // 颜色主题行 Select（带渐变色条预览）
           Row() {
-            Text(settingsItemText(this.getUIContext(), 'color_theme'))
+
+            Text(settingsItemText(this.getUIContext(), 'color_theme', this.uiLanguage))
               .fontSize(15)
               .fontColor(设置面板色板_取(this.是否深色).主文字)
-              .layoutWeight(1)
+              .textAlign(TextAlign.Start).layoutWeight(1)
             // 当前主题渐变色条预览（18×12 圆角矩形，3 档色阶）
             Row()
               .width(18)
@@ -199,7 +180,7 @@ export struct 外观分组 {
               .optionFont(SelectStyle.optionFont)
               .selectedOptionFont(SelectStyle.selectedOptionFont)
               .textModifier(SelectStyle.labelText())
-              .borderRadius(SelectStyle.controlRadius)
+              .borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
               .onSelect((索引: number): void => {
                 this.selectColorTheme(索引);
               })

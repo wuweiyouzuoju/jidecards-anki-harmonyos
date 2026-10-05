@@ -21,7 +21,7 @@
 //
 // @业务规则
 // 节点 → HTML 的组装属于渲染层（ArkWeb 页面），本文件只做纯编解码。
-// TtsTag 的 voices/speed/other_fields 本端不使用，跳过。
+// TTSTag 完整保留文本、语言、候选音色、语速与平台附加参数。
 //
 // @副作用
 // 无
@@ -98,32 +98,74 @@ export interface AvTagsResult {
   text: string;
   soundFiles: string[];
   ttsItems: TtsItem[];
+  /** Core 的 repeated AvTag 顺序；旧调用方只提供分类数组时仍可播放。 */
+  items?: AvItem[];
+}
+
+/** generic.String；也用于渲染辅助 RPC 的字符串响应。 */
+export function encodeRenderingString(text: string): Uint8Array {
+  const writer = new 协议写入器();
+  writer.写入字符串(1, text);
+  return writer.转为字节();
+}
+
+export function encodeCompareAnswerRequest(expected: string, provided: string, combining: boolean): Uint8Array {
+  const writer = new 协议写入器();
+  writer.写入字符串(1, expected);
+  writer.写入字符串(2, provided);
+  writer.写入布尔(3, combining);
+  return writer.转为字节();
+}
+
+/** ordinal 是从 1 开始的填空编号，调用方从卡片模板序号转换。 */
+export function encodeExtractClozeForTypingRequest(text: string, ordinal: number): Uint8Array {
+  const writer = new 协议写入器();
+  writer.写入字符串(1, text);
+  writer.写入变长整数(2, ordinal);
+  return writer.转为字节();
+}
+
+export interface AvItem {
+  soundFile: string | null;
+  tts: TtsItem | null;
 }
 
 export interface TtsItem {
   text: string;
   language: string;
+  voices: string[];
+  speed: number;
+  otherArgs: string[];
 }
 
-function decodeAvTag(bytes: Uint8Array, soundFiles: string[], ttsItems: TtsItem[]): void {
+function decodeAvTag(bytes: Uint8Array): AvItem | null {
   const r = new 协议读取器(bytes);
+  let item: AvItem | null = null;
   let tag;
   while ((tag = r.读取标签()) !== null) {
     if (tag.字段号 === 1) {
       // sound_or_video: string
-      soundFiles.push(r.读取字符串());
+      item = { soundFile: r.读取字符串(), tts: null };
     } else if (tag.字段号 === 2) {
-      // TTSTag: { text=1, lang=2, voices=3, speed=4, other_fields=5 }
-      ttsItems.push(decodeTtsTag(r.读取字节()));
+      // TTSTag: { field_text=1, lang=2, voices=3, speed=4, other_args=5 }
+      item = { soundFile: null, tts: decodeTtsTag(r.读取字节()) };
     } else {
       r.跳过字段(tag.线类型);
     }
   }
+  return item;
+}
+
+export function orderedAvItems(tags: AvTagsResult): AvItem[] {
+  if (tags.items !== undefined) return tags.items;
+  const items: AvItem[] = tags.soundFiles.map((name: string): AvItem => ({ soundFile: name, tts: null }));
+  for (const tts of tags.ttsItems) items.push({ soundFile: null, tts: tts });
+  return items;
 }
 
 function decodeTtsTag(bytes: Uint8Array): TtsItem {
   const r = new 协议读取器(bytes);
-  const out: TtsItem = { text: '', language: '' };
+  const out: TtsItem = { text: '', language: '', voices: [], speed: 1, otherArgs: [] };
   let tag;
   while ((tag = r.读取标签()) !== null) {
     switch (tag.字段号) {
@@ -133,8 +175,16 @@ function decodeTtsTag(bytes: Uint8Array): TtsItem {
       case 2:
         out.language = r.读取字符串();
         break;
+      case 3:
+        out.voices.push(r.读取字符串());
+        break;
+      case 4:
+        out.speed = r.读取浮点();
+        break;
+      case 5:
+        out.otherArgs.push(r.读取字符串());
+        break;
       default:
-        // 3=voices(repeated string), 4=speed(float), 5=other_fields(map) — 本端不使用
         r.跳过字段(tag.线类型);
     }
   }
@@ -143,16 +193,23 @@ function decodeTtsTag(bytes: Uint8Array): TtsItem {
 
 export function decodeExtractAvTagsResponse(bytes: Uint8Array): AvTagsResult {
   const r = new 协议读取器(bytes);
-  const out: AvTagsResult = { text: '', soundFiles: [], ttsItems: [] };
+  const items: AvItem[] = [];
+  const out: AvTagsResult = { text: '', soundFiles: [], ttsItems: [], items: items };
   let tag;
   while ((tag = r.读取标签()) !== null) {
     switch (tag.字段号) {
       case 1:
         out.text = r.读取字符串();
         break;
-      case 2:
-        decodeAvTag(r.读取字节(), out.soundFiles, out.ttsItems);
+      case 2: {
+        const item: AvItem | null = decodeAvTag(r.读取字节());
+        if (item !== null) {
+          items.push(item);
+          if (item.soundFile !== null) out.soundFiles.push(item.soundFile);
+          else if (item.tts !== null) out.ttsItems.push(item.tts);
+        }
         break;
+      }
       default:
         r.跳过字段(tag.线类型);
     }
@@ -179,6 +236,9 @@ export interface RenderedCard {
   css: string;
   latexSvg: boolean;
   isEmpty: boolean;
+  /** Service 对完整卡面调用 Core EncodeIriPaths；原节点仍供拼写标记和音频提取。 */
+  questionHtml?: string;
+  answerHtml?: string;
 }
 
 function decodeReplacement(bytes: Uint8Array): TemplateReplacement {

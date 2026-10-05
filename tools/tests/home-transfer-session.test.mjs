@@ -2,10 +2,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DataTransferSession } from '../../entry/src/main/ets/model/home/DataTransferSession.ts';
+import { DEFAULT_IMPORT_ANKI_PACKAGE_OPTIONS } from '../../entry/src/main/ets/proto/messages/ImportExportMessages.ts';
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
 function harness(){
   const events=[],states=[];
-  const backend={pickDeck:async()=>null,pickCollection:async()=>null,
+  const backend={importPackagePresets:async()=>({...DEFAULT_IMPORT_ANKI_PACKAGE_OPTIONS}),pickDeck:async()=>null,pickCollection:async()=>null,
     importDeck:async(uri,progress)=>{events.push(['import',uri]);progress(1);return null;},
     replaceCollection:async uri=>events.push(['replace',uri]),exportData:async()=>true,
     committed:()=>events.push('committed')};
@@ -14,7 +15,7 @@ function harness(){
 }
 test('transfer reserves file selection and suppresses duplicate pickers and close',async()=>{
   const h=harness(),picker=deferred();let picks=0;h.backend.pickDeck=()=>{picks++;return picker.promise;};
-  h.session.open('importDeck',0,false);const work=h.session.execute({kind:'importDeck'});
+  await h.session.open('importDeck',0,false);const work=h.session.execute({kind:'importDeck'});
   h.session.close();await h.session.execute({kind:'importDeck'});assert.equal(picks,1);
   assert.equal(h.states.at(-1).visible,true);assert.equal(h.states.at(-1).phase,'picking');
   picker.resolve(null);await work;assert.equal(h.states.at(-1).phase,'idle');assert.deepEqual(h.events,[]);

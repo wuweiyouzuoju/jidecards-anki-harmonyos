@@ -3,6 +3,7 @@
 export type ThemeId = 'aurora' | 'forest' | 'midnight' | 'lagoon' | 'sunset' | 'lemon' | 'minimal_gray' | 'iridescent';
 export const THEME_VISUALS_KEY: string = 'themeVisuals';
 export const THEME_TEXT_COLORS_KEY: string = 'themeTextColors';
+export const THEME_MOTION_KEY: string = 'themeMotion';
 export const PAGE_SURFACE_KEY: string = 'themePageSurface';
 export const UNLOCKED_CONTENTS_KEY: string = 'unlockedContentIds';
 export const GLASS_COLORS_KEY: string = 'glassSurfaceColors';

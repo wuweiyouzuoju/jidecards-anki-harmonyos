@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { settingsItemText } from '../../utils/SettingsStructureText';
 import { OFFICIAL_QQ_GROUP } from '../../model/OfficialCommunity';
-import { PressFeedback } from '../../utils/PressFeedback';
 import { common } from '@kit.AbilityKit';
 import { pasteboard } from '@kit.BasicServicesKit';
 import { 链接服务 } from '../../backend/链接服务';
@@ -11,12 +10,14 @@ import { showToastSafely } from '../../utils/UiFeedback';
 import { 打开应用内好评 } from '../../utils/好评引导';
 import { 颜色键 } from '../../model/颜色主题';
 import { AboutActionDialog } from './AboutActionDialog';
-import { DisclosureChevron } from '../common/DisclosureChevron';
+import { SettingsActionRow } from '../common/SettingsActionRow';
+import { settingsIcon } from '../../utils/SettingsIcons';
 import { ThemeTextSpans } from '../common/ThemeText';
 
 /** 关于分组独占外链和反馈交互；主壳只负责目录与许可证导航。 */
 @Component
 export struct AboutSettings {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop 是否深色: boolean = false;
   @StorageLink(颜色键.动作主色) private 动作主色链接: string = '';
   打开许可证回调: () => void = (): void => {};
@@ -127,171 +128,50 @@ export struct AboutSettings {
     打开应用内好评(context, this.本应用包名);
   }
 
+  @Builder
+  private communityHint(): void {
+    Flex({ wrap: FlexWrap.Wrap, alignItems: ItemAlign.Center }) {
+      Text($r('app.string.about_qq_group_summary')).fontSize(12).fontColor($r('app.color.text_secondary'))
+      Text($r('app.string.about_qq_group_number_label')).fontSize(12).fontColor($r('app.color.text_secondary'))
+      Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(this.QQ群号, [], this.getUIContext()) }, (_locale: string): string => _locale) }
+        .fontSize(12).fontColor(this.解析主色()).fontWeight(FontWeight.Medium)
+        .copyOption(CopyOptions.LocalDevice)
+    }.width('100%')
+  }
+
   build() {
     Column() {
       Column({ space: 9 }) {
-        Text(settingsItemText(this.getUIContext(), 'app_information'))
-          .fontSize(18)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(设置面板色板_取(this.是否深色).主文字)
-          .width('100%')
-        Text($r('app.string.app_about_copyright'))
-          .fontSize(12)
-          .fontColor(设置面板色板_取(this.是否深色).三级文字)
-          .width('100%')
-      }
-      .width('100%')
-      .alignItems(HorizontalAlign.Start)
-      .padding({ bottom: 12 })
-
+        Text(settingsItemText(this.getUIContext(), 'app_information', this.uiLanguage))
+          .fontSize(18).fontWeight(FontWeight.Bold)
+          .fontColor(设置面板色板_取(this.是否深色).主文字).width('100%')
+        Text($r('app.string.app_about_copyright')).fontSize(12)
+          .fontColor(设置面板色板_取(this.是否深色).三级文字).width('100%')
+      }.width('100%').alignItems(HorizontalAlign.Start).padding({ bottom: 12 })
       Divider().color(设置面板色板_取(this.是否深色).分隔线).strokeWidth(1)
-
-      Row() {
-        Text(settingsItemText(this.getUIContext(), 'feedback'))
-          .fontSize(15)
-          .fontColor(设置面板色板_取(this.是否深色).主文字)
-        Blank()
-        DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
-      }
-      .width('100%')
-      .height(48)
-      .attributeModifier(new PressFeedback()).onClick((): void => { this.feedbackDialog.open(); })
-
+      SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'feedback', this.uiLanguage), icon: settingsIcon('feedback'),
+        onAction: (): void => { this.feedbackDialog.open(); } })
       Divider().color(设置面板色板_取(this.是否深色).分隔线).strokeWidth(1)
-
-      // 复用公共好评入口及市场降级。
-      Row() {
-        Column({ space: 2 }) {
-          Text(settingsItemText(this.getUIContext(), 'rate'))
-            .fontSize(15)
-            .fontColor(设置面板色板_取(this.是否深色).主文字)
-          Text($r('app.string.about_rate_summary'))
-            .fontSize(12)
-            .fontColor(设置面板色板_取(this.是否深色).弱化文字)
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-        }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
-        Blank()
-        DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
-      }
-      .width('100%')
-      .height(58)
-      .attributeModifier(new PressFeedback()).onClick(() => {
-        this.打开好评弹窗();
-      })
-
+      SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'rate', this.uiLanguage),
+        hint: $r('app.string.about_rate_summary'), icon: settingsIcon('rate'),
+        onAction: (): void => { this.打开好评弹窗(); } })
       Divider().color(设置面板色板_取(this.是否深色).分隔线).strokeWidth(1)
-
-      // AnkiWeb 资源入口行：点击用系统浏览器打开 AnkiWeb 共享牌组页面
-      Row() {
-        Column({ space: 2 }) {
-          Text(settingsItemText(this.getUIContext(), 'ankiweb'))
-            .fontSize(15)
-            .fontColor(设置面板色板_取(this.是否深色).主文字)
-          Text(this.AnkiWeb网址)
-            .fontSize(12)
-            .fontColor(设置面板色板_取(this.是否深色).弱化文字)
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-        }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
-        Blank()
-        DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
-      }
-      .width('100%')
-      .height(58)
-      .attributeModifier(new PressFeedback()).onClick(() => {
-        this.打开AnkiWeb网址();
-      })
-
+      SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'ankiweb', this.uiLanguage),
+        hint: this.AnkiWeb网址, icon: settingsIcon('ankiweb'),
+        onAction: (): void => { this.打开AnkiWeb网址(); } })
       Divider().color(设置面板色板_取(this.是否深色).分隔线).strokeWidth(1)
-
-      // QQ 群入口行：点击复制群号到剪贴板（不跳转 QQ 应用，避免未装 QQ 时降级链路复杂）
-      Row() {
-        Column({ space: 2 }) {
-          Text(settingsItemText(this.getUIContext(), 'community'))
-            .fontSize(15)
-            .fontColor(设置面板色板_取(this.是否深色).主文字)
-          Row({ space: 4 }) {
-            Text($r('app.string.about_qq_group_summary'))
-              .fontSize(12)
-              .fontColor(设置面板色板_取(this.是否深色).弱化文字)
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-            Text($r('app.string.about_qq_group_number_label'))
-              .fontSize(12)
-              .fontColor(设置面板色板_取(this.是否深色).弱化文字)
-            Text() { ThemeTextSpans(this.QQ群号, [], this.getUIContext()) }
-              .fontSize(12)
-              .fontColor(this.解析主色())
-              .fontWeight(FontWeight.Medium)
-              .copyOption(CopyOptions.LocalDevice)
-          }
-          .width('100%')
-        }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
-        Blank()
-        DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
-      }
-      .width('100%')
-      .height(58)
-      .attributeModifier(new PressFeedback()).onClick(() => {
-        this.复制QQ群号到剪贴板();
-      })
-
+      SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'community', this.uiLanguage),
+        hint: $r('app.string.about_qq_group_summary'), icon: settingsIcon('community'),
+        hintContent: (): void => { this.communityHint(); },
+        onAction: (): void => { this.复制QQ群号到剪贴板(); } })
       Divider().color(设置面板色板_取(this.是否深色).分隔线).strokeWidth(1)
-
-      // 许可证入口行
-      Row() {
-        Column({ space: 2 }) {
-          Text(settingsItemText(this.getUIContext(), 'licenses'))
-            .fontSize(15)
-            .fontColor(设置面板色板_取(this.是否深色).主文字)
-          Text($r('app.string.licenses_summary'))
-            .fontSize(12)
-            .fontColor(设置面板色板_取(this.是否深色).弱化文字)
-        }
-        .alignItems(HorizontalAlign.Start)
-        Blank()
-        DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
-      }
-      .width('100%')
-      .height(58)
-      .attributeModifier(new PressFeedback()).onClick(() => {
-        this.打开许可证回调();
-      })
-
+      SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'licenses', this.uiLanguage),
+        hint: $r('app.string.licenses_summary'), icon: settingsIcon('licenses'),
+        onAction: (): void => { this.打开许可证回调(); } })
       Divider().color(设置面板色板_取(this.是否深色).分隔线).strokeWidth(1)
-
-      // Anki 官方文档入口行（设置页底部）：点击用系统浏览器打开 docs.ankiweb.net
-      // 优先调后端 LinksService.HelpPageLink 取 URL（按 locale 选站点），失败兜底本地常量
-      Row() {
-        Column({ space: 2 }) {
-          Text(settingsItemText(this.getUIContext(), 'anki_documentation'))
-            .fontSize(15)
-            .fontColor(设置面板色板_取(this.是否深色).主文字)
-          Text(this.Anki文档网址)
-            .fontSize(12)
-            .fontColor(设置面板色板_取(this.是否深色).弱化文字)
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-        }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
-        Blank()
-        DisclosureChevron({ tint: 设置面板色板_取(this.是否深色).弱化文字 })
-      }
-      .width('100%')
-      .height(58)
-      .attributeModifier(new PressFeedback()).onClick(() => {
-        this.打开Anki官方文档();
-      })
-    }
-    .width('100%')
+      SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'anki_documentation', this.uiLanguage),
+        hint: this.Anki文档网址, icon: settingsIcon('anki_documentation'),
+        onAction: (): void => { this.打开Anki官方文档(); } })
+    }.width('100%')
   }
-
 }

@@ -38,12 +38,16 @@ export class ReviewPreferencesStore {
     return this.enqueue(async (): Promise<ReviewPreferences> => decodeReviewPreferences(await this.backend.read()));
   }
 
-  save(edits: ReviewPreferenceEdit[]): Promise<ReviewPreferences> {
+  save(edits: ReviewPreferenceEdit[], expected?: ReviewPreferences): Promise<ReviewPreferences> {
+    const baseline: string | undefined = expected === undefined ? undefined : JSON.stringify(expected);
     const snapshot: ReviewPreferenceEdit[] = edits.map((edit: ReviewPreferenceEdit): ReviewPreferenceEdit =>
       ({ field: edit.field, value: edit.value }));
     for (const edit of snapshot) validatePreferenceEdit(edit);
     return this.enqueue(async (): Promise<ReviewPreferences> => {
       const latest: Uint8Array = await this.backend.read();
+      if (baseline !== undefined && JSON.stringify(decodeReviewPreferences(latest)) !== baseline) {
+        throw new Error('preferences_changed_since_proposal');
+      }
       if (snapshot.length === 0) return decodeReviewPreferences(latest);
       await this.backend.write(patchReviewPreferences(latest, snapshot));
       this.backend.changed();

@@ -2,7 +2,7 @@
 //! Application-owned media RPC; upstream service 41 and its wire format stay unchanged.
 //! A backend owns one snapshot. Closing/rechecking invalidates its token. Only bounded
 //! pages cross FFI; Core's scan and complete native response still cost O(collection).
-use crate::rpc_ids::{CHECK_MEDIA, MEDIA_SERVICE, TRASH_MEDIA_FILES};
+use crate::rpc_ids::{ADD_NOTE_TAGS, CHECK_MEDIA, MEDIA_SERVICE, TAGS_SERVICE, TRASH_MEDIA_FILES};
 use crate::{BackendFailure, RawBackend};
 use prost::Message;
 use std::collections::HashSet;
@@ -17,6 +17,8 @@ struct CheckResponse {
     unused: Vec<String>,
     #[prost(string, repeated, tag = "2")]
     missing: Vec<String>,
+    #[prost(int64, repeated, tag = "3")]
+    missing_media_notes: Vec<i64>,
     #[prost(string, tag = "4")]
     report: String,
     #[prost(bool, tag = "5")]
@@ -47,6 +49,26 @@ struct Page {
     next_offset: u32,
     #[prost(string, repeated, tag = "7")]
     files: Vec<String>,
+    #[prost(int64, repeated, tag = "8")]
+    note_ids: Vec<i64>,
+    #[prost(uint32, tag = "9")]
+    missing_note_count: u32,
+    #[prost(uint32, tag = "10")]
+    tagged_count: u32,
+}
+
+#[derive(Clone, PartialEq, Message)]
+struct NoteTags {
+    #[prost(int64, repeated, tag = "1")]
+    ids: Vec<i64>,
+    #[prost(string, tag = "2")]
+    tags: String,
+}
+
+#[derive(Clone, PartialEq, Message)]
+struct ChangesWithCount {
+    #[prost(uint32, tag = "2")]
+    count: u32,
 }
 
 #[derive(Clone, PartialEq, Message)]
@@ -96,6 +118,8 @@ impl MediaSnapshot {
             let mut response = Self::check(raw)?;
             self.missing_count = response.missing.len() as u32;
             response.missing = Vec::new();
+            response.missing_media_notes.sort_unstable();
+            response.missing_media_notes.dedup();
             self.response = Some(response);
             return self.report_page(0);
         }
@@ -156,6 +180,64 @@ impl MediaSnapshot {
                 self.clear();
                 Ok(Vec::new())
             }
+            5 => {
+                let ids = &self.response.as_ref().unwrap().missing_media_notes;
+                let offset = request.offset as usize;
+                if offset > ids.len() {
+                    return Err(invalid("Invalid missing note offset"));
+                }
+                let end = (offset + FILES_PER_BATCH).min(ids.len());
+                Ok(Page {
+                    token: self.token,
+                    note_ids: ids[offset..end].to_vec(),
+                    next_offset: if end < ids.len() { end as u32 } else { 0 },
+                    missing_note_count: ids.len() as u32,
+                    ..Page::default()
+                }
+                .encode_to_vec())
+            }
+            6 => {
+                // Recheck and write under one registry lock. Newly missing notes were not confirmed.
+                let current = Self::check(raw)?;
+                let confirmed: HashSet<i64> = self
+                    .response
+                    .as_ref()
+                    .unwrap()
+                    .missing_media_notes
+                    .iter()
+                    .copied()
+                    .collect();
+                let mut ids: Vec<i64> = current
+                    .missing_media_notes
+                    .into_iter()
+                    .filter(|id| confirmed.contains(id))
+                    .collect();
+                ids.sort_unstable();
+                ids.dedup();
+                self.clear();
+                let count = if ids.is_empty() {
+                    0
+                } else {
+                    // One Core transaction and one undo step; IDs never cross FFI as an unbounded list.
+                    let bytes = raw.run_method_raw(
+                        TAGS_SERVICE,
+                        ADD_NOTE_TAGS,
+                        &NoteTags {
+                            ids,
+                            tags: "missing-media".into(),
+                        }
+                        .encode_to_vec(),
+                    )?;
+                    ChangesWithCount::decode(bytes.as_slice())
+                        .map_err(|_| invalid("Invalid tag response"))?
+                        .count
+                };
+                Ok(Page {
+                    tagged_count: count,
+                    ..Page::default()
+                }
+                .encode_to_vec())
+            }
             _ => Err(invalid("Unknown media snapshot method")),
         }
     }
@@ -190,6 +272,8 @@ impl MediaSnapshot {
                 0
             },
             files: Vec::new(),
+            missing_note_count: response.missing_media_notes.len() as u32,
+            ..Page::default()
         }
         .encode_to_vec())
     }
@@ -220,6 +304,19 @@ mod tests {
             .as_nanos();
         let folder = temp.join(format!("jidecards-media-test-{unique}"));
         std::fs::create_dir(&folder).unwrap();
+        let note_id = {
+            let mut col = anki::collection::CollectionBuilder::default()
+                .set_collection_path(folder.join("collection.anki2"))
+                .with_desktop_media_paths()
+                .build()
+                .unwrap();
+            let nt = col.get_notetype_by_name("Basic").unwrap().unwrap();
+            let mut note = nt.new_note();
+            note.set_field(0, "<img src=\"missing-test.png\">").unwrap();
+            note.tags = vec!["existing".into()];
+            col.add_note(&mut note, anki::decks::DeckId(1)).unwrap();
+            note.id
+        };
         let registry = BackendRegistry::new();
         let handle = registry.insert(AnkiBackend(anki::backend::init_backend(&[]).unwrap()));
         let media = folder.join("collection.media");
@@ -254,8 +351,45 @@ mod tests {
         // The unmodified Core endpoint still uses its original response schema.
         let bytes = registry.call(handle, 41, 0, &[]).unwrap();
         assert!(CheckResponse::decode(bytes.as_slice()).unwrap().have_trash);
+        assert_eq!(page.missing_note_count, 1);
+        let request = Request {
+            token: page.token,
+            offset: 0,
+        }
+        .encode_to_vec();
+        let bytes = registry.call(handle, SERVICE, 5, &request).unwrap();
+        assert_eq!(
+            Page::decode(bytes.as_slice()).unwrap().note_ids,
+            vec![note_id.0]
+        );
+        let bytes = registry.call(handle, SERVICE, 6, &request).unwrap();
+        assert_eq!(Page::decode(bytes.as_slice()).unwrap().tagged_count, 1);
+        assert!(registry.call(handle, SERVICE, 6, &request).is_err());
+        use crate::rpc_ids::{COLLECTION_SERVICE, GET_UNDO_STATUS};
+        let status = registry
+            .call(handle, COLLECTION_SERVICE, GET_UNDO_STATUS, &[])
+            .unwrap();
+        registry
+            .call(handle, crate::collection_history::SERVICE, 0, &status)
+            .unwrap();
+        let status = registry
+            .call(handle, COLLECTION_SERVICE, GET_UNDO_STATUS, &[])
+            .unwrap();
+        registry
+            .call(handle, crate::collection_history::SERVICE, 1, &status)
+            .unwrap();
         registry.call(handle, 3, 1, &[]).unwrap();
         registry.close(handle);
+        {
+            let col = anki::collection::CollectionBuilder::default()
+                .set_collection_path(folder.join("collection.anki2"))
+                .with_desktop_media_paths()
+                .build()
+                .unwrap();
+            let note = col.storage.get_note(note_id).unwrap().unwrap();
+            assert!(note.tags.contains(&"existing".into()));
+            assert!(note.tags.contains(&"missing-media".into()));
+        }
         let resolved = folder.canonicalize().unwrap();
         assert!(resolved.starts_with(&temp) && resolved != temp);
         std::fs::remove_dir_all(resolved).unwrap();
@@ -264,6 +398,7 @@ mod tests {
         response: CheckResponse,
         batches: Vec<usize>,
         fail: bool,
+        tagged: Vec<i64>,
     }
     impl RawBackend for Core {
         fn run_method_raw(
@@ -272,6 +407,16 @@ mod tests {
             method: u32,
             input: &[u8],
         ) -> Result<Vec<u8>, BackendFailure> {
+            if service == TAGS_SERVICE {
+                assert_eq!(method, ADD_NOTE_TAGS);
+                let tags = NoteTags::decode(input).unwrap();
+                assert_eq!(tags.tags, "missing-media");
+                self.tagged = tags.ids;
+                return Ok(ChangesWithCount {
+                    count: self.tagged.len() as u32,
+                }
+                .encode_to_vec());
+            }
             assert_eq!(service, 41);
             if method == 0 {
                 return Ok(self.response.encode_to_vec());
@@ -289,11 +434,13 @@ mod tests {
             response: CheckResponse {
                 unused: (0..100_000).map(|n| format!("{n}.png")).collect(),
                 missing: vec!["missing.png".into()],
+                missing_media_notes: vec![],
                 report: "媒体😀\n".repeat(100_000),
                 have_trash: true,
             },
             batches: vec![],
             fail: false,
+            tagged: vec![],
         }
     }
     #[test]
@@ -361,5 +508,26 @@ mod tests {
         .encode_to_vec();
         assert!(snapshot.call(&mut core, 3, &request).is_err());
         assert!(snapshot.response.is_none());
+    }
+    #[test]
+    fn missing_notes_are_paged_deduplicated_and_tagging_revalidates_only_confirmed_notes() {
+        let mut core = core();
+        core.response.missing_media_notes = (1..=600).chain([1, 2]).collect();
+        let mut snapshot = MediaSnapshot::default();
+        snapshot.call(&mut core, 0, &[]).unwrap();
+        let request = Request {
+            token: snapshot.token,
+            offset: 0,
+        }
+        .encode_to_vec();
+        let page = Page::decode(snapshot.call(&mut core, 5, &request).unwrap().as_slice()).unwrap();
+        assert_eq!(page.note_ids.len(), 256);
+        assert_eq!(page.missing_note_count, 600);
+        assert_eq!(page.next_offset, 256);
+        core.response.missing_media_notes = vec![2, 2, 700];
+        let page = Page::decode(snapshot.call(&mut core, 6, &request).unwrap().as_slice()).unwrap();
+        assert_eq!(page.tagged_count, 1);
+        assert_eq!(core.tagged, vec![2]);
+        assert!(snapshot.call(&mut core, 5, &request).is_err());
     }
 }

@@ -6,6 +6,7 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
+mod collection_history;
 pub mod deck_preview;
 mod media_snapshot;
 pub mod note_duplicates;
@@ -100,6 +101,9 @@ impl BackendState {
     ) -> Result<Vec<u8>, BackendFailure> {
         if service == media_snapshot::SERVICE {
             return self.media.call(self.raw.as_mut(), method, input);
+        }
+        if service == collection_history::SERVICE {
+            return collection_history::call(self.raw.as_mut(), method, input);
         }
         if service == COLLECTION_SERVICE
             && (method == OPEN_COLLECTION || method == CLOSE_COLLECTION)
@@ -282,6 +286,14 @@ unsafe fn call_with_registry(
 #[cfg(feature = "anki-core")]
 struct AnkiBackend(anki::backend::Backend);
 
+/// Shared by production FFI and real HTTP interoperability tests.
+#[cfg(feature = "anki-core")]
+pub fn init_anki_backend(init: &[u8]) -> Result<anki::backend::Backend, String> {
+    let backend = anki::backend::init_backend(init)?;
+    backend.set_marking_sync_priority(true);
+    Ok(backend)
+}
+
 #[cfg(feature = "anki-core")]
 impl RawBackend for AnkiBackend {
     fn progress_control(&self) -> Option<ProgressControl> {
@@ -351,7 +363,7 @@ pub unsafe extern "C" fn anki_backend_open(
 
     #[cfg(feature = "anki-core")]
     {
-        return match catch_unwind(AssertUnwindSafe(|| anki::backend::init_backend(init))) {
+        return match catch_unwind(AssertUnwindSafe(|| init_anki_backend(init))) {
             Ok(Ok(backend)) => {
                 let registered = catch_unwind(AssertUnwindSafe(|| {
                     global_backends().insert(AnkiBackend(backend))

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { PressFeedback } from '../utils/PressFeedback';
 import { DialogBackdrop } from './common/DialogBackdrop';
 import { ThemeTextSpans } from './common/ThemeText';
@@ -50,6 +51,7 @@ import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时
 
 @Component
 export struct AnkiWeb引导对话框 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   isDark: boolean = false;
   @StorageProp(颜色键.主色按钮背景) private 主色按钮背景: string = '#2F5FD0';
@@ -112,7 +114,7 @@ export struct AnkiWeb引导对话框 {
           .margin({ top: 应用尺寸.间距_4 })
 
         // 网址：可长按选中复制（Text.copyOption）
-        Text() { ThemeTextSpans(this.网址, this.themeAccentColors, this.getUIContext()) }
+        Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(this.网址, this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }
           .fontSize(应用尺寸.字号_正文_小)
           .fontColor($r('app.color.action_primary'))
           .width('100%')
@@ -126,7 +128,7 @@ export struct AnkiWeb引导对话框 {
 
         Row({ space: 应用尺寸.间距_12 }) {
           Button() {
-            Text() { ThemeTextSpans($r('app.string.ankiweb_guide_button_open'), this.themeAccentColors, this.getUIContext()) }.fontSize(应用尺寸.字号_正文).fontColor($r('app.color.action_primary'))
+            Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans($r('app.string.ankiweb_guide_button_open'), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }.fontSize(应用尺寸.字号_正文).fontColor($r('app.color.action_primary'))
           }
             .type(ButtonType.Normal)
             .layoutWeight(1)
@@ -148,7 +150,7 @@ export struct AnkiWeb引导对话框 {
       .padding(应用尺寸.间距_16)
       .backgroundColor($r('app.color.surface_card'))
       .borderRadius(应用尺寸.圆角_卡片)
-      .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+      .border(SurfaceBorder.options())
       .transition(TransitionEffect.asymmetric(
         TransitionEffect.opacity(0).combine(TransitionEffect.scale({ x: 0.96, y: 0.96 }))
           .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }),

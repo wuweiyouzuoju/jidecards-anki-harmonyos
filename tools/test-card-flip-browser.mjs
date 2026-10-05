@@ -16,7 +16,7 @@ try {
   for (const preview of [false, true]) for (const dark of [false, true]) {
     const context = await browser.newContext();
     const page = await context.newPage();
-    const errors = [], failures = [], actions = [], pending = [];
+    const errors = [], failures = [], actions = [], pending = [], backgrounds = [];
     let document = '', shown = 0, navigations = 0;
     await context.route('**/*', async route => {
       const url = route.request().url();
@@ -44,9 +44,9 @@ try {
         navigations++;
       },
       evaluate: script => page.evaluate(script),
-      shown: () => shown++, failed: message => failures.push(message)
+      shown: background => { shown++; backgrounds.push(background); }, failed: message => failures.push(message)
     });
-    await page.exposeFunction('nativeRendered', (id, revision, error) => session.rendered(id, revision, error));
+    await page.exposeFunction('nativeRendered', (id, revision, error, background) => session.rendered(id, revision, error, background));
     await page.exposeFunction('nativeAction', (action, version) => actions.push({ action, version }));
     await page.addInitScript(() => {
       window.jideCardRuntime = { onRendered: (...args) => window.nativeRendered(...args) };
@@ -99,6 +99,7 @@ try {
     await assertAlignment('answer');
     assert.equal(await page.locator('#score').textContent(), '2/3');
     assert.deepEqual(await page.evaluate(() => savedAnswers), [true, false, true]);
+    assert.deepEqual(backgrounds, ['#ffffff', '#ffffff'], 'explicit template colors override either app theme');
     assert.deepEqual(await page.evaluate(() => [questionRuns, answerRuns, styleRuns, dependencyRead, updateRan, shownRan]),
       [1, 1, 2, 7, true, true]);
     assert.equal(await page.locator('.anki-collapsible-toggle').count(), 1);
@@ -124,10 +125,26 @@ try {
     session.show(html('answer', 6), 2, 'answer'); await waitShown(6);
     await assertAlignment('answer');
     assert.equal(await page.locator('#score').textContent(), '1/1');
+    // A dark deck in either app theme must publish its actual CSS surface across full document loads.
+    for (const [index, css, expected] of [
+      [0, '.card {background:#101820;color:white}', '#101820'],
+      [1, 'html {background:#101820} .card {background:transparent;color:white}', '#101820'],
+      [2, 'html {background:#000000} .card {background:rgba(32,48,64,.5);color:white}', '#101820']
+    ]) {
+      card.css = css;
+      session.reset(); session.show(html('question', 7 + index * 2), 3 + index, 'question');
+      await waitShown(7 + index * 2);
+      assert.equal(backgrounds.at(-1), expected);
+      await page.locator('#one').click();
+      session.show(html('answer', 8 + index * 2), 3 + index, 'answer');
+      await waitShown(8 + index * 2);
+      assert.equal(backgrounds.at(-1), expected);
+      assert.equal(await page.locator('#score').textContent(), '1/1', 'card globals remain isolated');
+    }
     assert.deepEqual(errors, []);
     await Promise.all(pending);
     passed++;
     await context.close();
   }
-  console.log(JSON.stringify({ passed, scenarios: 'study/preview × light/dark; full/partial answers, repeated flips, next card, scripts, storage, math, collapsible fields, gestures' }));
+  console.log(JSON.stringify({ passed, scenarios: 'study/preview × light/dark; dark/transparent/translucent deck backgrounds, full/partial answers, repeated flips, next card, scripts, storage, math, collapsible fields, gestures' }));
 } finally { await browser.close(); }

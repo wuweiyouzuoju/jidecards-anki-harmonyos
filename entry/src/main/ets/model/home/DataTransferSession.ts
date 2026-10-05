@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { 数据迁移意图, 数据迁移模式 } from '../DataTransferIntent';
 import type { ImportSummary, ImportAnkiPackageOptions } from '../../proto/messages/ImportExportMessages';
+import { copyImportAnkiPackageOptions } from '../../proto/messages/ImportExportMessages';
 import type { CsvMetadata } from '../../proto/messages/CsvImportMessages';
 import { validateCsvMapping } from '../CsvImport';
 import type { CsvImportPreview } from '../CsvImport';
@@ -10,6 +11,7 @@ import { importFileKind, importFileName } from '../ImportFile';
 import type { ImportFile } from '../ImportFile';
 
 export interface DataTransferBackend {
+  importPackagePresets(): Promise<ImportAnkiPackageOptions>;
   pickImportFile(): Promise<ImportFile | null>;
   pickDeck(): Promise<string | null>;
   pickCollection(): Promise<string | null>;
@@ -28,7 +30,7 @@ export interface DataTransferState {
   mode: 数据迁移模式;
   deckId: number;
   allowDeckSelection: boolean;
-  phase: 'idle' | 'picking' | 'running' | 'refreshing';
+  phase: 'idle' | 'picking' | 'loadingOptions' | 'running' | 'refreshing';
   stage: number;
   replacementStep: number;
   error: string;
@@ -39,11 +41,13 @@ export interface DataTransferState {
   cancelled: boolean;
   externalInput: boolean;
   fileName: string;
+  importOptions: ImportAnkiPackageOptions | null;
 }
 export function initialTransferState(): DataTransferState {
   return { visible: false, mode: 'exportDeck', deckId: 0, allowDeckSelection: false,
     phase: 'idle', stage: -1, replacementStep: 0, error: '', result: null, csv: null,
-    progress: { text: '', processed: 0, total: 0, cancellable: false }, cancelRequested: false, cancelled: false, externalInput: false, fileName: '' };
+    progress: { text: '', processed: 0, total: 0, cancellable: false }, cancelRequested: false, cancelled: false,
+    externalInput: false, fileName: '', importOptions: null };
 }
 
 /** 文件选择、二次确认和已接受操作共用一个拥有者，避免页面各自维护忙碌布尔量。 */
@@ -63,12 +67,24 @@ export class DataTransferSession {
     refresh: () => Promise<void>, success: () => void) {
     this.backend = backend; this.publish = publish; this.refresh = refresh; this.success = success;
   }
-  open(mode: 数据迁移模式, deckId: number, allowDeckSelection: boolean): void {
+  async open(mode: 数据迁移模式, deckId: number, allowDeckSelection: boolean, loadPresets: boolean = true): Promise<void> {
     if (!this.alive || this.state.phase !== 'idle' || this.finishExternal !== null) return;
     this.selectedUri = ''; this.state.fileName = '';
     this.state.mode = mode; this.state.deckId = deckId; this.state.allowDeckSelection = allowDeckSelection;
     this.state.result = null; this.state.cancelled = false;
+    this.state.importOptions = null;
     this.state.visible = true; this.state.error = ''; this.state.replacementStep = 0; this.emit();
+    if (mode === 'importDeck' && loadPresets) {
+      this.state.phase = 'loadingOptions'; this.emit();
+      try { await this.readImportOptions(); }
+      catch (error) { this.fail(error instanceof Error ? error.message : String(error)); }
+      finally { this.state.phase = 'idle'; this.emit(); }
+    }
+  }
+
+  private async readImportOptions(): Promise<void> {
+    const options = await this.backend.importPackagePresets();
+    if (this.alive) this.state.importOptions = copyImportAnkiPackageOptions(options);
   }
 
   /** 先选文件再展示该格式的配置；选择阶段即占用会话，迟到结果不能启动导入。 */
@@ -85,7 +101,11 @@ export class DataTransferSession {
       const kind = importFileKind(file.name);
       if (kind === 'unsupported') { this.fail('transfer_file_unsupported'); return; }
       this.state.fileName = file.name; this.state.mode = kind;
-      if (kind === 'importDeck') this.selectedUri = file.uri;
+      if (kind === 'importDeck') {
+        this.state.phase = 'loadingOptions'; this.emit();
+        await this.readImportOptions();
+        if (this.alive) this.selectedUri = file.uri;
+      }
       else await this.prepareCsv(file.uri);
     } catch (error) { this.fail(error instanceof Error ? error.message : String(error)); }
     finally { this.state.phase = 'idle'; this.emit(); }
@@ -104,7 +124,7 @@ export class DataTransferSession {
   dispose(): void {
     this.alive = false;
     if (this.state.phase === 'idle' && this.state.csv !== null) void this.backend.discardCsv();
-    if (this.state.phase === 'idle') this.releaseExternal();
+    if (this.state.phase === 'idle' || this.state.phase === 'picking' || this.state.phase === 'loadingOptions') this.releaseExternal();
   }
 
   private releaseExternal(): void {
@@ -155,6 +175,7 @@ export class DataTransferSession {
   async execute(intent: 数据迁移意图): Promise<void> {
     if (!this.alive || this.state.phase !== 'idle') return;
     if (this.state.result !== null) return;
+    if (intent.kind === 'importDeck' && this.state.importOptions === null) return;
     if (intent.kind === 'chooseImportFile') { await this.startImport(); return; }
     if (this.externalUri !== '') {
       if (intent.kind === 'importDeck') {
@@ -189,11 +210,12 @@ export class DataTransferSession {
 
   async importUri(uri: string, confirmOptions: boolean = false): Promise<void> {
     if (!this.alive || this.state.phase !== 'idle' || this.finishExternal !== null) return;
-    this.open('importDeck', 0, false);
+    const ready = this.open('importDeck', 0, false, confirmOptions);
     if (confirmOptions) {
       this.externalUri = uri; this.state.externalInput = true; this.state.fileName = importFileName(uri);
       const completion = new Promise<void>((resolve: () => void): void => { this.finishExternal = resolve; });
       this.emit();
+      await ready;
       await completion;
       return;
     }
@@ -210,7 +232,8 @@ export class DataTransferSession {
     let committed: boolean = false;
     try {
       if (intent.kind === 'importDeck') {
-        this.state.result = await this.backend.importDeck(uri, progress, intent.options, operation); committed = true;
+        this.state.result = await this.backend.importDeck(uri, progress,
+          intent.options ?? this.state.importOptions ?? undefined, operation); committed = true;
       } else if (intent.kind === 'importText' && intent.metadata !== undefined) {
         this.state.stage = 1;
         this.state.result = await this.backend.importCsv(intent.metadata, operation); committed = true;
@@ -246,6 +269,6 @@ export class DataTransferSession {
     this.publish({ visible: s.visible, mode: s.mode, deckId: s.deckId, allowDeckSelection: s.allowDeckSelection,
       phase: s.phase, stage: s.stage, replacementStep: s.replacementStep, error: s.error,
       result: s.result, csv: s.csv, progress: s.progress, cancelRequested: s.cancelRequested, cancelled: s.cancelled,
-      externalInput: s.externalInput, fileName: s.fileName });
+      externalInput: s.externalInput, fileName: s.fileName, importOptions: s.importOptions });
   }
 }

@@ -1,7 +1,6 @@
+import { IconActionButton } from '../common/IconActionButton';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../../utils/PressFeedback';
-import { ThemeTextSpans } from '../common/ThemeText';
-import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
 // 日历卡：渲染 GraphsResponse.reviews.count 为年历热力图（对齐 Anki CalendarGraph）。
 // 52-53 列（周）× 7 行（星期）小方格；颜色 Blues 按当日复习数开方归一取色（浅色 t∈[0.2,1]），
@@ -49,7 +48,7 @@ function 取日期(距今天数: number): Date {
 
 @Component
 export struct 日历卡 {
-  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('重算格子') 复习计数: Map<number, ReviewKindCounts> | null = null;
   @Prop @Watch('重算格子') 周首日: Weekday = Weekday.SUNDAY;
   /** 星期标签点击回调：父组件负责写 GraphPreferences（Anki 点标签即存，autoSavingPrefs 行为） */
@@ -173,30 +172,20 @@ export struct 日历卡 {
     Column({ space: 应用尺寸.间距_8 }) {
       // 年份导航：◄ 2026 ►（居中）
       Row({ space: 应用尺寸.间距_12 }) {
-        Text() { ThemeTextSpans('◄', (this.目标年份 > this.取最小年份()) ? this.themeAccentColors : [], this.getUIContext()) }
-          .fontSize(应用尺寸.字号_正文_小)
-          .fontColor(this.目标年份 > this.取最小年份() ? this.主色 : $r('app.color.text_tertiary'))
-          .attributeModifier(new PressFeedback())
-          .onClick((): void => {
-            if (this.目标年份 > this.取最小年份()) {
-              this.目标年份 -= 1;
-              this.重算格子();
-            }
-          })
+        IconActionButton({ source: $r('app.media.ic_common_arrow_left'), label: $r('app.string.icon_year_previous'),
+          glyphColor: this.主色, isInteractive: this.目标年份 > this.取最小年份(),
+          onAction: (): void => {
+            if (this.目标年份 > this.取最小年份()) { this.目标年份 -= 1; this.重算格子(); }
+          } })
         Text(`${this.目标年份}`)
           .fontSize(应用尺寸.字号_正文)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.text_primary'))
-        Text() { ThemeTextSpans('►', (this.目标年份 < new Date().getFullYear()) ? this.themeAccentColors : [], this.getUIContext()) }
-          .fontSize(应用尺寸.字号_正文_小)
-          .fontColor(this.目标年份 < new Date().getFullYear() ? this.主色 : $r('app.color.text_tertiary'))
-          .attributeModifier(new PressFeedback())
-          .onClick((): void => {
-            if (this.目标年份 < new Date().getFullYear()) {
-              this.目标年份 += 1;
-              this.重算格子();
-            }
-          })
+        IconActionButton({ source: $r('app.media.ic_common_arrow_right'), label: $r('app.string.icon_year_next'),
+          glyphColor: this.主色, isInteractive: this.目标年份 < new Date().getFullYear(),
+          onAction: (): void => {
+            if (this.目标年份 < new Date().getFullYear()) { this.目标年份 += 1; this.重算格子(); }
+          } })
       }
       .width('100%')
       .justifyContent(FlexAlign.Center)

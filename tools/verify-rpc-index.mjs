@@ -139,7 +139,9 @@ async function main() {
   // 上游字段检查随协议门禁执行；可移植仓库测试不读取本机 Anki checkout。
   const configProto = readFileSync(path.join(ankiRoot, 'proto/anki/config.proto'), 'utf8');
   for (const field of ['uint32 rollover = 2;', 'uint32 learn_ahead_secs = 3;', 'bool show_remaining_due_counts = 3;',
-    'bool show_intervals_on_buttons = 4;', 'uint32 time_limit_secs = 5;']) {
+      'bool show_intervals_on_buttons = 4;', 'uint32 time_limit_secs = 5;', 'bool load_balancer_enabled = 6;',
+      'bool fsrs_short_term_with_steps_enabled = 7;', 'uint32 daily = 1;', 'uint32 weekly = 2;',
+      'uint32 monthly = 3;', 'uint32 minimum_interval_mins = 4;']) {
     if (!configProto.includes(field)) throw new Error(`Anki review preferences contract differs: ${field}`);
   }
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));

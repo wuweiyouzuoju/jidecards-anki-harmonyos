@@ -12,6 +12,9 @@ export interface MediaSnapshotPage {
   report: string;
   nextOffset: number;
   files: string[];
+  noteIds?: number[];
+  missingNoteCount?: number;
+  taggedCount?: number;
 }
 export function encodeMediaSnapshotRequest(token: number, offset: number = 0): Uint8Array {
   const writer = new 协议写入器();
@@ -22,7 +25,7 @@ export function encodeMediaSnapshotRequest(token: number, offset: number = 0): U
 export function decodeMediaSnapshotPage(bytes: Uint8Array): MediaSnapshotPage {
   const reader = new 协议读取器(bytes);
   const page: MediaSnapshotPage = { token: 0, unusedCount: 0, missingCount: 0,
-    haveTrash: false, report: '', nextOffset: 0, files: [] };
+    haveTrash: false, report: '', nextOffset: 0, files: [], noteIds: [], missingNoteCount: 0, taggedCount: 0 };
   let tag;
   while ((tag = reader.读取标签()) !== null) {
     switch (tag.字段号) {
@@ -33,6 +36,12 @@ export function decodeMediaSnapshotPage(bytes: Uint8Array): MediaSnapshotPage {
       case 5: page.report = reader.读取字符串(); break;
       case 6: page.nextOffset = reader.读取变长整数(); break;
       case 7: page.files.push(reader.读取字符串()); break;
+      case 8:
+        if (tag.线类型 === 2) page.noteIds = (page.noteIds ?? []).concat(reader.读取打包64位整数());
+        else (page.noteIds ?? []).push(reader.读取64位整数());
+        break;
+      case 9: page.missingNoteCount = reader.读取变长整数(); break;
+      case 10: page.taggedCount = reader.读取变长整数(); break;
       default: reader.跳过字段(tag.线类型);
     }
   }

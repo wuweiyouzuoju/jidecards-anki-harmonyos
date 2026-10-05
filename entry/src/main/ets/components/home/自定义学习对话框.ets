@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { FormInputStyle } from '../../utils/FormInputStyle';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { DialogBackdrop } from '../common/DialogBackdrop';
-import { resourceText, showToastSafely } from '../../utils/UiFeedback';
+import { showToastSafely, resourceText } from '../../utils/UiFeedback';
 import { ThemeTextSpans } from '../common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
@@ -31,6 +32,7 @@ interface 预设选项 {
 
 @Component
 export struct 自定义学习对话框 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
 
   private handleBackRequest(): void {
@@ -114,11 +116,11 @@ export struct 自定义学习对话框 {
 
   aboutToDisappear(): void { this.mounted = false; }
 
-  private 取本地化文本(资源: Resource): string {
+  private 取本地化文本(资源: Resource, _locale: string = this.uiLanguage): string {
     return resourceText(this.getUIContext(), 资源);
   }
 
-  private 取本地化带参文本(资源: Resource, 参数: Array<string | number>): string {
+  private 取本地化带参文本(资源: Resource, 参数: Array<string | number>, _locale: string = this.uiLanguage): string {
     return resourceText(this.getUIContext(), 资源, ...参数);
   }
 
@@ -241,7 +243,7 @@ export struct 自定义学习对话框 {
     Row({ space: 应用尺寸.间距_8 }) {
       Row() {
         Column({ space: 2 }) {
-          Text() { ThemeTextSpans(预设.标题资源, (this.选中预设 === 预设.字段号) ? this.themeAccentColors : [], this.getUIContext()) }
+          Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(预设.标题资源, (this.选中预设 === 预设.字段号) ? this.themeAccentColors : [], this.getUIContext()) }, (_locale: string): string => _locale) }
             .fontSize(应用尺寸.字号_正文)
             .fontColor(this.选中预设 === 预设.字段号 ?
               设置面板色板_取(this.isDark).主色 : 设置面板色板_取(this.isDark).主文字)
@@ -330,7 +332,7 @@ export struct 自定义学习对话框 {
                 .optionFont(SelectStyle.optionFont)
                 .selectedOptionFont(SelectStyle.selectedOptionFont)
                 .textModifier(SelectStyle.labelText())
-                .borderRadius(SelectStyle.controlRadius)
+                .borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
                 .height(SelectStyle.controlHeight)
                 .padding(SelectStyle.controlPadding)
                 .space(SelectStyle.controlSpace)
@@ -391,7 +393,7 @@ export struct 自定义学习对话框 {
       .width('88%').constraintSize({ maxWidth: 480, maxHeight: '88%' })
       .padding(应用尺寸.面板内边距)
       .backgroundColor($r('app.color.surface_card'))
-      .borderRadius(应用尺寸.圆角_卡片)
+      .borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
       .onClick(() => {})
       .transition(TransitionEffect.asymmetric(
         TransitionEffect.opacity(0).combine(TransitionEffect.scale({ x: 0.96, y: 0.96 }))

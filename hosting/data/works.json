@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-03",
+  "updatedAt": "2026-10-04",
   "author": {
     "name": "可塑性天赋",
     "url": "https://jidecards.com/about/",
@@ -28,6 +28,10 @@
       "developmentPriority": "项目优先服务 Agent 开发",
       "url": "https://jidecards.com/works/jidecards/",
       "repository": "https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos",
+      "repositoryMirrors": [
+        { "name": "Gitee", "url": "https://gitee.com/wuweiyouzuoju/jidecards-anki-harmonyos" },
+        { "name": "GitCode", "url": "https://gitcode.com/wuweiyouzuoju/jidecards-anki-harmonyos" }
+      ],
       "marketplace": {
         "name": "华为应用市场",
         "price": 0,
@@ -47,7 +51,8 @@
         { "name": "同步", "description": "AnkiWeb 集合与媒体同步，支持自定义同步服务器。" },
         { "name": "导入导出", "description": "APKG 牌组导入导出，集合备份与恢复。" },
         { "name": "管理", "description": "牌组层级、搜索、批量编辑、标签与学习统计。" },
-        { "name": "桌面与外观", "description": "桌面服务卡片、学习提醒、主题色；提供幻彩限时主题色。" }
+        { "name": "桌面与外观", "description": "桌面服务卡片、学习提醒、主题色；提供幻彩限时主题色。" },
+        { "name": "JIDE 助手", "description": "软件内的全能助手：功能导航、学习分析、资料阅读、制卡改卡与设置协助。当前为默认隐藏的开发者调试功能。" }
       ],
       "detailSections": [
         {
@@ -91,6 +96,27 @@
           ]
         },
         {
+          "id": "jide",
+          "title": "JIDE：软件内的全能助手",
+          "paragraphs": [
+            "通过自然语言讨论学习、了解软件功能、阅读资料和管理卡片。JIDE 可以从牌组、浏览或学习页携带上下文进入，把功能导航、真实数据读取、资料处理和可确认的修改串联在同一对话中。",
+            "例如，从“整理这份 PDF 的知识点”开始，按页读取或 OCR，选择合适的笔记类型，再生成带来源的可编辑卡片草稿；也可以查看复习情况，随后打开统计或牌组选项继续核对。"
+          ],
+          "availability": "当前 JIDE 为开发者调试功能，发布配置默认隐藏入口。需解锁并配置模型服务后使用；联网检索另需开启应用端联网并配置搜索凭据。具体能力以当前应用、工具与发布说明为准。",
+          "items": [
+            { "name": "功能认知与页面导航", "description": "读取当前页面、菜单、设置与已接通状态，开始指定牌组学习，打开带搜索条件的浏览页、统计、设置、提醒、编辑或预览。导航复用应用真实页面。", "example": "开始学习四级词汇这个牌组。" },
+            { "name": "学习数据与复习负担", "description": "按全库或搜索范围读取复习次数、耗时、卡片状态、到期预测与有数据时的 FSRS 记忆率，查看卡片历史和牌组选项。到期预测与每日限额后的可学队列分别解释。", "example": "总结最近七天的复习情况，看看未来两周的到期分布。" },
+            { "name": "设置读取与调整", "description": "查看已接通的外观、备份、同步、语言和学习偏好；确认调整卡片字号、列表宽窄、学习触感、主题色或全库 FSRS。深浅色按明确指令切换并提供撤销，其他设置按工具目录区分读写。", "example": "把卡片字号调到 130%，关闭答题触感。" },
+            { "name": "资料阅读与系统 OCR", "description": "导入 PDF、办公文档、电子书、文本和图片，按页或分段读取资料，使用本地系统 OCR 识别扫描页，保存资料笔记。支持视觉的模型可接收页面图片，制卡草稿可标注实际读取的文件与页码。", "example": "读这份 PDF 第 5 到第 8 页，整理核心概念。" },
+            { "name": "制卡、改卡与标签", "description": "根据真实字段和模板生成问答或填空草稿，查找已有卡片后精简答案、补充解释、修改字段与标签。目标缺失时使用原生选择框，用户可继续编辑草稿并确认保存。", "example": "把这段材料做成 10 张问答卡，答案尽量简短。" },
+            { "name": "卡库、笔记类型与外观", "description": "提出牌组或笔记类型创建、卡片移组、批量删除、类型迁移、共享模板与卡片样式修改。展示真实影响范围；删除、类型迁移、共享模板和样式等高风险草稿需要二次确认。", "example": "新建一个“概念、解释、例子”三个字段的笔记类型。" },
+            { "name": "长期偏好与历史继续", "description": "确认保存全局或指定牌组的长期偏好，恢复历史对话、澄清、读取进度和待确认提案。达到执行预算时保留进度，可显式继续；结果未知的写入先检查现状。", "example": "以后给我制卡，答案尽量控制在两句话内。" },
+            { "name": "本地计算与数据整理", "description": "通过一次性 JavaScript 沙箱清洗、去重和计算显式 JSON 数据。计算有固定资源预算，不取得文件、网络、卡库或工具权限，结果保存仍走原有草稿确认流程。", "example": "把这份列表去掉前后空格，再去重并统计数量。" },
+            { "name": "公开检索与图片候选", "description": "独立联网开关下搜索与读取公开 HTTPS 网页文字；Wikimedia 图片候选带来源和许可，带图草稿确认后才下载导入媒体。网页读取不执行脚本或登录。", "example": "联网查找这个概念的公开资料，给出来源。" },
+            { "name": "官方教程与场景建议", "description": "按需检索随应用打包的 Anki 官方手册选章，解释 FSRS、搜索或模板；结合空牌组、搜索结果、学习阶段和已导入资料给出可选择的下一步建议。对话支持表格、数学及化学公式。", "example": "解释一下 FSRS 和目标记忆保持率，再告诉我在哪里查看。" }
+          ]
+        },
+        {
           "id": "native",
           "title": "HarmonyOS NEXT 原生界面与开源内核",
           "paragraphs": [
@@ -100,10 +126,14 @@
         }
       ],
       "screenshots": [
-        { "path": "/assets/app-preview-01.png", "caption": "首页：今日进度与层级牌组" },
-        { "path": "/assets/app-preview-02.png", "caption": "统计：卡片状态与记忆指标" },
-        { "path": "/assets/app-preview-03.png", "caption": "提醒：定时学习通知" },
-        { "path": "/assets/app-preview-04.png", "caption": "桌面：学习统计服务卡片" }
+        { "path": "/assets/app-preview-01.png", "sourceUrl": "https://gitee.com/wuweiyouzuoju/jidecards-anki-harmonyos/raw/main/screenshots/app-preview-01.png", "caption": "首页：今日学习进度与层级牌组", "width": 1320, "height": 2856 },
+        { "path": "/assets/app-deck-overview.png", "sourceUrl": "https://gitee.com/wuweiyouzuoju/jidecards-anki-harmonyos/raw/main/screenshots/app-deck-overview.png", "caption": "牌组详情：卡片数量与近七天学习记录", "width": 1320, "height": 2856 },
+        { "path": "/assets/app-study.png", "sourceUrl": "https://gitee.com/wuweiyouzuoju/jidecards-anki-harmonyos/raw/main/screenshots/app-study.png", "caption": "卡片复习：单词、发音、助记与四档评分", "width": 1320, "height": 2856 },
+        { "path": "/assets/app-statistics.png", "sourceUrl": "https://gitee.com/wuweiyouzuoju/jidecards-anki-harmonyos/raw/main/screenshots/app-statistics.png", "caption": "学习统计：今日概览、到期预测与学习日历", "width": 1320, "height": 2856 },
+        { "path": "/assets/app-settings.png", "sourceUrl": "https://gitee.com/wuweiyouzuoju/jidecards-anki-harmonyos/raw/main/screenshots/app-settings.png", "caption": "设置：常规、复习、同步与外观分类", "width": 1320, "height": 2856 },
+        { "path": "/assets/app-reminders.png", "sourceUrl": "https://gitee.com/wuweiyouzuoju/jidecards-anki-harmonyos/raw/main/screenshots/app-reminders.png", "caption": "学习提醒：定时提醒与启用开关", "width": 1320, "height": 2856 },
+        { "path": "/assets/app-preview-04.png", "sourceUrl": "https://gitee.com/wuweiyouzuoju/jidecards-anki-harmonyos/raw/main/screenshots/app-preview-04.png", "caption": "桌面服务卡片：各学习状态的卡片数量", "width": 1320, "height": 2856 },
+        { "path": "/assets/app-introduction.png", "sourceUrl": "https://gitee.com/wuweiyouzuoju/jidecards-anki-harmonyos/raw/main/screenshots/app-introduction.png", "caption": "应用速览：闪卡入门与牌组来源", "width": 1320, "height": 2856 }
       ]
     }
   ]

@@ -1,20 +1,29 @@
 import { PressFeedback } from '../../utils/PressFeedback';
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { LengthMetrics } from '@kit.ArkUI';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 颜色键 } from '../../model/颜色主题';
-import { FieldEditResult, wrapFieldSelection, nextClozeNumber } from '../../model/NoteFieldEditing';
+import { FieldEditResult, wrapFieldSelection, nextClozeNumber, NoteFieldEditingOptions,
+  NOTE_FIELD_EDITING_SUPPORT } from '../../model/NoteFieldEditing';
 import { NoteTextRun, parseNoteRichText, serializeNoteRichText, selectionHasFormat, richResultIsBold,
   FORMAT_BOLD, FORMAT_ITALIC, FORMAT_UNDERLINE, FORMAT_HIGHLIGHT } from '../../model/NoteRichText';
+import { FORMAT_SUPERSCRIPT, FORMAT_SUBSCRIPT, noteLinkUrl } from '../../model/NoteRichText';
+import { noteEditorHeight, richNoteList, sourceNoteList, sourceNoteClearFormat, richNoteLink,
+  sourceNoteLink } from '../../model/NoteHtmlTools';
+import { NoteLinkDialog } from './NoteLinkDialog';
 import { hasNoteEditingHint, completeNoteEditingHint } from '../../utils/NoteEditingHints';
-import { namedResourceText, resourceText, showToastSafely } from '../../utils/UiFeedback';
+import { showToastSafely, resourceText, namedResourceText } from '../../utils/UiFeedback';
 import { 字段帮助对话框 } from '../字段帮助面板';
+export type { NoteFieldEditingOptions } from '../../model/NoteFieldEditing';
 
 /** 三个笔记入口共用；可视编辑仅接管可保真理解的文字 HTML，复杂内容保留源码。 */
 @Component
 export struct NoteFieldEditor {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('receiveValue') value: string = '';
   @Prop fieldName: string = '';
+  @Prop fieldConfig: NoteFieldEditingOptions | null = null;
   @Prop disabled: boolean = false;
   @Prop clozeEnabled: boolean = false;
   @Prop allFields: string[] = [];
@@ -23,6 +32,8 @@ export struct NoteFieldEditor {
   private richController: RichEditorController = new RichEditorController();
   @State private sourceMode: boolean = false;
   @State private typingFormat: number = 0;
+  @State private expanded: boolean = false;
+  @State private moreFormats: boolean = false;
   private selectionStart: number = -1;
   private selectionEnd: number = -1;
   private disposed: boolean = false;
@@ -32,12 +43,14 @@ export struct NoteFieldEditor {
   private selectionVersion: number = 0;
   private hintDialog: CustomDialogController | null = null;
   private hintSaving: boolean = false;
+  private linkDialog: CustomDialogController | null = null;
   @StorageProp(颜色键.动作主色) private accent: string = '#2F5FD0';
 
-  aboutToAppear(): void { this.sourceMode = parseNoteRichText(this.value) === null; }
+  aboutToAppear(): void { this.sourceMode = this.fieldConfig?.plainText === true || parseNoteRichText(this.value) === null; }
   aboutToDisappear(): void {
     this.disposed = true; this.selectionVersion++; this.ready = false;
     this.hintDialog?.close(); this.hintDialog = null;
+    this.linkDialog?.close(); this.linkDialog = null;
   }
 
   private receiveValue(): void {
@@ -58,19 +71,29 @@ export struct NoteFieldEditor {
   }
 
   private style(format: number): RichEditorTextStyle {
-    return { fontSize: 应用尺寸.字号_正文,
+    return { fontSize: this.editingFontSize(), fontFamily: this.fieldConfig?.fontName || undefined,
       fontColor: (format & FORMAT_HIGHLIGHT) !== 0 ? '#202020' : $r('app.color.text_primary'),
       fontWeight: (format & FORMAT_BOLD) !== 0 ? FontWeight.Bold : FontWeight.Normal,
       fontStyle: (format & FORMAT_ITALIC) !== 0 ? FontStyle.Italic : FontStyle.Normal,
+      fontFeature: (format & FORMAT_SUPERSCRIPT) !== 0 ? '"sups" 1' :
+        (format & FORMAT_SUBSCRIPT) !== 0 ? '"subs" 1' : '"sups" 0, "subs" 0',
       decoration: { type: (format & FORMAT_UNDERLINE) !== 0 ? TextDecorationType.Underline : TextDecorationType.None },
       textBackgroundStyle: { color: (format & FORMAT_HIGHLIGHT) !== 0 ? '#FFF176' : Color.Transparent } };
+  }
+
+  private editingFontSize(): number {
+    const size: number = this.fieldConfig?.fontSize ?? 0;
+    return Number.isFinite(size) && size > 0 ? Math.min(NOTE_FIELD_EDITING_SUPPORT.maximumFontSize,
+      Math.max(NOTE_FIELD_EDITING_SUPPORT.minimumFontSize, size)) : 应用尺寸.字号_正文;
   }
 
   private loadRich(runs: NoteTextRun[]): void {
     this.applying = true;
     try {
       this.richController.deleteSpans();
-      for (const run of runs) this.richController.addTextSpan(run.text, { style: this.style(run.format) });
+      for (const run of runs) this.richController.addTextSpan(run.text, { style: this.style(run.format),
+        paragraphStyle: { textAlign: TextAlign.Start },
+        urlStyle: run.url === undefined ? undefined : { url: run.url } });
       this.lastSnapshot = serializeNoteRichText(runs);
       this.richController.setTypingStyle(this.style(this.typingFormat));
     } finally { this.applying = false; }
@@ -87,7 +110,13 @@ export struct NoteFieldEditor {
       const background: ResourceColor | undefined = style.textBackgroundStyle?.color;
       if ((typeof background === 'string' && background.toUpperCase().endsWith('FFF176')) ||
         (typeof background === 'number' && (background & 0xFFFFFF) === 0xFFF176)) format |= FORMAT_HIGHLIGHT;
-      runs.push({ text: text.value.slice(text.offsetInSpan[0], text.offsetInSpan[1]), format: format });
+      const feature: string = style.fontFeature ?? '';
+      if (feature.indexOf('"sups" 1') >= 0) format |= FORMAT_SUPERSCRIPT;
+      if (feature.indexOf('"subs" 1') >= 0) format |= FORMAT_SUBSCRIPT;
+      const run: NoteTextRun = { text: text.value.slice(text.offsetInSpan[0], text.offsetInSpan[1]), format: format };
+      const url: ResourceStr | undefined = text.urlStyle?.url;
+      if (typeof url === 'string' && url !== '') run.url = url;
+      runs.push(run);
     }
     return runs;
   }
@@ -100,14 +129,37 @@ export struct NoteFieldEditor {
     this.value = html; this.onChange(html);
   }
 
-  private placeholderText(): string {
+  private placeholderText(_locale: string = this.uiLanguage): string {
+    if ((this.fieldConfig?.description ?? '') !== '') return this.fieldConfig?.description ?? '';
     return resourceText(this.getUIContext(), $r('app.string.note_editor_field_placeholder'), this.fieldName);
+  }
+
+  private richSelectionChanged(range: RichEditorRange): void {
+    if (this.disposed || this.applying) return;
+    this.selectionStart = range.start ?? 0; this.selectionEnd = range.end ?? this.selectionStart;
+    if (this.ready) this.richController.setTypingStyle(this.style(this.typingFormat));
+  }
+
+  /** 样式更新可能临时收起原生选区；同一范围重新选中，便于连续格式操作。 */
+  private applySelectionStyle(style: RichEditorTextStyle, clearLink: boolean = false): void {
+    const start: number = this.selectionStart;
+    const end: number = this.selectionEnd;
+    const update: RichEditorUpdateTextSpanStyleOptions = { start: start, end: end, textStyle: style };
+    if (clearLink) update.urlStyle = { url: '' };
+    this.applying = true;
+    try {
+      this.richController.updateSpanStyle(update);
+      this.richController.setSelection(start, end, { menuPolicy: MenuPolicy.HIDE });
+      this.selectionStart = start; this.selectionEnd = end;
+    } finally { this.applying = false; }
+    this.publishRich();
   }
 
   private applyFormat(flag: number): void {
     if (this.disabled || this.disposed) return;
     if (this.sourceMode) {
-      const tag: string = flag === FORMAT_BOLD ? 'b' : flag === FORMAT_ITALIC ? 'i' : flag === FORMAT_UNDERLINE ? 'u' : 'mark';
+      const tag: string = flag === FORMAT_BOLD ? 'b' : flag === FORMAT_ITALIC ? 'i' : flag === FORMAT_UNDERLINE ? 'u' :
+        flag === FORMAT_HIGHLIGHT ? 'mark' : flag === FORMAT_SUPERSCRIPT ? 'sup' : 'sub';
       this.wrap(`<${tag}>`, `</${tag}>`); return;
     }
     if (!this.ready) return;
@@ -121,13 +173,14 @@ export struct NoteFieldEditor {
         patch.textBackgroundStyle = { color: enabled ? '#FFF176' : Color.Transparent };
         patch.fontColor = enabled ? '#202020' : $r('app.color.text_primary');
       }
-      const end: number = this.selectionEnd;
-      this.richController.updateSpanStyle({ start: this.selectionStart, end: end, textStyle: patch });
-      this.richController.setCaretOffset(end);
-      this.selectionStart = end; this.selectionEnd = end;
-      this.publishRich();
+      if (flag === FORMAT_SUPERSCRIPT || flag === FORMAT_SUBSCRIPT) {
+        patch.fontFeature = enabled ? (flag === FORMAT_SUPERSCRIPT ? '"sups" 1' : '"subs" 1') : '"sups" 0, "subs" 0';
+      }
+      this.applySelectionStyle(patch);
     } else {
       this.typingFormat ^= flag;
+      if ((this.typingFormat & flag) !== 0 && flag === FORMAT_SUPERSCRIPT) this.typingFormat &= ~FORMAT_SUBSCRIPT;
+      if ((this.typingFormat & flag) !== 0 && flag === FORMAT_SUBSCRIPT) this.typingFormat &= ~FORMAT_SUPERSCRIPT;
     }
     // 选区格式不改变持续输入状态；后续输入仍由点亮按钮控制。
     this.richController.setTypingStyle(this.style(this.typingFormat));
@@ -182,7 +235,7 @@ export struct NoteFieldEditor {
     this.publishRich();
   }
 
-  private switchMode(): void {
+  private switchMode(_locale: string = this.uiLanguage): void {
     if (this.disabled || this.disposed) return;
     if (!this.sourceMode) { this.publishRich(); this.sourceMode = true; this.ready = false; }
     else {
@@ -195,8 +248,111 @@ export struct NoteFieldEditor {
     this.typingFormat = 0; this.selectionStart = -1; this.selectionEnd = -1;
   }
 
-  private activateTool(key: string, label: Resource, action: () => void): void {
-    if (this.disabled || this.disposed || this.hintDialog !== null || this.hintSaving) return;
+  private toggleExpanded(): void {
+    if (!this.disabled && !this.disposed) this.expanded = !this.expanded;
+  }
+
+  private toggleMoreFormats(): void {
+    if (!this.disabled && !this.disposed) this.moreFormats = !this.moreFormats;
+  }
+
+  private selectedRange(): RichEditorRange {
+    const length: number = this.sourceMode ? this.value.length :
+      this.richRuns().reduce((total: number, run: NoteTextRun): number => total + run.text.length, 0);
+    const caret: number = this.sourceMode ? length : Math.max(0, this.richController.getCaretOffset());
+    const start: number = Math.max(0, Math.min(length, this.selectionStart < 0 ? caret : this.selectionStart));
+    return { start: start, end: Math.max(start, Math.min(length, this.selectionEnd < 0 ? start : this.selectionEnd)) };
+  }
+
+  private applySourceEdit(result: FieldEditResult): void {
+    this.sourceMode = true; this.ready = false;
+    this.value = result.text; this.onChange(result.text);
+    this.selectionStart = result.start; this.selectionEnd = result.end;
+    const version: number = ++this.selectionVersion;
+    setTimeout((): void => {
+      if (this.disposed || this.disabled || version !== this.selectionVersion) return;
+      try { this.controller.caretPosition(result.start); } catch (_error) { /* 草稿已保留。 */ }
+    }, 0);
+  }
+
+  private list(ordered: boolean): void {
+    if (this.disabled || this.disposed || (!this.sourceMode && !this.ready)) return;
+    const range: RichEditorRange = this.selectedRange();
+    const runs: NoteTextRun[] = this.sourceMode ? [] : this.richRuns();
+    const text: string = this.sourceMode ? this.value : runs.map((run: NoteTextRun): string => run.text).join('');
+    let start: number = range.start ?? 0;
+    let end: number = range.end ?? start;
+    if (start === end) {
+      start = start === 0 ? 0 : text.lastIndexOf('\n', start - 1) + 1;
+      const next: number = text.indexOf('\n', end);
+      end = next < 0 ? text.length : next;
+    }
+    const result: FieldEditResult | null = this.sourceMode ? sourceNoteList(this.value, start, end, ordered) :
+      richNoteList(runs, start, end, ordered);
+    if (result === null) this.sourceSelectionHint();
+    else this.applySourceEdit(result);
+  }
+
+  private clearFormat(): void {
+    if (this.disabled || this.disposed) return;
+    if (this.sourceMode) {
+      const range: RichEditorRange = this.selectedRange();
+      const result: FieldEditResult | null = sourceNoteClearFormat(this.value, range.start ?? 0, range.end ?? 0);
+      if (result === null) this.sourceSelectionHint();
+      else this.applySourceEdit(result);
+      return;
+    }
+    if (!this.ready) return;
+    if (this.selectionEnd > this.selectionStart && this.selectionStart >= 0) {
+      this.applySelectionStyle(this.style(0), true);
+    } else this.typingFormat = 0;
+    this.richController.setTypingStyle(this.style(this.typingFormat));
+  }
+
+  private sourceSelectionHint(_locale: string = this.uiLanguage): void {
+    showToastSafely(this.getUIContext(), { message: resourceText(this.getUIContext(), $r('app.string.note_editor_source_selection_hint')) });
+  }
+
+  private openLink(): void {
+    if (this.disabled || this.disposed || this.linkDialog !== null || (!this.sourceMode && !this.ready)) return;
+    const range: RichEditorRange = this.selectedRange();
+    const start: number = range.start ?? 0;
+    const end: number = range.end ?? start;
+    const source: boolean = this.sourceMode;
+    const snapshot: string = this.value;
+    const runs: NoteTextRun[] = source ? [] : this.richRuns();
+    const text: string = source ? snapshot : runs.map((run: NoteTextRun): string => run.text).join('');
+    const selected: NoteTextRun[] | null = source ? parseNoteRichText(text.slice(start, end)) : null;
+    if (source && selected === null) { this.sourceSelectionHint(); return; }
+    const label: string = source ? (selected ?? []).map((run: NoteTextRun): string => run.text).join('') : text.slice(start, end);
+    this.linkDialog = new CustomDialogController({ builder: NoteLinkDialog({ selectedText: label,
+      onClose: (): void => { this.closeLink(); },
+      onApply: (url: string, label: string): void => {
+        this.closeLink();
+        if (this.disabled || this.disposed || this.value !== snapshot || noteLinkUrl(url) === '') return;
+        if (source) {
+          const result: FieldEditResult | null = sourceNoteLink(snapshot, start, end, url, label);
+          if (result === null) this.sourceSelectionHint(); else this.applySourceEdit(result);
+        } else {
+          const html: string = richNoteLink(runs, start, end, url, label);
+          const linked: NoteTextRun[] | null = parseNoteRichText(html);
+          if (linked === null) return;
+          this.applying = true;
+          try { this.value = html; this.onChange(html); this.loadRich(linked); }
+          finally { this.applying = false; }
+          const caret: number = end > start ? end : start + label.length;
+          this.richController.setCaretOffset(caret); this.selectionStart = caret; this.selectionEnd = caret;
+        }
+      } }), cancel: (): void => { this.linkDialog = null; },
+      customStyle: true, autoCancel: true, alignment: DialogAlignment.Center,
+      width: '100%', height: '100%', maskColor: Color.Transparent });
+    this.linkDialog.open();
+  }
+
+  private closeLink(): void { this.linkDialog?.close(); this.linkDialog = null; }
+
+  private activateTool(key: string, label: Resource, action: () => void, _locale: string = this.uiLanguage): void {
+    if (this.disabled || this.disposed || this.hintDialog !== null || this.linkDialog !== null || this.hintSaving) return;
     let seen: boolean = false;
     try { seen = hasNoteEditingHint(key); } catch (error) { this.hintFailure(); }
     if (seen) { action(); return; }
@@ -222,7 +378,7 @@ export struct NoteFieldEditor {
     finally { if (!this.disposed) this.hintSaving = false; }
   }
 
-  private hintFailure(): void {
+  private hintFailure(_locale: string = this.uiLanguage): void {
     showToastSafely(this.getUIContext(), { message: resourceText(this.getUIContext(), $r('app.string.note_editor_hint_store_failed')) });
   }
 
@@ -230,7 +386,9 @@ export struct NoteFieldEditor {
   private tool(key: string, label: Resource, flag: number, action: () => void) {
     // 动态文案在构建函数内读取状态，避免按值参数保留首次文案。
     Button(key === 'source' ?
-      (this.sourceMode ? $r('app.string.note_editor_visual') : $r('app.string.note_editor_source')) : label)
+      (this.sourceMode ? $r('app.string.note_editor_visual') : $r('app.string.note_editor_source')) :
+      key === 'expand' ? (this.expanded ? $r('app.string.note_editor_collapse') : $r('app.string.note_editor_expand')) :
+      key === 'more' ? (this.moreFormats ? $r('app.string.note_editor_less_formats') : $r('app.string.note_editor_more_formats')) : label)
       .fontSize(应用尺寸.字号_正文_小)
       .fontColor(flag !== 0 && (this.typingFormat & flag) !== 0 ? Color.White : this.accent)
       .backgroundColor(flag !== 0 && (this.typingFormat & flag) !== 0 ? this.accent : Color.Transparent)
@@ -242,17 +400,23 @@ export struct NoteFieldEditor {
         $r('app.string.note_editor_format_on') : $r('app.string.note_editor_format_action'))
       .attributeModifier(new PressFeedback())
       .stateEffect(false)
-      .onClick((): void => { if (key === 'source') action(); else this.activateTool(key, label, action); })
+      .onClick((): void => {
+        if (key === 'source' || key === 'expand' || key === 'more') action();
+        else this.activateTool(key, label, action);
+      })
   }
 
   build() {
     Column({ space: 应用尺寸.间距_5 }) {
       if (this.sourceMode) {
         TextArea({ text: this.value, placeholder: this.placeholderText(), controller: this.controller })
-          .width('100%').height(112).fontSize(应用尺寸.字号_正文)
+          .width('100%').height(noteEditorHeight(this.expanded)).fontSize(this.editingFontSize())
+          .fontFamily(this.fieldConfig?.fontName || 'HarmonyOS Sans')
+          .direction(this.fieldConfig?.rtl === true ? Direction.Rtl : Direction.Ltr)
+          .textAlign(TextAlign.Start)
           .fontColor($r('app.color.text_primary')).placeholderColor($r('app.color.text_tertiary'))
           .backgroundColor($r('app.color.surface_card'))
-          .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
+          .border(SurfaceBorder.options())
           .borderRadius(应用尺寸.圆角_面板).padding(应用尺寸.间距_10).enabled(!this.disabled)
           .onChange((text: string): void => { this.sourceChanged(text); })
           .onTextSelectionChange((start: number, end: number): void => { this.selectionStart = start; this.selectionEnd = end; })
@@ -260,15 +424,13 @@ export struct NoteFieldEditor {
           .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
       } else {
         RichEditor({ controller: this.richController })
-          .width('100%').height(112).placeholder(this.placeholderText(), { fontColor: $r('app.color.text_tertiary') })
+          .direction(this.fieldConfig?.rtl === true ? Direction.Rtl : Direction.Ltr)
+          .width('100%').height(noteEditorHeight(this.expanded)).placeholder(this.placeholderText(), { fontColor: $r('app.color.text_tertiary') })
           .backgroundColor($r('app.color.surface_card'))
-          .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_input') })
+          .border(SurfaceBorder.options())
           .borderRadius(应用尺寸.圆角_面板).padding(应用尺寸.间距_10).enabled(!this.disabled)
           .onReady((): void => { this.richReady(); })
-          .onSelectionChange((range: RichEditorRange): void => {
-            this.selectionStart = range.start ?? 0; this.selectionEnd = range.end ?? this.selectionStart;
-            if (!this.applying && this.ready) this.richController.setTypingStyle(this.style(this.typingFormat));
-          })
+          .onSelectionChange((range: RichEditorRange): void => { this.richSelectionChanged(range); })
           .onWillChange((change: RichEditorChangeValue): boolean => change.replacedImageSpans.length === 0 && change.replacedSymbolSpans.length === 0)
           .onDidChange((): void => { this.publishRich(); })
       }
@@ -286,6 +448,18 @@ export struct NoteFieldEditor {
         }
         this.tool('source', $r('app.string.note_editor_source'),
           0, (): void => { this.switchMode(); })
+        this.tool('expand', $r('app.string.note_editor_expand'), 0, (): void => { this.toggleExpanded(); })
+        this.tool('more', $r('app.string.note_editor_more_formats'), 0, (): void => { this.toggleMoreFormats(); })
+        if (this.moreFormats) {
+          this.tool('superscript', $r('app.string.note_editor_superscript'), FORMAT_SUPERSCRIPT,
+            (): void => { this.applyFormat(FORMAT_SUPERSCRIPT); })
+          this.tool('subscript', $r('app.string.note_editor_subscript'), FORMAT_SUBSCRIPT,
+            (): void => { this.applyFormat(FORMAT_SUBSCRIPT); })
+          this.tool('bullet_list', $r('app.string.note_editor_bullet_list'), 0, (): void => { this.list(false); })
+          this.tool('numbered_list', $r('app.string.note_editor_numbered_list'), 0, (): void => { this.list(true); })
+          this.tool('link', $r('app.string.note_editor_link'), 0, (): void => { this.openLink(); })
+          this.tool('clear_format', $r('app.string.note_editor_clear_format'), 0, (): void => { this.clearFormat(); })
+        }
       }.width('100%')
     }.width('100%')
   }

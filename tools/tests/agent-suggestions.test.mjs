@@ -132,9 +132,34 @@ test('empty suggestions mount only in an empty assistant conversation and use na
   assert.match(page, /if \(this\.pageMode === 'assistant' && this\.消息列表\.length === 0\) \{\s*AgentEmptySuggestions\(/);
   assert.match(page, /if \(this\.显示历史区\) \{\s*this\.历史区\(\)\s*\} else/);
   assert.match(page, /onShown\(\(\): void => \{ appInterface.showPage\('agent'\); this\.isAgentPageVisible = true; this\.publishInterface\(\); \}\)/);
-  assert.match(page, /onHidden\(\(\): void => \{ appInterface.hidePage\('agent'\); this\.isAgentPageVisible = false; \}\)/);
+  assert.match(page, /onHidden\(\(\): void => \{ appInterface.hidePage\('agent'\); this\.isAgentPageVisible = false; this\.navigationSession\?\.cancel\(\); \}\)/);
   const component = read('entry/src/main/ets/components/agent/AgentEmptySuggestions.ets');
   assert.equal((component.match(/\bText\(/g) ?? []).length, 1);
   assert.match(component, /LongPressGesture\(\{ repeat: false, duration: 500 \}\)/);
   assert.doesNotMatch(component, /Button\(|TextInput\(|TextArea\(|\.onClick\(|AgentRunner/);
+});
+
+test('context suggestions lead the existing cycle, refresh on state changes, and copy the displayed localized prompt', async () => {
+  const h = harness(), c = h.component;
+  let current = [{promptKey:'ai_agent_context_deck_study'}, {promptKey:'ai_agent_context_deck_overview'}];
+  c.loadRecommendations = () => current;
+  c.visibilityChanged();
+  assert.equal(c.suggestionText(), zh.get('ai_agent_context_deck_study'));
+  await c.copySuggestion(); assert.deepEqual(h.copied, [c.suggestionText()]);
+  h.advance(10300); assert.equal(c.suggestionText(), zh.get('ai_agent_context_deck_overview'));
+  h.advance(10300); assert.equal(c.suggestionText(), zh.get(agentSuggestionKey(0)));
+  current = [{promptKey:'ai_agent_context_deck_limits'}];
+  h.advance(10300); assert.equal(c.suggestionText(), zh.get('ai_agent_context_deck_limits'));
+  current = []; h.advance(10300); assert.equal(c.suggestionText(), zh.get(agentSuggestionKey(0)));
+  assert.equal(h.timers.size, 1);
+});
+
+test('context reads pause with visibility and gestures and resume from current context without late callbacks', () => {
+  const h = harness(), c = h.component; let reads = 0;
+  c.loadRecommendations = () => { reads++; return [{promptKey:'ai_agent_context_document'}]; };
+  c.touchChanged(TouchType.Down); h.advance(30000); assert.equal(reads, 0);
+  c.isPageVisible = false; c.visibilityChanged(); assert.equal(reads, 0);
+  c.isPageVisible = true; c.visibilityChanged(); assert.equal(reads, 1);
+  assert.equal(c.suggestionText(), zh.get('ai_agent_context_document'));
+  c.aboutToDisappear(); h.advance(30000); assert.equal(reads, 1);
 });

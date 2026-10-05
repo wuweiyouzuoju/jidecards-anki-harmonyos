@@ -7,9 +7,17 @@ import { agentMathParts, hasAgentMath, agentMathMarkup, agentMathHtml, agentMath
   parseAgentMathLayout, AGENT_MATH_LAYOUT_PREFIX } from '../../entry/src/main/ets/model/agent/AgentMath.ts';
 import { agentMathDocumentMarkup, agentMathDocumentHtml, agentMathDocumentUpdateScript } from '../../entry/src/main/ets/model/agent/AgentMathDocument.ts';
 import { parseAgentMarkdown } from '../../entry/src/main/ets/model/agent/AgentMarkdown.ts';
-import { loadComponentLogic } from './platform-module-harness.mjs';
+import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
 
 const appearance = {color:'#182230',fontSize:14,alignment:'left',bold:false};
+const dimensions = loadPlatformModule('utils/应用尺寸.ets', '应用尺寸', {});
+const SurfaceBorder = loadPlatformModule('utils/SurfaceBorder.ets', 'SurfaceBorder', {
+  应用尺寸: dimensions, $r: key => key
+});
+const resourceColors = {
+  'app.color.text_primary': '#FF182230', 'app.color.surface_card': '#FFFFFFFF',
+  'app.color.surface_page': '#FFF6F7FA', 'app.color.surface_border': '#FF64748B'
+};
 
 test('conversation formulas preserve TeX delimiters, matrices, chemistry and source through every stream prefix', () => {
   const text = String.raw`分式 \(\frac12\)，矩阵 \[\begin{pmatrix}1&2\\3&4\end{pmatrix}\]，$x^2$ 和 $$\ce{SO4^2- + Ba^2+ -> BaSO4 v}$$。`;
@@ -61,8 +69,8 @@ function componentHarness() {
   const calls=[],timers=new Map();let next=0;
   class Controller {loadData(...args){calls.push(['load',...args]);}runJavaScript(script){calls.push(['update',script]);return Promise.resolve('');}}
   const Component=loadComponentLogic('components/agent/AgentMathText.ets','AgentMathText',{
-    $r:key=>key,应用尺寸:{字号_正文:14},webview:{WebviewController:Controller},
-    ColorMetrics:{resourceColor:()=>({color:'#FF182230'})},px2vp:x=>x,fp2px:x=>x,
+    $r:key=>key,应用尺寸:{字号_正文:14},webview:{WebviewController:Controller},SurfaceBorder,
+    ColorMetrics:{resourceColor:key=>{assert.ok(resourceColors[key],key);return {color:resourceColors[key]};}},px2vp:x=>x,fp2px:x=>x,
     agentMathDocumentHtml,agentMathDocumentUpdateScript,parseAgentMathLayout,AGENT_MATH_BASE:'https://jidecards-render.local/agent-math/',
     setTimeout:callback=>{timers.set(++next,callback);return next;},clearTimeout:id=>timers.delete(id),
     MATH_ASSET_BASE:'https://jidecards-render.local/mathjax/3.2.2/',interceptCardAsset:()=>({asset:true}),
@@ -74,9 +82,16 @@ function componentHarness() {
 
 test('formula component waits for attach and page readiness, coalesces latest stream and cancels disposal', () => {
   const h=componentHarness();h.c.text='\\(x\\)';h.c.contentChanged();assert.equal(h.calls.length,0);
+  assert.deepEqual(h.c.appearance(), {color:'#FF182230',fontSize:14,alignment:'left',bold:false,
+    tableColor:'#FFFFFFFF',headerColor:'#FFF6F7FA',borderColor:'#FF64748B'});
   h.c.attached();assert.equal(h.calls[0][0],'load');assert.equal(h.calls[0][4],'https://jidecards-render.local/agent-math/');
+  assert.equal(h.c.failed,false,'successful mounting must not silently enter source fallback');
+  assert.equal(h.calls[0][1],agentMathDocumentHtml(h.c.text,h.c.appearance()));
+  h.c.contentChanged();assert.equal(h.timers.size,0,'content updates wait for page readiness');
   h.c.ready=true;h.c.contentChanged();h.c.text+='\\(y\\)';h.c.contentChanged();assert.equal(h.timers.size,1);
   h.flush();assert.equal(h.calls.length,2);assert.ok(h.calls[1][1].includes('y'));
+  const updates=[];vm.runInNewContext(h.calls[1][1],{window:{jideAgentMathUpdate(...args){updates.push(args);}}});
+  assert.equal(updates[0][0],1);assert.equal(updates[0][8],'#64748BFF');
   h.c.contentChanged();h.c.aboutToDisappear();h.flush();assert.equal(h.calls.length,2);
   h.c.attached();assert.equal(h.calls.length,2);
 });

@@ -1,0 +1,170 @@
+[
+  {
+    "expected": "<div>123</div>",
+    "provided": "",
+    "combining": true,
+    "html": "<code id=typeans>123</code>"
+  },
+  {
+    "expected": "3 < 5",
+    "provided": "3 < 5",
+    "combining": true,
+    "html": "<code id=typeans><span class=typeGood>3 &lt; 5</span></code>"
+  },
+  {
+    "expected": "a & b",
+    "provided": "a & b",
+    "combining": true,
+    "html": "<code id=typeans><span class=typeGood>a &amp; b</span></code>"
+  },
+  {
+    "expected": "123",
+    "provided": "123",
+    "combining": true,
+    "html": "<code id=typeans><span class=typeGood>123</span></code>"
+  },
+  {
+    "expected": "123",
+    "provided": "1123",
+    "combining": true,
+    "html": "<code id=typeans><span class=typeBad>1</span><span class=typeGood>123</span><br><span id=typearrow>&darr;</span><br><span class=typeGood>123</span></code>"
+  },
+  {
+    "expected": "¿Y ahora qué vamos a hacer?",
+    "provided": "y ahora qe vamosa hacer",
+    "combining": true,
+    "html": "<code id=typeans><span class=typeBad>y</span><span class=typeGood> ahora q</span><span class=typeBad>e</span><span class=typeGood> vamos</span><span class=typeMissed>-</span><span class=typeGood>a hacer</span><span class=typeMissed>-</span><br><span id=typearrow>&darr;</span><br><span class=typeMissed>¿Y</span><span class=typeGood> ahora q</span><span class=typeMissed>ué</span><span class=typeGood> vamos</span><span class=typeMissed> </span><span class=typeGood>a hacer</span><span class=typeMissed>?</span></code>"
+  },
+  {
+    "expected": "1",
+    "provided": "23",
+    "combining": true,
+    "html": "<code id=typeans><span class=typeBad>23</span><br><span id=typearrow>&darr;</span><br><span class=typeMissed>1</span></code>"
+  },
+  {
+    "expected": "12",
+    "provided": "1",
+    "combining": true,
+    "html": "<code id=typeans><span class=typeGood>1</span><span class=typeMissed>-</span><br><span id=typearrow>&darr;</span><br><span class=typeGood>1</span><span class=typeMissed>2</span></code>"
+  },
+  {
+    "expected": "нос",
+    "provided": "нс",
+    "combining": true,
+    "html": "<code id=typeans><span class=typeGood>н</span><span class=typeMissed>-</span><span class=typeGood>с</span><br><span id=typearrow>&darr;</span><br><span class=typeGood>н</span><span class=typeMissed>о</span><span class=typeGood>с</span></code>"
+  },
+  {
+    "expected": "쓰다듬다",
+    "provided": "스다뜸다",
+    "combining": true,
+    "html": "<code id=typeans><span class=typeBad>스</span><span class=typeGood>다</span><span class=typeBad>뜸</span><span class=typeGood>다</span><br><span id=typearrow>&darr;</span><br><span class=typeMissed>쓰</span><span class=typeGood>다</span><span class=typeMissed>듬</span><span class=typeGood>다</span></code>"
+  },
+  {
+    "expected": "Сущность должна быть ответственна только за одно дело",
+    "provided": "Single responsibility Сущность выполняет только одну задачу.Повод для изменения сущности только один.",
+    "combining": true,
+    "html": "<code id=typeans><span class=typeBad>Single responsibility </span><span class=typeGood>Сущность </span><span class=typeBad>вып</span><span class=typeGood>ол</span><span class=typeMissed>-</span><span class=typeGood>н</span><span class=typeBad>я</span><span class=typeGood>ет</span><span class=typeMissed>-------</span><span class=typeGood> только </span><span class=typeMissed>---</span><span class=typeGood>одн</span><span class=typeBad>у задачу.П</span><span class=typeGood>о</span><span class=typeBad>вод</span><span class=typeGood> д</span><span class=typeMissed>-</span><span class=typeGood>л</span><span class=typeBad>я изменения сущн</span><span class=typeGood>о</span><span class=typeBad>сти только один.</span><br><span id=typearrow>&darr;</span><br><span class=typeGood>Сущность </span><span class=typeMissed>д</span><span class=typeGood>ол</span><span class=typeMissed>ж</span><span class=typeGood>н</span><span class=typeMissed>а быть отв</span><span class=typeGood>ет</span><span class=typeMissed>ственна</span><span class=typeGood> только </span><span class=typeMissed>за </span><span class=typeGood>одн</span><span class=typeGood>о</span><span class=typeGood> д</span><span class=typeMissed>е</span><span class=typeGood>л</span><span class=typeGood>о</span></code>"
+  },
+  {
+    "expected": "<div>123</div>",
+    "provided": "123",
+    "combining": true,
+    "html": "<code id=typeans><span class=typeGood>123</span></code>"
+  },
+  {
+    "expected": "[sound:foo.mp3]<b>1</b> &nbsp;2",
+    "provided": "1  2",
+    "combining": true,
+    "html": "<code id=typeans><span class=typeGood>1  2</span></code>"
+  },
+  {
+    "expected": "שִׁנּוּן",
+    "provided": "שנון",
+    "combining": false,
+    "html": "<code id=typeans><span class=typeGood>שִׁנּוּן</span></code>"
+  },
+  {
+    "expected": "חוֹף",
+    "provided": "חופ",
+    "combining": false,
+    "html": "<code id=typeans><span class=typeGood>חו</span><span class=typeBad>פ</span><br><span id=typearrow>&darr;</span><br><span class=typeGood>חוֹ</span><span class=typeMissed>ף</span></code>"
+  },
+  {
+    "expected": "ば",
+    "provided": "は",
+    "combining": false,
+    "html": "<code id=typeans><span class=typeGood>ば</span></code>"
+  },
+  {
+    "expected": "<mark><b>浮、熔、游、响、红</b></mark>。<br>浮：密度比水小",
+    "provided": "",
+    "combining": true,
+    "html": "<code id=typeans>浮、熔、游、响、红。 浮：密度比水小</code>"
+  },
+  {
+    "expected": "<mark><b>浮、熔、游、响、红</b></mark>。<br>浮：密度比水小",
+    "provided": "wrong",
+    "combining": true,
+    "html": "<code id=typeans><span class=typeBad>wrong</span><br><span id=typearrow>&darr;</span><br><span class=typeMissed>浮、熔、游、响、红。 浮：密度比水小</span></code>"
+  },
+  {
+    "expected": "<b>answer</b>",
+    "provided": "",
+    "combining": true,
+    "html": "<code id=typeans>answer</code>"
+  },
+  {
+    "expected": "two",
+    "provided": "two",
+    "combining": true,
+    "html": "<code id=typeans><span class=typeGood>two</span></code>"
+  },
+  {
+    "expected": "<b>correct & safe</b>",
+    "provided": "",
+    "combining": true,
+    "html": "<code id=typeans>correct &amp; safe</code>"
+  },
+  {
+    "expected": "two & safe",
+    "provided": "",
+    "combining": true,
+    "html": "<code id=typeans>two &amp; safe</code>"
+  },
+  {
+    "expected": "á",
+    "provided": "",
+    "combining": true,
+    "html": "<code id=typeans>á</code>"
+  },
+  {
+    "expected": "<b>two</b>",
+    "provided": "",
+    "combining": true,
+    "html": "<code id=typeans>two</code>"
+  },
+  {
+    "expected": "&aacute;",
+    "provided": "á",
+    "combining": true,
+    "html": "<code id=typeans><span class=typeGood>á</span></code>"
+  },
+  {
+    "expected": "<b>correct &amp; safe</b>",
+    "provided": "",
+    "combining": true,
+    "html": "<code id=typeans>correct &amp; safe</code>"
+  },
+  {
+    "expected": "café",
+    "provided": "",
+    "combining": false,
+    "html": "<code id=typeans>café</code>"
+  },
+  {
+    "expected": "second",
+    "provided": "",
+    "combining": true,
+    "html": "<code id=typeans>second</code>"
+  }
+]

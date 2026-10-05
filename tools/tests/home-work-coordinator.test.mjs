@@ -148,6 +148,21 @@ function startupHarness() {
   return { sequence, host, events, allow: value => { allowed = value; } };
 }
 
+test('startup resume reports progress only after a pending phase actually runs', async () => {
+  const h = startupHarness(), gate = deferred();
+  assert.equal(await h.sequence.resume(h.host), false);
+  h.allow(false); await h.sequence.continue(h.host);
+  assert.equal(await h.sequence.resume(h.host), false);
+  h.allow(true); h.host.cloudCompleted = () => gate.promise;
+  const active = h.sequence.resume(h.host);
+  assert.equal(await h.sequence.resume(h.host), false);
+  gate.resolve(false);
+  assert.equal(await active, true);
+  assert.deepEqual(h.events, ['cloud']);
+  h.sequence.dispose();
+  assert.equal(await h.sequence.resume(h.host), false);
+});
+
 test('initial announcement precedes cloud and intro; repeated start and disposed checks never replay', async () => {
   for (const found of [false, true]) {
     for (const disposed of [false, true]) {

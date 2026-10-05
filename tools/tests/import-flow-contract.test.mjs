@@ -48,7 +48,7 @@ test('settings exposes separate import, export and backup routes', () => {
 
   assert.match(settings, /导入数据回调: \(\) => void/);
   assert.match(settings, /导出数据回调: \(\) => void/);
-  for (const id of ['import', 'export_deck', 'backups']) assert.ok(dataGroup.includes(`settingsItemText(this.getUIContext(), '${id}')`));
+  for (const id of ['import', 'export_deck', 'backups']) assert.ok(dataGroup.includes(`settingsItemText(this.getUIContext(), '${id}', this.uiLanguage)`));
   assert.match(settings, /点击导入回调:.*this\.导入数据回调\(\)/);
   assert.match(settings, /点击导出回调:.*this\.导出数据回调\(\)/);
   assert.match(read('entry/src/main/ets/pages/首页.ets'), /transferSession\.startImport\(\)/);

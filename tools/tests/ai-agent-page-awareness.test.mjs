@@ -4,22 +4,30 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { APP_INTERFACE_SURFACES, STATS_INTERFACE_SECTIONS, AppInterfaceTracker, visibleInterfaceItems,
-  statsInterfaceSections, addNoteInterfaceControls, noteEditInterfaceControls } from '../../entry/src/main/ets/model/AppInterface.ts';
+  statsInterfaceSections, addNoteInterfaceControls, noteEditInterfaceControls, noteAudioInterfaceObservation } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { noteFieldDisplayKey, noteTypeDisplayKey } from '../../entry/src/main/ets/model/NoteTypePresentation.ts';
 import { buildAgentAppStructure } from '../../entry/src/main/ets/model/agent/AgentAppStructure.ts';
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
+import { DeckOptionsSession, DeckOptionsFsrsState } from '../../entry/src/main/ets/model/home/DeckOptionsSession.ts';
+import { 牌组配置表单 } from '../../entry/src/main/ets/model/牌组配置表单.ets';
+import { 牌组选项编辑 } from '../../entry/src/main/ets/model/牌组选项编辑.ets';
+import { emptyDeckConfigSettings } from '../../entry/src/main/ets/proto/messages/DeckConfigMessages.ts';
+import { deckConfigUseCount } from '../../entry/src/main/ets/model/DeckConfigSave.ts';
 
 const read = path => readFileSync(new URL('../../entry/src/main/ets/' + path, import.meta.url),'utf8');
 const strings = locale => new Map(JSON.parse(readFileSync(new URL(`../../entry/src/main/resources/${locale}/element/string.json`,import.meta.url),'utf8')).string.map(x=>[x.name,x.value]));
 const zh = strings('base'), en = strings('en_US');
 const localize = key => {assert.ok(zh.has(key),key);return zh.get(key);};
 const context = {simple:false,agent:true,cloudDeck:false,themeHasTextures:false};
+const deckConfig = () => ({...emptyDeckConfigSettings(),newPerDay:20,reviewsPerDay:200,maximumReviewInterval:36500,
+  minimumLapseInterval:1,graduatingIntervalGood:1,graduatingIntervalEasy:4,leechThreshold:8,
+  initialEase:2.5,easyMultiplier:1.3,hardMultiplier:1.2,intervalMultiplier:1,desiredRetention:0.9,historicalRetention:0.9,capAnswerTimeToSecs:60,learnSteps:[1,10]});
 const result = (tracker,id,locale=localize) => buildAgentAppStructure(context,id,'',locale,[],[],tracker.snapshot());
 function dependencies(tracker) {
   const namedResourceText = (_,key) => localize(key);
   const text = {APP_INTERFACE_SURFACES,namedResourceText};
   const note = {noteFieldDisplayKey,noteTypeDisplayKey,namedResourceText};
-  return {appInterface:tracker,namedResourceText,visibleInterfaceItems,statsInterfaceSections,addNoteInterfaceControls,noteEditInterfaceControls,
+  return {appInterface:tracker,namedResourceText,visibleInterfaceItems,statsInterfaceSections,addNoteInterfaceControls,noteEditInterfaceControls,noteAudioInterfaceObservation,
     noteFieldDisplayKey,noteTypeDisplayKey,
     interfaceItemText:loadPlatformModule('utils/AppInterfaceText.ets','interfaceItemText',text),
     interfaceControlText:loadPlatformModule('utils/AppInterfaceText.ets','interfaceControlText',text),
@@ -135,6 +143,37 @@ test('real editor form observes bounded field labels, busy guards and cleanup wi
   form.aboutToDisappear();form.publishInterface();assert.equal(tracker.snapshot().length,0);
 });
 
+test('real audio field status reaches JIDE from both editor hosts with pause/resume and disabled actions, without media details',()=>{
+  for (const path of ['pages/添加笔记页.ets', 'components/browser/浏览编辑区.ets']) {
+    const tracker = new AppInterfaceTracker(), Page = methods(path, ['publishAudioStatus'], dependencies(tracker));
+    const page = new Page(); Object.assign(page, { pageActive: true, interfaceMounted: true, disposed: false });
+    const Field = loadComponentLogic('components/common/NoteAudioField.ets', 'NoteAudioField', {
+      APP_FOREGROUND_KEY: 'foreground', NoteAudioPreview: class {}, NoteAudioRecorder: class {},
+      noteAudioParts: value => [{ text: value, filename: 'PRIVATE_FILENAME' }]
+    });
+    const field = new Field(); field.value = '[sound:PRIVATE_FILENAME]'; field.audios = [{ id: 5, uri: 'PRIVATE_URI' }];
+    field.onStatus = status => page.publishAudioStatus(status);
+    field.aboutToAppear();
+    const item = id => result(tracker, 'note_audio_manage').surfaces[0].items.find(x => x.id === id);
+    assert.equal(item('record').title, zh.get('note_audio_record'));
+    assert.equal(item('pending-5-remove').title, zh.get('note_audio_remove'));
+    assert.equal(item('pause').visibility, 'hidden');
+    field.recording = field.disabled = true; field.publishStatus();
+    assert.equal(item('record').title, zh.get('note_audio_record_done')); assert.equal(item('record').enabled, true);
+    assert.equal(item('pause').title, zh.get('note_audio_pause')); assert.equal(item('close').enabled, false);
+    assert.equal(item('apply').enabled, false); assert.equal(item('add').visibility, 'hidden');
+    field.paused = true; field.seconds = 12; field.publishStatus();
+    assert.equal(item('pause').title, zh.get('note_audio_resume'));
+    assert.equal(result(tracker, 'note_audio_manage', key => en.get(key)).surfaces[0].items.find(x => x.id === 'pause').title, en.get('note_audio_resume'));
+    field.working = true; field.publishStatus(); assert.ok(tracker.snapshot()[0].items.every(x => !x.enabled));
+    assert.ok(!JSON.stringify(result(tracker, 'note_audio_manage')).includes('PRIVATE_'));
+    page.publishAudioStatus(null); assert.equal(tracker.snapshot().length, 0);
+    page.pageActive = page.interfaceMounted = false; page.disposed = true;
+    field.publishStatus(); assert.equal(tracker.snapshot().length, 0);
+    assert.match(read(path), /onAudioStatus:.*this\.publishAudioStatus\(status\)/);
+  }
+});
+
 test('editor page exposes loading/retry and loaded-form destination, without reading note contents',()=>{
   const tracker=new AppInterfaceTracker();const Page=methods('pages/EditNotePage.ets',['publishInterface'],dependencies(tracker));
   const page=new Page();Object.assign(page,{active:true,targetId:42,isNote:true,getUIContext:()=>({}),editor:{busy:true,note:null,error:''}});
@@ -144,6 +183,99 @@ test('editor page exposes loading/retry and loaded-form destination, without rea
   const view=result(tracker,'edit_note');assert.equal(view.surfaces[0].items.find(x=>x.id==='form').opens,'edit_note_form');
   assert.ok(!JSON.stringify(view).includes('PRIVATE_BODY'));
   tracker.leave('edit_note');page.active=false;page.publishInterface();assert.equal(tracker.snapshot().length,0);
+});
+
+test('real deck options feature publishes loading, error/retry and loaded form facts, then disposes late callbacks',async()=>{
+  for(const mode of ['ready','error','disposed']) {
+    const tracker=new AppInterfaceTracker();let resolve,reject,loads=0,writes=0;
+    const backend={load:()=>{loads++;return new Promise((yes,no)=>{resolve=yes;reject=no;});},save:async()=>{writes++;},committed(){}};
+    class Session extends DeckOptionsSession {
+      constructor(id,adapter,publish){super(id,adapter,publish,{beginOperation(){},endOperation(){}},{waitForCollection:async()=>{}});}
+    }
+    const Feature=loadComponentLogic('components/home/DeckOptionsFeature.ets','DeckOptionsFeature',{
+      ...dependencies(tracker),DeckOptionsSession:Session,DeckOptionsFsrsState,牌组配置表单,牌组选项编辑,deckConfigUseCount,
+      AnkiDeckOptions:class{load(...args){return backend.load(...args);}save(){return backend.save();}committed(){}}
+    });
+    const feature=new Feature();Object.assign(feature,{deckId:12,deckName:'PRIVATE_DECK',getUIContext:()=>({})});
+    feature.aboutToAppear();assert.equal(tracker.snapshot()[0].sectionId,'loading');
+    assert.equal(result(tracker,'deck_options').surfaces[0].items.find(x=>x.id==='retry').visibility,'hidden');
+    await new Promise(setImmediate);assert.equal(loads,1);
+    if(mode==='disposed')feature.aboutToDisappear();
+    const config=deckConfig();
+    if(mode==='error')reject(Error('PRIVATE_ERROR'));
+    else resolve({currentDeck:{configId:7,limits:null},allConfigs:[{config:{id:7,name:'PRIVATE_PRESET',mtimeSecs:0,usn:0,config},useCount:1}],
+      fsrs:false,newCardsIgnoreReviewLimit:false,applyAllParentLimits:false,fsrsHealthCheck:false});
+    await new Promise(setImmediate);
+    if(mode==='disposed'){assert.deepEqual(tracker.snapshot(),[]);continue;}
+    const view=result(tracker,'deck_options');const controls=view.surfaces[0].items;
+    if(mode==='error')assert.equal(controls.find(x=>x.id==='retry').visibility,'observed');
+    else {
+      assert.equal(feature.state.phase,'ready',feature.state.error);
+      assert.equal(controls.find(x=>x.id==='form').opens,'deck_options_form');
+      assert.equal(controls.find(x=>x.id==='close').visibility,'hidden');
+      assert.equal(view.observations[0].values.find(x=>x.id==='presetId').value,'7');
+      feature.state.fsrs.busy=true;feature.publishInterface();assert.equal(tracker.snapshot()[0].busy,true);
+    }
+    assert.ok(!JSON.stringify(view).includes('PRIVATE_'));assert.equal(writes,0);
+    feature.aboutToDisappear();feature.publishInterface();assert.deepEqual(tracker.snapshot(),[]);
+  }
+});
+
+test('real deck options header observes validation, computation, nested overlays and manual save without exposing draft fields',()=>{
+  const tracker=new AppInterfaceTracker();
+  const Form=loadComponentLogic('components/牌组选项面板.ets','牌组选项面板',{
+    ...dependencies(tracker),DeckOptionsFsrsState,$r:key=>({params:[key]})
+  });
+  const config=deckConfig();
+  const form=new Form();Object.assign(form,{getUIContext:()=>({}),form:牌组配置表单.从配置创建(config),
+    options:牌组选项编辑.从视图创建(null,false,false,false,false),deckName:'PRIVATE_DECK'});
+  form.aboutToAppear();let view=result(tracker,'deck_options_form');
+  const item=id=>result(tracker,'deck_options_form').surfaces[0].items.find(x=>x.id===id);
+  assert.deepEqual(form.form.校验().concat(form.options.校验()),[]);
+  assert.equal(item('save').enabled,true);assert.equal(item('cancel').enabled,true);assert.equal(item('help').enabled,true);
+  assert.equal(view.observations[0].controlsComplete,false);
+  assert.equal(view.observations[0].values.find(x=>x.id==='save_behavior').value,'manual');
+  assert.equal(form.interfaceLabel('save'),item('save').title);
+  form.form.每日新卡数文本='PRIVATE_INVALID_TEXT';form.publishInterface();assert.equal(item('save').enabled,false);
+  form.form.每日新卡数文本='30';form.publishInterface();assert.equal(item('save').enabled,true);
+  form.busy=true;form.publishInterface();assert.equal(item('save').title,localize('deck_options_saving'));
+  assert.ok(['cancel','save','help'].every(id=>!item(id).enabled));
+  form.computing=true;form.publishInterface();assert.equal(item('save').title,localize('deck_fsrs_computing'));assert.equal(item('cancel').enabled,true);
+  form.busy=false;form.computing=false;form.showHelp=true;form.publishInterface();assert.ok(['cancel','save','help'].every(id=>!item(id).enabled));
+  form.showHelp=false;form.简洁模式=false;form.errorMessage='PRIVATE_ERROR';form.publishInterface();
+  view=result(tracker,'deck_options_form',key=>en.get(key));assert.equal(view.observations[0].sectionId,'full');
+  assert.equal(view.observations[0].values.find(x=>x.id==='has_error').value,'true');assert.equal(view.surfaces[0].items.find(x=>x.id==='save').title,en.get('deck_options_save'));
+  assert.ok(!JSON.stringify(view).includes('PRIVATE_'));
+  form.aboutToDisappear();form.publishInterface();assert.deepEqual(tracker.snapshot(),[]);
+});
+
+test('FSRS panel publishes real evaluation and history counts, conditional actions and disposal to JIDE',()=>{
+  const tracker=new AppInterfaceTracker();
+  const Panel=loadComponentLogic('components/home/FsrsTools.ets','FsrsTools',{
+    ...dependencies(tracker),DeckOptionsFsrsState
+  });
+  const panel=new Panel();panel.getUIContext=()=>({});
+  panel.aboutToAppear();
+  const surface=()=>result(tracker,'deck_options_fsrs').surfaces[0];
+  assert.equal(surface().items.find(x=>x.id==='evaluate').enabled,true);
+  assert.equal(surface().items.find(x=>x.id==='retry').visibility,'hidden');
+  assert.equal(surface().items.find(x=>x.id==='use_retention').visibility,'hidden');
+  panel.state.evaluation={logLoss:0.25,rmseBins:0.08};
+  panel.state.historyCount={included:6,total:10};
+  panel.state.evaluationSearch='preset:7 -is:suspended';
+  panel.state.evaluationDate='2025-01-01';
+  panel.state.operation='evaluate';panel.busy=true;panel.publishInterface();
+  const view=result(tracker,'deck_options_fsrs',key=>en.get(key));
+  assert.equal(view.surfaces[0].items.find(x=>x.id==='evaluate').title,en.get('deck_fsrs_evaluate_current'));
+  assert.ok(view.surfaces[0].items.filter(x=>x.visibility==='observed').every(x=>!x.enabled));
+  const values=Object.fromEntries(view.observations[0].values.map(x=>[x.id,x.value]));
+  assert.deepEqual(values,{operation:'evaluate',search:'preset:7 -is:suspended',ignore_before_date:'2025-01-01',
+    log_loss:'0.25',rmse_bins:'0.08',included_cards:'6',total_cards:'10',days:'365',compare_retention:'90'});
+  assert.equal(view.observations[0].controlsComplete,true);
+  panel.state.results=[{id:7,error:'failure'}];panel.state.workload={points:[]};panel.busy=false;panel.publishInterface();
+  assert.equal(surface().items.find(x=>x.id==='retry').visibility,'observed');
+  assert.equal(surface().items.find(x=>x.id==='use_retention').enabled,true);
+  panel.aboutToDisappear();panel.publishInterface();assert.deepEqual(tracker.snapshot(),[]);
 });
 
 test('directory reads omit mounted control and dataset details; targeted reads keep actual observations intact',()=>{

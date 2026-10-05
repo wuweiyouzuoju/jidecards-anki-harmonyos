@@ -16,6 +16,7 @@ import { 设置分组卡片 } from './设置分组卡片';
 
 @Component
 export struct 开发者调试分组 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop 是否深色: boolean = false;
   启用成功回调: () => void = (): void => {};
@@ -62,23 +63,23 @@ export struct 开发者调试分组 {
     }) {
       Column({ space: 应用尺寸.间距_10 }) {
         if (this.Agent入口已启用) {
-          Text() { ThemeTextSpans(settingsItemText(this.getUIContext(), 'agent_enabled'), this.themeAccentColors, this.getUIContext()) }
+          Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(settingsItemText(this.getUIContext(), 'agent_enabled', this.uiLanguage), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }
             .width('100%')
             .fontSize(应用尺寸.字号_正文_小)
             .fontColor(设置面板色板_取(this.是否深色).主色)
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
         } else {
-          Text(settingsItemText(this.getUIContext(), 'developer_description'))
+          Text(settingsItemText(this.getUIContext(), 'developer_description', this.uiLanguage))
             .width('100%')
             .fontSize(应用尺寸.字号_正文_小)
             .fontColor(设置面板色板_取(this.是否深色).次文字)
-          Text() { ThemeTextSpans(settingsItemText(this.getUIContext(), 'developer_contact'), this.themeAccentColors, this.getUIContext()) }
+          Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(settingsItemText(this.getUIContext(), 'developer_contact', this.uiLanguage), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }
             .width('100%')
             .fontSize(应用尺寸.字号_正文_小)
             .fontColor(设置面板色板_取(this.是否深色).主色)
           TextInput({
-            placeholder: settingsItemText(this.getUIContext(), 'developer_key'),
+            placeholder: settingsItemText(this.getUIContext(), 'developer_key', this.uiLanguage),
             text: this.开发者密钥
           })
             .type(InputType.Password)
@@ -88,7 +89,7 @@ export struct 开发者调试分组 {
               this.显示错误 = false;
             })
           PrimaryActionButton({ label: this.正在启用 ? $r('app.string.settings_developer_debug_enabling') :
-            settingsItemText(this.getUIContext(), 'developer_enable'), tint: this.解析主色按钮背景(),
+            settingsItemText(this.getUIContext(), 'developer_enable', this.uiLanguage), tint: this.解析主色按钮背景(),
             isInteractive: !this.正在启用 && this.开发者密钥.trim() !== '',
             onAction: (): void => { this.启用开发者功能(); } })
         }

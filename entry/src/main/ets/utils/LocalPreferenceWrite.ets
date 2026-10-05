@@ -19,11 +19,11 @@ export function readLocalPreference(store: preferences.Preferences, key: string,
   });
 }
 
-/** 字号、牌组宽度、触感的设置页与助手共用队列；比较原值后保存、回读、广播。 */
+/** 本机可逆偏好共用队列，包括字号、牌组样式、触感与 JIDE 学习操作；比较原值后保存、回读、广播。 */
 /** @throws {Error} 过期提案或读写失败交给调用方；已接受的写入不依赖页面生命周期。 */
 export function saveLocalPreference(store: preferences.Preferences, key: string,
   value: preferences.ValueType, fallback: preferences.ValueType,
-  expected: preferences.ValueType | null = null): Promise<void> {
+  expected: preferences.ValueType | null = null, onApplied: () => void = (): void => {}): Promise<void> {
   const work: Promise<void> = saving.then(async (): Promise<void> => {
     const previous: preferences.ValueType = store.getSync(key, fallback);
     if (typeof previous !== typeof fallback) { throw new Error('invalid_saved_setting:' + key); }
@@ -42,7 +42,10 @@ export function saveLocalPreference(store: preferences.Preferences, key: string,
     } catch (error) {
       throw new LocalPreferenceWriteError('setting_save_unverified', false);
     }
-    try { AppStorage.setOrCreate<preferences.ValueType>(key, value); }
+    try {
+      AppStorage.setOrCreate<preferences.ValueType>(key, value);
+      onApplied();
+    }
     catch (error) { throw new LocalPreferenceWriteError('setting_apply_failed', true); }
   });
   saving = work.catch((): void => {});

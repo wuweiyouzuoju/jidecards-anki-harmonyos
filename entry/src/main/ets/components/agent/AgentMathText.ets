@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { webview } from '@kit.ArkWeb';
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { ColorMetrics } from '@kit.ArkUI';
 import { AGENT_MATH_BASE, AgentMathAppearance, AgentMathLayout, parseAgentMathLayout } from '../../model/agent/AgentMath';
 import { agentMathDocumentHtml, agentMathDocumentUpdateScript } from '../../model/agent/AgentMathDocument';
@@ -40,7 +41,7 @@ export struct AgentMathText {
       fontSize: context.px2vp(context.fp2px(this.fontSize)), alignment: this.alignment, bold: this.bold,
       tableColor: ColorMetrics.resourceColor($r('app.color.surface_card')).color,
       headerColor: ColorMetrics.resourceColor($r('app.color.surface_page')).color,
-      borderColor: ColorMetrics.resourceColor($r('app.color.border_subtle')).color };
+      borderColor: ColorMetrics.resourceColor(SurfaceBorder.color()).color };
   }
 
   private attached(): void {

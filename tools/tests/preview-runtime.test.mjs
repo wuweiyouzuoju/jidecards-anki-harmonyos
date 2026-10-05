@@ -4,9 +4,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import vm from 'node:vm';
+import { loadPlatformModule } from './platform-module-harness.mjs';
 import { CardAudioSession } from '../../entry/src/main/ets/model/CardAudioSession.ts';
 import { buildPreviewInteractionScript } from '../../entry/src/main/ets/model/PreviewInteraction.ts';
 import { renderPreviewAnswer } from '../../entry/src/main/ets/model/StudyAnswerRenderer.ts';
+import { coreTyping } from './core-rendering-harness.mjs';
+import { readCardMarking, parseFlagLabels } from '../../entry/src/main/ets/model/CardMarking.ts';
 import { 构建卡片HTML, 剥除拼写标记, 原始侧HTML } from '../../entry/src/main/ets/model/学习卡片HTML构建器.ts';
 
 const read = path => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
@@ -26,18 +29,19 @@ test('preview overlay admits child input while keeping loading input blocked', (
 });
 const names = ['aboutToAppear', 'aboutToDisappear', 'updateActivity', 'stopAudio', 'playCurrentAudio',
   '预览刷新版本变化', '取当前卡片ID', '加载当前卡', '应用HTML', 'webFailed', 'installActionBridge', 'onControllerAttached回调',
-  '翻面', '上一张', '下一张', '请求编辑字段', '请求AI改卡', '预览更多菜单', 'focusPreviewCard', 'dismissMoreMenu'];
+  '翻面', '上一张', '下一张', '请求编辑字段', '请求AI改卡', '预览更多菜单', 'focusPreviewCard', 'dismissMoreMenu', 'previewCardShown'];
 const methods = names.map(name => {
   const start = source.search(new RegExp(`^  (?:private )?(?:async )?${name}\\(`, 'm'));
   assert.ok(start >= 0, name);
   return source.slice(start, source.indexOf('\n  }', start) + 4);
 });
 const Page = new Function('构建卡片HTML', '剥除拼写标记', '原始侧HTML', '媒体基地址',
-  '解码文件名', 'buildPreviewInteractionScript', 'renderPreviewAnswer', '$r', 'PreviewActionProxy', 'console',
+  '解码文件名', 'buildPreviewInteractionScript', 'renderPreviewAnswer', 'readCardMarking', 'parseFlagLabels', '$r', 'actionIcon', 'PreviewActionProxy', 'console',
   stripTypeScriptTypes(`class Page {${methods.join('\n')}}`, { mode: 'transform' }) + '\nreturn Page;')(
   构建卡片HTML, 剥除拼写标记, 原始侧HTML, 'https://jidecards-media.local/',
   name => { try { return decodeURIComponent(name); } catch { return name; } },
-  buildPreviewInteractionScript, renderPreviewAnswer, key => key,
+  buildPreviewInteractionScript, renderPreviewAnswer, readCardMarking, parseFlagLabels, key => key,
+  loadPlatformModule('utils/ActionIcons.ets', 'actionIcon', { $r: key => key }),
   class { onAction(action, version) { this.dispatch(action, version); } },
   // 故障注入的预期日志只留在替身中，避免 Windows Node 测试 IPC 与多字节 stdout 混写。
   { info() {} }
@@ -50,12 +54,15 @@ async function settle(page) { for (let i = 0; i < 8; i++) { await new Promise(r 
 function harness() {
   const page = new Page(), displayed = [], sounds = [], tts = [], renderedIds = [], events = [];
   const service = {
+    ...coreTyping,
     渲染既有卡片: async id => { renderedIds.push(id); return card(id); },
     extractAudioTags: async (raw, question) => ({ soundFiles: [question ? '%E4%B8%AD.mp3' : 'back.mp3'],
       ttsItems: [{ text: question ? 'front speech' : 'back speech', language: 'en_US' }] })
   };
   Object.assign(page, {
     mounted: true, loadVersion: 0, documentVersion: 0, bridgeReady: false, audioRefreshPending: false,
+    markingBackend: { card: async id => ({ id, noteId: id + 100, flags: id === 11 ? 7 : 0 }),
+      note: async () => ({ tags: ['marked', 'marked::child'] }), labels: async () => '{"7":"Check"}' },
     previewIds: [11, 22, 33], 卡片ID列表: [11, 22, 33], 当前索引值: 0, 初始索引: 0,
     当前面: 'question', 正面HTML: '', 背面HTML: '',
     忙碌: false, 错误详情: '', audioError: '', hasAudio: false, 已渲染: null,
@@ -75,9 +82,28 @@ function harness() {
       registerJavaScriptProxy: proxy => { page.proxy = proxy; } }
   });
   page.audioSession = new CardAudioSession(page.soundPlayer, page.ttsPlayer, (raw, question) => service.extractAudioTags(raw, question));
-  page.cardWeb = { reset() {}, attach() {}, show: html => page.网页控制器.loadData(html) };
+  page.cardRenderPending = false;
+  page.cardWeb = { reset() {}, attach() {}, show: html => {
+    page.网页控制器.loadData(html);
+    page.previewCardShown('');
+  } };
   return { page, displayed, sounds, tts, renderedIds, events, service };
 }
+
+test('preview retains the dark surface until rendering acknowledges it and blocks early flips', async () => {
+  const { page, displayed, sounds } = harness();
+  page.cardSurfaceBackground = '#101820';
+  page.cardWeb.show = html => displayed.push(html);
+  await page.加载当前卡();
+  assert.equal(page.忙碌, false); assert.equal(page.cardRenderPending, true);
+  assert.equal(page.cardSurfaceBackground, '#101820');
+  page.翻面(); assert.equal(page.当前面, 'question'); assert.deepEqual(sounds, []);
+  page.previewCardShown('#202830');
+  assert.equal(page.cardRenderPending, false); assert.equal(page.cardSurfaceBackground, '#202830');
+  page.翻面(); assert.equal(page.当前面, 'answer'); assert.equal(page.cardRenderPending, true);
+  page.mounted = false; page.previewCardShown('#ffffff');
+  assert.equal(page.cardSurfaceBackground, '#202830'); assert.equal(page.cardRenderPending, true);
+});
 
 test('both preview hosts dismiss the open menu before leaving preview and release the handler on unmount', async () => {
   const { page } = harness();
@@ -90,7 +116,7 @@ test('both preview hosts dismiss the open menu before leaving preview and releas
     const start = hostSource.indexOf('  onBackPress(): boolean {');
     const method = hostSource.slice(start, hostSource.indexOf('\n  }', start) + 4);
     const Host = new Function(stripTypeScriptTypes(`class Host {${method}}`) + '; return Host;')();
-    const host = Object.assign(new Host(), { [visible]: true, previewBackHandler: handler,
+    const host = Object.assign(new Host(), { deckLevelMenuId: '', [visible]: true, previewBackHandler: handler,
       transfer: { phase: 'idle' }, batchDialog: 'none', editor: { visible: false, busy: false } });
     page.moreMenuOpen = true;
     assert.equal(host.onBackPress(), true);
@@ -213,9 +239,14 @@ test('editing preserves card identity even when search results reorder or remove
 
 test('rapid navigation discards stale successes and failures while allowing skip during loading', async () => {
   for (const fails of [false, true]) {
-    const { page, service, displayed } = harness(), slow = deferred();
-    service.渲染既有卡片 = id => id === 11 ? slow.promise : Promise.resolve(card(id));
-    const old = page.加载当前卡(); page.下一张(); await settle(page);
+    const { page, service, displayed } = harness(), slow = deferred(), rendering = deferred();
+    service.渲染既有卡片 = id => {
+      if (id === 11) { rendering.resolve(); return slow.promise; }
+      return Promise.resolve(card(id));
+    };
+    const old = page.加载当前卡();
+    await rendering.promise;
+    page.下一张(); await settle(page);
     assert.match(displayed.at(-1), /front-22/);
     if (fails) slow.reject(new Error('old failure')); else slow.resolve(card(11));
     await old; await settle(page);
@@ -310,8 +341,10 @@ function domHarness(version = 42) {
   const listeners = {}, actions = [];
   const window = { getSelection: () => '', jidePreview: { onAction: (...args) => actions.push(args) } };
   const document = { addEventListener: (name, fn) => { listeners[name] = fn; }, getElementById: () => null };
-  vm.runInNewContext(buildPreviewInteractionScript(version), { window, document, Promise, setTimeout: fn => fn() });
-  return { listeners, actions, window };
+  const context = { window, document, Promise, setTimeout: fn => fn() };
+  const updateVersion = version => vm.runInNewContext(buildPreviewInteractionScript(version), context);
+  updateVersion(version);
+  return { listeners, actions, window, updateVersion };
 }
 
 test('DOM clicks reveal the answer; controls, selection, drags and multi-touch stay inert', () => {
@@ -366,6 +399,70 @@ test('horizontal swipe changes cards inside the document; vertical scrolls and c
   listeners.touchstart({ touches: [{ clientX: 300, clientY: 400 }, { clientX: 320, clientY: 400 }], target: plain });
   listeners.touchend({ changedTouches: [{ clientX: 300, clientY: 400 }, { clientX: 320, clientY: 400 }] });
   assert.equal(actions.length, 2);
+});
+
+test('image occlusion canvas swipes reveal, hide and navigate through the shared preview bridge', async () => {
+  const { page } = harness();
+  await page.加载当前卡(); await settle(page);
+  assert.deepEqual(page.currentMarking,{flag:7,marked:true});assert.deepEqual(page.flagLabels,{'7':'Check'});
+  const dom = domHarness(page.documentVersion);
+  dom.window.jidePreview = page.proxy;
+  const canvas = { tagName: 'CANVAS', id: 'image-occlusion-canvas', parentElement: null, getAttribute: () => null };
+  const swipe = async (left, index, side) => {
+    dom.updateVersion(page.documentVersion);
+    const start = left ? 300 : 150, end = left ? 150 : 300;
+    dom.listeners.touchstart({ touches: [{ clientX: start, clientY: 100 }], target: canvas });
+    dom.listeners.touchmove({ touches: [{ clientX: end, clientY: 100 }] });
+    dom.listeners.touchend({ changedTouches: [{ clientX: end, clientY: 100 }] });
+    dom.listeners.click({ target: canvas });
+    await settle(page);
+    assert.equal(page.当前索引值, index);
+    assert.equal(page.当前面, side);
+  };
+  await swipe(false, 0, 'question');
+  await swipe(true, 0, 'answer');
+  await swipe(false, 0, 'question');
+  await swipe(true, 0, 'answer');
+  await swipe(true, 1, 'question');
+  await swipe(true, 1, 'answer');
+  await swipe(false, 1, 'question');
+  await swipe(false, 0, 'question');
+});
+
+test('occlusion swipe exemption preserves template controls, drawing canvases and ignored regions', () => {
+  const { listeners, actions } = domHarness();
+  const occlusion = parentElement => ({ tagName: 'CANVAS', id: 'image-occlusion-canvas', parentElement });
+  for (const target of [
+    { tagName: 'CANVAS' },
+    occlusion({ tagName: 'A' }), occlusion({ tagName: 'BUTTON' }),
+    occlusion({ isContentEditable: true }), occlusion({ getAttribute: name => name === 'role' ? 'slider' : null }),
+    occlusion({ getAttribute: name => name === 'data-jide-gesture' ? 'ignore' : null })
+  ]) {
+    listeners.touchstart({ touches: [{ clientX: 300, clientY: 100 }], target });
+    listeners.touchmove({ touches: [{ clientX: 150, clientY: 100 }] });
+    listeners.touchend({ changedTouches: [{ clientX: 150, clientY: 100 }] });
+  }
+  assert.deepEqual(actions, []);
+});
+
+test('cancelled and multi-touch occlusion gestures cannot become navigation when one finger remains', () => {
+  const { listeners, actions } = domHarness();
+  const canvas = { tagName: 'CANVAS', id: 'image-occlusion-canvas' };
+  const first = { clientX: 300, clientY: 100 }, second = { clientX: 320, clientY: 100 };
+  const end = { clientX: 150, clientY: 100 };
+  listeners.touchstart({ touches: [first, second], target: canvas });
+  listeners.touchend({ touches: [first], changedTouches: [second] });
+  listeners.touchmove({ touches: [end] });
+  listeners.touchend({ touches: [], changedTouches: [end] });
+  listeners.touchstart({ touches: [first], target: canvas });
+  listeners.touchmove({ touches: [first, second] });
+  listeners.touchend({ changedTouches: [end] });
+  listeners.touchstart({ touches: [first], target: canvas });
+  listeners.touchmove({ touches: [end] });
+  if (listeners.touchcancel) listeners.touchcancel({});
+  listeners.touchend({ changedTouches: [end] });
+  listeners.click({ target: { tagName: 'DIV' } });
+  assert.deepEqual(actions, []);
 });
 
 test('preview matches Anki: no side buttons, question first, reveal by tap, swipe and keys outside ArkUI', () => {
@@ -453,6 +550,7 @@ test('top-right preview menu replays audio and edits exactly the current card wi
   const menu = page.预览更多菜单();
   const replay = menu.find(item => item.value === 'app.string.study_replay_sound');
   const agent = menu.find(item => item.value === 'app.string.ai_card_edit');
+  assert.ok(menu.every(item => item.icon?.startsWith('app.media.')), 'each preview action has a semantic icon');
   assert.equal(replay.enabled, true);
   assert.equal(agent.enabled, true);
   replay.action(); agent.action();

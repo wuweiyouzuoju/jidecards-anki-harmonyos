@@ -11,7 +11,7 @@ const read = file => readFileSync(new URL('../../entry/src/main/ets/' + file, im
 
 test('detail actions share a single equal-width row above the full-width deck title', () => {
   const detail = read('components/牌组详情面板.ets');
-  const titleStart = detail.indexOf('Text(牌组显示名(deck))');
+  const titleStart = detail.indexOf('Text(牌组显示名(deck, this.uiLanguage))');
   const headerStart = detail.lastIndexOf('Row({ space:', titleStart);
   const header = detail.slice(headerStart, titleStart);
   const title = detail.slice(titleStart, detail.indexOf("if (deck.description !== '')"));
@@ -35,7 +35,7 @@ test('detail actions share a single equal-width row above the full-width deck ti
   assert.match(action, /width\('100%'\)[\s\S]*textAlign\(TextAlign.Center\)/);
   assert.match(action, /minWidth: 0/);
   assert.match(action, /left: 应用尺寸.间距_4, right: 应用尺寸.间距_4/);
-  assert.match(header, /'deck_details', 'preview'\),.*true\)/);
+  assert.match(header, /'deck_details', 'preview', this\.uiLanguage\),.*true\)/);
   assert.match(read('components/home/HomeDeckDetails.ets'), /onCreateWithAI:.*this.onCreateWithAI\(\)/);
   assert.match(detail, /if \(this.showHeaderActions\) \{\s*Row/);
   assert.match(read('components/home/HomeDeckDetails.ets'), /showHeaderActions: !this.compact/,
@@ -70,24 +70,27 @@ test('compact detail menu closes before each action, consumes back and resets ac
   assert.equal(page.actionsMenuOpen, false); assert.equal(registrations.at(-1), null);
 });
 
-test('compact detail reuses the arrowless home menu while Preview retains its own arrow anchor', () => {
+test('compact detail keeps its shared arrowless menu while home and Preview use their own arrow anchors', () => {
   const shell = read('components/home/HomeDeckDetails.ets');
   const menu = shell.slice(shell.indexOf('  private actionsMenu()'), shell.indexOf('  build()'));
   assert.match(shell, /private previewScopes\(\)[\s\S]*DeckPreviewScopeMenu\(\{/);
   const homeMenu = read('components/home/主页更多面板.ets');
   assert.match(shell, /if \(this.compact && this.actionsMenuOpen\) \{\s*AnchoredMenu\(/);
-  for (const surface of [shell, homeMenu]) {
+  for (const surface of [shell]) {
     assert.match(surface, /menuWidth: 应用尺寸.compactMenuWidth/);
     assert.match(surface, /contentMaxWidth: 应用尺寸.内容最大宽度/);
     assert.match(surface, /topOffset: 应用尺寸.pageContentTop\(this.状态栏高度, this.narrowDeckLayout\)/);
   }
+  assert.match(homeMenu, /width\(应用尺寸.compactMenuWidth\)/);
+  const header=read('components/home/HomeSummaryHeader.ets');
+  assert.match(header, /bindPopup\(this.moreOpen/); assert.match(header, /enableArrow: true/);
   assert.match(shell, /alignEnd: true/);
   assert.match(shell, /onClose:.*this.closeActionsMenu\(\)/);
   assert.doesNotMatch(shell, /bindPopup\(this.actionsMenuOpen|autoCancel:/);
   assert.match(shell, /onStateChange:[\s\S]*this.closeActionsMenu\(\)/);
   assert.equal((menu.match(/AnchoredMenuItem\(/g) ?? []).length, 3);
   assert.match(menu, /'deck_details', 'add_note'[\s\S]*if \(this.agentEnabled\)[\s\S]*'deck_details', 'agent'[\s\S]*'deck_details', 'preview'/);
-  const previewRow = menu.slice(menu.indexOf("label: interfaceItemText(this.getUIContext(), 'deck_details', 'preview')"));
+  const previewRow = menu.slice(menu.indexOf("label: interfaceItemText(this.getUIContext(), 'deck_details', 'preview', this.uiLanguage)"));
   assert.match(previewRow, /bindPopup\(this.previewMenuOpen,[\s\S]*builder: this.previewScopes/);
   assert.match(previewRow, /placement: Placement.Left/);
   assert.match(previewRow, /enableArrow: true/);
@@ -111,6 +114,7 @@ test('home system back closes the detail menu before leaving the detail page', (
   const Host = new Function(stripTypeScriptTypes(`class Host { ${code} }`, { mode: 'transform' }) + ';return Host;')();
   const page = new Host(); let open = true;
   Object.assign(page, { transfer: { phase: 'idle', visible: false }, syncController: { cancel() {} },
+    deckReorderBusy: false, deckLevelMenuId: '', 排序模式中: false,
     显示牌组详情: true, deckDetailsBackHandler: () => { const consumed = open; open = false; return consumed; } });
   assert.equal(page.onBackPress(), true); assert.equal(page.显示牌组详情, true);
   assert.equal(page.onBackPress(), true); assert.equal(page.显示牌组详情, false);
@@ -118,7 +122,7 @@ test('home system back closes the detail menu before leaving the detail page', (
 
 test('two or three detail actions keep equal centers and responsive gaps without extra outer margins', () => {
   const source = read('components/牌组详情面板.ets');
-  const titleStart = source.indexOf('Text(牌组显示名(deck))');
+  const titleStart = source.indexOf('Text(牌组显示名(deck, this.uiLanguage))');
   const row = source.slice(source.lastIndexOf('Row({ space:', titleStart), titleStart);
   const expression = row.match(/space: (应用尺寸\.页面分组间距\([^)]+\))/)[1];
   const dimensions = loadPlatformModule('utils/应用尺寸.ets', '应用尺寸', {});

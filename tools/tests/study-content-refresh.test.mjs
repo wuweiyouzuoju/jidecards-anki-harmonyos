@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 
 const source = readFileSync(new URL('../../entry/src/main/ets/pages/学习页.ets', import.meta.url), 'utf8');
-const names = ['加载下一张卡', '刷新编辑后当前卡', '消费待重渲染', '卡片内容变更_回调', '显示答案', 'returnFromEditor', 'invalidateCardWork', 'isCurrentRequest', 'studyActivityChanged', 'applyStudyHtml', 'playStudyAudio', 'clearChoiceAutoAdvance', 'scheduleChoiceAutoAdvance', 'choiceAutoAdvanceSeconds'];
+const names = ['加载下一张卡', '刷新编辑后当前卡', '消费待重渲染', '卡片内容变更_回调', '显示答案', 'returnFromEditor', 'invalidateCardWork', 'isCurrentRequest', 'studyActivityChanged', 'updateScreenAwake', 'applyStudyHtml', 'playStudyAudio', 'clearChoiceAutoAdvance', 'scheduleChoiceAutoAdvance', 'choiceAutoAdvanceSeconds'];
 const methods = names.map(name => {
   const start = source.search(new RegExp(`  private (?:async )?${name}\\(`));
   assert.ok(start >= 0);
@@ -36,7 +36,7 @@ function harness(phase = 'question') {
   const page = new Page();
   Object.assign(page, {
     getUIContext: () => ({}),
-    mounted: true, sessionReady: true, foreground: true, requestVersion: 0, loadingVersion: -1, flipPending: false, controllerReady: true, pendingHtml: '',
+    screenAwake:null,mounted: true, sessionReady: true, foreground: true, requestVersion: 0, loadingVersion: -1, flipPending: false, controllerReady: true, pendingHtml: '',
     audioSession: { stop: async () => {}, play: async () => false, isPlaying: () => false },
     页面已显示: true, 待重渲染当前卡: false, contentRefreshInFlight: false, 评分中: false,
     choiceQuestion: null, choiceGrade: null, choiceAutoAdvanceTimer: -1, choiceFeedbackDeadline: 0, studyMenuOpen: false,

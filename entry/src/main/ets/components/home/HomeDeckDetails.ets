@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../../utils/PressFeedback';
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { 牌组详情面板 } from '../牌组详情面板';
 import { 应用尺寸 } from '../../utils/应用尺寸';
-import { DECK_LIST_NARROW_KEY } from '../../model/DeckListAppearance';
+import { PAGE_COMPACT_LAYOUT_KEY } from '../../model/AppLayoutState';
 import { PAGE_SURFACE_KEY } from '../../model/ThemeCatalog';
 import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../../model/ReleaseFeatures';
 import { DeckPreviewScopeMenu } from './DeckPreviewScopeMenu';
 import { DeckPreviewScope } from '../../model/DeckPreviewSession';
-import { APP_FOREGROUND_KEY } from '../../model/Redemption';
+import { APP_FOREGROUND_KEY } from '../../model/AppLifecycleState';
 import { AnchoredMenu } from '../common/AnchoredMenu';
+import { MenuSurface } from '../common/MenuSurface';
 import { AnchoredMenuItem } from '../common/MenuItem';
 import { 按下态按钮 } from '../common/按下态按钮';
 import { AppInterfaceItem, AppInterfaceControl, visibleInterfaceItems } from '../../model/AppInterface';
@@ -18,6 +20,7 @@ import { interfaceItemText } from '../../utils/AppInterfaceText';
 /** 手机详情与宽屏侧栏共用展示，动作及选择仍由首页持有。 */
 @Component
 export struct HomeDeckDetails {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('compactChanged') compact: boolean = false;
   @Prop isDark: boolean = false;
   @Prop optionsBusy: boolean = false;
@@ -25,7 +28,7 @@ export struct HomeDeckDetails {
   @Prop @Watch('closeActionsMenu') deckId: string = '';
   @Prop @Watch('publishInterface') previewBusy: boolean = false;
   @StorageProp(APP_FOREGROUND_KEY) @Watch('foregroundChanged') private foreground: boolean = true;
-  @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
+  @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
   @StorageProp(PAGE_SURFACE_KEY) private 页面底色微染值: string = '#F5F7FA';
   @StorageLink(AI_AGENT_CHANNELS_APP_STORAGE_KEY) @Watch('publishInterface') private agentEnabled: boolean = false;
@@ -40,6 +43,8 @@ export struct HomeDeckDetails {
   onAddNote: () => void = (): void => {};
   onCreateWithAI: () => void = (): void => {};
   onCreateChild: () => void = (): void => {};
+  onMoveDeck: () => void = (): void => {};
+  onRenameDeck: () => void = (): void => {};
   onExport: () => void = (): void => {};
   onOptions: () => void = (): void => {};
 
@@ -62,10 +67,10 @@ export struct HomeDeckDetails {
       cloudDeck: false, themeHasTextures: false }).filter((item: AppInterfaceItem): boolean => ['add_note', 'agent', 'preview'].includes(item.id));
     appInterface.observe({ surface: 'deck_actions', sectionId: '', selectedId: this.deckId, busy: this.previewBusy,
       optionIds: items.map((item: AppInterfaceItem): string => item.id),
-      optionLabels: items.map((item: AppInterfaceItem): string => interfaceItemText(this.getUIContext(), 'deck_details', item.id)),
+      optionLabels: items.map((item: AppInterfaceItem): string => interfaceItemText(this.getUIContext(), 'deck_details', item.id, this.uiLanguage)),
       items: items.map((item: AppInterfaceItem): AppInterfaceControl => ({ id: item.id,
         titleKey: item.titleKey,
-        title: interfaceItemText(this.getUIContext(), 'deck_details', item.id), enabled: item.id !== 'preview' || !this.previewBusy, selected: false })) });
+        title: interfaceItemText(this.getUIContext(), 'deck_details', item.id, this.uiLanguage), enabled: item.id !== 'preview' || !this.previewBusy, selected: false })) });
   }
 
   private compactChanged(): void {
@@ -120,19 +125,23 @@ export struct HomeDeckDetails {
   @Builder
   private actionsMenu() {
     // Keep the Preview row mounted: it owns the scope popup's arrow anchor.
-    AnchoredMenuItem({ label: interfaceItemText(this.getUIContext(), 'deck_details', 'add_note'),
+    AnchoredMenuItem({ label: interfaceItemText(this.getUIContext(), 'deck_details', 'add_note', this.uiLanguage),
       onSelect: (): void => { this.selectAction(this.onAddNote); } })
     if (this.agentEnabled) {
-      AnchoredMenuItem({ label: interfaceItemText(this.getUIContext(), 'deck_details', 'agent'), divider: true,
+      AnchoredMenuItem({ label: interfaceItemText(this.getUIContext(), 'deck_details', 'agent', this.uiLanguage), divider: true,
         onSelect: (): void => { this.selectAction(this.onCreateWithAI); } })
     }
-    AnchoredMenuItem({ label: interfaceItemText(this.getUIContext(), 'deck_details', 'preview'), divider: true,
+    AnchoredMenuItem({ label: interfaceItemText(this.getUIContext(), 'deck_details', 'preview', this.uiLanguage), divider: true,
       onSelect: (): void => { this.openPreviewMenu(); } })
       .bindPopup(this.previewMenuOpen, {
         builder: this.previewScopes,
         placement: Placement.Left,
-        popupColor: $r('app.color.surface_card'),
+        popupColor: $r('app.color.menu_surface'),
         enableArrow: true,
+        arrowWidth: MenuSurface.pointerSpan,
+        arrowHeight: MenuSurface.pointerDepth,
+        radius: 应用尺寸.圆角_指标卡,
+        transition: MenuSurface.popupTransition(),
         onStateChange: (event: PopupStateChangeParam): void => {
           if (!event.isVisible) this.closeActionsMenu();
         }
@@ -151,7 +160,7 @@ export struct HomeDeckDetails {
               .fontSize(应用尺寸.字号_按钮)
               .fontColor($r('app.color.text_primary'))
               .backgroundColor($r('app.color.surface_card'))
-              .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+              .border(SurfaceBorder.options())
               .borderRadius(应用尺寸.圆角_胶囊)
               .attributeModifier(new PressFeedback())
               .stateEffect(false)
@@ -190,6 +199,8 @@ export struct HomeDeckDetails {
             this.onAddNote();
           },
           onCreateWithAI: (): void => { this.onCreateWithAI(); },
+          onMoveDeck: (): void => { this.onMoveDeck(); },
+          onRenameDeck: (): void => { this.onRenameDeck(); },
           创建子牌组: (): void => {
             this.onCreateChild();
           },

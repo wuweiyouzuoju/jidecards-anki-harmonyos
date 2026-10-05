@@ -23,7 +23,7 @@ try {
     }
   }
   const base = ['apply', '--recount', '--ignore-space-change', '--ignore-whitespace', '--directory=third_party/anki'];
-  for (const name of ['anki-compact-import-log.patch', 'anki-deck-preview.patch', 'anki-fsrs-workload-params.patch']) {
+  for (const name of ['anki-compact-import-log.patch', 'anki-deck-preview.patch', 'anki-fsrs-workload-params.patch', 'anki-marking-sync-conflicts.patch']) {
     const patch = `tools/patches/${name}`;
     const reverse = spawnSync('git', [...base, '--check', '--reverse', patch], {cwd: root, stdio: 'ignore'});
     if (reverse.status !== 0) { run('git', [...base, '--check', patch]); run('git', [...base, patch]); }

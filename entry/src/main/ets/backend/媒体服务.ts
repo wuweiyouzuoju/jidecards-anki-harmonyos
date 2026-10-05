@@ -98,6 +98,13 @@ export class 媒体服务 {
     await this.会话.调用(MEDIA_SNAPSHOT_SERVICE, 4, encodeMediaSnapshotRequest(token));
   }
 
+  async missingNotesPage(token: number, offset: number): Promise<MediaSnapshotPage> {
+    return decodeMediaSnapshotPage(await this.会话.调用(MEDIA_SNAPSHOT_SERVICE, 5, encodeMediaSnapshotRequest(token, offset)));
+  }
+  async tagMissingNotes(token: number): Promise<number> {
+    return (decodeMediaSnapshotPage(await this.会话.调用(MEDIA_SNAPSHOT_SERVICE, 6, encodeMediaSnapshotRequest(token))).taggedCount ?? 0);
+  }
+
   /** 牌组删除差集仍需文件名，但不再传输完整报告和缺失笔记。 */
   async unusedFiles(): Promise<string[]> {
     const snapshot: MediaSnapshotPage = await this.createSnapshot();

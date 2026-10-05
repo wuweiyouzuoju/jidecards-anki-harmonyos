@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { localizedResourceText } from '../../utils/UiFeedback';
 import { PressFeedback } from '../../utils/PressFeedback';
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 颜色键 } from '../../model/颜色主题';
 import { PAGE_SURFACE_KEY } from '../../model/ThemeCatalog';
-import { DECK_LIST_NARROW_KEY } from '../../model/DeckListAppearance';
+import { PAGE_COMPACT_LAYOUT_KEY } from '../../model/AppLayoutState';
 import type { AgentConversation } from '../../model/agent/AgentConversationTypes';
 import { appInterface } from '../../backend/AppInterfaceService';
 import { AppInterfaceControl } from '../../model/AppInterface';
 import { interfaceItemText, interfaceItemTitleKey } from '../../utils/AppInterfaceText';
 @Component
 export struct AgentHistoryList {
-  @StorageProp(DECK_LIST_NARROW_KEY) private narrowDeckLayout: boolean = false;
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
+  @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
   @Prop @Watch('publishInterface') conversations: AgentConversation[] = [];
   @Prop @Watch('publishInterface') conversationId: string = '';
   private interfaceMounted: boolean = false;
@@ -25,12 +28,12 @@ export struct AgentHistoryList {
     const conversations: AgentConversation[] = this.conversations.slice(0, 100);
     const controls: AppInterfaceControl[] = [];
     if (conversations.length > 0) {
-      controls.push({ id: 'delete', title: interfaceItemText(this.getUIContext(), 'agent_history', 'delete'),
+      controls.push({ id: 'delete', title: interfaceItemText(this.getUIContext(), 'agent_history', 'delete', this.uiLanguage),
         titleKey: interfaceItemTitleKey('agent_history', 'delete'), enabled: true, selected: false });
     }
     for (const item of conversations) {
       controls.push({ id: item.id, title: item.title.slice(0, 160), enabled: true, selected: item.id === this.conversationId });
-      controls.push({ id: 'delete-' + item.id, title: interfaceItemText(this.getUIContext(), 'agent_history', 'delete'),
+      controls.push({ id: 'delete-' + item.id, title: interfaceItemText(this.getUIContext(), 'agent_history', 'delete', this.uiLanguage),
         titleKey: interfaceItemTitleKey('agent_history', 'delete'), enabled: true, selected: false });
     }
     appInterface.observe({ surface: 'agent_history', sectionId: '', selectedId: this.conversationId,
@@ -69,7 +72,7 @@ export struct AgentHistoryList {
                       .textOverflow({ overflow: TextOverflow.Ellipsis })
                   }
                   .width('100%')
-                  Text(this.getUIContext().getHostContext()!.resourceManager.getStringSync($r('app.string.ai_agent_history_message_count').id, `${item.messages.length}`) + ` · ${this.格式化历史时间(item.updatedAt)}`)
+                  Text(localizedResourceText(this.getUIContext(), this.uiLanguage, $r('app.string.ai_agent_history_message_count'), `${item.messages.length}`) + ` · ${this.格式化历史时间(item.updatedAt)}`)
                     .fontSize(应用尺寸.字号_正文_小)
                     .fontColor($r('app.color.text_secondary'))
                     .width('100%')
@@ -77,7 +80,7 @@ export struct AgentHistoryList {
                 .layoutWeight(1)
                 .attributeModifier(new PressFeedback())
                 .onClick((): void => { this.onRestore(item); })
-                Button(interfaceItemText(this.getUIContext(), 'agent_history', 'delete'))
+                Button(interfaceItemText(this.getUIContext(), 'agent_history', 'delete', this.uiLanguage))
                   .height(应用尺寸.按钮高度)
                   .fontSize(应用尺寸.字号_按钮)
                   .fontColor($r('app.color.error_text'))
@@ -90,7 +93,7 @@ export struct AgentHistoryList {
               .padding(应用尺寸.间距_10)
               .backgroundColor(item.id === this.conversationId ?
                 this.选中背景色 : $r('app.color.surface_card'))
-              .border({ width: 应用尺寸.卡片边框, color: $r('app.color.border_subtle') })
+              .border(SurfaceBorder.options())
               .borderRadius(应用尺寸.圆角_面板)
             }, (item: AgentConversation): string => item.id)
           }

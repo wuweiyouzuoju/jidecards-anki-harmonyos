@@ -6,7 +6,9 @@ param(
     [string]$BuildMode = 'debug',
     [switch]$SkipRust,
     [switch]$Clean,
-    [switch]$Test
+    [switch]$Test,
+    # Preserve the validated package and evidence while still holding the shared build lock.
+    [string]$ArtifactDirectory = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -95,6 +97,16 @@ $WarningArgs = @($BuildLog)
 if ($Clean) { $WarningArgs += '--require-clean' }
 & node (Join-Path $PSScriptRoot 'verify-build-warnings.mjs') @WarningArgs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+if ($ArtifactDirectory -ne '') {
+    $TaskArtifactPath = if ([System.IO.Path]::IsPathRooted($ArtifactDirectory)) {
+        [System.IO.Path]::GetFullPath($ArtifactDirectory)
+    } else { [System.IO.Path]::GetFullPath((Join-Path $Workspace $ArtifactDirectory)) }
+    New-Item -ItemType Directory -Force -Path $TaskArtifactPath | Out-Null
+    Copy-Item -LiteralPath $SignedHap -Destination (Join-Path $TaskArtifactPath (Split-Path -Leaf $SignedHap))
+    Copy-Item -LiteralPath $BuildLog -Destination (Join-Path $TaskArtifactPath 'build.log')
+    Copy-Item -LiteralPath $WarningReport -Destination (Join-Path $TaskArtifactPath 'build-warning-report.json')
+    Write-Host "[build-app] Validated artifacts saved to $TaskArtifactPath"
+}
 exit 0
 } finally {
     if ($HasBuildLock) { $BuildMutex.ReleaseMutex() }

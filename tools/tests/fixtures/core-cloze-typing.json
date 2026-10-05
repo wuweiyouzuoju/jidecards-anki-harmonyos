@@ -1,0 +1,11 @@
+[
+  { "text": "{{c1::one}} {{c2::two}}", "ordinal": 2, "expected": "two" },
+  { "text": "{{c1::one}} {{c2::two}}", "ordinal": 6, "expected": "" },
+  { "text": "{{c1::same}} {{c1::same}}", "ordinal": 1, "expected": "same" },
+  { "text": "{{c1::甲}} {{c1::乙}}", "ordinal": 1, "expected": "甲, 乙" },
+  { "text": "{{c1::<b>answer</b>}}", "ordinal": 1, "expected": "<b>answer</b>" },
+  { "text": "{{c2::two & safe}}", "ordinal": 2, "expected": "two & safe" },
+  { "text": "{{c2::<b>two</b>}}", "ordinal": 2, "expected": "<b>two</b>" },
+  { "text": "{{c1::outer {{c2::inner}}}}", "ordinal": 1, "expected": "outer inner" },
+  { "text": "{{c1::first}} / {{c2::second}}", "ordinal": 2, "expected": "second" }
+]
