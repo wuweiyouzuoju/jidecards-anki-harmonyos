@@ -8,7 +8,7 @@ const root = new URL('../../entry/src/main/ets/components/common/', import.meta.
 const sharedModels = new Set(['AppLayoutState', 'AppLifecycleState', 'ThemeCatalog', 'ThemeBackgroundMotion',
   '颜色主题', '主题设置', 'CardViewportLayout', 'WindowSafeLayout'].map(name => 'model/' + name));
 const sharedUtils = new Set(['应用尺寸', 'UiFeedback', 'PressFeedback', 'SurfaceBorder', '转场时长',
-  'FormInputStyle', 'FormRowLayout', 'FormTextAreaStyle', 'GlassSurface', 'SelectStyle', 'ImageSurfaceStyle']
+  'FormInputStyle', 'FormRowLayout', 'FormTextAreaStyle', 'GlassSurface', 'SelectStyle', 'ImageSurfaceStyle', 'ExpansionReveal']
   .map(name => 'utils/' + name));
 
 // 现有跨入口业务 UI 的逐条迁移例外；新组件不能继承例外，迁出后删除对应项。
@@ -21,7 +21,7 @@ const legacyDependencies = new Map([
     'model/NoteDraftPreview']],
   ['NoteFieldCard.ets', ['@kit.AbilityKit', 'model/NoteAudioDraft', 'model/NoteImageDraft',
     'model/NoteMediaParts', 'utils/NoteAudioPreview', 'utils/NoteTypeText']],
-  ['NoteFieldEditor.ets', ['components/字段帮助面板', 'model/NoteFieldEditing', 'model/NoteHtmlTools',
+  ['NoteFieldEditor.ets', ['components/editor/NoteEditorWheel', 'model/NoteEditorWheel', 'components/字段帮助面板', 'model/NoteFieldEditing', 'model/NoteHtmlTools',
     'model/NoteRichText', 'utils/NoteEditingHints']],
   ['NoteLinkDialog.ets', ['model/NoteRichText']],
   ['NoteMediaDialog.ets', ['@kit.AbilityKit', '@kit.MediaLibraryKit', 'model/NoteAudioDraft',
@@ -70,6 +70,8 @@ test('common gate rejects feature imports, IO, re-exports and new edges on legac
     "import { State } from '../../model/AppLayoutState.ts'; import { Row } from './FormSelectRow';"]])), []);
   assert.deepEqual(boundaryErrors(new Map([['Widget.ets',
     "import { safeMenuGeometry } from '../../model/WindowSafeLayout';"]])), []);
+  assert.deepEqual(boundaryErrors(new Map([['Widget.ets',
+    "import { ExpansionReveal } from '../../utils/ExpansionReveal';"]])), []);
 });
 
 test('index gate requires actual local links and supports explicitly internal files', () => {

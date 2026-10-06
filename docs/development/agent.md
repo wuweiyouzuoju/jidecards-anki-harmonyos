@@ -32,6 +32,8 @@
 
 ### 软件界面认知
 
+纯图标入口仍保留完整资源名称，`AppInterfaceItem.iconKey` 和观察中的同名字段表明实际图标资源；`get_app_structure` 同步返回图标和语义名称。设置顶栏由 `AppInterface.SETTINGS_HEADER_ITEMS` 与 `settingsHeaderItems/Controls` 同时供 UI 和 JIDE 使用，当前模式切换入口按真实 `simple_mode` 选择叶子/烧瓶；`AgentAppStructure.settingsHeader` 提供该声明，设置壳发布菜单打开态并随模式变化更新观察，观察的拷贝不丢图标。能力指纹包含顶栏声明；图标替换不增加助手操作权限。
+
 `model/navigation/AppNavigation.ts` 是页面名称与 JIDE 导航动作的共同声明，`HomeDestinations` 用它映射真实目的地。`AgentAppStructure` 每次从页面、菜单、设置和**本轮实际工具**重建 `revision`、`destinations`、`actions`；Runner 每次请求自动加入当前目录与能力指纹，恢复的旧历史不能覆盖当前版本。共同声明、设置项或工具协议变化都会改变指纹，无须清空会话或手工更新长期记忆。指纹不含用户实时状态，不是应用版本号或安全签名；未登记的 UI 仍不能自动发现。
 
 `destinations.detailed` 明确区分真实页面入口与已接通的界面详情。`actions.available` 只表示当前宿主注册了导航工具，执行时还需满足前台、草稿、集合占用等条件；读到界面控件不自动得到任意点击权限。入口、显隐与状态仍从共同声明和实际观察获得，不使用另一份手写软件说明。
@@ -46,7 +48,7 @@
 
 学习布局的 `smart`（智感握姿）与 UI 共用 `StudyLayout.STUDY_LAYOUT_MODES`，当前保存值由原 `AgentPreferenceReader` 读取；`study_layout` 未开放 JIDE 写入。学习观察中的 `study_layout`、`grip_availability`、`grip_side` 来自学习页和浮动栏：能力结果表示最近订阅是否可用，不能据此宣称系统开关已开启。普通闪卡、选择题/白板差异与窗口空间降级见[学习布局](study-media.md#智感握姿学习布局2026-10-04)。直接认知回归包含于 `study-grip-layout.test.mjs`。
 
-手写白板优先使用华为 Pen Kit 完整套件，不可用或初始化失败时自动回退原版透明覆盖白板。`study_whiteboard` 共用控件目录，中英 `study_whiteboard_instructions` 说明两种引擎、原版布局与回退规则。观察中的 `engine` 区分 `huawei_pen_kit` 和 `local_canvas`：官方仅发布支持/初始化/失败/缩放与宿主按钮，工具栏内部笔刷、颜色、笔宽、弹窗和历史未通过公开接口接入，保持 `controlsComplete=false`；原版发布真实笔刷选择、工具设置、历史可用性和是否有笔迹，`controlsComplete=true`，只展示当前可用的控件。不能据静态说明声称可读取或修改官方内部状态。两种白板的笔迹和文字均未接入内容识别与 JIDE 工具，不能读取或判题。认知边界与真实结构生成回归见 `study-whiteboard.test.mjs`、`study-whiteboard-local.test.mjs`，实现入口见[手写白板](study-media.md#手写白板)。
+手写白板优先使用华为 Pen Kit 完整套件，不可用或初始化失败时自动回退原版透明覆盖白板。`study_whiteboard` 共用控件目录，中英 `study_whiteboard_instructions` 说明两种引擎、原版布局与回退规则。观察中的 `engine` 区分 `huawei_pen_kit` 和 `local_canvas`：官方仅发布支持/初始化/布局/失败/缩放与宿主按钮，`initialized` 表示 SDK 回调，`layout_ready` 表示画布获得有效尺寸，`ready=true` 要求两者成立，但不表示工具栏外观或实际书写已验收；工具栏内部笔刷、颜色、笔宽、弹窗和历史未通过公开接口接入，保持 `controlsComplete=false`。原版发布真实 `fallback_reason`、笔刷选择、工具设置、历史可用性和是否有笔迹，`controlsComplete=true`，只展示当前可用的控件。回退原因区分系统能力缺失、官方不支持的已知仿真环境、上下文缺失、加载失败、Controller 创建/画布构建失败、初始化超时与 SDK 已初始化但布局未就绪的超时，不能仅据原版界面声称真机不支持，也不能以代码测试或编译成功声称官方套件实际运行成功。不能据静态说明声称可读取或修改官方内部状态。两种白板的笔迹和文字均未接入内容识别与 JIDE 工具，不能读取或判题。认知边界与真实结构生成回归见 `study-whiteboard.test.mjs`、`study-whiteboard-local.test.mjs`，实现入口见[手写白板](study-media.md#手写白板)。
 
 JIDE 页发布当前模式、历史/对话分区、发送/停止、文件解析和输入可用状态；历史组件发布实际会话名称和选中项，提醒页发布时间/标题及独立开关，编辑组件发布真实24小时/60分钟选项与新建/编辑、保存/删除状态。历史和文件名称、提醒列表均最多100项；用户名称最多160字符，`optionsTotal` 保留总数。聊天、文件正文、错误正文和表单草稿不复制到观察，仅登记数量、长度或存在状态。提醒的占位符标签目前在忙碌时仍可点击，观察保持实际行为。
 
@@ -134,7 +136,7 @@ JIDE 页发布当前模式、历史/对话分区、发送/停止、文件解析�
 - 确认卡显示目标牌组、预设及共享范围，保持率使用百分比，开关和枚举使用共同目录的本地化名称，轻松日逐星期显示最低/减少/正常，清除显示未设置；确认展示不改变登记的 Core 参数。`ai-agent-deck-options.test.mjs` 执行真实 Registry、确认执行器、会话及请求编解码，覆盖 SM-2 轻松日、单牌组克隆、零限额/清除、全局范围、未知字段保留、过期及失败。Core 在该测试中是注入边界，测试不证明设备保存或真实模型规划；HAP 和设备验收单独记录。升级依据及门禁见[牌组选项与 Core 升级](browser-stats.md#牌组选项与-core-升级)。
 - `propose_set_theme_color` 与 `propose_set_fsrs` 风险为 `write`，只生成 `setting_change` 动作。确认卡复用 `AgentActionCard`，显示前后值和范围；FSRS 开启说明全库重新调度，关闭不恢复原排程。`AgentActionExecutor` 消费登记的同一载荷，再校验设置 ID/类型及原值，主题权益在提交时重查。过期、篡改、重复确认失败；失败后的新提案须先重新读取，不盲目重试。
 - `propose_set_setting` 在 assistant/create/edit 共用一个严格工具，只支持 `AgentPreferenceSettings.agentWritablePreferenceIds()` 中已接通的三项：`card_text_size`（50–200 的整数百分比）、`deck_list_style`（single_wide / single_narrow / double_wide / double_narrow）和 `study_haptics`（开关）。参数 `value` 使用规范字符串，例如 `"130"`、`"true"`；其余设置仍只读。它读取当前值后生成既有 `setting_change`，确认卡显示本地化名称、百分比或四种牌组样式、前后值及本机范围，确认前零写入。
-- 三项修改复用设置页的 `saveCardTextSize`、`saveDeckListStyle`、`saveStudyHaptics`。`utils/LocalPreferenceWrite.ets` 拥有这些键的共享串行队列，保存函数接受可选原值；确认执行在队列内重查原值，同状态不落盘，flush 与回读成功后才广播。助手读取等待已接受的保存。字号控件订阅公共值，学习/预览、牌组列表和触感继续消费既有 AppStorage 键；不改模板、调度或设备振动能力。牌组样式从旧宽窄键迁移，当前值与写入共用唯一存储入口；双列隐藏牌组计数、名称允许两行，窄样式保留页面密度联动。
+- 三项修改复用设置页的 `saveCardTextSize`、`saveDeckListStyle`、`saveStudyHaptics`。`utils/LocalPreferenceWrite.ets` 拥有这些键的共享串行队列，保存函数接受可选原值；确认执行在队列内重查原值，同状态不落盘，flush 与回读成功后才广播。助手读取等待已接受的保存。字号控件订阅公共值，学习/预览、牌组列表和触感继续消费既有 AppStorage 键；不改模板、调度或设备振动能力。牌组样式从旧宽窄键迁移，当前值与写入共用唯一存储入口；双列隐藏牌组计数，所有牌组名称允许两行，单/双列同密度等高，窄版仅在原字号名称需要两行且有描述时缩小字号，窄样式保留页面密度联动。`AgentPreferenceSettings` 的真实设置描述同步该规则，设置读取及确认仍消费原值与入口。
 - 本机偏好结果区分 `saved/applied`：保存未确认或回读失败返回 `partial, saved=false`，已确认保存但广播失败返回 `partial, saved=true, applied=false`；只恢复偏好缓存，不声称磁盘已回滚。失败确认已消费，须重新读取再提案。`ai-agent-app-settings.test.mjs` 执行真实 Registry、读取适配、确认执行器及三项保存入口；`ai-agent-local-preference-write.test.mjs` 覆盖手动写入与确认的竞争、读取等待和回读失败。Node 不证明真实模型选择工具、ArkUI 观察更新或设备交互，需独立验收。
 - `AppThemeService` 的 `ThemeColorSession` 是设置页与助手共用的串行保存/回读/应用入口，深浅色与主题色使用不同键并在应用时读取另一维度；结果区分 `saved/applied/completed/partial`，部分成功保留失败状态。全库 FSRS 共用 `FSRS控制器.ets` 的串行变更入口，保留其余配置与未知协议字节，保存后回读、通知页面；同状态请求不写入、不重排。后台初始化与手动/助手切换共用队列。
 - `set_theme_mode` 风险为 `setting_write`，不能注册为 read、普通草稿或卡库写入。明确切换指令来自页面传入的本轮原始用户意图，不扫描模板、附件、记忆或 Provider 上下文。许可仅本轮一次使用；问题、否定、引用和卡片模板请求不授予直接写入。历史恢复、暂停继续和旧澄清回放不恢复许可；识别不到时要求明确切换命令。
@@ -211,7 +213,7 @@ JIDE 无公式正文与表格单元格在 `AgentMarkdownText` 的统一 Text 入
 - `AgentActionExecutor.ets` 消费绑定 ID/种类/载荷的一次性确认，提交前重查牌组/笔记类型重名；记忆变更复用存储基线检查，分析授权只接受已冻结的 ID。`AgentDraftExecutor.ets` 仍负责 ChangeDraft 写入和高风险双确认，两者不是同一个确认协议。
 - `ai-agent-v2-runtime.test.mjs` 执行真实会话、工具和辅助执行器，覆盖未确认无写入、重复/取消/篡改确认、名称冲突及崩溃恢复。`architecture-boundaries.test.mjs` 防止 Runner/Registry/工具经字面量模块依赖取得执行器；它不替代运行时权限测试。
 
-- `AgentProviderContext.ts` 负责草稿语义上下文与 Provider 历史预算（最多80项、240000正文字符）；`truncateProviderText` 必须包括截断标记在内遵守额度，字段/操作丢失须标记 truncated。
+- `AgentProviderContext.ts` 负责草稿语义视图；`truncateProviderText` 必须包括截断标记在内遵守额度，字段/操作丢失须标记 truncated。`buildProviderDraftStateContext` 对大量草稿改用真实身份、状态、数量和执行结果，明确正文已省略，避免完整草稿复制进系统指令后占满请求。页面不再按80项/正文字符预裁剪历史或当前材料，发送预算由下面的整包预检统一拥有。
 - `AgentCardBatch.ts` 在第一处等待前复制整批选中字段和目标；每张卡仍经页面适配器调用 `AgentDraftExecutor.prepare/executeOrdinary`。单卡失败不中断整批，已保存卡不再创建；操作占用直到整批完成，成功才通知同步。
 - 页面通过会话 ID 和消息 ID 回写状态，不能依赖异步开始时的数组索引。离页后执行器继续已接受写入，禁止访问旧 UI 或读取下一张卡的可变字段；错误文案在开始保存前固定。
 - `AgentFileImport.ts` 的 `mergeAgentImportedFiles` 统一限制10个文件、160000正文字符；持久资料只提交描述，PDF 按页读取不占这个正文额度。迟到文件解析不得进入另一个会话。
@@ -227,6 +229,16 @@ JIDE 无公式正文与表格单元格在 `AgentMarkdownText` 的统一 Text 入
 `model/agent/AgentHistoryCoordinator.ts` 拥有历史列表读取/恢复代次，协调 `AgentConversationView`、现有会话存储及 CheckpointStore。保存时冻结可见记录，checkpoint 失败不声称已保存；已接受的历史写入按序完成，删除等待先前写入，避免晚到保存重建刚删除的记录。关闭/重开列表、切换上下文、新会话和离页均使旧读取失效。
 
 恢复把 checkpoint 交给既有 `AgentSessionController.restore` 校验，只重建显示、协议及检索进度；不恢复卡片写入令牌，不自动重新执行动作。创建模式校验牌组/类型是否仍存在，页面异步加载类型后再次核对恢复代次；编辑模式仍允许未指定目标。页面继续拥有输入、文件选择、导航与错误呈现。直接回归 `agent-history-coordinator.test.mjs`，页面接线及迟到类型结果回归 `platform-warning-boundaries.test.mjs`。
+
+### 请求上下文预算（2026-10-06）
+
+`ProviderProtocol.ts` 的 `providerRequestFitsContext` 与 `buildResponsesPayload` 共用完整 Responses 序列化和同一限制：非图片部分最多240000字符、图片最多8张/12MiB。这是序列化字符额度，不是模型 token 窗口。工具 schema、指令、参数、输出、JSON 转义与原始思考都计入，密钥仍只进请求头；无效协议/schema 不作为可压缩的大小错误。
+
+`AgentRunner` 每次补齐当轮运行指令后调用 `AgentSessionState.fitAgentRequestContext`。能发送的文字保持完整，图片沿用最近两页策略；超限才从旧的长工具输出开始移出正文，保留 noteId、fieldOrd、totalLength、nextOffset、检索覆盖数及执行/草稿状态。需要原文时必须重新读取，工具调用与结果的 ID、顺序和原始思考仍完整配对。仍超限才移出完整旧用户回合，保留有上限且标为参考数据的历史要求摘录和工具进度；再次整理会合并已有进度，不重放旧工具或把历史变成新授权。Scope 的发现 ID、真实读取覆盖和确认账本由原拥有者保留，不因模型窗口整理重置。
+
+最新用户材料和保留回合的原始思考不能按字符截断；它们本身无法容纳时仍明确报错并保存会话进度。失败后发送较短的新要求可以移出那个旧回合，避免短句重试永久卡住。超限前已校验成功的部分草稿由页面正常接收，保留可编辑预览和原确认保存入口，错误本身不触发卡库写入。
+
+直接回归 `ai-agent-context-budget.test.mjs` 覆盖三种入口的8条长字段、转义后的整包限制、正常文字不提前丢弃、滚动进度、巨大草稿状态、非法协议、图片和真实页面的完整输入/部分草稿接收；`ai-agent-v2-runtime.test.mjs` 执行真实 Session/Runner/Registry 的旧超限短句恢复、8条字段读取与检查点恢复，并保持已确认写入只执行一次。编译与签名包使用本任务增量 HAP 验证；未安装设备或调用真实模型，这些测试不代表真机与模型规划已验收。
 
 ### 思考协议续接
 

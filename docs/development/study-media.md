@@ -94,23 +94,76 @@ JIDE 偏好值域复用同一模式声明，`get_settings` 可读 `smart` 及能
 
 ### 手写白板
 
+2026-10-06 最新交互：用户统一取消全局拖动按钮，整张闪卡与手写内容随双指连续平移和缩放，手写笔继续书写，官方内部工具输入保持可用。两指等距移动会连续平移，距离变化同时缩放，初始双指中心下的内容跟随当前中心；不能再锁定起始中心或只响应捏合。应用自己的顶部按钮和底部答案/评分保持固定；完整华为内部工具栏随内容移动和缩放，用户已接受。“复位”复用公共按下态按钮，位于透明度旁，只恢复1倍和初始位置，不清除笔迹或重建Controller。
+
+同日用户进一步接受单指只拖动字迹，要求横向和纵向皆可。`学习手写白板层.judgeInkPan` 只在手指、单触点、画布自定义单指 Pan 响应链且无系统滑条 Pan 时允许外层并行手势；纵向继续由华为套件滚动，`inkOffsetX` 只补水平位移，不调用 scrollTo 或禁用 SDK 识别器。水平增量按当前全局比例换回内容坐标，原卡面不跟随；完整华为组件和内部工具栏随水平偏移。双指或笔落下结束单指横移，收起保留位置，复位和下一题归零；不改写笔迹与历史。JIDE 共用中英白板说明并观察 `single_finger_navigation=ink_pan`、`ink_offset_x`，不冒充 SDK 纵向位置或增加代操作能力。直接方法回归覆盖斜向增量、全局比例换算、卡面固定、系统滑条、触点切换和生命周期；SDK 响应链与手指书写设置的真实交互仍需设备验收。本次白板、原版、全局视图、学习生命周期及资源/JIDE/架构/文档检查128项通过。增量HAP编译最初指出ContentSlot不能直接translate，已用原生Stack承载平移；第二次编译只报告已有编辑轮盘目录的AppInterface.ts:85使用未声明editing字段。本任务保留该并行改动，尚无成功新HAP，未安装或执行真机交互。构建与检查记录在D:\Projects\jidecards-penkit-2026-10-06\single-finger-ink-pan-*.log；另一次包含card-viewport-layout的检查在无关AnchoredMenu源码形状断言失败，未为白板改写该断言。
+
+同日此前恢复版本记录（历史验收，当前交互以上述双指平移和缩放为准）：用户要求笔感必须与华为官方无异，排除用自研笔刷替代官方引擎；手指/手写笔输入设置继续归华为套件。原生 Pinch 加逐帧 `scrollTo` 的试验已撤掉：设备日志显示初始化偏移被后续布局重置，`scrollTo` 绘制将横向偏移设回0并以结束状态重绘，不能用于连续二维平移和缩放。源码恢复此前用户确认顺滑的完整组件并行手势，保留80%默认透明度与偏好记忆。恢复版相关69项检查、增量ceshi构建和警告门禁通过，产物 `D:\Projects\jidecards-penkit-2026-10-06\restored-after-native-pan` 已覆盖安装。两指横向输入后的设备布局显示画布横移、原卡片与顶部按钮位置保持不变，也确认内部工具栏仍跟随；此项不证明硬件笔感或连续缩放已验收。本次已取得并逐文件核对华为 Codelab 完整 ZIP；它仍是调用系统套件的接入示例，未包含真实组件、工具栏或笔刷引擎实现。当前没有已验证的独立绘制入口，拆分未完成，保留可用的完整组件。
+
+两种白板的宿主顶部按钮和底部答案/评分条共用 `model/CardViewportLayout.ts` 的 `cardViewportWidth`，由白板根层的完整窗口宽高更新限宽并居中；不能用中间画布扣除工具栏后的高度判断横竖屏。竖屏最多840vp，横屏沿用学习页的自适应宽度。顶部条自身和学习页 `答案条` 各贡献一次12vp水平留白，最终按钮外缘都是 `(窗口宽 - 内容宽) / 2 + 12vp`；顶部安全区只归顶部条，操作区留白与底部安全区只归 `答案条`。官方顶部关闭/透明度按钮在窄窗可换行，透明度弹窗宽度受窗口内缘限制；原版工具设置继续使用已有换行和限宽。画布仍使用完整可用宽度。固定显示答案及四个评分按钮跟随同一边界；浮动答案工具栏保留独立的拖动与吸附尺寸，选择题沿用卡片内操作。布局回归见 `tools/tests/card-viewport-layout.test.mjs`，覆盖两种引擎、旋转、宽窄密度、系统安全区和窄窗弹出设置；Node几何检查不代表设备外观已验收。
+
 学习「更多」的顺序只由 `model/AppInterface.ts` 的 `study_more` 目录拥有；编辑、JIDE 改卡、撤销操作相邻排列，学习说明固定在末项。页面真实菜单与应用内助手使用同一目录，入口可见性和禁用条件仍由既有上下文判定。`ai-agent-app-structure.test.mjs` 执行实际菜单与分发验证顺序。多个文件音频经 `CardAudioSession` 交给原生 `声音播放器` 按顺序串行播放，重播从头开始；题目面只播题目，答案面依据 `skipQuestionWhenReplayingAnswer` 决定是否先重播题目再播答案。与 AnkiDroid `CardMediaPlayer.replayAll` / `playAllAvTagsInternal` 的多文件和两面重播语义一致；现有 `card-audio-session.test.mjs` 覆盖队列、两面顺序、取消和完成等待。菜单重排不改音频规则。
 
-学习页通过“更多 → 手写”打开白板覆盖层。华为 Pen Kit 可用时挂载完整 `HandwriteComponent`，包含钢笔、圆珠笔、铅笔、马克笔、荧光笔、马赛克笔、橡皮擦、套索及激光笔，不隐藏官方工具；笔迹编辑、一笔成形和报点预测由官方管理。接口以本机 SDK 的 `@hms.stylus.HandwriteComponent.d.ets` 与[官方接入说明](https://developer.huawei.com/consumer/cn/doc/harmonyos-guides/pen-suite)为准，最低 API 21 使用已有基础组件、默认钢笔与画布比例，不依赖后续版本新增可选字段。
+学习页通过“更多 → 手写”直接挂载完整华为 `HandwriteComponent`，保留钢笔、圆珠笔、铅笔、马克笔、荧光笔、马赛克笔、橡皮擦、套索和激光笔，官方管理笔刷、历史、一笔成形和报点预测。没有“华为白板”与“批注”的手动模式切换。2026-10-06 的透明层尝试曾错误地默认替换成原绘制层并移动 CardViewport，这些改动已撤掉。
 
-`components/StudyPenCanvas.ets` 每次挂载独占一个 `HandwriteController`，只能由 `StudyPenCanvasHost.ets` 动态导入，不能静态进入首页/学习页的启动依赖图。宿主通过 NodeContainer / BuilderNode 挂载全局 WrappedBuilder，参数共用 `StudyPenCanvasParameters.ts`，换题和退出主动 dispose；释放后的异步加载不创建节点。`backend/StudyPenKitAvailability.ets` 同时检查 `SystemCapability.Stylus.Handwrite` 与系统 HSP 的沙箱映射（打包 Penkit.hsp、解包 ets/modules.abc）。此前崩溃日志表明报告 SysCap 但缺包时直接导入会触发系统加载器 SIGABRT，无法用 JS catch 恢复。因此模块缺失或不可访问时直接使用原版白板，不进入可选模块，也不显示不可用空白页；不安装或复制 SDK 的预览 HSP。路径或权限拒绝属于保守回退，不能据此宣称设备永久不支持套件。
+2026-10-06 用户明确确认：当前安装版本已经可以在原卡片上直接批注。此项来自用户实际使用反馈，不能继续登记为“卡面直接批注尚未实现”。这条反馈确认卡面批注效果；华为各笔刷和双指拖动/缩放的验收范围分别记录，不能从某次安装未运行验收推导当前功能不存在。
 
-`components/学习手写白板层.ets` 拥有引擎选择、官方初始化代次、15 秒初始化超时与原版 `StudyWhiteboard` 会话。官方加载、构建失败或超时自动释放节点并切到 `StudyLocalWhiteboard.ets`，当前学习会话保持原版，不在下一题反复重试套件。原版沿用已有透明 Canvas、画笔/颜色/笔宽、橡皮宽度、仅手写笔、撤销、重做和清空；纯模型 `model/StudyWhiteboard.ts` 管理归一化笔迹、有界历史与多触点隔离，组件管理绘制和工具设置。
+本机 API 23 SDK 与[当前官方组件 API](https://developer.huawei.com/consumer/cn/doc/doccenter-capabilities/api/pen-handwritecomponent)没有显式透明纸张、批注叠加层或任意二维平移参数；新增隐藏工具配置用于隐藏工具。这是公开接口声明的边界，不能据此断言组件在真机必然遮住卡面。现阶段保留完整华为组件，只有实际能力/上下文/加载/初始化失败或超时才自动回退原版；不可为了透明效果擅自将可用的官方笔刷替换掉，也不用白色混合、整层半透明或卡面截图冒充透明笔迹层。
 
-学习页首次打开后保持宿主挂载，收起使用 `Visibility.None`；重开、翻面和同卡内容刷新保留画布。原版收起取消未完成的一笔和工具设置，不调用销毁生命周期，重开可继续书写。下一题提交后发送 resetTick，即使 cardId 相同也清空；原版由子组件重置笔迹与历史，官方重建 Controller。完成或退出学习释放会话。旧代次及重复失败回调不影响新画布或覆盖原版观察，迟到初始化也不能重新启用失败的官方分支。
+全局视图由 `学习手写白板层` 单独拥有 `StudyAnnotationView`，通过 `onViewChanged(AnnotationPose)` 交给学习页；学习页仅在手写打开时变换完整 CardViewport，原顶栏和原答案条隐藏但保留占位，当前可操作按钮仍在固定层。`StudyContentViewport` 供两种白板复用：内容正向变换，两指 PanGesture 与 PinchGesture 并行使用同一双指位置计算，不设单指拖动模式或输入遮罩；手势使用窗口坐标，按每个内容层布局原点补偿 `(scale-1)*origin`，避免SDK画布位于顶部条下方时与卡面发生缩放偏移。原版启用 globalNavigation 后取消自身缩放，绘制与历史仍归原版；SDK的笔感仍归完整套件，API23起关闭SDK缩放并限制长画布到视口，避免重复导航。比例范围0.5～4，边缘保留最多48vp。双指距离决定比例、当前双指中心决定位移；两个识别器分别跟踪活动状态，结束一个不能取消另一个仍在运行的手势。笔正在书写时手掌不能导航，单指继续归笔刷引擎；不改写笔迹或历史。关闭后卡面显示原比例，重新打开沿用全局视图；下一题才清空笔迹并复位。手写期间学习页隐藏原顶栏并保留其占位，官方宿主顶栏为透明，不以实色浮层盖住卡面。左侧关闭手写、右侧透明度均用普通公共按钮边框。背景纸张首次默认80%透明；手动滑动只实时预览，松手、点击滑块或退出时通过 `utils/StudyWhiteboardAppearanceStore.ets` 保存本机偏好，复用 `LocalPreferenceWrite` 串行写盘与回读，重开、重启和换题沿用。存储失败显示提示，`paper_transparency_saved=false` 不冒充已经记住。背景独立调节，不淡化笔迹或工具栏。返回先收起透明度弹窗，收起保留视图，下一题清空并复位。
 
-白板在学习页根 Stack 中覆盖卡片，不再把卡片和画布按 1:2 压缩。原版透过 Canvas 保留题目阅读和原有卡片布局，工具栏、画布和底部答案条维持原版位置；官方使用完整覆盖画布，收起即可查看卡片。白板顶部条拥有顶部安全区，底部学习答案条拥有操作区和底部安全区；官方工具栏内部布局归 Pen Kit。手写期间暂停自动前进/时间盒并屏蔽卡片手势，后台或评分中禁止输入。普通卡复用显示答案和评分入口，选择题先收起白板。返回或 Escape 先关闭原版工具设置，再收起；原版 Ctrl+Z/Y 执行白板撤销/重做，官方分支传递相应按键，均不能触发卡片撤销或评分。
+接手时分别核对以下证据，不以缺少 SDK 参数推导功能不存在，也不以 Node 模拟代替系统 HSP：
 
-`AppInterface.WHITEBOARD_INTERFACE_ITEMS` 是两种 UI 与 JIDE 的共同目录。官方观察发布 `engine=huawei_pen_kit`、支持/初始化/失败/缩放与宿主按钮，`controlsComplete=false`，不伪造官方内部笔刷、颜色、笔宽、弹窗和撤销历史。原版观察发布 `engine=local_canvas`、笔刷选择、设置工具、历史可用性和是否有笔迹，`controlsComplete=true`，隐藏官方控件及未展开的工具设置。收起或后台撤掉观察。两种引擎均没有笔迹识别与 JIDE 内容工具，中英说明明确不能读取或判题，UI 可见性不授予助手绘画或评分权限。
+| 能力 | 责任入口 | 当前证据与验证边界 |
+| --- | --- | --- |
+| 固定原卡片、透明叠加批注 | 学习页根 Stack；两种渲染器 | 用户已确认当前安装版本效果；外层源码不填充纸张，不据此推断所有 SDK 版本 |
+| 华为笔刷、历史及工具栏 | `StudyPenCanvas` → 系统 `HandwriteComponent` | 源码接入完整套件；各工具实际效果由系统 HSP 和设备验收确认，Node 不模拟笔刷质量 |
+| 全局闪卡与手写视图 | `学习手写白板层` → `StudyAnnotationView` / `StudyContentViewport` / 学习页 CardViewport | 检查双指等距连续平移、同时平移和缩放、两个识别器结束顺序、不同布局原点的对齐、手掌隔离、复位不清墨与生命周期；完整华为内部工具栏仍跟随，实际触控须设备验收 |
+| 原版回退绘制与导航 | `StudyLocalWhiteboard` → `StudyAnnotationView` | `study-whiteboard-local.test.mjs` 与 `study-annotation-view.test.mjs`；通过不证明当前设备正在使用此引擎 |
 
-回归入口 `tools/tests/study-whiteboard.test.mjs` 执行真实宿主方法、官方 Controller 拥有关系、自动回退、初始化超时、动态加载/释放、旧回调隔离、按键与 JIDE 结构，并遍历启动依赖图阻止 Pen Kit 提前加载。`study-whiteboard-local.test.mjs` 执行原版模型和真实组件方法，覆盖落笔、擦除、历史边界、取消、旋转重绘、收起重开、下一题清空、工具设置与观察。`study-lifecycle.test.mjs` 检查加载/翻面/评分时的清空时机。此前菜单检查依赖旧内联公式，已改为执行真实菜单几何；首页资源检查的正则曾将 `$r` 字符串误识别为硬编码，现区分资源调用和直接文本并覆盖正反例。按用户明确要求，本次回退修复仅执行代码测试与 HAP 构建，不安装或运行模拟器/设备；Node 检查和编译不能证明官方 HSP 的实际书写效果。
+本次源码与原生引擎调查（2026-10-06）新增的具体证据：
 
-2026-10-05 回退修复的 `npm test` 全量 2503/2503 通过；全量检查发现的旧菜单断言、旧高级面板返回契约及测试依赖缺失已按现有代码同步，保留菜单边界、共享草稿、翻译与禁用行为断言。增量签名构建 `npm run build:app -- -SkipRust -ArtifactDirectory D:\Projects\jidecards-penkit-2026-10-05\fallback-artifact` 通过，警告门禁 unexpected=0；原生输入未改，本次复用已校验的目标架构库。当前产物为该目录的 `entry-default-signed.hap`，未做任何安装或运行验收。
+| 材料 | 可核对内容 | 对拆分的边界 |
+| --- | --- | --- |
+| [华为手写笔服务 Codelab](https://developer.huawei.com/consumer/cn/codelabsPortal/carddetails/tutorials_PenKit-Next-Easy)的完整示例 ZIP | 从页面公开内容接口取得教程和下载地址；`pen-kit-codelab-arkts.zip` 共251个归档条目，SHA256 `03f87137e8430321c06a64519f5796ea7ab90d8fd8de1d5cc7d3cbec3952a361`。`entry/src/main/ets/pages/HandWritingDemo.ets` 导入 `@kit.Penkit` 并挂载完整 `HandwriteComponent`；源码未定义该组件或官方工具栏，归档无笔刷 `.cpp/.so/.hsp/.har` | 可以参考宿主接入与 Context，不能据此重组官方画布/工具栏或复制其笔感。`PointPredictor.ets` 只展示实际/预测坐标；`InstantShapeGenerator.ets` 使用应用自己的 Canvas 展示成形，均不是完整笔刷引擎 |
+| 本机 API23 SDK 声明与 Kit 映射 | `@kit.Penkit.d.ts` / kit配置把组件与Controller导向 `@hms.stylus.HandwriteComponent`；该声明的 `@bundle` 指向 `com.huawei.hmos.hwstylusfeature/Penkit/ets/hsp/HandwritePaint`。Controller公开方法为save、load、onLoad、getContentRange、getThumbnail、scrollTo，组件build只有声明 | 真实实现仍由系统HSP提供；当前声明没有独立画布、独立工具栏、后续笔刷选择或任意二维视图设置接口。不能把声明文件当实现源码 |
+| SDK previewer 的 `Penkit.hsp` | 归档只有 `ets/modules.abc`（23912字节）；SDK `ark_disasm` 显示 `mockHandwriteComponent`，导出的组件指向 `MyComponent`，Controller方法含 `mocked implementation` 提示。HSP SHA256 `677d41e0d663ffb899080df5b64cf1575b4c9fae35ad931988c04ac19b4cf280` | 是预览模拟包，不能当成真机实现、独立引擎或笔感等价证据，也不能安装/复制进应用来完成拆分 |
+| 本机 Pen Kit C API | `handwrite/native_handwrite_api.h` 只声明 `HMS_HandWrite_GetPredictPoint`，输入历史坐标/压力并输出预测坐标；ArkTS独立能力为PointPredictor与InstantShapeGenerator | 预测与成形没有提供官方笔刷的纹理/压感绘制、擦除、套索、历史及低延迟Surface挂载契约，不能以接入预测代替保留完整引擎 |
+| SLG-W50/API24 当前只读调试 | 新取1840×2800布局，应用在首页；shell读取 `/system/app`、`/sys_prod/app`、`/system/lib64`、`/data/storage/el1/bundle` 均Permission denied，读取当前应用 `/proc/<pid>/maps` 为Operation not permitted；按声明中的bundle查询也未返回包信息 | 这些结果只证明本次不能从普通shell取得真实HSP/原生库，不能证明设备没有套件。未修改权限、未点击/评分、未装包；没有新增运行或硬件笔感验收 |
+
+教程响应、下载来源与清单、原始ZIP、解压源码、预览ABC及反汇编、设备读取记录集中保存在 `D:\Projects\jidecards-penkit-2026-10-06\engine-boundary`。后续可验证拆分需要华为真实组件实现及其原生调用契约，或官方提供的独立画布/工具栏连接接口；本次没有取得此边界。此次拆分调查本身没有改动应用源码；随后用户取消拖动的改动见本节最新交互。随后用户接受华为内部工具栏跟随，增加整张闪卡与手写内容共享的全局视图；当前 `toolbar_follows_view=true` 明示此局限，不能视为工具栏拆分已经完成；不加入猜测的私有字段、节点指针、SDK手势禁用或自研替代笔刷。
+
+2026-10-06 用户反馈“双指滑动与大小缩放常常互斥”。完整组件变换曾带动内部工具栏，改为持久禁用响应链 Pan 后笔无法留下笔迹，撤回后用户确认书写恢复。随后原始触点驱动 scrollTo 的方案仍出现抖动；设备日志显示响应链实际是双指 Pinch 与单指 Pan，没有预设的双指 Pan，不能把替身测试视作匹配真实 SDK。用户明确指出“拖动顺滑，但工具栏跟着动”的此前实现较好，当时恢复完整组件的并行共用触点算法，删除 scrollTo 补偿、内部手势拦截及试验模型；随后用户暂时取消拖动，该请求随后改为全局视图，以上述最新交互为准。此反馈只确认顺滑算法，不表示接受工具栏跟随；用户再次要求解决工具栏。当前 SDK 的 HandwriteComponent/Controller 无工具栏定位或分离接口；ArkUI 的声明式代理节点不支持 commonAttribute 修改、moveTo 或取得内部 RenderNode，NDK adopted RenderNode 也只允许 BuilderNode 根等合法节点。不能把反向变换内部工具栏写成已实现，也不能把未经过实际设备验证的滚动补偿当作解决方案。工具栏固定仍未完成，需更换可分别控制画布与工具栏的集成边界；不得宣称已移入评分区。
+
+`components/StudyPenCanvas.ets` 只能由 `StudyPenCanvasHost.ets` 动态导入，不能静态进入首页/学习页的启动依赖图。启动侧共用 `StudyPenCanvasMount.ets` 的挂载/调整尺寸接口与 `StudyPenCanvasParameters.ts` 的参数，不引用官方 Controller。宿主先等页面原生 Stack 测出有效可用宽高，再检查宿主/资源上下文、设置 SDK Context、异步加载工厂；加载后恢复当前 UI scope，在原生 scope 回调内部捕获 Controller 构造、建树和插入错误。每个挂载独占 Controller 和 BuilderNode，构建开启嵌套 Builder 支持；通过 `NodeContent.addFrameNode` 把根节点显式插入页面的 `ContentSlot`，不再使用异步 NodeController 重建链。动态 Builder 的原生 Stack 使用宿主测得的数值宽高，根 onAreaChange 另行发布实际挂载后的宽高；插入成功不能冒充布局成功。页面 Stack 直接参与官方 Column 的剩余高度分配并裁剪内容，顶部收起条和底部学习操作保留自己的空间。等待导入期间尺寸变化使用最新值，失去尺寸则推迟建树；旋转/分屏通过 BuilderNode.update 调整同一画布，不重建 Controller 或清除笔迹。宿主、NodeContent 和节点不经 `@State` 代理，只有代次、初始化状态和界面状态响应式更新。换题和退出先 removeFrameNode，再 dispose BuilderNode；释放后的异步加载或重入初始化不遗留节点。NodeContent/ContentSlot 用法以[官方节点生命周期示例](https://developer.huawei.com/consumer/cn/doc/harmonyos-guides/arkts-user-defined-node-faq)及本机 API 12 起的声明为依据。
+
+`EntryAbility.onCreate` 在创建页面前调用 `backend/StudyPenKitContext.js` 设置官方约定的 `globalThis._brushEngineContext`，`onDestroy` 只清除自身仍拥有的 Context；宿主在异步加载前和创建 Controller 前绑定对应窗口的 Context。此 JS 互操作文件与 `.d.ts` 是唯一 SDK 全局键写入边界，不能改成系统 HSP 不认识的应用单例，也不用于共享业务状态；ArkTS 组件和模型不直接操作 `globalThis`。即使 Context 缺失或 SDK Controller 构造失败，也应在进入渲染回调前切回原版，而不能依赖外层 `BuilderNode.build` 的 catch 接住 ArkUI 已转交全局故障处理的异常。
+
+`backend/StudyPenKitAvailability.ets` 在真机上使用官方 `SystemCapability.Stylus.Handwrite` 决定是否尝试接入，不要求系统 HSP 的内部路径在加载前已经存在或可读。此前通用文件探测把不可访问等同于不支持，可能阻止真机进入官方分支，2026-10-06 已修正。重新审查[官方 Pen Kit 简介](https://developer.huawei.com/consumer/cn/doc/harmonyos-guides/pen-introduction)后，移除全部内部 HSP 路径探测；官方声明仿真环境不受支持，已知 `emulator` 型号直接回退为 `emulator_unsupported`，不因探测到某个内部文件而启用套件。不按 ABI 或所有设备类型扩大拦截，不复制或安装 SDK 预览 HSP。真机仍依赖系统能力声明与系统套件完整性；原生 abort 不能由 JS catch 恢复，也没有通用 HSP 完整性检测接口。
+
+`components/学习手写白板层.ets` 拥有官方默认/失败回退选择、官方初始化代次、15 秒初始化超时与原版 `StudyWhiteboard` 会话。SDK 初始化回调与有效布局尺寸分别记录；只有两者成立才启用画布和官方工具观察；隐藏和后台暂停等待，不计作 SDK 初始化失败。只收到回调而画布未获得有效尺寸时，等待仍继续，15 秒后按 `layout_timeout` 回退；未收到初始化回调则为 `init_timeout`。可见画布失去有效尺寸时重新等待，隐藏/后台期间仍暂停。下一题同时清除初始化与布局状态，旧代次的布局回调不能恢复新画布。官方加载、构建失败或超时自动释放节点并切到 `StudyLocalWhiteboard.ets`，当前学习会话保持原版，不在下一题反复重试套件。原版沿用已有透明 Canvas、画笔/颜色/笔宽、橡皮宽度、仅手写笔、撤销、重做和清空；纯模型 `model/StudyWhiteboard.ts` 管理归一化笔迹、有界历史与多触点隔离，组件管理绘制和工具设置。
+
+学习页首次打开后保持宿主挂载，收起使用 `Visibility.None`；重开、翻面和同卡内容刷新保留画布。原版收起取消未完成的一笔和工具设置，不调用销毁生命周期，重开可继续书写。官方初始化的 15 秒等待只在白板可见且允许输入时启用；收起、后台、编辑或评分期间取消等待，恢复后重新计时，取消前已排队的回调由等待版本隔离，不能误判当前画布失败。下一题提交后发送 resetTick，即使 cardId 相同也清空；原版由子组件重置笔迹与历史，官方重建 Controller。完成或退出学习释放会话。旧代次及重复失败回调不影响新画布或覆盖原版观察，迟到初始化也不能重新启用失败的官方分支。
+
+白板在学习页根 Stack 中覆盖卡片，不再把卡片和画布按 1:2 压缩。原版透过 Canvas 保留题目阅读和原有卡片布局，工具栏、画布和底部答案条维持原版位置；官方宿主外层同样使用透明背景，纸张的实际显示不能仅凭全屏覆盖结构判断。白板顶部条拥有顶部安全区，底部学习答案条拥有操作区和底部安全区；官方工具栏内部布局归 Pen Kit。手写期间暂停自动前进/时间盒并屏蔽卡片手势，后台或评分中禁止输入。普通卡复用显示答案和评分入口，选择题先收起白板。返回或 Escape 先关闭原版工具设置，再收起；原版 Ctrl+Z/Y 执行白板撤销/重做，官方分支传递相应按键，均不能触发卡片撤销或评分。
+
+`AppInterface.WHITEBOARD_INTERFACE_ITEMS` 是两种 UI 与 JIDE 的共同目录。官方观察发布 `engine=huawei_pen_kit`、支持/初始化/失败/SDK缩放、`paper_transparency`、`paper_transparency_saved`、`opacity_open` 与宿主按钮；`navigation_scope=study_content`、`navigation=global_pan_zoom`、`view_scale/view_x/view_y` 与 `toolbar_follows_view=true` 发布双指导航能力、真实视图及官方内部工具栏跟随局限；`ready=true` 仅确认 SDK 初始化与有效布局同时成立，不代表运行验收。原版回退观察发布 `engine=local_canvas`、全局比例/偏移/导航能力、`navigation_scope=study_content`、`fallback_reason`、笔刷选择、设置工具、历史可用性和是否有笔迹，`controlsComplete=true`，无手动切换入口，隐藏官方内部控件及未展开的工具设置。回退原因由真实失败边界设置：`capability_missing`、`emulator_unsupported`、`context_missing`、`load_failed`、`initialization_failed`、`init_timeout`、`layout_timeout`；其中上下文缺失发生在导入前，初始化失败包括 Controller 创建和画布构建失败。加载异常、选择、初始化成功与回退均记入日志，避免把所有失败解释为设备不支持。原版隐藏回调晚于官方观察时通知宿主重新发布当前引擎，不能抹掉已发布的官方观察。收起或后台撤掉观察。两种引擎均没有笔迹识别与 JIDE 内容工具，中英说明明确不能读取或判题，UI 可见性不授予助手绘画或评分权限。
+
+回归入口 `tools/tests/study-whiteboard.test.mjs` 执行真实宿主方法、官方 Controller 拥有关系、自动回退、初始化超时、动态加载/释放、旧回调隔离、按键与 JIDE 结构，并遍历启动依赖图阻止 Pen Kit 提前加载。`study-whiteboard-local.test.mjs` 执行原版模型和真实组件方法，覆盖落笔、擦除、历史边界、取消、旋转重绘、收起重开、下一题清空、工具设置与观察。`study-lifecycle.test.mjs` 检查加载/翻面/评分时的清空时机。此前菜单检查依赖旧内联公式，已改为执行真实菜单几何；首页资源检查的正则曾将 `$r` 字符串误识别为硬编码，现区分资源调用和直接文本并覆盖正反例。设备安装和实际交互按本次用户授权执行，保留独立运行证据；安装身份见[签名记录](signing.md)。Node 检查、编译与安装均不能单独证明官方 HSP 的实际书写效果。
+
+2026-10-06 真机检测修正：白板、原版画布与学习生命周期检查通过 55/55 项，i18n、文档、JIDE 结构、架构边界与 ArkTS 字段检查通过 45/45 项。使用现有 `ceshi` 配置增量签名构建通过，警告门禁 unexpected=0，产物和日志位于 `D:\Projects\jidecards-penkit-2026-10-05\availability-fix-ceshi-2026-10-06` 及同级 `availability-*-2026-10-06.log`。用户重新连接平板并明确要求安装后，此检测修正版已通过 `install -r` 覆盖安装到 SLG-W50；安装前后 Bundle Manager 均为 2.9.10 / 2991、debug / none，应用身份保持一致。未启动应用或执行功能验证，尚无真机官方初始化成功证据。
+
+随后用户手动打开白板触发闪退。通过 Hiview Faultlogger 读取既有 `jscrash-com.jide.kapian-20020250-20261006123218`，确认错误为 `Cannot read property createSystemHspModuleResourceManager of undefined`，发生于组件字段初始化的 `new HandwriteController()`；官方 HSP 已加载，不能把这次错误解释为缺少套件。日志中的 XComponent 提示不是已确认的异常根因。修正完整 Context 生命周期、UI scope 和构造异常边界后，白板/原版/学习生命周期、i18n、JIDE 结构、架构与 ArkTS 字段检查通过 94/94 项；回归执行真实工厂和宿主，将报告中的 SDK TypeError 注入 Controller 构造，检查其在进入 Builder 渲染前回退且不逃出原生 scope 回调，同时覆盖缺上下文、释放重入和节点释放。增量 `ceshi` 签名构建通过，警告门禁 unexpected=0；产物为 `D:\Projects\jidecards-penkit-2026-10-05\context-final-ceshi-2026-10-06\entry-default-signed.hap`，崩溃与构建/检查日志位于同级 `tablet-whiteboard-*`、`context-*`。代码回归使用 SDK 替身，不作为官方 HSP 已在真机初始化成功的证据；本任务不启动应用或执行运行验证。
+
+2026-10-06 再次按用户要求审查：重读现有官方 Pen Kit 副本 34 份，补查在线组件 API 与动态挂载所需的 ArkUI 合约，核对本机 SDK 后修正隐藏/后台期间的初始化等待、取消回调版本隔离及已知仿真型号的官方不支持边界，移除全部内部 HSP 路径探测。初始化/生命周期与原版回归等第一批 73/73 通过，能力检测、资源/JIDE/架构等补充检查 54/54 通过，两批有重叠。ArkTS 扫描的 11 个命中经人工复核和实际编译确认未构成当前编译阻断，原始结果保留在审查目录。最终增量 `ceshi` 签名构建及警告门禁通过，unexpected=0；审查报告、源码指纹、包内修复符号和安装日志位于 `D:\Projects\jidecards-penkit-2026-10-05\official-recheck-2026-10-06`。最终包已覆盖安装到同一平板，版本和身份核对见[签名记录](signing.md)；没有启动应用或执行手写运行验收。在线 Codelab 未返回可读取正文，本机资料副本不代表已完整取得全部当前在线资料。
+
+用户随后报告进入白板不再闪退但没有内容。本次读取的已有日志中，12:46:56 的套件曾调用初始化回调、创建工具栏并测得 1840×2800；这些记录早于上一轮最终安装，不能用来证明当前包的工具栏已显示。修正页面覆盖层尺寸、动态节点原生布局根与 NodeContainer 剩余高度分配，同时阻止仅有 SDK 回调却无有效画布尺寸时取消回退等待；JIDE 同步区分初始化与布局就绪。相关检查 99/99 通过，增量 `ceshi` 构建、签名及警告门禁通过（unexpected=0），修正版已覆盖安装。证据位于 `D:\Projects\jidecards-penkit-2026-10-05\empty-canvas-fix-2026-10-06`；此次没有启动或操作应用，实际空白的全部成因与修正后的显示效果仍未进行运行确认，布局就绪也不等于官方笔迹渲染已经验收。
+
+用户确认上一包仍只显示标题并稍后回退。随后读取的已有日志在 13:15:38 记录 SDK 初始化和内部 1840×2800 尺寸，但没有宿主根布局回调，13:15:52 以 `layout_timeout` 回退。安装包字节码包含根 onAreaChange 和 NodeContainer 创建，不能解释为设备缺少套件或源码未打包。最初提出的“rebuild 在 UI scope 外必然失效”判断缺乏依据：OpenHarmony 原生实现按节点 ID 查找容器，makeNode 回调恢复绑定时的 UI context；基于相反假设的测试不是故障复现，已移除。当前改为显式 ContentSlot 插入、测量后建树与数值尺寸更新，代码检查分别覆盖插入、平台布局回调和初始化，不能代替真实显示验收。本轮证据位于 `D:\Projects\jidecards-penkit-2026-10-05\mount-recheck-2026-10-06`；继续遵守用户仅检查代码及安装的范围。
+
+本轮相关检查 63/63 通过，四个受影响 ArkTS 文件审查未发现 Critical 项；增量 ceshi 编译与警告门禁通过（unexpected=0），SDK 验证签名 HAP 和 profile 成功。最终包字节码确认显式插入/移除、ContentSlot 和数值尺寸，平板覆盖安装返回成功，安装前后应用身份与版本一致。没有启动或操作应用，当前包的实际画布与工具栏显示仍未运行确认；详细记录见该目录的 `review.md`、`artifact-proof.json` 与 `installation-receipt.json`。
+
+2026-10-05 回退修复的 `npm test` 全量 2503/2503 通过；全量检查发现的旧菜单断言、旧高级面板返回契约及测试依赖缺失已按现有代码同步，保留菜单边界、共享草稿、翻译与禁用行为断言。增量签名构建 `npm run build:app -- -SkipRust -ArtifactDirectory D:\Projects\jidecards-penkit-2026-10-05\fallback-artifact` 通过，警告门禁 unexpected=0；原生输入未改，本次复用已校验的目标架构库。产物为该目录的 `entry-default-signed.hap`，当次未做任何安装或运行验收。
 
 `ReviewControlsSettings.ets` 在两种界面模式都提供「快捷答题方式」单选：关闭、四象限点击答题、学习手势，默认关闭。`model/实验性功能存储.ets` 是偏好唯一入口，运行时仅广播 `studyQuickAnswerMode`，持久化 `study_quick_answer_mode` 并同步旧开关键。没有新模式时兼容旧值：仅开一种保持原选择，旧版双开优先保留四象限。串行落盘成功后才广播，失败恢复模式、兼容键和引导原值并显示错误。切换到四象限时重置本机已读标记，旧用户缺少标记也会收到引导。
 
@@ -140,6 +193,10 @@ HTML 构建器在模板 CSS 前同时提供默认字色与不透明卡片底色�
 
 
 ## 卡片只读预览
+
+取卡前由 `DeckPreviewService` 持有独立操作占用，等待 `SyncActivity` 释放集合，再用首页冻结传入的 `filesDir` 调用 `后端会话.确保已打开`，最后发快照请求。返回、后台和切牌组只使显示代次失效；原生读取及解码完成前不能释放操作占用，重叠请求分别拥有租约。错误日志 `DeckPreview: deck=... scope=... stage=... error=...` 区分 wait/open/snapshot/decode 阶段，不静默改用正式学习队列。行为回归见 [deck-preview-backend.test.mjs](../../tools/tests/deck-preview-backend.test.mjs)。
+
+“无法加载卡片预览”是首页取卡失败的通用提示，不能单凭这句话确定根因。早期 2.8.1/2.9.6 用标准搜索 RPC 29/0、29/1；较新包用本地快照 RPC 1001/0。曾经的回退扩展与预览重复占用1001，当前回退为1003；升级该修复必须携带重建的原生库。旧搜索还会受整批 ID 展开成函数实参的引擎上限影响，共用解码现已逐项追加。原生回归 `legacy_preview_search_rpc_accepts_deck_ids_and_omitted_sort_order` 验证旧版 did 搜索和省略排序字段合法；具体用户故障仍需实际构建和上述日志。卡片列表为空使用独立空态提示，进入预览后的模板/Web失败使用“加载卡片失败”，不与首页取卡提示混为一类。
 
 首页点击“预览”后，通过 `DeckPreviewScopeMenu` 的锚点 Popup 选择今日待学、今日到期、今日已学或全部卡片；手机在“更多”父菜单的“预览”行旁向左打开范围子弹窗，箭头指向“预览”；宽屏锚定预览按钮。范围包含子牌组。今日待学复用 Core 当日队列的额度、排序和同笔记隐藏规则，并补入已安排在今日稍后的学习步骤，每张卡只出现一次，不模拟后续评分。今日到期使用 Core `is:due`，包含学习提前量，不受每日额度截断；今日已学仅计 Core 今日复习日志中的实际评分并去重，手动改期不算学习；全部卡片包含暂停和隐藏卡片。今日按 Core 学习日切换时间定义，不按前端自然日计算。
 
@@ -175,7 +232,7 @@ HTML 构建器在模板 CSS 前同时提供默认字色与不透明卡片底色�
 
 ## 卡片模板脚本与样式
 
-学习与预览的 Web 生命周期统一由 `utils/CardWebView.ets` → `model/CardWebSession.ts` → `model/CardReviewerRuntime.ts` 管理。页面只提供当前加载代次、HTML 和正反面；只有适配器调用 ArkWeb `loadData`。同一次卡片加载的正反面共用 document/window，翻面替换 `#qa`，依次重新执行模板脚本并等待外部脚本，保留模板自己的全局作答状态和同源 Web Storage。模板 CSS 和通过 CSS 字段嵌入的脚本也放在 `#qa`，按每面执行；jQuery、MathJax 和应用内置脚本只在文档首次加载。每面重新处理公式、遮罩、折叠字段及 onUpdateHook/onShownHook；预览的文档监听只安装一次，动作使用当前卡面版本。
+学习与预览的 Web 生命周期统一由 `utils/CardWebView.ets` → `model/CardWebBuffer.ts` / `model/CardWebSession.ts` → `model/CardReviewerRuntime.ts` 管理。页面只提供当前加载代次、HTML 和正反面；只有适配器调用 ArkWeb `loadData`。学习、既有卡预览及草稿/模板预览固定挂载两个 Web，新文档在备用视图完成脚本、公式及布局后等待两次动画帧，再切换可见槽；当前视图保留完整旧帧，备用槽不参与输入。适配器激活准备中的视图并将其静音，切换后冻结、静音旧视图；仅前台且允许当前预览播放时恢复新视图声音，迟到完成不能在后台解除静音；不会提前在候选卡中运行模板或播放媒体。同一次卡片加载的正反面仍共用 document/window，翻面替换 `#qa`，依次重新执行模板脚本并等待外部脚本，保留模板自己的全局作答状态和同源 Web Storage。跨槽加载前读取当前 sessionStorage，在新文档首个脚本中同步并清除已删除项；localStorage 保持原同源行为。模板 CSS 和通过 CSS 字段嵌入的脚本也放在 `#qa`，按每面执行；jQuery、MathJax 和应用内置脚本只在文档首次加载。每面重新处理公式、遮罩、折叠字段及 onUpdateHook/onShownHook；预览的文档监听只安装一次，动作使用当前卡面版本。
 
 新卡、撤销后重新取卡、编辑刷新及离页会使旧会话失效；新卡采用新文档，防止上一张卡的计时器、监听和全局变量串入下一张。这个隔离范围有意限定为“同卡翻面持久”，不承诺 Anki 桌面整个复习会话的全局变量寿命，也不清空作者的 localStorage/sessionStorage。持久化数据和调度仍归 Anki Core；模板小题得分不是调度评分。
 
@@ -183,17 +240,31 @@ HTML 构建器在模板 CSS 前同时提供默认字色与不透明卡片底色�
 
 完成信号由 JS 桥带文档/卡面版本回传，不能把 `runJavaScript` 返回当作页面内异步脚本已执行完毕。首次加载未结束的翻面请求排队，连续更新串行处理最新一面；旧文档回调不能确认新卡，当前脚本资源失败进入页面错误态，不通过重新 loadData 隐式丢掉作答状态。资源超时为 15 秒。
 
-切卡时的原生 Web 底色与加载占位由当前页面的 `cardSurfaceBackground` 拥有，沿用最近一次真实渲染完成的模板背景，不回退为浅色 `surface_card`。`CardReviewerRuntime` 在脚本、公式、布局及两次动画帧后读取实际 html/body 配色，使用 1px Canvas 合成透明度并回传不透明 RGB；`CardWebSession` 先检查文档/卡面版本，再校验颜色格式，旧回调不能改变新卡底色。首次卡片尚未取得颜色时使用原应用表面；背景图片和渐变保留在模板内，原生占位只跟随其基础背景色，不复制图片。
+切卡时的原生 Web 底色与加载占位由当前页面的 `cardSurfaceBackground` 拥有，沿用最近一次真实渲染完成的模板背景，不回退为浅色 `surface_card`。`CardReviewerRuntime` 在脚本、公式和布局完成，且两次动画帧完成后读取实际 html/body 配色，使用 1px Canvas 合成透明度并回传不透明 RGB；`CardWebSession` 先检查文档/卡面版本，再校验颜色格式，旧回调不能改变新卡底色。首次卡片尚未取得颜色时使用原应用表面；背景图片和渐变保留在模板内，原生占位只跟随其基础背景色，不复制图片。
 
-学习与预览都保留占位至渲染确认，以免新文档加载期间先露出默认 HTML 背景。学习等待期间阻止翻面、评分、手势与自动推进，确认后才开始当前面的音频和计时；预览阻止早期翻面，仍允许原有的慢卡/坏卡跳过。标记写入的同卡重渲染继续保留原计时与作答状态。参考 [Anki 官网的淡入及动态页面说明](https://docs.ankiweb.net/templates/styling.html#fading-and-scrolling)、[AnkiDroid 的防白闪 Web 底色](https://github.com/ankidroid/Anki-Android/blob/main/AnkiDroid/src/main/java/com/ichi2/anki/AbstractFlashcardViewer.kt) 和 HarmonyOS 官方 ArkWeb「优化跳转至新Web组件过程中的页面闪烁现象」；保持既有同卡翻面、跨卡新文档的脚本寿命边界。
+学习与浏览预览的首卡在渲染确认前使用初始占位；`hasRenderedCard` 只在当前渲染确认后置为 true，后续切卡、翻面及编辑刷新不清除。已经显示卡片后，加载层保持透明，只阻止旧卡输入；学习页在 loading 阶段继续显示当前槽，备用 Web 完成后一次切换，避免题面→整块加载画面→新题面的闪烁。三种卡面入口的进度圈共用 `DelayedLoadingIndicator`，超过 250ms 才叠加显示；完成及错误仍使用原页面。草稿/模板预览切换模板或填空编号时保留 `NoteDraftPreviewSession` 的旧 rendered，宿主不再用 revision 重建子组件；子组件通过 contentRevision 使旧文档失效，复用同一套双槽切换。等待读取/排版期间禁用翻面和 Web 输入，失败保留旧帧及错误提示，恢复后从新卡题面开始；草稿临时媒体的退出清理责任保持原会话所有。
 
-对应回归在 `card-web-session.test.mjs`、`study-lifecycle.test.mjs` 与 `preview-runtime.test.mjs` 直接执行生产版本检查、渲染确认及页面等待行为；`test-card-flip-browser.mjs` 使用真实 CSS、Canvas、导航、模板脚本和公式验证深浅应用主题下的深色、透明及半透明卡片背景。它们不替代原牌组在 ArkWeb 上的连续切卡视觉验收；设备由用户操作。
+`CardRenderPrefetch` 仅缓存一张候选卡的 Core 渲染结果，最长30秒；当前卡面确认后才开始准备，不执行未来模板 JavaScript、不提取或播放未来音频。浏览预览使用既定 previewIds 的下一项；学习后端请求当前队首和一张候选，评分后仍重新读取 Core 队首、原始调度字节、牌组设置、间隔和标记，只有实际 cardId 匹配才复用内容。评分引起同胞埋藏、重复学习或不同队首时正常读取，候选失败不影响当前题目；撤销、编辑/内容广播、标记、埋藏/删除、完成及离页清除缓存，后台停止准备。已开始的学习预读取直到完成仍保护集合优先级，不让迟到结果在销毁后恢复缓存。此优化不承诺未命中或复杂模板零等待，等待时保留旧帧。
+
+学习等待期间阻止翻面、评分、手势与自动推进，确认后才开始当前面的音频和计时；预览阻止早期翻面，仍允许原有的慢卡/坏卡跳过。标记写入的同卡重渲染继续保留原计时与作答状态。对照 [AnkiDroid 的 createWebView/loadContentIntoCard](https://github.com/ankidroid/Anki-Android/blob/main/AnkiDroid/src/main/java/com/ichi2/anki/AbstractFlashcardViewer.kt)：复用 WebView 直接加载内容并设置透明底色防白闪，普通填卡不插入全卡加载覆盖层。jidecards 保留既有同卡翻面、跨卡新文档的脚本寿命边界与模板实际底色；这里修复的是应用主动插入的画面，不能据此声称任意第三方模板或 ArkWeb 导航帧都已在设备上验证。
+
+2026-10-06 加载速度优化：普通静态卡片原先每次新文档也解析约2.3MB的MathJax引擎。`MathRendering.cardMathScripts` 统一检查Core渲染的两面（优先已解析HTML）及模板CSS，仅静态且不含公式线索时省去大引擎；仍同步提供小型配置/LaTeX媒体兜底。任一面含TeX分隔符或反斜线、MathML、可能编码公式的实体，或模板脚本、事件属性、JavaScript链接/嵌入对象时，保守加载完整引擎；背面才有公式也在题面准备，不能因当前面无公式而让翻面失效。`CardReviewerRuntime` 只有实际启动引擎后才等待其Promise及排版；成功确认仍等待两次动画帧，不用固定延时替代绘制确认，不跳过资源与模板异步工作。所有学习、浏览/首页预览、草稿/模板预览沿用共享构建器与运行时。
+
+2026-10-07 安全复查：撤销前一版100ms帧等待兜底。模板、公式和布局完成并不证明新帧已绘制，固定延时提前确认可能让备用视图尚未就绪就换槽；保持旧帧，仍等待两次动画帧后确认，普通卡按需加载MathJax的提速保留。`card-web-session.test.mjs` 和真实浏览器回归持有帧回调并推进时间，验证超出100ms以及仅收到一次帧回调时均不确认，第二次回调到达才显示；这种受控测试验证完成信号门禁，不能据此证明ArkWeb设备合成无闪帧。专项137项、真实Chromium的学习/预览×深浅主题4组场景通过，增量签名构建通过，警告门禁unexpected=0。证据为 `.local/card-render-safe-{regression,browser,build}-20261007.log`；最新产物 `.local/card-render-safe-fix-20261007/entry-default-signed.hap` 替代上一版速度包。
+
+之前的速度对照为浏览器4倍CPU降速、同进程普通卡完整引擎/省略引擎每组6次、去掉首轮后的中位数245ms/106ms，仅测网页导航至渲染确认，不含Core查询、ArkUI页面进入与设备合成；记录为 `.local/card-render-profile-20261006.mjs`、`.local/card-render-speed-comparison-20261006.log`。它反映正常动画帧路径的省略引擎收益，不是鸿蒙实机测速，也不证明固定延时可以安全换帧。没有安装或启动设备，实际首卡/连续切卡速度和视觉效果仍待用户真机验收。
+
+对应回归在 `card-web-prefetch.test.mjs`、`card-web-session.test.mjs`、`study-session-controller.test.mjs`、`study-lifecycle.test.mjs` 与 `preview-runtime.test.mjs` 直接执行候选命中/失效、实际队首原始字节、双槽显示、会话缓存、安全迁移、渲染确认及页面等待行为；`ui-loading-feedback.test.mjs` 覆盖首次/连续加载的底层可见性、透明遮罩、延迟圈与旧输入阻挡。`test-card-flip-browser.mjs` 使用真实 CSS、Canvas、导航、模板脚本和公式验证深浅应用主题下的深色、透明及半透明卡片背景。它们不替代原牌组在 ArkWeb 上的连续切卡视觉验收；设备由用户操作。
+
+2026-10-06 候选预加载与双槽切换验收：生产模型/适配器/学习/预览/草稿、布局、加载反馈与架构/文档专项195项通过；`npm test -- study` 398/398通过。进一步执行 `npm test -- browser`（492/496）、`npm test -- media`（285/287）及 `npm test -- ui`（417/421），剩余失败位于现有浏览器菜单/预览标题、媒体编辑器按钮、首页转场、AI隐藏回调旧harness、菜单密度/外观及主题文字契约，未据此宣称全领域通过。各命令记录在 `.local/card-prefetch-{regression,study,browser,media,ui}-20261006.log`。`npm run build:app -- -SkipRust -ArtifactDirectory .local/card-prefetch-fix-20261006` 最终增量签名构建通过，警告门禁 unexpected=0，构建记录为 `.local/card-prefetch-build-20261006.log`，包与报告保存在该产物目录；首次新增双槽的异常处理警告已在最终源码修正，未加入警告基线。沿用现有双架构 Core 库和默认签名配置，没有安装或启动设备。旧帧到新帧的 ArkWeb 合成、连续快切、大图/公式、模板脚本、前后台及内存表现仍需真实设备验收，Node与HAP通过不证明零闪帧。
+
+2026-10-06 连续加载遮罩修复：相关学习/预览/音频/计时/草稿预览、架构、组件字段和文档回归通过；预览专项在修正测试操作顺序后单独重跑通过，其余输入未变，复用已通过结果。`npm run build:app -- -SkipRust -ArtifactDirectory .local/card-loading-fix-20261006` 增量签名构建通过，警告门禁 unexpected=0；使用现有双架构 Core 库和默认签名，没有改动签名配置。产物与构建证据保存在该忽略目录，回归日志为 `.local/card-loading-regression-20261006.log` 和 `.local/card-loading-preview-20261006.log`。没有安装、启动或执行设备视觉验收；没有新增设置、菜单或操作能力。
 
 2026-10-04 按用户要求使用既有 `ceshi` 配置重新签名，以 `install -r` 在 SLG-W50 平板覆盖安装成功；随后强制停止并启动 EntryAbility，系统报告启动成功及应用前台状态。Bundle Manager 核对版本为 2.9.10（2991），未卸载或清理数据。包、构建记录及安装记录保存于忽略的 `.local/card-flicker-fix-20261004/`；原牌组连续切卡的视觉效果仍待用户实机验收。
 
 2026-10-04 上述回归、相关学习/预览/音频/计时/模板/教学检查及文档/架构/组件字段门禁通过；真实 Edge 的学习/预览 × 深浅主题场景通过。`npm run build:app` 更新双架构原生输入并产出签名 HAP，最后的快捷键修正通过 `npm run build:app -- -SkipRust` 增量重编译，警告门禁无新增项。等待渲染时 Escape 仍可返回；未执行设备安装或原牌组的真机视觉验收。
 
-回归入口：`tools/tests/card-web-session.test.mjs` 验证队列、旧回调、错误恢复和适配器；`tools/test-card-flip-browser.mjs` 用真实导航执行生产 HTML、渲染会话与脚本，覆盖学习/预览、深浅色、完整/部分作答、反复翻面、切卡隔离、Storage、外部脚本顺序、公式、遮罩、折叠和预览监听。浏览器命令：`node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs tools/test-card-flip-browser.mjs`，可用 `PLAYWRIGHT_MODULE` 指定 Playwright 模块路径，需安装 Edge。ArkWeb 桥及原问题牌组仍需真机验收；浏览器回归不证明任意第三方模板全部兼容。
+回归入口：`tools/tests/card-web-session.test.mjs` 验证队列、旧回调、错误恢复和适配器；`tools/test-card-flip-browser.mjs` 用真实导航执行生产 HTML、渲染会话与脚本，覆盖学习/预览、深浅色、完整/部分作答、反复翻面、切卡隔离、Storage、外部脚本顺序、公式、遮罩、折叠和预览监听。浏览器命令：`node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs tools/test-card-flip-browser.mjs`，可用 `PLAYWRIGHT_MODULE` 指定 Playwright 模块路径，默认需安装 Edge；`PLAYWRIGHT_BROWSER_CHANNEL=chromium` 可选择已安装的Playwright Chromium。ArkWeb 桥及原问题牌组仍需真机验收；浏览器回归不证明任意第三方模板全部兼容。
 
 学习、浏览预览和未保存模板预览共用 `model/学习卡片HTML构建器.ts`。默认配色与列表/代码对齐、笔记类型 CSS、应用布局/媒体兜底分别包在独立 style 中；不能重新合并，部分 Anki 牌组在 CSS 字段用闭合标签嵌入脚本。`utils/CardAssetResponse.ets`（原 MathAssetResponse）统一映射固定的内置 jQuery 3.7.1/MathJax rawfile；未知内置域请求返回 404，其他域沿原媒体/网络逻辑。jQuery 必须先于模板脚本同步加载。新增内置脚本需同时更新固定映射、许可与浏览器回归；不要修改导入笔记类型原文来规避渲染问题。外部作者脚本依赖与实际验证边界见 docs/FEATURE_STATUS.md。
 
@@ -289,3 +360,5 @@ HTML 构建器在模板 CSS 前同时提供默认字色与不透明卡片底色�
 媒体快照保留 missing_media_notes，按 256 个 ID 分页（service 1000 method 5）并去重。受影响笔记通过完整 nid 查询交给浏览器；写入 method 6 在 registry lock 内重检并与确认快照取交集，单个 AddNoteTags 事务添加 missing-media。成功／失败后原快照失效，避免重复使用；离页停止查询发布，已接受打标仍完成并广播刷新／同步。报告与文件分页继续原语义，最终浏览查询内存仍是 O(受影响笔记数)。
 
 打标提交成功后重检失败保留 taggedCount，单独提示重新检查；原快照已失效，不能把成功写入误报成可直接重试的失败。媒体面板的 JIDE 实时观察只发布当前渲染控件，并与各按钮实际启用条件一致。
+
+手写宿主和原版回退的关闭手写入口、笔刷设置关闭入口共用 `IconActionButton.toolbarStyle` 的叉号；撤销、重做和清空也沿用同一按钮外观。透明度继续显示完整“透明度”文字与纸张百分比，不改为图标，不影响笔迹与工具栏透明度。`WHITEBOARD_INTERFACE_ITEMS` 和实际观察保留完整名称、图标资源及启用状态；原关闭、持久化、系统返回和输入冻结策略保持。自定义调度脚本警告的退出学习同样由公共标题栏显示叉号，继续学习仍需明确确认。
