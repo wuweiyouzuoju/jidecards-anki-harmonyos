@@ -8,6 +8,8 @@ import { localPreferenceApi } from './local-preference-harness.mjs';
 import * as appearance from '../../entry/src/main/ets/model/DeckListAppearance.ts';
 const { DECK_LIST_NARROW_KEY, DECK_LIST_STYLE_KEY, DECK_LIST_STYLES } = appearance;
 import { 应用尺寸 } from '../../entry/src/main/ets/utils/应用尺寸.ets';
+import { 牌组列表数据源, 空牌组汇总 } from '../../entry/src/main/ets/model/主页模型.ets';
+import { loadComponentLogic } from './platform-module-harness.mjs';
 
 const read = path => readFileSync(new URL('../../entry/src/main/ets/' + path, import.meta.url), 'utf8');
 
@@ -88,16 +90,23 @@ test('narrow rows keep symmetric padding, fit the expand target and share crop h
   assert.match(toggle, /\.animation\(\{ duration: 150, curve: Curve\.EaseOut \}\)/);
   for (const path of ['components/牌组列表项.ets', 'components/牌组定制面板.ets']) {
     assert.match(read(path), /@StorageProp\(DECK_LIST_NARROW_KEY\)/);
-    assert.match(read(path), /\.height\(应用尺寸\.deckRowHeight\(this\.narrow,/);
+    assert.match(read(path), /\.height\(应用尺寸\.deckRowHeight\(this\.narrow\)\)/);
   }
   const list = read('components/home/主页牌组列表.ets');
   assert.match(list, /@StorageProp\(DECK_LIST_NARROW_KEY\)/);
   assert.match(list, /@Prop\s+展开的牌组ID集合: Set<string>/,
     'plain fields do not propagate expansion changes to existing lazy rows');
   assert.match(list, /expanded: this\.展开的牌组ID集合\.has\(deck\.id\)/);
-  const keyGenerator = list.match(/\}, \(deck: 牌组汇总\) => `([^`]+)`/)[1];
-  assert.doesNotMatch(keyGenerator, /展开|expanded/,
+  const DeckList = loadComponentLogic('components/home/主页牌组列表.ets', '主页牌组列表', {
+    牌组列表数据源, Scroller: class {}
+  });
+  const deckList = new DeckList(), deck = { ...空牌组汇总, id: '2', hasChildren: true };
+  const key = deckList.deckKey(deck);
+  deckList.展开的牌组ID集合 = new Set(['2']);
+  assert.equal(deckList.deckKey(deck), key,
     'toggling expansion must preserve the row and its animated triangle');
+  deck.description = 'changed';
+  assert.notEqual(deckList.deckKey(deck), key, 'changed row content must refresh the lazy row');
   assert.match(read('components/settings/外观分组.ets'), /DeckWidthControl\(\)/);
   assert.match(read('entryability/EntryAbility.ets'), /initializeDeckListAppearance\(\);/);
 });
@@ -134,13 +143,67 @@ test('deck style selector exposes four localized options and saves each actual v
 });
 
 
-test('both double column densities fit two name lines plus description and symmetric padding', () => {
+test('single and double columns share row height and still fit two name lines plus description', () => {
   const source = read('components/牌组列表项.ets');
-  assert.match(source, /maxLines\(this\.hideStudyCounts \? 2 : 1\)/);
+  const Row = loadComponentLogic('components/牌组列表项.ets', '牌组列表项', {
+    应用尺寸, FontWeight: { Medium: 'medium' }, 牌组显示名: deck => deck.displayName
+  });
+  const name = source.slice(source.indexOf('Text(牌组显示名(this.deck, this.uiLanguage))'),
+    source.indexOf('Text(this.deck.description)'));
+  const description = source.slice(source.indexOf('Text(this.deck.description)'), source.indexOf('if (!this.hideStudyCounts)'));
+  const attribute = (content, key, props) => {
+    const expression = content.match(new RegExp(`\\.${key}\\(([^;]*?)\\)\\s*\\.`))[1];
+    return new Function('应用尺寸', `return (${expression});`).call(props, 应用尺寸);
+  };
+  const padding = source.match(/\.padding\(\{\s*left: (\(this\.narrow[\s\S]*?)\n\s*\}\)/)[1];
+  const evaluatePadding = new Function('应用尺寸', `return { left: ${padding} };`);
   for (const narrow of [false, true]) {
-    const nameHeight = 2 * (narrow ? 20 : 22);
-    const contentHeight = nameHeight + (narrow ? 3 : 5) + 16;
-    assert.ok(应用尺寸.deckRowHeight(narrow, true) >= contentHeight + 2 * (narrow ? 6 : 13));
-    assert.equal(应用尺寸.deckRowHeight(narrow, false), narrow ? 60 : 92);
+    const heights = [];
+    for (const hideStudyCounts of [false, true]) {
+      for (const wraps of [false, true]) {
+        for (const hasDescription of [false, true]) {
+          const props = { narrow, hideStudyCounts, textColumnWidth: 100,
+            deck: { depth: 0, displayName: '实际牌组名称', description: hasDescription ? '说明' : '  ' },
+            getUIContext: () => ({ vp2px: width => width * 2, getMeasureUtils: () => ({
+              measureText: options => {
+                assert.equal(options.textContent, '实际牌组名称');
+                assert.equal(options.fontSize, 16, 'always measure the original font to avoid oscillation');
+                assert.equal(options.fontWeight, 'medium');
+                return wraps ? 250 : 150;
+              }
+            }) }),
+            compactText: Row.prototype.compactText
+          };
+          const compact = narrow && wraps && hasDescription;
+          assert.equal(props.compactText(), compact);
+          const nameLines = attribute(name, 'maxLines', props);
+          const nameFont = attribute(name, 'fontSize', props);
+          const nameLine = attribute(name, 'lineHeight', props);
+          const descriptionFont = attribute(description, 'fontSize', props);
+          const descriptionLine = attribute(description, 'lineHeight', props);
+          const insets = evaluatePadding.call(props, 应用尺寸);
+          const rowExpression = source.match(/\.height\((应用尺寸\.deckRowHeight\([^\n]+)\)/)[1];
+          const rowHeight = new Function('应用尺寸', `return ${rowExpression};`).call(props, 应用尺寸);
+          assert.equal(nameLines, 2, 'long names can wrap in every deck style');
+          assert.equal(nameFont, narrow ? (compact ? 14 : 16) : 17);
+          assert.equal(descriptionFont, narrow ? (compact ? 11 : 12) : 13);
+          assert.ok(nameLine >= nameFont);
+          assert.ok(descriptionLine >= descriptionFont);
+          const actualNameLines = wraps ? 2 : 1;
+          const textHeight = actualNameLines * nameLine +
+            (!narrow || hasDescription ? (narrow ? 3 : 5) + descriptionLine : 0);
+          assert.ok(rowHeight >= Math.max(textHeight, 应用尺寸.箭头槽位高度) + insets.top + insets.bottom,
+            `content must fit: narrow=${narrow}, double=${hideStudyCounts}, wraps=${wraps}, description=${hasDescription}`);
+          assert.equal(rowHeight, narrow ? 60 : 92);
+          props.textColumnWidth = 0; assert.equal(props.compactText(), false, 'unmeasured rows keep the original font');
+          props.textColumnWidth = 200; assert.equal(props.compactText(), false, 'wider columns restore the original font');
+          props.textColumnWidth = 100;
+          assert.equal(props.compactText(), compact, 'repeated layout keeps the same font decision');
+          heights.push(rowHeight);
+        }
+      }
+    }
+    assert.ok(heights.every(height => height === heights[0]));
   }
+  assert.match(source, /\.onAreaChange\([\s\S]*this\.textColumnWidth = Number\(newArea\.width\)/);
 });

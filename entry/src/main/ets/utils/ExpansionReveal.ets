@@ -2,8 +2,12 @@
 
 /** 末尾折叠区展开后，只在内容完成布局时滚动一次；展开状态仍由宿主持有。 */
 export class ExpansionReveal {
-  readonly scroller: Scroller = new Scroller();
+  readonly scroller: Scroller;
   private pending: boolean = false;
+
+  constructor(scroller: Scroller = new Scroller()) {
+    this.scroller = scroller;
+  }
 
   request(expanded: boolean): void {
     this.pending = expanded;

@@ -108,17 +108,20 @@ export class 应用尺寸 {
     return Math.max(0, statusBarHeight - 应用尺寸.statusTextBottomInset);
   }
 
-  static pageToolbarTop(statusBarHeight: number, narrow: boolean): number {
-    return 应用尺寸.statusTextBottom(statusBarHeight) + 应用尺寸.页面分组间距(narrow);
+  static pageToolbarTop(statusBarHeight: number, narrow: boolean, safeTop: number = 0): number {
+    const gap: number = 应用尺寸.页面分组间距(narrow);
+    const top: number = 应用尺寸.statusTextBottom(statusBarHeight) + gap;
+    // 普通系统栏保留既有光学校准；挖孔超出系统栏时从真实安全边缘起算。
+    return safeTop > statusBarHeight ? Math.max(top, safeTop + gap) : top;
   }
 
   // 工具栏在按钮下缘结束，b 只由内容区的顶部间距贡献一次。
-  static pageToolbarHeight(statusBarHeight: number, narrow: boolean): number {
-    return 应用尺寸.pageToolbarTop(statusBarHeight, narrow) + 应用尺寸.按钮高度;
+  static pageToolbarHeight(statusBarHeight: number, narrow: boolean, safeTop: number = 0): number {
+    return 应用尺寸.pageToolbarTop(statusBarHeight, narrow, safeTop) + 应用尺寸.按钮高度;
   }
 
-  static pageContentTop(statusBarHeight: number, narrow: boolean): number {
-    return 应用尺寸.pageToolbarHeight(statusBarHeight, narrow) + 应用尺寸.页面内容顶部间距(narrow);
+  static pageContentTop(statusBarHeight: number, narrow: boolean, safeTop: number = 0): number {
+    return 应用尺寸.pageToolbarHeight(statusBarHeight, narrow, safeTop) + 应用尺寸.页面内容顶部间距(narrow);
   }
 
   static 页面底部间距(窄版: boolean): number {
@@ -168,12 +171,10 @@ export class 应用尺寸 {
   // 用于 牌组定制面板 预览框，保证用户裁剪选区与实际渲染一致
   static readonly 牌组行高度: number = 92;
   static readonly narrowDeckRowHeight: number = 60;
-  static readonly narrowDoubleDeckRowHeight: number = 76;
 
-  /** 双列名称允许两行，紧凑版也为描述保留完整空间。 */
-  static deckRowHeight(narrow: boolean, doubleColumn: boolean = false): number {
-    return narrow ? (doubleColumn ? 应用尺寸.narrowDoubleDeckRowHeight : 应用尺寸.narrowDeckRowHeight) :
-      应用尺寸.牌组行高度;
+  /** 同密度的单/双列等高；窄版仅在两行名称加描述时缩小字号。 */
+  static deckRowHeight(narrow: boolean): number {
+    return narrow ? 应用尺寸.narrowDeckRowHeight : 应用尺寸.牌组行高度;
   }
 
   // ---- 进度条 ----

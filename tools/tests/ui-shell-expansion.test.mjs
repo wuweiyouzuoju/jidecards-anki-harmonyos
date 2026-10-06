@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import test from 'node:test';
-import { loadPlatformModule } from './platform-module-harness.mjs';
+import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
 
 const read = file => readFileSync(new URL('../../entry/src/main/ets/' + file, import.meta.url), 'utf8')
   .replaceAll('\r\n', '\n');
@@ -12,7 +12,7 @@ function harness() {
   const Reveal = loadPlatformModule('utils/ExpansionReveal.ets', 'ExpansionReveal', {
     Scroller: class { scrollEdge(edge) { scrolls.push(edge); } }, Edge: { Bottom: 'bottom' }
   });
-  return { reveal: new Reveal(), scrolls };
+  return { Reveal, reveal: new Reveal(), scrolls };
 }
 
 test('expansion waits for measurable content, scrolls once, and leaves later layout changes alone', () => {
@@ -40,6 +40,53 @@ test('collapse and teardown cancel a pending reveal before late layout arrives',
   }
 });
 
+test('nested tag picker expansion shares the form scroller but owns its reveal request', () => {
+  const { Reveal, reveal, scrolls } = harness();
+  const Field = loadComponentLogic('components/common/NoteTagsField.ets', 'NoteTagsField', {
+    Scroller: class {}, ExpansionReveal: Reveal
+  });
+  const field = new Field();
+  field.scroller = reveal.scroller;
+  field.text = 'keep draft tags';
+  field.aboutToAppear();
+  const source = read('components/common/NoteTagsField.ets');
+  const callback = source.match(/\.onAreaChange\((\(_oldArea: Area, newArea: Area\): void => \{[^]*?\n\s*\})\)/)[1];
+  const layout = new Function('return ' + stripTypeScriptTypes(callback, { mode: 'transform' }).trim()).call(field);
+  layout({}, { height: 100 });
+  assert.deepEqual(scrolls, []);
+  reveal.request(true); reveal.revealAfterLayout(true, 120);
+  field.togglePicker();
+  assert.equal(field.expanded, true);
+  assert.equal(field.pickerReveal.scroller, reveal.scroller);
+  reveal.revealAfterLayout(true, 420);
+  assert.deepEqual(scrolls, ['bottom'], 'outer layout must not consume the picker request');
+  layout({}, { height: 0 });
+  layout({}, { height: 420 });
+  layout({}, { height: 460 });
+  assert.deepEqual(scrolls, ['bottom', 'bottom']);
+  field.togglePicker(); field.togglePicker(); field.togglePicker();
+  layout({}, { height: 420 });
+  assert.equal(field.expanded, false);
+  assert.equal(scrolls.length, 2, 'collapse cancels a pending reveal');
+  field.isInteractive = false; field.togglePicker();
+  assert.equal(field.expanded, false, 'disabled late clicks cannot expand');
+  field.isInteractive = true; field.togglePicker(); layout({}, { height: 420 });
+  assert.equal(scrolls.length, 3, 'reopening permits one new reveal');
+  field.togglePicker(); field.togglePicker(); field.aboutToDisappear();
+  layout({}, { height: 420 });
+  assert.equal(scrolls.length, 3, 'teardown cancels late layout');
+  assert.equal(field.text, 'keep draft tags');
+  assert.match(source, /onSelect: [^]*?this\.togglePicker\(\)/);
+});
+
+test('every manual tag field receives its containing form scroller', () => {
+  for (const file of ['pages/添加笔记页.ets', 'components/browser/浏览编辑区.ets', 'components/添加笔记面板.ets']) {
+    const source = read(file);
+    assert.match(source, /Scroll\(this\.tagsReveal\.scroller\)/, file);
+    assert.match(source, /NoteTagsField\(\{[^]*?scroller: this\.tagsReveal\.scroller/, file);
+  }
+});
+
 function method(source, name) {
   const start = source.indexOf(`  private ${name}(): void {`);
   assert.ok(start >= 0, name);
@@ -51,6 +98,7 @@ function method(source, name) {
 test('tags and deck More connect their real toggles and post-layout callbacks to the same scroller', () => {
   for (const [file, owner, expanded, toggle] of [
     ['pages/添加笔记页.ets', 'tagsReveal', '高级已展开', 'toggleTags'],
+    ['components/添加笔记面板.ets', 'tagsReveal', '高级已展开', 'toggleTags'],
     ['components/牌组详情面板.ets', 'moreReveal', '显示更多', 'toggleMore']
   ]) {
     const source = read(file), { reveal, scrolls } = harness();
@@ -72,7 +120,8 @@ test('tags and deck More connect their real toggles and post-layout callbacks to
     assert.deepEqual(scrolls, ['bottom', 'bottom']);
     assert.equal(state.标签, 'draft tag'); assert.deepEqual(state.字段值列表, ['front', 'back']);
     if (toggle === 'toggleTags') {
-      for (const guard of ['处理中', 'pickingFieldImage', 'audioBusy', 'confirmingDiscard']) {
+      for (const guard of file === 'components/添加笔记面板.ets' ? ['busy'] :
+        ['处理中', 'pickingFieldImage', 'audioBusy', 'confirmingDiscard']) {
         state[guard] = true; toggleAction.call(state); state[guard] = false;
         assert.equal(state[expanded], false, `${guard}: disabled expansion`);
       }

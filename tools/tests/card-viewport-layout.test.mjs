@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import test from 'node:test';
 import { cardViewportWidth } from '../../entry/src/main/ets/model/CardViewportLayout.ts';
+import { 应用尺寸 } from '../../entry/src/main/ets/utils/应用尺寸.ets';
 
 test('card viewport fits phones, widens landscape windows and follows rotation', () => {
   assert.equal(cardViewportWidth(412, 892), 412);
@@ -33,6 +34,61 @@ test('study and preview share responsive widths and the same card surface', () =
     assert.doesNotMatch(source, /border\(\{ width: 1\.5, color: \$r\('app.color.border_input'\)/);
     assert.doesNotMatch(source, /shadow\(ShadowStyle\.OUTER_DEFAULT_XS\)/);
   }
+});
+
+test('both whiteboard engines keep header and review button edges aligned with the card after rotation', () => {
+  const study = readFileSync(new URL('../../entry/src/main/ets/pages/学习页.ets', import.meta.url), 'utf8');
+  const review = study.slice(study.indexOf('private 答案条()'), study.indexOf('private cardViewportContent()'));
+  const footerPadding = review.match(/\.padding\((\{[^]*?\})\)/)[1];
+  for (const file of ['学习手写白板层.ets', 'StudyLocalWhiteboard.ets']) {
+    const source = readFileSync(new URL(`../../entry/src/main/ets/components/${file}`, import.meta.url), 'utf8');
+    const update = source.match(/this\.toolbarContentWidth = cardViewportWidth\(Number\(area\.width\), Number\(area\.height\)\);/);
+    assert.ok(update, `${file}: observe the complete window, not the remaining canvas height`);
+    assert.equal((source.match(/\.constraintSize\(\{ maxWidth: this\.toolbarContentWidth \}\)/g) ?? []).length, 2,
+      `${file}: constrain both header and footer; the drawing canvas keeps its full width`);
+    const headerPadding = source.match(/\.padding\((\{ left: 应用尺寸\.页面内边距_水平,[^]*?\})\)/)[1];
+    const resize = new Function('cardViewportWidth', 'area', update[0]);
+    const evaluate = (expression, state) => new Function('应用尺寸', `return ${expression}`).call(state, 应用尺寸);
+    const state = {};
+    for (const [width, height, contentWidth] of [[1000, 1600, 840], [1600, 1000, 1472], [412, 892, 412], [2560, 1440, 1600]]) {
+      resize.call(state, cardViewportWidth, { width: String(width), height: String(height) });
+      assert.equal(state.toolbarContentWidth, contentWidth);
+      for (const narrow of [false, true]) {
+        for (const statusBar of [0, 24]) {
+          Object.assign(state, { narrowDeckLayout: narrow, statusBarHeight: statusBar, 状态栏高度: statusBar,
+            toolbarSafeTop: statusBar, 导航条高度: statusBar });
+          const header = evaluate(headerPadding, state), footer = evaluate(footerPadding, state);
+          const inset = (width - contentWidth) / 2;
+          assert.equal(inset + header.left, inset + footer.left);
+          assert.equal(inset + header.right, inset + footer.right);
+          assert.equal(inset + header.left, inset + 12, 'exactly one horizontal page padding');
+          assert.equal(contentWidth - footer.left - footer.right, contentWidth - 24, 'show-answer width');
+          assert.equal((contentWidth - footer.left - footer.right - 3 * 应用尺寸.间距_8) / 4,
+            (contentWidth - 48) / 4, 'four equally sized rating buttons share the same bounds');
+          assert.equal(header.top, 应用尺寸.pageToolbarTop(statusBar, narrow, statusBar));
+          assert.equal(footer.bottom, 应用尺寸.操作区底部间距(narrow, statusBar));
+        }
+      }
+    }
+  }
+});
+
+test('whiteboard popups fit narrow windows and official header actions can wrap', () => {
+  const official = readFileSync(new URL('../../entry/src/main/ets/components/学习手写白板层.ets', import.meta.url), 'utf8');
+  const local = readFileSync(new URL('../../entry/src/main/ets/components/StudyLocalWhiteboard.ets', import.meta.url), 'utf8');
+  const officialWidth = official.match(/\.width\((Math\.max\(0, Math\.min\(260,[^\n]+)\)\n/)[1];
+  const localWidth = local.match(/\.width\((Math\.min\(320,[^\n]+)\)/)[1];
+  for (const width of [240, 280, 320, 412, 1000]) {
+    const state = { toolbarContentWidth: cardViewportWidth(width, 1600) };
+    for (const expression of [officialWidth, localWidth]) {
+      const popupWidth = new Function('应用尺寸', `return ${expression}`).call(state, 应用尺寸);
+      assert.ok(popupWidth > 0 && popupWidth <= width - 24, 'popup keeps both horizontal edge gaps');
+    }
+  }
+  const headerStart = official.indexOf('private officialCanvas()');
+  const header = official.slice(headerStart, official.indexOf('StudyContentViewport(', headerStart));
+  assert.match(header, /Flex\(\{ wrap: FlexWrap\.Wrap, justifyContent: FlexAlign\.SpaceBetween/);
+  assert.doesNotMatch(header, /Blank\(\)\.layoutWeight/);
 });
 
 test('viewport measures the final child width on the first layout and immediately after rotation', () => {
@@ -93,6 +149,6 @@ test('narrow deck appearance drives page, deck-list and menu spacing from one de
   assert.match(home, /页面分组间距\(this\.narrowDeckLayout\)/);
   assert.match(deckList, /页面分组间距\(this\.narrow\)/);
   assert.match(menu, /margin\(\{ top: this\.menuGeometry\(\)\.top/);
-  assert.match(menu, /safeMenuGeometry\(this\.viewportHeight, this\.topOffset, this\.safeTop, this\.safeBottom,\s*应用尺寸\.页面底部间距\(this\.narrowDeckLayout\)/);
+  assert.match(menu, /safeMenuGeometry\(this\.viewportHeight, this\.topOffset, Math\.max\(0, this\.safeTop - this\.viewportTop\), this\.safeBottom,\s*应用尺寸\.页面底部间距\(this\.narrowDeckLayout\)/);
   assert.doesNotMatch(menu, /effectiveTopOffset/);
 });
