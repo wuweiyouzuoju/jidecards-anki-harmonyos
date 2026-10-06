@@ -2,6 +2,7 @@
 import { parseNoteTags } from '../model/NoteFieldEditing';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { NoteTagsField } from './common/NoteTagsField';
+import { ExpansionReveal } from '../utils/ExpansionReveal';
 import { noteTypeText, noteFieldText } from '../utils/NoteTypeText';
 import { PressFeedback } from '../utils/PressFeedback';
 import { HelpLabel } from './common/HelpLabel';
@@ -91,6 +92,7 @@ export struct 添加笔记面板 {
   @State private fieldValues: string[] = [];
   @State private tags: string = '';
   @State private 高级已展开: boolean = false;
+  private tagsReveal: ExpansionReveal = new ExpansionReveal();
   @State private 本地错误: string = '';
   @State private 显示帮助: boolean = false;
   @State private 帮助标题: Resource = $r('app.string.add_note_deck');
@@ -127,6 +129,14 @@ export struct 添加笔记面板 {
 
   aboutToAppear(): void {
     this.确保字段值数组();
+  }
+
+  aboutToDisappear(): void { this.tagsReveal.cancel(); }
+
+  private toggleTags(): void {
+    if (this.busy) return;
+    this.高级已展开 = !this.高级已展开;
+    this.tagsReveal.request(this.高级已展开);
   }
 
   // ========================================================
@@ -359,7 +369,7 @@ export struct 添加笔记面板 {
             this.提交();
           }
         })
-        Scroll() {
+        Scroll(this.tagsReveal.scroller) {
           Column({ space: 应用尺寸.间距_14 }) {
 
             Row({ space: 应用尺寸.间距_12 }) {
@@ -451,13 +461,13 @@ export struct 添加笔记面板 {
               .attributeModifier(new PressFeedback())
               .stateEffect(false)
               .onClick((): void => {
-                this.高级已展开 = !this.高级已展开;
+                this.toggleTags();
               })
 
             if (this.高级已展开) {
               Column({ space: 应用尺寸.间距_5 }) {
                 this.带帮助的标签($r('app.string.add_note_tags'), $r('app.string.add_note_tags_help'))
-                NoteTagsField({ text: this.tags, isInteractive: !this.busy,
+                NoteTagsField({ text: this.tags, scroller: this.tagsReveal.scroller, isInteractive: !this.busy,
                   onChange: (value: string): void => { this.tags = value; } })
                 Text($r('app.string.add_note_duplicate_rejected'))
                   .fontSize(应用尺寸.字号_正文_小)
@@ -465,6 +475,9 @@ export struct 添加笔记面板 {
                   .width('100%')
               }
               .width('100%')
+              .onAreaChange((_oldArea: Area, newArea: Area): void => {
+                this.tagsReveal.revealAfterLayout(this.高级已展开, Number(newArea.height));
+              })
             }
           }
           .width('100%')

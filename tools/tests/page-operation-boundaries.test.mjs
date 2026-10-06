@@ -21,6 +21,7 @@ import { AutoSyncScheduler } from '../../entry/src/main/ets/model/AutoSyncSchedu
 import { CloudDeckImportController } from '../../entry/src/main/ets/model/CloudDeckImportController.ts';
 import { ExternalDeckOpenQueue } from '../../entry/src/main/ets/model/ExternalDeckOpen.ts';
 import { HomeSyncController } from '../../entry/src/main/ets/model/HomeSyncController.ts';
+import { HomeSyncStatusController, homeSyncIndicator, homeSyncLabelKey } from '../../entry/src/main/ets/model/HomeSyncStatusController.ts';
 import { SyncActivity } from '../../entry/src/main/ets/model/SyncSettings.ts';
 import { AppInterfaceTracker } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { OFFICIAL_ANNOUNCEMENTS_ENABLED } from '../../entry/src/main/ets/model/官方公告配置.ts';
@@ -86,7 +87,7 @@ function homeHarness(announcementsEnabled = true) {
     后端会话: { 获取实例: () => ({ 是否就绪: () => true }) }, 当前语言模式: () => 'zh',
     是否已确认官方公告: async () => false, 是否已完成云端牌组引导: async () => false,
     CLOUD_DECK_CHANNEL_ENABLED: false, OFFICIAL_ANNOUNCEMENTS_ENABLED: announcementsEnabled,
-    appInterface: interfaceTracker, isDoubleColumnDeckListStyle,
+    appInterface: interfaceTracker, isDoubleColumnDeckListStyle, homeSyncIndicator, homeSyncLabelKey,
     isHomeIntroCompleted: async () => false, completeHomeIntro: async () => events.push('welcome-persist'),
     isIridescentGiftNoticeCompleted: async () => true,
     官方公告检查延迟毫秒: () => 600000,
@@ -96,6 +97,13 @@ function homeHarness(announcementsEnabled = true) {
   });
   const page = new Page();
   page.transfer = initialTransferState();
+  page.syncAccountState = 'normal'; page.syncIndicator = 'hidden'; page.syncStatusText = '';
+  page.syncStatusController = new HomeSyncStatusController({
+    auth: () => null, canRead: () => false,
+    read: async () => { assert.fail('logged-out startup must not read idle status'); },
+    saveEndpoint: () => { assert.fail('no idle status read'); },
+    changed: icon => { page.syncAccountState = icon; }, failed: () => { assert.fail('unexpected status error'); }
+  });
   page.牌组数据源 = { snapshotDecks: () => [] };
   Object.assign(page, { announcementController: new HomeAnnouncementController(), homeDisposed: false,
     syncScheduler: new AutoSyncScheduler(), deckLevelMenuId: '',

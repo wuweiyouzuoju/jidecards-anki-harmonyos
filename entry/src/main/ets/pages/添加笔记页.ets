@@ -2,6 +2,7 @@ import { PressFeedback } from '../utils/PressFeedback';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { ExpansionReveal } from '../utils/ExpansionReveal';
 import { NoteFieldCard } from '../components/common/NoteFieldCard';
+import { NoteEditorWheelSession, NOTE_EDITOR_WHEEL_SESSION_KEY } from '../model/NoteEditorWheel';
 import { SettingsToggleRow } from '../components/common/SettingsToggleRow';
 import { PrimaryActionButton } from '../components/common/PrimaryActionButton';
 import { 按下态按钮 } from '../components/common/按下态按钮';
@@ -82,6 +83,7 @@ export interface 添加笔记页参数 {
 
 @Component
 export struct 添加笔记页 {
+  @Provide(NOTE_EDITOR_WHEEL_SESSION_KEY) private wheelSession: NoteEditorWheelSession = new NoteEditorWheelSession();
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
   @StorageProp(简洁模式AppStorage键) @Watch('publishInterface') private isSimpleMode: boolean = true;
@@ -601,7 +603,7 @@ export struct 添加笔记页 {
   private 标签字段块() {
     Column({ space: 应用尺寸.间距_5 }) {
       this.带帮助的标签($r('app.string.add_note_tags'), (): Resource => $r('app.string.add_note_tags_help'))
-      NoteTagsField({ text: this.标签,
+      NoteTagsField({ text: this.标签, scroller: this.tagsReveal.scroller,
         isInteractive: !this.处理中 && !this.pickingFieldImage && !this.audioBusy && !this.confirmingDiscard,
         onChange: (value: string): void => { this.updateTags(value); } })
       Text($r('app.string.add_note_duplicate_policy'))
@@ -879,8 +881,8 @@ export struct 添加笔记页 {
     .hideTitleBar(true)
     .backgroundColor(Color.Transparent)
     .opacity(this.转场透明度)
-    .onShown((): void => { this.restoreEditorAfterPreview(); appInterface.showPage('add_note'); this.publishInterface(); })
-    .onHidden((): void => { appInterface.hidePage('add_note'); this.audioPreview.stop().catch((): void => {}); })
+    .onShown((): void => { this.restoreEditorAfterPreview(); this.wheelSession.setVisible(true); appInterface.showPage('add_note'); this.publishInterface(); })
+    .onHidden((): void => { this.wheelSession.setVisible(false); appInterface.hidePage('add_note'); this.audioPreview.stop().catch((): void => {}); })
     .onBackPressed((): boolean => this.onBackPress())
   }
 

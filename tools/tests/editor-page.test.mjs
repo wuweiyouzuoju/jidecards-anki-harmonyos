@@ -46,12 +46,10 @@ test('rich text preserves nested cloze numbers, hints, incomplete markers and ex
 });
 
 
-test('source and format actions share exact button geometry, with permanent gaps independent of active state',async()=>{
+test('field editors retain accessible placeholders while formatting is delegated to the shared edge wheel',async()=>{
  const {readFileSync}=await import('node:fs');
  const source=readFileSync(new URL('../../entry/src/main/ets/components/common/NoteFieldEditor.ets',import.meta.url),'utf8');
- assert.equal((source.match(/\bButton\(/g)||[]).length,1);
- assert.match(source,/this.tool\('source'/);
- assert.match(source,/space: \{ main: LengthMetrics.vp\(8\), cross: LengthMetrics.vp\(8\) \}/);
- assert.match(source,/left: 应用尺寸.间距_10, right: 应用尺寸.间距_10/);
+ assert.doesNotMatch(source,/this\.tool\(|FlexWrap\.Wrap|toggleMoreFormats/);
+ assert.match(source,/buildNoteEditorWheel/);
  assert.match(source,/placeholder\(this.placeholderText\(\), \{ fontColor: \$r\('app.color.text_tertiary'\)/);
 });

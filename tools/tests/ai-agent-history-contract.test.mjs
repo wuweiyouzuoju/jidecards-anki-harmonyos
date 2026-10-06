@@ -78,7 +78,7 @@ test('history mode has its own toolbar, returns to chat, and marks selection wit
   assert.match(top, /agentInterfaceTitle\(this\.pageMode, this\.显示历史区\)/);
   assert.match(top, /if \(this\.显示历史区\)[\s\S]*this\.关闭历史区\(\);[\s\S]*this\.pathStack\.pop\(\)/);
   assert.match(top,
-    /this\.interfaceLabel\('new'\)[\s\S]*字色: this\.动作主色[\s\S]*themeText: true/);
+    /IconActionButton\(\{ toolbarStyle: true,[\s\S]*source: \$r\('app\.media\.ic_home_new'\), label: this\.interfaceLabel\('new'\)[\s\S]*isInteractive: this\.interfaceEnabled\('new'\)/);
   assert.match(top, /this\.interfaceLabel\('new'\)[\s\S]*this\.开始新会话\(\)/);
   assert.doesNotMatch(history, /ai_agent_history_current/);
   assert.match(history, /item\.id === this\.conversationId \?[\s\S]*this\.选中背景色/);

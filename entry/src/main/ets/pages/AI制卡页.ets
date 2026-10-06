@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { WINDOW_SAFE_TOP_KEY } from '../model/WindowSafeLayout';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { AgentDocumentStore } from '../backend/agent/AgentDocumentStore';
 import { appInterface } from '../backend/AppInterfaceService';
@@ -41,7 +42,7 @@ import type { 卡片草稿, 聊天消息 } from '../model/agent/AgentConversatio
 import { AgentEditableCard } from '../components/agent/AgentEditableCard';
 import { AgentCardBatch } from '../model/agent/AgentCardBatch';
 import type { AgentBatchResult } from '../model/agent/AgentCardBatch';
-import { buildProviderDraftContext, limitProviderInput } from '../model/agent/AgentProviderContext';
+import { buildProviderDraftContext } from '../model/agent/AgentProviderContext';
 import { ThemeTextSpans } from '../components/common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
@@ -134,7 +135,7 @@ import { loadAgentSecret } from '../backend/agent/AgentSecretStore';
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { 颜色键 } from '../model/颜色主题';
 import { CustomTransition } from '../utils/自定义转场';
-import { 按下态按钮 } from '../components/common/按下态按钮';
+import { IconActionButton } from '../components/common/IconActionButton';
 import type { EditableNote } from '../proto/messages/NoteMessages';
 import type { Card } from '../proto/messages/CardsMessages';
 import { NOTE_TYPE_KIND_NORMAL } from '../proto/messages/NotetypeMessages';
@@ -144,6 +145,7 @@ import { AgentDisclosureCard } from '../components/agent/AgentDisclosureCard';
 import { AgentReasoning } from '../components/agent/AgentReasoning';
 import { ScrollTailFollower } from '../model/ScrollTailFollower';
 import { NoteFieldEditor } from '../components/common/NoteFieldEditor';
+import { NoteEditorWheelSession, NOTE_EDITOR_WHEEL_SESSION_KEY } from '../model/NoteEditorWheel';
 import { AgentSetupCard } from '../components/agent/AgentSetupCard';
 import { AgentClarificationCard } from '../components/agent/AgentClarificationCard';
 import { FormTextAreaStyle } from '../utils/FormTextAreaStyle';
@@ -200,6 +202,7 @@ class 页面Agent观察者 implements AgentRunObserver {
 
 @Component
 export struct AI制卡页 {
+  @Provide(NOTE_EDITOR_WHEEL_SESSION_KEY) private wheelSession: NoteEditorWheelSession = new NoteEditorWheelSession();
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
@@ -298,6 +301,7 @@ export struct AI制卡页 {
   @StorageProp(PAGE_SURFACE_KEY) private 页面底色微染值: string = '#F5F7FA';
   @StorageProp('导航条高度') private 导航条高度: number = 0;
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
+  @StorageProp(WINDOW_SAFE_TOP_KEY) private toolbarSafeTop: number = 0;
   /** NavDestination 透明度（由 customNavContentTransition 回调控制，实现淡入淡出转场）。 */
   @State private 转场透明度: number = 1;
   private 上一键盘避让模式: KeyboardAvoidMode = KeyboardAvoidMode.OFFSET;
@@ -1051,7 +1055,7 @@ export struct AI制卡页 {
         }
       }
     }
-    return limitProviderInput(values);
+    return values;
   }
 
   private 构建消息草稿上下文(message: 聊天消息): string {
@@ -1194,6 +1198,9 @@ export struct AI制卡页 {
         message.是否错误 = true;
         message.kind = message.providerText.length > 0 ? 'normal' : 'error';
       });
+      if (异常.message === 'agent_context_limit' && this.agentRunner !== null) {
+        this.接收Agent草稿(aiIndex, this.agentRunner.getPartialDrafts());
+      }
       return null;
     } finally {
       this.appSettingsTools?.endTurn();
@@ -1970,10 +1977,9 @@ export struct AI制卡页 {
   private 顶部条() {
     Row() {
       Row() {
-        按下态按钮({
-          文案: this.interfaceLabel('back'),
-          字色: $r('app.color.text_primary'),
-          点击回调: (): void => {
+        IconActionButton({ toolbarStyle: true,
+          source: $r('app.media.ic_common_arrow_left'), label: this.interfaceLabel('back'),
+          onAction: (): void => {
             if (this.显示历史区) {
               this.关闭历史区();
             } else {
@@ -1993,19 +1999,16 @@ export struct AI制卡页 {
         .textOverflow({ overflow: TextOverflow.Ellipsis })
       Row({ space: 应用尺寸.间距_8 }) {
         if (this.显示历史区) {
-          按下态按钮({
-            文案: this.interfaceLabel('new'),
-            是否启用: this.interfaceEnabled('new'),
-            字色: this.动作主色,
-          themeText: true,
-            点击回调: (): void => { this.开始新会话(); }
+          IconActionButton({ toolbarStyle: true,
+            source: $r('app.media.ic_home_new'), label: this.interfaceLabel('new'),
+            isInteractive: this.interfaceEnabled('new'),
+            onAction: (): void => { this.开始新会话(); }
           })
         } else {
-          按下态按钮({
-            文案: this.interfaceLabel('history'),
-            是否启用: this.interfaceEnabled('history'),
-            字色: $r('app.color.text_primary'),
-            点击回调: (): void => {
+          IconActionButton({ toolbarStyle: true,
+            source: $r('app.media.ic_common_history'), label: this.interfaceLabel('history'),
+            isInteractive: this.interfaceEnabled('history'),
+            onAction: (): void => {
               if (!this.处理中) { this.打开历史会话(); }
             }
           })
@@ -2015,11 +2018,11 @@ export struct AI制卡页 {
       .justifyContent(FlexAlign.End)
     }
     .width('100%')
-    .height(应用尺寸.pageToolbarHeight(this.状态栏高度, this.narrowDeckLayout))
+    .height(应用尺寸.pageToolbarHeight(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop))
     .padding({
       left: 应用尺寸.页面内边距_水平,
       right: 应用尺寸.页面内边距_水平,
-      top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout),
+      top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop),
       bottom: 0
     })
     .backgroundColor(this.页面底色微染值)
@@ -2833,8 +2836,8 @@ export struct AI制卡页 {
     }
     .hideTitleBar(true)
     .backgroundColor(Color.Transparent)
-    .onShown((): void => { appInterface.showPage('agent'); this.isAgentPageVisible = true; this.publishInterface(); })
-    .onHidden((): void => { appInterface.hidePage('agent'); this.isAgentPageVisible = false; this.navigationSession?.cancel(); })
+    .onShown((): void => { this.wheelSession.setVisible(true); appInterface.showPage('agent'); this.isAgentPageVisible = true; this.publishInterface(); })
+    .onHidden((): void => { this.wheelSession.setVisible(false); appInterface.hidePage('agent'); this.isAgentPageVisible = false; this.navigationSession?.cancel(); })
     .opacity(this.转场透明度)
     .onBackPressed((): boolean => {
       if (this.targetSelectionMessage < 0) return false;

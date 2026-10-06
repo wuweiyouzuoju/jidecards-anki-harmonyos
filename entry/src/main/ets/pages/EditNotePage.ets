@@ -3,6 +3,7 @@ import { PressFeedback } from '../utils/PressFeedback';
 import { 浏览编辑区 } from '../components/browser/浏览编辑区';
 import { NoteEditorHeader } from '../components/common/NoteEditorHeader';
 import { NoteEditorSession, NoteEditorState, initialNoteEditorState } from '../model/NoteEditorSession';
+import { NoteEditorWheelSession, NOTE_EDITOR_WHEEL_SESSION_KEY } from '../model/NoteEditorWheel';
 import { BrowserOperationController, BrowserOperationContext } from '../model/BrowserOperationController';
 import { AnkiNoteEditor } from '../backend/AnkiNoteEditor';
 import { AnkiNoteUpdate } from '../backend/AnkiNoteUpdate';
@@ -23,6 +24,7 @@ import { NoteDraftPreviewPageParams } from '../model/navigation/PageParams';
 /** 导航只传 ID；此页持有读取会话和写入保护，来源页面仅刷新返回结果。 */
 @Component
 export struct EditNotePage {
+  @Provide(NOTE_EDITOR_WHEEL_SESSION_KEY) private wheelSession: NoteEditorWheelSession = new NoteEditorWheelSession();
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   targetId: number = 0;
   isNote: boolean = false;
@@ -136,8 +138,8 @@ export struct EditNotePage {
         }.width('100%').height('100%').backgroundColor(this.surface)
       }
     }.hideTitleBar(true).backgroundColor(Color.Transparent).opacity(this.opacityValue)
-      .onShown((): void => { this.restoreEditorAfterPreview(); appInterface.showPage('edit_note'); this.publishInterface(); })
-      .onHidden((): void => { appInterface.hidePage('edit_note'); })
+      .onShown((): void => { this.restoreEditorAfterPreview(); this.wheelSession.setVisible(true); appInterface.showPage('edit_note'); this.publishInterface(); })
+      .onHidden((): void => { this.wheelSession.setVisible(false); appInterface.hidePage('edit_note'); })
       .onBackPressed((): boolean => { this.requestBack(); return true; })
   }
 }
