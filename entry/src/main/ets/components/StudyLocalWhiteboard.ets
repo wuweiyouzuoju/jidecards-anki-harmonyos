@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { WINDOW_SAFE_TOP_KEY } from '../model/WindowSafeLayout';
 import { LengthMetrics } from '@kit.ArkUI';
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { PAGE_COMPACT_LAYOUT_KEY } from '../model/AppLayoutState';
@@ -12,11 +13,14 @@ import { 按下态按钮 } from './common/按下态按钮';
 import { IconActionButton } from './common/IconActionButton';
 import { SettingsToggleRow } from './common/SettingsToggleRow';
 import { MenuSurface } from './common/MenuSurface';
+import { StudyAnnotationView, AnnotationPoint, AnnotationPosition } from '../model/StudyAnnotationView';
+import { StudyContentViewport } from './StudyContentViewport';
 
 /** Canvas 随组件释放，当前卡草稿由白板宿主持有；展开工具不改变画布坐标。 */
 @Component
 export struct StudyLocalWhiteboard {
   @Prop @Watch('visibilityChanged') isVisible: boolean = true;
+  @Prop @Watch('publishInterface') fallbackReason: string = '';
   @Prop @Watch('redraw') 是否深色: boolean = false;
   @Prop @Watch('inputEnabledChanged') isInputEnabled: boolean = true;
   @Prop @Watch('undoRequested') undoTick: number = 0;
@@ -27,8 +31,22 @@ export struct StudyLocalWhiteboard {
   @BuilderParam reviewActions: () => void = this.emptyReviewActions;
   session: StudyWhiteboard = new StudyWhiteboard();
   onClose: () => void = (): void => {};
+  onInactive: () => void = (): void => {};
+  @Prop globalNavigation: boolean = false;
+  @Prop @Watch('publishInterface') globalScale: number = 1;
+  @Prop @Watch('publishInterface') globalX: number = 0;
+  @Prop @Watch('publishInterface') globalY: number = 0;
+  @Prop rootX: number = 0;
+  @Prop rootY: number = 0;
+  onResetGlobalView: () => void = (): void => {};
+  onGlobalTouch: (event: TouchEvent) => void = (): void => {};
+  onGlobalJudge: (info: GestureInfo, event: BaseGestureEvent) => GestureJudgeResult = (): GestureJudgeResult => GestureJudgeResult.REJECT;
+  onGlobalStart: (event: GestureEvent, pinch: boolean) => void = (): void => {};
+  onGlobalUpdate: (event: GestureEvent, pinch: boolean) => void = (): void => {};
+  onGlobalFinish: (pinch: boolean) => void = (): void => {};
   @StorageProp('系统语言') @Watch('publishInterface') private uiLanguage: string = 'zh-Hans';
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
+  @StorageProp(WINDOW_SAFE_TOP_KEY) private toolbarSafeTop: number = 0;
   @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
   @State private toolbarContentWidth: number = 840;
   @State private hasInk: boolean = false;
@@ -43,6 +61,9 @@ export struct StudyLocalWhiteboard {
   @State private capacityReached: boolean = false;
   @State private canvasFailed: boolean = false;
   @State private canvasGeneration: number = 0;
+  private view: StudyAnnotationView = new StudyAnnotationView();
+  private navigationSuppressed: boolean = false;
+  private activePen: boolean = false;
   private context: CanvasRenderingContext2D = new CanvasRenderingContext2D(new RenderingContextSettings(true));
   private mounted: boolean = false;
   private ready: boolean = false;
@@ -69,6 +90,8 @@ export struct StudyLocalWhiteboard {
   }
 
   private syncControls(): void {
+    // 撤销、清空或尺寸变化会取消模型中的活动笔画，输入隔离状态也必须同步结束。
+    if (this.session.currentPointer() < 0) this.activePen = false;
     const changed: boolean = this.hasInk !== this.session.hasInk() || this.hasUndo !== this.session.canUndo() ||
       this.hasRedo !== this.session.canRedo() || this.capacityReached !== this.session.isFull();
     this.hasInk = this.session.hasInk();
@@ -84,18 +107,26 @@ export struct StudyLocalWhiteboard {
 
   private publishInterface(): void {
     if (!this.mounted) return;
-    if (!this.isVisible || !this.isInputEnabled) { appInterface.leave('study_whiteboard'); return; }
+    if (!this.isVisible || !this.isInputEnabled) {
+      appInterface.leave('study_whiteboard');
+      // 原版隐藏回调可能晚于官方宿主发布状态，不能抹掉已经生效的官方观察。
+      this.onInactive();
+      return;
+    }
     const controls: AppInterfaceControl[] = WHITEBOARD_INTERFACE_ITEMS
       .filter((item: AppInterfaceItem): boolean => item.condition === undefined || item.condition === 'local_suite' ||
+        (item.condition === 'global_navigation' && this.globalNavigation) ||
         (item.condition === 'pen_settings' && this.settingsTool === 'pen') ||
         (item.condition === 'eraser_settings' && this.settingsTool === 'eraser') ||
         (item.condition === 'tool_settings' && this.settingsTool !== '') ||
         (item.condition === 'failed' && this.canvasFailed) ||
         item.condition === this.reviewPhase)
-      .map((item: AppInterfaceItem): AppInterfaceControl => ({ id: item.id, titleKey: item.titleKey,
+      .map((item: AppInterfaceItem): AppInterfaceControl => ({ id: item.id, titleKey: item.titleKey, iconKey: item.iconKey,
         title: this.label(item.id), enabled: item.id === 'undo' ? this.hasUndo : item.id === 'redo' ? this.hasRedo :
-          item.id === 'clear' ? this.hasInk : item.condition === this.reviewPhase ? this.settingsTool === '' : true,
-        selected: item.id === 'pen' ? !this.eraserSelected : item.id === 'eraser' ? this.eraserSelected :
+          item.id === 'clear' ? this.hasInk :
+          item.condition === this.reviewPhase ? this.settingsTool === '' : true,
+        selected: item.id === 'pen' ? !this.eraserSelected :
+          item.id === 'eraser' ? this.eraserSelected :
           item.id === 'stylus' ? this.stylusOnly :
           item.id === 'color_' + WHITEBOARD_COLORS.indexOf(this.selectedColor) ||
           item.id === 'width_' + WHITEBOARD_WIDTHS.indexOf(this.selectedWidth) ||
@@ -103,6 +134,12 @@ export struct StudyLocalWhiteboard {
     appInterface.observe({ surface: 'study_whiteboard', sectionId: this.reviewPhase, selectedId: '',
       optionIds: [], optionLabels: [], busy: false, controlsComplete: true, items: controls,
       values: [{ id: 'engine', value: 'local_canvas' }, { id: 'ready', value: String(this.ready && !this.canvasFailed) },
+        { id: 'navigation', value: this.globalNavigation ? 'global_pan_zoom' : 'pan_zoom' },
+        { id: 'navigation_scope', value: this.globalNavigation ? 'study_content' : 'local_ink' },
+        { id: 'scale', value: String(this.globalNavigation ? this.globalScale : this.view.snapshot().scale) },
+        { id: 'offset_x', value: String(this.globalNavigation ? this.globalX : this.view.snapshot().x) },
+        { id: 'offset_y', value: String(this.globalNavigation ? this.globalY : this.view.snapshot().y) },
+        { id: 'fallback_reason', value: this.fallbackReason },
         { id: 'tool', value: this.eraserSelected ? 'eraser' : 'pen' },
         { id: 'color', value: this.selectedColor }, { id: 'width', value: String(this.selectedWidth) },
         { id: 'eraser_width', value: String(this.selectedEraserWidth) }, { id: 'settings_tool', value: this.settingsTool },
@@ -112,6 +149,7 @@ export struct StudyLocalWhiteboard {
   private selectTool(eraser: boolean): void {
     if (!this.mounted || !this.isVisible || !this.isInputEnabled) return;
     if (this.session.cancel()) this.redraw();
+    this.view.endGesture(); this.navigationSuppressed = false; this.activePen = false;
     this.session.eraser = eraser;
     this.eraserSelected = eraser;
     this.syncControls();
@@ -147,6 +185,7 @@ export struct StudyLocalWhiteboard {
     if (this.session.cancel()) this.redraw();
     this.stylusOnly = value;
     this.session.stylusOnly = value;
+    this.activePen = false;
     this.syncControls();
     this.publishInterface();
   }
@@ -161,7 +200,7 @@ export struct StudyLocalWhiteboard {
 
   private closeToolSettings(tool: string = this.settingsTool): void {
     // 旧弹窗迟到的隐藏事件不能关掉刚切换的另一个工具弹窗。
-    if (this.settingsTool !== tool) return;
+    if (this.settingsTool === '' || this.settingsTool !== tool) return;
     this.settingsTool = '';
     this.publishInterface();
   }
@@ -172,10 +211,14 @@ export struct StudyLocalWhiteboard {
     else this.close();
   }
 
-  private resetRequested(): void { this.session.reset(); this.closeToolSettings(); this.redraw(); this.syncControls(); }
+  private resetRequested(): void {
+    this.session.reset(); this.view.reset(); this.navigationSuppressed = false;
+    this.activePen = false; this.closeToolSettings(); this.viewChanged(); this.syncControls();
+  }
 
   private visibilityChanged(): void {
     if (!this.isVisible) {
+      this.view.endGesture(); this.navigationSuppressed = false; this.activePen = false;
       if (this.session.cancel()) this.redraw();
       this.closeToolSettings();
     }
@@ -201,6 +244,7 @@ export struct StudyLocalWhiteboard {
   }
 
   private inputEnabledChanged(): void {
+    if (!this.isInputEnabled) { this.view.endGesture(); this.navigationSuppressed = false; this.activePen = false; }
     if (!this.isInputEnabled) this.closeToolSettings();
     if (!this.isInputEnabled && this.session.cancel()) this.redraw();
     if (this.mounted) this.syncControls();
@@ -228,6 +272,7 @@ export struct StudyLocalWhiteboard {
     this.canvasWidth = width;
     this.canvasHeight = height;
     this.session.setViewport(width, height);
+    this.view.setViewport(width, height);
     this.redraw();
     this.syncControls();
   }
@@ -237,16 +282,19 @@ export struct StudyLocalWhiteboard {
       this.context.globalCompositeOperation = segment.eraser ? 'destination-out' : 'source-over';
       this.context.strokeStyle = segment.eraser ? '#000000' : whiteboardColor(segment.color, this.是否深色);
       this.context.fillStyle = this.context.strokeStyle;
-      this.context.lineWidth = segment.width;
+      this.context.lineWidth = segment.width * this.view.snapshot().scale;
       this.context.lineCap = 'round';
       this.context.lineJoin = 'round';
       this.context.beginPath();
       if (segment.from.x === segment.to.x && segment.from.y === segment.to.y) {
-        this.context.arc(segment.to.x * this.canvasWidth, segment.to.y * this.canvasHeight, segment.width / 2, 0, Math.PI * 2);
+        const point: AnnotationPosition = this.screenPoint(segment.to.x, segment.to.y);
+        this.context.arc(point.x, point.y, this.context.lineWidth / 2, 0, Math.PI * 2);
         this.context.fill();
       } else {
-        this.context.moveTo(segment.from.x * this.canvasWidth, segment.from.y * this.canvasHeight);
-        this.context.lineTo(segment.to.x * this.canvasWidth, segment.to.y * this.canvasHeight);
+        const from: AnnotationPosition = this.screenPoint(segment.from.x, segment.from.y);
+        const to: AnnotationPosition = this.screenPoint(segment.to.x, segment.to.y);
+        this.context.moveTo(from.x, from.y);
+        this.context.lineTo(to.x, to.y);
         this.context.stroke();
       }
     });
@@ -257,17 +305,20 @@ export struct StudyLocalWhiteboard {
     this.context.globalCompositeOperation = stroke.eraser ? 'destination-out' : 'source-over';
     this.context.strokeStyle = stroke.eraser ? '#000000' : whiteboardColor(stroke.color, this.是否深色);
     this.context.fillStyle = this.context.strokeStyle;
-    this.context.lineWidth = stroke.width;
+    this.context.lineWidth = stroke.width * this.view.snapshot().scale;
     this.context.lineCap = 'round';
     this.context.lineJoin = 'round';
     this.context.beginPath();
     if (points.length === 1) {
-      this.context.arc(points[0].x * this.canvasWidth, points[0].y * this.canvasHeight, stroke.width / 2, 0, Math.PI * 2);
+      const point: AnnotationPosition = this.screenPoint(points[0].x, points[0].y);
+      this.context.arc(point.x, point.y, this.context.lineWidth / 2, 0, Math.PI * 2);
       this.context.fill();
     } else {
-      this.context.moveTo(points[0].x * this.canvasWidth, points[0].y * this.canvasHeight);
+      const first: AnnotationPosition = this.screenPoint(points[0].x, points[0].y);
+      this.context.moveTo(first.x, first.y);
       for (let index: number = 1; index < points.length; index++) {
-        this.context.lineTo(points[index].x * this.canvasWidth, points[index].y * this.canvasHeight);
+        const point: AnnotationPosition = this.screenPoint(points[index].x, points[index].y);
+        this.context.lineTo(point.x, point.y);
       }
       this.context.stroke();
     }
@@ -278,6 +329,36 @@ export struct StudyLocalWhiteboard {
       this.context.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
       this.session.visitStrokes((stroke: WhiteboardStroke): void => { this.paintStroke(stroke); });
     });
+  }
+
+  private screenPoint(x: number, y: number): AnnotationPosition {
+    return this.view.toScreen(x * this.canvasWidth, y * this.canvasHeight);
+  }
+
+  private viewChanged(): void {
+    this.redraw();
+    this.publishInterface();
+  }
+
+  private navigateTouch(event: TouchEvent): boolean {
+    if (this.activePen && event.sourceTool !== SourceTool.Pen) return true;
+    const points: AnnotationPoint[] = [];
+    const touches: TouchObject[] = event.touches ?? [];
+    for (const touch of touches) {
+      if (touch === undefined) continue;
+      if (event.type === TouchType.Up && event.changedTouches.some((up: TouchObject): boolean => up !== undefined && up.id === touch.id)) continue;
+      if (Number.isFinite(touch.id) && Number.isFinite(touch.x) && Number.isFinite(touch.y)) {
+        points.push({ id: touch.id, x: touch.x, y: touch.y });
+      }
+    }
+    if (!this.navigationSuppressed && (event.sourceTool === SourceTool.Pen || points.length < 2)) return false;
+    if (this.session.cancel()) { this.redraw(); this.syncControls(); }
+    this.activePen = false;
+    this.navigationSuppressed = points.length > 0;
+    if (points.length >= 2) {
+      if (!this.globalNavigation && this.view.navigate(points)) this.viewChanged();
+    } else this.view.endGesture();
+    return true;
   }
 
   private touchPoint(points: TouchObject[], id: number): TouchObject | null {
@@ -292,6 +373,10 @@ export struct StudyLocalWhiteboard {
   private handleTouch(event: TouchEvent): void {
     event.stopPropagation();
     if (!this.canDraw() || !this.isVisible || !this.isInputEnabled || this.settingsTool !== '') return;
+    if (this.activePen && event.sourceTool !== SourceTool.Pen && event.sourceTool !== SourceTool.Unknown) return;
+    if (event.type === TouchType.Cancel) {
+      this.view.endGesture(); this.navigationSuppressed = false; this.activePen = false;
+    } else if (this.navigateTouch(event)) return;
     // 手掌不能终止正在书写的笔；工具栏始终支持手指操作。
     if (this.stylusOnly && event.sourceTool !== SourceTool.Pen &&
       !(event.type === TouchType.Cancel && event.sourceTool === SourceTool.Unknown)) return;
@@ -309,19 +394,23 @@ export struct StudyLocalWhiteboard {
       for (const sample of history) {
         const point: TouchObject = sample.touchObject;
         if (point.id !== id) continue;
-        const segment: WhiteboardSegment | null = this.session.append(id, point.x, point.y);
+        const position: AnnotationPosition = this.view.toContent(point.x, point.y);
+        const segment: WhiteboardSegment | null = this.session.append(id, position.x, position.y);
         if (segment !== null) this.paintSegment(segment);
       }
     }
     let segment: WhiteboardSegment | null = null;
+    const position: AnnotationPosition = this.view.toContent(point.x, point.y);
     if (event.type === TouchType.Down && id < 0) {
-      segment = this.session.begin(point.id, point.x, point.y, this.selectedColor,
-        this.eraserSelected ? this.selectedEraserWidth : this.selectedWidth, this.eraserSelected);
+      segment = this.session.begin(point.id, position.x, position.y, this.selectedColor,
+        (this.eraserSelected ? this.selectedEraserWidth : this.selectedWidth) / this.view.snapshot().scale, this.eraserSelected);
+      this.activePen = segment !== null && event.sourceTool === SourceTool.Pen;
     } else if (event.type === TouchType.Move) {
-      segment = this.session.append(point.id, point.x, point.y);
+      segment = this.session.append(point.id, position.x, position.y);
     } else if (event.type === TouchType.Up) {
-      segment = this.session.append(point.id, point.x, point.y, true);
+      segment = this.session.append(point.id, position.x, position.y, true);
       this.session.finish(point.id);
+      this.activePen = false;
     }
     if (segment !== null) this.paintSegment(segment);
     this.syncControls();
@@ -352,6 +441,7 @@ export struct StudyLocalWhiteboard {
   private close(): void {
     if (!this.mounted || !this.isVisible) return;
     if (this.session.cancel()) this.redraw();
+    this.view.endGesture(); this.navigationSuppressed = false; this.activePen = false;
     this.closeToolSettings();
     appInterface.leave('study_whiteboard');
     this.onClose();
@@ -371,7 +461,8 @@ export struct StudyLocalWhiteboard {
 
   @Builder
   private brushTools() {
-    Row({ space: 应用尺寸.间距_8 }) {
+    Flex({ wrap: FlexWrap.Wrap,
+      space: { main: LengthMetrics.vp(应用尺寸.间距_8), cross: LengthMetrics.vp(应用尺寸.间距_8) } }) {
       按下态按钮({ 文案: this.label('pen'), selectable: true, selected: !this.eraserSelected,
         markerColor: whiteboardColor(this.selectedColor, this.是否深色), 是否启用: this.isInputEnabled,
         点击回调: (): void => { this.openToolSettings(false); } })
@@ -419,7 +510,8 @@ export struct StudyLocalWhiteboard {
       Row({ space: 应用尺寸.间距_8 }) {
         Text(this.label(eraser ? 'eraser' : 'pen')).fontSize(应用尺寸.字号_正文)
           .fontColor($r('app.color.text_primary')).layoutWeight(1)
-        按下态按钮({ 文案: this.label('settings_close'), 点击回调: (): void => { this.closeToolSettings(); } })
+        IconActionButton({ toolbarStyle: true, source: $r('app.media.ic_common_close'), label: this.label('settings_close'),
+          isInteractive: this.isInputEnabled, onAction: (): void => { this.closeToolSettings(); } })
       }.width('100%')
       Scroll() {
         Column({ space: 应用尺寸.间距_8 }) {
@@ -461,60 +553,72 @@ export struct StudyLocalWhiteboard {
     .onTouch((event: TouchEvent): void => { event.stopPropagation(); })
   }
 
-  build() {
-    Column() {
-      Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween,
-        space: { main: LengthMetrics.vp(应用尺寸.间距_8), cross: LengthMetrics.vp(应用尺寸.间距_8) } }) {
-        按下态按钮({ 文案: this.label('close'), 点击回调: (): void => { this.close(); } })
-        Row({ space: 应用尺寸.间距_8 }) {
-          IconActionButton({ source: $r('app.media.ic_study_undo'), label: this.label('undo'),
-            isInteractive: this.hasUndo && this.isInputEnabled, onAction: (): void => { this.undoInk(); } })
-          IconActionButton({ source: $r('app.media.ic_whiteboard_redo'), label: this.label('redo'),
-            isInteractive: this.hasRedo && this.isInputEnabled, onAction: (): void => { this.redoInk(); } })
-          IconActionButton({ source: $r('app.media.ic_study_delete'), label: this.label('clear'),
-            isInteractive: this.hasInk && this.isInputEnabled, onAction: (): void => { this.clearInk(); } })
-        }
-      }
-      .width('100%')
-      .constraintSize({ maxWidth: this.toolbarContentWidth })
-      .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平,
-        top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout), bottom: 0 })
-      .backgroundColor($r('app.color.surface_page'))
+  @Builder
+  private inkContent() {
+    ForEach([this.canvasGeneration], (_generation: number) => {
+      Canvas(this.context).width('100%').height('100%')
+        .onReady((): void => { this.canvasReady(); })
+        .onAreaChange((): void => { this.refreshCanvas(); })
+        .onTouch((event: TouchEvent): void => { this.handleTouch(event); })
+    }, (generation: number): string => generation.toString())
+  }
 
-      Stack({ alignContent: Alignment.Bottom }) {
-        if (this.canvasFailed) {
+  build() {
+    // 全局视图由白板宿主持有，工具栏与评分栏放在变换容器外。
+    Stack({ alignContent: Alignment.Top }) {
+      if (this.canvasFailed) {
           Column({ space: 应用尺寸.间距_8 }) {
             Text($r('app.string.study_whiteboard_failed')).fontSize(应用尺寸.字号_正文)
               .fontColor($r('app.color.text_primary'))
             按下态按钮({ 文案: this.label('retry'), 是否启用: this.isInputEnabled,
               点击回调: (): void => { this.retryCanvas(); } })
           }.width('100%').height('100%').justifyContent(FlexAlign.Center)
-        } else {
-          ForEach([this.canvasGeneration], (_generation: number) => {
-            Canvas(this.context).width('100%').height('100%')
-              .onReady((): void => { this.canvasReady(); })
-              .onAreaChange((): void => { this.refreshCanvas(); })
-              .onTouch((event: TouchEvent): void => { this.handleTouch(event); })
-          }, (generation: number): string => generation.toString())
-        }
-        if (this.capacityReached) {
+      } else {
+          StudyContentViewport({ viewScale: this.globalScale, viewX: this.globalX, viewY: this.globalY,
+            rootX: this.rootX, rootY: this.rootY,
+            isInputEnabled: this.isVisible && this.isInputEnabled && !this.canvasFailed,
+            onTouchInput: this.onGlobalTouch, onJudge: this.onGlobalJudge,
+            onStart: this.onGlobalStart, onUpdate: this.onGlobalUpdate, onFinish: this.onGlobalFinish,
+            content: () => { this.inkContent(); } })
+      }
+      if (this.capacityReached) {
           Text($r('app.string.study_whiteboard_full')).fontSize(应用尺寸.字号_正文_小)
             .fontColor($r('app.color.text_primary')).padding(应用尺寸.间距_8)
             .backgroundColor($r('app.color.surface_card')).hitTestBehavior(HitTestMode.None)
-        }
-        Column() {
-          this.brushTools()
-        }.width('100%').constraintSize({ maxWidth: this.toolbarContentWidth })
-        .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平, top: 应用尺寸.间距_8 })
-        .align(Alignment.Top)
-      }.width('100%').layoutWeight(1)
+            .align(Alignment.Center)
+      }
+      Column({ space: 应用尺寸.间距_8 }) {
+        Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween,
+          space: { main: LengthMetrics.vp(应用尺寸.间距_8), cross: LengthMetrics.vp(应用尺寸.间距_8) } }) {
+          Row({ space: 应用尺寸.间距_8 }) {
+            IconActionButton({ toolbarStyle: true, source: $r('app.media.ic_common_close'), label: this.label('close'),
+              isInteractive: this.isInputEnabled, onAction: (): void => { this.close(); } })
+            if (this.globalNavigation) {
+              按下态按钮({ 文案: this.label('reset_view'), singleLine: true,
+                是否启用: this.isInputEnabled, 点击回调: this.onResetGlobalView })
+            }
+          }
+          Row({ space: 应用尺寸.间距_8 }) {
+            IconActionButton({ toolbarStyle: true, source: $r('app.media.ic_study_undo'), label: this.label('undo'),
+              isInteractive: this.hasUndo && this.isInputEnabled, onAction: (): void => { this.undoInk(); } })
+            IconActionButton({ toolbarStyle: true, source: $r('app.media.ic_whiteboard_redo'), label: this.label('redo'),
+              isInteractive: this.hasRedo && this.isInputEnabled, onAction: (): void => { this.redoInk(); } })
+            IconActionButton({ toolbarStyle: true, source: $r('app.media.ic_study_delete'), label: this.label('clear'),
+              isInteractive: this.hasInk && this.isInputEnabled, onAction: (): void => { this.clearInk(); } })
+          }
+        }.width('100%')
+        this.brushTools()
+      }.width('100%').constraintSize({ maxWidth: this.toolbarContentWidth })
+      .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平,
+        top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop), bottom: 应用尺寸.间距_8 })
+      .backgroundColor($r('app.color.surface_page')).align(Alignment.Top)
       Column() { this.reviewActions() }
-        .width('100%').constraintSize({ maxWidth: this.toolbarContentWidth })
+        .width('100%').height('100%').constraintSize({ maxWidth: this.toolbarContentWidth })
+        .justifyContent(FlexAlign.End).hitTestBehavior(HitTestMode.Transparent)
         .enabled(this.isInputEnabled && this.settingsTool === '')
     }
     .width('100%').height('100%')
-    .alignItems(HorizontalAlign.Center)
-    .backgroundColor(this.是否深色 ? 'rgba(16,21,29,0.18)' : 'rgba(245,247,250,0.18)')
+    .backgroundColor(Color.Transparent)
     // Default 保留子按钮/画布响应并挡住下层；Block 会连子控件一起排除。
     .hitTestBehavior(HitTestMode.Default)
     .onTouch((event: TouchEvent): void => { event.stopPropagation(); })

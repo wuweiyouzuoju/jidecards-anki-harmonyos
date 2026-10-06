@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { StudyWhiteboard, whiteboardColor, WHITEBOARD_COLORS, WHITEBOARD_WIDTHS,
   WHITEBOARD_ERASER_WIDTHS } from '../../entry/src/main/ets/model/StudyWhiteboard.ts';
+import { StudyAnnotationView } from '../../entry/src/main/ets/model/StudyAnnotationView.ts';
 import { AppInterfaceTracker, WHITEBOARD_INTERFACE_ITEMS } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { buildAgentAppStructure } from '../../entry/src/main/ets/model/agent/AgentAppStructure.ts';
 import { gesturePointer } from '../../entry/src/main/ets/model/GesturePointer.ts';
@@ -152,7 +153,7 @@ class FakeCanvas {
 const tracker = new AppInterfaceTracker();
 const labels = new Map(JSON.parse(readFileSync(new URL('../../entry/src/main/resources/base/element/string.json', import.meta.url))).string.map(item => [item.name, item.value]));
 const Component = loadComponentLogic('components/StudyLocalWhiteboard.ets', 'StudyLocalWhiteboard', {
-  StudyWhiteboard, TouchType, whiteboardColor, WHITEBOARD_COLORS, WHITEBOARD_WIDTHS, WHITEBOARD_ERASER_WIDTHS, WHITEBOARD_INTERFACE_ITEMS,
+  StudyWhiteboard, StudyAnnotationView, TouchType, whiteboardColor, WHITEBOARD_COLORS, WHITEBOARD_WIDTHS, WHITEBOARD_ERASER_WIDTHS, WHITEBOARD_INTERFACE_ITEMS,
   SourceTool: { Unknown: 0, Pen: 2 }, appInterface: tracker,
   interfaceControlText: (_context, items, id) => labels.get(items.find(item => item.id === id)?.titleKey),
   CanvasRenderingContext2D: FakeCanvas, RenderingContextSettings: class {},
@@ -167,6 +168,149 @@ function component() {
     changedTouches: [{ id, x, y }], getHistoricalPoints: () => [], stopPropagation() {} });
   return { instance, send };
 }
+
+const navigationTouch = (instance, type, touches, changedTouches = touches, sourceTool = 1) =>
+  instance.handleTouch({ type, touches, changedTouches, sourceTool, getHistoricalPoints: () => [], stopPropagation() {} });
+
+test('global fallback allows pen writing and publishes the shared pan and zoom without a second transform', () => {
+  const { instance } = component();
+  instance.globalNavigation = true; instance.globalScale = 2; instance.globalX = 30; instance.globalY = -40;
+  navigationTouch(instance, TouchType.Down, [{ id: 4, x: 20, y: 10 }], undefined, 2);
+  navigationTouch(instance, TouchType.Up, [], [{ id: 4, x: 40, y: 20 }], 2);
+  assert.equal(instance.session.hasInk(), true, 'pen input remains available without a drag mode');
+  instance.publishInterface();
+  const observed = tracker.snapshot().find(item => item.surface === 'study_whiteboard');
+  assert.equal(observed.items.some(item => item.id === 'move'), false);
+  assert.equal(observed.items.find(item => item.id === 'pen').selected, true);
+  assert.equal(observed.items.find(item => item.id === 'reset_view').title, '复位');
+  assert.equal(observed.values.find(item => item.id === 'scale').value, '2');
+  assert.equal(observed.values.find(item => item.id === 'navigation').value, 'global_pan_zoom');
+  navigationTouch(instance, TouchType.Down, [{ id: 5, x: 50, y: 50 }, { id: 6, x: 150, y: 50 }]);
+  navigationTouch(instance, TouchType.Move, [{ id: 5, x: 25, y: 50 }, { id: 6, x: 175, y: 50 }]);
+  assert.deepEqual(instance.view.snapshot(), { scale: 1, x: 0, y: 0 }, 'the outer viewport owns navigation');
+  assert.equal(instance.globalScale, 2); assert.equal(instance.session.hasInk(), true);
+});
+
+test('fallback combined pan and zoom preserves drawing coordinates and completed history', () => {
+  const { instance, send } = component();
+  send(TouchType.Down, 4, 20, 10); send(TouchType.Up, 4, 80, 40);
+  const original = ink(instance.session);
+  navigationTouch(instance, TouchType.Down, [{ id: 7, x: 50, y: 50 }, { id: 9, x: 150, y: 50 }]);
+  navigationTouch(instance, TouchType.Move, [{ id: 9, x: 240, y: 70 }, { id: 7, x: 40, y: 70 }]);
+  navigationTouch(instance, TouchType.Up, [], [{ id: 7, x: 40, y: 70 }, { id: 9, x: 240, y: 70 }]);
+  assert.deepEqual(instance.view.snapshot(), { scale: 2, x: -60, y: -30 });
+  assert.deepEqual(ink(instance.session), original);
+  assert.deepEqual(instance.context.calls.filter(call => call[0] === 'line').at(-1), ['line', 100, 50]);
+  send(TouchType.Down, 4, 20, 10); send(TouchType.Up, 4, 100, 50);
+  const newest = ink(instance.session).at(-1);
+  assert.deepEqual(newest.points, [{ x: 0.2, y: 0.2 }, { x: 0.4, y: 0.4 }]);
+  assert.equal(newest.width, 1.5);
+  assert.equal(instance.context.calls.filter(call => call[0] === 'stroke').at(-1)[2], 3);
+  assert.equal(ink(instance.session).length, 2);
+  instance.undoInk(); assert.deepEqual(ink(instance.session), original);
+  instance.redoInk(); assert.equal(ink(instance.session).length, 2);
+  const source = readFileSync(new URL('../../entry/src/main/ets/components/StudyLocalWhiteboard.ets', import.meta.url), 'utf8');
+  assert.match(source, /Canvas\(this\.context\)\.width\('100%'\)\.height\('100%'\)/);
+  assert.match(source, /\.width\('100%'\)\.height\('100%'\)\s*\.backgroundColor\(Color\.Transparent\)/);
+  assert.doesNotMatch(source, /#\w{8}|fillRect\(/, 'no full-screen tint or opaque paper is drawn');
+  const page = readFileSync(new URL('../../entry/src/main/ets/pages/学习页.ets', import.meta.url), 'utf8');
+  const viewport = page.slice(page.indexOf('CardViewport({ content:'), page.indexOf('if (this.isFloatingStudyLayout() && !this.手写模式)'));
+  assert.match(viewport, /\.scale\(\{ x: this\.手写模式 \? this\.studyViewScale : 1/);
+  assert.match(viewport, /\.translate\(\{ x: this\.手写模式 \? this\.studyViewX : 0/);
+  assert.match(page, /onViewChanged: \(pose: AnnotationPose\)/, 'card and ink share the global view owner');
+  assert.doesNotMatch(page, /annotationScale|annotationOffsetX|annotationOffsetY/, 'no second view owner');
+});
+
+test('two-finger navigation cancels tentative ink and suppresses the remaining finger until all lift', () => {
+  const { instance } = component();
+  const a = { id: 4, x: 50, y: 50 }, b = { id: 8, x: 150, y: 50 };
+  navigationTouch(instance, TouchType.Down, [a]);
+  assert.equal(instance.session.currentPointer(), 4);
+  navigationTouch(instance, TouchType.Down, [a, b], [b]);
+  assert.equal(instance.session.currentPointer(), -1);
+  assert.equal(instance.session.hasInk(), false);
+  navigationTouch(instance, TouchType.Move, [{ ...a, x: 60 }, { ...b, x: 160 }]);
+  assert.deepEqual(instance.view.snapshot(), { scale: 1, x: 10, y: 0 }, 'parallel finger motion continuously pans');
+  navigationTouch(instance, TouchType.Up, [a, b], [b]);
+  navigationTouch(instance, TouchType.Move, [{ ...a, x: 90 }]);
+  assert.equal(instance.session.hasInk(), false);
+  navigationTouch(instance, TouchType.Up, [], [a]);
+  navigationTouch(instance, TouchType.Down, [a]); navigationTouch(instance, TouchType.Up, [], [a]);
+  assert.equal(ink(instance.session).length, 1);
+});
+
+test('fallback has no move tool, a single finger writes without panning, and the next card resets zoom', () => {
+  const { instance } = component();
+  navigationTouch(instance, TouchType.Down, [{ id: 5, x: 10, y: 10 }]);
+  navigationTouch(instance, TouchType.Move, [{ id: 5, x: 40, y: 30 }]);
+  navigationTouch(instance, TouchType.Up, [], [{ id: 5, x: 40, y: 30 }]);
+  assert.deepEqual(instance.view.snapshot(), { scale: 1, x: 0, y: 0 });
+  assert.equal(ink(instance.session).length, 1);
+  const saved = ink(instance.session);
+  const observed = () => tracker.snapshot().find(item => item.surface === 'study_whiteboard');
+  assert.equal(observed().items.some(item => item.id === 'move'), false);
+  assert.equal(observed().items.find(item => item.id === 'pen').selected, true);
+  assert.equal(observed().values.find(item => item.id === 'tool').value, 'pen');
+  assert.equal(observed().values.find(item => item.id === 'navigation').value, 'pan_zoom');
+  navigationTouch(instance, TouchType.Down, [{ id: 5, x: 50, y: 50 }, { id: 6, x: 150, y: 50 }]);
+  navigationTouch(instance, TouchType.Move, [{ id: 5, x: 25, y: 50 }, { id: 6, x: 175, y: 50 }]);
+  navigationTouch(instance, TouchType.Up, [], [{ id: 5, x: 25, y: 50 }, { id: 6, x: 175, y: 50 }]);
+  assert.deepEqual(instance.view.snapshot(), { scale: 1.5, x: -50, y: -25 });
+  assert.deepEqual(ink(instance.session), saved);
+  instance.isVisible = false; instance.visibilityChanged();
+  instance.isVisible = true; instance.visibilityChanged();
+  assert.deepEqual(instance.view.snapshot(), { scale: 1.5, x: -50, y: -25 });
+  instance.resetRequested();
+  assert.deepEqual(instance.view.snapshot(), { scale: 1, x: 0, y: 0 });
+  assert.equal(instance.session.hasInk(), false);
+});
+
+test('stylus palm contact cannot cancel writing; stylus-only mode still accepts two-finger navigation', () => {
+  const { instance } = component(); instance.setStylusOnly(true);
+  const pen = { id: 1, x: 20, y: 10 }, palm = { id: 5, x: 80, y: 50 };
+  navigationTouch(instance, TouchType.Down, [pen], [pen], 2);
+  navigationTouch(instance, TouchType.Down, [pen, palm], [palm]);
+  navigationTouch(instance, TouchType.Cancel, [], [palm]);
+  assert.equal(instance.session.currentPointer(), 1);
+  navigationTouch(instance, TouchType.Up, [], [{ ...pen, x: 40, y: 20 }], 2);
+  assert.equal(ink(instance.session).length, 1);
+  navigationTouch(instance, TouchType.Down, [{ id: 5, x: 50, y: 50 }, { id: 6, x: 150, y: 50 }]);
+  navigationTouch(instance, TouchType.Move, [{ id: 5, x: 25, y: 50 }, { id: 6, x: 175, y: 50 }]);
+  assert.equal(instance.view.snapshot().scale, 1.5);
+  assert.equal(ink(instance.session).length, 1);
+});
+
+test('rotation and undo release stylus isolation so the following finger navigation remains usable', () => {
+  const { instance } = component();
+  const pen = { id: 1, x: 20, y: 10 };
+  navigationTouch(instance, TouchType.Down, [pen], [pen], 2);
+  assert.equal(instance.activePen, true);
+  instance.context.width = 400; instance.context.height = 200; instance.refreshCanvas();
+  assert.equal(instance.activePen, false);
+  navigationTouch(instance, TouchType.Down, [pen], [pen], 2);
+  instance.undoInk();
+  assert.equal(instance.activePen, false);
+  navigationTouch(instance, TouchType.Down, [{ id: 5, x: 50, y: 50 }, { id: 6, x: 150, y: 50 }]);
+  navigationTouch(instance, TouchType.Move, [{ id: 5, x: 25, y: 50 }, { id: 6, x: 175, y: 50 }]);
+  assert.equal(instance.view.snapshot().scale, 1.5);
+  assert.equal(instance.session.hasInk(), false);
+});
+
+test('eraser retains its selected screen width at half scale and inactive callbacks restore the current mode observation', () => {
+  const { instance, send } = component();
+  send(TouchType.Down, 4, 80, 40); send(TouchType.Up, 4, 100, 50);
+  navigationTouch(instance, TouchType.Down, [{ id: 5, x: 50, y: 50 }, { id: 6, x: 150, y: 50 }]);
+  navigationTouch(instance, TouchType.Move, [{ id: 5, x: 75, y: 50 }, { id: 6, x: 125, y: 50 }]);
+  navigationTouch(instance, TouchType.Up, [], [{ id: 5, x: 75, y: 50 }, { id: 6, x: 125, y: 50 }]);
+  instance.selectEraserWidth(2); send(TouchType.Down, 4, 90, 45); send(TouchType.Up, 4, 90, 45);
+  assert.equal(ink(instance.session).at(-1).width, 80);
+  assert.equal(instance.context.lineWidth, 40);
+  let inactive = 0;
+  instance.onInactive = () => { inactive++; tracker.observe({ surface: 'study_whiteboard', sectionId: '', selectedId: '', optionIds: [], optionLabels: [], busy: false, controlsComplete: false, items: [], values: [{ id: 'engine', value: 'huawei_pen_kit' }] }); };
+  instance.isVisible = false; instance.visibilityChanged();
+  assert.equal(inactive, 1);
+  assert.equal(tracker.snapshot().find(item => item.surface === 'study_whiteboard').values[0].value, 'huawei_pen_kit');
+});
 
 test('production component handles sparse nonzero touch ID, taps and lift endpoint with incremental drawing', () => {
   const { instance, send } = component();
@@ -212,6 +356,8 @@ test('cached original canvas reopens with completed ink, rejects hidden callback
   const view = () => tracker.snapshot().find(item => item.surface === 'study_whiteboard');
   assert.equal(view().values.find(item => item.id === 'engine').value, 'local_canvas');
   assert.equal(view().values.find(item => item.id === 'ready').value, 'true');
+  instance.fallbackReason = 'init_timeout'; instance.publishInterface();
+  assert.equal(view().values.find(item => item.id === 'fallback_reason').value, 'init_timeout');
   send(TouchType.Down); send(TouchType.Up, 4, 80, 50);
   const saved = ink(instance.session), context = instance.context;
   send(TouchType.Down, 9);
@@ -312,7 +458,7 @@ test('whiteboard overlay leaves child controls hittable and shares the study too
   assert.doesNotMatch(source, /\.hitTestBehavior\(HitTestMode\.Block\)/, 'Block would exclude the Canvas and toolbar children');
   assert.match(source, /toolbarContentWidth = cardViewportWidth\(Number\(area\.width\), Number\(area\.height\)\)/);
   assert.match(source, /\.constraintSize\(\{ maxWidth: this\.toolbarContentWidth \}\)/);
-  assert.match(source, /top: 应用尺寸\.pageToolbarTop\(this\.状态栏高度, this\.narrowDeckLayout\), bottom: 0/);
+  assert.match(source, /top: 应用尺寸\.pageToolbarTop\(this\.状态栏高度, this\.narrowDeckLayout, this\.toolbarSafeTop\), bottom: 应用尺寸\.间距_8/);
   assert.doesNotMatch(source, /themeText: true|\.padding\(\{ top: this\.状态栏高度 \}\)/);
 });
 
@@ -457,9 +603,12 @@ test('stylus-only rejects palm input and cancellation; coalesced samples retain 
 test('JIDE reads the same visible controls, live brush state and history availability; closing removes observation', () => {
   const { instance, send } = component();
   const view = () => tracker.snapshot().find(item => item.surface === 'study_whiteboard');
+  assert.equal(view().items.find(item => item.id === 'close').iconKey, 'ic_common_close');
   assert.equal(view().items.find(item => item.id === 'redo').enabled, false);
   assert.equal(view().items.some(item => item.id === 'color_0'), false);
   instance.openToolSettings(false);
+  assert.equal(view().items.find(item => item.id === 'settings_close').iconKey, 'ic_common_close');
+  assert.equal(view().items.find(item => item.id === 'settings_close').title, '关闭');
   instance.selectColor(2);
   instance.setStylusOnly(true);
   assert.equal(view().items.find(item => item.id === 'color_2').title, '蓝色');
