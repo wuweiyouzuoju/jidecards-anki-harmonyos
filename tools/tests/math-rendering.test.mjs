@@ -30,6 +30,26 @@ test('both sides render math regardless of legacy SVG option, with theme and off
   }
 });
 
+test('static cards omit the large math engine while either side and dynamic templates preserve it', () => {
+  const plain = { questionNodes: [node('word')], answerNodes: [node('meaning')], css: '.card{color:red}', latexSvg: false, isEmpty: false };
+  for (const side of ['question', 'answer']) {
+    const html = 构建卡片HTML(plain, side);
+    assert.match(html, /card-math\.js/);
+    assert.doesNotMatch(html, /tex-svg-full\.js/);
+    assert.match(html, /jquery\.min\.js/, 'Anki templates retain their shared dependencies');
+  }
+  for (const content of ['\\(x\\)', '$x$', '\\begin{equation}x\\end{equation}', '<math><mi>x</mi></math>',
+    '<script>onShownHook.push(function(){MathJax.typesetPromise()})</script>', '<img onload="showMath()">',
+    '<a href="javascript:showMath()">math</a>', '&#92;(x&#92;)', '&bsol;(x&bsol;)']) {
+    for (const field of ['questionHtml', 'answerHtml', 'css']) {
+      const html = 构建卡片HTML({...plain, [field]: content}, 'question');
+      assert.match(html, /tex-svg-full\.js/, `${field}: ${content}`);
+    }
+  }
+  assert.match(构建卡片HTML({...plain, answerNodes: [node('\\[x\\]')]}, 'question'), /tex-svg-full\.js/,
+    'raw Core nodes are checked when the resolved side HTML is absent');
+});
+
 test('vendored component is byte-identical to the pinned manifest and embeds mhchem and SVG fonts', () => {
   const manifest = JSON.parse(read(resources + 'manifest.json'));
   assert.equal(manifest.version, '3.2.2');

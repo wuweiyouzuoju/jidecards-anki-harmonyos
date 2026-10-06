@@ -42,7 +42,7 @@
 
 import { IMAGE_OCCLUSION_SCRIPT } from './ImageOcclusionRendering';
 import type { RenderedCard, TemplateNode } from '../proto/messages/CardRenderingMessages';
-import { MATH_SCRIPTS } from './MathRendering';
+import { cardMathScripts } from './MathRendering';
 
 // ========================================================
 // @块ID MODEL-STUDY-HTML-002
@@ -354,7 +354,9 @@ export function 构建卡片HTML(渲染结果: RenderedCard, 侧面: 卡片正�
   const 默认配色: string = `html { background: ${cardBackground}; }
 body { color: ${isDark ? '#E6E6E6' : '#1A1A1A'}; background: ${cardBackground}; }`;
   const 样式: string = `${基础样式}\n${图片遮罩渲染样式}\n${可折叠字段样式}`;
-  // latexSvg 只决定传统 LaTeX 图片后缀，不能关闭同一卡片中的 MathJax。
+  // 同卡两面共用文档；背面才有公式也必须在题面准备引擎。
+  const mathScripts: string = cardMathScripts(渲染结果.questionHtml ?? 原始侧HTML(渲染结果, 'question'),
+    渲染结果.answerHtml ?? 原始侧HTML(渲染结果, 'answer'), 渲染结果.css);
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -363,7 +365,7 @@ body { color: ${isDark ? '#E6E6E6' : '#1A1A1A'}; background: ${cardBackground}; 
 <script src="https://jidecards-render.local/jquery/3.7.1/jquery.min.js"></script>
 <style>${默认配色}\n${templateAlignmentDefaults}</style>
 ${IMAGE_OCCLUSION_SCRIPT}
-${MATH_SCRIPTS}
+${mathScripts}
 ${可折叠字段脚本}
 </head>
 <body class="card${isDark ? ' nightMode' : ''}"><div id="qa"><style>${渲染结果.css}</style>
