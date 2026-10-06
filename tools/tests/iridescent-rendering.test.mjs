@@ -195,7 +195,7 @@ test('home and nested transparent destinations never crossfade old and new conte
     assert.equal(nav.snapshot()[destination], 1);
   }
   const home = readFileSync(new URL('../../entry/src/main/ets/pages/首页.ets', import.meta.url), 'utf8');
-  assert.match(home, /\.expandSafeArea\([^\n]*\)\s*\.opacity\(this\.homeTransitionOpacity\)/,
+  assert.match(home, /\.expandSafeArea\([^\n]*\)\s*\.onAreaChange\([^\n]*\)\s*\.opacity\(this\.homeTransitionOpacity\)/,
     'bind home opacity to NavBar content, not Navigation or the shared background');
 });
 

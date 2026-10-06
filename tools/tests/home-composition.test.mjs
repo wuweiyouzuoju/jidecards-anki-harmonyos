@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { appPageName, APP_PAGE_ROUTES } from '../../entry/src/main/ets/model/navigation/AppNavigation.ts';
+import { homeHeaderGeometry } from '../../entry/src/main/ets/model/HomeHeaderLayout.ts';
 
 const read = path => readFileSync(new URL('../../entry/src/main/ets/' + path, import.meta.url), 'utf8');
 const home = read('pages/首页.ets');
@@ -74,9 +75,10 @@ test('destination renderer preserves route defaults, explicit parameters, snapsh
 
 test('home binds its live navigation host and both detail layouts to the same actions', () => {
   let routeArgs, details;
-  const Page = new Function('HomeDestinations', 'HomeDeckDetails',
-    compile(`class Page { ${method('页面映射')} ${method('deckDetails')} }`) + ';return Page;')(
-    (...args) => { routeArgs = args; }, props => { details = props; });
+  const Page = new Function('HomeDestinations', 'HomeDeckDetails', 'homeHeaderGeometry', '应用尺寸',
+    compile(`class Page { ${method('页面映射')} ${method('deckDetails')} ${method('detailHeaderActionHeight')} }`) + ';return Page;')(
+    (...args) => { routeArgs = args; }, props => { details = props; }, homeHeaderGeometry,
+    { 页面分组间距: () => 12, 按钮高度: 44 });
   const page = new Page(), events = [];
   Object.assign(page, { 页面栈: {}, historyRefreshToken: 3, deckOptionsBusy: true,
     是否深色: () => true, requestManualSync: () => events.push('sync'),
@@ -85,7 +87,7 @@ test('home binds its live navigation host and both detail layouts to the same ac
     打开AI制卡: () => events.push('ai-create'),
     openDeckRename: id => events.push(['rename', id]),
     openCreateDeck: id => events.push(['child', id]), 打开数据迁移: (...args) => events.push(args),
-    打开牌组选项: () => events.push('options') });
+    打开牌组选项: () => events.push('options'), homeActionAnchor: { width: 360 }, 显示今日进度卡: true });
   const params = {};
   page.页面映射('SettingsPage', params);
   assert.equal(routeArgs[0], 'SettingsPage');
@@ -100,6 +102,7 @@ test('home binds its live navigation host and both detail layouts to the same ac
     assert.equal(details.historyRefreshToken, page.historyRefreshToken);
     assert.equal(details.optionsBusy, true);
     assert.equal(details.isDark, true);
+    assert.equal(details.headerActionHeight, homeHeaderGeometry(360, 12, true, 44).actionsHeight);
     const back = () => true;
     details.onBackHandlerChange(back);
     assert.equal(page.deckDetailsBackHandler, back);

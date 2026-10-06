@@ -7,6 +7,7 @@ import { canStartHomeAutoSync } from '../../entry/src/main/ets/model/HomeActivit
 import { HomeAnnouncementController } from '../../entry/src/main/ets/model/HomeAnnouncementController.ts';
 import { AutoSyncScheduler } from '../../entry/src/main/ets/model/AutoSyncScheduler.ts';
 import { HomeSyncController } from '../../entry/src/main/ets/model/HomeSyncController.ts';
+import { HomeSyncStatusController } from '../../entry/src/main/ets/model/HomeSyncStatusController.ts';
 import { DeckPreviewSession } from '../../entry/src/main/ets/model/DeckPreviewSession.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -41,6 +42,12 @@ function homeHarness() {
     clearTimeout: id => state.timers.delete(id)
   });
   const page = new Page();
+  page.syncStatusController = new HomeSyncStatusController({
+    auth: () => state.auth, canRead: () => false,
+    read: async () => { assert.fail('task-only fixture must not read idle status'); },
+    saveEndpoint: () => { assert.fail('no idle status read'); },
+    changed: icon => { page.syncAccountState = icon; }, failed: () => { assert.fail('unexpected status error'); }
+  });
   page.deckPreviewSession = new DeckPreviewSession({ cardIds: async () => [] });
   page.transfer = initialTransferState();
   page.backupController = { schedule() {}, stop() {} };
@@ -771,8 +778,8 @@ test('sync status stays on the dedicated Sync button and preserves accessible de
   assert.match(header, /accessibilityText\(this.syncStatusText\)/);
   assert.ok(header.indexOf('app.media.ic_home_sync') < header.indexOf('accessibilityText(this.syncStatusText)'));
   assert.doesNotMatch(header, /\bText\(this.syncStatusText\)/);
-  assert.match(header, /if \(this\.syncIndicator === 'syncing'\)\s*\{\s*LoadingProgress\(\)/);
-  assert.match(header, /syncIndicator === 'attention'[\s\S]*?Text\('!'\)[\s\S]*?app.color.error_text/);
+  assert.match(header, /if \(homeSyncIndicator\(this\.syncAccountState, this\.syncIndicator\) === 'syncing'\)\s*\{\s*LoadingProgress\(\)/);
+  assert.match(header, /homeSyncIndicator\(this\.syncAccountState, this\.syncIndicator\) === 'attention'[\s\S]*?Text\('!'\)[\s\S]*?app.color.error_text/);
   assert.doesNotMatch(header, /Text\('⚠'\)/);
   assert.match(panel, /this\.statusChanged\(text, indicator\)/);
   assert.match(panel, /if \(this.state.detailsVisible\)/);

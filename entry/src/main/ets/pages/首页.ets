@@ -24,12 +24,17 @@ import { IridescentGiftPanel } from '../components/IridescentGiftPanel';
 import { isIridescentGiftNoticeCompleted, completeIridescentGiftNotice } from '../utils/IridescentGiftStore';
 import { CLOUD_DECK_CHANNEL_ENABLED, AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../model/ReleaseFeatures';
 import { HomeSummaryHeader } from '../components/home/HomeSummaryHeader';
+import { HomeActionAnchor, homeHeaderGeometry } from '../model/HomeHeaderLayout';
+import { 简洁模式AppStorage键 } from '../model/简洁模式存储';
+import { AnchoredMenu } from '../components/common/AnchoredMenu';
 import { WINDOW_SAFE_TOP_KEY, WINDOW_SAFE_LEFT_KEY, WINDOW_SAFE_RIGHT_KEY } from '../model/WindowSafeLayout';
 import { HomeDeckSearchDialog } from '../components/home/HomeDeckSearchDialog';
 import { searchHomeDecks } from '../model/HomeDeckSearch';
 import { OFFICIAL_ANNOUNCEMENTS_ENABLED } from '../model/官方公告配置';
 import { AutoSyncScheduler, autoSyncScheduler } from '../model/AutoSyncScheduler';
 import { HomeSyncController, HomeSyncHost } from '../model/HomeSyncController';
+import { HomeSyncStatusController, homeSyncIndicator, homeSyncLabelKey } from '../model/HomeSyncStatusController';
+import { 同步服务 } from '../backend/同步服务';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
 
 import { bundleManager, common } from '@kit.AbilityKit';
@@ -66,7 +71,7 @@ import { AI制卡页参数 } from './AI制卡页';
 import type { 数据迁移模式, 导出牌组选项 } from '../model/DataTransferIntent';
 import { 同步面板 } from '../components/同步面板';
 import { syncActivity } from '../model/SyncSettings';
-import { loadVisibleSyncAuth, 同步凭证信息, loadAutoSyncEnabled } from '../model/同步凭证存储';
+import { loadVisibleSyncAuth, 同步凭证信息, loadAutoSyncEnabled, 保存同步端点 } from '../model/同步凭证存储';
 import { APP_FOREGROUND_KEY } from '../model/AppLifecycleState';
 import { 主页顶部工具栏 } from '../components/home/主页顶部工具栏';
 import { CollectionHistoryDialog } from '../components/CollectionHistoryDialog';
@@ -242,7 +247,11 @@ struct 首页 {
   @State @Watch('homeActivityChanged') private deckRenameBusy: boolean = false;
   @State private deckRenameBackRequest: number = 0;
   @State @Watch('homeActivityChanged') private 显示主页操作: boolean = false;
-  // 更多/新建由统计卡旁的真实图标锚点承载。
+  // 公共菜单使用顶部按钮行的实测窗口锚点，详情分栏时仍对齐列表面板。
+  @State private homeActionAnchor: HomeActionAnchor = { left: 0, top: 0, width: 0 };
+  @State private homeMenuHostLeft: number = 0;
+  @State private homeMenuHostTop: number = 0;
+  @StorageProp(简洁模式AppStorage键) private homeSimpleMode: boolean = true;
   @State @Watch('homeActivityChanged') private collectionHistoryOpen: boolean = false;
   @State @Watch('homeActivityChanged') private collectionHistoryBusy: boolean = false;
   @State private collectionHistoryBackRequest: number = 0;
@@ -267,13 +276,22 @@ struct 首页 {
   @State private 同步面板认证: SyncAuth | null = null;
   @State private 同步面板账号名: string = '';
   @State private syncAutomatic: boolean = true;
-  @State private syncStatusText: string = '';
-  @State private syncIndicator: string = 'hidden';
+  @State @Watch('publishHomeInterface') private syncStatusText: string = '';
+  @State @Watch('publishHomeInterface') private syncIndicator: string = 'hidden';
+  @State @Watch('publishHomeInterface') private syncAccountState: string = 'normal';
   @State private syncDetailsRequest: number = 0;
   @StorageProp(APP_FOREGROUND_KEY) @Watch('syncForegroundChanged') private syncForeground: boolean = false;
   private readonly syncScheduler: AutoSyncScheduler = autoSyncScheduler;
   private readonly syncController: HomeSyncController = new HomeSyncController(
     this.syncScheduler, syncActivity, (): HomeSyncHost => this.homeSyncHost());
+  private readonly syncStatusController: HomeSyncStatusController = new HomeSyncStatusController({
+    auth: (): SyncAuth | null => this.visibleSyncAuth(),
+    canRead: (): boolean => this.canReadHomeSyncStatus(),
+    read: (auth: SyncAuth) => new 同步服务().同步状态检查(auth),
+    saveEndpoint: (endpoint: string): void => { 保存同步端点(endpoint); },
+    changed: (state: string): void => { this.syncAccountState = state; },
+    failed: (): void => { hilog.warn(0x4342, 'jidecards', 'Home sync status check unavailable'); }
+  });
   private readonly backupController: HomeBackupController = new HomeBackupController(
     (): HomeBackupHost => this.homeBackupHost(), (filesDir: string): BackupBackend => new LocalBackups(filesDir));
   private autoSyncStartupReady: boolean = false;
@@ -347,6 +365,19 @@ struct 首页 {
   @State @Watch('homeActivityChanged') private 预览加载中: boolean = false;
   @State @Watch('homeActivityChanged') private deckPreviewMenuOpen: boolean = false;
 
+  private visibleSyncAuth(): SyncAuth | null {
+    const info: 同步凭证信息 | null = loadVisibleSyncAuth();
+    return info === null ? null : { hkey: info.hkey, endpoint: info.endpoint, ioTimeoutSecs: 0 };
+  }
+
+  private canReadHomeSyncStatus(): boolean {
+    const activity: HomeActivityState = this.homeActivity();
+    return !this.homeDisposed && this.syncForeground && this.主页允许公告检查 && this.页面栈.size() === 0 &&
+      !this.显示同步面板 && !this.syncScheduler.isManualPending() && this.syncScheduler.canSync() &&
+      !syncActivity.isActive() && activity.collectionReady && !activity.collectionBusy &&
+      !activity.dialogOpen && !activity.interactionBusy;
+  }
+
   private homeSyncHost(): HomeSyncHost {
     return {
       activity: (): HomeActivityState => this.homeActivity(),
@@ -360,10 +391,7 @@ struct 首页 {
       startupReady: (): boolean => this.autoSyncStartupReady,
       externalImportPending: (): boolean => externalDeckOpens.hasPending(),
       autoSyncEnabled: (): boolean => loadAutoSyncEnabled(),
-      auth: (): SyncAuth | null => {
-        const info: 同步凭证信息 | null = loadVisibleSyncAuth();
-        return info === null ? null : { hkey: info.hkey, endpoint: info.endpoint, ioTimeoutSecs: 0 };
-      },
+      auth: (): SyncAuth | null => this.visibleSyncAuth(),
       username: (): string => {
         const info: 同步凭证信息 | null = loadVisibleSyncAuth();
         return info === null ? '' : info.username;
@@ -421,7 +449,11 @@ struct 首页 {
 
   aboutToAppear(): void {
     this.restoreHomeDeckExpansion();
-    this.syncScheduler.setListener((): void => { this.scheduleAutoSyncCheck(); });
+    this.syncScheduler.setListener((): void => {
+      this.syncStatusController.invalidate();
+      this.syncStatusController.refresh();
+      this.scheduleAutoSyncCheck();
+    });
     this.requestAutoSync();
     this.恢复主题();
     this.恢复颜色主题();
@@ -451,6 +483,7 @@ struct 首页 {
     this.stopAutoSyncTimer();
     this.backupController.dispose();
     this.syncController.dispose();
+    this.syncStatusController.dispose();
     syncActivity.cancelReservation();
   }
 
@@ -480,7 +513,9 @@ struct 首页 {
 
   /** 前台恢复时排队；在编辑或学习中恢复时，等待真正返回首页。 */
   private syncForegroundChanged(): void {
+    this.syncStatusController.invalidate();
     this.syncController.foregroundChanged();
+    this.syncStatusController.refresh();
     if (this.syncForeground) this.backupController.schedule();
     else {
       this.closeHomeActions();
@@ -571,7 +606,9 @@ struct 首页 {
   }
 
   private syncHostClosed(): void {
+    this.syncStatusController.invalidate();
     this.syncController.closePanel();
+    this.syncStatusController.refresh();
   }
 
   /** 刷新完成且仍停留首页时只执行最后一次意图；返回或退后台会取消它。 */
@@ -625,7 +662,8 @@ struct 首页 {
       if (this.homeAgentEnabled) controls.push({ id: 'agent', title: '', titleKey: 'ai_agent_title', enabled: true, selected: false });
       controls.push({ id: 'search', title: '', titleKey: 'home_search_title', enabled: true, selected: this.homeSearchOpen });
       controls.push({ id: 'browser', title: '', titleKey: 'browser_title', enabled: true, selected: false });
-      controls.push({ id: 'sync', title: '', titleKey: 'home_sync', enabled: true, selected: this.显示同步面板 });
+      controls.push({ id: 'sync', title: '', titleKey: homeSyncLabelKey(this.syncAccountState, this.syncIndicator),
+        enabled: true, selected: this.显示同步面板 });
       controls.push({ id: 'create', title: '', titleKey: 'create_deck', enabled: true, selected: this.显示主页操作 });
     }
     if (this.显示今日进度卡) controls.push({ id: 'today', title: '', titleKey: 'settings_home_today_summary', enabled: true, selected: false });
@@ -653,10 +691,15 @@ struct 首页 {
         { id: 'deck_study_counts_visible', value: String(!isDoubleColumnDeckListStyle(this.deckListStyle)) },
         { id: 'home_action_position', value: 'above_summary' },
         { id: 'home_header_layout', value: 'one_row' },
-        { id: 'home_summary_visible', value: String(this.显示今日进度卡) }] });
+        { id: 'home_action_grouping', value: 'more_left_others_right' },
+        { id: 'home_menu_style', value: 'anchored_no_arrow' },
+        { id: 'home_summary_visible', value: String(this.显示今日进度卡) },
+        { id: 'sync_account_state', value: this.syncAccountState },
+        { id: 'sync_indicator', value: homeSyncIndicator(this.syncAccountState, this.syncIndicator) },
+        { id: 'sync_status', value: this.syncStatusText }] });
     if (this.排序模式中) {
       const controls: AppInterfaceControl[] = [
-        { id: 'exit', title: '', titleKey: 'deck_reorder_exit', enabled: !this.deckReorderBusy, selected: false },
+        { id: 'exit', title: '', titleKey: 'deck_reorder_exit', iconKey: 'ic_common_close', enabled: !this.deckReorderBusy, selected: false },
         { id: 'done', title: '', titleKey: 'deck_reorder_done', enabled: !this.deckReorderBusy, selected: false },
         { id: 'decks', title: '', titleKey: 'home_interface_decks', enabled: !this.deckReorderBusy, selected: false }
       ];
@@ -671,6 +714,7 @@ struct 首页 {
   /** 页面映射当前占用与效果，任务优先级由 HomeWorkCoordinator 统一管理。 */
   private homeActivityChanged(): void {
     if (this.homeDisposed) return;
+    this.syncStatusController.refresh();
     this.publishHomeInterface();
     const host: HomeWorkHost = {
       activity: (): HomeActivityState => this.homeActivity(),
@@ -848,6 +892,7 @@ struct 首页 {
 
   /** 所有真正返回主页的入口都调用这里，避免遗漏公告检查。 */
   private 返回主页后刷新(): void {
+    this.syncStatusController.invalidate();
     this.主页允许公告检查 = true;
     this.加载主页数据().then((): void => { this.presentPendingSyncWarning(); });
     this.homeActivityChanged();
@@ -926,6 +971,7 @@ struct 首页 {
   /** 进入后台：取消尚未执行的公告延迟检查，返回前台由 onPageShow 重新协调。 */
   onPageHide(): void {
     this.暂停主页官方公告检查();
+    this.syncStatusController.invalidate();
     this.deckPreviewSession.invalidate();
     this.stopAutoSyncTimer();
   }
@@ -1131,7 +1177,7 @@ struct 首页 {
           buttons: [
             {
               text: resourceText(this.getUIContext(), $r('app.string.sync_fsrs_disabled_reenable')),
-              color: '#2F5FD0'
+              color: this.动作主色
             },
             {
               text: resourceText(this.getUIContext(), $r('app.string.sync_fsrs_disabled_keep')),
@@ -1313,7 +1359,7 @@ struct 首页 {
     if (context === null) return;
     this.预览加载中 = true;
     try {
-      const ids: number[] | null = await this.deckPreviewSession.load(deck.id, scope);
+      const ids: number[] | null = await this.deckPreviewSession.load(deck.id, scope, context.filesDir);
       if (ids === null || this.homeDisposed || this.页面栈.size() > 0 || this.选中的牌组ID !== deck.id || !this.syncForeground) return;
       if (ids.length === 0) {
         this.显示提示($r('app.string.deck_preview_empty'));
@@ -1456,7 +1502,14 @@ struct 首页 {
   /** 长按牌组色条切换 tone：先持久化、再就地替换当前 主页快照数据 中对应行的 tone 并刷新列表，避免重拉后端数据。 */
   private async 更改牌组色调(deckId: string, tone: 牌组色调): Promise<void> {
     if (this.deferForSync((): void => { this.更改牌组色调(deckId, tone); })) return;
-    await 保存牌组色调(deckId, tone);
+    try { await 保存牌组色调(deckId, tone); }
+    catch (error) {
+      if (!this.homeDisposed) showToastSafely(this.getUIContext(), {
+        message: resourceText(this.getUIContext(), $r('app.string.deck_tone_save_failed'))
+      });
+      return;
+    }
+    if (this.homeDisposed) return;
     const oldDecks: 牌组汇总[] = this.主页快照数据.decks;
     const newDecks: 牌组汇总[] = oldDecks.map((deck: 牌组汇总): 牌组汇总 => {
       if (deck.id !== deckId) {
@@ -1845,9 +1898,9 @@ struct 首页 {
           Column({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout) }) {
             HomeSummaryHeader({ showSummary: this.显示今日进度卡, actionsVisible: !this.排序模式中,
               agentEnabled: this.homeAgentEnabled,
-              moreOpen: this.显示更多菜单, createOpen: this.显示主页操作, actionColor: this.动作主色,
+              actionColor: this.动作主色,
               homeSnapshot: this.主页快照数据, graphsSnapshot: this.图表快照,
-              syncIndicator: this.syncIndicator, syncStatusText: this.syncStatusText,
+              syncIndicator: this.syncIndicator, syncStatusText: this.syncStatusText, syncAccountState: this.syncAccountState,
               onMore: (): void => { const open: boolean = !this.显示更多菜单; this.closeHomeActions(); this.显示更多菜单 = open; },
               onCreate: (): void => { const open: boolean = !this.显示主页操作; this.closeHomeActions(); this.显示主页操作 = open; },
               onAgent: (): void => { if (this.homeAgentEnabled) { this.closeHomeActions(); this.openAgent(); } },
@@ -1858,10 +1911,8 @@ struct 首页 {
                 else this.startSyncFromMenu();
               },
               onBrowser: (): void => { this.closeHomeActions(); this.打开浏览页(); },
-              onMoreClose: (): void => { this.显示更多菜单 = false; },
-              onCreateClose: (): void => { this.显示主页操作 = false; },
-              moreContent: (maxHeight: number) => { this.homeMoreMenu(maxHeight); },
-              createContent: (maxHeight: number) => { this.homeCreateMenu(maxHeight); } })
+              onMenusClose: (): void => { this.closeHomeActions(); },
+              onMenuAnchor: (anchor: HomeActionAnchor): void => { this.homeActionAnchor = anchor; } })
             主页牌组列表({
               onOverflowChange: (overflow: boolean): void => { this.deckListOverflow = overflow; },
               牌组数据源: this.牌组数据源,
@@ -1935,7 +1986,7 @@ struct 首页 {
         }
       }
       .layoutWeight(1)
-      .padding({ top: this.排序模式中 ? 0 : Math.max(this.状态栏高度, this.safeTop) + 应用尺寸.页面分组间距(this.narrowDeckLayout),
+      .padding({ top: this.排序模式中 ? 0 : 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout, this.safeTop),
         left: this.safeLeft, right: this.safeRight })
       .onBreakpointChange((breakpoint: string) => {
         if (this.当前断点 !== breakpoint) this.closeHomeActions();
@@ -1955,9 +2006,8 @@ struct 首页 {
   }
 
   @Builder
-  private homeCreateMenu(maxHeight: number) {
+  private homeCreateMenu() {
       主页操作面板({
-        menuMaxHeight: maxHeight,
         创建牌组回调: (): void => {
           this.显示主页操作 = false;
           this.openCreateDeck('');
@@ -1979,9 +2029,8 @@ struct 首页 {
   }
 
   @Builder
-  private homeMoreMenu(maxHeight: number) {
+  private homeMoreMenu() {
       主页更多面板({
-        menuMaxHeight: maxHeight,
         historyAvailable: this.homeActivity().collectionReady && !this.homeActivity().collectionBusy,
         onHistory: (): void => {
           if (this.homeActivity().collectionBusy || !this.homeActivity().collectionReady) return;
@@ -2006,8 +2055,40 @@ struct 首页 {
       })
   }
 
+  private homeMenuHostChanged(area: Area): void {
+    const left: number = Number(area.globalPosition.x);
+    const top: number = Number(area.globalPosition.y);
+    if (Math.abs(left - this.homeMenuHostLeft) <= 0.1 && Math.abs(top - this.homeMenuHostTop) <= 0.1) return;
+    this.closeHomeActions();
+    this.homeMenuHostLeft = left;
+    this.homeMenuHostTop = top;
+  }
+
+  private homeMenuAnchor(): HomeActionAnchor {
+    // 标题栏或导航容器会移动宿主；窗口锚点在宿主边界只转成局部坐标一次。
+    return { left: Math.max(0, this.homeActionAnchor.left - this.homeMenuHostLeft),
+      top: Math.max(0, this.homeActionAnchor.top - this.homeMenuHostTop), width: this.homeActionAnchor.width };
+  }
+
   @Builder
   private homeMenus() {
+    if (this.显示更多菜单 && this.homeActionAnchor.width > 0) {
+      AnchoredMenu({ menuWidth: Math.min(应用尺寸.compactMenuWidth, this.homeActionAnchor.width),
+        topOffset: this.homeMenuAnchor().top, contentLeft: this.homeMenuAnchor().left,
+        contentMaxWidth: this.homeActionAnchor.width, alignEnd: false, cornerRadius: 应用尺寸.圆角_卡片,
+        onClose: (): void => { this.closeHomeActions(); } }) {
+        this.homeMoreMenu()
+      }
+    }
+    if (this.显示主页操作 && this.homeActionAnchor.width > 0) {
+      AnchoredMenu({ menuWidth: Math.min(!this.homeSimpleMode || CLOUD_DECK_CHANNEL_ENABLED && !this.云端牌组配额已用尽 ?
+          应用尺寸.extendedMenuWidth : 应用尺寸.compactMenuWidth, this.homeActionAnchor.width),
+        topOffset: this.homeMenuAnchor().top, contentLeft: this.homeMenuAnchor().left,
+        contentMaxWidth: this.homeActionAnchor.width, alignEnd: true, cornerRadius: 应用尺寸.圆角_卡片,
+        onClose: (): void => { this.closeHomeActions(); } }) {
+        this.homeCreateMenu()
+      }
+    }
     if (this.homeSearchOpen) {
       HomeDeckSearchDialog({ decks: this.主页快照数据.decks, hiddenIds: this.隐藏的牌组ID集合, loadState: this.加载状态,
         onClose: (): void => { this.homeSearchOpen = false; }, onRetry: (): void => { this.加载主页数据(); },
@@ -2022,6 +2103,7 @@ struct 首页 {
   @Builder
   private deckDetails(compact: boolean) {
     HomeDeckDetails({ compact: compact, isDark: this.是否深色(), optionsBusy: this.deckOptionsBusy,
+      headerActionHeight: this.detailHeaderActionHeight(),
       historyRefreshToken: this.historyRefreshToken,
       onBackHandlerChange: (handler: (() => boolean) | null): void => { this.deckDetailsBackHandler = handler; },
       deckId: this.选中的牌组ID,
@@ -2037,6 +2119,12 @@ struct 首页 {
       onRenameDeck: (): void => { this.openDeckRename(this.选中的牌组ID); },
       onExport: (): void => { this.打开数据迁移('exportDeck', Number(this.选中的牌组ID), false); },
       onOptions: (): void => { this.打开牌组选项(); } })
+  }
+
+  private detailHeaderActionHeight(): number {
+    if (this.排序模式中) return 0;
+    return this.homeActionAnchor.width > 0 ? homeHeaderGeometry(this.homeActionAnchor.width,
+      应用尺寸.页面分组间距(this.narrowDeckLayout), this.显示今日进度卡, 应用尺寸.按钮高度).actionsHeight : 应用尺寸.按钮高度;
   }
 
   @Builder
@@ -2256,6 +2344,7 @@ struct 首页 {
       .height('100%')
       .backgroundColor(this.页面底色微染值)
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+      .onAreaChange((_old: Area, area: Area): void => { this.homeMenuHostChanged(area); })
       .opacity(this.homeTransitionOpacity)
     }
     .hideTitleBar(true)
