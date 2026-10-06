@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-04",
+  "updatedAt": "2026-10-07",
   "author": {
     "name": "可塑性天赋",
     "url": "https://jidecards.com/about/",
@@ -25,6 +25,20 @@
       "license": "AGPL-3.0-or-later",
       "releaseVersion": "2.9.6",
       "releaseVersionSource": "2026-10-01 作者确认当前应用市场上线版本",
+      "sourceVersion": "2.9.22",
+      "sourceVersionCode": 3003,
+      "sourceUpdate": {
+        "updatedAt": "2026-10-07",
+        "changes": [
+          "首页牌组布局、常驻同步状态、牌组背景与菜单交互更新。",
+          "笔记编辑新增工具转盘，完善富文本、挖空、音频与数学公式草稿预览。",
+          "学习卡片预加载与 Web 缓冲更新，修复牌组预览和卡片视口。",
+          "完善学习白板与透明卡面批注，修复 Pen Kit 挂载、后台回调和不可用时的回退。",
+          "修复统计范围、学习提醒与桌面卡片存储生命周期。",
+          "统一公共控件和设置图标，更新幻彩主题解锁反馈及 JIDE 界面认知。",
+          "完善 JIDE 上下文预算、取消状态与推理历史兼容。"
+        ]
+      },
       "developmentPriority": "项目优先服务 Agent 开发",
       "url": "https://jidecards.com/works/jidecards/",
       "repository": "https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos",

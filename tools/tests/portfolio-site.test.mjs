@@ -3,6 +3,7 @@ import { access, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import test from 'node:test';
+import JSON5 from 'json5';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const read = file => readFile(path.join(root, 'hosting', file), 'utf8');
@@ -36,6 +37,25 @@ test('release facts stay consistent across human and machine entry points', asyn
   for (const file of [...pages, 'data/works.json', 'llms.txt', 'llms-full.txt']) {
     assert.doesNotMatch(await read(file), /无为又作局|无谓又左|2\.0\.0|3\.0\.0|jideyanggeqi\.cn|超/, file);
   }
+});
+
+test('source updates match application metadata and remain separate from marketplace facts', async () => {
+  const { app } = JSON5.parse(await readFile(path.join(root, 'AppScope/app.json5'), 'utf8'));
+  assert.equal(work.sourceVersion, app.versionName);
+  assert.equal(work.sourceVersionCode, app.versionCode);
+  for (const file of ['index.html', 'works/jidecards/index.html', 'llms.txt', 'llms-full.txt']) {
+    assert.ok((await read(file)).includes(work.sourceVersion), file);
+  }
+  const product = await read('works/jidecards/index.html');
+  const fullText = await read('llms-full.txt');
+  for (const change of work.sourceUpdate.changes) {
+    assert.ok(product.includes(change));
+    assert.ok(fullText.includes(change));
+  }
+  const graph = JSON.parse(product.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1])['@graph'];
+  assert.equal(graph.find(item => item['@type'] === 'SoftwareApplication').softwareVersion, work.releaseVersion);
+  assert.equal(graph.find(item => item['@type'] === 'SoftwareSourceCode').version, work.sourceVersion);
+  assert.ok(product.includes('商店下载版本以应用市场为准'));
 });
 
 test('home offers separate entry points while development policy stays on its own page', async () => {

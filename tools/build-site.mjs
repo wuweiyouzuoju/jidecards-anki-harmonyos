@@ -3,12 +3,20 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import JSON5 from 'json5';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const hosting = path.join(root, 'hosting');
 const data = JSON.parse(await readFile(path.join(hosting, 'data/works.json'), 'utf8'));
 const guide = JSON.parse(await readFile(path.join(hosting, 'data/harmonyos-anki-guide.json'), 'utf8'));
 const work = data.works[0];
+const { app } = JSON5.parse(await readFile(path.join(root, 'AppScope/app.json5'), 'utf8'));
+// 源码版本由应用配置生成；商店版本仍使用作者确认的上架记录。
+if (work.sourceVersion !== app.versionName || work.sourceVersionCode !== app.versionCode) {
+  work.sourceVersion = app.versionName;
+  work.sourceVersionCode = app.versionCode;
+  await writeFile(path.join(hosting, 'data/works.json'), `${JSON.stringify(data, null, 2)}\n`, 'utf8');
+}
 const author = data.author;
 const origin = 'https://jidecards.com';
 const repo = work.repository;
@@ -73,12 +81,14 @@ function page({ title, description, pathname, body, graph = [], noindex = false,
 const download = `<div class="actions"><a class="button" href="${esc(work.marketplace.url)}">打开华为应用市场 <span aria-hidden="true">↗</span></a><span class="meta">搜索「记得闪卡」 · 正式版 ${esc(work.releaseVersion)}${work.marketplace.price === 0 ? ' · 免费下载' : ''}</span></div>`;
 const theme = `<div class="theme-note"><span class="theme-swatch" aria-hidden="true"></span><p><strong>${esc(work.promotion.title)}</strong><span>${esc(work.promotion.description)}</span></p><a href="/works/jidecards/#appearance">详情 →</a></div>`;
 const jide = work.detailSections.find(section => section.id === 'jide');
+const sourceUpdate = `<section id="source-update"><h2>源码更新 ${esc(work.sourceVersion)}</h2><p class="meta">${esc(work.sourceUpdate.updatedAt)} · 构建编号 ${work.sourceVersionCode} · 商店下载版本以应用市场为准</p><ul>${work.sourceUpdate.changes.map(change => `<li>${esc(change)}</li>`).join('')}</ul></section>`;
 const home = page({
   title: work.seo.homeTitle, description: work.summary, pathname: '/',
   graph: [{ '@type': 'WebSite', name: '记得闪卡 · jidecards', url: origin, author: { '@id': `${origin}/#author` } }, application],
   body: `<section class="intro"><p class="eyebrow">鸿蒙 HarmonyOS NEXT · 原生开源闪卡</p><h1>记得闪卡</h1>
     <p class="lede">${esc(work.summary)}</p>${download}</section>
     ${theme}
+    <p class="meta">当前源码版本 ${esc(work.sourceVersion)} · <a href="/works/jidecards/#source-update">查看本次更新 →</a></p>
     <nav class="entry-grid" aria-label="站点入口">
       <a class="entry" href="/works/jidecards/"><strong>功能与截图 <span aria-hidden="true">→</span></strong><span>学习、同步、卡片管理与外观</span></a>
       <div class="entry"><strong>开源代码 <span aria-hidden="true">↗</span></strong><span>源码、版本记录与问题反馈</span><span>${repositoryLinks}</span></div>
@@ -91,9 +101,10 @@ const features = work.featureGroups.map(group => `<div><dt>${esc(group.name)}</d
 const useCases = work.useCases.map(item => `<div><dt>${esc(item.name)}</dt><dd>${esc(item.description)}</dd></div>`).join('\n');
 const product = page({
   title: work.seo.productTitle, description: work.summary, pathname: '/works/jidecards/', breadcrumbTitle: '下载与功能',
-  graph: [application, { '@type': 'SoftwareSourceCode', name: 'jidecards', codeRepository: repositories.map(repository => repository.url), programmingLanguage: ['ArkTS', 'Rust', 'C++'], license: 'https://spdx.org/licenses/AGPL-3.0-or-later.html' }],
-  body: `<p class="eyebrow">功能与下载</p><h1>记得闪卡 <small>${esc(work.releaseVersion)}</small></h1><p class="lede">${esc(work.summary)}</p>
+  graph: [application, { '@type': 'SoftwareSourceCode', name: 'jidecards', version: work.sourceVersion, dateModified: work.sourceUpdate.updatedAt, codeRepository: repositories.map(repository => repository.url), programmingLanguage: ['ArkTS', 'Rust', 'C++'], license: 'https://spdx.org/licenses/AGPL-3.0-or-later.html' }],
+  body: `<p class="eyebrow">功能与下载</p><h1>记得闪卡</h1><p class="lede">${esc(work.summary)}</p>
     <section id="download" class="download-block"><h2>下载</h2>${download}<p class="meta">适用于 ${esc(work.platform)}。应用已上架华为应用市场。</p></section>
+    ${sourceUpdate}
     <section id="learning"><h2>在鸿蒙端用闪卡学习</h2><dl class="feature-list">${useCases}</dl></section>
     <section id="features"><h2>功能</h2><dl class="feature-list">${features}</dl></section>
     <section class="product-details"><h2>进一步了解记得闪卡</h2><nav class="toc" aria-label="功能目录"><ul>${work.detailSections.map(section => `<li><a href="#${esc(section.id)}">${esc(section.title)}</a></li>`).join('')}</ul></nav>${work.detailSections.map(section => `<section id="${esc(section.id)}"><h3>${esc(section.title)}</h3>${section.paragraphs.map(paragraph => `<p>${esc(paragraph)}</p>`).join('')}${section.availability ? `<p class="note">${esc(section.availability)}</p>` : ''}${section.items ? `<dl class="questions">${section.items.map(item => `<div><dt>${esc(item.name)}</dt><dd>${esc(item.description)}${item.example ? `<p class="meta">可以这样说：“${esc(item.example)}”</p>` : ''}</dd></div>`).join('')}</dl>` : ''}</section>`).join('')}</section>
@@ -139,6 +150,8 @@ ${work.summary}
 
 - 作者：${author.name}
 - 华为应用市场上线版本：${work.releaseVersion}
+- 当前源码版本：${work.sourceVersion}（构建编号 ${work.sourceVersionCode}）
+- 源码更新：${work.url}#source-update
 - ${work.promotion.title}：${work.promotion.description}
 - 许可证：${work.license}
 - 首页：${origin}/
@@ -157,6 +170,12 @@ ${work.repositoryMirrors.map(repository => `- ${repository.name} 源码：${repo
 独立开源项目，非 Anki 官方客户端。
 `;
 const fullText = `${shortText}
+## 源码更新 ${work.sourceVersion}
+
+更新日期：${work.sourceUpdate.updatedAt}。商店下载版本以应用市场为准。
+
+${work.sourceUpdate.changes.map(change => `- ${change}`).join('\n')}
+
 ## 学习用途
 
 ${work.useCases.map(item => `- ${item.name}：${item.description}`).join('\n')}

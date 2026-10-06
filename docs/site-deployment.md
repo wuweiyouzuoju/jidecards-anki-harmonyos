@@ -35,6 +35,8 @@ python -c 'from PIL import Image; from pathlib import Path; icon = Image.open("A
 
 上线版本由作者确认后写入 `releaseVersion`，不从源码版本推断商店版本。当前确认日期与版本见 `hosting/data/works.json` 的 `releaseVersionSource` 和 `releaseVersion`。
 
+源码版本由生成器读取 `AppScope/app.json5`，同步生成 `works.json` 的 `sourceVersion` / `sourceVersionCode`。源码更新日期与条目维护在 `sourceUpdate`；首页、功能页、源码结构化数据和 llms 文本共享这些事实。未推送的源码更新也可单独发布网站，更新条目展示在功能页，不链接尚不存在的远端发布文件。
+
 ## 自动部署
 
 工作流：`.github/workflows/site-deploy.yml`，修改网站或生成器后推送 `main` 可触发。

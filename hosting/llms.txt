@@ -4,6 +4,8 @@
 
 - 作者：可塑性天赋
 - 华为应用市场上线版本：2.9.6
+- 当前源码版本：2.9.22（构建编号 3003）
+- 源码更新：https://jidecards.com/works/jidecards/#source-update
 - 幻彩限时主题色：领取方式见应用内说明。
 - 许可证：AGPL-3.0-or-later
 - 首页：https://jidecards.com/
