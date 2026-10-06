@@ -7,7 +7,7 @@ export enum DeckPreviewScope {
 }
 
 export interface DeckPreviewBackend {
-  cardIds(deckId: string, scope: DeckPreviewScope): Promise<number[]>;
+  cardIds(deckId: string, scope: DeckPreviewScope, filesDir: string): Promise<number[]>;
 }
 
 /** 只持有本次列表读取，预览位置与正式学习会话相互独立。 */
@@ -26,11 +26,11 @@ export class DeckPreviewSession {
     this.invalidate();
   }
 
-  async load(deckId: string, scope: DeckPreviewScope): Promise<number[] | null> {
+  async load(deckId: string, scope: DeckPreviewScope, filesDir: string): Promise<number[] | null> {
     if (this.disposed) return null;
     const generation: number = ++this.generation;
     try {
-      const ids: number[] = await this.backend.cardIds(deckId, scope);
+      const ids: number[] = await this.backend.cardIds(deckId, scope, filesDir);
       if (this.disposed || generation !== this.generation) return null;
       if (ids.some((id: number): boolean => !Number.isSafeInteger(id) || id <= 0)) {
         throw new Error('Invalid preview card ID');

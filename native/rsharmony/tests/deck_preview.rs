@@ -199,6 +199,36 @@ fn preview(f: &Fixture, deck_id: i64, scope: u32) -> Vec<i64> {
     .card_ids
 }
 
+#[test]
+fn legacy_preview_search_rpc_accepts_deck_ids_and_omitted_sort_order() {
+    use anki_proto::search::{search_node::Filter, SearchNode, SearchRequest, SearchResponse};
+    let f = fixture();
+    let before = data(&f.backend);
+    let query = SearchNode {
+        filter: Some(Filter::ParsableText("did:1".into())),
+    };
+    let search = f
+        .backend
+        .run_service_method(29, 0, &query.encode_to_vec())
+        .unwrap();
+    let search = anki_proto::generic::String::decode(search.as_slice()).unwrap();
+    let request = SearchRequest {
+        search: search.val,
+        order: None,
+    };
+    let response = f
+        .backend
+        .run_service_method(29, 1, &request.encode_to_vec())
+        .unwrap();
+    let mut ids = SearchResponse::decode(response.as_slice()).unwrap().ids;
+    ids.sort_unstable();
+    // The old frontend expanded descendants separately; did: itself is supported.
+    let mut expected = preview(&f, 1, 3);
+    expected.retain(|id| *id != f.child);
+    assert_eq!(ids, expected);
+    assert_eq!(before, data(&f.backend));
+}
+
 fn query(backend: &Backend, sql: &str) -> Vec<u8> {
     backend
         .run_db_command_bytes(

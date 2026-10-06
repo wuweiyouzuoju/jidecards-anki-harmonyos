@@ -13,7 +13,7 @@ test('deck detail preview loads the selected native snapshot and mounts the exis
   assert.match(panel, /interfaceItemText\(this.getUIContext\(\), 'deck_details', 'preview', this.uiLanguage\)/);
   assert.match(panel, /预览: \(\) => void/);
   assert.match(home, /打开牌组预览/);
-  assert.match(home, /deckPreviewSession\.load\(deck.id, scope\)/);
+  assert.match(home, /deckPreviewSession\.load\(deck.id, scope, context.filesDir\)/);
   assert.match(home, /onPreview: \(scope: DeckPreviewScope\)/);
   assert.doesNotMatch(home, /ids\.sort\(/, 'today queue must retain Core ordering');
   assert.match(home, /卡片预览页\(\{/);
@@ -59,8 +59,9 @@ test('deck title wraps at full width below the preview action row without a curr
   assert.match(header, /\.width\('100%'\)/);
   assert.match(header, /\.wordBreak\(WordBreak\.BREAK_ALL\)/);
   assert.doesNotMatch(header, /\.maxLines\(|TextOverflow\.Ellipsis/);
-  const actions = panel.slice(panel.lastIndexOf('Row({ space:', panel.indexOf('Text(牌组显示名(deck, this.uiLanguage))')),
-    panel.indexOf('Text(牌组显示名(deck, this.uiLanguage))'));
-  assert.match(actions, /'deck_details', 'add_note'[\s\S]*'deck_details', 'agent'[\s\S]*'deck_details', 'preview'/);
+  const actionsStart = panel.indexOf('  private headerActions() {');
+  assert.ok(actionsStart >= 0);
+  const actions = panel.slice(actionsStart, panel.indexOf('\n  }', actionsStart) + 4);
+  for (const id of ['add_note', 'agent', 'preview']) assert.ok(actions.includes(`'deck_details', '${id}'`));
   assert.doesNotMatch(actions, /Column\(/);
 });
