@@ -1,22 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { SurfaceBorder } from '../utils/SurfaceBorder';
-import { MenuSurface } from './common/MenuSurface';
+import { HomeActionAnchor } from '../model/HomeHeaderLayout';
 import { PressFeedback } from '../utils/PressFeedback';
 import { AppInterfaceItem, AppInterfaceControl, visibleInterfaceItems } from '../model/AppInterface';
 import { appInterface } from '../backend/AppInterfaceService';
 import { interfaceItemText } from '../utils/AppInterfaceText';
 import { ExpansionReveal } from '../utils/ExpansionReveal';
 import { DisclosureChevron } from './common/DisclosureChevron';
+import { IconActionButton } from './common/IconActionButton';
 import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../model/ReleaseFeatures';
 import { GlassSurface } from '../utils/GlassSurface';
 import { GLASS_COLORS_KEY, GLASS_HIGHLIGHT_COLORS } from '../model/ThemeCatalog';
-import { ThemeTextSpans } from './common/ThemeText';
-import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 import { DeckStudyHistoryCard } from './DeckStudyHistoryCard';
 import { deckHistorySearch } from '../model/DeckStudyHistory';
 import { PAGE_COMPACT_LAYOUT_KEY } from '../model/AppLayoutState';
-import { DeckPreviewScopeMenu } from './home/DeckPreviewScopeMenu';
-import { DeckPreviewScope } from '../model/DeckPreviewSession';
 
 import { 牌组汇总, 主页快照, 牌组显示名 } from '../model/主页模型';
 import { 应用尺寸 } from '../utils/应用尺寸';
@@ -59,15 +56,13 @@ import { 颜色键 } from '../model/颜色主题';
 export struct 牌组详情面板 {
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
-  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @StorageProp(GLASS_COLORS_KEY) private glassColors: string[] = GLASS_HIGHLIGHT_COLORS;
   @StorageLink(AI_AGENT_CHANNELS_APP_STORAGE_KEY) @Watch('publishInterface') private Agent入口已启用: boolean = false;
   @Prop historyRefreshToken: number = 0;
   @Prop @Watch('publishInterface') showHeaderActions: boolean = true;
-  @Prop previewMenuOpen: boolean = false;
+  @Prop @Watch('publishInterface') headerActionHeight: number = 应用尺寸.按钮高度;
   @Prop previewBusy: boolean = false;
-  onPreviewMenuClose: () => void = (): void => {};
-  onPreviewScope: (scope: DeckPreviewScope) => void = (_scope: DeckPreviewScope): void => {};
+  onActionAnchorChange: (anchor: HomeActionAnchor) => void = (_anchor: HomeActionAnchor): void => {};
   @StorageProp('导航条高度') private navigationBottomInset: number = 0;
   @Prop 是否深色: boolean = false;
   // 注：@Consume key 字符串 'selectedDeckId' / 'snapshot' 与 Index.ets 的 @Provide 配对，保留不动。
@@ -121,6 +116,12 @@ export struct 牌组详情面板 {
     appInterface.observe({ surface: 'deck_details', sectionId: this.showHeaderActions ? 'wide' : 'compact',
       selectedId: deck.id, optionIds: [], optionLabels: [], busy: this.牌组选项加载中,
       values: [{ id: 'name', value: 牌组显示名(deck) }, { id: 'core_name', value: deck.fullName },
+        { id: 'header_actions_position', value: this.showHeaderActions ?
+          (this.headerActionHeight > 0 ? 'above_card' : 'hidden') : 'toolbar_right' },
+        { id: 'header_actions_style', value: 'icons' },
+        { id: 'header_actions_layout', value: this.showHeaderActions ? (this.headerActionHeight > 0 ?
+          (this.Agent入口已启用 ? 'add_note:left,agent:after_add_note,preview:right' : 'add_note:left,preview:right') : 'hidden') :
+          (this.Agent入口已启用 ? 'add_note:right_group,agent:right_group,preview:right_group' : 'add_note:right_group,preview:right_group') },
         { id: 'local_display_name', value: deck.displayName }, { id: 'description', value: deck.description },
         { id: 'total', value: String(deck.totalCards) }, { id: 'new', value: String(deck.newCount) },
         { id: 'learning', value: String(deck.learningCount) }, { id: 'review', value: String(deck.reviewCount) }] });
@@ -157,36 +158,45 @@ export struct 牌组详情面板 {
   }
 
   @Builder
-  private creationAction(label: ResourceStr, action: () => void, secondary: boolean = false) {
-    Button({ type: ButtonType.Normal }) {
-      Text() {
-        if (secondary) {
-          Span(label)
-        } else {
-          ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(label, this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale)
-        }
-      }
-      .fontSize(应用尺寸.字号_按钮)
-      .fontColor(secondary ? $r('app.color.text_tertiary') : this.动作主色)
-      .width('100%')
-      .textAlign(TextAlign.Center)
-      .maxLines(1)
-      .textOverflow({ overflow: TextOverflow.Ellipsis })
-    }
-    .height(应用尺寸.按钮高度)
-    .layoutWeight(1)
-    .constraintSize({ minWidth: 0 })
-    .padding({ left: 应用尺寸.间距_4, right: 应用尺寸.间距_4 })
-    .backgroundColor(Color.Transparent)
-    .enabled(this.选中牌组Id !== '')
-    .attributeModifier(new PressFeedback())
-    .stateEffect(false)
-    .onClick((): void => { action(); })
+  private creationAction(source: ResourceStr, label: ResourceStr, action: () => void,
+    isInteractive: boolean = true) {
+    IconActionButton({ toolbarStyle: true, source: source, label: label,
+      controlSize: this.headerActionHeight, controlWidth: this.headerActionHeight,
+      controlGlyphSize: Math.min(18, this.headerActionHeight * 0.46),
+      isInteractive: this.选中牌组Id !== '' && isInteractive, onAction: action })
   }
 
   @Builder
-  private previewScopes() {
-    DeckPreviewScopeMenu({ onSelect: (scope: DeckPreviewScope): void => { this.onPreviewScope(scope); } })
+  private headerActions() {
+    // 制卡和 JIDE 共用左侧工具组，预览始终贴齐卡片右缘。
+    Row() {
+      ForEach(this.主页快照数据.decks, (deck: 牌组汇总) => {
+        if (deck.id === this.选中牌组Id) {
+          Row({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout) }) {
+            this.creationAction($r('app.media.ic_study_edit'),
+              interfaceItemText(this.getUIContext(), 'deck_details', 'add_note', this.uiLanguage), (): void => { this.添加卡片(); })
+            if (this.Agent入口已启用) {
+              this.creationAction($r('app.media.ic_study_agent'),
+                interfaceItemText(this.getUIContext(), 'deck_details', 'agent', this.uiLanguage), (): void => { this.onCreateWithAI(); })
+            }
+          }
+          Blank()
+          this.creationAction($r('app.media.ic_common_preview'),
+            interfaceItemText(this.getUIContext(), 'deck_details', 'preview', this.uiLanguage),
+            (): void => { this.预览(); }, !this.previewBusy)
+        }
+      }, (deck: 牌组汇总): string => deck.id)
+    }
+    .width('100%')
+    .height(this.headerActionHeight)
+    .alignItems(VerticalAlign.Center)
+    .flexShrink(0)
+    .margin({ bottom: 应用尺寸.页面内容顶部间距(this.narrowDeckLayout) })
+    .onAreaChange((_old: Area, area: Area): void => {
+      this.onActionAnchorChange({ left: Number(area.globalPosition.x),
+        top: Number(area.globalPosition.y) + Number(area.height) + 应用尺寸.页面内容顶部间距(this.narrowDeckLayout),
+        width: Number(area.width) });
+    })
   }
 
   // ========================================================
@@ -194,7 +204,7 @@ export struct 牌组详情面板 {
   // @名称 牌组详情面板主渲染
   //
   // @作用
-  // 直接展示详情时三个操作位于名称上方；手机由顶栏菜单承接，开始学习独立固定。
+  // 宽屏操作位于名称上方，手机操作在顶栏右侧直接展示；开始学习独立固定。
   //
   // @输入
   // @Consume 主页快照数据 + 选中牌组Id（直接在 build() 内 ForEach + if 建立响应式依赖）。
@@ -215,6 +225,7 @@ export struct 牌组详情面板 {
   build() {
     Stack() {
       Column() {
+      if (this.showHeaderActions && this.headerActionHeight > 0) { this.headerActions() }
       // B12-Y2 2026-07-23：Scroll 包裹，"更多"展开后内容超出时可滚动，开始学习按钮 不被推出边界
       Scroll(this.moreReveal.scroller) {
       Column({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout) }) {
@@ -225,36 +236,6 @@ export struct 牌组详情面板 {
         // 直接用 deck.totalCards 等渲染，不经过 @State 中转。
         ForEach(this.主页快照数据.decks, (deck: 牌组汇总) => {
           if (deck.id === this.选中牌组Id) {
-            // 直接展示详情时操作在名称上方；手机操作由顶栏菜单承接。
-            if (this.showHeaderActions) {
-              Row({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout) }) {
-                this.creationAction(interfaceItemText(this.getUIContext(), 'deck_details', 'add_note', this.uiLanguage), (): void => { this.添加卡片(); })
-                if (this.Agent入口已启用) {
-                  this.creationAction(interfaceItemText(this.getUIContext(), 'deck_details', 'agent', this.uiLanguage), (): void => { this.onCreateWithAI(); })
-                }
-                Row() {
-                  this.creationAction(interfaceItemText(this.getUIContext(), 'deck_details', 'preview', this.uiLanguage), (): void => { this.预览(); }, true)
-                }
-                .layoutWeight(1)
-                .constraintSize({ minWidth: 0 })
-                .enabled(!this.previewBusy)
-                .bindPopup(this.previewMenuOpen, {
-                  builder: this.previewScopes,
-                  placement: Placement.Bottom,
-                  popupColor: $r('app.color.menu_surface'),
-                  enableArrow: true,
-                  arrowWidth: MenuSurface.pointerSpan,
-                  arrowHeight: MenuSurface.pointerDepth,
-                  radius: 应用尺寸.圆角_指标卡,
-                  transition: MenuSurface.popupTransition(),
-                  onStateChange: (event: PopupStateChangeParam): void => {
-                    if (!event.isVisible) this.onPreviewMenuClose();
-                  }
-                })
-              }
-              .width('100%')
-              .alignItems(VerticalAlign.Center)
-            }
             Text(牌组显示名(deck, this.uiLanguage))
               .fontSize(应用尺寸.字号_牌组标题)
               .fontWeight(FontWeight.Bold)
@@ -425,7 +406,7 @@ export struct 牌组详情面板 {
     .padding({
       left: 应用尺寸.页面内边距_水平,
       right: 应用尺寸.页面内边距_水平,
-      top: 应用尺寸.页面内容顶部间距(this.narrowDeckLayout)
+      top: this.showHeaderActions && this.headerActionHeight > 0 ? 0 : 应用尺寸.页面内容顶部间距(this.narrowDeckLayout)
     })
   }
 }

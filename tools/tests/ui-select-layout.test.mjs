@@ -223,8 +223,11 @@ test('shared menu surfaces distinguish dark overlays from cards and retain reada
   }
   assert.doesNotMatch(read('components/home/DeckPreviewScopeMenu.ets'), /new MenuSurface\(|\.border\(|\.shadow\(/,
     'the native popup owns the preview outline including its arrow');
+  assert.match(read('components/home/HomeDeckDetails.ets'), /AnchoredMenu\(\{[\s\S]*this\.previewScopes\(\)/);
+  assert.match(read('components/common/AnchoredMenu.ets'), /new MenuSurface\(this\.surfaceVisible, this\.cornerRadius\)/);
+  assert.match(read('components/common/AnchoredMenu.ets'), /surfaceVisible: boolean = true/);
   for (const path of ['components/home/HomeDeckDetails.ets', 'components/牌组详情面板.ets']) {
-    assert.match(read(path), /popupColor: \$r\('app\.color\.menu_surface'\)/);
+    assert.doesNotMatch(read(path), /bindPopup\(/, 'preview menus share the verified menu surface');
   }
 });
 
