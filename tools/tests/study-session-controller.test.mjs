@@ -97,6 +97,53 @@ for (const phase of ['marking', 'flagLabels']) {
   });
 }
 
+test('prepared candidates speed up rendering but actual Core queue states and metadata stay authoritative', async () => {
+  const h = harness(), renderedIds = [];
+  const candidate = { ...h.card, cardId: 43, noteId: 143 };
+  h.backend.queuedCards = async () => ({ cards: [h.card, candidate] });
+  h.backend.renderCard = async id => { renderedIds.push(id); return { id }; };
+  await h.session.loadNext(1, () => true);
+  await h.session.prepareNextCard();
+  assert.deepEqual(renderedIds, [42, 43]); assert.deepEqual(h.calls, []);
+  await h.session.answer(h.card, 2, 1000, 750);
+  const actual = { ...candidate, states: { ...candidate.states, good: new Uint8Array([99, 1, 255]) } };
+  h.backend.queuedCards = async () => ({ cards: [actual], reviewCount: 9 });
+  h.backend.marking = async () => ({ flag: 7, marked: true });
+  const snapshot = await h.session.loadNext(1, () => true);
+  assert.deepEqual(renderedIds, [42, 43]);
+  assert.equal(snapshot.card, actual); assert.equal(snapshot.queue.reviewCount, 9);
+  assert.deepEqual(snapshot.marking, { flag: 7, marked: true });
+  await h.session.answer(snapshot.card, 2, 1200, 1100);
+  assert.equal(h.calls.at(-1).newState, actual.states.good);
+});
+
+test('Core choosing a different next card or undo invalidates speculative contents', async () => {
+  for (const action of ['different', 'undo', 'clear']) {
+    const h = harness(), renderedIds = [], candidate = { ...h.card, cardId: 43 };
+    h.backend.queuedCards = async () => ({ cards: [h.card, candidate] });
+    h.backend.renderCard = async id => { renderedIds.push(id); return { id }; };
+    await h.session.loadNext(1, () => true); await h.session.prepareNextCard();
+    if (action === 'undo') await h.session.undo();
+    if (action === 'clear') h.session.clearPreparedCard();
+    const actualId = action === 'different' ? 44 : 43;
+    h.backend.queuedCards = async () => ({ cards: [{ ...candidate, cardId: actualId }] });
+    const snapshot = await h.session.loadNext(1, () => true);
+    assert.equal(snapshot.rendered.id, actualId);
+    assert.deepEqual(renderedIds, [42, 43, actualId], action);
+  }
+});
+
+test('background preparation retains collection priority until it finishes after disposal', async () => {
+  const h = harness(), gate = deferred();
+  h.backend.queuedCards = async () => ({ cards: [h.card, { ...h.card, cardId: 43 }] });
+  h.backend.renderCard = id => id === 43 ? gate.promise : Promise.resolve({ id });
+  await h.session.loadNext(1, () => true);
+  const preparing = h.session.prepareNextCard(); await turn(); h.session.dispose();
+  assert.equal(h.scheduler.canSync(), false);
+  gate.resolve({ id: 43 }); await preparing;
+  assert.equal(h.scheduler.canSync(), true);
+});
+
 test('each successful rating preserves raw bytes and queues one coalesced intent without starting sync', async () => {
   const { session, card, calls, scheduler } = harness();
   const choices = ['again', 'hard', 'good', 'easy'];

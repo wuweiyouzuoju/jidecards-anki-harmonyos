@@ -53,7 +53,7 @@ export class AnkiStudySessionBackend implements StudySessionBackend {
   async removeCard(cardId: number): Promise<void> { await this.cards.删除卡片([cardId]); }
   async unburyDeck(deckId: number): Promise<void> { await this.scheduler.按牌组恢复埋藏(deckId, UNBURY_MODE_ALL); }
   async canUndo(): Promise<boolean> { return (await this.collection.获取撤销状态()).undo.length > 0; }
-  queuedCards(deckId: number): Promise<QueuedCardsView> { return this.scheduler.获取队首卡片(deckId); }
+  queuedCards(deckId: number): Promise<QueuedCardsView> { return this.scheduler.获取队首卡片(deckId, 2); }
   renderCard(cardId: number): Promise<RenderedCard> { return this.renderer.渲染既有卡片(cardId); }
   async choiceQuestion(noteId: number): Promise<JideChoiceQuestion | null> {
     const note = await this.notes.获取笔记(noteId);

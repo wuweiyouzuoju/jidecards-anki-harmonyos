@@ -5,6 +5,7 @@ import type { RenderedCard } from '../proto/messages/CardRenderingMessages';
 import { AutoSyncScheduler, autoSyncScheduler } from './AutoSyncScheduler';
 import { SyncActivity, syncActivity } from './SyncSettings';
 import { StudyOptions } from './StudyTiming';
+import { CardRenderPrefetch } from './CardRenderPrefetch';
 import type { JideChoiceQuestion } from './JideChoice';
 import { ReviewPreferences } from '../proto/messages/PreferencesMessages';
 import type { CardMarkingState, FlagLabels } from './CardMarking';
@@ -64,6 +65,8 @@ export class StudySessionController {
   private timeboxNotice: StudyTimeboxNotice | null = null;
   private customSchedulingScript: string = '';
   private acknowledgedScript: string = '';
+  private renderPrefetch: CardRenderPrefetch;
+  private nextRenderId: number = 0;
 
   needsCustomSchedulingAcknowledgement(): boolean {
     return this.customSchedulingScript.trim() !== '' && this.customSchedulingScript !== this.acknowledgedScript;
@@ -78,6 +81,22 @@ export class StudySessionController {
     this.scheduler = scheduler;
     this.activity = activity;
     this.now = now;
+    this.renderPrefetch = new CardRenderPrefetch((id: number): Promise<RenderedCard> => backend.renderCard(id), now);
+  }
+
+  clearPreparedCard(): void {
+    this.nextRenderId = 0;
+    this.renderPrefetch.clear();
+  }
+
+  /** 当前题面显示后再准备 Core 给出的候选；不提前提交评分或采用候选的调度状态。 */
+  async prepareNextCard(): Promise<void> {
+    const id: number = this.nextRenderId;
+    if (this.disposed || id <= 0 || this.activity.isCollectionBusy()) return;
+    this.beginOperation();
+    try {
+      await this.renderPrefetch.prepare(id);
+    } finally { this.endOperation(); }
   }
 
   activate(): void {
@@ -88,12 +107,14 @@ export class StudySessionController {
   }
 
   markComplete(): void {
+    this.clearPreparedCard();
     this.pauseTimebox();
     this.complete = true;
     this.updateAvailability();
   }
 
   dispose(): void {
+    this.clearPreparedCard();
     this.pauseTimebox();
     this.timeboxNotice = null;
     this.disposed = true;
@@ -101,6 +122,7 @@ export class StudySessionController {
   }
 
   async loadNext(deckId: number, isCurrent: () => boolean): Promise<StudySnapshot | null> {
+    this.nextRenderId = 0;
     this.beginOperation();
     try {
       await this.activity.waitForCollection();
@@ -114,7 +136,8 @@ export class StudySessionController {
       if (this.disposed || !isCurrent()) return null;
       const card: StudyCard | null = queue.cards.length === 0 ? null : queue.cards[0];
       if (card === null) return { queue: queue, canUndo: canUndo, card: null, rendered: null, labels: [], options: new StudyOptions(), choiceQuestion: null, preferences: preferences, marking: null, flagLabels: {} };
-      const rendered: RenderedCard = await this.backend.renderCard(card.cardId);
+      // 评分后仍先重新读 Core 队首；只对确认相同的卡复用预加载 HTML。
+      const rendered: RenderedCard = await this.renderPrefetch.read(card.cardId);
       if (this.disposed || !isCurrent()) return null;
       const options: StudyOptions = await this.backend.studyOptions(card.cardId);
       if (this.disposed || !isCurrent()) return null;
@@ -128,6 +151,7 @@ export class StudySessionController {
       const flagLabels: FlagLabels = this.backend.flagLabels === undefined ? {} : await this.backend.flagLabels();
       if (this.disposed || !isCurrent()) return null;
       this.customSchedulingScript = options.customSchedulingScript ?? '';
+      this.nextRenderId = queue.cards.length > 1 ? queue.cards[1].cardId : 0;
       return { queue: queue, canUndo: canUndo, card: card, rendered: rendered, labels: labels, options: options,
         choiceQuestion: choiceQuestion, preferences: preferences, marking: marking, flagLabels: flagLabels };
     } finally {
@@ -162,7 +186,7 @@ export class StudySessionController {
       answeredAtMillis: now, millisecondsTaken: Math.max(0, now - shownAt)
     };
     this.pauseTimebox();
-    await this.commitChange((): Promise<void> => this.backend.answer(input));
+    await this.commitChange((): Promise<void> => this.backend.answer(input), true);
     if (!this.disposed) {
       this.timeboxAnswers++;
       this.pauseTimebox();
@@ -256,7 +280,8 @@ export class StudySessionController {
   }
 
   /** 写入完成才通知同步；销毁页面不撤回已提交的写入，也不能提前释放集合占用。 */
-  async commitChange(write: () => Promise<void>): Promise<void> {
+  async commitChange(write: () => Promise<void>, preservePreparedCard: boolean = false): Promise<void> {
+    if (!preservePreparedCard) this.clearPreparedCard();
     this.beginOperation();
     try {
       await this.activity.waitForCollection();

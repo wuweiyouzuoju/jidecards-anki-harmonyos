@@ -76,13 +76,13 @@ export class 调度器服务 {
   private readonly 会话: 后端会话 = 后端会话.获取实例();
 
   /**
-   * 拉取指定牌组的队首卡片（最多 1 张）。
+   * 拉取指定牌组的队首卡片；学习可多取一张作为内容预加载候选。
    * 先 设置当前牌组（Anki 队列按当前牌组构建），再 获取队首卡片。
    * 返回空 cards 表示该牌组当前无待学习卡片。
    */
-  async 获取队首卡片(牌组ID: number): Promise<QueuedCardsView> {
+  async 获取队首卡片(牌组ID: number, fetchLimit: number = 1): Promise<QueuedCardsView> {
     await this.设置当前牌组(牌组ID);
-    const 请求字节: Uint8Array = encodeGetQueuedCardsRequest(1, false);
+    const 请求字节: Uint8Array = encodeGetQueuedCardsRequest(fetchLimit, false);
     const 响应字节: Uint8Array = await this.会话.调用(
       服务号.后端调度器, 调度器方法.获取队首卡片, 请求字节);
     return decodeQueuedCards(响应字节);
