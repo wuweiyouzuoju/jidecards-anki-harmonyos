@@ -27,10 +27,12 @@ export const CARD_REVIEWER_RUNTIME: string = String.raw`
       window.jideCardRuntime.onRendered(documentId, revision, String(error), '');
       return;
     }
-    // Keep the native loading surface until layout and the first content frame have completed.
+    var id = documentId, version = revision;
+    // 布局完成不等于绘制完成；不能用固定延时提前确认隐藏视图。
+    document.body.getBoundingClientRect();
     window.requestAnimationFrame(function () {
       window.requestAnimationFrame(function () {
-        window.jideCardRuntime.onRendered(documentId, revision, '', surfaceBackground());
+        window.jideCardRuntime.onRendered(id, version, '', surfaceBackground());
       });
     });
   }
@@ -39,7 +41,7 @@ export const CARD_REVIEWER_RUNTIME: string = String.raw`
   }
   async function finish(side, scrollToAnswer, initial) {
     await hooks(window.onUpdateHook);
-    if (window.MathJax && MathJax.startup) {
+    if (window.MathJax && MathJax.startup && MathJax.startup.promise) {
       await MathJax.startup.promise;
       if (!initial) await MathJax.typesetPromise([document.getElementById('qa')]);
     }

@@ -10,7 +10,7 @@ import { MATH_ASSET_BASE } from '../entry/src/main/ets/model/MathRendering.ts';
 
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE
   ? pathToFileURL(process.env.PLAYWRIGHT_MODULE).href : 'playwright');
-const browser = await chromium.launch({ headless: true, channel: 'msedge' });
+const browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_BROWSER_CHANNEL || 'msedge' });
 let passed = 0;
 try {
   for (const preview of [false, true]) for (const dark of [false, true]) {
@@ -141,6 +141,32 @@ try {
       assert.equal(backgrounds.at(-1), expected);
       assert.equal(await page.locator('#score').textContent(), '1/1', 'card globals remain isolated');
     }
+    // Plain cards need no math engine; a formula on the answer still prepares it before the first flip.
+    card.css = '.card {background:white;color:black}';
+    card.questionNodes = [{text: 'Word', replacement: null}];
+    card.answerNodes = [{text: 'Meaning', replacement: null}];
+    session.reset(); session.show(html('question', 20), 20, 'question'); await waitShown(13);
+    assert.equal(await page.evaluate(() => typeof window.MathJax.typesetPromise), 'undefined');
+    session.show(html('answer', 21), 20, 'answer'); await waitShown(14);
+    assert.equal(await page.locator('#qa').innerText(), 'Meaning');
+    card.answerNodes = [{text: '\\(x^2\\)', replacement: null}];
+    session.reset(); session.show(html('question', 22), 21, 'question'); await waitShown(15);
+    session.show(html('answer', 23), 21, 'answer'); await waitShown(16);
+    assert.equal(await page.locator('mjx-container').count(), 1);
+    // Hold the frame callbacks: a deadline must not switch an unpainted spare document.
+    await page.addInitScript(() => {
+      window.heldCardFrames = [];
+      window.requestAnimationFrame = callback => { window.heldCardFrames.push(callback); return 0; };
+    });
+    card.answerNodes = [{text: 'Meaning', replacement: null}];
+    session.reset(); session.show(html('question', 24), 22, 'question');
+    await page.waitForFunction(() => window.heldCardFrames && window.heldCardFrames.length === 1);
+    await new Promise(resolve => setTimeout(resolve, 180));
+    assert.equal(shown, 16, 'the earlier 100ms fallback would have confirmed this document');
+    await page.evaluate(() => window.heldCardFrames.shift()());
+    assert.equal(shown, 16);
+    await page.evaluate(() => window.heldCardFrames.shift()()); await waitShown(17);
+    assert.equal(await page.locator('#qa').innerText(), 'Word');
     assert.deepEqual(errors, []);
     await Promise.all(pending);
     passed++;

@@ -6,6 +6,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import vm from 'node:vm';
 import { loadPlatformModule } from './platform-module-harness.mjs';
 import { CardAudioSession } from '../../entry/src/main/ets/model/CardAudioSession.ts';
+import { CardRenderPrefetch } from '../../entry/src/main/ets/model/CardRenderPrefetch.ts';
 import { buildPreviewInteractionScript } from '../../entry/src/main/ets/model/PreviewInteraction.ts';
 import { renderPreviewAnswer } from '../../entry/src/main/ets/model/StudyAnswerRenderer.ts';
 import { coreTyping } from './core-rendering-harness.mjs';
@@ -60,7 +61,7 @@ function harness() {
       ttsItems: [{ text: question ? 'front speech' : 'back speech', language: 'en_US' }] })
   };
   Object.assign(page, {
-    mounted: true, loadVersion: 0, documentVersion: 0, bridgeReady: false, audioRefreshPending: false,
+    mounted: true, loadVersion: 0, documentVersion: 0, bridgeReady: false, audioRefreshPending: false, hasRenderedCard: false,
     markingBackend: { card: async id => ({ id, noteId: id + 100, flags: id === 11 ? 7 : 0 }),
       note: async () => ({ tags: ['marked', 'marked::child'] }), labels: async () => '{"7":"Check"}' },
     previewIds: [11, 22, 33], 卡片ID列表: [11, 22, 33], 当前索引值: 0, 初始索引: 0,
@@ -82,8 +83,10 @@ function harness() {
       registerJavaScriptProxy: proxy => { page.proxy = proxy; } }
   });
   page.audioSession = new CardAudioSession(page.soundPlayer, page.ttsPlayer, (raw, question) => service.extractAudioTags(raw, question));
+  page.renderPrefetch = new CardRenderPrefetch(id => service.渲染既有卡片(id));
+  page.webSlots = [0, 1]; page.attachedWebSlots = [false, true]; page.visibleWebSlot = 0;
   page.cardRenderPending = false;
-  page.cardWeb = { reset() {}, attach() {}, show: html => {
+  page.cardWeb = { reset() {}, attach() {}, setAudioEnabled() {}, controllerAt: () => page.网页控制器, isRelevant: () => true, show: html => {
     page.网页控制器.loadData(html);
     page.previewCardShown('');
   } };
@@ -96,13 +99,30 @@ test('preview retains the dark surface until rendering acknowledges it and block
   page.cardWeb.show = html => displayed.push(html);
   await page.加载当前卡();
   assert.equal(page.忙碌, false); assert.equal(page.cardRenderPending, true);
+  assert.equal(page.hasRenderedCard, false, 'initial placeholder remains until the first card is actually ready');
   assert.equal(page.cardSurfaceBackground, '#101820');
   page.翻面(); assert.equal(page.当前面, 'question'); assert.deepEqual(sounds, []);
   page.previewCardShown('#202830');
+  assert.equal(page.hasRenderedCard, true);
   assert.equal(page.cardRenderPending, false); assert.equal(page.cardSurfaceBackground, '#202830');
   page.翻面(); assert.equal(page.当前面, 'answer'); assert.equal(page.cardRenderPending, true);
+  assert.equal(page.hasRenderedCard, true, 'flipping must not restore the full loading surface');
   page.mounted = false; page.previewCardShown('#ffffff');
   assert.equal(page.cardSurfaceBackground, '#202830'); assert.equal(page.cardRenderPending, true);
+});
+
+test('preview keeps its rendered presentation while fetching the next card', async () => {
+  const { page } = harness();
+  await page.加载当前卡();
+  page.翻面();
+  const gate = deferred();
+  page.markingBackend.card = () => gate.promise;
+  page.下一张();
+  assert.equal(page.忙碌, true);
+  assert.equal(page.hasRenderedCard, true);
+  page.mounted = false;
+  gate.resolve({ id: 22, noteId: 122, flags: 0 });
+  await settle(page);
 });
 
 test('both preview hosts dismiss the open menu before leaving preview and release the handler on unmount', async () => {
@@ -160,7 +180,7 @@ test('next/previous follow the Anki preview state machine', async () => {
   page.下一张(); await settle(page);
   assert.equal(page.当前索引值, 1, 'next on the answer side moves to the next card');
   assert.equal(page.当前面, 'question');
-  assert.equal(renderedIds.at(-1), 22);
+  assert.deepEqual(renderedIds, [11, 22, 33], 'next uses the prepared card and then prepares its successor');
   assert.match(displayed.at(-1), /front-22/);
   page.上一张(); await settle(page);
   assert.equal(page.当前索引值, 0, 'previous on the question side moves to the previous card');
@@ -224,7 +244,7 @@ test('editing preserves card identity even when search results reorder or remove
   page.卡片ID列表 = [33, 11];
   service.渲染既有卡片 = async id => { renderedIds.push(id); const result = card(id); result.css = '/* updated */'; return result; };
   page.预览刷新版本变化(); await settle(page);
-  assert.equal(renderedIds.at(-1), 22);
+  assert.deepEqual(renderedIds, [22, 33, 22, 33], 'editing clears the old candidate and prepares its fresh successor');
   assert.equal(page.当前面, 'question');
   assert.match(displayed.at(-1), /front-22/);
   assert.match(displayed.at(-1), /updated/);

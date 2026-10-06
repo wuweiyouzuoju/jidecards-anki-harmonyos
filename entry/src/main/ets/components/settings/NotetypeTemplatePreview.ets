@@ -19,11 +19,15 @@ import { TTS播放器 } from '../../utils/TTS播放器';
 import { 卡片渲染服务 } from '../../backend/卡片渲染服务';
 import { APP_FOREGROUND_KEY } from '../../model/AppLifecycleState';
 import { PAGE_COMPACT_LAYOUT_KEY } from '../../model/AppLayoutState';
+import { DelayedLoadingIndicator } from '../common/DelayedLoadingIndicator';
 
 /** 草稿卡片只读预览；离线资源、翻面和 Web 生命周期复用学习渲染链。 */
 @Component
 export struct NotetypeTemplatePreview {
   @Prop rendered: RenderedCard;
+  @Prop @Watch('contentChanged') contentRevision: number = 1;
+  @Prop @Watch('loadingChanged') loading: boolean = false;
+  @Prop loadError: string = '';
   @Prop options: DraftPreviewOption[] = [];
   @Prop selected: number = 0;
   @Prop sample: boolean = true;
@@ -37,12 +41,27 @@ export struct NotetypeTemplatePreview {
   @State private answerSide: boolean = false;
   @State private failed: boolean = false;
   @State private audioFailed: boolean = false;
+  @State private renderPending: boolean = false;
+  @State private hasRendered: boolean = false;
+  @State private visibleWebSlot: number = 0;
+  @State private cardSurfaceBackground: string = '';
   @StorageProp(APP_FOREGROUND_KEY) @Watch('stopBackgroundAudio') private foreground: boolean = true;
   onClose: () => void = (): void => {};
   onReleaseAvailable: (release: () => Promise<void>) => void = (_release: () => Promise<void>): void => {};
   private controller: webview.WebviewController = new webview.WebviewController();
-  private cardWeb: CardWebView = new CardWebView(this.controller, (): void => { this.playAudio(); },
-    (_message: string): void => { this.failed = true; });
+  private spareController: webview.WebviewController = new webview.WebviewController();
+  private readonly webSlots: number[] = [0, 1];
+  private attachedWebSlots: boolean[] = [false, false];
+  private cardWeb: CardWebView = new CardWebView(this.controller, (background: string): void => {
+    if (!this.attached) return;
+    this.hasRendered = true; this.renderPending = false;
+    if (background !== '') this.cardSurfaceBackground = background;
+    this.playAudio();
+  }, (_message: string): void => { this.failed = true; this.renderPending = false; },
+    this.spareController, (slot: number): void => {
+      this.visibleWebSlot = slot;
+      this.controller = this.cardWeb.controllerAt(slot);
+    });
   private attached: boolean = false;
   private renderer: 卡片渲染服务 = new 卡片渲染服务();
   private audio: CardAudioSession = new CardAudioSession(new 声音播放器(), new TTS播放器(),
@@ -53,14 +72,21 @@ export struct NotetypeTemplatePreview {
   aboutToAppear(): void { this.onReleaseAvailable((): Promise<void> => this.releaseCard()); }
   aboutToDisappear(): void { this.releaseCard().catch((error: Error): void => { console.info(error.message); }); }
   private releaseCard(): Promise<void> {
+    this.cardWeb.setAudioEnabled(false);
     this.attached = false; this.cardWeb.reset();
     return this.audio.release();
   }
 
-  private stopBackgroundAudio(): void { if (!this.foreground) this.audio.stop(); }
-  private stopHiddenAudio(): void { if (!this.isVisible) this.audio.stop(); }
+  private stopBackgroundAudio(): void {
+    this.cardWeb.setAudioEnabled(this.foreground && this.isVisible && !this.loading);
+    if (!this.foreground) this.audio.stop();
+  }
+  private stopHiddenAudio(): void {
+    this.cardWeb.setAudioEnabled(this.foreground && this.isVisible && !this.loading);
+    if (!this.isVisible) this.audio.stop();
+  }
   private async playAudio(): Promise<void> {
-    if (!this.attached || !this.foreground || !this.isVisible) return;
+    if (!this.attached || !this.foreground || !this.isVisible || this.loading || this.renderPending || this.loadError !== '') return;
     this.audioFailed = false;
     try {
       await this.audio.play(构建卡片HTML(this.rendered, this.answerSide ? 'answer' : 'question', this.isDark),
@@ -69,17 +95,38 @@ export struct NotetypeTemplatePreview {
   }
 
   private showSide(): void {
-    if (!this.attached) return;
+    if (!this.attached || this.loading || this.loadError !== '') return;
     try {
+      this.cardWeb.setAudioEnabled(this.foreground && this.isVisible);
       this.failed = false;
       this.audio.stop();
+      this.renderPending = true;
       const side: string = this.answerSide ? 'answer' : 'question';
-      this.cardWeb.show(剥除拼写标记(构建卡片HTML(this.rendered, this.answerSide ? 'answer' : 'question', this.isDark)), 1, side);
-    } catch (error) { this.failed = true; }
+      this.cardWeb.show(剥除拼写标记(构建卡片HTML(this.rendered, this.answerSide ? 'answer' : 'question', this.isDark)), this.contentRevision, side);
+    } catch (error) { this.failed = true; this.renderPending = false; }
   }
 
-  private attach(): void {
-    try { this.cardWeb.attach(); this.attached = true; this.showSide(); }
+  private contentChanged(): void {
+    this.answerSide = false;
+    this.cardWeb.reset();
+    this.showSide();
+  }
+
+  private loadingChanged(): void {
+    if (this.loading) { this.audio.stop(); this.cardWeb.setAudioEnabled(false); }
+    else this.showSide();
+  }
+
+  private toggleSide(): void {
+    if (!this.attached || this.loading || this.renderPending || this.failed || this.loadError !== '') return;
+    this.answerSide = !this.answerSide;
+    this.showSide();
+  }
+
+  private attach(slot: number = 0): void {
+    this.attachedWebSlots[slot] = true;
+    if (!this.attachedWebSlots[0] || !this.attachedWebSlots[1]) return;
+    try { this.cardWeb.attach(0); this.cardWeb.attach(1); this.attached = true; this.showSide(); }
     catch (error) { this.failed = true; }
   }
 
@@ -97,7 +144,7 @@ export struct NotetypeTemplatePreview {
   private header() {
     DialogHeader({ title: this.sample ? $r('app.string.notetype_template_preview') : $r('app.string.note_draft_preview'), closeLabel: $r('app.string.close'),
       actionLabel: this.answerSide ? $r('app.string.notetype_preview_question') : $r('app.string.notetype_preview_answer'),
-      onClose: this.onClose, onAction: (): void => { this.answerSide = !this.answerSide; this.showSide(); } })
+      onClose: this.onClose, onAction: (): void => { this.toggleSide(); } })
   }
 
   @Builder
@@ -110,30 +157,45 @@ export struct NotetypeTemplatePreview {
             FormSelectRow({ label: $r('app.string.note_preview_card_label'),
               options: this.options.map((option: DraftPreviewOption): SelectOption => ({ value: option.name })),
               selectedIndex: this.selected, value: this.options[this.selected].name,
-              surfaceColor: $r('app.color.surface_card'), onSelect: this.onSelect })
+              surfaceColor: $r('app.color.surface_card'), isInteractive: !this.loading && !this.renderPending,
+              onSelect: this.onSelect })
           }
           LabeledActionRow({ label: this.sample ? $r('app.string.notetype_preview_hint') : $r('app.string.note_preview_hint'),
             actionLabel: $r('app.string.study_replay_sound'), textColor: $r('app.color.text_secondary'),
             onAction: (): void => { this.playAudio(); } })
-          if (this.failed) {
-            Text($r('app.string.browser_preview_load_error')).fontColor($r('app.color.error_text'))
+          if (this.failed || this.loadError !== '') {
+            Text(this.loadError === '' ? $r('app.string.browser_preview_load_error') : this.loadError).fontColor($r('app.color.error_text'))
           }
           if (this.rendered.isEmpty) { Text($r('app.string.note_preview_empty')).fontColor($r('app.color.text_secondary')) }
           if (this.audioFailed) { Text($r('app.string.browser_preview_audio_error')).fontColor($r('app.color.error_text')) }
         }.width('100%')
       }.width('100%').constraintSize({ maxHeight: '40%' }).flexShrink(0).scrollBar(BarState.Auto)
-      Web({ src: '', controller: this.controller })
+      Stack() {
+      ForEach(this.webSlots, (slot: number) => {
+      Web({ src: '', controller: this.cardWeb.controllerAt(slot) })
         .javaScriptAccess(true).fileAccess(true).domStorageAccess(true).zoomAccess(true)
-        .backgroundColor($r('app.color.surface_card'))
-        .onControllerAttached((): void => { this.attach(); })
+        .backgroundColor(this.cardSurfaceBackground || $r('app.color.surface_card'))
+        .onControllerAttached((): void => { this.attach(slot); })
         .onInterceptRequest((event: OnInterceptRequestEvent): WebResourceResponse | null =>
           interceptCardAsset(event.request.getRequestUrl()) ??
           interceptMediaRequest(event.request, this.requestMediaDirectory(event.request.getRequestUrl()), 媒体基地址))
         .onErrorReceive((event: OnErrorReceiveEvent): void => {
-          if (event.request.isMainFrame() && event.request.getRequestUrl() !== 'about:blank') this.failed = true;
+          if (this.cardWeb.isRelevant(slot) && event.request.isMainFrame() && event.request.getRequestUrl() !== 'about:blank') {
+            this.failed = true; this.renderPending = false;
+          }
         })
-        .onRenderExited((): void => { this.renderExited(); })
-        .width('100%').layoutWeight(1)
+        .onRenderExited((): void => { if (this.cardWeb.isRelevant(slot)) this.renderExited(); })
+        .opacity(this.visibleWebSlot === slot ? 1 : 0)
+        .hitTestBehavior(this.visibleWebSlot === slot ? HitTestMode.Default : HitTestMode.None)
+        .width('100%').height('100%')
+      }, (slot: number): string => String(slot))
+      if (this.loading || this.renderPending) {
+        Column() { DelayedLoadingIndicator() }
+          .width('100%').height('100%').justifyContent(FlexAlign.Center)
+          .backgroundColor(this.hasRendered ? Color.Transparent : (this.cardSurfaceBackground || $r('app.color.surface_card')))
+          .hitTestBehavior(HitTestMode.Block)
+      }
+      }.width('100%').layoutWeight(1)
     }.width('100%').height('100%')
   }
 
@@ -149,7 +211,7 @@ export struct NotetypeTemplatePreview {
       Column() {
         NoteEditorHeader({ title: this.sample ? $r('app.string.notetype_template_preview') : $r('app.string.note_draft_preview'),
           actionLabel: this.answerSide ? $r('app.string.notetype_preview_question') : $r('app.string.notetype_preview_answer'),
-          onBack: this.onClose, onSave: (): void => { this.answerSide = !this.answerSide; this.showSide(); } })
+          onBack: this.onClose, onSave: (): void => { this.toggleSide(); } })
         Column() { this.content() }.width('100%').layoutWeight(1)
           .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平,
             top: 应用尺寸.页面内容顶部间距(this.narrow), bottom: 应用尺寸.间距_8 + this.navigationBarHeight })

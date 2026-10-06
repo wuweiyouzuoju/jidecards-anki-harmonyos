@@ -21,7 +21,7 @@ test('renderer starts unanchored answers at the top and preserves answer anchors
       const qa = { innerHTML: '', querySelectorAll: () => [] };
       const document = {
         createElement: () => ({ getContext: () => null }),
-        body: { className: 'card', scrollHeight: 3200 },
+        body: { className: 'card', scrollHeight: 3200, getBoundingClientRect() {} },
         querySelectorAll: () => [],
         getElementById: id => id === 'qa' ? qa : scenario.anchored
           ? { scrollIntoView: options => scrolls.push(['anchor', options.block]) } : null
@@ -34,7 +34,7 @@ test('renderer starts unanchored answers at the top and preserves answer anchors
         jideCardRuntime: { onRendered: (_id, _revision, error) => acknowledge(error) }
       };
       const DOMParser = class { parseFromString() { return document; } };
-      vm.runInNewContext(CARD_REVIEWER_RUNTIME, { window, document, DOMParser });
+      vm.runInNewContext(CARD_REVIEWER_RUNTIME, { window, document, DOMParser, setTimeout, clearTimeout });
       const start = new Promise(resolve => { acknowledge = resolve; });
       window.__jideCardReviewer.start(1, 1, initial ? scenario.side : 'question', scenario.scroll);
       onLoad();
@@ -86,16 +86,44 @@ test('render acknowledgement waits for two animation frames after asynchronous h
   const frames = [], acknowledgements = [];
   let load;
   const document = { createElement: () => ({ getContext: () => null }),
-    getElementById: () => ({}), body: {}, querySelectorAll: () => [] };
+    getElementById: () => ({}), body: { getBoundingClientRect() {} }, querySelectorAll: () => [] };
   const window = { addEventListener: (_event, callback) => { load = callback; }, scrollTo() {},
     requestAnimationFrame: callback => frames.push(callback),
     jideCardRuntime: { onRendered: (...args) => acknowledgements.push(args) } };
-  vm.runInNewContext(CARD_REVIEWER_RUNTIME, { window, document });
+  vm.runInNewContext(CARD_REVIEWER_RUNTIME, { window, document, setTimeout, clearTimeout });
   window.__jideCardReviewer.start(7, 12, 'question', false); load();
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(frames.length, 1); assert.deepEqual(acknowledgements, []);
   frames.shift()(); assert.deepEqual(acknowledgements, []);
   frames.shift()(); assert.deepEqual(acknowledgements, [[7, 12, '', '']]);
+});
+
+test('elapsed time cannot acknowledge a spare Web before both content frames arrive', async () => {
+  const frames = [], timers = [], acknowledgements = [];
+  let load, releaseHook, layouts = 0;
+  const hook = new Promise(resolve => { releaseHook = resolve; });
+  const document = { createElement: () => ({ getContext: () => null }), getElementById: () => ({}),
+    body: { getBoundingClientRect() { layouts++; } }, querySelectorAll: () => [] };
+  const window = { addEventListener: (_event, callback) => { load = callback; }, scrollTo() {},
+    requestAnimationFrame: callback => frames.push(callback),
+    jideCardRuntime: { onRendered: (...args) => acknowledgements.push(args) } };
+  vm.runInNewContext(CARD_REVIEWER_RUNTIME, { window, document,
+    setTimeout: (callback, delay) => { timers.push({callback, delay}); return timers.length; },
+    clearTimeout() {} });
+  window.onShownHook.push(() => hook);
+  window.__jideCardReviewer.start(7, 12, 'question', false); load();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(frames.length, 0, 'a slow template hook must finish before waiting for frames');
+  releaseHook(); await new Promise(resolve => setImmediate(resolve));
+  assert.equal(layouts, 1);
+  // Advance any scheduled deadline while the hidden compositor has delivered no new frames.
+  for (const timer of timers) timer.callback();
+  assert.deepEqual(acknowledgements, [], 'layout and a deadline do not prove a new frame exists');
+  frames.shift()();
+  for (const timer of timers) timer.callback();
+  assert.deepEqual(acknowledgements, [], 'one callback still precedes the first content paint');
+  frames.shift()();
+  assert.deepEqual(acknowledgements, [[7, 12, '', '']]);
 });
 
 test('same card flips through JavaScript, a new card or reset gets a new document', () => {

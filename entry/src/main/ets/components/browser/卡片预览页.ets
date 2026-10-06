@@ -1,5 +1,6 @@
 import { actionIcon } from '../../utils/ActionIcons';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { WINDOW_SAFE_TOP_KEY } from '../../model/WindowSafeLayout';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { CardMarkingBadge } from '../common/CardMarkingBadge';
@@ -44,6 +45,7 @@ import { resourceText } from '../../utils/UiFeedback';
 
 import { webview } from '@kit.ArkWeb';
 import { CardWebView } from '../../utils/CardWebView';
+import { CardRenderPrefetch } from '../../model/CardRenderPrefetch';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { interceptCardAsset } from '../../utils/CardAssetResponse';
 import { 卡片渲染服务 } from '../../backend/卡片渲染服务';
@@ -64,7 +66,8 @@ import { interceptMediaRequest } from '../../utils/媒体响应助手';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 取全屏转场曲线, 取全屏转场时长 } from '../../utils/转场时长';
 import { 颜色键 } from '../../model/颜色主题';
-import { 按下态按钮 } from '../common/按下态按钮';
+import { IconActionButton } from '../common/IconActionButton';
+import { DelayedLoadingIndicator } from '../common/DelayedLoadingIndicator';
 import { 声音播放器 } from '../../utils/声音播放器';
 import { TTS播放器 } from '../../utils/TTS播放器';
 import { CardAudioSession } from '../../model/CardAudioSession';
@@ -115,12 +118,24 @@ export struct 卡片预览页 {
   onEditField: (卡片ID: number) => void = (_卡片ID: number): void => {};
   onEditWithAgent: (cardId: number) => void = (_cardId: number): void => {};
 
-  private readonly 网页控制器: webview.WebviewController = new webview.WebviewController();
+  private 网页控制器: webview.WebviewController = new webview.WebviewController();
+  private readonly 备用网页控制器: webview.WebviewController = new webview.WebviewController();
+  private readonly webSlots: number[] = [0, 1];
+  private attachedWebSlots: boolean[] = [false, false];
+  @State private visibleWebSlot: number = 0;
   @State private cardSurfaceBackground: string = '';
+  @State private hasRenderedCard: boolean = false;
   @State private cardRenderPending: boolean = false;
   private readonly cardWeb: CardWebView = new CardWebView(this.网页控制器,
-    (background: string): void => { this.previewCardShown(background); }, (_message: string): void => { this.webFailed(); });
+    (background: string): void => { this.previewCardShown(background); }, (_message: string): void => { this.webFailed(); },
+    this.备用网页控制器, (slot: number): void => {
+      if (slot !== this.visibleWebSlot) this.initialFocusPending = true;
+      this.visibleWebSlot = slot;
+      this.网页控制器 = this.cardWeb.controllerAt(slot);
+    });
   private readonly 卡片渲染服务实例: 卡片渲染服务 = new 卡片渲染服务();
+  private readonly renderPrefetch: CardRenderPrefetch = new CardRenderPrefetch(
+    (id: number): Promise<RenderedCard> => this.卡片渲染服务实例.渲染既有卡片(id));
   private readonly 卡片服务实例: 卡片服务 = new 卡片服务();
   private readonly 笔记服务实例: 笔记服务 = new 笔记服务();
   private readonly 笔记类型服务实例: 笔记类型服务 = new 笔记类型服务();
@@ -152,6 +167,7 @@ export struct 卡片预览页 {
   @StorageProp(颜色键.主色容器) private 主色容器色: string = '#E8EEFC';
   // 状态栏高度（沉浸式全屏下，预览层全屏铺开，顶部条需让出状态栏区域，与主页顶栏同一水平面）
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
+  @StorageProp(WINDOW_SAFE_TOP_KEY) private toolbarSafeTop: number = 0;
   // 手势导航条高度（底部固定操作区需整体抬高，避免按钮落入系统手势区域）
   @StorageProp('导航条高度') private 导航条高度: number = 0;
 
@@ -165,6 +181,8 @@ export struct 卡片预览页 {
   }
 
   aboutToDisappear(): void {
+    this.cardWeb.setAudioEnabled(false);
+    this.renderPrefetch.clear();
     this.cardWeb.reset();
     this.moreMenuOpen = false;
     this.onBackHandlerChange(null);
@@ -184,8 +202,10 @@ export struct 卡片预览页 {
 
   /** 编辑或后台期间停止所有声音；返回后由用户重播，不自动打断其他音频。 */
   private updateActivity(): void {
+    this.cardWeb.setAudioEnabled(this.mounted && this.interactionEnabled && this.foreground);
     if (!this.interactionEnabled || !this.foreground) this.moreMenuOpen = false;
     if (!this.interactionEnabled || !this.foreground) {
+      this.renderPrefetch.clear();
       this.audioRefreshPending = this.已渲染 !== null;
       this.stopAudio();
       if (this.控制器已挂载) {
@@ -232,6 +252,7 @@ export struct 卡片预览页 {
 
   /** 字段保存后父级递增刷新版本，重新渲染当前仍在预览中的卡片。 */
   private 预览刷新版本变化(): void {
+    this.renderPrefetch.clear();
     this.加载当前卡();
   }
 
@@ -297,7 +318,7 @@ export struct 卡片预览页 {
       if (!this.mounted || version !== this.loadVersion) return;
       const labels: FlagLabels = parseFlagLabels(await this.markingBackend.labels());
       if (!this.mounted || version !== this.loadVersion) return;
-      const rendered: RenderedCard = await this.卡片渲染服务实例.渲染既有卡片(卡片ID);
+      const rendered: RenderedCard = await this.renderPrefetch.read(卡片ID);
       if (!this.mounted || version !== this.loadVersion) return;
       const answerHtml: string = await renderPreviewAnswer(构建卡片HTML(rendered, 'answer', this.isDark),
         rendered, 卡片ID, {
@@ -336,6 +357,7 @@ export struct 卡片预览页 {
       `<script>${buildPreviewInteractionScript(version)}</script></div></body>`);
     if (this.控制器已挂载) {
       try {
+        this.cardWeb.setAudioEnabled(this.interactionEnabled && this.foreground);
         this.installActionBridge();
         this.cardWeb.show(document, this.loadVersion, this.当前面);
       } catch (错误) {
@@ -372,16 +394,21 @@ export struct 卡片预览页 {
       if (action === 'next') this.下一张();
       if (action === 'replay') this.playCurrentAudio();
     };
-    this.网页控制器.registerJavaScriptProxy(proxy, 'jidePreview', ['onAction']);
+    for (const slot of this.webSlots) {
+      this.cardWeb.controllerAt(slot).registerJavaScriptProxy(proxy, 'jidePreview', ['onAction']);
+    }
     this.bridgeReady = true;
   }
 
   /** Web 控制器 attach 回调：消费缓存的待加载 HTML。 */
-  private onControllerAttached回调(): void {
+  private onControllerAttached回调(slot: number = 0): void {
     if (!this.mounted) return;
+    this.attachedWebSlots[slot] = true;
+    if (!this.attachedWebSlots[0] || !this.attachedWebSlots[1]) return;
     this.控制器已挂载 = true;
     try {
       this.cardWeb.attach();
+      this.cardWeb.attach(1);
     } catch (error) {
       this.webFailed();
       return;
@@ -475,10 +502,14 @@ export struct 卡片预览页 {
 
   private previewCardShown(background: string): void {
     if (!this.mounted) return;
+    this.hasRenderedCard = true;
     if (background !== '') this.cardSurfaceBackground = background;
     this.cardRenderPending = false;
     this.playCurrentAudio();
     this.focusPreviewCard();
+    if (this.interactionEnabled && this.foreground && this.当前索引值 + 1 < this.previewIds.length) {
+      this.renderPrefetch.prepare(this.previewIds[this.当前索引值 + 1]);
+    }
   }
 
   private 请求AI改卡(): void {
@@ -568,20 +599,18 @@ export struct 卡片预览页 {
         .textAlign(TextAlign.Center)
         .hitTestBehavior(HitTestMode.None)
       Row() {
-        按下态按钮({
-          文案: $r('app.string.browser_preview_close'),
-          字色: $r('app.color.text_primary'),
-          点击回调: (): void => { this.onClose(); }
+        IconActionButton({ toolbarStyle: true,
+          source: $r('app.media.ic_common_close'), label: $r('app.string.browser_preview_close'),
+          onAction: (): void => { this.onClose(); }
         })
         Blank()
         if (this.currentMarking !== null) {
           CardMarkingBadge({ flag: this.currentMarking.flag, marked: this.currentMarking.marked, labels: this.flagLabels })
             .margin({ right: 应用尺寸.间距_8 }).hitTestBehavior(HitTestMode.None)
         }
-        按下态按钮({
-          文案: $r('app.string.study_more'),
-          字色: $r('app.color.text_primary'),
-          点击回调: (): void => { this.moreMenuOpen = true; }
+        IconActionButton({ toolbarStyle: true,
+          source: $r('app.media.ic_home_more'), label: $r('app.string.study_more'),
+          onAction: (): void => { this.moreMenuOpen = true; }
         })
       }
       .width('100%')
@@ -589,11 +618,11 @@ export struct 卡片预览页 {
       .alignItems(VerticalAlign.Center)
     }
     .width('100%')
-    .height(应用尺寸.pageToolbarHeight(this.状态栏高度, this.narrowDeckLayout))
+    .height(应用尺寸.pageToolbarHeight(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop))
     .padding({
       left: 应用尺寸.页面内边距_水平,
       right: 应用尺寸.页面内边距_水平,
-      top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout),
+      top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop),
       bottom: 0
     })
   }
@@ -603,7 +632,8 @@ export struct 卡片预览页 {
     Column() {
     Stack() {
       // Web 组件：src 必须为空字符串（BUG-008 修复），baseUrl=媒体基地址 由 loadData 传入。
-      Web({ src: '', controller: this.网页控制器 })
+      ForEach(this.webSlots, (slot: number) => {
+      Web({ src: '', controller: this.cardWeb.controllerAt(slot) })
         .backgroundColor(this.cardSurfaceBackground || $r('app.color.surface_card'))
         .textZoomRatio(this.cardTextSizePercent)
         .javaScriptAccess(true)
@@ -612,32 +642,34 @@ export struct 卡片预览页 {
         .zoomAccess(true)
         .focusable(true)
         // 进入预览即接收方向键，无需先点卡片；Web 内表单仍自行处理编辑按键。
-        .defaultFocus(true)
-        .onControllerAttached((): void => { this.onControllerAttached回调(); })
+        .defaultFocus(slot === 0)
+        .onControllerAttached((): void => { this.onControllerAttached回调(slot); })
         .onInterceptRequest((event: OnInterceptRequestEvent): WebResourceResponse | null => {
           return interceptCardAsset(event.request.getRequestUrl()) ?? this.拦截媒体(event);
         })
         .onErrorReceive((event: OnErrorReceiveEvent): void => {
-          if (event.request.isMainFrame() && event.request.getRequestUrl() !== 'about:blank') this.webFailed();
+          if (this.cardWeb.isRelevant(slot) && event.request.isMainFrame() &&
+            event.request.getRequestUrl() !== 'about:blank') this.webFailed();
         })
-        .onRenderExited((): void => { this.webFailed(); })
+        .onRenderExited((): void => { if (this.cardWeb.isRelevant(slot)) this.webFailed(); })
         .width('100%')
         .height('100%')
         // 左右滑切卡在文档内监听判断，保留链接、媒体、遮罩和表单的原生交互。
+        .opacity(this.visibleWebSlot === slot ? 1 : 0)
+        .hitTestBehavior(this.visibleWebSlot === slot ? HitTestMode.Default : HitTestMode.None)
         // 不在 Web 上挂 ArkUI 手势：ArkWeb 先消费触摸，SwipeGesture 收不到左右滑。
+      }, (slot: number): string => String(slot))
 
       // Loading 覆盖层
       if (this.错误详情 === '' && (this.忙碌 || this.cardRenderPending)) {
         Column() {
-          LoadingProgress()
-            .width(应用尺寸.加载指示器尺寸)
-            .height(应用尺寸.加载指示器尺寸)
-            .color(this.主色按钮背景)
+          DelayedLoadingIndicator({ tint: this.主色按钮背景 })
         }
         .width('100%')
         .height('100%')
         .justifyContent(FlexAlign.Center)
-        .backgroundColor(this.cardSurfaceBackground || $r('app.color.surface_card'))
+        // 首卡使用占位；后续翻面/切卡只阻止输入，保留 Web 的内容画面。
+        .backgroundColor(this.hasRenderedCard ? Color.Transparent : (this.cardSurfaceBackground || $r('app.color.surface_card')))
         .hitTestBehavior(HitTestMode.Block)
       }
 
