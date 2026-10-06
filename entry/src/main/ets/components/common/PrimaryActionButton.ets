@@ -2,19 +2,23 @@
 import { PressFeedback } from '../../utils/PressFeedback';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { localizedResourceText } from '../../utils/UiFeedback';
+import { 颜色键 } from '../../model/颜色主题';
 
 /** 主操作按钮统一几何与反馈；宿主决定可用状态、忙碌文案及业务动作。 */
 @Component
 export struct PrimaryActionButton {
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
+  @StorageProp(颜色键.主色按钮背景) private primaryBackground: string = '#2F5FD0';
   @Prop label: ResourceStr = '';
   @Prop isInteractive: boolean = true;
-  @Prop tint: ResourceColor = $r('app.color.action_primary');
+  @Prop tint: ResourceColor | undefined = undefined;
   onAction: () => void = (): void => {};
 
   private activate(): void {
     if (this.isInteractive) this.onAction();
   }
+
+  private resolvedTint(): ResourceColor { return this.tint ?? this.primaryBackground; }
 
   build() {
     Button(this.label)
@@ -22,7 +26,7 @@ export struct PrimaryActionButton {
       .height(应用尺寸.按钮高度)
       .fontSize(应用尺寸.字号_按钮)
       .fontColor('#FFFFFF')
-      .backgroundColor(this.tint)
+      .backgroundColor(this.resolvedTint())
       .borderRadius(应用尺寸.圆角_胶囊)
       .enabled(this.isInteractive)
       .opacity(this.isInteractive ? 1 : 0.6)

@@ -5,6 +5,7 @@ import { ThemeLabelGlyph, themeLabelGlyphs } from './ThemeText';
 import { GlassSurface } from '../../utils/GlassSurface';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { localizedResourceText } from '../../utils/UiFeedback';
+import { 颜色键 } from '../../model/颜色主题';
 
 // ========================================================
 // @块ID UI-COMMON-PRESSBTN-001
@@ -39,6 +40,7 @@ export struct 按下态按钮 {
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(GLASS_COLORS_KEY) private glassColors: string[] = GLASS_HIGHLIGHT_COLORS;
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
+  @StorageProp(颜色键.动作主色) private actionColor: string = '#2F5FD0';
   @Prop themeText: boolean = false;
   @Prop 文案: ResourceStr;
   @Prop 图标: Resource | undefined = undefined;
@@ -47,7 +49,7 @@ export struct 按下态按钮 {
   @Prop 是否启用: boolean = true;
   @Prop selectable: boolean = false;
   @Prop selected: boolean = false;
-  @Prop selectionColor: ResourceColor = $r('app.color.action_primary');
+  @Prop selectionColor: ResourceColor | undefined = undefined;
   @Prop markerColor: ResourceColor | undefined = undefined;
   // 工具栏在等宽侧栏内约束标签，保留完整无障碍名称。
   @Prop singleLine: boolean = false;
@@ -58,10 +60,13 @@ export struct 按下态按钮 {
     if (this.是否启用) this.点击回调();
   }
 
-  private labelColor(): ResourceColor { return this.selectable && this.selected ? this.selectionColor : this.字色; }
+  private resolvedSelectionColor(): ResourceColor { return this.selectionColor ?? this.actionColor; }
+  private labelColor(): ResourceColor {
+    return this.selectable && this.selected ? this.resolvedSelectionColor() : this.字色;
+  }
   private buttonBorder(): BorderOptions {
     return SurfaceBorder.options(this.selectable ? 2 : 应用尺寸.卡片边框,
-      this.selectable && this.selected ? this.selectionColor : SurfaceBorder.color());
+      this.selectable && this.selected ? this.resolvedSelectionColor() : SurfaceBorder.color());
   }
 
   build() {

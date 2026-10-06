@@ -9,12 +9,16 @@ import { safeMenuGeometry, SafeMenuGeometry, WINDOW_SAFE_TOP_KEY, WINDOW_SAFE_BO
 @Component
 export struct AnchoredMenu {
   @Prop menuWidth: number = 应用尺寸.compactMenuWidth;
-  /** 调用方传入最终窗口坐标；公共表面不得再次扣除密度偏移。 */
+  /** 调用方传入菜单宿主内的最终坐标；窗口根宿主与窗口坐标相同。 */
   @Prop topOffset: number = 0;
   @Prop alignEnd: boolean = true;
   @Prop contentMaxWidth: Length = '100%';
+  /** 实测内容区域在宿主内的左缘；已包含安全区和页面内边距，不能重复叠加。 */
+  @Prop contentLeft: number | undefined = undefined;
+  @Prop cornerRadius: number = 应用尺寸.radiusLg;
   @Prop surfaceVisible: boolean = true;
   @State private viewportHeight: number = 600;
+  @State private viewportTop: number = 0;
   @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
   @StorageProp(WINDOW_SAFE_TOP_KEY) private safeTop: number = 0;
   @StorageProp(WINDOW_SAFE_BOTTOM_KEY) private safeBottom: number = 0;
@@ -27,12 +31,12 @@ export struct AnchoredMenu {
   private emptyContent(): void {}
 
   private menuGeometry(): SafeMenuGeometry {
-    return safeMenuGeometry(this.viewportHeight, this.topOffset, this.safeTop, this.safeBottom,
+    return safeMenuGeometry(this.viewportHeight, this.topOffset, Math.max(0, this.safeTop - this.viewportTop), this.safeBottom,
       应用尺寸.页面底部间距(this.narrowDeckLayout));
   }
 
   build() {
-    Stack({ alignContent: Alignment.Top }) {
+    Stack({ alignContent: this.contentLeft === undefined ? Alignment.Top : Alignment.TopStart }) {
       Column()
         .width('100%').height('100%')
         .backgroundColor(Color.Transparent)
@@ -48,17 +52,22 @@ export struct AnchoredMenu {
         .constraintSize({ maxHeight: this.menuGeometry().maxHeight })
         .scrollBar(BarState.Auto)
         .width(this.menuWidth)
-        .attributeModifier(new MenuSurface(this.surfaceVisible))
-        .margin({ top: this.menuGeometry().top, left: this.alignEnd ? this.safeLeft : this.safeLeft + 应用尺寸.页面内边距_水平,
-          right: this.alignEnd ? this.safeRight + 应用尺寸.页面内边距_水平 : this.safeRight })
+        .attributeModifier(new MenuSurface(this.surfaceVisible, this.cornerRadius))
+        .margin({ top: this.menuGeometry().top,
+          left: this.contentLeft !== undefined ? 0 : this.alignEnd ? this.safeLeft : this.safeLeft + 应用尺寸.页面内边距_水平,
+          right: this.contentLeft !== undefined ? 0 : this.alignEnd ? this.safeRight + 应用尺寸.页面内边距_水平 : this.safeRight })
         .onClick((): void => {})
         .transition(MenuSurface.popupTransition())
       }
       .width('100%')
       .constraintSize({ maxWidth: this.contentMaxWidth })
+      .margin({ left: this.contentLeft ?? 0 })
       .hitTestBehavior(HitTestMode.Transparent)
     }
     .width('100%').height('100%')
-    .onAreaChange((_old: Area, area: Area): void => { this.viewportHeight = Number(area.height); })
+    .onAreaChange((_old: Area, area: Area): void => {
+      this.viewportHeight = Number(area.height);
+      this.viewportTop = Number(area.globalPosition.y);
+    })
   }
 }

@@ -2,6 +2,7 @@
 import { PressFeedback } from '../../utils/PressFeedback';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { HelpLabel } from './HelpLabel';
+import { IconActionButton } from './IconActionButton';
 import { ThemeLabelGlyph, themeLabelGlyphs } from './ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
@@ -17,6 +18,9 @@ export struct DialogHeader {
   @Prop highlightColors: string[] = [];
   @Prop actionLabel: ResourceStr = $r('app.string.done');
   @Prop closeLabel: ResourceStr = $r('app.string.cancel');
+  @Prop closeIcon: ResourceStr = $r('app.media.ic_common_close');
+  // 引导继续、取消传输和风险确认需要可见文案解释结果。
+  @Prop showCloseLabel: boolean = false;
   @Prop actionEnabled: boolean = true;
   @Prop closeEnabled: boolean = true;
   @Prop showClose: boolean = true;
@@ -35,21 +39,17 @@ export struct DialogHeader {
       Row() {
       Row() {
       if (this.showClose) {
-        Button(this.closeLabel)
-          .type(ButtonType.Normal)
-          .height(44)
-          .constraintSize({ maxWidth: '100%' })
-          .padding({ left: 4, right: 4 })
-          .fontSize(14)
-          .fontColor($r('app.color.text_secondary'))
-          .backgroundColor(Color.Transparent)
-          .borderRadius(10)
-          .attributeModifier(new PressFeedback())
-          .stateEffect(false)
-          .enabled(this.closeEnabled)
-          .onClick((): void => {
-            if (this.closeEnabled) { this.onClose(); }
-          })
+        if (this.showCloseLabel) {
+          Button(this.closeLabel)
+            .type(ButtonType.Normal).height(44).constraintSize({ maxWidth: '100%' })
+            .padding({ left: 4, right: 4 }).fontSize(14).fontColor($r('app.color.text_secondary'))
+            .backgroundColor(Color.Transparent).borderRadius(10)
+            .attributeModifier(new PressFeedback()).stateEffect(false).enabled(this.closeEnabled)
+            .onClick((): void => { if (this.closeEnabled) this.onClose(); })
+        } else {
+          IconActionButton({ toolbarStyle: true, source: this.closeIcon, label: this.closeLabel,
+            isInteractive: this.closeEnabled, onAction: this.onClose })
+        }
       }
       }
       .width('28%')

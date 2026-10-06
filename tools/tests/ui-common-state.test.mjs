@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
-import { PAGE_COMPACT_LAYOUT_KEY } from '../../entry/src/main/ets/model/AppLayoutState.ts';
+import { PAGE_COMPACT_LAYOUT_KEY, SIMPLE_MODE_KEY } from '../../entry/src/main/ets/model/AppLayoutState.ts';
 import { APP_FOREGROUND_KEY } from '../../entry/src/main/ets/model/AppLifecycleState.ts';
 import { DECK_LIST_NARROW_KEY } from '../../entry/src/main/ets/model/DeckListAppearance.ts';
 import { THEME_MOTION_KEY } from '../../entry/src/main/ets/model/ThemeCatalog.ts';
@@ -14,6 +14,7 @@ const dimensions = loadPlatformModule('utils/应用尺寸.ets', '应用尺寸', 
 test('generic state owners retain the existing preference and lifecycle keys', () => {
   assert.equal(PAGE_COMPACT_LAYOUT_KEY, DECK_LIST_NARROW_KEY);
   assert.equal(PAGE_COMPACT_LAYOUT_KEY, 'deckListNarrow');
+  assert.equal(SIMPLE_MODE_KEY, 'simpleMode');
   assert.equal(APP_FOREGROUND_KEY, 'appForeground');
   assert.equal(THEME_MOTION_KEY, 'themeMotion');
 });

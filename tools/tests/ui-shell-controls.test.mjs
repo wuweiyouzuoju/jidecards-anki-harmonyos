@@ -14,6 +14,15 @@ test('primary actions and switches block disabled callbacks without owning busin
   const Button = loadComponentLogic('components/common/PrimaryActionButton.ets', 'PrimaryActionButton', { $r: resource });
   const Row = loadComponentLogic('components/common/SettingsToggleRow.ets', 'SettingsToggleRow', { $r: resource });
   const button = new Button(), row = new Row();
+  for (const themeColor of ['#733BCD', '#14B8A6']) {
+    button.primaryBackground = themeColor;
+    assert.equal(button.resolvedTint(), themeColor, 'default primary action follows the current theme');
+  }
+  button.tint = '#C2410C';
+  button.primaryBackground = '#733BCD';
+  assert.equal(button.resolvedTint(), '#C2410C', 'explicit action color remains owned by the host');
+  button.tint = undefined;
+  assert.equal(button.resolvedTint(), '#733BCD', 'removing the override restores the current theme');
   let actions = 0; const changes = [];
   button.onAction = () => actions++;
   row.onChange = value => changes.push(value);
@@ -34,6 +43,13 @@ test('shared secondary buttons retain ordinary colors and stable selection borde
     应用尺寸: dimensions, $r: resource, SurfaceBorder, GLASS_HIGHLIGHT_COLORS: []
   });
   const button = new Button();
+  button.selectable = true; button.selected = true;
+  for (const themeColor of ['#733BCD', '#14B8A6']) {
+    button.actionColor = themeColor;
+    assert.equal(button.labelColor(), themeColor, 'selected tool follows theme changes on the same instance');
+    assert.deepEqual(button.buttonBorder(), { width: 2, color: themeColor });
+  }
+  button.selectable = false;
   button.字色 = 'danger'; button.selectionColor = 'cyan';
   button.selected = true;
   assert.equal(button.labelColor(), 'danger', 'ordinary actions ignore selection state');

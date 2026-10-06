@@ -16,13 +16,17 @@ export class MenuSurface implements AttributeModifier<CommonAttribute> {
   }
 
   private active: boolean;
+  private cornerRadius: number;
 
-  constructor(active: boolean = true) { this.active = active; }
+  constructor(active: boolean = true, cornerRadius: number = 应用尺寸.radiusLg) {
+    this.active = active;
+    this.cornerRadius = cornerRadius;
+  }
 
   applyNormalAttribute(instance: CommonAttribute): void {
     instance.backgroundColor(this.active ? $r('app.color.menu_surface') : Color.Transparent)
       .border(SurfaceBorder.options(this.active ? 应用尺寸.卡片边框 : 0))
-      .borderRadius(应用尺寸.radiusLg)
+      .borderRadius(this.cornerRadius)
       .shadow({ radius: this.active ? 12 : 0, color: $r('app.color.menu_shadow'), offsetX: 0, offsetY: 4 })
       .clip(this.active);
   }

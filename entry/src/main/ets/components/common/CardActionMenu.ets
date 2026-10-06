@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { WINDOW_SAFE_TOP_KEY } from '../../model/WindowSafeLayout';
 import { PAGE_COMPACT_LAYOUT_KEY } from '../../model/AppLayoutState';
 import { AnchoredMenu } from './AnchoredMenu';
 import { AnchoredMenuItem } from './MenuItem';
@@ -32,6 +33,7 @@ export struct CardActionMenu {
   private lastOcclusion: boolean = false;
   @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
   @StorageProp('状态栏高度') private statusBarHeight: number = 0;
+  @StorageProp(WINDOW_SAFE_TOP_KEY) private toolbarSafeTop: number = 0;
   onClose: () => void = (): void => {};
   onToggleBranch: (item: CardActionMenuEntry) => void = (_item: CardActionMenuEntry): void => {};
   onPrimaryObscured: (obscured: boolean) => void = (_obscured: boolean): void => {};
@@ -164,7 +166,7 @@ export struct CardActionMenu {
     Stack() {
       AnchoredMenu({ menuWidth: this.totalWidth(), alignEnd: true, surfaceVisible: false,
         contentMaxWidth: this.contentWidth,
-        topOffset: this.topOffset ?? 应用尺寸.pageContentTop(this.statusBarHeight, this.narrowDeckLayout),
+        topOffset: this.topOffset ?? 应用尺寸.pageContentTop(this.statusBarHeight, this.narrowDeckLayout, this.toolbarSafeTop),
         onClose: (): void => { this.dismissTop(); } }) {
         Stack({ alignContent: Alignment.TopStart }) {
           Row({ space: 6 }) {

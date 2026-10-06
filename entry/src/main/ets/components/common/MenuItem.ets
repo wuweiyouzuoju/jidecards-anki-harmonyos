@@ -47,7 +47,7 @@ export struct AnchoredMenuItem {
 
   private labelPadding(): Padding {
     if (this.icon !== undefined) return { left: 0, right: 0, top: 8, bottom: 8 };
-    return { left: this.labelAlignment === TextAlign.Start ? 0 : this.trailingInset(),
+    return { left: this.labelAlignment === TextAlign.Start ? 应用尺寸.menuHorizontalPadding : this.trailingInset(),
       right: this.trailingInset(), top: 8, bottom: 8 };
   }
 

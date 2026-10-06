@@ -28,15 +28,15 @@ test('menu, panel and button outlines share defaults while explicit state colors
 
 test('the real menu surface applies the shared outline and preserves its custom radius', () => {
   const MenuSurface=loadPlatformModule('components/common/MenuSurface.ets','MenuSurface',{
-    应用尺寸:{卡片边框:1,radiusLg:18},SurfaceBorder,$r:key=>key,Color:{Transparent:'transparent'}
+    应用尺寸:{卡片边框:1,radiusLg:16},SurfaceBorder,$r:key=>key,Color:{Transparent:'transparent'}
   });
-  for(const active of [true,false]) {
+  for(const active of [true,false]) for(const cornerRadius of [undefined,18]) {
     const attrs={},calls=[];
     const instance=Object.fromEntries(['backgroundColor','border','borderRadius','shadow','clip'].map(name=>
       [name,value=>{calls.push(name);attrs[name]=value;return instance;}]));
-    new MenuSurface(active).applyNormalAttribute(instance);
+    new MenuSurface(active,cornerRadius).applyNormalAttribute(instance);
     assert.deepEqual(attrs.border,SurfaceBorder.options(active?1:0));
-    assert.equal(attrs.borderRadius,18);
+    assert.equal(attrs.borderRadius,cornerRadius??16);
     assert.ok(calls.indexOf('border')<calls.indexOf('borderRadius'),'border defaults must not override the explicit radius');
     assert.equal(attrs.backgroundColor,active?'app.color.menu_surface':'transparent');
     assert.equal(attrs.clip,active);assert.equal(attrs.shadow.radius,active?12:0);
@@ -80,11 +80,13 @@ test('ordinary outlines, form controls and separators use the common border inst
       file + ': neutral outlines and separators must use SurfaceBorder');
   }
   for (const file of ['components/牌组详情面板.ets', 'components/DeckStudyHistoryCard.ets',
-    'components/home/HomeDeckDetails.ets', 'components/common/DialogFrame.ets',
+    'components/common/IconActionButton.ets', 'components/common/DialogFrame.ets',
     'components/common/MenuSurface.ets', 'utils/PrimaryGlassSurface.ets', 'utils/FormInputStyle.ets',
     'utils/FormTextAreaStyle.ets', 'utils/ImageSurfaceStyle.ets', 'components/settings/设置分组卡片.ets']) {
     assert.match(read(file), /\.border\(SurfaceBorder\.options\(/, file);
   }
+  assert.match(read('components/home/HomeDeckDetails.ets'), /IconActionButton\(\{ toolbarStyle: true/,
+    'detail toolbar delegates its homepage outline to the public icon button');
   assert.match(read('utils/GlassSurface.ets'),/outline: BorderOptions = SurfaceBorder\.options\(\)/);
   assert.match(read('utils/GlassSurface.ets'),/\.border\(this\.outline\)/);
   const deck = read('components/牌组列表项.ets');

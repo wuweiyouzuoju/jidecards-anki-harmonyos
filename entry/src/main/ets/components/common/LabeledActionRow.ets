@@ -8,7 +8,7 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 export struct LabeledActionRow {
   @Prop label: ResourceStr = '';
   @Prop actionLabel: ResourceStr = '';
-  @Prop tint: ResourceColor = $r('app.color.action_primary');
+  @Prop tint: ResourceColor = $r('app.color.text_primary');
   @Prop textColor: ResourceColor = $r('app.color.text_primary');
   @Prop isInteractive: boolean = true;
   onAction: () => void = (): void => {};
