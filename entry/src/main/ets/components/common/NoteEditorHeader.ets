@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { WINDOW_SAFE_TOP_KEY } from '../../model/WindowSafeLayout';
 import { 按下态按钮 } from './按下态按钮';
+import { IconActionButton } from './IconActionButton';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { PAGE_COMPACT_LAYOUT_KEY } from '../../model/AppLayoutState';
 
@@ -15,6 +17,7 @@ export struct NoteEditorHeader {
   onBack: () => void = (): void => {};
   onSave: () => void = (): void => {};
   @StorageProp('状态栏高度') private statusBarHeight: number = 0;
+  @StorageProp(WINDOW_SAFE_TOP_KEY) private toolbarSafeTop: number = 0;
   @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrow: boolean = false;
 
   build() {
@@ -25,8 +28,8 @@ export struct NoteEditorHeader {
         .width('44%').hitTestBehavior(HitTestMode.None)
       Row() {
         Row() {
-          按下态按钮({ 文案: $r('app.string.study_back'), 字色: $r('app.color.text_primary'),
-            是否启用: this.closeEnabled, singleLine: true, 点击回调: this.onBack })
+          IconActionButton({ toolbarStyle: true, source: $r('app.media.ic_common_arrow_left'), label: $r('app.string.study_back'),
+            isInteractive: this.closeEnabled, onAction: this.onBack })
         }.width('28%').justifyContent(FlexAlign.Start)
         Blank().layoutWeight(1)
         Row() {
@@ -36,8 +39,8 @@ export struct NoteEditorHeader {
           }
         }.width('28%').justifyContent(FlexAlign.End)
       }.width('100%').height('100%').alignItems(VerticalAlign.Center)
-    }.width('100%').height(应用尺寸.pageToolbarHeight(this.statusBarHeight, this.narrow))
+    }.width('100%').height(应用尺寸.pageToolbarHeight(this.statusBarHeight, this.narrow, this.toolbarSafeTop))
       .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平,
-        top: 应用尺寸.pageToolbarTop(this.statusBarHeight, this.narrow), bottom: 0 })
+        top: 应用尺寸.pageToolbarTop(this.statusBarHeight, this.narrow, this.toolbarSafeTop), bottom: 0 })
   }
 }

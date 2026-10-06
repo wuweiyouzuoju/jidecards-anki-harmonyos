@@ -133,7 +133,7 @@ export class NoteDraftPreviewSession {
   async select(index: number): Promise<void> {
     if (!this.alive || this.state.busy || index < 0 || index >= this.state.options.length) return;
     const version = ++this.version;
-    this.state.busy = true; this.state.error = ''; this.state.rendered = null; this.publish();
+    this.state.busy = true; this.state.error = ''; this.publish();
     this.pending = this.renderSelection(index, version);
     await this.pending;
   }

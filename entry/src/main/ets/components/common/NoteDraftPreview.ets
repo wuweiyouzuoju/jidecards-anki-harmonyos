@@ -41,13 +41,13 @@ export struct NoteDraftPreview {
   }
   build() {
     if (this.state.rendered !== null) {
-      ForEach([this.state.revision], (_revision: number) => {
-        NotetypeTemplatePreview({ rendered: this.state.rendered!, isDark: this.isDark, options: this.state.options,
-          selected: this.state.selected, media: this.state.media, sample: this.input.sample ?? false,
-          fullScreen: this.fullScreen, isVisible: this.isVisible,
-          onReleaseAvailable: (release: () => Promise<void>): void => { this.releaseCard = release; },
-          onSelect: (index: number): void => { this.session.select(index); }, onClose: this.onClose })
-      }, (revision: number): string => String(revision))
+      NotetypeTemplatePreview({ rendered: this.state.rendered!, contentRevision: this.state.revision,
+        loading: this.state.busy, loadError: this.state.error,
+        isDark: this.isDark, options: this.state.options,
+        selected: this.state.selected, media: this.state.media, sample: this.input.sample ?? false,
+        fullScreen: this.fullScreen, isVisible: this.isVisible,
+        onReleaseAvailable: (release: () => Promise<void>): void => { this.releaseCard = release; },
+        onSelect: (index: number): void => { this.session.select(index); }, onClose: this.onClose })
     } else if (this.fullScreen) {
       Column() {
         NoteEditorHeader({ title: this.input.sample ? $r('app.string.notetype_template_preview') : $r('app.string.note_draft_preview'),

@@ -128,6 +128,25 @@ test('selection busy guard prevents parallel render and disposal during render n
   assert.equal(h.states.length,count+1);assert.equal(h.states.at(-1).busy,true);
 });
 
+test('draft selection retains the old rendered card through loading and failure, then replaces it after success',async()=>{
+  const h=fixture();await h.session.open(input());
+  const previous=h.states.at(-1),gate=deferred();
+  h.backend.render=async()=>{await gate.promise;throw Error('render unavailable');};
+  const pending=h.session.select(1);
+  assert.deepEqual(h.states.at(-1).rendered,previous.rendered);
+  assert.equal(h.states.at(-1).revision,previous.revision);
+  assert.equal(h.states.at(-1).busy,true);
+  gate.resolve();await pending;
+  assert.deepEqual(h.states.at(-1).rendered,previous.rendered);
+  assert.equal(h.states.at(-1).error,'render unavailable');
+  h.backend.render=async()=>({...previous.rendered,css:'new template'});
+  await h.session.select(1);
+  assert.equal(h.states.at(-1).rendered.css,'new template');
+  assert.equal(h.states.at(-1).selected,1);
+  assert.equal(h.states.at(-1).revision,previous.revision+1);
+  assert.equal(h.states.at(-1).error,'');
+});
+
 test('disposal immediately rejects late results and waits for Web/audio release before deleting preview media',async()=>{
   const h=fixture();await h.session.open(input());const mediaGate=deferred(),count=h.states.length;
   const cleanup=h.session.dispose(mediaGate.promise);await new Promise(r=>setImmediate(r));

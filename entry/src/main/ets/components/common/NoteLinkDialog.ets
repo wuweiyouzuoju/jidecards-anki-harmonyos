@@ -6,8 +6,9 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 import { noteLinkUrl } from '../../model/NoteRichText';
 import { localizedResourceText } from '../../utils/UiFeedback';
 
-@Component
+@CustomDialog
 export struct NoteLinkDialog {
+  controller?: CustomDialogController;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   selectedText: string = '';
   initialUrl: string = '';

@@ -1,9 +1,10 @@
+import { IconActionButton } from './IconActionButton';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { noteFieldText } from '../../utils/NoteTypeText';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { NoteAudioField } from './NoteAudioField';
-import { NoteFieldEditor, NoteFieldEditingOptions } from './NoteFieldEditor';
+import { NoteFieldEditor, NoteFieldEditingOptions, noteFieldMediaTool } from './NoteFieldEditor';
 import { NoteImagePreview } from './NoteImagePreview';
 import { NoteMediaDialog } from './NoteMediaDialog';
 import { common } from '@kit.AbilityKit';
@@ -147,17 +148,14 @@ export struct NoteFieldCard {
               .onClick((): void => { if (!this.disabled && !this.disposed) this.collapsed = !this.collapsed; })
           }
           if (this.mediaEditable) {
-            Button($r('app.string.add_note_image_add')).height(应用尺寸.紧凑控件高度)
-              .fontSize(应用尺寸.字号_正文_小).fontColor(this.accent).backgroundColor(Color.Transparent)
-              .borderRadius(应用尺寸.圆角_面板).padding({ left: 10, right: 10 })
-              .enabled(!this.disabled).attributeModifier(new PressFeedback())
-              .stateEffect(false)
-              .onClick((): void => { this.openManager('image'); })
-            Button($r('app.string.note_audio_add'))
-              .height(应用尺寸.紧凑控件高度).fontSize(应用尺寸.字号_正文_小).fontColor(this.accent)
-              .backgroundColor(Color.Transparent).borderRadius(应用尺寸.圆角_面板).padding({ left: 10, right: 10 })
-              .enabled(!this.disabled).attributeModifier(new PressFeedback()).stateEffect(false)
-              .onClick((): void => { this.openManager('audio'); })
+            IconActionButton({ source: $r('app.media.' + noteFieldMediaTool('image').iconKey),
+              label: $r('app.string.' + noteFieldMediaTool('image').titleKey),
+              glyphColor: this.accent, controlGlyphSize: 24, isInteractive: !this.disabled,
+              onAction: (): void => { this.openManager('image'); } })
+            IconActionButton({ source: $r('app.media.' + noteFieldMediaTool('audio').iconKey),
+              label: $r('app.string.' + noteFieldMediaTool('audio').titleKey),
+              glyphColor: this.accent, controlGlyphSize: 24, isInteractive: !this.disabled,
+              onAction: (): void => { this.openManager('audio'); } })
           }
         }.width('100%')
         if (!this.collapsed) {

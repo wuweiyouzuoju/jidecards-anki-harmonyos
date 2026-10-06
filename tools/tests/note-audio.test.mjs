@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { noteAudioParts, replaceNoteAudioPart, localNoteAudioPath, noteAudioExtension,
   prepareNoteAudioFields, MAX_NOTE_AUDIO_BYTES } from '../../entry/src/main/ets/model/NoteAudioDraft.ts';
 import { NoteCreationSession } from '../../entry/src/main/ets/model/NoteCreationSession.ts';
-import { loadPlatformModule, loadComponentLogic } from './platform-module-harness.mjs';
+import { expansionRevealDependencies, loadPlatformModule, loadComponentLogic } from './platform-module-harness.mjs';
 import { editorPageHarness } from './editor-page-harness.mjs';
 
 const turn = () => new Promise(resolve => setImmediate(resolve));
@@ -319,6 +319,7 @@ test('missing audio errors are visible and background cancels microphone capture
 
 test('audio recording and picker busy flags block the real form save and close paths', async () => {
   const Form = loadComponentLogic('components/browser/浏览编辑区.ets', '浏览编辑区', {
+    ...expansionRevealDependencies(),
     NoteAudioPreview: class { async dispose() {} }, discardNoteRecordings: async () => {},
     confirmNoteDiscard: async () => assert.fail('must not prompt while microphone is active'),
     noteDraftChanged: () => true, parseNoteTags: () => []

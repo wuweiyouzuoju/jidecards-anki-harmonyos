@@ -56,7 +56,7 @@ test('draft Web and sound requests route owned cache files and stop playback whe
   const Preview=loadComponentLogic('components/settings/NotetypeTemplatePreview.ets','NotetypeTemplatePreview',{
     APP_FOREGROUND_KEY:'foreground',webview:{WebviewController:class{}},
     AppStorage:{get:()=>({filesDir:'/files'})},媒体基地址:'https://anki.local/',
-    CardWebView:class {reset(){resets++;}},卡片渲染服务:class{},声音播放器:class{},TTS播放器:class{},
+    CardWebView:class {reset(){resets++;}setAudioEnabled(){}},卡片渲染服务:class{},声音播放器:class{},TTS播放器:class{},
     CardAudioSession:class {constructor(_sound,_tts,_extract,path){this.path=path;}stop(){stops++;}async release(){releases++;}}
   });
   const preview=new Preview();preview.media={fields:[],directory:'/cache/owned',filenames:['draft.png','draft.m4a']};
@@ -72,6 +72,42 @@ test('draft Web and sound requests route owned cache files and stop playback whe
   assert.equal(stops,2);assert.equal(resets,1);
   preview.onReleaseAvailable=release=>{registered=release;};preview.aboutToAppear();
   await registered();assert.equal(releases,1);assert.equal(preview.attached,false);
+});
+
+test('draft preview waits for both Web controllers, retains same-card flips and stages a new revision',async()=>{
+  const requests=[],attached=[],audio=[],muted=[];let bridge;
+  const Preview=loadComponentLogic('components/settings/NotetypeTemplatePreview.ets','NotetypeTemplatePreview',{
+    APP_FOREGROUND_KEY:'foreground',webview:{WebviewController:class{}},
+    AppStorage:{get:()=>({filesDir:'/files'})},
+    构建卡片HTML:(_rendered,side)=>side,剥除拼写标记:value=>value,
+    CardWebView:class {
+      constructor(_controller,shown,_failed,_spare,switched){bridge={shown,switched};}
+      attach(slot){attached.push(slot);}reset(){}setAudioEnabled(enabled){muted.push(enabled);}
+      show(...args){requests.push(args);}controllerAt(slot){return {slot};}
+    },
+    卡片渲染服务:class{},声音播放器:class{},TTS播放器:class{},
+    CardAudioSession:class {stop(){}async release(){}async play(...args){audio.push(args);}}
+  });
+  const preview=new Preview();preview.rendered={};
+  preview.attach(0);assert.deepEqual(requests,[]);
+  preview.attach(1);assert.deepEqual(attached,[0,1]);
+  assert.deepEqual(requests,[['question',1,'question']]);
+  preview.toggleSide();assert.equal(requests.length,1,'pending render blocks early flips');
+  bridge.switched(0);bridge.shown('#102030');
+  assert.equal(preview.cardSurfaceBackground,'#102030');
+  assert.equal(preview.hasRendered,true);assert.equal(audio.length,1);
+  preview.toggleSide();assert.deepEqual(requests.at(-1),['answer',1,'answer']);
+  bridge.shown('#102030');
+  preview.loading=true;preview.loadingChanged();
+  preview.contentRevision=2;preview.contentChanged();
+  assert.equal(requests.length,2,'Core selection retains old frame until actual content arrives');
+  preview.loading=false;preview.loadingChanged();
+  assert.deepEqual(requests.at(-1),['question',2,'question']);
+  assert.equal(preview.visibleWebSlot,0);
+  bridge.switched(1);bridge.shown('#203040');
+  assert.equal(preview.visibleWebSlot,1);assert.equal(preview.controller.slot,1);
+  preview.foreground=false;preview.stopBackgroundAudio();
+  assert.equal(muted.at(-1),false);
 });
 
 test('structure impact uses actual localized counts and concrete field/template names and positions',()=>{

@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { NoteMediaSession } from '../../entry/src/main/ets/model/NoteMediaSession.ts';
+import { noteFieldMediaTool } from '../../entry/src/main/ets/model/NoteFieldEditing.ts';
 import { noteMediaParts, replaceNoteMediaPart, noteImagePreviewSource, assertNoteMediaResolved } from '../../entry/src/main/ets/model/NoteMediaParts.ts';
 import { prepareNoteImageFields } from '../../entry/src/main/ets/model/NoteImageDraft.ts';
 import { prepareNoteAudioFields, noteAudioParts } from '../../entry/src/main/ets/model/NoteAudioDraft.ts';
@@ -151,8 +152,11 @@ test('main field previews resolve existing and replacement images live and delet
 test('media UI keeps fixed Add labels and main previews expose deletion independent of the management dialog', () => {
   const read = path => readFileSync(new URL('../../entry/src/main/ets/' + path, import.meta.url), 'utf8');
   const card = read('components/common/NoteFieldCard.ets');
-  assert.match(card, /Button\(\$r\('app.string.add_note_image_add'\)\)/);
-  assert.match(card, /Button\(\$r\('app.string.note_audio_add'\)\)/);
+  for (const [id, label] of [['image', 'add_note_image_add'], ['audio', 'note_audio_add']]) {
+    assert.equal(noteFieldMediaTool(id).titleKey, label);
+    assert.ok(card.includes(`label: $r('app.string.' + noteFieldMediaTool('${id}').titleKey)`));
+    assert.ok(card.includes(`this.openManager('${id}')`));
+  }
   assert.match(card, /Stack\(\{ alignContent: Alignment.TopEnd \}\)/);
   assert.match(card, /Button\(\$r\('app.string.add_note_image_remove'\)\)/);
   assert.doesNotMatch(card, /note_(image|audio)_modify|removalsVisible: false/);
