@@ -209,11 +209,12 @@ test('double columns keep a top level deck and all visible descendants as one in
     {rootId:'C',start:6,count:1},{rootId:'D',start:7,count:2}
   ]);
   assert.deepEqual(groups.flatMap(group => roots.slice(group.start,group.start+group.count)), roots);
-  assert.equal(appearance.groupedDeckListOverflows([4,2,1,2],76,8,496), false);
-  assert.equal(appearance.groupedDeckListOverflows([4,2,1,2],76,8,495), true);
-  assert.equal(appearance.groupedDeckListOverflows([8],76,8,500), true, 'one large tree stays in one column');
-  assert.equal(appearance.groupedDeckListOverflows([],76,8,500), false);
-  assert.equal(appearance.groupedDeckListOverflows([3,1],76,8,0), false);
+  const height = 应用尺寸.deckRowHeight(true);
+  assert.equal(appearance.groupedDeckListOverflows([4,2,1,2],height,8,400), false);
+  assert.equal(appearance.groupedDeckListOverflows([4,2,1,2],height,8,399), true);
+  assert.equal(appearance.groupedDeckListOverflows([8],height,8,500), true, 'one large tree stays in one column');
+  assert.equal(appearance.groupedDeckListOverflows([],height,8,500), false);
+  assert.equal(appearance.groupedDeckListOverflows([3,1],height,8,0), false);
 });
 
 test('real grouped data source preserves complete subtrees through expansion, collapse and reorder', () => {
@@ -230,7 +231,7 @@ test('real grouped data source preserves complete subtrees through expansion, co
     ...appearance, 应用尺寸, 牌组列表数据源:Source, Scroller:class {}
   });
   const list = new List();
-  list.style = 'double_narrow'; list.narrow = true; list.加载状态 = 'ready'; list.viewportHeight = 320;
+  list.style = 'double_narrow'; list.narrow = true; list.加载状态 = 'ready'; list.viewportHeight = 263;
   const events = []; list.onOverflowChange = overflow => events.push(overflow); list.aboutToAppear();
   const row = (id,ancestorIds=[]) => ({id,ancestorIds});
   const a = [row('A'),row('A1',['A']),row('A11',['A','A1']),row('A2',['A'])];
@@ -239,6 +240,10 @@ test('real grouped data source preserves complete subtrees through expansion, co
   assert.deepEqual(list.groupSource.getData(0).decks.map(x=>x.id),['A','A1','A11','A2']);
   assert.deepEqual(list.groupSource.getData(1).decks.map(x=>x.id),['B','B1']);
   assert.equal(events.at(-1),true,'group A is taller than the viewport, cannot split it');
+  list.viewportHeight = 264; list.reportOverflow();
+  assert.equal(events.at(-1),false,'four 60vp rows and three 8vp gaps fit exactly');
+  list.viewportHeight = 263; list.reportOverflow();
+  assert.equal(events.at(-1),true,'one vp less must overflow');
   list.牌组数据源.replaceDecks([a[0],...b]);
   assert.equal(events.at(-1),false,'collapse reduces the complete group height');
   list.牌组数据源.replaceDecks([...b,...a]);

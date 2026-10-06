@@ -2,6 +2,7 @@
 import { AnchoredMenuItem } from './common/MenuItem';
 import { interfaceItemText } from '../utils/AppInterfaceText';
 import { PressFeedback } from '../utils/PressFeedback';
+import { DeckRowMenuGesture } from '../utils/DeckRowMenuGesture';
 import { DisclosureChevron } from './common/DisclosureChevron';
 import { ActionIcon } from './common/ActionIcon';
 import { MenuSurface } from './common/MenuSurface';
@@ -17,8 +18,7 @@ import { 牌组汇总, 牌组色调, 牌组显示名 } from '../model/主页模�
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { 颜色键 } from '../model/颜色主题';
 import { 简洁模式AppStorage键 } from '../model/简洁模式存储';
-import { image } from '@kit.ImageKit';
-import { fileIo as fs } from '@kit.CoreFileKit';
+import { loadDeckBackground, releaseDeckBackground } from '../backend/DeckBackgroundImage';
 
 // ========================================================
 // @块ID UI-DECK-LIST-001
@@ -75,7 +75,7 @@ export struct 牌组列表项 {
   @StorageProp(GLASS_COLORS_KEY) private glassColors: string[] = GLASS_HIGHLIGHT_COLORS;
   @StorageProp(THEME_VISUALS_KEY) private visual: ThemeDefinition = themeDefinition('aurora');
   // 注：deck / expanded / onToggle 保留英文名以兼容 deck-hierarchy-contract.test.mjs 阶段 6 前的断言。
-  @Prop deck: 牌组汇总 = {
+  @Prop @Watch('backgroundChanged') deck: 牌组汇总 = {
     id: '', name: '', fullName: '', depth: 0, parentId: '', hasChildren: false, ancestorIds: [],
     description: '',
     newCount: 0, learningCount: 0, reviewCount: 0, totalCards: 0,
@@ -91,6 +91,7 @@ export struct 牌组列表项 {
   @Prop reorderMode: boolean = false;
   @State private 显示牌组菜单: boolean = false;
   @State private 显示色条菜单: boolean = false;
+  @State private textColumnWidth: number = 0;
   // 沙盒背景图异步加载的 PixelMap。
   // 必须用 PixelMap 而不是直接传文件路径给 Image——ArkUI Image 对沙盒绝对路径解析不稳定，
   // 标准方式是 fileIo.openSync → image.createImageSource → createPixelMap → Image(pixelMap)。
@@ -100,6 +101,9 @@ export struct 牌组列表项 {
   // ArkUI 的 TapGesture({count:2}) 与 .onClick 冲突——onClick 消费第一次点击后双击手势收不到完整序列，
   // 必须手动用时序判定替代。
   private 上次点击时间: number = 0;
+  private disposed: boolean = true;
+  private imageGeneration: number = 0;
+  private backgroundPath: string = '';
   onSelect: (deckId: string) => void = (deckId: string): void => {
   };
   onToggle: (deckId: string) => void = (deckId: string): void => {
@@ -136,51 +140,42 @@ export struct 牌组列表项 {
   @StorageProp(颜色键.复习中计数色) private 复习中计数色: string = '#7056C8';
 
   aboutToAppear(): void {
+    this.disposed = false;
+    this.backgroundChanged();
+  }
+
+  aboutToDisappear(): void {
+    this.disposed = true;
+    this.imageGeneration++;
+    this.backgroundPath = '';
+    const previous: PixelMap | null = this.背景像素图;
+    this.背景像素图 = null;
+    releaseDeckBackground(previous);
+  }
+
+  private backgroundChanged(): void {
+    if (this.disposed || this.backgroundPath === this.deck.backgroundImage) return;
+    this.backgroundPath = this.deck.backgroundImage;
     this.异步加载背景像素图();
   }
 
-  // ========================================================
-  // @块ID UI-DECK-LIST-002
-  // @名称 异步加载背景像素图
-  //
-  // @作用
-  // 把沙盒背景图读入为 PixelMap，供 Image 组件稳定渲染。
-  //
-  // @输入
-  // this.deck.backgroundImage：沙盒绝对路径，空串表示无背景图。
-  //
-  // @输出
-  // this.背景像素图：成功时为 PixelMap，失败或路径为空时为 null（Stack 显示底色）。
-  //
-  // @业务规则
-  // ArkUI Image 直接传沙盒绝对路径解析不稳定（部分版本白屏），
-  // 标准方式是 fileIo.openSync → image.createImageSource(fd) → createPixelMap → Image(pixelMap)。
-  // 失败时静默——背景像素图 保持 null，Stack 显示 surface_card 底色。
-  //
-  // @副作用
-  // 读取沙盒文件、分配 PixelMap 资源；imageSource 在 finally 中 release。
-  // ========================================================
+  /** 组件拥有返回图片；旧请求与销毁后的解码结果只释放，不回写。 */
   private async 异步加载背景像素图(): Promise<void> {
-    const 路径: string = this.deck.backgroundImage;
-    if (路径 === '') {
-      this.背景像素图 = null;
-      return;
-    }
+    const path: string = this.deck.backgroundImage;
+    const generation: number = ++this.imageGeneration;
+    const previous: PixelMap | null = this.背景像素图;
+    this.背景像素图 = null;
+    releaseDeckBackground(previous);
+    if (path === '') return;
     try {
-      const 文件: fs.File = fs.openSync(路径, fs.OpenMode.READ_ONLY);
-      try {
-        const 图像源: image.ImageSource = image.createImageSource(文件.fd);
-        try {
-          this.背景像素图 = await 图像源.createPixelMap();
-        } finally {
-          图像源.release();
-        }
-      } finally {
-        await fs.close(文件);
+      const pixels: PixelMap = await loadDeckBackground(path);
+      if (this.disposed || generation !== this.imageGeneration || path !== this.deck.backgroundImage) {
+        releaseDeckBackground(pixels);
+        return;
       }
+      this.背景像素图 = pixels;
     } catch (error) {
-      // 文件不存在或解码失败：背景像素图 保持 null，UI 显示底色
-      this.背景像素图 = null;
+      console.warn('[deck-background] Preview unavailable: ' + String(error));
     }
   }
 
@@ -458,7 +453,7 @@ export struct 牌组列表项 {
   // 单行卡组列表项视觉；通过 onSelect / onToggle / onDoubleTap / 长按 Popup 上抛用户操作。
   //
   // @业务规则
-  // 排序模式：onClick 不触发选牌，长按 duration 设极大值等效禁用。
+  // 排序模式：onClick 不触发选牌，移除菜单长按识别器，由 ListItem 接管拖动。
   // 双击检测：两次 onClick 间隔 < 300ms 且 hasChildren → onDoubleTap（递归展开）。
   // 色条 tone===None 时不渲染色块，但保留 Column 占位维持行内对齐。
   // 排序模式下行描边用 动作主色 高亮，选中态用 主色边框色（更浅避免视觉过重）。
@@ -469,6 +464,22 @@ export struct 牌组列表项 {
   private expansionLabel(_locale: string = this.uiLanguage): string {
     const label: Resource = this.expanded ? $r('app.string.deck_collapse') : $r('app.string.deck_expand');
     return resourceText(this.getUIContext(), label, 牌组显示名(this.deck, this.uiLanguage));
+  }
+
+  private compactText(): boolean {
+    if (!this.narrow || this.deck.description.trim().length === 0 ||
+      this.textColumnWidth <= 0) {
+      return false;
+    }
+    const name: string = 牌组显示名(this.deck, this.uiLanguage);
+    // 始终测原字号，避免缩小后变成一行又恢复字号的反复跳动。
+    const nameWidth: number = this.getUIContext().getMeasureUtils().measureText({
+      textContent: name,
+      fontSize: 应用尺寸.字号_强调,
+      fontWeight: FontWeight.Medium
+    });
+    return name.includes('\n') || name.includes('\r') ||
+      nameWidth > Math.ceil(this.getUIContext().vp2px(this.textColumnWidth));
   }
 
   @Builder
@@ -524,16 +535,18 @@ export struct 牌组列表项 {
         }
         Column({ space: this.narrow ? 应用尺寸.间距_3 : 应用尺寸.间距_5 }) {
           Text(牌组显示名(this.deck, this.uiLanguage))
-            .fontSize(this.narrow ? 应用尺寸.字号_强调 : 应用尺寸.字号_标题)
-            .lineHeight(this.narrow ? 20 : 22)
+            .fontSize(this.narrow ?
+              (this.compactText() ? 应用尺寸.字号_正文 : 应用尺寸.字号_强调) : 应用尺寸.字号_标题)
+            .lineHeight(this.narrow ? (this.compactText() ? 16 : 20) : 22)
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.text_primary'))
-            .maxLines(this.hideStudyCounts ? 2 : 1)
+            .maxLines(2)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
           if (!this.narrow || this.deck.description.trim().length > 0) {
             Text(this.deck.description)
-              .fontSize(this.narrow ? 应用尺寸.字号_正文_小 : 应用尺寸.字号_正文_中)
-              .lineHeight(16)
+              .fontSize(this.narrow ?
+                (this.compactText() ? 应用尺寸.字号_说明 : 应用尺寸.字号_正文_小) : 应用尺寸.字号_正文_中)
+              .lineHeight(this.compactText() ? 12 : 16)
               .fontColor($r('app.color.text_secondary'))
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -541,6 +554,9 @@ export struct 牌组列表项 {
         }
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1)
+        .onAreaChange((_oldArea: Area, newArea: Area): void => {
+          this.textColumnWidth = Number(newArea.width);
+        })
         if (!this.hideStudyCounts) {
           Column({ space: 应用尺寸.间距_5 }) {
             Row({ space: this.narrow ? 应用尺寸.间距_6 : 应用尺寸.间距_8 }) {
@@ -567,7 +583,7 @@ export struct 牌组列表项 {
       })
       .attributeModifier(new PressFeedback())
       .onClick(() => {
-        if (this.reorderMode) return;
+        if (this.reorderMode || this.显示牌组菜单) return;
         // 双击检测：两次点击间隔 < 300ms 且当前牌组有子牌组时，触发递归展开/折叠。
         // 第一次点击走 onSelect（选牌），第二次点击（间隔内）走 onDoubleTap（递归展开）。
         const 当前时间: number = Date.now();
@@ -580,16 +596,9 @@ export struct 牌组列表项 {
         this.上次点击时间 = 当前时间;
         this.onSelect(this.deck.id);
       })
-      // 与列表内置拖动并行；排序时长按不再打开菜单，也不拦截父级识别器。
-      .parallelGesture(
-        LongPressGesture({ repeat: false, duration: 500 })
-          .onAction(() => {
-            if (this.reorderMode) {
-              return;
-            }
-            this.显示牌组菜单 = true;
-          })
-      )
+      .gestureModifier(new DeckRowMenuGesture(this.reorderMode, (): void => {
+        this.显示牌组菜单 = true;
+      }))
       .bindPopup(!this.reorderMode && this.显示牌组菜单, {
         builder: this.弹层内容,
         placement: Placement.Bottom,
@@ -607,7 +616,7 @@ export struct 牌组列表项 {
       })
     }
     .width('100%')
-    .height(应用尺寸.deckRowHeight(this.narrow, this.hideStudyCounts))
+    .height(应用尺寸.deckRowHeight(this.narrow))
     .clip(true)
     .borderRadius(应用尺寸.圆角_牌组行)
     .linearGradient({ angle: 110, colors: this.visual.selectedColors.length > 0 && this.selected

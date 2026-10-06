@@ -142,7 +142,7 @@ export struct 主页牌组列表 {
   }
 
   private reportOverflow(): void {
-    const rowHeight: number = 应用尺寸.deckRowHeight(this.narrow, isDoubleColumnDeckListStyle(this.style));
+    const rowHeight: number = 应用尺寸.deckRowHeight(this.narrow);
     const gap: number = 应用尺寸.页面分组间距(this.narrow);
     const overflow: boolean = this.columnCount() === 2 ? groupedDeckListOverflows(
       this.groupSource.groupCounts(), rowHeight, gap, this.viewportHeight) : deckListOverflows(
@@ -178,6 +178,23 @@ export struct 主页牌组列表 {
 
   private deckKey(deck: 牌组汇总): string {
     return `${deck.id}_${deck.fullName}_${deck.hasChildren}_${deck.tone}_${deck.displayName}_${deck.description}_${deck.newCount}_${deck.learningCount}_${deck.reviewCount}_${deck.totalCards}_${deck.backgroundImage}`;
+  }
+
+  private moveDeck(from: number, to: number): void {
+    if (!this.排序模式中 || this.reorderBusy) return;
+    this.onMove(from, to);
+  }
+
+  @Builder
+  private flatDeckRows(sortingEnabled: boolean) {
+    LazyForEach(this.牌组数据源, (deck: 牌组汇总) => {
+      ListItem() {
+        this.deckItem(deck)
+      }
+    }, (deck: 牌组汇总): string => this.deckKey(deck) + (sortingEnabled ? '_sort' : '_view'))
+    .onMove(sortingEnabled ? (from: number, to: number): void => {
+      this.moveDeck(from, to);
+    } : undefined)
   }
 
   @Builder
@@ -225,7 +242,10 @@ export struct 主页牌组列表 {
       // 指示器等待刷新 Promise 落定，成功、失败或跳过都收起。
       Refresh({ refreshing: $$this.刷新指示器开关 }) {
         List({ scroller: this.牌组列表滚动器, space: 应用尺寸.页面分组间距(this.narrow) }) {
-          if (this.columnCount() === 2) {
+          // LazyForEach 的 onMove 在创建时注册；单列进入/退出排序也必须换分支重建。
+          if (this.排序模式中) {
+            this.flatDeckRows(true)
+          } else if (this.columnCount() === 2) {
             LazyForEach(this.groupSource, (group: HomeDeckGroup) => {
               ListItem() {
                 Column({ space: 应用尺寸.页面分组间距(this.narrow) }) {
@@ -239,12 +259,7 @@ export struct 主页牌组列表 {
             }, (group: HomeDeckGroup): string => group.rootId + ':' +
               group.decks.map((deck: 牌组汇总): string => this.deckKey(deck)).join('|'))
           } else {
-            LazyForEach(this.牌组数据源, (deck: 牌组汇总) => {
-              ListItem() {
-                this.deckItem(deck)
-              }
-            }, (deck: 牌组汇总) => `${deck.id}_${deck.fullName}_${deck.hasChildren}_${deck.tone}_${deck.displayName}_${deck.newCount}_${deck.learningCount}_${deck.reviewCount}_${deck.totalCards}_${deck.backgroundImage}_${this.排序模式中 ? 1 : 0}`)
-            .onMove(this.排序模式中 && !this.reorderBusy ? this.onMove : undefined)
+            this.flatDeckRows(false)
           }
 
           // 三态 ListItem：加载 / 错误 / 空。统一使用 共用积木 组件，
@@ -292,6 +307,7 @@ export struct 主页牌组列表 {
           }
         }
         .width('100%')
+        .enabled(!this.reorderBusy)
         .lanes(this.columnCount(), 应用尺寸.页面分组间距(this.narrow))
         .layoutWeight(1)
         .scrollBar(BarState.Auto)
@@ -301,6 +317,7 @@ export struct 主页牌组列表 {
           this.reportOverflow();
         })
       }
+      .pullToRefresh(!this.排序模式中 && !this.reorderBusy)
       .onRefreshing(() => {
         this.refreshDecks().catch((error: Error): void => {
           hilog.warn(0x4342, 'jidecards', `首页: 下拉刷新失败 ${error}`);

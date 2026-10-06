@@ -14,8 +14,9 @@ import { AppInterfaceTracker } from '../../entry/src/main/ets/model/AppInterface
 import { OFFICIAL_ANNOUNCEMENTS_ENABLED } from '../../entry/src/main/ets/model/官方公告配置.ts';
 import { buildAgentAppStructure } from '../../entry/src/main/ets/model/agent/AgentAppStructure.ts';
 import { agentFunctionTools } from '../../entry/src/main/ets/model/agent/AgentToolCatalog.ts';
-import { loadPlatformModule } from './platform-module-harness.mjs';
+import { loadPlatformModule, loadComponentLogic } from './platform-module-harness.mjs';
 import { isDoubleColumnDeckListStyle } from '../../entry/src/main/ets/model/DeckListAppearance.ts';
+import { homeSyncIndicator, homeSyncLabelKey } from '../../entry/src/main/ets/model/HomeSyncStatusController.ts';
 
 const node = (id, name, children = [], filtered = false) => ({ deckId:id, name, children, filtered,
   level:0, collapsed:false, reviewCount:0, learnCount:0, newCount:0, totalInDeck:0, totalIncludingChildren:0 });
@@ -130,10 +131,10 @@ function pageHarness(){
   const h=commandsHarness(), events=[], tracker=new AppInterfaceTracker();
   const methods=['处理牌组移动','saveDeckArrangement','退出排序模式','homeActionControls','publishHomeInterface'];
   const dependencies={DeckHierarchyCommands:class{executeDrop(drop){return h.commands.executeDrop(drop);}},
-    deckSiblingDrop,reorderDeckRows,可见牌组行,appInterface:tracker,OFFICIAL_ANNOUNCEMENTS_ENABLED,isDoubleColumnDeckListStyle,
+    deckSiblingDrop,reorderDeckRows,可见牌组行,appInterface:tracker,OFFICIAL_ANNOUNCEMENTS_ENABLED,isDoubleColumnDeckListStyle,homeSyncIndicator,homeSyncLabelKey,
     AppStorage:{setOrCreate:()=>events.push('broadcast')},$r:key=>key};
   const Page=new Function(...Object.keys(dependencies),stripTypeScriptTypes('class Page {\n'+methods.map(homeMethod).join('\n')+'\n}',{mode:'transform'})+';return Page;')(...Object.values(dependencies));
-  const page=new Page();Object.assign(page,{排序模式中:true,deckReorderBusy:false,homeDisposed:false,
+  const page=new Page();Object.assign(page,{排序模式中:true,deckReorderBusy:false,homeDisposed:false,syncAccountState:'normal',syncIndicator:'hidden',syncStatusText:'',
     homeDeckTree:h.state.root,主页快照数据:{decks:平铺牌组树(h.state.root)},牌组数据源:new 牌组列表数据源(平铺牌组树(h.state.root)),
     展开的牌组ID集合:new Set(['1','2']),隐藏的牌组ID集合:new Set(),选中的牌组ID:'',homeActivity:()=>({collectionBusy:page.deckReorderBusy}),
     按ID查牌组:id=>page.主页快照数据.decks.find(x=>x.id===id)??{id:'',ancestorIds:[]},显示提示:key=>events.push(key),
@@ -188,10 +189,54 @@ test('JIDE observes sibling sorting and its busy state with no promote or demote
   assert.equal(h.tracker.snapshot().some(x=>x.surface==='deck_reorder'||x.surface==='deck_level_menu'),false);
 });
 
-test('row leaves native sorting gestures unblocked and has no sorting popup callbacks',()=>{
+test('list move handler checks current sorting and saving state across mode changes',()=>{
+  const List=loadComponentLogic('components/home/主页牌组列表.ets','主页牌组列表',{
+    牌组列表数据源,Scroller:class {},isDoubleColumnDeckListStyle
+  });
+  const list=new List(), moves=[];
+  list.onMove=(from,to)=>moves.push([from,to]);
+  for(const style of ['single_wide','single_narrow','double_wide','double_narrow']) {
+    list.style=style;list.加载状态='ready';list.排序模式中=false;list.moveDeck(0,4);
+    list.排序模式中=true;assert.equal(list.columnCount(),1);list.moveDeck(0,4);
+    list.reorderBusy=true;list.moveDeck(1,2);
+    list.reorderBusy=false;list.moveDeck(3,2);
+    list.排序模式中=false;list.moveDeck(2,3);
+    assert.equal(list.columnCount(),isDoubleColumnDeckListStyle(style)?2:1);
+  }
+  assert.deepEqual(moves,Array.from({length:4},()=>[[0,4],[3,2]]).flat());
+});
+
+test('row menu recognizer is removed during sorting and restored after sorting',()=>{
+  class LongPressGestureHandler {
+    constructor(options) { this.options=options; }
+    onAction(action) { this.action=action;return this; }
+  }
+  const MenuGesture=loadPlatformModule('utils/DeckRowMenuGesture.ets','DeckRowMenuGesture',{LongPressGestureHandler});
+  const gestures=[], event={clearGestures(){gestures.length=0;},addGesture(gesture){gestures.push(gesture);}};
+  let menus=0;
+  const openMenu=()=>{menus++;};
+  new MenuGesture(false,openMenu).applyGesture(event);
+  assert.equal(gestures.length,1);
+  assert.deepEqual(gestures[0].options,{repeat:false,duration:500});
+  gestures[0].action();assert.equal(menus,1);
+  new MenuGesture(true,openMenu).applyGesture(event);
+  assert.equal(gestures.length,0,'sorting must have no child long-press recognizer, even with a guarded callback');
+  new MenuGesture(false,openMenu).applyGesture(event);
+  assert.equal(gestures.length,1);gestures[0].action();assert.equal(menus,2);
+});
+
+test('row uses dynamic menu gestures and list recreates sorting registration on mode changes',()=>{
   const row=read('components/牌组列表项.ets');
-  assert.match(row,/\.parallelGesture\(/);
+  assert.match(row,/\.gestureModifier\(new DeckRowMenuGesture\(this\.reorderMode/);
+  assert.doesNotMatch(row,/\.parallelGesture\(|LongPressGesture\(/);
+  assert.match(row,/if \(this\.reorderMode \|\| this\.显示牌组菜单\) return/);
   assert.match(row,/\.bindPopup\(!this\.reorderMode && this\.显示牌组菜单/);
   assert.doesNotMatch(row,/onLevelMenu|onLevelChange|levelMenuDeckId|99999999/);
-  assert.match(read('components/home/主页牌组列表.ets'),/\.onMove\(this\.排序模式中 && !this\.reorderBusy \? this\.onMove : undefined/);
+  const list=read('components/home/主页牌组列表.ets');
+  // onMove 在 LazyForEach 创建时注册：单列进入排序也必须切换分支，不能仅改回调表达式。
+  assert.match(list,/if \(this\.排序模式中\) \{\s*this\.flatDeckRows\(true\)\s*\} else if \(this\.columnCount\(\) === 2\)/);
+  assert.match(list,/this\.flatDeckRows\(false\)/);
+  assert.match(list,/\.onMove\(sortingEnabled \?/);
+  assert.match(list,/\.enabled\(!this\.reorderBusy\)/);
+  assert.match(list,/\.pullToRefresh\(!this\.排序模式中 && !this\.reorderBusy\)/);
 });
