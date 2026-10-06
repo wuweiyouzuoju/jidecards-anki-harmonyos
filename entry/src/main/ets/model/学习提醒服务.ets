@@ -2,6 +2,7 @@
 
 import { reminderAgentManager } from '@kit.BackgroundTasksKit';
 import { notificationManager } from '@kit.NotificationKit';
+import { reminderText, reminderTitle, reminderContent } from '../utils/StudyReminderText';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { 加载学习提醒设置, 保存提醒ID列表, 是否已引导通知设置, 标记已引导通知设置, 提醒项 } from './学习提醒存储';
 import { 牌组服务 } from '../backend/牌组服务';
@@ -18,11 +19,7 @@ function 错误描述(错误: Object): string {
   if (typeof e.code === 'number') {
     // 诊断日志：输出真实错误码到 hilog，便于定位 publishReminder 失败的根因
     console.error(`[reminder] code=${e.code} msg=${e.message}`);
-    // 1700002：代理提醒数量超限——AGC 权益审批通过后华为云侧需 1-2 个自然日同步，
-    // 同步完成前 publishReminder 固定报此错（配额为 0），不是用户可修复的问题
-    if (e.code === 1700002) {
-      return '华为云权益尚未生效（开放能力审批通过后需 1-2 个自然日同步），请稍后再试';
-    }
+    if (e.code === 1700002) return reminderText('reminder_error_quota');
     return `code ${e.code}：${e.message}`;
   }
   return `${错误}`;
@@ -30,45 +27,23 @@ function 错误描述(错误: Object): string {
 
 const 包名: string = 'com.jide.kapian';
 const 能力名: string = 'EntryAbility';
-const 默认标题: string = 'jidecards 学习提醒';
-const 默认内容模板: string = '今日待学习 {{待学}} 张，待复习 {{待复习}} 张';
 
 // ========================================================
 // @名称 计算待学数量
 // @作用 拉取牌组树，汇总 newCount + learnCount（待学）和 reviewCount（待复习）
 // ========================================================
 async function 计算待学数量(): Promise<[number, number]> {
-  try {
-    const 上下文: common.UIAbilityContext | undefined =
-      AppStorage.get<common.UIAbilityContext>('abilityContext');
-    if (上下文 === undefined) {
-      return [0, 0];
-    }
-    await 后端会话.获取实例().确保已打开(上下文.filesDir);
-    const 服务: 牌组服务 = new 牌组服务();
-    const 树: DeckTreeNode = await 服务.获取牌组树();
-    let 待学: number = 0;
-    let 待复习: number = 0;
-    for (let i: number = 0; i < 树.children.length; i++) {
-      const 节点 = 树.children[i];
-      待学 += 节点.newCount + 节点.learnCount;
-      待复习 += 节点.reviewCount;
-    }
-    return [待学, 待复习];
-  } catch (错误) {
-    return [0, 0];
+  const context: common.UIAbilityContext | undefined = AppStorage.get<common.UIAbilityContext>('abilityContext');
+  if (context === undefined) throw new Error('reminder_context_unavailable');
+  await 后端会话.获取实例().确保已打开(context.filesDir);
+  const tree: DeckTreeNode = await new 牌组服务().获取牌组树();
+  let learning: number = 0;
+  let review: number = 0;
+  for (const child of tree.children) {
+    learning += child.newCount + child.learnCount;
+    review += child.reviewCount;
   }
-}
-
-// ========================================================
-// @名称 替换占位符
-// @作用 把 {{待学}} {{待复习}}（中文）或 {{new}} {{review}}（英文）替换成实际数字；
-//       无占位符的文案原样返回。双占位符兼容旧用户已存中文文案与新英文 UI。
-// ========================================================
-function 替换占位符(模板: string, 待学数: number, 待复习数: number): string {
-  return 模板
-    .replace(/{{待学}}|{{new}}/g, `${待学数}`)
-    .replace(/{{待复习}}|{{review}}/g, `${待复习数}`);
+  return [learning, review];
 }
 
 // ========================================================
@@ -81,9 +56,8 @@ async function 发布单个提醒(
   待学数: number,
   待复习数: number
 ): Promise<number> {
-  const 标题: string = 项.标题.length > 0 ? 项.标题 : 默认标题;
-  const 内容模板: string = 项.内容.length > 0 ? 项.内容 : 默认内容模板;
-  const 内容: string = 替换占位符(内容模板, 待学数, 待复习数);
+  const 标题: string = reminderTitle(项.标题);
+  const 内容: string = reminderContent(项.内容, String(待学数), String(待复习数));
   const 提醒请求: reminderAgentManager.ReminderRequestAlarm = {
     reminderType: reminderAgentManager.ReminderType.REMINDER_TYPE_ALARM,
     hour: 项.小时,
@@ -132,8 +106,8 @@ export async function 首次引导通知设置(): Promise<void> {
     if (上下文 === undefined) {
       return;
     }
-    await 标记已引导通知设置();
     await notificationManager.openNotificationSettings(上下文);
+    await 标记已引导通知设置();
   } catch (错误) {
     console.error(`[reminder] 引导通知设置失败：${错误描述(错误)}`);
   }
@@ -147,9 +121,7 @@ export async function 首次引导通知设置(): Promise<void> {
 async function 确保通知授权(): Promise<void> {
   const 上下文: common.UIAbilityContext | undefined =
     AppStorage.get<common.UIAbilityContext>('abilityContext');
-  if (上下文 === undefined) {
-    return;
-  }
+  if (上下文 === undefined) throw new Error('reminder_context_unavailable');
   try {
     // 先查当前授权状态：已授权时直接放行，避免多余的系统弹窗
     const 已启用: boolean = await notificationManager.isNotificationEnabled();
@@ -160,13 +132,13 @@ async function 确保通知授权(): Promise<void> {
     await notificationManager.requestEnableNotification(上下文);
     const 请求后已启用: boolean = await notificationManager.isNotificationEnabled();
     if (!请求后已启用) {
-      throw new Error('通知权限未开启：请到 系统设置 → 通知 → 记得闪卡 开启通知');
+      throw new Error(reminderText('reminder_error_permission_disabled'));
     }
   } catch (错误) {
-    if (错误 instanceof Error && 错误.message.startsWith('通知权限未开启')) {
+    if (错误 instanceof Error && 错误.message === reminderText('reminder_error_permission_disabled')) {
       throw 错误;
     }
-    throw new Error(`请求通知权限失败：${错误描述(错误)}`);
+    throw new Error(reminderText('reminder_error_permission_request', 错误描述(错误)));
   }
 }
 
@@ -194,10 +166,16 @@ async function 注册提醒通知渠道(): Promise<void> {
 // @使用时机 App 启动 / 复习后 / 设置变更
 // ========================================================
 /** @throws {Error} 系统提醒发布或取消失败，调用方必须显示失败或记录后台刷新错误。 */
-export async function 刷新学习提醒(): Promise<void> {
+let refreshQueue: Promise<void> = Promise.resolve();
+export function 刷新学习提醒(): Promise<void> {
+  const work: Promise<void> = refreshQueue.then((): Promise<void> => refreshReminders());
+  refreshQueue = work.catch((): void => {});
+  return work;
+}
+
+/** @throws {Error} 失败由领域调用方报告，不以默认值或假成功继续。 */
+async function refreshReminders(): Promise<void> {
   const 设置 = await 加载学习提醒设置();
-  // 先取消所有旧提醒
-  await 取消所有学习提醒();
   // 计算当前待学数量（仅在有开启的提醒项时才查）
   let 任一开启: boolean = false;
   for (let i: number = 0; i < 设置.提醒项列表.length; i++) {
@@ -207,6 +185,8 @@ export async function 刷新学习提醒(): Promise<void> {
     }
   }
   if (!任一开启) {
+    await 取消所有学习提醒();
+    await 保存提醒ID列表([]);
     return;
   }
   // 发布前确保通知已授权；未授权时抛错（编辑页会显示），不再静默失败到点不弹
@@ -214,6 +194,8 @@ export async function 刷新学习提醒(): Promise<void> {
   // 注册服务提醒渠道，让到点通知默认走横幅/锁屏/铃声（而非仅下拉可见）
   await 注册提醒通知渠道();
   const 数量: [number, number] = await 计算待学数量();
+  // 所有只读前置检查成功后才替换现有系统提醒。
+  await 取消所有学习提醒();
   // 为每个开启的提醒项发布一个提醒
   const 新ID列表: number[] = [];
   let 首个失败原因: string = '';
@@ -225,14 +207,14 @@ export async function 刷新学习提醒(): Promise<void> {
       const id: number = await 发布单个提醒(设置.提醒项列表[i], 数量[0], 数量[1]);
       新ID列表.push(id);
     } catch (错误) {
-      // 单个发布失败不阻塞其他，但记录首个原因；全部失败时上抛让 UI 显示
+      // 尽力发布剩余项；部分失败也必须告知调用方。
       if (首个失败原因 === '') {
         首个失败原因 = 错误描述(错误);
       }
     }
   }
   await 保存提醒ID列表(新ID列表);
-  if (新ID列表.length === 0 && 首个失败原因 !== '') {
-    throw new Error(`提醒发布失败：${首个失败原因}`);
+  if (首个失败原因 !== '') {
+    throw new Error(reminderText('reminder_error_publish', 首个失败原因));
   }
 }

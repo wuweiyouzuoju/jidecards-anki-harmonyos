@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { WINDOW_SAFE_TOP_KEY } from '../model/WindowSafeLayout';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { PressFeedback } from '../utils/PressFeedback';
 import { CustomTransition } from '../utils/自定义转场';
@@ -13,11 +14,13 @@ import { 颜色键 } from '../model/颜色主题';
 import { 解析是否深色, 主题模式 } from '../model/主题设置';
 import { 提醒编辑面板 } from '../components/提醒编辑面板';
 import { 应用尺寸 } from '../utils/应用尺寸';
-import { 按下态按钮 } from '../components/common/按下态按钮';
+import { IconActionButton } from '../components/common/IconActionButton';
 import { 统一空态 } from '../components/common/统一空态';
+import { 按下态按钮 } from '../components/common/按下态按钮';
 import { appInterface } from '../backend/AppInterfaceService';
 import { visibleInterfaceItems, AppInterfaceControl } from '../model/AppInterface';
 import { interfaceItemText } from '../utils/AppInterfaceText';
+import { reminderTitle, reminderContent } from '../utils/StudyReminderText';
 import { namedResourceText } from '../utils/UiFeedback';
 
 // ========================================================
@@ -47,6 +50,7 @@ export struct 学习提醒页 {
   @StorageProp(颜色键.主色容器) private 主色容器色: string = '#E8EEFC';
   @StorageProp(颜色键.动作主色) private 动作主色: string = '#2F5FD0';
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
+  @StorageProp(WINDOW_SAFE_TOP_KEY) private toolbarSafeTop: number = 0;
   // 手势导航条高度（提醒列表滚到底时最后一项需完整滚出导航条区域）
   @StorageProp('导航条高度') private 导航条高度: number = 0;
   @StorageLink('systemDarkMode') @Watch('refreshThemeState') private 系统暗黑模式: boolean = false;
@@ -54,6 +58,9 @@ export struct 学习提醒页 {
 
   @State private 是否深色: boolean = false;
   private interfaceMounted: boolean = false;
+  private loadGeneration: number = 0;
+  @State @Watch('publishInterface') private loading: boolean = false;
+  @State private toggleRevision: number = 0;
   @State @Watch('publishInterface') private 提醒项列表: 提醒项[] = [];
   @State @Watch('publishInterface') private 操作中: boolean = false;
   @State @Watch('publishInterface') private 错误信息: string = '';
@@ -66,7 +73,7 @@ export struct 学习提醒页 {
   @State private 面板初始分钟: number = 0;
   @State private 面板初始标题: string = '';
   @State private 面板初始内容: string = '';
-  @State private 面板保存中: boolean = false;
+  @State @Watch('publishInterface') private 面板保存中: boolean = false;
   @State private 面板错误: string = '';
 
   async aboutToAppear(): Promise<void> {
@@ -85,13 +92,36 @@ export struct 学习提醒页 {
   }
 
   private async 加载列表(): Promise<void> {
-    const 设置 = await 加载学习提醒设置();
-    this.提醒项列表 = 设置.提醒项列表;
-    this.已加载 = true;
+    if (!this.interfaceMounted || this.操作中 || this.面板保存中) return;
+    const generation: number = ++this.loadGeneration;
+    this.loading = true;
+    this.已加载 = false;
+    this.错误信息 = '';
+    try {
+      const settings = await 加载学习提醒设置();
+      if (!this.interfaceMounted || generation !== this.loadGeneration) return;
+      this.提醒项列表 = settings.提醒项列表;
+      this.已加载 = true;
+    } catch (error) {
+      if (this.interfaceMounted && generation === this.loadGeneration) this.错误信息 = String(error);
+    } finally {
+      if (this.interfaceMounted && generation === this.loadGeneration) this.loading = false;
+    }
+  }
+
+  private ready(): boolean {
+    return this.interfaceMounted && this.已加载 && !this.loading && !this.操作中 && !this.面板保存中;
+  }
+
+  private retry(): void {
+    if (this.loading || this.操作中 || this.面板保存中) return;
+    if (this.已加载) this.重新发布();
+    else this.加载列表();
   }
 
   aboutToDisappear(): void {
     this.interfaceMounted = false;
+    this.loadGeneration++;
     appInterface.hidePage('reminders');
     appInterface.leave('reminders');
     CustomTransition.getInstance().注销NavParam('ReminderPage');
@@ -102,21 +132,22 @@ export struct 学习提醒页 {
     const reminders: 提醒项[] = this.已加载 ? this.提醒项列表.slice(0, 100) : [];
     const controls: AppInterfaceControl[] = visibleInterfaceItems('reminders',
       { simple: false, agent: false, cloudDeck: false, themeHasTextures: false })
+      .filter((item): boolean => item.id !== 'retry' || this.错误信息 !== '')
       .map((item): AppInterfaceControl => ({ id: item.id, title: namedResourceText(this.getUIContext(), item.titleKey),
-        titleKey: item.titleKey, enabled: true, selected: false }));
+        titleKey: item.titleKey, enabled: item.id === 'back' || (item.id === 'retry' ? !this.loading && !this.操作中 && !this.面板保存中 : this.ready()), selected: false }));
     const labels: string[] = [];
     for (const item of reminders) {
       const title: string = this.格式化时间(item.小时, item.分钟) + ' · ' + this.预览标题(item).slice(0, 160);
       labels.push(title);
-      controls.push({ id: 'edit-' + item.唯一ID, title: title, enabled: true,
+      controls.push({ id: 'edit-' + item.唯一ID, title: title, enabled: this.ready(),
         selected: this.显示编辑面板 && this.面板目标ID === item.唯一ID });
-      controls.push({ id: 'toggle-' + item.唯一ID, title: title, enabled: !this.操作中, selected: item.开启 });
+      controls.push({ id: 'toggle-' + item.唯一ID, title: title, enabled: this.ready(), selected: item.开启 });
     }
     appInterface.observe({ surface: 'reminders', sectionId: '',
       selectedId: this.显示编辑面板 ? String(this.面板目标ID) : '',
       optionIds: reminders.map((item): string => 'edit-' + item.唯一ID), optionLabels: labels,
       optionsTotal: this.已加载 ? this.提醒项列表.length : 0,
-      busy: !this.已加载 || this.操作中, items: controls, controlsComplete: true,
+      busy: this.loading || this.操作中 || this.面板保存中, items: controls, controlsComplete: true,
       values: [{ id: 'loaded', value: String(this.已加载) }, { id: 'editor_open', value: String(this.显示编辑面板) },
         { id: 'has_error', value: String(this.错误信息.length > 0) }] });
   }
@@ -132,17 +163,12 @@ export struct 学习提醒页 {
   }
 
   private 预览内容(项: 提醒项): string {
-    const 模板: string = 项.内容.length > 0 ? 项.内容 : '今日待学习 {{待学}} 张，待复习 {{待复习}} 张';
-    return 模板
-      .replace('{{待学}}', 'X')
-      .replace('{{待复习}}', 'Y');
+    return reminderContent(项.内容, 'X', 'Y');
   }
-
-  private 预览标题(项: 提醒项): string {
-    return 项.标题.length > 0 ? 项.标题 : 'jidecards 学习提醒';
-  }
+  private 预览标题(项: 提醒项): string { return reminderTitle(项.标题); }
 
   private async 切换单项开关(项ID: number, 值: boolean): Promise<void> {
+    if (!this.ready()) return;
     const 新列表: 提醒项[] = [];
     for (let i: number = 0; i < this.提醒项列表.length; i++) {
       if (this.提醒项列表[i].唯一ID === 项ID) {
@@ -158,9 +184,21 @@ export struct 学习提醒页 {
         新列表.push(this.提醒项列表[i]);
       }
     }
-    this.提醒项列表 = 新列表;
-    await 保存学习提醒设置(this.提醒项列表);
-    await this.重新发布();
+    this.操作中 = true;
+    this.错误信息 = '';
+    try {
+      await 保存学习提醒设置(新列表);
+      if (this.interfaceMounted) this.提醒项列表 = 新列表;
+      await 刷新学习提醒();
+    } catch (error) {
+      if (this.interfaceMounted) this.错误信息 = String(error);
+    } finally {
+      if (this.interfaceMounted) {
+        // Toggle 内部选态须重新绑定上次确认值，尤其在保存失败时。
+        this.toggleRevision++;
+        this.操作中 = false;
+      }
+    }
   }
 
   private async 重新发布(): Promise<void> {
@@ -169,13 +207,14 @@ export struct 学习提醒页 {
     try {
       await 刷新学习提醒();
     } catch (错误) {
-      this.错误信息 = 错误 instanceof Error ? 错误.message : `${错误}`;
+      if (this.interfaceMounted) this.错误信息 = String(错误);
     } finally {
-      this.操作中 = false;
+      if (this.interfaceMounted) this.操作中 = false;
     }
   }
 
   private 新建提醒(): void {
+    if (!this.ready()) return;
     // 新建走磨砂弹层（时间 + 标题 + 内容），默认早上 6 点
     this.面板是否新建 = true;
     this.面板目标ID = -1;
@@ -188,6 +227,7 @@ export struct 学习提醒页 {
   }
 
   private 编辑提醒(项: 提醒项): void {
+    if (!this.ready()) return;
     this.面板是否新建 = false;
     this.面板目标ID = 项.唯一ID;
     this.面板初始小时 = 项.小时;
@@ -200,7 +240,7 @@ export struct 学习提醒页 {
 
   // 弹层确认：新建追加 / 编辑替换 → 落盘 → 发布；首个提醒保存成功后首次拉起系统通知设置页
   private async 弹层确认(小时: number, 分钟: number, 标题: string, 内容: string): Promise<void> {
-    if (this.面板保存中) {
+    if (!this.ready()) {
       return;
     }
     this.面板保存中 = true;
@@ -235,20 +275,26 @@ export struct 学习提醒页 {
         });
       }
       await 保存学习提醒设置(新列表);
+      // 保存成功而系统发布失败时，重试仍编辑同一 ID，不能重复追加。
+      if (this.interfaceMounted) {
+        this.提醒项列表 = 新列表;
+        if (!已替换) this.面板目标ID = 新列表[新列表.length - 1].唯一ID;
+        this.面板是否新建 = false;
+      }
       await 刷新学习提醒();
-      this.提醒项列表 = 新列表;
+      if (!this.interfaceMounted) return;
       this.显示编辑面板 = false;
       await 首次引导通知设置();
     } catch (错误) {
-      this.面板错误 = 错误 instanceof Error ? 错误.message : `${错误}`;
+      if (this.interfaceMounted) this.面板错误 = String(错误);
     } finally {
-      this.面板保存中 = false;
+      if (this.interfaceMounted) this.面板保存中 = false;
     }
   }
 
   // 弹层删除：过滤目标项 → 落盘 → 重发布
   private async 弹层删除(): Promise<void> {
-    if (this.面板保存中) {
+    if (!this.ready()) {
       return;
     }
     this.面板保存中 = true;
@@ -261,11 +307,11 @@ export struct 学习提醒页 {
         }
       }
       await 保存学习提醒设置(新列表);
+      if (this.interfaceMounted) this.提醒项列表 = 新列表;
       await 刷新学习提醒();
-      this.提醒项列表 = 新列表;
-      this.显示编辑面板 = false;
+      if (this.interfaceMounted) this.显示编辑面板 = false;
     } catch (错误) {
-      this.面板错误 = 错误 instanceof Error ? 错误.message : `${错误}`;
+      if (this.interfaceMounted) this.面板错误 = String(错误);
     } finally {
       this.面板保存中 = false;
     }
@@ -286,18 +332,19 @@ export struct 学习提醒页 {
         .textAlign(TextAlign.Center).maxLines(1).hitTestBehavior(HitTestMode.None)
       // 左返回 + 右新建按钮，铺满
       Row() {
-        按下态按钮({
-          文案: interfaceItemText(this.getUIContext(), 'reminders', 'back', this.uiLanguage),
-          字色: $r('app.color.text_primary'),
-          点击回调: (): void => { this.返回(); }
+        IconActionButton({ toolbarStyle: true,
+          source: $r('app.media.ic_common_arrow_left'),
+          label: interfaceItemText(this.getUIContext(), 'reminders', 'back', this.uiLanguage),
+          onAction: (): void => { this.返回(); }
         })
         Blank()
           .hitTestBehavior(HitTestMode.Transparent)
-        按下态按钮({
-          文案: interfaceItemText(this.getUIContext(), 'reminders', 'create', this.uiLanguage),
-          字色: this.动作主色,
-          themeText: true,
-          点击回调: (): void => { this.新建提醒(); }
+        IconActionButton({ toolbarStyle: true,
+          source: $r('app.media.ic_home_new'),
+          label: interfaceItemText(this.getUIContext(), 'reminders', 'create', this.uiLanguage),
+          isInteractive: this.ready(),
+
+          onAction: (): void => { this.新建提醒(); }
         })
       }
       .width('100%')
@@ -306,11 +353,11 @@ export struct 学习提醒页 {
       .hitTestBehavior(HitTestMode.Transparent)
     }
     .width('100%')
-    .height(应用尺寸.pageToolbarHeight(this.状态栏高度, this.narrowDeckLayout))
+    .height(应用尺寸.pageToolbarHeight(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop))
     .padding({
       left: 应用尺寸.页面内边距_水平,
       right: 应用尺寸.页面内边距_水平,
-      top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout),
+      top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop),
       bottom: 0
     })
     .backgroundColor(this.页面底色微染值)
@@ -362,7 +409,7 @@ export struct 学习提醒页 {
       // 右侧开关：独立区域，不与编辑点击手势竞争
       Toggle({ type: ToggleType.Switch, isOn: 项.开启 })
         .selectedColor(this.解析主色按钮背景())
-        .enabled(!this.操作中)
+        .enabled(this.ready())
         .onChange((值: boolean): void => {
           this.切换单项开关(项.唯一ID, 值);
         })
@@ -389,6 +436,11 @@ export struct 学习提醒页 {
         Column() {
           this.顶部条()
 
+          if (!this.已加载 && this.错误信息 !== '') {
+            统一空态({ 标题: this.错误信息, 动作文案: $r('app.string.common_retry'),
+              onAction: (): void => { this.retry(); } })
+          }
+
           if (this.已加载) {
             Scroll() {
               Column({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout) }) {
@@ -397,7 +449,7 @@ export struct 学习提醒页 {
                 } else {
                   ForEach(this.提醒项列表, (项: 提醒项) => {
                     this.提醒项卡片(项)
-                  }, (项: 提醒项) => `${项.唯一ID}-${项.小时}-${项.分钟}-${项.标题}-${项.内容}-${项.开启}`)
+                  }, (项: 提醒项) => `${this.toggleRevision}-${项.唯一ID}-${项.小时}-${项.分钟}-${项.标题}-${项.内容}-${项.开启}`)
                 }
 
                 if (this.错误信息 !== '') {
@@ -406,6 +458,8 @@ export struct 学习提醒页 {
                     .fontColor(设置面板色板_取(this.是否深色).错误色)
                     .width('100%')
                     .padding({ top: 应用尺寸.间距_8 })
+                  按下态按钮({ 文案: $r('app.string.common_retry'),
+                    点击回调: (): void => { this.retry(); } })
                 }
               }
               .width('100%')
