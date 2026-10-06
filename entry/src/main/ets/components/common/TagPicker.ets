@@ -5,6 +5,7 @@ import { TagSelection, TagSelectionChange, TagRow, applyTagSelection, newTagName
 import { TagTreeList } from './TagTreeList';
 import { AnchoredMenuItem } from './MenuItem';
 import { FormInputStyle } from '../../utils/FormInputStyle';
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { localizedResourceText, namedResourceText } from '../../utils/UiFeedback';
 import { appInterface } from '../../backend/AppInterfaceService';
@@ -112,9 +113,13 @@ export struct TagPicker {
           Text($r('app.string.tags_no_matches')).fontSize(应用尺寸.字号_正文_小)
             .fontColor($r('app.color.text_secondary'))
         } else {
-          TagTreeList({ rows: this.rows, listHeight: this.listHeight, isInteractive: this.isInteractive,
-            onSelect: (name: string): void => { this.toggle(name); },
-            onToggle: (name: string): void => { this.selection?.toggleCollapsed(name); this.refresh(); } })
+          Column() {
+            TagTreeList({ rows: this.rows, listHeight: this.listHeight, isInteractive: this.isInteractive,
+              onSelect: (name: string): void => { this.toggle(name); },
+              onToggle: (name: string): void => { this.selection?.toggleCollapsed(name); this.refresh(); } })
+          }.width('100%').padding(应用尺寸.间距_5)
+            .backgroundColor($r('app.color.surface_card')).borderRadius(应用尺寸.圆角_面板)
+            .border(SurfaceBorder.options())
         }
         if (this.canAdd()) {
           AnchoredMenuItem({ label: $r('app.string.tags_add_named', newTagName(this.query)), available: this.isInteractive,
