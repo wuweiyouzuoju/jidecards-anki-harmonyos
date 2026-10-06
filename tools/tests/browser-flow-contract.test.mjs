@@ -32,8 +32,8 @@ test('card preview keeps its position header and preserves preview while editing
   )?.[0] ?? '';
   // 顶部条统一为「关闭 / N/N / 更多」，更多菜单里是编辑 + Agent 改卡（浏览页与牌组预览同一套）
   assert.match(preview, /Text\(this\.取位置文案\(\)\)/);
-  assert.match(preview, /文案: \$r\('app\.string\.browser_preview_close'\)/);
-  assert.match(preview, /文案: \$r\('app\.string\.study_more'\)/);
+  assert.match(preview, /source: \$r\('app\.media\.ic_common_close'\), label: \$r\('app\.string\.browser_preview_close'\)/);
+  assert.match(preview, /source: \$r\('app\.media\.ic_home_more'\), label: \$r\('app\.string\.study_more'\)/);
   assert.match(preview, /CardActionMenu\(\{ items: this\.预览更多菜单\(\)/);
   assert.doesNotMatch(preview, /DialogHeader\(/);
   assert.match(preview, /@Prop\s+@Watch\('预览刷新版本变化'\)\s+刷新版本:\s*number/);
@@ -259,11 +259,11 @@ test('Browser multi-select count opens the menu below the top toolbar and back f
   const page = read('entry/src/main/ets/pages/浏览页.ets');
   const table = read('entry/src/main/ets/components/browser/卡片表格.ets');
   assert.match(page, /Text\(this\.多选模式值 \? this\.取选中计数文案\(\) : \$r\('app\.string\.browser_title'\)\)/);
-  assert.match(page, /if \(this\.多选模式值\) \{[\s\S]*?文案: \$r\('app\.string\.browser_selection_actions'\)[\s\S]*?点击回调: \(\): void => \{ this\.showBatchMenu = !this\.showBatchMenu; \}/);
+  assert.match(page, /if \(this\.多选模式值\) \{[\s\S]*?label: \$r\('app\.string\.browser_selection_actions'\)[\s\S]*?onAction: \(\): void => \{ this\.showBatchMenu = !this\.showBatchMenu; \}/);
   assert.match(page, /return 模板\.replace\('%d', `\$\{this\.选中ID列表\.length\}`\)/);
   assert.match(page, /onExit: \(\): void => \{ this\.退出多选\(\); \}/);
   assert.match(page, /if \(this.showBatchMenu\) \{ this.batchBackRequest\+\+; return true; \}/);
-  assert.match(page, /topOffset: 应用尺寸.pageContentTop\(this.状态栏高度, this.narrowDeckLayout\)/);
+  assert.match(page, /topOffset: 应用尺寸.pageContentTop\(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop\)/);
   assert.doesNotMatch(table, /private 选中计数条\(|Text\('✕'\)/);
   assert.match(table, /@Prop 多选模式: boolean = false/);
   assert.match(page, /多选模式: this\.多选模式值/);

@@ -6,9 +6,11 @@ import { DialogHeader } from '../common/DialogHeader';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { namedResourceText } from '../../utils/UiFeedback';
 import { CARD_FLAGS, CardFlagDefinition, FlagLabels, customFlagLabel } from '../../model/CardMarking';
+import { 颜色键 } from '../../model/颜色主题';
 
 @Component
 export struct BrowserFlagDialog {
+  @StorageProp(颜色键.动作主色) private actionColor: string = '#2F5FD0';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
 
@@ -60,7 +62,7 @@ export struct BrowserFlagDialog {
           .layoutWeight(1)
         if (this.currentFlag === definition.value) {
           Text($r('app.string.card_mark_selected_symbol'))
-            .fontColor(definition.value === 0 ? $r('app.color.text_primary') : $r('app.color.action_primary'))
+            .fontColor(definition.value === 0 ? $r('app.color.text_primary') : this.actionColor)
         }
       }
       .width('100%')

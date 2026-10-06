@@ -38,7 +38,7 @@ test('selection count replaces the browser title while Actions stays a manual me
     }
     assert.equal(visibleInterfaceItems('browser', {simple:false,agent:false,cloudDeck:false,themeHasTextures:false})
       .find(item => item.id === 'selection').titleKey, 'browser_selection_actions');
-    const action = header.match(/点击回调: \(\): void => \{ this\.showBatchMenu = !this\.showBatchMenu; \}/)?.[0];
+    const action = header.match(/onAction: \(\): void => \{ this\.showBatchMenu = !this\.showBatchMenu; \}/)?.[0];
     assert.ok(action);
     page.showBatchMenu = false;
     new Function(action.slice(action.indexOf('{') + 1, -1)).call(page);

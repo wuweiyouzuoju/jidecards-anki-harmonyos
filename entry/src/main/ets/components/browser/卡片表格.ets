@@ -6,6 +6,7 @@ import { CardMarkingBadge } from '../common/CardMarkingBadge';
 import { CARD_FLAGS, FlagLabels, browserRowFlag } from '../../model/CardMarking';
 import type { BrowserDisplayRow as 浏览行数据 } from '../../model/BrowserSearchSession';
 import { PAGE_COMPACT_LAYOUT_KEY } from '../../model/AppLayoutState';
+import { 颜色键 } from '../../model/颜色主题';
 
 // ========================================================
 // @块ID UI-BROWSER-TABLE-001
@@ -81,6 +82,7 @@ export type { BrowserDisplayRow as 浏览行数据 } from '../../model/BrowserSe
 
 @Component
 export struct 卡片表格 {
+  @StorageProp(颜色键.动作主色) private actionColor: string = '#2F5FD0';
   @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
   @Prop @Watch('同步行数据源') 行列表: 浏览行数据[] = [];
   @Prop 结果总数: number = 0;
@@ -199,7 +201,7 @@ export struct 卡片表格 {
                 if (this.多选模式) {
                   Checkbox()
                     .select(this.选中IDs.indexOf(行.id) >= 0)
-                    .selectedColor($r('app.color.action_primary'))
+                    .selectedColor(this.actionColor)
                     .width(20)
                     .height(20)
                     .onChange((value: boolean): void => {

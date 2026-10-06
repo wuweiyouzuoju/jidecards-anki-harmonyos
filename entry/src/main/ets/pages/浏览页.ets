@@ -8,6 +8,7 @@ import { BrowserMoreMenu } from '../components/browser/BrowserMoreMenu';
 import { appInterface } from '../backend/AppInterfaceService';
 import { BrowserNotetypeFeature } from '../components/browser/BrowserNotetypeFeature';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { WINDOW_SAFE_TOP_KEY } from '../model/WindowSafeLayout';
 import { DialogBackdrop } from '../components/common/DialogBackdrop';
 import { showToastSafely, localizedNamedResourceText, namedResourceText } from '../utils/UiFeedback';
 import { loadBrowserSidebar, parseBrowserSavedSearches, removeBrowserSavedSearch, serializeBrowserSavedSearches, upsertBrowserSavedSearch } from '../model/BrowserSidebar';
@@ -69,7 +70,9 @@ import { BrowserViewMenu } from '../components/browser/BrowserViewMenu';
 import { 卡片表格, 浏览行数据 } from '../components/browser/卡片表格';
 import { 批量操作栏 } from '../components/browser/批量操作栏';
 import { 字段帮助面板 } from '../components/字段帮助面板';
-import { 按下态按钮 } from '../components/common/按下态按钮';
+import { IconActionButton } from '../components/common/IconActionButton';
+import { browserBackItem, AppInterfaceItem } from '../model/AppInterface';
+import { interfaceControlIcon, interfaceControlText } from '../utils/AppInterfaceText';
 import { 卡片信息 } from '../components/browser/卡片信息';
 import { 查找替换对话框 } from '../components/browser/查找替换对话框';
 import { 浏览侧边栏, 已保存搜索项 } from '../components/browser/浏览侧边栏';
@@ -169,7 +172,7 @@ export struct 浏览页 {
   @State private infoCardId: number = 0;
 
   // T8 批量操作栏状态：多选模式 + 选中ID + 4 个操作弹层 + 牌组树（改牌组选择器用）
-  @State private 多选模式值: boolean = false;
+  @State @Watch('publishInterface') private 多选模式值: boolean = false;
   @State @Watch('publishInterface') private 选中ID列表: number[] = [];
   // 退出多选信号：每次退出多选 +1，经 @Watch 触发 卡片表格 清内部选中（组件内部状态不可外部直改）
   @State private batchDialog: string = 'none';
@@ -229,6 +232,7 @@ export struct 浏览页 {
   @StorageProp(颜色键.主色容器) private 主色容器色: string = '#E8EEFC';
   @StorageProp(PAGE_SURFACE_KEY) private 页面底色微染值: string = '#F5F7FA';
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
+  @StorageProp(WINDOW_SAFE_TOP_KEY) private toolbarSafeTop: number = 0;
 
   async aboutToAppear(): Promise<void> {
     this.interfaceMounted = true;
@@ -323,9 +327,11 @@ export struct 浏览页 {
 
   private publishInterface(): void {
     if (!this.interfaceMounted) return;
+    const back: AppInterfaceItem = browserBackItem(this.多选模式值);
     appInterface.observe({ surface: 'browser', sectionId: this.阶段, selectedId: this.浏览模式值,
       optionIds: this.结果ID列表.slice(0, 100).map((id: number): string => String(id)), optionLabels: [],
       optionsTotal: this.结果ID列表.length, busy: this.mutationBusy || this.阶段 === 'loading',
+      items: [{ id: back.id, title: '', titleKey: back.titleKey, iconKey: back.iconKey, enabled: true, selected: false }],
       values: [{ id: 'mode', value: this.浏览模式值 }, { id: 'filter', value: this.quickFilter },
         { id: 'selected_count', value: String(this.选中ID列表.length) }] });
   }
@@ -1314,7 +1320,7 @@ export struct 浏览页 {
     if (this.showMoreMenu) {
       BrowserMoreMenu({ filterActive: this.搜索文本.trim() !== '' || this.quickFilter !== 'all', available: !this.mutationBusy && this.阶段 === 'list',
         subtitleIndex: this.subtitleIndex,
-        topOffset: 应用尺寸.pageContentTop(this.状态栏高度, this.narrowDeckLayout),
+        topOffset: 应用尺寸.pageContentTop(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop),
         onClose: (): void => { this.showMoreMenu = false; },
         onHistory: (): void => {
           if (this.mutationBusy || this.operations.isBusy()) return;
@@ -1355,37 +1361,35 @@ export struct 浏览页 {
         .fontColor($r('app.color.text_primary')).width('44%').textAlign(TextAlign.Center)
         .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).hitTestBehavior(HitTestMode.None)
       Row() {
-      按下态按钮({
-        文案: $r('app.string.study_back'),
-        字色: $r('app.color.text_primary'),
-        点击回调: (): void => this.返回()
+      IconActionButton({ toolbarStyle: true,
+        source: interfaceControlIcon([browserBackItem(this.多选模式值)], 'back'),
+        label: interfaceControlText(this.getUIContext(), [browserBackItem(this.多选模式值)], 'back', this.uiLanguage),
+        onAction: (): void => this.返回()
       })
 
       Blank()
       if (this.多选模式值) {
 
-        按下态按钮({
-          文案: $r('app.string.browser_selection_actions'),
-          字色: $r('app.color.text_primary'),
-          是否启用: !this.批量忙碌 && !this.mutationBusy && this.选中ID列表.length > 0,
-          点击回调: (): void => { this.showBatchMenu = !this.showBatchMenu; }
+        IconActionButton({ toolbarStyle: true,
+          source: $r('app.media.ic_home_more'), label: $r('app.string.browser_selection_actions'),
+          isInteractive: !this.批量忙碌 && !this.mutationBusy && this.选中ID列表.length > 0,
+          onAction: (): void => { this.showBatchMenu = !this.showBatchMenu; }
         })
       } else {
 
-        按下态按钮({
-          文案: $r('app.string.study_more'),
-          字色: $r('app.color.text_primary'),
-          点击回调: (): void => { this.showMoreMenu = !this.showMoreMenu; }
+        IconActionButton({ toolbarStyle: true,
+          source: $r('app.media.ic_home_more'), label: $r('app.string.study_more'),
+          onAction: (): void => { this.showMoreMenu = !this.showMoreMenu; }
         })
       }
       }.width('100%').height('100%').alignItems(VerticalAlign.Center)
     }
     .width('100%')
-    .height(应用尺寸.pageToolbarHeight(this.状态栏高度, this.narrowDeckLayout))
+    .height(应用尺寸.pageToolbarHeight(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop))
     .padding({
       left: 应用尺寸.页面内边距_水平,
       right: 应用尺寸.页面内边距_水平,
-      top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout),
+      top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop),
       bottom: 0
     })
     .backgroundColor(this.页面底色微染值)
@@ -1651,7 +1655,7 @@ export struct 浏览页 {
         isDark: this.是否深色(), busy: this.批量忙碌 || this.mutationBusy,
         backRequest: this.batchBackRequest, labels: this.flagLabels,
         选中数: this.选中ID列表.length, notesMode: this.浏览模式值 === 'notes',
-        topOffset: 应用尺寸.pageContentTop(this.状态栏高度, this.narrowDeckLayout),
+        topOffset: 应用尺寸.pageContentTop(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop),
         onClose: (): void => { this.showBatchMenu = false; },
         onExit: (): void => { this.退出多选(); },
         on改牌组: (): void => { this.打开改牌组弹层(); },
@@ -1758,7 +1762,7 @@ export struct 浏览页 {
             filterOptions: this.quickFilterOptions(),
             sortOptions: this.sortOptions(),
             available: !this.多选模式值 && this.阶段 === 'list',
-            topOffset: 应用尺寸.pageContentTop(this.状态栏高度, this.narrowDeckLayout) + SelectStyle.controlHeight * 2 + 应用尺寸.间距_8 * 2,
+            topOffset: 应用尺寸.pageContentTop(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop) + SelectStyle.controlHeight * 2 + 应用尺寸.间距_8 * 2,
             onClose: (): void => { this.showViewMenu = false; },
             onModeChange: (notes: boolean): void => {
               this.showViewMenu = false;

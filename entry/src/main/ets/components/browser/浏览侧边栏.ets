@@ -132,8 +132,8 @@ export struct 浏览侧边栏 {
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.text_primary'))
           Blank()
-          IconActionButton({ source: $r('app.media.ic_common_close'), label: $r('app.string.icon_sidebar_close'),
-            surface: $r('app.color.surface_card'), onAction: (): void => { this.onClose(); } })
+          IconActionButton({ toolbarStyle: true, source: $r('app.media.ic_common_close'), label: $r('app.string.icon_sidebar_close'),
+            onAction: (): void => { this.onClose(); } })
         }
         .width('100%')
         .height(56 + this.状态栏高度)

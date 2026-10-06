@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { NoteTagsField } from '../common/NoteTagsField';
+import { ExpansionReveal } from '../../utils/ExpansionReveal';
 import { common } from '@kit.AbilityKit';
 import { 图片遮罩编辑器 } from '../图片遮罩编辑器';
 import { 遮罩描述, parseOcclusionMasks, serializeOcclusionDocument } from '../../model/图片遮罩模型';
@@ -73,6 +74,7 @@ export struct 浏览编辑区 {
 
   @State @Watch('publishInterface') private fieldValues: string[] = [];
   @State @Watch('publishInterface') private tags: string = '';
+  private tagsReveal: ExpansionReveal = new ExpansionReveal();
   @State private 本地错误: string = '';
   private disposed: boolean = false;
   private interfaceMounted: boolean = false;
@@ -89,6 +91,7 @@ export struct 浏览编辑区 {
   }
 
   aboutToDisappear(): void {
+    this.tagsReveal.cancel();
     this.disposed = true;
     this.interfaceMounted = false;
     appInterface.leave('edit_note_form');
@@ -231,7 +234,7 @@ export struct 浏览编辑区 {
         actionEnabled: !this.busy && !this.audioBusy && !this.confirmingClose && this.note !== null,
         closeEnabled: this.interfaceEnabled('back'),
         onBack: (): void => { this.requestClose(); }, onSave: (): void => { this.openPreview(); } })
-      Scroll() {
+      Scroll(this.tagsReveal.scroller) {
         Column({ space: 应用尺寸.页面分组间距(this.narrow) }) {
           if (this.imageOcclusionFields.length === 4) {
             Button($r('app.string.add_note_image_occlusion_edit_masks')).attributeModifier(new PressFeedback())
@@ -266,7 +269,7 @@ export struct 浏览编辑区 {
           Column({ space: 应用尺寸.间距_8 }) {
             Text(this.interfaceLabel('tags')).fontSize(应用尺寸.字号_正文_小)
               .fontColor($r('app.color.text_secondary')).width('100%')
-            NoteTagsField({ text: this.tags, isInteractive: this.interfaceEnabled('tags'),
+            NoteTagsField({ text: this.tags, scroller: this.tagsReveal.scroller, isInteractive: this.interfaceEnabled('tags'),
               onChange: (value: string): void => { this.tags = value; } })
           }.width('100%')
         }.width('100%')
