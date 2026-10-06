@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { SurfaceBorder } from '../utils/SurfaceBorder';
-import { DialogBackdrop } from './common/DialogBackdrop';
+import { DialogFrame } from './common/DialogFrame';
 import { showToastSafely } from '../utils/UiFeedback';
 import { DialogHeader } from './common/DialogHeader';
 import { 应用尺寸 } from '../utils/应用尺寸';
@@ -9,11 +8,37 @@ import { pasteboard } from '@kit.BasicServicesKit';
 import { OFFICIAL_QQ_GROUP } from '../model/OfficialCommunity';
 import { IridescentThemePreview } from './common/IridescentThemePreview';
 
-/** 简短入门说明，随内容收缩，小屏可滚动，确认按钮始终可见。 */
+/** 六个内容区共用标题、内边距和底色，正文不再自行叠加水平留白。 */
+@Component
+struct HomeIntroSection {
+  @Prop title: Resource = $r('app.string.home_intro_title');
+  @BuilderParam content: () => void = this.emptyContent;
+
+  @Builder
+  private emptyContent(): void {}
+
+  build() {
+    Column({ space: 应用尺寸.间距_12 }) {
+      Text(this.title)
+        .fontSize(应用尺寸.字号_按钮)
+        .fontWeight(FontWeight.Bold)
+        .fontColor($r('app.color.text_primary'))
+        .textAlign(TextAlign.Start)
+        .width('100%')
+      this.content()
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
+    .padding(应用尺寸.间距_12)
+    .backgroundColor($r('app.color.surface_page'))
+    .borderRadius(应用尺寸.圆角_面板)
+  }
+}
+
+/** 分组入门说明；公共弹窗外壳负责固定操作栏、滚动和窗口安全区。 */
 @Component
 export struct HomeIntroPanel {
   onClose: () => void = (): void => {};
-  @State private contentHeight: number = 400;
   private readonly groupNumber: string = OFFICIAL_QQ_GROUP;
   private readonly decksUrl: string = 'https://ankiweb.net/shared/decks/';
 
@@ -43,30 +68,38 @@ export struct HomeIntroPanel {
 
   @Builder
   private sourcesSection() {
-    Column({ space: 6 }) {
-      Text($r('app.string.home_intro_sources_title'))
-        .fontSize(应用尺寸.字号_按钮).fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.text_primary')).width('100%')
+    Column({ space: 应用尺寸.间距_12 }) {
       Text() {
         Span($r('app.string.home_intro_source_one_prefix'))
         Span(this.groupNumber)
           .fontColor($r('app.color.home_intro_link')).fontWeight(FontWeight.Medium)
           .onClick((): void => { this.copyGroup(); })
         Span($r('app.string.home_intro_source_one_suffix'))
+      }
+      .fontSize(应用尺寸.字号_正文)
+      .lineHeight(22)
+      .fontColor($r('app.color.text_secondary'))
+      .textAlign(TextAlign.Start)
+      .width('100%')
+      Text() {
         Span($r('app.string.home_intro_source_two_prefix'))
         Span(this.decksUrl)
           .fontColor($r('app.color.home_intro_link')).fontWeight(FontWeight.Medium)
           .onClick((): void => { this.openDecksWebsite(); })
         Span($r('app.string.home_intro_source_two_suffix'))
       }
-      .fontSize(应用尺寸.字号_正文_中)
+      .fontSize(应用尺寸.字号_正文)
+      .lineHeight(22)
       .fontColor($r('app.color.text_secondary'))
+      .textAlign(TextAlign.Start)
       .width('100%')
       Text($r('app.string.home_intro_source_three'))
-        .fontSize(应用尺寸.字号_正文_中)
+        .fontSize(应用尺寸.字号_正文).lineHeight(22)
+        .textAlign(TextAlign.Start)
         .fontColor($r('app.color.text_secondary')).width('100%')
       Text($r('app.string.home_intro_source_four'))
-        .fontSize(应用尺寸.字号_正文_中)
+        .fontSize(应用尺寸.字号_正文).lineHeight(22)
+        .textAlign(TextAlign.Start)
         .fontColor($r('app.color.text_secondary')).width('100%')
     }
     .width('100%').alignItems(HorizontalAlign.Start)
@@ -74,10 +107,7 @@ export struct HomeIntroPanel {
 
   @Builder
   private themeSection() {
-    Column({ space: 10 }) {
-      Text($r('app.string.home_intro_theme_title'))
-        .fontSize(应用尺寸.字号_按钮).fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.text_primary')).width('100%')
+    Column({ space: 应用尺寸.间距_12 }) {
       Text() {
         Span($r('app.string.home_intro_theme_body'))
         Span($r('app.string.home_intro_theme_group_prefix'))
@@ -86,75 +116,56 @@ export struct HomeIntroPanel {
           .onClick((): void => { this.copyGroup(); })
         Span($r('app.string.home_intro_theme_group_suffix'))
       }
-      .fontSize(应用尺寸.字号_正文_中)
+      .fontSize(应用尺寸.字号_正文)
+      .lineHeight(22)
       .fontColor($r('app.color.text_secondary'))
+      .textAlign(TextAlign.Start)
       .width('100%')
-      Text($r('app.string.home_intro_theme_preview'))
-        .fontSize(应用尺寸.字号_正文_小)
-        .fontColor($r('app.color.text_secondary')).width('100%')
-      IridescentThemePreview()
+      Column({ space: 应用尺寸.间距_8 }) {
+        IridescentThemePreview()
+        Text($r('app.string.home_intro_theme_preview'))
+          .fontSize(应用尺寸.字号_正文_小)
+          .fontColor($r('app.color.text_secondary'))
+          .textAlign(TextAlign.Center).width('100%')
+      }
+      .width('100%').alignItems(HorizontalAlign.Center)
     }
-    .width('100%').alignItems(HorizontalAlign.Center)
+    .width('100%').alignItems(HorizontalAlign.Start)
   }
 
   @Builder
   private section(title: Resource, body: Resource) {
-    Column({ space: 6 }) {
-      Text(title)
-        .fontSize(应用尺寸.字号_按钮)
-        .fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.text_primary'))
-        .width('100%')
-      Text(body)
-        .fontSize(应用尺寸.字号_正文_中)
-        .fontColor($r('app.color.text_secondary'))
-        .copyOption(CopyOptions.LocalDevice)
-        .width('100%')
+    HomeIntroSection({ title, content: () => {
+      Text(body).fontSize(应用尺寸.字号_正文).lineHeight(22)
+        .fontColor($r('app.color.text_secondary')).textAlign(TextAlign.Start)
+        .copyOption(CopyOptions.LocalDevice).width('100%')
+    } })
+  }
+
+  @Builder
+  private headerContent() {
+    DialogHeader({ title: $r('app.string.home_intro_title'),
+      actionLabel: $r('app.string.study_guide_start'), showClose: false,
+      onAction: (): void => { this.onClose(); } })
+  }
+
+  @Builder
+  private bodyContent() {
+    Column({ space: 应用尺寸.间距_12 }) {
+      this.section($r('app.string.home_intro_flashcards_title'), $r('app.string.home_intro_flashcards_body'))
+      this.section($r('app.string.home_intro_simple_start_title'), $r('app.string.home_intro_simple_start_body'))
+      HomeIntroSection({ title: $r('app.string.home_intro_sources_title'),
+        content: () => { this.sourcesSection(); } })
+      this.section($r('app.string.home_intro_agent_title'), $r('app.string.home_intro_agent_body'))
+      this.section($r('app.string.home_intro_apkg_title'), $r('app.string.home_intro_apkg_body'))
+      HomeIntroSection({ title: $r('app.string.home_intro_theme_title'),
+        content: () => { this.themeSection(); } })
     }
     .width('100%')
-    .alignItems(HorizontalAlign.Start)
   }
 
   build() {
-    Stack() {
-      DialogBackdrop()
-        .onClick((): void => {})
-      Column() {
-        DialogHeader({
-          title: $r('app.string.home_intro_title'),
-          actionLabel: $r('app.string.study_guide_start'),
-          showClose: false,
-          onAction: (): void => { this.onClose(); }
-        })
-        .padding({ left: 20, right: 20, top: 12 })
-        Scroll() {
-          Column({ space: 20 }) {
-            this.section($r('app.string.home_intro_flashcards_title'), $r('app.string.home_intro_flashcards_body'))
-            this.section($r('app.string.home_intro_simple_start_title'), $r('app.string.home_intro_simple_start_body'))
-            this.sourcesSection()
-            this.section($r('app.string.home_intro_agent_title'), $r('app.string.home_intro_agent_body'))
-            this.section($r('app.string.home_intro_apkg_title'), $r('app.string.home_intro_apkg_body'))
-            this.themeSection()
-          }
-          .width('100%')
-          .padding(20)
-        }
-        .width('100%')
-        .constraintSize({ maxHeight: this.contentHeight })
-        .scrollBar(BarState.Auto)
-        .edgeEffect(EdgeEffect.Spring)
-      }
-      .width('90%')
-      .constraintSize({ maxWidth: 520 })
-      .backgroundColor($r('app.color.surface_card'))
-      .borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
-    }
-    .width('100%')
-    .height('100%')
-    .alignContent(Alignment.Center)
-    .onAreaChange((_old: Area, area: Area): void => {
-      const height: number = Number(area.height);
-      if (height > 0) this.contentHeight = Math.max(100, height * 0.86 - 76);
-    })
+    DialogFrame({ maximumWidth: 520, canDismiss: false,
+      header: () => { this.headerContent(); }, content: () => { this.bodyContent(); } })
   }
 }
