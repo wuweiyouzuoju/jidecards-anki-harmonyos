@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { SETTINGS_ENTRIES } from '../../entry/src/main/ets/model/SettingsNavigation.ts';
 import { SETTINGS_GROUPS } from '../../entry/src/main/ets/model/SettingsStructure.ts';
+import { settingsHeaderItems, browserBackItem } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
 
 const root = new URL('../../entry/src/main/ets/', import.meta.url);
@@ -23,6 +24,76 @@ test('icon buttons reject disabled late clicks without changing host state', () 
     button.activate();
   }
   assert.deepEqual(events, ['action', 'action']);
+});
+
+test('direct navigation keeps simple strokes while menus retain theme fills', () => {
+  const Button = loadComponentLogic('components/common/IconActionButton.ets', 'IconActionButton', {
+    $r: key => key, Color: { Transparent: 'transparent' }, 应用尺寸: { 按钮高度: 44 }
+  });
+  const button = new Button();
+  button.surface = 'custom-image-overlay'; button.glyphColor = '#FFFFFF';
+  button.iconFill = 'custom-fill';
+  assert.equal(button.resolvedSurface(), 'custom-image-overlay');
+  assert.equal(button.resolvedGlyphColor(), '#FFFFFF');
+  assert.equal(button.resolvedIconFill(), 'custom-fill');
+  assert.equal(button.usesSquareSurface(), false);
+  button.toolbarStyle = true;
+  assert.equal(button.resolvedSurface(), 'app.color.surface_card');
+  assert.equal(button.usesSquareSurface(), true);
+  for (const menuFill of ['light-gray', 'dark-gray', 'selected-fill']) {
+    button.iconFill = menuFill;
+    assert.equal(button.resolvedIconFill(), 'transparent', 'menu fills cannot leak into directly exposed navigation');
+  }
+  for (const accent of ['#2F5FD0', '#FFFFFF', '#7BADEF']) {
+    button.actionColor = accent;
+    assert.equal(button.resolvedGlyphColor(), accent);
+  }
+  assert.match(read('components/common/IconActionButton.ets'), /tint: this\.resolvedIconFill\(\)/);
+  const MenuItem = loadComponentLogic('components/common/MenuItem.ets', 'AnchoredMenuItem', {
+    $r: key => key, TextAlign: { Center: 'center' }
+  });
+  const menu = new MenuItem();
+  assert.equal(menu.resolvedIconTint(), 'app.color.menu_icon_fill');
+  menu.selected = true;
+  menu.accent = '#2F5FD0';
+  assert.equal(menu.resolvedIconTint(), '#402F5FD0');
+  menu.iconTint = 'custom-menu-fill';
+  assert.equal(menu.resolvedIconTint(), 'custom-menu-fill');
+});
+
+test('direct navigation SVGs use unfilled round strokes with matching theme geometry', () => {
+  const names = new Set();
+  for (const path of readdirSync(root, { recursive: true }).filter(path => path.endsWith('.ets'))) {
+    const source = read(path);
+    for (const call of source.matchAll(/IconActionButton\(\{[\s\S]*?\}\)/g)) {
+      if (!/toolbarStyle:\s*true/.test(call[0])) continue;
+      const resource = call[0].match(/source:\s*\$r\('app\.media\.([^']+)'\)/);
+      if (resource) names.add(resource[1]);
+    }
+  }
+  // 动态顶栏继续读取 UI/JIDE 共用的真实声明，不维护第二份图标名单。
+  for (const state of [false, true]) {
+    for (const item of settingsHeaderItems(state)) if (item.iconKey) names.add(item.iconKey);
+    names.add(browserBackItem(state).iconKey);
+  }
+  assert.ok(names.size > 0, 'no directly exposed navigation resources discovered');
+  for (const name of names) {
+    const [base, dark] = ['base', 'dark'].map(theme => readFileSync(new URL(
+      `../../entry/src/main/resources/${theme}/media/${name}.svg`, import.meta.url), 'utf8'));
+    const geometry = svg => svg.replace(/\bstroke="#[0-9a-fA-F]{6}"/g, 'stroke="theme"');
+    assert.equal(geometry(base), geometry(dark), `${name}: theme variants must keep the same simple drawing`);
+    for (const svg of [base, dark]) {
+      const head = svg.match(/<svg\b([^>]*)>/)?.[1];
+      assert.ok(head, `${name}: SVG root missing`);
+      assert.match(head, /viewBox="0 0 24 24"/);
+      assert.match(head, /fill="none"/);
+      assert.match(head, /stroke="#[0-9a-fA-F]{6}"/);
+      assert.match(head, /stroke-width="2\.5"/);
+      assert.match(head, /stroke-linecap="round"/);
+      assert.match(head, /stroke-linejoin="round"/);
+      for (const fill of svg.matchAll(/\bfill="([^"]+)"/g)) assert.equal(fill[1], 'none', `${name}: filled menu artwork in direct navigation`);
+    }
+  }
 });
 
 test('icon recoloring preserves alpha and uses the requested RGB independent of theme', () => {

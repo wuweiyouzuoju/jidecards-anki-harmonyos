@@ -47,6 +47,35 @@ test('short loading unmount cancels feedback; slow loading shows it', () => {
   assert.equal(slow.shown, true); assert.equal(slow.timer, -1);
 });
 
+test('study and browser loading layers retain existing card content while blocking stale input', () => {
+  const read = path => readFileSync(new URL('../../entry/src/main/ets/' + path, import.meta.url), 'utf8');
+  for (const [path, start, end] of [
+    ['pages/学习页.ets', "      if (this.阶段 === 'loading' || (this.cardRenderPending &&", "      if (this.阶段 === 'error')"],
+    ['components/browser/卡片预览页.ets', '// Loading 覆盖层', '// 错误覆盖层']
+  ]) {
+    const source = read(path);
+    const overlay = source.slice(source.indexOf(start), source.indexOf(end, source.indexOf(start)));
+    const expression = overlay.match(/\.backgroundColor\((.*)\)/)[1];
+    const background = new Function('Color', '$r', `return (${expression});`);
+    for (const color of ['', '#101820', '#ffffff']) {
+      assert.equal(background.call({ hasRenderedCard: false, cardSurfaceBackground: color },
+        { Transparent: 'transparent' }, key => key), color || 'app.color.surface_card');
+      assert.equal(background.call({ hasRenderedCard: true, cardSurfaceBackground: color },
+        { Transparent: 'transparent' }, key => key), 'transparent', path);
+    }
+    assert.match(overlay, /DelayedLoadingIndicator\(/);
+    assert.match(overlay, /hitTestBehavior\(HitTestMode\.Block\)/);
+  }
+  const study = read('pages/学习页.ets');
+  const card = study.slice(study.indexOf('  private 卡片区()'), study.indexOf('  private 答案条()'));
+  const expression = card.match(/\.visibility\((.*)\)/)[1];
+  const visibility = new Function('Visibility', `return (${expression});`);
+  for (const phase of ['loading', 'question', 'answer', 'done', 'error']) {
+    assert.equal(visibility.call({ 阶段: phase }, { Visible: true, Hidden: false }),
+      ['loading', 'question', 'answer'].includes(phase));
+  }
+});
+
 test('home refresh preserves ready/empty presentation while initial load stays loading and failures remain visible', async () => {
   const source = readFileSync(new URL('../../entry/src/main/ets/pages/首页.ets', import.meta.url), 'utf8');
   const start = source.indexOf('  private async 执行加载主页数据(');

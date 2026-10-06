@@ -172,6 +172,7 @@ export struct 云端牌组弹窗 {
           actionLabel: $r('app.string.cloud_deck_download', this.selectedIds.length),
           actionEnabled: !this.busy && !this.loading && this.errorMessage.length === 0 && this.selectedIds.length > 0,
           closeLabel: this.主按钮文案(),
+          showCloseLabel: !this.从菜单打开,
           closeEnabled: !this.busy,
           onClose: (): void => { this.触发主按钮(); },
           onAction: (): void => { this.onDownload(); }

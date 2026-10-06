@@ -20,7 +20,7 @@ import { 后端会话 } from '../backend/后端会话';
 import { 解析是否深色, 主题模式 } from '../model/主题设置';
 import { 加载主题模式 } from '../model/主题存储';
 import { appThemeSession, appThemeColorSession } from '../backend/AppThemeService';
-import { 颜色主题, 默认颜色主题 } from '../model/颜色主题';
+import { 颜色主题, 默认颜色主题, 颜色键 } from '../model/颜色主题';
 import { 加载颜色主题 } from '../model/颜色主题存储';
 import { 加载已隐藏牌组ID列表, 取消隐藏全部牌组 } from '../model/隐藏牌组存储';
 import { activeHiddenDeckIds } from '../model/HiddenDecks';
@@ -33,6 +33,7 @@ import { 浏览页参数 } from '../model/navigation/PageParams';
 
 @Component
 export struct 设置页 {
+  @StorageProp(颜色键.动作主色) private actionColor: string = '#2F5FD0';
   @State private settingsBackRequest: number = 0;
   @State private transfer: DataTransferState = initialTransferState();
   private disposed: boolean = false;
@@ -181,7 +182,7 @@ export struct 设置页 {
         },
         secondaryButton: {
           value: $r('app.string.hidden_decks_unhide'),
-          fontColor: $r('app.color.action_primary'),
+          fontColor: this.actionColor,
           action: (): void => {
             this.确认全部取消隐藏();
           }

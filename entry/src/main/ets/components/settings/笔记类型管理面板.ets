@@ -283,7 +283,7 @@ export struct 笔记类型管理面板 {
         LoadingProgress()
           .width(20)
           .height(20)
-          .color($r('app.color.action_primary'))
+          .color($r('app.color.text_secondary'))
         Text(this.处理中 ? $r('app.string.notetype_mgmt_processing') : $r('app.string.notetype_mgmt_loading'))
           .fontSize(应用尺寸.字号_正文_中)
           .fontColor($r('app.color.text_secondary'))

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { WINDOW_SAFE_TOP_KEY } from '../model/WindowSafeLayout';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { SettingsActionRow } from './common/SettingsActionRow';
 import { settingsIcon } from '../utils/SettingsIcons';
@@ -6,6 +7,9 @@ import { showToastSafely, resourceText, namedResourceText } from '../utils/UiFee
 import { ThemeTextSpans } from './common/ThemeText';
 import { SettingsGroup, visibleSettingsGroups } from '../model/SettingsStructure';
 import { appInterface } from '../backend/AppInterfaceService';
+import { settingsHeaderControls, settingsHeaderItems } from '../model/AppInterface';
+import { interfaceControlIcon, interfaceControlText } from '../utils/AppInterfaceText';
+import { IconActionButton } from './common/IconActionButton';
 import { SettingsEntry, filterSettingsEntries, SETTINGS_ENTRIES } from '../model/SettingsNavigation';
 import { syncActivity } from '../model/SyncSettings';
 import { OFFICIAL_QQ_GROUP } from '../model/OfficialCommunity';
@@ -55,7 +59,7 @@ import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../model/ReleaseFeatures';
 //
 // @作用
 // 设置面板主壳：Stack 遮罩 + List 列出各分组 ListItem + 根 Stack 顶层浮层。
-// 顶栏布局：左「返回」（关闭设置页）+ 右「当前模式名」（弹出 模式切换菜单 选 简洁版/实验版），
+// 顶栏布局：左返回箭头 + 右当前模式图标；弹出菜单保留简洁版/实验版名称。
 // 替代原底部「当前模式」分组，该分组已于 2026-08-29 删除）。
 // 5 个分组（外观/调度器/布局/数据/术语表）+ 模式切换菜单 已抽到 components/settings/ 子组件；
 // 维护会话与各设置分组独立持有业务状态；主壳负责目录和弹层接线。
@@ -109,6 +113,7 @@ export struct 设置面板 {
   @StorageProp(PAGE_SURFACE_KEY) private 页面底色微染值: string = '#F5F7FA';
   @StorageProp(颜色键.主色容器) private 主色容器色: string = '#E8EEFC';
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
+  @StorageProp(WINDOW_SAFE_TOP_KEY) private toolbarSafeTop: number = 0;
   // 手势导航条高度（列表滚到底时最后分组需完整滚出导航条区域）
   @StorageProp('导航条高度') private 导航条高度: number = 0;
   主题模式切换回调: (模式: 主题模式) => void = (模式: 主题模式): void => {
@@ -139,7 +144,7 @@ export struct 设置面板 {
   };
 
   // 右上角模式切换菜单：顶栏「当前模式」按钮触发，弹出 简洁版/实验版 选择
-  @State private 显示模式菜单: boolean = false;
+  @State @Watch('publishInterface') private 显示模式菜单: boolean = false;
   @State private maintenance: CollectionMaintenanceState = new CollectionMaintenanceState();
   private readonly maintenanceSession: CollectionMaintenanceSession = new CollectionMaintenanceSession();
   // 子分组（FSRS / 语音朗读）ⓘ 按钮上抛的说明请求：统一在本面板根 Stack 浮层显示，
@@ -161,7 +166,7 @@ export struct 设置面板 {
   @State private 编辑笔记类型ID: number = 0;
   @State private 编辑笔记类型名: string = '';
   // 简洁模式：默认 true，隐藏调度分组/术语分组等高级功能
-  @StorageLink(简洁模式AppStorage键) private 简洁模式: boolean = true;
+  @StorageLink(简洁模式AppStorage键) @Watch('publishInterface') private 简洁模式: boolean = true;
   // 输入开发者密钥后即时显示隐藏的 Agent 设置与各页面入口。
   @StorageLink(AI_AGENT_CHANNELS_APP_STORAGE_KEY) private Agent入口已启用: boolean = false;
   // 内容 List 滚动器：openAiSettings 跳转进来时无动画直接定位到 AI 智能体分组
@@ -234,7 +239,8 @@ export struct 设置面板 {
 
   private publishInterface(): void {
     appInterface.observe({ surface: 'settings', sectionId: this.activeSection, selectedId: '',
-      optionIds: [], optionLabels: [], busy: false });
+      optionIds: [], optionLabels: [], busy: false,
+      items: settingsHeaderControls(this.简洁模式, this.显示模式菜单) });
   }
 
   private pageTitle(): string {
@@ -396,17 +402,16 @@ export struct 设置面板 {
             .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).textAlign(TextAlign.Center)
             .hitTestBehavior(HitTestMode.None)
           Row() {
-            按下态按钮({
-              文案: $r('app.string.study_back'),
-              字色: $r('app.color.text_primary'),
-              点击回调: (): void => { this.navigateBack(); }
+            IconActionButton({ toolbarStyle: true,
+              source: interfaceControlIcon(settingsHeaderItems(this.简洁模式), 'back'),
+              label: interfaceControlText(this.getUIContext(), settingsHeaderItems(this.简洁模式), 'back', this.uiLanguage),
+              onAction: (): void => { this.navigateBack(); }
             })
             Blank()
-            按下态按钮({
-              文案: this.简洁模式 ? $r('app.string.settings_simple_mode_simple')
-                : $r('app.string.settings_simple_mode_full'),
-              字色: $r('app.color.text_primary'),
-              点击回调: (): void => { this.显示模式菜单 = true; }
+            IconActionButton({ toolbarStyle: true,
+              source: interfaceControlIcon(settingsHeaderItems(this.简洁模式), 'mode'),
+              label: interfaceControlText(this.getUIContext(), settingsHeaderItems(this.简洁模式), 'mode', this.uiLanguage),
+              onAction: (): void => { this.显示模式菜单 = true; }
             })
           }
           .width('100%')
@@ -415,9 +420,9 @@ export struct 设置面板 {
           .hitTestBehavior(HitTestMode.Transparent)
         }
         .width('100%')
-        .height(应用尺寸.pageToolbarHeight(this.状态栏高度, this.narrowDeckLayout))
+        .height(应用尺寸.pageToolbarHeight(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop))
         .padding({
-          top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout),
+          top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop),
           bottom: 0
         })
         .backgroundColor(this.页面底色微染值)
@@ -639,7 +644,7 @@ export struct 设置面板 {
         模式切换菜单({
           当前简洁模式: this.简洁模式,
           主色: this.解析主色(),
-          顶部偏移: 应用尺寸.pageContentTop(this.状态栏高度, this.narrowDeckLayout),
+          顶部偏移: 应用尺寸.pageContentTop(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop),
           选择回调: (简洁: boolean): void => {
             this.显示模式菜单 = false;
             if (简洁 !== this.简洁模式) {

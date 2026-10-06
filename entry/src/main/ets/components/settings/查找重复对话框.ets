@@ -121,7 +121,7 @@ export struct 查找重复对话框 {
       .fontColor($r('app.color.text_secondary')).width('100%')
     if (this.加载中 || this.scan.busy) {
       Row({ space: 应用尺寸.间距_8 }) {
-        LoadingProgress().width(20).height(20).color($r('app.color.action_primary'))
+        LoadingProgress().width(20).height(20).color($r('app.color.text_secondary'))
         Text(this.scan.total > 0 ? localizedResourceText(this.getUIContext(), this.uiLanguage, $r('app.string.find_dupes_progress'),
           this.scan.scanned, this.scan.total) : localizedResourceText(this.getUIContext(), this.uiLanguage, $r('app.string.find_dupes_searching')))
           .fontSize(应用尺寸.字号_正文_中).fontColor($r('app.color.text_secondary'))
