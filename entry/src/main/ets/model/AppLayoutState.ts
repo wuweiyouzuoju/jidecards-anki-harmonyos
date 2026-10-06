@@ -2,3 +2,5 @@
 
 /** 全应用页面密度；沿用旧键，由牌组样式存储派生并发布，页面只订阅。 */
 export const PAGE_COMPACT_LAYOUT_KEY: string = 'deckListNarrow';
+/** 简洁版/实验版的 UI 广播键；持久化由简洁模式存储拥有。 */
+export const SIMPLE_MODE_KEY: string = 'simpleMode';

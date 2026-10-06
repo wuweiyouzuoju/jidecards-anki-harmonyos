@@ -467,6 +467,11 @@ test('local save and application failures report distinct partial outcomes and c
 
 test('JIDE reads migrated narrow preference and confirms all four styles through the shared store', async () => {
   const f = fixture();
+  const definition = JSON.parse((await f.call('list_settings',{})).outputJson).settings
+    .find(setting => setting.id === 'deck_list_style');
+  assert.match(definition.description,/同密度单\/双列等高/);
+  assert.match(definition.description,/所有样式的牌组名称最多两行/);
+  assert.match(definition.description,/窄版仅在原字号名称需要两行且有描述时缩小字号/);
   f.state.localCache.set(DECK_LIST_NARROW_KEY,true);
   const migrated = JSON.parse((await f.call('get_settings',{ids:['deck_list_style']})).outputJson);
   assert.equal(migrated.preferences[0].value,'single_narrow');

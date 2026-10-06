@@ -7,7 +7,7 @@ import { APP_INTERFACE_SURFACES, STATS_INTERFACE_SECTIONS, AppInterfaceTracker, 
   statsInterfaceSections, addNoteInterfaceControls, noteEditInterfaceControls, noteAudioInterfaceObservation } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { noteFieldDisplayKey, noteTypeDisplayKey } from '../../entry/src/main/ets/model/NoteTypePresentation.ts';
 import { buildAgentAppStructure } from '../../entry/src/main/ets/model/agent/AgentAppStructure.ts';
-import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
+import { expansionRevealDependencies, loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
 import { DeckOptionsSession, DeckOptionsFsrsState } from '../../entry/src/main/ets/model/home/DeckOptionsSession.ts';
 import { 牌组配置表单 } from '../../entry/src/main/ets/model/牌组配置表单.ets';
 import { 牌组选项编辑 } from '../../entry/src/main/ets/model/牌组选项编辑.ets';
@@ -127,7 +127,7 @@ test('add-note observation follows actual field/type state, simple tags and imag
 test('real editor form observes bounded field labels, busy guards and cleanup without retaining note text or media URIs',()=>{
   const tracker=new AppInterfaceTracker();
   const Form=loadComponentLogic('components/browser/浏览编辑区.ets','浏览编辑区',
-    {...dependencies(tracker),NoteAudioPreview:class{async dispose(){}},discardNoteRecordings:async()=>{}});
+    {...dependencies(tracker),...expansionRevealDependencies(),NoteAudioPreview:class{async dispose(){}},discardNoteRecordings:async()=>{}});
   const form=new Form();Object.assign(form,{getUIContext:()=>({}),fieldNames:['Front','CUSTOM_FIELD'],originalStockKind:1,
     initialFieldValues:['PRIVATE_BODY','PRIVATE_BODY'],initialTags:'PRIVATE_TAGS',optionalReverseFieldOrd:1,clozeFieldOrds:[0]});
   form.aboutToAppear();let view=result(tracker,'edit_note_form',key=>en.get(key));

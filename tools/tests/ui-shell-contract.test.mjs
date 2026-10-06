@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 import { 应用尺寸 } from '../../entry/src/main/ets/utils/应用尺寸.ets';
+import { settingsHeaderItems } from '../../entry/src/main/ets/model/AppInterface.ts';
 
 test('home and settings keep the same gap below their toolbar buttons', () => {
   const toolbarSource = read('entry/src/main/ets/components/home/主页顶部工具栏.ets');
@@ -38,12 +39,12 @@ test('every primary page consumes the shared first-content and toolbar spacing',
     const page = read(`entry/src/main/ets/pages/${name}.ets`);
     assert.match(page, /top: (?:this.排序模式中 \? )?应用尺寸\.页面内容顶部间距\(this\.narrowDeckLayout\)/, name);
     const toolbar = name === '首页' ? read('entry/src/main/ets/components/home/HomeDeckDetails.ets') : name === '添加笔记页' ? read('entry/src/main/ets/components/common/NoteEditorHeader.ets').replaceAll('this.statusBarHeight', 'this.状态栏高度').replaceAll('this.narrow', 'this.narrowDeckLayout') : page;
-    assert.match(toolbar, /top: 应用尺寸\.pageToolbarTop\(this\.状态栏高度, this\.narrowDeckLayout\)/, name);
+    assert.match(toolbar, /top: 应用尺寸\.pageToolbarTop\(this\.状态栏高度, this\.narrowDeckLayout, this\.toolbarSafeTop\)/, name);
     assert.match(toolbar, /bottom: 0/, name);
   }
   const settings = read('entry/src/main/ets/components/设置面板.ets');
   assert.match(settings, /top: 应用尺寸\.页面内容顶部间距\(this\.narrowDeckLayout\)/);
-  assert.match(settings, /top: 应用尺寸\.pageToolbarTop\(this\.状态栏高度, this\.narrowDeckLayout\)/);
+  assert.match(settings, /top: 应用尺寸\.pageToolbarTop\(this\.状态栏高度, this\.narrowDeckLayout, this\.toolbarSafeTop\)/);
   const agent = read('entry/src/main/ets/pages/AI制卡页.ets');
   assert.doesNotMatch(agent.slice(agent.lastIndexOf('  build() {')), /Divider\(/,
     'a second divider must not add an extra offset below the Agent toolbar');
@@ -181,15 +182,17 @@ function readJson(relativePath) {
   return JSON.parse(read(relativePath));
 }
 
-test('home menus use their real button anchors and a shared pointed popup surface', () => {
+test('home menus use measured button bounds and the public anchored menu without arrows or nested scrolls', () => {
   const header = read('entry/src/main/ets/components/home/HomeSummaryHeader.ets');
-  assert.equal((header.match(/\.bindPopup\(/g) ?? []).length, 2);
-  assert.equal((header.match(/enableArrow: true/g) ?? []).length, 2);
-  assert.equal((header.match(/transition: MenuSurface.popupTransition\(\)/g) ?? []).length, 2);
-  assert.match(header, /placement: Placement.BottomLeft/);
-  assert.match(header, /placement: Placement.BottomRight/);
+  assert.doesNotMatch(header,/bindPopup|enableArrow/);
+  const page=read('entry/src/main/ets/pages/首页.ets');
+  assert.equal((page.match(/AnchoredMenu\(\{/g)??[]).length,2);
+  assert.equal((page.match(/topOffset: this.homeMenuAnchor\(\).top, contentLeft: this.homeMenuAnchor\(\).left/g)??[]).length,2);
+  assert.match(page,/\.onAreaChange\(\(_old: Area, area: Area\): void => \{ this.homeMenuHostChanged\(area\); \}\)/);
+  assert.match(page,/contentMaxWidth: this.homeActionAnchor.width, alignEnd: false/);
+  assert.match(page,/contentMaxWidth: this.homeActionAnchor.width, alignEnd: true/);
   for (const p of ['entry/src/main/ets/components/home/主页更多面板.ets','entry/src/main/ets/components/主页操作面板.ets']) {
-    const menu=read(p); assert.match(menu,/ActionMenuList\(/); assert.doesNotMatch(menu,/AnchoredMenu\(|topOffset|状态栏高度/);
+    const menu=read(p); assert.match(menu,/ActionMenuList\(/); assert.doesNotMatch(menu,/AnchoredMenu\(|Scroll\(|topOffset|状态栏高度/);
   }
 });
 
@@ -354,7 +357,8 @@ test('hour histogram range is shared by stats page, home card and widget', () =>
   assert.match(store, /export async function 加载小时分布窗口/);
   assert.match(store, /export async function 保存小时分布窗口/);
   assert.match(store, /stats_hours_range/);
-  assert.match(stats, /保存小时分布窗口\(索引\)/);
+  assert.match(stats, /this\.on小时切换\(索引\)/);
+  assert.match(stats, /await 保存小时分布窗口\(index\)/);
   assert.match(stats, /加载小时分布窗口\(\)/);
   // 提取按窗口取对应时间段（0=1月 1=3月 2=1年 3=全部）
   assert.match(store, /小时窗口 === 1 \? 小时源\.threeMonths/);
@@ -441,11 +445,15 @@ test('primary pages share one shell gutter and common visual primitives', () => 
   assert.match(agentPage,
     /private 消息流\(\)[\s\S]*?left: 应用尺寸\.页面内边距_水平,[\s\S]*?right: 应用尺寸\.页面内边距_水平/);
 
-  assert.match(settingsPanel, /文案: \$r\('app\.string\.study_back'\)/,
-    'instant-save settings must use the same back navigation wording as other pages');
-  assert.match(settingsPanel,
-    /文案: \$r\('app\.string\.study_back'\),\s*字色: \$r\('app\.color\.text_primary'\)/,
-    'settings back action must remain neutral instead of following the selected color theme');
+  for (const simple of [true, false]) {
+    assert.equal(settingsHeaderItems(simple).find(item => item.id === 'back').titleKey, 'study_back',
+      'instant-save settings retain the same semantic back label');
+  }
+  const settingsBack = settingsPanel.match(/IconActionButton\(\{[\s\S]*?navigateBack\(\); \}[\s\S]*?\}\)/)?.[0] ?? '';
+  assert.match(settingsBack, /label: interfaceControlText\([^\n]*'back'/);
+  assert.match(settingsBack, /toolbarStyle: true/);
+  assert.doesNotMatch(settingsBack, /glyphColor:|iconFill:/,
+    'settings back inherits the same theme stroke as the home buttons');
   assert.doesNotMatch(settingsPage, /private 顶部条\(\)/,
     'settings must not keep an unused second toolbar implementation');
   assert.match(settingsCard, /borderRadius\(16\)/,
@@ -615,7 +623,8 @@ test('card counts caliber follows the separation preference across stats page, h
     '分离偏好决定 CardCounts 口径');
   assert.match(store, /export async function 加载分离暂停偏好/, '模型层须有分离偏好加载（读后端 GraphPreferences）');
   // 统计页：切换分离复选框后立即重提卡片快照并传分离参数
-  assert.match(stats, /刷新卡片快照\(\)\.catch/, '切换分离偏好须立即刷新卡片快照');
+  assert.match(stats, /if \(saved && this\.pageActive && this\.取搜索串\(\) === ''\)\s*\{\s*try \{ await this\.刷新卡片快照\(\); \} catch \(error\) \{ this\.reportFailure\(error\); \}/,
+    '切换分离偏好确认保存后刷新卡片，失败须反馈');
   assert.match(stats, /this\.图表偏好\.cardCountsSeparateInactive/, '刷新卡片快照须读取当前分离偏好');
   // 首页/FSRS控制器：提取时加载分离偏好
   assert.match(home, /加载分离暂停偏好\(\)/, '首页提取卡片数据须加载分离偏好');

@@ -2,7 +2,7 @@
 import { SETTINGS_ENTRIES, settingsEntryVisible } from '../SettingsNavigation';
 import { SETTINGS_GROUPS, visibleSettingsGroups, settingsItemVisible } from '../SettingsStructure';
 import type { SettingsGroup, SettingsItem } from '../SettingsStructure';
-import { APP_INTERFACE_SURFACES, visibleInterfaceItems } from '../AppInterface';
+import { APP_INTERFACE_SURFACES, visibleInterfaceItems, SETTINGS_HEADER_ITEMS, settingsHeaderItems } from '../AppInterface';
 import type { AppInterfaceContext, AppInterfaceObservation, AppInterfaceControl } from '../AppInterface';
 import type { AgentSettingDefinition } from './AgentSettingsTools';
 import type { ProviderFunctionTool } from './ProviderProtocol';
@@ -27,7 +27,7 @@ export interface AgentPageDestination {
 /** 指纹覆盖共同声明与本轮能力；不是持久缓存，也不把用户状态写入长期记忆。 */
 export function agentInterfaceRevision(tools: ProviderFunctionTool[]): string {
   const source: string = JSON.stringify([APP_PAGE_ROUTES, APP_INTERFACE_SURFACES, SETTINGS_ENTRIES,
-    SETTINGS_GROUPS, APP_NAVIGATION_ACTIONS, AGENT_APP_RECOMMENDATIONS, CARD_RENDERING_SUPPORT, NOTE_FIELD_EDITING_SUPPORT, tools]);
+    SETTINGS_GROUPS, SETTINGS_HEADER_ITEMS, APP_NAVIGATION_ACTIONS, AGENT_APP_RECOMMENDATIONS, CARD_RENDERING_SUPPORT, NOTE_FIELD_EDITING_SUPPORT, tools]);
   let hash: number = 2166136261;
   for (let index: number = 0; index < source.length; index++) { hash = Math.imul(hash ^ source.charCodeAt(index), 16777619); }
   return (hash >>> 0).toString(16);
@@ -45,6 +45,7 @@ export interface AgentInterfaceItem {
   id: string; title: string; opens: string; visibility: string; condition: string;
   settingId: string; readTool: string; writeTool: string; sensitive: boolean;
   enabled?: boolean; selected?: boolean;
+  iconKey?: string;
 }
 export interface AgentInterfaceGroup {
   id: string; title: string; visible: boolean; items: AgentInterfaceItem[];
@@ -63,6 +64,7 @@ export interface AgentAppStructure {
   source: string; coverage: string[]; limitation: string; simpleMode: boolean;
   observations: AppInterfaceObservation[]; tools: AgentInterfaceTool[];
   surfaces: AgentInterfaceSurface[]; visibleSettingsSectionCount: number; sections: AgentInterfaceSection[];
+  settingsHeader: AgentInterfaceItem[];
   foregroundSurface: string;
   contextSurface: string;
   recommendations: AgentInterfaceRecommendation[];
@@ -80,7 +82,7 @@ export function buildAgentAppStructure(context: AppInterfaceContext, surfaceId: 
   const views: AppInterfaceObservation[] = observations.map((view: AppInterfaceObservation): AppInterfaceObservation => {
     const declaration = APP_INTERFACE_SURFACES.find((surface): boolean => surface.id === view.surface);
     const controls: AppInterfaceControl[] | undefined = view.items?.map((item: AppInterfaceControl): AppInterfaceControl =>
-      ({ id: item.id, title: item.titleKey === undefined ? item.title : localize(item.titleKey), titleKey: item.titleKey,
+      ({ id: item.id, title: item.titleKey === undefined ? item.title : localize(item.titleKey), titleKey: item.titleKey, iconKey: item.iconKey,
         enabled: item.enabled, selected: item.selected }));
     return { surface: view.surface, titleKey: view.titleKey, controlsComplete: view.controlsComplete,
       sectionId: view.sectionId, selectedId: view.selectedId, optionIds: view.optionIds,
@@ -137,14 +139,21 @@ export function buildAgentAppStructure(context: AppInterfaceContext, surfaceId: 
         return { id: item.id, title: control?.title ?? localize(item.titleKey), opens: item.opens ?? '',
           visibility: !visibleIds.includes(item.id) || absentControl || (liveMenu && observation !== undefined && !observation.optionIds.includes(item.id)) ? 'hidden' :
             control !== undefined ? 'observed' : (item.condition === undefined ? 'available_in_surface' : 'conditional'),
-          condition: item.condition ?? '', enabled: control?.enabled, selected: control?.selected,
+          condition: item.condition ?? '', enabled: control?.enabled, selected: control?.selected, iconKey: control?.iconKey ?? item.iconKey,
           settingId: '', readTool: '', writeTool: '', sensitive: false };
       }).concat((observation?.items ?? []).filter((control): boolean => !surface.items.some((item): boolean => item.id === control.id))
         .map((control): AgentInterfaceItem => ({ id: control.id, title: control.title, opens: '', visibility: 'observed', condition: '',
-          enabled: control.enabled, selected: control.selected, settingId: '', readTool: '', writeTool: '', sensitive: false }))) });
+          enabled: control.enabled, selected: control.selected, iconKey: control.iconKey,
+          settingId: '', readTool: '', writeTool: '', sensitive: false }))) });
   }
   return { source: 'shared_ui_declarations_and_live_observations', cardRendering: CARD_RENDERING_SUPPORT,
     noteEditing: NOTE_FIELD_EDITING_SUPPORT,
+    settingsHeader: surfaceId === 'app' || surfaceId === 'settings' ? settingsHeaderItems(context.simple).map((item): AgentInterfaceItem => {
+      const control = views.find((view): boolean => view.surface === 'settings')?.items?.find((entry): boolean => entry.id === item.id);
+      return { id: item.id, title: control?.title ?? localize(item.titleKey), iconKey: control?.iconKey ?? item.iconKey,
+        opens: '', visibility: control === undefined ? 'available_in_surface' : 'observed', condition: '',
+        enabled: control?.enabled, selected: control?.selected, settingId: '', readTool: '', writeTool: '', sensitive: false };
+    }) : [],
     revision: agentInterfaceRevision(tools),
     destinations: APP_PAGE_ROUTES.map((route): AgentPageDestination => ({ surface: route.surface,
       title: localize(route.titleKey), detailed: route.surface === 'settings' || APP_INTERFACE_SURFACES.some((surface): boolean => surface.id === route.surface) })),

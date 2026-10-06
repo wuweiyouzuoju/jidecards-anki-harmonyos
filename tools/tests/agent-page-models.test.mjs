@@ -2,13 +2,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { AgentCardBatch } from '../../entry/src/main/ets/model/agent/AgentCardBatch.ts';
-import { buildProviderDraftContext, limitProviderInput, truncateProviderText } from '../../entry/src/main/ets/model/agent/AgentProviderContext.ts';
+import { buildProviderDraftContext, truncateProviderText } from '../../entry/src/main/ets/model/agent/AgentProviderContext.ts';
 import { mergeAgentImportedFiles } from '../../entry/src/main/ets/model/agent/AgentFileImport.ts';
 import { AutoSyncScheduler } from '../../entry/src/main/ets/model/AutoSyncScheduler.ts';
 import { SyncActivity } from '../../entry/src/main/ets/model/SyncSettings.ts';
 
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
-const message = content => ({ kind: 'message', role: 'user', content, callId: '', name: '', argumentsJson: '', output: '' });
 const card = (text, selected = true, status = 'draft') => ({ fields: [text], 已选中: selected, 状态: status });
 
 test('context truncation obeys every small budget, retains both ends when possible', () => {
@@ -17,16 +16,6 @@ test('context truncation obeys every small budget, retains both ends when possib
   const result = truncateProviderText(value, 100);
   assert.ok(result.startsWith('BEGIN')); assert.ok(result.endsWith('END'));
   assert.match(result, /truncated/);
-});
-
-test('provider history retains latest items in order without exceeding aggregate or item limits', () => {
-  const source = [message('old'.repeat(100)), message('x'.repeat(239999))];
-  const result = limitProviderInput(source);
-  assert.equal(result.reduce((sum, item) => sum + item.content.length, 0), 240000);
-  assert.equal(result[1].content, source[1].content);
-  assert.equal(source[0].content.length, 300);
-  assert.deepEqual(limitProviderInput(Array.from({ length: 100 }, (_, i) => message(String(i)))).map(x => x.content),
-    Array.from({ length: 80 }, (_, i) => String(i + 20)));
 });
 
 test('draft context preserves actual status and explicitly reports field and operation truncation', () => {

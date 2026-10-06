@@ -2,6 +2,9 @@
 import { CARD_FLAGS } from './CardMarking';
 import { DECK_OPTION_GROUPS } from './DeckOptionsCatalog';
 import type { NoteAudioStatus } from './NoteAudioDraft';
+import { NOTE_EDITOR_TOOLS, NOTE_EDITOR_COMMON_TOOL_IDS, NOTE_FIELD_EDITING_SUPPORT } from './NoteFieldEditing';
+import { noteEditorWheelTools, noteEditorWheelCommonTools, noteEditorWheelOuterTools, NOTE_EDITOR_WHEEL_VISIBLE_COUNT } from './NoteEditorWheel';
+import type { NoteEditorWheelState } from './NoteEditorWheel';
 export interface AppInterfaceContext {
   simple: boolean;
   agent: boolean;
@@ -11,6 +14,8 @@ export interface AppInterfaceContext {
 export interface AppInterfaceItem {
   id: string;
   titleKey: string;
+  /** 纯图标入口的资源名；完整名称继续由 titleKey 提供。 */
+  iconKey?: string;
   opens?: string;
   fullOnly?: boolean;
   agentOnly?: boolean;
@@ -42,11 +47,13 @@ export const STATS_INTERFACE_SECTIONS: AppInterfaceItem[] = [
 ];
 
 export const WHITEBOARD_INTERFACE_ITEMS: AppInterfaceItem[] = [
-  { id: 'close', titleKey: 'study_whiteboard_close' },
+  { id: 'close', titleKey: 'study_whiteboard_close', iconKey: 'ic_common_close' },
+  { id: 'opacity', titleKey: 'study_whiteboard_opacity', condition: 'official_suite' },
+  { id: 'reset_view', titleKey: 'study_whiteboard_reset_view', condition: 'global_navigation' },
   { id: 'official_tools', titleKey: 'study_whiteboard_official_tools', condition: 'official_suite' },
-  { id: 'undo', titleKey: 'image_occlusion_undo', condition: 'local_suite' },
-  { id: 'redo', titleKey: 'study_whiteboard_redo', condition: 'local_suite' },
-  { id: 'clear', titleKey: 'study_whiteboard_clear', condition: 'local_suite' },
+  { id: 'undo', titleKey: 'image_occlusion_undo', iconKey: 'ic_study_undo', condition: 'local_suite' },
+  { id: 'redo', titleKey: 'study_whiteboard_redo', iconKey: 'ic_whiteboard_redo', condition: 'local_suite' },
+  { id: 'clear', titleKey: 'study_whiteboard_clear', iconKey: 'ic_study_delete', condition: 'local_suite' },
   { id: 'pen', titleKey: 'study_whiteboard_pen', condition: 'local_suite' },
   { id: 'eraser', titleKey: 'study_whiteboard_eraser', condition: 'local_suite' },
   { id: 'color_0', titleKey: 'study_whiteboard_auto_color', condition: 'pen_settings' },
@@ -60,7 +67,7 @@ export const WHITEBOARD_INTERFACE_ITEMS: AppInterfaceItem[] = [
   { id: 'eraser_width_1', titleKey: 'study_whiteboard_medium_size', condition: 'eraser_settings' },
   { id: 'eraser_width_2', titleKey: 'study_whiteboard_large', condition: 'eraser_settings' },
   { id: 'stylus', titleKey: 'study_whiteboard_stylus', condition: 'tool_settings' },
-  { id: 'settings_close', titleKey: 'done', condition: 'tool_settings' },
+  { id: 'settings_close', titleKey: 'close', iconKey: 'ic_common_close', condition: 'tool_settings' },
   { id: 'retry', titleKey: 'study_whiteboard_retry', condition: 'failed' },
   { id: 'show_answer', titleKey: 'study_show_answer', condition: 'question' },
   { id: 'again', titleKey: 'rating_again', condition: 'answer' },
@@ -71,8 +78,14 @@ export const WHITEBOARD_INTERFACE_ITEMS: AppInterfaceItem[] = [
 
 /** 菜单直接遍历这里的条目；标签、顺序和显隐由 UI 与 JIDE 共用。 */
 export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
+  { id: 'note_editor_wheel', titleKey: 'note_editor_wheel_title', instructionsKey: 'note_editor_wheel_instructions',
+    parent: 'edit_note_form', items: NOTE_EDITOR_TOOLS.map((tool): AppInterfaceItem => ({ id: tool.id,
+      titleKey: tool.titleKey, iconKey: tool.iconKey,
+      fullOnly: NOTE_EDITOR_COMMON_TOOL_IDS.indexOf(tool.id) < 0 })).concat([
+      { id: 'position', titleKey: 'note_editor_wheel_move_hint', iconKey: 'ic_editor_wheel' }
+    ]) },
   { id: 'home', titleKey: 'home_interface_title', instructionsKey: 'home_actions_instructions', parent: '', items: [
-    { id: 'more', titleKey: 'study_more', opens: 'home_more' },
+    { id: 'more', titleKey: 'study_more', iconKey: 'ic_home_more', opens: 'home_more' },
     { id: 'agent', titleKey: 'ai_agent_title', opens: 'agent', agentOnly: true },
     { id: 'search', titleKey: 'home_search_title', opens: 'home_search' },
     { id: 'browser', titleKey: 'browser_title', opens: 'browser' },
@@ -84,7 +97,7 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'reorder', titleKey: 'deck_menu_reorder', opens: 'deck_reorder', condition: 'deck_long_press' }
   ] },
   { id: 'deck_reorder', titleKey: 'deck_menu_reorder', instructionsKey: 'deck_reorder_instructions', parent: 'home', items: [
-    { id: 'exit', titleKey: 'deck_reorder_exit' },
+    { id: 'exit', titleKey: 'deck_reorder_exit', iconKey: 'ic_common_close' },
     { id: 'done', titleKey: 'deck_reorder_done' },
     { id: 'decks', titleKey: 'home_interface_decks', condition: 'drag_sibling_decks_in_reorder_mode' }
   ] },
@@ -112,17 +125,17 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'top_level', titleKey: 'top_level_deck' },
     { id: 'parent_decks', titleKey: 'create_deck_parent_options', condition: 'loaded_parent_decks' },
     { id: 'confirm', titleKey: 'create_deck_confirm' },
-    { id: 'cancel', titleKey: 'create_deck_cancel' }
+    { id: 'cancel', titleKey: 'create_deck_cancel', iconKey: 'ic_common_close' }
   ] },
   { id: 'deck_details', titleKey: 'home_interface_decks', parent: 'home', items: [
-    { id: 'add_note', titleKey: 'deck_add_card', opens: 'add_note' },
-    { id: 'agent', titleKey: 'ai_agent_title', opens: 'agent', agentOnly: true },
-    { id: 'preview', titleKey: 'deck_preview', opens: 'deck_preview_scope' },
+    { id: 'add_note', titleKey: 'deck_add_card', iconKey: 'ic_study_edit', opens: 'add_note' },
+    { id: 'agent', titleKey: 'ai_agent_title', iconKey: 'ic_study_agent', opens: 'agent', agentOnly: true },
+    { id: 'preview', titleKey: 'deck_preview', iconKey: 'ic_common_preview', opens: 'deck_preview_scope' },
     { id: 'total', titleKey: 'deck_total_cards' },
     { id: 'new', titleKey: 'new_cards' },
     { id: 'learning', titleKey: 'learning_cards' },
     { id: 'review', titleKey: 'review_cards' },
-    { id: 'more', titleKey: 'deck_more', opens: 'deck_details_more' },
+    { id: 'more', titleKey: 'deck_more', iconKey: 'ic_home_more', opens: 'deck_details_more' },
     { id: 'study', titleKey: 'start_study', opens: 'study' }
   ] },
   { id: 'deck_actions', titleKey: 'deck_more', parent: 'deck_details', items: [] },
@@ -132,7 +145,7 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'form', titleKey: 'deck_options_title', opens: 'deck_options_form', condition: 'ready' }
   ] },
   { id: 'deck_options_form', titleKey: 'deck_options_title', parent: 'deck_options', items: [
-    { id: 'cancel', titleKey: 'create_deck_cancel' },
+    { id: 'cancel', titleKey: 'create_deck_cancel', iconKey: 'ic_common_close' },
     { id: 'save', titleKey: 'deck_options_save' },
       { id: 'help', titleKey: 'field_help_button' },
     { id: 'newPerDay', titleKey: 'deck_newPerDay_label', condition: 'simple_mode' },
@@ -171,6 +184,8 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'reload', titleKey: 'common_retry' }
   ] },
   { id: 'deck_customize', titleKey: 'deck_customize_title', instructionsKey: 'deck_customize_alias_hint', parent: 'home', items: [
+    { id: 'crop_confirm', titleKey: 'deck_customize_background_crop_confirm' },
+    { id: 'crop_cancel', titleKey: 'deck_customize_background_crop_cancel' },
     { id: 'name', titleKey: 'deck_customize_name_label' },
     { id: 'background', titleKey: 'deck_customize_background_label' },
     { id: 'confirm', titleKey: 'deck_customize_save' },
@@ -187,13 +202,14 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: '3', titleKey: 'deck_preview_all', opens: 'preview' }
   ] },
   { id: 'browser', titleKey: 'browser_title', parent: 'home', items: [
+    { id: 'back', titleKey: 'study_back', iconKey: 'ic_common_arrow_left' },
     { id: 'search', titleKey: 'browser_search_placeholder' },
     { id: 'cards', titleKey: 'browser_mode_cards', opens: 'browser_view' },
     { id: 'notes', titleKey: 'browser_mode_notes', opens: 'browser_view' },
     { id: 'filter', titleKey: 'browser_action_sidebar', opens: 'browser_view' },
     { id: 'sort', titleKey: 'browser_sort_default', opens: 'browser_view' },
-    { id: 'more', titleKey: 'study_more', opens: 'browser_more' },
-    { id: 'selection', titleKey: 'browser_selection_actions', opens: 'browser_batch' }
+    { id: 'more', titleKey: 'study_more', iconKey: 'ic_home_more', opens: 'browser_more' },
+    { id: 'selection', titleKey: 'browser_selection_actions', iconKey: 'ic_home_more', opens: 'browser_batch' }
   ] },
   { id: 'browser_more', titleKey: 'study_more', parent: 'browser', items: [
     { id: 'filter', titleKey: 'browser_action_sidebar', opens: 'browser_sidebar' },
@@ -253,9 +269,9 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
   // 筛选与排序的选项由浏览页真实列/筛选模型提供，不能在这里另抄一份。
   { id: 'browser_view', titleKey: 'browser_title', parent: 'browser', items: [] },
   { id: 'agent', titleKey: 'ai_agent_title', parent: 'home', items: [
-    { id: 'back', titleKey: 'study_back' },
-    { id: 'history', titleKey: 'ai_agent_history', opens: 'agent_history', condition: 'conversation' },
-    { id: 'new', titleKey: 'ai_agent_history_new', condition: 'history' },
+    { id: 'back', titleKey: 'study_back', iconKey: 'ic_common_arrow_left' },
+    { id: 'history', titleKey: 'ai_agent_history', iconKey: 'ic_common_history', opens: 'agent_history', condition: 'conversation' },
+    { id: 'new', titleKey: 'ai_agent_history_new', iconKey: 'ic_home_new', condition: 'history' },
     { id: 'input', titleKey: 'ai_card_input_hint', condition: 'conversation' },
     { id: 'import', titleKey: 'ai_agent_import_files', condition: 'conversation' },
     { id: 'submit', titleKey: 'ai_card_send', condition: 'conversation' }
@@ -264,11 +280,12 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'delete', titleKey: 'ai_agent_history_delete', condition: 'has_conversations' }
   ] },
   { id: 'reminders', titleKey: 'reminder_list_title', parent: 'home_more', items: [
-    { id: 'back', titleKey: 'study_back' },
-    { id: 'create', titleKey: 'reminder_list_create_button', opens: 'reminder_editor' }
+    { id: 'retry', titleKey: 'common_retry', condition: 'error' },
+    { id: 'back', titleKey: 'study_back', iconKey: 'ic_common_arrow_left' },
+    { id: 'create', titleKey: 'reminder_list_create_button', iconKey: 'ic_home_new', opens: 'reminder_editor' }
   ] },
   { id: 'reminder_editor', titleKey: 'reminder_edit_title_create', parent: 'reminders', items: [
-    { id: 'cancel', titleKey: 'create_deck_cancel' },
+    { id: 'cancel', titleKey: 'create_deck_cancel', iconKey: 'ic_common_close' },
     { id: 'confirm', titleKey: 'create_deck_confirm' },
     { id: 'time', titleKey: 'reminder_edit_time_label' },
     { id: 'title', titleKey: 'reminder_edit_notification_title' },
@@ -278,7 +295,8 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'delete', titleKey: 'reminder_edit_delete', condition: 'editing' }
   ] },
   { id: 'stats', titleKey: 'stats_page_title', parent: 'home_more', items: [
-    { id: 'back', titleKey: 'study_back' },
+    { id: 'retry', titleKey: 'common_retry', condition: 'error' },
+    { id: 'back', titleKey: 'study_back', iconKey: 'ic_common_arrow_left' },
     { id: 'deck', titleKey: 'stats_deck_all', condition: 'charts_and_decks' },
     { id: 'year', titleKey: 'stats_history_range_year', condition: 'charts' },
     { id: 'all', titleKey: 'stats_history_range_all', condition: 'charts' },
@@ -290,7 +308,7 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     items: [{ id: 'help', titleKey: 'field_help_button' }]
   })),
   { id: 'add_note', titleKey: 'add_note_title', instructionsKey: 'note_editor_format_action', parent: 'deck_details', items: [
-    { id: 'back', titleKey: 'study_back' }, { id: 'save', titleKey: 'add_note_save_continue' },
+    { id: 'back', titleKey: 'study_back', iconKey: 'ic_common_arrow_left' }, { id: 'save', titleKey: 'add_note_save_continue' },
     { id: 'save_return', titleKey: 'add_note_save_return' },
     { id: 'type', titleKey: 'add_note_notetype', opens: 'add_note_types' },
     { id: 'tags_entry', titleKey: 'add_note_tags', fullOnly: true },
@@ -300,13 +318,13 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
   ] },
   { id: 'add_note_types', titleKey: 'add_note_notetype', parent: 'add_note', items: [] },
   { id: 'edit_note', titleKey: 'note_editor_edit_title', parent: 'browser', items: [
-    { id: 'back', titleKey: 'study_back', condition: 'no_form' },
+    { id: 'back', titleKey: 'study_back', iconKey: 'ic_common_arrow_left', condition: 'no_form' },
     { id: 'save', titleKey: 'browser_detail_save', condition: 'no_form' },
     { id: 'retry', titleKey: 'note_editor_retry', condition: 'load_failed' },
     { id: 'form', titleKey: 'note_editor_edit_title', opens: 'edit_note_form', condition: 'loaded' }
   ] },
   { id: 'edit_note_form', titleKey: 'note_editor_edit_title', instructionsKey: 'note_editor_format_action', parent: 'edit_note', items: [
-    { id: 'back', titleKey: 'study_back' }, { id: 'save', titleKey: 'browser_detail_save' },
+    { id: 'back', titleKey: 'study_back', iconKey: 'ic_common_arrow_left' }, { id: 'save', titleKey: 'browser_detail_save' },
     { id: 'tags', titleKey: 'browser_detail_tags', opens: 'tag_picker' }
   ] },
   { id: 'note_audio_manage', titleKey: 'note_audio_manage', parent: '', items: [
@@ -332,8 +350,8 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'use_retention', titleKey: 'deck_fsrs_use_retention' }
   ] },
   { id: 'study', titleKey: 'start_study', parent: 'deck_details', items: [
-    { id: 'back', titleKey: 'study_back' },
-    { id: 'more', titleKey: 'study_more', opens: 'study_more' },
+    { id: 'back', titleKey: 'study_back', iconKey: 'ic_common_arrow_left' },
+    { id: 'more', titleKey: 'study_more', iconKey: 'ic_home_more', opens: 'study_more' },
     { id: 'show_answer', titleKey: 'study_show_answer', condition: 'question' },
     { id: 'again', titleKey: 'rating_again', condition: 'answer' },
     { id: 'hard', titleKey: 'rating_hard', condition: 'answer' },
@@ -341,7 +359,7 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'easy', titleKey: 'rating_easy', condition: 'answer' }
   ] },
   { id: 'custom_scheduling_warning', titleKey: 'custom_scheduling_title', parent: 'study', items: [
-    { id: 'exit', titleKey: 'custom_scheduling_exit' }, { id: 'continue', titleKey: 'custom_scheduling_continue' }
+    { id: 'exit', titleKey: 'custom_scheduling_exit', iconKey: 'ic_common_close' }, { id: 'continue', titleKey: 'custom_scheduling_continue' }
   ] },
   { id: 'study_more', titleKey: 'study_more', parent: 'study', items: [
     { id: 'edit', titleKey: 'study_edit_note', opens: 'edit_note' },
@@ -398,10 +416,34 @@ export interface AppInterfaceControl {
   id: string;
   title: string;
   titleKey?: string;
+  iconKey?: string;
   enabled: boolean;
   selected: boolean;
 }
 export interface AppInterfaceValue { id: string; value: string; }
+
+/** 同一左侧入口在多选态退出选择，普通态返回上一页；UI 与实时认知共用。 */
+export function browserBackItem(multiSelect: boolean): AppInterfaceItem {
+  return { id: 'back', titleKey: multiSelect ? 'browser_exit_selection' : 'study_back',
+    iconKey: multiSelect ? 'ic_common_close' : 'ic_common_arrow_left' };
+}
+
+export const SETTINGS_HEADER_ITEMS: AppInterfaceItem[] = [
+  { id: 'back', titleKey: 'study_back', iconKey: 'ic_common_arrow_left' },
+  { id: 'simple', titleKey: 'settings_simple_mode_simple', iconKey: 'ic_mode_simple' },
+  { id: 'full', titleKey: 'settings_simple_mode_full', iconKey: 'ic_mode_experimental' }
+];
+
+export function settingsHeaderItems(simple: boolean): AppInterfaceItem[] {
+  return SETTINGS_HEADER_ITEMS.filter((item): boolean => item.id === 'back' || item.id === (simple ? 'simple' : 'full'))
+    .map((item): AppInterfaceItem => ({ id: item.id === 'back' ? 'back' : 'mode', titleKey: item.titleKey, iconKey: item.iconKey }));
+}
+
+/** 设置壳和 JIDE 使用同一个当前模式入口，菜单内名称仍由原模式选择器展示。 */
+export function settingsHeaderControls(simple: boolean, menuOpen: boolean): AppInterfaceControl[] {
+  return settingsHeaderItems(simple).map((item): AppInterfaceControl => ({ id: item.id, title: '',
+    titleKey: item.titleKey, iconKey: item.iconKey, enabled: true, selected: item.id === 'mode' && menuOpen }));
+}
 export interface AppInterfaceMenuItem extends AppInterfaceItem {
   enabled: boolean;
   selected: boolean;
@@ -502,6 +544,29 @@ export function noteAudioInterfaceObservation(status: NoteAudioStatus): AppInter
       { id: 'recorded_seconds', value: String(status.seconds) }, { id: 'has_error', value: String(status.hasError) }] };
 }
 
+export function noteEditorWheelObservation(state: NoteEditorWheelState, selectedId: string, side: string,
+  collapsed: boolean, grip: string, centeredId: string = ''): AppInterfaceObservation {
+  const items: AppInterfaceControl[] = noteEditorWheelTools(state).map((tool): AppInterfaceControl =>
+    ({ id: tool.id, title: '', titleKey: tool.titleKey, iconKey: tool.iconKey, enabled: !collapsed, selected: tool.active }));
+  items.push({ id: 'position', title: '', titleKey: collapsed ? 'note_editor_wheel_open' : 'note_editor_wheel_close',
+    iconKey: (side === 'right') !== collapsed ? 'ic_common_arrow_right' : 'ic_common_arrow_left', enabled: true, selected: false });
+  return { surface: 'note_editor_wheel', sectionId: collapsed ? 'collapsed' : 'open', selectedId: selectedId,
+    optionIds: items.map((item): string => item.id), optionLabels: [], optionsTotal: items.length,
+    busy: false, controlsComplete: true, items: items,
+    values: [{ id: 'side', value: side }, { id: 'grip_availability', value: grip },
+      { id: 'source', value: String(state.source) }, { id: 'target_field', value: state.fieldName ?? '' },
+      { id: 'input_expanded', value: String(state.expanded) },
+      { id: 'experimental', value: String(state.experimental === true) },
+      { id: 'visible_tools', value: collapsed ? '0' : String(noteEditorWheelCommonTools(state).length +
+        Math.min(NOTE_EDITOR_WHEEL_VISIBLE_COUNT, noteEditorWheelOuterTools(state).length)) },
+      { id: 'inner_tools', value: noteEditorWheelCommonTools(state).map((tool): string => tool.id).join(',') },
+      { id: 'centered_outer_tool', value: centeredId }, { id: 'activation', value: 'click_only_rotation_preserves_multiple_selection' },
+      { id: 'folding_selection', value: 'collapse_preserves_formats_reopen_resets_formats' },
+      { id: 'one_shot_feedback', value: NOTE_FIELD_EDITING_SUPPORT.toolMenu.oneShotFeedback },
+      { id: 'one_shot_flash_ms', value: String(NOTE_FIELD_EDITING_SUPPORT.toolMenu.oneShotFlashMs) },
+      { id: 'labels', value: 'below_each_icon' }] };
+}
+
 export function noteEditInterfaceControls(busy: boolean, blocked: boolean, fieldCount: number): AppInterfaceMenuItem[] {
   return visibleInterfaceItems('edit_note_form', { simple: false, agent: false, cloudDeck: false, themeHasTextures: false })
     .map((item): AppInterfaceMenuItem => ({ id: item.id,
@@ -542,6 +607,8 @@ export function appInterfaceSurfaceIds(): string[] {
 /** 组件出现时挂载、状态变化时更新、离开时卸载。不是历史截图缓存。 */
 export class AppInterfaceTracker {
   private readonly views: Map<string, AppInterfaceObservation> = new Map<string, AppInterfaceObservation>();
+  private readonly viewVersions: Map<string, number> = new Map<string, number>();
+  private nextViewVersion: number = 0;
   private shownPage: string = '';
   private contextPage: string = '';
   showPage(surface: string): void {
@@ -552,22 +619,29 @@ export class AppInterfaceTracker {
   currentPage(): string { return this.shownPage; }
   /** JIDE 使用最近的非助手页面；hide 保留上下文，真实销毁才移除。 */
   currentContextPage(): string { return this.shownPage === 'agent' ? this.contextPage : this.shownPage; }
-  observe(view: AppInterfaceObservation): void {
+  observe(view: AppInterfaceObservation): number {
+    const version: number = ++this.nextViewVersion;
+    this.viewVersions.set(view.surface, version);
     this.views.set(view.surface, { surface: view.surface, titleKey: view.titleKey, sectionId: view.sectionId,
       selectedId: view.selectedId, optionIds: view.optionIds.slice(), optionLabels: view.optionLabels.slice(),
       optionsTotal: view.optionsTotal ?? view.optionIds.length, busy: view.busy, controlsComplete: view.controlsComplete,
-      items: view.items?.map((item: AppInterfaceControl): AppInterfaceControl => ({ id: item.id, title: item.title, titleKey: item.titleKey, enabled: item.enabled, selected: item.selected })),
+      items: view.items?.map((item: AppInterfaceControl): AppInterfaceControl => ({ id: item.id, title: item.title, titleKey: item.titleKey,
+        iconKey: item.iconKey, enabled: item.enabled, selected: item.selected })),
       values: view.values?.map((value: AppInterfaceValue): AppInterfaceValue => ({ id: value.id, value: value.value })) });
+    return version;
   }
-  leave(surface: string): void {
+  leave(surface: string, version?: number): void {
+    if (version !== undefined && version !== this.viewVersions.get(surface)) return;
     this.views.delete(surface);
+    this.viewVersions.delete(surface);
     if (this.contextPage === surface) this.contextPage = '';
   }
   snapshot(): AppInterfaceObservation[] {
     return Array.from(this.views.values()).map((view: AppInterfaceObservation): AppInterfaceObservation =>
       ({ surface: view.surface, titleKey: view.titleKey, sectionId: view.sectionId, selectedId: view.selectedId,
         optionIds: view.optionIds.slice(), optionLabels: view.optionLabels.slice(), optionsTotal: view.optionsTotal, busy: view.busy, controlsComplete: view.controlsComplete,
-        items: view.items?.map((item: AppInterfaceControl): AppInterfaceControl => ({ id: item.id, title: item.title, titleKey: item.titleKey, enabled: item.enabled, selected: item.selected })),
+        items: view.items?.map((item: AppInterfaceControl): AppInterfaceControl => ({ id: item.id, title: item.title, titleKey: item.titleKey,
+          iconKey: item.iconKey, enabled: item.enabled, selected: item.selected })),
         values: view.values?.map((value: AppInterfaceValue): AppInterfaceValue => ({ id: value.id, value: value.value })) }));
   }
 }

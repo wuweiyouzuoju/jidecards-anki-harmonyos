@@ -7,7 +7,7 @@ import { AGENT_APP_RECOMMENDATIONS, buildAgentAppRecommendations } from '../../e
 import { buildAgentAppStructure, agentInterfaceRevision } from '../../entry/src/main/ets/model/agent/AgentAppStructure.ts';
 import { agentFunctionTools } from '../../entry/src/main/ets/model/agent/AgentToolCatalog.ts';
 import { APP_NAVIGATION_ACTIONS } from '../../entry/src/main/ets/model/navigation/AppNavigation.ts';
-import { loadComponentLogic } from './platform-module-harness.mjs';
+import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
 
 const tools = agentFunctionTools(100, 'assistant');
 const strings = locale => new Map(JSON.parse(readFileSync(new URL(`../../entry/src/main/resources/${locale}/element/string.json`, import.meta.url), 'utf8')).string.map(x => [x.name, x.value]));
@@ -131,6 +131,7 @@ test('structure localizes evidence-backed suggestions, bounds results, and targe
 test('the real deck detail publisher drives recommendations through refresh, busy and removal transitions', () => {
   const tracker = new AppInterfaceTracker(); tracker.showPage('home'); tracker.observe(home); tracker.showPage('agent');
   const Details = loadComponentLogic('components/牌组详情面板.ets', '牌组详情面板', {
+    应用尺寸:loadPlatformModule('utils/应用尺寸.ets','应用尺寸',{}),
     appInterface:tracker, visibleInterfaceItems,
     interfaceItemText:(_, surface, id) => zh.get(APP_INTERFACE_SURFACES.find(x=>x.id===surface).items.find(x=>x.id===id).titleKey),
     牌组显示名:deck=>deck.name, ExpansionReveal:class {cancel(){} request(){}},

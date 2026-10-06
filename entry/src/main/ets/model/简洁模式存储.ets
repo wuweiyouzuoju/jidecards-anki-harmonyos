@@ -29,12 +29,13 @@
 
 import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
+import { SIMPLE_MODE_KEY } from './AppLayoutState';
 
 const 存储名: string = 'jidecards_settings';
 const 简洁模式键: string = 'simple_mode';
 const 上下文键: string = 'abilityContext';
 
-export const 简洁模式AppStorage键: string = 'simpleMode';
+export const 简洁模式AppStorage键: string = SIMPLE_MODE_KEY;
 
 function 取上下文(): common.UIAbilityContext | null {
   const 上下文: common.UIAbilityContext | undefined =

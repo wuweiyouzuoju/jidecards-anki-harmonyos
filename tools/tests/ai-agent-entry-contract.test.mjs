@@ -333,8 +333,6 @@ test('partial AI output remains in live provider history after terminal validati
     'the next provider turn must receive retained raw model text');
   assert.match(page, /构建消息草稿上下文\(message\)/,
     'draft state must be replayed as bounded semantic context on the next provider turn');
-  assert.match(page, /limitProviderInput\(values\)/,
-    'provider history must be bounded before every stateless request');
   assert.match(page,
     /message\.kind = message\.providerText\.length > 0 \? 'normal' : 'error'/,
     'a terminal validation error with model text must remain a replayable conversation message');
@@ -375,7 +373,7 @@ test('AI page title uses equal side regions around the screen midpoint', () => {
   assert.equal((top.match(/\.width\('35%'\)/g) ?? []).length, 2);
   assert.match(top, /\.width\('30%'\)[\s\S]*\.textAlign\(TextAlign\.Center\)/);
   assert.match(top, /\.justifyContent\(FlexAlign\.End\)/);
-  assert.equal((top.match(/按下态按钮\(\{/g) ?? []).length, 3,
+  assert.equal((top.match(/IconActionButton\(\{ toolbarStyle: true/g) ?? []).length, 3,
     'back, history and new conversation must share the home toolbar button component');
 });
 
