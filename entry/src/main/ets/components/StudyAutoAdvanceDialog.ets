@@ -151,7 +151,7 @@ export struct StudyAutoAdvanceDialog {
             }
           }.width('100%')
         }.width('100%').constraintSize({ maxHeight: '55%' }).scrollBar(BarState.Auto)
-        DialogHeader({ title: '', closeLabel: $r('app.string.study_back'),
+        DialogHeader({ title: '', closeLabel: $r('app.string.study_back'), closeIcon: $r('app.media.ic_common_arrow_left'),
           actionLabel: $r('app.string.custom_study_confirm'), showDivider: false,
           onClose: (): void => { this.back(); }, onAction: (): void => { this.confirm(); } })
       }

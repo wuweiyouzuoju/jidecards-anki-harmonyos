@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { WINDOW_SAFE_TOP_KEY } from '../model/WindowSafeLayout';
 import { CustomSchedulingWarning } from '../components/CustomSchedulingWarning';
 import { PressFeedback } from '../utils/PressFeedback';
 import { actionIcon } from '../utils/ActionIcons';
@@ -85,10 +86,11 @@ import { APP_FOREGROUND_KEY } from '../model/AppLifecycleState';
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { 学习浮动工具栏 } from '../components/学习浮动工具栏';
 import { 学习手写白板层 } from '../components/学习手写白板层';
+import { AnnotationPose } from '../model/StudyAnnotationView';
 import { StudyActionButton } from '../components/StudyActionButton';
 import { isStudyGuideCompleted, completeStudyGuide } from '../utils/StudyGuideStore';
 import { playStudyHaptic } from '../utils/StudyHaptics';
-import { 按下态按钮 } from '../components/common/按下态按钮';
+import { IconActionButton } from '../components/common/IconActionButton';
 import { 学习阶段 } from '../utils/吸附计算器';
 import { 加载学习布局模式, 学习布局模式 } from '../model/学习布局存储';
 import { StudyGripAvailability, StudyToolbarSide, studyToolbarBounds } from '../model/StudyLayout';
@@ -157,8 +159,13 @@ export struct 学习页 {
     new AnkiStudySessionBackend(this.调度器服务实例, this.卡片渲染服务实例, this.集合服务实例));
   private readonly 笔记服务实例: 笔记服务 = new 笔记服务();
   private readonly 笔记类型服务实例: 笔记类型服务 = new 笔记类型服务();
-  private readonly 网页控制器: webview.WebviewController = new webview.WebviewController();
+  private 网页控制器: webview.WebviewController = new webview.WebviewController();
+  private readonly 备用网页控制器: webview.WebviewController = new webview.WebviewController();
+  private readonly webSlots: number[] = [0, 1];
+  private attachedWebSlots: boolean[] = [false, false];
+  @State private visibleWebSlot: number = 0;
   @State private cardSurfaceBackground: string = '';
+  @State private hasRenderedCard: boolean = false;
   @State private cardRenderPending: boolean = false;
   private readonly cardWeb: CardWebView = new CardWebView(this.网页控制器,
     (background: string): void => { this.studyCardShown(background); }, (message: string): void => {
@@ -167,6 +174,9 @@ export struct 学习页 {
       this.stopStudyTimers();
       this.阶段 = 'error';
       this.错误详情 = message;
+    }, this.备用网页控制器, (slot: number): void => {
+      this.visibleWebSlot = slot;
+      this.网页控制器 = this.cardWeb.controllerAt(slot);
     });
   private readonly 声音播放器实例: 声音播放器 = new 声音播放器();
   private readonly TTS播放器实例: TTS播放器 = new TTS播放器();
@@ -288,6 +298,9 @@ export struct 学习页 {
   @State private whiteboardUndoTick: number = 0;
   @State private whiteboardRedoTick: number = 0;
   @State private officialWhiteboard: boolean = false;
+  @State private studyViewScale: number = 1;
+  @State private studyViewX: number = 0;
+  @State private studyViewY: number = 0;
   /** Agent 改卡写入成功后 AI制卡页 广播本键（Date.now()），本页据此协调当前卡与队列。
    *  双通道之一：NavPathStack.onPop 在本项目已知偶发不触发（BUG-006 同类），
    *  只挂 onPop 时改卡返回学习页会停在旧卡片上。与 onShown 并存，两者只消费一次。 */
@@ -305,6 +318,7 @@ export struct 学习页 {
   @StorageProp(PAGE_SURFACE_KEY) private 页面底色微染值: string = '#F5F7FA';
   // 状态栏高度（沉浸式全屏下，顶部条需让出状态栏区域，避免按钮叠在状态栏上）
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
+  @StorageProp(WINDOW_SAFE_TOP_KEY) private toolbarSafeTop: number = 0;
   // 手势导航条高度（bottom 布局下答案条贴底，需抬高避让导航条）
   @StorageProp('导航条高度') private 导航条高度: number = 0;
   // Type-in-the-Answer：拼写字段名 为空串表示当前卡无 {{type:FieldName}} 标记，
@@ -674,10 +688,12 @@ export struct 学习页 {
   /** 隐藏和系统后台共用取消规则；回来后重新读取队列，不能继续评旧卡。 */
   private studyActivityChanged(): void {
     if (!this.mounted) { return; }
+    this.cardWeb.setAudioEnabled(this.页面已显示 && this.foreground);
     this.updateScreenAwake();
     this.publishInterface();
     if (!this.页面已显示 || !this.foreground) {
       this.timeboxNotice = null;
+      this.studySession.clearPreparedCard();
       this.stopStudyTimers();
       if (this.tapZonesGuideVisible) {
         this.tapZonesGuideVisible = false;
@@ -712,9 +728,10 @@ export struct 学习页 {
   }
 
 
-  /** 当前文档确认后才释放占位、计时和交互；切卡占位沿用上张卡的实际底色。 */
+  /** 渲染确认只开放计时和交互；等待期间保留 Web 卡面，不插入整块加载画面。 */
   private studyCardShown(background: string = ''): void {
     if (!this.isCurrentRequest(this.requestVersion)) return;
+    if (this.阶段 === 'question' || this.阶段 === 'answer') this.hasRenderedCard = true;
     if (background !== '') this.cardSurfaceBackground = background;
     if (this.cardRenderPending) {
       this.cardRenderPending = false;
@@ -727,6 +744,7 @@ export struct 学习页 {
       this.maybeShowStudyGuide();
       this.playStudyAudio();
       this.startStudyTimers();
+      this.studySession.prepareNextCard().catch((error: Error): void => { console.info(`Study prepare: ${error}`); });
     }
     this.maybeShowTapZonesGuide();
     this.refreshStudyGestureScript();
@@ -738,6 +756,7 @@ export struct 学习页 {
     this.controllerReady = true;
     try {
       this.cardWeb.attach();
+      this.cardWeb.attach(1);
       if (this.pendingHtml === '') { return; }
       this.applyStudyHtml(this.pendingHtml);
     } catch (error) {
@@ -1270,6 +1289,7 @@ export struct 学习页 {
    *  页面在前台则立刻重渲染；被 AI 页盖住时只置位，等 onShown 再消费。 */
   private 卡片内容变更_回调(): void {
     if (this.卡片内容变更信号 <= 0) { return; }
+    this.studySession.clearPreparedCard();
     this.待重渲染当前卡 = true;
     if (this.页面已显示) {
       this.消费待重渲染();
@@ -1287,6 +1307,7 @@ export struct 学习页 {
 
   /** 复用完整加载链更新模板、字段、拼写和音频；同一张卡保留正反面，失效时使用真实队首。 */
   private async 刷新编辑后当前卡(): Promise<void> {
+    this.studySession.clearPreparedCard();
     const currentCardId: number = this.当前卡片?.cardId ?? 0;
     const wasAnswer: boolean = this.阶段 === 'answer';
     this.contentRefreshInFlight = true;
@@ -1929,10 +1950,9 @@ export struct 学习页 {
       // 避免左侧两按钮叠加宽度覆盖居中牌组名。
       Row() {
         // 左侧：返回
-        按下态按钮({
-          文案: $r('app.string.study_back'),
-          字色: $r('app.color.text_primary'),
-          点击回调: (): void => { this.返回(); }
+        IconActionButton({ toolbarStyle: true,
+          source: $r('app.media.ic_common_arrow_left'), label: $r('app.string.study_back'),
+          onAction: (): void => { this.返回(); }
         })
 
         // 中间空白撑开：让左侧按钮靠左、右侧按钮靠右
@@ -1945,19 +1965,21 @@ export struct 学习页 {
 
         // 右侧：更多（共享菜单展示学习动作）
         // 菜单项 enabled 跟随 可撤销 / 阶段 状态，组件重新 build 时数组重新求值。
-        按下态按钮({ 文案: $r('app.string.study_more'),
-          点击回调: (): void => { this.openStudyMenu(); } })
+        IconActionButton({ toolbarStyle: true, source: $r('app.media.ic_home_more'), label: $r('app.string.study_more'),
+          onAction: (): void => { this.openStudyMenu(); } })
       }
       .width('100%')
       .height('100%')
       .alignItems(VerticalAlign.Center)
     }
     .width('100%')
-    .height(应用尺寸.pageToolbarHeight(this.状态栏高度, this.narrowDeckLayout))
+    .height(应用尺寸.pageToolbarHeight(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop))
+    // 手写操作接管这两个入口；保留顶栏占位，隐藏原按钮而不是用实色浮层盖住。
+    .visibility(this.手写模式 ? Visibility.Hidden : Visibility.Visible)
     .padding({
       left: 应用尺寸.页面内边距_水平,
       right: 应用尺寸.页面内边距_水平,
-      top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout),
+      top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop),
       bottom: 0
     })
     .backgroundColor(this.页面底色微染值)
@@ -1975,7 +1997,8 @@ export struct 学习页 {
         // "首卡不显示，点击显示答案或埋藏取消埋藏后能恢复"的现象。
         // 改为空字符串避免自动加载；loadData 的 baseUrl 仍是 媒体基地址，
         // 相对路径资源解析与 onInterceptRequest 媒体拦截不受影响。
-        Web({ src: '', controller: this.网页控制器 })
+        ForEach(this.webSlots, (slot: number) => {
+        Web({ src: '', controller: this.cardWeb.controllerAt(slot) })
         .backgroundColor(this.cardSurfaceBackground || $r('app.color.surface_card'))
         .textZoomRatio(this.cardTextSizePercent)
         .javaScriptAccess(true)
@@ -1990,7 +2013,9 @@ export struct 学习页 {
           proxy.handle = (action: string, nx: number, ny: number, version: number, surface: number): void => {
             this.handleStudyGesture(action, nx, ny, version, surface);
           };
-          this.网页控制器.registerJavaScriptProxy(proxy, 'jideStudyInput', ['onAction']);
+          this.cardWeb.controllerAt(slot).registerJavaScriptProxy(proxy, 'jideStudyInput', ['onAction']);
+          this.attachedWebSlots[slot] = true;
+          if (!this.attachedWebSlots[0] || !this.attachedWebSlots[1]) return;
           this.studyWebAttached();
         })
         .onInterceptRequest((event: OnInterceptRequestEvent): WebResourceResponse | null => {
@@ -1999,8 +2024,11 @@ export struct 学习页 {
         .width('100%')
         .height(this.choiceQuestion === null ? '100%' : '42%')
         .align(Alignment.TopStart)
-        // 保留控制器供撤销/恢复埋藏复用；加载、完成及错误态均不透出旧卡。
-        .visibility(this.阶段 === 'question' || this.阶段 === 'answer' ? Visibility.Visible : Visibility.Hidden)
+        // 读取下一张时保留旧帧；透明加载层阻止旧卡输入，完成及错误态隐藏卡面。
+        .visibility(this.阶段 === 'loading' || this.阶段 === 'question' || this.阶段 === 'answer' ? Visibility.Visible : Visibility.Hidden)
+        .opacity(this.visibleWebSlot === slot ? 1 : 0)
+        .hitTestBehavior(this.visibleWebSlot === slot ? HitTestMode.Default : HitTestMode.None)
+        }, (slot: number): string => String(slot))
 
         this.选择题区()
 
@@ -2030,7 +2058,7 @@ export struct 学习页 {
         .width('100%')
         .height('100%')
         .justifyContent(FlexAlign.Center)
-        .backgroundColor(this.cardSurfaceBackground || $r('app.color.surface_card'))
+        .backgroundColor(this.hasRenderedCard ? Color.Transparent : (this.cardSurfaceBackground || $r('app.color.surface_card')))
         .hitTestBehavior(HitTestMode.Block)
       }
 
@@ -2044,21 +2072,8 @@ export struct 学习页 {
             .fontSize(应用尺寸.字号_正文_中)
             .fontColor($r('app.color.text_secondary'))
             .textAlign(TextAlign.Center)
-          Button() {
-            Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans($r('app.string.study_back'), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }.fontSize(应用尺寸.字号_按钮).fontColor(this.动作主色)
-          }
-            .height(应用尺寸.按钮高度)
-            .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
-            .fontSize(应用尺寸.字号_按钮)
-            .fontColor(this.动作主色)
-            .backgroundColor($r('app.color.surface_card'))
-            .border(SurfaceBorder.options())
-            .borderRadius(应用尺寸.圆角_胶囊)
-            .attributeModifier(new PressFeedback())
-            .stateEffect(false)
-            .onClick(() => {
-              this.返回();
-            })
+          IconActionButton({ toolbarStyle: true, source: $r('app.media.ic_common_close'), label: $r('app.string.study_back'),
+            onAction: (): void => { this.返回(); } })
         }
         .width('100%')
         .height('100%')
@@ -2281,7 +2296,8 @@ export struct 学习页 {
       this.顶部条()
       this.卡片区()
       if (!this.isFloatingStudyLayout()) {
-        this.答案条()
+        Column() { this.答案条(); }
+          .visibility(this.手写模式 ? Visibility.Hidden : Visibility.Visible)
       }
     }
     .width('100%')
@@ -2290,7 +2306,7 @@ export struct 学习页 {
 
   private isFloatingStudyLayout(): boolean {
     return this.学习布局模式值 !== 'bottom' && studyToolbarBounds(this.toolbarViewportWidth, this.toolbarViewportHeight,
-      应用尺寸.pageToolbarHeight(this.状态栏高度, this.narrowDeckLayout), this.导航条高度,
+      应用尺寸.pageToolbarHeight(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop), this.导航条高度,
       主工具栏_竖版_宽度, 主工具栏_竖版_高度_答案阶段).fits;
   }
 
@@ -2310,6 +2326,10 @@ export struct 学习页 {
         .height('100%')
         .backgroundColor(Color.Transparent)
 
+        .scale({ x: this.手写模式 ? this.studyViewScale : 1, y: this.手写模式 ? this.studyViewScale : 1,
+          centerX: 0, centerY: 0 })
+        .translate({ x: this.手写模式 ? this.studyViewX : 0, y: this.手写模式 ? this.studyViewY : 0 })
+
         if (this.isFloatingStudyLayout() && !this.手写模式) {
           // 主操作浮动工具栏：question 阶段显示「显示答案」，answer 阶段切换为 4 个评分按钮。
           if (this.choiceQuestion === null) 学习浮动工具栏({
@@ -2320,7 +2340,7 @@ export struct 学习页 {
             isGripActive: this.isStudyGripActive(),
             viewportWidth: this.toolbarViewportWidth,
             viewportHeight: this.toolbarViewportHeight,
-            topInset: 应用尺寸.pageToolbarHeight(this.状态栏高度, this.narrowDeckLayout),
+            topInset: 应用尺寸.pageToolbarHeight(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop),
             bottomInset: this.导航条高度,
             onGripState: (availability: StudyGripAvailability, side: StudyToolbarSide): void => {
               this.gripAvailability = availability; this.gripSide = side;
@@ -2342,8 +2362,12 @@ export struct 学习页 {
             undoTick: this.whiteboardUndoTick, redoTick: this.whiteboardRedoTick,
             reviewPhase: this.choiceQuestion === null ? this.阶段 : '',
             reviewActions: () => { if (this.choiceQuestion === null) { this.答案条(); } },
+            onViewChanged: (pose: AnnotationPose): void => {
+              this.studyViewScale = pose.scale; this.studyViewX = pose.x; this.studyViewY = pose.y;
+            },
             onEngineChanged: (official: boolean): void => { this.officialWhiteboard = official; },
             onClose: (): void => { this.closeWhiteboard(); } })
+            .width('100%').height('100%')
             .visibility(this.手写模式 ? Visibility.Visible : Visibility.None)
         }
 

@@ -33,7 +33,7 @@ function harness() {
   let id = 'A';
   Object.assign(page, {
     screenAwake:null,mounted:true, sessionReady:true, foreground:true, requestVersion:0, loadingVersion:-1, flipPending:false, controllerReady:true, pendingHtml:'', 媒体目录:'',
-    页面已显示:true, 阶段:'question', 评分中:false, studyGuideVisible:false,
+    页面已显示:true, 阶段:'question', 评分中:false, studyGuideVisible:false, hasRenderedCard:false,
     choiceQuestion:null, choiceGrade:null, choiceAutoAdvanceTimer:-1, choiceFeedbackDeadline:0, studyMenuOpen:false,
     contentRefreshInFlight:false, 待重渲染当前卡:false, 可撤销:true,
     noteEditorVisible:false, noteEditorBusy:false, 拼写字段名:'', 牌组ID:1,
@@ -241,12 +241,14 @@ test('rendering retains the dark surface and blocks answers, ratings and timers 
   page.cardWeb.show = html => displayed.push(html); // Deliberately delay the rendering port's acknowledgement.
   await page.加载下一张卡();
   assert.equal(page.cardRenderPending, true);
+  assert.equal(page.hasRenderedCard, false);
   assert.equal(page.cardSurfaceBackground, '#101820');
   assert.equal(page.studyTimerState().active, false);
   await page.显示答案(); assert.equal(page.阶段, 'question');
   assert.deepEqual(sounds, []);
   page.阶段 = 'answer'; await page.评分(2); assert.deepEqual(answers, []);
   page.阶段 = 'question'; page.studyCardShown('#202830');
+  assert.equal(page.hasRenderedCard, true);
   assert.equal(page.cardRenderPending, false);
   assert.equal(page.cardSurfaceBackground, '#202830');
   assert.equal(page.studyTimerState().active, true);
@@ -254,6 +256,7 @@ test('rendering retains the dark surface and blocks answers, ratings and timers 
   const start = page.展示时刻毫秒;
   page.studyCardShown(''); assert.equal(page.展示时刻毫秒, start, 'interaction refresh does not restart the card');
   page.invalidateCardWork();
+  assert.equal(page.hasRenderedCard, true, 'loading the next card must not restore the initial loading screen');
   assert.equal(page.cardSurfaceBackground, '#202830', 'next card retains the acknowledged background');
   page.mounted = false; page.studyCardShown('#ffffff');
   assert.equal(page.cardRenderPending, true); assert.equal(page.cardSurfaceBackground, '#202830');

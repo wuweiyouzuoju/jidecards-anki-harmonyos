@@ -23,7 +23,7 @@ const body=methods.map(name=>{
 function harness() {
   let now=0, failed=false, empty=false;
   const states=Object.fromEntries(['current','again','hard','good','easy'].map(key=>[key,new Uint8Array([1,255])]));
-  const card={cardId:1,states};const answers=[];
+  const card={cardId:1,states};const answers=[],nativeAudioAllowed=[];
   const prefs=Object.assign(new ReviewPreferences(),{timeLimitSecs:60,showRemaining:true,showIntervals:true});
   const backend={reviewPreferences:async()=>prefs,canUndo:async()=>false,
     queuedCards:async()=>({cards:empty?[]:[card],newCount:2,learningCount:3,reviewCount:4}),
@@ -40,6 +40,7 @@ function harness() {
     当前卡片:card,可撤销:true,牌组ID:1,contentRefreshInFlight:false,消费待重渲染(){},maybeShowStudyGuide(){},
     choiceSelectedIds:[],choiceGrade:null,背面HTML:'answer',applyStudyHtml(){this.startStudyTimers();},
     publishInterface(){},网页控制器:{runJavaScript:async()=>{}},choiceAutoAdvanceSeconds:()=>5,
+    cardWeb:{setAudioEnabled:enabled=>nativeAudioAllowed.push(enabled)},
     studySession:controller,studyOptions:new StudyOptions(),autoAdvanceSettings:new StudyAutoAdvanceSettings(),
     autoAdvanceEnabled:false,reviewPreferences:prefs,按钮文案:['1m','5m','1d','4d'],
     isCurrentRequest:()=>page.mounted&&page.页面已显示&&page.foreground,
@@ -49,7 +50,7 @@ function harness() {
   const timers=new Map();let next=0;
   page.studyTimer=new StudyTimerController({state:()=>page.studyTimerState(),display(){},act(){throw Error('unexpected automatic action');}},
     {now:()=>now,repeat:work=>{timers.set(++next,work);return next;},cancel:id=>timers.delete(id)});
-  return {page,controller,backend,card,prefs,answers,timers,advance:ms=>now+=ms,fail:value=>failed=value,
+  return {page,controller,backend,card,prefs,answers,timers,nativeAudioAllowed,advance:ms=>now+=ms,fail:value=>failed=value,
     empty:value=>empty=value,answer:()=>controller.answer(card,2,now,0),load:()=>controller.loadNext(1,()=>true)};
 }
 
@@ -148,8 +149,10 @@ test('ordinary and choice grading display the pending timebox only after their a
     }
     assert.deepEqual(h.page.timeboxNotice,{seconds:60,answers:1});assert.equal(h.page.评分中,false);
     h.page.foreground=false;h.page.studyActivityChanged();assert.equal(h.page.timeboxNotice,null);
+    assert.equal(h.nativeAudioAllowed.at(-1),false);
     assert.deepEqual(h.controller.pendingTimebox(),{seconds:60,answers:1});
     h.advance(600000);h.page.foreground=true;h.page.studyActivityChanged();await h.load();h.page.startStudyTimers();
+    assert.equal(h.nativeAudioAllowed.at(-1),true);
     assert.deepEqual(h.page.timeboxNotice,{seconds:60,answers:1});
   }
 });

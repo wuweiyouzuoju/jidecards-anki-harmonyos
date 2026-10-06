@@ -132,10 +132,13 @@ test('finished and error pages leave neither the previous card nor the floating 
   const page = read(STUDY_PAGE);
   const toolbar = read('entry/src/main/ets/components/学习浮动工具栏.ets');
 
-  // 完成/错误页背景可透明，但卡片 Web 必须在非学习阶段彻底不可见，避免旧卡透出。
-  assert.match(page,
-    /\.visibility\(this\.阶段 === 'question' \|\| this\.阶段 === 'answer' \? Visibility\.Visible : Visibility\.Hidden\)/,
-    'the card Web must be hidden outside question/answer so no finished card stays visible');
+  // 加载保留旧帧，完成/错误仍隐藏 Web，避免旧卡透出。
+  const condition = page.match(/\.visibility\((this\.阶段[^\n]+Visibility\.Hidden)\)/)?.[1];
+  assert.ok(condition, 'card Web visibility must follow the actual phase');
+  const visible = new Function('phase', 'Visibility', `return ${condition.replaceAll('this.阶段', 'phase')};`);
+  for (const phase of ['loading', 'question', 'answer', 'done', 'error']) {
+    assert.equal(visible(phase, { Visible: true, Hidden: false }), !['done', 'error'].includes(phase), phase);
+  }
 
   // 空队列清空画面与停止音频由 study-content-refresh/study-lifecycle 行为测试验证。
 
@@ -145,11 +148,12 @@ test('finished and error pages leave neither the previous card nor the floating 
     'the floating toolbar must collapse to zero size outside question/answer');
 
   // 错误页保留退出按钮；完成页仅使用顶部返回入口。
-  const backButtons = page.match(
-    /ThemeTextSpans\(\$r\('app\.string\.study_back'\), this\.themeAccentColors, this\.getUIContext\(\)\)[\s\S]{0,320}?\.padding\(\{ left: 应用尺寸\.卡片内边距, right: 应用尺寸\.卡片内边距 \}\)/g
+  const errorPanel = page.slice(page.indexOf("      if (this.阶段 === 'error')"), page.indexOf("      if (this.阶段 === 'done')"));
+  const backButtons = errorPanel.match(
+    /IconActionButton\(\{[^}]*label: \$r\('app\.string\.study_back'\)[\s\S]{0,160}?onAction: \(\): void => \{ this\.返回\(\); \}/g
   ) ?? [];
   assert.equal(backButtons.length, 1,
-    'only the error page retains an inline back button with horizontal padding');
+    'only the error page retains an inline back action');
   const done = page.slice(page.indexOf("if (this.阶段 === 'done')"), page.indexOf('// Type-in-the-Answer：正面阶段'));
   assert.doesNotMatch(done, /study_back/);
 });

@@ -42,10 +42,10 @@ const AI_PAGE = 'entry/src/main/ets/pages/AI制卡页.ets';
 test('scheduler service walks the study queue contract', () => {
   const service = read(SCHEDULER);
 
-  assert.match(service, /async 获取队首卡片\(牌组ID: number\): Promise<QueuedCardsView>/);
+  assert.match(service, /async 获取队首卡片\(牌组ID: number, fetchLimit: number = 1\): Promise<QueuedCardsView>/);
   assert.match(service, /牌组方法\.设置当前牌组/, 'must select deck before queueing');
   assert.match(service, /调度器方法\.获取队首卡片/);
-  assert.match(service, /encodeGetQueuedCardsRequest\(1, false\)/, 'fetch one card at a time');
+  assert.match(service, /encodeGetQueuedCardsRequest\(fetchLimit, false\)/, 'caller can request a candidate without advancing the queue');
   assert.match(service, /调度器方法\.描述下一档状态/);
   assert.match(service, /encodeSchedulingStates\(状态字节\)/, 'states passthrough for labels');
   assert.match(service, /调度器方法\.提交评分/);
@@ -122,7 +122,7 @@ test('study keeps default cards opaque without replacing template backgrounds wh
   assert.doesNotMatch(html, /background: #E8EEFC !important/);
   const page = read(STUDY_PAGE);
   assert.match(page, /构建卡片HTML\(rendered, 'question', this\.是否深色\(\)\)/);
-  assert.match(page, /Web\(\{ src: '', controller: this\.网页控制器 \}\)\s*\.backgroundColor\(this\.cardSurfaceBackground \|\| \$r\('app\.color\.surface_card'\)\)/);
+  assert.match(page, /Web\(\{ src: '', controller: this\.cardWeb\.controllerAt\(slot\) \}\)\s*\.backgroundColor\(this\.cardSurfaceBackground \|\| \$r\('app\.color\.surface_card'\)\)/);
   assert.match(page, /\.backgroundColor\(this\.页面底色微染值\)/);
   const cardArea = page.slice(page.indexOf('private 卡片区()'), page.indexOf('private 答案条()'));
   const answerBar = page.slice(page.indexOf('private 答案条()'), page.indexOf('\n  build()'));
@@ -279,7 +279,7 @@ test('study page web component blocks file-protocol cross origin correctly', () 
   // 旧实现 src=媒体基地址 会在 onControllerAttached 后自动加载 https://jidecards-media.local/，
   // 与 aboutToAppear 中的 loadData(data: URL) 竞争导致首卡渲染被初始空加载覆盖。
   // 跨域拦截由 onInterceptRequest + loadData baseUrl=媒体基地址 负责，与 Web 组件 src 无关。
-  assert.match(page, /Web\(\{ src: '', controller: this\.网页控制器 \}\)/);
+  assert.match(page, /Web\(\{ src: '', controller: this\.cardWeb\.controllerAt\(slot\) \}\)/);
   assert.match(page, /\.fileAccess\(true\)/);
   assert.match(page, /\.javaScriptAccess\(true\)/);
   assert.match(page, /\.onInterceptRequest\(/);

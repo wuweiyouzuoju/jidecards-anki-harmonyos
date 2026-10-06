@@ -14,7 +14,7 @@ export struct CustomSchedulingWarning {
   aboutToAppear(): void {
     appInterface.observe({ surface: 'custom_scheduling_warning', sectionId: '', selectedId: '', busy: false,
       optionIds: ['exit', 'continue'], optionLabels: [], controlsComplete: true,
-      items: [{ id: 'exit', title: '', titleKey: 'custom_scheduling_exit', enabled: true, selected: false },
+      items: [{ id: 'exit', title: '', titleKey: 'custom_scheduling_exit', iconKey: 'ic_common_close', enabled: true, selected: false },
         { id: 'continue', title: '', titleKey: 'custom_scheduling_continue', enabled: true, selected: false }],
       values: [{ id: 'supported', value: 'false' }, { id: 'acknowledged', value: 'false' }] });
   }
