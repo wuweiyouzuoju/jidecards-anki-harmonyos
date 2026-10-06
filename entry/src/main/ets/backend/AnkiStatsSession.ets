@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { hilog } from '@kit.PerformanceAnalysisKit';
 import { StatsBackend, StatsRequest } from '../model/StatsSession';
 import { GraphPreferences, GraphsView } from '../proto/messages/StatsMessages';
 import { DeckTreeNode } from '../proto/messages/DeckMessages';
@@ -23,12 +22,10 @@ export class AnkiStatsSession implements StatsBackend {
   preferences(): Promise<GraphPreferences> { return this.stats.获取图表偏好(); }
   savePreferences(value: GraphPreferences): Promise<void> { return this.stats.设置图表偏好(value); }
   async publishWidget(graphs: GraphsView, hours: number, separate: boolean, current: () => boolean): Promise<void> {
-    let tree: DeckTreeNode | null = null;
     await syncActivity.waitForCollection();
     if (!current()) return;
-    try { tree = await this.decks.获取牌组树(); } catch (error) {}
+    const tree: DeckTreeNode = await this.decks.获取牌组树();
     if (!current()) return;
-    try { await publishStatsWidget(createStatsWidget(graphs, tree, hours, separate)); }
-    catch (error) { hilog.error(0xFFFE, '统计页', `保存卡片数据失败 ${error}`); }
+    await publishStatsWidget(createStatsWidget(graphs, tree, hours, separate));
   }
 }

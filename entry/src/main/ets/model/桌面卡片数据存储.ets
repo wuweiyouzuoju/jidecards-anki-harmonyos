@@ -35,13 +35,14 @@
 //   详见 https://developer.huawei.com/consumer/cn/doc/harmonyos-faqs/faqs-local-file-manager-42
 // - Map 字段统一转为 [键, 值][] 数组（卡片沙箱无法直接 JSON.parse Map）
 // - 未来到期只存未来 7 天（含今天），减少数据量
-// - 持久化失败记录 hilog，卡片显示上次数据或空态
+// - 写临时文件、关闭后原子替换；失败抛给调用方，卡片保留上次数据
 //
 // @副作用
 // 读写 filesDir/widget_stats.json
 // 读写 filesDir/widget_form_ids.json（FormExtensionAbility 写 formId，主进程读后主动推送）
 // ========================================================
 
+import { readLocalPreference, saveLocalPreference } from '../utils/LocalPreferenceWrite';
 import { common } from '@kit.AbilityKit';
 import { fileIo } from '@kit.CoreFileKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
@@ -381,30 +382,31 @@ function 读取主题色(): 主题色载体 {
 // 数据: 桌面卡片数据
 //
 // @输出
-// Promise<void>。持久化失败记录日志（卡片显示上次数据或空态）。
+// Promise<void>。持久化失败记录日志并拒绝（卡片保留上次数据）。
 //
 // @副作用
 // 写入 filesDir/widget_stats.json（覆盖写）。
 // ========================================================
+/** @throws {Error} 文件保存失败由调用方报告；卡片仍能读取上次完整快照。 */
 export async function 保存卡片数据(数据: 桌面卡片数据): Promise<void> {
-  const 上下文: common.UIAbilityContext | null = 取上下文();
-  if (上下文 === null) {
-    hilog.error(0x0000, 日志域, '保存卡片数据失败: AppStorage 中无 abilityContext');
-    return;
-  }
+  const context: common.UIAbilityContext | null = 取上下文();
+  if (context === null) throw new Error('widget_storage_unavailable');
+  const path: string = `${context.getApplicationContext().filesDir}/${数据文件名}`;
+  const temporary: string = path + '.tmp';
   try {
-    const 路径: string = `${上下文.getApplicationContext().filesDir}/${数据文件名}`;
-    const 文件: fileIo.File = fileIo.openSync(路径, fileIo.OpenMode.CREATE | fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.TRUNC);
-    const JSON串: string = JSON.stringify(数据);
-    fileIo.writeSync(文件.fd, JSON串);
-    fileIo.fsyncSync(文件.fd);
-    fileIo.closeSync(文件);
-    hilog.info(0x0000, 日志域, `保存卡片数据成功: ${路径}, ${JSON串.length} 字节`);
-    // 保存成功后主动推送到所有已注册卡片，不依赖系统 30 分钟定时刷新
-    await 推送到所有卡片(数据);
-  } catch (错误) {
-    hilog.error(0x0000, 日志域, `保存卡片数据异常: ${错误}`);
+    const file: fileIo.File = fileIo.openSync(temporary, fileIo.OpenMode.CREATE | fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.TRUNC);
+    try {
+      fileIo.writeSync(file.fd, JSON.stringify(数据));
+      fileIo.fsyncSync(file.fd);
+    } finally {
+      fileIo.closeSync(file);
+    }
+    fileIo.renameSync(temporary, path);
+  } catch (error) {
+    hilog.error(0x0000, 日志域, `保存卡片数据异常: ${error}`);
+    throw new Error(error instanceof Error ? error.message : String(error));
   }
+  await 推送到所有卡片(数据);
 }
 
 // ========================================================
@@ -418,33 +420,23 @@ export async function 保存卡片数据(数据: 桌面卡片数据): Promise<vo
 // @副作用
 // 读写 preferences（jidecards_settings / stats_hours_range）。
 // ========================================================
-export async function 加载小时分布窗口(): Promise<number> {
-  const 上下文: common.UIAbilityContext | null = 取上下文();
-  if (上下文 === null) {
-    return 2;
-  }
-  try {
-    const 存储: preferences.Preferences = await preferences.getPreferences(上下文, 偏好存储名);
-    const 值: preferences.ValueType = await 存储.get(小时分布窗口键, 2);
-    const 窗口: number = typeof 值 === 'number' ? 值 : 2;
-    return 窗口 >= 0 && 窗口 <= 3 ? 窗口 : 2;
-  } catch (_错误) {
-    return 2;
-  }
+/** @throws {Error} 失败由领域调用方报告，不以默认值或假成功继续。 */
+async function statsPreferenceStore(): Promise<preferences.Preferences> {
+  const context: common.UIAbilityContext | null = 取上下文();
+  if (context === null) throw new Error('stats_storage_unavailable');
+  return preferences.getPreferences(context, 偏好存储名);
 }
 
-export async function 保存小时分布窗口(窗口: number): Promise<void> {
-  const 上下文: common.UIAbilityContext | null = 取上下文();
-  if (上下文 === null) {
-    return;
-  }
-  try {
-    const 存储: preferences.Preferences = await preferences.getPreferences(上下文, 偏好存储名);
-    await 存储.put(小时分布窗口键, 窗口);
-    await 存储.flush();
-  } catch (_错误) {
-    // 偏好写入失败静默跳过，不影响统计页展示
-  }
+/** @throws {Error} 失败由领域调用方报告，不以默认值或假成功继续。 */
+export async function 加载小时分布窗口(): Promise<number> {
+  const value: number = await readLocalPreference(await statsPreferenceStore(), 小时分布窗口键, 2) as number;
+  if (!Number.isInteger(value) || value < 0 || value > 3) throw new Error('stats_invalid_hours_range');
+  return value;
+}
+/** @throws {Error} 失败由领域调用方报告，不以默认值或假成功继续。 */
+export async function 保存小时分布窗口(value: number): Promise<void> {
+  if (!Number.isInteger(value) || value < 0 || value > 3) throw new Error('stats_invalid_hours_range');
+  await saveLocalPreference(await statsPreferenceStore(), 小时分布窗口键, value, 2);
 }
 
 // ========================================================
@@ -455,36 +447,16 @@ export async function 保存小时分布窗口(窗口: number): Promise<void> {
 //
 // @副作用 读写 preferences（jidecards_settings / stats_days_range）。
 // ========================================================
+/** @throws {Error} 失败由领域调用方报告，不以默认值或假成功继续。 */
 export async function 加载统计天数(): Promise<number> {
-  const 上下文: common.UIAbilityContext | null = 取上下文();
-  if (上下文 === null) {
-    return 365;
-  }
-  try {
-    const 存储: preferences.Preferences = await preferences.getPreferences(上下文, 偏好存储名);
-    const 值: preferences.ValueType = await 存储.get(统计天数键, 365);
-    if (typeof 值 !== 'number') {
-      return 365;
-    }
-    // 仅两档合法：365=近 1 年，0=全部；越界回退默认
-    return 值 === 0 ? 0 : 365;
-  } catch (_错误) {
-    return 365;
-  }
+  const value: number = await readLocalPreference(await statsPreferenceStore(), 统计天数键, 365) as number;
+  if (value !== 0 && value !== 365) throw new Error('stats_invalid_days_range');
+  return value;
 }
-
-export async function 保存统计天数(天数: number): Promise<void> {
-  const 上下文: common.UIAbilityContext | null = 取上下文();
-  if (上下文 === null) {
-    return;
-  }
-  try {
-    const 存储: preferences.Preferences = await preferences.getPreferences(上下文, 偏好存储名);
-    await 存储.put(统计天数键, 天数);
-    await 存储.flush();
-  } catch (_错误) {
-    // 偏好写入失败静默跳过，不影响统计页展示
-  }
+/** @throws {Error} 失败由领域调用方报告，不以默认值或假成功继续。 */
+export async function 保存统计天数(value: number): Promise<void> {
+  if (value !== 0 && value !== 365) throw new Error('stats_invalid_days_range');
+  await saveLocalPreference(await statsPreferenceStore(), 统计天数键, value, 365);
 }
 
 // ========================================================
@@ -492,16 +464,11 @@ export async function 保存统计天数(天数: number): Promise<void> {
 // @作用 首页/FSRS控制器提取卡片数据时调用：读后端 GraphPreferences 的
 //       cardCountsSeparateInactive（统计页图内复选框即时落库），
 //       保证摘要卡/桌面卡片的「卡片数量」口径与统计页一致。
-// @兜底 偏好读取失败返回 false（不分离，Anki 默认值）
+// @失败 偏好读取失败阻止发布，保留上次快照
 // ========================================================
 export async function 加载分离暂停偏好(): Promise<boolean> {
-  try {
-    const 统计: 统计服务 = new 统计服务();
-    const 偏好: GraphPreferences = await 统计.获取图表偏好();
-    return 偏好.cardCountsSeparateInactive;
-  } catch (_错误) {
-    return false;
-  }
+  const preference: GraphPreferences = await new 统计服务().获取图表偏好();
+  return preference.cardCountsSeparateInactive;
 }
 
 // ========================================================

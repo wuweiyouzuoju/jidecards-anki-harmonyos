@@ -244,9 +244,8 @@ export async function 刷新桌面卡片数据(): Promise<void> {
     const 统计: 统计服务 = new 统计服务();
     // days 跟随统计页「近 1 年/全部」偏好，否则桌面卡片与统计页数据不一致
     const graphs: GraphsView = await 统计.获取图表统计(await 加载统计天数());
-    // 树读取失败时沿用零计数降级；聚合和发布与首页、统计页共用。
-    let tree: DeckTreeNode | null = null;
-    try { tree = await new 牌组服务().获取牌组树(); } catch (error) {}
+    // 树读取失败保留上次快照，未知数量不能发布成零。
+    const tree: DeckTreeNode = await new 牌组服务().获取牌组树();
     await publishStatsWidget(createStatsWidget(graphs, tree, await 加载小时分布窗口(), await 加载分离暂停偏好()));
   } catch (错误) {
     hilog.error(0x0000, 'FSRS控制器', `刷新桌面卡片数据异常: ${错误}`);

@@ -68,7 +68,9 @@ export class HomeDataRepository {
       return { tree: tree, snapshot: snapshot, cardData: null, graphs: null, days: this.days, hiddenIds: hiddenIds };
   }
 
-  /** 统计与桌面卡片推送由首页的独立队列持有，不延迟牌组可用和学习导航。 */
+  /** 统计与桌面卡片推送由首页的独立队列持有，不延迟牌组可用和学习导航。
+   * @throws {Error} 范围或偏好读取失败交由首页统计会话保留上次快照并记录。
+   */
   async loadStatistics(data: HomeDataResult): Promise<HomeDataResult> {
     const tree: DeckTreeNode = data.tree;
     let cardData: 桌面卡片数据 | null = null;

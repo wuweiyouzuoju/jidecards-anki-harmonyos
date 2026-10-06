@@ -8,11 +8,12 @@ import { 提取卡片数据, 保存卡片数据, 桌面卡片数据 } from '../m
 let publication: Promise<void> = Promise.resolve();
 
 /** 调用方在入队前确认请求代次及全库范围，页面不参与卡片存储协议。 */
-export function createStatsWidget(graphs: GraphsView, tree: DeckTreeNode | null,
+export function createStatsWidget(graphs: GraphsView, tree: DeckTreeNode,
   hours: number, separate: boolean): 桌面卡片数据 {
   let due: number = 0;
-  if (tree !== null) for (const child of tree.children) due += child.newCount + child.learnCount + child.reviewCount;
-  const count: number = tree === null ? 0 : 平铺牌组树(tree).length;
+  if (tree === null || tree === undefined) throw new Error('widget_deck_tree_unavailable');
+  for (const child of tree.children) due += child.newCount + child.learnCount + child.reviewCount;
+  const count: number = 平铺牌组树(tree).length;
   const data: 桌面卡片数据 = 提取卡片数据(graphs, due, count, hours, separate);
   return data;
 }
