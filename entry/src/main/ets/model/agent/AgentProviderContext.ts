@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { ChangeDraft } from './AgentTypes';
-import type { ProviderInputItem } from './ProviderProtocol';
 
 /** 仅接收 Provider 需要的草稿视图，不依赖 ArkUI 消息组件。 */
 export interface ProviderCardDraft { fields: string[]; 状态: string; 已选中: boolean; }
@@ -40,6 +39,53 @@ interface ProviderDraftContext {
   changes: ProviderChangeDraftContext[];
   executionResult: string;
   truncated: boolean;
+}
+
+interface ProviderCardStatusContext { index: number; status: string; selected: boolean; fieldCount: number; }
+interface ProviderChangeStatusContext { id: string; status: string; risk: string; operationCount: number; }
+interface ProviderDraftStatusContext {
+  cards: ProviderCardStatusContext[];
+  changes: ProviderChangeStatusContext[];
+  executionResult: string;
+  truncated: boolean;
+}
+
+/** 大量草稿只带身份、真实状态与数量；完整可编辑内容仍由应用消息拥有。 */
+function providerDraftStatusContext(text: string): string {
+  const unavailable: string = '[Application draft details unavailable; inspect current state before assuming any save.]';
+  let context: ProviderDraftContext;
+  try { context = JSON.parse(text.slice(text.indexOf('{'))) as ProviderDraftContext; } catch (error) {
+    return unavailable;
+  }
+  if (context === null || !Array.isArray(context.cards) || !Array.isArray(context.changes) ||
+    context.cards.length > 100 || context.changes.length > 20 ||
+    typeof context.executionResult !== 'string' || context.executionResult.length > 2000) { return unavailable; }
+  const summary: ProviderDraftStatusContext = { cards: [], changes: [], executionResult: context.executionResult, truncated: true };
+  for (const card of context.cards) {
+    if (card === null || !Array.isArray(card.fields) || typeof card.index !== 'number' ||
+      typeof card.status !== 'string' || card.status.length > 40 || typeof card.selected !== 'boolean') { return unavailable; }
+    summary.cards.push({ index: card.index, status: card.status, selected: card.selected, fieldCount: card.fields.length });
+  }
+  for (const change of context.changes) {
+    if (change === null || !Array.isArray(change.operations) || typeof change.id !== 'string' || change.id.length > 160 ||
+      typeof change.status !== 'string' || change.status.length > 40 || typeof change.risk !== 'string' || change.risk.length > 40) { return unavailable; }
+    summary.changes.push({ id: change.id, status: change.status, risk: change.risk, operationCount: change.operations.length });
+  }
+  return '应用内当前草稿与执行状态（正文已移出上下文；数量仅表示原视图中保留的条目，不代表已保存）：' + JSON.stringify(summary);
+}
+
+/** 草稿语义视图有自己的额度，避免它复制到系统指令后挤掉整轮上下文；最终仍由整包预检核算。 */
+export function buildProviderDraftStateContext(contexts: string[]): string {
+  const recent: string[] = contexts.slice(-10);
+  if (JSON.stringify(recent.join('\n')).length <= 16000) { return recent.join('\n'); }
+  const summaries: string[] = [];
+  for (let index: number = recent.length - 1; index >= 0; index--) {
+    const summary: string = providerDraftStatusContext(recent[index]);
+    if (JSON.stringify(summary + '\n' + summaries.join('\n')).length > 16000) { break; }
+    summaries.unshift(summary);
+  }
+  return '[Application draft content summarized; older state views omitted when necessary. ' +
+    'Use actual saved/execution status; omitted fields are unavailable here.]\n' + summaries.join('\n');
 }
 
 export function truncateProviderText(value: string, limit: number): string {
@@ -96,24 +142,5 @@ export function buildProviderDraftContext(message: ProviderDraftMessage): string
     executionResult: truncateProviderText(message.批次结果, 2000), truncated: truncated
   };
   return `应用内当前草稿与执行状态（仅作后续对话上下文，不代表已保存）：${JSON.stringify(context)}`;
-}
-
-export function limitProviderInput(values: ProviderInputItem[]): ProviderInputItem[] {
-  const output: ProviderInputItem[] = [];
-  let totalChars: number = 0;
-  for (let index: number = values.length - 1; index >= 0; index--) {
-    if (output.length >= 80 || totalChars >= 240000) { break; }
-    const source: ProviderInputItem = values[index];
-    const remaining: number = 240000 - totalChars;
-    if (remaining <= 0) { break; }
-    const content: string = truncateProviderText(source.content, remaining);
-    output.unshift({
-      kind: source.kind, role: source.role, content: content,
-      callId: source.callId, name: source.name,
-      argumentsJson: source.argumentsJson, output: source.output
-    });
-    totalChars += content.length;
-  }
-  return output;
 }
 

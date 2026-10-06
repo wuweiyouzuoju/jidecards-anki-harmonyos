@@ -19,7 +19,7 @@ import {
   registerToolCallId
 } from '../../model/agent/AgentPolicy';
 import type { ProviderCapabilities } from '../../model/agent/AgentTypes';
-import { compactAgentToolOutputs } from '../../model/agent/AgentSessionState';
+import { fitAgentRequestContext } from '../../model/agent/AgentSessionState';
 import type { ProviderInputImage } from '../../model/agent/ProviderProtocol';
 import { readProviderContinuation, hasProviderReasoningText } from '../../model/agent/ProviderProtocol';
 import type { ResponsesOpaqueOutputInput } from '../../model/agent/ProviderProtocol';
@@ -451,9 +451,9 @@ export class AgentRunner {
         throw new AgentRunnerError('cancelled');
       }
       providerCalls += 1;
-      compactAgentToolOutputs(request.input);
       request.instructions = baseInstructions + buildAgentRuntimeInstructions(
         request.functionTools, providerCalls, toolCalls, this.limits);
+      fitAgentRequestContext(request);
       const collector: RoundCollector = new RoundCollector(observer);
       this.activeSession = this.createSession(provider, request, collector);
       try {

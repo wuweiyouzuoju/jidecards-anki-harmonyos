@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { safeAgentSessionState, restoreAgentSessionState, boundAgentSessionInput } from '../../entry/src/main/ets/model/agent/AgentSessionState.ts';
+import { safeAgentSessionState, restoreAgentSessionState, fitAgentRequestContext } from '../../entry/src/main/ets/model/agent/AgentSessionState.ts';
 import { buildResponsesPayload } from '../../entry/src/main/ets/model/agent/ProviderProtocol.ts';
 import { ResponsesEventNormalizer } from '../../entry/src/main/ets/model/agent/ResponsesEventNormalizer.ts';
 
 const item = (kind, content = '', extra = {}) => ({ kind, role: '', content, callId: '', name: '', argumentsJson: '', output: '', ...extra });
 const state = input => ({ input, readableIds: [[1], [2], [3], [4]],
   retrieval: { snapshots: [], readNoteIds: [], approvedNoteIds: [] }, action: null, waitingCallId: '', paused: false });
-const body = input => JSON.parse(buildResponsesPayload({ apiKey: 'test-credential', baseUrl: 'https://example.test', model: 'test',
+const request = input => ({ apiKey: 'test-credential', baseUrl: 'https://example.test', model: 'test',
   instructions: '', input, functionTools: [], searchMode: 'off', requiresWebSearch: false,
-  requiresSearchEvidence: false, requiresDraft: false, expectedDraftCount: 0, reasoningEffort: 'low', maxOutputTokens: 32768 }));
+  requiresSearchEvidence: false, requiresDraft: false, expectedDraftCount: 0, reasoningEffort: 'low', maxOutputTokens: 32768 });
+const body = input => JSON.parse(buildResponsesPayload(request(input)));
 const accept = (normalizer, raw) => normalizer.accept({ event: raw.type, data: JSON.stringify(raw), done: false });
 
 test('long original reasoning survives save, JSON storage, restore and wire encoding without truncation or rewriting', () => {
@@ -67,8 +68,10 @@ test('context bounds remove whole old turns including reasoning and retain reaso
   const latest = [item('message', 'latest', { role: 'user' }), item('reasoning', 'latest thinking'),
     item('function_call', '', { callId: 'new-call', name: 'read', argumentsJson: '{}' }),
     item('function_call_output', '', { callId: 'new-call', output: 'data' })];
-  const bounded = boundAgentSessionInput([item('message', 'old', { role: 'user' }), item('reasoning', 'old'.repeat(1000)),
-    item('message', 'old answer', { role: 'assistant' }), ...latest], 100);
+  const value = request([item('message', 'old', { role: 'user' }), item('reasoning', 'old'.repeat(100000)),
+    item('message', 'old answer', { role: 'assistant' }), ...latest]);
+  fitAgentRequestContext(value);
+  const bounded = value.input;
   assert.deepEqual(bounded.slice(1), latest);
   assert.ok(!bounded.some(value => value.role === 'assistant'));
 });

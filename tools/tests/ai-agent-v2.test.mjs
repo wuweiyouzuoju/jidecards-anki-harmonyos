@@ -8,7 +8,7 @@ import { evaluateAgentReadiness } from '../../entry/src/main/ets/model/agent/Age
 import { agentExtensionTools, decodeExtensionArguments, extensionToolRisk } from '../../entry/src/main/ets/model/agent/AgentExtensionTools.ts';
 import { buildAgentNotetypeJson } from '../../entry/src/main/ets/model/agent/AgentNotetypeDesign.ts';
 import { applyAgentMemoryChange, relevantAgentMemories } from '../../entry/src/main/ets/model/agent/AgentMemory.ts';
-import { safeAgentSessionState, closeUnansweredCalls, boundAgentSessionInput, compactAgentToolOutputs } from '../../entry/src/main/ets/model/agent/AgentSessionState.ts';
+import { safeAgentSessionState, closeUnansweredCalls, fitAgentRequestContext } from '../../entry/src/main/ets/model/agent/AgentSessionState.ts';
 import { toolRiskOf } from '../../entry/src/main/ets/model/agent/AgentPolicy.ts';
 import { AgentScope } from '../../entry/src/main/ets/backend/agent/AgentScope.ets';
 
@@ -19,10 +19,10 @@ test('large checkpoints preserve valid action JSON and compacted tools retain co
     {kind:'function_call_output',role:'',content:'',callId:'r1',name:'',argumentsJson:'',output:JSON.stringify({notes:'长正文'.repeat(80000),nextOffset:5,readCount:5})},
     {kind:'message',role:'user',content:'new task',callId:'',name:'',argumentsJson:'',output:''},
   ];
-  const bounded=boundAgentSessionInput(input,1000);
-  assert.equal(bounded.at(-1).content,'new task');
-  assert.equal(bounded.filter(x=>x.callId==='r1').length,0);
-  compactAgentToolOutputs(input,10000);
+  const request={model:'test',instructions:'',input,functionTools:[],searchMode:'off',reasoningEffort:'low',maxOutputTokens:100};
+  fitAgentRequestContext(request);
+  assert.equal(input.at(-1).content,'new task');
+  assert.equal(input.filter(x=>x.callId==='r1').length,2);
   const output=JSON.parse(input[2].output);assert.equal(output.nextOffset,5);assert.equal(output.readCount,5);
   assert.equal(output.status,'earlier_tool_content_omitted');
   const retrieval=new AgentRetrieval();

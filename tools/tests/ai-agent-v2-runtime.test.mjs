@@ -623,6 +623,36 @@ function requireReasoningReplay(body) {
  }
 }
 
+test('real Session recovers an unsent oversized turn on a short retry without another size failure',async()=>{
+ const h=harness([[event('reasoning_delta','follow current request'),event('text_delta','继续处理这8条。')]],undefined,'assistant',null,requireReasoningReplay);
+ await assert.rejects(()=>h.run('旧材料'+ '"'.repeat(130000)),/agent_context_limit/);
+ assert.equal(h.requests.length,0);
+ assert.ok(h.session.exportState().input[0].content.startsWith('旧材料'));
+ assert.equal((await h.run('先改这8条')).status,'completed');
+ assert.equal(h.requests.length,1);
+ assert.ok(h.requests[0].input.at(-1).content==='先改这8条');
+ assert.match(h.requests[0].input[0].content,/historical excerpts/);
+ assert.ok(buildResponsesPayload(h.requests[0]).length<=240000);
+});
+
+test('real Registry reads eight long fields and Runner compacts wire size without changing retrieval progress or writing',async()=>{
+ const previousText=fixture.longText;fixture.writes=[];fixture.longText='"'.repeat(12000);
+ try {
+  const reads=Array.from({length:8},(_,index)=>call('field-'+(index+1),'read_note_field',{noteId:index+1,fieldOrd:0,offset:0,length:12000}));
+  const h=harness([[event('reasoning_delta','read these eight fields'),...reads],
+    [event('reasoning_delta','use the retained fields and cursors'),event('text_delta','已读取，等待下一步修改。')]],undefined,'assistant',null,requireReasoningReplay);
+  h.scope.registerReadableNoteIds([1,2,3,4,5,6,7,8]);
+  assert.equal((await h.run('先改民法-债权这8条')).status,'completed');
+  const outputs=h.requests[1].input.filter(x=>x.kind==='function_call_output');
+  assert.equal(outputs.length,8);assert.ok(outputs.some(x=>JSON.parse(x.output).status==='earlier_tool_content_omitted'));
+  assert.equal(h.scope.retrieval.readCount(),8);
+  assert.equal(JSON.parse(outputs.at(-1).output).text.length,12000);
+  for(const r of h.requests)assert.ok(buildResponsesPayload(r).length<=240000);
+  const restored=harness();restored.session.restore(h.session.exportState());
+  assert.equal(restored.scope.retrieval.readCount(),8);assert.deepEqual(fixture.writes,[]);
+ } finally {fixture.longText=previousText;}
+});
+
 test('confirmed action continues through a mixed target/details rejection with one assistant tool batch and no repeated write',async()=>{
  fixture.writes=[];
  const h=harness([

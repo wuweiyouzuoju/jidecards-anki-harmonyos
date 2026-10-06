@@ -227,9 +227,8 @@ function parseToolParameters(parametersJson: string): object {
 // This is a serialized-character budget, not a provider token estimate.
 export const MAX_PROVIDER_PAYLOAD_CHARS: number = 240000;
 
-/** @throws {ProviderProtocolError} 无效协议或超限请求交给会话层报告。 */
 /** @throws {ProviderProtocolError} 无效输入或工具定义交给请求调用方，在发送前明确失败。 */
-export function buildResponsesPayload(request: ProviderTurnRequest): string {
+function serializeResponsesPayload(request: ProviderTurnRequest): string {
   const input: ResponsesInput[] = [];
   for (const item of request.input) {
     input.push(buildInput(item));
@@ -269,13 +268,28 @@ export function buildResponsesPayload(request: ProviderTurnRequest): string {
     store: false,
     include: ['web_search_call.action.sources']
   };
-  const payload: string = JSON.stringify(body);
+  return JSON.stringify(body);
+}
+
+function withinProviderContextBudget(payload: string, request: ProviderTurnRequest): boolean {
   let imageChars: number = 0;
   let imageCount: number = 0;
   for (const item of request.input) {
     for (const entry of item.images ?? []) { imageChars += entry.imageUrl.length; imageCount++; }
   }
-  if (payload.length - imageChars > MAX_PROVIDER_PAYLOAD_CHARS || imageChars > 12 * 1024 * 1024 || imageCount > 8) {
+  return payload.length - imageChars <= MAX_PROVIDER_PAYLOAD_CHARS && imageChars <= 12 * 1024 * 1024 && imageCount <= 8;
+}
+
+/** 与发送共用完整序列化；正文转义、工具定义、指令与图片都计入同一预算。 */
+/** @throws {ProviderProtocolError} 非大小问题不得当作可压缩的上下文。 */
+export function providerRequestFitsContext(request: ProviderTurnRequest): boolean {
+  return withinProviderContextBudget(serializeResponsesPayload(request), request);
+}
+
+/** @throws {ProviderProtocolError} 无效协议或超限请求交给会话层报告。 */
+export function buildResponsesPayload(request: ProviderTurnRequest): string {
+  const payload: string = serializeResponsesPayload(request);
+  if (!withinProviderContextBudget(payload, request)) {
     throw new ProviderProtocolError('agent_context_limit');
   }
   return payload;
