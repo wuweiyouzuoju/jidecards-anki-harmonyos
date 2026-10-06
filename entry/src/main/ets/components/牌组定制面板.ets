@@ -9,7 +9,7 @@ import type { 牌组背景动作, 牌组定制结果 } from '../model/DeckCustom
 import { DialogHeader } from './common/DialogHeader';
 import { appInterface } from '../backend/AppInterfaceService';
 import { interfaceItemText } from '../utils/AppInterfaceText';
-import { DECK_LIST_NARROW_KEY, DECK_LIST_STYLE_KEY, isDoubleColumnDeckListStyle } from '../model/DeckListAppearance';
+import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
 // ========================================================
 // @块ID UI-DECK-CUSTOMIZE-001
 // @名称 牌组定制面板
@@ -48,8 +48,7 @@ import { DECK_LIST_NARROW_KEY, DECK_LIST_STYLE_KEY, isDoubleColumnDeckListStyle 
 import { common } from '@kit.AbilityKit';
 import { IBestImageCropper } from '@ibestservices/ibest-ui';
 import { IBestImageCropperController } from '@ibestservices/ibest-ui';
-import { image } from '@kit.ImageKit';
-import { fileIo } from '@kit.CoreFileKit';
+import { loadDeckBackground, releaseDeckBackground } from '../backend/DeckBackgroundImage';
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { 牌组汇总, 牌组色调, 牌组显示名 } from '../model/主页模型';
 import { 从图库选取图片 } from '../utils/文件导入助手';
@@ -64,13 +63,12 @@ export struct 牌组定制面板 {
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
 
   private handleBackRequest(): void {
-    if (this.busy) return;
+    if (this.busy || this.saving || this.disposed) return;
     if (this.裁剪模式) { this.取消裁剪(); return; }
     this.onClose();
   }
 
   @StorageProp(DECK_LIST_NARROW_KEY) private narrow: boolean = false;
-  @StorageProp(DECK_LIST_STYLE_KEY) private style: string = 'single_wide';
   @Prop isDark: boolean = false;
   @Prop deck: 牌组汇总 = {
     id: '', name: '', fullName: '', depth: 0, parentId: '', hasChildren: false, ancestorIds: [],
@@ -83,7 +81,7 @@ export struct 牌组定制面板 {
   @Prop @Watch('publishInterface') busy: boolean = false;
   @Prop errorMessage: string = '';
   onClose: () => void = (): void => {};
-  onSave: (结果: 牌组定制结果) => void = (_r: 牌组定制结果): void => {};
+  onSave: (结果: 牌组定制结果) => Promise<void> = async (_r: 牌组定制结果): Promise<void> => {};
 
   // 裁剪/选图等内部操作的错误信息（与父组件传入的 errorMessage 分开，build 里一并显示）
   @State private 本地错误: string = '';
@@ -106,6 +104,11 @@ export struct 牌组定制面板 {
 
   private readonly 裁剪器控制器: IBestImageCropperController = new IBestImageCropperController();
   private disposed: boolean = false;
+  private imageGeneration: number = 0;
+  private cropGeneration: number = 0;
+  private borrowedPixels: PixelMap | null = null;
+  @State @Watch('publishInterface') private saving: boolean = false;
+  @State @Watch('publishInterface') private applyingCrop: boolean = false;
   @StorageProp(颜色键.动作主色) private 动作主色: string = '#2F5FD0';
   @StorageProp(颜色键.动作主色按下) private 动作主色按下: string = '#1E4FB8';
   // 2.1.4.1 对比度：按钮背景专用档（配 #FFFFFF 文字 ≥ 4.5:1）
@@ -113,6 +116,7 @@ export struct 牌组定制面板 {
   @StorageProp(颜色键.主色按钮按下) private 主色按钮按下: string = '#1E4FB8';
 
   aboutToAppear(): void {
+    this.disposed = false;
     this.编辑中名称 = this.deck.displayName;
     // 已有背景图：保留态；无背景图：保留态（不修改）。用户操作后切到 remove/replace。
     this.背景动作 = 'keep';
@@ -120,13 +124,33 @@ export struct 牌组定制面板 {
     this.publishInterface();
   }
 
-  aboutToDisappear(): void { this.disposed = true; appInterface.leave('deck_customize'); }
+  aboutToDisappear(): void {
+    this.disposed = true;
+    this.imageGeneration++;
+    this.cropGeneration++;
+    const original: PixelMap | null = this.原像素图;
+    const cropped: PixelMap | null = this.已裁剪像素图;
+    this.原像素图 = null;
+    this.已裁剪像素图 = null;
+    this.releaseOwned(original);
+    this.releaseOwned(cropped);
+    appInterface.leave('deck_customize');
+  }
+
+  private releaseOwned(pixels: PixelMap | null): void {
+    if (pixels !== this.borrowedPixels) releaseDeckBackground(pixels);
+  }
 
   private publishInterface(): void {
     if (this.disposed) return;
     appInterface.observe({ surface: 'deck_customize', sectionId: this.裁剪模式 ? 'crop' : '', selectedId: this.deck.id,
-      optionIds: [], optionLabels: [], busy: this.busy, controlsComplete: true,
-      items: this.裁剪模式 ? [] : [
+      optionIds: [], optionLabels: [], busy: this.busy || this.saving || this.applyingCrop, controlsComplete: true,
+      items: this.裁剪模式 ? [
+        { id: 'crop_confirm', titleKey: 'deck_customize_background_crop_confirm', title: '',
+          enabled: !this.busy && !this.applyingCrop, selected: false },
+        { id: 'crop_cancel', titleKey: 'deck_customize_background_crop_cancel', title: '',
+          enabled: true, selected: false }
+      ] : [
         { id: 'name', titleKey: 'deck_customize_name_label', title: '', enabled: !this.busy, selected: false },
         { id: 'background', titleKey: 'deck_customize_background_label', title: '', enabled: !this.busy, selected: false },
         { id: 'confirm', titleKey: 'deck_customize_save', title: '', enabled: this.可提交(), selected: false },
@@ -135,33 +159,28 @@ export struct 牌组定制面板 {
         { id: 'background_action', value: this.背景动作 }] });
   }
 
-  /** 异步加载牌组原有背景图为 PixelMap（与牌组列表项.loadBackgroundPixelMap 同款）。
-   *  ArkUI Image 直接传沙盒绝对路径解析不稳定，必须用 PixelMap。 */
+  /** 迟到解码不回写，返回的图片也必须释放。 */
   private async 加载原像素图(): Promise<void> {
-    const 路径: string = this.deck.backgroundImage;
-    if (路径 === '') {
-      this.原像素图 = null;
-      return;
-    }
+    const path: string = this.deck.backgroundImage;
+    const generation: number = ++this.imageGeneration;
+    const previous: PixelMap | null = this.原像素图;
+    this.原像素图 = null;
+    this.releaseOwned(previous);
+    if (path === '') return;
     try {
-      const 文件: fileIo.File = fileIo.openSync(路径, fileIo.OpenMode.READ_ONLY);
-      try {
-        const 图像源: image.ImageSource = image.createImageSource(文件.fd);
-        try {
-          this.原像素图 = await 图像源.createPixelMap();
-        } finally {
-          图像源.release();
-        }
-      } finally {
-        await fileIo.close(文件);
+      const pixels: PixelMap = await loadDeckBackground(path);
+      if (this.disposed || generation !== this.imageGeneration || path !== this.deck.backgroundImage) {
+        releaseDeckBackground(pixels);
+        return;
       }
-    } catch (错误) {
-      this.原像素图 = null;
+      this.原像素图 = pixels;
+    } catch (error) {
+      if (!this.disposed && generation === this.imageGeneration) this.本地错误 = String(error);
     }
   }
 
   private 可提交(): boolean {
-    if (this.busy) {
+    if (this.busy || this.saving || this.disposed || this.裁剪模式) {
       return false;
     }
     // 替换背景必须先完成裁剪（待裁剪Uri === '' 表示已裁剪完成或未选图）
@@ -173,7 +192,7 @@ export struct 牌组定制面板 {
 
   /** 点"选择图片"或"替换图片"：调起 PhotoViewPicker → 进入裁剪模式。 */
   private async 选取并裁剪(): Promise<void> {
-    if (this.busy) {
+    if (this.busy || this.saving || this.disposed) {
       return;
     }
     this.本地错误 = '';
@@ -182,7 +201,9 @@ export struct 牌组定制面板 {
     if (上下文 === undefined) {
       return;
     }
+    const generation: number = ++this.cropGeneration;
     const uri: string | null = await 从图库选取图片(上下文);
+    if (this.disposed || generation !== this.cropGeneration) return;
     if (uri === null || uri === '') {
       // 用户取消或选图失败：静默返回，不打错误提示（cancel 是正常流程）
       return;
@@ -196,18 +217,25 @@ export struct 牌组定制面板 {
    *  注意：必须清空 待裁剪Uri——可提交() 用 `背景动作 === 'replace'
    *  && 待裁剪Uri !== ''` 判断"replace 但还没裁剪"，若不清空会卡死保存键。 */
   private async 应用裁剪(): Promise<void> {
-    if (this.busy) {
-      return;
-    }
+    if (this.busy || this.saving || this.disposed || this.applyingCrop || !this.裁剪模式) return;
+    const generation: number = this.cropGeneration;
+    this.applyingCrop = true;
     try {
-      const 像素图: PixelMap = await this.裁剪器控制器.getResult();
-      this.已裁剪像素图 = 像素图;
+      const pixels: PixelMap = await this.裁剪器控制器.getResult();
+      if (this.disposed || generation !== this.cropGeneration || !this.裁剪模式) {
+        releaseDeckBackground(pixels);
+        return;
+      }
+      const previous: PixelMap | null = this.已裁剪像素图;
+      this.已裁剪像素图 = pixels;
+      this.releaseOwned(previous);
       this.背景动作 = 'replace';
       this.裁剪模式 = false;
       this.待裁剪Uri = '';
-    } catch (错误) {
-      // 裁剪失败：留在裁剪模式让用户重试，错误显示到面板底部 本地错误
-      this.本地错误 = 错误 instanceof Error ? 错误.message : `${错误}`;
+    } catch (error) {
+      if (!this.disposed && generation === this.cropGeneration) this.本地错误 = String(error);
+    } finally {
+      if (!this.disposed && generation === this.cropGeneration) this.applyingCrop = false;
     }
   }
 
@@ -230,38 +258,52 @@ export struct 牌组定制面板 {
    *  - 已裁剪后再次选图取消：背景动作 仍是 replace、已裁剪像素图 保留上次结果 → 回到上次裁剪预览
    *  旧实现清掉 已裁剪像素图 并把 replace 回退为 keep，会丢失用户上一次的裁剪成果。 */
   private 取消裁剪(): void {
+    this.cropGeneration++;
+    this.applyingCrop = false;
     this.裁剪模式 = false;
     this.待裁剪Uri = '';
   }
 
   /** 用户点"移除背景"：标记 remove，清掉待裁剪状态。 */
   private 标记移除(): void {
-    if (this.busy) {
+    if (this.busy || this.saving || this.disposed) {
       return;
     }
     this.背景动作 = 'remove';
+    const previous: PixelMap | null = this.已裁剪像素图;
     this.已裁剪像素图 = null;
+    this.releaseOwned(previous);
     this.待裁剪Uri = '';
   }
 
   /** 移除后又想保留：点预览区恢复。 */
   private 撤销移除(): void {
-    if (this.busy) {
+    if (this.busy || this.saving || this.disposed) {
       return;
     }
     this.背景动作 = 'keep';
+    const previous: PixelMap | null = this.已裁剪像素图;
+    this.已裁剪像素图 = null;
+    this.releaseOwned(previous);
   }
 
   /** 提交时把 已裁剪像素图 拼进结果（覆盖 null 占位）。 */
-  private 提交带像素图(): void {
-    if (!this.可提交()) {
-      return;
+  private async 提交带像素图(): Promise<void> {
+    if (!this.可提交()) return;
+    const result: 牌组定制结果 = {
+      新名: this.编辑中名称, 背景动作: this.背景动作,
+      背景像素图: this.背景动作 === 'replace' ? this.已裁剪像素图 : null
+    };
+    const pixels: PixelMap | null = result.背景像素图;
+    this.borrowedPixels = pixels;
+    this.saving = true;
+    try { await this.onSave(result); }
+    catch (error) { if (!this.disposed) this.本地错误 = String(error); }
+    finally {
+      this.borrowedPixels = null;
+      if (this.disposed || pixels !== this.已裁剪像素图) releaseDeckBackground(pixels);
+      if (!this.disposed) this.saving = false;
     }
-    this.onSave({
-      新名: this.编辑中名称,
-      背景动作: this.背景动作,
-      背景像素图: this.已裁剪像素图
-    });
   }
 
   build() {
@@ -364,7 +406,7 @@ export struct 牌组定制面板 {
             }
           }
           .width('100%')
-          .height(应用尺寸.deckRowHeight(this.narrow, isDoubleColumnDeckListStyle(this.style)))
+          .height(应用尺寸.deckRowHeight(this.narrow))
           .backgroundColor($r('app.color.surface_page'))
           .borderRadius(应用尺寸.圆角_面板)
           .border(SurfaceBorder.options())
@@ -427,7 +469,7 @@ export struct 牌组定制面板 {
           DialogHeader({
             title: $r('app.string.deck_customize_background_crop_title'),
             actionLabel: $r('app.string.deck_customize_background_crop_confirm'),
-            actionEnabled: true,
+            actionEnabled: !this.applyingCrop && !this.busy,
             closeLabel: $r('app.string.deck_customize_background_crop_cancel'),
             closeEnabled: true,
             onClose: () => { this.取消裁剪(); },

@@ -50,6 +50,6 @@ export struct DeckCustomizationFeature {
   build() {
     牌组定制面板({ backRequest: this.backRequest, isDark: this.isDark, deck: this.deck, busy: this.busy, errorMessage: this.error,
       onClose: (): void => { if (!this.busy) this.onClose(); },
-      onSave: (result: 牌组定制结果): void => { this.save(result); } })
+      onSave: (result: 牌组定制结果): Promise<void> => this.save(result) })
   }
 }

@@ -32,6 +32,7 @@
 // ========================================================
 
 import { common } from '@kit.AbilityKit';
+import { readLocalPreference, saveLocalPreference } from '../utils/LocalPreferenceWrite';
 import { preferences } from '@kit.ArkData';
 import { fileIo as fs } from '@kit.CoreFileKit';
 import { image } from '@kit.ImageKit';
@@ -122,18 +123,12 @@ export async function 加载牌组色调映射(牌组ID列表: string[]): Promis
 }
 
 /** 持久化单张牌组的 tone 选择；tone===None 也持久化（表示用户主动取消色条）。 */
+/** @throws {Error} 失败由领域调用方报告，不以默认值或假成功继续。 */
 export async function 保存牌组色调(牌组ID: string, 色调: 牌组色调): Promise<void> {
   const 上下文: common.UIAbilityContext | null = 获取能力上下文();
-  if (上下文 === null) {
-    return;
-  }
-  try {
-    const 存储: preferences.Preferences = await preferences.getPreferences(上下文, 存储名);
-    await 存储.put(色调键(牌组ID), 牌组色调键(色调));
-    await 存储.flush();
-  } catch (错误) {
-    // 偏好不可用时仅丢失持久化，不阻塞 UI。
-  }
+  if (上下文 === null) throw new Error('deck_tone_storage_unavailable');
+  const 存储: preferences.Preferences = await preferences.getPreferences(上下文, 存储名);
+  await saveLocalPreference(存储, 色调键(牌组ID), 牌组色调键(色调), '');
 }
 
 /**
@@ -303,30 +298,17 @@ export async function 保存牌组背景图(牌组ID: string, 像素图: PixelMa
 }
 
 /**
- * 删除单张牌组的背景图：删除沙盒文件 + 删除 preferences 键。
- * 失败时静默——背景图丢失不会阻塞 UI，DeckListItem 会回退到 surface_card。
+ * 先确认移除路径，再清理旧文件；保存失败时原图仍可重试。
+ * @throws {Error} 偏好读写失败由定制面板报告。
  */
 export async function 清除牌组背景图(牌组ID: string): Promise<void> {
   const 上下文: common.UIAbilityContext | null = 获取能力上下文();
-  if (上下文 === null) {
-    return;
-  }
-  try {
-    const 存储: preferences.Preferences = await preferences.getPreferences(上下文, 存储名);
-    const 是否存在: boolean = await 存储.has(背景图键(牌组ID));
-    if (是否存在) {
-      const 值: preferences.ValueType = await 存储.get(背景图键(牌组ID), '');
-      if (typeof 值 === 'string' && 值 !== '') {
-        try {
-          await fs.unlink(值);
-        } catch (e) {
-          // 文件不存在忽略
-        }
-      }
-      await 存储.delete(背景图键(牌组ID));
-      await 存储.flush();
-    }
-  } catch (错误) {
-    // 偏好不可用时仅丢失持久化，不阻塞 UI。
+  if (上下文 === null) throw new Error('deck_background_storage_unavailable');
+  const store: preferences.Preferences = await preferences.getPreferences(上下文, 存储名);
+  const previous: string = await readLocalPreference(store, 背景图键(牌组ID), '') as string;
+  await saveLocalPreference(store, 背景图键(牌组ID), '', '', previous);
+  if (previous !== '') {
+    try { await fs.unlink(previous); }
+    catch (error) { console.warn('[deck-background] Orphan file cleanup failed: ' + String(error)); }
   }
 }

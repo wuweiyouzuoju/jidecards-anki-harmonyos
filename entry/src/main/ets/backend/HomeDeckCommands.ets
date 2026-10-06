@@ -22,11 +22,13 @@ export class HomeDeckCommands {
     const pixels = result.背景像素图;
     const alias: string = result.新名.trim() === originalName ? '' : result.新名.trim();
     if (alias !== displayName) await 保存牌组别名(id, alias);
-    if (backgroundAction === 'remove') await 清除牌组背景图(id);
-    else if (backgroundAction === 'replace' && pixels !== null) {
-      try { await 保存牌组背景图(id, pixels); }
-      catch (error) { return false; }
-    }
+    try {
+      if (backgroundAction === 'remove') await 清除牌组背景图(id);
+      else if (backgroundAction === 'replace') {
+        if (pixels === null) return false;
+        await 保存牌组背景图(id, pixels);
+      }
+    } catch (error) { return false; }
     return true;
   }
 }

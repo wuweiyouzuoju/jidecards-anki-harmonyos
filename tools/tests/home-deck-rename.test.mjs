@@ -172,6 +172,10 @@ test('local display form starts with the saved override, accepts empty input and
   assert.equal(tracker.snapshot()[0].values.find(x=>x.id==='local_display_name').value,'');
   panel.busy=true;panel.publishInterface();assert.ok(tracker.snapshot()[0].items.every(x=>!x.enabled));
   panel.busy=false;panel.裁剪模式=true;panel.publishInterface();assert.equal(tracker.snapshot()[0].sectionId,'crop');
-  assert.deepEqual(tracker.snapshot()[0].items,[]);
+  assert.deepEqual(tracker.snapshot()[0].items.map(x=>x.id),['crop_confirm','crop_cancel']);
+  assert.equal(panel.可提交(),false);
+  panel.applyingCrop=true;panel.publishInterface();
+  assert.equal(tracker.snapshot()[0].items.find(x=>x.id==='crop_confirm').enabled,false);
+  assert.equal(tracker.snapshot()[0].items.find(x=>x.id==='crop_cancel').enabled,true);
   panel.aboutToDisappear();panel.publishInterface();assert.deepEqual(tracker.snapshot(),[]);
 });
