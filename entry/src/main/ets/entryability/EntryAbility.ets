@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { APP_FOREGROUND_KEY } from '../model/AppLifecycleState';
+import { setStudyPenKitContext, clearStudyPenKitContext } from '../backend/StudyPenKitContext';
 import {
   AbilityConstant,
   common,
@@ -68,6 +69,7 @@ export default class EntryAbility extends UIAbility {
   }
 
   onCreate(want: Want, _launchParam: AbilityConstant.LaunchParam): void {
+    setStudyPenKitContext(this.context);
     AppStorage.setOrCreate<common.UIAbilityContext>('abilityContext', this.context);
     initializeSimpleMode();
     initializeCardTextSize();
@@ -298,6 +300,7 @@ export default class EntryAbility extends UIAbility {
   }
 
   onDestroy(): void {
+    clearStudyPenKitContext(this.context);
     hilog.info(DOMAIN, 'jidecards', 'Application destroyed');
   }
 }

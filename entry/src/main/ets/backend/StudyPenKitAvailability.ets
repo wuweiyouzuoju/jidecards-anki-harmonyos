@@ -1,22 +1,23 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { fileIo } from '@kit.CoreFileKit';
+import { deviceInfo } from '@kit.BasicServicesKit';
 
-// 系统 HSP 的沙箱映射；兼容打包 HSP 与解包 ABC 两种布局。
-const PEN_KIT_MODULE_PATHS: string[] = [
-  '/data/storage/el1/bundle/com.huawei.hmos.hwstylusfeature/Penkit/Penkit.hsp',
-  '/data/storage/el1/bundle/com.huawei.hmos.hwstylusfeature/Penkit/ets/modules.abc',
-  '/data/storage/el1/bundle/com.huawei.hmos.hwstylusfeature/Penkit/Penkit/ets/modules.abc'
-];
+export interface StudyPenKitAvailability {
+  available: boolean;
+  reason: string;
+}
 
-/** 模拟器可能报告手写 SysCap 却没有系统 HSP，不能以 SysCap 单独决定导入。 */
-export function isStudyPenKitAvailable(): boolean {
-  if (!canIUse('SystemCapability.Stylus.Handwrite')) return false;
-  for (const path of PEN_KIT_MODULE_PATHS) {
-    try {
-      if (fileIo.accessSync(path)) return true;
-    } catch (error) {
-      // 不可访问的模块也不能交给加载器；缺少 HSP 会导致原生 abort，无法由 import.catch 接住。
-    }
+/** 真机按官方 SysCap 决定接入，不能要求系统 HSP 在加载前已映射到文件沙箱。 */
+export function studyPenKitAvailability(): StudyPenKitAvailability {
+  if (!canIUse('SystemCapability.Stylus.Handwrite')) {
+    return { available: false, reason: 'capability_missing' };
   }
-  return false;
+  // 官方不支持仿真环境；已知型号直接回退，不能以内部 HSP 路径推断支持。
+  if (deviceInfo.productModel.toLowerCase() === 'emulator') {
+    return { available: false, reason: 'emulator_unsupported' };
+  }
+  return { available: true, reason: '' };
+}
+
+export function isStudyPenKitAvailable(): boolean {
+  return studyPenKitAvailability().available;
 }
