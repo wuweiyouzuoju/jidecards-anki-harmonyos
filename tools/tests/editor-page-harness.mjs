@@ -2,6 +2,7 @@
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
 import { noteInterfaceDependencies } from './app-interface-harness.mjs';
 import { NoteEditorSession, initialNoteEditorState } from '../../entry/src/main/ets/model/NoteEditorSession.ts';
+import { NoteEditorWheelSession } from '../../entry/src/main/ets/model/NoteEditorWheel.ts';
 import { BrowserOperationController } from '../../entry/src/main/ets/model/BrowserOperationController.ts';
 import { AutoSyncScheduler } from '../../entry/src/main/ets/model/AutoSyncScheduler.ts';
 import { SyncActivity } from '../../entry/src/main/ets/model/SyncSettings.ts';
@@ -24,7 +25,7 @@ export function editorPageHarness() {
   });
   const Page = loadComponentLogic('pages/EditNotePage.ets','EditNotePage',{
     ...noteInterfaceDependencies(),
-    NoteEditorSession,initialNoteEditorState,AnkiNoteUpdate:Writer,
+    NoteEditorSession,NoteEditorWheelSession,initialNoteEditorState,AnkiNoteUpdate:Writer,
     AnkiNoteEditor:class {card(id){return io.card(id)} note(id){return io.note(id)} notetype(id){return io.notetype(id)}},
     BrowserOperationController:class extends BrowserOperationController {
       execute(context,write,effects){return super.execute(context,write,effects,scheduler,activity)}

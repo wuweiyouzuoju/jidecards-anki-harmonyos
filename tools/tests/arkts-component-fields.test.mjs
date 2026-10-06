@@ -41,3 +41,18 @@ test('ArkUI component getters cannot silently disappear from compiled pages', ()
     assert.deepEqual(componentGetters(readFileSync(path, 'utf8')), [], path);
   }
 });
+
+function dialogBuilders(source) {
+  return [...source.matchAll(/new CustomDialogController\(\{[\s\S]*?builder:\s*([\p{L}_$][\p{L}\p{N}_$]*)\s*\(/gu)]
+    .map(match=>match[1]);
+}
+test('CustomDialogController builders must provide the generated custom-dialog controller contract', () => {
+  assert.deepEqual(dialogBuilders('new CustomDialogController({ builder: NoteLinkDialog({}) })'),['NoteLinkDialog']);
+  const root=fileURLToPath(new URL('../../entry/src/main/ets/',import.meta.url));
+  const files=sources(root).map(path=>({path,source:readFileSync(path,'utf8')}));
+  const customDialogs=new Set(files.flatMap(({source})=>
+    [...source.matchAll(/@CustomDialog\s+(?:export\s+)?struct\s+([\p{L}_$][\p{L}\p{N}_$]*)/gu)].map(match=>match[1])));
+  for(const file of files)for(const builder of dialogBuilders(file.source)) {
+    assert.ok(customDialogs.has(builder),`${file.path}: ${builder} needs @CustomDialog so setController is generated`);
+  }
+});

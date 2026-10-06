@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { NoteCreationSession } from '../../entry/src/main/ets/model/NoteCreationSession.ts';
+import { NoteEditorWheelSession } from '../../entry/src/main/ets/model/NoteEditorWheel.ts';
 import { noteDraftChanged, parseNoteTags } from '../../entry/src/main/ets/model/NoteFieldEditing.ts';
 import { NoteTypeCatalog } from '../../entry/src/main/ets/model/NoteTypeCatalog.ts';
 import { noteImagePreviewSource } from '../../entry/src/main/ets/model/NoteMediaParts.ts';
@@ -25,7 +26,7 @@ export function creationPageHarness(overrides = {}) {
     saveOcclusion: async input => writes.push(structuredClone(input)),
     committed() {}, errorMessage: error => error.message, ...overrides.backend };
   const Page = loadComponentLogic('pages/添加笔记页.ets', '添加笔记页', {
-    NoteCreationSession, AnkiNoteCreation: class {constructor() {return backend;}},
+    NoteCreationSession, NoteEditorWheelSession, AnkiNoteCreation: class {constructor() {return backend;}},
     NoteAudioPreview: class {async stop() {} async dispose() {}},
     ExpansionReveal: class {cancel() {}}, NavPathStack: class {},
     $r: key => key, NoteTypeCatalog, noteDraftChanged, parseNoteTags, noteImagePreviewSource,

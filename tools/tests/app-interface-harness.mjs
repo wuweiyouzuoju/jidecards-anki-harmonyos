@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { actionMenuRows, toggleActionMenuBranch } from '../../entry/src/main/ets/components/common/ActionMenuTree.ts';
 import { APP_INTERFACE_SURFACES, AppInterfaceTracker, visibleInterfaceItems, studyInterfaceMenu, noteEditInterfaceControls } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { noteFieldDisplayKey } from '../../entry/src/main/ets/model/NoteTypePresentation.ts';
-import { loadPlatformModule } from './platform-module-harness.mjs';
+import { expansionRevealDependencies, loadPlatformModule } from './platform-module-harness.mjs';
 import { BURY_SUSPEND_MODE_BURY_USER, BURY_SUSPEND_MODE_SUSPEND } from '../../entry/src/main/ets/proto/messages/SchedulerMessages.ts';
 import { CARD_FLAGS, customFlagLabel } from '../../entry/src/main/ets/model/CardMarking.ts';
 import { OFFICIAL_ANNOUNCEMENTS_ENABLED } from '../../entry/src/main/ets/model/官方公告配置.ts';
@@ -22,7 +22,7 @@ export function appInterfaceDependencies() {
 /** 编辑生命周期回归仍执行真实观察方法；只替换平台资源解析。 */
 export function noteInterfaceDependencies() {
   const deps = appInterfaceDependencies();
-  return { ...deps, noteEditInterfaceControls, noteFieldDisplayKey,
+  return { ...deps, ...expansionRevealDependencies(), noteEditInterfaceControls, noteFieldDisplayKey,
     interfaceItemText: loadPlatformModule('utils/AppInterfaceText.ets', 'interfaceItemText', { APP_INTERFACE_SURFACES, ...deps }),
     noteFieldText: loadPlatformModule('utils/NoteTypeText.ets', 'noteFieldText', { noteFieldDisplayKey, ...deps }) };
 }

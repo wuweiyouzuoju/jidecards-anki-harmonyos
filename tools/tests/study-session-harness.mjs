@@ -18,7 +18,7 @@ export function attachStudySession(page) {
   page.cardRenderPending = false;
   // Onboarding has its own page/gesture tests; these hosts only exercise the study session.
   page.maybeShowTapZonesGuide ??= () => {};
-  page.cardWeb = { reset() {}, attach() {}, show: html => {
+  page.cardWeb = { reset() {}, attach() {}, setAudioEnabled() {}, show: html => {
     page.网页控制器.loadData(html);
     page.studyCardShown('');
   } };
