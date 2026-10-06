@@ -87,7 +87,7 @@ test('theme text identity changes with its color and create-deck draws spans in 
   assert.match(read('components/common/DialogHeader.ets'), /ForEach\(themeLabelGlyphs\(this\.actionLabel, this\.themeAccentColors/);
   assert.doesNotMatch(button, /index % this\.themeAccentColors\.length/);
   assert.match(read('components/home/主页顶部工具栏.ets'), /deck_reorder_done'[\s\S]*?themeText: true/);
-  assert.match(read('components/home/HomeSummaryHeader.ets'), /ic_home_new'[\s\S]*?glyphColor: this.actionColor/);
+  assert.match(read('components/home/HomeSummaryHeader.ets'), /IconActionButton\(\{ toolbarStyle: true, source: \$r\('app.media.ic_home_new'\), label: \$r\('app.string.create_deck'\)[\s\S]*?onAction: this.onCreate/);
 });
 
 test('data text stays single-color so times, counts and numbers never enter the ramp', () => {

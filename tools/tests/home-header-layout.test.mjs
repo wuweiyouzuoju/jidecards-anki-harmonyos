@@ -7,27 +7,37 @@ import { searchHomeDecks } from '../../entry/src/main/ets/model/HomeDeckSearch.t
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
+const dimensions = loadPlatformModule('utils/应用尺寸.ets', '应用尺寸', {});
 
-test('six top controls always fit one row by scaling widths, gaps and glyphs before rendering', () => {
+test('a small left More button and five right-aligned controls fit one row with flexible separation', () => {
   let previous = 0;
   for (const width of [0,80,160,240,288,328,360,480,600,768,1024,1400]) {
-    const g = homeHeaderGeometry(width, 8, true);
+    const g = homeHeaderGeometry(width, 8, true, dimensions.按钮高度);
     assert.equal(g.summaryWidth,width);assert.equal(g.summaryHeight,168);
-    assert.ok(Math.abs(g.controlWidth*6+g.actionGap*5-width)<1e-10,'six controls plus five gaps exactly fill the available width');
+    assert.ok(Math.abs(g.controlWidth+g.actionSeparation+g.trailingWidth-width)<1e-10,
+      'More, flexible separation and the right group fill the available width');
+    assert.ok(Math.abs(g.trailingWidth-g.controlWidth*5-g.actionGap*4)<1e-10);
+    assert.ok(g.actionSeparation>=g.actionGap-1e-10);
     assert.equal(g.actionsHeight,g.controlHeight,'the action area always has one row');
-    assert.ok(g.controlHeight>=44 && g.controlHeight<=56);
+    assert.ok(g.controlHeight>=0 && g.controlHeight<=dimensions.按钮高度);
+    assert.equal(g.controlHeight,g.controlWidth);
+    assert.ok(g.controlGlyphSize<=18);
     assert.ok(g.actionGap>=0 && g.actionGap<=8);
     assert.ok(g.controlWidth>=previous,'buttons adapt continuously to width');previous=g.controlWidth;
     assert.ok(g.controlGlyphSize <= Math.min(g.controlWidth, g.controlHeight) * 0.46);
-    const hidden=homeHeaderGeometry(width,8,false);
+    const hidden=homeHeaderGeometry(width,8,false,dimensions.按钮高度);
     assert.equal(hidden.summaryWidth,0);assert.equal(hidden.controlWidth,g.controlWidth);
     assert.equal(hidden.actionsHeight,g.actionsHeight,'hiding the summary does not change the action row');
+    if(width>=328) {
+      assert.equal(g.controlWidth,dimensions.按钮高度,'available windows use the shared Back/More button size');
+      assert.ok(g.actionSeparation>=32,'More remains visually separate from the right group');
+    }
   }
 });
 
 test('all summary pages reserve dots, a common title and centered body without overflow', () => {
   for (const compact of [true, false]) {
-    const header=homeHeaderGeometry(compact ? 328 : 480,8,true);
+    const header=homeHeaderGeometry(compact ? 328 : 480,8,true,dimensions.按钮高度);
     const g=homeSummaryGeometry(header.summaryHeight,compact);
     assert.equal(g.topPadding-g.padding,10, 'dots have their own strip above the title');
     assert.equal(g.titleHeight,24);
@@ -93,6 +103,10 @@ test('the real window owner publishes the union in vp and the shared anchored me
   const menu=new Menu();Object.assign(menu,{viewportHeight:400,safeTop:26,safeBottom:12,topOffset:0});
   assert.deepEqual(menu.menuGeometry(),{top:38,maxHeight:338});
   menu.topOffset=100;assert.deepEqual(menu.menuGeometry(),{top:100,maxHeight:276});
+  Object.assign(menu,{safeTop:80,topOffset:56,viewportTop:200});
+  assert.deepEqual(menu.menuGeometry(),{top:56,maxHeight:320},'wide pane below the safe edge must not add the system bar again');
+  menu.viewportTop=30;assert.deepEqual(menu.menuGeometry(),{top:62,maxHeight:314},'a pane overlapping the safe edge still avoids it');
+  menu.viewportTop=0;assert.deepEqual(menu.menuGeometry(),{top:92,maxHeight:284},'window root retains the complete safe inset');
   const dimensions=loadPlatformModule('utils/应用尺寸.ets','应用尺寸',{});
   const Frame=loadComponentLogic('components/common/DialogFrame.ets','DialogFrame',{
     ...keys,safeDialogMaxHeight,应用尺寸:dimensions
@@ -104,25 +118,49 @@ test('the real window owner publishes the union in vp and the shared anchored me
 function homeHeader() {
   const Header = loadComponentLogic('components/home/HomeSummaryHeader.ets', 'HomeSummaryHeader', {
     homeHeaderGeometry,
-    空主页快照: {}, WINDOW_SAFE_TOP_KEY:'safeTop', WINDOW_SAFE_BOTTOM_KEY:'safeBottom', WINDOW_HEIGHT_KEY:'height',
-    safePopupContentHeight, 应用尺寸: { 间距_8: 8 },
-    MenuSurface: { pointerDepth: 6 }
+    空主页快照: {}, 应用尺寸: dimensions
   });
-  return new Header();
+  const header = new Header(); header.narrowDeckLayout = true; return header;
 }
 
-test('both top-corner menus reserve space below the button and upward arrow and close when safe geometry changes', () => {
+test('the real header publishes one measured menu region below the buttons and closes menus only when it changes', () => {
   const header=homeHeader();
-  Object.assign(header,{contentWidth:328,headerTop:60,windowHeight:400,safeTop:52,safeBottom:24});
-  const g=homeHeaderGeometry(328,8,true);
-  const popupTop=60+g.controlHeight+8+6;
-  assert.equal(header.menuHeight(),safePopupContentHeight(400,popupTop,52,24,8));
-  assert.ok(popupTop+header.menuHeight()+32<=400-24-8);
-  header.showSummary=false;header.contentWidth=328;
-  assert.equal(header.menuHeight(),safePopupContentHeight(400,popupTop,52,24,8));
-  const closures=[]; header.onMoreClose=()=>closures.push('more'); header.onCreateClose=()=>closures.push('create');
-  header.layoutChanged(); assert.deepEqual(closures,['more','create']);
-  header.aboutToDisappear();assert.deepEqual(closures,['more','create','more','create']);
+  const anchors=[],closures=[];
+  header.onMenuAnchor=anchor=>anchors.push(anchor);header.onMenusClose=()=>closures.push('close');
+  const area={width:328,globalPosition:{x:12,y:60}};
+  header.updateAnchor(area);
+  assert.deepEqual(anchors,[{left:12,top:112,width:328}]);assert.equal(header.contentWidth,328);
+  header.updateAnchor(area);assert.equal(anchors.length,1);assert.equal(closures.length,1,'unchanged layout does not close an open menu');
+  header.updateAnchor({width:240,globalPosition:{x:56,y:80}});
+  assert.deepEqual(anchors.at(-1),{left:56,top:80+homeHeaderGeometry(240,8,true,dimensions.按钮高度).controlHeight+8,width:240});
+  assert.equal(closures.length,2);
+  header.layoutChanged();header.aboutToDisappear();assert.equal(closures.length,4);
+});
+
+test('home button footprint and toolbar/card edges match the public navigation dimensions and safety bounds', () => {
+  const page=readFileSync(new URL('../../entry/src/main/ets/pages/首页.ets',import.meta.url),'utf8');
+  const expression=page.match(/\.padding\(\{ top: this\.排序模式中 \? 0 : (应用尺寸\.pageToolbarTop[^\n]+),/)[1];
+  for(const narrow of [false,true]) for(const status of [0,24,40]) for(const safe of [0,status,status+18]) {
+    const state={状态栏高度:status,narrowDeckLayout:narrow,safeTop:safe};
+    const buttonTop=new Function('应用尺寸',`return ${expression}`).call(state,dimensions);
+    const gap=dimensions.页面内容顶部间距(narrow);
+    const toolbarBottom=dimensions.pageToolbarHeight(status,narrow,safe);
+    const g=homeHeaderGeometry(480,dimensions.页面分组间距(narrow),true,dimensions.按钮高度);
+    assert.equal(g.controlHeight,dimensions.按钮高度);
+    assert.equal(buttonTop+g.actionsHeight,toolbarBottom);
+    assert.equal(buttonTop+g.actionsHeight+gap,dimensions.pageContentTop(status,narrow,safe));
+    assert.ok(buttonTop>=safe,'the button surface stays below the camera/system edge');
+    if(safe>status) assert.equal(buttonTop-safe,gap,'a deeper camera cutout contributes one safety gap');
+    const header=homeHeader();header.narrowDeckLayout=narrow;
+    const anchors=[];header.onMenuAnchor=anchor=>anchors.push(anchor);
+    header.updateAnchor({width:480,globalPosition:{x:12,y:buttonTop}});
+    assert.equal(anchors.at(-1).top,dimensions.pageContentTop(status,narrow,safe));
+  }
+  for(const gap of [8,12]) for(const width of [160,240,288,328,360,600]) {
+    const g=homeHeaderGeometry(width,gap,true,dimensions.按钮高度);
+    assert.ok(Math.abs(g.controlWidth+g.actionSeparation+g.trailingWidth-width)<1e-10);
+    assert.ok(g.controlHeight<=dimensions.按钮高度);
+  }
 });
 
 const decks = [
@@ -130,6 +168,44 @@ const decks = [
   {id:'2',name:'法语',fullName:'语言::法语',displayName:'Français café',ancestorIds:['1']},
   {id:'3',name:'生物',fullName:'生物',displayName:'biology',ancestorIds:[]}
 ];
+
+test('both home menus retain the button gap when their host has a title bar or navigation offset', () => {
+  const page=readFileSync(new URL('../../entry/src/main/ets/pages/首页.ets',import.meta.url),'utf8');
+  const methods=['homeMenuHostChanged','homeMenuAnchor'].map(name=>{
+    const start=page.indexOf(`  private ${name}(`);
+    assert.ok(start>=0);
+    return page.slice(start,page.indexOf('\n  }',start)+4);
+  }).join('\n');
+  const Host=new Function(stripTypeScriptTypes(`class Host { ${methods} }`,{mode:'transform'})+';return Host;')();
+  const menuInputs=[...page.matchAll(/topOffset: ([^,\n]+), contentLeft: ([^,\n]+)/g)];
+  assert.equal(menuInputs.length,2,'More and Create share the measured host');
+  const evaluate=(expression,host)=>new Function('return '+expression).call(host);
+  for(const narrow of [false,true]) for(const width of [240,768]) for(const inset of [0,24])
+    for(const origin of [{x:0,y:0},{x:0,y:36},{x:140,y:80}]) {
+      const host=new Host();let closed=0;
+      Object.assign(host,{homeMenuHostLeft:0,homeMenuHostTop:0,closeHomeActions:()=>closed++});
+      host.homeMenuHostChanged({globalPosition:origin});
+      const changes=closed;host.homeMenuHostChanged({globalPosition:origin});
+      assert.equal(closed,changes,'unchanged host measurements keep the menu open');
+      const header=homeHeader();header.narrowDeckLayout=narrow;
+      const buttonTop=dimensions.pageToolbarTop(inset,narrow,inset);
+      header.onMenuAnchor=anchor=>host.homeActionAnchor=anchor;
+      header.updateAnchor({width,globalPosition:{x:origin.x+12,y:origin.y+buttonTop}});
+      const gap=dimensions.页面内容顶部间距(narrow);
+      const buttonHeight=homeHeaderGeometry(width,dimensions.页面分组间距(narrow),true,dimensions.按钮高度).controlHeight;
+      for(const [,top,left] of menuInputs) {
+        const localTop=evaluate(top,host),localLeft=evaluate(left,host);
+        assert.equal(localTop,buttonTop+buttonHeight+gap,'the title bar is not added a second time');
+        assert.equal(localLeft,12,'navigation offsets are not added a second time');
+        const geometry=safeMenuGeometry(600,localTop,inset,24,dimensions.页面底部间距(narrow));
+        assert.equal(origin.y+geometry.top-(origin.y+buttonTop+buttonHeight),gap,
+          'normal/compact layouts with and without safety insets keep exactly one content gap');
+      }
+      host.homeMenuHostChanged({globalPosition:{x:origin.x+1,y:origin.y+1}});
+      assert.equal(closed,changes+1,'moving the host closes stale menus');
+    }
+});
+
 test('deck search includes collapsed descendants, matches aliases and normalized words, and excludes hidden subtrees', () => {
   assert.deepEqual(searchHomeDecks(decks, new Set(), '  CAFÉ français ').map(d => d.id), ['2']);
   assert.deepEqual(searchHomeDecks(decks, new Set(), '语言::法').map(d => d.id), ['2']);
@@ -152,16 +228,17 @@ test('search selection validates the current snapshot and reports only loaded cu
   assert.deepEqual(observations.at(-1).optionIds, []);
 });
 
-test('home binds swapped icon buttons to pointed popups while summary pages use responsive geometry', () => {
+test('home uses grouped small icon buttons and public menus while summary pages use responsive geometry', () => {
   const read = p => readFileSync(new URL('../../entry/src/main/ets/' + p, import.meta.url), 'utf8');
   const header = read('components/home/HomeSummaryHeader.ets');
   assert.deepEqual([...header.matchAll(/source: \$r\('app.media.([^']+)'\)/g)].map(match=>match[1]),
     ['ic_study_agent','ic_settings_search','ic_home_browser','ic_home_more','ic_home_new','ic_home_sync']);
-  assert.match(header,/Row\(\{ space: this.geometry\(\).actionGap \}\) \{\s*this.moreButton\(\)\s*this.agentButton\(\)\s*this.searchButton\(\)\s*this.browserButton\(\)\s*this.syncButton\(\)\s*this.createButton\(\)/);
+  assert.match(header,/this.moreButton\(\)\s*Blank\(\).width\(this.geometry\(\).actionSeparation\).flexShrink\(0\)\s*Row\(\{ space: this.geometry\(\).actionGap \}\) \{\s*this.agentButton\(\)\s*this.searchButton\(\)\s*this.browserButton\(\)\s*this.syncButton\(\)\s*this.createButton\(\)/);
   assert.match(header,/if \(this.actionsVisible\) \{ this.actions\(\) \}\s*if \(this.showSummary\) \{ this.summaryCard\(\) \}/);
-  assert.match(header,/placement: Placement.BottomLeft/);assert.match(header,/placement: Placement.BottomRight/);
-  assert.equal((header.match(/enableArrow: true/g) ?? []).length, 2);
+  assert.doesNotMatch(header,/bindPopup|enableArrow|MenuSurface/);
   assert.equal((header.match(/IconActionButton\(\{/g) ?? []).length, 6);
+  assert.equal((read('pages/首页.ets').match(/cornerRadius: 应用尺寸.圆角_卡片/g) ?? []).length,2);
+  assert.match(read('components/common/IconActionButton.ets'),/this.usesSquareSurface\(\) \? 应用尺寸.圆角_卡片 : this.controlSize \/ 2/);
   assert.doesNotMatch(header, /\.scale\(/);
   assert.doesNotMatch(header, /caption|Text\(\$r\('app.string/);
   assert.doesNotMatch(header, /StudyGrip|gripSide|trackTouch|onSideChange|splitDetails|flanking|stacked/);

@@ -4,14 +4,11 @@ import { appInterface } from '../../backend/AppInterfaceService';
 import { namedResourceText } from '../../utils/UiFeedback';
 import { ActionMenuList, ActionMenuListItem } from '../common/ActionMenuList';
 
-// 原生尖角弹窗的菜单正文；锚点、表面和关闭由 HomeSummaryHeader 拥有。
-
-import { 应用尺寸 } from '../../utils/应用尺寸';
+// 只提供菜单正文；表面、外部关闭和滚动由公共 AnchoredMenu 拥有。
 
 @Component
 export struct 主页更多面板 {
   @Prop @Watch('publishInterface') historyAvailable: boolean = true;
-  @Prop menuMaxHeight: number = 360;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   设置回调: () => void = (): void => {};
   onHistory: () => void = (): void => {};
@@ -64,8 +61,6 @@ export struct 主页更多面板 {
   aboutToDisappear(): void { appInterface.leave('home_more'); }
 
   build() {
-    Scroll() {
-      ActionMenuList({ items: this.menuEntries(), onSelect: (id: string): void => { this.selectItem(id); } })
-    }.width(应用尺寸.compactMenuWidth).constraintSize({ maxHeight: this.menuMaxHeight }).scrollBar(BarState.Auto)
+    ActionMenuList({ items: this.menuEntries(), onSelect: (id: string): void => { this.selectItem(id); } })
   }
 }

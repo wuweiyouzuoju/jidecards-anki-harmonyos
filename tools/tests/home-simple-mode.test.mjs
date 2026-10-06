@@ -4,6 +4,7 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { loadPlatformModule } from './platform-module-harness.mjs';
 import { visibleInterfaceItems } from '../../entry/src/main/ets/model/AppInterface.ts';
+import { SIMPLE_MODE_KEY } from '../../entry/src/main/ets/model/AppLayoutState.ts';
 
 function harness(saved = undefined) {
   const disk = new Map(saved === undefined ? [] : [['simple_mode', saved]]);
@@ -16,7 +17,7 @@ function harness(saved = undefined) {
   };
   const api = loadPlatformModule('model/简洁模式存储.ets',
     '({ initializeSimpleMode, 加载简洁模式, 保存简洁模式 })', {
-      AppStorage: { get: key => app.get(key), setOrCreate: (key, value) => app.set(key, value) },
+      SIMPLE_MODE_KEY, AppStorage: { get: key => app.get(key), setOrCreate: (key, value) => app.set(key, value) },
       preferences: {
         getPreferencesSync: () => { if (unreadable) throw Error('unreadable'); return store; },
         getPreferences: async () => store

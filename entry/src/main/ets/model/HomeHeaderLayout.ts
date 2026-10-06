@@ -1,9 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 export const HOME_SUMMARY_HEIGHT: number = 168;
+export interface HomeActionAnchor {
+  left: number;
+  top: number;
+  width: number;
+}
 export interface HomeHeaderGeometry {
   summaryWidth: number;
   summaryHeight: number;
   actionGap: number;
+  actionSeparation: number;
+  trailingWidth: number;
   actionsHeight: number;
   controlWidth: number;
   controlHeight: number;
@@ -29,17 +36,21 @@ export function homeSummaryGeometry(cardHeight: number, compact: boolean, indica
     bodyHeight: bodyHeight, chartHeight: Math.max(0, bodyHeight - 20) };
 }
 
-/** 六个按钮始终横排；按实测宽度共同收缩间距、点击区和图标，保留两端菜单锚点。 */
-export function homeHeaderGeometry(contentWidth: number, gap: number, showSummary: boolean): HomeHeaderGeometry {
+/** 更多独居左端，其余五个靠右；公共按钮尺寸由宿主传入，窄窗共同收缩。 */
+export function homeHeaderGeometry(contentWidth: number, gap: number, showSummary: boolean,
+  buttonSize: number): HomeHeaderGeometry {
   const width: number = Math.max(0, contentWidth);
   const spacing: number = Math.min(Math.max(0, gap), width / 40);
   const summaryWidth: number = showSummary ? width : 0;
   const compactCard: boolean = showSummary && summaryWidth < 260;
   const summaryHeight: number = HOME_SUMMARY_HEIGHT;
-  const controlWidth: number = Math.max(0, (width - spacing * 5) / 6);
-  const controlHeight: number = Math.min(56, Math.max(44, controlWidth));
+  const controlWidth: number = Math.min(Math.max(0, buttonSize), Math.max(0, (width - spacing * 5) / 6));
+  const controlHeight: number = controlWidth;
+  const trailingWidth: number = controlWidth * 5 + spacing * 4;
+  const actionSeparation: number = Math.max(0, width - controlWidth - trailingWidth);
   return { summaryWidth: summaryWidth, summaryHeight: summaryHeight, actionGap: spacing,
+    actionSeparation: actionSeparation, trailingWidth: trailingWidth,
     actionsHeight: controlHeight, controlWidth: controlWidth, controlHeight: controlHeight,
-    controlGlyphSize: Math.min(28, controlWidth * 0.46, controlHeight * 0.46),
+    controlGlyphSize: Math.min(18, controlWidth * 0.46, controlHeight * 0.46),
     compactCard: compactCard };
 }

@@ -4,14 +4,12 @@ import { appInterface } from '../backend/AppInterfaceService';
 import { namedResourceText } from '../utils/UiFeedback';
 import { ActionMenuList, ActionMenuListItem } from './common/ActionMenuList';
 
-import { 应用尺寸 } from '../utils/应用尺寸';
 import { 简洁模式AppStorage键 } from '../model/简洁模式存储';
 
-// 原生尖角弹窗的菜单正文；锚点、表面和关闭由 HomeSummaryHeader 拥有。
+// 只提供菜单正文；表面、外部关闭和滚动由公共 AnchoredMenu 拥有。
 
 @Component
 export struct 主页操作面板 {
-  @Prop menuMaxHeight: number = 360;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   创建牌组回调: () => void = (): void => {};
   onCreateFilteredDeck: () => void = (): void => {};
@@ -60,8 +58,6 @@ export struct 主页操作面板 {
   aboutToDisappear(): void { appInterface.leave('home_create'); }
 
   build() {
-    Scroll() {
-      ActionMenuList({ items: this.menuEntries(), onSelect: (id: string): void => { this.selectItem(id); } })
-    }.width(!this.简洁模式 || this.显示获取直链牌组 ? 应用尺寸.extendedMenuWidth : 应用尺寸.compactMenuWidth).constraintSize({ maxHeight: this.menuMaxHeight }).scrollBar(BarState.Auto)
+    ActionMenuList({ items: this.menuEntries(), onSelect: (id: string): void => { this.selectItem(id); } })
   }
 }
