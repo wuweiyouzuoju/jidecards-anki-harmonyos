@@ -47,6 +47,7 @@ function harness({ snapshot = decodeGraphsResponse(new Uint8Array()), theme = Pr
     hilog: { info() {}, error() {} }, $r: key => key
   });
   const page = new Page();
+  let persisted={cardCountsSeparateInactive:true};
   Object.assign(page, {
     pageActive: false, statsSession: null, 阶段: 'loading', 图表数据: null,
     initialSnapshot: { graphs: snapshot, days: 365 }, 图表偏好: { cardCountsSeparateInactive: false },
@@ -54,8 +55,8 @@ function harness({ snapshot = decodeGraphsResponse(new Uint8Array()), theme = Pr
     刷新卡片快照: async () => { events.push('widgets'); },
     统计服务实例: {
       获取图表统计: async () => { events.push('graphs'); return fresh; },
-      获取图表偏好: async () => { events.push('preferences'); return { cardCountsSeparateInactive: true }; },
-      设置图表偏好: async () => { events.push('save preferences'); }
+      获取图表偏好: async () => { events.push('preferences'); return persisted; },
+      设置图表偏好: async value => { events.push('save preferences'); persisted=value; }
     }
   });
   return { page, sync, events, snapshot, fresh };

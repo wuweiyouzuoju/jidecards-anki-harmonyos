@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import test from 'node:test';
+import { loadComponentLogic } from './platform-module-harness.mjs';
 
 const read = file => readFileSync(new URL('../../entry/src/main/ets/' + file, import.meta.url), 'utf8');
 const page = read('pages/统计页.ets');
@@ -59,17 +60,29 @@ test('answer-button chart refreshes to the selected month, quarter, year and all
   }
 });
 
-test('hour range title callback persists the new value and refreshes home/widget data', () => {
+test('hour range title callback confirms persistence before updating and publishing, with retry on failure', async () => {
   const start = page.indexOf('rangeIndex: this.小时分布窗口');
   const callback = page.slice(start).match(/onRangeChange: (\(索引: number\): void => \{[\s\S]*?\n\s*\}),/)[1];
-  const saved = [];
-  const updates = [];
-  const state = { 小时分布窗口: 0, 刷新卡片快照() { updates.push(this.小时分布窗口); } };
-  const select = new Function('保存小时分布窗口', stripTypeScriptTypes(`const callback = ${callback};`,
+  const saved=[],updates=[];
+  let finish,fail=false;
+  const wait=new Promise(resolve=>{finish=resolve;});
+  const Page=loadComponentLogic('pages/统计页.ets','统计页',{
+    NavPathStack:class{},Weekday:{SUNDAY:0},$r:key=>key,showToastSafely:()=>{},
+    保存小时分布窗口:async value=>{saved.push(value);await wait;if(fail)throw Error('disk');}
+  });
+  const state=new Page();state.pageActive=true;state.小时分布窗口=0;
+  state.getUIContext=()=>({});state.刷新卡片快照=async()=>updates.push(state.小时分布窗口);
+  const select = new Function(stripTypeScriptTypes(`const callback = ${callback};`,
     { mode: 'transform' }) + '\nreturn callback;')
-    .call(state, value => { saved.push(value); return Promise.resolve(); });
-  select(2);
+    .call(state);
+  select(2);assert.equal(state.小时分布窗口,0);assert.deepEqual(updates,[]);
+  finish();await new Promise(setImmediate);
   assert.equal(state.小时分布窗口, 2);
   assert.deepEqual(saved, [2]);
   assert.deepEqual(updates, [2]);
+  fail=true;await state.on小时切换(1);
+  assert.equal(state.小时分布窗口,2);assert.deepEqual(updates,[2]);
+  assert.equal(state.阶段,'error');assert.equal(state.错误详情,'disk');assert.equal(state.preferenceSaving,false);
+  fail=false;await state.on小时切换(1);
+  assert.equal(state.小时分布窗口,1);assert.deepEqual(updates,[2,1]);
 });

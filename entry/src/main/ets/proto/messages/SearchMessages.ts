@@ -349,7 +349,8 @@ function decodeIdList(bytes: Uint8Array): SearchNodeIdList {
   while ((tag = r.读取标签()) !== null) {
     if (tag.字段号 === 1) {
       if (tag.线类型 === 线类型_长度分隔) {
-        ids.push(...r.读取打包64位整数());
+        // 大牌组的整批 ID 不能展开成函数实参，移动端引擎有参数数量上限。
+        for (const id of r.读取打包64位整数()) ids.push(id);
       } else {
         ids.push(r.读取64位整数());
       }
@@ -735,7 +736,7 @@ export function decodeSearchResponse(bytes: Uint8Array): number[] {
     if (tag.字段号 === 1) {
       if (tag.线类型 === 线类型_长度分隔) {
         // packed: wire type 2，载荷是连续 varint（prost 默认编码）
-        ids.push(...r.读取打包64位整数());
+        for (const id of r.读取打包64位整数()) ids.push(id);
       } else {
         // 非 packed: wire type 0，单个 varint（向后兼容）
         ids.push(r.读取64位整数());

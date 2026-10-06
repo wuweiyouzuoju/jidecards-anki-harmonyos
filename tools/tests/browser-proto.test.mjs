@@ -37,6 +37,18 @@ function roundTripSearchNode(node) {
   return decodeSearchNode(encodeSearchNode(node).转为字节());
 }
 
+test('large packed search results and note selections preserve every ID without argument spreading', () => {
+  const ids = Array.from({ length: 200000 }, (_, index) => 1700000000000 + index);
+  const response = new 协议写入器();
+  response.写入打包64位整数(1, ids);
+  response.写入64位整数(1, 42);
+  response.写入变长整数(9, 1);
+  assert.deepEqual(decodeSearchResponse(response.转为字节()), ids.concat(42));
+  const selection = roundTripSearchNode({ kind: 'nids', nids: ids });
+  assert.equal(selection.kind, 'nids');
+  assert.deepEqual(selection.nids, ids);
+});
+
 // ---- 测试局部解码器（验证 encode 侧 wire format 契约） ----
 // encodeSortOrder / decodeSortOrder 未导出，经 encodeSearchRequest 编码后
 // 用 协议读取器 独立解析，验证编码 wire format 与 prost 对齐。

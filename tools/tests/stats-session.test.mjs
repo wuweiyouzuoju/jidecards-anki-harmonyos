@@ -40,14 +40,42 @@ test('stats invalidates widget work on newer requests and on disposal',async()=>
 });
 test('stats preference writes are serialized and stale preferences cannot reset a user choice',async()=>{
   const h=harness(), read=deferred(), write=deferred(), saved=[];
-  h.backend.preferences=()=>read.promise;
-  h.backend.savePreferences=async value=>{saved.push(value); if(saved.length===1) await write.promise;};
+  let persisted={cardCountsSeparateInactive:false}, reads=0;
+  h.backend.preferences=()=>++reads===1?read.promise:Promise.resolve(persisted);
+  h.backend.savePreferences=async value=>{saved.push(value); if(saved.length===1) await write.promise;persisted=value;};
   const loading=h.session.load(request); await settle();
   const one=h.session.updatePreferences(p=>({...p,cardCountsSeparateInactive:true})); await settle();
   const two=h.session.updatePreferences(p=>({...p,extra:true})); await settle(); assert.equal(saved.length,1);
+  write.resolve();await one;
   read.resolve({cardCountsSeparateInactive:false}); await loading;
+  await two;
   assert.equal(h.states.at(-1).preferences.cardCountsSeparateInactive,true);
-  write.resolve(); await Promise.all([one,two]); assert.equal(saved[1].cardCountsSeparateInactive,true);
+  assert.equal(saved[1].cardCountsSeparateInactive,true);
+  assert.equal(saved[1].extra,true);
+});
+
+test('stats read and save failures are observable and do not publish defaults or failed choices',async()=>{
+  const h=harness();
+  h.backend.preferences=async()=>{throw Error('read preferences');};
+  await h.session.load(request);
+  assert.equal(h.states.at(-1).phase,'error');assert.equal(h.widgets.length,0);
+  await assert.rejects(h.session.updatePreferences(p=>({...p,cardCountsSeparateInactive:true})),/read preferences/);
+  h.backend.preferences=async()=>({cardCountsSeparateInactive:false,calendarFirstDayOfWeek:2});
+  await h.session.load(request);
+  h.backend.savePreferences=async()=>{throw Error('save preferences');};
+  await assert.rejects(h.session.updatePreferences(p=>({...p,cardCountsSeparateInactive:true})),/save preferences/);
+  assert.equal(h.states.at(-1).preferences.cardCountsSeparateInactive,false);
+  h.backend.savePreferences=async()=>{};
+  await h.session.updatePreferences(p=>p);
+  assert.equal(h.states.at(-1).preferences.calendarFirstDayOfWeek,2);
+});
+
+test('an accepted preference write finishes after disposal without notifying the disposed page',async()=>{
+  const h=harness(),gate=deferred();let saved=false;
+  h.backend.savePreferences=async()=>{await gate.promise;saved=true;};
+  const work=h.session.updatePreferences(p=>p);await settle();
+  const count=h.states.length;h.session.dispose();gate.resolve();await work;
+  assert.equal(saved,true);assert.equal(h.states.length,count);
 });
 test('stats platform stops after collection open or deck lookup if the request expired',async()=>{
   for(const stage of ['open','tree']) {

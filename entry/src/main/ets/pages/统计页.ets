@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { WINDOW_SAFE_TOP_KEY } from '../model/WindowSafeLayout';
 import { appInterface } from '../backend/AppInterfaceService';
 import { statsInterfaceSections, visibleInterfaceItems, AppInterfaceItem, AppInterfaceControl } from '../model/AppInterface';
-import { resourceText, namedResourceText } from '../utils/UiFeedback';
+import { showToastSafely, resourceText, namedResourceText } from '../utils/UiFeedback';
 import { interfaceItemText } from '../utils/AppInterfaceText';
 import { StatsSession, StatsSnapshot, StatsRequest } from '../model/StatsSession';
 import { AnkiStatsSession } from '../backend/AnkiStatsSession';
@@ -18,6 +19,7 @@ import { 颜色键 } from '../model/颜色主题';
 import { 解析是否深色, 主题模式 } from '../model/主题设置';
 import { 加载主题模式 } from '../model/主题存储';
 import { CustomTransition } from '../utils/自定义转场';
+import { IconActionButton } from '../components/common/IconActionButton';
 import { 按下态按钮 } from '../components/common/按下态按钮';
 import { 统计图表分区 } from '../components/stats/统计图表分区';
 import { 范围切换条 } from '../components/stats/范围切换条';
@@ -68,6 +70,7 @@ export struct 统计页 {
   initialSnapshot: 统计页参数 = { graphs: null, days: 365 };
   private pageActive: boolean = false;
   private statsSession: StatsSession | null = null;
+  @State @Watch('publishInterface') private preferenceSaving: boolean = false;
 
   @State @Watch('publishInterface') private 阶段: 统计阶段 = 'loading';
   @State @Watch('publishInterface') private 错误详情: string = '';
@@ -132,6 +135,7 @@ export struct 统计页 {
   @StorageProp(颜色键.主色容器) private 主色容器色: string = '#E8EEFC';
   @StorageProp(PAGE_SURFACE_KEY) private 页面底色微染值: string = '#F5F7FA';
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
+  @StorageProp(WINDOW_SAFE_TOP_KEY) private toolbarSafeTop: number = 0;
   // 手势导航条高度（统计内容滚到底时需完整滚出导航条区域）
   @StorageProp('导航条高度') private 导航条高度: number = 0;
   @StorageLink('systemDarkMode') private 系统暗黑模式: boolean = false;
@@ -161,10 +165,17 @@ export struct 统计页 {
     // 恢复主题模式（与浏览页同款，供 是否深色() 判断）
     this.主题模式值 = await 加载主题模式();
     // 恢复小时分布窗口选择（首页卡片/桌面卡片跟随同一偏好）
-    this.小时分布窗口 = await 加载小时分布窗口();
-    // 恢复统计天数（近 1 年/全部两档，首页/FSRS控制器拉 GraphsView 前加载同一偏好）
-    const days: number = await 加载统计天数();
+    let hours: number;
+    let days: number;
+    try {
+      hours = await 加载小时分布窗口();
+      days = await 加载统计天数();
+    } catch (error) {
+      this.reportFailure(error);
+      return;
+    }
     if (!this.pageActive) return;
+    this.小时分布窗口 = hours;
     if (days !== this.统计天数) this.图表数据 = null;
     this.统计天数 = days;
     this.加载牌组列表();
@@ -237,9 +248,26 @@ export struct 统计页 {
     this.加载统计数据();
   }
 
-  /** 图内偏好变更：本地即时生效 + 异步写后端（对齐 Anki autoSavingPrefs 行为） */
-  private async 更新偏好(change: (old: GraphPreferences) => GraphPreferences): Promise<void> {
-    await this.getStatsSession()?.updatePreferences(change);
+  private reportFailure(error: Object): void {
+    if (!this.pageActive) return;
+    this.错误详情 = error instanceof Error ? error.message : String(error);
+    this.阶段 = 'error';
+    showToastSafely(this.getUIContext(), { message: this.错误详情 });
+  }
+
+  /** 确认保存再更新选择；失败保留上次确认的偏好。 */
+  private async 更新偏好(change: (old: GraphPreferences) => GraphPreferences): Promise<boolean> {
+    if (this.preferenceSaving || this.阶段 !== 'content' || !this.pageActive) return false;
+    this.preferenceSaving = true;
+    try {
+      await this.getStatsSession()?.updatePreferences(change);
+      return true;
+    } catch (error) {
+      this.reportFailure(error);
+      return false;
+    } finally {
+      if (this.pageActive) this.preferenceSaving = false;
+    }
   }
 
   /** 预测卡积压复选框切换（图内控件，即时落库） */
@@ -256,7 +284,7 @@ export struct 统计页 {
 
   /** 卡片数量图分离暂停复选框切换（图内控件，即时落库） */
   private async on分离变更(值: boolean): Promise<void> {
-    await this.更新偏好((旧: GraphPreferences): GraphPreferences => {
+    const saved: boolean = await this.更新偏好((旧: GraphPreferences): GraphPreferences => {
       return {
         calendarFirstDayOfWeek: 旧.calendarFirstDayOfWeek,
         cardCountsSeparateInactive: 值,
@@ -266,8 +294,8 @@ export struct 统计页 {
     });
     // 分离偏好改变卡片数量口径：立即重提卡片快照，首页摘要/桌面卡片跟随。
     // 仅全库口径推送：选中单牌组时 图表数据 为单牌组口径，推送会污染首页/桌面卡片（跳过）。
-    if (this.取搜索串() === '') {
-      this.刷新卡片快照().catch((): void => {});
+    if (saved && this.pageActive && this.取搜索串() === '') {
+      try { await this.刷新卡片快照(); } catch (error) { this.reportFailure(error); }
     }
   }
 
@@ -302,15 +330,17 @@ export struct 统计页 {
     const hasCharts: boolean = this.图表数据 !== null;
     const controls: AppInterfaceControl[] = visibleInterfaceItems('stats',
       { simple: false, agent: false, cloudDeck: false, themeHasTextures: false })
-      .filter((item): boolean => item.id === 'back' || (hasCharts && (item.id !== 'deck' || this.牌组选项.length > 1)))
+      .filter((item): boolean => item.id === 'retry' ? this.阶段 === 'error' :
+        item.id === 'back' || (hasCharts && (item.id !== 'deck' || this.牌组选项.length > 1)))
       .map((item): AppInterfaceControl => ({ id: item.id, title: namedResourceText(this.getUIContext(), item.titleKey),
-        titleKey: item.titleKey, enabled: item.id === 'back' || this.阶段 === 'content',
+        titleKey: item.titleKey, enabled: item.id === 'back' || (item.id === 'retry' ? !this.preferenceSaving :
+          this.阶段 === 'content' && !this.preferenceSaving),
         selected: item.id === 'year' ? this.统计天数 !== 0 : item.id === 'all' && this.统计天数 === 0 }));
     const options: SelectOption[] = hasCharts && this.牌组选项.length > 1 ? this.牌组选项.slice(0, 100) : [];
     const labels: string[] = options.map((option): string => typeof option.value === 'string' ? option.value.slice(0, 160) : resourceText(this.getUIContext(), option.value));
     appInterface.observe({ surface: 'stats', sectionId: '', selectedId: 'deck-' + this.选中牌组索引,
       optionIds: labels.map((_label, index): string => 'deck-' + index), optionLabels: labels,
-      optionsTotal: options.length > 0 ? this.牌组选项.length : 0, busy: this.阶段 === 'loading',
+      optionsTotal: options.length > 0 ? this.牌组选项.length : 0, busy: this.阶段 === 'loading' || this.preferenceSaving,
       items: controls, controlsComplete: true,
       values: [{ id: 'phase', value: this.阶段 }, { id: 'days', value: String(this.统计天数) },
         { id: 'fsrs', value: hasCharts ? String(this.图表数据?.fsrs) : 'unknown' },
@@ -322,18 +352,50 @@ export struct 统计页 {
       optionIds: sections.map((item): string => item.id), optionLabels: sections.map((item): string => namedResourceText(this.getUIContext(), item.titleKey)),
       busy: this.阶段 !== 'content', controlsComplete: true, items: sections.map((item): AppInterfaceControl =>
         ({ id: item.id, title: namedResourceText(this.getUIContext(), item.titleKey), titleKey: item.titleKey,
-          enabled: this.阶段 === 'content', selected: false })) });
+          enabled: this.阶段 === 'content' && !this.preferenceSaving, selected: false })) });
   }
 
   /** 顶栏统计天数切换（对齐 Anki RangeBox：1 年=365 / 全部=0 两档，切换重新请求后端） */
-  private on天数切换(天数: number): void {
-    if (天数 === this.统计天数) {
-      return;
-    }
-    this.统计天数 = 天数;
-    // 本地持久化：首页/FSRS控制器拉 GraphsView 前加载同一偏好，摘要卡/桌面卡片口径一致
-    保存统计天数(天数).catch((): void => {});
-    this.加载统计数据();
+  private async on天数切换(天数: number): Promise<void> {
+    if (天数 === this.统计天数 || this.preferenceSaving || !this.pageActive) return;
+    this.preferenceSaving = true;
+    try {
+      await 保存统计天数(天数);
+      if (!this.pageActive) return;
+      this.统计天数 = 天数;
+      await this.加载统计数据();
+    } catch (error) { this.reportFailure(error); }
+    finally { if (this.pageActive) this.preferenceSaving = false; }
+  }
+
+  private async on小时切换(index: number): Promise<void> {
+    if (this.preferenceSaving || !this.pageActive) return;
+    this.preferenceSaving = true;
+    try {
+      await 保存小时分布窗口(index);
+      if (!this.pageActive) return;
+      this.小时分布窗口 = index;
+      await this.刷新卡片快照();
+    } catch (error) { this.reportFailure(error); }
+    finally { if (this.pageActive) this.preferenceSaving = false; }
+  }
+
+  /** 重试先重读保存值，包括启动时尚未成功加载的本地范围。 */
+  private async retryStatistics(): Promise<void> {
+    if (!this.pageActive || this.preferenceSaving) return;
+    this.preferenceSaving = true;
+    this.阶段 = 'loading';
+    try {
+      const hours: number = await 加载小时分布窗口();
+      const days: number = await 加载统计天数();
+      if (!this.pageActive) return;
+      this.小时分布窗口 = hours;
+      this.统计天数 = days;
+      this.加载牌组列表();
+      this.fsrsRefreshReady = true;
+      await this.加载统计数据();
+    } catch (error) { this.reportFailure(error); }
+    finally { if (this.pageActive) this.preferenceSaving = false; }
   }
 
   private 取能力上下文(): common.UIAbilityContext | null {
@@ -391,7 +453,7 @@ export struct 统计页 {
 
   @Builder
   private 顶部条() {
-    // 与浏览页顶部条同款：左返回按钮（按下态胶囊样式 + 淡色边框）。
+    // 与浏览页顶部条同款：左侧公共返回图标。
     // FSRS 状态位于右上角，牌组和历史范围位于内容首行。
     Stack({ alignContent: Alignment.Center }) {
       Text($r('app.string.stats_page_title'))
@@ -399,10 +461,10 @@ export struct 统计页 {
         .fontColor($r('app.color.text_primary')).width('38%').textAlign(TextAlign.Center)
         .maxLines(1).hitTestBehavior(HitTestMode.None)
       Row() {
-        按下态按钮({
-          文案: interfaceItemText(this.getUIContext(), 'stats', 'back', this.uiLanguage),
-          字色: $r('app.color.text_primary'),
-          点击回调: (): void => this.返回()
+        IconActionButton({ toolbarStyle: true,
+          source: $r('app.media.ic_common_arrow_left'),
+          label: interfaceItemText(this.getUIContext(), 'stats', 'back', this.uiLanguage),
+          onAction: (): void => this.返回()
         })
 
         Blank()
@@ -425,12 +487,12 @@ export struct 统计页 {
 
     }
     .width('100%')
-    .height(应用尺寸.pageToolbarHeight(this.状态栏高度, this.narrowDeckLayout))
+    .height(应用尺寸.pageToolbarHeight(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop))
     .alignContent(Alignment.Center)
     .padding({
       left: 应用尺寸.页面内边距_水平,
       right: 应用尺寸.页面内边距_水平,
-      top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout),
+      top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop),
       bottom: 0
     })
     .backgroundColor(this.页面底色微染值)
@@ -674,10 +736,7 @@ export struct 统计页 {
               rangeLabels: this.historyLabels,
               rangeIndex: this.小时分布窗口,
               onRangeChange: (索引: number): void => {
-                  this.小时分布窗口 = 索引;
-                  保存小时分布窗口(索引).catch((): void => {});
-                  // 切换窗口后立即把对应窗口数据推送到首页/桌面卡片
-                  this.刷新卡片快照();
+                  this.on小时切换(索引);
                 },
 
               有数据: this.图表数据 !== null && this.图表数据.hours !== null,
@@ -733,7 +792,7 @@ export struct 统计页 {
         }, (section: AppInterfaceItem): string => section.id)
       }
       .width('100%')
-      .enabled(this.阶段 === 'content')
+      .enabled(this.阶段 === 'content' && !this.preferenceSaving)
       .padding({
         left: 应用尺寸.页面内边距_水平,
         right: 应用尺寸.页面内边距_水平,
@@ -771,6 +830,8 @@ export struct 统计页 {
               .width('100%')
               .textAlign(TextAlign.Center)
               .padding(40)
+            按下态按钮({ 文案: $r('app.string.common_retry'),
+              点击回调: (): void => { this.retryStatistics(); } })
           }
 
           // 切换牌组重载时保留旧图表（Anki 数据不闪空行为）

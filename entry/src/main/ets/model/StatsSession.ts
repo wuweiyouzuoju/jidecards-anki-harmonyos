@@ -21,7 +21,6 @@ export class StatsSession {
   private backend: StatsBackend;
   private notify: (snapshot: StatsSnapshot) => void;
   private state: StatsSnapshot;
-  private defaults: GraphPreferences;
   private alive: boolean = true;
   private generation: number = 0;
   private preferenceRevision: number = 0;
@@ -30,7 +29,6 @@ export class StatsSession {
   constructor(backend: StatsBackend, initial: GraphsView | null, defaults: GraphPreferences,
     notify: (snapshot: StatsSnapshot) => void) {
     this.backend = backend;
-    this.defaults = defaults;
     this.notify = notify;
     this.state = { phase: 'loading', graphs: initial, preferences: defaults, error: '' };
   }
@@ -53,8 +51,7 @@ export class StatsSession {
       if (!current()) return;
       const graphs: GraphsView = await this.backend.graphs(frozen, current);
       if (!current()) return;
-      let preferences: GraphPreferences = this.defaults;
-      try { preferences = await this.backend.preferences(); } catch (error) {}
+      const preferences: GraphPreferences = await this.backend.preferences();
       if (!current()) return;
       this.state.graphs = graphs;
       if (preferenceRevision === this.preferenceRevision) this.state.preferences = preferences;
@@ -75,12 +72,14 @@ export class StatsSession {
     const operation: Promise<void> = this.writes.then(async (): Promise<void> => {
       await this.backend.waitForCollection();
       if (!this.alive) return;
-      const value: GraphPreferences = change(this.state.preferences);
       this.preferenceRevision++;
-      this.state.preferences = value;
+      // 读真实偏好再应用差量，读取失败不能用页面默认值覆盖其他字段。
+      const previous: GraphPreferences = await this.backend.preferences();
+      if (!this.alive) return;
+      const value: GraphPreferences = change(previous);
+      await this.backend.savePreferences(value);
+      this.state.preferences = await this.backend.preferences();
       this.emit();
-      // 已接受的偏好写入完成后才放行下一项；展示继续保留用户选择。
-      try { await this.backend.savePreferences(value); } catch (error) {}
     });
     this.writes = operation.catch((): void => {});
     return operation;
