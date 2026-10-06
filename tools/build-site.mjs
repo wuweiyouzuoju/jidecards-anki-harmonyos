@@ -81,7 +81,7 @@ function page({ title, description, pathname, body, graph = [], noindex = false,
 const download = `<div class="actions"><a class="button" href="${esc(work.marketplace.url)}">打开华为应用市场 <span aria-hidden="true">↗</span></a><span class="meta">搜索「记得闪卡」 · 正式版 ${esc(work.releaseVersion)}${work.marketplace.price === 0 ? ' · 免费下载' : ''}</span></div>`;
 const theme = `<div class="theme-note"><span class="theme-swatch" aria-hidden="true"></span><p><strong>${esc(work.promotion.title)}</strong><span>${esc(work.promotion.description)}</span></p><a href="/works/jidecards/#appearance">详情 →</a></div>`;
 const jide = work.detailSections.find(section => section.id === 'jide');
-const sourceUpdate = `<section id="source-update"><h2>源码更新 ${esc(work.sourceVersion)}</h2><p class="meta">${esc(work.sourceUpdate.updatedAt)} · 构建编号 ${work.sourceVersionCode} · 商店下载版本以应用市场为准</p><ul>${work.sourceUpdate.changes.map(change => `<li>${esc(change)}</li>`).join('')}</ul></section>`;
+const sourceUpdate = `<section id="source-update"><h2>源码更新 ${esc(work.sourceVersion)}</h2><p class="meta">${esc(work.sourceUpdate.updatedAt)} · 构建编号 ${work.sourceVersionCode} · 商店下载版本以应用市场为准</p><ol>${work.sourceUpdate.changes.map(change => `<li>${esc(change)}</li>`).join('')}</ol></section>`;
 const home = page({
   title: work.seo.homeTitle, description: work.summary, pathname: '/',
   graph: [{ '@type': 'WebSite', name: '记得闪卡 · jidecards', url: origin, author: { '@id': `${origin}/#author` } }, application],
@@ -174,7 +174,7 @@ const fullText = `${shortText}
 
 更新日期：${work.sourceUpdate.updatedAt}。商店下载版本以应用市场为准。
 
-${work.sourceUpdate.changes.map(change => `- ${change}`).join('\n')}
+${work.sourceUpdate.changes.map((change, index) => `${index + 1}. ${change}`).join('\n')}
 
 ## 学习用途
 
