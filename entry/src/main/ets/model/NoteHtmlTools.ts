@@ -1,10 +1,25 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { parseNoteRichText, serializeNoteRichText, sliceNoteRichText, encodeNoteText,
-  noteLinkUrl } from './NoteRichText';
+  noteLinkUrl, FORMAT_SUPERSCRIPT, FORMAT_SUBSCRIPT } from './NoteRichText';
 import type { NoteTextRun } from './NoteRichText';
 import type { FieldEditResult } from './NoteFieldEditing';
 
 export function noteEditorHeight(expanded: boolean): number { return expanded ? 336 : 112; }
+
+/** 可视选区转为标准上下标源码；空选区把光标留在标签内部，保留相邻样式与链接。 */
+export function richNoteScript(runs: NoteTextRun[], start: number, end: number, superscript: boolean): FieldEditResult {
+  const length: number = runs.reduce((total: number, run: NoteTextRun): number => total + run.text.length, 0);
+  const from: number = Math.max(0, Math.min(start, length));
+  const to: number = Math.max(from, Math.min(end, length));
+  const before: string = serializeNoteRichText(sliceNoteRichText(runs, 0, from));
+  const selected: NoteTextRun[] = sliceNoteRichText(runs, from, to);
+  for (const run of selected) run.format &= ~(FORMAT_SUPERSCRIPT | FORMAT_SUBSCRIPT);
+  const tag: string = superscript ? 'sup' : 'sub';
+  const contents: string = serializeNoteRichText(selected);
+  const cursor: number = before.length + tag.length + 2 + contents.length;
+  return { text: before + `<${tag}>` + contents + `</${tag}>` +
+    serializeNoteRichText(sliceNoteRichText(runs, to, length)), start: cursor, end: cursor };
+}
 
 /** 工具不能把光标两侧的半个标签、实体或代理对拼成损坏的源码。 */
 function sourceSelectionComplete(value: string, start: number, end: number): boolean {

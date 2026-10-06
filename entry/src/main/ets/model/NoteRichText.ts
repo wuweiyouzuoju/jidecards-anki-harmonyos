@@ -113,6 +113,13 @@ export function serializeNoteRichText(runs: NoteTextRun[]): string {
   }).join('');
 }
 
+/** Span 模式没有基线偏移；字体特性不能保证上下标排版，统一保留源码。 */
+export function parseNoteVisualText(html: string): NoteTextRun[] | null {
+  const runs: NoteTextRun[] | null = parseNoteRichText(html);
+  return runs !== null && runs.every((run: NoteTextRun): boolean =>
+    (run.format & (FORMAT_SUPERSCRIPT | FORMAT_SUBSCRIPT)) === 0) ? runs : null;
+}
+
 /** 选区按 RichEditor 的 UTF-16 偏移切片，保留选区外的样式与链接。 */
 export function sliceNoteRichText(runs: NoteTextRun[], start: number, end: number): NoteTextRun[] {
   const result: NoteTextRun[] = [];
