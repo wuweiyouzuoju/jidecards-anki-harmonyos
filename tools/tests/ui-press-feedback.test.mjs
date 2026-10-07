@@ -44,7 +44,14 @@ test('all app button and action-row click targets share one press owner', () => 
       const location = `${path}:${target.line} ${target.kind}`;
       assert.match(target.modifiers, /new (?:PressFeedback|GlassSurface|PrimaryGlassSurface)\(/, location);
       if (target.kind === 'Button') assert.match(target.modifiers, /\.stateEffect\(false\)/, location);
-      assert.doesNotMatch(target.modifiers, /duration:\s*80|\.onTouch\(/, location);
+      let pressModifiers = target.modifiers;
+      if (path === 'components/editor/NoteEditorWheel.ets') {
+        // 触摸只清除长按补发 click 的抑制位；按下外观仍由公共 modifier 负责。
+        // note-editor-wheel 的直接行为测试验证按下、长按、松手和再次点击。
+        assert.match(source, /private toolTouch\(event: TouchEvent\): void \{\s*if \(event\.type === TouchType\.Down\) this\.longPressedTool = '';\s*\}/);
+        pressModifiers = pressModifiers.replace(/\.onTouch\(\(event: TouchEvent\): void => \{ this\.toolTouch\(event\); \}\)/g, '');
+      }
+      assert.doesNotMatch(pressModifiers, /duration:\s*80|\.onTouch\(/, location);
     }
   }
   // 共用菜单减少散写点击节点；以真实入口覆盖检查扫描范围，而不固定按钮数量。

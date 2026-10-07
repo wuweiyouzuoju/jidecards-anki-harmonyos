@@ -8,11 +8,11 @@ import { NoteWheelRotation, noteWheelDistance, noteWheelAngleStep, noteWheelView
   noteWheelAxisDelta, NoteWheelMouseRotation, noteWheelTrackRadius, noteWheelLabel,
   noteEditorWheelCommonTools, noteEditorWheelOuterTools } from '../../entry/src/main/ets/model/NoteEditorWheel.ts';
 import * as wheelModel from '../../entry/src/main/ets/model/NoteEditorWheel.ts';
-import { NOTE_EDITOR_ACTION_FLASH_MS, NOTE_FIELD_EDITING_SUPPORT } from '../../entry/src/main/ets/model/NoteFieldEditing.ts';
+import { NOTE_EDITOR_ACTION_FLASH_MS, NOTE_FIELD_EDITING_SUPPORT, noteEditorTool, noteEditorFormatOptions } from '../../entry/src/main/ets/model/NoteFieldEditing.ts';
 import { loadComponentLogic } from './platform-module-harness.mjs';
-import { AppInterfaceTracker, noteEditorWheelObservation, APP_INTERFACE_SURFACES } from '../../entry/src/main/ets/model/AppInterface.ts';
+import { AppInterfaceTracker, noteEditorWheelObservation, noteEditorFormatObservation, APP_INTERFACE_SURFACES } from '../../entry/src/main/ets/model/AppInterface.ts';
 
-const state={cloze:false,source:false,expanded:false,activeIds:[],experimental:true};
+const state={cloze:false,source:false,expanded:false,activeIds:[]};
 const point=(angle,right,radius=112)=>({x:right?radius-88*Math.cos(angle):88*Math.cos(angle),y:radius+88*Math.sin(angle)});
 test('arc rotation follows fractional finger motion on either edge and reverses without jumps',()=>{
  for(const right of [true,false]) {
@@ -32,11 +32,11 @@ test('arc wrapping and selection use the nearest icon and stable tool identities
  assert.ok(Math.abs(noteWheelDistance(13,0.2,14)+1.2)<1e-10);
  const tools=noteEditorWheelTools({...state,activeIds:['bold']});
  assert.equal(tools.find(item=>item.id==='bold').active,true);
- assert.equal(tools.length,12);assert.equal(tools[0].id,'bold');assert.equal(tools.some(item=>['none','more','source','expand'].includes(item.id)),false);
+ assert.equal(tools.length,14);assert.equal(tools[0].id,'bold');assert.equal(tools.some(item=>['none','more','source','expand'].includes(item.id)),false);
  assert.deepEqual(noteEditorWheelCommonTools(state).map(tool=>tool.id),['bold','italic','underline','highlight','break','clear_format']);
- assert.equal(noteEditorWheelOuterTools(state).length,6);
+ assert.equal(noteEditorWheelOuterTools(state).length,8);
  const cloze=noteEditorWheelTools({...state,cloze:true,source:true,expanded:true});
- assert.equal(cloze.length,14);assert.equal(noteEditorWheelOuterTools({...state,cloze:true}).length,8);
+ assert.equal(cloze.length,16);assert.equal(noteEditorWheelOuterTools({...state,cloze:true}).length,10);
  assert.ok(cloze.every(item=>item.iconKey.startsWith('ic_editor_')));
 });
 test('seven symbols share one circle with equal chord spacing and mirrored angles on either edge',()=>{
@@ -65,7 +65,7 @@ test('JIDE observes current tools, hidden cloze, grip fallback and collapsed act
  const tracker=new AppInterfaceTracker();
  const first=tracker.observe(noteEditorWheelObservation(state,'link','right',false,'unsupported'));
  const snapshot=tracker.snapshot()[0];assert.equal(snapshot.selectedId,'link');
- assert.equal(snapshot.values.find(item=>item.id==='visible_tools').value,'12');
+ assert.equal(snapshot.values.find(item=>item.id==='visible_tools').value,'13');
  assert.equal(snapshot.values.find(item=>item.id==='inner_tools').value,'bold,italic,underline,highlight,break,clear_format');
  assert.equal(snapshot.values.find(item=>item.id==='activation').value,'click_only_rotation_preserves_multiple_selection');
  const target=noteEditorWheelObservation({...state,fieldName:'Front'},'bold','right',false,'unsupported');
@@ -78,25 +78,56 @@ test('JIDE observes current tools, hidden cloze, grip fallback and collapsed act
  assert.equal(noteEditorWheelObservation(state,'','right',true,'unsupported').items.some(item=>item.id==='none'),false);
  tracker.leave('note_editor_wheel',next);assert.deepEqual(tracker.snapshot(),[]);
  const declaration=APP_INTERFACE_SURFACES.find(item=>item.id==='note_editor_wheel');
- assert.ok(declaration.instructionsKey);assert.equal(declaration.items.length,15);
+ assert.ok(declaration.instructionsKey);assert.equal(declaration.items.length,17);
 });
 
 function wheelHarness(initialTool=''){
- const actions=[],resets=[],timers=new Map();let timerId=0;
+ const actions=[],longActions=[],resets=[],timers=new Map();let timerId=0;
  const Component=loadComponentLogic('components/editor/NoteEditorWheel.ets','NoteEditorWheel',{
-  ...wheelModel,NOTE_EDITOR_ACTION_FLASH_MS,StudyGripSensor:class{},StudyGripSession:class{setActive(){}dispose(){}setTouching(){}restoreSide(){}},
+  ...wheelModel,NOTE_EDITOR_ACTION_FLASH_MS,noteEditorTool,TouchType:{Down:0},StudyGripSensor:class{},StudyGripSession:class{setActive(){}dispose(){}setTouching(){}restoreSide(){}},
   appInterface:new AppInterfaceTracker(),noteEditorWheelObservation,
   setTimeout:(callback,delay)=>{timers.set(++timerId,{callback,delay});return timerId;},clearTimeout:id=>timers.delete(id),
   curves:{springCurve:()=>0},Curve:{EaseOut:0,EaseInOut:0},AxisAction:{BEGIN:1,UPDATE:2,END:3,CANCEL:4}
  });
- const instance=new Component();instance.params={state,onAction:id=>actions.push(id),visible:true,initialTool,onSelection:()=>{},
+ const instance=new Component();instance.params={state,onAction:id=>actions.push(id),onLongAction:id=>longActions.push(id),visible:true,initialTool,onSelection:()=>{},
   onResetFormats:()=>{resets.push(true);instance.params.state={...instance.params.state,activeIds:[]};instance.parametersChanged();}};
  instance.getUIContext=()=>({getHostContext:()=>undefined,animateTo:(_opts,apply)=>apply()});
  instance.viewportWidth=377;instance.viewportHeight=720;instance.aboutToAppear();
  const flush=()=>{const pending=[...timers.values()];timers.clear();for(const timer of pending)timer.callback();};
  const axis=(action,value=0,scrollStep=1)=>instance.axisWheel({action,scrollStep,getVerticalAxisValue:()=>value});
- return {instance,actions,resets,timers,flush,axis};
+ return {instance,actions,longActions,resets,timers,flush,axis};
 }
+
+test('math tap and hold dispatch separate actions and never double-apply when release also sends a click',()=>{
+ const h=wheelHarness();h.instance.clickTool('math');assert.deepEqual(h.actions,['math']);
+ h.instance.toolTouch({type:0});h.instance.longPressTool('math');h.instance.clickTool('math');
+ assert.deepEqual(h.actions,['math']);assert.deepEqual(h.longActions,['math']);
+ h.instance.toolTouch({type:0});h.instance.clickTool('math');assert.deepEqual(h.actions,['math','math']);
+ h.instance.longPressTool('heading');assert.deepEqual(h.longActions,['math']);
+ h.instance.params.visible=false;h.instance.parametersChanged();h.instance.longPressTool('math');
+ assert.deepEqual(h.longActions,['math']);
+});
+
+test('JIDE and the real format dialog enumerate the same options and release only their own observation',()=>{
+ const tracker=new AppInterfaceTracker(),selected=[];
+ const Dialog=loadComponentLogic('components/editor/NoteEditorFormatDialog.ets','NoteEditorFormatDialog',{
+  appInterface:tracker,noteEditorFormatObservation,noteEditorFormatOptions,noteEditorTool,namedResourceText:(_ctx,key)=>key
+ });
+ for(const toolId of ['font_size','heading','math']){
+  const dialog=new Dialog();Object.assign(dialog,{toolId,fieldName:'Front',source:false,getUIContext:()=>({}),onSelect:id=>selected.push(id)});
+  dialog.aboutToAppear();const snapshot=tracker.snapshot()[0];
+  assert.equal(snapshot.sectionId,toolId);assert.deepEqual(snapshot.optionIds,dialog.options().map(option=>toolId+'_'+option.id));
+  assert.equal(snapshot.values.find(value=>value.id==='target_field').value,'Front');
+  assert.equal(snapshot.items.every(item=>item.enabled),true);
+  for(const option of dialog.options())dialog.select(option.id);
+  const count=selected.length;dialog.select('unknown');assert.equal(selected.length,count);
+  dialog.aboutToDisappear();assert.deepEqual(tracker.snapshot(),[]);
+ }
+ assert.equal(selected.length,14);
+ assert.equal(NOTE_FIELD_EDITING_SUPPORT.tools.find(tool=>tool.id==='math').longPressAction,'choose_block_or_chemistry');
+ assert.deepEqual(noteEditorWheelOuterTools(state).slice(-2).map(tool=>tool.id),['font_size','heading']);
+ for(const toolId of ['font_size','heading','math'])assert.equal(NOTE_FIELD_EDITING_SUPPORT.formatMenus.find(menu=>menu.toolId===toolId).options,noteEditorFormatOptions(toolId));
+});
 
 test('only explicit inner or outer clicks apply; touch rotation preserves selection without applying a centered tool',()=>{
  const h=wheelHarness();assert.equal(h.instance.selectedId,'');h.flush();assert.deepEqual(h.actions,[]);
@@ -104,7 +135,7 @@ test('only explicit inner or outer clicks apply; touch rotation preserves select
  const start=noteWheelItemPosition(0,h.instance.radius(),true),end=noteWheelItemPosition(-1,h.instance.radius(),true);
  h.instance.rotateStart({fingerList:[{globalX:start.x,globalY:start.y}],offsetX:0,offsetY:0});assert.equal(h.instance.selectedId,'bold');
  h.instance.rotateWheel({offsetX:end.x-start.x,offsetY:end.y-start.y});h.instance.settleRotation();h.flush();assert.deepEqual(h.actions,['bold']);
- assert.equal(h.instance.selectedId,'bold');assert.equal(h.instance.arcPosition,0.5);
+ assert.equal(h.instance.selectedId,'bold');assert.equal(h.instance.arcPosition,1);
  h.instance.select(1);assert.deepEqual(h.actions,['bold','superscript']);
  h.instance.execute('bold');h.instance.execute('bold');assert.deepEqual(h.actions,['bold','superscript','bold','bold']);
  h.instance.toggleOpen();assert.equal(h.instance.selectedId,'bold');assert.equal(h.resets.length,0);
@@ -157,17 +188,17 @@ test('concentric circular buttons remain separate with matching ring centers on 
 });
 test('icons and two-line captions retain edge clearance; normal outer items align with common radial positions',()=>{
  const h=wheelHarness();
- for(const width of [320,377,430])for(const right of [true,false])for(const mode of [false,true])for(const cloze of [false,true]){
-  h.instance.viewportWidth=width;h.instance.side=right?'right':'left';h.instance.params.state={...state,experimental:mode,cloze};h.instance.parametersChanged();
+ for(const width of [320,377,430])for(const right of [true,false])for(const cloze of [false,true]){
+  h.instance.viewportWidth=width;h.instance.side=right?'right':'left';h.instance.params.state={...state,cloze};h.instance.parametersChanged();
   const radius=h.instance.radius();
   for(const common of [true,false])for(let index=0;index<(common?h.instance.commonTools:h.instance.wheelTools).length;index++){
    if(!common&&!h.instance.iconVisible(index))continue;
    const size=h.instance.circleSize(common),x=h.instance.x(index,common)+h.instance.itemWidth(common)/2,
     y=h.instance.iconY(index,common)+size/2,w=h.instance.labelWidth(common),bottom=(common?33:37)/2;
-   assert.ok(Math.hypot(x-(right?radius:0),y-radius)+size/2<=radius-6,`${width}/${mode}/${cloze}/${common}/${index}: button touches boundary`);
+   assert.ok(Math.hypot(x-(right?radius:0),y-radius)+size/2<=radius-6,`${width}/${cloze}/${common}/${index}: button touches boundary`);
    assert.ok(Math.hypot(w/2,bottom)<=size/2,`caption is outside ${common?'inner':'outer'} button`);
   }
-  if(mode&&!cloze){
+  if(!cloze){
    assert.equal(h.instance.trackRadius(false)-h.instance.trackRadius(true),46);
    assert.equal(wheelModel.noteWheelAngleStep(radius,6),wheelModel.noteWheelCommonAngleStep());
   }
@@ -187,16 +218,23 @@ test('the handle flips toward opening or closing on either edge using the same a
  const source=readFileSync(new URL('../../entry/src/main/ets/components/editor/NoteEditorWheel.ets',import.meta.url),'utf8');
  assert.match(source,/DisclosureChevron\(\{ tint: this.accent \}\)\s*\.rotate\(\{ angle: noteWheelHandleAngle\(this.openProgress, this.side === 'right'\) \}\)/);
 });
-test('ordinary mode keeps six common tools and uses a smaller arc; changing modes never applies hidden outer tools',()=>{
- const h=wheelHarness();h.instance.params.state={...state,experimental:false};h.instance.parametersChanged();
- assert.equal(h.instance.wheelTools.length,0);assert.equal(h.instance.commonTools.length,6);assert.equal(h.instance.radius(),110);
- assert.equal(h.instance.trackRadius(true),82);h.instance.execute('bold');h.axis(1,15);h.instance.settleRotation();h.flush();
- assert.equal(h.instance.selectedId,'bold');assert.deepEqual(h.actions,['bold']);
- assert.deepEqual(noteEditorWheelTools({...state,experimental:false}).map(tool=>tool.id),['bold','italic','underline','highlight','break','clear_format']);
- h.instance.params.state=state;h.instance.parametersChanged();h.instance.select(1);assert.equal(h.instance.selectedId,'superscript');
- h.instance.params.state={...state,experimental:false};h.instance.parametersChanged();h.flush();assert.equal(h.instance.selectedId,'');
- h.instance.execute('superscript');h.instance.execute('missing');assert.equal(h.instance.selectedId,'');
- assert.deepEqual(h.actions,['bold','superscript']);
+test('default wheel exposes both arcs and rejects cloze actions after switching to a field without cloze capability',()=>{
+ const h=wheelHarness();
+ assert.equal(h.instance.wheelTools.length,8);assert.equal(h.instance.commonTools.length,6);assert.equal(h.instance.radius(),158);
+ assert.equal(h.instance.trackRadius(true),82);assert.equal(h.instance.trackRadius(false),128);
+ h.instance.execute('superscript');h.flush();assert.deepEqual(h.actions,['superscript']);
+ h.instance.execute('cloze_next');h.instance.execute('missing');assert.deepEqual(h.actions,['superscript']);
+ h.instance.params.state={...state,cloze:true};h.instance.parametersChanged();
+ assert.equal(h.instance.wheelTools.length,10);h.instance.execute('cloze_next');h.flush();
+ assert.deepEqual(h.actions,['superscript','cloze_next']);
+ const cloze=noteEditorWheelObservation(h.instance.params.state,'','right',false,'unsupported');
+ assert.equal(cloze.values.find(value=>value.id==='cloze_enabled').value,'true');
+ assert.equal(cloze.items.some(item=>item.id==='cloze_same'),true);
+ h.instance.params.state=state;h.instance.parametersChanged();h.flush();
+ h.instance.execute('cloze_same');assert.deepEqual(h.actions,['superscript','cloze_next']);
+ const normal=noteEditorWheelObservation(state,'','right',false,'unsupported');
+ assert.equal(normal.values.find(value=>value.id==='cloze_enabled').value,'false');
+ assert.equal(normal.items.some(item=>item.id==='cloze_next'),false);
 });
 test('Chinese ring captions balance long names into two lines and retain complete non-Chinese labels',()=>{
  assert.equal(noteWheelLabel('粗体',33),'粗体');assert.equal(noteWheelLabel('下划线',33),'下划线');
@@ -204,7 +242,7 @@ test('Chinese ring captions balance long names into two lines and retain complet
  assert.equal(noteWheelLabel('展开输入框',33),'展开\n输入框');assert.equal(noteWheelLabel('Clear formatting',33),'Clear formatting');
 });
 test('restoring an inner selection or updating parameters does not execute the tool or rotate the outer ring',()=>{
- const h=wheelHarness('bold');assert.equal(h.instance.selectedId,'bold');assert.equal(h.instance.arcPosition,-0.5);h.flush();assert.deepEqual(h.actions,[]);
+ const h=wheelHarness('bold');assert.equal(h.instance.selectedId,'bold');assert.equal(h.instance.arcPosition,0);h.flush();assert.deepEqual(h.actions,[]);
  h.instance.params.state={...state,activeIds:['bold']};h.instance.parametersChanged();assert.equal(h.instance.selectedId,'bold');h.flush();assert.deepEqual(h.actions,[]);
 });
 test('wheel places each label below its symbol; gestures keep the handle separate from the rotating surface',()=>{

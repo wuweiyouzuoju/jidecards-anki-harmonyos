@@ -12,7 +12,6 @@ export interface NoteEditorWheelState {
   expanded: boolean;
   activeIds: string[];
   fieldName?: string;
-  experimental?: boolean;
 }
 export interface NoteEditorWheelTool extends NoteEditorTool { active: boolean; }
 export function noteWheelToolIsToggle(id: string, source: boolean): boolean {
@@ -25,10 +24,9 @@ export function noteWheelToolHighlighted(id: string, activeIds: string[], select
 }
 export function noteEditorWheelTools(state: NoteEditorWheelState): NoteEditorWheelTool[] {
   return NOTE_EDITOR_TOOLS.filter((tool: NoteEditorTool): boolean =>
-    (state.experimental === true || NOTE_EDITOR_COMMON_TOOL_IDS.indexOf(tool.id) >= 0) &&
     (state.cloze || tool.editing !== 'cloze_only'))
     .map((tool: NoteEditorTool): NoteEditorWheelTool => ({ id: tool.id, iconKey: tool.iconKey, editing: tool.editing,
-      titleKey: tool.titleKey,
+      titleKey: tool.titleKey, longPressAction: tool.longPressAction,
       active: state.activeIds.indexOf(tool.id) >= 0 }));
 }
 export function noteEditorWheelCommonTools(state: NoteEditorWheelState): NoteEditorWheelTool[] {

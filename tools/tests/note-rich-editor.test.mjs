@@ -8,8 +8,8 @@ import { optionalReverseField, noteTypeDisplayKey } from '../../entry/src/main/e
 import { nextClozeNumber, wrapFieldSelection } from '../../entry/src/main/ets/model/NoteFieldEditing.ts';
 import { noteEditorWheelTools, NoteEditorWheelSession } from '../../entry/src/main/ets/model/NoteEditorWheel.ts';
 import { NoteEditorSession } from '../../entry/src/main/ets/model/NoteEditorSession.ts';
-import { NOTE_FIELD_EDITING_SUPPORT, noteEditorTool, noteFieldExpansionTool } from '../../entry/src/main/ets/model/NoteFieldEditing.ts';
-import { SIMPLE_MODE_KEY } from '../../entry/src/main/ets/model/AppLayoutState.ts';
+import { NOTE_FIELD_EDITING_SUPPORT, noteEditorTool, noteFieldExpansionTool,
+  noteEditorFormatOptions } from '../../entry/src/main/ets/model/NoteFieldEditing.ts';
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
 
 test('supported rich text preserves combined styles, entities, line breaks, Chinese and emoji', () => {
@@ -39,7 +39,7 @@ function editor(html='',fieldConfig=null,wheelSession=null,uniqueId=123) {
   const changes=[], seen=new Set(), dialogs=[], patches=[], typing=[], selections=[];
   let spans=[], caret=0;
   const overlay=[],focusRequests=[],sourceCarets=[], timers=new Map(); let timerId=0;
-  class WheelParams { constructor(state,onAction,visible,initialTool,onSelection,onResetFormats){Object.assign(this,{state,onAction,visible,initialTool,onSelection,onResetFormats});} }
+  class WheelParams { constructor(state,onAction,visible,initialTool,onSelection,onResetFormats,onLongAction){Object.assign(this,{state,onAction,visible,initialTool,onSelection,onResetFormats,onLongAction});} }
   class Content { constructor(_context,_builder,params){this.params=params;this.updates=[];this.disposed=false;}
     update(params){this.params=params;this.updates.push(params);} dispose(){this.disposed=true;} }
   const context={getFocusController:()=>({requestFocus:id=>focusRequests.push(id)}),getOverlayManager:()=>({addComponentContent:content=>overlay.push(content),
@@ -57,7 +57,8 @@ function editor(html='',fieldConfig=null,wheelSession=null,uniqueId=123) {
     setTypingStyle(style){typing.push(style);}, updateSpanStyle(patch){patches.push(patch);}
   };
   const Editor=loadComponentLogic('components/common/NoteFieldEditor.ets','NoteFieldEditor',{
-    ...rich, ...htmlTools, nextClozeNumber,wrapFieldSelection,NOTE_FIELD_EDITING_SUPPORT,noteEditorTool,NoteLinkDialog: options=>options,
+    ...rich, ...htmlTools, nextClozeNumber,wrapFieldSelection,NOTE_FIELD_EDITING_SUPPORT,noteEditorTool,
+    noteEditorFormatOptions,NoteEditorFormatDialog:options=>options,NoteLinkDialog: options=>options,
     NoteEditorWheelSession,NoteEditorWheelParams:WheelParams,ComponentContent:Content,wrapBuilder:builder=>builder,buildNoteEditorWheel(){},
     setTimeout:(callback,delay)=>{timers.set(++timerId,{callback,delay});return timerId;},clearTimeout:id=>timers.delete(id),
     TextAreaController:class {caretPosition(value){sourceCarets.push(value);}},RichEditorController:class {constructor(){return controller;}},
@@ -74,6 +75,59 @@ function editor(html='',fieldConfig=null,wheelSession=null,uniqueId=123) {
   if(instance.ready)instance.loadRich(rich.parseNoteRichText(html));
   return {instance,controller,changes,seen,dialogs,patches,typing,selections,overlay,timers,focusRequests,sourceCarets,set spans(value){spans=value;}};
 }
+
+test('font size and heading menus preserve styled selections and place an empty caret inside the inserted HTML',()=>{
+ for(const [tool,id,prefix,suffix] of [['font_size','large','<span style="font-size:large">','</span>'],['heading','h2','<h2>','</h2>']]){
+  const h=editor('<b>甲😀乙</b>后');h.instance.fieldFocus();h.seen.add(tool);
+  h.instance.selectionStart=1;h.instance.selectionEnd=3;h.instance.executeWheel(tool);
+  const dialog=h.dialogs.at(-1).options.builder;assert.equal(dialog.toolId,tool);assert.deepEqual(h.changes,[]);
+  assert.equal(h.overlay.length,0);dialog.onSelect(id);
+  assert.equal(h.instance.value,`<b>甲</b>${prefix}<b>😀</b>${suffix}<b>乙</b>后`);
+  assert.equal(h.instance.sourceMode,true);assert.equal(h.overlay.length,1);
+  assert.equal(h.instance.selectionStart,`<b>甲</b>${prefix}<b>😀</b>${suffix}`.length);
+  const empty=editor('ab');empty.instance.fieldFocus();empty.seen.add(tool);
+  empty.instance.selectionStart=1;empty.instance.selectionEnd=1;empty.instance.executeWheel(tool);
+  empty.dialogs.at(-1).options.builder.onSelect(id);
+  assert.equal(empty.instance.value,`a${prefix}${suffix}b`);assert.equal(empty.instance.selectionStart,1+prefix.length);
+  assert.equal(empty.instance.typingFormat,0);
+ }
+ assert.equal(noteEditorFormatOptions('font_size').length,7);
+ assert.deepEqual(noteEditorFormatOptions('heading').map(option=>option.id),['h1','h2','h3','h4','h5']);
+ const source=editor('<b>x</b>');source.instance.requestMode(true);source.instance.selectionStart=0;source.instance.selectionEnd=8;
+ source.instance.openFormatOptions('font_size');source.dialogs.at(-1).options.builder.onSelect('small');
+ assert.equal(source.instance.value,'<span style="font-size:small"><b>x</b></span>');
+ assert.equal(htmlTools.sourceNoteWrap('<b>x</b>',1,1,'<h1>','</h1>'),null);
+ assert.equal(htmlTools.sourceNoteWrap('😀',1,1,'<h1>','</h1>'),null);
+});
+
+test('format menu cancellation and stale callbacks cannot change drafts, close a newer menu or target another field',()=>{
+ const session=new NoteEditorWheelSession(),h=editor('draft',null,session,1),other=editor('other',null,session,2);
+ h.instance.fieldFocus();h.instance.openFormatOptions('heading');const old=h.dialogs.at(-1).options;
+ old.cancel();assert.equal(h.instance.value,'draft');assert.deepEqual(h.changes,[]);
+ h.instance.openFormatOptions('heading');const next=h.instance.formatDialog;old.builder.onSelect('h1');
+  assert.equal(h.instance.formatDialog,next);assert.deepEqual(h.changes,[]);
+ old.cancel();old.builder.onClose();assert.equal(h.instance.formatDialog,next);
+ other.instance.fieldFocus();assert.equal(h.instance.formatDialog,null);next.options.builder.onSelect('h2');
+ assert.equal(h.instance.value,'draft');assert.equal(other.instance.value,'other');
+ for(const change of [editor=>{editor.disabled=true;},editor=>{editor.foreground=false;},editor=>{editor.value='updated';},editor=>{editor.sourceMode=true;},editor=>editor.aboutToDisappear()]){
+  const item=editor('snapshot');item.instance.fieldFocus();item.instance.openFormatOptions('font_size');
+  const callback=item.dialogs.at(-1).options.builder.onSelect;change(item.instance);callback('large');assert.deepEqual(item.changes,[]);
+ }
+ const invalid=editor('safe');invalid.instance.fieldFocus();invalid.instance.openFormatOptions('heading');
+ invalid.dialogs.at(-1).options.builder.onSelect('h9');assert.deepEqual(invalid.changes,[]);
+});
+
+test('math hold opens block and chemistry choices without inline insertion and applies only the captured selection',()=>{
+ for(const [id,expected] of [['block','a\\[x^2\\]b'],['chemistry','a\\( \\ce{x^2} \\)b']]){
+  const h=editor('ax^2b');h.instance.requestMode(true);h.seen.add('math');
+  h.instance.selectionStart=1;h.instance.selectionEnd=4;h.instance.executeWheel('math',true);
+  assert.deepEqual(h.changes,[]);assert.equal(h.dialogs.at(-1).options.builder.toolId,'math');
+  h.instance.selectionStart=5;h.instance.selectionEnd=5;h.dialogs.at(-1).options.builder.onSelect(id);
+  assert.equal(h.instance.value,expected);assert.equal(h.changes.length,1);
+ }
+ const tap=editor('x');tap.instance.requestMode(true);tap.seen.add('math');tap.instance.selectionStart=0;tap.instance.selectionEnd=1;
+ tap.instance.executeWheel('math');assert.equal(tap.instance.value,'\\(x\\)');assert.equal(tap.dialogs.length,0);
+});
 
 test('field editing metadata applies font, direction and hint while source default preserves HTML',()=>{
  const config={ord:0,name:'Front',fontName:'Noto Sans Arabic',fontSize:28,rtl:true,description:'تلميح',plainText:true};
@@ -126,12 +180,19 @@ test('wheel formats follow selection while mode and expansion remain local input
   assert.deepEqual(h.changes,[]);assert.deepEqual(complex.changes,[]);
 });
 
-test('field mode updates the existing overlay from the same global key used by settings', () => {
- const source=readFileSync(new URL('../../entry/src/main/ets/components/common/NoteFieldEditor.ets',import.meta.url),'utf8');
- assert.equal(SIMPLE_MODE_KEY,'simpleMode');assert.match(source,/@StorageProp\(SIMPLE_MODE_KEY\) @Watch\('updateWheel'\)/);
- const h=editor('draft'),content=h.overlay[0];assert.equal(content.params.state.experimental,false);
- h.instance.simpleMode=false;h.instance.updateWheel();assert.equal(h.overlay[0],content);assert.equal(content.params.state.experimental,true);
- h.instance.simpleMode=true;h.instance.updateWheel();assert.equal(content.params.state.experimental,false);assert.deepEqual(h.changes,[]);
+test('both application modes expose all editor tools and cloze follows field capability without replacing the draft overlay', () => {
+ const h=editor('draft'),content=h.overlay[0];
+ for(const simpleMode of [true,false,true])for(const cloze of [false,true]) {
+  h.instance.simpleMode=simpleMode;h.instance.clozeEnabled=cloze;h.instance.updateWheel();
+  assert.equal(h.overlay[0],content);
+  const tools=noteEditorWheelTools(content.params.state);
+  assert.equal(tools.length,cloze?16:14);
+  for(const id of ['math','font_size','heading','superscript','subscript','bullet_list','numbered_list','link']) {
+   assert.ok(tools.some(tool=>tool.id===id));
+  }
+  for(const id of ['cloze_next','cloze_same'])assert.equal(tools.some(tool=>tool.id===id),cloze);
+  assert.deepEqual(h.changes,[]);assert.equal(h.instance.value,'draft');
+ }
 });
 
 test('input expansion publishes a different icon and action name in both editing modes', () => {

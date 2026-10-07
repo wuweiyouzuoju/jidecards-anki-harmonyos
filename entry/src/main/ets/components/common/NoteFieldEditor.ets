@@ -3,19 +3,19 @@ import { ComponentContent } from '@kit.ArkUI';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { FieldEditResult, wrapFieldSelection, nextClozeNumber, NoteFieldEditingOptions,
-  NOTE_FIELD_EDITING_SUPPORT, noteFieldExpansionTool, noteEditorTool, noteFieldModeTool } from '../../model/NoteFieldEditing';
+  NOTE_FIELD_EDITING_SUPPORT, noteFieldExpansionTool, noteEditorTool, noteFieldModeTool,
+  noteEditorFormatOptions, NoteEditorFormatOption } from '../../model/NoteFieldEditing';
 import { 按下态按钮 } from './按下态按钮';
 import { IconActionButton } from './IconActionButton';
 import { NoteTextRun, parseNoteRichText, parseNoteVisualText, serializeNoteRichText, selectionHasFormat, richResultIsBold,
   FORMAT_BOLD, FORMAT_ITALIC, FORMAT_UNDERLINE, FORMAT_HIGHLIGHT } from '../../model/NoteRichText';
 import { FORMAT_SUPERSCRIPT, FORMAT_SUBSCRIPT, noteLinkUrl } from '../../model/NoteRichText';
 import { noteEditorHeight, richNoteList, sourceNoteList, sourceNoteClearFormat, richNoteLink,
-  sourceNoteLink, richNoteScript } from '../../model/NoteHtmlTools';
+  sourceNoteLink, richNoteScript, richNoteWrap, sourceNoteWrap } from '../../model/NoteHtmlTools';
 import { NoteLinkDialog } from './NoteLinkDialog';
-import { buildNoteEditorWheel, NoteEditorWheelParams } from '../editor/NoteEditorWheel';
+import { buildNoteEditorWheel, NoteEditorWheelParams, NoteEditorFormatDialog } from '../editor/NoteEditorWheel';
 import { NoteEditorWheelState, NoteEditorWheelSession, NOTE_EDITOR_WHEEL_SESSION_KEY } from '../../model/NoteEditorWheel';
 import { APP_FOREGROUND_KEY } from '../../model/AppLifecycleState';
-import { SIMPLE_MODE_KEY } from '../../model/AppLayoutState';
 import { hasNoteEditingHint, completeNoteEditingHint } from '../../utils/NoteEditingHints';
 import { showToastSafely, resourceText, namedResourceText } from '../../utils/UiFeedback';
 import { 字段帮助对话框 } from '../字段帮助面板';
@@ -27,7 +27,6 @@ export { noteFieldMediaTool } from '../../model/NoteFieldEditing';
 export struct NoteFieldEditor {
   @Consume(NOTE_EDITOR_WHEEL_SESSION_KEY) private wheelSession: NoteEditorWheelSession = new NoteEditorWheelSession();
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
-  @StorageProp(SIMPLE_MODE_KEY) @Watch('updateWheel') private simpleMode: boolean = true;
   @Prop @Watch('receiveValue') value: string = '';
   @Prop fieldName: string = '';
   @Prop fieldConfig: NoteFieldEditingOptions | null = null;
@@ -53,6 +52,8 @@ export struct NoteFieldEditor {
   private hintSaving: boolean = false;
   private hintedAction: (() => void) | null = null;
   private linkDialog: CustomDialogController | null = null;
+  private formatDialog: CustomDialogController | null = null;
+  private formatVersion: number = 0;
   private wheelContent: ComponentContent<NoteEditorWheelParams> | null = null;
   private wheelVisible: boolean = false;
   private wheelRemoval: number = -1;
@@ -66,7 +67,7 @@ export struct NoteFieldEditor {
     this.sourceMode = this.fieldConfig?.plainText === true || parseNoteVisualText(this.value) === null;
     this.wheelSession.register(this.inputKey, !this.disabled && this.foreground, (active: boolean): void => {
       this.wheelActive = active;
-      if (active) this.showWheel(); else this.hideWheel(true);
+      if (active) this.showWheel(); else { this.hideWheel(true); this.closeFormat(); }
     });
   }
   aboutToDisappear(): void {
@@ -75,6 +76,7 @@ export struct NoteFieldEditor {
     this.hintDialog?.close(); this.hintDialog = null;
     this.hintedAction = null;
     this.linkDialog?.close(); this.linkDialog = null;
+    this.closeFormat();
   }
 
   private receiveValue(): void {
@@ -401,8 +403,53 @@ export struct NoteFieldEditor {
     if (this.wheelActive) this.showWheel();
   }
 
+  private openFormatOptions(key: string): void {
+    if (this.disabled || this.disposed || !this.foreground || !this.wheelActive || this.formatDialog !== null ||
+      (!this.sourceMode && !this.ready) || noteEditorFormatOptions(key).length === 0) return;
+    const range: RichEditorRange = this.selectedRange();
+    const start: number = range.start ?? 0;
+    const end: number = range.end ?? start;
+    const source: boolean = this.sourceMode;
+    const snapshot: string = this.value;
+    const runs: NoteTextRun[] = source ? [] : this.richRuns();
+    const version: number = ++this.formatVersion;
+    this.formatDialog = new CustomDialogController({ builder: NoteEditorFormatDialog({ toolId: key,
+      fieldName: this.fieldName, source: source, onClose: (): void => { this.closeFormat(version); },
+      onSelect: (id: string): void => {
+        if (version !== this.formatVersion || this.formatDialog === null) return;
+        this.closeFormat();
+        const option: NoteEditorFormatOption | undefined = noteEditorFormatOptions(key)
+          .find((item: NoteEditorFormatOption): boolean => item.id === id);
+        // 弹窗使用打开时的选区；晚回调不能改写新字段、隐藏页面或更新后的草稿。
+        if (option === undefined || this.disabled || this.disposed || !this.foreground || !this.wheelActive ||
+          this.sourceMode !== source || this.value !== snapshot) return;
+        if (key === 'math') {
+          this.selectionStart = start; this.selectionEnd = end;
+          this.wrap(option.prefix, option.suffix);
+          this.focusInput(source, this.selectionStart);
+        } else {
+          const result: FieldEditResult | null = source ? sourceNoteWrap(snapshot, start, end, option.prefix, option.suffix) :
+            richNoteWrap(runs, start, end, option.prefix, option.suffix);
+          if (result === null) this.sourceSelectionHint(); else this.applySourceEdit(result);
+        }
+        this.updateWheel();
+      } }), cancel: (): void => { this.closeFormat(version); },
+      customStyle: true, autoCancel: true, alignment: DialogAlignment.Center,
+      width: '100%', height: '100%', maskColor: Color.Transparent });
+    this.formatDialog.open(); this.hideWheel(true);
+  }
+
+  private closeFormat(expectedVersion: number = this.formatVersion): void {
+    if (expectedVersion !== this.formatVersion) return;
+    const dialog: CustomDialogController | null = this.formatDialog;
+    this.formatVersion++;
+    this.formatDialog = null; dialog?.close();
+    if (dialog !== null && this.wheelActive) this.showWheel();
+  }
+
   private activateTool(key: string, label: Resource, action: () => void, _locale: string = this.uiLanguage): void {
-    if (this.disabled || this.disposed || this.hintDialog !== null || this.linkDialog !== null || this.hintSaving) return;
+    if (this.disabled || this.disposed || this.hintDialog !== null || this.linkDialog !== null ||
+      this.formatDialog !== null || this.hintSaving) return;
     let seen: boolean = false;
     try { seen = hasNoteEditingHint(key); } catch (error) { this.hintFailure(); }
     if (seen) { action(); return; }
@@ -453,12 +500,12 @@ export struct NoteFieldEditor {
         selectionHasFormat(runs, this.selectionStart, this.selectionEnd, flag) : (this.typingFormat & flag) !== 0)) active.push(tool);
     }
     return { cloze: this.clozeEnabled, source: this.sourceMode, expanded: this.expanded, activeIds: active,
-      fieldName: this.fieldName, experimental: !this.simpleMode };
+      fieldName: this.fieldName };
   }
   private wheelParams(): NoteEditorWheelParams {
     return new NoteEditorWheelParams(this.wheelState(), (id: string): void => { this.executeWheel(id); }, this.wheelVisible,
       this.lastWheelTool, (id: string): void => { if (!this.disposed) this.lastWheelTool = id; },
-      (): void => { this.resetWheelFormats(); });
+      (): void => { this.resetWheelFormats(); }, (id: string): void => { this.executeWheel(id, true); });
   }
   private resetWheelFormats(): void {
     if (this.disposed || this.disabled || !this.foreground || !this.wheelActive || !this.wheelVisible) return;
@@ -473,7 +520,8 @@ export struct NoteFieldEditor {
   private fieldFocus(): void { this.fieldFocused = true; this.wheelSession.activate(this.inputKey); }
   private fieldBlur(): void { this.fieldFocused = false; }
   private showWheel(): void {
-    if (!this.wheelActive || this.disposed || this.disabled || !this.foreground || this.hintDialog !== null || this.linkDialog !== null) return;
+    if (!this.wheelActive || this.disposed || this.disabled || !this.foreground || this.hintDialog !== null ||
+      this.linkDialog !== null || this.formatDialog !== null) return;
     if (this.wheelRemoval >= 0) { clearTimeout(this.wheelRemoval); this.wheelRemoval = -1; }
     this.wheelVisible = true;
     if (this.wheelContent !== null) { this.updateWheel(); return; }
@@ -501,11 +549,12 @@ export struct NoteFieldEditor {
   }
   private editingAvailabilityChanged(): void {
     this.wheelSession.setAvailable(this.inputKey, !this.disabled && this.foreground);
-    if (this.disabled || !this.foreground) this.hideWheel(true);
+    if (this.disabled || !this.foreground) { this.hideWheel(true); this.closeFormat(); }
   }
-  private executeWheel(key: string): void {
+  private executeWheel(key: string, longPress: boolean = false): void {
     if (this.disposed || this.disabled || !this.foreground || !this.wheelVisible) return;
     if ((key === 'cloze_next' || key === 'cloze_same') && !this.clozeEnabled) return;
+    if (longPress && noteEditorTool(key).longPressAction === undefined) return;
     const action: () => void = (): void => {
       switch (key) {
         case 'bold': this.applyFormat(FORMAT_BOLD); break;
@@ -515,7 +564,11 @@ export struct NoteFieldEditor {
         case 'superscript': this.applyFormat(FORMAT_SUPERSCRIPT); break;
         case 'subscript': this.applyFormat(FORMAT_SUBSCRIPT); break;
         case 'break': this.insertBreak(); break;
-        case 'math': this.wrap('\\(', '\\)'); break;
+        case 'math':
+          if (longPress) this.openFormatOptions(key); else this.wrap('\\(', '\\)');
+          break;
+        case 'font_size':
+        case 'heading': this.openFormatOptions(key); break;
         case 'cloze_next': this.cloze(false); break;
         case 'cloze_same': this.cloze(true); break;
         case 'bullet_list': this.list(false); break;
@@ -523,7 +576,9 @@ export struct NoteFieldEditor {
         case 'link': this.openLink(); break;
         case 'clear_format': this.clearFormat(); break;
       }
-      if (!this.fieldFocused && key !== 'link') this.focusInput(this.sourceMode, this.sourceMode ? this.selectionStart : -1);
+      if (!this.fieldFocused && key !== 'link' && this.formatDialog === null) {
+        this.focusInput(this.sourceMode, this.sourceMode ? this.selectionStart : -1);
+      }
       this.updateWheel();
     };
     this.activateTool(key, $r('app.string.' + noteEditorTool(key).titleKey), action);

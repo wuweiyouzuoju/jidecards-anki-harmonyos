@@ -156,7 +156,7 @@ export const NOTE_FIELD_EDITING_SUPPORT: NoteFieldEditingSupport = {
     buttonContent: 'icon_above_caption_inside_circle', formatSelection: 'independent_multiple_format_toggles',
     toggleToolIds: NOTE_EDITOR_FORMAT_TOGGLE_IDS, oneShotFeedback: 'brief_flash_without_toggle',
     oneShotFlashMs: NOTE_EDITOR_ACTION_FLASH_MS,
-    outerVisibility: 'experimental_mode_only',
+    outerVisibility: 'all_modes',
     defaultVisibility: 'visible_and_expanded_without_input_focus',
     initialSelection: 'no_selected_tools', foldingSelection: 'collapse_preserves_formats_reopen_resets_formats',
     target: 'first_editable_field_then_last_focused_field', visibleCount: 7, commonToolIds: NOTE_EDITOR_COMMON_TOOL_IDS,

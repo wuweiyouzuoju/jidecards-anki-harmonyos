@@ -65,6 +65,9 @@ test('JIDE reads current Core rendering ownership and the same supported TTS par
   assert.equal(support.tts.voiceAvailability,'device-installed voices only');
   assert.equal(support.avOrder,'core-tag-order; adjacent same-kind items may be batched');
   const editor=structure().noteEditing;
+  assert.deepEqual(editor.tools.filter(tool=>['font_size','heading'].includes(tool.id)).map(tool=>tool.id),['font_size','heading']);
+  assert.equal(editor.tools.find(tool=>tool.id==='math').longPressAction,'choose_block_or_chemistry');
+  assert.deepEqual(editor.formatMenus.map(menu=>[menu.toolId,menu.options.length]),[['font_size',7],['heading',5],['math',2]]);
   assert.equal(editor.toolMenu.defaultVisibility,'visible_and_expanded_without_input_focus');
   assert.equal(editor.toolMenu.visibleCount,7);assert.equal(editor.toolMenu.labels,'below_each_icon');
   assert.equal(editor.toolMenu.target,'first_editable_field_then_last_focused_field');
@@ -72,7 +75,8 @@ test('JIDE reads current Core rendering ownership and the same supported TTS par
   assert.equal(editor.toolMenu.rotation,'drag_arc_or_vertical_mouse_wheel');
   assert.equal(editor.toolMenu.geometry,'concentric_common_inner_and_rotating_outer_arcs');assert.equal(editor.toolMenu.labelLines,2);
   assert.deepEqual(editor.toolMenu.commonToolIds,['bold','italic','underline','highlight','break','clear_format']);
-  assert.equal(editor.toolMenu.outerVisibility,'experimental_mode_only');
+  assert.equal(editor.toolMenu.outerVisibility,'all_modes');
+  assert.deepEqual(structure({...context,simple:true}).noteEditing,structure({...context,simple:false}).noteEditing);
   assert.equal(editor.toolMenu.neutralControl,undefined);assert.equal(editor.toolMenu.mouseNotchesPerTool,2);
   assert.equal(editor.toolMenu.formatSelection,'independent_multiple_format_toggles');
   assert.equal(editor.toolMenu.foldingSelection,'collapse_preserves_formats_reopen_resets_formats');

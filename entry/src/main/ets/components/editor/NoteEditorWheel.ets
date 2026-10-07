@@ -18,7 +18,8 @@ import { NOTE_EDITOR_GRIP_AVAILABILITY_KEY, NoteEditorWheelState, NoteEditorWhee
   noteWheelRadius, noteWheelY, NoteWheelRotation } from '../../model/NoteEditorWheel';
 import { appInterface } from '../../backend/AppInterfaceService';
 import { noteEditorWheelObservation } from '../../model/AppInterface';
-import { NOTE_EDITOR_ACTION_FLASH_MS } from '../../model/NoteFieldEditing';
+import { NOTE_EDITOR_ACTION_FLASH_MS, noteEditorTool } from '../../model/NoteFieldEditing';
+export { NoteEditorFormatDialog } from './NoteEditorFormatDialog';
 
 export class NoteEditorWheelParams {
   state: NoteEditorWheelState;
@@ -27,12 +28,15 @@ export class NoteEditorWheelParams {
   initialTool: string;
   onSelection: (id: string) => void;
   onResetFormats: () => void;
+  onLongAction: (id: string) => void;
   constructor(state: NoteEditorWheelState, onAction: (id: string) => void, visible: boolean = true,
     initialTool: string = '', onSelection: (id: string) => void = (_id: string): void => {},
-    onResetFormats: () => void = (): void => {}) {
+    onResetFormats: () => void = (): void => {},
+    onLongAction: (id: string) => void = (_id: string): void => {}) {
     this.state = state; this.onAction = onAction; this.visible = visible;
     this.initialTool = initialTool; this.onSelection = onSelection;
     this.onResetFormats = onResetFormats;
+    this.onLongAction = onLongAction;
   }
 }
 
@@ -47,6 +51,7 @@ export function buildNoteEditorWheel(params: NoteEditorWheelParams) {
 /** 表单当前字段拥有默认展开浮层；浮层只负责选择、布局和单一握姿订阅。 */
 @Component
 struct NoteEditorWheel {
+  private longPressedTool: string = '';
   @Prop @Watch('parametersChanged') params: NoteEditorWheelParams = new NoteEditorWheelParams(
     { cloze: false, source: false, expanded: false, activeIds: [] }, (_id: string): void => {});
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
@@ -214,10 +219,11 @@ struct NoteEditorWheel {
     this.mouseRotation.reset();
     this.execute(tool.id);
   }
-  private execute(id: string): void {
+  private execute(id: string, longPress: boolean = false): void {
     const available: boolean = noteEditorWheelTools(this.params.state)
       .some((tool: NoteEditorWheelTool): boolean => tool.id === id);
     if (available && this.mounted && this.foreground && this.params.visible && !this.collapsed) {
+      if (longPress && noteEditorTool(id).longPressAction === undefined) return;
       this.clearActionFlash(); this.selectedId = id;
       if (!noteWheelToolIsToggle(id, this.params.state.source)) {
         const version: number = this.actionFlashVersion;
@@ -226,8 +232,23 @@ struct NoteEditorWheel {
           this.actionFlashTimer = -1; this.selectedId = ''; this.publish();
         }, NOTE_EDITOR_ACTION_FLASH_MS);
       }
-      this.publish(); this.params.onAction(id);
+      this.publish();
+      if (longPress) this.params.onLongAction(id); else this.params.onAction(id);
     }
+  }
+  private toolTouch(event: TouchEvent): void {
+    if (event.type === TouchType.Down) this.longPressedTool = '';
+  }
+  private longPressTool(id: string): void {
+    if (noteEditorTool(id).longPressAction === undefined) return;
+    this.longPressedTool = id;
+    this.execute(id, true);
+  }
+  private clickTool(id: string): void {
+    // 长按松手若补发 click，也不能额外插入行内标记；下一次按下恢复普通点击。
+    if (this.longPressedTool === id) { this.longPressedTool = ''; return; }
+    this.mouseRotation.reset();
+    this.execute(id);
   }
   private clearActionFlash(): void {
     this.actionFlashVersion++;
@@ -317,9 +338,12 @@ struct NoteEditorWheel {
       .position({ x: this.x(index, common), y: this.iconY(index, common) }).opacity(common ? 1 : this.iconOpacity(index))
       .visibility(common || this.iconVisible(index) ? Visibility.Visible : Visibility.Hidden)
       .accessibilityText(this.title(tool))
-      .accessibilityDescription(this.params.state.activeIds.indexOf(tool.id) >= 0 ?
-        $r('app.string.note_editor_format_on') : $r('app.string.note_editor_wheel_select'))
-      .onClick((): void => { if (common) this.execute(tool.id); else this.select(index); })
+      .accessibilityDescription(tool.longPressAction !== undefined ? $r('app.string.note_editor_math_press_hint') :
+        (this.params.state.activeIds.indexOf(tool.id) >= 0 ?
+          $r('app.string.note_editor_format_on') : $r('app.string.note_editor_wheel_select')))
+      .onTouch((event: TouchEvent): void => { this.toolTouch(event); })
+      .onClick((): void => { this.clickTool(tool.id); })
+      .gesture(LongPressGesture().onAction((): void => { this.longPressTool(tool.id); }))
   }
 
   @Builder

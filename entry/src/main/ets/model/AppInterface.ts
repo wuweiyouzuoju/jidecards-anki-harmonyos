@@ -2,7 +2,8 @@
 import { CARD_FLAGS } from './CardMarking';
 import { DECK_OPTION_GROUPS } from './DeckOptionsCatalog';
 import type { NoteAudioStatus } from './NoteAudioDraft';
-import { NOTE_EDITOR_TOOLS, NOTE_EDITOR_COMMON_TOOL_IDS, NOTE_FIELD_EDITING_SUPPORT } from './NoteFieldEditing';
+import { NOTE_EDITOR_TOOLS, NOTE_EDITOR_COMMON_TOOL_IDS, NOTE_FIELD_EDITING_SUPPORT,
+  NOTE_EDITOR_FORMAT_MENUS, noteEditorFormatOptions } from './NoteFieldEditing';
 import { noteEditorWheelTools, noteEditorWheelCommonTools, noteEditorWheelOuterTools, NOTE_EDITOR_WHEEL_VISIBLE_COUNT } from './NoteEditorWheel';
 import type { NoteEditorWheelState } from './NoteEditorWheel';
 export interface AppInterfaceContext {
@@ -84,6 +85,11 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
       fullOnly: NOTE_EDITOR_COMMON_TOOL_IDS.indexOf(tool.id) < 0 })).concat([
       { id: 'position', titleKey: 'note_editor_wheel_move_hint', iconKey: 'ic_editor_wheel' }
     ]) },
+  { id: 'note_editor_format_options', titleKey: 'note_editor_format_options',
+    instructionsKey: 'note_editor_format_options_instructions', parent: 'note_editor_wheel',
+    items: NOTE_EDITOR_FORMAT_MENUS.flatMap((menu): AppInterfaceItem[] =>
+      menu.options.map((option): AppInterfaceItem => ({ id: menu.toolId + '_' + option.id,
+        titleKey: option.titleKey, fullOnly: true, condition: menu.toolId }))) },
   { id: 'home', titleKey: 'home_interface_title', instructionsKey: 'home_actions_instructions', parent: '', items: [
     { id: 'more', titleKey: 'study_more', iconKey: 'ic_home_more', opens: 'home_more' },
     { id: 'agent', titleKey: 'ai_agent_title', opens: 'agent', agentOnly: true },
@@ -544,6 +550,15 @@ export function noteAudioInterfaceObservation(status: NoteAudioStatus): AppInter
       { id: 'recorded_seconds', value: String(status.seconds) }, { id: 'has_error', value: String(status.hasError) }] };
 }
 
+export function noteEditorFormatObservation(toolId: string, fieldName: string, source: boolean): AppInterfaceObservation {
+  const items: AppInterfaceControl[] = noteEditorFormatOptions(toolId).map((option): AppInterfaceControl =>
+    ({ id: toolId + '_' + option.id, title: '', titleKey: option.titleKey, enabled: true, selected: false }));
+  return { surface: 'note_editor_format_options', sectionId: toolId, selectedId: '',
+    optionIds: items.map((item): string => item.id), optionLabels: [], optionsTotal: items.length,
+    busy: false, controlsComplete: true, items: items,
+    values: [{ id: 'target_field', value: fieldName }, { id: 'source', value: String(source) }] };
+}
+
 export function noteEditorWheelObservation(state: NoteEditorWheelState, selectedId: string, side: string,
   collapsed: boolean, grip: string, centeredId: string = ''): AppInterfaceObservation {
   const items: AppInterfaceControl[] = noteEditorWheelTools(state).map((tool): AppInterfaceControl =>
@@ -556,11 +571,12 @@ export function noteEditorWheelObservation(state: NoteEditorWheelState, selected
     values: [{ id: 'side', value: side }, { id: 'grip_availability', value: grip },
       { id: 'source', value: String(state.source) }, { id: 'target_field', value: state.fieldName ?? '' },
       { id: 'input_expanded', value: String(state.expanded) },
-      { id: 'experimental', value: String(state.experimental === true) },
+      { id: 'cloze_enabled', value: String(state.cloze) },
       { id: 'visible_tools', value: collapsed ? '0' : String(noteEditorWheelCommonTools(state).length +
         Math.min(NOTE_EDITOR_WHEEL_VISIBLE_COUNT, noteEditorWheelOuterTools(state).length)) },
       { id: 'inner_tools', value: noteEditorWheelCommonTools(state).map((tool): string => tool.id).join(',') },
       { id: 'centered_outer_tool', value: centeredId }, { id: 'activation', value: 'click_only_rotation_preserves_multiple_selection' },
+      { id: 'math_long_press', value: 'choose_block_or_chemistry' },
       { id: 'folding_selection', value: 'collapse_preserves_formats_reopen_resets_formats' },
       { id: 'one_shot_feedback', value: NOTE_FIELD_EDITING_SUPPORT.toolMenu.oneShotFeedback },
       { id: 'one_shot_flash_ms', value: String(NOTE_FIELD_EDITING_SUPPORT.toolMenu.oneShotFlashMs) },
