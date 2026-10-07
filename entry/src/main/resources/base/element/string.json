@@ -2147,6 +2147,7 @@
     {"name": "note_editor_italic", "value": "斜体"},
     {"name": "note_editor_underline", "value": "下划线"},
     {"name": "note_editor_break", "value": "换行"},
+
     {"name": "note_editor_math", "value": "公式"},
     {"name": "note_editor_cloze_next", "value": "新挖空"},
     {"name": "note_editor_cloze_same", "value": "同组挖空"},

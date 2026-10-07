@@ -1697,6 +1697,7 @@
     {"name": "note_editor_italic", "value": "Italic"},
     {"name": "note_editor_underline", "value": "Underline"},
     {"name": "note_editor_break", "value": "Line break"},
+
     {"name": "note_editor_math", "value": "Math"},
     {"name": "note_editor_cloze_next", "value": "New cloze"},
     {"name": "note_editor_cloze_same", "value": "Same cloze"},

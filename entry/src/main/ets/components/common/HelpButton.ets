@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../../utils/PressFeedback';
 import { resourceText } from '../../utils/UiFeedback';
+import { HelpLayout } from '../../utils/HelpLayout';
 
 /** 帮助/信息共用图标与独立点击区；不把点击转交给所在设置行或卡片行。 */
 @Component
@@ -21,14 +22,15 @@ export struct HelpButton {
   build() {
     Button() {
       Image($r('app.media.ic_info'))
-        .width(18).height(18).objectFit(ImageFit.Contain)
+        .width(HelpLayout.iconSize).height(HelpLayout.iconSize).objectFit(ImageFit.Contain)
         .hitTestBehavior(HitTestMode.None)
         .accessibilityLevel('no')
     }
     .type(ButtonType.Normal)
-    .width(44).height(44).padding(0)
+    .width(HelpLayout.iconSize).height(HelpLayout.iconSize).padding(0)
+    .responseRegion(HelpLayout.hitRegion()).mouseResponseRegion(HelpLayout.hitRegion())
     .flexShrink(0)
-    .borderRadius(22)
+    .borderRadius(HelpLayout.iconSize / 2)
     .backgroundColor(Color.Transparent)
     .enabled(this.isHelpEnabled)
     .attributeModifier(new PressFeedback())

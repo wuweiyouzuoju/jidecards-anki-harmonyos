@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
+import { loadPlatformModule } from './platform-module-harness.mjs';
 
 const root = new URL('../../entry/src/main/ets/', import.meta.url);
 const read = file => readFileSync(new URL(file, root), 'utf8').replaceAll('\r\n', '\n');
@@ -49,7 +50,7 @@ test('every ArkTS help entry shares the icon, and labelled help cannot float to 
   }
   assert.ok(callers > 0);
   const label = read('components/common/HelpLabel.ets');
-  assert.match(label, /Text\(\)\s*\{\s*ForEach\(\[this.uiLanguage\][\s\S]*?ThemeHighlightedTextSpans\(this.title, this.highlightLabel, this.highlightColors, this.getUIContext\(\)\)[\s\S]*?flexShrink\(1\)[\s\S]*?HelpButton\(/);
+  assert.match(label, /Text\(\)\s*\{\s*ForEach\(\[themeTextKey\([\s\S]*?ThemeHighlightedTextSpans\(this.title, this.highlightLabel, this.highlightColors, this.getUIContext\(\)\)/);
   assert.match(label, /@Prop highlightLabel: ResourceStr = ''/);
   assert.match(label, /@Prop highlightColors: string\[\] = \[\]/);
   assert.doesNotMatch(label, /Blank\(|layoutWeight\(|margin\(|padding\(|Row\(\{/);
@@ -59,14 +60,28 @@ test('every ArkTS help entry shares the icon, and labelled help cannot float to 
   assert.match(label, /\.width\('100%'\)/);
   assert.doesNotMatch(label, /\.width\(this\.centered \? '100%' : undefined\)/);
   assert.match(label, /justifyContent\(this\.centered \? FlexAlign\.Center : FlexAlign\.Start\)/);
+  assert.match(label, /Stack\(\)\s*\{[\s\S]*?Text\([\s\S]*?HelpButton\([\s\S]*?\.position\(HelpLayout.titleHelpPosition\(this.titleWidth, this.titleHeight\)\)/,
+    'help must leave the normal flow so adding it cannot shift the title or increase row height');
+  assert.match(label, /\.onAreaChange\([\s\S]*?this.updateTitleArea\(area\)/);
+  assert.match(label, /maxWidth: HelpLayout.titleMaxWidth\(this.centered, this.showHelp\)/);
 });
 
 test('help icon geometry, accessibility, press effect and click isolation have one owner', () => {
   const button = read('components/common/HelpButton.ets');
-  const [, glyph] = button.match(/Image\([\s\S]*?\.width\((\d+)\)\.height\(18\)/).map(Number);
-  const [, width, height] = button.match(/\.width\((44)\)\.height\((44)\)/).map(Number);
-  assert.equal(glyph, 18); assert.equal(width, 44); assert.equal(height, 44);
-  assert.equal((width - glyph) / 2, 13);
+  const layout = loadPlatformModule('utils/HelpLayout.ets', 'HelpLayout', {});
+  assert.equal(layout.iconSize, 18); assert.equal(layout.touchSize, 44); assert.equal(layout.titleGap, 4);
+  assert.deepEqual(layout.hitRegion(), { x: -13, y: -13, width: 44, height: 44 });
+  assert.match(button, /Image\([\s\S]*?\.width\(HelpLayout.iconSize\)\.height\(HelpLayout.iconSize\)/);
+  assert.match(button, /\.width\(HelpLayout.iconSize\)\.height\(HelpLayout.iconSize\)\.padding\(0\)/);
+  assert.match(button, /responseRegion\(HelpLayout.hitRegion\(\)\).mouseResponseRegion\(HelpLayout.hitRegion\(\)\)/);
+  assert.doesNotMatch(button, /\.width\(44\)|\.height\(44\)/, 'touch target must not become a layout box');
+  assert.equal(layout.titleMaxWidth(true, true), 'calc(100% - 44vp)');
+  assert.equal(layout.titleMaxWidth(false, true), 'calc(100% - 22vp)');
+  assert.equal(layout.titleMaxWidth(true, false), '100%');
+  assert.equal(layout.titleMaxWidth(false, false), '100%');
+  for(const [width,height] of [[72,22],[144,48],[260,52]]) {
+    assert.deepEqual(layout.titleHelpPosition(width,height),{x:width+4,y:(height-18)/2});
+  }
   assert.match(button, /padding\(0\)/);
   assert.match(button, /flexShrink\(0\)/);
   assert.match(button, /monopolizeEvents\(true\)/);
@@ -95,6 +110,16 @@ test('disabled help never invokes the owner; enabled clicks invoke it exactly on
   button.activate(); assert.equal(calls, 0);
   button.isHelpEnabled = true; button.activate(); assert.equal(calls, 1);
   button.isHelpEnabled = false; button.activate(); assert.equal(calls, 1);
+});
+
+test('help follows the actual measured title after text width, wrapping or font size changes',()=>{
+  const layout=loadPlatformModule('utils/HelpLayout.ets','HelpLayout',{});
+  const label=method('components/common/HelpLabel.ets','updateTitleArea',{titleWidth:0,titleHeight:0});
+  for(const [width,height] of [[72,22],[144,48],[90,24]]) {
+    label.updateTitleArea({width:String(width),height:String(height)});
+    assert.equal(label.titleWidth,width);assert.equal(label.titleHeight,height);
+    assert.deepEqual(layout.titleHelpPosition(label.titleWidth,label.titleHeight),{x:width+4,y:(height-18)/2});
+  }
 });
 
 test('note help reads the current resource and Back preserves all draft fields', () => {
