@@ -8,6 +8,8 @@
 
 沿用已有 Node 静态生成器，将事实加载、公共布局、页面模板和文本导出分别放入 `tools/site/`。参考 [Astro 的内容站点与默认零客户端 JavaScript 原则](https://docs.astro.build/en/concepts/why-astro/)以及 [Vite 官网的产品、文档和开源入口](https://vite.dev/)组织信息。当前页面只需要静态内容和原生 HTML 导航，没有引入框架运行时的需求。
 
+为响应“先进入，再加载图片”，增加一个仅负责图片加载的可选模块：Logo 小图内嵌，宣传图预留真实尺寸；正文首次绘制后，接近视口才下载原图。阅读、导航与机器格式仍不依赖脚本；禁用脚本时使用 noscript 原生图片。此增强不引入客户端内容渲染或改变爬虫正文。
+
 ## 事实与素材边界
 
 正式版本由作者确认，记录在 `hosting/data/works.json` 的 `releaseVersion` 与 `releaseVersionSource`。源码版本由 `AppScope/app.json5` 读取，两个字段分别表达事实。作者本次指定正式版为 2.9.22。

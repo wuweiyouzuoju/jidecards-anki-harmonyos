@@ -12,13 +12,14 @@ Cloudflare Worker：`wispy-glade-db0d`。静态目录：`hosting/`。主域名�
 
 | 入口 | 责任 |
 | --- | --- |
-| `tools/site/content.mjs` | 读取事实、派生源码版本、检查素材版本与 SHA-256、生成样式和 Logo 缓存键 |
+| `tools/site/content.mjs` | 读取事实、派生源码版本、检查素材版本与 SHA-256、生成样式、Logo 和图片脚本缓存键 |
 | `tools/site/layout.mjs` | 共享导航、页脚、下载入口、页面元数据、JSON-LD |
 | `tools/site/pages.mjs` | 首页、功能、指南、开发、更新、关于与 404 页面 |
 | `tools/site/feeds.mjs` | 逐页 Markdown、llms、页面索引、sitemap、robots、Atom |
 | `hosting/styles.css` | 响应式视觉；首页 Logo 在左、宣传词在右；手机导航使用原生 details |
+| `hosting/assets/site-media.mjs` | 首次绘制后，按视口接近程度加载原图；下载失败恢复内嵌预览 |
 
-执行 `node tools/build-site.mjs` 同时更新所有输出，避免逐页手改 HTML。样式与 Logo 地址使用内容摘要缓存键；图片保留真实尺寸并延迟加载。应用的 `announcement.json` 和 `cloud-decks.json` 独立维护，网站重构不改变其协议。
+执行 `node tools/build-site.mjs` 同时更新所有输出，避免逐页手改 HTML。样式、Logo 和图片脚本地址使用内容摘要缓存键。应用的 `announcement.json` 和 `cloud-decks.json` 独立维护，网站重构不改变其协议。
 
 源码主仓库和镜像统一维护 `repository` / `repositoryMirrors`，生成器同步导航、正文、结构化数据和文本链接。官网可单独发布，不把尚未推送的本地发布文档作为远端已存在的链接。
 
@@ -28,7 +29,11 @@ Cloudflare Worker：`wispy-glade-db0d`。静态目录：`hosting/`。主域名�
 
 替换图片时检查实际内容，复制作者提供的原始字节，然后更新所有元数据；生成器发现版本或摘要不匹配即失败。过时 `assets/app-*.png` 已加入 `.assetsignore`，不再进入线上资产清单。
 
-可见 Logo 由生成器从 `AppScope/resources/base/media/app_icon.png` 原样复制。标签页图标仍提供 ico、16/32 像素 PNG 和 180 像素 Apple 图标。更换应用图标时重新生成这些图标并运行构建（需要 Python 与 Pillow）：
+Logo 原图由生成器从 `AppScope/resources/base/media/app_icon.png` 原样复制。页面先内嵌已有 180 像素 Apple 图标，正文首次绘制无需等待 1024 像素原图。宣传图先使用同尺寸内嵌 SVG 占位；图片脚本等待两次 animation frame，确保正文先绘制一次，再用 IntersectionObserver 在图片距离视口 200 像素时赋予原图地址，配合原生 lazy 与低优先级下载。预留真实宽高避免下载后布局跳动；下载失败恢复内嵌预览。不支持观察器的浏览器在首次绘制后交给原生 lazy。
+
+脚本只增强图片显示，正文、导航、alt、figcaption、原图链接和 JSON-LD 已在静态 HTML 中。禁用 JavaScript 时 Logo 仍可见，宣传图通过 noscript 使用原生 lazy；Markdown、JSON 和 llms 保持完整原图地址与说明。
+
+标签页图标仍提供 ico、16/32 像素 PNG 和 180 像素 Apple 图标。更换应用图标时重新生成这些图标并运行构建（需要 Python 与 Pillow）：
 
 ```powershell
 python -c 'from PIL import Image; from pathlib import Path; icon = Image.open("AppScope/resources/base/media/app_icon.png").convert("RGBA"); target = Path("hosting"); icon.save(target / "favicon.ico", sizes=[(16,16), (32,32), (48,48)]); [icon.resize((size,size), Image.Resampling.LANCZOS).save(target / filename, optimize=True) for size, filename in [(16,"favicon-16x16.png"), (32,"favicon-32x32.png"), (180,"apple-touch-icon.png")]]'
@@ -59,7 +64,7 @@ node --test tools/tests/portfolio-site.test.mjs tools/tests/site-worker.test.mjs
 python -m http.server 8771 --bind 127.0.0.1 --directory hosting
 ```
 
-测试检查静态正文、版本、素材摘要、有效链接、旧锚点、全部更新条目、机器格式完整性、应用数据端点和域名路由。浏览器检查桌面与手机实际布局、图片显示、导航和横向溢出。纯网站修改不要求重新构建手机 HAP，也不替代原生引擎或设备测试。
+测试检查静态正文、版本、素材摘要、有效链接、旧锚点、全部更新条目、机器格式完整性、应用数据端点和域名路由；图片行为测试覆盖首次绘制前不发起原图请求、仅接近视口时加载、重复通知、下载失败与观察器缺失。浏览器检查桌面与手机实际布局、图片显示、导航、横向溢出，以及阻断图片时正文仍可读、下载入口仍可用。纯网站修改不要求重新构建手机 HAP，也不替代原生引擎或设备测试。
 
 本地发布不依赖 Git 推送：
 
