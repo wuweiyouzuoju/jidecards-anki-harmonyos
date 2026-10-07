@@ -43,7 +43,7 @@ import { AgentEditableCard } from '../components/agent/AgentEditableCard';
 import { AgentCardBatch } from '../model/agent/AgentCardBatch';
 import type { AgentBatchResult } from '../model/agent/AgentCardBatch';
 import { buildProviderDraftContext } from '../model/agent/AgentProviderContext';
-import { ThemeTextSpans } from '../components/common/ThemeText';
+import { ThemeTextSpans, themeTextKey } from '../components/common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
 import { PAGE_COMPACT_LAYOUT_KEY } from '../model/AppLayoutState';
@@ -2434,7 +2434,7 @@ export struct AI制卡页 {
         if (ctx.message.来源列表.length > 0) {
           Text($r('app.string.ai_agent_sources')).fontSize(应用尺寸.字号_正文_小).fontWeight(FontWeight.Medium)
           ForEach(ctx.message.来源列表, (source: SearchSource) => {
-            Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(`${source.title}\n${source.url}`, this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }.fontSize(应用尺寸.字号_正文_小)
+            Text() { ForEach([themeTextKey(`${source.title}\n${source.url}`, this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(`${source.title}\n${source.url}`, this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }.fontSize(应用尺寸.字号_正文_小)
               .fontColor(this.动作主色).width('100%')
               .copyOption(CopyOptions.LocalDevice)
           }, (source: SearchSource): string => source.url)
@@ -2496,7 +2496,7 @@ export struct AI制卡页 {
         }
 
         if (ctx.message.批次结果 !== '') {
-          Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(ctx.message.批次结果, this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }
+          Text() { ForEach([themeTextKey(ctx.message.批次结果, this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(ctx.message.批次结果, this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }
             .fontSize(应用尺寸.字号_正文_小)
             .fontColor(this.动作主色)
             .width('100%')
@@ -2708,7 +2708,7 @@ export struct AI制卡页 {
                 .layoutWeight(1)
                 .alignItems(HorizontalAlign.Start)
                 Button() {
-                  Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans($r('app.string.ai_agent_file_remove'), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }.fontSize(应用尺寸.字号_正文_小).fontColor(this.动作主色)
+                  Text() { ForEach([themeTextKey($r('app.string.ai_agent_file_remove'), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans($r('app.string.ai_agent_file_remove'), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }.fontSize(应用尺寸.字号_正文_小).fontColor(this.动作主色)
                 }
                   .height(32)
                   .fontSize(应用尺寸.字号_正文_小)
@@ -2749,11 +2749,11 @@ export struct AI制卡页 {
             Stack() {
               // 两条文案都常驻布局、只切透明度：解析态显示「…」（窄于「导入」），
               // 按钮宽度恒为「导入」两字，与右侧发送按钮等宽，解析切换不抖动。
-              Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(localizedNamedResourceText(this.getUIContext(), this.uiLanguage, agentImportLabelKey(false)), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }
+              Text() { ForEach([themeTextKey(localizedNamedResourceText(this.getUIContext(), this.uiLanguage, agentImportLabelKey(false)), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(localizedNamedResourceText(this.getUIContext(), this.uiLanguage, agentImportLabelKey(false)), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }
                 .fontSize(应用尺寸.字号_按钮)
                 .fontColor(this.动作主色)
                 .opacity(this.文件解析中 ? 0 : 1)
-              Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(localizedNamedResourceText(this.getUIContext(), this.uiLanguage, agentImportLabelKey(true)), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }
+              Text() { ForEach([themeTextKey(localizedNamedResourceText(this.getUIContext(), this.uiLanguage, agentImportLabelKey(true)), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(localizedNamedResourceText(this.getUIContext(), this.uiLanguage, agentImportLabelKey(true)), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }
                 .fontSize(应用尺寸.字号_按钮)
                 .fontColor(this.动作主色)
                 .opacity(this.文件解析中 ? 1 : 0)

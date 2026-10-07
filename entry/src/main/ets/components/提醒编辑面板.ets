@@ -4,7 +4,7 @@ import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { DialogBackdrop } from './common/DialogBackdrop';
 import { localizedNamedResourceText, resourceText, namedResourceText } from '../utils/UiFeedback';
 import { SelectStyle } from '../utils/SelectStyle';
-import { ThemeTextSpans } from './common/ThemeText';
+import { ThemeTextSpans, themeTextKey } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
 import { DialogHeader } from './common/DialogHeader';
@@ -275,7 +275,7 @@ export struct 提醒编辑面板 {
 
             // 快捷插入标签：点一下把占位符追加到内容末尾
             Row({ space: 应用尺寸.间距_8 }) {
-                Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(this.interfaceLabel('insert_new'), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }
+                Text() { ForEach([themeTextKey(this.interfaceLabel('insert_new'), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(this.interfaceLabel('insert_new'), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }
                 .fontSize(应用尺寸.字号_正文_小)
                 .fontColor(this.主色按钮背景)
                 .padding({ left: 应用尺寸.间距_12, right: 应用尺寸.间距_12, top: 6, bottom: 6 })
@@ -285,7 +285,7 @@ export struct 提醒编辑面板 {
                 .onClick((): void => {
                   this.插入占位符($r('app.string.reminder_edit_token_new'));
                 })
-                Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(this.interfaceLabel('insert_review'), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }
+                Text() { ForEach([themeTextKey(this.interfaceLabel('insert_review'), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(this.interfaceLabel('insert_review'), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }
                 .fontSize(应用尺寸.字号_正文_小)
                 .fontColor(this.主色按钮背景)
                 .padding({ left: 应用尺寸.间距_12, right: 应用尺寸.间距_12, top: 6, bottom: 6 })

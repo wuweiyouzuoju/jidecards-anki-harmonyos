@@ -5,7 +5,7 @@ import { NoteFieldEditor } from '../common/NoteFieldEditor';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 颜色键 } from '../../model/颜色主题';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
-import { ThemeTextSpans } from '../common/ThemeText';
+import { ThemeTextSpans, themeTextKey } from '../common/ThemeText';
 import type { 卡片草稿 } from '../../model/agent/AgentConversationView';
 @Component
 export struct AgentEditableCard {
@@ -54,7 +54,7 @@ export struct AgentEditableCard {
           .opacity(this.card.已选中 ? 1 : 0.5)
 
         if (this.card.状态 === 'saved') {
-          Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans($r('app.string.ai_card_saved'), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }
+          Text() { ForEach([themeTextKey($r('app.string.ai_card_saved'), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans($r('app.string.ai_card_saved'), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }
             .fontSize(应用尺寸.字号_正文_小)
             .fontColor(this.动作主色)
         } else if (this.card.状态 === 'failed') {

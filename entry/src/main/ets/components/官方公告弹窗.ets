@@ -3,7 +3,7 @@ import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { PressFeedback } from '../utils/PressFeedback';
 import { DialogBackdrop } from './common/DialogBackdrop';
 import { resourceText } from '../utils/UiFeedback';
-import { ThemeTextSpans } from './common/ThemeText';
+import { ThemeTextSpans, themeTextKey } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
 import { DialogHeader } from './common/DialogHeader';
@@ -69,7 +69,7 @@ export struct 官方公告弹窗 {
         Row({ space: 应用尺寸.间距_12 }) {
           if (this.announcement.actionUrl.length > 0) {
             Button() {
-              Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans($r('app.string.official_announcement_details'), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }.fontColor($r('app.color.action_primary'))
+              Text() { ForEach([themeTextKey($r('app.string.official_announcement_details'), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans($r('app.string.official_announcement_details'), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }.fontColor($r('app.color.action_primary'))
             }
               .type(ButtonType.Normal)
               .layoutWeight(1)

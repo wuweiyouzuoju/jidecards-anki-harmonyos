@@ -8,7 +8,7 @@ import { PressFeedback } from '../utils/PressFeedback';
 import { HelpLabel } from './common/HelpLabel';
 import { DialogBackdrop } from './common/DialogBackdrop';
 import { SelectStyle } from '../utils/SelectStyle';
-import { ThemeTextSpans } from './common/ThemeText';
+import { ThemeTextSpans, themeTextKey } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
 import { DialogHeader } from './common/DialogHeader';
@@ -448,7 +448,7 @@ export struct 添加笔记面板 {
             }, (字段名: string, index: number): string => `${index}-${字段名}`)
 
             Button() {
-              Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(this.高级已展开 ? $r('app.string.add_note_advanced_hide') : $r('app.string.add_note_advanced'), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }.fontSize(应用尺寸.字号_按钮).fontColor(this.动作主色)
+              Text() { ForEach([themeTextKey(this.高级已展开 ? $r('app.string.add_note_advanced_hide') : $r('app.string.add_note_advanced'), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(this.高级已展开 ? $r('app.string.add_note_advanced_hide') : $r('app.string.add_note_advanced'), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }.fontSize(应用尺寸.字号_按钮).fontColor(this.动作主色)
             }
               .width('100%')
               .height(应用尺寸.按钮高度)

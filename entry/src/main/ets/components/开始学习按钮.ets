@@ -5,7 +5,7 @@ import { PRIMARY_GLASS_KEY, PrimaryGlassStyle, themePrimaryGlass } from '../mode
 
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { 颜色键 } from '../model/颜色主题';
-import { ThemeTextSpans } from './common/ThemeText';
+import { ThemeTextSpans, themeTextKey } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
 // ========================================================
@@ -76,7 +76,7 @@ export struct 开始学习按钮 {
       Row() {
         Text() {
           if (this.isAvailable) {
-            ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(this.文案, this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale)
+            ForEach([themeTextKey(this.文案, this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(this.文案, this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey)
           } else {
             Span(this.文案).fontColor($r('app.color.text_secondary'))
           }

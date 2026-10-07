@@ -9,7 +9,7 @@ import { FsrsTools } from './home/FsrsTools';
 import type { DeckOptionsPresetEntry } from '../model/DeckOptionsPresets';
 import type { DeckConfigSettings } from '../proto/messages/DeckConfigMessages';
 import { DeckOptionsFsrsState } from '../model/home/DeckOptionsSession';
-import { ThemeTextSpans } from './common/ThemeText';
+import { ThemeTextSpans, themeTextKey } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
 import { DialogHeader } from './common/DialogHeader';
@@ -393,7 +393,7 @@ export struct 牌组选项面板 {
   @Builder
   private modeSectionTitle(title: Resource) {
     Text() {
-      ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(title, this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale)
+      ForEach([themeTextKey(title, this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(title, this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey)
     }.fontSize(应用尺寸.字号_正文_小).fontWeight(FontWeight.Medium)
       .fontColor($r('app.color.text_secondary')).width('100%')
   }

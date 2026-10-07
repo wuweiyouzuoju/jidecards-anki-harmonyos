@@ -7,6 +7,7 @@ import { loadComponentLogic, loadPlatformModule } from './platform-module-harnes
 import { uiFeedback } from './ui-feedback-harness.mjs';
 import { visibleSettingsGroups } from '../../entry/src/main/ets/model/SettingsStructure.ts';
 import { DECK_LIST_STYLES, deckListStyleTitleKey } from '../../entry/src/main/ets/model/DeckListAppearance.ts';
+import { themeTextWrappers, themeTextArguments } from './theme-text-harness.mjs';
 
 const root = new URL('../../entry/src/main/ets/', import.meta.url);
 const read = path => readFileSync(new URL(path, root), 'utf8').replaceAll('\r\n', '\n');
@@ -59,15 +60,21 @@ test('locale invalidation is separate from resource formatting arguments', () =>
   assert.deepEqual(calls, [[1, 42], ['test', 'Front', 2]]);
 });
 
-test('theme span builders recreate only their text children on language change', () => {
+test('every value-parameter theme span caller keys only its text children by all rendering inputs', () => {
   let count = 0;
   for (const path of readdirSync(root, { recursive: true }).filter(name => name.endsWith('.ets'))) {
+    if (path.replaceAll('\\', '/') === 'components/common/ThemeText.ets') continue;
     const source = read(path.replaceAll('\\', '/'));
-    for (const call of source.matchAll(/(?:ThemeTextSpans|ThemeHighlightedTextSpans)\(/g)) {
-      if (!source.slice(call.index, source.indexOf('\n', call.index)).includes('this.getUIContext()')) continue;
-      const before = source.slice(Math.max(0, call.index - 110), call.index);
-      assert.match(before, /ForEach\(\[this\.(?:uiLanguage|系统语言)\], \(_locale: string\) => \{\s*$/,
-        `${path}: value-parameter span builders must rebuild for a new locale`);
+    const calls = [...source.matchAll(/(?:ThemeTextSpans|ThemeHighlightedTextSpans)\(/g)];
+    const wrappers = themeTextWrappers(source);
+    assert.equal(wrappers.length, calls.length, `${path}: all span builders require a complete rendering key`);
+    for (const wrapper of wrappers) {
+      const keyArgs = themeTextArguments(wrapper[1]);
+      const args = themeTextArguments(wrapper[3]);
+      const highlighted = wrapper[2] === 'ThemeHighlightedTextSpans';
+      assert.match(keyArgs[3], /^this\.(?:uiLanguage|系统语言)$/, `${path}: locale is an observed dependency`);
+      assert.deepEqual(keyArgs, highlighted ? [args[0], args[2], args[3], keyArgs[3], args[1]] : [...args, keyArgs[3]],
+        `${path}: label, effective palette and highlight must match the rendered builder inputs`);
       count++;
     }
   }

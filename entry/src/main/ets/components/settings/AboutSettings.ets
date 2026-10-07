@@ -12,7 +12,7 @@ import { 颜色键 } from '../../model/颜色主题';
 import { AboutActionDialog } from './AboutActionDialog';
 import { SettingsActionRow } from '../common/SettingsActionRow';
 import { settingsIcon } from '../../utils/SettingsIcons';
-import { ThemeTextSpans } from '../common/ThemeText';
+import { ThemeTextSpans, themeTextKey } from '../common/ThemeText';
 
 /** 关于分组独占外链和反馈交互；主壳只负责目录与许可证导航。 */
 @Component
@@ -133,7 +133,7 @@ export struct AboutSettings {
     Flex({ wrap: FlexWrap.Wrap, alignItems: ItemAlign.Center }) {
       Text($r('app.string.about_qq_group_summary')).fontSize(12).fontColor($r('app.color.text_secondary'))
       Text($r('app.string.about_qq_group_number_label')).fontSize(12).fontColor($r('app.color.text_secondary'))
-      Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(this.QQ群号, [], this.getUIContext()) }, (_locale: string): string => _locale) }
+      Text() { ForEach([themeTextKey(this.QQ群号, [], this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(this.QQ群号, [], this.getUIContext()) }, (_textKey: string): string => _textKey) }
         .fontSize(12).fontColor(this.解析主色()).fontWeight(FontWeight.Medium)
         .copyOption(CopyOptions.LocalDevice)
     }.width('100%')

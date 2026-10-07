@@ -84,7 +84,7 @@
 
 普通字符串资源的即时翻译使用 `@StorageProp('系统语言')` 建立渲染依赖：直接渲染调用 `localizedResourceText` / `localizedNamedResourceText`，目录辅助函数显式传入语言，既有组件本地文字辅助方法在默认 `_locale` 参数读取语言。资源格式化仍由 UiFeedback 拥有，语言不进入占位符；不重建整页，不丢失草稿或选择。帮助图标使用居中的 `ic_info` SVG，保留44vp点击区与既有点击隔离。
 
-渐变 Span Builder 的按值参数会保留旧字符，因此宿主用仅包裹文字子节点的 `ForEach([this.uiLanguage])` 按语言重建 Span；不重建表单或页面。统计页语言 watcher 只替换缓存的“全部牌组”标签，保留牌组筛选；统计范围选择与默认牌组名也直接依赖同一语言。
+渐变 Span Builder 的按值参数会保留旧文字和颜色，因此宿主用仅包裹文字子节点的 `ForEach([themeTextKey(...)])` 重建 Span，key 必须传入与 Builder 相同的文案、有效色板和高亮，并显式读取语言；空色板也参与 key，让取消选中或禁用恢复继承色。`theme-text.test.mjs` 执行真实调用表达式并模拟 ForEach 缓存，覆盖选择、禁用、文案、数据、色板与语言变化；`ui-locale-refresh.test.mjs` 审计全部调用的参数对应。不重建表单或页面。统计页语言 watcher 只替换缓存的“全部牌组”标签，保留牌组筛选；统计范围选择与默认牌组名也直接依赖同一语言。
 
 牌组详情的手机顶栏将制卡、可选 JIDE、预览图标直接组成右侧工具组；宽屏将制卡和 JIDE 组成左侧工具组，预览靠右，均复用主页 `IconActionButton.toolbarStyle`。牌组预览范围只渲染 `ActionMenuList`，由 `HomeDeckDetails` 统一挂载 `AnchoredMenu`；手机和宽屏共用表面、居中条目、分隔线和动效。工具栏上报实际窗口位置与宽度，详情宿主转换一次坐标后按右缘对齐。关闭手写、退出排序、退出多选及标题栏关闭统一用 `IconActionButton.toolbarStyle` 的叉号；需要展示当前设置含义的透明度控件继续保留文字。
 

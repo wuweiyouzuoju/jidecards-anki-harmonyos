@@ -89,6 +89,7 @@ this.localizedFmt($r('app.string.xxx_lang'), [arg1, arg2]);
 ## ArkUI 关键约束
 
 - `@Builder` 按值参数会被快照，@State 变化不重跑 builder，三角形不转——传引用用 interface
+- `ThemeTextSpans` / `ThemeHighlightedTextSpans` 的宿主必须用 `themeTextKey` 按实际文案、有效色板（含空色板）、高亮及语言重建文字子节点；不能只按语言重建，否则取消选中/禁用和动态文案会保留旧 Span。直接 `themeLabelGlyphs` 的组件仍由自身 build 读取响应式输入。
 - `LazyForEach` keyItem 必须含全部可变字段，否则数据变化不刷新
 - `Select.value` 必须传 string 不能传 Resource（运行时实测按钮文本空白）
 - `Select` 选中态用 `selected` + `value` 双绑

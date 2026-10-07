@@ -2,7 +2,7 @@
 import { settingsItemText } from '../../utils/SettingsStructureText';
 import { PrimaryActionButton } from '../common/PrimaryActionButton';
 import { FormInputStyle } from '../../utils/FormInputStyle';
-import { ThemeTextSpans } from '../common/ThemeText';
+import { ThemeTextSpans, themeTextKey } from '../common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
 import { 颜色键 } from '../../model/颜色主题';
@@ -63,7 +63,7 @@ export struct 开发者调试分组 {
     }) {
       Column({ space: 应用尺寸.间距_10 }) {
         if (this.Agent入口已启用) {
-          Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(settingsItemText(this.getUIContext(), 'agent_enabled', this.uiLanguage), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }
+          Text() { ForEach([themeTextKey(settingsItemText(this.getUIContext(), 'agent_enabled', this.uiLanguage), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(settingsItemText(this.getUIContext(), 'agent_enabled', this.uiLanguage), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }
             .width('100%')
             .fontSize(应用尺寸.字号_正文_小)
             .fontColor(设置面板色板_取(this.是否深色).主色)
@@ -74,7 +74,7 @@ export struct 开发者调试分组 {
             .width('100%')
             .fontSize(应用尺寸.字号_正文_小)
             .fontColor(设置面板色板_取(this.是否深色).次文字)
-          Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(settingsItemText(this.getUIContext(), 'developer_contact', this.uiLanguage), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }
+          Text() { ForEach([themeTextKey(settingsItemText(this.getUIContext(), 'developer_contact', this.uiLanguage), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(settingsItemText(this.getUIContext(), 'developer_contact', this.uiLanguage), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }
             .width('100%')
             .fontSize(应用尺寸.字号_正文_小)
             .fontColor(设置面板色板_取(this.是否深色).主色)

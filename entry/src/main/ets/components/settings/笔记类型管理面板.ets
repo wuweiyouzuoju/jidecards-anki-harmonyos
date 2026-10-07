@@ -3,7 +3,7 @@ import { noteTypeText } from '../../utils/NoteTypeText';
 import { LengthMetrics } from '@kit.ArkUI';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { showToastSafely, resourceText } from '../../utils/UiFeedback';
-import { ThemeTextSpans } from '../common/ThemeText';
+import { ThemeTextSpans, themeTextKey } from '../common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
 import { DialogHeader } from '../common/DialogHeader';
@@ -186,7 +186,7 @@ export struct 笔记类型管理面板 {
       按下态按钮({ 文案: $r('app.string.notetype_clone'), 是否启用: !this.加载中 && !this.处理中,
         点击回调: (): void => { this.openCreate(类型.id, 类型.name); } })
       // 编辑按钮
-      Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans($r('app.string.notetype_mgmt_edit'), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }
+      Text() { ForEach([themeTextKey($r('app.string.notetype_mgmt_edit'), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans($r('app.string.notetype_mgmt_edit'), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }
         .fontSize(应用尺寸.字号_正文_小)
         .fontColor(this.主色按钮背景)
         .padding({ left: 12, right: 12, top: 6, bottom: 6 })

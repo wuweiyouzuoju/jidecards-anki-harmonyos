@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { HelpButton } from './HelpButton';
-import { ThemeHighlightedTextSpans } from './ThemeText';
+import { ThemeHighlightedTextSpans, themeTextKey } from './ThemeText';
 
 /** 帮助紧随标题；仅标题收缩，剩余行宽由调用方分配给右侧业务控件。 */
 @Component
@@ -20,7 +20,7 @@ export struct HelpLabel {
 
   build() {
     Row() {
-      Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeHighlightedTextSpans(this.title, this.highlightLabel, this.highlightColors, this.getUIContext()) }, (_locale: string): string => _locale) }
+      Text() { ForEach([themeTextKey(this.title, this.highlightColors, this.getUIContext(), this.uiLanguage, this.highlightLabel)], (_textKey: string) => { ThemeHighlightedTextSpans(this.title, this.highlightLabel, this.highlightColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }
         .fontSize(this.textSize).fontColor(this.textColor).fontWeight(this.textWeight)
         .textAlign(this.centered ? TextAlign.Center : TextAlign.Start)
         .maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis }).flexShrink(1)

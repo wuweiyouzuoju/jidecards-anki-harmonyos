@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
+import { themeTextWrappers, cachedThemeText } from './theme-text-harness.mjs';
 import { themeDefinition, GLASS_HIGHLIGHT_COLORS, GLASS_DARK_COLORS } from '../../entry/src/main/ets/model/ThemeCatalog.ts';
 import { 对比度 } from '../../entry/src/main/ets/model/色阶生成.ets';
 
@@ -12,7 +13,7 @@ const read = path => readFileSync(new URL('../../entry/src/main/ets/' + path, im
 const source = read('components/common/ThemeText.ets');
 const js = stripTypeScriptTypes(source.replace(/^import .*$/gm, '').replace(/^@Builder$/gm, '').replace(/^export /gm, ''), { mode: 'transform' });
 const spans = [];
-const api = compileWithUiFeedback('Span', 'ForEach', js + '\nreturn { themeLabelCharacters, themeAccentRampColor, themeLabelGlyphs, ThemeTextSpans, ThemeHighlightedTextSpans, themeHighlightedParts };')(
+const api = compileWithUiFeedback('Span', 'ForEach', js + '\nreturn { themeTextKey, themeLabelCharacters, themeAccentRampColor, themeLabelGlyphs, ThemeTextSpans, ThemeHighlightedTextSpans, themeHighlightedParts };')(
   text => { const item = { text }; spans.push(item); return { fontColor: color => { item.color = color; } }; },
   (items, build) => items.forEach(build)
 );
@@ -21,6 +22,114 @@ const context = { getHostContext: () => ({ resourceManager: { getStringSync: (id
   assert.deepEqual(args, ['课程', 12]);
   return '课程：12张';
 } } }) };
+
+function refreshHarness(path, locals = {}, index = 0) {
+  const translations = Object.fromEntries(['zh-Hans', 'en'].map(locale => [locale,
+    new Map(JSON.parse(readFileSync(new URL(`../../entry/src/main/resources/${locale === 'en' ? 'en_US' : 'base'}/element/string.json`, import.meta.url), 'utf8'))
+      .string.map(item => [item.name, item.value]))]));
+  const host = { uiLanguage: 'zh-Hans', 系统语言: 'zh-Hans', themeAccentColors: themeDefinition('iridescent').lightActionColors };
+  host.getUIContext = () => ({ getHostContext: () => ({ resourceManager: { getStringSync: id => {
+    assert.ok(translations[host.uiLanguage].has(id), id);
+    return translations[host.uiLanguage].get(id);
+  } } }) });
+  const $r = name => ({ id: name.slice('app.string.'.length), params: [name] });
+  const wrappers = themeTextWrappers(read(path));
+  assert.ok(wrappers[index], path);
+  return { host, view: cachedThemeText(wrappers[index], api, spans, $r, locals), translations };
+}
+
+test('custom study and parent-deck selection release the old accent without repainting siblings', () => {
+  const presets = [2, 3, 4].map(字段号 => ({ 字段号, 标题资源: `preset ${字段号}` }));
+  const views = presets.map(预设 => refreshHarness('components/home/自定义学习对话框.ets', { 预设 }).view);
+  const host = refreshHarness('components/home/自定义学习对话框.ets', { 预设: presets[0] }).host;
+  host.选中预设 = 2;
+  const draft = host.draft = { value: '12' };
+  for (const selected of [2, 3, 4, 2]) {
+    host.选中预设 = selected;
+    views.forEach((view, index) => {
+      const result = view.render(host);
+      assert.equal(result.some(span => span.color !== undefined), presets[index].字段号 === selected);
+      assert.equal(result.map(span => span.text).join(''), presets[index].标题资源);
+    });
+  }
+  assert.equal(host.draft, draft, 'only text children are rebuilt');
+  const { host: parent, view } = refreshHarness('components/创建牌组面板.ets', { id: '42', label: 'Parent deck' });
+  for (const id of ['42', '99', '42']) {
+    parent.parentId = id;
+    assert.equal(view.render(parent).some(span => span.color !== undefined), id === '42');
+  }
+});
+
+test('restore-trash text follows busy/empty transitions and light/dark/theme palettes', () => {
+  const { host, view } = refreshHarness('components/settings/媒体管理面板.ets');
+  host.回收站有内容 = true; host.处理中 = false;
+  const light = view.render(host);
+  assert.equal(light[0].color, host.themeAccentColors[0]);
+  const builds = view.builds();
+  host.themeAccentColors = [...host.themeAccentColors]; view.render(host);
+  assert.equal(view.builds(), builds, 'equivalent palettes retain the same text node');
+  host.themeAccentColors = themeDefinition('iridescent').darkActionColors;
+  assert.equal(view.render(host)[0].color, host.themeAccentColors[0]);
+  for (const [hasTrash, busy] of [[true, true], [false, false], [true, false]]) {
+    host.回收站有内容 = hasTrash; host.处理中 = busy;
+    assert.equal(view.render(host).some(span => span.color !== undefined), hasTrash && !busy);
+  }
+  host.themeAccentColors = [];
+  assert.ok(view.render(host).every(span => span.color === undefined), 'ordinary themes inherit the owner color');
+});
+
+test('dynamic action labels and plain percentage refresh under the same locale', () => {
+  for (const [path, property, resourceKeys] of [
+    ['components/添加笔记面板.ets', '高级已展开', ['add_note_advanced', 'add_note_advanced_hide']],
+    ['components/settings/空卡列表面板.ets', 'selectedAll', ['empty_cards_select_all', 'empty_cards_deselect_all']]
+  ]) {
+    const { host, view, translations } = refreshHarness(path);
+    host.全选状态 = () => host.selectedAll;
+    for (const flag of [false, true, false]) {
+      host[property] = flag;
+      assert.equal(view.render(host).map(span => span.text).join(''), translations['zh-Hans'].get(resourceKeys[Number(flag)]));
+    }
+    host.uiLanguage = 'en';
+    assert.equal(view.render(host).map(span => span.text).join(''), translations.en.get(resourceKeys[0]));
+  }
+  const { host, view } = refreshHarness('components/home/主页摘要分页.ets');
+  for (const value of [88.1, 92.4, 92.49, 88.1]) {
+    host.图表快照 = { 记忆率: value };
+    assert.deepEqual(view.render(host), [{ text: `${Math.round(value)}%` }]);
+  }
+  assert.equal(view.builds(), 3, 'an unchanged displayed percentage retains its text children');
+});
+
+test('status, assistant results and highlighted help titles refresh without remounting the owner', () => {
+  const sync = refreshHarness('components/同步面板.ets', {}, 2);
+  for (const text of ['done', 'uploaded', 'done']) {
+    sync.host.state = { 状态文案: text };
+    assert.equal(sync.view.render(sync.host).map(span => span.text).join(''), text);
+  }
+  const ctx = { message: { 批次结果: 'first batch' } };
+  const assistant = refreshHarness('pages/AI制卡页.ets', { ctx }, 1);
+  for (const text of ['first batch', 'second batch']) {
+    ctx.message.批次结果 = text;
+    assert.equal(assistant.view.render(assistant.host).map(span => span.text).join(''), text);
+  }
+  const { host, view } = refreshHarness('components/common/HelpLabel.ets');
+  host.title = 'Use Iridescent'; host.highlightLabel = 'Iridescent'; host.highlightColors = host.themeAccentColors;
+  assert.equal(view.render(host).filter(span => span.color !== undefined).map(span => span.text).join(''), 'Iridescent');
+  host.title = 'About Iridescent'; host.highlightLabel = 'About';
+  assert.equal(view.render(host).filter(span => span.color !== undefined).map(span => span.text).join(''), 'About');
+  host.highlightColors = [];
+  assert.deepEqual(view.render(host), [{ text: host.title }]);
+});
+
+test('theme text keys preserve formatting arguments and separate locale, text, palette and highlight', () => {
+  const resource = { id: 99, params: ['app.string.test', '课程', 12] };
+  assert.equal(api.themeTextKey(resource, [], context, 'zh'), api.themeTextKey('课程：12张', [], context, 'zh'));
+  const baseline = api.themeTextKey('a,b', ['#112233'], context, 'en', 'b');
+  for (const [label, colors, locale, highlight] of [
+    ['a,b', [], 'en', 'b'], ['a,b', ['#112233'], 'zh', 'b'],
+    ['a', ['#112233'], 'en', 'b'], ['a,b', ['#112233'], 'en', 'a']
+  ]) assert.notEqual(api.themeTextKey(label, colors, context, locale, highlight), baseline);
+});
 
 test('Iridescent names share the create-deck ramp while prose and group numbers keep their inherited color', () => {
   const theme = themeDefinition('iridescent');

@@ -14,7 +14,7 @@ import { DialogFrame } from '../common/DialogFrame';
 import { AnchoredMenuItem } from '../common/MenuItem';
 import { showToastSafely, resourceText } from '../../utils/UiFeedback';
 import { FormSelectRow } from '../common/FormSelectRow';
-import { ThemeTextSpans } from '../common/ThemeText';
+import { ThemeTextSpans, themeTextKey } from '../common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
 import { DialogHeader } from '../common/DialogHeader';
@@ -402,7 +402,7 @@ export struct 笔记类型编辑器 {
 
   @Builder
   private 字段令牌行(字段名: string) {
-    Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(`{{${字段名}}}`, this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }
+    Text() { ForEach([themeTextKey(`{{${字段名}}}`, this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(`{{${字段名}}}`, this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }
       .fontSize(应用尺寸.字号_正文_小)
       .fontColor(this.主色按钮背景)
       .backgroundColor(设置面板色板_取(this.isDark).标签背景)
@@ -485,7 +485,7 @@ export struct 笔记类型编辑器 {
           // === 字段区 ===
           Column({ space: 应用尺寸.间距_5 }) {
             Row() {
-              Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans($r('app.string.notetype_editor_add_field'), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }
+              Text() { ForEach([themeTextKey($r('app.string.notetype_editor_add_field'), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans($r('app.string.notetype_editor_add_field'), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }
                 .fontSize(应用尺寸.字号_正文_小)
                 .fontColor(this.主色按钮背景)
                 .attributeModifier(new PressFeedback())

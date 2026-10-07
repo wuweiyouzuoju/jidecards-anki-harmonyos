@@ -5,7 +5,7 @@ import { PrimaryActionButton } from '../common/PrimaryActionButton';
 import { OFFICIAL_ANKIWEB_SYNC_UI_ENABLED } from '../../model/ReleaseFeatures';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { showToastSafely, resourceText } from '../../utils/UiFeedback';
-import { ThemeTextSpans } from '../common/ThemeText';
+import { ThemeTextSpans, themeTextKey } from '../common/ThemeText';
 import { DialogHeader } from '../common/DialogHeader';
 import { SettingsToggleRow } from '../common/SettingsToggleRow';
 import { SettingsActionRow } from '../common/SettingsActionRow';
@@ -429,7 +429,7 @@ export struct 同步分组 {
           .fontSize(12)
           .fontColor(色板.三级文字)
           .layoutWeight(1)
-        Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(settingsItemText(this.getUIContext(), 'sync_register', this.uiLanguage), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }
+        Text() { ForEach([themeTextKey(settingsItemText(this.getUIContext(), 'sync_register', this.uiLanguage), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(settingsItemText(this.getUIContext(), 'sync_register', this.uiLanguage), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }
           .fontSize(12)
           .fontWeight(FontWeight.Medium)
           .fontColor(this.解析主色按钮背景())

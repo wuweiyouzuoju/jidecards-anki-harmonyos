@@ -2,7 +2,7 @@
 import { PressFeedback } from '../utils/PressFeedback';
 import { DialogBackdrop } from './common/DialogBackdrop';
 import { showToastSafely, resourceText, namedResourceText } from '../utils/UiFeedback';
-import { ThemeTextSpans } from './common/ThemeText';
+import { ThemeTextSpans, themeTextKey } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
 import { DialogHeader } from './common/DialogHeader';
@@ -133,7 +133,7 @@ export struct 同步面板 {
       // 上传按钮：fullDownload 场景不展示
       if (this.state.当前冲突类型 !== 'fullDownload') {
         Button() {
-          Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans($r('app.string.sync_conflict_upload'), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }.fontSize(应用尺寸.字号_按钮).fontColor(this.dialogActionColor)
+          Text() { ForEach([themeTextKey($r('app.string.sync_conflict_upload'), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans($r('app.string.sync_conflict_upload'), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }.fontSize(应用尺寸.字号_按钮).fontColor(this.dialogActionColor)
         }
           .layoutWeight(1)
           .height(44)
@@ -150,7 +150,7 @@ export struct 同步面板 {
       // 下载按钮：fullUpload 场景不展示
       if (this.state.当前冲突类型 !== 'fullUpload') {
         Button() {
-          Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans($r('app.string.sync_conflict_download'), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }.fontSize(应用尺寸.字号_按钮).fontColor(this.dialogActionColor)
+          Text() { ForEach([themeTextKey($r('app.string.sync_conflict_download'), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans($r('app.string.sync_conflict_download'), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }.fontSize(应用尺寸.字号_按钮).fontColor(this.dialogActionColor)
         }
           .layoutWeight(1)
           .height(44)
@@ -172,7 +172,7 @@ export struct 同步面板 {
   @Builder
   private 完成内容() {
     if (this.state.状态文案 !== '') {
-      Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(this.state.状态文案, this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }
+      Text() { ForEach([themeTextKey(this.state.状态文案, this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(this.state.状态文案, this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }
         .fontSize(应用尺寸.字号_正文_小)
         .fontColor(this.取色板().主色)
         .width('100%')

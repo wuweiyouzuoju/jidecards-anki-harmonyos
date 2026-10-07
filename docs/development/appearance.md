@@ -201,7 +201,7 @@ EntryAbility 的配置更新及返回前台通过 `refreshThemeColors()` 使用�
 
 EntryAbility 在配置通知后读取应用偏好语言，发布既有“系统语言”键；主题通知不能用系统语言覆盖应用偏好。UI 中提前解析成普通字符串的标题、菜单与 Select 选项显式观察此键，由 UiFeedback 和目录文字入口重新解析；本地辅助方法的 `_locale` 默认参数负责读到响应式语言。原生 `$r` 继续由系统刷新。帮助 i 改用18vp居中 SVG，保留44vp点击区，不依赖字体基线。`ui-locale-refresh.test.mjs` 验证真实资源与控件内容重算，`theme-configuration.test.mjs` 验证配置通知来源；Node/HAP 不能替代设备上的即时刷新验收。
 
-渐变 Span Builder 的按值参数会保留旧字符，因此宿主用仅包裹文字子节点的 `ForEach([this.uiLanguage])` 按语言重建 Span；不重建表单或页面。统计页语言 watcher 只替换缓存的“全部牌组”标签，保留牌组筛选；统计范围选择与默认牌组名也直接依赖同一语言。
+渐变 Span Builder 的按值参数会保留旧文字和颜色，外层 `Text.fontColor` 无法覆盖已染色的 Span。宿主仅重建文字子节点，用共享 `themeTextKey(label, colors, context, locale, highlight)` 让 key 覆盖与 Builder 相同的文案、有效色板、高亮和语言；不能只以语言为 key。取消选中和禁用时的空色板同样参与身份，使自定义学习、父牌组选择和媒体恢复按钮回到原有继承色，保持原选中样式。动态展开/全选文案、记忆率、同步状态及助手结果沿用此入口刷新；普通、危险和数据文字仍传空色板。`theme-text.test.mjs` 执行真实调用表达式并模拟缓存规则，`ui-locale-refresh.test.mjs` 审计全部调用参数；实际响应式更新需补 HAP 与设备验收。不重建表单或页面。统计页语言 watcher 只替换缓存的“全部牌组”标签，保留牌组筛选；统计范围选择与默认牌组名也直接依赖同一语言。
 
 2026-10-03 此批验收：定位、连续轮廓、语言刷新、帮助几何、主题配置、公共入口及文档的聚焦测试62项通过；增量签名HAP通过，unexpected warnings=0。实际 MenuBubble Path 已按深浅色、两种方向和44/132/176vp高度渲染检查，产物在忽略的 `.local/menu-bubble-geometry.*`。全量Node另外保留3项既有失败：`ai-agent-conversational-ui-contract` 仍期待散写分隔边框，`ai-agent-high-risk-ui-contract` 仍期待原生Select，`ai-agent-math` 的测试宿主缺少SurfaceBorder依赖；没有修改这些任务的实现或降低断言。本次未安装设备，Node与路径渲染不能证明实际ArkUI观察、长文字布局及触屏交互。
 

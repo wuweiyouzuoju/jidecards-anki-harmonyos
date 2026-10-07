@@ -2,7 +2,7 @@
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { PressFeedback } from '../utils/PressFeedback';
 import { DialogBackdrop } from './common/DialogBackdrop';
-import { ThemeTextSpans } from './common/ThemeText';
+import { ThemeTextSpans, themeTextKey } from './common/ThemeText';
 import { showToastSafely } from '../utils/UiFeedback';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
@@ -114,7 +114,7 @@ export struct AnkiWeb引导对话框 {
           .margin({ top: 应用尺寸.间距_4 })
 
         // 网址：可长按选中复制（Text.copyOption）
-        Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(this.网址, this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }
+        Text() { ForEach([themeTextKey(this.网址, this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(this.网址, this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }
           .fontSize(应用尺寸.字号_正文_小)
           .fontColor($r('app.color.action_primary'))
           .width('100%')
@@ -128,7 +128,7 @@ export struct AnkiWeb引导对话框 {
 
         Row({ space: 应用尺寸.间距_12 }) {
           Button() {
-            Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans($r('app.string.ankiweb_guide_button_open'), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }.fontSize(应用尺寸.字号_正文).fontColor($r('app.color.action_primary'))
+            Text() { ForEach([themeTextKey($r('app.string.ankiweb_guide_button_open'), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans($r('app.string.ankiweb_guide_button_open'), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }.fontSize(应用尺寸.字号_正文).fontColor($r('app.color.action_primary'))
           }
             .type(ButtonType.Normal)
             .layoutWeight(1)

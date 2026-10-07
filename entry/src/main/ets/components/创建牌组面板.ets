@@ -6,7 +6,7 @@ import { FormInputStyle } from '../utils/FormInputStyle';
 import { PressFeedback } from '../utils/PressFeedback';
 import { DialogBackdrop } from './common/DialogBackdrop';
 import { resourceText } from '../utils/UiFeedback';
-import { ThemeTextSpans } from './common/ThemeText';
+import { ThemeTextSpans, themeTextKey } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
 import { DialogHeader } from './common/DialogHeader';
@@ -254,7 +254,7 @@ export struct 创建牌组面板 {
   private 父牌组候选行(id: string, label: string, depth: number) {
     Row() {
       Row() {
-        Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(label, (this.parentId === id) ? this.themeAccentColors : [], this.getUIContext()) }, (_locale: string): string => _locale) }
+        Text() { ForEach([themeTextKey(label, (this.parentId === id) ? this.themeAccentColors : [], this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(label, (this.parentId === id) ? this.themeAccentColors : [], this.getUIContext()) }, (_textKey: string): string => _textKey) }
           .fontSize(应用尺寸.字号_正文)
           .fontColor(this.parentId === id ? this.动作主色 : $r('app.color.text_primary'))
           .fontWeight(this.parentId === id ? FontWeight.Bold : FontWeight.Medium)

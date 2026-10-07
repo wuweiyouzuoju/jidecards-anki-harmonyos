@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { ThemeTextSpans } from '../common/ThemeText';
+import { ThemeTextSpans, themeTextKey } from '../common/ThemeText';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { homeSummaryGeometry, HomeSummaryGeometry, HOME_SUMMARY_HEIGHT } from '../../model/HomeHeaderLayout';
 
@@ -211,7 +211,7 @@ export struct 主页摘要分页 {
       Column({ space: 应用尺寸.间距_8 }) {
         if (this.图表快照!.fsrs已启用) {
           Row() {
-            Text() { ForEach([this.系统语言], (_locale: string) => { ThemeTextSpans(`${Math.round(this.图表快照!.记忆率)}%`, [], this.getUIContext()) }, (_locale: string): string => _locale) }
+            Text() { ForEach([themeTextKey(`${Math.round(this.图表快照!.记忆率)}%`, [], this.getUIContext(), this.系统语言)], (_textKey: string) => { ThemeTextSpans(`${Math.round(this.图表快照!.记忆率)}%`, [], this.getUIContext()) }, (_textKey: string): string => _textKey) }
               .fontSize(32)
               .fontWeight(FontWeight.Bold)
               .fontColor(this.动作主色)

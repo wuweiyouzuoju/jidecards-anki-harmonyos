@@ -27,6 +27,14 @@ export interface ThemeLabelGlyph {
   color: string;
 }
 
+/** 按值 Builder 的文字子节点须随文案、有效色板、高亮及语言重建，空色板也参与身份。 */
+export function themeTextKey(label: ResourceStr, colors: string[], context: UIContext,
+  locale: string, highlight: ResourceStr = ''): string {
+  const text: string = typeof label === 'string' ? label : resourceText(context, label);
+  const name: string = typeof highlight === 'string' ? highlight : resourceText(context, highlight);
+  return JSON.stringify([locale, text, JSON.stringify(colors), name]);
+}
+
 /** 保留本地化参数与 Unicode 码点，不把表情拆成两个字形。 */
 function themeLabelCharacters(label: ResourceStr, context: UIContext): string[] {
   if (typeof label === 'string') return label.match(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\s\S]/g) ?? [];

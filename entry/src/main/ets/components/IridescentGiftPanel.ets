@@ -6,7 +6,7 @@ import { DialogFrame } from './common/DialogFrame';
 import { DialogHeader } from './common/DialogHeader';
 import { 颜色键 } from '../model/颜色主题';
 import { IridescentThemePreview } from './common/IridescentThemePreview';
-import { ThemeHighlightedTextSpans } from './common/ThemeText';
+import { ThemeHighlightedTextSpans, themeTextKey } from './common/ThemeText';
 import { themeDefinition } from '../model/ThemeCatalog';
 import { 规范化主题模式, 解析是否深色 } from '../model/主题设置';
 import { PressFeedback } from '../utils/PressFeedback';
@@ -49,9 +49,10 @@ export struct IridescentGiftPanel {
   private bodyContent() {
     Column({ space: 应用尺寸.间距_12 }) {
       Text() {
-        ForEach([this.uiLanguage], (_locale: string) => { ThemeHighlightedTextSpans(this.announcement ? $r('app.string.iridescent_gift_announcement') :
+        ForEach([themeTextKey(this.announcement ? $r('app.string.iridescent_gift_announcement') :
+          $r('app.string.iridescent_gift_offer'), this.iridescentTextColors(), this.getUIContext(), this.uiLanguage, $r('app.string.iridescent_gift_name'))], (_textKey: string) => { ThemeHighlightedTextSpans(this.announcement ? $r('app.string.iridescent_gift_announcement') :
           $r('app.string.iridescent_gift_offer'), $r('app.string.iridescent_gift_name'),
-          this.iridescentTextColors(), this.getUIContext()) }, (_locale: string): string => _locale)
+          this.iridescentTextColors(), this.getUIContext()) }, (_textKey: string): string => _textKey)
       }
         .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary')).width('100%')
       Button() {
@@ -66,8 +67,8 @@ export struct IridescentGiftPanel {
       .attributeModifier(new PressFeedback()).stateEffect(false)
       .onClick((): void => { this.copyGroup(); })
       Text() {
-        ForEach([this.uiLanguage], (_locale: string) => { ThemeHighlightedTextSpans($r('app.string.home_intro_theme_preview'), $r('app.string.iridescent_gift_name'),
-          this.iridescentTextColors(), this.getUIContext()) }, (_locale: string): string => _locale)
+        ForEach([themeTextKey($r('app.string.home_intro_theme_preview'), this.iridescentTextColors(), this.getUIContext(), this.uiLanguage, $r('app.string.iridescent_gift_name'))], (_textKey: string) => { ThemeHighlightedTextSpans($r('app.string.home_intro_theme_preview'), $r('app.string.iridescent_gift_name'),
+          this.iridescentTextColors(), this.getUIContext()) }, (_textKey: string): string => _textKey)
       }
         .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
       IridescentThemePreview()

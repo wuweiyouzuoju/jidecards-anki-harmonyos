@@ -7,7 +7,7 @@ import { HelpLabel } from '../common/HelpLabel';
 import { 字段帮助对话框 } from '../字段帮助面板';
 import { DisclosureChevron } from '../common/DisclosureChevron';
 import { showToastSafely, resourceText, namedResourceText } from '../../utils/UiFeedback';
-import { ThemeTextSpans } from '../common/ThemeText';
+import { ThemeTextSpans, themeTextKey } from '../common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 import { pasteboard } from '@kit.BasicServicesKit';
 import { ThemeId, themeForContent } from '../../model/ThemeCatalog';
@@ -89,8 +89,8 @@ export struct RedemptionPanel {
       Button() {
         Row({ space: 8 }) {
           Text($r('app.string.about_qq_group_title')).fontSize(14).fontColor($r('app.color.text_secondary'))
-          Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(this.developerGroup, this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }.fontSize(16).fontWeight(FontWeight.Medium).fontColor(this.primary).textAlign(TextAlign.Start).layoutWeight(1)
-          Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(settingsItemText(this.getUIContext(), 'fingerprint_copy', this.uiLanguage), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }.fontSize(14).fontColor(this.primary)
+          Text() { ForEach([themeTextKey(this.developerGroup, this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(this.developerGroup, this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }.fontSize(16).fontWeight(FontWeight.Medium).fontColor(this.primary).textAlign(TextAlign.Start).layoutWeight(1)
+          Text() { ForEach([themeTextKey(settingsItemText(this.getUIContext(), 'fingerprint_copy', this.uiLanguage), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(settingsItemText(this.getUIContext(), 'fingerprint_copy', this.uiLanguage), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }.fontSize(14).fontColor(this.primary)
         }.width('100%')
       }
       .width('100%').height(48).padding({ left: 14, right: 14 }).borderRadius(12).border(SurfaceBorder.options())
@@ -195,7 +195,7 @@ export struct RedemptionPanel {
         Text(settingsItemText(this.getUIContext(), 'installation_fingerprint', this.uiLanguage))
           .fontSize(15).fontColor($r('app.color.text_primary')).textAlign(TextAlign.Start).layoutWeight(1)
         Button() {
-          Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(settingsItemText(this.getUIContext(), 'fingerprint_copy', this.uiLanguage), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }.fontColor(this.primary)
+          Text() { ForEach([themeTextKey(settingsItemText(this.getUIContext(), 'fingerprint_copy', this.uiLanguage), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(settingsItemText(this.getUIContext(), 'fingerprint_copy', this.uiLanguage), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }.fontColor(this.primary)
         }
           .fontColor(this.primary).backgroundColor(Color.Transparent)
           .enabled(this.fingerprint !== '').attributeModifier(new PressFeedback())
@@ -222,7 +222,7 @@ export struct RedemptionPanel {
       Button() {
         Row() {
 
-          Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(settingsItemText(this.getUIContext(), 'redemption', this.uiLanguage), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }.fontSize(15).fontColor(this.primary).textAlign(TextAlign.Start).layoutWeight(1)
+          Text() { ForEach([themeTextKey(settingsItemText(this.getUIContext(), 'redemption', this.uiLanguage), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(settingsItemText(this.getUIContext(), 'redemption', this.uiLanguage), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }.fontSize(15).fontColor(this.primary).textAlign(TextAlign.Start).layoutWeight(1)
           DisclosureChevron({ tint: $r('app.color.text_tertiary') })
         }.width('100%')
       }

@@ -16,7 +16,7 @@ import { StudyTimerController, StudyTimerState } from '../model/StudyTimerContro
 import { showToastSafely, resourceText, namedResourceText } from '../utils/UiFeedback';
 import { AppInterfaceItem, AppInterfaceMenuItem, AppInterfaceControl, studyInterfaceMenu, visibleInterfaceItems } from '../model/AppInterface';
 import { appInterface } from '../backend/AppInterfaceService';
-import { ThemeTextSpans } from '../components/common/ThemeText';
+import { ThemeTextSpans, themeTextKey } from '../components/common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
 import { PAGE_COMPACT_LAYOUT_KEY } from '../model/AppLayoutState';
@@ -2109,7 +2109,7 @@ export struct 学习页 {
             }
             if (this.完成页有埋藏) {
               Button() {
-                Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans($r('app.string.study_unbury'), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }.fontSize(应用尺寸.字号_按钮).fontColor(this.动作主色)
+                Text() { ForEach([themeTextKey($r('app.string.study_unbury'), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans($r('app.string.study_unbury'), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }.fontSize(应用尺寸.字号_按钮).fontColor(this.动作主色)
               }
                 .height(应用尺寸.按钮高度)
                 .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })

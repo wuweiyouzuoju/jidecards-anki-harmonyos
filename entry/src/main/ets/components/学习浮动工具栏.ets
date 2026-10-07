@@ -38,7 +38,7 @@ import {
 } from '../utils/工具栏尺寸';
 import { 学习阶段 } from '../utils/吸附计算器';
 import { 颜色键 } from '../model/颜色主题';
-import { ThemeTextSpans } from './common/ThemeText';
+import { ThemeTextSpans, themeTextKey } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 import { themeDefinition } from '../model/ThemeCatalog';
 import { PrimaryGlassSurface } from '../utils/PrimaryGlassSurface';
@@ -449,7 +449,7 @@ export struct 学习浮动工具栏 {
   @Builder
   private 竖版显示答案按钮() {
     Button({ type: ButtonType.Normal }) {
-      Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans($r('app.string.study_show_answer'), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }
+      Text() { ForEach([themeTextKey($r('app.string.study_show_answer'), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans($r('app.string.study_show_answer'), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }
         .maxLines(2)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
         .textAlign(TextAlign.Center)

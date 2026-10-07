@@ -3,7 +3,7 @@ import { WINDOW_SAFE_TOP_KEY } from '../model/WindowSafeLayout';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { PressFeedback } from '../utils/PressFeedback';
 import { CustomTransition } from '../utils/自定义转场';
-import { ThemeTextSpans } from '../components/common/ThemeText';
+import { ThemeTextSpans, themeTextKey } from '../components/common/ThemeText';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
 import { PAGE_COMPACT_LAYOUT_KEY } from '../model/AppLayoutState';
 
@@ -371,7 +371,7 @@ export struct 学习提醒页 {
       Row() {
         // 左侧时间大字
         Column() {
-          Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(this.格式化时间(项.小时, 项.分钟), [], this.getUIContext()) }, (_locale: string): string => _locale) }
+          Text() { ForEach([themeTextKey(this.格式化时间(项.小时, 项.分钟), [], this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(this.格式化时间(项.小时, 项.分钟), [], this.getUIContext()) }, (_textKey: string): string => _textKey) }
             .fontSize(28)
             .fontWeight(FontWeight.Bold)
             .fontColor(项.开启 ? this.解析主色按钮背景() : 设置面板色板_取(this.是否深色).弱化文字)

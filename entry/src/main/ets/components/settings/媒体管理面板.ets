@@ -6,7 +6,7 @@ import { PressFeedback } from '../../utils/PressFeedback';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { DialogBackdrop } from '../common/DialogBackdrop';
 import { namedResourceText, resourceText } from '../../utils/UiFeedback';
-import { ThemeTextSpans } from '../common/ThemeText';
+import { ThemeTextSpans, themeTextKey } from '../common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
 import { DialogHeader } from '../common/DialogHeader';
@@ -377,7 +377,7 @@ export struct 媒体管理面板 {
                 .width('100%')
                 Row({ space: 8 }) {
                   Button() {
-                    Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans($r('app.string.media_restore_trash'), (this.回收站有内容 && !this.处理中) ? this.themeAccentColors : [], this.getUIContext()) }, (_locale: string): string => _locale) }.fontSize(14).fontColor(this.回收站有内容 && !this.处理中 ?
+                    Text() { ForEach([themeTextKey($r('app.string.media_restore_trash'), (this.回收站有内容 && !this.处理中) ? this.themeAccentColors : [], this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans($r('app.string.media_restore_trash'), (this.回收站有内容 && !this.处理中) ? this.themeAccentColors : [], this.getUIContext()) }, (_textKey: string): string => _textKey) }.fontSize(14).fontColor(this.回收站有内容 && !this.处理中 ?
                       this.dialogActionColor : $r('app.color.text_secondary'))
                   }
                     .type(ButtonType.Normal)

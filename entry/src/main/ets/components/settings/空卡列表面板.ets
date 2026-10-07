@@ -3,7 +3,7 @@ import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { DialogBackdrop } from '../common/DialogBackdrop';
 import { resourceText } from '../../utils/UiFeedback';
-import { ThemeTextSpans } from '../common/ThemeText';
+import { ThemeTextSpans, themeTextKey } from '../common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
 import { DialogHeader } from '../common/DialogHeader';
@@ -281,7 +281,7 @@ export struct 空卡列表面板 {
                   .layoutWeight(1)
                 if (this.笔记列表.length > 0) {
                   Button() {
-                    Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans(this.全选状态() ? $r('app.string.empty_cards_deselect_all') : $r('app.string.empty_cards_select_all'), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }.fontColor(this.主色按钮背景).fontSize(应用尺寸.字号_正文_小)
+                    Text() { ForEach([themeTextKey(this.全选状态() ? $r('app.string.empty_cards_deselect_all') : $r('app.string.empty_cards_select_all'), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(this.全选状态() ? $r('app.string.empty_cards_deselect_all') : $r('app.string.empty_cards_select_all'), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }.fontColor(this.主色按钮背景).fontSize(应用尺寸.字号_正文_小)
                   }
                     .type(ButtonType.Normal)
                     .backgroundColor(Color.Transparent)

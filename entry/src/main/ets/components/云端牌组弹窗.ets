@@ -2,7 +2,7 @@
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { PressFeedback } from '../utils/PressFeedback';
 import { DialogBackdrop } from './common/DialogBackdrop';
-import { ThemeTextSpans } from './common/ThemeText';
+import { ThemeTextSpans, themeTextKey } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
 import { DialogHeader } from './common/DialogHeader';
@@ -192,7 +192,7 @@ export struct 云端牌组弹窗 {
             .width('100%')
         }
 
-        Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans($r('app.string.cloud_deck_qq_group_entry', '726837065'), [], this.getUIContext()) }, (_locale: string): string => _locale) }
+        Text() { ForEach([themeTextKey($r('app.string.cloud_deck_qq_group_entry', '726837065'), [], this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans($r('app.string.cloud_deck_qq_group_entry', '726837065'), [], this.getUIContext()) }, (_textKey: string): string => _textKey) }
           .fontSize(应用尺寸.字号_说明)
           .fontColor(this.动作主色)
           .width('100%')
@@ -218,7 +218,7 @@ export struct 云端牌组弹窗 {
               .fontColor($r('app.color.error_text'))
               .textAlign(TextAlign.Center)
             Button() {
-              Text() { ForEach([this.uiLanguage], (_locale: string) => { ThemeTextSpans($r('app.string.cloud_deck_retry'), this.themeAccentColors, this.getUIContext()) }, (_locale: string): string => _locale) }.fontColor(this.动作主色)
+              Text() { ForEach([themeTextKey($r('app.string.cloud_deck_retry'), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans($r('app.string.cloud_deck_retry'), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }.fontColor(this.动作主色)
             }
               .type(ButtonType.Normal)
               .fontColor(this.动作主色)
