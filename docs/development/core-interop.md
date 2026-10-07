@@ -66,6 +66,12 @@ legacy 格式会重排未知 JSON 的键，比较其解析后的值；APKG 增�
 
 ## 未验证范围
 
+2026-10-07 新增显式在线入口 [online_sync_check.rs](../../native/rsharmony/examples/online_sync_check.rs)：先 `cargo build -p jidecards_core --features anki-core --example online_sync_check --locked`，进程环境提供 `JIDECARDS_SYNC_USER` / `JIDECARDS_SYNC_PASSWORD` 后运行 `target/debug/examples/online_sync_check.exe`。始终创建新集合；有服务器数据先完整下载，写入仅限唯一合成牌组/笔记，最后删除自己的合成数据并核对已有卡 ID。默认跳过整个远程媒体库；`JIDECARDS_SYNC_MEDIA=1` 显式启用媒体。`JIDECARDS_SYNC_LOCAL=1` 在隔离目录启动锁定 Core 服务器、执行完整媒体字节与删除验证，不需要账号。
+
+媒体同步单次最多等待900秒。`JIDECARDS_SYNC_MEDIA_CACHE` 可指向本入口之前已退出的隔离客户端目录，复用其 `collection.media` 和媒体数据库/WAL，继续之前的下载；仍为两端创建全新集合，不复制集合数据库，也不绕过媒体字节或删除核对。
+
+实际官方集合同步和隔离服务器媒体结果见[本轮记录](ankidroid-high-priority-2026-10-07.md)。原 `test:interop` 报告仍只声明它自身运行的范围；独立在线/设备结果不回填为该命令通过。下述2026-10-02范围保留为原入口边界，后续证据以日期记录区分。
+
 - AnkiDroid Android Backend 的实际执行、APK/UI 和设备返回包；Anki 桌面 GUI；jidecards C++ NAPI、ArkWeb/媒体播放、输入答案交互、IO 画布及设备进程中断。Core 渲染字符串通过不代表上述显示/交互通过。
 - AnkiWeb / 自建兼容服务器的增量同步、全量上传/下载、服务器重定向、媒体增删与断点恢复、跨客户端冲突/USN 合并。必须由用户另行提供隔离测试账号和目标服务器，不能使用已保存凭证或真实账号。
 - 电源故障、磁盘硬件损坏、任意压缩炸弹和平台磁盘耗尽；主机恢复证明进程中断协议，不扩大为断电持久化保证。
