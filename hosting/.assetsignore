@@ -1,3 +1,5 @@
 wrangler.jsonc
 .wrangler/
 .assetsignore
+# Retired screenshots stay in Git history/local checkout, never in the live asset manifest.
+assets/app-*.png
