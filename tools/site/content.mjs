@@ -1,0 +1,33 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
+import JSON5 from 'json5';
+
+export async function loadContent(root) {
+  const hosting = path.join(root, 'hosting');
+  const data = JSON.parse(await readFile(path.join(hosting, 'data/works.json'), 'utf8'));
+  const guide = JSON.parse(await readFile(path.join(hosting, 'data/harmonyos-anki-guide.json'), 'utf8'));
+  const { app } = JSON5.parse(await readFile(path.join(root, 'AppScope/app.json5'), 'utf8'));
+  const work = data.works[0];
+  work.sourceVersion = app.versionName;
+  work.sourceVersionCode = app.versionCode;
+  // 正式版由作者指定，源码版本来自应用配置，两项事实不相互推断。
+  if (!work.releaseVersion || !work.releaseVersionSource) throw new Error('Author-confirmed website release is required.');
+  if (!work.screenshots.length) throw new Error('Current author-supplied product media is required.');
+  for (const item of work.screenshots) {
+    if (item.releaseVersion !== work.releaseVersion) throw new Error(`Outdated product media: ${item.path}`);
+    const bytes = await readFile(path.join(hosting, item.path));
+    const digest = createHash('sha256').update(bytes).digest('hex');
+    if (digest !== item.sha256) throw new Error(`Product media does not match author-supplied bytes: ${item.path}`);
+  }
+  const css = await readFile(path.join(hosting, 'styles.css'));
+  const logo = await readFile(path.join(root, 'AppScope/resources/base/media/app_icon.png'));
+  const hash = bytes => createHash('sha256').update(bytes).digest('hex').slice(0, 12);
+  return {
+    root, hosting, data, guide, work, logo,
+    origin: 'https://jidecards.com',
+    assets: { css: hash(css), logo: hash(logo) },
+    repositories: [{ name: 'GitHub', url: work.repository }, ...work.repositoryMirrors]
+  };
+}
