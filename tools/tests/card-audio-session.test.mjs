@@ -16,6 +16,40 @@ const deferred = () => {
 };
 const tags = name => ({ soundFiles: [name], ttsItems: [{ text: name, language: 'en_US' }] });
 
+test('an on-card replay selects exactly one Core sound or TTS item', async () => {
+  const h=harness(async()=>mixedTags());
+  await h.session.play('mixed',true,'/media',true,'',()=>{}, {itemIndex:1});
+  assert.deepEqual(h.played(),[['tts',[{text:'middle',language:'en_US',voices:[],speed:1,otherArgs:[]}]]]);
+  h.events.length=0;
+  await h.session.play('mixed',true,'/media',true,'',()=>{}, {itemIndex:2});
+  assert.deepEqual(h.played(),[['sound',['/media/c.mp3']]]);
+});
+
+test('answer audio can wait for the question while card cancellation stops both', async () => {
+  const h=harness(async html=>({soundFiles:[html],ttsItems:[]}));
+  const completion=new AudioQueueCompletion();
+  h.sound.播放队列=async items=>{completion.begin();h.events.push(['sound',items]);};
+  h.sound.waitForCompletion=()=>completion.wait();h.sound.停止=async()=>completion.finish();
+  const question=h.session.play('question',true,'/media');
+  await new Promise(r=>setImmediate(r));
+  const answer=h.session.play('answer',false,'/media',true,'',()=>{}, {continuePrevious:true});
+  await new Promise(r=>setImmediate(r));
+  assert.deepEqual(h.played(),[['sound',['/media/question']]]);assert.equal(h.session.isPlaying(),true);
+  completion.finish();await question;await new Promise(r=>setImmediate(r));
+  assert.deepEqual(h.played().at(-1),['sound',['/media/answer']]);assert.equal(h.session.isPlaying(),true);
+  await h.session.stop();assert.equal(await answer,null);assert.equal(h.session.isPlaying(),false);
+});
+
+test('noninterrupting answer cannot overtake slow question extraction and an invalid individual index has no audio', async () => {
+  const slow=deferred(), h=harness(html=>html==='question'?slow.promise:Promise.resolve({soundFiles:[html],ttsItems:[]}));
+  const question=h.session.play('question',true,'/media');
+  const answer=h.session.play('answer',false,'/media',true,'',()=>{}, {continuePrevious:true});
+  await new Promise(r=>setImmediate(r)); assert.deepEqual(h.played(),[]);
+  slow.resolve({soundFiles:['question'],ttsItems:[]}); await question; await answer;
+  assert.deepEqual(h.played(),[['sound',['/media/question']],['sound',['/media/answer']]]);
+  assert.equal(await h.session.play('answer',false,'/media',true,'',()=>{}, {itemIndex:99}),false);
+});
+
 function mixedTags() {
   const wire = new 协议写入器();
   for (const item of ['a.mp3', { text: 'middle', language: 'en_US' }, 'c.mp3', 'd.mp3']) {

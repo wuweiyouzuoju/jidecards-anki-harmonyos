@@ -90,6 +90,22 @@ test('click exclusions and tap-only mode preserve native card interactions', () 
   d.tick(500); assert.equal(d.actions.length, 1);
 });
 
+test('audio icon clicks dispatch the chosen item immediately with the current card surface', () => {
+  for (const gestures of [false, true]) {
+    const d = dom(); d.install(7, 9, gestures);
+    const button = { ...d.plain, tagName: 'BUTTON',
+      getAttribute: name => name === 'data-jide-audio' ? 'q:1' : null };
+    const icon = { ...d.plain, tagName: 'path', parentElement: { ...d.plain, tagName: 'svg', parentElement: button } };
+    d.start(200, 200, icon); d.end(200, 200); d.click(icon);
+    assert.deepEqual(d.actions, [['audio:q:1', 0, 0, 7, 9]]);
+    d.tick(500); assert.equal(d.actions.length, 1, 'audio must not also trigger flip or grading');
+    button.getAttribute = name => name === 'data-jide-audio' ? 'a:12' : null;
+    d.click(icon); assert.deepEqual(d.actions[1], ['audio:a:12', 0, 0, 7, 9]);
+    button.getAttribute = name => name === 'data-jide-audio' ? 'q:invalid' : null;
+    d.click(icon); assert.equal(d.actions.length, 2);
+  }
+});
+
 function controlsStore(initial = []) {
   let memory = new Map(initial), disk = new Map(initial), fail = false;
   const notifications = [];

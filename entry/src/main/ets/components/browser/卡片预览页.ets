@@ -71,6 +71,8 @@ import { DelayedLoadingIndicator } from '../common/DelayedLoadingIndicator';
 import { 声音播放器 } from '../../utils/声音播放器';
 import { TTS播放器 } from '../../utils/TTS播放器';
 import { CardAudioSession } from '../../model/CardAudioSession';
+import { reviewPreferences } from '../../backend/ReviewPreferencesService';
+import { ReviewPreferences } from '../../proto/messages/PreferencesMessages';
 import { APP_FOREGROUND_KEY } from '../../model/AppLifecycleState';
 import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../../model/ReleaseFeatures';
 import { buildPreviewInteractionScript } from '../../model/PreviewInteraction';
@@ -154,6 +156,7 @@ export struct 卡片预览页 {
   @State private previewIds: number[] = [];
   @State private hasAudio: boolean = false;
   @State private audioError: string = '';
+  private audioPreferences: ReviewPreferences = new ReviewPreferences();
 
   @State private 当前索引值: number = 0;
   @State private 当前面: 预览面 = 'question';
@@ -223,7 +226,7 @@ export struct 卡片预览页 {
   }
 
   /** 音频失败只影响重播入口，卡片仍可浏览。 */
-  private async playCurrentAudio(autoplay: boolean = true): Promise<void> {
+  private async playCurrentAudio(autoplay: boolean = true, audioTarget: string = ''): Promise<void> {
     const rendered: RenderedCard | null = this.已渲染;
     if (rendered === null || !this.mounted || this.错误详情 !== '') return;
     if (!this.interactionEnabled || !this.foreground) {
@@ -234,12 +237,14 @@ export struct 卡片预览页 {
     const version: number = this.documentVersion;
     this.hasAudio = false;
     this.audioError = '';
+    const target: RegExpExecArray | null = /^([qa]):(\d+)$/.exec(audioTarget);
+    const question: boolean = target === null ? this.当前面 === 'question' : target[1] === 'q';
     try {
       const hasAudio: boolean | null = await this.audioSession.play(
-        原始侧HTML(rendered, this.当前面), this.当前面 === 'question', this.媒体目录, autoplay, '',
+        原始侧HTML(rendered, question ? 'question' : 'answer'), question, this.媒体目录, autoplay, '',
         (available: boolean): void => {
           if (this.mounted && version === this.documentVersion) this.hasAudio = available;
-        });
+        }, { itemIndex: target === null ? undefined : Number(target[2]) });
       if (hasAudio !== null && this.mounted && version === this.documentVersion) {
         this.hasAudio = hasAudio;
       }
@@ -314,13 +319,16 @@ export struct 卡片预览页 {
     this.待加载HTML = '';
     try {
       this.currentMarking = null;
+      this.audioPreferences = await reviewPreferences.read();
+      if (!this.mounted || version !== this.loadVersion) return;
       const marking: CardMarkingState = await readCardMarking(this.markingBackend, 卡片ID);
       if (!this.mounted || version !== this.loadVersion) return;
       const labels: FlagLabels = parseFlagLabels(await this.markingBackend.labels());
       if (!this.mounted || version !== this.loadVersion) return;
       const rendered: RenderedCard = await this.renderPrefetch.read(卡片ID);
       if (!this.mounted || version !== this.loadVersion) return;
-      const answerHtml: string = await renderPreviewAnswer(构建卡片HTML(rendered, 'answer', this.isDark),
+      const answerHtml: string = await renderPreviewAnswer(构建卡片HTML(rendered, 'answer', this.isDark, undefined,
+        this.audioPreferences.hideAudioPlayButtons, this.取本地化文案($r('app.string.study_replay_sound'))),
         rendered, 卡片ID, {
           card: (id: number): Promise<Card> => this.卡片服务实例.获取卡片(id),
           note: (id: number): Promise<EditableNote> => this.笔记服务实例.获取笔记(id),
@@ -333,7 +341,8 @@ export struct 卡片预览页 {
       if (!this.mounted || version !== this.loadVersion) return;
       this.已渲染 = rendered;
       this.currentMarking = marking; this.flagLabels = labels;
-      this.正面HTML = 剥除拼写标记(构建卡片HTML(this.已渲染, 'question', this.isDark));
+      this.正面HTML = 剥除拼写标记(构建卡片HTML(this.已渲染, 'question', this.isDark, undefined,
+        this.audioPreferences.hideAudioPlayButtons, this.取本地化文案($r('app.string.study_replay_sound'))));
       this.背面HTML = answerHtml;
       this.应用HTML(this.当前面 === 'question' ? this.正面HTML : this.背面HTML);
     } catch (错误) {
@@ -393,6 +402,7 @@ export struct 卡片预览页 {
       if (action === 'previous') this.上一张();
       if (action === 'next') this.下一张();
       if (action === 'replay') this.playCurrentAudio();
+      if (!this.cardRenderPending && /^audio:[qa]:\d+$/.test(action)) this.playCurrentAudio(true, action.slice(6));
     };
     for (const slot of this.webSlots) {
       this.cardWeb.controllerAt(slot).registerJavaScriptProxy(proxy, 'jidePreview', ['onAction']);

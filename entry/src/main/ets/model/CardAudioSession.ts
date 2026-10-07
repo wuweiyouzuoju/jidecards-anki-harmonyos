@@ -9,6 +9,7 @@ export interface AudioQueuePlayer<T> {
   停止(): Promise<void>;
   释放(): Promise<void>;
 }
+export interface CardAudioOptions { itemIndex?: number; continuePrevious?: boolean; }
 
 /**
  * 学习与预览共用的卡面音频生命周期。
@@ -23,9 +24,10 @@ export class CardAudioSession {
   private version: number = 0;
   private released: boolean = false;
   private work: Promise<void> = Promise.resolve();
-  private playing: boolean = false;
+  private preparation: Promise<void> = Promise.resolve();
+  private activePlayback: number = 0;
 
-  isPlaying(): boolean { return this.playing; }
+  isPlaying(): boolean { return this.activePlayback > 0; }
 
   constructor(sound: AudioQueuePlayer<string>, tts: AudioQueuePlayer<TtsItem>,
     extract: (html: string, question: boolean) => Promise<AvTagsResult>,
@@ -40,7 +42,8 @@ export class CardAudioSession {
   /** 立即使旧请求失效，并在初始化结束后再停止一次，防止迟到的原生播放。 */
   stop(): Promise<void> {
     this.version += 1;
-    this.playing = false;
+    this.preparation = Promise.resolve();
+    this.activePlayback = 0;
     this.sound.停止().catch((error: Object): void => { console.info(`Card audio stop: ${error}`); });
     this.tts.停止().catch((error: Object): void => { console.info(`Card TTS stop: ${error}`); });
     this.work = this.work.then(async (): Promise<void> => {
@@ -52,26 +55,38 @@ export class CardAudioSession {
 
   /** 一次解析当前卡面；null 表示已取消，false 表示该面无音频。 */
   async play(html: string, question: boolean, mediaDirectory: string, autoplay: boolean = true,
-    replayQuestionHtml: string = '', onReady: (hasAudio: boolean) => void = (): void => {}): Promise<boolean | null> {
+    replayQuestionHtml: string = '', onReady: (hasAudio: boolean) => void = (): void => {},
+    options: CardAudioOptions = {}): Promise<boolean | null> {
     if (this.released) { return null; }
-    this.stop();
+    if (!options.continuePrevious) this.stop();
     const version: number = this.version;
-    this.playing = autoplay;
+    if (autoplay) this.activePlayback++;
     try {
       // 解析不占原生播放队列，慢旧请求不能阻塞新卡。
-      const groups: AvTagsResult[] = [];
-      if (replayQuestionHtml !== '') groups.push(await this.extract(replayQuestionHtml, true));
+      const prepare = async (): Promise<AvTagsResult[]> => {
+        const groups: AvTagsResult[] = [];
+        if (!this.isCurrent(version)) return groups;
+        if (replayQuestionHtml !== '') groups.push(await this.extract(replayQuestionHtml, true));
+        if (!this.isCurrent(version)) return groups;
+        groups.push(await this.extract(html, question));
+        return groups;
+      };
+      const prepared: Promise<AvTagsResult[]> = options.continuePrevious ? this.preparation.then(prepare) : prepare();
+      this.preparation = prepared.then((): void => {}, (): void => {});
+      const groups: AvTagsResult[] = await prepared;
       if (!this.isCurrent(version)) return null;
-      const tags: AvTagsResult = await this.extract(html, question);
-      if (!this.isCurrent(version)) { return null; }
-      groups.push(tags);
-      const hasAudio: boolean = groups.some((group: AvTagsResult): boolean => orderedAvItems(group).length > 0);
+      const selectedItems = (group: AvTagsResult): AvItem[] => {
+        const allItems: AvItem[] = orderedAvItems(group);
+        return options.itemIndex === undefined ? allItems : Number.isInteger(options.itemIndex) && options.itemIndex >= 0 ?
+          allItems.slice(options.itemIndex, options.itemIndex + 1) : [];
+      };
+      const hasAudio: boolean = groups.some((group: AvTagsResult): boolean => selectedItems(group).length > 0);
       onReady(hasAudio);
       if (!autoplay) { return hasAudio; }
       const playback: Promise<void> = this.work.then(async (): Promise<void> => {
         for (const group of groups) {
           if (!this.isCurrent(version)) { return; }
-          const items: AvItem[] = orderedAvItems(group);
+          const items: AvItem[] = selectedItems(group);
           let index: number = 0;
           // 只合并相邻同类项目；跨播放器切换必须等待上一段真正结束。
           while (index < items.length) {
@@ -106,7 +121,7 @@ export class CardAudioSession {
       this.stop();
       throw error;
     } finally {
-      if (this.isCurrent(version)) this.playing = false;
+      if (autoplay && this.isCurrent(version)) this.activePlayback--;
     }
   }
 

@@ -121,7 +121,7 @@ test('study keeps default cards opaque without replacing template backgrounds wh
     'template foreground/background pairs must override the application defaults together');
   assert.doesNotMatch(html, /background: #E8EEFC !important/);
   const page = read(STUDY_PAGE);
-  assert.match(page, /构建卡片HTML\(rendered, 'question', this\.是否深色\(\)\)/);
+  assert.match(page, /构建卡片HTML\(rendered, 'question', this\.是否深色\(\), undefined,\s*this\.reviewPreferences\.hideAudioPlayButtons, this\.取文案\(\$r\('app\.string\.study_replay_sound'\)\)\)/);
   assert.match(page, /Web\(\{ src: '', controller: this\.cardWeb\.controllerAt\(slot\) \}\)\s*\.backgroundColor\(this\.cardSurfaceBackground \|\| \$r\('app\.color\.surface_card'\)\)/);
   assert.match(page, /\.backgroundColor\(this\.页面底色微染值\)/);
   const cardArea = page.slice(page.indexOf('private 卡片区()'), page.indexOf('private 答案条()'));

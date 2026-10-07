@@ -231,6 +231,8 @@ export interface TemplateNode {
 }
 
 export interface RenderedCard {
+  questionAudio?: AvTagsResult;
+  answerAudio?: AvTagsResult;
   questionNodes: TemplateNode[];
   answerNodes: TemplateNode[];
   css: string;

@@ -50,6 +50,12 @@ export function buildPreviewInteractionScript(version: number): string {
     // 点击卡片 = 看答案（题目态有效；答案态由后端状态机忽略）。滑动后的合成 click 被 moved 抑制。
     document.addEventListener('click',function(e){
       if(e.defaultPrevented || moved || String(window.getSelection()||'').length) return;
+      var audio=e.target;
+      while(audio){
+        var target=audio.getAttribute && audio.getAttribute('data-jide-audio');
+        if(target && /^[qa]:[0-9]+$/.test(target)){e.preventDefault();if(window.jidePreview) window.jidePreview.onAction('audio:'+target,window.__jidePreviewVersion);return;}
+        audio=audio.parentElement;
+      }
       if(e.target.classList && e.target.classList.contains('sound-flag')){
         if(window.jidePreview) window.jidePreview.onAction('replay',window.__jidePreviewVersion);
         return;

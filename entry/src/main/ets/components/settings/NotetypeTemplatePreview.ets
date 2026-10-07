@@ -5,7 +5,12 @@ import { CardWebView } from '../../utils/CardWebView';
 import { interceptCardAsset } from '../../utils/CardAssetResponse';
 import { interceptMediaRequest } from '../../utils/媒体响应助手';
 import { RenderedCard } from '../../proto/messages/CardRenderingMessages';
-import { 构建卡片HTML, 剥除拼写标记, 媒体基地址 } from '../../model/学习卡片HTML构建器';
+import { 构建卡片HTML, 剥除拼写标记, 媒体基地址, 原始侧HTML } from '../../model/学习卡片HTML构建器';
+import { buildPreviewInteractionScript } from '../../model/PreviewInteraction';
+import { reviewPreferences } from '../../backend/ReviewPreferencesService';
+import { resourceText } from '../../utils/UiFeedback';
+
+
 import { DialogFrame } from '../common/DialogFrame';
 import { DialogHeader } from '../common/DialogHeader';
 import { NoteEditorHeader } from '../common/NoteEditorHeader';
@@ -20,6 +25,11 @@ import { 卡片渲染服务 } from '../../backend/卡片渲染服务';
 import { APP_FOREGROUND_KEY } from '../../model/AppLifecycleState';
 import { PAGE_COMPACT_LAYOUT_KEY } from '../../model/AppLayoutState';
 import { DelayedLoadingIndicator } from '../common/DelayedLoadingIndicator';
+
+class TemplateAudioProxy {
+  dispatch: (action: string, version: number) => void = (_action: string, _version: number): void => {};
+  onAction(action: string, version: number): void { this.dispatch(action, version); }
+}
 
 /** 草稿卡片只读预览；离线资源、翻面和 Web 生命周期复用学习渲染链。 */
 @Component
@@ -63,16 +73,28 @@ export struct NotetypeTemplatePreview {
       this.controller = this.cardWeb.controllerAt(slot);
     });
   private attached: boolean = false;
+  private previewVersion: number = 0;
+  private alive: boolean = false;
+  private hideAudioButtons: boolean = false;
   private renderer: 卡片渲染服务 = new 卡片渲染服务();
   private audio: CardAudioSession = new CardAudioSession(new 声音播放器(), new TTS播放器(),
     (html: string, question: boolean) => this.renderer.extractAudioTags(html, question),
     (directory: string, filename: string): string => this.media.filenames.indexOf(filename) >= 0 ?
       this.media.directory + '/' + filename : directory + '/' + filename);
 
-  aboutToAppear(): void { this.onReleaseAvailable((): Promise<void> => this.releaseCard()); }
+  aboutToAppear(): void {
+    this.alive = true;
+    this.onReleaseAvailable((): Promise<void> => this.releaseCard());
+    reviewPreferences.read().then((value): void => {
+      if (!this.alive) return;
+      this.hideAudioButtons = value.hideAudioPlayButtons;
+      this.showSide();
+    }).catch((error: Error): void => { console.info(`Preview preferences: ${error.message}`); });
+  }
   aboutToDisappear(): void { this.releaseCard().catch((error: Error): void => { console.info(error.message); }); }
   private releaseCard(): Promise<void> {
     this.cardWeb.setAudioEnabled(false);
+    this.alive = false; this.previewVersion++;
     this.attached = false; this.cardWeb.reset();
     return this.audio.release();
   }
@@ -85,12 +107,14 @@ export struct NotetypeTemplatePreview {
     this.cardWeb.setAudioEnabled(this.foreground && this.isVisible && !this.loading);
     if (!this.isVisible) this.audio.stop();
   }
-  private async playAudio(): Promise<void> {
+  private async playAudio(audioTarget: string = ''): Promise<void> {
     if (!this.attached || !this.foreground || !this.isVisible || this.loading || this.renderPending || this.loadError !== '') return;
     this.audioFailed = false;
+    const target: RegExpExecArray | null = /^([qa]):(\d+)$/.exec(audioTarget);
+    const question: boolean = target === null ? !this.answerSide : target[1] === 'q';
     try {
-      await this.audio.play(构建卡片HTML(this.rendered, this.answerSide ? 'answer' : 'question', this.isDark),
-        !this.answerSide, this.mediaDirectory());
+      await this.audio.play(原始侧HTML(this.rendered, question ? 'question' : 'answer'),
+        question, this.mediaDirectory(), true, '', (): void => {}, { itemIndex: target === null ? undefined : Number(target[2]) });
     } catch (error) { if (this.attached) this.audioFailed = true; }
   }
 
@@ -102,7 +126,10 @@ export struct NotetypeTemplatePreview {
       this.audio.stop();
       this.renderPending = true;
       const side: string = this.answerSide ? 'answer' : 'question';
-      this.cardWeb.show(剥除拼写标记(构建卡片HTML(this.rendered, this.answerSide ? 'answer' : 'question', this.isDark)), this.contentRevision, side);
+      const version: number = ++this.previewVersion;
+      const html: string = 剥除拼写标记(构建卡片HTML(this.rendered, this.answerSide ? 'answer' : 'question', this.isDark,
+        undefined, this.hideAudioButtons, resourceText(this.getUIContext(), $r('app.string.study_replay_sound'))));
+      this.cardWeb.show(html.replace('</div></body>', `<script>${buildPreviewInteractionScript(version)}</script></div></body>`), this.contentRevision, side);
     } catch (error) { this.failed = true; this.renderPending = false; }
   }
 
@@ -126,7 +153,14 @@ export struct NotetypeTemplatePreview {
   private attach(slot: number = 0): void {
     this.attachedWebSlots[slot] = true;
     if (!this.attachedWebSlots[0] || !this.attachedWebSlots[1]) return;
-    try { this.cardWeb.attach(0); this.cardWeb.attach(1); this.attached = true; this.showSide(); }
+    try {
+      const proxy: TemplateAudioProxy = new TemplateAudioProxy();
+      proxy.dispatch = (action: string, version: number): void => {
+        if (version === this.previewVersion && /^audio:[qa]:\d+$/.test(action)) this.playAudio(action.slice(6));
+      };
+      for (const index of this.webSlots) this.cardWeb.controllerAt(index).registerJavaScriptProxy(proxy, 'jidePreview', ['onAction']);
+      this.cardWeb.attach(0); this.cardWeb.attach(1); this.attached = true; this.showSide();
+    }
     catch (error) { this.failed = true; }
   }
 

@@ -55,11 +55,13 @@ test('draft Web and sound requests route owned cache files and stop playback whe
   let stops=0,resets=0,releases=0,registered;
   const Preview=loadComponentLogic('components/settings/NotetypeTemplatePreview.ets','NotetypeTemplatePreview',{
     APP_FOREGROUND_KEY:'foreground',webview:{WebviewController:class{}},
+    reviewPreferences:{read:async()=>({hideAudioPlayButtons:false})}, $r:key=>key,
+    原始侧HTML:(_rendered,side)=>side, resourceText:()=> 'Play audio', buildPreviewInteractionScript:()=>'',
     AppStorage:{get:()=>({filesDir:'/files'})},媒体基地址:'https://anki.local/',
     CardWebView:class {reset(){resets++;}setAudioEnabled(){}},卡片渲染服务:class{},声音播放器:class{},TTS播放器:class{},
     CardAudioSession:class {constructor(_sound,_tts,_extract,path){this.path=path;}stop(){stops++;}async release(){releases++;}}
   });
-  const preview=new Preview();preview.media={fields:[],directory:'/cache/owned',filenames:['draft.png','draft.m4a']};
+  const preview=new Preview();preview.getUIContext=()=>({});preview.media={fields:[],directory:'/cache/owned',filenames:['draft.png','draft.m4a']};
   assert.equal(preview.requestMediaDirectory('https://anki.local/draft.png?version=1'),'/cache/owned');
   assert.equal(preview.requestMediaDirectory('https://anki.local/existing.png'),'/files/collection.media');
   assert.equal(preview.requestMediaDirectory('https://other.local/draft.png'),'/files/collection.media');
@@ -78,17 +80,19 @@ test('draft preview waits for both Web controllers, retains same-card flips and 
   const requests=[],attached=[],audio=[],muted=[];let bridge;
   const Preview=loadComponentLogic('components/settings/NotetypeTemplatePreview.ets','NotetypeTemplatePreview',{
     APP_FOREGROUND_KEY:'foreground',webview:{WebviewController:class{}},
+    reviewPreferences:{read:async()=>({hideAudioPlayButtons:false})}, $r:key=>key,
+    原始侧HTML:(_rendered,side)=>side, resourceText:()=> 'Play audio', buildPreviewInteractionScript:()=>'',
     AppStorage:{get:()=>({filesDir:'/files'})},
     构建卡片HTML:(_rendered,side)=>side,剥除拼写标记:value=>value,
     CardWebView:class {
       constructor(_controller,shown,_failed,_spare,switched){bridge={shown,switched};}
       attach(slot){attached.push(slot);}reset(){}setAudioEnabled(enabled){muted.push(enabled);}
-      show(...args){requests.push(args);}controllerAt(slot){return {slot};}
+      show(...args){requests.push(args);}controllerAt(slot){return {slot,registerJavaScriptProxy(){}};}
     },
     卡片渲染服务:class{},声音播放器:class{},TTS播放器:class{},
     CardAudioSession:class {stop(){}async release(){}async play(...args){audio.push(args);}}
   });
-  const preview=new Preview();preview.rendered={};
+  const preview=new Preview();preview.getUIContext=()=>({});preview.rendered={};
   preview.attach(0);assert.deepEqual(requests,[]);
   preview.attach(1);assert.deepEqual(attached,[0,1]);
   assert.deepEqual(requests,[['question',1,'question']]);

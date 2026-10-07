@@ -42,6 +42,7 @@
 
 import { IMAGE_OCCLUSION_SCRIPT } from './ImageOcclusionRendering';
 import type { RenderedCard, TemplateNode } from '../proto/messages/CardRenderingMessages';
+import { orderedAvItems } from '../proto/messages/CardRenderingMessages';
 import { cardMathScripts } from './MathRendering';
 
 // ========================================================
@@ -105,7 +106,11 @@ body {
 img { max-width: 100%; height: auto; }
 a { color: #2E6BE6; }
 hr { opacity: 0.3; }
-.sound-flag { color: #2E6BE6; font-size: 0.75em; }
+.sound-flag { display: inline-flex; align-items: center; justify-content: center; vertical-align: middle;
+  width: 44px; height: 44px; margin: 2px 4px; padding: 0; color: inherit; background: transparent;
+  border: 1px solid currentColor; border-radius: 50%; cursor: pointer; }
+.sound-flag svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; }
+.sound-flag:active { opacity: 0.6; }
 mjx-container[jax="SVG"][display="true"] { overflow-x: auto; overflow-y: hidden; max-width: 100%; padding: 2px 0; }
 .latex-missing { display: inline-block; max-width: 100%; overflow-wrap: anywhere; border: 1px dashed currentColor; padding: 4px; }
 #typeans { white-space: pre-wrap; font-family: monospace; display: inline-block; text-align: left; }
@@ -156,12 +161,24 @@ const 视频扩展名正则: RegExp = /\.(mp4|webm|mov|m4v|ogv)$/i;
 
 /** 剥除 Anki [sound:xxx] 标签：音频文件留小标记由原生 SoundPlayer 播放；
  *  视频文件改用 <video> 标签交给 webview 内联播放（playsinline 防止全屏跳转）。 */
-function 剥除音频标签(html: string): string {
-  return html.replace(/\[sound:([^\]]+)\]/g, (_匹配: string, 文件名: string): string => {
-    if (视频扩展名正则.test(文件名)) {
-      return `<video src="${媒体基地址}${encodeURIComponent(文件名)}" controls playsinline style="max-width:100%;display:block;margin:8px auto"></video>`;
-    }
-    return '<span class="sound-flag">♪</span>';
+function audioButton(side: string, index: number, hide: boolean, label: string): string {
+  if (hide) return '';
+  const escaped: string = label.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return `<button type="button" class="sound-flag" data-jide-audio="${side}:${index}" aria-label="${escaped}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l11 7-11 7z" stroke-linejoin="round"/></svg></button>`;
+}
+function 剥除音频标签(html: string, rendered: RenderedCard, side: 卡片正反面, hide: boolean, label: string): string {
+  let index: number = 0;
+  const video = (filename: string): string => `<video src="${媒体基地址}${encodeURIComponent(filename)}" controls playsinline style="max-width:100%;display:block;margin:8px auto"></video>`;
+  const raw: string = html.replace(/\[sound:([^\]]+)\]/g, (_match: string, filename: string): string => {
+    const item: number = index++;
+    return 视频扩展名正则.test(filename) ? video(filename) : audioButton(side === 'question' ? 'q' : 'a', item, hide, label);
+  });
+  return raw.replace(/\[anki:play:([qa]):(\d+)\]/g, (_match: string, markerSide: string, ordinal: string): string => {
+    const position: number = Number(ordinal);
+    const tags = markerSide === 'q' ? rendered.questionAudio : rendered.answerAudio;
+    const items = tags === undefined ? [] : orderedAvItems(tags);
+    const file: string | null | undefined = items[position]?.soundFile;
+    return file !== undefined && file !== null && 视频扩展名正则.test(file) ? video(file) : audioButton(markerSide, position, hide, label);
   });
 }
 
@@ -347,9 +364,10 @@ const 可折叠字段脚本: string = `<script>
 // 无
 // ========================================================
 export function 构建卡片HTML(渲染结果: RenderedCard, 侧面: 卡片正反面, isDark: boolean = false,
-  cardBackground: string = isDark ? '#18202B' : '#FFFFFF'): string {
+  cardBackground: string = isDark ? '#18202B' : '#FFFFFF', hideAudioButtons: boolean = false,
+  audioLabel: string = 'Play audio'): string {
   const 卡面: string | undefined = 侧面 === 'question' ? 渲染结果.questionHtml : 渲染结果.answerHtml;
-  const 正文: string = 剥除音频标签(卡面 ?? 原始侧HTML(渲染结果, 侧面));
+  const 正文: string = 剥除音频标签(卡面 ?? 原始侧HTML(渲染结果, 侧面), 渲染结果, 侧面, hideAudioButtons, audioLabel);
   // 底色只作兜底；单独强制替换模板底色会让黑字白底卡片变成黑字深色底。
   const 默认配色: string = `html { background: ${cardBackground}; }
 body { color: ${isDark ? '#E6E6E6' : '#1A1A1A'}; background: ${cardBackground}; }`;

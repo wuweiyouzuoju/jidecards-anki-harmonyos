@@ -37,7 +37,7 @@ const methods = names.map(name => {
   return source.slice(start, source.indexOf('\n  }', start) + 4);
 });
 const Page = new Function('构建卡片HTML', '剥除拼写标记', '原始侧HTML', '媒体基地址',
-  '解码文件名', 'buildPreviewInteractionScript', 'renderPreviewAnswer', 'readCardMarking', 'parseFlagLabels', '$r', 'actionIcon', 'PreviewActionProxy', 'console',
+  '解码文件名', 'buildPreviewInteractionScript', 'renderPreviewAnswer', 'readCardMarking', 'parseFlagLabels', '$r', 'actionIcon', 'PreviewActionProxy', 'console', 'reviewPreferences',
   stripTypeScriptTypes(`class Page {${methods.join('\n')}}`, { mode: 'transform' }) + '\nreturn Page;')(
   构建卡片HTML, 剥除拼写标记, 原始侧HTML, 'https://jidecards-media.local/',
   name => { try { return decodeURIComponent(name); } catch { return name; } },
@@ -45,7 +45,7 @@ const Page = new Function('构建卡片HTML', '剥除拼写标记', '原始侧HT
   loadPlatformModule('utils/ActionIcons.ets', 'actionIcon', { $r: key => key }),
   class { onAction(action, version) { this.dispatch(action, version); } },
   // 故障注入的预期日志只留在替身中，避免 Windows Node 测试 IPC 与多字节 stdout 混写。
-  { info() {} }
+  { info() {} }, { read: async () => ({hideAudioPlayButtons:false}) }
 );
 const card = id => ({ questionNodes: [{ text: `front-${id}[sound:%E4%B8%AD.mp3]`, replacement: null }],
   answerNodes: [{ text: `back-${id}[sound:back.mp3]`, replacement: null }], css: '', latexSvg: false, isEmpty: false });
@@ -367,6 +367,24 @@ function domHarness(version = 42) {
   return { listeners, actions, window, updateVersion };
 }
 
+test('preview audio SVG clicks dispatch only the selected side and item, using the updated document', () => {
+  const { listeners, actions, updateVersion } = domHarness();
+  const button = { tagName: 'BUTTON', parentElement: null,
+    getAttribute: name => name === 'data-jide-audio' ? 'q:1' : null,
+    classList: { contains: name => name === 'sound-flag' } };
+  const icon = { tagName: 'path', parentElement: { tagName: 'svg', parentElement: button } };
+  let prevented = 0;
+  listeners.click({ target: icon, preventDefault() { prevented++; } });
+  assert.deepEqual(actions, [['audio:q:1', 42]]);
+  updateVersion(43);
+  button.getAttribute = name => name === 'data-jide-audio' ? 'a:12' : null;
+  listeners.click({ target: icon, preventDefault() { prevented++; } });
+  assert.deepEqual(actions[1], ['audio:a:12', 43]);
+  assert.equal(prevented, 2);
+  listeners.click({ target: icon, defaultPrevented: true });
+  assert.equal(actions.length, 2, 'audio clicks never fall through to whole-side replay or flip');
+});
+
 test('DOM clicks reveal the answer; controls, selection, drags and multi-touch stay inert', () => {
   const { listeners, actions, window } = domHarness();
   const plain = { tagName: 'DIV', parentElement: null, getAttribute: () => null };
@@ -496,8 +514,8 @@ test('preview matches Anki: no side buttons, question first, reveal by tap, swip
   assert.doesNotMatch(source, /\.gesture\(|SwipeDirection\.Horizontal|处理滑动手势/,
     'swipe lives in the injected document script; ArkWeb would swallow an ArkUI gesture');
   // 只加载一面：题目在前，答案按需翻面（背面模板自带 {{FrontSide}}，不额外拼接）
-  assert.match(source, /构建卡片HTML\(this\.已渲染, 'question', this\.isDark\)/);
-  assert.match(source, /构建卡片HTML\(rendered, 'answer', this\.isDark\)/);
+  assert.match(source, /构建卡片HTML\(this\.已渲染, 'question', this\.isDark, undefined,\s*this\.audioPreferences\.hideAudioPlayButtons/);
+  assert.match(source, /构建卡片HTML\(rendered, 'answer', this\.isDark, undefined,\s*this\.audioPreferences\.hideAudioPlayButtons/);
   assert.doesNotMatch(source, /构建双面卡片HTML/);
   // 顶部条统一为「关闭 / N/N / 更多」，不再有 DialogHeader 标题栏
   assert.doesNotMatch(source, /DialogHeader|browser_preview_title|browser_preview_edit_fields/);

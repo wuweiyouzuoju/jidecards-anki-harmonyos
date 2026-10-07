@@ -91,7 +91,14 @@ export function buildStudyGestureScript(version: number, surface: number, gestur
       send(s.cfg,dx<0?'left':'right');
     },{passive:true});
     document.addEventListener('click',function(e){
-      if(e.defaultPrevented || moved || Date.now()<suppressUntil || interactive(e.target) || selected()) return;
+      if(e.defaultPrevented || moved || Date.now()<suppressUntil || selected()) return;
+      var audio=e.target;
+      while(audio){
+        var target=audio.getAttribute && audio.getAttribute('data-jide-audio');
+        if(target && /^[qa]:[0-9]+$/.test(target)){e.preventDefault();send(window.__jideStudyInput,'audio:'+target);return;}
+        audio=audio.parentElement;
+      }
+      if(interactive(e.target)) return;
       var c=window.__jideStudyInput,x=e.clientX/window.innerWidth,y=e.clientY/window.innerHeight;
       if(!c.gestures){send(c,'tap',x,y);return;}
       var now=Date.now(),last=c.last;

@@ -644,10 +644,10 @@ export struct 学习页 {
         this.拼写填空 = marker.cloze;
         this.拼写卡片序号 = card.templateIdx;
       }
-      this.正面HTML = 剥除拼写标记(构建卡片HTML(rendered, 'question', this.是否深色()));
+      this.正面HTML = 剥除拼写标记(构建卡片HTML(rendered, 'question', this.是否深色(), undefined, this.reviewPreferences.hideAudioPlayButtons, this.取文案($r('app.string.study_replay_sound'))));
       this.背面HTML = this.拼写字段名 !== ''
-        ? 构建卡片HTML(rendered, 'answer', this.是否深色())
-        : 剥除拼写标记(构建卡片HTML(rendered, 'answer', this.是否深色()));
+        ? 构建卡片HTML(rendered, 'answer', this.是否深色(), undefined, this.reviewPreferences.hideAudioPlayButtons, this.取文案($r('app.string.study_replay_sound')))
+        : 剥除拼写标记(构建卡片HTML(rendered, 'answer', this.是否深色(), undefined, this.reviewPreferences.hideAudioPlayButtons, this.取文案($r('app.string.study_replay_sound'))));
       if (this.choiceQuestion !== null) {
         this.正面HTML = hideJideChoiceStaticOptions(this.正面HTML);
         this.背面HTML = hideJideChoiceStaticOptions(this.背面HTML);
@@ -767,24 +767,26 @@ export struct 学习页 {
   }
 
   /** 原生音频失败不阻断评分；重播会重新解析，允许失败后恢复。 */
-  private async playStudyAudio(autoplay: boolean = true, manual: boolean = false): Promise<void> {
+  private async playStudyAudio(autoplay: boolean = true, manual: boolean = false, audioTarget: string = ''): Promise<void> {
     const rendered: RenderedCard | null = this.已渲染;
     if (this.cardRenderPending || !this.isCurrentRequest(this.requestVersion) || !this.controllerReady || rendered === null ||
       this.editingPageOpen || (this.阶段 !== 'question' && this.阶段 !== 'answer')) { return; }
     const version: number = this.requestVersion;
-    const question: boolean = this.阶段 === 'question';
-    const replayQuestion: string = manual && !question && !this.studyOptions.skipQuestionWhenReplayingAnswer ?
+    const target: RegExpExecArray | null = /^([qa]):(\d+)$/.exec(audioTarget);
+    const question: boolean = target === null ? this.阶段 === 'question' : target[1] === 'q';
+    const replayQuestion: string = target === null && manual && !question && !this.studyOptions.skipQuestionWhenReplayingAnswer ?
       原始侧HTML(rendered, 'question') : '';
     try {
       const hasAudio: boolean | null = await this.audioSession.play(
-        原始侧HTML(rendered, this.阶段 === 'answer' ? 'answer' : 'question'), this.阶段 === 'question', this.媒体目录,
+        原始侧HTML(rendered, question ? 'question' : 'answer'), question, this.媒体目录,
         autoplay && (manual || this.studyOptions.autoplay), replayQuestion,
         (available: boolean): void => {
           if (this.isCurrentRequest(version) && question === (this.阶段 === 'question')) {
             if (question) this.questionHasAudio = available;
             this.有音频 = available || (!question && !this.studyOptions.skipQuestionWhenReplayingAnswer && this.questionHasAudio);
           }
-        });
+        }, { itemIndex: target === null ? undefined : Number(target[2]),
+          continuePrevious: !manual && !question && !this.reviewPreferences.interruptAudioWhenAnswering });
       if (hasAudio !== null && this.isCurrentRequest(version) && question === (this.阶段 === 'question')) {
         this.有音频 = hasAudio || (!question && !this.studyOptions.skipQuestionWhenReplayingAnswer && this.questionHasAudio);
       }
@@ -1090,9 +1092,9 @@ export struct 学习页 {
       const snapshot: StudyMarkingSnapshot | null = await this.studySession.refreshMarking(card.cardId, current);
       if (snapshot === null || !current()) return;
       const rendered: RenderedCard = snapshot.rendered;
-      let front: string = 剥除拼写标记(构建卡片HTML(rendered, 'question', this.是否深色()));
-      let back: string = this.拼写字段名 !== '' ? 构建卡片HTML(rendered, 'answer', this.是否深色()) :
-        剥除拼写标记(构建卡片HTML(rendered, 'answer', this.是否深色()));
+      let front: string = 剥除拼写标记(构建卡片HTML(rendered, 'question', this.是否深色(), undefined, this.reviewPreferences.hideAudioPlayButtons, this.取文案($r('app.string.study_replay_sound'))));
+      let back: string = this.拼写字段名 !== '' ? 构建卡片HTML(rendered, 'answer', this.是否深色(), undefined, this.reviewPreferences.hideAudioPlayButtons, this.取文案($r('app.string.study_replay_sound'))) :
+        剥除拼写标记(构建卡片HTML(rendered, 'answer', this.是否深色(), undefined, this.reviewPreferences.hideAudioPlayButtons, this.取文案($r('app.string.study_replay_sound'))));
       if (this.choiceQuestion !== null) { front = hideJideChoiceStaticOptions(front); back = hideJideChoiceStaticOptions(back); }
       const changed: boolean = front !== this.正面HTML || back !== this.背面HTML;
       let html: string = this.阶段 === 'question' ? front : back;
@@ -1714,6 +1716,10 @@ export struct 学习页 {
         this.autoAdvanceSettingsOpen || this.editingPageOpen || this.手写模式 || this.评分中 ||
         this.cardRenderPending || this.flipPending || this.contentRefreshInFlight || !this.controllerReady || this.pendingHtml !== ''
     };
+    if (action.startsWith('audio:')) {
+      if (!state.blocked && /^audio:[qa]:\d+$/.test(action)) this.playStudyAudio(true, true, action.slice(6));
+      return;
+    }
     const fallback = resolveStudyGesture(action, state, nx, ny);
     const command = state.choice || state.blocked || !state.gestures || action === 'tap' ? fallback :
       mappedStudyCommand(this.controls().gestures, action, this.阶段, fallback === 'continue' ? 'none' : fallback);

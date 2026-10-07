@@ -10,9 +10,9 @@ import { 构建卡片HTML, 剥除拼写标记 } from '../../entry/src/main/ets/m
 import { hideJideChoiceStaticOptions } from '../../entry/src/main/ets/model/JideChoice.ts';
 const source=readFileSync(new URL('../../entry/src/main/ets/pages/学习页.ets',import.meta.url),'utf8');
 const methods=['changeMarking','closeMarkingDialog'].map(name=>{const start=source.search(new RegExp('^  private (?:async )?'+name+'\\(','m'));assert.ok(start>=0);return source.slice(start,source.indexOf('\n  }',start)+4);});
-const Page=new Function('构建卡片HTML','剥除拼写标记','hideJideChoiceStaticOptions','AppStorage','showToastSafely','$r',
+const Page=new Function('resourceText','构建卡片HTML','剥除拼写标记','hideJideChoiceStaticOptions','AppStorage','showToastSafely','$r',
  stripTypeScriptTypes('class Page {'+methods.join('\n')+'}',{mode:'transform'})+';return Page;')(
- 构建卡片HTML,剥除拼写标记,hideJideChoiceStaticOptions,{setOrCreate(){}},(_,value)=>{_.errors.push(value.message);},key=>key);
+ (_ui,key)=>key,构建卡片HTML,剥除拼写标记,hideJideChoiceStaticOptions,{setOrCreate(){}},(_,value)=>{_.errors.push(value.message);},key=>key);
 const rendered=flag=>({css:'',questionNodes:[{text:'front '+flag}],answerNodes:[{text:'back '+flag}],latexSvg:false,isEmpty:false});
 const deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {resolve,promise};};
 function harness(phase='answer'){
@@ -23,7 +23,7 @@ function harness(phase='answer'){
   canUndo:async()=>history.length>0,undo:async()=>{[flag,marked]=history.pop();calls.push(['undo']);}};
  const scheduler=new AutoSyncScheduler(),activity=new SyncActivity();
  const page=Object.assign(new Page(),{mounted:true,阶段:phase,requestVersion:4,当前卡片:{cardId:42,noteId:7,states:{current:[255,0]}},
-  currentMarking:{flag,marked},评分中:false,flipPending:false,controllerReady:true,markingUndoDepth:0,
+  reviewPreferences:{hideAudioPlayButtons:false},currentMarking:{flag,marked},评分中:false,flipPending:false,controllerReady:true,markingUndoDepth:0,
   choiceQuestion:null,choiceSelectedIds:['b'],choiceGrade:{rating:2},已输入答案:'my input',拼写字段名:'',
   展示时刻毫秒:12345,interactionVersion:3,errors:[],isCurrentRequest:version=>page.mounted&&page.requestVersion===version,
   正面HTML:剥除拼写标记(构建卡片HTML(rendered(flag),'question',false)),背面HTML:剥除拼写标记(构建卡片HTML(rendered(flag),'answer',false)),
