@@ -7,9 +7,12 @@ window.MathJax = {
   },
   tex: {
     packages: ['base', 'ams', 'newcommand', 'configmacros', 'autoload', 'require', 'mhchem'],
-    inlineMath: [['\\(', '\\)'], ['$', '$']],
-    displayMath: [['\\[', '\\]'], ['$$', '$$']],
-    processEscapes: true
+    // 对齐 Anki/AnkiDroid；美元符号保留为命令、正则及金额中的普通文字。
+    inlineMath: [['\\(', '\\)']],
+    displayMath: [['\\[', '\\]']],
+    processEscapes: false,
+    processEnvironments: false,
+    processRefs: false
   },
   svg: { fontCache: 'global' },
   options: {

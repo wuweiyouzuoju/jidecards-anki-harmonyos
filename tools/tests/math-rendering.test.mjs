@@ -63,11 +63,13 @@ test('vendored component is byte-identical to the pinned manifest and embeds mhc
   assert.match(read(resources + 'LICENSE'), /Apache License/);
 });
 
-test('MathJax runtime config preserves Anki delimiters and enables chemistry without network fonts', () => {
+test('MathJax runtime config follows Anki delimiters and enables chemistry without network fonts', () => {
   const context = { window: {}, document: { addEventListener() {} } };
   vm.runInNewContext(read(resources + 'card-math.js'), context);
   const config = context.window.MathJax;
-  assert.deepEqual(JSON.parse(JSON.stringify(config.tex.inlineMath)), [['\\(', '\\)'], ['$', '$']]);
+  assert.deepEqual(JSON.parse(JSON.stringify(config.tex.inlineMath)), [['\\(', '\\)']]);
+  assert.deepEqual(JSON.parse(JSON.stringify(config.tex.displayMath)), [['\\[', '\\]']]);
+  for (const option of ['processEscapes', 'processEnvironments', 'processRefs']) assert.equal(config.tex[option], false);
   assert.ok(config.tex.packages.includes('mhchem'));
   assert.equal(config.loader.paths.mathjax + '/', MATH_ASSET_BASE);
   assert.equal(config.options.enableMenu, false);

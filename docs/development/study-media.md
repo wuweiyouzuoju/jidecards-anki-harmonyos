@@ -268,6 +268,8 @@ HTML 构建器在模板 CSS 前同时提供默认字色与不透明卡片底色�
 
 学习、浏览预览和未保存模板预览共用 `model/学习卡片HTML构建器.ts`。默认配色与列表/代码对齐、笔记类型 CSS、应用布局/媒体兜底分别包在独立 style 中；不能重新合并，部分 Anki 牌组在 CSS 字段用闭合标签嵌入脚本。`utils/CardAssetResponse.ets`（原 MathAssetResponse）统一映射固定的内置 jQuery 3.7.1/MathJax rawfile；未知内置域请求返回 404，其他域沿原媒体/网络逻辑。jQuery 必须先于模板脚本同步加载。新增内置脚本需同时更新固定映射、许可与浏览器回归；不要修改导入笔记类型原文来规避渲染问题。外部作者脚本依赖与实际验证边界见 docs/FEATURE_STATUS.md。
 
+卡片默认公式识别由 `rawfile/mathjax/card-math.js` 统一拥有，对齐 Anki/AnkiDroid，仅识别 `\(...\)` 和 `\[...\]`，关闭公式之外的转义、环境和引用自动处理。美元符号写法作为普通正文保留，避免 `grep` 的 `^$`、Shell 变量/PID 和金额误入公式；没有新增兼容开关。`test-math-rendering-browser.mjs` 在真实公式与普通文字混合的正反面及深浅主题中验证原文完整、无错误公式，并继续验证数学、化学、MathML 和自定义宏。学习、浏览/首页及草稿/模板预览沿用共享构建器；JIDE 对话由独立的 `AgentMath.ts` 解析受保护的文本片段，其美元符号公式规则保持独立。
+
 卡片文字对齐采用 Anki/AnkiDroid 的模板语义：应用不在 `body`、`.card` 或 `#qa` 强制设置 `text-align`。本轮对照本机 `D:\Projects\AnkiDroid` 的 `AnkiDroid/src/main/assets/flashcard.css`、`card_template.html` 和 `cardviewer/AndroidCardRenderContext.kt`：默认 `li { text-align: start; }`、`pre { text-align: left; }` 放在模板 CSS 之前，模板同名规则可以覆盖。未声明对齐的正文使用浏览器的 `start`；标准 Anki 笔记类型自带 `.card { text-align: center; }`，仍按模板居中。`#typeans` 的拼写比较与折叠控件保留各自的局部对齐。卡片宽度由现有布局和模板负责，不额外对 `#qa` 添加固定阅读宽度。
 
 `card-template-style.test.mjs` 防止应用恢复全卡对齐及默认规则顺序回退；`test-card-template-browser.mjs` 验证深浅色、两面、无样式、标准模板、body/class/container/字段/行内对齐、列表/代码覆盖和 RTL；`test-card-flip-browser.mjs` 验证学习与预览中反复翻面、切卡时对齐和覆盖规则重新生效。两项浏览器脚本使用上面的 Node 参数和 `PLAYWRIGHT_MODULE` 配置。实际 ArkWeb、平板/折叠屏/电脑宽度与原牌组仍需设备验收。

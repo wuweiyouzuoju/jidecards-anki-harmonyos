@@ -17,6 +17,17 @@ const unexpected = [];
 const errors = [];
 const requested = new Set();
 const editorExamples = serializeNoteRichText([{ text: String.raw`\(\frac{1}{2}\) \(\ce{2H2 + O2 -> 2H2O}\)`, format: 0 }]);
+const literalExamples = [
+  { id: 'regex', text: "Command: grep -v -e '^#' -e '^$' /etc/services\n^# = comment line\n^$ = empty line" },
+  { id: 'shell', text: 'echo "$HOME" "$?" "$$"' },
+  { id: 'currency', text: 'Price: $5.00 each, $10.00 for two' },
+  { id: 'dollar', text: '$x^2$ and $$E=mc^2$$' },
+  { id: 'escaped-dollar', text: '\\$HOME and \\$5.00' },
+  { id: 'environment', text: '\\begin{equation}x^2\\end{equation}' },
+  { id: 'reference', text: '\\ref{literal} and \\eqref{literal}' }
+];
+const literalHtml = literalExamples.map(({ id, text }) =>
+  '<div id="' + id + '">' + text.replaceAll('\n', '<br>') + '</div>').join('\n');
 const question = String.raw`
 <h2>数学 · 化学</h2>
 <div id="editor-examples">${editorExamples}</div>
@@ -30,7 +41,7 @@ const question = String.raw`
 <div id="units">\(\pu{1.2e3 kJ mol-1}\)</div>
 <div id="macro">\(\R^2\)</div>
 <div id="cloze">\(x+\class{cloze}{[...]}=3\)</div>
-<div id="dollar">$x^2$ and $$E=mc^2$$</div>
+${literalHtml}
 <pre id="code">\(literal\)</pre>
 <div id="long">\[\underbrace{a+a+a+a+a+a+a+a+a+a+a+a+a+a+a+a+a+a+a+a+a+a+a+a+a+a+a+a+a+a}_{30}\]</div>
 <div id="legacy"><img class="latex" src="latex-existing.svg" alt="legacy x"></div>
@@ -69,15 +80,20 @@ const page = await context.newPage();
 page.on('pageerror', (e) => errors.push(e.message));
 const results = [];
 try {
-  for (const [index, svg, side, dark] of [[0, false, 'question', false], [1, true, 'answer', true], [2, true, 'question', false]]) {
+  for (const [index, svg, side, dark] of [[0, false, 'question', false], [1, true, 'answer', true],
+    [2, true, 'question', false], [3, false, 'question', true], [4, false, 'answer', false]]) {
     const rendered = { questionNodes: [{ text: question, replacement: null }], answerNodes: [{ text: answer, replacement: null }], css: '.cloze{color:#2E6BE6}', latexSvg: svg, isEmpty: false };
     html = 构建卡片HTML(rendered, side, dark);
     await page.goto('https://jidecards-media.local/test');
     await page.waitForFunction(() => document.documentElement.dataset.mathReady === 'true');
     assert.equal(await page.locator('[data-mml-node="merror"]').count(), 0, 'no formula parsing errors');
     assert.equal(await page.locator('#editor-examples mjx-container svg').count(), 2, 'editor help examples survive HTML escaping');
-    for (const id of ['fraction', 'mathml', 'matrix', 'integral', 'chem', 'reaction', 'charge', 'units', 'macro', 'cloze', 'dollar', 'long']) {
+    for (const id of ['fraction', 'mathml', 'matrix', 'integral', 'chem', 'reaction', 'charge', 'units', 'macro', 'cloze', 'long']) {
       assert.ok(await page.locator(`#${id} mjx-container svg`).count() > 0, id);
+    }
+    for (const { id, text } of literalExamples) {
+      assert.equal(await page.locator(`#${id} mjx-container`).count(), 0, id + ' stays literal');
+      assert.equal(await page.locator(`#${id}`).textContent(), text.replaceAll('\n', ''), id + ' preserves its text');
     }
     assert.equal(await page.locator('#code mjx-container').count(), 0);
     assert.equal(await page.locator('#missing .latex-missing').count(), 1);
