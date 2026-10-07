@@ -37,7 +37,7 @@
 
 | ID / 优先级 | 能力 | 当前实际状态与缺少的环节 | 后续接手入口与验收 |
 | --- | --- | --- | --- |
-| G01 / P1（兼容） | 自定义调度 JavaScript | 已检测非空脚本、显示脚本并要求确认标准 Core 调度；**脚本仍不执行**。SchedulingContext 在队列解码中跳过，评分仍提交原始 Core 候选状态。提示已补齐，执行兼容仍未完成。 | [SchedulerMessages](../../entry/src/main/ets/proto/messages/SchedulerMessages.ts)、[StudySessionController](../../entry/src/main/ets/model/StudySessionController.ts)、[StudySessionBackend](../../entry/src/main/ets/backend/StudySessionBackend.ts)。需要执行环境、上下文、候选状态校验及异常策略；保留原 oneof 原始透传，测试普通/过滤牌组和带脚本跨端行为。 |
+| G01 / P1（兼容） | 自定义调度 JavaScript | 2026-10-07 更新：同步脚本已执行，按钮间隔和评分采用同一份原生校验结果；保留完整 SchedulingContext。失败后必须确认本会话使用标准 Core 调度。异步、DOM 与网络仍不支持。 | 责任边界、普通/过滤牌组与撤销验证见[自定义调度决策](../decisions/2026-10-07-custom-scheduling.md)。前端继续原始透传，字段修改仅由原生服务执行。 |
 | G02 / P1 | 字段高级属性在本机编辑器生效 | JIDE 已能读取原始类型并保存 `rtl/font/size/description/plainText/collapsed`；但本机 `decodeNotetypeField()` 只读取 `sticky`，NoteFieldCard/NoteFieldEditor 没有这些属性输入，编辑字体使用应用固定字号。因此**保存链已接，新增/编辑显示链未接**。排序字段和 excludeFromSearch 由 Core 使用，sticky 已实现，不算缺失。 | [NotetypeMessages](../../entry/src/main/ets/proto/messages/NotetypeMessages.ts)、[NoteFieldCard](../../entry/src/main/ets/components/common/NoteFieldCard.ets)、[NoteFieldEditor](../../entry/src/main/ets/components/common/NoteFieldEditor.ets)、[AgentNotetypeFields](../../entry/src/main/ets/model/agent/AgentNotetypeFields.ts)。传递属性到新增/编辑/学习内编辑；验证 RTL、字体、纯文本、说明和折叠，同时保留旧媒体/HTML。 |
 | G03 / P1–P2 | 一个 JIDE 批量动作对应一次集合撤销 | 首页/浏览器撤销与重做已实现。但 `AddCustomUndoEntry` / `MergeUndoEntries` 未登记；AgentDraftExecutor 对多笔记新增、字段修改、移动和部分删除逐项写入，**一次确认仍可能产生多条 Core 历史**。AddNotes 批量入口同样未接。 | [AgentDraftExecutor](../../entry/src/main/ets/backend/agent/AgentDraftExecutor.ets)、[集合服务](../../entry/src/main/ets/backend/集合服务.ts)、Core collection/notes 协议。优先将适合的同类写入合为一次 RPC，再处理分组；分组并不等于原子事务。测试部分成功、完整/部分撤销和重做，保留逐项失败反馈。 |
 | G04 / P2 | Core 真正重命名牌组 | `RenameDeck` 已封装，但没有生产调用者。首页定制明确走本机别名存储，源码注释也说明导出和同步仍使用后端原名。**现有别名功能有效，但未提供同步级改名**；JIDE 也没有真实改名提案。 | [首页](../../entry/src/main/ets/pages/首页.ets)、[HomeDeckCommands](../../entry/src/main/ets/backend/HomeDeckCommands.ets)、[牌组服务](../../entry/src/main/ets/backend/牌组服务.ts)。复用 Core rename、名称冲突/子牌组影响确认与集合撤销；验证导出和跨端同步后的名称。 |
@@ -126,7 +126,7 @@ JIDE 能通过共同界面目录描述入口、读取已登记界面状态并导
 1. **先闭合已承诺的行为**：G02 字段元数据本机生效；G03 批量撤销/写入语义；G06/G22 音频偏好和混排顺序。同时检查 JIDE 的实际效果描述，避免把 Core 保存成功扩写成本机已经应用。
 2. **补日常数据管理**：G04 真正改名、G05 牌组说明、G15 标签替换、G17 导入结果定位、G21 既有筛选牌组维护；复用既有写入会话、确认和导航。
 3. **补诊断及配置**：G07 Editing 偏好、G08/G11 FSRS 评价/计数、G14 列偏好、G16 导入偏好；其他 P3 按实际需求推进。
-4. **单独立项**：G01 自定义调度执行、G12 通用结构草稿渲染、多档案、字体管理及更广的平台输入。需要不同边界和设备验证，不能用升 Core 一项覆盖。
+4. **独立边界**：G01 已接同步自定义调度，剩余异步兼容与跨端设备验证见[执行决策](../decisions/2026-10-07-custom-scheduling.md)；G12 通用结构草稿渲染、多档案、字体管理及更广的平台输入仍需独立方案，不能用升 Core 一项覆盖。
 
 此前高级能力只暴露 JIDE 的约定保持有效；按[当前入口决策](../decisions/2026-10-04-ankicore-ui-routing.md)，较复杂的配置能力通过 JIDE 类型化工具提供，极简入口可复用现有界面。G02/G06 等需要本机显示/播放实际消费配置，单加一个工具不能完成它们。
 

@@ -12,6 +12,21 @@ import { 协议写入器 } from '../../entry/src/main/ets/proto/core/ProtoWriter
 
 const read = path => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 
+test('custom scheduling edits and clearing use the existing save transaction without mutating the original script', async()=>{
+  for(const script of ['states.good.normal.review.scheduledDays = 123;','']){
+    const h=saveHarness();h.options.customScheduling=script;
+    await h.state.保存牌组选项(h.form,h.options);
+    assert.equal(h.calls.length,1);assert.equal(h.calls[0].cardStateCustomizer,script);
+    assert.equal(h.view.cardStateCustomizer,'custom');
+  }
+  const unchanged=saveHarness();unchanged.view.cardStateCustomizer='中'.repeat(20001);
+  await unchanged.state.保存牌组选项(unchanged.form,unchanged.options);
+  assert.equal(unchanged.calls[0].cardStateCustomizer,unchanged.view.cardStateCustomizer,'unrelated edits preserve an oversized legacy script');
+  const h=saveHarness();h.options.customScheduling='中'.repeat(20001);
+  await h.state.保存牌组选项(h.form,h.options);
+  assert.equal(h.calls.length,0);assert.equal(h.state.牌组选项错误,'deck_customScheduling_validation_error');
+});
+
 test('optional zero limits have explicit protobuf presence instead of clearing the override', () => {
   const limits = { review: 0, new: 0, reviewToday: 0, newToday: 0,
     reviewTodayActive: false, newTodayActive: false, desiredRetention: null };

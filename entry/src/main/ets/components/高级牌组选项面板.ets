@@ -12,6 +12,7 @@ import type { DeckOptionDefinition, DeckOptionGroup, DeckOptionEnumChoice } from
 import type { DeckConfigSettings } from '../proto/messages/DeckConfigMessages';
 import type { DeckOptionDefaultValue } from '../model/DeckOptionsDefaults';
 import { fsrsParams } from '../model/FsrsOptions';
+import { validateSchedulingScript, customSchedulingInfo } from '../model/CustomScheduling';
 import { appInterface } from '../backend/AppInterfaceService';
 import type { AppInterfaceControl, AppInterfaceValue } from '../model/AppInterface';
 import { namedResourceText } from '../utils/UiFeedback';
@@ -70,7 +71,7 @@ export struct 高级牌组选项面板 {
       case 'fsrsParameters': return fsrsParams(this.form.取配置()).join(' ');
       case 'paramSearch': return this.form.取配置().paramSearch;
       case 'ignoreRevlogsBeforeDate': return this.form.取配置().ignoreRevlogsBeforeDate;
-      case 'customScheduling': return this.customScheduling;
+      case 'customScheduling': return this.options.customScheduling ?? this.customScheduling;
       default: return this.form.取字段文本值(key as keyof DeckConfigSettings);
     }
   }
@@ -104,6 +105,7 @@ export struct 高级牌组选项面板 {
       .map((item: DeckOptionEnumChoice): DeckOptionChoice => ({ label: this.text(item.titleKey), value: String(item.value) }));
   }
   private validate(field: DeckOptionDefinition, text: string): string {
+    if (field.kind === 'script') return validateSchedulingScript(text) ? '' : this.text('deck_customScheduling_validation_error');
     let key = this.scopedKey(field.key);
     const raw = field.kind === 'percentage' ? percentageValue(text) : text;
     if (field.kind === 'params') key = raw.trim() === '' || raw.trim().split(/\s+/).length === 21 ? 'fsrsParams6' :
@@ -133,6 +135,13 @@ export struct 高级牌组选项面板 {
         { id: 'has_validation_errors', value: String(this.form.校验().length !== 0 || this.options.校验().length !== 0) }];
       if (group.id === 'daily_limits') {
         values.push({ id: 'new_limit_scope', value: String(this.newScope) }, { id: 'review_limit_scope', value: String(this.reviewScope) });
+      }
+      if (group.id === 'advanced') {
+        const scheduling = customSchedulingInfo(this.rawValue('customScheduling'));
+        values.push({ id: 'custom_scheduling_supported', value: 'true' },
+          { id: 'custom_scheduling_runtime', value: scheduling.runtime },
+          { id: 'custom_scheduling_configured', value: String(scheduling.configured) },
+          { id: 'custom_scheduling_agent_writable', value: String(scheduling.writableByAgent) });
       }
       appInterface.observe({ surface: 'deck_options_group_' + group.id, sectionId: group.id, selectedId: '', optionIds: [], optionLabels: [],
         items: items, values: values, busy: this.busy, controlsComplete: false });
@@ -175,6 +184,7 @@ export struct 高级牌组选项面板 {
       }
     } else {
       DeckOptionField({ title: this.text(field.titleKey), help: this.text(field.helpKey), value: this.value(field),
+        multiline: field.kind === 'script',
         choices: this.choices(field), busy: this.busy || field.kind === 'unsupported', defaultValue: this.defaultValue(field),
         validate: (value: string): string => this.validate(field, value), onChange: (value: string): void => this.change(field, value) })
       if (field.kind === 'unsupported') {

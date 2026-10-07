@@ -21,6 +21,7 @@ export struct DeckOptionEditor {
   initialValue: string = '';
   defaultValue: string | undefined = undefined;
   choices: DeckOptionChoice[] = [];
+  multiline: boolean = false;
   validate: (value: string) => string = (_value: string): string => '';
   onConfirm: (value: string) => void = (_value: string): void => {};
   @State private draft: string = '';
@@ -50,11 +51,19 @@ export struct DeckOptionEditor {
               } })
             }
             if (this.choices.length === 0) {
-              TextInput({ text: this.draft })
-                .width('100%').height(应用尺寸.按钮高度).fontSize(应用尺寸.字号_正文)
-                .backgroundColor($r('app.color.surface_card'))
-                .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
-                .onChange((value: string): void => { this.draft = value; this.error = ''; })
+              if (this.multiline) {
+                TextArea({ text: this.draft })
+                  .width('100%').height(200).fontSize(应用尺寸.字号_正文)
+                  .backgroundColor($r('app.color.surface_card'))
+                  .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
+                  .onChange((value: string): void => { this.draft = value; this.error = ''; })
+              } else {
+                TextInput({ text: this.draft })
+                  .width('100%').height(应用尺寸.按钮高度).fontSize(应用尺寸.字号_正文)
+                  .backgroundColor($r('app.color.surface_card'))
+                  .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
+                  .onChange((value: string): void => { this.draft = value; this.error = ''; })
+              }
             } else {
               ForEach(this.choices, (choice: DeckOptionChoice) => {
                 Row({ space: 12 }) {
@@ -86,6 +95,7 @@ export struct DeckOptionField {
   @Prop help: ResourceStr = '';
   @Prop @Watch('syncValue') value: string = '';
   @Prop choices: DeckOptionChoice[] = [];
+  @Prop multiline: boolean = false;
   @Prop busy: boolean = false;
   @Prop error: string = '';
   @Prop defaultValue: string | undefined = undefined;
@@ -120,6 +130,7 @@ export struct DeckOptionField {
     if (this.busy) return;
     this.dialog = new CustomDialogController({
       builder: DeckOptionEditor({ title: this.title, help: this.help, initialValue: this.displayValue,
+        multiline: this.multiline,
         defaultValue: this.defaultValue,
         onHelp: (): void => { this.openHelp(); },
         choices: this.choices, validate: (value: string): string => this.validate(value),

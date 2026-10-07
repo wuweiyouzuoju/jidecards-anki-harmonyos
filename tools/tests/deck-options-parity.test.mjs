@@ -7,6 +7,7 @@ import { DeckOptionsPresets } from '../../entry/src/main/ets/model/DeckOptionsPr
 import { DeckOptionsSession, DeckOptionsFsrsState } from '../../entry/src/main/ets/model/home/DeckOptionsSession.ts';
 import { emptyDeckConfigSettings, encodeDeckConfig } from '../../entry/src/main/ets/proto/messages/DeckConfigMessages.ts';
 import { copyDeckConfig } from '../../entry/src/main/ets/model/DeckConfigSave.ts';
+import { validateSchedulingScript, customSchedulingInfo } from '../../entry/src/main/ets/model/CustomScheduling.ts';
 import { 牌组配置表单 } from '../../entry/src/main/ets/model/牌组配置表单.ets';
 import { 牌组选项编辑 } from '../../entry/src/main/ets/model/牌组选项编辑.ets';
 import { validateDeckOptionText } from '../../entry/src/main/ets/model/DeckOptionValidation.ets';
@@ -127,6 +128,7 @@ test('deleting a preset and creating several presets uses Core deletion and crea
 function component() {
   const tracker=new AppInterfaceTracker();const {config,view}=fixture();
   const Fields=loadComponentLogic('components/高级牌组选项面板.ets','高级牌组选项面板',{
+    validateSchedulingScript, customSchedulingInfo,
     ...catalog,牌组配置表单,牌组选项编辑,validateDeckOptionText,applyDeckOptionEdit,fsrsParams,DeckOptionsFsrsState,
     appInterface:tracker,namedResourceText:(_,key)=>key,$r:key=>key });
   const ui=new Fields();Object.assign(ui,{getUIContext:()=>({}),form:牌组配置表单.从配置创建(config.config),
@@ -198,7 +200,12 @@ test('actual callbacks handle scheduler visibility, legacy FSRS parameters and w
   ui.changeDay(6,'0');assert.deepEqual(ui.form.取配置().easyDaysPercentages,[1,1,1,1,1,1,0]);
   const views=tracker.snapshot();assert.equal(views.length,11);assert.ok(views.find(x=>x.surface==='deck_options_group_advanced').items.some(x=>x.id==='historicalRetention'));
   assert.ok(!views.find(x=>x.surface==='deck_options_group_advanced').items.some(x=>x.id==='initialEase'));
-  assert.equal(views.find(x=>x.surface==='deck_options_group_advanced').items.find(x=>x.id==='customScheduling').enabled,false);
+  const advanced=views.find(x=>x.surface==='deck_options_group_advanced');
+  assert.equal(advanced.items.find(x=>x.id==='customScheduling').enabled,true);
+  assert.equal(advanced.values.find(x=>x.id==='custom_scheduling_supported').value,'true');
+  ui.change(field('customScheduling'),'states.good.normal.review.scheduledDays = 123;');
+  assert.equal(ui.options.customScheduling,'states.good.normal.review.scheduledDays = 123;');
+  assert.equal(ui.value(field('customScheduling')),ui.options.customScheduling);
   ui.aboutToDisappear();assert.equal(tracker.snapshot().length,0);
 });
 test('simple mode still hides complex settings; UI and JIDE declare the same full-mode fields and resources',()=>{

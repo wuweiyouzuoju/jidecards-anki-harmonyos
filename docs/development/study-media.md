@@ -361,7 +361,7 @@ HTML 构建器在模板 CSS 前同时提供默认字色与不透明卡片底色�
 
 ## 自定义调度脚本兼容与缺失媒体
 
-每卡 studyOptions 同时读取全局 card_state_customizer。StudySessionController 持有本次会话已确认脚本；非空且变化的脚本必须先确认，answer 在未确认时拒绝提交。学习页在卡面、音频和计时开始前显示只读脚本预览，允许退出或明确选择标准 Core 调度。此入口不执行 JavaScript、不修改配置，也不重编码 SchedulingStates 的原始 oneof；相同脚本在会话内不重复提示。JIDE 观察 custom_scheduling_warning 的实际执行边界与确认控件。
+每卡 studyOptions 读取全局 card_state_customizer；StudySessionController 在生成按钮标签前调用 CustomSchedulingService 执行同步脚本。原生服务 1004 校验结果并按字段叠加修改，current 和未修改状态字段仍保留原始字节；评分采用与按钮间隔相同的候选。失败才显示脚本与错误，确认后本次会话对相同脚本采用标准 Core 调度；脚本变化重新执行。JIDE 从共同能力声明、get_deck_options 和实际失败面板读取支持范围及当前状态。运行时、原生边界、直接验证命令和异步限制见[自定义调度执行边界](../decisions/2026-10-07-custom-scheduling.md)。
 
 媒体快照保留 missing_media_notes，按 256 个 ID 分页（service 1000 method 5）并去重。受影响笔记通过完整 nid 查询交给浏览器；写入 method 6 在 registry lock 内重检并与确认快照取交集，单个 AddNoteTags 事务添加 missing-media。成功／失败后原快照失效，避免重复使用；离页停止查询发布，已接受打标仍完成并广播刷新／同步。报告与文件分页继续原语义，最终浏览查询内存仍是 O(受影响笔记数)。
 

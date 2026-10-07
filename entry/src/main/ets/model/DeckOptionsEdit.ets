@@ -8,6 +8,7 @@ import { compatibleNewSortOrder } from './DeckOptionsCatalog';
 export function applyDeckOptionEdit(form: 牌组配置表单, options: 牌组选项编辑, key: string, value: string, kind: string): void {
   const enabled: boolean = value === 'true';
   switch (key) {
+    case 'customScheduling': options.customScheduling = value; break;
     case 'newPerDay': form.每日新卡数文本 = value; break;
     case 'reviewsPerDay': form.每日复习数文本 = value; break;
     case 'desiredRetention': form.目标保留率文本 = value; break;

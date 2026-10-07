@@ -38,7 +38,7 @@ export const DECK_OPTION_GROUPS: DeckOptionGroup[] = [
   { id: 'advanced', titleKey: 'deck_group_advanced', fields: [field('maximumReviewInterval'),
     field('initialEase', 'number', 'sm2'), field('easyMultiplier', 'number', 'sm2'), field('intervalMultiplier', 'number', 'sm2'),
     field('hardMultiplier', 'number', 'sm2'), field('lapseMultiplier', 'number', 'sm2'),
-    field('historicalRetention', 'percentage', 'fsrs'), field('ignoreRevlogsBeforeDate', 'text', 'fsrs'), field('customScheduling', 'unsupported')] }
+    field('historicalRetention', 'percentage', 'fsrs'), field('ignoreRevlogsBeforeDate', 'text', 'fsrs'), field('customScheduling', 'script')] }
 ];
 export function visibleDeckOptionFields(group: DeckOptionGroup, fsrs: boolean): DeckOptionDefinition[] {
   return group.fields.filter(item => item.scheduler === '' || item.scheduler === (fsrs ? 'fsrs' : 'sm2'));

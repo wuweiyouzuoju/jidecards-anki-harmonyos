@@ -12,6 +12,8 @@
 
 ## 有效决策
 
+- [自定义调度执行边界](2026-10-07-custom-scheduling.md)：同步脚本沙箱、原生状态字段保真、失败确认、共享 UI/JIDE 能力与直接行为验证。
+
 - [官网静态内容与机器读取](2026-10-07-website-static-content.md)：HTML、Markdown、JSON 使用同一事实来源，构建阶段输出完整正文，宣传图由作者提供并校验原始字节。
 
 - [Anki 剩余接入的 UI 与 JIDE 分工](2026-10-04-ankicore-ui-routing.md)：复杂配置交给 JIDE，简单入口复用原界面；逐项覆盖 22 组剩余事项及平台边界。

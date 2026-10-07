@@ -35,8 +35,10 @@
 import type { DeckLimits } from '../proto/messages/DeckConfigMessages';
 import type { 校验问题 } from './牌组配置表单';
 import { deckOptionFloatInRange } from './DeckOptionsCatalog';
+import { validateSchedulingScript } from './CustomScheduling';
 
 export class 牌组选项请求字段 {
+  cardStateCustomizer: string | undefined = undefined;
   limits: DeckLimits | null = null;
   newCardsIgnoreReviewLimit: boolean = false;
   fsrs: boolean = false;
@@ -66,6 +68,7 @@ function 解析保留率(输入文本: string): number | null { const 去除空�
 /** 仅用于 UI 的当前牌组限额与请求级调度器开关草稿。 */
 @Observed
 export class 牌组选项编辑 {
+  customScheduling: string | undefined = undefined;
   sharedDeckCount: number = 0;
   applyToSharedDecks: boolean = false;
   保存模式: number = 0;
@@ -94,6 +97,7 @@ export class 牌组选项编辑 {
   校验(): 校验问题[] {
     const 问题列表: 校验问题[] = []; const 字段键列表: string[] = ['reviewLimit', 'newLimit', 'reviewToday', 'newToday']; const 字段值列表: string[] = [this.复习限额文本, this.新卡限额文本, this.今日复习文本, this.今日新卡文本];
     for (let i = 0; i < 字段键列表.length; i++) if (字段值列表[i].trim() !== '' && 解析无符号32位整数(字段值列表[i]) === null) 问题列表.push({ 字段键: 字段键列表[i], 消息键: 'deck_limit_validation_error' });
+    if (this.customScheduling !== undefined && !validateSchedulingScript(this.customScheduling)) 问题列表.push({ 字段键: 'customScheduling', 消息键: 'deck_customScheduling_validation_error' });
     if (this.目标保留率覆盖文本.trim() !== '' && 解析保留率(this.目标保留率覆盖文本) === null) 问题列表.push({ 字段键: 'desiredRetentionOverride', 消息键: 'deck_retention_validation_error' }); return 问题列表;
   }
 
@@ -103,5 +107,5 @@ export class 牌组选项编辑 {
     const 下一个限额 = new 限额草稿(); 下一个限额.review = 解析无符号32位整数(this.复习限额文本); 下一个限额.new = 解析无符号32位整数(this.新卡限额文本); 下一个限额.reviewToday = 解析无符号32位整数(this.今日复习文本); 下一个限额.newToday = 解析无符号32位整数(this.今日新卡文本); 下一个限额.reviewTodayActive = this.今日复习启用; 下一个限额.newTodayActive = this.今日新卡启用; 下一个限额.desiredRetention = 解析保留率(this.目标保留率覆盖文本); this.已应用限额 = 下一个限额; return true;
   }
 
-  转换为请求字段(): 牌组选项请求字段 { const 请求字段 = new 牌组选项请求字段(); 请求字段.limits = this.已应用限额 === null ? null : 复制限额(this.已应用限额); 请求字段.newCardsIgnoreReviewLimit = this.新卡忽略复习限额; 请求字段.fsrs = this.是否启用FSRS; 请求字段.applyAllParentLimits = this.应用所有父级限额; 请求字段.fsrsReschedule = this.FSRS重排; 请求字段.fsrsHealthCheck = this.FSRS健康检查; 请求字段.mode = this.保存模式; return 请求字段; }
+  转换为请求字段(): 牌组选项请求字段 { const 请求字段 = new 牌组选项请求字段(); 请求字段.cardStateCustomizer = this.customScheduling; 请求字段.limits = this.已应用限额 === null ? null : 复制限额(this.已应用限额); 请求字段.newCardsIgnoreReviewLimit = this.新卡忽略复习限额; 请求字段.fsrs = this.是否启用FSRS; 请求字段.applyAllParentLimits = this.应用所有父级限额; 请求字段.fsrsReschedule = this.FSRS重排; 请求字段.fsrsHealthCheck = this.FSRS健康检查; 请求字段.mode = this.保存模式; return 请求字段; }
 }

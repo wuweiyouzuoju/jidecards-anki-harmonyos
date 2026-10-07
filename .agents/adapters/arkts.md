@@ -108,7 +108,7 @@ this.localizedFmt($r('app.string.xxx_lang'), [arg1, arg2]);
 - panic 在 FFI 内 `catch_unwind`，绝不跨语言边界
 - `nativeStatus=3` 是 BACKEND_ERROR（details 是 protobuf）
 - `nativeStatus=4` 是 NATIVE_FATAL（panic / 锁中毒）
-- SchedulingStates 必须 raw passthrough，禁止解码 / 重编码 oneof 结构
+- SchedulingStates 在 ArkTS 中必须 raw passthrough，禁止解码 / 重编码 oneof；脚本修改仅经原生服务 1004 按字段叠加，current 与未修改字段保持原样，见[执行边界](../../docs/decisions/2026-10-07-custom-scheduling.md)。
 
 ## 装机 / 签名
 

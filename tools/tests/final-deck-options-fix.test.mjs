@@ -16,8 +16,11 @@ test('current deck limits and scheduler flags round-trip as editable request dat
   edit.FSRS重排 = true; edit.FSRS健康检查 = true;
   assert.deepEqual(edit.校验(), []);
   assert.equal(edit.应用(), true);
-  const bytes = encodeUpdateDeckConfigsRequest({ targetDeckId: 1, configs: [], removedConfigIds: [], mode: 0, cardStateCustomizer: '', ...edit.转换为请求字段() });
+  const options = edit.转换为请求字段();
+  assert.equal(options.cardStateCustomizer, undefined, 'an unedited script remains unspecified for the save boundary');
+  const bytes = encodeUpdateDeckConfigsRequest({ targetDeckId: 1, configs: [], removedConfigIds: [], mode: 0, ...options, cardStateCustomizer: options.cardStateCustomizer ?? '' });
   const decoded = decodeUpdateDeckConfigsRequest(bytes);
+  assert.equal(decoded.cardStateCustomizer, '');
   assert.equal(decoded.limits.review, 120); assert.equal(decoded.limits.new, 30); assert.equal(decoded.limits.reviewToday, 25); assert.equal(decoded.limits.newToday, null); assert.equal(decoded.limits.reviewTodayActive, false); assert.equal(decoded.limits.newTodayActive, true); assert.ok(Math.abs(decoded.limits.desiredRetention - 0.85) < 0.00001);
   assert.equal(decoded.newCardsIgnoreReviewLimit, true);
   assert.equal(decoded.fsrs, true);

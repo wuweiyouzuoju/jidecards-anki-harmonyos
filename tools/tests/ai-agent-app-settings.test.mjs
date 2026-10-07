@@ -16,6 +16,7 @@ import { CARD_TEXT_SIZE_KEY, DEFAULT_CARD_TEXT_SIZE, normalizeCardTextSize } fro
 import * as deckAppearance from '../../entry/src/main/ets/model/DeckListAppearance.ts';
 const { DECK_LIST_NARROW_KEY, DECK_LIST_STYLE_KEY } = deckAppearance;
 import { buildAgentDeckSettings } from '../../entry/src/main/ets/model/agent/AgentDeckSettings.ts';
+import { customSchedulingInfo } from '../../entry/src/main/ets/model/CustomScheduling.ts';
 import { emptyDeckConfigSettings } from '../../entry/src/main/ets/proto/messages/DeckConfigMessages.ts';
 import { AgentApprovalRequired, createAgentAction, AgentActionLedger } from '../../entry/src/main/ets/model/agent/AgentAction.ts';
 import { loadPlatformModule } from './platform-module-harness.mjs';
@@ -73,7 +74,7 @@ function fixture() {
     AI_AGENT_CHANNELS_APP_STORAGE_KEY: 'aiAgentChannelsEnabled', CLOUD_DECK_CHANNEL_ENABLED: false, APP_FOREGROUND_KEY: 'appForeground',
     agentSettingDefinitions, decodeSettingsArguments, requestedThemeMode, isAppThemeMode, AgentToolSchemaError,
     appThemeSession: themes, appThemeColorSession: colors, THEME_CATALOG, isThemeAvailable, UNLOCKED_CONTENTS_KEY, isThemeId,
-    createAgentAction, readFsrsEnabled, agentPreferenceDefinitions, buildAgentDeckSettings,
+    createAgentAction, readFsrsEnabled, agentPreferenceDefinitions, buildAgentDeckSettings, customSchedulingInfo,
     当前语言模式: () => 'en', readSavedStudyQuickAnswerMode: async () => 2,
     readAgentPreference,
     统计服务: class { async 获取图表偏好() { return {calendarFirstDayOfWeek:1,cardCountsSeparateInactive:true,browserLinksSupported:false,futureDueShowBacklog:true}; } },
@@ -257,6 +258,7 @@ test('deck options read checks discovered IDs and preserves zero overrides, toda
   assert.equal(result.presetUseCount,3); assert.equal(result.newPerDay,20);
   assert.equal(result.limits.new,0); assert.equal(result.limits.newToday,4);
   assert.equal(result.limits.newTodayActive,true); assert.deepEqual(result.parentPresetIds,[5]);
+  assert.deepEqual(result.customScheduling,customSchedulingInfo(''));
   assert.deepEqual(f.state.writes,[]);
 });
 

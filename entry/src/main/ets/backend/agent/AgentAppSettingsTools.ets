@@ -12,6 +12,8 @@ import type { ThemeDefinition } from '../../model/ThemeCatalog';
 import { agentPreferenceDefinitions } from '../../model/agent/AgentPreferenceSettings';
 import type { AgentPreferenceDefinition } from '../../model/agent/AgentPreferenceSettings';
 import { buildAgentDeckSettings } from '../../model/agent/AgentDeckSettings';
+import { customSchedulingInfo } from '../../model/CustomScheduling';
+import type { CustomSchedulingInfo } from '../../model/CustomScheduling';
 import type { AgentDeckSettings, AgentDeckSettingsView } from '../../model/agent/AgentDeckSettings';
 import { readAgentPreference } from './AgentPreferenceReader';
 import type { AgentPreferenceState } from './AgentPreferenceReader';
@@ -56,6 +58,7 @@ interface SettingsReadResult {
 interface AgentThemeColorView { id: string; seed: string; available: boolean; }
 
 interface DeckOptionsResult {
+  customScheduling: CustomSchedulingInfo;
   deckId: number; deckName: string; presetId: number; presetName: string; presetUseCount: number;
   newPerDay: number; reviewsPerDay: number; learnStepsMinutes: number[];
   limits: DeckLimits | null; parentPresetIds: number[]; fsrs: boolean; applyAllParentLimits: boolean;
@@ -183,6 +186,7 @@ export class AgentAppSettingsTools {
     if (preset === undefined || preset.config.config === null) { throw new Error('deck_preset_unavailable'); }
     const settings: AgentDeckSettingsView = buildAgentDeckSettings(preset.config.config);
     const result: DeckOptionsResult = { deckId: args.deckId, deckName: view.currentDeck.name,
+      customScheduling: customSchedulingInfo(view.cardStateCustomizer),
       presetId: preset.config.id, presetName: preset.config.name, presetUseCount: preset.useCount,
       newPerDay: preset.config.config.newPerDay, reviewsPerDay: preset.config.config.reviewsPerDay,
       learnStepsMinutes: settings.settings.learnSteps.slice(), limits: view.currentDeck.limits,

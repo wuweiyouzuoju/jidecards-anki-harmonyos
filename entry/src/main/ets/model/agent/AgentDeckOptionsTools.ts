@@ -20,7 +20,7 @@ export interface AgentDeckOptionsAction extends AgentDeckOptionsArguments {
 const OVERRIDES: DeckOptionDefinition[] = ['newLimit','reviewLimit','newToday','reviewToday','desiredRetentionOverride']
   .map(key => ({ key, kind:'number', scheduler:'', titleKey:'deck_'+key+'_label', helpKey:'deck_'+key+'_help' }));
 export function agentWritableDeckOptionFields(): DeckOptionDefinition[] {
-  return DECK_OPTION_GROUPS.flatMap(group => group.fields).filter(field => field.kind !== 'unsupported').concat(OVERRIDES);
+  return DECK_OPTION_GROUPS.flatMap(group => group.fields).filter(field => field.kind !== 'unsupported' && field.kind !== 'script').concat(OVERRIDES);
 }
 export function agentDeckOptionsFunctionTools(): ProviderFunctionTool[] {
   return [{ name:'propose_update_deck_options', description:'修改已发现牌组的学习选项，包括轻松日、上限、步幅、FSRS、显示顺序、计时、音频及自动前进。展示前后值和共享范围，确认后直接写入 Anki Core，无需跳转页面手动设置。',

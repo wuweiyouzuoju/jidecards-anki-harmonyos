@@ -37,6 +37,7 @@ export function prepareDeckConfigForSave(view: DeckConfigsForUpdateView, origina
 }
 
 export interface DeckConfigRequestOptions {
+  cardStateCustomizer?: string;
   limits: DeckLimits | null;
   newCardsIgnoreReviewLimit: boolean;
   fsrs: boolean;
@@ -64,7 +65,8 @@ export function buildDeckConfigRequest(targetDeckId: number, view: DeckConfigsFo
   const request: UpdateDeckConfigsInput = {
     targetDeckId: targetDeckId,
     configs: [prepareDeckConfigForSave(view, original, copyDeckConfig(draft), applyToSharedDecks)],
-    removedConfigIds: [], mode: edited.mode ?? UPDATE_DECK_CONFIGS_MODE_NORMAL, cardStateCustomizer: view.cardStateCustomizer,
+    removedConfigIds: [], mode: edited.mode ?? UPDATE_DECK_CONFIGS_MODE_NORMAL,
+    cardStateCustomizer: edited.cardStateCustomizer ?? view.cardStateCustomizer,
     limits: limitsForSave(edited.limits), newCardsIgnoreReviewLimit: edited.newCardsIgnoreReviewLimit,
     fsrs: edited.fsrs, applyAllParentLimits: edited.applyAllParentLimits,
     fsrsReschedule: edited.fsrsReschedule, fsrsHealthCheck: edited.fsrsHealthCheck

@@ -25,7 +25,7 @@ Agent-first 原则与开发约束见 [AGENTS.md](AGENTS.md)，本页只提供任
 ## 全局不变量
 
 - 调度、FSRS、队列、埋藏/暂停与完成判定来自 Anki Core；前端不另写算法。
-- SchedulingStates 原始 protobuf 字节透传，不解码重编码 oneof。
+- SchedulingStates 在前端原始字节透传；自定义脚本仅由原生服务按字段叠加修改，current 和未修改字段保持原样，见[执行边界](docs/decisions/2026-10-07-custom-scheduling.md)。
 - Service 不持有 UI；页面负责错误展示，模型负责业务状态和可测试决策。
 - Rust 捕获 panic，C++ 纯转发；取消同步不等于回滚完成，集合占用在真实调用结束后才释放。
 - 已接受的写入不随页面销毁取消；迟到读取不能覆盖新页面/新选择。
