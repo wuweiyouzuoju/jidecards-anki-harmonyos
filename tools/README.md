@@ -1,5 +1,7 @@
 # 工具入口
 
+2026-10-07 在线 Core 验证使用 `native/rsharmony/examples/online_sync_check.rs`，凭证仅来自运行进程环境，隔离集合与合成数据清理；默认不下载整个远程媒体库。`audio_ui_fixture.rs` 生成设备用长音频包。命令、实际证据与平台边界见[互通回归](../docs/development/core-interop.md)及[本轮验收](../docs/development/ankidroid-high-priority-2026-10-07.md)。
+
 从仓库根执行。默认验证只运行本地测试，不启动真实 Provider 请求或内容发行工具。
 
 | 用途 | 入口 | 说明 |

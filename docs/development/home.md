@@ -2,6 +2,8 @@
 
 [返回任务索引](../../PROJECT_CONTEXT.md)
 
+2026-10-07：既有筛选牌组的详情与列表菜单提供“清空筛选牌组”“重建筛选牌组”。`FilteredDeckCommands` 独占校验、串行写入、自动同步占用与集合刷新，`backend/FilteredDeckService.ets` 只适配真实 Core。维护动作保留笔记与原牌组关联；重建显示 Core 实际计数。共享 `deckDetailsMoreItems` 排除筛选牌组不适用的普通预设选项，UI/JIDE 观察采用同一动作声明和真实 busy/filtered 值。复杂配置经 JIDE 提案，不增加配置工作台。手动创建表单使用公共 `DialogHeader`、`FormSelectRow` 和 `SettingsToggleRow`；排序选项来自与 JIDE 共用的 `FilteredDeckOptions`，按当前语言读取。直接行为与真实 Core 撤销测试、模拟器6→0→6记录见[本轮验收](ankidroid-high-priority-2026-10-07.md)。
+
 - 代码路径以下均相对 `entry/src/main/ets/`。
 - 责任链：首页映射 UI → HomeWorkCoordinator / HomeStartupSequence / HomeSyncPolicy 决策 → HomeDataRepository / 既有 Service。
 - 首页新建牌组菜单不再提供 AI 制卡/改卡。统计卡旁的独立 JIDE 图标通过 `onAgent` → `openAgent` 打开空白对话入口，配置预检和开发者开关保持在既有责任入口；按需目标选择、改卡搜索与确认见[应用内 Agent](agent.md#统一-ai-对话入口)。

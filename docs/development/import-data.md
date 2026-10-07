@@ -16,6 +16,8 @@
 
 ## APKG 与文本
 
+2026-10-07：导入结果保留 Core 返回的新增、更新、重复笔记 ID。`ImportResults.ts` 独占类别和每批256个 ID 的分页；`DataTransferSession.resultQuery()` 只在当前会话完成且空闲时允许导航，首页/设置共用浏览页 `initialSearch` + `initialNotesMode`。结果类别复用 `DataActionRow`，真实 ID 生成 `nid:` 搜索；无可定位 ID 的失败/冲突条目禁用且隐藏箭头，不按字段文本猜测笔记。返回结果保留所选批次，JIDE 观察真实类别、数量、批次及可用操作。浏览页的模式/筛选/排序标签在 Builder 内读取响应式状态。回归见 `import-results`、`import-options-runtime`，设备记录见[本轮验收](ankidroid-high-priority-2026-10-07.md)。
+
 - APKG 复用 Anki `ImportAnkiPackage`，开放笔记/笔记类型的较新才更新、始终更新、保留，以及复习进度、牌组配置、类型合并。面板打开或选中文件后先读取 Core 保存的五项选项，不用本机硬编码默认值覆盖它们；每次打开重新读取，本次草稿独立复制。读取失败保留错误并禁用提交，可关闭后重新打开或重新选文件。加载选项与系统选择文件是不同阶段；外部 URI 在选项加载/确认期间保持租约，离页后迟到结果不能导入。内部直接 `importUri(uri)` 保留 Core 自行决定选项的行为。任一更新策略选为“始终更新”时才显示覆盖本地修改的小字说明；两项都改回其他策略后隐藏。
 - CSV / TSV / TXT 使用 UTF-8，`GetCsvMetadata` 负责分隔符检测、Anki 文件头、带引号/多行字段及前五行预览；`ImportCsv` 负责实际解析、重复匹配和写入。应用不另写 CSV 解析器。可选择牌组、笔记类型、字段列、标签/GUID 列、重复处理、匹配范围和 HTML。文件指定的逐行牌组/笔记类型可保留；改变分隔符或类型会重新读取预览与映射，界面有重置说明。HTML 媒体引用不会自动复制文本旁的文件。
 - 协议以锁定 `third_party/anki/proto/anki/import_export.proto` 为准。`CsvImportMessages.ts` 保留 deck/notetype oneof 和字段列的 1-based 索引，0 表示未映射；`CsvImport.ts` 检查映射范围并复制草稿。新增 RPC 别名从 `tools/rpc-index-methods.json` 生成，不能手写编号。

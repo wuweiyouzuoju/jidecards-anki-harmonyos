@@ -1,5 +1,7 @@
 # 公共 UI 代码索引
 
+导入结果类别复用 `DataActionRow` → [SettingsActionRow.ets](SettingsActionRow.ets)。`showDisclosure=false` 可隐藏没有目标的尾部箭头；`isInteractive` 仍独占点击与禁用守卫，不能用箭头显隐代替操作校验。新增音频设置复用 `SettingsToggleRow`，筛选牌组维护沿用现有详情按钮与 `GlassSurface`、列表的公共菜单行。
+
 `SettingsActionRow` 的尾部默认使用共用箭头；录音、暂停等直接执行的动作可传 `trailingIcon`，由公共 `ActionIcon` 在相同24vp槽位显示图标，完整行仍拥有点击、按压与禁用守卫。音频录制主行显示当前状态：空闲麦克风、录制中麦克风带声波、暂停后为斜杠麦克风；独立的暂停/继续行显示暂停/播放图标。音频附件右上角的删除复用 `IconActionButton` 的44vp热区；传 `cornerAligned` 将图标靠右上并在热区内留4vp，默认仍居中，不以文字大小缩小点击范围。
 
 菜单图标与文字的对齐责任在 [MenuItem.ets](MenuItem.ets)：同一 Row 按 `labelAlignment` 成组居中或靠左，图文间隔8vp，不另叠图标或用文字 padding 补槽。首页平面菜单默认整组居中；卡片动作菜单显式整组靠左。箭头完整24vp及8vp间隔由公共行右侧预留，居中行对称预留。菜单宽度与10vp左右留白共用 [应用尺寸.ets](../../utils/应用尺寸.ets)，固定宽度各档已统一收紧8vp，44vp点击行高保留。`AnchoredMenu` 的左右边缘与同一限宽工具栏的按钮外缘对齐，不额外叠加外边距。回归：`ui-select-layout.test.mjs`、`ui-shell-contract.test.mjs`。

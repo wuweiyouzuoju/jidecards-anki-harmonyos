@@ -4,6 +4,8 @@
 
 AnkiDroid 源码级对照结果见 [ANKIDROID_PARITY_AUDIT.md](ANKIDROID_PARITY_AUDIT.md)。
 
+2026-10-07 高优先级改进已接入：卡面单项音频与两个 Core 音频偏好、既有筛选牌组清空/重建及 JIDE 配置提案、导入结果按类别定位笔记。主机包/恢复回归、真实 AnkiWeb 双向集合同步和隔离服务器媒体往返已有结果，模拟器逐项验收见[本轮记录](development/ankidroid-high-priority-2026-10-07.md)。这些证据不代表 AnkiDroid Android 运行时已验收。
+
 2026-10-04 继续核查结果见 [Anki Core 全量接入盘点](development/ankicore-integration-audit-2026-10-04.md)。该报告区分未接接口、替代路径和运行时消费缺口；原 RPC 明细是盘点时快照；实施进度见 [UI 分工与接入进度](decisions/2026-10-04-ankicore-ui-routing.md#当前接入进度2026-10-05)。2026-10-05 已补字段编辑配置消费、Core APKG 已存选项和混排 AV 顺序。原 FSRS 面板可评价草稿并读取卡片历史覆盖，JIDE 接参数评价、历史计数、记忆状态诊断及确认后逐日模拟。字体文件导入与其他未完成项继续保留在台账中。
 
 ## JIDE 专用高级功能（2026-10-04）

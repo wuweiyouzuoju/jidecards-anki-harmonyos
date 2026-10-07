@@ -10,6 +10,8 @@
 
 ## 助手身份与产品表述
 
+2026-10-07：`get_filtered_deck` 读取已发现筛选牌组的真实 Core 配置；`propose_update_filtered_deck` 仅准备搜索条件、数量/顺序、重新调度和预览延迟白名单修改。`FilteredDeckCommands` 是 UI/JIDE 的共同入口；确认卡显示前后值，执行前核对旧 protobuf 配置，保留未知字段与 v1 延迟，接受写入后独立于页面生命周期完成。搜索条件、数量上限、排序方式各自成行，不显示原始配置 JSON；未变值只显示一次，两组搜索以序号区分，移除项显示未设置。`FilteredDeckOptions` 的排序值/名称同时供手动表单和 JIDE 使用。普通牌组被拒绝，过期提案不提交，更新后重建并返回实际配置/计数。`get_advanced_settings` / `propose_update_collection_preferences` 同时读写隐藏音频按钮和翻面中断偏好。导入结果、音频设置和筛选菜单发布真实界面状态，不仅更新提示词。回归见 `filtered-deck-commands`，设备与 Core 证据见[本轮验收](ankidroid-high-priority-2026-10-07.md)。
+
 ### JIDE 专用高级能力（2026-10-04）
 
 以下能力仅通过 JIDE 的实际工具暴露，不增加设置、浏览器菜单或学习菜单入口。声明来自 `model/agent/AgentMaintenanceTools.ts`，三个模式共用；`backend/agent/AgentMaintenanceTools.ets` 在页面实际注册，只负责读取和准备提案。现有确认卡展示前后值、范围及风险，执行仍由 `AgentActionExecutor` / `AgentDraftExecutor` 消费应用登记的确认，不接受模型传入确认凭证。
