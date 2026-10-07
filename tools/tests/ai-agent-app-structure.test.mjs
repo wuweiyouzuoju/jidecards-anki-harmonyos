@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync, readdirSync } from 'node:fs';
-import { APP_INTERFACE_SURFACES, AppInterfaceTracker, visibleInterfaceItems, settingsHeaderItems, settingsHeaderControls } from '../../entry/src/main/ets/model/AppInterface.ts';
+import { APP_INTERFACE_SURFACES, AppInterfaceTracker, visibleInterfaceItems, deckDetailsMoreItems, settingsHeaderItems, settingsHeaderControls } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { appInterfaceSurfaceIds, browserInterfaceMenu, studyInterfaceMenu } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { agentInterfaceControls, agentInterfaceTitle, agentImportLabelKey, reminderEditorControls, reminderEditorTitle } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { stripTypeScriptTypes } from 'node:module';
@@ -378,7 +378,8 @@ test('deck detail observations follow the real snapshot, expansion and loading s
   const tracker=new AppInterfaceTracker();
   const Details=loadComponentLogic('components/牌组详情面板.ets','牌组详情面板',{
     应用尺寸:loadPlatformModule('utils/应用尺寸.ets','应用尺寸',{}),
-    appInterface:tracker,visibleInterfaceItems,interfaceItemText:(_,surface,id)=>localize(APP_INTERFACE_SURFACES.find(x=>x.id===surface).items.find(x=>x.id===id).titleKey),
+    appInterface:tracker,visibleInterfaceItems,deckDetailsMoreItems,
+    interfaceItemText:(_,surface,id)=>localize(APP_INTERFACE_SURFACES.find(x=>x.id===surface).items.find(x=>x.id===id).titleKey),
     牌组显示名:deck=>deck.name,ExpansionReveal:class {cancel(){} request(){}},
     DECK_LIST_NARROW_KEY:'narrow',THEME_TEXT_COLORS_KEY:'text',GLASS_COLORS_KEY:'glass',GLASS_HIGHLIGHT_COLORS:[],
     AI_AGENT_CHANNELS_APP_STORAGE_KEY:'agent',颜色键:{新卡计数色:'new',学习中计数色:'learning',复习中计数色:'review',动作主色:'primary'}});

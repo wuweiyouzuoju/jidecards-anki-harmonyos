@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { FILTERED_DECK_ACTIONS, FilteredDeckMenuAction } from '../model/FilteredDeckCommands';
+import { appInterface } from '../backend/AppInterfaceService';
+import { AppInterfaceControl } from '../model/AppInterface';
 import { AnchoredMenuItem } from './common/MenuItem';
 import { interfaceItemText } from '../utils/AppInterfaceText';
 import { PressFeedback } from '../utils/PressFeedback';
@@ -89,7 +92,9 @@ export struct 牌组列表项 {
   // 排序模式：true 时左侧显示≡手柄、行高亮描边、onClick 不触发选牌、长按不弹菜单。
   // 用户通过 牌组列表项 长按菜单的「拖动排序」项进入；Index.ets 顶部 Bar 上的「完成」退出。
   @Prop reorderMode: boolean = false;
-  @State private 显示牌组菜单: boolean = false;
+  @State @Watch('publishFilteredMenu') private 显示牌组菜单: boolean = false;
+  @Prop @Watch('publishFilteredMenu') filteredBusy: boolean = false;
+  onFilteredAction: (deckId: string, action: string) => void = (): void => {};
   @State private 显示色条菜单: boolean = false;
   @State private textColumnWidth: number = 0;
   // 沙盒背景图异步加载的 PixelMap。
@@ -146,6 +151,7 @@ export struct 牌组列表项 {
 
   aboutToDisappear(): void {
     this.disposed = true;
+    if (this.显示牌组菜单) appInterface.leave('deck_row_menu');
     this.imageGeneration++;
     this.backgroundPath = '';
     const previous: PixelMap | null = this.背景像素图;
@@ -313,6 +319,15 @@ export struct 牌组列表项 {
     .attributeModifier(new MenuSurface())
   }
 
+  private publishFilteredMenu(): void {
+    if (this.disposed) return;
+    if (!this.显示牌组菜单) { appInterface.leave('deck_row_menu'); return; }
+    const items: AppInterfaceControl[] = this.deck.filtered === true ? FILTERED_DECK_ACTIONS.map((item): AppInterfaceControl =>
+      ({ id: item.id, titleKey: item.titleKey, title: interfaceItemText(this.getUIContext(), 'deck_row_menu', item.id, this.uiLanguage), enabled: !this.filteredBusy, selected: false })) : [];
+    appInterface.observe({ surface: 'deck_row_menu', sectionId: '', selectedId: this.deck.id, optionIds: [], optionLabels: [],
+      busy: this.filteredBusy, items: items, values: [{ id: 'filtered', value: String(this.deck.filtered === true) }] });
+  }
+
   /** 主菜单：色条文字入口与牌组操作入口。 */
   @Builder
   private 主菜单() {
@@ -379,6 +394,14 @@ export struct 牌组列表项 {
         this.显示牌组菜单 = false;
         this.onCustomizeDeck(this.deck.id);
       })
+      if (this.deck.filtered === true) {
+        ForEach(FILTERED_DECK_ACTIONS, (item: FilteredDeckMenuAction) => {
+          AnchoredMenuItem({ label: interfaceItemText(this.getUIContext(), 'deck_row_menu', item.id, this.uiLanguage),
+            labelAlignment: TextAlign.Start, available: !this.filteredBusy, onSelect: (): void => {
+              this.显示牌组菜单 = false; this.onFilteredAction(this.deck.id, item.id);
+            } })
+        }, (item: FilteredDeckMenuAction): string => item.id)
+      }
       // 自定义学习作用于当前牌组；独立创建入口在首页新建菜单。
       if (!this.简洁模式) {
         Row() {

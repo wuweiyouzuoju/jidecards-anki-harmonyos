@@ -41,6 +41,7 @@ export struct AgentActionCard {
     if (this.action.kind === 'collection_preferences' || this.action.kind === 'study_controls') { return $r('app.string.ai_agent_action_advanced'); }
     if (this.action.kind === 'export_subset') { return $r('app.string.ai_agent_action_export_subset'); }
     if (this.action.kind === 'fsrs_simulation') { return $r('app.string.agent_tool_simulate_fsrs'); }
+    if (this.action.kind === 'filtered_deck_change') { return $r('app.string.filtered_deck_settings'); }
     if (this.action.kind === 'deck_options_change') { return $r('app.string.deck_options_title'); }
     return $r('app.string.ai_agent_action_analysis');
   }
@@ -93,14 +94,14 @@ export struct AgentActionCard {
 
   @Builder
   private preview() {
-    if (this.action.kind === 'deck_options_change' || this.action.kind === 'collection_preferences' || this.action.kind === 'study_controls' || this.action.kind === 'export_subset' || this.action.kind === 'fsrs_simulation') {
+    if (this.action.kind === 'filtered_deck_change' || this.action.kind === 'deck_options_change' || this.action.kind === 'collection_preferences' || this.action.kind === 'study_controls' || this.action.kind === 'export_subset' || this.action.kind === 'fsrs_simulation') {
       ForEach(maintenancePreviewRows(this.action, (key: string): string => namedResourceText(this.getUIContext(), key)),
         (row: MaintenancePreviewRow) => {
           Text(row.title).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
           Text(row.before === '' ? row.after : this.maintenanceBeforeAfter(row.before, row.after))
             .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary')).width('100%')
         }, (row: MaintenancePreviewRow): string => row.title)
-      Text(this.action.kind === 'deck_options_change' ? $r('app.string.agent_deck_options_change_hint') : this.action.kind === 'fsrs_simulation' ? $r('app.string.agent_fsrs_simulation_hint') :
+      Text(this.action.kind === 'filtered_deck_change' ? $r('app.string.filtered_deck_change_hint') : this.action.kind === 'deck_options_change' ? $r('app.string.agent_deck_options_change_hint') : this.action.kind === 'fsrs_simulation' ? $r('app.string.agent_fsrs_simulation_hint') :
         this.action.kind === 'export_subset' ? $r('app.string.agent_export_subset_hint') :
         this.action.kind === 'collection_preferences' ? $r('app.string.agent_collection_preferences_hint') : $r('app.string.ai_agent_setting_device_scope'))
         .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')

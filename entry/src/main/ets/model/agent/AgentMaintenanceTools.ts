@@ -18,6 +18,10 @@ function tool(name: string, description: string, properties: string, required: s
 export function agentMaintenanceTools(): ProviderFunctionTool[] {
   const draft: string = `"draftId":${TEXT},"reason":${TEXT}`;
   return [
+    tool('get_filtered_deck', '读取已发现的既有过滤牌组真实配置。返回两个搜索条件、数量、排序、reschedule 与预览延时（秒）；普通牌组会失败。使用本工具后再提出修改。',
+      `"deckId":${ID}`, '"deckId"', '{"deckId":1}'),
+    tool('propose_update_filtered_deck', '提出既有过滤牌组配置修改，changesJson 只允许 reschedule、searchTerms、previewDelay、previewAgainSecs、previewHardSecs、previewGoodSecs。searchTerms 是1至2个完整 search/limit/order 对象，limit 1至100000，order 0至10，与 Core 排序一致。延时单位秒，0至86400。省略字段保留。确认后由 Core 保存并重新填充，已有卡归还原牌组；空结果仍保留牌组，不删除笔记或复习历史。提交前重查真实配置，过期提案失败。',
+      `"deckId":${ID},"changesJson":${TEXT}`, '"deckId","changesJson"', '{"deckId":1,"changesJson":"{\\"reschedule\\":false}"}'),
     tool('get_advanced_settings', '读取 JIDE 专用高级设置。collection 返回 Core FSRS 负担均衡、带步骤短期调度和历史备份保留策略；study 返回本机常亮与输入映射。不会读取凭证。',
       '"group":{"type":"string","enum":["collection","study"]}', '"group"', '{"group":"collection"}'),
     tool('propose_update_collection_preferences', '提出 Core 全库高级偏好修改。changesJson 为非空对象，只允许 loadBalancer、shortTermWithSteps 开关及 backupDaily、backupWeekly、backupMonthly、backupInterval 整数。间隔单位分钟，保留数可为零。省略项保留；不主动重排卡片。',

@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { filteredDeckCommands } from '../FilteredDeckService';
+import type { FilteredDeckProposal } from '../../model/FilteredDeckCommands';
 import { 牌组服务 } from '../牌组服务';
 import { DeckHierarchyCommands } from '../DeckHierarchyCommands';
 import type { DeckReparentPlan } from '../../model/DeckReparent';
@@ -58,7 +60,12 @@ export class AgentActionExecutor {
     try {
       const target: number[] = this.scope.currentCreateTarget();
       let result: string = '{"status":"completed"}';
-      if (action.kind === 'deck_options_change') {
+      if (action.kind === 'filtered_deck_change') {
+        const proposal: FilteredDeckProposal = JSON.parse(action.payloadJson) as FilteredDeckProposal;
+        this.scope.assertReadableDeckIds([proposal.deckId]);
+        const saved = await filteredDeckCommands.save(proposal);
+        result = JSON.stringify({ status: 'completed', deckId: saved.id, config: saved.config, rebuilt: true });
+      } else if (action.kind === 'deck_options_change') {
         result = await executeAgentDeckOptionsAction(this.scope, JSON.parse(action.payloadJson) as AgentDeckOptionsAction);
       } else if (action.kind === 'fsrs_simulation') {
         result = await this.simulateFsrsConfirmed(JSON.parse(action.payloadJson) as FsrsSimulationAction);

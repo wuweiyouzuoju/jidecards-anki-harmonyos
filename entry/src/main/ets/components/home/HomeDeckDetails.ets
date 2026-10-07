@@ -23,6 +23,8 @@ export struct HomeDeckDetails {
   @Prop @Watch('closePreviewMenu') headerActionHeight: number = 应用尺寸.按钮高度;
   @Prop isDark: boolean = false;
   @Prop optionsBusy: boolean = false;
+  @Prop filteredBusy: boolean = false;
+  onFilteredAction: (id: string) => void = (): void => {};
   @Prop historyRefreshToken: number = 0;
   @Prop @Watch('closePreviewMenu') deckId: string = '';
   @Prop @Watch('publishInterface') previewBusy: boolean = false;
@@ -192,6 +194,7 @@ export struct HomeDeckDetails {
           onCreateWithAI: (): void => { this.onCreateWithAI(); },
           onMoveDeck: (): void => { this.onMoveDeck(); },
           onRenameDeck: (): void => { this.onRenameDeck(); },
+          filteredBusy: this.filteredBusy, onFilteredAction: (id: string): void => { this.onFilteredAction(id); },
           创建子牌组: (): void => {
             this.onCreateChild();
           },

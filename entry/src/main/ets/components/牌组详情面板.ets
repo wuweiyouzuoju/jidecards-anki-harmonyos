@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { FILTERED_DECK_ACTIONS } from '../model/FilteredDeckCommands';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { HomeActionAnchor } from '../model/HomeHeaderLayout';
 import { PressFeedback } from '../utils/PressFeedback';
-import { AppInterfaceItem, AppInterfaceControl, visibleInterfaceItems } from '../model/AppInterface';
+import { AppInterfaceItem, AppInterfaceControl, deckDetailsMoreItems } from '../model/AppInterface';
 import { appInterface } from '../backend/AppInterfaceService';
 import { interfaceItemText } from '../utils/AppInterfaceText';
 import { ExpansionReveal } from '../utils/ExpansionReveal';
@@ -62,6 +63,8 @@ export struct 牌组详情面板 {
   @Prop @Watch('publishInterface') showHeaderActions: boolean = true;
   @Prop @Watch('publishInterface') headerActionHeight: number = 应用尺寸.按钮高度;
   @Prop previewBusy: boolean = false;
+  @Prop @Watch('publishInterface') filteredBusy: boolean = false;
+  onFilteredAction: (id: string) => void = (): void => {};
   onActionAnchorChange: (anchor: HomeActionAnchor) => void = (_anchor: HomeActionAnchor): void => {};
   @StorageProp('导航条高度') private navigationBottomInset: number = 0;
   @Prop 是否深色: boolean = false;
@@ -105,8 +108,8 @@ export struct 牌组详情面板 {
   }
 
   private moreItems(): AppInterfaceItem[] {
-    return visibleInterfaceItems('deck_details_more', { simple: false, agent: this.Agent入口已启用,
-      cloudDeck: false, themeHasTextures: false });
+    return deckDetailsMoreItems(this.Agent入口已启用,
+      this.主页快照数据.decks.some((deck: 牌组汇总): boolean => deck.id === this.选中牌组Id && deck.filtered === true));
   }
 
   private publishInterface(): void {
@@ -115,7 +118,7 @@ export struct 牌组详情面板 {
     if (deck === undefined) { appInterface.leave('deck_details'); appInterface.leave('deck_details_more'); return; }
     appInterface.observe({ surface: 'deck_details', sectionId: this.showHeaderActions ? 'wide' : 'compact',
       selectedId: deck.id, optionIds: [], optionLabels: [], busy: this.牌组选项加载中,
-      values: [{ id: 'name', value: 牌组显示名(deck) }, { id: 'core_name', value: deck.fullName },
+      values: [{ id: 'name', value: 牌组显示名(deck) }, { id: 'core_name', value: deck.fullName }, { id: 'filtered', value: String(deck.filtered === true) },
         { id: 'header_actions_position', value: this.showHeaderActions ?
           (this.headerActionHeight > 0 ? 'above_card' : 'hidden') : 'toolbar_right' },
         { id: 'header_actions_style', value: 'icons' },
@@ -130,21 +133,23 @@ export struct 牌组详情面板 {
     appInterface.observe({ surface: 'deck_details_more', sectionId: '', selectedId: deck.id,
       optionIds: items.map((item: AppInterfaceItem): string => item.id),
       optionLabels: items.map((item: AppInterfaceItem): string => interfaceItemText(this.getUIContext(), 'deck_details_more', item.id, this.uiLanguage)),
-      busy: this.牌组选项加载中,
+      busy: this.牌组选项加载中 || this.filteredBusy,
       items: items.map((item: AppInterfaceItem): AppInterfaceControl => ({ id: item.id,
         titleKey: item.titleKey,
         title: interfaceItemText(this.getUIContext(), 'deck_details_more', item.id, this.uiLanguage),
-        enabled: item.id !== 'options' || !this.牌组选项加载中, selected: false })) });
+        enabled: !this.filteredBusy && (item.id !== 'options' || !this.牌组选项加载中), selected: false })) });
   }
 
   private selectMoreItem(id: string): void {
-    if (id === 'options' && this.牌组选项加载中) return;
+    if (this.filteredBusy || !this.moreItems().some((item: AppInterfaceItem): boolean => item.id === id) ||
+      (id === 'options' && this.牌组选项加载中)) return;
     this.closeMore();
     if (id === 'create_child') this.创建子牌组();
     else if (id === 'move') this.onMoveDeck();
     else if (id === 'rename') this.onRenameDeck();
     else if (id === 'options') this.打开牌组选项();
     else if (id === 'export') this.导出牌组();
+    else if (FILTERED_DECK_ACTIONS.some((item): boolean => item.id === id)) this.onFilteredAction(id);
   }
 
   private toggleMore(): void {

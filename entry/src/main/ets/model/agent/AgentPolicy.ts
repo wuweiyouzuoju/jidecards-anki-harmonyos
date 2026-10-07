@@ -55,6 +55,7 @@ export function toolRiskOf(toolName: string): ToolRisk {
     case 'evaluate_fsrs':
     case 'get_fsrs_history_count':
     case 'compute_fsrs_memory_state':
+    case 'get_filtered_deck':
     case 'get_advanced_settings':
     case 'execute_code':
     case 'get_note_type_capabilities':
@@ -79,6 +80,7 @@ export function toolRiskOf(toolName: string): ToolRisk {
     case 'propose_move_cards':
     case 'propose_set_theme_color':
     case 'propose_set_fsrs':
+    case 'propose_update_filtered_deck':
     case 'propose_update_deck_options':
     case 'propose_simulate_fsrs':
     case 'propose_set_setting':

@@ -2,8 +2,9 @@
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { FormInputStyle } from '../../utils/FormInputStyle';
 import { DialogBackdrop } from '../common/DialogBackdrop';
-import { showToastSafely, resourceText } from '../../utils/UiFeedback';
+import { showToastSafely, resourceText, localizedNamedResourceText } from '../../utils/UiFeedback';
 import { FormSelectRow } from '../common/FormSelectRow';
+import { SettingsToggleRow } from '../common/SettingsToggleRow';
 
 import { DialogHeader } from '../common/DialogHeader';
 // ========================================================
@@ -40,11 +41,8 @@ import { 颜色键 } from '../../model/颜色主题';
 import { 取全屏转场时长, 取全屏转场曲线 } from '../../utils/转场时长';
 import { 过滤牌组排序 } from '../../proto/messages/DeckMessages';
 import type { 过滤牌组更新, 搜索条件 } from '../../proto/messages/DeckMessages';
-
-interface 排序选项 {
-  值: number;
-  标签资源: Resource;
-}
+import { FILTERED_DECK_ORDERS, filteredDeckOrderTitleKey } from '../../model/FilteredDeckOptions';
+import type { FilteredDeckOrderChoice } from '../../model/FilteredDeckOptions';
 
 @Component
 export struct 创建过滤牌组面板 {
@@ -69,22 +67,18 @@ export struct 创建过滤牌组面板 {
 
   private readonly 牌组服务实例: 牌组服务 = new 牌组服务();
 
-  private readonly 排序选项列表: 排序选项[] = [
-    { 值: 过滤牌组排序.最旧复习优先, 标签资源: $r('app.string.filtered_deck_order_oldest') },
-    { 值: 过滤牌组排序.随机, 标签资源: $r('app.string.filtered_deck_order_random') },
-    { 值: 过滤牌组排序.间隔升序, 标签资源: $r('app.string.filtered_deck_order_interval_asc') },
-    { 值: 过滤牌组排序.间隔降序, 标签资源: $r('app.string.filtered_deck_order_interval_desc') },
-    { 值: 过滤牌组排序.遗忘次数, 标签资源: $r('app.string.filtered_deck_order_lapses') },
-    { 值: 过滤牌组排序.添加顺序, 标签资源: $r('app.string.filtered_deck_order_added') },
-    { 值: 过滤牌组排序.到期日, 标签资源: $r('app.string.filtered_deck_order_due') },
-    { 值: 过滤牌组排序.逆添加顺序, 标签资源: $r('app.string.filtered_deck_order_reverse_added') },
-    { 值: 过滤牌组排序.可回忆率升序, 标签资源: $r('app.string.filtered_deck_order_retr_asc') },
-    { 值: 过滤牌组排序.可回忆率降序, 标签资源: $r('app.string.filtered_deck_order_retr_desc') },
-    { 值: 过滤牌组排序.相对逾期程度, 标签资源: $r('app.string.filtered_deck_order_relative') }
-  ];
-
   private 取本地化文本(资源: Resource, _locale: string = this.uiLanguage): string {
     return resourceText(this.getUIContext(), 资源);
+  }
+
+  private orderOptions(): SelectOption[] {
+    return FILTERED_DECK_ORDERS.map((choice: FilteredDeckOrderChoice): SelectOption => ({
+      value: localizedNamedResourceText(this.getUIContext(), this.uiLanguage, choice.titleKey)
+    }));
+  }
+
+  private orderValue(): string {
+    return localizedNamedResourceText(this.getUIContext(), this.uiLanguage, filteredDeckOrderTitleKey(this.排序值));
   }
 
   private 可提交(): boolean {
@@ -186,34 +180,16 @@ export struct 创建过滤牌组面板 {
 
         // 排序方式
         FormSelectRow({ label: $r('app.string.filtered_deck_order_label'),
-          options: this.排序选项列表.map((选项: 排序选项): SelectOption => {
-            return { value: this.取本地化文本(选项.标签资源) };
-          }),
-          selectedIndex: this.排序选项列表.findIndex((选项: 排序选项): boolean => 选项.值 === this.排序值),
-          value: this.取本地化文本(this.排序选项列表.find((选项: 排序选项): boolean => 选项.值 === this.排序值)?.标签资源
-            ?? $r('app.string.filtered_deck_order_added')), isInteractive: !this.处理中,
-          onSelect: (index: number): void => { this.排序值 = this.排序选项列表[index].值; } })
+          options: this.orderOptions(),
+          selectedIndex: FILTERED_DECK_ORDERS.findIndex((choice: FilteredDeckOrderChoice): boolean => choice.value === this.排序值),
+          value: this.orderValue(), isInteractive: !this.处理中,
+          onSelect: (index: number): void => { this.排序值 = FILTERED_DECK_ORDERS[index].value; } })
 
         // 调整调度开关
-        Row() {
-          Column({ space: 2 }) {
-            Text($r('app.string.filtered_deck_reschedule_label'))
-              .fontSize(应用尺寸.字号_正文)
-              .fontColor($r('app.color.text_primary'))
-            Text($r('app.string.filtered_deck_reschedule_hint'))
-              .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_secondary'))
-              .maxLines(2)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-          }
-          .alignItems(HorizontalAlign.Start)
-          .layoutWeight(1)
-          Toggle({ type: ToggleType.Switch, isOn: this.调整调度 })
-            .selectedColor(this.主色按钮背景)
-            .enabled(!this.处理中)
-            .onChange((值: boolean) => { this.调整调度 = 值; })
-        }
-        .width('100%')
+        SettingsToggleRow({ title: $r('app.string.filtered_deck_reschedule_label'),
+          hint: $r('app.string.filtered_deck_reschedule_hint'), isOn: this.调整调度,
+          isInteractive: !this.处理中, isDark: this.isDark, tint: this.主色按钮背景,
+          onChange: (value: boolean): void => { this.调整调度 = value; } })
 
         if (this.错误信息 !== '') {
           Text(this.错误信息)

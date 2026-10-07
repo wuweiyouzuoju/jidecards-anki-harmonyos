@@ -1,5 +1,18 @@
 {
   "string": [
+    {"name":"filtered_deck_empty","value":"清空筛选牌组"},
+    {"name":"filtered_deck_rebuild","value":"重建筛选牌组"},
+    {"name":"filtered_deck_emptied","value":"卡片已归还原牌组，可随时重建"},
+    {"name":"filtered_deck_rebuilt","value":"已重新填充 %d 张卡片"},
+    {"name":"filtered_deck_failed","value":"筛选牌组操作失败，请重试"},
+    {"name":"filtered_deck_settings","value":"筛选牌组配置"},
+    {"name":"filtered_deck_change_hint","value":"确认后由 Anki Core 保存并重新填充；保留笔记与复习历史。"},
+    {"name":"filtered_deck_reschedule","value":"调整卡片调度"},
+    {"name":"filtered_deck_searchTerms","value":"搜索条件、上限与排序"},
+    {"name":"filtered_deck_previewDelay","value":"预览间隔（秒）"},
+    {"name":"filtered_deck_previewAgainSecs","value":"忘记预览间隔（秒）"},
+    {"name":"filtered_deck_previewHardSecs","value":"困难预览间隔（秒）"},
+    {"name":"filtered_deck_previewGoodSecs","value":"记得预览间隔（秒）"},
     {"name": "reminder_error_quota", "value": "系统学习提醒数量已达上限，请减少开启的提醒后重试"},
     {"name": "reminder_error_permission_disabled", "value": "通知权限未开启，请在系统设置中允许记得闪卡发送通知"},
     {"name": "reminder_error_permission_request", "value": "请求通知权限失败：%s"},

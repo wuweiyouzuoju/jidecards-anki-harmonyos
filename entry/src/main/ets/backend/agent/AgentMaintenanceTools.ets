@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { filteredDeckCommands } from '../FilteredDeckService';
 import { decodeMaintenanceArguments, collectionPreferenceEdits } from '../../model/agent/AgentMaintenanceTools';
 import type { MaintenanceArguments } from '../../model/agent/AgentMaintenanceTools';
 import { agentRestoreStockKind, patchAgentNotetypeFields } from '../../model/agent/AgentNotetypeFields';
@@ -21,10 +22,10 @@ import { AgentToolRegistry } from './AgentToolRegistry';
 import type { AgentReadToolHandler, AgentActionToolHandler, AgentDraftToolHandler } from './AgentToolRegistry';
 
 class MaintenanceRead implements AgentReadToolHandler {
-  private owner: AgentMaintenanceTools;
-  constructor(owner: AgentMaintenanceTools) { this.owner = owner; }
+  private owner: AgentMaintenanceTools; private name: string;
+  constructor(owner: AgentMaintenanceTools, name: string) { this.owner = owner; this.name = name; }
   /** @throws {Error} 由 Registry 记录读取失败。 */
-  execute(json: string): Promise<string> { return this.owner.read(json); }
+  execute(json: string): Promise<string> { return this.owner.read(json, this.name); }
 }
 class MaintenanceAction implements AgentActionToolHandler {
   private owner: AgentMaintenanceTools; private name: string;
@@ -45,8 +46,8 @@ export class AgentMaintenanceTools {
   private types: 笔记类型服务 = new 笔记类型服务();
   constructor(scope: AgentScope) { this.scope = scope; }
   register(registry: AgentToolRegistry): void {
-    registry.registerRead('get_advanced_settings', new MaintenanceRead(this));
-    for (const name of ['propose_update_collection_preferences', 'propose_update_study_controls', 'propose_export_subset']) {
+    for (const name of ['get_advanced_settings', 'get_filtered_deck']) registry.registerRead(name, new MaintenanceRead(this, name));
+    for (const name of ['propose_update_collection_preferences', 'propose_update_study_controls', 'propose_export_subset', 'propose_update_filtered_deck']) {
       registry.registerAction(name, new MaintenanceAction(this, name));
     }
     registry.registerDraft('propose_duplicate_note', new MaintenanceDraft(this, 'propose_duplicate_note'));
@@ -55,8 +56,13 @@ export class AgentMaintenanceTools {
     }
   }
   /** @throws {Error} 真实配置读取失败交给工具结果。 */
-  async read(json: string): Promise<string> {
-    const args: MaintenanceArguments = decodeMaintenanceArguments('get_advanced_settings', json);
+  async read(json: string, name: string = 'get_advanced_settings'): Promise<string> {
+    const args: MaintenanceArguments = decodeMaintenanceArguments(name, json);
+    if (name === 'get_filtered_deck') {
+      this.scope.assertReadableDeckIds([args.deckId!]);
+      const deck = await filteredDeckCommands.read(args.deckId!);
+      return JSON.stringify({ deckId: deck.id, name: deck.name, config: deck.config, configEditing: 'JIDE proposal', manualMaintenance: ['empty_filtered', 'rebuild_filtered'] });
+    }
     if (args.group === 'study') return JSON.stringify({ scope: 'device', controls: await readStudyControls(),
       screenAwakeEffect: 'Only the visible foreground study page borrows the window state; device support is not guaranteed.' });
     const current = await reviewPreferences.read();
@@ -68,6 +74,10 @@ export class AgentMaintenanceTools {
   /** @throws {Error} 参数、范围或当前值读取失败时不生成提案。 */
   async proposeAction(name: string, json: string): Promise<AgentAction> {
     const args: MaintenanceArguments = decodeMaintenanceArguments(name, json);
+    if (name === 'propose_update_filtered_deck') {
+      this.scope.assertReadableDeckIds([args.deckId!]);
+      return createAgentAction('filtered_deck_change', JSON.stringify(await filteredDeckCommands.prepare(args.deckId!, args.changesJson!)));
+    }
     if (name === 'propose_update_collection_preferences') {
       collectionPreferenceEdits(args.changesJson!);
       const payload: CollectionPreferencesAction = { before: await reviewPreferences.read(), changesJson: args.changesJson! };

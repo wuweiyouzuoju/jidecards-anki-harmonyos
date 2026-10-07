@@ -49,6 +49,7 @@ import { initializeRedemption } from '../utils/RedemptionStore';
 import { UNLOCKED_CONTENTS_KEY, isThemeAvailable } from '../model/ThemeCatalog';
 import { ThemeBackground } from '../components/common/ThemeBackground';
 
+import { filteredDeckCommands } from '../backend/FilteredDeckService';
 import { HomeDeckDetails } from '../components/home/HomeDeckDetails';
 
 import { 主页操作面板 } from '../components/主页操作面板';
@@ -245,6 +246,7 @@ struct 首页 {
   @State private deckMoveBackRequest: number = 0;
   @State @Watch('homeActivityChanged') private renamingDeckId: number = 0;
   @State @Watch('homeActivityChanged') private deckRenameBusy: boolean = false;
+  @State @Watch('homeActivityChanged') private filteredDeckBusy: boolean = false;
   @State private deckRenameBackRequest: number = 0;
   @State @Watch('homeActivityChanged') private 显示主页操作: boolean = false;
   // 公共菜单使用顶部按钮行的实测窗口锚点，详情分栏时仍对齐列表面板。
@@ -638,7 +640,7 @@ struct 首页 {
       atHome: this.页面栈.size() === 0 && this.主页允许公告检查 && !this.显示牌组详情,
       collectionReady: 后端会话.获取实例().是否就绪() && this.加载状态 !== 'loading' && this.加载状态 !== 'error',
       collectionBusy: this.collectionHistoryBusy || this.autoSyncCollectionBusy || this.syncController.isRefreshing() || this.刷新中 || this.deckDeletionBusy ||
-        (this.transfer.phase !== 'idle') || this.创建牌组中 || this.deckMoveBusy || this.deckRenameBusy || this.deckReorderBusy || this.deckOptionsBusy || this.云端牌组忙碌,
+        (this.transfer.phase !== 'idle') || this.创建牌组中 || this.deckMoveBusy || this.deckRenameBusy || this.filteredDeckBusy || this.deckReorderBusy || this.deckOptionsBusy || this.云端牌组忙碌,
       dialogOpen: this.collectionHistoryOpen || this.显示官方公告 || this.显示欢迎弹窗 || this.showIridescentGift || this.显示云端牌组弹窗 || this.transfer.visible ||
         this.显示牌组定制 || this.显示自定义学习 || this.显示过滤牌组面板 || this.显示牌组选项 ||
         this.显示创建牌组 || this.movingDeckId > 0 || this.renamingDeckId > 0 || this.显示主页操作 || this.显示更多菜单 || this.homeSearchOpen || this.显示节流奖励 ||
@@ -1317,6 +1319,20 @@ struct 首页 {
     return this.选中的牌组ID !== '' && this.选中牌组().id !== '';
   }
 
+  private async maintainFilteredDeck(deckId: string, action: string): Promise<void> {
+    if (this.homeDisposed || this.homeActivity().collectionBusy || !this.主页快照数据.decks.some((deck: 牌组汇总): boolean => deck.id === deckId && deck.filtered === true)) return;
+    this.filteredDeckBusy = true;
+    try {
+      const count: number = await filteredDeckCommands.maintain(Number(deckId), action);
+      await this.加载主页数据();
+      if (!this.homeDisposed) showToastSafely(this.getUIContext(), { message: action === 'empty_filtered' ?
+        resourceText(this.getUIContext(), $r('app.string.filtered_deck_emptied')) : resourceText(this.getUIContext(), $r('app.string.filtered_deck_rebuilt'), count) });
+    } catch (error) {
+      console.info('Filtered deck maintenance: ' + String(error));
+      if (!this.homeDisposed) this.显示提示($r('app.string.filtered_deck_failed'));
+    } finally { if (!this.homeDisposed) this.filteredDeckBusy = false; }
+  }
+
   private 显示提示(message: Resource): void {
     try {
       showToastSafely(this.getUIContext(), { message: message });
@@ -1940,6 +1956,7 @@ struct 首页 {
                 this.打开牌组定制(deckId);
               },
               onItemRename: (deckId: string): void => { this.openDeckRename(deckId); },
+              filteredBusy: this.filteredDeckBusy, onItemFiltered: (deckId: string, action: string): void => { this.maintainFilteredDeck(deckId, action); },
               onItemEnterReorder: (deckId: string): void => {
                 this.进入排序模式();
               },
@@ -2103,6 +2120,7 @@ struct 首页 {
   @Builder
   private deckDetails(compact: boolean) {
     HomeDeckDetails({ compact: compact, isDark: this.是否深色(), optionsBusy: this.deckOptionsBusy,
+      filteredBusy: this.filteredDeckBusy, onFilteredAction: (action: string): void => { this.maintainFilteredDeck(this.选中的牌组ID, action); },
       headerActionHeight: this.detailHeaderActionHeight(),
       historyRefreshToken: this.historyRefreshToken,
       onBackHandlerChange: (handler: (() => boolean) | null): void => { this.deckDetailsBackHandler = handler; },

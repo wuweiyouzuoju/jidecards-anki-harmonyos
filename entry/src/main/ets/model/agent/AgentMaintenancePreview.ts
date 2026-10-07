@@ -1,4 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { filteredDeckPatch } from '../FilteredDeckCommands';
+import type { FilteredDeckProposal } from '../FilteredDeckCommands';
+import { filteredDeckOrderTitleKey } from '../FilteredDeckOptions';
+import { decode过滤牌组更新 } from '../../proto/messages/DeckMessages';
+import type { 搜索条件 } from '../../proto/messages/DeckMessages';
 import type { AgentAction } from './AgentAction';
 import type { CollectionPreferencesAction, StudyControlsAction, ExportSubsetAction } from './AgentMaintenanceActions';
 import type { StudyCommandMapping } from '../StudyControls';
@@ -7,6 +12,34 @@ import type { AgentDeckOptionsAction } from './AgentDeckOptionsTools';
 import { agentWritableDeckOptionFields } from './AgentDeckOptionsTools';
 import { deckOptionChoices, easyDayValues, percentageText, parseDeckOptionSteps, deckOptionStepsText } from '../DeckOptionsCatalog';
 export interface MaintenancePreviewRow { title: string; before: string; after: string; }
+function filteredSearchPreviewRows(before: 搜索条件[], after: 搜索条件[], text: (key: string) => string): MaintenancePreviewRow[] {
+  const rows: MaintenancePreviewRow[] = [];
+  const count: number = Math.max(before.length, after.length);
+  const unset: string = text('deck_option_unset');
+  const orderText = (term: 搜索条件 | undefined): string => {
+    if (term === undefined) return unset;
+    const key: string = filteredDeckOrderTitleKey(term.order);
+    return key === '' ? String(term.order) : text(key);
+  };
+  for (let index: number = 0; index < count; index++) {
+    const oldTerm: 搜索条件 | undefined = before[index];
+    const newTerm: 搜索条件 | undefined = after[index];
+    const suffix: string = count > 1 ? ' ' + String(index + 1) : '';
+    const terms: MaintenancePreviewRow[] = [
+      { title: text('filtered_deck_search_label') + suffix,
+        before: oldTerm === undefined ? unset : oldTerm.search.trim() === '' ? text('deck_scope_collection') : oldTerm.search,
+        after: newTerm === undefined ? unset : newTerm.search.trim() === '' ? text('deck_scope_collection') : newTerm.search },
+      { title: text('filtered_deck_limit_label') + suffix,
+        before: oldTerm === undefined ? unset : String(oldTerm.limit), after: newTerm === undefined ? unset : String(newTerm.limit) },
+      { title: text('filtered_deck_order_label') + suffix, before: orderText(oldTerm), after: orderText(newTerm) }
+    ];
+    for (const row of terms) {
+      if (row.before === row.after) row.before = '';
+      rows.push(row);
+    }
+  }
+  return rows;
+}
 /** 确认展示使用界面单位和选项名称，Core 参数仍留在登记的原始载荷中。 */
 function deckOptionPreviewValue(key: string, value: string, fsrs: boolean, text: (key: string) => string): string {
   if (key === 'easyDaysPercentages') {
@@ -31,7 +64,24 @@ function deckOptionPreviewValue(key: string, value: string, fsrs: boolean, text:
 export function maintenancePreviewRows(action: AgentAction, text: (key: string) => string): MaintenancePreviewRow[] {
   const rows: MaintenancePreviewRow[] = [];
   const boolean = (value: boolean): string => text(value ? 'agent_value_on' : 'agent_value_off');
-  if (action.kind === 'deck_options_change') {
+  if (action.kind === 'filtered_deck_change') {
+    const payload: FilteredDeckProposal = JSON.parse(action.payloadJson) as FilteredDeckProposal;
+    const before = decode过滤牌组更新(new Uint8Array(payload.before));
+    const after = filteredDeckPatch(before, payload.changesJson);
+    rows.push({ title: text('deck_scope_deck'), before: '', after: before.name });
+    const changes: Record<string, Object> = JSON.parse(payload.changesJson) as Record<string, Object>;
+    const oldValues: Record<string, Object> = JSON.parse(JSON.stringify(before.config)) as Record<string, Object>;
+    const newValues: Record<string, Object> = JSON.parse(JSON.stringify(after.config)) as Record<string, Object>;
+    for (const key of Object.keys(changes)) {
+      if (key === 'searchTerms') {
+        rows.push(...filteredSearchPreviewRows(before.config.searchTerms, after.config.searchTerms, text));
+        continue;
+      }
+      const value = (item: Object): string => typeof item === 'boolean' ? boolean(item as boolean) :
+        Array.isArray(item) ? JSON.stringify(item) : String(item);
+      rows.push({ title: text('filtered_deck_' + key), before: value(oldValues[key]), after: value(newValues[key]) });
+    }
+  } else if (action.kind === 'deck_options_change') {
     const payload: AgentDeckOptionsAction = JSON.parse(action.payloadJson) as AgentDeckOptionsAction;
     rows.push({ title: text('deck_scope_deck'), before: '', after: payload.deckName });
     rows.push({ title: text('deck_preset_label'), before: '', after: payload.presetName });

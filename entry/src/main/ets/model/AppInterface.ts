@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { FILTERED_DECK_ACTIONS } from './FilteredDeckCommands';
 import { CARD_FLAGS } from './CardMarking';
 import { DECK_OPTION_GROUPS } from './DeckOptionsCatalog';
 import type { NoteAudioStatus } from './NoteAudioDraft';
@@ -175,8 +176,9 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'create_child', titleKey: 'deck_create_subdeck', opens: 'create_deck' },
     { id: 'rename', titleKey: 'deck_rename_title', opens: 'deck_rename' },
     { id: 'move', titleKey: 'deck_move_title', opens: 'deck_move' },
-    { id: 'options', titleKey: 'deck_options_title', opens: 'deck_options' },
-    { id: 'export', titleKey: 'deck_export_this', opens: 'export' }
+    { id: 'options', titleKey: 'deck_options_title', opens: 'deck_options', condition: 'normal_deck' },
+    { id: 'export', titleKey: 'deck_export_this', opens: 'export' },
+    ...FILTERED_DECK_ACTIONS.map((item): AppInterfaceItem => ({ id: item.id, titleKey: item.titleKey, condition: 'filtered_deck' }))
   ] },
   { id: 'deck_move', titleKey: 'deck_move_title', parent: 'deck_details_more', items: [
     { id: 'parent', titleKey: 'deck_move_parent' },
@@ -200,7 +202,8 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
   ] },
   { id: 'deck_row_menu', titleKey: 'deck_more', parent: 'home', items: [
     { id: 'rename', titleKey: 'deck_rename_title', opens: 'deck_rename' },
-    { id: 'customize', titleKey: 'deck_customize', opens: 'deck_customize' }
+    { id: 'customize', titleKey: 'deck_customize', opens: 'deck_customize' },
+    ...FILTERED_DECK_ACTIONS.map((item): AppInterfaceItem => ({ id: item.id, titleKey: item.titleKey, condition: 'filtered_deck' }))
   ] },
   { id: 'deck_preview_scope', titleKey: 'deck_preview', parent: 'deck_details', items: [
     { id: '0', titleKey: 'deck_preview_remaining', opens: 'preview' },
@@ -401,6 +404,13 @@ export function visibleInterfaceItems(surfaceId: string, context: AppInterfaceCo
   if (surface === undefined) return [];
   return surface.items.filter((item: AppInterfaceItem): boolean =>
     !(item.fullOnly && context.simple) && !(item.agentOnly && !context.agent) && !(item.cloudOnly && !context.cloudDeck));
+}
+
+/** 普通牌组预设不适用于筛选牌组；筛选配置使用 JIDE 提案，菜单提供维护操作。 */
+export function deckDetailsMoreItems(agent: boolean, filtered: boolean): AppInterfaceItem[] {
+  return visibleInterfaceItems('deck_details_more', { simple: false, agent, cloudDeck: false, themeHasTextures: false })
+    .filter((item: AppInterfaceItem): boolean => item.condition === 'filtered_deck' ? filtered :
+      item.condition === 'normal_deck' ? !filtered : true);
 }
 
 export interface AppInterfaceObservation {

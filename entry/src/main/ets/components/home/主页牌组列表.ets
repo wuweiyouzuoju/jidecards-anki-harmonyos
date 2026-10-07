@@ -112,6 +112,8 @@ export struct 主页牌组列表 {
   onItemToneChange: (deckId: string, tone: 牌组色调) => void
     = (deckId: string, tone: 牌组色调): void => {};
   onItemCustomize: (deckId: string) => void = (deckId: string): void => {};
+  @Prop filteredBusy: boolean = false;
+  onItemFiltered: (deckId: string, action: string) => void = (): void => {};
   onItemRename: (deckId: string) => void = (_deckId: string): void => {};
   onItemEnterReorder: (deckId: string) => void = (deckId: string): void => {};
   onItemDelete: (deckId: string) => void = (deckId: string): void => {};
@@ -218,6 +220,7 @@ export struct 主页牌组列表 {
         this.onItemCustomize(deckId);
       },
       onRenameDeck: (deckId: string): void => { this.onItemRename(deckId); },
+      filteredBusy: this.filteredBusy, onFilteredAction: (deckId: string, action: string): void => { this.onItemFiltered(deckId, action); },
       onEnterReorder: (deckId: string): void => {
         this.onItemEnterReorder(deckId);
       },

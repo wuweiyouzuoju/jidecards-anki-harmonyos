@@ -17,6 +17,7 @@ const stub = `
 export class AgentStreamObserver {} export class AgentTransportError extends Error {} export class AgentTransportSession {}
 export class DeepSeekAdapter {} export class OpenAIAdapter {} export class CustomAdapter {}
 export class AgentWorkspaceStore {} export class WikimediaImageService {} export class WikimediaImageServiceError extends Error {}
+export const filteredDeckCommands = {read:async()=>{throw Error("unexpected filtered read");},prepare:async()=>{throw Error("unexpected filtered proposal");},save:async()=>{throw Error("unexpected filtered save");}};
 export class FsrsService {async deckContext(){throw Error('unexpected FSRS context read');}async daily(){throw Error('unexpected FSRS simulation');}}
 export class AnkiDeckOptions {async load(){throw Error('unexpected deck options read');}async save(){throw Error('unexpected deck options write');}committed(){throw Error('unexpected deck options notification');}}
 export const fsrsContextSnapshot = context => JSON.stringify(context);
@@ -65,7 +66,7 @@ const stubUrl = 'data:text/javascript;base64,' + Buffer.from(stub).toString('bas
 const names = ['AgentTransport','DeepSeekAdapter','OpenAIAdapter','CustomAdapter','AgentWorkspaceStore','WikimediaImageService',
  '牌组服务','笔记类型服务','搜索服务','笔记服务','卡片服务','标签服务','统计服务','AppThemeService','FSRS控制器',
  'CardTextSizeStore','DeckListAppearanceStore','StudyHaptics','LocalPreferenceWrite','牌组顺序存储',
- 'ReviewPreferencesService','StudyControlsService','数据迁移服务','FsrsService','AnkiDeckOptions'];
+ 'ReviewPreferencesService','StudyControlsService','数据迁移服务','FsrsService','AnkiDeckOptions','FilteredDeckService'];
 register('data:text/javascript;base64,' + Buffer.from(`export function resolve(s,c,next) {
  if (${JSON.stringify(names)}.some(n=>s.endsWith('/'+n))) return {url:${JSON.stringify(stubUrl)},shortCircuit:true};
  return next(s,c); }`).toString('base64'), import.meta.url);
