@@ -54,6 +54,8 @@ python -c 'from PIL import Image; from pathlib import Path; icon = Image.open("A
 
 页面使用真实 Person、Organization、SoftwareApplication、SoftwareSourceCode、BreadcrumbList、FAQPage 与文章元数据。功能可见状态与正式版本必须在 HTML、Markdown、JSON 和 llms 中一致，不虚构评分或评论。
 
+所有页面通过公共布局生成同一套项目身份图谱：作者 `/#author`、项目 `/#project`、应用 `/#app`、源码 `/#source` 和网站 `/#website` 使用主域名下的稳定 `@id`。各 WebPage 对应当前 canonical，并通过 `isPartOf` 关联网站、`about` 关联应用。应用的 `sameAs` 指向真实应用市场页面，`subjectOf` 关联源码；源码的 `targetProduct` 回指应用，`codeRepository` 来自既有仓库清单，镜像进入源码 `sameAs`。项目 `sameAs` 使用该项目的仓库，作者身份链接仍属于 Person。不要把文章、作者主页或不同产品混入应用身份，也不要为这些关联增加另一份手工维护的数据源。网站测试检查各页身份唯一、引用可解析及应用与源码的双向关系。
+
 ## 验证与部署
 
 先构建并执行对应专项：
@@ -85,5 +87,13 @@ GPT 读取验收必须使用真实网页读取工具，确认当前版本与正�
 四个自定义域名声明在 `hosting/wrangler.jsonc`。`tools/site-worker.mjs` 在静态资源匹配前处理域名跳转；`assets.run_worker_first=true` 使旧域名已有页面也执行 301。`jideyanggeqi.cn`、`www.jideyanggeqi.cn`、`www.jidecards.com` 以及主域名 HTTP 请求保留路径与查询参数跳转至 `https://jidecards.com`。主域名 HTTPS 请求交给 ASSETS，保留资源、JSON 与 404 行为。
 
 旧域名应长期保留对应跳转。Search Console 需要站点所有者验证权限并提交 `https://jidecards.com/sitemap.xml`；外部仓库简介、社区文章和应用市场官网链接需要在对应平台更新。发布网站不等于这些外部入口已更新，也不能推定搜索排名或 AI 推荐结果。
+
+新站采用 Search Console 提供的 HTML 文件验证。根目录 `hosting/googlef6dc96ac7f0bd137.html` 保留下载原始内容，随静态资源发布，不由页面生成器覆盖。Worker 在域名 301 之后，为根目录 `google<十六进制>.html` 文件内部改写为 ASSETS 的无扩展名路径，避免默认 HTML 处理对指定验证地址产生 307；正文、查询参数、方法、请求头和真实 404 仍由静态服务负责。文件发布后核对原始指定地址直接返回 200，内容与 Google 下载文件相同；不能因为发布了文件就宣布所有权验证、sitemap 提交或域名迁移已成功。成功验证后也需保留文件。
+
+2026-10-07 已在作者确认后完成 `https://jidecards.com/` 网址前缀资源的所有权验证，提交 `sitemap.xml`；Search Console 显示“成功”、发现 6 个网页。旧域名的网域资源迁移检查最初报告无法获取 `http://jideyanggeqi.cn/`，但本机代理及直连请求均返回指向新站的 301。随后添加 `https://jideyanggeqi.cn/` 网址前缀资源，通过既有网域 DNS 验证自动取得同一所有者权限；从该资源重新检查时，Google 的首页 301 与双方所有权测试均通过，并已点击“确认迁移”。后台显示“此网站当前正在迁移”，目标 `jidecards.com`，请求日期为 2026-10-07；同步 Worker 日志记录该次 Googlebot 请求在旧站收到 301、在新站收到 200。这里完成的是迁移请求提交，搜索索引迁移仍由 Google 处理，不能宣布收录迁移已全部完成。
+
+Google [地址更改工具](https://support.google.com/webmasters/answer/9370220)支持根级网址前缀资源，并说明请求会涉及源网站的所有协议。仍应保留旧域名 HTTP、HTTPS 和 www 的既有 301。Google 的迁移检查通过不代表 OpenAI 的网页读取已经恢复；真实 GPT 读取仍需单独验收。
+
+外部版本核对必须区分远端源码与官网正式版。未推送的本地 README 或应用配置不能当作远端仓库已经更新的证据；明确“不上传 Git”时只维护本地源码资料，记录远端差异，不通过网页编辑仓库绕过该要求。
 
 参考 [Cloudflare Wrangler deploy](https://developers.cloudflare.com/workers/wrangler/commands/#deploy)、[Cloudflare 静态资源](https://developers.cloudflare.com/workers/static-assets/)和 [Google 域名迁移说明](https://developers.google.com/search/docs/crawling-indexing/site-move-with-url-changes)。
