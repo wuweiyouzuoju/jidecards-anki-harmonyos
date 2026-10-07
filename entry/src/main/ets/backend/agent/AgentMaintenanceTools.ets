@@ -67,6 +67,7 @@ export class AgentMaintenanceTools {
       screenAwakeEffect: 'Only the visible foreground study page borrows the window state; device support is not guaranteed.' });
     const current = await reviewPreferences.read();
     return JSON.stringify({ scope: 'collection', loadBalancer: current.loadBalancer, shortTermWithSteps: current.shortTermWithSteps,
+      hideAudioPlayButtons: current.hideAudioPlayButtons, interruptAudioWhenAnswering: current.interruptAudioWhenAnswering,
       backupDaily: current.backupDaily, backupWeekly: current.backupWeekly,
       backupMonthly: current.backupMonthly, backupInterval: current.backupInterval,
       backupIncludesMedia: false, changesRescheduleCards: false });

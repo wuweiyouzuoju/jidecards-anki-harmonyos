@@ -12,7 +12,8 @@ export function encodeCreateBackup(folder: string, force: boolean): Uint8Array {
 
 /** 字段号以 UPSTREAM.lock 的 Anki 26.05 config.proto 为准。 */
 export enum ReviewPreferenceField { Rollover, LearnAheadSecs, TimeLimitSecs, ShowRemaining, ShowIntervals,
-  LoadBalancer, ShortTermWithSteps, BackupDaily, BackupWeekly, BackupMonthly, BackupInterval }
+  LoadBalancer, ShortTermWithSteps, BackupDaily, BackupWeekly, BackupMonthly, BackupInterval,
+  HideAudioPlayButtons, InterruptAudioWhenAnswering }
 
 export interface ReviewPreferenceEdit {
   field: ReviewPreferenceField;
@@ -25,6 +26,8 @@ export class ReviewPreferences {
   timeLimitSecs: number = 0;
   showRemaining: boolean = false;
   showIntervals: boolean = false;
+  hideAudioPlayButtons: boolean = false;
+  interruptAudioWhenAnswering: boolean = false;
   loadBalancer: boolean = false;
   shortTermWithSteps: boolean = false;
   backupDaily: number = 0;
@@ -34,12 +37,14 @@ export class ReviewPreferences {
 }
 
 export function preferenceSection(field: ReviewPreferenceField): number {
-  return field >= ReviewPreferenceField.BackupDaily ? 4 :
+  return field >= ReviewPreferenceField.BackupDaily && field <= ReviewPreferenceField.BackupInterval ? 4 :
     field === ReviewPreferenceField.Rollover || field === ReviewPreferenceField.LearnAheadSecs ? 1 : 2;
 }
 
 export function preferenceTag(field: ReviewPreferenceField): number {
   switch (field) {
+    case ReviewPreferenceField.HideAudioPlayButtons: return 1;
+    case ReviewPreferenceField.InterruptAudioWhenAnswering: return 2;
     case ReviewPreferenceField.Rollover: return 2;
     case ReviewPreferenceField.LearnAheadSecs: return 3;
     case ReviewPreferenceField.ShowRemaining: return 3;
@@ -59,7 +64,8 @@ export function validatePreferenceEdit(edit: ReviewPreferenceEdit): void {
   preferenceTag(edit.field);
   const max: number = edit.field === ReviewPreferenceField.Rollover ? 23 :
     ([ReviewPreferenceField.ShowRemaining, ReviewPreferenceField.ShowIntervals, ReviewPreferenceField.LoadBalancer,
-      ReviewPreferenceField.ShortTermWithSteps].includes(edit.field) ? 1 : 4294967295);
+      ReviewPreferenceField.ShortTermWithSteps, ReviewPreferenceField.HideAudioPlayButtons,
+      ReviewPreferenceField.InterruptAudioWhenAnswering].includes(edit.field) ? 1 : 4294967295);
   if (!Number.isInteger(edit.value) || edit.value < 0 || edit.value > max) {
     throw new Error('invalid_review_preference_value');
   }
@@ -77,6 +83,8 @@ export function decodeReviewPreferences(bytes: Uint8Array): ReviewPreferences {
         const child = nested.读取标签()!;
         if (child.线类型 === 0 && tag.字段号 === 1 && child.字段号 === 2) result.rollover = nested.读取变长整数();
         else if (child.线类型 === 0 && tag.字段号 === 1 && child.字段号 === 3) result.learnAheadSecs = nested.读取变长整数();
+        else if (child.线类型 === 0 && tag.字段号 === 2 && child.字段号 === 1) result.hideAudioPlayButtons = nested.读取布尔();
+        else if (child.线类型 === 0 && tag.字段号 === 2 && child.字段号 === 2) result.interruptAudioWhenAnswering = nested.读取布尔();
         else if (child.线类型 === 0 && tag.字段号 === 2 && child.字段号 === 3) result.showRemaining = nested.读取布尔();
         else if (child.线类型 === 0 && tag.字段号 === 2 && child.字段号 === 4) result.showIntervals = nested.读取布尔();
         else if (child.线类型 === 0 && tag.字段号 === 2 && child.字段号 === 5) result.timeLimitSecs = nested.读取变长整数();

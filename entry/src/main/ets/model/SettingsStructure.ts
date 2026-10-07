@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { SETTINGS_ENTRIES, settingsEntryVisible } from './SettingsNavigation';
+import { REVIEW_AUDIO_PREFERENCES } from './ReviewAudioPreferences';
 
 export interface SettingsItem {
   id: string;
@@ -64,7 +65,8 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
   ] },
   { id: 'study_display', sectionId: 'appearance', titleKey: 'settings_study_display', items: [
     { id: 'show_remaining', titleKey: 'settings_show_remaining' },
-    { id: 'show_intervals', titleKey: 'settings_show_intervals' }
+    { id: 'show_intervals', titleKey: 'settings_show_intervals' },
+    ...REVIEW_AUDIO_PREFERENCES.map((item): SettingsItem => ({ id: item.id, titleKey: item.titleKey }))
   ] },
 
   { id: 'data', sectionId: 'data', titleKey: 'settings_data_management', items: [

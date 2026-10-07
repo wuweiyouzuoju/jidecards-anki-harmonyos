@@ -49,7 +49,7 @@ test('Preferences reads and writes preserve wire fields and use the locked Confi
     后端会话: {获取实例: () => ({调用: async (...args) => { calls.push(args); return args[1] === 9 ? preferencesFixture() : new Uint8Array(); }})}});
   const config = new Config(); const raw = await config.getPreferences();
   assert.deepEqual({ ...decodeReviewPreferences(raw) }, {
-    rollover: 4, learnAheadSecs: 1201, timeLimitSecs: 60, showRemaining: true, showIntervals: true,
+    rollover: 4, learnAheadSecs: 1201, timeLimitSecs: 60, showRemaining: true, showIntervals: true, hideAudioPlayButtons: true, interruptAudioWhenAnswering: true,
     loadBalancer: true, shortTermWithSteps: true, backupDaily: 12, backupWeekly: 5, backupMonthly: 2, backupInterval: 30
   });
   await config.setPreferences(patchReviewPreferences(raw, [{field:F.Rollover, value:0}]));
@@ -62,7 +62,7 @@ test('each single-field patch preserves all other fields and unknown bytes, incl
   const original = preferencesFixture();
   assert.deepEqual(fields(patchReviewPreferences(original, [])).map(f => f.raw), fields(original).map(f => f.raw));
   for (const [field, section, tag, value] of [[F.Rollover,1,2,0],[F.LearnAheadSecs,1,3,0],[F.TimeLimitSecs,2,5,0],
-    [F.ShowRemaining,2,3,0],[F.ShowIntervals,2,4,0],[F.LoadBalancer,2,6,0],[F.ShortTermWithSteps,2,7,0],
+    [F.HideAudioPlayButtons,2,1,0],[F.InterruptAudioWhenAnswering,2,2,0],[F.ShowRemaining,2,3,0],[F.ShowIntervals,2,4,0],[F.LoadBalancer,2,6,0],[F.ShortTermWithSteps,2,7,0],
     [F.BackupDaily,4,1,0],[F.BackupWeekly,4,2,0],[F.BackupMonthly,4,3,0],[F.BackupInterval,4,4,0]]) {
     const result = patchReviewPreferences(original,[{field,value}]);
     const before = fields(original), after = fields(result);

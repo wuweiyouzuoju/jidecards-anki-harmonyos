@@ -52,11 +52,14 @@ test('localized settings search respects simple and developer gates', () => {
     assert.deepEqual(simple, ['general', 'scheduler', 'sync', 'appearance', 'data', 'help', 'redemption', 'about']);
     for (const simpleMode of [true, false]) {
       for (const query of (locale === 'base' ? ['隐藏', '隐藏牌组', '恢复显示', '导入文件', 'CSV', '备份与恢复'] : ['hidden', 'hidden decks', 'restore', 'import file', 'CSV', 'backups and restore'])) {
-        assert.deepEqual(filterSettingsEntries(query, simpleMode, false, localize).map(entry => entry.id), ['data']);
+        assert.deepEqual(filterSettingsEntries(query, simpleMode, false, localize).map(entry => entry.id), query === '隐藏' ? ['appearance','data'] : ['data']);
       }
       for (const query of (locale === 'base' ? ['指纹', '识别码', '兑换'] : ['fingerprint', 'app ID', 'redeem'])) {
-        assert.deepEqual(filterSettingsEntries(query, simpleMode, false, localize).map(entry => entry.id), ['redemption']);
+        assert.deepEqual(filterSettingsEntries(query, simpleMode, false, localize).map(entry => entry.id), query === 'app ID' ? ['appearance', 'redemption'] : ['redemption']);
       }
+    }
+    for (const query of (locale === 'base' ? ['隐藏卡面音频按钮', '显示答案时中断音频'] : ['Hide on-card audio buttons', 'Interrupt audio when showing the answer'])) {
+      assert.deepEqual(filterSettingsEntries(query, false, false, localize).map(entry => entry.id), ['appearance']);
     }
     for (const simpleMode of [true, false]) {
       for (const query of (locale === 'base' ? ['学习布局', '复习布局', '答题工具栏'] : ['review layout', 'answer toolbar'])) {

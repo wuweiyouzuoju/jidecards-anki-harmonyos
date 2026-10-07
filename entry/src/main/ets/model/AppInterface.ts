@@ -2,6 +2,7 @@
 import { FILTERED_DECK_ACTIONS } from './FilteredDeckCommands';
 import { CARD_FLAGS } from './CardMarking';
 import { IMPORT_RESULT_ACTIONS } from './ImportResults';
+import { REVIEW_AUDIO_PREFERENCES } from './ReviewAudioPreferences';
 import { DECK_OPTION_GROUPS } from './DeckOptionsCatalog';
 import type { NoteAudioStatus } from './NoteAudioDraft';
 import { NOTE_EDITOR_TOOLS, NOTE_EDITOR_COMMON_TOOL_IDS, NOTE_FIELD_EDITING_SUPPORT,
@@ -81,6 +82,8 @@ export const WHITEBOARD_INTERFACE_ITEMS: AppInterfaceItem[] = [
 
 /** 菜单直接遍历这里的条目；标签、顺序和显隐由 UI 与 JIDE 共用。 */
 export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
+  { id: 'review_audio', titleKey: 'settings_study_display', parent: 'settings',
+    items: REVIEW_AUDIO_PREFERENCES.map((item): AppInterfaceItem => ({ id: item.id, titleKey: item.titleKey })) },
   { id: 'import_results', titleKey: 'transfer_result_title', instructionsKey: 'transfer_result_browse_hint', parent: 'home',
     items: IMPORT_RESULT_ACTIONS.map((item): AppInterfaceItem => ({ id: item.id, titleKey: item.titleKey,
       opens: ['new', 'updated', 'duplicate'].includes(item.id) ? 'browser' : undefined,

@@ -33,7 +33,7 @@ test('global review preferences come from the Core service and refresh independe
   backend.config={getPreferences:async()=>{calls++;return preferences.转为字节();}};
   backend.deckConfigs={获取牌组配置编辑视图:async()=>assert.fail('global preferences must not read a deck preset')};
   assert.deepEqual({...await backend.reviewPreferences()},
-    {rollover:7,learnAheadSecs:60,timeLimitSecs:61,showRemaining:true,showIntervals:false,
+    {rollover:7,learnAheadSecs:60,timeLimitSecs:61,showRemaining:true,showIntervals:false,hideAudioPlayButtons:false,interruptAudioWhenAnswering:false,
       loadBalancer:false,shortTermWithSteps:false,backupDaily:0,backupWeekly:0,backupMonthly:0,backupInterval:0});
   await backend.reviewPreferences();assert.equal(calls,2);
   backend.config.getPreferences=async()=>{throw Error('Core preferences failed');};

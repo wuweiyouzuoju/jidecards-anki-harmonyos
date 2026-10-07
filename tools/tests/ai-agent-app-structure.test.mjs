@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { REVIEW_AUDIO_PREFERENCES } from '../../entry/src/main/ets/model/ReviewAudioPreferences.ts';
 import { readFileSync, readdirSync } from 'node:fs';
 import { APP_INTERFACE_SURFACES, AppInterfaceTracker, visibleInterfaceItems, deckDetailsMoreItems, settingsHeaderItems, settingsHeaderControls } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { appInterfaceSurfaceIds, browserInterfaceMenu, studyInterfaceMenu } from '../../entry/src/main/ets/model/AppInterface.ts';
@@ -569,7 +570,7 @@ test('all shared settings labels have UI bindings and resources; all card branch
   const readableIds=new Set(agentSettingDefinitions().map(x=>x.id));
   for(const group of SETTINGS_GROUPS) for(const item of group.items) {
     assert.ok(zh.has(item.titleKey)&&en.has(item.titleKey),item.titleKey);
-    assert.ok(ui.includes(`'${item.id}'`)||ui.includes(`"${item.id}"`), 'missing UI binding: '+item.id);
+    assert.ok((REVIEW_AUDIO_PREFERENCES.some(audio=>audio.id===item.id) && ui.includes('ForEach(REVIEW_AUDIO_PREFERENCES') && ui.includes('settingsItemText(this.getUIContext(), item.id')) || ui.includes(`'${item.id}'`)||ui.includes(`"${item.id}"`), 'missing UI binding: '+item.id);
     if(item.settingId!==undefined)assert.ok(readableIds.has(item.settingId),'missing setting reader declaration: '+item.settingId);
   }
   assertRegisteredSettingsLabels(sources,ids);

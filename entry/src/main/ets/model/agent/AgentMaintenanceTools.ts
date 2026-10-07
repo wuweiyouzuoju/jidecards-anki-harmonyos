@@ -3,6 +3,7 @@ import type { ProviderFunctionTool } from './ProviderProtocol';
 import type { ReviewPreferenceEdit } from '../../proto/messages/PreferencesMessages';
 import { ReviewPreferenceField, validatePreferenceEdit } from '../../proto/messages/PreferencesMessages';
 import { validateNotetypeLatexPatch } from './AgentNotetypeLatex';
+import { REVIEW_AUDIO_PREFERENCES } from '../ReviewAudioPreferences';
 
 const TEXT: string = '{"type":"string","minLength":1,"maxLength":60000}';
 const ID: string = '{"type":"integer","minimum":1}';
@@ -11,8 +12,8 @@ function tool(name: string, description: string, properties: string, required: s
     parametersJson: `{"type":"object","properties":{${properties}},"required":[${required}],"additionalProperties":false}`,
     exampleArgumentsJson: example,
     rules: name.startsWith('propose_') ?
-      'Call alone. Only discovered IDs. This creates an app-owned proposal, never writes. Wait for real user confirmation and execution. Stale targets fail; never claim completion before the result. No manual settings/menu entry exists for this capability.' :
-      'Read only. Report actual returned state and supported boundaries. These are JIDE tools, not manual settings/menu entries.' };
+      'Call alone. Only discovered IDs. This creates an app-owned proposal, never writes. Wait for real user confirmation and execution. Stale targets fail; never claim completion before the result. Use the app-owned confirmation result; audio preferences also exist in Appearance settings.' :
+      'Read only. Report actual returned state and supported boundaries. Audio preferences also exist in Appearance settings.' };
 }
 /** 独立于手动界面目录的实际工具；只声明已接通的领域操作。 */
 export function agentMaintenanceTools(): ProviderFunctionTool[] {
@@ -22,9 +23,9 @@ export function agentMaintenanceTools(): ProviderFunctionTool[] {
       `"deckId":${ID}`, '"deckId"', '{"deckId":1}'),
     tool('propose_update_filtered_deck', '提出既有过滤牌组配置修改，changesJson 只允许 reschedule、searchTerms、previewDelay、previewAgainSecs、previewHardSecs、previewGoodSecs。searchTerms 是1至2个完整 search/limit/order 对象，limit 1至100000，order 0至10，与 Core 排序一致。延时单位秒，0至86400。省略字段保留。确认后由 Core 保存并重新填充，已有卡归还原牌组；空结果仍保留牌组，不删除笔记或复习历史。提交前重查真实配置，过期提案失败。',
       `"deckId":${ID},"changesJson":${TEXT}`, '"deckId","changesJson"', '{"deckId":1,"changesJson":"{\\"reschedule\\":false}"}'),
-    tool('get_advanced_settings', '读取 JIDE 专用高级设置。collection 返回 Core FSRS 负担均衡、带步骤短期调度和历史备份保留策略；study 返回本机常亮与输入映射。不会读取凭证。',
+    tool('get_advanced_settings', '读取 JIDE 专用高级设置。collection 返回 Core FSRS 负担均衡、带步骤短期调度和历史备份保留策略、隐藏音频按钮和翻面中断音频；study 返回本机常亮与输入映射。不会读取凭证。',
       '"group":{"type":"string","enum":["collection","study"]}', '"group"', '{"group":"collection"}'),
-    tool('propose_update_collection_preferences', '提出 Core 全库高级偏好修改。changesJson 为非空对象，只允许 loadBalancer、shortTermWithSteps 开关及 backupDaily、backupWeekly、backupMonthly、backupInterval 整数。间隔单位分钟，保留数可为零。省略项保留；不主动重排卡片。',
+    tool('propose_update_collection_preferences', '提出 Core 全库高级偏好修改。changesJson 为非空对象，只允许 loadBalancer、shortTermWithSteps、hideAudioPlayButtons、interruptAudioWhenAnswering 开关及 backupDaily、backupWeekly、backupMonthly、backupInterval 整数。间隔单位分钟，保留数可为零。省略项保留；不主动重排卡片。',
       `"changesJson":${TEXT}`, '"changesJson"', '{"changesJson":"{\\"loadBalancer\\":true}"}'),
     tool('propose_update_study_controls', '提出本机学习常亮与键盘/手势映射修改。controlsJson 为 get_advanced_settings(study) 返回的完整 controls 对象。keepScreenOn 为开关，gestureMode 为 inherit/off/gestures/tap_zones，keys/gestures 为 input、command 对象数组。keys 仅 space/enter/1/2/3/4/r/b/s，gestures 仅 left/right/double。command 可为 none/flip/again/hard/good/easy/undo/replay/bury/suspend。空映射沿用默认；评分仅答案面，退出/后台恢复常亮。',
       `"controlsJson":${TEXT}`, '"controlsJson"', '{"controlsJson":"{\\"keepScreenOn\\":true,\\"gestureMode\\":\\"inherit\\",\\"keys\\":[],\\"gestures\\":[]}"}'),
@@ -90,12 +91,14 @@ export function collectionPreferenceEdits(json: string): ReviewPreferenceEdit[] 
     shortTermWithSteps: ReviewPreferenceField.ShortTermWithSteps, backupDaily: ReviewPreferenceField.BackupDaily,
     backupWeekly: ReviewPreferenceField.BackupWeekly, backupMonthly: ReviewPreferenceField.BackupMonthly,
     backupInterval: ReviewPreferenceField.BackupInterval };
+  for (const item of REVIEW_AUDIO_PREFERENCES) fields[item.key] = item.field;
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw) || Object.keys(raw).length === 0) throw new Error('invalid_preferences_patch');
   return Object.keys(raw).map((key: string): ReviewPreferenceEdit => {
     if (!Object.keys(fields).includes(key)) throw new Error('invalid_preferences_patch');
     const field: ReviewPreferenceField = fields[key];
     const value: Object = raw[key];
-    const boolean: boolean = field === ReviewPreferenceField.LoadBalancer || field === ReviewPreferenceField.ShortTermWithSteps;
+    const boolean: boolean = field === ReviewPreferenceField.LoadBalancer || field === ReviewPreferenceField.ShortTermWithSteps ||
+      REVIEW_AUDIO_PREFERENCES.some((item): boolean => item.field === field);
     if ((boolean && typeof value !== 'boolean') || (!boolean && typeof value !== 'number')) throw new Error('invalid_preferences_patch');
     const edit: ReviewPreferenceEdit = { field: field, value: boolean ? (value === true ? 1 : 0) : value as number };
     validatePreferenceEdit(edit); return edit;

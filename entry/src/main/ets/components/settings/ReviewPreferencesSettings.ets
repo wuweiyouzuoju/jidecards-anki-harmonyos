@@ -9,6 +9,10 @@ import { 颜色键 } from '../../model/颜色主题';
 import { SettingsToggleRow } from '../common/SettingsToggleRow';
 import { 按下态按钮 } from '../common/按下态按钮';
 import { 设置分组卡片 } from './设置分组卡片';
+import { REVIEW_AUDIO_PREFERENCES, ReviewAudioPreference } from '../../model/ReviewAudioPreferences';
+import { appInterface } from '../../backend/AppInterfaceService';
+import { AppInterfaceControl, AppInterfaceValue } from '../../model/AppInterface';
+import { namedResourceText } from '../../utils/UiFeedback';
 
 /** 两个分类复用集合偏好保存入口；草稿只记录用户实际编辑的字段。 */
 @Component
@@ -18,8 +22,8 @@ export struct ReviewPreferencesSettings {
   @Prop displayOptions: boolean = false;
   打开说明回调: (标题: Resource, 正文: Resource) => void = (_标题: Resource, _正文: Resource): void => {};
   @StorageProp(颜色键.动作主色) private actionColor: string = '#2F5FD0';
-  @State private loaded: boolean = false;
-  @State private busy: boolean = false;
+  @State @Watch('publishAudioInterface') private loaded: boolean = false;
+  @State @Watch('publishAudioInterface') private busy: boolean = false;
   @State private failed: boolean = false;
   @State private invalid: boolean = false;
   @State private rollover: string = '';
@@ -27,6 +31,8 @@ export struct ReviewPreferencesSettings {
   @State private timeLimit: string = '';
   @State private remaining: boolean = false;
   @State private intervals: boolean = false;
+  @State @Watch('publishAudioInterface') private hideAudio: boolean = false;
+  @State @Watch('publishAudioInterface') private interruptAudio: boolean = false;
   private rolloverEdited: boolean = false;
   private learnEdited: boolean = false;
   private timeEdited: boolean = false;
@@ -34,7 +40,17 @@ export struct ReviewPreferencesSettings {
   private generation: number = 0;
 
   aboutToAppear(): void { this.alive = true; this.reload(); }
-  aboutToDisappear(): void { this.alive = false; this.generation++; }
+  aboutToDisappear(): void { this.alive = false; this.generation++; if (this.displayOptions) appInterface.leave('review_audio'); }
+
+  private publishAudioInterface(): void {
+    if (!this.alive || !this.displayOptions) return;
+    const items: AppInterfaceControl[] = REVIEW_AUDIO_PREFERENCES.map((item: ReviewAudioPreference): AppInterfaceControl => ({
+      id: item.id, titleKey: item.titleKey, title: '', enabled: this.loaded && !this.busy, selected: false }));
+    const values: AppInterfaceValue[] = REVIEW_AUDIO_PREFERENCES.map((item: ReviewAudioPreference): AppInterfaceValue => ({
+      id: item.id, value: this.loaded ? String(item.id === 'hide_audio_buttons' ? this.hideAudio : this.interruptAudio) : 'unavailable' }));
+    appInterface.observe({ surface: 'review_audio', sectionId: 'study_display', selectedId: '', optionIds: [],
+      optionLabels: [], busy: this.busy, controlsComplete: true, items, values });
+  }
 
   private apply(value: ReviewPreferences, preserveDraft: boolean = false): void {
     if (!preserveDraft || !this.rolloverEdited) {
@@ -48,6 +64,8 @@ export struct ReviewPreferencesSettings {
     }
     this.remaining = value.showRemaining;
     this.intervals = value.showIntervals;
+    this.hideAudio = value.hideAudioPlayButtons;
+    this.interruptAudio = value.interruptAudioWhenAnswering;
     this.loaded = true;
   }
 
@@ -68,9 +86,13 @@ export struct ReviewPreferencesSettings {
     const generation: number = this.generation;
     const remaining: boolean = this.remaining;
     const intervals: boolean = this.intervals;
+    const hideAudio: boolean = this.hideAudio;
+    const interruptAudio: boolean = this.interruptAudio;
     for (const edit of edits) {
       if (edit.field === ReviewPreferenceField.ShowRemaining) this.remaining = edit.value !== 0;
       else if (edit.field === ReviewPreferenceField.ShowIntervals) this.intervals = edit.value !== 0;
+      else if (edit.field === ReviewPreferenceField.HideAudioPlayButtons) this.hideAudio = edit.value !== 0;
+      else if (edit.field === ReviewPreferenceField.InterruptAudioWhenAnswering) this.interruptAudio = edit.value !== 0;
     }
     this.busy = true; this.failed = false; this.invalid = false;
     try {
@@ -80,6 +102,7 @@ export struct ReviewPreferencesSettings {
       if (this.alive && generation === this.generation) {
         this.failed = true;
         this.remaining = remaining; this.intervals = intervals;
+        this.hideAudio = hideAudio; this.interruptAudio = interruptAudio;
         // 重新核对真实开关值，但数字草稿仅在保存确认成功后清除，失败/重试不能覆盖输入。
         try {
           const actual: ReviewPreferences = await reviewPreferences.read();
@@ -151,6 +174,13 @@ export struct ReviewPreferencesSettings {
           SettingsToggleRow({ title: settingsItemText(this.getUIContext(), 'show_intervals', this.uiLanguage), isOn: this.intervals, tint: this.actionColor, isDark: this.是否深色,
             isInteractive: this.loaded && !this.busy,
             onChange: (value: boolean): void => { this.changeDisplay(ReviewPreferenceField.ShowIntervals, value); } })
+          ForEach(REVIEW_AUDIO_PREFERENCES, (item: ReviewAudioPreference) => {
+            SettingsToggleRow({ title: settingsItemText(this.getUIContext(), item.id, this.uiLanguage),
+              hint: namedResourceText(this.getUIContext(), item.hintKey),
+              isOn: item.id === 'hide_audio_buttons' ? this.hideAudio : this.interruptAudio,
+              tint: this.actionColor, isDark: this.是否深色, isInteractive: this.loaded && !this.busy,
+              onChange: (value: boolean): void => { this.changeDisplay(item.field, value); } })
+          }, (item: ReviewAudioPreference): string => item.id)
         } else {
           this.numberField(ReviewPreferenceField.Rollover)
           this.numberField(ReviewPreferenceField.LearnAheadSecs)
