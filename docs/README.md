@@ -31,6 +31,7 @@
 - [长期决策](decisions/README.md)：受版本控制的当前决策；不把 `.trae` 当作项目规则来源。
 - [云端牌组托管](cloud-deck-hosting.md)：公开目录协议和发布操作。
 - [官方公告托管](official-announcement-hosting.md)：公告协议、发布、停用与送达语义。
+- [官网内容与部署](site-deployment.md)：静态构建、AI 与爬虫读取入口、新版图片和域名发布。
 - [主题兑换](REDEMPTION.md)：发行工具、身份备份与扩展入口。
 - [设置能力对照](../entry/src/main/ets/components/settings/SETTINGS_PARITY.md)：设置模式、实际接入和待验收边界。
 
