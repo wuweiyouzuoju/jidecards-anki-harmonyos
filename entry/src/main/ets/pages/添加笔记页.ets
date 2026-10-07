@@ -34,7 +34,6 @@ import { ThemeTextSpans } from '../components/common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
 import { PAGE_COMPACT_LAYOUT_KEY } from '../model/AppLayoutState';
-import { 简洁模式AppStorage键, 加载简洁模式 } from '../model/简洁模式存储';
 
 // 添加笔记页：独立全屏建卡页（Task 9）。
 // 由 首页.ets 通过 Navigation pathStack 以 NavDestination 形式入栈（与 学习页 同机制），
@@ -86,7 +85,6 @@ export struct 添加笔记页 {
   @Provide(NOTE_EDITOR_WHEEL_SESSION_KEY) private wheelSession: NoteEditorWheelSession = new NoteEditorWheelSession();
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
-  @StorageProp(简洁模式AppStorage键) @Watch('publishInterface') private isSimpleMode: boolean = true;
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @StorageProp(PAGE_SURFACE_KEY) private pageSurface: string = '#F5F7FA';
   /** Navigation 入栈参数 */
@@ -190,9 +188,6 @@ export struct 添加笔记页 {
       if (!this.pageActive) return;
       this.主题模式值 = 'system';
     }
-    const simpleMode: boolean = await 加载简洁模式();
-    if (!this.pageActive) { return; }
-    AppStorage.setOrCreate<boolean>(简洁模式AppStorage键, simpleMode);
     await this.加载初始数据();
   }
 
@@ -493,7 +488,7 @@ export struct 添加笔记页 {
   }
 
   private interfaceControls(): AppInterfaceMenuItem[] {
-    return addNoteInterfaceControls({ simple: this.isSimpleMode, tagsExpanded: this.高级已展开,
+    return addNoteInterfaceControls({ tagsExpanded: this.高级已展开,
       occlusion: this.是否图片遮盖模式, hasSource: this.图片遮盖_源图Uri !== '', busy: this.处理中,
       blocked: this.处理中 || this.pickingFieldImage || this.audioBusy || this.confirmingDiscard,
       saveEnabled: this.保存按钮可用() && !this.confirmingDiscard, hasTypes: this.笔记类型选项.length > 0 });
@@ -627,27 +622,25 @@ export struct 添加笔记页 {
   // 抽 @Builder 消除两个分支的高级设置代码重复（BUG-004 修复）。
   @Builder
   private 高级设置折叠区() {
-    if (!this.isSimpleMode) {
-      Button() {
-        Text(this.interfaceLabel('tags_entry'))
-          .fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_secondary'))
-      }
-        .height(应用尺寸.紧凑控件高度)
-        .flexShrink(0)
-        .padding({ left: 应用尺寸.间距_12, right: 应用尺寸.间距_12 })
-        .backgroundColor(Color.Transparent)
-        .borderRadius(应用尺寸.圆角_面板)
-        .enabled(!this.处理中 && !this.pickingFieldImage && !this.audioBusy && !this.confirmingDiscard)
-        .attributeModifier(new PressFeedback())
-        .stateEffect(false)
-        .onClick((): void => {
-          this.toggleTags();
-        })
+    Button() {
+      Text(this.interfaceLabel('tags_entry'))
+        .fontSize(应用尺寸.字号_正文)
+        .fontColor($r('app.color.text_secondary'))
+    }
+      .height(应用尺寸.紧凑控件高度)
+      .flexShrink(0)
+      .padding({ left: 应用尺寸.间距_12, right: 应用尺寸.间距_12 })
+      .backgroundColor(Color.Transparent)
+      .borderRadius(应用尺寸.圆角_面板)
+      .enabled(!this.处理中 && !this.pickingFieldImage && !this.audioBusy && !this.confirmingDiscard)
+      .attributeModifier(new PressFeedback())
+      .stateEffect(false)
+      .onClick((): void => {
+        this.toggleTags();
+      })
 
-      if (this.高级已展开) {
-        this.标签字段块()
-      }
+    if (this.高级已展开) {
+      this.标签字段块()
     }
   }
 

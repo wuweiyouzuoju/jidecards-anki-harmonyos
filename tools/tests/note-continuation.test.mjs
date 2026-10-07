@@ -240,7 +240,7 @@ test('session rejects saves while a type read is pending and ignores late type r
 
 test('both save controls share unavailable states and resource-backed action semantics', () => {
   for(const blocked of [false,true]) {
-    const controls=addNoteInterfaceControls({simple:true,tagsExpanded:false,occlusion:false,hasSource:false,
+    const controls=addNoteInterfaceControls({tagsExpanded:false,occlusion:false,hasSource:false,
       busy:blocked,blocked,saveEnabled:true,hasTypes:true});
     assert.equal(controls.find(c=>c.id==='save').enabled,!blocked);
     assert.equal(controls.find(c=>c.id==='save_return').enabled,!blocked);

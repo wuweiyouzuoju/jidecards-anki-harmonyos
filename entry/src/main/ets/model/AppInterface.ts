@@ -317,8 +317,8 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'back', titleKey: 'study_back', iconKey: 'ic_common_arrow_left' }, { id: 'save', titleKey: 'add_note_save_continue' },
     { id: 'save_return', titleKey: 'add_note_save_return' },
     { id: 'type', titleKey: 'add_note_notetype', opens: 'add_note_types' },
-    { id: 'tags_entry', titleKey: 'add_note_tags', fullOnly: true },
-    { id: 'tags', titleKey: 'add_note_tags', opens: 'tag_picker', fullOnly: true, condition: 'tags_expanded' },
+    { id: 'tags_entry', titleKey: 'add_note_tags' },
+    { id: 'tags', titleKey: 'add_note_tags', opens: 'tag_picker', condition: 'tags_expanded' },
     { id: 'image', titleKey: 'add_note_image_occlusion_pick_image', condition: 'image_occlusion' },
     { id: 'masks', titleKey: 'add_note_image_occlusion_edit_masks', condition: 'image_source' }
   ] },
@@ -507,11 +507,11 @@ export function statsInterfaceSections(fsrs: boolean): AppInterfaceItem[] {
 }
 
 export interface AddNoteInterfaceContext {
-  simple: boolean; tagsExpanded: boolean; occlusion: boolean; hasSource: boolean;
+  tagsExpanded: boolean; occlusion: boolean; hasSource: boolean;
   busy: boolean; blocked: boolean; saveEnabled: boolean; hasTypes: boolean;
 }
 export function addNoteInterfaceControls(context: AddNoteInterfaceContext): AppInterfaceMenuItem[] {
-  return visibleInterfaceItems('add_note', { simple: context.simple, agent: false, cloudDeck: false, themeHasTextures: false })
+  return visibleInterfaceItems('add_note', { simple: false, agent: false, cloudDeck: false, themeHasTextures: false })
     .filter((item): boolean => item.id !== 'tags' || context.tagsExpanded)
     .filter((item): boolean => item.id !== 'image' || context.occlusion)
     .filter((item): boolean => item.id !== 'masks' || (context.occlusion && context.hasSource))

@@ -96,7 +96,7 @@ test('chart component observes actual range labels, selection, empty data and an
   chart.aboutToDisappear();chart.publishInterface();assert.equal(tracker.snapshot().length,0);
 });
 
-test('add-note observation follows actual field/type state, simple tags and image-occlusion form without draft bodies',()=>{
+test('add-note observation exposes tags in both modes and follows field/type and image-occlusion state without draft bodies',()=>{
   const tracker=new AppInterfaceTracker();
   const Page=methods('pages/添加笔记页.ets',['interfaceControls','interfaceEnabled','publishInterface','displayTypeName','保存按钮可用','图片遮盖_标题字段索引','图片遮盖_额外字段索引'],dependencies(tracker));
   const page=new Page();Object.assign(page,{pageActive:true,isSimpleMode:true,高级已展开:true,是否图片遮盖模式:false,
@@ -106,13 +106,21 @@ test('add-note observation follows actual field/type state, simple tags and imag
     字段值列表:['PRIVATE_BODY'],标签:'PRIVATE_TAGS'});
   page.publishInterface();let view=result(tracker,'add_note');
   assert.deepEqual(view.observations[0].optionIds,['field-0','field-1','field-2']);
-  assert.equal(view.surfaces[0].items.find(x=>x.id==='tags_entry').visibility,'hidden');
+  assert.equal(view.surfaces[0].items.find(x=>x.id==='tags_entry').visibility,'observed');
   assert.equal(view.surfaces[0].items.find(x=>x.id==='save').enabled,true);
   assert.equal(view.surfaces[0].items.find(x=>x.id==='save_return').enabled,true);
   assert.equal(view.observations[0].items.find(x=>x.id==='sticky-1').selected,true);
   assert.equal(result(tracker,'add_note_types').observations[0].selectedId,'1');
   assert.ok(!JSON.stringify(view).includes('PRIVATE_'));
-  page.isSimpleMode=false;page.publishInterface();assert.equal(result(tracker,'add_note').surfaces[0].items.find(x=>x.id==='tags').visibility,'observed');
+  for(const simple of [true,false]) {
+    page.isSimpleMode=simple;page.publishInterface();
+    const current=buildAgentAppStructure({...context,simple},'add_note','',localize,[],[],tracker.snapshot());
+    assert.equal(current.surfaces[0].items.find(x=>x.id==='tags_entry').visibility,'observed');
+    assert.equal(current.surfaces[0].items.find(x=>x.id==='tags').visibility,'observed');
+    page.高级已展开=false;page.publishInterface();
+    assert.equal(tracker.snapshot().find(item=>item.surface==='add_note').items.some(item=>item.id==='tags'),false);
+    page.高级已展开=true;page.publishInterface();
+  }
   page.是否图片遮盖模式=true;page.字段名列表=['Masks','Image','Header','Back Extra'];page.imageOcclusionFields=[0,1,2,3];page.publishInterface();
   assert.deepEqual(result(tracker,'add_note').observations[0].optionIds,['field-2','field-3']);
   assert.equal(result(tracker,'add_note').surfaces[0].items.find(x=>x.id==='save').enabled,false);
