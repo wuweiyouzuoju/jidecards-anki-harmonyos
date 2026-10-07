@@ -23,11 +23,13 @@ export async function loadContent(root) {
   }
   const css = await readFile(path.join(hosting, 'styles.css'));
   const logo = await readFile(path.join(root, 'AppScope/resources/base/media/app_icon.png'));
+  const logoPreview = await readFile(path.join(hosting, 'apple-touch-icon.png'));
+  const mediaLoader = await readFile(path.join(hosting, 'assets/site-media.mjs'));
   const hash = bytes => createHash('sha256').update(bytes).digest('hex').slice(0, 12);
   return {
-    root, hosting, data, guide, work, logo,
+    root, hosting, data, guide, work, logo, logoPreview: `data:image/png;base64,${logoPreview.toString('base64')}`,
     origin: 'https://jidecards.com',
-    assets: { css: hash(css), logo: hash(logo) },
+    assets: { css: hash(css), logo: hash(logo), media: hash(mediaLoader) },
     repositories: [{ name: 'GitHub', url: work.repository }, ...work.repositoryMirrors]
   };
 }

@@ -21,7 +21,7 @@ export function createLayout(content) {
   const repo = work.repository;
   const repoLinks = repositories.map(item => `<a href="${esc(item.url)}">${esc(item.name)} ${arrow}</a>`).join('');
   const sourceLink = (file, label) => `<a href="${esc(repo)}/blob/main/${esc(file)}">${esc(label)} ${arrow}</a>`;
-  const logo = (className, size, alt = '记得闪卡 Logo') => `<img class="${className}" src="${work.brand.logo}?v=${assets.logo}" alt="${esc(alt)}" width="${size}" height="${size}">`;
+  const logo = (className, size, alt = '记得闪卡 Logo') => `<img class="${className}" src="${content.logoPreview}" data-full-src="${work.brand.logo}?v=${assets.logo}" alt="${esc(alt)}" width="${size}" height="${size}" loading="lazy" decoding="async" fetchpriority="low">`;
   const download = `<div class="actions"><a class="button" href="${esc(work.marketplace.url)}">免费下载 ${arrow}</a><a class="button secondary" href="${esc(repo)}">查看源码 ${arrow}</a></div><p class="download-meta">正式版 ${esc(work.releaseVersion)} · ${esc(work.platform)} · 华为应用市场搜索「记得闪卡」</p>`;
   const application = {
     '@type': 'SoftwareApplication', '@id': `${origin}/#app`, name: work.name, alternateName: work.alternateName,
@@ -74,6 +74,7 @@ export function createLayout(content) {
   <meta property="og:image:width" content="${heroImage.width}">
   <meta property="og:image:height" content="${heroImage.height}">
   <script type="application/ld+json">${JSON.stringify(structured).replace(/</g, '\\u003c')}</script>
+  <noscript><style>.deferred-media { display: none; }</style></noscript>
 </head>
 <body>
   <a class="skip-link" href="#content">跳到正文</a>
@@ -90,6 +91,7 @@ export function createLayout(content) {
     <nav aria-label="开源项目"><h2>开源项目</h2>${repoLinks}<a href="/developers/">开发文档</a><a href="${esc(repo)}/issues">问题反馈 ${arrow}</a></nav>
     <nav aria-label="机器可读资料"><h2>机器可读资料</h2><a href="/llms.txt">llms.txt · 索引</a><a href="/llms-full.txt">llms-full.txt · 完整资料</a><a href="/data/site-index.json">页面与内容 JSON</a><a href="/data/works.json">产品数据 JSON</a><a href="/sitemap.xml">网站地图</a></nav>
   </div><div class="footer-bottom"><p>由 <a href="/about/">${esc(author.name)}</a> 开发 · 独立开源项目，非 Anki 官方客户端。</p><a href="/releases.xml">订阅版本更新 ${arrow}</a></div></div></footer>
+  <script type="module" src="/assets/site-media.mjs?v=${assets.media}"></script>
 </body>
 </html>
 `;

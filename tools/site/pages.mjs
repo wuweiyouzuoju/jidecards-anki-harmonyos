@@ -7,7 +7,11 @@ export function renderPages(content, layout) {
   const jide = work.detailSections.find(section => section.id === 'jide');
   const changes = `<ol class="release-list">${work.sourceUpdate.changes.map(change => `<li>${esc(change)}</li>`).join('\n')}</ol>`;
   const featureList = items => `<dl class="feature-list">${items.map(item => `<div><dt>${esc(item.name)}</dt><dd>${esc(item.description)}</dd></div>`).join('\n')}</dl>`;
-  const figure = (item, eager = false) => `<figure class="product-media"><a href="${esc(item.path)}" aria-label="查看完整图片：${esc(item.caption)}"><img src="${esc(item.path)}" alt="记得闪卡 ${esc(item.caption)}。${esc(item.description)}" width="${item.width}" height="${item.height}" ${eager ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async"></a><figcaption><strong>${esc(item.caption)}</strong><p>${esc(item.description)}</p><a href="${esc(item.path)}">查看完整图片 ${arrow}</a></figcaption></figure>`;
+  const figure = item => {
+    const placeholder = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${item.width}" height="${item.height}"><rect width="100%" height="100%" fill="#f1f2fa"/></svg>`)}`;
+    const attributes = `alt="记得闪卡 ${esc(item.caption)}。${esc(item.description)}" width="${item.width}" height="${item.height}" loading="lazy" decoding="async" fetchpriority="low"`;
+    return `<figure class="product-media"><a href="${esc(item.path)}" aria-label="查看完整图片：${esc(item.caption)}"><img class="deferred-media" src="${placeholder}" data-full-src="${esc(item.path)}" ${attributes}><noscript><img src="${esc(item.path)}" ${attributes}></noscript></a><figcaption><strong>${esc(item.caption)}</strong><p>${esc(item.description)}</p><a href="${esc(item.path)}">查看完整图片 ${arrow}</a></figcaption></figure>`;
+  };
   const pageHeader = (eyebrow, title, description) => `<header class="page-heading"><p class="eyebrow">${esc(eyebrow)}</p><h1>${esc(title)}</h1><p class="lede">${esc(description)}</p></header>`;
   const featureKinds = ['review', 'cards', 'sync', 'package', 'search', 'theme'];
   const featureTargets = ['fsrs', 'card-types', 'ankiweb', 'apkg', 'organization', 'appearance'];
