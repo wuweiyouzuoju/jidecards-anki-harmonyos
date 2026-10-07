@@ -4,6 +4,9 @@ import { UNBURY_MODE_ALL } from '../proto/messages/SchedulerMessages';
 import { 笔记服务 } from './笔记服务';
 import type { StudySessionBackend } from '../model/StudySessionController';
 import type { CardAnswerInput, CongratsInfo, QueuedCardsView, SchedulingStatesRaw } from '../proto/messages/SchedulerMessages';
+import type { StudyCard } from '../proto/messages/SchedulerMessages';
+import type { SchedulingScriptRuntime } from '../model/CustomScheduling';
+import { CustomSchedulingService } from './CustomSchedulingService';
 import type { RenderedCard } from '../proto/messages/CardRenderingMessages';
 import { 调度器服务 } from './调度器服务';
 import { 卡片渲染服务 } from './卡片渲染服务';
@@ -37,15 +40,20 @@ export class AnkiStudySessionBackend implements StudySessionBackend {
   private deckConfigs: 牌组配置服务 = new 牌组配置服务();
   private notetypes: 笔记类型服务 = new 笔记类型服务();
   private config: 配置服务 = new 配置服务();
+  private customScheduling: CustomSchedulingService;
 
   async reviewPreferences(): Promise<ReviewPreferences> {
     return decodeReviewPreferences(await this.config.getPreferences());
   }
 
-  constructor(scheduler: 调度器服务, renderer: 卡片渲染服务, collection: 集合服务) {
+  constructor(scheduler: 调度器服务, renderer: 卡片渲染服务, collection: 集合服务, runtime: SchedulingScriptRuntime) {
     this.scheduler = scheduler;
     this.renderer = renderer;
     this.collection = collection;
+    this.customScheduling = new CustomSchedulingService(runtime);
+  }
+  customizeStates(card: StudyCard, script: string): Promise<SchedulingStatesRaw> {
+    return this.customScheduling.apply(card, script);
   }
 
   async updateNote(note: EditableNote): Promise<void> { await this.notes.更新笔记([note], false); }

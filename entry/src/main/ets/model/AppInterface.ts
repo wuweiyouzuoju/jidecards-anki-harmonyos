@@ -378,7 +378,7 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'good', titleKey: 'rating_good', condition: 'answer' },
     { id: 'easy', titleKey: 'rating_easy', condition: 'answer' }
   ] },
-  { id: 'custom_scheduling_warning', titleKey: 'custom_scheduling_title', parent: 'study', items: [
+  { id: 'custom_scheduling_warning', titleKey: 'custom_scheduling_title', instructionsKey: 'custom_scheduling_hint', parent: 'study', items: [
     { id: 'exit', titleKey: 'custom_scheduling_exit', iconKey: 'ic_common_close' }, { id: 'continue', titleKey: 'custom_scheduling_continue' }
   ] },
   { id: 'study_more', titleKey: 'study_more', parent: 'study', items: [

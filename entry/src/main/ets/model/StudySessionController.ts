@@ -30,6 +30,7 @@ export interface StudySessionBackend {
   flagLabels?(): Promise<FlagLabels>;
   setCardFlag?(cardId: number, flag: number): Promise<void>;
   setNoteMarked?(noteId: number, marked: boolean): Promise<void>;
+  customizeStates?(card: StudyCard, script: string): Promise<SchedulingStatesRaw>;
 }
 
 export interface StudySnapshot {
@@ -65,12 +66,14 @@ export class StudySessionController {
   private timeboxNotice: StudyTimeboxNotice | null = null;
   private customSchedulingScript: string = '';
   private acknowledgedScript: string = '';
+  private customSchedulingError: string = '';
   private renderPrefetch: CardRenderPrefetch;
   private nextRenderId: number = 0;
 
   needsCustomSchedulingAcknowledgement(): boolean {
-    return this.customSchedulingScript.trim() !== '' && this.customSchedulingScript !== this.acknowledgedScript;
+    return this.customSchedulingError !== '' && this.customSchedulingScript !== this.acknowledgedScript;
   }
+  schedulingError(): string { return this.customSchedulingError; }
   acknowledgeCustomScheduling(): void {
     if (!this.disposed) this.acknowledgedScript = this.customSchedulingScript;
   }
@@ -141,6 +144,20 @@ export class StudySessionController {
       if (this.disposed || !isCurrent()) return null;
       const options: StudyOptions = await this.backend.studyOptions(card.cardId);
       if (this.disposed || !isCurrent()) return null;
+      this.customSchedulingScript = options.customSchedulingScript ?? '';
+      this.customSchedulingError = '';
+      if (this.customSchedulingScript.trim() !== '' && this.customSchedulingScript !== this.acknowledgedScript) {
+        try {
+          if (this.backend.customizeStates === undefined) throw new Error('Custom scheduling runtime unavailable');
+          const states = await this.backend.customizeStates(card, this.customSchedulingScript);
+          if (this.disposed || !isCurrent()) return null;
+          card.states = states;
+        } catch (error) {
+          if (this.disposed || !isCurrent()) return null;
+          this.customSchedulingError = error instanceof Error && error.message !== ''
+            ? error.message : 'Custom scheduling failed';
+        }
+      }
       const labels: string[] = await this.backend.describeStates(card.states);
       if (this.disposed || !isCurrent()) return null;
       const choiceQuestion: JideChoiceQuestion | null = this.backend.choiceQuestion === undefined
@@ -150,7 +167,6 @@ export class StudySessionController {
       if (this.disposed || !isCurrent()) return null;
       const flagLabels: FlagLabels = this.backend.flagLabels === undefined ? {} : await this.backend.flagLabels();
       if (this.disposed || !isCurrent()) return null;
-      this.customSchedulingScript = options.customSchedulingScript ?? '';
       this.nextRenderId = queue.cards.length > 1 ? queue.cards[1].cardId : 0;
       return { queue: queue, canUndo: canUndo, card: card, rendered: rendered, labels: labels, options: options,
         choiceQuestion: choiceQuestion, preferences: preferences, marking: marking, flagLabels: flagLabels };

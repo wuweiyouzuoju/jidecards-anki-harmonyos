@@ -9,7 +9,7 @@ import { SyncActivity } from '../../entry/src/main/ets/model/SyncSettings.ts';
 
 const turn = () => new Promise(resolve => setImmediate(resolve));
 
-test('custom scheduling requires explicit acknowledgement for each changed script and preserves raw states', async () => {
+test('unavailable custom scheduling requires explicit acknowledgement for each changed script and preserves raw states', async () => {
   const h = harness(); let script='states.good.customData = "test";';
   h.backend.studyOptions = async () => Object.assign(new StudyOptions(), {customSchedulingScript: script});
   await h.session.loadNext(1,()=>true);
@@ -20,6 +20,56 @@ test('custom scheduling requires explicit acknowledgement for each changed scrip
   await h.session.loadNext(1,()=>true); assert.equal(h.session.needsCustomSchedulingAcknowledgement(),false);
   script='different script'; await h.session.loadNext(1,()=>true); assert.equal(h.session.needsCustomSchedulingAcknowledgement(),true);
   script='  '; await h.session.loadNext(1,()=>true); assert.equal(h.session.needsCustomSchedulingAcknowledgement(),false);
+});
+test('customized candidates drive labels and every rating while the original current state stays opaque', async () => {
+  for (let rating=0;rating<4;rating++) {
+    const h=harness(); const original=h.card.states;
+    const states={...original,again:Uint8Array.of(11),hard:Uint8Array.of(12),good:Uint8Array.of(13),easy:Uint8Array.of(14)};
+    h.backend.studyOptions=async()=>Object.assign(new StudyOptions(),{customSchedulingScript:'script'});
+    h.backend.customizeStates=async(card,script)=>{assert.equal(card,h.card);assert.equal(script,'script');return states;};
+    h.backend.describeStates=async actual=>{assert.equal(actual,states);return ['11','12','13','14'];};
+    const snapshot=await h.session.loadNext(1,()=>true);
+    assert.deepEqual(snapshot.labels,['11','12','13','14']);
+    assert.equal(h.session.needsCustomSchedulingAcknowledgement(),false);
+    await h.session.answer(snapshot.card,rating,200,100);
+    assert.equal(h.calls[0].newState,[states.again,states.hard,states.good,states.easy][rating]);
+    assert.equal(h.calls[0].currentState,original.current);
+  }
+});
+test('failed scripts cannot submit before confirmation; changed scripts execute again and failures retain original candidates', async () => {
+  const h=harness();let script='bad',runs=0;const original=h.card.states;
+  h.backend.studyOptions=async()=>Object.assign(new StudyOptions(),{customSchedulingScript:script});
+  h.backend.customizeStates=async()=>{runs++;throw Error('sandbox_deadline');};
+  await h.session.loadNext(1,()=>true);assert.equal(h.card.states,original);
+  assert.equal(h.session.schedulingError(),'sandbox_deadline');
+  await assert.rejects(h.session.answer(h.card,2,200,100),/requires acknowledgement/);
+  h.session.acknowledgeCustomScheduling();await h.session.loadNext(1,()=>true);assert.equal(runs,1);
+  await h.session.answer(h.card,2,200,100);assert.equal(h.calls[0].newState,original.good);
+  script='changed';await h.session.loadNext(1,()=>true);assert.equal(runs,2);
+  assert.equal(h.session.needsCustomSchedulingAcknowledgement(),true);
+});
+test('disposed or superseded script results never replace states or publish labels', async()=>{
+  for(const dispose of [false,true]){
+    const h=harness(),gate=deferred();let current=true,described=0;const original=h.card.states;
+    h.backend.studyOptions=async()=>Object.assign(new StudyOptions(),{customSchedulingScript:'script'});
+    h.backend.customizeStates=()=>gate.promise;h.backend.describeStates=async()=>{described++;return [];};
+    const pending=h.session.loadNext(1,()=>current);await turn();
+    if(dispose)h.session.dispose();else current=false;
+    gate.resolve({...original,good:Uint8Array.of(99)});
+    assert.equal(await pending,null);assert.equal(described,0);assert.equal(h.card.states,original);
+  }
+});
+test('empty or non-Error execution failures still require acknowledgement before standard scheduling',async()=>{
+  for(const failure of [new Error(''),'sandbox failed',undefined]){
+    const h=harness();
+    h.backend.studyOptions=async()=>Object.assign(new StudyOptions(),{customSchedulingScript:'script'});
+    h.backend.customizeStates=async()=>{throw failure;};
+    await h.session.loadNext(1,()=>true);
+    assert.equal(h.session.schedulingError(),'Custom scheduling failed');
+    assert.equal(h.session.needsCustomSchedulingAcknowledgement(),true);
+    await assert.rejects(h.session.answer(h.card,2,200,100),/requires acknowledgement/);
+    assert.equal(h.calls.length,0);
+  }
 });
 function deferred() {
   let resolve, reject;

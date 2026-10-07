@@ -1,0 +1,130 @@
+{
+  "script": "states.good.normal.review.scheduledDays = 123;\nstates.good.normal.review.easeFactor = 3;\ncustomData.good.c += 1;",
+  "source": "\nconst payload = JSON.parse(JSON.stringify(input));\nconst states = payload.states;\nconst ctx = payload.ctx;\nctx.seed = BigInt(ctx.seed);\nconst customData = {};\nfor (const name of ['again', 'hard', 'good', 'easy']) {\n  try { customData[name] = JSON.parse(states.current.customData); }\n  catch (_) { customData[name] = {}; }\n}\nconst result = (function(states, customData, ctx) {\nstates.good.normal.review.scheduledDays = 123;\nstates.good.normal.review.easeFactor = 3;\ncustomData.good.c += 1;\n})(states, customData, ctx);\nif (result && typeof result.then === 'function') throw new Error('Async scheduling is unsupported');\nconst checkNumbers = (value) => {\n  if (typeof value === 'number' && !Number.isFinite(value)) throw new Error('Non-finite scheduling value');\n  if (value && typeof value === 'object') for (const child of Object.values(value)) checkNumbers(child);\n};\ncheckNumbers(states);\ncheckNumbers(customData);\nfor (const name of ['again', 'hard', 'good', 'easy']) {\n  states[name].customData = JSON.stringify(customData[name]);\n}\nreturn states;",
+  "input": {
+    "states": {
+      "current": {
+        "normal": {
+          "review": {
+            "scheduledDays": 10,
+            "elapsedDays": 2,
+            "easeFactor": 2.5,
+            "lapses": 0,
+            "leeched": false
+          }
+        },
+        "customData": "{\"c\":1}"
+      },
+      "again": {
+        "normal": {
+          "review": {
+            "scheduledDays": 10,
+            "elapsedDays": 2,
+            "easeFactor": 2.5,
+            "lapses": 0,
+            "leeched": false
+          }
+        }
+      },
+      "hard": {
+        "normal": {
+          "review": {
+            "scheduledDays": 10,
+            "elapsedDays": 2,
+            "easeFactor": 2.5,
+            "lapses": 0,
+            "leeched": false
+          }
+        }
+      },
+      "good": {
+        "normal": {
+          "review": {
+            "scheduledDays": 10,
+            "elapsedDays": 2,
+            "easeFactor": 2.5,
+            "lapses": 0,
+            "leeched": false
+          }
+        }
+      },
+      "easy": {
+        "normal": {
+          "review": {
+            "scheduledDays": 10,
+            "elapsedDays": 2,
+            "easeFactor": 2.5,
+            "lapses": 0,
+            "leeched": false
+          }
+        }
+      }
+    },
+    "ctx": {
+      "deckName": "Fixture",
+      "seed": "18446744073709551615"
+    }
+  },
+  "expected": {
+    "current": {
+      "normal": {
+        "review": {
+          "scheduledDays": 10,
+          "elapsedDays": 2,
+          "easeFactor": 2.5,
+          "lapses": 0,
+          "leeched": false
+        }
+      },
+      "customData": "{\"c\":1}"
+    },
+    "again": {
+      "normal": {
+        "review": {
+          "scheduledDays": 10,
+          "elapsedDays": 2,
+          "easeFactor": 2.5,
+          "lapses": 0,
+          "leeched": false
+        }
+      },
+      "customData": "{\"c\":1}"
+    },
+    "hard": {
+      "normal": {
+        "review": {
+          "scheduledDays": 10,
+          "elapsedDays": 2,
+          "easeFactor": 2.5,
+          "lapses": 0,
+          "leeched": false
+        }
+      },
+      "customData": "{\"c\":1}"
+    },
+    "good": {
+      "normal": {
+        "review": {
+          "scheduledDays": 123,
+          "elapsedDays": 2,
+          "easeFactor": 3,
+          "lapses": 0,
+          "leeched": false
+        }
+      },
+      "customData": "{\"c\":2}"
+    },
+    "easy": {
+      "normal": {
+        "review": {
+          "scheduledDays": 10,
+          "elapsedDays": 2,
+          "easeFactor": 2.5,
+          "lapses": 0,
+          "leeched": false
+        }
+      },
+      "customData": "{\"c\":1}"
+    }
+  }
+}

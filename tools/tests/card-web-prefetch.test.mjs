@@ -6,7 +6,10 @@ import { CardRenderPrefetch } from '../../entry/src/main/ets/model/CardRenderPre
 import { CardWebSession } from '../../entry/src/main/ets/model/CardWebSession.ts';
 import { CardWebBuffer, CARD_SESSION_STORAGE_SNAPSHOT, carryCardSessionStorage } from '../../entry/src/main/ets/model/CardWebBuffer.ts';
 import { loadPlatformModule } from './platform-module-harness.mjs';
-import { encodeGetQueuedCardsRequest, decodeQueuedCards } from '../../entry/src/main/ets/proto/messages/SchedulerMessages.ts';
+import { encodeGetQueuedCardsRequest, decodeQueuedCards, decodeSchedulingStates } from '../../entry/src/main/ets/proto/messages/SchedulerMessages.ts';
+import { CUSTOM_SCHEDULING_SERVICE, encodeCustomScheduling } from '../../entry/src/main/ets/proto/messages/CustomSchedulingMessages.ts';
+import { decodeStringResponse } from '../../entry/src/main/ets/proto/messages/LinksMessages.ts';
+import { schedulingScriptSource } from '../../entry/src/main/ets/model/CustomScheduling.ts';
 import { encodeDeckId } from '../../entry/src/main/ets/proto/messages/DeckMessages.ts';
 import { 服务号, 调度器方法, 牌组方法 } from '../../entry/src/main/ets/backend/服务索引.ts';
 
@@ -33,11 +36,15 @@ test('Core queue reads default to one card and study requests two without answer
   assert.deepEqual(calls[1][2],encodeGetQueuedCardsRequest(1,false));
   assert.deepEqual(calls[3][2],encodeGetQueuedCardsRequest(2,false));
   const Dummy=class{};
+  const CustomSchedulingService=loadPlatformModule('backend/CustomSchedulingService.ts','CustomSchedulingService',{
+    CUSTOM_SCHEDULING_SERVICE,encodeCustomScheduling,decodeSchedulingStates,decodeStringResponse,schedulingScriptSource,
+    后端会话:{获取实例:()=>({调用:async()=>assert.fail('queue reads must not execute custom scheduling')})}
+  });
   const Adapter=loadPlatformModule('backend/StudySessionBackend.ts','AnkiStudySessionBackend',{
-    AnkiCardMarking:Dummy,笔记服务:Dummy,卡片服务:Dummy,牌组配置服务:Dummy,笔记类型服务:Dummy,配置服务:Dummy
+    CustomSchedulingService,AnkiCardMarking:Dummy,笔记服务:Dummy,卡片服务:Dummy,牌组配置服务:Dummy,笔记类型服务:Dummy,配置服务:Dummy
   });
   const requested=[];
-  const adapter=new Adapter({获取队首卡片:async(...args)=>{requested.push(args);return {cards:[]};}},{},{});
+  const adapter=new Adapter({获取队首卡片:async(...args)=>{requested.push(args);return {cards:[]};}},{},{},{execute:async()=>assert.fail('queue reads must not run scripts')});
   await adapter.queuedCards(77);
   assert.deepEqual(requested,[[77,2]]);
 });

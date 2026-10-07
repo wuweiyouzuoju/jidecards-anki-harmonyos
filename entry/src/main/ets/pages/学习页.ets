@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { WINDOW_SAFE_TOP_KEY } from '../model/WindowSafeLayout';
 import { CustomSchedulingWarning } from '../components/CustomSchedulingWarning';
+import { NativeSchedulingScript } from '../backend/NativeSchedulingScript';
 import { PressFeedback } from '../utils/PressFeedback';
 import { actionIcon } from '../utils/ActionIcons';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
@@ -156,7 +157,7 @@ export struct 学习页 {
   private readonly 卡片渲染服务实例: 卡片渲染服务 = new 卡片渲染服务();
   private readonly 集合服务实例: 集合服务 = new 集合服务();
   private readonly studySession: StudySessionController = new StudySessionController(
-    new AnkiStudySessionBackend(this.调度器服务实例, this.卡片渲染服务实例, this.集合服务实例));
+    new AnkiStudySessionBackend(this.调度器服务实例, this.卡片渲染服务实例, this.集合服务实例, new NativeSchedulingScript()));
   private readonly 笔记服务实例: 笔记服务 = new 笔记服务();
   private readonly 笔记类型服务实例: 笔记类型服务 = new 笔记类型服务();
   private 网页控制器: webview.WebviewController = new webview.WebviewController();
@@ -222,6 +223,7 @@ export struct 学习页 {
   private 展示时刻毫秒: number = 0;
   @State private customSchedulingWarning: boolean = false;
   @State private customSchedulingScript: string = '';
+  @State private customSchedulingError: string = '';
   @State @Watch('publishInterface') private 评分中: boolean = false;
   private 媒体目录: string = '';
   private studyGuideChecked: boolean = false;
@@ -620,6 +622,7 @@ export struct 学习页 {
       }
       if (this.studySession.needsCustomSchedulingAcknowledgement()) {
         this.customSchedulingScript = snapshot.options.customSchedulingScript;
+        this.customSchedulingError = this.studySession.schedulingError();
         this.customSchedulingWarning = true;
         this.stopStudyTimers(); this.audioSession.stop(); this.publishInterface();
         return;
@@ -2392,7 +2395,7 @@ export struct 学习页 {
         }
 
         if (this.customSchedulingWarning) {
-          CustomSchedulingWarning({ script: this.customSchedulingScript,
+          CustomSchedulingWarning({ script: this.customSchedulingScript, error: this.customSchedulingError,
             onExit: (): void => { this.pathStack.pop(); },
             onContinue: (): void => {
               this.studySession.acknowledgeCustomScheduling(); this.customSchedulingWarning = false;
