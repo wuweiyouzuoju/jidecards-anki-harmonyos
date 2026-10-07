@@ -24,7 +24,7 @@ test('request golden wire bytes are consumed by real Core Rust tests, with exact
 
 test('diagnostic golden requests and daily response use the real Core wire layouts',()=>{
  for(const [name,bytes] of [['evaluate',encodeEvaluateFsrs({params:[],search:'did:1 -is:suspended',ignoreRevlogsBeforeMs:0})],
-  ['history-count',encodeFsrsHistoryCount('2099-01-01','did:1 -is:suspended')]])
+  ['history-count',encodeFsrsHistoryCount('2099-01-01','(did:1) -is:suspended')]])
   assert.equal(Buffer.from(bytes).toString('hex'),readFileSync(new URL(`./fixtures/fsrs-${name}.hex`,import.meta.url),'utf8').trim());
  const response=new 协议写入器();response.写入打包浮点(1,[1.5,2.5]);response.写入打包64位整数(2,[3,0]);
  response.写入变长整数(3,0);response.写入变长整数(3,4);response.写入打包浮点(4,[12.5,0]);

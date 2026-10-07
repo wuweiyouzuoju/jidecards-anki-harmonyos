@@ -148,6 +148,9 @@ fn fixture() -> Fixture {
     let mut col = CollectionBuilder::new(&path).build().unwrap();
     let shared_deck = col.get_or_create_normal_deck("Shared").unwrap().id;
     let foreign_deck = col.get_or_create_normal_deck("Foreign").unwrap().id;
+    assert_ne!(shared_deck, DeckId(1));
+    assert_ne!(foreign_deck, DeckId(1));
+    assert_ne!(shared_deck, foreign_deck);
     let nt = col
         .get_all_notetypes()
         .unwrap()
@@ -199,6 +202,19 @@ fn fixture() -> Fixture {
                 .unwrap();
         }
     }
+    // 锁定 Core 的 did: 内部含 OR；显式分组后才与后续状态条件相交。
+    assert_eq!(
+        col.search_cards("(did:1) is:review", anki::search::SortMode::NoOrder)
+            .unwrap()
+            .len(),
+        6
+    );
+    assert_eq!(
+        col.search_cards("(did:1) is:new", anki::search::SortMode::NoOrder)
+            .unwrap()
+            .len(),
+        6
+    );
     col.close(None).unwrap();
     let backend = init_backend(&[]).unwrap();
     backend
