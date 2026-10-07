@@ -271,7 +271,12 @@ export struct 设置页 {
           })
         }
 
-        DataTransferFeature({ state: this.transfer, session: this.transferSession,
+      DataTransferFeature({ state: this.transfer, session: this.transferSession,
+        onBrowseResult: (query: string): void => {
+          if (this.disposed || this.pathStack === undefined || this.transfer.phase !== 'idle') return;
+          const params: 浏览页参数 = { initialSearch: query, initialNotesMode: true };
+          this.pathStack.pushPath({ name: 'BrowserPage', param: params });
+        },
           deckOptions: this.牌组列表, isDark: this.是否深色() })
       }
       .width('100%')

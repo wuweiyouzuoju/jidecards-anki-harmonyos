@@ -63,6 +63,7 @@ export struct 数据迁移面板 {
   @State private importOptions: ImportAnkiPackageOptions = DEFAULT_IMPORT_ANKI_PACKAGE_OPTIONS;
   @State private csvDraft: CsvMetadata | null = null;
   onCancel: () => void = (): void => {};
+  onBrowseResult: (category: string, page: number) => void = (_category: string, _page: number): void => {};
   onReparse: (delimiter: number, notetypeId: number) => void = (_delimiter: number, _notetypeId: number): void => {};
   @StorageProp(颜色键.主色按钮背景) private 主色按钮背景: string = '#2F5FD0';
   @State private 模式: 数据迁移模式 = 'exportDeck';
@@ -319,7 +320,7 @@ export struct 数据迁移面板 {
     if (this.busy) {
       this.operationProgress()
     } else if (this.result !== null) {
-      ImportResult({ summary: this.result })
+      ImportResult({ summary: this.result, onBrowse: this.onBrowseResult })
     } else {
           Text(this.副标题())
             .fontSize(应用尺寸.字号_正文_中)

@@ -8,12 +8,13 @@ export struct DataActionRow {
   @Prop hint: ResourceStr = '';
   @Prop icon: ResourceStr | undefined = undefined;
   @Prop isInteractive: boolean = true;
+  @Prop showDisclosure: boolean = true;
   @Prop showHelp: boolean = false;
   onHelp: () => void = (): void => {};
   onAction: () => void = (): void => {};
   build() {
     SettingsActionRow({ title: this.title, hint: this.hint, icon: this.icon,
-      isInteractive: this.isInteractive, showHelp: this.showHelp,
+      isInteractive: this.isInteractive, showDisclosure: this.showDisclosure, showHelp: this.showHelp,
       onHelp: this.onHelp, onAction: this.onAction })
   }
 }

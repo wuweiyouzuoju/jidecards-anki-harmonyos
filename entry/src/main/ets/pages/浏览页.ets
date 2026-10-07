@@ -1417,11 +1417,17 @@ export struct 浏览页 {
     this.showViewMenu = true;
   }
 
+  private viewChoiceLabel(group: string): string {
+    if (group === 'mode') return this.取本地化文案(this.浏览模式值 === 'cards' ? $r('app.string.browser_mode_cards') : $r('app.string.browser_mode_notes'));
+    if (group === 'filter') return localizedNamedResourceText(this.getUIContext(), this.uiLanguage, BROWSER_QUICK_FILTERS[this.quickFilterIndex()].labelKey);
+    return this.sortLabel();
+  }
+
   @Builder
-  private viewChoice(label: string, group: string) {
+  private viewChoice(group: string) {
     Button() {
       Row({ space: 4 }) {
-        Text(label).fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary'))
+        Text(this.viewChoiceLabel(group)).fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary'))
           .layoutWeight(1).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
           .textAlign(TextAlign.Center)
         Polygon().width(8).height(5).points([[0, 0], [8, 0], [4, 5]])
@@ -1432,7 +1438,7 @@ export struct 浏览页 {
     .type(ButtonType.Normal).backgroundColor(Color.Transparent)
     .height(SelectStyle.controlHeight).padding({ left: 6, right: 6 }).borderRadius(0)
     .layoutWeight(1).enabled(!this.多选模式值 && this.阶段 === 'list')
-    .accessibilityText(label)
+    .accessibilityText(this.viewChoiceLabel(group))
     .attributeModifier(new PressFeedback())
     .stateEffect(false)
     .onClick((): void => { this.openViewMenu(group); })
@@ -1442,12 +1448,11 @@ export struct 浏览页 {
   private browserControls() {
     Row({ space: 应用尺寸.间距_8 }) {
       Row() {
-        this.viewChoice(this.浏览模式值 === 'cards' ? this.取本地化文案($r('app.string.browser_mode_cards')) :
-          this.取本地化文案($r('app.string.browser_mode_notes')), 'mode')
+        this.viewChoice('mode')
         Divider().vertical(true).height(16).strokeWidth(0.5).color(SurfaceBorder.color())
-        this.viewChoice(localizedNamedResourceText(this.getUIContext(), this.uiLanguage, BROWSER_QUICK_FILTERS[this.quickFilterIndex()].labelKey), 'filter')
+        this.viewChoice('filter')
         Divider().vertical(true).height(16).strokeWidth(0.5).color(SurfaceBorder.color())
-        this.viewChoice(this.sortLabel(), 'sort')
+        this.viewChoice('sort')
       }
       .id('browser-view-selector')
       .layoutWeight(7).height(SelectStyle.controlHeight)

@@ -13,6 +13,7 @@ export struct SettingsActionRow {
   @Prop icon: ResourceStr | undefined = undefined;
   @Prop trailingIcon: ResourceStr | undefined = undefined;
   @Prop isInteractive: boolean = true;
+  @Prop showDisclosure: boolean = true;
   @Prop showHelp: boolean = false;
   onHelp: () => void = (): void => {};
   onAction: () => void = (): void => {};
@@ -42,9 +43,9 @@ export struct SettingsActionRow {
         }
         this.hintContent()
       }.alignItems(HorizontalAlign.Start).layoutWeight(1)
-      if (this.trailingIcon === undefined) {
+      if (this.trailingIcon === undefined && this.showDisclosure) {
         DisclosureChevron({ tint: $r('app.color.text_secondary') })
-      } else {
+      } else if (this.trailingIcon !== undefined) {
         ActionIcon({ source: this.trailingIcon, glyphSize: 24 })
       }
     }.width('100%').constraintSize({ minHeight: this.hint === '' ? 48 : 58 })

@@ -2182,6 +2182,11 @@ struct 首页 {
     }
 
     DataTransferFeature({ state: this.transfer, session: this.transferSession,
+      onBrowseResult: (query: string): void => {
+        if (this.homeDisposed || this.transfer.phase !== 'idle') return;
+        const params: 浏览页参数 = { initialSearch: query, initialNotesMode: true };
+        this.页面栈.pushPath({ name: 'BrowserPage', param: params });
+      },
       deckOptions: this.导出牌组选项列表(), isDark: this.是否深色() })
 
     if (this.显示牌组选项) {

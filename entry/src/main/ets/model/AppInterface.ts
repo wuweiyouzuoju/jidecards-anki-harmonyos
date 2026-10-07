@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { FILTERED_DECK_ACTIONS } from './FilteredDeckCommands';
 import { CARD_FLAGS } from './CardMarking';
+import { IMPORT_RESULT_ACTIONS } from './ImportResults';
 import { DECK_OPTION_GROUPS } from './DeckOptionsCatalog';
 import type { NoteAudioStatus } from './NoteAudioDraft';
 import { NOTE_EDITOR_TOOLS, NOTE_EDITOR_COMMON_TOOL_IDS, NOTE_FIELD_EDITING_SUPPORT,
@@ -80,6 +81,12 @@ export const WHITEBOARD_INTERFACE_ITEMS: AppInterfaceItem[] = [
 
 /** 菜单直接遍历这里的条目；标签、顺序和显隐由 UI 与 JIDE 共用。 */
 export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
+  { id: 'import_results', titleKey: 'transfer_result_title', instructionsKey: 'transfer_result_browse_hint', parent: 'home',
+    items: IMPORT_RESULT_ACTIONS.map((item): AppInterfaceItem => ({ id: item.id, titleKey: item.titleKey,
+      opens: ['new', 'updated', 'duplicate'].includes(item.id) ? 'browser' : undefined,
+      condition: 'import_result_category' })).concat([
+      { id: 'previous', titleKey: 'transfer_result_previous' }, { id: 'next', titleKey: 'transfer_result_next' }
+    ]) },
   { id: 'note_editor_wheel', titleKey: 'note_editor_wheel_title', instructionsKey: 'note_editor_wheel_instructions',
     parent: 'edit_note_form', items: NOTE_EDITOR_TOOLS.map((tool): AppInterfaceItem => ({ id: tool.id,
       titleKey: tool.titleKey, iconKey: tool.iconKey,
