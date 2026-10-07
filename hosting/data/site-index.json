@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-10-07",
+  "origin": "https://jidecards.com",
+  "releaseVersion": "2.9.22",
+  "contentLanguage": "zh-CN",
+  "product": "https://jidecards.com/data/works.json",
+  "llms": "https://jidecards.com/llms.txt",
+  "fullText": "https://jidecards.com/llms-full.txt",
+  "releaseFeed": "https://jidecards.com/releases.xml",
+  "pages": [
+    {
+      "path": "/",
+      "title": "记得闪卡 JideCards",
+      "description": "记得闪卡是面向鸿蒙 HarmonyOS NEXT 的原生开源闪卡应用，基于 Anki 内核，用于背单词、记忆知识点与备考。根据记忆情况安排间隔复习，支持导入已有的 Anki 牌组、同步学习进度和备份学习资料。",
+      "markdown": "/content/home.md",
+      "url": "https://jidecards.com/",
+      "markdownUrl": "https://jidecards.com/content/home.md",
+      "updatedAt": "2026-10-07"
+    },
+    {
+      "path": "/works/jidecards/",
+      "title": "记得闪卡功能与下载",
+      "description": "记得闪卡是面向鸿蒙 HarmonyOS NEXT 的原生开源闪卡应用，基于 Anki 内核，用于背单词、记忆知识点与备考。根据记忆情况安排间隔复习，支持导入已有的 Anki 牌组、同步学习进度和备份学习资料。",
+      "markdown": "/content/product.md",
+      "url": "https://jidecards.com/works/jidecards/",
+      "markdownUrl": "https://jidecards.com/content/product.md",
+      "updatedAt": "2026-10-07"
+    },
+    {
+      "path": "/guides/harmonyos-anki/",
+      "title": "鸿蒙 HarmonyOS NEXT 使用 Anki 完整指南：闪卡、背单词、APKG、FSRS 与同步",
+      "description": "用记得闪卡 JideCards 在鸿蒙 HarmonyOS NEXT 上学习已有 Anki 牌组：选择 APKG 导入或 AnkiWeb 同步，理解 FSRS 评分、媒体同步与备份恢复，并排查常见迁移问题。",
+      "markdown": "/content/harmonyos-anki-guide.md",
+      "updatedAt": "2026-10-04",
+      "url": "https://jidecards.com/guides/harmonyos-anki/",
+      "markdownUrl": "https://jidecards.com/content/harmonyos-anki-guide.md"
+    },
+    {
+      "path": "/releases/",
+      "title": "2.9.22 更新说明",
+      "description": "当前版本的完整编号更新说明。",
+      "markdown": "/content/releases.md",
+      "url": "https://jidecards.com/releases/",
+      "markdownUrl": "https://jidecards.com/content/releases.md",
+      "updatedAt": "2026-10-07"
+    },
+    {
+      "path": "/developers/",
+      "title": "开发文档",
+      "description": "源码、模块责任、构建与验证入口。",
+      "markdown": "/content/developers.md",
+      "url": "https://jidecards.com/developers/",
+      "markdownUrl": "https://jidecards.com/content/developers.md",
+      "updatedAt": "2026-10-07"
+    },
+    {
+      "path": "/about/",
+      "title": "关于项目与作者",
+      "description": "可塑性天赋，记得闪卡开发者。",
+      "markdown": "/content/about.md",
+      "url": "https://jidecards.com/about/",
+      "markdownUrl": "https://jidecards.com/content/about.md",
+      "updatedAt": "2026-10-07"
+    }
+  ]
+}

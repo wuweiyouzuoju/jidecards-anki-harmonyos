@@ -1,0 +1,16 @@
+# 关于记得闪卡
+
+可塑性天赋，记得闪卡开发者。
+
+- 正式版：2.9.22
+- 源码版本：2.9.22（构建编号 3003）
+- 平台：HarmonyOS NEXT
+- 许可证：AGPL-3.0-or-later
+- 作者：[可塑性天赋](https://jidecards.com/about/)
+- 下载：[华为应用市场](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare)
+- 源码：[GitHub](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos) · [Gitee](https://gitee.com/wuweiyouzuoju/jidecards-anki-harmonyos) · [GitCode](https://gitcode.com/wuweiyouzuoju/jidecards-anki-harmonyos)
+- 更新日期：2026-10-07
+
+独立开源项目，非 Anki 官方客户端。
+
+[GitHub 作者主页](https://github.com/wuweiyouzuoju) · [问题反馈](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/issues)

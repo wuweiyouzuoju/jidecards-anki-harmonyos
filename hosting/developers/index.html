@@ -7,37 +7,45 @@
   <meta name="description" content="记得闪卡的源码、构建文档与 Agent 开发入口。">
   <meta name="author" content="可塑性天赋">
   <meta name="robots" content="index, follow, max-image-preview:large">
+  <meta name="theme-color" content="#f8f9ff">
   <link rel="canonical" href="https://jidecards.com/developers/">
-  <link rel="icon" href="/favicon.ico?v=20261001" sizes="16x16 32x32 48x48">
-  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=20261001">
-  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=20261001">
-  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=20261001">
-  <link rel="stylesheet" href="/styles.css?v=20261003">
+  <link rel="icon" href="/favicon.ico?v=89f691b5af21" sizes="16x16 32x32 48x48">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=89f691b5af21">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=89f691b5af21">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=89f691b5af21">
+  <link rel="stylesheet" href="/styles.css?v=899177f26fcb">
+  <link rel="alternate" type="text/plain" href="/llms-full.txt" title="完整项目资料">
+  <link rel="alternate" type="text/markdown" href="/content/developers.md" title="本页 Markdown">
+  <link rel="alternate" type="application/atom+xml" href="/releases.xml" title="版本更新订阅">
   <meta property="og:type" content="website">
   <meta property="og:locale" content="zh_CN">
   <meta property="og:site_name" content="记得闪卡 · jidecards">
   <meta property="og:title" content="开发文档｜记得闪卡">
   <meta property="og:description" content="记得闪卡的源码、构建文档与 Agent 开发入口。">
   <meta property="og:url" content="https://jidecards.com/developers/">
-  <meta property="og:image" content="https://jidecards.com/apple-touch-icon.png">
-  <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Person","@id":"https://jidecards.com/#author","name":"可塑性天赋","url":"https://jidecards.com/about/","sameAs":["https://github.com/wuweiyouzuoju"]},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"首页","item":"https://jidecards.com/"},{"@type":"ListItem","position":2,"name":"开发文档｜记得闪卡","item":"https://jidecards.com/developers/"}]}]}</script>
+  <meta property="og:image" content="https://jidecards.com/assets/jidecards-2.9.22-home.png">
+  <meta property="og:image:width" content="1080">
+  <meta property="og:image:height" content="1920">
+  <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Person","@id":"https://jidecards.com/#author","name":"可塑性天赋","url":"https://jidecards.com/about/","sameAs":["https://github.com/wuweiyouzuoju"]},{"@type":"Organization","@id":"https://jidecards.com/#project","name":"记得闪卡项目","url":"https://jidecards.com","logo":{"@type":"ImageObject","url":"https://jidecards.com/assets/jidecards-logo.png","width":1024,"height":1024}},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"首页","item":"https://jidecards.com/"},{"@type":"ListItem","position":2,"name":"开发文档","item":"https://jidecards.com/developers/"}]}]}</script>
 </head>
 <body>
   <a class="skip-link" href="#content">跳到正文</a>
-  <header class="site-header"><nav class="nav" aria-label="主导航">
-    <a class="brand" href="/">记得闪卡 <span>jidecards</span></a>
-    <div class="nav-links"><a href="/works/jidecards/#download">下载</a><a href="/works/jidecards/">功能</a><a href="/guides/harmonyos-anki/">指南</a><a href="/developers/" aria-current="page">开发</a><a href="/about/">作者</a><a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos">GitHub ↗</a></div>
+  <header class="site-header"><nav class="nav shell" aria-label="主导航">
+    <a class="brand" href="/"><img class="brand-logo" src="/assets/jidecards-logo.png?v=89f691b5af21" alt="记得闪卡 Logo" width="38" height="38"><span><strong>记得闪卡</strong><small>jidecards</small></span></a>
+    <div class="nav-links"><a href="/works/jidecards/">功能与下载</a><a href="/guides/harmonyos-anki/">使用指南</a><a href="/releases/">更新说明</a><a href="/developers/" aria-current="page">开发</a><a href="/about/">关于</a></div>
+    <a class="nav-source" href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos">GitHub <span aria-hidden="true">↗</span></a>
+    <details class="mobile-nav"><summary aria-label="展开导航"><span aria-hidden="true">☰</span><span>菜单</span></summary><div><a href="/works/jidecards/">功能与下载</a><a href="/guides/harmonyos-anki/">使用指南</a><a href="/releases/">更新说明</a><a href="/developers/" aria-current="page">开发</a><a href="/about/">关于</a><a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos">GitHub <span aria-hidden="true">↗</span></a></div></details>
   </nav></header>
-  <main id="content" class="wrap"><nav class="breadcrumb" aria-label="面包屑"><a href="/">首页</a><span aria-hidden="true">/</span><span aria-current="page">开发文档｜记得闪卡</span></nav><p class="eyebrow">开发</p><h1>开发文档</h1><p class="lede">项目优先服务 Agent 开发。</p><p>这里的 Agent 指参与仓库开发的编程 Agent。</p>
-    <dl class="feature-list link-list">
-      <div><dt>源码仓库</dt><dd><a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos">GitHub</a> · <a href="https://gitee.com/wuweiyouzuoju/jidecards-anki-harmonyos">Gitee</a> · <a href="https://gitcode.com/wuweiyouzuoju/jidecards-anki-harmonyos">GitCode</a></dd></div>
-      <div><dt>从这里开始</dt><dd><a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/main/AGENTS.md">开发约定</a> · <a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/main/PROJECT_CONTEXT.md">项目索引</a></dd></div>
-      <div><dt>构建与验证</dt><dd><a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/main/README.md">环境与构建</a> · <a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/main/docs/development/verification.md">验证命令</a></dd></div>
-      <div><dt>修改代码</dt><dd><a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/main/docs/development/ownership.md">模块边界</a> · <a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/main/docs/development/extension-points.md">扩展点</a></dd></div>
-      <div><dt>制作选择题卡</dt><dd><a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/main/docs/choice-authoring.md">制卡指南</a> · <a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/main/docs/choice-apkg-v1.md">APKG 扩展规范</a></dd></div>
-      <div><dt>JIDE 应用内助手</dt><dd><a href="/works/jidecards/#jide">JIDE：软件内的全能助手</a> · <a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/main/docs/development/agent.md">实现与验证</a>。当前 JIDE 为开发者调试功能，发布配置默认隐藏入口。需解锁并配置模型服务后使用；联网检索另需开启应用端联网并配置搜索凭据。具体能力以当前应用、工具与发布说明为准。 开发开关见 <a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/main/entry/src/main/ets/model/ReleaseFeatures.ets">ReleaseFeatures</a>。</dd></div>
-      <div><dt>机器读取</dt><dd><a href="/data/works.json">项目 JSON</a> · <a href="/llms-full.txt">纯文本资料</a> · <a href="/sitemap.xml">网站地图</a></dd></div>
-    </dl><p class="meta">ArkUI → Node-API → Rust / Anki Core。许可证：AGPL-3.0-or-later。</p></main>
-  <footer class="footer"><div class="wrap footer-inner"><a href="/about/">可塑性天赋</a><div><span><a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos">GitHub</a> · <a href="https://gitee.com/wuweiyouzuoju/jidecards-anki-harmonyos">Gitee</a> · <a href="https://gitcode.com/wuweiyouzuoju/jidecards-anki-harmonyos">GitCode</a></span><a href="/data/works.json">JSON</a><a href="/llms.txt">llms.txt</a><span>AGPL-3.0-or-later</span></div></div></footer>
+  <main id="content" class="shell "><nav class="breadcrumb" aria-label="面包屑"><a href="/">首页</a><span aria-hidden="true">/</span><span>开发文档</span></nav><header class="page-heading"><p class="eyebrow">源码与协作</p><h1>一起把记得闪卡做好。</h1><p class="lede">项目优先服务 Agent 开发。</p></header><p>这里的 Agent 指参与仓库开发的编程 Agent。源码与当前开发文档是理解应用能力、模块边界和验证要求的入口。</p>
+    <div class="developer-grid"><section class="developer-card"><p class="eyebrow">01 · 开始</p><h2>了解项目</h2><ul><li><a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/main/AGENTS.md">开发约定 <span aria-hidden="true">↗</span></a></li><li><a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/main/PROJECT_CONTEXT.md">项目索引 <span aria-hidden="true">↗</span></a></li><li><a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/main/README.md">环境与构建 <span aria-hidden="true">↗</span></a></li></ul></section><section class="developer-card"><p class="eyebrow">02 · 修改</p><h2>找准责任入口</h2><ul><li><a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/main/docs/development/ownership.md">模块责任与边界 <span aria-hidden="true">↗</span></a></li><li><a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/main/docs/development/extension-points.md">扩展点 <span aria-hidden="true">↗</span></a></li><li><a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/main/docs/development/task-contract.md">任务契约 <span aria-hidden="true">↗</span></a></li></ul></section><section class="developer-card"><p class="eyebrow">03 · 验证</p><h2>提交可验证的改进</h2><ul><li><a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/main/docs/development/verification.md">验证命令与范围 <span aria-hidden="true">↗</span></a></li><li><a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/main/docs/choice-authoring.md">选择题制卡指南 <span aria-hidden="true">↗</span></a></li><li><a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/main/docs/choice-apkg-v1.md">APKG 扩展规范 <span aria-hidden="true">↗</span></a></li></ul></section></div>
+    <section><h2>源码仓库</h2><div class="repository-links"><a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos">GitHub <span aria-hidden="true">↗</span></a><a href="https://gitee.com/wuweiyouzuoju/jidecards-anki-harmonyos">Gitee <span aria-hidden="true">↗</span></a><a href="https://gitcode.com/wuweiyouzuoju/jidecards-anki-harmonyos">GitCode <span aria-hidden="true">↗</span></a></div><p class="meta">ArkUI → Node-API → Rust / Anki Core。许可证：AGPL-3.0-or-later。</p></section>
+    <section><h2>JIDE 应用内助手</h2><p>当前 JIDE 为开发者调试功能，发布配置默认隐藏入口。需解锁并配置模型服务后使用；联网检索另需开启应用端联网并配置搜索凭据。具体能力以当前应用、工具与发布说明为准。</p><p><a href="/works/jidecards/#jide">JIDE：软件内的全能助手</a> · <a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/main/docs/development/agent.md">实现与验证 <span aria-hidden="true">↗</span></a> · <a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/main/entry/src/main/ets/model/ReleaseFeatures.ets">ReleaseFeatures <span aria-hidden="true">↗</span></a></p></section>
+    <section class="machine-section" id="machine-readable"><h2>AI 与爬虫读取入口</h2><p>网站正文在构建时输出为完整 HTML；功能、版本、适用平台、更新说明和能力边界同时提供 Markdown 与 JSON。所有访问者读取同一套内容。</p><dl class="feature-list"><div><dt>资料索引</dt><dd><a href="/llms.txt">llms.txt</a> · <a href="/data/site-index.json">页面与 Markdown 清单</a></dd></div><div><dt>完整资料</dt><dd><a href="/llms-full.txt">llms-full.txt</a> · <a href="/content/product.md">产品 Markdown</a> · <a href="/content/harmonyos-anki-guide.md">指南 Markdown</a></dd></div><div><dt>结构化事实</dt><dd><a href="/data/works.json">产品 JSON</a> · <a href="/sitemap.xml">网站地图</a> · <a href="/releases.xml">版本更新订阅</a></dd></div></dl></section></main>
+  <footer class="footer"><div class="shell"><div class="footer-grid">
+    <div class="footer-brand"><a class="brand" href="/"><img class="brand-logo" src="/assets/jidecards-logo.png?v=89f691b5af21" alt="记得闪卡 Logo" width="38" height="38"><span><strong>记得闪卡</strong><small>每天记得，记得闪卡</small></span></a><p>HarmonyOS NEXT 原生开源闪卡应用。</p><p>正式版 2.9.22 · AGPL-3.0-or-later</p></div>
+    <nav aria-label="产品与文档"><h2>产品与文档</h2><a href="/works/jidecards/#download">免费下载</a><a href="/works/jidecards/">功能介绍</a><a href="/guides/harmonyos-anki/">使用指南</a><a href="/releases/">更新说明</a></nav>
+    <nav aria-label="开源项目"><h2>开源项目</h2><a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos">GitHub <span aria-hidden="true">↗</span></a><a href="https://gitee.com/wuweiyouzuoju/jidecards-anki-harmonyos">Gitee <span aria-hidden="true">↗</span></a><a href="https://gitcode.com/wuweiyouzuoju/jidecards-anki-harmonyos">GitCode <span aria-hidden="true">↗</span></a><a href="/developers/">开发文档</a><a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/issues">问题反馈 <span aria-hidden="true">↗</span></a></nav>
+    <nav aria-label="机器可读资料"><h2>机器可读资料</h2><a href="/llms.txt">llms.txt · 索引</a><a href="/llms-full.txt">llms-full.txt · 完整资料</a><a href="/data/site-index.json">页面与内容 JSON</a><a href="/data/works.json">产品数据 JSON</a><a href="/sitemap.xml">网站地图</a></nav>
+  </div><div class="footer-bottom"><p>由 <a href="/about/">可塑性天赋</a> 开发 · 独立开源项目，非 Anki 官方客户端。</p><a href="/releases.xml">订阅版本更新 <span aria-hidden="true">↗</span></a></div></div></footer>
 </body>
 </html>
