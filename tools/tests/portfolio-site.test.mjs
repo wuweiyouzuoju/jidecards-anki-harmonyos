@@ -4,10 +4,11 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import test from 'node:test';
 import JSON5 from 'json5';
+import { createHash } from 'node:crypto';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const read = file => readFile(path.join(root, 'hosting', file), 'utf8');
-const pages = ['index.html', 'works/jidecards/index.html', 'guides/harmonyos-anki/index.html', 'developers/index.html', 'about/index.html', '404.html'];
+const pages = ['index.html', 'works/jidecards/index.html', 'guides/harmonyos-anki/index.html', 'releases/index.html', 'developers/index.html', 'about/index.html', '404.html'];
 const data = JSON.parse(await read('data/works.json'));
 const work = data.works[0];
 
@@ -35,7 +36,7 @@ test('release facts stay consistent across human and machine entry points', asyn
     assert.ok(content.includes(data.author.name), file);
   }
   for (const file of [...pages, 'data/works.json', 'llms.txt', 'llms-full.txt']) {
-    assert.doesNotMatch(await read(file), /无为又作局|无谓又左|2\.0\.0|3\.0\.0|jideyanggeqi\.cn|超/, file);
+    assert.doesNotMatch(await read(file), /无为又作局|无谓又左|2\.0\.0|3\.0\.0|2\.9\.6|jideyanggeqi\.cn|超/, file);
   }
 });
 
@@ -55,7 +56,8 @@ test('source updates match application metadata and remain separate from marketp
   const graph = JSON.parse(product.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1])['@graph'];
   assert.equal(graph.find(item => item['@type'] === 'SoftwareApplication').softwareVersion, work.releaseVersion);
   assert.equal(graph.find(item => item['@type'] === 'SoftwareSourceCode').version, work.sourceVersion);
-  assert.ok(product.includes('商店下载版本以应用市场为准'));
+  assert.ok(product.includes(`正式版 ${work.releaseVersion}`));
+  assert.ok(work.releaseVersionSource.includes('作者'));
 });
 
 test('home offers separate entry points while development policy stays on its own page', async () => {
@@ -90,7 +92,7 @@ test('crawler files include every canonical public page', async () => {
   assert.match(robots, /^Allow: \/$/m);
   assert.match(robots, /^Sitemap: https:\/\/jidecards\.com\/sitemap\.xml$/m);
   const sitemap = await read('sitemap.xml');
-  for (const route of ['/', '/works/jidecards/', '/guides/harmonyos-anki/', '/developers/', '/about/']) {
+  for (const route of ['/', '/works/jidecards/', '/guides/harmonyos-anki/', '/releases/', '/developers/', '/about/']) {
     assert.ok(sitemap.includes(`<loc>https://jidecards.com${route}</loc>`));
   }
   assert.match(await read('404.html'), /content="noindex"/);
@@ -146,4 +148,88 @@ test('existing app data endpoints retain their contracts', async () => {
   assert.equal(announcement.schemaVersion, 1);
   assert.equal(cloudDecks.schemaVersion, 1);
   assert.ok(Array.isArray(cloudDecks.decks));
+});
+
+test('shared navigation and home expose the real application logo with fresh asset keys', async () => {
+  const actual = await readFile(path.join(root, 'hosting', work.brand.logo));
+  const expected = await readFile(path.join(root, 'AppScope/resources/base/media/app_icon.png'));
+  assert.deepEqual(actual, expected);
+  const digest = bytes => createHash('sha256').update(bytes).digest('hex').slice(0, 12);
+  const cssHash = digest(await readFile(path.join(root, 'hosting/styles.css')));
+  const logoHash = digest(actual);
+  for (const file of pages) {
+    const html = await read(file);
+    assert.ok(html.includes(`src="${work.brand.logo}?v=${logoHash}"`), file);
+    assert.ok(html.includes(`/styles.css?v=${cssHash}`), file);
+    assert.match(html, /<img class="brand-logo"[^>]+alt="记得闪卡 Logo"/);
+  }
+  assert.match(await read('index.html'), /<img class="hero-logo"[^>]+alt="记得闪卡应用 Logo"/);
+});
+
+test('author-supplied current media replace retired screenshots in HTML, metadata and AI text', async () => {
+  const product = await read('works/jidecards/index.html');
+  const markdown = await read('content/product.md');
+  const full = await read('llms-full.txt');
+  for (const item of work.screenshots) {
+    const bytes = await readFile(path.join(root, 'hosting', item.path));
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), item.sha256);
+    assert.equal(item.releaseVersion, work.releaseVersion);
+    assert.equal(bytes.readUInt32BE(16), item.width);
+    assert.equal(bytes.readUInt32BE(20), item.height);
+    for (const source of [product, markdown, full]) {
+      assert.ok(source.includes(item.path));
+      assert.ok(source.includes(item.description));
+    }
+  }
+  for (const file of [...pages, 'data/works.json', 'llms.txt', 'llms-full.txt', 'content/product.md']) {
+    assert.doesNotMatch(await read(file), /assets\/app-(?:preview|deck|study|statistics|settings|reminders|introduction)/, file);
+  }
+  assert.match(await read('.assetsignore'), /assets\/app-\*\.png/);
+});
+
+test('HTML, per-page Markdown, llms and JSON share complete crawlable content', async () => {
+  const index = JSON.parse(await read('data/site-index.json'));
+  assert.equal(index.releaseVersion, work.releaseVersion);
+  assert.equal(index.contentLanguage, 'zh-CN');
+  const llms = await read('llms.txt');
+  const full = await read('llms-full.txt');
+  const sitemap = await read('sitemap.xml');
+  assert.deepEqual(index.pages.map(item => item.path).sort(), pages.filter(file => file !== '404.html').map(file => `/${file.replace(/index\.html$/, '')}`).sort());
+  for (const item of index.pages) {
+    const html = await read(`${item.path.slice(1)}index.html`);
+    const markdown = await read(item.markdown.slice(1));
+    assert.ok(llms.includes(item.markdownUrl));
+    assert.ok(sitemap.includes(item.url));
+    assert.match(markdown, /^# /);
+    assert.ok(html.includes(`type="text/markdown" href="${item.markdown}"`));
+    assert.doesNotMatch(html, /<script(?![^>]*type="application\/ld\+json")/);
+  }
+  for (const item of work.detailSections) {
+    for (const paragraph of [...item.paragraphs, ...(item.availability ? [item.availability] : [])]) {
+      assert.ok(full.includes(paragraph));
+      assert.ok((await read('content/product.md')).includes(paragraph));
+    }
+  }
+  const guide = JSON.parse(await read('data/harmonyos-anki-guide.json'));
+  for (const section of guide.sections) {
+    for (const paragraph of [...(section.paragraphs ?? []), ...(section.steps ?? []), ...(section.after ?? [])]) {
+      assert.ok(full.includes(paragraph));
+      assert.ok((await read('content/harmonyos-anki-guide.md')).includes(paragraph));
+    }
+  }
+});
+
+test('release pages and Atom contain every numbered note and preserve the existing update anchor', async () => {
+  const release = await read('releases/index.html');
+  const markdown = await read('content/releases.md');
+  const feed = await read('releases.xml');
+  const product = await read('works/jidecards/index.html');
+  assert.ok(product.includes('id="source-update"'));
+  assert.match(release, /<ol class="release-list">/);
+  assert.match(feed, /<feed xmlns="http:\/\/www\.w3\.org\/2005\/Atom">/);
+  for (const [index, change] of work.sourceUpdate.changes.entries()) {
+    assert.ok(release.includes(change));
+    assert.ok(markdown.includes(`${index + 1}. ${change}`));
+    assert.ok(feed.includes(change));
+  }
 });
