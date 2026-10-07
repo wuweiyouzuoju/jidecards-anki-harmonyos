@@ -27,13 +27,26 @@ export function createLayout(content) {
     '@type': 'SoftwareApplication', '@id': `${origin}/#app`, name: work.name, alternateName: work.alternateName,
     url: work.url, operatingSystem: work.platform, applicationCategory: 'EducationalApplication',
     softwareVersion: work.releaseVersion, description: work.summary, author: { '@id': `${origin}/#author` },
+    publisher: { '@id': `${origin}/#project` }, sameAs: [work.marketplace.url],
+    subjectOf: { '@id': `${origin}/#source` },
     downloadUrl: work.marketplace.url, installUrl: work.marketplace.url,
     image: `${origin}${work.brand.logo}`, screenshot: work.screenshots.map(item => ({ '@type': 'ImageObject', url: `${origin}${item.path}`, caption: item.caption, description: item.description, width: item.width, height: item.height })),
     isAccessibleForFree: work.marketplace.price === 0,
     offers: { '@type': 'Offer', price: work.marketplace.price, priceCurrency: work.marketplace.priceCurrency, url: work.marketplace.url },
     featureList: work.features, license: 'https://spdx.org/licenses/AGPL-3.0-or-later.html'
   };
-  const sourceCode = { '@type': 'SoftwareSourceCode', name: 'jidecards', version: work.sourceVersion, dateModified: work.sourceUpdate.updatedAt, codeRepository: repositories.map(item => item.url), programmingLanguage: ['ArkTS', 'Rust', 'C++'], license: 'https://spdx.org/licenses/AGPL-3.0-or-later.html' };
+  const sourceCode = {
+    '@type': 'SoftwareSourceCode', '@id': `${origin}/#source`, name: 'jidecards', url: repo,
+    version: work.sourceVersion, dateModified: work.sourceUpdate.updatedAt,
+    author: { '@id': `${origin}/#author` }, publisher: { '@id': `${origin}/#project` },
+    targetProduct: { '@id': application['@id'] },
+    codeRepository: repositories.map(item => item.url), sameAs: work.repositoryMirrors.map(item => item.url),
+    programmingLanguage: ['ArkTS', 'Rust', 'C++'], license: 'https://spdx.org/licenses/AGPL-3.0-or-later.html'
+  };
+  const website = {
+    '@type': 'WebSite', '@id': `${origin}/#website`, name: '记得闪卡 · jidecards', url: origin,
+    publisher: { '@id': `${origin}/#project` }, about: { '@id': application['@id'] }, inLanguage: 'zh-CN'
+  };
   const nav = [['/works/jidecards/', '功能与下载'], [guide.pathname, '使用指南'], ['/releases/', '更新说明'], ['/developers/', '开发'], ['/about/', '关于']];
   function page({ title, description, pathname, body, graph = [], noindex = false, breadcrumbTitle = title, ogType = 'website', markdown = null, className = '' }) {
     const navLinks = nav.map(([url, label]) => `<a href="${url}"${url === pathname ? ' aria-current="page"' : ''}>${label}</a>`).join('');
@@ -42,7 +55,9 @@ export function createLayout(content) {
     const heroImage = work.screenshots[0];
     const structured = { '@context': 'https://schema.org', '@graph': [
       { '@type': 'Person', '@id': `${origin}/#author`, name: author.name, url: author.url, sameAs: [author.github] },
-      { '@type': 'Organization', '@id': `${origin}/#project`, name: '记得闪卡项目', url: origin, logo: { '@type': 'ImageObject', url: `${origin}${work.brand.logo}`, width: work.brand.width, height: work.brand.height } },
+      { '@type': 'Organization', '@id': `${origin}/#project`, name: '记得闪卡项目', url: origin, sameAs: repositories.map(item => item.url), logo: { '@type': 'ImageObject', url: `${origin}${work.brand.logo}`, width: work.brand.width, height: work.brand.height } },
+      website, application, sourceCode,
+      { '@type': 'WebPage', '@id': `${origin}${pathname}#webpage`, url: `${origin}${pathname}`, name: title, description, inLanguage: 'zh-CN', isPartOf: { '@id': website['@id'] }, about: { '@id': application['@id'] } },
       ...graph, ...breadcrumb
     ] };
     return `<!doctype html>
@@ -96,5 +111,5 @@ export function createLayout(content) {
 </html>
 `;
   }
-  return { page, logo, download, repoLinks, sourceLink, application, sourceCode };
+  return { page, logo, download, repoLinks, sourceLink };
 }

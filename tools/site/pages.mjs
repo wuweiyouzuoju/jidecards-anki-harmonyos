@@ -3,7 +3,7 @@ import { esc, paragraphs, questions, icon, arrow } from './layout.mjs';
 
 export function renderPages(content, layout) {
   const { data, work, guide, origin } = content;
-  const { page, logo, download, repoLinks, sourceLink, application, sourceCode } = layout;
+  const { page, logo, download, repoLinks, sourceLink } = layout;
   const jide = work.detailSections.find(section => section.id === 'jide');
   const changes = `<ol class="release-list">${work.sourceUpdate.changes.map(change => `<li>${esc(change)}</li>`).join('\n')}</ol>`;
   const featureList = items => `<dl class="feature-list">${items.map(item => `<div><dt>${esc(item.name)}</dt><dd>${esc(item.description)}</dd></div>`).join('\n')}</dl>`;
@@ -17,7 +17,6 @@ export function renderPages(content, layout) {
   const featureTargets = ['fsrs', 'card-types', 'ankiweb', 'apkg', 'organization', 'appearance'];
   const home = page({
     title: work.seo.homeTitle, description: work.summary, pathname: '/', markdown: '/content/home.md',
-    graph: [{ '@type': 'WebSite', name: '记得闪卡 · jidecards', url: origin, publisher: { '@id': `${origin}/#project` } }, application, sourceCode],
     className: 'home',
     body: `<section class="hero" aria-labelledby="hero-title"><div class="hero-identity">${logo('hero-logo', 220, '记得闪卡应用 Logo')}<p>JideCards</p></div><div class="hero-copy">
       <p class="eyebrow">${esc(work.platform)} · 原生开源闪卡</p><h1 id="hero-title">${esc(work.brand.headline[0])}<br><span>${esc(work.brand.headline[1])}</span></h1>
@@ -43,7 +42,7 @@ export function renderPages(content, layout) {
   const productSections = work.detailSections.map(section => `<section id="${esc(section.id)}"><h2>${esc(section.title)}</h2>${paragraphs(section.paragraphs)}${section.availability ? `<p class="note">${esc(section.availability)}</p>` : ''}${section.items ? questions(section.items) : ''}</section>`).join('\n');
   const product = page({
     title: work.seo.productTitle, description: work.summary, pathname: '/works/jidecards/', breadcrumbTitle: '功能与下载', markdown: '/content/product.md',
-    graph: [application, sourceCode, { '@type': 'FAQPage', mainEntity: work.questions.map(item => ({ '@type': 'Question', name: item.name, acceptedAnswer: { '@type': 'Answer', text: item.description } })) }],
+    graph: [{ '@type': 'FAQPage', mainEntity: work.questions.map(item => ({ '@type': 'Question', name: item.name, acceptedAnswer: { '@type': 'Answer', text: item.description } })) }],
     body: `${pageHeader('JideCards · HarmonyOS NEXT', '记得闪卡', work.summary)}<div class="product-intro"><div>${logo('product-logo', 96, '记得闪卡应用 Logo')}<p class="version-pill">正式版 ${esc(work.releaseVersion)}</p></div><div id="download"><h2>开始使用记得闪卡</h2>${download}</div></div>
     <nav class="page-toc" aria-label="功能目录"><a href="#features">功能概览</a><a href="#screenshots">新版应用展示</a><a href="#source-update">版本更新</a>${work.detailSections.map(section => `<a href="#${esc(section.id)}">${esc(section.title.split('：')[0])}</a>`).join('')}<a href="#questions">常见问题</a></nav>
     <section id="learning"><h2>在鸿蒙端用闪卡学习</h2>${featureList(work.useCases)}</section>
@@ -60,7 +59,7 @@ export function renderPages(content, layout) {
   const guideSections = guide.sections.map(section => `<section id="${esc(section.id)}"><h2>${esc(section.title)}</h2>${paragraphs(section.paragraphs)}${section.table ? `<div class="table-wrap"><table><thead><tr>${section.table.headers.map(header => `<th scope="col">${esc(header)}</th>`).join('')}</tr></thead><tbody>${section.table.rows.map(row => `<tr>${row.map(cell => `<td>${esc(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>` : ''}${section.steps ? `<ol class="steps">${section.steps.map(step => `<li>${esc(step)}</li>`).join('')}</ol>` : ''}${section.items ? questions(section.items) : ''}${paragraphs(section.after)}</section>`).join('\n');
   const guidePage = page({
     title: `${guide.title}｜记得闪卡`, description: guide.description, pathname: guide.pathname, breadcrumbTitle: guide.navTitle, ogType: 'article', markdown: '/content/harmonyos-anki-guide.md', className: 'guide-page',
-    graph: [application, { '@type': 'TechArticle', '@id': `${origin}${guide.pathname}#article`, headline: guide.title, description: guide.description, dateModified: guide.updatedAt, inLanguage: 'zh-CN', author: { '@id': `${origin}/#author` }, about: { '@id': `${origin}/#app` }, mainEntityOfPage: `${origin}${guide.pathname}` }],
+    graph: [{ '@type': 'TechArticle', '@id': `${origin}${guide.pathname}#article`, headline: guide.title, description: guide.description, dateModified: guide.updatedAt, inLanguage: 'zh-CN', author: { '@id': `${origin}/#author` }, about: { '@id': `${origin}/#app` }, mainEntityOfPage: `${origin}${guide.pathname}` }],
     body: `${pageHeader('使用指南 · HarmonyOS NEXT', guide.title, guide.intro)}<p class="meta">作者：${esc(data.author.name)} · 更新于 <time datetime="${guide.updatedAt}">${guide.updatedAt}</time></p>
     <div class="document-layout"><aside><nav class="toc" aria-label="文章目录"><h2>阅读目录</h2><ol>${guide.sections.map(section => `<li><a href="#${esc(section.id)}">${esc(section.title)}</a></li>`).join('\n')}</ol><a class="markdown-link" href="/content/harmonyos-anki-guide.md">阅读 Markdown ${arrow}</a></nav></aside><article class="guide">${guideSections}
     <section id="references"><h2>进一步阅读与反馈</h2><ul>${guide.references.map(reference => `<li><a href="${esc(reference.url)}">${esc(reference.title)} ${arrow}</a></li>`).join('')}<li>${sourceLink('README.md', '记得闪卡源码与功能说明')}</li><li>源码仓库：${repoLinks}</li><li><a href="${esc(work.repository)}/issues">记得闪卡问题反馈 ${arrow}</a></li></ul><p class="meta">本文结合项目公开说明与 Anki 官方手册整理。界面与具体选项以当前正式版为准。记得闪卡是独立开源项目，非 Anki 官方客户端。</p></section>
@@ -78,7 +77,7 @@ export function renderPages(content, layout) {
 
   const release = page({
     title: `${work.releaseVersion} 更新说明｜记得闪卡`, description: `记得闪卡 ${work.releaseVersion} 的编辑器、牌组、学习、白板、统计和 JIDE 更新说明。`, pathname: '/releases/', breadcrumbTitle: '更新说明', markdown: '/content/releases.md', ogType: 'article',
-    graph: [application, sourceCode, { '@type': 'TechArticle', headline: `记得闪卡 ${work.releaseVersion} 更新说明`, dateModified: work.sourceUpdate.updatedAt, author: { '@id': `${origin}/#author` }, mainEntityOfPage: `${origin}/releases/` }],
+    graph: [{ '@type': 'TechArticle', headline: `记得闪卡 ${work.releaseVersion} 更新说明`, dateModified: work.sourceUpdate.updatedAt, author: { '@id': `${origin}/#author` }, mainEntityOfPage: `${origin}/releases/` }],
     body: `${pageHeader('版本更新', `${work.releaseVersion} 更新说明`, '完善制卡工具、学习体验与日常管理。')}<p class="release-meta"><span class="version-pill">正式版 ${esc(work.releaseVersion)}</span><time datetime="${work.sourceUpdate.updatedAt}">${work.sourceUpdate.updatedAt}</time><a href="/content/releases.md">Markdown</a><a href="/releases.xml">订阅更新</a></p><article class="release-article" id="release-${work.releaseVersion.replaceAll('.', '-')}">${changes}</article><section class="guide-entry"><h2>继续你的学习</h2>${download}<a href="/works/jidecards/">了解完整功能 <span aria-hidden="true">→</span></a></section>`
   });
 
