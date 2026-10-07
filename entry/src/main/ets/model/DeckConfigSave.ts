@@ -18,7 +18,7 @@ export function deckConfigUseCount(view: DeckConfigsForUpdateView, configId: num
 }
 
 /**
- * 按显式范围保存：UI 默认更新共享预设，单牌组提案按需隔离。
+ * 默认按牌组隔离预设修改；显式选择共享时才更新原预设。
  * Invariants: 原配置不变；无修改不分离；ID 1 留给未来新牌组；ID 0 由后端原子创建并绑定。
  */
 export function prepareDeckConfigForSave(view: DeckConfigsForUpdateView, original: DeckConfig,

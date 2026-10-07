@@ -144,7 +144,10 @@ export struct 牌组选项面板 {
       controlsComplete: false,
       values: [{ id: 'simple_mode', value: String(this.简洁模式) },
         { id: 'has_error', value: String(this.errorMessage !== '' || this.submitError !== '') },
-        { id: 'save_behavior', value: 'manual' }, { id: 'nested_overlay_open', value: String(this.showHelp) }] });
+        { id: 'save_behavior', value: 'manual' },
+        { id: 'save_scope', value: this.options.applyToSharedDecks ? 'preset' : 'deck' },
+        { id: 'preset_use_count', value: String(this.options.sharedDeckCount) },
+        { id: 'nested_overlay_open', value: String(this.showHelp) }] });
   }
 
   // ========================================================
@@ -423,12 +426,22 @@ export struct 牌组选项面板 {
   private presetName(): string { return this.presets.find((entry: DeckOptionsPresetEntry): boolean => entry.key === this.presetKey)?.config.name ?? ''; }
   private defaultPresetSelected(): boolean { return this.presets.find((entry: DeckOptionsPresetEntry): boolean => entry.key === this.presetKey)?.config.id === 1; }
   private validatePresetName(value: string): string { return value.trim() === '' ? namedResourceText(this.getUIContext(), 'deck_preset_name_required') : ''; }
+  private changeSaveScope(value: string): void {
+    if (this.busy || this.showHelp) return;
+    this.options.applyToSharedDecks = value === 'preset';
+    this.publishInterface();
+  }
   @Builder
   private presetOptions() {
     Column({ space: 应用尺寸.间距_12 }) {
       DeckOptionField({ title: $r('app.string.deck_preset_label'), help: $r('app.string.deck_preset_help'), value: this.presetKey,
         choices: this.presetChoices(), busy: this.busy, onChange: (value: string): void => this.onPreset('select', value) })
-      Text($r('app.string.deck_preset_scope_hint', this.options.sharedDeckCount)).fontSize(14).fontColor($r('app.color.text_secondary')).width('100%')
+      DeckOptionField({ title: this.interfaceLabel('save_scope'), help: $r('app.string.deck_apply_shared_help'),
+        value: this.options.applyToSharedDecks ? 'preset' : 'deck', busy: this.busy,
+        choices: [{ label: $r('app.string.deck_scope_deck'), value: 'deck' }, { label: $r('app.string.deck_scope_preset'), value: 'preset' }],
+        onChange: (value: string): void => this.changeSaveScope(value) })
+      Text(this.options.applyToSharedDecks ? $r('app.string.deck_preset_scope_hint', this.options.sharedDeckCount) :
+        $r('app.string.deck_save_scope_current')).fontSize(14).fontColor($r('app.color.text_secondary')).width('100%')
       DeckOptionField({ title: $r('app.string.deck_preset_rename'), help: $r('app.string.deck_preset_help'), value: this.presetName(),
         busy: this.busy, validate: (value: string): string => this.validatePresetName(value), onChange: (value: string): void => this.onPreset('rename', value) })
       DeckOptionField({ title: $r('app.string.deck_preset_create'), help: $r('app.string.deck_preset_help'), value: '',

@@ -67,7 +67,7 @@ function 解析保留率(输入文本: string): number | null { const 去除空�
 @Observed
 export class 牌组选项编辑 {
   sharedDeckCount: number = 0;
-  applyToSharedDecks: boolean = true;
+  applyToSharedDecks: boolean = false;
   保存模式: number = 0;
   复习限额文本: string = '';
   新卡限额文本: string = '';

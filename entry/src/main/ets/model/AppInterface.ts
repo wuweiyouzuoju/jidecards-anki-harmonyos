@@ -159,6 +159,7 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'learnSteps', titleKey: 'deck_learnSteps_label', condition: 'simple_mode' },
     { id: 'reviewOrder', titleKey: 'deck_reviewOrder_label', condition: 'simple_mode' },
     { id: 'preset', titleKey: 'deck_preset_label', fullOnly: true },
+    { id: 'save_scope', titleKey: 'deck_scope_label', fullOnly: true },
     { id: 'rename_preset', titleKey: 'deck_preset_rename', fullOnly: true },
     { id: 'create_preset', titleKey: 'deck_preset_create', fullOnly: true },
     { id: 'clone_preset', titleKey: 'deck_preset_clone', fullOnly: true },

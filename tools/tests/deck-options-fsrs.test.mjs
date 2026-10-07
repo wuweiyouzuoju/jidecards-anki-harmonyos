@@ -66,7 +66,7 @@ test('departed evaluation cannot start after a pending history read',async()=>{
  gate.resolve({included:0,total:6});await work;assert.equal(evaluations,0);assert.equal(h.states.length,count);
 });
 
-test('current preset optimization consumes the edited draft, stages without writes, then saves the shared preset as in Anki',async()=>{
+test('current preset optimization consumes the edited draft and saves to an isolated preset by default',async()=>{
   const h=harness(); await h.session.load();
   const form=牌组配置表单.从配置创建(h.current.config),options=牌组选项编辑.从视图创建(null,true,true,true,true);
   form.每日新卡数文本='15'; form.重学步骤文本='1 10'; form.设置文本字段('ignoreRevlogsBeforeDate','2026-01-02');
@@ -78,7 +78,7 @@ test('current preset optimization consumes the edited draft, stages without writ
   form.设置浮点数组字段('fsrsParams6',result.join(' '));
   const saved=prepareDeckOptionsDraft(h.current,form,options);
   await h.session.save(saved.config,saved.shared,saved.options);
-  assert.equal(h.writes[0].configs[0].id,1); assert.equal(h.writes[0].configs[0].config.newPerDay,15);
+  assert.equal(h.writes[0].configs[0].id,0); assert.equal(h.writes[0].configs[0].config.newPerDay,15);
   assert.deepEqual(h.writes[0].configs[0].config.preserved,h.current.config.preserved);
   assert.deepEqual(h.current.config.fsrsParams6,[]); assert.equal(h.committed(),1);
 });

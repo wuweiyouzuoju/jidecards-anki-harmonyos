@@ -93,13 +93,11 @@ function saveHarness(id = 1, useCount = 2) {
   const form = 牌组配置表单.从配置创建(original.config);
   const options = 牌组选项编辑.从视图创建(view.currentDeck.limits, true, true, true, true);
   options.sharedDeckCount = deckConfigUseCount(view, id);
-  // Retain coverage for the explicit isolation policy; the UI now edits shared presets by default.
-  options.applyToSharedDecks = false;
   assert.deepEqual(form.校验(), []);
   return { state, original, view, form, options, calls };
 }
 
-test('explicit isolation creates a new config bound only to the selected deck', async () => {
+test('default editing creates a new config bound only to the selected deck', async () => {
   const { state, original, form, options, calls } = saveHarness(42, 3);
   const before = encodeDeckConfig(original);
   form.每日新卡数文本 = '10';
@@ -142,7 +140,7 @@ test('an existing independent preset is reused on subsequent edits', async () =>
   assert.equal(calls[0].configs[0].config.reviewsPerDay, 100);
 });
 
-test('explicit shared editing updates the shared preset while limits stay deck-specific', async () => {
+test('explicit shared editing updates the shared preset while each new panel defaults to deck scope', async () => {
   const { state, form, options, calls } = saveHarness(42, 2);
   options.applyToSharedDecks = true;
   options.今日新卡文本 = '5';
@@ -154,7 +152,7 @@ test('explicit shared editing updates the shared preset while limits stay deck-s
   assert.equal(calls[0].limits.newToday, 5);
   assert.equal(calls[0].targetDeckId, 10);
   assert.equal(calls[0].mode, 0);
-  assert.equal(牌组选项编辑.从视图创建(null, false, false, false, false).applyToSharedDecks, true);
+  assert.equal(牌组选项编辑.从视图创建(null, false, false, false, false).applyToSharedDecks, false);
 });
 
 test('unchanged saves, reverted edits and deck-limit-only saves do not create presets', async () => {
