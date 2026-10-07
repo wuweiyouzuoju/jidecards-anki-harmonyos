@@ -52,6 +52,7 @@ import { 牌组配置表单 } from '../model/牌组配置表单';
 import { 牌组选项编辑 } from '../model/牌组选项编辑';
 import { 字段帮助面板 } from './字段帮助面板';
 import { 高级牌组选项面板 } from './高级牌组选项面板';
+import type { DeckOptionDefaultValue } from '../model/DeckOptionsDefaults';
 import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时长';
 import type { 校验问题 } from '../model/牌组配置表单';
 
@@ -85,7 +86,7 @@ export struct 牌组选项面板 {
   @Prop presets: DeckOptionsPresetEntry[] = [];
   @Prop presetKey: string = '';
   @Prop presetAssignmentsChanged: boolean = false;
-  @Prop defaults: DeckConfigSettings | null = null;
+  @Prop defaultValues: DeckOptionDefaultValue[] = [];
   @Prop customScheduling: string = '';
   onPreset: (action: string, value: string) => void = (): void => {};
 
@@ -446,7 +447,7 @@ export struct 牌组选项面板 {
     Column({ space: 应用尺寸.间距_12 * 2 }) {
       this.modeSectionTitle($r('app.string.settings_simple_mode_full'))
       this.presetOptions()
-      高级牌组选项面板({ form: this.form, options: this.options, busy: this.busy, defaults: this.defaults,
+      高级牌组选项面板({ form: this.form, options: this.options, busy: this.busy, defaultValues: this.defaultValues,
         customScheduling: this.customScheduling, fsrsState: this.fsrsState, presetAssignmentsChanged: this.presetAssignmentsChanged,
         onOptimize: this.onOptimize, onSimulate: this.onSimulate, onEvaluate: this.onEvaluate })
     }.width('100%')

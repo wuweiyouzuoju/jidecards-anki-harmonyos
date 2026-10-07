@@ -129,7 +129,7 @@ HomeSummaryHeader 不再区分手机双侧与详情分栏外缘布局，也不�
 - `model/HomeBackupController.ts` 拥有自动备份延迟任务和配置读取期间的占用；`homeBackupHost()` 与后端工厂隔离 Kit。后台/销毁取消尚未接受的任务，已开始的备份继续由 `BackupCoordinator` 持锁至结束；Core 决定归档间隔和保留数量。读取配置失败进入日志回调，不产生未处理 Promise 拒绝。
 - `backend/HomeDeckCommands.ets` 创建并记住牌组、写入别名与背景；`CreateDeckFeature.ets` 和 `DeckCustomizationFeature.ets` 分别拥有表单忙碌态、校验错误及已接受写入的收尾，页面只装配弹层、刷新和提示。背景失败单独反馈，已落盘别名保留；刷新失败不会把已成功写入重新标成可重试写入。
 - `components/home/DeckOptionsFeature.ets` 持有表单和校验错误，`model/DeckOptionsDraft.ets` 从表单构造有效草稿；`model/home/DeckOptionsSession.ts` 拥有读取代次、原配置、暂存预设和提交状态，经 `backend/AnkiDeckOptions.ets` 调用服务。`DeckOptionsPresets.ts` 暂存选择、新建、克隆、重命名和删除，取消不写入；`DeckConfigSave.ts` 复制配置并冻结请求。与 Anki 一致，默认编辑共享预设；明确选择克隆或 JIDE 的单牌组范围才分离。多预设保存将当前配置放在最后，保留未编辑字段和未知协议数据。首页只持有打开目标与占用；失败保留草稿，成功不可重复提交，离页后的已接受写入仍广播 FSRS/首页刷新。
-- `components/牌组选项面板.ets` 的 `commonOptions` 展示简洁版四项：每日新卡上限、每日复习上限、学习步幅与复习排序；简洁模式继续隐藏复杂配置。`experimentalOptions` 展示预设管理和 `高级牌组选项面板` 的完整内联选项，分组和调度器条件由 `DeckOptionsCatalog.ts` 统一声明：每日上限、新卡、遗忘、显示顺序、FSRS、埋藏、音频、计时器、自动前进、轻松日、高级。完整模式不再叠加简洁区或另开高级导航弹层；分组间距 24vp、字段间距 12vp 由外层 Column 贡献。单项编辑器支持 Core 默认值、确认和取消。模式只控制界面，同一表单、配置与保存入口继续共用，不另建模式专用预设。行为回归见 `deck-options-parity.test.mjs`、`deck-option-dialog.test.mjs`；主题、宽窄屏、大字体和 ArkUI 状态更新仍需设备验收。
+- `components/牌组选项面板.ets` 的 `commonOptions` 展示简洁版四项：每日新卡上限、每日复习上限、学习步幅与复习排序；简洁模式继续隐藏复杂配置。`experimentalOptions` 展示预设管理和 `高级牌组选项面板` 的完整内联选项，分组和调度器条件由 `DeckOptionsCatalog.ts` 统一声明：每日上限、新卡、遗忘、显示顺序、FSRS、埋藏、音频、计时器、自动前进、轻松日、高级。完整模式不再叠加简洁区或另开高级导航弹层；分组间距 24vp、字段间距 12vp 由外层 Column 贡献。单项编辑器支持 Core 默认值、确认和取消。`DeckOptionsFeature` 在会话回调中通过 `DeckOptionsDefaults.ts` 将 Core 默认配置转换成键/文字数组，两个展示组件只接收此普通值；完整配置及 `other` / `preserved` 字节留在原会话和表单的保存流程。`@Prop` 对非支持内置类型的深拷贝会丢失内部类型，默认值渲染不能再创建完整协议草稿。模式只控制界面，同一表单、配置与保存入口继续共用，不另建模式专用预设。行为回归见 `deck-options-parity.test.mjs`、`deck-option-dialog.test.mjs`；主题、宽窄屏、大字体和 ArkUI 状态更新仍需设备验收。
 - `model/home/DataTransferSession.ts` 是首页与设置页共用的数据迁移入口，拥有弹层、选择器占用、整库替换二次确认、进度和错误。页面只观察一个状态快照；`components/home/DataTransferFeature.ets` 绑定面板与会话，`backend/AnkiDataTransfer.ets` 适配选择器、导入/替换及 `DataExportWorkflow`。系统入口直接调用 `importUri`，选择器结果在离页后不得启动新写入，已接受写入仍完成并广播，提交后刷新失败不可诱导重复导入。
 - 同步的挂载状态、认证和账号由首页传入 `components/同步面板.ets`；面板通过 `backend/AnkiSyncSession.ets` 创建 `model/SyncSession.ts`，只展示快照并传递冲突选择/详情显隐。会话拥有集合 RPC、媒体终态轮询和销毁收尾，调度与占用仍分别由 `AutoSyncScheduler`、`SyncActivity` 管理。创建牌组和定制弹层的局部状态由各自 Feature 持有，首页只保留显示目标和跨功能占用事实。
 - 控制器直接行为测试：`home-sync-controller.test.mjs`、`home-backup-controller.test.mjs`；既有页面集成测试继续覆盖同步、学习、公告和弹层的组合时序。
@@ -149,6 +149,8 @@ HomeSummaryHeader 不再区分手机双侧与详情分栏外缘布局，也不�
 
 
 筛选牌组的排序方式和自定义学习的卡片范围使用 FormSelectRow；牌组背景选择/替换放到标题右侧，保留预览删除按钮及撤销移除入口。说明、限宽和省略策略归公共选择/辅助行，牌组、自定义学习与定制会话仍持有选值及保存状态。
+
+2026-10-07 完整模式闪退验收：模拟器 19:51 的记录在默认配置字节 `.slice()` 报 `The O is not a TypedArray`；20:06 的记录证明改成索引复制后，读取 `.length` 仍缺少 TypedArray 内部槽。原因是两个 `@Prop defaults: DeckConfigSettings` 边界的深拷贝已损坏字节类型，修复点必须前移到会话→显示值转换。最终移除该复制尝试，原协议/草稿复制入口恢复；默认值转换只产生键和字符串，禁止访问 `other` / `preserved`。原未知字段保留与保存重试检查继续执行，回归还覆盖所有默认值类型、实际组件读取、两层普通值复制和宿主传参。选项专项72项及结构/公共组件/认知/文档74项通过，日志 `.local/deck-options-default-boundary-tests.log` / `.local/deck-options-default-boundary-contracts.log`；签名增量HAP成功，新增警告0。仅覆盖安装 `127.0.0.1:5555`，20:15–20:23用模拟器内部 `uitest` 点击验证完整模式打开、每日上限编辑后恢复默认20并确认、保存退出、再次打开、滚动到高级/轻松日及返回；进程保持运行，最新崩溃记录仍为20:06。截图 `.local/deck-options-full-open.png` / `.local/deck-options-full-bottom.png`。该验证没有激活或切换Windows窗口；筛选入口、模式显隐和集合卡片保持。横屏、大字体、SM-2/FSRS全部设备组合未扩大发布声明。
 
 ## 集合历史入口
 

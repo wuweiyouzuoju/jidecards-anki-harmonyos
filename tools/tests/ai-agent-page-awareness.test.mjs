@@ -13,6 +13,7 @@ import { 牌组配置表单 } from '../../entry/src/main/ets/model/牌组配置�
 import { 牌组选项编辑 } from '../../entry/src/main/ets/model/牌组选项编辑.ets';
 import { emptyDeckConfigSettings } from '../../entry/src/main/ets/proto/messages/DeckConfigMessages.ts';
 import { deckConfigUseCount } from '../../entry/src/main/ets/model/DeckConfigSave.ts';
+import { deckOptionDefaultValues } from '../../entry/src/main/ets/model/DeckOptionsDefaults.ts';
 
 const read = path => readFileSync(new URL('../../entry/src/main/ets/' + path, import.meta.url),'utf8');
 const strings = locale => new Map(JSON.parse(readFileSync(new URL(`../../entry/src/main/resources/${locale}/element/string.json`,import.meta.url),'utf8')).string.map(x=>[x.name,x.value]));
@@ -201,7 +202,7 @@ test('real deck options feature publishes loading, error/retry and loaded form f
       constructor(id,adapter,publish){super(id,adapter,publish,{beginOperation(){},endOperation(){}},{waitForCollection:async()=>{}});}
     }
     const Feature=loadComponentLogic('components/home/DeckOptionsFeature.ets','DeckOptionsFeature',{
-      ...dependencies(tracker),DeckOptionsSession:Session,DeckOptionsFsrsState,牌组配置表单,牌组选项编辑,deckConfigUseCount,
+      ...dependencies(tracker),DeckOptionsSession:Session,DeckOptionsFsrsState,牌组配置表单,牌组选项编辑,deckConfigUseCount,deckOptionDefaultValues,
       AnkiDeckOptions:class{load(...args){return backend.load(...args);}save(){return backend.save();}committed(){}}
     });
     const feature=new Feature();Object.assign(feature,{deckId:12,deckName:'PRIVATE_DECK',getUIContext:()=>({})});
@@ -209,9 +210,10 @@ test('real deck options feature publishes loading, error/retry and loaded form f
     assert.equal(result(tracker,'deck_options').surfaces[0].items.find(x=>x.id==='retry').visibility,'hidden');
     await new Promise(setImmediate);assert.equal(loads,1);
     if(mode==='disposed')feature.aboutToDisappear();
-    const config=deckConfig();
+    const config=deckConfig(),defaults={...deckConfig(),newPerDay:35};
     if(mode==='error')reject(Error('PRIVATE_ERROR'));
     else resolve({currentDeck:{configId:7,limits:null},allConfigs:[{config:{id:7,name:'PRIVATE_PRESET',mtimeSecs:0,usn:0,config},useCount:1}],
+      defaults:{id:0,name:'PRIVATE_DEFAULT',mtimeSecs:0,usn:0,config:defaults},
       fsrs:false,newCardsIgnoreReviewLimit:false,applyAllParentLimits:false,fsrsHealthCheck:false});
     await new Promise(setImmediate);
     if(mode==='disposed'){assert.deepEqual(tracker.snapshot(),[]);continue;}
@@ -219,6 +221,7 @@ test('real deck options feature publishes loading, error/retry and loaded form f
     if(mode==='error')assert.equal(controls.find(x=>x.id==='retry').visibility,'observed');
     else {
       assert.equal(feature.state.phase,'ready',feature.state.error);
+      assert.equal(feature.defaultValues.find(value=>value.key==='newPerDay').value,'35','the feature projects Core defaults independently of the current preset');
       assert.equal(controls.find(x=>x.id==='form').opens,'deck_options_form');
       assert.equal(controls.find(x=>x.id==='close').visibility,'hidden');
       assert.equal(view.observations[0].values.find(x=>x.id==='presetId').value,'7');

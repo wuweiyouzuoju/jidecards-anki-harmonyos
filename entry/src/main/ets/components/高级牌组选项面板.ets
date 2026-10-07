@@ -10,6 +10,7 @@ import { DECK_OPTION_GROUPS, visibleDeckOptionFields, deckOptionChoices, compati
   easyDayValues, updateEasyDay, percentageText, percentageValue } from '../model/DeckOptionsCatalog';
 import type { DeckOptionDefinition, DeckOptionGroup, DeckOptionEnumChoice } from '../model/DeckOptionsCatalog';
 import type { DeckConfigSettings } from '../proto/messages/DeckConfigMessages';
+import type { DeckOptionDefaultValue } from '../model/DeckOptionsDefaults';
 import { fsrsParams } from '../model/FsrsOptions';
 import { appInterface } from '../backend/AppInterfaceService';
 import type { AppInterfaceControl, AppInterfaceValue } from '../model/AppInterface';
@@ -23,7 +24,7 @@ export struct 高级牌组选项面板 {
   @ObjectLink @Watch('publishInterface') form: 牌组配置表单;
   @ObjectLink @Watch('publishInterface') options: 牌组选项编辑;
   @Prop @Watch('publishInterface') busy: boolean = false;
-  @Prop defaults: DeckConfigSettings | null = null;
+  @Prop defaultValues: DeckOptionDefaultValue[] = [];
   @Prop customScheduling: string = '';
   @Prop fsrsState: DeckOptionsFsrsState = new DeckOptionsFsrsState();
   @Prop presetAssignmentsChanged: boolean = false;
@@ -119,30 +120,9 @@ export struct 高级牌组选项面板 {
     this.publishInterface();
   }
   private defaultValue(field: DeckOptionDefinition): string | undefined {
-    if (field.key === 'customScheduling') return undefined;
+    if (field.key === 'customScheduling') return '';
     if (['newPerDay', 'reviewsPerDay', 'desiredRetention'].includes(field.key) && this.scope(field.key) !== 0) return '';
-    if (this.defaults === null) return undefined;
-    const form = 牌组配置表单.从配置创建(this.defaults);
-    let text = form.取字段文本值(field.key as keyof DeckConfigSettings);
-    if (field.key === 'learnSteps') text = form.学习步骤文本;
-    if (field.key === 'relearnSteps') text = form.重学步骤文本;
-    if (field.kind === 'params') text = fsrsParams(this.defaults).join(' ');
-    if (field.kind === 'text') text = field.key === 'paramSearch' ? this.defaults.paramSearch : this.defaults.ignoreRevlogsBeforeDate;
-    if (field.kind === 'global') return field.key === 'fsrsHealthCheck' ? 'true' : 'false';
-    if (field.kind === 'boolean') {
-      const config = this.defaults;
-      switch (field.key) {
-        case 'buryNew': return String(config.buryNew);
-        case 'buryReviews': return String(config.buryReviews);
-        case 'buryInterdayLearning': return String(config.buryInterdayLearning);
-        case 'disableAutoplay': return String(config.disableAutoplay);
-        case 'skipQuestionWhenReplayingAnswer': return String(config.skipQuestionWhenReplayingAnswer);
-        case 'waitForAudio': return String(config.waitForAudio);
-        case 'showTimer': return String(config.showTimer);
-        case 'stopTimerOnAnswer': return String(config.stopTimerOnAnswer);
-      }
-    }
-    return field.kind === 'percentage' ? percentageText(text) : text;
+    return this.defaultValues.find((item: DeckOptionDefaultValue): boolean => item.key === field.key)?.value;
   }
   private publishInterface(): void {
     if (!this.mounted) return;

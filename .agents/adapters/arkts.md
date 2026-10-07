@@ -88,6 +88,7 @@ this.localizedFmt($r('app.string.xxx_lang'), [arg1, arg2]);
 
 ## ArkUI 关键约束
 
+- `@Prop` 深拷贝不保留 `Uint8Array` 等内置对象的内部类型。完整 protobuf 配置及不透明字节由会话持有；跨组件传显示用的普通值，不能把深拷贝后的对象再送回协议/草稿复制入口。牌组选项默认值的转换入口为 `DeckOptionsDefaults.ts`，回归同时执行实际组件读取逻辑与设备完整模式。
 - `@Builder` 按值参数会被快照，@State 变化不重跑 builder，三角形不转——传引用用 interface
 - `ThemeTextSpans` / `ThemeHighlightedTextSpans` 的宿主必须用 `themeTextKey` 按实际文案、有效色板（含空色板）、高亮及语言重建文字子节点；不能只按语言重建，否则取消选中/禁用和动态文案会保留旧 Span。直接 `themeLabelGlyphs` 的组件仍由自身 build 读取响应式输入。
 - `LazyForEach` keyItem 必须含全部可变字段，否则数据变化不刷新

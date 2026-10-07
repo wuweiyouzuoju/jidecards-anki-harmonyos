@@ -12,6 +12,7 @@ import { 牌组选项编辑 } from '../../entry/src/main/ets/model/牌组选项�
 import { validateDeckOptionText } from '../../entry/src/main/ets/model/DeckOptionValidation.ets';
 import { applyDeckOptionEdit } from '../../entry/src/main/ets/model/DeckOptionsEdit.ets';
 import { fsrsParams } from '../../entry/src/main/ets/model/FsrsOptions.ts';
+import { deckOptionDefaultValues } from '../../entry/src/main/ets/model/DeckOptionsDefaults.ts';
 import { AppInterfaceTracker, visibleInterfaceItems, APP_INTERFACE_SURFACES } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { loadComponentLogic } from './platform-module-harness.mjs';
 
@@ -129,9 +130,54 @@ function component() {
     ...catalog,牌组配置表单,牌组选项编辑,validateDeckOptionText,applyDeckOptionEdit,fsrsParams,DeckOptionsFsrsState,
     appInterface:tracker,namedResourceText:(_,key)=>key,$r:key=>key });
   const ui=new Fields();Object.assign(ui,{getUIContext:()=>({}),form:牌组配置表单.从配置创建(config.config),
-    options:牌组选项编辑.从视图创建(view.currentDeck.limits,false,false,false,true),defaults:view.defaults.config});
+    options:牌组选项编辑.从视图创建(view.currentDeck.limits,false,false,false,true),defaultValues:deckOptionDefaultValues(view.defaults.config)});
   ui.aboutToAppear();return {ui,tracker,config};
 }
+
+test('default value projection never reads opaque protocol bytes and retains all supported reset values', () => {
+  const {config}=fixture();const source=config.config;
+  source.fsrsParams6=Array(21).fill(.5);source.disableAutoplay=true;source.paramSearch='deck:Target';
+  Object.defineProperty(source,'other',{get(){throw new Error('UI accessed opaque bytes');}});
+  Object.defineProperty(source,'preserved',{get(){throw new Error('UI accessed preserved bytes');}});
+  const values=deckOptionDefaultValues(source);
+  assert.ok(values.every(item=>typeof item.key==='string'&&typeof item.value==='string'));
+  const byKey=new Map(values.map(item=>[item.key,item.value]));
+  for(const [key,value] of [['newPerDay','20'],['learnSteps','1m 10m'],['relearnSteps','10m'],
+    ['desiredRetention','90'],['disableAutoplay','true'],['paramSearch','deck:Target'],
+    ['fsrsHealthCheck','true'],['fsrsEnabled','false'],['capAnswerTimeToSecs','60']])assert.equal(byKey.get(key),value);
+  assert.equal(byKey.get('fsrsParameters').split(' ').length,21);
+  assert.equal(byKey.has('customScheduling'),false);
+  assert.equal(byKey.has('easyDaysPercentages'),false,'week reset belongs to individual day fields');
+  assert.deepEqual(deckOptionDefaultValues(null),[]);
+});
+
+test('actual full-mode default callbacks accept two copied UI layers without cloning protocol data', () => {
+  const {ui,config}=component();
+  const corrupted=Object.create(Uint8Array.prototype);
+  assert.throws(()=>corrupted.length,TypeError,'reproduce missing TypedArray internal slot from unsupported copies');
+  assert.throws(()=>牌组配置表单.从配置创建({...config.config,other:corrupted}),TypeError);
+  const original=encodeDeckConfig(config);
+  ui.defaultValues=JSON.parse(JSON.stringify(JSON.parse(JSON.stringify(deckOptionDefaultValues(config.config)))));
+  for(const field of catalog.DECK_OPTION_GROUPS.flatMap(group=>group.fields))assert.doesNotThrow(()=>ui.defaultValue(field));
+  const field=key=>catalog.DECK_OPTION_GROUPS.flatMap(group=>group.fields).find(item=>item.key===key);
+  assert.equal(ui.defaultValue(field('learnSteps')),'1m 10m');
+  assert.equal(ui.defaultValue(field('desiredRetention')),'90');
+  assert.equal(ui.defaultValue(field('customScheduling')),'');
+  ui.defaultValues=[];assert.equal(ui.defaultValue(field('newPerDay')),undefined);
+  assert.deepEqual(encodeDeckConfig(config),original,'default UI rendering must not mutate protocol data');
+});
+
+test('deck option host projects defaults before passing them through Prop components', () => {
+  const root=new URL('../../entry/src/main/ets/',import.meta.url);
+  const host=readFileSync(new URL('components/home/DeckOptionsFeature.ets',root),'utf8');
+  assert.match(host,/this\.defaultValues = deckOptionDefaultValues\(state\.view\?\.defaults\?\.config \?\? null\)/);
+  for(const path of ['components/牌组选项面板.ets','components/高级牌组选项面板.ets']){
+    const source=readFileSync(new URL(path,root),'utf8');
+    assert.match(source,/@Prop defaultValues: DeckOptionDefaultValue\[\]/);
+    assert.doesNotMatch(source,/@Prop defaults: DeckConfigSettings/);
+  }
+  assert.match(host,/defaultValues: this\.defaultValues/);
+});
 test('actual full-mode callbacks honor per-deck and today scopes, including zero and reset to inheritance',()=>{
   const {ui}=component();const daily=catalog.DECK_OPTION_GROUPS[0];const newField=daily.fields[0];
   ui.newScope=1;ui.change(newField,'0');assert.equal(ui.options.新卡限额文本,'0');assert.equal(ui.form.每日新卡数文本,'20');

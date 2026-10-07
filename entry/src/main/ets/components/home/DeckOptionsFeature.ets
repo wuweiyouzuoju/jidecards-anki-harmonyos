@@ -4,6 +4,7 @@ import { AnkiDeckOptions } from '../../backend/AnkiDeckOptions';
 import { 牌组配置表单 } from '../../model/牌组配置表单';
 import { 牌组选项编辑 } from '../../model/牌组选项编辑';
 import { deckConfigUseCount } from '../../model/DeckConfigSave';
+import { deckOptionDefaultValues, DeckOptionDefaultValue } from '../../model/DeckOptionsDefaults';
 import { prepareDeckOptionsDraft, DeckOptionsDraft } from '../../model/DeckOptionsDraft';
 import { namedResourceText } from '../../utils/UiFeedback';
 import { 牌组选项面板 } from '../牌组选项面板';
@@ -33,6 +34,7 @@ export struct DeckOptionsFeature {
   @State private state: DeckOptionsSnapshot = { phase: 'loading', view: null, config: null, error: '', fsrs: new DeckOptionsFsrsState() };
   @State private form: 牌组配置表单 | null = null;
   @State private options: 牌组选项编辑 | null = null;
+  @State private defaultValues: DeckOptionDefaultValue[] = [];
   @State @Watch('publishInterface') private validationError: string = '';
   private session: DeckOptionsSession | null = null;
   private active: boolean = false;
@@ -40,6 +42,7 @@ export struct DeckOptionsFeature {
   aboutToAppear(): void {
     this.active = true;
     this.session = new DeckOptionsSession(this.deckId, new AnkiDeckOptions(), (state: DeckOptionsSnapshot): void => {
+      this.defaultValues = deckOptionDefaultValues(state.view?.defaults?.config ?? null);
       this.state = state;
       this.onBusy(state.phase === 'saving' || state.fsrs.busy);
       if (state.phase === 'ready' && this.form === null && state.view !== null && state.config?.config !== null && state.config !== null) {
@@ -162,7 +165,7 @@ export struct DeckOptionsFeature {
         fsrsState: this.state.fsrs, errorMessage: this.validationError || this.state.error,
         presets: this.state.presets ?? [], presetKey: this.state.presetKey ?? '',
         presetAssignmentsChanged: this.state.presetAssignmentsChanged ?? false,
-        defaults: this.state.view?.defaults?.config ?? null, customScheduling: this.state.view?.cardStateCustomizer ?? '',
+        defaultValues: this.defaultValues, customScheduling: this.state.view?.cardStateCustomizer ?? '',
         onPreset: (action: string, value: string): void => { this.editPreset(action, value); },
         onOptimize: (all: boolean, retry: boolean): void => { this.optimize(all, retry); },
         onSimulate: (days: number): void => { this.simulate(days); },
