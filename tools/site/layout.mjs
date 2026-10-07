@@ -21,7 +21,7 @@ export function createLayout(content) {
   const repo = work.repository;
   const repoLinks = repositories.map(item => `<a href="${esc(item.url)}">${esc(item.name)} ${arrow}</a>`).join('');
   const sourceLink = (file, label) => `<a href="${esc(repo)}/blob/main/${esc(file)}">${esc(label)} ${arrow}</a>`;
-  const logo = (className, size, alt = '记得闪卡 Logo') => `<img class="${className}" src="${content.logoPreview}" data-full-src="${work.brand.logo}?v=${assets.logo}" alt="${esc(alt)}" width="${size}" height="${size}" loading="lazy" decoding="async" fetchpriority="low">`;
+  const logo = (className, size, alt = '记得闪卡 Logo') => `<img class="${className}" src="${size <= 38 ? content.logoSmallPreview : content.logoPreview}" data-full-src="${work.brand.logo}?v=${assets.logo}" alt="${esc(alt)}" width="${size}" height="${size}" loading="lazy" decoding="async" fetchpriority="low">`;
   const download = `<div class="actions"><a class="button" href="${esc(work.marketplace.url)}">免费下载 ${arrow}</a><a class="button secondary" href="${esc(repo)}">查看源码 ${arrow}</a></div><p class="download-meta">正式版 ${esc(work.releaseVersion)} · ${esc(work.platform)} · 华为应用市场搜索「记得闪卡」</p>`;
   const application = {
     '@type': 'SoftwareApplication', '@id': `${origin}/#app`, name: work.name, alternateName: work.alternateName,

@@ -165,7 +165,7 @@ test('shared navigation and home expose the real application logo with fresh ass
   const digest = bytes => createHash('sha256').update(bytes).digest('hex').slice(0, 12);
   const cssHash = digest(await readFile(path.join(root, 'hosting/styles.css')));
   const logoHash = digest(actual);
-  const preview = await readFile(path.join(root, 'hosting/apple-touch-icon.png'));
+  const preview = await readFile(path.join(root, 'hosting/favicon-32x32.png'));
   for (const file of pages) {
     const html = await read(file);
     assert.ok(html.includes(`data-full-src="${work.brand.logo}?v=${logoHash}"`), file);
@@ -174,6 +174,8 @@ test('shared navigation and home expose the real application logo with fresh ass
     assert.match(html, /<img class="brand-logo"[^>]+alt="记得闪卡 Logo"/);
   }
   assert.match(await read('index.html'), /<img class="hero-logo"[^>]+alt="记得闪卡应用 Logo"/);
+  const largePreview = await readFile(path.join(root, 'hosting/apple-touch-icon.png'));
+  assert.ok((await read('index.html')).includes(`class="hero-logo" src="data:image/png;base64,${largePreview.toString('base64')}"`));
 });
 
 test('author-supplied current media replace retired screenshots in HTML, metadata and AI text', async () => {

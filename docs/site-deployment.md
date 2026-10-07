@@ -29,7 +29,7 @@ Cloudflare Worker：`wispy-glade-db0d`。静态目录：`hosting/`。主域名�
 
 替换图片时检查实际内容，复制作者提供的原始字节，然后更新所有元数据；生成器发现版本或摘要不匹配即失败。过时 `assets/app-*.png` 已加入 `.assetsignore`，不再进入线上资产清单。
 
-Logo 原图由生成器从 `AppScope/resources/base/media/app_icon.png` 原样复制。页面先内嵌已有 180 像素 Apple 图标，正文首次绘制无需等待 1024 像素原图。宣传图先使用同尺寸内嵌 SVG 占位；图片脚本等待两次 animation frame，确保正文先绘制一次，再用 IntersectionObserver 在图片距离视口 200 像素时赋予原图地址，配合原生 lazy 与低优先级下载。预留真实宽高避免下载后布局跳动；下载失败恢复内嵌预览。不支持观察器的浏览器在首次绘制后交给原生 lazy。
+Logo 原图由生成器从 `AppScope/resources/base/media/app_icon.png` 原样复制。页面先内嵌已有图标：导航与页脚用 32 像素 PNG，主体用 180 像素 Apple 图标，正文首次绘制无需等待 1024 像素原图。宣传图先使用同尺寸内嵌 SVG 占位；图片脚本等待两次 animation frame，确保正文先绘制一次，再用 IntersectionObserver 在图片距离视口 200 像素时赋予原图地址，配合原生 lazy 与低优先级下载。预留真实宽高避免下载后布局跳动；下载失败恢复内嵌预览。不支持观察器的浏览器在首次绘制后交给原生 lazy。
 
 脚本只增强图片显示，正文、导航、alt、figcaption、原图链接和 JSON-LD 已在静态 HTML 中。禁用 JavaScript 时 Logo 仍可见，宣传图通过 noscript 使用原生 lazy；Markdown、JSON 和 llms 保持完整原图地址与说明。
 
