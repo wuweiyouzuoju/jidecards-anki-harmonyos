@@ -7,12 +7,32 @@ test('legacy and www domains permanently redirect matching paths and query strin
   const env = { ASSETS: { fetch() { assert.fail('redirects must run before assets'); } } };
   for (const host of ['jideyanggeqi.cn', 'www.jideyanggeqi.cn', 'www.jidecards.com']) {
     for (const protocol of ['http:', 'https:']) {
-      for (const pathname of ['/', '/works/jidecards/', '/assets/app-preview-01.png', '/announcement.json', '/missing/']) {
+      for (const pathname of ['/', '/works/jidecards/', '/assets/app-preview-01.png', '/announcement.json', '/googlef6dc96ac7f0bd137.html', '/missing/']) {
         const response = await worker.fetch(new Request(`${protocol}//${host}${pathname}?source=old&tag=%E9%B8%BF%E8%92%99`), env);
         assert.equal(response.status, 301);
         assert.equal(response.headers.get('Location'), `https://jidecards.com${pathname}?source=old&tag=%E9%B8%BF%E8%92%99`);
       }
     }
+  }
+});
+
+test('Google verification files serve the asset directly while preserving request metadata and failures', async () => {
+  for (const method of ['GET', 'HEAD']) {
+    for (const status of [200, 404]) {
+      const request = new Request('https://jidecards.com/googlef6dc96ac7f0bd137.html?check=1', { method, headers: { 'Accept': 'text/html' } });
+      const response = new Response(method === 'HEAD' ? null : 'verification', { status });
+      const env = { ASSETS: { fetch(actualRequest) {
+        assert.equal(actualRequest.url, 'https://jidecards.com/googlef6dc96ac7f0bd137?check=1');
+        assert.equal(actualRequest.method, method);
+        assert.equal(actualRequest.headers.get('Accept'), 'text/html');
+        return response;
+      } } };
+      assert.equal(await worker.fetch(request, env), response);
+    }
+  }
+  for (const pathname of ['/google-not-verification.html', '/nested/google123.html', '/index.html']) {
+    const request = new Request(`https://jidecards.com${pathname}`);
+    await worker.fetch(request, { ASSETS: { fetch(actualRequest) { assert.equal(actualRequest, request); return new Response('asset'); } } });
   }
 });
 

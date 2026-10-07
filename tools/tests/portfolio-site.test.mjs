@@ -150,6 +150,48 @@ test('guide and restored product details are discoverable with matching human an
   assert.match(article, /"@type":"TechArticle"/);
 });
 
+test('every page resolves the same application, source, author and project identities', async () => {
+  const repositories = [work.repository, ...work.repositoryMirrors.map(item => item.url)];
+  for (const file of pages) {
+    const html = await read(file);
+    const canonical = html.match(/rel="canonical" href="([^"]+)"/)[1];
+    const graph = JSON.parse(html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1])['@graph'];
+    const identities = graph.filter(item => item['@id']).map(item => item['@id']);
+    assert.equal(new Set(identities).size, identities.length, `${file}: duplicate identity`);
+    const app = graph.find(item => item['@type'] === 'SoftwareApplication');
+    const source = graph.find(item => item['@type'] === 'SoftwareSourceCode');
+    const project = graph.find(item => item['@type'] === 'Organization');
+    const website = graph.find(item => item['@type'] === 'WebSite');
+    const page = graph.find(item => item['@type'] === 'WebPage');
+    assert.equal(app.name, work.name);
+    assert.equal(app.alternateName, work.alternateName);
+    assert.equal(app.url, work.url);
+    assert.equal(app.softwareVersion, work.releaseVersion);
+    assert.deepEqual(app.sameAs, [work.marketplace.url]);
+    assert.equal(app.subjectOf['@id'], source['@id']);
+    assert.equal(source.targetProduct['@id'], app['@id']);
+    assert.equal(source.url, work.repository);
+    assert.deepEqual(source.codeRepository, repositories);
+    assert.deepEqual(source.sameAs, work.repositoryMirrors.map(item => item.url));
+    assert.deepEqual(project.sameAs, repositories);
+    assert.equal(source.author['@id'], app.author['@id']);
+    assert.equal(source.publisher['@id'], project['@id']);
+    assert.equal(app.publisher['@id'], project['@id']);
+    assert.equal(website.about['@id'], app['@id']);
+    assert.equal(page.url, canonical);
+    assert.equal(page.isPartOf['@id'], website['@id']);
+    assert.equal(page.about['@id'], app['@id']);
+    const checkReferences = value => {
+      if (!value || typeof value !== 'object') return;
+      if (Object.keys(value).length === 1 && value['@id']) {
+        assert.ok(identities.includes(value['@id']), `${file}: unresolved ${value['@id']}`);
+      }
+      for (const child of Object.values(value)) checkReferences(child);
+    };
+    checkReferences(graph);
+  }
+});
+
 test('existing app data endpoints retain their contracts', async () => {
   const announcement = JSON.parse(await read('announcement.json'));
   const cloudDecks = JSON.parse(await read('cloud-decks.json'));
