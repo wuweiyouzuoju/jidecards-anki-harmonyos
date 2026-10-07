@@ -499,12 +499,14 @@ export const 过滤牌组排序 = {
 } as const;
 
 export interface 搜索条件 {
+  preserved?: Uint8Array[];
   search: string;
   limit: number;
   order: number;
 }
 
 export interface 过滤牌组配置 {
+  preserved?: Uint8Array[];
   reschedule: boolean;
   searchTerms: 搜索条件[];
   previewDelay: number;
@@ -518,6 +520,7 @@ export interface 过滤牌组更新 {
   name: string;
   config: 过滤牌组配置;
   allowEmpty: boolean;
+  preserved?: Uint8Array[];
 }
 
 function encode搜索条件(term: 搜索条件): 协议写入器 {
@@ -531,14 +534,17 @@ function encode搜索条件(term: 搜索条件): 协议写入器 {
   if (term.order !== 0) {
     w.写入变长整数(3, term.order);
   }
+  for (const raw of term.preserved ?? []) w.写入原始字节(raw);
   return w;
 }
 
 function decode搜索条件(bytes: Uint8Array): 搜索条件 {
   const r = new 协议读取器(bytes);
   const out: 搜索条件 = { search: '', limit: 0, order: 0 };
-  let tag;
-  while ((tag = r.读取标签()) !== null) {
+  while (true) {
+    const start: number = r.当前位置;
+    const tag = r.读取标签();
+    if (tag === null) break;
     switch (tag.字段号) {
       case 1:
         out.search = r.读取字符串();
@@ -551,6 +557,8 @@ function decode搜索条件(bytes: Uint8Array): 搜索条件 {
         break;
       default:
         r.跳过字段(tag.线类型);
+        if (out.preserved === undefined) out.preserved = [];
+        out.preserved.push(r.截取片段(start));
     }
   }
   return out;
@@ -564,7 +572,7 @@ function encode过滤牌组配置(config: 过滤牌组配置): 协议写入器 {
   for (let i = 0; i < config.searchTerms.length; i++) {
     w.写入子消息(2, encode搜索条件(config.searchTerms[i]));
   }
-  // field 3 delays 是 v1 scheduler 专用，v3 不编码
+  // field 3 和未知字段原样保留，不修改旧调度参数
   if (config.previewDelay !== 0) {
     w.写入变长整数(4, config.previewDelay);
   }
@@ -577,6 +585,7 @@ function encode过滤牌组配置(config: 过滤牌组配置): 协议写入器 {
   if (config.previewAgainSecs !== 0) {
     w.写入变长整数(7, config.previewAgainSecs);
   }
+  for (const raw of config.preserved ?? []) w.写入原始字节(raw);
   return w;
 }
 
@@ -590,8 +599,10 @@ function decode过滤牌组配置(bytes: Uint8Array): 过滤牌组配置 {
     previewHardSecs: 0,
     previewGoodSecs: 0
   };
-  let tag;
-  while ((tag = r.读取标签()) !== null) {
+  while (true) {
+    const start: number = r.当前位置;
+    const tag = r.读取标签();
+    if (tag === null) break;
     switch (tag.字段号) {
       case 1:
         out.reschedule = r.读取布尔();
@@ -600,8 +611,9 @@ function decode过滤牌组配置(bytes: Uint8Array): 过滤牌组配置 {
         out.searchTerms.push(decode搜索条件(r.读取字节()));
         break;
       case 3:
-        // delays (v1 only) - 跳过
         r.跳过字段(tag.线类型);
+        if (out.preserved === undefined) out.preserved = [];
+        out.preserved.push(r.截取片段(start));
         break;
       case 4:
         out.previewDelay = r.读取变长整数();
@@ -617,6 +629,8 @@ function decode过滤牌组配置(bytes: Uint8Array): 过滤牌组配置 {
         break;
       default:
         r.跳过字段(tag.线类型);
+        if (out.preserved === undefined) out.preserved = [];
+        out.preserved.push(r.截取片段(start));
     }
   }
   return out;
@@ -635,6 +649,7 @@ export function encode过滤牌组更新(deck: 过滤牌组更新): Uint8Array {
   if (deck.allowEmpty) {
     w.写入布尔(4, true);
   }
+  for (const raw of deck.preserved ?? []) w.写入原始字节(raw);
   return w.转为字节();
 }
 
@@ -654,8 +669,10 @@ export function decode过滤牌组更新(bytes: Uint8Array): 过滤牌组更新 
     },
     allowEmpty: false
   };
-  let tag;
-  while ((tag = r.读取标签()) !== null) {
+  while (true) {
+    const start: number = r.当前位置;
+    const tag = r.读取标签();
+    if (tag === null) break;
     switch (tag.字段号) {
       case 1:
         out.id = r.读取64位整数();
@@ -671,6 +688,8 @@ export function decode过滤牌组更新(bytes: Uint8Array): 过滤牌组更新 
         break;
       default:
         r.跳过字段(tag.线类型);
+        if (out.preserved === undefined) out.preserved = [];
+        out.preserved.push(r.截取片段(start));
     }
   }
   return out;

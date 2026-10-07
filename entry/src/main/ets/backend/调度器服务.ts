@@ -224,10 +224,10 @@ export class 调度器服务 {
    * 重建过滤牌组（RebuildFilteredDeck, method 16）。
    * 重新执行搜索并填充卡片。
    */
-  async 重建过滤牌组(牌组ID: number): Promise<void> {
+  async 重建过滤牌组(牌组ID: number): Promise<number> {
     const 请求字节: Uint8Array = encodeDeckId(牌组ID);
-    await this.会话.调用(
-      服务号.后端调度器, 调度器方法.重建过滤牌组, 请求字节);
+    return decodeOpChangesWithCount(await this.会话.调用(
+      服务号.后端调度器, 调度器方法.重建过滤牌组, 请求字节));
   }
 
   /**
