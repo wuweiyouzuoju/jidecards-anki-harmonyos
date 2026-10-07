@@ -174,9 +174,9 @@ export struct 备份管理面板 {
         SettingsToggleRow({ title: $r('app.string.backup_management_auto'), hint: $r('app.string.backup_management_auto_hint'), isOn: this.automaticEnabled,
           isInteractive: !this.busy, isDark: this.isDark, tint: this.actionColor, onChange: (value: boolean): void => { this.toggleAutomatic(value); } })
         Row({ space: 应用尺寸.间距_8 }) {
-          按下态按钮({ 文案: $r('app.string.backup_management_create'), 字色: this.actionColor, themeText: true,
+          按下态按钮({ 文案: $r('app.string.backup_management_create'), 字色: this.actionColor, themeText: true, fillWidth: true,
             是否启用: !this.busy, 点击回调: (): void => { this.createBackup(); } }).layoutWeight(1)
-          按下态按钮({ 文案: $r('app.string.backup_management_restore'), 字色: this.actionColor, themeText: true,
+          按下态按钮({ 文案: $r('app.string.backup_management_restore'), 字色: this.actionColor, themeText: true, fillWidth: true,
             是否启用: !this.busy && this.selectedBackup !== '', 点击回调: (): void => { this.restoreBackup(); } }).layoutWeight(1)
         }.width('100%');
         if (this.backups.length === 0) {
