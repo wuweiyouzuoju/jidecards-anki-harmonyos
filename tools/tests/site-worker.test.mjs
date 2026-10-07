@@ -38,6 +38,7 @@ test('deployed asset routing runs domain redirects before any static file', asyn
   const config = JSON.parse(await readFile(new URL('../../hosting/wrangler.jsonc', import.meta.url), 'utf8'));
   assert.equal(config.assets.run_worker_first, true);
   assert.equal(config.assets.binding, 'ASSETS');
+  assert.equal(config.assets.not_found_handling, '404-page');
   assert.equal(config.main, '../tools/site-worker.mjs');
   assert.deepEqual(config.routes.map(route => route.pattern).sort(), ['jidecards.com', 'jideyanggeqi.cn', 'www.jidecards.com', 'www.jideyanggeqi.cn']);
   assert.ok(config.routes.every(route => route.custom_domain === true));

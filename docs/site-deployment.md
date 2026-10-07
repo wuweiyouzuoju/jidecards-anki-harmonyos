@@ -45,7 +45,7 @@ python -c 'from PIL import Image; from pathlib import Path; icon = Image.open("A
 | `/developers/` | 编程 Agent 的源码、责任和验证入口 |
 | `/about/` | 项目、作者与反馈 |
 
-六个可索引页面各有 `/content/*.md`，HTML alternate 链接和 `/data/site-index.json` 提供对应地址。`/llms.txt` 是文档索引；`/llms-full.txt` 包含完整产品、指南、版本和开发资料；`/data/works.json` 与 `/data/harmonyos-anki-guide.json` 提供事实数据。`/sitemap.xml` 只列主域名页面，`/robots.txt` 允许抓取，`/releases.xml` 提供 Atom 更新订阅；404 标记 noindex。
+六个可索引页面各有 `/content/*.md`，HTML alternate 链接和 `/data/site-index.json` 提供对应地址。`/llms.txt` 是文档索引；`/llms-full.txt` 包含完整产品、指南、版本和开发资料；`/data/works.json` 与 `/data/harmonyos-anki-guide.json` 提供事实数据。`/sitemap.xml` 只列主域名页面，`/robots.txt` 允许抓取，`/releases.xml` 提供 Atom 更新订阅。静态服务通过 `assets.not_found_handling=404-page` 为缺失链接返回自定义 404 正文与 404 状态，页面标记 noindex。
 
 页面使用真实 Person、Organization、SoftwareApplication、SoftwareSourceCode、BreadcrumbList、FAQPage 与文章元数据。功能可见状态与正式版本必须在 HTML、Markdown、JSON 和 llms 中一致，不虚构评分或评论。
 
