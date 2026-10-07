@@ -5,21 +5,29 @@ import path from 'node:path';
 import test from 'node:test';
 import JSON5 from 'json5';
 import { createHash } from 'node:crypto';
+import { deferMedia } from '../../hosting/assets/site-media.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const read = file => readFile(path.join(root, 'hosting', file), 'utf8');
 const pages = ['index.html', 'works/jidecards/index.html', 'guides/harmonyos-anki/index.html', 'releases/index.html', 'developers/index.html', 'about/index.html', '404.html'];
 const data = JSON.parse(await read('data/works.json'));
 const work = data.works[0];
+const mediaHash = createHash('sha256').update(await read('assets/site-media.mjs')).digest('hex').slice(0, 12);
+const assertImageOnlyScript = html => {
+  const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)].filter(([, attributes]) => !attributes.includes('type="application/ld+json"'));
+  assert.equal(scripts.length, 1);
+  assert.equal(scripts[0][1], ` type="module" src="/assets/site-media.mjs?v=${mediaHash}"`);
+  assert.equal(scripts[0][2], '');
+};
 
-test('public pages expose readable content and valid structured data without client scripts', async () => {
+test('public pages expose static content and structured data with only an optional image script', async () => {
   for (const file of pages) {
     const html = await read(file);
     assert.equal((html.match(/<h1\b/g) ?? []).length, 1, file);
     assert.match(html, /<html lang="zh-CN">/);
     assert.match(html, /<main id="content"/);
     assert.ok(html.includes(data.author.name));
-    assert.doesNotMatch(html, /<script(?![^>]*type="application\/ld\+json")/);
+    assertImageOnlyScript(html);
     for (const [, json] of html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)) {
       const structured = JSON.parse(json);
       assert.equal(structured['@context'], 'https://schema.org');
@@ -157,9 +165,11 @@ test('shared navigation and home expose the real application logo with fresh ass
   const digest = bytes => createHash('sha256').update(bytes).digest('hex').slice(0, 12);
   const cssHash = digest(await readFile(path.join(root, 'hosting/styles.css')));
   const logoHash = digest(actual);
+  const preview = await readFile(path.join(root, 'hosting/apple-touch-icon.png'));
   for (const file of pages) {
     const html = await read(file);
-    assert.ok(html.includes(`src="${work.brand.logo}?v=${logoHash}"`), file);
+    assert.ok(html.includes(`data-full-src="${work.brand.logo}?v=${logoHash}"`), file);
+    assert.ok(html.includes(`src="data:image/png;base64,${preview.toString('base64')}"`), file);
     assert.ok(html.includes(`/styles.css?v=${cssHash}`), file);
     assert.match(html, /<img class="brand-logo"[^>]+alt="记得闪卡 Logo"/);
   }
@@ -202,7 +212,7 @@ test('HTML, per-page Markdown, llms and JSON share complete crawlable content', 
     assert.ok(sitemap.includes(item.url));
     assert.match(markdown, /^# /);
     assert.ok(html.includes(`type="text/markdown" href="${item.markdown}"`));
-    assert.doesNotMatch(html, /<script(?![^>]*type="application\/ld\+json")/);
+    assertImageOnlyScript(html);
   }
   for (const item of work.detailSections) {
     for (const paragraph of [...item.paragraphs, ...(item.availability ? [item.availability] : [])]) {
@@ -232,4 +242,88 @@ test('release pages and Atom contain every numbered note and preserve the existi
     assert.ok(markdown.includes(`${index + 1}. ${change}`));
     assert.ok(feed.includes(change));
   }
+});
+
+test('posters use fixed-size inline placeholders and offer full images without JavaScript', async () => {
+  const product = await read('works/jidecards/index.html');
+  assert.match(product, /<noscript><style>\.deferred-media \{ display: none; \}<\/style><\/noscript>/);
+  for (const item of work.screenshots) {
+    const tag = [...product.matchAll(/<img\b[^>]+>/g)].map(([tag]) => tag).find(tag => tag.includes(`data-full-src="${item.path}"`));
+    assert.match(tag, /src="data:image\/svg\+xml,/);
+    assert.match(tag, /loading="lazy" decoding="async" fetchpriority="low"/);
+    const svg = decodeURIComponent(tag.match(/src="data:image\/svg\+xml,([^"]+)"/)[1]);
+    assert.ok(svg.includes(`width="${item.width}" height="${item.height}"`));
+    assert.ok(product.includes(`<noscript><img src="${item.path}"`));
+    assert.ok(product.includes(`href="${item.path}"`));
+  }
+});
+
+function mediaHarness({ observer = true, count = 2 } = {}) {
+  const frames = [];
+  const requests = [];
+  const images = Array.from({ length: count }, (_, index) => {
+    const attributes = new Map([['src', `preview-${index}`], ['data-full-src', `full-${index}`]]);
+    let errorHandler;
+    return {
+      getAttribute: name => attributes.get(name), hasAttribute: name => attributes.has(name),
+      removeAttribute: name => attributes.delete(name),
+      addEventListener(name, callback, options) { assert.equal(name, 'error'); assert.equal(options.once, true); errorHandler = callback; },
+      fail() { const callback = errorHandler; errorHandler = undefined; callback?.(); },
+      set src(value) { attributes.set('src', value); requests.push(value); }
+    };
+  });
+  let instance;
+  const view = { requestAnimationFrame: callback => frames.push(callback) };
+  if (observer) view.IntersectionObserver = class {
+    observed = new Set();
+    disconnected = false;
+    constructor(callback, options) { this.notify = callback; this.options = options; instance = this; }
+    observe(image) { this.observed.add(image); }
+    unobserve(image) { this.observed.delete(image); }
+    disconnect() { this.disconnected = true; }
+  };
+  deferMedia(view, { querySelectorAll(selector) { assert.equal(selector, 'img[data-full-src]'); return images; } });
+  return { images, requests, frames, frame: () => frames.shift()(), get observer() { return instance; } };
+}
+
+test('full images wait for a painted frame and only load near the viewport', () => {
+  const harness = mediaHarness();
+  assert.deepEqual(harness.requests, []);
+  assert.equal(harness.observer, undefined);
+  harness.frame();
+  assert.equal(harness.observer, undefined);
+  assert.deepEqual(harness.requests, []);
+  harness.frame();
+  assert.deepEqual(harness.requests, []);
+  assert.equal(harness.observer.options.rootMargin, '200px 0px');
+  harness.observer.notify([{ target: harness.images[0], isIntersecting: false }]);
+  assert.deepEqual(harness.requests, []);
+  harness.observer.notify([{ target: harness.images[0], isIntersecting: true }]);
+  assert.deepEqual(harness.requests, ['full-0']);
+  assert.equal(harness.observer.observed.has(harness.images[0]), false);
+  assert.equal(harness.observer.observed.has(harness.images[1]), true);
+  harness.observer.notify([{ target: harness.images[0], isIntersecting: true }, { target: harness.images[1], isIntersecting: true }]);
+  assert.deepEqual(harness.requests, ['full-0', 'full-1']);
+  assert.equal(harness.observer.disconnected, true);
+});
+
+test('failed image downloads restore the inline preview', () => {
+  const harness = mediaHarness({ count: 1 });
+  harness.frame(); harness.frame();
+  harness.observer.notify([{ target: harness.images[0], isIntersecting: true }]);
+  harness.images[0].fail(); harness.images[0].fail();
+  assert.deepEqual(harness.requests, ['full-0', 'preview-0']);
+});
+
+test('older browsers defer source assignment until after the first painted frame', () => {
+  const harness = mediaHarness({ observer: false });
+  assert.deepEqual(harness.requests, []);
+  harness.frame();
+  assert.deepEqual(harness.requests, []);
+  harness.frame();
+  assert.deepEqual(harness.requests, ['full-0', 'full-1']);
+});
+
+test('pages without deferred media do not schedule image work', () => {
+  assert.deepEqual(mediaHarness({ count: 0 }).frames, []);
 });
