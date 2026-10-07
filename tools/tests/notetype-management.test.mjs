@@ -80,7 +80,7 @@ test('uncommitted preview uses UTF-8 template bytes and sample filling without a
     else if(tag.字段号===3)values.template=reader.读取字符串();
     else values[tag.字段号]=reader.读取变长整数();
   }
-  assert.deepEqual(values.note,note);assert.equal(values.template,template);assert.equal(values[2],2);assert.equal(values[4],1);
+  assert.deepEqual(values.note,note);assert.equal(values.template,template);assert.equal(values[2],2);assert.equal(values[4],1);assert.equal(values[5],1);
 });
 
 function editor() {

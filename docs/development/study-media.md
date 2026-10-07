@@ -4,6 +4,10 @@
 
 ## Core 渲染语义与平台 TTS
 
+2026-10-07：Core `ExtractAvTags` 的 `[anki:play:q|a:index]` 映射为统一 44px 播放按钮；按钮只播放对应有序 AV 项，视频保持原生内联播放。学习、浏览预览、未保存模板预览共用 HTML 构建器、`CardAudioSession` 和 `PreviewInteraction`/`StudyGestures`，桥接再次校验文档代次、前台与阻塞状态。既有/未保存卡请求 `partial_render=true`，对齐 AnkiDroid `TemplateManager`：先提取题面 AV，再用含 q 编号的题面填充答案 `FrontSide`，最后提取答案 AV。题面声音不会重复加入答案自动播放；背面的题面按钮仍引用题面队列，视频也按 marker 的 q/a 来源解析。节点属于一次渲染结果，不修改笔记或模板字段，Core 音频读取失败不清空正文。
+
+“外观 → 学习显示”的隐藏音频按钮、显示答案时中断音频通过 `ReviewAudioPreferences` 共同声明和公共 `SettingsToggleRow` 展示。读写复用 `ReviewPreferencesStore`，JIDE 高级偏好读取、提案与实际界面观察同时接入。关闭中断后题面队列完成再播放答案，慢提取也不得让答案超车；换卡、后台和离页仍取消旧队列。隐藏只作用于卡面按钮，菜单重播与自动播放保持可用。行为回归见 `card-audio-session`、`review-preferences`、`preview-runtime`、`note-draft-preview-media`，设备记录见[本轮验收](ankidroid-high-priority-2026-10-07.md)。
+
 `backend/卡片渲染服务.ts` 直接调用锁定 Core 的 `EncodeIriPaths`、`CompareAnswer`、`ExtractClozeForTyping`。既有卡片与未保存草稿先完成 LaTeX 解析，再合并完整正反面 HTML 并编码本地媒体路径；`RenderedCard.questionHtml/answerHtml` 只用于展示，原模板节点仍用于拼写标记和 AV 提取，避免修改音频文件名。必须合并后编码，因为 `<img src="` 和文件名可能分属不同节点；中文与带 `#` 的文件名、远程 URL 的处理由 Core 决定。
 
 学习和只读预览通过 `StudyAnswerRenderer` 将原始字段、实际填空编号、输入与 combining 标志交给 Core，前端只注入 Core 返回的 HTML，不再维护拼写 diff/实体解码算法。Core 读取或比较失败时保留普通答案，不给出本机猜测的正确/错误结论。同步编辑器用于识别编号和插入下一填空的 `填空解析器` 仍保留：这条纯计算路径不负责学习答案裁判，不让每次按键等待 RPC。

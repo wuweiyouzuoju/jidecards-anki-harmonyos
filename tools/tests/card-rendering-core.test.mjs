@@ -49,6 +49,10 @@ test('existing and draft cards encode assembled media paths without changing typ
     const renderer = service(async (service, method, bytes) => {
       assert.equal(service, 27); calls.push(method);
       if (method === (draft ? 8 : 6)) return rendered.转为字节();
+      if (method === 卡片渲染方法.提取音视频标签) {
+        const audio=new 协议写入器(),tag=new 协议写入器();tag.写入字符串(1,'a#1.mp3');audio.写入子消息(2,tag);
+        audio.写入字符串(1,requestFields(bytes)[1].replace('[sound:a#1.mp3]','[anki:play:q:0]'));return audio.转为字节();
+      }
       assert.equal(method, 11);
       const html = requestFields(bytes)[1];
       assert.match(html, /<img src="图#1.png">/, 'Core receives the complete attribute across nodes');
@@ -56,9 +60,11 @@ test('existing and draft cards encode assembled media paths without changing typ
     });
     const card = draft ? await renderer.renderUncommittedCard({id: 0, guid: '', notetypeId: 1, mtimeSecs: 0, usn: 0, fields: [], tags: []}, 0, '{}', '') :
       await renderer.渲染既有卡片(1);
-    assert.deepEqual(calls, [draft ? 8 : 6, 11, 11]);
+    assert.deepEqual(calls, [draft ? 8 : 6, 卡片渲染方法.提取音视频标签, 11, 11]);
     assert.match(原始侧HTML(card, 'question'), /src="图#1.png".*\[sound:a#1.mp3\]/);
     assert.equal(提取拼写标记(card.questionNodes).fieldName, 'Front');
+    assert.match(构建卡片HTML(card,'question'), /data-jide-audio="q:0"/);
+    assert.doesNotMatch(构建卡片HTML(card,'question',false,undefined,true), /data-jide-audio=/);
     for (const side of ['question', 'answer']) {
       const html = 构建卡片HTML(card, side), src = html.match(/<img src="([^"]+)"/)[1];
       assert.equal(decodeURIComponent(new URL(src, 媒体基地址).pathname.slice(1)), '图#1.png');
@@ -76,6 +82,39 @@ test('Core rendering failures propagate; typing failure keeps the ordinary answe
   backend.compareAnswer = coreTyping.compareAnswer;
   assert.equal(await renderStudyAnswer('[[type:Front]]', request, backend), '<code id=typeans><span class=typeGood>á</span></code>');
   assert.equal(await renderStudyAnswer('answer', request, backend), 'answer<hr><code id=typeans><span class=typeGood>á</span></code>');
+});
+
+test('FrontSide preserves question playback markers while answer audio stays independent in both render paths', async () => {
+  for (const draft of [false, true]) {
+    const rendered = new 协议写入器(), question = new 协议写入器(), front = new 协议写入器(), replacement = new 协议写入器(), answer = new 协议写入器();
+    question.写入字符串(1, '<b>Question</b>[sound:q.wav]'); rendered.写入子消息(1, question);
+    replacement.写入字符串(1, 'FrontSide'); front.写入子消息(2, replacement); rendered.写入子消息(2, front);
+    answer.写入字符串(1, '<hr>Answer[sound:a.wav]'); rendered.写入子消息(2, answer);
+    const renderer = service(async (_service, method, bytes) => {
+      const fields = requestFields(bytes);
+      if (method === (draft ? 8 : 6)) {
+        assert.equal(fields[draft ? 5 : 3], 1, 'Core must defer FrontSide in existing and draft cards');
+        return rendered.转为字节();
+      }
+      if (method === 11) return codec.encodeRenderingString(fields[1]);
+      assert.equal(method, 卡片渲染方法.提取音视频标签);
+      const output = new 协议写入器(), side = fields[2] === 1 ? 'q' : 'a';
+      const matches = [...fields[1].matchAll(/\[sound:([^\]]+)\]/g)];
+      assert.deepEqual(matches.map(m => m[1]), [side + '.wav']);
+      output.写入字符串(1, fields[1].replace(/\[sound:[^\]]+\]/g, '[anki:play:' + side + ':0]'));
+      for (const match of matches) { const tag = new 协议写入器(); tag.写入字符串(1, match[1]); output.写入子消息(2, tag); }
+      return output.转为字节();
+    });
+    const card = draft ? await renderer.renderUncommittedCard({id:0,guid:'',notetypeId:1,mtimeSecs:0,usn:0,fields:[],tags:[]},0,'{}') :
+      await renderer.渲染既有卡片(1);
+    assert.deepEqual(card.questionAudio.soundFiles, ['q.wav']); assert.deepEqual(card.answerAudio.soundFiles, ['a.wav']);
+    assert.match(原始侧HTML(card, 'answer'), /\[anki:play:q:0\]/);
+    assert.doesNotMatch(原始侧HTML(card, 'answer'), /\[sound:q.wav\]/);
+    const html = 构建卡片HTML(card, 'answer');
+    assert.match(html, /data-jide-audio="q:0"/); assert.match(html, /data-jide-audio="a:0"/);
+    card.questionAudio.soundFiles[0] = 'question.mp4'; card.questionAudio.items[0].soundFile = 'question.mp4';
+    assert.match(构建卡片HTML(card, 'answer'), /<video src="[^\"]*question.mp4"/);
+  }
 });
 
 test('Core TTS decoding preserves all template parameters and protobuf defaults', () => {

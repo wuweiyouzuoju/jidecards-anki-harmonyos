@@ -137,8 +137,8 @@ test('StringList decodes repeated vals (DescribeNextStates output)', () => {
   assert.deepEqual(decodeStringList(w.转为字节()), ['1分钟', '10分钟', '4天']);
 });
 
-test('RenderExistingCardRequest encodes card_id only', () => {
-  assert.equal(hex(encodeRenderExistingCardRequest(42)), '08 2a');
+test('RenderExistingCardRequest requests deferred FrontSide completion', () => {
+  assert.equal(hex(encodeRenderExistingCardRequest(42)), '08 2a 18 01');
 });
 
 test('RenderCardResponse decodes mixed text/replacement nodes and flags', () => {

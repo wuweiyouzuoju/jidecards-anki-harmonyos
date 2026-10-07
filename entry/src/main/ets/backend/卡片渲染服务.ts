@@ -18,7 +18,7 @@
 //
 // @业务规则
 // 编号统一来自 服务索引，按锁定 Core 的 Backend 分派表验证。
-// 渲染既有卡片：browser=false / partial_render=false（学习页语义，非浏览页）；isEmpty=true 表示卡片内容为空（如字段缺失），调用方可跳过展示。
+// 渲染既有卡片：browser=false / partial_render=true；FrontSide 由本服务在题面 AV 提取后完成，保持两面的声音独立。
 // extractAudioTags 一次返回声音文件名与 TTS 项，同时保留混合出现顺序。
 // 获取空卡报告：请求为 generic.Empty（空字节）；返回 EmptyCardsReport，UI 自绘列表展示，不直接渲染后端 HTML 报告。
 //
@@ -67,8 +67,28 @@ export class 卡片渲染服务 {
 
   /** 必须先合并完整卡面，媒体属性可以横跨模板文本与字段节点。 */
   private async resolveMediaPaths(rendered: RenderedCard): Promise<void> {
-    rendered.questionHtml = await this.encodeIriPaths(原始侧HTML(rendered, 'question'));
-    rendered.answerHtml = await this.encodeIriPaths(原始侧HTML(rendered, 'answer'));
+    let question: string = 原始侧HTML(rendered, 'question');
+    if (/\[sound:|\[anki:tts/.test(question)) {
+      try {
+        rendered.questionAudio = await this.extractAudioTags(question, true);
+        question = rendered.questionAudio.text;
+      } catch (error) { console.info('Question audio tags: ' + String(error)); }
+    }
+    // 对齐 Anki/AnkiDroid：FrontSide 使用已提取 AV 的题面，题面声音不会再次成为答案自动播放项。
+    for (const node of rendered.answerNodes) {
+      if (node.replacement !== null && node.replacement.fieldName === 'FrontSide') {
+        node.replacement.currentText = question;
+      }
+    }
+    let answer: string = 原始侧HTML(rendered, 'answer');
+    if (/\[sound:|\[anki:tts/.test(answer)) {
+      try {
+        rendered.answerAudio = await this.extractAudioTags(answer, false);
+        answer = rendered.answerAudio.text;
+      } catch (error) { console.info('Answer audio tags: ' + String(error)); }
+    }
+    rendered.questionHtml = await this.encodeIriPaths(question);
+    rendered.answerHtml = await this.encodeIriPaths(answer);
   }
 
   async renderUncommittedCard(note: EditableNote, ordinal: number, template: string, css: string, fillEmpty: boolean = false): Promise<RenderedCard> {
@@ -84,7 +104,7 @@ export class 卡片渲染服务 {
 
   /**
    * 渲染既有卡片的正面/背面节点流与模板 CSS。
-   * browser=false / partial_render=false（学习页语义，非浏览页）。
+   * browser=false / partial_render=true；FrontSide 在题面媒体提取后补齐。
    * isEmpty=true 表示卡片内容为空（如字段缺失），调用方可跳过展示。
    */
   async 渲染既有卡片(卡片ID: number): Promise<RenderedCard> {

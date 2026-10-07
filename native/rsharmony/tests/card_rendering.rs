@@ -134,3 +134,114 @@ fn cloze_typing_preserves_numbering_nested_content_and_duplicate_collapse() {
         );
     }
 }
+
+#[test]
+fn deferred_frontside_keeps_question_av_out_of_answer_autoplay() {
+    use anki::collection::CollectionBuilder;
+    use anki_proto::card_rendering::{
+        rendered_template_node::Value, ExtractAvTagsRequest, ExtractAvTagsResponse,
+        RenderCardResponse, RenderExistingCardRequest,
+    };
+    let (backend, directory) = backend();
+    call(&backend, "close_collection", &generic::Empty {});
+    let collection_path = directory.path().join("collection.anki2");
+    let mut col = CollectionBuilder::new(&collection_path).build().unwrap();
+    let nt = col
+        .get_all_notetypes()
+        .unwrap()
+        .into_iter()
+        .find(|nt| nt.config.original_stock_kind == 1)
+        .unwrap();
+    let mut note = nt.new_note();
+    note.set_field(0, "Question[sound:q.wav]").unwrap();
+    note.set_field(1, "Answer[sound:a.wav]").unwrap();
+    col.add_note(&mut note, 1.into()).unwrap();
+    let cid = col
+        .storage
+        .all_card_ids_of_note_in_template_order(note.id)
+        .unwrap()[0]
+        .0;
+    col.close(None).unwrap();
+    call(
+        &backend,
+        "open_collection",
+        &OpenCollectionRequest {
+            collection_path: collection_path.to_string_lossy().into_owned(),
+            media_folder_path: directory
+                .path()
+                .join("collection.media")
+                .to_string_lossy()
+                .into_owned(),
+            media_db_path: directory
+                .path()
+                .join("collection.mdb")
+                .to_string_lossy()
+                .into_owned(),
+        },
+    );
+    let rendered = RenderCardResponse::decode(
+        call(
+            &backend,
+            "render_existing_card",
+            &RenderExistingCardRequest {
+                card_id: cid,
+                browser: false,
+                partial_render: true,
+            },
+        )
+        .as_slice(),
+    )
+    .unwrap();
+    let question: String = rendered
+        .question_nodes
+        .iter()
+        .map(|node| match node.value.as_ref().unwrap() {
+            Value::Text(text) => text.as_str(),
+            Value::Replacement(_) => panic!("stock Basic question must be complete"),
+        })
+        .collect();
+    let q = ExtractAvTagsResponse::decode(
+        call(
+            &backend,
+            "extract_av_tags",
+            &ExtractAvTagsRequest {
+                text: question,
+                question_side: true,
+            },
+        )
+        .as_slice(),
+    )
+    .unwrap();
+    assert_eq!(q.av_tags.len(), 1);
+    let mut deferred_fronts = 0;
+    let answer: String = rendered
+        .answer_nodes
+        .iter()
+        .map(|node| match node.value.as_ref().unwrap() {
+            Value::Text(text) => text.as_str(),
+            Value::Replacement(replacement) => {
+                assert_eq!(replacement.field_name, "FrontSide");
+                assert!(replacement.filters.is_empty());
+                deferred_fronts += 1;
+                q.text.as_str()
+            }
+        })
+        .collect();
+    assert_eq!(deferred_fronts, 1);
+    let a = ExtractAvTagsResponse::decode(
+        call(
+            &backend,
+            "extract_av_tags",
+            &ExtractAvTagsRequest {
+                text: answer,
+                question_side: false,
+            },
+        )
+        .as_slice(),
+    )
+    .unwrap();
+    assert_eq!(a.av_tags.len(), 1);
+    assert!(a.text.contains("[anki:play:q:0]"));
+    assert!(a.text.contains("[anki:play:a:0]"));
+    call(&backend, "close_collection", &generic::Empty {});
+}

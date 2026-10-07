@@ -39,6 +39,8 @@ export function encodeRenderUncommittedCardRequest(note: EditableNote, ordinal: 
   writer.写入变长整数(2, ordinal);
   writer.写入字符串(3, template);
   writer.写入布尔(4, fillEmpty);
+  // FrontSide 在题面 AV 提取后填入，保留正反面音频的独立编号。
+  writer.写入布尔(5, true);
   return writer.转为字节();
 }
 
@@ -47,7 +49,8 @@ export function encodeRenderExistingCardRequest(cardId: number): Uint8Array {
   if (cardId !== 0) {
     w.写入64位整数(1, cardId);
   }
-  // browser=false、partial_render=false 为 proto3 默认值，按 prost 约定不写字段
+  // browser=false；FrontSide 由渲染服务在题面 AV 提取后完成。
+  w.写入布尔(3, true);
   return w.转为字节();
 }
 
