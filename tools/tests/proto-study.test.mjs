@@ -54,6 +54,7 @@ test('QueuedCards decodes nested card summary, queue and states', () => {
   cardMsg.写入64位整数(3, 300); // deck_id
   cardMsg.写入变长整数(4, 2); // template_idx（card_ord）
   cardMsg.写入变长整数(12, 9); // reps：学习链路不需要，应被跳过
+  cardMsg.写入字符串(19, '{"c":1}');
 
   const statesMsg = new 协议写入器();
   statesMsg.写入字节(4, new Uint8Array([0x21])); // good
@@ -64,7 +65,7 @@ test('QueuedCards decodes nested card summary, queue and states', () => {
   queued.写入子消息(3, statesMsg);
   const context = new 协议写入器();
   context.写入字符串(1, '英语');
-  queued.写入子消息(4, context); // context 应被跳过
+  queued.写入子消息(4, context); // preserve the complete context without uint64 seed rounding
 
   const resp = new 协议写入器();
   resp.写入子消息(1, queued);
@@ -80,6 +81,8 @@ test('QueuedCards decodes nested card summary, queue and states', () => {
   assert.equal(view.cards[0].templateIdx, 2);
   assert.equal(view.cards[0].queue, QUEUE_REVIEW);
   assert.deepEqual([...view.cards[0].states.good], [0x21]);
+  assert.deepEqual(view.cards[0].schedulingContext, context.转为字节());
+  assert.equal(view.cards[0].customData, '{"c":1}');
   assert.equal(view.newCount, 7);
   assert.equal(view.learningCount, 3);
   assert.equal(view.reviewCount, 11);

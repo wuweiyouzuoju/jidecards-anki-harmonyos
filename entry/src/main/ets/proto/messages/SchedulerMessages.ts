@@ -26,7 +26,7 @@
 // 前端不解其内容——按钮文案由后端 DescribeNextStates 给出。
 // 解码时把每个状态的原始字节原样保留（raw passthrough），作答时原样回写，
 // 保证字节级保真，避免前端维护易过期的 oneof 重编码。
-// custom_data（插件用）当前不填充：后端注释明确「不设置则不会更新」。
+// custom_data 只由原生自定义调度服务填入候选；普通调度不填充，保留 Core 的不更新语义。
 // RATING_*/QUEUE_*/BURY_SUSPEND_MODE_*/UNBURY_MODE_* 常量与 proto 枚举值对齐。
 //
 // @副作用
@@ -125,6 +125,8 @@ export interface StudyCard {
   templateIdx: number;
   queue: number;
   states: SchedulingStatesRaw;
+  schedulingContext?: Uint8Array;
+  customData?: string;
 }
 
 export interface QueuedCardsView {
@@ -151,11 +153,12 @@ interface CardSummary {
   noteId: number;
   deckId: number;
   templateIdx: number;
+  customData: string;
 }
 
 function decodeCardSummary(bytes: Uint8Array): CardSummary {
   const r = new 协议读取器(bytes);
-  const out: CardSummary = { cardId: 0, noteId: 0, deckId: 0, templateIdx: 0 };
+  const out: CardSummary = { cardId: 0, noteId: 0, deckId: 0, templateIdx: 0, customData: '' };
   let tag;
   while ((tag = r.读取标签()) !== null) {
     switch (tag.字段号) {
@@ -170,6 +173,9 @@ function decodeCardSummary(bytes: Uint8Array): CardSummary {
         break;
       case 4:
         out.templateIdx = r.读取变长整数();
+        break;
+      case 19:
+        out.customData = r.读取字符串();
         break;
       default:
         r.跳过字段(tag.线类型);
@@ -203,6 +209,7 @@ function decodeQueuedCard(bytes: Uint8Array): StudyCard {
         card.noteId = summary.noteId;
         card.deckId = summary.deckId;
         card.templateIdx = summary.templateIdx;
+        card.customData = summary.customData;
         break;
       }
       case 2:
@@ -211,8 +218,10 @@ function decodeQueuedCard(bytes: Uint8Array): StudyCard {
       case 3:
         card.states = decodeSchedulingStates(r.读取字节());
         break;
+      case 4:
+        card.schedulingContext = r.读取字节();
+        break;
       default:
-        // context（牌组名/随机种子）UI 暂不需要
         r.跳过字段(tag.线类型);
     }
   }

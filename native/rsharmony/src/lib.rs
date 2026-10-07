@@ -7,6 +7,7 @@ use std::ptr;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 mod collection_history;
+pub mod custom_scheduling;
 pub mod deck_preview;
 mod media_snapshot;
 pub mod note_duplicates;
@@ -99,6 +100,9 @@ impl BackendState {
         method: u32,
         input: &[u8],
     ) -> Result<Vec<u8>, BackendFailure> {
+        if service == custom_scheduling::SERVICE {
+            return custom_scheduling::call(method, input);
+        }
         if service == media_snapshot::SERVICE {
             return self.media.call(self.raw.as_mut(), method, input);
         }
