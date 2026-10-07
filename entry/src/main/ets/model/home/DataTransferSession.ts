@@ -9,6 +9,7 @@ import { ImportOperation, ImportCancelled } from '../ImportOperation';
 import type { ImportProgress } from '../ImportOperation';
 import { importFileKind, importFileName } from '../ImportFile';
 import type { ImportFile } from '../ImportFile';
+import { importResultBatch } from '../ImportResults';
 
 export interface DataTransferBackend {
   importPackagePresets(): Promise<ImportAnkiPackageOptions>;
@@ -62,6 +63,11 @@ export class DataTransferSession {
   private externalUri: string = '';
   private selectedUri: string = '';
   private finishExternal: (() => void) | null = null;
+
+  resultQuery(category: string, page: number): string | null {
+    if (!this.alive || this.state.phase !== 'idle' || this.state.result === null) return null;
+    return importResultBatch(this.state.result, category, page)?.query ?? null;
+  }
 
   constructor(backend: DataTransferBackend, publish: (state: DataTransferState) => void,
     refresh: () => Promise<void>, success: () => void) {

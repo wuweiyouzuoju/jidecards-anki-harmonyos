@@ -8,7 +8,7 @@
 // 编解码 anki.import_export.proto 消息（Anki 26.05）：
 // - ImportAnkiPackageRequest / ExportAnkiPackageRequest：apkg 包导入导出
 // - ImportCollectionPackageRequest / ExportCollectionPackageRequest：colpkg 全量包
-// - ImportResponse：仅提取 Log 中的 new/updated/duplicate 计数与 found_notes
+// - ImportResponse：提取分类计数及目标集合笔记 ID，供导入结果定位
 // 字段来源：third_party/anki/proto/anki/import_export.proto
 //
 // @输入
@@ -21,7 +21,7 @@
 //
 // @业务规则
 // DEFAULT_*_OPTIONS 常量与 Anki 桌面端默认选项对齐。
-// ImportResponse 只计数 Log 中本端需要的字段，其他子消息跳过。
+// ImportResponse 保留目标集合 ID，跳过来源字段内容以免复制大笔记。
 // ExportAnkiPackageRequest 内嵌 limit 子消息（field 3）指定 deckId。
 //
 // @副作用
@@ -67,6 +67,9 @@ export interface ImportCollectionPackageRequest {
 }
 
 export interface ImportSummary {
+  newNoteIds?: number[];
+  updatedNoteIds?: number[];
+  duplicateNoteIds?: number[];
   newNotes: number;
   updatedNotes: number;
   duplicateNotes: number;
@@ -191,7 +194,7 @@ function encodeExportAnkiPackageOptions(options: ExportAnkiPackageOptions): 协�
   return w;
 }
 
-/** ImportResponse: only counts the Log section required by the presentation layer. */
+/** 导入分类及目标笔记 ID；失败分类的来源 ID 不作为目标集合定位依据。 */
 export function decodeImportResponse(bytes: Uint8Array): ImportSummary {
   const summary: ImportSummary = { newNotes: 0, updatedNotes: 0, duplicateNotes: 0, foundNotes: 0,
     conflictingNotes: 0, firstFieldMatches: 0, missingNotetypeNotes: 0, missingDeckNotes: 0, emptyFirstFieldNotes: 0 };
@@ -214,15 +217,15 @@ function decodeImportLog(bytes: Uint8Array, summary: ImportSummary): void {
     switch (tag.字段号) {
       case 1:
         summary.newNotes += 1;
-        r.跳过字段(tag.线类型);
+        appendImportNoteId(r.读取字节(), summary, 1);
         break;
       case 2:
         summary.updatedNotes += 1;
-        r.跳过字段(tag.线类型);
+        appendImportNoteId(r.读取字节(), summary, 2);
         break;
       case 3:
         summary.duplicateNotes += 1;
-        r.跳过字段(tag.线类型);
+        appendImportNoteId(r.读取字节(), summary, 3);
         break;
       case 4: summary.conflictingNotes++; r.跳过字段(tag.线类型); break;
       case 5: summary.firstFieldMatches++; r.跳过字段(tag.线类型); break;
@@ -235,5 +238,27 @@ function decodeImportLog(bytes: Uint8Array, summary: ImportSummary): void {
       default:
         r.跳过字段(tag.线类型);
     }
+  }
+}
+
+/** 只有成功/重复日志的 ID 属于目标集合；冲突日志可能携带来源 ID，禁止用于定位。 */
+function appendImportNoteId(bytes: Uint8Array, summary: ImportSummary, category: number): void {
+  const reader = new 协议读取器(bytes);
+  while (!reader.已读完) {
+    const tag = reader.读取标签()!;
+    if (tag.字段号 === 1 && tag.线类型 === 2) {
+      const idReader = new 协议读取器(reader.读取字节());
+      while (!idReader.已读完) {
+        const idTag = idReader.读取标签()!;
+        if (idTag.字段号 === 1 && idTag.线类型 === 0) {
+          const id: number = idReader.读取变长整数();
+          if (Number.isSafeInteger(id) && id > 0) {
+            if (category === 1) (summary.newNoteIds ??= []).push(id);
+            else if (category === 2) (summary.updatedNoteIds ??= []).push(id);
+            else (summary.duplicateNoteIds ??= []).push(id);
+          }
+        } else idReader.跳过字段(idTag.线类型);
+      }
+    } else reader.跳过字段(tag.线类型);
   }
 }
