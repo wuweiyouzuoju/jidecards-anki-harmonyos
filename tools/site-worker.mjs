@@ -10,6 +10,11 @@ export default {
       url.host = 'jidecards.com';
       return Response.redirect(url.href, 301);
     }
+    // Google 验证文件必须保留公开的 .html 地址；内部使用静态服务的无扩展名路径。
+    if (/^\/google[a-f0-9]+\.html$/.test(url.pathname)) {
+      url.pathname = url.pathname.slice(0, -5);
+      return env.ASSETS.fetch(new Request(url, request));
+    }
     return env.ASSETS.fetch(request);
   }
 };
