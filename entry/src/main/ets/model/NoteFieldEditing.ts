@@ -53,6 +53,7 @@ export interface NoteFieldEditingSupport {
   plainTextMeaning: string;
   fontAvailability: string;
   tools: NoteEditorTool[];
+  formatMenus: NoteEditorFormatMenu[];
   mediaTools: NoteEditorTool[];
   modeTools: NoteEditorTool[];
   modeControlPlacement: string;
@@ -65,7 +66,26 @@ export interface NoteFieldEditingSupport {
     target: string; visibleCount: number; commonToolIds: string[]; labels: string; labelLines: number; mouseNotchesPerTool: number;
     activation: string; rotation: string; grip: string; manualPosition: string };
 }
-export interface NoteEditorTool { id: string; titleKey: string; iconKey: string; editing: string; }
+export interface NoteEditorTool { id: string; titleKey: string; iconKey: string; editing: string; longPressAction?: string; }
+export interface NoteEditorFormatOption { id: string; titleKey: string; prefix: string; suffix: string; }
+export interface NoteEditorFormatMenu { toolId: string; options: NoteEditorFormatOption[]; }
+
+/** 插入写法与 AnkiDroid 相同；UI 选项和 JIDE 能力目录只读取这一份声明。 */
+export const NOTE_EDITOR_FORMAT_MENUS: NoteEditorFormatMenu[] = [
+  { toolId: 'font_size', options: ['xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large']
+    .map((size: string): NoteEditorFormatOption => ({ id: size,
+      titleKey: 'note_editor_size_' + size.replace(new RegExp('-', 'g'), '_'),
+      prefix: `<span style="font-size:${size}">`, suffix: '</span>' })) },
+  { toolId: 'heading', options: [1, 2, 3, 4, 5].map((level: number): NoteEditorFormatOption =>
+    ({ id: 'h' + level, titleKey: 'note_editor_heading_' + level, prefix: `<h${level}>`, suffix: `</h${level}>` })) },
+  { toolId: 'math', options: [
+    { id: 'block', titleKey: 'note_editor_math_block', prefix: '\\[', suffix: '\\]' },
+    { id: 'chemistry', titleKey: 'note_editor_math_chemistry', prefix: '\\( \\ce{', suffix: '} \\)' }
+  ] }
+];
+export function noteEditorFormatOptions(toolId: string): NoteEditorFormatOption[] {
+  return NOTE_EDITOR_FORMAT_MENUS.find((menu: NoteEditorFormatMenu): boolean => menu.toolId === toolId)?.options ?? [];
+}
 
 /** 按钮图标和 JIDE 工具认知共用；界面显隐与可点击状态仍由字段编辑器持有。 */
 export const NOTE_EDITOR_TOOLS: NoteEditorTool[] = [
@@ -74,7 +94,8 @@ export const NOTE_EDITOR_TOOLS: NoteEditorTool[] = [
   { id: 'underline', titleKey: 'note_editor_underline', iconKey: 'ic_editor_underline', editing: 'visual_or_source' },
   { id: 'highlight', titleKey: 'note_editor_highlight', iconKey: 'ic_editor_highlight', editing: 'visual_or_source' },
   { id: 'break', titleKey: 'note_editor_break', iconKey: 'ic_editor_break', editing: 'visual_or_source' },
-  { id: 'math', titleKey: 'note_editor_math', iconKey: 'ic_editor_math', editing: 'literal_math_delimiters' },
+  { id: 'math', titleKey: 'note_editor_math', iconKey: 'ic_editor_math', editing: 'literal_math_delimiters',
+    longPressAction: 'choose_block_or_chemistry' },
   { id: 'cloze_next', titleKey: 'note_editor_cloze_next', iconKey: 'ic_editor_cloze_next', editing: 'cloze_only' },
   { id: 'cloze_same', titleKey: 'note_editor_cloze_same', iconKey: 'ic_editor_cloze_same', editing: 'cloze_only' },
   { id: 'superscript', titleKey: 'note_editor_superscript', iconKey: 'ic_editor_superscript', editing: 'html_source_then_card_preview' },
@@ -82,7 +103,9 @@ export const NOTE_EDITOR_TOOLS: NoteEditorTool[] = [
   { id: 'bullet_list', titleKey: 'note_editor_bullet_list', iconKey: 'ic_editor_bullet_list', editing: 'html_source_then_card_preview' },
   { id: 'numbered_list', titleKey: 'note_editor_numbered_list', iconKey: 'ic_editor_numbered_list', editing: 'html_source_then_card_preview' },
   { id: 'link', titleKey: 'note_editor_link', iconKey: 'ic_editor_link', editing: 'selection_or_label_link_dialog' },
-  { id: 'clear_format', titleKey: 'note_editor_clear_format', iconKey: 'ic_editor_clear_format', editing: 'selection_or_typing_format' }
+  { id: 'clear_format', titleKey: 'note_editor_clear_format', iconKey: 'ic_editor_clear_format', editing: 'selection_or_typing_format' },
+  { id: 'font_size', titleKey: 'note_editor_font_size', iconKey: 'ic_editor_font_size', editing: 'html_source_then_card_preview' },
+  { id: 'heading', titleKey: 'note_editor_heading', iconKey: 'ic_editor_heading', editing: 'html_source_then_card_preview' }
 ];
 export const NOTE_EDITOR_COMMON_TOOL_IDS: string[] = ['bold', 'italic', 'underline', 'highlight', 'break', 'clear_format'];
 export const NOTE_EDITOR_FORMAT_TOGGLE_IDS: string[] = ['bold', 'italic', 'underline', 'highlight'];
@@ -122,6 +145,7 @@ export const NOTE_FIELD_EDITING_SUPPORT: NoteFieldEditingSupport = {
   minimumFontSize: 5, maximumFontSize: 300, plainTextMeaning: 'default_html_source_preserving_formatting',
   fontAvailability: 'installed fonts with system fallback; font file import is not available',
   tools: NOTE_EDITOR_TOOLS,
+  formatMenus: NOTE_EDITOR_FORMAT_MENUS,
   mediaTools: NOTE_FIELD_MEDIA_TOOLS,
   modeTools: NOTE_FIELD_MODE_TOOLS,
   modeControlPlacement: 'above_each_editable_field',

@@ -2,9 +2,29 @@
 import { parseNoteRichText, serializeNoteRichText, sliceNoteRichText, encodeNoteText,
   noteLinkUrl, FORMAT_SUPERSCRIPT, FORMAT_SUBSCRIPT } from './NoteRichText';
 import type { NoteTextRun } from './NoteRichText';
+import { wrapFieldSelection } from './NoteFieldEditing';
 import type { FieldEditResult } from './NoteFieldEditing';
 
 export function noteEditorHeight(expanded: boolean): number { return expanded ? 336 : 112; }
+
+/** 可视选区按 HTML 边界分别序列化；插入标题/字号后交给源码编辑与卡片预览。 */
+export function richNoteWrap(runs: NoteTextRun[], start: number, end: number,
+  prefix: string, suffix: string): FieldEditResult {
+  const length: number = runs.reduce((total: number, run: NoteTextRun): number => total + run.text.length, 0);
+  const from: number = Math.max(0, Math.min(start, length));
+  const to: number = Math.max(from, Math.min(end, length));
+  const before: string = serializeNoteRichText(sliceNoteRichText(runs, 0, from));
+  const contents: string = serializeNoteRichText(sliceNoteRichText(runs, from, to));
+  const cursor: number = before.length + prefix.length + contents.length + (from === to ? 0 : suffix.length);
+  return { text: before + prefix + contents + suffix + serializeNoteRichText(sliceNoteRichText(runs, to, length)),
+    start: cursor, end: cursor };
+}
+
+export function sourceNoteWrap(value: string, start: number, end: number,
+  prefix: string, suffix: string): FieldEditResult | null {
+  if (!sourceSelectionComplete(value, start, end)) return null;
+  return wrapFieldSelection(value, start, end, prefix, suffix);
+}
 
 /** 可视选区转为标准上下标源码；空选区把光标留在标签内部，保留相邻样式与链接。 */
 export function richNoteScript(runs: NoteTextRun[], start: number, end: number, superscript: boolean): FieldEditResult {
