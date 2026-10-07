@@ -76,6 +76,8 @@ npx --yes wrangler@4.141.0 deploy --config hosting/wrangler.jsonc
 
 代理只在本机提供该端口时设置。Wrangler 使用已登录账户；首次使用按官方流程登录。发布后读回主域名页面、数据、文本、XML 和所有新图片，与本地摘要比对，并核对 MIME、旧图片 404 与旧域名 301。不能仅凭部署命令成功认定线上内容正确。
 
+GPT 读取验收必须使用真实网页读取工具，确认当前版本与正文；本机 curl 使用 GPTBot / ChatGPT-User 的 User-Agent 得到 200，只证明该请求线路成功，不能证明 OpenAI 的真实出口 IP 可访问。搜索工具返回旧版本也不能当作当前线上验收通过。失败时同时检查实际读取结果、Worker 日志和 Cloudflare Security 的 AI Search / Agent 策略及安全事件。日志中没有请求时，应继续检查网络、边缘设置和读取工具；模板或图片加载修改不能作为读取恢复的证据。安全事件存在采样，筛选结果为空不能证明从未发生拦截。安全设置读取需要对应权限，当前 Wrangler 发布凭证不含该权限，可通过已登录的后台核对。
+
 自动部署入口是 `.github/workflows/site-deploy.yml`：安装锁定依赖、构建、网站测试，再部署。需要 GitHub Actions 的 `CLOUDFLARE_API_TOKEN` 和 `CLOUDFLARE_ACCOUNT_ID`；当前发布仍使用本地登录账户。推送源码与发布网站是两项独立动作。
 
 ## 域名与收录
