@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { currentMotionProfile, motionAnimation } from '../../utils/AppMotion';
 import { ActionIcon } from '../common/ActionIcon';
 import { DisclosureChevron } from '../common/DisclosureChevron';
 import { PressFeedback } from '../../utils/PressFeedback';
@@ -18,6 +19,7 @@ import { NOTE_EDITOR_GRIP_AVAILABILITY_KEY, NoteEditorWheelState, NoteEditorWhee
   noteWheelRadius, noteWheelY, NoteWheelRotation } from '../../model/NoteEditorWheel';
 import { appInterface } from '../../backend/AppInterfaceService';
 import { noteEditorWheelObservation } from '../../model/AppInterface';
+import type { AppInterfaceObservation } from '../../model/AppInterface';
 import { NOTE_EDITOR_ACTION_FLASH_MS, noteEditorTool } from '../../model/NoteFieldEditing';
 export { NoteEditorFormatDialog } from './NoteEditorFormatDialog';
 
@@ -52,6 +54,13 @@ export function buildNoteEditorWheel(params: NoteEditorWheelParams) {
 @Component
 struct NoteEditorWheel {
   private longPressedTool: string = '';
+  @State private pressedId: string = '';
+  @State private rotating: boolean = false;
+  @State private moving: boolean = false;
+  @State private edgeContact: boolean = false;
+  private suppressToolClick: boolean = false;
+  private suppressHandleClick: boolean = false;
+  private axisStartPosition: number = 0;
   @Prop @Watch('parametersChanged') params: NoteEditorWheelParams = new NoteEditorWheelParams(
     { cloze: false, source: false, expanded: false, activeIds: [] }, (_id: string): void => {});
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
@@ -101,7 +110,7 @@ struct NoteEditorWheel {
 
   aboutToAppear(): void { this.mounted = true; this.parametersChanged(); this.subscribeKeyboard(); }
   aboutToDisappear(): void {
-    this.mounted = false; this.grip.dispose(); this.clearActionFlash();
+    this.cancelManipulation(); this.mounted = false; this.grip.dispose(); this.clearActionFlash();
     if (this.revealTimer >= 0) clearTimeout(this.revealTimer);
     if (this.keyboardSubscribed) {
       try { this.hostWindow?.off('keyboardHeightChange', this.keyboardListener); } catch (_error) { /* 窗口已销毁。 */ }
@@ -130,7 +139,7 @@ struct NoteEditorWheel {
   private activityChanged(): void {
     const active: boolean = this.mounted && this.foreground && this.params.visible;
     this.grip.setActive(active);
-    if (active) this.publish(); else { this.clearActionFlash(); this.mouseRotation.reset(); this.axisMoved = false; this.detach(); }
+    if (active) this.publish(); else { this.cancelManipulation(); this.clearActionFlash(); this.mouseRotation.reset(); this.axisMoved = false; this.detach(); }
   }
   private detach(): void {
     if (this.attached) appInterface.leave('note_editor_wheel', this.observationVersion);
@@ -165,7 +174,8 @@ struct NoteEditorWheel {
       if (height !== 0 && rect.height > 0) top = this.getUIContext().px2vp(rect.top);
       else if (height > 0) top = this.getUIContext().px2vp(this.hostWindow.getWindowProperties().windowRect.height - height);
     } catch (_error) { /* 键盘区域暂不可读时沿用宿主测量。 */ }
-    this.getUIContext().animateTo({ duration: 220, curve: Curve.EaseOut }, (): void => { this.keyboardTop = top; });
+    this.cancelManipulation();
+    this.getUIContext().animateTo(motionAnimation(currentMotionProfile().textMs), (): void => { this.keyboardTop = top; });
   }
   private distance(index: number, common: boolean = false): number {
     return common ? index - (this.commonTools.length - 1) / 2 : noteWheelDistance(index, this.arcPosition, this.wheelTools.length);
@@ -195,18 +205,23 @@ struct NoteEditorWheel {
   }
   private publish(): void {
     if (!this.mounted || !this.foreground || !this.params.visible || this.commonTools.length === 0) return;
-    this.observationVersion = appInterface.observe(noteEditorWheelObservation(this.params.state, this.selectedId, this.side,
-      this.collapsed, this.gripAvailability, this.selected()?.id ?? ''));
+    const observation: AppInterfaceObservation = noteEditorWheelObservation(this.params.state, this.selectedId, this.side,
+      this.collapsed, this.gripAvailability, this.selected()?.id ?? '');
+    observation.values = (observation.values ?? []).concat([
+      { id: 'pressed_tool', value: this.pressedId }, { id: 'rotating', value: String(this.rotating) },
+      { id: 'moving', value: String(this.moving) }, { id: 'edge_contact', value: String(this.edgeContact) }]);
+    this.observationVersion = appInterface.observe(observation);
     this.params.onSelection(this.selectedId);
     this.attached = true;
   }
   private animateOpen(open: boolean): void {
-    this.getUIContext().animateTo({ duration: open ? 260 : 220, curve: curves.springCurve(0, 1, 280, 28) },
+    this.getUIContext().animateTo(motionAnimation(open ? currentMotionProfile().wheelOpenMs : currentMotionProfile().wheelCloseMs),
       (): void => { this.openProgress = open ? 1 : 0; });
   }
   private toggleOpen(): void {
     if (!this.mounted || !this.foreground || !this.params.visible) return;
-    this.clearActionFlash();
+    if (this.suppressHandleClick) { this.suppressHandleClick = false; return; }
+    this.cancelManipulation(); this.clearActionFlash();
     this.mouseRotation.reset(); this.axisMoved = false;
     this.collapsed = !this.collapsed;
     if (!this.collapsed) { this.selectedId = ''; this.params.onResetFormats(); }
@@ -236,8 +251,10 @@ struct NoteEditorWheel {
       if (longPress) this.params.onLongAction(id); else this.params.onAction(id);
     }
   }
-  private toolTouch(event: TouchEvent): void {
-    if (event.type === TouchType.Down) this.longPressedTool = '';
+  private toolTouch(id: string, event: TouchEvent): void {
+    if (event.type === TouchType.Down) { this.longPressedTool = ''; this.suppressToolClick = false; this.pressedId = id; }
+    if (event.type === TouchType.Up || event.type === TouchType.Cancel) this.pressedId = '';
+    if (event.type === TouchType.Cancel || event.touches.length > 1) { this.suppressToolClick = true; this.cancelManipulation(); }
   }
   private longPressTool(id: string): void {
     if (noteEditorTool(id).longPressAction === undefined) return;
@@ -245,6 +262,7 @@ struct NoteEditorWheel {
     this.execute(id, true);
   }
   private clickTool(id: string): void {
+    if (this.suppressToolClick || this.rotating) return;
     // 长按松手若补发 click，也不能额外插入行内标记；下一次按下恢复普通点击。
     if (this.longPressedTool === id) { this.longPressedTool = ''; return; }
     this.mouseRotation.reset();
@@ -258,10 +276,13 @@ struct NoteEditorWheel {
   }
   private axisWheel(event: AxisEvent): void {
     if (!this.mounted || !this.foreground || !this.params.visible || this.collapsed) return;
-    if (event.action === AxisAction.CANCEL) { this.mouseRotation.reset(); this.axisMoved = false; return; }
+    if (event.action === AxisAction.CANCEL) {
+      if (this.axisMoved) this.restoreRotation(this.axisStartPosition);
+      this.mouseRotation.reset(); this.axisMoved = false; return;
+    }
     const delta: number = this.mouseRotation.move(event.getVerticalAxisValue(), event.scrollStep ?? 1);
     if (this.wheelTools.length === 0) return;
-    if (delta !== 0) { this.axisMoved = true; this.arcPosition += delta; this.publish(); }
+    if (delta !== 0) { if (!this.axisMoved) this.axisStartPosition = this.arcPosition; this.axisMoved = true; this.arcPosition += delta; this.publish(); }
     if (event.action === AxisAction.END && this.axisMoved) { this.axisMoved = false; this.settleRotation(); }
   }
   private rotateStart(event: GestureEvent): void {
@@ -271,6 +292,7 @@ struct NoteEditorWheel {
     if (finger === undefined) return;
     this.startX = finger.globalX - this.originX - event.offsetX;
     this.startY = finger.globalY - this.originY - event.offsetY;
+    this.rotating = true; this.pressedId = ''; this.suppressToolClick = true;
     this.rotationPosition = this.arcPosition;
     this.rotation.begin(this.startX, this.startY, this.radius(), this.side === 'right', noteWheelAngleStep(this.radius(), this.wheelTools.length));
   }
@@ -283,21 +305,44 @@ struct NoteEditorWheel {
     if (this.selectedIndex() !== previous) this.publish();
   }
   private settleRotation(): void {
+    this.rotating = false; this.pressedId = '';
     if (this.wheelTools.length === 0) return;
-    this.getUIContext().animateTo({ duration: 180, curve: curves.springCurve(0, 1, 340, 28) },
+    this.getUIContext().animateTo(motionAnimation(currentMotionProfile().wheelSnapMs),
       (): void => { this.arcPosition = Math.round(this.arcPosition - this.alignmentOffset()) + this.alignmentOffset(); });
     this.publish();
   }
+  private restoreRotation(position: number): void {
+    this.rotating = false; this.pressedId = '';
+    this.getUIContext().animateTo(motionAnimation(currentMotionProfile().wheelSnapMs), (): void => { this.arcPosition = position; });
+    this.publish();
+  }
+  private cancelManipulation(): void {
+    if (this.rotating) this.restoreRotation(this.rotationPosition);
+    if (this.moving) this.finishMove(true);
+    this.pressedId = ''; this.touchIds.clear(); this.grip.setTouching(false);
+  }
+  private finishMove(cancelled: boolean): void {
+    if (!this.moving) return;
+    this.moving = false; this.edgeContact = false;
+    const target: number = cancelled ? this.dragY : noteWheelY(this.centerY, this.usableHeight(), this.radius(), false);
+    this.getUIContext().animateTo(motionAnimation(currentMotionProfile().wheelSnapMs), (): void => { this.centerY = target; });
+  }
+  private handleTouch(event: TouchEvent): void {
+    if (event.type === TouchType.Down) this.suppressHandleClick = false;
+    this.touch(event);
+  }
   private moveSide(side: StudyToolbarSide): void {
-    this.getUIContext().animateTo({ duration: 240, curve: Curve.EaseInOut }, (): void => { this.side = side; });
+    this.cancelManipulation();
+    this.getUIContext().animateTo(motionAnimation(currentMotionProfile().wheelMoveMs), (): void => { this.side = side; });
     this.publish();
   }
   private switchSide(): void {
+    this.suppressHandleClick = true;
     const side: StudyToolbarSide = this.side === 'left' ? 'right' : 'left';
     this.grip.restoreSide(side); this.moveSide(side);
   }
   private touch(event: TouchEvent): void {
-    if (event.type === TouchType.Cancel) this.touchIds.clear();
+    if (event.type === TouchType.Cancel || event.touches.length > 1) this.cancelManipulation();
     else for (const touch of event.changedTouches) {
       if (event.type === TouchType.Up) this.touchIds.delete(touch.id);
       else this.touchIds.add(touch.id);
@@ -322,6 +367,7 @@ struct NoteEditorWheel {
       Stack() {
         Circle().width(this.circleSize(common)).height(this.circleSize(common)).fill(this.current(tool) ?
           this.accent : $r('app.color.surface_sidebar'))
+          .stroke(this.pressedId === tool.id ? this.accent : Color.Transparent).strokeWidth(2)
         Column({ space: this.contentScale() }) {
           ActionIcon({ source: $r('app.media.' + tool.iconKey),
             glyphSize: (common ? 16 : 18) * this.contentScale(),
@@ -341,7 +387,7 @@ struct NoteEditorWheel {
       .accessibilityDescription(tool.longPressAction !== undefined ? $r('app.string.note_editor_math_press_hint') :
         (this.params.state.activeIds.indexOf(tool.id) >= 0 ?
           $r('app.string.note_editor_format_on') : $r('app.string.note_editor_wheel_select')))
-      .onTouch((event: TouchEvent): void => { this.toolTouch(event); })
+      .onTouch((event: TouchEvent): void => { this.toolTouch(tool.id, event); })
       .onClick((): void => { this.clickTool(tool.id); })
       .gesture(LongPressGesture().onAction((): void => { this.longPressTool(tool.id); }))
   }
@@ -353,6 +399,9 @@ struct NoteEditorWheel {
         .rotate({ angle: noteWheelHandleAngle(this.openProgress, this.side === 'right') })
     }.width(28).height(48).padding(0).type(ButtonType.Normal)
       .borderRadius(12).backgroundColor($r('app.color.surface_sidebar'))
+      .border({ width: 1, color: this.moving || this.edgeContact ? this.accent : SurfaceBorder.color() })
+      .scale({ x: this.moving ? 1.04 : 1, y: this.moving ? 1.04 : 1 })
+      .animation(motionAnimation(currentMotionProfile().statusMs))
       .focusOnTouch(false).focusable(false).attributeModifier(new PressFeedback()).stateEffect(false)
       .accessibilityText(this.collapsed ? $r('app.string.note_editor_wheel_open') : $r('app.string.note_editor_wheel_close'))
       .accessibilityDescription($r('app.string.note_editor_wheel_move_hint'))
@@ -360,10 +409,13 @@ struct NoteEditorWheel {
       .gesture(GestureGroup(GestureMode.Exclusive,
         LongPressGesture().onAction((): void => { this.switchSide(); }),
         PanGesture({ direction: PanDirection.Vertical, distance: 6 })
-          .onActionStart((): void => { this.dragY = this.y(); })
+          .onActionStart((): void => { this.dragY = this.y(); this.moving = true; this.suppressHandleClick = true; })
           .onActionUpdate((event: GestureEvent): void => {
-            this.centerY = noteWheelY(this.dragY + event.offsetY, this.usableHeight(), this.radius(), false);
-          })))
+            const desired: number = this.dragY + event.offsetY;
+            this.centerY = noteWheelY(desired, this.usableHeight(), this.radius(), false);
+            this.edgeContact = Math.abs(this.centerY - desired) > 0.5;
+          }).onActionEnd((): void => { this.finishMove(false); })
+          .onActionCancel((): void => { this.finishMove(true); })))
   }
 
   build() {
@@ -393,7 +445,7 @@ struct NoteEditorWheel {
           .onAxisEvent((event: AxisEvent): void => { this.axisWheel(event); })
           .gesture(PanGesture({ distance: 3 }).onActionStart((event: GestureEvent): void => { this.rotateStart(event); })
             .onActionUpdate((event: GestureEvent): void => { this.rotateWheel(event); })
-            .onActionEnd((): void => { this.settleRotation(); }).onActionCancel((): void => { this.settleRotation(); }))
+            .onActionEnd((): void => { this.settleRotation(); }).onActionCancel((): void => { if (this.rotating) this.restoreRotation(this.rotationPosition); }))
           .onAreaChange((_old: Area, area: Area): void => {
             this.originX = Number(area.globalPosition.x); this.originY = Number(area.globalPosition.y);
           })
@@ -403,7 +455,7 @@ struct NoteEditorWheel {
           .position({ x: this.side === 'left' ? 0 : this.viewportWidth - 28, y: this.y() - 24 })
           .opacity(this.params.visible ? 1 : this.openProgress)
           .hitTestBehavior(this.params.visible ? HitTestMode.Default : HitTestMode.None)
-          .onTouch((event: TouchEvent): void => { this.touch(event); })
+          .onTouch((event: TouchEvent): void => { this.handleTouch(event); })
       }
     }.width('100%').height('100%').focusable(false).hitTestBehavior(HitTestMode.Transparent)
       .onAreaChange((_old: Area, area: Area): void => {

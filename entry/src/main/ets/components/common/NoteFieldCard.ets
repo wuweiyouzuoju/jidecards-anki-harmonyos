@@ -1,3 +1,4 @@
+import { SurfaceTransition } from '../../utils/SurfaceTransition';
 import { IconActionButton } from './IconActionButton';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
@@ -88,7 +89,7 @@ export struct NoteFieldCard {
           if (kind === 'audio') this.onAudioStatus(null);
           if (!this.disposed) this.onAudioBusy(false);
         } }),
-      customStyle: true, autoCancel: false, alignment: DialogAlignment.Center,
+      openAnimation: SurfaceTransition.dialogEnterAnimation(), closeAnimation: SurfaceTransition.dialogExitAnimation(), customStyle: true, autoCancel: false, alignment: DialogAlignment.Center,
       width: '100%', height: '100%', maskColor: Color.Transparent,
       onWillDismiss: (_action: DismissDialogAction): void => { this.dismissManager(); }
     });

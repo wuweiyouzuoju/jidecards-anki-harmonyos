@@ -1,3 +1,4 @@
+import { SurfaceTransition } from '../../utils/SurfaceTransition';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { ComponentContent } from '@kit.ArkUI';
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -314,11 +315,18 @@ export struct NoteFieldEditor {
 
   private focusInput(source: boolean, caret: number = -1): void {
     const version: number = ++this.selectionVersion;
+    const start: number = this.selectionStart;
+    const end: number = this.selectionEnd;
     setTimeout((): void => {
       if (this.disposed || this.disabled || !this.foreground || !this.wheelActive || this.sourceMode !== source || version !== this.selectionVersion) return;
       try {
         this.getUIContext().getFocusController().requestFocus(this.inputKey + (source ? '-source' : '-visual'));
-        if (source && caret >= 0) this.controller.caretPosition(caret);
+        if (source && start >= 0 && end > start) this.controller.setTextSelection(start, end, { menuPolicy: MenuPolicy.HIDE });
+        else if (source && (caret >= 0 || start >= 0)) this.controller.caretPosition(caret >= 0 ? caret : start);
+        else if (!source && this.ready && start >= 0) {
+          if (end > start) this.richController.setSelection(start, end, { menuPolicy: MenuPolicy.HIDE });
+          else this.richController.setCaretOffset(start);
+        }
       } catch (_error) { /* 焦点不可恢复时草稿与目标光标仍保留。 */ }
     }, 16);
   }
@@ -392,7 +400,7 @@ export struct NoteFieldEditor {
           this.richController.setCaretOffset(caret); this.selectionStart = caret; this.selectionEnd = caret;
         }
       } }), cancel: (): void => { this.closeLink(); },
-      customStyle: true, autoCancel: true, alignment: DialogAlignment.Center,
+      openAnimation: SurfaceTransition.dialogEnterAnimation(), closeAnimation: SurfaceTransition.dialogExitAnimation(), customStyle: true, autoCancel: true, alignment: DialogAlignment.Center,
       width: '100%', height: '100%', maskColor: Color.Transparent });
     this.linkDialog.open();
     this.hideWheel(true);
@@ -400,7 +408,7 @@ export struct NoteFieldEditor {
 
   private closeLink(): void {
     this.linkDialog?.close(); this.linkDialog = null;
-    if (this.wheelActive) this.showWheel();
+    if (this.wheelActive) { this.showWheel(); this.focusInput(this.sourceMode, this.selectionStart); }
   }
 
   private openFormatOptions(key: string): void {
@@ -434,7 +442,7 @@ export struct NoteFieldEditor {
         }
         this.updateWheel();
       } }), cancel: (): void => { this.closeFormat(version); },
-      customStyle: true, autoCancel: true, alignment: DialogAlignment.Center,
+      openAnimation: SurfaceTransition.dialogEnterAnimation(), closeAnimation: SurfaceTransition.dialogExitAnimation(), customStyle: true, autoCancel: true, alignment: DialogAlignment.Center,
       width: '100%', height: '100%', maskColor: Color.Transparent });
     this.formatDialog.open(); this.hideWheel(true);
   }
@@ -444,7 +452,7 @@ export struct NoteFieldEditor {
     const dialog: CustomDialogController | null = this.formatDialog;
     this.formatVersion++;
     this.formatDialog = null; dialog?.close();
-    if (dialog !== null && this.wheelActive) this.showWheel();
+    if (dialog !== null && this.wheelActive) { this.showWheel(); this.focusInput(this.sourceMode, this.selectionStart); }
   }
 
   private activateTool(key: string, label: Resource, action: () => void, _locale: string = this.uiLanguage): void {
@@ -461,7 +469,7 @@ export struct NoteFieldEditor {
           namedResourceText(this.getUIContext(), `note_editor_hint_${key}`),
         onDismiss: (): void => { this.finishHint(key); } }),
       cancel: (): void => { this.finishHint(key); },
-      customStyle: true, autoCancel: true, alignment: DialogAlignment.Center,
+      openAnimation: SurfaceTransition.dialogEnterAnimation(), closeAnimation: SurfaceTransition.dialogExitAnimation(), customStyle: true, autoCancel: true, alignment: DialogAlignment.Center,
       width: '100%', height: '100%', maskColor: Color.Transparent
     });
     this.hintDialog.open();

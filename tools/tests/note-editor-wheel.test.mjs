@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { motionApi } from './motion-harness.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -83,7 +84,7 @@ test('JIDE observes current tools, hidden cloze, grip fallback and collapsed act
 
 function wheelHarness(initialTool=''){
  const actions=[],longActions=[],resets=[],timers=new Map();let timerId=0;
- const Component=loadComponentLogic('components/editor/NoteEditorWheel.ets','NoteEditorWheel',{
+ const Component=loadComponentLogic('components/editor/NoteEditorWheel.ets','NoteEditorWheel',{ ...motionApi(),
   ...wheelModel,NOTE_EDITOR_ACTION_FLASH_MS,noteEditorTool,TouchType:{Down:0},StudyGripSensor:class{},StudyGripSession:class{setActive(){}dispose(){}setTouching(){}restoreSide(){}},
   appInterface:new AppInterfaceTracker(),noteEditorWheelObservation,
   setTimeout:(callback,delay)=>{timers.set(++timerId,{callback,delay});return timerId;},clearTimeout:id=>timers.delete(id),
@@ -100,9 +101,9 @@ function wheelHarness(initialTool=''){
 
 test('math tap and hold dispatch separate actions and never double-apply when release also sends a click',()=>{
  const h=wheelHarness();h.instance.clickTool('math');assert.deepEqual(h.actions,['math']);
- h.instance.toolTouch({type:0});h.instance.longPressTool('math');h.instance.clickTool('math');
+ h.instance.toolTouch('math', {touches:[],type:0});h.instance.longPressTool('math');h.instance.clickTool('math');
  assert.deepEqual(h.actions,['math']);assert.deepEqual(h.longActions,['math']);
- h.instance.toolTouch({type:0});h.instance.clickTool('math');assert.deepEqual(h.actions,['math','math']);
+ h.instance.toolTouch('math', {touches:[],type:0});h.instance.clickTool('math');assert.deepEqual(h.actions,['math','math']);
  h.instance.longPressTool('heading');assert.deepEqual(h.longActions,['math']);
  h.instance.params.visible=false;h.instance.parametersChanged();h.instance.longPressTool('math');
  assert.deepEqual(h.longActions,['math']);
@@ -325,4 +326,17 @@ test('form ownership defaults to the first available field, keeps focus target t
  session.setAvailable('second',false);assert.deepEqual(events.at(-1),['first',true]);
  session.remove('first');assert.ok(events.slice(-3).every(e=>e[1]===false));
  session.setAvailable('second',true);assert.deepEqual(events.at(-1),['second',true]);
+});
+
+
+test('cancelled rotation and vertical motion restore their exact start without executing or clearing formats',()=>{
+ const h=wheelHarness(),w=h.instance;
+ w.params.state={...state,activeIds:['bold','italic','underline','highlight']};w.parametersChanged();
+ w.arcPosition=2.25;w.rotationPosition=2.25;w.rotating=true;w.arcPosition=3.8;
+ w.cancelManipulation();assert.equal(w.arcPosition,2.25);assert.equal(w.rotating,false);
+ w.dragY=400;w.centerY=510;w.moving=true;w.edgeContact=true;w.finishMove(true);
+ assert.equal(w.centerY,400);assert.equal(w.edgeContact,false);assert.deepEqual(h.actions,[]);
+ assert.deepEqual(w.params.state.activeIds,['bold','italic','underline','highlight']);
+ w.arcPosition=2.25;h.axis(2,1,1);h.axis(2,1,1);h.axis(4);
+ assert.equal(w.arcPosition,2.25);assert.deepEqual(h.actions,[]);
 });

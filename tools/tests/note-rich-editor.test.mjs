@@ -11,6 +11,7 @@ import { NoteEditorSession } from '../../entry/src/main/ets/model/NoteEditorSess
 import { NOTE_FIELD_EDITING_SUPPORT, noteEditorTool, noteFieldExpansionTool,
   noteEditorFormatOptions } from '../../entry/src/main/ets/model/NoteFieldEditing.ts';
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
+import { surfaceMotionApi } from './motion-harness.mjs';
 
 test('supported rich text preserves combined styles, entities, line breaks, Chinese and emoji', () => {
   const html = '<strong>中文😀<i>&lt;>&amp;&nbsp;</i></strong><br><mark><u>亮</u></mark>';
@@ -57,6 +58,7 @@ function editor(html='',fieldConfig=null,wheelSession=null,uniqueId=123) {
     setTypingStyle(style){typing.push(style);}, updateSpanStyle(patch){patches.push(patch);}
   };
   const Editor=loadComponentLogic('components/common/NoteFieldEditor.ets','NoteFieldEditor',{
+    ...surfaceMotionApi(),
     ...rich, ...htmlTools, nextClozeNumber,wrapFieldSelection,NOTE_FIELD_EDITING_SUPPORT,noteEditorTool,
     noteEditorFormatOptions,NoteEditorFormatDialog:options=>options,NoteLinkDialog: options=>options,
     NoteEditorWheelSession,NoteEditorWheelParams:WheelParams,ComponentContent:Content,wrapBuilder:builder=>builder,buildNoteEditorWheel(){},
