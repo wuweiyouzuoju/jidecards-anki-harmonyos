@@ -51,6 +51,7 @@ Agent-first 原则与开发约束见 [AGENTS.md](AGENTS.md)，本页只提供任
 | Anki / AnkiDroid 核心互通回归 | [核心互通](docs/development/core-interop.md) | `npm run test:interop`；隔离包往返、行为断言与未验证范围 |
 | 搜索、批量编辑、统计、设置 | [浏览与统计](docs/development/browser-stats.md) | `BrowserSearchSession`、`BrowserOperationController`、`BrowserSidebar`、`StatsOverview`；`npm test -- browser` 或 `npm test -- ui` |
 | 主题、布局、权益 | [界面](docs/development/appearance.md) | `ThemeCatalog`、`ThemeBackground`、`SelectStyle`；`npm test -- ui` |
+| 恢复反馈、键盘弹层、菜单划选与编辑轮盘 | [交互恢复与局部动效](docs/development/interaction-feedback.md) | `StudySessionController`、`MenuHoldController`、`MenuSlideSession`、`ResultNotice`、`ChangingText`、`NoteEditorWheel`；study/browser/ui 回归 |
 | 应用内 Agent | [应用内 Agent](docs/development/agent.md) | `pages/AI制卡页.ets`、`components/agent/`、`backend/agent/`、`model/agent/`、`ReleaseFeatures.ets`；`npm test -- agent` |
 | 应用内 Agent 本地代码沙箱 | [本地沙箱方案与接手入口](docs/decisions/2026-09-30-agent-local-sandbox.md) | [模块入口](native/agent-sandbox/README.md)：execute_code、异步 NAPI、真实引擎测试、双架构 probe 与测试包 |
 | 工具链、测试、源码导出 | [验证](docs/development/verification.md) | `tools/README.md`；`npm test -- tooling` |

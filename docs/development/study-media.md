@@ -2,9 +2,13 @@
 
 [返回任务索引](../../PROJECT_CONTEXT.md)
 
+学习失败原地恢复、评分结果核对与就近撤销的当前边界见 [交互恢复与局部动效](interaction-feedback.md)。
+
 ## Core 渲染语义与平台 TTS
 
-2026-10-07：Core `ExtractAvTags` 的 `[anki:play:q|a:index]` 映射为统一 44px 播放按钮；按钮只播放对应有序 AV 项，视频保持原生内联播放。学习、浏览预览、未保存模板预览共用 HTML 构建器、`CardAudioSession` 和 `PreviewInteraction`/`StudyGestures`，桥接再次校验文档代次、前台与阻塞状态。既有/未保存卡请求 `partial_render=true`，对齐 AnkiDroid `TemplateManager`：先提取题面 AV，再用含 q 编号的题面填充答案 `FrontSide`，最后提取答案 AV。题面声音不会重复加入答案自动播放；背面的题面按钮仍引用题面队列，视频也按 marker 的 q/a 来源解析。节点属于一次渲染结果，不修改笔记或模板字段，Core 音频读取失败不清空正文。
+2026-10-07：Core `ExtractAvTags` 的 `[anki:play:q|a:index]` 映射为随所在文字字号缩放的播放按钮；按钮只播放对应有序 AV 项，视频保持原生内联播放。学习、浏览预览、未保存模板预览共用 HTML 构建器、`CardAudioSession` 和 `PreviewInteraction`/`StudyGestures`，桥接再次校验文档代次、前台与阻塞状态。既有/未保存卡请求 `partial_render=true`，对齐 AnkiDroid `TemplateManager`：先提取题面 AV，再用含 q 编号的题面填充答案 `FrontSide`，最后提取答案 AV。题面声音不会重复加入答案自动播放；背面的题面按钮仍引用题面队列，视频也按 marker 的 q/a 来源解析。节点属于一次渲染结果，不修改笔记或模板字段，Core 音频读取失败不清空正文。
+
+播放键的尺寸只由 `model/学习卡片HTML构建器.ts` 的 `.sound-flag` 拥有：继承所在文字字号，圆形外径为 `1.5em`、内部图形为 `1em`，外间距也使用 `em`；模板局部字号与卡片文字缩放均沿既有入口生效。2026-10-08 移除固定 44px 尺寸，保留按钮索引、单项播放、隐藏开关和自动播放语义。浏览器检查覆盖深浅色、宽窄视口和多档字号；实际 ArkWeb 的文字缩放与点击观感仍需设备验收。
 
 “外观 → 学习显示”的隐藏音频按钮、显示答案时中断音频通过 `ReviewAudioPreferences` 共同声明和公共 `SettingsToggleRow` 展示。读写复用 `ReviewPreferencesStore`，JIDE 高级偏好读取、提案与实际界面观察同时接入。关闭中断后题面队列完成再播放答案，慢提取也不得让答案超车；换卡、后台和离页仍取消旧队列。隐藏只作用于卡面按钮，菜单重播与自动播放保持可用。行为回归见 `card-audio-session`、`review-preferences`、`preview-runtime`、`note-draft-preview-media`，设备记录见[本轮验收](ankidroid-high-priority-2026-10-07.md)。
 

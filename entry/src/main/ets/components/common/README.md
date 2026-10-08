@@ -1,5 +1,9 @@
 # 公共 UI 代码索引
 
+界面动效参数共用 [MotionStyle.ts](../../model/MotionStyle.ts) / [AppMotion.ets](../../utils/AppMotion.ets)：菜单表面、弹窗、箭头和 PressFeedback 消费克制/灵动档位；按压由属性修改器即时反馈，不在 modifier 内调用不受支持的 animation。设置保存与 JIDE 接线、导航和卡片内容边界见[界面动效](../../../../../../docs/development/appearance.md#视觉与交互一致性)。
+
+页面栈、设置分组及手机牌组详情的前进/返回共用 [SurfaceTransition.ets](../../utils/SurfaceTransition.ets)；覆盖预览只淡入淡出，常驻宽屏侧栏选项变化不当作导航。普通弹窗与蒙层也由此入口合成，宿主不另包转场；CustomDialogController 使用公共动画参数并每次打开时取当前档位，内部 DialogFrame 传 nativeHost=true 禁用重复效果，由平台拥有窗口几何。详情见上述规范，检查入口为 `motion-style-surfaces.test.mjs`。
+
 导入结果类别复用 `DataActionRow` → [SettingsActionRow.ets](SettingsActionRow.ets)。`showDisclosure=false` 可隐藏没有目标的尾部箭头；`isInteractive` 仍独占点击与禁用守卫，不能用箭头显隐代替操作校验。新增音频设置复用 `SettingsToggleRow`，筛选牌组维护沿用现有详情按钮与 `GlassSurface`、列表的公共菜单行。
 
 `SettingsActionRow` 的尾部默认使用共用箭头；录音、暂停等直接执行的动作可传 `trailingIcon`，由公共 `ActionIcon` 在相同24vp槽位显示图标，完整行仍拥有点击、按压与禁用守卫。音频录制主行显示当前状态：空闲麦克风、录制中麦克风带声波、暂停后为斜杠麦克风；独立的暂停/继续行显示暂停/播放图标。音频附件右上角的删除复用 `IconActionButton` 的44vp热区；传 `cornerAligned` 将图标靠右上并在热区内留4vp，默认仍居中，不以文字大小缩小点击范围。
@@ -36,7 +40,7 @@
 | 菜单、设置与状态图标 | [ActionIcon.ets](ActionIcon.ets)：默认18vp，状态徽标可用14vp；装饰图标不接收点击/朗读，描边使用成对明暗 SVG。`tint` 管理内填色，`strokeColor` 仅接受六位十六进制色并保留透明度；设置语义由 [SettingsIcons.ets](../../utils/SettingsIcons.ets) 映射，学习/预览/浏览多选动作由 [ActionIcons.ets](../../utils/ActionIcons.ets) 映射，同义动作复用首页/学习资源 | `ui-settings-components.test.mjs` 检查目录和明暗几何、执行染色透明度回归；菜单行为分别由 `study-menu-actions.test.mjs`、`browser-batch-menu.test.mjs`、`preview-runtime.test.mjs` 验证 |
 | 仅图标的关闭、移动与年份操作 | [IconActionButton.ets](IconActionButton.ets)：默认44vp圆形点击区，首页六个入口复用同一按钮高度 token，极窄窗才共同收缩，保留圆角矩形表面，矩形圆角复用统计卡的 `圆角_卡片`，圆形仍由直径计算；borderRadius 在 border 之后设置；保持纯图标和完整本地化朗读名称、按压反馈与禁用迟到点击守卫；调用方拥有可用边界与回调，图片上的关闭使用白色图标和深色底 | `ui-settings-components.test.mjs` 执行禁用守卫；`stats-calendar-runtime.test.mjs`、`notetype-management.test.mjs` 保留业务边界回归；HAP/设备验证几何、主题与读屏 |
 | 设置目录、维护、关于与术语入口 | [SettingsActionRow.ets](SettingsActionRow.ets)：统一图标、标题、可选说明/帮助、箭头、按压和禁用守卫；DataActionRow 是维护/备份的兼容入口。行无水平边距，说明自然换行；QQ群富说明由宿主 Builder 提供 | `ui-settings-components.test.mjs` 执行迟到禁用点击、检查入口复用；业务继续由原设置宿主和既有行为回归负责 |
-| 文字左、选择框右的表单行 | [FormSelectRow.ets](FormSelectRow.ets)：12vp 间隔、标签占剩余宽度且可换行、右侧按内容占宽并限于 56%；省略仅用于当前显示，完整名称和选项不改。导入适配器 ImportSelect 也委托此行 | `ui-compact-controls.test.mjs` 执行禁用、越界和完整名称回归；`ui-select-layout.test.mjs` 扫描原生几何 |
+| 文字左、选择框右的表单行 | [FormSelectRow.ets](FormSelectRow.ets)：12vp 间隔、标签占剩余宽度且可换行、右侧按内容占宽并限于 56%；颜色预览使用可选 valuePreview 插槽。完整名称和选项不改，ImportSelect 也委托此行；同级行距与说明间距共用 [FormRowLayout.ets](../../utils/FormRowLayout.ets)，规范见[公共表单控件](../../../../../../docs/development/appearance.md#公共表单控件) | `ui-compact-controls.test.mjs` 执行禁用、越界和完整名称回归；`ui-select-layout.test.mjs` 扫描原生几何 |
 | 说明或状态左、辅助按钮右 | [LabeledActionRow.ets](LabeledActionRow.ets)：复用按下态按钮和上述限宽，默认按钮文字沿用 `text_primary`；需要强调时由宿主传入主题色，长按钮文案单行省略；整表提交与危险确认保留原操作区 | `ui-compact-controls.test.mjs` 执行禁用回调及色值保留；宽窄布局仍需设备验收 |
 | 幻彩主题预览 | [IridescentThemePreview.ets](IridescentThemePreview.ets)：速览与启动/锁定领赠说明共用已有截图、260vp 限宽及原始比例 | `theme-iridescent-gift.test.mjs`；实际滚动与图像显示另需设备验收 |
 | 白字实底主操作按钮 | [PrimaryActionButton.ets](PrimaryActionButton.ets)：登录、保存配置和开发者启用共用高度、字号、圆角、按压反馈和禁用守卫；默认订阅 `颜色键.主色按钮背景`，宿主可显式覆盖颜色并提供完整可用条件 | `ui-shell-controls.test.mjs` 执行主题切换、显式覆盖、禁用回调并扫描同类散写；既有同步/应用内 Agent 测试保留业务验证 |
@@ -91,3 +95,9 @@
 牌组详情的手机顶栏将制卡、可选 JIDE、预览图标直接组成右侧工具组；宽屏将制卡和 JIDE 组成左侧工具组，预览靠右，均复用主页 `IconActionButton.toolbarStyle`。牌组预览范围只渲染 `ActionMenuList`，由 `HomeDeckDetails` 统一挂载 `AnchoredMenu`；手机和宽屏共用表面、居中条目、分隔线和动效。工具栏上报实际窗口位置与宽度，详情宿主转换一次坐标后按右缘对齐。关闭手写、退出排序、退出多选及标题栏关闭统一用 `IconActionButton.toolbarStyle` 的叉号；需要展示当前设置含义的透明度控件继续保留文字。
 
 `AnchoredMenu.topOffset/contentLeft` 是最终菜单宿主坐标；窗口根宿主的原点为零。公共菜单读取自身窗口上缘，将窗口安全上缘换算成宿主安全上缘，宽屏分栏已避让的系统栏不能再次计入。`home-header-layout.test.mjs` 覆盖窗口根、分栏完全避让及分栏与安全区相交的情况。
+
+操作结果与就地恢复使用 [ResultNotice.ets](ResultNotice.ets)，宿主负责真实失败、重试与 Core 撤销步号。提示条不自动重送写入，也不持有业务服务。
+
+[ActionStatus.ets](ActionStatus.ets) 固定20vp结果槽由请求拥有者发布忙碌、成功和失败；[ChangingText.ets](ChangingText.ets) 只过渡真实短状态文字，保留实测宽度，不用于卡片翻面。
+
+[MenuHoldGesture.ets](MenuHoldGesture.ets) 只将 ArkUI 触摸事件交给 `MenuHoldController`，公共菜单命中由 `MenuSlideSession` 拥有。布局不同的普通菜单入口复用同一指针生命周期；排序/轮盘按其原语义处理。[当前行为、来源和验证](../../../../../../docs/development/interaction-feedback.md)。

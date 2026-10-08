@@ -2,6 +2,8 @@
 
 [返回任务索引](../../PROJECT_CONTEXT.md)
 
+恢复/结果反馈面、按钮真实状态和手动菜单/轮盘的共同认知声明见 [交互恢复与局部动效](interaction-feedback.md#jide-与维护边界)。反馈观察不提供新的助手代操作许可。
+
 - 本页只描述产品运行时的应用内 Agent，不描述负责修改仓库的编程 Agent；编程 Agent 规则见 [编程 Agent](coding-agent.md) 和根 [AGENTS.md](../../AGENTS.md)。
 - 代码路径以下均相对 `entry/src/main/ets/`。
 - 责任链：UI → 会话/Runner → 读取、导航排队与提案；成功回复收尾 → 首页 Navigation；用户确认 → DraftExecutor / ActionExecutor → Service 或受控存储。
@@ -138,9 +140,9 @@ JIDE 页发布当前模式、历史/对话分区、发送/停止、文件解析�
 - `get_deck_options.customScheduling` 来自真实集合配置和 `CustomScheduling.ts` 共同能力声明，报告是否配置、同步运行时、异步限制、脚本大小上限和 Agent 写入边界；UI 完整模式可编辑脚本，JIDE 写入白名单继续排除 `script`。实际失败面板报告支持状态、执行失败和用户可选动作。执行与直接回归见[自定义调度](../decisions/2026-10-07-custom-scheduling.md)。
 - 确认卡显示目标牌组、预设及共享范围，保持率使用百分比，开关和枚举使用共同目录的本地化名称，轻松日逐星期显示最低/减少/正常，清除显示未设置；确认展示不改变登记的 Core 参数。`ai-agent-deck-options.test.mjs` 执行真实 Registry、确认执行器、会话及请求编解码，覆盖 SM-2 轻松日、单牌组克隆、零限额/清除、全局范围、未知字段保留、过期及失败。Core 在该测试中是注入边界，测试不证明设备保存或真实模型规划；HAP 和设备验收单独记录。升级依据及门禁见[牌组选项与 Core 升级](browser-stats.md#牌组选项与-core-升级)。
 - `propose_set_theme_color` 与 `propose_set_fsrs` 风险为 `write`，只生成 `setting_change` 动作。确认卡复用 `AgentActionCard`，显示前后值和范围；FSRS 开启说明全库重新调度，关闭不恢复原排程。`AgentActionExecutor` 消费登记的同一载荷，再校验设置 ID/类型及原值，主题权益在提交时重查。过期、篡改、重复确认失败；失败后的新提案须先重新读取，不盲目重试。
-- `propose_set_setting` 在 assistant/create/edit 共用一个严格工具，只支持 `AgentPreferenceSettings.agentWritablePreferenceIds()` 中已接通的三项：`card_text_size`（50–200 的整数百分比）、`deck_list_style`（single_wide / single_narrow / double_wide / double_narrow）和 `study_haptics`（开关）。参数 `value` 使用规范字符串，例如 `"130"`、`"true"`；其余设置仍只读。它读取当前值后生成既有 `setting_change`，确认卡显示本地化名称、百分比或四种牌组样式、前后值及本机范围，确认前零写入。
-- 三项修改复用设置页的 `saveCardTextSize`、`saveDeckListStyle`、`saveStudyHaptics`。`utils/LocalPreferenceWrite.ets` 拥有这些键的共享串行队列，保存函数接受可选原值；确认执行在队列内重查原值，同状态不落盘，flush 与回读成功后才广播。助手读取等待已接受的保存。字号控件订阅公共值，学习/预览、牌组列表和触感继续消费既有 AppStorage 键；不改模板、调度或设备振动能力。牌组样式从旧宽窄键迁移，当前值与写入共用唯一存储入口；双列隐藏牌组计数，所有牌组名称允许两行，单/双列同密度等高，窄版仅在原字号名称需要两行且有描述时缩小字号，窄样式保留页面密度联动。`AgentPreferenceSettings` 的真实设置描述同步该规则，设置读取及确认仍消费原值与入口。
-- 本机偏好结果区分 `saved/applied`：保存未确认或回读失败返回 `partial, saved=false`，已确认保存但广播失败返回 `partial, saved=true, applied=false`；只恢复偏好缓存，不声称磁盘已回滚。失败确认已消费，须重新读取再提案。`ai-agent-app-settings.test.mjs` 执行真实 Registry、读取适配、确认执行器及三项保存入口；`ai-agent-local-preference-write.test.mjs` 覆盖手动写入与确认的竞争、读取等待和回读失败。Node 不证明真实模型选择工具、ArkUI 观察更新或设备交互，需独立验收。
+- `propose_set_setting` 在 assistant/create/edit 共用一个严格工具，只支持 `AgentPreferenceSettings.agentWritablePreferenceIds()` 中已接通的设置：`card_text_size`（50–200 的整数百分比）、`deck_list_style`（single_wide / single_narrow / double_wide / double_narrow）、`study_haptics`（开关）和 `motion_style`（restrained 克制 / lively 灵动，两档均无翻卡动画，与动态背景和震动独立）。参数 `value` 使用规范字符串，例如 `"130"`、`"true"`；其余设置仍只读。它读取当前值后生成既有 `setting_change`，确认卡显示共同资源的本地化名称、选项、前后值及本机范围，确认前零写入。
+- 本机修改复用设置页的 `saveCardTextSize`、`saveDeckListStyle`、`saveStudyHaptics` 和 `saveMotionStyle`。`utils/LocalPreferenceWrite.ets` 拥有这些键的共享串行队列，保存函数接受可选原值；确认执行在队列内重查原值，同状态不落盘，flush 与回读成功后才广播。助手读取等待已接受的保存。字号控件订阅公共值，学习/预览、牌组列表和触感继续消费既有 AppStorage 键；不改模板、调度或设备振动能力。牌组样式从旧宽窄键迁移，当前值与写入共用唯一存储入口；双列隐藏牌组计数，所有牌组名称允许两行，单/双列同密度等高，窄版仅在原字号名称需要两行且有描述时缩小字号，窄样式保留页面密度联动。`AgentPreferenceSettings` 的真实设置描述同步该规则，设置读取及确认仍消费原值与入口。
+- 本机偏好结果区分 `saved/applied`：保存未确认或回读失败返回 `partial, saved=false`，已确认保存但广播失败返回 `partial, saved=true, applied=false`；只恢复偏好缓存，不声称磁盘已回滚。失败确认已消费，须重新读取再提案。`ai-agent-app-settings.test.mjs` 执行真实 Registry、读取适配、确认执行器及已接通保存入口；`ai-agent-local-preference-write.test.mjs` 覆盖手动写入与确认的竞争、读取等待和回读失败。Node 不证明真实模型选择工具、ArkUI 观察更新或设备交互，需独立验收。
 - `AppThemeService` 的 `ThemeColorSession` 是设置页与助手共用的串行保存/回读/应用入口，深浅色与主题色使用不同键并在应用时读取另一维度；结果区分 `saved/applied/completed/partial`，部分成功保留失败状态。全库 FSRS 共用 `FSRS控制器.ets` 的串行变更入口，保留其余配置与未知协议字节，保存后回读、通知页面；同状态请求不写入、不重排。后台初始化与手动/助手切换共用队列。
 - `set_theme_mode` 风险为 `setting_write`，不能注册为 read、普通草稿或卡库写入。明确切换指令来自页面传入的本轮原始用户意图，不扫描模板、附件、记忆或 Provider 上下文。许可仅本轮一次使用；问题、否定、引用和卡片模板请求不授予直接写入。历史恢复、暂停继续和旧澄清回放不恢复许可；识别不到时要求明确切换命令。
 - `backend/AppThemeService.ets` 拥有共享 `ThemeModeSession`。设置页与助手共用串行保存、回读、应用资源主题、广播色板与桌面推送入口；已接受设置不随离页取消。各页面通过 `themeMode` 订阅当前模式。启动读取仍可回退，修改与助手读取采用严格存储接口。

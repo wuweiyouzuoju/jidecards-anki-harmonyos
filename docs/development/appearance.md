@@ -2,6 +2,8 @@
 
 [返回任务索引](../../PROJECT_CONTEXT.md)
 
+恢复反馈、按钮状态、键盘弹层、单指菜单划选、状态文字和轮盘的共同入口与 Telegram 来源见 [交互恢复与局部动效](interaction-feedback.md)。
+
 主题偏好修改（设置页与助手）共用 `backend/AppThemeService.ets` / `model/settings/ThemeModeSession.ts`，先严格保存和回读再应用；失败区分保存未确认与已保存但应用失败。页面通过 `themeMode` 订阅公共状态。启动/系统通知仍由既有入口负责。测试：`theme-mode-session.test.mjs`；助手工具和撤销边界见 [应用内 Agent](agent.md#应用设置读取与修改)。
 
 卡片文字缩放、牌组样式和学习触感保留各自的 `CardTextSizeStore`、`DeckListAppearanceStore`、`StudyHaptics` 保存入口，共用 `utils/LocalPreferenceWrite.ets` 串行保存、原值校验、回读与广播。JIDE 经同一入口确认修改；手动操作不需要提案，设置控件和学习/预览消费既有公共值。保存失败只恢复偏好缓存，磁盘结果未确认时不声称回滚。验证入口：`ai-agent-app-settings.test.mjs`、`ai-agent-local-preference-write.test.mjs` 及各设置原有行为回归；最终观察与交互需设备验收。
@@ -12,6 +14,18 @@
 - 快速反馈：`npm test -- ui`；完整验收见 [验证说明](verification.md)。
 
 ## 视觉与交互一致性
+
+“设置 → 外观 → 动效风格”提供克制（默认）与灵动，两档均无应用提供的翻卡动画。`model/MotionStyle.ts` 是参数事实来源，`utils/AppMotion.ets` 在动作时读取当前档位，`MotionStyleStore` 在首屏前恢复并通过 `LocalPreferenceWrite` 确认保存/回读/广播；设置与 JIDE 共用此入口。动态背景仍由原开关拥有，学习震动仍由 StudyHaptics 拥有，两者不随动效档位改变。卡片文档和 Core 评分时序不消费动效参数。
+
+克制保留菜单98%→100%、150ms及现有屏幕尺寸分档时长。灵动菜单94%→100%、220ms弹簧展开，关闭140ms仅淡出；弹窗92%→100%，转场基础时长增加40ms；进入页面从前进/返回方向16vp平移到0，同时淡入，退出内容仍立即隐藏，根背景不平移。全屏时长仅缓存设备尺寸，档位每次读取。普通按钮/动作行灵动按下时即时缩至97.5%，松开或禁用恢复，不延迟操作或额外订阅触摸。AttributeModifier 不调用 `.animation()`（平台实现尚不支持）；箭头、菜单、轮盘与工具吸附在原动画入口消费公共参数。制卡轮盘展开/吸附、学习工具自动换边保留原几何和触摸守卫，吸附动画跟随动效档位且独立于动态背景开关；卡片显示答案及换题没有额外转场。
+
+界面转场统一由 `utils/SurfaceTransition.ets` 合成效果：页面栈的 `HomeNavigationTransition`、设置目录/分组的本地切换、手机牌组详情前进与列表返回共用 `pageAnimation/pageContent`，两档都有淡入，灵动另附方向位移。透明的退出内容立即隐藏，避免前后文字交叉叠影；手机列表仍用 `Visibility.Hidden` 保留滚动位置。设置只以 `activeSection` 作为内容身份，搜索结果、偏好保存和加载反馈不重放整页动画，首次直达分组也不与外层 Navigation 叠加。宽屏牌组详情属于常驻侧栏，不把每次选牌组视为新页面；覆盖式卡片预览用 `pageOverlay` 只淡入淡出，背景与 Web 不横移。
+
+普通弹窗及14个旧弹窗实现共用 `SurfaceTransition.dialog/backdrop`：内容轻缩放淡入，关闭仅淡出；蒙层单独淡化。弹窗自己拥有一次转场，宿主不再另包一层动画。原生 `CustomDialogController` 的13处宿主使用 `dialogEnterAnimation/dialogExitAnimation` 共用时长和曲线，窗口几何由平台拥有，内部 `DialogFrame.nativeHost` 禁用重复转场。5个原先长期持有的控制器改为每次打开时构造，避免缓存旧动效档位；返回、关闭、草稿和忙碌守卫保留。不能把原生宿主动效归零后假定内容都有动画，旧式反馈/自动前进等窗口自身就是效果入口。系统确认框、选择器下拉和原生 sheet 仍保留各自平台交互。菜单继续由 `MenuSurface.popupTransition` 拥有，主题背景与权益庆祝保持独立语义。不得为统一动效在表单根上套隐式动画，或把学习显示答案、换题、Web 加载当作页面导航。
+
+`motion-style-surfaces.test.mjs` 执行公共效果、9个目的地的真实注册回调、设置切换方向与首次展示守卫，并审计重复弹窗/原生宿主动效；`iridescent-rendering.test.mjs` 保留转场取消、快速接管、背景冻结与不叠文字的直接回归。设备验收和构建范围见[交互验收](interaction-feedback.md#界面转场统一验收)。
+
+验证入口：`motion-style.test.mjs` 执行真实公共参数、菜单、按压、屏幕时长与偏好保存/失败；`iridescent-rendering.test.mjs` 覆盖导航取消与透明内容；`ai-agent-app-settings.test.mjs` / `ai-agent-local-preference-write.test.mjs` 覆盖新设置读取、一次确认、原值校验和中英文预览。Node 与 HAP 不证明真机连续开合、宽窄屏、触摸手感或帧率。自动检查拒绝重新散写固定弹窗缩放，当前按钮尺寸、窗口安全区和菜单定位保持原入口。
 
 视觉与交互一致性是项目质量要求。新增或修改 UI 先查[公共 UI 索引](../../entry/src/main/ets/components/common/README.md)与实际同类调用，按复用、组合/扩展、必要时新建的顺序实施。同一语义的控件共用已有实现、主题和尺寸；不复制组件再局部改外观，也不在调用处覆盖公共组件内部几何来规避缺陷。公共入口不足时在其责任边界修正，并验证受影响的调用方。
 
@@ -40,6 +54,10 @@
 
 菜单表面与动效由 `MenuSurface` 拥有。展开箭头复用 `AnchoredMenuItem` 与 `DisclosureChevron`，围绕自身中心旋转且不平移；左侧组标题使用向下/向左，旗标分支使用公共默认向右/向下。牌组预览范围复用公共 AnchoredMenu 定位与表面，内容不叠加第二层边框和阴影；其他原生 Popup 保留20vp宽、6vp深的短圆尖、16vp圆角和150ms动画。`study-menu.test.mjs` 执行左右分组、旗标收起、禁用和延迟点击回归；`ui-select-layout.test.mjs` 检查展开角度和固定旋转中心，`motion-style-contract.test.mjs` 验证原生动效接线。实际布局仍须 HAP/设备验收。
 
+克制档菜单入场保持150ms、0.98倍轻缩放与淡入；灵动档使用公共参数，退场均只淡出。`MenuSurface.popupTransition(centerX, centerY)` 拥有合成属性动效：`AnchoredMenu` 按左/右对齐传入顶部对应边缘，左侧子菜单以右缘尖角中心为缩放原点，旗标覆盖面板使用右上角；由系统自动避让的原生 Popup 保留默认中心。`CardActionMenu` 展开时直接更新状态与最终几何，仅对子面板添加转场，不对整个菜单包裹 animateTo，不给随禁用/选中而重建的单行添加入场动画。菜单宽度、安全区、留白、滚动与指向位置仍由原定位入口计算；快速开合仍经当前可见树校验动作，主菜单遮挡与 JIDE 观察使用现有同步入口。这样减少宽高动画期间的反复测量，避免状态更新时单行重复闪现；性能收益与最终手感需真机验证。
+
+导航继续先隐藏退出页、再淡入进入页，防止透明页面文字叠影。`HomeNavigationTransition` 的代次拥有背景暂停与目的地显示；系统结束、取消或超时后忽略旧动画更新/完成回调，结束请求在系统确认前也只发送一次。`iridescent-rendering.test.mjs` 执行重叠导航、迟到闭包、重复完成与无 UIContext 回退；Node 不模拟真实渲染帧。本轮参考 [Telegram Android 菜单的缩放原点与取消处理](https://github.com/DrKLO/Telegram/blob/master/TMessagesProj/src/main/java/org/telegram/ui/ActionBar/ActionBarPopupWindow.java)、[Telegram iOS 从当前显示状态接续动画](https://github.com/TelegramMessenger/Telegram-iOS/blob/master/submodules/Display/Source/ContainedViewLayoutTransition.swift)，按 ArkUI 的转场与生命周期实现。
+
 设置目录、数据/备份、关于、术语和同步服务器入口共用 `components/common/SettingsActionRow.ets`；`DataActionRow` 只转交内容和回调。公共行提供18vp图标、12vp图文间隔、15fp标题、12fp说明、右箭头与禁用回调守卫，无说明最小48vp、有说明最小58vp且上下各8vp，长说明可撑高。目录卡片和分组卡片拥有左右16vp内边距，公共行不再贡献水平边距；页面仍拥有宽/窄分组间距及安全区，所以这两种布局、导航条有/无时不会叠加新的外边距。QQ群号的富说明由关于宿主 Builder 保留复制行为，并按可用宽度换行。
 
 设置图标按层级使用：一级目录和数据维护、关于、帮助等操作入口保留图标；二级分组标题、开关、普通选择、数字偏好、字体滑块及识别码标签暂不显示装饰图标。调用方省略可选 `icon`，资源和语义映射仍保留，帮助按钮和展开箭头继续显示。联网资源 `ic_settings_web` 使用无外伸箭头的普通地球，避免与男性符号混淆。
@@ -50,7 +68,9 @@
 
 `IconActionButton` 统一字段移动/删除、年份导航、侧栏关闭和图片移除的44vp点击区、按压反馈、完整本地化朗读名称与禁用守卫；年份/字段边界及写入回调仍由宿主持有。图片上的移除使用白色叉与深色圆底，避免背景图改变时失去对比；牌组展开使用 `DisclosureChevron`，拖动手柄与标记/旗标使用 SVG，迁移警告保留系统警告符号。
 
-设置开关和普通选择行通过 `SettingsToggleRow` / `FormSelectRow` 的可选 `icon` 参数使用同一入口；选择行帮助仍由内部 `HelpLabel` 提供。颜色主题行保留渐变色样与拒绝选择后重建机制，兑换入口保留原生 bindSheet 的窗口/关闭策略，数字偏好和文字缩放保留原生输入/Slider；这些专用控件只复用图标和已有样式，不改保存协议。检查入口：`ui-settings-components.test.mjs`、`ui-compact-controls.test.mjs`、学习/预览/批量菜单及既有设置行为回归；HAP 验证编译，深浅色、窄/宽屏、大字体及系统返回的最终显示与交互仍须设备验收。
+设置开关和普通选择行通过 `SettingsToggleRow` / `FormSelectRow` 的可选 `icon` 参数使用同一入口；选择行帮助仍由内部 `HelpLabel` 提供。颜色主题也使用 `FormSelectRow`，渐变色样通过可选 `valuePreview` 插槽展示，拒绝选择后重建仍由主题宿主持有；不得再复制原生 Select 或固定48vp行高。兑换入口保留原生 bindSheet 的窗口/关闭策略，数字偏好和文字缩放保留原生输入/Slider，不改保存协议。检查入口：`ui-settings-components.test.mjs`、`ui-compact-controls.test.mjs`、学习/预览/批量菜单及既有设置行为回归；HAP 验证编译，深浅色、窄/宽屏、大字体及系统返回的最终显示与交互仍须设备验收。
+
+同级设置表单间距统一由 `FormRowLayout.rowGap` 提供8vp，选择框高40vp，标签与控件最小间隔由 `FormRowLayout.gap` 提供12vp；普通选择行不自带外边距。单项下的说明、错误提示由 `hintGap` 提供4vp，属于该项内容，不另当同级选择行排版。标签过长可撑高行，开关说明、字号滑块及预览内容按自己的语义保留自然高度。页面分组、安全区和卡片16vp内边距仍由宿主各自拥有一次；不得用控件内部 padding 或局部固定行高补偿。当前设置主表单复用该 token，`ui-settings-components.test.mjs` 拒绝散写原生 Select并检查这些入口，`ui-select-layout.test.mjs` 校验共享几何。
 
 原生面板、卡片、菜单、按钮和表单的外轮廓由 `utils/SurfaceBorder.ets` 的 `options()` 统一提供，中性颜色只由 `surface_border` 明暗资源拥有。`MenuSurface`、`GlassSurface`、普通 `DialogFrame`、设置分组、详情/统计/摘要卡片、笔记字段卡片及各类表单共用；菜单指向三角和分隔线使用同一 `color()`。`FormInputStyle`、`FormTextAreaStyle` 与 `SelectStyle.controlBorder` 委托公共轮廓，定制的搜索、同步登录及数字输入只接入边框，保留自身尺寸与输入行为。分隔线通过单边参数保留原0.5/1vp线宽。公共轮廓不接管底色、圆角、内外边距或按压状态；选中/排序状态保留原来的状态色。`ImageSurfaceStyle` 共用参数但保留适合灰底的 `border_image`；卡面内填空、用户卡片 HTML 和白板笔迹保持各自语义。深色轮廓与菜单/卡片/页面/侧栏底色的对比度由 `ui-surface-border.test.mjs` 检查，实际设备观感由用户验收。
 
@@ -116,7 +136,7 @@
 
 从学习页返回时，首页刷新保留 ready/empty 快照；同牌组同一天的历史图表刷新保留原图，切换范围或日切才隐藏旧数据，失败仍显示错误。学习页进度圈通过 `DelayedLoadingIndicator` 延迟 250ms，短请求完成即卸载并取消任务，慢请求保持反馈。回归入口为 `ui-loading-feedback.test.mjs` 与 `deck-study-history.test.mjs`。
 
-学习与卡片预览右上角动作菜单通过 `components/common/CardActionMenu.ets` 复用首页的 `AnchoredMenu` 与 `MenuItem`，菜单顶部通过 `应用尺寸.pageContentTop(statusBarHeight, narrow)` 与首卡上缘对齐，定位宽度复用工具栏的 `CardViewportLayout.cardViewportWidth` 策略，菜单在 build 中直接挂载，不能再穿过自定义测量组件的嵌套 Builder。菜单表面、图文成组对齐、分隔线、透明外部关闭层和 150ms 动效均由公共组件负责；长菜单按实际窗口剩余高度滚动。不能用系统 `bindMenu` 默认位置替代该入口。回归见 `tools/tests/study-menu.test.mjs` 和 `motion-style-contract.test.mjs`，设备验收对照首页菜单、学习长菜单和横屏边界。本项执行既有[同类变更闭环](coding-agent.md#同类变更闭环)，不另建治理规则。
+学习与卡片预览右上角动作菜单通过 `components/common/CardActionMenu.ets` 复用首页的 `AnchoredMenu` 与 `MenuItem`，菜单顶部通过 `应用尺寸.pageContentTop(statusBarHeight, narrow)` 与首卡上缘对齐，定位宽度复用工具栏的 `CardViewportLayout.cardViewportWidth` 策略，菜单在 build 中直接挂载，不能再穿过自定义测量组件的嵌套 Builder。菜单表面、图文成组对齐、分隔线、透明外部关闭层和当前档位动效均由公共组件负责；长菜单按实际窗口剩余高度滚动。不能用系统 `bindMenu` 默认位置替代该入口。回归见 `tools/tests/study-menu.test.mjs` 和 `motion-style-contract.test.mjs`，设备验收对照首页菜单、学习长菜单和横屏边界。本项执行既有[同类变更闭环](coding-agent.md#同类变更闭环)，不另建治理规则。
 
 设置项选择弹窗和备份选择列表的选中项只保留背景色，不叠加勾号。牌组选项统一从 `components/home/DeckOptionField.ets` 修改该样式；新增同类选择弹窗先复用现有入口，保持相同选中态。
 
@@ -166,7 +186,7 @@ EntryAbility 的配置更新及返回前台通过 `refreshThemeColors()` 使用�
 
 笔记类型编辑器复用 `DialogFrame` / `DialogHeader`，折叠时按内容收缩，展开后正文限高滚动。字段、模板、CSS 的展开行复用 `AnchoredMenuItem` 的左对齐模式，箭头使用公共几何组件，不用文字字符；模板选择保留 `SelectStyle`。
 
-按钮按压反馈由一个所有者负责：`GlassSurface` / `PrimaryGlassSurface` 通过 `applyNormalAttribute`、`applyPressedAttribute` 和 `applyDisabledAttribute` 直接设置色层，调用方关闭默认 `stateEffect`。按下、松开、取消和禁用不写组件/父层 `@State`，不重建文字，不切换透明底或边框，渐变停靠点数量和位置保持一致；不在这些按钮上添加覆盖整按钮的隐式动画。所有普通按钮和操作行也复用 `PressFeedback`：正常不透明度乘以 0.72 显示按下态，松开恢复；保留调用方忙态/隐藏透明度，禁用单独显示。两个玻璃表面继承该反馈，确保浅色玻璃在白底上也可见；不再叠加手动缩放或隐式动画。导航、展开箭头和主题背景动画各自保持原有职责。
+按钮按压反馈由一个所有者负责：`GlassSurface` / `PrimaryGlassSurface` 通过 `applyNormalAttribute`、`applyPressedAttribute` 和 `applyDisabledAttribute` 直接设置色层，调用方关闭默认 `stateEffect`。按下、松开、取消和禁用不写组件/父层 `@State`，不重建文字，不切换透明底或边框，渐变停靠点数量和位置保持一致；不在这些按钮上添加覆盖整按钮的隐式动画。所有普通按钮和操作行也复用 `PressFeedback`：正常不透明度乘以 0.72 显示按下态，松开恢复；保留调用方忙态/隐藏透明度，禁用单独显示。两个玻璃表面继承该反馈，确保浅色玻璃在白底上也可见；灵动按下态的轻缩放也由公共反馈提供，调用方不再叠加缩放或隐式动画。导航、展开箭头和主题背景动画各自保持原有职责。
 
 按钮回归：`theme-text.test.mjs` 执行两种表面的按下/恢复/禁用、连续重复、兄弟按钮隔离和渐变几何；`button-press-state-contract.test.mjs` 审计全部自定义表面调用，`motion-style-contract.test.mjs` 检查普通按钮没有双重反馈。它们不模拟 ArkUI 的真实触摸分发；浅/深色与幻彩下的快点、长按移出、取消、弹窗切换仍须真机验收。
 
@@ -206,3 +226,5 @@ EntryAbility 在配置通知后读取应用偏好语言，发布既有“系统�
 2026-10-03 此批验收：定位、连续轮廓、语言刷新、帮助几何、主题配置、公共入口及文档的聚焦测试62项通过；增量签名HAP通过，unexpected warnings=0。实际 MenuBubble Path 已按深浅色、两种方向和44/132/176vp高度渲染检查，产物在忽略的 `.local/menu-bubble-geometry.*`。全量Node另外保留3项既有失败：`ai-agent-conversational-ui-contract` 仍期待散写分隔边框，`ai-agent-high-risk-ui-contract` 仍期待原生Select，`ai-agent-math` 的测试宿主缺少SurfaceBorder依赖；没有修改这些任务的实现或降低断言。本次未安装设备，Node与路径渲染不能证明实际ArkUI观察、长文字布局及触屏交互。
 
 2026-10-06 图标与预览菜单验证：受影响的按钮、预览会话、JIDE 认知、资源和公共菜单回归通过；增量签名 HAP 通过，新增编译警告为 0。已在现有 x86_64 模拟器保留数据覆盖安装，核对手机更多菜单与预览范围的相同上缘/右缘、居中条目、分隔线和无尖角，以及系统返回关闭和原版手写叉号退出。宽屏坐标转换与系统安全区交集已做直接行为回归；当前模拟器拒绝调试旋转，宽屏最终外观、官方手写透明度控件和真机尚未设备验收。
+
+2026-10-08 外观设置的“动效风格”只保留标题与选择框，去掉常驻说明小字；保存失败仍由实际错误状态展示。颜色主题与其他选择框共用 `FormSelectRow`，设置主表单共用8vp行距，竖屏模拟器已核对选择框高40vp、相邻间隔8vp和右边界对齐。构建与八项交互验收范围见[交互恢复与局部动效](interaction-feedback.md)。

@@ -25,6 +25,10 @@ JIDE 通用空会话文案顺序归 `model/agent/AgentSuggestions.ts`，场景�
 
 ### 状态所有者
 
+应用控件动效档位归 `MotionStyle.ts`，保存和启动恢复归 `MotionStyleStore.ets`，平台曲线与当前参数读取归 `AppMotion.ets`。MenuSurface、普通弹窗、PressFeedback、导航和工具分别消费参数，不拥有独立档位。主题背景仍归 ThemeCatalog/RedemptionStore；学习卡文档与 Core 评分不依赖此设置。JIDE 与外观控件复用同一严格保存入口。
+
+短期菜单指针归 `MenuHoldController` 与 `MenuSlideSession`，仅公共菜单控件共享命中、取消和滚动状态，不承载领域数据或写入。反馈声明与撤销提示资格归 `InteractionFeedback.ts`；真实评分核对和撤销写入仍归学习会话、浏览操作及 Core。公共 `ActionStatus/ResultNotice/ChangingText` 只消费宿主状态、拥有展示计时和过渡，属于通用 UI 依赖。各入口与验证见[交互恢复与局部动效](interaction-feedback.md)。
+
 自定义调度的唯一状态/JSON 转换与字段保真入口为原生 `custom_scheduling.rs`（服务 1004）；`CustomSchedulingService` 编排沙箱执行，`StudySessionController` 拥有每卡结果和本会话失败确认。脚本保存复用 `DeckConfigSave`，UI/JIDE 能力共用 `CustomScheduling.ts`。入口、限制和直接测试见[自定义调度执行边界](../decisions/2026-10-07-custom-scheduling.md)。
 
 牌组层级调整的 ID、路径快照和父子合并规则归 `model/DeckReparent.ts`；同级排列、升级/降级目标与展开子树重排归 `model/DeckReorder.ts`。`backend/DeckHierarchyCommands.ets` 串行层级/排序写入，独占提交前重查、同步占用、Core ReparentDecks 和原本机顺序存储入口。`DeckReparentFeature` 拥有手动选择/预览与返回策略；首页拥有排序模式、保存占用和唯一右侧层级菜单行 ID，`牌组列表项` 复用既有 Popup/MenuSurface/ActionMenuList。JIDE 仍通过原 `AgentAuxiliaryTools` 读取/提案和 `AgentActionExecutor` 确认执行。菜单及当前表单状态与 JIDE 共用 AppInterface；见[首页](home.md#牌组展开记忆与手机详情)及[牌组层级操作](agent.md#牌组层级操作)。
@@ -40,6 +44,8 @@ Anki 官方教程的选章与检索别名归 `tools/anki-manual-topics.json`，�
 界面结构由 `model/AppInterface.ts`、`SettingsNavigation.ts` 和 `SettingsStructure.ts` 共同声明；UI 的菜单/设置卡片枚举与 JIDE 的只读结构工具共用入口。`backend/AppInterfaceService.ets` 独占已挂载界面的语义观察，组件更新/离开负责登记/释放；不承载业务写入或凭证。当前覆盖和扩展方式见 [软件界面认知](agent.md#软件界面认知)。
 
 页面标识、JIDE 导航动作、动作参数和清栈约束由 `model/navigation/AppNavigation.ts` 共同声明，`HomeDestinations` 使用真实目的地，`AgentAppStructure` / `AgentSessionContext` 重建本次能力目录与指纹。`AgentAppNavigationSession` 拥有单页导航队列、代次与当前宿主就绪状态读取，结构工具不缓存占用事实；`AgentAppNavigationTools.readNavigationTarget` 适配真实对象读取，Scope 保持只读，成功回复收尾后通过类型化回调交给首页 Navigation 执行。编辑复用 `EditNotePage`，卡片预览复用浏览页的初始搜索和原预览，牌组详情/选项复用首页选择与原 `DeckOptionsFeature`；导航不持有页面或卡库写入执行器，不替代学习调度与表单保存。行为与扩展见[自动页面操作](agent.md#自动页面操作)。
+
+界面转场的效果由 `utils/SurfaceTransition.ets` 独占；`HomeNavigationTransition` 拥有页面栈完成/取消协议，设置宿主只以分组身份触发本地切换，首页手机详情沿可见性返回保留原列表。普通弹窗内容持有一次效果；原生 CustomDialog 使用公共时长/曲线、每次打开时构造，由窗口拥有平台几何，内部 nativeHost 禁用重复效果；菜单由 `MenuSurface` 单独拥有。时长及档位仍沿 `转场时长/AppMotion/MotionStyle`，共同支持说明由 `InteractionFeedback` 直接进入 JIDE 结构与 revision。实现和直接检查见[界面动效](appearance.md#视觉与交互一致性)。
 
 平面动作菜单的条目渲染与选择守卫由 [ActionMenuList](../../entry/src/main/ets/components/common/ActionMenuList.ets) 负责，复用 `AnchoredMenuItem` 的行样式和默认主题色；定位/表面仍归 `AnchoredMenu` / `MenuSurface`。首页两菜单负责 registry 显隐、本地化、图标语义和业务回调，公共列表不依赖首页模型或全局业务状态。回归入口：`ui-shell-action-menu-list.test.mjs`；范围与设备验收见 [首页](home.md)。
 
