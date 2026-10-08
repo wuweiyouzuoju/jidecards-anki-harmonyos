@@ -73,15 +73,15 @@ JideCards 已经接通旗标的数据写入、七色列表显示、Anki 搜索�
 
 ### 旗标属于卡片
 
-[cards.proto](../../third_party/anki/proto/anki/cards.proto) 的 `Card.flags` 为字段 17，`SetFlagRequest` 包含 `card_ids` 和 `flag`。数据库旗标值为 0=无、1=红、2=橙、3=绿、4=蓝、5=粉、6=青绿、7=紫；一张卡片同时只有一种旗标，可以和星标并存。[官方搜索说明](https://docs.ankiweb.net/searching.html#flags)
+[cards.proto](https://github.com/ankitects/anki/blob/e64c6b1/proto/anki/cards.proto) 的 `Card.flags` 为字段 17，`SetFlagRequest` 包含 `card_ids` 和 `flag`。数据库旗标值为 0=无、1=红、2=橙、3=绿、4=蓝、5=粉、6=青绿、7=紫；一张卡片同时只有一种旗标，可以和星标并存。[官方搜索说明](https://docs.ankiweb.net/searching.html#flags)
 
-[Core 卡片实现](../../third_party/anki/rslib/src/card/mod.rs) 的 `set_card_flag` 校验 `flag < 8`，只替换 flags 的低三位，保留其他位。事务为 `Op::SetFlag`，写入可撤销并更新 USN；为避免重建学习队列，旗标操作不改变卡片修改时间。调用现有 SetFlag，不用 UpdateCards 的局部对象覆盖完整调度数据。
+[Core 卡片实现](https://github.com/ankitects/anki/blob/e64c6b1/rslib/src/card/mod.rs) 的 `set_card_flag` 校验 `flag < 8`，只替换 flags 的低三位，保留其他位。事务为 `Op::SetFlag`，写入可撤销并更新 USN；为避免重建学习队列，旗标操作不改变卡片修改时间。调用现有 SetFlag，不用 UpdateCards 的局部对象覆盖完整调度数据。
 
 数据库值、`SearchNodeFlag` 和 `BrowserRowColor` 是三套不同编号。例如红旗分别为 1、2、3，不能直接互相转换。建议用一个小型模型集中维护七色定义和显式转换，避免选择器、列表、搜索各有一份色表。
 
 ### 标星属于笔记
 
-标星等于笔记包含完整标签 `marked`，不是每张卡片的独立收藏状态。Core [浏览表](../../third_party/anki/rslib/src/browser_table.rs) 用忽略 ASCII 大小写的完整标签比较判断星标，因此 `Marked` 也算，`marked::child` 本身不算。一条笔记生成正反卡或多个 Cloze 时，星标关联全部兄弟卡。[官方学习说明](https://docs.ankiweb.net/studying.html#editing-and-more)
+标星等于笔记包含完整标签 `marked`，不是每张卡片的独立收藏状态。Core [浏览表](https://github.com/ankitects/anki/blob/e64c6b1/rslib/src/browser_table.rs) 用忽略 ASCII 大小写的完整标签比较判断星标，因此 `Marked` 也算，`marked::child` 本身不算。一条笔记生成正反卡或多个 Cloze 时，星标关联全部兄弟卡。[官方学习说明](https://docs.ankiweb.net/studying.html#editing-and-more)
 
 卡片模式标星：解析所选卡片的 noteId，全部成功后去重再写入。笔记模式直接使用所选 noteId。一个解析失败须整批停止，不能遗漏一部分笔记后仍报告成功。添加/取消必须保留字段、其他标签、卡片调度和复习记录。
 
@@ -112,7 +112,7 @@ Core 的卡片模式先返回旗标色，再返回标星色；笔记模式只返
 
 ### 3. 取消星标可能误删层级标签
 
-[Core RemoveNoteTags](../../third_party/anki/rslib/src/tags/remove.rs) 经 [TagMatcher](../../third_party/anki/rslib/src/tags/matcher.rs) 按前缀匹配：删除 `marked` 也会删除 `marked::child`。这是 AnkiDroid 批量取消的现有行为；其学习页单笔记入口则用 `note.removeTag("marked")` 后 UpdateNote。
+[Core RemoveNoteTags](https://github.com/ankitects/anki/blob/e64c6b1/rslib/src/tags/remove.rs) 经 [TagMatcher](https://github.com/ankitects/anki/blob/e64c6b1/rslib/src/tags/matcher.rs) 按前缀匹配：删除 `marked` 也会删除 `marked::child`。这是 AnkiDroid 批量取消的现有行为；其学习页单笔记入口则用 `note.removeTag("marked")` 后 UpdateNote。
 
 建议 JideCards 新增专用标星写入入口：占用集合后读取最新笔记，忽略大小写地精确增删 `marked`，通过现有批量 UpdateNotes 一次提交，保留 `marked::child` 等其他完整标签。不要拿页面缓存的整条笔记覆写最新字段。该精确保留策略应明示为 JideCards 的一致性选择，并与通用前缀删标签动作区分。
 
@@ -124,9 +124,9 @@ Anki 26.05 的 [FlagManager](https://github.com/ankitects/anki/blob/26.05/qt/aqt
 
 ### 5. 包迁移有明确边界
 
-[Core 导出数据收集](../../third_party/anki/rslib/src/import_export/gather.rs) 在 APKG 不含学习进度时同时清除卡片 flags 和完整的 `marked`/`leech` 标签。这是标准共享牌组导出语义，完整对接应保留并在导出说明中解释，不能悄悄改为永久保留。
+[Core 导出数据收集](https://github.com/ankitects/anki/blob/e64c6b1/rslib/src/import_export/gather.rs) 在 APKG 不含学习进度时同时清除卡片 flags 和完整的 `marked`/`leech` 标签。这是标准共享牌组导出语义，完整对接应保留并在导出说明中解释，不能悄悄改为永久保留。
 
-APKG 含学习进度时，新导入卡可携带旗标及星标；[导入卡片实现](../../third_party/anki/rslib/src/import_export/package/apkg/import/cards.rs) 跳过已存在的 note+template 卡片，因此重复导入不是更新已有卡旗标的同步方案。笔记标签是否更新还受笔记导入策略影响。`flagLabels` 属于全局集合配置，APKG 不应被宣称可迁移全部旗标名称；COLPKG 与标准同步才覆盖集合配置，仍须专项往返验证。
+APKG 含学习进度时，新导入卡可携带旗标及星标；[导入卡片实现](https://github.com/ankitects/anki/blob/e64c6b1/rslib/src/import_export/package/apkg/import/cards.rs) 跳过已存在的 note+template 卡片，因此重复导入不是更新已有卡旗标的同步方案。笔记标签是否更新还受笔记导入策略影响。`flagLabels` 属于全局集合配置，APKG 不应被宣称可迁移全部旗标名称；COLPKG 与标准同步才覆盖集合配置，仍须专项往返验证。
 
 现有 [core_interop](../../native/rsharmony/tests/core_interop.rs) 快照包含 flags/tags，但样本未设置七色非零旗标、marked 或 flagLabels，不能凭“快照里有列”认定这些能力已验收。
 

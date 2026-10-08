@@ -81,7 +81,7 @@ G04 的本机别名、G14 的固定列等属于当前产品选择；上表记录
 | Editing | render_latex | 未开放，客户端没有按它控制 TeX 生成；MathJax/预生成媒体是已接替代能力 |
 | BackupLimits | daily、weekly、monthly、minimum_interval_mins | 已接 JIDE 读取/修改，Core 保留与清理；手动 UI 仍只有原备份管理 |
 
-来源：[Core config.proto](../../third_party/anki/proto/anki/config.proto)、[PreferencesMessages](../../entry/src/main/ets/proto/messages/PreferencesMessages.ts)、[Core preferences](../../third_party/anki/rslib/src/preferences.rs)、[Core 搜索](../../third_party/anki/rslib/src/search/sqlwriter.rs)、[Core 队列](../../third_party/anki/rslib/src/scheduler/queue/builder/mod.rs)。
+来源：[Core config.proto](https://github.com/ankitects/anki/blob/e64c6b1/proto/anki/config.proto)、[PreferencesMessages](../../entry/src/main/ets/proto/messages/PreferencesMessages.ts)、[Core preferences](https://github.com/ankitects/anki/blob/e64c6b1/rslib/src/preferences.rs)、[Core 搜索](https://github.com/ankitects/anki/blob/e64c6b1/rslib/src/search/sqlwriter.rs)、[Core 队列](https://github.com/ankitects/anki/blob/e64c6b1/rslib/src/scheduler/queue/builder/mod.rs)。
 
 ## C. 应用已有、JIDE 尚未直接操作的能力
 
