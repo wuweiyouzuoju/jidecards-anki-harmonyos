@@ -102,11 +102,9 @@ export struct HomeSummaryHeader {
       Stack({ alignContent: Alignment.TopEnd }) {
         IconActionButton({ toolbarStyle: true, source: $r('app.media.ic_home_sync'), label: this.syncLabel(),
           controlSize: this.geometry().controlHeight, controlWidth: this.geometry().controlWidth, controlGlyphSize: this.geometry().controlGlyphSize,
-          onAction: this.onSync })
-        if (homeSyncIndicator(this.syncAccountState, this.syncIndicator) === 'syncing') {
-          LoadingProgress().width(14).height(14)
-            .color(this.actionColor).hitTestBehavior(HitTestMode.None).accessibilityText(this.syncStatusText)
-        } else if (homeSyncIndicator(this.syncAccountState, this.syncIndicator) === 'attention') {
+          feedback: this.syncIndicator === 'syncing' ? 'busy' : this.syncIndicator === 'done' ? 'success' :
+            this.syncIndicator === 'failure' ? 'failure' : 'idle', onAction: this.onSync })
+        if (homeSyncIndicator(this.syncAccountState, this.syncIndicator) === 'attention') {
           Text('!').fontSize(14).fontWeight(FontWeight.Bold)
             .fontColor(Color.White).backgroundColor($r('app.color.error_text'))
             .width(16).height(16).textAlign(TextAlign.Center).borderRadius(8)

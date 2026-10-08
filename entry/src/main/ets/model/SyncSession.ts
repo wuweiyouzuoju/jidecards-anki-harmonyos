@@ -199,7 +199,7 @@ export class SyncSession {
     let text: string = '';
     let indicator: string = 'syncing';
     if (this.错误文案 !== '' || this.当前阶段 === 'conflict') {
-      indicator = 'attention';
+      indicator = this.错误文案 !== '' ? 'failure' : 'attention';
       text = this.取本地化文案(this.错误文案 !== '' ?
         'sync_background_error' : 'sync_needs_attention');
     } else if (this.当前阶段 === 'done') {

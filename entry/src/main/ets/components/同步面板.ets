@@ -1,3 +1,5 @@
+import { SurfaceTransition } from '../utils/SurfaceTransition';
+import { ActionStatus } from './common/ActionStatus';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../utils/PressFeedback';
 import { DialogBackdrop } from './common/DialogBackdrop';
@@ -10,7 +12,6 @@ import type { SyncAuth } from '../proto/messages/SyncMessages';
 
 import { 设置面板色板_取, 设置面板色板 } from '../utils/设置面板配色';
 import { 应用尺寸 } from '../utils/应用尺寸';
-import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时长';
 import { 颜色键 } from '../model/颜色主题';
 import { APP_FOREGROUND_KEY } from '../model/AppLifecycleState';
 
@@ -86,10 +87,7 @@ export struct 同步面板 {
   @Builder
   private 同步中内容() {
     Row({ space: 8 }) {
-      LoadingProgress()
-        .width(18)
-        .height(18)
-        .color(this.取色板().主色)
+      ActionStatus({ phase: 'busy', tint: this.取色板().主色 })
       Text(this.state.是否在媒体阶段 ? $r('app.string.sync_syncing_media') : $r('app.string.sync_syncing'))
         .fontSize(应用尺寸.字号_正文)
         .fontColor(this.取色板().主文字)
@@ -171,23 +169,27 @@ export struct 同步面板 {
   /** done 阶段：状态/错误文案 + 关闭按钮。 */
   @Builder
   private 完成内容() {
+    Row({ space: 8 }) {
+      ActionStatus({ phase: this.state.错误文案 !== '' ? 'failure' :
+        this.state.状态文案 !== '' && !this.state.是否请求中止 ? 'success' : 'idle', tint: this.取色板().主色 })
     if (this.state.状态文案 !== '') {
       Text() { ForEach([themeTextKey(this.state.状态文案, this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(this.state.状态文案, this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }
         .fontSize(应用尺寸.字号_正文_小)
         .fontColor(this.取色板().主色)
-        .width('100%')
+        .layoutWeight(1)
     }
     if (this.state.错误文案 !== '') {
       Text(this.state.错误文案)
         .fontSize(应用尺寸.字号_正文_小)
         .fontColor(this.取色板().错误色)
-        .width('100%')
+        .layoutWeight(1)
         .maxLines(8)
       Button($r('app.string.sync_retry'))
         .attributeModifier(new PressFeedback())
         .stateEffect(false)
         .onClick((): void => { this.onRetry(); })
     }
+    }.width('100%')
 
   }
 
@@ -199,7 +201,7 @@ export struct 同步面板 {
         .onClick((): void => {
           this.dismissPresentation();
         })
-        .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
+        .transition(SurfaceTransition.backdrop())
 
       Column({ space: 应用尺寸.间距_12 }) {
         this.头部行()
@@ -226,13 +228,7 @@ export struct 同步面板 {
       .padding(20)
       .backgroundColor(this.取色板().背景)
       .borderRadius(应用尺寸.圆角_卡片)
-      .transition(TransitionEffect.asymmetric(
-        TransitionEffect.opacity(0)
-          .combine(TransitionEffect.scale({ x: 0.96, y: 0.96 }))
-          .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }),
-        TransitionEffect.opacity(0)
-          .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() })
-      ))
+      .transition(SurfaceTransition.dialog())
     }
     .width('100%')
     .height('100%')

@@ -1,5 +1,6 @@
 import { initialTransferState } from '../../entry/src/main/ets/model/home/DataTransferSession.ts';
 import { componentMethods, panelHarness, settle } from './sync-panel-harness.mjs';
+import { surfaceMotionApi } from './motion-harness.mjs';
 import { decideHomeSync } from '../../entry/src/main/ets/model/HomeSyncPolicy.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { HomeStartupSequence } from '../../entry/src/main/ets/model/HomeStartupSequence.ts';
@@ -542,12 +543,19 @@ test('the server entry lives inside the sync card and the editor is a centered c
 });
 
 test('centered server dialog opens on the persisted value, cancels drafts, and blocks dismissal during save', () => {
-  const Group = componentMethods(read('components/settings/同步分组.ets'), ['openServerDialog', 'closeServerDialog'], {});
-  const group = new Group();
   let opened = 0, closed = 0;
+  const motion = surfaceMotionApi();
+  const Group = componentMethods(read('components/settings/同步分组.ets'), ['createServerDialog', 'openServerDialog', 'closeServerDialog'], {
+    ...motion, DialogAlignment: { Center: 'center' }, Color: { Transparent: 'transparent' },
+    自定义服务器弹窗: props => props, CustomDialogController: class {
+      constructor(options) { this.options = options; }
+      open() { opened++; } close() { closed++; }
+    }
+  });
+  const group = new Group();
   Object.assign(group, { 登录中: false, settingsSaving: false, savedServer: 'https://saved.example/',
     serverInput: 'https://draft.example/', serverError: 'old error',
-    serverDialogController: { open: () => { opened++; }, close: () => { closed++; } } });
+    serverDialogController: null });
   group.openServerDialog();
   assert.equal(opened, 1);
   assert.equal(group.serverInput, group.savedServer);
@@ -558,6 +566,13 @@ test('centered server dialog opens on the persisted value, cancels drafts, and b
   assert.equal(closed, 1);
   assert.equal(group.serverInput, group.savedServer);
   assert.equal(group.serverError, '');
+  const previous = group.serverDialogController;
+  motion.setStyle('lively'); group.openServerDialog();
+  assert.notEqual(group.serverDialogController, previous);
+  assert.equal(group.serverDialogController.options.openAnimation.duration, 290);
+  assert.equal(group.serverDialogController.options.builder.serverInput, group.savedServer);
+  assert.equal(opened, 2);
+  assert.equal(closed, 2);
 });
 
 
@@ -751,7 +766,7 @@ test('sync indicator distinguishes transfer, attention, waiting, completion and 
   panel.当前阶段 = 'done';
   panel.错误文案 = 'offline';
   panel.publishStatus();
-  assert.equal(state.indicator, 'attention');
+  assert.equal(state.indicator, 'failure');
   assert.equal(state.status, 'app.string.sync_background_error');
   panel.错误文案 = '';
   panel.状态文案 = 'completed';
@@ -775,10 +790,10 @@ test('sync status stays on the dedicated Sync button and preserves accessible de
   assert.match(home, /syncStatusText: this.syncStatusText/);
   assert.match(home, /syncIndicator: this.syncIndicator/);
   assert.match(home, /onSync:[\s\S]*?this.syncDetailsRequest\+\+/);
-  assert.match(header, /accessibilityText\(this.syncStatusText\)/);
-  assert.ok(header.indexOf('app.media.ic_home_sync') < header.indexOf('accessibilityText(this.syncStatusText)'));
+  assert.match(header, /source: \$r\('app.media.ic_home_sync'\), label: this\.syncLabel\(\)/);
+  assert.match(header, /if \(this\.syncIndicator !== 'hidden' && this\.syncStatusText !== ''\) return this\.syncStatusText;/);
   assert.doesNotMatch(header, /\bText\(this.syncStatusText\)/);
-  assert.match(header, /if \(homeSyncIndicator\(this\.syncAccountState, this\.syncIndicator\) === 'syncing'\)\s*\{\s*LoadingProgress\(\)/);
+  assert.match(header, /feedback: this\.syncIndicator === 'syncing' \? 'busy' : this\.syncIndicator === 'done' \? 'success' :\s*this\.syncIndicator === 'failure' \? 'failure' : 'idle'/);
   assert.match(header, /homeSyncIndicator\(this\.syncAccountState, this\.syncIndicator\) === 'attention'[\s\S]*?Text\('!'\)[\s\S]*?app.color.error_text/);
   assert.doesNotMatch(header, /Text\('⚠'\)/);
   assert.match(panel, /this\.statusChanged\(text, indicator\)/);
