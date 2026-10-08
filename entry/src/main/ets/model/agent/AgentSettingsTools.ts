@@ -29,7 +29,7 @@ export function agentSettingDefinitions(): AgentSettingDefinition[] {
     { id: 'color_theme', description: '应用主题色，与深浅色和闪卡模板配色独立；可用颜色及权益见 list_theme_colors。',
       valueType: 'enum', allowedValues: [], scope: 'device', writable: true,
       writeTool: 'propose_set_theme_color', effect: 'confirmed_persistent' },
-    { id: 'fsrs_enabled', description: '整个 Anki 卡库的 FSRS 开关，不是单牌组选项；开启会重新调度卡片。',
+    { id: 'fsrs_enabled', description: '整个 Anki 卡库的 FSRS 开关，不是单牌组设置；开启会重新调度卡片。',
       valueType: 'boolean', allowedValues: [], scope: 'collection', writable: true,
       writeTool: 'propose_set_fsrs', effect: 'confirmed_collection_write' }
   ];

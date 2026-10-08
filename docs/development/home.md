@@ -86,6 +86,8 @@ HomeSummaryHeader 不再区分手机双侧与详情分栏外缘布局，也不�
 
 ## 页面操作边界扩展点
 
+牌组详情页“更多”中的入口、设置面板标题与相关帮助统一称“牌组设置”（英文 `Deck settings`）。UI 和 JIDE 的界面目录共同读取 `deck_options_title`，资源键、内部类型及工具 ID 保留原名；改名同时维护本地化说明和 JIDE 的领域描述。父牌组选择列表的“父牌组选项”表示候选列表，不属于这个设置入口。
+
 123 云盘远程公告暂不启用，唯一开关在 `model/官方公告配置.ts`，首页检查、调度、展示和 `backend/官方公告服务.ets` 网络边界共用 `OFFICIAL_ANNOUNCEMENTS_ENABLED`。关闭时跳过远程流程，不创建 HTTP 请求或公告定时器，也不消费已读 ID；本地启动引导和幻彩提醒继续。首页向 `AppInterface` 发布 `official_announcements_enabled`，JIDE 通过 `get_app_structure` 读取实际停用状态。暂停状态的直接回归见 `page-operation-boundaries`、`official-announcement-flow-contract`，JIDE 读取回归在 `ai-agent-app-structure`，恢复启用后的协调流程仍由原行为测试覆盖。
 
 首页 `homeActivity()` 只映射占用；`HomeWorkCoordinator` 拥有合并唤醒、外部导入串行消费与任务优先级（外部文件 → 待执行导航 → 手动同步 → 公告 → 引导），每次效果后重查占用。新增集合任务/弹层在映射处登记，释放时触发 `homeActivityChanged`；State 用 Watch，普通字段收尾显式唤醒。`HomeStartupSequence` 拥有云端引导/入门的待展示和读取中状态；销毁禁止迟到展示，已接受导入仍完成并释放队列。公告网络结果经 `HomeAnnouncementController` 暂存，首页安全空闲时再展示，导航/后台不丢待展示项。`CloudDeckFeature` 拥有目录、选择、进度、重试、配额落盘和退出确认；`CloudDeckImportController` 编排串行下载/导入。首页只持有显示目标、忙碌及配额摘要，接收刷新与关闭通知，配额写入完成才释放忙碌。

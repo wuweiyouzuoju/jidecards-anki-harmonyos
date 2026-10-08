@@ -388,7 +388,7 @@ struct 统计卡片 {
           Text(this.t('未启用 FSRS', 'FSRS not enabled'))
             .fontSize(15)
             .fontColor(this.数据.主题色.文字主)
-          Text(this.t('在牌组选项→高级设置中开启 FSRS', 'Enable FSRS in Deck Options > Advanced'))
+          Text(this.t('在牌组设置→高级设置中开启 FSRS', 'Enable FSRS in Deck settings > Advanced'))
             .fontSize(11)
             .fontColor(this.数据.主题色.文字次)
             .margin({ top: 3 })

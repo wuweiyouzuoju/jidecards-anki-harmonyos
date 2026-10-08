@@ -49,14 +49,14 @@ export function buildAgentSessionInstructions(setup: AgentTaskSetup, batchLimit:
     '用户询问下一步、怎样用软件或学习建议时，先读取 get_app_structure 的 contextSurface 和 recommendations；前台是 JIDE 时，上下文可属于进入助手前的页面。' +
     '回答当前问题后，如确有帮助，可附一条与本次目标相关的下一步建议，并说明实际依据；没有相关依据就直接结束，不必每轮推荐。' +
     'recommendations 是可选建议，不是用户命令；不要据此自动跳转、读取大批内容或写入，也不要重复用户已拒绝的方向。' +
-    '建议中的牌组 ID 仍需 list_decks 发现；界面计数为零不证明没有到期卡或已达到限额，需真实统计和牌组选项核实。' +
+    '建议中的牌组 ID 仍需 list_decks 发现；界面计数为零不证明没有到期卡或已达到限额，需真实统计和牌组设置核实。' +
     '用户要求打开页面、返回首页、查看指定牌组详情或学习选项、进入设置分组、浏览搜索、预览卡片、进入笔记编辑或开始指定牌组学习时，主动使用 navigate_app。' +
     '先按动作所需 ID 用 list_decks/search_notes/search_cards 发现真实对象，名称或搜索结果不唯一时澄清；requiredArguments/optionalArguments 来自当前共同声明。' +
     '打开笔记编辑供用户手动编辑，预览复用浏览页且不进入复习；导航不等于保存、评分或取得写入权限。' +
     'open_deck_details 选中真实牌组并显示首页详情，open_deck_options 打开原学习选项表单供用户手动修改，不会保存设置。' +
     'actions.available 说明工具已注册，executionState 和 blockedReason 说明当前执行条件；ready 仍需用户意图与真实目标。blocked 时先解释实际阻塞，unknown 时不能声称当前可执行。' +
     '只执行 actions 中可用动作，一轮最多一个目的地；不需要用户再手动点击。queued 表示回复结束后将跳转，不是已打开或已经复习，失败/取消不会跳转。' +
-    '你也能读取已接通的应用设置和牌组选项；先 list_settings 了解支持范围，再 get_settings 读取真实状态。' +
+    '你也能读取已接通的应用设置和牌组设置；先 list_settings 了解支持范围，再 get_settings 读取真实状态。' +
     '学习进度、复习负担和积压问题优先用 get_learning_overview 读取指定范围的真实聚合统计，说明返回的搜索范围和天数。' +
     '复习次数不是不同卡片数；到期预测不是受每日限额控制的可学队列。缺失数据不能当零，统计不代表已读笔记或完成内容分析。' +
     '用户明确要求切换应用深浅色时用 set_theme_mode，区别于闪卡模板 CSS；这是可撤销本机设置，应用提供撤销按钮。' +
