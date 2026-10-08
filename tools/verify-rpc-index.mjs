@@ -136,38 +136,21 @@ async function main() {
     if (checkout !== revision) throw new Error(`Anki checkout ${checkout} differs from locked ${revision}`);
   }
   const fingerprint = protocolFingerprint(ankiRoot);
-  // 上游字段检查随协议门禁执行；可移植仓库测试不读取本机 Anki checkout。
-  const configProto = readFileSync(path.join(ankiRoot, 'proto/anki/config.proto'), 'utf8');
-  for (const field of ['uint32 rollover = 2;', 'uint32 learn_ahead_secs = 3;', 'bool show_remaining_due_counts = 3;',
-      'bool show_intervals_on_buttons = 4;', 'uint32 time_limit_secs = 5;', 'bool load_balancer_enabled = 6;',
-      'bool fsrs_short_term_with_steps_enabled = 7;', 'uint32 daily = 1;', 'uint32 weekly = 2;',
-      'uint32 monthly = 3;', 'uint32 minimum_interval_mins = 4;']) {
-    if (!configProto.includes(field)) throw new Error(`Anki review preferences contract differs: ${field}`);
-  }
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
   if (manifest.ankiRevision !== `${lock.ANKI_TAG}-${revision}`) throw new Error('RPC aliases differ from UPSTREAM.lock');
-  if (args[0] === '--generate') {
-    if (!args[1]) throw new Error('--generate requires the exact freshly built backend.rs path');
-    verifyGenerationCheckout(ankiRoot, revision);
-    const services = parseGeneratedBackend(readFileSync(path.resolve(args[1]), 'utf8'));
-    const baseline = { revision, fingerprint, services };
-    const { writeGeneratedIndexes } = await import('./generate-rpc-index.mjs');
-    writeGeneratedIndexes(manifest, baseline, readFileSync(path.join(root, 'native/rsharmony/include/rsharmony.h'), 'utf8'));
-    writeFileSync(baselinePath, JSON.stringify(baseline, null, 2) + '\n');
-    console.log('[rpc-index] generated baseline and source; review protocol and alias changes together');
-  } else {
-    const baseline = JSON.parse(readFileSync(baselinePath, 'utf8'));
-    verifyBaseline(baseline, revision, fingerprint);
-    const services = args.length ? parseGeneratedBackend(readFileSync(path.resolve(args[0]), 'utf8')) : baseline.services;
-    verifyIndex(serviceIndex, manifest, services);
-    console.log(`[rpc-index] verified ${serviceNames.size} services and ${methodNames.size} method tables (${args.length ? 'explicit generated artifact' : 'locked protocol baseline'})`);
-  }
+  if (args[0] === '--generate') throw new Error('Rust text is comparison-only; use node tools/core-protocol.mjs --refresh <independent official locked checkout>');
+  const baseline = JSON.parse(readFileSync(baselinePath, 'utf8'));
+  verifyBaseline(baseline, revision, fingerprint);
+  const {checkGenerated,dispatchBaseline,verifyDescriptors} = await import('./core-protocol.mjs');
+  const schema=JSON.parse(readFileSync(path.join(root,'tools/core-protocol-schema.json')));
+  verifyDescriptors(schema);
+  checkGenerated(schema);
+  if (JSON.stringify(baseline) !== JSON.stringify(dispatchBaseline(schema))) throw new Error('RPC baseline differs from official descriptor dispatch');
+  const services = args.length ? parseGeneratedBackend(readFileSync(path.resolve(args[0]), 'utf8')) : baseline.services;
+  verifyIndex(serviceIndex, manifest, services);
+  console.log('[rpc-index] complete protocol generation and locked dispatch verified' + (args.length ? ' against explicit Rust comparison artifact' : ' using source archive fingerprint'));
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  try { await main(); }
-  catch (error) {
-    console.error(`[rpc-index] ${error instanceof Error ? error.message : String(error)}`);
-    process.exitCode = 1;
-  }
+  main().catch(error => { console.error(`[rpc-index] ${error.message}`); process.exitCode = 1; });
 }

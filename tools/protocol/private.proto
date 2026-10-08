@@ -1,0 +1,19 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+syntax = "proto3";
+package jide;
+// 应用私有 wire 契约；Core 服务编号与权限不在这里扩展。
+message MediaRequest { uint32 token = 1; uint32 offset = 2; }
+message MediaPage {
+  uint32 token = 1; uint32 unused_count = 2; uint32 missing_count = 3;
+  bool have_trash = 4; string report = 5; uint32 next_offset = 6;
+  repeated string files = 7; repeated int64 note_ids = 8;
+  uint32 missing_note_count = 9; uint32 tagged_count = 10;
+}
+message DeckPreviewRequest { int64 deck_id = 1; uint32 scope = 2; }
+message DeckPreviewResponse { repeated int64 card_ids = 1; }
+message NoteDuplicateRequest { repeated int64 note_ids = 1; int64 notetype_id = 2; uint32 field_ord = 3; }
+message DuplicateField { int64 note_id = 1; string value = 2; }
+message NoteDuplicateResponse { repeated DuplicateField fields = 1; }
+message CustomSchedulingRequest {
+  bytes states = 1; bytes context = 2; string custom_data = 3; string result_json = 4;
+}

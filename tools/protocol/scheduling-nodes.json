@@ -1,0 +1,14 @@
+{
+  "states":"anki.scheduler.SchedulingStates",
+  "state":"anki.scheduler.SchedulingState",
+  "normal":"anki.scheduler.SchedulingState.Normal",
+  "filtered":"anki.scheduler.SchedulingState.Filtered",
+  "new":"anki.scheduler.SchedulingState.New",
+  "learning":"anki.scheduler.SchedulingState.Learning",
+  "review":"anki.scheduler.SchedulingState.Review",
+  "relearning":"anki.scheduler.SchedulingState.Relearning",
+  "preview":"anki.scheduler.SchedulingState.Preview",
+  "rescheduling":"anki.scheduler.SchedulingState.ReschedulingFilter",
+  "memory":"anki.cards.FsrsMemoryState",
+  "context":"anki.scheduler.SchedulingContext"
+}

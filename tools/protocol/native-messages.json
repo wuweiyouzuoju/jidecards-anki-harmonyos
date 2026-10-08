@@ -1,0 +1,17 @@
+[
+  "anki.backend.BackendError",
+  "anki.media.CheckMediaResponse",
+  "anki.tags.NoteIdsAndTagsRequest",
+  "anki.collection.OpChangesWithCount",
+  "anki.collection.UndoStatus",
+  "anki.generic.StringList",
+  "anki.generic.String",
+  "jide.MediaRequest",
+  "jide.MediaPage",
+  "jide.DeckPreviewRequest",
+  "jide.DeckPreviewResponse",
+  "jide.NoteDuplicateRequest",
+  "jide.DuplicateField",
+  "jide.NoteDuplicateResponse",
+  "jide.CustomSchedulingRequest"
+]

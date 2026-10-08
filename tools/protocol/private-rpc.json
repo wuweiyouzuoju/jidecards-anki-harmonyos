@@ -1,0 +1,29 @@
+{
+  "MediaSnapshot": {
+    "id":1000,"methods":{"check":0,"report":1,"unused":2,"trash":3,"end":4,"missingNotes":5,"tagMissing":6},
+    "owner":"native/rsharmony/src/media_snapshot.rs",
+    "contracts": {
+      "check":{"input":"jide.MediaRequest","output":"jide.MediaPage","meaning":"新建快照；使旧 token 失效"},
+      "report":{"input":"jide.MediaRequest","output":"jide.MediaPage","meaning":"UTF-8 与行边界分页"},
+      "unused":{"input":"jide.MediaRequest","output":"jide.MediaPage","meaning":"最多 256 项文件页"},
+      "trash":{"input":"jide.MediaRequest","output":"anki.generic.Empty","meaning":"锁内复查，只清理已确认交集"},
+      "end":{"input":"jide.MediaRequest","output":"anki.generic.Empty","meaning":"释放快照"},
+      "missingNotes":{"input":"jide.MediaRequest","output":"jide.MediaPage","meaning":"最多 256 项笔记页"},
+      "tagMissing":{"input":"jide.MediaRequest","output":"jide.MediaPage","meaning":"锁内复查交集，单事务添加 missing-media 标签"}
+    }
+  },
+  "DeckPreview": {"id":1001,"methods":{"ids":0},"owner":"native/rsharmony/src/deck_preview.rs",
+    "contracts":{"ids":{"input":"jide.DeckPreviewRequest","output":"jide.DeckPreviewResponse","meaning":"范围 0 今日剩余、1 当前到期、2 今日已答、3 全部；Core 只读快照"}}},
+  "NoteDuplicates": {"id":1002,"methods":{"fields":0},"owner":"native/rsharmony/src/note_duplicates.rs",
+    "contracts":{"fields":{"input":"jide.NoteDuplicateRequest","output":"jide.NoteDuplicateResponse","meaning":"最多 200 个正数且不重复 ID；固定只读查询"}}},
+  "CollectionHistory": {"id":1003,"methods":{"undo":0,"redo":1},"owner":"native/rsharmony/src/collection_history.rs",
+    "contracts":{
+      "undo":{"input":"anki.collection.UndoStatus","output":"anki.collection.OpChangesAfterUndo","meaning":"锁内核对显示的历史，再撤销"},
+      "redo":{"input":"anki.collection.UndoStatus","output":"anki.collection.OpChangesAfterUndo","meaning":"锁内核对显示的历史，再重做"}
+    }},
+  "CustomScheduling": {"id":1004,"methods":{"input":0,"patch":1},"owner":"native/rsharmony/src/custom_scheduling.rs",
+    "contracts":{
+      "input":{"input":"jide.CustomSchedulingRequest","output":"anki.generic.String","meaning":"状态与上下文转为受限 JSON；seed 为十进制字符串"},
+      "patch":{"input":"jide.CustomSchedulingRequest","output":"anki.scheduler.SchedulingStates","meaning":"局部 wire 修改；current 不可修改；未知字段保留"}
+    }}
+}

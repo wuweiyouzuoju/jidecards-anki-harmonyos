@@ -1,0 +1,3644 @@
+{
+  "source": "Direct forwarding methods selected from immutable legacy Service source; arguments and responses from the frozen legacy codec corpus. expectedCalls includes nested media resolution. Does not model platform IO.",
+  "cases": [
+    {
+      "file": "AnkiNoteDuplicates.ts",
+      "model": "AnkiNoteDuplicates",
+      "method": "fields",
+      "encoder": {
+        "file": "NoteDuplicateMessages.ts",
+        "entry": "encodeDuplicateFields"
+      },
+      "args": [
+        [
+          17
+        ],
+        17,
+        17
+      ],
+      "response": {
+        "$bytes": "0a0f0811120be6b189e5ad97f09f988000"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "AnkiWeb服务.ts",
+      "model": "AnkiWeb服务",
+      "method": "检查更新",
+      "encoder": {
+        "file": "AnkiwebMessages.ts",
+        "entry": "encodeCheckForUpdateRequest"
+      },
+      "args": [
+        {
+          "version": 0,
+          "buildhash": "",
+          "os": "",
+          "installId": -1,
+          "lastMessageId": 0
+        }
+      ],
+      "response": {
+        "$bytes": "0a06322e312e35301080e2cfaa061a0b6e65772072656c656173652063"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "AnkiWeb服务.ts",
+      "model": "AnkiWeb服务",
+      "method": "检查更新",
+      "encoder": {
+        "file": "AnkiwebMessages.ts",
+        "entry": "encodeCheckForUpdateRequest"
+      },
+      "args": [
+        {
+          "version": 0,
+          "buildhash": "",
+          "os": "",
+          "installId": 0,
+          "lastMessageId": 0
+        }
+      ],
+      "response": {
+        "$bytes": "0a06322e312e35301080e2cfaa061a0b6e65772072656c656173652063"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "AnkiWeb服务.ts",
+      "model": "AnkiWeb服务",
+      "method": "检查更新",
+      "encoder": {
+        "file": "AnkiwebMessages.ts",
+        "entry": "encodeCheckForUpdateRequest"
+      },
+      "args": [
+        {
+          "version": 0,
+          "buildhash": "hash123",
+          "os": "",
+          "installId": 0,
+          "lastMessageId": 0
+        }
+      ],
+      "response": {
+        "$bytes": "0a06322e312e35301080e2cfaa061a0b6e65772072656c656173652063"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "AnkiWeb服务.ts",
+      "model": "AnkiWeb服务",
+      "method": "检查更新",
+      "encoder": {
+        "file": "AnkiwebMessages.ts",
+        "entry": "encodeCheckForUpdateRequest"
+      },
+      "args": [
+        {
+          "version": 26,
+          "buildhash": "abc",
+          "os": "linux",
+          "installId": 1234567890,
+          "lastMessageId": 42
+        }
+      ],
+      "response": {
+        "$bytes": "0a06322e312e35301080e2cfaa061a0b6e65772072656c656173652063"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "FsrsService.ts",
+      "model": "FsrsService",
+      "method": "evaluate",
+      "encoder": {
+        "file": "FsrsMessages.ts",
+        "entry": "encodeEvaluateFsrs"
+      },
+      "args": [
+        {
+          "params": [],
+          "search": "did:1 -is:suspended",
+          "ignoreRevlogsBeforeMs": 0
+        }
+      ],
+      "response": {
+        "$bytes": "0d0000003f150000003e"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "FsrsService.ts",
+      "model": "FsrsService",
+      "method": "memoryState",
+      "encoder": {
+        "file": "CardsMessages.ts",
+        "entry": "encodeCardId"
+      },
+      "args": [
+        0
+      ],
+      "response": {
+        "$bytes": "156666663f1d000000bf"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "FsrsService.ts",
+      "model": "FsrsService",
+      "method": "memoryState",
+      "encoder": {
+        "file": "CardsMessages.ts",
+        "entry": "encodeCardId"
+      },
+      "args": [
+        1234567890
+      ],
+      "response": {
+        "$bytes": "156666663f1d000000bf"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "FsrsService.ts",
+      "model": "FsrsService",
+      "method": "historyCount",
+      "encoder": {
+        "file": "FsrsMessages.ts",
+        "entry": "encodeFsrsHistoryCount"
+      },
+      "args": [
+        "2099-01-01",
+        "(did:1) -is:suspended"
+      ],
+      "response": {
+        "$bytes": "08001006"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "FsrsService.ts",
+      "model": "FsrsService",
+      "method": "daily",
+      "encoder": {
+        "file": "FsrsMessages.ts",
+        "entry": "encodeSimulateFsrs"
+      },
+      "args": [
+        {
+          "params": [],
+          "desiredRetention": 0.9,
+          "deckSize": 0,
+          "daysToSimulate": 30,
+          "newLimit": 10,
+          "reviewLimit": 100,
+          "maxInterval": 36500,
+          "search": "did:1 -is:suspended",
+          "newCardsIgnoreReviewLimit": true,
+          "easyDaysPercentages": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "reviewOrder": 8,
+          "suspendAfterLapseCount": 0,
+          "historicalRetention": 0.9,
+          "learningStepCount": 2,
+          "relearningStepCount": 1
+        }
+      ],
+      "response": {
+        "$bytes": "0a080000c03f00002040120203001800180422080000484100000000"
+      },
+      "expectedCalls": 2,
+      "successful": false
+    },
+    {
+      "file": "FsrsService.ts",
+      "model": "FsrsService",
+      "method": "daily",
+      "encoder": {
+        "file": "FsrsMessages.ts",
+        "entry": "encodeSimulateFsrs"
+      },
+      "args": [
+        {
+          "params": [],
+          "desiredRetention": 0.9,
+          "deckSize": 0,
+          "daysToSimulate": 30,
+          "newLimit": 10,
+          "reviewLimit": 100,
+          "maxInterval": 36500,
+          "search": "did:1 -is:suspended",
+          "newCardsIgnoreReviewLimit": true,
+          "easyDaysPercentages": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "reviewOrder": 8,
+          "suspendAfterLapseCount": 8,
+          "historicalRetention": 0.9,
+          "learningStepCount": 2,
+          "relearningStepCount": 1
+        }
+      ],
+      "response": {
+        "$bytes": "0a080000c03f00002040120203001800180422080000484100000000"
+      },
+      "expectedCalls": 2,
+      "successful": false
+    },
+    {
+      "file": "FsrsService.ts",
+      "model": "FsrsService",
+      "method": "daily",
+      "encoder": {
+        "file": "FsrsMessages.ts",
+        "entry": "encodeSimulateFsrs"
+      },
+      "args": [
+        {
+          "params": [],
+          "desiredRetention": 0.9,
+          "deckSize": 0,
+          "daysToSimulate": 30,
+          "newLimit": 10,
+          "reviewLimit": 100,
+          "maxInterval": 36500,
+          "search": "did:1 -is:suspended",
+          "newCardsIgnoreReviewLimit": true,
+          "easyDaysPercentages": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "reviewOrder": 8,
+          "suspendAfterLapseCount": null,
+          "historicalRetention": 0.9,
+          "learningStepCount": 2,
+          "relearningStepCount": 1
+        }
+      ],
+      "response": {
+        "$bytes": "0a080000c03f00002040120203001800180422080000484100000000"
+      },
+      "expectedCalls": 2,
+      "successful": false
+    },
+    {
+      "file": "FsrsService.ts",
+      "model": "FsrsService",
+      "method": "optimize",
+      "encoder": {
+        "file": "FsrsMessages.ts",
+        "entry": "encodeComputeFsrsParams"
+      },
+      "args": [
+        {
+          "search": "did:1 -is:suspended",
+          "currentParams": [],
+          "ignoreRevlogsBeforeMs": 0,
+          "numOfRelearningSteps": 1,
+          "healthCheck": true
+        }
+      ],
+      "response": {
+        "$bytes": "0a080000803f000000400d0000404010910318009a0606667574757265"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "FsrsService.ts",
+      "model": "FsrsService",
+      "method": "optimize",
+      "encoder": {
+        "file": "FsrsMessages.ts",
+        "entry": "encodeComputeFsrsParams"
+      },
+      "args": [
+        {
+          "search": "did:1 -is:suspended",
+          "currentParams": [
+            1,
+            2
+          ],
+          "ignoreRevlogsBeforeMs": 1767312000000,
+          "numOfRelearningSteps": 1,
+          "healthCheck": true
+        }
+      ],
+      "response": {
+        "$bytes": "0a080000803f000000400d0000404010910318009a0606667574757265"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "FsrsService.ts",
+      "model": "FsrsService",
+      "method": "workload",
+      "encoder": {
+        "file": "FsrsMessages.ts",
+        "entry": "encodeSimulateFsrs"
+      },
+      "args": [
+        {
+          "params": [],
+          "desiredRetention": 0.9,
+          "deckSize": 0,
+          "daysToSimulate": 30,
+          "newLimit": 10,
+          "reviewLimit": 100,
+          "maxInterval": 36500,
+          "search": "did:1 -is:suspended",
+          "newCardsIgnoreReviewLimit": true,
+          "easyDaysPercentages": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "reviewOrder": 8,
+          "suspendAfterLapseCount": 0,
+          "historicalRetention": 0.9,
+          "learningStepCount": 2,
+          "relearningStepCount": 1
+        }
+      ],
+      "response": {
+        "$bytes": "22040863101d0a070863150080d9441a070863150000e84122040862101c0a070862150000d2441a070862150000e04122040861101b0a070861150080ca441a070861150000d84122040860101a0a070860150000c3441a070860150000d0412204085f10190a07085f150080bb441a07085f150000c8412204085e10180a07085e150000b4441a07085e150000c0412204085d10170a07085d150080ac441a07085d150000b8412204085c10160a07085c150000a5441a07085c150000b0412204085b10150a07085b1500809d441a07085b150000a8412204085a10140a07085a15000096441a07085a150000a0412204085910130a0708591500808e441a07085915000098412204085810120a07085815000087441a07085815000090412204085710110a0708571500007f441a07085715000088412204085610100a07085615000070441a070856150000804122040855100f0a07085515000061441a070855150000704122040854100e0a07085415000052441a070854150000604122040853100d0a07085315000043441a070853150000504122040852100c0a07085215000034441a070852150000404122040851100b0a07085115000025441a070851150000304122040850100a0a07085015000016441a07085015000020412204084f10090a07084f15000007441a07084f15000010412204084e10080a07084e150000f0431a07084e15000000412204084d10070a07084d150000d2431a07084d150000e0402204084c10060a07084c150000b4431a07084c150000c0402204084b10050a07084b15000096431a07084b150000a0402204084a10040a07084a15000070431a07084a15000080402204084910030a07084915000034431a07084915000040402204084810020a070848150000f0421a07084815000000402204084710010a07084715000070421a070847150000803f2204084610000a07084615000000001a07084615000000000a07085a150000f642150000a040980601"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "FsrsService.ts",
+      "model": "FsrsService",
+      "method": "workload",
+      "encoder": {
+        "file": "FsrsMessages.ts",
+        "entry": "encodeSimulateFsrs"
+      },
+      "args": [
+        {
+          "params": [],
+          "desiredRetention": 0.9,
+          "deckSize": 0,
+          "daysToSimulate": 30,
+          "newLimit": 10,
+          "reviewLimit": 100,
+          "maxInterval": 36500,
+          "search": "did:1 -is:suspended",
+          "newCardsIgnoreReviewLimit": true,
+          "easyDaysPercentages": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "reviewOrder": 8,
+          "suspendAfterLapseCount": 8,
+          "historicalRetention": 0.9,
+          "learningStepCount": 2,
+          "relearningStepCount": 1
+        }
+      ],
+      "response": {
+        "$bytes": "22040863101d0a070863150080d9441a070863150000e84122040862101c0a070862150000d2441a070862150000e04122040861101b0a070861150080ca441a070861150000d84122040860101a0a070860150000c3441a070860150000d0412204085f10190a07085f150080bb441a07085f150000c8412204085e10180a07085e150000b4441a07085e150000c0412204085d10170a07085d150080ac441a07085d150000b8412204085c10160a07085c150000a5441a07085c150000b0412204085b10150a07085b1500809d441a07085b150000a8412204085a10140a07085a15000096441a07085a150000a0412204085910130a0708591500808e441a07085915000098412204085810120a07085815000087441a07085815000090412204085710110a0708571500007f441a07085715000088412204085610100a07085615000070441a070856150000804122040855100f0a07085515000061441a070855150000704122040854100e0a07085415000052441a070854150000604122040853100d0a07085315000043441a070853150000504122040852100c0a07085215000034441a070852150000404122040851100b0a07085115000025441a070851150000304122040850100a0a07085015000016441a07085015000020412204084f10090a07084f15000007441a07084f15000010412204084e10080a07084e150000f0431a07084e15000000412204084d10070a07084d150000d2431a07084d150000e0402204084c10060a07084c150000b4431a07084c150000c0402204084b10050a07084b15000096431a07084b150000a0402204084a10040a07084a15000070431a07084a15000080402204084910030a07084915000034431a07084915000040402204084810020a070848150000f0421a07084815000000402204084710010a07084715000070421a070847150000803f2204084610000a07084615000000001a07084615000000000a07085a150000f642150000a040980601"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "FsrsService.ts",
+      "model": "FsrsService",
+      "method": "workload",
+      "encoder": {
+        "file": "FsrsMessages.ts",
+        "entry": "encodeSimulateFsrs"
+      },
+      "args": [
+        {
+          "params": [],
+          "desiredRetention": 0.9,
+          "deckSize": 0,
+          "daysToSimulate": 30,
+          "newLimit": 10,
+          "reviewLimit": 100,
+          "maxInterval": 36500,
+          "search": "did:1 -is:suspended",
+          "newCardsIgnoreReviewLimit": true,
+          "easyDaysPercentages": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "reviewOrder": 8,
+          "suspendAfterLapseCount": null,
+          "historicalRetention": 0.9,
+          "learningStepCount": 2,
+          "relearningStepCount": 1
+        }
+      ],
+      "response": {
+        "$bytes": "22040863101d0a070863150080d9441a070863150000e84122040862101c0a070862150000d2441a070862150000e04122040861101b0a070861150080ca441a070861150000d84122040860101a0a070860150000c3441a070860150000d0412204085f10190a07085f150080bb441a07085f150000c8412204085e10180a07085e150000b4441a07085e150000c0412204085d10170a07085d150080ac441a07085d150000b8412204085c10160a07085c150000a5441a07085c150000b0412204085b10150a07085b1500809d441a07085b150000a8412204085a10140a07085a15000096441a07085a150000a0412204085910130a0708591500808e441a07085915000098412204085810120a07085815000087441a07085815000090412204085710110a0708571500007f441a07085715000088412204085610100a07085615000070441a070856150000804122040855100f0a07085515000061441a070855150000704122040854100e0a07085415000052441a070854150000604122040853100d0a07085315000043441a070853150000504122040852100c0a07085215000034441a070852150000404122040851100b0a07085115000025441a070851150000304122040850100a0a07085015000016441a07085015000020412204084f10090a07084f15000007441a07084f15000010412204084e10080a07084e150000f0431a07084e15000000412204084d10070a07084d150000d2431a07084d150000e0402204084c10060a07084c150000b4431a07084c150000c0402204084b10050a07084b15000096431a07084b150000a0402204084a10040a07084a15000070431a07084a15000080402204084910030a07084915000034431a07084915000040402204084810020a070848150000f0421a07084815000000402204084710010a07084715000070421a070847150000803f2204084610000a07084615000000001a07084615000000000a07085a150000f642150000a040980601"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "卡片服务.ts",
+      "model": "卡片服务",
+      "method": "获取卡片",
+      "encoder": {
+        "file": "CardsMessages.ts",
+        "entry": "encodeCardId"
+      },
+      "args": [
+        0
+      ],
+      "response": {
+        "$bytes": "08079a0614756e6b6e6f776e2d6675747572652d6669656c641864"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "卡片服务.ts",
+      "model": "卡片服务",
+      "method": "获取卡片",
+      "encoder": {
+        "file": "CardsMessages.ts",
+        "entry": "encodeCardId"
+      },
+      "args": [
+        1234567890
+      ],
+      "response": {
+        "$bytes": "08079a0614756e6b6e6f776e2d6675747572652d6669656c641864"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "卡片服务.ts",
+      "model": "卡片服务",
+      "method": "更新卡片",
+      "encoder": {
+        "file": "CardsMessages.ts",
+        "entry": "encodeUpdateCardsRequest"
+      },
+      "args": [
+        [],
+        true
+      ],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "卡片服务.ts",
+      "model": "卡片服务",
+      "method": "更新卡片",
+      "encoder": {
+        "file": "CardsMessages.ts",
+        "entry": "encodeUpdateCardsRequest"
+      },
+      "args": [
+        [
+          {
+            "id": 100,
+            "noteId": 0,
+            "deckId": 0,
+            "templateIdx": 0,
+            "mtimeSecs": 0,
+            "usn": 0,
+            "ctype": 0,
+            "queue": 0,
+            "due": 0,
+            "interval": 0,
+            "easeFactor": 0,
+            "reps": 0,
+            "lapses": 0,
+            "remainingSteps": 0,
+            "originalDue": 0,
+            "originalDeckId": 0,
+            "flags": 0,
+            "customData": ""
+          }
+        ],
+        false
+      ],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "卡片服务.ts",
+      "model": "卡片服务",
+      "method": "删除卡片",
+      "encoder": {
+        "file": "CardsMessages.ts",
+        "entry": "encodeRemoveCardsRequest"
+      },
+      "args": [
+        [
+          100,
+          200
+        ]
+      ],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "卡片服务.ts",
+      "model": "卡片服务",
+      "method": "设置牌组",
+      "encoder": {
+        "file": "CardsMessages.ts",
+        "entry": "encodeSetDeckRequest"
+      },
+      "args": [
+        [
+          1,
+          2
+        ],
+        1701
+      ],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "卡片服务.ts",
+      "model": "卡片服务",
+      "method": "设置标志",
+      "encoder": {
+        "file": "CardsMessages.ts",
+        "entry": "encodeSetFlagRequest"
+      },
+      "args": [
+        [
+          42
+        ],
+        0
+      ],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "卡片服务.ts",
+      "model": "卡片服务",
+      "method": "设置标志",
+      "encoder": {
+        "file": "CardsMessages.ts",
+        "entry": "encodeSetFlagRequest"
+      },
+      "args": [
+        [
+          42
+        ],
+        3
+      ],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "卡片渲染服务.ts",
+      "model": "卡片渲染服务",
+      "method": "encodeIriPaths",
+      "encoder": {
+        "file": "CardRenderingMessages.ts",
+        "entry": "encodeRenderingString"
+      },
+      "args": [
+        ""
+      ],
+      "response": {
+        "$bytes": "0a0be6b189e5ad97f09f988000121a0a0be6b189e5ad97f09f988000120be6b189e5ad97f09f988000"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "卡片渲染服务.ts",
+      "model": "卡片渲染服务",
+      "method": "encodeIriPaths",
+      "encoder": {
+        "file": "CardRenderingMessages.ts",
+        "entry": "encodeRenderingString"
+      },
+      "args": [
+        "42"
+      ],
+      "response": {
+        "$bytes": "0a0be6b189e5ad97f09f988000121a0a0be6b189e5ad97f09f988000120be6b189e5ad97f09f988000"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "卡片渲染服务.ts",
+      "model": "卡片渲染服务",
+      "method": "compareAnswer",
+      "encoder": {
+        "file": "CardRenderingMessages.ts",
+        "entry": "encodeCompareAnswerRequest"
+      },
+      "args": [
+        "",
+        "",
+        false
+      ],
+      "response": {
+        "$bytes": "0a0be6b189e5ad97f09f988000121a0a0be6b189e5ad97f09f988000120be6b189e5ad97f09f988000"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "卡片渲染服务.ts",
+      "model": "卡片渲染服务",
+      "method": "compareAnswer",
+      "encoder": {
+        "file": "CardRenderingMessages.ts",
+        "entry": "encodeCompareAnswerRequest"
+      },
+      "args": [
+        "42",
+        "42",
+        true
+      ],
+      "response": {
+        "$bytes": "0a0be6b189e5ad97f09f988000121a0a0be6b189e5ad97f09f988000120be6b189e5ad97f09f988000"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "卡片渲染服务.ts",
+      "model": "卡片渲染服务",
+      "method": "extractClozeForTyping",
+      "encoder": {
+        "file": "CardRenderingMessages.ts",
+        "entry": "encodeExtractClozeForTypingRequest"
+      },
+      "args": [
+        "",
+        0
+      ],
+      "response": {
+        "$bytes": "0a0be6b189e5ad97f09f988000121a0a0be6b189e5ad97f09f988000120be6b189e5ad97f09f988000"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "卡片渲染服务.ts",
+      "model": "卡片渲染服务",
+      "method": "extractClozeForTyping",
+      "encoder": {
+        "file": "CardRenderingMessages.ts",
+        "entry": "encodeExtractClozeForTypingRequest"
+      },
+      "args": [
+        "42",
+        17
+      ],
+      "response": {
+        "$bytes": "0a0be6b189e5ad97f09f988000121a0a0be6b189e5ad97f09f988000120be6b189e5ad97f09f988000"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "卡片渲染服务.ts",
+      "model": "卡片渲染服务",
+      "method": "renderUncommittedCard",
+      "encoder": {
+        "file": "CardRenderingMessages.ts",
+        "entry": "encodeRenderUncommittedCardRequest"
+      },
+      "args": [
+        {
+          "id": 0,
+          "guid": "",
+          "notetypeId": 0,
+          "mtimeSecs": 0,
+          "usn": 0,
+          "tags": [],
+          "fields": []
+        },
+        0,
+        "",
+        {
+          "$undefined": true
+        },
+        false
+      ],
+      "response": {
+        "$bytes": "0a0b0a09e997aee9a298efbc9a0a2412220a0546726f6e741206e4b896e7958c1a0b636c6f7a653a46726f6e741a0468696e74120b0a09e997aee9a298efbc9a1a1a2e63617264207b20666f6e742d73697a653a20323070783b207d20012800"
+      },
+      "expectedCalls": 4,
+      "successful": true
+    },
+    {
+      "file": "卡片渲染服务.ts",
+      "model": "卡片渲染服务",
+      "method": "renderUncommittedCard",
+      "encoder": {
+        "file": "CardRenderingMessages.ts",
+        "entry": "encodeRenderUncommittedCardRequest"
+      },
+      "args": [
+        {
+          "id": 17,
+          "guid": "42",
+          "notetypeId": 17,
+          "mtimeSecs": 17,
+          "usn": 17,
+          "tags": [
+            "42"
+          ],
+          "fields": [
+            "42"
+          ]
+        },
+        17,
+        "42",
+        {
+          "$undefined": true
+        },
+        true
+      ],
+      "response": {
+        "$bytes": "0a0b0a09e997aee9a298efbc9a0a2412220a0546726f6e741206e4b896e7958c1a0b636c6f7a653a46726f6e741a0468696e74120b0a09e997aee9a298efbc9a1a1a2e63617264207b20666f6e742d73697a653a20323070783b207d20012800"
+      },
+      "expectedCalls": 4,
+      "successful": true
+    },
+    {
+      "file": "卡片渲染服务.ts",
+      "model": "卡片渲染服务",
+      "method": "获取空卡报告",
+      "encoder": {
+        "file": "CardRenderingMessages.ts",
+        "entry": "encode空请求"
+      },
+      "args": [],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "同步服务.ts",
+      "model": "同步服务",
+      "method": "同步状态检查",
+      "encoder": {
+        "file": "SyncMessages.ts",
+        "entry": "encodeSyncAuth"
+      },
+      "args": [
+        {
+          "hkey": "",
+          "endpoint": "",
+          "ioTimeoutSecs": 0
+        }
+      ],
+      "response": {
+        "$bytes": "0801220b68747470733a2f2f6e6577"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "同步服务.ts",
+      "model": "同步服务",
+      "method": "同步状态检查",
+      "encoder": {
+        "file": "SyncMessages.ts",
+        "entry": "encodeSyncAuth"
+      },
+      "args": [
+        {
+          "hkey": "abc123",
+          "endpoint": "https://sync.example.com",
+          "ioTimeoutSecs": 60
+        }
+      ],
+      "response": {
+        "$bytes": "0801220b68747470733a2f2f6e6577"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "同步服务.ts",
+      "model": "同步服务",
+      "method": "同步状态检查",
+      "encoder": {
+        "file": "SyncMessages.ts",
+        "entry": "encodeSyncAuth"
+      },
+      "args": [
+        {
+          "hkey": "hk",
+          "endpoint": "",
+          "ioTimeoutSecs": 0
+        }
+      ],
+      "response": {
+        "$bytes": "0801220b68747470733a2f2f6e6577"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "同步服务.ts",
+      "model": "同步服务",
+      "method": "同步状态检查",
+      "encoder": {
+        "file": "SyncMessages.ts",
+        "entry": "encodeSyncAuth"
+      },
+      "args": [
+        {
+          "hkey": "key",
+          "endpoint": "",
+          "ioTimeoutSecs": 0
+        }
+      ],
+      "response": {
+        "$bytes": "0801220b68747470733a2f2f6e6577"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "同步服务.ts",
+      "model": "同步服务",
+      "method": "同步媒体",
+      "encoder": {
+        "file": "SyncMessages.ts",
+        "entry": "encodeSyncAuth"
+      },
+      "args": [
+        {
+          "hkey": "",
+          "endpoint": "",
+          "ioTimeoutSecs": 0
+        }
+      ],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "同步服务.ts",
+      "model": "同步服务",
+      "method": "同步媒体",
+      "encoder": {
+        "file": "SyncMessages.ts",
+        "entry": "encodeSyncAuth"
+      },
+      "args": [
+        {
+          "hkey": "abc123",
+          "endpoint": "https://sync.example.com",
+          "ioTimeoutSecs": 60
+        }
+      ],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "同步服务.ts",
+      "model": "同步服务",
+      "method": "同步媒体",
+      "encoder": {
+        "file": "SyncMessages.ts",
+        "entry": "encodeSyncAuth"
+      },
+      "args": [
+        {
+          "hkey": "hk",
+          "endpoint": "",
+          "ioTimeoutSecs": 0
+        }
+      ],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "同步服务.ts",
+      "model": "同步服务",
+      "method": "同步媒体",
+      "encoder": {
+        "file": "SyncMessages.ts",
+        "entry": "encodeSyncAuth"
+      },
+      "args": [
+        {
+          "hkey": "key",
+          "endpoint": "",
+          "ioTimeoutSecs": 0
+        }
+      ],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "同步服务.ts",
+      "model": "同步服务",
+      "method": "媒体同步状态",
+      "encoder": {
+        "file": "SyncMessages.ts",
+        "entry": "encodeEmptyRequest"
+      },
+      "args": [],
+      "response": {
+        "$bytes": "0801120d0a03312f3212022b331a022d30"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "同步服务.ts",
+      "model": "同步服务",
+      "method": "中止同步",
+      "encoder": {
+        "file": "SyncMessages.ts",
+        "entry": "encodeEmptyRequest"
+      },
+      "args": [],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "同步服务.ts",
+      "model": "同步服务",
+      "method": "中止媒体同步",
+      "encoder": {
+        "file": "SyncMessages.ts",
+        "entry": "encodeEmptyRequest"
+      },
+      "args": [],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "同步服务.ts",
+      "model": "同步服务",
+      "method": "设置自定义证书",
+      "encoder": {
+        "file": "SyncMessages.ts",
+        "entry": "encodeStringRequest"
+      },
+      "args": [
+        "cert-pem"
+      ],
+      "response": {
+        "$bytes": "0800"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "图片遮罩服务.ts",
+      "model": "图片遮罩服务",
+      "method": "获取遮罩用图片",
+      "encoder": {
+        "file": "ImageOcclusionMessages.ts",
+        "entry": "encodeGetImageForOcclusionRequest"
+      },
+      "args": [
+        ""
+      ],
+      "response": {
+        "$bytes": "0a030080ff120be6b189e5ad97f09f988000"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "图片遮罩服务.ts",
+      "model": "图片遮罩服务",
+      "method": "获取遮罩用图片",
+      "encoder": {
+        "file": "ImageOcclusionMessages.ts",
+        "entry": "encodeGetImageForOcclusionRequest"
+      },
+      "args": [
+        "42"
+      ],
+      "response": {
+        "$bytes": "0a030080ff120be6b189e5ad97f09f988000"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "图片遮罩服务.ts",
+      "model": "图片遮罩服务",
+      "method": "获取图片遮罩笔记",
+      "encoder": {
+        "file": "ImageOcclusionMessages.ts",
+        "entry": "encodeGetImageOcclusionNoteRequest"
+      },
+      "args": [
+        0
+      ],
+      "response": {
+        "$bytes": "0a500a030080ff12130a0f0a0be6b189e5ad97f09f988000120010111a0be6b189e5ad97f09f988000220be6b189e5ad97f09f9880002a0be6b189e5ad97f09f988000320be6b189e5ad97f09f9880003811"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "图片遮罩服务.ts",
+      "model": "图片遮罩服务",
+      "method": "获取图片遮罩笔记",
+      "encoder": {
+        "file": "ImageOcclusionMessages.ts",
+        "entry": "encodeGetImageOcclusionNoteRequest"
+      },
+      "args": [
+        17
+      ],
+      "response": {
+        "$bytes": "0a500a030080ff12130a0f0a0be6b189e5ad97f09f988000120010111a0be6b189e5ad97f09f988000220be6b189e5ad97f09f9880002a0be6b189e5ad97f09f988000320be6b189e5ad97f09f9880003811"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "图片遮罩服务.ts",
+      "model": "图片遮罩服务",
+      "method": "获取图片遮罩字段",
+      "encoder": {
+        "file": "ImageOcclusionMessages.ts",
+        "entry": "encodeGetImageOcclusionFieldsRequest"
+      },
+      "args": [
+        0
+      ],
+      "response": {
+        "$bytes": "0a080811101118112011"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "图片遮罩服务.ts",
+      "model": "图片遮罩服务",
+      "method": "获取图片遮罩字段",
+      "encoder": {
+        "file": "ImageOcclusionMessages.ts",
+        "entry": "encodeGetImageOcclusionFieldsRequest"
+      },
+      "args": [
+        17
+      ],
+      "response": {
+        "$bytes": "0a080811101118112011"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "图片遮罩服务.ts",
+      "model": "图片遮罩服务",
+      "method": "添加图片遮罩笔记",
+      "encoder": {
+        "file": "ImageOcclusionMessages.ts",
+        "entry": "encodeAddImageOcclusionNoteRequest"
+      },
+      "args": [
+        {
+          "imagePath": "",
+          "occlusions": "",
+          "header": "",
+          "backExtra": "",
+          "tags": [],
+          "notetypeId": 0
+        }
+      ],
+      "response": {
+        "$bytes": "08011801500158016001"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "图片遮罩服务.ts",
+      "model": "图片遮罩服务",
+      "method": "添加图片遮罩笔记",
+      "encoder": {
+        "file": "ImageOcclusionMessages.ts",
+        "entry": "encodeAddImageOcclusionNoteRequest"
+      },
+      "args": [
+        {
+          "imagePath": "42",
+          "occlusions": "42",
+          "header": "42",
+          "backExtra": "42",
+          "tags": [
+            "42"
+          ],
+          "notetypeId": 17
+        }
+      ],
+      "response": {
+        "$bytes": "08011801500158016001"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "图片遮罩服务.ts",
+      "model": "图片遮罩服务",
+      "method": "更新图片遮罩笔记",
+      "encoder": {
+        "file": "ImageOcclusionMessages.ts",
+        "entry": "encodeUpdateImageOcclusionNoteRequest"
+      },
+      "args": [
+        {
+          "noteId": 0,
+          "occlusions": "",
+          "header": "",
+          "backExtra": "",
+          "tags": []
+        }
+      ],
+      "response": {
+        "$bytes": "08011801500158016001"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "图片遮罩服务.ts",
+      "model": "图片遮罩服务",
+      "method": "更新图片遮罩笔记",
+      "encoder": {
+        "file": "ImageOcclusionMessages.ts",
+        "entry": "encodeUpdateImageOcclusionNoteRequest"
+      },
+      "args": [
+        {
+          "noteId": 17,
+          "occlusions": "42",
+          "header": "42",
+          "backExtra": "42",
+          "tags": [
+            "42"
+          ]
+        }
+      ],
+      "response": {
+        "$bytes": "08011801500158016001"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "媒体服务.ts",
+      "model": "媒体服务",
+      "method": "createSnapshot",
+      "encoder": {
+        "file": "MediaMessages.ts",
+        "entry": "encodeEmpty"
+      },
+      "args": [],
+      "response": {
+        "$bytes": "08111011181120112a0be6b189e5ad97f09f98800030113a0be6b189e5ad97f09f9880004202112a48115011"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "媒体服务.ts",
+      "model": "媒体服务",
+      "method": "reportPage",
+      "encoder": {
+        "file": "MediaSnapshotMessages.ts",
+        "entry": "encodeMediaSnapshotRequest"
+      },
+      "args": [
+        0,
+        0
+      ],
+      "response": {
+        "$bytes": "08111011181120112a0be6b189e5ad97f09f98800030113a0be6b189e5ad97f09f9880004202112a48115011"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "媒体服务.ts",
+      "model": "媒体服务",
+      "method": "reportPage",
+      "encoder": {
+        "file": "MediaSnapshotMessages.ts",
+        "entry": "encodeMediaSnapshotRequest"
+      },
+      "args": [
+        17,
+        17
+      ],
+      "response": {
+        "$bytes": "08111011181120112a0be6b189e5ad97f09f98800030113a0be6b189e5ad97f09f9880004202112a48115011"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "媒体服务.ts",
+      "model": "媒体服务",
+      "method": "unusedPage",
+      "encoder": {
+        "file": "MediaSnapshotMessages.ts",
+        "entry": "encodeMediaSnapshotRequest"
+      },
+      "args": [
+        0,
+        0
+      ],
+      "response": {
+        "$bytes": "08111011181120112a0be6b189e5ad97f09f98800030113a0be6b189e5ad97f09f9880004202112a48115011"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "媒体服务.ts",
+      "model": "媒体服务",
+      "method": "unusedPage",
+      "encoder": {
+        "file": "MediaSnapshotMessages.ts",
+        "entry": "encodeMediaSnapshotRequest"
+      },
+      "args": [
+        17,
+        17
+      ],
+      "response": {
+        "$bytes": "08111011181120112a0be6b189e5ad97f09f98800030113a0be6b189e5ad97f09f9880004202112a48115011"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "媒体服务.ts",
+      "model": "媒体服务",
+      "method": "trashSnapshot",
+      "encoder": {
+        "file": "MediaSnapshotMessages.ts",
+        "entry": "encodeMediaSnapshotRequest"
+      },
+      "args": [
+        0
+      ],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "媒体服务.ts",
+      "model": "媒体服务",
+      "method": "trashSnapshot",
+      "encoder": {
+        "file": "MediaSnapshotMessages.ts",
+        "entry": "encodeMediaSnapshotRequest"
+      },
+      "args": [
+        17
+      ],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "媒体服务.ts",
+      "model": "媒体服务",
+      "method": "releaseSnapshot",
+      "encoder": {
+        "file": "MediaSnapshotMessages.ts",
+        "entry": "encodeMediaSnapshotRequest"
+      },
+      "args": [
+        0
+      ],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "媒体服务.ts",
+      "model": "媒体服务",
+      "method": "releaseSnapshot",
+      "encoder": {
+        "file": "MediaSnapshotMessages.ts",
+        "entry": "encodeMediaSnapshotRequest"
+      },
+      "args": [
+        17
+      ],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "媒体服务.ts",
+      "model": "媒体服务",
+      "method": "missingNotesPage",
+      "encoder": {
+        "file": "MediaSnapshotMessages.ts",
+        "entry": "encodeMediaSnapshotRequest"
+      },
+      "args": [
+        0,
+        0
+      ],
+      "response": {
+        "$bytes": "08111011181120112a0be6b189e5ad97f09f98800030113a0be6b189e5ad97f09f9880004202112a48115011"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "媒体服务.ts",
+      "model": "媒体服务",
+      "method": "missingNotesPage",
+      "encoder": {
+        "file": "MediaSnapshotMessages.ts",
+        "entry": "encodeMediaSnapshotRequest"
+      },
+      "args": [
+        17,
+        17
+      ],
+      "response": {
+        "$bytes": "08111011181120112a0be6b189e5ad97f09f98800030113a0be6b189e5ad97f09f9880004202112a48115011"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "媒体服务.ts",
+      "model": "媒体服务",
+      "method": "tagMissingNotes",
+      "encoder": {
+        "file": "MediaSnapshotMessages.ts",
+        "entry": "encodeMediaSnapshotRequest"
+      },
+      "args": [
+        0
+      ],
+      "response": {
+        "$bytes": "08111011181120112a0be6b189e5ad97f09f98800030113a0be6b189e5ad97f09f9880004202112a48115011"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "媒体服务.ts",
+      "model": "媒体服务",
+      "method": "tagMissingNotes",
+      "encoder": {
+        "file": "MediaSnapshotMessages.ts",
+        "entry": "encodeMediaSnapshotRequest"
+      },
+      "args": [
+        17
+      ],
+      "response": {
+        "$bytes": "08111011181120112a0be6b189e5ad97f09f98800030113a0be6b189e5ad97f09f9880004202112a48115011"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "媒体服务.ts",
+      "model": "媒体服务",
+      "method": "检查媒体",
+      "encoder": {
+        "file": "MediaMessages.ts",
+        "entry": "encodeEmpty"
+      },
+      "args": [],
+      "response": {
+        "$bytes": "0a05612e6a70670a05622e706e670a05632e6769661205782e6d7033186418c80118ac022213556e7573656420332c204d697373696e6720312801"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "媒体服务.ts",
+      "model": "媒体服务",
+      "method": "清空回收站",
+      "encoder": {
+        "file": "MediaMessages.ts",
+        "entry": "encodeEmpty"
+      },
+      "args": [],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "媒体服务.ts",
+      "model": "媒体服务",
+      "method": "恢复回收站",
+      "encoder": {
+        "file": "MediaMessages.ts",
+        "entry": "encodeEmpty"
+      },
+      "args": [],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "媒体服务.ts",
+      "model": "媒体服务",
+      "method": "提取静态媒体文件",
+      "encoder": {
+        "file": "NotetypeMessages.ts",
+        "entry": "encodeNotetypeId"
+      },
+      "args": [
+        0
+      ],
+      "response": {
+        "$bytes": "0a086b6565702e6d70331209736b69702e746869730a096b656570322e706e67"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "媒体服务.ts",
+      "model": "媒体服务",
+      "method": "提取静态媒体文件",
+      "encoder": {
+        "file": "NotetypeMessages.ts",
+        "entry": "encodeNotetypeId"
+      },
+      "args": [
+        1752902400123
+      ],
+      "response": {
+        "$bytes": "0a086b6565702e6d70331209736b69702e746869730a096b656570322e706e67"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "搜索服务.ts",
+      "model": "搜索服务",
+      "method": "搜索卡片",
+      "encoder": {
+        "file": "SearchMessages.ts",
+        "entry": "encodeSearchRequest"
+      },
+      "args": [
+        {
+          "search": "",
+          "order": {
+            "kind": {
+              "$undefined": true
+            }
+          }
+        }
+      ],
+      "response": {
+        "$bytes": "0a02112a"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "搜索服务.ts",
+      "model": "搜索服务",
+      "method": "搜索卡片",
+      "encoder": {
+        "file": "SearchMessages.ts",
+        "entry": "encodeSearchRequest"
+      },
+      "args": [
+        {
+          "search": "42",
+          "order": {
+            "kind": {
+              "$undefined": true
+            },
+            "custom": "42",
+            "column": "42",
+            "reverse": true
+          }
+        }
+      ],
+      "response": {
+        "$bytes": "0a02112a"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "搜索服务.ts",
+      "model": "搜索服务",
+      "method": "搜索笔记",
+      "encoder": {
+        "file": "SearchMessages.ts",
+        "entry": "encodeSearchRequest"
+      },
+      "args": [
+        {
+          "search": "",
+          "order": {
+            "kind": {
+              "$undefined": true
+            }
+          }
+        }
+      ],
+      "response": {
+        "$bytes": "0a02112a"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "搜索服务.ts",
+      "model": "搜索服务",
+      "method": "搜索笔记",
+      "encoder": {
+        "file": "SearchMessages.ts",
+        "entry": "encodeSearchRequest"
+      },
+      "args": [
+        {
+          "search": "42",
+          "order": {
+            "kind": {
+              "$undefined": true
+            },
+            "custom": "42",
+            "column": "42",
+            "reverse": true
+          }
+        }
+      ],
+      "response": {
+        "$bytes": "0a02112a"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "搜索服务.ts",
+      "model": "搜索服务",
+      "method": "连接搜索节点",
+      "encoder": {
+        "file": "SearchMessages.ts",
+        "entry": "encodeJoinSearchNodesRequest"
+      },
+      "args": [
+        {
+          "joiner": 0,
+          "existingNode": {
+            "kind": {
+              "$undefined": true
+            }
+          },
+          "additionalNode": {
+            "kind": {
+              "$undefined": true
+            }
+          }
+        }
+      ],
+      "response": {
+        "$bytes": "0a0be6b189e5ad97f09f988000"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "搜索服务.ts",
+      "model": "搜索服务",
+      "method": "连接搜索节点",
+      "encoder": {
+        "file": "SearchMessages.ts",
+        "entry": "encodeJoinSearchNodesRequest"
+      },
+      "args": [
+        {
+          "joiner": 1,
+          "existingNode": {
+            "kind": {
+              "$undefined": true
+            },
+            "group": {
+              "nodes": {
+                "$undefined": true
+              },
+              "joiner": {
+                "$undefined": true
+              }
+            },
+            "negated": {
+              "kind": {
+                "$undefined": true
+              },
+              "group": {
+                "$undefined": true
+              },
+              "negated": {
+                "$undefined": true
+              },
+              "text": {
+                "$undefined": true
+              },
+              "template": {
+                "$undefined": true
+              },
+              "nid": {
+                "$undefined": true
+              },
+              "dupe": {
+                "$undefined": true
+              },
+              "fieldName": {
+                "$undefined": true
+              },
+              "rated": {
+                "$undefined": true
+              },
+              "days": {
+                "$undefined": true
+              },
+              "flag": {
+                "$undefined": true
+              },
+              "cardState": {
+                "$undefined": true
+              },
+              "nids": {
+                "$undefined": true
+              },
+              "day": {
+                "$undefined": true
+              },
+              "deck": {
+                "$undefined": true
+              },
+              "tag": {
+                "$undefined": true
+              },
+              "note": {
+                "$undefined": true
+              },
+              "field": {
+                "$undefined": true
+              }
+            },
+            "text": "42",
+            "template": 17,
+            "nid": 17,
+            "dupe": {
+              "notetypeId": {
+                "$undefined": true
+              },
+              "firstField": {
+                "$undefined": true
+              }
+            },
+            "fieldName": "42",
+            "rated": {
+              "days": {
+                "$undefined": true
+              },
+              "rating": {
+                "$undefined": true
+              }
+            },
+            "days": 17,
+            "flag": 1,
+            "cardState": 1,
+            "nids": [
+              17
+            ],
+            "day": 17,
+            "deck": "42",
+            "tag": "42",
+            "note": "42",
+            "field": {
+              "fieldName": {
+                "$undefined": true
+              },
+              "text": {
+                "$undefined": true
+              },
+              "mode": {
+                "$undefined": true
+              }
+            }
+          },
+          "additionalNode": {
+            "kind": {
+              "$undefined": true
+            },
+            "group": {
+              "nodes": {
+                "$undefined": true
+              },
+              "joiner": {
+                "$undefined": true
+              }
+            },
+            "negated": {
+              "kind": {
+                "$undefined": true
+              },
+              "group": {
+                "$undefined": true
+              },
+              "negated": {
+                "$undefined": true
+              },
+              "text": {
+                "$undefined": true
+              },
+              "template": {
+                "$undefined": true
+              },
+              "nid": {
+                "$undefined": true
+              },
+              "dupe": {
+                "$undefined": true
+              },
+              "fieldName": {
+                "$undefined": true
+              },
+              "rated": {
+                "$undefined": true
+              },
+              "days": {
+                "$undefined": true
+              },
+              "flag": {
+                "$undefined": true
+              },
+              "cardState": {
+                "$undefined": true
+              },
+              "nids": {
+                "$undefined": true
+              },
+              "day": {
+                "$undefined": true
+              },
+              "deck": {
+                "$undefined": true
+              },
+              "tag": {
+                "$undefined": true
+              },
+              "note": {
+                "$undefined": true
+              },
+              "field": {
+                "$undefined": true
+              }
+            },
+            "text": "42",
+            "template": 17,
+            "nid": 17,
+            "dupe": {
+              "notetypeId": {
+                "$undefined": true
+              },
+              "firstField": {
+                "$undefined": true
+              }
+            },
+            "fieldName": "42",
+            "rated": {
+              "days": {
+                "$undefined": true
+              },
+              "rating": {
+                "$undefined": true
+              }
+            },
+            "days": 17,
+            "flag": 1,
+            "cardState": 1,
+            "nids": [
+              17
+            ],
+            "day": 17,
+            "deck": "42",
+            "tag": "42",
+            "note": "42",
+            "field": {
+              "fieldName": {
+                "$undefined": true
+              },
+              "text": {
+                "$undefined": true
+              },
+              "mode": {
+                "$undefined": true
+              }
+            }
+          }
+        }
+      ],
+      "response": {
+        "$bytes": "0a0be6b189e5ad97f09f988000"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "搜索服务.ts",
+      "model": "搜索服务",
+      "method": "替换搜索节点",
+      "encoder": {
+        "file": "SearchMessages.ts",
+        "entry": "encodeReplaceSearchNodeRequest"
+      },
+      "args": [
+        {
+          "existingNode": {
+            "kind": {
+              "$undefined": true
+            }
+          },
+          "replacementNode": {
+            "kind": {
+              "$undefined": true
+            }
+          }
+        }
+      ],
+      "response": {
+        "$bytes": "0a0be6b189e5ad97f09f988000"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "搜索服务.ts",
+      "model": "搜索服务",
+      "method": "替换搜索节点",
+      "encoder": {
+        "file": "SearchMessages.ts",
+        "entry": "encodeReplaceSearchNodeRequest"
+      },
+      "args": [
+        {
+          "existingNode": {
+            "kind": {
+              "$undefined": true
+            },
+            "group": {
+              "nodes": {
+                "$undefined": true
+              },
+              "joiner": {
+                "$undefined": true
+              }
+            },
+            "negated": {
+              "kind": {
+                "$undefined": true
+              },
+              "group": {
+                "$undefined": true
+              },
+              "negated": {
+                "$undefined": true
+              },
+              "text": {
+                "$undefined": true
+              },
+              "template": {
+                "$undefined": true
+              },
+              "nid": {
+                "$undefined": true
+              },
+              "dupe": {
+                "$undefined": true
+              },
+              "fieldName": {
+                "$undefined": true
+              },
+              "rated": {
+                "$undefined": true
+              },
+              "days": {
+                "$undefined": true
+              },
+              "flag": {
+                "$undefined": true
+              },
+              "cardState": {
+                "$undefined": true
+              },
+              "nids": {
+                "$undefined": true
+              },
+              "day": {
+                "$undefined": true
+              },
+              "deck": {
+                "$undefined": true
+              },
+              "tag": {
+                "$undefined": true
+              },
+              "note": {
+                "$undefined": true
+              },
+              "field": {
+                "$undefined": true
+              }
+            },
+            "text": "42",
+            "template": 17,
+            "nid": 17,
+            "dupe": {
+              "notetypeId": {
+                "$undefined": true
+              },
+              "firstField": {
+                "$undefined": true
+              }
+            },
+            "fieldName": "42",
+            "rated": {
+              "days": {
+                "$undefined": true
+              },
+              "rating": {
+                "$undefined": true
+              }
+            },
+            "days": 17,
+            "flag": 1,
+            "cardState": 1,
+            "nids": [
+              17
+            ],
+            "day": 17,
+            "deck": "42",
+            "tag": "42",
+            "note": "42",
+            "field": {
+              "fieldName": {
+                "$undefined": true
+              },
+              "text": {
+                "$undefined": true
+              },
+              "mode": {
+                "$undefined": true
+              }
+            }
+          },
+          "replacementNode": {
+            "kind": {
+              "$undefined": true
+            },
+            "group": {
+              "nodes": {
+                "$undefined": true
+              },
+              "joiner": {
+                "$undefined": true
+              }
+            },
+            "negated": {
+              "kind": {
+                "$undefined": true
+              },
+              "group": {
+                "$undefined": true
+              },
+              "negated": {
+                "$undefined": true
+              },
+              "text": {
+                "$undefined": true
+              },
+              "template": {
+                "$undefined": true
+              },
+              "nid": {
+                "$undefined": true
+              },
+              "dupe": {
+                "$undefined": true
+              },
+              "fieldName": {
+                "$undefined": true
+              },
+              "rated": {
+                "$undefined": true
+              },
+              "days": {
+                "$undefined": true
+              },
+              "flag": {
+                "$undefined": true
+              },
+              "cardState": {
+                "$undefined": true
+              },
+              "nids": {
+                "$undefined": true
+              },
+              "day": {
+                "$undefined": true
+              },
+              "deck": {
+                "$undefined": true
+              },
+              "tag": {
+                "$undefined": true
+              },
+              "note": {
+                "$undefined": true
+              },
+              "field": {
+                "$undefined": true
+              }
+            },
+            "text": "42",
+            "template": 17,
+            "nid": 17,
+            "dupe": {
+              "notetypeId": {
+                "$undefined": true
+              },
+              "firstField": {
+                "$undefined": true
+              }
+            },
+            "fieldName": "42",
+            "rated": {
+              "days": {
+                "$undefined": true
+              },
+              "rating": {
+                "$undefined": true
+              }
+            },
+            "days": 17,
+            "flag": 1,
+            "cardState": 1,
+            "nids": [
+              17
+            ],
+            "day": 17,
+            "deck": "42",
+            "tag": "42",
+            "note": "42",
+            "field": {
+              "fieldName": {
+                "$undefined": true
+              },
+              "text": {
+                "$undefined": true
+              },
+              "mode": {
+                "$undefined": true
+              }
+            }
+          }
+        }
+      ],
+      "response": {
+        "$bytes": "0a0be6b189e5ad97f09f988000"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "搜索服务.ts",
+      "model": "搜索服务",
+      "method": "查找并替换",
+      "encoder": {
+        "file": "SearchMessages.ts",
+        "entry": "encodeFindAndReplaceRequest"
+      },
+      "args": [
+        {
+          "nids": [],
+          "search": "",
+          "replacement": "",
+          "regex": false,
+          "matchCase": false,
+          "fieldName": ""
+        }
+      ],
+      "response": {
+        "$bytes": "0801102a"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "搜索服务.ts",
+      "model": "搜索服务",
+      "method": "查找并替换",
+      "encoder": {
+        "file": "SearchMessages.ts",
+        "entry": "encodeFindAndReplaceRequest"
+      },
+      "args": [
+        {
+          "nids": [
+            17
+          ],
+          "search": "42",
+          "replacement": "42",
+          "regex": true,
+          "matchCase": true,
+          "fieldName": "42"
+        }
+      ],
+      "response": {
+        "$bytes": "0801102a"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "搜索服务.ts",
+      "model": "搜索服务",
+      "method": "全部浏览器列",
+      "encoder": {
+        "file": "SearchMessages.ts",
+        "entry": "encodeEmptyRequest"
+      },
+      "args": [],
+      "response": {
+        "$bytes": "0a490a0be6b189e5ad97f09f988000120be6b189e5ad97f09f9880001a0be6b189e5ad97f09f9880002000281130003a0be6b189e5ad97f09f988000420be6b189e5ad97f09f9880004800"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "搜索服务.ts",
+      "model": "搜索服务",
+      "method": "浏览器行按ID",
+      "encoder": {
+        "file": "SearchMessages.ts",
+        "entry": "encodeInt64Request"
+      },
+      "args": [
+        0
+      ],
+      "response": {
+        "$bytes": "0a110a0be6b189e5ad97f09f9880001011180010001a0be6b189e5ad97f09f9880002011"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "搜索服务.ts",
+      "model": "搜索服务",
+      "method": "浏览器行按ID",
+      "encoder": {
+        "file": "SearchMessages.ts",
+        "entry": "encodeInt64Request"
+      },
+      "args": [
+        17
+      ],
+      "response": {
+        "$bytes": "0a110a0be6b189e5ad97f09f9880001011180010001a0be6b189e5ad97f09f9880002011"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "搜索服务.ts",
+      "model": "搜索服务",
+      "method": "设置激活浏览器列",
+      "encoder": {
+        "file": "SearchMessages.ts",
+        "entry": "encodeStringListRequest"
+      },
+      "args": [
+        []
+      ],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "搜索服务.ts",
+      "model": "搜索服务",
+      "method": "设置激活浏览器列",
+      "encoder": {
+        "file": "SearchMessages.ts",
+        "entry": "encodeStringListRequest"
+      },
+      "args": [
+        [
+          "42"
+        ]
+      ],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "标签服务.ts",
+      "model": "标签服务",
+      "method": "标签树",
+      "encoder": {
+        "file": "TagsMessages.ts",
+        "entry": "encodeEmptyRequest"
+      },
+      "args": [],
+      "response": {
+        "$bytes": "0a06e59b9be7baa718012000"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "标签服务.ts",
+      "model": "标签服务",
+      "method": "设置标签折叠",
+      "encoder": {
+        "file": "TagsMessages.ts",
+        "entry": "encodeSetTagCollapsedRequest"
+      },
+      "args": [
+        {
+          "name": "hard",
+          "collapsed": true
+        }
+      ],
+      "response": {
+        "$bytes": "08011801500158016001"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "标签服务.ts",
+      "model": "标签服务",
+      "method": "清除未用标签",
+      "encoder": {
+        "file": "TagsMessages.ts",
+        "entry": "encodeEmptyRequest"
+      },
+      "args": [],
+      "response": {
+        "$bytes": "0801102a"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "标签服务.ts",
+      "model": "标签服务",
+      "method": "移除标签",
+      "encoder": {
+        "file": "TagsMessages.ts",
+        "entry": "encodeStringRequest"
+      },
+      "args": [
+        ""
+      ],
+      "response": {
+        "$bytes": "0801102a"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "标签服务.ts",
+      "model": "标签服务",
+      "method": "移除标签",
+      "encoder": {
+        "file": "TagsMessages.ts",
+        "entry": "encodeStringRequest"
+      },
+      "args": [
+        "英语::四级"
+      ],
+      "response": {
+        "$bytes": "0801102a"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "标签服务.ts",
+      "model": "标签服务",
+      "method": "重命名标签",
+      "encoder": {
+        "file": "TagsMessages.ts",
+        "entry": "encodeRenameTagsRequest"
+      },
+      "args": [
+        {
+          "currentPrefix": "",
+          "newPrefix": ""
+        }
+      ],
+      "response": {
+        "$bytes": "0801102a"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "标签服务.ts",
+      "model": "标签服务",
+      "method": "重命名标签",
+      "encoder": {
+        "file": "TagsMessages.ts",
+        "entry": "encodeRenameTagsRequest"
+      },
+      "args": [
+        {
+          "currentPrefix": "英语::四级",
+          "newPrefix": "英语::六级"
+        }
+      ],
+      "response": {
+        "$bytes": "0801102a"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "标签服务.ts",
+      "model": "标签服务",
+      "method": "重命名标签",
+      "encoder": {
+        "file": "TagsMessages.ts",
+        "entry": "encodeRenameTagsRequest"
+      },
+      "args": [
+        {
+          "currentPrefix": "old",
+          "newPrefix": ""
+        }
+      ],
+      "response": {
+        "$bytes": "0801102a"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "标签服务.ts",
+      "model": "标签服务",
+      "method": "查找并替换标签",
+      "encoder": {
+        "file": "TagsMessages.ts",
+        "entry": "encodeFindAndReplaceTagRequest"
+      },
+      "args": [
+        {
+          "noteIds": [],
+          "search": "x",
+          "replacement": "",
+          "regex": false,
+          "matchCase": false
+        }
+      ],
+      "response": {
+        "$bytes": "0801102a"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "标签服务.ts",
+      "model": "标签服务",
+      "method": "查找并替换标签",
+      "encoder": {
+        "file": "TagsMessages.ts",
+        "entry": "encodeFindAndReplaceTagRequest"
+      },
+      "args": [
+        {
+          "noteIds": [
+            1,
+            2,
+            3
+          ],
+          "search": "old",
+          "replacement": "new",
+          "regex": true,
+          "matchCase": false
+        }
+      ],
+      "response": {
+        "$bytes": "0801102a"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "标签服务.ts",
+      "model": "标签服务",
+      "method": "补全标签",
+      "encoder": {
+        "file": "TagsMessages.ts",
+        "entry": "encodeCompleteTagRequest"
+      },
+      "args": [
+        {
+          "input": "",
+          "matchLimit": 0
+        }
+      ],
+      "response": {
+        "$bytes": "0a06e88bb1e8afad0a0ee88bb1e8afad3a3ae59b9be7baa70a0ee88bb1e8afad3a3ae585ade7baa7"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "标签服务.ts",
+      "model": "标签服务",
+      "method": "补全标签",
+      "encoder": {
+        "file": "TagsMessages.ts",
+        "entry": "encodeCompleteTagRequest"
+      },
+      "args": [
+        {
+          "input": "英",
+          "matchLimit": 20
+        }
+      ],
+      "response": {
+        "$bytes": "0a06e88bb1e8afad0a0ee88bb1e8afad3a3ae59b9be7baa70a0ee88bb1e8afad3a3ae585ade7baa7"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "标签服务.ts",
+      "model": "标签服务",
+      "method": "添加笔记标签",
+      "encoder": {
+        "file": "TagsMessages.ts",
+        "entry": "encodeNoteIdsAndTagsRequest"
+      },
+      "args": [
+        {
+          "noteIds": [],
+          "tags": ""
+        }
+      ],
+      "response": {
+        "$bytes": "0801102a"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "标签服务.ts",
+      "model": "标签服务",
+      "method": "添加笔记标签",
+      "encoder": {
+        "file": "TagsMessages.ts",
+        "entry": "encodeNoteIdsAndTagsRequest"
+      },
+      "args": [
+        {
+          "noteIds": [
+            17
+          ],
+          "tags": "42"
+        }
+      ],
+      "response": {
+        "$bytes": "0801102a"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "标签服务.ts",
+      "model": "标签服务",
+      "method": "移除笔记标签",
+      "encoder": {
+        "file": "TagsMessages.ts",
+        "entry": "encodeNoteIdsAndTagsRequest"
+      },
+      "args": [
+        {
+          "noteIds": [],
+          "tags": ""
+        }
+      ],
+      "response": {
+        "$bytes": "0801102a"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "标签服务.ts",
+      "model": "标签服务",
+      "method": "移除笔记标签",
+      "encoder": {
+        "file": "TagsMessages.ts",
+        "entry": "encodeNoteIdsAndTagsRequest"
+      },
+      "args": [
+        {
+          "noteIds": [
+            17
+          ],
+          "tags": "42"
+        }
+      ],
+      "response": {
+        "$bytes": "0801102a"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "牌组服务.ts",
+      "model": "牌组服务",
+      "method": "调整牌组父级",
+      "encoder": {
+        "file": "DeckMessages.ts",
+        "entry": "encodeReparentDecksRequest"
+      },
+      "args": [
+        [],
+        0
+      ],
+      "response": {
+        "$bytes": "0801102a"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "牌组服务.ts",
+      "model": "牌组服务",
+      "method": "调整牌组父级",
+      "encoder": {
+        "file": "DeckMessages.ts",
+        "entry": "encodeReparentDecksRequest"
+      },
+      "args": [
+        [
+          17
+        ],
+        17
+      ],
+      "response": {
+        "$bytes": "0801102a"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "牌组服务.ts",
+      "model": "牌组服务",
+      "method": "获取或创建过滤牌组",
+      "encoder": {
+        "file": "DeckMessages.ts",
+        "entry": "encodeDeckId"
+      },
+      "args": [
+        0
+      ],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "牌组服务.ts",
+      "model": "牌组服务",
+      "method": "获取或创建过滤牌组",
+      "encoder": {
+        "file": "DeckMessages.ts",
+        "entry": "encodeDeckId"
+      },
+      "args": [
+        17
+      ],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "牌组服务.ts",
+      "model": "牌组服务",
+      "method": "添加或更新过滤牌组",
+      "encoder": {
+        "file": "DeckMessages.ts",
+        "entry": "encode过滤牌组更新"
+      },
+      "args": [
+        {
+          "id": 0,
+          "name": "",
+          "config": {
+            "reschedule": false,
+            "searchTerms": [],
+            "previewDelay": 0,
+            "previewAgainSecs": 0,
+            "previewHardSecs": 0,
+            "previewGoodSecs": 0
+          },
+          "allowEmpty": false
+        }
+      ],
+      "response": {
+        "$bytes": "0a02180110e7f7ff888233"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "笔记服务.ts",
+      "model": "笔记服务",
+      "method": "clozeNumbersInNote",
+      "encoder": {
+        "file": "NoteMessages.ts",
+        "entry": "encodeNote"
+      },
+      "args": [
+        {
+          "id": 0,
+          "guid": "",
+          "notetypeId": 0,
+          "mtimeSecs": 0,
+          "usn": 0,
+          "tags": [],
+          "fields": []
+        }
+      ],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "笔记服务.ts",
+      "model": "笔记服务",
+      "method": "clozeNumbersInNote",
+      "encoder": {
+        "file": "NoteMessages.ts",
+        "entry": "encodeNote"
+      },
+      "args": [
+        {
+          "id": 17,
+          "guid": "42",
+          "notetypeId": 17,
+          "mtimeSecs": 17,
+          "usn": 17,
+          "tags": [
+            "42"
+          ],
+          "fields": [
+            "42"
+          ]
+        }
+      ],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "笔记服务.ts",
+      "model": "笔记服务",
+      "method": "获取添加默认值",
+      "encoder": {
+        "file": "NoteMessages.ts",
+        "entry": "encodeDefaultsForAddingRequest"
+      },
+      "args": [],
+      "response": {
+        "$bytes": "08111011"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "笔记服务.ts",
+      "model": "笔记服务",
+      "method": "新建笔记",
+      "encoder": {
+        "file": "NotetypeMessages.ts",
+        "entry": "encodeNotetypeId"
+      },
+      "args": [
+        0
+      ],
+      "response": {
+        "$bytes": "0811120be6b189e5ad97f09f988000181120112811320be6b189e5ad97f09f9880003a0be6b189e5ad97f09f988000"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "笔记服务.ts",
+      "model": "笔记服务",
+      "method": "新建笔记",
+      "encoder": {
+        "file": "NotetypeMessages.ts",
+        "entry": "encodeNotetypeId"
+      },
+      "args": [
+        1752902400123
+      ],
+      "response": {
+        "$bytes": "0811120be6b189e5ad97f09f988000181120112811320be6b189e5ad97f09f9880003a0be6b189e5ad97f09f988000"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "笔记服务.ts",
+      "model": "笔记服务",
+      "method": "获取笔记",
+      "encoder": {
+        "file": "NoteMessages.ts",
+        "entry": "encodeNoteId"
+      },
+      "args": [
+        0
+      ],
+      "response": {
+        "$bytes": "0811120be6b189e5ad97f09f988000181120112811320be6b189e5ad97f09f9880003a0be6b189e5ad97f09f988000"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "笔记服务.ts",
+      "model": "笔记服务",
+      "method": "获取笔记",
+      "encoder": {
+        "file": "NoteMessages.ts",
+        "entry": "encodeNoteId"
+      },
+      "args": [
+        17
+      ],
+      "response": {
+        "$bytes": "0811120be6b189e5ad97f09f988000181120112811320be6b189e5ad97f09f9880003a0be6b189e5ad97f09f988000"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "笔记服务.ts",
+      "model": "笔记服务",
+      "method": "获取笔记的卡片",
+      "encoder": {
+        "file": "NoteMessages.ts",
+        "entry": "encodeNoteId"
+      },
+      "args": [
+        0
+      ],
+      "response": {
+        "$bytes": "0a02112a"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "笔记服务.ts",
+      "model": "笔记服务",
+      "method": "获取笔记的卡片",
+      "encoder": {
+        "file": "NoteMessages.ts",
+        "entry": "encodeNoteId"
+      },
+      "args": [
+        17
+      ],
+      "response": {
+        "$bytes": "0a02112a"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "笔记服务.ts",
+      "model": "笔记服务",
+      "method": "获取笔记的唯一笔记类型",
+      "encoder": {
+        "file": "NoteMessages.ts",
+        "entry": "encodeNoteIds"
+      },
+      "args": [
+        []
+      ],
+      "response": {
+        "$bytes": "0811"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "笔记服务.ts",
+      "model": "笔记服务",
+      "method": "获取笔记的唯一笔记类型",
+      "encoder": {
+        "file": "NoteMessages.ts",
+        "entry": "encodeNoteIds"
+      },
+      "args": [
+        [
+          17
+        ]
+      ],
+      "response": {
+        "$bytes": "0811"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "笔记服务.ts",
+      "model": "笔记服务",
+      "method": "更新笔记",
+      "encoder": {
+        "file": "NoteMessages.ts",
+        "entry": "encodeUpdateNotesRequest"
+      },
+      "args": [
+        [],
+        false
+      ],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "笔记服务.ts",
+      "model": "笔记服务",
+      "method": "更新笔记",
+      "encoder": {
+        "file": "NoteMessages.ts",
+        "entry": "encodeUpdateNotesRequest"
+      },
+      "args": [
+        [
+          {
+            "id": 17,
+            "guid": "42",
+            "notetypeId": 17,
+            "mtimeSecs": 17,
+            "usn": 17,
+            "tags": [
+              "42"
+            ],
+            "fields": [
+              "42"
+            ]
+          }
+        ],
+        true
+      ],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "笔记类型服务.ts",
+      "model": "笔记类型服务",
+      "method": "获取笔记类型",
+      "encoder": {
+        "file": "NotetypeMessages.ts",
+        "entry": "encodeNotetypeId"
+      },
+      "args": [
+        0
+      ],
+      "response": {
+        "$bytes": "0811120be6b189e5ad97f09f988000181120113a41080010111a0be6b189e5ad97f09f98800020112a0be6b189e5ad97f09f988000320be6b189e5ad97f09f9880003811420608111000181148005011fa0f030080ff42450a020811120be6b189e5ad97f09f9880002a32081110111a0be6b189e5ad97f09f98800020112a0be6b189e5ad97f09f988000301138114011481150115811fa0f030080ff4a640a020811120be6b189e5ad97f09f988000181120112a4d0a0be6b189e5ad97f09f988000120be6b189e5ad97f09f9880001a0be6b189e5ad97f09f988000220be6b189e5ad97f09f9880002811320be6b189e5ad97f09f98800038114011fa0f030080ff"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "笔记类型服务.ts",
+      "model": "笔记类型服务",
+      "method": "获取笔记类型",
+      "encoder": {
+        "file": "NotetypeMessages.ts",
+        "entry": "encodeNotetypeId"
+      },
+      "args": [
+        1752902400123
+      ],
+      "response": {
+        "$bytes": "0811120be6b189e5ad97f09f988000181120113a41080010111a0be6b189e5ad97f09f98800020112a0be6b189e5ad97f09f988000320be6b189e5ad97f09f9880003811420608111000181148005011fa0f030080ff42450a020811120be6b189e5ad97f09f9880002a32081110111a0be6b189e5ad97f09f98800020112a0be6b189e5ad97f09f988000301138114011481150115811fa0f030080ff4a640a020811120be6b189e5ad97f09f988000181120112a4d0a0be6b189e5ad97f09f988000120be6b189e5ad97f09f9880001a0be6b189e5ad97f09f988000220be6b189e5ad97f09f9880002811320be6b189e5ad97f09f98800038114011fa0f030080ff"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "笔记类型服务.ts",
+      "model": "笔记类型服务",
+      "method": "获取填空字段序号",
+      "encoder": {
+        "file": "NotetypeMessages.ts",
+        "entry": "encodeNotetypeId"
+      },
+      "args": [
+        0
+      ],
+      "response": {
+        "$bytes": "0811"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "笔记类型服务.ts",
+      "model": "笔记类型服务",
+      "method": "获取填空字段序号",
+      "encoder": {
+        "file": "NotetypeMessages.ts",
+        "entry": "encodeNotetypeId"
+      },
+      "args": [
+        1752902400123
+      ],
+      "response": {
+        "$bytes": "0811"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "笔记类型服务.ts",
+      "model": "笔记类型服务",
+      "method": "获取标准笔记类型JSON",
+      "encoder": {
+        "file": "NotetypeMessages.ts",
+        "entry": "encodeStockNotetype"
+      },
+      "args": [
+        0
+      ],
+      "response": {
+        "$bytes": "0a030080ff"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "笔记类型服务.ts",
+      "model": "笔记类型服务",
+      "method": "获取标准笔记类型JSON",
+      "encoder": {
+        "file": "NotetypeMessages.ts",
+        "entry": "encodeStockNotetype"
+      },
+      "args": [
+        17
+      ],
+      "response": {
+        "$bytes": "0a030080ff"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "笔记类型服务.ts",
+      "model": "笔记类型服务",
+      "method": "添加笔记类型旧版",
+      "encoder": {
+        "file": "NotetypeMessages.ts",
+        "entry": "encodeJsonString"
+      },
+      "args": [
+        ""
+      ],
+      "response": {
+        "$bytes": "0a02180110e7f7ff888233"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "笔记类型服务.ts",
+      "model": "笔记类型服务",
+      "method": "添加笔记类型旧版",
+      "encoder": {
+        "file": "NotetypeMessages.ts",
+        "entry": "encodeJsonString"
+      },
+      "args": [
+        "42"
+      ],
+      "response": {
+        "$bytes": "0a02180110e7f7ff888233"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "笔记类型服务.ts",
+      "model": "笔记类型服务",
+      "method": "获取笔记类型旧版",
+      "encoder": {
+        "file": "NotetypeMessages.ts",
+        "entry": "encodeNotetypeId"
+      },
+      "args": [
+        0
+      ],
+      "response": {
+        "$bytes": "0a030080ff"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "笔记类型服务.ts",
+      "model": "笔记类型服务",
+      "method": "获取笔记类型旧版",
+      "encoder": {
+        "file": "NotetypeMessages.ts",
+        "entry": "encodeNotetypeId"
+      },
+      "args": [
+        1752902400123
+      ],
+      "response": {
+        "$bytes": "0a030080ff"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "笔记类型服务.ts",
+      "model": "笔记类型服务",
+      "method": "更新笔记类型旧版",
+      "encoder": {
+        "file": "NotetypeMessages.ts",
+        "entry": "encodeUpdateNotetypeLegacyRequest"
+      },
+      "args": [
+        "",
+        false
+      ],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "笔记类型服务.ts",
+      "model": "笔记类型服务",
+      "method": "更新笔记类型旧版",
+      "encoder": {
+        "file": "NotetypeMessages.ts",
+        "entry": "encodeUpdateNotetypeLegacyRequest"
+      },
+      "args": [
+        "42",
+        true
+      ],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "笔记类型服务.ts",
+      "model": "笔记类型服务",
+      "method": "移除笔记类型",
+      "encoder": {
+        "file": "NotetypeMessages.ts",
+        "entry": "encodeNotetypeId"
+      },
+      "args": [
+        0
+      ],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "笔记类型服务.ts",
+      "model": "笔记类型服务",
+      "method": "移除笔记类型",
+      "encoder": {
+        "file": "NotetypeMessages.ts",
+        "entry": "encodeNotetypeId"
+      },
+      "args": [
+        1752902400123
+      ],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "笔记类型服务.ts",
+      "model": "笔记类型服务",
+      "method": "获取变更笔记类型信息",
+      "encoder": {
+        "file": "NotetypeMessages.ts",
+        "entry": "encodeGetChangeNotetypeInfoRequest"
+      },
+      "args": [
+        0,
+        0
+      ],
+      "response": {
+        "$bytes": "0a0be6b189e5ad97f09f988000120be6b189e5ad97f09f9880001a0be6b189e5ad97f09f988000220be6b189e5ad97f09f9880002a1d0a02112a101118112011281130113a0be6b189e5ad97f09f9880004011320be6b189e5ad97f09f988000"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "笔记类型服务.ts",
+      "model": "笔记类型服务",
+      "method": "获取变更笔记类型信息",
+      "encoder": {
+        "file": "NotetypeMessages.ts",
+        "entry": "encodeGetChangeNotetypeInfoRequest"
+      },
+      "args": [
+        17,
+        17
+      ],
+      "response": {
+        "$bytes": "0a0be6b189e5ad97f09f988000120be6b189e5ad97f09f9880001a0be6b189e5ad97f09f988000220be6b189e5ad97f09f9880002a1d0a02112a101118112011281130113a0be6b189e5ad97f09f9880004011320be6b189e5ad97f09f988000"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "笔记类型服务.ts",
+      "model": "笔记类型服务",
+      "method": "变更笔记类型",
+      "encoder": {
+        "file": "NotetypeMessages.ts",
+        "entry": "encodeChangeNotetypeRequest"
+      },
+      "args": [
+        {
+          "noteIds": [],
+          "newFields": [],
+          "newTemplates": [],
+          "oldNotetypeId": 0,
+          "newNotetypeId": 0,
+          "currentSchema": 0,
+          "oldNotetypeName": "",
+          "isCloze": false
+        }
+      ],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "笔记类型服务.ts",
+      "model": "笔记类型服务",
+      "method": "变更笔记类型",
+      "encoder": {
+        "file": "NotetypeMessages.ts",
+        "entry": "encodeChangeNotetypeRequest"
+      },
+      "args": [
+        {
+          "noteIds": [
+            17
+          ],
+          "newFields": [
+            17
+          ],
+          "newTemplates": [
+            17
+          ],
+          "oldNotetypeId": 17,
+          "newNotetypeId": 17,
+          "currentSchema": 17,
+          "oldNotetypeName": "42",
+          "isCloze": true
+        }
+      ],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "调度器服务.ts",
+      "model": "调度器服务",
+      "method": "scheduleCardsAsNew",
+      "encoder": {
+        "file": "SchedulerMessages.ts",
+        "entry": "encodeScheduleCardsAsNew"
+      },
+      "args": [
+        [],
+        {
+          "restorePosition": false,
+          "resetCounts": false
+        }
+      ],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 0,
+      "successful": false
+    },
+    {
+      "file": "调度器服务.ts",
+      "model": "调度器服务",
+      "method": "scheduleCardsAsNew",
+      "encoder": {
+        "file": "SchedulerMessages.ts",
+        "entry": "encodeScheduleCardsAsNew"
+      },
+      "args": [
+        [
+          17
+        ],
+        {
+          "restorePosition": true,
+          "resetCounts": true
+        }
+      ],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "调度器服务.ts",
+      "model": "调度器服务",
+      "method": "customStudyByStateOrTags",
+      "encoder": {
+        "file": "SchedulerMessages.ts",
+        "entry": "encodeCustomStudyCramRequest"
+      },
+      "args": [
+        0,
+        {
+          "kind": 0,
+          "cardLimit": 0,
+          "tagsToInclude": [],
+          "tagsToExclude": []
+        }
+      ],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "调度器服务.ts",
+      "model": "调度器服务",
+      "method": "customStudyByStateOrTags",
+      "encoder": {
+        "file": "SchedulerMessages.ts",
+        "entry": "encodeCustomStudyCramRequest"
+      },
+      "args": [
+        17,
+        {
+          "kind": 1,
+          "cardLimit": 17,
+          "tagsToInclude": [
+            "42"
+          ],
+          "tagsToExclude": [
+            "42"
+          ]
+        }
+      ],
+      "response": {
+        "$bytes": ""
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "配置服务.ts",
+      "model": "配置服务",
+      "method": "获取配置JSON",
+      "encoder": {
+        "file": "ConfigMessages.ts",
+        "entry": "encodeStringRequest"
+      },
+      "args": [
+        ""
+      ],
+      "response": {
+        "$bytes": "0a030080ff"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "配置服务.ts",
+      "model": "配置服务",
+      "method": "获取配置JSON",
+      "encoder": {
+        "file": "ConfigMessages.ts",
+        "entry": "encodeStringRequest"
+      },
+      "args": [
+        "42"
+      ],
+      "response": {
+        "$bytes": "0a030080ff"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "配置服务.ts",
+      "model": "配置服务",
+      "method": "设置配置JSON",
+      "encoder": {
+        "file": "ConfigMessages.ts",
+        "entry": "encodeSetConfigJsonRequest"
+      },
+      "args": [
+        {
+          "key": "",
+          "valueJson": "",
+          "undoable": false
+        }
+      ],
+      "response": {
+        "$bytes": "08011801500158016001"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "配置服务.ts",
+      "model": "配置服务",
+      "method": "设置配置JSON",
+      "encoder": {
+        "file": "ConfigMessages.ts",
+        "entry": "encodeSetConfigJsonRequest"
+      },
+      "args": [
+        {
+          "key": "42",
+          "valueJson": "42",
+          "undoable": true
+        }
+      ],
+      "response": {
+        "$bytes": "08011801500158016001"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "配置服务.ts",
+      "model": "配置服务",
+      "method": "获取配置布尔",
+      "encoder": {
+        "file": "ConfigMessages.ts",
+        "entry": "encodeGetConfigBoolRequest"
+      },
+      "args": [
+        0
+      ],
+      "response": {
+        "$bytes": "0811"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "配置服务.ts",
+      "model": "配置服务",
+      "method": "获取配置布尔",
+      "encoder": {
+        "file": "ConfigMessages.ts",
+        "entry": "encodeGetConfigBoolRequest"
+      },
+      "args": [
+        1
+      ],
+      "response": {
+        "$bytes": "0811"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "配置服务.ts",
+      "model": "配置服务",
+      "method": "设置配置布尔",
+      "encoder": {
+        "file": "ConfigMessages.ts",
+        "entry": "encodeSetConfigBoolRequest"
+      },
+      "args": [
+        {
+          "key": 0,
+          "value": false,
+          "undoable": false
+        }
+      ],
+      "response": {
+        "$bytes": "08011801500158016001"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "配置服务.ts",
+      "model": "配置服务",
+      "method": "设置配置布尔",
+      "encoder": {
+        "file": "ConfigMessages.ts",
+        "entry": "encodeSetConfigBoolRequest"
+      },
+      "args": [
+        {
+          "key": 1,
+          "value": true,
+          "undoable": true
+        }
+      ],
+      "response": {
+        "$bytes": "08011801500158016001"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "集合服务.ts",
+      "model": "集合服务",
+      "method": "createBackup",
+      "encoder": {
+        "file": "PreferencesMessages.ts",
+        "entry": "encodeCreateBackup"
+      },
+      "args": [
+        "",
+        false
+      ],
+      "response": {
+        "$bytes": "0811"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    },
+    {
+      "file": "集合服务.ts",
+      "model": "集合服务",
+      "method": "createBackup",
+      "encoder": {
+        "file": "PreferencesMessages.ts",
+        "entry": "encodeCreateBackup"
+      },
+      "args": [
+        "42",
+        true
+      ],
+      "response": {
+        "$bytes": "0811"
+      },
+      "expectedCalls": 2,
+      "successful": true
+    }
+  ]
+}

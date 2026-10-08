@@ -68,6 +68,9 @@ export class 协议读取器 {
       return null;
     }
     const 键 = this.读取大变长整数();
+    if (键 > 0xffffffffn) {
+      throw new Error('proto: field tag exceeds 32-bit range');
+    }
     const 线类型 = Number(键 & 0x7n);
     const 字段号 = Number(键 >> 3n);
     if (字段号 <= 0) {
@@ -81,6 +84,9 @@ export class 协议读取器 {
     let 位移 = 0n;
     for (let i = 0; i < 10; i++) {
       const b = this.读取单字节();
+      if (i === 9 && b > 1) {
+        throw new Error('proto: varint exceeds 64-bit range');
+      }
       结果 |= BigInt(b & 0x7f) << 位移;
       if ((b & 0x80) === 0) {
         return 结果;
@@ -139,6 +145,54 @@ export class 协议读取器 {
     return new Float32Array(缓冲.buffer)[0];
   }
 
+  /** 生成器唯一的标量读取入口；64 位业务值继续显式拒绝精度丢失。 */
+  读取数值(kind: string): number {
+    if (kind === 'float') return this.读取浮点();
+    if (kind === 'double' || kind === 'fixed64' || kind === 'sfixed64' || kind === 'fixed32' || kind === 'sfixed32') {
+      const size = kind.endsWith('32') ? 4 : 8;
+      if (this.位置 + size > this.字节流.length) throw new Error('proto: unexpected end of input');
+      const v = new DataView(this.字节流.buffer, this.字节流.byteOffset + this.位置, size);
+      this.位置 += size;
+      if (kind === 'double') return v.getFloat64(0, true);
+      if (kind === 'fixed32') return v.getUint32(0, true);
+      if (kind === 'sfixed32') return v.getInt32(0, true);
+      const n = kind === 'fixed64' ? v.getBigUint64(0, true) : v.getBigInt64(0, true);
+      return this.安全整数(n);
+    }
+    const n = this.读取大变长整数();
+    if (kind === 'bool') return n === 0n ? 0 : 1;
+    if (kind === 'int32' || kind === 'enum') return Number(BigInt.asIntN(32, n));
+    if (kind === 'uint32') return Number(BigInt.asUintN(32, n));
+    if (kind === 'int64') return this.安全整数(BigInt.asIntN(64, n));
+    if (kind === 'sint32' || kind === 'sint64') {
+      // prost 先缩窄 sint32 的 wire 值，再做 zigzag；次序影响高于 32 位的载荷。
+      const encoded = kind === 'sint32' ? BigInt.asUintN(32, n) : n;
+      return this.安全整数((encoded >> 1n) ^ -(encoded & 1n));
+    }
+    return this.安全整数(n);
+  }
+
+  private 安全整数(n: bigint): number {
+    if (n > BigInt(Number.MAX_SAFE_INTEGER) || n < BigInt(-Number.MAX_SAFE_INTEGER)) {
+      throw new Error(`proto: integer ${n} exceeds safe integer range`);
+    }
+    return Number(n);
+  }
+
+  /** Full-width protocol access; domain number APIs still reject precision loss. */
+  读取宽整数(kind: string): bigint {
+    if (kind === 'fixed64' || kind === 'sfixed64') {
+      if (this.位置 + 8 > this.字节流.length) throw new Error('proto: unexpected end of input');
+      const view = new DataView(this.字节流.buffer, this.字节流.byteOffset + this.位置, 8);
+      this.位置 += 8;
+      return kind === 'fixed64' ? view.getBigUint64(0, true) : view.getBigInt64(0, true);
+    }
+    const value = this.读取大变长整数();
+    if (kind === 'uint64') return value;
+    if (kind === 'sint64') return (value >> 1n) ^ -(value & 1n);
+    return BigInt.asIntN(64, value);
+  }
+
   /** packed repeated int64（wire type 2 载荷） */
   读取打包64位整数(): number[] {
     const 载荷 = new 协议读取器(this.读取字节());
@@ -172,6 +226,17 @@ export class 协议读取器 {
   读取字符串(): string {
     return UTF8解码(this.读取字节());
   }
+
+  /** Wire scanner borrows opaque payloads; public domain byte getters return copies. */
+  读取字节视图(): Uint8Array {
+    const length = this.读取变长整数();
+    if (this.位置 + length > this.字节流.length) throw new Error('proto: length-delimited field exceeds input');
+    const result = this.字节流.subarray(this.位置, this.位置 + length);
+    this.位置 += length;
+    return result;
+  }
+
+  读取剩余字节(): Uint8Array { const bytes = this.字节流.slice(this.位置); this.位置 = this.字节流.length; return bytes; }
 
   /** 跳过未知字段，保证向前兼容（新版 Anki 加字段不崩） */
   跳过字段(线类型: number): void {

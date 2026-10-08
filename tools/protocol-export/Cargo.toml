@@ -1,0 +1,12 @@
+[package]
+name = "jidecards_protocol_export"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+anki_proto_gen = { path = "../../third_party/anki/rslib/proto_gen" }
+prost-reflect = "0.14.7"
+serde_json = "1.0"

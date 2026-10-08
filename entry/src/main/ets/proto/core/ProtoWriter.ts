@@ -73,6 +73,48 @@ export class 协议写入器 {
     this.写入变长整数(字段号, 值 ? 1 : 0);
   }
 
+  写入数值(field: number, kind: string, value: number): void {
+    this.写入标签(field, kind === 'float' || kind === 'fixed32' || kind === 'sfixed32' ? 5 :
+      kind === 'double' || kind === 'fixed64' || kind === 'sfixed64' ? 1 : 0);
+    this.写入数值载荷(kind, value);
+  }
+
+  写入数值载荷(kind: string, value: number): void {
+    if (kind === 'float' || kind === 'double' || kind.startsWith('fixed') || kind.startsWith('sfixed')) {
+      const size = kind === 'float' || kind.endsWith('32') ? 4 : 8;
+      const bytes = new Uint8Array(size);
+      const v = new DataView(bytes.buffer);
+      if (kind === 'float') v.setFloat32(0, value, true);
+      else if (kind === 'double') v.setFloat64(0, value, true);
+      else if (kind === 'fixed32') v.setUint32(0, value, true);
+      else if (kind === 'sfixed32') v.setInt32(0, value, true);
+      else {
+        if (!Number.isSafeInteger(value)) throw new Error('proto: integer exceeds safe integer range');
+        if (kind === 'fixed64') v.setBigUint64(0, BigInt(value), true);
+        else v.setBigInt64(0, BigInt(value), true);
+      }
+      this.写入原始字节(bytes);
+      return;
+    }
+    if (!Number.isSafeInteger(value)) throw new Error('proto: integer exceeds safe integer range');
+    const n = BigInt(value);
+    if (kind === 'sint32' || kind === 'sint64') this.压入变长整数((n << 1n) ^ (n >> (kind === 'sint32' ? 31n : 63n)));
+    else if (kind === 'int32' || kind === 'int64' || kind === 'enum') this.压入变长整数(BigInt.asUintN(64, n));
+    else this.压入变长整数(n >= 0n ? n : 0n);
+  }
+
+  写入宽整数载荷(kind: string, value: bigint): void {
+    const unsigned = kind === 'uint64' || kind === 'fixed64';
+    if (value < (unsigned ? 0n : -(1n << 63n)) || value > (unsigned ? (1n << 64n) - 1n : (1n << 63n) - 1n)) {
+      throw new Error('proto: integer out of 64-bit range');
+    }
+    if (kind === 'fixed64' || kind === 'sfixed64') {
+      const bytes = new Uint8Array(8); const view = new DataView(bytes.buffer);
+      if (unsigned) view.setBigUint64(0, value, true); else view.setBigInt64(0, value, true);
+      this.写入原始字节(bytes);
+    } else this.压入变长整数(kind === 'sint64' ? (value << 1n) ^ (value >> 63n) : BigInt.asUintN(64, value));
+  }
+
   /** float（wire type 5，小端 32 位） */
   写入浮点(字段号: number, 值: number): void {
     this.写入标签(字段号, 线类型_定长32);

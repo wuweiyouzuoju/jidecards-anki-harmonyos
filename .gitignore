@@ -6,6 +6,7 @@
 /entry/oh_modules/
 /oh_modules/
 /native/**/target/
+/tools/protocol-export/target/
 /target/
 /work/
 /outputs/
