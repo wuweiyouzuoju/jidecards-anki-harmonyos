@@ -1,23 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Application-owned preview RPC, separate from the locked upstream service IDs.
+#[cfg(feature = "anki-core")]
 use prost::Message;
 
-pub const SERVICE: u32 = 1001;
+pub const SERVICE: u32 = crate::private_rpc_ids::DECK_PREVIEW;
 
-#[derive(Clone, PartialEq, Message)]
-pub struct Request {
-    #[prost(int64, tag = "1")]
-    pub deck_id: i64,
-    // 0 remaining today, 1 due now, 2 answered today, 3 all.
-    #[prost(uint32, tag = "2")]
-    pub scope: u32,
-}
+pub use crate::protocol_generated::JideDeckPreviewRequest as Request;
 
-#[derive(Clone, PartialEq, Message)]
-pub struct Response {
-    #[prost(int64, repeated, packed = "true", tag = "1")]
-    pub card_ids: Vec<i64>,
-}
+pub use crate::protocol_generated::JideDeckPreviewResponse as Response;
 
 #[cfg(feature = "anki-core")]
 pub fn call(
@@ -26,7 +16,10 @@ pub fn call(
     input: &[u8],
 ) -> Result<Vec<u8>, crate::BackendFailure> {
     let request = Request::decode(input).map_err(|_| invalid())?;
-    if method != 0 || request.deck_id <= 0 || request.scope > 3 {
+    if method != crate::private_rpc_ids::DECK_PREVIEW_IDS
+        || request.deck_id <= 0
+        || request.scope > 3
+    {
         return Err(invalid());
     }
     let card_ids = backend
@@ -37,14 +30,11 @@ pub fn call(
 
 #[cfg(feature = "anki-core")]
 fn invalid() -> crate::BackendFailure {
-    #[derive(Clone, PartialEq, Message)]
-    struct Error {
-        #[prost(string, tag = "1")]
-        localized: String,
-    }
+    use crate::protocol_generated::BackendBackendError as Error;
     crate::BackendFailure::Backend(
         Error {
-            localized: "Invalid deck preview request".to_owned(),
+            message: "Invalid deck preview request".to_owned(),
+            ..Default::default()
         }
         .encode_to_vec(),
     )

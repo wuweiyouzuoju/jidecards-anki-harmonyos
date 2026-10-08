@@ -1,3 +1,4 @@
+import { loadPlatformModule } from './platform-module-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -213,13 +214,10 @@ test('current errors are reported and a retry remains usable', async () => {
 });
 
 test('rendering service decodes both audio kinds from exactly one backend RPC', async () => {
-  const source = readFileSync(new URL('../../entry/src/main/ets/backend/卡片渲染服务.ts', import.meta.url), 'utf8');
-  const start = source.indexOf('  async extractAudioTags(');
-  assert.ok(start >= 0);
-  const body = source.slice(start, source.indexOf('\n  }', start) + 4);
-  const Service = new Function('encodeExtractAvTagsRequest', 'decodeExtractAvTagsResponse', '服务号', '卡片渲染方法',
-    stripTypeScriptTypes(`class Service { ${body} }`) + '; return Service;')(
-    encodeExtractAvTagsRequest, decodeExtractAvTagsResponse, 服务号, 卡片渲染方法);
+  const Service = loadPlatformModule('backend/卡片渲染服务.ts', '卡片渲染服务', {
+    encodeExtractAvTagsRequest, decodeExtractAvTagsResponse,
+    后端会话: { 获取实例: () => ({}) }
+  });
   // Reuse the actual wire decoder; this asserts the one-call boundary rather than a source spelling.
   const service = new Service(), calls = [];
   const bytes = new 协议写入器().转为字节();

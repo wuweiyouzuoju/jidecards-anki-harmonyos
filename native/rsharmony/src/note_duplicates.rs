@@ -1,33 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Bounded, read-only field batches over the locked Core DB proxy.
+#[cfg(feature = "anki-core")]
 use prost::Message;
 
-pub const SERVICE: u32 = 1002;
+pub const SERVICE: u32 = crate::private_rpc_ids::NOTE_DUPLICATES;
 pub const BATCH_SIZE: usize = 200;
 
-#[derive(Clone, PartialEq, Message)]
-pub struct Request {
-    #[prost(int64, repeated, packed = "true", tag = "1")]
-    pub note_ids: Vec<i64>,
-    #[prost(int64, tag = "2")]
-    pub notetype_id: i64,
-    #[prost(uint32, tag = "3")]
-    pub field_ord: u32,
-}
+pub use crate::protocol_generated::JideNoteDuplicateRequest as Request;
 
-#[derive(Clone, PartialEq, Message)]
-pub struct Field {
-    #[prost(int64, tag = "1")]
-    pub note_id: i64,
-    #[prost(string, tag = "2")]
-    pub value: String,
-}
+pub use crate::protocol_generated::JideDuplicateField as Field;
 
-#[derive(Clone, PartialEq, Message)]
-pub struct Response {
-    #[prost(message, repeated, tag = "1")]
-    pub fields: Vec<Field>,
-}
+pub use crate::protocol_generated::JideNoteDuplicateResponse as Response;
 
 #[cfg(feature = "anki-core")]
 pub fn call(
@@ -36,7 +19,7 @@ pub fn call(
     input: &[u8],
 ) -> Result<Vec<u8>, crate::BackendFailure> {
     let request = Request::decode(input).map_err(|_| invalid())?;
-    if method != 0
+    if method != crate::private_rpc_ids::NOTE_DUPLICATES_FIELDS
         || request.note_ids.is_empty()
         || request.note_ids.len() > BATCH_SIZE
         || request.notetype_id <= 0
@@ -88,15 +71,12 @@ pub fn call(
 
 #[cfg(feature = "anki-core")]
 fn invalid() -> crate::BackendFailure {
-    #[derive(Clone, PartialEq, Message)]
-    struct Error {
-        #[prost(string, tag = "1")]
-        localized: String,
-    }
+    use crate::protocol_generated::BackendBackendError as Error;
     crate::BackendFailure::Backend(
         Error {
-            localized: "Duplicate scan failed: invalid batch or notes changed; retry the search"
+            message: "Duplicate scan failed: invalid batch or notes changed; retry the search"
                 .to_owned(),
+            ..Default::default()
         }
         .encode_to_vec(),
     )

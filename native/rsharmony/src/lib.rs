@@ -11,6 +11,10 @@ pub mod custom_scheduling;
 pub mod deck_preview;
 mod media_snapshot;
 pub mod note_duplicates;
+mod private_rpc_ids;
+mod protocol_generated;
+#[cfg(test)]
+mod protocol_legacy_tests;
 mod rpc_ids;
 use rpc_ids::{
     ABORT_SYNC, CLOSE_COLLECTION, COLLECTION_SERVICE, LATEST_PROGRESS, OPEN_COLLECTION,

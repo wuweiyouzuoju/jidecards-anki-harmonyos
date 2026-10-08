@@ -5,26 +5,12 @@ use crate::BackendFailure;
 use prost::Message;
 use serde_json::{json, Map, Value};
 
-pub const SERVICE: u32 = 1004;
+pub const SERVICE: u32 = crate::private_rpc_ids::CUSTOM_SCHEDULING;
 const LIMIT: usize = 65_536;
 
-#[derive(Clone, PartialEq, Message)]
-pub struct Request {
-    #[prost(bytes = "vec", tag = "1")]
-    pub states: Vec<u8>,
-    #[prost(bytes = "vec", tag = "2")]
-    pub context: Vec<u8>,
-    #[prost(string, tag = "3")]
-    pub custom_data: String,
-    #[prost(string, tag = "4")]
-    pub result_json: String,
-}
+pub use crate::protocol_generated::JideCustomSchedulingRequest as Request;
 
-#[derive(Clone, PartialEq, Message)]
-struct Text {
-    #[prost(string, tag = "1")]
-    value: String,
-}
+use crate::protocol_generated::GenericString as Text;
 
 #[derive(Clone, Copy)]
 enum Kind {
@@ -42,78 +28,13 @@ struct Field {
     kind: Kind,
     optional: bool,
 }
-fn field(id: u32, name: &'static str, kind: Kind) -> Field {
-    Field {
-        id,
-        name,
-        kind,
-        optional: false,
-    }
-}
-fn optional(id: u32, name: &'static str, kind: Kind) -> Field {
-    Field {
-        id,
-        name,
-        kind,
-        optional: true,
-    }
-}
-fn schema(node: &str) -> Vec<Field> {
-    use Kind::*;
-    match node {
-        "states" => vec![
-            field(1, "current", Node("state")),
-            field(2, "again", Node("state")),
-            field(3, "hard", Node("state")),
-            field(4, "good", Node("state")),
-            field(5, "easy", Node("state")),
-        ],
-        "state" => vec![
-            optional(1, "normal", Node("normal")),
-            optional(2, "filtered", Node("filtered")),
-            optional(3, "customData", Text),
-        ],
-        "normal" => vec![
-            optional(1, "new", Node("new")),
-            optional(2, "learning", Node("learning")),
-            optional(3, "review", Node("review")),
-            optional(4, "relearning", Node("relearning")),
-        ],
-        "filtered" => vec![
-            optional(1, "preview", Node("preview")),
-            optional(2, "rescheduling", Node("rescheduling")),
-        ],
-        "new" => vec![field(1, "position", Uint)],
-        "learning" => vec![
-            field(1, "remainingSteps", Uint),
-            field(2, "scheduledSecs", Uint),
-            field(3, "elapsedSecs", Uint),
-            optional(6, "memoryState", Node("memory")),
-        ],
-        "review" => vec![
-            field(1, "scheduledDays", Uint),
-            field(2, "elapsedDays", Uint),
-            field(3, "easeFactor", Float),
-            field(4, "lapses", Uint),
-            field(5, "leeched", Bool),
-            optional(6, "memoryState", Node("memory")),
-        ],
-        "relearning" => vec![
-            field(1, "review", Node("review")),
-            field(2, "learning", Node("learning")),
-        ],
-        "preview" => vec![field(1, "scheduledSecs", Uint), field(2, "finished", Bool)],
-        "rescheduling" => vec![field(1, "originalState", Node("normal"))],
-        "memory" => vec![field(1, "stability", Float), field(2, "difficulty", Float)],
-        "context" => vec![
-            field(1, "deckName", Text),
-            field(2, "seed", Seed),
-            optional(3, "decay", Float),
-            optional(4, "desiredRetention", Float),
-        ],
-        _ => unreachable!(),
-    }
-}
+include!("custom_scheduling_schema.rs");
+
+// Frozen pre-migration implementation is an executable oracle, never linked into production.
+#[cfg(test)]
+#[path = "../../../tools/tests/fixtures/protocol-legacy/native/custom_scheduling.rs"]
+#[allow(dead_code)]
+mod legacy;
 
 struct Wire<'a> {
     id: u32,
@@ -398,14 +319,14 @@ pub fn call(method: u32, input: &[u8]) -> Result<Vec<u8>, BackendFailure> {
     validate(&before, "states")?;
     // Card.custom_data is supplied by Core with the queue; current_state itself stays untouched.
     before["current"]["customData"] = json!(request.custom_data);
-    if method == 0 {
+    if method == crate::private_rpc_ids::CUSTOM_SCHEDULING_INPUT {
         let value = json!({"states":before,"ctx":decode(&request.context,"context")?});
         return Ok(Text {
-            value: value.to_string(),
+            val: value.to_string(),
         }
         .encode_to_vec());
     }
-    if method != 1 {
+    if method != crate::private_rpc_ids::CUSTOM_SCHEDULING_PATCH {
         return Err(invalid());
     }
     let after: Value = serde_json::from_str(&request.result_json).map_err(|_| invalid())?;
@@ -421,7 +342,7 @@ pub fn call(method: u32, input: &[u8]) -> Result<Vec<u8>, BackendFailure> {
 fn invalid() -> BackendFailure {
     BackendFailure::Backend(
         Text {
-            value: "custom_scheduling_invalid_state".into(),
+            val: "custom_scheduling_invalid_state".into(),
         }
         .encode_to_vec(),
     )
@@ -430,6 +351,14 @@ fn invalid() -> BackendFailure {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn field(id: u32, name: &'static str, kind: Kind) -> Field {
+        Field {
+            id,
+            name,
+            kind,
+            optional: false,
+        }
+    }
     fn fixture() -> Request {
         let state = json!({"normal":{"review":{"scheduledDays":10,"elapsedDays":2,
             "easeFactor":2.5,"lapses":0,"leeched":false}}});
@@ -444,7 +373,40 @@ mod tests {
     }
     fn input(request: &Request) -> Value {
         let bytes = call(0, &request.encode_to_vec()).unwrap();
-        serde_json::from_str(&Text::decode(bytes.as_slice()).unwrap().value).unwrap()
+        serde_json::from_str(&Text::decode(bytes.as_slice()).unwrap().val).unwrap()
+    }
+    #[test]
+    fn generated_schema_matches_legacy_json_patch_bytes_and_errors() {
+        for extra in [false, true] {
+            let mut request = fixture();
+            if extra {
+                request.states.extend_from_slice(&[0xf8, 0x07, 42]);
+            }
+            let prepare = request.encode_to_vec();
+            assert_eq!(
+                call(0, &prepare).unwrap(),
+                legacy::call(0, &prepare).unwrap()
+            );
+            for change in [false, true] {
+                let mut states = input(&request)["states"].clone();
+                if change {
+                    states["good"]["normal"]["review"]["scheduledDays"] = json!(123);
+                }
+                request.result_json = states.to_string();
+                let bytes = request.encode_to_vec();
+                assert_eq!(call(1, &bytes).unwrap(), legacy::call(1, &bytes).unwrap());
+            }
+            let mut states = input(&request)["states"].clone();
+            states["current"]["normal"]["review"]["scheduledDays"] = json!(123);
+            request.result_json = states.to_string();
+            let bytes = request.encode_to_vec();
+            for method in [1, 2] {
+                assert!(
+                    matches!((call(method, &bytes), legacy::call(method, &bytes)),
+                    (Err(BackendFailure::Backend(a)), Err(BackendFailure::Backend(b))) if a == b)
+                );
+            }
+        }
     }
     #[test]
     fn no_op_keeps_all_bytes_and_float_defaults_and_full_uint64_context() {

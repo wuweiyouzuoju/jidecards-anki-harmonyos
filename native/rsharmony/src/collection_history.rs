@@ -5,28 +5,17 @@ use crate::{BackendFailure, RawBackend};
 use prost::Message;
 
 // 1000 media snapshot, 1001 deck preview, 1002 note duplicates.
-pub const SERVICE: u32 = 1003;
+pub const SERVICE: u32 = crate::private_rpc_ids::COLLECTION_HISTORY;
 
-#[derive(Clone, PartialEq, Message)]
-struct Status {
-    #[prost(string, tag = "1")]
-    undo: String,
-    #[prost(string, tag = "2")]
-    redo: String,
-    #[prost(uint32, tag = "3")]
-    last_step: u32,
-}
+use crate::protocol_generated::CollectionUndoStatus as Status;
 
 fn invalid() -> BackendFailure {
     // BackendError.localized, stable application error translated by the dialog.
-    #[derive(Clone, PartialEq, Message)]
-    struct Error {
-        #[prost(string, tag = "1")]
-        localized: String,
-    }
+    use crate::protocol_generated::BackendBackendError as Error;
     BackendFailure::Backend(
         Error {
-            localized: "collection_history_changed".into(),
+            message: "collection_history_changed".into(),
+            ..Default::default()
         }
         .encode_to_vec(),
     )
@@ -41,8 +30,12 @@ pub fn call(
     let current = raw.run_method_raw(COLLECTION_SERVICE, GET_UNDO_STATUS, &[])?;
     let current = Status::decode(current.as_slice()).map_err(|_| invalid())?;
     if current != expected
-        || method > 1
-        || (if method == 0 {
+        || !matches!(
+            method,
+            crate::private_rpc_ids::COLLECTION_HISTORY_UNDO
+                | crate::private_rpc_ids::COLLECTION_HISTORY_REDO
+        )
+        || (if method == crate::private_rpc_ids::COLLECTION_HISTORY_UNDO {
             &current.undo
         } else {
             &current.redo
@@ -53,7 +46,11 @@ pub fn call(
     }
     raw.run_method_raw(
         COLLECTION_SERVICE,
-        if method == 0 { UNDO } else { REDO },
+        if method == crate::private_rpc_ids::COLLECTION_HISTORY_UNDO {
+            UNDO
+        } else {
+            REDO
+        },
         &[],
     )
 }

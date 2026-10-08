@@ -7,17 +7,13 @@ import { 协议写入器 } from '../../entry/src/main/ets/proto/core/ProtoWriter
 import { decodeUndoStatus } from '../../entry/src/main/ets/proto/messages/CollectionMessages.ts';
 
 const nativeRoot = new URL('../../native/rsharmony/src/', import.meta.url);
-const nativeService = file => Number(readFileSync(new URL(file, nativeRoot), 'utf8').match(/pub const SERVICE: u32 = (\d+);/)[1]);
-
-test('application native services never shadow another service', () => {
-  const owners = new Map();
-  for (const file of readdirSync(nativeRoot).filter(file => file.endsWith('.rs'))) {
-    const source = readFileSync(new URL(file, nativeRoot), 'utf8');
-    const match = source.match(/pub const SERVICE: u32 = (\d+);/);
-    if (!match) continue;
-    assert.ok(!owners.has(match[1]), `${file} shadows ${owners.get(match[1])} at service ${match[1]}`);
-    owners.set(match[1], file);
-  }
+const spec = JSON.parse(readFileSync(new URL('../protocol/private-rpc.json', import.meta.url)));
+const nativeService = file => spec[{'collection_history.rs':'CollectionHistory','deck_preview.rs':'DeckPreview'}[file]].id;
+test('application native services never shadow another private or upstream service', () => {
+  const ids=Object.values(spec).map(service=>service.id);
+  assert.equal(new Set(ids).size,5);
+  const core=JSON.parse(readFileSync(new URL('../core-protocol-schema.json',import.meta.url)));
+  assert.ok(ids.every(id=>!core.services.some(service=>service.id===id)));
 });
 
 test('history adapter sends the displayed status to its own native service for undo and redo', async () => {

@@ -1,0 +1,321 @@
+{
+  "description": "Exact reviewed legacy/Core differences. Changes require old/new and official Core evidence.",
+  "cases": [
+    {
+      "file": "StatsMessages.ts",
+      "entry": "decodeGraphsResponse",
+      "reason": "nested:nested:duplicate-nested@1/0@0/0",
+      "inputs": [
+        {
+          "$bytes": "0a280a120a04010203041204050607081a04090a0b0c22120a04010203041204050607081a04090a0b0c0a4e0a120a04010203041204050607081a04090a0b0c22120a04010203041204050607081a04090a0b0c0a240a04010203041204050607081a04090a0b0c0a04010203041204050607081a04090a0b0c"
+        }
+      ],
+      "before": {
+        "value": {
+          "today": null,
+          "retrievability": null,
+          "reviewCountsByDaysAgo": null,
+          "reviewTimesByDaysAgo": null,
+          "fsrs": false,
+          "buttons": {
+            "oneMonth": {
+              "learning": [
+                1,
+                2,
+                3,
+                4
+              ],
+              "young": [
+                5,
+                6,
+                7,
+                8
+              ],
+              "mature": [
+                9,
+                10,
+                11,
+                12
+              ]
+            },
+            "threeMonths": null,
+            "oneYear": null,
+            "allTime": {
+              "learning": [
+                1,
+                2,
+                3,
+                4
+              ],
+              "young": [
+                5,
+                6,
+                7,
+                8
+              ],
+              "mature": [
+                9,
+                10,
+                11,
+                12
+              ]
+            }
+          },
+          "cardCounts": null,
+          "hours": null,
+          "eases": null,
+          "intervals": null,
+          "futureDue": null,
+          "added": null,
+          "rolloverHour": 0,
+          "difficulty": null,
+          "stability": null,
+          "trueRetention": null
+        },
+        "after": [
+          {
+            "$bytes": "0a280a120a04010203041204050607081a04090a0b0c22120a04010203041204050607081a04090a0b0c0a4e0a120a04010203041204050607081a04090a0b0c22120a04010203041204050607081a04090a0b0c0a240a04010203041204050607081a04090a0b0c0a04010203041204050607081a04090a0b0c"
+          }
+        ]
+      },
+      "after": {
+        "value": {
+          "today": null,
+          "retrievability": null,
+          "reviewCountsByDaysAgo": null,
+          "reviewTimesByDaysAgo": null,
+          "fsrs": false,
+          "buttons": {
+            "oneMonth": {
+              "learning": [
+                1,
+                2,
+                3,
+                4,
+                1,
+                2,
+                3,
+                4
+              ],
+              "young": [
+                5,
+                6,
+                7,
+                8,
+                5,
+                6,
+                7,
+                8
+              ],
+              "mature": [
+                9,
+                10,
+                11,
+                12,
+                9,
+                10,
+                11,
+                12
+              ]
+            },
+            "threeMonths": null,
+            "oneYear": null,
+            "allTime": {
+              "learning": [
+                1,
+                2,
+                3,
+                4
+              ],
+              "young": [
+                5,
+                6,
+                7,
+                8
+              ],
+              "mature": [
+                9,
+                10,
+                11,
+                12
+              ]
+            }
+          },
+          "cardCounts": null,
+          "hours": null,
+          "eases": null,
+          "intervals": null,
+          "futureDue": null,
+          "added": null,
+          "rolloverHour": 0,
+          "difficulty": null,
+          "stability": null,
+          "trueRetention": null
+        },
+        "after": [
+          {
+            "$bytes": "0a280a120a04010203041204050607081a04090a0b0c22120a04010203041204050607081a04090a0b0c0a4e0a120a04010203041204050607081a04090a0b0c22120a04010203041204050607081a04090a0b0c0a240a04010203041204050607081a04090a0b0c0a04010203041204050607081a04090a0b0c"
+          }
+        ]
+      }
+    },
+    {
+      "file": "StatsMessages.ts",
+      "entry": "decodeGraphsResponse",
+      "reason": "nested:nested:duplicate-nested@1/1@0/0",
+      "inputs": [
+        {
+          "$bytes": "0a280a120a04010203041204050607081a04090a0b0c22120a04010203041204050607081a04090a0b0c0a4e0a120a04010203041204050607081a04090a0b0c22120a04010203041204050607081a04090a0b0c22240a04010203041204050607081a04090a0b0c0a04010203041204050607081a04090a0b0c"
+        }
+      ],
+      "before": {
+        "value": {
+          "today": null,
+          "retrievability": null,
+          "reviewCountsByDaysAgo": null,
+          "reviewTimesByDaysAgo": null,
+          "fsrs": false,
+          "buttons": {
+            "oneMonth": {
+              "learning": [
+                1,
+                2,
+                3,
+                4
+              ],
+              "young": [
+                5,
+                6,
+                7,
+                8
+              ],
+              "mature": [
+                9,
+                10,
+                11,
+                12
+              ]
+            },
+            "threeMonths": null,
+            "oneYear": null,
+            "allTime": {
+              "learning": [
+                1,
+                2,
+                3,
+                4
+              ],
+              "young": [
+                5,
+                6,
+                7,
+                8
+              ],
+              "mature": [
+                9,
+                10,
+                11,
+                12
+              ]
+            }
+          },
+          "cardCounts": null,
+          "hours": null,
+          "eases": null,
+          "intervals": null,
+          "futureDue": null,
+          "added": null,
+          "rolloverHour": 0,
+          "difficulty": null,
+          "stability": null,
+          "trueRetention": null
+        },
+        "after": [
+          {
+            "$bytes": "0a280a120a04010203041204050607081a04090a0b0c22120a04010203041204050607081a04090a0b0c0a4e0a120a04010203041204050607081a04090a0b0c22120a04010203041204050607081a04090a0b0c22240a04010203041204050607081a04090a0b0c0a04010203041204050607081a04090a0b0c"
+          }
+        ]
+      },
+      "after": {
+        "value": {
+          "today": null,
+          "retrievability": null,
+          "reviewCountsByDaysAgo": null,
+          "reviewTimesByDaysAgo": null,
+          "fsrs": false,
+          "buttons": {
+            "oneMonth": {
+              "learning": [
+                1,
+                2,
+                3,
+                4
+              ],
+              "young": [
+                5,
+                6,
+                7,
+                8
+              ],
+              "mature": [
+                9,
+                10,
+                11,
+                12
+              ]
+            },
+            "threeMonths": null,
+            "oneYear": null,
+            "allTime": {
+              "learning": [
+                1,
+                2,
+                3,
+                4,
+                1,
+                2,
+                3,
+                4
+              ],
+              "young": [
+                5,
+                6,
+                7,
+                8,
+                5,
+                6,
+                7,
+                8
+              ],
+              "mature": [
+                9,
+                10,
+                11,
+                12,
+                9,
+                10,
+                11,
+                12
+              ]
+            }
+          },
+          "cardCounts": null,
+          "hours": null,
+          "eases": null,
+          "intervals": null,
+          "futureDue": null,
+          "added": null,
+          "rolloverHour": 0,
+          "difficulty": null,
+          "stability": null,
+          "trueRetention": null
+        },
+        "after": [
+          {
+            "$bytes": "0a280a120a04010203041204050607081a04090a0b0c22120a04010203041204050607081a04090a0b0c0a4e0a120a04010203041204050607081a04090a0b0c22120a04010203041204050607081a04090a0b0c22240a04010203041204050607081a04090a0b0c0a04010203041204050607081a04090a0b0c"
+          }
+        ]
+      }
+    }
+  ]
+}

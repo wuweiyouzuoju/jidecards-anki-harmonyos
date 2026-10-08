@@ -2,9 +2,13 @@
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { uiFeedback } from './ui-feedback-harness.mjs';
+import { CoreRpc } from '../../entry/src/main/ets/proto/generated/CoreRpc.ts';
+import * as privateRpc from '../../entry/src/main/ets/proto/generated/PrivateRpc.ts';
+import * as coreMessages from '../../entry/src/main/ets/proto/generated/CoreMessages.ts';
 
 function localeDependencies(dependencies) {
   return {
+    CoreRpc, ...privateRpc, ...coreMessages,
     localizedResourceText: (context, _locale, resource, ...args) =>
       (dependencies.resourceText ?? uiFeedback.resourceText)(context, resource, ...args),
     localizedNamedResourceText: (context, _locale, name, ...args) =>
@@ -13,16 +17,17 @@ function localeDependencies(dependencies) {
   };
 }
 export function loadPlatformModule(path, exportName, dependencies) {
+  return loadPlatformSource(readFileSync(new URL('../../entry/src/main/ets/' + path, import.meta.url), 'utf8'), exportName, dependencies);
+}
+export function loadPlatformSource(source, exportName, dependencies) {
   dependencies = localeDependencies(dependencies);
-  const source = readFileSync(new URL('../../entry/src/main/ets/' + path, import.meta.url), 'utf8')
-    .replace(/^import[^;]+;\s*/gm, '').replace(/^export /gm, '');
+  source = source.replace(/^import[^;]+;\s*/gm, '').replace(/^export /gm, '');
   return new Function(...Object.keys(dependencies), stripTypeScriptTypes(source, { mode: 'transform' }) + ';return ' + exportName + ';')(...Object.values(dependencies));
 }
 
 /** 仅替换原生 Scroller；展开请求和取消仍执行公共控制器。 */
 export function expansionRevealDependencies() {
   return { ExpansionReveal: loadPlatformModule('utils/ExpansionReveal.ets', 'ExpansionReveal', {
-    Scroller: class { scrollEdge() {} }, Edge: { Bottom: 'bottom' }
   }) };
 }
 

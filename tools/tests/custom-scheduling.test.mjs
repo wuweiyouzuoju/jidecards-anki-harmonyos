@@ -78,7 +78,7 @@ test('the service prepares input, runs the injected runtime, and returns only na
     assert.equal(calls.length,1);assert.equal(source,fixture.source);assert.deepEqual(JSON.parse(input),fixture.input);
     return JSON.stringify(fixture.expected);
   }};
-  assert.deepEqual(await new Service(runtime).apply(card,fixture.script),states);
+  assert.deepEqual(await new Service(runtime).apply(card,fixture.script),{...states,raw:encodeSchedulingStates(states)});
   assert.deepEqual(calls.map(call=>call.method),[0,1]);
   calls.length=0;
   await assert.rejects(new Service({execute:async()=>{throw Error('script failed');}}).apply(card,fixture.script),/script failed/);

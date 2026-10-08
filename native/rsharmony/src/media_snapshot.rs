@@ -7,81 +7,27 @@ use crate::{BackendFailure, RawBackend};
 use prost::Message;
 use std::collections::HashSet;
 
-pub const SERVICE: u32 = 1000;
+pub const SERVICE: u32 = crate::private_rpc_ids::MEDIA_SNAPSHOT;
 const FILES_PER_BATCH: usize = 256;
 const REPORT_PAGE_BYTES: usize = 16 * 1024;
 
-#[derive(Clone, PartialEq, Message)]
-struct CheckResponse {
-    #[prost(string, repeated, tag = "1")]
-    unused: Vec<String>,
-    #[prost(string, repeated, tag = "2")]
-    missing: Vec<String>,
-    #[prost(int64, repeated, tag = "3")]
-    missing_media_notes: Vec<i64>,
-    #[prost(string, tag = "4")]
-    report: String,
-    #[prost(bool, tag = "5")]
-    have_trash: bool,
-}
+use crate::protocol_generated::MediaCheckMediaResponse as CheckResponse;
 
-#[derive(Clone, PartialEq, Message)]
-struct Request {
-    #[prost(uint32, tag = "1")]
-    token: u32,
-    #[prost(uint32, tag = "2")]
-    offset: u32,
-}
+use crate::protocol_generated::JideMediaRequest as Request;
 
-#[derive(Clone, PartialEq, Message)]
-struct Page {
-    #[prost(uint32, tag = "1")]
-    token: u32,
-    #[prost(uint32, tag = "2")]
-    unused_count: u32,
-    #[prost(uint32, tag = "3")]
-    missing_count: u32,
-    #[prost(bool, tag = "4")]
-    have_trash: bool,
-    #[prost(string, tag = "5")]
-    report: String,
-    #[prost(uint32, tag = "6")]
-    next_offset: u32,
-    #[prost(string, repeated, tag = "7")]
-    files: Vec<String>,
-    #[prost(int64, repeated, tag = "8")]
-    note_ids: Vec<i64>,
-    #[prost(uint32, tag = "9")]
-    missing_note_count: u32,
-    #[prost(uint32, tag = "10")]
-    tagged_count: u32,
-}
+use crate::protocol_generated::JideMediaPage as Page;
 
-#[derive(Clone, PartialEq, Message)]
-struct NoteTags {
-    #[prost(int64, repeated, tag = "1")]
-    ids: Vec<i64>,
-    #[prost(string, tag = "2")]
-    tags: String,
-}
+use crate::protocol_generated::TagsNoteIdsAndTagsRequest as NoteTags;
 
-#[derive(Clone, PartialEq, Message)]
-struct ChangesWithCount {
-    #[prost(uint32, tag = "2")]
-    count: u32,
-}
+use crate::protocol_generated::CollectionOpChangesWithCount as ChangesWithCount;
 
-#[derive(Clone, PartialEq, Message)]
-struct Strings {
-    #[prost(string, repeated, tag = "1")]
-    values: Vec<String>,
-}
+use crate::protocol_generated::GenericStringList as Strings;
 
 fn invalid(message: &str) -> BackendFailure {
     // BackendError.localized = 1; preserve the existing typed error channel.
     BackendFailure::Backend(
         Strings {
-            values: vec![message.to_owned()],
+            vals: vec![message.to_owned()],
         }
         .encode_to_vec(),
     )
@@ -113,7 +59,7 @@ impl MediaSnapshot {
     ) -> Result<Vec<u8>, BackendFailure> {
         let request =
             Request::decode(input).map_err(|_| invalid("Invalid media snapshot request"))?;
-        if method == 0 {
+        if method == crate::private_rpc_ids::MEDIA_SNAPSHOT_CHECK {
             self.clear();
             let mut response = Self::check(raw)?;
             self.missing_count = response.missing.len() as u32;
@@ -127,8 +73,10 @@ impl MediaSnapshot {
             return Err(invalid("Media snapshot expired; check media again"));
         }
         match method {
-            1 => self.report_page(request.offset as usize),
-            2 => {
+            crate::private_rpc_ids::MEDIA_SNAPSHOT_REPORT => {
+                self.report_page(request.offset as usize)
+            }
+            crate::private_rpc_ids::MEDIA_SNAPSHOT_UNUSED => {
                 let response = self.response.as_ref().unwrap();
                 let offset = request.offset as usize;
                 if offset > response.unused.len() {
@@ -147,7 +95,7 @@ impl MediaSnapshot {
                 }
                 .encode_to_vec())
             }
-            3 => {
+            crate::private_rpc_ids::MEDIA_SNAPSHOT_TRASH => {
                 // The user confirmed the old snapshot. Only trash names still unused now.
                 let current = Self::check(raw)?;
                 let confirmed: HashSet<&str> = self
@@ -169,18 +117,18 @@ impl MediaSnapshot {
                         MEDIA_SERVICE,
                         TRASH_MEDIA_FILES,
                         &Strings {
-                            values: batch.to_vec(),
+                            vals: batch.to_vec(),
                         }
                         .encode_to_vec(),
                     )?;
                 }
                 Ok(Vec::new())
             }
-            4 => {
+            crate::private_rpc_ids::MEDIA_SNAPSHOT_END => {
                 self.clear();
                 Ok(Vec::new())
             }
-            5 => {
+            crate::private_rpc_ids::MEDIA_SNAPSHOT_MISSING_NOTES => {
                 let ids = &self.response.as_ref().unwrap().missing_media_notes;
                 let offset = request.offset as usize;
                 if offset > ids.len() {
@@ -196,7 +144,7 @@ impl MediaSnapshot {
                 }
                 .encode_to_vec())
             }
-            6 => {
+            crate::private_rpc_ids::MEDIA_SNAPSHOT_TAG_MISSING => {
                 // Recheck and write under one registry lock. Newly missing notes were not confirmed.
                 let current = Self::check(raw)?;
                 let confirmed: HashSet<i64> = self
@@ -223,7 +171,7 @@ impl MediaSnapshot {
                         TAGS_SERVICE,
                         ADD_NOTE_TAGS,
                         &NoteTags {
-                            ids,
+                            note_ids: ids,
                             tags: "missing-media".into(),
                         }
                         .encode_to_vec(),
@@ -411,9 +359,10 @@ mod tests {
                 assert_eq!(method, ADD_NOTE_TAGS);
                 let tags = NoteTags::decode(input).unwrap();
                 assert_eq!(tags.tags, "missing-media");
-                self.tagged = tags.ids;
+                self.tagged = tags.note_ids;
                 return Ok(ChangesWithCount {
                     count: self.tagged.len() as u32,
+                    ..Default::default()
                 }
                 .encode_to_vec());
             }
@@ -422,7 +371,7 @@ mod tests {
                 return Ok(self.response.encode_to_vec());
             }
             let names = Strings::decode(input).unwrap();
-            self.batches.push(names.values.len());
+            self.batches.push(names.vals.len());
             if self.fail {
                 return Err(invalid("IO failed"));
             }
