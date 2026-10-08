@@ -134,12 +134,16 @@ export struct HomeIntroPanel {
   }
 
   @Builder
+  private paragraph(body: Resource) {
+    Text(body).fontSize(应用尺寸.字号_正文).lineHeight(22)
+      .fontColor($r('app.color.text_secondary')).textAlign(TextAlign.Start)
+      .copyOption(CopyOptions.LocalDevice).width('100%')
+  }
+
+  @Builder
   private section(title: Resource, body: Resource) {
-    HomeIntroSection({ title, content: () => {
-      Text(body).fontSize(应用尺寸.字号_正文).lineHeight(22)
-        .fontColor($r('app.color.text_secondary')).textAlign(TextAlign.Start)
-        .copyOption(CopyOptions.LocalDevice).width('100%')
-    } })
+    // BuilderParam 回调只调用已编译的 Builder，不能直接放声明式组件链。
+    HomeIntroSection({ title, content: () => { this.paragraph(body); } })
   }
 
   @Builder

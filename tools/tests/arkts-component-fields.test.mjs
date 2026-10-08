@@ -24,6 +24,35 @@ function sources(directory) {
     return entry.isDirectory() ? sources(path) : path.endsWith('.ets') ? [path] : [];
   });
 }
+
+// 提前拦截已实测会原样留在编译产物中的内联组件链；不代替 HAP/设备验收。
+function inlineBuilderComponents(source, builderNames) {
+  const component = '(?:Text|Column|Row|Stack|Button|Image|Scroll|List|ForEach)';
+  return builderNames.filter(name => {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(?<![$\\u200c\\u200d\\p{ID_Continue}])${escaped}\\s*:\\s*\\([^)]*\\)(?:\\s*:\\s*void)?\\s*=>\\s*\\{\\s*${component}\\s*\\(`, 'u').test(source);
+  });
+}
+function builderParamNames(source) {
+  return [...source.matchAll(/@BuilderParam\s+(?:(?:private|public)\s+)?([$\p{ID_Start}][$\u200c\u200d\p{ID_Continue}]*)\s*:/gu)]
+    .map(match => match[1]);
+}
+
+test('BuilderParam callbacks delegate to compiled builders instead of inline declarative component chains', () => {
+  assert.deepEqual(inlineBuilderComponents('content: () => { Text(body).fontSize(16) }', ['content']), ['content']);
+  assert.deepEqual(inlineBuilderComponents('content: (): void => { Column() { Text(body) } }', ['content']), ['content']);
+  assert.deepEqual(inlineBuilderComponents('content: () => { this.paragraph(body); }', ['content']), []);
+  assert.deepEqual(inlineBuilderComponents('内容: () => { Text(body).fontSize(16) }', ['内容']), ['内容']);
+  assert.deepEqual(inlineBuilderComponents('$content: () => { Column() { Text(body) } }', ['$content']), ['$content']);
+  assert.deepEqual(inlineBuilderComponents('父内容: () => { Text(body) }', ['内容']), []);
+  assert.deepEqual(builderParamNames('@BuilderParam 内容: () => void; @BuilderParam private $content: () => void;'), ['内容', '$content']);
+  const root = fileURLToPath(new URL('../../entry/src/main/ets/', import.meta.url));
+  const files = sources(root).map(path => ({ path, source: readFileSync(path, 'utf8') }));
+  const builderNames = [...new Set(files.flatMap(({ source }) => builderParamNames(source)))];
+  for (const file of files) {
+    assert.deepEqual(inlineBuilderComponents(file.source, builderNames), [], file.path);
+  }
+});
 test('state fields cannot shadow common ArkUI component attribute methods', () => {
   assert.deepEqual(collisions('@State private enabled: boolean = false;'), ['enabled']);
   assert.deepEqual(collisions('@State private isAdvanceEnabled: boolean = false;'), []);

@@ -91,6 +91,7 @@ this.localizedFmt($r('app.string.xxx_lang'), [arg1, arg2]);
 
 - `@Prop` 深拷贝不保留 `Uint8Array` 等内置对象的内部类型。完整 protobuf 配置及不透明字节由会话持有；跨组件传显示用的普通值，不能把深拷贝后的对象再送回协议/草稿复制入口。牌组选项默认值的转换入口为 `DeckOptionsDefaults.ts`，回归同时执行实际组件读取逻辑与设备完整模式。
 - `@Builder` 按值参数会被快照，@State 变化不重跑 builder，三角形不转——传引用用 interface
+- `@BuilderParam` 的内联箭头回调只委托到 `@Builder` 方法，不直接写 `Text(...).fontSize(...)` 等声明式组件链。目标编译器曾保留这类普通函数调用，导致首次入门弹窗在运行时读 `undefined.fontSize` 后退出；`arkts-component-fields.test.mjs` 按 Unicode 标识符扫描（包括中文 `内容`），拦截常见直接写法。入门正文变更还运行 [实际编译产物检查](../../tools/check-home-intro-compiled.mjs)，命令和范围见 [验证说明](../../docs/development/verification.md#启动渲染编译产物检查)；设备展示单独验收。
 - `ThemeTextSpans` / `ThemeHighlightedTextSpans` 的宿主必须用 `themeTextKey` 按实际文案、有效色板（含空色板）、高亮及语言重建文字子节点；不能只按语言重建，否则取消选中/禁用和动态文案会保留旧 Span。直接 `themeLabelGlyphs` 的组件仍由自身 build 读取响应式输入。
 - `LazyForEach` keyItem 必须含全部可变字段，否则数据变化不刷新
 - `Select.value` 必须传 string 不能传 Resource（运行时实测按钮文本空白）

@@ -107,6 +107,10 @@ HomeSummaryHeader 不再区分手机双侧与详情分栏外缘布局，也不�
 
 `HomeIntroPanel` 复用首页启动弹层序列，在公告处理后展示（直链渠道暂停时跳过云端牌组流程）；`HomeIntroStore` 用独立内容修订键，只有确认才写入，旧欢迎版本不抑制新介绍。首页“更多 → 速览”可重看。新用户说明明确默认配置即可开始，不要求先探索复杂设置。内容覆盖闪卡用途、牌组获取渠道（QQ群、Anki 共享牌组、AI 或人工制卡）、外部 Agent 制卡/改卡、APKG 导入复习以及 3.0.0 前老用户进群领取幻彩兑换码；沿用现有签名兑换，不自动授予权益。
 
+入门分组的普通正文由 `HomeIntroPanel.paragraph` 的 `@Builder` 渲染，`HomeIntroSection.content` 只委托该方法。2026-10-08 平板启动崩溃记录定位到内联回调里的 `Text(body).fontSize(...)`：目标编译器未将其转换为 `Text.create/fontSize`，运行时抛出 `Cannot read property fontSize of undefined`。不能靠捕获异常、标记已读或跳过入门掩盖问题。`home-intro.test.mjs` 保留内容与启动接线检查，`arkts-component-fields.test.mjs` 扫描实际 BuilderParam 名称，拒绝常见内联声明式组件链；这些静态检查仍不能代替编译产物和真实首屏验收。
+
+启动检查的误区：模拟器能打开首页不代表首次安装安全，已有 `home_intro_completed_v1` 会直接跳过入门渲染；确认前重启、首次安装和旧版本升级都要覆盖未读路径，不能通过清除用户数据制造测试条件。HAP 编译通过也不证明 BuilderParam 内的声明式组件已正确转换，须核对并执行真实编译产物；崩溃堆栈里的 `HomeIntroPanel.ts:279` 是生成代码位置，不能直接当成 `.ets` 源码行号。此故障在旧 debug 生成代码中同样存在，不应仅归因于 release、签名或 CPU 架构。回归使用真实 `HomeStartupSequence` 与 `HomeIntroStore` 验证只有持久化确认才抑制展示，使用 [编译产物检查](../../tools/check-home-intro-compiled.mjs) 验证首次渲染，环境与边界见 [验证说明](verification.md#启动渲染编译产物检查)。
+
 删除牌组期间显示忙碌遮罩，自动同步与其他首页操作等待。`DeckMediaCleanup` 比较删除前后 Core 媒体检查的 unused 差集，仅提示此次新增未引用文件；用户单独确认后再次检查，仍 unused 的确认文件才移入媒体回收站，绝不清空全局回收站。媒体同步活动或检查失败时保留媒体，牌组删除成功不回滚、不误报为删除失败。共享引用、原有闲置媒体和筛选牌组归还的卡片受检查保护。行为测试在 `deck-media-cleanup` 与 `home-deletion-runtime`。
 
 牌组色条候选为蓝、紫、绿、黄、红五色和取消色条；绿色/黄色继续使用现有 mint/amber 存储键，历史黑色仍正确显示但不再提供为新候选。色条子菜单仅以当前主题色文字标明选中项（幻彩沿用主题文字渐变），不显示勾号。定制入口显示“本机显示名称 / 背景”，真实改名使用独立入口；隐藏操作使用正常正文色。

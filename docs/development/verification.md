@@ -25,6 +25,12 @@ Node 24.x 与 `package.json` / CI 一致。首次准备或 lockfile 变化后运
 
 `platform-module-harness.mjs` 可注入平台依赖执行 `.ets` 模块或组件的真实非渲染逻辑；组件装饰器与 build 被去除，因此不证明 ArkUI 观察、Prop 更新或布局行为。不要在测试中重新实现会话规则，也不能用该 harness 代替 HAP 和设备验证。
 
+### 启动渲染编译产物检查
+
+首次入门的回归入口为 [check-home-intro-compiled.mjs](../../tools/check-home-intro-compiled.mjs)。HAP 构建后，从仓库根运行 `node tools/check-home-intro-compiled.mjs entry/build/default/cache/default/default@CompileArkTS/esmodule/release/entry/src/main/ets/components/HomeIntroPanel.ts`（debug 包相应替换目录）。需要 Node 24 和本次构建留下的 CompileArkTS 产物；不接受 `.ets` 源码，不依赖旧的入门已读记录。
+
+工具执行真实编译后的 `HomeIntroPanel` / `HomeIntroSection` 及其 BuilderParam 回调，只替换外部组件与平台边界；原始声明式 `Text()` 返回 `undefined`，未转换的 `.fontSize` 链会直接失败。六个分组或 16 个 Text 节点缺失、执行异常、产物不存在均非零退出，成功输出文件路径、SHA-256 与渲染计数。工具自身反例在 `home-intro-compiled.test.mjs`，进入 home 测试；它不验证字节码执行、布局、重渲染、原生库或真机兼容性，也不能单独认证上架包。
+
 `verify` 按阶段打印 environment/repository/native/sandbox/rpc-index/protocol-core/hap，失败立即非零退出。结束报告必须写明执行的模式，repo 成功不等于整个应用验证完成。
 
 ## 开发可维护性门禁

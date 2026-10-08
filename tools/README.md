@@ -29,6 +29,7 @@
 | HAP 警告 | `npm run build:app -- -Clean` | 精确依赖/SDK 基线，项目新警告失败；[范围与维护](../docs/development/verification.md#hap-警告门禁) |
 | 本机签名 | `check-signing.mjs`、`signing-config.ts` | [配置和构建注入](../docs/development/signing.md)，不输出材料值 |
 | HAP 检查 | `inspect-hap.ps1` | 检查已有产物 |
+| 首次入门编译产物 | `node tools/check-home-intro-compiled.mjs <本次编译的HomeIntroPanel.ts>` | 执行真实编译输出的六个分组与16个Text节点；原始内联组件链抛错即失败，输出SHA-256；需要Node24与HAP编译缓存，不代替设备/字节码验收，[命令与范围](../docs/development/verification.md#启动渲染编译产物检查) |
 | 源码副本 | `npm run export:source -- <新目录>` | 保留源码与测试，只在副本脱敏签名字段，不覆盖已有目录 |
 | 卡片浏览器回归 | `test-card-template-browser.mjs`、`test-card-flip-browser.mjs`、`test-math-rendering-browser.mjs`、`test-card-colors-browser.mjs` | 需要对应浏览器环境；翻面测试使用生产会话与真实导航，命令见 [学习与媒体](../docs/development/study-media.md#卡片模板脚本与样式) |
 | 图片遮罩浏览器回归 | `node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs tools/test-image-occlusion-browser.mjs` | 真实 Edge/Canvas 检查形状、两种模式、答案轮廓及文字，并以触摸输入验证遮罩上的预览左右滑与取消；`PLAYWRIGHT_MODULE` 可指定模块入口，截图在 `.local/io-preview-browser.png`，不操作卡库或设备 |
