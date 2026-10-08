@@ -27,7 +27,7 @@ test('import/export codecs include official deck and collection package fields',
   ]) {
     assert.match(codec, new RegExp(symbol));
   }
-  assert.match(codec, /写入64位整数\(2,.*deckId/);
+  assert.match(codec, /setDeckId\(deckId/);
   for (const field of ['withScheduling', 'withDeckConfigs', 'withMedia', 'legacy']) {
     assert.match(codec, new RegExp(field));
   }
@@ -85,7 +85,7 @@ test('backend session retains the native handle while collection-only RPCs run',
   assert.match(session, /async 在集合关闭下调用\(/);
   assert.match(session, /集合方法\.关闭/);
   assert.match(collectionMessages, /encodeCloseCollectionRequest/);
-  assert.match(collectionMessages, /写入布尔\(1, downgradeToSchema11\)/);
+  assert.match(collectionMessages, /setDowngradeToSchema11\(downgradeToSchema11\)/);
 });
 
 test('sandbox exports are delivered through the official document saver and always cleaned', () => {
@@ -106,7 +106,7 @@ test('document saver writes the selected provider URI through file descriptors a
   const service = read('entry/src/main/ets/backend/数据迁移服务.ts');
   assert.match(service, /按描述符复制文件\(沙箱路径, URI列表\[0\]\)/);
   assert.doesNotMatch(service, /fs\.copyFileSync\(沙箱路径, URI列表\[0\]\)/);
-  assert.match(service, /if \(URI列表\.length === 0\) return null;/);
+  assert.match(service, /if \(URI列表\.length === 0\)\s+return null;/);
   assert.match(service, /finally[\s\S]*静默删除\(沙箱路径\)/);
 });
 

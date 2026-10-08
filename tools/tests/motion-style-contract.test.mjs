@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { loadPlatformModule } from './platform-module-harness.mjs';
+import { motionApi } from './motion-harness.mjs';
 
 function read(path) {
   return readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
@@ -15,18 +16,30 @@ test('small anchored menus share the restrained 150ms transition', () => {
     animation(options) { this.options = options; return this; }
   });
   const MenuSurface = loadPlatformModule('components/common/MenuSurface.ets', 'MenuSurface', {
+    ...motionApi(),
     TransitionEffect: { opacity: value => effect('opacity', value), scale: value => effect('scale', value),
       asymmetric: (enter, exit) => ({ enter, exit }) }, Curve: { EaseOut: 'ease-out' }
   });
   const transition = MenuSurface.popupTransition();
   assert.equal(transition.enter.kind, 'opacity'); assert.equal(transition.enter.value, 0);
-  assert.deepEqual(transition.enter.combined.value, { x: 0.98, y: 0.98 });
+  assert.deepEqual(transition.enter.combined.value, { x: 0.98, y: 0.98, centerX: '50%', centerY: '50%' });
   assert.equal(transition.exit.kind, 'opacity'); assert.equal(transition.exit.value, 0);
   assert.equal(transition.exit.combined, undefined, 'closing only fades');
   for (const branch of [transition.enter, transition.exit]) {
     assert.deepEqual(branch.options, { duration: 150, curve: 'ease-out' });
   }
-  assert.match(read('entry/src/main/ets/components/common/AnchoredMenu.ets'), /\.transition\(MenuSurface\.popupTransition\(\)\)/);
+  for (const [x, y] of [['0%', '0%'], ['100%', '0%'], ['100%', 88]]) {
+    const anchored = MenuSurface.popupTransition(x, y);
+    assert.deepEqual(anchored.enter.combined.value, { x: 0.98, y: 0.98, centerX: x, centerY: y });
+    assert.equal(anchored.exit.combined, undefined, 'closing does not scale or move the anchor');
+  }
+  assert.match(read('entry/src/main/ets/components/common/AnchoredMenu.ets'),
+    /\.transition\(MenuSurface\.popupTransition\(this\.alignEnd \? '100%' : '0%', '0%'\)\)/);
+  const cardMenu = read('entry/src/main/ets/components/common/CardActionMenu.ets');
+  assert.doesNotMatch(cardMenu, /animateTo\(|TransitionEffect\.opacity/,
+    'branch/state changes must not animate measured geometry or replay individual row entrances');
+  assert.match(cardMenu, /\.transition\(MenuSurface\.popupTransition\('100%', this\.placements\(\)\[groupIndex\]\.pointerCenter\)\)/);
+  assert.match(cardMenu, /\.transition\(MenuSurface\.popupTransition\('100%', '0%'\)\)/);
   for (const path of ['entry/src/main/ets/components/牌组列表项.ets',
     'entry/src/main/ets/components/home/HomeSummaryHeader.ets', 'entry/src/main/ets/components/牌组详情面板.ets', 'entry/src/main/ets/components/home/HomeDeckDetails.ets']) {
     const source = read(path);
@@ -53,9 +66,9 @@ test('dialogs enter gently and leave with opacity only', () => {
     'entry/src/main/ets/components/云端牌组弹窗.ets',
   ]) {
     const source = read(path);
-    const transition = source.slice(source.lastIndexOf('.transition(TransitionEffect.asymmetric('));
-    assert.equal((transition.match(/TransitionEffect\.scale\(\{ x: 0\.96, y: 0\.96 \}\)/g) ?? []).length, 1, path);
-    assert.match(transition, /TransitionEffect\.opacity\(0\)\s*\.animation\(\{ curve: 取全屏转场曲线\(\), duration: 取全屏转场时长\(\) \}\)\s*\)\)/, path);
+    assert.match(source, /\.transition\(SurfaceTransition\.dialog\(\)\)/, path);
+    assert.match(source, /\.transition\(SurfaceTransition\.backdrop\(\)\)/, path);
+    assert.doesNotMatch(source, /TransitionEffect\.scale|TransitionEffect\.asymmetric/, path);
   }
 });
 
@@ -63,11 +76,10 @@ test('navigation applies one fade transition including the home boundary', () =>
   const home = read('entry/src/main/ets/utils/HomeNavigationTransition.ets');
   assert.doesNotMatch(home, /from\.index === -1 \|\| to\.index === -1/);
   assert.match(home, /const context: UIContext \| undefined = this\.host\.getUIContext\(\)/);
-  assert.match(home, /if \(context === undefined\) \{\s*showDestination\(\);\s*transitionProxy\.finishTransition\(\);/);
-  const fade = home;
-  assert.match(fade, /const 转场曲线: Curve = Curve\.EaseOut/);
-  assert.match(fade, /expectedFrameRateRange: \{ min: 60, max: 120, expected: 60 \}/);
-  assert.match(fade, /onFinish:[\s\S]*?transitionProxy\.finishTransition\(\)/);
+  assert.match(home, /if \(context === undefined\) \{\s*showDestination\(\);\s*finishTransition\(\);/);
+  assert.match(home, /const animation: AnimateParam = SurfaceTransition\.pageAnimation\(\)/);
+  assert.match(home, /animation\.onFinish =[\s\S]*?finishTransition\(\)/);
+  assert.match(home, /context\.animateTo\(animation, showDestination\)/);
 
   for (const [path, name] of [
     ['entry/src/main/ets/pages/设置页.ets', 'SettingsPage'],

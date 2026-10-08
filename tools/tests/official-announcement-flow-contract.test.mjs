@@ -62,7 +62,8 @@ test('announcement modal is native, themed, scrollable and non-dismissible', () 
   assert.match(source, /onAcknowledge/);
   assert.match(source, /onOpenDetails/);
   assert.match(source, /DialogBackdrop\(\)/);
-  assert.match(source, /取全屏转场/);
+  assert.match(source, /\.transition\(SurfaceTransition\.dialog\(\)\)/);
+  assert.match(source, /\.transition\(SurfaceTransition\.backdrop\(\)\)/);
   assert.match(source, /edgeEffect\(EdgeEffect\.Spring\)/);
   assert.doesNotMatch(source, /Web\(|RichText\(|onClose|\.onClick\(\(\) => this\.onAcknowledge/);
 });

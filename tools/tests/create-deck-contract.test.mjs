@@ -92,8 +92,8 @@ test('deck service creates decks via NewDeck template then AddDeck', () => {
   const service = read(SERVICE);
 
   assert.match(service, /async 创建牌组\(名称: string\): Promise<number>/);
-  assert.match(service, /牌组方法\.新建牌组/);
-  assert.match(service, /牌组方法\.添加牌组/);
+  assert.match(service, /Decks_new_deck/);
+  assert.match(service, /Decks_add_deck/);
   assert.match(service, /模板\.id = 0/);
   assert.match(service, /模板\.name = 名称/);
   assert.match(service, /decodeOpChangesWithId/);

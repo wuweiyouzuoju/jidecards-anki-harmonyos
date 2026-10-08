@@ -1,3 +1,4 @@
+import { CoreRpc } from '../../entry/src/main/ets/proto/generated/CoreRpc.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -139,7 +140,7 @@ test('render service resolves legacy nodes on both sides and preserves ordinary 
   const source = read('entry/src/main/ets/backend/卡片渲染服务.ts')
     .replace(/^import[\s\S]*?;\r?\n/gm, '')
     .replace('export class 卡片渲染服务', 'class 卡片渲染服务') + '\nglobalThis.Service = 卡片渲染服务;';
-  const context = { ...codec, 原始侧HTML, 服务号, 卡片渲染方法, 后端会话: { 获取实例: () => session } };
+  const context = { CoreRpc, ...codec, 原始侧HTML, 服务号, 卡片渲染方法, 后端会话: { 获取实例: () => session } };
   vm.createContext(context);
   vm.runInContext(stripTypeScriptTypes(source), context);
   const service = new context.Service();

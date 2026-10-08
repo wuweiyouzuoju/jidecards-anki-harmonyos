@@ -6,9 +6,9 @@ import { posix } from 'node:path';
 
 const root = new URL('../../entry/src/main/ets/components/common/', import.meta.url);
 const sharedModels = new Set(['AppLayoutState', 'AppLifecycleState', 'ThemeCatalog', 'ThemeBackgroundMotion',
-  '颜色主题', '主题设置', 'CardViewportLayout', 'WindowSafeLayout'].map(name => 'model/' + name));
+  '颜色主题', '主题设置', 'CardViewportLayout', 'WindowSafeLayout', 'MenuHoldController', 'MenuSlideSession', 'InteractionFeedback'].map(name => 'model/' + name));
 const sharedUtils = new Set(['应用尺寸', 'UiFeedback', 'PressFeedback', 'SurfaceBorder', '转场时长',
-  'FormInputStyle', 'FormRowLayout', 'FormTextAreaStyle', 'GlassSurface', 'SelectStyle', 'ImageSurfaceStyle', 'ExpansionReveal', 'HelpLayout']
+  'FormInputStyle', 'FormRowLayout', 'FormTextAreaStyle', 'GlassSurface', 'SelectStyle', 'ImageSurfaceStyle', 'ExpansionReveal', 'HelpLayout', 'AppMotion', 'SurfaceTransition']
   .map(name => 'utils/' + name));
 
 // 现有跨入口业务 UI 的逐条迁移例外；新组件不能继承例外，迁出后删除对应项。

@@ -34,7 +34,7 @@ test('button, menu and selected item share a font size with one owner for each f
     应用尺寸: { 卡片边框: 1 }, $r: key => key
   });
   const FormRowLayout = loadPlatformModule('utils/FormRowLayout.ets', 'FormRowLayout', {
-    应用尺寸: { 间距_12: 12 }
+    应用尺寸: { 间距_12: 12, 间距_8: 8, 间距_4: 4 }
   });
   const SelectStyle = loadPlatformModule('utils/SelectStyle.ets', 'SelectStyle', {
     TextModifier, FontWeight: { Normal: 400, Medium: 500 }, TextOverflow: { Ellipsis: 'ellipsis' },
@@ -43,6 +43,8 @@ test('button, menu and selected item share a font size with one owner for each f
   assert.equal(SelectStyle.controlFont.size, 14);
   assert.equal(SelectStyle.controlRadius, 16);
   assert.equal(SelectStyle.controlHeight, FormRowLayout.controlHeight);
+  assert.equal(FormRowLayout.rowGap, 8);
+  assert.equal(FormRowLayout.hintGap, 4);
   assert.equal(SelectStyle.fieldConstraint, FormRowLayout.trailingConstraint);
   assert.deepEqual(SelectStyle.fieldConstraint, { maxWidth: '56%' });
   assert.equal(SelectStyle.optionFont.size, SelectStyle.controlFont.size);
@@ -90,9 +92,13 @@ test('all native selects reserve layout space and directly reapply geometry', ()
     }
   }
   // 共享表单减少原生节点；核对真实责任入口，不再要求散写节点数量。
-  for (const owner of ['components/common/FormSelectRow.ets', 'components/settings/外观分组.ets']) {
+  for (const owner of ['components/common/FormSelectRow.ets']) {
     assert.ok([...auditedPaths].some(path => path.endsWith(owner)), `Select audit must include ${owner}`);
   }
+  const appearance = read('components/settings/外观分组.ets');
+  assert.equal((appearance.match(/FormSelectRow\(/g) ?? []).length, 2);
+  assert.match(appearance, /showValuePreview: true,\s*valuePreview: \(\): void => \{ this\.themeSwatch\(\); \}/);
+  assert.doesNotMatch(appearance, /\bSelect\(|new SelectStyle|\.height\(48\)/);
 });
 
 test('browser subtitle choices share aligned theme selection and dismissal', () => {
@@ -240,7 +246,7 @@ test('browser uses one segmented frame and opens only the chosen option group', 
   assert.match(controls, /'sort'/);
   assert.match(controls, /id\('browser-view-selector'\)/);
   assert.match(controls, /layoutWeight\(7\)/);
-  assert.match(controls, /resultCountLabel\(\)[\s\S]*layoutWeight\(3\)[\s\S]*TextAlign\.End/);
+  assert.match(controls, /ChangingText\(\{ value: this\.阶段 === 'loading' \? this\.取本地化文案\(\$r\('app.string.browser_loading'\)\) : this\.resultCountLabel\(\),\s*textSize: 应用尺寸\.字号_正文_小, alignment: TextAlign\.End \}\)\s*\.layoutWeight\(3\)/);
   assert.doesNotMatch(page, /\bSelect\(/);
   const search = read('components/browser/搜索框.ets');
   assert.match(search, /TextInput\(/);

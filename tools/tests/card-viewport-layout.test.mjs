@@ -149,6 +149,6 @@ test('narrow deck appearance drives page, deck-list and menu spacing from one de
   assert.match(home, /页面分组间距\(this\.narrowDeckLayout\)/);
   assert.match(deckList, /页面分组间距\(this\.narrow\)/);
   assert.match(menu, /margin\(\{ top: this\.menuGeometry\(\)\.top/);
-  assert.match(menu, /safeMenuGeometry\(this\.viewportHeight, this\.topOffset, Math\.max\(0, this\.safeTop - this\.viewportTop\), this\.safeBottom,\s*应用尺寸\.页面底部间距\(this\.narrowDeckLayout\)/);
+  assert.match(menu, /safeMenuGeometry\(keyboardViewportHeight\(this\.viewportHeight, this\.viewportTop, this\.keyboardTop\), this\.topOffset, Math\.max\(0, this\.safeTop - this\.viewportTop\), this\.keyboardTop > 0 \? 0 : this\.safeBottom,\s*应用尺寸\.页面底部间距\(this\.narrowDeckLayout\)/);
   assert.doesNotMatch(menu, /effectiveTopOffset/);
 });

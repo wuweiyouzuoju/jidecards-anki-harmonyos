@@ -50,7 +50,7 @@ test('short loading unmount cancels feedback; slow loading shows it', () => {
 test('study and browser loading layers retain existing card content while blocking stale input', () => {
   const read = path => readFileSync(new URL('../../entry/src/main/ets/' + path, import.meta.url), 'utf8');
   for (const [path, start, end] of [
-    ['pages/学习页.ets', "      if (this.阶段 === 'loading' || (this.cardRenderPending &&", "      if (this.阶段 === 'error')"],
+    ['pages/学习页.ets', "      if (this.recoveryMessage === '' && (this.阶段 === 'loading' || (this.cardRenderPending &&", "      if (this.阶段 === 'error')"],
     ['components/browser/卡片预览页.ets', '// Loading 覆盖层', '// 错误覆盖层']
   ]) {
     const source = read(path);

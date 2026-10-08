@@ -2,6 +2,7 @@ import { loadPlatformModule } from './platform-module-harness.mjs';
 import { compileWithUiFeedback } from './ui-feedback-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
+import { motionApi } from './motion-harness.mjs';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
@@ -225,13 +226,13 @@ test('glass deck selection exposes the existing background without opacity on it
 test('glass presses preserve the backing and geometry, reset on release/disable, and isolate siblings', () => {
   const deps = { Color: { Transparent: 'transparent' }, $r: name => name, 应用尺寸: { 卡片边框: 1 } };
   const themePressGradient = loadPlatformModule('utils/ThemeVisuals.ets', 'themePressGradient', deps);
-  const PressFeedback = loadPlatformModule('utils/PressFeedback.ets', 'PressFeedback', {});
+  const PressFeedback = loadPlatformModule('utils/PressFeedback.ets', 'PressFeedback', motionApi());
   const SurfaceBorder = loadPlatformModule('utils/SurfaceBorder.ets', 'SurfaceBorder', deps);
   const GlassSurface = loadPlatformModule('utils/GlassSurface.ets', 'GlassSurface', { ...deps, themePressGradient, PressFeedback, SurfaceBorder });
   const PrimaryGlassSurface = loadPlatformModule('utils/PrimaryGlassSurface.ets', 'PrimaryGlassSurface', { ...deps, themePressGradient, PressFeedback, SurfaceBorder });
   const target = () => {
     const state = {}, node = {};
-    for (const key of ['backgroundColor', 'linearGradient', 'border', 'opacity']) {
+    for (const key of ['backgroundColor', 'linearGradient', 'border', 'opacity', 'scale']) {
       node[key] = value => { state[key] = structuredClone(value); return node; };
     }
     return { state, node };

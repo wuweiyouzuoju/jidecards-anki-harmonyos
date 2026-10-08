@@ -174,10 +174,12 @@ test('directory and same-semantic setting entries have one row, icon and spacing
   for (const name of readdirSync(new URL('components/settings/', root)).filter(name => name.endsWith('.ets'))) {
     const source = read('components/settings/' + name);
     if (name === '外观分组.ets') {
-      assert.equal((source.match(/\bSelect\(/g) ?? []).length, 1, 'only the color swatch selector retains native geometry');
+      assert.equal((source.match(/FormSelectRow\(/g) ?? []).length, 2, 'the color swatch shares the ordinary selection row');
       assert.match(source, /linearGradient\(/); assert.match(source, /themeSelectionRevision/);
-    } else {
-      assert.doesNotMatch(source, /\bSelect\(/, `${name}: copied ordinary selection row`);
     }
+    assert.doesNotMatch(source, /\bSelect\(/, `${name}: copied ordinary selection row`);
+  }
+  for (const name of ['外观分组','GeneralSettings','ReviewControlsSettings','布局分组','AIAgent设置分组','AgentWebSettingsSection']) {
+    assert.match(read('components/settings/'+name+'.ets'), /Column\(\{ space: FormRowLayout\.rowGap \}\)/, name);
   }
 });

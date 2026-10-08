@@ -36,7 +36,7 @@ test('collection service wraps checkDatabase through 后端会话 only', () => {
   assert.doesNotMatch(service, /new 后端客户端/, 'must go through 后端会话');
 
   assert.match(service, /async 检查数据库\(\): Promise<string\[\]>/);
-  assert.match(service, /服务号\.后端集合, 集合方法\.检查数据库, new Uint8Array\(0\)/,
+  assert.match(service, /Collection_check_database\(new Uint8Array\(0\)/,
     'empty request body, generic.Empty');
   assert.match(service, /decodeCheckDatabaseResponse\(响应字节\)/);
 });

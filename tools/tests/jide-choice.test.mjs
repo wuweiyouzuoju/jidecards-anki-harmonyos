@@ -104,7 +104,7 @@ const ChoicePage = new Function('gradeJideChoice', 'playStudyHaptic', 'RATING_GO
   gradeJideChoice, () => {}, RATING_GOOD, RATING_HARD);
 
 function choicePage() {
-  const page = new ChoicePage();
+  const page = Object.assign(new ChoicePage(), { recoveryMessage: '', resultMessage: '', resultUndo: null });
   const writes = [];
   Object.assign(page, { timeboxNotice: null, stopStudyTimers() {}, startStudyTimers() {}, editor: { visible: false, busy: false },
     choiceQuestion: parseJideChoiceDeck(JSON.stringify(sample)).questions[0], choiceGrade: null,

@@ -461,8 +461,8 @@ test('primary pages share one shell gutter and common visual primitives', () => 
   assert.match(reminders, /统一空态\(\{[\s\S]*?reminder_list_empty[\s\S]*?reminder_list_empty_hint/,
     'reminders must use the common empty-state component');
 
-  assert.equal((appearance.match(/new SelectStyle\(\)/g) ?? []).length, 1);
-  assert.match(appearance, /FormSelectRow\(\{/);
+  assert.doesNotMatch(appearance, /new SelectStyle\(\)/);
+  assert.equal((appearance.match(/FormSelectRow\(\{/g) ?? []).length, 2);
   assert.match(read('entry/src/main/ets/components/settings/GeneralSettings.ets'), /FormSelectRow\(\{/);
   assert.match(read('entry/src/main/ets/components/common/FormSelectRow.ets'), /new SelectStyle\(/);
   assert.equal((agentSettings.match(/FormSelectRow\(\{/g) ?? []).length, 3,
@@ -838,7 +838,7 @@ test('settings directory keeps full-screen navigation and existing about content
   const aboutDialog = read('entry/src/main/ets/components/settings/AboutActionDialog.ets');
   assert.match(about, /builder: AboutActionDialog\(/);
   assert.match(about, /groupNumber: this\.QQ群号/);
-  assert.match(about, /this\.feedbackDialog\.open\(\)/);
+  assert.match(about, /this\.createFeedbackDialog\(\); this\.feedbackDialog\?\.open\(\)/);
   assert.doesNotMatch(about, /sponsorDialog|app\.string\.sponsor_title/);
   assert.match(aboutDialog, /app\.string\.feedback_copy_group/);
   assert.match(aboutDialog, /app\.media\.sponsor_qrcode/);

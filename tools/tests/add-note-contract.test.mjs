@@ -190,14 +190,14 @@ test('add note services validate field state before creating the note in the sel
   for (const method of ['获取添加默认值', '新建笔记', '添加笔记']) {
     assert.match(noteService, new RegExp(`async ${method}`));
   }
-  assert.match(noteService, /笔记方法\.笔记字段校验/);
-  assert.match(noteService, /笔记方法\.添加笔记/);
+  assert.match(noteService, /Notes_note_fields_check/);
+  assert.match(noteService, /Notes_add_note/);
   assert.match(noteService, /牌组ID/);
   assert.match(noteService, /EMPTY|DUPLICATE|MISSING_CLOZE|NOTETYPE_NOT_CLOZE|FIELD_NOT_CLOZE/);
   assert.match(notetypeService, /async 获取笔记类型名列表/);
   assert.match(notetypeService, /async 获取笔记类型/);
-  assert.match(notetypeService, /笔记类型方法\.获取笔记类型名列表/);
-  assert.match(notetypeService, /笔记类型方法\.获取笔记类型/);
+  assert.match(notetypeService, /Notetypes_get_notetype_names/);
+  assert.match(notetypeService, /Notetypes_get_notetype/);
 });
 
 test('add note panel is presentation-only and preserves drafts until a successful save', () => {

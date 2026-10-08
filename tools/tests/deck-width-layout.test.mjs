@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { motionApi } from './motion-harness.mjs';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import vm from 'node:vm';
@@ -87,7 +88,8 @@ test('narrow rows keep symmetric padding, fit the expand target and share crop h
   assert.match(toggle, /\.width\(this\.narrow \? 24 : 应用尺寸\.箭头槽位宽度\)/);
   assert.match(toggle, /DisclosureChevron\(\)/);
   assert.match(toggle, /\.rotate\(\{ angle: this\.expanded \? 90 : 0 \}\)/);
-  assert.match(toggle, /\.animation\(\{ duration: 150, curve: Curve\.EaseOut \}\)/);
+  assert.match(toggle, /\.animation\(disclosureAnimation\(\)\)/);
+  assert.deepEqual(motionApi().disclosureAnimation(), {duration:150, curve:'ease-out'});
   for (const path of ['components/牌组列表项.ets', 'components/牌组定制面板.ets']) {
     assert.match(read(path), /@StorageProp\(DECK_LIST_NARROW_KEY\)/);
     assert.match(read(path), /\.height\(应用尺寸\.deckRowHeight\(this\.narrow\)\)/);
