@@ -32,10 +32,11 @@
 | 图片遮罩浏览器回归 | `node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs tools/test-image-occlusion-browser.mjs` | 真实 Edge/Canvas 检查形状、两种模式、答案轮廓及文字，并以触摸输入验证遮罩上的预览左右滑与取消；`PLAYWRIGHT_MODULE` 可指定模块入口，截图在 `.local/io-preview-browser.png`，不操作卡库或设备 |
 | 颜色专项分析 | `verify-contrast.mjs`、`verify-contrast-official.mjs`、`verify-hardcoded-colors.mjs` | 专项输出，不是完整验收 |
 | 第三方资源/纹理维护 | `vendor-mathjax.mjs`、`generate-iridescent-textures.mjs` | 显式资源更新任务才运行，检查许可和字节保真 |
-| 兑换内容发行 | `redemption-issuer.mjs`、`redemption-ui.mjs` 及启动器 | 业务发行入口，不属于测试；私钥由外部工具环境提供 |
 | 历史实验 | `experimental/` | 不进源码导出或自动验证；以当前模型/协议为准 |
 
 `tests/` 是测试，`patches/` 是构建所需上游补丁；不要因“工具目录清理”删除这两个目录。
+
+本机发行工具、内部说明与密钥材料由 `.gitignore` 排除，禁止强制加入 Git。源码导出另有路径过滤，避免意外跟踪的本机文件进入副本；`tests/release-export.test.mjs` 检查导出行为和当前 Git 索引。公开客户端回归独立运行，只使用临时测试密钥。
 
 共享工作树交付或装机使用 `npm run build:app -- -SkipRust -ArtifactDirectory .local/<任务>/artifact`：构建锁释放前复制已验证的 signed HAP、原始日志和警告报告，失败不发布新产物，避免后续构建覆盖本次验收依据。仅确认原生库有效时使用 `-SkipRust`。大包签名 Java 堆不足时可临时设置 `JAVA_TOOL_OPTIONS=-Xmx2048m`；精确的单一堆参数启动公告不是编译诊断，其他警告仍需通过门禁。
 

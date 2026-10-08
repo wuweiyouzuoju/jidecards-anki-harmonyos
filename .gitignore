@@ -47,3 +47,17 @@ build_log.txt
 **/.wrangler/
 # Hvigor device-test intermediates are not source.
 entry/.test/
+
+# Local issuance tools and internal instructions must stay off public remotes.
+/tools/redemption-*
+/tools/打开兑换码工具.ps1
+/tools/生成兑换码.cmd
+/docs/REDEMPTION.md
+**/.jidecards-issuer/
+*.jidekey
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore

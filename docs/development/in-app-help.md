@@ -79,7 +79,7 @@
 | `stats_help_forecast`、`stats_help_added` | 长范围多天合并一柱；预测是当前排期汇总，不是后续复习过程模拟。`components/stats/预测卡.ets`、`新增卡.ets`。 |
 | `glossary_ratings_help`、`glossary_shortcuts_help`、`settings_tap_zones_hint`、自动前进与布局帮助 | 区分普通闪卡与选择题。选择题自动 Good／Hard，不走普通翻面、四档评分、Tap Zones、自动前进与浮动评分工具栏。R 的音频范围遵循跳过问题选项。`pages/学习页.ets`、`model/StudyTiming.ts`。 |
 | `transfer_legacy_help` | Legacy2 为 Anki 2.1 兼容格式；牌组／集合决定 apkg／colpkg，文件包不等于增量同步。`backend/DataExportWorkflow.ets`；Core `import_export/package/meta.rs`。 |
-| `redemption_contents_eligibility` | 沿用 `docs/REDEMPTION.md` 的 3.0.0 之前老用户赠送政策；补充资格由开发者核实，应用不自动判断使用时间；兑换校验实现不变。 |
+| `redemption_contents_eligibility` | 沿用 3.0.0 之前老用户赠送政策；补充资格由开发者核实，应用不自动判断使用时间；兑换校验实现不变。赠送说明由应用中英文资源维护。 |
 | `custom_study_preset_*_hint` | 预览新卡是过去 N 天添加且尚未学习的卡片，按添加顺序收集，不是未来 N 天、也不是每日展示一张。遗忘预习不改原调度；提前复习会重排。Core `scheduler/filtered/custom_study.rs`。 |
 | `empty_cards_description`、删除确认 | 按笔记列出空卡，不表示整条笔记都无效；只删除空卡，最后一张卡删除时才删笔记。当前使用可撤销的卡片删除服务，但本页无撤销入口。`components/settings/空卡列表面板.ets`；Core `notetype/emptycards.rs`、`card/service.rs`。 |
 | `stats_help_calendar`、`stats_help_interval`、桌面卡片简介 | 年历显示答题次数，不是未来日程；间隔范围是横轴上限／分位点，不是历史时间窗口。桌面卡片实际为八页统计，无旧月历页。`components/stats/日历卡.ets`、`间隔分布卡.ets`、`widget/pages/统计卡片.ets`。 |

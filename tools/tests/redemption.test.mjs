@@ -6,7 +6,6 @@ import { stripTypeScriptTypes } from 'node:module';
 import { generateKeyPairSync, sign, verify, randomBytes, createPublicKey } from 'node:crypto';
 import * as catalog from '../../entry/src/main/ets/model/ThemeCatalog.ts';
 import * as protocol from '../../entry/src/main/ets/model/Redemption.ts';
-import { issueCode } from '../redemption-issuer.mjs';
 import { 解析主题色板, 规范化颜色主题, 颜色主题渐变档 } from '../../entry/src/main/ets/model/颜色主题.ets';
 import { 对比度 } from '../../entry/src/main/ets/model/色阶生成.ets';
 import { initialThemeBackgroundPoses, nextThemeBackgroundPoses, sampleThemeBackgroundPoses, backgroundEase } from '../../entry/src/main/ets/model/ThemeBackgroundMotion.ts';
@@ -15,9 +14,10 @@ const keys = generateKeyPairSync('ed25519');
 const fingerprint = '0123456789ABCDEF0123456789ABCDEF';
 const otherFingerprint = 'FEDCBA9876543210FEDCBA9876543210';
 const content = protocol.IRIDESCENT_CONTENT;
-const makeCode = (fp = fingerprint, id = content) => {
+// 仅为客户端验签生成合成样本；不读取或依赖本机发行工具和真实密钥。
+const makeCode = (fp = fingerprint, id = content, signingKey = keys.privateKey) => {
   const message = `JCR1.${fp}.${id}`;
-  return `${message}.${sign(null, Buffer.from(message), keys.privateKey).toString('base64url')}`;
+  return `${message}.${sign(null, Buffer.from(message), signingKey).toString('base64url')}`;
 };
 
 /** 运行真实 Store，只用内存偏好和 Node 的同算法密码接口替换系统适配。 */
@@ -75,13 +75,12 @@ test('fingerprints normalize only full 128-bit identities', () => {
   assert.equal(protocol.normalizeFingerprint('Z'.repeat(32)), '');
 });
 
-test('issuer deterministically binds one content to one installation', () => {
-  const code = issueCode(protocol.displayFingerprint(fingerprint), content, keys.privateKey);
-  assert.equal(code, makeCode());
-  assert.equal(issueCode(fingerprint, content, keys.privateKey), code);
-  assert.notEqual(issueCode(otherFingerprint, content, keys.privateKey), code);
-  assert.throws(() => issueCode(fingerprint, 'all-content', keys.privateKey));
-  assert.equal(protocol.parseRedemption(' \n' + code + '\n').encoded, code);
+test('client parses one installation and content and rejects malformed credentials', () => {
+  const code = makeCode();
+  const parsed = protocol.parseRedemption(' \n' + code + '\n');
+  assert.equal(parsed.encoded, code);
+  assert.equal(parsed.fingerprint, fingerprint);
+  assert.equal(parsed.contentId, content);
   for (const invalid of [code.replace('JCR1', 'JCR2'), code + '.extra', code.slice(0, -1), 'x'.repeat(1025)]) {
     assert.equal(protocol.parseRedemption(invalid), null);
   }
@@ -114,7 +113,7 @@ test('real signature verification rejects forwarding, tampering and foreign issu
   assert.equal(await store.redeemContent(makeCode(otherFingerprint)), 'wrong_installation');
   assert.equal(await store.redeemContent(makeCode().replace(content, 'theme-future')), 'invalid');
   const foreign = generateKeyPairSync('ed25519');
-  assert.equal(await store.redeemContent(issueCode(fingerprint, content, foreign.privateKey)), 'invalid');
+  assert.equal(await store.redeemContent(makeCode(fingerprint, content, foreign.privateKey)), 'invalid');
   assert.equal(await store.redeemContent(makeCode(fingerprint, 'theme-future')), 'unsupported');
   assert.equal(store.app.get(catalog.UNLOCKED_CONTENTS_KEY).includes(content), false);
   assert.equal(store.snapshot().tokens, undefined);

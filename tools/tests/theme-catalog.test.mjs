@@ -4,7 +4,6 @@ import test from 'node:test';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { THEME_CATALOG, availableThemes, isThemeAvailable, themeDefinition, themeForContent, themePrimaryGlass } from '../../entry/src/main/ets/model/ThemeCatalog.ts';
 import { isSupportedContent } from '../../entry/src/main/ets/model/Redemption.ts';
-import { contents } from '../redemption-issuer.mjs';
 import { 解析主题色板 } from '../../entry/src/main/ets/model/颜色主题.ets';
 import { 对比度 } from '../../entry/src/main/ets/model/色阶生成.ets';
 
@@ -77,7 +76,10 @@ test('registered themes have unique identities, localized names and valid render
       assert.ok(existsSync(new URL('../../entry/src/main/resources/rawfile/' + texture, import.meta.url)), texture);
     }
   }
-  assert.deepEqual(contents.map(content => content.id), paid.map(theme => theme.requiredContent));
+  for (const theme of paid) {
+    assert.equal(isSupportedContent(theme.requiredContent), true, theme.requiredContent);
+    assert.equal(themeForContent(theme.requiredContent), theme);
+  }
 });
 
 test('theme selection and redemption use the same entitlement mapping', () => {
