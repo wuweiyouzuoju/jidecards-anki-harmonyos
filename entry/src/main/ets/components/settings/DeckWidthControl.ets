@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { FormRowLayout } from '../../utils/FormRowLayout';
 import { settingsItemText } from '../../utils/SettingsStructureText';
 import { DECK_LIST_STYLE_KEY, DECK_LIST_STYLES, deckListStyleTitleKey } from '../../model/DeckListAppearance';
 import { saveDeckListStyle } from '../../utils/DeckListAppearanceStore';
@@ -32,7 +33,7 @@ export struct DeckWidthControl {
   }
 
   build() {
-    Column({ space: 4 }) {
+    Column({ space: FormRowLayout.hintGap }) {
       FormSelectRow({ label: settingsItemText(this.getUIContext(), 'deck_list_style', this.uiLanguage),
         options: this.options(), selectedIndex: DECK_LIST_STYLES.indexOf(this.style),
         value: localizedNamedResourceText(this.getUIContext(), this.uiLanguage, deckListStyleTitleKey(this.style)),

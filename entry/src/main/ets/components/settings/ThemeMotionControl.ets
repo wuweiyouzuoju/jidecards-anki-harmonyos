@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { FormRowLayout } from '../../utils/FormRowLayout';
 import { settingsItemText } from '../../utils/SettingsStructureText';
 import { 颜色键 } from '../../model/颜色主题';
 import { THEME_MOTION_KEY } from '../../model/ThemeCatalog';
@@ -25,7 +26,7 @@ export struct ThemeMotionControl {
   }
 
   build() {
-    Column({ space: 6 }) {
+    Column({ space: FormRowLayout.hintGap }) {
       SettingsToggleRow({ title: settingsItemText(this.getUIContext(), 'theme_motion', this.uiLanguage), hint: $r('app.string.iridescent_motion_hint'), isOn: this.motionEnabled,
         isInteractive: !this.saving, tint: this.actionColor, isDark: this.isDark,
         onChange: (value: boolean): void => { this.save(value); } })

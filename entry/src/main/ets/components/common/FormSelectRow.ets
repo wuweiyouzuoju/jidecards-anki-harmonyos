@@ -11,6 +11,8 @@ export struct FormSelectRow {
   @Prop label: ResourceStr = '';
   @Prop icon: ResourceStr | undefined = undefined;
   @Prop showHelp: boolean = false;
+  @Prop showValuePreview: boolean = false;
+  @BuilderParam valuePreview: () => void = this.emptyValuePreview;
   onHelp: () => void = (): void => {};
   @Prop options: SelectOption[] = [];
   @Prop selectedIndex: number = -1;
@@ -18,6 +20,9 @@ export struct FormSelectRow {
   @Prop isInteractive: boolean = true;
   @Prop surfaceColor: ResourceColor = $r('app.color.surface_sidebar');
   onSelect: (index: number) => void = (_index: number): void => {};
+
+  @Builder
+  private emptyValuePreview(): void {}
 
   private select(index: number): void {
     if (this.isInteractive && Number.isInteger(index) && index >= 0 && index < this.options.length) {
@@ -35,6 +40,7 @@ export struct FormSelectRow {
         Text(this.label).fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary'))
           .textAlign(TextAlign.Start).layoutWeight(1).constraintSize({ minWidth: 0 })
       }
+      if (this.showValuePreview) { this.valuePreview() }
       Select(this.options).selected(this.selectedIndex).value(this.value)
         .width(SelectStyle.fieldWidth).constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
         .enabled(this.isInteractive).attributeModifier(new SelectStyle(this.surfaceColor))

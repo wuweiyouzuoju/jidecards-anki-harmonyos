@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { FormRowLayout } from '../../utils/FormRowLayout';
 import { settingsItemText } from '../../utils/SettingsStructureText';
 import { PrimaryActionButton } from '../common/PrimaryActionButton';
 import { SettingsToggleRow } from '../common/SettingsToggleRow';
@@ -127,7 +128,7 @@ export struct AgentWebSettingsSection {
   }
 
   build() {
-    Column({ space: 应用尺寸.间距_10 }) {
+    Column({ space: FormRowLayout.rowGap }) {
       SettingsToggleRow({ title: settingsItemText(this.getUIContext(), 'ai_web_enabled', this.uiLanguage), hint: $r('app.string.ai_web_hint'),
         isOn: this.webEnabled, isInteractive: this.ready && !this.saving && !this.providerLoading, isDark: this.isDark, tint: this.tint,
         onChange: (value: boolean): void => { this.changeEnabled(value); } })

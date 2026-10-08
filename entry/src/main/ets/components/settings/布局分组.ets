@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { FormRowLayout } from '../../utils/FormRowLayout';
 import { settingsItemText } from '../../utils/SettingsStructureText';
 import { resourceText } from '../../utils/UiFeedback';
 import { FormSelectRow } from '../common/FormSelectRow';
@@ -112,7 +113,7 @@ export struct 布局分组 {
       groupId: 'study_layout',
       是否深色: this.是否深色
     }) {
-      Column({ space: 8 }) {
+      Column({ space: FormRowLayout.rowGap }) {
           FormSelectRow({ label: settingsItemText(this.getUIContext(), 'study_layout', this.uiLanguage),
             showHelp: true,
             onHelp: (): void => {

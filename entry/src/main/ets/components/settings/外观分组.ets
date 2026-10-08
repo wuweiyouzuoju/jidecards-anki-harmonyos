@@ -3,10 +3,9 @@ import { isSettingsItemVisible } from '../../model/SettingsStructure';
 import { settingsItemText } from '../../utils/SettingsStructureText';
 import { resourceText, namedResourceText } from '../../utils/UiFeedback';
 import { FormSelectRow } from '../common/FormSelectRow';
-import { SelectStyle } from '../../utils/SelectStyle';
+import { FormRowLayout } from '../../utils/FormRowLayout';
 
 import { 主题模式 } from '../../model/主题设置';
-import { 设置面板色板_取 } from '../../utils/设置面板配色';
 import { 设置分组卡片 } from './设置分组卡片';
 import { UNLOCKED_CONTENTS_KEY, THEME_CATALOG, ThemeDefinition, isThemeAvailable, themeDefinition } from '../../model/ThemeCatalog';
 import { IridescentGiftDialog } from '../IridescentGiftDialog';
@@ -138,57 +137,31 @@ export struct 外观分组 {
     ];
   }
 
+  @Builder
+  private themeSwatch(): void {
+    Row().width(18).height(12).borderRadius(6).flexShrink(0)
+      .linearGradient({ angle: 90, colors: this.色样档位(this.当前颜色主题) })
+  }
+
   build() {
     设置分组卡片({
       groupId: 'appearance',
       是否深色: this.是否深色
     }) {
-      Column({ space: 4 }) {
+      Column({ space: FormRowLayout.rowGap }) {
           FormSelectRow({ label: settingsItemText(this.getUIContext(), 'theme_mode', this.uiLanguage), options: this.主题模式选项(), selectedIndex: this.主题模式索引(), value: this.主题模式标签(this.当前主题模式),
             onSelect: (索引: number): void => {
               const 模式列表: 主题模式[] = ['system', 'light', 'dark'];
               this.主题模式切换回调(模式列表[索引]);
             } })
 
-          // 颜色主题行 Select（带渐变色条预览）
-          Row() {
-
-            Text(settingsItemText(this.getUIContext(), 'color_theme', this.uiLanguage))
-              .fontSize(15)
-              .fontColor(设置面板色板_取(this.是否深色).主文字)
-              .textAlign(TextAlign.Start).layoutWeight(1)
-            // 当前主题渐变色条预览（18×12 圆角矩形，3 档色阶）
-            Row()
-              .width(18)
-              .height(12)
-              .borderRadius(6)
-              .linearGradient({
-                angle: 90,
-                colors: this.色样档位(this.当前颜色主题)
-              })
-            ForEach([this.themeSelectionRevision], (_revision: number) => {
-              Select(this.颜色主题选项())
-              .selected(this.颜色主题索引())
-              .value(this.颜色主题展示名文本(this.当前颜色主题))
-              .margin({ left: 8 })
-              .attributeModifier(new SelectStyle())
-              .height(SelectStyle.controlHeight)
-              .padding(SelectStyle.controlPadding)
-              .space(SelectStyle.controlSpace)
-              .width(SelectStyle.fieldWidth)
-              .constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
-              .font(SelectStyle.controlFont)
-              .optionFont(SelectStyle.optionFont)
-              .selectedOptionFont(SelectStyle.selectedOptionFont)
-              .textModifier(SelectStyle.labelText())
-              .borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
-              .onSelect((索引: number): void => {
-                this.selectColorTheme(索引);
-              })
-            }, (revision: number): string => revision.toString())
-          }
-          .width('100%')
-          .height(48)
+          ForEach([this.themeSelectionRevision], (_revision: number) => {
+            FormSelectRow({ label: settingsItemText(this.getUIContext(), 'color_theme', this.uiLanguage),
+              options: this.颜色主题选项(), selectedIndex: this.颜色主题索引(),
+              value: this.颜色主题展示名文本(this.当前颜色主题), showValuePreview: true,
+              valuePreview: (): void => { this.themeSwatch(); },
+              onSelect: (索引: number): void => { this.selectColorTheme(索引); } })
+          }, (revision: number): string => revision.toString())
 
           if (isSettingsItemVisible('theme_motion', this.简洁模式, themeDefinition(this.当前颜色主题).backgroundTextures.length > 0)) {
             ThemeMotionControl({ isDark: this.是否深色 })

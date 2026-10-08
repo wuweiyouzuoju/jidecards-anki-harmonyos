@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { FormRowLayout } from '../../utils/FormRowLayout';
 import { settingsItemText } from '../../utils/SettingsStructureText';
 import { PrimaryActionButton } from '../common/PrimaryActionButton';
 import { FormInputStyle } from '../../utils/FormInputStyle';
@@ -113,7 +114,7 @@ export struct AIAgent设置分组 {
       groupId: 'ai',
       是否深色: this.是否深色
     }) {
-      Column({ space: 应用尺寸.间距_10 }) {
+      Column({ space: FormRowLayout.rowGap }) {
           FormSelectRow({ label: settingsItemText(this.getUIContext(), 'ai_provider', this.uiLanguage), options: [{ value: 'DeepSeek' }, { value: this.getString($r('app.string.ai_agent_provider_custom')) }],
             selectedIndex: this.providerIndex(), value: this.provider === 'custom' ?
               this.getString($r('app.string.ai_agent_provider_custom')) : 'DeepSeek',

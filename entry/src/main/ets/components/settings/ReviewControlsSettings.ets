@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { FormRowLayout } from '../../utils/FormRowLayout';
 import { settingsItemText } from '../../utils/SettingsStructureText';
 import { SettingsToggleRow } from '../common/SettingsToggleRow';
 import { FormSelectRow } from '../common/FormSelectRow';
@@ -105,7 +106,7 @@ export struct ReviewControlsSettings {
 
   build() {
     设置分组卡片({ groupId: 'review_controls', 是否深色: this.是否深色 }) {
-      Column({ space: 4 }) {
+      Column({ space: FormRowLayout.rowGap }) {
           SettingsToggleRow({ title: settingsItemText(this.getUIContext(), 'study_haptics', this.uiLanguage), isOn: this.hapticsToggle, tint: this.actionColor, isDark: this.是否深色,
             isInteractive: !this.hapticsSaving,
             onChange: (enabled: boolean): void => { this.changeStudyHaptics(enabled); } })
