@@ -1,3 +1,4 @@
+import { WINDOW_KEYBOARD_TOP_KEY } from '../model/WindowSafeLayout';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { APP_FOREGROUND_KEY } from '../model/AppLifecycleState';
@@ -181,6 +182,7 @@ export default class EntryAbility extends UIAbility {
         this.主窗口.on('avoidAreaChange', (): void => {
           this.同步规避区高度();
         });
+        this.主窗口.on('keyboardHeightChange', (): void => { this.同步规避区高度(); });
         this.主窗口.on('windowRectChange', (): void => { this.同步规避区高度(); });
         // 兜底：部分设备启动时规避区尚未计算完成（getWindowAvoidArea 返回 0）且
         // avoidAreaChange 不触发，会导致状态栏高度一直是 0、顶栏按钮与状态栏重合。
@@ -214,6 +216,11 @@ export default class EntryAbility extends UIAbility {
       AppStorage.setOrCreate<number>(WINDOW_SAFE_LEFT_KEY, ui.px2vp(safe.left));
       AppStorage.setOrCreate<number>(WINDOW_SAFE_RIGHT_KEY, ui.px2vp(safe.right));
       AppStorage.setOrCreate<number>(WINDOW_HEIGHT_KEY, ui.px2vp(bounds.height));
+      // 键盘读数暂不可用时仍发布系统安全区，并保留上次键盘位置。
+      try {
+        const keyboard = this.主窗口.getWindowAvoidArea(window.AvoidAreaType.TYPE_KEYBOARD).bottomRect;
+        AppStorage.setOrCreate<number>(WINDOW_KEYBOARD_TOP_KEY, keyboard.height > 0 ? ui.px2vp(keyboard.top) : 0);
+      } catch (_error) { /* 窗口事件稍后会刷新。 */ }
       AppStorage.setOrCreate<number>('状态栏高度', this.主窗口.getUIContext().px2vp(系统栏区.topRect.height));
       AppStorage.setOrCreate<number>('导航条高度', this.主窗口.getUIContext().px2vp(导航条区.bottomRect.height));
     } catch (e) {

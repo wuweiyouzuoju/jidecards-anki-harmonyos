@@ -1,14 +1,18 @@
+import { WINDOW_KEYBOARD_TOP_KEY, keyboardViewportHeight } from '../../model/WindowSafeLayout';
+import { motionAnimation } from '../../utils/AppMotion';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { currentMotionProfile } from '../../utils/AppMotion';
 import { DialogBackdrop } from './DialogBackdrop';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
-import { 取全屏转场时长, 取全屏转场曲线 } from '../../utils/转场时长';
+import { SurfaceTransition } from '../../utils/SurfaceTransition';
 import { safeDialogMaxHeight, WINDOW_SAFE_TOP_KEY, WINDOW_SAFE_BOTTOM_KEY,
   WINDOW_SAFE_LEFT_KEY, WINDOW_SAFE_RIGHT_KEY } from '../../model/WindowSafeLayout';
 
 /** 常规弹窗固定操作栏、正文按内容收缩并限高滚动；不拥有草稿或业务任务。 */
 @Component
 export struct DialogFrame {
+  @Prop nativeHost: boolean = false;
   @Prop maximumWidth: number = 应用尺寸.dialogMaxWidth;
   // 卡片预览自行拥有滚动；普通表单继续按内容收缩并由外壳滚动。
   @Prop fillBody: boolean = false;
@@ -16,6 +20,8 @@ export struct DialogFrame {
   onDismiss: () => void = (): void => {};
   @BuilderParam header: () => void = this.emptyContent;
   @BuilderParam content: () => void = this.emptyContent;
+  @State private viewportTop: number = 0;
+  @StorageProp(WINDOW_KEYBOARD_TOP_KEY) private keyboardTop: number = 0;
   @State private viewportHeight: number = 600;
   @State private headerHeight: number = 56;
   @StorageProp(WINDOW_SAFE_TOP_KEY) private safeTop: number = 0;
@@ -35,14 +41,17 @@ export struct DialogFrame {
       this.headerHeight - 应用尺寸.卡片内边距 * 2 - 应用尺寸.间距_12);
   }
 
+  private usableHeight(): number { return keyboardViewportHeight(this.viewportHeight, this.viewportTop, this.keyboardTop); }
+
   private frameMaxHeight(): number {
-    return safeDialogMaxHeight(this.viewportHeight, this.safeTop, this.safeBottom,
+    return safeDialogMaxHeight(this.usableHeight(), this.safeTop, this.keyboardTop > 0 ? 0 : this.safeBottom,
       应用尺寸.间距_8, 应用尺寸.dialogHeightRatio);
   }
 
   build() {
     Stack() {
       DialogBackdrop().onClick((): void => { this.dismiss(); })
+        .transition(this.nativeHost ? TransitionEffect.IDENTITY : SurfaceTransition.backdrop())
       Stack() {
         Column({ space: 应用尺寸.间距_12 }) {
           Column() { this.header() }
@@ -66,15 +75,15 @@ export struct DialogFrame {
         .border(SurfaceBorder.options())
         .borderRadius(应用尺寸.圆角_卡片)
         .onClick((): void => {})
-        .transition(TransitionEffect.opacity(0).combine(TransitionEffect.scale({ x: 0.96, y: 0.96 }))
-          .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
-      }.width('100%').height('100%').alignContent(Alignment.Center)
-        .padding({ top: this.safeTop + 应用尺寸.间距_8, bottom: this.safeBottom + 应用尺寸.间距_8,
+        .transition(this.nativeHost ? TransitionEffect.IDENTITY : SurfaceTransition.dialog())
+      }.width('100%').height(this.usableHeight()).align(Alignment.Top).alignContent(Alignment.Center)
+        .animation(motionAnimation(currentMotionProfile().textMs))
+        .padding({ top: this.safeTop + 应用尺寸.间距_8, bottom: (this.keyboardTop > 0 ? 0 : this.safeBottom) + 应用尺寸.间距_8,
           left: this.safeLeft + 应用尺寸.间距_8, right: this.safeRight + 应用尺寸.间距_8 })
         .hitTestBehavior(HitTestMode.Transparent)
     }
     .width('100%').height('100%')
     .alignContent(Alignment.Center)
-    .onAreaChange((_old: Area, area: Area): void => { this.viewportHeight = Number(area.height); })
+    .onAreaChange((_old: Area, area: Area): void => { this.viewportHeight = Number(area.height); this.viewportTop = Number(area.globalPosition.y); })
   }
 }

@@ -7,9 +7,11 @@ import * as privateRpc from '../../entry/src/main/ets/proto/generated/PrivateRpc
 import * as coreMessages from '../../entry/src/main/ets/proto/generated/CoreMessages.ts';
 import { MenuHoldController } from '../../entry/src/main/ets/model/MenuHoldController.ts';
 import { MenuSlideScope, menuSlideSession } from '../../entry/src/main/ets/model/MenuSlideSession.ts';
+import { keyboardViewportHeight } from '../../entry/src/main/ets/model/WindowSafeLayout.ts';
 
 function localeDependencies(dependencies) {
   return {
+    MenuHoldController, MenuSlideScope, menuSlideSession, keyboardViewportHeight,
     Scroller: class { currentOffset() { return {xOffset:0,yOffset:0}; } scrollBy() {} },
     CoreRpc, ...privateRpc, ...coreMessages,
     localizedResourceText: (context, _locale, resource, ...args) =>

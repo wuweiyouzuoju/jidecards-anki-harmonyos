@@ -4,6 +4,11 @@ export const WINDOW_SAFE_BOTTOM_KEY: string = 'windowSafeBottom';
 export const WINDOW_SAFE_LEFT_KEY: string = 'windowSafeLeft';
 export const WINDOW_SAFE_RIGHT_KEY: string = 'windowSafeRight';
 export const WINDOW_HEIGHT_KEY: string = 'windowHeightVp';
+export const WINDOW_KEYBOARD_TOP_KEY: string = 'windowKeyboardTopVp';
+
+export function keyboardViewportHeight(height: number, top: number, keyboardTop: number): number {
+  return keyboardTop <= 0 ? height : Math.min(height, Math.max(0, keyboardTop - top));
+}
 
 interface SafeRect { left: number; top: number; width: number; height: number; }
 interface SafeRects { topRect: SafeRect; bottomRect: SafeRect; leftRect: SafeRect; rightRect: SafeRect; }
