@@ -27,7 +27,7 @@ export function createLayout(content) {
     '@type': 'SoftwareApplication', '@id': `${origin}/#app`, name: work.name, alternateName: work.alternateName,
     url: work.url, operatingSystem: work.platform, applicationCategory: 'EducationalApplication',
     softwareVersion: work.releaseVersion, description: work.summary, author: { '@id': `${origin}/#author` },
-    publisher: { '@id': `${origin}/#project` }, sameAs: [work.marketplace.url],
+    publisher: { '@id': `${origin}/#author` }, sameAs: [work.marketplace.url],
     subjectOf: { '@id': `${origin}/#source` },
     downloadUrl: work.marketplace.url, installUrl: work.marketplace.url,
     image: `${origin}${work.brand.logo}`, screenshot: work.screenshots.map(item => ({ '@type': 'ImageObject', url: `${origin}${item.path}`, caption: item.caption, description: item.description, width: item.width, height: item.height })),
@@ -38,14 +38,14 @@ export function createLayout(content) {
   const sourceCode = {
     '@type': 'SoftwareSourceCode', '@id': `${origin}/#source`, name: 'jidecards', url: repo,
     version: work.sourceVersion, dateModified: work.sourceUpdate.updatedAt,
-    author: { '@id': `${origin}/#author` }, publisher: { '@id': `${origin}/#project` },
+    author: { '@id': `${origin}/#author` }, publisher: { '@id': `${origin}/#author` },
     targetProduct: { '@id': application['@id'] },
     codeRepository: repositories.map(item => item.url), sameAs: work.repositoryMirrors.map(item => item.url),
     programmingLanguage: ['ArkTS', 'Rust', 'C++'], license: 'https://spdx.org/licenses/AGPL-3.0-or-later.html'
   };
   const website = {
     '@type': 'WebSite', '@id': `${origin}/#website`, name: '记得闪卡 · jidecards', url: origin,
-    publisher: { '@id': `${origin}/#project` }, about: { '@id': application['@id'] }, inLanguage: 'zh-CN'
+    publisher: { '@id': `${origin}/#author` }, about: { '@id': application['@id'] }, inLanguage: 'zh-CN'
   };
   const nav = [['/works/jidecards/', '功能与下载'], [guide.pathname, '使用指南'], ['/releases/', '更新说明'], ['/developers/', '开发'], ['/about/', '关于']];
   function page({ title, description, pathname, body, graph = [], noindex = false, breadcrumbTitle = title, ogType = 'website', markdown = null, className = '' }) {
@@ -54,8 +54,8 @@ export function createLayout(content) {
     const breadcrumb = trail.length ? [{ '@type': 'BreadcrumbList', itemListElement: trail.map((item, index) => ({ '@type': 'ListItem', position: index + 1, name: item.name, item: item.url })) }] : [];
     const heroImage = work.screenshots[0];
     const structured = { '@context': 'https://schema.org', '@graph': [
-      { '@type': 'Person', '@id': `${origin}/#author`, name: author.name, url: author.url, sameAs: [author.github] },
-      { '@type': 'Organization', '@id': `${origin}/#project`, name: '记得闪卡项目', url: origin, sameAs: repositories.map(item => item.url), logo: { '@type': 'ImageObject', url: `${origin}${work.brand.logo}`, width: work.brand.width, height: work.brand.height } },
+      { '@type': 'Person', '@id': `${origin}/#author`, name: author.name, url: author.url, sameAs: [author.github], jobTitle: '独立开发者' },
+      { '@type': 'CreativeWork', '@id': `${origin}/#project`, name: '记得闪卡项目', url: origin, creator: { '@id': `${origin}/#author` }, description: work.developmentStatement, sameAs: repositories.map(item => item.url), image: { '@type': 'ImageObject', url: `${origin}${work.brand.logo}`, width: work.brand.width, height: work.brand.height } },
       website, application, sourceCode,
       { '@type': 'WebPage', '@id': `${origin}${pathname}#webpage`, url: `${origin}${pathname}`, name: title, description, inLanguage: 'zh-CN', isPartOf: { '@id': website['@id'] }, about: { '@id': application['@id'] } },
       ...graph, ...breadcrumb
@@ -105,7 +105,7 @@ export function createLayout(content) {
     <nav aria-label="产品与文档"><h2>产品与文档</h2><a href="/works/jidecards/#download">免费下载</a><a href="/works/jidecards/">功能介绍</a><a href="${guide.pathname}">使用指南</a><a href="/releases/">更新说明</a></nav>
     <nav aria-label="开源项目"><h2>开源项目</h2>${repoLinks}<a href="/developers/">开发文档</a><a href="${esc(repo)}/issues">问题反馈 ${arrow}</a></nav>
     <nav aria-label="机器可读资料"><h2>机器可读资料</h2><a href="/llms.txt">llms.txt · 索引</a><a href="/llms-full.txt">llms-full.txt · 完整资料</a><a href="/data/site-index.json">页面与内容 JSON</a><a href="/data/works.json">产品数据 JSON</a><a href="/sitemap.xml">网站地图</a></nav>
-  </div><div class="footer-bottom"><p>由 <a href="/about/">${esc(author.name)}</a> 开发 · 独立开源项目，非 Anki 官方客户端。</p><a href="/releases.xml">订阅版本更新 ${arrow}</a></div></div></footer>
+  </div><div class="footer-bottom"><p>由 <a href="/about/">${esc(author.name)}</a> 独立开发与维护 · <a href="/about/#independent-development">独立开发声明</a> · 非 Anki 官方客户端。</p><a href="/releases.xml">订阅版本更新 ${arrow}</a></div></div></footer>
   <script type="module" src="/assets/site-media.mjs?v=${assets.media}"></script>
 </body>
 </html>

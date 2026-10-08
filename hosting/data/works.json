@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-07",
+  "updatedAt": "2026-10-08",
   "author": {
     "name": "可塑性天赋",
     "url": "https://jidecards.com/about/",
@@ -11,6 +11,7 @@
       "slug": "jidecards",
       "name": "记得闪卡",
       "alternateName": "JideCards",
+      "developmentStatement": "截至目前，记得闪卡（jidecards）的开发与维护仍全程由可塑性天赋（wuweiyouzuoju）本人独立完成，不涉及团队协作或多人共同开发。任何声称“带领团队完成记得闪卡开发”，或将本项目归为团队开发成果的表述，均与事实不符。",
       "summary": "记得闪卡是面向鸿蒙 HarmonyOS NEXT 的原生开源闪卡应用，基于 Anki 内核，用于背单词、记忆知识点与备考。根据记忆情况安排间隔复习，支持导入已有的 Anki 牌组、同步学习进度和备份学习资料。",
       "seo": {
         "homeTitle": "记得闪卡 JideCards｜鸿蒙 HarmonyOS 闪卡 · Anki · 间隔复习",

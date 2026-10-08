@@ -13,6 +13,7 @@ export function renderPages(content, layout) {
     return `<figure class="product-media"><a href="${esc(item.path)}" aria-label="查看完整图片：${esc(item.caption)}"><img class="deferred-media" src="${placeholder}" data-full-src="${esc(item.path)}" ${attributes}><noscript><img src="${esc(item.path)}" ${attributes}></noscript></a><figcaption><strong>${esc(item.caption)}</strong><p>${esc(item.description)}</p><a href="${esc(item.path)}">查看完整图片 ${arrow}</a></figcaption></figure>`;
   };
   const pageHeader = (eyebrow, title, description) => `<header class="page-heading"><p class="eyebrow">${esc(eyebrow)}</p><h1>${esc(title)}</h1><p class="lede">${esc(description)}</p></header>`;
+  const developmentStatement = `<section id="independent-development"><h2>独立开发声明</h2><p>${esc(work.developmentStatement)}</p></section>`;
   const featureKinds = ['review', 'cards', 'sync', 'package', 'search', 'theme'];
   const featureTargets = ['fsrs', 'card-types', 'ankiweb', 'apkg', 'organization', 'appearance'];
   const home = page({
@@ -36,6 +37,7 @@ export function renderPages(content, layout) {
     <section class="home-section release-section" id="source-update"><div class="section-heading"><div><p class="eyebrow">持续更新</p><h2>${esc(work.releaseVersion)} · 本次更新</h2></div><a class="text-link" href="/releases/">完整更新说明 <span aria-hidden="true">→</span></a></div><p class="meta"><time datetime="${work.sourceUpdate.updatedAt}">${work.sourceUpdate.updatedAt}</time></p>${changes}</section>
     <section class="appearance-strip" id="appearance"><span class="theme-swatch" aria-hidden="true"></span><div><h2>${esc(work.promotion.title)}</h2><p>${esc(work.promotion.description)} ${esc(work.promotion.details)}</p></div><a href="/works/jidecards/#appearance">了解外观 <span aria-hidden="true">→</span></a></section>
     <section class="open-source home-section"><div><p class="eyebrow">OPEN SOURCE</p><h2>开源，让改进持续发生。</h2><p>从应用界面到 Anki 内核，源码、构建说明和问题反馈入口公开。由 ${esc(data.author.name)} 开发，按 ${esc(work.license)} 许可发布。</p><div class="repository-links">${repoLinks}</div></div><nav aria-label="参与开源项目"><a href="/developers/">开发文档 <span aria-hidden="true">→</span></a><a href="${esc(work.repository)}/issues">报告问题 ${arrow}</a><a href="/works/jidecards/#jide">${esc(jide.title)} <span aria-hidden="true">→</span></a></nav></section>
+    ${developmentStatement}
     <section class="home-section"><div class="section-heading"><h2>开始前，你可能想了解。</h2></div>${questions(work.questions)}</section>`
   });
 
@@ -44,6 +46,7 @@ export function renderPages(content, layout) {
     title: work.seo.productTitle, description: work.summary, pathname: '/works/jidecards/', breadcrumbTitle: '功能与下载', markdown: '/content/product.md',
     graph: [{ '@type': 'FAQPage', mainEntity: work.questions.map(item => ({ '@type': 'Question', name: item.name, acceptedAnswer: { '@type': 'Answer', text: item.description } })) }],
     body: `${pageHeader('JideCards · HarmonyOS NEXT', '记得闪卡', work.summary)}<div class="product-intro"><div>${logo('product-logo', 96, '记得闪卡应用 Logo')}<p class="version-pill">正式版 ${esc(work.releaseVersion)}</p></div><div id="download"><h2>开始使用记得闪卡</h2>${download}</div></div>
+    ${developmentStatement}
     <nav class="page-toc" aria-label="功能目录"><a href="#features">功能概览</a><a href="#screenshots">新版应用展示</a><a href="#source-update">版本更新</a>${work.detailSections.map(section => `<a href="#${esc(section.id)}">${esc(section.title.split('：')[0])}</a>`).join('')}<a href="#questions">常见问题</a></nav>
     <section id="learning"><h2>在鸿蒙端用闪卡学习</h2>${featureList(work.useCases)}</section>
     <section id="features"><h2>功能概览</h2>${featureList(work.featureGroups)}</section>
@@ -68,7 +71,8 @@ export function renderPages(content, layout) {
 
   const developers = page({
     title: '开发文档｜记得闪卡', description: '记得闪卡的源码、构建文档与 Agent 开发入口。', pathname: '/developers/', breadcrumbTitle: '开发文档', markdown: '/content/developers.md',
-    body: `${pageHeader('源码与协作', '一起把记得闪卡做好。', '项目优先服务 Agent 开发。')}<p>这里的 Agent 指参与仓库开发的编程 Agent。源码与当前开发文档是理解应用能力、模块边界和验证要求的入口。</p>
+    body: `${pageHeader('源码与开发', '记得闪卡开发文档。', '项目优先服务 Agent 开发。')}<p>这里的 Agent 指辅助作者开发仓库的编程 Agent。源码与当前开发文档是理解应用能力、模块边界和验证要求的入口。</p>
+    ${developmentStatement}
     <div class="developer-grid"><section class="developer-card"><p class="eyebrow">01 · 开始</p><h2>了解项目</h2><ul><li>${sourceLink('AGENTS.md', '开发约定')}</li><li>${sourceLink('PROJECT_CONTEXT.md', '项目索引')}</li><li>${sourceLink('README.md', '环境与构建')}</li></ul></section><section class="developer-card"><p class="eyebrow">02 · 修改</p><h2>找准责任入口</h2><ul><li>${sourceLink('docs/development/ownership.md', '模块责任与边界')}</li><li>${sourceLink('docs/development/extension-points.md', '扩展点')}</li><li>${sourceLink('docs/development/task-contract.md', '任务契约')}</li></ul></section><section class="developer-card"><p class="eyebrow">03 · 验证</p><h2>提交可验证的改进</h2><ul><li>${sourceLink('docs/development/verification.md', '验证命令与范围')}</li><li>${sourceLink('docs/choice-authoring.md', '选择题制卡指南')}</li><li>${sourceLink('docs/choice-apkg-v1.md', 'APKG 扩展规范')}</li></ul></section></div>
     <section><h2>源码仓库</h2><div class="repository-links">${repoLinks}</div><p class="meta">ArkUI → Node-API → Rust / Anki Core。许可证：${esc(work.license)}。</p></section>
     <section><h2>JIDE 应用内助手</h2><p>${esc(jide.availability)}</p><p><a href="/works/jidecards/#jide">${esc(jide.title)}</a> · ${sourceLink('docs/development/agent.md', '实现与验证')} · ${sourceLink('entry/src/main/ets/model/ReleaseFeatures.ets', 'ReleaseFeatures')}</p></section>
@@ -82,8 +86,8 @@ export function renderPages(content, layout) {
   });
 
   const about = page({
-    title: `${data.author.name}｜作者`, description: `${data.author.name}，记得闪卡开发者。`, pathname: '/about/', breadcrumbTitle: '关于', markdown: '/content/about.md',
-    body: `${pageHeader('关于项目', '记得闪卡，持续改进。', '一个面向 HarmonyOS NEXT 的独立开源闪卡项目。')}<div class="about-project">${logo('about-logo', 120, '记得闪卡应用 Logo')}<div><h2>${esc(data.author.name)}</h2><p>记得闪卡开发者。</p><p>把学习资料整理成卡片，让回忆与复习成为日常。项目复用 Anki Core，使用 HarmonyOS 原生界面，源码公开。</p></div></div><dl class="feature-list"><div><dt>作品</dt><dd><a href="/works/jidecards/">记得闪卡 · ${esc(work.platform)}</a></dd></div><div><dt>当前版本</dt><dd>${esc(work.releaseVersion)} · <a href="/releases/">更新说明</a></dd></div><div><dt>作者</dt><dd><a href="${esc(data.author.github)}">wuweiyouzuoju ${arrow}</a></dd></div><div><dt>反馈与协作</dt><dd><a href="${esc(work.repository)}/issues">GitHub Issues ${arrow}</a> · <a href="/developers/">开发文档</a></dd></div><div><dt>源码许可</dt><dd>${esc(work.license)} · ${repoLinks}</dd></div></dl><p class="meta">独立开源项目，非 Anki 官方客户端。</p>`
+    title: `${data.author.name}｜作者`, description: `${data.author.name}，记得闪卡独立开发者。`, pathname: '/about/', breadcrumbTitle: '关于', markdown: '/content/about.md',
+    body: `${pageHeader('关于项目', '记得闪卡，持续改进。', '一个面向 HarmonyOS NEXT 的个人独立开源闪卡项目。')}<div class="about-project">${logo('about-logo', 120, '记得闪卡应用 Logo')}<div><h2>${esc(data.author.name)}</h2><p>记得闪卡独立开发者。</p><p>把学习资料整理成卡片，让回忆与复习成为日常。项目复用 Anki Core，使用 HarmonyOS 原生界面，源码公开。</p></div></div>${developmentStatement}<dl class="feature-list"><div><dt>作品</dt><dd><a href="/works/jidecards/">记得闪卡 · ${esc(work.platform)}</a></dd></div><div><dt>当前版本</dt><dd>${esc(work.releaseVersion)} · <a href="/releases/">更新说明</a></dd></div><div><dt>作者</dt><dd><a href="${esc(data.author.github)}">wuweiyouzuoju ${arrow}</a></dd></div><div><dt>反馈与开发文档</dt><dd><a href="${esc(work.repository)}/issues">GitHub Issues ${arrow}</a> · <a href="/developers/">开发文档</a></dd></div><div><dt>源码许可</dt><dd>${esc(work.license)} · ${repoLinks}</dd></div></dl><p class="meta">独立开源项目，非 Anki 官方客户端。</p>`
   });
   return {
     'index.html': home, 'works/jidecards/index.html': product, [`${guide.pathname.slice(1)}index.html`]: guidePage,

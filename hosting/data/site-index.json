@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-07",
+  "updatedAt": "2026-10-08",
   "origin": "https://jidecards.com",
   "releaseVersion": "2.9.22",
   "contentLanguage": "zh-CN",
@@ -16,7 +16,7 @@
       "markdown": "/content/home.md",
       "url": "https://jidecards.com/",
       "markdownUrl": "https://jidecards.com/content/home.md",
-      "updatedAt": "2026-10-07"
+      "updatedAt": "2026-10-08"
     },
     {
       "path": "/works/jidecards/",
@@ -25,7 +25,7 @@
       "markdown": "/content/product.md",
       "url": "https://jidecards.com/works/jidecards/",
       "markdownUrl": "https://jidecards.com/content/product.md",
-      "updatedAt": "2026-10-07"
+      "updatedAt": "2026-10-08"
     },
     {
       "path": "/guides/harmonyos-anki/",
@@ -43,7 +43,7 @@
       "markdown": "/content/releases.md",
       "url": "https://jidecards.com/releases/",
       "markdownUrl": "https://jidecards.com/content/releases.md",
-      "updatedAt": "2026-10-07"
+      "updatedAt": "2026-10-08"
     },
     {
       "path": "/developers/",
@@ -52,16 +52,16 @@
       "markdown": "/content/developers.md",
       "url": "https://jidecards.com/developers/",
       "markdownUrl": "https://jidecards.com/content/developers.md",
-      "updatedAt": "2026-10-07"
+      "updatedAt": "2026-10-08"
     },
     {
       "path": "/about/",
       "title": "关于项目与作者",
-      "description": "可塑性天赋，记得闪卡开发者。",
+      "description": "可塑性天赋，记得闪卡独立开发者。",
       "markdown": "/content/about.md",
       "url": "https://jidecards.com/about/",
       "markdownUrl": "https://jidecards.com/content/about.md",
-      "updatedAt": "2026-10-07"
+      "updatedAt": "2026-10-08"
     }
   ]
 }

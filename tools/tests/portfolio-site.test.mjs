@@ -160,7 +160,8 @@ test('every page resolves the same application, source, author and project ident
     assert.equal(new Set(identities).size, identities.length, `${file}: duplicate identity`);
     const app = graph.find(item => item['@type'] === 'SoftwareApplication');
     const source = graph.find(item => item['@type'] === 'SoftwareSourceCode');
-    const project = graph.find(item => item['@type'] === 'Organization');
+    const project = graph.find(item => item['@id'] === 'https://jidecards.com/#project');
+    const author = graph.find(item => item['@type'] === 'Person');
     const website = graph.find(item => item['@type'] === 'WebSite');
     const page = graph.find(item => item['@type'] === 'WebPage');
     assert.equal(app.name, work.name);
@@ -174,9 +175,12 @@ test('every page resolves the same application, source, author and project ident
     assert.deepEqual(source.codeRepository, repositories);
     assert.deepEqual(source.sameAs, work.repositoryMirrors.map(item => item.url));
     assert.deepEqual(project.sameAs, repositories);
+    assert.equal(project['@type'], 'CreativeWork');
+    assert.equal(project.creator['@id'], author['@id']);
     assert.equal(source.author['@id'], app.author['@id']);
-    assert.equal(source.publisher['@id'], project['@id']);
-    assert.equal(app.publisher['@id'], project['@id']);
+    assert.equal(source.publisher['@id'], author['@id']);
+    assert.equal(app.publisher['@id'], author['@id']);
+    assert.equal(website.publisher['@id'], author['@id']);
     assert.equal(website.about['@id'], app['@id']);
     assert.equal(page.url, canonical);
     assert.equal(page.isPartOf['@id'], website['@id']);

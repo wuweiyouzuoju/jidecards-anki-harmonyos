@@ -13,7 +13,11 @@ export function renderFeeds(content) {
 - 源码：${repositories.map(item => `[${item.name}](${item.url})`).join(' · ')}
 - 更新日期：${data.updatedAt}
 
-独立开源项目，非 Anki 官方客户端。`;
+独立开源项目，非 Anki 官方客户端。
+
+## 独立开发声明
+
+${work.developmentStatement}`;
   const detailed = work.detailSections.map(section => `## ${section.title}\n\n${section.paragraphs.join('\n\n')}${section.availability ? `\n\n${section.availability}` : ''}${section.items ? `\n\n${section.items.map(item => `- ${item.name}：${item.description}${item.example ? ` 示例：“${item.example}”` : ''}`).join('\n')}` : ''}`).join('\n\n');
   const media = work.screenshots.map(item => `### ${item.caption}\n\n${item.description}\n\n![${item.caption}](${origin}${item.path})\n\n版本：${item.releaseVersion}。${item.source}。`).join('\n\n');
   const table = item => `| ${item.headers.join(' | ')} |\n| ${item.headers.map(() => '---').join(' | ')} |\n${item.rows.map(row => `| ${row.join(' | ')} |`).join('\n')}`;
@@ -35,7 +39,7 @@ ${guide.references.map(item => `- [${item.title}](${item.url})`).join('\n')}
 
 原文：${origin}/developers/
 
-项目优先服务 Agent 开发；这里的 Agent 指参与仓库开发的编程 Agent。
+项目优先服务 Agent 开发；这里的 Agent 指辅助作者开发仓库的编程 Agent。
 
 ${facts}
 
@@ -67,14 +71,14 @@ ${work.detailSections.find(item => item.id === 'jide').availability}
 `;
   const productText = `# 记得闪卡 JideCards\n\n原文：${work.url}\n\n${work.summary}\n\n${facts}\n\n## 学习用途\n\n${work.useCases.map(item => `- ${item.name}：${item.description}`).join('\n')}\n\n## 功能概览\n\n${work.featureGroups.map(item => `- ${item.name}：${item.description}`).join('\n')}\n\n${detailed}\n\n## ${work.promotion.title}\n\n${work.promotion.description} ${work.promotion.details}\n\n## 新版应用展示\n\n${media}\n\n## 常见问题\n\n${work.questions.map(item => `### ${item.name}\n\n${item.description}`).join('\n\n')}\n\n## ${work.releaseVersion} 更新说明\n\n${releaseNotes}\n`;
   const homeText = `# 记得闪卡 JideCards\n\n${work.brand.headline.join('')}\n\n${work.summary}\n\n${facts}\n\n## 学习与资料\n\n${work.useCases.map(item => `- ${item.name}：${item.description}`).join('\n')}\n\n${work.featureGroups.map(item => `- ${item.name}：${item.description}`).join('\n')}\n\n## ${work.promotion.title}\n\n${work.promotion.description} ${work.promotion.details}\n\n## ${work.releaseVersion} 更新说明\n\n${releaseNotes}\n\n[完整功能](${work.url}) · [使用指南](${origin}${guide.pathname}) · [开发文档](${origin}/developers/)\n`;
-  const aboutText = `# 关于记得闪卡\n\n${data.author.name}，记得闪卡开发者。\n\n${facts}\n\n[GitHub 作者主页](${data.author.github}) · [问题反馈](${work.repository}/issues)\n`;
+  const aboutText = `# 关于记得闪卡\n\n${data.author.name}，记得闪卡独立开发者。\n\n${facts}\n\n[GitHub 作者主页](${data.author.github}) · [问题反馈](${work.repository}/issues)\n`;
   const pages = [
     { path: '/', title: '记得闪卡 JideCards', description: work.summary, markdown: '/content/home.md' },
     { path: '/works/jidecards/', title: '记得闪卡功能与下载', description: work.summary, markdown: '/content/product.md' },
     { path: guide.pathname, title: guide.title, description: guide.description, markdown: '/content/harmonyos-anki-guide.md', updatedAt: guide.updatedAt },
     { path: '/releases/', title: `${work.releaseVersion} 更新说明`, description: '当前版本的完整编号更新说明。', markdown: '/content/releases.md' },
     { path: '/developers/', title: '开发文档', description: '源码、模块责任、构建与验证入口。', markdown: '/content/developers.md' },
-    { path: '/about/', title: '关于项目与作者', description: `${data.author.name}，记得闪卡开发者。`, markdown: '/content/about.md' }
+    { path: '/about/', title: '关于项目与作者', description: `${data.author.name}，记得闪卡独立开发者。`, markdown: '/content/about.md' }
   ].map(item => ({ ...item, url: `${origin}${item.path}`, markdownUrl: `${origin}${item.markdown}`, updatedAt: item.updatedAt ?? data.updatedAt }));
   const llms = `# 记得闪卡（JideCards）
 

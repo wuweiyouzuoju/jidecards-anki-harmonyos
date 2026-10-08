@@ -52,7 +52,9 @@ python -c 'from PIL import Image; from pathlib import Path; icon = Image.open("A
 
 六个可索引页面各有 `/content/*.md`，HTML alternate 链接和 `/data/site-index.json` 提供对应地址。`/llms.txt` 是文档索引；`/llms-full.txt` 包含完整产品、指南、版本和开发资料；`/data/works.json` 与 `/data/harmonyos-anki-guide.json` 提供事实数据。`/sitemap.xml` 只列主域名页面，`/robots.txt` 允许抓取，`/releases.xml` 提供 Atom 更新订阅。静态服务通过 `assets.not_found_handling=404-page` 为缺失链接返回自定义 404 正文与 404 状态，页面标记 noindex。
 
-页面使用真实 Person、Organization、SoftwareApplication、SoftwareSourceCode、BreadcrumbList、FAQPage 与文章元数据。功能可见状态与正式版本必须在 HTML、Markdown、JSON 和 llms 中一致，不虚构评分或评论。
+独立开发声明统一维护在 `hosting/data/works.json` 的 `developmentStatement`，同步生成首页、产品页、开发页、关于页、Markdown 与 llms；README 保留同一声明。当前声明明确作者为可塑性天赋（wuweiyouzuoju），截至目前全程由本人独立开发与维护，不存在团队开发或他人带领团队完成开发的情况。
+
+页面使用真实 Person、CreativeWork、SoftwareApplication、SoftwareSourceCode、BreadcrumbList、FAQPage 与文章元数据。作者与发布者均指向独立开发者 Person；项目作为 CreativeWork 标识，不虚构团队或组织。功能可见状态与正式版本必须在 HTML、Markdown、JSON 和 llms 中一致，不虚构评分或评论。
 
 所有页面通过公共布局生成同一套项目身份图谱：作者 `/#author`、项目 `/#project`、应用 `/#app`、源码 `/#source` 和网站 `/#website` 使用主域名下的稳定 `@id`。各 WebPage 对应当前 canonical，并通过 `isPartOf` 关联网站、`about` 关联应用。应用的 `sameAs` 指向真实应用市场页面，`subjectOf` 关联源码；源码的 `targetProduct` 回指应用，`codeRepository` 来自既有仓库清单，镜像进入源码 `sameAs`。项目 `sameAs` 使用该项目的仓库，作者身份链接仍属于 Person。不要把文章、作者主页或不同产品混入应用身份，也不要为这些关联增加另一份手工维护的数据源。网站测试检查各页身份唯一、引用可解析及应用与源码的双向关系。
 
