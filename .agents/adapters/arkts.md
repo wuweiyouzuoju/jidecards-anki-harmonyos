@@ -73,6 +73,7 @@ this.localizedFmt($r('app.string.xxx_lang'), [arg1, arg2]);
 ```
 
 - `resourceText(context, $r('app.string.key', arg))` 与显式 `resourceText(context, $r('app.string.key'), arg)` 均保留参数；显式参数优先。参数提取只在 `UiFeedback.ets` 维护，禁止在页面或主题文字中再复制。
+- 静态 `$r` 的编译产物是正 ID，`params` 全部为格式参数；动态字符串资源 ID 为 `-1`，`params[0]` 才保留 `app.string.*` 名称。不能对两种形态统一跳过首项；回归样本必须符合实际编译结果。
 - 格式化回归须运行真实 `resourceText` 并使用真实中英资源验证最终文字，不能只用 `$r` 拼接替身检查调用。公共回归：`ui-feedback.test.mjs`；设置弹窗示例：`study-auto-advance-settings.test.mjs`。
 - 中英 i18n key 必须完全对齐（数量 + 名称）
 - 英文 value 不能含中文字符

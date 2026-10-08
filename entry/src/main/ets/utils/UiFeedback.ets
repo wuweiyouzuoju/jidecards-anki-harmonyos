@@ -7,16 +7,23 @@ export function resourceText(context: UIContext, resource: Resource, ...args: Ar
   try {
     const host = context.getHostContext();
     if (host === undefined) { throw new Error('UI context unavailable'); }
-    // $r 的第一个参数是资源名，后续参数才是占位符值；显式参数优先。
+    // 静态 $r 已解析为正 ID，params 只有占位符；动态 $r 才在首项保留资源名。
+    const isNamedResource: boolean = resource.id === -1 && resource.params !== undefined &&
+      typeof resource.params[0] === 'string' && /^app\.string\.[A-Za-z0-9_]+$/.test(resource.params[0] as string);
     if (args.length === 0 && resource.params !== undefined) {
-      for (let index: number = 1; index < resource.params.length; index++) {
+      for (let index: number = isNamedResource ? 1 : 0; index < resource.params.length; index++) {
         const value: Object = resource.params[index];
         if (typeof value === 'string' || typeof value === 'number') args.push(value);
       }
     }
+    // 动态 $r 保留资源名，ID 为 -1；名称查询仍使用同一当前语言资源管理器。
+    if (isNamedResource && resource.params !== undefined) {
+      const name: string = resource.params[0] as string;
+      return host.resourceManager.getStringByNameSync(name.substring('app.string.'.length), ...args);
+    }
     return host.resourceManager.getStringSync(resource.id, ...args);
   } catch (error) {
-    const name: string = resource.params !== undefined && typeof resource.params[0] === 'string'
+    const name: string = resource.id === -1 && resource.params !== undefined && typeof resource.params[0] === 'string'
       ? resource.params[0] as string : `${resource.id}`;
     hilog.error(0x4342, 'jidecards', 'Resource text unavailable: %{public}s', name);
     return `[${name}]`;

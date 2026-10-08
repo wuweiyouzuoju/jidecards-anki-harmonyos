@@ -123,7 +123,7 @@ test('status, assistant results and highlighted help titles refresh without remo
 });
 
 test('theme text keys preserve formatting arguments and separate locale, text, palette and highlight', () => {
-  const resource = { id: 99, params: ['app.string.test', '课程', 12] };
+  const resource = { id: 99, params: ['课程', 12] };
   assert.equal(api.themeTextKey(resource, [], context, 'zh'), api.themeTextKey('课程：12张', [], context, 'zh'));
   const baseline = api.themeTextKey('a,b', ['#112233'], context, 'en', 'b');
   for (const [label, colors, locale, highlight] of [
@@ -146,7 +146,7 @@ test('Iridescent names share the create-deck ramp while prose and group numbers 
     assert.ok(spans.find(span => span.text.includes('726837065')).color === undefined);
     assert.deepEqual(api.themeHighlightedParts('plain text', '【幻彩】', context), [{text: 'plain text', highlighted: false}]);
   }
-  const resource = {id: 99, params: ['app.string.test', '课程', 12]};
+  const resource = {id: 99, params: ['课程', 12]};
   for (const [highlight, colors] of [['', theme.lightActionColors], ['【幻彩】', []]]) {
     spans.length = 0;
     api.ThemeHighlightedTextSpans(resource, highlight, colors, context);
@@ -156,7 +156,7 @@ test('Iridescent names share the create-deck ramp while prose and group numbers 
 
 test('theme labels retain localized substitutions, emoji and single-text reading order', () => {
   assert.deepEqual(api.themeLabelCharacters('新建🎨牌组', context), ['新', '建', '🎨', '牌', '组']);
-  const resource = { id: 99, params: ['app.string.test', '课程', 12] };
+  const resource = { id: 99, params: ['课程', 12] };
   assert.equal(api.themeLabelCharacters(resource, context).join(''), '课程：12张');
   spans.length = 0;
   api.ThemeTextSpans(resource, [], context);
