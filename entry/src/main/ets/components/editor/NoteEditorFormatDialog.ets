@@ -44,7 +44,7 @@ export struct NoteEditorFormatDialog {
     ActionMenuList({ items: this.options(), onSelect: (id: string): void => { this.select(id); } })
   }
   build() {
-    DialogFrame({ maximumWidth: 应用尺寸.dialogCompactMaxWidth,
+    DialogFrame({ nativeHost: true, maximumWidth: 应用尺寸.dialogCompactMaxWidth,
       header: () => { this.header(); }, content: () => { this.content(); },
       onDismiss: (): void => { this.onClose(); } })
   }

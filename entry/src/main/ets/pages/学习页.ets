@@ -1,3 +1,8 @@
+import { SurfaceTransition } from '../utils/SurfaceTransition';
+import { FEEDBACK_ACTIONS, resultUndoStatus } from '../model/InteractionFeedback';
+import { ChangingText } from '../components/common/ChangingText';
+import { ResultNotice } from '../components/common/ResultNotice';
+import type { UndoStatus } from '../proto/messages/CollectionMessages';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { navigationEnterOffset } from '../utils/AppMotion';
 import { WINDOW_SAFE_TOP_KEY } from '../model/WindowSafeLayout';
@@ -488,7 +493,7 @@ export struct 学习页 {
             });
           }
         }),
-        autoCancel: false, customStyle: true, alignment: DialogAlignment.Center,
+        autoCancel: false, openAnimation: SurfaceTransition.dialogEnterAnimation(), closeAnimation: SurfaceTransition.dialogExitAnimation(), customStyle: true, alignment: DialogAlignment.Center,
         onWillDismiss: (action: DismissDialogAction): void => {
           closeGuide();
           action.dismiss();
@@ -912,7 +917,7 @@ export struct 学习页 {
             this.studyTimer.restartAdvance();
           },
           onClose: finish }),
-        autoCancel: false, customStyle: true, alignment: DialogAlignment.Center,
+        autoCancel: false, openAnimation: SurfaceTransition.dialogEnterAnimation(), closeAnimation: SurfaceTransition.dialogExitAnimation(), customStyle: true, alignment: DialogAlignment.Center,
         onWillDismiss: (_action: DismissDialogAction): void => { this.autoAdvanceDialogBack(); }
       });
       this.autoAdvanceDialog.open();

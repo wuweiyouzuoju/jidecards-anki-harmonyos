@@ -6,6 +6,7 @@ import { 应用尺寸 } from '../utils/应用尺寸';
 /** 页面根层承载只读说明；关闭不提交或丢弃下层表单草稿。 */
 @Component
 export struct 字段帮助面板 {
+  @Prop nativeHost: boolean = false;
   @Prop 标题: ResourceStr = $r('app.string.deck_options_title');
   @Prop 正文: ResourceStr = '';
   onClose: () => void = (): void => {};
@@ -29,7 +30,7 @@ export struct 字段帮助面板 {
   }
 
   build() {
-    DialogFrame({ maximumWidth: 应用尺寸.dialogMaxWidth,
+    DialogFrame({ nativeHost: this.nativeHost, maximumWidth: 应用尺寸.dialogMaxWidth,
       onDismiss: (): void => { this.onClose(); },
       header: () => { this.headerContent(); },
       content: () => { this.helpContent(); }
@@ -50,7 +51,7 @@ export struct 字段帮助对话框 {
   private emptyContent(): void {}
 
   build() {
-    字段帮助面板({ 标题: this.标题, 正文: this.正文,
+    字段帮助面板({ nativeHost: true, 标题: this.标题, 正文: this.正文,
       内容: (): void => { this.内容(); },
       onClose: (): void => { this.controller?.close(); this.onDismiss(); }
     })

@@ -1,3 +1,4 @@
+import { SurfaceTransition } from '../utils/SurfaceTransition';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../utils/PressFeedback';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
@@ -43,7 +44,6 @@ import { 颜色键 } from '../model/颜色主题';
 import { appInterface } from '../backend/AppInterfaceService';
 import { reminderEditorControls, reminderEditorTitle, AppInterfaceMenuItem, AppInterfaceControl } from '../model/AppInterface';
 import { interfaceControlText } from '../utils/AppInterfaceText';
-import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时长';
 
 @Component
 export struct 提醒编辑面板 {
@@ -167,7 +167,7 @@ export struct 提醒编辑面板 {
             this.onCancel();
           }
         })
-        .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
+        .transition(SurfaceTransition.backdrop())
 
       Column({ space: 应用尺寸.间距_16 }) {
         DialogHeader({
@@ -347,13 +347,7 @@ export struct 提醒编辑面板 {
       .onClick(() => {
         // 阻断点击穿透到遮罩
       })
-      .transition(TransitionEffect.asymmetric(
-        TransitionEffect.opacity(0)
-          .combine(TransitionEffect.scale({ x: 0.96, y: 0.96 }))
-          .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }),
-        TransitionEffect.opacity(0)
-          .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() })
-      ))
+      .transition(SurfaceTransition.dialog())
     }
     .width('100%')
     .height('100%')

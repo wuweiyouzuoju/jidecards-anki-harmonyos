@@ -1,3 +1,4 @@
+import { SurfaceTransition } from '../utils/SurfaceTransition';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { OFFICIAL_QQ_GROUP } from '../model/OfficialCommunity';
@@ -29,7 +30,6 @@ import { DialogHeader } from './common/DialogHeader';
 import { common } from '@kit.AbilityKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { 应用尺寸 } from '../utils/应用尺寸';
-import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时长';
 import { 颜色键 } from '../model/颜色主题';
 
 // 更新日志条目：【新增】/【优化】/【修复】前缀 + 正文
@@ -69,7 +69,7 @@ export struct 欢迎弹窗 {
     Stack() {
       // 遮罩 + 磨砂玻璃（点击空白处关闭）
       DialogBackdrop()
-        .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
+        .transition(SurfaceTransition.backdrop())
         .onClick(() => this.onClose())
 
       // 内容卡（居中，最大宽度 380）
@@ -199,13 +199,7 @@ export struct 欢迎弹窗 {
       .constraintSize({ maxWidth: 480 })
       .backgroundColor($r('app.color.surface_page'))
       .borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
-      .transition(TransitionEffect.asymmetric(
-        TransitionEffect.opacity(0)
-          .combine(TransitionEffect.scale({ x: 0.96, y: 0.96 }))
-          .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }),
-        TransitionEffect.opacity(0)
-          .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() })
-      ))
+      .transition(SurfaceTransition.dialog())
     }
     .width('100%')
     .height('100%')

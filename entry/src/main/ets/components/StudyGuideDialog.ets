@@ -122,7 +122,7 @@ export struct StudyGuideDialog {
   }
 
   build() {
-    DialogFrame({ maximumWidth: 应用尺寸.dialogMaxWidth, canDismiss: false,
+    DialogFrame({ nativeHost: true, maximumWidth: 应用尺寸.dialogMaxWidth, canDismiss: false,
       header: () => { this.headerContent(); }, content: () => { this.guideContent(); } })
   }
 }

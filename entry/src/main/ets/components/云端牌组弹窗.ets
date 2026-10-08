@@ -1,3 +1,4 @@
+import { SurfaceTransition } from '../utils/SurfaceTransition';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { PressFeedback } from '../utils/PressFeedback';
@@ -9,7 +10,6 @@ import { DialogHeader } from './common/DialogHeader';
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { 颜色键 } from '../model/颜色主题';
 import { 云端牌组目录项, 格式化云端牌组大小 } from '../model/云端牌组模型';
-import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时长';
 
 /**
  * 云端牌组目录、选择、进度和结果的纯展示弹窗。
@@ -162,9 +162,7 @@ export struct 云端牌组弹窗 {
   build() {
     Stack() {
       DialogBackdrop()
-        .transition(TransitionEffect.OPACITY.animation({
-          curve: 取全屏转场曲线(), duration: 取全屏转场时长()
-        }))
+        .transition(SurfaceTransition.backdrop())
 
       Column({ space: 应用尺寸.间距_12 }) {
         DialogHeader({
@@ -278,12 +276,7 @@ export struct 云端牌组弹窗 {
       .backgroundColor($r('app.color.surface_card'))
       .border(SurfaceBorder.options())
       .borderRadius(应用尺寸.圆角_卡片)
-      .transition(TransitionEffect.asymmetric(
-        TransitionEffect.opacity(0).combine(TransitionEffect.scale({ x: 0.96, y: 0.96 }))
-          .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }),
-        TransitionEffect.opacity(0)
-          .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() })
-      ))
+      .transition(SurfaceTransition.dialog())
     }
     .width('100%')
     .height('100%')

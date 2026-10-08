@@ -1,3 +1,4 @@
+import { SurfaceTransition } from '../../utils/SurfaceTransition';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../../utils/PressFeedback';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
@@ -114,7 +115,7 @@ export struct DeckOptionField {
   private openHelp(): void {
     this.helpDialog = new CustomDialogController({
       builder: 字段帮助对话框({ 标题: this.title, 正文: this.help }),
-      customStyle: true, autoCancel: true, alignment: DialogAlignment.Center,
+      openAnimation: SurfaceTransition.dialogEnterAnimation(), closeAnimation: SurfaceTransition.dialogExitAnimation(), customStyle: true, autoCancel: true, alignment: DialogAlignment.Center,
       width: '100%', height: '100%', maskColor: Color.Transparent
     });
     this.helpDialog.open();
@@ -139,7 +140,7 @@ export struct DeckOptionField {
           this.onChange(value);
           this.displayValue = value;
         } }),
-      autoCancel: true, customStyle: true, alignment: DialogAlignment.Center
+      autoCancel: true, openAnimation: SurfaceTransition.dialogEnterAnimation(), closeAnimation: SurfaceTransition.dialogExitAnimation(), customStyle: true, alignment: DialogAlignment.Center
     });
     this.dialog.open();
   }

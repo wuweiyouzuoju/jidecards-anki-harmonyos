@@ -16,6 +16,7 @@ import { 应用尺寸 } from '../utils/应用尺寸';
 /** 启动提醒和锁定主题共用领赠说明、群号与复制反馈。 */
 @Component
 export struct IridescentGiftPanel {
+  @Prop nativeHost: boolean = false;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop announcement: boolean = false;
   @StorageProp(颜色键.动作主色) private primary: string = '#2F5FD0';
@@ -76,7 +77,7 @@ export struct IridescentGiftPanel {
   }
 
   build() {
-    DialogFrame({ canDismiss: false,
+    DialogFrame({ nativeHost: this.nativeHost, canDismiss: false,
       header: () => { this.headerContent(); }, content: () => { this.bodyContent(); } })
   }
 }

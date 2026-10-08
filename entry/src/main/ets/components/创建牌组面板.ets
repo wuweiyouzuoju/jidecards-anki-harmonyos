@@ -1,3 +1,4 @@
+import { SurfaceTransition } from '../utils/SurfaceTransition';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { interfaceItemText } from '../utils/AppInterfaceText';
@@ -43,7 +44,6 @@ import { 应用尺寸 } from '../utils/应用尺寸';
 import { 组合牌组路径, 规范化牌组路径 } from '../model/牌组层级';
 import type { 牌组汇总 } from '../model/主页模型';
 import { 颜色键 } from '../model/颜色主题';
-import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时长';
 
 @Component
 export struct 创建牌组面板 {
@@ -295,7 +295,7 @@ export struct 创建牌组面板 {
             this.onCancel();
           }
         })
-        .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
+        .transition(SurfaceTransition.backdrop())
 
       Column({ space: 应用尺寸.间距_16 }) {
         // 标题行
@@ -384,13 +384,7 @@ export struct 创建牌组面板 {
         // 阻断点击穿透到遮罩
       })
       // 居中浮卡：缩放+淡入过渡（思路参考：华为官方 TransitionEffect 示例）
-      .transition(TransitionEffect.asymmetric(
-        TransitionEffect.opacity(0)
-          .combine(TransitionEffect.scale({ x: 0.96, y: 0.96 }))
-          .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }),
-        TransitionEffect.opacity(0)
-          .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() })
-      ))
+      .transition(SurfaceTransition.dialog())
     }
     .width('100%')
     .height('100%')

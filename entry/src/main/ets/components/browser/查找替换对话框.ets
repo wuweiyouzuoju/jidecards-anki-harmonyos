@@ -1,3 +1,4 @@
+import { SurfaceTransition } from '../../utils/SurfaceTransition';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { FormInputStyle } from '../../utils/FormInputStyle';
@@ -41,7 +42,6 @@ import { DialogHeader } from '../common/DialogHeader';
 
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 颜色键 } from '../../model/颜色主题';
-import { 取全屏转场时长, 取全屏转场曲线 } from '../../utils/转场时长';
 
 @Component
 export struct 查找替换对话框 {
@@ -141,7 +141,7 @@ export struct 查找替换对话框 {
             this.onCancel();
           }
         })
-        .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
+        .transition(SurfaceTransition.backdrop())
 
       // 主面板
       Column({ space: 应用尺寸.间距_14 }) {
@@ -292,13 +292,7 @@ export struct 查找替换对话框 {
       .backgroundColor($r('app.color.surface_card'))
       .borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
       // 居中浮卡：缩放+淡入过渡（入：opacity(0)+scale(0.96,0.96)，出：opacity(0)）
-      .transition(TransitionEffect.asymmetric(
-        TransitionEffect.opacity(0)
-          .combine(TransitionEffect.scale({ x: 0.96, y: 0.96 }))
-          .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }),
-        TransitionEffect.opacity(0)
-          .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() })
-      ))
+      .transition(SurfaceTransition.dialog())
       .onClick((): void => {})
     }
     .width('100%')

@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
 import { uiFeedback } from './ui-feedback-harness.mjs';
+import { surfaceMotionApi } from './motion-harness.mjs';
 import { THEME_CATALOG, isThemeAvailable, UNLOCKED_CONTENTS_KEY } from '../../entry/src/main/ets/model/ThemeCatalog.ts';
 import { OFFICIAL_QQ_GROUP } from '../../entry/src/main/ets/model/OfficialCommunity.ts';
 import { themeDefinition } from '../../entry/src/main/ets/model/ThemeCatalog.ts';
@@ -41,7 +42,7 @@ test('overview and both gift dialog modes share the existing theme screenshot re
 test('locked dialog is declared as CustomDialog and embeds the same gift panel', () => {
   const dialog = read('entry/src/main/ets/components/IridescentGiftDialog.ets');
   assert.match(dialog, /@CustomDialog\s+export struct IridescentGiftDialog/);
-  assert.match(dialog, /IridescentGiftPanel\(\{ onClose:/);
+  assert.match(dialog, /IridescentGiftPanel\(\{ nativeHost: true, onClose:/);
   assert.match(read('entry/src/main/ets/components/settings/外观分组.ets'), /builder: IridescentGiftDialog\(/);
 });
 
@@ -69,7 +70,7 @@ function appearanceHarness(locale = 'base') {
     }
   } }) };
   const Appearance = loadComponentLogic('components/settings/外观分组.ets', '外观分组', {
-    ...uiFeedback, $r: resource, THEME_CATALOG, isThemeAvailable,
+    ...uiFeedback, ...surfaceMotionApi(), $r: resource, THEME_CATALOG, isThemeAvailable,
     CustomDialogController: class { open() { this.isOpen = true; } close() { this.isOpen = false; } },
     IridescentGiftDialog: () => ({}), DialogAlignment: {}, Color: {}
   });
@@ -112,7 +113,7 @@ test('restored and newly redeemed entitlement removes the lock and applies Iride
   component.selectColorTheme(index);
   component.selectColorTheme(1);
   assert.deepEqual(applied, ['iridescent', 'forest']);
-  assert.notEqual(component.giftDialog.isOpen, true);
+  assert.equal(component.giftDialog, null, 'unlocked selections do not construct a dialog window');
 });
 
 function noticeHarness() {

@@ -155,7 +155,7 @@ export struct NoteMediaDialog {
   }
 
   build() {
-    DialogFrame({ canDismiss: !this.working, onDismiss: (): void => { this.close(false); },
+    DialogFrame({ nativeHost: true, canDismiss: !this.working, onDismiss: (): void => { this.close(false); },
       header: () => { this.headerContent(); }, content: () => { this.bodyContent(); } })
   }
 }

@@ -1,3 +1,4 @@
+import { SurfaceTransition } from '../../utils/SurfaceTransition';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { FormInputStyle } from '../../utils/FormInputStyle';
@@ -13,7 +14,6 @@ import { 调度器服务 } from '../../backend/调度器服务';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 设置面板色板_取 } from '../../utils/设置面板配色';
 import { 颜色键 } from '../../model/颜色主题';
-import { 取全屏转场时长, 取全屏转场曲线 } from '../../utils/转场时长';
 import { CustomStudyCardKind, CustomStudyCram, 自定义学习预设 } from '../../proto/messages/SchedulerMessages';
 import { 自定义学习默认值, 自定义学习标签 } from '../../proto/messages/SchedulerMessages';
 
@@ -350,7 +350,7 @@ export struct 自定义学习对话框 {
     Stack() {
       DialogBackdrop()
         .onClick(() => { if (!this.处理中) { this.onClose(); } })
-        .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
+        .transition(SurfaceTransition.backdrop())
       Column({ space: 应用尺寸.间距_16 }) {
         DialogHeader({
           title: $r('app.string.custom_study_title'),
@@ -395,11 +395,7 @@ export struct 自定义学习对话框 {
       .backgroundColor($r('app.color.surface_card'))
       .borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
       .onClick(() => {})
-      .transition(TransitionEffect.asymmetric(
-        TransitionEffect.opacity(0).combine(TransitionEffect.scale({ x: 0.96, y: 0.96 }))
-          .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }),
-        TransitionEffect.opacity(0).animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() })
-      ))
+      .transition(SurfaceTransition.dialog())
     }.width('100%').height('100%')
   }
 }

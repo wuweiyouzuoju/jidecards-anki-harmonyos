@@ -64,7 +64,7 @@ import {
 } from '../../model/学习卡片HTML构建器';
 import { interceptMediaRequest } from '../../utils/媒体响应助手';
 import { 应用尺寸 } from '../../utils/应用尺寸';
-import { 取全屏转场曲线, 取全屏转场时长 } from '../../utils/转场时长';
+import { SurfaceTransition } from '../../utils/SurfaceTransition';
 import { 颜色键 } from '../../model/颜色主题';
 import { IconActionButton } from '../common/IconActionButton';
 import { DelayedLoadingIndicator } from '../common/DelayedLoadingIndicator';
@@ -792,9 +792,6 @@ export struct 卡片预览页 {
       return true;
     })
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-    .transition(TransitionEffect.OPACITY.animation({
-      curve: 取全屏转场曲线(),
-      duration: 取全屏转场时长()
-    }))
+    .transition(SurfaceTransition.pageOverlay())
   }
 }

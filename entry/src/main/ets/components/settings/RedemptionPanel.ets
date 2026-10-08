@@ -1,3 +1,4 @@
+import { SurfaceTransition } from '../../utils/SurfaceTransition';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { settingsItemText } from '../../utils/SettingsStructureText';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
@@ -27,17 +28,22 @@ export struct RedemptionPanel {
   onUseTheme: (theme: 颜色主题) => void = (): void => {};
   @State private fingerprint: string = '';
   @State private expanded: boolean = false;
-  private contentHelp: CustomDialogController = new CustomDialogController({
-    builder: 字段帮助对话框({ 标题: $r('app.string.redemption_contents_title'),
-      内容: (): void => { this.contentInfo(); } }),
-    customStyle: true, autoCancel: true, alignment: DialogAlignment.Center,
-    width: '100%', height: '100%', maskColor: Color.Transparent
-  });
+  private contentHelp: CustomDialogController | null = null;
+
+  private createContentHelp(): void {
+    this.contentHelp?.close();
+    this.contentHelp = new CustomDialogController({
+      builder: 字段帮助对话框({ 标题: $r('app.string.redemption_contents_title'),
+        内容: (): void => { this.contentInfo(); } }),
+      openAnimation: SurfaceTransition.dialogEnterAnimation(), closeAnimation: SurfaceTransition.dialogExitAnimation(), customStyle: true, autoCancel: true, alignment: DialogAlignment.Center,
+      width: '100%', height: '100%', maskColor: Color.Transparent
+    });
+  }
 
   aboutToDisappear(): void {
     this.active = false;
     this.showCelebration = false;
-    this.contentHelp.close();
+    this.contentHelp?.close();
   }
   @State private code: string = '';
   @State private busy: boolean = false;
@@ -210,7 +216,7 @@ export struct RedemptionPanel {
       }.width('100%').padding(12).borderRadius(12).border(SurfaceBorder.options()).backgroundColor($r('app.color.surface_page'))
       HelpLabel({ title: $r('app.string.redemption_fingerprint_hint'), textSize: 12,
         textColor: $r('app.color.text_secondary'),
-        onHelp: (): void => { this.contentHelp.open(); }
+        onHelp: (): void => { this.createContentHelp(); this.contentHelp?.open(); }
       }).width('100%')
       if (this.loadFailed) {
         Button($r('app.string.redemption_retry'))

@@ -1,3 +1,4 @@
+import { SurfaceTransition } from '../../utils/SurfaceTransition';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { settingsItemText } from '../../utils/SettingsStructureText';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
@@ -110,29 +111,34 @@ export struct 同步分组 {
 
   private readonly 同步服务实例: 同步服务 = new 同步服务();
   /** 居中弹窗控制器：手机窗口宽度 < 600vp 时 bindSheet 只能底部弹出，改用 CustomDialog 保证居中。 */
-  private serverDialogController: CustomDialogController = new CustomDialogController({
-    builder: 自定义服务器弹窗({
-      serverInput: this.serverInput,
-      serverError: this.serverError,
-      当前状态: this.当前状态,
-      登录中: this.登录中,
-      settingsSaving: this.settingsSaving,
-      是否深色: this.是否深色,
-      onSave: (): void => { this.saveServer(); },
-      onClose: (): void => { this.closeServerDialog(); }
-    }),
-    autoCancel: false,
-    alignment: DialogAlignment.Center,
-    customStyle: true,
-    onWillDismiss: (dismiss: DismissDialogAction): void => {
-      if (this.settingsSaving) {
-        return;
+  private serverDialogController: CustomDialogController | null = null;
+
+  private createServerDialog(): void {
+    this.serverDialogController?.close();
+    this.serverDialogController = new CustomDialogController({
+      builder: 自定义服务器弹窗({
+        serverInput: this.serverInput,
+        serverError: this.serverError,
+        当前状态: this.当前状态,
+        登录中: this.登录中,
+        settingsSaving: this.settingsSaving,
+        是否深色: this.是否深色,
+        onSave: (): void => { this.saveServer(); },
+        onClose: (): void => { this.closeServerDialog(); }
+      }),
+      autoCancel: false,
+      alignment: DialogAlignment.Center,
+      openAnimation: SurfaceTransition.dialogEnterAnimation(), closeAnimation: SurfaceTransition.dialogExitAnimation(), customStyle: true,
+      onWillDismiss: (dismiss: DismissDialogAction): void => {
+        if (this.settingsSaving) {
+          return;
+        }
+        this.serverInput = this.savedServer;
+        this.serverError = '';
+        dismiss.dismiss();
       }
-      this.serverInput = this.savedServer;
-      this.serverError = '';
-      dismiss.dismiss();
-    }
-  });
+    });
+  }
   // AnkiWeb 注册页（外部网址保留原文，与 设置面板.AnkiWeb网址 同款约定）
   private readonly 注册网址: string = 'https://ankiweb.net/account/signup';
 
@@ -193,7 +199,7 @@ export struct 同步分组 {
       this.serverLoaded = true;
       this.serverInput = this.savedServer;
       this.密码输入 = '';
-      this.serverDialogController.close();
+      this.serverDialogController?.close();
     } catch (error) {
       this.serverError = this.取本地化文本($r('app.string.sync_settings_save_failed'));
     } finally {
@@ -206,7 +212,7 @@ export struct 同步分组 {
     if (this.登录中 || this.settingsSaving) return;
     this.serverInput = this.savedServer;
     this.serverError = '';
-    this.serverDialogController.open();
+    this.createServerDialog(); this.serverDialogController?.open();
   }
 
   /** 保存中不可关闭；取消时丢弃草稿和表单错误。 */
@@ -214,7 +220,7 @@ export struct 同步分组 {
     if (this.settingsSaving) return;
     this.serverInput = this.savedServer;
     this.serverError = '';
-    this.serverDialogController.close();
+    this.serverDialogController?.close();
   }
 
   /** 开启前说明对即时学习的影响；取消或保存失败都恢复原开关。 */

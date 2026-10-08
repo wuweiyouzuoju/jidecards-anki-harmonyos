@@ -53,7 +53,7 @@ export struct NoteLinkDialog {
   }
 
   build() {
-    DialogFrame({ maximumWidth: 应用尺寸.dialogMaxWidth,
+    DialogFrame({ nativeHost: true, maximumWidth: 应用尺寸.dialogMaxWidth,
       header: () => { this.header(); }, content: () => { this.content(); },
       onDismiss: (): void => { this.onClose(); } })
   }

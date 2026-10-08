@@ -1,3 +1,4 @@
+import { SurfaceTransition } from '../utils/SurfaceTransition';
 import { IconActionButton } from './common/IconActionButton';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { SurfaceBorder } from '../utils/SurfaceBorder';
@@ -53,7 +54,6 @@ import { 应用尺寸 } from '../utils/应用尺寸';
 import { 牌组汇总, 牌组色调, 牌组显示名 } from '../model/主页模型';
 import { 从图库选取图片 } from '../utils/文件导入助手';
 import { 颜色键 } from '../model/颜色主题';
-import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时长';
 
 export type { 牌组背景动作, 牌组定制结果 } from '../model/DeckCustomization';
 
@@ -311,7 +311,7 @@ export struct 牌组定制面板 {
       // ---- 底层：磨砂遮罩 + 主面板 ----
       DialogBackdrop()
         .onClick(() => { if (!this.busy && !this.裁剪模式) this.onClose(); })
-        .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
+        .transition(SurfaceTransition.backdrop())
 
       // ---- 主面板 ----
       // 内容高度随表单收缩，避免短表单被固定面板高度撑出大块空白。
@@ -450,13 +450,7 @@ export struct 牌组定制面板 {
       .onClick(() => {
         // 阻断点击穿透到遮罩
       })
-      .transition(TransitionEffect.asymmetric(
-        TransitionEffect.opacity(0)
-          .combine(TransitionEffect.scale({ x: 0.96, y: 0.96 }))
-          .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }),
-        TransitionEffect.opacity(0)
-          .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() })
-      ))
+      .transition(SurfaceTransition.dialog())
 
       // ---- 顶层：裁剪模式覆盖层（仅 裁剪模式=true 时显示）----
       if (this.裁剪模式) {
@@ -509,13 +503,7 @@ export struct 牌组定制面板 {
         .padding(应用尺寸.卡片内边距)
         .backgroundColor($r('app.color.surface_card'))
         .borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
-        .transition(TransitionEffect.asymmetric(
-          TransitionEffect.opacity(0)
-            .combine(TransitionEffect.scale({ x: 0.96, y: 0.96 }))
-            .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }),
-          TransitionEffect.opacity(0)
-            .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() })
-        ))
+        .transition(SurfaceTransition.dialog())
       }
     }
     .width('100%')

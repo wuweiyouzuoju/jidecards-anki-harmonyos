@@ -1,3 +1,4 @@
+import { SurfaceTransition } from '../utils/SurfaceTransition';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { HelpLabel } from './common/HelpLabel';
@@ -186,16 +187,21 @@ export struct 数据迁移面板 {
     return this.忙碌文案();
   }
 
-  private legacyHelp: CustomDialogController = new CustomDialogController({
-    builder: 字段帮助对话框({ 标题: $r('app.string.transfer_legacy'), 正文: $r('app.string.transfer_legacy_help') }),
-    customStyle: true, autoCancel: true, alignment: DialogAlignment.Center,
-    width: '100%', height: '100%', maskColor: Color.Transparent
-  });
+  private legacyHelp: CustomDialogController | null = null;
 
-  aboutToDisappear(): void { this.legacyHelp.close(); }
+  private createLegacyHelp(): void {
+    this.legacyHelp?.close();
+    this.legacyHelp = new CustomDialogController({
+      builder: 字段帮助对话框({ 标题: $r('app.string.transfer_legacy'), 正文: $r('app.string.transfer_legacy_help') }),
+      openAnimation: SurfaceTransition.dialogEnterAnimation(), closeAnimation: SurfaceTransition.dialogExitAnimation(), customStyle: true, autoCancel: true, alignment: DialogAlignment.Center,
+      width: '100%', height: '100%', maskColor: Color.Transparent
+    });
+  }
+
+  aboutToDisappear(): void { this.legacyHelp?.close(); }
 
   private 打开旧版帮助(): void {
-    if (!this.busy) this.legacyHelp.open();
+    if (!this.busy) { this.createLegacyHelp(); this.legacyHelp?.open(); }
   }
 
   private 可提交(): boolean {

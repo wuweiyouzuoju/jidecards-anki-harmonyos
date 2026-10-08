@@ -1,3 +1,4 @@
+import { SurfaceTransition } from '../utils/SurfaceTransition';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { PressFeedback } from '../utils/PressFeedback';
@@ -10,7 +11,6 @@ import { DialogHeader } from './common/DialogHeader';
 import type { 官方公告展示项 } from '../model/官方公告模型';
 import { 颜色键 } from '../model/颜色主题';
 import { 应用尺寸 } from '../utils/应用尺寸';
-import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时长';
 
 /** 官方启动公告弹窗：纯展示层；确认与详情动作经回调上抛，返回键与遮罩点击不关闭。 */
 @Component
@@ -37,9 +37,7 @@ export struct 官方公告弹窗 {
     Stack() {
       DialogBackdrop()
         .onClick((): void => {})
-        .transition(TransitionEffect.OPACITY.animation({
-          curve: 取全屏转场曲线(), duration: 取全屏转场时长()
-        }))
+        .transition(SurfaceTransition.backdrop())
 
       Column({ space: 应用尺寸.间距_12 }) {
         DialogHeader({
@@ -91,12 +89,7 @@ export struct 官方公告弹窗 {
       .backgroundColor($r('app.color.surface_card'))
       .borderRadius(应用尺寸.圆角_卡片)
       .border(SurfaceBorder.options())
-      .transition(TransitionEffect.asymmetric(
-        TransitionEffect.opacity(0).combine(TransitionEffect.scale({ x: 0.96, y: 0.96 }))
-          .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }),
-        TransitionEffect.opacity(0)
-          .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() })
-      ))
+      .transition(SurfaceTransition.dialog())
     }
     .width('100%')
     .height('100%')

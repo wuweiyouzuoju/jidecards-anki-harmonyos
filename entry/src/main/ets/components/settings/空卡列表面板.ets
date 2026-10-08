@@ -1,3 +1,4 @@
+import { SurfaceTransition } from '../../utils/SurfaceTransition';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { PressFeedback } from '../../utils/PressFeedback';
@@ -40,7 +41,6 @@ import { 卡片服务 } from '../../backend/卡片服务';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 设置面板色板_取 } from '../../utils/设置面板配色';
 import { 颜色键 } from '../../model/颜色主题';
-import { 取全屏转场时长, 取全屏转场曲线 } from '../../utils/转场时长';
 import type { 笔记空卡 } from '../../proto/messages/CardRenderingMessages';
 
 @Component
@@ -224,7 +224,7 @@ export struct 空卡列表面板 {
             this.onClose();
           }
         })
-        .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
+        .transition(SurfaceTransition.backdrop())
 
       Column({ space: 应用尺寸.间距_16 }) {
         // 固定标题操作栏
@@ -349,13 +349,7 @@ export struct 空卡列表面板 {
       .backgroundColor($r('app.color.surface_card'))
       .borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
       .onClick(() => {})
-      .transition(TransitionEffect.asymmetric(
-        TransitionEffect.opacity(0)
-          .combine(TransitionEffect.scale({ x: 0.96, y: 0.96 }))
-          .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }),
-        TransitionEffect.opacity(0)
-          .animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() })
-      ))
+      .transition(SurfaceTransition.dialog())
     }
     .width('100%')
     .height('100%')

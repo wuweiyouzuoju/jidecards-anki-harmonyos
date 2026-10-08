@@ -1,3 +1,4 @@
+import { SurfaceTransition } from '../../utils/SurfaceTransition';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { isSettingsItemVisible } from '../../model/SettingsStructure';
 import { settingsItemText } from '../../utils/SettingsStructureText';
@@ -43,13 +44,18 @@ export struct 外观分组 {
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(UNLOCKED_CONTENTS_KEY) private unlockedContents: string[] = [];
   @State private themeSelectionRevision: number = 0;
-  private giftDialog: CustomDialogController = new CustomDialogController({
-    builder: IridescentGiftDialog({}),
-    customStyle: true, autoCancel: false, alignment: DialogAlignment.Center,
-    width: '100%', height: '100%', maskColor: Color.Transparent
-  });
+  private giftDialog: CustomDialogController | null = null;
 
-  aboutToDisappear(): void { this.giftDialog.close(); }
+  private createGiftDialog(): void {
+    this.giftDialog?.close();
+    this.giftDialog = new CustomDialogController({
+      builder: IridescentGiftDialog({}),
+      openAnimation: SurfaceTransition.dialogEnterAnimation(), closeAnimation: SurfaceTransition.dialogExitAnimation(), customStyle: true, autoCancel: false, alignment: DialogAlignment.Center,
+      width: '100%', height: '100%', maskColor: Color.Transparent
+    });
+  }
+
+  aboutToDisappear(): void { this.giftDialog?.close(); }
   @Prop 是否深色: boolean = false;
   @Prop 简洁模式: boolean = true;
   @Prop 当前主题模式: 主题模式 = 'system';
@@ -107,7 +113,7 @@ export struct 外观分组 {
       if (theme === this.当前颜色主题) return;
       this.颜色主题切换回调(theme);
     } else {
-      this.giftDialog.open();
+      this.createGiftDialog(); this.giftDialog?.open();
     }
     // 原生 Select 已先更新内部选中值；重建使锁定项恢复为实际主题。
     this.themeSelectionRevision += 1;
