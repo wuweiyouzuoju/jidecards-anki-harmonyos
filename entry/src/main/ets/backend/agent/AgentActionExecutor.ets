@@ -21,6 +21,7 @@ import { appThemeColorSession } from '../AppThemeService';
 import { 设置FSRS开启状态 } from '../../model/FSRS控制器';
 import { saveCardTextSize } from '../../utils/CardTextSizeStore';
 import { saveDeckListStyle } from '../../utils/DeckListAppearanceStore';
+import { saveMotionStyle } from '../../utils/MotionStyleStore';
 import { saveStudyHaptics } from '../../utils/StudyHaptics';
 import { LocalPreferenceWriteError } from '../../utils/LocalPreferenceWrite';
 import type { AgentAction } from '../../model/agent/AgentAction';
@@ -96,6 +97,8 @@ export class AgentActionExecutor {
             await saveCardTextSize(Number(change.after), Number(change.before));
           } else if (change.settingId === 'deck_list_style') {
             await saveDeckListStyle(change.after, change.before);
+          } else if (change.settingId === 'motion_style') {
+            await saveMotionStyle(change.after, change.before);
           } else if (change.settingId === 'study_haptics') {
             await saveStudyHaptics(change.after === 'true', change.before === 'true');
           } else { throw new Error('unsupported_setting_write'); }

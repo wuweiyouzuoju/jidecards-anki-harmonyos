@@ -1634,7 +1634,7 @@
     {"name": "settings_search_placeholder", "value": "Search settings: font, sync, FSRS"},
     {"name": "settings_search_empty", "value": "No matching settings. Try another keyword or switch to Experimental for advanced options."},
     {"name": "settings_directory_algorithm_hint", "value": "Grading vibration, study gestures, four-quadrant tap zones, review layout, FSRS memory algorithm and deck options guide"},
-    {"name": "settings_directory_appearance_hint", "value": "Themes, card font size and animated background"},
+    {"name": "settings_directory_appearance_hint", "value": "Themes, card font size and animated background, motion style"},
     {"name": "settings_directory_sync", "value": "Sync"},
     {"name": "settings_directory_sync_hint", "value": "Account, automatic sync, custom server"},
     {"name": "settings_directory_data_hint", "value": "Import, export, backups, restore hidden decks, media and database maintenance"},
@@ -1679,7 +1679,7 @@
     {"name": "settings_controls_review", "value": "Review controls"},
     {"name": "settings_controls_tap_hint", "value": "Grade by zone on the answer; a color guide appears on first use"},
     {"name": "settings_appearance_display", "value": "Theme and text"},
-    {"name": "settings_directory_appearance_simple_hint", "value": "Appearance and color themes, motion and card font size"},
+    {"name": "settings_directory_appearance_simple_hint", "value": "Appearance and color themes, motion and card font size, motion style"},
     {"name": "settings_directory_review_simple_hint", "value": "Grading vibration, study gestures, four-quadrant tap zones and review layout"},
     {"name": "settings_directory_data_simple_hint", "value": "Import, export, backups, restore hidden decks and media"},
     {"name": "settings_directory_sync_simple_hint", "value": "Custom server, account and automatic sync"},
@@ -1727,7 +1727,8 @@
     {"name": "note_editor_bold", "value": "Bold"},
     {"name": "note_editor_italic", "value": "Italic"},
     {"name": "note_editor_underline", "value": "Underline"},
-    {"name": "note_editor_break", "value": "Line break"},    {"name":"note_editor_font_size","value":"Font size"},
+    {"name": "note_editor_break", "value": "Line break"},
+    {"name":"note_editor_font_size","value":"Font size"},
     {"name":"note_editor_heading","value":"Heading"},
     {"name":"note_editor_size_xx_small","value":"Extra extra small (xx-small)"},
     {"name":"note_editor_size_x_small","value":"Extra small (x-small)"},
@@ -1748,7 +1749,6 @@
     {"name":"note_editor_format_options_instructions","value":"Select an option to apply it to the field selection captured when the menu opened, or insert at the caret. Font size and headings insert HTML and switch to Source editing; view them in card preview or study. Holding Math opens display and chemistry options; tapping Math inserts inline delimiters. Cancel preserves the draft and returns to the outer arc."},
     {"name":"note_editor_hint_font_size","value":"Select text, tap Font size, and choose one of seven sizes. With no selection, insert empty tags with the caret inside. The editor switches to Source editing; view the result in card preview or study. This changes the current content, separately from Settings → Appearance → Card text size. Close this tip to choose a size."},
     {"name":"note_editor_hint_heading","value":"Select text, tap Heading, and choose heading level 1 to 5. With no selection, insert an empty heading with the caret inside. Headings form a separate block; template CSS controls their final size and spacing. The editor switches to Source editing; view the result in card preview or study. Close this tip to choose a level."},
-
     {"name": "note_editor_math", "value": "Math"},
     {"name": "note_editor_cloze_next", "value": "New cloze"},
     {"name": "note_editor_cloze_same", "value": "Same cloze"},
@@ -2348,6 +2348,14 @@
     {"name": "note_editor_wheel_move_hint", "value": "Drag vertically to move; hold to switch sides"},
     {"name": "note_editor_wheel_apply", "value": "Apply selected tool"},
     {"name": "note_editor_wheel_select", "value": "Click to apply this tool"},
-    {"name": "note_editor_wheel_tap", "value": "Tap to apply"}
+    {"name": "note_editor_wheel_tap", "value": "Tap to apply"},
+    {"name": "motion_style", "value": "Motion style"},
+    {"name": "motion_style_restrained", "value": "Restrained"},
+    {"name": "motion_style_lively", "value": "Lively"},
+    {"name": "motion_style_hint", "value": "Lively adds feedback to menus, dialogs and tools. Study cards keep switching directly."},
+    {"name": "motion_style_save_failed", "value": "Could not save motion style. Please retry"},
+    {"name": "feedback_buried", "value": "Card buried"},
+    {"name": "feedback_suspended", "value": "Card suspended"},
+    {"name": "feedback_items_updated", "value": "Updated %d items"}
   ]
 }

@@ -22,6 +22,7 @@ import { 刷新学习提醒 } from '../model/学习提醒服务';
 import { AI_AGENT_CHANNELS_APP_STORAGE_KEY, initializeAiAgentChannels } from '../model/ReleaseFeatures';
 import { initializeCardTextSize } from '../utils/CardTextSizeStore';
 import { initializeDeckListAppearance } from '../utils/DeckListAppearanceStore';
+import { initializeMotionStyle } from '../utils/MotionStyleStore';
 import { initializeStudyHaptics } from '../utils/StudyHaptics';
 import { initializeSimpleMode } from '../model/简洁模式存储';
 import { syncActivity } from '../model/SyncSettings';
@@ -74,6 +75,7 @@ export default class EntryAbility extends UIAbility {
     initializeSimpleMode();
     initializeCardTextSize();
     initializeDeckListAppearance();
+    initializeMotionStyle();
     initializeStudyHaptics();
     AppStorage.setOrCreate<boolean>(AI_AGENT_CHANNELS_APP_STORAGE_KEY, false);
     initializeAiAgentChannels().catch((_error: Object): void => {

@@ -2084,7 +2084,7 @@
     {"name": "settings_search_placeholder", "value": "搜索设置，例如字体、同步、FSRS"},
     {"name": "settings_search_empty", "value": "没有匹配的设置，请换个关键词；高级选项可切换至实验版查找。"},
     {"name": "settings_directory_algorithm_hint", "value": "评分振动、学习手势、四象限分区点击答题、复习布局、FSRS 记忆算法、牌组选项说明"},
-    {"name": "settings_directory_appearance_hint", "value": "主题、卡片字体大小、动态背景"},
+    {"name": "settings_directory_appearance_hint", "value": "主题、卡片字体大小、动态背景、动效风格"},
     {"name": "settings_directory_sync", "value": "同步"},
     {"name": "settings_directory_sync_hint", "value": "账号、自动同步、自定义服务器"},
     {"name": "settings_directory_data_hint", "value": "导入导出、备份、隐藏牌组恢复、媒体与数据库维护"},
@@ -2129,7 +2129,7 @@
     {"name": "settings_controls_review", "value": "复习操作"},
     {"name": "settings_controls_tap_hint", "value": "答案面分区评分；开启后首次学习显示彩色提示"},
     {"name": "settings_appearance_display", "value": "主题与文字"},
-    {"name": "settings_directory_appearance_simple_hint", "value": "深浅与颜色主题、动态背景、卡片字体大小"},
+    {"name": "settings_directory_appearance_simple_hint", "value": "深浅与颜色主题、动态背景、卡片字体大小、动效风格"},
     {"name": "settings_directory_review_simple_hint", "value": "评分振动、学习手势、四象限分区点击答题、复习布局"},
     {"name": "settings_directory_data_simple_hint", "value": "导入导出、备份、隐藏牌组恢复、媒体管理"},
     {"name": "settings_directory_sync_simple_hint", "value": "自定义服务器、账号与自动同步"},
@@ -2177,7 +2177,8 @@
     {"name": "note_editor_bold", "value": "粗体"},
     {"name": "note_editor_italic", "value": "斜体"},
     {"name": "note_editor_underline", "value": "下划线"},
-    {"name": "note_editor_break", "value": "换行"},    {"name":"note_editor_font_size","value":"字号"},
+    {"name": "note_editor_break", "value": "换行"},
+    {"name":"note_editor_font_size","value":"字号"},
     {"name":"note_editor_heading","value":"标题"},
     {"name":"note_editor_size_xx_small","value":"极小（xx-small）"},
     {"name":"note_editor_size_x_small","value":"很小（x-small）"},
@@ -2198,7 +2199,6 @@
     {"name":"note_editor_format_options_instructions","value":"点选一个选项应用到打开菜单时的字段选区；无选区时在光标处插入。字号和标题写入 HTML 并切到源码编辑，在卡片预览或学习时查看效果。公式菜单由长按公式按钮打开，只提供独立成行和化学格式；单按公式按钮插入行内格式。取消不改内容，关闭后恢复外圈。"},
     {"name":"note_editor_hint_font_size","value":"选中文字后点“字号”，选择从极小到极大的七档字号；没有选区时插入空标签，光标留在标签内部。会切到源码编辑，在卡片预览或学习时查看效果。此工具只修改当前内容，不改变“设置 → 外观 → 卡片文字大小”。关闭提示后打开字号选项。"},
     {"name":"note_editor_hint_heading","value":"选中文字后点“标题”，选择一级到五级标题；没有选区时插入空标题，光标留在标签内部。标题独立成段，模板 CSS 决定最终字号和间距。会切到源码编辑，在卡片预览或学习时查看效果。关闭提示后打开标题选项。"},
-
     {"name": "note_editor_math", "value": "公式"},
     {"name": "note_editor_cloze_next", "value": "新挖空"},
     {"name": "note_editor_cloze_same", "value": "同组挖空"},
@@ -2798,6 +2798,14 @@
     {"name": "note_editor_wheel_move_hint", "value": "上下拖动调整高度，长按切换左右侧"},
     {"name": "note_editor_wheel_apply", "value": "执行当前工具"},
     {"name": "note_editor_wheel_select", "value": "点击应用此工具"},
-    {"name": "note_editor_wheel_tap", "value": "点击使用"}
+    {"name": "note_editor_wheel_tap", "value": "点击使用"},
+    {"name": "motion_style", "value": "动效风格"},
+    {"name": "motion_style_restrained", "value": "克制"},
+    {"name": "motion_style_lively", "value": "灵动"},
+    {"name": "motion_style_hint", "value": "灵动增强菜单、弹窗和工具反馈，学习卡片保持直接切换。"},
+    {"name": "motion_style_save_failed", "value": "动效风格保存失败，请重试"},
+    {"name": "feedback_buried", "value": "已埋藏当前卡片"},
+    {"name": "feedback_suspended", "value": "已暂停当前卡片"},
+    {"name": "feedback_items_updated", "value": "已更新 %d 项"}
   ]
 }

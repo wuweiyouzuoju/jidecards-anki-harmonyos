@@ -11,6 +11,7 @@ import { 设置分组卡片 } from './设置分组卡片';
 import { UNLOCKED_CONTENTS_KEY, THEME_CATALOG, ThemeDefinition, isThemeAvailable, themeDefinition } from '../../model/ThemeCatalog';
 import { IridescentGiftDialog } from '../IridescentGiftDialog';
 import { ThemeMotionControl } from './ThemeMotionControl';
+import { MotionStyleControl } from './MotionStyleControl';
 import { CardTextSizeControl } from './CardTextSizeControl';
 import { DeckWidthControl } from './DeckWidthControl';
 import {
@@ -192,6 +193,7 @@ export struct 外观分组 {
           if (isSettingsItemVisible('theme_motion', this.简洁模式, themeDefinition(this.当前颜色主题).backgroundTextures.length > 0)) {
             ThemeMotionControl({ isDark: this.是否深色 })
           }
+          MotionStyleControl()
           DeckWidthControl()
           CardTextSizeControl()
       }

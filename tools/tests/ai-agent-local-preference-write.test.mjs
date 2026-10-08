@@ -63,7 +63,8 @@ test('confirmation previews use actual localized names and values for font, widt
     for (const [id,before,after,label,beforeText,afterText] of [
       ['card_text_size','100','130','card_text_size','100%','130%'],
       ['deck_list_style','single_wide','double_narrow','deck_width',resources.get('deck_style_single_wide'),resources.get('deck_style_double_narrow')],
-      ['study_haptics','true','false','settings_study_haptics',resources.get('ai_agent_setting_on'),resources.get('ai_agent_setting_off')]
+      ['study_haptics','true','false','settings_study_haptics',resources.get('ai_agent_setting_on'),resources.get('ai_agent_setting_off')],
+      ['motion_style','restrained','lively','motion_style',resources.get('motion_style_restrained'),resources.get('motion_style_lively')]
     ]) {
       control.action = {kind:'setting_change',payloadJson:JSON.stringify({settingId:id,before,after})};
       assert.equal(control.settingLabel(),label);

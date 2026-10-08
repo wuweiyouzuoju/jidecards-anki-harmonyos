@@ -14,6 +14,7 @@ import { agentPreferenceDefinitions, agentWritablePreferenceIds, decodeWritableP
 import { localPreferenceApi } from './local-preference-harness.mjs';
 import { CARD_TEXT_SIZE_KEY, DEFAULT_CARD_TEXT_SIZE, normalizeCardTextSize } from '../../entry/src/main/ets/model/CardTextSize.ts';
 import * as deckAppearance from '../../entry/src/main/ets/model/DeckListAppearance.ts';
+import * as motionModel from '../../entry/src/main/ets/model/MotionStyle.ts';
 const { DECK_LIST_NARROW_KEY, DECK_LIST_STYLE_KEY } = deckAppearance;
 import { buildAgentDeckSettings } from '../../entry/src/main/ets/model/agent/AgentDeckSettings.ts';
 import { customSchedulingInfo } from '../../entry/src/main/ets/model/CustomScheduling.ts';
@@ -46,10 +47,11 @@ function fixture() {
   };
   const localDependencies = { ...localApi, AppStorage: localStorage,
     preferences: {getPreferencesSync: () => localStore},
-    CARD_TEXT_SIZE_KEY, DEFAULT_CARD_TEXT_SIZE, normalizeCardTextSize, ...deckAppearance };
+    CARD_TEXT_SIZE_KEY, DEFAULT_CARD_TEXT_SIZE, normalizeCardTextSize, ...deckAppearance, ...motionModel };
   const saveCardTextSize = loadPlatformModule('utils/CardTextSizeStore.ets','saveCardTextSize',localDependencies);
   const { saveDeckListStyle, legacyDeckListStyle } = loadPlatformModule('utils/DeckListAppearanceStore.ets','({saveDeckListStyle, legacyDeckListStyle})',localDependencies);
   const saveStudyHaptics = loadPlatformModule('utils/StudyHaptics.ets','saveStudyHaptics',localDependencies);
+  const saveMotionStyle = loadPlatformModule('utils/MotionStyleStore.ets','saveMotionStyle',localDependencies);
   const readAgentPreference = loadPlatformModule('backend/agent/AgentPreferenceReader.ets','readAgentPreference', {
     ...localApi, agentPreferenceDefinitions, agentWritablePreferenceIds, decodeAgentPreference, legacyDeckListStyle,
     AppStorage: localStorage, preferences: {getPreferences: async () => localStore}
@@ -99,7 +101,7 @@ function fixture() {
   const call = (name,args) => registry.execute({id:'call',name,argumentsJson:JSON.stringify(args)});
   const Executor = loadPlatformModule('backend/agent/AgentActionExecutor.ets', 'AgentActionExecutor', {
     牌组服务: class {}, 笔记类型服务: class {}, AgentActionLedger, decodeSettingChange, appThemeColorSession: colors,
-    LocalPreferenceWriteError: localApi.LocalPreferenceWriteError, saveCardTextSize, saveDeckListStyle, saveStudyHaptics,
+    LocalPreferenceWriteError: localApi.LocalPreferenceWriteError, saveCardTextSize, saveDeckListStyle, saveStudyHaptics, saveMotionStyle,
     设置FSRS开启状态: async (enabled, expected) => {
       if (state.fsrs !== expected) throw Error('setting_changed_since_proposal');
       if (state.fsrs !== enabled) state.fsrsWrites.push(enabled);
@@ -107,7 +109,7 @@ function fixture() {
     }
   });
   const executor = new Executor({...scope, currentCreateTarget: () => [0,0]}, {});
-  return {state,themes,colors,tools,registry,call,executor,saveCardTextSize,saveDeckListStyle,saveStudyHaptics,views};
+  return {state,themes,colors,tools,registry,call,executor,saveCardTextSize,saveDeckListStyle,saveStudyHaptics,saveMotionStyle,views};
 }
 
 test('the registered app interface tool reads fresh UI mode, observations and actual turn tool capabilities without writes', async () => {
@@ -274,7 +276,7 @@ test('page binds authorization to fresh raw user intent and exposes undo without
 test('broad settings catalog has executable reads, exact schemas, no secret keys and no synthetic write support', async () => {
   const f = fixture();
   const definitions = agentSettingDefinitions();
-  assert.equal(definitions.length, 20);
+  assert.equal(definitions.length, 21);
   assert.equal(new Set(definitions.map(x => x.id)).size, definitions.length);
   const ids = definitions.map(x => x.id);
   const schema = JSON.parse(agentSettingsFunctionTools().find(x => x.name === 'get_settings').parametersJson);
@@ -393,7 +395,8 @@ test('local setting proposals execute real shared stores only after one exact co
   for (const [settingId,value,key,stored] of [
     ['card_text_size','130',CARD_TEXT_SIZE_KEY,130],
     ['deck_list_style','double_narrow',DECK_LIST_STYLE_KEY,'double_narrow'],
-    ['study_haptics','false','studyHapticsEnabled',false]
+    ['study_haptics','false','studyHapticsEnabled',false],
+    ['motion_style','lively',motionModel.MOTION_STYLE_KEY,'lively']
   ]) {
     const action = (await f.call('propose_set_setting',{settingId,value})).action;
     assert.equal(action.kind,'setting_change');
@@ -424,7 +427,8 @@ test('manual changes invalidate local proposals and unsupported or malformed set
   const cases = [
     ['card_text_size','140',() => f.saveCardTextSize(110)],
     ['deck_list_style','single_narrow',() => f.saveDeckListStyle('double_wide')],
-    ['study_haptics','false',() => f.saveStudyHaptics(false)]
+    ['study_haptics','false',() => f.saveStudyHaptics(false)],
+    ['motion_style','lively',() => f.saveMotionStyle('lively')]
   ];
   for (const [settingId,value,manual] of cases) {
     const action = (await f.call('propose_set_setting',{settingId,value})).action;
@@ -436,7 +440,7 @@ test('manual changes invalidate local proposals and unsupported or malformed set
   const writes = f.state.localWrites.length;
   for (const [settingId,value] of [['language','en'],['api_key','secret'],['card_text_size','49'],
     ['card_text_size','201'],['card_text_size','100.5'],['card_text_size','1e2'],
-    ['card_text_size','0100'],['study_haptics','1'],['deck_list_style','true']]) {
+    ['card_text_size','0100'],['study_haptics','1'],['deck_list_style','true'],['motion_style','true'],['motion_style','Lively']]) {
     assert.throws(() => decodeSettingsArguments('propose_set_setting',JSON.stringify({settingId,value})));
     assert.throws(() => decodeSettingChange(JSON.stringify({settingId,before:value,after:value})));
     await assert.rejects(f.call('propose_set_setting',{settingId,value}),/invalid_tool_arguments/);

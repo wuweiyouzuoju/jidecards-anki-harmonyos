@@ -60,6 +60,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     { id: 'theme_mode', titleKey: 'appearance_theme', settingId: 'theme_mode' },
     { id: 'color_theme', titleKey: 'appearance_color_theme', settingId: 'color_theme' },
     { id: 'theme_motion', titleKey: 'iridescent_motion', settingId: 'theme_motion', condition: 'theme_has_textures' },
+    { id: 'motion_style', titleKey: 'motion_style', settingId: 'motion_style' },
     { id: 'deck_list_style', titleKey: 'deck_width', settingId: 'deck_list_style' },
     { id: 'card_text_size', titleKey: 'card_text_size', settingId: 'card_text_size' }
   ] },
