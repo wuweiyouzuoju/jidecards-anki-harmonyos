@@ -25,7 +25,7 @@ Node 24.x 与 `package.json` / CI 一致。首次准备或 lockfile 变化后运
 
 `platform-module-harness.mjs` 可注入平台依赖执行 `.ets` 模块或组件的真实非渲染逻辑；组件装饰器与 build 被去除，因此不证明 ArkUI 观察、Prop 更新或布局行为。不要在测试中重新实现会话规则，也不能用该 harness 代替 HAP 和设备验证。
 
-`verify` 按阶段打印 environment/repository/native/rpc-index/hap，失败立即非零退出。结束报告必须写明执行的模式，repo 成功不等于整个应用验证完成。
+`verify` 按阶段打印 environment/repository/native/sandbox/rpc-index/protocol-core/hap，失败立即非零退出。结束报告必须写明执行的模式，repo 成功不等于整个应用验证完成。
 
 ## 开发可维护性门禁
 
@@ -37,13 +37,11 @@ Node 24.x 与 `package.json` / CI 一致。首次准备或 lockfile 变化后运
 
 ## RPC 协议门禁
 
-`node tools/verify-rpc-index.mjs` 需要 Node 24 和 `third_party/anki` 源码，不依赖残留构建目录。它核对 `UPSTREAM.lock`、协议/生成器输入的 SHA-256 指纹，以及每个本地常量的服务号、方法号和 Rust 方法名。存在独立 Anki Git checkout 时还检查提交；源码归档没有 `.git` 时以输入指纹验证，不借用父仓库的 HEAD。
+统一入口为 [Core 协议生成](core-protocol.md)。`node tools/core-protocol.mjs --check` 重新用官方 `anki_proto_gen::get_services` 导出锁定描述快照，核对源归档指纹、schema 和全部 ArkTS/Rust/C++ 产物。生成使用 `--generate`；导入官方描述使用 `--refresh <独立官方锁定checkout>`，要求 origin、HEAD 与锁文件一致且工作树完全干净。日常源码归档无需 Git，不能借用父仓库 HEAD。
 
-`tools/rpc-index-methods.json` 按本地常量名称绑定语义方法名；`tools/rpc-index-baseline.json` 是从生成的 `backend.rs` 导出的分派基线。交换两个有效编号、缺少末项、新增未登记常量、上游输入变动都失败。同一门禁还读取上游 `config.proto`，核对复习偏好的字段类型和编号。CI 的 Rust 作业在克隆锁定 Anki 后调用同一脚本；仓库测试使用受版本控制的基线和合成 protobuf 字节执行字段编解码及 RPC 行为断言，不读取本机 Anki，也不因缺少它而悄悄跳过。
+`tools/rpc-index-methods.json` 只绑定领域别名与语义方法名；`rpc-index-baseline.json` 来自官方 helper 分派信息。`node tools/verify-rpc-index.mjs` 核对完整生成及既有索引；传入显式 `backend.rs` 只作额外对照，不从构建缓存提取协议事实。旧 `--generate backend.rs` 已拒绝，不能拿旧缓存或本机改稿刷新官方基线。
 
-升级流程：更新锁定依赖并完成真实 Core 构建，核对别名语义，然后运行 `node tools/verify-rpc-index.mjs --generate <本次构建生成的backend.rs绝对路径>`，审查别名、基线 JSON 与生成的 ArkTS/Rust/C++ 常量差异，最后运行完整 `npm run verify`。生成基线必须使用独立的、提交匹配 `UPSTREAM.lock` 的 Anki Git checkout；协议/生成器目录及 `Cargo.lock` 有未提交修改时拒绝生成，防止把本机裁剪工作区后的依赖锁写成官方基线。普通校验仍支持源码归档。禁止拿旧缓存生成新版本基线。传入单个 `backend.rs` 路径则只校验该显式产物，不扫描并择优使用旧缓存。
-
-输入指纹覆盖 proto、Rust 接口生成器及其依赖锁；它证明这些输入与已审查基线一致，不代表本次刚编译过 Core。显式产物校验和 Rust/HAP 构建仍是独立证据，远端 CI 与设备行为也须分别报告。
+升级前保存旧 schema，审查 `core-protocol.mjs --diff <旧schema> <新schema>` 的接口、字段、类型、默认、optional/oneof/枚举差异，再执行领域旧／新对照、真实 Core 和完整门禁。源指纹与生成检查不代表本次编译过 Core；ArkTS/HAP、远端 CI、设备及在线行为是独立证据。本任务保持原锁定版本及四项 Core 补丁。
 
 ## HAP 警告门禁
 
@@ -138,7 +136,7 @@ Node 24 测试使用内置 TypeScript 转换，运行时可能输出 `Experiment
 
 ## Core 集成、生成索引与定期 HAP
 
-- `node tools/generate-rpc-index.mjs` 从已锁定的分派基线、语义别名及 C 头生成 ArkTS 索引、`native/rsharmony/src/rpc_ids.rs` 和 `native/napi_bridge/src/rpc_ids.h`；`--check` 只比较，不写入。升级基线的 `verify-rpc-index --generate` 同步生成这些文件。不要手改数字；新增语义别名放 `rpc-index-methods.json`。完整 Node 测试验证可再生成性。
+- `node tools/core-protocol.mjs --generate|--check` 管理全部协议产物；`generate-rpc-index.mjs` 是兼容委托入口。事实来源、官方刷新、字段差异及生产迁移证据见 [Core 协议生成](core-protocol.md)。
 - `node tools/test-anki-core.mjs` 是 CI 与本地共用的真实 Core 入口：校验锁定输入、准备翻译子模块、幂等应用已跟踪补丁，运行 `cargo test -p jidecards_core --features anki-core --locked`。独立 checkout 核对提交；源码归档核对协议指纹，不能错误借用父仓库 HEAD。Windows 原生工具链仍可用 `build-native.ps1 -Target host-test`。
 - `.github/workflows/ci.yml` 的 Rust 作业增加上述 Core 入口，覆盖实际集合/媒体/取消行为；远端执行结果需另行查看，不以本地通过冒充。
 - `.github/workflows/hap.yml` 每周和手动运行 `npm run verify`，需要带 `jidecards-deveco` 标签的 Windows 自托管 runner。Runner 必须预置锁定 SDK、Rust/Anki 及本机签名配置。`clean: false` 保留这些不受版本控制的本机依赖。工作流只运行可信默认分支，不接入 PR 的签名主机执行；配置文件存在不代表 runner 已注册或定时任务已运行。

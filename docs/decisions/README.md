@@ -12,6 +12,8 @@
 
 ## 有效决策
 
+- [描述驱动的 Core 协议生成](2026-10-08-core-protocol-generation.md)：官方 helper、单一生成入口、私有协议、不可变旧实现对照、领域契约与未接入能力边界。
+
 - [自定义调度执行边界](2026-10-07-custom-scheduling.md)：同步脚本沙箱、原生状态字段保真、失败确认、共享 UI/JIDE 能力与直接行为验证。
 
 - [官网静态内容与机器读取](2026-10-07-website-static-content.md)：HTML、Markdown、JSON 使用同一事实来源，构建阶段输出完整正文，宣传图由作者提供并校验原始字节。

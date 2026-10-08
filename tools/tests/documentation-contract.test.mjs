@@ -7,6 +7,15 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
+test('Core protocol generation has current ownership, commands and handoff navigation', () => {
+  for (const file of ['PROJECT_CONTEXT.md','docs/development/ownership.md','docs/development/verification.md','tools/README.md']) assert.match(read(file), /core-protocol\.md/);
+  assert.match(read('docs/decisions/README.md'), /2026-10-08-core-protocol-generation\.md/);
+  const protocol=read('docs/development/core-protocol.md');
+  assert.match(protocol,/anki_proto_gen::get_services/);
+  for(const file of ['tools/core-protocol.mjs','tools/protocol/private.proto','tools/protocol/private-rpc.json','tools/protocol/inventory.json','tools/tests/fixtures/protocol-legacy/manifest.json']) assert.ok(existsSync(path.join(root,file)),file);
+  assert.doesNotMatch(read('docs/architecture.md'), /必须从新版本生成的 `backend.rs`/);
+});
+
 function read(relativePath) {
   return readFileSync(path.join(root, relativePath), 'utf8');
 }

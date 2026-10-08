@@ -1,5 +1,7 @@
 # Anki / AnkiDroid 核心互通回归
 
+生产协议迁移联测使用 `npm run protocol:test-core`，完整门禁已接入；输入权威、旧／新差分、私有协议和重现命令见 [Core 协议生成](core-protocol.md)。
+
 [返回任务索引](../../PROJECT_CONTEXT.md) · [数据导入](import-data.md) · [同步](sync-data.md) · [验证](verification.md)
 
 ## 可重复入口与隔离

@@ -4,6 +4,8 @@
 
 这张表是编程 Agent 判断“应该从哪里开始、代码应该放哪里、改完验证什么”的当前入口。更细的行为规则以源码和对应领域文档为准。
 
+Core/私有协议的描述、生成、wire 与领域映射职责见 [Core 协议生成](core-protocol.md)。`tools/core-protocol.mjs` 独占协议产物；`proto/messages` 只保留领域契约差异，生成客户端不注册 UI/JIDE 能力。
+
 ## `entry`
 
 JIDE 通用空会话文案顺序归 `model/agent/AgentSuggestions.ts`，场景建议规则与能力筛选归 `AgentAppRecommendations.ts`，文字归中英文资源。`AppInterfaceTracker` 独占最近非 JIDE 页的上下文与销毁释放；结构工具和提示共用纯建议模型。`AgentEmptySuggestions.ets` 独占轮换、手势和剪贴板，页面只装配可见状态与读取回调。入口与验证见 [空会话提示](agent.md#jide-空会话提示)。

@@ -24,6 +24,7 @@ try {
     run('native', 'powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/build-native.ps1', '-Target', 'host-test']);
     run('sandbox', 'powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/build-agent-sandbox.ps1', '-Target', 'host']);
     run('rpc-index', process.execPath, ['tools/verify-rpc-index.mjs']);
+    run('protocol-core', process.execPath, ['--experimental-transform-types', '--import', './tools/tests/register-ts-hook.mjs', 'tools/test-protocol-core.mjs']);
   }
   if (mode === 'all') {
     run('hap', 'powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/build-app.ps1', '-Clean']);

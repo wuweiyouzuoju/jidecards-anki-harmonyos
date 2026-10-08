@@ -11,7 +11,8 @@ Agent-first 原则与开发约束见 [AGENTS.md](AGENTS.md)，本页只提供任
 | --- | --- |
 | 应用版本 | `AppScope/app.json5` |
 | SDK / 本机签名 | `build-profile.json5` / `.local/signing.json`（或环境指定文件），见 [签名说明](docs/development/signing.md) |
-| Anki 提交、协议基线 | `UPSTREAM.lock` |
+| Anki 提交 | `UPSTREAM.lock` |
+| Core / 私有协议生成、迁移与接通清单 | [Core 协议生成](docs/development/core-protocol.md)、`tools/core-protocol.mjs` |
 | Rust 工具链 | `rust-toolchain.toml` |
 | Node 与验证入口 | `package.json`、`npm test -- --list` |
 | 应用内 Agent 发布能力 | `entry/src/main/ets/model/ReleaseFeatures.ets` |
@@ -46,6 +47,7 @@ Agent-first 原则与开发约束见 [AGENTS.md](AGENTS.md)，本页只提供任
 | 学习、评分、音频、卡片预览 | [学习与媒体](docs/development/study-media.md) | `StudySessionController`、`StudyInputPolicy`、`StudyAnswerRenderer`、`CardAudioSession`；`npm test -- study` 或 `npm test -- media` |
 | 同步、导入导出、集合生命周期 | [同步](docs/development/sync-data.md) | `AutoSyncScheduler`、`SyncSettings`、`同步面板`；`npm test -- sync` |
 | APKG/CSV 导入、整库中断恢复 | [数据导入](docs/development/import-data.md) | `DataTransferSession`、`AnkiDataTransfer`、`TransferRecovery`；`npm test -- sync` |
+| Core 协议、字段、RPC 或生成流程 | [Core 协议生成](docs/development/core-protocol.md) | `tools/core-protocol.mjs`、`proto/generated/`、领域 Service；生成覆盖不等于 UI/JIDE 接通 |
 | Anki / AnkiDroid 核心互通回归 | [核心互通](docs/development/core-interop.md) | `npm run test:interop`；隔离包往返、行为断言与未验证范围 |
 | 搜索、批量编辑、统计、设置 | [浏览与统计](docs/development/browser-stats.md) | `BrowserSearchSession`、`BrowserOperationController`、`BrowserSidebar`、`StatsOverview`；`npm test -- browser` 或 `npm test -- ui` |
 | 主题、布局、权益 | [界面](docs/development/appearance.md) | `ThemeCatalog`、`ThemeBackground`、`SelectStyle`；`npm test -- ui` |

@@ -67,14 +67,14 @@ Navigation 的 push/pop 触发。
 
 ## 4. Anki 服务边界
 
-服务号和方法号的唯一维护点是
-[`entry/src/main/ets/backend/服务索引.ts`](../entry/src/main/ets/backend/服务索引.ts)。
-当前已封装集合、卡片、牌组、配置、牌组配置、调度、AnkiWeb、链接、笔记类型、
-笔记、卡片渲染、搜索、图片遮罩、导入导出、媒体、统计和标签等服务。
+协议事实来自锁定官方描述与 `anki_proto_gen::get_services`，唯一生成入口是
+`tools/core-protocol.mjs`。消息、RPC、既有中文服务索引与原生重复字段均生成；
+`proto/messages` 保留明确领域映射和既有调用契约。生成范围不授予 UI/JIDE 能力。
 
-升级 Anki 时必须从新版本生成的 `backend.rs` 重新核对编号和 protobuf，不得根据
-旧文档抄写。proto 定义以本地 `third_party/anki/proto/anki/` 中锁定提交为准；
-该目录是本地依赖，不受 Git 跟踪。
+升级时比较描述 schema 的接口、编号、字段、类型、默认和 optional/oneof/枚举变化，
+再执行旧／新对照与真实 Core/HAP 验收；Rust 文本只作显式比较。
+日常支持锁定源码归档，刷新官方基线要求独立 clean checkout。
+入口和剩余差异见 [Core 协议生成](development/core-protocol.md)。
 
 ## 5. 关键业务流
 
