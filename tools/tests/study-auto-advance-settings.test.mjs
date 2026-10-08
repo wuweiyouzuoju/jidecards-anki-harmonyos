@@ -8,6 +8,7 @@ import { StudyOptions, StudyAutoAdvanceSettings } from '../../entry/src/main/ets
 import { StudyAutoAdvanceDraft, StudyAdvanceField as Field } from '../../entry/src/main/ets/model/StudyAutoAdvanceDraft.ts';
 import { loadUiFeedback } from './ui-feedback-harness.mjs';
 import { appInterfaceDependencies, studyInterfaceMethods } from './app-interface-harness.mjs';
+import { surfaceMotionApi } from './motion-harness.mjs';
 
 const source = readFileSync(new URL('../../entry/src/main/ets/pages/学习页.ets', import.meta.url), 'utf8');
 function methods(source, names) {
@@ -18,7 +19,7 @@ function methods(source, names) {
   }).join('\n');
 }
 const pageMethods = methods(source, ['configureAutoAdvance', 'choiceAutoAdvanceSeconds', 'studyTimerState', '更多菜单']);
-const interfaceDeps = appInterfaceDependencies();
+const interfaceDeps = { ...appInterfaceDependencies(), ...surfaceMotionApi() };
 const Page = new Function(...Object.keys(interfaceDeps), 'StudyAutoAdvanceDraft', 'CustomDialogController', 'StudyAutoAdvanceDialog', 'DialogAlignment', '$r',
   stripTypeScriptTypes('class Page {' + pageMethods + studyInterfaceMethods(source) + '}', { mode: 'transform' }) + '\nreturn Page;')(
     ...Object.values(interfaceDeps),
@@ -29,7 +30,7 @@ const Page = new Function(...Object.keys(interfaceDeps), 'StudyAutoAdvanceDraft'
     }, options => options, { Center: 0 }, key => key);
 
 function harness(choice = false) {
-  const page = new Page();
+  const page = Object.assign(new Page(), { recoveryMessage: '', resultMessage: '', resultUndo: null });
   const events = [];
   Object.assign(page, {
     getUIContext: () => ({}),

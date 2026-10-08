@@ -56,7 +56,7 @@ test('actual keyboard handler honors mappings, protected keys, modifiers and eve
   'RATING_AGAIN','RATING_HARD','RATING_GOOD','RATING_EASY','BURY_SUSPEND_MODE_BURY_USER','BURY_SUSPEND_MODE_SUSPEND',
   stripTypeScriptTypes('class Host{'+methods(['controls','处理按键'])+'}',{mode:'transform'})+';return Host;')(
    validateStudyControls,mappedStudyCommand,resolveStudyKey,key=>key,{Down:0,Up:1},0,1,2,3,4,5);
- const page=Object.assign(new Host(),{阶段:'answer',Ctrl按下:false,timeboxNotice:null,
+ const page=Object.assign(Object.assign(new Host(), { recoveryMessage: '', resultMessage: '', resultUndo: null }),{阶段:'answer',Ctrl按下:false,timeboxNotice:null,
   controlsJson:JSON.stringify({...defaultStudyControls(),keys:[{input:'space',command:'easy'}]}),
   评分:n=>calls.push(n),返回:()=>calls.push('back'),请求删除当前卡:()=>calls.push('delete'),撤销上次:()=>calls.push('undo')});
  const key=(keyCode,type=0)=>page.处理按键({keyCode,type});
@@ -74,7 +74,7 @@ test('actual keyboard handler honors mappings, protected keys, modifiers and eve
 
 test('actual lifecycle gate borrows the window only while the study page is mounted, visible and foreground',()=>{
  const calls=[];const Host=new Function('validateStudyControls',stripTypeScriptTypes('class Host{'+methods(['controls','updateScreenAwake'])+'}',{mode:'transform'})+';return Host;')(validateStudyControls);
- const page=Object.assign(new Host(),{mounted:true,页面已显示:true,foreground:true,controlsJson:JSON.stringify({...defaultStudyControls(),keepScreenOn:true}),screenAwake:{update:async value=>calls.push(value)}});
+ const page=Object.assign(Object.assign(new Host(), { recoveryMessage: '', resultMessage: '', resultUndo: null }),{mounted:true,页面已显示:true,foreground:true,controlsJson:JSON.stringify({...defaultStudyControls(),keepScreenOn:true}),screenAwake:{update:async value=>calls.push(value)}});
  page.updateScreenAwake();
  for(const field of ['foreground','页面已显示','mounted']) {page[field]=false;page.updateScreenAwake();page[field]=true;}
  page.controlsJson=JSON.stringify(defaultStudyControls());page.updateScreenAwake();

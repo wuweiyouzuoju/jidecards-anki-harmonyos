@@ -274,7 +274,7 @@ test('Web attach consumes only the current cached question and errors are recove
   await page.加载下一张卡();
   page.网页控制器.loadData=()=>{throw new Error('web failed');};
   page.studyWebAttached();
-  assert.equal(page.阶段,'error'); assert.equal(page.错误详情,'web failed');
+  assert.equal(page.阶段,'question'); assert.equal(page.recoveryMessage,'web failed');
   page.网页控制器.loadData=html=>displayed.push(html);
   await page.加载下一张卡();
   assert.equal(page.阶段,'question');

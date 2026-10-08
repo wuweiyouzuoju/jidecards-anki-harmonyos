@@ -21,7 +21,7 @@ const Page = new Function('KeyType', 'studyKeyName', 'actionMenuRows', 'toggleAc
   { Down: 0 }, key => key, actionMenuRows, toggleActionMenuBranch);
 
 function harness() {
-  const page = new Page(), events = [];
+  const page = Object.assign(new Page(), { recoveryMessage: '', resultMessage: '', resultUndo: null }), events = [];
   const root = [
     { id: 'edit', action: () => events.push('edit') },
     { id: 'marking', value: 'Marking', children: [
@@ -110,7 +110,7 @@ test('shared menu rejects stale/disabled rows and keeps flat preview callbacks',
     MenuSurface:{pointerSpan:20,pointerDepth:6},Curve:{EaseOut:'easeOut'}
   });
   const menu=new Menu(),{root}=harness(),events=[];menu.items=root;menu.expandedIds=['marking','card_actions'];
-  menu.getUIContext=()=>({animateTo:(_options,callback)=>callback()});
+  menu.getUIContext=()=>{throw new Error('branch changes must not animate the entire measured menu layout');};
   menu.onToggleBranch=item=>{menu.expandedIds=toggleActionMenuBranch(menu.items,menu.expandedIds,item.id);};
   menu.onSelect=item=>events.push(item.id);
   const mark=menu.rows().find(row=>row.node.id==='mark');
@@ -218,7 +218,7 @@ test('all card menu callers share one viewport-limited surface and one row rende
     mounted.topOffset = 800;
     assert.equal(mounted.menuGeometry().maxHeight, 0, 'an offscreen anchor cannot create overflowing menu height');
   }
-  assert.match(shell, /Scroll\(\)/);
+  assert.match(shell, /Scroll\(this\.scroller\)/);
   assert.match(shell, /maxHeight: this\.menuGeometry\(\)\.maxHeight/);
   assert.match(shell, /top: this\.menuGeometry\(\)\.top/);
 });

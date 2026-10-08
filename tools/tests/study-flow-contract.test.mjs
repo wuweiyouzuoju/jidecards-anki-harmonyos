@@ -43,12 +43,12 @@ test('scheduler service walks the study queue contract', () => {
   const service = read(SCHEDULER);
 
   assert.match(service, /async 获取队首卡片\(牌组ID: number, fetchLimit: number = 1\): Promise<QueuedCardsView>/);
-  assert.match(service, /牌组方法\.设置当前牌组/, 'must select deck before queueing');
-  assert.match(service, /调度器方法\.获取队首卡片/);
+  assert.match(service, /Decks_set_current_deck/, 'must select deck before queueing');
+  assert.match(service, /Scheduler_get_queued_cards/);
   assert.match(service, /encodeGetQueuedCardsRequest\(fetchLimit, false\)/, 'caller can request a candidate without advancing the queue');
-  assert.match(service, /调度器方法\.描述下一档状态/);
+  assert.match(service, /Scheduler_describe_next_states/);
   assert.match(service, /encodeSchedulingStates\(状态字节\)/, 'states passthrough for labels');
-  assert.match(service, /调度器方法\.提交评分/);
+  assert.match(service, /Scheduler_answer_card/);
   assert.match(service, /encodeCardAnswer\(作答参数\)/);
   assert.doesNotMatch(service, /new 后端客户端/, 'must go through 后端会话');
 });
@@ -57,10 +57,10 @@ test('card rendering service wraps RenderExistingCard and ExtractAvTags', () => 
   const service = read(RENDERING);
 
   assert.match(service, /async 渲染既有卡片\(卡片ID: number\): Promise<RenderedCard>/);
-  assert.match(service, /卡片渲染方法\.渲染既有卡片/);
+  assert.match(service, /CardRendering_render_existing_card/);
   assert.match(service, /encodeRenderExistingCardRequest\(卡片ID\)/);
   assert.match(service, /async extractAudioTags\(html: string, question: boolean\): Promise<AvTagsResult>/);
-  assert.match(service, /卡片渲染方法\.提取音视频标签/);
+  assert.match(service, /CardRendering_extract_av_tags/);
   assert.match(service, /encodeExtractAvTagsRequest\(html, question\)/);
   assert.doesNotMatch(service, /new 后端客户端/);
 });
@@ -353,8 +353,8 @@ test('study page reconciles the current card and queue after an Agent edit', () 
   // 多通道只允许刷新一次：onPop 与 @Watch 都只置位，渲染 RPC 由 消费待重渲染 统一发起。
   assert.match(page, /onPop[\s\S]{0,120}?待重渲染当前卡 = true/);
 
-  assert.equal((page.match(/this\.刷新编辑后当前卡\(\)/g) ?? []).length, 1,
-    'only 消费待重渲染 may fire the re-render; double firing wastes a render RPC');
+  assert.equal((page.replace(/this\.recoverStudy\(error as Object, \(\): Promise<void> => this\.刷新编辑后当前卡\(\)\);/, '').match(/this\.刷新编辑后当前卡\(\)/g) ?? []).length, 1,
+    'only the consumer starts refresh; the recovery callback is not invoked until an explicit retry');
 
   // 返回后先核对真实队首：普通改字段保留当前阶段；删除/移走当前卡则加载新队首。
   const refresh = page.match(/private async 刷新编辑后当前卡\(\)[\s\S]*?\n  \}/)?.[0] ?? '';
@@ -386,7 +386,7 @@ test('counts for deck today decodes new and review tallies', () => {
 test('scheduler service exposes deck today counts via scheduler method 10', () => {
   const service = read(SCHEDULER);
   assert.match(service, /async 获取牌组今日计数\(牌组ID: number\): Promise<DeckTodayCounts>/);
-  assert.match(service, /调度器方法\.牌组今日计数/);
+  assert.match(service, /Scheduler_counts_for_deck_today/);
   assert.match(service, /encodeDeckId\(牌组ID\)/);
 });
 

@@ -180,7 +180,7 @@ test('settings selection disables duplicate input and restores actual mode after
     StudyQuickAnswerMode, loadStudyQuickAnswerMode: async () => 0,
     saveStudyQuickAnswerMode: () => new Promise((resolve, reject) => { finish = { resolve, reject }; })
   });
-  const host = new Host();
+  const host = Object.assign(new Host(), { recoveryMessage: '', resultMessage: '', resultUndo: null });
   const saving = host.changeControl(1);
   assert.equal(host.controlsSaving, true); assert.equal(host.selectedMode, 1);
   await host.changeControl(2); assert.equal(host.selectedMode, 1);
@@ -205,7 +205,7 @@ function pageHarness() {
     'RATING_AGAIN', 'RATING_HARD', 'RATING_GOOD', 'RATING_EASY', 'validateStudyControls', 'mappedStudyCommand',
     stripTypeScriptTypes('class Host {' + methods + '}', { mode: 'transform' }) + ';return Host;')(
     StudyQuickAnswerMode, resolveStudyGesture, () => completed, async () => { saved++; completed = true; }, { now: () => now }, 0, 1, 2, 3,validateStudyControls,mappedStudyCommand);
-  const page = Object.assign(new Host(), { timeboxNotice: null, 阶段: 'question', requestVersion: 1, interactionVersion: 1,
+  const page = Object.assign(Object.assign(new Host(), { recoveryMessage: '', resultMessage: '', resultUndo: null }), { timeboxNotice: null, 阶段: 'question', requestVersion: 1, interactionVersion: 1,
     controlsJson:JSON.stringify(defaultStudyControls()),quickAnswerMode: StudyQuickAnswerMode.TapZones, choiceQuestion: null, pendingHtml: '', controllerReady: true,
     展示时刻毫秒: 500, isCurrentRequest: v => v === 1, stopStudyTimers() {}, startStudyTimers() {}, clearChoiceAutoAdvance() {},
     studyCardShown() { scripts.push(this.interactionVersion); }, 显示答案() { commands.push('flip'); },

@@ -41,15 +41,15 @@ test('collection service wraps undo trio through 后端会话 only', () => {
   assert.doesNotMatch(service, /new 后端客户端/, 'must go through 后端会话');
 
   assert.match(service, /async 获取撤销状态\(\): Promise<UndoStatus>/);
-  assert.match(service, /服务号\.后端集合, 集合方法\.获取撤销状态, new Uint8Array\(0\)/);
+  assert.match(service, /Collection_get_undo_status\(new Uint8Array\(0\)/);
   assert.match(service, /decodeUndoStatus\(响应字节\)/);
 
   assert.match(service, /async 撤销\(\): Promise<OpChangesAfterUndo>/);
-  assert.match(service, /服务号\.后端集合, 集合方法\.撤销, new Uint8Array\(0\)/);
+  assert.match(service, /Collection_undo\(new Uint8Array\(0\)/);
   assert.match(service, /decodeOpChangesAfterUndo\(响应字节\)/);
 
   assert.match(service, /async 重做\(\): Promise<OpChangesAfterUndo>/);
-  assert.match(service, /服务号\.后端集合, 集合方法\.重做, new Uint8Array\(0\)/);
+  assert.match(service, /Collection_redo\(new Uint8Array\(0\)/);
 });
 
 test('undo status decoder reads labels and last step', () => {
@@ -116,9 +116,8 @@ test('study page undo button is wired to undo then refetch', () => {
     'undone card returns to queue front, refetch required');
   const undoBody = page.match(/撤销上次\(\): Promise<void> \{[\s\S]*?\n  \}/);
   assert.notEqual(undoBody, null);
-  assert.match(undoBody[0], /this\.阶段 = 'error';/);
-  assert.match(undoBody[0], /this\.错误详情 = error instanceof Error \? error\.message : `\$\{error\}`;/,
-    'undo failure surfaces through existing error state');
+  assert.match(undoBody[0], /this\.recoverStudy\(error as Object, .*this\.加载下一张卡\(\)/,
+    'undo failure retains the card and retries a read instead of repeating the write');
 });
 
 test('study keeps undo-only and undo strings are resourced', () => {

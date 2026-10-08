@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import vm from 'node:vm';
 import test from 'node:test';
+import { surfaceMotionApi } from './motion-harness.mjs';
 
 const read = path => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 const pageSource = read('entry/src/main/ets/pages/学习页.ets');
@@ -40,7 +41,7 @@ function pageHarness(completed = false, failOpen = false) {
   const dialogs = [];
   let saves = 0;
   const context = vm.createContext({ validateStudyControls,mappedStudyCommand,resolveStudyKey, resolveStudyGesture, StudyQuickAnswerMode, loadNoteEditor, studyKeyName: key => String(key), KeyType: { Down: 0 },
-    Date: { now: () => now }, $r: key => key, isTapZonesGuideCompleted: () => false,
+    ...surfaceMotionApi(), Date: { now: () => now }, $r: key => key, isTapZonesGuideCompleted: () => false,
     DialogAlignment: { Center: 0 },
     StudyGuideDialog: options => options,
     CustomDialogController: class {

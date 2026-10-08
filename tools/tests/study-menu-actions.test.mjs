@@ -22,7 +22,7 @@ vm.runInContext(stripTypeScriptTypes('globalThis.Page = class {' + studyInterfac
 test('review menu exposes bury and suspend on both card faces and dispatches the correct mode', () => {
   for (const phase of ['question', 'answer']) {
     const calls = [];
-    const page = Object.assign(new context.Page(), {
+    const page = Object.assign(Object.assign(new context.Page(), { recoveryMessage: '', resultMessage: '', resultUndo: null }), {
       flagLabels: {}, 阶段: phase, 评分中: false, 当前卡片: {}, 可撤销: false,
       choiceQuestion: null, choiceAutoAdvanceSeconds: () => 5,
       studyOptions: { secondsToShowQuestion: 0, secondsToShowAnswer: 0 },
@@ -36,7 +36,7 @@ test('review menu exposes bury and suspend on both card faces and dispatches the
     }
     assert.deepEqual(calls, [BURY_SUSPEND_MODE_BURY_USER, BURY_SUSPEND_MODE_SUSPEND]);
     for (const state of [{ 评分中: true }, { 当前卡片: null }, { 阶段: 'loading' }, { 阶段: 'done' }, { 阶段: 'error' }]) {
-      const disabled = Object.assign(new context.Page(), page, state).更多菜单()
+      const disabled = Object.assign(Object.assign(new context.Page(), { recoveryMessage: '', resultMessage: '', resultUndo: null }), page, state).更多菜单()
         .find(item => item.value === 'app.string.study_card_actions_title').children;
       assert.equal(disabled.find(item => item.value === 'app.string.study_bury').enabled, false);
       assert.equal(disabled.find(item => item.value === 'app.string.study_suspend').enabled, false);
@@ -45,7 +45,7 @@ test('review menu exposes bury and suspend on both card faces and dispatches the
 });
 
 test('menu catalog declares both child levels and every study entry has a distinct action icon', () => {
-  const page = Object.assign(new context.Page(), { flagLabels: {}, 阶段: 'question', 当前卡片: {}, 评分中: false,
+  const page = Object.assign(Object.assign(new context.Page(), { recoveryMessage: '', resultMessage: '', resultUndo: null }), { flagLabels: {}, 阶段: 'question', 当前卡片: {}, 评分中: false,
     Agent入口已启用: true, 有音频: true, 可撤销: true, currentMarking: { marked: false }, getUIContext: () => ({}) });
   const menu = page.更多菜单();
   const marking = menu.find(item => item.value === 'app.string.study_marking_title');
@@ -67,7 +67,7 @@ test('menu catalog declares both child levels and every study entry has a distin
 
 test('flag popup has all seven colors and clear, keeps custom labels and dispatches exactly the chosen flag', () => {
   const calls = [];
-  const page = Object.assign(new context.Page(), { 评分中: false, currentMarking: { flag: 7 },
+  const page = Object.assign(Object.assign(new context.Page(), { recoveryMessage: '', resultMessage: '', resultUndo: null }), { 评分中: false, currentMarking: { flag: 7 },
     flagLabels: { '2': 'custom orange' }, getUIContext: () => ({}), changeMarking: flag => calls.push(flag) });
   const options = page.flagMenuItems();
   assert.equal(options.length, 8);

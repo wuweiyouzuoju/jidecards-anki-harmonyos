@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { currentMotionProfile, motionAnimation } from '../utils/AppMotion';
 import { GlassSurface } from '../utils/GlassSurface';
 import { GesturePointer, gesturePointer } from '../model/GesturePointer';
 import { GLASS_COLORS_KEY, GLASS_HIGHLIGHT_COLORS } from '../model/ThemeCatalog';
@@ -14,7 +15,6 @@ import { StudyGripSensor } from '../backend/StudyGripSensor';
 import { StudyGripSession } from '../model/StudyGripSession';
 import { StudyGripAvailability, StudyToolbarSide, StudyToolbarBounds, studyToolbarBounds,
   clampStudyToolbar } from '../model/StudyLayout';
-import { THEME_MOTION_KEY } from '../model/ThemeCatalog';
 import { showToastSafely } from '../utils/UiFeedback';
 import {
   加载工具栏位置,
@@ -91,7 +91,6 @@ export struct 学习浮动工具栏 {
   @Prop @Watch('viewportChanged') viewportHeight: number = 0;
   @Prop @Watch('viewportChanged') topInset: number = 0;
   @Prop @Watch('viewportChanged') bottomInset: number = 0;
-  @StorageProp(THEME_MOTION_KEY) private isMotionEnabled: boolean = true;
   onGripState: (availability: StudyGripAvailability, side: StudyToolbarSide) => void =
     (_availability: StudyGripAvailability, _side: StudyToolbarSide): void => {};
   private gripAvailability: StudyGripAvailability = 'unchecked';
@@ -209,8 +208,7 @@ export struct 学习浮动工具栏 {
       this.位置X = side === 'left' ? bounds.left : bounds.right;
       this.位置Y = clampStudyToolbar(this.位置Y, bounds.top, bounds.bottom);
     };
-    if (this.isMotionEnabled) this.getUIContext().animateTo({ duration: 150, curve: Curve.EaseOut }, move);
-    else move();
+    this.getUIContext().animateTo(motionAnimation(currentMotionProfile().toolbarSnapMs), move);
     this.onGripState(this.gripAvailability, side);
   }
 

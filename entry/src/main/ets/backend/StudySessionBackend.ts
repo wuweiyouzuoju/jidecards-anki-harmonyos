@@ -2,7 +2,9 @@
 import type { EditableNote } from '../proto/messages/NoteMessages';
 import { UNBURY_MODE_ALL } from '../proto/messages/SchedulerMessages';
 import { 笔记服务 } from './笔记服务';
-import type { StudySessionBackend } from '../model/StudySessionController';
+import type { StudySessionBackend, StudyAnswerProbe } from '../model/StudySessionController';
+import type { UndoStatus } from '../proto/messages/CollectionMessages';
+import { AnkiCollectionHistoryBackend } from './CollectionHistoryBackend';
 import type { CardAnswerInput, CongratsInfo, QueuedCardsView, SchedulingStatesRaw } from '../proto/messages/SchedulerMessages';
 import type { StudyCard } from '../proto/messages/SchedulerMessages';
 import type { SchedulingScriptRuntime } from '../model/CustomScheduling';
@@ -96,6 +98,15 @@ export class AnkiStudySessionBackend implements StudySessionBackend {
   }
   describeStates(states: SchedulingStatesRaw): Promise<string[]> { return this.scheduler.描述下一档状态(states); }
   answer(input: CardAnswerInput): Promise<void> { return this.scheduler.提交评分(input); }
+  historyStatus(): Promise<UndoStatus> { return this.collection.获取撤销状态(); }
+  undoExpected(status: UndoStatus): Promise<void> { return new AnkiCollectionHistoryBackend().apply(false, status); }
+  async answerProbe(cardId: number): Promise<StudyAnswerProbe> {
+    const status: UndoStatus = await this.historyStatus();
+    const card: Card = await this.cards.获取卡片(cardId);
+    const checked: UndoStatus = await this.historyStatus();
+    if (checked.lastStep !== status.lastStep) throw new Error('Core history changed during rating probe');
+    return { step: status.lastStep, card: JSON.stringify(card), reps: card.reps };
+  }
   async undo(): Promise<void> { await this.collection.撤销(); }
   congrats(): Promise<CongratsInfo> { return this.scheduler.获取完成页信息(); }
 }

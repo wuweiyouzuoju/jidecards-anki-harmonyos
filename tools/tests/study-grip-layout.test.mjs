@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { motionApi } from './motion-harness.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -106,11 +107,12 @@ test('window bounds own insets once and detect when all rating controls cannot f
 const read = path => readFileSync(new URL('../../entry/src/main/ets/' + path, import.meta.url), 'utf8');
 const size = loadPlatformModule('utils/工具栏尺寸.ets', '[工具栏宽度, 工具栏高度]', {});
 function toolbarHarness(options = {}) {
-  const time = clock(), saved = [], state = [], sensors = [], toasts = [];
+  const time = clock(), saved = [], state = [], sensors = [], toasts = [], animations = [];
+  const motion = motionApi();
   class Sensor { constructor() { sensors.push(this); } start(callback) { this.callback = callback; return options.availability ?? 'available'; } stop() { this.callback = null; return true; } }
-  const Toolbar = loadComponentLogic('components/学习浮动工具栏.ets', '学习浮动工具栏', {
+  const Toolbar = loadComponentLogic('components/学习浮动工具栏.ets', '学习浮动工具栏', { ...motion,
     StudyGripSensor: Sensor, StudyGripSession, setTimeout: time.schedule, clearTimeout: time.cancel,
-    THEME_TEXT_COLORS_KEY: 'text', GLASS_COLORS_KEY: 'glass', GLASS_HIGHLIGHT_COLORS: [], THEME_MOTION_KEY: 'motion',
+    THEME_TEXT_COLORS_KEY: 'text', GLASS_COLORS_KEY: 'glass', GLASS_HIGHLIGHT_COLORS: [],
     PRIMARY_GLASS_KEY: 'primary', 颜色键: {}, themePrimaryGlass: () => ({}), themeDefinition: () => ({}),
     studyToolbarBounds, clampStudyToolbar, 工具栏宽度: size[0], 工具栏高度: size[1],
     加载工具栏位置: async () => options.saved ?? { x: 252, y: 240 },
@@ -119,10 +121,21 @@ function toolbarHarness(options = {}) {
     gesturePointer: (_infos, list, id = -1) => list.find(p => p && (id < 0 || p.id === id)) ?? null,
     TouchType: { Down: 0, Up: 1, Move: 2, Cancel: 3 }, Curve: { EaseOut: 0 }, $r: x => x, showToastSafely: (_context, options) => toasts.push(options.message) });
   const bar = new Toolbar(); Object.assign(bar, { isGripLayout: true, isGripActive: true, viewportWidth: 360,
-    viewportHeight: 720, topInset: 80, bottomInset: 24, isMotionEnabled: false, onGripState: (...args) => state.push(args),
-    getUIContext: () => ({ animateTo: (_options, move) => move() }) });
-  return { bar, time, saved, state, sensors, toasts };
+    viewportHeight: 720, topInset: 80, bottomInset: 24, onGripState: (...args) => state.push(args),
+    getUIContext: () => ({ animateTo: (options, move) => { animations.push(options); move(); } }) });
+  return { bar, time, saved, state, sensors, toasts, animations, motion };
 }
+
+test('automatic toolbar migration reads the current motion style independently of the background', async () => {
+  const h = toolbarHarness(); await h.bar.aboutToAppear();
+  h.sensors[0].callback(1); h.time.tick(250);
+  assert.deepEqual(h.animations.at(-1), { duration: 150, curve: 'ease-out' });
+  h.motion.setStyle('lively'); h.sensors[0].callback(2); h.time.tick(250);
+  assert.deepEqual(h.animations.at(-1), { duration: 240, curve: { spring: [0, 1, 280, 24] } });
+  assert.equal(h.bar.位置X, 252); assert.deepEqual(h.saved, []);
+  assert.doesNotMatch(read('components/学习浮动工具栏.ets'), /THEME_MOTION_KEY|isMotionEnabled/);
+  h.bar.aboutToDisappear();
+});
 
 test('real toolbar migrates in its container, freezes for multiple touch IDs, and preserves manual position on auto moves', async () => {
   const h = toolbarHarness(); await h.bar.aboutToAppear();
@@ -222,7 +235,7 @@ test('study page selects bottom fallback in a short window and gates sensing for
   const Page = new Function('studyToolbarBounds', '应用尺寸', '主工具栏_竖版_宽度', '主工具栏_竖版_高度_答案阶段',
     stripTypeScriptTypes('class Page {' + methods + '}') + '; return Page;')(studyToolbarBounds,
     { pageToolbarHeight: () => 80 }, 96, 360);
-  const page = new Page(); Object.assign(page, { 学习布局模式值: 'smart', toolbarViewportWidth: 360, toolbarViewportHeight: 720,
+  const page = Object.assign(new Page(), { recoveryMessage: '', resultMessage: '', resultUndo: null }); Object.assign(page, { 学习布局模式值: 'smart', toolbarViewportWidth: 360, toolbarViewportHeight: 720,
     状态栏高度: 24, 导航条高度: 24, 页面已显示: true, foreground: true, timeboxNotice: null, choiceQuestion: null });
   assert.equal(page.isFloatingStudyLayout(), true); page.toolbarViewportHeight = 400; assert.equal(page.isFloatingStudyLayout(), false);
   assert.equal(page.isStudyGripActive(), true);
@@ -242,7 +255,8 @@ test('real JIDE structure receives smart layout and sensor state from the produc
   const Page = new Function('appInterface', 'visibleInterfaceItems', 'namedResourceText',
     stripTypeScriptTypes(`class Page { ${method} }`, { mode: 'transform' }) + ';return Page;')(
     tracker, visibleInterfaceItems, (_context, key) => key);
-  const page = new Page(); Object.assign(page, { mounted: true, 阶段: 'question', 牌组名: 'Deck', 当前卡片: null,
+  const page = Object.assign(new Page(), { recoveryMessage: '', resultMessage: '', resultUndo: null,
+    studySession: { hasPendingAnswer: () => false } }); Object.assign(page, { mounted: true, 阶段: 'question', 牌组名: 'Deck', 当前卡片: null,
     currentMarking: null, 学习布局模式值: 'smart', gripAvailability: 'unsupported', gripSide: 'left',
     getUIContext: () => ({}), studyMenuOpen: false });
   page.publishInterface();

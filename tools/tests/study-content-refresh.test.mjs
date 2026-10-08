@@ -135,12 +135,15 @@ test('notification during an in-flight render is replayed without concurrent ref
   assert.equal(page.正面HTML, 'old-css:latest-front');
 });
 
-test('refresh failure displays the existing error state rather than leaving old content active', async () => {
+test('refresh failure retains the displayed card and blocks study actions behind explicit recovery', async () => {
   const { page } = harness();
   page.卡片渲染服务实例.渲染既有卡片 = async () => { throw new Error('read failed'); };
   hidden.call(page); shown.call(page); await settle(page);
-  assert.equal(page.阶段, 'error');
-  assert.equal(page.错误详情, 'read failed');
+  assert.equal(page.阶段, 'question');
+  assert.equal(page.recoveryMessage, 'read failed');
+  assert.equal(page.已输入答案, 'old-input');
+  assert.equal(page.当前卡片.cardId, 7);
+  assert.equal(page.studyTimerState().active, false);
   assert.equal(page.评分中, false);
 });
 

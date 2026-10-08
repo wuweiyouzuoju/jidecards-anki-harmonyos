@@ -9,6 +9,10 @@ import { CardRenderPrefetch } from './CardRenderPrefetch';
 import type { JideChoiceQuestion } from './JideChoice';
 import { ReviewPreferences } from '../proto/messages/PreferencesMessages';
 import type { CardMarkingState, FlagLabels } from './CardMarking';
+import type { UndoStatus } from '../proto/messages/CollectionMessages';
+
+export interface StudyAnswerProbe { step: number; card: string; reps: number; }
+interface PendingStudyAnswer { input: CardAnswerInput; before: StudyAnswerProbe | null; }
 
 /** 显式后端边界，允许在不加载 NAPI/ArkUI 的测试中验证学习会话。 */
 export interface StudySessionBackend {
@@ -23,6 +27,9 @@ export interface StudySessionBackend {
   reviewPreferences(): Promise<ReviewPreferences>;
   describeStates(states: SchedulingStatesRaw): Promise<string[]>;
   answer(input: CardAnswerInput): Promise<void>;
+  answerProbe?(cardId: number): Promise<StudyAnswerProbe>;
+  historyStatus?(): Promise<UndoStatus>;
+  undoExpected?(status: UndoStatus): Promise<void>;
   undo(): Promise<void>;
   congrats(): Promise<CongratsInfo>;
   choiceQuestion?(noteId: number): Promise<JideChoiceQuestion | null>;
@@ -69,6 +76,29 @@ export class StudySessionController {
   private customSchedulingError: string = '';
   private renderPrefetch: CardRenderPrefetch;
   private nextRenderId: number = 0;
+  private pendingAnswer: PendingStudyAnswer | null = null;
+
+  hasPendingAnswer(): boolean { return this.pendingAnswer !== null; }
+  async historyStatus(): Promise<UndoStatus> {
+    if (this.backend.historyStatus === undefined) throw new Error('History status unavailable');
+    return this.backend.historyStatus();
+  }
+  undoExpected(status: UndoStatus): Promise<void> {
+    return this.commitChange(async (): Promise<void> => {
+      if (this.backend.undoExpected === undefined) throw new Error('Verified undo unavailable');
+      await this.backend.undoExpected(status);
+    });
+  }
+
+  /** 只有 Core 步号和卡片都未变才允许重送；核对失败或冲突保留待核对输入。 */
+  private async reconcileAnswer(pending: PendingStudyAnswer): Promise<boolean> {
+    if (pending.before === null || this.backend.answerProbe === undefined) throw new Error('Answer outcome unresolved');
+    const after: StudyAnswerProbe = await this.backend.answerProbe(pending.input.cardId);
+    if (after.step === pending.before.step && after.card === pending.before.card) return false;
+    if (after.step === pending.before.step + 1 && after.reps === pending.before.reps + 1 &&
+      after.card !== pending.before.card) return true;
+    throw new Error('Answer outcome unresolved; Core state changed');
+  }
 
   needsCustomSchedulingAcknowledgement(): boolean {
     return this.customSchedulingError !== '' && this.customSchedulingScript !== this.acknowledgedScript;
@@ -130,6 +160,7 @@ export class StudySessionController {
     try {
       await this.activity.waitForCollection();
       if (this.disposed || !isCurrent()) return null;
+      if (this.pendingAnswer !== null) throw new Error('Pending answer requires reconciliation before loading another card');
       const canUndo: boolean = await this.canUndo();
       if (this.disposed || !isCurrent()) return null;
       const preferences: ReviewPreferences = await this.backend.reviewPreferences();
@@ -202,7 +233,29 @@ export class StudySessionController {
       answeredAtMillis: now, millisecondsTaken: Math.max(0, now - shownAt)
     };
     this.pauseTimebox();
-    await this.commitChange((): Promise<void> => this.backend.answer(input), true);
+    await this.commitChange(async (): Promise<void> => {
+      let pending: PendingStudyAnswer | null = this.pendingAnswer;
+      if (pending !== null) {
+        if (pending.input.cardId !== card.cardId || pending.input.rating !== rating) throw new Error('Pending answer requires reconciliation');
+        if (await this.reconcileAnswer(pending)) { this.pendingAnswer = null; return; }
+      } else {
+        const before: StudyAnswerProbe | null = this.backend.answerProbe === undefined ? null :
+          await this.backend.answerProbe(card.cardId);
+        pending = { input: input, before: before };
+      }
+      this.pendingAnswer = pending;
+      try {
+        await this.backend.answer(pending.input);
+        this.pendingAnswer = null;
+      } catch (error) {
+        try {
+          if (await this.reconcileAnswer(pending)) { this.pendingAnswer = null; return; }
+        } catch (probeError) {
+          throw new Error(`${error instanceof Error ? error.message : error}; ${probeError}`);
+        }
+        throw error;
+      }
+    }, true);
     if (!this.disposed) {
       this.timeboxAnswers++;
       this.pauseTimebox();

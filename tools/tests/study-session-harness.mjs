@@ -10,8 +10,11 @@ import { stripTypeScriptTypes } from 'node:module';
 import { SyncActivity } from '../../entry/src/main/ets/model/SyncSettings.ts';
 import { buildStudyGestureScript, StudyQuickAnswerMode } from '../../entry/src/main/ets/model/StudyGestures.ts';
 import {defaultStudyControls,validateStudyControls} from '../../entry/src/main/ets/model/StudyControls.ts';
+import { resultUndoStatus } from '../../entry/src/main/ets/model/InteractionFeedback.ts';
 
 export function attachStudySession(page) {
+  page.recoveryMessage ??= ''; page.resultMessage ??= ''; page.recoveryAction ??= null; page.resultUndo ??= null;
+  page.hasRenderedCard ??= page.当前卡片 !== null && page.当前卡片 !== undefined;
   page.whiteboardMounted = false;
   page.whiteboardResetTick = 0;
   // These tests isolate study orchestration. CardWebSession has separate runtime/browser coverage.
@@ -41,14 +44,15 @@ export function attachStudySession(page) {
   page.controlsJson ??= JSON.stringify(defaultStudyControls());
   const source = readFileSync(new URL('../../entry/src/main/ets/pages/学习页.ets', import.meta.url), 'utf8');
   const names = ['startStudyTimers', 'stopStudyTimers', 'studyTimerState', 'applyTimedAction', 'toggleAutoAdvance',
-    'resetWhiteboard', 'studyCardShown', 'refreshStudyGestureScript', 'controls', 'isStudyGesturesEnabled'];
+    'recoverStudy', 'retryStudy', 'showStudyResult', 'resetWhiteboard', 'studyCardShown', 'refreshStudyGestureScript', 'controls', 'isStudyGesturesEnabled'];
   const methods = names.map(name => {
-    const start = source.indexOf('  private ' + name + '(');
+    let start = source.indexOf('  private ' + name + '(');
+    if (start < 0) start = source.indexOf('  private async ' + name + '(');
     return source.slice(start, source.indexOf('\n  }', start) + 4);
   });
-  const TimingPage = new Function('StudyAdvanceAction', 'BURY_SUSPEND_MODE_BURY_USER', '$r', 'buildStudyGestureScript', 'StudyQuickAnswerMode', 'validateStudyControls',
+  const TimingPage = new Function('StudyAdvanceAction', 'BURY_SUSPEND_MODE_BURY_USER', '$r', 'buildStudyGestureScript', 'StudyQuickAnswerMode', 'validateStudyControls', 'resultUndoStatus',
     stripTypeScriptTypes('class TimingPage {' + methods.join('\n') + '}', { mode: 'transform' }) + '; return TimingPage;')(
-    StudyAdvanceAction, 2, key => key, buildStudyGestureScript, StudyQuickAnswerMode,validateStudyControls);
+    StudyAdvanceAction, 2, key => key, buildStudyGestureScript, StudyQuickAnswerMode,validateStudyControls,resultUndoStatus);
   for (const name of names) page[name] = TimingPage.prototype[name];
   page.timerHandles = new Map(); let nextTimer = 0;
   page.studyTimer = new StudyTimerController({ state: () => page.studyTimerState(),

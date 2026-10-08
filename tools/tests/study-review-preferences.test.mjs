@@ -11,29 +11,33 @@ import { AutoSyncScheduler } from '../../entry/src/main/ets/model/AutoSyncSchedu
 import { SyncActivity } from '../../entry/src/main/ets/model/SyncSettings.ts';
 import { gradeJideChoice } from '../../entry/src/main/ets/model/JideChoice.ts';
 import { loadUiFeedback } from './ui-feedback-harness.mjs';
+import { resultUndoStatus } from '../../entry/src/main/ets/model/InteractionFeedback.ts';
 
 const source=readFileSync(new URL('../../entry/src/main/ets/pages/学习页.ets',import.meta.url),'utf8');
 const methods=['startStudyTimers','stopStudyTimers','studyTimerState','maybeShowTimebox','closeTimebox','openStudyMenu','closeStudyMenu','按钮文案位',
-  '撤销上次','刷新编辑后当前卡','埋藏或暂停当前卡','确认删除当前卡','恢复埋藏','评分','提交选择题','studyActivityChanged','updateScreenAwake'];
+  '撤销上次','刷新编辑后当前卡','埋藏或暂停当前卡','确认删除当前卡','恢复埋藏','评分','提交选择题','studyActivityChanged','updateScreenAwake',
+  'recoverStudy','showStudyResult'];
 const body=methods.map(name=>{
   const match=new RegExp('  private (?:async )?'+name+'\\(').exec(source);assert.ok(match,name);
   return source.slice(match.index,source.indexOf('\n  }',match.index)+4);
 }).join('\n');
 
 function harness() {
-  let now=0, failed=false, empty=false;
+  let now=0, failed=false, empty=false, step=0, reps=0;
   const states=Object.fromEntries(['current','again','hard','good','easy'].map(key=>[key,new Uint8Array([1,255])]));
   const card={cardId:1,states};const answers=[],nativeAudioAllowed=[];
   const prefs=Object.assign(new ReviewPreferences(),{timeLimitSecs:60,showRemaining:true,showIntervals:true});
   const backend={reviewPreferences:async()=>prefs,canUndo:async()=>false,
     queuedCards:async()=>({cards:empty?[]:[card],newCount:2,learningCount:3,reviewCount:4}),
     renderCard:async()=>({}),studyOptions:async()=>new StudyOptions(),describeStates:async()=>['1m','5m','1d','4d'],
-    answer:async input=>{if(failed)throw Error('answer failed');answers.push(input);},undo:async()=>{},
+    answerProbe:async()=>({step,reps,card:JSON.stringify({reps})}),
+    historyStatus:async()=>({lastStep:step,undo:step>0?'answer':'',redo:''}),
+    answer:async input=>{if(failed)throw Error('answer failed');answers.push(input);step++;reps++;},undo:async()=>{},
     buryCard:async()=>{},removeCard:async()=>{},unburyDeck:async()=>{}};
   const controller=new StudySessionController(backend,new AutoSyncScheduler(),new SyncActivity(),()=>now);
-  const Page=new Function('Date','playStudyHaptic','gradeJideChoice','RATING_GOOD','RATING_HARD',
-    stripTypeScriptTypes('class Page {'+body+'}',{mode:'transform'})+';return Page;')({now:()=>now},()=>{},gradeJideChoice,2,1);
-  const page=Object.assign(new Page(),{screenAwake:null,mounted:true,页面已显示:true,foreground:true,requestVersion:1,
+  const Page=new Function('Date','playStudyHaptic','gradeJideChoice','RATING_GOOD','RATING_HARD','resultUndoStatus','$r','BURY_SUSPEND_MODE_BURY_USER',
+    stripTypeScriptTypes('class Page {'+body+'}',{mode:'transform'})+';return Page;')({now:()=>now},()=>{},gradeJideChoice,2,1,resultUndoStatus,key=>key,2);
+  const page=Object.assign(Object.assign(new Page(), { recoveryMessage: '', resultMessage: '', resultUndo: null }),{screenAwake:null,mounted:true,页面已显示:true,foreground:true,requestVersion:1,
     controllerReady:true,studyMenuOpen:false,autoAdvanceSettingsOpen:false,editingPageOpen:false,
     studyGuideVisible:false,tapZonesGuideVisible:false,手写模式:false,评分中:false,flipPending:false,
     阶段:'question',choiceQuestion:null,timeboxNotice:null,choiceFeedbackDeadline:0,展示时刻毫秒:0,
@@ -44,7 +48,7 @@ function harness() {
     studySession:controller,studyOptions:new StudyOptions(),autoAdvanceSettings:new StudyAutoAdvanceSettings(),
     autoAdvanceEnabled:false,reviewPreferences:prefs,按钮文案:['1m','5m','1d','4d'],
     isCurrentRequest:()=>page.mounted&&page.页面已显示&&page.foreground,
-    audioSession:{isPlaying:()=>false},clearChoiceAutoAdvance(){this.choiceCancelled=true;},
+    audioSession:{isPlaying:()=>false,stop(){}},取文案:key=>key,hasRenderedCard:true,clearChoiceAutoAdvance(){this.choiceCancelled=true;},
     invalidateCardWork(){this.stopStudyTimers();this.requestVersion++;},
     scheduleChoiceAutoAdvance(){this.choiceScheduled=true;},返回(){this.left=true;}});
   const timers=new Map();let next=0;
@@ -109,7 +113,7 @@ test('choice feedback pauses while the timebox is open; counts and both button l
   const expression=source.match(/评分按钮文案: (.+),/)[1];
   assert.deepEqual(new Function('return '+expression).call(h.page),[]);
   assert.deepEqual(h.page.按钮文案,['1m','5m','1d','4d'],'hiding labels preserves Core scheduling data');
-  assert.match(source,/if \(this.reviewPreferences.showRemaining\)\s*\{\s*Text\(\$r\('app.string.study_remaining_detail'/);
+  assert.match(source,/if \(this.reviewPreferences.showRemaining\)\s*\{\s*ChangingText\(\{ value: resourceText\(this.getUIContext\(\), \$r\('app.string.study_remaining_detail'/);
 });
 
 for(const [method,args] of [['撤销上次',[]],['刷新编辑后当前卡',[]],['埋藏或暂停当前卡',[2]],['确认删除当前卡',[]],['恢复埋藏',[]]]) {

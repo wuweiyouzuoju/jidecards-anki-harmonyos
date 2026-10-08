@@ -54,18 +54,18 @@ test('scheduler service wraps bury/suspend, unbury, restore and congrats through
   assert.match(service, /async 埋藏或暂停卡片\(卡片ID: number, 模式: number\): Promise<void>/);
   assert.match(service, /encodeBuryOrSuspendCardsRequest\(\[卡片ID\], \[\], 模式\)/,
     'single card id, no note ids');
-  assert.match(service, /服务号\.后端调度器, 调度器方法\.埋藏或暂停, 请求字节/);
+  assert.match(service, /Scheduler_bury_or_suspend_cards\(请求字节/);
 
   assert.match(service, /async 按牌组恢复埋藏\(牌组ID: number, 模式: number\): Promise<void>/);
   assert.match(service, /encodeUnburyDeckRequest\(牌组ID, 模式\)/);
-  assert.match(service, /服务号\.后端调度器, 调度器方法\.按牌组恢复埋藏, 请求字节/);
+  assert.match(service, /Scheduler_unbury_deck\(请求字节/);
 
   assert.match(service, /async 恢复埋藏与暂停的卡片\(卡片ID列表: number\[\]\): Promise<void>/);
   assert.match(service, /encodeCardIds\(卡片ID列表\)/);
-  assert.match(service, /服务号\.后端调度器, 调度器方法\.恢复埋藏与暂停, 请求字节/);
+  assert.match(service, /Scheduler_restore_buried_and_suspended_cards\(请求字节/);
 
   assert.match(service, /async 获取完成页信息\(\): Promise<CongratsInfo>/);
-  assert.match(service, /服务号\.后端调度器, 调度器方法\.完成页信息, new Uint8Array\(0\)/);
+  assert.match(service, /Scheduler_congrats_info\(new Uint8Array\(0\)/);
   assert.match(service, /decodeCongratsInfo\(响应字节\)/);
 });
 
@@ -82,12 +82,12 @@ test('study page bury/suspend entries use upstream reviewer semantics and refetc
 
   const body = page.match(/埋藏或暂停当前卡\(mode: number\): Promise<void> \{[\s\S]*?\n  \}/);
   assert.notEqual(body, null);
-  assert.match(body[0], /if \(this\.评分中 \|\| this\.当前卡片 === null\)/,
+  assert.match(body[0], /if \(this\.recoveryMessage !== '' \|\| this\.评分中 \|\| this\.当前卡片 === null\)/,
     'bury/suspend reuses reentrancy guard');
-  assert.match(body[0], /await this\.studySession\.buryCard\(cardId, mode\);\s*await this\.加载下一张卡\(\);/,
+  assert.match(body[0], /await this\.studySession\.buryCard\(cardId, mode\);\s*await this\.showStudyResult\(mode, before\);\s*await this\.加载下一张卡\(\);/,
     'card leaves today queue, next card fetched immediately');
-  assert.match(body[0], /this\.阶段 = 'error';/,
-    'bury/suspend failure surfaces through existing error state');
+  assert.match(body[0], /this\.recoverStudy\(error as Object, .*this\.埋藏或暂停当前卡\(mode\)/,
+    'bury/suspend failure keeps the current card behind recovery');
 });
 
 test('done page fetches congrats info when queue empties and degrades silently on failure', () => {
@@ -122,7 +122,7 @@ test('done page renders real congrats data and deck-scoped unbury entry', () => 
   assert.notEqual(body, null);
   assert.match(body[0], /await this\.studySession\.unburyDeck\(this\.牌组ID\);\s*await this\.加载下一张卡\(\);/,
     'CongratsInfo exposes no card ids, so restore is deck-scoped like desktop overview, then refetch');
-  assert.match(body[0], /this\.阶段 = 'error';/);
+  assert.match(body[0], /this\.recoverStudy\(error as Object, .*this\.加载下一张卡\(\)/);
 
   assert.doesNotMatch(page, /恢复埋藏与暂停的卡片\(/,
     'id-based restore is not usable from the congrats page (no ids available)');

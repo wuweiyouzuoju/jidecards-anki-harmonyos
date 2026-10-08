@@ -100,9 +100,9 @@ test('all ratings vibrate once after guards, never wait for haptics, and reject 
   for (const rating of [0, 1, 2, 3]) {
     let release, answers = 0, loads = 0;
     const gate = new Promise(resolve => { release = resolve; });
-    const page = new Page();
+    const page = Object.assign(new Page(), { recoveryMessage: '', resultMessage: '', resultUndo: null });
     Object.assign(page, { timeboxNotice: null, startStudyTimers() {}, choiceQuestion: null, studyGuideVisible: false, 评分中: false, 阶段: 'answer', 当前卡片: {}, requestVersion: 0,
-      isCurrentRequest: () => true, invalidateCardWork() {},
+      isCurrentRequest: () => true, invalidateCardWork() {}, stopStudyTimers() {}, audioSession: { stop() {} },
       studySession: { answer: async (_card, value) => { assert.equal(value, rating); answers++; await gate; } },
       加载下一张卡: async () => { loads++; page.阶段 = 'question'; }, 消费待重渲染() {}, maybeShowStudyGuide() {} });
     const before = haptics;

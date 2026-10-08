@@ -931,7 +931,7 @@ test('each official mount owns its controller and both engines use an overlay in
   const page = readFileSync(new URL('../../entry/src/main/ets/pages/学习页.ets', import.meta.url), 'utf8');
   assert.match(page, /if \(this\.whiteboardMounted\)/);
   assert.match(page, /visibility\(this\.手写模式 \? Visibility\.Visible : Visibility\.None\)/);
-  assert.match(page, /onClose: [^\n]+\n\s*\.width\('100%'\)\.height\('100%'\)\n\s*\.visibility/);
+  assert.match(page, /onClose: [^\n]+\n\s*\.width\('100%'\)\.height\('100%'\)\s*\.visibility/);
   assert.doesNotMatch(page, /whiteboardSession/);
   const viewport = page.match(/  private cardViewportContent\(\)[^]*?\n  }/)[0];
   assert.doesNotMatch(viewport, /学习手写白板层\(/);
