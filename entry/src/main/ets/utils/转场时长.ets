@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { currentMotionProfile } from './AppMotion';
 
 // ========================================================
 // @块ID UTIL-TRANSITION-DURATION-001
@@ -13,15 +14,15 @@
 // 曲线优先使用弹簧曲线（curves.springCurve）。
 //
 // @输入
-// 无（首次调用读 display.getDefaultDisplaySync()，结果缓存到模块变量）。
+// 首次调用读 display.getDefaultDisplaySync()；每次调用读取当前动效档位。
 //
 // @输出
-// 取全屏转场时长(): number  —— 分档时长（200/250/300）
-// 取全屏转场曲线(): ICurve  —— 弹簧曲线（mass=1, stiffness=228, damping=22）
+// 取全屏转场时长(): number  —— 分档基础时长（200/250/300）加当前档位增量
+// 取全屏转场曲线(): ICurve  —— 克制（1,228,22）或灵动（1,280,24）弹簧曲线
 //
 // @业务规则
 // 物理英寸 = sqrt(width² + height²) / densityDPI。
-// 首次调用计算并缓存；后续直接返回缓存值，避免每次 transition 重复计算。
+// 设备尺寸分档首次计算并缓存；动效档位每次读取，切换后影响下一次转场。
 // 取不到屏幕信息时回退到 250ms（中等档），既不短于手机档 200ms，也不至于让大屏设备过快。
 // 弹簧曲线参数取 ArkUI 官方示例常用值（stiffness=228, damping=22），自然不弹跳。
 //
@@ -89,7 +90,7 @@ function 计算物理英寸(): number {
  * 取全屏转场时长（按设备物理英寸分档）。
  * 首次调用计算并缓存；后续直接返回缓存值。
  */
-export function 取全屏转场时长(): number {
+function baseTransitionDuration(): number {
   if (缓存时长 !== null) {
     return 缓存时长;
   }
@@ -110,11 +111,17 @@ export function 取全屏转场时长(): number {
 
 /**
  * 取全屏转场曲线（弹簧曲线）。
- * 首次调用构造 ICurve 实例并缓存；后续直接返回缓存实例。
+ * 克制曲线复用缓存实例；当前档位在每次转场时读取。
  */
 export function 取全屏转场曲线(): ICurve {
   if (缓存曲线 === null) {
     缓存曲线 = curves.springCurve(弹簧_初速度, 弹簧_质量, 弹簧_刚度, 弹簧_阻尼);
   }
+  if (currentMotionProfile().springFeedback) { return curves.springCurve(0, 1, 280, 24); }
   return 缓存曲线;
+}
+
+/** 屏幕尺寸缓存与用户偏好分离，切换风格立即影响下一次转场。 */
+export function 取全屏转场时长(): number {
+  return baseTransitionDuration() + currentMotionProfile().fullScreenExtraMs;
 }

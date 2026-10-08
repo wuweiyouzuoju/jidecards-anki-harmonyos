@@ -1,17 +1,22 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
+import { currentMotionProfile, motionAnimation } from '../../utils/AppMotion';
 
 /** 所有锚点菜单共用的小弹窗表面；一个菜单只由一个表面拥有轮廓和阴影。 */
 export class MenuSurface implements AttributeModifier<CommonAttribute> {
   static readonly pointerSpan: number = 20;
   static readonly pointerDepth: number = 6;
 
-  static popupTransition(): TransitionEffect {
+  /** 缩放围绕触发边缘；原生 Popup 未指定锚点时保留系统居中语义。 */
+  static popupTransition(centerX: number | string = '50%',
+    centerY: number | string = '50%'): TransitionEffect {
+    const profile = currentMotionProfile();
     return TransitionEffect.asymmetric(
-      TransitionEffect.opacity(0).combine(TransitionEffect.scale({ x: 0.98, y: 0.98 }))
-        .animation({ duration: 150, curve: Curve.EaseOut }),
-      TransitionEffect.opacity(0).animation({ duration: 150, curve: Curve.EaseOut })
+      TransitionEffect.opacity(0).combine(
+        TransitionEffect.scale({ x: profile.menuScale, y: profile.menuScale, centerX: centerX, centerY: centerY }))
+        .animation(motionAnimation(profile.menuEnterMs)),
+      TransitionEffect.opacity(0).animation({ duration: profile.menuExitMs, curve: Curve.EaseOut })
     );
   }
 

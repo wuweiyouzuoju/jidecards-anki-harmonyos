@@ -4,12 +4,13 @@ import { readFileSync, readdirSync } from 'node:fs';
 import test from 'node:test';
 import { arkuiClickTargets, clickFeedbackExemption } from '../arkui-click-targets.mjs';
 import { loadPlatformModule } from './platform-module-harness.mjs';
+import { motionApi } from './motion-harness.mjs';
 
 test('press feedback is visible on any backing and preserves caller opacity and disabled states', () => {
-  const Feedback = loadPlatformModule('utils/PressFeedback.ets', 'PressFeedback', {});
+  const Feedback = loadPlatformModule('utils/PressFeedback.ets', 'PressFeedback', motionApi());
   for (const rest of [0, 0.6, 1]) {
     const feedback = new Feedback(rest); let opacity;
-    const node = { opacity(value) { opacity = value; return node; } };
+    const node = { opacity(value) { opacity = value; return node; }, scale() { return node; } };
     for (let i = 0; i < 8; i++) {
       feedback.applyNormalAttribute(node); assert.equal(opacity, rest);
       feedback.applyPressedAttribute(node); assert.equal(opacity, rest * 0.72);
@@ -48,8 +49,15 @@ test('all app button and action-row click targets share one press owner', () => 
       if (path === 'components/editor/NoteEditorWheel.ets') {
         // 触摸只清除长按补发 click 的抑制位；按下外观仍由公共 modifier 负责。
         // note-editor-wheel 的直接行为测试验证按下、长按、松手和再次点击。
-        assert.match(source, /private toolTouch\(event: TouchEvent\): void \{\s*if \(event\.type === TouchType\.Down\) this\.longPressedTool = '';\s*\}/);
-        pressModifiers = pressModifiers.replace(/\.onTouch\(\(event: TouchEvent\): void => \{ this\.toolTouch\(event\); \}\)/g, '');
+        assert.match(source, /private toolTouch\(id: string, event: TouchEvent\): void/);
+        pressModifiers = pressModifiers.replace(/\.onTouch\(\(event: TouchEvent\): void => \{ this\.toolTouch\(tool\.id, event\); \}\)/g, '');
+      }
+      if (path === 'components/common/IconActionButton.ets') {
+        // menu-slide 直接执行单指、多指、取消及补发点击；按压仍由公共 modifier 绘制。
+        pressModifiers = pressModifiers.replace(/\.onTouch\(\(event: TouchEvent\): void => \{ this\.slideTouch\(event\); \}\)/g, '');
+      }
+      if (path === 'pages/浏览页.ets') {
+        pressModifiers = pressModifiers.replace(/\.onTouch\(\(event: TouchEvent\): void => \{\s*if \(event\.type === TouchType\.Down\) this\.viewHoldGroup = group;\s*menuHoldTouch\(this\.viewHold, event\);\s*\}\)/g, '');
       }
       assert.doesNotMatch(pressModifiers, /duration:\s*80|\.onTouch\(/, location);
     }

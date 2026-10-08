@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { currentMotionProfile } from './AppMotion';
 
-/** 按钮和可点击行共用的单次按压反馈，不依赖底色、触摸状态或隐式动画。 */
+/** 唯一按压反馈入口；仅灵动档增加轻缩放，不另建触摸状态或延迟点击。 */
 export class PressFeedback implements AttributeModifier<CommonAttribute> {
   private restingOpacity: number;
   private disabledOpacity: number;
@@ -11,14 +12,15 @@ export class PressFeedback implements AttributeModifier<CommonAttribute> {
   }
 
   applyNormalAttribute(instance: CommonAttribute): void {
-    instance.opacity(this.restingOpacity);
+    instance.opacity(this.restingOpacity).scale({ x: 1, y: 1 });
   }
 
   applyPressedAttribute(instance: CommonAttribute): void {
-    instance.opacity(this.restingOpacity * 0.72);
+    const profile = currentMotionProfile();
+    instance.opacity(this.restingOpacity * 0.72).scale({ x: profile.pressScale, y: profile.pressScale });
   }
 
   applyDisabledAttribute(instance: CommonAttribute): void {
-    instance.opacity(Math.min(this.restingOpacity, this.disabledOpacity));
+    instance.opacity(Math.min(this.restingOpacity, this.disabledOpacity)).scale({ x: 1, y: 1 });
   }
 }
