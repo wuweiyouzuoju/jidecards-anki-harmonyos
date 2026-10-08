@@ -107,9 +107,10 @@ img { max-width: 100%; height: auto; }
 a { color: #2E6BE6; }
 hr { opacity: 0.3; }
 .sound-flag { display: inline-flex; align-items: center; justify-content: center; vertical-align: middle;
-  width: 44px; height: 44px; margin: 2px 4px; padding: 0; color: inherit; background: transparent;
+  font-size: inherit; line-height: 1; box-sizing: border-box;
+  width: 1.5em; height: 1.5em; margin: 0.1em 0.2em; padding: 0; color: inherit; background: transparent;
   border: 1px solid currentColor; border-radius: 50%; cursor: pointer; }
-.sound-flag svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; }
+.sound-flag svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1.6; }
 .sound-flag:active { opacity: 0.6; }
 mjx-container[jax="SVG"][display="true"] { overflow-x: auto; overflow-y: hidden; max-width: 100%; padding: 2px 0; }
 .latex-missing { display: inline-block; max-width: 100%; overflow-wrap: anywhere; border: 1px dashed currentColor; padding: 4px; }
