@@ -74,11 +74,12 @@ test('destination renderer preserves route defaults, explicit parameters, snapsh
 });
 
 test('home binds its live navigation host and both detail layouts to the same actions', () => {
-  let routeArgs, details;
-  const Page = new Function('HomeDestinations', 'HomeDeckDetails', 'homeHeaderGeometry', '应用尺寸',
+  let routeArgs, details, detailTransition;
+  const Page = new Function('HomeDestinations', 'HomeDeckDetails', 'homeHeaderGeometry', '应用尺寸', 'SurfaceTransition',
     compile(`class Page { ${method('页面映射')} ${method('deckDetails')} ${method('detailHeaderActionHeight')} }`) + ';return Page;')(
-    (...args) => { routeArgs = args; }, props => { details = props; }, homeHeaderGeometry,
-    { 页面分组间距: () => 12, 按钮高度: 44 });
+    (...args) => { routeArgs = args; }, props => { details = props;
+      return { transition: effect => { detailTransition = effect; } }; }, homeHeaderGeometry,
+    { 页面分组间距: () => 12, 按钮高度: 44 }, { pageContent: (forward, enabled) => ({ forward, enabled }) });
   const page = new Page(), events = [];
   Object.assign(page, { 页面栈: {}, historyRefreshToken: 3, deckOptionsBusy: true,
     是否深色: () => true, requestManualSync: () => events.push('sync'),
@@ -98,6 +99,7 @@ test('home binds its live navigation host and both detail layouts to the same ac
   for (const compact of [true, false]) {
     page.显示牌组详情 = true;
     page.deckDetails(compact);
+    assert.deepEqual(detailTransition, { forward: true, enabled: compact });
     assert.equal(details.compact, compact);
     assert.equal(details.historyRefreshToken, page.historyRefreshToken);
     assert.equal(details.optionsBusy, true);

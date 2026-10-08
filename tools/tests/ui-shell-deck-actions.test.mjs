@@ -38,14 +38,14 @@ test('detail icon actions share public square buttons above the full-width deck 
   assert.doesNotMatch(action, /\bButton\(\{|ThemeTextSpans|new PressFeedback/,
     'the public icon button owns the surface, SVG rendering and press feedback');
   assert.doesNotMatch(action, /\.padding\(/, 'the slot does not duplicate public button padding');
-  assert.match(header, /'deck_details', 'preview', this\.uiLanguage\),[\s\S]*?!this\.previewBusy\)/);
+  assert.match(header, /'deck_details', 'preview', this\.uiLanguage\),[\s\S]*?!this\.previewBusy, true\)/);
   for (const icon of ['ic_study_edit', 'ic_study_agent', 'ic_common_preview']) {
     assert.ok(header.includes(`app.media.${icon}`));
     for (const theme of ['base', 'dark']) assert.match(readFileSync(new URL(
       `../../entry/src/main/resources/${theme}/media/${icon}.svg`, import.meta.url), 'utf8'), /viewBox="0 0 24 24"/);
   }
   const options = action.match(/IconActionButton\((\{[\s\S]*?\})\)/)[1];
-  const propsFor = new Function('source', 'label', 'action', 'isInteractive', '$r', 'return ' + options);
+  const propsFor = new Function('source', 'label', 'action', 'isInteractive', '$r', 'previewMenu', 'return ' + options);
   const IconButton = loadComponentLogic('components/common/IconActionButton.ets', 'IconActionButton', {
     Color: { Transparent: 'transparent' }, 应用尺寸: dimensions
   });
@@ -157,7 +157,7 @@ test('wide JIDE shares the left creation group and preview remains on the right 
   assert.doesNotMatch(row, /Stack\(|Alignment.Center/);
   assert.match(row, /Row\(\{ space: 应用尺寸.页面分组间距\(this.narrowDeckLayout\) \}\)/);
   assert.match(row, /'deck_details', 'add_note'[\s\S]*if \(this.Agent入口已启用\)[\s\S]*'deck_details', 'agent'[\s\S]*Blank\(\)[\s\S]*'deck_details', 'preview'/);
-  assert.match(row, /'deck_details', 'preview'[\s\S]*this.预览\(\); \}, !this.previewBusy\)/,
+  assert.match(row, /'deck_details', 'preview'[\s\S]*this.预览\(\); \}, !this.previewBusy, true\)/,
     'the preview square keeps its busy guard while its public surface is owned by HomeDeckDetails');
   assert.match(row, /\.alignItems\(VerticalAlign.Center\)/);
   assert.doesNotMatch(row + action, /\.padding\(|\.layoutWeight\(|\.margin\(\{ (?:left|right):/);

@@ -427,6 +427,8 @@ export struct 设置面板 {
             IconActionButton({ toolbarStyle: true,
               source: interfaceControlIcon(settingsHeaderItems(this.简洁模式), 'mode'),
               label: interfaceControlText(this.getUIContext(), settingsHeaderItems(this.简洁模式), 'mode', this.uiLanguage),
+              slideMenu: true, onHoldOpen: (): void => { this.显示模式菜单 = true; },
+              onHoldCancel: (): void => { this.显示模式菜单 = false; },
               onAction: (): void => { this.显示模式菜单 = true; }
             })
           }

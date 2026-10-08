@@ -1979,7 +1979,8 @@ export struct 学习页 {
         // 右侧：更多（共享菜单展示学习动作）
         // 菜单项 enabled 跟随 可撤销 / 阶段 状态，组件重新 build 时数组重新求值。
         IconActionButton({ toolbarStyle: true, source: $r('app.media.ic_home_more'), label: $r('app.string.study_more'),
-          onAction: (): void => { this.openStudyMenu(); } })
+          slideMenu: true, onHoldOpen: (): void => { this.openStudyMenu(); },
+          onHoldCancel: (): void => { this.closeStudyMenu(); }, onAction: (): void => { this.openStudyMenu(); } })
       }
       .width('100%')
       .height('100%')
@@ -2389,7 +2390,7 @@ export struct 学习页 {
             expandedIds: this.studyExpandedIds,
             onPrimaryObscured: (obscured: boolean): void => { this.studyPrimaryObscured = obscured; },
             onToggleBranch: (item: CardActionMenuEntry): void => { this.toggleStudyMenuBranch(item.id ?? ''); },
-            onClose: (): void => { this.closeStudyMenu(); },
+            onClose: (): void => { this.backStudyMenu(); },
             onSelect: (item: CardActionMenuEntry): void => { this.selectStudyMenu(item); } })
         }
         if (this.flagNamesOpen) {

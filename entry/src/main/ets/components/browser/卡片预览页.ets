@@ -620,7 +620,8 @@ export struct 卡片预览页 {
         }
         IconActionButton({ toolbarStyle: true,
           source: $r('app.media.ic_home_more'), label: $r('app.string.study_more'),
-          onAction: (): void => { this.moreMenuOpen = true; }
+          slideMenu: true, onHoldOpen: (): void => { this.moreMenuOpen = true; },
+          onHoldCancel: (): void => { this.moreMenuOpen = false; }, onAction: (): void => { this.moreMenuOpen = true; }
         })
       }
       .width('100%')

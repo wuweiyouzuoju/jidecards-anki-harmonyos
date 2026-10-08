@@ -3,11 +3,13 @@ import { AppInterfaceItem, AppInterfaceControl, visibleInterfaceItems } from '..
 import { appInterface } from '../../backend/AppInterfaceService';
 import { namedResourceText } from '../../utils/UiFeedback';
 import { ActionMenuList, ActionMenuListItem } from '../common/ActionMenuList';
+import { MenuSlideScope } from '../../model/MenuSlideSession';
 
 // 只提供菜单正文；表面、外部关闭和滚动由公共 AnchoredMenu 拥有。
 
 @Component
 export struct 主页更多面板 {
+  slideScope: MenuSlideScope = new MenuSlideScope();
   @Prop @Watch('publishInterface') historyAvailable: boolean = true;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   设置回调: () => void = (): void => {};
@@ -61,6 +63,6 @@ export struct 主页更多面板 {
   aboutToDisappear(): void { appInterface.leave('home_more'); }
 
   build() {
-    ActionMenuList({ items: this.menuEntries(), onSelect: (id: string): void => { this.selectItem(id); } })
+    ActionMenuList({ items: this.menuEntries(), slideScope: this.slideScope, onSelect: (id: string): void => { this.selectItem(id); } })
   }
 }

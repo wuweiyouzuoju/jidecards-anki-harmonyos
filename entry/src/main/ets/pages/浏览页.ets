@@ -1,3 +1,11 @@
+import { FEEDBACK_ACTIONS, resultUndoStatus } from '../model/InteractionFeedback';
+import { MENU_SLIDE_HOLD_MS } from '../model/InteractionFeedback';
+import { MenuHoldController } from '../model/MenuHoldController';
+import { menuHoldTouch } from '../components/common/MenuHoldGesture';
+import { ChangingText } from '../components/common/ChangingText';
+import { ResultNotice } from '../components/common/ResultNotice';
+import { AnkiCollectionHistoryBackend } from '../backend/CollectionHistoryBackend';
+import type { UndoStatus } from '../proto/messages/CollectionMessages';
 import { PressFeedback } from '../utils/PressFeedback';
 import { navigationEnterOffset } from '../utils/AppMotion';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
@@ -318,6 +326,7 @@ export struct 浏览页 {
    */
 
   aboutToDisappear(): void {
+    this.viewHold.cancel();
     this.interfaceMounted = false;
     appInterface.hidePage('browser');
     appInterface.leave('browser');
@@ -583,6 +592,11 @@ export struct 浏览页 {
     return { mode: this.浏览模式值, ids: this.选中ID列表.slice(),
       viewVersion: this.searchVersion, selectionVersion: this.selectionVersion };
   }
+
+  private viewHoldGroup: string = '';
+  private readonly viewHold: MenuHoldController = new MenuHoldController(
+    (): boolean => this.interfaceMounted && !this.mutationBusy && !this.多选模式值 && this.阶段 === 'list',
+    (): void => { this.openViewMenu(this.viewHoldGroup); }, (): void => { this.showViewMenu = false; });
 
   /** 写入占用一直保持到刷新结束；退出页面后只广播数据变化，不回写旧组件。 */
   private async runBrowserOperation(action: (selection: BrowserOperationContext) => Promise<void>,
@@ -1377,13 +1391,15 @@ export struct 浏览页 {
         IconActionButton({ toolbarStyle: true,
           source: $r('app.media.ic_home_more'), label: $r('app.string.browser_selection_actions'),
           isInteractive: !this.批量忙碌 && !this.mutationBusy && this.选中ID列表.length > 0,
-          onAction: (): void => { this.showBatchMenu = !this.showBatchMenu; }
+          slideMenu: true, onHoldOpen: (): void => { this.showBatchMenu = true; },
+          onHoldCancel: (): void => { this.showBatchMenu = false; }, onAction: (): void => { this.showBatchMenu = !this.showBatchMenu; }
         })
       } else {
 
         IconActionButton({ toolbarStyle: true,
           source: $r('app.media.ic_home_more'), label: $r('app.string.study_more'),
-          onAction: (): void => { this.showMoreMenu = !this.showMoreMenu; }
+          slideMenu: true, onHoldOpen: (): void => { this.showMoreMenu = true; },
+          onHoldCancel: (): void => { this.showMoreMenu = false; }, onAction: (): void => { this.showMoreMenu = !this.showMoreMenu; }
         })
       }
       }.width('100%').height('100%').alignItems(VerticalAlign.Center)
@@ -1445,7 +1461,13 @@ export struct 浏览页 {
     .accessibilityText(this.viewChoiceLabel(group))
     .attributeModifier(new PressFeedback())
     .stateEffect(false)
-    .onClick((): void => { this.openViewMenu(group); })
+    .focusOnTouch(false)
+    .onTouch((event: TouchEvent): void => {
+      if (event.type === TouchType.Down) this.viewHoldGroup = group;
+      menuHoldTouch(this.viewHold, event);
+    })
+    .gesture(LongPressGesture({ duration: MENU_SLIDE_HOLD_MS }).onAction((): void => { this.viewHold.hold(); }))
+    .onClick((): void => { if (this.viewHold.consumeClick()) this.openViewMenu(group); })
   }
 
   @Builder

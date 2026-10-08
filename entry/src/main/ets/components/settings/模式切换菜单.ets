@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { AnchoredMenu } from '../common/AnchoredMenu';
 import { AnchoredMenuItem } from '../common/MenuItem';
+import { MenuSlideScope } from '../../model/MenuSlideSession';
 
 
 // ========================================================
@@ -31,6 +32,7 @@ import { AnchoredMenuItem } from '../common/MenuItem';
 
 @Component
 export struct 模式切换菜单 {
+  private readonly slideScope: MenuSlideScope = new MenuSlideScope();
   @Prop 当前简洁模式: boolean = true;
   @Prop 主色: ResourceColor = $r('app.color.action_primary');
   @Prop 顶部偏移: number = 68;
@@ -38,10 +40,10 @@ export struct 模式切换菜单 {
   关闭回调: () => void = (): void => {};
 
   build() {
-    AnchoredMenu({ topOffset: this.顶部偏移, onClose: (): void => { this.关闭回调(); } }) {
-      AnchoredMenuItem({ label: $r('app.string.settings_simple_mode_simple'), selected: this.当前简洁模式,
+    AnchoredMenu({ topOffset: this.顶部偏移, slideScope: this.slideScope, onClose: (): void => { this.关闭回调(); } }) {
+      AnchoredMenuItem({ label: $r('app.string.settings_simple_mode_simple'), selected: this.当前简洁模式, slideScope: this.slideScope,
         onSelect: (): void => { this.选择回调(true); } })
-      AnchoredMenuItem({ label: $r('app.string.settings_simple_mode_full'), selected: !this.当前简洁模式, divider: true,
+      AnchoredMenuItem({ label: $r('app.string.settings_simple_mode_full'), selected: !this.当前简洁模式, divider: true, slideScope: this.slideScope,
         onSelect: (): void => { this.选择回调(false); } })
     }
   }

@@ -19,7 +19,7 @@ test('selection count replaces the browser title while Actions stays a manual me
   const start = source.indexOf('  private 取选中计数文案(');
   const countMethod = source.slice(start, source.indexOf('\n  }', start) + 4);
   const header = source.slice(source.indexOf('  private 顶部条()'), source.indexOf('  private quickFilterOptions()'));
-  const titleExpression = header.match(/Text\((.+)\)\r?\n/)?.[1];
+  const titleExpression = header.match(/ChangingText\(\{ value: (.+),\r?\n/)?.[1];
   assert.ok(titleExpression);
   const Page = new Function('$r', stripTypeScriptTypes(
     `class Page { ${countMethod}\n title() { return ${titleExpression}; } }`, { mode: 'transform' }) + '; return Page;')(key => key);
@@ -30,7 +30,7 @@ test('selection count replaces the browser title while Actions stays a manual me
     page.取本地化文案 = key => strings.get(key.replace('app.string.', ''));
     page.多选模式值 = false;
     page.选中ID列表 = [1, 2, 3];
-    assert.equal(page.title(), 'app.string.browser_title');
+    assert.equal(page.title(), strings.get('browser_title'));
     page.多选模式值 = true;
     for (const count of [0, 3, 1234]) {
       page.选中ID列表 = Array(count).fill(1);

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { DeckPreviewScope } from '../../model/DeckPreviewSession';
 import { ActionMenuList, ActionMenuListItem } from '../common/ActionMenuList';
+import { MenuSlideScope } from '../../model/MenuSlideSession';
 import { AppInterfaceItem, visibleInterfaceItems } from '../../model/AppInterface';
 import { appInterface } from '../../backend/AppInterfaceService';
 import { namedResourceText } from '../../utils/UiFeedback';
@@ -8,6 +9,7 @@ import { namedResourceText } from '../../utils/UiFeedback';
 /** 手机与宽屏共用公共菜单条目；HomeDeckDetails 独占表面与定位。 */
 @Component
 export struct DeckPreviewScopeMenu {
+  slideScope: MenuSlideScope = new MenuSlideScope();
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   onSelect: (scope: DeckPreviewScope) => void = (_scope: DeckPreviewScope): void => {};
   private options(): AppInterfaceItem[] {
@@ -32,7 +34,7 @@ export struct DeckPreviewScopeMenu {
   }
 
   build() {
-    ActionMenuList({ items: this.menuItems(this.uiLanguage),
+    ActionMenuList({ items: this.menuItems(this.uiLanguage), slideScope: this.slideScope,
       onSelect: (id: string): void => { this.selectOption(id); } })
   }
 }

@@ -82,7 +82,7 @@ test('home lists delegate row geometry and theme tint to the existing public men
   assert.doesNotMatch(shared, /Image\(|\.padding\(|\.margin\(|\.fontSize\(|\.fillColor\(/);
   for (const menu of menus) {
     const host = source(menu.path);
-    assert.match(host, /ActionMenuList\(\{ items: this\.menuEntries\(\), onSelect:/);
+    assert.match(host, /ActionMenuList\(\{ items: this\.menuEntries\(\), slideScope: this\.slideScope, onSelect:/);
     assert.doesNotMatch(host, /AnchoredMenuItem\(|ForEach\(/);
   }
 });

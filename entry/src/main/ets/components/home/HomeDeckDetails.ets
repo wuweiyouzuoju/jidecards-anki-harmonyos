@@ -9,6 +9,7 @@ import { DeckPreviewScopeMenu } from './DeckPreviewScopeMenu';
 import { DeckPreviewScope } from '../../model/DeckPreviewSession';
 import { APP_FOREGROUND_KEY } from '../../model/AppLifecycleState';
 import { AnchoredMenu } from '../common/AnchoredMenu';
+import { MenuSlideScope } from '../../model/MenuSlideSession';
 import { HomeActionAnchor } from '../../model/HomeHeaderLayout';
 import { IconActionButton } from '../common/IconActionButton';
 import { AppInterfaceItem, AppInterfaceControl, visibleInterfaceItems } from '../../model/AppInterface';
@@ -18,6 +19,7 @@ import { interfaceItemText } from '../../utils/AppInterfaceText';
 /** 手机详情与宽屏侧栏共用展示，动作及选择仍由首页持有。 */
 @Component
 export struct HomeDeckDetails {
+  private readonly previewSlideScope: MenuSlideScope = new MenuSlideScope();
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('compactChanged') compact: boolean = false;
   @Prop @Watch('closePreviewMenu') headerActionHeight: number = 应用尺寸.按钮高度;
@@ -137,7 +139,7 @@ export struct HomeDeckDetails {
 
   @Builder
   private previewScopes() {
-    DeckPreviewScopeMenu({ onSelect: (scope: DeckPreviewScope): void => { this.selectPreview(scope); } })
+    DeckPreviewScopeMenu({ slideScope: this.previewSlideScope, onSelect: (scope: DeckPreviewScope): void => { this.selectPreview(scope); } })
   }
 
   build() {
@@ -161,7 +163,8 @@ export struct HomeDeckDetails {
               }
               IconActionButton({ toolbarStyle: true, source: $r('app.media.ic_common_preview'),
                 label: interfaceItemText(this.getUIContext(), 'deck_details', 'preview', this.uiLanguage),
-                isInteractive: this.deckId !== '' && !this.previewBusy, onAction: (): void => { this.openPreviewMenu(); } })
+                isInteractive: this.deckId !== '' && !this.previewBusy, slideMenu: true, onHoldOpen: (): void => { this.openPreviewMenu(); },
+                onHoldCancel: (): void => { this.previewMenuOpen = false; }, onAction: (): void => { this.openPreviewMenu(); } })
             }
           }
           .width('100%')
@@ -188,6 +191,8 @@ export struct HomeDeckDetails {
           previewBusy: this.previewBusy,
           onActionAnchorChange: (anchor: HomeActionAnchor): void => { this.actionAnchor = anchor; },
           预览: (): void => { this.openPreviewMenu(); },
+          onPreviewHold: (): void => { this.openPreviewMenu(); },
+          onPreviewCancel: (): void => { this.previewMenuOpen = false; },
           添加卡片: (): void => {
             this.onAddNote();
           },
@@ -211,7 +216,7 @@ export struct HomeDeckDetails {
       .height('100%')
       .backgroundColor(this.compact ? this.页面底色微染值 : Color.Transparent)
       if (this.previewMenuOpen && this.actionAnchor.width > 0) {
-        AnchoredMenu({ menuWidth: Math.min(应用尺寸.compactMenuWidth, this.actionAnchor.width), alignEnd: true,
+        AnchoredMenu({ menuWidth: Math.min(应用尺寸.compactMenuWidth, this.actionAnchor.width), alignEnd: true, slideScope: this.previewSlideScope,
           contentLeft: this.menuAnchor().left, contentMaxWidth: this.actionAnchor.width,
           topOffset: this.menuAnchor().top,
           onClose: (): void => { this.closePreviewMenu(); } }) {

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { disclosureAnimation } from '../utils/AppMotion';
 import { FILTERED_DECK_ACTIONS, FilteredDeckMenuAction } from '../model/FilteredDeckCommands';
 import { appInterface } from '../backend/AppInterfaceService';
 import { AppInterfaceControl } from '../model/AppInterface';
@@ -513,7 +514,7 @@ export struct 牌组列表项 {
       } else if (this.deck.hasChildren) {
         DisclosureChevron()
           .rotate({ angle: this.expanded ? 90 : 0 })
-          .animation({ duration: 150, curve: Curve.EaseOut })
+          .animation(disclosureAnimation())
       }
     }
     .width(this.narrow ? 24 : 应用尺寸.箭头槽位宽度)

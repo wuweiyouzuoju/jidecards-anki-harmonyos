@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { AnchoredMenu } from '../common/AnchoredMenu';
 import { AnchoredMenuItem } from '../common/MenuItem';
+import { MenuSlideScope } from '../../model/MenuSlideSession';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { AppInterfaceMenuItem, AppInterfaceControl, browserInterfaceMenu } from '../../model/AppInterface';
 import { appInterface } from '../../backend/AppInterfaceService';
@@ -9,6 +10,7 @@ import { localizedNamedResourceText, namedResourceText } from '../../utils/UiFee
 /** 沿用设置模式菜单的居中条目、主题色标记和透明承接层。 */
 @Component
 export struct BrowserMoreMenu {
+  private readonly slideScope: MenuSlideScope = new MenuSlideScope();
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('publishInterface') filterActive: boolean = false;
   @Prop @Watch('publishInterface') available: boolean = true;
@@ -55,10 +57,10 @@ export struct BrowserMoreMenu {
   }
 
   build() {
-    AnchoredMenu({ menuWidth: 应用尺寸.extendedMenuWidth, topOffset: this.topOffset,
+    AnchoredMenu({ menuWidth: 应用尺寸.extendedMenuWidth, topOffset: this.topOffset, slideScope: this.slideScope,
       onClose: (): void => { this.onClose(); } }) {
       ForEach(this.menuItems(), (item: AppInterfaceMenuItem, index: number) => {
-        AnchoredMenuItem({ label: localizedNamedResourceText(this.getUIContext(), this.uiLanguage, item.titleKey), divider: index > 0,
+        AnchoredMenuItem({ label: localizedNamedResourceText(this.getUIContext(), this.uiLanguage, item.titleKey), divider: index > 0, slideScope: this.slideScope,
           available: item.enabled, selected: item.selected, onSelect: (): void => { this.selectItem(item.id); } })
       }, (item: AppInterfaceMenuItem): string => item.id)
     }

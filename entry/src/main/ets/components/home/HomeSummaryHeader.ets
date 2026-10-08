@@ -21,6 +21,8 @@ export struct HomeSummaryHeader {
   @Prop syncAccountState: string = 'normal';
   @Prop homeSnapshot: 主页快照 = 空主页快照;
   @Prop graphsSnapshot: 桌面卡片数据 | null = null;
+  onMoreHold: () => void = (): void => {};
+  onCreateHold: () => void = (): void => {};
   onMore: () => void = (): void => {};
   onCreate: () => void = (): void => {};
   onAgent: () => void = (): void => {};
@@ -85,14 +87,14 @@ export struct HomeSummaryHeader {
   private moreButton() {
       IconActionButton({ toolbarStyle: true, source: $r('app.media.ic_home_more'), label: $r('app.string.study_more'),
         controlSize: this.geometry().controlHeight, controlWidth: this.geometry().controlWidth, controlGlyphSize: this.geometry().controlGlyphSize,
-        onAction: this.onMore })
+        slideMenu: true, onHoldOpen: this.onMoreHold, onHoldCancel: this.onMenusClose, onAction: this.onMore })
   }
 
   @Builder
   private createButton() {
       IconActionButton({ toolbarStyle: true, source: $r('app.media.ic_home_new'), label: $r('app.string.create_deck'),
         controlSize: this.geometry().controlHeight, controlWidth: this.geometry().controlWidth, controlGlyphSize: this.geometry().controlGlyphSize,
-        onAction: this.onCreate })
+        slideMenu: true, onHoldOpen: this.onCreateHold, onHoldCancel: this.onMenusClose, onAction: this.onCreate })
   }
 
   @Builder

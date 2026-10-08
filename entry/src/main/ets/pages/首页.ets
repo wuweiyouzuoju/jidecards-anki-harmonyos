@@ -78,6 +78,7 @@ import { APP_FOREGROUND_KEY } from '../model/AppLifecycleState';
 import { 主页顶部工具栏 } from '../components/home/主页顶部工具栏';
 import { CollectionHistoryDialog } from '../components/CollectionHistoryDialog';
 import { 主页更多面板 } from '../components/home/主页更多面板';
+import { MenuSlideScope } from '../model/MenuSlideSession';
 import { appInterface } from '../backend/AppInterfaceService';
 import { 设置页参数, 浏览页参数 } from '../model/navigation/PageParams';
 import { 主页牌组列表 } from '../components/home/主页牌组列表';
@@ -138,6 +139,8 @@ import { loadAgentSecret } from '../backend/agent/AgentSecretStore';
 @Entry
 @Component
 struct 首页 {
+  private readonly homeMoreSlideScope: MenuSlideScope = new MenuSlideScope();
+  private readonly homeCreateSlideScope: MenuSlideScope = new MenuSlideScope();
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @State private customizationBackRequest: number = 0;
   @State private deckOptionsBackRequest: number = 0;
@@ -1926,6 +1929,8 @@ struct 首页 {
               actionColor: this.动作主色,
               homeSnapshot: this.主页快照数据, graphsSnapshot: this.图表快照,
               syncIndicator: this.syncIndicator, syncStatusText: this.syncStatusText, syncAccountState: this.syncAccountState,
+              onMoreHold: (): void => { this.closeHomeActions(); this.显示更多菜单 = true; },
+              onCreateHold: (): void => { this.closeHomeActions(); this.显示主页操作 = true; },
               onMore: (): void => { const open: boolean = !this.显示更多菜单; this.closeHomeActions(); this.显示更多菜单 = open; },
               onCreate: (): void => { const open: boolean = !this.显示主页操作; this.closeHomeActions(); this.显示主页操作 = open; },
               onAgent: (): void => { if (this.homeAgentEnabled) { this.closeHomeActions(); this.openAgent(); } },
@@ -2034,7 +2039,7 @@ struct 首页 {
 
   @Builder
   private homeCreateMenu() {
-      主页操作面板({
+      主页操作面板({ slideScope: this.homeCreateSlideScope,
         创建牌组回调: (): void => {
           this.显示主页操作 = false;
           this.openCreateDeck('');
@@ -2057,7 +2062,7 @@ struct 首页 {
 
   @Builder
   private homeMoreMenu() {
-      主页更多面板({
+      主页更多面板({ slideScope: this.homeMoreSlideScope,
         historyAvailable: this.homeActivity().collectionReady && !this.homeActivity().collectionBusy,
         onHistory: (): void => {
           if (this.homeActivity().collectionBusy || !this.homeActivity().collectionReady) return;
@@ -2100,7 +2105,7 @@ struct 首页 {
   @Builder
   private homeMenus() {
     if (this.显示更多菜单 && this.homeActionAnchor.width > 0) {
-      AnchoredMenu({ menuWidth: Math.min(应用尺寸.compactMenuWidth, this.homeActionAnchor.width),
+      AnchoredMenu({ menuWidth: Math.min(应用尺寸.compactMenuWidth, this.homeActionAnchor.width), slideScope: this.homeMoreSlideScope,
         topOffset: this.homeMenuAnchor().top, contentLeft: this.homeMenuAnchor().left,
         contentMaxWidth: this.homeActionAnchor.width, alignEnd: false, cornerRadius: 应用尺寸.圆角_卡片,
         onClose: (): void => { this.closeHomeActions(); } }) {
@@ -2109,7 +2114,7 @@ struct 首页 {
     }
     if (this.显示主页操作 && this.homeActionAnchor.width > 0) {
       AnchoredMenu({ menuWidth: Math.min(!this.homeSimpleMode || CLOUD_DECK_CHANNEL_ENABLED && !this.云端牌组配额已用尽 ?
-          应用尺寸.extendedMenuWidth : 应用尺寸.compactMenuWidth, this.homeActionAnchor.width),
+          应用尺寸.extendedMenuWidth : 应用尺寸.compactMenuWidth, this.homeActionAnchor.width), slideScope: this.homeCreateSlideScope,
         topOffset: this.homeMenuAnchor().top, contentLeft: this.homeMenuAnchor().left,
         contentMaxWidth: this.homeActionAnchor.width, alignEnd: true, cornerRadius: 应用尺寸.圆角_卡片,
         onClose: (): void => { this.closeHomeActions(); } }) {

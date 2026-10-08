@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { disclosureAnimation } from '../utils/AppMotion';
 import { FILTERED_DECK_ACTIONS } from '../model/FilteredDeckCommands';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { HomeActionAnchor } from '../model/HomeHeaderLayout';
@@ -63,6 +64,8 @@ export struct 牌组详情面板 {
   @Prop @Watch('publishInterface') showHeaderActions: boolean = true;
   @Prop @Watch('publishInterface') headerActionHeight: number = 应用尺寸.按钮高度;
   @Prop previewBusy: boolean = false;
+  onPreviewHold: () => void = (): void => {};
+  onPreviewCancel: () => void = (): void => {};
   @Prop @Watch('publishInterface') filteredBusy: boolean = false;
   onFilteredAction: (id: string) => void = (): void => {};
   onActionAnchorChange: (anchor: HomeActionAnchor) => void = (_anchor: HomeActionAnchor): void => {};
@@ -164,11 +167,12 @@ export struct 牌组详情面板 {
 
   @Builder
   private creationAction(source: ResourceStr, label: ResourceStr, action: () => void,
-    isInteractive: boolean = true) {
+    isInteractive: boolean = true, previewMenu: boolean = false) {
     IconActionButton({ toolbarStyle: true, source: source, label: label,
       controlSize: this.headerActionHeight, controlWidth: this.headerActionHeight,
       controlGlyphSize: Math.min(18, this.headerActionHeight * 0.46),
-      isInteractive: this.选中牌组Id !== '' && isInteractive, onAction: action })
+      isInteractive: this.选中牌组Id !== '' && isInteractive, onAction: action,
+      slideMenu: previewMenu, onHoldOpen: this.onPreviewHold, onHoldCancel: this.onPreviewCancel })
   }
 
   @Builder
@@ -188,7 +192,7 @@ export struct 牌组详情面板 {
           Blank()
           this.creationAction($r('app.media.ic_common_preview'),
             interfaceItemText(this.getUIContext(), 'deck_details', 'preview', this.uiLanguage),
-            (): void => { this.预览(); }, !this.previewBusy)
+            (): void => { this.预览(); }, !this.previewBusy, true)
         }
       }, (deck: 牌组汇总): string => deck.id)
     }
@@ -313,7 +317,7 @@ export struct 牌组详情面板 {
             Row() {
               DisclosureChevron()
                 .rotate({ angle: this.显示更多 ? 90 : 0 })
-                .animation({ duration: 150, curve: Curve.EaseOut })
+                .animation(disclosureAnimation())
               Text(interfaceItemText(this.getUIContext(), 'deck_details', 'more', this.uiLanguage))
                 .fontSize(应用尺寸.字号_按钮)
                 .fontColor($r('app.color.text_primary'))

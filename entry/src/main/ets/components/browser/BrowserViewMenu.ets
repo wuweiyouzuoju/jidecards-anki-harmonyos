@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { AnchoredMenu } from '../common/AnchoredMenu';
 import { AnchoredMenuItem } from '../common/MenuItem';
+import { MenuSlideScope } from '../../model/MenuSlideSession';
 import { AppInterfaceControl } from '../../model/AppInterface';
 import { appInterface } from '../../backend/AppInterfaceService';
 import { resourceText, namedResourceText } from '../../utils/UiFeedback';
@@ -8,6 +9,7 @@ import { resourceText, namedResourceText } from '../../utils/UiFeedback';
 /** 合并选择框一次只展示被点击的选值区；选项不再套分类或折叠层。 */
 @Component
 export struct BrowserViewMenu {
+  private readonly slideScope: MenuSlideScope = new MenuSlideScope();
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('publishInterface') group: string = 'mode';
   @Prop menuWidth: number = 240;
@@ -44,23 +46,23 @@ export struct BrowserViewMenu {
   }
 
   build() {
-    AnchoredMenu({ menuWidth: this.menuWidth, topOffset: this.topOffset, alignEnd: false,
+    AnchoredMenu({ menuWidth: this.menuWidth, topOffset: this.topOffset, alignEnd: false, slideScope: this.slideScope,
       onClose: (): void => { this.onClose(); } }) {
       Scroll() {
         Column() {
           if (this.group === 'mode') {
-            AnchoredMenuItem({ label: $r('app.string.browser_mode_cards'), selected: !this.notes, available: this.available,
+            AnchoredMenuItem({ label: $r('app.string.browser_mode_cards'), selected: !this.notes, available: this.available, slideScope: this.slideScope,
               onSelect: (): void => { this.onModeChange(false); } })
-            AnchoredMenuItem({ label: $r('app.string.browser_mode_notes'), selected: this.notes, available: this.available,
+            AnchoredMenuItem({ label: $r('app.string.browser_mode_notes'), selected: this.notes, available: this.available, slideScope: this.slideScope,
               divider: true, onSelect: (): void => { this.onModeChange(true); } })
           } else if (this.group === 'filter') {
             ForEach(this.filterOptions, (option: SelectOption, index: number) => {
-              AnchoredMenuItem({ label: option.value, selected: this.filterIndex === index, available: this.available,
+              AnchoredMenuItem({ label: option.value, selected: this.filterIndex === index, available: this.available, slideScope: this.slideScope,
                 divider: index > 0, onSelect: (): void => { this.onFilterChange(index); } })
             }, (option: SelectOption, index: number): string => index + '-' + option.value)
           } else if (this.group === 'sort') {
             ForEach(this.sortOptions, (option: SelectOption, index: number) => {
-              AnchoredMenuItem({ label: option.value, selected: this.sortIndex === index, available: this.available,
+              AnchoredMenuItem({ label: option.value, selected: this.sortIndex === index, available: this.available, slideScope: this.slideScope,
                 divider: index > 0, onSelect: (): void => { this.onSortChange(index); } })
             }, (option: SelectOption, index: number): string => index + '-' + option.value)
           }

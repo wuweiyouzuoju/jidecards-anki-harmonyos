@@ -3,6 +3,7 @@ import { AppInterfaceItem, visibleInterfaceItems } from '../model/AppInterface';
 import { appInterface } from '../backend/AppInterfaceService';
 import { namedResourceText } from '../utils/UiFeedback';
 import { ActionMenuList, ActionMenuListItem } from './common/ActionMenuList';
+import { MenuSlideScope } from '../model/MenuSlideSession';
 
 import { 简洁模式AppStorage键 } from '../model/简洁模式存储';
 
@@ -10,6 +11,7 @@ import { 简洁模式AppStorage键 } from '../model/简洁模式存储';
 
 @Component
 export struct 主页操作面板 {
+  slideScope: MenuSlideScope = new MenuSlideScope();
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   创建牌组回调: () => void = (): void => {};
   onCreateFilteredDeck: () => void = (): void => {};
@@ -58,6 +60,6 @@ export struct 主页操作面板 {
   aboutToDisappear(): void { appInterface.leave('home_create'); }
 
   build() {
-    ActionMenuList({ items: this.menuEntries(), onSelect: (id: string): void => { this.selectItem(id); } })
+    ActionMenuList({ items: this.menuEntries(), slideScope: this.slideScope, onSelect: (id: string): void => { this.selectItem(id); } })
   }
 }
