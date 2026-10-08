@@ -1,169 +1,512 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-
-// ========================================================
-// @块ID PROTO-MSG-DECKCONF-001
-// @名称 牌组配置消息编解码
-//
-// @作用
-// 编解码 anki.deck_config.proto 消息（Anki 26.05）：
-// - DeckConfig / DeckConfigSettings：完整牌组配置（40+ 字段，含 FSRS 参数）
-// - DeckLimits / CurrentDeckInfo / DeckConfigsForUpdateView：配置面板视图
-// - UpdateDeckConfigsInput：批量更新请求（增删改 + 应用到子牌组 + FSRS 重排）
-// 字段来源：third_party/anki/proto/anki/deck_config.proto
-//
-// @输入
-// 编码：DeckConfig / DeckLimits / UpdateDeckConfigsInput 结构
-// 解码：字节流
-//
-// @输出
-// 编码：Uint8Array 字节
-// 解码：DeckConfig / DeckConfigsForUpdateView
-//
-// @业务规则
-// `preserved` 字段原样保留未知字段字节，保证未来 Anki 加字段时更新无损。
-// `other`（field 255）保留 backend 自定义字节。
-// 每个公共 Config 字段都建模，无字段被丢弃。
-// 紧凑写法（单行多语句）是为减小文件体积，逻辑与 prost 对齐。
-//
-// @副作用
-// 无
-// ========================================================
-
-import { 协议读取器 } from '../core/ProtoReader';
-import { 协议写入器, 线类型_长度分隔 } from '../core/ProtoWriter';
-
+// 领域契约适配；协议事实由 generated/CoreMessages.ts 提供。
+import { DeckConfigUpdateDeckConfigsMode } from '../generated/CoreMessages';
+import { 协议写入器 } from '../core/ProtoWriter';
+import { DeckConfigDeckConfig, DeckConfigDeckConfigConfig, DeckConfigDeckConfigId, DeckConfigDeckConfigsForUpdate, DeckConfigDeckConfigsForUpdateConfigWithExtra, DeckConfigDeckConfigsForUpdateCurrentDeck, DeckConfigDeckConfigsForUpdateCurrentDeckLimits, DeckConfigUpdateDeckConfigsRequest } from '../generated/CoreMessages';
 export function encodeDeckConfigId(dcid: number): Uint8Array {
-  const w = new 协议写入器();
-  if (dcid !== 0) w.写入64位整数(1, dcid);
-  return w.转为字节();
+    const w = new DeckConfigDeckConfigId();
+    if (dcid !== 0)
+        w.setDcid(dcid);
+    return w.转为字节();
 }
-
 export interface DeckConfigSettings {
-  learnSteps: number[]; relearnSteps: number[]; fsrsParams4: number[]; easyDaysPercentages: number[];
-  fsrsParams5: number[]; fsrsParams6: number[]; newPerDay: number; reviewsPerDay: number;
-  initialEase: number; easyMultiplier: number; hardMultiplier: number; lapseMultiplier: number;
-  intervalMultiplier: number; maximumReviewInterval: number; minimumLapseInterval: number;
-  graduatingIntervalGood: number; graduatingIntervalEasy: number; newCardInsertOrder: number;
-  leechAction: number; leechThreshold: number; disableAutoplay: boolean; capAnswerTimeToSecs: number;
-  showTimer: boolean; skipQuestionWhenReplayingAnswer: boolean; buryNew: boolean; buryReviews: boolean;
-  buryInterdayLearning: boolean; newMix: number; interdayLearningMix: number; newCardSortOrder: number;
-  reviewOrder: number; newCardGatherPriority: number; newPerDayMinimum: number; questionAction: number;
-  desiredRetention: number; stopTimerOnAnswer: boolean; historicalRetention: number;
-  secondsToShowQuestion: number; secondsToShowAnswer: number; answerAction: number; waitForAudio: boolean;
-  paramSearch: string; ignoreRevlogsBeforeDate: string; other: Uint8Array; preserved: Uint8Array[];
+    learnSteps: number[];
+    relearnSteps: number[];
+    fsrsParams4: number[];
+    easyDaysPercentages: number[];
+    fsrsParams5: number[];
+    fsrsParams6: number[];
+    newPerDay: number;
+    reviewsPerDay: number;
+    initialEase: number;
+    easyMultiplier: number;
+    hardMultiplier: number;
+    lapseMultiplier: number;
+    intervalMultiplier: number;
+    maximumReviewInterval: number;
+    minimumLapseInterval: number;
+    graduatingIntervalGood: number;
+    graduatingIntervalEasy: number;
+    newCardInsertOrder: number;
+    leechAction: number;
+    leechThreshold: number;
+    disableAutoplay: boolean;
+    capAnswerTimeToSecs: number;
+    showTimer: boolean;
+    skipQuestionWhenReplayingAnswer: boolean;
+    buryNew: boolean;
+    buryReviews: boolean;
+    buryInterdayLearning: boolean;
+    newMix: number;
+    interdayLearningMix: number;
+    newCardSortOrder: number;
+    reviewOrder: number;
+    newCardGatherPriority: number;
+    newPerDayMinimum: number;
+    questionAction: number;
+    desiredRetention: number;
+    stopTimerOnAnswer: boolean;
+    historicalRetention: number;
+    secondsToShowQuestion: number;
+    secondsToShowAnswer: number;
+    answerAction: number;
+    waitForAudio: boolean;
+    paramSearch: string;
+    ignoreRevlogsBeforeDate: string;
+    other: Uint8Array;
+    preserved: Uint8Array[];
 }
-
-export interface DeckConfig { id: number; name: string; mtimeSecs: number; usn: number; config: DeckConfigSettings | null; }
-
+export interface DeckConfig {
+    id: number;
+    name: string;
+    mtimeSecs: number;
+    usn: number;
+    config: DeckConfigSettings | null;
+}
 export function emptyDeckConfigSettings(): DeckConfigSettings {
-  return {
-    learnSteps: [], relearnSteps: [], fsrsParams4: [], easyDaysPercentages: [], fsrsParams5: [], fsrsParams6: [],
-    newPerDay: 0, reviewsPerDay: 0, initialEase: 0, easyMultiplier: 0, hardMultiplier: 0, lapseMultiplier: 0,
-    intervalMultiplier: 0, maximumReviewInterval: 0, minimumLapseInterval: 0, graduatingIntervalGood: 0,
-    graduatingIntervalEasy: 0, newCardInsertOrder: 0, leechAction: 0, leechThreshold: 0, disableAutoplay: false,
-    capAnswerTimeToSecs: 0, showTimer: false, skipQuestionWhenReplayingAnswer: false, buryNew: false,
-    buryReviews: false, buryInterdayLearning: false, newMix: 0, interdayLearningMix: 0, newCardSortOrder: 0,
-    reviewOrder: 0, newCardGatherPriority: 0, newPerDayMinimum: 0, questionAction: 0, desiredRetention: 0,
-    stopTimerOnAnswer: false, historicalRetention: 0, secondsToShowQuestion: 0, secondsToShowAnswer: 0,
-    answerAction: 0, waitForAudio: false, paramSearch: '', ignoreRevlogsBeforeDate: '', other: new Uint8Array(), preserved: []
-  };
+    return {
+        learnSteps: [], relearnSteps: [], fsrsParams4: [], easyDaysPercentages: [], fsrsParams5: [], fsrsParams6: [],
+        newPerDay: 0, reviewsPerDay: 0, initialEase: 0, easyMultiplier: 0, hardMultiplier: 0, lapseMultiplier: 0,
+        intervalMultiplier: 0, maximumReviewInterval: 0, minimumLapseInterval: 0, graduatingIntervalGood: 0,
+        graduatingIntervalEasy: 0, newCardInsertOrder: 0, leechAction: 0, leechThreshold: 0, disableAutoplay: false,
+        capAnswerTimeToSecs: 0, showTimer: false, skipQuestionWhenReplayingAnswer: false, buryNew: false,
+        buryReviews: false, buryInterdayLearning: false, newMix: 0, interdayLearningMix: 0, newCardSortOrder: 0,
+        reviewOrder: 0, newCardGatherPriority: 0, newPerDayMinimum: 0, questionAction: 0, desiredRetention: 0,
+        stopTimerOnAnswer: false, historicalRetention: 0, secondsToShowQuestion: 0, secondsToShowAnswer: 0,
+        answerAction: 0, waitForAudio: false, paramSearch: '', ignoreRevlogsBeforeDate: '', other: new Uint8Array(), preserved: []
+    };
 }
-
-function floats(w: 协议写入器, field: number, value: number[]): void { if (value.length > 0) w.写入打包浮点(field, value); }
-function uint(w: 协议写入器, field: number, value: number): void { if (value !== 0) w.写入变长整数(field, value); }
-function float(w: 协议写入器, field: number, value: number): void { if (value !== 0) w.写入浮点(field, value); }
-function bool(w: 协议写入器, field: number, value: boolean): void { if (value) w.写入布尔(field, true); }
-function text(w: 协议写入器, field: number, value: string): void { if (value !== '') w.写入字符串(field, value); }
-function 读取浮点s(r: 协议读取器, wireType: number, target: number[]): void {
-  if (wireType === 线类型_长度分隔) target.push(...r.读取打包浮点()); else target.push(r.读取浮点());
-}
-
 function encodeSettings(input: DeckConfigSettings): 协议写入器 {
-  const v: DeckConfigSettings = { ...emptyDeckConfigSettings(), ...input };
-  const w = new 协议写入器();
-  floats(w, 1, v.learnSteps); floats(w, 2, v.relearnSteps); floats(w, 3, v.fsrsParams4); floats(w, 4, v.easyDaysPercentages);
-  floats(w, 5, v.fsrsParams5); floats(w, 6, v.fsrsParams6); uint(w, 9, v.newPerDay); uint(w, 10, v.reviewsPerDay);
-  float(w, 11, v.initialEase); float(w, 12, v.easyMultiplier); float(w, 13, v.hardMultiplier); float(w, 14, v.lapseMultiplier);
-  float(w, 15, v.intervalMultiplier); uint(w, 16, v.maximumReviewInterval); uint(w, 17, v.minimumLapseInterval);
-  uint(w, 18, v.graduatingIntervalGood); uint(w, 19, v.graduatingIntervalEasy); uint(w, 20, v.newCardInsertOrder);
-  uint(w, 21, v.leechAction); uint(w, 22, v.leechThreshold); bool(w, 23, v.disableAutoplay); uint(w, 24, v.capAnswerTimeToSecs);
-  bool(w, 25, v.showTimer); bool(w, 26, v.skipQuestionWhenReplayingAnswer); bool(w, 27, v.buryNew); bool(w, 28, v.buryReviews);
-  bool(w, 29, v.buryInterdayLearning); uint(w, 30, v.newMix); uint(w, 31, v.interdayLearningMix); uint(w, 32, v.newCardSortOrder);
-  uint(w, 33, v.reviewOrder); uint(w, 34, v.newCardGatherPriority); uint(w, 35, v.newPerDayMinimum); uint(w, 36, v.questionAction);
-  float(w, 37, v.desiredRetention); bool(w, 38, v.stopTimerOnAnswer); float(w, 40, v.historicalRetention);
-  float(w, 41, v.secondsToShowQuestion); float(w, 42, v.secondsToShowAnswer); uint(w, 43, v.answerAction); bool(w, 44, v.waitForAudio);
-  text(w, 45, v.paramSearch); text(w, 46, v.ignoreRevlogsBeforeDate); if (v.other.length > 0) w.写入字节(255, v.other);
-  for (const raw of v.preserved) w.写入原始字节(raw);
-  return w;
+    const w = new DeckConfigDeckConfigConfig();
+    if (input.learnSteps !== undefined && input.learnSteps.length > 0)
+        w.setLearnSteps(input.learnSteps);
+    if (input.relearnSteps !== undefined && input.relearnSteps.length > 0)
+        w.setRelearnSteps(input.relearnSteps);
+    if (input.fsrsParams4 !== undefined && input.fsrsParams4.length > 0)
+        w.setFsrsParams4(input.fsrsParams4);
+    if (input.easyDaysPercentages !== undefined && input.easyDaysPercentages.length > 0)
+        w.setEasyDaysPercentages(input.easyDaysPercentages);
+    if (input.fsrsParams5 !== undefined && input.fsrsParams5.length > 0)
+        w.setFsrsParams5(input.fsrsParams5);
+    if (input.fsrsParams6 !== undefined && input.fsrsParams6.length > 0)
+        w.setFsrsParams6(input.fsrsParams6);
+    if (input.newPerDay !== undefined && input.newPerDay !== 0)
+        w.setNewPerDay(input.newPerDay);
+    if (input.reviewsPerDay !== undefined && input.reviewsPerDay !== 0)
+        w.setReviewsPerDay(input.reviewsPerDay);
+    if (input.initialEase !== undefined && input.initialEase !== 0)
+        w.setInitialEase(input.initialEase);
+    if (input.easyMultiplier !== undefined && input.easyMultiplier !== 0)
+        w.setEasyMultiplier(input.easyMultiplier);
+    if (input.hardMultiplier !== undefined && input.hardMultiplier !== 0)
+        w.setHardMultiplier(input.hardMultiplier);
+    if (input.lapseMultiplier !== undefined && input.lapseMultiplier !== 0)
+        w.setLapseMultiplier(input.lapseMultiplier);
+    if (input.intervalMultiplier !== undefined && input.intervalMultiplier !== 0)
+        w.setIntervalMultiplier(input.intervalMultiplier);
+    if (input.maximumReviewInterval !== undefined && input.maximumReviewInterval !== 0)
+        w.setMaximumReviewInterval(input.maximumReviewInterval);
+    if (input.minimumLapseInterval !== undefined && input.minimumLapseInterval !== 0)
+        w.setMinimumLapseInterval(input.minimumLapseInterval);
+    if (input.graduatingIntervalGood !== undefined && input.graduatingIntervalGood !== 0)
+        w.setGraduatingIntervalGood(input.graduatingIntervalGood);
+    if (input.graduatingIntervalEasy !== undefined && input.graduatingIntervalEasy !== 0)
+        w.setGraduatingIntervalEasy(input.graduatingIntervalEasy);
+    if (input.newCardInsertOrder !== undefined && input.newCardInsertOrder !== 0)
+        w.setNewCardInsertOrder(input.newCardInsertOrder);
+    if (input.leechAction !== undefined && input.leechAction !== 0)
+        w.setLeechAction(input.leechAction);
+    if (input.leechThreshold !== undefined && input.leechThreshold !== 0)
+        w.setLeechThreshold(input.leechThreshold);
+    if (input.disableAutoplay !== undefined && input.disableAutoplay)
+        w.setDisableAutoplay(input.disableAutoplay);
+    if (input.capAnswerTimeToSecs !== undefined && input.capAnswerTimeToSecs !== 0)
+        w.setCapAnswerTimeToSecs(input.capAnswerTimeToSecs);
+    if (input.showTimer !== undefined && input.showTimer)
+        w.setShowTimer(input.showTimer);
+    if (input.skipQuestionWhenReplayingAnswer !== undefined && input.skipQuestionWhenReplayingAnswer)
+        w.setSkipQuestionWhenReplayingAnswer(input.skipQuestionWhenReplayingAnswer);
+    if (input.buryNew !== undefined && input.buryNew)
+        w.setBuryNew(input.buryNew);
+    if (input.buryReviews !== undefined && input.buryReviews)
+        w.setBuryReviews(input.buryReviews);
+    if (input.buryInterdayLearning !== undefined && input.buryInterdayLearning)
+        w.setBuryInterdayLearning(input.buryInterdayLearning);
+    if (input.newMix !== undefined && input.newMix !== 0)
+        w.setNewMix(input.newMix);
+    if (input.interdayLearningMix !== undefined && input.interdayLearningMix !== 0)
+        w.setInterdayLearningMix(input.interdayLearningMix);
+    if (input.newCardSortOrder !== undefined && input.newCardSortOrder !== 0)
+        w.setNewCardSortOrder(input.newCardSortOrder);
+    if (input.reviewOrder !== undefined && input.reviewOrder !== 0)
+        w.setReviewOrder(input.reviewOrder);
+    if (input.newCardGatherPriority !== undefined && input.newCardGatherPriority !== 0)
+        w.setNewCardGatherPriority(input.newCardGatherPriority);
+    if (input.newPerDayMinimum !== undefined && input.newPerDayMinimum !== 0)
+        w.setNewPerDayMinimum(input.newPerDayMinimum);
+    if (input.questionAction !== undefined && input.questionAction !== 0)
+        w.setQuestionAction(input.questionAction);
+    if (input.desiredRetention !== undefined && input.desiredRetention !== 0)
+        w.setDesiredRetention(input.desiredRetention);
+    if (input.stopTimerOnAnswer !== undefined && input.stopTimerOnAnswer)
+        w.setStopTimerOnAnswer(input.stopTimerOnAnswer);
+    if (input.historicalRetention !== undefined && input.historicalRetention !== 0)
+        w.setHistoricalRetention(input.historicalRetention);
+    if (input.secondsToShowQuestion !== undefined && input.secondsToShowQuestion !== 0)
+        w.setSecondsToShowQuestion(input.secondsToShowQuestion);
+    if (input.secondsToShowAnswer !== undefined && input.secondsToShowAnswer !== 0)
+        w.setSecondsToShowAnswer(input.secondsToShowAnswer);
+    if (input.answerAction !== undefined && input.answerAction !== 0)
+        w.setAnswerAction(input.answerAction);
+    if (input.waitForAudio !== undefined && input.waitForAudio)
+        w.setWaitForAudio(input.waitForAudio);
+    if (input.paramSearch !== undefined && input.paramSearch !== '')
+        w.setParamSearch(input.paramSearch);
+    if (input.ignoreRevlogsBeforeDate !== undefined && input.ignoreRevlogsBeforeDate !== '')
+        w.setIgnoreRevlogsBeforeDate(input.ignoreRevlogsBeforeDate);
+    if (input.other !== undefined && input.other.length > 0)
+        w.setOther(input.other);
+    for (const raw of input.preserved ?? [])
+        w.appendRaw(raw);
+    const writer = new 协议写入器();
+    writer.写入原始字节(w.toBytes());
+    return writer;
 }
-
 function decodeSettings(bytes: Uint8Array): DeckConfigSettings {
-  const r = new 协议读取器(bytes); const out = emptyDeckConfigSettings();
-  while (true) {
-    const start = r.当前位置;
-    const tag = r.读取标签();
-    if (tag === null) break;
-    switch (tag.字段号) {
-      case 1: 读取浮点s(r, tag.线类型, out.learnSteps); break; case 2: 读取浮点s(r, tag.线类型, out.relearnSteps); break;
-      case 3: 读取浮点s(r, tag.线类型, out.fsrsParams4); break; case 4: 读取浮点s(r, tag.线类型, out.easyDaysPercentages); break;
-      case 5: 读取浮点s(r, tag.线类型, out.fsrsParams5); break; case 6: 读取浮点s(r, tag.线类型, out.fsrsParams6); break;
-      case 9: out.newPerDay = r.读取变长整数(); break; case 10: out.reviewsPerDay = r.读取变长整数(); break;
-      case 11: out.initialEase = r.读取浮点(); break; case 12: out.easyMultiplier = r.读取浮点(); break;
-      case 13: out.hardMultiplier = r.读取浮点(); break; case 14: out.lapseMultiplier = r.读取浮点(); break;
-      case 15: out.intervalMultiplier = r.读取浮点(); break; case 16: out.maximumReviewInterval = r.读取变长整数(); break;
-      case 17: out.minimumLapseInterval = r.读取变长整数(); break; case 18: out.graduatingIntervalGood = r.读取变长整数(); break;
-      case 19: out.graduatingIntervalEasy = r.读取变长整数(); break; case 20: out.newCardInsertOrder = r.读取变长整数(); break;
-      case 21: out.leechAction = r.读取变长整数(); break; case 22: out.leechThreshold = r.读取变长整数(); break;
-      case 23: out.disableAutoplay = r.读取布尔(); break; case 24: out.capAnswerTimeToSecs = r.读取变长整数(); break;
-      case 25: out.showTimer = r.读取布尔(); break; case 26: out.skipQuestionWhenReplayingAnswer = r.读取布尔(); break;
-      case 27: out.buryNew = r.读取布尔(); break; case 28: out.buryReviews = r.读取布尔(); break;
-      case 29: out.buryInterdayLearning = r.读取布尔(); break; case 30: out.newMix = r.读取变长整数(); break;
-      case 31: out.interdayLearningMix = r.读取变长整数(); break; case 32: out.newCardSortOrder = r.读取变长整数(); break;
-      case 33: out.reviewOrder = r.读取变长整数(); break; case 34: out.newCardGatherPriority = r.读取变长整数(); break;
-      case 35: out.newPerDayMinimum = r.读取变长整数(); break; case 36: out.questionAction = r.读取变长整数(); break;
-      case 37: out.desiredRetention = r.读取浮点(); break; case 38: out.stopTimerOnAnswer = r.读取布尔(); break;
-      case 40: out.historicalRetention = r.读取浮点(); break; case 41: out.secondsToShowQuestion = r.读取浮点(); break;
-      case 42: out.secondsToShowAnswer = r.读取浮点(); break; case 43: out.answerAction = r.读取变长整数(); break;
-      case 44: out.waitForAudio = r.读取布尔(); break; case 45: out.paramSearch = r.读取字符串(); break;
-      case 46: out.ignoreRevlogsBeforeDate = r.读取字符串(); break; case 255: out.other = r.读取字节(); break;
-      default: r.跳过字段(tag.线类型); out.preserved.push(r.截取片段(start)); break;
-    }
-  }
-  return out;
+    const m = new DeckConfigDeckConfigConfig(bytes);
+    const out = emptyDeckConfigSettings();
+    if (m.hasLearnSteps())
+        out.learnSteps = m.getLearnSteps();
+    if (m.hasRelearnSteps())
+        out.relearnSteps = m.getRelearnSteps();
+    if (m.hasFsrsParams4())
+        out.fsrsParams4 = m.getFsrsParams4();
+    if (m.hasEasyDaysPercentages())
+        out.easyDaysPercentages = m.getEasyDaysPercentages();
+    if (m.hasFsrsParams5())
+        out.fsrsParams5 = m.getFsrsParams5();
+    if (m.hasFsrsParams6())
+        out.fsrsParams6 = m.getFsrsParams6();
+    if (m.hasNewPerDay())
+        out.newPerDay = m.getNewPerDay();
+    if (m.hasReviewsPerDay())
+        out.reviewsPerDay = m.getReviewsPerDay();
+    if (m.hasInitialEase())
+        out.initialEase = m.getInitialEase();
+    if (m.hasEasyMultiplier())
+        out.easyMultiplier = m.getEasyMultiplier();
+    if (m.hasHardMultiplier())
+        out.hardMultiplier = m.getHardMultiplier();
+    if (m.hasLapseMultiplier())
+        out.lapseMultiplier = m.getLapseMultiplier();
+    if (m.hasIntervalMultiplier())
+        out.intervalMultiplier = m.getIntervalMultiplier();
+    if (m.hasMaximumReviewInterval())
+        out.maximumReviewInterval = m.getMaximumReviewInterval();
+    if (m.hasMinimumLapseInterval())
+        out.minimumLapseInterval = m.getMinimumLapseInterval();
+    if (m.hasGraduatingIntervalGood())
+        out.graduatingIntervalGood = m.getGraduatingIntervalGood();
+    if (m.hasGraduatingIntervalEasy())
+        out.graduatingIntervalEasy = m.getGraduatingIntervalEasy();
+    if (m.hasNewCardInsertOrder())
+        out.newCardInsertOrder = m.getNewCardInsertOrder();
+    if (m.hasLeechAction())
+        out.leechAction = m.getLeechAction();
+    if (m.hasLeechThreshold())
+        out.leechThreshold = m.getLeechThreshold();
+    if (m.hasDisableAutoplay())
+        out.disableAutoplay = m.getDisableAutoplay();
+    if (m.hasCapAnswerTimeToSecs())
+        out.capAnswerTimeToSecs = m.getCapAnswerTimeToSecs();
+    if (m.hasShowTimer())
+        out.showTimer = m.getShowTimer();
+    if (m.hasSkipQuestionWhenReplayingAnswer())
+        out.skipQuestionWhenReplayingAnswer = m.getSkipQuestionWhenReplayingAnswer();
+    if (m.hasBuryNew())
+        out.buryNew = m.getBuryNew();
+    if (m.hasBuryReviews())
+        out.buryReviews = m.getBuryReviews();
+    if (m.hasBuryInterdayLearning())
+        out.buryInterdayLearning = m.getBuryInterdayLearning();
+    if (m.hasNewMix())
+        out.newMix = m.getNewMix();
+    if (m.hasInterdayLearningMix())
+        out.interdayLearningMix = m.getInterdayLearningMix();
+    if (m.hasNewCardSortOrder())
+        out.newCardSortOrder = m.getNewCardSortOrder();
+    if (m.hasReviewOrder())
+        out.reviewOrder = m.getReviewOrder();
+    if (m.hasNewCardGatherPriority())
+        out.newCardGatherPriority = m.getNewCardGatherPriority();
+    if (m.hasNewPerDayMinimum())
+        out.newPerDayMinimum = m.getNewPerDayMinimum();
+    if (m.hasQuestionAction())
+        out.questionAction = m.getQuestionAction();
+    if (m.hasDesiredRetention())
+        out.desiredRetention = m.getDesiredRetention();
+    if (m.hasStopTimerOnAnswer())
+        out.stopTimerOnAnswer = m.getStopTimerOnAnswer();
+    if (m.hasHistoricalRetention())
+        out.historicalRetention = m.getHistoricalRetention();
+    if (m.hasSecondsToShowQuestion())
+        out.secondsToShowQuestion = m.getSecondsToShowQuestion();
+    if (m.hasSecondsToShowAnswer())
+        out.secondsToShowAnswer = m.getSecondsToShowAnswer();
+    if (m.hasAnswerAction())
+        out.answerAction = m.getAnswerAction();
+    if (m.hasWaitForAudio())
+        out.waitForAudio = m.getWaitForAudio();
+    if (m.hasParamSearch())
+        out.paramSearch = m.getParamSearch();
+    if (m.hasIgnoreRevlogsBeforeDate())
+        out.ignoreRevlogsBeforeDate = m.getIgnoreRevlogsBeforeDate();
+    if (m.hasOther())
+        out.other = m.getOther()!;
+    out.preserved = m.preserved();
+    return out;
 }
-
 export function encodeDeckConfig(value: DeckConfig): Uint8Array {
-  const w = new 协议写入器(); if (value.id !== 0) w.写入64位整数(1, value.id); if (value.name !== '') w.写入字符串(2, value.name);
-  if (value.mtimeSecs !== 0) w.写入64位整数(3, value.mtimeSecs); if (value.usn !== 0) w.写入变长整数(4, value.usn);
-  if (value.config !== null) w.写入子消息(5, encodeSettings(value.config)); return w.转为字节();
+    const w = new DeckConfigDeckConfig();
+    if (value.id !== 0)
+        w.setId(value.id);
+    if (value.name !== '')
+        w.setName(value.name);
+    if (value.mtimeSecs !== 0)
+        w.setMtimeSecs(value.mtimeSecs);
+    if (value.usn !== 0)
+        w.setUsn(value.usn);
+    if (value.config !== null)
+        w.setConfigWriter(encodeSettings(value.config));
+    return w.转为字节();
 }
 export function decodeDeckConfig(bytes: Uint8Array): DeckConfig {
-  const r = new 协议读取器(bytes); const out: DeckConfig = { id: 0, name: '', mtimeSecs: 0, usn: 0, config: null }; let tag;
-  while ((tag = r.读取标签()) !== null) { switch (tag.字段号) { case 1: out.id = r.读取64位整数(); break; case 2: out.name = r.读取字符串(); break; case 3: out.mtimeSecs = r.读取64位整数(); break; case 4: out.usn = r.读取32位整数(); break; case 5: out.config = decodeSettings(r.读取字节()); break; default: r.跳过字段(tag.线类型); } }
-  return out;
+    const r = new DeckConfigDeckConfig(bytes);
+    const out: DeckConfig = { id: 0, name: '', mtimeSecs: 0, usn: 0, config: null };
+    if (r.hasId()) {
+        out.id = r.getId();
+    }
+    if (r.hasName()) {
+        out.name = r.getName();
+    }
+    if (r.hasMtimeSecs()) {
+        out.mtimeSecs = r.getMtimeSecs();
+    }
+    if (r.hasUsn()) {
+        out.usn = r.getUsn();
+    }
+    if (r.hasConfig()) {
+        out.config = decodeSettings(r.getConfigLast()!);
+    }
+    return out;
 }
-
-export interface DeckLimits { review: number | null; new: number | null; reviewToday: number | null; newToday: number | null; reviewTodayActive: boolean; newTodayActive: boolean; desiredRetention: number | null; }
+export interface DeckLimits {
+    review: number | null;
+    new: number | null;
+    reviewToday: number | null;
+    newToday: number | null;
+    reviewTodayActive: boolean;
+    newTodayActive: boolean;
+    desiredRetention: number | null;
+}
 export function encodeLimits(v: DeckLimits): 协议写入器 {
-  const w = new 协议写入器();
-  // optional 的 0 表示零限额，必须与 null（跟随预设／清除覆盖）区分。
-  if (v.review !== null) w.写入变长整数(1, v.review);
-  if (v.new !== null) w.写入变长整数(2, v.new);
-  if (v.reviewToday !== null) w.写入变长整数(3, v.reviewToday);
-  if (v.newToday !== null) w.写入变长整数(4, v.newToday);
-  bool(w, 5, v.reviewTodayActive); bool(w, 6, v.newTodayActive);
-  if (v.desiredRetention !== null) w.写入浮点(7, v.desiredRetention);
-  return w;
+    const w = new DeckConfigDeckConfigsForUpdateCurrentDeckLimits();
+    if (v.review !== null)
+        w.setReview(v.review);
+    if (v.new !== null)
+        w.setNew(v.new);
+    if (v.reviewToday !== null)
+        w.setReviewToday(v.reviewToday);
+    if (v.newToday !== null)
+        w.setNewToday(v.newToday);
+    if (v.reviewTodayActive)
+        w.setReviewTodayActive(true);
+    if (v.newTodayActive)
+        w.setNewTodayActive(true);
+    if (v.desiredRetention !== null)
+        w.setDesiredRetention(v.desiredRetention);
+    const out = new 协议写入器();
+    out.写入原始字节(w.toBytes());
+    return out;
 }
-export function decodeLimits(bytes: Uint8Array): DeckLimits { const r = new 协议读取器(bytes); const out: DeckLimits = { review: null, new: null, reviewToday: null, newToday: null, reviewTodayActive: false, newTodayActive: false, desiredRetention: null }; let tag; while ((tag = r.读取标签()) !== null) { switch (tag.字段号) { case 1: out.review = r.读取变长整数(); break; case 2: out.new = r.读取变长整数(); break; case 3: out.reviewToday = r.读取变长整数(); break; case 4: out.newToday = r.读取变长整数(); break; case 5: out.reviewTodayActive = r.读取布尔(); break; case 6: out.newTodayActive = r.读取布尔(); break; case 7: out.desiredRetention = r.读取浮点(); break; default: r.跳过字段(tag.线类型); } } return out; }
-
-export interface DeckConfigWithUseCount { config: DeckConfig; useCount: number; }
-export interface CurrentDeckInfo { name: string; configId: number; parentConfigIds: number[]; limits: DeckLimits | null; }
-function decodeConfigWithExtra(bytes: Uint8Array): DeckConfigWithUseCount { const r = new 协议读取器(bytes); const out: DeckConfigWithUseCount = { config: { id: 0, name: '', mtimeSecs: 0, usn: 0, config: null }, useCount: 0 }; let tag; while ((tag = r.读取标签()) !== null) { if (tag.字段号 === 1) out.config = decodeDeckConfig(r.读取字节()); else if (tag.字段号 === 2) out.useCount = r.读取变长整数(); else r.跳过字段(tag.线类型); } return out; }
-function decodeCurrentDeck(bytes: Uint8Array): CurrentDeckInfo { const r = new 协议读取器(bytes); const out: CurrentDeckInfo = { name: '', configId: 0, parentConfigIds: [], limits: null }; let tag; while ((tag = r.读取标签()) !== null) { switch (tag.字段号) { case 1: out.name = r.读取字符串(); break; case 2: out.configId = r.读取64位整数(); break; case 3: if (tag.线类型 === 线类型_长度分隔) out.parentConfigIds.push(...r.读取打包64位整数()); else out.parentConfigIds.push(r.读取64位整数()); break; case 4: out.limits = decodeLimits(r.读取字节()); break; default: r.跳过字段(tag.线类型); } } return out; }
-export interface DeckConfigsForUpdateView { allConfigs: DeckConfigWithUseCount[]; currentDeck: CurrentDeckInfo | null; defaults: DeckConfig | null; schemaModified: boolean; cardStateCustomizer: string; newCardsIgnoreReviewLimit: boolean; fsrs: boolean; applyAllParentLimits: boolean; fsrsHealthCheck: boolean; }
-export function decodeDeckConfigsForUpdate(bytes: Uint8Array): DeckConfigsForUpdateView { const r = new 协议读取器(bytes); const out: DeckConfigsForUpdateView = { allConfigs: [], currentDeck: null, defaults: null, schemaModified: false, cardStateCustomizer: '', newCardsIgnoreReviewLimit: false, fsrs: false, applyAllParentLimits: false, fsrsHealthCheck: false }; let tag; while ((tag = r.读取标签()) !== null) { switch (tag.字段号) { case 1: out.allConfigs.push(decodeConfigWithExtra(r.读取字节())); break; case 2: out.currentDeck = decodeCurrentDeck(r.读取字节()); break; case 3: out.defaults = decodeDeckConfig(r.读取字节()); break; case 4: out.schemaModified = r.读取布尔(); break; case 6: out.cardStateCustomizer = r.读取字符串(); break; case 7: out.newCardsIgnoreReviewLimit = r.读取布尔(); break; case 8: out.fsrs = r.读取布尔(); break; case 9: out.applyAllParentLimits = r.读取布尔(); break; case 11: out.fsrsHealthCheck = r.读取布尔(); break; default: r.跳过字段(tag.线类型); } } return out; }
-export const UPDATE_DECK_CONFIGS_MODE_NORMAL = 0; export const UPDATE_DECK_CONFIGS_MODE_APPLY_TO_CHILDREN = 1; export const UPDATE_DECK_CONFIGS_MODE_COMPUTE_ALL_PARAMS = 2;
-export interface UpdateDeckConfigsInput { targetDeckId: number; configs: DeckConfig[]; removedConfigIds: number[]; mode: number; cardStateCustomizer: string; limits: DeckLimits | null; newCardsIgnoreReviewLimit: boolean; fsrs: boolean; applyAllParentLimits: boolean; fsrsReschedule: boolean; fsrsHealthCheck: boolean; }
-export function encodeUpdateDeckConfigsRequest(req: UpdateDeckConfigsInput): Uint8Array { const w = new 协议写入器(); if (req.targetDeckId !== 0) w.写入64位整数(1, req.targetDeckId); for (const config of req.configs) w.写入字节(2, encodeDeckConfig(config)); w.写入打包64位整数(3, req.removedConfigIds); uint(w, 4, req.mode); text(w, 5, req.cardStateCustomizer); if (req.limits !== null) w.写入子消息(6, encodeLimits(req.limits)); bool(w, 7, req.newCardsIgnoreReviewLimit); bool(w, 8, req.fsrs); bool(w, 9, req.applyAllParentLimits); bool(w, 10, req.fsrsReschedule); bool(w, 11, req.fsrsHealthCheck); return w.转为字节(); }
-export function decodeUpdateDeckConfigsRequest(bytes: Uint8Array): UpdateDeckConfigsInput { const r = new 协议读取器(bytes); const out: UpdateDeckConfigsInput = { targetDeckId: 0, configs: [], removedConfigIds: [], mode: 0, cardStateCustomizer: '', limits: null, newCardsIgnoreReviewLimit: false, fsrs: false, applyAllParentLimits: false, fsrsReschedule: false, fsrsHealthCheck: false }; let tag; while ((tag = r.读取标签()) !== null) { switch (tag.字段号) { case 1: out.targetDeckId = r.读取64位整数(); break; case 2: out.configs.push(decodeDeckConfig(r.读取字节())); break; case 3: if (tag.线类型 === 线类型_长度分隔) out.removedConfigIds.push(...r.读取打包64位整数()); else out.removedConfigIds.push(r.读取64位整数()); break; case 4: out.mode = r.读取变长整数(); break; case 5: out.cardStateCustomizer = r.读取字符串(); break; case 6: out.limits = decodeLimits(r.读取字节()); break; case 7: out.newCardsIgnoreReviewLimit = r.读取布尔(); break; case 8: out.fsrs = r.读取布尔(); break; case 9: out.applyAllParentLimits = r.读取布尔(); break; case 10: out.fsrsReschedule = r.读取布尔(); break; case 11: out.fsrsHealthCheck = r.读取布尔(); break; default: r.跳过字段(tag.线类型); } } return out; }
+export function decodeLimits(bytes: Uint8Array): DeckLimits {
+    const r = new DeckConfigDeckConfigsForUpdateCurrentDeckLimits(bytes);
+    const out: DeckLimits = { review: null, new: null, reviewToday: null, newToday: null, reviewTodayActive: false, newTodayActive: false, desiredRetention: null };
+    if (r.hasReview()) {
+        out.review = r.getReview();
+    }
+    if (r.hasNew()) {
+        out.new = r.getNew();
+    }
+    if (r.hasReviewToday()) {
+        out.reviewToday = r.getReviewToday();
+    }
+    if (r.hasNewToday()) {
+        out.newToday = r.getNewToday();
+    }
+    if (r.hasReviewTodayActive()) {
+        out.reviewTodayActive = r.getReviewTodayActive();
+    }
+    if (r.hasNewTodayActive()) {
+        out.newTodayActive = r.getNewTodayActive();
+    }
+    if (r.hasDesiredRetention()) {
+        out.desiredRetention = r.getDesiredRetention();
+    }
+    return out;
+}
+export interface DeckConfigWithUseCount {
+    config: DeckConfig;
+    useCount: number;
+}
+export interface CurrentDeckInfo {
+    name: string;
+    configId: number;
+    parentConfigIds: number[];
+    limits: DeckLimits | null;
+}
+function decodeConfigWithExtra(bytes: Uint8Array): DeckConfigWithUseCount {
+    const m = new DeckConfigDeckConfigsForUpdateConfigWithExtra(bytes);
+    const out: DeckConfigWithUseCount = { config: decodeDeckConfig(m.getConfigLast() ?? new Uint8Array(0)), useCount: m.getUseCount() };
+    return out;
+}
+function decodeCurrentDeck(bytes: Uint8Array): CurrentDeckInfo {
+    const r = new DeckConfigDeckConfigsForUpdateCurrentDeck(bytes);
+    const out: CurrentDeckInfo = { name: '', configId: 0, parentConfigIds: [], limits: null };
+    if (r.hasName()) {
+        out.name = r.getName();
+    }
+    if (r.hasConfigId()) {
+        out.configId = r.getConfigId();
+    }
+    if (r.hasParentConfigIds()) {
+        out.parentConfigIds.push(...r.getParentConfigIds());
+    }
+    if (r.hasLimits()) {
+        out.limits = decodeLimits(r.getLimitsLast()!);
+    }
+    return out;
+}
+export interface DeckConfigsForUpdateView {
+    allConfigs: DeckConfigWithUseCount[];
+    currentDeck: CurrentDeckInfo | null;
+    defaults: DeckConfig | null;
+    schemaModified: boolean;
+    cardStateCustomizer: string;
+    newCardsIgnoreReviewLimit: boolean;
+    fsrs: boolean;
+    applyAllParentLimits: boolean;
+    fsrsHealthCheck: boolean;
+}
+export function decodeDeckConfigsForUpdate(bytes: Uint8Array): DeckConfigsForUpdateView {
+    const r = new DeckConfigDeckConfigsForUpdate(bytes);
+    const out: DeckConfigsForUpdateView = { allConfigs: [], currentDeck: null, defaults: null, schemaModified: false, cardStateCustomizer: '', newCardsIgnoreReviewLimit: false, fsrs: false, applyAllParentLimits: false, fsrsHealthCheck: false };
+    if (r.hasAllConfig()) {
+        for (const item of r.getAllConfig())
+            out.allConfigs.push(decodeConfigWithExtra(item));
+    }
+    if (r.hasCurrentDeck()) {
+        out.currentDeck = decodeCurrentDeck(r.getCurrentDeckLast()!);
+    }
+    if (r.hasDefaults()) {
+        out.defaults = decodeDeckConfig(r.getDefaultsLast()!);
+    }
+    if (r.hasSchemaModified()) {
+        out.schemaModified = r.getSchemaModified();
+    }
+    if (r.hasCardStateCustomizer()) {
+        out.cardStateCustomizer = r.getCardStateCustomizer();
+    }
+    if (r.hasNewCardsIgnoreReviewLimit()) {
+        out.newCardsIgnoreReviewLimit = r.getNewCardsIgnoreReviewLimit();
+    }
+    if (r.hasFsrs()) {
+        out.fsrs = r.getFsrs();
+    }
+    if (r.hasApplyAllParentLimits()) {
+        out.applyAllParentLimits = r.getApplyAllParentLimits();
+    }
+    if (r.hasFsrsHealthCheck()) {
+        out.fsrsHealthCheck = r.getFsrsHealthCheck();
+    }
+    return out;
+}
+export const UPDATE_DECK_CONFIGS_MODE_NORMAL = DeckConfigUpdateDeckConfigsMode.UPDATE_DECK_CONFIGS_MODE_NORMAL;
+export const UPDATE_DECK_CONFIGS_MODE_APPLY_TO_CHILDREN = DeckConfigUpdateDeckConfigsMode.UPDATE_DECK_CONFIGS_MODE_APPLY_TO_CHILDREN;
+export const UPDATE_DECK_CONFIGS_MODE_COMPUTE_ALL_PARAMS = DeckConfigUpdateDeckConfigsMode.UPDATE_DECK_CONFIGS_MODE_COMPUTE_ALL_PARAMS;
+export interface UpdateDeckConfigsInput {
+    targetDeckId: number;
+    configs: DeckConfig[];
+    removedConfigIds: number[];
+    mode: number;
+    cardStateCustomizer: string;
+    limits: DeckLimits | null;
+    newCardsIgnoreReviewLimit: boolean;
+    fsrs: boolean;
+    applyAllParentLimits: boolean;
+    fsrsReschedule: boolean;
+    fsrsHealthCheck: boolean;
+}
+export function encodeUpdateDeckConfigsRequest(req: UpdateDeckConfigsInput): Uint8Array {
+    const w = new DeckConfigUpdateDeckConfigsRequest();
+    if (req.targetDeckId !== 0)
+        w.setTargetDeckId(req.targetDeckId);
+    w.setConfigs(req.configs.map((v: DeckConfig): Uint8Array => encodeDeckConfig(v)));
+    w.setRemovedConfigIds(req.removedConfigIds);
+    if (req.mode !== 0)
+        w.setMode(req.mode);
+    if (req.cardStateCustomizer !== '')
+        w.setCardStateCustomizer(req.cardStateCustomizer);
+    if (req.limits !== null)
+        w.setLimits(encodeLimits(req.limits).转为字节());
+    if (req.newCardsIgnoreReviewLimit)
+        w.setNewCardsIgnoreReviewLimit(true);
+    if (req.fsrs)
+        w.setFsrs(true);
+    if (req.applyAllParentLimits)
+        w.setApplyAllParentLimits(true);
+    if (req.fsrsReschedule)
+        w.setFsrsReschedule(true);
+    if (req.fsrsHealthCheck)
+        w.setFsrsHealthCheck(true);
+    return w.toBytes();
+}
+export function decodeUpdateDeckConfigsRequest(bytes: Uint8Array): UpdateDeckConfigsInput {
+    const r = new DeckConfigUpdateDeckConfigsRequest(bytes);
+    const out: UpdateDeckConfigsInput = { targetDeckId: 0, configs: [], removedConfigIds: [], mode: 0, cardStateCustomizer: '', limits: null, newCardsIgnoreReviewLimit: false, fsrs: false, applyAllParentLimits: false, fsrsReschedule: false, fsrsHealthCheck: false };
+    if (r.hasTargetDeckId()) {
+        out.targetDeckId = r.getTargetDeckId();
+    }
+    if (r.hasConfigs()) {
+        for (const item of r.getConfigs())
+            out.configs.push(decodeDeckConfig(item));
+    }
+    if (r.hasRemovedConfigIds()) {
+        out.removedConfigIds.push(...r.getRemovedConfigIds());
+    }
+    if (r.hasMode()) {
+        out.mode = r.getMode();
+    }
+    if (r.hasCardStateCustomizer()) {
+        out.cardStateCustomizer = r.getCardStateCustomizer();
+    }
+    if (r.hasLimits()) {
+        out.limits = decodeLimits(r.getLimitsLast()!);
+    }
+    if (r.hasNewCardsIgnoreReviewLimit()) {
+        out.newCardsIgnoreReviewLimit = r.getNewCardsIgnoreReviewLimit();
+    }
+    if (r.hasFsrs()) {
+        out.fsrs = r.getFsrs();
+    }
+    if (r.hasApplyAllParentLimits()) {
+        out.applyAllParentLimits = r.getApplyAllParentLimits();
+    }
+    if (r.hasFsrsReschedule()) {
+        out.fsrsReschedule = r.getFsrsReschedule();
+    }
+    if (r.hasFsrsHealthCheck()) {
+        out.fsrsHealthCheck = r.getFsrsHealthCheck();
+    }
+    return out;
+}

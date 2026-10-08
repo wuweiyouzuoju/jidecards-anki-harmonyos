@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-
+import { CoreRpc } from '../proto/generated/CoreRpc';
 // ========================================================
 // @块ID BACKEND-SVC-SYNC-001
 // @名称 同步服务边界
@@ -30,125 +30,60 @@
 // @副作用
 // 通过 后端会话 间接调用 NAPI 桥，可能发起对外 HTTP 请求并修改 Anki collection / 媒体库。
 // ========================================================
-
 import { 后端会话 } from './后端会话';
-import { 服务号, 同步方法 } from './服务索引';
-import {
-  decodeBoolResponse,
-  decodeMediaSyncStatusResponse,
-  decodeSyncAuth,
-  decodeSyncCollectionResponse,
-  decodeSyncStatusResponse,
-  encodeEmptyRequest,
-  encodeFullUploadOrDownloadRequest,
-  encodeStringRequest,
-  encodeSyncAuth,
-  encodeSyncCollectionRequest,
-  encodeSyncLoginRequest
-} from '../proto/messages/SyncMessages';
-import type {
-  MediaSyncStatusResponse,
-  SyncAuth,
-  SyncCollectionResponse,
-  SyncStatusResponse
-} from '../proto/messages/SyncMessages';
-
+import { decodeBoolResponse, decodeMediaSyncStatusResponse, decodeSyncAuth, decodeSyncCollectionResponse, decodeSyncStatusResponse, encodeEmptyRequest, encodeFullUploadOrDownloadRequest, encodeStringRequest, encodeSyncAuth, encodeSyncCollectionRequest, encodeSyncLoginRequest } from '../proto/messages/SyncMessages';
+import type { MediaSyncStatusResponse, SyncAuth, SyncCollectionResponse, SyncStatusResponse } from '../proto/messages/SyncMessages';
 export class 同步服务 {
-  private readonly 会话: 后端会话 = 后端会话.获取实例();
-
-  /**
-   * AnkiWeb 登录。
-   * 端点 为空串时使用官方 sync.ankiweb.net；返回的 SyncAuth 供后续所有同步 RPC 使用。
-   */
-  async 同步登录(用户名: string, 密码: string, 端点: string = ''): Promise<SyncAuth> {
-    const 响应字节 = await this.会话.调用(
-      服务号.后端同步,
-      同步方法.同步登录,
-      encodeSyncLoginRequest({ username: 用户名, password: 密码, endpoint: 端点 })
-    );
-    return decodeSyncAuth(响应字节);
-  }
-
-  /** 同步前检查：required 取值见 SYNC_STATUS_REQUIRED，newEndpoint 非空时需迁移端点。 */
-  async 同步状态检查(凭证: SyncAuth): Promise<SyncStatusResponse> {
-    const 响应字节 = await this.会话.调用(
-      服务号.后端同步,
-      同步方法.同步状态,
-      encodeSyncAuth(凭证)
-    );
-    return decodeSyncStatusResponse(响应字节);
-  }
-
-  /**
-   * 执行一次集合同步。
-   * 是否同步媒体=true 时同步完成后自动挂起媒体同步；
-   * required 取值见 SYNC_COLLECTION_REQUIRED（可能要求全量上传/下载）。
-   */
-  async 同步集合(凭证: SyncAuth, 是否同步媒体: boolean): Promise<SyncCollectionResponse> {
-    const 响应字节 = await this.会话.调用(
-      服务号.后端同步,
-      同步方法.同步集合,
-      encodeSyncCollectionRequest({ auth: 凭证, syncMedia: 是否同步媒体 })
-    );
-    return decodeSyncCollectionResponse(响应字节);
-  }
-
-  /**
-   * 强制全量上传（是否上传=true）或全量下载（是否上传=false），调用方须先得到用户确认。
-   * 服务器USN 为 null 时跳过媒体 usn 记录；响应为 generic.Empty，忽略字节。
-   */
-  async 全量上传或下载(凭证: SyncAuth, 是否上传: boolean, 服务器USN: number | null): Promise<void> {
-    await this.会话.调用(
-      服务号.后端同步,
-      同步方法.全量上传或下载,
-      encodeFullUploadOrDownloadRequest({ auth: 凭证, upload: 是否上传, serverUsn: 服务器USN })
-    );
-  }
-
-  /** 显式启动媒体；Core 已启动时只监测，重复调用可能丢弃已结束任务的结果。 */
-  async 同步媒体(凭证: SyncAuth): Promise<void> {
-    await this.会话.调用(
-      服务号.后端同步,
-      同步方法.同步媒体,
-      encodeSyncAuth(凭证)
-    );
-  }
-
-  /** 消费媒体结果：只允许任务拥有者调用；其他页面通过 SyncActivity 查询占用。 */
-  async 媒体同步状态(): Promise<MediaSyncStatusResponse> {
-    const 响应字节 = await this.会话.调用(
-      服务号.后端同步,
-      同步方法.媒体同步状态,
-      encodeEmptyRequest()
-    );
-    return decodeMediaSyncStatusResponse(响应字节);
-  }
-
-  /** 中止进行中的集合同步；响应为 generic.Empty，忽略字节。 */
-  async 中止同步(): Promise<void> {
-    await this.会话.调用(
-      服务号.后端同步,
-      同步方法.中止同步,
-      encodeEmptyRequest()
-    );
-  }
-
-  /** 中止进行中的媒体同步；响应为 generic.Empty，忽略字节。 */
-  async 中止媒体同步(): Promise<void> {
-    await this.会话.调用(
-      服务号.后端同步,
-      同步方法.中止媒体同步,
-      encodeEmptyRequest()
-    );
-  }
-
-  /** 注入自定义 CA 证书（PEM 文本），供同步 TLS 校验使用；返回是否生效。 */
-  async 设置自定义证书(PEM文本: string): Promise<boolean> {
-    const 响应字节 = await this.会话.调用(
-      服务号.后端同步,
-      同步方法.设置自定义证书,
-      encodeStringRequest(PEM文本)
-    );
-    return decodeBoolResponse(响应字节);
-  }
+    private readonly 会话: 后端会话 = 后端会话.获取实例();
+    /**
+     * AnkiWeb 登录。
+     * 端点 为空串时使用官方 sync.ankiweb.net；返回的 SyncAuth 供后续所有同步 RPC 使用。
+     */
+    async 同步登录(用户名: string, 密码: string, 端点: string = ''): Promise<SyncAuth> {
+        const 响应字节 = await new CoreRpc(this.会话).Sync_sync_login(encodeSyncLoginRequest({ username: 用户名, password: 密码, endpoint: 端点 }));
+        return decodeSyncAuth(响应字节);
+    }
+    /** 同步前检查：required 取值见 SYNC_STATUS_REQUIRED，newEndpoint 非空时需迁移端点。 */
+    async 同步状态检查(凭证: SyncAuth): Promise<SyncStatusResponse> {
+        const 响应字节 = await new CoreRpc(this.会话).Sync_sync_status(encodeSyncAuth(凭证));
+        return decodeSyncStatusResponse(响应字节);
+    }
+    /**
+     * 执行一次集合同步。
+     * 是否同步媒体=true 时同步完成后自动挂起媒体同步；
+     * required 取值见 SYNC_COLLECTION_REQUIRED（可能要求全量上传/下载）。
+     */
+    async 同步集合(凭证: SyncAuth, 是否同步媒体: boolean): Promise<SyncCollectionResponse> {
+        const 响应字节 = await new CoreRpc(this.会话).Sync_sync_collection(encodeSyncCollectionRequest({ auth: 凭证, syncMedia: 是否同步媒体 }));
+        return decodeSyncCollectionResponse(响应字节);
+    }
+    /**
+     * 强制全量上传（是否上传=true）或全量下载（是否上传=false），调用方须先得到用户确认。
+     * 服务器USN 为 null 时跳过媒体 usn 记录；响应为 generic.Empty，忽略字节。
+     */
+    async 全量上传或下载(凭证: SyncAuth, 是否上传: boolean, 服务器USN: number | null): Promise<void> {
+        await new CoreRpc(this.会话).Sync_full_upload_or_download(encodeFullUploadOrDownloadRequest({ auth: 凭证, upload: 是否上传, serverUsn: 服务器USN }));
+    }
+    /** 显式启动媒体；Core 已启动时只监测，重复调用可能丢弃已结束任务的结果。 */
+    async 同步媒体(凭证: SyncAuth): Promise<void> {
+        await new CoreRpc(this.会话).Sync_sync_media(encodeSyncAuth(凭证));
+    }
+    /** 消费媒体结果：只允许任务拥有者调用；其他页面通过 SyncActivity 查询占用。 */
+    async 媒体同步状态(): Promise<MediaSyncStatusResponse> {
+        const 响应字节 = await new CoreRpc(this.会话).Sync_media_sync_status(encodeEmptyRequest());
+        return decodeMediaSyncStatusResponse(响应字节);
+    }
+    /** 中止进行中的集合同步；响应为 generic.Empty，忽略字节。 */
+    async 中止同步(): Promise<void> {
+        await new CoreRpc(this.会话).Sync_abort_sync(encodeEmptyRequest());
+    }
+    /** 中止进行中的媒体同步；响应为 generic.Empty，忽略字节。 */
+    async 中止媒体同步(): Promise<void> {
+        await new CoreRpc(this.会话).Sync_abort_media_sync(encodeEmptyRequest());
+    }
+    /** 注入自定义 CA 证书（PEM 文本），供同步 TLS 校验使用；返回是否生效。 */
+    async 设置自定义证书(PEM文本: string): Promise<boolean> {
+        const 响应字节 = await new CoreRpc(this.会话).Sync_set_custom_certificate(encodeStringRequest(PEM文本));
+        return decodeBoolResponse(响应字节);
+    }
 }

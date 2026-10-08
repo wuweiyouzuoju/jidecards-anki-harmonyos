@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-
+import { CoreRpc } from '../proto/generated/CoreRpc';
 // ========================================================
 // @块ID BACKEND-SVC-DECKCONF-001
 // @名称 牌组配置服务边界
@@ -22,42 +22,29 @@
 // @副作用
 // 通过 后端会话 间接调用 NAPI 桥，可能修改 Anki collection 状态。
 // ========================================================
-
 import { 后端会话 } from './后端会话';
-import { 牌组配置方法, 服务号 } from './服务索引';
 import { encodeDeckId } from '../proto/messages/DeckMessages';
-import type {
-  DeckConfigsForUpdateView,
-  UpdateDeckConfigsInput
-} from '../proto/messages/DeckConfigMessages';
-import {
-  decodeDeckConfigsForUpdate,
-  encodeUpdateDeckConfigsRequest
-} from '../proto/messages/DeckConfigMessages';
-
+import type { DeckConfigsForUpdateView, UpdateDeckConfigsInput } from '../proto/messages/DeckConfigMessages';
+import { decodeDeckConfigsForUpdate, encodeUpdateDeckConfigsRequest } from '../proto/messages/DeckConfigMessages';
 export class 牌组配置服务 {
-  private readonly 会话: 后端会话 = 后端会话.获取实例();
-
-  /**
-   * 拉取指定牌组的选项编辑视图：全部预设（含使用计数）、当前牌组选中项
-   * （configId/limits）与全局 flag。编辑面板据此定位 currentDeck.configId
-   * 对应的 DeckConfig，修改三字段（new_per_day / reviews_per_day / learn_steps）。
-   */
-  async 获取牌组配置编辑视图(牌组ID: number): Promise<DeckConfigsForUpdateView> {
-    const 请求: Uint8Array = encodeDeckId(牌组ID);
-    const 响应: Uint8Array = await this.会话.调用(
-      服务号.后端牌组配置, 牌组配置方法.获取牌组配置编辑视图, 请求);
-    return decodeDeckConfigsForUpdate(响应);
-  }
-
-  /**
-   * 整体回写牌组选项。request 需携带编辑后的 configs、当前牌组 limits
-   * 与视图中的全局 flag；未建模字段经 DeckConfigMessages 保真字节回写。
-   * 失败以 BackendError 抛出，message 可直接展示。
-   */
-  async 更新牌组配置(请求: UpdateDeckConfigsInput): Promise<void> {
-    const 编码字节: Uint8Array = encodeUpdateDeckConfigsRequest(请求);
-    await this.会话.调用(
-      服务号.后端牌组配置, 牌组配置方法.更新牌组配置, 编码字节);
-  }
+    private readonly 会话: 后端会话 = 后端会话.获取实例();
+    /**
+     * 拉取指定牌组的选项编辑视图：全部预设（含使用计数）、当前牌组选中项
+     * （configId/limits）与全局 flag。编辑面板据此定位 currentDeck.configId
+     * 对应的 DeckConfig，修改三字段（new_per_day / reviews_per_day / learn_steps）。
+     */
+    async 获取牌组配置编辑视图(牌组ID: number): Promise<DeckConfigsForUpdateView> {
+        const 请求: Uint8Array = encodeDeckId(牌组ID);
+        const 响应: Uint8Array = await new CoreRpc(this.会话).DeckConfig_get_deck_configs_for_update(请求);
+        return decodeDeckConfigsForUpdate(响应);
+    }
+    /**
+     * 整体回写牌组选项。request 需携带编辑后的 configs、当前牌组 limits
+     * 与视图中的全局 flag；未建模字段经 DeckConfigMessages 保真字节回写。
+     * 失败以 BackendError 抛出，message 可直接展示。
+     */
+    async 更新牌组配置(请求: UpdateDeckConfigsInput): Promise<void> {
+        const 编码字节: Uint8Array = encodeUpdateDeckConfigsRequest(请求);
+        await new CoreRpc(this.会话).DeckConfig_update_deck_configs(编码字节);
+    }
 }

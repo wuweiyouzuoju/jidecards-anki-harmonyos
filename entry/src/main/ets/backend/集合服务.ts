@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-
+import { CoreRpc } from '../proto/generated/CoreRpc';
 // ========================================================
 // @块ID BACKEND-SVC-COLLECTION-001
 // @名称 集合服务边界
@@ -26,55 +26,35 @@
 // @副作用
 // 通过 后端会话 间接调用 NAPI 桥，可能修改 Anki collection 状态（撤销/重做/数据库修复）。
 // ========================================================
-
 import { encodeCreateBackup } from '../proto/messages/PreferencesMessages';
 import { decodeBoolResponse } from '../proto/messages/ConfigMessages';
 import { 后端会话 } from './后端会话';
-import { 集合方法, 服务号 } from './服务索引';
-import type {
-  OpChangesAfterUndo,
-  UndoStatus
-} from '../proto/messages/CollectionMessages';
-import {
-  decodeCheckDatabaseResponse,
-  decodeOpChangesAfterUndo,
-  decodeUndoStatus
-} from '../proto/messages/CollectionMessages';
-
+import type { OpChangesAfterUndo, UndoStatus } from '../proto/messages/CollectionMessages';
+import { decodeCheckDatabaseResponse, decodeOpChangesAfterUndo, decodeUndoStatus } from '../proto/messages/CollectionMessages';
 export class 集合服务 {
-  /** Core 决定是否创建及保留策略；返回前等待实际归档完成。 */
-  async createBackup(folder: string, force: boolean = false): Promise<boolean> {
-    return decodeBoolResponse(await this.会话.调用(服务号.后端集合, 集合方法.创建备份,
-      encodeCreateBackup(folder, force)));
-  }
-
-  private readonly 会话: 后端会话 = 后端会话.获取实例();
-
-  /** 查询撤销/重做状态；undo/redo 描述为空串表示对应方向不可用。 */
-  async 获取撤销状态(): Promise<UndoStatus> {
-    const 响应字节: Uint8Array = await this.会话.调用(
-      服务号.后端集合, 集合方法.获取撤销状态, new Uint8Array(0));
-    return decodeUndoStatus(响应字节);
-  }
-
-  /** 撤销最近一次操作；评分被撤销后卡片回到队列顶部，调用方应重新取卡。 */
-  async 撤销(): Promise<OpChangesAfterUndo> {
-    const 响应字节: Uint8Array = await this.会话.调用(
-      服务号.后端集合, 集合方法.撤销, new Uint8Array(0));
-    return decodeOpChangesAfterUndo(响应字节);
-  }
-
-  /** 重做最近一次被撤销的操作。 */
-  async 重做(): Promise<OpChangesAfterUndo> {
-    const 响应字节: Uint8Array = await this.会话.调用(
-      服务号.后端集合, 集合方法.重做, new Uint8Array(0));
-    return decodeOpChangesAfterUndo(响应字节);
-  }
-
-  /** 检查数据库完整性；返回本地化问题列表，空数组表示检查通过。 */
-  async 检查数据库(): Promise<string[]> {
-    const 响应字节: Uint8Array = await this.会话.调用(
-      服务号.后端集合, 集合方法.检查数据库, new Uint8Array(0));
-    return decodeCheckDatabaseResponse(响应字节);
-  }
+    /** Core 决定是否创建及保留策略；返回前等待实际归档完成。 */
+    async createBackup(folder: string, force: boolean = false): Promise<boolean> {
+        return decodeBoolResponse(await new CoreRpc(this.会话).Collection_create_backup(encodeCreateBackup(folder, force)));
+    }
+    private readonly 会话: 后端会话 = 后端会话.获取实例();
+    /** 查询撤销/重做状态；undo/redo 描述为空串表示对应方向不可用。 */
+    async 获取撤销状态(): Promise<UndoStatus> {
+        const 响应字节: Uint8Array = await new CoreRpc(this.会话).Collection_get_undo_status(new Uint8Array(0));
+        return decodeUndoStatus(响应字节);
+    }
+    /** 撤销最近一次操作；评分被撤销后卡片回到队列顶部，调用方应重新取卡。 */
+    async 撤销(): Promise<OpChangesAfterUndo> {
+        const 响应字节: Uint8Array = await new CoreRpc(this.会话).Collection_undo(new Uint8Array(0));
+        return decodeOpChangesAfterUndo(响应字节);
+    }
+    /** 重做最近一次被撤销的操作。 */
+    async 重做(): Promise<OpChangesAfterUndo> {
+        const 响应字节: Uint8Array = await new CoreRpc(this.会话).Collection_redo(new Uint8Array(0));
+        return decodeOpChangesAfterUndo(响应字节);
+    }
+    /** 检查数据库完整性；返回本地化问题列表，空数组表示检查通过。 */
+    async 检查数据库(): Promise<string[]> {
+        const 响应字节: Uint8Array = await new CoreRpc(this.会话).Collection_check_database(new Uint8Array(0));
+        return decodeCheckDatabaseResponse(响应字节);
+    }
 }

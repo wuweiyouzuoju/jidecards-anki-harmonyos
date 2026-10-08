@@ -1,14 +1,25 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { 协议写入器 } from '../core/ProtoWriter';
-export interface ExportSubset { mode: string; ids: number[]; }
-/** Core ExportLimit 的 oneof：绝不把空 ID 集合编码成全库范围。 */
+// 领域契约适配；协议事实由 generated/CoreMessages.ts 提供。
+import { CardsCardIds, ImportExportExportLimit, NotesNoteIds } from '../generated/CoreMessages';
+export interface ExportSubset {
+    mode: string;
+    ids: number[];
+}
 export function encodeExportSubset(value: ExportSubset): Uint8Array {
-  if (!['notes', 'cards'].includes(value.mode) || !Array.isArray(value.ids) || value.ids.length === 0 ||
-    value.ids.some((id: number): boolean => !Number.isSafeInteger(id) || id <= 0) ||
-    new Set<number>(value.ids).size !== value.ids.length) throw new Error('invalid_export_subset');
-  const writer = new 协议写入器();
-  const ids = new 协议写入器();
-  ids.写入打包64位整数(1, value.ids);
-  writer.写入子消息(value.mode === 'notes' ? 3 : 4, ids);
-  return writer.转为字节();
+    if (!['notes', 'cards'].includes(value.mode) || !Array.isArray(value.ids) || value.ids.length === 0 ||
+        value.ids.some((id: number): boolean => !Number.isSafeInteger(id) || id <= 0) ||
+        new Set<number>(value.ids).size !== value.ids.length)
+        throw new Error('invalid_export_subset');
+    const w = new ImportExportExportLimit();
+    if (value.mode === 'notes') {
+        const ids = new NotesNoteIds();
+        ids.setNoteIds(value.ids);
+        w.setNoteIds(ids.toBytes());
+    }
+    else {
+        const ids = new CardsCardIds();
+        ids.setCids(value.ids);
+        w.setCardIds(ids.toBytes());
+    }
+    return w.toBytes();
 }

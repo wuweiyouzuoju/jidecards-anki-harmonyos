@@ -31,19 +31,14 @@
 
 import { decodeBackendError } from '../proto/messages/BackendMessages';
 import { 原生状态 } from './服务索引';
+import { isKnownBackendBackendErrorKind } from '../proto/generated/CoreMessages';
+import type { BackendBackendErrorKindValue } from '../proto/generated/CoreMessages';
 
-export type 后端错误种类 = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24;
+export type 后端错误种类 = BackendBackendErrorKindValue;
 export type 原生状态码 = 0 | 1 | 2 | 3 | 4;
 
 function 规范化后端错误种类(value: number): 后端错误种类 | null {
-  switch (value) {
-    case 0: case 1: case 2: case 3: case 4: case 5: case 6: case 7: case 8: case 9:
-    case 10: case 11: case 12: case 13: case 14: case 15: case 16: case 17: case 18: case 19:
-    case 20: case 21: case 22: case 23: case 24:
-      return value;
-    default:
-      return null;
-  }
+  return isKnownBackendBackendErrorKind(value) ? value as 后端错误种类 : null;
 }
 
 function 规范化原生状态(value: number): 原生状态码 | null {

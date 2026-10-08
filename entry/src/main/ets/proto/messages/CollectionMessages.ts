@@ -1,256 +1,157 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-
-// ========================================================
-// @块ID PROTO-MSG-COLLECTION-001
-// @名称 集合消息编解码
-//
-// @作用
-// 编解码 anki.collection.proto 消息（Anki 26.05）：
-// - OpenCollectionRequest / CloseCollectionRequest：打开/关闭集合
-// - OpChanges 族：写操作返回的实体变更标记（卡片/笔记/牌组/标签等）
-// - UndoStatus / OpChangesAfterUndo：撤销/重做链路
-// - CheckDatabaseResponse：数据库检查问题列表
-// 字段来源：third_party/anki/proto/anki/collection.proto
-//
-// @输入
-// 编码：OpenCollectionRequest / CloseCollectionRequest 参数
-// 解码：字节流
-//
-// @输出
-// 编码：Uint8Array 字节
-// 解码：OpChanges / UndoStatus / OpChangesAfterUndo / 问题列表
-//
-// @业务规则
-// OpChangesWithId / OpChangesWithCount 仅提取需要的标量字段，跳过 changes 子消息。
-// proto3 默认值省略，与 prost 对齐。
-//
-// @副作用
-// 无
-// ========================================================
-
-import { 协议读取器 } from '../core/ProtoReader';
-import { 协议写入器 } from '../core/ProtoWriter';
-
+// 领域契约适配；协议事实由 generated/CoreMessages.ts 提供。
+import { CollectionCheckDatabaseResponse, CollectionCloseCollectionRequest, CollectionOpChanges, CollectionOpChangesAfterUndo, CollectionOpChangesWithCount, CollectionOpChangesWithId, CollectionOpenCollectionRequest, CollectionUndoStatus } from '../generated/CoreMessages';
 export interface OpenCollectionRequest {
-  collectionPath: string;
-  mediaFolderPath: string;
-  mediaDbPath: string;
+    collectionPath: string;
+    mediaFolderPath: string;
+    mediaDbPath: string;
 }
-
 export function encodeOpenCollectionRequest(req: OpenCollectionRequest): Uint8Array {
-  const w = new 协议写入器();
-  if (req.collectionPath !== '') {
-    w.写入字符串(1, req.collectionPath);
-  }
-  if (req.mediaFolderPath !== '') {
-    w.写入字符串(2, req.mediaFolderPath);
-  }
-  if (req.mediaDbPath !== '') {
-    w.写入字符串(3, req.mediaDbPath);
-  }
-  return w.转为字节();
+    const w = new CollectionOpenCollectionRequest();
+    if (req.collectionPath !== '') {
+        w.setCollectionPath(req.collectionPath);
+    }
+    if (req.mediaFolderPath !== '') {
+        w.setMediaFolderPath(req.mediaFolderPath);
+    }
+    if (req.mediaDbPath !== '') {
+        w.setMediaDbPath(req.mediaDbPath);
+    }
+    return w.转为字节();
 }
-
-/** BackendCollectionService.CloseCollectionRequest, with schema downgrade disabled. */
 export function encodeCloseCollectionRequest(downgradeToSchema11: boolean = false): Uint8Array {
-  const w = new 协议写入器();
-  if (downgradeToSchema11) {
-    w.写入布尔(1, downgradeToSchema11);
-  }
-  return w.转为字节();
+    const w = new CollectionCloseCollectionRequest();
+    if (downgradeToSchema11) {
+        w.setDowngradeToSchema11(downgradeToSchema11);
+    }
+    return w.转为字节();
 }
-
-/** OpChangesWithId：仅需 id，changes 子消息跳过 */
 export function decodeOpChangesWithId(bytes: Uint8Array): number {
-  const r = new 协议读取器(bytes);
-  let id = 0;
-  let tag;
-  while ((tag = r.读取标签()) !== null) {
-    if (tag.字段号 === 2) {
-      id = r.读取64位整数();
-    } else {
-      r.跳过字段(tag.线类型);
-    }
-  }
-  return id;
+    return new CollectionOpChangesWithId(bytes).getId();
 }
-
-/** OpChangesWithCount：仅需 count */
 export function decodeOpChangesWithCount(bytes: Uint8Array): number {
-  const r = new 协议读取器(bytes);
-  let count = 0;
-  let tag;
-  while ((tag = r.读取标签()) !== null) {
-    if (tag.字段号 === 2) {
-      count = r.读取变长整数();
-    } else {
-      r.跳过字段(tag.线类型);
-    }
-  }
-  return count;
+    return new CollectionOpChangesWithCount(bytes).getCount();
 }
-
-/** OpChanges：各实体变更标记，Undo/BuryOrSuspend 等写操作的响应 */
 export interface OpChanges {
-  card: boolean;
-  note: boolean;
-  deck: boolean;
-  tag: boolean;
-  notetype: boolean;
-  config: boolean;
-  deckConfig: boolean;
-  mtime: boolean;
-  browserTable: boolean;
-  browserSidebar: boolean;
-  noteText: boolean;
-  studyQueues: boolean;
+    card: boolean;
+    note: boolean;
+    deck: boolean;
+    tag: boolean;
+    notetype: boolean;
+    config: boolean;
+    deckConfig: boolean;
+    mtime: boolean;
+    browserTable: boolean;
+    browserSidebar: boolean;
+    noteText: boolean;
+    studyQueues: boolean;
 }
-
 export function decodeOpChanges(bytes: Uint8Array): OpChanges {
-  const r = new 协议读取器(bytes);
-  const out: OpChanges = {
-    card: false,
-    note: false,
-    deck: false,
-    tag: false,
-    notetype: false,
-    config: false,
-    deckConfig: false,
-    mtime: false,
-    browserTable: false,
-    browserSidebar: false,
-    noteText: false,
-    studyQueues: false
-  };
-  let tag;
-  while ((tag = r.读取标签()) !== null) {
-    switch (tag.字段号) {
-      case 1:
-        out.card = r.读取布尔();
-        break;
-      case 2:
-        out.note = r.读取布尔();
-        break;
-      case 3:
-        out.deck = r.读取布尔();
-        break;
-      case 4:
-        out.tag = r.读取布尔();
-        break;
-      case 5:
-        out.notetype = r.读取布尔();
-        break;
-      case 6:
-        out.config = r.读取布尔();
-        break;
-      case 7:
-        out.browserTable = r.读取布尔();
-        break;
-      case 8:
-        out.browserSidebar = r.读取布尔();
-        break;
-      case 9:
-        out.noteText = r.读取布尔();
-        break;
-      case 10:
-        out.studyQueues = r.读取布尔();
-        break;
-      case 11:
-        out.deckConfig = r.读取布尔();
-        break;
-      case 12:
-        out.mtime = r.读取布尔();
-        break;
-      default:
-        r.跳过字段(tag.线类型);
+    const r = new CollectionOpChanges(bytes);
+    const out: OpChanges = {
+        card: false,
+        note: false,
+        deck: false,
+        tag: false,
+        notetype: false,
+        config: false,
+        deckConfig: false,
+        mtime: false,
+        browserTable: false,
+        browserSidebar: false,
+        noteText: false,
+        studyQueues: false
+    };
+    if (r.hasCard()) {
+        out.card = r.getCard();
     }
-  }
-  return out;
+    if (r.hasNote()) {
+        out.note = r.getNote();
+    }
+    if (r.hasDeck()) {
+        out.deck = r.getDeck();
+    }
+    if (r.hasTag()) {
+        out.tag = r.getTag();
+    }
+    if (r.hasNotetype()) {
+        out.notetype = r.getNotetype();
+    }
+    if (r.hasConfig()) {
+        out.config = r.getConfig();
+    }
+    if (r.hasBrowserTable()) {
+        out.browserTable = r.getBrowserTable();
+    }
+    if (r.hasBrowserSidebar()) {
+        out.browserSidebar = r.getBrowserSidebar();
+    }
+    if (r.hasNoteText()) {
+        out.noteText = r.getNoteText();
+    }
+    if (r.hasStudyQueues()) {
+        out.studyQueues = r.getStudyQueues();
+    }
+    if (r.hasDeckConfig()) {
+        out.deckConfig = r.getDeckConfig();
+    }
+    if (r.hasMtime()) {
+        out.mtime = r.getMtime();
+    }
+    return out;
 }
-
-/** UndoStatus：undo/redo 为空串表示对应方向不可操作 */
 export interface UndoStatus {
-  undo: string;
-  redo: string;
-  lastStep: number;
+    undo: string;
+    redo: string;
+    lastStep: number;
 }
-
 export function decodeUndoStatus(bytes: Uint8Array): UndoStatus {
-  const r = new 协议读取器(bytes);
-  const out: UndoStatus = { undo: '', redo: '', lastStep: 0 };
-  let tag;
-  while ((tag = r.读取标签()) !== null) {
-    switch (tag.字段号) {
-      case 1:
-        out.undo = r.读取字符串();
-        break;
-      case 2:
-        out.redo = r.读取字符串();
-        break;
-      case 3:
-        out.lastStep = r.读取变长整数();
-        break;
-      default:
-        r.跳过字段(tag.线类型);
+    const r = new CollectionUndoStatus(bytes);
+    const out: UndoStatus = { undo: '', redo: '', lastStep: 0 };
+    if (r.hasUndo()) {
+        out.undo = r.getUndo();
     }
-  }
-  return out;
+    if (r.hasRedo()) {
+        out.redo = r.getRedo();
+    }
+    if (r.hasLastStep()) {
+        out.lastStep = r.getLastStep();
+    }
+    return out;
 }
-
-/** OpChangesAfterUndo：Undo/Redo 的响应 */
 export interface OpChangesAfterUndo {
-  changes: OpChanges | null;
-  operation: string;
-  revertedToTimestamp: number;
-  newStatus: UndoStatus | null;
-  counter: number;
+    changes: OpChanges | null;
+    operation: string;
+    revertedToTimestamp: number;
+    newStatus: UndoStatus | null;
+    counter: number;
 }
-
 export function decodeOpChangesAfterUndo(bytes: Uint8Array): OpChangesAfterUndo {
-  const r = new 协议读取器(bytes);
-  const out: OpChangesAfterUndo = {
-    changes: null,
-    operation: '',
-    revertedToTimestamp: 0,
-    newStatus: null,
-    counter: 0
-  };
-  let tag;
-  while ((tag = r.读取标签()) !== null) {
-    switch (tag.字段号) {
-      case 1:
-        out.changes = decodeOpChanges(r.读取字节());
-        break;
-      case 2:
-        out.operation = r.读取字符串();
-        break;
-      case 3:
-        out.revertedToTimestamp = r.读取64位整数();
-        break;
-      case 4:
-        out.newStatus = decodeUndoStatus(r.读取字节());
-        break;
-      case 5:
-        out.counter = r.读取变长整数();
-        break;
-      default:
-        r.跳过字段(tag.线类型);
+    const r = new CollectionOpChangesAfterUndo(bytes);
+    const out: OpChangesAfterUndo = {
+        changes: null,
+        operation: '',
+        revertedToTimestamp: 0,
+        newStatus: null,
+        counter: 0
+    };
+    if (r.hasChanges()) {
+        out.changes = decodeOpChanges(r.getChangesLast()!);
     }
-  }
-  return out;
+    if (r.hasOperation()) {
+        out.operation = r.getOperation();
+    }
+    if (r.hasRevertedToTimestamp()) {
+        out.revertedToTimestamp = r.getRevertedToTimestamp();
+    }
+    if (r.hasNewStatus()) {
+        out.newStatus = decodeUndoStatus(r.getNewStatusLast()!);
+    }
+    if (r.hasCounter()) {
+        out.counter = r.getCounter();
+    }
+    return out;
 }
-
-/** CheckDatabaseResponse：问题列表，空数组表示检查通过 */
 export function decodeCheckDatabaseResponse(bytes: Uint8Array): string[] {
-  const r = new 协议读取器(bytes);
-  const problems: string[] = [];
-  let tag;
-  while ((tag = r.读取标签()) !== null) {
-    if (tag.字段号 === 1) {
-      problems.push(r.读取字符串());
-    } else {
-      r.跳过字段(tag.线类型);
-    }
-  }
-  return problems;
+    return new CollectionCheckDatabaseResponse(bytes).getProblems();
 }

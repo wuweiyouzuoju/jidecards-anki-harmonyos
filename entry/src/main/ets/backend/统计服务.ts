@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-
+import { CoreRpc } from '../proto/generated/CoreRpc';
 // ========================================================
 // @块ID BACKEND-SVC-STATS-001
 // @名称 统计服务边界
@@ -27,66 +27,47 @@
 // @副作用
 // 通过 后端会话 间接调用 NAPI 桥，仅读取 / 写入 Anki collection 的统计聚合与偏好。
 // ========================================================
-
 import { 后端会话 } from './后端会话';
-import { 服务号, 统计方法 } from './服务索引';
 import type { CardStatsView, GraphPreferences, GraphsView } from '../proto/messages/StatsMessages';
-import {
-  decodeCardStatsResponse,
-  decodeGraphPreferences,
-  decodeGraphsResponse,
-  encodeCardIdRequest,
-  encodeEmpty,
-  encodeGraphPreferences,
-  encodeGraphsRequest
-} from '../proto/messages/StatsMessages';
-
+import { decodeCardStatsResponse, decodeGraphPreferences, decodeGraphsResponse, encodeCardIdRequest, encodeEmpty, encodeGraphPreferences, encodeGraphsRequest } from '../proto/messages/StatsMessages';
 export class 统计服务 {
-  private readonly 会话: 后端会话 = 后端会话.获取实例();
-
-  /**
-   * 拉取图表统计。天数 为回看天数（0=全部历史）。
-   * 搜索串 为空 = 全库统计；传 deck:"牌组名" 时仅统计该牌组（统计页牌组下拉）。
-   * 返回值中 reviewCountsByDaysAgo / retrievability 可能为 null（响应缺省字段）。
-   */
-  async 获取图表统计(天数: number, 搜索串: string = ''): Promise<GraphsView> {
-    const 请求字节: Uint8Array = encodeGraphsRequest(天数, 搜索串);
-    const 响应字节: Uint8Array = await this.会话.调用(
-      服务号.后端统计, 统计方法.图表, 请求字节);
-    return decodeGraphsResponse(响应字节);
-  }
-
-  /**
-   * 拉取单卡完整统计（T11 卡片信息用）。含调度信息 + 复习历史。
-   * 调 stats.proto 方法 0 CardStats(CardId) → CardStatsResponse。
-   */
-  async 获取卡片统计(卡片ID: number): Promise<CardStatsView> {
-    const 请求字节: Uint8Array = encodeCardIdRequest(卡片ID);
-    const 响应字节: Uint8Array = await this.会话.调用(
-      服务号.后端统计, 统计方法.卡片统计, 请求字节);
-    return decodeCardStatsResponse(响应字节);
-  }
-
-  /**
-   * 拉取图表偏好（统计页 ⚙ 面板初始化用）。
-   * 调 stats.proto 方法 3 GetGraphPreferences(generic.Empty) → GraphPreferences。
-   * 后端默认值：SUNDAY 周首日 + 三个 false。
-   */
-  async 获取图表偏好(): Promise<GraphPreferences> {
-    const 请求字节: Uint8Array = encodeEmpty();
-    const 响应字节: Uint8Array = await this.会话.调用(
-      服务号.后端统计, 统计方法.获取图表偏好, 请求字节);
-    return decodeGraphPreferences(响应字节);
-  }
-
-  /**
-   * 写入图表偏好（统计页 ⚙ 面板保存用）。
-   * 调 stats.proto 方法 4 SetGraphPreferences(GraphPreferences) → generic.Empty。
-   * 与 prost 一致：默认值字段省略不写入字节流。
-   */
-  async 设置图表偏好(偏好: GraphPreferences): Promise<void> {
-    const 请求字节: Uint8Array = encodeGraphPreferences(偏好);
-    await this.会话.调用(
-      服务号.后端统计, 统计方法.设置图表偏好, 请求字节);
-  }
+    private readonly 会话: 后端会话 = 后端会话.获取实例();
+    /**
+     * 拉取图表统计。天数 为回看天数（0=全部历史）。
+     * 搜索串 为空 = 全库统计；传 deck:"牌组名" 时仅统计该牌组（统计页牌组下拉）。
+     * 返回值中 reviewCountsByDaysAgo / retrievability 可能为 null（响应缺省字段）。
+     */
+    async 获取图表统计(天数: number, 搜索串: string = ''): Promise<GraphsView> {
+        const 请求字节: Uint8Array = encodeGraphsRequest(天数, 搜索串);
+        const 响应字节: Uint8Array = await new CoreRpc(this.会话).Stats_graphs(请求字节);
+        return decodeGraphsResponse(响应字节);
+    }
+    /**
+     * 拉取单卡完整统计（T11 卡片信息用）。含调度信息 + 复习历史。
+     * 调 stats.proto 方法 0 CardStats(CardId) → CardStatsResponse。
+     */
+    async 获取卡片统计(卡片ID: number): Promise<CardStatsView> {
+        const 请求字节: Uint8Array = encodeCardIdRequest(卡片ID);
+        const 响应字节: Uint8Array = await new CoreRpc(this.会话).Stats_card_stats(请求字节);
+        return decodeCardStatsResponse(响应字节);
+    }
+    /**
+     * 拉取图表偏好（统计页 ⚙ 面板初始化用）。
+     * 调 stats.proto 方法 3 GetGraphPreferences(generic.Empty) → GraphPreferences。
+     * 后端默认值：SUNDAY 周首日 + 三个 false。
+     */
+    async 获取图表偏好(): Promise<GraphPreferences> {
+        const 请求字节: Uint8Array = encodeEmpty();
+        const 响应字节: Uint8Array = await new CoreRpc(this.会话).Stats_get_graph_preferences(请求字节);
+        return decodeGraphPreferences(响应字节);
+    }
+    /**
+     * 写入图表偏好（统计页 ⚙ 面板保存用）。
+     * 调 stats.proto 方法 4 SetGraphPreferences(GraphPreferences) → generic.Empty。
+     * 与 prost 一致：默认值字段省略不写入字节流。
+     */
+    async 设置图表偏好(偏好: GraphPreferences): Promise<void> {
+        const 请求字节: Uint8Array = encodeGraphPreferences(偏好);
+        await new CoreRpc(this.会话).Stats_set_graph_preferences(请求字节);
+    }
 }

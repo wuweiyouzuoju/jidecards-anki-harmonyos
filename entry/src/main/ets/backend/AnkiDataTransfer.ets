@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { CoreRpc } from '../proto/generated/CoreRpc';
 import { common } from '@kit.AbilityKit';
 import { fileUri } from '@kit.CoreFileKit';
 import { DataTransferBackend } from '../model/home/DataTransferSession';
@@ -15,7 +16,6 @@ import { ImportOperation } from '../model/ImportOperation';
 import { ImportFile } from '../model/ImportFile';
 import { 复制URI到沙箱, 静默删除 } from './DataTransferFiles';
 import { withImportProgress } from './ImportProgressService';
-import { 服务号, 导入导出方法 } from './服务索引';
 import { 笔记类型服务 } from './笔记类型服务';
 
 export class AnkiDataTransfer implements DataTransferBackend {
@@ -30,8 +30,7 @@ export class AnkiDataTransfer implements DataTransferBackend {
   async importPackagePresets(): Promise<ImportAnkiPackageOptions> {
     const session = 后端会话.获取实例();
     await session.确保已打开(this.context().filesDir);
-    return decodeImportAnkiPackageOptions(await session.调用(服务号.后端导入导出,
-      导入导出方法.getImportAnkiPackagePresets, new Uint8Array()));
+    return decodeImportAnkiPackageOptions(await new CoreRpc(session).ImportExport_get_import_anki_package_presets( new Uint8Array()));
   }
   /** @throws 选择器错误由 DataTransferSession 展示。 */
   async pickImportFile(): Promise<ImportFile | null> {
@@ -62,8 +61,7 @@ export class AnkiDataTransfer implements DataTransferBackend {
       this.csvPath = await 复制URI到沙箱(this.context().filesDir, uri, 'csv', operation);
     }
     operation.check();
-    const response = await 后端会话.获取实例().调用(服务号.后端导入导出,
-      导入导出方法.获取CSV元数据, encodeCsvMetadataRequest(this.csvPath, delimiter, notetypeId));
+    const response = await new CoreRpc(后端会话.获取实例()).ImportExport_get_csv_metadata( encodeCsvMetadataRequest(this.csvPath, delimiter, notetypeId));
     const service = new 笔记类型服务();
     const notetypes: CsvNotetype[] = [];
     for (const item of await service.获取笔记类型名列表()) {
@@ -77,7 +75,7 @@ export class AnkiDataTransfer implements DataTransferBackend {
   async importCsv(metadata: CsvMetadata, operation: ImportOperation): Promise<ImportSummary> {
     try {
       const bytes = await withImportProgress(operation, async (): Promise<Uint8Array> =>
-        await 后端会话.获取实例().调用(服务号.后端导入导出, 导入导出方法.导入CSV, encodeCsvImport(this.csvPath, metadata)));
+        await new CoreRpc(后端会话.获取实例()).ImportExport_import_csv( encodeCsvImport(this.csvPath, metadata)));
       return decodeImportResponse(bytes);
     } finally { await this.discardCsv(); }
   }

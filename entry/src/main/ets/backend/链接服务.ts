@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-
+import { CoreRpc } from '../proto/generated/CoreRpc';
 // ========================================================
 // @块ID BACKEND-SVC-LINKS-001
 // @名称 链接服务边界
@@ -25,24 +25,19 @@
 // @副作用
 // 通过 后端会话 间接调用 NAPI 桥，仅读取后端内置的 URL 映射，无外部网络请求。
 // ========================================================
-
 import { 后端会话 } from './后端会话';
-import { 服务号, 链接方法 } from './服务索引';
 import { decodeStringResponse, encodeHelpPageLinkRequest } from '../proto/messages/LinksMessages';
 import type { HelpPage } from '../proto/messages/LinksMessages';
-
 export class 链接服务 {
-  private readonly 会话: 后端会话 = 后端会话.获取实例();
-
-  /**
-   * 拉取 Anki 官方文档指定章节的 URL。
-   * 页面 为 HelpPage 枚举；设置页底部「查看 Anki 官方文档」入口传 INDEX(10)，
-   * 后端返回 docs.ankiweb.net 主页 URL（按当前 locale 选择中英文站点）。
-   */
-  async 获取帮助页链接(页面: HelpPage): Promise<string> {
-    const 请求字节: Uint8Array = encodeHelpPageLinkRequest(页面);
-    const 响应字节: Uint8Array = await this.会话.调用(
-      服务号.后端链接, 链接方法.帮助页链接, 请求字节);
-    return decodeStringResponse(响应字节);
-  }
+    private readonly 会话: 后端会话 = 后端会话.获取实例();
+    /**
+     * 拉取 Anki 官方文档指定章节的 URL。
+     * 页面 为 HelpPage 枚举；设置页底部「查看 Anki 官方文档」入口传 INDEX(10)，
+     * 后端返回 docs.ankiweb.net 主页 URL（按当前 locale 选择中英文站点）。
+     */
+    async 获取帮助页链接(页面: HelpPage): Promise<string> {
+        const 请求字节: Uint8Array = encodeHelpPageLinkRequest(页面);
+        const 响应字节: Uint8Array = await new CoreRpc(this.会话).Links_help_page_link(请求字节);
+        return decodeStringResponse(响应字节);
+    }
 }

@@ -28,11 +28,11 @@ import { 图片遮罩服务 } from './图片遮罩服务';
 import { optionalReverseField } from '../model/NoteTypePresentation';
 import { updateNotetypeFieldSticky } from '../model/NotetypeFieldDraft';
 import { 后端会话 } from './后端会话';
-import { 协议写入器 } from '../proto/core/ProtoWriter';
+import { NotetypesRestoreNotetypeToStockRequest, NotetypesNotetypeId } from '../proto/generated/CoreMessages';
+import { CoreRpc } from '../proto/generated/CoreRpc';
 import { 搜索服务 } from './搜索服务';
 import type { NotetypeImpact } from '../model/NotetypeManagement';
 import { decodeOpChangesWithId } from '../proto/messages/CollectionMessages';
-import { 笔记类型方法, 服务号 } from './服务索引';
 import type {
   NotetypeCapabilities,
   NotetypeNameId,
@@ -59,11 +59,11 @@ import {
 /** AddNotePanel 所属页面使用的 Anki 笔记类型边界。 */
 export class 笔记类型服务 {
   async restoreNotetypeToStock(id: number, forceKind?: number): Promise<void> {
-    const writer = new 协议写入器();
-    const target = new 协议写入器(); target.写入64位整数(1, id);
-    writer.写入子消息(1, target);
-    if (forceKind !== undefined) writer.写入变长整数(2, forceKind);
-    await this.会话.调用(服务号.后端笔记类型, 笔记类型方法.restoreNotetypeToStock, writer.转为字节());
+    const writer = new NotetypesRestoreNotetypeToStockRequest();
+    const target = new NotetypesNotetypeId(); target.setNtid(id);
+    writer.setNotetypeId(target.toBytes());
+    if (forceKind !== undefined) writer.setForceKind(forceKind);
+    await new CoreRpc(this.会话).Notetypes_restore_notetype_to_stock( writer.转为字节());
   }
   private readonly 会话: 后端会话 = 后端会话.获取实例();
 
@@ -91,14 +91,12 @@ export class 笔记类型服务 {
   }
 
   async 获取笔记类型名列表(): Promise<NotetypeNameId[]> {
-    const 响应字节 = await this.会话.调用(
-      服务号.后端笔记类型, 笔记类型方法.获取笔记类型名列表, new Uint8Array(0));
+    const 响应字节 = await new CoreRpc(this.会话).Notetypes_get_notetype_names( new Uint8Array(0));
     return decodeNotetypeNames(响应字节);
   }
 
   async 获取笔记类型(ID: number): Promise<NotetypeView> {
-    const 响应字节 = await this.会话.调用(
-      服务号.后端笔记类型, 笔记类型方法.获取笔记类型, encodeNotetypeId(ID));
+    const 响应字节 = await new CoreRpc(this.会话).Notetypes_get_notetype( encodeNotetypeId(ID));
     return decodeNotetype(响应字节);
   }
 
@@ -123,8 +121,7 @@ export class 笔记类型服务 {
 
   /** Return the exact field ordinals that accept cloze markers for this note type. */
   async 获取填空字段序号(ID: number): Promise<number[]> {
-    const 响应字节 = await this.会话.调用(
-      服务号.后端笔记类型, 笔记类型方法.获取填空字段序号, encodeNotetypeId(ID));
+    const 响应字节 = await new CoreRpc(this.会话).Notetypes_get_cloze_field_ords( encodeNotetypeId(ID));
     return decodeClozeFieldOrds(响应字节);
   }
 
@@ -151,8 +148,7 @@ export class 笔记类型服务 {
    * kind 取值见 标准笔记类型种类。
    */
   async 获取标准笔记类型JSON(kind: number): Promise<string> {
-    const 响应字节 = await this.会话.调用(
-      服务号.后端笔记类型, 笔记类型方法.获取标准笔记类型JSON, encodeStockNotetype(kind));
+    const 响应字节 = await new CoreRpc(this.会话).Notetypes_get_stock_notetype_legacy( encodeStockNotetype(kind));
     return decodeJsonString(响应字节);
   }
 
@@ -161,8 +157,7 @@ export class 笔记类型服务 {
    * 返回新笔记类型的 ID。失败以 后端错误 抛出。
    */
   async 添加笔记类型旧版(json: string): Promise<number> {
-    const 响应字节 = await this.会话.调用(
-      服务号.后端笔记类型, 笔记类型方法.添加笔记类型旧版, encodeJsonString(json));
+    const 响应字节 = await new CoreRpc(this.会话).Notetypes_add_notetype_legacy( encodeJsonString(json));
     // Anki 返回 OpChangesWithId，字段 2 才是新类型 ID。
     const id: number = decodeOpChangesWithId(响应字节);
     if (!Number.isSafeInteger(id) || id <= 0) {
@@ -176,8 +171,7 @@ export class 笔记类型服务 {
    * T3 模板编辑器加载初始数据用。失败以 后端错误 抛出。
    */
   async 获取笔记类型旧版(ID: number): Promise<string> {
-    const 响应字节 = await this.会话.调用(
-      服务号.后端笔记类型, 笔记类型方法.获取笔记类型旧版, encodeNotetypeId(ID));
+    const 响应字节 = await new CoreRpc(this.会话).Notetypes_get_notetype_legacy( encodeNotetypeId(ID));
     return decodeJsonString(响应字节);
   }
 
@@ -188,8 +182,7 @@ export class 笔记类型服务 {
    * 失败以 后端错误 抛出。
    */
   async 更新笔记类型旧版(json: string, skipChecks: boolean = false): Promise<void> {
-    await this.会话.调用(
-      服务号.后端笔记类型, 笔记类型方法.更新笔记类型旧版,
+    await new CoreRpc(this.会话).Notetypes_update_notetype_legacy(
       encodeUpdateNotetypeLegacyRequest(json, skipChecks));
   }
 
@@ -198,8 +191,7 @@ export class 笔记类型服务 {
    * 成功无返回值。失败以 后端错误 抛出。
    */
   async 移除笔记类型(ID: number): Promise<void> {
-    await this.会话.调用(
-      服务号.后端笔记类型, 笔记类型方法.移除笔记类型, encodeNotetypeId(ID));
+    await new CoreRpc(this.会话).Notetypes_remove_notetype( encodeNotetypeId(ID));
   }
 
   /**
@@ -211,8 +203,7 @@ export class 笔记类型服务 {
    * Extension Points: 浏览页 T8 批量操作栏「更改笔记类型」第一步调用此方法。
    */
   async 获取变更笔记类型信息(旧笔记类型ID: number, 新笔记类型ID: number): Promise<变更笔记类型信息> {
-    const 响应字节 = await this.会话.调用(
-      服务号.后端笔记类型, 笔记类型方法.获取变更笔记类型信息,
+    const 响应字节 = await new CoreRpc(this.会话).Notetypes_get_change_notetype_info(
       encodeGetChangeNotetypeInfoRequest(旧笔记类型ID, 新笔记类型ID));
     return decodeChangeNotetypeInfo(响应字节);
   }
@@ -228,7 +219,6 @@ export class 笔记类型服务 {
    * Extension Points: 浏览页 T8 批量操作栏「更改笔记类型」第二步调用此方法。
    */
   async 变更笔记类型(请求: 变更笔记类型请求): Promise<void> {
-    await this.会话.调用(
-      服务号.后端笔记类型, 笔记类型方法.变更笔记类型, encodeChangeNotetypeRequest(请求));
+    await new CoreRpc(this.会话).Notetypes_change_notetype( encodeChangeNotetypeRequest(请求));
   }
 }
