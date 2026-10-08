@@ -3,6 +3,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { BrowserSearchSession } from '../../entry/src/main/ets/model/BrowserSearchSession.ts';
 const query = {filesDir: '/files', notes: false, text: '', filter: '', sortColumn: '', sortReverse: false};
+
+test('refresh failure retains the previous pagination cursor while a new query clears it', async () => {
+  const h=harness(); await h.session.search(query,()=>true); await h.session.more(()=>true);
+  const original=h.backend.open;
+  h.backend.open=async()=>{throw Error('offline');};
+  await assert.rejects(h.session.search(query,()=>true,true),/offline/);
+  h.backend.open=original;
+  assert.equal((await h.session.more(()=>true)).consumed,303);
+  h.backend.open=async()=>{throw Error('offline');};
+  await assert.rejects(h.session.search({...query,text:'new'},()=>true),/offline/);
+  assert.equal(await h.session.more(()=>true),null);
+});
 const deferred = () => { let resolve; const promise = new Promise(r => resolve = r); return {promise, resolve}; };
 function harness() {
   const calls = [];

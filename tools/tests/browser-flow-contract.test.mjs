@@ -258,7 +258,7 @@ test('卡片表格 component exposes onSelectionChange + onMultiSelectChange cal
 test('Browser multi-select count opens the menu below the top toolbar and back first closes that menu', () => {
   const page = read('entry/src/main/ets/pages/浏览页.ets');
   const table = read('entry/src/main/ets/components/browser/卡片表格.ets');
-  assert.match(page, /Text\(this\.多选模式值 \? this\.取选中计数文案\(\) : \$r\('app\.string\.browser_title'\)\)/);
+  assert.match(page, /ChangingText\(\{ value: this\.多选模式值 \? this\.取选中计数文案\(\) : this\.取本地化文案\(\$r\('app\.string\.browser_title'\)\)/);
   assert.match(page, /if \(this\.多选模式值\) \{[\s\S]*?label: \$r\('app\.string\.browser_selection_actions'\)[\s\S]*?onAction: \(\): void => \{ this\.showBatchMenu = !this\.showBatchMenu; \}/);
   assert.match(page, /return 模板\.replace\('%d', `\$\{this\.选中ID列表\.length\}`\)/);
   assert.match(page, /onExit: \(\): void => \{ this\.退出多选\(\); \}/);
@@ -278,7 +278,7 @@ test('Browser multi-select count opens the menu below the top toolbar and back f
 test('调度器服务 exposes 批量埋藏或暂停卡片 method (T8 batch suspend)', () => {
   const svc = read('entry/src/main/ets/backend/调度器服务.ts');
   assert.match(svc, /async\s+批量埋藏或暂停卡片\s*\(\s*卡片ID列表:\s*number\[\],\s*模式:\s*number\s*\)/);
-  assert.match(svc, /this\.会话\.调用\s*\(\s*服务号\.后端调度器,\s*调度器方法\.埋藏或暂停/);
+  assert.match(svc, /new CoreRpc\(this\.会话\)\.Scheduler_bury_or_suspend_cards/);
   assert.match(svc, /async\s+批量埋藏或暂停笔记\s*\(\s*笔记ID列表:\s*number\[\],\s*模式:\s*number\s*\)/);
   assert.match(svc, /encodeBuryOrSuspendCardsRequest\(\[\],\s*笔记ID列表,\s*模式\)/);
 });
@@ -364,7 +364,7 @@ test('卡片表格 component exposes onInfoClick callback for T11', () => {
 test('统计服务 exposes 获取卡片统计 method (T11 card stats)', () => {
   const svc = read('entry/src/main/ets/backend/统计服务.ts');
   assert.match(svc, /async\s+获取卡片统计\s*\(\s*卡片ID:\s*number\s*\):\s*Promise<CardStatsView>/);
-  assert.match(svc, /this\.会话\.调用\s*\(\s*服务号\.后端统计,\s*统计方法\.卡片统计/);
+  assert.match(svc, /new CoreRpc\(this\.会话\)\.Stats_card_stats/);
   assert.match(svc, /decodeCardStatsResponse\s*\(/);
   assert.match(svc, /encodeCardIdRequest\s*\(/);
 });
@@ -718,9 +718,9 @@ test('标签服务 exposes 标签树 + 设置标签折叠 methods (T6 sidebar ta
   assert.match(svc, /async\s+标签树\s*\(\s*\):\s*Promise<TagTreeNode>/);
   assert.match(svc, /async\s+设置标签折叠\s*\(\s*请求:\s*SetTagCollapsedRequest\s*\):\s*Promise<OpChanges>/);
   // 服务号与方法号
-  assert.match(svc, /服务号\.后端标签/);
-  assert.match(svc, /标签方法\.标签树/);
-  assert.match(svc, /标签方法\.设置标签折叠/);
+  assert.match(svc, /Tags_/);
+  assert.match(svc, /Tags_tag_tree/);
+  assert.match(svc, /Tags_set_tag_collapsed/);
 });
 
 test('配置服务 exposes 获取配置JSON + 设置配置JSON + 获取配置布尔 + 设置配置布尔 methods (T6 sidebar config)', () => {
@@ -730,11 +730,11 @@ test('配置服务 exposes 获取配置JSON + 设置配置JSON + 获取配置布
   assert.match(svc, /async\s+获取配置布尔\s*\(\s*key:\s*ConfigKeyBool\s*\):\s*Promise<boolean>/);
   assert.match(svc, /async\s+设置配置布尔\s*\(\s*请求:\s*SetConfigBoolRequest\s*\):\s*Promise<OpChanges>/);
   // 服务号与方法号
-  assert.match(svc, /服务号\.后端配置/);
-  assert.match(svc, /配置方法\.获取配置JSON/);
-  assert.match(svc, /配置方法\.设置配置JSON/);
-  assert.match(svc, /配置方法\.获取配置布尔/);
-  assert.match(svc, /配置方法\.设置配置布尔/);
+  assert.match(svc, /Config_/);
+  assert.match(svc, /Config_get_config_json/);
+  assert.match(svc, /Config_set_config_json/);
+  assert.match(svc, /Config_get_config_bool/);
+  assert.match(svc, /Config_set_config_bool/);
 });
 
 test('TagsMessages decodes TagTreeNode recursively + encodes SetTagCollapsedRequest', () => {
@@ -752,12 +752,13 @@ test('TagsMessages decodes TagTreeNode recursively + encodes SetTagCollapsedRequ
   assert.match(msg, /collapsed:\s*boolean/);
 });
 
-test('ConfigMessages exposes ConfigKeyBool enum with COLLAPSE_TAGS/DECKS/SAVED_SEARCHES', () => {
+test('ConfigMessages exposes ConfigKeyBool enum with COLLAPSE_TAGS/DECKS/SAVED_SEARCHES', async () => {
   const msg = read('entry/src/main/ets/proto/messages/ConfigMessages.ts');
   assert.match(msg, /export\s+enum\s+ConfigKeyBool\s*\{/);
-  assert.match(msg, /COLLAPSE_TAGS\s*=\s*4/);
-  assert.match(msg, /COLLAPSE_DECKS\s*=\s*6/);
-  assert.match(msg, /COLLAPSE_SAVED_SEARCHES\s*=\s*7/);
+  const { ConfigKeyBool } = await import('../../entry/src/main/ets/proto/messages/ConfigMessages.ts');
+  assert.equal(ConfigKeyBool.COLLAPSE_TAGS, 4);
+  assert.equal(ConfigKeyBool.COLLAPSE_DECKS, 6);
+  assert.equal(ConfigKeyBool.COLLAPSE_SAVED_SEARCHES, 7);
   // 编解码函数
   assert.match(msg, /export\s+function\s+encodeStringRequest\s*\(/);
   assert.match(msg, /export\s+function\s+decodeJsonResponse\s*\(/);

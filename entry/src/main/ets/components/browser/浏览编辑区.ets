@@ -284,6 +284,7 @@ export struct 浏览编辑区 {
       }
       Row() {
         PrimaryActionButton({ label: this.interfaceLabel('save'), tint: this.主色按钮背景,
+          feedback: this.busy ? 'busy' : this.errorMessage !== '' ? 'failure' : 'idle',
           isInteractive: this.interfaceEnabled('save'), onAction: (): void => { this.提交(); } })
       }.width('100%').flexShrink(0).padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平,
         top: 应用尺寸.操作区顶部间距(this.narrow),

@@ -19,7 +19,7 @@ import { BrowserNotetypeFeature } from '../components/browser/BrowserNotetypeFea
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { WINDOW_SAFE_TOP_KEY } from '../model/WindowSafeLayout';
 import { DialogBackdrop } from '../components/common/DialogBackdrop';
-import { showToastSafely, localizedNamedResourceText, namedResourceText } from '../utils/UiFeedback';
+import { showToastSafely, resourceText, localizedNamedResourceText, namedResourceText } from '../utils/UiFeedback';
 import { loadBrowserSidebar, parseBrowserSavedSearches, removeBrowserSavedSearch, serializeBrowserSavedSearches, upsertBrowserSavedSearch } from '../model/BrowserSidebar';
 import type { BrowserSavedSearch } from '../model/BrowserSidebar';
 import { AnkiBrowserSidebar } from '../backend/AnkiBrowserSidebar';
@@ -80,7 +80,7 @@ import { 卡片表格, 浏览行数据 } from '../components/browser/卡片表�
 import { 批量操作栏 } from '../components/browser/批量操作栏';
 import { 字段帮助面板 } from '../components/字段帮助面板';
 import { IconActionButton } from '../components/common/IconActionButton';
-import { browserBackItem, AppInterfaceItem } from '../model/AppInterface';
+import { browserBackItem, AppInterfaceItem, AppInterfaceControl } from '../model/AppInterface';
 import { interfaceControlIcon, interfaceControlText } from '../utils/AppInterfaceText';
 import { 卡片信息 } from '../components/browser/卡片信息';
 import { 查找替换对话框 } from '../components/browser/查找替换对话框';
@@ -165,7 +165,19 @@ export struct 浏览页 {
   private searchVersion: number = 0;
   private selectionVersion: number = 0;
   private consumedRowCount: number = 0;
-  private refreshingSearch: boolean = false;
+  @State @Watch('publishInterface') private refreshingSearch: boolean = false;
+  @State @Watch('publishInterface') private refreshError: string = '';
+  @State @Watch('publishInterface') private resultMessage: string = '';
+  @State @Watch('publishInterface') private resultUndo: UndoStatus | null = null;
+
+  private async undoResult(): Promise<void> {
+    if (this.resultUndo === null || this.operations.isBusy()) return;
+    const expected: UndoStatus = this.resultUndo;
+    this.resultUndo = null; this.resultMessage = '';
+    await this.runBrowserOperation(async (): Promise<void> => {
+      await new AnkiCollectionHistoryBackend().apply(false, expected);
+    }, (error: Error): void => { this.refreshError = error.message; }, false);
+  }
   private readonly operations: BrowserOperationController = new BrowserOperationController();
   @State @Watch('publishInterface') private mutationBusy: boolean = false;
   /** NavDestination 透明度（由 customNavContentTransition 回调控制，实现淡入淡出转场）。 */
@@ -278,7 +290,7 @@ export struct 浏览页 {
       this.多选模式值 = true;
     }
     const initialSearchVersion: number = this.searchVersion + 1;
-    await this.执行搜索();
+    await this.执行搜索(true);
     if (!this.operations.isAlive()) return;
     if (this.pageInitialPreviewCardId > 0 && this.searchVersion === initialSearchVersion &&
       this.阶段 === 'list' && this.浏览模式值 === 'cards' && this.结果ID列表.includes(this.pageInitialPreviewCardId)) {
@@ -329,7 +341,7 @@ export struct 浏览页 {
     this.viewHold.cancel();
     this.interfaceMounted = false;
     appInterface.hidePage('browser');
-    appInterface.leave('browser');
+    appInterface.leave('browser'); appInterface.leave('browser_feedback');
     this.operations.dispose();
     this.searchVersion++;
     CustomTransition.getInstance().注销NavParam('BrowserPage');
@@ -341,12 +353,21 @@ export struct 浏览页 {
   private publishInterface(): void {
     if (!this.interfaceMounted) return;
     const back: AppInterfaceItem = browserBackItem(this.多选模式值);
+    if (this.refreshError !== '' || this.resultMessage !== '') {
+      appInterface.observe({ surface: 'browser_feedback', sectionId: this.refreshError !== '' ? 'recovery' : 'result', selectedId: '',
+        optionIds: [], optionLabels: [], busy: this.mutationBusy || this.refreshingSearch, controlsComplete: true,
+        items: FEEDBACK_ACTIONS.map((item): AppInterfaceControl => ({ id: item.id, titleKey: item.titleKey,
+          title: namedResourceText(this.getUIContext(), item.titleKey), selected: false,
+          enabled: !(this.mutationBusy || this.refreshingSearch) && (item.id === 'retry' ? this.refreshError !== '' : !(this.refreshError !== '') && this.resultUndo !== null) })),
+        values: [{ id: 'message', value: this.refreshError || this.resultMessage }] });
+    } else appInterface.leave('browser_feedback');
     appInterface.observe({ surface: 'browser', sectionId: this.阶段, selectedId: this.浏览模式值,
       optionIds: this.结果ID列表.slice(0, 100).map((id: number): string => String(id)), optionLabels: [],
       optionsTotal: this.结果ID列表.length, busy: this.mutationBusy || this.阶段 === 'loading',
       items: [{ id: back.id, title: '', titleKey: back.titleKey, iconKey: back.iconKey, enabled: true, selected: false }],
       values: [{ id: 'mode', value: this.浏览模式值 }, { id: 'filter', value: this.quickFilter },
-        { id: 'selected_count', value: String(this.选中ID列表.length) }] });
+        { id: 'refresh_error', value: this.refreshError }, { id: 'result', value: this.resultMessage },
+        { id: 'refreshing', value: String(this.refreshingSearch) }, { id: 'selected_count', value: String(this.选中ID列表.length) }] });
   }
 
   /**
@@ -416,20 +437,17 @@ export struct 浏览页 {
     const filter: string = this.quickFilter;
     const sortColumn: string = this.sortColumn;
     const sortReverse: boolean = this.sortReverse;
-    this.refreshingSearch = true;
+    this.refreshingSearch = true; this.refreshError = '';
     const retainedCount: number = keepRows ? this.consumedRowCount : 0;
     if (!keepRows) { this.consumedRowCount = 0; this.阶段 = 'loading'; }
     try {
       const context: common.UIAbilityContext | null = this.取能力上下文();
       if (context === null) {
-        this.阶段 = 'error';
-        this.错误详情 = this.getUIContext().getHostContext()!.resourceManager
-          .getStringSync($r('app.string.ability_context_unavailable').id);
-        return;
+        throw new Error(resourceText(this.getUIContext(), $r('app.string.ability_context_unavailable')));
       }
       const result = await this.searchSession.search({ filesDir: context.filesDir, notes: notesMode,
         text: text, filter: filter, sortColumn: sortColumn, sortReverse: sortReverse },
-        (): boolean => this.operations.isAlive() && version === this.searchVersion);
+        (): boolean => this.operations.isAlive() && version === this.searchVersion, keepRows);
       if (result === null || version !== this.searchVersion) return;
       let rows: 浏览行数据[] = result.rows;
       let consumed: number = result.consumed;
@@ -446,8 +464,8 @@ export struct 浏览页 {
       this.阶段 = 'list';
     } catch (error) {
       if (version !== this.searchVersion) { return; }
-      this.阶段 = 'error';
       this.错误详情 = error instanceof Error ? error.message : `${error}`;
+      if (keepRows) this.refreshError = this.错误详情; else this.阶段 = 'error';
     } finally { if (version === this.searchVersion) this.refreshingSearch = false; }
   }
 
@@ -610,11 +628,11 @@ export struct 浏览页 {
         afterCommit: async (): Promise<void> => {
           if (clearSelection && this.operations.isCurrent(selection, this.浏览模式值, this.选中ID列表,
             this.searchVersion, this.selectionVersion)) this.退出多选();
-          await this.执行搜索();
+          await this.执行搜索(true);
         },
         changed: (): void => { AppStorage.setOrCreate<number>('需要刷新主页', Date.now()); },
         failed: onFailure,
-        refreshFailed: (error: Error): void => { this.阶段 = 'error'; this.错误详情 = error.message; }
+        refreshFailed: (error: Error): void => { this.refreshError = error.message; }
       }, autoSyncScheduler);
     } finally {
       if (this.operations.isAlive()) this.mutationBusy = false;
@@ -628,10 +646,20 @@ export struct 浏览页 {
     this.批量忙碌 = true;
     this.批量错误 = '';
     try {
-      await this.runBrowserOperation(action, (error: Error): void => {
+      const committed: boolean = await this.runBrowserOperation(async (selection: BrowserOperationContext): Promise<void> => {
+        let before: UndoStatus | null = null;
+        try { before = await new AnkiCollectionHistoryBackend().status(); } catch (_error) { /* 未核实历史时仅显示结果。 */ }
+        await action(selection);
+        this.resultUndo = null;
+        try { this.resultUndo = resultUndoStatus(before, await new AnkiCollectionHistoryBackend().status()); }
+        catch (error) { console.info(`Browser result history: ${error}`); }
+      }, (error: Error): void => {
         if (this.isBrowserSelectionCurrent(initial)) this.批量错误 = this.取本地化文案(errorResource);
         console.info(`BrowserPage: batch failed: ${error.message}`);
       }, true);
+      if (committed && this.operations.isAlive()) {
+        this.resultMessage = resourceText(this.getUIContext(), $r('app.string.feedback_items_updated'), initial.ids.length);
+      }
     } finally {
       if (this.operations.isAlive()) this.批量忙碌 = false;
     }
@@ -1374,10 +1402,9 @@ export struct 浏览页 {
   private 顶部条() {
     // 多选时标题显示计数，右侧保留明确的手动操作入口。
     Stack({ alignContent: Alignment.Center }) {
-      Text(this.多选模式值 ? this.取选中计数文案() : $r('app.string.browser_title'))
-        .fontSize(应用尺寸.字号_标题).fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.text_primary')).width('44%').textAlign(TextAlign.Center)
-        .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).hitTestBehavior(HitTestMode.None)
+      ChangingText({ value: this.多选模式值 ? this.取选中计数文案() : this.取本地化文案($r('app.string.browser_title')),
+        textSize: 应用尺寸.字号_标题, tint: $r('app.color.text_primary') })
+        .width('44%').hitTestBehavior(HitTestMode.None)
       Row() {
       IconActionButton({ toolbarStyle: true,
         source: interfaceControlIcon([browserBackItem(this.多选模式值)], 'back'),
@@ -1484,9 +1511,9 @@ export struct 浏览页 {
       .layoutWeight(7).height(SelectStyle.controlHeight)
       .backgroundColor($r('app.color.surface_card')).borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder).clip(true)
       .onAreaChange((_oldArea: Area, area: Area): void => { this.viewMenuWidth = Number(area.width); })
-      Text(this.阶段 === 'loading' ? $r('app.string.browser_loading') : this.resultCountLabel())
-        .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
-        .layoutWeight(3).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).textAlign(TextAlign.End)
+      ChangingText({ value: this.阶段 === 'loading' ? this.取本地化文案($r('app.string.browser_loading')) : this.resultCountLabel(),
+        textSize: 应用尺寸.字号_正文_小, alignment: TextAlign.End })
+        .layoutWeight(3)
     }.width('100%')
       // 首张结果卡由列表的 contentStartOffset 贡献唯一的区块间距。
       .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平, bottom: 0 })
@@ -1518,6 +1545,15 @@ export struct 浏览页 {
           文案: this.错误详情 !== '' ? this.错误详情 : $r('app.string.browser_search_error'),
           onRetry: (): void => { this.执行搜索(); }
         })
+      }
+      if (this.refreshError !== '' || this.resultMessage !== '') {
+        ResultNotice({ message: this.refreshError || this.resultMessage, canAct: !this.mutationBusy && !this.refreshingSearch,
+          duration: this.refreshError !== '' ? 0 : 6000,
+          onDismiss: (): void => { this.resultMessage = ''; this.resultUndo = null; this.publishInterface(); },
+          actionLabel: this.refreshError !== '' ? $r('app.string.common_retry') :
+            (this.resultUndo !== null ? $r('app.string.collection_history_undo') : ''),
+          onAction: (): void => { if (this.refreshError !== '') this.执行搜索(true); else this.undoResult(); } })
+          .margin({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平 })
       }
       if (this.阶段 === 'list') {
         // 卡片表格组件（扁平列表 + 多选 + 空态 + 懒加载）

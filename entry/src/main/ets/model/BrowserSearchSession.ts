@@ -79,9 +79,9 @@ export class BrowserSearchSession {
   private readonly backend: BrowserSearchBackend;
   constructor(backend: BrowserSearchBackend) { this.backend = backend; }
 
-  search(query: BrowserQuery, current: () => boolean): Promise<BrowserSearchResult | null> {
+  search(query: BrowserQuery, current: () => boolean, retainResult: boolean = false): Promise<BrowserSearchResult | null> {
     const generation: number = ++this.generation;
-    this.result = null;
+    if (!retainResult) this.result = null;
     this.loadingMore = false;
     const valid = (): boolean => generation === this.generation && current();
     const run = async (): Promise<BrowserSearchResult | null> => {

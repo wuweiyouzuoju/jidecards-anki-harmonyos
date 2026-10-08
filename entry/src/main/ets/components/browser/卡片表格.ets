@@ -1,5 +1,6 @@
 // SPDX-License-Identifier-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../../utils/PressFeedback';
+import { currentMotionProfile, motionAnimation } from '../../utils/AppMotion';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { HelpButton } from '../common/HelpButton';
 import { CardMarkingBadge } from '../common/CardMarkingBadge';
@@ -65,8 +66,33 @@ export class 浏览行数据源 implements IDataSource {
     return `${row.id}`;
   }
   replaceAll(rows: 浏览行数据[]): void {
-    this.rows = rows.slice();
-    for (const listener of this.listeners) listener.onDataReloaded();
+    if (this.rows.length === 0) {
+      this.rows = rows.slice();
+      for (const listener of this.listeners) listener.onDataReloaded();
+      return;
+    }
+    const wanted: Set<number> = new Set<number>(rows.map((row: 浏览行数据): number => row.id));
+    for (let index: number = this.rows.length - 1; index >= 0; index--) {
+      if (!wanted.has(this.rows[index].id)) {
+        this.rows.splice(index, 1);
+        for (const listener of this.listeners) listener.onDataDelete(index);
+      }
+    }
+    for (let index: number = 0; index < rows.length; index++) {
+      const next: 浏览行数据 = rows[index];
+      if (this.rows[index]?.id !== next.id) {
+        const oldIndex: number = this.rows.findIndex((row: 浏览行数据): boolean => row.id === next.id);
+        if (oldIndex >= 0) {
+          this.rows.splice(oldIndex, 1);
+          for (const listener of this.listeners) listener.onDataDelete(oldIndex);
+        }
+        this.rows.splice(index, 0, next);
+        for (const listener of this.listeners) listener.onDataAdd(index);
+      } else if (JSON.stringify(this.rows[index]) !== JSON.stringify(next)) {
+        this.rows[index] = next;
+        for (const listener of this.listeners) listener.onDataChange(index);
+      }
+    }
   }
   registerDataChangeListener(listener: DataChangeListener): void {
     if (this.listeners.indexOf(listener) < 0) this.listeners.push(listener);
@@ -269,12 +295,14 @@ export struct 卡片表格 {
                   .onAction((): void => this.处理长按(行.id))
               )
             }
+            .transition(TransitionEffect.OPACITY.animation(motionAnimation(currentMotionProfile().listChangeMs)))
           }, (行: 浏览行数据): string => this.行数据源.keyForRow(行))
         }
         .width('100%')
         .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平 })
         .layoutWeight(1)
         .edgeEffect(EdgeEffect.Spring)
+        .maintainVisibleContentPosition(true)
         // 内容末尾偏移导航条高度：滚到底时最后一行完整可见、可点（AppGallery 导航栏适配要求）
         .contentStartOffset(应用尺寸.页面分组间距(this.narrowDeckLayout))
         .contentEndOffset(this.导航条高度 + 应用尺寸.页面分组间距(this.narrowDeckLayout))

@@ -8,6 +8,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
+import { compileWithUiFeedback } from './ui-feedback-harness.mjs';
 
 const source = readFileSync(new URL('../../entry/src/main/ets/pages/浏览页.ets', import.meta.url), 'utf8');
 const names = ['captureBrowserSelection', 'runBatchOperation', 'runBrowserOperation', 'isBrowserSelectionCurrent', '执行批量删除', '执行批量改牌组', '执行批量设置标志', '解析选中为卡片ID',
@@ -17,7 +18,7 @@ const methods = names.map(name => {
   assert.ok(start >= 0, name);
   return source.slice(start, source.indexOf('\n  }', start) + 4);
 });
-const Page = new Function('resolveBrowserCardIds', 'resolveBrowserNoteIds', 'snapshotNotetypeChange', '$r', 'console', 'autoSyncScheduler', 'AppStorage', 'setCardFlags', 'toggleBrowserCardState', stripTypeScriptTypes(
+const Page = compileWithUiFeedback('resolveBrowserCardIds', 'resolveBrowserNoteIds', 'snapshotNotetypeChange', '$r', 'console', 'autoSyncScheduler', 'AppStorage', 'setCardFlags', 'toggleBrowserCardState', stripTypeScriptTypes(
   `class Page { ${methods.join('\n')} }`, { mode: 'transform' }) + '; return Page;')(
   resolveBrowserCardIds, resolveBrowserNoteIds, snapshotNotetypeChange, key => key, { info() {} }, new AutoSyncScheduler(), { setOrCreate() {} }, setCardFlags, toggleBrowserCardState);
 
@@ -25,6 +26,7 @@ function harness(mode = 'notes') {
   const page = new Page(), calls = [];
   const notes = new Map([[11, [101, 102]], [12, [103]], [13, [104]]]);
   Object.assign(page, {
+    getUIContext:()=>({getHostContext:()=>({resourceManager:{getStringSync:(_id,count)=>`Updated ${count} items`}})}),
     operations: new BrowserOperationController(), selectionVersion: 0, searchVersion: 0,
     浏览模式值: mode, 选中ID列表: mode === 'notes' ? [11, 12] : [101],
     结果ID列表: [11, 12, 13], 行列表: [{ id: 11 }, { id: 12 }, { id: 13 }],
