@@ -7,7 +7,46 @@ import { join, resolve, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import JSON5 from 'json5';
 import { stripTypeScriptTypes } from 'node:module';
-import { exportSource, validateDestination, sanitizeSigning } from '../strip-for-release.mjs';
+import { exportSource, validateDestination, sanitizeSigning, isPrivateSourcePath } from '../strip-for-release.mjs';
+
+test('public Git index excludes local issuance tools and key material', t => {
+  const root = new URL('../../', import.meta.url);
+  if (!existsSync(new URL('.git', root))) {
+    t.skip('Source archives have no Git index; export exclusion is tested independently.');
+    return;
+  }
+  const tracked = execFileSync('git', ['ls-files', '--cached', '-z'], { cwd: root, encoding: 'utf8' })
+    .split('\0').filter(Boolean);
+  assert.deepEqual(tracked.filter(isPrivateSourcePath), [], 'untrack local files; do not bypass .gitignore');
+});
+
+test('export excludes local issuance and key files even when accidentally force-added', t => {
+  const { source, output } = fixture(t);
+  const privatePaths = [
+    'tools/redemption-issuer.mjs', 'tools/redemption-ui.mjs', 'tools/redemption-ui.html',
+    'tools/redemption-android/app/src/main/AndroidManifest.xml',
+    'tools/打开兑换码工具.ps1', 'tools/生成兑换码.cmd', 'docs/REDEMPTION.md',
+    '.jidecards-issuer/state.json', 'nested/.jidecards-issuer/state.json',
+    'identity.jidekey', 'secret.pem', 'secret.key', 'signing.p12', 'signing.pfx', 'signing.jks', 'signing.keystore',
+  ];
+  for (const file of privatePaths) {
+    mkdirSync(dirname(join(source, file)), { recursive: true });
+    writeFileSync(join(source, file), 'synthetic local-only fixture');
+  }
+  const publicPaths = ['entry/src/main/ets/model/RedemptionPublicKey.ts', 'tools/tests/redemption.test.mjs'];
+  for (const file of publicPaths) {
+    mkdirSync(dirname(join(source, file)), { recursive: true });
+    writeFileSync(join(source, file), 'synthetic public client fixture');
+  }
+  execFileSync('git', ['-C', source, 'add', '-f', '.']);
+  exportSource(source, output);
+  for (const file of privatePaths) {
+    assert.equal(existsSync(join(output, file)), false, file);
+    assert.equal(readFileSync(join(source, file), 'utf8'), 'synthetic local-only fixture', 'local source is preserved');
+  }
+  for (const file of publicPaths) assert.ok(existsSync(join(output, file)), file);
+  assert.equal(isPrivateSourcePath('TOOLS\\REDEMPTION-ANDROID\\app\\build.gradle'), true);
+});
 
 function fixture(t) {
   const base = mkdtempSync(join(tmpdir(), 'jidecards-export-test-'));

@@ -9,6 +9,13 @@ import JSON5 from 'json5';
 
 const signingFields = new Set(['certpath', 'keyAlias', 'keyPassword', 'profile', 'storeFile', 'storePassword']);
 
+export function isPrivateSourcePath(file) {
+  const path = file.replaceAll('\\', '/').toLowerCase();
+  return path.startsWith('.local/') || path.startsWith('tools/redemption-') ||
+    ['tools/打开兑换码工具.ps1', 'tools/生成兑换码.cmd', 'docs/redemption.md'].includes(path) ||
+    path.split('/').includes('.jidecards-issuer') || /\.(?:jidekey|pem|key|p12|pfx|jks|keystore)$/.test(path);
+}
+
 export function sanitizeSigning(source) {
   // 配置使用真正的 JSON5 解析器，只改字段值；不扫描或重写应用代码。
   const config = JSON5.parse(source);
@@ -47,7 +54,7 @@ export function exportSource(source, destination) {
   const out = validateDestination(src, destination);
   const files = execFileSync('git', ['-C', src, 'ls-files', '--cached', '--others', '--exclude-standard', '-z'], { encoding: 'utf8' })
     .split('\0').filter(Boolean);
-  const unique = [...new Set(files)].filter(file => !file.startsWith('tools/experimental/') && !file.startsWith('.local/'));
+  const unique = [...new Set(files)].filter(file => !file.startsWith('tools/experimental/') && !isPrivateSourcePath(file));
   // 复制前完成所有检查与脱敏；工作树删除文件不再进入导出。
   const planned = [];
   for (const file of unique) {
