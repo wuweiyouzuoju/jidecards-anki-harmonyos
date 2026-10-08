@@ -48,7 +48,7 @@ import { 开发者调试分组 } from './settings/开发者调试分组';
 import { 设置分组卡片 } from './settings/设置分组卡片';
 import { 简洁模式AppStorage键, 加载简洁模式, 保存简洁模式 } from '../model/简洁模式存储';
 import { 字段帮助面板 } from './字段帮助面板';
-import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时长';
+import { SurfaceTransition } from '../utils/SurfaceTransition';
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { 按下态按钮 } from './common/按下态按钮';
 import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../model/ReleaseFeatures';
@@ -99,7 +99,11 @@ export struct 设置面板 {
   }
 
   @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
-  @Link @Watch('publishInterface') activeSection: string;
+  @Link @Watch('sectionChanged') activeSection: string;
+  @State private animateSection: boolean = false;
+  @State private sectionForward: boolean = true;
+  private previousSection: string = '';
+  private sectionNavigationReady: boolean = false;
   @State private settingsQuery: string = '';
   @Prop openAiSettings: boolean = false;
   @Prop initialSectionId: string = '';
@@ -204,9 +208,12 @@ export struct 设置面板 {
       this.directoryEntries().some((entry: SettingsEntry): boolean => entry.id === this.initialSectionId)) {
       this.openSection(this.initialSectionId);
     }
+    this.previousSection = this.activeSection;
+    this.sectionNavigationReady = true;
   }
 
   aboutToDisappear(): void {
+    this.sectionNavigationReady = false;
     appInterface.leave('settings');
     this.disposed = true;
     this.lifecycleVersion++;
@@ -241,6 +248,15 @@ export struct 设置面板 {
     appInterface.observe({ surface: 'settings', sectionId: this.activeSection, selectedId: '',
       optionIds: [], optionLabels: [], busy: false,
       items: settingsHeaderControls(this.简洁模式, this.显示模式菜单) });
+  }
+
+  private sectionChanged(): void {
+    if (this.sectionNavigationReady && this.activeSection !== this.previousSection) {
+      this.animateSection = true;
+      this.sectionForward = this.activeSection !== '';
+    }
+    this.previousSection = this.activeSection;
+    this.publishInterface();
   }
 
   private pageTitle(): string {
@@ -440,7 +456,8 @@ export struct 设置面板 {
           bottom: 应用尺寸.页面分组间距(this.narrowDeckLayout)
         })
 
-        // 内容区
+        // 只按导航身份切换内容；偏好/搜索结果更新不重放整页转场。
+        ForEach([this.activeSection], (_section: string) => {
         List({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout), scroller: this.内容滚动器 }) {
           if (this.activeSection === '') {
             ListItem() { this.settingsDirectory() }
@@ -624,6 +641,8 @@ export struct 设置面板 {
         .scrollBar(BarState.Off)
         .edgeEffect(EdgeEffect.Spring)
         .alignListItem(ListItemAlign.Center)
+        .transition(SurfaceTransition.pageContent(this.sectionForward, this.animateSection))
+        }, (section: string): string => section)
       }
       .width('100%')
       .height('100%')
@@ -664,7 +683,7 @@ export struct 设置面板 {
           onImportCollection: (): void => { this.恢复完整备份回调(); },
           onClose: (): void => { this.显示备份管理 = false; }
         })
-          .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
+
       }
 
       // 媒体管理面板：数据管理分组入口打开，挂在根 Stack 顶层
@@ -675,7 +694,7 @@ export struct 设置面板 {
           isDark: this.是否深色,
           onClose: (): void => { this.显示媒体管理 = false; }
         })
-          .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
+
       }
 
       if (this.显示空卡列表) {
@@ -684,7 +703,7 @@ export struct 设置面板 {
           isDark: this.是否深色,
           onClose: (): void => { this.显示空卡列表 = false; }
         })
-          .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
+
       }
 
       // 查找重复对话框：数据管理分组入口打开，挂在根 Stack 顶层
@@ -698,7 +717,7 @@ export struct 设置面板 {
             this.跳转浏览页回调(searchText);
           }
         })
-          .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
+
       }
 
       // 笔记类型管理面板（T3）：数据管理分组入口打开
@@ -714,7 +733,7 @@ export struct 设置面板 {
             this.显示笔记类型编辑器 = true;
           }
         })
-          .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
+
       }
 
       // 笔记类型编辑器（T3）：从管理面板点击编辑后打开
@@ -730,7 +749,7 @@ export struct 设置面板 {
           },
           onSaved: (): void => {}
         })
-          .transition(TransitionEffect.OPACITY.animation({ curve: 取全屏转场曲线(), duration: 取全屏转场时长() }))
+
       }
     }
     .width('100%')

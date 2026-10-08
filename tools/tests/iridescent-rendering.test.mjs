@@ -6,6 +6,7 @@ import { inflateSync } from 'node:zlib';
 import { stripTypeScriptTypes } from 'node:module';
 import * as catalog from '../../entry/src/main/ets/model/ThemeCatalog.ts';
 import * as style from '../../entry/src/main/ets/model/ThemeBackgroundMotion.ts';
+import { motionApi, surfaceMotionApi } from './motion-harness.mjs';
 
 test('all cloud textures have fully transparent borders and contain no opaque rectangle', () => {
   for (let image = 0; image < 3; image++) {
@@ -115,7 +116,8 @@ test('theme configuration changes preserve elapsed position and adopt the next c
 });
 
 /** 执行首页实际转场协议，模拟 @Prop 的更新通知。 */
-function createNavigation(background) {
+function createNavigation(background, motionStyle = 'restrained') {
+  const motion = surfaceMotionApi(motionStyle);
   const pages = new Map();
   const callbacks = new Map();
   const registry = {
@@ -129,16 +131,16 @@ function createNavigation(background) {
     const begin = pageSource.indexOf('CustomTransition.getInstance().注册NavParam(');
     const registration = pageSource.slice(begin, pageSource.indexOf('\n    );', begin) + 7);
     const page = { 转场透明度: 1 };
-    const register = new Function('CustomTransition', stripTypeScriptTypes(registration, { mode: 'transform' }));
-    register.call(page, { getInstance: () => registry });
+    const register = new Function('CustomTransition', 'navigationEnterOffset', stripTypeScriptTypes(registration, { mode: 'transform' }));
+    register.call(page, { getInstance: () => registry }, motion.navigationEnterOffset);
     pages.set(name, page);
   }
   const source = readFileSync(new URL('../../entry/src/main/ets/utils/HomeNavigationTransition.ets', import.meta.url), 'utf8')
     .replace(/^import[^;]+;\s*/gm, '').replace(/^export /gm, '');
   const js = stripTypeScriptTypes(source, { mode: 'transform' });
   const values = {
+    ...motion,
     NavigationOperation: { PUSH: 'push' },
-    取全屏转场时长: () => 250,
     Curve: { EaseOut: 'ease-out' },
     CustomTransition: { getInstance: () => registry },
   };
@@ -150,6 +152,7 @@ function createNavigation(background) {
     set: active => { background.transitionActive = active; background.updatePlayback(); },
   });
   const fades = [];
+  const finishes = [];
   const snapshot = () => Object.fromEntries([['Home', home.homeTransitionOpacity],
     ...Array.from(pages, ([name, page]) => [name, page.转场透明度])]);
   const frames = [];
@@ -161,16 +164,18 @@ function createNavigation(background) {
   } });
   const transition = new Transition({ getUIContext: () => home.getUIContext(),
     setHomeOpacity: value => { home.homeTransitionOpacity = value; },
+    setHomeOffset: value => { home.homeTransitionOffset = value; },
     setBackgroundActive: value => { home.backgroundTransitionActive = value; } });
   const startTransition = (operation = 'push', from = { index: -1 }, to = { name: 'SettingsPage', index: 0 }) => {
     const protocol = transition.create(from, to, operation);
-    protocol.transition({ finishTransition: () => protocol.onTransitionEnd(true) });
+    protocol.transition({ finishTransition: () => { finishes.push(protocol); protocol.onTransitionEnd(true); } });
     return protocol;
   };
-  return { home, fades, frames, snapshot, startTransition };
+  return { home, pages, fades, finishes, frames, snapshot, startTransition, transition };
 }
 
-test('home and nested transparent destinations never crossfade old and new content', () => {
+test('home and nested transparent destinations never crossfade old and new content in either motion style', () => {
+  for (const motionStyle of ['restrained','lively']) {
   for (const [operation, from, to] of [
     ['push', { index: -1 }, { name: 'StudyPage', index: 0 }],
     ['pop', { name: 'StudyPage', index: 0 }, { index: -1 }],
@@ -183,7 +188,14 @@ test('home and nested transparent destinations never crossfade old and new conte
     ['replace', { name: 'SettingsPage', index: 0 }, { name: 'BrowserPage', index: 0 }],
   ]) {
     const { background } = createBackground();
-    const nav = createNavigation(background);
+    const nav = createNavigation(background, motionStyle);
+    const offsets = [];
+    nav.home.getUIContext = () => ({animateTo: (options, update) => {
+      const target = to.index === -1 ? nav.home : nav.pages.get(to.name);
+      offsets.push(to.index === -1 ? target.homeTransitionOffset : target.navigationOffset);
+      const start = nav.snapshot(); update();
+      nav.frames.push({start,end:nav.snapshot()}); nav.fades.push(options);
+    }});
     nav.startTransition(operation, from, to);
     const source = from.index === -1 ? 'Home' : from.name;
     const destination = to.index === -1 ? 'Home' : to.name;
@@ -191,8 +203,11 @@ test('home and nested transparent destinations never crossfade old and new conte
     assert.equal(nav.frames[0].end[source], 0, `${operation}: source cannot fade back in`);
     assert.equal(nav.frames[0].start[destination], 0);
     assert.equal(nav.frames[0].end[destination], 1);
+    assert.equal(offsets[0], motionStyle === 'restrained' ? 0 : operation === 'push' ? 16 : -16);
+    assert.equal(to.index === -1 ? nav.home.homeTransitionOffset : nav.pages.get(to.name).navigationOffset,0);
     nav.fades[0].onFinish();
     assert.equal(nav.snapshot()[destination], 1);
+  }
   }
   const home = readFileSync(new URL('../../entry/src/main/ets/pages/首页.ets', import.meta.url), 'utf8');
   assert.match(home, /\.expandSafeArea\([^\n]*\)\s*\.onAreaChange\([^\n]*\)\s*\.opacity\(this\.homeTransitionOpacity\)/,
@@ -240,7 +255,7 @@ test('push and pop freeze the current cloud pose and resume only after navigatio
 
 test('overlapping navigation ignores old completions and releases the pause on failure or timeout', () => {
   const { background, animations } = createBackground();
-  const { startTransition, fades } = createNavigation(background);
+  const { startTransition, fades, finishes } = createNavigation(background);
   background.updatePlayback();
   const first = startTransition();
   const second = startTransition('pop');
@@ -254,6 +269,47 @@ test('overlapping navigation ignores old completions and releases the pause on f
   assert.equal(animations.length, 3);
   fades[1].onFinish();
   assert.equal(animations.length, 3, 'late animation completion after timeout is idempotent');
+  assert.equal(finishes.length, 0, 'ended navigation proxies cannot be finished by late animation callbacks');
+});
+
+test('navigation requests proxy completion once even before the system acknowledges it', () => {
+  const { background } = createBackground();
+  const nav = createNavigation(background);
+  let finishCount = 0;
+  const protocol = nav.transition.create({ index: -1 }, { name: 'SettingsPage', index: 0 }, 'push');
+  // Delay system acknowledgement so the guard cannot rely only on onTransitionEnd.
+  protocol.transition({ finishTransition: () => { finishCount++; } });
+  nav.fades[0].onFinish();
+  nav.fades[0].onFinish();
+  assert.equal(finishCount, 1);
+  assert.equal(background.transitionActive, true);
+  protocol.onTransitionEnd(true);
+  nav.fades[0].onFinish();
+  assert.equal(finishCount, 1);
+  assert.equal(background.transitionActive, false);
+});
+
+test('queued navigation updates cannot reveal an obsolete destination after cancellation or replacement', () => {
+  const { background } = createBackground();
+  const nav = createNavigation(background), queued = [];
+  nav.home.getUIContext = () => ({ animateTo: (options, update) => queued.push({ options, update }) });
+  const first = nav.startTransition();
+  const second = nav.startTransition('push', { name: 'SettingsPage', index: 0 }, { name: 'BrowserPage', index: 1 });
+  queued[0].update();
+  assert.equal(nav.snapshot().SettingsPage, 0, 'an obsolete destination stays hidden');
+  first.onTransitionEnd(false);
+  queued[1].update();
+  assert.equal(nav.snapshot().BrowserPage, 1);
+  queued[0].options.onFinish();
+  assert.equal(nav.finishes.length, 0);
+  assert.equal(background.transitionActive, true);
+  second.onTransitionEnd(false);
+  const before = nav.snapshot();
+  queued[1].update();
+  queued[1].options.onFinish();
+  assert.deepEqual(nav.snapshot(), before);
+  assert.equal(nav.finishes.length, 0);
+  assert.equal(background.transitionActive, false);
 });
 
 test('navigation completion respects background lifecycle, motion preference and missing UI context', () => {

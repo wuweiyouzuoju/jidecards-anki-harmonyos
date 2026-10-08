@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { navigationEnterOffset } from '../utils/AppMotion';
 import { WINDOW_SAFE_TOP_KEY } from '../model/WindowSafeLayout';
 import { appInterface } from '../backend/AppInterfaceService';
 import { statsInterfaceSections, visibleInterfaceItems, AppInterfaceItem, AppInterfaceControl } from '../model/AppInterface';
@@ -130,6 +131,7 @@ export struct 统计页 {
   @State private 分区帮助正文: Resource = $r('app.string.stats_no_data');
   /** NavDestination 透明度（由 customNavContentTransition 回调控制，实现淡入淡出转场）。 */
   @State private 转场透明度: number = 1;
+  @State private navigationOffset: number = 0;
 
   @StorageProp(颜色键.主色按钮背景) private 主色按钮背景色: string = '#2F5FD0';
   @StorageProp(颜色键.主色容器) private 主色容器色: string = '#E8EEFC';
@@ -157,9 +159,11 @@ export struct 统计页 {
     CustomTransition.getInstance().注册NavParam('StatsPage',
       (isPush: boolean, isExit: boolean): void => {
         this.转场透明度 = isExit ? 1 : 0;
+        this.navigationOffset = isExit ? 0 : navigationEnterOffset(isPush);
       },
       (isPush: boolean, isExit: boolean): void => {
         this.转场透明度 = isExit ? 0 : 1;
+        this.navigationOffset = 0;
       }
     );
     // 恢复主题模式（与浏览页同款，供 是否深色() 判断）
@@ -870,6 +874,7 @@ export struct 统计页 {
       return true;
     })
     .opacity(this.转场透明度)
+    .translate({ x: this.navigationOffset })
     .onShown((): void => { appInterface.showPage('stats'); this.publishInterface(); })
     .onHidden((): void => { appInterface.hidePage('stats'); })
   }

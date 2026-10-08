@@ -1,4 +1,5 @@
 import { PressFeedback } from '../utils/PressFeedback';
+import { navigationEnterOffset } from '../utils/AppMotion';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { EditNotePageParams } from '../model/navigation/PageParams';
 import { CollectionHistoryDialog } from '../components/CollectionHistoryDialog';
@@ -161,6 +162,7 @@ export struct 浏览页 {
   @State @Watch('publishInterface') private mutationBusy: boolean = false;
   /** NavDestination 透明度（由 customNavContentTransition 回调控制，实现淡入淡出转场）。 */
   @State private 转场透明度: number = 1;
+  @State private navigationOffset: number = 0;
 
   // 字段帮助浮层（与设置面板同模式：子组件上抛 → 父组件根 Stack 统一渲染）
   @State private 显示说明浮层: boolean = false;
@@ -245,9 +247,11 @@ export struct 浏览页 {
     CustomTransition.getInstance().注册NavParam('BrowserPage',
       (isPush: boolean, isExit: boolean): void => {
         this.转场透明度 = isExit ? 1 : 0;
+        this.navigationOffset = isExit ? 0 : navigationEnterOffset(isPush);
       },
       (isPush: boolean, isExit: boolean): void => {
         this.转场透明度 = isExit ? 0 : 1;
+        this.navigationOffset = 0;
       }
     );
     // 加载主题模式用于编辑区深色判断；失败回退 'system'，不阻塞浏览流程
@@ -1804,5 +1808,6 @@ export struct 浏览页 {
       if (this.interfaceMounted) this.loadFlagLabels(); })
     .onHidden((): void => { appInterface.hidePage('browser'); })
     .opacity(this.转场透明度)
+    .translate({ x: this.navigationOffset })
   }
 }

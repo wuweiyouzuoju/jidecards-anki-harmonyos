@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { navigationEnterOffset } from '../utils/AppMotion';
 import { WINDOW_SAFE_TOP_KEY } from '../model/WindowSafeLayout';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { PressFeedback } from '../utils/PressFeedback';
@@ -43,6 +44,7 @@ export struct 学习提醒页 {
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
   @State private 转场透明度: number = 1;
+  @State private navigationOffset: number = 0;
   pathStack?: NavPathStack;
 
   @StorageLink(颜色键.主色按钮背景) private 主色按钮背景链接: string = '';
@@ -80,8 +82,14 @@ export struct 学习提醒页 {
     this.interfaceMounted = true;
     this.publishInterface();
     CustomTransition.getInstance().注册NavParam('ReminderPage',
-      (isPush: boolean, isExit: boolean): void => { this.转场透明度 = isExit ? 1 : 0; },
-      (isPush: boolean, isExit: boolean): void => { this.转场透明度 = isExit ? 0 : 1; }
+      (isPush: boolean, isExit: boolean): void => {
+        this.转场透明度 = isExit ? 1 : 0;
+        this.navigationOffset = isExit ? 0 : navigationEnterOffset(isPush);
+      },
+      (isPush: boolean, isExit: boolean): void => {
+        this.转场透明度 = isExit ? 0 : 1;
+        this.navigationOffset = 0;
+      }
     );
     this.refreshThemeState();
     await this.加载列表();
@@ -515,6 +523,7 @@ export struct 学习提醒页 {
       return true;
     })
     .opacity(this.转场透明度)
+    .translate({ x: this.navigationOffset })
     // 从编辑页 pop 返回时刷新列表。onPageShow 只对 @Entry 路由页生效，NavDestination 必须用 onShown。
     .onShown((): void => {
       appInterface.showPage('reminders');

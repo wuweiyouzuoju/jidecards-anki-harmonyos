@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { navigationEnterOffset } from '../utils/AppMotion';
 import { DataTransferSession, DataTransferState, initialTransferState } from '../model/home/DataTransferSession';
 import { appInterface } from '../backend/AppInterfaceService';
 import { AnkiDataTransfer } from '../backend/AnkiDataTransfer';
@@ -60,6 +61,7 @@ export struct 设置页 {
   @StorageLink('themeMode') private 主题模式值: 主题模式 = 'system';
   @StorageLink('colorTheme') private 颜色主题值: 颜色主题 = 默认颜色主题;
   @State private 转场透明度: number = 1;
+  @State private navigationOffset: number = 0;
 
   // 弹层状态
   @State private 显示许可证: boolean = false;
@@ -72,9 +74,11 @@ export struct 设置页 {
     CustomTransition.getInstance().注册NavParam('SettingsPage',
       (isPush: boolean, isExit: boolean): void => {
         this.转场透明度 = isExit ? 1 : 0;
+        this.navigationOffset = isExit ? 0 : navigationEnterOffset(isPush);
       },
       (isPush: boolean, isExit: boolean): void => {
         this.转场透明度 = isExit ? 0 : 1;
+        this.navigationOffset = 0;
       }
     );
     this.主题模式值 = await 加载主题模式();
@@ -293,6 +297,7 @@ export struct 设置页 {
       return true;
     })
     .opacity(this.转场透明度)
+    .translate({ x: this.navigationOffset })
     .onShown((): void => { appInterface.showPage('settings'); })
     .onHidden((): void => { appInterface.hidePage('settings'); })
   }

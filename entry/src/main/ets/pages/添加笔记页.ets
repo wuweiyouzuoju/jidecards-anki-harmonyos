@@ -1,4 +1,5 @@
 import { PressFeedback } from '../utils/PressFeedback';
+import { navigationEnterOffset } from '../utils/AppMotion';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { ExpansionReveal } from '../utils/ExpansionReveal';
 import { NoteFieldCard } from '../components/common/NoteFieldCard';
@@ -160,6 +161,7 @@ export struct 添加笔记页 {
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
   /** NavDestination 透明度（由 customNavContentTransition 回调控制，实现淡入淡出转场）。 */
   @State private 转场透明度: number = 1;
+  @State private navigationOffset: number = 0;
 
   async aboutToAppear(): Promise<void> {
     this.pageActive = true;
@@ -174,9 +176,11 @@ export struct 添加笔记页 {
     CustomTransition.getInstance().注册NavParam('AddNotePage',
       (isPush: boolean, isExit: boolean): void => {
         this.转场透明度 = isExit ? 1 : 0;
+        this.navigationOffset = isExit ? 0 : navigationEnterOffset(isPush);
       },
       (isPush: boolean, isExit: boolean): void => {
         this.转场透明度 = isExit ? 0 : 1;
+        this.navigationOffset = 0;
       }
     );
     // 加载主题模式用于图片遮罩编辑器的深色判断；失败回退默认 'system'，不阻塞建卡流程。
@@ -241,10 +245,13 @@ export struct 添加笔记页 {
     }
   }
 
+  @State private saveFeedback: string = 'idle';
+
   private applyCreationState(state: NoteCreationState, _locale: string = this.uiLanguage): void {
     if (!this.pageActive) return;
     this.duplicateSearch = state.duplicateSearch ?? '';
     this.处理中 = state.busy || this.duplicateSearch !== '';
+    this.saveFeedback = state.busy ? 'busy' : state.error !== '' ? 'failure' : state.saved ? 'success' : 'idle';
     this.错误信息 = this.duplicateSearch !== '' ? '' :
       (state.error.startsWith('add_note_') || state.error.startsWith('note_audio_')) ? namedResourceText(this.getUIContext(), state.error) : state.error;
     this.笔记类型选项 = state.types;
@@ -559,7 +566,7 @@ export struct 添加笔记页 {
       optionsTotal: this.是否图片遮盖模式 ? fieldIds.length : this.字段名列表.length,
       busy: this.处理中 || this.pickingFieldImage || this.audioBusy || this.confirmingDiscard,
       items: controls, controlsComplete: true,
-      values: [{ id: 'stock_kind', value: String(this.originalStockKind) },
+      values: [{ id: 'save_feedback', value: this.saveFeedback }, { id: 'stock_kind', value: String(this.originalStockKind) },
         { id: 'cloze_fields', value: this.clozeFieldOrds.join(',') }, { id: 'reverse_field', value: String(this.optionalReverseIndex) },
         { id: 'image_count', value: String(this.fieldImages.length) }, { id: 'audio_count', value: String(this.fieldAudios.length) },
         { id: 'has_source_image', value: String(this.图片遮盖_源图Uri !== '') },
@@ -812,8 +819,9 @@ export struct 添加笔记页 {
 
         Row({ space: 应用尺寸.间距_8 }) {
           按下态按钮({ 文案: this.interfaceLabel('save_return'), fillWidth: true,
+            feedback: this.saveFeedback,
             是否启用: this.interfaceEnabled('save_return'), 点击回调: (): void => { this.提交(true); } }).layoutWeight(1)
-          PrimaryActionButton({ label: this.interfaceLabel('save'), tint: this.动作主色,
+          PrimaryActionButton({ label: this.interfaceLabel('save'), tint: this.动作主色, feedback: this.saveFeedback,
             isInteractive: this.interfaceEnabled('save'), onAction: (): void => { this.提交(false); } }).layoutWeight(1)
         }.width('100%').flexShrink(0).padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平,
           top: 应用尺寸.操作区顶部间距(this.narrowDeckLayout),
@@ -874,6 +882,7 @@ export struct 添加笔记页 {
     .hideTitleBar(true)
     .backgroundColor(Color.Transparent)
     .opacity(this.转场透明度)
+    .translate({ x: this.navigationOffset })
     .onShown((): void => { this.restoreEditorAfterPreview(); this.wheelSession.setVisible(true); appInterface.showPage('add_note'); this.publishInterface(); })
     .onHidden((): void => { this.wheelSession.setVisible(false); appInterface.hidePage('add_note'); this.audioPreview.stop().catch((): void => {}); })
     .onBackPressed((): boolean => this.onBackPress())

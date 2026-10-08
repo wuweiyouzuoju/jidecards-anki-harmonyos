@@ -15,6 +15,7 @@ import { 解析是否深色, 主题模式 } from '../model/主题设置';
 import { 加载主题模式 } from '../model/主题存储';
 import { localizedResourceText } from '../utils/UiFeedback';
 import { CustomTransition } from '../utils/自定义转场';
+import { navigationEnterOffset } from '../utils/AppMotion';
 import { appInterface } from '../backend/AppInterfaceService';
 import { visibleInterfaceItems, AppInterfaceControl } from '../model/AppInterface';
 import { interfaceItemText } from '../utils/AppInterfaceText';
@@ -33,6 +34,7 @@ export struct EditNotePage {
   @State private backRequest: number = 0;
   @State private previewReturnRequest: number = 0;
   @State private opacityValue: number = 1;
+  @State private navigationOffset: number = 0;
   @StorageLink('themeMode') private theme: 主题模式 = 'system';
   @StorageLink('systemDarkMode') private systemDark: boolean = false;
   @StorageProp(PAGE_SURFACE_KEY) private surface: string = '#F5F7FA';
@@ -46,8 +48,14 @@ export struct EditNotePage {
     this.active = true;
     this.publishInterface();
     CustomTransition.getInstance().注册NavParam('EditNotePage',
-      (_push: boolean, exit: boolean): void => { this.opacityValue = exit ? 1 : 0; },
-      (_push: boolean, exit: boolean): void => { this.opacityValue = exit ? 0 : 1; });
+      (push: boolean, exit: boolean): void => {
+        this.opacityValue = exit ? 1 : 0;
+        this.navigationOffset = exit ? 0 : navigationEnterOffset(push);
+      },
+      (_push: boolean, exit: boolean): void => {
+        this.opacityValue = exit ? 0 : 1;
+        this.navigationOffset = 0;
+      });
     this.load();
     加载主题模式().then((mode: 主题模式): void => { if (this.active) this.theme = mode; })
       .catch((): void => {});
@@ -138,6 +146,7 @@ export struct EditNotePage {
         }.width('100%').height('100%').backgroundColor(this.surface)
       }
     }.hideTitleBar(true).backgroundColor(Color.Transparent).opacity(this.opacityValue)
+      .translate({ x: this.navigationOffset })
       .onShown((): void => { this.restoreEditorAfterPreview(); this.wheelSession.setVisible(true); appInterface.showPage('edit_note'); this.publishInterface(); })
       .onHidden((): void => { this.wheelSession.setVisible(false); appInterface.hidePage('edit_note'); })
       .onBackPressed((): boolean => { this.requestBack(); return true; })

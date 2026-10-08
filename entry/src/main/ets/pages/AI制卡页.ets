@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { navigationEnterOffset } from '../utils/AppMotion';
 import { WINDOW_SAFE_TOP_KEY } from '../model/WindowSafeLayout';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { AgentDocumentStore } from '../backend/agent/AgentDocumentStore';
@@ -304,6 +305,7 @@ export struct AI制卡页 {
   @StorageProp(WINDOW_SAFE_TOP_KEY) private toolbarSafeTop: number = 0;
   /** NavDestination 透明度（由 customNavContentTransition 回调控制，实现淡入淡出转场）。 */
   @State private 转场透明度: number = 1;
+  @State private navigationOffset: number = 0;
   private 上一键盘避让模式: KeyboardAvoidMode = KeyboardAvoidMode.OFFSET;
 
   // 图片遮盖第一版仍走独立 RPC；填空能力改由 Anki 后端结构提供，不再按名称猜测。
@@ -320,9 +322,11 @@ export struct AI制卡页 {
     CustomTransition.getInstance().注册NavParam('AiCardPage',
       (isPush: boolean, isExit: boolean): void => {
         this.转场透明度 = isExit ? 1 : 0;
+        this.navigationOffset = isExit ? 0 : navigationEnterOffset(isPush);
       },
       (isPush: boolean, isExit: boolean): void => {
         this.转场透明度 = isExit ? 0 : 1;
+        this.navigationOffset = 0;
       }
     );
     this.牌组选项 = this.pageDeckOptions;
@@ -2839,6 +2843,7 @@ export struct AI制卡页 {
     .onShown((): void => { this.wheelSession.setVisible(true); appInterface.showPage('agent'); this.isAgentPageVisible = true; this.publishInterface(); })
     .onHidden((): void => { this.wheelSession.setVisible(false); appInterface.hidePage('agent'); this.isAgentPageVisible = false; this.navigationSession?.cancel(); })
     .opacity(this.转场透明度)
+    .translate({ x: this.navigationOffset })
     .onBackPressed((): boolean => {
       if (this.targetSelectionMessage < 0) return false;
       if (!this.处理中 && !this.targetSelectionBusy) this.finishTargetSelection('cancel');

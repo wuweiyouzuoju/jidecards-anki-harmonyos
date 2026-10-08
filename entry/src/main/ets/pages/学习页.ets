@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { navigationEnterOffset } from '../utils/AppMotion';
 import { WINDOW_SAFE_TOP_KEY } from '../model/WindowSafeLayout';
 import { CustomSchedulingWarning } from '../components/CustomSchedulingWarning';
 import { NativeSchedulingScript } from '../backend/NativeSchedulingScript';
@@ -336,15 +337,18 @@ export struct 学习页 {
   @State private choiceGrade: JideChoiceGrade | null = null;
   @State private choiceFeedbackSecondsOverride: number = -1;
   @State private 转场透明度: number = 1;
+  @State private navigationOffset: number = 0;
 
   async aboutToAppear(): Promise<void> {
     // 与浏览、统计共用转场协议；背景由首页根层持续持有。
     CustomTransition.getInstance().注册NavParam('StudyPage',
       (isPush: boolean, isExit: boolean): void => {
         this.转场透明度 = isExit ? 1 : 0;
+        this.navigationOffset = isExit ? 0 : navigationEnterOffset(isPush);
       },
       (isPush: boolean, isExit: boolean): void => {
         this.转场透明度 = isExit ? 0 : 1;
+        this.navigationOffset = 0;
       }
     );
     this.mounted = true;
@@ -2428,6 +2432,7 @@ export struct 学习页 {
     .hideTitleBar(true)
     .backgroundColor(Color.Transparent)
     .opacity(this.转场透明度)
+    .translate({ x: this.navigationOffset })
     .onBackPressed((): boolean => {
       if (this.flagNamesOpen) { this.markingBackRequest++; return true; }
       if (this.手写模式) { this.whiteboardBackTick++; return true; }

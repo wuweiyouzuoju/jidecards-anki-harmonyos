@@ -4,6 +4,7 @@ import { EditNotePageParams } from '../model/navigation/PageParams';
 import { HomeDestinations } from './navigation/HomeDestinations';
 import { appPageName, browserNavigationQuery, appNavigationStackBlockReason, AppNavigationRequest } from '../model/navigation/AppNavigation';
 import { HomeNavigationTransition } from '../utils/HomeNavigationTransition';
+import { SurfaceTransition } from '../utils/SurfaceTransition';
 import { HomeDeckDeletion } from '../components/home/HomeDeckDeletion';
 import { DialogHeader } from '../components/common/DialogHeader';
 import { DialogBackdrop } from '../components/common/DialogBackdrop';
@@ -215,10 +216,12 @@ struct 首页 {
   @State private historyRefreshToken: number = 0;
   @State private backgroundTransitionActive: boolean = false;
   @State private homeTransitionOpacity: number = 1;
+  @State private homeTransitionOffset: number = 0;
   private readonly navigationTransition: HomeNavigationTransition = new HomeNavigationTransition({
     getUIContext: (): UIContext | undefined => this.getUIContext(),
     setBackgroundActive: (active: boolean): void => { this.backgroundTransitionActive = active; },
-    setHomeOpacity: (opacity: number): void => { this.homeTransitionOpacity = opacity; }
+    setHomeOpacity: (opacity: number): void => { this.homeTransitionOpacity = opacity; },
+    setHomeOffset: (offset: number): void => { this.homeTransitionOffset = offset; }
   });
   // 图表快照：静默加载图表 后用 提取卡片数据 转成纯基础类型，传给 主页摘要分页 渲染 Swiper 多页统计
   @State private 图表快照: 桌面卡片数据 | null = null;
@@ -357,7 +360,8 @@ struct 首页 {
   @State @Watch('homeActivityChanged') private 显示节流奖励: boolean = false;
   @State private 节流奖励文案: string = '';
   // 窄屏详情显隐（方案 C 2026-07-25）：点牌组后 true，根 Stack 内 牌组详情面板 盖住列表，替代推栈 NavDestination
-  @State @Watch('homeActivityChanged') private 显示牌组详情: boolean = false;
+  @State @Watch('deckDetailsChanged') private 显示牌组详情: boolean = false;
+  @State private deckNavigationStarted: boolean = false;
   @State @Watch('homeActivityChanged') private 显示卡片预览: boolean = false;
   private previewBackHandler: (() => boolean) | null = null;
   private deckDetailsBackHandler: (() => boolean) | null = null;
@@ -711,6 +715,11 @@ struct 首页 {
         optionsTotal: visibleDecks.length, busy: this.deckReorderBusy, items: controls, controlsComplete: true,
         values: [{ id: 'order_scope', value: 'device' }] });
     } else appInterface.leave('deck_reorder');
+  }
+
+  private deckDetailsChanged(): void {
+    this.deckNavigationStarted = true;
+    this.homeActivityChanged();
   }
 
   /** 页面映射当前占用与效果，任务优先级由 HomeWorkCoordinator 统一管理。 */
@@ -2019,6 +2028,7 @@ struct 首页 {
     .height('100%')
     .backgroundColor(this.页面底色微染值)
     // 幻彩背景透明，详情打开时底层列表不能参与绘制/命中；Hidden 保留滚动位置与断点测量。
+    .transition(SurfaceTransition.pageContent(false, this.当前断点 === 'xs' && this.deckNavigationStarted))
     .visibility(this.当前断点 === 'xs' && this.显示牌组详情 ? Visibility.Hidden : Visibility.Visible)
   }
 
@@ -2137,6 +2147,7 @@ struct 首页 {
       onRenameDeck: (): void => { this.openDeckRename(this.选中的牌组ID); },
       onExport: (): void => { this.打开数据迁移('exportDeck', Number(this.选中的牌组ID), false); },
       onOptions: (): void => { this.打开牌组选项(); } })
+      .transition(SurfaceTransition.pageContent(true, compact))
   }
 
   private detailHeaderActionHeight(): number {
@@ -2369,6 +2380,7 @@ struct 首页 {
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
       .onAreaChange((_old: Area, area: Area): void => { this.homeMenuHostChanged(area); })
       .opacity(this.homeTransitionOpacity)
+      .translate({ x: this.homeTransitionOffset })
     }
     .hideTitleBar(true)
     .mode(NavigationMode.Stack)
