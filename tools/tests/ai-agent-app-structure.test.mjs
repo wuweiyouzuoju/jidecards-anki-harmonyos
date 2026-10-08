@@ -322,7 +322,8 @@ test('study UI preserves actions and JIDE observes expanded left groups and flag
     flagMenuChoices:loadPlatformModule('components/common/FlagMenuChoices.ets','flagMenuChoices',{
       ...deps, customFlagLabel:(labels,flag)=>labels[String(flag)]??'', namedResourceText:(_,key)=>localize(key)}),
     BURY_SUSPEND_MODE_BURY_USER:0,BURY_SUSPEND_MODE_SUSPEND:1});
-  const page=new Page(),calls=[];
+  const page=Object.assign(new Page(), { recoveryMessage: '', resultMessage: '', resultUndo: null,
+    studySession: { hasPendingAnswer: () => false } }),calls=[];
   Object.assign(page,{getUIContext:()=>({}),mounted:true,页面已显示:true,studyMenuOpen:true,studyExpandedIds:['marking','card_actions'],flagLabels:{'7':'Custom purple'},阶段:'question',评分中:false,
     当前卡片:{cardId:42},currentMarking:{flag:7,marked:false},有音频:false,可撤销:false,Agent入口已启用:true,简洁模式:true,choiceQuestion:null,
     牌组名:'Deck',新卡剩余:1,学习中剩余:2,复习剩余:3,
@@ -400,7 +401,7 @@ test('deck detail observations follow the real snapshot, expansion and loading s
 test('home selection refreshes knowledge without waking unrelated collection work', () => {
   const tracker=new AppInterfaceTracker();
   const Page=pageMethods('pages/首页.ets',['previewDeckChanged','homeActionControls','publishHomeInterface'],{appInterface:tracker,OFFICIAL_ANNOUNCEMENTS_ENABLED,isDoubleColumnDeckListStyle,homeSyncIndicator,homeSyncLabelKey});
-  const page=new Page();let invalidations=0;
+  const page=Object.assign(new Page(), { recoveryMessage: '', resultMessage: '', resultUndo: null });let invalidations=0;
   Object.assign(page,{homeDisposed:false,加载状态:'ready',当前断点:'xs',deckListStyle:'single_wide',显示今日进度卡:true,homeAgentEnabled:true,syncAccountState:'normal',syncIndicator:'hidden',syncStatusText:'',选中的牌组ID:'d2',牌组数据源:{snapshotDecks:()=>[{id:'d1',name:'Visible'}]},
     homeActivity:()=>({collectionBusy:false}),deckPreviewSession:{invalidate:()=>invalidations++},
     homeActivityChanged:()=>assert.fail('read-only interface publication must not wake startup/sync/import work')});
@@ -469,7 +470,7 @@ test('actual JIDE publisher exposes state without recursively including chat, im
   const tracker = new AppInterfaceTracker();
   const Page = pageMethods('pages/AI制卡页.ets',['interfaceControls','interfaceLabel','interfaceEnabled','publishInterface'],
     {...textDependencies(tracker),agentInterfaceControls,agentInterfaceTitle});
-  const page = new Page();
+  const page = Object.assign(new Page(), { recoveryMessage: '', resultMessage: '', resultUndo: null });
   Object.assign(page,{interfaceMounted:true,pageDisposed:false,pageMode:'assistant',显示历史区:false,处理中:false,
     文件解析中:false,cardBatch:{isRunning:()=>false},hasPendingClarification:()=>false,canSubmit:()=>true,
     conversationId:'current',输入草稿:'PRIVATE_DRAFT',消息列表:[{正文:'PRIVATE_CHAT'}],targetSelectionMessage:-1,
@@ -516,7 +517,7 @@ test('real reminder page publishes current rows, toggle states, editor selection
   const Page=loadComponentLogic('pages/学习提醒页.ets','学习提醒页',
     {...textDependencies(tracker),visibleInterfaceItems, reminderTitle: title => title,
       CustomTransition:{getInstance:()=>({注销NavParam(){}})}});
-  const page=new Page();page.getUIContext=()=>({});page.interfaceMounted=true;
+  const page=Object.assign(new Page(), { recoveryMessage: '', resultMessage: '', resultUndo: null });page.getUIContext=()=>({});page.interfaceMounted=true;
   page.loading=true;
   page.publishInterface();assert.equal(tracker.snapshot()[0].busy,true);assert.deepEqual(tracker.snapshot()[0].optionIds,[]);
   page.loading=false;page.错误信息='read failed';page.publishInterface();

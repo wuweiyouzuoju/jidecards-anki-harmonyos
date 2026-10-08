@@ -7,13 +7,14 @@ import { expansionRevealDependencies, loadPlatformModule } from './platform-modu
 import { BURY_SUSPEND_MODE_BURY_USER, BURY_SUSPEND_MODE_SUSPEND } from '../../entry/src/main/ets/proto/messages/SchedulerMessages.ts';
 import { CARD_FLAGS, customFlagLabel } from '../../entry/src/main/ets/model/CardMarking.ts';
 import { OFFICIAL_ANNOUNCEMENTS_ENABLED } from '../../entry/src/main/ets/model/官方公告配置.ts';
+import { FEEDBACK_ACTIONS, resultUndoStatus } from '../../entry/src/main/ets/model/InteractionFeedback.ts';
 
 /** 较早的学习生命周期测试仍执行生产方法；补入实际界面观察依赖。标签替身只服务这些键值断言。 */
 export function appInterfaceDependencies() {
   const flagMenuChoices = loadPlatformModule('components/common/FlagMenuChoices.ets', 'flagMenuChoices', {
     CARD_FLAGS, customFlagLabel, $r: key => key, namedResourceText: (_context, key) => 'app.string.' + key
   });
-  return { appInterface: new AppInterfaceTracker(), OFFICIAL_ANNOUNCEMENTS_ENABLED, visibleInterfaceItems, studyInterfaceMenu, actionMenuRows, toggleActionMenuBranch,
+  return { appInterface: new AppInterfaceTracker(), FEEDBACK_ACTIONS, resultUndoStatus, OFFICIAL_ANNOUNCEMENTS_ENABLED, visibleInterfaceItems, studyInterfaceMenu, actionMenuRows, toggleActionMenuBranch,
     $r: key => key, CARD_FLAGS, customFlagLabel, flagMenuChoices,
     actionIcon: loadPlatformModule('utils/ActionIcons.ets', 'actionIcon', { $r: key => key }),
     namedResourceText: (_context, key) => 'app.string.' + key, BURY_SUSPEND_MODE_BURY_USER, BURY_SUSPEND_MODE_SUSPEND };

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { FILTERED_DECK_ACTIONS } from './FilteredDeckCommands';
+import { FEEDBACK_ACTIONS } from './InteractionFeedback';
 import { CARD_FLAGS } from './CardMarking';
 import { IMPORT_RESULT_ACTIONS } from './ImportResults';
 import { REVIEW_AUDIO_PREFERENCES } from './ReviewAudioPreferences';
@@ -82,6 +83,8 @@ export const WHITEBOARD_INTERFACE_ITEMS: AppInterfaceItem[] = [
 
 /** 菜单直接遍历这里的条目；标签、顺序和显隐由 UI 与 JIDE 共用。 */
 export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
+  { id: 'study_feedback', titleKey: 'feedback_title', parent: 'study', items: FEEDBACK_ACTIONS },
+  { id: 'browser_feedback', titleKey: 'feedback_title', parent: 'browser', items: FEEDBACK_ACTIONS },
   { id: 'review_audio', titleKey: 'settings_study_display', parent: 'settings',
     items: REVIEW_AUDIO_PREFERENCES.map((item): AppInterfaceItem => ({ id: item.id, titleKey: item.titleKey })) },
   { id: 'import_results', titleKey: 'transfer_result_title', instructionsKey: 'transfer_result_browse_hint', parent: 'home',

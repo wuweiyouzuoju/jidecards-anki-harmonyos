@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
+import { ActionStatus } from './ActionStatus';
 import { GLASS_COLORS_KEY, GLASS_HIGHLIGHT_COLORS } from '../../model/ThemeCatalog';
 import { ThemeLabelGlyph, themeLabelGlyphs } from './ThemeText';
 import { GlassSurface } from '../../utils/GlassSurface';
@@ -37,6 +38,7 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 
 @Component
 export struct 按下态按钮 {
+  @Prop feedback: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(GLASS_COLORS_KEY) private glassColors: string[] = GLASS_HIGHLIGHT_COLORS;
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
@@ -72,6 +74,7 @@ export struct 按下态按钮 {
   build() {
     Button() {
       Row({ space: 应用尺寸.间距_8 }) {
+        if (this.feedback !== '') { ActionStatus({ phase: this.feedback, tint: this.labelColor() }) }
         if (this.markerColor !== undefined) {
           Circle().width(10).height(10).fill(this.markerColor)
         }

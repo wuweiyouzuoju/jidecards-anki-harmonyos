@@ -3,6 +3,7 @@ import { PressFeedback } from '../../utils/PressFeedback';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { localizedResourceText } from '../../utils/UiFeedback';
 import { 颜色键 } from '../../model/颜色主题';
+import { ActionStatus } from './ActionStatus';
 
 /** 主操作按钮统一几何与反馈；宿主决定可用状态、忙碌文案及业务动作。 */
 @Component
@@ -12,6 +13,7 @@ export struct PrimaryActionButton {
   @Prop label: ResourceStr = '';
   @Prop isInteractive: boolean = true;
   @Prop tint: ResourceColor | undefined = undefined;
+  @Prop feedback: string = '';
   onAction: () => void = (): void => {};
 
   private activate(): void {
@@ -21,7 +23,12 @@ export struct PrimaryActionButton {
   private resolvedTint(): ResourceColor { return this.tint ?? this.primaryBackground; }
 
   build() {
-    Button(this.label)
+    Button() {
+      Row({ space: 8 }) {
+        if (this.feedback !== '') { ActionStatus({ phase: this.feedback, tint: '#FFFFFF' }) }
+        Text(this.label).fontSize(应用尺寸.字号_按钮).fontColor('#FFFFFF').maxLines(1)
+      }.justifyContent(FlexAlign.Center)
+    }
       .width('100%')
       .height(应用尺寸.按钮高度)
       .fontSize(应用尺寸.字号_按钮)
