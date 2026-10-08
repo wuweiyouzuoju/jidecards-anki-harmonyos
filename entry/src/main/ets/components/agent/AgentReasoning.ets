@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { disclosureAnimation } from '../../utils/AppMotion';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { DisclosureChevron } from '../common/DisclosureChevron';
@@ -45,7 +46,7 @@ export struct AgentReasoning {
       Row({ space: 应用尺寸.间距_8 }) {
         DisclosureChevron({ tint: $r('app.color.text_secondary') })
           .rotate({ angle: this.expanded ? 90 : 0 })
-          .animation({ duration: 150, curve: Curve.EaseOut }).flexShrink(0)
+          .animation(disclosureAnimation()).flexShrink(0)
         Text(this.title).fontSize(应用尺寸.字号_正文_小)
           .fontColor($r('app.color.text_secondary')).layoutWeight(1)
       }.width('100%').constraintSize({ minHeight: 应用尺寸.按钮高度 })

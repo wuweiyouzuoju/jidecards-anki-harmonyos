@@ -52,6 +52,7 @@ export const appThemeColorSession = {};
 export async function 设置FSRS开启状态() { throw Error('unexpected setting write'); }
 export async function saveCardTextSize() { throw Error('unexpected setting write'); }
 export async function saveDeckListStyle() { throw Error('unexpected setting write'); }
+export async function saveMotionStyle() { throw Error('unexpected setting write'); }
 export function legacyDeckListStyle() { return 'single_wide'; }
 export async function saveStudyHaptics() { throw Error('unexpected setting write'); }
 export class LocalPreferenceWriteError extends Error {}
@@ -65,7 +66,7 @@ export async function 完成导出() {throw Error('unexpected subset save');}
 const stubUrl = 'data:text/javascript;base64,' + Buffer.from(stub).toString('base64');
 const names = ['AgentTransport','DeepSeekAdapter','OpenAIAdapter','CustomAdapter','AgentWorkspaceStore','WikimediaImageService',
  '牌组服务','笔记类型服务','搜索服务','笔记服务','卡片服务','标签服务','统计服务','AppThemeService','FSRS控制器',
- 'CardTextSizeStore','DeckListAppearanceStore','StudyHaptics','LocalPreferenceWrite','牌组顺序存储',
+ 'CardTextSizeStore','DeckListAppearanceStore','MotionStyleStore','StudyHaptics','LocalPreferenceWrite','牌组顺序存储',
  'ReviewPreferencesService','StudyControlsService','数据迁移服务','FsrsService','AnkiDeckOptions','FilteredDeckService'];
 register('data:text/javascript;base64,' + Buffer.from(`export function resolve(s,c,next) {
  if (${JSON.stringify(names)}.some(n=>s.endsWith('/'+n))) return {url:${JSON.stringify(stubUrl)},shortCircuit:true};

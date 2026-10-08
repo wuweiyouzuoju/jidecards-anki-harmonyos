@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { disclosureAnimation } from '../../utils/AppMotion';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 
@@ -36,7 +37,7 @@ export struct AgentDisclosureCard {
         }
         DisclosureChevron({ tint: $r('app.color.text_tertiary') })
           .rotate({ angle: this.expanded ? 90 : 0 })
-          .animation({ duration: 150, curve: Curve.EaseOut })
+          .animation(disclosureAnimation())
           .flexShrink(0)
       }
       .width('100%')

@@ -389,7 +389,7 @@ test('an in-flight Agent turn is cancellable from the send button and exposes lo
   const page = read('entry/src/main/ets/pages/AI制卡页.ets') + read('entry/src/main/ets/model/agent/AgentConversationView.ts');
   assert.match(page, /private 取消当前请求\(\): void/);
   assert.match(page, /this\.agentRunner\.cancel\(\)/);
-  assert.match(page, /Button\(this\.interfaceLabel\('submit'\)\)/);
+  assert.match(page, /ActionStatus\([\s\S]*Text\(this\.interfaceLabel\('submit'\)\)/);
   assert.match(read('entry/src/main/ets/model/AppInterface.ts'), /item\.id === 'submit' && context\.processing \? 'ai_agent_cancel'/);
   assert.match(page, /if \(this\.处理中\) \{ this\.取消当前请求\(\); \}/);
   assert.match(page, /ai_agent_web_search_unsupported/);

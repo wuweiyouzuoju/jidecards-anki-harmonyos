@@ -57,6 +57,7 @@ export struct AgentActionCard {
     if (id === 'color_theme') { return $r('app.string.appearance_color_theme'); }
     if (id === 'card_text_size') { return $r('app.string.card_text_size'); }
     if (id === 'deck_list_style') { return $r('app.string.deck_width'); }
+    if (id === 'motion_style') { return $r('app.string.motion_style'); }
     if (id === 'study_haptics') { return $r('app.string.settings_study_haptics'); }
     return $r('app.string.settings_fsrs_label');
   }
@@ -70,6 +71,9 @@ export struct AgentActionCard {
     return $r('app.string.ai_agent_setting_device_scope');
   }
   private settingValue(value: string, _locale: string = this.uiLanguage): string {
+    if (this.setting().settingId === 'motion_style') {
+      return namedResourceText(this.getUIContext(), 'motion_style_' + value);
+    }
     if (this.setting().settingId === 'card_text_size') { return `${value}%`; }
     if (this.setting().settingId === 'deck_list_style') {
       return namedResourceText(this.getUIContext(), 'deck_style_' + value);

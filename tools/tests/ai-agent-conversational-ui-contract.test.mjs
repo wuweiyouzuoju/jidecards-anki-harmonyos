@@ -6,6 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { loadPlatformModule } from './platform-module-harness.mjs';
+import { motionApi } from './motion-harness.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
@@ -15,8 +16,8 @@ test('one disclosure component owns the conversation arrow and animation', () =>
   const page = read('entry/src/main/ets/pages/AI制卡页.ets') + read('entry/src/main/ets/model/agent/AgentConversationView.ts');
   assert.match(disclosure, /DisclosureChevron\(/);
   assert.match(disclosure, /expanded\s*\?\s*90\s*:\s*0/);
-  assert.match(disclosure, /duration:\s*150/);
-  assert.match(disclosure, /Curve\.EaseOut/);
+  assert.match(disclosure, /\.animation\(disclosureAnimation\(\)\)/);
+  assert.deepEqual(motionApi().disclosureAnimation(), { duration: 150, curve: 'ease-out' });
   assert.doesNotMatch(disclosure, /animateTo\(/);
   assert.match(page, /AgentDisclosureCard/);
   assert.doesNotMatch(page, /private 切换工具详情[\s\S]*animateTo\(/);

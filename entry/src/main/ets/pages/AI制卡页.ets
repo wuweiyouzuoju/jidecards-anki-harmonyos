@@ -1,3 +1,4 @@
+import { ActionStatus } from '../components/common/ActionStatus';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { navigationEnterOffset } from '../utils/AppMotion';
 import { WINDOW_SAFE_TOP_KEY } from '../model/WindowSafeLayout';
@@ -733,7 +734,7 @@ export struct AI制卡页 {
       optionIds: files.map((file): string => 'file-' + file.id), optionLabels: files.map((file): string => file.name.slice(0, 160)),
       optionsTotal: this.显示历史区 ? 0 : this.导入文件列表.length,
       busy: this.处理中 || this.文件解析中 || this.cardBatch.isRunning(), items: controls, controlsComplete: true,
-      values: [{ id: 'mode', value: this.pageMode }, { id: 'message_count', value: String(this.消息列表.length) },
+      values: [{ id: 'request_feedback', value: this.requestFeedback }, { id: 'mode', value: this.pageMode }, { id: 'message_count', value: String(this.消息列表.length) },
         { id: 'draft_length', value: String(this.输入草稿.length) },
         { id: 'pending_clarification', value: String(this.hasPendingClarification()) },
         { id: 'target_dialog_open', value: String(this.targetSelectionMessage >= 0) },
@@ -1032,6 +1033,7 @@ export struct AI制卡页 {
   }
 
   private 取消当前请求(): void {
+    this.requestFeedback = 'idle';
     this.navigationSession?.cancel();
     this.agentTurnVersion++;
     if (this.agentRunner !== null) { this.agentRunner.cancel(); }
@@ -1065,6 +1067,8 @@ export struct AI制卡页 {
   private 构建消息草稿上下文(message: 聊天消息): string {
     return buildProviderDraftContext(message);
   }
+
+  @State @Watch('publishInterface') private requestFeedback: string = 'idle';
 
   private async 发送(): Promise<void> {
     const 输入: string = this.输入草稿.trim();
@@ -1133,7 +1137,7 @@ export struct AI制卡页 {
       this.追加消息(userMessage);
     }
     this.storeClarificationAnswerMessageId(userMessageId);
-    this.处理中 = true;
+    this.处理中 = true; this.requestFeedback = 'busy';
     const aiMessage: 聊天消息 = this.空消息('ai', '', false);
     aiMessage.streaming = true;
     this.追加消息(aiMessage);
@@ -1187,10 +1191,14 @@ export struct AI制卡页 {
         }
         this.接收Agent草稿(aiIndex, result.drafts);
       }
+      if (turnVersion === this.agentTurnVersion) {
+        this.requestFeedback = result.status === 'completed' ? 'success' : 'idle';
+      }
       navigationSuccess = result.status === 'completed';
       return result;
     } catch (错误) {
       if (this.currentMessageIndex(conversationId, aiMessage.id) < 0) return null;
+      if (turnVersion === this.agentTurnVersion) this.requestFeedback = 'failure';
       const 异常: Error = 错误 instanceof Error ? 错误 : new Error(`${错误}`);
       const 错误文案: string = this.取Agent错误文案(异常);
       this.更新消息(aiIndex, (message: 聊天消息): void => {
@@ -2479,24 +2487,14 @@ export struct AI制卡页 {
 
         // 保存操作：本批次保存选中卡片
         if (ctx.message.卡片列表.length > 0) {
-          Button(ctx.message.批次保存中
-            ? $r('app.string.ai_card_saving_cards')
-            : (this.待保存数(ctx.messageIndex) > 0
-              ? this.取本地化格式($r('app.string.ai_card_save_selected_count'),
-                [`${this.待保存数(ctx.messageIndex)}`])
-              : $r('app.string.ai_card_save_selected')))
-            .width('100%')
-            .height(应用尺寸.按钮高度)
-            .fontSize(应用尺寸.字号_按钮)
-            .fontColor($r('app.color.action_on_primary'))
-            .backgroundColor(this.主色按钮背景色)
-            .borderRadius(应用尺寸.圆角_胶囊)
-            .enabled(this.待保存数(ctx.messageIndex) > 0 && !ctx.message.批次保存中)
-            .attributeModifier(new PressFeedback())
-            .stateEffect(false)
-            .onClick((): void => {
-              this.保存批次(ctx.messageIndex);
-            })
+          PrimaryActionButton({ label: ctx.message.批次保存中 ? $r('app.string.ai_card_saving_cards') :
+            this.待保存数(ctx.messageIndex) > 0 ? this.取本地化格式($r('app.string.ai_card_save_selected_count'),
+              [`${this.待保存数(ctx.messageIndex)}`]) : $r('app.string.ai_card_save_selected'),
+            feedback: ctx.message.批次保存中 ? 'busy' :
+              ctx.message.卡片列表.some((card: 卡片草稿): boolean => card.状态 === 'failed') ? 'failure' :
+              ctx.message.卡片列表.every((card: 卡片草稿): boolean => card.状态 === 'saved') ? 'success' : 'idle',
+            tint: this.主色按钮背景色, isInteractive: this.待保存数(ctx.messageIndex) > 0 && !ctx.message.批次保存中,
+            onAction: (): void => { this.保存批次(ctx.messageIndex); } })
         }
 
         if (ctx.message.批次结果 !== '') {
@@ -2775,7 +2773,12 @@ export struct AI制卡页 {
             .attributeModifier(new PressFeedback())
             .stateEffect(false)
             .onClick((): void => { this.选择并解析文件(); })
-          Button(this.interfaceLabel('submit'))
+          Button() {
+            Row({ space: 4 }) {
+              ActionStatus({ phase: this.处理中 ? 'busy' : this.requestFeedback, tint: $r('app.color.action_on_primary') })
+              Text(this.interfaceLabel('submit')).fontSize(应用尺寸.字号_按钮).fontColor($r('app.color.action_on_primary'))
+            }
+          }
             .height(应用尺寸.按钮高度)
             .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
             .constraintSize({ minWidth: 0 })

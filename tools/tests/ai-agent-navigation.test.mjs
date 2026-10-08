@@ -349,7 +349,7 @@ test('the real JIDE turn finalizer saves history before navigation and discards 
     appendAgentTimelineText:(timeline,kind,text)=>timeline.push({kind,text}),$r:key=>key
   };
   const Page=new Function(...Object.keys(deps),stripTypeScriptTypes('class Page {'+body+'}',{mode:'transform'})+';return Page;')(...Object.values(deps));
-  for (const mode of ['completed','failed','paused','awaiting_clarification','hidden','superseded','unsaved_form']) {
+  for (const mode of ['completed','failed','paused','awaiting_clarification','hidden','superseded','unsaved_form','cancelled_completed','cancelled_failed']) {
     const page=new Page(),events=[],opened=[];let seq=0;
     const nav=new AgentAppNavigationSession({context:()=>context,canNavigate:()=>true,collectionBusy:()=>false,
       assertReadableTarget(){},readTarget:async()=>'',navigate:request=>{
@@ -370,13 +370,18 @@ test('the real JIDE turn finalizer saves history before navigation and discards 
         if(mode==='superseded'){nav.beginTurn('打开提醒');await nav.queue('{"action":"open_reminders"}');}
       },
       sessionController:{run:async()=>{
+        assert.equal(page.requestFeedback,'busy');
         await nav.queue('{"action":"open_stats"}');events.push('queued');assert.deepEqual(opened,[]);
+        if(mode.startsWith('cancelled_')){page.agentTurnVersion++;page.requestFeedback='idle';}
+        if(mode==='cancelled_failed')throw Error('cancelled_provider_failed');
         if(mode==='failed')throw Error('provider_failed');
-        return {status:['hidden','superseded','unsaved_form'].includes(mode)?'completed':mode,drafts:[]};
+        return {status:['hidden','superseded','unsaved_form','cancelled_completed'].includes(mode)?'completed':mode,drafts:[]};
       }}
     });
     await page.runAgentTurn('打开统计','打开统计');
     assert.equal(page.处理中,false);assert.equal(page.消息列表.at(-1).streaming,false);
+    assert.equal(page.requestFeedback,mode==='failed'?'failure':
+      ['completed','hidden','superseded','unsaved_form'].includes(mode)?'success':'idle',mode);
     if(mode==='completed'){assert.deepEqual(events,['queued','saved','navigate']);assert.equal(opened[0].surface,'stats');}
     else assert.deepEqual(opened,[],mode);
     if(mode==='superseded'){await nav.finish(true);assert.equal(opened[0].surface,'reminders');}
