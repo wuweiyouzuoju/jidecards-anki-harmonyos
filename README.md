@@ -2,11 +2,14 @@
 
 [![CI](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/actions/workflows/ci.yml/badge.svg)](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/actions/workflows/ci.yml)
 [![License: AGPL-3.0-or-later](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](LICENSE)
+[![AppGallery 2.9.22](https://img.shields.io/badge/AppGallery-2.9.22-6750a4.svg)](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare)
 [![HarmonyOS NEXT](https://img.shields.io/badge/platform-HarmonyOS%20NEXT-0a59f7.svg)](https://www.harmonyos.com/)
 
 jidecards（中文名“记得闪卡”）是面向 HarmonyOS NEXT 的开源闪卡学习应用，支持鸿蒙手机、平板和电脑。导入 Anki 牌组后，可以离线复习、编辑资料、查看学习统计，并通过 AnkiWeb 同步。原生界面由 ArkTS/ArkUI 实现，集合、模板渲染、调度和同步复用锁定版本的 Anki Rust Core。
 
-**当前源码版本：2.9.10（versionCode 2991）**
+**应用市场正式版：2.9.22** · **当前源码版本：2.9.10（versionCode 2991）**
+
+每天一点，把知识记牢。用闪卡整理知识，以间隔复习建立自己的学习节奏。
 
 应用可在[华为应用市场](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare)搜索“记得闪卡”下载安装。仓库构建版本的唯一事实来源是 [AppScope/app.json5](AppScope/app.json5)；商店实际上架版本以 AppGallery 页面为准。
 
@@ -16,8 +19,13 @@ jidecards（中文名“记得闪卡”）是面向 HarmonyOS NEXT 的开源闪�
 
 > jidecards 是独立开源项目，与 Ankitects、AnkiWeb 或 AnkiDroid 无关，也未获得其认可。
 
+## 独立开发声明
+
+截至目前，记得闪卡（jidecards）的开发与维护仍全程由可塑性天赋（wuweiyouzuoju）本人独立完成，不涉及团队协作或多人共同开发。任何声称“带领团队完成记得闪卡开发”，或将本项目归为团队开发成果的表述，均与事实不符。
+
 ## 目录
 
+- [独立开发声明](#独立开发声明)
 - [项目特点](#项目特点)
 - [应用截图](#应用截图)
 - [安装与使用](#安装与使用)
@@ -79,22 +87,22 @@ JIDE 提供统一的自然语言对话入口，也可以从牌组、浏览或学
 
 ## 应用截图
 
-首页牌组、牌组详情、卡片复习与学习统计：
+以下七张为 **2.9.22 应用市场版**最新宣传图，覆盖首页、学习、编辑、浏览、学习操作、统计和提醒。点击图片可查看原图；其中 JIDE 入口需通过开发者调试开启。
 
 <p align="center">
-  <img src="screenshots/app-preview-01.png" width="180" alt="首页：今日学习进度与层级牌组列表" />
-  <img src="screenshots/app-deck-overview.png" width="180" alt="牌组详情：卡片数量与近七天学习记录" />
-  <img src="screenshots/app-study.png" width="180" alt="卡片复习：单词、发音、助记与四档评分" />
-  <img src="screenshots/app-statistics.png" width="180" alt="学习统计：今日概览、到期预测与学习日历" />
+  <a href="screenshots/promo-2.9.22/home.png"><img src="screenshots/promo-2.9.22/home.png" width="320" alt="记得闪卡 2.9.22：每天一点，把知识记牢；首页牌组与今日任务" /></a>
 </p>
 
-设置、学习提醒、桌面服务卡片与应用速览：
+<p align="center">
+  <a href="screenshots/promo-2.9.22/study.png"><img src="screenshots/promo-2.9.22/study.png" width="220" alt="图片与例句，让记忆更具体：卡片学习与输入答案" /></a>
+  <a href="screenshots/promo-2.9.22/editor.png"><img src="screenshots/promo-2.9.22/editor.png" width="220" alt="自由编辑，打造专属卡片：可视与源码编辑、图片音频公式" /></a>
+  <a href="screenshots/promo-2.9.22/browser.png"><img src="screenshots/promo-2.9.22/browser.png" width="220" alt="快速查找，卡片井然有序：卡片搜索与筛选" /></a>
+</p>
 
 <p align="center">
-  <img src="screenshots/app-settings.png" width="180" alt="设置：搜索与常规、复习、同步、外观等分类" />
-  <img src="screenshots/app-reminders.png" width="180" alt="学习提醒：定时提醒与启用开关" />
-  <img src="screenshots/app-preview-04.png" width="180" alt="手机桌面服务卡片：各学习状态的卡片数量" />
-  <img src="screenshots/app-introduction.png" width="180" alt="应用速览：闪卡入门、牌组来源与 Agent 制卡说明" />
+  <a href="screenshots/promo-2.9.22/actions.png"><img src="screenshots/promo-2.9.22/actions.png" width="220" alt="灵活操作，学习更加顺手：标星、旗标与今日跳过" /></a>
+  <a href="screenshots/promo-2.9.22/statistics.png"><img src="screenshots/promo-2.9.22/statistics.png" width="220" alt="复习有安排，进步看得见：FSRS 复习与学习统计" /></a>
+  <a href="screenshots/promo-2.9.22/reminders.png"><img src="screenshots/promo-2.9.22/reminders.png" width="220" alt="定时提醒，让学习成为习惯：提醒时间与待学待复习数量" /></a>
 </p>
 
 <details>
@@ -223,6 +231,8 @@ npm run verify             # 完整测试、双架构构建与签名 HAP
 ## 版本与发布
 
 当前源码版本由 [AppScope/app.json5](AppScope/app.json5) 中的 `versionName` 和 `versionCode` 定义。查看[更新记录](CHANGELOG.md)及[2.9.10 源码变更说明](docs/releases/2.9.10.md)；历史说明保留在 [docs/releases/](docs/releases/) 中。商店版本与源码版本分别维护，商店版本只在确认上架后更新。
+
+应用市场 2.9.22 的更新内容与下载入口见 [2.9.22 应用市场版说明](docs/releases/appgallery-2.9.22.md)。GitHub 的 `appgallery-v2.9.22` 标签用于记录本次版本介绍，自动生成的源码快照仍对应上方源码版本；应用安装请使用应用市场入口。
 
 发布前的构建、测试和设备验收要求见[开发状态与发布门禁](docs/DEVELOPMENT_PLAN.md)。CI 检查结果不代替实体设备验收；源码中的能力以当前发布开关为准。
 
