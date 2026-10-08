@@ -3,6 +3,7 @@ import { WINDOW_SAFE_TOP_KEY } from '../../model/WindowSafeLayout';
 import { PAGE_COMPACT_LAYOUT_KEY } from '../../model/AppLayoutState';
 import { AnchoredMenu } from './AnchoredMenu';
 import { AnchoredMenuItem } from './MenuItem';
+import { MenuSlideScope } from '../../model/MenuSlideSession';
 import { ActionMenuNode, ActionMenuRow, actionMenuRows } from './ActionMenuTree';
 import { ActionMenuPanelPlacement, actionMenuGroupInset, placeActionMenuGroups } from './ActionMenuLayout';
 import { MenuBubble } from './MenuBubble';
@@ -23,6 +24,7 @@ export interface CardActionMenuEntry extends MenuElement, ActionMenuNode {
 /** 右侧主菜单保持紧凑，左侧分组自然堆叠；宿主拥有展开状态和业务动作，公共外壳独占滚动。 */
 @Component
 export struct CardActionMenu {
+  private readonly slideScope: MenuSlideScope = new MenuSlideScope();
   @Prop @Watch('publishOcclusion') items: CardActionMenuEntry[] = [];
   @Prop @Watch('publishOcclusion') expandedIds: string[] = [];
   @Prop menuWidth: number = 应用尺寸.compactMenuWidth;
@@ -48,7 +50,8 @@ export struct CardActionMenu {
     if (current === undefined || !current.enabled || (this.primaryObscured() && current.depth === 0)) return;
     const entry: CardActionMenuEntry = this.rowItem(current);
     if (entry.children !== undefined) {
-      this.getUIContext().animateTo({ duration: 150, curve: Curve.EaseOut }, (): void => { this.onToggleBranch(entry); });
+      // 几何一次到位，面板独占入退场；不在每帧重测整组菜单或等动画结束才更新可操作性。
+      this.onToggleBranch(entry);
     } else this.onSelect(entry);
   }
 
@@ -151,7 +154,7 @@ export struct CardActionMenu {
 
   @Builder
   private menuRow(row: ActionMenuRow, index: number) {
-    AnchoredMenuItem({ label: this.rowItem(row).value, available: row.enabled && !(this.primaryObscured() && row.depth === 0), divider: index > 0,
+    AnchoredMenuItem({ label: this.rowItem(row).value, slideScope: this.slideScope, slideLayer: row.depth, available: row.enabled && !(this.primaryObscured() && row.depth === 0), divider: index > 0,
       icon: this.rowItem(row).icon, iconTint: this.rowItem(row).iconTint, labelAlignment: TextAlign.Start,
       selected: this.rowItem(row).selected === true,
       selectionUsesAccent: this.rowItem(row).selectionUsesAccent !== false,
@@ -159,12 +162,11 @@ export struct CardActionMenu {
       disclosure: row.node.children !== undefined, expanded: this.expandedIds.includes(row.node.id ?? ''),
       disclosureAngle: row.depth > 0 ? undefined : this.expandedIds.includes(row.node.id ?? '') ? 180 : 90,
       onSelect: (): void => { this.selectEntry(row); } })
-      .transition(TransitionEffect.opacity(0).animation({ duration: 150, curve: Curve.EaseOut }))
   }
 
   build() {
     Stack() {
-      AnchoredMenu({ menuWidth: this.totalWidth(), alignEnd: true, surfaceVisible: false,
+      AnchoredMenu({ menuWidth: this.totalWidth(), alignEnd: true, surfaceVisible: false, slideScope: this.slideScope,
         contentMaxWidth: this.contentWidth,
         topOffset: this.topOffset ?? 应用尺寸.pageContentTop(this.statusBarHeight, this.narrowDeckLayout, this.toolbarSafeTop),
         onClose: (): void => { this.dismissTop(); } }) {
@@ -180,7 +182,9 @@ export struct CardActionMenu {
                         this.menuRow(row, index)
                       }, (row: ActionMenuRow): string => `${row.key}-${row.enabled}-${this.rowItem(row).selected}`)
                     }
-                  }.onAreaChange((_old: Area, area: Area): void => { this.recordHeight(group.id ?? '', Number(area.height)); })
+                  }
+                  .transition(MenuSurface.popupTransition('100%', this.placements()[groupIndex].pointerCenter))
+                  .onAreaChange((_old: Area, area: Area): void => { this.recordHeight(group.id ?? '', Number(area.height)); })
                 }, (group: CardActionMenuEntry): string => group.id ?? '')
               }.width(this.groupWidth() + MenuSurface.pointerDepth)
             }
@@ -198,6 +202,7 @@ export struct CardActionMenu {
               }, (row: ActionMenuRow): string => `${row.key}-${row.enabled}-${this.rowItem(row).selected}`)
             }.width(this.primaryWidth()).attributeModifier(new MenuSurface())
             .position({ x: this.popupX(), y: 0 }).zIndex(1)
+            .transition(MenuSurface.popupTransition('100%', '0%'))
             .onAreaChange((_old: Area, area: Area): void => { this.recordHeight('popup', Number(area.height)); })
           }
         }.width(this.totalWidth()).height(this.layoutHeight())

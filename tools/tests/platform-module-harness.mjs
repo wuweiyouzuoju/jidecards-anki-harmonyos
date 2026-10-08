@@ -5,9 +5,12 @@ import { uiFeedback } from './ui-feedback-harness.mjs';
 import { CoreRpc } from '../../entry/src/main/ets/proto/generated/CoreRpc.ts';
 import * as privateRpc from '../../entry/src/main/ets/proto/generated/PrivateRpc.ts';
 import * as coreMessages from '../../entry/src/main/ets/proto/generated/CoreMessages.ts';
+import { MenuHoldController } from '../../entry/src/main/ets/model/MenuHoldController.ts';
+import { MenuSlideScope, menuSlideSession } from '../../entry/src/main/ets/model/MenuSlideSession.ts';
 
 function localeDependencies(dependencies) {
   return {
+    Scroller: class { currentOffset() { return {xOffset:0,yOffset:0}; } scrollBy() {} },
     CoreRpc, ...privateRpc, ...coreMessages,
     localizedResourceText: (context, _locale, resource, ...args) =>
       (dependencies.resourceText ?? uiFeedback.resourceText)(context, resource, ...args),
@@ -28,6 +31,7 @@ export function loadPlatformSource(source, exportName, dependencies) {
 /** 仅替换原生 Scroller；展开请求和取消仍执行公共控制器。 */
 export function expansionRevealDependencies() {
   return { ExpansionReveal: loadPlatformModule('utils/ExpansionReveal.ets', 'ExpansionReveal', {
+    Scroller: class { scrollEdge() {} }, Edge: { Bottom: 'bottom' }
   }) };
 }
 

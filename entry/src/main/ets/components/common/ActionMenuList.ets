@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { AnchoredMenuItem } from './MenuItem';
+import { MenuSlideScope } from '../../model/MenuSlideSession';
 
 export interface ActionMenuListItem {
   id: string;
@@ -14,6 +15,7 @@ export interface ActionMenuListItem {
 /** 平面动作菜单共用条目渲染；宿主提供唯一 ID、完整文案及业务回调。 */
 @Component
 export struct ActionMenuList {
+  slideScope: MenuSlideScope = new MenuSlideScope();
   @Prop items: ActionMenuListItem[] = [];
   onSelect: (id: string) => void = (_id: string): void => {};
 
@@ -27,7 +29,7 @@ export struct ActionMenuList {
   build() {
     Column() {
       ForEach(this.items, (item: ActionMenuListItem, index: number) => {
-        AnchoredMenuItem({ label: item.label, icon: item.icon, iconTint: item.iconTint,
+        AnchoredMenuItem({ label: item.label, icon: item.icon, iconTint: item.iconTint, slideScope: this.slideScope,
           available: item.available !== false, selected: item.selected === true, divider: index > 0,
           destructive: item.destructive === true,
           onSelect: (): void => { this.selectEntry(item.id); } })

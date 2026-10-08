@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { disclosureAnimation } from '../../utils/AppMotion';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { DisclosureChevron } from './DisclosureChevron';
 import { ActionIcon } from './ActionIcon';
@@ -7,10 +8,31 @@ import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { 颜色键 } from '../../model/颜色主题';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 import { ThemeLabelGlyph, themeLabelGlyphs } from './ThemeText';
+import { MenuSlideScope, MenuSlideTarget, menuSlideSession } from '../../model/MenuSlideSession';
 
 /** 菜单图标与标题成组对齐；表单展开行共用尺寸、箭头及选中主题色。 */
 @Component
 export struct AnchoredMenuItem {
+  slideScope: MenuSlideScope = new MenuSlideScope();
+  @Prop slideLayer: number = 0;
+  @State private slideHighlighted: boolean = false;
+  private slideTarget: MenuSlideTarget | null = null;
+  private slideArea(area: Area): void {
+    if (this.slideTarget === null) {
+      this.slideTarget = { scope: this.slideScope, rect: { left: 0, top: 0, width: 0, height: 0 },
+        offset: 0, layer: this.slideLayer, available: (): boolean => this.available,
+        highlight: (active: boolean): void => { this.slideHighlighted = active; },
+        select: (): void => { if (this.available && (!this.disclosure || !this.expanded)) this.onSelect(); },
+        enter: (): void => { if (this.available && this.disclosure && !this.expanded) this.onSelect(); }, branch: this.disclosure };
+      menuSlideSession.register(this.slideTarget);
+    }
+    this.slideTarget.rect = { left: Number(area.globalPosition.x), top: Number(area.globalPosition.y),
+      width: Number(area.width), height: Number(area.height) };
+    this.slideTarget.offset = this.slideScope.offset;
+    this.slideTarget.layer = this.slideLayer;
+    this.slideTarget.branch = this.disclosure;
+  }
+  aboutToDisappear(): void { if (this.slideTarget !== null) menuSlideSession.remove(this.slideTarget); this.slideTarget = null; }
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop label: ResourceStr = '';
   @Prop labelAlignment: TextAlign = TextAlign.Center;
@@ -93,15 +115,17 @@ export struct AnchoredMenuItem {
         if (this.disclosure) {
           DisclosureChevron({ tint: $r('app.color.text_secondary') })
             .rotate({ angle: this.disclosureAngle ?? (this.expanded ? 90 : 0), centerX: '50%', centerY: '50%' })
-            .animation({ duration: 150, curve: Curve.EaseOut })
+            .animation(disclosureAnimation())
             .margin({ right: 应用尺寸.menuHorizontalPadding })
             .hitTestBehavior(HitTestMode.None)
         }
       }
       .width('100%')
+      .backgroundColor(this.slideHighlighted ? $r('app.color.surface_sidebar') : Color.Transparent)
       .attributeModifier(new PressFeedback())
       .enabled(this.available)
-      .onClick((): void => { this.onSelect(); })
+      .onClick((): void => { if (this.available) this.onSelect(); })
+      .onAreaChange((_old: Area, area: Area): void => { this.slideArea(area); })
     }.width('100%')
   }
 }
