@@ -210,8 +210,12 @@ test('cancel, dismissal and leaving settings cannot enable automatic sync', asyn
     }
     await enabling;
     assert.deepEqual(state.saves, [], action);
-    assert.equal(group.autoSyncEnabled, false, action);
-    assert.equal(group.settingsSaving, false, action);
+    assert.equal(group.disposed, action === 'leave');
+    if (action !== 'leave') {
+      assert.equal(group.autoSyncEnabled, false, action);
+      assert.equal(group.settingsSaving, false, action);
+    }
+    // Destroyed UI has no display state to roll back; the compiled regression rejects late access.
   }
 });
 

@@ -1,3 +1,5 @@
+import { DialogFrame } from '../common/DialogFrame';
+import { NativeDialogHost, NativeDialogFactory, NativeDialogDismiss, NativeDialogPresentation } from '../common/NativeDialogHost';
 import { SurfaceTransition } from '../../utils/SurfaceTransition';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { settingsItemText } from '../../utils/SettingsStructureText';
@@ -111,11 +113,13 @@ export struct 同步分组 {
 
   private readonly 同步服务实例: 同步服务 = new 同步服务();
   /** 居中弹窗控制器：手机窗口宽度 < 600vp 时 bindSheet 只能底部弹出，改用 CustomDialog 保证居中。 */
-  private serverDialogController: CustomDialogController | null = null;
+  private readonly serverDialogController: NativeDialogHost = new NativeDialogHost();
 
-  private createServerDialog(): void {
-    this.serverDialogController?.close();
-    this.serverDialogController = new CustomDialogController({
+  // 字段初始化表达式才会转换 CustomDialog 的 @Link 引用；普通方法内会传入原始值并崩溃。
+  private readonly createServerDialog: NativeDialogFactory = (dismiss: NativeDialogDismiss): CustomDialogController => {
+    const presentation: NativeDialogPresentation = this.serverDialogController.presentation();
+    return new CustomDialogController({
+      onWillDismiss: dismiss,
       builder: 自定义服务器弹窗({
         serverInput: this.serverInput,
         serverError: this.serverError,
@@ -123,27 +127,21 @@ export struct 同步分组 {
         登录中: this.登录中,
         settingsSaving: this.settingsSaving,
         是否深色: this.是否深色,
-        onSave: (): void => { this.saveServer(); },
-        onClose: (): void => { this.closeServerDialog(); }
+        onSave: this.serverDialogController.guard((): void => { this.saveServer(); }),
+        onClose: this.serverDialogController.guard((): void => { this.closeServerDialog(); })
       }),
-      autoCancel: false,
-      alignment: DialogAlignment.Center,
-      openAnimation: SurfaceTransition.dialogEnterAnimation(), closeAnimation: SurfaceTransition.dialogExitAnimation(), customStyle: true,
-      onWillDismiss: (dismiss: DismissDialogAction): void => {
-        if (this.settingsSaving) {
-          return;
-        }
-        this.serverInput = this.savedServer;
-        this.serverError = '';
-        dismiss.dismiss();
-      }
+      width: presentation.width, height: presentation.height, maskColor: presentation.maskColor,
+      autoCancel: presentation.autoCancel,
+      alignment: presentation.alignment,
+      openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation, customStyle: presentation.customStyle,
     });
-  }
+  };
   // AnkiWeb 注册页（外部网址保留原文，与 设置面板.AnkiWeb网址 同款约定）
   private readonly 注册网址: string = 'https://ankiweb.net/account/signup';
 
   aboutToAppear(): void {
     this.disposed = false;
+    this.serverDialogController.activate();
     // 启动读取本地凭证：有 hkey 直接进 已登录（重启免登录）
     const 信息: 同步凭证信息 | null = loadVisibleSyncAuth();
     if (信息 !== null) {
@@ -173,6 +171,7 @@ export struct 同步分组 {
 
   aboutToDisappear(): void {
     this.disposed = true;
+    this.serverDialogController.dispose();
   }
 
   /** 后台媒体仍使用当前账户，完成前不接受凭证或服务器变更。 */
@@ -184,6 +183,7 @@ export struct 同步分组 {
 
   /** 先校验并保存目标，再允许登录，避免未保存地址和实际登录目标不一致。 */
   private async saveServer(): Promise<void> {
+    if (this.disposed) return;
     if (this.syncSettingsBusy()) return;
     if (this.登录中 || this.settingsSaving || this.当前状态 === '已登录') return;
     this.serverError = '';
@@ -195,29 +195,38 @@ export struct 同步分组 {
     }
     this.settingsSaving = true;
     try {
-      this.savedServer = await saveCustomSyncServer(this.serverInput);
+      const saved: string = await saveCustomSyncServer(this.serverInput);
+      if (this.disposed) return;
+      this.savedServer = saved;
       this.serverLoaded = true;
       this.serverInput = this.savedServer;
       this.密码输入 = '';
-      this.serverDialogController?.close();
+      this.serverDialogController.close();
     } catch (error) {
-      this.serverError = this.取本地化文本($r('app.string.sync_settings_save_failed'));
+      if (!this.disposed) {
+        this.serverError = this.取本地化文本($r('app.string.sync_settings_save_failed'));
+      }
     } finally {
-      this.settingsSaving = false;
+      if (!this.disposed) this.settingsSaving = false;
     }
   }
 
   /** 每次打开都从已保存地址开始，取消的草稿不会影响账号登录。 */
   private openServerDialog(): void {
-    if (this.登录中 || this.settingsSaving) return;
+    if (this.disposed || this.登录中 || this.settingsSaving) return;
     this.serverInput = this.savedServer;
     this.serverError = '';
-    this.createServerDialog(); this.serverDialogController?.open();
+    this.serverDialogController.open(this.createServerDialog, (): boolean => {
+      if (this.settingsSaving) return false;
+      this.serverInput = this.savedServer;
+      this.serverError = '';
+      return true;
+    });
   }
 
   /** 保存中不可关闭；取消时丢弃草稿和表单错误。 */
   private closeServerDialog(): void {
-    if (this.settingsSaving) return;
+    if (this.disposed || this.settingsSaving) return;
     this.serverInput = this.savedServer;
     this.serverError = '';
     this.serverDialogController?.close();
@@ -244,16 +253,18 @@ export struct 同步分组 {
           });
         });
         if (!confirmed || this.disposed) {
-          this.autoSyncEnabled = previous;
+          if (!this.disposed) this.autoSyncEnabled = previous;
           return;
         }
       }
       await saveAutoSyncEnabled(enabled);
     } catch (error) {
-      this.autoSyncEnabled = previous;
-      this.错误文本 = this.取本地化文本($r('app.string.sync_settings_save_failed'));
+      if (!this.disposed) {
+        this.autoSyncEnabled = previous;
+        this.错误文本 = this.取本地化文本($r('app.string.sync_settings_save_failed'));
+      }
     } finally {
-      this.settingsSaving = false;
+      if (!this.disposed) this.settingsSaving = false;
     }
   }
 
@@ -308,6 +319,7 @@ export struct 同步分组 {
   // 成功后调用 保存同步凭证 持久化凭证（密码绝不落盘）。
   // ========================================================
   private async 点击登录(): Promise<void> {
+    if (this.disposed) return;
     if (this.syncSettingsBusy()) return;
     if (!this.serverLoaded) {
       this.错误文本 = this.取本地化文本($r('app.string.sync_server_load_failed'));
@@ -318,21 +330,26 @@ export struct 同步分组 {
     }
     this.登录中 = true;
     this.错误文本 = '';
+    const username: string = this.用户名输入;
+    const password: string = this.密码输入;
+    const endpoint: string = this.savedServer;
     try {
       const 凭证: SyncAuth = await this.同步服务实例.同步登录(
-        this.用户名输入, this.密码输入, this.savedServer);
+        username, password, endpoint);
       const 信息: 同步凭证信息 = {
         hkey: 凭证.hkey,
-        username: this.用户名输入,
+        username: username,
         endpoint: 凭证.endpoint
       };
       保存同步凭证(信息);
+      if (this.disposed) return;
       this.鉴权凭证 = 凭证;
-      this.账号名 = this.用户名输入;
+      this.账号名 = username;
       this.密码输入 = '';
       this.错误文本 = '';
       this.当前状态 = '已登录';
     } catch (error) {
+      if (this.disposed) return;
       const 错误对象: Error = error instanceof Error ? error : new Error(`${error}`);
       const 后端错误类别编号: number | undefined = 错误对象 instanceof 后端错误 ? 错误对象.kind : undefined;
       const 类别 = 分类同步错误(错误对象, 后端错误类别编号);
@@ -346,26 +363,32 @@ export struct 同步分组 {
         this.错误文本 = `${this.取本地化文本($r('app.string.sync_error_generic'))} [kind=${后端错误类别编号 ?? -1}]：${错误对象.message}`;
       }
     } finally {
-      this.登录中 = false;
+      if (!this.disposed) this.登录中 = false;
     }
   }
 
   /** 注销：弹 AlertDialog 二次确认后清空本地凭证与面板状态，回登录表单。 */
   private 点击注销(): void {
+    if (this.disposed) return;
     if (this.syncSettingsBusy()) return;
+    const auth: SyncAuth | null = this.鉴权凭证;
+    let settled: boolean = false;
     this.getUIContext().showAlertDialog({
       title: this.取本地化文本($r('app.string.sync_logout')),
       message: this.取本地化文本($r('app.string.sync_logout_confirm_message')),
       autoCancel: false,
       alignment: DialogAlignment.Center,
+      cancel: (): void => { settled = true; },
       primaryButton: {
         value: $r('app.string.cancel'),
-        action: (): void => {}
+        action: (): void => { settled = true; }
       },
       secondaryButton: {
         value: $r('app.string.sync_logout'),
         fontColor: $r('app.color.error_text'),
         action: (): void => {
+          if (settled || auth !== this.鉴权凭证) return;
+          settled = true;
           this.确认注销();
         }
       }
@@ -374,6 +397,7 @@ export struct 同步分组 {
 
   /** 真正执行注销：清凭证 + 清状态 + 回 未登录。 */
   private 确认注销(): void {
+    if (this.disposed) return;
     if (this.syncSettingsBusy()) return;
     清除同步凭证();
     this.鉴权凭证 = null;
@@ -683,36 +707,33 @@ struct 自定义服务器弹窗 {
   onSave: () => void = (): void => {};
   onClose: () => void = (): void => {};
 
-  build() {
-    // 外层占满窗口，卡片再取 88%：与 AnkiWeb引导对话框 / 云端牌组弹窗 同结构，
-    // 百分比宽度才有确定的参照物。
-    Column() {
-      Column({ space: 应用尺寸.间距_12 }) {
-        DialogHeader({
-          title: $r('app.string.sync_server_label'),
-          actionLabel: $r('app.string.sync_server_save'),
-          actionEnabled: this.当前状态 === '未登录' && !this.登录中 && !this.settingsSaving,
-          closeEnabled: !this.settingsSaving,
-          onAction: (): void => { this.onSave(); },
-          onClose: (): void => { this.onClose(); }
-        })
-        this.服务器表单(设置面板色板_取(this.是否深色))
-        if (this.serverError !== '') {
-          Text(this.serverError)
-            .fontSize(12)
-            .fontColor(设置面板色板_取(this.是否深色).错误色)
-            .width('100%')
-        }
-      }
-      .width('88%')
-      .constraintSize({ maxWidth: 480, maxHeight: '88%' })
-      .padding(应用尺寸.间距_16)
-      .backgroundColor($r('app.color.surface_card'))
-      .borderRadius(应用尺寸.圆角_卡片)
-      .border(SurfaceBorder.options())
+  @Builder
+  private dialogHeader() {
+    DialogHeader({
+      title: $r('app.string.sync_server_label'),
+      actionLabel: $r('app.string.sync_server_save'),
+      actionEnabled: this.当前状态 === '未登录' && !this.登录中 && !this.settingsSaving,
+      closeEnabled: !this.settingsSaving,
+      onAction: (): void => { this.onSave(); },
+      onClose: (): void => { this.onClose(); }
+    })
+  }
+
+  @Builder
+  private dialogContent() {
+    this.服务器表单(设置面板色板_取(this.是否深色))
+    if (this.serverError !== '') {
+      Text(this.serverError)
+        .fontSize(12)
+        .fontColor(设置面板色板_取(this.是否深色).错误色)
+        .width('100%')
     }
-    .width('100%')
-    .alignItems(HorizontalAlign.Center)
+  }
+
+  build() {
+    DialogFrame({ nativeHost: true, maximumWidth: 应用尺寸.dialogMaxWidth,
+      canDismiss: !this.settingsSaving, onDismiss: (): void => { this.onClose(); },
+      header: () => { this.dialogHeader(); }, content: () => { this.dialogContent(); } })
   }
 
   @Builder
