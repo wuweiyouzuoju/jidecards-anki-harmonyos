@@ -1,11 +1,8 @@
-import { SurfaceTransition } from '../../utils/SurfaceTransition';
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { SurfaceBorder } from '../../utils/SurfaceBorder';
-import { PressFeedback } from '../../utils/PressFeedback';
-import { DialogBackdrop } from '../common/DialogBackdrop';
 import { resourceText } from '../../utils/UiFeedback';
-import { ThemeTextSpans, themeTextKey } from '../common/ThemeText';
-import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
+import { EMPTY_CARDS_ACTIONS } from '../../model/AppInterface';
+import { DialogFrame } from '../common/DialogFrame';
+import { 按下态按钮 } from '../common/按下态按钮';
 
 import { DialogHeader } from '../common/DialogHeader';
 // ========================================================
@@ -49,10 +46,9 @@ export struct 空卡列表面板 {
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
 
   private handleBackRequest(): void {
-    if (!(this.检查中 || this.处理中)) this.onClose();
+    if (!this.disposed && !this.处理中) this.onClose();
   }
 
-  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
   onClose: () => void = (): void => {};
 
@@ -66,10 +62,13 @@ export struct 空卡列表面板 {
 
   private readonly 渲染服务: 卡片渲染服务 = new 卡片渲染服务();
   private readonly 卡片服务实例: 卡片服务 = new 卡片服务();
+  private disposed: boolean = false;
+  private confirmingDelete: boolean = false;
 
   aboutToAppear(): void {
     this.执行检查();
   }
+  aboutToDisappear(): void { this.disposed = true; }
 
   private 取本地化文本(资源: Resource, _locale: string = this.uiLanguage): string {
     return resourceText(this.getUIContext(), 资源);
@@ -114,13 +113,16 @@ export struct 空卡列表面板 {
   }
 
   private async 执行检查(): Promise<void> {
-    if (this.检查中 || this.处理中) {
-      return;
-    }
+    if (this.disposed || this.检查中 || this.处理中 || this.confirmingDelete) return;
+    await this.loadReport();
+  }
+
+  private async loadReport(): Promise<void> {
     this.检查中 = true;
     this.错误信息 = '';
     try {
       const 报告 = await this.渲染服务.获取空卡报告();
+      if (this.disposed) return;
       this.笔记列表 = 报告.笔记列表;
       const 初始选中: boolean[] = [];
       for (let i = 0; i < this.笔记列表.length; i++) {
@@ -129,35 +131,45 @@ export struct 空卡列表面板 {
       this.选中状态 = 初始选中;
       this.已检查 = true;
     } catch (error) {
-      this.错误信息 = error instanceof Error ? error.message : `${error}`;
+      if (!this.disposed) this.错误信息 = error instanceof Error ? error.message : `${error}`;
     } finally {
-      this.检查中 = false;
+      if (!this.disposed) this.检查中 = false;
     }
   }
 
   private 确认删除(): void {
     const 选中数 = this.选中数量();
-    if (选中数 === 0 || this.处理中) {
+    if (this.disposed || 选中数 === 0 || this.检查中 || this.处理中 || this.confirmingDelete) {
       return;
     }
+    const ids: number[] = this.selectedCardIds();
+    this.confirmingDelete = true;
+    let settled: boolean = false;
+    const finish = (): boolean => {
+      if (settled) return false;
+      settled = true; this.confirmingDelete = false; return true;
+    };
+    try {
     this.getUIContext().showAlertDialog({
       title: this.取本地化文本($r('app.string.empty_cards_delete')),
       message: this.取本地化带参文本($r('app.string.empty_cards_confirm_delete'), [选中数]),
       autoCancel: true,
       alignment: DialogAlignment.Center,
+      cancel: (): void => { finish(); },
       primaryButton: {
         value: this.取本地化文本($r('app.string.cancel')),
-        action: (): void => {}
+        action: (): void => { finish(); }
       },
       secondaryButton: {
         value: this.取本地化文本($r('app.string.empty_cards_delete')),
         fontColor: $r('app.color.error_text'),
-        action: (): void => { this.执行删除(); }
+        action: (): void => { if (finish()) this.执行删除(ids); }
       }
     });
+    } catch (error) { finish(); }
   }
 
-  private async 执行删除(): Promise<void> {
+  private selectedCardIds(): number[] {
     const 选中卡片IDs: number[] = [];
     for (let i = 0; i < this.笔记列表.length; i++) {
       if (this.选中状态[i]) {
@@ -167,7 +179,11 @@ export struct 空卡列表面板 {
         }
       }
     }
-    if (选中卡片IDs.length === 0 || this.处理中) {
+    return 选中卡片IDs;
+  }
+
+  private async 执行删除(选中卡片IDs: number[]): Promise<void> {
+    if (this.disposed || 选中卡片IDs.length === 0 || this.检查中 || this.处理中) {
       return;
     }
     this.处理中 = true;
@@ -176,11 +192,11 @@ export struct 空卡列表面板 {
       await this.卡片服务实例.删除卡片(选中卡片IDs);
       // 通知首页刷新牌组计数（本面板挂在设置页内，无 onPop 可依赖）
       AppStorage.setOrCreate<number>('需要刷新主页', Date.now());
-      await this.执行检查();
+      if (!this.disposed) await this.loadReport();
     } catch (error) {
-      this.错误信息 = error instanceof Error ? error.message : `${error}`;
+      if (!this.disposed) this.错误信息 = error instanceof Error ? error.message : `${error}`;
     } finally {
-      this.处理中 = false;
+      if (!this.disposed) this.处理中 = false;
     }
   }
 
@@ -215,143 +231,111 @@ export struct 空卡列表面板 {
     .height(56)
   }
 
-  build() {
-    Stack() {
-      // 磨砂玻璃遮罩层
-      DialogBackdrop()
-        .onClick(() => {
-          if (!this.检查中 && !this.处理中) {
-            this.onClose();
-          }
-        })
-        .transition(SurfaceTransition.backdrop())
+  @Builder
+  private panelHeader() {
+    DialogHeader({
+      title: $r('app.string.empty_cards_title'),
+      actionLabel: this.检查中 ? $r('app.string.empty_cards_checking') :
+        $r('app.string.' + EMPTY_CARDS_ACTIONS.refresh.titleKey),
+      actionIcon: $r('app.media.' + EMPTY_CARDS_ACTIONS.refresh.iconKey),
+      actionEnabled: !this.检查中 && !this.处理中,
+      closeLabel: $r('app.string.close'),
+      closeEnabled: !this.处理中,
+      onClose: () => { this.handleBackRequest(); },
+      onAction: () => { this.执行检查(); }
+    })
+  }
 
-      Column({ space: 应用尺寸.间距_16 }) {
-        // 固定标题操作栏
-        DialogHeader({
-          title: $r('app.string.empty_cards_title'),
-          actionLabel: this.检查中 ? $r('app.string.empty_cards_checking') : $r('app.string.empty_cards_refresh'),
-          actionEnabled: !this.检查中 && !this.处理中,
-          closeLabel: $r('app.string.close'),
-          closeEnabled: !this.检查中 && !this.处理中,
-          onClose: () => { this.onClose(); },
-          onAction: () => { this.执行检查(); }
-        })
+  @Builder
+  private panelContent() {
+    // 说明文案
+    Text($r('app.string.empty_cards_description'))
+      .fontSize(应用尺寸.字号_正文_小)
+      .fontColor($r('app.color.text_secondary'))
+      .width('100%')
 
-        // 说明文案
-        Text($r('app.string.empty_cards_description'))
-          .fontSize(应用尺寸.字号_正文_小)
+    // busy 指示
+    if (this.检查中) {
+      Row({ space: 应用尺寸.间距_8 }) {
+        LoadingProgress()
+          .width(20)
+          .height(20)
+          .color($r('app.color.text_secondary'))
+        Text($r('app.string.empty_cards_checking'))
+          .fontSize(应用尺寸.字号_正文_中)
           .fontColor($r('app.color.text_secondary'))
-          .width('100%')
-
-        // 刷新按钮
-
-        // busy 指示
-        if (this.检查中) {
-          Row({ space: 应用尺寸.间距_8 }) {
-            LoadingProgress()
-              .width(20)
-              .height(20)
-              .color($r('app.color.text_secondary'))
-            Text($r('app.string.empty_cards_checking'))
-              .fontSize(应用尺寸.字号_正文_中)
-              .fontColor($r('app.color.text_secondary'))
-          }
-          .width('100%')
-          .justifyContent(FlexAlign.Center)
-        }
-
-        // 错误信息
-        if (this.错误信息 !== '') {
-          Text(this.错误信息)
-            .fontSize(应用尺寸.字号_正文_中)
-            .fontColor($r('app.color.error_text'))
-            .width('100%')
-        }
-
-        // 检查结果
-        if (this.已检查) {
-          Scroll() {
-            Column({ space: 应用尺寸.间距_4 }) {
-              Row() {
-                Text(this.取本地化带参文本($r('app.string.empty_cards_count'), [this.笔记列表.length]))
-                  .fontSize(应用尺寸.字号_正文)
-                  .fontColor($r('app.color.text_primary'))
-                  .fontWeight(FontWeight.Medium)
-                  .layoutWeight(1)
-                if (this.笔记列表.length > 0) {
-                  Button() {
-                    Text() { ForEach([themeTextKey(this.全选状态() ? $r('app.string.empty_cards_deselect_all') : $r('app.string.empty_cards_select_all'), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(this.全选状态() ? $r('app.string.empty_cards_deselect_all') : $r('app.string.empty_cards_select_all'), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }.fontColor(this.主色按钮背景).fontSize(应用尺寸.字号_正文_小)
-                  }
-                    .type(ButtonType.Normal)
-                    .backgroundColor(Color.Transparent)
-                    .fontColor(this.主色按钮背景)
-                    .fontSize(应用尺寸.字号_正文_小)
-                    .attributeModifier(new PressFeedback())
-                    .stateEffect(false)
-                    .onClick(() => { this.切换全选(); })
-                }
-              }
-              .width('100%')
-
-              if (this.笔记列表.length === 0) {
-                Text($r('app.string.empty_cards_none'))
-                  .fontSize(应用尺寸.字号_正文_小)
-                  .fontColor($r('app.color.text_secondary'))
-                  .width('100%')
-              }
-
-              ForEach(this.笔记列表, (笔记: 笔记空卡, 索引: number) => {
-                this.笔记项行(索引)
-              }, (笔记: 笔记空卡, 索引: number): string => `${笔记.笔记ID}|${this.选中状态[索引] ? 1 : 0}`)
-            }
-            .width('100%')
-          }
-          .width('100%')
-          .constraintSize({ maxHeight: 320 })
-          .scrollBar(BarState.Auto)
-          .edgeEffect(EdgeEffect.Spring)
-
-          // 删除按钮
-          Button($r('app.string.empty_cards_delete'))
-            .type(ButtonType.Normal)
-            .alignSelf(ItemAlign.End)
-            .height(应用尺寸.按钮高度)
-            .fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.error_text'))
-            .backgroundColor(Color.Transparent)
-            .borderRadius(应用尺寸.圆角_胶囊)
-            .enabled(this.选中数量() > 0 && !this.处理中)
-            .opacity(this.选中数量() > 0 && !this.处理中 ? 1 : 0.4)
-            .attributeModifier(new PressFeedback(this.选中数量() > 0 && !this.处理中 ? 1 : 0.4))
-            .stateEffect(false)
-            .onClick(() => { this.确认删除(); })
-
-          // 处理中指示
-          if (this.处理中) {
-            Row({ space: 应用尺寸.间距_8 }) {
-              LoadingProgress()
-                .width(20)
-                .height(20)
-                .color($r('app.color.text_secondary'))
-              Text($r('app.string.empty_cards_processing'))
-                .fontSize(应用尺寸.字号_正文_中)
-                .fontColor($r('app.color.text_secondary'))
-            }
-            .width('100%')
-            .justifyContent(FlexAlign.Center)
-          }
-        }
       }
-      .width('88%')
-      .constraintSize({ maxWidth: 480, maxHeight: '88%' })
-      .padding(应用尺寸.面板内边距)
-      .backgroundColor($r('app.color.surface_card'))
-      .borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
-      .onClick(() => {})
-      .transition(SurfaceTransition.dialog())
+      .width('100%')
+      .justifyContent(FlexAlign.Center)
     }
-    .width('100%')
-    .height('100%')
+
+    // 错误信息
+    if (this.错误信息 !== '') {
+      Text(this.错误信息)
+        .fontSize(应用尺寸.字号_正文_中)
+        .fontColor($r('app.color.error_text'))
+        .width('100%')
+    }
+
+    // 检查结果
+    if (this.已检查) {
+        Column({ space: 应用尺寸.间距_4 }) {
+          Row() {
+            Text(this.取本地化带参文本($r('app.string.empty_cards_count'), [this.笔记列表.length]))
+              .fontSize(应用尺寸.字号_正文)
+              .fontColor($r('app.color.text_primary'))
+              .fontWeight(FontWeight.Medium)
+              .layoutWeight(1)
+            if (this.笔记列表.length > 0) {
+              按下态按钮({ 文案: this.全选状态() ?
+                $r('app.string.' + EMPTY_CARDS_ACTIONS.deselect_all.titleKey) :
+                $r('app.string.' + EMPTY_CARDS_ACTIONS.select_all.titleKey),
+                themeText: true, 字色: this.主色按钮背景, singleLine: true,
+                是否启用: !this.检查中 && !this.处理中,
+                点击回调: (): void => { this.切换全选(); } })
+            }
+          }
+          .width('100%')
+
+          if (this.笔记列表.length === 0) {
+            Text($r('app.string.empty_cards_none'))
+              .fontSize(应用尺寸.字号_正文_小)
+              .fontColor($r('app.color.text_secondary'))
+              .width('100%')
+          }
+
+          ForEach(this.笔记列表, (笔记: 笔记空卡, 索引: number) => {
+            this.笔记项行(索引)
+          }, (笔记: 笔记空卡, 索引: number): string => `${笔记.笔记ID}|${this.选中状态[索引] ? 1 : 0}`)
+        }
+        .width('100%')
+
+      按下态按钮({ 文案: $r('app.string.' + EMPTY_CARDS_ACTIONS.delete.titleKey),
+        图标: $r('app.media.' + EMPTY_CARDS_ACTIONS.delete.iconKey),
+        字色: $r('app.color.error_text'),
+        是否启用: this.选中数量() > 0 && !this.检查中 && !this.处理中,
+        点击回调: (): void => { this.确认删除(); } })
+        .alignSelf(ItemAlign.End)
+
+      // 处理中指示
+      if (this.处理中) {
+        Row({ space: 应用尺寸.间距_8 }) {
+          LoadingProgress()
+            .width(20)
+            .height(20)
+            .color($r('app.color.text_secondary'))
+          Text($r('app.string.empty_cards_processing'))
+            .fontSize(应用尺寸.字号_正文_中)
+            .fontColor($r('app.color.text_secondary'))
+        }
+        .width('100%')
+        .justifyContent(FlexAlign.Center)
+      }
+    }
+  }
+
+  build() {
+    DialogFrame({ header: () => { this.panelHeader(); }, content: () => { this.panelContent(); },
+      canDismiss: !this.处理中, onDismiss: (): void => { this.handleBackRequest(); } })
   }
 }

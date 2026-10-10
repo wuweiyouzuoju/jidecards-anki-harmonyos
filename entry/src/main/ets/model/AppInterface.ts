@@ -38,6 +38,21 @@ export interface AppInterfaceSurface {
   items: AppInterfaceItem[];
 }
 
+/** 类型管理卡片与 JIDE 共用操作名称和图标；实际写入仍由管理会话确认。 */
+export const NOTETYPE_MANAGEMENT_ACTIONS: Record<string, AppInterfaceItem> = {
+  add: { id: 'add', titleKey: 'notetype_mgmt_add', iconKey: 'ic_home_new' },
+  copy: { id: 'copy', titleKey: 'notetype_clone' },
+  edit: { id: 'edit', titleKey: 'notetype_mgmt_edit', iconKey: 'ic_study_edit', opens: 'notetype_editor' },
+  delete: { id: 'delete', titleKey: 'notetype_mgmt_delete', iconKey: 'ic_study_delete' }
+};
+
+export const EMPTY_CARDS_ACTIONS: Record<string, AppInterfaceItem> = {
+  refresh: { id: 'refresh', titleKey: 'empty_cards_refresh', iconKey: 'ic_home_sync' },
+  select_all: { id: 'select_all', titleKey: 'empty_cards_select_all' },
+  deselect_all: { id: 'deselect_all', titleKey: 'empty_cards_deselect_all' },
+  delete: { id: 'delete', titleKey: 'empty_cards_delete', iconKey: 'ic_study_delete' }
+};
+
 export const STATS_INTERFACE_SECTIONS: AppInterfaceItem[] = [
   { id: 'today', titleKey: 'stats_section_today', opens: 'stats_today' },
   { id: 'forecast', titleKey: 'stats_section_forecast', opens: 'stats_forecast' },
@@ -86,6 +101,18 @@ export const WHITEBOARD_INTERFACE_ITEMS: AppInterfaceItem[] = [
 
 /** 菜单直接遍历这里的条目；标签、顺序和显隐由 UI 与 JIDE 共用。 */
 export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
+  { id: 'notetype_editor', titleKey: 'notetype_editor_title', instructionsKey: 'notetype_editor_tokens', parent: 'notetype_management', items: [
+    { id: 'fields', titleKey: 'notetype_editor_fields' },
+    { id: 'templates', titleKey: 'notetype_editor_templates' },
+    { id: 'front', titleKey: 'notetype_editor_front_template' },
+    { id: 'back', titleKey: 'notetype_editor_back_template' },
+    { id: 'tokens', titleKey: 'notetype_editor_tokens' },
+    { id: 'css', titleKey: 'notetype_editor_css' }
+  ] },
+  { id: 'notetype_management', titleKey: 'notetype_mgmt_title', parent: 'settings',
+    items: Object.values(NOTETYPE_MANAGEMENT_ACTIONS) },
+  { id: 'empty_cards', titleKey: 'empty_cards_title', instructionsKey: 'empty_cards_description', parent: 'settings',
+    items: Object.values(EMPTY_CARDS_ACTIONS) },
   { id: 'directory_tree', titleKey: 'directory_title', instructionsKey: 'directory_instructions', parent: 'app', items: [
     { id: 'search', titleKey: 'directory_search' },
     { id: 'expand', titleKey: 'directory_expand' },

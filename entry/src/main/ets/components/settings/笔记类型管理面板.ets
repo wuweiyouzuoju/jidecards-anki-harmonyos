@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { noteTypeText } from '../../utils/NoteTypeText';
-import { LengthMetrics } from '@kit.ArkUI';
-import { PressFeedback } from '../../utils/PressFeedback';
 import { showToastSafely, resourceText } from '../../utils/UiFeedback';
-import { ThemeTextSpans, themeTextKey } from '../common/ThemeText';
-import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
+import { IconActionButton } from '../common/IconActionButton';
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
+import { NOTETYPE_MANAGEMENT_ACTIONS } from '../../model/AppInterface';
 
 import { DialogHeader } from '../common/DialogHeader';
 import { DialogFrame } from '../common/DialogFrame';
@@ -57,7 +56,6 @@ export struct 笔记类型管理面板 {
     this.requestClose();
   }
 
-  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
   onClose: () => void = (): void => {};
   onEdit: (id: number, name: string) => void = (id: number, name: string): void => {};
@@ -163,7 +161,7 @@ export struct 笔记类型管理面板 {
   }
 
   private async requestClose(): Promise<void> {
-    if (!this.mounted || this.加载中 || this.处理中 || this.confirmingClose) return;
+    if (!this.mounted || this.处理中 || this.confirmingClose) return;
     if (!this.createVisible) { this.onClose(); return; }
     if (this.createName === this.createInitialName && this.stockKind === 0) { this.createVisible = false; return; }
     this.confirmingClose = true;
@@ -174,43 +172,39 @@ export struct 笔记类型管理面板 {
   @Builder
   private 类型行(类型: NotetypeNameId) {
     Column({ space: 应用尺寸.间距_8 }) {
+      Row({ space: 应用尺寸.间距_8 }) {
         Text(noteTypeText(this.getUIContext(), 类型.name))
           .fontSize(应用尺寸.字号_正文)
           .fontColor(设置面板色板_取(this.isDark).主文字)
-          .maxLines(1)
+          .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .width('100%')
+          .layoutWeight(1)
           .textAlign(TextAlign.Start)
+        IconActionButton({ source: $r('app.media.' + NOTETYPE_MANAGEMENT_ACTIONS.delete.iconKey),
+          label: $r('app.string.' + NOTETYPE_MANAGEMENT_ACTIONS.delete.titleKey), cornerAligned: true,
+          glyphColor: 设置面板色板_取(this.isDark).错误色,
+          isInteractive: !this.处理中 && !this.加载中,
+          onAction: (): void => { this.确认删除(类型); } })
+      }.width('100%')
 
-      Flex({ wrap: FlexWrap.Wrap, space: { main: LengthMetrics.vp(8), cross: LengthMetrics.vp(8) } }) {
-      按下态按钮({ 文案: $r('app.string.notetype_clone'), 是否启用: !this.加载中 && !this.处理中,
-        点击回调: (): void => { this.openCreate(类型.id, 类型.name); } })
-      // 编辑按钮
-      Text() { ForEach([themeTextKey($r('app.string.notetype_mgmt_edit'), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans($r('app.string.notetype_mgmt_edit'), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }
-        .fontSize(应用尺寸.字号_正文_小)
-        .fontColor(this.主色按钮背景)
-        .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-        .attributeModifier(new PressFeedback())
-        .enabled(!this.处理中 && !this.加载中)
-        .onClick(() => {
-          this.onEdit(类型.id, 类型.name);
-        })
-
-      // 删除按钮
-      Text($r('app.string.notetype_mgmt_delete'))
-        .fontSize(应用尺寸.字号_正文_小)
-        .fontColor($r('app.color.error_text'))
-        .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-        .attributeModifier(new PressFeedback())
-        .enabled(!this.处理中 && !this.加载中)
-        .onClick(() => {
-          this.确认删除(类型);
-        })
+      Row({ space: 应用尺寸.间距_8 }) {
+        按下态按钮({ 文案: $r('app.string.' + NOTETYPE_MANAGEMENT_ACTIONS.copy.titleKey),
+          fillWidth: true, singleLine: true, themeText: true, 字色: this.主色按钮背景,
+          是否启用: !this.加载中 && !this.处理中,
+          点击回调: (): void => { this.openCreate(类型.id, 类型.name); } }).layoutWeight(1)
+        按下态按钮({ 文案: $r('app.string.' + NOTETYPE_MANAGEMENT_ACTIONS.edit.titleKey),
+          图标: $r('app.media.' + NOTETYPE_MANAGEMENT_ACTIONS.edit.iconKey),
+          fillWidth: true, singleLine: true, themeText: true, 字色: this.主色按钮背景,
+          是否启用: !this.加载中 && !this.处理中,
+          点击回调: (): void => { this.onEdit(类型.id, 类型.name); } }).layoutWeight(1)
       }.width('100%')
     }
     .width('100%')
     .alignItems(HorizontalAlign.Start)
-    .padding({ top: 应用尺寸.间距_8, bottom: 应用尺寸.间距_8 })
+    .padding(应用尺寸.间距_12)
+    .backgroundColor($r('app.color.surface_card'))
+    .border(SurfaceBorder.options())
+    .borderRadius(应用尺寸.圆角_卡片)
   }
 
   private openCreate(sourceId: number = 0, sourceName: string = ''): void {
@@ -260,10 +254,11 @@ export struct 笔记类型管理面板 {
   private mainHeader() {
     DialogHeader({
       title: $r('app.string.notetype_mgmt_title'),
-      actionLabel: $r('app.string.notetype_mgmt_add'),
+      actionLabel: $r('app.string.' + NOTETYPE_MANAGEMENT_ACTIONS.add.titleKey),
+      actionIcon: $r('app.media.' + NOTETYPE_MANAGEMENT_ACTIONS.add.iconKey),
       actionEnabled: !this.处理中 && !this.加载中,
       closeLabel: $r('app.string.close'),
-      closeEnabled: !this.加载中 && !this.处理中,
+      closeEnabled: !this.处理中,
       onClose: () => { this.requestClose(); },
       onAction: () => { this.openCreate(); }
     })
@@ -300,7 +295,7 @@ export struct 笔记类型管理面板 {
         .width('100%')
     }
 
-    Column({ space: 应用尺寸.间距_4 }) {
+    Column({ space: 应用尺寸.间距_8 }) {
       if (this.类型列表.length === 0 && !this.加载中) {
         Text($r('app.string.notetype_mgmt_empty')).fontSize(应用尺寸.字号_正文_小)
           .fontColor($r('app.color.text_secondary')).width('100%')
@@ -315,7 +310,7 @@ export struct 笔记类型管理面板 {
   build() {
     Stack() {
       DialogFrame({ header: () => { this.mainHeader(); }, content: () => { this.listContent(); },
-        canDismiss: !this.加载中 && !this.处理中 && !this.confirmingClose && !this.createVisible,
+        canDismiss: !this.处理中 && !this.confirmingClose && !this.createVisible,
         onDismiss: (): void => { this.requestClose(); } })
         .enabled(!this.createVisible && !this.confirmingClose)
       if (this.createVisible) {

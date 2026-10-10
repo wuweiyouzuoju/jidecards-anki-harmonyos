@@ -1,6 +1,5 @@
 import { IconActionButton } from '../common/IconActionButton';
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { PressFeedback } from '../../utils/PressFeedback';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { LengthMetrics } from '@kit.ArkUI';
 import { NoteDraftPreview } from '../common/NoteDraftPreview';
@@ -14,8 +13,6 @@ import { DialogFrame } from '../common/DialogFrame';
 import { AnchoredMenuItem } from '../common/MenuItem';
 import { showToastSafely, resourceText } from '../../utils/UiFeedback';
 import { FormSelectRow } from '../common/FormSelectRow';
-import { ThemeTextSpans, themeTextKey } from '../common/ThemeText';
-import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 
 import { DialogHeader } from '../common/DialogHeader';
 // ========================================================
@@ -50,10 +47,12 @@ import { DialogHeader } from '../common/DialogHeader';
 
 import { 笔记类型服务 } from '../../backend/笔记类型服务';
 import { 应用尺寸 } from '../../utils/应用尺寸';
-import { 设置面板色板_取 } from '../../utils/设置面板配色';
 import { 颜色键 } from '../../model/颜色主题';
 
 import { NotetypeFieldDraft as 字段项, serializeNotetypeFields } from '../../model/NotetypeFieldDraft';
+
+interface EditableNotetypeField extends 字段项 { draftId: number; }
+interface TemplateSelection { start: number; end: number; }
 
 @Component
 export struct 笔记类型编辑器 {
@@ -64,7 +63,6 @@ export struct 笔记类型编辑器 {
     this.requestClose();
   }
 
-  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
   @Prop notetypeId: number = 0;
   @Prop notetypeName: string = '';
@@ -76,7 +74,7 @@ export struct 笔记类型编辑器 {
   @State private 保存中: boolean = false;
   @State private 错误信息: string = '';
   @State private 类型名: string = '';
-  @State private 字段列表: 字段项[] = [];
+  @State private 字段列表: EditableNotetypeField[] = [];
   @State private 模板列表: 模板项[] = [];
   @State private 当前模板索引: number = 0;
   @State private CSS文本: string = '';
@@ -92,6 +90,13 @@ export struct 笔记类型编辑器 {
   private baselineDraft: string = '';
   private mounted: boolean = true;
   private readVersion: number = 0;
+  private nextFieldId: number = 0;
+  private templateFace: string = 'front';
+  private frontSelection: TemplateSelection = { start: -1, end: -1 };
+  private backSelection: TemplateSelection = { start: -1, end: -1 };
+  private readonly frontController: TextAreaController = new TextAreaController();
+  private readonly backController: TextAreaController = new TextAreaController();
+  private templateInsertionVersion: number = 0;
 
   private readonly 服务: 笔记类型服务 = new 笔记类型服务();
   private readonly writes: NotetypeOperationSession = new NotetypeOperationSession(this.服务, (): void => {
@@ -145,17 +150,18 @@ export struct 笔记类型编辑器 {
       // 字段
       const flds: Object | undefined = obj['flds'];
       if (Array.isArray(flds)) {
-        const 列表: 字段项[] = [];
+        const 列表: EditableNotetypeField[] = [];
         for (let i = 0; i < flds.length; i++) {
           const f: Record<string, Object> = flds[i] as Record<string, Object>;
           const fname: Object | undefined = f['name'];
           const ford: Object | undefined = f['ord'];
           列表.push({
+            draftId: this.nextFieldId++,
             ord: typeof ford === 'number' ? ford : i,
             name: typeof fname === 'string' ? fname : ''
           });
         }
-        列表.sort((a: 字段项, b: 字段项): number => (a.ord ?? 0) - (b.ord ?? 0));
+        列表.sort((a: EditableNotetypeField, b: EditableNotetypeField): number => (a.ord ?? 0) - (b.ord ?? 0));
         this.字段列表 = 列表;
       }
       // 模板
@@ -178,6 +184,7 @@ export struct 笔记类型编辑器 {
         列表.sort((a: 模板项, b: 模板项): number => (a.ord ?? 0) - (b.ord ?? 0));
         this.模板列表 = 列表;
         this.当前模板索引 = 0;
+        this.resetTemplateSelection();
       }
     } catch (error) {
       this.错误信息 = this.取本地化文本($r('app.string.notetype_editor_parse_error'));
@@ -248,7 +255,7 @@ export struct 笔记类型编辑器 {
 
   private async requestClose(): Promise<void> {
     if (this.preview !== null) { this.preview = null; return; }
-    if (!this.mounted || this.加载中 || this.保存中 || this.previewBusy || this.confirmingSave || this.confirmingClose) return;
+    if (!this.mounted || this.保存中 || this.previewBusy || this.confirmingSave || this.confirmingClose) return;
     if (this.原始JSON === '' || this.序列化JSON() === this.baselineDraft) { this.onClose(); return; }
     this.confirmingClose = true;
     try { if (await confirmNoteDiscard(this.getUIContext()) && this.mounted) this.onClose(); }
@@ -257,12 +264,13 @@ export struct 笔记类型编辑器 {
 
   // 字段操作
   private 添加字段(): void {
-    this.字段列表.push({ ord: null, name: '' });
+    this.字段列表.push({ draftId: this.nextFieldId++, ord: null, name: '' });
     // ArkUI @State 数组 push 后需要触发刷新
     this.字段列表 = [...this.字段列表];
   }
 
   private 删除字段(索引: number): void {
+    if (索引 < 0 || 索引 >= this.字段列表.length) return;
     if (this.字段列表.length <= 1) {
       this.错误信息 = this.取本地化文本($r('app.string.notetype_editor_last_field'));
       return;
@@ -273,28 +281,83 @@ export struct 笔记类型编辑器 {
   }
 
   private 上移字段(索引: number): void {
-    if (索引 <= 0) {
+    if (索引 <= 0 || 索引 >= this.字段列表.length) {
       return;
     }
-    const 临时: 字段项 = this.字段列表[索引 - 1];
+    const 临时: EditableNotetypeField = this.字段列表[索引 - 1];
     this.字段列表[索引 - 1] = this.字段列表[索引];
     this.字段列表[索引] = 临时;
     this.字段列表 = [...this.字段列表];
   }
 
   private 下移字段(索引: number): void {
-    if (索引 >= this.字段列表.length - 1) {
+    if (索引 < 0 || 索引 >= this.字段列表.length - 1) {
       return;
     }
-    const 临时: 字段项 = this.字段列表[索引 + 1];
+    const 临时: EditableNotetypeField = this.字段列表[索引 + 1];
     this.字段列表[索引 + 1] = this.字段列表[索引];
     this.字段列表[索引] = 临时;
     this.字段列表 = [...this.字段列表];
   }
 
-  private 更新字段名(索引: number, 名: string): void {
-    this.字段列表[索引] = { ord: this.字段列表[索引].ord, name: 名 };
+  private fieldIndex(id: number): number {
+    return this.字段列表.findIndex((field: EditableNotetypeField): boolean => field.draftId === id);
+  }
+
+  private fieldName(id: number): string {
+    const index: number = this.fieldIndex(id);
+    return index < 0 ? '' : this.字段列表[index].name;
+  }
+
+  private updateFieldName(id: number, name: string): void {
+    const index: number = this.fieldIndex(id);
+    if (index < 0) return;
+    const field: EditableNotetypeField = this.字段列表[index];
+    this.字段列表[index] = { draftId: field.draftId, ord: field.ord, name: name };
     this.字段列表 = [...this.字段列表];
+  }
+
+  private resetTemplateSelection(): void {
+    this.templateInsertionVersion++;
+    this.frontSelection = { start: -1, end: -1 };
+    this.backSelection = { start: -1, end: -1 };
+  }
+
+  private selectTemplate(index: number): void {
+    if (index < 0 || index >= this.模板列表.length) return;
+    this.当前模板索引 = index;
+    this.resetTemplateSelection();
+  }
+
+  private templateSelection(face: string, start: number, end: number): void {
+    const selection: TemplateSelection = { start: start, end: end };
+    if (face === 'back') this.backSelection = selection;
+    else this.frontSelection = selection;
+  }
+
+  private insertFieldToken(name: string): void {
+    if (!this.mounted || this.加载中 || this.保存中 || this.confirmingSave || this.confirmingClose ||
+      this.preview !== null || this.previewBusy || this.模板列表.length === 0) return;
+    const template: 模板项 = this.当前模板();
+    const face: string = this.templateFace;
+    const text: string = face === 'back' ? template.afmt : template.qfmt;
+    const selection: TemplateSelection = face === 'back' ? this.backSelection : this.frontSelection;
+    const unset: boolean = selection.start < 0 && selection.end < 0;
+    const start: number = unset ? text.length : Math.min(text.length, Math.max(0, Math.min(selection.start, selection.end)));
+    const end: number = unset ? start : Math.min(text.length, Math.max(start, Math.max(selection.start, selection.end)));
+    const token: string = `{{${name}}}`;
+    const result: string = text.slice(0, start) + token + text.slice(end);
+    if (face === 'back') this.更新背面模板(result);
+    else this.更新正面模板(result);
+    const caret: number = start + token.length;
+    const version: number = ++this.templateInsertionVersion;
+    this.templateSelection(face, caret, caret);
+    // 状态应用到原生输入框后恢复光标；切换模板或离开后忽略旧回调。
+    setTimeout((): void => {
+      if (!this.mounted || version !== this.templateInsertionVersion || this.当前模板() !== template || this.templateFace !== face ||
+        (face === 'back' ? template.afmt : template.qfmt) !== result) return;
+      try { (face === 'back' ? this.backController : this.frontController).caretPosition(caret); } catch (error) {}
+    }, 0);
   }
 
   // 模板操作
@@ -304,6 +367,7 @@ export struct 笔记类型编辑器 {
     this.模板列表 = this.模板列表.concat([{ ord: null, name: this.取本地化文本($r('app.string.notetype_new_template')),
       qfmt: current.qfmt, afmt: current.afmt, sourceOrd: current.ord ?? current.sourceOrd }]);
     this.当前模板索引 = this.模板列表.length - 1;
+    this.resetTemplateSelection();
   }
 
   private removeTemplate(): void {
@@ -312,13 +376,20 @@ export struct 笔记类型编辑器 {
       this.错误信息 = this.取本地化文本($r('app.string.notetype_last_template')); return;
     }
     const index = this.当前模板索引;
+    const template: 模板项 = this.模板列表[index];
+    let settled: boolean = false;
     this.getUIContext().showAlertDialog({ title: this.取本地化文本($r('app.string.notetype_remove_template')),
       message: this.取本地化文本($r('app.string.notetype_remove_template_hint')),
-      primaryButton: { value: this.取本地化文本($r('app.string.cancel')), action: (): void => {} },
+      cancel: (): void => { settled = true; },
+      primaryButton: { value: this.取本地化文本($r('app.string.cancel')), action: (): void => { settled = true; } },
       secondaryButton: { value: this.取本地化文本($r('app.string.notetype_mgmt_delete')), action: (): void => {
-        if (!this.mounted || this.保存中 || this.confirmingSave || this.confirmingClose || this.preview !== null || index !== this.当前模板索引) return;
+        if (settled) return;
+        settled = true;
+        if (!this.mounted || this.保存中 || this.confirmingSave || this.confirmingClose || this.preview !== null ||
+          this.模板列表.length <= 1 || this.模板列表[index] !== template || index !== this.当前模板索引) return;
         this.模板列表.splice(index, 1); this.模板列表 = this.模板列表.slice();
         this.当前模板索引 = Math.min(index, this.模板列表.length - 1);
+        this.resetTemplateSelection();
       } } });
   }
 
@@ -377,54 +448,44 @@ export struct 笔记类型编辑器 {
   }
 
   @Builder
-  private 字段行(字段: 字段项, 索引: number) {
+  private 字段行(字段: EditableNotetypeField) {
     Row({ space: 应用尺寸.间距_4 }) {
-      TextInput({ text: 字段.name })
+      TextInput({ text: this.fieldName(字段.draftId) })
         .fontSize(应用尺寸.字号_正文_小)
         .height(应用尺寸.按钮高度)
         .backgroundColor($r('app.color.surface_card'))
         .border(SurfaceBorder.options())
         .borderRadius(应用尺寸.圆角_面板)
         .layoutWeight(1)
-        .onChange((值: string) => { this.更新字段名(索引, 值); })
+        .onChange((值: string) => { this.updateFieldName(字段.draftId, 值); })
       IconActionButton({ source: $r('app.media.ic_common_arrow_up'), label: $r('app.string.icon_field_up'),
-        glyphColor: this.主色按钮背景, isInteractive: 索引 > 0,
-        onAction: (): void => { this.上移字段(索引); } })
+        glyphColor: this.主色按钮背景, isInteractive: this.fieldIndex(字段.draftId) > 0,
+        onAction: (): void => { this.上移字段(this.fieldIndex(字段.draftId)); } })
       IconActionButton({ source: $r('app.media.ic_common_arrow_down'), label: $r('app.string.icon_field_down'),
-        glyphColor: this.主色按钮背景, isInteractive: 索引 < this.字段列表.length - 1,
-        onAction: (): void => { this.下移字段(索引); } })
+        glyphColor: this.主色按钮背景, isInteractive: this.fieldIndex(字段.draftId) < this.字段列表.length - 1,
+        onAction: (): void => { this.下移字段(this.fieldIndex(字段.draftId)); } })
       IconActionButton({ source: $r('app.media.ic_study_delete'), label: $r('app.string.icon_field_delete'),
         iconFill: $r('app.color.error_text'),
-        onAction: (): void => { this.删除字段(索引); } })
+        onAction: (): void => { this.删除字段(this.fieldIndex(字段.draftId)); } })
     }
     .width('100%')
   }
 
   @Builder
-  private 字段令牌行(字段名: string) {
-    Text() { ForEach([themeTextKey(`{{${字段名}}}`, this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(`{{${字段名}}}`, this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }
-      .fontSize(应用尺寸.字号_正文_小)
-      .fontColor(this.主色按钮背景)
-      .backgroundColor(设置面板色板_取(this.isDark).标签背景)
-      .borderRadius(应用尺寸.圆角_面板)
-      .padding({ left: 8, right: 8, top: 4, bottom: 4 })
-      .margin({ right: 4, bottom: 4 })
-      .attributeModifier(new PressFeedback())
-      .onClick(() => {
-        // 点击令牌插入到当前模板的正面编辑区末尾
-        const t: 模板项 = this.当前模板();
-        this.更新正面模板(t.qfmt + `{{${字段名}}}`);
-      })
+  private 字段令牌行(id: number) {
+    按下态按钮({ 文案: `{{${this.fieldName(id)}}}`, 字号: 应用尺寸.字号_正文_小,
+      themeText: true, 字色: this.主色按钮背景, preserveInputFocus: true,
+      点击回调: (): void => { this.insertFieldToken(this.fieldName(id)); } })
   }
 
   @Builder
   private dialogHeader() {
     DialogHeader({
       title: $r('app.string.notetype_editor_title'),
-      actionLabel: this.保存中 ? $r('app.string.notetype_editor_saving') : $r('app.string.notetype_editor_save'),
+      showActionLabel: this.保存中, actionLabel: this.保存中 ? $r('app.string.notetype_editor_saving') : $r('app.string.notetype_editor_save'),
       actionEnabled: !this.加载中 && !this.保存中 && !this.previewBusy && this.原始JSON !== '',
       closeLabel: $r('app.string.create_deck_cancel'),
-      closeEnabled: !this.加载中 && !this.保存中 && !this.confirmingSave && !this.confirmingClose,
+      closeEnabled: !this.保存中 && !this.confirmingSave && !this.confirmingClose,
       onClose: (): void => { this.requestClose(); },
       onAction: () => { this.保存(); }
     })
@@ -485,17 +546,14 @@ export struct 笔记类型编辑器 {
           // === 字段区 ===
           Column({ space: 应用尺寸.间距_5 }) {
             Row() {
-              Text() { ForEach([themeTextKey($r('app.string.notetype_editor_add_field'), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans($r('app.string.notetype_editor_add_field'), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }
-                .fontSize(应用尺寸.字号_正文_小)
-                .fontColor(this.主色按钮背景)
-                .attributeModifier(new PressFeedback())
-                .onClick(() => { this.添加字段(); })
+              按下态按钮({ 文案: $r('app.string.notetype_editor_add_field'), themeText: true,
+                字色: this.主色按钮背景, 点击回调: (): void => { this.添加字段(); } })
             }
             .width('100%')
 
-            ForEach(this.字段列表, (字段: 字段项, 索引: number) => {
-              this.字段行(字段, 索引)
-            }, (字段: 字段项, 索引: number): string => `${索引}_${字段.name}`)
+            ForEach(this.字段列表, (字段: EditableNotetypeField) => {
+              this.字段行(字段)
+            }, (字段: EditableNotetypeField): string => `${字段.draftId}`)
           }
           .width('100%')
         }
@@ -535,7 +593,7 @@ export struct 笔记类型编辑器 {
                 options: this.模板列表.map((t: 模板项): SelectOption => { return { value: t.name }; }),
                 selectedIndex: this.当前模板索引, value: this.当前模板().name,
                 isInteractive: !this.保存中 && !this.previewBusy,
-                onSelect: (index: number): void => { this.当前模板索引 = index; } })
+                onSelect: (index: number): void => { this.selectTemplate(index); } })
             }
 
             // 模板名
@@ -557,10 +615,10 @@ export struct 笔记类型编辑器 {
                 .fontSize(应用尺寸.字号_正文_小)
                 .fontColor($r('app.color.text_secondary'))
                 .width('100%')
-              Flex({ wrap: FlexWrap.Wrap }) {
-                ForEach(this.字段列表, (字段: 字段项) => {
-                  this.字段令牌行(字段.name)
-                }, (字段: 字段项): string => 字段.name)
+              Flex({ wrap: FlexWrap.Wrap, space: { main: LengthMetrics.vp(8), cross: LengthMetrics.vp(8) } }) {
+                ForEach(this.字段列表, (字段: EditableNotetypeField) => {
+                  this.字段令牌行(字段.draftId)
+                }, (字段: EditableNotetypeField): string => `${字段.draftId}`)
               }
               .width('100%')
             }
@@ -570,13 +628,15 @@ export struct 笔记类型编辑器 {
               .fontSize(应用尺寸.字号_正文_小)
               .fontColor($r('app.color.text_secondary'))
               .width('100%')
-            TextArea({ text: this.当前模板().qfmt })
+            TextArea({ text: this.当前模板().qfmt, controller: this.frontController })
               .fontSize(应用尺寸.字号_正文_小)
               .backgroundColor($r('app.color.surface_card'))
               .border(SurfaceBorder.options())
               .borderRadius(应用尺寸.圆角_面板)
               .constraintSize({ minHeight: 80 })
               .width('100%')
+              .onFocus((): void => { this.templateFace = 'front'; })
+              .onTextSelectionChange((start: number, end: number): void => { this.templateSelection('front', start, end); })
               .onChange((值: string) => { this.更新正面模板(值); })
 
             // 背面模板
@@ -584,13 +644,15 @@ export struct 笔记类型编辑器 {
               .fontSize(应用尺寸.字号_正文_小)
               .fontColor($r('app.color.text_secondary'))
               .width('100%')
-            TextArea({ text: this.当前模板().afmt })
+            TextArea({ text: this.当前模板().afmt, controller: this.backController })
               .fontSize(应用尺寸.字号_正文_小)
               .backgroundColor($r('app.color.surface_card'))
               .border(SurfaceBorder.options())
               .borderRadius(应用尺寸.圆角_面板)
               .constraintSize({ minHeight: 80 })
               .width('100%')
+              .onFocus((): void => { this.templateFace = 'back'; })
+              .onTextSelectionChange((start: number, end: number): void => { this.templateSelection('back', start, end); })
               .onChange((值: string) => { this.更新背面模板(值); })
           }
           .width('100%')
@@ -643,7 +705,7 @@ export struct 笔记类型编辑器 {
       DialogFrame({
       header: () => { this.dialogHeader(); },
       content: () => { this.dialogContent(); },
-      canDismiss: !this.加载中 && !this.保存中 && !this.confirmingSave && !this.confirmingClose && this.preview === null,
+      canDismiss: !this.保存中 && !this.confirmingSave && !this.confirmingClose && this.preview === null,
       onDismiss: (): void => { this.requestClose(); }
       })
       if (this.preview !== null) {

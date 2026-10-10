@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { serializeNotetypeTemplates, cloneNotetypeJson, previewFieldsUnchanged, templateStructureChanged, notetypeStructureChanges,
   NotetypeOperationSession } from '../../entry/src/main/ets/model/NotetypeManagement.ts';
 import { autoSyncScheduler } from '../../entry/src/main/ets/model/AutoSyncScheduler.ts';
@@ -86,6 +87,7 @@ test('uncommitted preview uses UTF-8 template bytes and sample filling without a
 function editor() {
   let writeCount=0,changes=0,closes=0,confirm=true,previewRequests=[];
   const Editor=loadComponentLogic('components/settings/笔记类型编辑器.ets','笔记类型编辑器',{
+    TextAreaController: class { positions=[]; caretPosition(value){this.positions.push(value);} },
     THEME_TEXT_COLORS_KEY:'theme',颜色键:{主色按钮背景:'color'},
     笔记类型服务:class {async 获取笔记类型旧版(){return json;} async 更新笔记类型旧版(){writeCount++;}
       async impact(){return {noteIds:[1],cardIds:[2,3,4],removedCardIds:[],movedCardIds:[]};}},
@@ -100,6 +102,43 @@ function editor() {
   instance.onSaved=()=>{};instance.onClose=()=>closes++;
   return {instance,previewRequests,get writes(){return writeCount;},get closes(){return closes;},set confirm(value){confirm=value;}};
 }
+
+test('field drafts retain stable UI identity through continuous rename, reorder, blank additions and deletion', () => {
+  const h=editor(), e=h.instance;
+  const source=readFileSync(new URL('../../entry/src/main/ets/components/settings/笔记类型编辑器.ets',import.meta.url),'utf8');
+  const keys=[...source.matchAll(/\}, \(字段: EditableNotetypeField\): string => ([^\n]+)\)/g)]
+    .map(match=>new Function('字段','return '+match[1]));
+  assert.equal(keys.length,2,'field inputs and token buttons consume the same stable draft identity');
+  const first=e.字段列表[0], second=e.字段列表[1];
+  const before=keys.map(key=>key(first));
+  e.updateFieldName(first.draftId,'F');e.updateFieldName(first.draftId,'Front中文');
+  assert.equal(e.fieldName(first.draftId),'Front中文');assert.equal(e.fieldName(second.draftId),second.name);
+  assert.deepEqual(keys.map(key=>key(e.字段列表[0])),before);
+  e.下移字段(0);e.updateFieldName(first.draftId,'Moved');
+  assert.equal(e.fieldName(first.draftId),'Moved');assert.equal(e.字段列表[1].draftId,first.draftId);
+  e.添加字段();e.添加字段();
+  assert.equal(new Set(e.字段列表.map(field=>field.draftId)).size,e.字段列表.length);
+  const removed=e.字段列表.at(-1).draftId;e.删除字段(e.字段列表.length-1);e.updateFieldName(removed,'late callback');
+  assert.equal(e.fieldIndex(removed),-1);assert.ok(e.字段列表.every(field=>field.name!=='late callback'));
+  assert.ok(JSON.parse(e.序列化JSON()).flds.every(field=>!Object.hasOwn(field,'draftId')),'UI identity never enters Core JSON');
+});
+
+test('tokens target the active template selection, advance the caret and reject busy or stale callbacks', async () => {
+  const e=editor().instance;
+  e.insertFieldToken('Default');assert.equal(e.当前模板().qfmt,'{{Front}}{{Default}}');
+  e.templateFace='back';e.templateSelection('back',2,5);e.更新背面模板('abcdef');
+  const front=e.当前模板().qfmt;
+  e.insertFieldToken('Front');assert.equal(e.当前模板().afmt,'ab{{Front}}f');assert.equal(e.当前模板().qfmt,front);
+  e.insertFieldToken('Back');assert.equal(e.当前模板().afmt,'ab{{Front}}{{Back}}f');
+  await new Promise(resolve=>setTimeout(resolve,5));
+  assert.deepEqual(e.backController.positions,[19]);
+  e.templateSelection('back',500,-10);e.insertFieldToken('All');assert.equal(e.当前模板().afmt,'{{All}}');
+  e.保存中=true;e.insertFieldToken('Rejected');assert.equal(e.当前模板().afmt,'{{All}}');
+  const otherBack=e.模板列表[1].afmt;
+  e.保存中=false;e.selectTemplate(1);e.insertFieldToken('Other');
+  assert.equal(e.当前模板().afmt,otherBack+'{{Other}}','changing templates resets the old selection');
+  const current=e.当前模板().afmt;e.aboutToDisappear();e.insertFieldToken('Disposed');assert.equal(e.当前模板().afmt,current);
+});
 
 test('editor refuses cloze template changes, previews the current draft and blocks unsaved field structure',async()=>{
   const h=editor();h.instance.CSS文本='.card{color:blue}';h.instance.更新正面模板('{{Back}}');await h.instance.previewTemplate();
@@ -143,6 +182,20 @@ function manager() {
   instance.onClose=()=>closes++;instance.onEdit=(...args)=>edited.push(args);
   return {instance,edited,get writes(){return writes;},get closes(){return closes;},get refreshes(){return refreshes;},set confirm(value){confirms=value;}};
 }
+
+test('initial notetype reads permit dismissal and template confirmations are one shot and identity bound',async()=>{
+  for(const factory of [manager,editor]){
+    const h=factory();h.instance.加载中=true;
+    if(factory===editor) h.instance.原始JSON='';
+    await h.instance.requestClose();assert.equal(h.closes,1);
+  }
+  const h=editor(),dialogs=[];h.instance.getUIContext=()=>({showAlertDialog:options=>dialogs.push(options)});
+  h.instance.removeTemplate();h.instance.removeTemplate();
+  dialogs[0].secondaryButton.action();dialogs[0].secondaryButton.action();dialogs[1].secondaryButton.action();
+  assert.equal(h.instance.模板列表.length,2,'late confirmations must not remove the replacement at the same index');
+  h.instance.removeTemplate();dialogs[2].primaryButton.action();dialogs[2].secondaryButton.action();
+  assert.equal(h.instance.模板列表.length,2);
+});
 
 test('manager selects and clones a source, protects busy Back and confirms deletion before writing',async()=>{
   const h=manager();h.instance.openCreate(123,'Custom');assert.equal(h.instance.cloneSourceId,123);
