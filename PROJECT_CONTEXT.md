@@ -5,7 +5,7 @@
 ## 项目与事实来源
 
 HarmonyOS 本地闪卡客户端：ArkUI → 领域 Service → protobuf → C++ Node-API → Rust FFI → 锁定 Anki Core。
-Agent-first 原则与开发约束见 [AGENTS.md](AGENTS.md)，本页只提供任务入口和事实来源。
+面向后续接手的编程 Agent-first 原则与开发约束见 [AGENTS.md](AGENTS.md)，本页只提供任务入口和事实来源。
 
 | 事实 | 唯一配置来源 |
 | --- | --- |

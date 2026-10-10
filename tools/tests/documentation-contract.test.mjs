@@ -4,6 +4,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import JSON5 from 'json5';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -19,6 +20,36 @@ test('Core protocol generation has current ownership, commands and handoff navig
 function read(relativePath) {
   return readFileSync(path.join(root, relativePath), 'utf8');
 }
+
+test('AnkiDroid comparison routes capability status to the current domain owners', () => {
+  const comparison = read('docs/ANKIDROID_PARITY_AUDIT.md');
+  const targets = [...comparison.matchAll(/\[[^\]]*\]\(([^)]+)\)/g)].map(match => match[1].split('#')[0]);
+  for (const owner of ['FEATURE_STATUS.md', 'development/browser-stats.md', 'development/study-media.md',
+    'development/import-data.md', 'development/core-interop.md', 'development/agent.md']) {
+    assert.ok(targets.includes(owner), `comparison must route to ${owner}`);
+  }
+  assert.ok(read('docs/README.md').includes('(ANKIDROID_PARITY_AUDIT.md)'));
+});
+
+test('JIDE long-project ownership and recovery decisions are reachable from current documentation', () => {
+  const decision = '2026-10-09-agent-long-project.md';
+  for (const file of ['docs/development/agent.md', 'docs/decisions/README.md']) assert.ok(read(file).includes(decision), file);
+  for (const owner of ['AgentMemoryManager', 'AgentScope.taskPlan', 'AgentExecutionBudget']) {
+    assert.ok(read(`docs/decisions/${decision}`).includes(owner), owner);
+  }
+  assert.match(read('docs/development/ownership.md'), /AgentMemoryManagement\.ts[\s\S]*AgentTaskPlan\.ts[\s\S]*AgentSessionController/);
+  assert.match(read(`docs/decisions/${decision}`), /未进行设备布局验收或付费模型评测/);
+});
+
+test('JIDE subagent proposal stays discoverable and distinct from runtime capabilities', () => {
+  const decision = '2026-10-09-agent-subagents.md';
+  for (const file of ['docs/development/agent.md', 'docs/decisions/README.md']) assert.ok(read(file).includes(decision), file);
+  const proposal = read(`docs/decisions/${decision}`);
+  assert.match(proposal, /状态：调研与下一阶段设计/);
+  assert.match(proposal, /尚未实现/);
+  assert.match(proposal, /不修改运行时代码/);
+  assert.match(proposal, /https:\/\/code\.claude\.com\/docs\/en\/sub-agents/);
+});
 
 function lockValue(source, key) {
   const prefix = `${key}=`;
@@ -44,26 +75,28 @@ test('JIDE document ownership and native validation have current navigation entr
 });
 
 test('current documentation follows application and SDK configuration', () => {
-  const app = read('AppScope/app.json5');
-  const buildProfile = read('build-profile.json5');
+  const { app } = JSON5.parse(read('AppScope/app.json5'));
+  const buildProfile = JSON5.parse(read('build-profile.json5')).app.products[0];
   const upstream = read('UPSTREAM.lock');
   const readme = read('README.md');
   const status = read('docs/DEVELOPMENT_PLAN.md');
 
-  const versionName = app.match(/versionName:\s*'([^']+)'/)?.[1];
-  const versionCode = app.match(/versionCode:\s*(\d+)/)?.[1];
-  const compatibleSdk = buildProfile.match(/compatibleSdkVersion:\s*'([^']+)\((\d+)\)'/);
+  const versionName = app.versionName;
+  const versionCode = String(app.versionCode);
+  const compatibleSdk = buildProfile.compatibleSdkVersion.match(/^(.+)\((\d+)\)$/);
   const compatibleVersion = compatibleSdk?.[1];
   const compatibleApi = compatibleSdk?.[2];
-  const targetApi = buildProfile.match(/targetSdkVersion:\s*'[^']+\((\d+)\)'/)?.[1];
+  const targetApi = buildProfile.targetSdkVersion.match(/\((\d+)\)$/)?.[1];
   const lockedMinVersion = lockValue(upstream, 'HARMONY_MIN_VERSION');
   const lockedMinApi = lockValue(upstream, 'HARMONY_MIN_API');
   const lockedTargetApi = lockValue(upstream, 'HARMONY_TARGET_API');
   const lockedRust = lockValue(upstream, 'RUST_TOOLCHAIN');
+  const lockedCommit = lockValue(upstream, 'ANKI_RELEASE_COMMIT');
   const rustToolchain = read('rust-toolchain.toml').match(/^channel\s*=\s*"([^"]+)"$/m)?.[1];
 
   assert.ok(versionName);
-  assert.ok(versionCode);
+  assert.ok(Number.isSafeInteger(app.versionCode) && app.versionCode > 0);
+  assert.ok(lockedCommit);
   assert.ok(compatibleVersion);
   assert.ok(compatibleApi);
   assert.ok(targetApi);
@@ -71,8 +104,10 @@ test('current documentation follows application and SDK configuration', () => {
   assert.equal(lockedMinApi, compatibleApi);
   assert.equal(lockedTargetApi, targetApi);
   assert.equal(lockedRust, rustToolchain);
-  assert.match(readme, new RegExp(`当前源码版本：${versionName.replaceAll('.', '\\.')}`));
-  assert.match(readme, /checkout --detach e64c6b1/);
+  assert.ok(status.includes(`| Rust | ${lockedRust} |`));
+  assert.ok(status.includes(`| Anki Core | ${lockValue(upstream, 'ANKI_TAG')}，提交 \`${lockedCommit}\` |`));
+  assert.ok(readme.includes(`当前源码版本：${versionName}（versionCode ${versionCode}）`));
+  assert.ok(readme.includes(`checkout --detach ${lockedCommit}`), 'checkout instructions must follow UPSTREAM.lock');
   assert.match(readme, /rev-parse --short=7 HEAD/);
   assert.match(readme, /JIDECARDS_SIGNING_CONFIG/);
   assert.match(readme, /docs\/development\/signing\.md/);
@@ -263,6 +298,19 @@ test('same-kind change guidance is reachable from entry, workflow, acceptance an
   }
   assert.match(read(guide), /^## 同类变更闭环$/m, 'linked section must exist');
   assert.ok(read('docs/decisions/README.md').includes(path.basename(decision)));
+});
+
+test('stale knowledge repair has one reachable owner across coding Agent entry and acceptance', () => {
+  const owner = '.agents/rules/context.md', anchor = '过期知识核查与修复';
+  for (const file of ['AGENTS.md', '.agents/rules/workflow.md',
+    'docs/development/coding-agent.md', 'docs/development/task-contract.md']) {
+    const links = [...read(file).matchAll(/\[[^\]]+\]\(([^)]+)\)/g)];
+    assert.ok(links.some(([, link]) => {
+      const [target, fragment] = link.split('#');
+      return fragment === anchor && path.resolve(root, path.dirname(file), target) === path.resolve(root, owner);
+    }), `${file}: missing route to the canonical knowledge repair workflow`);
+  }
+  assert.ok(read(owner).split(/\r?\n/).includes(`## ${anchor}`), 'linked knowledge owner section must exist');
 });
 
 test('current docs route confirmation owners and do not freeze current test totals', () => {
