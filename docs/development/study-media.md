@@ -4,6 +4,8 @@
 
 学习失败原地恢复、评分结果核对与就近撤销的当前边界见 [交互恢复与局部动效](interaction-feedback.md)。
 
+视频新增与编辑复用字段原图片图标及同一管理弹层；分类、导入、草稿和设备边界统一见[编辑媒体预览与独立管理](browser-stats.md#编辑媒体预览与独立管理2026-10-01)。卡片 HTML 与编辑器共用 `NoteVideoMedia.isNoteVideoFilename`；原生 `CardAudioSession` 排除视频，保留原 Core 单项索引，视频只在卡面内联播放器播放。
+
 ## Core 渲染语义与平台 TTS
 
 2026-10-07：Core `ExtractAvTags` 的 `[anki:play:q|a:index]` 映射为随所在文字字号缩放的播放按钮；按钮只播放对应有序 AV 项，视频保持原生内联播放。学习、浏览预览、未保存模板预览共用 HTML 构建器、`CardAudioSession` 和 `PreviewInteraction`/`StudyGestures`，桥接再次校验文档代次、前台与阻塞状态。既有/未保存卡请求 `partial_render=true`，对齐 AnkiDroid `TemplateManager`：先提取题面 AV，再用含 q 编号的题面填充答案 `FrontSide`，最后提取答案 AV。题面声音不会重复加入答案自动播放；背面的题面按钮仍引用题面队列，视频也按 marker 的 q/a 来源解析。节点属于一次渲染结果，不修改笔记或模板字段，Core 音频读取失败不清空正文。
@@ -58,11 +60,11 @@ JIDE 偏好值域复用同一模式声明，`get_settings` 可读 `smart` 及能
 
 ## 旗标与标星（2026-10-03）
 
-学习“更多”的“标记”分组提供标星切换、七色旗标／清除及旗标名称；“卡片操作”分组提供今日跳过、暂停此卡、删除此卡和自动前进。打开“更多”保留右侧主菜单，两组默认向左展开；点击组标题可收起／展开。旗标七色与清除的弹层直接覆盖右侧“更多”菜单，与主菜单同宽、同锚点；左侧两组保留原位和可操作性。重新打开“更多”恢复两组展开并收起颜色。所有学习菜单项左侧显示自绘SVG图标，统一24×24画布、2.5单位粗描边与圆角端点/转角；编辑使用笔，卡片操作使用叠卡，自动前进使用时钟和前进箭头。浅填色由公共 `menu_icon_fill` 或25%透明度的主题/旗标色提供，深色资源保留明亮描边。状态来自 Core 卡片 flags 的低三位和笔记完整 `marked` 标签；学习快照同时读取 `flagLabels`，读取失败不发布猜测的标记。旗标与星标可同时显示；首页和浏览器共用的卡片预览只读显示这些状态。
+学习“更多”的“标记”分组提供标星切换、七色旗标／清除及旗标名称；“卡片操作”分组提供今日跳过、暂停此卡、删除此卡和自动前进。打开“更多”保留右侧主菜单并初始展开左侧标记面板；点击组标题收起或切换唯一子面板。旗标七色与清除在原标记面板内替换内容并显示“返回上级”，尖角继续连接主菜单标记行，不覆盖主菜单。重新打开“更多”恢复标记分组并收起颜色。所有学习菜单项左侧显示自绘SVG图标，统一24×24画布、2.5单位粗描边与圆角端点/转角；编辑使用笔，卡片操作使用叠卡，自动前进使用时钟和前进箭头。浅填色由公共 `menu_icon_fill` 或25%透明度的主题/旗标色提供，深色资源保留明亮描边。状态来自 Core 卡片 flags 的低三位和笔记完整 `marked` 标签；学习快照同时读取 `flagLabels`，读取失败不发布猜测的标记。旗标与星标可同时显示；首页和浏览器共用的卡片预览只读显示这些状态。
 
-目录由 `model/AppInterface.ts` 的 `study_more`、`study_marking`、`study_card_actions`、`study_flags` 拥有，页面映射实时标签、图标和业务回调。学习页拥有 `studyExpandedIds`，公共 `ActionMenuTree` 计算当前可见行，收起父级同时收起后代，禁用状态沿父级传播。右侧主菜单不因左侧高度变化而加大行距；`ActionMenuLayout` 用实测行高与面板高度计算左侧位置，仅移动左侧面板避让。返回/Escape 或点击外部先收起颜色，再关闭菜单。组标题不提交动作或恢复学习计时，选择当前可用叶子后先关闭菜单、建立动作阻塞状态，再恢复计时。组件及宿主重查当前树，隐藏、禁用、被颜色面板覆盖或过期的条目不能执行。
+目录由 `model/AppInterface.ts` 的 `study_more`、`study_marking`、`study_card_actions`、`study_flags` 拥有，页面映射实时标签、图标和业务回调。学习页拥有 `studyExpandedIds`，公共 `ActionMenuTree` 计算当前可见行，收起父级同时收起后代，禁用状态沿父级传播。右侧主菜单不因左侧高度变化而加大行距；`ActionMenuLayout` 用实测行高与面板高度计算左侧位置，仅移动左侧面板避让。返回/Escape 或点击外部先收起颜色，再关闭菜单。组标题不提交动作或恢复学习计时，选择当前可用叶子后先关闭菜单、建立动作阻塞状态，再恢复计时。组件及宿主重查当前树，通过 `visibleActionMenuRows` 排除被替换的父级行；隐藏、禁用或过期的条目不能执行。
 
-`AnchoredMenu` 拥有锚点、外部点击与整组菜单的限高滚动；主菜单使用 `MenuSurface`，左侧 `MenuBubble` 的轮廓与阴影共用同一几何，路径坐标显式由 vp 转 px。预览以空展开状态复用紧凑平面菜单；浏览多选使用相同树与左侧分组，选择及确认语义保留。行对齐和间距由 `MenuItem` 拥有。清除旗标传入 `selectionUsesAccent: false`，保留真实选中状态；表面使用 `menu_surface/menu_shadow` 明暗资源，边框委托 `SurfaceBorder`。JIDE 同时观察主菜单与实际可操作分组，包括动态旗标名称和选中态；被覆盖、收起、关闭或离页立即释放对应观察。直接回归见 `study-menu-actions.test.mjs`、`study-menu.test.mjs`、`browser-batch-menu.test.mjs`、`ai-agent-app-structure.test.mjs`；实际外观和滚动须设备验收。
+`AnchoredMenu` 拥有锚点、外部点击与整组菜单的限高滚动；主菜单使用 `MenuSurface`，左侧 `MenuBubble` 的轮廓与阴影共用同一几何，路径坐标显式由 vp 转 px。预览以空展开状态复用紧凑平面菜单；浏览多选使用相同树与左侧分组，选择及确认语义保留。行对齐和间距由 `MenuItem` 拥有。清除旗标传入 `selectionUsesAccent: false`，保留真实选中状态；表面使用 `menu_surface/menu_shadow` 明暗资源，边框委托 `SurfaceBorder`。JIDE 同时观察主菜单与实际可操作分组，包括动态旗标名称和选中态；被颜色内容替换的标记分组、收起、关闭或离页立即释放对应观察；颜色观察同时登记实际返回控件，主菜单观察持续保留。直接回归见 `study-menu-actions.test.mjs`、`study-menu.test.mjs`、`browser-batch-menu.test.mjs`、`ai-agent-app-structure.test.mjs`；实际外观和滚动须设备验收。
 
 标记写入经 StudySessionController 保护集合与同步，提交后针对原 cardId 回读并重渲染模板引用的 CardFlag／Tags。此路径不取下一张、不切换正反面、不清空拼写输入或选择题状态、不重启音频和计时起点；无 HTML 变化时不替换卡面。连续标记撤销保留当前卡；切卡、编辑、名称写入清除这段撤销提示，实际历史仍由 Core 拥有。弹层期间暂停自动推进并屏蔽学习键盘及手势，返回先关闭弹层；写入失败隐藏未知标记，再次点击标星入口先重读。
 
@@ -102,13 +104,29 @@ JIDE 偏好值域复用同一模式声明，`get_settings` 可读 `smart` 及能
 
 ### 手写白板
 
-2026-10-06 最新交互：用户统一取消全局拖动按钮，整张闪卡与手写内容随双指连续平移和缩放，手写笔继续书写，官方内部工具输入保持可用。两指等距移动会连续平移，距离变化同时缩放，初始双指中心下的内容跟随当前中心；不能再锁定起始中心或只响应捏合。应用自己的顶部按钮和底部答案/评分保持固定；完整华为内部工具栏随内容移动和缩放，用户已接受。“复位”复用公共按下态按钮，位于透明度旁，只恢复1倍和初始位置，不清除笔迹或重建Controller。
+当前交互（2026-10-10，按用户确认的自动识别分工）：本次打开白板尚未检测到真实笔按下时，单指交给书写引擎、双指拖动/缩放。首次SourceTool.Pen按下后保持penDetected=true，笔抬起也不切回；放大后手指单指二维拖动共同视野，双指继续平移与缩放，笔用原有笔刷作画。笔正在接触画布时手掌不能导航。关闭/离开白板清除检测状态，重新打开从未检测开始；复位、换题和暂时禁用输入保留模式。检测过笔后所有倍率都禁止手指绘图区书写/擦除；1倍无单指平移，放大后单指平移。未检测笔时原生手指设置继续生效。StudyAnnotationView统一拥有单指/双指锚点、比例及位置，范围1～4，允许缩回1倍但不能低于1倍；缩到1倍位移归零。setContentBounds按按钮之间实测画布四边夹紧共同视野，根窗口仍拥有横竖屏判断和共同原点。
 
-同日用户进一步接受单指只拖动字迹，要求横向和纵向皆可。`学习手写白板层.judgeInkPan` 只在手指、单触点、画布自定义单指 Pan 响应链且无系统滑条 Pan 时允许外层并行手势；纵向继续由华为套件滚动，`inkOffsetX` 只补水平位移，不调用 scrollTo 或禁用 SDK 识别器。水平增量按当前全局比例换回内容坐标，原卡面不跟随；完整华为组件和内部工具栏随水平偏移。双指或笔落下结束单指横移，收起保留位置，复位和下一题归零；不改写笔迹与历史。JIDE 共用中英白板说明并观察 `single_finger_navigation=ink_pan`、`ink_offset_x`，不冒充 SDK 纵向位置或增加代操作能力。直接方法回归覆盖斜向增量、全局比例换算、卡面固定、系统滑条、触点切换和生命周期；SDK 响应链与手指书写设置的真实交互仍需设备验收。本次白板、原版、全局视图、学习生命周期及资源/JIDE/架构/文档检查128项通过。增量HAP编译最初指出ContentSlot不能直接translate，已用原生Stack承载平移；第二次编译只报告已有编辑轮盘目录的AppInterface.ts:85使用未声明editing字段。本任务保留该并行改动，尚无成功新HAP，未安装或执行真机交互。构建与检查记录在D:\Projects\jidecards-penkit-2026-10-06\single-finger-ink-pan-*.log；另一次包含card-viewport-layout的检查在无关AnchoredMenu源码形状断言失败，未为白板改写该断言。
+官方与原版均使用Column依次放置顶部操作区、layoutWeight(1)中间画布与底部答案/评分。中间画布使用完整可用宽度并裁剪，笔迹不能覆盖显示答案或上方应用按钮；纸张背景仅存在于绘制区域内。已删除StudyWhiteboardHitRegions、笔迹覆盖按钮的zIndex以及onTouchIntercept穿透/按钮起手拖动处理。华为组件仍使用widthRatio/heightRatio=1填满实际绘制区，外围布局测量不能代替真实HSP横屏边缘验收。华为内部工具栏仍属于完整组件，会随视野移动/缩放；独立固定到显示答案处未完成。
 
-同日此前恢复版本记录（历史验收，当前交互以上述双指平移和缩放为准）：用户要求笔感必须与华为官方无异，排除用自研笔刷替代官方引擎；手指/手写笔输入设置继续归华为套件。原生 Pinch 加逐帧 `scrollTo` 的试验已撤掉：设备日志显示初始化偏移被后续布局重置，`scrollTo` 绘制将横向偏移设回0并以结束状态重绘，不能用于连续二维平移和缩放。源码恢复此前用户确认顺滑的完整组件并行手势，保留80%默认透明度与偏好记忆。恢复版相关69项检查、增量ceshi构建和警告门禁通过，产物 `D:\Projects\jidecards-penkit-2026-10-06\restored-after-native-pan` 已覆盖安装。两指横向输入后的设备布局显示画布横移、原卡片与顶部按钮位置保持不变，也确认内部工具栏仍跟随；此项不证明硬件笔感或连续缩放已验收。本次已取得并逐文件核对华为 Codelab 完整 ZIP；它仍是调用系统套件的接入示例，未包含真实组件、工具栏或笔刷引擎实现。当前没有已验证的独立绘制入口，拆分未完成，保留可用的完整组件。
+StudyContentViewport只包裹中间笔迹区域，应用按钮不在手势链内。单指Pan仅在宿主penDetected且viewScale>1时接受，双指Pan/Pinch在两种模式都接受。未检测笔时双指接管前经API20的TouchRecognizer.cancelTouch取消子节点本次书写触摸，排除自身观察器，同次导航不重复取消；人工Cancel冒泡不能结束新导航，没有可取消的子触摸时拒绝接管。笔模式下绘图区手指由onTouchIntercept从Down独占，静止点按也不向SDK落墨；按实际触点ID记录拦截，已拦截触点没有子书写识别器也可导航，Up/Cancel与新Down移除旧ID，避免重开后复用旧路由。工具滑条Pan保留输入，ScrollableTargetInfo对应的原生滚动容器不误判成滑条。不持久禁用SDK识别器，不使用逐帧scrollTo补偿。本地原版在globalPenDetected的所有倍率抑制手指绘制/擦除，其他状态继续原笔刷和stylus_only设置；首次笔接触取消旧手指草稿/导航并继续笔书写，手掌不终止笔。共同视野下Canvas允许触摸冒泡给宿主，独立编辑器仍消费触摸。单指/双指结束顺序不能清掉新手势锚点，笔落下结束导航。
 
-两种白板的宿主顶部按钮和底部答案/评分条共用 `model/CardViewportLayout.ts` 的 `cardViewportWidth`，由白板根层的完整窗口宽高更新限宽并居中；不能用中间画布扣除工具栏后的高度判断横竖屏。竖屏最多840vp，横屏沿用学习页的自适应宽度。顶部条自身和学习页 `答案条` 各贡献一次12vp水平留白，最终按钮外缘都是 `(窗口宽 - 内容宽) / 2 + 12vp`；顶部安全区只归顶部条，操作区留白与底部安全区只归 `答案条`。官方顶部关闭/透明度按钮在窄窗可换行，透明度弹窗宽度受窗口内缘限制；原版工具设置继续使用已有换行和限宽。画布仍使用完整可用宽度。固定显示答案及四个评分按钮跟随同一边界；浮动答案工具栏保留独立的拖动与吸附尺寸，选择题沿用卡片内操作。布局回归见 `tools/tests/card-viewport-layout.test.mjs`，覆盖两种引擎、旋转、宽窄密度、系统安全区和窄窗弹出设置；Node几何检查不代表设备外观已验收。
+单指/双指经onViewChanged发布同一视野，没有独立inkOffsetX。JIDE两种引擎都发布真实pen_detected：本次打开是否收到过笔按下，不是连接状态、笔是否正在接触或华为开关。检测过笔且放大时single_finger_navigation=viewport_pan；检测过笔但1倍时为blocked；尚未检测笔时官方为native_input、原版为brush。原版brush受真实stylus_only约束，未检测笔时官方书写遵循华为原生手指设置。drawing_scope=full_window、ink_above_app_controls和review_controls_position=top_overlay仍已撤掉。复位仅恢复应用视野，不清墨或重建Controller；下一题清墨归位但保持本次打开的输入模式。
+
+输入来源与笔刷边界：SourceTool.Pen/Finger是系统实际输入工具，见[官方SourceTool定义](https://github.com/openharmony/docs/blob/master/zh-cn/application-dev/reference/apis-arkui/arkui-ts/ts-gesture-settings.md#sourcetool枚举说明9)。未知来源、压力或笔刷不启用笔模式。StudyContentViewport的onTouchIntercept在子组件消费笔Down之前记录输入，手写笔、未检测笔时手指及工具控件返回Default，笔模式手指绘图区返回Block，自身接收触摸和手势，子绘制面从Down就不接收手指。StudyPenCanvasHost在每次命中测试中只读实际FrameNode：工具点击绑定和Slider按当前变换后坐标/测量尺寸放行，Canvas/XComponent及包含绘制面的容器不误判成工具；不写内部ID、不改节点，不提前缓存工具热区。API23用convertPositionFromWindow处理变换，较早版本使用变换后原点和共同倍率；onTouch处理后续事件。若SDK消费笔Up，新手指Down依据event.touches真实活动ID清掉已经抬起的笔，检测模式仍保持；手指Cancel不释放活动笔。[华为HandwriteComponent](https://developer.huawei.com/consumer/cn/doc/doccenter-capabilities/api/pen-handwritecomponent)继续拥有所有笔刷和已有“禁止手指书写”开关。该开关没有公开getter/变更回调，也没有被应用代操作；用户明确同意的模式来源改为本次真实笔接触后保持，关闭重置，不声称读取了原生开关。未检测笔时若原生关闭手指书写，应用不能强制其落墨。实际笔事件、SDK对Cancel的恢复语义、混合输入活动ID与手掌隔离仍需真机验收。
+
+2026-10-09回退验收（历史）：npm test -- study通过431项；布局、JIDE结构、i18n、架构、ArkTS组件字段和文档契约专项通过62项。回归覆盖上下按钮之外实测画布的平移夹紧、旋转、共同坐标及1～4倍双向缩放。增量签名HAP构建通过，警告门禁unexpected=0，当前产物为D:\Projects\jidecards-whiteboard-restored-controls-2026-10-09\entry-default-signed.hap。实际生成代码确认两种渲染器使用顶部操作、中间layoutWeight(1)/clip画布、底部reviewActions的布局，覆盖按钮的zIndex、controls构建入口和onTouchIntercept均已撤掉。此前fullscreen-layers和control-gestures目录中的包是已撤回的覆盖试验，不代表当前源码。回退不涉及原生引擎或SDK调用配置，复用既有双架构库；未安装设备，真实HSP边缘、工具栏和触控仍需设备验收。
+
+2026-10-10笔后手指单点修复验收：用户报告自动识别后手指单点仍产生墨点。原实现只在Pan识别移动后取消SDK触摸，且1倍仍放行手指；当前改为检测过笔后所有倍率的绘图区手指从Down独占，工具热区放行并按ID保护整个控件触摸序列。npm test -- study通过448项；JIDE结构、i18n、架构、ArkTS组件字段和文档专项通过55项，布局回归包含在学习域内。新增回归覆盖静止点按路由、1倍禁墨、无笔书写恢复、已拦截触点继续单指/双指导航、稀疏触点与fingerInfos优先、控件序列保护、实时变换/密度热区以及不可用节点转换的错误边界。增量签名HAP构建与警告门禁通过，accepted=162、unexpected=0；产物D:\Projects\jidecards-whiteboard-pen-tap-2026-10-10\entry-default-signed.hap，构建/学习/专项日志为同前缀-build.log、-study.log、-contract.log。生成代码确认宿主的禁止手指绘制/控件热区回调、视口Block/Default分流、按触点ID的导航与控件保护，以及两种引擎的1倍blocked观察均接通。只读获取连接设备当前布局，未安装、启动应用或操作平板；该布局没有打开白板，不能证明真实HSP工具节点兼容。手写笔报点、华为工具点击/滑条/弹窗、两指在笔模式下的导航与旧系统热区分支仍需设备复测。
+
+2026-10-10自动识别实现验收（历史；用户随后报告手指单点落墨）：npm test -- study通过442项；布局、JIDE结构、i18n、架构、ArkTS组件字段和文档专项通过62项。回归直接执行真实宿主/共同视口/本地组件，覆盖实际笔Down才启用模式、笔Up保持、关闭重置、换题/复位/后台保持、消失的笔活动ID、单指/双指结束次序、滑条排除、取消书写及笔首次接管旧手指草稿。最终增量签名HAP构建通过，警告门禁accepted=162、unexpected=0（前一轮较宽增量accepted=268、unexpected=0）。产物D:\Projects\jidecards-whiteboard-auto-pen-2026-10-10\entry-default-signed.hap，构建/学习检查日志为D:\Projects\jidecards-whiteboard-auto-pen-2026-10-10-build.log及同前缀-study.log。生成代码确认默认命中的onTouchIntercept、单指条件允许回调、双指Pan/Pinch、TouchRecognizer取消，以及两种引擎的pen_detected和single_finger_navigation接线均保留。没有安装或操作平板；原生笔事件、混合活动ID、SDK取消未完成笔迹的实际行为及掌托仍需设备验收。
+
+2026-10-10自动识别之前的输入冲突修复验收（历史）：学习域435项通过；最终白板/共同视野、布局、JIDE结构、资源、架构、组件字段和文档专项145项通过。增量签名HAP及警告门禁通过，accepted=268、unexpected=0，产物为D:\Projects\jidecards-whiteboard-finger-input-2026-10-10\entry-default-signed.hap，构建日志为D:\Projects\jidecards-whiteboard-finger-input-2026-10-10-final-build.log。生成代码保留双指Pan/Pinch与TouchRecognizer取消接线，未注册应用单指Pan；本地绘制不再按放大倍率禁用手指。只读确认SLG-W50仍连接，没有安装或操作设备，也没有原生开关两种状态的成对事件样本。官方判定回调给出当前绑定组件即将响应的识别器及响应链，不能仅凭链中单指Pan推导其手指书写开关。SDK取消是否恢复未完成笔迹、笔触摸是否冒泡、滑条与原生滚动隔离仍需设备验收。
+
+历史导航试验（2026-10-06，已被当前交互替代）：此前单指横向只移动整个华为组件、纵向继续由SDK滚动，双指同时变换卡面和笔迹，比例可缩至0.5并只保留48vp边缘。该版本会暴露有限画布之外的不可写背景，且卡面与单指移动的笔迹分离；本轮替换这一责任入口。旧安装与测试记录仅用于追溯，不证明本轮手势在真机已完成验收。
+
+同日此前恢复版本记录（历史验收，当前交互以本节最新说明为准）：用户要求笔感必须与华为官方无异，排除用自研笔刷替代官方引擎；手指/手写笔输入设置继续归华为套件。原生 Pinch 加逐帧 `scrollTo` 的试验已撤掉：设备日志显示初始化偏移被后续布局重置，`scrollTo` 绘制将横向偏移设回0并以结束状态重绘，不能用于连续二维平移和缩放。源码恢复此前用户确认顺滑的完整组件并行手势，保留80%默认透明度与偏好记忆。恢复版相关69项检查、增量ceshi构建和警告门禁通过，产物 `D:\Projects\jidecards-penkit-2026-10-06\restored-after-native-pan` 已覆盖安装。两指横向输入后的设备布局显示画布横移、原卡片与顶部按钮位置保持不变，也确认内部工具栏仍跟随；此项不证明硬件笔感或连续缩放已验收。本次已取得并逐文件核对华为 Codelab 完整 ZIP；它仍是调用系统套件的接入示例，未包含真实组件、工具栏或笔刷引擎实现。当前没有已验证的独立绘制入口，拆分未完成，保留可用的完整组件。
+
+两种白板的宿主顶部按钮和底部答案/评分共用CardViewportLayout.cardViewportWidth，按根窗口宽高判断横竖屏，不能用按钮扣除后的剩余高度判断方向。竖屏最多840vp，横屏沿用学习页自适应宽度。顶部条自身和学习页答案条各贡献一次12vp水平留白，最终按钮外缘保持相同；中间绘制区保持完整宽度，按钮和画布在纵向布局中分开。官方顶部关闭/透明度在窄窗可换行，透明度弹窗宽度受窗口内缘限制；原版工具设置沿用换行和限宽。布局回归见tools/tests/card-viewport-layout.test.mjs，真机按钮、华为内部工具栏和横竖屏边缘仍需设备验收。
 
 学习「更多」的顺序只由 `model/AppInterface.ts` 的 `study_more` 目录拥有；编辑、JIDE 改卡、撤销操作相邻排列，学习说明固定在末项。页面真实菜单与应用内助手使用同一目录，入口可见性和禁用条件仍由既有上下文判定。`ai-agent-app-structure.test.mjs` 执行实际菜单与分发验证顺序。多个文件音频经 `CardAudioSession` 交给原生 `声音播放器` 按顺序串行播放，重播从头开始；题目面只播题目，答案面依据 `skipQuestionWhenReplayingAnswer` 决定是否先重播题目再播答案。与 AnkiDroid `CardMediaPlayer.replayAll` / `playAllAvTagsInternal` 的多文件和两面重播语义一致；现有 `card-audio-session.test.mjs` 覆盖队列、两面顺序、取消和完成等待。菜单重排不改音频规则。
 
@@ -118,15 +136,15 @@ JIDE 偏好值域复用同一模式声明，`get_settings` 可读 `smart` 及能
 
 本机 API 23 SDK 与[当前官方组件 API](https://developer.huawei.com/consumer/cn/doc/doccenter-capabilities/api/pen-handwritecomponent)没有显式透明纸张、批注叠加层或任意二维平移参数；新增隐藏工具配置用于隐藏工具。这是公开接口声明的边界，不能据此断言组件在真机必然遮住卡面。现阶段保留完整华为组件，只有实际能力/上下文/加载/初始化失败或超时才自动回退原版；不可为了透明效果擅自将可用的官方笔刷替换掉，也不用白色混合、整层半透明或卡面截图冒充透明笔迹层。
 
-全局视图由 `学习手写白板层` 单独拥有 `StudyAnnotationView`，通过 `onViewChanged(AnnotationPose)` 交给学习页；学习页仅在手写打开时变换完整 CardViewport，原顶栏和原答案条隐藏但保留占位，当前可操作按钮仍在固定层。`StudyContentViewport` 供两种白板复用：内容正向变换，两指 PanGesture 与 PinchGesture 并行使用同一双指位置计算，不设单指拖动模式或输入遮罩；手势使用窗口坐标，按每个内容层布局原点补偿 `(scale-1)*origin`，避免SDK画布位于顶部条下方时与卡面发生缩放偏移。原版启用 globalNavigation 后取消自身缩放，绘制与历史仍归原版；SDK的笔感仍归完整套件，API23起关闭SDK缩放并限制长画布到视口，避免重复导航。比例范围0.5～4，边缘保留最多48vp。双指距离决定比例、当前双指中心决定位移；两个识别器分别跟踪活动状态，结束一个不能取消另一个仍在运行的手势。笔正在书写时手掌不能导航，单指继续归笔刷引擎；不改写笔迹或历史。关闭后卡面显示原比例，重新打开沿用全局视图；下一题才清空笔迹并复位。手写期间学习页隐藏原顶栏并保留其占位，官方宿主顶栏为透明，不以实色浮层盖住卡面。左侧关闭手写、右侧透明度均用普通公共按钮边框。背景纸张首次默认80%透明；手动滑动只实时预览，松手、点击滑块或退出时通过 `utils/StudyWhiteboardAppearanceStore.ets` 保存本机偏好，复用 `LocalPreferenceWrite` 串行写盘与回读，重开、重启和换题沿用。存储失败显示提示，`paper_transparency_saved=false` 不冒充已经记住。背景独立调节，不淡化笔迹或工具栏。返回先收起透明度弹窗，收起保留视图，下一题清空并复位。
+全局视野与输入分工以本节“当前交互”为准。纸张背景首次默认80%透明，手动调整在松手或退出时通过 `StudyWhiteboardAppearanceStore` 串行写盘并回读，重开、重启和换题沿用；保存失败保留真实未确认状态。透明度只影响背景，不淡化笔迹或工具栏。返回先关闭透明度弹窗，再收起白板。
 
 接手时分别核对以下证据，不以缺少 SDK 参数推导功能不存在，也不以 Node 模拟代替系统 HSP：
 
 | 能力 | 责任入口 | 当前证据与验证边界 |
 | --- | --- | --- |
-| 固定原卡片、透明叠加批注 | 学习页根 Stack；两种渲染器 | 用户已确认当前安装版本效果；外层源码不填充纸张，不据此推断所有 SDK 版本 |
+| 透明叠加批注与卡片共享视野 | 学习页根 Stack；两种渲染器 | 当前源码共用视野变换；纸张背景单独调节透明度。历史安装体验不能证明本轮实际画布布局及所有SDK版本的效果 |
 | 华为笔刷、历史及工具栏 | `StudyPenCanvas` → 系统 `HandwriteComponent` | 源码接入完整套件；各工具实际效果由系统 HSP 和设备验收确认，Node 不模拟笔刷质量 |
-| 全局闪卡与手写视图 | `学习手写白板层` → `StudyAnnotationView` / `StudyContentViewport` / 学习页 CardViewport | 检查双指等距连续平移、同时平移和缩放、两个识别器结束顺序、不同布局原点的对齐、手掌隔离、复位不清墨与生命周期；完整华为内部工具栏仍跟随，实际触控须设备验收 |
+| 全局闪卡与手写视图 | `学习手写白板层` → `StudyAnnotationView` / `StudyContentViewport` / 学习页 CardViewport | 检查未检测笔时单指书写、检测后单指平移、关闭重置模式、导航取消书写触摸后连续平移/双向缩放及1倍下限、四边夹紧、识别器结束顺序、不同布局原点的对齐、手掌隔离、复位不清墨与生命周期；完整华为内部工具栏仍跟随，实际触控须设备验收 |
 | 原版回退绘制与导航 | `StudyLocalWhiteboard` → `StudyAnnotationView` | `study-whiteboard-local.test.mjs` 与 `study-annotation-view.test.mjs`；通过不证明当前设备正在使用此引擎 |
 
 本次源码与原生引擎调查（2026-10-06）新增的具体证据：
@@ -194,6 +212,8 @@ JIDE 偏好值域复用同一模式声明，`get_settings` 可读 `smart` 及能
 学习页沿用浏览、统计页的背景链路：`首页.ets` 在 Navigation 外持有唯一 `ThemeBackground`，学习页 NavDestination 透明；顶部条、卡片区外围及答案条订阅 `PAGE_SURFACE_KEY`（本页变量 `页面底色微染值`）。这个键在幻彩主题下是 `#00000000`，普通主题下才是微染底色，不能把它当作固定不透明色，也不能在卡片外边距或底部避让区写死 `surface_page`，否则主题背景只剩顶部可见。卡片本体由 ArkUI 圆角外壳和 `学习卡片HTML构建器.ts` 的 ArkWeb 文档组成，使用 `surface_card` 深浅表面；不要把选中态用的 `主色容器` 铺满正文。
 
 HTML 构建器在模板 CSS 前同时提供默认字色与不透明卡片底色。模板显式设置的字色、底色和 `nightMode` 配色必须成对保留；不能在模板后用 `!important` 强制覆盖背景，否则标准 Anki 黑字白底模板会变成黑字深色底。学习与浏览预览共用此入口；未声明配色时仍使用应用深浅默认表面。CSS 顺序回归见 `tools/tests/card-template-style.test.mjs`，实际浏览器配色与对比度回归见 `tools/test-card-colors-browser.mjs`（Node 参数与 `PLAYWRIGHT_MODULE` 配置同 `tools/test-card-template-browser.mjs`）。
+
+模板只声明底色、字色缺失或无效时，默认字色通过 `--jide-card-default-text` 提供。`CardReviewerRuntime` 在每次完整加载与翻面的模板脚本、更新/展示 hook 完成后，按 body 与 html 合成的实际底色检查默认字色对比度，低于 4.5 且另一档更清晰时切换深浅默认文字，再确认绘制完成。有效的模板 `color`、字段内联颜色及背景保持 CSS 层叠语义，不因与默认值相同而被改写。导入样本中 `color:#C393939` 为无效七位颜色，浅色 `#E8E3DF` 背景在深色模式下仍需深色默认文字。学习、卡片预览和模板预览共用 CardWebView/同一运行时；`test-card-colors-browser.mjs` 使用生产会话与真实导航，覆盖深浅/宽窄、透明与半透明底色、明确配色和异步脚本生成答案，不再移除脚本后单独验证 CSS。浏览器验证不替代设备 ArkWeb 验收，也不验证卡包的外部联网解密服务。
 
 学习页注册现有 `CustomTransition` 协议，首页统一先隐藏退出页、再淡入进入页，并冻结/恢复根背景；不在学习页复制背景或用禁用转场掩盖问题。转场运行验证见 `tools/tests/iridescent-rendering.test.mjs`，背景接线见 `tools/tests/study-flow-contract.test.mjs`。设备验收须比较卡片四周、答案按钮四周与顶部背景是否连续，并检查进入、返回、翻面；Node 测试及 HAP 编译不能证明实际视觉效果。
 
@@ -276,6 +296,12 @@ HTML 构建器在模板 CSS 前同时提供默认字色与不透明卡片底色�
 
 学习、浏览预览和未保存模板预览共用 `model/学习卡片HTML构建器.ts`。默认配色与列表/代码对齐、笔记类型 CSS、应用布局/媒体兜底分别包在独立 style 中；不能重新合并，部分 Anki 牌组在 CSS 字段用闭合标签嵌入脚本。`utils/CardAssetResponse.ets`（原 MathAssetResponse）统一映射固定的内置 jQuery 3.7.1/MathJax rawfile；未知内置域请求返回 404，其他域沿原媒体/网络逻辑。jQuery 必须先于模板脚本同步加载。新增内置脚本需同时更新固定映射、许可与浏览器回归；不要修改导入笔记类型原文来规避渲染问题。外部作者脚本依赖与实际验证边界见 docs/FEATURE_STATUS.md。
 
+文档显示上下文由构建器唯一生成：`html.night-mode`、`data-bs-theme`、body 的 `card/nightMode/night_mode` 及具名 `jide-card-appearance` 样式。色板只在该样式中定义，运行时读取 CSS 变量，不另维护深浅色常量。翻面在执行模板脚本前更新同一位置的应用样式和文档主题，清除旧的派生默认字色，再替换正文、执行脚本和 hooks；保留模板的 JS 全局状态和应用未拥有的根类名。异步 hook 拒绝必须走现有失败通道，不得确认加载成功。模板异步工作应返回 hook Promise；未登记的任意定时器/外部服务不属于完成确认范围。
+
+此边界对照本机 `D:\Projects\AnkiDroid` 的现代 reviewer/preview 公共 `previewer/PreviewerHelpers.kt`（`stdHtml/bodyClass`）、`CardViewerViewModel.kt`（正反面内容更新）及 `assets/scripts/card.js`（hook Promise）确定；旧 `CardAppearance.kt` 同样提供两种夜间类名。采用公共显示上下文和会话内更新，保持 jidecards 的模板显式配色优先及合成表面兜底，不照搬旧版强制夜间背景规则。尚未提供 AnkiDroid 的全部平台/卡片序号类名。
+
+统一回归入口为 `npm run test:cards:browser`，包含 appearance/colors/template/flip 四项。`test-card-appearance-browser.mjs` 对比直接加载答案与反复翻面/主题变化的计算样式、脚本可见主题、背景及类名，检查不重新导航且模板状态保留；此前仅替换正文会在这里失败。CI 独立执行同一命令。依赖、浏览器安装及验证范围见[工具入口](../../tools/README.md)和[验证说明](verification.md)。
+
 卡片默认公式识别由 `rawfile/mathjax/card-math.js` 统一拥有，对齐 Anki/AnkiDroid，仅识别 `\(...\)` 和 `\[...\]`，关闭公式之外的转义、环境和引用自动处理。美元符号写法作为普通正文保留，避免 `grep` 的 `^$`、Shell 变量/PID 和金额误入公式；没有新增兼容开关。`test-math-rendering-browser.mjs` 在真实公式与普通文字混合的正反面及深浅主题中验证原文完整、无错误公式，并继续验证数学、化学、MathML 和自定义宏。学习、浏览/首页及草稿/模板预览沿用共享构建器；JIDE 对话由独立的 `AgentMath.ts` 解析受保护的文本片段，其美元符号公式规则保持独立。
 
 卡片文字对齐采用 Anki/AnkiDroid 的模板语义：应用不在 `body`、`.card` 或 `#qa` 强制设置 `text-align`。本轮对照本机 `D:\Projects\AnkiDroid` 的 `AnkiDroid/src/main/assets/flashcard.css`、`card_template.html` 和 `cardviewer/AndroidCardRenderContext.kt`：默认 `li { text-align: start; }`、`pre { text-align: left; }` 放在模板 CSS 之前，模板同名规则可以覆盖。未声明对齐的正文使用浏览器的 `start`；标准 Anki 笔记类型自带 `.card { text-align: center; }`，仍按模板居中。`#typeans` 的拼写比较与折叠控件保留各自的局部对齐。卡片宽度由现有布局和模板负责，不额外对 `#qa` 添加固定阅读宽度。
@@ -299,7 +325,7 @@ HTML 构建器在模板 CSS 前同时提供默认字色与不透明卡片底色�
 
 回归入口 `tools/tests/study-auto-advance-settings.test.mjs`：直接测试草稿返回/确认、取消不写入、已存在覆盖值、非预设时长、迟到回调及反馈倒计时；文案调用真实 `UiFeedback.resourceText`，使用中英资源文件验证具体秒数，禁止用字符串拼接替身宣称格式化通过。设备验收须检查主界面→二级→返回/确定→主界面、系统返回、底部按钮及深浅色；Node 测试和 HAP 构建不替代视觉验收。
 
-自定义弹窗通过 `components/common/DialogHeader.ets` 将确认、保存、完成固定在标题栏右侧，取消或关闭放左侧；左右操作区等宽，标题相对弹窗整体居中。主操作为透明底色文字按钮，文字跟随 `颜色键.动作主色`，保留调用方的忙碌与校验守卫。媒体管理的操作按未使用媒体和回收站分区排列，禁用按钮保留位置与清晰的灰色文字。系统原生确认框沿用平台布局。
+自定义弹窗通过 `components/common/DialogHeader.ets` 将确认、保存、完成固定在标题栏右侧，取消或关闭放左侧；左右操作区等宽，标题相对弹窗整体居中。主操作与文字取消复用 `按下态按钮`，与新增图片和笔记保存共用卡片表面、描边、胶囊圆角和按压反馈；普通主操作跟随 `颜色键.动作主色`，危险操作保留错误色，关闭/返回复用 `IconActionButton`。调用方继续拥有忙碌与校验守卫，按钮内部阻止禁用回调。媒体管理的操作按未使用媒体和回收站分区排列。系统原生确认框沿用平台布局。公共接线回归见 `ui-shell-controls.test.mjs`，几何与设备验收边界见 [界面一致性](appearance.md#视觉与交互一致性)。
 
 学习页右上角更多菜单提供“编辑”，进入 `pages/EditNotePage.ets` 独立页面，复用新增的标题栏与字段卡片。`model/NoteEditorSession.ts` 在编辑页拥有读取代次、草稿可见性和写入输入快照；`AnkiNoteUpdate` 在集合操作保护内导图和更新。学习页只冻结交互，并在 onShown 恢复，写入通知通过原有 cardContentChangedTick 消费。编辑期间屏蔽学习快捷键及评分；字段读取完成前不挂载空编辑器；取消保留当前卡面并排除编辑耗时，保存保留撤销记录并通过既有加载流程重新获取队首、调度状态与题面。
 

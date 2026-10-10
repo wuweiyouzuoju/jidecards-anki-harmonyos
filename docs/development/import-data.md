@@ -1,6 +1,8 @@
 # 数据导入、导出与恢复
 
-[返回任务索引](../../PROJECT_CONTEXT.md) · [集合生命周期](sync-data.md)
+[返回任务索引](../../PROJECT_CONTEXT.md)
+
+导出牌组及CSV目标牌组选择共用[公共目录树](appearance.md#公共目录树)，完整路径搜索、独立展开和稳定ID回传由 DirectorySelect / DirectoryTree 负责。CSV“文件指定”保留原文件的 deckId/deckColumn/deckName，选实际牌组只修改原目标字段；笔记类型和列映射保留普通枚举控件。导出范围、导入草稿及持久化仍归原流程。 · [集合生命周期](sync-data.md)
 
 ## 入口与责任
 
@@ -12,7 +14,7 @@
 
 `settings/DataActionRow.ets` 共用数据操作与备份入口：水平边距仅由外层提供，行内只贡献上下 8vp，最小高度 58vp 可随文字增长；提示占剩余宽度，箭头固定。导入面板继续复用 `DialogFrame` 的限宽、固定标题、滚动正文及安全区约束。
 
-外部 APKG 用 `importUri(uri, true)` 打开同一选项面板；等待确认期间保留 `HomeWorkCoordinator` 的 URI 租约，确认后直接使用已授权 URI，不再弹选择器。关闭/离页释放未提交文件，已接受导入等待真实调用结束才释放队列。历史的 `importUri(uri)` 直接执行接口保留给内部调用与测试。云端精选牌组继续沿用其串行下载、成功配额和逐项失败策略，不复用整库替换语义。
+外部 APKG 用 `importUri(uri, true)` 打开同一选项面板；等待确认期间保留 `HomeWorkCoordinator` 的 URI 租约，确认后直接使用已授权 URI，不再弹选择器。系统声明与聊天应用类型兜底归 [APKG 系统打开入口](home.md#apkg-系统打开入口)，通用二进制/ZIP 类型不能放宽 APKG 文件名校验。关闭/离页释放未提交文件，已接受导入等待真实调用结束才释放队列。历史的 `importUri(uri)` 直接执行接口保留给内部调用与测试。云端精选牌组继续沿用其串行下载、成功配额和逐项失败策略，不复用整库替换语义。
 
 ## APKG 与文本
 

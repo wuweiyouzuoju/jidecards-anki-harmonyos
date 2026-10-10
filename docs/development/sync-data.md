@@ -4,12 +4,18 @@
 
 同步按钮与面板共用 `ActionStatus`；`SyncSession` 的 failure 与冲突 attention 分开，暂停/等待不展示成功。反馈责任与验证范围见 [交互恢复与局部动效](interaction-feedback.md)。
 
-不依赖账号的 Anki / AnkiDroid 核心回归见[核心互通](core-interop.md)：`npm run test:interop` 生成隔离 APKG/COLPKG 与结果报告。它不证明线上同步通过；真实 AnkiWeb 增量、全量和媒体同步需要隔离测试账号，未提供前保持未验证。旗标／星标另有 [card_marking.rs](../../native/rsharmony/tests/card_marking.rs) 的临时 SimpleServer＋两个独立 Core Backend HTTP 同步回归，覆盖普通双向修改、全量、撤销、失败重试与重开；这是本机协议证据，未运行 Android/HarmonyOS 应用。社区调查未找到可直接采用的标记冲突修复后，按用户选择启用 JideCards 待同步标记优先：混合客户端冲突保留 JideCards 旗标／exact marked，整体记录仍按上游 mtime 选择；两个 JideCards 均待同步时由后同步端的标记胜出并传播。上传前为剩余待同步卡片／笔记准备更大的标准修订时间，故不是纯字段时间戳合并。名称仍走原集合配置规则，两个未修改 AnkiDroid 之间不受影响。见[源码对照](flags-marking-audit-2026-10-03.md)和[当前决策及社区来源](../decisions/2026-10-03-marking-sync-priority.md)。
+不依赖账号的 Anki / AnkiDroid 核心回归见[核心互通](core-interop.md)：`npm run test:interop` 生成隔离 APKG/COLPKG 与结果报告。它不证明线上同步通过；2026-10-07 的独立真实 AnkiWeb 集合与隔离服务器媒体结果见[验收记录](ankidroid-high-priority-2026-10-07.md)，不扩大为完整线上故障矩阵通过。旗标／星标另有 [card_marking.rs](../../native/rsharmony/tests/card_marking.rs) 的临时 SimpleServer＋两个独立 Core Backend HTTP 同步回归，覆盖普通双向修改、全量、撤销、失败重试与重开；这是本机协议证据，未运行 Android/HarmonyOS 应用。社区调查未找到可直接采用的标记冲突修复后，按用户选择启用 JideCards 待同步标记优先：混合客户端冲突保留 JideCards 旗标／exact marked，整体记录仍按上游 mtime 选择；两个 JideCards 均待同步时由后同步端的标记胜出并传播。上传前为剩余待同步卡片／笔记准备更大的标准修订时间，故不是纯字段时间戳合并。名称仍走原集合配置规则，两个未修改 AnkiDroid 之间不受影响。见[源码对照](flags-marking-audit-2026-10-03.md)和[当前决策及社区来源](../decisions/2026-10-03-marking-sync-priority.md)。
 
 - 代码路径以下均相对 `entry/src/main/ets/`。
 - 责任链：AutoSyncScheduler 保存意图；SyncActivity 拥有集合占用；SyncSession 执行同步，根同步面板展示快照。
 - 快速反馈：`npm test -- sync`；完整验收见 [验证说明](verification.md)。
 - 审查与修复记录：[2026-09-27 同步实现审查](sync-audit-2026-09-27.md)；媒体任务唯一启动/消费、首页统计独立队列和设置分组保护的当前契约见下文。
+
+## 自定义同步端点与证书边界
+
+`components/settings/同步分组.ets` 提供自定义服务器地址，`同步凭证存储` 保存端点，实际请求沿 `SyncSession` → `同步服务` → Core。系统受信任证书的 HTTPS 使用平台/Core 的正常校验。
+
+`同步服务.设置自定义证书` 只有 Service 封装，当前 UI/JIDE 没有调用者，也没有证书选择、持久化、重启恢复或移除流程。不能把生成的 `Sync_set_custom_certificate` RPC 或该封装当作可用的私有 CA 配置功能。核查时同时搜索 Service 调用者、`同步分组` 和生成调用清单，不从 README 或历史盘点反推已接通。
 
 ## 同步任务与页面可用性
 
@@ -21,9 +27,23 @@
 
 普通与全量同步采用 Anki 桌面端的所有权方式：Core 自动启动媒体后，`SyncSession.启动媒体阶段()` 只监测，不再调用 SyncMedia。冲突重检用 `syncMedia=false`，若重检已经完成集合合并，则显式传 `startMedia=true` 启动一次。保留服务端媒体 USN 和重定向端点，不能把这些路径改成无条件再启动媒体。`媒体同步状态()` 会消费一次性终态，只有根同步宿主（包括其销毁清理）可以调用；媒体管理与删除牌组后的媒体清理只读 `SyncActivity.isActive()`，整个同步租约期间保守禁止清理。回归：`sync-media-ownership.test.mjs` 覆盖快速失败、全量/无变化/重检、其他页面抢先观察及错误保留。
 
+媒体启动被接受后立即读取一次进度，后续每秒检查；打开同步详情和恢复前台时，通过 `SyncSession.pollMediaStatus()` 立即刷新主页按钮及详情快照。读取串行，交互触发在已有读取后合并补查一次；完成、失败和销毁后，旧定时器不得再消费终态。销毁清理等待当前读取落定后才中止并确认线程退出，防止两次状态查询争抢一次性结果。Core 暂无媒体进度时保留上一份有效计数。主页沿原 `statusChanged` 发布 `sync_indicator` / `sync_status` 给 JIDE，入口及能力声明不变。回归：`sync-media-refresh.test.mjs` 覆盖普通、全量和重检路径的首读、前台/详情刷新、快速终态、并发及销毁；设备上的后台挂起、最终按钮重绘和真实网络传输仍需单独验收。
+
 按阶段提示成功：卡片提交后提示“卡片数据已同步，可以开始学习”，媒体结束后明确提示“媒体同步完成”，每个阶段只提示一次，不能使用两条泛称“同步完成”的提示。关闭媒体同步时，集合结束仍只提示一次整体完成。自动静默任务不打扰，用户主动打开详情时允许展示完成提示。媒体失败保留卡片已保存的说明。媒体详情可关闭，任务仍由根宿主持有；失败重试仍使用原有手动同步入口和租约，不另起无所属的并发任务。既有自动同步默认关闭及升级迁移规则不变。
 
 设置目录、外观、帮助、AI 等独立内容可在集合同步期间直接进入。`设置面板.openSection()` 对调度器、数据维护和高级分组按 `SyncActivity.isCollectionBusy()` 保护；设置页的牌组查询等待集合释放并检查离页状态，直接导出/备份入口也检查集合占用。卡片读写、提醒等真实依赖集合的入口仍保留事务保护。`home-sync-refresh-runtime.test.mjs` 验证设置导航和数据库分组的差异。
+
+## 自定义服务器弹窗与生命周期
+
+`components/settings/同步分组.ets` 仍拥有地址草稿、校验错误、登录状态和保存占用；`自定义服务器弹窗` 通过五个 `@Link` 共享这些状态，持久化继续由 `saveCustomSyncServer` 完成。`createServerDialog` 必须是字段初始化的箭头工厂，每次打开仍重建控制器并取当前动效参数。普通方法中的 `CustomDialogController` 虽然能编译，但目标 SDK 保留 `this.serverInput` 等原始值，打开时 `SynchedPropertyTwoWayPU` 无法订阅；换成裸 `$field` 也可能未转换。不能用生成字段 `__field` 或捕获后跳过弹窗掩盖问题。
+
+离开设置时关闭并释放控制器，迟到的原生关闭回调只执行 dismiss，不再读取已销毁状态。地址保存、登录和自动同步偏好提交可独立完成；迟到成功/失败不更新已销毁 UI。登录开始时捕获账号、密码和端点，成功后仍持久化已接受请求的凭证，密码不落盘；离开自动同步确认框不视为授权。设置目录、地址规范化、账号保护和 JIDE 能力入口保持原有语义。
+
+窗口和表单外壳已接入公共 `NativeDialogHost` / `DialogFrame`：字段工厂只声明实际 builder 并消费公共窗口配置，`openServerDialog` 给公共宿主传入保存守卫与取消草稿回滚。窗口退出调用 `dispose()`；表单遮罩和标题关闭继续交 `closeServerDialog`，保存完成主动关闭仍不回滚已保存地址。公共外壳提供键盘、安全区和正文滚动限高；不再在服务器组件重复固定宽高、卡片内边距或原生遮罩。
+
+后续同日统一验收已连接 SLG-W50 / API24，使用该设备既有测试签名覆盖安装并验证自定义服务器的打开、非法地址错误、关闭/重开、返回与遮罩关闭；API23 手机模拟器另验键盘与取消草稿，均未修改已保存地址。上述初始修复的“没有连接设备”是先前验证阶段，当前实际覆盖及剩余设备范围见 [原生弹窗验收](appearance.md#视觉与交互一致性)。
+
+回归入口：[check-sync-server-compiled.mjs](../../tools/check-sync-server-compiled.mjs) 执行真实 CompileArkTS 输出的打开、渲染、输入、保存、取消、重新打开与生命周期；全应用位置扫描在 `arkts-component-fields.test.mjs`，原业务回归在 `sync-automatic.test.mjs` / `sync-settings.test.mjs`。2026-10-09 本次检查复现旧产物的订阅失败，新 release 产物通过；其余原生弹窗无同类 `@Link`，设置面板的 `activeSection` 在父页面 build 中正确传状态对象。签名 release HAP 与原入门编译产物检查通过，新增编译警告为零。没有连接设备，HarmonyOS 6.1 / API24 的手机和平板交互尚未验收；Node 检查不代替 ArkUI 重渲染、字节码和真机。
 
 ## 学习会话与同步调度
 
