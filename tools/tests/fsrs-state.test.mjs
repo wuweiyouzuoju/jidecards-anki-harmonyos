@@ -31,6 +31,7 @@ function dialogHarness(path, { current = false, choice = 0, save = async () => t
   });
   const page = new Page();
   page.fsrsPromptActive = false;
+  page.homeDisposed = false;
   page.homeActivityChanged = () => {};
   page.getUIContext = () => ({
     getHostContext: () => ({ resourceManager: { getStringSync: key => key } }),
@@ -41,6 +42,22 @@ function dialogHarness(path, { current = false, choice = 0, save = async () => t
   });
   return { page, state };
 }
+
+test('FSRS warning cannot open after a late read or write settings after a departed confirmation',async()=>{
+  for(const phase of ['read','confirm']){
+    let release;const gate=new Promise(resolve=>release=resolve),events=[];
+    const Page=componentMethods('pages/首页.ets',['同步后检查FSRS'],{
+      加载FSRS开启状态:()=>phase==='read'?gate:Promise.resolve(false),
+      设置FSRS开启状态:async()=>events.push('write'),$r:key=>({id:key})
+    });
+    const page=new Page();Object.assign(page,{homeDisposed:false,fsrsPromptActive:false,homeActivityChanged(){},
+      getUIContext:()=>({getHostContext:()=>({resourceManager:{getStringSync:key=>key}}),
+        getPromptAction:()=>({showDialog:()=>{events.push('prompt');return gate;},showToast:()=>events.push('toast')})})});
+    const work=page.同步后检查FSRS(true);await settle();page.homeDisposed=true;
+    release(phase==='read'?false:{index:0});await work;
+    assert.deepEqual(events,phase==='read'?[]:['prompt']);assert.equal(page.fsrsPromptActive,false);
+  }
+});
 
 // 手动/自动同步都由首页根宿主交付集合结果，设置页不再持有同步弹窗。
 for (const path of ['pages/首页.ets']) {

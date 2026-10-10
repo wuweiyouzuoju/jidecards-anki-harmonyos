@@ -18,6 +18,7 @@ import * as textExport from '../entry/src/main/ets/proto/messages/TextExportMess
 import * as cards from '../entry/src/main/ets/proto/messages/CardsMessages.ts';
 import * as collection from '../entry/src/main/ets/proto/messages/CollectionMessages.ts';
 import * as sync from '../entry/src/main/ets/proto/messages/SyncMessages.ts';
+import * as config from '../entry/src/main/ets/proto/messages/ConfigMessages.ts';
 import { pack } from './tests/protocol-oracle.mjs';
 
 const child=spawn('cargo',['run','--locked','-p','jidecards_core','--features','anki-core','--example','protocol_probe'],
@@ -66,6 +67,21 @@ try {
   const found=await compare('SearchMessages','decodeSearchResponse',[await rpc.Search_search_cards(await compare('SearchMessages','encodeSearchRequest',[searchInput]))]);assert.ok(found.includes(fixture.cardId));
   await compare('CardsMessages','decodeCard',[await rpc.Cards_get_card(await compare('CardsMessages','encodeCardId',[fixture.cardId]))]);
   const note=await compare('NoteMessages','decodeNote',[await rpc.Notes_get_note(await compare('NoteMessages','encodeNoteId',[fixture.noteId]))]);
+  const fieldRequest=new messages.NotesFieldNamesForNotesRequest();fieldRequest.setNids([fixture.noteId]);
+  const fieldNames=new messages.NotesFieldNamesForNotesResponse(await rpc.Notes_field_names_for_notes(fieldRequest.toBytes())).getFields();
+  assert.ok(fieldNames.includes('Front'));assert.ok(fieldNames.includes('Back'));
+  const grade=new messages.SchedulerGradeNowRequest();grade.setCardIds([fixture.cardId]);grade.setRating(2);
+  const beforeGrade=cards.decodeCard(await rpc.Cards_get_card(cards.encodeCardId(fixture.cardId)));
+  await rpc.Scheduler_grade_now(grade.toBytes());
+  const afterGrade=cards.decodeCard(await rpc.Cards_get_card(cards.encodeCardId(fixture.cardId)));
+  assert.equal(afterGrade.reps,beforeGrade.reps+1);
+  await rpc.Collection_undo();assert.equal(cards.decodeCard(await rpc.Cards_get_card(cards.encodeCardId(fixture.cardId))).reps,beforeGrade.reps);
+  const browserColumns=new messages.GenericStringList();browserColumns.setVals(['question','answer']);
+  await rpc.Search_set_active_browser_columns(browserColumns.toBytes());
+  assert.equal(search.decodeBrowserRow(await rpc.Search_browser_row_for_id(search.encodeInt64Request(fixture.cardId))).cells.length,2);
+  const browserPreference=new messages.ConfigSetConfigJsonRequest();browserPreference.setKey('jideBrowserPreferences');
+  const browserPreferenceJson=JSON.stringify({mode:'cards',sortColumn:'noteFld',sortReverse:false,subtitleIndex:1,cardsColumns:['question','answer'],notesColumns:[],recentSearches:['deck:Default']});
+  await rpc.Config_set_config_json(config.encodeSetConfigJsonRequest({key:'jideBrowserPreferences',valueJson:browserPreferenceJson,undoable:false}));
   note.fields[1]='Saved through generated wire 😀';
   await rpc.Notes_update_notes(await compare('NoteMessages','encodeUpdateNotesRequest',[[note]]));
   assert.equal((await compare('NoteMessages','decodeNote',[await rpc.Notes_get_note(notes.encodeNoteId(fixture.noteId))])).fields[1],note.fields[1]);
@@ -91,8 +107,13 @@ try {
   }]));
   const restored=await compare('NoteMessages','decodeNote',[await rpc.Notes_get_note(notes.encodeNoteId(fixture.noteId))]);
   assert.equal(restored.id,fixture.noteId);
+  assert.deepEqual(JSON.parse(config.decodeJsonResponse(await rpc.Config_get_all_config())).jideBrowserPreferences,JSON.parse(browserPreferenceJson));
+  await assert.rejects(rpc.Search_browser_row_for_id(search.encodeInt64Request(fixture.cardId)),/protocol error/);
+  await rpc.Search_set_active_browser_columns(browserColumns.toBytes());
+  assert.equal(search.decodeBrowserRow(await rpc.Search_browser_row_for_id(search.encodeInt64Request(fixture.cardId))).cells.length,2);
   child.stdin.end();const [code]=await once(child,'exit');assert.equal(code,0);
   mkdirSync('.local',{recursive:true});writeFileSync('.local/protocol-core-evidence.json',JSON.stringify({revision:'26.05-e64c6b1',samples:record,
-    scope:'temporary synthetic collection; production codecs + official dispatch + locked Core',onlineSync:'not-run'},null,2)+'\n');
+    scope:'temporary synthetic collection; production codecs + official dispatch + locked Core',
+    browser:['field names','grade now and undo','preference persistence','columns lost on reopen and restored'],onlineSync:'not-run'},null,2)+'\n');
   console.log(`[protocol-core] ${record.length} old/new comparisons; study/config/search/cards/notes/media/packages/text/sync control passed`);
 } finally { if(child.exitCode===null)child.kill(); }

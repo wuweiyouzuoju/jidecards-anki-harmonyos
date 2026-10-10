@@ -7,9 +7,9 @@
     "enums": 49,
     "backendServices": 23,
     "backendMethods": 239,
-    "domainMethods": 136,
+    "domainMethods": 138,
     "contractMethods": 5,
-    "unconnectedMethods": 98,
+    "unconnectedMethods": 96,
     "migrations": 208
   },
   "capabilityPolicy": "生成覆盖不等于产品接入；无领域调用为未接入。有调用也须经过原有 UI/JIDE 能力目录、权限与确认流程。",
@@ -1129,7 +1129,8 @@
         "oracleInputs": 1,
         "successfulInputs": 1,
         "tests": [
-          "tools/tests/import-options-runtime.test.mjs"
+          "tools/tests/import-options-runtime.test.mjs",
+          "tools/tests/ui-directory-tree.test.mjs"
         ],
         "differential": "tools/tests/protocol-generation.test.mjs",
         "expandedDifferential": "tools/tests/protocol-equivalence.test.mjs",
@@ -6852,9 +6853,13 @@
       "input": "anki.scheduler.GradeNowRequest",
       "output": "anki.collection.OpChanges",
       "wrapper": "Scheduler_grade_now",
-      "status": "未接入",
-      "callers": [],
-      "wrapperCallers": [],
+      "status": "领域 Service 已调用",
+      "callers": [
+        "entry/src/main/ets/backend/调度器服务.ts"
+      ],
+      "wrapperCallers": [
+        "entry/src/main/ets/backend/调度器服务.ts"
+      ],
       "contractCallers": []
     },
     {
@@ -7962,9 +7967,13 @@
       "input": "anki.notes.FieldNamesForNotesRequest",
       "output": "anki.notes.FieldNamesForNotesResponse",
       "wrapper": "Notes_field_names_for_notes",
-      "status": "未接入",
-      "callers": [],
-      "wrapperCallers": [],
+      "status": "领域 Service 已调用",
+      "callers": [
+        "entry/src/main/ets/backend/笔记服务.ts"
+      ],
+      "wrapperCallers": [
+        "entry/src/main/ets/backend/笔记服务.ts"
+      ],
       "contractCallers": []
     },
     {

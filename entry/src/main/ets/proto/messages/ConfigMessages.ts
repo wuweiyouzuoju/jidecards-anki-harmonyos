@@ -5,6 +5,7 @@ import { UTF8编码, UTF8解码 } from '../core/utf8';
 import { ConfigGetConfigBoolRequest, ConfigSetConfigBoolRequest, ConfigSetConfigJsonRequest, GenericBool, GenericJson, GenericString } from '../generated/CoreMessages';
 export { decodeOpChanges } from './CollectionMessages';
 export enum ConfigKeyBool {
+    IGNORE_ACCENTS_IN_SEARCH = ConfigConfigKeyBool.IGNORE_ACCENTS_IN_SEARCH,
     BROWSER_TABLE_SHOW_NOTES_MODE = ConfigConfigKeyBool.BROWSER_TABLE_SHOW_NOTES_MODE,
     COLLAPSE_TAGS = ConfigConfigKeyBool.COLLAPSE_TAGS,
     COLLAPSE_DECKS = ConfigConfigKeyBool.COLLAPSE_DECKS,
