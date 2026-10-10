@@ -12,6 +12,7 @@ Node 24.x 与 `package.json` / CI 一致。首次准备或 lockfile 变化后运
 | `npm test -- --list` | 当前可选领域及测试文件数 | 测试执行 |
 | `npm test -- home`（或 study/sync/browser/media/agent/ui/tooling/repo） | 受影响领域的局部验证 | 未覆盖领域、编译、真机 |
 | `npm test` | 全部 Node 行为与静态约束测试 | ArkTS 类型检查、Kit/ArkUI 实际行为 |
+| `npm run test:cards:browser` | 真实浏览器中的生产卡片会话、初次/翻面显示上下文等价、模板脚本/配色、状态和公式；CI 独立门禁 | ArkWeb、HAP、设备、任意第三方联网服务；依赖/浏览器前提见[工具入口](../../tools/README.md) |
 | `npm run test:interop` | 锁定 Core 的隔离 APKG/COLPKG、ID/历史/未知配置、取消及进程恢复；生成样本和报告，见[核心互通](core-interop.md) | Android/HarmonyOS 设备、Anki 桌面 GUI、真实在线同步 |
 | `npm run verify -- repo` | 可移植仓库门禁，CI 使用同一入口 | Rust、HAP、设备 |
 | `npm run doctor` | 本机工具链与版本诊断 | 实际构建、签名可用性 |
@@ -30,6 +31,16 @@ Node 24.x 与 `package.json` / CI 一致。首次准备或 lockfile 变化后运
 首次入门的回归入口为 [check-home-intro-compiled.mjs](../../tools/check-home-intro-compiled.mjs)。HAP 构建后，从仓库根运行 `node tools/check-home-intro-compiled.mjs entry/build/default/cache/default/default@CompileArkTS/esmodule/release/entry/src/main/ets/components/HomeIntroPanel.ts`（debug 包相应替换目录）。需要 Node 24 和本次构建留下的 CompileArkTS 产物；不接受 `.ets` 源码，不依赖旧的入门已读记录。
 
 工具执行真实编译后的 `HomeIntroPanel` / `HomeIntroSection` 及其 BuilderParam 回调，只替换外部组件与平台边界；原始声明式 `Text()` 返回 `undefined`，未转换的 `.fontSize` 链会直接失败。六个分组或 16 个 Text 节点缺失、执行异常、产物不存在均非零退出，成功输出文件路径、SHA-256 与渲染计数。工具自身反例在 `home-intro-compiled.test.mjs`，进入 home 测试；它不验证字节码执行、布局、重渲染、原生库或真机兼容性，也不能单独认证上架包。
+
+### 同步服务器编译产物检查
+
+HAP 构建后运行 `node tools/check-sync-server-compiled.mjs entry/build/default/cache/default/default@CompileArkTS/esmodule/release/entry/src/main/ets/components/settings/同步分组.ts`，debug 包替换目录。需要 Node 24 和本次 CompileArkTS 输出，不接受 `.ets` 源码；产物不存在、绑定不是父状态引用或运行异常均非零退出，成功输出路径、SHA-256 与覆盖计数。
+
+工具执行编译后的分组/弹窗构造、渲染与真实业务方法。平台替身严格执行状态 get/set/订阅与销毁契约，旧产物传字符串时会在 `addSubscriber` 立即失败；五个字段须连接父状态，输入和错误须到达表单。覆盖地址校验、持久化失败、保存中禁用与关闭守卫、取消/重开、已登录保护，以及销毁后的地址保存、登录、自动同步确认/写入和原生关闭回调。自身反例在 `sync-server-compiled.test.mjs`，进入 sync 测试；全应用构造位置扫描在 `arkts-component-fields.test.mjs`。替身不模拟 ArkUI 的观察调度、动画、布局、网络或真实存储，工具也不执行字节码；设备上的手机/平板完整操作仍需独立验收。
+
+原生弹窗统一后，工具同时执行当前 `NativeDialogHost` 源逻辑；DialogFrame 平台替身只转发编译后的 header/content 插槽，确保真实表单仍渲染和接线，不证明公共外壳布局。`native-dialog-host.test.mjs` 进入 ui 筛选，独立执行公共窗口生命周期、失败与迟到回调，并扫描字段工厂、公共配置和布局。动效档位变更仍执行 `motion-style-surfaces.test.mjs`；这些检查均需配合本次 HAP 和设备验收。
+
+`ui-help-entry.test.mjs` 的旧版导入帮助、牌组选项帮助与兑换说明执行真实 `NativeDialogHost` 和调用方字段工厂，只替换系统窗口及内容渲染。生命周期回归检查忙碌保护、帮助先于编辑器关闭、重复销毁、重新出现和旧内容回调隔离；窗口配置检查实际工厂输出与公共 `presentation()` 一致，不要求调用方重复配置字面量。牌组选项的本地草稿和确认边界继续由 `deck-option-dialog.test.mjs` 验证；上述主机检查不证明 ArkUI 布局和设备窗口行为。
 
 `verify` 按阶段打印 environment/repository/native/sandbox/rpc-index/protocol-core/hap，失败立即非零退出。结束报告必须写明执行的模式，repo 成功不等于整个应用验证完成。
 
@@ -154,3 +165,5 @@ Node 24 测试使用内置 TypeScript 转换，运行时可能输出 `Experiment
 - `node tools/test-anki-core.mjs` 是 CI 与本地共用的真实 Core 入口：校验锁定输入、准备翻译子模块、幂等应用已跟踪补丁，运行 `cargo test -p jidecards_core --features anki-core --locked`。独立 checkout 核对提交；源码归档核对协议指纹，不能错误借用父仓库 HEAD。Windows 原生工具链仍可用 `build-native.ps1 -Target host-test`。
 - `.github/workflows/ci.yml` 的 Rust 作业增加上述 Core 入口，覆盖实际集合/媒体/取消行为；远端执行结果需另行查看，不以本地通过冒充。
 - `.github/workflows/hap.yml` 每周和手动运行 `npm run verify`，需要带 `jidecards-deveco` 标签的 Windows 自托管 runner。Runner 必须预置锁定 SDK、Rust/Anki 及本机签名配置。`clean: false` 保留这些不受版本控制的本机依赖。工作流只运行可信默认分支，不接入 PR 的签名主机执行；配置文件存在不代表 runner 已注册或定时任务已运行。
+
+`npm test -- ui` 按文件名自动包含所有 `ui-*.test.mjs`，避免新增 UI 门禁遗漏；tooling.test 直接验证发现结果。圆角属性顺序门禁为 `ui-surface-border.test.mjs`，扫描器入口是 `tools/arkui-border-order.mjs`，覆盖连续属性链中的多行参数和中间属性；这是源码级检查，设备外观与键盘操作仍单独验收。

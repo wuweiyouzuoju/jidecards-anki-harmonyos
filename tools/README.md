@@ -11,6 +11,7 @@
 | 选择题 Anki 引擎验收 | `python tools/choice-anki-roundtrip.py` | 独立 Python 环境安装 `anki==26.5`；临时集合验证导入、模板渲染、重复导入和含 Hard/Good 记录的导出再导入，不访问真实账户 |
 | 变更影响计划 | `npm run impact` | 支持 `--kind cosmetic|behavior|compile|integration|release`、`--json`、`--base <ref>` 或 `--paths <路径> ...`；按影响建议局部检查，只读，不执行验证，详见 [验证说明](../docs/development/verification.md) |
 | 领域/完整 Node 回归 | `npm test -- <领域>` / `npm test` | 清单 `npm test -- --list` |
+| ArkUI 圆角属性顺序 | `node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs --test tools/tests/ui-surface-border.test.mjs` | `arkui-border-order.mjs` 扫描连续属性链，发现未指定 radius 的 border 覆盖前置圆角时失败；Node 24，无设备依赖，不替代实际外观验收；也进入 `npm test -- ui` |
 | JIDE 软件认知同步 | `node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs --test tools/tests/ai-agent-app-structure.test.mjs tools/tests/ai-agent-app-settings.test.mjs` | 新设置组件自动扫描登记 ID/资源，真实结构回归验证新增、改名、显隐和删除；漏登记关系失败，不保证发现任意手写 UI；[开发规范](../docs/development/coding-agent.md#软件升级时的认知同步) |
 | Anki 官方教程完整性 | `node tools/vendor-anki-manual.mjs --check` | 离线检查选章、原文/许可证 SHA-256、范围索引与归属；失败退出非零；同一检查包含在 Agent 测试中 |
 | 更新官方教程快照 | `node tools/vendor-anki-manual.mjs --write --source-dir <官方-Anki-checkout>` | 明确更新才写；Git + Node，读取 origin 为 ankitects/anki 的已提交 HEAD，不联网、不读取改稿、不改 Core 锁；选择在 `anki-manual-topics.json`，需复核差异并跑 Agent 测试/增量 HAP |
@@ -33,7 +34,7 @@
 | 同步服务器编译产物 | `node tools/check-sync-server-compiled.mjs <本次编译的同步分组.ts>` | 执行真实分组/弹窗输出，检查五个状态引用、表单与保存/关闭/销毁回调；旧原始值绑定立即失败，输出 SHA-256；需要 Node24 与 HAP 编译缓存，不代替设备/字节码验收，[命令与范围](../docs/development/verification.md#同步服务器编译产物检查) |
 | 媒体管理编译产物 | `node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs tools/check-note-media-compiled.mjs <本次编译的NoteFieldCard.ts> <本次编译的NoteMediaDialog.ts>` | 执行真实编译组件与窗口宿主，不合成 controller 注入，检查完成/取消/遮罩/返回、忙碌、重开与解锁；输出 SHA-256；[环境与范围](../docs/development/verification.md#媒体管理编译产物检查) |
 | 源码副本 | `npm run export:source -- <新目录>` | 保留源码与测试，只在副本脱敏签名字段，不覆盖已有目录 |
-| 卡片浏览器回归 | `test-card-template-browser.mjs`、`test-card-flip-browser.mjs`、`test-math-rendering-browser.mjs`、`test-card-colors-browser.mjs` | 需要对应浏览器环境；翻面测试使用生产会话与真实导航，命令见 [学习与媒体](../docs/development/study-media.md#卡片模板脚本与样式) |
+| 卡片浏览器回归 | `npm run test:cards:browser` | Node 24、`npm ci` 安装锁定 Playwright；默认使用本机 Edge。Chromium 用 `npx playwright install chromium` 并设 `PLAYWRIGHT_BROWSER_CHANNEL=chromium`（Linux CI 安装时加 `--with-deps`）。执行 appearance/colors/template/flip；运行失败、脚本错误、样式或首次/翻面不一致均非零退出，CI 使用同一入口。可用 `PLAYWRIGHT_MODULE` 指定本机模块。公式完整专项另用 `test-math-rendering-browser.mjs`；不替代 ArkWeb、HAP、设备或外部服务验收，见[学习与媒体](../docs/development/study-media.md#卡片模板脚本与样式) |
 | 图片遮罩浏览器回归 | `node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs tools/test-image-occlusion-browser.mjs` | 真实 Edge/Canvas 检查形状、两种模式、答案轮廓及文字，并以触摸输入验证遮罩上的预览左右滑与取消；`PLAYWRIGHT_MODULE` 可指定模块入口，截图在 `.local/io-preview-browser.png`，不操作卡库或设备 |
 | 颜色专项分析 | `verify-contrast.mjs`、`verify-contrast-official.mjs`、`verify-hardcoded-colors.mjs` | 专项输出，不是完整验收 |
 | 第三方资源/纹理维护 | `vendor-mathjax.mjs`、`generate-iridescent-textures.mjs` | 显式资源更新任务才运行，检查许可和字节保真 |
