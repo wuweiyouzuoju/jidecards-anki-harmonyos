@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { resultUndoStatus, FEEDBACK_ACTIONS, INTERACTION_FEEDBACK_SUPPORT } from '../../entry/src/main/ets/model/InteractionFeedback.ts';
 import { keyboardViewportHeight } from '../../entry/src/main/ets/model/WindowSafeLayout.ts';
@@ -26,6 +26,41 @@ test('rapid text updates finish the current transition then animate the latest v
   text.value='3';text.changed();text.value='4';text.changed();assert.equal(text.current,'2');
   finishes.shift()();assert.equal(text.previous,'2');assert.equal(text.current,'4');assert.deepEqual(changes,[120,120]);
   text.aboutToDisappear();text.value='5';finishes.shift()();assert.equal(text.current,'4');
+});
+
+test('allocated text slots fill the real Stack without retaining wide-window minima; content-sized text keeps its measured width',()=>{
+  const source=readFileSync(new URL('../../entry/src/main/ets/components/common/ChangingText.ets',import.meta.url),'utf8').replaceAll('\r\n','\n');
+  const rootStyle=source.slice(source.indexOf('\n    }',source.indexOf('  build() {'))+6,source.lastIndexOf('\n  }'));
+  const apply=new Function(stripTypeScriptTypes('function apply(attributes) { return attributes'+rootStyle+'; }',
+    {mode:'transform'})+';return apply;')();
+  const Text=loadComponentLogic('components/common/ChangingText.ets','ChangingText',{$r:k=>k,TextAlign:{Center:0}});
+  const text=new Text();
+  const capture=()=>{
+    const attrs={};const recorder=new Proxy({}, {get:(_target,name)=>value=>{attrs[name]=value;return recorder;}});
+    apply.call(text,recorder);return attrs;
+  };
+  text.reservedWidth=500;text.fillWidth=true;
+  for(const width of [640,180,72]) {
+    const attrs=capture();assert.equal(attrs.width,'100%','fill belongs to the actual Stack, not only the Common wrapper');
+    assert.equal(attrs.constraintSize.minWidth,0,'previous measurements must not pin a narrower title/count slot');
+    attrs.onAreaChange({}, {width:String(width)});assert.equal(text.reservedWidth,500,'allocated widths are not content measurements');
+  }
+  text.fillWidth=false;text.reservedWidth=0;
+  assert.equal(capture().width,undefined,'study remaining counts keep their intrinsic width');
+  capture().onAreaChange({}, {width:'96'});capture().onAreaChange({}, {width:'60'});
+  assert.equal(capture().constraintSize.minWidth,96,'content-sized animation retains its measured width');
+});
+
+test('every ChangingText call with an allocated width opts into filling that width',()=>{
+  const root=new URL('../../entry/src/main/ets/',import.meta.url);let checked=0;
+  for(const file of readdirSync(root,{recursive:true}).filter(file=>file.endsWith('.ets'))) {
+    const source=readFileSync(new URL(file.replaceAll('\\','/'),root),'utf8');
+    for(const call of source.matchAll(/ChangingText\(\{([\s\S]*?)\}\)\s*((?:\.[^\n]+\n?\s*)*)/g)) {
+      if(!/\.(?:width|layoutWeight)\(/.test(call[2]))continue;
+      assert.match(call[1],/fillWidth:\s*true\b/,file+': the real text container must inherit the allocated width');checked++;
+    }
+  }
+  assert.ok(checked>=2,'cover the browser title and count slots');
 });
 
 test('result notice owns and cancels expiry; persistent recovery cannot disappear on the old result timer',()=>{

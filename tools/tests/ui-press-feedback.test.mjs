@@ -50,7 +50,7 @@ test('all app button and action-row click targets share one press owner', () => 
         // 触摸只清除长按补发 click 的抑制位；按下外观仍由公共 modifier 负责。
         // note-editor-wheel 的直接行为测试验证按下、长按、松手和再次点击。
         assert.match(source, /private toolTouch\(id: string, event: TouchEvent\): void/);
-        pressModifiers = pressModifiers.replace(/\.onTouch\(\(event: TouchEvent\): void => \{ this\.toolTouch\(tool\.id, event\); \}\)/g, '');
+        pressModifiers = pressModifiers.replace(/\.onTouch\(\(event: TouchEvent\): void => \{ this\.toolTouch\((?:tool\.id|'format_option_' \+ option\.id), event\); \}\)/g, '');
       }
       if (path === 'components/common/IconActionButton.ets') {
         // menu-slide 直接执行单指、多指、取消及补发点击；按压仍由公共 modifier 绘制。
@@ -64,7 +64,7 @@ test('all app button and action-row click targets share one press owner', () => 
   }
   // 共用菜单减少散写点击节点；以真实入口覆盖检查扫描范围，而不固定按钮数量。
   for (const path of ['pages/浏览页.ets', 'pages/学习页.ets', 'pages/AI制卡页.ets',
-    'pages/添加笔记页.ets', 'components/common/MenuItem.ets', 'components/common/DialogHeader.ets',
+    'pages/添加笔记页.ets', 'components/common/MenuItem.ets', 'components/common/按下态按钮.ets',
     'components/common/PrimaryActionButton.ets']) {
     assert.ok(auditedPaths.has(path), `press audit must include ${path}`);
   }

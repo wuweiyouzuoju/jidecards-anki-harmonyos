@@ -9,6 +9,7 @@ export struct ChangingText {
   @Prop tint: ResourceColor = $r('app.color.text_secondary');
   @Prop minimumWidth: number = 0;
   @Prop alignment: TextAlign = TextAlign.Center;
+  @Prop fillWidth: boolean = false;
   @State private previous: string = '';
   @State private current: string = '';
   @State private progress: number = 1;
@@ -39,7 +40,12 @@ export struct ChangingText {
       Text(this.current).fontSize(this.textSize).fontColor(this.tint).opacity(this.progress)
         .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).textAlign(this.alignment)
         .translate({ y: currentMotionProfile().textOffset * (1 - this.progress) })
-    }.constraintSize({ minWidth: Math.max(this.minimumWidth, this.reservedWidth) })
-      .onAreaChange((_old: Area, area: Area): void => { this.reservedWidth = Math.max(this.reservedWidth, Number(area.width)); })
+    }
+      // 外层分配的宽度需传到实际 Stack；填充模式不把旧窗口宽度缓存为最小宽度。
+      .width(this.fillWidth ? '100%' : undefined)
+      .constraintSize({ minWidth: this.fillWidth ? this.minimumWidth : Math.max(this.minimumWidth, this.reservedWidth) })
+      .onAreaChange((_old: Area, area: Area): void => {
+        if (!this.fillWidth) this.reservedWidth = Math.max(this.reservedWidth, Number(area.width));
+      })
   }
 }

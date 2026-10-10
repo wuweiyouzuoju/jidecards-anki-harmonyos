@@ -8,7 +8,7 @@ import { 颜色键 } from '../../model/颜色主题';
 import { MenuHoldController } from '../../model/MenuHoldController';
 import { menuHoldTouch } from './MenuHoldGesture';
 import { ActionStatus } from './ActionStatus';
-import { MENU_SLIDE_HOLD_MS } from '../../model/InteractionFeedback';
+import { hasActionStatus, MENU_SLIDE_HOLD_MS } from '../../model/InteractionFeedback';
 
 /** 仅图标动作默认44vp点击区；可按布局调整几何，宿主提供完整本地化无障碍名称。 */
 @Component
@@ -59,7 +59,7 @@ export struct IconActionButton {
   build() {
     Button() {
       Stack({ alignContent: this.cornerAligned ? Alignment.TopEnd : Alignment.Center }) {
-        if (this.feedback === 'idle') {
+        if (!hasActionStatus(this.feedback)) {
           ActionIcon({ source: this.source, tint: this.resolvedIconFill(), strokeColor: this.resolvedGlyphColor(), glyphSize: this.controlGlyphSize })
         } else { ActionStatus({ phase: this.feedback, tint: this.resolvedGlyphColor() || this.actionColor }) }
       }.width('100%').height('100%').padding(this.cornerAligned ? 应用尺寸.间距_4 : 0)

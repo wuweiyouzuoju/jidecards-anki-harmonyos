@@ -7,6 +7,23 @@ export const FEEDBACK_ACTIONS: FeedbackAction[] = [
 ];
 export const MENU_SLIDE_HOLD_MS: number = 200;
 export const MENU_SLIDE_BRANCH_MS: number = 220;
+/** 只有实际绘制的请求状态才占用按钮内容；idle 和未知状态不留空槽。 */
+export function hasActionStatus(phase: string): boolean {
+  return phase === 'busy' || phase === 'success' || phase === 'failure';
+}
+/** 弹窗普通提交与完成共用勾号；宿主显式保留需要解释结果和忙碌状态的文案。 */
+export interface DialogActionPresentation {
+  confirmIconKey: string;
+  defaultAction: string;
+  textActionReasons: string[];
+  textActionPlacement: string;
+  semanticLabelsRetained: boolean;
+}
+export const DIALOG_ACTION_PRESENTATION: DialogActionPresentation = {
+  confirmIconKey: 'ic_common_confirm', defaultAction: 'confirm_icon',
+  textActionReasons: ['destructive', 'consequence_confirmation', 'navigation', 'transfer',
+    'inspection', 'open_subdialog', 'busy_status'], textActionPlacement: 'below_title', semanticLabelsRetained: true
+};
 /** 只有此次单步写入产生的新记录才提供就近撤销；无变化或多步/并发变化降级为结果。 */
 export function resultUndoStatus(before: UndoStatus | null, after: UndoStatus | null): UndoStatus | null {
   return before !== null && after !== null && after.undo !== '' && after.lastStep === before.lastStep + 1 ? after : null;
@@ -21,6 +38,7 @@ export interface InteractionFeedbackSupport {
   cardFlipAnimation: boolean;
   pageMotion: string;
   dialogMotion: string;
+  dialogActions: DialogActionPresentation;
   execution: string;
 }
 export const INTERACTION_FEEDBACK_SUPPORT: InteractionFeedbackSupport = {
@@ -30,5 +48,6 @@ export const INTERACTION_FEEDBACK_SUPPORT: InteractionFeedbackSupport = {
   undoProtection: 'core_expected_history_step', cardFlipAnimation: false,
   pageMotion: 'shared_navigation_and_local_sections; fade_in_only_with_optional_direction_offset; preview_overlay_fades',
   dialogMotion: 'shared_surface_transition; inline_scale_and_fade_in_then_fade_out; native_window_owns_platform_geometry; one_owner_per_surface',
+  dialogActions: DIALOG_ACTION_PRESENTATION,
   execution: 'feedback_buttons_are_manual_ui_callbacks; existing_agent_domain_tools_keep_their_confirmation_rules'
 };

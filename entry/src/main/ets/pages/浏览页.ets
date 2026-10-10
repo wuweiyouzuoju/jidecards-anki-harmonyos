@@ -1403,7 +1403,7 @@ export struct 浏览页 {
     // 多选时标题显示计数，右侧保留明确的手动操作入口。
     Stack({ alignContent: Alignment.Center }) {
       ChangingText({ value: this.多选模式值 ? this.取选中计数文案() : this.取本地化文案($r('app.string.browser_title')),
-        textSize: 应用尺寸.字号_标题, tint: $r('app.color.text_primary') })
+        textSize: 应用尺寸.字号_标题, tint: $r('app.color.text_primary'), fillWidth: true })
         .width('44%').hitTestBehavior(HitTestMode.None)
       Row() {
       IconActionButton({ toolbarStyle: true,
@@ -1512,7 +1512,7 @@ export struct 浏览页 {
       .backgroundColor($r('app.color.surface_card')).borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder).clip(true)
       .onAreaChange((_oldArea: Area, area: Area): void => { this.viewMenuWidth = Number(area.width); })
       ChangingText({ value: this.阶段 === 'loading' ? this.取本地化文案($r('app.string.browser_loading')) : this.resultCountLabel(),
-        textSize: 应用尺寸.字号_正文_小, alignment: TextAlign.End })
+        textSize: 应用尺寸.字号_正文_小, alignment: TextAlign.End, fillWidth: true })
         .layoutWeight(3)
     }.width('100%')
       // 首张结果卡由列表的 contentStartOffset 贡献唯一的区块间距。
