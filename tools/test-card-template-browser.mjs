@@ -2,13 +2,11 @@
 // 实际浏览器覆盖 Anki 样式字段中的脚本及完整 jQuery；所有资源仅由本地提供。
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { pathToFileURL } from 'node:url';
+import { launchCardBrowser } from './card-browser-harness.mjs';
 import { 构建卡片HTML } from '../entry/src/main/ets/model/学习卡片HTML构建器.ts';
 import { MATH_ASSET_BASE } from '../entry/src/main/ets/model/MathRendering.ts';
 
-const { chromium } = await import(process.env.PLAYWRIGHT_MODULE
-  ? pathToFileURL(process.env.PLAYWRIGHT_MODULE).href : 'playwright');
-const browser = await chromium.launch({ headless: true, channel: 'msedge' });
+const browser = await launchCardBrowser();
 const errors = [];
 const unexpected = [];
 let passed = 0;

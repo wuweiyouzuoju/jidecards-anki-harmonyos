@@ -23,6 +23,20 @@ jobs:
           npm ci --prefix ../jidecards-source-check
           npm --prefix ../jidecards-source-check run verify -- repo
 
+  card-browser:
+    name: Card rendering in browser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:cards:browser
+        env:
+          PLAYWRIGHT_BROWSER_CHANNEL: chromium
+
   rust-check:
     name: Rust workspace check
     runs-on: ubuntu-latest

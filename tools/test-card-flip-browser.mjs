@@ -2,15 +2,13 @@
 // Real navigation + production host session/runtime; page.setContent would not prove window lifetime.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { pathToFileURL } from 'node:url';
+import { launchCardBrowser } from './card-browser-harness.mjs';
 import { CardWebSession } from '../entry/src/main/ets/model/CardWebSession.ts';
 import { 构建卡片HTML } from '../entry/src/main/ets/model/学习卡片HTML构建器.ts';
 import { buildPreviewInteractionScript } from '../entry/src/main/ets/model/PreviewInteraction.ts';
 import { MATH_ASSET_BASE } from '../entry/src/main/ets/model/MathRendering.ts';
 
-const { chromium } = await import(process.env.PLAYWRIGHT_MODULE
-  ? pathToFileURL(process.env.PLAYWRIGHT_MODULE).href : 'playwright');
-const browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_BROWSER_CHANNEL || 'msedge' });
+const browser = await launchCardBrowser();
 let passed = 0;
 try {
   for (const preview of [false, true]) for (const dark of [false, true]) {
@@ -158,6 +156,7 @@ try {
       window.heldCardFrames = [];
       window.requestAnimationFrame = callback => { window.heldCardFrames.push(callback); return 0; };
     });
+    card.questionNodes = [{text: 'Word', replacement: null}];
     card.answerNodes = [{text: 'Meaning', replacement: null}];
     session.reset(); session.show(html('question', 24), 22, 'question');
     await page.waitForFunction(() => window.heldCardFrames && window.heldCardFrames.length === 1);

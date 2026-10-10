@@ -6,6 +6,7 @@
     "test": "node tools/test.mjs",
     "test:release": "node tools/test.mjs release",
     "test:interop": "node tools/test-core-interop.mjs",
+    "test:cards:browser": "node tools/test-card-browser.mjs",
     "protocol:check": "node tools/core-protocol.mjs --check",
     "protocol:generate": "node tools/core-protocol.mjs --generate",
     "protocol:test-core": "node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs tools/test-protocol-core.mjs",
@@ -24,6 +25,7 @@
   },
   "license": "AGPL-3.0-or-later",
   "devDependencies": {
-    "json5": "2.2.3"
+    "json5": "2.2.3",
+    "playwright": "1.62.0"
   }
 }
