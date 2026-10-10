@@ -5,7 +5,7 @@
 项目优先服务 Agent 开发；这里的 Agent 指辅助作者开发仓库的编程 Agent。
 
 - 正式版：2.9.22
-- 源码版本：2.9.22（构建编号 3003）
+- 源码版本：2.9.88（构建编号 3069）
 - 平台：HarmonyOS NEXT
 - 许可证：AGPL-3.0-or-later
 - 作者：[可塑性天赋](https://jidecards.com/about/)

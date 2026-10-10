@@ -35,8 +35,8 @@
       "license": "AGPL-3.0-or-later",
       "releaseVersion": "2.9.22",
       "releaseVersionSource": "2026-10-07 作者指定官网正式版本为 2.9.22",
-      "sourceVersion": "2.9.22",
-      "sourceVersionCode": 3003,
+      "sourceVersion": "2.9.88",
+      "sourceVersionCode": 3069,
       "sourceUpdate": {
         "updatedAt": "2026-10-07",
         "changes": [
