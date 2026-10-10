@@ -1,3 +1,5 @@
+import { DirectorySelect } from '../components/common/DirectorySelect';
+import { DirectoryRow, DirectoryView, DirectoryChoice, directoryChoiceRows, directorySpecial } from '../model/DirectoryTree';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { navigationEnterOffset } from '../utils/AppMotion';
 import { WINDOW_SAFE_TOP_KEY } from '../model/WindowSafeLayout';
@@ -6,8 +8,8 @@ import { statsInterfaceSections, visibleInterfaceItems, AppInterfaceItem, AppInt
 import { showToastSafely, resourceText, namedResourceText } from '../utils/UiFeedback';
 import { interfaceItemText } from '../utils/AppInterfaceText';
 import { StatsSession, StatsSnapshot, StatsRequest } from '../model/StatsSession';
+import { deckScopeSearch } from '../model/DeckScope';
 import { AnkiStatsSession } from '../backend/AnkiStatsSession';
-import { SelectStyle } from '../utils/SelectStyle';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
 import { PAGE_COMPACT_LAYOUT_KEY } from '../model/AppLayoutState';
 
@@ -121,6 +123,7 @@ export struct 统计页 {
   @State @Watch('publishInterface') private 牌组选项: SelectOption[] = [];
   @State @Watch('publishInterface') private 选中牌组索引: number = 0;
   private 牌组名列表: string[] = [];
+  private 牌组ID列表: string[] = [];
   @StorageProp(FSRS_STATE_REVISION_KEY) @Watch('onFsrsStateChanged') private fsrsRevision: number = 0;
   private fsrsRefreshReady: boolean = false;
   // 小时分布时间段（0=近1月 1=近3月 2=近1年 3=全部）：与首页卡片/桌面卡片共用同一偏好
@@ -150,7 +153,16 @@ export struct 统计页 {
 
   async aboutToAppear(): Promise<void> {
     this.pageActive = true;
-    this.图表数据 = this.initialSnapshot.graphs;
+    // 带入范围在任何 await 前生效，禁止把首页全库缓存当成当前牌组统计。
+    const scoped: boolean = (this.initialSnapshot.deckId ?? '') !== '';
+    this.牌组ID列表 = scoped ? [this.initialSnapshot.deckId ?? ''] : [];
+    this.牌组名列表 = scoped ? [this.initialSnapshot.deckName ?? ''] : [];
+    this.牌组选项 = scoped ? [
+      { value: resourceText(this.getUIContext(), $r('app.string.stats_deck_all')) },
+      { value: this.initialSnapshot.deckName ?? '' }
+    ] : [];
+    this.选中牌组索引 = scoped ? 1 : 0;
+    this.图表数据 = scoped ? null : this.initialSnapshot.graphs;
     this.统计天数 = this.initialSnapshot.days;
     this.主题模式值 = AppStorage.get<主题模式>('themeMode') ?? 'system';
     // 注册自定义转场回调：首页 Navigation.customNavContentTransition 通过此 name 查找回调，
@@ -210,17 +222,37 @@ export struct 统计页 {
   }
 
   /** 顶部条牌组下拉选项：全部牌组 + 全库牌组全名（平铺牌组树前序） */
+  private deckRows(): DirectoryRow[] {
+    return [directorySpecial('0', this.牌组选项[0]?.value as string ?? '', this.选中牌组索引 === 0 ? 1 : 0)]
+      .concat(directoryChoiceRows(this.牌组名列表.map((name: string, index: number): DirectoryChoice =>
+        ({ id: this.牌组ID列表[index], path: name })), this.牌组ID列表[this.选中牌组索引 - 1] ?? '0'));
+  }
+
+  private selectDirectoryDeck(id: string): void {
+    if (!this.pageActive || this.阶段 !== 'content' || this.preferenceSaving) return;
+    const index: number = id === '0' ? 0 : this.牌组ID列表.indexOf(id) + 1;
+    if (id === '0' || index > 0) this.on牌组切换(index);
+  }
+
   private async 加载牌组列表(): Promise<void> {
     await syncActivity.waitForCollection();
     if (!this.pageActive) return;
     const 牌组服务实例 = new 牌组服务();
     牌组服务实例.获取牌组树().then((tree: DeckTreeNode) => {
       if (!this.pageActive) return;
+      const selectedId: string = this.牌组ID列表[this.选中牌组索引 - 1] ?? '';
+      const previousSearch: string = this.取搜索串();
       const 名列表: string[] = [];
+      const id列表: string[] = [];
       平铺牌组树(tree).forEach((行: 牌组汇总) => {
         名列表.push(行.fullName);
+        id列表.push(行.id);
       });
+      // 目标已删除或列表暂时不可用时保留原范围，不静默扩大为全库。
+      if (selectedId !== '' && !id列表.includes(selectedId)) return;
       this.牌组名列表 = 名列表;
+      this.牌组ID列表 = id列表;
+      this.选中牌组索引 = selectedId === '' ? 0 : id列表.indexOf(selectedId) + 1;
       const 选项: SelectOption[] = [];
       选项.push({ value: this.getUIContext().getHostContext()!.resourceManager
         .getStringSync($r('app.string.stats_deck_all').id) });
@@ -228,8 +260,9 @@ export struct 统计页 {
         选项.push({ value: 名列表[i] } as SelectOption);
       }
       this.牌组选项 = 选项;
+      if (previousSearch !== this.取搜索串()) this.加载统计数据();
     }).catch((_错误: Object): void => {
-      // 牌组列表加载失败时仅保留"全部牌组"，不阻塞统计
+      // 保留已有范围和选项，不阻塞统计查询。
     });
   }
 
@@ -239,7 +272,7 @@ export struct 统计页 {
       return '';
     }
     const 名: string = this.牌组名列表[this.选中牌组索引 - 1];
-    return `deck:"${名}"`;
+    return deckScopeSearch(名);
   }
 
   /** 牌组下拉切换：重选牌组后重新加载统计 */
@@ -509,22 +542,11 @@ export struct 统计页 {
         // 统计口径行：牌组选择在左，历史范围选择在右。
         Row({ space: 应用尺寸.间距_8 }) {
           if (this.牌组选项.length > 1) {
-            Select(this.牌组选项)
-              .selected(this.选中牌组索引)
-              .value(this.牌组选项[this.选中牌组索引]?.value ?? '')
-              .layoutWeight(1)
-              .attributeModifier(new SelectStyle($r('app.color.surface_card')))
-              .height(SelectStyle.controlHeight)
-              .padding(SelectStyle.controlPadding)
-              .space(SelectStyle.controlSpace)
-              .font(SelectStyle.controlFont)
-              .optionFont(SelectStyle.optionFont)
-              .selectedOptionFont(SelectStyle.selectedOptionFont)
-              .textModifier(SelectStyle.labelText())
-              .borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
-              .onSelect((索引: number) => {
-                this.on牌组切换(索引);
-              })
+            DirectorySelect({ rows: this.deckRows(), showLabel: false, title: $r('app.string.transfer_label_deck'),
+              value: this.牌组选项[this.选中牌组索引]?.value as string ?? '', surfaceColor: $r('app.color.surface_card'),
+              isInteractive: this.阶段 === 'content' && !this.preferenceSaving,
+              onSelect: (id: string): void => { this.selectDirectoryDeck(id); },
+              onViewChanged: (view: DirectoryView | null): void => { appInterface.observeDirectory('stats_deck', view); } }).layoutWeight(1)
           } else {
             Blank()
           }
@@ -884,4 +906,6 @@ export struct 统计页 {
 export interface 统计页参数 {
   graphs: GraphsView | null;
   days: number;
+  deckId?: string;
+  deckName?: string;
 }

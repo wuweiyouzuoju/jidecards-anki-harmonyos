@@ -8,6 +8,8 @@ import { stripTypeScriptTypes } from 'node:module';
 import { SyncActivity } from '../../entry/src/main/ets/model/SyncSettings.ts';
 import { StatsSession } from '../../entry/src/main/ets/model/StatsSession.ts';
 import { decodeGraphsResponse } from '../../entry/src/main/ets/proto/messages/StatsMessages.ts';
+import { deckScopeSearch } from '../../entry/src/main/ets/model/DeckScope.ts';
+import { uiFeedback } from './ui-feedback-harness.mjs';
 
 const read = name => readFileSync(new URL('../../entry/src/main/ets/pages/' + name + '.ets', import.meta.url), 'utf8');
 const settle = async () => { for (let i = 0; i < 5; i++) await new Promise(setImmediate); };
@@ -23,13 +25,15 @@ function component(name, names, dependencies) {
   return new Function(...Object.keys(dependencies), js + '; return Page;')(...Object.values(dependencies));
 }
 
-function harness({ snapshot = decodeGraphsResponse(new Uint8Array()), theme = Promise.resolve('dark'), days = 365 } = {}) {
+function harness({ snapshot = decodeGraphsResponse(new Uint8Array()), theme = Promise.resolve('dark'), days = 365,
+  scope = {}, treeRows = [] } = {}) {
   const sync = new SyncActivity(), events = [], fresh = decodeGraphsResponse(new Uint8Array());
-  const Page = component('统计页', ['aboutToAppear', 'aboutToDisappear', 'getStatsSession', 'statsRequest', '加载统计数据', '加载牌组列表', '更新偏好', 'on分离变更'], {
-    ...appInterfaceDependencies(), StatsSession,
+  const requests = [], rows = { current: treeRows };
+  const Page = component('统计页', ['aboutToAppear', 'aboutToDisappear', 'getStatsSession', 'statsRequest', '加载统计数据', '加载牌组列表', '取搜索串', 'on牌组切换', '更新偏好', 'on分离变更'], {
+    ...appInterfaceDependencies(), ...uiFeedback, StatsSession, deckScopeSearch,
     AnkiStatsSession: class {
       waitForCollection() { return sync.waitForCollection(); }
-      async graphs() { events.push('open'); return page.统计服务实例.获取图表统计(); }
+      async graphs(request) { events.push('open'); return page.统计服务实例.获取图表统计(request.days, request.search); }
       preferences() { return page.统计服务实例.获取图表偏好(); }
       savePreferences(value) { return page.统计服务实例.设置图表偏好(value); }
       publishWidget() { return page.刷新卡片快照(); }
@@ -41,8 +45,8 @@ function harness({ snapshot = decodeGraphsResponse(new Uint8Array()), theme = Pr
     加载小时分布窗口: async () => 0,
     加载统计天数: async () => days,
     后端会话: { 获取实例: () => ({ 确保已打开: async () => { events.push('open'); } }) },
-    牌组服务: class { async 获取牌组树() { events.push('decks'); return { children: [] }; } },
-    平铺牌组树: () => [],
+    牌组服务: class { async 获取牌组树() { events.push('decks'); return { children: rows.current }; } },
+    平铺牌组树: tree => tree.children,
     默认偏好: () => ({ cardCountsSeparateInactive: false }),
     hilog: { info() {}, error() {} }, $r: key => key
   });
@@ -50,17 +54,52 @@ function harness({ snapshot = decodeGraphsResponse(new Uint8Array()), theme = Pr
   let persisted={cardCountsSeparateInactive:true};
   Object.assign(page, {
     pageActive: false, statsSession: null, 阶段: 'loading', 图表数据: null,
-    initialSnapshot: { graphs: snapshot, days: 365 }, 图表偏好: { cardCountsSeparateInactive: false },
-    取搜索串: () => '', 取能力上下文: () => ({ filesDir: 'test' }),
+    initialSnapshot: { graphs: snapshot, days: 365, ...scope }, 图表偏好: { cardCountsSeparateInactive: false },
+    取能力上下文: () => ({ filesDir: 'test' }),
+    getUIContext: () => ({ getHostContext: () => ({ resourceManager: { getStringSync: id => id } }) }),
     刷新卡片快照: async () => { events.push('widgets'); },
     统计服务实例: {
-      获取图表统计: async () => { events.push('graphs'); return fresh; },
+      获取图表统计: async (days, search) => { events.push('graphs'); requests.push({ days, search }); return fresh; },
       获取图表偏好: async () => { events.push('preferences'); return persisted; },
       设置图表偏好: async value => { events.push('save preferences'); persisted=value; }
     }
   });
-  return { page, sync, events, snapshot, fresh };
+  return { page, sync, events, snapshot, fresh, requests, rows };
 }
+
+test('a deck entry applies scope before awaiting and the first query never requests the whole collection', async () => {
+  const theme = deferred(), name = 'Parent::Deck "quoted" *_';
+  const h = harness({ theme: theme.promise, scope: { deckId: '42', deckName: name }, treeRows: [
+    { id: '2', fullName: 'Other' }, { id: '42', fullName: name }, { id: '43', fullName: name + '::Child' }
+  ] });
+  h.sync.reserveCollection();
+  const ready = h.page.aboutToAppear();
+  assert.equal(h.page.图表数据, null, 'does not show global cached charts as deck charts');
+  assert.equal(h.page.取搜索串(), deckScopeSearch(name));
+  assert.equal(h.page.选中牌组索引, 1);
+  assert.equal(h.page.牌组选项[1].value, name);
+  theme.resolve('dark'); await settle(); assert.deepEqual(h.requests, []);
+  h.sync.cancelReservation(); await ready; await settle();
+  assert.equal(h.page.选中牌组索引, 2);
+  assert.ok(h.requests.length > 0 && h.requests.every(request => request.search === deckScopeSearch(name)));
+  assert.equal(h.events.includes('widgets'), false, 'deck charts cannot replace the global widget');
+  h.page.on牌组切换(0); await settle();
+  assert.equal(h.requests.at(-1).search, '');
+  assert.equal(h.events.includes('widgets'), true);
+});
+
+test('late deck lists preserve a user selection and removed target decks never expand to all decks', async () => {
+  const h = harness({ scope: { deckId: '42', deckName: 'Target' }, treeRows: [{ id: '42', fullName: 'Target' }, { id: '9', fullName: 'Other' }] });
+  await h.page.aboutToAppear(); await settle();
+  h.page.on牌组切换(2); await settle();
+  h.rows.current.reverse(); await h.page.加载牌组列表(); await settle();
+  assert.equal(h.page.选中牌组索引, 1);
+  assert.equal(h.page.取搜索串(), deckScopeSearch('Other'));
+  const missing = harness({ scope: { deckId: '42', deckName: 'Deleted' }, treeRows: [{ id: '9', fullName: 'Other' }] });
+  await missing.page.aboutToAppear(); await settle();
+  assert.equal(missing.page.取搜索串(), deckScopeSearch('Deleted'));
+  assert.ok(missing.requests.every(request => request.search === deckScopeSearch('Deleted')));
+});
 
 test('home retains full graphs with their range and opens statistics immediately during sync', async () => {
   const graph = decodeGraphsResponse(new Uint8Array()); let navigated, cancelled = 0;
