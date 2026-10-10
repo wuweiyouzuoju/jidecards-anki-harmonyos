@@ -609,6 +609,11 @@ export function agentInterfaceTitle(mode: string, history: boolean, memory: bool
 export function agentImportLabelKey(parsing: boolean): string {
   return parsing ? 'ai_agent_file_parsing' : 'ai_agent_import_files';
 }
+
+/** 两个输入动作按全部可见文案共同测宽，解析和取消切换不挤动输入框。 */
+export function agentComposerLabelKeys(): string[] {
+  return [agentImportLabelKey(false), agentImportLabelKey(true), 'ai_card_send', 'ai_agent_cancel'];
+}
 export function reminderEditorTitle(creating: boolean): string {
   return creating ? 'reminder_edit_title_create' : 'reminder_edit_title_edit';
 }

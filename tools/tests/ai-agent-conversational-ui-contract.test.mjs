@@ -44,7 +44,8 @@ test('create setup is an assistant-side local card instead of a fixed top form',
 test('edit setup exposes explicit deck and note-type search scope selectors', () => {
   const page = read('entry/src/main/ets/pages/AI制卡页.ets') + read('entry/src/main/ets/model/agent/AgentConversationView.ts');
   const setup = read('entry/src/main/ets/components/agent/AgentSetupCard.ets');
-  assert.match(setup, /if \(this\.mode === 'create'\)[\s\S]*else \{[\s\S]*Select\(this\.editDeckOptions\(\)\)/);
+  assert.match(setup, /if \(this\.mode === 'create'\)[\s\S]*this\.deckSelector\(\)[\s\S]*else \{[\s\S]*this\.deckSelector\(\)/);
+  assert.match(setup, /DirectorySelect\(/);
   assert.match(setup, /Select\(this\.editNotetypeOptions\(\)\)/);
   assert.match(setup, /this\.onDeckSelected\(0\)/);
   assert.match(setup, /this\.onNotetypeSelected\(0\)/);

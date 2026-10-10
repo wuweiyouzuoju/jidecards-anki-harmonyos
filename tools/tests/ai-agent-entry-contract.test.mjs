@@ -373,8 +373,12 @@ test('AI page title uses equal side regions around the screen midpoint', () => {
   assert.equal((top.match(/\.width\('35%'\)/g) ?? []).length, 2);
   assert.match(top, /\.width\('30%'\)[\s\S]*\.textAlign\(TextAlign\.Center\)/);
   assert.match(top, /\.justifyContent\(FlexAlign\.End\)/);
-  assert.equal((top.match(/IconActionButton\(\{ toolbarStyle: true/g) ?? []).length, 3,
-    'back, history and new conversation must share the home toolbar button component');
+  assert.equal((top.match(/IconActionButton\(\{ toolbarStyle: true/g) ?? []).length, 5,
+    'back, history, memory, new conversation and new memory share the home toolbar button component');
+  const right = top.slice(top.indexOf('Row({ space: 应用尺寸.间距_8 })'));
+  const history = right.slice(right.indexOf('} else if (this.显示历史区)'), right.indexOf('} else {'));
+  assert.ok(history.indexOf("source: $r('app.media.ic_agent_memory')") < history.indexOf("source: $r('app.media.ic_home_new')"));
+  assert.match(top, /if \(this\.memoryVisible\) \{\s*IconActionButton\([\s\S]*?label: this\.interfaceLabel\('memory_create'\)/);
 });
 
 test('settings API key, custom endpoint and custom model inputs share one visual style', () => {

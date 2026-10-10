@@ -5,7 +5,9 @@ import { WINDOW_SAFE_TOP_KEY } from '../model/WindowSafeLayout';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { AgentDocumentStore } from '../backend/agent/AgentDocumentStore';
 import { appInterface } from '../backend/AppInterfaceService';
-import { agentInterfaceControls, agentInterfaceTitle, agentImportLabelKey, AppInterfaceMenuItem, AppInterfaceControl } from '../model/AppInterface';
+import { agentInterfaceControls, agentInterfaceTitle, agentImportLabelKey, agentComposerLabelKeys,
+  AppInterfaceMenuItem, AppInterfaceControl } from '../model/AppInterface';
+import { hasActionStatus } from '../model/InteractionFeedback';
 import { interfaceControlText } from '../utils/AppInterfaceText';
 import { localizedNamedResourceText, namedResourceText } from '../utils/UiFeedback';
 import { registerAgentDocumentTools } from '../backend/agent/AgentDocumentTools';
@@ -2787,6 +2789,14 @@ export struct AI制卡页 {
   }
 
   @Builder
+  private composerLabelWidth() {
+    ForEach(agentComposerLabelKeys(), (key: string) => {
+      Text(localizedNamedResourceText(this.getUIContext(), this.uiLanguage, key))
+        .fontSize(应用尺寸.字号_按钮).maxLines(1).opacity(0).accessibilityLevel('no')
+    }, (key: string): string => `${this.uiLanguage}-${key}`)
+  }
+
+  @Builder
   private 输入区() {
     Column({ space: 应用尺寸.间距_8 }) {
       if (this.导入文件列表.length > 0) {
@@ -2850,8 +2860,7 @@ export struct AI制卡页 {
         Column({ space: 应用尺寸.间距_8 }) {
           Button() {
             Stack() {
-              // 两条文案都常驻布局、只切透明度：解析态显示「…」（窄于「导入」），
-              // 按钮宽度恒为「导入」两字，与右侧发送按钮等宽，解析切换不抖动。
+              this.composerLabelWidth()
               Text() { ForEach([themeTextKey(localizedNamedResourceText(this.getUIContext(), this.uiLanguage, agentImportLabelKey(false)), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(localizedNamedResourceText(this.getUIContext(), this.uiLanguage, agentImportLabelKey(false)), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }
                 .fontSize(应用尺寸.字号_按钮)
                 .fontColor(this.动作主色)
@@ -2875,10 +2884,18 @@ export struct AI制卡页 {
             .stateEffect(false)
             .onClick((): void => { this.选择并解析文件(); })
           Button() {
-            Row({ space: 4 }) {
-              ActionStatus({ phase: this.处理中 ? 'busy' : this.requestFeedback, tint: $r('app.color.action_on_primary') })
-              Text(this.interfaceLabel('submit')).fontSize(应用尺寸.字号_按钮).fontColor($r('app.color.action_on_primary'))
+            Stack() {
+              this.composerLabelWidth()
+              if (!this.处理中 && this.requestFeedback !== 'busy' && hasActionStatus(this.requestFeedback)) {
+                // 14vp 状态槽位于既有16vp左内边距，文案仍独立居中，不增加按钮宽度。
+                ActionStatus({ phase: this.requestFeedback,
+                  tint: $r('app.color.action_on_primary'), glyphSize: 12 })
+                  .position({ x: 1 - 应用尺寸.卡片内边距, y: '50%' }).markAnchor({ y: 7 })
+              }
+              Text(this.interfaceLabel('submit')).fontSize(应用尺寸.字号_按钮)
+                .fontColor($r('app.color.action_on_primary')).maxLines(1)
             }
+            .alignContent(Alignment.Center)
           }
             .height(应用尺寸.按钮高度)
             .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
