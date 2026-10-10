@@ -1509,7 +1509,7 @@ export struct 浏览页 {
       }
       .id('browser-view-selector')
       .layoutWeight(7).height(SelectStyle.controlHeight)
-      .backgroundColor($r('app.color.surface_card')).borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder).clip(true)
+      .backgroundColor($r('app.color.surface_card')).border(SelectStyle.controlBorder).borderRadius(SelectStyle.controlRadius).clip(true)
       .onAreaChange((_oldArea: Area, area: Area): void => { this.viewMenuWidth = Number(area.width); })
       ChangingText({ value: this.阶段 === 'loading' ? this.取本地化文案($r('app.string.browser_loading')) : this.resultCountLabel(),
         textSize: 应用尺寸.字号_正文_小, alignment: TextAlign.End, fillWidth: true })

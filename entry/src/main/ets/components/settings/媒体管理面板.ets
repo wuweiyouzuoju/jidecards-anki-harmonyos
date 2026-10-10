@@ -314,7 +314,7 @@ export struct 媒体管理面板 {
               .alignItems(HorizontalAlign.Start)
               .padding(12)
               .backgroundColor($r('app.color.surface_page'))
-              .borderRadius(12).border(SurfaceBorder.options())
+              .border(SurfaceBorder.options()).borderRadius(12)
 
               // 缺失媒体区
               Column({ space: 应用尺寸.间距_4 }) {
@@ -341,7 +341,7 @@ export struct 媒体管理面板 {
               .alignItems(HorizontalAlign.Start)
               .padding(12)
               .backgroundColor($r('app.color.surface_page'))
-              .borderRadius(12).border(SurfaceBorder.options())
+              .border(SurfaceBorder.options()).borderRadius(12)
 
               // 连续滚动按需追加报告块；分页仅存在于传输边界。
               Column({ space: 应用尺寸.间距_4 }) {
@@ -361,7 +361,7 @@ export struct 媒体管理面板 {
               .width('100%')
               .padding(12)
               .backgroundColor($r('app.color.surface_page'))
-              .borderRadius(12).border(SurfaceBorder.options())
+              .border(SurfaceBorder.options()).borderRadius(12)
 
               // 回收站状态
               Column({ space: 12 }) {
@@ -416,7 +416,7 @@ export struct 媒体管理面板 {
               .width('100%')
               .padding(12)
               .backgroundColor($r('app.color.surface_page'))
-              .borderRadius(12).border(SurfaceBorder.options())
+              .border(SurfaceBorder.options()).borderRadius(12)
             }
             .width('100%')
           }
@@ -448,7 +448,7 @@ export struct 媒体管理面板 {
       .constraintSize({ maxWidth: 480, maxHeight: '88%' })
       .padding(应用尺寸.面板内边距)
       .backgroundColor($r('app.color.surface_card'))
-      .borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
+      .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
       .onClick(() => {})
       .transition(SurfaceTransition.dialog())
     }

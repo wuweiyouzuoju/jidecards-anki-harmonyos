@@ -710,7 +710,7 @@ export struct 卡片预览页 {
     .backgroundColor($r('app.color.surface_card'))
     .borderRadius(应用尺寸.圆角_卡片)
     .clip(true)
-    .border(SurfaceBorder.options())
+    .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
     }
     .width('100%')
     .layoutWeight(1)

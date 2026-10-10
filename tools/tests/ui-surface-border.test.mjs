@@ -6,11 +6,35 @@ import { loadPlatformModule, loadComponentLogic } from './platform-module-harnes
 import { CARD_FLAGS, browserRowFlag } from '../../entry/src/main/ets/model/CardMarking.ts';
 import { BrowserRowColor } from '../../entry/src/main/ets/proto/messages/SearchMessages.ts';
 import { 对比度 } from '../../entry/src/main/ets/model/色阶生成.ets';
+import { arkuiBorderOrderViolations } from '../arkui-border-order.mjs';
 
 const root = new URL('../../entry/src/main/ets/', import.meta.url);
 const read = path => readFileSync(new URL(path, root), 'utf8');
 const SurfaceBorder = loadPlatformModule('utils/SurfaceBorder.ets', 'SurfaceBorder', {
   应用尺寸: { 卡片边框: 1 }, $r: key => key
+});
+
+test('border order audit follows one balanced modifier chain and respects the final radius', () => {
+  for (const source of [
+    'Column().borderRadius(12).border(SurfaceBorder.options())',
+    'Select([]).borderRadius(radius(12)).height(44).border(outline({ width: 1 }))',
+    'Column().borderRadius(12) // border comment\n.border(SurfaceBorder.options())'
+  ]) assert.equal(arkuiBorderOrderViolations(source).length, 1, source);
+  for (const source of [
+    'Column().border(SurfaceBorder.options()).borderRadius(12)',
+    'Column().borderRadius(12).border({ width: 1, radius: 16 })',
+    'Column().borderRadius(12).border(outline()).borderRadius(16)',
+    'Column().borderRadius(12)\nText(".border(SurfaceBorder.options())")',
+    '// Column().borderRadius(12).border(outline())'
+  ]) assert.deepEqual(arkuiBorderOrderViolations(source), [], source);
+});
+
+test('all explicit ArkUI radii survive subsequent radius-less borders', () => {
+  const failures = [];
+  for (const file of readdirSync(root, { recursive: true }).filter(file => file.endsWith('.ets'))) {
+    for (const hit of arkuiBorderOrderViolations(read(file))) failures.push(`${file}:${hit.line}`);
+  }
+  assert.deepEqual(failures, [], 'apply border before the final explicit borderRadius');
 });
 
 test('menu, panel and button outlines share defaults while explicit state colors retain their geometry', () => {
@@ -90,11 +114,9 @@ test('ordinary outlines, form controls and separators use the common border inst
   assert.match(read('utils/GlassSurface.ets'),/outline: BorderOptions = SurfaceBorder\.options\(\)/);
   assert.match(read('utils/GlassSurface.ets'),/\.border\(this\.outline\)/);
   const deck = read('components/牌组列表项.ets');
-  for(const name of ['主菜单','色条菜单']) {
-    const start=deck.indexOf(`  private ${name}() {`);assert.ok(start>=0,name);
-    const menu=deck.slice(start,deck.indexOf('\n  }',start)+4);
-    assert.match(menu,/\.attributeModifier\(new MenuSurface\(\)\)/,name+': the owning surface draws the outline');
-  }
+  assert.doesNotMatch(deck, /bindPopup\(/, 'deck rows delegate menus to the root shared surface');
+  assert.match(read('components/home/HomeDeckRowMenu.ets'), /CardActionMenu\(\{/);
+  assert.match(read('components/common/CardActionMenu.ets'), /\.attributeModifier\(new MenuSurface\(this\.anchor === undefined\)\)/);
+  assert.match(read('components/common/MenuBubbleSurface.ets'), /\.stroke\(SurfaceBorder\.color\(\)\)/);
   assert.match(read('components/home/DeckReparentFeature.ets'),/DialogFrame\(\{/,'hierarchy changes use the shared dialog surface');
-  assert.equal((deck.match(/popupColor: \$r\('app\.color\.menu_surface'\)/g) ?? []).length, 2, 'native arrow backgrounds match');
 });

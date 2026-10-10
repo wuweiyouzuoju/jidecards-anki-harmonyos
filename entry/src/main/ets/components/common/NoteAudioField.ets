@@ -253,7 +253,7 @@ export struct NoteAudioField {
       }
     }.width('100%')
       .backgroundColor($r('app.color.surface_sidebar'))
-      .borderRadius(应用尺寸.圆角_面板).border(SurfaceBorder.options())
+      .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
   }
 
   @Builder

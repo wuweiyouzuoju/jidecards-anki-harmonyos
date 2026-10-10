@@ -151,7 +151,7 @@ export struct 查找重复对话框 {
             .fontSize(应用尺寸.字号_正文_中).fontColor($r('app.color.text_primary')).maxLines(2)
           Text(localizedResourceText(this.getUIContext(), this.uiLanguage, $r('app.string.find_dupes_notes_in_group'), group.noteIds.length))
             .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
-        }.width('100%').padding(应用尺寸.间距_8).borderRadius(应用尺寸.圆角_面板).border(SurfaceBorder.options())
+        }.width('100%').padding(应用尺寸.间距_8).border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
         .backgroundColor($r('app.color.surface_sidebar')).attributeModifier(new PressFeedback())
         .onClick((): void => { this.jump(group); })
       }, (group: DuplicateGroup): string => `${group.noteIds[0]}`)

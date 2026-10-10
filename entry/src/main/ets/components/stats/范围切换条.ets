@@ -35,7 +35,7 @@ export struct 范围切换条 {
       .optionFont(SelectStyle.optionFont)
       .selectedOptionFont(SelectStyle.selectedOptionFont)
       .textModifier(SelectStyle.labelText())
-      .borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
+      .border(SelectStyle.controlBorder).borderRadius(SelectStyle.controlRadius)
       .onSelect((index: number): void => { this.onRangeChange(index); })
   }
 }

@@ -414,7 +414,7 @@ export struct 添加笔记面板 {
               .optionFont(SelectStyle.optionFont)
               .selectedOptionFont(SelectStyle.selectedOptionFont)
               .textModifier(SelectStyle.labelText())
-              .borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
+              .border(SelectStyle.controlBorder).borderRadius(SelectStyle.controlRadius)
               .onSelect((index: number): void => {
                 if (!this.busy && Number.isInteger(index) && index >= 0 && index < this.notetypeOptions.length) {
                   this.onSelectNotetype(this.notetypeOptions[index].id);
@@ -456,7 +456,7 @@ export struct 添加笔记面板 {
               .fontSize(应用尺寸.字号_按钮)
               .fontColor(this.动作主色)
               .backgroundColor($r('app.color.surface_page'))
-              .borderRadius(应用尺寸.圆角_面板).border(SurfaceBorder.options())
+              .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
               .enabled(!this.busy)
               .attributeModifier(new PressFeedback())
               .stateEffect(false)
@@ -504,7 +504,7 @@ export struct 添加笔记面板 {
       .constraintSize({ maxWidth: 520, maxHeight: '88%' })
       .padding(应用尺寸.卡片内边距)
       .backgroundColor($r('app.color.surface_card'))
-      .borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
+      .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
       .onClick(() => {
       })
 

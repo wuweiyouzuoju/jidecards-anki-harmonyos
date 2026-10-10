@@ -36,7 +36,7 @@ export struct AgentEditableCard {
         .backgroundColor(this.card.已选中
           && this.card.状态 !== 'saved'
           ? this.动作主色 : Color.Transparent)
-        .border({ width: 应用尺寸.卡片边框, color: this.动作主色 })
+        .border({ width: 应用尺寸.卡片边框, color: this.动作主色 }).borderRadius(10)
         .justifyContent(FlexAlign.Center)
         .alignItems(VerticalAlign.Center)
         .enabled(!this.busy && this.card.状态 !== 'saved')

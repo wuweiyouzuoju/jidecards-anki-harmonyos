@@ -2219,9 +2219,8 @@ export struct 学习页 {
       .layoutWeight(1)
       .alignContent(Alignment.BottomEnd)
       .backgroundColor($r('app.color.surface_card'))
-      .borderRadius(应用尺寸.圆角_卡片)
       .clip(true)
-      .border(SurfaceBorder.options())
+      .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
 
       // Type-in-the-Answer：正面阶段在 Web 下方渲染输入框，翻面后比对用户输入与笔记字段值。
       // Enter 提交翻面（对齐 Anki 桌面端输入框回车显示答案）。
@@ -2248,8 +2247,7 @@ export struct 学习页 {
               .fontColor($r('app.color.text_primary'))
               .placeholderColor($r('app.color.text_tertiary'))
               .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
-              .borderRadius(应用尺寸.圆角_行动按钮)
-              .border({ width: 0 })
+              .border({ width: 0 }).borderRadius(应用尺寸.圆角_行动按钮)
               .backgroundColor($r('app.color.surface_card'))
               // 聚焦视觉完全去主题色，三层处理：局部主题色、组件状态样式、系统焦点框。
               .stateStyles({

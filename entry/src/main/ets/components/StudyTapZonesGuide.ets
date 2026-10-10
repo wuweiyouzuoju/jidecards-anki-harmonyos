@@ -37,7 +37,7 @@ export struct StudyTapZonesGuide {
           .fontColor($r('app.color.text_primary')).textAlign(TextAlign.Center)
         按下态按钮({ 文案: $r('app.string.study_guide_start'), 点击回调: this.onConfirm })
       }.width('88%').constraintSize({ maxWidth: 360 })
-        .padding(12).backgroundColor($r('app.color.surface_card')).borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
+        .padding(12).backgroundColor($r('app.color.surface_card')).border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
     }.width('100%').height('100%').onClick((): void => {})
   }
 }

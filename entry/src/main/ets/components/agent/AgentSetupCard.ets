@@ -83,7 +83,7 @@ export struct AgentSetupCard {
           .optionFont(SelectStyle.optionFont)
           .selectedOptionFont(SelectStyle.selectedOptionFont)
           .textModifier(SelectStyle.labelText())
-          .borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
+          .border(SelectStyle.controlBorder).borderRadius(SelectStyle.controlRadius)
           .onSelect((index: number): void => {
             if (index >= 0 && index < this.notetypeOptions.length) {
               this.onNotetypeSelected(this.notetypeOptions[index].id);
@@ -133,7 +133,7 @@ export struct AgentSetupCard {
           .optionFont(SelectStyle.optionFont)
           .selectedOptionFont(SelectStyle.selectedOptionFont)
           .textModifier(SelectStyle.labelText())
-          .borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
+          .border(SelectStyle.controlBorder).borderRadius(SelectStyle.controlRadius)
           .onSelect((index: number): void => {
             if (index === 0) { this.onNotetypeSelected(0); }
             else if (index > 0 && index <= this.notetypeOptions.length) {

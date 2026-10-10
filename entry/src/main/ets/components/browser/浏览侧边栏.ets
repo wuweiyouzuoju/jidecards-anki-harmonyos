@@ -167,7 +167,7 @@ export struct 浏览侧边栏 {
               }
             }
             }.width('100%').backgroundColor($r('app.color.surface_card'))
-              .borderRadius(应用尺寸.圆角_指标卡).border(SurfaceBorder.options()).clip(true)
+              .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_指标卡).clip(true)
               .margin({ bottom: 应用尺寸.页面分组间距(this.narrowDeckLayout) })
 
             // 标签分区
@@ -198,7 +198,7 @@ export struct 浏览侧边栏 {
               }
             }
             }.width('100%').backgroundColor($r('app.color.surface_card'))
-              .borderRadius(应用尺寸.圆角_指标卡).border(SurfaceBorder.options()).clip(true)
+              .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_指标卡).clip(true)
               .margin({ bottom: 应用尺寸.页面分组间距(this.narrowDeckLayout) })
 
             // 已保存搜索分区
@@ -215,7 +215,7 @@ export struct 浏览侧边栏 {
               }
             }
             }.width('100%').backgroundColor($r('app.color.surface_card'))
-              .borderRadius(应用尺寸.圆角_指标卡).border(SurfaceBorder.options()).clip(true)
+              .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_指标卡).clip(true)
               .margin({ bottom: 应用尺寸.页面分组间距(this.narrowDeckLayout) })
 
           }

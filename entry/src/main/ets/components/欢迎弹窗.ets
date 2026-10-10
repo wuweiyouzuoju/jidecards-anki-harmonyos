@@ -198,7 +198,7 @@ export struct 欢迎弹窗 {
       // maxHeight 百分比（layoutWeight(1)+'88%' 组合会让弹窗永远撑满屏高 88% 不收缩）
       .constraintSize({ maxWidth: 480 })
       .backgroundColor($r('app.color.surface_page'))
-      .borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
+      .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
       .transition(SurfaceTransition.dialog())
     }
     .width('100%')

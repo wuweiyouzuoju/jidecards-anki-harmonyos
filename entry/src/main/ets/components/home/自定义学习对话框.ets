@@ -393,7 +393,7 @@ export struct 自定义学习对话框 {
       .width('88%').constraintSize({ maxWidth: 480, maxHeight: '88%' })
       .padding(应用尺寸.面板内边距)
       .backgroundColor($r('app.color.surface_card'))
-      .borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
+      .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
       .onClick(() => {})
       .transition(SurfaceTransition.dialog())
     }.width('100%').height('100%')

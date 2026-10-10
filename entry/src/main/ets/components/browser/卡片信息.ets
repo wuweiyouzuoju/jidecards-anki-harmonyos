@@ -299,7 +299,7 @@ export struct 卡片信息 {
       .alignItems(HorizontalAlign.Start)
       .padding(应用尺寸.卡片内边距)
       .backgroundColor($r('app.color.surface_card'))
-      .borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
+      .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
     }
     .width('100%')
     .height('100%')

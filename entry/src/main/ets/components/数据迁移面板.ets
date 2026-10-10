@@ -453,7 +453,7 @@ export struct 数据迁移面板 {
         .width('100%')
         .padding(应用尺寸.间距_12)
         .backgroundColor($r('app.color.surface_page'))
-        .borderRadius(应用尺寸.圆角_面板).border(SurfaceBorder.options())
+        .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
       }
 
       // === 错误信息（红字）===

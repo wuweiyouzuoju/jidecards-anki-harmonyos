@@ -64,7 +64,7 @@ export struct IridescentGiftPanel {
         }.fontSize(应用尺寸.字号_正文).fontColor(this.primary).width('100%')
       }
       .width('100%').constraintSize({ minHeight: 48 }).padding(应用尺寸.间距_12)
-      .backgroundColor($r('app.color.surface_page')).borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
+      .backgroundColor($r('app.color.surface_page')).border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
       .attributeModifier(new PressFeedback()).stateEffect(false)
       .onClick((): void => { this.copyGroup(); })
       Text() {

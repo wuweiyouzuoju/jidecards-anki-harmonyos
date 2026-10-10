@@ -46,7 +46,7 @@ export struct FormSelectRow {
         .enabled(this.isInteractive).attributeModifier(new SelectStyle(this.surfaceColor))
         .height(SelectStyle.controlHeight).padding(SelectStyle.controlPadding).space(SelectStyle.controlSpace)
         .font(SelectStyle.controlFont).optionFont(SelectStyle.optionFont).selectedOptionFont(SelectStyle.selectedOptionFont)
-        .textModifier(SelectStyle.labelText()).borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
+        .textModifier(SelectStyle.labelText()).border(SelectStyle.controlBorder).borderRadius(SelectStyle.controlRadius)
         .onSelect((index: number): void => { this.select(index); })
     }.width('100%').constraintSize({ minHeight: FormRowLayout.controlHeight }).alignItems(VerticalAlign.Center)
   }

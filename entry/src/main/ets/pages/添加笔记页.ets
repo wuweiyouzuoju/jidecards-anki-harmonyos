@@ -689,7 +689,7 @@ export struct 添加笔记页 {
                 .optionFont(SelectStyle.optionFont)
                 .selectedOptionFont(SelectStyle.selectedOptionFont)
                 .textModifier(SelectStyle.labelText())
-                .borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
+                .border(SelectStyle.controlBorder).borderRadius(SelectStyle.controlRadius)
                 .onSelect((索引: number): void => {
                   this.加载笔记类型(this.笔记类型选项[索引].id);
                 })
@@ -705,7 +705,7 @@ export struct 添加笔记页 {
                   .fontSize(应用尺寸.字号_正文)
                   .fontColor(this.动作主色)
                   .backgroundColor($r('app.color.surface_card'))
-                  .borderRadius(应用尺寸.圆角_面板).border(SurfaceBorder.options())
+                  .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
                   .enabled(!this.处理中 && !this.pickingFieldImage && !this.audioBusy && !this.confirmingDiscard)
                   .attributeModifier(new PressFeedback())
                   .stateEffect(false)
@@ -716,7 +716,7 @@ export struct 添加笔记页 {
                     .fontSize(应用尺寸.字号_正文)
                     .fontColor(this.动作主色)
                     .backgroundColor($r('app.color.surface_card'))
-                    .borderRadius(应用尺寸.圆角_面板).border(SurfaceBorder.options())
+                    .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
                     .enabled(!this.处理中 && !this.pickingFieldImage && !this.audioBusy && !this.confirmingDiscard)
                     .attributeModifier(new PressFeedback())
                     .stateEffect(false)

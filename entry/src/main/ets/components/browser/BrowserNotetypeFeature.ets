@@ -113,7 +113,7 @@ export struct BrowserNotetypeFeature {
               .optionFont(SelectStyle.optionFont)
               .selectedOptionFont(SelectStyle.selectedOptionFont)
               .textModifier(SelectStyle.labelText())
-              .borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
+              .border(SelectStyle.controlBorder).borderRadius(SelectStyle.controlRadius)
               .enabled(!this.busy && !this.state.busy)
               .onSelect((选索引: number): void => {
                 if (this.busy || this.state.busy) return;
@@ -152,7 +152,7 @@ export struct BrowserNotetypeFeature {
                 .optionFont(SelectStyle.optionFont)
                 .selectedOptionFont(SelectStyle.selectedOptionFont)
                 .textModifier(SelectStyle.labelText())
-                .borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
+                .border(SelectStyle.controlBorder).borderRadius(SelectStyle.controlRadius)
                 .enabled(!this.busy && !this.state.busy)
                 .onSelect((选索引: number): void => {
                   if (this.busy || this.state.busy) return;

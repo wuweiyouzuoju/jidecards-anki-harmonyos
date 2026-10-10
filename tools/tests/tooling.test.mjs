@@ -12,6 +12,8 @@ test('all discovers every test once; domain suites are nonempty and invalid suit
   const all = selectTests(root);
   assert.equal(all.length, new Set(all).size);
   assert.equal(all.length, readdirSync(new URL('./', import.meta.url)).filter(n => n.endsWith('.test.mjs')).length);
+  const ui = new Set(selectTests(root, 'ui'));
+  for (const file of all.filter(file => /[\\/]ui-/.test(file))) assert.ok(ui.has(file), file);
   for (const suite of Object.keys(SUITES)) {
     assert.ok(selectTests(root, suite).every(file => all.includes(file)));
   }

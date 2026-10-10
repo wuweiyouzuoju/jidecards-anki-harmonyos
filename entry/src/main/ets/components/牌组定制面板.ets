@@ -502,7 +502,7 @@ export struct 牌组定制面板 {
         .constraintSize({ maxWidth: 560 })
         .padding(应用尺寸.卡片内边距)
         .backgroundColor($r('app.color.surface_card'))
-        .borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
+        .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
         .transition(SurfaceTransition.dialog())
       }
     }

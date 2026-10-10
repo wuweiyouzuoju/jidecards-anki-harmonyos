@@ -99,7 +99,7 @@ export struct RedemptionPanel {
           Text() { ForEach([themeTextKey(settingsItemText(this.getUIContext(), 'fingerprint_copy', this.uiLanguage), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(settingsItemText(this.getUIContext(), 'fingerprint_copy', this.uiLanguage), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }.fontSize(14).fontColor(this.primary)
         }.width('100%')
       }
-      .width('100%').height(48).padding({ left: 14, right: 14 }).borderRadius(12).border(SurfaceBorder.options())
+      .width('100%').height(48).padding({ left: 14, right: 14 }).border(SurfaceBorder.options()).borderRadius(12)
       .backgroundColor($r('app.color.surface_page')).attributeModifier(new PressFeedback())
       .stateEffect(false)
       .onClick((): void => { this.copyDeveloperGroup(); })
@@ -213,7 +213,7 @@ export struct RedemptionPanel {
           .fontSize(14).fontFamily('monospace').fontColor($r('app.color.text_secondary')).width('100%')
         Text(this.fingerprintLine(5))
           .fontSize(14).fontFamily('monospace').fontColor($r('app.color.text_secondary')).width('100%')
-      }.width('100%').padding(12).borderRadius(12).border(SurfaceBorder.options()).backgroundColor($r('app.color.surface_page'))
+      }.width('100%').padding(12).border(SurfaceBorder.options()).borderRadius(12).backgroundColor($r('app.color.surface_page'))
       HelpLabel({ title: $r('app.string.redemption_fingerprint_hint'), textSize: 12,
         textColor: $r('app.color.text_secondary'),
         onHelp: (): void => { this.createContentHelp(); this.contentHelp?.open(); }
@@ -248,7 +248,7 @@ export struct RedemptionPanel {
         })
 
     }
-    .padding(16).width('100%').borderRadius(20).border(SurfaceBorder.options()).backgroundColor($r('app.color.surface_card'))
+    .padding(16).width('100%').border(SurfaceBorder.options()).borderRadius(20).backgroundColor($r('app.color.surface_card'))
   }
   build() {
     this.redemptionDetails()
