@@ -1,5 +1,6 @@
 import { SurfaceTransition } from '../utils/SurfaceTransition';
 import { ActionStatus } from './common/ActionStatus';
+import { hasActionStatus } from '../model/InteractionFeedback';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../utils/PressFeedback';
 import { DialogBackdrop } from './common/DialogBackdrop';
@@ -167,11 +168,17 @@ export struct 同步面板 {
   }
 
   /** done 阶段：状态/错误文案 + 关闭按钮。 */
+  private completionFeedback(): string {
+    return this.state.错误文案 !== '' ? 'failure' :
+      this.state.状态文案 !== '' && !this.state.是否请求中止 ? 'success' : 'idle';
+  }
+
   @Builder
   private 完成内容() {
     Row({ space: 8 }) {
-      ActionStatus({ phase: this.state.错误文案 !== '' ? 'failure' :
-        this.state.状态文案 !== '' && !this.state.是否请求中止 ? 'success' : 'idle', tint: this.取色板().主色 })
+      if (hasActionStatus(this.completionFeedback())) {
+        ActionStatus({ phase: this.completionFeedback(), tint: this.取色板().主色 })
+      }
     if (this.state.状态文案 !== '') {
       Text() { ForEach([themeTextKey(this.state.状态文案, this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(this.state.状态文案, this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }
         .fontSize(应用尺寸.字号_正文_小)

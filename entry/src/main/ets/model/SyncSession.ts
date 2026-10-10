@@ -67,7 +67,6 @@ export class SyncSession {
   private automatic: boolean;
   private 初始鉴权: SyncAuth | null;
   private detailsVisible: boolean = false;
-  private syncForeground: boolean = true;
   private 状态变化回调: (busy: boolean, modal: boolean) => void;
   private statusChanged: (text: string, indicator: string) => void;
   private 同步完成回调: (disabled: boolean) => void;
@@ -94,7 +93,9 @@ export class SyncSession {
   private readonly syncOwner: Object = new Object();
   private ownsSync: boolean = false;
   private disposed: boolean = false;
-  private mediaPollInFlight: boolean = false;
+  private mediaPollTask: Promise<void> | null = null;
+  private mediaRefreshPending: boolean = false;
+  private mediaPollStartedAt: number = 0;
   private fsrsBeforeSync: boolean | null = null;
   private fsrsDisabledBySync: boolean = false;
   private collectionResultNotified: boolean = false;
@@ -165,6 +166,7 @@ export class SyncSession {
       if (this.syncTask !== null) await this.syncTask;
       if (this.mediaStart !== null) await this.mediaStart;
       if (this.abortCall !== null) await this.abortCall;
+      if (this.mediaPollTask !== null) await this.mediaPollTask;
     } catch (error) {
       this.environment.log.warn(同步日志域, 同步日志标签, 'sync: detached operation finished with error');
     }
@@ -221,6 +223,7 @@ export class SyncSession {
   showDetails(): void {
     this.detailsVisible = true;
     this.publishSyncState();
+    this.pollMediaStatus(true);
   }
 
   /** 全量替换只能由用户明确发起，学习不自动打断已确认的替换。 */
@@ -281,11 +284,10 @@ export class SyncSession {
     }
   }
 
-  /** 仅给已启动的同步申请退后台收尾时间，不创建后台轮询任务。 */
+  /** 恢复前台立即追上媒体状态；后台挂起期间的定时器不保证准时。 */
   syncForegroundChanged(): void {
-    if (this.syncForeground) {
-      this.releaseSuspendDelay();
-    }
+    this.releaseSuspendDelay();
+    this.pollMediaStatus(true);
   }
 
   /** 必须由 Ability 退后台回调同步触发，不能等 ArkUI Watch 调度。 */
@@ -340,6 +342,7 @@ export class SyncSession {
 
   /** 清理媒体轮询定时器。 */
   private 清理轮询定时器(): void {
+    this.mediaRefreshPending = false;
     if (this.轮询定时器 >= 0) {
       this.environment.clearInterval(this.轮询定时器);
       this.轮询定时器 = -1;
@@ -673,7 +676,7 @@ export class SyncSession {
   }
 
   /**
-   * 1s 轮询媒体进度。完成判定：
+   * 媒体启动后立即读取，随后每秒轮询；详情打开和恢复前台复用同一读取入口。
    * - active=false → 正常成功（get_media_sync_status 在 task 结束时 join，
    *   正常完成返回 Ok 走本分支，出错抛 Err 走 catch）
    * - active=true → 继续轮询，更新进度文案
@@ -683,61 +686,75 @@ export class SyncSession {
     this.清理轮询定时器();
     this.媒体检查次数 = 0;
     this.媒体曾进入活跃 = false;
-    const 轮询开始时间: number = Date.now();
-    this.environment.log.info(同步日志域, 同步日志标签, 'sync: mediaPoll START at %{public}d', 轮询开始时间);
+    this.mediaPollStartedAt = Date.now();
+    this.environment.log.info(同步日志域, 同步日志标签, 'sync: mediaPoll START at %{public}d', this.mediaPollStartedAt);
     this.轮询定时器 = this.environment.setInterval((): void => {
-      if (this.disposed || this.mediaPollInFlight) return;
-      this.mediaPollInFlight = true;
-      this.同步服务实例.媒体同步状态()
-        .then((状态: MediaSyncStatusResponse): void => {
-          if (this.disposed) return;
-          if (this.是否请求中止) {
-            this.完成中止();
-            return;
-          }
-          this.媒体检查次数++;
-          if (状态.active) {
-            this.媒体曾进入活跃 = true;
-          }
-          // 后端 rslib 已通过 i18n 模板格式化为「已检查：N / 已新增：N↑ N↓ / 已删除：N↑ N↓」，
-          // ↑=上传方向（本地→云端），↓=下载方向（云端→本地）。直接原样展示，不再替换符号。
-          this.媒体进度文案 = `${this.取本地化文案('sync_syncing_media')} ` +
-            `${状态.progress.checked}  ${状态.progress.added}  ${状态.progress.removed}`;
-          this.publishStatus();
-          this.environment.log.info(同步日志域, 同步日志标签,
-            'sync: mediaPoll check#%{public}d elapsed=%{public}dms active=%{public}s everActive=%{public}s checked=%{public}s added=%{public}s removed=%{public}s',
-            this.媒体检查次数, Date.now() - 轮询开始时间, 状态.active ? 'true' : 'false',
-            this.媒体曾进入活跃 ? 'true' : 'false',
-            状态.progress.checked, 状态.progress.added, 状态.progress.removed);
-          // 完成判定：active=false 即算成功。
-          // get_media_sync_status 在 task finished 时会 join 拿结果——正常完成返回 Ok
-          // （走到本 then 分支），出错抛 Err（走 catch）。所以 active=false 且无异常 = 正常结束：
-          // - everActive=true：有传输的正常完成
-          // - everActive=false：rslib sync_inner 中 actions_performed=false（本地与远端一致，
-          //   register_changes 后 client_usn==server_usn 且无 pending）的无变化快速完成。
-          // syncMedia RPC 失败会走 catch 不会进轮询，故进轮询即说明任务已派发。
-          if (!状态.active) {
-            this.environment.log.info(同步日志域, 同步日志标签,
-              'sync: mediaPoll DONE (everActive=%{public}s, checkCount=%{public}d, elapsed=%{public}dms)',
-              this.媒体曾进入活跃 ? 'true' : 'false', this.媒体检查次数, Date.now() - 轮询开始时间);
-            this.是否在媒体阶段 = false;
-            this.清理轮询定时器();
-            this.媒体进度文案 = '';
-            this.状态文案 = this.取本地化文案('sync_media_complete');
-            this.setSyncPhase('done');
-            // 媒体同步成功，清除待完成标志。
-            this.environment.设置媒体待同步(false);
-            this.notifySyncResult();
-          }
-        })
-        .catch((error: Error): void => {
-          if (this.disposed) return;
-          this.处理同步错误(error instanceof Error ? error : new Error(`${error}`));
-        })
-        .finally((): void => {
-          this.mediaPollInFlight = false;
-        });
+      this.pollMediaStatus();
     }, 1000);
+    this.pollMediaStatus();
+  }
+
+  /** 终态只消费一次；交互刷新合并到当前读取之后，旧定时器不得重读已结束任务。 */
+  private pollMediaStatus(refreshIfBusy: boolean = false): void {
+    if (this.disposed || this.当前阶段 !== 'syncing' || !this.是否在媒体阶段 || this.轮询定时器 < 0) return;
+    if (this.mediaPollTask !== null) {
+      this.mediaRefreshPending = this.mediaRefreshPending || refreshIfBusy;
+      return;
+    }
+    this.mediaPollTask = this.同步服务实例.媒体同步状态()
+      .then((状态: MediaSyncStatusResponse): void => {
+        if (this.disposed) return;
+        if (this.是否请求中止) {
+          this.完成中止();
+          return;
+        }
+        this.媒体检查次数++;
+        if (状态.active) {
+          this.媒体曾进入活跃 = true;
+        }
+        // 后端 rslib 已通过 i18n 模板格式化为「已检查：N / 已新增：N↑ N↓ / 已删除：N↑ N↓」，
+        // ↑=上传方向（本地→云端），↓=下载方向（云端→本地）。直接原样展示，不再替换符号。
+        const progress: string = [状态.progress.checked, 状态.progress.added, 状态.progress.removed]
+          .filter((value: string): boolean => value !== '').join('  ');
+        if (progress !== '') this.媒体进度文案 = `${this.取本地化文案('sync_syncing_media')} ${progress}`;
+        this.publishStatus();
+        this.environment.log.info(同步日志域, 同步日志标签,
+          'sync: mediaPoll check#%{public}d elapsed=%{public}dms active=%{public}s everActive=%{public}s checked=%{public}s added=%{public}s removed=%{public}s',
+          this.媒体检查次数, Date.now() - this.mediaPollStartedAt, 状态.active ? 'true' : 'false',
+          this.媒体曾进入活跃 ? 'true' : 'false',
+          状态.progress.checked, 状态.progress.added, 状态.progress.removed);
+        // 完成判定：active=false 即算成功。
+        // get_media_sync_status 在 task finished 时会 join 拿结果——正常完成返回 Ok
+        // （走到本 then 分支），出错抛 Err（走 catch）。所以 active=false 且无异常 = 正常结束：
+        // - everActive=true：有传输的正常完成
+        // - everActive=false：rslib sync_inner 中 actions_performed=false（本地与远端一致，
+        //   register_changes 后 client_usn==server_usn 且无 pending）的无变化快速完成。
+        // syncMedia RPC 失败会走 catch 不会进轮询，故进轮询即说明任务已派发。
+        if (!状态.active) {
+          this.environment.log.info(同步日志域, 同步日志标签,
+            'sync: mediaPoll DONE (everActive=%{public}s, checkCount=%{public}d, elapsed=%{public}dms)',
+            this.媒体曾进入活跃 ? 'true' : 'false', this.媒体检查次数, Date.now() - this.mediaPollStartedAt);
+          this.是否在媒体阶段 = false;
+          this.清理轮询定时器();
+          this.媒体进度文案 = '';
+          this.状态文案 = this.取本地化文案('sync_media_complete');
+          this.setSyncPhase('done');
+          // 媒体同步成功，清除待完成标志。
+          this.environment.设置媒体待同步(false);
+          this.notifySyncResult();
+        }
+      })
+      .catch((error: Error): void => {
+        if (this.disposed) return;
+        this.处理同步错误(error instanceof Error ? error : new Error(`${error}`));
+      })
+      .finally((): void => {
+        this.mediaPollTask = null;
+        if (this.mediaRefreshPending) {
+          this.mediaRefreshPending = false;
+          this.pollMediaStatus();
+        }
+      });
   }
 
 

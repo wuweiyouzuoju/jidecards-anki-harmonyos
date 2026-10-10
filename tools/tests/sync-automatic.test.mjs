@@ -71,7 +71,7 @@ function homeHarness() {
   });
   Object.assign(page, { startupSequence: new HomeStartupSequence(), announcementController: new HomeAnnouncementController(), homeActivityChanged() {}, homeDisposed: false, syncForeground: true, autoSyncStartupReady: true, syncScheduler: new AutoSyncScheduler(), autoSyncTimer: -1,
     页面栈: { size: () => 0, pushPath: path => state.navigation.push(path) }, 加载状态: 'ready', 显示同步面板: false,
-    autoSyncCollectionBusy: false, autoSyncModal: false, deckLevelMenuId: '',
+    autoSyncCollectionBusy: false, autoSyncModal: false, deckMenuId: '',
     syncDetailsRequest: 0, getUIContext: () => ({ getHostContext: () => ({ resourceManager: { getStringSync: key => key } }) }),
     显示提示: () => { state.toasts++; }, 已选中牌组: () => true, 选中牌组: () => ({ id: 'deck', name: 'deck' }), 展开牌组路径() {}, 当前断点: 'xs',
     加载主页数据: async () => {}, 同步后检查FSRS: async () => {}, 暂停主页官方公告检查() {} });
@@ -414,6 +414,7 @@ test('media-only sync runs even with unchanged collection and closes only after 
   assert.equal(state.calls.find(call => call[0] === 'collection')[2], true, 'Core starts media');
   assert.equal(state.calls.some(call => call[0] === 'media'), false, 'only monitor the existing task');
   assert.equal(state.closed, 0);
+  state.mediaActive = false;
   state.timers.get(1)(); await settle();
   assert.equal(state.closed, 1);
   assert.equal(state.pending, false);
@@ -441,7 +442,6 @@ test('network/auth/media failures remain visible and cannot be mistaken for auto
     if (kind !== 'media') panel.同步服务实例.同步集合 = async () => { throw new Error(kind === 'auth' ? '401 unauthorized' : 'network timeout'); };
     else panel.同步服务实例.媒体同步状态 = async () => { throw new Error('network timeout'); };
     panel.aboutToAppear(); await settle();
-    if (kind === 'media') { state.timers.get(1)(); await settle(); }
     assert.equal(panel.当前阶段, 'done');
     assert.notEqual(panel.错误文案, '');
     assert.equal(state.closed, 0);
@@ -554,8 +554,7 @@ test('centered server dialog opens on the persisted value, cancels drafts, and b
   });
   const group = new Group();
   Object.assign(group, { 登录中: false, settingsSaving: false, savedServer: 'https://saved.example/',
-    serverInput: 'https://draft.example/', serverError: 'old error',
-    serverDialogController: null });
+    serverInput: 'https://draft.example/', serverError: 'old error' });
   group.openServerDialog();
   assert.equal(opened, 1);
   assert.equal(group.serverInput, group.savedServer);
@@ -566,13 +565,13 @@ test('centered server dialog opens on the persisted value, cancels drafts, and b
   assert.equal(closed, 1);
   assert.equal(group.serverInput, group.savedServer);
   assert.equal(group.serverError, '');
-  const previous = group.serverDialogController;
+  const previous = group.serverDialogController.current();
   motion.setStyle('lively'); group.openServerDialog();
-  assert.notEqual(group.serverDialogController, previous);
-  assert.equal(group.serverDialogController.options.openAnimation.duration, 290);
-  assert.equal(group.serverDialogController.options.builder.serverInput, group.savedServer);
+  assert.notEqual(group.serverDialogController.current(), previous);
+  assert.equal(group.serverDialogController.current().options.openAnimation.duration, 290);
+  assert.equal(group.serverDialogController.current().options.builder.serverInput, group.savedServer);
   assert.equal(opened, 2);
-  assert.equal(closed, 2);
+  assert.equal(closed, 1, 'closing releases the reference, so reopening does not close the same window twice');
 });
 
 
@@ -593,6 +592,7 @@ test('automatic sync protects only collection work, delivers it before media, an
   assert.equal(state.states.at(-1).modal, false);
   assert.equal(state.closed, 0);
   assert.equal(state.timers.size, 1, 'hiding details must not destroy media polling');
+  state.mediaActive = false;
   state.timers.get(1)(); await settle();
   assert.equal(state.refreshed, 1);
   assert.equal(gate.isActive(), false);
@@ -654,7 +654,7 @@ test('short background allowance is requested synchronously by Ability and retur
     panel.aboutToAppear(); await settle();
     gate.continueInBackground(); gate.continueInBackground();
     assert.equal(state.delays.length, 1);
-    if (end === 'finished') { state.timers.get(1)(); await settle(); }
+    if (end === 'finished') { state.mediaActive = false; state.timers.get(1)(); await settle(); }
     if (end === 'foreground') panel.syncForegroundChanged();
     if (end === 'expiry') state.delays[0]();
     if (end === 'destroyed') panel.aboutToDisappear();
@@ -687,6 +687,7 @@ test('manual completion waits for media and reports once whether details are ope
     if (detailsVisible) panel.showDetails();
     assert.deepEqual(state.toasts, ['app.string.sync_collection_complete'], 'collection is usable before media completes');
     assert.equal(state.closed, 0);
+    await settle(); state.mediaActive = false;
     state.timers.get(1)(); await settle();
     assert.deepEqual(state.toasts, ['app.string.sync_collection_complete', 'app.string.sync_media_complete'], 'completion must identify the stage');
     assert.equal(state.closed, 1);

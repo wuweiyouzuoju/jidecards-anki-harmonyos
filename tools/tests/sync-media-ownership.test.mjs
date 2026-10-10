@@ -24,7 +24,6 @@ for (const required of [0, 1, 2, 3, 4]) {
     panel.aboutToAppear(); await settle();
     if (required >= 2) { await panel.冲突确认(required !== 3); await settle(); }
     assert.equal(starts, 1);
-    state.timers.get(1)(); await settle();
     assert.match(panel.错误文案, /timeout/);
     assert.equal(state.pending, true);
     assert.equal(state.closed, 0);
@@ -45,6 +44,7 @@ test('media management observes the lease without consuming the sync result', as
   let pendingError = new Error('network timeout'), reads = 0;
   const status = async () => {
     reads++;
+    if (reads === 1) return { active: true, progress: { checked: '', added: '', removed: '' } };
     if (pendingError) { const error = pendingError; pendingError = null; throw error; }
     return { active: false, progress: { checked: '', added: '', removed: '' } };
   };
@@ -55,7 +55,7 @@ test('media management observes the lease without consuming the sync result', as
   Object.assign(ui, { visible: true, 同步服务实例: { 媒体同步状态: status } });
   await ui.检查媒体同步状态();
   assert.equal(ui.媒体同步中, true);
-  assert.equal(reads, 0);
+  assert.equal(reads, 1, 'media management must not add a consuming read to the owner\'s first sample');
   state.timers.get(1)(); await settle();
   assert.match(panel.错误文案, /timeout/);
   assert.equal(state.pending, true);
@@ -76,6 +76,7 @@ test('manual collection completion reports usable cards before media finishes', 
   assert.ok(state.toasts.includes('app.string.sync_collection_complete'));
   assert.equal(state.closed, 0);
   assert.equal(state.states.at(-1).busy, false);
+  state.mediaActive = false;
   state.timers.get(1)(); await settle();
   assert.deepEqual(state.toasts, ['app.string.sync_collection_complete', 'app.string.sync_media_complete']);
   assert.equal(state.closed, 1);
@@ -87,6 +88,7 @@ test('opening media details after a silent collection commit can show one comple
   const { panel, state } = panelHarness({ required: 0, media: true, automatic: true });
   panel.aboutToAppear(); await settle();
   assert.deepEqual(state.toasts, []);
+  state.mediaActive = false;
   panel.showDetails();
   state.timers.get(1)(); await settle();
   assert.deepEqual(state.toasts, ['app.string.sync_media_complete']);

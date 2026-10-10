@@ -24,7 +24,7 @@ import { CoreRpc } from '../proto/generated/CoreRpc';
 // 同步集合：是否同步媒体=true 时同步完成后自动挂起媒体同步；
 //   required 取值见 SYNC_COLLECTION_REQUIRED（可能要求全量上传/下载）。
 // 全量上传或下载：是否上传 决定方向，调用方须先得到用户确认；服务器USN 为 null 时跳过媒体 usn 记录。
-// 同步媒体：rslib 对重复启动安全。
+// 同步媒体：Core 已启动时只监测；重复启动可能丢弃已结束任务的一次性结果。
 // 设置自定义证书：注入 PEM 文本形式的 CA 证书，供同步 TLS 校验使用。
 //
 // @副作用
