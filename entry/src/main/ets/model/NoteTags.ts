@@ -1,3 +1,5 @@
+import type { DirectoryRow } from './DirectoryTree';
+import { directoryRow, visibleDirectoryRows } from './DirectoryTree';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { TagTreeNode } from '../proto/messages/TagsMessages';
 import type { EditableNote } from '../proto/messages/NoteMessages';
@@ -37,32 +39,14 @@ export function flattenTagTree(root: TagTreeNode): TagRow[] {
 }
 
 export function visibleTagRows(rows: TagRow[], query: string): TagRow[] {
-  const needle: string = query.trim().toLowerCase();
-  if (needle === '') {
-    let hiddenBelow: number = -1;
-    return rows.filter((row: TagRow): boolean => {
-      if (hiddenBelow >= 0 && row.level > hiddenBelow) return false;
-      hiddenBelow = row.hasChildren && row.collapsed ? row.level : -1;
-      return true;
-    });
-  }
-  const visible: Set<string> = new Set<string>();
-  const expanded: Set<string> = new Set<string>();
-  for (const row of rows) {
-    if (!row.fullName.toLowerCase().includes(needle)) continue;
-    visible.add(row.fullName.toLowerCase());
-    let parent: string = row.fullName;
-    let separator: number = parent.lastIndexOf('::');
-    while (separator >= 0) {
-      parent = parent.slice(0, separator);
-      visible.add(parent.toLowerCase()); expanded.add(parent.toLowerCase());
-      separator = parent.lastIndexOf('::');
-    }
-  }
-  return rows.filter((row: TagRow): boolean => visible.has(row.fullName.toLowerCase()))
-    .map((row: TagRow): TagRow => ({ fullName: row.fullName, name: row.name, level: row.level,
-      hasChildren: row.hasChildren, collapsed: expanded.has(row.fullName.toLowerCase()) ? false : row.collapsed,
-      selection: row.selection }));
+  const directory: DirectoryRow[] = rows.map((tag: TagRow): DirectoryRow => {
+    const row: DirectoryRow = directoryRow(tag.fullName, tag.fullName, tag.selection);
+    row.name = tag.name; row.level = tag.level; row.hasChildren = tag.hasChildren; row.collapsed = tag.collapsed;
+    return row;
+  });
+  return visibleDirectoryRows(directory, query).map((row: DirectoryRow): TagRow => ({
+    fullName: row.path, name: row.name, level: row.level, hasChildren: row.hasChildren,
+    collapsed: row.collapsed, selection: row.selection }));
 }
 
 /** 新建单个标签时空白作为层级分隔；普通手输标签仍以空白分隔多个标签。 */

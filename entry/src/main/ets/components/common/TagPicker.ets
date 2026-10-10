@@ -1,3 +1,4 @@
+import { DirectoryView } from '../../model/DirectoryTree';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { 标签服务 } from '../../backend/标签服务';
 import { TagTreeNode } from '../../proto/messages/TagsMessages';
@@ -114,12 +115,13 @@ export struct TagPicker {
             .fontColor($r('app.color.text_secondary'))
         } else {
           Column() {
-            TagTreeList({ rows: this.rows, listHeight: this.listHeight, isInteractive: this.isInteractive,
+            TagTreeList({ rows: this.rows, query: this.query, listHeight: this.listHeight, isInteractive: this.isInteractive,
               onSelect: (name: string): void => { this.toggle(name); },
-              onToggle: (name: string): void => { this.selection?.toggleCollapsed(name); this.refresh(); } })
+              onToggle: (name: string): void => { this.selection?.toggleCollapsed(name); this.refresh(); },
+              onViewChanged: (view: DirectoryView | null): void => { appInterface.observeDirectory('tag_picker', view); } })
           }.width('100%').padding(应用尺寸.间距_5)
-            .backgroundColor($r('app.color.surface_card')).borderRadius(应用尺寸.圆角_面板)
-            .border(SurfaceBorder.options())
+            .backgroundColor($r('app.color.surface_card'))
+            .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
         }
         if (this.canAdd()) {
           AnchoredMenuItem({ label: $r('app.string.tags_add_named', newTagName(this.query)), available: this.isInteractive,

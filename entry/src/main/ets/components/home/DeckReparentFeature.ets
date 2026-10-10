@@ -8,7 +8,8 @@ import type { DeckHierarchyEntry, DeckReparentPlan, DeckPathChange } from '../..
 import type { DeckTreeNode } from '../../proto/messages/DeckMessages';
 import { DialogFrame } from '../common/DialogFrame';
 import { DialogHeader } from '../common/DialogHeader';
-import { FormSelectRow } from '../common/FormSelectRow';
+import { DirectorySelect } from '../common/DirectorySelect';
+import { DirectoryRow, DirectoryView, DirectoryChoice, directoryChoiceRows, directorySpecial } from '../../model/DirectoryTree';
 import { 按下态按钮 } from '../common/按下态按钮';
 import { 统一加载态 } from '../common/统一加载态';
 import { 应用尺寸 } from '../../utils/应用尺寸';
@@ -49,6 +50,12 @@ export struct DeckReparentFeature {
     const result: SelectOption[] = [{ value: resourceText(this.getUIContext(), $r('app.string.top_level_deck')) }];
     for (const entry of this.candidates()) result.push({ value: entry.path });
     return result;
+  }
+
+  private parentRows(): DirectoryRow[] {
+    return [directorySpecial('0', resourceText(this.getUIContext(), $r('app.string.top_level_deck')), this.parentId === 0 ? 1 : 0)]
+      .concat(directoryChoiceRows(this.candidates().map((entry: DeckHierarchyEntry): DirectoryChoice =>
+        ({ id: String(entry.id), path: entry.path })), String(this.parentId)));
   }
 
   private publishInterface(): void {
@@ -147,10 +154,11 @@ export struct DeckReparentFeature {
   @Builder
   private content() {
     Text($r('app.string.deck_move_hint')).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
-    FormSelectRow({ label: $r('app.string.deck_move_parent'), options: this.options(),
-      selectedIndex: this.candidateIds().indexOf(this.parentId),
+    DirectorySelect({ label: $r('app.string.deck_move_parent'), rows: this.parentRows(),
       value: this.options()[Math.max(0, this.candidateIds().indexOf(this.parentId))].value as string,
-      isInteractive: !this.loading && !this.saving && this.tree !== null, onSelect: (index: number): void => { this.select(index); } })
+      isInteractive: !this.loading && !this.saving && this.tree !== null,
+      onSelect: (id: string): void => { this.select(this.candidateIds().indexOf(Number(id))); },
+      onViewChanged: (view: DirectoryView | null): void => { appInterface.observeDirectory('deck_move_parent', view); } })
     if (this.loading) {
       统一加载态().height(应用尺寸.加载指示器尺寸 + 应用尺寸.按钮高度)
     }

@@ -3,7 +3,10 @@ import { IconActionButton } from '../common/IconActionButton';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { PAGE_COMPACT_LAYOUT_KEY } from '../../model/AppLayoutState';
-import { BrowserDeckRow, browserDeckRows } from '../../model/BrowserSidebar';
+import { DirectoryTree } from '../common/DirectoryTree';
+import { DirectoryRow, DirectoryView } from '../../model/DirectoryTree';
+import { deckDirectoryRows } from '../../model/DeckDirectory';
+import { appInterface } from '../../backend/AppInterfaceService';
 
 // ========================================================
 // @名称 浏览侧边栏
@@ -38,7 +41,7 @@ import { BrowserDeckRow, browserDeckRows } from '../../model/BrowserSidebar';
 //
 // @Invariants
 // - 本组件不直接调后端，所有操作经回调上抛
-// - 树节点折叠（node.collapsed）由组件内部尊重，不展示折叠节点的 children
+// - 牌组目录从 Core 折叠状态初始化，公共树在侧栏内独立展开；不写首页折叠状态
 // - 分区折叠（section 级）由父级控制，组件仅渲染对应状态
 // - 标签长按弹 ActionMenu（追加搜索/重命名/删除），牌组长按仍直接追加 AND
 //
@@ -94,14 +97,18 @@ export struct 浏览侧边栏 {
   onToggleTag: (tagName: string) => void = (_name: string): void => {};
   onClearUnusedTags: () => void = (): void => {};
   @State private tagQuery: string = '';
+  private disposed: boolean = false;
+  aboutToDisappear(): void { this.disposed = true; }
   onToggle折叠: (section: 侧边栏分区) => void = (_section: 侧边栏分区): void => {};
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
 
   @StorageProp(颜色键.主色按钮背景) private 主色按钮背景: string = '#2F5FD0';
 
-  /** 扁平化牌组树为行数组（尊重 node.collapsed，折叠的节点不展开 children）。 */
-  private 扁平化牌组树(): BrowserDeckRow[] {
-    return browserDeckRows(this.牌组树);
+  private deckRows(): DirectoryRow[] { return deckDirectoryRows(this.牌组树, 0, true); }
+  private selectDeck(id: string, append: boolean = false): void {
+    if (this.busy) return;
+    const row: DirectoryRow | undefined = this.deckRows().find((item: DirectoryRow): boolean => item.id === id);
+    if (row !== undefined) { if (append) this.onAppendDeck(row.path); else this.onSelectDeck(row.path); }
   }
 
   /** 扁平化标签树为行数组（尊重 node.collapsed）。 */
@@ -161,9 +168,11 @@ export struct 浏览侧边栏 {
               if (this.牌组树 === null) {
                 this.空提示()
               } else {
-                ForEach(this.扁平化牌组树(), (行: BrowserDeckRow): void => {
-                  this.牌组节点行(行)
-                }, (行: BrowserDeckRow): string => `${行.deckId}-${行.fullName}`)
+                DirectoryTree({ rows: this.deckRows(), isInteractive: !this.busy, framed: false,
+                  selectionMode: 'none', revealSelection: false,
+                  onSelect: (id: string): void => { this.selectDeck(id); },
+                  onLongPress: (id: string): void => { this.selectDeck(id, true); },
+                  onViewChanged: (view: DirectoryView | null): void => { appInterface.observeDirectory('browser_decks', view); } })
               }
             }
             }.width('100%').backgroundColor($r('app.color.surface_card'))
@@ -186,10 +195,11 @@ export struct 浏览侧边栏 {
                     Text($r('app.string.tags_no_matches')).fontSize(应用尺寸.字号_正文_小)
                       .fontColor($r('app.color.text_tertiary')).width('100%')
                   } else {
-                    TagTreeList({ rows: this.扁平化标签树(), isInteractive: !this.busy && !this.tagWriteBusy,
+                    TagTreeList({ rows: this.扁平化标签树(), query: this.tagQuery, isInteractive: !this.busy && !this.tagWriteBusy,
                       onSelect: (name: string): void => { this.onSelectTag(name); },
                       onToggle: (name: string): void => { this.onToggleTag(name); },
-                      onLongPress: (name: string): void => { this.显示标签操作菜单(name); } })
+                      onLongPress: (name: string): void => { this.显示标签操作菜单(name); },
+                      onViewChanged: (view: DirectoryView | null): void => { appInterface.observeDirectory('browser_tags', view); } })
                   }
                 }.width('100%').padding(应用尺寸.卡片内边距)
                 AnchoredMenuItem({ label: $r('app.string.settings_clear_unused_tags'),
@@ -249,42 +259,9 @@ export struct 浏览侧边栏 {
         top: 应用尺寸.间距_8, bottom: 应用尺寸.间距_8 })
   }
 
-  /** 牌组节点行：缩进 + 名称 + 计数。短按替换搜索，长按追加 AND。 */
-  @Builder
-  牌组节点行(行: BrowserDeckRow) {
-    Row() {
-      Blank()
-        .width(行.level * 应用尺寸.间距_12)
-      Text(行.name)
-        .fontSize(应用尺寸.字号_正文)
-        .fontColor($r('app.color.text_primary'))
-        .layoutWeight(1)
-        .maxLines(1)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-      if (行.totalInDeck > 0) {
-        Text(String(行.totalInDeck))
-          .fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_tertiary'))
-      }
-    }
-    .width('100%')
-    .padding({ left: 应用尺寸.间距_16, right: 应用尺寸.间距_16,
-      top: 应用尺寸.间距_10, bottom: 应用尺寸.间距_10 })
-    .attributeModifier(new PressFeedback())
-    .onClick((): void => {
-      this.onSelectDeck(行.fullName);
-    })
-    .gesture(
-      LongPressGesture({ repeat: false, duration: 500 })
-        .onAction((): void => {
-          this.onAppendDeck(行.fullName);
-        })
-    )
-  }
-
   /** 标签长按操作菜单：追加到搜索 / 重命名 / 删除。 */
   private 显示标签操作菜单(标签名: string): void {
-    if (this.busy || this.tagWriteBusy) return;
+    if (this.disposed || this.busy || this.tagWriteBusy) return;
     this.getUIContext().getPromptAction().showActionMenu({
       title: $r('app.string.browser_tag_actions'),
       buttons: [
@@ -293,7 +270,7 @@ export struct 浏览侧边栏 {
         { text: $r('app.string.browser_tag_delete'), color: $r('app.color.error_text') }
       ]
     }, (err: BusinessError, data: promptAction.ActionMenuSuccessResponse): void => {
-      if (err !== null) {
+      if (err !== null || this.disposed || this.busy || this.tagWriteBusy) {
         return;
       }
       const index: number = data.index;
@@ -308,6 +285,21 @@ export struct 浏览侧边栏 {
   }
 
   /** 已保存搜索行：名称。短按替换搜索文本。 */
+  private 显示保存搜索操作菜单(项: 已保存搜索项): void {
+    if (this.disposed || this.busy) return;
+    this.getUIContext().getPromptAction().showActionMenu({
+      title: $r('app.string.browser_saved_search_actions'),
+      buttons: [
+        { text: $r('app.string.browser_saved_search_rename'), color: $r('app.color.text_primary') },
+        { text: $r('app.string.browser_saved_search_delete'), color: $r('app.color.error_text') }
+      ]
+    }, (err: BusinessError, data: promptAction.ActionMenuSuccessResponse): void => {
+      if (err !== null || this.disposed || this.busy) return;
+      if (data.index === 0) this.onRenameSavedSearch(项);
+      if (data.index === 1) this.onDeleteSavedSearch(项);
+    });
+  }
+
   @Builder
   已保存搜索行(项: 已保存搜索项) {
     Row() {
@@ -326,17 +318,7 @@ export struct 浏览侧边栏 {
       this.onSelectSavedSearch(项.search);
     })
     .gesture(LongPressGesture({ repeat: false, duration: 500 }).onAction((): void => {
-      this.getUIContext().getPromptAction().showActionMenu({
-        title: $r('app.string.browser_saved_search_actions'),
-        buttons: [
-          { text: $r('app.string.browser_saved_search_rename'), color: $r('app.color.text_primary') },
-          { text: $r('app.string.browser_saved_search_delete'), color: $r('app.color.error_text') }
-        ]
-      }, (err: BusinessError, data: promptAction.ActionMenuSuccessResponse): void => {
-        if (err !== null) return;
-        if (data.index === 0) this.onRenameSavedSearch(项);
-        if (data.index === 1) this.onDeleteSavedSearch(项);
-      });
+      this.显示保存搜索操作菜单(项);
     }))
   }
 }

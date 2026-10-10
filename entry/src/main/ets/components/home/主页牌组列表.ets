@@ -20,13 +20,8 @@
 // onMove: (from: number, to: number) => void  拖拽排序回调
 // onItemSelect: (deckId: string) => void  点击牌组项回调
 // onItemToggle: (deckId: string) => void  展开/折叠牌组项回调
-// onItemToneChange: (deckId: string, tone: 牌组色调) => void  牌组色调变更回调
-// onItemCustomize: (deckId: string) => void  牌组定制回调
-// onItemEnterReorder: (deckId: string) => void  进入排序模式回调
-// onItemDelete: (deckId: string) => void  删除牌组回调
-// onItemHide: (deckId: string) => void  隐藏牌组回调
+// onItemMenu: (deckId: string, anchor: ActionMenuAnchor) => void  长按目标及窗口锚点交给首页
 // onItemDoubleTap: (deckId: string) => void  递归展开回调
-// onItemCustomStudy: (deckId: string) => void  打开自定义学习对话框回调
 // onRefresh: () => Promise<void>  下拉刷新完成信号
 // onRetry: () => void  错误态重试回调
 //
@@ -44,13 +39,14 @@
 
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { 牌组列表项 } from '../牌组列表项';
+import { ActionMenuAnchor } from '../common/ActionMenuLayout';
 import { DECK_LIST_NARROW_KEY, DECK_LIST_STYLE_KEY, isDoubleColumnDeckListStyle,
   deckListOverflows, groupDeckListRows, groupedDeckListOverflows, DeckListGroup } from '../../model/DeckListAppearance';
 import { 统一加载态 } from '../common/统一加载态';
 import { 统一空态 } from '../common/统一空态';
 import { 统一错误态 } from '../common/统一错误态';
 import { 应用尺寸 } from '../../utils/应用尺寸';
-import { 牌组列表数据源, 牌组汇总, 牌组色调, 主页加载状态 } from '../../model/主页模型';
+import { 牌组列表数据源, 牌组汇总, 主页加载状态 } from '../../model/主页模型';
 
 interface HomeDeckGroup {
   rootId: string;
@@ -109,17 +105,9 @@ export struct 主页牌组列表 {
   onMove: (from: number, to: number) => void = (from: number, to: number): void => {};
   onItemSelect: (deckId: string) => void = (deckId: string): void => {};
   onItemToggle: (deckId: string) => void = (deckId: string): void => {};
-  onItemToneChange: (deckId: string, tone: 牌组色调) => void
-    = (deckId: string, tone: 牌组色调): void => {};
-  onItemCustomize: (deckId: string) => void = (deckId: string): void => {};
-  @Prop filteredBusy: boolean = false;
-  onItemFiltered: (deckId: string, action: string) => void = (): void => {};
-  onItemRename: (deckId: string) => void = (_deckId: string): void => {};
-  onItemEnterReorder: (deckId: string) => void = (deckId: string): void => {};
-  onItemDelete: (deckId: string) => void = (deckId: string): void => {};
-  onItemHide: (deckId: string) => void = (deckId: string): void => {};
-  onItemDoubleTap: (deckId: string) => void = (deckId: string): void => {};
-  onItemCustomStudy: (deckId: string) => void = (deckId: string): void => {};
+  @Prop menuDeckId: string = '';
+  onItemMenu: (deckId: string, anchor: ActionMenuAnchor) => void = (): void => {};
+  onItemDoubleTap: (deckId: string) => void = (_deckId: string): void => {};
   onRefresh: () => Promise<void> = (): Promise<void> => Promise.resolve();
   onRetry: () => void = (): void => {};
   onOverflowChange: (overflow: boolean) => void = (_overflow: boolean): void => {};
@@ -213,28 +201,10 @@ export struct 主页牌组列表 {
       onToggle: (deckId: string): void => {
         this.onItemToggle(deckId);
       },
-      onToneChange: (deckId: string, tone: 牌组色调): void => {
-        this.onItemToneChange(deckId, tone);
-      },
-      onCustomizeDeck: (deckId: string): void => {
-        this.onItemCustomize(deckId);
-      },
-      onRenameDeck: (deckId: string): void => { this.onItemRename(deckId); },
-      filteredBusy: this.filteredBusy, onFilteredAction: (deckId: string, action: string): void => { this.onItemFiltered(deckId, action); },
-      onEnterReorder: (deckId: string): void => {
-        this.onItemEnterReorder(deckId);
-      },
-      onDeleteDeck: (deckId: string): void => {
-        this.onItemDelete(deckId);
-      },
-      onHideDeck: (deckId: string): void => {
-        this.onItemHide(deckId);
-      },
+      menuOpen: this.menuDeckId !== '',
+      onMenu: (deckId: string, anchor: ActionMenuAnchor): void => { this.onItemMenu(deckId, anchor); },
       onDoubleTap: (deckId: string): void => {
         this.onItemDoubleTap(deckId);
-      },
-      onCustomStudy: (deckId: string): void => {
-        this.onItemCustomStudy(deckId);
       }
     })
   }

@@ -4,6 +4,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
+import { stripTypeScriptTypes } from 'node:module';
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
 
 const root = fileURLToPath(new URL('../../entry/src/main/ets/', import.meta.url));
@@ -59,6 +60,47 @@ test('button, menu and selected item share a font size with one owner for each f
   style.applyNormalAttribute(instance);
   assert.equal(calls.some(([name]) => /font$|fontSize|fontWeight|controlSize/i.test(name)), false,
     'diffed modifiers must not own or reset fonts when Select options are rebuilt');
+  assert.equal(calls.find(([name]) => name === 'selectedOptionFontColor')[1], SelectStyle.selectedOptionColor);
+  assert.equal(calls.find(([name]) => name === 'selectedOptionBgColor')[1], SelectStyle.selectedOptionSurface);
+});
+
+test('directory trigger reuses the existing selection row and actual rounded control geometry', () => {
+  const source = read('components/common/DirectorySelect.ets');
+  assert.match(source, /FormSelectRow\(\{[\s\S]*useCustomControl: true,[\s\S]*customControl: \(\) => \{ this\.control\(\); \}/);
+  assert.doesNotMatch(source, /HelpLabel\(|Text\(this\.label\)|Row\(\{ space: FormRowLayout/);
+  assert.match(source, /Text\(this\.value\)\.fontSize\(SelectStyle\.controlFont\.size\)\.fontWeight\(SelectStyle\.controlFont\.weight\)/);
+  const SelectStyle = loadPlatformModule('utils/SelectStyle.ets', 'SelectStyle', {
+    TextModifier: class {}, FontWeight: { Normal: 400, Medium: 500 },
+    应用尺寸: { 字号_正文: 14, radiusLg: 16 }, $r: key => key,
+    SurfaceBorder: { options: () => ({ width: 1, color: 'outline' }) },
+    FormRowLayout: { controlHeight: 40, trailingConstraint: { maxWidth: '56%' }, directoryConstraint: { maxWidth: '70%' } }
+  });
+  const start = source.indexOf('  private control('), end = source.indexOf('\n  }', start);
+  const body = source.slice(start, end), chain = body.slice(body.indexOf('}.type(') + 1);
+  const capture = new Function('control', 'SelectStyle', 'ButtonType', 'PressFeedback', 'fill',
+    stripTypeScriptTypes('function render() { return control' + chain + '; }', { mode: 'transform' }) + '; return render.call(this);');
+  for (const fill of [false, true]) {
+    const calls = new Map();
+    const control = new Proxy({}, { get: (_target, name) => (...args) => { calls.set(name, args); return control; } });
+    const host = { surfaceColor: 'surface', isInteractive: true, rows: [{}], value: '英语::四级', controlWidth: () => 125, open() {} };
+    capture.call(host, control, SelectStyle, { Normal: 'normal' }, class {}, fill);
+    assert.equal(calls.get('height')[0], 40);
+    assert.equal(calls.get('borderRadius')[0], 16, 'existing 16vp radius stays rounded');
+    assert.deepEqual(calls.get('border')[0], { width: 1, color: 'outline' });
+    assert.deepEqual(calls.get('padding')[0], SelectStyle.controlPadding);
+    assert.equal(calls.get('backgroundColor')[0], 'surface');
+    assert.equal(calls.get('width')[0], fill ? '100%' : 125);
+    assert.deepEqual(calls.get('constraintSize')[0], { maxWidth: fill ? '100%' : '70%' });
+    assert.equal(calls.get('clip')[0], true);
+    assert.equal(calls.get('accessibilityText')[0], '英语::四级');
+  }
+  const Tree = read('components/common/DirectoryTree.ets');
+  assert.match(Tree, /backgroundColor\(this\.selectionMode === 'single'[\s\S]*SelectStyle\.selectedOptionSurface[\s\S]*\.borderRadius\(SelectStyle\.controlRadius\)/);
+  const font = Tree.slice(Tree.indexOf('Text(row.name)')).match(/\.fontWeight\(([^)]+)\)/)[1];
+  for (const selection of [0, 1, 2]) {
+    assert.equal(new Function('row', 'SelectStyle', 'return ' + font).call({ selectionMode: 'single' },
+      { selection }, SelectStyle), selection === 1 ? 500 : 400);
+  }
 });
 
 // Native Select can restore system geometry after a selection. Every caller must
@@ -116,7 +158,7 @@ test('browser subtitle choices share aligned theme selection and dismissal', () 
   }
   assert.match(menu, /selected: item.selected/);
   assert.match(menu, /this\.onClose\(\)/);
-  assert.match(page, /if \(this\.showMoreMenu\) \{ this\.showMoreMenu = false; return true; \}/);
+  assert.match(page, /if \(this\.showMoreMenu\) \{ this\.moreBackRequest\+\+; return true; \}/);
   assert.match(page, /onSubtitle:[^\n]*this\.subtitleIndex = index; this\.showMoreMenu = false/);
 });
 
@@ -230,7 +272,7 @@ test('shared menu surfaces distinguish dark overlays from cards and retain reada
   assert.doesNotMatch(read('components/home/DeckPreviewScopeMenu.ets'), /new MenuSurface\(|\.border\(|\.shadow\(/,
     'the native popup owns the preview outline including its arrow');
   assert.match(read('components/home/HomeDeckDetails.ets'), /AnchoredMenu\(\{[\s\S]*this\.previewScopes\(\)/);
-  assert.match(read('components/common/AnchoredMenu.ets'), /new MenuSurface\(this\.surfaceVisible, this\.cornerRadius\)/);
+  assert.match(read('components/common/AnchoredMenu.ets'), /new MenuSurface\(this\.surfaceVisible && this\.bubble === undefined, this\.cornerRadius\)/);
   assert.match(read('components/common/AnchoredMenu.ets'), /surfaceVisible: boolean = true/);
   for (const path of ['components/home/HomeDeckDetails.ets', 'components/牌组详情面板.ets']) {
     assert.doesNotMatch(read(path), /bindPopup\(/, 'preview menus share the verified menu surface');
@@ -246,7 +288,7 @@ test('browser uses one segmented frame and opens only the chosen option group', 
   assert.match(controls, /'sort'/);
   assert.match(controls, /id\('browser-view-selector'\)/);
   assert.match(controls, /layoutWeight\(7\)/);
-  assert.match(controls, /ChangingText\(\{ value: this\.阶段 === 'loading' \? this\.取本地化文案\(\$r\('app.string.browser_loading'\)\) : this\.resultCountLabel\(\),\s*textSize: 应用尺寸\.字号_正文_小, alignment: TextAlign\.End \}\)\s*\.layoutWeight\(3\)/);
+  assert.match(controls, /ChangingText\(\{ value: this\.阶段 === 'loading' \? this\.取本地化文案\(\$r\('app.string.browser_loading'\)\) : this\.resultCountLabel\(\),\s*textSize: 应用尺寸\.字号_正文_小, alignment: TextAlign\.End, fillWidth: true \}\)\s*\.layoutWeight\(3\)/);
   assert.doesNotMatch(page, /\bSelect\(/);
   const search = read('components/browser/搜索框.ets');
   assert.match(search, /TextInput\(/);
