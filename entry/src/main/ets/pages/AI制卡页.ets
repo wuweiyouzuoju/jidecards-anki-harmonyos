@@ -36,6 +36,7 @@ import { DialogFrame } from '../components/common/DialogFrame';
 import { DialogHeader } from '../components/common/DialogHeader';
 import { AgentSessionState } from '../model/agent/AgentSessionState';
 import { AgentHistoryList } from '../components/agent/AgentHistoryList';
+import { AgentMemoryPanel } from '../components/agent/AgentMemoryPanel';
 import { AgentEmptySuggestions } from '../components/agent/AgentEmptySuggestions';
 import { buildAgentAppRecommendations } from '../model/agent/AgentAppRecommendations';
 import type { AgentAppRecommendation } from '../model/agent/AgentAppRecommendations';
@@ -289,6 +290,10 @@ export struct AI制卡页 {
   @State private 页面Provider: ProviderId = 'deepseek';
   @State private 本地入口上下文: string = '';
   @State @Watch('publishInterface') private 显示历史区: boolean = false;
+  @State @Watch('publishInterface') private memoryVisible: boolean = false;
+  @State private memoryCloseRequest: number = 0;
+  @State private memoryCreateRequest: number = 0;
+  @State @Watch('publishInterface') private memoryCanCreate: boolean = false;
   @State private 历史会话列表: AgentConversation[] = [];
   @State @Watch('publishInterface') private 错误信息: string = '';
   @State @Watch('publishInterface') private 导入文件列表: AgentImportedFile[] = [];
@@ -706,7 +711,7 @@ export struct AI制卡页 {
   }
 
   private interfaceControls(): AppInterfaceMenuItem[] {
-    return agentInterfaceControls({ history: this.显示历史区, processing: this.处理中,
+    return agentInterfaceControls({ history: this.显示历史区, memory: this.memoryVisible, memoryCanCreate: this.memoryCanCreate, processing: this.处理中,
       parsing: this.文件解析中, batchRunning: this.cardBatch.isRunning(),
       pendingClarification: this.hasPendingClarification(), canSubmit: this.canSubmit() });
   }
@@ -730,8 +735,8 @@ export struct AI制卡页 {
       controls.push({ id: 'remove-' + file.id, title: namedResourceText(this.getUIContext(), 'ai_agent_file_remove'),
         titleKey: 'ai_agent_file_remove', enabled: true, selected: false });
     }
-    appInterface.observe({ surface: 'agent', titleKey: agentInterfaceTitle(this.pageMode, this.显示历史区),
-      sectionId: this.显示历史区 ? 'history' : 'conversation', selectedId: this.conversationId,
+    appInterface.observe({ surface: 'agent', titleKey: agentInterfaceTitle(this.pageMode, this.显示历史区, this.memoryVisible),
+      sectionId: this.memoryVisible ? 'memory' : this.显示历史区 ? 'history' : 'conversation', selectedId: this.conversationId,
       optionIds: files.map((file): string => 'file-' + file.id), optionLabels: files.map((file): string => file.name.slice(0, 160)),
       optionsTotal: this.显示历史区 ? 0 : this.导入文件列表.length,
       busy: this.处理中 || this.文件解析中 || this.cardBatch.isRunning(), items: controls, controlsComplete: true,
@@ -1897,6 +1902,7 @@ export struct AI制卡页 {
 
   private 开始新会话(): void {
     if (this.pageDisposed || this.处理中 || this.文件解析中 || this.cardBatch.isRunning()) return;
+    this.memoryVisible = false;
     this.history.invalidateRestore();
     this.history.close();
     this.sessionController?.clear();
@@ -2060,7 +2066,9 @@ export struct AI制卡页 {
         IconActionButton({ toolbarStyle: true,
           source: $r('app.media.ic_common_arrow_left'), label: this.interfaceLabel('back'),
           onAction: (): void => {
-            if (this.显示历史区) {
+            if (this.memoryVisible) {
+              this.memoryCloseRequest++;
+            } else if (this.显示历史区) {
               this.关闭历史区();
             } else {
               this.pathStack.pop();
@@ -2069,7 +2077,7 @@ export struct AI制卡页 {
         })
       }
       .width('35%')
-      Text(localizedNamedResourceText(this.getUIContext(), this.uiLanguage, agentInterfaceTitle(this.pageMode, this.显示历史区)))
+      Text(localizedNamedResourceText(this.getUIContext(), this.uiLanguage, agentInterfaceTitle(this.pageMode, this.显示历史区, this.memoryVisible)))
         .fontSize(应用尺寸.字号_标题)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.text_primary'))
@@ -2078,7 +2086,16 @@ export struct AI制卡页 {
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
       Row({ space: 应用尺寸.间距_8 }) {
-        if (this.显示历史区) {
+        if (this.memoryVisible) {
+          IconActionButton({ toolbarStyle: true,
+            source: $r('app.media.ic_home_new'), label: this.interfaceLabel('memory_create'),
+            isInteractive: this.interfaceEnabled('memory_create'),
+            onAction: (): void => { if (this.interfaceEnabled('memory_create')) this.memoryCreateRequest++; } })
+        } else if (this.显示历史区) {
+          IconActionButton({ toolbarStyle: true,
+            source: $r('app.media.ic_agent_memory'), label: this.interfaceLabel('memory'),
+            isInteractive: this.interfaceEnabled('memory'),
+            onAction: (): void => { if (this.interfaceEnabled('memory')) this.memoryVisible = true; } })
           IconActionButton({ toolbarStyle: true,
             source: $r('app.media.ic_home_new'), label: this.interfaceLabel('new'),
             isInteractive: this.interfaceEnabled('new'),
@@ -2880,7 +2897,13 @@ export struct AI制卡页 {
       Stack() {
       Column() {
         this.顶部条()
-        if (this.显示历史区) {
+        if (this.memoryVisible) {
+          AgentMemoryPanel({ repository: this.workspaceStore, deckOptions: this.牌组选项,
+            navigationBarHeight: this.导航条高度,
+            closeRequest: this.memoryCloseRequest, createRequest: this.memoryCreateRequest,
+            onCreateAvailability: (available: boolean): void => { this.memoryCanCreate = available; },
+            onClose: (): void => { this.memoryCanCreate = false; this.memoryVisible = false; } })
+        } else if (this.显示历史区) {
           this.历史区()
         } else {
           if (this.pageMode === 'assistant' && this.消息列表.length === 0) {
@@ -2916,6 +2939,8 @@ export struct AI制卡页 {
     .opacity(this.转场透明度)
     .translate({ x: this.navigationOffset })
     .onBackPressed((): boolean => {
+      if (this.memoryVisible) { this.memoryCloseRequest++; return true; }
+      if (this.显示历史区) { this.关闭历史区(); return true; }
       if (this.targetSelectionMessage < 0) return false;
       if (!this.处理中 && !this.targetSelectionBusy) this.finishTargetSelection('cancel');
       return true;

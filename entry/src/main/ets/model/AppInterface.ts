@@ -367,13 +367,26 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
   { id: 'agent', titleKey: 'ai_agent_title', parent: 'home', items: [
     { id: 'back', titleKey: 'study_back', iconKey: 'ic_common_arrow_left' },
     { id: 'history', titleKey: 'ai_agent_history', iconKey: 'ic_common_history', opens: 'agent_history', condition: 'conversation' },
+    { id: 'memory', titleKey: 'agent_memory_title', iconKey: 'ic_agent_memory', opens: 'agent_memory', condition: 'history' },
     { id: 'new', titleKey: 'ai_agent_history_new', iconKey: 'ic_home_new', condition: 'history' },
+    { id: 'memory_create', titleKey: 'ai_agent_memory_create', iconKey: 'ic_home_new', opens: 'agent_memory_editor', condition: 'memory' },
     { id: 'input', titleKey: 'ai_card_input_hint', condition: 'conversation' },
     { id: 'import', titleKey: 'ai_agent_import_files', condition: 'conversation' },
     { id: 'submit', titleKey: 'ai_card_send', condition: 'conversation' }
   ] },
   { id: 'agent_history', titleKey: 'ai_agent_history_title', parent: 'agent', items: [
     { id: 'delete', titleKey: 'ai_agent_history_delete', condition: 'has_conversations' }
+  ] },
+  { id: 'agent_memory', titleKey: 'agent_memory_title', parent: 'agent_history', instructionsKey: 'agent_memory_description', items: [
+    { id: 'search', titleKey: 'agent_memory_search' }, { id: 'filter', titleKey: 'agent_memory_scope' },
+    { id: 'create', titleKey: 'ai_agent_memory_create', iconKey: 'ic_home_new', opens: 'agent_memory_editor' },
+    { id: 'edit', titleKey: 'ai_agent_memory_update', iconKey: 'ic_study_edit', opens: 'agent_memory_editor' },
+    { id: 'delete', titleKey: 'ai_agent_memory_delete', iconKey: 'ic_study_delete' },
+  ] },
+  { id: 'agent_memory_editor', titleKey: 'ai_agent_memory_create', parent: 'agent_memory', instructionsKey: 'agent_memory_description', items: [
+    { id: 'text', titleKey: 'agent_memory_example' }, { id: 'scope', titleKey: 'agent_memory_scope' },
+    { id: 'save', titleKey: 'deck_customize_save' },
+    { id: 'cancel', titleKey: 'create_deck_cancel', iconKey: 'ic_common_close' }
   ] },
   { id: 'reminders', titleKey: 'reminder_list_title', parent: 'home_more', items: [
     { id: 'retry', titleKey: 'common_retry', condition: 'error' },
@@ -582,11 +595,14 @@ export interface StudyInterfaceContext {
 }
 
 export interface AgentInterfaceContext {
+  memory?: boolean;
+  memoryCanCreate?: boolean;
   history: boolean; processing: boolean; parsing: boolean; batchRunning: boolean;
   pendingClarification: boolean; canSubmit: boolean;
 }
 
-export function agentInterfaceTitle(mode: string, history: boolean): string {
+export function agentInterfaceTitle(mode: string, history: boolean, memory: boolean = false): string {
+  if (memory) return 'agent_memory_title';
   return history ? 'ai_agent_history_title' : mode === 'assistant' ? 'ai_agent_title' :
     mode === 'create' ? 'ai_card_title' : 'ai_card_edit';
 }
@@ -600,12 +616,13 @@ export function reminderEditorTitle(creating: boolean): string {
 export function agentInterfaceControls(context: AgentInterfaceContext): AppInterfaceMenuItem[] {
   const surface = APP_INTERFACE_SURFACES.find((entry): boolean => entry.id === 'agent');
   return (surface?.items ?? []).filter((item): boolean => item.condition === undefined ||
-    (item.condition === 'history' ? context.history : !context.history))
+    (item.condition === 'memory' ? context.memory === true :
+      !context.memory && (item.condition === 'history' ? context.history : !context.history)))
     .map((item): AppInterfaceMenuItem => ({ id: item.id,
       titleKey: item.id === 'submit' && context.processing ? 'ai_agent_cancel' :
         item.id === 'import' ? agentImportLabelKey(context.parsing) : item.titleKey, opens: item.opens,
       condition: item.condition, selected: false,
-      enabled: item.id === 'back' ? true : ['history', 'new'].includes(item.id) ?
+      enabled: item.id === 'back' ? true : item.id === 'memory_create' ? context.memoryCanCreate === true : ['history', 'new', 'memory'].includes(item.id) ?
         !context.processing && !context.parsing && !context.batchRunning : item.id === 'input' ?
           !context.pendingClarification : item.id === 'import' ?
             !context.processing && !context.parsing && !context.pendingClarification : context.processing || context.canSubmit }));

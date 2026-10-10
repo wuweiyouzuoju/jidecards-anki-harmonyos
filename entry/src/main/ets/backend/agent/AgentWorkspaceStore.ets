@@ -5,7 +5,7 @@ import { preferences } from '@kit.ArkData';
 import type { AgentWorkspaceState, AgentMemoryChange, AgentDeckPreference } from '../../model/agent/AgentMemory';
 import { applyAgentMemoryChange } from '../../model/agent/AgentMemory';
 
-/** 选择偏好自动保存；长期记忆只有确认执行器可以调用 changeMemory 写入。 */
+/** 选择偏好自动保存；记忆由确认执行器或用户手动管理入口提交，同一队列核对旧版本。 */
 export class AgentWorkspaceStore {
   private readonly context: common.UIAbilityContext;
   private queue: Promise<void> = Promise.resolve();

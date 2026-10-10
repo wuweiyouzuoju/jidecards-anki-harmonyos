@@ -135,9 +135,11 @@ test('add-note observation exposes tags in both modes and follows field/type and
 
 test('real editor form observes bounded field labels, busy guards and cleanup without retaining note text or media URIs',()=>{
   const tracker=new AppInterfaceTracker();
+  let drawingCleanup;
   const Form=loadComponentLogic('components/browser/浏览编辑区.ets','浏览编辑区',
-    {...dependencies(tracker),...expansionRevealDependencies(),NoteAudioPreview:class{async dispose(){}},discardNoteRecordings:async()=>{}});
-  const form=new Form();Object.assign(form,{getUIContext:()=>({}),fieldNames:['Front','CUSTOM_FIELD'],originalStockKind:1,
+    {...dependencies(tracker),...expansionRevealDependencies(),NoteAudioPreview:class{async dispose(){}},discardNoteRecordings:async()=>{},
+      discardNoteDrawingImages:async(images,cacheDir)=>{drawingCleanup={images,cacheDir};}});
+  const form=new Form();Object.assign(form,{getUIContext:()=>({getHostContext:()=>({cacheDir:'TEST_CACHE'})}),fieldNames:['Front','CUSTOM_FIELD'],originalStockKind:1,
     initialFieldValues:['PRIVATE_BODY','PRIVATE_BODY'],initialTags:'PRIVATE_TAGS',optionalReverseFieldOrd:1,clozeFieldOrds:[0]});
   form.aboutToAppear();let view=result(tracker,'edit_note_form',key=>en.get(key));
   assert.equal(view.observations[0].optionsTotal,2);
@@ -150,6 +152,7 @@ test('real editor form observes bounded field labels, busy guards and cleanup wi
   form.busy=false;form.fieldNames=Array.from({length:105},(_,i)=>'Field '+i);form.publishInterface();
   assert.equal(tracker.snapshot()[0].optionIds.length,100);assert.equal(tracker.snapshot()[0].optionsTotal,105);
   form.aboutToDisappear();form.publishInterface();assert.equal(tracker.snapshot().length,0);
+  assert.deepEqual(drawingCleanup,{images:form.images,cacheDir:'TEST_CACHE'});
 });
 
 test('real audio field status reaches JIDE from both editor hosts with pause/resume and disabled actions, without media details',()=>{
