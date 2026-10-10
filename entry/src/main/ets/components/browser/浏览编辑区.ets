@@ -18,6 +18,7 @@ import { NoteFieldImage } from '../../model/NoteImageDraft';
 import { NoteFieldAudio, NoteAudioStatus } from '../../model/NoteAudioDraft';
 import { NoteAudioPreview } from '../../utils/NoteAudioPreview';
 import { discardNoteRecordings } from '../../utils/NoteAudioRecorder';
+import { discardNoteDrawingImages } from '../../backend/NoteDrawingStore';
 import { noteDraftChanged, parseNoteTags } from '../../model/NoteFieldEditing';
 import { confirmNoteDiscard } from '../../utils/ConfirmNoteDiscard';
 import { resourceText, namedResourceText } from '../../utils/UiFeedback';
@@ -26,6 +27,7 @@ import { noteEditInterfaceControls, noteAudioInterfaceObservation, AppInterfaceM
 import { interfaceControlText } from '../../utils/AppInterfaceText';
 import { noteFieldText } from '../../utils/NoteTypeText';
 import { noteFieldDisplayKey } from '../../model/NoteTypePresentation';
+import { browserKeyName } from '../../utils/BrowserKeyAdapter';
 
 
 
@@ -69,6 +71,7 @@ export struct 浏览编辑区 {
   onPreview: (input: NoteDraftPreviewInput, onReturn: () => void) => boolean =
     (_input: NoteDraftPreviewInput, _onReturn: () => void): boolean => false;
   onCancel: () => void = (): void => {};
+  onCloseCancelled: () => void = (): void => {};
   onSave: (fields: string[], tags: string[], images: NoteFieldImage[], audios: NoteFieldAudio[]) => Promise<boolean> =
     async (_fields: string[], _tags: string[], _images: NoteFieldImage[], _audios: NoteFieldAudio[]): Promise<boolean> => false;
 
@@ -98,6 +101,13 @@ export struct 浏览编辑区 {
     appInterface.leave('note_audio_manage');
     this.audioPreview.dispose().catch((): void => {});
     if (!this.busy) discardNoteRecordings(this.audios).catch((): void => {});
+    if (!this.busy) this.cleanupDrawingImages(this.images);
+  }
+
+  private cleanupDrawingImages(images: NoteFieldImage[]): void {
+    if (images.length === 0) return;
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    discardNoteDrawingImages(images, context.cacheDir).catch((): void => {});
   }
 
   private interfaceControls(): AppInterfaceMenuItem[] {
@@ -129,7 +139,8 @@ export struct 浏览编辑区 {
       optionIds: names.map((_name, index): string => 'field-' + index), optionLabels: labels, optionsTotal: this.fieldNames.length,
       busy: this.busy || this.audioBusy || this.confirmingClose, items: controls, controlsComplete: true,
       values: [{ id: 'stock_kind', value: String(this.originalStockKind) }, { id: 'cloze_fields', value: this.clozeFieldOrds.join(',') },
-        { id: 'reverse_field', value: String(this.optionalReverseFieldOrd) }, { id: 'image_count', value: String(this.images.length) },
+        { id: 'reverse_field', value: String(this.optionalReverseFieldOrd) }, { id: 'image_count', value: String(this.images.filter((item: NoteFieldImage): boolean => item.kind !== 'video').length) },
+        { id: 'video_count', value: String(this.images.filter((item: NoteFieldImage): boolean => item.kind === 'video').length) },
         { id: 'audio_count', value: String(this.audios.length) }, { id: 'tags_length', value: String(this.tags.length) },
         { id: 'has_error', value: String(this.errorMessage !== '' || this.本地错误 !== '') }] });
   }
@@ -145,7 +156,7 @@ export struct 浏览编辑区 {
     this.更新字段(index, value);
     this.images = this.images.filter((item: NoteFieldImage): boolean => item.fieldIndex !== index)
       .concat(images.map((item: NoteFieldImage): NoteFieldImage => ({ id: ++this.nextImageId,
-        fieldIndex: index, uri: item.uri, filename: item.filename, reference: item.reference })));
+        fieldIndex: index, uri: item.uri, filename: item.filename, reference: item.reference, kind: item.kind })));
     this.audios = this.audios.filter((item: NoteFieldAudio): boolean => item.fieldIndex !== index)
       .concat(audios.map((item: NoteFieldAudio): NoteFieldAudio => ({ id: ++this.nextAudioId,
         fieldIndex: index, uri: item.uri, filename: item.filename, label: item.label,
@@ -163,11 +174,14 @@ export struct 浏览编辑区 {
       return;
     }
     this.本地错误 = '';
+    const savingImages: NoteFieldImage[] = this.images.slice();
     try {
       // 保存后的导航由页面唯一持有，不能再触发取消回调导致二次 pop。
-      await this.onSave(this.fieldValues.slice(), this.解析标签(), this.images.slice(), this.audios.slice());
+      const saved: boolean = await this.onSave(this.fieldValues.slice(), this.解析标签(), savingImages, this.audios.slice());
+      if (saved || this.disposed) this.cleanupDrawingImages(savingImages);
     } catch (_错误) {
       // 父级通过 errorMessage 提供本地化错误文案；草稿保留
+      if (this.disposed) this.cleanupDrawingImages(savingImages);
     }
   }
 
@@ -183,6 +197,17 @@ export struct 浏览编辑区 {
     if (this.disposed) return;
     this.confirmingClose = false;
     if (discard && !this.disposed && !this.busy) this.onCancel();
+    else this.onCloseCancelled();
+  }
+  private handleEditorKey(event: KeyEvent): void {
+    if (event.type !== KeyType.Down) return;
+    const key: string = browserKeyName(event.keyCode);
+    const ctrl: boolean = event.getModifierKeyState?.(['Ctrl']) ?? false;
+    const other: boolean = (event.getModifierKeyState?.(['Alt']) ?? false) || (event.getModifierKeyState?.(['Shift']) ?? false);
+    if (ctrl && !other && key === 's') this.提交();
+    else if (!ctrl && !other && key === 'escape') this.requestClose();
+    // 编辑表单是输入作用域；其余按键由原生输入/Web 编辑器处理，不冒泡成浏览批量动作。
+    event.stopPropagation();
   }
 
   private openPreview(_locale: string = this.uiLanguage): void {
@@ -263,6 +288,7 @@ export struct 浏览编辑区 {
               },
               onChange: (value: string): void => { this.更新字段(index, value); },
               onRemoveImage: (id: number): void => {
+                this.cleanupDrawingImages(this.images.filter((image: NoteFieldImage): boolean => image.id === id));
                 this.images = this.images.filter((image: NoteFieldImage): boolean => image.id !== id);
               } })
           }, (name: string, index: number): string => `${index}-${name}`)
@@ -292,5 +318,6 @@ export struct 浏览编辑区 {
       }
     }.width('100%').height('100%').backgroundColor(this.pageSurface)
     }.width('100%').height('100%')
+      .onKeyEvent((event: KeyEvent): void => { this.handleEditorKey(event); })
   }
 }

@@ -103,13 +103,14 @@ export struct EditNotePage {
     else this.pathStack.pop();
   }
   private async save(fields: string[], tags: string[], images: NoteFieldImage[], audios: NoteFieldAudio[] = []): Promise<boolean> {
+    const before: EditableNote | null = this.editor.note;
     const attachments: NoteFieldImage[] = images.slice();
     const audioAttachments: NoteFieldAudio[] = audios.slice();
     const saved: boolean = await this.session.save(fields, tags, async (note: EditableNote): Promise<boolean> => {
       const operation: BrowserOperationContext | null = this.operations.begin('notes', [note.id], 0, 0);
       if (operation === null) return false;
       return this.operations.execute(operation,
-        (): Promise<void> => this.writer.save(note, attachments, audioAttachments), {
+        (): Promise<void> => this.writer.save(note, attachments, audioAttachments, before ?? undefined), {
           afterCommit: async (): Promise<void> => {}, changed: (): void => { this.writer.committed(); },
           failed: (_error: Error): void => {}, refreshFailed: (_error: Error): void => {}
         });
