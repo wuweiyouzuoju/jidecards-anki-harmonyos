@@ -12,6 +12,7 @@ import { agentAnkiHelpTools } from './AgentAnkiHelp';
 import { agentMaintenanceTools } from './AgentMaintenanceTools';
 import { agentFsrsTools } from './AgentFsrsTools';
 import { agentDeckOptionsFunctionTools } from './AgentDeckOptionsTools';
+import { agentToolDiscoveryDefinition } from './AgentToolDiscovery';
 
 function exampleArgumentsFor(name: string): string {
   switch (name) {
@@ -130,11 +131,12 @@ const IMAGE_ATTACHMENT: string =
   '"fieldOrd":{"type":"integer","minimum":0},"placement":{"type":"string","enum":["append"]},' +
   '"altText":{"type":"string","maxLength":200}},"required":["candidateId","fieldOrd"],"additionalProperties":false}';
 
-/** 模型可见的完整语义工具表；不存在 RPC、数据库、文件或任意 HTTP 工具。 */
+/** 当前模式的完整能力目录；Runner 按需发送定义，不存在通用 RPC/数据库/文件权限。 */
 export function agentFunctionTools(batchLimit: number = 100, mode: AgentMode = 'edit'): ProviderFunctionTool[] {
   const createLimit: number = normalizeBatchLimit(batchLimit);
   const notes: string = `{"type":"array","minItems":1,"maxItems":${createLimit},"items":{"type":"object","properties":{"fields":{"type":"array","items":{"type":"string"}},"sources":{"type":"array","maxItems":10,"items":{"type":"object","properties":{"documentId":{"type":"string","minLength":1,"maxLength":100},"page":{"type":"integer","minimum":1}},"required":["documentId","page"],"additionalProperties":false}},"images":{"type":"array","maxItems":1,"items":${IMAGE_ATTACHMENT}}},"required":[],"additionalProperties":{"type":"string"}}}`;
   const tools: ProviderFunctionTool[] = [
+    agentToolDiscoveryDefinition(),
     tool('web_search', '使用已配置的搜索服务检索公开网页，返回真实来源。',
       '"query":{"type":"string","minLength":1,"maxLength":100},"limit":{"type":"integer","minimum":1,"maximum":10}', '"query"'),
     tool('read_webpage', '在本机读取公开 HTTPS 网页文本，无需搜索密钥；不运行脚本或登录。长正文按 nextOffset 续读，-1 表示读完。',

@@ -19,6 +19,9 @@ function tool(name: string, description: string, properties: string, required: s
 export function agentMaintenanceTools(): ProviderFunctionTool[] {
   const draft: string = `"draftId":${TEXT},"reason":${TEXT}`;
   return [
+    tool('get_browser_preferences', '读取浏览器真实模式、排序、副标题、Cards/Notes 各自显示列、最近搜索与 Core 忽略重音选项，返回 Core 列目录。显示列也有手动更多菜单入口。读取不修改浏览模式或激活列。', '', '', '{}'),
+    tool('propose_update_browser_preferences', '提出浏览器偏好修改，确认后与手动界面共用保存队列。changesJson 只允许 mode(cards/notes)、sortColumn(Core 可排序 key 或空串默认)、sortReverse(boolean)、subtitleIndex(1牌组/2到期/4答案)、cardsColumns/notesColumns(有序 Core key 数组最多16项，空数组恢复默认)。省略项保留；先读取 get_browser_preferences。不会修改卡片内容或调度，不能设置任意配置键。忽略重音在此工具中只读，通过手动搜索选项修改。',
+      `"changesJson":${TEXT}`, '"changesJson"', '{"changesJson":"{\\"cardsColumns\\":[\\"question\\",\\"answer\\"]}"}'),
     tool('get_filtered_deck', '读取已发现的既有过滤牌组真实配置。返回两个搜索条件、数量、排序、reschedule 与预览延时（秒）；普通牌组会失败。使用本工具后再提出修改。',
       `"deckId":${ID}`, '"deckId"', '{"deckId":1}'),
     tool('propose_update_filtered_deck', '提出既有过滤牌组配置修改，changesJson 只允许 reschedule、searchTerms、previewDelay、previewAgainSecs、previewHardSecs、previewGoodSecs。searchTerms 是1至2个完整 search/limit/order 对象，limit 1至100000，order 0至10，与 Core 排序一致。延时单位秒，0至86400。省略字段保留。确认后由 Core 保存并重新填充，已有卡归还原牌组；空结果仍保留牌组，不删除笔记或复习历史。提交前重查真实配置，过期提案失败。',

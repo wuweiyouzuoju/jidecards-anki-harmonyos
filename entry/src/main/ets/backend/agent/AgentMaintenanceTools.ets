@@ -12,6 +12,12 @@ import { validateStudyControls } from '../../model/StudyControls';
 import type { StudyControls } from '../../model/StudyControls';
 import { reviewPreferences } from '../ReviewPreferencesService';
 import { readStudyControls } from '../StudyControlsService';
+import { loadBrowserPreferences, loadBrowserIgnoreAccents } from '../BrowserPreferencesStore';
+import { browserPreferencePatch, updateBrowserPreferences } from '../../model/BrowserPreferences';
+import { AnkiBrowserSearch } from '../AnkiBrowserSearch';
+import { BrowserColumnSorting } from '../../proto/messages/SearchMessages';
+import type { BrowserColumn } from '../../proto/messages/SearchMessages';
+import type { BrowserPreferencesAction } from '../../model/agent/AgentMaintenanceActions';
 import { 笔记服务 } from '../笔记服务';
 import { 卡片服务 } from '../卡片服务';
 import { 笔记类型服务 } from '../笔记类型服务';
@@ -46,8 +52,8 @@ export class AgentMaintenanceTools {
   private types: 笔记类型服务 = new 笔记类型服务();
   constructor(scope: AgentScope) { this.scope = scope; }
   register(registry: AgentToolRegistry): void {
-    for (const name of ['get_advanced_settings', 'get_filtered_deck']) registry.registerRead(name, new MaintenanceRead(this, name));
-    for (const name of ['propose_update_collection_preferences', 'propose_update_study_controls', 'propose_export_subset', 'propose_update_filtered_deck']) {
+    for (const name of ['get_advanced_settings', 'get_filtered_deck', 'get_browser_preferences']) registry.registerRead(name, new MaintenanceRead(this, name));
+    for (const name of ['propose_update_collection_preferences', 'propose_update_study_controls', 'propose_update_browser_preferences', 'propose_export_subset', 'propose_update_filtered_deck']) {
       registry.registerAction(name, new MaintenanceAction(this, name));
     }
     registry.registerDraft('propose_duplicate_note', new MaintenanceDraft(this, 'propose_duplicate_note'));
@@ -58,6 +64,9 @@ export class AgentMaintenanceTools {
   /** @throws {Error} 真实配置读取失败交给工具结果。 */
   async read(json: string, name: string = 'get_advanced_settings'): Promise<string> {
     const args: MaintenanceArguments = decodeMaintenanceArguments(name, json);
+    if (name === 'get_browser_preferences') return JSON.stringify({ scope: 'collection', preferences: await loadBrowserPreferences(),
+      ignoreAccents: await loadBrowserIgnoreAccents(), columns: (await new AnkiBrowserSearch().columns()).columns,
+      manualEntry: 'browser_more', writableFields: ['mode', 'sortColumn', 'sortReverse', 'subtitleIndex', 'cardsColumns', 'notesColumns'] });
     if (name === 'get_filtered_deck') {
       this.scope.assertReadableDeckIds([args.deckId!]);
       const deck = await filteredDeckCommands.read(args.deckId!);
@@ -75,6 +84,21 @@ export class AgentMaintenanceTools {
   /** @throws {Error} 参数、范围或当前值读取失败时不生成提案。 */
   async proposeAction(name: string, json: string): Promise<AgentAction> {
     const args: MaintenanceArguments = decodeMaintenanceArguments(name, json);
+    if (name === 'propose_update_browser_preferences') {
+      const before = await loadBrowserPreferences();
+      const patch = browserPreferencePatch(args.changesJson!);
+      const after = updateBrowserPreferences(before, patch);
+      const columns: BrowserColumn[] = (await new AnkiBrowserSearch().columns()).columns;
+      const known: Set<string> = new Set<string>(columns.map((column: BrowserColumn): string => column.key));
+      if (after.cardsColumns.concat(after.notesColumns).some((key: string): boolean => !known.has(key)) ||
+        after.notesColumns.some((key: string): boolean => !columns.some((column: BrowserColumn): boolean => column.key === key && column.notesModeLabel !== '')) ||
+        after.cardsColumns.some((key: string): boolean => !columns.some((column: BrowserColumn): boolean => column.key === key && column.cardsModeLabel !== '')) ||
+        (after.sortColumn !== '' && !columns.some((column: BrowserColumn): boolean => column.key === after.sortColumn &&
+          (after.mode === 'notes' ? column.sortingNotes : column.sortingCards) !== BrowserColumnSorting.SORTING_NONE)))
+        throw new Error('Invalid browser column');
+      const payload: BrowserPreferencesAction = { before: before, patch: patch, columns: columns };
+      return createAgentAction('browser_preferences', JSON.stringify(payload));
+    }
     if (name === 'propose_update_filtered_deck') {
       this.scope.assertReadableDeckIds([args.deckId!]);
       return createAgentAction('filtered_deck_change', JSON.stringify(await filteredDeckCommands.prepare(args.deckId!, args.changesJson!)));

@@ -32,6 +32,8 @@ import { collectionPreferenceEdits } from '../../model/agent/AgentMaintenanceToo
 import type { CollectionPreferencesAction, StudyControlsAction, ExportSubsetAction } from '../../model/agent/AgentMaintenanceActions';
 import { reviewPreferences } from '../ReviewPreferencesService';
 import { saveStudyControls } from '../StudyControlsService';
+import { saveBrowserPreferences } from '../BrowserPreferencesStore';
+import type { BrowserPreferencesAction } from '../../model/agent/AgentMaintenanceActions';
 import { exportSubset, 完成导出 } from '../数据迁移服务';
 import { 卡片服务 } from '../卡片服务';
 import { 笔记服务 } from '../笔记服务';
@@ -77,6 +79,10 @@ export class AgentActionExecutor {
       } else if (action.kind === 'study_controls') {
         const payload: StudyControlsAction = JSON.parse(action.payloadJson) as StudyControlsAction;
         result = JSON.stringify({ status: 'completed', scope: 'device', controls: await saveStudyControls(payload.after, payload.before) });
+      } else if (action.kind === 'browser_preferences') {
+        const payload: BrowserPreferencesAction = JSON.parse(action.payloadJson) as BrowserPreferencesAction;
+        result = JSON.stringify({ status: 'completed', saved: true, scope: 'collection',
+          preferences: await saveBrowserPreferences(payload.patch, JSON.stringify(payload.before)) });
       } else if (action.kind === 'export_subset') {
         result = await this.exportConfirmed(JSON.parse(action.payloadJson) as ExportSubsetAction);
         if (result.includes('"status":"cancelled"')) { action.resultJson = result; action.status = 'cancelled'; return result; }

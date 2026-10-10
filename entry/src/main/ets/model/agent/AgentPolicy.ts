@@ -37,6 +37,8 @@ export class SearchExecutionError extends Error {
 
 export function toolRiskOf(toolName: string): ToolRisk {
   switch (toolName) {
+    case 'discover_tools':
+      return 'read';
     case 'navigate_app':
       return 'navigation';
     case 'set_theme_mode':
@@ -57,6 +59,7 @@ export function toolRiskOf(toolName: string): ToolRisk {
     case 'compute_fsrs_memory_state':
     case 'get_filtered_deck':
     case 'get_advanced_settings':
+    case 'get_browser_preferences':
     case 'execute_code':
     case 'get_note_type_capabilities':
     case 'get_note_context':
@@ -86,6 +89,7 @@ export function toolRiskOf(toolName: string): ToolRisk {
     case 'propose_set_setting':
     case 'propose_update_collection_preferences':
     case 'propose_update_study_controls':
+    case 'propose_update_browser_preferences':
     case 'propose_export_subset':
     case 'propose_duplicate_note':
       return 'write';

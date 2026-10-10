@@ -20,9 +20,11 @@ import { AgentRetrieval } from '../../entry/src/main/ets/model/agent/AgentRetrie
 import { sameAgentIds } from '../../entry/src/main/ets/model/agent/AgentTemplateUpdate.ts';
 import { maintenancePreviewRows } from '../../entry/src/main/ets/model/agent/AgentMaintenancePreview.ts';
 import { buildFailedOperationsRetryDraft } from '../../entry/src/main/ets/model/agent/AgentDraftRetry.ts';
+import { defaultBrowserPreferences, browserPreferencePatch, updateBrowserPreferences } from '../../entry/src/main/ets/model/BrowserPreferences.ts';
+import { BrowserColumnSorting } from '../../entry/src/main/ets/proto/messages/SearchMessages.ts';
 
 function fixture() {
-  const state = { writes:[], creates:[], exports:[], saved:true, controls:defaultStudyControls(),
+  const state = { writes:[], creates:[], exports:[], saved:true, controls:defaultStudyControls(), browserPreferences:defaultBrowserPreferences(),
     note:{id:41,guid:'source',notetypeId:7,mtime:1,usn:0,tags:['source-tag'],fields:['Question <img src="existing.png">','Answer']},
     type:JSON.stringify({id:7,name:'Type',type:0,css:'keep',sortf:0,latexPre:'\\documentclass{article}',latexPost:'\\end{document}',latexsvg:true,
       flds:[{name:'Front',ord:0,id:91,rtl:false,font:'Arial',size:20,external:3},{name:'Back',ord:1,id:92}],tmpls:[{ord:0,name:'Card',qfmt:'{{Front}}',afmt:'{{Back}}'}],external:{keep:true}}),
@@ -52,7 +54,14 @@ function fixture() {
   class Decks { async 获取牌组树() { return {deckId:0,name:'',children:[{deckId:1,name:'Default',children:[]}]}; } }
   const readAgentNotetypeImpact=async()=>({noteIds:state.notes.slice(),cardIds:state.cards.slice()});
   const readAgentExportSnapshot=loadPlatformModule('backend/agent/AgentExportSnapshot.ets','readAgentExportSnapshot',{});
-  const dependencies={decodeMaintenanceArguments,collectionPreferenceEdits,agentRestoreStockKind,patchAgentNotetypeFields,patchAgentNotetypeLatex,createAgentAction,
+  const browserDependencies={browserPreferencePatch,updateBrowserPreferences,BrowserColumnSorting,
+    loadBrowserPreferences:async()=>structuredClone(state.browserPreferences),loadBrowserIgnoreAccents:async()=>true,
+    AnkiBrowserSearch:class {async columns(){return {columns:[{key:'question',cardsModeLabel:'Question',notesModeLabel:'Question',sortingCards:1,sortingNotes:1},
+      {key:'answer',cardsModeLabel:'Answer',notesModeLabel:'Answer',sortingCards:0,sortingNotes:0},
+      {key:'cardDue',cardsModeLabel:'Due',notesModeLabel:'',sortingCards:1,sortingNotes:0}]};}},
+    saveBrowserPreferences:async(patch,expected)=>{assert.equal(JSON.stringify(state.browserPreferences),expected);if(state.browserWriteError)throw Error('disk');
+      state.browserPreferences=updateBrowserPreferences(state.browserPreferences,patch);state.writes.push('browser');return state.browserPreferences;}};
+  const dependencies={...browserDependencies,decodeMaintenanceArguments,collectionPreferenceEdits,agentRestoreStockKind,patchAgentNotetypeFields,patchAgentNotetypeLatex,createAgentAction,
     validateStudyControls,reviewPreferences,readStudyControls:async()=>structuredClone(state.controls),
     笔记服务:Notes,卡片服务:Cards,笔记类型服务:Types,readAgentNotetypeImpact,readAgentExportSnapshot};
   const Registry=loadPlatformModule('backend/agent/AgentToolRegistry.ets','AgentToolRegistry',{
@@ -62,7 +71,7 @@ function fixture() {
   const tools=new Tools(scope);tools.register(registry);
   const call=(name,args)=>registry.execute({id:'call',name,argumentsJson:JSON.stringify(args)});
   const Executor=loadPlatformModule('backend/agent/AgentActionExecutor.ets','AgentActionExecutor',{
-    AgentActionLedger,牌组服务:Decks,笔记类型服务:Types,笔记服务:Notes,卡片服务:Cards,collectionPreferenceEdits,reviewPreferences,
+    ...browserDependencies,AgentActionLedger,牌组服务:Decks,笔记类型服务:Types,笔记服务:Notes,卡片服务:Cards,collectionPreferenceEdits,reviewPreferences,
     readAgentExportSnapshot,saveStudyControls:async(after,before)=>{assert.equal(JSON.stringify(state.controls),JSON.stringify(before));state.writes.push('controls');state.controls=structuredClone(after);return after;},
     AppStorage:{get:()=>({filesDir:'/sandbox'})},autoSyncScheduler:{beginOperation(){},endOperation(){}},syncActivity:{waitForCollection:async()=>{}},
     exportSubset:async(...args)=>{state.exports.push(args);return '/sandbox/approved.apkg';},完成导出:async()=>state.saved?'uri':null,
@@ -107,6 +116,25 @@ test('advanced settings read the current Core state and proposals are read-only;
   const tampered=(await f.call('propose_update_collection_preferences',{changesJson:'{"backupDaily":4}'})).action;
   f.executor.registerPending(tampered);tampered.payloadJson+=' ';await assert.rejects(f.executor.executeConfirmed(tampered),/confirmation_mismatch/);
   assert.deepEqual(f.state.writes,['preferences']);
+});
+
+test('browser preferences use the live Core catalog, preserve omitted settings and require exact confirmation against current values', async () => {
+  const f=fixture();const live=JSON.parse((await f.call('get_browser_preferences',{})).outputJson);
+  assert.equal(live.scope,'collection');assert.equal(live.ignoreAccents,true);assert.equal(live.columns.length,3);
+  const args={changesJson:JSON.stringify({mode:'notes',notesColumns:['answer','question'],sortColumn:'question'})};
+  const action=(await f.call('propose_update_browser_preferences',args)).action;
+  assert.equal(action.kind,'browser_preferences');assert.deepEqual(f.state.writes,[]);
+  f.executor.registerPending(action);const result=JSON.parse(await f.executor.executeConfirmed(action));
+  assert.equal(result.saved,true);assert.deepEqual(f.state.browserPreferences.notesColumns,['answer','question']);
+  assert.equal(f.state.browserPreferences.subtitleIndex,1);assert.deepEqual(f.state.writes,['browser']);
+  for(const patch of [{arbitrary:true},{notesColumns:['unknown']},{sortColumn:'cardDue'},{sortColumn:'answer'}])
+    await assert.rejects(f.call('propose_update_browser_preferences',{changesJson:JSON.stringify(patch)}));
+  const stale=(await f.call('propose_update_browser_preferences',{changesJson:'{"subtitleIndex":4}'})).action;
+  f.executor.registerPending(stale);f.state.browserPreferences.subtitleIndex=2;
+  await assert.rejects(f.executor.executeConfirmed(stale));assert.deepEqual(f.state.writes,['browser']);
+  const tampered=(await f.call('propose_update_browser_preferences',{changesJson:'{"subtitleIndex":4}'})).action;
+  f.executor.registerPending(tampered);tampered.payloadJson+=' ';
+  await assert.rejects(f.executor.executeConfirmed(tampered),/confirmation_mismatch/);
 });
 
 test('study controls and subset export use confirmation, exact discovered IDs, target rechecks and honest save cancellation', async () => {

@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { filteredDeckPatch } from '../FilteredDeckCommands';
+import { updateBrowserPreferences } from '../BrowserPreferences';
+import type { BrowserPreferencesAction } from './AgentMaintenanceActions';
 import type { FilteredDeckProposal } from '../FilteredDeckCommands';
 import { filteredDeckOrderTitleKey } from '../FilteredDeckOptions';
 import { decode过滤牌组更新 } from '../../proto/messages/DeckMessages';
@@ -64,7 +66,23 @@ function deckOptionPreviewValue(key: string, value: string, fsrs: boolean, text:
 export function maintenancePreviewRows(action: AgentAction, text: (key: string) => string): MaintenancePreviewRow[] {
   const rows: MaintenancePreviewRow[] = [];
   const boolean = (value: boolean): string => text(value ? 'agent_value_on' : 'agent_value_off');
-  if (action.kind === 'filtered_deck_change') {
+  if (action.kind === 'browser_preferences') {
+    const payload: BrowserPreferencesAction = JSON.parse(action.payloadJson) as BrowserPreferencesAction;
+    const after = updateBrowserPreferences(payload.before, payload.patch);
+    const columnLabel = (key: string, notes: boolean): string => {
+      const column = payload.columns.find((item): boolean => item.key === key);
+      return column === undefined ? key : notes ? column.notesModeLabel : column.cardsModeLabel;
+    };
+    const columns = (keys: string[], notes: boolean): string => keys.length === 0 ? text('browser_sort_default') : keys.map((key: string): string => columnLabel(key, notes)).join(' → ');
+    rows.push({ title: text('browser_title'), before: text(payload.before.mode === 'notes' ? 'browser_mode_notes' : 'browser_mode_cards'), after: text(after.mode === 'notes' ? 'browser_mode_notes' : 'browser_mode_cards') });
+    rows.push({ title: text('browser_sort_default'), before: payload.before.sortColumn === '' ? text('browser_sort_default') : columnLabel(payload.before.sortColumn, payload.before.mode === 'notes'),
+      after: after.sortColumn === '' ? text('browser_sort_default') : columnLabel(after.sortColumn, after.mode === 'notes') });
+    rows.push({ title: text('browser_sort_direction'), before: boolean(payload.before.sortReverse), after: boolean(after.sortReverse) });
+    rows.push({ title: text('browser_subtitle_deck'), before: text(payload.before.subtitleIndex === 4 ? 'browser_subtitle_answer' : payload.before.subtitleIndex === 2 ? 'browser_subtitle_due' : 'browser_subtitle_deck'),
+      after: text(after.subtitleIndex === 4 ? 'browser_subtitle_answer' : after.subtitleIndex === 2 ? 'browser_subtitle_due' : 'browser_subtitle_deck') });
+    rows.push({ title: text('browser_mode_cards') + ' · ' + text('browser_display_columns'), before: columns(payload.before.cardsColumns, false), after: columns(after.cardsColumns, false) });
+    rows.push({ title: text('browser_mode_notes') + ' · ' + text('browser_display_columns'), before: columns(payload.before.notesColumns, true), after: columns(after.notesColumns, true) });
+  } else if (action.kind === 'filtered_deck_change') {
     const payload: FilteredDeckProposal = JSON.parse(action.payloadJson) as FilteredDeckProposal;
     const before = decode过滤牌组更新(new Uint8Array(payload.before));
     const after = filteredDeckPatch(before, payload.changesJson);
