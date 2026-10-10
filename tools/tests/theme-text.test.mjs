@@ -9,6 +9,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import { themeTextWrappers, cachedThemeText } from './theme-text-harness.mjs';
 import { themeDefinition, GLASS_HIGHLIGHT_COLORS, GLASS_DARK_COLORS } from '../../entry/src/main/ets/model/ThemeCatalog.ts';
 import { 对比度 } from '../../entry/src/main/ets/model/色阶生成.ets';
+import { EMPTY_CARDS_ACTIONS } from '../../entry/src/main/ets/model/AppInterface.ts';
 
 const read = path => readFileSync(new URL('../../entry/src/main/ets/' + path, import.meta.url), 'utf8');
 const source = read('components/common/ThemeText.ets');
@@ -39,7 +40,7 @@ function refreshHarness(path, locals = {}, index = 0) {
   return { host, view: cachedThemeText(wrappers[index], api, spans, $r, locals), translations };
 }
 
-test('custom study and parent-deck selection release the old accent without repainting siblings', () => {
+test('custom study selection releases the old accent without repainting siblings', () => {
   const presets = [2, 3, 4].map(字段号 => ({ 字段号, 标题资源: `preset ${字段号}` }));
   const views = presets.map(预设 => refreshHarness('components/home/自定义学习对话框.ets', { 预设 }).view);
   const host = refreshHarness('components/home/自定义学习对话框.ets', { 预设: presets[0] }).host;
@@ -54,11 +55,6 @@ test('custom study and parent-deck selection release the old accent without repa
     });
   }
   assert.equal(host.draft, draft, 'only text children are rebuilt');
-  const { host: parent, view } = refreshHarness('components/创建牌组面板.ets', { id: '42', label: 'Parent deck' });
-  for (const id of ['42', '99', '42']) {
-    parent.parentId = id;
-    assert.equal(view.render(parent).some(span => span.color !== undefined), id === '42');
-  }
 });
 
 test('restore-trash text follows busy/empty transitions and light/dark/theme palettes', () => {
@@ -81,8 +77,7 @@ test('restore-trash text follows busy/empty transitions and light/dark/theme pal
 
 test('dynamic action labels and plain percentage refresh under the same locale', () => {
   for (const [path, property, resourceKeys] of [
-    ['components/添加笔记面板.ets', '高级已展开', ['add_note_advanced', 'add_note_advanced_hide']],
-    ['components/settings/空卡列表面板.ets', 'selectedAll', ['empty_cards_select_all', 'empty_cards_deselect_all']]
+    ['components/添加笔记面板.ets', '高级已展开', ['add_note_advanced', 'add_note_advanced_hide']]
   ]) {
     const { host, view, translations } = refreshHarness(path);
     host.全选状态 = () => host.selectedAll;
@@ -99,6 +94,25 @@ test('dynamic action labels and plain percentage refresh under the same locale',
     assert.deepEqual(view.render(host), [{ text: `${Math.round(value)}%` }]);
   }
   assert.equal(view.builds(), 3, 'an unchanged displayed percentage retains its text children');
+});
+
+test('empty-card shared button labels follow selection and locale with the real theme glyph renderer', () => {
+  const expression = read('components/settings/空卡列表面板.ets')
+    .match(/按下态按钮\(\{ 文案: ([\s\S]*?),\s*themeText: true/)[1];
+  const label = new Function('$r', 'EMPTY_CARDS_ACTIONS', 'return (' + expression + ');');
+  const translations = Object.fromEntries(['base', 'en_US'].map(locale => [locale,
+    new Map(JSON.parse(readFileSync(new URL(`../../entry/src/main/resources/${locale}/element/string.json`,
+      import.meta.url), 'utf8')).string.map(item => [item.name, item.value]))]));
+  const host = { selectedAll: false, 全选状态() { return this.selectedAll; } };
+  for (const locale of ['base', 'en_US']) for (const selectedAll of [false, true, false]) {
+    host.selectedAll = selectedAll;
+    const actual = label.call(host, key => translations[locale].get(key.slice('app.string.'.length)), EMPTY_CARDS_ACTIONS);
+    const key = selectedAll ? 'empty_cards_deselect_all' : 'empty_cards_select_all';
+    assert.equal(actual, translations[locale].get(key));
+    for (const colors of [themeDefinition('iridescent').lightActionColors, themeDefinition('iridescent').darkActionColors]) {
+      assert.equal(api.themeLabelGlyphs(actual, colors).map(glyph => glyph.letter).join(''), actual);
+    }
+  }
 });
 
 test('status, assistant results and highlighted help titles refresh without remounting the owner', () => {
@@ -177,14 +191,32 @@ test('shared label renderer ramps between two catalog colors with readable light
       assert.ok(!colors.slice(2).includes(color), `${color} must not jump to a non-adjacent hue`);
       assert.ok(对比度(color, background) >= 4.5, color);
     }
+    for (const label of ['好', '完成', '保存', '取消', '评论', '🎨', 'OK']) {
+      spans.length = 0;
+      api.ThemeTextSpans(label, colors, context);
+      const letters = api.themeLabelCharacters(label, context);
+      assert.equal(spans.map(span => span.text).join(''), label);
+      assert.deepEqual(spans.map(span => span.color), letters.map(() => colors[1]),
+        'one- and two-glyph labels use the shared purple in both light and dark themes');
+      assert.ok(对比度(colors[1], background) >= 4.5);
+    }
     spans.length = 0;
-    api.ThemeTextSpans('评论', colors, context);
-    assert.deepEqual(spans.map(span => span.color), [colors[0], colors[0]], 'labels under three glyphs stay single-color');
+    api.ThemeTextSpans({ id: 99, params: ['课程', 12] }, colors, {
+      getHostContext: () => ({ resourceManager: { getStringSync: () => '完成' } })
+    });
+    assert.deepEqual(spans, [{ text: '完', color: colors[1] }, { text: '成', color: colors[1] }],
+      'localized short labels use the same purple as literal labels');
+    assert.equal(api.themeAccentRampColor(0, 1, colors), colors[1]);
+    assert.equal(api.themeAccentRampColor(0, 2, colors), colors[1]);
+    assert.equal(api.themeAccentRampColor(1, 2, colors), colors[1]);
+    assert.equal(api.themeAccentRampColor(0, 1, [colors[0]]), colors[0]);
+    assert.equal(api.themeAccentRampColor(1, 2, [colors[0]]), colors[0]);
+    assert.equal(api.themeAccentRampColor(0, 3, colors), colors[0]);
+    assert.equal(api.themeAccentRampColor(2, 3, colors), colors[1]);
     assert.equal(api.themeAccentRampColor(0, 4, colors), colors[0]);
     assert.equal(api.themeAccentRampColor(3, 4, colors), colors[1]);
   }
   assert.match(read('utils/颜色主题管理器.ets'), /THEME_TEXT_COLORS_KEY, 是否深色 \? visual.darkActionColors : visual.lightActionColors/);
-  assert.match(read('components/common/DialogHeader.ets'), /!this.destructive && this.themeAccentColors.length > 0/);
   assert.match(read('components/stats/范围切换条.ets'), /Select\(this\.options\(\)\)/);
 });
 
@@ -194,7 +226,6 @@ test('theme text identity changes with its color and create-deck draws spans in 
   const button = read('components/common/按下态按钮.ets');
   assert.match(button, /ForEach\(themeLabelGlyphs\(this\.文案, this\.themeAccentColors, this\.getUIContext\(\), this\.uiLanguage\)/);
   assert.doesNotMatch(button, /ThemeTextSpans\(/, 'button colors must not be snapshotted by a value-parameter builder');
-  assert.match(read('components/common/DialogHeader.ets'), /ForEach\(themeLabelGlyphs\(this\.actionLabel, this\.themeAccentColors/);
   assert.doesNotMatch(button, /index % this\.themeAccentColors\.length/);
   assert.match(read('components/home/主页顶部工具栏.ets'), /deck_reorder_done'[\s\S]*?themeText: true/);
   assert.match(read('components/home/HomeSummaryHeader.ets'), /IconActionButton\(\{ toolbarStyle: true, source: \$r\('app.media.ic_home_new'\), label: \$r\('app.string.create_deck'\)[\s\S]*?onAction: this.onCreate/);

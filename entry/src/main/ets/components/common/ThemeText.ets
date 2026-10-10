@@ -12,7 +12,7 @@ import { resourceText } from '../../utils/UiFeedback';
 // @业务规则
 // - 数据文字（时间、计数、百分比、号码、链接、路径）不换色，调用方传空色板沿用原单色；
 // - 标签文字在色板前两色之间按字符位置线性插值，整段读作一条连续渐变；
-// - 少于 3 个字的标签直接用首色，两个字不会出现两种颜色。
+// - 1–2 个字的标签统一用第二色（幻彩紫色），两个字不会出现两种颜色。
 //
 // @Invariants
 // - 禁止逐字对色板取模轮换色相：四个色相跳色会被读成“一个数字一个颜色”。
@@ -49,9 +49,10 @@ function themeAccentRgb(color: string): number[] {
   return [parseInt(rgb.slice(0, 2), 16), parseInt(rgb.slice(2, 4), 16), parseInt(rgb.slice(4, 6), 16)];
 }
 
-/** 在首色与次色之间按字符位置取色；色板不足两色或少于 3 个字时用首色。 */
+/** 长标签在首色与次色之间插值；1–2 字用第二色，单色色板沿用唯一颜色。 */
 export function themeAccentRampColor(index: number, length: number, colors: string[]): string {
-  if (colors.length < 2 || length < 3) return colors[0];
+  if (colors.length < 2) return colors[0];
+  if (length < 3) return colors[1];
   if (index <= 0) return colors[0];
   if (index >= length - 1) return colors[1];
   const from: number[] = themeAccentRgb(colors[0]);
