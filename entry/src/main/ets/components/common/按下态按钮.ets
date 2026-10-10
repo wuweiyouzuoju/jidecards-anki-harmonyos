@@ -57,6 +57,8 @@ export struct 按下态按钮 {
   // 工具栏在等宽侧栏内约束标签，保留完整无障碍名称。
   @Prop singleLine: boolean = false;
   @Prop fillWidth: boolean = false;
+  // 编辑工具保留输入框的焦点与选区；普通操作继续使用原生焦点行为。
+  @Prop preserveInputFocus: boolean = false;
   @Prop autoHeight: boolean = false;
   点击回调: () => void = (): void => {};
 
@@ -116,6 +118,7 @@ export struct 按下态按钮 {
     .stateEffect(false)
     .borderRadius(应用尺寸.圆角_胶囊)
     .enabled(this.是否启用)
+    .focusOnTouch(!this.preserveInputFocus)
     .onClick(() => { this.activate(); })
   }
 }

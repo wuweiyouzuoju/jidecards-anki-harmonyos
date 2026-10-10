@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { NOTE_EDITOR_TOOLS, NOTE_EDITOR_COMMON_TOOL_IDS, NOTE_EDITOR_FORMAT_TOGGLE_IDS } from './NoteFieldEditing';
+import { NOTE_EDITOR_TOOLS, NOTE_EDITOR_COMMON_TOOL_IDS, NOTE_EDITOR_FORMAT_TOGGLE_IDS, NOTE_FIELD_EDITING_SUPPORT } from './NoteFieldEditing';
 import type { NoteEditorTool } from './NoteFieldEditing';
 
 export const NOTE_EDITOR_GRIP_AVAILABILITY_KEY: string = 'note_editor_grip_availability';
@@ -12,13 +12,17 @@ export interface NoteEditorWheelState {
   expanded: boolean;
   activeIds: string[];
   fieldName?: string;
+  optionsOpen?: boolean;
+  optionToolId?: string;
+  optionId?: string;
 }
 export interface NoteEditorWheelTool extends NoteEditorTool { active: boolean; }
 export function noteWheelToolIsToggle(id: string, source: boolean): boolean {
   return !source && NOTE_EDITOR_FORMAT_TOGGLE_IDS.indexOf(id) >= 0;
 }
-/** 可视格式读取真实开关；一次性动作仅在点击反馈期间高亮。 */
+/** 格式入口读取真实状态；一次性动作仅在点击反馈期间高亮。 */
 export function noteWheelToolHighlighted(id: string, activeIds: string[], selectedId: string, source: boolean = false): boolean {
+  if (NOTE_FIELD_EDITING_SUPPORT.formatOptionPicker.toolIds.indexOf(id) >= 0) return activeIds.indexOf(id) >= 0;
   if (noteWheelToolIsToggle(id, source)) return activeIds.indexOf(id) >= 0;
   return id === selectedId;
 }
@@ -68,6 +72,25 @@ export function noteWheelAxisDelta(axis: number, scrollStep: number = 1): number
   return Number.isFinite(axis) ? axis / (15 * Math.max(1, scrollStep)) : 0;
 }
 export interface NoteWheelItemPosition { x: number; y: number; }
+export interface NoteWheelOptionPosition extends NoteWheelItemPosition { size: number; }
+/** 选项与轮盘同圆心且完整位于外缘之外；优先对齐入口角度，遇边界只移动弧段。 */
+export function noteWheelOptionArcPosition(index: number, count: number, radius: number, centerY: number,
+  anchorAngle: number, width: number, height: number, right: boolean): NoteWheelOptionPosition {
+  const scale: number = radius / 158;
+  const size: number = 42 * scale;
+  const track: number = radius + size / 2 + 5 * scale;
+  const inset: number = size / 2 + 8;
+  const edgeAngle: number = Math.acos(Math.min(1, inset / track));
+  const minAngle: number = Math.max(-edgeAngle, Math.asin(Math.max(-1, Math.min(1, (inset - centerY) / track))));
+  const maxAngle: number = Math.min(edgeAngle, Math.asin(Math.max(-1, Math.min(1, (height - inset - centerY) / track))));
+  // 按按钮弦长留6vp间隙；七档字号只占局部弧段，不铺满整个半圆。
+  const step: number = 2 * Math.asin((size + 6 * scale) / (2 * track));
+  const halfSpan: number = Math.max(0, count - 1) * step / 2;
+  const middle: number = Math.max(minAngle + halfSpan, Math.min(maxAngle - halfSpan, anchorAngle));
+  const angle: number = middle + (index - (count - 1) / 2) * step;
+  return { x: (right ? width : 0) + (right ? -1 : 1) * track * Math.cos(angle),
+    y: centerY + track * Math.sin(angle), size: size };
+}
 /** 两圈共用圆心：内圈30度、外圈25度角距，各圈上下镜像且相邻弦长相等。 */
 export function noteWheelItemPosition(distance: number, radius: number, right: boolean, common: boolean = false,
   outerShown: boolean = true, outerCount: number = 7): NoteWheelItemPosition {

@@ -16,11 +16,11 @@ import { NOTE_EDITOR_GRIP_AVAILABILITY_KEY, NoteEditorWheelState, NoteEditorWhee
   noteWheelIndex, noteWheelDistance, noteWheelAngleStep, noteWheelViewportHeight,
   noteWheelItemPosition, noteWheelTrackRadius, noteWheelLabel, noteWheelHandleAngle, NOTE_EDITOR_WHEEL_VISIBLE_COUNT,
   NoteWheelMouseRotation,
-  noteWheelRadius, noteWheelY, NoteWheelRotation } from '../../model/NoteEditorWheel';
+  noteWheelRadius, noteWheelY, NoteWheelRotation, noteWheelOptionArcPosition, NoteWheelOptionPosition } from '../../model/NoteEditorWheel';
 import { appInterface } from '../../backend/AppInterfaceService';
-import { noteEditorWheelObservation } from '../../model/AppInterface';
+import { noteEditorWheelObservation, noteEditorFormatObservation } from '../../model/AppInterface';
 import type { AppInterfaceObservation } from '../../model/AppInterface';
-import { NOTE_EDITOR_ACTION_FLASH_MS, noteEditorTool } from '../../model/NoteFieldEditing';
+import { NOTE_EDITOR_ACTION_FLASH_MS, NOTE_FIELD_EDITING_SUPPORT, noteEditorTool, noteEditorFormatOptions, NoteEditorFormatOption } from '../../model/NoteFieldEditing';
 export { NoteEditorFormatDialog } from './NoteEditorFormatDialog';
 
 export class NoteEditorWheelParams {
@@ -31,20 +31,25 @@ export class NoteEditorWheelParams {
   onSelection: (id: string) => void;
   onResetFormats: () => void;
   onLongAction: (id: string) => void;
+  onOptionSelect: (id: string) => void;
+  onCloseOptions: () => void;
   constructor(state: NoteEditorWheelState, onAction: (id: string) => void, visible: boolean = true,
     initialTool: string = '', onSelection: (id: string) => void = (_id: string): void => {},
     onResetFormats: () => void = (): void => {},
-    onLongAction: (id: string) => void = (_id: string): void => {}) {
+    onLongAction: (id: string) => void = (_id: string): void => {},
+    onOptionSelect: (id: string) => void = (_id: string): void => {},
+    onCloseOptions: () => void = (): void => {}) {
     this.state = state; this.onAction = onAction; this.visible = visible;
     this.initialTool = initialTool; this.onSelection = onSelection;
     this.onResetFormats = onResetFormats;
     this.onLongAction = onLongAction;
+    this.onOptionSelect = onOptionSelect; this.onCloseOptions = onCloseOptions;
   }
 }
 
 @Builder
 export function buildNoteEditorWheel(params: NoteEditorWheelParams) {
-  // WrappedBuilder 的首节点必须是可穿透的原生布局，避免自定义组件代理覆盖整页触摸。
+  // 原生根布局只穿透空白；局部交互区用 BLOCK_HIERARCHY 阻止点击落到页面控件。
   Column() {
     NoteEditorWheel({ params: params })
   }.width('100%').height('100%').focusable(false).hitTestBehavior(HitTestMode.Transparent)
@@ -83,6 +88,7 @@ struct NoteEditorWheel {
   private keyboardListener: (height: number) => void = (height: number): void => { this.readKeyboard(height); };
   private attached: boolean = false;
   private observationVersion: number = 0;
+  private optionsObservationVersion: number = 0;
   private revealTimer: number = -1;
   private actionFlashTimer: number = -1;
   private actionFlashVersion: number = 0;
@@ -144,6 +150,11 @@ struct NoteEditorWheel {
   private detach(): void {
     if (this.attached) appInterface.leave('note_editor_wheel', this.observationVersion);
     this.attached = false;
+    this.detachOptions();
+  }
+  private detachOptions(): void {
+    if (this.optionsObservationVersion > 0) appInterface.leave('note_editor_format_options', this.optionsObservationVersion);
+    this.optionsObservationVersion = 0;
   }
   private selectedIndex(): number { return noteWheelIndex(Math.round(this.arcPosition), this.wheelTools.length); }
   private alignmentOffset(): number { return this.wheelTools.length > 0 && this.wheelTools.length < 7 && this.wheelTools.length % 2 === 0 ? -0.5 : 0; }
@@ -153,8 +164,9 @@ struct NoteEditorWheel {
     const radius: number = noteWheelRadius(this.viewportWidth, this.usableHeight());
     return this.wheelTools.length > 0 ? radius : Math.min(110, radius);
   }
+  private frameRadius(): number { return this.radius(); }
   private trackRadius(common: boolean): number { return noteWheelTrackRadius(this.radius(), common, this.wheelTools.length > 0); }
-  private y(): number { return noteWheelY(this.centerY, this.usableHeight(), this.radius(), false); }
+  private y(): number { return noteWheelY(this.centerY, this.usableHeight(), this.frameRadius(), false); }
   private async subscribeKeyboard(): Promise<void> {
     const context = this.getUIContext().getHostContext();
     if (context === undefined) return;
@@ -193,15 +205,17 @@ struct NoteEditorWheel {
   private circleSize(common: boolean = false): number { return (common ? 42 : 46) * this.contentScale(); }
   private current(tool: NoteEditorWheelTool): boolean {
     // ForEach 按 id 复用按钮，开启状态必须读取当前字段，不能留在旧条目闭包里。
-    return noteWheelToolHighlighted(tool.id, this.params.state.activeIds, this.selectedId, this.params.state.source);
+    return tool.id === this.params.state.optionToolId && this.params.state.optionsOpen === true ||
+      noteWheelToolHighlighted(tool.id, this.params.state.activeIds, this.selectedId, this.params.state.source);
   }
   private x(index: number, common: boolean = false): number {
     return noteWheelItemPosition(this.distance(index, common), this.radius(), this.side === 'right', common,
-      this.wheelTools.length > 0, this.wheelTools.length).x - this.itemWidth(common) / 2;
+      this.wheelTools.length > 0, this.wheelTools.length).x - this.itemWidth(common) / 2 +
+      (this.side === 'right' ? this.frameRadius() - this.radius() : 0);
   }
   private iconY(index: number, common: boolean = false): number {
     return noteWheelItemPosition(this.distance(index, common), this.radius(), this.side === 'right', common,
-      this.wheelTools.length > 0, this.wheelTools.length).y - this.circleSize(common) / 2;
+      this.wheelTools.length > 0, this.wheelTools.length).y - this.circleSize(common) / 2 + this.frameRadius() - this.radius();
   }
   private publish(): void {
     if (!this.mounted || !this.foreground || !this.params.visible || this.commonTools.length === 0) return;
@@ -211,6 +225,11 @@ struct NoteEditorWheel {
       { id: 'pressed_tool', value: this.pressedId }, { id: 'rotating', value: String(this.rotating) },
       { id: 'moving', value: String(this.moving) }, { id: 'edge_contact', value: String(this.edgeContact) }]);
     this.observationVersion = appInterface.observe(observation);
+    if (this.params.state.optionsOpen === true && !this.collapsed) {
+      this.optionsObservationVersion = appInterface.observe(noteEditorFormatObservation(this.params.state.optionToolId ?? '',
+        this.params.state.fieldName ?? '', this.params.state.source, this.params.state.optionId ?? '',
+        NOTE_FIELD_EDITING_SUPPORT.formatOptionPicker.placement));
+    } else this.detachOptions();
     this.params.onSelection(this.selectedId);
     this.attached = true;
   }
@@ -224,6 +243,7 @@ struct NoteEditorWheel {
     this.cancelManipulation(); this.clearActionFlash();
     this.mouseRotation.reset(); this.axisMoved = false;
     this.collapsed = !this.collapsed;
+    if (this.collapsed) this.params.onCloseOptions();
     if (!this.collapsed) { this.selectedId = ''; this.params.onResetFormats(); }
     this.animateOpen(!this.collapsed); this.publish();
   }
@@ -281,6 +301,7 @@ struct NoteEditorWheel {
       this.mouseRotation.reset(); this.axisMoved = false; return;
     }
     const delta: number = this.mouseRotation.move(event.getVerticalAxisValue(), event.scrollStep ?? 1);
+    if (delta !== 0 && this.params.state.optionsOpen === true) this.params.onCloseOptions();
     if (this.wheelTools.length === 0) return;
     if (delta !== 0) { if (!this.axisMoved) this.axisStartPosition = this.arcPosition; this.axisMoved = true; this.arcPosition += delta; this.publish(); }
     if (event.action === AxisAction.END && this.axisMoved) { this.axisMoved = false; this.settleRotation(); }
@@ -290,11 +311,12 @@ struct NoteEditorWheel {
     if (this.wheelTools.length === 0) return;
     const finger: FingerInfo | undefined = event.fingerList[0];
     if (finger === undefined) return;
+    if (this.params.state.optionsOpen === true) this.params.onCloseOptions();
     this.startX = finger.globalX - this.originX - event.offsetX;
     this.startY = finger.globalY - this.originY - event.offsetY;
     this.rotating = true; this.pressedId = ''; this.suppressToolClick = true;
     this.rotationPosition = this.arcPosition;
-    this.rotation.begin(this.startX, this.startY, this.radius(), this.side === 'right', noteWheelAngleStep(this.radius(), this.wheelTools.length));
+    this.rotation.begin(this.startX, this.startY, this.frameRadius(), this.side === 'right', noteWheelAngleStep(this.radius(), this.wheelTools.length));
   }
   private rotateWheel(event: GestureEvent): void {
     if (this.wheelTools.length === 0) return;
@@ -357,8 +379,49 @@ struct NoteEditorWheel {
   private track(common: boolean) {
     Circle().width(this.trackRadius(common) * 2).height(this.trackRadius(common) * 2)
       .fill(Color.Transparent).stroke(SurfaceBorder.color()).strokeWidth(1)
-      .position({ x: this.side === 'right' ? this.radius() - this.trackRadius(common) : -this.trackRadius(common),
-        y: this.radius() - this.trackRadius(common) }).hitTestBehavior(HitTestMode.None)
+      .position({ x: this.side === 'right' ? this.frameRadius() - this.trackRadius(common) : -this.trackRadius(common),
+        y: this.frameRadius() - this.trackRadius(common) }).hitTestBehavior(HitTestMode.None)
+  }
+
+  private selectFormatOption(id: string): void {
+    if (!this.mounted || !this.foreground || !this.params.visible || this.collapsed || this.rotating ||
+      this.suppressToolClick || this.params.state.optionsOpen !== true) return;
+    if (noteEditorFormatOptions(this.params.state.optionToolId ?? '').some((option: NoteEditorFormatOption): boolean => option.id === id)) {
+      this.params.onOptionSelect(id);
+    }
+  }
+  private optionTitle(option: NoteEditorFormatOption, short: boolean = false, _locale: string = this.uiLanguage): string {
+    return namedResourceText(this.getUIContext(), option.titleKey + (short ? '_short' : ''));
+  }
+  private optionPosition(index: number): NoteWheelOptionPosition {
+    const toolIndex: number = this.wheelTools.findIndex((tool: NoteEditorWheelTool): boolean => tool.id === this.params.state.optionToolId);
+    return noteWheelOptionArcPosition(index, noteEditorFormatOptions(this.params.state.optionToolId ?? '').length,
+      this.radius(), this.y(), this.distance(Math.max(0, toolIndex)) * noteWheelAngleStep(this.radius(), this.wheelTools.length),
+      this.viewportWidth, this.usableHeight(), this.side === 'right');
+  }
+
+  @Builder
+  private optionArc() {
+    ForEach(noteEditorFormatOptions(this.params.state.optionToolId ?? ''), (option: NoteEditorFormatOption, index: number) => {
+      Button() {
+        Text(this.optionTitle(option, true))
+          .fontSize((this.params.state.optionToolId === 'heading' ? 19 - index * 2 : 11 + index) * this.optionPosition(index).size / 42)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(this.params.state.optionId === option.id ? '#FFFFFF' : this.accent)
+          .textAlign(TextAlign.Center).maxLines(2)
+      }.width(this.optionPosition(index).size).height(this.optionPosition(index).size).padding(0).type(ButtonType.Circle)
+        .backgroundColor(this.params.state.optionId === option.id ? this.accent : $r('app.color.surface_sidebar'))
+        .border({ width: 1, color: this.params.state.optionId === option.id ? this.accent : SurfaceBorder.color() })
+        .focusOnTouch(false).focusable(false).attributeModifier(new PressFeedback()).stateEffect(false)
+        .hitTestBehavior(HitTestMode.BLOCK_HIERARCHY)
+        .position({ x: this.optionPosition(index).x - this.optionPosition(index).size / 2,
+          y: this.optionPosition(index).y - this.optionPosition(index).size / 2 })
+        .accessibilityText(this.optionTitle(option))
+        .accessibilityDescription(this.params.state.optionId === option.id ? $r('app.string.note_editor_format_on') :
+          $r('app.string.note_editor_wheel_select'))
+        .onTouch((event: TouchEvent): void => { this.toolTouch('format_option_' + option.id, event); })
+        .onClick((): void => { this.selectFormatOption(option.id); })
+    }, (option: NoteEditorFormatOption): string => (this.params.state.optionToolId ?? '') + '_' + option.id)
   }
 
   @Builder
@@ -398,8 +461,9 @@ struct NoteEditorWheel {
       DisclosureChevron({ tint: this.accent })
         .rotate({ angle: noteWheelHandleAngle(this.openProgress, this.side === 'right') })
     }.width(28).height(48).padding(0).type(ButtonType.Normal)
-      .borderRadius(12).backgroundColor($r('app.color.surface_sidebar'))
+      .backgroundColor($r('app.color.surface_sidebar'))
       .border({ width: 1, color: this.moving || this.edgeContact ? this.accent : SurfaceBorder.color() })
+      .borderRadius(12)
       .scale({ x: this.moving ? 1.04 : 1, y: this.moving ? 1.04 : 1 })
       .animation(motionAnimation(currentMotionProfile().statusMs))
       .focusOnTouch(false).focusable(false).attributeModifier(new PressFeedback()).stateEffect(false)
@@ -412,7 +476,7 @@ struct NoteEditorWheel {
           .onActionStart((): void => { this.dragY = this.y(); this.moving = true; this.suppressHandleClick = true; })
           .onActionUpdate((event: GestureEvent): void => {
             const desired: number = this.dragY + event.offsetY;
-            this.centerY = noteWheelY(desired, this.usableHeight(), this.radius(), false);
+            this.centerY = noteWheelY(desired, this.usableHeight(), this.frameRadius(), false);
             this.edgeContact = Math.abs(this.centerY - desired) > 0.5;
           }).onActionEnd((): void => { this.finishMove(false); })
           .onActionCancel((): void => { this.finishMove(true); })))
@@ -422,25 +486,24 @@ struct NoteEditorWheel {
     Stack({ alignContent: Alignment.TopStart }) {
       if (this.viewportWidth >= 160 && this.usableHeight() >= 176 && this.foreground) {
         Stack({ alignContent: Alignment.TopStart }) {
-          Column().width(this.radius()).height(this.radius() * 2)
+          Column().width(this.frameRadius()).height(this.frameRadius() * 2)
             .backgroundColor($r('app.color.surface_card')).border(SurfaceBorder.options())
-            .borderRadius(this.side === 'left' ? { topRight: this.radius(), bottomRight: this.radius() } :
-              { topLeft: this.radius(), bottomLeft: this.radius() })
+            .borderRadius(this.side === 'left' ? { topRight: this.frameRadius(), bottomRight: this.frameRadius() } :
+              { topLeft: this.frameRadius(), bottomLeft: this.frameRadius() })
             .shadow({ radius: 12, color: '#24000000', offsetX: this.side === 'left' ? 2 : -2, offsetY: 2 })
             .hitTestBehavior(HitTestMode.None)
           if (this.wheelTools.length > 0) { this.track(false) }
-          this.track(true)
           ForEach(this.wheelTools, (tool: NoteEditorWheelTool, index: number) => {
             this.toolButton(tool, index, false)
           }, (tool: NoteEditorWheelTool): string => tool.id)
           ForEach(this.commonTools, (tool: NoteEditorWheelTool, index: number) => {
             this.toolButton(tool, index, true)
           }, (tool: NoteEditorWheelTool): string => tool.id)
-        }.width(this.radius()).height(this.radius() * 2).clip(true)
-          .position({ x: this.side === 'left' ? 0 : this.viewportWidth - this.radius(), y: this.y() - this.radius() })
-          .translate({ x: (this.side === 'left' ? -1 : 1) * (this.radius() + 12) * (1 - this.openProgress) })
+        }.width(this.frameRadius()).height(this.frameRadius() * 2).clip(true)
+          .position({ x: this.side === 'left' ? 0 : this.viewportWidth - this.frameRadius(), y: this.y() - this.frameRadius() })
+          .translate({ x: (this.side === 'left' ? -1 : 1) * (this.frameRadius() + 12) * (1 - this.openProgress) })
           .opacity(this.openProgress)
-          .hitTestBehavior(this.collapsed || !this.params.visible ? HitTestMode.None : HitTestMode.Default)
+          .hitTestBehavior(this.collapsed || !this.params.visible ? HitTestMode.None : HitTestMode.BLOCK_HIERARCHY)
           .onTouch((event: TouchEvent): void => { this.touch(event); })
           .onAxisEvent((event: AxisEvent): void => { this.axisWheel(event); })
           .gesture(PanGesture({ distance: 3 }).onActionStart((event: GestureEvent): void => { this.rotateStart(event); })
@@ -454,8 +517,9 @@ struct NoteEditorWheel {
         }.alignItems(VerticalAlign.Center)
           .position({ x: this.side === 'left' ? 0 : this.viewportWidth - 28, y: this.y() - 24 })
           .opacity(this.params.visible ? 1 : this.openProgress)
-          .hitTestBehavior(this.params.visible ? HitTestMode.Default : HitTestMode.None)
+          .hitTestBehavior(this.params.visible ? HitTestMode.BLOCK_HIERARCHY : HitTestMode.None)
           .onTouch((event: TouchEvent): void => { this.handleTouch(event); })
+        if (this.params.visible && !this.collapsed && this.params.state.optionsOpen === true) { this.optionArc() }
       }
     }.width('100%').height('100%').focusable(false).hitTestBehavior(HitTestMode.Transparent)
       .onAreaChange((_old: Area, area: Area): void => {

@@ -683,13 +683,15 @@ export function noteAudioInterfaceObservation(status: NoteAudioStatus): AppInter
       { id: 'recorded_seconds', value: String(status.seconds) }, { id: 'has_error', value: String(status.hasError) }] };
 }
 
-export function noteEditorFormatObservation(toolId: string, fieldName: string, source: boolean): AppInterfaceObservation {
+export function noteEditorFormatObservation(toolId: string, fieldName: string, source: boolean,
+  selectedId: string = '', placement: string = 'dialog'): AppInterfaceObservation {
   const items: AppInterfaceControl[] = noteEditorFormatOptions(toolId).map((option): AppInterfaceControl =>
-    ({ id: toolId + '_' + option.id, title: '', titleKey: option.titleKey, enabled: true, selected: false }));
-  return { surface: 'note_editor_format_options', sectionId: toolId, selectedId: '',
+    ({ id: toolId + '_' + option.id, title: '', titleKey: option.titleKey, enabled: true, selected: option.id === selectedId }));
+  return { surface: 'note_editor_format_options', sectionId: toolId, selectedId: selectedId === '' ? '' : toolId + '_' + selectedId,
     optionIds: items.map((item): string => item.id), optionLabels: [], optionsTotal: items.length,
     busy: false, controlsComplete: true, items: items,
-    values: [{ id: 'target_field', value: fieldName }, { id: 'source', value: String(source) }] };
+    values: [{ id: 'target_field', value: fieldName }, { id: 'source', value: String(source) },
+      { id: 'placement', value: placement }] };
 }
 
 export function noteEditorWheelObservation(state: NoteEditorWheelState, selectedId: string, side: string,

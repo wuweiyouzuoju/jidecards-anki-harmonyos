@@ -85,12 +85,13 @@ test('JIDE observes current tools, hidden cloze, grip fallback and collapsed act
 function wheelHarness(initialTool=''){
  const actions=[],longActions=[],resets=[],timers=new Map();let timerId=0;
  const Component=loadComponentLogic('components/editor/NoteEditorWheel.ets','NoteEditorWheel',{ ...motionApi(),
-  ...wheelModel,NOTE_EDITOR_ACTION_FLASH_MS,noteEditorTool,TouchType:{Down:0},StudyGripSensor:class{},StudyGripSession:class{setActive(){}dispose(){}setTouching(){}restoreSide(){}},
-  appInterface:new AppInterfaceTracker(),noteEditorWheelObservation,
+  ...wheelModel,NOTE_EDITOR_ACTION_FLASH_MS,NOTE_FIELD_EDITING_SUPPORT,noteEditorTool,noteEditorFormatOptions,TouchType:{Down:0,Up:1,Cancel:3},StudyGripSensor:class{},StudyGripSession:class{setActive(){}dispose(){}setTouching(){}restoreSide(){}},
+  appInterface:new AppInterfaceTracker(),noteEditorWheelObservation,noteEditorFormatObservation,
   setTimeout:(callback,delay)=>{timers.set(++timerId,{callback,delay});return timerId;},clearTimeout:id=>timers.delete(id),
   curves:{springCurve:()=>0},Curve:{EaseOut:0,EaseInOut:0},AxisAction:{BEGIN:1,UPDATE:2,END:3,CANCEL:4}
  });
  const instance=new Component();instance.params={state,onAction:id=>actions.push(id),onLongAction:id=>longActions.push(id),visible:true,initialTool,onSelection:()=>{},
+  onOptionSelect:id=>actions.push('size:'+id),onCloseOptions:()=>{instance.params.state={...instance.params.state,optionsOpen:false};instance.parametersChanged();},
   onResetFormats:()=>{resets.push(true);instance.params.state={...instance.params.state,activeIds:[]};instance.parametersChanged();}};
  instance.getUIContext=()=>({getHostContext:()=>undefined,animateTo:(_opts,apply)=>apply()});
  instance.viewportWidth=377;instance.viewportHeight=720;instance.aboutToAppear();
@@ -275,7 +276,8 @@ test('multiple formats highlight from current field state; reused entries and th
 
 test('all one-shot tools flash briefly, execute once and leave multiple format toggles unchanged',()=>{
  const h=wheelHarness();h.instance.params.state={...state,cloze:true,activeIds:['bold','highlight']};h.instance.parametersChanged();
- const oneShots=wheelModel.noteEditorWheelTools(h.instance.params.state).filter(tool=>!wheelModel.noteWheelToolIsToggle(tool.id,false));
+ const oneShots=wheelModel.noteEditorWheelTools(h.instance.params.state).filter(tool=>!wheelModel.noteWheelToolIsToggle(tool.id,false)&&
+  !NOTE_FIELD_EDITING_SUPPORT.formatOptionPicker.toolIds.includes(tool.id));
  for(const tool of oneShots){
   const before=h.actions.length;h.instance.execute(tool.id);
   assert.equal(h.instance.current(tool),true);assert.equal(h.actions.length,before+1);assert.equal(h.actions.at(-1),tool.id);
@@ -339,4 +341,111 @@ test('cancelled rotation and vertical motion restore their exact start without e
  assert.deepEqual(w.params.state.activeIds,['bold','italic','underline','highlight']);
  w.arcPosition=2.25;h.axis(2,1,1);h.axis(2,1,1);h.axis(4);
  assert.equal(w.arcPosition,2.25);assert.deepEqual(h.actions,[]);
+});
+test('shared option arc reports current selection and rejects cancelled, hidden and late clicks',()=>{
+ const h=wheelHarness(),w=h.instance;
+ w.params.state={...state,optionsOpen:true,optionToolId:'font_size',optionId:'large',fieldName:'Front'};w.parametersChanged();
+ assert.equal(w.current(w.wheelTools.find(tool=>tool.id==='font_size')),true);
+ const observation=noteEditorFormatObservation('font_size','Front',false,'large','outer_arc_overlay');
+ assert.equal(observation.selectedId,'font_size_large');
+ assert.deepEqual(observation.items.filter(item=>item.selected).map(item=>item.id),['font_size_large']);
+ assert.equal(observation.values.find(value=>value.id==='placement').value,'outer_arc_overlay');
+ w.toolTouch('font_size_small',{type:0,touches:[]});w.selectFormatOption('small');assert.deepEqual(h.actions,['size:small']);
+ w.toolTouch('font_size_large',{type:3,touches:[]});w.selectFormatOption('large');assert.deepEqual(h.actions,['size:small']);
+ w.toolTouch('font_size_large',{type:0,touches:[{},{}]});w.selectFormatOption('large');assert.deepEqual(h.actions,['size:small']);
+ w.toolTouch('font_size_large',{type:0,touches:[]});
+ w.selectFormatOption('unknown');w.rotating=true;w.selectFormatOption('large');w.rotating=false;
+ w.params.visible=false;w.selectFormatOption('large');w.params.visible=true;
+ w.toggleOpen();assert.equal(w.params.state.optionsOpen,false);w.selectFormatOption('large');
+ w.aboutToDisappear();w.selectFormatOption('large');assert.deepEqual(h.actions,['size:small']);
+});
+
+test('heading and font size triggers remain lit from actual formats after the option arc closes and clicks expire',()=>{
+ for(const source of [false,true]) {
+  const h=wheelHarness(),w=h.instance;
+  w.params.state={...state,source,activeIds:['heading','font_size']};w.parametersChanged();
+  for(const id of ['heading','font_size']) {
+   const tool=w.wheelTools.find(item=>item.id===id);
+   w.execute(id);h.flush();assert.equal(w.current(tool),true);
+  }
+  const observed=noteEditorWheelObservation(w.params.state,'','right',false,'unsupported');
+  assert.deepEqual(observed.items.filter(item=>item.selected).map(item=>item.id),['font_size','heading']);
+  w.params.state={...state,source,activeIds:[]};w.parametersChanged();
+  w.selectedId='heading';assert.equal(w.current(w.wheelTools.find(item=>item.id==='heading')),false);
+  w.selectedId='font_size';assert.equal(w.current(w.wheelTools.find(item=>item.id==='font_size')),false);
+ }
+});
+
+function assertOuterArc(boxes,width,height,radius,centerY,right) {
+ const centerX=right?width:0;
+ const track=Math.hypot(boxes[0].x-centerX,boxes[0].y-centerY);
+ for(const point of boxes) {
+  assert.ok(point.x-point.size/2>=8-1e-9);assert.ok(point.x+point.size/2<=width-8+1e-9);
+  assert.ok(point.y-point.size/2>=8-1e-9);assert.ok(point.y+point.size/2<=height-8+1e-9);
+  const distance=Math.hypot(point.x-centerX,point.y-centerY);
+  assert.ok(Math.abs(distance-track)<1e-9,'all options must share the original wheel center');
+  assert.ok(distance-point.size/2>radius,'the whole option must stay outside the original wheel');
+ }
+ for(let a=0;a<boxes.length;a++)for(let b=a+1;b<boxes.length;b++) {
+  assert.ok(Math.hypot(boxes[a].x-boxes[b].x,boxes[a].y-boxes[b].y)>(boxes[a].size+boxes[b].size)/2,'option buttons overlap');
+ }
+}
+function arcAngle(point,width,centerY,right) {
+ return Math.atan2(point.y-centerY,right?width-point.x:point.x);
+}
+
+test('font size and heading stay on a concentric local arc entirely outside the wheel on either screen edge',()=>{
+ for(const [width,height] of [[377,720],[377,500],[320,480],[280,250],[160,176]])for(const right of [true,false])for(const count of [5,7]) {
+  const radius=noteWheelRadius(width,height);
+  for(const desiredY of [0,height/2,height])for(const anchorAngle of [-75,-20,0,20,75].map(deg=>deg*Math.PI/180)) {
+   const centerY=noteWheelY(desiredY,height,radius,false);
+   const boxes=Array.from({length:count},(_,index)=>wheelModel.noteWheelOptionArcPosition(index,count,radius,centerY,anchorAngle,width,height,right));
+   assertOuterArc(boxes,width,height,radius,centerY,right);
+   const angles=boxes.map(point=>arcAngle(point,width,centerY,right));
+   assert.ok(angles.at(-1)-angles[0]<Math.PI*0.51,'options must not fill a whole semicircle');
+   const middle=angles[Math.floor(count/2)];
+   assert.ok(Math.abs((angles[0]+angles.at(-1))/2-middle)<1e-9);
+   if(Math.abs(middle-anchorAngle)>1e-9) {
+    const end=middle>anchorAngle?boxes[0]:boxes.at(-1);
+    const nearestEdge=Math.min(end.x-end.size/2,width-end.x-end.size/2,end.y-end.size/2,height-end.y-end.size/2);
+    assert.ok(Math.abs(nearestEdge-8)<1e-9,'alignment may shift only as far as a boundary requires');
+   }
+  }
+ }
+});
+
+test('an unconstrained outer arc is angularly centered on its trigger and mirrors across left and right wheels',()=>{
+ for(const count of [5,7])for(const anchorAngle of [-20,0,20].map(deg=>deg*Math.PI/180)) {
+  const boxes=Array.from({length:count},(_,index)=>wheelModel.noteWheelOptionArcPosition(index,count,158,360,anchorAngle,377,720,true));
+  assert.ok(Math.abs(arcAngle(boxes[Math.floor(count/2)],377,360,true)-anchorAngle)<1e-9);
+  for(let index=0;index<count;index++) {
+   const left=wheelModel.noteWheelOptionArcPosition(index,count,158,360,anchorAngle,377,720,false);
+   assert.ok(Math.abs(left.x+boxes[index].x-377)<1e-9);assert.equal(left.y,boxes[index].y);
+  }
+ }
+});
+
+test('the shared font size and heading overlay uses actual wheel geometry and keyboard limits without resizing it',()=>{
+ for(const [width,height] of [[377,720],[377,500],[320,480],[280,250],[160,176]])for(const right of [true,false])for(const toolId of ['font_size','heading']) {
+  const h=wheelHarness(),w=h.instance;
+  w.viewportWidth=width;w.viewportHeight=height+240;w.overlayTop=32;w.keyboardTop=height+32;w.side=right?'right':'left';
+  const original=[w.radius(),w.frameRadius(),w.x(0),w.iconY(0)];
+  w.params.state={...state,optionsOpen:true,optionToolId:toolId,optionId:toolId==='font_size'?'medium':'h2'};w.parametersChanged();
+  assert.deepEqual([w.radius(),w.frameRadius(),w.x(0),w.iconY(0)],original);
+  const count=noteEditorFormatOptions(toolId).length;
+  for(const angle of [-50,0,20,75])for(const desiredY of [0,height/2,height]) {
+   w.arcPosition=w.wheelTools.findIndex(tool=>tool.id===toolId)-angle*Math.PI/180/noteWheelAngleStep(w.radius(),w.wheelTools.length);
+   w.centerY=desiredY;
+   const boxes=Array.from({length:count},(_,index)=>w.optionPosition(index));
+   assertOuterArc(boxes,width,height,w.radius(),w.y(),right);
+   if(height===720&&desiredY===height/2&&angle===20) {
+    const toolIndex=w.wheelTools.findIndex(tool=>tool.id===toolId);
+    const trigger={x:(right?width-w.frameRadius():0)+w.x(toolIndex)+w.itemWidth()/2,
+      y:w.y()-w.frameRadius()+w.iconY(toolIndex)+w.itemHeight()/2};
+    assert.ok(Math.abs(arcAngle(boxes[Math.floor(count/2)],width,w.y(),right)-arcAngle(trigger,width,w.y(),right))<1e-9);
+   }
+  }
+  assert.equal(w.current(w.wheelTools.find(tool=>tool.id===toolId)),true);
+  w.aboutToDisappear();
+ }
 });
