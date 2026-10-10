@@ -6,7 +6,15 @@
 
 ## 面向用户的复习说明
 
+常驻文案只留一句必要提示，详细用途、输入示例和操作影响放进已有 i，不在页面重复展开。帮助正文先说明怎么用，再补用户需要判断的限制；省去组件、协议、几何和重复的图例说明。删除、整库覆盖、共用预设影响范围、保存时机与输入语法必须保留。核查范围包括设置、牌组选项、浏览、统计、同步、编辑器和术语帮助；`AppInterface` 中仅供 JIDE 的 `*_instructions` 界面契约说明按真实拥有者维护，不能按用户帮助长度机械裁剪。共享的提示资源继续同时用于 UI 与 JIDE。
+
 新学习日用凌晨 4 点的例子解释每日计数边界；提前学习只针对即将到期的学习卡、当前没有其他卡片可学时生效及 0 关闭；休息提醒说明累计看卡答题时间、答完后提示、暂停范围和继续后重新计时。三项复用分组 i 的 `settings_core_review_help`，页面只保留所有牌组的作用范围；原常驻长说明资源已移除。保存校验与失败反馈使用相同名称，不能再次出现未解释的“日切”“时间盒”。
+
+学习步骤两种模式共用 `parseDeckOptionSteps`，支持 s/m/h/d 单位，无单位按分钟；帮助和校验示例一致。首次复习间隔、复习日期随机微调、共用预设、目标记忆保持率、一周各天复习量与重新计算到期日，用实际等待时间、影响牌组和保存时机解释；FSRS/SM-2 和真实输入语法保留。FSRS 优化说明并入 `deck_fsrsEnabled_help`，模拟说明复用天数和保持率字段已有 i，移除两段重复常驻说明。中英文资源一起维护，配置字段、协议及算法不因文案改名而变化。
+
+设置名称由 `SettingsStructure` 和 `SettingsNavigation` 共用，牌组选项名称及帮助由 `DeckOptionsCatalog` 共用；JIDE 的结构与牌组选项读取使用同一资源，改名不另建助手文案副本。认知验证入口为 `ai-agent-app-structure.test.mjs` 与 `ai-agent-deck-options.test.mjs`，资源验证仍使用下文的 `i18n-contract.test.mjs`。本次文案调整未做设备安装或最终排版验收。
+
+2026-10-11 文案核查：扫描336条说明资源及公共帮助调用，澄清154处中文与对应英文，删除两项重复说明资源；保留输入语法、操作风险及仅供 JIDE 的界面契约。使用 `node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs --test` 执行资源、文档、JIDE 设置/牌组选项、复习偏好、FSRS、公共帮助、编辑器、同步、统计与浏览15个相关测试文件，329项通过（`.local/concise-copy-checks.log`），`git diff --check` 通过。只移除重复 Text，未新增组件、类型或平台 API；未打包安装，长标签与中英帮助的设备排版仍须验收。
 
 ## 帮助入口与弹窗规范
 
@@ -48,7 +56,7 @@
 
 ## 术语与过时内容维护
 
-界面统一使用“撤销”“同笔记卡片”“筛选牌组”“今日跳过（埋藏）”“可回忆率”。SM-2 的 ease 称“易度”，FSRS difficulty 称“难度”，避免把易度升序误写成难度升序。目标记忆保持率是 FSRS 调度目标；实际记忆保留率按合格记录计算；评分通过率把非 Again 评分计为通过，不能当作选择题答对率。首页与桌面卡片的 `t(中文, 英文)` 文案也属于审计范围，不能只更新 string.json。内部字段和协议键保持稳定。
+界面统一使用“撤销”“同笔记卡片”“筛选牌组”“今日跳过”“可回忆率”；牌组选项的同笔记开关和反馈也不再只写“埋藏”。历史窗口称“操作历史”，浏览操作恢复提示使用已有“更多 → 操作历史”，学习页仍可直接用“更多 → 撤销操作”。SM-2 的 ease 称“易度”，FSRS difficulty 称“难度”，避免把易度升序误写成难度升序；系数帮助须说明调高／调低的效果，不能只列范围。目标记忆保持率是 FSRS 调度目标；实际记忆保留率按合格记录计算；评分通过率把非 Again 评分计为通过，不能当作选择题答对率。保持率示例使用界面百分比，不把底层 0.9 当成输入值。首页与桌面卡片的 `t(中文, 英文)` 文案也属于审计范围，不能只更新 string.json。内部字段和协议键保持稳定。
 
 欢迎页采用无硬编码版本号的常驻入门说明；实时公告负责发布消息。直链渠道由发布开关隐藏，其保留说明不得引导到当前不存在的菜单，也不能再宣称应用只能单机使用。备份／许可简介中的数据存储说明需同时承认可选同步。
 
@@ -63,12 +71,12 @@
 | `settings_home_today_summary_hint`、`settings_directory_general_hint` | 首页开关控制整个统计区域；`pages/首页.ets`、`components/home/主页摘要分页.ets` 的 Swiper 内容决定可见卡片。 |
 | `browser_help_find_replace_body`、`browser_find_scope_all` | 范围是提交时的完整搜索结果快照，包含未加载页；空结果不提交。`pages/浏览页.ets`、`model/BrowserSelection.ts`；Core `findreplace.rs` 只替换字段。 |
 | `browser_find_regex_help` | 默认不启用多行模式，逐行锚点需 `(?m)`；Core `search/service/mod.rs`、`findreplace.rs`。 |
-| `browser_help_batch_body` | 明确卡片／笔记模式作用范围、删除和替换的会话撤销限制、模板映射可能删除／新增卡片、完整同步双向选择。Core `card/service.rs`、`notetype/notetypechange.rs`。 |
+| `browser_help_batch_body` | 明确卡片／笔记模式作用范围、删除和替换的会话撤销限制、模板映射可能删除／新增卡片、完整同步双向选择；浏览已有“更多 → 操作历史”恢复入口。`components/browser/BrowserMoreMenu.ets`、`pages/浏览页.ets`；Core `card/service.rs`、`notetype/notetypechange.rs`。 |
 | 同上：到期日／重排位置 | 有 FSRS 记忆状态时不保证保留间隔；随机打乱笔记后按步长分配位置，同笔记卡片共享位置。Core `scheduler/reviews.rs`、`scheduler/new.rs`。 |
 | `browser_help_sidebar_body` | 长按标签先开操作菜单；牌组长按直接追加搜索。`components/browser/浏览侧边栏.ets`。 |
 | `glossary_delete_help`、`glossary_browser_info_help` | 撤销在学习页“更多”；卡片信息中的类型是模板名，不是队列状态。`pages/学习页.ets`、`components/browser/卡片信息.ets`。 |
 | `add_note_notetype_basic_type_answer_help` | 输入框在问题面、比较在答案面；Core `notetype/stock.rs`，前端 `model/StudyAnswerRenderer.ts`。 |
-| `deck_learnSteps_help`、`deck_relearnSteps_help`、`settings_fsrs_help` | 当前表单只接收正数分钟，不支持单位后缀，可留空；校验提示同步表单真实范围。`model/牌组配置表单.ets`。SM-2 与 FSRS 的毕业／短期学习不同，Core `scheduler/states/learning.rs`、`review.rs`。 |
+| `deck_learnSteps_help`、`deck_relearnSteps_help`、`deck_learn_steps_help`、`settings_fsrs_help` | 两种模式均接收空格分隔的正数时间，支持 s/m/h/d 后缀，无单位按分钟，可留空；校验提示同步真实范围。`model/DeckOptionsCatalog.ts`、`model/牌组配置表单.ets`。SM-2 与 FSRS 的首次复习／短期学习不同，Core `scheduler/states/learning.rs`、`review.rs`。 |
 | `deck_minimumLapseInterval_help`、`glossary_lapse_help`、`deck_lapseMultiplier_help` | 遗忘间隔系数及最小间隔只作用于 SM-2；0 不会重置为新卡。FSRS 空步骤仍可能自动短期重学。Core `scheduler/states/review.rs`。 |
 | `deck_initialEase_help`、`deck_graduatingIntervalEasy_help`、`deck_intervalMultiplier_help`、`deck_maximumReviewInterval_help` | 首次毕业间隔不先乘初始 ease；简单毕业间隔的大小关系是建议；间隔倍率不代表全库所有间隔；到期不等于必定展示。Core `scheduler/states/` 与 `model/DeckConfigSave.ts`。 |
 | `deck_reviewOrder_help`、`deck_newCardGatherPriority_help` | 可回忆率递减为高概率先；按牌组收集使用名称顺序，不随首页拖动。Core `storage/card/`、`storage/deck/active_deck_ids_sorted.sql`。 |
