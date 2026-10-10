@@ -88,7 +88,6 @@ export struct FsrsTools {
         onOpen: (): void => { this.onOptimize(false, false); } })
       DeckOptionRow({ title: $r('app.string.deck_fsrs_optimize_all'), busy: this.busy,
         onOpen: (): void => { this.onOptimize(true, false); } })
-      Text($r('app.string.deck_fsrs_draft_help')).fontSize(14).fontColor($r('app.color.text_secondary')).width('100%')
       DeckOptionRow({ title: $r('app.string.deck_fsrs_evaluate_current'), busy: this.busy, onOpen: this.onEvaluate })
       if (this.state.busy) {
         统一加载态({ 文案: this.state.operation === 'optimize'
@@ -125,7 +124,6 @@ export struct FsrsTools {
         onChange: (value: string): void => { this.daysText = value; } })
       DeckOptionRow({ title: $r('app.string.deck_fsrs_simulate'), busy: this.busy,
         onOpen: (): void => { if (this.validateDays(this.daysText) === '') this.onSimulate(Number(this.daysText)); } })
-      Text($r('app.string.deck_fsrs_simulation_help')).fontSize(14).fontColor($r('app.color.text_secondary')).width('100%')
       if (this.state.error !== '') {
         Text(this.state.error).fontSize(14).fontColor($r('app.color.error_text')).width('100%')
       }

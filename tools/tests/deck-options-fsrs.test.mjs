@@ -227,7 +227,7 @@ test('FSRS UI renders actual bilingual resources, compares Core points, and sele
     const ui=new Tools();ui.getUIContext=()=>context;
     const text=ui.resultText({name:'P',fsrsItems:0,healthCheckPassed:null,error:''}); assert.ok(!text.includes('%1'));
     assert.match(text,locale==='base'?/无有效学习记录/:/No usable history/);
-    assert.match(ui.resultText({name:'P',fsrsItems:301,healthCheckPassed:false,error:''}),locale==='base'?/健康检查未通过/:/Health check failed/);
+    assert.ok(ui.resultText({name:'P',fsrsItems:301,healthCheckPassed:false,error:''}).includes(strings.get('deck_fsrs_health_failed')));
     assert.match(ui.resultText({name:'P',fsrsItems:0,healthCheckPassed:null,error:'disk'}),/disk/);
     ui.state.workloadDays=10;ui.state.workload={points:[70,80,90,95,99].map(retention=>({retention,costSeconds:1200,memorized:12,reviewCount:40})),reviewlessEndMemorized:0};
     assert.deepEqual(ui.comparisonPoints().map(x=>x.retention),[80,90,95,99]);ui.selectedRetention='70';
