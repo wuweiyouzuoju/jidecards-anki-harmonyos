@@ -76,7 +76,7 @@ JIDE 偏好值域复用同一模式声明，`get_settings` 可读 `smart` 及能
 
 ## 集合级全局复习偏好（2026-10-02）
 
-设置 → 复习 → 全局复习偏好提供日切时间、提前学习窗口、时间盒；设置 → 外观 → 学习显示提供剩余卡数和下次复习间隔。两种界面模式均可使用，分类与搜索由 `SettingsStructure.ts`、`SettingsNavigation.ts` 管理，中英标题从同一资源表取得。当前集合是保存范围；每日上限、学习步骤、保持率和自动前进仍归牌组选项或已有会话设置。
+设置 → 复习 → 全部牌组的复习设置提供新学习日开始时间、允许提前学习的分钟数和学习休息提醒，仅实验版显示该分组；设置 → 外观 → 复习显示提供剩余卡数和下次复习间隔，两种模式均可使用。分类与搜索由 `SettingsStructure.ts`、`SettingsNavigation.ts` 管理，中英标题从同一资源表取得，JIDE 同步读取共同声明。当前集合是保存范围；每日上限、学习步骤、保持率和自动前进仍归牌组选项或已有会话设置。面向用户的名称、例子和格式边界见[复习说明](in-app-help.md#面向用户的复习说明)，下表保留协议概念以便定位实现。
 
 协议事实来自 `UPSTREAM.lock` 的 Anki 26.05（`e64c6b1`）和 `third_party/anki/proto/anki/config.proto`。本轮对照本机 `D:\Projects\AnkiDroid` 的 `preferences_reviewing.xml`、`preferences_appearance.xml`、`ReviewingSettingsFragment` 与 `CollectionPreferences`，按真实 Preferences 读写链路接入。
 

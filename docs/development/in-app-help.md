@@ -4,6 +4,10 @@
 
 中文正文位于 `entry/src/main/resources/base/element/string.json`，英文位于 `entry/src/main/resources/en_US/element/string.json`。资源名是稳定定位入口；同一功能的标签、帮助、目录摘要需一起检查。当前行为以 UI 调用链及锁定的 Anki Core 为准，不能直接复制其他客户端的菜单位置、输入格式或功能承诺。
 
+## 面向用户的复习说明
+
+新学习日用凌晨 4 点的例子解释每日计数边界；提前学习只针对即将到期的学习卡、当前没有其他卡片可学时生效及 0 关闭；休息提醒说明累计看卡答题时间、答完后提示、暂停范围和继续后重新计时。三项复用分组 i 的 `settings_core_review_help`，页面只保留所有牌组的作用范围；原常驻长说明资源已移除。保存校验与失败反馈使用相同名称，不能再次出现未解释的“日切”“时间盒”。
+
 ## 帮助入口与弹窗规范
 
 公共入口是 `components/common/HelpLabel.ets`、`HelpButton.ets` 与 `components/字段帮助面板.ets`，索引见 [公共 UI](../../entry/src/main/ets/components/common/README.md)。更改时搜索 `HelpLabel|HelpButton|showHelp:|帮助标题:|字段帮助对话框`，同时扫描旧资源 `field_help_button`、文字 `ⓘ / ℹ / ?` 和 `info_circle` 等替代实现。不能只检查截图所在页。

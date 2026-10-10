@@ -185,8 +185,6 @@ export struct ReviewPreferencesSettings {
           this.numberField(ReviewPreferenceField.Rollover)
           this.numberField(ReviewPreferenceField.LearnAheadSecs)
           this.numberField(ReviewPreferenceField.TimeLimitSecs)
-          Text($r('app.string.settings_core_review_hint')).fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_secondary')).width('100%')
           按下态按钮({ 文案: $r('app.string.deck_options_save'), 字色: this.actionColor,
             是否启用: this.loaded && !this.busy,
             点击回调: (): void => { this.saveScheduling(); } })

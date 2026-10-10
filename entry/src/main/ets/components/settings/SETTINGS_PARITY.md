@@ -13,7 +13,7 @@
 | 分类 | 简洁版 | 实验版 | 开发位置 |
 | --- | --- | --- | --- |
 | 常规 | 语言、首页今日进度 | 相同 | `GeneralSettings.ets`；既有语言存储、主页偏好 |
-| 复习 | 评分振动、学习手势、四象限点击答题、底部/悬浮答题工具栏、日切时间、提前学习窗口、时间盒 | 相同，另有 FSRS 开关与作用范围说明 | `ReviewControlsSettings.ets`、`布局分组.ets`、`ReviewPreferencesSettings.ets`、`调度器分组.ets`、`model/FSRS控制器.ets`；每日上限、学习步骤、目标记忆率等仍在牌组选项，不能复制成全局设置 |
+| 复习 | 评分振动、学习手势、四象限点击答题、底部/悬浮答题工具栏 | 相同，另有全部牌组的复习设置（新学习日开始时间、允许提前学习、学习休息提醒）及 FSRS 开关与作用范围说明 | `ReviewControlsSettings.ets`、`布局分组.ets`、`ReviewPreferencesSettings.ets`、`调度器分组.ets`、`model/FSRS控制器.ets`；每日上限、学习步骤、目标记忆率等仍在牌组选项，不能复制成全局设置 |
 | 同步 | 账号、自动/立即同步、自定义服务器 | 相同 | `同步分组.ets` |
 | 外观 | 深浅与颜色主题、支持主题的背景动效、卡片字号、剩余卡数/下次复习间隔显示 | 相同 | `外观分组.ets`、`CardTextSizeControl.ets`、`ThemeMotionControl.ets`、`ReviewPreferencesSettings.ets` |
 | 数据管理 | 导入文件、导出牌组、备份与恢复、媒体管理、隐藏牌组恢复 | 另含数据库检查、笔记类型、空卡、重复笔记、未用标签 | `数据分组.ets`；数据库检查状态和服务调用保留在 `../设置面板.ets`，并入普通列表行 |
