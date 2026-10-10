@@ -22,6 +22,32 @@ export const CARD_REVIEWER_RUNTIME: string = String.raw`
       return value.toString(16).padStart(2, '0');
     }).join('');
   }
+  function luminance(hex) {
+    var channels = [1, 3, 5].map(function (offset) {
+      var value = parseInt(hex.slice(offset, offset + 2), 16) / 255;
+      return value <= 0.04045 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
+    });
+    return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+  }
+  function updateDefaultTextColor() {
+    var background = surfaceBackground();
+    if (!background) return;
+    // The builder owns the palette; this runtime derives only the readable fallback.
+    var appearance = getComputedStyle(document.documentElement);
+    var light = appearance.getPropertyValue('--jide-card-light-text').trim();
+    var dark = appearance.getPropertyValue('--jide-card-dark-text').trim();
+    var preferred = appearance.getPropertyValue('--jide-card-preferred-text').trim();
+    if (![light, dark, preferred].every(function (color) { return /^#[0-9a-f]{6}$/i.test(color); })) return;
+    var alternate = preferred === light ? dark : light;
+    var surface = luminance(background);
+    function contrast(color) {
+      var text = luminance(color);
+      return (Math.max(text, surface) + 0.05) / (Math.min(text, surface) + 0.05);
+    }
+    if (contrast(preferred) < 4.5 && contrast(alternate) > contrast(preferred)) preferred = alternate;
+    // Only the application fallback consumes this variable; explicit template/field colors keep priority.
+    document.body.style.setProperty('--jide-card-default-text', preferred);
+  }
   function report(error) {
     if (error) {
       window.jideCardRuntime.onRendered(documentId, revision, String(error), '');
@@ -37,7 +63,20 @@ export const CARD_REVIEWER_RUNTIME: string = String.raw`
     });
   }
   async function hooks(list) {
-    await Promise.allSettled(list.map(function (hook) { return Promise.resolve().then(hook); }));
+    await Promise.all(list.map(function (hook) { return Promise.resolve().then(hook); }));
+  }
+  function updateAppearance(parsed) {
+    var next = parsed.getElementById('jide-card-appearance');
+    var current = document.getElementById('jide-card-appearance');
+    if (!next && !current) return;
+    if (!next || next.tagName !== 'STYLE' || !current || current.tagName !== 'STYLE') {
+      throw new Error('Missing card appearance stylesheet');
+    }
+    // Keep the same cascade position and the template's global environment. Update before its scripts run.
+    current.textContent = next.textContent;
+    document.documentElement.classList.toggle('night-mode', parsed.documentElement.classList.contains('night-mode'));
+    document.documentElement.setAttribute('data-bs-theme', parsed.documentElement.getAttribute('data-bs-theme'));
+    document.body.style.removeProperty('--jide-card-default-text');
   }
   async function finish(side, scrollToAnswer, initial) {
     await hooks(window.onUpdateHook);
@@ -48,6 +87,7 @@ export const CARD_REVIEWER_RUNTIME: string = String.raw`
     if (window.anki && anki.imageOcclusion) anki.imageOcclusion.setup();
     if (window.ankiSetupCollapsible) window.ankiSetupCollapsible();
     await hooks(window.onShownHook);
+    updateDefaultTextColor();
     if (side === 'question') window.scrollTo(0, 0);
     if (side === 'answer' && scrollToAnswer) {
       var anchor = document.getElementById('answer');
@@ -93,6 +133,7 @@ export const CARD_REVIEWER_RUNTIME: string = String.raw`
         if (window.MathJax && MathJax.typesetClear) MathJax.typesetClear([qa]);
         window.onUpdateHook.length = 0;
         window.onShownHook.length = 0;
+        updateAppearance(parsed);
         document.body.className = parsed.body.className;
         qa.innerHTML = next.innerHTML;
         for (var script of Array.from(qa.querySelectorAll('script'))) await replaceScript(script);

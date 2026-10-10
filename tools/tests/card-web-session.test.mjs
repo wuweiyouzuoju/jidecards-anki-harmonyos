@@ -9,6 +9,76 @@ import { loadPlatformModule } from './platform-module-harness.mjs';
 
 const html = side => `<html><head></head><body><div id="qa">${side}</div></body></html>`;
 
+test('default text follows the composed surface after hooks and resets on every flip before acknowledgement', async () => {
+  let pixel = [24, 32, 43, 255];
+  let color = '', onLoad, acknowledge;
+  const qa = { innerHTML: '', querySelectorAll: () => [] };
+  const context = { fillRect() {}, getImageData: () => ({data: Uint8ClampedArray.from(pixel)}) };
+  const document = {
+    documentElement: {},
+    createElement: () => ({getContext: () => context}),
+    body: { className: 'card nightMode', getBoundingClientRect() {},
+      classList: {contains: name => document.body.className.split(' ').includes(name)},
+      style: {setProperty: (name, value) => {assert.equal(name, '--jide-card-default-text'); color = value;}} },
+    querySelectorAll: () => [], getElementById: id => id === 'qa' ? qa : null
+  };
+  const window = {
+    requestAnimationFrame: callback => setImmediate(callback),
+    addEventListener: (_event, callback) => {onLoad = callback;}, scrollTo() {},
+    jideCardRuntime: {onRendered: (_id, _revision, error, background) => acknowledge({color, error, background})}
+  };
+  const DOMParser = class {parseFromString() {return document;}};
+  vm.runInNewContext(CARD_REVIEWER_RUNTIME, {window, document, DOMParser, setTimeout, clearTimeout,
+    getComputedStyle: () => ({backgroundColor: 'transparent', getPropertyValue: name => ({
+      '--jide-card-light-text': '#E6E6E6', '--jide-card-dark-text': '#1A1A1A',
+      '--jide-card-preferred-text': document.body.className.includes('nightMode') ? '#E6E6E6' : '#1A1A1A'
+    })[name]})});
+  window.onShownHook.push(async () => {await Promise.resolve(); pixel = [232, 227, 223, 255];});
+  window.__jideCardReviewer.start(1, 1, 'question', false);
+  const initial = new Promise(resolve => {acknowledge = resolve;}); onLoad();
+  assert.deepEqual(await initial, {color: '#1A1A1A', error: '', background: '#e8e3df'});
+  let revision = 1;
+  for (const [className, nextPixel, expected] of [
+    ['card nightMode', [24, 32, 43, 255], '#E6E6E6'],
+    ['card', [16, 24, 32, 255], '#E6E6E6'],
+    ['card', [255, 255, 255, 255], '#1A1A1A'],
+    ['card nightMode', [232, 227, 223, 255], '#1A1A1A']
+  ]) {
+    document.body.className = className; pixel = nextPixel;
+    const done = new Promise(resolve => {acknowledge = resolve;});
+    window.__jideCardReviewer.update(1, ++revision, html('answer'), 'answer', false);
+    const result = await done;
+    assert.equal(result.color, expected); assert.equal(result.error, '');
+  }
+});
+
+test('rejected template hooks report a failed render instead of acknowledging an empty answer', async () => {
+  for (const name of ['onUpdateHook', 'onShownHook']) for (const initial of [true, false]) {
+    let load, acknowledge;
+    const qa = {innerHTML: '', querySelectorAll: () => []};
+    const document = {createElement: () => ({getContext: () => null}),
+      body: {className: 'card', getBoundingClientRect() {}}, querySelectorAll: () => [],
+      getElementById: id => id === 'qa' ? qa : null};
+    const window = {scrollTo() {}, addEventListener: (_event, callback) => {load = callback;},
+      requestAnimationFrame: callback => setImmediate(callback),
+      jideCardRuntime: {onRendered: (_id, _revision, error) => acknowledge(error)}};
+    const addFailure = () => window[name].push(() => Promise.reject(new Error('answer failed')));
+    // qa's replacement registers the next side's hook, as a template script would.
+    const DOMParser = class {parseFromString() { return document; }};
+    Object.defineProperty(qa, 'innerHTML', {set() { addFailure(); }});
+    vm.runInNewContext(CARD_REVIEWER_RUNTIME, {window, document, DOMParser, setTimeout, clearTimeout});
+    if (initial) addFailure();
+    window.__jideCardReviewer.start(1, 1, 'question', false);
+    const first = new Promise(resolve => {acknowledge = resolve;}); load();
+    assert.equal(await first, initial ? 'Error: answer failed' : '');
+    if (!initial) {
+      const done = new Promise(resolve => {acknowledge = resolve;});
+      window.__jideCardReviewer.update(1, 2, html('answer'), 'answer', false);
+      assert.equal(await done, 'Error: answer failed');
+    }
+  }
+});
+
 test('renderer starts unanchored answers at the top and preserves answer anchors and preview scrolling', async () => {
   for (const initial of [true, false]) {
     for (const scenario of [
@@ -23,7 +93,7 @@ test('renderer starts unanchored answers at the top and preserves answer anchors
         createElement: () => ({ getContext: () => null }),
         body: { className: 'card', scrollHeight: 3200, getBoundingClientRect() {} },
         querySelectorAll: () => [],
-        getElementById: id => id === 'qa' ? qa : scenario.anchored
+        getElementById: id => id === 'qa' ? qa : id === 'answer' && scenario.anchored
           ? { scrollIntoView: options => scrolls.push(['anchor', options.block]) } : null
       };
       let onLoad, acknowledge;

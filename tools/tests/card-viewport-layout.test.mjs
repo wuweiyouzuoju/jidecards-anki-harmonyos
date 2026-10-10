@@ -85,7 +85,7 @@ test('whiteboard popups fit narrow windows and official header actions can wrap'
       assert.ok(popupWidth > 0 && popupWidth <= width - 24, 'popup keeps both horizontal edge gaps');
     }
   }
-  const headerStart = official.indexOf('private officialCanvas()');
+  const headerStart = official.indexOf('private officialHeader()');
   const header = official.slice(headerStart, official.indexOf('StudyContentViewport(', headerStart));
   assert.match(header, /Flex\(\{ wrap: FlexWrap\.Wrap, justifyContent: FlexAlign\.SpaceBetween/);
   assert.doesNotMatch(header, /Blank\(\)\.layoutWeight/);

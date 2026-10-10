@@ -21,7 +21,7 @@ test('both sides render math regardless of legacy SVG option, with theme and off
   for (const svg of [true, false]) {
     for (const side of ['question', 'answer']) {
       const html = 构建卡片HTML(card(svg), side, true);
-      assert.match(html, /body class="card nightMode"/);
+      assert.match(html, /body class="card nightMode night_mode"/);
       assert.ok(html.indexOf('card-math.js') < html.indexOf('tex-svg-full.js'));
       assert.ok(html.indexOf('tex-svg-full.js') < html.indexOf('<body'));
       assert.doesNotMatch(html, /cdn\.jsdelivr|async src=/);

@@ -34,8 +34,7 @@ test('default card colors precede template color pairs on both sides in both mod
   for (const dark of [false, true]) for (const side of ['question', 'answer']) {
     const html = 构建卡片HTML(card, side, dark);
     const background = dark ? '#18202B' : '#FFFFFF';
-    const defaultColor = dark ? '#E6E6E6' : '#1A1A1A';
-    const defaults = `body { color: ${defaultColor}; background: ${background}; }`;
+    const defaults = `body { color: var(--jide-card-default-text, var(--jide-card-preferred-text)); background: ${background}; }`;
     assert.ok(html.includes(defaults));
     assert.ok(html.indexOf(defaults) < html.indexOf(css));
     assert.doesNotMatch(html.slice(html.indexOf(css) + css.length), /background:[^;]*!important/,
@@ -49,7 +48,7 @@ test('card alignment belongs to templates and list/code defaults precede their o
   const card = { css, questionNodes: nodes, answerNodes: nodes, latexSvg: false, isEmpty: false };
   for (const dark of [false, true]) for (const side of ['question', 'answer']) {
     const html = 构建卡片HTML(card, side, dark);
-    const styles = [...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(match => match[1]);
+    const styles = [...html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)].map(match => match[1]);
     assert.ok(styles.includes(css), 'template alignment is preserved verbatim');
     const applicationCss = styles.filter(style => style !== css).join('\n');
     for (const rule of applicationCss.matchAll(/(?:\bbody|\.card|#qa)\s*\{([^}]*)\}/g)) {
