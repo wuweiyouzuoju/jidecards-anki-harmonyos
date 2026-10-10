@@ -55,7 +55,7 @@ HAP 构建后运行 `node --experimental-transform-types --import ./tools/tests/
 ## 开发可维护性门禁
 
 - `tools/tests/architecture-boundaries.test.mjs` 自动发现应用 `.ts/.ets`，检查字面量导入/再导出的可解析性、依赖环、UI 反向依赖、纯模型平台隔离及应用内 Agent 工具到确认执行器的传递依赖。含故意破坏边界的测试样例；它不是完整解析器，不分析计算型加载、方法能力或运行时数据流。
-- `tools/tests/documentation-contract.test.mjs` 自动发现 `.agents/`、`docs/`（历史计划除外）和应用目录中的 Markdown，检查相对文件链接；核对当前规则入口、发布配置、归档标识及失效知识入口。不会验证链接锚点、外网内容或所有自然语言语义。
+- `tools/tests/documentation-contract.test.mjs` 自动发现根入口、`.agents/`、`docs/`（历史计划除外）和应用目录中的 Markdown，检查相对文件链接与本地 Markdown 章节锚点；按仓库使用的 ATX/Setext 标题及 HTML 锚点识别目标，排除围栏代码示例，覆盖同名标题编号、Unicode 与格式标记。核对当前规则入口、发布配置、归档标识及失效知识入口；不是完整 Markdown 渲染器，不验证外网内容或所有自然语言语义。
 - 两者均进入完整 `npm test` / `verify`。新增边界先补能失败的反例，新增领域规则同时维护 [责任表](ownership.md)，不以“源码出现了类名”证明行为正确。
 
 公共 UI 另有 `tools/tests/common-boundary.test.mjs`：扫描 common 的字面量直接依赖，禁止新增业务/平台 IO 依赖，逐条保留既有迁移例外并拒绝失效例外；公开 `.ets` 必须在 common README 有文件链接，内部实现可标 `@internal`。用 `npm test -- repo` 或单独执行该测试；环境与完整测试一致，不依赖设备。它不分析计算型导入、传递平台能力或渲染效果，完整依赖和编译仍由 architecture/HAP 验证。

@@ -146,7 +146,60 @@ test('current capability documentation follows release gates and runtime constan
   assert.doesNotMatch(cardHtml + read('entry/src/main/ets/model/颜色主题.ets'), /\.trae\//);
 });
 
-test('active Markdown uses valid relative links', () => {
+// The repository uses ATX/Setext headings and optional HTML anchors. Keep code
+// examples out of navigation checks; their headings and links are not rendered.
+function markdownContentLines(source) {
+  let fence = null;
+  return source.split(/\r?\n/).map((line) => {
+    const marker = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+    if (fence !== null) {
+      if (marker && marker[1][0] === fence[0] && marker[1].length >= fence.length && !marker[2].trim()) fence = null;
+      return '';
+    }
+    if (marker) { fence = marker[1]; return ''; }
+    return line;
+  });
+}
+
+function markdownAnchors(source) {
+  const anchors = new Set();
+  const headingIds = new Set();
+  const lines = markdownContentLines(source);
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index];
+    const heading = line.match(/^ {0,3}#{1,6}[ \t]+(.+?)(?:[ \t]+#+)?[ \t]*$/)?.[1] ??
+      (/^ {0,3}(?:=+|-+)[ \t]*$/.test(line) ? lines[index - 1]?.trim() : undefined);
+    if (heading) {
+      const base = heading.replace(/<[^>]*>/g, '').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+        .replace(/(^|\s)_{1,3}([^_]+)_{1,3}(?=$|\s)/g, '$1$2')
+        .trim().toLowerCase().replace(/[^\p{L}\p{N}\p{M}\p{Pc}\- ]/gu, '').replaceAll(' ', '-');
+      let id = base;
+      for (let suffix = 1; headingIds.has(id); suffix++) id = `${base}-${suffix}`;
+      headingIds.add(id);
+      anchors.add(id);
+    }
+    for (const match of line.matchAll(/<[^>]*\b(?:id|name)=["']([^"']+)["'][^>]*>/g)) anchors.add(match[1]);
+  }
+  return anchors;
+}
+
+test('Markdown section navigation handles formatting, duplicate headings and code examples', () => {
+  const source = [
+    '# Example headings', "## This’ll be a _Helpful_ Section About the Greek Letter Θ!",
+    '## 同步端点（API 21）', '## Same section', '## Same section', '## Same section-1',
+    'Underlined title', '---', '<a name="custom-anchor"></a>',
+    '````md', '## Example only', '```', '## Still code', '````',
+    '~~~md', '<a id="code-anchor"></a>', '~~~', '## `deck_config`',
+  ].join('\n');
+  assert.deepEqual([...markdownAnchors(source)], [
+    'example-headings', 'thisll-be-a-helpful-section-about-the-greek-letter-θ',
+    '同步端点api-21', 'same-section', 'same-section-1', 'same-section-1-1',
+    'underlined-title', 'custom-anchor', 'deck_config',
+  ]);
+  assert.ok(!markdownAnchors(source).has('old-section'), 'removed headings must not resolve');
+});
+
+test('active Markdown uses valid relative links and section anchors', () => {
   const activeFiles = [
     'README.md',
     'CONTRIBUTING.md',
@@ -166,18 +219,21 @@ test('active Markdown uses valid relative links', () => {
   const broken = [];
 
   for (const relativeFile of activeFiles) {
-    const source = read(relativeFile);
+    const source = markdownContentLines(read(relativeFile)).join('\n');
     for (const match of source.matchAll(/\[[^\]]*\]\(([^)]+)\)/g)) {
       const link = match[1];
-      if (/^(?:https?:|mailto:|#)/.test(link)) {
+      if (/^[a-z][a-z0-9+.-]*:/i.test(link)) {
         continue;
       }
       const pathPart = decodeURIComponent(link.split('#')[0]);
-      if (!pathPart) {
+      const target = pathPart ? pathPart.startsWith('/') ? path.resolve(root, pathPart.slice(1)) :
+        path.resolve(root, path.dirname(relativeFile), pathPart) : path.join(root, relativeFile);
+      if (!existsSync(target)) {
+        broken.push(`${relativeFile} -> ${link}`);
         continue;
       }
-      const target = path.resolve(root, path.dirname(relativeFile), pathPart);
-      if (!existsSync(target)) {
+      const fragment = link.includes('#') ? decodeURIComponent(link.slice(link.indexOf('#') + 1)) : '';
+      if (fragment && target.endsWith('.md') && !markdownAnchors(readFileSync(target, 'utf8')).has(fragment)) {
         broken.push(`${relativeFile} -> ${link}`);
       }
     }
