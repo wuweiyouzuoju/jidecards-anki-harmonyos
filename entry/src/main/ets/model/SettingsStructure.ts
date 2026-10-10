@@ -74,11 +74,11 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     { id: 'import', titleKey: 'transfer_import_file' },
     { id: 'export_deck', titleKey: 'transfer_export_deck' },
     { id: 'backups', titleKey: 'backup_hub_title', opens: 'backup_management' },
-    { id: 'notetypes', titleKey: 'notetype_mgmt_entry', fullOnly: true },
+    { id: 'notetypes', titleKey: 'notetype_mgmt_entry', opens: 'notetype_management', fullOnly: true },
     { id: 'hidden_decks', titleKey: 'hidden_decks_entry' },
     { id: 'media_management', titleKey: 'settings_media_management', opens: 'media_maintenance' },
     { id: 'check_database', titleKey: 'check_db_title', fullOnly: true },
-    { id: 'empty_cards', titleKey: 'empty_cards_entry', fullOnly: true },
+    { id: 'empty_cards', titleKey: 'empty_cards_entry', opens: 'empty_cards', fullOnly: true },
     { id: 'duplicate_notes', titleKey: 'find_dupes_entry', fullOnly: true },
     { id: 'unused_tags', titleKey: 'settings_clear_unused_tags', fullOnly: true }
   ] },

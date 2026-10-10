@@ -6,7 +6,7 @@
 
 jidecards（中文名“记得闪卡”）是面向 HarmonyOS NEXT 的开源闪卡学习应用，支持鸿蒙手机、平板和电脑。导入 Anki 牌组后，可以离线复习、编辑资料、查看学习统计，并通过 AnkiWeb 同步。原生界面由 ArkTS/ArkUI 实现，集合、模板渲染、调度和同步复用锁定版本的 Anki Rust Core。
 
-**当前源码版本：2.9.22（versionCode 3003）**
+**当前源码版本：2.9.88（versionCode 3069）**
 
 应用可在[华为应用市场](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare)搜索“记得闪卡”下载安装。仓库构建版本的唯一事实来源是 [AppScope/app.json5](AppScope/app.json5)；商店实际上架版本以 AppGallery 页面为准。
 
@@ -53,7 +53,7 @@ jidecards（中文名“记得闪卡”）是面向 HarmonyOS NEXT 的开源闪�
 
 ### 同步、导入与维护
 
-- 支持 AnkiWeb 集合与媒体同步、自定义同步端点、TLS 证书、自动同步及全量上传/下载。
+- 支持 AnkiWeb 集合与媒体同步、自定义同步端点、自动同步及全量上传/下载；自定义 CA 证书尚无用户配置入口，见[同步边界](docs/development/sync-data.md#自定义同步端点与证书边界)。
 - 支持 `.apkg` 牌组导入与导出、`.colpkg` 集合备份与恢复，并可选择媒体和调度信息；提供自动历史备份和恢复列表，历史备份不包含媒体。
 - 支持 CSV / TSV / TXT 导入预览、字段映射和重复处理；APKG 导入可配置更新策略，查看进度、取消及结果统计；整库替换提供空间预检和进程中断恢复。详见[数据导入](docs/development/import-data.md)。
 - 支持笔记文本和卡片文本导出，适合整理资料或交给其他工具处理；文本导出不包含媒体文件和复习进度。
@@ -227,7 +227,7 @@ npm run verify             # 完整测试、双架构构建与签名 HAP
 
 ## 版本与发布
 
-当前源码版本由 [AppScope/app.json5](AppScope/app.json5) 中的 `versionName` 和 `versionCode` 定义。查看[更新记录](CHANGELOG.md)及[2.9.22 源码变更说明](docs/releases/2.9.22.md)；历史说明保留在 [docs/releases/](docs/releases/) 中。商店版本与源码版本分别维护，商店版本只在确认上架后更新。
+当前源码版本由 [AppScope/app.json5](AppScope/app.json5) 中的 `versionName` 和 `versionCode` 定义。查看[更新记录](CHANGELOG.md)及[2.9.88 源码变更说明](docs/releases/2.9.88.md)；历史说明保留在 [docs/releases/](docs/releases/) 中。商店版本与源码版本分别维护，商店版本只在确认上架后更新。
 
 发布前的构建、测试和设备验收要求见[开发状态与发布门禁](docs/DEVELOPMENT_PLAN.md)。CI 检查结果不代替实体设备验收；源码中的能力以当前发布开关为准。
 

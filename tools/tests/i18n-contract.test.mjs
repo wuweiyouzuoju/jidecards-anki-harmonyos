@@ -69,6 +69,13 @@ test('English resources are translated and contain no Chinese copy', () => {
   const allowedIdenticalValues = new Set(['working_name', 'entry_ability_desc', 'feedback_email', 'app_about_copyright', 'field_help_button', 'image_occlusion_c_label', 'stats_retention_rate', 'reminder_edit_time_colon', 'stats_range_p50', 'stats_range_p95', 'stats_range_p100', 'stats_retrievability_average_value', 'ai_agent_file_parsing']);
   for (const item of JSON.parse(read(english)).string) {
     assert.doesNotMatch(item.value, /[\u4e00-\u9fff]/, `${item.name} must be English`);
+    // 弧形标题按钮使用标准 HTML 级别符号，两个语言均须精确保留 H1～H5。
+    const headingSymbol = item.name.match(/^note_editor_heading_([1-5])_short$/);
+    if (headingSymbol !== null) {
+      assert.equal(item.value, 'H' + headingSymbol[1]);
+      assert.equal(zhItems.get(item.name), item.value);
+      continue;
+    }
     // AI 是用户指定的跨语言入口名称，精确值另有入口回归约束。
     const markingSymbols = new Set(['card_mark_star_symbol', 'card_mark_flag_symbol', 'card_mark_selected_symbol']);
     if (!allowedIdenticalValues.has(item.name) && !markingSymbols.has(item.name) && item.name !== 'ai_agent_title') {
