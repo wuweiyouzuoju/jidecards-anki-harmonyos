@@ -50,13 +50,12 @@ export struct 学习手写白板层 {
   @State private viewY: number = 0;
   @State private rootX: number = 0;
   @State private rootY: number = 0;
-  @State private inkOffsetX: number = 0;
+  @State private penDetected: boolean = false;
   private contentView: StudyAnnotationView = new StudyAnnotationView();
+  private drawingArea: Area | null = null;
   private panActive: boolean = false;
   private pinchActive: boolean = false;
-  private inkPanActive: boolean = false;
-  private inkPanStartX: number = 0;
-  private inkPanScale: number = 1;
+  private singlePanActive: boolean = false;
   private penPointers: number[] = [];
   private canvasHost: StudyPenCanvasHost | null = null;
   @StorageProp('状态栏高度') private statusBarHeight: number = 0;
@@ -76,6 +75,7 @@ export struct 学习手写白板层 {
 
   aboutToAppear(): void {
     this.mounted = true;
+    this.penDetected = false;
     this.paperTransparency = loadStudyPaperTransparency();
     this.savedPaperTransparency = this.paperTransparency;
     const availability: StudyPenKitAvailability = studyPenKitAvailability();
@@ -90,6 +90,7 @@ export struct 学习手写白板层 {
   aboutToDisappear(): void {
     this.savePaperTransparency();
     this.mounted = false;
+    this.penDetected = false;
     this.endNavigation();
     this.cancelInitTimer();
     this.canvasHost?.dispose();
@@ -119,6 +120,7 @@ export struct 学习手写白板层 {
   }
 
   private inputConditionsChanged(): void {
+    if (!this.isVisible) this.penDetected = false;
     if (!this.isVisible || !this.isInputEnabled) {
       this.savePaperTransparency();
       this.endNavigation();
@@ -252,29 +254,61 @@ export struct 学习手写白板层 {
     this.onClose();
   }
 
-  private canNavigate(event: BaseEvent): boolean {
+  private canReceiveInput(): boolean {
     return this.mounted && this.isVisible && this.isInputEnabled &&
-      (!this.isSupported || this.canvasFailed || this.canvasReady) &&
-      event.sourceTool === SourceTool.Finger && this.penPointers.length === 0;
+      (!this.isSupported || this.canvasFailed || this.canvasReady);
+  }
+
+  private canNavigate(event: BaseEvent): boolean {
+    return this.canReceiveInput() && event.sourceTool === SourceTool.Finger && this.penPointers.length === 0;
+  }
+
+  private canSinglePan(event: BaseEvent): boolean {
+    return this.penDetected && this.viewScale > 1 && this.canNavigate(event);
+  }
+
+  private shouldBlockFingerDrawing(event: BaseEvent): boolean {
+    return this.canReceiveInput() && this.penDetected && event.sourceTool === SourceTool.Finger;
   }
 
   private judgeNavigation(info: GestureInfo, event: BaseGestureEvent): GestureJudgeResult {
+    if (info.tag === 'study_view_pan') {
+      return this.canSinglePan(event) ? GestureJudgeResult.CONTINUE : GestureJudgeResult.REJECT;
+    }
     if (info.tag !== 'study_global_pan' && info.tag !== 'study_global_zoom') return GestureJudgeResult.CONTINUE;
     return this.canNavigate(event) ? GestureJudgeResult.CONTINUE : GestureJudgeResult.REJECT;
   }
 
   private trackTouch(event: TouchEvent): void {
-    if (event.type === TouchType.Cancel) { this.endNavigation(); return; }
+    if (!this.canReceiveInput()) return;
+    if (event.type === TouchType.Cancel) {
+      this.finishNavigation(false); this.finishNavigation(true);
+      this.finishSinglePan();
+      // 手掌/手指的Cancel不表示仍在书写的笔已抬起。
+      if (event.sourceTool !== SourceTool.Finger) this.penPointers = [];
+      this.publishInterface();
+      return;
+    }
+    if (event.sourceTool === SourceTool.Finger) {
+      // 原生组件可能消费笔Up；新的手指按下时，用真实活动触点清掉已抬起的笔。
+      if (event.type === TouchType.Down && event.touches !== undefined && event.touches.length > 0) {
+        this.penPointers = this.penPointers.filter((id: number): boolean =>
+          event.touches.some((touch: TouchObject): boolean => touch !== undefined && touch.id === id));
+      }
+      if (event.type === TouchType.Up || (event.touches?.length ?? 0) > 1) this.finishSinglePan();
+    }
     if (event.sourceTool !== SourceTool.Pen) return;
     for (const touch of event.changedTouches) {
-      if (touch === undefined || !Number.isFinite(touch.id)) continue;
+      if (touch === undefined || !Number.isFinite(touch.id) || touch.id < 0) continue;
       if (event.type === TouchType.Down && !this.penPointers.includes(touch.id)) {
         this.finishNavigation(false); this.finishNavigation(true);
-        this.inkPanActive = false;
+        this.finishSinglePan();
+        this.penDetected = true;
         this.penPointers.push(touch.id);
       }
       else if (event.type === TouchType.Up) this.penPointers = this.penPointers.filter((id: number): boolean => id !== touch.id);
     }
+    this.publishInterface();
   }
 
   private syncView(): void {
@@ -284,23 +318,30 @@ export struct 学习手写白板层 {
     this.publishInterface();
   }
 
-  private navigate(event: GestureEvent, pinch: boolean): void {
-    if (!(pinch ? this.pinchActive : this.panActive) || !this.canNavigate(event)) return;
+  private navigationPoints(event: GestureEvent): AnnotationPoint[] {
     const points: AnnotationPoint[] = [];
-    const fingers: FingerInfo[] = event.fingerInfos ?? event.fingerList;
+    const fingers: FingerInfo[] = event.fingerInfos !== undefined && event.fingerInfos.length > 0 ?
+      event.fingerInfos : event.fingerList;
     for (const finger of fingers) {
       if (finger !== undefined && Number.isFinite(finger.id) && Number.isFinite(finger.globalX) && Number.isFinite(finger.globalY)) {
-        // 触点是固定视口局部坐标，换成窗口坐标后与卡面共享缩放锚点。
+        // 全局触点减去固定视口原点，卡面与笔迹使用同一个缩放锚点。
         points.push({ id: finger.id, x: finger.globalX - this.rootX, y: finger.globalY - this.rootY });
       }
     }
+    return points;
+  }
+
+  private navigate(event: GestureEvent, pinch: boolean): void {
+    if (!(pinch ? this.pinchActive : this.panActive) || !this.canNavigate(event)) return;
+    const points: AnnotationPoint[] = this.navigationPoints(event);
+    if (points.length !== 2) { this.finishNavigation(false); this.finishNavigation(true); return; }
     const changed: boolean = this.contentView.navigate(points);
     if (changed) this.syncView();
   }
 
   private startNavigation(event: GestureEvent, pinch: boolean): void {
-    if (!this.canNavigate(event)) return;
-    this.inkPanActive = false;
+    if (!this.canNavigate(event) || this.navigationPoints(event).length !== 2) return;
+    this.finishSinglePan();
     if (pinch) this.pinchActive = true;
     else this.panActive = true;
     this.navigate(event, pinch);
@@ -309,56 +350,35 @@ export struct 学习手写白板层 {
   private finishNavigation(pinch: boolean): void {
     if (pinch) this.pinchActive = false;
     else this.panActive = false;
-    if (!this.panActive && !this.pinchActive) this.contentView.endGesture();
+    if (!this.panActive && !this.pinchActive && !this.singlePanActive) this.contentView.endGesture();
   }
 
   private endNavigation(): void {
     this.panActive = false; this.pinchActive = false;
-    this.inkPanActive = false;
+    this.finishSinglePan();
     this.contentView.endGesture(); this.penPointers = [];
   }
 
   private resetView(): void {
-    this.endNavigation(); this.inkOffsetX = 0; this.contentView.reset(); this.syncView();
+    this.endNavigation(); this.contentView.reset(); this.syncView();
   }
 
-  private judgeInkPan(event: BaseGestureEvent, current: GestureRecognizer,
-    others: GestureRecognizer[]): GestureJudgeResult {
-    if (current.getTag() !== 'study_ink_horizontal') return GestureJudgeResult.CONTINUE;
-    if (!this.canNavigate(event) || event.fingerList.filter((finger: FingerInfo): boolean =>
-      finger !== undefined && Number.isFinite(finger.id)).length !== 1) return GestureJudgeResult.REJECT;
-    let hasCanvasPan: boolean = false;
-    for (const recognizer of others) {
-      if (recognizer.getType() !== GestureControl.GestureType.PAN_GESTURE) continue;
-      // 系统滑条拥有自己的拖动；不把笔宽或颜色设置误当成画布平移。
-      if (recognizer.isBuiltIn()) return GestureJudgeResult.REJECT;
-      if (recognizer.getTag() !== 'study_ink_horizontal' && recognizer.getFingerCount() === 1) {
-        hasCanvasPan = true;
-      }
+  private startSinglePan(event: GestureEvent): void {
+    if (!this.canSinglePan(event) || this.panActive || this.pinchActive) return;
+    const points: AnnotationPoint[] = this.navigationPoints(event);
+    this.singlePanActive = points.length === 1 && this.contentView.beginPan(points[0]);
+  }
+
+  private updateSinglePan(event: GestureEvent): void {
+    const points: AnnotationPoint[] = this.navigationPoints(event);
+    if (!this.singlePanActive || !this.canSinglePan(event) || points.length !== 1) {
+      this.finishSinglePan(); return;
     }
-    return hasCanvasPan ? GestureJudgeResult.CONTINUE : GestureJudgeResult.REJECT;
+    if (this.contentView.pan(points[0])) this.syncView();
   }
 
-  private startInkPan(event: GestureEvent): void {
-    if (!this.canNavigate(event)) return;
-    this.inkPanActive = true;
-    this.inkPanStartX = this.inkOffsetX;
-    this.inkPanScale = this.viewScale;
-    this.updateInkPan(event);
-  }
-
-  private updateInkPan(event: GestureEvent): void {
-    const fingers: FingerInfo[] = event.fingerInfos ?? event.fingerList;
-    if (!this.inkPanActive || !this.canNavigate(event) || fingers.filter((finger: FingerInfo): boolean =>
-      finger !== undefined && Number.isFinite(finger.id)).length !== 1) {
-      this.inkPanActive = false;
-      return;
-    }
-    if (!Number.isFinite(event.offsetX) || this.inkPanScale <= 0) return;
-    // 纵向仍归 SDK；只补水平位移，屏幕增量按全局比例换回内容坐标。
-    const limit: number = Math.max(0, this.canvasWidth - Math.min(48, this.canvasWidth / 2));
-    this.inkOffsetX = Math.max(-limit, Math.min(limit, this.inkPanStartX + event.offsetX / this.inkPanScale));
-    this.publishInterface();
+  private finishSinglePan(): void {
+    this.singlePanActive = false; this.contentView.endPan();
   }
 
   private resetGlobalView(): void {
@@ -369,7 +389,19 @@ export struct 学习手写白板层 {
     this.toolbarContentWidth = cardViewportWidth(Number(area.width), Number(area.height));
     this.rootX = Number(area.globalPosition.x); this.rootY = Number(area.globalPosition.y);
     this.contentView.setViewport(Number(area.width), Number(area.height));
+    this.updateDrawingBounds();
     this.syncView();
+  }
+
+  private drawingAreaChanged(area: Area): void {
+    this.drawingArea = area;
+    this.updateDrawingBounds(); this.syncView();
+  }
+
+  private updateDrawingBounds(): void {
+    if (this.drawingArea === null) return;
+    this.contentView.setContentBounds(Number(this.drawingArea.globalPosition.x) - this.rootX,
+      Number(this.drawingArea.globalPosition.y) - this.rootY, Number(this.drawingArea.width), Number(this.drawingArea.height));
   }
 
   private publishInterface(): void {
@@ -401,8 +433,8 @@ export struct 学习手写白板层 {
         { id: 'opacity_open', value: String(this.opacityOpen) },
         { id: 'navigation', value: 'global_pan_zoom' },
         { id: 'navigation_scope', value: 'study_content' },
-        { id: 'single_finger_navigation', value: 'ink_pan' },
-        { id: 'ink_offset_x', value: String(this.inkOffsetX) },
+        { id: 'pen_detected', value: String(this.penDetected) },
+        { id: 'single_finger_navigation', value: this.penDetected ? (this.viewScale > 1 ? 'viewport_pan' : 'blocked') : 'native_input' },
         { id: 'view_scale', value: String(this.viewScale) }, { id: 'view_x', value: String(this.viewX) },
         { id: 'view_y', value: String(this.viewY) }, { id: 'toolbar_follows_view', value: 'true' }] });
   }
@@ -431,12 +463,11 @@ export struct 学习手写白板层 {
   @Builder
   private officialInk() {
     Stack({ alignContent: Alignment.TopStart }) { ContentSlot(this.canvasHost!.getContent()); }
-      .width('100%').height('100%').translate({ x: this.inkOffsetX })
+      .width('100%').height('100%')
   }
 
   @Builder
-  private officialCanvas() {
-    Column() {
+  private officialHeader() {
       Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween,
         space: { main: LengthMetrics.vp(应用尺寸.间距_8), cross: LengthMetrics.vp(应用尺寸.间距_8) } }) {
         IconActionButton({ toolbarStyle: true, source: $r('app.media.ic_common_close'), label: this.label('close'),
@@ -460,11 +491,15 @@ export struct 学习手写白板层 {
       .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平,
         top: 应用尺寸.pageToolbarTop(this.statusBarHeight, this.narrowDeckLayout, this.toolbarSafeTop) })
       .backgroundColor(Color.Transparent)
+  }
 
+  @Builder
+  private officialCanvas() {
+    Column() {
+      this.officialHeader()
       if (this.isSupported && this.canvasHost !== null && !this.canvasFailed) {
         ForEach([this.canvasGeneration], (generation: number) => {
           Stack({ alignContent: Alignment.TopStart }) {
-            // 只调节独立纸张背景的透明度，不淡化 SDK 笔迹和工具栏。
             Column().width('100%').height('100%').backgroundColor($r('app.color.surface_page'))
               .opacity(1 - this.paperTransparency / 100).hitTestBehavior(HitTestMode.None)
             StudyContentViewport({ viewScale: this.viewScale, viewX: this.viewX, viewY: this.viewY,
@@ -472,23 +507,22 @@ export struct 学习手写白板层 {
               isInputEnabled: this.isVisible && this.isInputEnabled && this.canvasReady,
               content: () => { this.officialInk(); },
               onTouchInput: (event: TouchEvent): void => { this.trackTouch(event); },
+              onNavigationAllowed: (event: BaseEvent): boolean => this.canNavigate(event),
+              onFingerDrawingBlocked: (event: BaseEvent): boolean => this.shouldBlockFingerDrawing(event),
+              onControlTouch: (event: TouchEvent): boolean => this.canvasHost?.isControlTouch(this.getUIContext(), event, this.viewScale) ?? false,
+              onSinglePanAllowed: (event: BaseEvent): boolean => this.canSinglePan(event),
+              onSinglePanStart: (event: GestureEvent): void => { this.startSinglePan(event); },
+              onSinglePanUpdate: (event: GestureEvent): void => { this.updateSinglePan(event); },
+              onSinglePanFinish: (): void => { this.finishSinglePan(); },
               onJudge: (info: GestureInfo, event: BaseGestureEvent): GestureJudgeResult => this.judgeNavigation(info, event),
               onStart: (event: GestureEvent, pinch: boolean): void => { this.startNavigation(event, pinch); },
               onUpdate: (event: GestureEvent, pinch: boolean): void => { this.navigate(event, pinch); },
               onFinish: (pinch: boolean): void => { this.finishNavigation(pinch); } })
           }.width('100%').layoutWeight(1).clip(true)
           .enabled(this.isVisible && this.isInputEnabled && this.canvasReady && !this.canvasFailed)
-          .onGestureRecognizerJudgeBegin((event: BaseGestureEvent, current: GestureRecognizer,
-            others: GestureRecognizer[]): GestureJudgeResult => this.judgeInkPan(event, current, others))
-          .parallelGesture(
-            PanGesture({ fingers: 1, direction: PanDirection.All, distance: 1 }).tag('study_ink_horizontal')
-              .onActionStart((event: GestureEvent): void => { this.startInkPan(event); })
-              .onActionUpdate((event: GestureEvent): void => { this.updateInkPan(event); })
-              .onActionEnd((): void => { this.inkPanActive = false; })
-              .onActionCancel((): void => { this.inkPanActive = false; })
-          )
           .onAreaChange((_oldArea: Area, area: Area): void => {
             if (generation === this.canvasGeneration && !this.canvasFailed) {
+              this.drawingAreaChanged(area);
               this.canvasHost?.setViewport(this.getUIContext(), Number(area.width), Number(area.height));
             }
           })
@@ -510,9 +544,16 @@ export struct 学习手写白板层 {
           undoTick: this.undoTick, redoTick: this.redoTick, resetTick: this.resetTick, backTick: this.backTick,
           reviewPhase: this.reviewPhase, reviewActions: () => { this.reviewActions(); },
           globalNavigation: true,
+          globalPenDetected: this.penDetected,
+          onDrawingAreaChanged: (area: Area): void => { this.drawingAreaChanged(area); },
           globalScale: this.viewScale, globalX: this.viewX, globalY: this.viewY, rootX: this.rootX, rootY: this.rootY,
           onResetGlobalView: (): void => { this.resetGlobalView(); },
           onGlobalTouch: (event: TouchEvent): void => { this.trackTouch(event); },
+          onGlobalNavigationAllowed: (event: BaseEvent): boolean => this.canNavigate(event),
+          onSinglePanAllowed: (event: BaseEvent): boolean => this.canSinglePan(event),
+          onSinglePanStart: (event: GestureEvent): void => { this.startSinglePan(event); },
+          onSinglePanUpdate: (event: GestureEvent): void => { this.updateSinglePan(event); },
+          onSinglePanFinish: (): void => { this.finishSinglePan(); },
           onGlobalJudge: (info: GestureInfo, event: BaseGestureEvent): GestureJudgeResult => this.judgeNavigation(info, event),
           onGlobalStart: (event: GestureEvent, pinch: boolean): void => { this.startNavigation(event, pinch); },
           onGlobalUpdate: (event: GestureEvent, pinch: boolean): void => { this.navigate(event, pinch); },

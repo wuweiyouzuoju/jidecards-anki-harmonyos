@@ -154,7 +154,7 @@ const tracker = new AppInterfaceTracker();
 const labels = new Map(JSON.parse(readFileSync(new URL('../../entry/src/main/resources/base/element/string.json', import.meta.url))).string.map(item => [item.name, item.value]));
 const Component = loadComponentLogic('components/StudyLocalWhiteboard.ets', 'StudyLocalWhiteboard', {
   StudyWhiteboard, StudyAnnotationView, TouchType, whiteboardColor, WHITEBOARD_COLORS, WHITEBOARD_WIDTHS, WHITEBOARD_ERASER_WIDTHS, WHITEBOARD_INTERFACE_ITEMS,
-  SourceTool: { Unknown: 0, Pen: 2 }, appInterface: tracker,
+  SourceTool: { Unknown: 0, Finger: 1, Pen: 2 }, appInterface: tracker,
   interfaceControlText: (_context, items, id) => labels.get(items.find(item => item.id === id)?.titleKey),
   CanvasRenderingContext2D: FakeCanvas, RenderingContextSettings: class {},
   console: { error() {} }
@@ -171,6 +171,21 @@ function component() {
 
 const navigationTouch = (instance, type, touches, changedTouches = touches, sourceTool = 1) =>
   instance.handleTouch({ type, touches, changedTouches, sourceTool, getHistoricalPoints: () => [], stopPropagation() {} });
+
+test('global fallback lets pen contact reach the shared observer while standalone drawing consumes touch', () => {
+  const { instance } = component(); let stopped = 0;
+  const event = { type: TouchType.Down, sourceTool: 2,
+    touches: [{ id: 4, x: 20, y: 10 }], changedTouches: [{ id: 4, x: 20, y: 10 }],
+    getHistoricalPoints: () => [], stopPropagation() { stopped++; } };
+  instance.globalNavigation = true;
+  instance.handleTouch(event);
+  assert.equal(instance.activePen, true); assert.equal(stopped, 0, 'parent can observe pen and reject palm navigation');
+  instance.handleTouch({ ...event, type: TouchType.Cancel, touches: [] });
+  instance.globalNavigation = false;
+  instance.handleTouch(event);
+  assert.equal(stopped, 1, 'independent editor keeps its touch boundary');
+  instance.aboutToDisappear();
+});
 
 test('global fallback allows pen writing and publishes the shared pan and zoom without a second transform', () => {
   const { instance } = component();
@@ -189,6 +204,111 @@ test('global fallback allows pen writing and publishes the shared pan and zoom w
   navigationTouch(instance, TouchType.Move, [{ id: 5, x: 25, y: 50 }, { id: 6, x: 175, y: 50 }]);
   assert.deepEqual(instance.view.snapshot(), { scale: 1, x: 0, y: 0 }, 'the outer viewport owns navigation');
   assert.equal(instance.globalScale, 2); assert.equal(instance.session.hasInk(), true);
+});
+
+test('fallback single-finger brush and eraser remain usable at every shared scale without moving the view', () => {
+  for (const scale of [1, 2, 4]) {
+    const { instance } = component();
+    instance.globalNavigation = true; instance.globalScale = scale;
+    const before = instance.view.snapshot();
+    navigationTouch(instance, TouchType.Down, [{ id: 7, x: 20, y: 10 }]);
+    navigationTouch(instance, TouchType.Move, [{ id: 7, x: 80, y: 60 }]);
+    navigationTouch(instance, TouchType.Up, [], [{ id: 7, x: 80, y: 60 }]);
+    const drawn = ink(instance.session);
+    assert.equal(drawn.length, 1); assert.equal(drawn[0].eraser, false);
+    instance.selectTool(true);
+    navigationTouch(instance, TouchType.Down, [{ id: 7, x: 20, y: 10 }]);
+    navigationTouch(instance, TouchType.Up, [], [{ id: 7, x: 80, y: 60 }]);
+    assert.equal(ink(instance.session).at(-1).eraser, true);
+    assert.deepEqual(instance.view.snapshot(), before, 'single-finger ink never changes view geometry');
+    instance.undoInk(); assert.deepEqual(ink(instance.session), drawn);
+    instance.redoInk(); assert.equal(ink(instance.session).length, 2);
+    instance.publishInterface();
+    assert.equal(tracker.snapshot().find(item => item.surface === 'study_whiteboard')
+      .values.find(item => item.id === 'single_finger_navigation').value, 'brush');
+    instance.aboutToDisappear();
+  }
+});
+
+test('zoomed fallback suppresses finger ink only after actual pen mode and keeps pen brushes and completed history', () => {
+  const { instance } = component(); instance.globalNavigation = true; instance.globalScale = 2;
+  navigationTouch(instance, TouchType.Down, [{ id: 7, x: 20, y: 10 }]);
+  navigationTouch(instance, TouchType.Up, [], [{ id: 7, x: 80, y: 60 }]);
+  const saved = ink(instance.session);
+  instance.globalPenDetected = true;
+  for (const eraser of [false, true]) {
+    instance.selectTool(eraser);
+    navigationTouch(instance, TouchType.Down, [{ id: 9, x: 20, y: 10 }]);
+    navigationTouch(instance, TouchType.Move, [{ id: 9, x: 80, y: 60 }]);
+    navigationTouch(instance, TouchType.Up, [], [{ id: 9, x: 80, y: 60 }]);
+    assert.deepEqual(ink(instance.session), saved, 'navigation cannot draw or erase');
+  }
+  instance.selectTool(false);
+  navigationTouch(instance, TouchType.Down, [{ id: 27, x: 20, y: 10 }], undefined, 2);
+  navigationTouch(instance, TouchType.Up, [], [{ id: 27, x: 40, y: 20 }], 2);
+  assert.equal(ink(instance.session).length, 2, 'original pen brush keeps writing in latched mode');
+  instance.publishInterface();
+  const observed = tracker.snapshot().find(item => item.surface === 'study_whiteboard');
+  assert.equal(observed.values.find(item => item.id === 'pen_detected').value, 'true');
+  assert.equal(observed.values.find(item => item.id === 'single_finger_navigation').value, 'viewport_pan');
+  instance.globalPenDetected = false;
+  navigationTouch(instance, TouchType.Down, [{ id: 31, x: 20, y: 10 }]);
+  navigationTouch(instance, TouchType.Up, [], [{ id: 31, x: 40, y: 20 }]);
+  assert.equal(ink(instance.session).length, 3, 'reset on reopening restores no-pen finger writing while preserving ink');
+  instance.aboutToDisappear();
+});
+
+test('latched fallback rejects stationary finger dots and erasing at scale one as well as zoomed scales', () => {
+  for (const scale of [1, 2, 4]) {
+    const { instance } = component();
+    instance.globalNavigation = true; instance.globalScale = scale; instance.globalPenDetected = true;
+    for (const eraser of [false, true]) {
+      instance.selectTool(eraser);
+      navigationTouch(instance, TouchType.Down, [{ id: 7, x: 20, y: 10 }]);
+      navigationTouch(instance, TouchType.Up, [], [{ id: 7, x: 20, y: 10 }]);
+      assert.deepEqual(ink(instance.session), [], 'stationary finger input cannot add ink or history');
+      assert.equal(instance.session.canUndo(), false);
+    }
+    instance.publishInterface();
+    assert.equal(tracker.snapshot().find(item => item.surface === 'study_whiteboard')
+      .values.find(item => item.id === 'single_finger_navigation').value, scale > 1 ? 'viewport_pan' : 'blocked');
+    instance.aboutToDisappear();
+  }
+});
+
+test('first pen contact cancels a partial finger stroke or navigation and writes through the existing brush', () => {
+  for (const navigation of [false, true]) {
+    const { instance } = component(); instance.globalNavigation = true; instance.globalScale = 2;
+    navigationTouch(instance, TouchType.Down, [{ id: 7, x: 20, y: 10 }]);
+    if (navigation) navigationTouch(instance, TouchType.Down,
+      [{ id: 7, x: 20, y: 10 }, { id: 9, x: 100, y: 50 }], [{ id: 9, x: 100, y: 50 }]);
+    instance.globalPenDetected = true;
+    navigationTouch(instance, TouchType.Down, [{ id: 27, x: 30, y: 20 }], undefined, 2);
+    assert.equal(instance.activePen, true);
+    navigationTouch(instance, TouchType.Down, [{ id: 27, x: 30, y: 20 }, { id: 31, x: 90, y: 50 }], [{ id: 31, x: 90, y: 50 }]);
+    assert.equal(instance.session.currentPointer(), 27, 'palm input cannot cancel the new pen stroke');
+    navigationTouch(instance, TouchType.Up, [], [{ id: 27, x: 40, y: 30 }], 2);
+    assert.equal(ink(instance.session).length, 1); assert.equal(instance.session.canUndo(), true);
+    assert.deepEqual(ink(instance.session)[0].points, [{ x: 0.15, y: 0.2 }, { x: 0.2, y: 0.3 }]);
+    instance.aboutToDisappear();
+  }
+});
+
+test('zoomed global fallback cancels partial finger ink on two fingers and waits until both are lifted', () => {
+  const { instance } = component(); instance.globalNavigation = true; instance.globalScale = 2;
+  navigationTouch(instance, TouchType.Down, [{ id: 7, x: 20, y: 10 }]);
+  navigationTouch(instance, TouchType.Move, [{ id: 7, x: 80, y: 60 }]);
+  assert.equal(instance.session.hasInk(), true);
+  navigationTouch(instance, TouchType.Down, [{ id: 7, x: 80, y: 60 }, { id: 9, x: 120, y: 60 }], [{ id: 9, x: 120, y: 60 }]);
+  assert.equal(instance.session.hasInk(), false); assert.equal(instance.session.canUndo(), false);
+  navigationTouch(instance, TouchType.Up, [{ id: 7, x: 80, y: 60 }], [{ id: 9, x: 120, y: 60 }]);
+  navigationTouch(instance, TouchType.Move, [{ id: 7, x: 100, y: 60 }]);
+  navigationTouch(instance, TouchType.Up, [], [{ id: 7, x: 100, y: 60 }]);
+  assert.equal(instance.session.hasInk(), false);
+  navigationTouch(instance, TouchType.Down, [{ id: 12, x: 20, y: 10 }]);
+  navigationTouch(instance, TouchType.Up, [], [{ id: 12, x: 40, y: 20 }]);
+  assert.equal(ink(instance.session).length, 1, 'a new single-finger gesture writes again');
+  instance.aboutToDisappear();
 });
 
 test('fallback combined pan and zoom preserves drawing coordinates and completed history', () => {
@@ -230,7 +350,10 @@ test('two-finger navigation cancels tentative ink and suppresses the remaining f
   assert.equal(instance.session.currentPointer(), -1);
   assert.equal(instance.session.hasInk(), false);
   navigationTouch(instance, TouchType.Move, [{ ...a, x: 60 }, { ...b, x: 160 }]);
-  assert.deepEqual(instance.view.snapshot(), { scale: 1, x: 10, y: 0 }, 'parallel finger motion continuously pans');
+  assert.deepEqual(instance.view.snapshot(), { scale: 1, x: 0, y: 0 }, 'scale one cannot expose blank drawing space');
+  navigationTouch(instance, TouchType.Move, [{ ...a, x: 0 }, { ...b, x: 200 }]);
+  navigationTouch(instance, TouchType.Move, [{ ...a, x: 10 }, { ...b, x: 210 }]);
+  assert.deepEqual(instance.view.snapshot(), { scale: 2, x: -90, y: -50 }, 'zoomed parallel motion continuously pans');
   navigationTouch(instance, TouchType.Up, [a, b], [b]);
   navigationTouch(instance, TouchType.Move, [{ ...a, x: 90 }]);
   assert.equal(instance.session.hasInk(), false);
@@ -296,14 +419,14 @@ test('rotation and undo release stylus isolation so the following finger navigat
   assert.equal(instance.session.hasInk(), false);
 });
 
-test('eraser retains its selected screen width at half scale and inactive callbacks restore the current mode observation', () => {
+test('eraser retains its selected screen width at double scale and inactive callbacks restore the current mode observation', () => {
   const { instance, send } = component();
   send(TouchType.Down, 4, 80, 40); send(TouchType.Up, 4, 100, 50);
   navigationTouch(instance, TouchType.Down, [{ id: 5, x: 50, y: 50 }, { id: 6, x: 150, y: 50 }]);
-  navigationTouch(instance, TouchType.Move, [{ id: 5, x: 75, y: 50 }, { id: 6, x: 125, y: 50 }]);
-  navigationTouch(instance, TouchType.Up, [], [{ id: 5, x: 75, y: 50 }, { id: 6, x: 125, y: 50 }]);
+  navigationTouch(instance, TouchType.Move, [{ id: 5, x: 0, y: 50 }, { id: 6, x: 200, y: 50 }]);
+  navigationTouch(instance, TouchType.Up, [], [{ id: 5, x: 0, y: 50 }, { id: 6, x: 200, y: 50 }]);
   instance.selectEraserWidth(2); send(TouchType.Down, 4, 90, 45); send(TouchType.Up, 4, 90, 45);
-  assert.equal(ink(instance.session).at(-1).width, 80);
+  assert.equal(ink(instance.session).at(-1).width, 20);
   assert.equal(instance.context.lineWidth, 40);
   let inactive = 0;
   instance.onInactive = () => { inactive++; tracker.observe({ surface: 'study_whiteboard', sectionId: '', selectedId: '', optionIds: [], optionLabels: [], busy: false, controlsComplete: false, items: [], values: [{ id: 'engine', value: 'huawei_pen_kit' }] }); };

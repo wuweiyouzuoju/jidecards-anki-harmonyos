@@ -556,8 +556,7 @@ export struct 学习浮动工具栏 {
         .height('100%')
         .padding(应用尺寸.间距_8)
         .backgroundColor(this.浮卡底色())
-        .borderRadius(应用尺寸.圆角_面板)
-        .border({ width: 应用尺寸.卡片边框, color: this.主色边框 })
+        .border({ width: 应用尺寸.卡片边框, color: this.主色边框 }).borderRadius(应用尺寸.圆角_面板)
         .shadow(this.阴影样式())
       }
       // position 是绝对定位（相对父容器左上角），Stack 作占位容器不影响布局

@@ -33,6 +33,7 @@ export struct StudyLocalWhiteboard {
   onClose: () => void = (): void => {};
   onInactive: () => void = (): void => {};
   @Prop globalNavigation: boolean = false;
+  @Prop @Watch('publishInterface') globalPenDetected: boolean = false;
   @Prop @Watch('publishInterface') globalScale: number = 1;
   @Prop @Watch('publishInterface') globalX: number = 0;
   @Prop @Watch('publishInterface') globalY: number = 0;
@@ -40,10 +41,16 @@ export struct StudyLocalWhiteboard {
   @Prop rootY: number = 0;
   onResetGlobalView: () => void = (): void => {};
   onGlobalTouch: (event: TouchEvent) => void = (): void => {};
+  onGlobalNavigationAllowed: (event: BaseEvent) => boolean = (): boolean => false;
+  onSinglePanAllowed: (event: BaseEvent) => boolean = (): boolean => false;
+  onSinglePanStart: (event: GestureEvent) => void = (): void => {};
+  onSinglePanUpdate: (event: GestureEvent) => void = (): void => {};
+  onSinglePanFinish: () => void = (): void => {};
   onGlobalJudge: (info: GestureInfo, event: BaseGestureEvent) => GestureJudgeResult = (): GestureJudgeResult => GestureJudgeResult.REJECT;
   onGlobalStart: (event: GestureEvent, pinch: boolean) => void = (): void => {};
   onGlobalUpdate: (event: GestureEvent, pinch: boolean) => void = (): void => {};
   onGlobalFinish: (pinch: boolean) => void = (): void => {};
+  onDrawingAreaChanged: (area: Area) => void = (): void => {};
   @StorageProp('系统语言') @Watch('publishInterface') private uiLanguage: string = 'zh-Hans';
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
   @StorageProp(WINDOW_SAFE_TOP_KEY) private toolbarSafeTop: number = 0;
@@ -136,6 +143,9 @@ export struct StudyLocalWhiteboard {
       values: [{ id: 'engine', value: 'local_canvas' }, { id: 'ready', value: String(this.ready && !this.canvasFailed) },
         { id: 'navigation', value: this.globalNavigation ? 'global_pan_zoom' : 'pan_zoom' },
         { id: 'navigation_scope', value: this.globalNavigation ? 'study_content' : 'local_ink' },
+        { id: 'pen_detected', value: String(this.globalNavigation && this.globalPenDetected) },
+        { id: 'single_finger_navigation', value: this.globalNavigation && this.globalPenDetected ?
+          (this.globalScale > 1 ? 'viewport_pan' : 'blocked') : 'brush' },
         { id: 'scale', value: String(this.globalNavigation ? this.globalScale : this.view.snapshot().scale) },
         { id: 'offset_x', value: String(this.globalNavigation ? this.globalX : this.view.snapshot().x) },
         { id: 'offset_y', value: String(this.globalNavigation ? this.globalY : this.view.snapshot().y) },
@@ -371,9 +381,18 @@ export struct StudyLocalWhiteboard {
   }
 
   private handleTouch(event: TouchEvent): void {
-    event.stopPropagation();
+    // 共同视野的触摸观察器需要看到笔落下/抬起；宿主会阻止触摸传到学习页。
+    if (!this.globalNavigation) event.stopPropagation();
     if (!this.canDraw() || !this.isVisible || !this.isInputEnabled || this.settingsTool !== '') return;
     if (this.activePen && event.sourceTool !== SourceTool.Pen && event.sourceTool !== SourceTool.Unknown) return;
+    if (event.type === TouchType.Down && event.sourceTool === SourceTool.Pen && !this.activePen) {
+      this.navigationSuppressed = false; this.view.endGesture();
+      if (this.session.cancel()) { this.redraw(); this.syncControls(); }
+    }
+    if (this.globalNavigation && this.globalPenDetected && event.sourceTool === SourceTool.Finger) {
+      if (this.session.cancel()) { this.redraw(); this.syncControls(); }
+      return;
+    }
     if (event.type === TouchType.Cancel) {
       this.view.endGesture(); this.navigationSuppressed = false; this.activePen = false;
     } else if (this.navigateTouch(event)) return;
@@ -563,31 +582,9 @@ export struct StudyLocalWhiteboard {
     }, (generation: number): string => generation.toString())
   }
 
-  build() {
-    // 全局视图由白板宿主持有，工具栏与评分栏放在变换容器外。
-    Stack({ alignContent: Alignment.Top }) {
-      if (this.canvasFailed) {
-          Column({ space: 应用尺寸.间距_8 }) {
-            Text($r('app.string.study_whiteboard_failed')).fontSize(应用尺寸.字号_正文)
-              .fontColor($r('app.color.text_primary'))
-            按下态按钮({ 文案: this.label('retry'), 是否启用: this.isInputEnabled,
-              点击回调: (): void => { this.retryCanvas(); } })
-          }.width('100%').height('100%').justifyContent(FlexAlign.Center)
-      } else {
-          StudyContentViewport({ viewScale: this.globalScale, viewX: this.globalX, viewY: this.globalY,
-            rootX: this.rootX, rootY: this.rootY,
-            isInputEnabled: this.isVisible && this.isInputEnabled && !this.canvasFailed,
-            onTouchInput: this.onGlobalTouch, onJudge: this.onGlobalJudge,
-            onStart: this.onGlobalStart, onUpdate: this.onGlobalUpdate, onFinish: this.onGlobalFinish,
-            content: () => { this.inkContent(); } })
-      }
-      if (this.capacityReached) {
-          Text($r('app.string.study_whiteboard_full')).fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_primary')).padding(应用尺寸.间距_8)
-            .backgroundColor($r('app.color.surface_card')).hitTestBehavior(HitTestMode.None)
-            .align(Alignment.Center)
-      }
-      Column({ space: 应用尺寸.间距_8 }) {
+  @Builder
+  private fixedToolbar() {
+    Column({ space: 应用尺寸.间距_8 }) {
         Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween,
           space: { main: LengthMetrics.vp(应用尺寸.间距_8), cross: LengthMetrics.vp(应用尺寸.间距_8) } }) {
           Row({ space: 应用尺寸.间距_8 }) {
@@ -611,10 +608,43 @@ export struct StudyLocalWhiteboard {
       }.width('100%').constraintSize({ maxWidth: this.toolbarContentWidth })
       .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平,
         top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop), bottom: 应用尺寸.间距_8 })
-      .backgroundColor($r('app.color.surface_page')).align(Alignment.Top)
+      .backgroundColor($r('app.color.surface_page'))
+  }
+
+  build() {
+    Column() {
+      this.fixedToolbar()
+      Stack({ alignContent: Alignment.Top }) {
+        if (this.canvasFailed) {
+          Column({ space: 应用尺寸.间距_8 }) {
+            Text($r('app.string.study_whiteboard_failed')).fontSize(应用尺寸.字号_正文)
+              .fontColor($r('app.color.text_primary'))
+            按下态按钮({ 文案: this.label('retry'), 是否启用: this.isInputEnabled,
+              点击回调: (): void => { this.retryCanvas(); } })
+          }.width('100%').height('100%').justifyContent(FlexAlign.Center)
+        } else {
+          StudyContentViewport({ viewScale: this.globalScale, viewX: this.globalX, viewY: this.globalY,
+            rootX: this.rootX, rootY: this.rootY,
+            isInputEnabled: this.isVisible && this.isInputEnabled,
+            onTouchInput: this.onGlobalTouch, onJudge: this.onGlobalJudge,
+            onNavigationAllowed: this.onGlobalNavigationAllowed,
+            onSinglePanAllowed: this.onSinglePanAllowed, onSinglePanStart: this.onSinglePanStart,
+            onSinglePanUpdate: this.onSinglePanUpdate, onSinglePanFinish: this.onSinglePanFinish,
+            onStart: this.onGlobalStart, onUpdate: this.onGlobalUpdate, onFinish: this.onGlobalFinish,
+            content: () => { this.inkContent(); } })
+        }
+        if (this.capacityReached) {
+          Text($r('app.string.study_whiteboard_full')).fontSize(应用尺寸.字号_正文_小)
+            .fontColor($r('app.color.text_primary')).padding(应用尺寸.间距_8)
+            .backgroundColor($r('app.color.surface_card')).hitTestBehavior(HitTestMode.None)
+            .align(Alignment.Center)
+        }
+      }.width('100%').layoutWeight(1).clip(true)
+      .onAreaChange((_old: Area, area: Area): void => {
+        if (this.isVisible) this.onDrawingAreaChanged(area);
+      })
       Column() { this.reviewActions() }
-        .width('100%').height('100%').constraintSize({ maxWidth: this.toolbarContentWidth })
-        .justifyContent(FlexAlign.End).hitTestBehavior(HitTestMode.Transparent)
+        .width('100%').constraintSize({ maxWidth: this.toolbarContentWidth })
         .enabled(this.isInputEnabled && this.settingsTool === '')
     }
     .width('100%').height('100%')

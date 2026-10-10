@@ -69,7 +69,7 @@ export class StudyWhiteboard {
       x < 0 || y < 0 || x > this.width || y > this.height) return null;
     const point: WhiteboardPoint | null = this.point(x, y);
     if (point === null || !Number.isFinite(width) || width <= 0 || (eraser && !this.hasInk())) return null;
-    // 批注缩小至半倍时，40vp 橡皮需保存 80vp 内容宽度；仍限制异常输入。
+    // 笔宽保存内容尺寸，缩放后的屏幕宽度由输入层换算；限制异常输入。
     this.active = { points: [point], color: color, width: Math.min(width, 96), eraser: eraser };
     this.pointerId = id;
     this.pointCount++;

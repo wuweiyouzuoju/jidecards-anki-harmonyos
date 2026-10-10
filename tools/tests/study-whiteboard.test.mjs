@@ -67,60 +67,162 @@ function nativeCanvasOptions(parameters, sdkApiVersion = 24) {
 const fingersEvent = (points, extra = {}) => ({ sourceTool: 1,
   fingerInfos: points.map(([id, globalX, globalY]) => ({ id, localX: globalX, localY: globalY, globalX, globalY })), ...extra });
 
-test('a single finger adds horizontal ink movement while the SDK retains vertical scrolling and the card stays fixed', () => {
-  const { instance, view } = component(); instance.canvasInitialized(0);
-  const poses = []; instance.onViewChanged = pose => poses.push(pose);
-  const recognizer = (tag, fingers, builtIn = false, type = 2) => ({
-    getTag: () => tag, getFingerCount: () => fingers, isBuiltIn: () => builtIn, getType: () => type,
-    setEnabled() { assert.fail('the SDK must remain enabled'); }, preventBegin() { assert.fail('native scrolling is retained'); }
-  });
-  const current = recognizer('study_ink_horizontal', 1), nativePan = recognizer('', 1);
-  const one = { ...fingersEvent([[7, 100, 120]], { offsetX: 0, offsetY: 0 }),
-    fingerList: [{ id: 7, globalX: 100, globalY: 120 }] };
-  assert.equal(instance.judgeInkPan(one, current, [nativePan]), 0);
-  assert.equal(instance.judgeInkPan(one, current, []), 1, 'tools without a canvas pan cannot move the ink');
-  assert.equal(instance.judgeInkPan(one, current, [nativePan, recognizer('slider', 1, true)]), 1);
-  assert.equal(instance.judgeInkPan({ ...one, sourceTool: 2 }, current, [nativePan]), 1);
-  assert.equal(instance.judgeInkPan({ ...one, fingerList: [...one.fingerList, { id: 9 }] }, current, [nativePan]), 1);
-  instance.startInkPan(one);
-  instance.updateInkPan({ ...one, offsetX: 60, offsetY: 80 });
-  assert.equal(instance.inkOffsetX, 60);
-  assert.deepEqual(instance.contentView.snapshot(), { scale: 1, x: 0, y: 0 });
-  assert.deepEqual(poses, [], 'single-finger ink movement cannot change the card view');
-  assert.equal(view().values.find(item => item.id === 'single_finger_navigation').value, 'ink_pan');
-  assert.equal(view().values.find(item => item.id === 'ink_offset_x').value, '60');
-  instance.inkPanActive = false;
-  instance.viewScale = 2;
-  instance.startInkPan(one);
-  instance.updateInkPan({ ...one, offsetX: -40, offsetY: -100 });
-  assert.equal(instance.inkOffsetX, 40, 'horizontal screen movement is divided by the current global scale');
-  instance.updateInkPan({ ...one, offsetX: Infinity });
-  assert.equal(instance.inkOffsetX, 40);
-  instance.updateInkPan(fingersEvent([[7, 100, 120], [9, 200, 120]], { offsetX: 90 }));
-  assert.equal(instance.inkPanActive, false);
-  assert.equal(instance.inkOffsetX, 40, 'adding a second finger hands control back to the global view');
-  instance.updateInkPan({ ...one, offsetX: 90 });
-  assert.equal(instance.inkOffsetX, 40, 'the remaining finger cannot resume an ended gesture');
-  instance.startInkPan(one);
-  instance.startNavigation(fingersEvent([[7, 100, 120], [9, 200, 120]]), false);
-  assert.equal(instance.inkPanActive, false, 'global navigation terminates horizontal ink movement immediately');
+const recognizer = (tag, fingers, builtIn = false, type = 2) => ({
+  getTag: () => tag, getFingerCount: () => fingers, isBuiltIn: () => builtIn, getType: () => type,
+  setEnabled() { assert.fail('SDK recognizers cannot be persistently disabled'); },
+  preventBegin() { assert.fail('per-gesture priority arbitrates input without disabling native scrolling'); }
+});
+const oneFinger = (x = 100, y = 120, id = 7) => ({
+  ...fingersEvent([[id, x, y]]), fingerList: [{ id, globalX: x, globalY: y }]
+});
+function zoomIn(instance) {
+  instance.startNavigation(fingersEvent([[4, 100, 100], [9, 200, 100]]), true);
+  instance.navigate(fingersEvent([[4, 50, 100], [9, 250, 100]]), true);
+  instance.finishNavigation(true);
+}
+
+test('before pen detection single-finger input never moves the shared view at any scale in either engine', () => {
+  for (const supported of [true, false]) {
+    const { instance, view } = component(supported);
+    if (supported) instance.canvasInitialized(0);
+    for (const zoomed of [false, true]) {
+      if (zoomed) zoomIn(instance);
+      const before = instance.contentView.snapshot();
+      assert.equal(instance.judgeNavigation({ tag: 'study_view_pan' }, oneFinger()), 1);
+      instance.startNavigation(oneFinger(), false);
+      instance.startNavigation(oneFinger(), true);
+      instance.navigate(oneFinger(140, 150), false);
+      instance.navigate(oneFinger(140, 150), true);
+      assert.equal(instance.panActive, false);
+      assert.equal(instance.pinchActive, false);
+      assert.deepEqual(instance.contentView.snapshot(), before, 'finger writing cannot pan the card or ink');
+      if (supported) assert.equal(view().values.find(item => item.id === 'single_finger_navigation').value, 'native_input');
+    }
+    instance.aboutToDisappear();
+  }
+});
+
+test('actual pen contact latches navigation until closing while pen up, reset, next card and background keep the mode', () => {
+  for (const supported of [true, false]) {
+    const { instance, view } = component(supported);
+    if (supported) instance.canvasInitialized(0);
+    zoomIn(instance);
+    for (const event of [
+      { type: 0, sourceTool: 1, pressure: 1, changedTouches: [{ id: 12 }] },
+      { type: 0, sourceTool: 0, pressure: 1, changedTouches: [{ id: 12 }] },
+      { type: 3, sourceTool: 2, changedTouches: [{ id: 12 }] },
+      { type: 0, sourceTool: 2, changedTouches: [{ id: NaN }, { id: -1 }] }
+    ]) instance.trackTouch(event);
+    assert.equal(instance.penDetected, false, 'only a valid actual pen down enables the mode');
+    instance.trackTouch({ type: 0, sourceTool: 2, changedTouches: [{ id: 27 }] });
+    assert.equal(instance.penDetected, true);
+    assert.equal(instance.judgeNavigation({ tag: 'study_view_pan' }, oneFinger()), 1, 'palm cannot navigate during pen contact');
+    instance.trackTouch({ type: 1, sourceTool: 2, changedTouches: [{ id: 27 }] });
+    assert.equal(instance.judgeNavigation({ tag: 'study_view_pan' }, oneFinger()), 0);
+    instance.startSinglePan(oneFinger());
+    instance.updateSinglePan(oneFinger(140, 150));
+    assert.deepEqual(instance.contentView.snapshot(), { scale: 2, x: -110, y: -70 });
+    const pose = instance.contentView.snapshot();
+    instance.updateSinglePan(oneFinger(190, 190, 9));
+    assert.deepEqual(instance.contentView.snapshot(), pose, 'another pointer cannot take over the drag');
+    instance.finishSinglePan();
+    if (supported) {
+      assert.equal(view().values.find(item => item.id === 'pen_detected').value, 'true');
+      assert.equal(view().values.find(item => item.id === 'single_finger_navigation').value, 'viewport_pan');
+    }
+    instance.resetGlobalView(); assert.equal(instance.penDetected, true);
+    assert.equal(instance.judgeNavigation({ tag: 'study_view_pan' }, oneFinger()), 1, 'scale one has no shared single-finger movement');
+    instance.resetRequested(); assert.equal(instance.penDetected, true, 'next card is not a close/reopen');
+    if (supported) { instance.canvasLayoutChanged(instance.canvasGeneration, 400, 300); instance.canvasInitialized(instance.canvasGeneration); }
+    instance.isInputEnabled = false; instance.inputConditionsChanged(); assert.equal(instance.penDetected, true);
+    instance.isInputEnabled = true; instance.inputConditionsChanged();
+    instance.isVisible = false; instance.inputConditionsChanged(); assert.equal(instance.penDetected, false);
+    instance.trackTouch({ type: 0, sourceTool: 2, changedTouches: [{ id: 31 }] });
+    assert.equal(instance.penDetected, false, 'hidden late input cannot relatch the next opening');
+    instance.isVisible = true; instance.inputConditionsChanged(); zoomIn(instance);
+    assert.equal(instance.judgeNavigation({ tag: 'study_view_pan' }, oneFinger()), 1);
+    instance.aboutToDisappear();
+  }
+});
+
+test('a new finger down releases a pen-up consumed by the SDK only when the pen is absent from active touches', () => {
+  const { instance } = component(); instance.canvasInitialized(0); zoomIn(instance);
+  instance.trackTouch({ type: 0, sourceTool: 2, changedTouches: [{ id: 27 }] });
+  const down = { type: 0, sourceTool: 1, changedTouches: [{ id: 7 }], touches: [{ id: 27 }, { id: 7 }] };
+  instance.trackTouch(down); assert.equal(instance.canSinglePan(oneFinger()), false);
+  instance.trackTouch({ ...down, touches: [{ id: 7 }] });
+  assert.equal(instance.canSinglePan(oneFinger()), true);
+  assert.equal(instance.penDetected, true, 'ending contact does not reset the latched mode');
+  instance.aboutToDisappear();
+});
+
+test('pen mode blocks finger drawing even at scale one and during pen contact, and reopening restores writing', () => {
+  for (const supported of [true, false]) {
+    const { instance, view } = component(supported);
+    if (supported) instance.canvasInitialized(0);
+    assert.equal(instance.shouldBlockFingerDrawing({ sourceTool: 1 }), false);
+    instance.trackTouch({ type: 0, sourceTool: 2, changedTouches: [{ id: 27 }] });
+    assert.equal(instance.shouldBlockFingerDrawing({ sourceTool: 1 }), true, 'palm cannot dot while the pen writes');
+    assert.equal(instance.shouldBlockFingerDrawing({ sourceTool: 2 }), false, 'pen delivery stays native');
+    instance.trackTouch({ type: 1, sourceTool: 2, changedTouches: [{ id: 27 }] });
+    assert.equal(instance.shouldBlockFingerDrawing({ sourceTool: 1 }), true, 'one-times zoom cannot restore finger ink');
+    assert.equal(instance.canSinglePan(oneFinger()), false, 'scale one has no pan displacement');
+    if (supported) assert.equal(view().values.find(item => item.id === 'single_finger_navigation').value, 'blocked');
+    instance.isVisible = false; instance.inputConditionsChanged();
+    instance.isVisible = true; instance.inputConditionsChanged();
+    assert.equal(instance.shouldBlockFingerDrawing({ sourceTool: 1 }), false);
+    instance.aboutToDisappear();
+  }
+});
+
+test('single and two-finger navigation switch without old recognizer completions corrupting the new anchor', () => {
+  const { instance } = component(); instance.canvasInitialized(0); zoomIn(instance);
+  instance.trackTouch({ type: 0, sourceTool: 2, changedTouches: [{ id: 27 }] });
+  instance.trackTouch({ type: 1, sourceTool: 2, changedTouches: [{ id: 27 }] });
+  instance.startSinglePan(oneFinger());
+  instance.updateSinglePan(oneFinger(110, 130));
+  instance.startNavigation(fingersEvent([[7, 110, 130], [9, 210, 130]]), false);
+  instance.finishSinglePan();
+  instance.navigate(fingersEvent([[7, 130, 150], [9, 230, 150]]), false);
+  assert.deepEqual(instance.contentView.snapshot(), { scale: 2, x: -120, y: -70 });
   instance.finishNavigation(false);
-  instance.startInkPan(one);
-  instance.trackTouch({ type: 0, sourceTool: 2, changedTouches: [{ id: 8 }] });
-  assert.equal(instance.inkPanActive, false, 'pen down stops palm movement');
-  instance.endNavigation();
-  instance.isVisible = false; instance.inputConditionsChanged();
-  assert.equal(instance.inkOffsetX, 40, 'hiding preserves the current card ink position');
-  instance.isVisible = true; instance.inputConditionsChanged();
+  instance.startSinglePan(oneFinger());
+  instance.finishNavigation(false); instance.finishNavigation(true);
+  instance.updateSinglePan(oneFinger(120, 140));
+  assert.deepEqual(instance.contentView.snapshot(), { scale: 2, x: -100, y: -50 });
+  instance.trackTouch({ type: 0, sourceTool: 2, changedTouches: [{ id: 29 }] });
+  assert.equal(instance.singlePanActive, false, 'new pen contact ends navigation before ink starts');
+  instance.aboutToDisappear();
+});
+
+test('lifting a navigation finger or adding a third ends both recognizers without resuming stale movement', () => {
+  const { instance } = component(); instance.canvasInitialized(0); zoomIn(instance);
+  for (const points of [[[7, 110, 120]], [[7, 110, 120], [9, 210, 120], [12, 260, 120]]]) {
+    const start = fingersEvent([[7, 100, 120], [9, 200, 120]]);
+    instance.startNavigation(start, false); instance.startNavigation(start, true);
+    const before = instance.contentView.snapshot();
+    instance.navigate(fingersEvent(points), false);
+    assert.equal(instance.panActive, false); assert.equal(instance.pinchActive, false);
+    instance.navigate(fingersEvent([[7, 160, 160], [9, 260, 160]]), true);
+    assert.deepEqual(instance.contentView.snapshot(), before);
+  }
+  instance.aboutToDisappear();
+});
+
+test('drawing-area measurements reserve the fixed top and bottom controls during shared navigation', () => {
+  const { instance, view } = component(); instance.canvasInitialized(0);
+  instance.updateViewport({ width: 400, height: 300, globalPosition: { x: 20, y: 40 } });
+  instance.drawingAreaChanged({ width: 400, height: 180, globalPosition: { x: 20, y: 104 } });
+  zoomIn(instance);
+  instance.startNavigation(fingersEvent([[7, 100, 120], [9, 200, 120]]), false);
+  instance.navigate(fingersEvent([[7, 100000, 100000], [9, 100100, 100000]]), false);
+  assert.deepEqual(instance.contentView.snapshot(), { scale: 2, x: 0, y: -64 });
+  instance.navigate(fingersEvent([[7, -100000, -100000], [9, -99900, -100000]]), false);
+  assert.deepEqual(instance.contentView.snapshot(), { scale: 2, x: -400, y: -244 });
   instance.resetGlobalView();
-  assert.equal(instance.inkOffsetX, 0, 'Reset brings the horizontally moved toolkit back into view');
-  instance.startInkPan(one); instance.updateInkPan({ ...one, offsetX: 70 });
-  instance.resetRequested();
-  assert.equal(instance.inkOffsetX, 0, 'the next card resets the horizontal ink position');
-  const source = readFileSync(new URL('../../entry/src/main/ets/components/学习手写白板层.ets', import.meta.url), 'utf8');
-  assert.match(source, /private officialInk\(\)[^]*?Stack[^]*?ContentSlot[^]*?translate\(\{ x: this\.inkOffsetX \}\)/);
-  assert.match(source, /\.onGestureRecognizerJudgeBegin\([^]*?this\.judgeInkPan\(event, current, others\)/);
-  assert.match(source, /\.parallelGesture\(\s*PanGesture\(\{ fingers: 1[^]*?tag\('study_ink_horizontal'\)/);
+  assert.deepEqual(instance.contentView.snapshot(), { scale: 1, x: 0, y: 0 });
+  assert.equal(view().values.some(item => ['drawing_scope', 'ink_above_app_controls', 'review_controls_position'].includes(item.id)), false,
+    'rolled-back overlay capabilities are not advertised to JIDE');
   instance.aboutToDisappear();
 });
 
@@ -142,8 +244,8 @@ test('global view continuously pans and zooms with two fingers while official pe
   assert.deepEqual(instance.contentView.snapshot(), { scale: 2, x: 0, y: -20 }, 'ended input cannot resume');
   instance.startNavigation(start, false);
   for (let step = 1; step <= 5; step++) {
-    instance.navigate(fingersEvent([[4, 50 + step * 10, 100], [9, 150 + step * 10, 100]]), false);
-    assert.deepEqual(poses.at(-1), { scale: 2, x: step * 10, y: -20 });
+    instance.navigate(fingersEvent([[4, 50 - step * 10, 100], [9, 150 - step * 10, 100]]), false);
+    assert.deepEqual(poses.at(-1), { scale: 2, x: -step * 10, y: -20 });
   }
   assert.equal(view().items.some(item => item.id === 'move'), false);
   assert.equal(view().items.find(item => item.id === 'official_tools').enabled, true);
@@ -157,7 +259,7 @@ test('global view continuously pans and zooms with two fingers while official pe
   const source = readFileSync(new URL('../../entry/src/main/ets/components/StudyContentViewport.ets', import.meta.url), 'utf8');
   assert.match(source, /PanGesture\(\{ fingers: 2/);
   assert.match(source, /PinchGesture\(\{ fingers: 2/);
-  assert.doesNotMatch(source, /moveMode|HitTestMode\.Block/);
+  assert.doesNotMatch(source, /moveMode/);
   instance.aboutToDisappear();
 });
 
@@ -168,7 +270,14 @@ test('global reset preserves ink, history, controller and card generation, while
   instance.localSession.begin(4, 20, 10, 'auto'); instance.localSession.finish(4);
   const before = []; instance.localSession.visitStrokes(stroke => before.push(structuredClone(stroke)));
   instance.startNavigation(fingersEvent([[7, 10, 10], [9, 110, 10]]), false);
+  instance.navigate(fingersEvent([[7, -10, 30], [9, 190, 30]]), false);
+  const enlarged = instance.contentView.snapshot();
+  assert.equal(enlarged.scale, 2);
   instance.navigate(fingersEvent([[7, 40, 30], [9, 140, 30]]), false);
+  assert.deepEqual(instance.contentView.snapshot(), { scale: 1, x: 0, y: 0 }, 'pinching inward returns to scale one');
+  assert.equal(view().values.find(item => item.id === 'single_finger_navigation').value, 'native_input');
+  instance.navigate(fingersEvent([[7, -10, 30], [9, 190, 30]]), false);
+  assert.deepEqual(instance.contentView.snapshot(), enlarged, 'the same gesture can enlarge again after shrinking');
   instance.resetGlobalView();
   assert.deepEqual(instance.contentView.snapshot(), { scale: 1, x: 0, y: 0 });
   const after = []; instance.localSession.visitStrokes(stroke => after.push(structuredClone(stroke)));
@@ -192,6 +301,8 @@ test('global navigation protects pen writing, follows window coordinates and rej
   assert.equal(instance.panActive, true);
   instance.trackTouch({ type: 0, sourceTool: 2, changedTouches: [{ id: 27 }] });
   assert.equal(instance.panActive, false, 'pen contact ends running navigation before writing');
+  instance.trackTouch({ type: 3, sourceTool: 1, changedTouches: [{ id: 29 }] });
+  assert.deepEqual(instance.penPointers, [27], 'palm cancellation cannot release pen isolation');
   instance.navigate(fingersEvent([[4, 100, 170], [9, 200, 170]]), false);
   assert.deepEqual(instance.contentView.snapshot(), { scale: 1, x: 0, y: 0 });
   instance.startNavigation(fingersEvent([[4, 70, 140], [9, 170, 140]]), true);
@@ -215,7 +326,7 @@ test('SDK zoom is disabled only on supported versions so the shared global trans
   for (const version of [18, 23, 24]) {
     const options = nativeCanvasOptions(parameters, version);
     assert.equal(options.scaleDisabled, version >= 23 ? true : undefined);
-    assert.equal(options.maxCanvasHeight, version >= 23 ? 300 : undefined);
+    assert.equal(options.maxCanvasHeight, undefined, 'native vertical scrolling retains its long canvas');
     assert.equal(options.handwriteController, parameters.controller);
   }
 });
@@ -463,7 +574,8 @@ function canvasHostHarness() {
       parameters.onReady(parameters.generation);
     }, { sdkApiVersion: 24 });
   const Host = loadPlatformModule('components/StudyPenCanvasHost.ets', 'StudyPenCanvasHost', {
-    console: { error() {} },
+    console: { error() {}, warn() {} },
+    deviceInfo: { sdkApiVersion: 24 }, EventQueryType: { ON_CLICK: 0 },
     // 只模拟公开的插入/移除契约，不把插入或 SDK 初始化冒充布局回调。
     NodeContent: class {
       frames = [];
@@ -484,6 +596,44 @@ function canvasHostHarness() {
     failConstructor(error) { constructorError = error; }, failBuild(error) { buildError = error; },
     failAttach(error) { attachError = error; } };
 }
+
+test('native control hit testing reads current nodes and density, preserves tools after transforms, and excludes ink surfaces', () => {
+  const { Host } = canvasHostHarness();
+  const context = { px2vp: value => value / 2 };
+  const frame = (type, x, y, width, height, children = [], click = false) => ({
+    getUniqueId: () => 12, isAttached: () => true, isVisible: () => true, getNodeType: () => type,
+    getChildrenCount: () => children.length, getChild: index => children[index],
+    getInteractionEventBindingInfo: type => {
+      assert.equal(type, 0); return click ? { baseEventRegistered: true } : undefined;
+    },
+    getMeasuredSize: () => ({ width: width * 2, height: height * 2 }),
+    convertPositionFromWindow: point => ({ x: (point.x - x) / 2, y: (point.y - y) / 2 })
+  });
+  const host = new Host({ generation: 0 }, () => {});
+  const ink = frame('Canvas', 20, 100, 400, 300, [], true);
+  const button = frame('Image', 100, 40, 40, 40, [], true);
+  const slider = frame('Slider', 200, 40, 100, 40);
+  const container = frame('Stack', 20, 40, 400, 400, [ink, button, slider], true);
+  host.frame = container;
+  const touch = (x, y) => ({ changedTouches: [{ windowX: x, windowY: y }] });
+  assert.equal(host.isControlTouch(context, touch(120, 60), 2), true, 'click binding protects an SDK image tool');
+  assert.equal(host.isControlTouch(context, touch(350, 60), 2), true, 'sliders retain their drag input at the scaled edge');
+  slider.convertPositionFromWindow = () => { throw new Error('node detached during hit testing'); };
+  assert.equal(host.isControlTouch(context, touch(350, 60), 2), false, 'a failed tool conversion is contained in the input boundary');
+  slider.convertPositionFromWindow = point => ({ x: (point.x - 200) / 2, y: (point.y - 40) / 2 });
+  assert.equal(host.isControlTouch(context, touch(450, 60), 2), false, 'measured control width is not widened beyond its transform');
+  assert.equal(host.isControlTouch(context, touch(100, 180), 2), false, 'canvas or a clickable wrapper containing it cannot bypass the drawing gate');
+  button.isVisible = () => false;
+  assert.equal(host.isControlTouch(context, touch(120, 60), 2), false);
+  const replacement = frame('Row', 420, 40, 30, 40, [], true);
+  container.getChild = index => [ink, replacement, slider][index];
+  assert.equal(host.isControlTouch(context, touch(440, 60), 2), true, 'recreated tool nodes are queried without stale bounds');
+  replacement.isAttached = () => false;
+  assert.equal(host.isControlTouch(context, touch(440, 60), 2), false, 'detached nodes are not converted');
+  assert.equal(host.isControlTouch(context, touch(NaN, 60), 2), false);
+  host.isDisposed = true;
+  assert.equal(host.isControlTouch(context, touch(350, 60), 2), false);
+});
 
 test('optional canvas loads on mounting once and disposes its built node once', async () => {
   const { Host, nodes, context, factory } = canvasHostHarness();
