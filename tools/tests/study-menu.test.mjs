@@ -4,8 +4,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
-import { actionMenuRows, toggleActionMenuBranch } from '../../entry/src/main/ets/components/common/ActionMenuTree.ts';
-import { actionMenuGroupInset, placeActionMenuGroups, actionMenuBubbleOutline } from '../../entry/src/main/ets/components/common/ActionMenuLayout.ts';
+import { actionMenuRows, visibleActionMenuRows, toggleActionMenuBranch } from '../../entry/src/main/ets/components/common/ActionMenuTree.ts';
+import { ActionMenuPointerSide, actionMenuGroupInset, placeActionMenuGroups, actionMenuBubbleOutline } from '../../entry/src/main/ets/components/common/ActionMenuLayout.ts';
 import { safeMenuGeometry } from '../../entry/src/main/ets/model/WindowSafeLayout.ts';
 
 const read = path => readFileSync(new URL('../../' + path, import.meta.url), 'utf8');
@@ -16,9 +16,9 @@ const methods = ['openStudyMenu', 'closeStudyMenu', 'toggleStudyMenuBranch', 'ba
     assert.ok(start >= 0, name);
     return source.slice(start, source.indexOf('\n  }', start) + 4);
   });
-const Page = new Function('KeyType', 'studyKeyName', 'actionMenuRows', 'toggleActionMenuBranch',
+const Page = new Function('KeyType', 'studyKeyName', 'actionMenuRows', 'visibleActionMenuRows', 'toggleActionMenuBranch',
   stripTypeScriptTypes('class Page {' + methods.join('\n') + '}') + '; return Page;')(
-  { Down: 0 }, key => key, actionMenuRows, toggleActionMenuBranch);
+  { Down: 0 }, key => key, actionMenuRows, visibleActionMenuRows, toggleActionMenuBranch);
 
 function harness() {
   const page = Object.assign(new Page(), { recoveryMessage: '', resultMessage: '', resultUndo: null }), events = [];
@@ -52,19 +52,19 @@ test('expanded trees keep parent order, nested flags and inherited disabled stat
   assert.deepEqual(toggleActionMenuBranch(root,expanded,'edit'),expanded,'leaf selection does not change expansion');
 });
 
-test('opening defaults to both left groups; toggling and closing flags keep timers paused until dismissal', () => {
+test('opening shows one group; switching groups and closing flags keep timers paused until dismissal', () => {
   const { page,events }=harness(); page.openStudyMenu();
-  assert.deepEqual(page.studyExpandedIds,['marking','card_actions']);
+  assert.deepEqual(page.studyExpandedIds,['marking']);
   assert.equal(page.Ctrl按下,false);assert.deepEqual(events,['stop','cancel']);
   page.toggleStudyMenuBranch('flag');
   assert.deepEqual(events,['stop','cancel','labels']);
   page.backStudyMenu();
-  assert.deepEqual(page.studyExpandedIds,['marking','card_actions']);assert.equal(page.studyMenuOpen,true);
-  page.toggleStudyMenuBranch('card_actions');page.toggleStudyMenuBranch('marking');
-  assert.deepEqual(page.studyExpandedIds,[]);assert.equal(page.studyMenuOpen,true);
+  assert.deepEqual(page.studyExpandedIds,['marking']);assert.equal(page.studyMenuOpen,true);
+  page.toggleStudyMenuBranch('card_actions');assert.deepEqual(page.studyExpandedIds,['card_actions']);
+  page.toggleStudyMenuBranch('card_actions');assert.deepEqual(page.studyExpandedIds,[]);assert.equal(page.studyMenuOpen,true);
   page.backStudyMenu();page.closeStudyMenu();
   assert.equal(page.studyMenuOpen,false);assert.deepEqual(events,['stop','cancel','labels','resume','schedule']);
-  page.openStudyMenu();assert.deepEqual(page.studyExpandedIds,['marking','card_actions']);
+  page.openStudyMenu();assert.deepEqual(page.studyExpandedIds,['marking']);
 });
 
 test('only visible enabled leaves execute with fresh actions before timer recovery', () => {
@@ -76,7 +76,7 @@ test('only visible enabled leaves execute with fresh actions before timer recove
   page.评分中=true;page.selectStudyMenu(stale);page.评分中=false;
   root[1].children[1].enabled=false;page.selectStudyMenu(stale);assert.deepEqual(events,[]);
   root[1].children[1].enabled=true;
-  page.studyPrimaryObscured=true;page.selectStudyMenu(root[0]);assert.deepEqual(events,[]);
+  page.selectStudyMenu(root[1].children[0]);assert.deepEqual(events,[],'replaced parent rows reject delayed clicks');
   root[1].children[1].children[0].action=()=>{assert.equal(page.studyMenuOpen,false);events.push('purple');};
   page.selectStudyMenu(stale);page.selectStudyMenu(stale);
   assert.deepEqual(events,['purple','resume','schedule']);
@@ -106,8 +106,8 @@ test('native Back reaches navigation instead of being swallowed by the keyboard 
 
 test('shared menu rejects stale/disabled rows and keeps flat preview callbacks', () => {
   const Menu=loadComponentLogic('components/common/CardActionMenu.ets','CardActionMenu',{
-    应用尺寸:{compactMenuWidth:112,menuItemHeight:44,cardActionGroupWidth:136,radiusLg:16},PAGE_COMPACT_LAYOUT_KEY:'compact',actionMenuRows,actionMenuGroupInset,placeActionMenuGroups,
-    MenuSurface:{pointerSpan:20,pointerDepth:6},Curve:{EaseOut:'easeOut'}
+    应用尺寸:{compactMenuWidth:112,menuItemHeight:44,cardActionGroupWidth:136,radiusLg:16},PAGE_COMPACT_LAYOUT_KEY:'compact',actionMenuRows,visibleActionMenuRows,actionMenuGroupInset,placeActionMenuGroups,
+    actionIcon:id=>id,$r:key=>key,MenuSurface:{pointerSpan:20,pointerDepth:6},Curve:{EaseOut:'easeOut'}
   });
   const menu=new Menu(),{root}=harness(),events=[];menu.items=root;menu.expandedIds=['marking','card_actions'];
   menu.getUIContext=()=>{throw new Error('branch changes must not animate the entire measured menu layout');};
@@ -127,8 +127,8 @@ test('left panels use measured first-group anchoring without adding root gaps or
   assert.equal(actionMenuGroupInset([60,48,44,64],3,180,44),94);
   assert.equal(actionMenuGroupInset([],3,484,44),0,'expanded flags move the left column upward, never stretch the right menu');
   const Menu=loadComponentLogic('components/common/CardActionMenu.ets','CardActionMenu',{
-    应用尺寸:{compactMenuWidth:112,menuItemHeight:44,cardActionGroupWidth:136,radiusLg:16},PAGE_COMPACT_LAYOUT_KEY:'compact',actionMenuRows,actionMenuGroupInset,placeActionMenuGroups,
-    MenuSurface:{pointerSpan:20,pointerDepth:6}
+    应用尺寸:{compactMenuWidth:112,menuItemHeight:44,cardActionGroupWidth:136,radiusLg:16},PAGE_COMPACT_LAYOUT_KEY:'compact',actionMenuRows,visibleActionMenuRows,actionMenuGroupInset,placeActionMenuGroups,
+    actionIcon:id=>id,$r:key=>key,MenuSurface:{pointerSpan:20,pointerDepth:6}
   });
   const menu=new Menu(),{root}=harness();menu.items=root;menu.menuWidth=168;menu.contentWidth=360;menu.expandedIds=['marking','card_actions'];
   for(const width of [180,280,360,840]) { menu.contentWidth=width;assert.ok(menu.totalWidth()<=width-24); }
@@ -152,8 +152,9 @@ test('left panel avoidance preserves trigger coordinates and never overlaps adja
 });
 
 test('bubble outline converts all coordinates at the actual density and keeps a single closed contour', () => {
-  for(const width of [88,136,168])for(const height of [44,132,176,352])for(const center of [22,height/2,height-22]) {
-    const commands=density=>actionMenuBubbleOutline(width,height,center,density,1,16,6,20);
+  for(const side of [ActionMenuPointerSide.Right, ActionMenuPointerSide.Left, ActionMenuPointerSide.Top, ActionMenuPointerSide.Bottom])
+    for(const width of [88,136,168])for(const height of [44,132,176,352])for(const center of [22,height/2,height-22]) {
+    const commands=density=>actionMenuBubbleOutline(width,height,center,density,1,16,6,20,side);
     assert.equal((commands(1).match(/M /g)??[]).length,1);
     assert.equal((commands(1).match(/ Z/g)??[]).length,1);
     const numbers=density=>commands(density).match(/-?\d+(?:\.\d+)?/g).map(Number);
@@ -162,33 +163,36 @@ test('bubble outline converts all coordinates at the actual density and keeps a 
       assert.ok(Math.abs(value-unit[index]*density)<1e-7,`coordinate ${index}: ${width}x${height}vp @ ${density}`);
     });
   }
-  const bubble=read('entry/src/main/ets/components/common/MenuBubble.ets');
+  const bubble=read('entry/src/main/ets/components/common/MenuBubbleSurface.ets');
   assert.match(bubble,/vp2px\(1\)/);assert.doesNotMatch(bubble,/\.shadow\(/,'Path bounding-box shadows caused the rectangular ghost');
 });
 
-test('flags cover the primary menu at its original position and preserve operable left groups at every width', () => {
+test('flags replace their left panel, keep the trigger anchor and return without covering primary actions', () => {
   const Menu=loadComponentLogic('components/common/CardActionMenu.ets','CardActionMenu',{
     应用尺寸:{compactMenuWidth:168,menuItemHeight:44,cardActionGroupWidth:136,radiusLg:16},PAGE_COMPACT_LAYOUT_KEY:'compact',
-    actionMenuRows,actionMenuGroupInset,placeActionMenuGroups,MenuSurface:{pointerSpan:20,pointerDepth:6},Curve:{EaseOut:'easeOut'}
+    actionMenuRows,visibleActionMenuRows,actionMenuGroupInset,placeActionMenuGroups,actionIcon:id=>id,$r:key=>key,MenuSurface:{pointerSpan:20,pointerDepth:6},Curve:{EaseOut:'easeOut'}
   });
-  const menu=new Menu(),{root}=harness(),events=[];menu.items=root;menu.expandedIds=['marking','card_actions','flag'];
-  menu.onSelect=item=>events.push(item.id);menu.onPrimaryObscured=obscured=>events.push(obscured);
+  const menu=new Menu(),{root}=harness(),events=[];menu.items=root;menu.expandedIds=['marking','flag'];
+  menu.onSelect=item=>events.push(item.id);
   menu.onToggleBranch=item=>{menu.expandedIds=toggleActionMenuBranch(menu.items,menu.expandedIds,item.id);};
-  menu.contentWidth=360;menu.publishOcclusion();assert.equal(menu.primaryObscured(),true);
-  assert.deepEqual(menu.popupRows().map(row=>row.node.id),['7']);
+  menu.contentWidth=360;
+  assert.deepEqual(menu.groupRows(root[1]).map(row=>row.node.id),['back','7']);
   for(const width of [180,360,840]) {
     menu.contentWidth=width;const expanded=menu.expandedIds.slice();
-    menu.expandedIds=['marking','card_actions'];const originalWidth=menu.totalWidth(),originalHeight=menu.layoutHeight();
+    menu.expandedIds=['marking'];const originalWidth=menu.totalWidth();
     menu.expandedIds=expanded;
     assert.equal(menu.totalWidth(),originalWidth,'colors do not reserve another column');
-    assert.equal(menu.popupX()+menu.primaryWidth(),originalWidth,'overlay shares the primary right edge');
-    assert.ok(menu.totalWidth()<=width-24);assert.ok(menu.layoutHeight()>=originalHeight);
-    const count=events.length;menu.selectEntry(menu.rows().find(row=>row.node.id==='edit'));assert.equal(events.length,count);
-    menu.selectEntry(menu.rows().find(row=>row.node.id==='mark'));assert.equal(events.at(-1),'mark');
+    assert.ok(menu.totalWidth()<=width-24);
+    menu.recordRow(0,60);menu.recordRow(1,72);
+    const placement=menu.placements()[0];assert.equal(placement.top+placement.pointerCenter,96);
+    menu.selectEntry(menu.rows().find(row=>row.node.id==='edit'));assert.equal(events.at(-1),'edit');
+    const count=events.length;menu.selectEntry(menu.rows().find(row=>row.node.id==='mark'));assert.equal(events.length,count);
     menu.selectEntry(menu.rows().find(row=>row.node.id==='7'));assert.equal(events.at(-1),'7');
   }
-  menu.dismissTop();menu.publishOcclusion();assert.equal(menu.primaryObscured(),false);
-  assert.equal(events.at(-1),false);assert.deepEqual(menu.expandedIds,['marking','card_actions']);
+  menu.selectEntry(menu.groupRows(root[1])[0]);assert.deepEqual(menu.expandedIds,['marking']);
+  menu.selectEntry(menu.rows().find(row=>row.node.id==='flag'));assert.deepEqual(menu.expandedIds,['marking','flag']);
+  menu.dismissTop();assert.deepEqual(menu.expandedIds,['marking']);
+  assert.doesNotMatch(read('entry/src/main/ets/components/common/CardActionMenu.ets'), /popupX|popupRows|zIndex\(1\)/);
 });
 
 test('all card menu callers share one viewport-limited surface and one row renderer', () => {
@@ -199,7 +203,7 @@ test('all card menu callers share one viewport-limited surface and one row rende
   const menu = read('entry/src/main/ets/components/common/CardActionMenu.ets');
   assert.equal((menu.match(/AnchoredMenu\(\{/g) ?? []).length, 1);
   assert.equal((menu.match(/AnchoredMenuItem\(\{/g) ?? []).length, 1);
-  assert.match(menu, /contentMaxWidth: this.contentWidth/);
+  assert.match(menu, /contentMaxWidth: this\.anchor === undefined \? this\.contentWidth : this\.totalWidth\(\)/);
   assert.match(menu, /this.contentWidth = cardViewportWidth\(Number\(area.width\), Number\(area.height\)\)/);
   assert.doesNotMatch(menu, /popupOpen|rowGap|collapsedGroupIds/);
   assert.match(menu, /placeActionMenuGroups\(/);
@@ -219,6 +223,6 @@ test('all card menu callers share one viewport-limited surface and one row rende
     assert.equal(mounted.menuGeometry().maxHeight, 0, 'an offscreen anchor cannot create overflowing menu height');
   }
   assert.match(shell, /Scroll\(this\.scroller\)/);
-  assert.match(shell, /maxHeight: this\.menuGeometry\(\)\.maxHeight/);
+  assert.match(shell, /maxHeight: this\.scrollMaxHeight\(\)/);
   assert.match(shell, /top: this\.menuGeometry\(\)\.top/);
 });

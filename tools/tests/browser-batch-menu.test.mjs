@@ -5,10 +5,11 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
 import { AppInterfaceTracker, visibleInterfaceItems } from '../../entry/src/main/ets/model/AppInterface.ts';
-import { actionMenuRows, toggleActionMenuBranch } from '../../entry/src/main/ets/components/common/ActionMenuTree.ts';
+import { actionMenuRows, visibleActionMenuRows, toggleActionMenuBranch } from '../../entry/src/main/ets/components/common/ActionMenuTree.ts';
 import { CARD_FLAGS, customFlagLabel } from '../../entry/src/main/ets/model/CardMarking.ts';
 
-const callbacks = { reset:'onReset', suspend:'on挂起', bury:'onBury', notetype:'on更改笔记类型', deck:'on改牌组',
+const callbacks = { select_all:'onSelectAll', clear_selection:'onClearSelection', preview:'onPreview', export:'onExport', grade:'onGrade',
+  reset:'onReset', suspend:'on挂起', bury:'onBury', notetype:'on更改笔记类型', deck:'on改牌组',
   reposition:'on重新定位', due:'on设置到期日', tags:'onTags', marking:'group',
   agent:'onAI改卡', help:'onHelp', exit:'onExit', delete:'on删除' };
 const markingCallbacks = {mark:'onMark',unmark:'onMark',flag:'on设置标志',flag_names:'onFlagNames'};
@@ -51,7 +52,7 @@ test('selection count replaces the browser title while Actions stays a manual me
 
 function dependencies(namedResourceText = (_context,key) => key, tracker = new AppInterfaceTracker()) {
   const deps = { CARD_FLAGS, customFlagLabel, namedResourceText, $r: key=>key };
-  return { ...deps, visibleInterfaceItems, appInterface:tracker, actionMenuRows, toggleActionMenuBranch,
+  return { ...deps, visibleInterfaceItems, appInterface:tracker, actionMenuRows, visibleActionMenuRows, toggleActionMenuBranch,
     actionIcon:loadPlatformModule('utils/ActionIcons.ets','actionIcon',deps),
     flagMenuChoices:loadPlatformModule('components/common/FlagMenuChoices.ets','flagMenuChoices',deps),
     应用尺寸:{compactMenuWidth:112,cardActionMenuWidth:176} };
@@ -108,7 +109,7 @@ test('Back closes the popup before exiting selection; explicit exit clears the m
   const page = new Page();
   const Menu=loadComponentLogic(path,'批量操作栏',dependencies()), menu=new Menu();
   menu.getUIContext=()=>({}); menu.expandedIds=['marking','flag']; menu.选中数=2; menu.onClose=()=>{page.showBatchMenu=false;};
-  Object.assign(page,{showBatchMenu:true,batchBackRequest:0,batchDialog:'none',多选模式值:true,选中ID列表:[1,2],selectionVersion:0,退出多选信号:0});
+  Object.assign(page,{displayDialog:'',inlineEditorId:0,showBatchMenu:true,batchBackRequest:0,batchDialog:'none',多选模式值:true,选中ID列表:[1,2],selectionVersion:0,退出多选信号:0});
   assert.equal(page.onBackPress(),true);
   assert.equal(page.batchBackRequest,1); menu.handleBackRequest();
   assert.deepEqual(menu.expandedIds,['marking']); assert.equal(page.showBatchMenu,true);
@@ -127,7 +128,7 @@ test('batch and study reuse the same marking popup, flag choices and viewport-li
   assert.match(menu,/flagMenuChoices\(/); assert.doesNotMatch(menu,/Scroll\(|\.height\(|\.padding\(/);
   assert.match(read('pages/学习页.ets'),/flagMenuChoices\(/);
   assert.doesNotMatch(page,/BrowserFlagDialog\(/);
-  assert.match(surface,/Scroll\(/); assert.match(surface,/maxHeight: this\.menuGeometry\(\)\.maxHeight/);
+  assert.match(surface,/Scroll\(/); assert.match(surface,/maxHeight: this\.scrollMaxHeight\(\)/);
   assert.match(surface,/\.onAreaChange\([\s\S]*this.viewportHeight = Number\(area.height\)/);
   const content = page.slice(page.indexOf('private browserContent()'),page.indexOf('private browserInspection()'));
   assert.doesNotMatch(content,/批量操作栏\(/,'bottom panel must no longer reserve list space');
@@ -140,15 +141,12 @@ test('flag popup preserves seven colors, clear, custom names and submits only on
   menu.onFlag=flag=>calls.push(flag); menu.aboutToAppear();
   assert.deepEqual(tracker.snapshot().map(e=>e.surface).sort(),['browser_batch','browser_batch_marking']);
   menu.expandedIds=['marking']; menu.selectItem('flag'); menu.publishInterface();
-  assert.deepEqual(tracker.snapshot().map(e=>e.surface).sort(),['browser_batch','browser_batch_flags','browser_batch_marking']);
-  assert.deepEqual(tracker.snapshot().find(e=>e.surface==='browser_batch_flags').optionIds,['0','1','2','3','4','5','6','7']);
+  assert.deepEqual(tracker.snapshot().map(e=>e.surface).sort(),['browser_batch','browser_batch_flags']);
+  assert.deepEqual(tracker.snapshot().find(e=>e.surface==='browser_batch_flags').optionIds,['back','0','1','2','3','4','5','6','7']);
   const flags=menu.flagEntries(); assert.equal(flags.length,8); assert.equal(flags[7].value,'Custom purple');
   assert.equal(flags[0].iconTint,undefined); assert.equal(flags[0].selectionUsesAccent,false);
-  menu.primaryObscured=true;menu.publishInterface();
-  assert.deepEqual(tracker.snapshot().map(e=>e.surface).sort(),['browser_batch_flags','browser_batch_marking']);
-  menu.on删除=()=>assert.fail('covered primary action must not execute');menu.selectItem('delete');
-  menu.primaryObscured=false;menu.publishInterface();
-  assert.ok(tracker.snapshot().some(e=>e.surface==='browser_batch'));
+  menu.onMark=()=>assert.fail('replaced marking action must not execute');menu.selectItem('mark');
+  assert.ok(tracker.snapshot().some(e=>e.surface==='browser_batch'),'primary menu remains visible and operable');
   flags[7].action(); assert.deepEqual(calls,['close',7]);
   calls.length=0; menu.busy=true; flags[0].action(); menu.busy=false; menu.expandedIds=[]; flags[0].action();
   menu.expandedIds=['marking','flag']; menu.submitFlag(8); assert.deepEqual(calls,[]);

@@ -2357,6 +2357,7 @@
     {"name": "feedback_buried", "value": "Card buried"},
     {"name": "feedback_suspended", "value": "Card suspended"},
     {"name": "feedback_items_updated", "value": "Updated %d items"},
+    {"name":"menu_back_to_parent","value":"Back"},
     {"name":"directory_title","value":"Directory selection"},
     {"name":"directory_search","value":"Search directories"},
     {"name":"directory_empty","value":"No matching directories"},

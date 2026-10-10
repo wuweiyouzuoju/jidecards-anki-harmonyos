@@ -64,7 +64,7 @@ test('real flat and nested row builders pass the owning scope explicitly across 
   const source=read('components/common/CardActionMenu.ets'),start=source.indexOf('  private menuRow(');
   const method=source.slice(start,source.indexOf('\n  }',start)+4);let rowProps;
   const Rows=new Function('AnchoredMenuItem','TextAlign',stripTypeScriptTypes('class Rows {'+method+'};', {mode:'transform'})+'return Rows;')(props=>rowProps=props,{Start:0});
-  const rows=Object.assign(new Rows(),{slideScope:scope,expandedIds:[],rowItem:()=>({value:'Leaf'}),primaryObscured:()=>false,selectEntry:row=>selected.push(row.node.id)});
+  const rows=Object.assign(new Rows(),{slideScope:scope,expandedIds:[],rowItem:()=>({value:'Leaf'}),selectEntry:row=>selected.push(row.node.id)});
   rows.menuRow({depth:1,enabled:true,node:{id:'child'}},0);
   assert.equal(rowProps.slideScope,scope);assert.equal(rowProps.slideLayer,1);rowProps.onSelect();assert.deepEqual(selected,['leaf','child']);
 });

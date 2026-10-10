@@ -77,7 +77,7 @@ import { APP_FOREGROUND_KEY } from '../../model/AppLifecycleState';
 import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../../model/ReleaseFeatures';
 import { buildPreviewInteractionScript } from '../../model/PreviewInteraction';
 import { CardViewport } from '../common/CardViewport';
-import { CardActionMenu } from '../common/CardActionMenu';
+import { CardActionMenu, CardActionMenuEntry } from '../common/CardActionMenu';
 import { studyKeyName } from '../../utils/StudyKeyAdapter';
 import { PAGE_SURFACE_KEY } from '../../model/ThemeCatalog';
 import { PAGE_COMPACT_LAYOUT_KEY } from '../../model/AppLayoutState';
@@ -708,7 +708,6 @@ export struct 卡片预览页 {
     .width('100%')
     .layoutWeight(1)
     .backgroundColor($r('app.color.surface_card'))
-    .borderRadius(应用尺寸.圆角_卡片)
     .clip(true)
     .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
     }
@@ -774,7 +773,7 @@ export struct 卡片预览页 {
       if (this.moreMenuOpen) {
         CardActionMenu({ items: this.预览更多菜单(),
           onClose: (): void => { this.dismissMoreMenu(); },
-          onSelect: (item: MenuElement): void => {
+          onSelect: (item: CardActionMenuEntry): void => {
             this.moreMenuOpen = false;
             item.action?.();
           } })

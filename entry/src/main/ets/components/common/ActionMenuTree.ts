@@ -32,6 +32,16 @@ export function actionMenuRows(root: ActionMenuNode[], expandedIds: string[]): A
   return collectRows(root, expandedIds, '', 0, true);
 }
 
+/** 深层列表替换所属子面板；隐藏的父级行不接收迟到点击，也不发布为当前控件。 */
+export function visibleActionMenuRows(root: ActionMenuNode[], expandedIds: string[]): ActionMenuRow[] {
+  const rows: ActionMenuRow[] = actionMenuRows(root, expandedIds);
+  const replaced: string[] = rows.filter((row: ActionMenuRow): boolean => row.depth === 1 &&
+    row.node.children !== undefined && expandedIds.includes(row.node.id ?? ''))
+    .map((row: ActionMenuRow): string => row.key.slice(0, row.key.lastIndexOf('/')));
+  return rows.filter((row: ActionMenuRow): boolean => row.depth !== 1 ||
+    !replaced.includes(row.key.slice(0, row.key.lastIndexOf('/'))));
+}
+
 function branchIds(node: ActionMenuNode): string[] {
   const ids: string[] = node.children !== undefined && node.id !== undefined ? [node.id] : [];
   for (const child of node.children ?? []) ids.push(...branchIds(child));
@@ -43,7 +53,8 @@ export function toggleActionMenuBranch(root: ActionMenuNode[], expandedIds: stri
   const row: ActionMenuRow | undefined = actionMenuRows(root, expandedIds)
     .find((item: ActionMenuRow): boolean => item.node.id === id);
   if (row === undefined || !row.enabled || row.node.children === undefined) return expandedIds.slice();
-  if (!expandedIds.includes(id)) return [...expandedIds, id];
+  // 同一侧只展开一个根分组，切换分组同时清除旧子级。
+  if (!expandedIds.includes(id)) return row.depth === 0 ? [id] : [...expandedIds, id];
   const closed: string[] = branchIds(row.node);
   return expandedIds.filter((expanded: string): boolean => !closed.includes(expanded));
 }

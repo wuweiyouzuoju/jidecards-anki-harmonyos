@@ -2807,6 +2807,7 @@
     {"name": "feedback_buried", "value": "已埋藏当前卡片"},
     {"name": "feedback_suspended", "value": "已暂停当前卡片"},
     {"name": "feedback_items_updated", "value": "已更新 %d 项"},
+    {"name":"menu_back_to_parent","value":"返回上级"},
     {"name":"directory_title","value":"目录选择"},
     {"name":"directory_search","value":"搜索目录"},
     {"name":"directory_empty","value":"没有匹配的目录"},

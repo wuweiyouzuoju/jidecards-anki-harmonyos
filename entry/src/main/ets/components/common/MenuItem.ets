@@ -37,6 +37,7 @@ export struct AnchoredMenuItem {
   @Prop label: ResourceStr = '';
   @Prop labelAlignment: TextAlign = TextAlign.Center;
   @Prop selected: boolean = false;
+  @Prop showSelectionMark: boolean = false;
   @Prop selectionUsesAccent: boolean = true;
   @Prop available: boolean = true;
   @Prop divider: boolean = false;
@@ -59,7 +60,7 @@ export struct AnchoredMenuItem {
   private hasCenteredIcon(): boolean { return this.labelAlignment === TextAlign.Center && this.icon !== undefined; }
 
   private trailingInset(): number {
-    return 应用尺寸.menuHorizontalPadding + (this.disclosure ? 24 + 应用尺寸.间距_8 : 0);
+    return 应用尺寸.menuHorizontalPadding + (this.disclosure || this.showSelectionMark ? 24 + 应用尺寸.间距_8 : 0);
   }
 
   private iconRowPadding(): Padding {
@@ -116,6 +117,10 @@ export struct AnchoredMenuItem {
           DisclosureChevron({ tint: $r('app.color.text_secondary') })
             .rotate({ angle: this.disclosureAngle ?? (this.expanded ? 90 : 0), centerX: '50%', centerY: '50%' })
             .animation(disclosureAnimation())
+            .margin({ right: 应用尺寸.menuHorizontalPadding })
+            .hitTestBehavior(HitTestMode.None)
+        } else if (this.showSelectionMark && this.selected) {
+          Text('✓').fontSize(18).fontColor(this.accent).width(24).textAlign(TextAlign.Center)
             .margin({ right: 应用尺寸.menuHorizontalPadding })
             .hitTestBehavior(HitTestMode.None)
         }
