@@ -1,3 +1,4 @@
+import { NativeDialogHost, NativeDialogDismiss, NativeDialogPresentation } from './NativeDialogHost';
 import { SurfaceTransition } from '../../utils/SurfaceTransition';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { ComponentContent } from '@kit.ArkUI';
@@ -9,10 +10,14 @@ import { FieldEditResult, wrapFieldSelection, nextClozeNumber, NoteFieldEditingO
 import { 按下态按钮 } from './按下态按钮';
 import { IconActionButton } from './IconActionButton';
 import { NoteTextRun, parseNoteRichText, parseNoteVisualText, serializeNoteRichText, selectionHasFormat, richResultIsBold,
+  noteFontSizeValue, noteFontSizeId, noteRichFontSize, noteRichCaretFontSize, setNoteRichFontSize,
+  preserveNoteRichStyles, sliceNoteRichText, noteHeadingScale, noteRichHeading, noteRichCaretHeading,
+  noteRichParagraphRange, setNoteRichHeading, normalizeNoteRichHeadings, clearNoteRichFormat,
   FORMAT_BOLD, FORMAT_ITALIC, FORMAT_UNDERLINE, FORMAT_HIGHLIGHT } from '../../model/NoteRichText';
 import { FORMAT_SUPERSCRIPT, FORMAT_SUBSCRIPT, noteLinkUrl } from '../../model/NoteRichText';
 import { noteEditorHeight, richNoteList, sourceNoteList, sourceNoteClearFormat, richNoteLink,
-  sourceNoteLink, richNoteScript, richNoteWrap, sourceNoteWrap } from '../../model/NoteHtmlTools';
+  sourceNoteLink, richNoteScript, richNoteWrap, sourceNoteWrap, sourceNoteFontSize, sourceNoteSetFontSize,
+  sourceNoteHeading, sourceNoteSetHeading } from '../../model/NoteHtmlTools';
 import { NoteLinkDialog } from './NoteLinkDialog';
 import { buildNoteEditorWheel, NoteEditorWheelParams, NoteEditorFormatDialog } from '../editor/NoteEditorWheel';
 import { NoteEditorWheelState, NoteEditorWheelSession, NOTE_EDITOR_WHEEL_SESSION_KEY } from '../../model/NoteEditorWheel';
@@ -22,6 +27,17 @@ import { showToastSafely, resourceText, namedResourceText } from '../../utils/Ui
 import { 字段帮助对话框 } from '../字段帮助面板';
 export type { NoteFieldEditingOptions } from '../../model/NoteFieldEditing';
 export { noteFieldMediaTool } from '../../model/NoteFieldEditing';
+
+interface NoteEditorOptionSelection {
+  toolId: string;
+  source: boolean;
+  snapshot: string;
+  runs: NoteTextRun[];
+  start: number;
+  end: number;
+  version: number;
+  selectedId: string;
+}
 
 /** 三个笔记入口共用；可视编辑仅接管可保真理解的文字 HTML，复杂内容保留源码。 */
 @Component
@@ -40,6 +56,9 @@ export struct NoteFieldEditor {
   private richController: RichEditorController = new RichEditorController();
   @State private sourceMode: boolean = false;
   @State private typingFormat: number = 0;
+  private typingFontSize: string = '';
+  private typingHeading: string = '';
+  private richStyleRuns: NoteTextRun[] = [];
   @State private expanded: boolean = false;
   @State private sourceToolFocus: boolean = false;
   private selectionStart: number = -1;
@@ -49,12 +68,13 @@ export struct NoteFieldEditor {
   private applying: boolean = false;
   private lastSnapshot: string = '';
   private selectionVersion: number = 0;
-  private hintDialog: CustomDialogController | null = null;
+  private readonly hintDialog: NativeDialogHost = new NativeDialogHost();
   private hintSaving: boolean = false;
   private hintedAction: (() => void) | null = null;
-  private linkDialog: CustomDialogController | null = null;
-  private formatDialog: CustomDialogController | null = null;
+  private readonly linkDialog: NativeDialogHost = new NativeDialogHost();
+  private readonly formatDialog: NativeDialogHost = new NativeDialogHost();
   private formatVersion: number = 0;
+  private optionSelection: NoteEditorOptionSelection | null = null;
   private wheelContent: ComponentContent<NoteEditorWheelParams> | null = null;
   private wheelVisible: boolean = false;
   private wheelRemoval: number = -1;
@@ -64,6 +84,8 @@ export struct NoteFieldEditor {
   private inputKey: string = '';
 
   aboutToAppear(): void {
+    this.disposed = false;
+    this.hintDialog.activate(); this.linkDialog.activate(); this.formatDialog.activate();
     this.inputKey = 'note-editor-' + this.getUniqueId();
     this.sourceMode = this.fieldConfig?.plainText === true || parseNoteVisualText(this.value) === null;
     this.wheelSession.register(this.inputKey, !this.disabled && this.foreground, (active: boolean): void => {
@@ -74,13 +96,15 @@ export struct NoteFieldEditor {
   aboutToDisappear(): void {
     this.disposed = true; this.selectionVersion++; this.ready = false; this.hideWheel(true);
     this.wheelSession.remove(this.inputKey);
-    this.hintDialog?.close(); this.hintDialog = null;
+    this.hintDialog.dispose();
     this.hintedAction = null;
-    this.linkDialog?.close(); this.linkDialog = null;
+    this.linkDialog.dispose();
     this.closeFormat();
+    this.formatDialog.dispose();
   }
 
   private receiveValue(): void {
+    if (this.optionSelection !== null && this.value !== this.optionSelection.snapshot) this.closeOptions();
     if (this.disposed || this.applying || this.sourceMode || this.value === this.lastSnapshot) return;
     const runs: NoteTextRun[] | null = parseNoteVisualText(this.value);
     if (runs === null) { this.sourceMode = true; this.ready = false; }
@@ -90,17 +114,19 @@ export struct NoteFieldEditor {
 
   private sourceChanged(text: string): void {
     if (this.disposed || this.disabled) return;
-    this.value = text; this.onChange(text);
+    this.closeOptions(); this.value = text; this.onChange(text);
   }
 
   private richReady(): void {
     if (this.disposed) return;
     if (this.sourceMode) return;
     this.ready = true; this.loadRich(parseNoteVisualText(this.value) ?? []);
+    this.updateWheel();
   }
 
-  private style(format: number): RichEditorTextStyle {
-    return { fontSize: this.editingFontSize(), fontFamily: this.fieldConfig?.fontName || undefined,
+  private style(format: number, fontSize: string = this.typingFontSize, heading: string = this.typingHeading): RichEditorTextStyle {
+    return { fontSize: noteFontSizeValue(fontSize, this.editingFontSize()) * (fontSize === '' ? noteHeadingScale(heading) : 1),
+      fontFamily: this.fieldConfig?.fontName || undefined,
       fontColor: (format & FORMAT_HIGHLIGHT) !== 0 ? '#202020' : $r('app.color.text_primary'),
       fontWeight: (format & FORMAT_BOLD) !== 0 ? FontWeight.Bold : FontWeight.Normal,
       fontStyle: (format & FORMAT_ITALIC) !== 0 ? FontStyle.Italic : FontStyle.Normal,
@@ -119,15 +145,19 @@ export struct NoteFieldEditor {
     this.applying = true;
     try {
       this.richController.deleteSpans();
-      for (const run of runs) this.richController.addTextSpan(run.text, { style: this.style(run.format),
+      for (const run of runs) this.richController.addTextSpan(run.text, { style: this.style(run.format, run.fontSize ?? '', run.heading ?? ''),
         paragraphStyle: { textAlign: TextAlign.Start },
         urlStyle: run.url === undefined ? undefined : { url: run.url } });
       this.lastSnapshot = serializeNoteRichText(runs);
+      this.richStyleRuns = runs;
+      this.typingFontSize = noteRichCaretFontSize(runs, Math.max(0, this.richController.getCaretOffset()));
+      this.typingHeading = noteRichCaretHeading(runs, Math.max(0, this.richController.getCaretOffset()));
+      if (this.typingHeading !== '') this.typingFormat |= FORMAT_BOLD;
       this.richController.setTypingStyle(this.style(this.typingFormat));
     } finally { this.applying = false; }
   }
 
-  private richRuns(): NoteTextRun[] {
+  private nativeRichRuns(): NoteTextRun[] {
     const runs: NoteTextRun[] = [];
     for (const span of this.richController.getSpans()) {
       const text = span as RichEditorTextSpanResult;
@@ -144,14 +174,64 @@ export struct NoteFieldEditor {
       const run: NoteTextRun = { text: text.value.slice(text.offsetInSpan[0], text.offsetInSpan[1]), format: format };
       const url: ResourceStr | undefined = text.urlStyle?.url;
       if (typeof url === 'string' && url !== '') run.url = url;
+      const size: string = noteFontSizeId(style.fontSize, this.editingFontSize());
+      if (size !== '') run.fontSize = size;
       runs.push(run);
     }
     return runs;
   }
 
+  private richRuns(): NoteTextRun[] {
+    return preserveNoteRichStyles(this.nativeRichRuns(), this.richStyleRuns);
+  }
+
+  private replaceRichParagraphs(runs: NoteTextRun[], start: number, end: number): void {
+    const format: number = this.typingFormat;
+    const size: string = this.typingFontSize;
+    const heading: string = this.typingHeading;
+    const html: string = serializeNoteRichText(runs);
+    this.loadRich(runs);
+    this.typingFormat = format; this.typingFontSize = size; this.typingHeading = heading;
+    this.richController.setTypingStyle(this.style(format));
+    this.applying = true;
+    try {
+      this.richController.setSelection(start, end, { menuPolicy: MenuPolicy.HIDE });
+      this.selectionStart = start; this.selectionEnd = end;
+    } finally { this.applying = false; }
+    if (html !== this.value) { this.value = html; this.onChange(html); }
+  }
+
+  private replaceRichStyles(start: number, end: number, inserted: NoteTextRun[]): void {
+    this.richStyleRuns = sliceNoteRichText(this.richStyleRuns, 0, start).concat(inserted,
+      sliceNoteRichText(this.richStyleRuns, end, Number.MAX_SAFE_INTEGER));
+  }
+
+  /** 原生输入/粘贴/删除给出变更前后 UTF-16 范围；选区外的字号语义不变。 */
+  private richChanged(before: TextRange, after: TextRange): void {
+    if (this.applying || !this.ready || this.disposed || this.disabled || this.sourceMode) return;
+    const inserted: NoteTextRun[] = sliceNoteRichText(this.nativeRichRuns(), after.start ?? 0, after.end ?? 0);
+    const headings: boolean = this.typingHeading !== '' || this.richStyleRuns.some((run: NoteTextRun): boolean => run.heading !== undefined);
+    for (const run of inserted) {
+      if (run.fontSize === undefined && this.typingFontSize === 'medium') run.fontSize = 'medium';
+      if (this.typingHeading !== '') { run.heading = this.typingHeading; run.fontSize = this.typingFontSize || undefined; }
+    }
+    this.replaceRichStyles(before.start ?? 0, before.end ?? 0, inserted);
+    this.closeOptions();
+    if (headings) {
+      const runs: NoteTextRun[] = normalizeNoteRichHeadings(this.richRuns());
+      const caret: number = after.end ?? 0;
+      this.typingHeading = noteRichCaretHeading(runs, caret);
+      this.typingFontSize = noteRichCaretFontSize(runs, caret);
+      this.replaceRichParagraphs(runs, caret, caret);
+    } else this.publishRich();
+    this.updateWheel();
+  }
+
   private publishRich(): void {
     if (this.applying || !this.ready || this.disposed || this.disabled || this.sourceMode) return;
-    const html: string = serializeNoteRichText(this.richRuns());
+    const runs: NoteTextRun[] = this.richRuns();
+    this.richStyleRuns = runs;
+    const html: string = serializeNoteRichText(runs);
     if (html === this.lastSnapshot) return;
     this.lastSnapshot = html;
     this.value = html; this.onChange(html);
@@ -164,7 +244,17 @@ export struct NoteFieldEditor {
 
   private richSelectionChanged(range: RichEditorRange): void {
     if (this.disposed || this.applying) return;
+    const changed: boolean = this.selectionStart !== (range.start ?? 0) || this.selectionEnd !== (range.end ?? range.start ?? 0);
+    if (changed) this.closeOptions();
     this.selectionStart = range.start ?? 0; this.selectionEnd = range.end ?? this.selectionStart;
+    // 输入时的选区通知可能早于 onDidChange，等待字号片段随文字范围更新后再继承。
+    if (changed && this.selectionStart === this.selectionEnd &&
+      this.nativeRichRuns().map((run: NoteTextRun): string => run.text).join('') ===
+      this.richStyleRuns.map((run: NoteTextRun): string => run.text).join('')) {
+      this.typingFontSize = noteRichCaretFontSize(this.richStyleRuns, this.selectionStart);
+      this.typingHeading = noteRichCaretHeading(this.richStyleRuns, this.selectionStart);
+      if (this.typingHeading !== '') this.typingFormat |= FORMAT_BOLD;
+    }
     if (this.ready) this.richController.setTypingStyle(this.style(this.typingFormat));
     this.updateWheel();
   }
@@ -230,6 +320,10 @@ export struct NoteFieldEditor {
         // 仅插入边界标记，保留选中文字原有样式。
         if (suffix !== '') this.richController.addTextSpan(suffix, { offset: end, style: this.style(this.typingFormat) });
         this.richController.addTextSpan(prefix, { offset: start, style: this.style(this.typingFormat) });
+        if (suffix !== '') this.replaceRichStyles(end, end, [{ text: suffix, format: this.typingFormat,
+          fontSize: this.typingFontSize || undefined, heading: this.typingHeading || undefined }]);
+        this.replaceRichStyles(start, start, [{ text: prefix, format: this.typingFormat,
+          fontSize: this.typingFontSize || undefined, heading: this.typingHeading || undefined }]);
         const next: number = start === end ? start + prefix.length : end + prefix.length + suffix.length;
         this.richController.setCaretOffset(Math.min(next, text.length + prefix.length + suffix.length));
         this.selectionStart = next; this.selectionEnd = next;
@@ -260,14 +354,21 @@ export struct NoteFieldEditor {
     try {
       if (end > start) this.richController.deleteSpans({ start: start, end: end });
       this.richController.addTextSpan('\n', { offset: start, style: this.style(this.typingFormat) });
+      this.replaceRichStyles(start, end, [{ text: '\n', format: this.typingFormat,
+        fontSize: this.typingFontSize || undefined, heading: this.typingHeading || undefined }]);
       this.richController.setCaretOffset(start + 1);
       this.selectionStart = start + 1; this.selectionEnd = start + 1;
     } finally { this.applying = false; }
-    this.publishRich();
+    if (this.richStyleRuns.some((run: NoteTextRun): boolean => run.heading !== undefined)) {
+      const runs: NoteTextRun[] = normalizeNoteRichHeadings(this.richRuns());
+      this.typingHeading = noteRichCaretHeading(runs, start + 1);
+      this.replaceRichParagraphs(runs, start + 1, start + 1);
+    } else this.publishRich();
   }
 
   private switchMode(_locale: string = this.uiLanguage): void {
     if (this.disabled || this.disposed) return;
+    this.closeOptions();
     if (!this.sourceMode) { this.publishRich(); this.sourceMode = true; this.ready = false; }
     else {
       if (parseNoteVisualText(this.value) === null) {
@@ -276,7 +377,7 @@ export struct NoteFieldEditor {
       }
       this.sourceMode = false;
     }
-    this.typingFormat = 0; this.selectionStart = -1; this.selectionEnd = -1;
+    this.typingFormat = 0; this.typingFontSize = ''; this.typingHeading = ''; this.selectionStart = -1; this.selectionEnd = -1;
     this.focusInput(this.sourceMode);
   }
 
@@ -305,12 +406,12 @@ export struct NoteFieldEditor {
     return { start: start, end: Math.max(start, Math.min(length, this.selectionEnd < 0 ? start : this.selectionEnd)) };
   }
 
-  private applySourceEdit(result: FieldEditResult): void {
-    this.sourceToolFocus = true;
+  private applySourceEdit(result: FieldEditResult, restoreFocus: boolean = true): void {
+    if (restoreFocus) this.sourceToolFocus = true;
     this.sourceMode = true; this.ready = false;
     this.value = result.text; this.onChange(result.text);
     this.selectionStart = result.start; this.selectionEnd = result.end;
-    this.focusInput(true, result.start);
+    if (restoreFocus) this.focusInput(true, result.start);
   }
 
   private focusInput(source: boolean, caret: number = -1): void {
@@ -360,8 +461,14 @@ export struct NoteFieldEditor {
     }
     if (!this.ready) return;
     if (this.selectionEnd > this.selectionStart && this.selectionStart >= 0) {
-      this.applySelectionStyle(this.style(0), true);
-    } else this.typingFormat = 0;
+      if (this.richStyleRuns.some((run: NoteTextRun): boolean => run.heading !== undefined)) {
+        this.replaceRichParagraphs(clearNoteRichFormat(this.richRuns(), this.selectionStart, this.selectionEnd),
+          this.selectionStart, this.selectionEnd);
+        return;
+      }
+      this.richStyleRuns = setNoteRichFontSize(this.richRuns(), this.selectionStart, this.selectionEnd, '');
+      this.applySelectionStyle(this.style(0, '', ''), true);
+    } else { this.typingFormat = 0; this.typingFontSize = ''; this.typingHeading = ''; }
     this.richController.setTypingStyle(this.style(this.typingFormat));
   }
 
@@ -369,28 +476,23 @@ export struct NoteFieldEditor {
     showToastSafely(this.getUIContext(), { message: resourceText(this.getUIContext(), $r('app.string.note_editor_source_selection_hint')) });
   }
 
-  private openLink(): void {
-    if (this.disabled || this.disposed || this.linkDialog !== null || (!this.sourceMode && !this.ready)) return;
-    const range: RichEditorRange = this.selectedRange();
-    const start: number = range.start ?? 0;
-    const end: number = range.end ?? start;
-    const source: boolean = this.sourceMode;
-    const snapshot: string = this.value;
-    const runs: NoteTextRun[] = source ? [] : this.richRuns();
-    const text: string = source ? snapshot : runs.map((run: NoteTextRun): string => run.text).join('');
-    const selected: NoteTextRun[] | null = source ? parseNoteRichText(text.slice(start, end)) : null;
-    if (source && selected === null) { this.sourceSelectionHint(); return; }
-    const label: string = source ? (selected ?? []).map((run: NoteTextRun): string => run.text).join('') : text.slice(start, end);
-    this.linkDialog = new CustomDialogController({ builder: NoteLinkDialog({ selectedText: label,
-      onClose: (): void => { this.closeLink(); },
+  private readonly createLinkDialog: (label: string, source: boolean, snapshot: string, runs: NoteTextRun[], start: number, end: number, dismiss: NativeDialogDismiss) => CustomDialogController =
+    (label: string, source: boolean, snapshot: string, runs: NoteTextRun[], start: number, end: number, dismiss: NativeDialogDismiss): CustomDialogController => {
+    const presentation: NativeDialogPresentation = this.linkDialog.presentation();
+    const isCurrent: () => boolean = this.linkDialog.captureCurrent();
+    return new CustomDialogController({ builder: NoteLinkDialog({ selectedText: label,
+      onClose: this.linkDialog.guard((): void => { this.closeLink(); }),
       onApply: (url: string, label: string): void => {
+        if (!isCurrent()) return;
         this.closeLink();
-        if (this.disabled || this.disposed || this.value !== snapshot || noteLinkUrl(url) === '') return;
+        if (this.disabled || this.disposed || !this.foreground || !this.wheelActive || this.sourceMode !== source ||
+          this.value !== snapshot || noteLinkUrl(url) === '') return;
         if (source) {
           const result: FieldEditResult | null = sourceNoteLink(snapshot, start, end, url, label);
           if (result === null) this.sourceSelectionHint(); else this.applySourceEdit(result);
         } else {
-          const html: string = richNoteLink(runs, start, end, url, label);
+          const html: string = richNoteLink(runs, start, end, url, label, { text: '', format: this.typingFormat,
+            fontSize: this.typingFontSize, heading: this.typingHeading });
           const linked: NoteTextRun[] | null = parseNoteRichText(html);
           if (linked === null) return;
           this.applying = true;
@@ -399,32 +501,18 @@ export struct NoteFieldEditor {
           const caret: number = end > start ? end : start + label.length;
           this.richController.setCaretOffset(caret); this.selectionStart = caret; this.selectionEnd = caret;
         }
-      } }), cancel: (): void => { this.closeLink(); },
-      openAnimation: SurfaceTransition.dialogEnterAnimation(), closeAnimation: SurfaceTransition.dialogExitAnimation(), customStyle: true, autoCancel: true, alignment: DialogAlignment.Center,
-      width: '100%', height: '100%', maskColor: Color.Transparent });
-    this.linkDialog.open();
-    this.hideWheel(true);
-  }
+      } }), onWillDismiss: dismiss,
+      openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation, customStyle: presentation.customStyle, autoCancel: presentation.autoCancel, alignment: presentation.alignment,
+      width: presentation.width, height: presentation.height, maskColor: presentation.maskColor });
+  };
 
-  private closeLink(): void {
-    this.linkDialog?.close(); this.linkDialog = null;
-    if (this.wheelActive) { this.showWheel(); this.focusInput(this.sourceMode, this.selectionStart); }
-  }
-
-  private openFormatOptions(key: string): void {
-    if (this.disabled || this.disposed || !this.foreground || !this.wheelActive || this.formatDialog !== null ||
-      (!this.sourceMode && !this.ready) || noteEditorFormatOptions(key).length === 0) return;
-    const range: RichEditorRange = this.selectedRange();
-    const start: number = range.start ?? 0;
-    const end: number = range.end ?? start;
-    const source: boolean = this.sourceMode;
-    const snapshot: string = this.value;
-    const runs: NoteTextRun[] = source ? [] : this.richRuns();
-    const version: number = ++this.formatVersion;
-    this.formatDialog = new CustomDialogController({ builder: NoteEditorFormatDialog({ toolId: key,
+  private readonly createFormatDialog: (key: string, source: boolean, snapshot: string, runs: NoteTextRun[], start: number, end: number, version: number, dismiss: NativeDialogDismiss) => CustomDialogController =
+    (key: string, source: boolean, snapshot: string, runs: NoteTextRun[], start: number, end: number, version: number, dismiss: NativeDialogDismiss): CustomDialogController => {
+    const presentation: NativeDialogPresentation = this.formatDialog.presentation();
+    return new CustomDialogController({ builder: NoteEditorFormatDialog({ toolId: key,
       fieldName: this.fieldName, source: source, onClose: (): void => { this.closeFormat(version); },
       onSelect: (id: string): void => {
-        if (version !== this.formatVersion || this.formatDialog === null) return;
+        if (version !== this.formatVersion || this.formatDialog.current() === null) return;
         this.closeFormat();
         const option: NoteEditorFormatOption | undefined = noteEditorFormatOptions(key)
           .find((item: NoteEditorFormatOption): boolean => item.id === id);
@@ -441,45 +529,144 @@ export struct NoteFieldEditor {
           if (result === null) this.sourceSelectionHint(); else this.applySourceEdit(result);
         }
         this.updateWheel();
-      } }), cancel: (): void => { this.closeFormat(version); },
-      openAnimation: SurfaceTransition.dialogEnterAnimation(), closeAnimation: SurfaceTransition.dialogExitAnimation(), customStyle: true, autoCancel: true, alignment: DialogAlignment.Center,
-      width: '100%', height: '100%', maskColor: Color.Transparent });
-    this.formatDialog.open(); this.hideWheel(true);
-  }
+      } }), onWillDismiss: dismiss,
+      openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation, customStyle: presentation.customStyle, autoCancel: presentation.autoCancel, alignment: presentation.alignment,
+      width: presentation.width, height: presentation.height, maskColor: presentation.maskColor });
+  };
 
-  private closeFormat(expectedVersion: number = this.formatVersion): void {
-    if (expectedVersion !== this.formatVersion) return;
-    const dialog: CustomDialogController | null = this.formatDialog;
-    this.formatVersion++;
-    this.formatDialog = null; dialog?.close();
-    if (dialog !== null && this.wheelActive) { this.showWheel(); this.focusInput(this.sourceMode, this.selectionStart); }
-  }
-
-  private activateTool(key: string, label: Resource, action: () => void, _locale: string = this.uiLanguage): void {
-    if (this.disabled || this.disposed || this.hintDialog !== null || this.linkDialog !== null ||
-      this.formatDialog !== null || this.hintSaving) return;
-    let seen: boolean = false;
-    try { seen = hasNoteEditingHint(key); } catch (error) { this.hintFailure(); }
-    if (seen) { action(); return; }
-    this.hintedAction = action;
-    this.hintDialog = new CustomDialogController({
+  private readonly createHintDialog: (key: string, label: Resource, dismiss: NativeDialogDismiss) => CustomDialogController =
+    (key: string, label: Resource, dismiss: NativeDialogDismiss): CustomDialogController => {
+    const presentation: NativeDialogPresentation = this.hintDialog.presentation();
+    return new CustomDialogController({
       builder: 字段帮助对话框({ 标题: label,
         正文: this.sourceMode && ['bold', 'italic', 'underline', 'highlight'].indexOf(key) >= 0 ?
           resourceText(this.getUIContext(), $r('app.string.note_editor_hint_source_format')) :
           namedResourceText(this.getUIContext(), `note_editor_hint_${key}`),
-        onDismiss: (): void => { this.finishHint(key); } }),
-      cancel: (): void => { this.finishHint(key); },
-      openAnimation: SurfaceTransition.dialogEnterAnimation(), closeAnimation: SurfaceTransition.dialogExitAnimation(), customStyle: true, autoCancel: true, alignment: DialogAlignment.Center,
-      width: '100%', height: '100%', maskColor: Color.Transparent
+        onDismiss: this.hintDialog.guard((): void => { this.finishHint(key); }) }),
+      onWillDismiss: dismiss,
+      openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation, customStyle: presentation.customStyle, autoCancel: presentation.autoCancel, alignment: presentation.alignment,
+      width: presentation.width, height: presentation.height, maskColor: presentation.maskColor
     });
-    this.hintDialog.open();
+  };
+
+  private openLink(): void {
+    if (this.disabled || this.disposed || this.linkDialog.current() !== null || (!this.sourceMode && !this.ready)) return;
+    const range: RichEditorRange = this.selectedRange();
+    const start: number = range.start ?? 0;
+    const end: number = range.end ?? start;
+    const source: boolean = this.sourceMode;
+    const snapshot: string = this.value;
+    const runs: NoteTextRun[] = source ? [] : this.richRuns();
+    const text: string = source ? snapshot : runs.map((run: NoteTextRun): string => run.text).join('');
+    const selected: NoteTextRun[] | null = source ? parseNoteRichText(text.slice(start, end)) : null;
+    if (source && selected === null) { this.sourceSelectionHint(); return; }
+    const label: string = source ? (selected ?? []).map((run: NoteTextRun): string => run.text).join('') : text.slice(start, end);
+    this.linkDialog.open((dismiss: NativeDialogDismiss): CustomDialogController =>
+      this.createLinkDialog(label, source, snapshot, runs, start, end, dismiss), (): boolean => { this.closeLink(); return true; });
+    this.hideWheel(true);
+  }
+
+  private closeLink(): void {
+    this.linkDialog.close();
+    if (this.wheelActive) { this.showWheel(); this.focusInput(this.sourceMode, this.selectionStart); }
+  }
+
+  private openFormatOptions(key: string): void {
+    if (this.disabled || this.disposed || !this.foreground || !this.wheelActive || this.formatDialog.current() !== null ||
+      (!this.sourceMode && !this.ready) || noteEditorFormatOptions(key).length === 0) return;
+    // 外圈只选择格式；取消旧输入焦点任务，保持用户当前键盘状态和选区。
+    if (NOTE_FIELD_EDITING_SUPPORT.formatOptionPicker.toolIds.indexOf(key) >= 0) this.selectionVersion++;
+    if (key === this.optionSelection?.toolId) { this.closeOptions(); return; }
+    this.closeOptions();
+    const range: RichEditorRange = this.selectedRange();
+    const start: number = range.start ?? 0;
+    const end: number = range.end ?? start;
+    const source: boolean = this.sourceMode;
+    const snapshot: string = this.value;
+    const runs: NoteTextRun[] = source ? [] : this.richRuns();
+    const version: number = ++this.formatVersion;
+    if (key === 'font_size' || key === 'heading') {
+      this.optionSelection = { toolId: key, source: source, snapshot: snapshot, runs: runs, start: start, end: end,
+        version: version, selectedId: key === 'heading' ?
+          source ? sourceNoteHeading(snapshot, start, end) : end > start ? noteRichHeading(runs, start, end) : this.typingHeading :
+          source ? sourceNoteFontSize(snapshot, start, end) : end > start ? noteRichFontSize(runs, start, end) :
+            this.typingFontSize || (this.typingHeading !== '' ? '' : 'medium') };
+      this.updateWheel();
+      return;
+    }
+    this.formatDialog.open((dismiss: NativeDialogDismiss): CustomDialogController =>
+      this.createFormatDialog(key, source, snapshot, runs, start, end, version, dismiss), (): boolean => { this.closeFormat(version); return true; });
+    this.hideWheel(true);
+  }
+
+  private closeFormat(expectedVersion: number = this.formatVersion): void {
+    if (expectedVersion !== this.formatVersion) return;
+    this.closeOptions();
+    const wasOpen: boolean = this.formatDialog.current() !== null;
+    this.formatVersion++;
+    this.formatDialog.close();
+    if (wasOpen && this.wheelActive) { this.showWheel(); this.focusInput(this.sourceMode, this.selectionStart); }
+  }
+
+  private closeOptions(): void {
+    if (this.optionSelection === null) return;
+    this.optionSelection = null; this.formatVersion++; this.updateWheel();
+  }
+
+  private selectFormatOption(id: string, version: number): void {
+    const selection: NoteEditorOptionSelection | null = this.optionSelection;
+    const option: NoteEditorFormatOption | undefined = noteEditorFormatOptions(selection?.toolId ?? '')
+      .find((item: NoteEditorFormatOption): boolean => item.id === id);
+    if (selection === null || selection.version !== version || option === undefined) return;
+    this.closeOptions();
+    if (this.disposed || this.disabled || !this.foreground || !this.wheelActive || !this.wheelVisible ||
+      this.sourceMode !== selection.source || this.value !== selection.snapshot) return;
+    if (selection.source) {
+      const result: FieldEditResult | null = selection.toolId === 'heading' ?
+        sourceNoteSetHeading(selection.snapshot, selection.start, selection.end, id) :
+        sourceNoteSetFontSize(selection.snapshot, selection.start, selection.end, id);
+      if (result === null) this.sourceSelectionHint(); else this.applySourceEdit(result, false);
+    } else if (this.ready) {
+      if (selection.toolId === 'heading') {
+        this.typingHeading = id; this.typingFontSize = ''; this.typingFormat |= FORMAT_BOLD;
+        const range: number[] = noteRichParagraphRange(selection.runs, selection.start, selection.end);
+        if (range[1] > range[0]) {
+          this.replaceRichParagraphs(setNoteRichHeading(selection.runs, selection.start, selection.end, id), selection.start, selection.end);
+        } else {
+          this.richController.setTypingStyle(this.style(this.typingFormat));
+        }
+      } else if (selection.end > selection.start) {
+        this.richStyleRuns = setNoteRichFontSize(selection.runs, selection.start, selection.end, id);
+        this.selectionStart = selection.start; this.selectionEnd = selection.end;
+        this.applySelectionStyle({ fontSize: noteFontSizeValue(id, this.editingFontSize()) });
+      } else {
+        this.typingFontSize = id;
+        this.richController.setTypingStyle(this.style(this.typingFormat));
+      }
+    }
+    this.updateWheel();
+  }
+  private sourceSelectionChanged(start: number, end: number): void {
+    if (this.selectionStart !== start || this.selectionEnd !== end) this.closeOptions();
+    this.selectionStart = start; this.selectionEnd = end; this.updateWheel();
+  }
+
+  private activateTool(key: string, label: Resource, action: () => void, _locale: string = this.uiLanguage): void {
+    if (this.disabled || this.disposed || this.hintDialog.current() !== null || this.linkDialog.current() !== null ||
+      this.formatDialog.current() !== null || this.hintSaving) return;
+    let seen: boolean = false;
+    try { seen = hasNoteEditingHint(key); } catch (error) { this.hintFailure(); }
+    if (seen) { action(); return; }
+    this.hintedAction = action;
+    this.hintDialog.open((dismiss: NativeDialogDismiss): CustomDialogController =>
+      this.createHintDialog(key, label, dismiss), (): boolean => { this.finishHint(key); return true; });
     this.hideWheel(true);
   }
 
   private async finishHint(key: string): Promise<void> {
     const action: (() => void) | null = this.hintedAction;
     this.hintedAction = null;
-    this.hintDialog = null;
+    this.hintDialog.close();
     if (this.disposed || this.hintSaving) return;
     this.hintSaving = true;
     try { await completeNoteEditingHint(key); }
@@ -507,18 +694,31 @@ export struct NoteFieldEditor {
       if (!this.sourceMode && (this.selectionEnd > this.selectionStart && this.selectionStart >= 0 ?
         selectionHasFormat(runs, this.selectionStart, this.selectionEnd, flag) : (this.typingFormat & flag) !== 0)) active.push(tool);
     }
+    const range: RichEditorRange = this.sourceMode || this.ready ? this.selectedRange() : { start: 0, end: 0 };
+    const start: number = range.start ?? 0;
+    const end: number = range.end ?? start;
+    const heading: string = this.sourceMode ? sourceNoteHeading(this.value, start, end) :
+      end > start ? noteRichHeading(runs, start, end) : this.typingHeading;
+    const size: string = this.sourceMode ? sourceNoteFontSize(this.value, start, end, '') :
+      end > start ? noteRichFontSize(runs, start, end, '') : this.typingFontSize;
+    if (heading !== '') active.push('heading');
+    if (size !== '') active.push('font_size');
     return { cloze: this.clozeEnabled, source: this.sourceMode, expanded: this.expanded, activeIds: active,
-      fieldName: this.fieldName };
+      fieldName: this.fieldName, optionsOpen: this.optionSelection !== null,
+      optionToolId: this.optionSelection?.toolId ?? '',
+      optionId: this.optionSelection?.selectedId ?? '' };
   }
   private wheelParams(): NoteEditorWheelParams {
+    const version: number = this.optionSelection?.version ?? -1;
     return new NoteEditorWheelParams(this.wheelState(), (id: string): void => { this.executeWheel(id); }, this.wheelVisible,
       this.lastWheelTool, (id: string): void => { if (!this.disposed) this.lastWheelTool = id; },
-      (): void => { this.resetWheelFormats(); }, (id: string): void => { this.executeWheel(id, true); });
+      (): void => { this.resetWheelFormats(); }, (id: string): void => { this.executeWheel(id, true); },
+      (id: string): void => { this.selectFormatOption(id, version); }, (): void => { this.closeOptions(); });
   }
   private resetWheelFormats(): void {
     if (this.disposed || this.disabled || !this.foreground || !this.wheelActive || !this.wheelVisible) return;
     const caret: number = this.selectedRange().end ?? 0;
-    this.typingFormat = 0; this.lastWheelTool = ''; this.selectionStart = -1; this.selectionEnd = -1;
+    this.typingFormat = 0; this.typingFontSize = ''; this.typingHeading = ''; this.lastWheelTool = ''; this.selectionStart = -1; this.selectionEnd = -1;
     if (!this.sourceMode && this.ready) {
       this.richController.setTypingStyle(this.style(0));
       this.richController.setSelection(caret, caret, { menuPolicy: MenuPolicy.HIDE });
@@ -528,8 +728,8 @@ export struct NoteFieldEditor {
   private fieldFocus(): void { this.fieldFocused = true; this.wheelSession.activate(this.inputKey); }
   private fieldBlur(): void { this.fieldFocused = false; }
   private showWheel(): void {
-    if (!this.wheelActive || this.disposed || this.disabled || !this.foreground || this.hintDialog !== null ||
-      this.linkDialog !== null || this.formatDialog !== null) return;
+    if (!this.wheelActive || this.disposed || this.disabled || !this.foreground || this.hintDialog.current() !== null ||
+      this.linkDialog.current() !== null || this.formatDialog.current() !== null) return;
     if (this.wheelRemoval >= 0) { clearTimeout(this.wheelRemoval); this.wheelRemoval = -1; }
     this.wheelVisible = true;
     if (this.wheelContent !== null) { this.updateWheel(); return; }
@@ -539,6 +739,7 @@ export struct NoteFieldEditor {
   }
   private updateWheel(): void { this.wheelContent?.update(this.wheelParams()); }
   private hideWheel(immediate: boolean = false): void {
+    this.closeOptions();
     this.wheelVisible = false;
     if (this.wheelRemoval >= 0) { clearTimeout(this.wheelRemoval); this.wheelRemoval = -1; }
     const content: ComponentContent<NoteEditorWheelParams> | null = this.wheelContent;
@@ -563,6 +764,8 @@ export struct NoteFieldEditor {
     if (this.disposed || this.disabled || !this.foreground || !this.wheelVisible) return;
     if ((key === 'cloze_next' || key === 'cloze_same') && !this.clozeEnabled) return;
     if (longPress && noteEditorTool(key).longPressAction === undefined) return;
+    const inlineOptions: boolean = NOTE_FIELD_EDITING_SUPPORT.formatOptionPicker.toolIds.indexOf(key) >= 0;
+    if (!inlineOptions) this.closeOptions();
     const action: () => void = (): void => {
       switch (key) {
         case 'bold': this.applyFormat(FORMAT_BOLD); break;
@@ -584,7 +787,7 @@ export struct NoteFieldEditor {
         case 'link': this.openLink(); break;
         case 'clear_format': this.clearFormat(); break;
       }
-      if (!this.fieldFocused && key !== 'link' && this.formatDialog === null) {
+      if (!inlineOptions && !this.fieldFocused && key !== 'link' && this.formatDialog.current() === null) {
         this.focusInput(this.sourceMode, this.sourceMode ? this.selectionStart : -1);
       }
       this.updateWheel();
@@ -619,7 +822,7 @@ export struct NoteFieldEditor {
             .onFocus((): void => { this.fieldFocus(); }).onBlur((): void => { this.fieldBlur(); })
             .onTouch((event: TouchEvent): void => { if (this.fieldFocused && event.type === TouchType.Down) this.showWheel(); })
             .onChange((text: string): void => { this.sourceChanged(text); })
-            .onTextSelectionChange((start: number, end: number): void => { this.selectionStart = start; this.selectionEnd = end; this.updateWheel(); })
+            .onTextSelectionChange((start: number, end: number): void => { this.sourceSelectionChanged(start, end); })
         } else {
           RichEditor({ controller: this.richController })
             .id(this.inputKey + '-visual')
@@ -635,7 +838,7 @@ export struct NoteFieldEditor {
             .onReady((): void => { this.richReady(); })
             .onSelectionChange((range: RichEditorRange): void => { this.richSelectionChanged(range); })
             .onWillChange((change: RichEditorChangeValue): boolean => change.replacedImageSpans.length === 0 && change.replacedSymbolSpans.length === 0)
-            .onDidChange((): void => { this.publishRich(); })
+            .onDidChange((before: TextRange, after: TextRange): void => { this.richChanged(before, after); })
         }
         IconActionButton({ source: $r('app.media.' + noteFieldExpansionTool(this.expanded).iconKey),
           label: $r('app.string.' + noteFieldExpansionTool(this.expanded).titleKey),

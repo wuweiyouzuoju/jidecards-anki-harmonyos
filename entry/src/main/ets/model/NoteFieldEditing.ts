@@ -55,6 +55,9 @@ export interface NoteFieldEditingSupport {
   fontAvailability: string;
   tools: NoteEditorTool[];
   formatMenus: NoteEditorFormatMenu[];
+  fontSizeMenu: { placement: string; selection: string; mixedSelection: string; visualEditing: string };
+  formatOptionPicker: { toolIds: string[]; placement: string; alignment: string; boundaryAvoidance: string;
+    triggerHighlight: string; inputFocus: string };
   mediaTools: NoteEditorTool[];
   modeTools: NoteEditorTool[];
   modeControlPlacement: string;
@@ -67,18 +70,34 @@ export interface NoteFieldEditingSupport {
     target: string; visibleCount: number; commonToolIds: string[]; labels: string; labelLines: number; mouseNotchesPerTool: number;
     activation: string; rotation: string; grip: string; manualPosition: string };
 }
-export interface NoteEditorTool { id: string; titleKey: string; iconKey: string; editing: string; longPressAction?: string; }
+export interface NoteEditorTool {
+  id: string; titleKey: string; iconKey: string; editing: string; longPressAction?: string;
+  mediaKinds?: string[]; videoFormats?: string[]; maxVideoBytes?: number; opens?: string;
+}
 export interface NoteEditorFormatOption { id: string; titleKey: string; prefix: string; suffix: string; }
 export interface NoteEditorFormatMenu { toolId: string; options: NoteEditorFormatOption[]; }
+export interface NoteEditorFontSize { id: string; scale: number; }
+/** 可视编辑按字段编辑字号缩放；持久化仍使用标准 CSS 字号关键字。 */
+export const NOTE_EDITOR_FONT_SIZES: NoteEditorFontSize[] = [
+  { id: 'xx-small', scale: 0.6 }, { id: 'x-small', scale: 0.75 }, { id: 'small', scale: 0.89 },
+  { id: 'medium', scale: 1 }, { id: 'large', scale: 1.2 }, { id: 'x-large', scale: 1.5 }, { id: 'xx-large', scale: 2 }
+];
+export const NOTE_EDITOR_HEADINGS: NoteEditorFontSize[] = [
+  { id: 'h1', scale: 2 }, { id: 'h2', scale: 1.5 }, { id: 'h3', scale: 1.17 },
+  { id: 'h4', scale: 1 }, { id: 'h5', scale: 0.83 }
+];
 
 /** 插入写法与 AnkiDroid 相同；UI 选项和 JIDE 能力目录只读取这一份声明。 */
 export const NOTE_EDITOR_FORMAT_MENUS: NoteEditorFormatMenu[] = [
-  { toolId: 'font_size', options: ['xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large']
-    .map((size: string): NoteEditorFormatOption => ({ id: size,
+  { toolId: 'font_size', options: NOTE_EDITOR_FONT_SIZES.map((option: NoteEditorFontSize): NoteEditorFormatOption => {
+    const size: string = option.id;
+    return { id: size,
       titleKey: 'note_editor_size_' + size.replace(new RegExp('-', 'g'), '_'),
-      prefix: `<span style="font-size:${size}">`, suffix: '</span>' })) },
-  { toolId: 'heading', options: [1, 2, 3, 4, 5].map((level: number): NoteEditorFormatOption =>
-    ({ id: 'h' + level, titleKey: 'note_editor_heading_' + level, prefix: `<h${level}>`, suffix: `</h${level}>` })) },
+      prefix: `<span style="font-size:${size}">`, suffix: '</span>' };
+  }) },
+  { toolId: 'heading', options: NOTE_EDITOR_HEADINGS.map((heading: NoteEditorFontSize): NoteEditorFormatOption =>
+    ({ id: heading.id, titleKey: 'note_editor_heading_' + heading.id.slice(1),
+      prefix: `<${heading.id}>`, suffix: `</${heading.id}>` })) },
   { toolId: 'math', options: [
     { id: 'block', titleKey: 'note_editor_math_block', prefix: '\\[', suffix: '\\]' },
     { id: 'chemistry', titleKey: 'note_editor_math_chemistry', prefix: '\\( \\ce{', suffix: '} \\)' }
@@ -105,8 +124,8 @@ export const NOTE_EDITOR_TOOLS: NoteEditorTool[] = [
   { id: 'numbered_list', titleKey: 'note_editor_numbered_list', iconKey: 'ic_editor_numbered_list', editing: 'html_source_then_card_preview' },
   { id: 'link', titleKey: 'note_editor_link', iconKey: 'ic_editor_link', editing: 'selection_or_label_link_dialog' },
   { id: 'clear_format', titleKey: 'note_editor_clear_format', iconKey: 'ic_editor_clear_format', editing: 'selection_or_typing_format' },
-  { id: 'font_size', titleKey: 'note_editor_font_size', iconKey: 'ic_editor_font_size', editing: 'html_source_then_card_preview' },
-  { id: 'heading', titleKey: 'note_editor_heading', iconKey: 'ic_editor_heading', editing: 'html_source_then_card_preview' }
+  { id: 'font_size', titleKey: 'note_editor_font_size', iconKey: 'ic_editor_font_size', editing: 'visual_or_source' },
+  { id: 'heading', titleKey: 'note_editor_heading', iconKey: 'ic_editor_heading', editing: 'visual_paragraph_or_source' }
 ];
 export const NOTE_EDITOR_COMMON_TOOL_IDS: string[] = ['bold', 'italic', 'underline', 'highlight', 'break', 'clear_format'];
 export const NOTE_EDITOR_FORMAT_TOGGLE_IDS: string[] = ['bold', 'italic', 'underline', 'highlight'];
@@ -149,6 +168,12 @@ export const NOTE_FIELD_EDITING_SUPPORT: NoteFieldEditingSupport = {
   fontAvailability: 'installed fonts with system fallback; font file import is not available',
   tools: NOTE_EDITOR_TOOLS,
   formatMenus: NOTE_EDITOR_FORMAT_MENUS,
+  formatOptionPicker: { toolIds: ['font_size', 'heading'], placement: 'outer_arc_overlay',
+    alignment: 'wheel_center_with_trigger_angle_without_resizing_wheel', boundaryAvoidance: 'screen_and_keyboard_before_trigger_alignment',
+    triggerHighlight: 'current_recognized_selection_or_typing_format', inputFocus: 'preserve_current_focus_and_keyboard' },
+  fontSizeMenu: { placement: 'outer_arc_overlay',
+    selection: 'current_caret_or_selection_font_size', mixedSelection: 'no_selected_size',
+    visualEditing: 'selection_live_style_or_caret_typing_style_saved_as_css_keywords' },
   mediaTools: NOTE_FIELD_MEDIA_TOOLS,
   modeTools: NOTE_FIELD_MODE_TOOLS,
   modeControlPlacement: 'above_each_editable_field',
@@ -161,7 +186,7 @@ export const NOTE_FIELD_EDITING_SUPPORT: NoteFieldEditingSupport = {
     oneShotFlashMs: NOTE_EDITOR_ACTION_FLASH_MS,
     outerVisibility: 'all_modes',
     defaultVisibility: 'visible_and_expanded_without_input_focus',
-    initialSelection: 'no_selected_tools', foldingSelection: 'collapse_preserves_formats_reopen_resets_formats',
+    initialSelection: 'current_formats_without_executing_tools', foldingSelection: 'collapse_preserves_formats_reopen_resets_formats',
     target: 'first_editable_field_then_last_focused_field', visibleCount: 7, commonToolIds: NOTE_EDITOR_COMMON_TOOL_IDS,
     labels: 'below_each_icon', labelLines: 2, mouseNotchesPerTool: 2,
     activation: 'click_tool_to_apply_rotation_preserves_multiple_selection',

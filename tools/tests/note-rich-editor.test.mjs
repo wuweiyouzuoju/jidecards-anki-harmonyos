@@ -40,7 +40,7 @@ function editor(html='',fieldConfig=null,wheelSession=null,uniqueId=123) {
   const changes=[], seen=new Set(), dialogs=[], patches=[], typing=[], selections=[];
   let spans=[], caret=0;
   const overlay=[],focusRequests=[],sourceCarets=[], timers=new Map(); let timerId=0;
-  class WheelParams { constructor(state,onAction,visible,initialTool,onSelection,onResetFormats,onLongAction){Object.assign(this,{state,onAction,visible,initialTool,onSelection,onResetFormats,onLongAction});} }
+  class WheelParams { constructor(state,onAction,visible,initialTool,onSelection,onResetFormats,onLongAction,onOptionSelect,onCloseOptions){Object.assign(this,{state,onAction,visible,initialTool,onSelection,onResetFormats,onLongAction,onOptionSelect,onCloseOptions});} }
   class Content { constructor(_context,_builder,params){this.params=params;this.updates=[];this.disposed=false;}
     update(params){this.params=params;this.updates.push(params);} dispose(){this.disposed=true;} }
   const context={getFocusController:()=>({requestFocus:id=>focusRequests.push(id)}),getOverlayManager:()=>({addComponentContent:content=>overlay.push(content),
@@ -78,25 +78,70 @@ function editor(html='',fieldConfig=null,wheelSession=null,uniqueId=123) {
   return {instance,controller,changes,seen,dialogs,patches,typing,selections,overlay,timers,focusRequests,sourceCarets,set spans(value){spans=value;}};
 }
 
-test('font size and heading menus preserve styled selections and place an empty caret inside the inserted HTML',()=>{
- for(const [tool,id,prefix,suffix] of [['font_size','large','<span style="font-size:large">','</span>'],['heading','h2','<h2>','</h2>']]){
-  const h=editor('<b>甲😀乙</b>后');h.instance.fieldFocus();h.seen.add(tool);
-  h.instance.selectionStart=1;h.instance.selectionEnd=3;h.instance.executeWheel(tool);
-  const dialog=h.dialogs.at(-1).options.builder;assert.equal(dialog.toolId,tool);assert.deepEqual(h.changes,[]);
-  assert.equal(h.overlay.length,0);dialog.onSelect(id);
-  assert.equal(h.instance.value,`<b>甲</b>${prefix}<b>😀</b>${suffix}<b>乙</b>后`);
-  assert.equal(h.instance.sourceMode,true);assert.equal(h.overlay.length,1);
-  assert.equal(h.instance.selectionStart,`<b>甲</b>${prefix}<b>😀</b>${suffix}`.length);
-  const empty=editor('ab');empty.instance.fieldFocus();empty.seen.add(tool);
-  empty.instance.selectionStart=1;empty.instance.selectionEnd=1;empty.instance.executeWheel(tool);
-  empty.dialogs.at(-1).options.builder.onSelect(id);
-  assert.equal(empty.instance.value,`a${prefix}${suffix}b`);assert.equal(empty.instance.selectionStart,1+prefix.length);
-  assert.equal(empty.instance.typingFormat,0);
- }
+// Simulate the SDK splitting text spans at UTF-16 style boundaries, preserving other attributes.
+function enableNativeStyleUpdates(h) {
+ h.controller.updateSpanStyle=patch=>{
+  h.patches.push(patch);let offset=0;const result=[];
+  for(const span of h.controller.getSpans()) {
+   const value=span.value.slice(...span.offsetInSpan),length=value.length;
+   const from=Math.max(0,Math.min(length,patch.start-offset)),to=Math.max(from,Math.min(length,patch.end-offset));
+   for(const [start,end,selected] of [[0,from,false],[from,to,true],[to,length,false]]) {
+    if(end<=start)continue;
+    const text=value.slice(start,end);
+    result.push({...span,value:text,offsetInSpan:[0,text.length],
+     textStyle:selected?{...span.textStyle,...patch.textStyle}:span.textStyle,
+     urlStyle:selected?(patch.urlStyle??span.urlStyle):span.urlStyle});
+   }
+   offset+=length;
+  }
+  h.spans=result;
+ };
+}
+
+test('visual font size applies to the selected emoji immediately and keeps styles, links and the selection',()=>{
+ const h=editor('<b>甲😀乙</b><a href="https://example.com">后</a>');enableNativeStyleUpdates(h);
+ h.instance.fieldFocus();h.seen.add('font_size');h.instance.richSelectionChanged({start:1,end:3});
+ h.instance.executeWheel('font_size');assert.equal(h.dialogs.length,0);
+ assert.equal(h.overlay[0].params.state.optionId,'medium');h.overlay[0].params.onOptionSelect('large');
+ assert.equal(h.overlay[0].params.state.optionsOpen,false);assert.ok(h.overlay[0].params.state.activeIds.includes('font_size'));
+ assert.equal(h.instance.sourceMode,false);assert.equal(h.instance.selectionStart,1);assert.equal(h.instance.selectionEnd,3);
+ assert.equal(h.instance.value,'<b>甲</b><span style="font-size:large"><b>😀</b></span><b>乙</b><a href="https://example.com">后</a>');
+ assert.equal(h.controller.getSpans()[1].textStyle.fontSize,19.2);
+ assert.equal(h.controller.getSpans()[1].textStyle.fontWeight,9);
+ assert.deepEqual(h.selections.at(-1),{start:1,end:3,menuPolicy:1});
+ h.instance.applyFormat(rich.FORMAT_HIGHLIGHT);
+ assert.equal(h.instance.value,'<b>甲</b><span style="font-size:large"><b><mark>😀</mark></b></span><b>乙</b><a href="https://example.com">后</a>');
+ h.instance.openFormatOptions('font_size');assert.equal(h.overlay[0].params.state.optionId,'large');
+ h.overlay[0].params.onOptionSelect('small');assert.equal(h.controller.getSpans()[1].textStyle.fontSize,14.24);
+ assert.equal(h.controller.getSpans()[1].textStyle.textBackgroundStyle.color,'#FFF176');
+ assert.equal(h.instance.value.includes('font-size:large'),false);
+ h.instance.clearFormat();assert.equal(h.instance.value,'<b>甲</b>😀<b>乙</b><a href="https://example.com">后</a>');
+ assert.equal(h.controller.getSpans()[1].textStyle.fontSize,16);
+});
+
+test('heading reuses the option arc and applies to the selected paragraph visually while retaining selection and links',()=>{
+ const h=editor('前<br><a href="#x"><i>甲😀乙</i></a><br>后');h.instance.fieldFocus();h.seen.add('heading');
+ h.instance.richSelectionChanged({start:3,end:5});h.instance.executeWheel('heading');assert.deepEqual(h.changes,[]);
+ assert.equal(h.dialogs.length,0);assert.equal(h.overlay[0].params.state.optionToolId,'heading');
+ h.overlay[0].params.onOptionSelect('h2');
+ assert.equal(h.overlay[0].params.state.optionsOpen,false);assert.ok(h.overlay[0].params.state.activeIds.includes('heading'));
+ assert.equal(h.instance.value,'前<h2><a href="#x"><i>甲😀乙</i></a></h2>后');
+ assert.equal(h.instance.sourceMode,false);assert.equal(h.instance.selectionStart,3);assert.equal(h.instance.selectionEnd,5);
+ assert.equal(h.controller.getSpans().find(span=>span.value==='甲😀乙').textStyle.fontSize,24);
+ h.instance.openFormatOptions('heading');assert.equal(h.overlay[0].params.state.optionId,'h2');
+ h.overlay[0].params.onOptionSelect('h4');assert.equal(h.instance.value,'前<h4><a href="#x"><i>甲😀乙</i></a></h4>后');
+ assert.equal(h.controller.getSpans().find(span=>span.value==='甲😀乙').textStyle.fontSize,16);
+ const empty=editor('');empty.instance.fieldFocus();empty.instance.openFormatOptions('heading');
+ empty.overlay[0].params.onOptionSelect('h1');assert.deepEqual(empty.changes,[]);assert.equal(empty.typing.at(-1).fontSize,32);
+ nativeTextEdit(empty,0,0,'标题');assert.equal(empty.instance.value,'<h1>标题</h1>');
+ const sourceHeading=editor('<h2 data-x="keep">甲😀</h2>');sourceHeading.instance.fieldFocus();
+ sourceHeading.instance.sourceSelectionChanged(18,21);sourceHeading.instance.openFormatOptions('heading');
+ assert.equal(sourceHeading.overlay[0].params.state.optionId,'h2');sourceHeading.overlay[0].params.onOptionSelect('h3');
+ assert.equal(sourceHeading.instance.value,'<h3 data-x="keep">甲😀</h3>');
  assert.equal(noteEditorFormatOptions('font_size').length,7);
  assert.deepEqual(noteEditorFormatOptions('heading').map(option=>option.id),['h1','h2','h3','h4','h5']);
  const source=editor('<b>x</b>');source.instance.requestMode(true);source.instance.selectionStart=0;source.instance.selectionEnd=8;
- source.instance.openFormatOptions('font_size');source.dialogs.at(-1).options.builder.onSelect('small');
+ source.instance.openFormatOptions('font_size');source.overlay[0].params.onOptionSelect('small');
  assert.equal(source.instance.value,'<span style="font-size:small"><b>x</b></span>');
  assert.equal(htmlTools.sourceNoteWrap('<b>x</b>',1,1,'<h1>','</h1>'),null);
  assert.equal(htmlTools.sourceNoteWrap('😀',1,1,'<h1>','</h1>'),null);
@@ -104,19 +149,71 @@ test('font size and heading menus preserve styled selections and place an empty 
 
 test('format menu cancellation and stale callbacks cannot change drafts, close a newer menu or target another field',()=>{
  const session=new NoteEditorWheelSession(),h=editor('draft',null,session,1),other=editor('other',null,session,2);
- h.instance.fieldFocus();h.instance.openFormatOptions('heading');const old=h.dialogs.at(-1).options;
- old.cancel();assert.equal(h.instance.value,'draft');assert.deepEqual(h.changes,[]);
- h.instance.openFormatOptions('heading');const next=h.instance.formatDialog;old.builder.onSelect('h1');
-  assert.equal(h.instance.formatDialog,next);assert.deepEqual(h.changes,[]);
- old.cancel();old.builder.onClose();assert.equal(h.instance.formatDialog,next);
- other.instance.fieldFocus();assert.equal(h.instance.formatDialog,null);next.options.builder.onSelect('h2');
+ h.instance.fieldFocus();h.instance.openFormatOptions('math');const old=h.dialogs.at(-1).options;
+ old.onWillDismiss({ dismiss() {} });assert.equal(h.instance.value,'draft');assert.deepEqual(h.changes,[]);
+ h.instance.openFormatOptions('math');const next=h.instance.formatDialog.current();old.builder.onSelect('block');
+  assert.equal(h.instance.formatDialog.current(),next);assert.deepEqual(h.changes,[]);
+ old.onWillDismiss({ dismiss() {} });old.builder.onClose();assert.equal(h.instance.formatDialog.current(),next);
+ other.instance.fieldFocus();assert.equal(h.instance.formatDialog.current(),null);next.options.builder.onSelect('chemistry');
  assert.equal(h.instance.value,'draft');assert.equal(other.instance.value,'other');
  for(const change of [editor=>{editor.disabled=true;},editor=>{editor.foreground=false;},editor=>{editor.value='updated';},editor=>{editor.sourceMode=true;},editor=>editor.aboutToDisappear()]){
   const item=editor('snapshot');item.instance.fieldFocus();item.instance.openFormatOptions('font_size');
-  const callback=item.dialogs.at(-1).options.builder.onSelect;change(item.instance);callback('large');assert.deepEqual(item.changes,[]);
+  const callback=item.overlay[0].params.onOptionSelect;change(item.instance);callback('large');assert.deepEqual(item.changes,[]);
  }
  const invalid=editor('safe');invalid.instance.fieldFocus();invalid.instance.openFormatOptions('heading');
- invalid.dialogs.at(-1).options.builder.onSelect('h9');assert.deepEqual(invalid.changes,[]);
+ const oldOption=invalid.overlay[0].params.onOptionSelect;
+ oldOption('h9');assert.deepEqual(invalid.changes,[]);
+ invalid.instance.openFormatOptions('font_size');oldOption('h1');
+ assert.equal(invalid.overlay[0].params.state.optionToolId,'font_size');assert.deepEqual(invalid.changes,[]);
+});
+
+test('font size and heading arcs preserve input focus through opening, switching, closing and applying',()=>{
+ for(const source of [false,true])for(const focused of [false,true])for(const toolId of ['font_size','heading']) {
+  const h=editor('甲😀乙',source?{plainText:true}:null);enableNativeStyleUpdates(h);
+  h.seen.add('font_size');h.seen.add('heading');
+  if(focused)h.instance.fieldFocus();
+  if(source)h.instance.sourceSelectionChanged(1,3);else h.instance.richSelectionChanged({start:1,end:3});
+  // A focus request would produce a native caret notification and dismiss the just-opened arc.
+  h.instance.getUIContext().getFocusController=()=>({requestFocus:id=>{
+   h.focusRequests.push(id);
+   if(source)h.instance.sourceSelectionChanged(0,0);else h.instance.richSelectionChanged({start:0,end:0});
+  }});
+  const flush=()=>{const pending=[...h.timers.values()];h.timers.clear();for(const timer of pending)timer.callback();};
+  const content=h.overlay[0];
+  h.instance.executeWheel(toolId);flush();
+  assert.equal(content.params.state.optionsOpen,true);assert.equal(content.params.state.optionToolId,toolId);
+  assert.equal(h.instance.selectionStart,1);assert.equal(h.instance.selectionEnd,3);
+  assert.equal(h.instance.fieldFocused,focused);assert.deepEqual(h.focusRequests,[]);assert.deepEqual(h.changes,[]);
+  h.instance.executeWheel(toolId);flush();assert.equal(content.params.state.optionsOpen,false);
+  h.instance.executeWheel(toolId);
+  const other=toolId==='font_size'?'heading':'font_size';h.instance.executeWheel(other);flush();
+  assert.equal(content.params.state.optionToolId,other);assert.equal(content.params.state.optionsOpen,true);
+  h.instance.executeWheel(toolId);content.params.onOptionSelect(toolId==='font_size'?'large':'h2');flush();
+  assert.equal(content.params.state.optionsOpen,false);assert.equal(h.changes.length,1);
+  assert.equal(h.instance.sourceMode,source);assert.equal(h.instance.fieldFocused,focused);
+  assert.deepEqual(h.focusRequests,[]);assert.equal(h.overlay[0],content);assert.equal(h.dialogs.length,0);
+ }
+});
+
+test('opening or toggling an inline format arc invalidates pending input focus callbacks',()=>{
+ for(const source of [false,true])for(const toolId of ['font_size','heading'])for(const close of [false,true]) {
+  const h=editor('draft',source?{plainText:true}:null);h.seen.add(toolId);
+  h.instance.selectionStart=1;h.instance.selectionEnd=3;h.instance.focusInput(source,1);
+  h.instance.executeWheel(toolId);if(close)h.instance.executeWheel(toolId);
+  for(const timer of h.timers.values())timer.callback();
+  assert.deepEqual(h.focusRequests,[]);assert.equal(h.overlay[0].params.state.optionsOpen,!close);
+  assert.equal(h.instance.selectionStart,1);assert.equal(h.instance.selectionEnd,3);
+ }
+});
+
+test('first-use format help returns to its option arc without requesting input focus',async()=>{
+ for(const toolId of ['font_size','heading']) {
+  const h=editor('draft');h.instance.executeWheel(toolId);
+  assert.equal(h.dialogs.length,1);assert.equal(h.overlay.length,0);
+  await h.instance.finishHint(toolId);
+  for(const timer of h.timers.values())timer.callback();
+  assert.equal(h.overlay[0].params.state.optionsOpen,true);assert.deepEqual(h.focusRequests,[]);
+ }
 });
 
 test('math hold opens block and chemistry choices without inline insertion and applies only the captured selection',()=>{
@@ -383,10 +480,10 @@ test('first-use help defers one authorized action until closing; disabled or dis
   const h=editor();let actions=0;const activate=()=>h.instance.activateTool('bold','Bold',()=>actions++);
   activate();activate();assert.equal(actions,0);assert.equal(h.dialogs.length,1);
   h.dialogs[0].options.builder.onDismiss();await Promise.resolve();assert.equal(actions,1);activate();assert.equal(actions,2);
-  h.instance.activateTool('italic','Italic',()=>actions++);h.dialogs[1].options.cancel();await Promise.resolve();
+  h.instance.activateTool('italic','Italic',()=>actions++);h.dialogs[1].options.onWillDismiss({ dismiss() {} });await Promise.resolve();
   assert.equal(h.seen.has('italic'),true);assert.equal(actions,3);
   h.instance.activateTool('underline','Underline',()=>actions++);h.instance.disabled=true;
-  h.dialogs[2].options.cancel();await Promise.resolve();assert.equal(actions,3);
+  h.dialogs[2].options.onWillDismiss({ dismiss() {} });await Promise.resolve();assert.equal(actions,3);
   h.instance.aboutToDisappear();activate();assert.equal(actions,3);
 });
 
@@ -527,7 +624,7 @@ test('list action handles selection and caret line, keeps drafts on unsupported 
 test('link dialog freezes selection, cancellation does not edit, valid apply preserves selected styles, and departed callbacks are ignored',()=>{
   const h=editor('<b>甲😀</b>乙');h.instance.selectionStart=0;h.instance.selectionEnd=3;h.instance.openLink();
   const canceled=h.dialogs.at(-1);assert.equal(canceled.options.builder.selectedText,'甲😀');
-  canceled.options.builder.onClose();assert.deepEqual(h.changes,[]);assert.equal(h.instance.linkDialog,null);
+  canceled.options.builder.onClose();assert.deepEqual(h.changes,[]);assert.equal(h.instance.linkDialog.current(),null);
   h.instance.openLink();h.instance.selectionStart=4;h.instance.selectionEnd=4;
   h.dialogs.at(-1).options.builder.onApply('https://example.com','ignored');
   assert.equal(h.changes.at(-1),'<a href="https://example.com"><b>甲😀</b></a>乙');
@@ -536,6 +633,15 @@ test('link dialog freezes selection, cancellation does not edit, valid apply pre
   late.instance.aboutToDisappear();callback('https://example.com','文字');assert.deepEqual(late.changes,[]);
   const stale=editor('旧');stale.instance.openLink();stale.instance.value='新';
   stale.dialogs.at(-1).options.builder.onApply('https://example.com','文字');assert.deepEqual(stale.changes,[]);
+});
+
+test('old link cancel and submit callbacks cannot close or edit the next window',()=>{
+  const h=editor('same'); h.instance.openLink(); const old=h.dialogs.at(-1).options.builder;
+  old.onClose(); h.instance.openLink(); const next=h.instance.linkDialog.current();
+  old.onClose(); old.onApply('https://example.com','stale');
+  assert.equal(h.instance.linkDialog.current(),next); assert.deepEqual(h.changes,[]);
+  next.options.builder.onApply('https://example.com','current');
+  assert.equal(h.instance.linkDialog.current(),null); assert.equal(h.changes.length,1);
 });
 
 test('script transition focuses the mounted source input before restoring the interior caret; late transitions cannot steal focus',()=>{
@@ -547,4 +653,190 @@ test('script transition focuses the mounted source input before restoring the in
  const stale=editor('x');stale.instance.applyFormat(rich.FORMAT_SUBSCRIPT);
  const late=[...stale.timers.values()].at(-1).callback;stale.instance.aboutToDisappear();late();
  assert.deepEqual(stale.focusRequests,[]);assert.deepEqual(stale.sourceCarets,[]);
+});
+test('font size ring restores the actual current size and protects drafts from old selections and changed ranges',()=>{
+ const html='<span style="font-size:large">甲<span style="font-size:small">乙</span></span>';
+ const h=editor(html);h.instance.requestMode(true);h.instance.selectionStart=html.indexOf('甲');h.instance.selectionEnd=h.instance.selectionStart+1;
+ h.instance.openFormatOptions('font_size');assert.equal(h.overlay[0].params.state.optionId,'large');
+ const old=h.overlay[0].params.onOptionSelect;
+ h.instance.openFormatOptions('font_size');assert.equal(h.overlay[0].params.state.optionsOpen,false);
+ h.instance.selectionStart=html.indexOf('乙');h.instance.selectionEnd=h.instance.selectionStart+1;
+ h.instance.openFormatOptions('font_size');assert.equal(h.overlay[0].params.state.optionId,'small');
+ old('xx-large');assert.deepEqual(h.changes,[]);assert.equal(h.overlay[0].params.state.optionsOpen,true);
+ h.instance.sourceSelectionChanged(0,html.length);assert.equal(h.overlay[0].params.state.optionsOpen,false);
+ h.instance.openFormatOptions('font_size');assert.equal(h.overlay[0].params.state.optionId,'');
+ h.overlay[0].params.onOptionSelect('medium');assert.equal(h.changes.length,1);
+ h.instance.openFormatOptions('font_size');assert.equal(h.overlay[0].params.state.optionId,'medium');
+ h.overlay[0].params.onCloseOptions();assert.equal(h.changes.length,1);
+});
+
+test('all seven sizes reopen visually, retain explicit medium, and survive mode switching without rewriting a draft',()=>{
+ const ids=noteEditorFormatOptions('font_size').map(option=>option.id);
+ for(const id of ids) {
+  const html=`前<span style="font-size:${id}"><a href="#part"><b>甲😀</b></a></span>后`;
+  const h=editor(html,{fontSize:28});assert.equal(h.instance.sourceMode,false);
+  assert.equal(h.controller.getSpans()[1].textStyle.fontSize,rich.noteFontSizeValue(id,28));
+  assert.equal(rich.serializeNoteRichText(h.instance.richRuns()),html);assert.deepEqual(h.changes,[]);
+  h.instance.fieldFocus();h.instance.richSelectionChanged({start:1,end:4});h.instance.openFormatOptions('font_size');
+  assert.equal(h.overlay[0].params.state.optionId,id);h.overlay[0].params.onCloseOptions();
+  h.instance.requestMode(true);h.instance.requestMode(false);h.instance.richReady();
+  assert.equal(rich.serializeNoteRichText(h.instance.richRuns()),html);assert.deepEqual(h.changes,[]);
+ }
+ const nested=rich.parseNoteVisualText('<span style="font-size:large">甲<span style="font-size:small">乙</span>丙</span>后');
+ assert.deepEqual(nested.map(run=>run.fontSize),['large','small','large',undefined]);
+ for(const html of ['<span style="font-size:24px">甲</span>','<span style="font-size:large;color:red">甲</span>',
+  '<span style="font-size:large" class="x">甲</span>','<span>甲</span>','<span style="font-size:large">甲']) {
+  assert.equal(rich.parseNoteVisualText(html),null);assert.equal(editor(html).instance.sourceMode,true);
+ }
+});
+
+function nativeTextEdit(h,start,end,inserted,style=h.typing.at(-1)) {
+ const spans=h.controller.getSpans();
+ const slice=(from,to)=>{
+  let offset=0;const result=[];
+  for(const span of spans) {
+   const value=span.value.slice(...span.offsetInSpan);
+   const text=value.slice(Math.max(0,from-offset),Math.max(0,Math.min(value.length,to-offset)));
+   if(text)result.push({...span,value:text,offsetInSpan:[0,text.length]});
+   offset+=value.length;
+  }
+  return result;
+ };
+ h.spans=slice(0,start).concat(inserted?[{value:inserted,offsetInSpan:[0,inserted.length],textStyle:style}]:[],slice(end,Infinity));
+ h.controller.setCaretOffset(start+inserted.length);
+ // Exercise the SDK ordering where the selection notification arrives before text did-change.
+ h.instance.richSelectionChanged({start:start+inserted.length,end:start+inserted.length});
+ h.instance.richChanged({start,end},{start,end:start+inserted.length});
+}
+
+test('caret sizes affect later input, keep existing content inherited, and survive native insertion and deletion',()=>{
+ const h=editor('ab');h.instance.fieldFocus();h.instance.richSelectionChanged({start:1,end:1});
+ h.instance.applyFormat(rich.FORMAT_BOLD);h.instance.openFormatOptions('font_size');h.overlay[0].params.onOptionSelect('large');
+ assert.ok(h.overlay[0].params.state.activeIds.includes('font_size'));
+ assert.deepEqual(h.changes,[]);assert.equal(h.instance.value,'ab');assert.equal(h.typing.at(-1).fontSize,19.2);
+ h.instance.openFormatOptions('font_size');assert.equal(h.overlay[0].params.state.optionId,'large');h.overlay[0].params.onCloseOptions();
+ nativeTextEdit(h,1,1,'😀');assert.equal(h.instance.value,'a<span style="font-size:large"><b>😀</b></span>b');
+ nativeTextEdit(h,0,1,'');assert.equal(h.instance.value,'<span style="font-size:large"><b>😀</b></span>b');
+ h.instance.richSelectionChanged({start:2,end:2});h.instance.openFormatOptions('font_size');
+ assert.equal(h.overlay[0].params.state.optionId,'large');h.overlay[0].params.onOptionSelect('medium');
+ nativeTextEdit(h,2,2,'中');assert.equal(h.instance.value,'<span style="font-size:large"><b>😀</b></span><span style="font-size:medium"><b>中</b></span>b');
+ h.instance.richSelectionChanged({start:4,end:4});assert.equal(h.instance.typingFontSize,'');
+ nativeTextEdit(h,4,4,'!');assert.ok(h.instance.value.endsWith('b<b>!</b>'));
+ h.instance.richSelectionChanged({start:0,end:5});h.instance.openFormatOptions('font_size');
+ assert.equal(h.overlay[0].params.state.optionId,'');const late=h.overlay[0].params.onOptionSelect;
+ nativeTextEdit(h,4,5,'?');late('xx-large');assert.equal(h.instance.value.includes('xx-large'),false);
+ const reopened=editor(h.instance.value);assert.equal(reopened.instance.sourceMode,false);
+ assert.equal(rich.serializeNoteRichText(reopened.instance.richRuns()),h.instance.value);
+});
+
+test('heading at a caret changes only the current paragraph and subsequent typing uses that heading',()=>{
+ const h=editor('前<br>甲乙<br>后');h.instance.fieldFocus();h.instance.richSelectionChanged({start:4,end:4});
+ h.instance.openFormatOptions('heading');h.overlay[0].params.onOptionSelect('h2');
+ assert.equal(h.instance.value,'前<h2>甲乙</h2>后');
+ assert.equal(h.instance.selectionStart,4);assert.equal(h.instance.selectionEnd,4);
+ assert.equal(h.typing.at(-1).fontSize,24);assert.equal(h.typing.at(-1).fontWeight,9);
+ assert.ok(h.overlay[0].params.state.activeIds.includes('heading'));
+ assert.equal(h.overlay[0].params.state.activeIds.includes('font_size'),false);
+ for(const span of h.controller.getSpans().filter(span=>span.value==='前'||span.value==='后')) {
+  assert.equal(span.textStyle.fontSize,16);assert.equal(span.textStyle.fontWeight,10);
+ }
+ nativeTextEdit(h,4,4,'新');assert.equal(h.instance.value,'前<h2>甲乙新</h2>后');
+ for(const span of h.controller.getSpans().filter(span=>span.value==='甲乙'||span.value==='新')) {
+  assert.equal(span.textStyle.fontSize,24);
+ }
+ assert.equal(h.controller.getSpans().find(span=>span.value==='新').textStyle.fontWeight,9);
+ h.instance.openFormatOptions('heading');assert.equal(h.overlay[0].params.state.optionId,'h2');
+});
+
+test('every caret font size preserves old text and only sizes later input in body text and headings',()=>{
+ for(const id of noteEditorFormatOptions('font_size').map(option=>option.id))for(const heading of [false,true]) {
+  const html=heading?'<h2>甲乙</h2>':'甲乙';
+  const h=editor(html);h.instance.fieldFocus();h.instance.richSelectionChanged({start:1,end:1});
+  const spans=structuredClone(h.controller.getSpans());
+  h.instance.openFormatOptions('font_size');h.overlay[0].params.onOptionSelect(id);
+  assert.deepEqual(h.changes,[]);assert.equal(h.instance.value,html);
+  assert.deepEqual(h.controller.getSpans(),spans,'changing typing size must not update an existing span');
+  assert.equal(h.patches.length,0);assert.ok(h.overlay[0].params.state.activeIds.includes('font_size'));
+  nativeTextEdit(h,1,1,'新');
+  const contents=`甲<span style="font-size:${id}">新</span>乙`;
+  assert.equal(h.instance.value,heading?`<h2>${contents}</h2>`:contents);
+  const runs=rich.parseNoteVisualText(h.instance.value);
+  assert.equal(runs.find(run=>run.text==='甲').fontSize,undefined);
+  assert.equal(runs.find(run=>run.text==='乙').fontSize,undefined);
+ }
+ const html='<span style="font-size:large">甲乙</span>';
+ const source=editor(html);source.instance.fieldFocus();source.instance.requestMode(true);
+ const caret=html.indexOf('乙');source.instance.sourceSelectionChanged(caret,caret);
+ source.instance.openFormatOptions('font_size');source.overlay[0].params.onOptionSelect('small');
+ assert.equal(source.instance.value,'<span style="font-size:large">甲<span style="font-size:small"></span>乙</span>');
+});
+
+test('restored, mixed and cleared font sizes and headings publish the real trigger highlight',()=>{
+ const plain=editor('甲乙');plain.instance.richReady();
+ assert.equal(plain.overlay[0].params.state.activeIds.includes('font_size'),false);
+ assert.equal(plain.overlay[0].params.state.activeIds.includes('heading'),false);
+ for(const html of ['<h2>甲乙</h2>','<span style="font-size:medium">甲乙</span>']) {
+  const h=editor(html);h.instance.richReady();
+  const toolId=html.startsWith('<h2>')?'heading':'font_size';
+  assert.ok(h.overlay[0].params.state.activeIds.includes(toolId));
+  h.instance.fieldFocus();h.instance.richSelectionChanged({start:0,end:2});
+  assert.ok(h.overlay[0].params.state.activeIds.includes(toolId));
+  enableNativeStyleUpdates(h);h.instance.clearFormat();h.instance.updateWheel();
+  assert.equal(h.overlay[0].params.state.activeIds.includes(toolId),false);
+ }
+ const mixed=editor('<h1>甲</h1><h2>乙</h2><span style="font-size:large">丙</span><span style="font-size:small">丁</span>');
+ mixed.instance.richSelectionChanged({start:0,end:3});
+ assert.equal(mixed.overlay[0].params.state.activeIds.includes('heading'),false);
+ mixed.instance.richSelectionChanged({start:4,end:6});
+ assert.equal(mixed.overlay[0].params.state.activeIds.includes('font_size'),false);
+ const source=editor('<h2 data-x="keep">甲</h2><span style="font-size:large">乙</span>');
+ source.instance.requestMode(true);source.instance.sourceSelectionChanged(source.instance.value.indexOf('甲'),source.instance.value.indexOf('甲')+1);
+ assert.ok(source.overlay[0].params.state.activeIds.includes('heading'));
+ source.instance.sourceSelectionChanged(source.instance.value.indexOf('乙'),source.instance.value.indexOf('乙')+1);
+ assert.ok(source.overlay[0].params.state.activeIds.includes('font_size'));
+ assert.equal(source.overlay[0].params.state.activeIds.includes('heading'),false);
+});
+
+test('heading round trips preserve paragraph breaks, font-size overrides and normal-weight text without changing untouched HTML',()=>{
+ for(const id of noteEditorFormatOptions('heading').map(option=>option.id)) {
+  const html=`前<${id}><a href="#x"><i>甲😀</i></a><span style="font-size:small">乙</span></${id}>后`;
+  const h=editor(html);assert.equal(h.instance.sourceMode,false);assert.deepEqual(h.changes,[]);
+  assert.equal(rich.serializeNoteRichText(h.instance.richRuns()),html);
+  assert.equal(h.controller.getSpans().map(span=>span.value).join(''),'前\n甲😀乙\n后');
+  assert.equal(h.controller.getSpans().find(span=>span.value==='甲😀').textStyle.fontSize,16*rich.noteHeadingScale(id));
+  assert.equal(h.controller.getSpans().find(span=>span.value==='乙').textStyle.fontSize,14.24);
+  h.instance.requestMode(true);h.instance.requestMode(false);h.instance.richReady();assert.deepEqual(h.changes,[]);
+ }
+ const h=editor('<h2>标题</h2>后');enableNativeStyleUpdates(h);h.instance.fieldFocus();
+ h.instance.richSelectionChanged({start:0,end:2});h.instance.applyFormat(rich.FORMAT_BOLD);
+ assert.equal(h.instance.value,'<h2><span style="font-weight:normal">标题</span></h2>后');
+ const reopened=editor(h.instance.value);assert.equal(reopened.controller.getSpans()[0].textStyle.fontWeight,10);
+ h.instance.openFormatOptions('font_size');assert.equal(h.overlay[0].params.state.optionId,'');h.overlay[0].params.onOptionSelect('large');
+ assert.equal(h.controller.getSpans()[0].textStyle.fontSize,19.2);
+ assert.equal(rich.noteRichFontSize(h.instance.richRuns(),0,3),'large');
+ h.instance.clearFormat();assert.equal(h.instance.value,'标题<br>后');assert.equal(h.instance.selectionEnd,2);
+ assert.equal(h.controller.getSpans()[0].textStyle.fontSize,16);
+ for(const html of ['<h2 class="custom">标题</h2>','<h1><h2>标题</h2></h1>','<h6>标题</h6>']) {
+  assert.equal(editor(html).instance.sourceMode,true);
+ }
+});
+
+test('typing, Enter and paragraph merging in headings keep visible content and saved HTML consistent',()=>{
+ const h=editor('<h2>甲乙</h2>后');h.instance.richSelectionChanged({start:1,end:1});
+ nativeTextEdit(h,1,1,'😀');assert.equal(h.instance.value,'<h2>甲😀乙</h2>后');
+ nativeTextEdit(h,4,4,'\n');assert.equal(h.instance.value,'<h2>甲😀乙</h2><br>后');
+ assert.equal(h.instance.typingHeading,'');
+ nativeTextEdit(h,4,5,'');assert.equal(h.instance.value,'<h2>甲😀乙</h2>后');
+ nativeTextEdit(h,4,5,'');assert.equal(h.instance.value,'<h2>甲😀乙<span style="font-weight:normal">后</span></h2>');
+ const reopened=editor(h.instance.value);assert.equal(reopened.instance.sourceMode,false);
+ assert.equal(rich.serializeNoteRichText(reopened.instance.richRuns()),h.instance.value);
+});
+
+test('inserting a link at a heading caret keeps the paragraph and the active font size',()=>{
+ const h=editor('<h2>甲乙</h2>');h.instance.fieldFocus();h.instance.richSelectionChanged({start:1,end:1});
+ h.instance.openFormatOptions('font_size');h.overlay[0].params.onOptionSelect('large');
+ h.instance.openLink();h.dialogs.at(-1).options.builder.onApply('#x','链接');
+ assert.equal(h.instance.value,'<h2>甲<span style="font-size:large"><a href="#x">链接</a></span>乙</h2>');
+ assert.equal(h.instance.sourceMode,false);assert.equal(h.controller.getSpans().find(span=>span.value==='链接').textStyle.fontSize,19.2);
+ assert.equal(rich.serializeNoteRichText(h.instance.richRuns()),h.instance.value);
 });
