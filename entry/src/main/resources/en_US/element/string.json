@@ -2372,5 +2372,28 @@
     {"name":"directory_expand","value":"Expand or collapse directories"},
     {"name":"directory_select","value":"Select a directory"},
     {"name":"directory_instructions","value":"Decks and tags share a directory tree. Search full paths and expand or collapse branches. Depending on the context, select one or multiple entries, or cycle through any, include and exclude. Expansion is separate from selection; selecting a parent does not select children. Only selectable entries can be submitted."}
+  ,
+    {"name":"note_drawing_new","value":"New whiteboard drawing"},
+    {"name":"note_drawing_draft_hint","value":"Write, draw, or add text; Done creates an image."},
+    {"name":"note_drawing_black","value":"Black"},
+    {"name":"note_drawing_edit","value":"Edit image"},
+    {"name":"note_drawing_title","value":"Whiteboard drawing"},
+    {"name":"note_drawing_ink","value":"Draw"},
+    {"name":"note_drawing_text","value":"Text"},
+    {"name":"note_drawing_add_image","value":"Add image"},
+    {"name":"note_drawing_replace_image","value":"Replace image"},
+    {"name":"note_drawing_text_hint","value":"Enter text, then tap the canvas to place it. Tap existing text to select and edit it."},
+    {"name":"note_drawing_color","value":"Color"},
+    {"name":"note_drawing_resize_text","value":"Resize selected text"},
+    {"name":"note_drawing_transform_hint","value":"Drag the selection to move text. Drag any edge or corner dot in any direction to resize proportionally, or pinch. Tap empty space to deselect."},
+    {"name":"note_drawing_add_text","value":"Add text"},
+    {"name":"note_drawing_delete_text","value":"Delete selected text"},
+    {"name":"note_drawing_undo","value":"Undo"},
+    {"name":"note_drawing_redo","value":"Redo"},
+    {"name":"note_drawing_canvas_size","value":"Canvas size"},
+    {"name":"note_drawing_failed","value":"Unable to load or save the drawing. Try again. The original image is unchanged."},
+    {"name":"note_drawing_requires_penkit","value":"This image contains Huawei handwriting. A device supporting Huawei Pen Kit is required to continue editing it."},
+    {"name":"note_drawing_hint","value":"Done creates an image in the media draft; save the note to keep it. The background, ink and text remain editable."},
+    {"name":"note_drawing_instructions","value":"In Images and videos, New whiteboard drawing appears below Add image or video. The pen icon at the top right of an image opens the same drawing editor; videos have no image editor. Drawing uses the existing complete Huawei handwriting suite, with the original ink model as fallback. Existing Huawei ink cannot silently change engines. Choose text color in the shared selector. Tap text to show a selection box fitted to its glyphs, then edit, drag or delete it. Drag any of the four edge or four corner handles in any direction, or pinch, to resize text proportionally; there is no font-size selector. Tap empty space to deselect. Use Add image on a blank canvas or Replace image when an image is present. Replacing the image keeps ink and text. You can also choose a blank canvas size. Done produces a regular PNG with embedded editable source; Cancel preserves the original. Media Done only transfers the field draft; saving the note uses existing media sync and export. Observations expose engine, text count, selection and transformation states, color options and tool availability, never background, ink, text contents or paths. They do not authorize assistant drawing, image reading or automatic importing. Huawei internal tools and direct dragging and resizing are not fully observed."}
   ]
 }

@@ -2822,5 +2822,28 @@
     {"name":"directory_expand","value":"展开或收起目录"},
     {"name":"directory_select","value":"选择目录"},
     {"name":"directory_instructions","value":"牌组与标签共用目录树。可搜索完整路径、展开或收起分支，按当前用途单选、多选或循环不限、包含、排除。展开与选择独立；选择父项不会自动选择子项。只有真实可选的条目能提交。"}
+  ,
+    {"name":"note_drawing_new","value":"新增白板书画"},
+    {"name":"note_drawing_draft_hint","value":"手写、绘画或添加文字，完成后生成图片。"},
+    {"name":"note_drawing_black","value":"黑色"},
+    {"name":"note_drawing_edit","value":"编辑图片"},
+    {"name":"note_drawing_title","value":"白板书画"},
+    {"name":"note_drawing_ink","value":"书画"},
+    {"name":"note_drawing_text","value":"文字"},
+    {"name":"note_drawing_add_image","value":"添加图片"},
+    {"name":"note_drawing_replace_image","value":"替换图片"},
+    {"name":"note_drawing_text_hint","value":"输入文字，再点击画布放置；点击已有文字可选中修改。"},
+    {"name":"note_drawing_color","value":"颜色"},
+    {"name":"note_drawing_resize_text","value":"缩放选中文字"},
+    {"name":"note_drawing_transform_hint","value":"拖动选中框移动文字；拖动四边或四角圆点可向上下左右等比缩放，也可双指缩放。点击空白处取消选择。"},
+    {"name":"note_drawing_add_text","value":"添加文字"},
+    {"name":"note_drawing_delete_text","value":"删除选中文字"},
+    {"name":"note_drawing_undo","value":"撤销"},
+    {"name":"note_drawing_redo","value":"重做"},
+    {"name":"note_drawing_canvas_size","value":"画布尺寸"},
+    {"name":"note_drawing_failed","value":"书画加载或保存失败，请重试。原图片未被修改。"},
+    {"name":"note_drawing_requires_penkit","value":"这张图片包含华为手写笔迹，需要支持华为手写套件的设备才能继续编辑。"},
+    {"name":"note_drawing_hint","value":"完成后生成图片并返回媒体草稿；保存笔记后保留。原图、笔迹和文字可再次编辑。"},
+    {"name":"note_drawing_instructions","value":"图片和视频管理中，新增图片或视频下方有新增白板书画。图片框右上角的笔形图标进入同一书画编辑器，视频不提供图片编辑。书画优先复用华为完整手写套件，不可用时复用原版笔迹模型；已有华为笔迹不能静默转换为其他引擎。文字颜色在公共选择框选择，点击文字显示贴合字形四边的选中框，可修改、拖动或删除；拖动四边或四角手柄可向上下左右等比缩放，也可双指缩放调整文字大小，不再提供字号选择框。点击空白处取消选择。空白画布可添加图片，已有图片时按钮显示“替换图片”，替换保留笔迹和文字；也可选择空白画布尺寸。完成生成包含可编辑源数据的普通 PNG，取消不修改原图；媒体弹层完成只移交字段草稿，保存笔记后沿现有媒体同步和导出。界面观察提供引擎、文字数量、选中与变换状态、颜色选项和工具可用性，不暴露底图、笔迹、文字正文或路径，也不授予助手绘画、读图或自动导入权限；华为内部工具栏与直接拖动、缩放未完整观察。"}
   ]
 }

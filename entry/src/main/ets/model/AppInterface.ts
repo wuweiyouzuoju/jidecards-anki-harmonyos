@@ -8,6 +8,7 @@ import { IMPORT_RESULT_ACTIONS } from './ImportResults';
 import { REVIEW_AUDIO_PREFERENCES } from './ReviewAudioPreferences';
 import { DECK_OPTION_GROUPS } from './DeckOptionsCatalog';
 import type { NoteAudioStatus } from './NoteAudioDraft';
+import { DRAWING_COLORS, DRAWING_TEXT_HANDLES, noteDrawingImageActionKey } from './NoteDrawing';
 import { NOTE_EDITOR_TOOLS, NOTE_EDITOR_COMMON_TOOL_IDS, NOTE_FIELD_EDITING_SUPPORT,
   NOTE_EDITOR_FORMAT_MENUS, noteEditorFormatOptions } from './NoteFieldEditing';
 import { noteEditorWheelTools, noteEditorWheelCommonTools, noteEditorWheelOuterTools, NOTE_EDITOR_WHEEL_VISIBLE_COUNT } from './NoteEditorWheel';
@@ -368,6 +369,25 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'back', titleKey: 'study_back', iconKey: 'ic_common_arrow_left' }, { id: 'save', titleKey: 'browser_detail_save' },
     { id: 'tags', titleKey: 'browser_detail_tags', opens: 'tag_picker' }
   ] },
+  { id: 'note_visual_manage', titleKey: 'note_visual_manage', instructionsKey: 'note_visual_instructions', parent: '', items: [
+    { id: 'close', titleKey: 'cancel' }, { id: 'apply', titleKey: 'done' },
+    { id: 'add', titleKey: 'note_visual_add', iconKey: 'ic_editor_image' },
+    { id: 'drawing', titleKey: 'note_drawing_new', iconKey: 'ic_study_edit', opens: 'note_drawing_editor' }
+  ] },
+  { id: 'note_drawing_editor', titleKey: 'note_drawing_title', instructionsKey: 'note_drawing_instructions', parent: 'note_visual_manage', items: [
+    { id: 'close', titleKey: 'cancel' }, { id: 'apply', titleKey: 'done' },
+    { id: 'ink', titleKey: 'note_drawing_ink' }, { id: 'text', titleKey: 'note_drawing_text' },
+    { id: 'import', titleKey: 'note_drawing_add_image', iconKey: 'ic_editor_image' },
+    { id: 'text_input', titleKey: 'note_drawing_text_hint', condition: 'text' },
+    { id: 'color', titleKey: 'note_drawing_color', condition: 'drawing_color' },
+    { id: 'resize_text', titleKey: 'note_drawing_resize_text', condition: 'selected_text' },
+    { id: 'add_text', titleKey: 'note_drawing_add_text', condition: 'text' },
+    { id: 'delete_text', titleKey: 'note_drawing_delete_text', condition: 'text' },
+    { id: 'eraser', titleKey: 'study_whiteboard_eraser', condition: 'local_ink' },
+    { id: 'undo', titleKey: 'note_drawing_undo', condition: 'local_ink' },
+    { id: 'redo', titleKey: 'note_drawing_redo', condition: 'local_ink' },
+    { id: 'canvas_size', titleKey: 'note_drawing_canvas_size', condition: 'new_canvas' }
+  ] },
   { id: 'note_audio_manage', titleKey: 'note_audio_manage', parent: '', items: [
     { id: 'close', titleKey: 'cancel' }, { id: 'apply', titleKey: 'done' },
     { id: 'add', titleKey: 'note_audio_add' }, { id: 'record', titleKey: 'note_audio_record' },
@@ -569,6 +589,71 @@ export function addNoteInterfaceControls(context: AddNoteInterfaceContext): AppI
       opens: item.opens, condition: item.condition, selected: item.id === 'tags_entry' && context.tagsExpanded,
       enabled: item.id === 'save' || item.id === 'save_return' ? context.saveEnabled && !context.blocked :
         !context.blocked && (item.id !== 'type' || context.hasTypes) }));
+}
+
+export interface NoteVisualStatus { working: boolean; hasError: boolean; kinds: string[]; }
+
+/** 只发布附件类型和实际操作状态，不暴露字段正文、文件名和 URI。 */
+export function noteVisualInterfaceObservation(status: NoteVisualStatus): AppInterfaceObservation {
+  const surface = APP_INTERFACE_SURFACES.find((entry): boolean => entry.id === 'note_visual_manage');
+  const items: AppInterfaceControl[] = (surface?.items ?? []).map((item): AppInterfaceControl =>
+    ({ id: item.id, title: '', titleKey: item.titleKey, iconKey: item.iconKey, enabled: !status.working, selected: false }));
+  for (let index: number = 0; index < Math.min(status.kinds.length, 100); index++) {
+    items.push({ id: 'attachment-' + index + '-replace', title: '', titleKey: 'note_media_replace',
+      enabled: !status.working, selected: false });
+    items.push({ id: 'attachment-' + index + '-remove', title: '', titleKey: 'note_visual_remove',
+      enabled: !status.working, selected: false });
+    if (status.kinds[index] === 'image') items.push({ id: 'attachment-' + index + '-edit', title: '',
+      titleKey: 'note_drawing_edit', iconKey: 'ic_study_edit', enabled: !status.working, selected: false });
+  }
+  return { surface: 'note_visual_manage', sectionId: '', selectedId: '', optionIds: [], optionLabels: [],
+    optionsTotal: status.kinds.length, busy: status.working, items: items,
+    controlsComplete: status.kinds.length <= 100 && status.kinds.indexOf('video') < 0,
+    values: [{ id: 'image_count', value: String(status.kinds.filter((kind: string): boolean => kind === 'image').length) },
+      { id: 'video_count', value: String(status.kinds.filter((kind: string): boolean => kind === 'video').length) },
+      { id: 'has_error', value: String(status.hasError) }, { id: 'video_playback', value: 'native_controls_not_observed' }] };
+}
+
+export interface NoteDrawingStatus {
+  working: boolean; ready: boolean; official: boolean; textMode: boolean; textCount: number;
+  selectedText: boolean; hasError: boolean; canUndo: boolean; canRedo: boolean;
+  newCanvas?: boolean; eraser?: boolean; color?: string; size?: number; canAddText?: boolean;
+  width?: number; height?: number;
+  failed?: boolean;
+  textTransforming?: boolean;
+  colorLabels?: string[];
+  hasBackground?: boolean;
+}
+export function noteDrawingInterfaceObservation(status: NoteDrawingStatus): AppInterfaceObservation {
+  const surface = APP_INTERFACE_SURFACES.find((entry): boolean => entry.id === 'note_drawing_editor');
+  const items: AppInterfaceControl[] = (surface?.items ?? [])
+    .filter((item): boolean => item.condition !== 'text' || status.textMode)
+    .filter((item): boolean => item.condition !== 'selected_text' || (status.textMode && status.selectedText))
+    .filter((item): boolean => item.condition !== 'drawing_color' || status.textMode || !status.official)
+    .filter((item): boolean => item.condition !== 'local_ink' || (!status.official && !status.textMode))
+    .filter((item): boolean => item.condition !== 'new_canvas' || status.newCanvas === true)
+    .map((item): AppInterfaceControl => ({ id: item.id, title: '',
+      titleKey: item.id === 'import' ? noteDrawingImageActionKey(status.hasBackground === true) : item.titleKey, iconKey: item.iconKey,
+      enabled: !status.working && (item.id === 'close' || (status.ready && status.failed !== true && status.textTransforming !== true &&
+        (item.id !== 'delete_text' || status.selectedText) && (item.id !== 'add_text' || status.canAddText === true) &&
+        (item.id !== 'undo' || status.canUndo) && (item.id !== 'redo' || status.canRedo))),
+      selected: item.id === 'ink' ? !status.textMode : item.id === 'text' ? status.textMode : item.id === 'eraser' && status.eraser === true }));
+  const showColors: boolean = status.textMode || !status.official;
+  return { surface: 'note_drawing_editor', sectionId: status.textMode ? 'text' : 'ink', selectedId: showColors ? status.color ?? '' : '',
+    optionIds: showColors ? DRAWING_COLORS.slice() : [], optionLabels: showColors ? status.colorLabels ?? [] : [],
+    optionsTotal: showColors ? DRAWING_COLORS.length : 0, busy: status.working, items: items,
+    controlsComplete: false,
+    values: [{ id: 'engine', value: status.official ? 'huawei_pen_kit' : 'local_canvas' },
+      { id: 'ready', value: String(status.ready) }, { id: 'selected_text', value: String(status.selectedText) },
+      { id: 'canvas_size', value: `${status.width ?? 1200} × ${status.height ?? 900}` },
+      { id: 'text_count', value: String(status.textCount) }, { id: 'has_error', value: String(status.hasError) },
+      { id: 'text_size', value: String(status.size ?? 36) }, { id: 'color', value: status.color ?? '' },
+      { id: 'text_transform', value: status.textMode && status.selectedText ? 'move_resize' : 'none' },
+      { id: 'text_resize_handles', value: status.textMode && status.selectedText ?
+        DRAWING_TEXT_HANDLES.map((handle): string => handle.id).join(',') : '' },
+      { id: 'text_selection_bounds', value: 'glyph' },
+      { id: 'text_transforming', value: String(status.textTransforming === true) },
+      { id: 'content_access', value: 'not_exposed' }] };
 }
 
 /** 音频弹层发布真实状态；不给 JIDE 暴露字段正文、录音文件或原始错误。 */
