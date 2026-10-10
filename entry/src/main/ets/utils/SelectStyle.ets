@@ -14,6 +14,8 @@ export class SelectStyle implements AttributeModifier<SelectAttribute> {
   static readonly controlFont: Font = { size: 应用尺寸.字号_正文, weight: FontWeight.Medium };
   static readonly optionFont: Font = { size: 应用尺寸.字号_正文, weight: FontWeight.Normal };
   static readonly selectedOptionFont: Font = SelectStyle.controlFont;
+  static readonly selectedOptionColor: ResourceColor = $r('app.color.text_primary');
+  static readonly selectedOptionSurface: ResourceColor = $r('app.color.surface_selected');
   static readonly controlRadius: number = 应用尺寸.radiusLg;
   static readonly controlBorder: BorderOptions = SurfaceBorder.options();
   static readonly controlHeight: number = FormRowLayout.controlHeight;
@@ -23,6 +25,7 @@ export class SelectStyle implements AttributeModifier<SelectAttribute> {
   static readonly fieldWidth: string = 'auto';
   // 给同一行的字段标签和帮助入口留出空间，不能由长选项挤占。
   static readonly fieldConstraint: ConstraintSizeOptions = FormRowLayout.trailingConstraint;
+  static readonly directoryFieldConstraint: ConstraintSizeOptions = FormRowLayout.directoryConstraint;
   static readonly rangeWidth: number = 112;
 
   // 只负责截断；字体归 Select.font，避免两套字体设置在节点更新时互相覆盖。
@@ -47,7 +50,7 @@ export class SelectStyle implements AttributeModifier<SelectAttribute> {
       .clip(true)
       .optionFontColor($r('app.color.text_primary'))
       .optionBgColor($r('app.color.surface_card'))
-      .selectedOptionFontColor($r('app.color.text_primary'))
-      .selectedOptionBgColor($r('app.color.surface_selected'));
+      .selectedOptionFontColor(SelectStyle.selectedOptionColor)
+      .selectedOptionBgColor(SelectStyle.selectedOptionSurface);
   }
 }

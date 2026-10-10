@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import type { DirectoryView } from './DirectoryTree';
 import { FILTERED_DECK_ACTIONS } from './FilteredDeckCommands';
 import { FEEDBACK_ACTIONS } from './InteractionFeedback';
 import { CARD_FLAGS } from './CardMarking';
@@ -83,6 +84,11 @@ export const WHITEBOARD_INTERFACE_ITEMS: AppInterfaceItem[] = [
 
 /** 菜单直接遍历这里的条目；标签、顺序和显隐由 UI 与 JIDE 共用。 */
 export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
+  { id: 'directory_tree', titleKey: 'directory_title', instructionsKey: 'directory_instructions', parent: 'app', items: [
+    { id: 'search', titleKey: 'directory_search' },
+    { id: 'expand', titleKey: 'directory_expand' },
+    { id: 'select', titleKey: 'directory_select' }
+  ] },
   { id: 'study_feedback', titleKey: 'feedback_title', parent: 'study', items: FEEDBACK_ACTIONS },
   { id: 'browser_feedback', titleKey: 'feedback_title', parent: 'browser', items: FEEDBACK_ACTIONS },
   { id: 'review_audio', titleKey: 'settings_study_display', parent: 'settings',
@@ -659,10 +665,35 @@ export class AppInterfaceTracker {
   currentPage(): string { return this.shownPage; }
   /** JIDE 使用最近的非助手页面；hide 保留上下文，真实销毁才移除。 */
   currentContextPage(): string { return this.shownPage === 'agent' ? this.contextPage : this.shownPage; }
+  /** 宿主传入公共组件的真实视图；这里只观察，不增加 JIDE 写入权限。 */
+  observeDirectory(owner: string, view: DirectoryView | null): void {
+    const key: string = 'directory_tree:' + owner;
+    if (view === null) {
+      this.leave(key);
+      return;
+    }
+    const controls: AppInterfaceControl[] = [];
+    if (view.searchable) controls.push({ id: 'search', title: '', titleKey: 'directory_search',
+      enabled: view.interactive, selected: view.query !== '' });
+    if (view.hasBranches) controls.push({ id: 'expand', title: '', titleKey: 'directory_expand',
+      enabled: view.interactive && view.query.trim() === '', selected: false });
+    if (view.total > 0) controls.push({ id: 'select', title: '', titleKey: 'directory_select',
+      enabled: view.interactive && view.selectable.some((value: boolean): boolean => value), selected: false });
+    this.storeObservation(key, { surface: 'directory_tree', sectionId: owner, selectedId: '',
+      optionIds: view.ids, optionLabels: view.paths, optionsTotal: view.total, busy: !view.interactive,
+      controlsComplete: true, items: controls,
+      values: [{ id: 'query', value: view.query }, { id: 'mode', value: view.mode },
+        { id: 'expanded_ids', value: JSON.stringify(view.expandedIds) },
+        { id: 'selection_states', value: JSON.stringify(view.selections) },
+        { id: 'selectable', value: JSON.stringify(view.selectable) }] });
+  }
   observe(view: AppInterfaceObservation): number {
+    return this.storeObservation(view.surface, view);
+  }
+  private storeObservation(key: string, view: AppInterfaceObservation): number {
     const version: number = ++this.nextViewVersion;
-    this.viewVersions.set(view.surface, version);
-    this.views.set(view.surface, { surface: view.surface, titleKey: view.titleKey, sectionId: view.sectionId,
+    this.viewVersions.set(key, version);
+    this.views.set(key, { surface: view.surface, titleKey: view.titleKey, sectionId: view.sectionId,
       selectedId: view.selectedId, optionIds: view.optionIds.slice(), optionLabels: view.optionLabels.slice(),
       optionsTotal: view.optionsTotal ?? view.optionIds.length, busy: view.busy, controlsComplete: view.controlsComplete,
       items: view.items?.map((item: AppInterfaceControl): AppInterfaceControl => ({ id: item.id, title: item.title, titleKey: item.titleKey,

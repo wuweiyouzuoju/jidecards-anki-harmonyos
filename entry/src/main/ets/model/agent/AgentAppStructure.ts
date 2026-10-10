@@ -90,6 +90,7 @@ export function buildAgentAppStructure(context: AppInterfaceContext, surfaceId: 
     return { surface: view.surface, titleKey: view.titleKey, controlsComplete: view.controlsComplete,
       sectionId: view.sectionId, selectedId: view.selectedId, optionIds: view.optionIds,
       optionLabels: view.optionLabels.map((label: string, index: number): string => {
+        if (view.surface === 'directory_tree') return label;
         const control = controls?.find((item): boolean => item.id === view.optionIds[index]);
         const item = declaration?.items.find((entry): boolean => entry.id === view.optionIds[index]);
         return control?.title ?? (item === undefined ? label : localize(item.titleKey));
@@ -171,7 +172,7 @@ export function buildAgentAppStructure(context: AppInterfaceContext, surfaceId: 
         requiredArguments: action.required.slice(), optionalArguments: action.optional.slice() };
     }),
     coverage: APP_INTERFACE_SURFACES.map((surface): string => surface.id).concat(['settings']),
-    limitation: 'Semantic interface structure, not a pixel screenshot. foregroundSurface comes from page visibility callbacks; empty means unknown or background. Observations describe mounted registered surfaces and can belong to a hidden page. observed/disabled controls are UI facts, not agent permissions. Conditional content without observation remains unknown. Destinations outside coverage have no detailed interface description. Secret values are never included.',
+    limitation: 'Semantic interface structure, not a pixel screenshot. foregroundSurface comes from page visibility callbacks; empty means unknown or background. Observations describe mounted registered surfaces and can belong to a hidden page. observed/disabled controls are UI facts, not agent permissions. Conditional content without observation remains unknown. Destinations outside coverage have no detailed interface description. Secret values are never included. The tool catalog describes available capabilities, not the currently loaded schemas: use discover_tools for missing definitions before calling domain tools.',
     foregroundSurface: foregroundSurface, contextSurface: sourceSurface,
     recommendations: buildAgentAppRecommendations(tools, observations, foregroundSurface, contextSurface)
       .filter((item: AgentAppRecommendation): boolean => surfaceId === 'app' ||

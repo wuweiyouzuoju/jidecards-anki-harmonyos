@@ -5,7 +5,7 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 import { ActionIcon } from './ActionIcon';
 import { HelpLabel } from './HelpLabel';
 
-/** 标签可换行；选择框靠右且限宽，完整选项仍保留在下拉菜单中。 */
+/** 标签与帮助的统一选择行；默认原生枚举，层级选择可提供同样限宽的控件。 */
 @Component
 export struct FormSelectRow {
   @Prop label: ResourceStr = '';
@@ -13,6 +13,8 @@ export struct FormSelectRow {
   @Prop showHelp: boolean = false;
   @Prop showValuePreview: boolean = false;
   @BuilderParam valuePreview: () => void = this.emptyValuePreview;
+  @Prop useCustomControl: boolean = false;
+  @BuilderParam customControl: () => void = this.emptyValuePreview;
   onHelp: () => void = (): void => {};
   @Prop options: SelectOption[] = [];
   @Prop selectedIndex: number = -1;
@@ -25,7 +27,7 @@ export struct FormSelectRow {
   private emptyValuePreview(): void {}
 
   private select(index: number): void {
-    if (this.isInteractive && Number.isInteger(index) && index >= 0 && index < this.options.length) {
+    if (!this.useCustomControl && this.isInteractive && Number.isInteger(index) && index >= 0 && index < this.options.length) {
       this.onSelect(index);
     }
   }
@@ -41,13 +43,17 @@ export struct FormSelectRow {
           .textAlign(TextAlign.Start).layoutWeight(1).constraintSize({ minWidth: 0 })
       }
       if (this.showValuePreview) { this.valuePreview() }
-      Select(this.options).selected(this.selectedIndex).value(this.value)
+      if (this.useCustomControl) {
+        this.customControl()
+      } else {
+        Select(this.options).selected(this.selectedIndex).value(this.value)
         .width(SelectStyle.fieldWidth).constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
         .enabled(this.isInteractive).attributeModifier(new SelectStyle(this.surfaceColor))
         .height(SelectStyle.controlHeight).padding(SelectStyle.controlPadding).space(SelectStyle.controlSpace)
         .font(SelectStyle.controlFont).optionFont(SelectStyle.optionFont).selectedOptionFont(SelectStyle.selectedOptionFont)
         .textModifier(SelectStyle.labelText()).border(SelectStyle.controlBorder).borderRadius(SelectStyle.controlRadius)
         .onSelect((index: number): void => { this.select(index); })
+      }
     }.width('100%').constraintSize({ minHeight: FormRowLayout.controlHeight }).alignItems(VerticalAlign.Center)
   }
 }

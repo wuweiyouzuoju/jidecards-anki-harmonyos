@@ -935,7 +935,7 @@
     { "name": "deck_tone_black", "value": "黑色色条" },
     { "name": "deck_tone_red", "value": "红色" },
     { "name": "deck_tone_none", "value": "取消色条" },
-    { "name": "deck_menu_tone_label", "value": "色条颜色" },
+{ "name": "deck_menu_tone_label", "value": "色条颜色" },
     { "name": "deck_menu_reorder", "value": "拖动排序" },
     { "name": "deck_menu_hide", "value": "隐藏牌组" },
     { "name": "deck_menu_delete", "value": "删除牌组" },
@@ -2806,6 +2806,16 @@
     {"name": "motion_style_save_failed", "value": "动效风格保存失败，请重试"},
     {"name": "feedback_buried", "value": "已埋藏当前卡片"},
     {"name": "feedback_suspended", "value": "已暂停当前卡片"},
-    {"name": "feedback_items_updated", "value": "已更新 %d 项"}
+    {"name": "feedback_items_updated", "value": "已更新 %d 项"},
+    {"name":"directory_title","value":"目录选择"},
+    {"name":"directory_search","value":"搜索目录"},
+    {"name":"directory_empty","value":"没有匹配的目录"},
+    {"name":"directory_selected","value":"已选择"},
+    {"name":"directory_unselected","value":"未选择"},
+    {"name":"directory_mixed","value":"部分选择"},
+    {"name":"directory_open_error","value":"目录选择器打开失败，请重试"},
+    {"name":"directory_expand","value":"展开或收起目录"},
+    {"name":"directory_select","value":"选择目录"},
+    {"name":"directory_instructions","value":"牌组与标签共用目录树。可搜索完整路径、展开或收起分支，按当前用途单选、多选或循环不限、包含、排除。展开与选择独立；选择父项不会自动选择子项。只有真实可选的条目能提交。"}
   ]
 }

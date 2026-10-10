@@ -8,4 +8,6 @@ export class FormRowLayout {
   static readonly gap: number = 应用尺寸.间距_12;
   static readonly controlHeight: number = 40;
   static readonly trailingConstraint: ConstraintSizeOptions = { maxWidth: '56%' };
+  // 目录值常包含完整路径；放宽右侧占比，字段标签仍使用剩余空间并可换行。
+  static readonly directoryConstraint: ConstraintSizeOptions = { maxWidth: '70%' };
 }
