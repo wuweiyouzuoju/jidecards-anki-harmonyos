@@ -106,7 +106,7 @@ test('new and existing editors both use the shared selection toolbar and guard t
   const panel=read('components/browser/浏览编辑区.ets');
   assert.match(panel,/onBack:[^]*?this\.requestClose\(\)/);
   assert.match(read('pages/EditNotePage.ets'),/backRequest: this\.backRequest/);
-  assert.match(read('components/common/NoteFieldCard.ets'),/NoteAudioField\(/);
+  assert.match(read('components/editor/NoteFieldCard.ets'),/NoteAudioField\(/);
   assert.match(read('components/common/NoteAudioField.ets'),/NoteFieldEditor\(/);
   assert.match(read('pages/添加笔记页.ets'),/\.onBackPressed\([^]*?this\.onBackPress\(\)/);
 });
@@ -116,7 +116,7 @@ test('IO save uses Core field indices, permanent media and explicit target deck,
   const Adapter=loadPlatformModule('backend/AnkiNoteCreation.ets','AnkiNoteCreation',{
     笔记服务:class{async 新建笔记(){return {fields:['','','','','extra'],tags:[]};} async 添加笔记(note,deck){writes.push({note,deck});}},
     笔记类型服务:class{},图片遮罩服务:class{async 获取图片遮罩字段(){return {遮罩:2,图片:0,标题:3,额外:1};}},
-    prepareNoteImageFields,importNoteImage:async()=> 'normalized.png'
+    prepareNoteImageFields,importNoteVisual:async()=> 'normalized.png'
   });
   const adapter=new Adapter();await adapter.saveOcclusion({deckId:123,notetypeId:4,uri:'photo://one',occlusions:'{{c1::image-occlusion:rect:left=0.1:top=0.1:width=0.2:height=0.2}}',header:'h',backExtra:'b',tags:['io']});
   assert.equal(writes[0].deck,123);assert.deepEqual(writes[0].note.fields,['<img src="normalized.png">','b','{{c1::image-occlusion:rect:left=0.1:top=0.1:width=0.2:height=0.2}}','h','extra']);

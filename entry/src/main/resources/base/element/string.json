@@ -2848,6 +2848,7 @@
     {"name":"note_visual_add","value":"新增图片或视频"},
     {"name":"note_visual_manage","value":"图片和视频"},
     {"name":"note_visual_remove","value":"删除附件"},
+    {"name":"note_media_open_failed","value":"无法打开媒体管理，草稿已保留，请重试。"},
     {"name":"note_visual_import_failed","value":"图片或视频读取失败，请重新选择。视频支持 MP4、MOV 和 WebM。"},
     {"name":"note_visual_draft_hint","value":"完成后应用到草稿，保存笔记后生效。视频单个最大 64 MiB。"},
     {"name":"note_video_too_large","value":"视频为空或超过 64 MiB，请选择较小的视频。"},

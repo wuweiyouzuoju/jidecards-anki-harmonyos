@@ -12,10 +12,125 @@ import { loadComponentLogic } from './platform-module-harness.mjs';
 import { mediaDialogHarness } from './note-media-dialog-harness.mjs';
 import { editorPageHarness } from './editor-page-harness.mjs';
 import { arkuiClickTargets } from '../arkui-click-targets.mjs';
+import { surfaceMotionApi } from './motion-harness.mjs';
 
 const deferred = () => { let resolve; const promise = new Promise(r => resolve = r); return { promise, resolve }; };
 const session = (value = '', images = [], audios = []) => new NoteMediaSession(value, 0, images, audios, 'test');
 const audio = (id, uri) => ({ id, fieldIndex: 0, uri, filename: '', label: uri, temporary: true });
+
+function fieldManagerHarness(initial = {}, failOpen = false, deferClose = false) {
+  const windows = [], events = [];
+  const Field = loadComponentLogic('components/editor/NoteFieldCard.ets', 'NoteFieldCard', {
+    ...surfaceMotionApi(), noteMediaParts, replaceNoteMediaPart, noteImagePreviewSource,
+    NoteAudioPreview: class { async stop() {} },
+    showToastSafely: (_ctx, options) => events.push(['error', options.message]), $r: key => key,
+    NoteMediaDialog: options => options,
+    CustomDialogController: class {
+      constructor(options) { this.options = options; this.visible = false; windows.push(this); }
+      open() {
+        if (failOpen) throw Error('native open failed');
+        this.visible = true;
+        const h = mediaDialogHarness(async () => [], this.options.builder);
+        this.dialog = h.dialog;
+      }
+      close() {
+        this.visible = false;
+        if (!deferClose) this.dialog?.aboutToDisappear();
+      }
+    }
+  });
+  const field = Object.assign(new Field(), initial, {
+    onAudioBusy: busy => events.push(['busy', busy]),
+    onMediaApply: (...draft) => events.push(['apply', ...draft]),
+    getUIContext: () => ({})
+  });
+  field.aboutToAppear();
+  return { field, events, windows };
+}
+
+test('real media owner closes without compiler controller injection for empty, picked and audio drafts', () => {
+  for (const kind of ['image', 'audio']) for (const picked of [false, true]) for (const commit of [false, true]) {
+    const h = fieldManagerHarness(); h.field.openManager(kind);
+    const window = h.windows[0], dialog = window.dialog;
+    assert.equal(dialog.controller, undefined);
+    if (picked) {
+      if (kind === 'audio') dialog.session.addAudio('/cache/note-audio-1-1.mp3', 'voice.mp3', true);
+      else dialog.session.addImage('photo://new');
+      dialog.sync();
+    }
+    dialog.close(commit);
+    assert.equal(window.visible, false, `${kind}/${picked}/${commit}: native window must close`);
+    assert.equal(h.field.mediaDialog.current(), null);
+    assert.deepEqual(h.events.filter(event => event[0] === 'busy'), [['busy', true], ['busy', false]]);
+    assert.equal(h.events.filter(event => event[0] === 'apply').length, commit ? 1 : 0);
+    if (commit) {
+      const applied = h.events.find(event => event[0] === 'apply');
+      assert.equal(applied[2].length, picked && kind === 'image' ? 1 : 0);
+      assert.equal(applied[3].length, picked && kind === 'audio' ? 1 : 0);
+    }
+    h.field.openManager(kind); assert.equal(h.windows[1].visible, true);
+  }
+});
+
+test('system dismissal honors picker busy, then cancels and releases the same real window', () => {
+  const h = fieldManagerHarness(); h.field.openManager('image');
+  const window = h.windows[0], dialog = window.dialog;
+  dialog.working = true;
+  window.options.onWillDismiss({ dismiss: () => assert.fail('busy window') });
+  assert.equal(window.visible, true);
+  dialog.working = false;
+  window.options.onWillDismiss({ dismiss: () => window.close() });
+  assert.equal(window.visible, false);
+  assert.equal(h.field.mediaDialog.current(), null);
+  assert.equal(h.events.some(event => event[0] === 'apply'), false);
+});
+
+test('opening failure restores parent editing, and delayed old callbacks cannot release a new manager', () => {
+  const failure = fieldManagerHarness({}, true);
+  failure.field.openManager('image');
+  assert.equal(failure.field.mediaDialog.current(), null);
+  assert.deepEqual(failure.events.filter(event => event[0] === 'busy'), [['busy', true], ['busy', false]]);
+  assert.equal(failure.events.filter(event => event[0] === 'error').length, 1);
+  const h = fieldManagerHarness({}, false, true);
+  h.field.openManager('image'); const old = h.windows[0]; old.dialog.close(false);
+  h.field.openManager('audio'); const current = h.windows[1];
+  old.options.builder.onApply('stale', [], []);
+  old.options.builder.onReady(() => assert.fail('old ready cannot replace current dismissal'));
+  old.dialog.aboutToDisappear();
+  assert.equal(h.field.mediaDialog.current(), current);
+  assert.equal(h.events.some(event => event[0] === 'apply'), false);
+  current.options.onWillDismiss({ dismiss: () => current.close() });
+  assert.equal(current.visible, false);
+});
+
+test('field teardown unlocks the parent and repeated close applies and cleans up only once', () => {
+  const h = fieldManagerHarness(); h.field.openManager('image'); h.field.aboutToDisappear();
+  assert.equal(h.field.mediaDialog.current(), null);
+  assert.deepEqual(h.events.filter(event => event[0] === 'busy'), [['busy', true], ['busy', false]]);
+  const draft = mediaDialogHarness(); draft.dialog.close(true); draft.dialog.close(true); draft.dialog.aboutToDisappear();
+  assert.equal(draft.events.filter(event => event[0] === 'apply').length, 1);
+  assert.equal(draft.events.filter(event => event[0] === 'cleanup').length, 1);
+  assert.equal(draft.events.filter(event => event === 'closed').length, 1);
+  const closing = fieldManagerHarness({}, false, true); closing.field.openManager('image');
+  closing.windows[0].dialog.close(false); closing.field.aboutToDisappear();
+  assert.deepEqual(closing.events.filter(event => event[0] === 'busy'), [['busy', true], ['busy', false]],
+    'teardown during the native closing animation still releases the parent busy state');
+});
+
+test('late media disappearance preserves the current JIDE observation', () => {
+  const first = mediaDialogHarness();
+  first.dialog.onRequestClose = () => {};
+  first.dialog.close(false);
+  const next = mediaDialogHarness(async () => [], {}, first.tracker);
+  next.dialog.session.addImage('photo://current'); next.dialog.sync();
+  const expected = first.tracker.snapshot();
+  first.dialog.publishVisualStatus();
+  assert.deepEqual(first.tracker.snapshot(), expected, 'closing content cannot republish over a newer window');
+  first.dialog.aboutToDisappear();
+  assert.deepEqual(first.tracker.snapshot(), expected);
+  next.dialog.aboutToDisappear();
+  assert.deepEqual(first.tracker.snapshot(), []);
+});
 
 test('media tokenizer preserves HTML bytes and distinguishes src, comments, scripts and quoted angle brackets', () => {
   const value = `前<img alt="it's > fine src='hidden.png' [sound:hidden.mp3]" SRC = '中&amp;文.png' width="50">中[sound:a.mp3]后<img data-src="x" src=b.png>`;
@@ -105,7 +220,7 @@ test('management applies only on Done, cancel preserves originals and picker err
   assert.equal(done.events.find(e => e[0] === 'apply')[2][0].uri, 'photo://new');
   const failure = mediaDialogHarness(async () => { throw Error('provider denied'); });
   await failure.dialog.pickImage();
-  assert.equal(failure.dialog.errorMessage, 'app.string.add_note_image_import_failed');
+  assert.equal(failure.dialog.errorMessage, 'app.string.note_visual_import_failed');
   assert.equal(failure.dialog.working, false);
 });
 
@@ -121,7 +236,7 @@ test('picker cancellation, late replies and every dialog dismissal respect the b
 });
 
 test('disposed or disabled field cards reject late text, reverse and audio callbacks during continuation', () => {
-  const Field=loadComponentLogic('components/common/NoteFieldCard.ets','NoteFieldCard',{NoteAudioPreview:class{}});
+  const Field=loadComponentLogic('components/editor/NoteFieldCard.ets','NoteFieldCard',{NoteAudioPreview:class{}});
   const field=new Field(),changes=[],removed=[]; field.onChange=value=>changes.push(value); field.onRemoveAudio=id=>removed.push(id);
   field.changeValue('current'); field.removeAudio(1); field.disabled=true;
   field.changeValue('busy'); field.removeAudio(2); field.disabled=false; field.aboutToDisappear();
@@ -130,7 +245,7 @@ test('disposed or disabled field cards reject late text, reverse and audio callb
 });
 
 test('main field previews resolve existing and replacement images live and delete only the selected occurrence', () => {
-  const Field = loadComponentLogic('components/common/NoteFieldCard.ets', 'NoteFieldCard', {
+  const Field = loadComponentLogic('components/editor/NoteFieldCard.ets', 'NoteFieldCard', {
     NoteAudioPreview: class {}, noteMediaParts, replaceNoteMediaPart, noteImagePreviewSource
   });
   const field = new Field(); field.value = '<img src="one.png">X<img src="one.png">';
@@ -151,16 +266,16 @@ test('main field previews resolve existing and replacement images live and delet
 
 test('media UI keeps fixed Add labels and main previews expose deletion independent of the management dialog', () => {
   const read = path => readFileSync(new URL('../../entry/src/main/ets/' + path, import.meta.url), 'utf8');
-  const card = read('components/common/NoteFieldCard.ets');
-  for (const [id, label] of [['image', 'add_note_image_add'], ['audio', 'note_audio_add']]) {
+  const card = read('components/editor/NoteFieldCard.ets');
+  for (const [id, label] of [['image', 'note_visual_add'], ['audio', 'note_audio_add']]) {
     assert.equal(noteFieldMediaTool(id).titleKey, label);
     assert.ok(card.includes(`label: $r('app.string.' + noteFieldMediaTool('${id}').titleKey)`));
     assert.ok(card.includes(`this.openManager('${id}')`));
   }
   assert.match(card, /Stack\(\{ alignContent: Alignment.TopEnd \}\)/);
-  assert.match(card, /Button\(\$r\('app.string.add_note_image_remove'\)\)/);
+  assert.match(card, /Button\(\$r\('app.string.note_visual_remove'\)\)/);
   assert.doesNotMatch(card, /note_(image|audio)_modify|removalsVisible: false/);
-  const dialog = read('components/common/NoteMediaDialog.ets');
+  const dialog = read('components/editor/NoteMediaDialog.ets');
   assert.match(dialog, /DialogFrame\(/); assert.match(dialog, /replacementsVisible: true/);
   assert.match(dialog, /canDismiss: !this.working/);
   assert.equal(noteAudioParts('[sound:one.mp3]')[1].filename, 'one.mp3');
@@ -168,13 +283,13 @@ test('media UI keeps fixed Add labels and main previews expose deletion independ
 
 test('filled image actions consume the live theme button color', () => {
   for (const [name, expected] of [['NoteMediaDialog',1]]) {
-    const source = readFileSync(new URL(`../../entry/src/main/ets/components/common/${name}.ets`, import.meta.url), 'utf8');
+    const source = readFileSync(new URL(`../../entry/src/main/ets/components/editor/${name}.ets`, import.meta.url), 'utf8');
     assert.match(source, /@StorageProp\(颜色键.主色按钮背景\) private buttonColor/);
     const buttons = arkuiClickTargets(source).filter(target => target.kind === 'Button' &&
       !target.modifiers.includes('backgroundColor(Color.Transparent)'));
     assert.equal(buttons.length, expected);
     if (name === 'NoteMediaDialog') {
-      assert.match(source, /LabeledActionRow\([\s\S]*actionLabel: \$r\('app.string.add_note_image_add'\),\s*tint: this\.buttonColor/);
+      assert.match(source, /LabeledActionRow\([\s\S]*actionLabel: \$r\('app.string.note_visual_add'\),\s*compactLabel: true/);
       assert.match(source, /isInteractive: !this\.working,[\s\S]*onAction:.*this\.pickImage\(\)/);
     }
     const state = { buttonColor: '#7C3AED' };

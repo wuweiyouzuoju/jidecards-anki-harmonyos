@@ -1,23 +1,25 @@
+import { NativeDialogHost, NativeDialogDismiss, NativeDialogPresentation } from '../common/NativeDialogHost';
 import { SurfaceTransition } from '../../utils/SurfaceTransition';
-import { IconActionButton } from './IconActionButton';
+import { IconActionButton } from '../common/IconActionButton';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { noteFieldText } from '../../utils/NoteTypeText';
 import { PressFeedback } from '../../utils/PressFeedback';
-import { NoteAudioField } from './NoteAudioField';
-import { NoteFieldEditor, NoteFieldEditingOptions, noteFieldMediaTool } from './NoteFieldEditor';
-import { NoteImagePreview } from './NoteImagePreview';
+import { NoteAudioField } from '../common/NoteAudioField';
+import { NoteFieldEditor, NoteFieldEditingOptions, noteFieldMediaTool } from '../common/NoteFieldEditor';
+import { NoteVisualPreview } from './NoteVisualPreview';
 import { NoteMediaDialog } from './NoteMediaDialog';
 import { common } from '@kit.AbilityKit';
 import { NoteMediaPart, noteMediaParts, replaceNoteMediaPart, noteImagePreviewSource } from '../../model/NoteMediaParts';
 import { NoteFieldAudio, NoteAudioStatus } from '../../model/NoteAudioDraft';
 import { NoteAudioPreview } from '../../utils/NoteAudioPreview';
-import { SettingsToggleRow } from './SettingsToggleRow';
+import { SettingsToggleRow } from '../common/SettingsToggleRow';
 import { NoteFieldImage } from '../../model/NoteImageDraft';
 import { 应用尺寸 } from '../../utils/应用尺寸';
-import { DisclosureChevron } from './DisclosureChevron';
+import { DisclosureChevron } from '../common/DisclosureChevron';
+import { showToastSafely } from '../../utils/UiFeedback';
 
-/** 字段标题、图片入口、输入区和附件的唯一布局；草稿与 IO 仍由宿主持有。 */
+/** 字段标题、图像入口、输入区和附件的唯一布局；图片和视频共用原图标。 */
 @Component
 export struct NoteFieldCard {
   @Prop fieldName: string = '';
@@ -48,16 +50,21 @@ export struct NoteFieldCard {
   @Prop accent: string = '#2F5FD0';
   onChange: (value: string) => void = (_value: string): void => {};
   onRemoveImage: (id: number) => void = (_id: number): void => {};
-  private mediaDialog: CustomDialogController | null = null;
+  private readonly mediaDialog: NativeDialogHost = new NativeDialogHost();
   private dismissManager: () => void = (): void => {};
   private disposed: boolean = false;
+  private managerVersion: number = 0;
+  private managerActive: boolean = false;
 
-  aboutToAppear(): void { this.loadFieldConfig(); }
+  aboutToAppear(): void { this.disposed = false; this.mediaDialog.activate(); this.loadFieldConfig(); }
   private loadFieldConfig(): void { this.collapsed = this.fieldConfig?.collapsed === true; }
 
   aboutToDisappear(): void {
-    this.disposed = true; this.mediaDialog?.close();
-    if (this.mediaDialog !== null) this.onAudioStatus(null);
+    if (this.managerActive) { this.onAudioStatus(null); this.onAudioBusy(false); }
+    this.managerActive = false;
+    this.managerVersion++;
+    this.dismissManager = (): void => {};
+    this.disposed = true; this.mediaDialog.dispose();
   }
 
   private changeValue(value: string): void {
@@ -73,27 +80,55 @@ export struct NoteFieldCard {
       (kind === 'image' ? this.images.length > 0 : this.audios.length > 0);
   }
 
-  private openManager(kind: string): void {
-    if (this.disabled || this.disposed || this.mediaDialog !== null) return;
-    this.audioPreview.stop().catch((): void => {});
-    this.mediaDialog = new CustomDialogController({
+  private readonly createMediaDialog: (kind: string, dismiss: NativeDialogDismiss) => CustomDialogController =
+    (kind: string, dismiss: NativeDialogDismiss): CustomDialogController => {
+    const presentation: NativeDialogPresentation = this.mediaDialog.presentation();
+    const version: number = this.managerVersion;
+    return new CustomDialogController({
       builder: NoteMediaDialog({ kind: kind, fieldIndex: this.fieldIndex, initialValue: this.value,
         initialImages: this.images, initialAudios: this.audios, preview: this.audioPreview,
-        onAudioStatus: (status: NoteAudioStatus): void => { if (!this.disposed) this.onAudioStatus(status); },
-        onReady: (dismiss: () => void): void => { this.dismissManager = dismiss; },
+        onRequestClose: this.mediaDialog.guard((): void => { this.mediaDialog.close(); }),
+        onAudioStatus: (status: NoteAudioStatus): void => { if (this.isCurrentManager(version)) this.onAudioStatus(status); },
+        onReady: (dismiss: () => void): void => { if (this.isCurrentManager(version)) this.dismissManager = dismiss; },
         onApply: (value: string, images: NoteFieldImage[], audios: NoteFieldAudio[]): void => {
-          if (!this.disposed) this.onMediaApply(value, images, audios);
+          if (this.isCurrentManager(version)) this.onMediaApply(value, images, audios);
         },
         onClosed: (): void => {
-          this.mediaDialog = null; this.dismissManager = (): void => {};
-          if (kind === 'audio') this.onAudioStatus(null);
-          if (!this.disposed) this.onAudioBusy(false);
+          if (!this.isCurrentManager(version)) return;
+          this.managerActive = false;
+          this.mediaDialog.release(); this.dismissManager = (): void => {};
+          if (!this.disposed) {
+            if (kind === 'audio') this.onAudioStatus(null);
+            this.onAudioBusy(false);
+          }
         } }),
-      openAnimation: SurfaceTransition.dialogEnterAnimation(), closeAnimation: SurfaceTransition.dialogExitAnimation(), customStyle: true, autoCancel: false, alignment: DialogAlignment.Center,
-      width: '100%', height: '100%', maskColor: Color.Transparent,
-      onWillDismiss: (_action: DismissDialogAction): void => { this.dismissManager(); }
+      openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation, customStyle: presentation.customStyle, autoCancel: presentation.autoCancel, alignment: presentation.alignment,
+      width: presentation.width, height: presentation.height, maskColor: presentation.maskColor,
+      onWillDismiss: dismiss
     });
-    this.onAudioBusy(true); this.mediaDialog.open();
+  };
+
+  private openManager(kind: string): void {
+    if (this.disabled || this.disposed || this.mediaDialog.current() !== null) return;
+    this.managerVersion++;
+    this.managerActive = true;
+    this.audioPreview.stop().catch((): void => {});
+    this.onAudioBusy(true);
+    try {
+      this.mediaDialog.open((dismiss: NativeDialogDismiss): CustomDialogController => this.createMediaDialog(kind, dismiss),
+        (): boolean => { this.dismissManager(); return false; });
+    } catch (error) {
+      this.managerVersion++;
+      this.managerActive = false;
+      this.dismissManager = (): void => {};
+      this.onAudioStatus(null);
+      this.onAudioBusy(false);
+      showToastSafely(this.getUIContext(), { message: $r('app.string.note_media_open_failed') });
+    }
+  }
+
+  private isCurrentManager(version: number): boolean {
+    return !this.disposed && this.managerActive && version === this.managerVersion;
   }
 
   private part(index: number): NoteMediaPart | undefined { return noteMediaParts(this.value)[index]; }
@@ -108,7 +143,7 @@ export struct NoteFieldCard {
   private removeImage(index: number, id: number = -1): void {
     if (this.disabled || this.disposed) return;
     const part: NoteMediaPart | undefined = this.part(index);
-    if (part?.kind === 'image') {
+    if (part?.kind === 'image' || part?.kind === 'video') {
       const draft = this.images.find((item: NoteFieldImage): boolean => item.reference === part.text);
       this.changeValue(replaceNoteMediaPart(this.value, index, ''));
       if (draft !== undefined) this.onRemoveImage(draft.id);
@@ -118,11 +153,13 @@ export struct NoteFieldCard {
   @Builder
   private imagePreview(index: number, id: number = -1) {
     Stack({ alignContent: Alignment.TopEnd }) {
-      NoteImagePreview({ source: index >= 0 ? this.imageSource(index) :
-        (this.images.find((item: NoteFieldImage): boolean => item.id === id)?.uri ?? '') })
-      Button($r('app.string.add_note_image_remove')).height(应用尺寸.紧凑控件高度)
+      NoteVisualPreview({ source: index >= 0 ? this.imageSource(index) :
+        (this.images.find((item: NoteFieldImage): boolean => item.id === id)?.uri ?? ''),
+        kind: index >= 0 ? (this.part(index)?.kind ?? 'image') :
+          (this.images.find((item: NoteFieldImage): boolean => item.id === id)?.kind ?? 'image'), disabled: this.disabled })
+      Button($r('app.string.note_visual_remove')).height(应用尺寸.紧凑控件高度)
         .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
-        .backgroundColor($r('app.color.surface_card')).borderRadius(应用尺寸.圆角_面板).border(SurfaceBorder.options())
+        .backgroundColor($r('app.color.surface_card')).border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
         .margin(应用尺寸.间距_5).enabled(!this.disabled)
         .attributeModifier(new PressFeedback()).stateEffect(false)
         .onClick((): void => { this.removeImage(index, id); })
@@ -161,7 +198,7 @@ export struct NoteFieldCard {
         }.width('100%')
         if (!this.collapsed) {
           ForEach(noteMediaParts(this.value), (_part: NoteMediaPart, index: number) => {
-            if (this.part(index)?.kind === 'image') {
+            if (this.part(index)?.kind === 'image' || this.part(index)?.kind === 'video') {
               this.imagePreview(index)
             } else if (this.part(index)?.kind === 'text' &&
               (this.part(index)?.text !== '' || index === 0 || index === noteMediaParts(this.value).length - 1)) {
@@ -171,7 +208,7 @@ export struct NoteFieldCard {
                 clozeEnabled: this.clozeEnabled, allFields: this.allFields,
                 onChange: (text: string): void => { this.changeValue(replaceNoteMediaPart(this.value, index, text)); } })
             }
-          }, (_part: NoteMediaPart, index: number): string => `${index}`)
+          }, (part: NoteMediaPart, index: number): string => `${index}-${part.kind}-${part.filename}`)
           ForEach(this.images.filter((item: NoteFieldImage): boolean => item.reference === undefined), (attachment: NoteFieldImage) => {
             this.imagePreview(-1, attachment.id)
           }, (attachment: NoteFieldImage): string => `${attachment.id}-${attachment.uri}`)
@@ -188,6 +225,6 @@ export struct NoteFieldCard {
           onChange: (sticky: boolean): void => { if (!this.disabled && !this.disposed) this.onStickyChange(sticky); } })
       }
     }.width('100%').padding(应用尺寸.卡片内边距)
-      .backgroundColor($r('app.color.surface_card')).borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
+      .backgroundColor($r('app.color.surface_card')).border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
   }
 }

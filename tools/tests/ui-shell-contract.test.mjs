@@ -65,7 +65,7 @@ test('peer cards share one gap and reminder scrolling does not fix the content h
 });
 
 test('note creation and editing share home gaps with one card padding owner', () => {
-  const card = read('entry/src/main/ets/components/common/NoteFieldCard.ets');
+  const card = read('entry/src/main/ets/components/editor/NoteFieldCard.ets');
   const padding = card.match(/\}\.width\('100%'\)\.padding\((应用尺寸\.[^)]+)\)\s*\.backgroundColor/)[1];
   assert.equal(new Function('应用尺寸', `return ${padding}`)(应用尺寸), 16);
   const cardContainer = card.slice(card.lastIndexOf("    }.width('100%')"));
@@ -400,8 +400,8 @@ test('stats toolbar shows FSRS and the scope row holds deck and history selector
   assert.ok(topBar.includes('stats_fsrs_disabled'));
   assert.ok(!topBar.includes('范围切换条({'));
   assert.ok(!scopeRow.includes('stats_fsrs_enabled'));
-  assert.ok(scopeRow.indexOf('Select(this.牌组选项)') < scopeRow.indexOf('范围切换条({'));
-  assert.ok(scopeRow.includes("new SelectStyle($r('app.color.surface_card'))"));
+  assert.ok(scopeRow.indexOf('DirectorySelect({') >= 0 && scopeRow.indexOf('DirectorySelect({') < scopeRow.indexOf('范围切换条({'));
+  assert.ok(scopeRow.includes("surfaceColor: $r('app.color.surface_card')"));
   assert.ok(scopeRow.includes('on天数切换(index === 1 ? 0 : 365)'));
 });
 
@@ -838,7 +838,7 @@ test('settings directory keeps full-screen navigation and existing about content
   const aboutDialog = read('entry/src/main/ets/components/settings/AboutActionDialog.ets');
   assert.match(about, /builder: AboutActionDialog\(/);
   assert.match(about, /groupNumber: this\.QQ群号/);
-  assert.match(about, /this\.createFeedbackDialog\(\); this\.feedbackDialog\?\.open\(\)/);
+  assert.match(about, /this\.feedbackDialog\.open\(this\.createFeedbackDialog\)/);
   assert.doesNotMatch(about, /sponsorDialog|app\.string\.sponsor_title/);
   assert.match(aboutDialog, /app\.string\.feedback_copy_group/);
   assert.match(aboutDialog, /app\.media\.sponsor_qrcode/);

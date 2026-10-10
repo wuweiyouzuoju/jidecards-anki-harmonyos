@@ -6,7 +6,7 @@ import { posix } from 'node:path';
 
 const root = new URL('../../entry/src/main/ets/components/common/', import.meta.url);
 const sharedModels = new Set(['AppLayoutState', 'AppLifecycleState', 'ThemeCatalog', 'ThemeBackgroundMotion',
-  '颜色主题', '主题设置', 'CardViewportLayout', 'WindowSafeLayout', 'MenuHoldController', 'MenuSlideSession', 'InteractionFeedback'].map(name => 'model/' + name));
+  '颜色主题', '主题设置', 'CardViewportLayout', 'WindowSafeLayout', 'MenuHoldController', 'MenuSlideSession', 'InteractionFeedback', 'DirectoryTree'].map(name => 'model/' + name));
 const sharedUtils = new Set(['应用尺寸', 'UiFeedback', 'PressFeedback', 'SurfaceBorder', '转场时长',
   'FormInputStyle', 'FormRowLayout', 'FormTextAreaStyle', 'GlassSurface', 'SelectStyle', 'ImageSurfaceStyle', 'ExpansionReveal', 'HelpLayout', 'AppMotion', 'SurfaceTransition']
   .map(name => 'utils/' + name));
@@ -19,14 +19,9 @@ const legacyDependencies = new Map([
     'model/NoteAudioDraft', 'utils/NoteAudioPreview', 'utils/NoteAudioRecorder']],
   ['NoteDraftPreview.ets', ['backend/AnkiNoteDraftPreview', 'components/settings/NotetypeTemplatePreview',
     'model/NoteDraftPreview']],
-  ['NoteFieldCard.ets', ['@kit.AbilityKit', 'model/NoteAudioDraft', 'model/NoteImageDraft',
-    'model/NoteMediaParts', 'utils/NoteAudioPreview', 'utils/NoteTypeText']],
   ['NoteFieldEditor.ets', ['components/editor/NoteEditorWheel', 'model/NoteEditorWheel', 'components/字段帮助面板', 'model/NoteFieldEditing', 'model/NoteHtmlTools',
     'model/NoteRichText', 'utils/NoteEditingHints']],
   ['NoteLinkDialog.ets', ['model/NoteRichText']],
-  ['NoteMediaDialog.ets', ['@kit.AbilityKit', '@kit.MediaLibraryKit', 'model/NoteAudioDraft',
-    'model/NoteImageDraft', 'model/NoteMediaParts', 'model/NoteMediaSession',
-    'utils/NoteAudioPreview', 'utils/NoteAudioRecorder']],
   ['NoteTagsField.ets', ['model/NoteFieldEditing', 'model/NoteTags']],
   ['TagPicker.ets', ['backend/AppInterfaceService', 'backend/标签服务', 'model/AppInterface',
     'model/NoteTags', 'proto/messages/TagsMessages']],
@@ -89,4 +84,11 @@ test('common has no new business dependencies and each public module has an inde
     const actual = [...new Set(dependencies(file, sources.get(file) ?? '').filter(dependency => !isShared(dependency)))];
     assert.deepEqual(actual.sort(), [...expected].sort(), `${file}: remove obsolete migration exceptions`);
   }
+});
+
+test('directory foundations depend only on shared UI and are indexed', () => {
+  const sources = new Map(['DirectoryTree.ets', 'DirectorySelect.ets', 'DirectorySelectDialog.ets']
+    .map(file => [file, readFileSync(new URL(file, root), 'utf8')]));
+  assert.deepEqual(boundaryErrors(sources), []);
+  assert.deepEqual(missingIndex(sources, readFileSync(new URL('README.md', root), 'utf8')), []);
 });

@@ -33,6 +33,14 @@ Node 24.x 与 `package.json` / CI 一致。首次准备或 lockfile 变化后运
 
 `verify` 按阶段打印 environment/repository/native/sandbox/rpc-index/protocol-core/hap，失败立即非零退出。结束报告必须写明执行的模式，repo 成功不等于整个应用验证完成。
 
+### 媒体管理编译产物检查
+
+HAP 构建后运行 `node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs tools/check-note-media-compiled.mjs <本次编译的NoteFieldCard.ts> <本次编译的NoteMediaDialog.ts>`。例如两个输入均位于 `entry/build/default/cache/default/default@CompileArkTS/esmodule/debug/entry/src/main/ets/components/editor/`；release 包替换目录。需要 Node24、本次 HAP 的 CompileArkTS 输出及现有 TS 加载 hook。输入缺失、不是编译组件或关闭行为失败均非零退出，成功报告两份输入路径、SHA-256 及场景/窗口计数。
+
+工具执行编译后的真实字段工厂、媒体组件、DialogFrame/Header 插槽和 NativeDialogHost，平台替身不会替编译器注入 controller。覆盖图片/音频、空/有新附件、×/完成/遮罩/系统返回、忙碌拒绝、重开及宿主解锁。旧无参 `setController()` 依赖必须重现无法退出；工具反例在 `note-media-compiled.test.mjs`，进入 media 测试。该入口不执行字节码，不模拟 ArkUI 观察调度、布局、动画、选择器或录音；仍须设备验收。
+
+制卡书画接入后，工具另执行当前编译产物中的编辑器父子回调，检查返回只取消书画、同一媒体窗口保留、完成移交图片和旧编辑回调隔离。书画替身只消费真实回调，不证明 SDK 书写、源文件加载或栅格合成；这些源逻辑回归在 `note-drawing.test.mjs`，设备范围见[制卡图片书画](browser-stats.md#制卡图片书画2026-10-09)。
+
 ## 开发可维护性门禁
 
 - `tools/tests/architecture-boundaries.test.mjs` 自动发现应用 `.ts/.ets`，检查字面量导入/再导出的可解析性、依赖环、UI 反向依赖、纯模型平台隔离及应用内 Agent 工具到确认执行器的传递依赖。含故意破坏边界的测试样例；它不是完整解析器，不分析计算型加载、方法能力或运行时数据流。

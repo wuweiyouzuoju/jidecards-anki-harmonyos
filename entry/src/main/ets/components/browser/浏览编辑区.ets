@@ -6,7 +6,7 @@ import { 图片遮罩编辑器 } from '../图片遮罩编辑器';
 import { 遮罩描述, parseOcclusionMasks, serializeOcclusionDocument } from '../../model/图片遮罩模型';
 import { noteMediaParts, NoteMediaPart, noteImagePreviewSource } from '../../model/NoteMediaParts';
 import { PressFeedback } from '../../utils/PressFeedback';
-import { NoteFieldCard } from '../common/NoteFieldCard';
+import { NoteFieldCard } from '../editor/NoteFieldCard';
 import { NoteEditorHeader } from '../common/NoteEditorHeader';
 import { PrimaryActionButton } from '../common/PrimaryActionButton';
 import { NoteDraftPreviewInput } from '../../model/NoteDraftPreview';

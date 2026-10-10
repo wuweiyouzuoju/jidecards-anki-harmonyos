@@ -20,7 +20,7 @@ function ioBackend() {
       async 添加笔记(note,deck){writes.push({note:structuredClone(note),deck});if(fail)throw Error('Core write failed');}},
     笔记类型服务:class {}, 笔记字段校验错误:class extends Error {}, NoteDuplicateWarning,
     图片遮罩服务:class {async 获取图片遮罩字段(){return {遮罩:2,图片:0,标题:3,额外:1};}},
-    prepareNoteImageFields, importNoteImage:async uri=>{imports.push(uri);return 'permanent.png';}
+    prepareNoteImageFields, importNoteVisual:async uri=>{imports.push(uri);return 'permanent.png';}
   });
   return {adapter:new Adapter(),writes,imports,set fail(value){fail=value;}};
 }

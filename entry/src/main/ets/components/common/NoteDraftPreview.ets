@@ -27,7 +27,7 @@ export struct NoteDraftPreview {
   @Builder
   private header() {
     DialogHeader({ title: this.input.sample ? $r('app.string.notetype_template_preview') : $r('app.string.note_draft_preview'),
-      closeLabel: $r('app.string.close'), onClose: this.onClose })
+      closeLabel: $r('app.string.close'), showAction: false, onClose: this.onClose })
   }
   @Builder
   private content() {

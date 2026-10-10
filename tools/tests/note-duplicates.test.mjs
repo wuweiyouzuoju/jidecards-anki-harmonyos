@@ -183,7 +183,7 @@ test('navigation and manual warning UI expose notes mode and explicit actions', 
   assert.match(page, /initialSearch: this\.duplicateSearch, initialNotesMode: true/);
   assert.match(read('pages/设置页.ets'), /initialSearch: 搜索串, initialNotesMode: true/);
   assert.match(read('pages/navigation/HomeDestinations.ets'), /pageInitialNotesMode:.*initialNotesMode/);
-  assert.match(read('pages/浏览页.ets'), /if \(this\.pageInitialNotesMode\) this\.浏览模式值 = 'notes'/);
+  assert.match(read('pages/浏览页.ets'), /if \(this\.pageInitialNotesMode\) \{\s*this\.浏览模式值 = 'notes'/);
 });
 
 test('real add page freezes a duplicate draft, views exact Core query, cancels on Back and requires a new confirmation', async () => {

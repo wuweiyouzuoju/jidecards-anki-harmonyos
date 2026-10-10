@@ -86,7 +86,7 @@ test('type selectors and field cards cannot bypass the shared display boundary',
     assert.doesNotMatch(source, /(?:value:|return|Text\()\s*(?:笔记类型|类型)\.name\s*[;})]/, path);
     if (source.includes('NoteFieldCard({')) assert.match(source, /originalStockKind:\s*this\./, path);
   }
-  const card = readFileSync(new URL('components/common/NoteFieldCard.ets', root), 'utf8');
+  const card = readFileSync(new URL('components/editor/NoteFieldCard.ets', root), 'utf8');
   assert.match(card, /Text\(noteFieldText\(/);
   assert.match(card, /fieldName: noteFieldText\(/);
 });

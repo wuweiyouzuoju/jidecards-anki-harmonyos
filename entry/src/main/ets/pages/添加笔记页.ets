@@ -2,7 +2,7 @@ import { PressFeedback } from '../utils/PressFeedback';
 import { navigationEnterOffset } from '../utils/AppMotion';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { ExpansionReveal } from '../utils/ExpansionReveal';
-import { NoteFieldCard } from '../components/common/NoteFieldCard';
+import { NoteFieldCard } from '../components/editor/NoteFieldCard';
 import { NoteEditorWheelSession, NOTE_EDITOR_WHEEL_SESSION_KEY } from '../model/NoteEditorWheel';
 import { SettingsToggleRow } from '../components/common/SettingsToggleRow';
 import { PrimaryActionButton } from '../components/common/PrimaryActionButton';
@@ -14,6 +14,7 @@ import { noteImagePreviewSource } from '../model/NoteMediaParts';
 import { NoteFieldAudio, NoteAudioStatus } from '../model/NoteAudioDraft';
 import { NoteAudioPreview } from '../utils/NoteAudioPreview';
 import { discardNoteRecordings } from '../utils/NoteAudioRecorder';
+import { discardNoteDrawingImages } from '../backend/NoteDrawingStore';
 import { NoteEditorHeader } from '../components/common/NoteEditorHeader';
 import { NoteDraftPreviewInput } from '../model/NoteDraftPreview';
 import { confirmNoteDiscard } from '../utils/ConfirmNoteDiscard';
@@ -202,6 +203,7 @@ export struct 添加笔记页 {
     this.tagsReveal.cancel();
     this.audioPreview.dispose().catch((): void => {});
     if (!this.处理中) discardNoteRecordings(this.fieldAudios).catch((): void => {});
+    if (!this.处理中) this.cleanupDrawingImages(this.fieldImages);
     this.creationSession.dispose();
     this.imageRequest++;
     // 注销自定义转场回调，避免内存泄漏与野回调
@@ -266,7 +268,7 @@ export struct 添加笔记页 {
       this.originalStockKind = state.view?.originalStockKind ?? 0;
       this.字段名列表 = state.view === null ? [] : state.view.fieldNames.slice();
       this.字段值列表 = this.字段名列表.map((_name: string): string => '');
-      this.fieldImages = [];
+      this.cleanupDrawingImages(this.fieldImages); this.fieldImages = [];
       discardNoteRecordings(this.fieldAudios).catch((): void => {});
       this.fieldAudios = [];
       this.audioPreview.stop().catch((): void => {});
@@ -282,12 +284,12 @@ export struct 添加笔记页 {
     }
     this.displayedType = state.view;
     if (state.completion !== null && state.completion !== undefined) {
-      if (state.completion.exit) { this.pathStack.pop(); return; }
+      if (state.completion.exit) { this.cleanupDrawingImages(this.fieldImages); this.pathStack.pop(); return; }
       const next = state.completion.next;
       const io = state.completion.nextOcclusion;
       if (next !== null) {
         this.字段值列表 = next.fields.slice(); this.标签 = next.tags.join(' ');
-        this.fieldImages = []; this.fieldAudios = [];
+        this.cleanupDrawingImages(this.fieldImages); this.fieldImages = []; this.fieldAudios = [];
       }
       if (io !== null) {
         this.occlusionImage = io.image;
@@ -404,8 +406,16 @@ export struct 添加笔记页 {
       this.错误信息 = this.取本地化文案($r('app.string.add_note_cloze_missing'));
       return;
     }
+    const savingImages: NoteFieldImage[] = this.fieldImages.slice();
     await this.creationSession.save({ deckId: this.牌组ID, notetypeId: this.已选笔记类型ID,
-      fields: this.字段值列表, tags: this.解析标签(), images: this.fieldImages, audios: this.fieldAudios }, exitAfterSave);
+      fields: this.字段值列表, tags: this.解析标签(), images: savingImages, audios: this.fieldAudios }, exitAfterSave);
+    if (!this.pageActive) this.cleanupDrawingImages(savingImages);
+  }
+
+  private cleanupDrawingImages(images: NoteFieldImage[]): void {
+    if (images.length === 0) return;
+    const context = this.取能力上下文();
+    if (context !== null) discardNoteDrawingImages(images, context.cacheDir).catch((): void => {});
   }
 
   private applyFieldMedia(index: number, value: string, images: NoteFieldImage[], audios: NoteFieldAudio[]): void {
@@ -413,7 +423,7 @@ export struct 添加笔记页 {
     this.更新字段(index, value);
     this.fieldImages = this.fieldImages.filter((item: NoteFieldImage): boolean => item.fieldIndex !== index)
       .concat(images.map((item: NoteFieldImage): NoteFieldImage => ({ id: ++this.nextImageId,
-        fieldIndex: index, uri: item.uri, filename: item.filename, reference: item.reference })));
+        fieldIndex: index, uri: item.uri, filename: item.filename, reference: item.reference, kind: item.kind })));
     this.fieldAudios = this.fieldAudios.filter((item: NoteFieldAudio): boolean => item.fieldIndex !== index)
       .concat(audios.map((item: NoteFieldAudio): NoteFieldAudio => ({ id: ++this.nextAudioId,
         fieldIndex: index, uri: item.uri, filename: item.filename, label: item.label,
@@ -568,7 +578,8 @@ export struct 添加笔记页 {
       items: controls, controlsComplete: true,
       values: [{ id: 'save_feedback', value: this.saveFeedback }, { id: 'stock_kind', value: String(this.originalStockKind) },
         { id: 'cloze_fields', value: this.clozeFieldOrds.join(',') }, { id: 'reverse_field', value: String(this.optionalReverseIndex) },
-        { id: 'image_count', value: String(this.fieldImages.length) }, { id: 'audio_count', value: String(this.fieldAudios.length) },
+        { id: 'image_count', value: String(this.fieldImages.filter((item: NoteFieldImage): boolean => item.kind !== 'video').length) },
+        { id: 'video_count', value: String(this.fieldImages.filter((item: NoteFieldImage): boolean => item.kind === 'video').length) }, { id: 'audio_count', value: String(this.fieldAudios.length) },
         { id: 'has_source_image', value: String(this.图片遮盖_源图Uri !== '') },
         { id: 'mask_count', value: String(this.图片遮盖_遮罩列表.length) },
         { id: 'mask_editor_open', value: String(this.图片遮盖_显示编辑器) }, { id: 'has_error', value: String(this.错误信息 !== '') }] });
@@ -784,6 +795,7 @@ export struct 添加笔记页 {
                   },
                   onChange: (value: string): void => { this.更新字段(索引, value); },
                   onRemoveImage: (id: number): void => {
+                    this.cleanupDrawingImages(this.fieldImages.filter((item: NoteFieldImage): boolean => item.id === id));
                     this.fieldImages = this.fieldImages.filter((item: NoteFieldImage): boolean => item.id !== id);
                   } })
               }, (字段名: string, 索引: number): string => `${this.fieldEditorVersion}-${this.已选笔记类型ID}-${索引}-${字段名}`)

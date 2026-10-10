@@ -2398,6 +2398,7 @@
     {"name":"note_visual_add","value":"Add image or video"},
     {"name":"note_visual_manage","value":"Images and videos"},
     {"name":"note_visual_remove","value":"Remove attachment"},
+    {"name":"note_media_open_failed","value":"Could not open media management. Your draft is preserved. Try again."},
     {"name":"note_visual_import_failed","value":"Could not read the image or video. Select it again. Supported videos: MP4, MOV and WebM."},
     {"name":"note_visual_draft_hint","value":"Done applies to the draft; save the note to keep changes. Maximum video size: 64 MiB."},
     {"name":"note_video_too_large","value":"The video is empty or larger than 64 MiB. Choose a smaller video."},

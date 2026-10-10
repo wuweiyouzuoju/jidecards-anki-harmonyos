@@ -1,3 +1,6 @@
+import { DirectorySelect } from './common/DirectorySelect';
+import { DirectoryRow, DirectoryView, DirectoryChoice, directoryChoiceRows } from '../model/DirectoryTree';
+import { appInterface } from '../backend/AppInterfaceService';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { parseNoteTags } from '../model/NoteFieldEditing';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
@@ -228,27 +231,9 @@ export struct 添加笔记面板 {
     return '';
   }
 
-  private 牌组下拉选项(): 添加笔记下拉选项[] {
-    const 选项: 添加笔记下拉选项[] = [];
-    for (const 牌组 of this.deckOptions) {
-      选项.push({ value: 牌组.name });
-    }
-    return 选项;
-  }
-
-  private 选中笔记类型索引(): number {
-    const 索引 = this.notetypeOptions.findIndex(
-      (笔记类型: 添加笔记笔记类型选项): boolean => 笔记类型.id === this.selectedNotetypeId);
-    return 索引 < 0 ? 0 : 索引;
-  }
-
-  private 选中笔记类型名(): string {
-    for (const 笔记类型 of this.notetypeOptions) {
-      if (笔记类型.id === this.selectedNotetypeId) {
-        return noteTypeText(this.getUIContext(), 笔记类型.name);
-      }
-    }
-    return '';
+  private deckRows(): DirectoryRow[] {
+    return directoryChoiceRows(this.deckOptions.map((deck: 添加笔记牌组选项): DirectoryChoice =>
+      ({ id: String(deck.id), path: deck.name })), String(this.selectedDeckId));
   }
 
   private 笔记类型下拉选项(): 添加笔记下拉选项[] {
@@ -358,7 +343,7 @@ export struct 添加笔记面板 {
         // 避免 TextArea 越出面板边界、按钮 Row 被挤出面板外显示成"下面多出一个框"
         DialogHeader({
           title: $r('app.string.add_note_title'),
-          actionLabel: this.busy ? $r('app.string.add_note_saving') : $r('app.string.add_note_save'),
+          showActionLabel: this.busy, actionLabel: this.busy ? $r('app.string.add_note_saving') : $r('app.string.add_note_save'),
           actionEnabled: !this.busy && this.fieldNames.length > 0,
           closeLabel: $r('app.string.add_note_cancel'),
           closeEnabled: !this.busy,
@@ -372,30 +357,14 @@ export struct 添加笔记面板 {
         Scroll(this.tagsReveal.scroller) {
           Column({ space: 应用尺寸.间距_14 }) {
 
-            Row({ space: 应用尺寸.间距_12 }) {
-              Column() {
-              this.带帮助的标签($r('app.string.add_note_deck'), $r('app.string.add_note_deck_help'))
-              }.layoutWeight(1)
-            Select(this.牌组下拉选项())
-              .selected(this.选中牌组索引())
-              .value(this.选中牌组名())
-              .width(SelectStyle.fieldWidth).constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
-              .enabled(!this.busy && this.deckOptions.length > 0)
-              .attributeModifier(new SelectStyle())
-              .height(SelectStyle.controlHeight)
-              .padding(SelectStyle.controlPadding)
-              .space(SelectStyle.controlSpace)
-              .font(SelectStyle.controlFont)
-              .optionFont(SelectStyle.optionFont)
-              .selectedOptionFont(SelectStyle.selectedOptionFont)
-              .textModifier(SelectStyle.labelText())
-              .borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
-              .onSelect((index: number): void => {
-                if (!this.busy && Number.isInteger(index) && index >= 0 && index < this.deckOptions.length) {
-                  this.onSelectDeck(this.deckOptions[index].id);
+            DirectorySelect({ label: $r('app.string.add_note_deck'), showHelp: true,
+              onHelp: (): void => { this.打开帮助($r('app.string.add_note_deck'), $r('app.string.add_note_deck_help')); },
+              rows: this.deckRows(), value: this.选中牌组名(), isInteractive: !this.busy,
+              onSelect: (id: string): void => {
+                if (!this.busy && this.deckOptions.some((deck: 添加笔记牌组选项): boolean => String(deck.id) === id)) {
+                  this.onSelectDeck(Number(id));
                 }
-              })
-            }.width('100%').alignItems(VerticalAlign.Center)
+              }, onViewChanged: (view: DirectoryView | null): void => { appInterface.observeDirectory('legacy_note_deck', view); } })
 
             Row({ space: 应用尺寸.间距_12 }) {
               Column() {

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { NoteFieldImage } from './NoteImageDraft';
-import { replaceNoteImageSource } from './NoteImageDraft';
+import { replaceNoteImageSource, noteVisualHtml } from './NoteImageDraft';
 import type { NoteFieldAudio } from './NoteAudioDraft';
 import { noteAudioParts, replaceNoteAudioPart } from './NoteAudioDraft';
 import { noteMediaParts, replaceNoteMediaPart } from './NoteMediaParts';
@@ -15,15 +15,18 @@ export class NoteMediaSession {
   private token: string;
   private originalAudios: NoteFieldAudio[];
   private createdAudios: NoteFieldAudio[] = [];
+  private originalImages: NoteFieldImage[];
+  private createdImages: NoteFieldImage[] = [];
 
   constructor(value: string, fieldIndex: number, images: NoteFieldImage[], audios: NoteFieldAudio[], token: string) {
     this.value = value; this.fieldIndex = fieldIndex; this.token = token;
     this.images = images.map((item: NoteFieldImage): NoteFieldImage => ({ id: item.id,
-      fieldIndex: item.fieldIndex, uri: item.uri, filename: item.filename, reference: item.reference }));
+      fieldIndex: item.fieldIndex, uri: item.uri, filename: item.filename, reference: item.reference, kind: item.kind }));
     this.audios = audios.map((item: NoteFieldAudio): NoteFieldAudio => ({ id: item.id,
       fieldIndex: item.fieldIndex, uri: item.uri, filename: item.filename, label: item.label,
       temporary: item.temporary, reference: item.reference }));
     this.originalAudios = this.audios.slice();
+    this.originalImages = this.images.slice();
     this.sequence = Math.max(0, ...images.map((item: NoteFieldImage): number => item.id),
       ...audios.map((item: NoteFieldAudio): number => item.id));
   }
@@ -31,21 +34,28 @@ export class NoteMediaSession {
   private nextReference(kind: string): string { return `jidecards-draft:${this.token}-${kind}-${++this.sequence}`; }
 
   addImage(uri: string, partIndex: number = -1, pendingId: number = -1): void {
+    this.addVisual(uri, 'image', partIndex, pendingId);
+  }
+
+  addVisual(uri: string, kind: string, partIndex: number = -1, pendingId: number = -1): void {
     const part = noteMediaParts(this.value)[partIndex];
-    if (partIndex >= 0 && (part === undefined || part.kind !== 'image')) return;
-    const reference: string = partIndex >= 0 ? replaceNoteImageSource(part.text, this.nextReference('image')) : '';
+    if (partIndex >= 0 && (part === undefined || (part.kind !== 'image' && part.kind !== 'video'))) return;
+    const name: string = kind === 'video' ? this.nextReference('video') + '.mp4' : this.nextReference('image');
+    const reference: string = partIndex >= 0 ?
+      (kind === 'image' && part.kind === 'image' ? replaceNoteImageSource(part.text, name) : noteVisualHtml(name, kind)) : '';
     const pendingIndex: number = this.images.findIndex((item: NoteFieldImage): boolean => item.id === pendingId);
     this.removeImage(partIndex, pendingId);
     const item: NoteFieldImage = { id: ++this.sequence, fieldIndex: this.fieldIndex, uri: uri, filename: '',
-      reference: reference === '' ? undefined : reference };
+      reference: reference === '' ? undefined : reference, kind: kind === 'video' ? 'video' : undefined };
     if (pendingIndex >= 0 && partIndex < 0) this.images.splice(pendingIndex, 0, item);
     else this.images = this.images.concat([item]);
+    this.createdImages.push(item);
     if (partIndex >= 0) this.value = this.value.slice(0, part.start) + reference + this.value.slice(part.start);
   }
 
   removeImage(partIndex: number, pendingId: number = -1): void {
     const part = noteMediaParts(this.value)[partIndex];
-    if (part !== undefined && part.kind === 'image') {
+    if (part !== undefined && (part.kind === 'image' || part.kind === 'video')) {
       this.images = this.images.filter((item: NoteFieldImage): boolean => item.reference !== part.text);
       this.value = replaceNoteMediaPart(this.value, partIndex, '');
     } else if (pendingId >= 0) this.images = this.images.filter((item: NoteFieldImage): boolean => item.id !== pendingId);
@@ -79,5 +89,11 @@ export class NoteMediaSession {
     const candidates: NoteFieldAudio[] = committed ? this.originalAudios.concat(this.createdAudios) : this.createdAudios;
     return candidates.filter((item: NoteFieldAudio): boolean => !committed ||
       !this.audios.some((kept: NoteFieldAudio): boolean => kept.uri === item.uri));
+  }
+
+  imageCleanup(committed: boolean): NoteFieldImage[] {
+    const candidates: NoteFieldImage[] = committed ? this.originalImages.concat(this.createdImages) : this.createdImages;
+    return candidates.filter((item: NoteFieldImage): boolean => !committed ||
+      !this.images.some((kept: NoteFieldImage): boolean => kept.uri === item.uri));
   }
 }

@@ -16,7 +16,18 @@ const 浏览编辑区 = loadComponentLogic('components/browser/浏览编辑区.e
   DialogHeader: class {},
   应用尺寸: {},
   颜色键: {},
-  NoteAudioPreview: class { async dispose() {} }, discardNoteRecordings: async () => {},
+  NoteAudioPreview: class { async dispose() {} async stop() {} }, discardNoteRecordings: async () => {},
+  discardNoteDrawingImages: async () => {},
+});
+
+test('browser form applies mixed visual drafts to one field and retains kinds in its frozen preview', () => {
+  const editor=new 浏览编辑区();editor.fieldValues=['front','back'];editor.note={notetypeId:1};
+  editor.images=[{id:9,fieldIndex:1,uri:'other',filename:''}];
+  editor.applyFieldMedia(0,'front',[{id:1,fieldIndex:0,uri:'movie',filename:'',kind:'video'}],[]);
+  assert.equal(editor.images.find(item=>item.fieldIndex===0).kind,'video');
+  assert.equal(editor.images.find(item=>item.fieldIndex===1).uri,'other');
+  editor.onPreview=()=>true;editor.openPreview();
+  assert.equal(editor.preview.images.find(item=>item.fieldIndex===0).kind,'video');
 });
 
 test('现有 IO 笔记按 Core 字段位置编辑，只更新遮罩草稿并走原保存入口', async () => {
