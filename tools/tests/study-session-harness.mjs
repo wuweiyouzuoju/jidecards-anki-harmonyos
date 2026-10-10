@@ -11,8 +11,11 @@ import { SyncActivity } from '../../entry/src/main/ets/model/SyncSettings.ts';
 import { buildStudyGestureScript, StudyQuickAnswerMode } from '../../entry/src/main/ets/model/StudyGestures.ts';
 import {defaultStudyControls,validateStudyControls} from '../../entry/src/main/ets/model/StudyControls.ts';
 import { resultUndoStatus } from '../../entry/src/main/ets/model/InteractionFeedback.ts';
+import { NativeDialogHost } from './platform-module-harness.mjs';
 
 export function attachStudySession(page) {
+  page.studyGuideDialog ??= new NativeDialogHost();
+  page.autoAdvanceDialog ??= new NativeDialogHost();
   page.recoveryMessage ??= ''; page.resultMessage ??= ''; page.recoveryAction ??= null; page.resultUndo ??= null;
   page.hasRenderedCard ??= page.当前卡片 !== null && page.当前卡片 !== undefined;
   page.whiteboardMounted = false;

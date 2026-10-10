@@ -9,6 +9,7 @@ import { SyncActivity } from '../../entry/src/main/ets/model/SyncSettings.ts';
 import { prepareNoteImageFields } from '../../entry/src/main/ets/model/NoteImageDraft.ts';
 import { prepareNoteAudioFields } from '../../entry/src/main/ets/model/NoteAudioDraft.ts';
 import { assertNoteMediaResolved } from '../../entry/src/main/ets/model/NoteMediaParts.ts';
+import { assertNoteEditorUnchanged } from '../../entry/src/main/ets/model/NoteEditorConflict.ts';
 export function editorPageHarness() {
   const scheduler = new AutoSyncScheduler(), activity = new SyncActivity(), store = new Map(), writes = [], pops = [], imports = [];
   const note = { id: 42, guid: 'g', notetypeId: 9, mtimeSecs: 3, usn: 4, fields: ['old', 'answer'], tags: ['tag'] };
@@ -19,9 +20,9 @@ export function editorPageHarness() {
     audio: async uri => { imports.push(uri); return 'saved.mp3'; } };
   const AppStorage = {setOrCreate:(k,v)=>store.set(k,v)};
   const Writer = loadPlatformModule('backend/AnkiNoteUpdate.ets','AnkiNoteUpdate',{
-    笔记服务:class { 更新笔记(...args) { return io.write(...args); } },
-    importNoteImage:uri=>io.image(uri), prepareNoteImageFields, AppStorage,
-    importNoteAudio:uri=>io.audio(uri),prepareNoteAudioFields,discardNoteRecordings:async()=>{},assertNoteMediaResolved
+    笔记服务:class { 获取笔记(id) { return io.note(id); } 更新笔记(...args) { return io.write(...args); } },
+    importNoteVisual:(uri,kind)=>io.image(uri,kind), prepareNoteImageFields, AppStorage,
+    importNoteAudio:uri=>io.audio(uri),prepareNoteAudioFields,discardNoteRecordings:async()=>{},assertNoteMediaResolved,assertNoteEditorUnchanged
   });
   const Page = loadComponentLogic('pages/EditNotePage.ets','EditNotePage',{
     ...noteInterfaceDependencies(),

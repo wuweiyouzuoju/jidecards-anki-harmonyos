@@ -8,11 +8,38 @@ import * as coreMessages from '../../entry/src/main/ets/proto/generated/CoreMess
 import { MenuHoldController } from '../../entry/src/main/ets/model/MenuHoldController.ts';
 import { MenuSlideScope, menuSlideSession } from '../../entry/src/main/ets/model/MenuSlideSession.ts';
 import { keyboardViewportHeight } from '../../entry/src/main/ets/model/WindowSafeLayout.ts';
+import { AgentTaskPlan } from '../../entry/src/main/ets/model/agent/AgentTaskPlan.ts';
+
+// 直接执行公共窗口管理器；只在调用方替换平台窗口。
+export function nativeDialogHostClass(dependencies = {}) {
+  const source = readFileSync(new URL('../../entry/src/main/ets/components/common/NativeDialogHost.ets', import.meta.url), 'utf8')
+    .replace(/^import[^;]+;\s*/gm, '').replace(/^export /gm, '');
+  return new Function('SurfaceTransition', 'Color', 'DialogAlignment',
+    stripTypeScriptTypes(source, { mode: 'transform' }) + ';return NativeDialogHost;')(
+    dependencies.SurfaceTransition, dependencies.Color ?? { Transparent: 'transparent' },
+    dependencies.DialogAlignment ?? { Center: 'center' });
+}
+export const NativeDialogHost = nativeDialogHostClass();
+
+/** 保留真实字段工厂和窗口拥有者，使方法级回归也执行公共生命周期。 */
+export function nativeDialogMembers(source, excluded = []) {
+  source = source.replaceAll('\r\n', '\n');
+  const fields = [...source.matchAll(/^  private readonly (\w+): NativeDialogHost[^\n]+/gm)].map(match => match[0]);
+  for (const match of source.matchAll(/^  private readonly (\w+):[^\n]+/gm)) {
+    if (excluded.includes(match[1])) continue;
+    const end = source.indexOf('\n  };', match.index);
+    if (end < 0) continue;
+    const field = source.slice(match.index, end + 6);
+    if (field.includes('new CustomDialogController(') && !field.includes('\n  private ')) fields.push(field);
+  }
+  return fields.join('\n');
+}
 
 function localeDependencies(dependencies) {
   return {
-    MenuHoldController, MenuSlideScope, menuSlideSession, keyboardViewportHeight,
-    Scroller: class { currentOffset() { return {xOffset:0,yOffset:0}; } scrollBy() {} },
+    MenuHoldController, MenuSlideScope, menuSlideSession, keyboardViewportHeight, AgentTaskPlan,
+    NativeDialogHost: nativeDialogHostClass(dependencies),
+    Scroller: class { currentOffset() { return {xOffset:0,yOffset:0}; } scrollBy() {} scrollToIndex() {} },
     CoreRpc, ...privateRpc, ...coreMessages,
     localizedResourceText: (context, _locale, resource, ...args) =>
       (dependencies.resourceText ?? uiFeedback.resourceText)(context, resource, ...args),

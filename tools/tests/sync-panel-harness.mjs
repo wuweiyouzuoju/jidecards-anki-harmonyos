@@ -5,22 +5,25 @@ import { compileWithUiFeedback } from './ui-feedback-harness.mjs';
 import { SyncActivity } from '../../entry/src/main/ets/model/SyncSettings.ts';
 import { AutoSyncScheduler } from '../../entry/src/main/ets/model/AutoSyncScheduler.ts';
 import { SyncSession } from '../../entry/src/main/ets/model/SyncSession.ts';
+import { nativeDialogHostClass, nativeDialogMembers } from './platform-module-harness.mjs';
 
 export function componentMethods(source, names, dependencies) {
+  source = source.replaceAll('\r\n', '\n');
+  dependencies = { NativeDialogHost: nativeDialogHostClass(dependencies), ...dependencies };
   const methods = names.map(name => {
-    const start = source.search(new RegExp(`  (?:private )?(?:async )?${name}\\(`));
+    const start = source.search(new RegExp(`^  (?:private )?(?:readonly )?(?:async )?${name}(?:\\(|\\s*:[^\\n]+)`, 'm'));
     assert.ok(start >= 0, name);
     const end = source.indexOf('\n  }', start);
     return source.slice(start, end + 4);
   });
-  const js = stripTypeScriptTypes(`class Component { ${methods.join('\n')} }`, { mode: 'transform' });
+  const js = stripTypeScriptTypes(`class Component { ${nativeDialogMembers(source, names)}\n${methods.join('\n')} }`, { mode: 'transform' });
   return compileWithUiFeedback(...Object.keys(dependencies), js + '\nreturn Component;')(...Object.values(dependencies));
 }
 
 export async function settle() { for (let i = 0; i < 8; i++) await new Promise(resolve => setImmediate(resolve)); }
 
 export function panelHarness({ required = 1, media = false, automatic = true, fsrsBefore = true, fsrsAfter = true, capability = true } = {}) {
-  const state = { closed: 0, refreshed: 0, toasts: [], media, pending: false, cleared: false, endpoint: '', calls: [], timers: new Map(),
+  const state = { closed: 0, refreshed: 0, toasts: [], media, mediaActive: media, pending: false, cleared: false, endpoint: '', calls: [], timers: new Map(),
     fsrsValues: required >= 2 ? [fsrsBefore, fsrsBefore, fsrsAfter] : [fsrsBefore, fsrsAfter], fsrsReads: 0, fsrsNotifications: 0, fsrsResults: [], states: [], delays: [], cancellations: [],
     response: { required, newEndpoint: '', hostNumber: 0, serverMediaUsn: 3, serverMessage: '' } };
   class BackendError extends Error {}
@@ -53,13 +56,14 @@ export function panelHarness({ required = 1, media = false, automatic = true, fs
     releaseBackgroundTime: id => dependencies.backgroundTaskManager.cancelSuspendDelay(id)
   };
   const auth = { hkey: 'test-key', endpoint: 'https://custom.example/anki/', ioTimeoutSecs: 0 };
+  // 默认任务保持活动，由测试显式结束；销毁竞态用例单独控制取消后的线程状态。
   const backend = {
-      中止同步: async () => {}, 中止媒体同步: async () => {},
+      中止同步: async () => {}, 中止媒体同步: async () => { state.mediaActive = false; },
       同步状态检查: async a => { state.calls.push(['status', a]); return { required: required === 0 ? 0 : 1, newEndpoint: '' }; },
       同步集合: async (a, m) => { state.calls.push(['collection', a, m]); return state.response; },
       全量上传或下载: async (a, upload, usn) => { state.calls.push(['full', a, upload, usn]); },
       同步媒体: async a => { state.calls.push(['media', a]); },
-      媒体同步状态: async () => ({ active: false, progress: { checked: '', added: '', removed: '' } })
+      媒体同步状态: async () => ({ active: state.mediaActive, progress: { checked: '', added: '', removed: '' } })
     };
   const panel = new SyncSession(auth, automatic, backend, environment, gate, dependencies.autoSyncScheduler);
   return { panel, state, gate };

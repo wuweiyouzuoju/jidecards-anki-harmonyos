@@ -33,6 +33,7 @@ export function creationPageHarness(overrides = {}) {
     namedResourceText: (_ctx, key) => key,
     showToastSafely: (_ctx, options) => toasts.push(options),
     discardNoteRecordings: async audios => cleanups.push(audios.slice()),
+    discardNoteDrawingImages: async () => {},
     confirmNoteDiscard: overrides.confirm ?? (async () => false),
     生成Occlusions字符串,
     文本中的填空编号: value => value.includes('{{c1::') ? [1] : [],
@@ -44,7 +45,7 @@ export function creationPageHarness(overrides = {}) {
   const page = new Page();
   page.pageActive = true; page.牌组ID = 123; page.牌组名 = 'Target'; page.牌组选项 = [{id:123,name:'Target'}];
   page.pathStack = {pop: () => pops.push('pop')}; page.getUIContext = () => ({});
-  page.取能力上下文 = () => ({filesDir: '/files'}); page.取本地化文案 = key => key;
+  page.取能力上下文 = () => ({filesDir: '/files', cacheDir: '/cache'}); page.取本地化文案 = key => key;
   page.publishInterface = () => {};
   const apply = page.applyCreationState.bind(page);
   page.applyCreationState = state => {states.push(state); apply(state);};

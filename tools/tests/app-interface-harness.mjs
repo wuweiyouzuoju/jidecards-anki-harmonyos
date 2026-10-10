@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
-import { actionMenuRows, toggleActionMenuBranch } from '../../entry/src/main/ets/components/common/ActionMenuTree.ts';
+import { actionMenuRows, visibleActionMenuRows, toggleActionMenuBranch } from '../../entry/src/main/ets/components/common/ActionMenuTree.ts';
 import { APP_INTERFACE_SURFACES, AppInterfaceTracker, visibleInterfaceItems, studyInterfaceMenu, noteEditInterfaceControls } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { noteFieldDisplayKey } from '../../entry/src/main/ets/model/NoteTypePresentation.ts';
 import { expansionRevealDependencies, loadPlatformModule } from './platform-module-harness.mjs';
@@ -14,7 +14,7 @@ export function appInterfaceDependencies() {
   const flagMenuChoices = loadPlatformModule('components/common/FlagMenuChoices.ets', 'flagMenuChoices', {
     CARD_FLAGS, customFlagLabel, $r: key => key, namedResourceText: (_context, key) => 'app.string.' + key
   });
-  return { appInterface: new AppInterfaceTracker(), FEEDBACK_ACTIONS, resultUndoStatus, OFFICIAL_ANNOUNCEMENTS_ENABLED, visibleInterfaceItems, studyInterfaceMenu, actionMenuRows, toggleActionMenuBranch,
+  return { appInterface: new AppInterfaceTracker(), FEEDBACK_ACTIONS, resultUndoStatus, OFFICIAL_ANNOUNCEMENTS_ENABLED, visibleInterfaceItems, studyInterfaceMenu, actionMenuRows, visibleActionMenuRows, toggleActionMenuBranch,
     $r: key => key, CARD_FLAGS, customFlagLabel, flagMenuChoices,
     actionIcon: loadPlatformModule('utils/ActionIcons.ets', 'actionIcon', { $r: key => key }),
     namedResourceText: (_context, key) => 'app.string.' + key, BURY_SUSPEND_MODE_BURY_USER, BURY_SUSPEND_MODE_SUSPEND };
