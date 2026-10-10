@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
+import { agentExecutionBudget } from '../../entry/src/main/ets/model/agent/AgentExecutionBudget.ts';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
@@ -241,6 +242,7 @@ test('the real browser initial search opens preview only for its current success
     Object.assign(page,{pageInitialSearch:'cid:9',pageInitialNotesMode:mode==='notes',pageSelectForAgentEdit:false,
       pageInitialPreviewCardId:mode==='ordinary'?0:9,searchVersion:0,浏览模式值:'cards',阶段:'loading',结果ID列表:[],
       operations:{isAlive:()=>alive},publishInterface(){},loadFlagLabels(){},加载牌组树:async()=>{},打开预览:id=>events.push([mode,id]),
+      readBrowserPreferences:async()=>{},persistBrowserPreferences:async()=>{},
       执行搜索:async()=>{page.searchVersion++;await Promise.resolve();page.结果ID列表=mode==='missing'?[]:[9];
         page.阶段=mode==='error'?'error':'list';if(mode==='superseded')page.searchVersion++;if(mode==='disposed')alive=false;}
     });
@@ -343,6 +345,7 @@ test('the real JIDE turn finalizer saves history before navigation and discards 
   const source=read('pages/AI制卡页.ets');const start=source.indexOf('  private async runAgentTurn(');
   const body=source.slice(start,source.indexOf('\n  }',start)+4);
   const deps={
+    agentExecutionBudget,
     explicitYearClozeRequested:()=>false,explicitWebSearchForbidden:()=>true,
     explicitWebSearchRequested:()=>false,explicitSourceEvidenceRequested:()=>false,inferRequestedCardCount:()=>0,
     页面Agent观察者:class {constructor(callback){this.onEvent=callback;}},

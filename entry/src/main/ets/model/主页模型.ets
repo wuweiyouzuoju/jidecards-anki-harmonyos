@@ -31,15 +31,8 @@
 // 牌组层级.ets 的 平铺牌组树 与 主页快照映射器.ets 的 构建主页快照。
 // ========================================================
 
-export enum 牌组色调 {
-  Blue,
-  Purple,
-  Mint,
-  Amber,
-  Black,
-  Red,
-  None
-}
+import { 牌组色调 } from './DeckTone';
+export { 牌组色调 } from './DeckTone';
 
 /** 把持久化的字符串值安全转回 牌组色调；非法/未设置时返回 null。 */
 export function 解析牌组色调(原始值: string | undefined | null): 牌组色调 | null {

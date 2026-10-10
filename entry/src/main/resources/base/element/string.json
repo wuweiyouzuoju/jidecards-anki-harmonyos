@@ -935,7 +935,11 @@
     { "name": "deck_tone_black", "value": "黑色色条" },
     { "name": "deck_tone_red", "value": "红色" },
     { "name": "deck_tone_none", "value": "取消色条" },
-{ "name": "deck_menu_tone_label", "value": "色条颜色" },
+    { "name": "deck_menu_stats",
+ "value": "查看统计"
+},
+{
+ "name": "deck_menu_tone_label", "value": "色条颜色" },
     { "name": "deck_menu_reorder", "value": "拖动排序" },
     { "name": "deck_menu_hide", "value": "隐藏牌组" },
     { "name": "deck_menu_delete", "value": "删除牌组" },

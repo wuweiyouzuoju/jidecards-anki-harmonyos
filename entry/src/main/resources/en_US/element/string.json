@@ -435,7 +435,11 @@
     { "name": "deck_tone_black", "value": "Black bar" },
     { "name": "deck_tone_red", "value": "Red" },
     { "name": "deck_tone_none", "value": "No color bar" },
-{ "name": "deck_menu_tone_label", "value": "Tone bar color" },
+    { "name": "deck_menu_stats",
+ "value": "View statistics"
+},
+{
+ "name": "deck_menu_tone_label", "value": "Tone bar color" },
     { "name": "deck_menu_reorder", "value": "Reorder" },
     { "name": "deck_menu_hide", "value": "Hide deck" },
     { "name": "deck_menu_delete", "value": "Delete deck" },

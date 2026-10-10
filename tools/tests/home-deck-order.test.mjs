@@ -213,12 +213,13 @@ test('row menu recognizer is removed during sorting and restored after sorting',
   }
   const MenuGesture=loadPlatformModule('utils/DeckRowMenuGesture.ets','DeckRowMenuGesture',{LongPressGestureHandler});
   const gestures=[], event={clearGestures(){gestures.length=0;},addGesture(gesture){gestures.push(gesture);}};
-  let menus=0;
-  const openMenu=()=>{menus++;};
+  let menus=0, received;
+  const openMenu=gesture=>{menus++;received=gesture;};
   new MenuGesture(false,openMenu).applyGesture(event);
   assert.equal(gestures.length,1);
   assert.deepEqual(gestures[0].options,{repeat:false,duration:500});
-  gestures[0].action();assert.equal(menus,1);
+  const press={fingerList:[{globalX:50,globalY:300,localX:20,localY:30}]};
+  gestures[0].action(press);assert.equal(menus,1);assert.equal(received,press);
   new MenuGesture(true,openMenu).applyGesture(event);
   assert.equal(gestures.length,0,'sorting must have no child long-press recognizer, even with a guarded callback');
   new MenuGesture(false,openMenu).applyGesture(event);
@@ -229,8 +230,9 @@ test('row uses dynamic menu gestures and list recreates sorting registration on 
   const row=read('components/牌组列表项.ets');
   assert.match(row,/\.gestureModifier\(new DeckRowMenuGesture\(this\.reorderMode/);
   assert.doesNotMatch(row,/\.parallelGesture\(|LongPressGesture\(/);
-  assert.match(row,/if \(this\.reorderMode \|\| this\.显示牌组菜单\) return/);
-  assert.match(row,/\.bindPopup\(!this\.reorderMode && this\.显示牌组菜单/);
+  assert.match(row,/if \(this\.reorderMode \|\| this\.menuOpen\) return/);
+  assert.match(row,/this\.onMenu\(this\.deck\.id, anchor\)/);
+  assert.match(read('pages/首页.ets'), /if \(this\.排序模式中 \|\| this\.按ID查牌组\(deckId\)\.id === ''\) return/);
   assert.doesNotMatch(row,/onLevelMenu|onLevelChange|levelMenuDeckId|99999999/);
   const list=read('components/home/主页牌组列表.ets');
   // onMove 在 LazyForEach 创建时注册：单列进入排序也必须切换分支，不能仅改回调表达式。

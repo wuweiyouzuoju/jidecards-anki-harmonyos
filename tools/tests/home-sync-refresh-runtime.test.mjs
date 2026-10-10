@@ -22,7 +22,7 @@ function harness() {
   const page = Object.assign(new Page(), {
     homeData: repository, homeDataGeneration: 0, homeDisposed: false, autoSyncCollectionBusy: false,
     refreshQueue: new HomeRefreshQueue(), statisticsQueue: new HomeRefreshQueue(),
-    加载状态: 'ready', 上次牌组已恢复: true, 当前断点: 'xs', historyRefreshToken: 0,
+    加载状态: 'ready', 上次牌组已恢复: true, 当前断点: 'xs', historyRefreshToken: 0, deckMenuId: '',
     主页快照数据: { decks: [], today: { completedCount: 2 }, memory: {} },
     取能力上下文: () => ({ filesDir: '/', resourceManager: { getStringSync: () => 'Default' } }),
     显示提示() {}, reconcileDeckSelection: async () => true, scheduleAutomaticBackup() {},
@@ -38,6 +38,41 @@ function harness() {
   page.syncController = controller;
   return { page, state, controller, scheduler, activity };
 }
+
+test('committed deck snapshots refresh history once and only close a menu whose deck disappeared', async () => {
+  for (const menuId of ['', '1', 'removed']) {
+    const h = harness(), previous = h.page.主页快照数据;
+    h.page.deckMenuId = menuId;
+    h.page.页面栈.size = () => 1;
+    h.page.historyRefreshToken = 7;
+    await h.page.加载主页数据();
+    await h.page.statisticsQueue.run(async () => {});
+    assert.notEqual(h.page.主页快照数据, previous);
+    assert.equal(h.page.主页快照数据.decks[0].id, '1');
+    assert.equal(h.page.historyRefreshToken, 8);
+    assert.equal(h.page.deckMenuId, menuId === 'removed' ? '' : menuId);
+    assert.equal(h.page.加载状态, 'ready');
+  }
+});
+
+test('failed, superseded and disposed deck reads do not commit snapshots or refresh history', async () => {
+  for (const outcome of ['failed', 'superseded', 'disposed']) {
+    const h = harness(), wait = deferred(), previous = h.page.主页快照数据;
+    h.page.homeData.load = async () => {
+      await wait.promise;
+      if (outcome === 'failed') throw Error('read failed');
+      return { snapshot: { decks: [{ id: 'new' }], today: {}, memory: {} }, hiddenIds: [], cardData: null, graphs: null };
+    };
+    const pending = h.page.加载主页数据();
+    await settle();
+    if (outcome === 'superseded') h.page.homeDataGeneration++;
+    if (outcome === 'disposed') h.page.homeDisposed = true;
+    wait.resolve(); await pending;
+    assert.equal(h.page.主页快照数据, previous, outcome);
+    assert.equal(h.page.historyRefreshToken, 0, outcome);
+    assert.equal(h.page.加载状态, outcome === 'failed' ? 'error' : 'ready', outcome);
+  }
+});
 
 test('slow widget delivery does not hold the sync completion or next deck refresh', async () => {
   const h = harness(), wait = deferred(); h.state.saveWait = wait.promise;
@@ -71,6 +106,7 @@ test('late statistics cannot overwrite a newer home generation or disposed page'
     wait.resolve(); await h.page.statisticsQueue.run(async () => {});
     assert.equal(h.page.主页快照数据.today.completedCount, 2, change);
     assert.equal(h.page.statsSnapshot, undefined);
+    assert.equal(h.page.historyRefreshToken, 1, 'late statistics do not refresh history');
   }
 });
 
@@ -81,10 +117,12 @@ test('queued statistics skip collection reads after navigation and preserve deck
   h.page.页面栈.size = () => 1;
   wait.resolve(); await h.page.statisticsQueue.run(async () => {});
   assert.equal(h.state.calls.some(call => Array.isArray(call) && call[0] === 'graphs'), false);
+  assert.equal(h.page.historyRefreshToken, 1);
   h.page.页面栈.size = () => 0;
   await h.page.加载主页数据(); await h.page.statisticsQueue.run(async () => {});
   assert.equal(h.page.主页快照数据.today.completedCount, 9);
   assert.equal(h.page.主页快照数据.decks[0].name, 'Default');
+  assert.equal(h.page.historyRefreshToken, 3, 'each committed deck/statistics snapshot refreshes history');
 });
 
 test('settings opens during collection work while database-only sections remain guarded', () => {

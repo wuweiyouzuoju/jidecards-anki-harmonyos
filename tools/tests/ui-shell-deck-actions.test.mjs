@@ -144,7 +144,7 @@ test('home system back closes the detail menu before leaving the detail page', (
   const Host = new Function(stripTypeScriptTypes(`class Host { ${code} }`, { mode: 'transform' }) + ';return Host;')();
   const page = new Host(); let open = true;
   Object.assign(page, { transfer: { phase: 'idle', visible: false }, syncController: { cancel() {} },
-    deckReorderBusy: false, deckLevelMenuId: '', 排序模式中: false,
+    deckReorderBusy: false, deckMenuId: '', 排序模式中: false,
     显示牌组详情: true, deckDetailsBackHandler: () => { const consumed = open; open = false; return consumed; } });
   assert.equal(page.onBackPress(), true); assert.equal(page.显示牌组详情, true);
   assert.equal(page.onBackPress(), true); assert.equal(page.显示牌组详情, false);

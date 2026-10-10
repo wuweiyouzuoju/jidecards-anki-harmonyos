@@ -141,9 +141,8 @@ test('visibility refreshes data and rollover polling only queries when study day
   state.setVisible(true); await Promise.resolve(); assert.equal(calls, 3);
 });
 
-test('both detail layouts refresh on committed home snapshots and history watches scope/token', () => {
+test('both detail layouts receive the history refresh token and history watches scope/token', () => {
   const home = readFileSync(new URL('../../entry/src/main/ets/pages/首页.ets', import.meta.url), 'utf8');
-  assert.match(home, /this\.主页快照数据 = snapshot;\s*this\.historyRefreshToken\+\+/);
   assert.equal((home.match(/historyRefreshToken: this\.historyRefreshToken/g) ?? []).length, 1);
   assert.match(home, /this\.deckDetails\(true\)/);
   assert.match(home, /this\.deckDetails\(false\)/);

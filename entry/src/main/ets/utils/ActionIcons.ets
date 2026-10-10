@@ -3,6 +3,23 @@
 /** 同义卡片动作在学习、浏览多选和预览中共用图标；未知动作不伪装成指南。 */
 export function actionIcon(id: string): Resource | undefined {
   switch (id) {
+    case 'back': return $r('app.media.ic_common_arrow_left');
+    case 'filter': return $r('app.media.ic_home_filtered_deck');
+    case 'find_replace': return $r('app.media.ic_settings_find_replace');
+    case 'search_tools':
+    case 'search_options': return $r('app.media.ic_settings_search');
+    case 'recent_searches':
+    case 'history': return $r('app.media.ic_common_history');
+    case 'save_search': return $r('app.media.ic_settings_backup');
+    case 'display_settings':
+    case 'columns': return $r('app.media.ic_settings_layout');
+    case 'more_settings': return $r('app.media.ic_settings_general');
+    case 'keyboard': return $r('app.media.ic_settings_keyboard');
+    case 'select_all': return $r('app.media.ic_settings_check');
+    case 'clear_selection': return $r('app.media.ic_study_flag_clear');
+    case 'preview': return $r('app.media.ic_common_preview');
+    case 'export': return $r('app.media.ic_settings_export');
+    case 'grade': return $r('app.media.ic_settings_rate');
     case 'edit': return $r('app.media.ic_study_edit');
     case 'agent': return $r('app.media.ic_study_agent');
     case 'undo': return $r('app.media.ic_study_undo');
@@ -21,9 +38,12 @@ export function actionIcon(id: string): Resource | undefined {
     case 'guide':
     case 'help': return $r('app.media.ic_study_guide');
     case 'notetype': return $r('app.media.ic_settings_notetypes');
+    case 'subtitle_deck':
     case 'deck': return $r('app.media.ic_action_move_deck');
+    case 'subtitle_answer': return $r('app.media.ic_settings_field');
     case 'reset':
     case 'reposition': return $r('app.media.ic_action_reposition');
+    case 'subtitle_due':
     case 'due': return $r('app.media.ic_action_due');
     case 'tags': return $r('app.media.ic_settings_tags');
     case 'exit': return $r('app.media.ic_common_close');

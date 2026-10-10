@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { DirectoryView } from './DirectoryTree';
 import { FILTERED_DECK_ACTIONS } from './FilteredDeckCommands';
+import { DECK_TONE_CHOICES } from './DeckTone';
 import { FEEDBACK_ACTIONS } from './InteractionFeedback';
 import { CARD_FLAGS } from './CardMarking';
 import { IMPORT_RESULT_ACTIONS } from './ImportResults';
@@ -220,9 +221,19 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'cancel', titleKey: 'cancel' }
   ] },
   { id: 'deck_row_menu', titleKey: 'deck_more', parent: 'home', items: [
+    { id: 'stats', titleKey: 'deck_menu_stats', opens: 'stats' },
+    { id: 'browser', titleKey: 'browser_title', opens: 'browser' },
+    { id: 'tone', titleKey: 'deck_menu_tone_label', opens: 'deck_tones' },
+    { id: 'reorder', titleKey: 'deck_menu_reorder', opens: 'deck_reorder' },
     { id: 'rename', titleKey: 'deck_rename_title', opens: 'deck_rename' },
     { id: 'customize', titleKey: 'deck_customize', opens: 'deck_customize' },
-    ...FILTERED_DECK_ACTIONS.map((item): AppInterfaceItem => ({ id: item.id, titleKey: item.titleKey, condition: 'filtered_deck' }))
+    ...FILTERED_DECK_ACTIONS.map((item): AppInterfaceItem => ({ id: item.id, titleKey: item.titleKey, condition: 'filtered_deck' })),
+    { id: 'custom_study', titleKey: 'custom_study_menu', opens: 'custom_study', fullOnly: true },
+    { id: 'hide', titleKey: 'deck_menu_hide' },
+    { id: 'delete', titleKey: 'deck_menu_delete' }
+  ] },
+  { id: 'deck_tones', titleKey: 'deck_menu_tone_label', parent: 'deck_row_menu', items: [
+    ...DECK_TONE_CHOICES.map((choice): AppInterfaceItem => ({ id: String(choice.tone), titleKey: choice.titleKey, iconKey: choice.iconKey }))
   ] },
   { id: 'deck_preview_scope', titleKey: 'deck_preview', parent: 'deck_details', items: [
     { id: '0', titleKey: 'deck_preview_remaining', opens: 'preview' },
@@ -432,6 +443,11 @@ export function deckDetailsMoreItems(agent: boolean, filtered: boolean): AppInte
   return visibleInterfaceItems('deck_details_more', { simple: false, agent, cloudDeck: false, themeHasTextures: false })
     .filter((item: AppInterfaceItem): boolean => item.condition === 'filtered_deck' ? filtered :
       item.condition === 'normal_deck' ? !filtered : true);
+}
+
+export function deckRowMenuItems(simple: boolean, filtered: boolean): AppInterfaceItem[] {
+  return visibleInterfaceItems('deck_row_menu', { simple, agent: false, cloudDeck: false, themeHasTextures: false })
+    .filter((item: AppInterfaceItem): boolean => item.condition !== 'filtered_deck' || filtered);
 }
 
 export interface AppInterfaceObservation {
