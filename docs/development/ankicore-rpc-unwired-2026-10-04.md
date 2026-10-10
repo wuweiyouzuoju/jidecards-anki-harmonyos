@@ -2,7 +2,7 @@
 
 [返回主报告](ankicore-integration-audit-2026-10-04.md) · [全部 232 项 CSV](ankicore-rpc-inventory-2026-10-04.csv)
 
-这里列出 **68 项方法表未登记 + 31 项已登记但没有生产方法表引用，共 99 项**。这是机械接口分区，不是 99 个缺失功能；每项的处理判断如下。CSV 还标出了有封装却没有上层调用者的专项发现。
+本页保留 2026-10-04 的机械接口快照：**68 项方法表未登记 + 31 项已登记但没有生产方法表引用，共 99 项**，不代表当前缺失数量。下表状态和专项发现均为当日判断；当前调用者以[生成清单](core-protocol.md)为准，产品能力以[功能状态](../FEATURE_STATUS.md)及领域入口为准。
 
 后续修复（2026-10-05）：`encode_iri_paths`、`compare_answer`、`extract_cloze_for_typing` 已登记并接通既有卡片、草稿渲染及学习/预览实际调用。媒体路径与拼写不再依赖本机近似实现；TTS 补齐模板音色、语速及支持的附加参数映射，保留系统播放器，因为锁定 Core 没有鸿蒙语音后端。具体入口、平台边界与回归见[Core 渲染语义与平台 TTS](study-media.md#core-渲染语义与平台-tts)。上方数量和 CSV 保留原盘点快照，后续接线不反改历史统计。
 
@@ -190,11 +190,11 @@
 
 | 领域 | RPC | 结论 |
 | --- | --- | --- |
-| sync | `set_custom_certificate` | 自定义服务器有 UI，私有 CA 证书配置/恢复流程未接。 G18 |
+| sync | `set_custom_certificate` | 当时：自定义服务器有 UI，私有 CA 证书配置/恢复流程未接。 G18；当前边界见[同步](sync-data.md#自定义同步端点与证书边界)。 |
 | cards | `update_cards` | 当前状态维护使用 SetFlag/SetDeck/调度器等专用操作；未开放任意卡片字段/调度修改。  |
-| decks | `rename_deck` | 生产改名为本机别名；真实 Core 改名未接。 G04 |
-| scheduler | `empty_filtered_deck` | 没有既有筛选牌组清空/重建业务入口；已有创建和 Core 自动填充。 G21 |
-| scheduler | `rebuild_filtered_deck` | 没有既有筛选牌组清空/重建业务入口；已有创建和 Core 自动填充。 G21 |
+| decks | `rename_deck` | 当时：生产改名为本机别名。G04 后续已接真实改名，见[当前首页入口](home.md#牌组真实改名与本机显示名称)。 |
+| scheduler | `empty_filtered_deck` | 当时：没有既有筛选牌组维护入口。G21 后续已接清空/重建，见[当前功能状态](../FEATURE_STATUS.md)。 |
+| scheduler | `rebuild_filtered_deck` | 当时：没有既有筛选牌组维护入口。G21 后续已接清空/重建，见[当前功能状态](../FEATURE_STATUS.md)。 |
 | ankiweb | `get_addon_info` | 只有 Service，生产无调用；上游桌面插件/版本服务，不属于普通 AnkiWeb 集合同步缺口。  |
 | ankiweb | `check_for_update` | 只有 Service，生产无调用；上游桌面插件/版本服务，不属于普通 AnkiWeb 集合同步缺口。  |
 | media | `extract_static_media_files` | 未找到此封装的生产调用；正常 APKG/COLPKG 媒体导出交由 Core 处理，没有单独模板静态媒体清单工具。  |

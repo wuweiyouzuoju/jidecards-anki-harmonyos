@@ -2,15 +2,15 @@
 
 [返回文档导航](../README.md) · [当前功能状态](../FEATURE_STATUS.md) · [逐 RPC 明细](ankicore-rpc-inventory-2026-10-04.csv)
 
-本次继续核查 `D:\Projects\jidecards` 实际工作树和本机 `third_party/anki`，结果包含 **22 组剩余功能或接入边界、JIDE 专属能力差距、平台侧后续项，以及全部 232 个 RPC 的明细**。上一轮已经补齐的功能不再列为缺失。P1/P2/P3 是本报告的实施顺序判断，不是已复现故障的严重等级。
+本文保留 2026-10-04 工作树的审计快照：当时识别的 **22 组功能或接入边界、JIDE 专属差距、平台项及 232 个 RPC 明细**。各节的“未接入”“当前”“后续”均属于当日范围，P1/P2/P3 是当时实施顺序判断。当前产品状态以[功能状态](../FEATURE_STATUS.md)及其领域拥有者为准，RPC 调用者以[生成清单](core-protocol.md)为准；不从本报告推导当前待办。
 
-最值得优先继续的是：**字段高级属性在本机编辑器中生效、JIDE 批量操作的撤销分组、Core 真正改名、音频全局偏好、导入结果定位**。自定义调度脚本与字段结构草稿预览需要独立方案。
+当日优先建议涉及字段属性、JIDE 批量撤销、真实改名、音频偏好和导入结果定位；字段属性、改名、音频、结果定位及同步自定义调度后续已接通，不能继续列为当前缺失。通用字段结构草稿预览与批量撤销分组的范围见当前领域及入口决策。
 
 后续入口选择见[UI 复杂度与 JIDE 分工](../decisions/2026-10-04-ankicore-ui-routing.md)：较复杂 UI 的配置/操作通过 JIDE 提供，极简或无需新增 UI 的事项复用现有界面。该分类覆盖下文 22 组以及 JIDE/平台后续项，并维护 2026-10-05 实施进度。下文缺口表和 RPC CSV 保留原盘点快照；G02/G08/G09/G10/G11/G13/G16/G22 的最新实现以决策进度和领域文档为准。
 
 ## 基线、范围与判断方法
 
-- 应用基线见 [AppScope/app.json5](../../AppScope/app.json5)，检查时为 2.9.10 / 2991；仓库 HEAD 为 `b14b346`，共享工作树有大量未提交修改。因此以下是当前源码状态，不能直接当作商店版本承诺。
+- 应用基线见 [AppScope/app.json5](../../AppScope/app.json5)，检查时为 2.9.10 / 2991；仓库 HEAD 为 `b14b346`，共享工作树有大量未提交修改。因此以下是当日源码状态，不能当作现在的工作树或商店版本承诺。
 - Core 锁定 Anki 26.05 / `e64c6b1`，本机 checkout 一致，见 [UPSTREAM.lock](../../UPSTREAM.lock)。检查包括本地补丁，没有把新版 Core 或桌面 Qt/Python 功能计入现版本能力。
 - 全量编号来自 [rpc-index-baseline.json](../../tools/rpc-index-baseline.json)，和 [服务索引](../../entry/src/main/ets/backend/服务索引.ts)、[映射清单](../../tools/rpc-index-methods.json)交叉核对。随后查 Service、模型、实际 UI/JIDE 调用及原生扩展。
 - 统计范围是 22 个有可调用方法的 Backend 服务；桌面 FrontendService 的界面通知和非 RPC 消息不计入。字段、平台行为和生产入口另外核查，不能只看方法覆盖率。
@@ -33,12 +33,12 @@
 
 [CSV 明细](ankicore-rpc-inventory-2026-10-04.csv)为每个 RPC 保留服务号、方法号、登记状态、方法表引用位置与专项判定。无直接登记/无引用的 99 项另见[接口附录](ankicore-rpc-unwired-2026-10-04.md)，逐项说明补齐价值或替代路径。
 
-## A. 当前仍剩余的 22 组接入事项
+## A. 2026-10-04 的 22 组功能与接入边界快照
 
-| ID / 优先级 | 能力 | 当前实际状态与缺少的环节 | 后续接手入口与验收 |
+| ID / 当时优先级 | 能力 | 当时状态及注明日期的后续修复 | 原责任入口与验收范围 |
 | --- | --- | --- | --- |
 | G01 / P1（兼容） | 自定义调度 JavaScript | 2026-10-07 更新：同步脚本已执行，按钮间隔和评分采用同一份原生校验结果；保留完整 SchedulingContext。失败后必须确认本会话使用标准 Core 调度。异步、DOM 与网络仍不支持。 | 责任边界、普通/过滤牌组与撤销验证见[自定义调度决策](../decisions/2026-10-07-custom-scheduling.md)。前端继续原始透传，字段修改仅由原生服务执行。 |
-| G02 / P1 | 字段高级属性在本机编辑器生效 | JIDE 已能读取原始类型并保存 `rtl/font/size/description/plainText/collapsed`；但本机 `decodeNotetypeField()` 只读取 `sticky`，NoteFieldCard/NoteFieldEditor 没有这些属性输入，编辑字体使用应用固定字号。因此**保存链已接，新增/编辑显示链未接**。排序字段和 excludeFromSearch 由 Core 使用，sticky 已实现，不算缺失。 | [NotetypeMessages](../../entry/src/main/ets/proto/messages/NotetypeMessages.ts)、[NoteFieldCard](../../entry/src/main/ets/components/common/NoteFieldCard.ets)、[NoteFieldEditor](../../entry/src/main/ets/components/common/NoteFieldEditor.ets)、[AgentNotetypeFields](../../entry/src/main/ets/model/agent/AgentNotetypeFields.ts)。传递属性到新增/编辑/学习内编辑；验证 RTL、字体、纯文本、说明和折叠，同时保留旧媒体/HTML。 |
+| G02 / P1 | 字段高级属性在本机编辑器生效 | JIDE 已能读取原始类型并保存 `rtl/font/size/description/plainText/collapsed`；但本机 `decodeNotetypeField()` 只读取 `sticky`，NoteFieldCard/NoteFieldEditor 没有这些属性输入，编辑字体使用应用固定字号。因此**保存链已接，新增/编辑显示链未接**。排序字段和 excludeFromSearch 由 Core 使用，sticky 已实现，不算缺失。 | [NotetypeMessages](../../entry/src/main/ets/proto/messages/NotetypeMessages.ts)、[NoteFieldCard](../../entry/src/main/ets/components/editor/NoteFieldCard.ets)、[NoteFieldEditor](../../entry/src/main/ets/components/common/NoteFieldEditor.ets)、[AgentNotetypeFields](../../entry/src/main/ets/model/agent/AgentNotetypeFields.ts)。传递属性到新增/编辑/学习内编辑；验证 RTL、字体、纯文本、说明和折叠，同时保留旧媒体/HTML。 |
 | G03 / P1–P2 | 一个 JIDE 批量动作对应一次集合撤销 | 首页/浏览器撤销与重做已实现。但 `AddCustomUndoEntry` / `MergeUndoEntries` 未登记；AgentDraftExecutor 对多笔记新增、字段修改、移动和部分删除逐项写入，**一次确认仍可能产生多条 Core 历史**。AddNotes 批量入口同样未接。 | [AgentDraftExecutor](../../entry/src/main/ets/backend/agent/AgentDraftExecutor.ets)、[集合服务](../../entry/src/main/ets/backend/集合服务.ts)、Core collection/notes 协议。优先将适合的同类写入合为一次 RPC，再处理分组；分组并不等于原子事务。测试部分成功、完整/部分撤销和重做，保留逐项失败反馈。 |
 | G04 / P2 | Core 真正重命名牌组 | `RenameDeck` 已封装，但没有生产调用者。首页定制明确走本机别名存储，源码注释也说明导出和同步仍使用后端原名。**现有别名功能有效，但未提供同步级改名**；JIDE 也没有真实改名提案。 | [首页](../../entry/src/main/ets/pages/首页.ets)、[HomeDeckCommands](../../entry/src/main/ets/backend/HomeDeckCommands.ets)、[牌组服务](../../entry/src/main/ets/backend/牌组服务.ts)。复用 Core rename、名称冲突/子牌组影响确认与集合撤销；验证导出和跨端同步后的名称。 |
 | G05 / P2 | 普通牌组说明的读取和编辑 | Core Deck.Normal 有 description/markdownDescription，应用编解码已有，但没有 GetDeck/UpdateDeck 接入；主页平铺时把 description 固定为空。导入的普通牌组说明没有完整展示和修改流程。 | [DeckMessages](../../entry/src/main/ets/proto/messages/DeckMessages.ts)、[牌组层级](../../entry/src/main/ets/model/牌组层级.ets)、Core decks 协议。只改说明须保留牌组限额、配置、身份及未知数据；Markdown 与 HTML 展示需单独验收。 |
@@ -62,11 +62,11 @@
 
 G04 的本机别名、G14 的固定列等属于当前产品选择；上表记录它们与 Core 能力的差距，并不主张无条件改变现有行为。G01/G12 方案复杂；其他大多数事项现有 Core 已提供基础，无须等待 Core 升级。
 
-## B. Preferences 字段逐项状态
+## B. 2026-10-04 Preferences 字段状态
 
-锁定 config.proto 的 Preferences 有 22 个标量字段。当前应用显式解码/编辑 11 项；另外 11 项由以下表格说明。保留未知字段已经实现，未开放不等于保存其他偏好时会清空它们。
+当日锁定 config.proto 的 Preferences 有 22 个标量字段，应用显式解码/编辑 11 项；另外 11 项由以下历史表格说明。保留未知字段当时已经实现，未开放不等于保存其他偏好时会清空它们。
 
-| 子消息 | 字段 | 当前接入状态 |
+| 子消息 | 字段 | 当日接入状态 |
 | --- | --- | --- |
 | Scheduling | rollover、learn_ahead_secs | 已接 UI 和 Core 保存；Core 执行 |
 | Scheduling | new_review_mix、new_timezone、day_learn_first | 未单独开放；包含旧调度器设置。当前队列混排读取牌组配置 new_mix，已具备现代对应选项，不建议照搬旧全局字段 |
@@ -83,11 +83,11 @@ G04 的本机别名、G14 的固定列等属于当前产品选择；上表记录
 
 来源：[Core config.proto](../../third_party/anki/proto/anki/config.proto)、[PreferencesMessages](../../entry/src/main/ets/proto/messages/PreferencesMessages.ts)、[Core preferences](../../third_party/anki/rslib/src/preferences.rs)、[Core 搜索](../../third_party/anki/rslib/src/search/sqlwriter.rs)、[Core 队列](../../third_party/anki/rslib/src/scheduler/queue/builder/mod.rs)。
 
-## C. 应用已有、JIDE 尚未直接操作的能力
+## C. 2026-10-04 应用已有、JIDE 尚未直接操作的能力
 
 JIDE 能通过共同界面目录描述入口、读取已登记界面状态并导航；这不等于能点击所有控件或执行该业务。以下属于 **JIDE 工具覆盖边界**，不能再算为 jidecards 完全未实现，也不能绕过现有确认/Scope 边界补一个万能 RPC。
 
-| 能力组 | JIDE 当前边界 | 后续责任入口 |
+| 能力组 | JIDE 当日边界 | 原责任入口 |
 | --- | --- | --- |
 | 五项基础全局复习偏好 | get_settings / get_advanced_settings 没有直接包含日切、提前窗口、时间盒和两项复习显示的读取/修改字段。已挂载的相关设置组件可以发布部分实际 UI 状态；缺的是稳定的领域读写工具 | ReviewPreferencesStore、AgentSettingsTools、AgentMaintenanceTools |
 | 牌组选项和 FSRS 工具 | get_deck_options 已能读选项；没有针对学习步骤、限额、保持率、排序等的修改提案，也没有启动参数优化/评价/模拟的工具。全库 FSRS 开关及两项高级全局开关已经可以改 | DeckOptionsSession、FsrsService、AgentActionExecutor |
@@ -98,9 +98,9 @@ JIDE 能通过共同界面目录描述入口、读取已登记界面状态并导
 
 来源：[真实工具总表](../../entry/src/main/ets/model/agent/AgentToolCatalog.ts)、[设置工具](../../entry/src/main/ets/model/agent/AgentSettingsTools.ts)、[高级工具](../../entry/src/main/ets/model/agent/AgentMaintenanceTools.ts)、[本机偏好白名单](../../entry/src/main/ets/model/agent/AgentPreferenceSettings.ts)。评分、同步凭证和任意按钮操作仍属于明确权限边界，不当作需自动授予模型的功能。
 
-## D. 平台能力及后续验收
+## D. 2026-10-04 平台能力与待验范围
 
-| 项目 | 当前边界 | 归属 |
+| 项目 | 当日边界 | 归属 |
 | --- | --- | --- |
 | 多档案 / 多账号集合隔离 | 后端单例直接使用 filesDir/collection.anki2、collection.media、单组同步偏好及备份目录，没有完整档案选择和隔离切换 | 应用架构；集合、媒体、备份、凭证、JIDE 会话必须一起隔离 |
 | 字体文件导入与加载 | 已有应用卡片字号/CSS；没有完整字体文件选择、注册与可用性管理。设置字段 font 字符串本身不证明鸿蒙拥有该字体 | HarmonyOS 字体/媒体适配 |
@@ -121,7 +121,7 @@ JIDE 能通过共同界面目录描述入口、读取已登记界面状态并导
 - **专属/旧辅助接口不自动建设**：AnkiDroid 原始 DB 分页/调试、AnkiHub 登录、桌面插件更新/GitHub 下载、桌面配色板、旧版牌组/配置 JSON、研究用 FSRS benchmark/dataset、旧最低保持率计算；对照价值与是否产品化分别判断。
 - **旧调度迁移不能仅因 UpgradeScheduler 未登记就判为全部缺失**：APKG Core import 内含条件性的 maybe_upgrade_scheduler；其他旧集合迁移场景仍需专用样本，不承诺全部跨版本兼容。
 
-## F. 建议继续顺序
+## F. 当日实施建议（历史）
 
 1. **先闭合已承诺的行为**：G02 字段元数据本机生效；G03 批量撤销/写入语义；G06/G22 音频偏好和混排顺序。同时检查 JIDE 的实际效果描述，避免把 Core 保存成功扩写成本机已经应用。
 2. **补日常数据管理**：G04 真正改名、G05 牌组说明、G15 标签替换、G17 导入结果定位、G21 既有筛选牌组维护；复用既有写入会话、确认和导航。
@@ -130,7 +130,7 @@ JIDE 能通过共同界面目录描述入口、读取已登记界面状态并导
 
 此前高级能力只暴露 JIDE 的约定保持有效；按[当前入口决策](../decisions/2026-10-04-ankicore-ui-routing.md)，较复杂的配置能力通过 JIDE 类型化工具提供，极简入口可复用现有界面。G02/G06 等需要本机显示/播放实际消费配置，单加一个工具不能完成它们。
 
-## G. 本次实际验证
+## G. 当日实际验证（历史）
 
 - `node tools/verify-rpc-index.mjs`：通过，22 服务/22 方法表与锁定协议一致。
 - 7 个专项文件 **77 项回归全部通过**：ai-agent-maintenance、review-preferences、note-draft-preview、notetype-management、deck-options-fsrs、browser-note-tags、collection-history-session。它们用于复核“已接功能”，没有把测试通过当作剩余缺口消失。
@@ -139,6 +139,6 @@ JIDE 能通过共同界面目录描述入口、读取已登记界面状态并导
 - 文档链接/契约 **10 项通过**；本任务文档差异检查通过。没有业务源码修改，没有重跑全仓库、Rust、HAP，没有安装设备、调用真实模型或改用户集合。
 - 专项日志：`.local/anki-integration-focused.log`、`.local/anki-integration-probes.log`、`.local/anki-integration-docs.log`；静态盘点中间结果：`.local/anki-integration-audit.json`。长期交接以本报告、接口附录和 CSV 为准，不依赖临时脚本存在。
 
-## 交接
+## 历史交接范围
 
-目标是继续查全接入边界并整理，不是本次实施上述事项。报告按现有锁定 Core 做接口全集核对；业务功能按当前生产调用链复查。下一轮选择具体 G 编号即可沿表中责任入口实施，完成后更新本报告状态及当前领域文档；涉及功能变化时必须同时接通 JIDE 的真实读取/操作/认知。
+当日目标是查全接入边界并整理，没有实施表中事项。后续实现更新[功能状态](../FEATURE_STATUS.md)、所属领域和[入口决策](../decisions/2026-10-04-ankicore-ui-routing.md)，本报告及 CSV 保留原审计证据。选择 G 编号时先核对当前生产调用链，避免重复实施已经完成的功能。
