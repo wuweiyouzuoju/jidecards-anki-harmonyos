@@ -2519,6 +2519,7 @@ export struct 学习页 {
   @Builder
   private timeboxHeader() {
     DialogHeader({ title: $r('app.string.study_timebox_title'),
+      showCloseLabel: true, showActionLabel: true,
       closeLabel: $r('app.string.study_timebox_finish'), actionLabel: $r('app.string.continue'),
       onClose: (): void => { this.closeTimebox(true); },
       onAction: (): void => { this.closeTimebox(); } })

@@ -13,7 +13,7 @@ export struct NoteDuplicateDialog {
   @Builder
   private headerContent() {
     DialogHeader({ title: $r('app.string.add_note_duplicate_title'),
-      closeLabel: $r('app.string.cancel'), actionLabel: $r('app.string.add_note_duplicate_continue'),
+      closeLabel: $r('app.string.cancel'), showActionLabel: true, actionLabel: $r('app.string.add_note_duplicate_continue'),
       onClose: (): void => { this.onCancel(); }, onAction: (): void => { this.onContinue(); } })
   }
   @Builder

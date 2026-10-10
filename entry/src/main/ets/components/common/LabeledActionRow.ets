@@ -8,6 +8,8 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 export struct LabeledActionRow {
   @Prop label: ResourceStr = '';
   @Prop actionLabel: ResourceStr = '';
+  @Prop actionIcon: Resource | undefined = undefined;
+  @Prop compactLabel: boolean = false;
   @Prop tint: ResourceColor = $r('app.color.text_primary');
   @Prop textColor: ResourceColor = $r('app.color.text_primary');
   @Prop isInteractive: boolean = true;
@@ -19,9 +21,9 @@ export struct LabeledActionRow {
 
   build() {
     Row({ space: FormRowLayout.gap }) {
-      Text(this.label).fontSize(应用尺寸.字号_正文).fontColor(this.textColor)
+      Text(this.label).fontSize(this.compactLabel ? 应用尺寸.字号_正文_小 : 应用尺寸.字号_正文).fontColor(this.textColor)
         .textAlign(TextAlign.Start).layoutWeight(1).constraintSize({ minWidth: 0 })
-      按下态按钮({ 文案: this.actionLabel, 字色: this.tint, 是否启用: this.isInteractive,
+      按下态按钮({ 文案: this.actionLabel, 图标: this.actionIcon, 字色: this.tint, 是否启用: this.isInteractive,
         singleLine: true, 点击回调: (): void => { this.activate(); } })
         .constraintSize(FormRowLayout.trailingConstraint).flexShrink(0)
     }.width('100%').constraintSize({ minHeight: FormRowLayout.controlHeight }).alignItems(VerticalAlign.Center)

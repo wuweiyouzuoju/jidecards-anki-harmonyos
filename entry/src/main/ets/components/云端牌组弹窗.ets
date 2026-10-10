@@ -167,7 +167,7 @@ export struct 云端牌组弹窗 {
       Column({ space: 应用尺寸.间距_12 }) {
         DialogHeader({
           title: $r('app.string.cloud_deck_title'),
-          actionLabel: $r('app.string.cloud_deck_download', this.selectedIds.length),
+          showActionLabel: true, actionLabel: $r('app.string.cloud_deck_download', this.selectedIds.length),
           actionEnabled: !this.busy && !this.loading && this.errorMessage.length === 0 && this.selectedIds.length > 0,
           closeLabel: this.主按钮文案(),
           showCloseLabel: !this.从菜单打开,

@@ -287,7 +287,7 @@ export struct 数据迁移面板 {
   private panelHeader() {
     DialogHeader({
       title: this.模式标签(this.模式),
-      actionLabel: this.主按钮文案(), actionEnabled: !this.busy && this.可提交(),
+      showActionLabel: true, actionLabel: this.主按钮文案(), actionEnabled: !this.busy && this.可提交(),
       closeLabel: this.busy ? $r('app.string.transfer_cancel_action') : $r('app.string.create_deck_cancel'),
       showCloseLabel: this.busy,
       closeEnabled: !this.busy || (this.progress.cancellable && !this.cancelRequested),

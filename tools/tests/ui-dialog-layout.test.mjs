@@ -22,7 +22,7 @@ function instance(path, methods, state = {}) {
 
 test('browser Back dismisses help and forms before the retained preview', () => {
   let previews=0;
-  const page=instance('pages/浏览页.ets',['onBackPress'],{显示说明浮层:true,显示查找替换:true,batchDialog:'none',显示预览:true,
+  const page=instance('pages/浏览页.ets',['onBackPress'],{displayDialog:'',inlineEditorId:0,显示说明浮层:true,显示查找替换:true,batchDialog:'none',显示预览:true,
     previewBackHandler:()=>{previews++;return false}});
   page.onBackPress();assert.equal(page.显示说明浮层,false);assert.equal(page.显示查找替换,true);
   page.onBackPress();assert.equal(page.显示查找替换,false);assert.equal(page.显示预览,true);assert.equal(previews,0);
@@ -81,7 +81,7 @@ test('statistics help consumes one Back; reminder save blocks closing until fini
 const guardedPanels = [
   ['settings/备份管理面板', ['busy']],
   ['settings/媒体管理面板', ['检查中', '处理中']],
-  ['settings/空卡列表面板', ['检查中', '处理中']],
+  ['settings/空卡列表面板', ['处理中']],
   ['settings/笔记类型管理面板', ['加载中', '处理中']],
   ['settings/笔记类型编辑器', ['保存中']],
   ['home/自定义学习对话框', ['处理中']],
@@ -90,15 +90,15 @@ const guardedPanels = [
   ['browser/BrowserDeckDialog', ['busy']],
   ['browser/BrowserDueDialog', ['busy']],
   ['browser/BrowserFlagDialog', ['busy']],
-  ['browser/BrowserRepositionDialog', ['busy', 'loading']],
-  ['browser/BrowserNotetypeFeature', ['busy', 'state.busy']]
+  ['browser/BrowserRepositionDialog', ['busy']],
+  ['browser/BrowserNotetypeFeature', ['busy']]
 ];
 for (const [path, guards] of guardedPanels) {
   if (path === 'settings/笔记类型管理面板' || path === 'settings/笔记类型编辑器') continue;
   test(`${path}: Back is consumed while busy and closes once available`, () => {
     let closes = 0;
     const component = instance(`components/${path}.ets`, ['handleBackRequest'], {
-      state: { busy: false }, onClose() { closes++; }
+      state: { busy: false }, visible: true, mounted: true, disposed: false, onClose() { closes++; }
     });
     for (const guard of guards) {
       const [owner, key] = guard.includes('.') ? [component.state, 'busy'] : [component, guard];
@@ -110,6 +110,16 @@ for (const [path, guards] of guardedPanels) {
     component.handleBackRequest();
     assert.equal(closes, 1);
     assert.match(read(`components/${path}.ets`), /@Prop @Watch\('handleBackRequest'\) backRequest/);
+  });
+}
+
+for(const [path,loading] of [['settings/空卡列表面板','检查中'],['browser/BrowserRepositionDialog','loading'],['browser/BrowserNotetypeFeature','state']]){
+  test(`${path}: a read in progress does not lock dismissal`,()=>{
+    let closes=0;const component=instance(`components/${path}.ets`,['handleBackRequest'],{
+      busy:false,处理中:false,disposed:false,onClose(){closes++;}
+    });
+    component[loading]=loading==='state'?{busy:true}:true;component.handleBackRequest();assert.equal(closes,1);
+    component.disposed=true;component.handleBackRequest();assert.equal(closes,1);
   });
 }
 
@@ -197,6 +207,9 @@ test('shared chrome owns theme, scroll limits and safe areas; slots retain their
   assert.match(backdrop, /expandSafeArea/);
   const frame = read('components/common/DialogFrame.ets');
   assert.match(frame, /Scroll\(\)[\s\S]*maxHeight: this.bodyHeight\(\)/);
+  assert.match(frame, /\.height\(this\.usableHeight\(\)\)\.alignContent\(Alignment\.Center\)/);
+  assert.match(frame, /\.width\('100%'\)\.height\('100%'\)\s*\.alignContent\(Alignment\.Top\)/,
+    'keyboard-sized inner viewport must start at the root top, so the root cannot clip the lower body');
   assert.match(frame, /this.header\(\)[\s\S]*flexShrink\(0\)/);
   for (const path of readdirSync(root, { recursive: true }).filter(p => p.endsWith('.ets'))) {
     const source = read(path.replaceAll('\\', '/'));

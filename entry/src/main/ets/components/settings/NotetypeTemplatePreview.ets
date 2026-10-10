@@ -177,7 +177,7 @@ export struct NotetypeTemplatePreview {
   @Builder
   private header() {
     DialogHeader({ title: this.sample ? $r('app.string.notetype_template_preview') : $r('app.string.note_draft_preview'), closeLabel: $r('app.string.close'),
-      actionLabel: this.answerSide ? $r('app.string.notetype_preview_question') : $r('app.string.notetype_preview_answer'),
+      showActionLabel: true, actionLabel: this.answerSide ? $r('app.string.notetype_preview_question') : $r('app.string.notetype_preview_answer'),
       onClose: this.onClose, onAction: (): void => { this.toggleSide(); } })
   }
 

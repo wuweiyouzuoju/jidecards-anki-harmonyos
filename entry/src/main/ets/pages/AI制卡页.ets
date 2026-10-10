@@ -2857,7 +2857,7 @@ export struct AI制卡页 {
   @Builder
   private targetDialogHeader() {
     DialogHeader({ title: $r('app.string.ai_agent_target_choose'),
-      actionLabel: $r('app.string.ai_agent_clarification_continue'),
+      showActionLabel: true, actionLabel: $r('app.string.ai_agent_clarification_continue'),
       actionEnabled: !this.处理中 && !this.targetSelectionBusy && this.牌组ID > 0 &&
         this.已选笔记类型ID > 0 && this.字段名列表.length > 0,
       closeEnabled: !this.处理中 && !this.targetSelectionBusy,

@@ -164,7 +164,7 @@ export struct RedemptionPanel {
     Column({ space: 16 }) {
       DialogHeader({
         title: this.showCelebration ? $r('app.string.redemption_gift_received') :
-          settingsItemText(this.getUIContext(), 'redemption', this.uiLanguage), actionLabel: $r('app.string.redemption_submit'),
+          settingsItemText(this.getUIContext(), 'redemption', this.uiLanguage), showActionLabel: true, actionLabel: $r('app.string.redemption_submit'),
         showAction: !this.showCelebration,
         actionEnabled: !this.busy && this.code.trim() !== '', closeEnabled: !this.busy,
         onClose: (): void => { this.closeRedemption(); },

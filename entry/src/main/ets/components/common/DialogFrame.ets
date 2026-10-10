@@ -76,14 +76,14 @@ export struct DialogFrame {
         .borderRadius(应用尺寸.圆角_卡片)
         .onClick((): void => {})
         .transition(this.nativeHost ? TransitionEffect.IDENTITY : SurfaceTransition.dialog())
-      }.width('100%').height(this.usableHeight()).align(Alignment.Top).alignContent(Alignment.Center)
+      }.width('100%').height(this.usableHeight()).alignContent(Alignment.Center)
         .animation(motionAnimation(currentMotionProfile().textMs))
         .padding({ top: this.safeTop + 应用尺寸.间距_8, bottom: (this.keyboardTop > 0 ? 0 : this.safeBottom) + 应用尺寸.间距_8,
           left: this.safeLeft + 应用尺寸.间距_8, right: this.safeRight + 应用尺寸.间距_8 })
         .hitTestBehavior(HitTestMode.Transparent)
     }
     .width('100%').height('100%')
-    .alignContent(Alignment.Center)
+    .alignContent(Alignment.Top)
     .onAreaChange((_old: Area, area: Area): void => { this.viewportHeight = Number(area.height); this.viewportTop = Number(area.globalPosition.y); })
   }
 }

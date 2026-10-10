@@ -210,7 +210,7 @@ export struct 媒体管理面板 {
         // 固定标题操作栏
         DialogHeader({
           title: $r('app.string.settings_media_management'),
-          actionLabel: this.检查中 ? $r('app.string.media_checking') : $r('app.string.media_check'),
+          showActionLabel: true, actionLabel: this.检查中 ? $r('app.string.media_checking') : $r('app.string.media_check'),
           actionEnabled: !this.检查中 && !this.处理中,
           closeLabel: $r('app.string.close'),
           closeEnabled: !this.检查中 && !this.处理中,

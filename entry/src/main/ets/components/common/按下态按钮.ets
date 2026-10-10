@@ -57,6 +57,7 @@ export struct 按下态按钮 {
   // 工具栏在等宽侧栏内约束标签，保留完整无障碍名称。
   @Prop singleLine: boolean = false;
   @Prop fillWidth: boolean = false;
+  @Prop autoHeight: boolean = false;
   点击回调: () => void = (): void => {};
 
   private activate(): void {
@@ -90,23 +91,25 @@ export struct 按下态按钮 {
             }, (glyph: ThemeLabelGlyph, index: number): string => `${index}-${glyph.letter}-${glyph.color}`)
           }
             .fontSize(this.字号)
+            .layoutWeight(this.fillWidth ? 1 : 0).textAlign(TextAlign.Center)
             .maxLines(this.singleLine ? 1 : undefined)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
         } else {
           Text(this.文案)
             .fontSize(this.字号)
             .fontColor(this.labelColor())
+            .layoutWeight(this.fillWidth ? 1 : 0).textAlign(TextAlign.Center)
             .maxLines(this.singleLine ? 1 : undefined)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
       }
       .justifyContent(FlexAlign.Center)
-      .constraintSize({ maxWidth: this.singleLine ? '100%' : undefined })
+      .constraintSize({ maxWidth: this.singleLine || this.fillWidth ? '100%' : undefined })
     }
-    .height(应用尺寸.按钮高度)
+    .height(this.autoHeight ? undefined : 应用尺寸.按钮高度)
     .width(this.fillWidth ? '100%' : undefined)
     .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
-    .constraintSize({ minWidth: 0, maxWidth: this.singleLine ? '100%' : undefined })
+    .constraintSize({ minWidth: 0, minHeight: 应用尺寸.按钮高度, maxWidth: this.singleLine || this.fillWidth ? '100%' : undefined })
     .accessibilityText(typeof this.文案 === 'string' ? this.文案 : localizedResourceText(this.getUIContext(), this.uiLanguage, this.文案))
     .fontColor(this.labelColor())
     .attributeModifier(new GlassSurface(this.glassColors, $r('app.color.surface_card'), this.buttonBorder()))

@@ -77,7 +77,7 @@ export struct 欢迎弹窗 {
         // 标题栏：标题居中 + × 右上角
         DialogHeader({
           title: $r('app.string.welcome_title'),
-          actionLabel: $r('app.string.welcome_btn_start'),
+          showActionLabel: true, actionLabel: $r('app.string.welcome_btn_start'),
           showClose: false,
           onAction: (): void => { this.onClose(); }
         })

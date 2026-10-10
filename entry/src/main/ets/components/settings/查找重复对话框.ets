@@ -97,7 +97,7 @@ export struct 查找重复对话框 {
   @Builder
   private headerContent() {
     DialogHeader({ title: $r('app.string.find_dupes_title'),
-      actionLabel: this.scan.busy ? $r('app.string.cancel') : $r('app.string.find_dupes_search'),
+      showActionLabel: true, actionLabel: this.scan.busy ? $r('app.string.cancel') : $r('app.string.find_dupes_search'),
       actionEnabled: this.scan.busy || (!this.加载中 && this.view !== null && this.view.fieldNames.length > 0),
       closeLabel: $r('app.string.close'), onClose: (): void => { this.close(); },
       onAction: (): void => { if (this.scan.busy) this.session.cancel(); else this.execute(); } })

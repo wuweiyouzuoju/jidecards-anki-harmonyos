@@ -4,6 +4,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import test from 'node:test';
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
 import { arkuiClickTargets } from '../arkui-click-targets.mjs';
+import { DIALOG_ACTION_PRESENTATION } from '../../entry/src/main/ets/model/InteractionFeedback.ts';
 
 const root = new URL('../../entry/src/main/ets/', import.meta.url);
 const read = file => readFileSync(new URL(file, root), 'utf8');
@@ -64,6 +65,79 @@ test('shared secondary buttons retain ordinary colors and stable selection borde
   button.是否启用 = false; button.activate();
   button.是否启用 = true; button.activate();
   assert.equal(clicks, 1);
+});
+
+test('dialog header icon and text actions preserve names, theme, danger and disabled callbacks', () => {
+  const Header = loadComponentLogic('components/common/DialogHeader.ets', 'DialogHeader', { $r: resource });
+  const Button = loadComponentLogic('components/common/按下态按钮.ets', '按下态按钮', {
+    应用尺寸: dimensions, $r: resource, GLASS_HIGHLIGHT_COLORS: []
+  });
+  const IconButton = loadComponentLogic('components/common/IconActionButton.ets', 'IconActionButton', {
+    应用尺寸: dimensions, $r: resource, Color: { Transparent: 'transparent' }
+  });
+  // 执行生产渲染传入的配置，再执行公共按钮的真实禁用守卫。
+  const bindings = [...read('components/common/DialogHeader.ets').matchAll(/按下态按钮\((\{[\s\S]*?\})\)/g)]
+    .map(match => new Function('$r', 'return (' + match[1] + ');'));
+  assert.equal(bindings.length, 2);
+  const header = new Header();
+  assert.equal(header.actionUsesIcon(), true, 'ordinary confirmation defaults to the shared check icon');
+  const iconBindings = [...read('components/common/DialogHeader.ets').matchAll(/IconActionButton\((\{[\s\S]*?\})\)/g)]
+    .map(match => new Function('$r', 'DIALOG_ACTION_PRESENTATION', 'return (' + match[1] + ');'));
+  assert.equal(iconBindings.length, 2);
+  let actions = 0, closes = 0;
+  header.onAction = () => actions++; header.onClose = () => closes++;
+  for (const themeColor of ['#733BCD', '#14B8A6']) {
+    header.actionColor = themeColor;
+    for (const destructive of [false, true]) {
+      header.destructive = destructive;
+      header.showActionLabel = false;
+      assert.equal(header.actionUsesIcon(), !destructive, 'destructive confirmation retains its visible label');
+      header.showActionLabel = true;
+      assert.equal(header.actionUsesIcon(), false, 'explicit result and busy labels remain visible');
+      for (const available of [false, true]) {
+        header.actionEnabled = header.closeEnabled = available;
+        const [close, action] = bindings.map(binding => Object.assign(new Button(), binding.call(header, resource)));
+        assert.equal(action.文案, header.actionLabel); assert.equal(close.文案, header.closeLabel);
+        assert.equal(action.themeText, !destructive);
+        assert.equal(action.labelColor(), destructive ? 'app.color.error_text' : themeColor);
+        assert.equal(close.labelColor(), 'app.color.text_secondary');
+        assert.equal(action.singleLine, false); assert.equal(close.singleLine, false);
+        assert.equal(action.fillWidth, true); assert.equal(close.fillWidth, true);
+        assert.equal(action.autoHeight, true); assert.equal(close.autoHeight, true);
+        assert.equal(header.usesTextRow(), true, 'visible text actions get room below the centered title');
+        const previous = [actions, closes];
+        action.activate(); close.activate();
+        assert.deepEqual([actions, closes], previous.map(count => count + Number(available)));
+      }
+    }
+    header.destructive = false; header.showActionLabel = false;
+    for (const available of [false, true]) {
+      header.actionEnabled = header.closeEnabled = available;
+      const [close, action] = iconBindings.map(binding => Object.assign(new IconButton(),
+        binding.call(header, resource, DIALOG_ACTION_PRESENTATION)));
+      assert.equal(action.label, header.actionLabel); assert.equal(close.label, header.closeLabel);
+      assert.equal(action.source, 'app.media.' + DIALOG_ACTION_PRESENTATION.confirmIconKey);
+      assert.equal(close.source, header.closeIcon);
+      for (const button of [close, action]) {
+        button.actionColor = themeColor;
+        assert.equal(button.toolbarStyle, true);
+        assert.equal(button.controlSize, dimensions.按钮高度);
+        assert.equal(button.resolvedGlyphColor(), themeColor);
+        assert.equal(button.resolvedSurface(), 'app.color.surface_card');
+      }
+      const previous = [actions, closes];
+      action.activate(); close.activate();
+      assert.deepEqual([actions, closes], previous.map(count => count + Number(available)));
+    }
+  }
+  header.actionIcon = 'app.media.ic_home_new';
+  header.actionEnabled = false;
+  const customAction = Object.assign(new IconButton(), iconBindings[1].call(header, resource, DIALOG_ACTION_PRESENTATION));
+  assert.equal(customAction.source, header.actionIcon);
+  assert.equal(customAction.label, header.actionLabel);
+  const before = actions;
+  customAction.activate();
+  assert.equal(actions, before, 'custom creation icons retain the existing disabled guard');
 });
 
 test('form input style applies real geometry/resources while leaving input behavior untouched', () => {
