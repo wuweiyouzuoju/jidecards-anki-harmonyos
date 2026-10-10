@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { CoreRpc } from '../proto/generated/CoreRpc';
+import { NotesFieldNamesForNotesRequest, NotesFieldNamesForNotesResponse } from '../proto/generated/CoreMessages';
 // ========================================================
 // @块ID BACKEND-SVC-NOTE-001
 // @名称 笔记服务边界
@@ -56,6 +57,12 @@ function 校验键对应状态(状态: NoteFieldsCheckState): 笔记字段校验
     }
 }
 export class 笔记服务 {
+    async fieldNamesForNotes(ids: number[]): Promise<string[]> {
+        if (ids.length === 0) return [];
+        const request: NotesFieldNamesForNotesRequest = new NotesFieldNamesForNotesRequest();
+        request.setNids(ids.slice());
+        return new NotesFieldNamesForNotesResponse(await new CoreRpc(this.会话).Notes_field_names_for_notes(request.转为字节())).getFields();
+    }
     private readonly 会话: 后端会话 = 后端会话.获取实例();
     /** 草稿编号由锁定 Core 解析，包含嵌套和多编号 Cloze。 */
     async clozeNumbersInNote(note: EditableNote): Promise<number[]> {

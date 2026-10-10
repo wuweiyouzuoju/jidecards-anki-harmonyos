@@ -2,6 +2,26 @@
 import type { BrowserOperationContext } from './BrowserOperationController';
 import type { 变更笔记类型请求 } from '../proto/messages/NotetypeMessages';
 
+/** 信息/笔记预览使用真实代表卡片；没有卡片时不得把 noteId 当 cardId。 */
+export async function resolveBrowserRepresentativeCard(id: number, mode: string,
+  cardsForNote: (noteId: number) => Promise<number[]>): Promise<number | null> {
+  if (mode === 'cards') return id;
+  if (mode !== 'notes') throw new Error('Invalid browser mode');
+  const cards: number[] = await cardsForNote(id);
+  return cards.length === 0 ? null : cards[0];
+}
+
+/** 区间按完整结果顺序确定，包含尚未加载的行。 */
+export function selectBrowserRange(resultIds: number[], selected: number[], anchor: number, target: number): number[] {
+  const start: number = resultIds.indexOf(anchor);
+  const end: number = resultIds.indexOf(target);
+  if (end < 0) return selected.slice();
+  const selection: Set<number> = new Set<number>(selected);
+  if (start < 0) selection.add(target);
+  else resultIds.slice(Math.min(start, end), Math.max(start, end) + 1).forEach((id: number): void => { selection.add(id); });
+  return resultIds.filter((id: number): boolean => selection.has(id));
+}
+
 /** 转换必须全部成功再写入；空数组在某些 Anki RPC 中表示全库，不能吞掉解析失败。 */
 export async function resolveBrowserCardIds(selection: BrowserOperationContext,
   cardsForNote: (noteId: number) => Promise<number[]>): Promise<number[]> {

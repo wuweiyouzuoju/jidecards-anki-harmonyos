@@ -19,6 +19,7 @@ export interface BrowserSearchBackend {
   search(request: SearchRequest, notes: boolean): Promise<number[]>;
   row(id: number): Promise<BrowserRow>;
   markedIds?(notes: boolean): Promise<number[]>;
+  defaultSort?(): Promise<SortOrder>;
 }
 export interface BrowserQuery {
   filesDir: string;
@@ -27,6 +28,7 @@ export interface BrowserQuery {
   filter: string;
   sortColumn: string;
   sortReverse: boolean;
+  activeColumns?: string[];
 }
 export interface BrowserSearchResult {
   columns: BrowserColumn[];
@@ -58,9 +60,12 @@ async function readBrowserRows(ids: number[], suspended: Set<number>,
   for (let offset = 0; offset < ids.length; offset += 20) {
     if (!current()) return [];
     const batch: number[] = ids.slice(offset, offset + 20);
+    let firstError: Error | null = null;
     const loaded: (BrowserRow | null)[] = await Promise.all(batch.map((id: number): Promise<BrowserRow | null> =>
-      rowForId(id).catch((): null => null)));
+      rowForId(id).catch((error: Error): null => { if (firstError === null) firstError = error; return null; })));
     if (!current()) return [];
+    // 单行缺失仍可跳过；整批失败不得消耗游标或展示空白成功。
+    if (loaded.every((row: BrowserRow | null): boolean => row === null)) throw firstError;
     batch.forEach((id: number, index: number): void => {
       const row: BrowserRow | null = loaded[index];
       if (row !== null) rows.push({ id: id, cells: row.cells, color: row.color,
@@ -74,6 +79,7 @@ async function readBrowserRows(ids: number[], suspended: Set<number>,
 export class BrowserSearchSession {
   private columnsCache: BrowserColumn[] = [];
   private result: BrowserSearchResult | null = null;
+  private resultQuery: BrowserQuery | null = null;
   private generation: number = 0;
   private loadingMore: boolean = false;
   private readonly backend: BrowserSearchBackend;
@@ -81,13 +87,17 @@ export class BrowserSearchSession {
 
   search(query: BrowserQuery, current: () => boolean, retainResult: boolean = false): Promise<BrowserSearchResult | null> {
     const generation: number = ++this.generation;
-    if (!retainResult) this.result = null;
+    if (!retainResult) { this.result = null; this.resultQuery = null; }
+    const accepted: BrowserQuery = { filesDir: query.filesDir, notes: query.notes, text: query.text,
+      filter: query.filter, sortColumn: query.sortColumn, sortReverse: query.sortReverse,
+      activeColumns: query.activeColumns === undefined ? undefined : query.activeColumns.slice() };
     this.loadingMore = false;
     const valid = (): boolean => generation === this.generation && current();
     const run = async (): Promise<BrowserSearchResult | null> => {
-      const result = await this.execute(query, valid);
+      const result = await this.execute(accepted, valid);
       if (!valid()) return null;
       this.result = result;
+      this.resultQuery = accepted;
       return result;
     };
     return serializeBrowserRead(run);
@@ -96,14 +106,20 @@ export class BrowserSearchSession {
   /** 搜索会话独占分页游标与结果；失败行也消费 ID，旧分页不影响新查询。 */
   async more(current: () => boolean): Promise<BrowserSearchResult | null> {
     const result: BrowserSearchResult | null = this.result;
-    if (this.loadingMore || result === null || result.consumed >= result.ids.length || !current()) return null;
+    const query: BrowserQuery | null = this.resultQuery;
+    if (this.loadingMore || result === null || query === null || result.consumed >= result.ids.length || !current()) return null;
     const generation: number = this.generation;
     const valid = (): boolean => generation === this.generation && current();
     const ids: number[] = result.ids.slice(result.consumed, result.consumed + 100);
     this.loadingMore = true;
     try {
-      const rows = await loadBrowserRows(ids, result.suspended,
-        (id: number): Promise<BrowserRow> => this.backend.row(id), valid, result.marked);
+      const rows = await serializeBrowserRead(async (): Promise<BrowserDisplayRow[]> => {
+        if (!valid()) return [];
+        await this.restoreContext(query);
+        if (!valid()) return [];
+        return readBrowserRows(ids, result.suspended,
+          (id: number): Promise<BrowserRow> => this.backend.row(id), valid, result.marked);
+      });
       if (!valid()) return null;
       this.result = { columns: result.columns, ids: result.ids, suspended: result.suspended, marked: result.marked,
         rows: result.rows.concat(rows), consumed: result.consumed + ids.length };
@@ -113,22 +129,26 @@ export class BrowserSearchSession {
     }
   }
 
+  private async restoreContext(query: BrowserQuery): Promise<void> {
+    await this.backend.open(query.filesDir);
+    await this.backend.setNotesMode(query.notes);
+    await this.backend.activateColumns(query.activeColumns === undefined ?
+      ['question', 'deck', 'cardDue', 'flags', 'answer'] : query.activeColumns);
+  }
+
   private async execute(query: BrowserQuery, current: () => boolean): Promise<BrowserSearchResult | null> {
     if (!current()) return null;
-    await this.backend.open(query.filesDir);
-    if (!current()) return null;
-    await this.backend.setNotesMode(query.notes);
+    await this.restoreContext(query);
     if (!current()) return null;
     if (this.columnsCache.length === 0) {
       const columns: BrowserColumns = await this.backend.columns();
-      if (!current()) return null;
-      await this.backend.activateColumns(['question', 'deck', 'cardDue', 'flags', 'answer']);
       if (!current()) return null;
       this.columnsCache = columns.columns;
     }
     const search: string = await this.backend.buildSearch(browserFilterNode(query.text, query.filter));
     if (!current()) return null;
-    const order: SortOrder = query.sortColumn === '' ? { kind: 'none' } :
+    const order: SortOrder = query.sortColumn === '' ?
+      (this.backend.defaultSort === undefined ? { kind: 'none' } : await this.backend.defaultSort()) :
       { kind: 'builtin', column: query.sortColumn, reverse: query.sortReverse };
     const ids: number[] = await this.backend.search({ search: search, order: order }, query.notes);
     if (!current()) return null;

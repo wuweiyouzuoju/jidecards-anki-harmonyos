@@ -23,7 +23,7 @@ import { CoreRpc } from '../proto/generated/CoreRpc';
 // 搜索串由后端构建（前端不拼字符串），保证与 Anki 桌面端搜索语法一致。
 // 查找并替换返回实际替换的笔记数（OpChangesWithCount.count）。
 // 全部浏览器列返回 Anki 后端预定义的列定义（key + 中英标签 + 排序方向等）。
-// 设置激活浏览器列持久化用户选择的列顺序，下次打开浏览页时复用。
+// 激活列只属于当前 Core collection；显示偏好由 BrowserPreferencesStore 保存。
 //
 // @副作用
 // 通过 后端会话 间接调用 NAPI 桥，仅读取 Anki collection；查找并替换会修改 notes 表。
@@ -112,8 +112,8 @@ export class 搜索服务 {
         return decodeBrowserRow(响应字节);
     }
     /**
-     * 设置激活浏览器列（SetActiveBrowserColumns）。持久化用户选择的列顺序，
-     * 下次打开浏览页时复用。Anki 后端会保存到 collection.anki2 的配置表。
+     * 设置当前集合的激活列（SetActiveBrowserColumns）。集合重开后必须重新激活；
+     * 不等于保存用户显示偏好。
      * @param 列键列表 列 key 数组（来自 BrowserColumn.key）
      */
     async 设置激活浏览器列(列键列表: string[]): Promise<void> {

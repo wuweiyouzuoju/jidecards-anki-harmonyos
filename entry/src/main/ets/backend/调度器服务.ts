@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { CoreRpc } from '../proto/generated/CoreRpc';
+import { SchedulerGradeNowRequest } from '../proto/generated/CoreMessages';
 // ========================================================
 // @块ID BACKEND-SVC-SCHED-001
 // @名称 调度器服务边界
@@ -32,6 +33,12 @@ import type { ScheduleCardsAsNewOptions } from '../proto/messages/SchedulerMessa
 import { encodeScheduleCardsAsNew, decodeScheduleCardsAsNewDefaults } from '../proto/messages/SchedulerMessages';
 import { decodeOpChanges, decodeOpChangesWithCount } from '../proto/messages/CollectionMessages';
 export class 调度器服务 {
+    async gradeNow(ids: number[], rating: number): Promise<void> {
+        if (ids.length === 0 || !Number.isInteger(rating) || rating < 0 || rating > 3) throw new Error('Invalid grade selection');
+        const request: SchedulerGradeNowRequest = new SchedulerGradeNowRequest();
+        request.setCardIds(ids.slice()); request.setRating(rating);
+        await new CoreRpc(this.会话).Scheduler_grade_now(request.转为字节());
+    }
     async scheduleCardsAsNew(ids: number[], options: ScheduleCardsAsNewOptions): Promise<void> {
         if (ids.length === 0)
             throw new Error('No cards selected');

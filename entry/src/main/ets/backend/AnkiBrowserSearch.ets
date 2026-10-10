@@ -4,7 +4,8 @@ import { 后端会话 } from './后端会话';
 import { 搜索服务 } from './搜索服务';
 import { 配置服务 } from './配置服务';
 import { ConfigKeyBool } from '../proto/messages/ConfigMessages';
-import type { BrowserColumns, BrowserRow, SearchNode, SearchRequest } from '../proto/messages/SearchMessages';
+import type { BrowserColumns, BrowserRow, SearchNode, SearchRequest, SortOrder } from '../proto/messages/SearchMessages';
+interface BrowserSortConfig { sortType?: string; sortBackwards?: boolean; }
 
 export class AnkiBrowserSearch implements BrowserSearchBackend {
   private readonly searchService: 搜索服务 = new 搜索服务();
@@ -20,6 +21,10 @@ export class AnkiBrowserSearch implements BrowserSearchBackend {
     return notes ? this.searchService.搜索笔记(request) : this.searchService.搜索卡片(request);
   }
   row(id: number): Promise<BrowserRow> { return this.searchService.浏览器行按ID(id); }
+  async defaultSort(): Promise<SortOrder> {
+    const config: BrowserSortConfig = JSON.parse(await this.config.获取全部配置()) as BrowserSortConfig;
+    return { kind: 'builtin', column: config.sortType ?? 'noteFld', reverse: config.sortBackwards ?? false };
+  }
   markedIds(notes: boolean): Promise<number[]> {
     return this.search({ search: 'tag:re:^marked$', order: { kind: 'none' } }, notes);
   }
