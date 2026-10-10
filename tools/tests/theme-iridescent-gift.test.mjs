@@ -93,12 +93,14 @@ test('locked Iridescent remains visible, opens the gift dialog and never applies
     assert.equal(component.颜色主题选项()[index].value, locale === 'base' ? '幻彩 🔒' : 'Iridescent 🔒 (locked)');
     component.selectColorTheme(index);
     assert.deepEqual(applied, []);
-    assert.equal(component.giftDialog.isOpen, true);
+    assert.equal(component.giftDialog.current().isOpen, true);
     assert.equal(component.当前颜色主题, 'aurora');
     assert.equal(component.颜色主题索引(), 0);
     assert.equal(component.themeSelectionRevision, 1);
+    const window = component.giftDialog.current();
     component.aboutToDisappear();
-    assert.equal(component.giftDialog.isOpen, false);
+    assert.equal(window.isOpen, false);
+    assert.equal(component.giftDialog.current(), null);
     component.selectColorTheme(-1);
     component.selectColorTheme(THEME_CATALOG.length);
     assert.deepEqual(applied, []);
@@ -113,7 +115,7 @@ test('restored and newly redeemed entitlement removes the lock and applies Iride
   component.selectColorTheme(index);
   component.selectColorTheme(1);
   assert.deepEqual(applied, ['iridescent', 'forest']);
-  assert.equal(component.giftDialog, null, 'unlocked selections do not construct a dialog window');
+  assert.equal(component.giftDialog.current(), null, 'unlocked selections do not construct a dialog window');
 });
 
 function noticeHarness() {

@@ -3,12 +3,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
-import { loadPlatformModule } from './platform-module-harness.mjs';
+import { loadPlatformModule, nativeDialogHostClass, nativeDialogMembers } from './platform-module-harness.mjs';
+import { surfaceMotionApi } from './motion-harness.mjs';
 
 const root = new URL('../../entry/src/main/ets/', import.meta.url);
 const read = file => readFileSync(new URL(file, root), 'utf8').replaceAll('\r\n', '\n');
-function method(file, name, state, bindings = {}) {
-  const source = read(file);
+function methodSource(file, name, source = read(file)) {
   const start = source.search(new RegExp(`^  (?:private )?${name}\\(`, 'm'));
   assert.notEqual(start, -1, `${file}: ${name}`);
   const open = source.indexOf('{', start);
@@ -17,10 +17,49 @@ function method(file, name, state, bindings = {}) {
     if (source[end] === '{') depth++;
     if (source[end] === '}') depth--;
   }
-  const code = stripTypeScriptTypes(`class Host { ${source.slice(start, end)} }`, { mode: 'transform' });
+  return source.slice(start, end);
+}
+function method(file, name, state, bindings = {}) {
+  const code = stripTypeScriptTypes(`class Host { ${methodSource(file, name)} }`, { mode: 'transform' });
   const Host = new Function(...Object.keys(bindings), `${code}; return Host;`)(...Object.values(bindings));
   return Object.assign(new Host(), state);
 }
+
+// 执行真实窗口拥有者和组件字段工厂，只替换系统窗口与帮助/编辑内容的渲染边界。
+function nativeHelpOwner(file, names, state = {}, events = []) {
+  const source = read(file), component = file.split('/').at(-1).replace('.ets', '');
+  const start = source.indexOf(`export struct ${component} {`);
+  assert.notEqual(start, -1, `${file}: ${component}`);
+  const ownerSource = source.slice(start);
+  const bindings = {
+    NativeDialogHost: nativeDialogHostClass(surfaceMotionApi()),
+    CustomDialogController: class {
+      constructor(options) { this.options = options; }
+      open() { events.push('open:' + this.options.builder.kind); }
+      close() { events.push('close:' + this.options.builder.kind); }
+    },
+    字段帮助对话框: props => ({ ...props, kind: 'help' }),
+    DeckOptionEditor: props => ({ ...props, kind: 'editor' }),
+    $r: key => key
+  };
+  const members = nativeDialogMembers(ownerSource);
+  const code = stripTypeScriptTypes(`class Host { ${members}\n${names.map(name => methodSource(file, name, ownerSource)).join('\n')} }`,
+    { mode: 'transform' });
+  const Host = new Function(...Object.keys(bindings), `${code}; return Host;`)(...Object.values(bindings));
+  return Object.assign(new Host(), state);
+}
+
+test('closed deck option content cannot submit values or open help for a newer editor', () => {
+  const changes=[], events=[];
+  const owner=nativeHelpOwner('components/home/DeckOptionField.ets',['open','openHelp'],
+    {busy:false,displayValue:'old',onChange:value=>changes.push(value),validate:()=>''},events);
+  owner.open(); const old=owner.dialog.current().options.builder;
+  old.onClose(); owner.open(); const next=owner.dialog.current();
+  old.onConfirm('stale'); old.onHelp(); old.onClose();
+  assert.deepEqual(changes,[]); assert.equal(owner.helpDialog.current(),null); assert.equal(owner.dialog.current(),next);
+  next.options.builder.onConfirm('current'); assert.deepEqual(changes,['current']);
+  owner.dialog.dispose(); next.options.builder.onConfirm('departed'); assert.deepEqual(changes,['current']);
+});
 
 function hasScatteredIcon(source) {
   const code = source.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '')
@@ -142,24 +181,52 @@ test('note help reads the current resource and Back preserves all draft fields',
 });
 
 test('legacy help respects busy state and is released when its owner leaves', () => {
-  let opens = 0, closes = 0;
-  const state = { busy: true, legacyHelp: { open() { opens++; }, close() { closes++; } } };
-  const owner = method('components/数据迁移面板.ets', '打开旧版帮助', state);
-  owner.打开旧版帮助(); assert.equal(opens, 0);
-  owner.busy = false; owner.打开旧版帮助(); assert.equal(opens, 1);
-  method('components/数据迁移面板.ets', 'aboutToDisappear', state).aboutToDisappear();
-  assert.equal(closes, 1);
+  const events = [], draft = { fields: ['front', 'back'] };
+  const owner = nativeHelpOwner('components/数据迁移面板.ets', ['打开旧版帮助', 'aboutToDisappear'],
+    { busy: true, csvDraft: draft }, events);
+  owner.打开旧版帮助(); assert.deepEqual(events, []); assert.equal(owner.legacyHelp.current(), null);
+  owner.busy = false; owner.打开旧版帮助();
+  const first = owner.legacyHelp.current();
+  assert.equal(first.options.builder.标题, 'app.string.transfer_legacy');
+  assert.equal(first.options.builder.正文, 'app.string.transfer_legacy_help');
+  assert.deepEqual(events, ['open:help']);
+  owner.打开旧版帮助();
+  const second = owner.legacyHelp.current();
+  first.options.builder.onDismiss();
+  assert.equal(owner.legacyHelp.current(), second, 'old content must not release a replacement');
+  owner.aboutToDisappear(); owner.aboutToDisappear(); owner.打开旧版帮助();
+  second.options.builder.onDismiss();
+  assert.equal(owner.legacyHelp.current(), null);
+  assert.equal(owner.csvDraft, draft);
+  assert.deepEqual(events, ['open:help', 'close:help', 'open:help', 'close:help']);
 });
 
 test('deck option teardown closes the top help before its editor', () => {
-  const closed = [];
-  const owner = method('components/home/DeckOptionField.ets', 'aboutToDisappear', {
-    helpDialog: { close() { closed.push('help'); } }, dialog: { close() { closed.push('editor'); } }, value: '30'
-  });
+  const events = [], changes = [];
+  const owner = nativeHelpOwner('components/home/DeckOptionField.ets',
+    ['open', 'openHelp', 'aboutToAppear', 'aboutToDisappear', 'syncValue'],
+    { title: 'Daily limit', help: 'Help A', value: '30', busy: false, onChange: value => changes.push(value) }, events);
+  owner.aboutToAppear(); owner.open();
+  const editor = owner.dialog.current();
+  assert.equal(editor.options.builder.initialValue, '30');
+  editor.options.builder.onHelp();
+  const help = owner.helpDialog.current();
+  assert.equal(help.options.builder.正文, 'Help A');
   owner.aboutToDisappear();
-  assert.deepEqual(closed, ['help', 'editor']);
+  assert.deepEqual(events, ['open:editor', 'open:help', 'close:help', 'close:editor']);
   assert.equal(owner.value, '30');
-  owner.aboutToDisappear(); assert.equal(closed.length, 2);
+  owner.aboutToDisappear(); owner.open(); owner.openHelp();
+  assert.equal(events.length, 4, 'disposed owners neither close twice nor reopen');
+  assert.deepEqual(changes, []);
+  owner.value = '40'; owner.help = 'Help B'; owner.aboutToAppear(); owner.open();
+  const reopened = owner.dialog.current();
+  assert.equal(reopened.options.builder.initialValue, '40');
+  editor.options.builder.onClose(); help.options.builder.onDismiss();
+  assert.equal(owner.dialog.current(), reopened, 'callbacks from disposed content cannot close a new editor');
+  reopened.options.builder.onHelp();
+  assert.equal(owner.helpDialog.current().options.builder.正文, 'Help B');
+  owner.aboutToDisappear();
+  assert.deepEqual(changes, []);
 });
 
 test('plain and rich help share fixed Done, scrollable content and a single backdrop', () => {
@@ -168,15 +235,36 @@ test('plain and rich help share fixed Done, scrollable content and a single back
   assert.match(panel, /showClose: false[\s\S]*?app.string.done[\s\S]*?this.onClose\(\)/);
   assert.match(panel, /onDismiss:.*this.onClose\(\)/);
   assert.match(panel, /Text\(this.正文\)[\s\S]*?this.内容\(\)/);
-  assert.match(panel, /字段帮助面板\([\s\S]*?this.controller\?\.close\(\)/);
-  for (const file of ['components/数据迁移面板.ets', 'components/home/DeckOptionField.ets',
-    'components/settings/RedemptionPanel.ets']) {
-    const source = read(file);
-    assert.match(source, /builder: 字段帮助对话框\(/, file);
-    assert.match(source, /maskColor: Color.Transparent/, file);
+  assert.match(panel, /字段帮助面板\([\s\S]*?this.onDismiss\(\)/);
+  for (const [file, hostName, factoryName] of [
+    ['components/数据迁移面板.ets', 'legacyHelp', 'createLegacyHelp'],
+    ['components/home/DeckOptionField.ets', 'helpDialog', 'createHelpDialog'],
+    ['components/settings/RedemptionPanel.ets', 'contentHelp', 'createContentHelp']
+  ]) {
+    const owner = nativeHelpOwner(file, [], { title: 'Title', help: 'Help' });
+    const host = owner[hostName], expected = host.presentation();
+    host.open(owner[factoryName]);
+    const options = host.current().options;
+    assert.equal(options.builder.kind, 'help', file);
+    for (const key of ['width', 'height', 'maskColor', 'autoCancel', 'customStyle', 'alignment',
+      'openAnimation', 'closeAnimation']) assert.deepEqual(options[key], expected[key], `${file}: ${key}`);
+    host.dispose();
   }
   assert.doesNotMatch(read('components/数据迁移面板.ets'), /showAlertDialog/);
   const editor = read('components/home/DeckOptionField.ets').split('export struct DeckOptionField')[0];
   assert.doesNotMatch(editor, /if \(this.showHelp\)|Text\(this.help\)/);
   assert.match(editor, /onHelp:.*this.onHelp\(\)/);
+});
+
+test('help completion closes each native window instead of only dropping its reference', () => {
+  for (const [file, hostName, factoryName] of [
+    ['components/数据迁移面板.ets', 'legacyHelp', 'createLegacyHelp'],
+    ['components/home/DeckOptionField.ets', 'helpDialog', 'createHelpDialog'],
+    ['components/settings/RedemptionPanel.ets', 'contentHelp', 'createContentHelp']
+  ]) {
+    const events = [], owner = nativeHelpOwner(file, [], {}, events), host = owner[hostName];
+    host.open(owner[factoryName]); host.current().options.builder.onDismiss();
+    assert.deepEqual(events, ['open:help', 'close:help'], file);
+    assert.equal(host.current(), null);
+  }
 });

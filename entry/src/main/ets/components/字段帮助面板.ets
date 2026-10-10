@@ -53,7 +53,7 @@ export struct 字段帮助对话框 {
   build() {
     字段帮助面板({ nativeHost: true, 标题: this.标题, 正文: this.正文,
       内容: (): void => { this.内容(); },
-      onClose: (): void => { this.controller?.close(); this.onDismiss(); }
+      onClose: (): void => { this.onDismiss(); }
     })
   }
 }

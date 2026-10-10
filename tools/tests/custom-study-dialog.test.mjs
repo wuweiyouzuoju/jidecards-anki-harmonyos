@@ -14,7 +14,7 @@ const logic = (source.slice(0, source.indexOf('  @Builder')) + '\n}')
 const defaults = { tags: [{ name: 'alpha', include: true, exclude: false }, { name: 'beta', include: false, exclude: true }],
   extendNew: 12, extendReview: 34, availableNew: 5, availableNewInChildren: 7, availableReview: 8, availableReviewInChildren: 0 };
 function harness() {
-  const calls = [], toasts = [], preferences = new Map();
+  const calls = [], toasts = [], preferences = new Map(), commits=[];
   const scheduler = { 获取自定义学习默认值: async () => defaults,
     自定义学习: async (...args) => { calls.push(args); },
     customStudyByStateOrTags: async (...args) => { calls.push(args); } };
@@ -25,6 +25,7 @@ function harness() {
     颜色键: { 主色按钮背景: '' }, 调度器服务: class { constructor() { return scheduler; } },
     CustomStudyPreferences: class { constructor() { return store; } },
     resourceText: (_ctx, key, ...args) => [key, ...args].join(' '),
+    AppStorage:{setOrCreate:key=>commits.push(key)},
     showToastSafely: (_ctx, { message }) => { toasts.push(message); } };
   const Dialog = new Function(...Object.keys(dependencies), stripTypeScriptTypes(logic, { mode: 'transform' }) + ';return Dialog;')(...Object.values(dependencies));
   const dialog = new Dialog();
@@ -32,8 +33,16 @@ function harness() {
   dialog.getUIContext = () => ({});
   dialog.onSuccess = () => { calls.push('success'); };
   dialog.onClose = () => { calls.push('close'); };
-  return { dialog, scheduler, store, calls, toasts, preferences };
+  return { dialog, scheduler, store, calls, toasts, preferences, commits };
 }
+
+test('accepted custom study commits after disposal without toasts or parent callbacks',async()=>{
+  const h=harness();await h.dialog.加载默认值();h.dialog.选中预设=5;h.dialog.输入值='1';
+  let release;h.scheduler.自定义学习=()=>new Promise(r=>release=r);
+  const work=h.dialog.执行提交();h.dialog.aboutToDisappear();release();await work;
+  assert.deepEqual(h.calls,[]);assert.deepEqual(h.toasts,[]);assert.deepEqual(h.commits,['需要刷新主页']);
+  await h.dialog.执行提交();assert.equal(h.commits.length,1);
+});
 
 test('custom study loads deck defaults and remembers day/count values without merging child counts', async () => {
   const h = harness();

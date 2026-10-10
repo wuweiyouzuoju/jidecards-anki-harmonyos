@@ -1,3 +1,5 @@
+import { DialogFrame } from '../common/DialogFrame';
+import { NativeDialogHost, NativeDialogFactory, NativeDialogDismiss, NativeDialogPresentation } from '../common/NativeDialogHost';
 import { SurfaceTransition } from '../../utils/SurfaceTransition';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../../utils/PressFeedback';
@@ -28,6 +30,7 @@ export struct DeckOptionEditor {
   @State private draft: string = '';
   @State private error: string = '';
   onHelp: () => void = (): void => {};
+  onClose: () => void = (): void => {};
 
   aboutToAppear(): void { this.draft = this.initialValue; }
 
@@ -35,57 +38,60 @@ export struct DeckOptionEditor {
     this.error = this.validate(this.draft);
     if (this.error !== '') return;
     this.onConfirm(this.draft);
-    this.controller?.close();
+    this.onClose();
   }
 
   build() {
-    Column() {
-      Column({ space: 应用尺寸.间距_12 }) {
-        DialogHeader({ title: this.title, actionLabel: $r('app.string.done'), showHelp: true,
-          onHelp: (): void => { this.onHelp(); },
-          onClose: (): void => { this.controller?.close(); }, onAction: (): void => { this.confirm(); } })
-        Scroll() {
-          Column({ space: 应用尺寸.间距_12 }) {
-            if (this.defaultValue !== undefined) {
-              按下态按钮({ 文案: $r('app.string.deck_option_restore_default'), 点击回调: (): void => {
-                this.draft = this.defaultValue!; this.error = '';
-              } })
-            }
-            if (this.choices.length === 0) {
-              if (this.multiline) {
-                TextArea({ text: this.draft })
-                  .width('100%').height(200).fontSize(应用尺寸.字号_正文)
-                  .backgroundColor($r('app.color.surface_card'))
-                  .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
-                  .onChange((value: string): void => { this.draft = value; this.error = ''; })
-              } else {
-                TextInput({ text: this.draft })
-                  .width('100%').height(应用尺寸.按钮高度).fontSize(应用尺寸.字号_正文)
-                  .backgroundColor($r('app.color.surface_card'))
-                  .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
-                  .onChange((value: string): void => { this.draft = value; this.error = ''; })
-              }
-            } else {
-              ForEach(this.choices, (choice: DeckOptionChoice) => {
-                Row({ space: 12 }) {
-                  Text(choice.label).fontSize(15).fontColor($r('app.color.text_primary')).layoutWeight(1)
-                }
-                .width('100%').constraintSize({ minHeight: 48 }).padding({ left: 8, right: 8 })
-                .backgroundColor(this.draft === choice.value ? $r('app.color.surface_page') : Color.Transparent)
-                .borderRadius(10)
-                .attributeModifier(new PressFeedback())
-                .onClick((): void => { this.draft = choice.value; this.error = ''; })
-              }, (choice: DeckOptionChoice): string => choice.value)
-            }
-            if (this.error !== '') {
-              Text(this.error).fontSize(14).fontColor($r('app.color.error_text')).width('100%')
-            }
-          }.width('100%')
-        }.width('100%').constraintSize({ maxHeight: 360 }).scrollBar(BarState.Auto)
+    DialogFrame({ nativeHost: true, maximumWidth: 应用尺寸.dialogMaxWidth,
+      onDismiss: (): void => { this.onClose(); },
+      header: () => { this.dialogHeader(); }, content: () => { this.dialogContent(); } })
+  }
+
+  @Builder
+  private dialogHeader() {
+    DialogHeader({ title: this.title, actionLabel: $r('app.string.done'), showHelp: true,
+      onHelp: (): void => { this.onHelp(); },
+      onClose: (): void => { this.onClose(); }, onAction: (): void => { this.confirm(); } })
+  }
+
+  @Builder
+  private dialogContent() {
+    Column({ space: 应用尺寸.间距_12 }) {
+      if (this.defaultValue !== undefined) {
+        按下态按钮({ 文案: $r('app.string.deck_option_restore_default'), 点击回调: (): void => {
+          this.draft = this.defaultValue!; this.error = '';
+        } })
       }
-      .width('88%').constraintSize({ maxWidth: 480, maxHeight: '85%' })
-      .padding(应用尺寸.卡片内边距).backgroundColor($r('app.color.surface_card')).borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
-    }.width('100%').alignItems(HorizontalAlign.Center)
+      if (this.choices.length === 0) {
+        if (this.multiline) {
+          TextArea({ text: this.draft })
+            .width('100%').height(200).fontSize(应用尺寸.字号_正文)
+            .backgroundColor($r('app.color.surface_card'))
+            .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
+            .onChange((value: string): void => { this.draft = value; this.error = ''; })
+        } else {
+          TextInput({ text: this.draft })
+            .width('100%').height(应用尺寸.按钮高度).fontSize(应用尺寸.字号_正文)
+            .backgroundColor($r('app.color.surface_card'))
+            .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
+            .onChange((value: string): void => { this.draft = value; this.error = ''; })
+        }
+      } else {
+        ForEach(this.choices, (choice: DeckOptionChoice) => {
+          Row({ space: 12 }) {
+            Text(choice.label).fontSize(15).fontColor($r('app.color.text_primary')).layoutWeight(1)
+          }
+          .width('100%').constraintSize({ minHeight: 48 }).padding({ left: 8, right: 8 })
+          .backgroundColor(this.draft === choice.value ? $r('app.color.surface_page') : Color.Transparent)
+          .borderRadius(10)
+          .attributeModifier(new PressFeedback())
+          .onClick((): void => { this.draft = choice.value; this.error = ''; })
+        }, (choice: DeckOptionChoice): string => choice.value)
+      }
+      if (this.error !== '') {
+        Text(this.error).fontSize(14).fontColor($r('app.color.error_text')).width('100%')
+      }
+    }.width('100%')
   }
 }
 
@@ -103,23 +109,26 @@ export struct DeckOptionField {
   validate: (value: string) => string = (_value: string): string => '';
   onChange: (value: string) => void = (_value: string): void => {};
   @State private displayValue: string = '';
-  private dialog: CustomDialogController | null = null;
-  private helpDialog: CustomDialogController | null = null;
+  private readonly dialog: NativeDialogHost = new NativeDialogHost();
+  private readonly helpDialog: NativeDialogHost = new NativeDialogHost();
 
-  aboutToAppear(): void { this.syncValue(); }
+  aboutToAppear(): void { this.dialog.activate(); this.helpDialog.activate(); this.syncValue(); }
   aboutToDisappear(): void {
-    this.helpDialog?.close(); this.helpDialog = null;
-    this.dialog?.close(); this.dialog = null;
+    this.helpDialog.dispose();
+    this.dialog.dispose();
   }
 
-  private openHelp(): void {
-    this.helpDialog = new CustomDialogController({
-      builder: 字段帮助对话框({ 标题: this.title, 正文: this.help }),
-      openAnimation: SurfaceTransition.dialogEnterAnimation(), closeAnimation: SurfaceTransition.dialogExitAnimation(), customStyle: true, autoCancel: true, alignment: DialogAlignment.Center,
-      width: '100%', height: '100%', maskColor: Color.Transparent
+  private readonly createHelpDialog: NativeDialogFactory = (dismiss: NativeDialogDismiss): CustomDialogController => {
+    const presentation: NativeDialogPresentation = this.helpDialog.presentation();
+    return new CustomDialogController({
+      onWillDismiss: dismiss,
+      builder: 字段帮助对话框({ 标题: this.title, 正文: this.help,
+        onDismiss: this.helpDialog.guard((): void => { this.helpDialog.close(); }) }),
+      openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation, customStyle: presentation.customStyle, autoCancel: presentation.autoCancel, alignment: presentation.alignment,
+      width: presentation.width, height: presentation.height, maskColor: presentation.maskColor
     });
-    this.helpDialog.open();
-  }
+  };
+  private openHelp(): void { this.helpDialog.open(this.createHelpDialog); }
   private syncValue(): void { this.displayValue = this.value; }
   private summary(): ResourceStr {
     const choice: DeckOptionChoice | undefined = this.choices.find((item: DeckOptionChoice): boolean =>
@@ -127,22 +136,28 @@ export struct DeckOptionField {
     return choice === undefined ? (this.displayValue === '' ? $r('app.string.deck_option_unset') : this.displayValue) : choice.label;
   }
 
-  private open(): void {
-    if (this.busy) return;
-    this.dialog = new CustomDialogController({
+  private readonly createDialog: NativeDialogFactory = (dismiss: NativeDialogDismiss): CustomDialogController => {
+    const presentation: NativeDialogPresentation = this.dialog.presentation();
+    const isCurrent: () => boolean = this.dialog.captureCurrent();
+    return new CustomDialogController({
+      onWillDismiss: dismiss,
       builder: DeckOptionEditor({ title: this.title, help: this.help, initialValue: this.displayValue,
+        onClose: this.dialog.guard((): void => { this.dialog.close(); }),
         multiline: this.multiline,
         defaultValue: this.defaultValue,
-        onHelp: (): void => { this.openHelp(); },
+        onHelp: this.dialog.guard((): void => { this.openHelp(); }),
         choices: this.choices, validate: (value: string): string => this.validate(value),
         onConfirm: (value: string): void => {
-          if (this.busy) return;
+          if (!isCurrent() || this.busy) return;
           this.onChange(value);
           this.displayValue = value;
         } }),
-      autoCancel: true, openAnimation: SurfaceTransition.dialogEnterAnimation(), closeAnimation: SurfaceTransition.dialogExitAnimation(), customStyle: true, alignment: DialogAlignment.Center
+      width: presentation.width, height: presentation.height, maskColor: presentation.maskColor,
+      autoCancel: presentation.autoCancel, openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation, customStyle: presentation.customStyle, alignment: presentation.alignment
     });
-    this.dialog.open();
+  };
+  private open(): void {
+    if (!this.busy) this.dialog.open(this.createDialog);
   }
 
   build() {

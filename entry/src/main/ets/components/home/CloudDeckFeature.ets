@@ -30,6 +30,7 @@ export struct CloudDeckFeature {
   private disposed: boolean = false;
   @State private 云端牌组加载中: boolean = false;
   @State @Watch('busyChanged') private 云端牌组忙碌: boolean = false;
+  @State private exitPending: boolean = false;
   @State private 云端牌组错误: string = '';
   @State private 云端牌组列表: 云端牌组目录项[] = [];
   @State private 云端牌组选中ID列表: string[] = [];
@@ -63,6 +64,7 @@ export struct CloudDeckFeature {
   }
 
   private async 加载云端牌组目录(): Promise<void> {
+    if (this.disposed || this.云端牌组忙碌 || this.exitPending) return;
     const version: number = ++this.cloudCatalogVersion;
     this.云端牌组加载中 = true;
     this.云端牌组错误 = '';
@@ -85,20 +87,22 @@ export struct CloudDeckFeature {
   }
 
   private async 完成云端牌组首次引导(): Promise<void> {
-    if (this.云端牌组忙碌) return;
+    if (this.disposed || this.云端牌组忙碌 || this.exitPending) return;
     if (this.云端牌组成功ID列表.length === 0) return;
-    const 已保存: boolean = await 标记已完成云端牌组引导();
-    if (this.disposed) return;
-    if (!已保存) {
-      this.显示提示($r('app.string.cloud_deck_save_failed'));
-      return;
-    }
-    this.onClose(!this.云端牌组从菜单打开);
-
+    this.exitPending = true;
+    try {
+      const 已保存: boolean = await 标记已完成云端牌组引导();
+      if (this.disposed) return;
+      if (!已保存) {
+        this.显示提示($r('app.string.cloud_deck_save_failed'));
+        return;
+      }
+      this.onClose(!this.云端牌组从菜单打开);
+    } finally { if (!this.disposed) this.exitPending = false; }
   }
 
   private 云端牌组弹窗按主按钮出口(): void {
-    if (this.云端牌组忙碌) {
+    if (this.disposed || this.云端牌组忙碌 || this.exitPending) {
       return;
     }
     if (!this.云端牌组从菜单打开 && this.云端牌组成功ID列表.length > 0) {
@@ -109,36 +113,37 @@ export struct CloudDeckFeature {
   }
 
   private async 跳过云端牌组引导(): Promise<void> {
-    if (this.disposed || this.云端牌组忙碌) return;
+    if (this.disposed || this.云端牌组忙碌 || this.exitPending) return;
     if (this.云端牌组从菜单打开) {
       this.onClose(!this.云端牌组从菜单打开);
 
       return;
     }
+    this.exitPending = true;
     try {
-      const result: promptAction.ShowDialogSuccessResponse =
-        await this.getUIContext().getPromptAction().showDialog({
-          title: this.取本地化文本($r('app.string.cloud_deck_skip_confirm_title')),
-          message: this.取本地化文本($r('app.string.cloud_deck_skip_confirm_message')),
-          buttons: [
-            { text: this.取本地化文本($r('app.string.cancel')), color: '#666666' },
-            { text: this.取本地化文本($r('app.string.cloud_deck_enter')), color: this.动作主色 }
-          ]
-        });
-      if (this.disposed || result.index !== 1) {
+      try {
+        const result: promptAction.ShowDialogSuccessResponse =
+          await this.getUIContext().getPromptAction().showDialog({
+            title: this.取本地化文本($r('app.string.cloud_deck_skip_confirm_title')),
+            message: this.取本地化文本($r('app.string.cloud_deck_skip_confirm_message')),
+            buttons: [
+              { text: this.取本地化文本($r('app.string.cancel')), color: '#666666' },
+              { text: this.取本地化文本($r('app.string.cloud_deck_enter')), color: this.动作主色 }
+            ]
+          });
+        if (this.disposed || this.云端牌组忙碌 || result.index !== 1) return;
+      } catch (error) {
+        // 弹窗失败不阻断：留在原弹窗上，用户可以重新点「稍后再说」。
         return;
       }
-    } catch (error) {
-      // 弹窗失败不阻断：留在原弹窗上，用户可以重新点「稍后再说」。
-      return;
-    }
-    const 已保存: boolean = await 标记已完成云端牌组引导();
-    if (this.disposed) return;
-    if (!已保存) {
-      this.显示提示($r('app.string.cloud_deck_save_failed'));
-      return;
-    }
-    this.onClose(true);
+      const 已保存: boolean = await 标记已完成云端牌组引导();
+      if (this.disposed) return;
+      if (!已保存) {
+        this.显示提示($r('app.string.cloud_deck_save_failed'));
+        return;
+      }
+      this.onClose(true);
+    } finally { if (!this.disposed) this.exitPending = false; }
   }
 
   private async 复制云端牌组QQ群号(): Promise<void> {
@@ -154,7 +159,7 @@ export struct CloudDeckFeature {
   }
 
   private 切换云端牌组选择(deckId: string): void {
-    if (this.云端牌组忙碌 || this.云端牌组成功ID列表.indexOf(deckId) >= 0) return;
+    if (this.disposed || this.exitPending || this.云端牌组忙碌 || this.云端牌组成功ID列表.indexOf(deckId) >= 0) return;
     const index: number = this.云端牌组选中ID列表.indexOf(deckId);
     if (index >= 0) {
       this.云端牌组选中ID列表 = this.云端牌组选中ID列表.filter(
@@ -169,7 +174,7 @@ export struct CloudDeckFeature {
   }
 
   private async 下载选中云端牌组(): Promise<void> {
-    if (this.云端牌组忙碌 || this.云端牌组选中ID列表.length === 0) return;
+    if (this.disposed || this.exitPending || this.云端牌组忙碌 || this.云端牌组选中ID列表.length === 0) return;
     if (this.云端牌组选中ID列表.length > 云端牌组最多选择数量) {
       this.显示提示($r('app.string.cloud_deck_selection_limit', 云端牌组最多选择数量));
       return;
@@ -243,7 +248,7 @@ export struct CloudDeckFeature {
       isDark: this.isDark,
       从菜单打开: this.云端牌组从菜单打开,
       loading: this.云端牌组加载中,
-      busy: this.云端牌组忙碌,
+      busy: this.云端牌组忙碌 || this.exitPending,
       errorMessage: this.云端牌组错误,
       decks: this.云端牌组列表,
       selectedIds: this.云端牌组选中ID列表,

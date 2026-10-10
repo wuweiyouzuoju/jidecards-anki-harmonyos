@@ -267,13 +267,13 @@ test('system Back reaches computing deck options while saving and other collecti
   const Home=compile(method('pages/首页.ets','  onBackPress(): boolean'));
   const Panel=compile(method('components/牌组选项面板.ets','  private handleBackRequest(): void'));
   for(const computing of [true,false]){
-    const home=new Home();Object.assign(home,{deckLevelMenuId:'',transfer:{phase:'idle',visible:false},deckOptionsBusy:true,
+    const home=new Home();Object.assign(home,{deckMenuId:'',transfer:{phase:'idle',visible:false},deckOptionsBusy:true,
       显示牌组选项:true,deckOptionsBackRequest:0,syncController:{cancel:()=>{}}});
     const panel=new Panel();Object.assign(panel,{busy:true,computing,showHelp:false,showAdvanced:false,
       onCancel:()=>{home.显示牌组选项=false;home.deckOptionsBusy=false;}});
     assert.equal(home.onBackPress(),true);assert.equal(home.deckOptionsBackRequest,1);
     panel.handleBackRequest();assert.equal(home.显示牌组选项,!computing);
   }
-  const home=new Home();Object.assign(home,{deckLevelMenuId:'',transfer:{phase:'saving'},显示牌组选项:true,deckOptionsBackRequest:0});
+  const home=new Home();Object.assign(home,{deckMenuId:'',transfer:{phase:'saving'},显示牌组选项:true,deckOptionsBackRequest:0});
   assert.equal(home.onBackPress(),true);assert.equal(home.deckOptionsBackRequest,0);
 });

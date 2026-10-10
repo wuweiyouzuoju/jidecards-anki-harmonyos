@@ -337,19 +337,21 @@ export struct 设置面板 {
     if (this.disposed || this.maintenance.clearingTags) {
       return;
     }
+    let settled: boolean = false;
     this.getUIContext().showAlertDialog({
       title: this.取本地化文本($r('app.string.settings_clear_unused_tags')),
       message: this.取本地化文本($r('app.string.settings_clear_unused_tags_confirm')),
       autoCancel: true,
+      cancel: (): void => { settled = true; },
       alignment: DialogAlignment.Center,
       primaryButton: {
         value: $r('app.string.cancel'),
-        action: (): void => {}
+        action: (): void => { settled = true; }
       },
       secondaryButton: {
         value: $r('app.string.settings_clear_unused_tags'),
         fontColor: $r('app.color.error_text'),
-        action: (): void => { this.执行清除未用标签(); }
+        action: (): void => { if (settled) return; settled = true; this.执行清除未用标签(); }
       }
     });
   }

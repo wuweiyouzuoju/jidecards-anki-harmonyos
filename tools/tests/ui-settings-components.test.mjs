@@ -6,6 +6,7 @@ import { SETTINGS_ENTRIES } from '../../entry/src/main/ets/model/SettingsNavigat
 import { SETTINGS_GROUPS } from '../../entry/src/main/ets/model/SettingsStructure.ts';
 import { settingsHeaderItems, browserBackItem } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
+import { DIALOG_ACTION_PRESENTATION } from '../../entry/src/main/ets/model/InteractionFeedback.ts';
 
 const root = new URL('../../entry/src/main/ets/', import.meta.url);
 const read = path => readFileSync(new URL(path, root), 'utf8');
@@ -62,7 +63,7 @@ test('direct navigation keeps simple strokes while menus retain theme fills', ()
 });
 
 test('direct navigation SVGs use unfilled round strokes with matching theme geometry', () => {
-  const names = new Set();
+  const names = new Set([DIALOG_ACTION_PRESENTATION.confirmIconKey]);
   for (const path of readdirSync(root, { recursive: true }).filter(path => path.endsWith('.ets'))) {
     const source = read(path);
     for (const call of source.matchAll(/IconActionButton\(\{[\s\S]*?\}\)/g)) {

@@ -55,7 +55,7 @@ test('locale invalidation is separate from resource formatting arguments', () =>
     getStringSync: (id, ...args) => { calls.push([id, ...args]); return 'formatted'; },
     getStringByNameSync: (name, ...args) => { calls.push([name, ...args]); return 'named'; }
   } }) };
-  assert.equal(uiFeedback.localizedResourceText(context, 'en', { id: 1, params: ['app.string.test', 42] }), 'formatted');
+  assert.equal(uiFeedback.localizedResourceText(context, 'en', { id: 1, params: [42] }), 'formatted');
   assert.equal(uiFeedback.localizedNamedResourceText(context, 'zh-Hans', 'test', 'Front', 2), 'named');
   assert.deepEqual(calls, [[1, 42], ['test', 'Front', 2]]);
 });

@@ -1,15 +1,12 @@
-import { SurfaceTransition } from '../utils/SurfaceTransition';
+import { DirectoryTree } from './common/DirectoryTree';
+import { DirectoryRow, DirectoryView, DirectoryChoice, directoryChoiceRows, directorySpecial } from '../model/DirectoryTree';
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { interfaceItemText } from '../utils/AppInterfaceText';
 import { appInterface } from '../backend/AppInterfaceService';
 import { FormInputStyle } from '../utils/FormInputStyle';
-import { PressFeedback } from '../utils/PressFeedback';
-import { DialogBackdrop } from './common/DialogBackdrop';
 import { resourceText } from '../utils/UiFeedback';
-import { ThemeTextSpans, themeTextKey } from './common/ThemeText';
-import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
+import { DialogFrame } from './common/DialogFrame';
 import { DialogHeader } from './common/DialogHeader';
 // ========================================================
 // @块ID UI-CREATE-DECK-001
@@ -48,7 +45,6 @@ import { 颜色键 } from '../model/颜色主题';
 @Component
 export struct 创建牌组面板 {
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
-  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
   @Prop @Watch('publishInterface') busy: boolean = false;
   @Prop errorMessage: string = '';
@@ -63,16 +59,16 @@ export struct 创建牌组面板 {
   @State @Watch('publishInterface') private parentId: string = '';
 
   @StorageProp(颜色键.动作主色) private 动作主色: string = '#2F5FD0';
-  @StorageProp(颜色键.动作主色按下) private 动作主色按下: string = '#1E4FB8';
-  // 2.1.4.1 对比度：按钮背景专用档（配 #FFFFFF 文字 ≥ 4.5:1）
-  @StorageProp(颜色键.主色按钮背景) private 主色按钮背景: string = '#2F5FD0';
-  @StorageProp(颜色键.主色按钮按下) private 主色按钮按下: string = '#1E4FB8';
-  @StorageProp(颜色键.选中背景) private 选中背景色: string = '#E8EEFC';
-  @State private 已按下确认: boolean = false;
 
   aboutToAppear(): void {
     this.parentId = this.initialParentId;
     this.publishInterface();
+  }
+
+  private parentRows(): DirectoryRow[] {
+    return [directorySpecial('', this.取本地化文本($r('app.string.top_level_deck')), this.parentId === '' ? 1 : 0)]
+      .concat(directoryChoiceRows(this.parentOptions.map((deck: 牌组汇总): DirectoryChoice =>
+        ({ id: deck.id, path: deck.fullName })), this.parentId));
   }
 
   private publishInterface(): void {
@@ -230,163 +226,80 @@ export struct 创建牌组面板 {
     }
   }
 
-  // ========================================================
-  // @块ID UI-CREATE-DECK-008
-  // @名称 父牌组候选行
-  //
-  // @作用
-  // 渲染单行父牌组选项：外层 padding 实现整张选择卡向右缩进
-  // （框开头短一截），内层承载边框/背景/文字。字号 12→14、字重
-  // Normal→Medium / Medium→Bold、padding 加大，整体更「粗」。
-  //
-  // @输入
-  // id: 父牌组 ID（空串表示顶级）
-  // label: 显示文本
-  // depth: 缩进层级
-  //
-  // @输出
-  // 渲染 Row 子树
-  //
-  // @副作用
-  // 点击时写 this.parentId。
-  // ========================================================
   @Builder
-  private 父牌组候选行(id: string, label: string, depth: number) {
-    Row() {
-      Row() {
-        Text() { ForEach([themeTextKey(label, (this.parentId === id) ? this.themeAccentColors : [], this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(label, (this.parentId === id) ? this.themeAccentColors : [], this.getUIContext()) }, (_textKey: string): string => _textKey) }
-          .fontSize(应用尺寸.字号_正文)
-          .fontColor(this.parentId === id ? this.动作主色 : $r('app.color.text_primary'))
-          .fontWeight(this.parentId === id ? FontWeight.Bold : FontWeight.Medium)
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .layoutWeight(1)
+  private headerContent() {
+    DialogHeader({
+      title: $r('app.string.create_deck_title'),
+      showActionLabel: this.busy, actionLabel: this.busy ? $r('app.string.create_deck_creating') : interfaceItemText(this.getUIContext(), 'create_deck', 'confirm', this.uiLanguage),
+      actionEnabled: this.canSubmit(),
+      closeLabel: interfaceItemText(this.getUIContext(), 'create_deck', 'cancel', this.uiLanguage),
+      closeEnabled: !this.busy,
+      onClose: () => {
+        this.onCancel();
+      },
+      onAction: () => {
+        this.提交();
       }
-      .width('100%')
-      .padding({
-        left: 应用尺寸.间距_14,
-        right: 应用尺寸.间距_14,
-        top: 应用尺寸.间距_12,
-        bottom: 应用尺寸.间距_12
+    })
+  }
+
+  @Builder
+  private formContent() {
+
+
+    // 牌组名称输入框上移到标题下方（先填名称 → 再选父牌组 → 看预览 → 提交）
+    TextInput({ placeholder: interfaceItemText(this.getUIContext(), 'create_deck', 'name', this.uiLanguage), text: this.deckName })
+      .attributeModifier(new FormInputStyle(应用尺寸.卡片内边距))
+      .enabled(!this.busy)
+      .onChange((value: string) => {
+        this.deckName = value;
       })
-      .backgroundColor(this.parentId === id ?
-        this.选中背景色 : $r('app.color.surface_page'))
-      .border({
-        width: 应用尺寸.卡片边框,
-        color: this.parentId === id ? this.动作主色 : Color.Transparent
+      .onSubmit((): void => {
+        this.提交();
       })
-      .borderRadius(应用尺寸.圆角_面板)
-      .attributeModifier(new PressFeedback())
-      .onClick(() => {
-        if (!this.busy) {
-          this.parentId = id;
-        }
-      })
+
+    if (this.预览父路径() !== '' && this.预览叶节点() !== '') {
+      Text(this.formatPreview($r('app.string.create_deck_preview_child'), this.预览父路径(), this.预览叶节点()))
+        .fontSize(应用尺寸.字号_正文_小)
+        .fontColor(this.动作主色)
+        .fontWeight(FontWeight.Medium)
+        .width('100%')
+        .maxLines(2)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+    } else if (this.预览父路径() !== '') {
+      Text(this.formatPreview($r('app.string.create_deck_preview_child_pending'), this.预览父路径()))
+        .fontSize(应用尺寸.字号_正文_小)
+        .fontColor(this.动作主色)
+        .fontWeight(FontWeight.Medium)
+        .width('100%')
+        .maxLines(2)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+    } else if (this.预览叶节点() !== '') {
+      Text(this.formatPreview($r('app.string.create_deck_preview_top'), this.预览叶节点()))
+        .fontSize(应用尺寸.字号_正文_小)
+        .fontColor(this.动作主色)
+        .fontWeight(FontWeight.Medium)
+        .width('100%')
+        .maxLines(2)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
     }
-    .width('100%')
-    .padding({ left: depth * 应用尺寸.父牌组候选项缩进 })
+
+    DirectoryTree({ rows: this.parentRows(), isInteractive: !this.busy,
+      onSelect: (id: string): void => { if (!this.busy) this.parentId = id; },
+      onViewChanged: (view: DirectoryView | null): void => { appInterface.observeDirectory('create_deck_parent', view); } })
+
+    if (this.errorMessage !== '') {
+      Text(this.errorMessage)
+        .fontSize(应用尺寸.字号_正文_小)
+        .fontColor($r('app.color.error_text'))
+        .width('100%')
+        .maxLines(3)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+    }
   }
 
   build() {
-    Stack() {
-      DialogBackdrop()
-        .onClick(() => {
-          if (!this.busy) {
-            this.onCancel();
-          }
-        })
-        .transition(SurfaceTransition.backdrop())
-
-      Column({ space: 应用尺寸.间距_16 }) {
-        // 标题行
-        DialogHeader({
-          title: $r('app.string.create_deck_title'),
-          actionLabel: this.busy ? $r('app.string.create_deck_creating') : interfaceItemText(this.getUIContext(), 'create_deck', 'confirm', this.uiLanguage),
-          actionEnabled: this.canSubmit(),
-          closeLabel: interfaceItemText(this.getUIContext(), 'create_deck', 'cancel', this.uiLanguage),
-          closeEnabled: !this.busy,
-          onClose: () => {
-            this.onCancel();
-          },
-          onAction: () => {
-            this.提交();
-          }
-        })
-
-        // 牌组名称输入框上移到标题下方（先填名称 → 再选父牌组 → 看预览 → 提交）
-        TextInput({ placeholder: interfaceItemText(this.getUIContext(), 'create_deck', 'name', this.uiLanguage), text: this.deckName })
-          .attributeModifier(new FormInputStyle(应用尺寸.卡片内边距))
-          .enabled(!this.busy)
-          .onChange((value: string) => {
-            this.deckName = value;
-          })
-          .onSubmit((): void => {
-            this.提交();
-          })
-
-        if (this.预览父路径() !== '' && this.预览叶节点() !== '') {
-          Text(this.formatPreview($r('app.string.create_deck_preview_child'), this.预览父路径(), this.预览叶节点()))
-            .fontSize(应用尺寸.字号_正文_小)
-            .fontColor(this.动作主色)
-            .fontWeight(FontWeight.Medium)
-            .width('100%')
-            .maxLines(2)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-        } else if (this.预览父路径() !== '') {
-          Text(this.formatPreview($r('app.string.create_deck_preview_child_pending'), this.预览父路径()))
-            .fontSize(应用尺寸.字号_正文_小)
-            .fontColor(this.动作主色)
-            .fontWeight(FontWeight.Medium)
-            .width('100%')
-            .maxLines(2)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-        } else if (this.预览叶节点() !== '') {
-          Text(this.formatPreview($r('app.string.create_deck_preview_top'), this.预览叶节点()))
-            .fontSize(应用尺寸.字号_正文_小)
-            .fontColor(this.动作主色)
-            .fontWeight(FontWeight.Medium)
-            .width('100%')
-            .maxLines(2)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-        }
-
-        // 父牌组列表：layoutWeight(1) 吃掉卡片撑高后的剩余空间，按钮自然贴底，无底部空白
-        Scroll() {
-          Column({ space: 应用尺寸.间距_5 }) {
-            this.父牌组候选行('', this.取本地化文本($r('app.string.top_level_deck')), 0)
-            ForEach(this.parentOptions, (父牌组: 牌组汇总) => {
-              this.父牌组候选行(父牌组.id, 父牌组.name, 父牌组.depth)
-            }, (父牌组: 牌组汇总): string => 父牌组.id)
-          }
-          .width('100%')
-        }
-        .width('100%')
-        .layoutWeight(1)
-        .scrollBar(BarState.Auto)
-        .edgeEffect(EdgeEffect.Spring)
-
-        if (this.errorMessage !== '') {
-          Text(this.errorMessage)
-            .fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.error_text'))
-            .width('100%')
-            .maxLines(3)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-        }
-
-      }
-      .width('88%')
-      .constraintSize({ maxWidth: 480, minHeight: '65%' })
-      .padding(应用尺寸.面板内边距)
-      .backgroundColor($r('app.color.surface_card'))
-      .borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
-      .onClick(() => {
-        // 阻断点击穿透到遮罩
-      })
-      // 居中浮卡：缩放+淡入过渡（思路参考：华为官方 TransitionEffect 示例）
-      .transition(SurfaceTransition.dialog())
-    }
-    .width('100%')
-    .height('100%')
+    DialogFrame({ canDismiss: !this.busy, onDismiss: this.onCancel,
+      header: () => { this.headerContent(); }, content: () => { this.formContent(); } })
   }
 }

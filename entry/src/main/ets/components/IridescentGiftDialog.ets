@@ -5,8 +5,9 @@ import { IridescentGiftPanel } from './IridescentGiftPanel';
 @CustomDialog
 export struct IridescentGiftDialog {
   controller?: CustomDialogController;
+  onClose: () => void = (): void => {};
 
   build() {
-    IridescentGiftPanel({ nativeHost: true, onClose: (): void => { this.controller?.close(); } })
+    IridescentGiftPanel({ nativeHost: true, onClose: (): void => { this.onClose(); } })
   }
 }

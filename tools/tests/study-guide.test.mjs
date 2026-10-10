@@ -9,6 +9,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import vm from 'node:vm';
 import test from 'node:test';
 import { surfaceMotionApi } from './motion-harness.mjs';
+import { nativeDialogHostClass, nativeDialogMembers } from './platform-module-harness.mjs';
 
 const read = path => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 const pageSource = read('entry/src/main/ets/pages/学习页.ets');
@@ -41,7 +42,7 @@ function pageHarness(completed = false, failOpen = false) {
   const dialogs = [];
   let saves = 0;
   const context = vm.createContext({ validateStudyControls,mappedStudyCommand,resolveStudyKey, resolveStudyGesture, StudyQuickAnswerMode, loadNoteEditor, studyKeyName: key => String(key), KeyType: { Down: 0 },
-    ...surfaceMotionApi(), Date: { now: () => now }, $r: key => key, isTapZonesGuideCompleted: () => false,
+    ...surfaceMotionApi(), NativeDialogHost: nativeDialogHostClass(surfaceMotionApi()), Date: { now: () => now }, $r: key => key, isTapZonesGuideCompleted: () => false,
     DialogAlignment: { Center: 0 },
     StudyGuideDialog: options => options,
     CustomDialogController: class {
@@ -60,7 +61,7 @@ function pageHarness(completed = false, failOpen = false) {
     assert.notEqual(start, -1);
     return pageSource.slice(start, pageSource.indexOf('\n  }', start) + 4);
   });
-  vm.runInContext(stripTypeScriptTypes(`globalThis.Harness = class { ${methods.join('\n')} }`), context);
+  vm.runInContext(stripTypeScriptTypes(`globalThis.Harness = class { ${nativeDialogMembers(pageSource)}\n${methods.join('\n')} }`), context);
   const page = new context.Harness();
   Object.assign(page, { controlsJson:JSON.stringify(defaultStudyControls()),quickAnswerMode: StudyQuickAnswerMode.Off, timeboxNotice: null, editor: { visible: false, busy: false },
     取文案: key => key,
@@ -189,7 +190,7 @@ test('card invalidation closes the guide without marking it read or resuming old
   page.showStudyGuide();
   page.invalidateCardWork();
   assert.equal(page.studyGuideVisible, false);
-  assert.equal(page.studyGuideDialog, null);
+  assert.equal(page.studyGuideDialog.current(), null);
   assert.equal(resumes, 0);
   dialogs[0].builder.onConfirm();
   dialogs[0].builder.onClose();
@@ -206,7 +207,7 @@ test('failed dialog opening releases the input guard and resumes study', () => {
   page.showStudyGuide();
   assert.equal(dialogs.length, 0);
   assert.equal(page.studyGuideVisible, false);
-  assert.equal(page.studyGuideDialog, null);
+  assert.equal(page.studyGuideDialog.current(), null);
   assert.equal(resumes, 1);
   assert.equal(saves(), 0);
 });
@@ -218,11 +219,11 @@ test('late callbacks from a closed guide cannot close or confirm a newly opened 
   page.showStudyGuide();
   dialogs[0].builder.onClose();
   page.showStudyGuide();
-  const currentDialog = page.studyGuideDialog;
+  const currentDialog = page.studyGuideDialog.current();
   dialogs[0].builder.onClose();
   dialogs[0].builder.onConfirm();
   assert.equal(page.studyGuideVisible, true);
-  assert.equal(page.studyGuideDialog, currentDialog);
+  assert.equal(page.studyGuideDialog.current(), currentDialog);
   assert.equal(saves(), 0);
   dialogs[1].builder.onConfirm();
   assert.equal(saves(), 1);

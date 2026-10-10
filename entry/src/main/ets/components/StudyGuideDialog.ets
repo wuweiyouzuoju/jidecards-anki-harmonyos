@@ -20,7 +20,6 @@ export struct StudyGuideDialog {
 
   private confirm(): void {
     this.onConfirm();
-    this.controller?.close();
     this.onClose();
   }
 

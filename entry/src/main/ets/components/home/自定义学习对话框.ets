@@ -19,7 +19,9 @@ import { 自定义学习默认值, 自定义学习标签 } from '../../proto/mes
 
 import { customStudyInitialValue, customStudyValueValid, isCustomStudyLimit } from '../../model/CustomStudyOptions';
 import { CustomStudyPreferences } from '../../backend/CustomStudyPreferences';
-import { SelectStyle } from '../../utils/SelectStyle';
+import { DirectoryTree } from '../common/DirectoryTree';
+import { DirectoryRow, DirectoryView, DirectoryChoice, directoryChoiceRows } from '../../model/DirectoryTree';
+import { appInterface } from '../../backend/AppInterfaceService';
 import { FormSelectRow } from '../common/FormSelectRow';
 
 interface 预设选项 {
@@ -36,7 +38,7 @@ export struct 自定义学习对话框 {
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
 
   private handleBackRequest(): void {
-    if (!(this.处理中)) this.onClose();
+    if (this.mounted && !this.处理中) this.onClose();
   }
 
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
@@ -171,7 +173,7 @@ export struct 自定义学习对话框 {
   }
 
   private 可提交(): boolean {
-    return !this.处理中 && !this.加载默认值中 && this.默认值 !== null &&
+    return this.mounted && !this.处理中 && !this.加载默认值中 && this.默认值 !== null &&
       customStudyValueValid(this.选中预设, this.输入值);
   }
 
@@ -184,6 +186,19 @@ export struct 自定义学习对话框 {
     this.excludedTags = this.excludedTags.filter(tag => tag !== name);
     if (index === 1) { this.includedTags = [...this.includedTags, name]; }
     if (index === 2) { this.excludedTags = [...this.excludedTags, name]; }
+  }
+
+  private tagRows(): DirectoryRow[] {
+    const rows: DirectoryRow[] = directoryChoiceRows((this.默认值?.tags ?? [])
+      .map((tag: 自定义学习标签): DirectoryChoice => ({ id: tag.name, path: tag.name })));
+    for (const row of rows) if (row.selectable) row.selection = this.tagSelection(row.id);
+    return rows;
+  }
+
+  private cycleTag(name: string): void {
+    if (!this.mounted || this.处理中 || this.加载默认值中 ||
+      !this.默认值?.tags.some((tag: 自定义学习标签): boolean => tag.name === name)) return;
+    this.setTagSelection(name, (this.tagSelection(name) + 1) % 3);
   }
 
   private availableCount(isNew: boolean): string {
@@ -226,15 +241,17 @@ export struct 自定义学习对话框 {
           message = $r('app.string.custom_study_preferences_error');
         }
       }
+      AppStorage.setOrCreate<number>('需要刷新主页', Date.now());
+      if (!this.mounted) return;
       showToastSafely(this.getUIContext(), {
         message: this.取本地化文本(message), duration: 3000
       });
       this.onSuccess();
       this.onClose();
     } catch (error) {
-      this.错误信息 = error instanceof Error ? error.message : `${error}`;
+      if (this.mounted) this.错误信息 = error instanceof Error ? error.message : `${error}`;
     } finally {
-      this.处理中 = false;
+      if (this.mounted) this.处理中 = false;
     }
   }
 
@@ -313,34 +330,10 @@ export struct 自定义学习对话框 {
           Text($r('app.string.custom_study_tags_hint'))
             .fontSize(应用尺寸.字号_正文_小)
             .fontColor($r('app.color.text_secondary'))
-          ForEach(this.默认值.tags, (tag: 自定义学习标签) => {
-            Row({ space: 应用尺寸.间距_8 }) {
-              Text(tag.name).layoutWeight(1).fontSize(应用尺寸.字号_正文_小)
-                .fontColor($r('app.color.text_primary'))
-              Select([
-                { value: this.取本地化文本($r('app.string.custom_study_tags_any')) },
-                { value: this.取本地化文本($r('app.string.custom_study_tags_include')) },
-                { value: this.取本地化文本($r('app.string.custom_study_tags_exclude')) }
-              ])
-                .width(SelectStyle.fieldWidth)
-                .constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
-                .selected(this.tagSelection(tag.name))
-                .value(this.取本地化文本(this.tagSelection(tag.name) === 1 ? $r('app.string.custom_study_tags_include') :
-                  (this.tagSelection(tag.name) === 2 ? $r('app.string.custom_study_tags_exclude') :
-                    $r('app.string.custom_study_tags_any'))))
-                .font(SelectStyle.controlFont)
-                .optionFont(SelectStyle.optionFont)
-                .selectedOptionFont(SelectStyle.selectedOptionFont)
-                .textModifier(SelectStyle.labelText())
-                .borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
-                .height(SelectStyle.controlHeight)
-                .padding(SelectStyle.controlPadding)
-                .space(SelectStyle.controlSpace)
-                .attributeModifier(new SelectStyle())
-                .enabled(!this.处理中)
-                .onSelect((index: number) => { this.setTagSelection(tag.name, index); })
-            }.width('100%')
-          }, (tag: 自定义学习标签): string => tag.name)
+          DirectoryTree({ rows: this.tagRows(), selectionMode: 'filter', revealSelection: false,
+            isInteractive: !this.处理中 && !this.加载默认值中,
+            onSelect: (name: string): void => { this.cycleTag(name); },
+            onViewChanged: (view: DirectoryView | null): void => { appInterface.observeDirectory('custom_study_tags', view); } })
         }
       }
     }.width('100%').alignItems(HorizontalAlign.Start)
@@ -349,15 +342,15 @@ export struct 自定义学习对话框 {
   build() {
     Stack() {
       DialogBackdrop()
-        .onClick(() => { if (!this.处理中) { this.onClose(); } })
+        .onClick(() => { this.handleBackRequest(); })
         .transition(SurfaceTransition.backdrop())
       Column({ space: 应用尺寸.间距_16 }) {
         DialogHeader({
           title: $r('app.string.custom_study_title'),
-          actionLabel: this.处理中 ? $r('app.string.custom_study_running') : $r('app.string.custom_study_confirm'),
+          showActionLabel: this.处理中, actionLabel: this.处理中 ? $r('app.string.custom_study_running') : $r('app.string.custom_study_confirm'),
           actionEnabled: this.可提交(),
           closeLabel: $r('app.string.custom_study_cancel'), closeEnabled: !this.处理中,
-          onClose: () => { this.onClose(); }, onAction: () => { this.执行提交(); }
+          onClose: () => { this.handleBackRequest(); }, onAction: () => { this.执行提交(); }
         })
         // 方式和设置共用一个按内容收缩的滚动区域，键盘/大字号下仍可操作。
         Scroll() {

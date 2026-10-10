@@ -62,8 +62,9 @@ test('duplicate redemption and verification failures never celebrate; storage fa
 
 test('busy dismissal is protected and a late accepted redemption cannot reopen a gift after leaving the page', async () => {
   let finish;
+  let persisted=false;
   const pending = new Promise(resolve => { finish = resolve; });
-  const { panel, applied } = panelHarness(() => pending);
+  const { panel, applied } = panelHarness(async () => { const result=await pending;persisted=true;return result; });
   const operation = panel.redeem();
   panel.closeRedemption();
   panel.useUnlockedTheme();
@@ -74,8 +75,9 @@ test('busy dismissal is protected and a late accepted redemption cannot reopen a
   finish('success');
   await operation;
   assert.equal(panel.showCelebration, false);
-  assert.equal(panel.unlocked, true, 'the accepted entitlement remains successful');
-  assert.equal(panel.busy, false);
+  assert.equal(persisted,true,'the accepted entitlement still persists outside the departed UI');
+  assert.equal(panel.unlocked,false,'late results cannot update a destroyed sheet');
+  assert.equal(panel.code,code);
 });
 
 function animationHarness() {

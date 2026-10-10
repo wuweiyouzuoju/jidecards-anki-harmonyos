@@ -1,3 +1,7 @@
+import { DirectorySelect } from './common/DirectorySelect';
+import { DirectoryRow, DirectoryView, DirectoryChoice, directoryChoiceRows } from '../model/DirectoryTree';
+import { appInterface } from '../backend/AppInterfaceService';
+import { NativeDialogHost, NativeDialogFactory, NativeDialogDismiss, NativeDialogPresentation } from './common/NativeDialogHost';
 import { SurfaceTransition } from '../utils/SurfaceTransition';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { SurfaceBorder } from '../utils/SurfaceBorder';
@@ -5,7 +9,6 @@ import { HelpLabel } from './common/HelpLabel';
 import { 字段帮助对话框 } from './字段帮助面板';
 import { DialogBackdrop } from './common/DialogBackdrop';
 import { resourceText } from '../utils/UiFeedback';
-import { SelectStyle } from '../utils/SelectStyle';
 import { FormSelectRow } from './common/FormSelectRow';
 import { ThemeTextSpans } from './common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
@@ -31,11 +34,6 @@ import { 颜色键 } from '../model/颜色主题';
 
 import type { 数据迁移模式, 导出牌组选项, 导出牌组意图, 导出个人数据意图, 导入牌组意图, 替换个人数据意图, 数据迁移意图 } from '../model/DataTransferIntent';
 export type { 数据迁移模式, 导出牌组选项, 导出牌组意图, 导出个人数据意图, 导入牌组意图, 替换个人数据意图, 数据迁移意图 } from '../model/DataTransferIntent';
-
-class 牌组选择项 {
-  value: string = '';
-}
-
 
 /** Presentation-only data management panel. File and backend work stay with its owner. */
 @Component
@@ -84,6 +82,7 @@ export struct 数据迁移面板 {
   onClose: () => void = (): void => {};
 
   aboutToAppear(): void {
+    this.legacyHelp.activate();
     this.loadImportOptions();
     this.模式 = this.initialMode;
     this.已选导出牌组Id = this.deckId;
@@ -113,12 +112,9 @@ export struct 数据迁移面板 {
     return '';
   }
 
-  private 牌组下拉选项(): 牌组选择项[] {
-    return this.deckOptions.map((牌组: 导出牌组选项): 牌组选择项 => {
-      const 选项 = new 牌组选择项();
-      选项.value = 牌组.name;
-      return 选项;
-    });
+  private deckRows(): DirectoryRow[] {
+    return directoryChoiceRows(this.deckOptions.map((deck: 导出牌组选项): DirectoryChoice =>
+      ({ id: String(deck.id), path: deck.name })), String(this.已选导出牌组Id));
   }
 
   // 官方 Select 文档：selected 仅控制菜单初始高亮，按钮文本需由 value 提供，否则框内空白。
@@ -187,21 +183,23 @@ export struct 数据迁移面板 {
     return this.忙碌文案();
   }
 
-  private legacyHelp: CustomDialogController | null = null;
+  private readonly legacyHelp: NativeDialogHost = new NativeDialogHost();
 
-  private createLegacyHelp(): void {
-    this.legacyHelp?.close();
-    this.legacyHelp = new CustomDialogController({
-      builder: 字段帮助对话框({ 标题: $r('app.string.transfer_legacy'), 正文: $r('app.string.transfer_legacy_help') }),
-      openAnimation: SurfaceTransition.dialogEnterAnimation(), closeAnimation: SurfaceTransition.dialogExitAnimation(), customStyle: true, autoCancel: true, alignment: DialogAlignment.Center,
-      width: '100%', height: '100%', maskColor: Color.Transparent
+  private readonly createLegacyHelp: NativeDialogFactory = (dismiss: NativeDialogDismiss): CustomDialogController => {
+    const presentation: NativeDialogPresentation = this.legacyHelp.presentation();
+    return new CustomDialogController({
+      onWillDismiss: dismiss,
+      builder: 字段帮助对话框({ 标题: $r('app.string.transfer_legacy'), 正文: $r('app.string.transfer_legacy_help'),
+        onDismiss: this.legacyHelp.guard((): void => { this.legacyHelp.close(); }) }),
+      openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation, customStyle: presentation.customStyle, autoCancel: presentation.autoCancel, alignment: presentation.alignment,
+      width: presentation.width, height: presentation.height, maskColor: presentation.maskColor
     });
-  }
+  };
 
-  aboutToDisappear(): void { this.legacyHelp?.close(); }
+  aboutToDisappear(): void { this.legacyHelp.dispose(); }
 
   private 打开旧版帮助(): void {
-    if (!this.busy) { this.createLegacyHelp(); this.legacyHelp?.open(); }
+    if (!this.busy) { this.legacyHelp.open(this.createLegacyHelp); }
   }
 
   private 可提交(): boolean {
@@ -340,30 +338,11 @@ export struct 数据迁移面板 {
 
       // === 牌组选择（仅 exportDeck 且允许选牌）===
       if (this.模式 === 'exportDeck' && this.allowDeckSelection) {
-        Row({ space: 应用尺寸.间距_12 }) {
-          Text(this.解析文本($r('app.string.transfer_label_deck')))
-            .fontSize(应用尺寸.字号_正文)
-            .fontColor($r('app.color.text_primary'))
-            .layoutWeight(1)
-          Select(this.牌组下拉选项())
-            .selected(this.已选牌组索引())
-            .value(this.已选牌组名称())
-            .width(SelectStyle.fieldWidth).constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
-            .enabled(!this.busy && this.deckOptions.length > 0)
-            .attributeModifier(new SelectStyle())
-            .height(SelectStyle.controlHeight)
-            .padding(SelectStyle.controlPadding)
-            .space(SelectStyle.controlSpace)
-            .font(SelectStyle.controlFont)
-            .optionFont(SelectStyle.optionFont)
-            .selectedOptionFont(SelectStyle.selectedOptionFont)
-            .textModifier(SelectStyle.labelText())
-            .borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
-            .onSelect((索引: number): void => {
-              this.已选导出牌组Id = this.deckOptions[索引].id;
-            })
-        }
-        .width('100%')
+        DirectorySelect({ label: $r('app.string.transfer_label_deck'), rows: this.deckRows(), value: this.已选牌组名称(),
+          isInteractive: !this.busy && this.deckOptions.length > 0,
+          onSelect: (id: string): void => {
+            if (!this.busy && this.deckOptions.some((deck: 导出牌组选项): boolean => String(deck.id) === id)) this.已选导出牌组Id = Number(id);
+          }, onViewChanged: (view: DirectoryView | null): void => { appInterface.observeDirectory('export_deck', view); } })
       }
 
       if (this.模式 === 'importDeck' && this.packagePresets !== null) {

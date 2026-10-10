@@ -1,3 +1,6 @@
+import { DirectorySelect } from '../common/DirectorySelect';
+import { DirectoryRow, DirectoryView, DirectoryChoice, directoryChoiceRows, directorySpecial } from '../../model/DirectoryTree';
+import { appInterface } from '../../backend/AppInterfaceService';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { CsvMetadata, emptyCsvMetadata } from '../../proto/messages/CsvImportMessages';
 import { CsvImportPreview, CsvNotetype, copyCsvMetadata } from '../../model/CsvImport';
@@ -31,8 +34,27 @@ export struct CsvImportOptions {
   private fields(): string[] {
     return this.preview.notetypes.find((n: CsvNotetype): boolean => n.id === this.draft.notetypeId)?.fields ?? [];
   }
-  private deckLabels(): string[] {
-    return [this.text($r('app.string.transfer_csv_file_deck'))].concat(this.decks.map((d: 导出牌组选项): string => d.name));
+  private deckRows(): DirectoryRow[] {
+    return [directorySpecial('file', this.text($r('app.string.transfer_csv_file_deck')), this.draft.deckColumn > 0 ||
+      !this.decks.some((deck: 导出牌组选项): boolean => deck.id === this.draft.deckId) ? 1 : 0)]
+      .concat(directoryChoiceRows(this.decks.map((deck: 导出牌组选项): DirectoryChoice =>
+        ({ id: String(deck.id), path: deck.name })), this.draft.deckColumn > 0 ? '' : String(this.draft.deckId)));
+  }
+  private deckValue(): string {
+    return this.draft.deckColumn > 0 ? this.text($r('app.string.transfer_csv_file_deck')) :
+      this.decks.find((deck: 导出牌组选项): boolean => deck.id === this.draft.deckId)?.name ?? this.text($r('app.string.transfer_csv_file_deck'));
+  }
+  private selectDeck(id: string): void {
+    if (!this.isInteractive) return;
+    if (id === 'file') {
+      this.draft.deckId = this.preview.metadata.deckId; this.draft.deckColumn = this.preview.metadata.deckColumn;
+      this.draft.deckName = this.preview.metadata.deckName;
+    } else {
+      const deck: 导出牌组选项 | undefined = this.decks.find((item: 导出牌组选项): boolean => String(item.id) === id);
+      if (deck === undefined) return;
+      this.draft.deckId = deck.id; this.draft.deckColumn = 0; this.draft.deckName = '';
+    }
+    this.changed();
   }
   private typeLabels(): string[] {
     return [this.text($r('app.string.transfer_csv_file_notetype'))].concat(this.preview.notetypes.map((n: CsvNotetype): string => n.name));
@@ -49,15 +71,9 @@ export struct CsvImportOptions {
           .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
       })
       Text($r('app.string.transfer_csv_utf8_hint')).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
-      ImportSelect({ label: this.text($r('app.string.transfer_label_deck')), labels: this.deckLabels(),
-        selectedIndex: this.decks.findIndex((d: 导出牌组选项): boolean => d.id === this.draft.deckId) + 1,
-        isInteractive: this.isInteractive, onSelect: (index: number): void => {
-          if (index === 0) {
-            this.draft.deckId = this.preview.metadata.deckId; this.draft.deckColumn = this.preview.metadata.deckColumn;
-            this.draft.deckName = this.preview.metadata.deckName;
-          } else { this.draft.deckId = this.decks[index - 1].id; this.draft.deckColumn = 0; this.draft.deckName = ''; }
-          this.changed();
-        } })
+      DirectorySelect({ label: $r('app.string.transfer_label_deck'), rows: this.deckRows(), value: this.deckValue(),
+        isInteractive: this.isInteractive, onSelect: (id: string): void => { this.selectDeck(id); },
+        onViewChanged: (view: DirectoryView | null): void => { appInterface.observeDirectory('csv_target_deck', view); } })
       ImportSelect({ label: this.text($r('app.string.transfer_csv_notetype')), labels: this.typeLabels(),
         selectedIndex: this.preview.notetypes.findIndex((n: CsvNotetype): boolean => n.id === this.draft.notetypeId) + 1,
         isInteractive: this.isInteractive, onSelect: (index: number): void => {

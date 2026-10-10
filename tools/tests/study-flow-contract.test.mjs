@@ -116,7 +116,7 @@ test('study keeps default cards opaque without replacing template backgrounds wh
     answerNodes: [{ text: 'back', replacement: null }],
     css: 'body { background: white; }', latexSvg: false, isEmpty: false
   }, 'question', false, '#E8EEFC');
-  assert.match(html, /html \{ background: #E8EEFC; \}/);
+  assert.match(html, /html\s*\{[^}]*\bbackground: #E8EEFC;/);
   assert.ok(html.indexOf('background: #E8EEFC;') < html.indexOf('body { background: white; }'),
     'template foreground/background pairs must override the application defaults together');
   assert.doesNotMatch(html, /background: #E8EEFC !important/);

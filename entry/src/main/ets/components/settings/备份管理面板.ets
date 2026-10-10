@@ -24,7 +24,7 @@ export struct 备份管理面板 {
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
 
   private handleBackRequest(): void {
-    if (!this.busy) this.onClose();
+    if (this.visible && !this.busy) this.onClose();
   }
 
   @Prop isDark: boolean = false;
@@ -40,6 +40,7 @@ export struct 备份管理面板 {
   @State private statusMessage: string = '';
   private backend: LocalBackups | null = null;
   private visible: boolean = false;
+  private confirmingRestore: boolean = false;
 
   aboutToAppear(): void {
     this.visible = true;
@@ -54,71 +55,92 @@ export struct 备份管理面板 {
 
   private async loadState(context: common.UIAbilityContext): Promise<void> {
     try {
-      this.automaticEnabled = await loadAutomaticBackup(context);
-      if (this.backend !== null) this.backups = await this.backend.list();
+      const automatic: boolean = await loadAutomaticBackup(context);
+      if (!this.visible) return;
+      this.automaticEnabled = automatic;
+      if (this.backend !== null) {
+        const backups: string[] = await this.backend.list();
+        if (!this.visible) return;
+        this.backups = backups;
+      }
       if (this.backups.length > 0) this.selectedBackup = this.backups[0];
     } catch (error) {
-      this.errorMessage = error instanceof Error ? error.message : `${error}`;
+      if (this.visible) this.errorMessage = error instanceof Error ? error.message : `${error}`;
     } finally { this.publishInterface(); }
   }
 
   private async toggleAutomatic(value: boolean): Promise<void> {
+    if (!this.visible || this.busy) return;
     const context: common.UIAbilityContext | undefined = AppStorage.get<common.UIAbilityContext>('abilityContext');
     if (context === undefined) return;
     this.automaticEnabled = value;
     try { await saveAutomaticBackup(context, value); }
-    catch (error) { this.automaticEnabled = !value; this.showError(error as Object); }
+    catch (error) { if (this.visible) this.automaticEnabled = !value; this.showError(error as Object); }
     finally { this.publishInterface(); }
   }
 
   private async createBackup(): Promise<void> {
-    if (this.busy || this.backend === null) return;
+    if (!this.visible || this.busy || this.backend === null) return;
     this.busy = true; this.errorMessage = ''; this.statusMessage = '';
     this.publishInterface();
     try {
       const created: boolean = await backupCoordinator.create(this.backend);
+      if (!this.visible) return;
       this.statusMessage = this.text(created ? $r('app.string.backup_management_created') :
         $r('app.string.backup_management_not_needed'));
-      this.backups = await this.backend.list();
+      const backups: string[] = await this.backend.list();
+      if (!this.visible) return;
+      this.backups = backups;
       if (this.backups.length > 0) this.selectedBackup = this.backups[0];
     } catch (error) { this.showError(error as Object); }
-    finally { this.busy = false; this.publishInterface(); }
+    finally { if (this.visible) this.busy = false; this.publishInterface(); }
   }
 
   private restoreBackup(): void {
-    if (this.busy || this.backend === null || this.selectedBackup === '') return;
+    if (!this.visible || this.busy || this.confirmingRestore || this.backend === null || this.selectedBackup === '') return;
     const name: string = this.selectedBackup;
+    this.confirmingRestore = true;
+    let settled: boolean = false;
+    const finish = (): boolean => {
+      if (settled) return false;
+      settled = true; this.confirmingRestore = false; return true;
+    };
+    try {
     this.getUIContext().showAlertDialog({
       title: $r('app.string.backup_management_restore_confirm_title'),
       message: resourceText(this.getUIContext(), $r('app.string.backup_management_restore_confirm'), name),
       autoCancel: false,
-      primaryButton: { value: $r('app.string.cancel'), action: (): void => {} },
+      cancel: (): void => { finish(); },
+      primaryButton: { value: $r('app.string.cancel'), action: (): void => { finish(); } },
       secondaryButton: {
         value: $r('app.string.backup_management_restore'),
-        action: (): void => { this.executeRestore(name); }
+        action: (): void => { if (finish()) this.executeRestore(name); }
       }
     });
+    } catch (error) { finish(); this.showError(error as Object); }
   }
 
   private async executeRestore(name: string): Promise<void> {
-    if (this.busy || this.backend === null) return;
+    if (!this.visible || this.busy || this.backend === null) return;
     this.busy = true; this.errorMessage = ''; this.statusMessage = '';
     this.publishInterface();
     try {
       await backupCoordinator.restore(this.backend, name, true);
+      if (!this.visible) return;
       this.statusMessage = resourceText(this.getUIContext(), $r('app.string.backup_management_restored'), name);
       if (this.visible) showToastSafely(this.getUIContext(), { message: this.statusMessage, duration: 3000 });
-      try { this.backups = await this.backend.list(); }
+      try { const backups: string[] = await this.backend.list(); if (this.visible) this.backups = backups; }
       catch (error) { this.showError(error as Object, true); }
     } catch (error) { this.showError(error as Object); }
-    finally { this.busy = false; this.publishInterface(); }
+    finally { if (this.visible) this.busy = false; this.publishInterface(); }
   }
 
   private showError(error: Object, restored: boolean = false): void {
     const reason: string = error instanceof Error ? error.message : `${error}`;
+    hilog.error(0x4342, '备份管理', '%{public}s', reason);
+    if (!this.visible) return;
     this.errorMessage = resourceText(this.getUIContext(),
       restored ? $r('app.string.backup_management_refresh_error') : $r('app.string.backup_management_error'), reason);
-    hilog.error(0x4342, '备份管理', '%{public}s', reason);
     if (this.visible) showToastSafely(this.getUIContext(), { message: this.errorMessage, duration: 5000 });
   }
 

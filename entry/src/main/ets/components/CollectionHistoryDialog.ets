@@ -23,14 +23,15 @@ export struct CollectionHistoryDialog {
       AppStorage.setOrCreate<number>('cardContentChangedTick', Date.now());
     });
   aboutToAppear(): void { this.session.load(); }
-  aboutToDisappear(): void { this.session.dispose(); appInterface.leave('collection_history'); }
-  private handleBack(): void { if (!this.state.busy) this.onClose(); }
+  aboutToDisappear(): void { this.session.dispose(); this.onBusy(false); appInterface.leave('collection_history'); }
+  private handleBack(): void { if (!this.state.applying) this.onClose(); }
   private publish(): void {
     appInterface.observe({ surface: 'collection_history', sectionId: '', selectedId: '', busy: this.state.busy,
       optionIds: [], optionLabels: [], controlsComplete: true,
       items: ['undo', 'redo', 'reload', 'close'].map((id: string): AppInterfaceControl => ({ id: id, title: '',
         titleKey: id === 'close' ? 'browser_detail_cancel' : id === 'reload' ? 'collection_history_reload' : 'collection_history_' + id,
-        enabled: !this.state.busy && (id === 'undo' ? !!this.state.status?.undo : id === 'redo' ? !!this.state.status?.redo : true), selected: false })),
+        enabled: id === 'close' ? !this.state.applying :
+          !this.state.busy && (id === 'undo' ? !!this.state.status?.undo : id === 'redo' ? !!this.state.status?.redo : true), selected: false })),
       values: [{ id: 'undo_operation', value: this.state.status?.undo ?? '' },
         { id: 'redo_operation', value: this.state.status?.redo ?? '' }, { id: 'has_error', value: String(this.state.error !== '') },
         { id: 'error_kind', value: this.state.error }, { id: 'error_detail', value: this.state.errorDetail }] });
@@ -38,7 +39,7 @@ export struct CollectionHistoryDialog {
   @Builder
   private header() {
     DialogHeader({ title: $r('app.string.collection_history_title'), closeLabel: $r('app.string.browser_detail_cancel'),
-      showAction: false, closeEnabled: !this.state.busy, onClose: (): void => { this.handleBack(); } })
+      showAction: false, closeEnabled: !this.state.applying, onClose: (): void => { this.handleBack(); } })
   }
   @Builder
   private content() {
@@ -61,7 +62,7 @@ export struct CollectionHistoryDialog {
       onAction: (): void => { this.session.load(); } })
   }
   build() {
-    DialogFrame({ maximumWidth: 应用尺寸.dialogCompactMaxWidth, canDismiss: !this.state.busy,
+    DialogFrame({ maximumWidth: 应用尺寸.dialogCompactMaxWidth, canDismiss: !this.state.applying,
       header: () => { this.header(); }, content: () => { this.content(); }, onDismiss: (): void => { this.handleBack(); } })
   }
 }

@@ -1,3 +1,4 @@
+import { NativeDialogHost, NativeDialogDismiss, NativeDialogPresentation } from '../components/common/NativeDialogHost';
 import { SurfaceTransition } from '../utils/SurfaceTransition';
 import { FEEDBACK_ACTIONS, resultUndoStatus } from '../model/InteractionFeedback';
 import { ChangingText } from '../components/common/ChangingText';
@@ -217,7 +218,7 @@ export struct 学习页 {
   private choiceAutoAdvanceTimer: number = -1;
   private choiceFeedbackDeadline: number = 0;
   private autoAdvanceSettingsOpen: boolean = false;
-  private autoAdvanceDialog: CustomDialogController | null = null;
+  private readonly autoAdvanceDialog: NativeDialogHost = new NativeDialogHost();
   private autoAdvanceDialogBack: () => void = (): void => {};
   @State @Watch('publishInterface') private studyMenuOpen: boolean = false;
   @State @Watch('publishInterface') private studyExpandedIds: string[] = ['marking', 'card_actions'];
@@ -232,7 +233,7 @@ export struct 学习页 {
   private 媒体目录: string = '';
   private studyGuideChecked: boolean = false;
   private studyGuideVisible: boolean = false;
-  private studyGuideDialog: CustomDialogController | null = null;
+  private readonly studyGuideDialog: NativeDialogHost = new NativeDialogHost();
   private studyGuideClose: () => void = (): void => {};
   private interactionVersion: number = 0;
   private tapZonesGuideChecked: boolean = false;
@@ -383,6 +384,7 @@ export struct 学习页 {
   @State private navigationOffset: number = 0;
 
   async aboutToAppear(): Promise<void> {
+    this.studyGuideDialog.activate(); this.autoAdvanceDialog.activate();
     // 与浏览、统计共用转场协议；背景由首页根层持续持有。
     CustomTransition.getInstance().注册NavParam('StudyPage',
       (isPush: boolean, isExit: boolean): void => {
@@ -433,6 +435,7 @@ export struct 学习页 {
 
   aboutToDisappear(): void {
     this.mounted = false;
+    this.studyGuideDialog.dispose(); this.autoAdvanceDialog.dispose();
     this.updateScreenAwake();
     appInterface.leave('study_whiteboard');
     appInterface.hidePage('study');
@@ -471,6 +474,20 @@ export struct 学习页 {
   }
 
   /** 等待可见页面和首张卡片，空牌组不消耗首次教学机会。 */
+  private readonly createStudyGuideDialog: (closeGuide: () => void, confirm: () => void, dismiss: NativeDialogDismiss) => CustomDialogController =
+    (closeGuide: () => void, confirm: () => void, dismiss: NativeDialogDismiss): CustomDialogController => {
+    const presentation: NativeDialogPresentation = this.studyGuideDialog.presentation();
+    return new CustomDialogController({
+        builder: StudyGuideDialog({
+          onClose: closeGuide,
+          onConfirm: confirm
+        }),
+        width: presentation.width, height: presentation.height, maskColor: presentation.maskColor,
+        autoCancel: presentation.autoCancel, openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation, customStyle: presentation.customStyle, alignment: presentation.alignment,
+        onWillDismiss: dismiss
+      });
+  };
+
   private maybeShowStudyGuide(): void {
     if (this.cardRenderPending || this.studyGuideChecked || !this.页面已显示 || !this.controllerReady || this.pendingHtml !== '' ||
       this.评分中 || this.阶段 !== 'question') {
@@ -508,7 +525,7 @@ export struct 学习页 {
         this.展示时刻毫秒 += Date.now() - openedAt;
       }
       this.studyGuideVisible = false;
-      this.studyGuideDialog = null;
+      this.studyGuideDialog.close();
       this.studyGuideClose = (): void => {};
       if (!this.isCurrentRequest(version)) return;
       this.maybeShowTapZonesGuide();
@@ -517,10 +534,8 @@ export struct 学习页 {
     };
     this.studyGuideClose = closeGuide;
     try {
-      this.studyGuideDialog = new CustomDialogController({
-        builder: StudyGuideDialog({
-          onClose: closeGuide,
-          onConfirm: (): void => {
+      this.studyGuideDialog.open((dismiss: NativeDialogDismiss): CustomDialogController =>
+        this.createStudyGuideDialog(closeGuide, (): void => {
             if (guideClosed || !this.studyGuideVisible || !this.isCurrentRequest(version)) return;
             closeGuide();
             completeStudyGuide().catch((error: Object): void => {
@@ -529,15 +544,7 @@ export struct 学习页 {
                 message: this.取文案($r('app.string.study_guide_save_failed'))
               });
             });
-          }
-        }),
-        autoCancel: false, openAnimation: SurfaceTransition.dialogEnterAnimation(), closeAnimation: SurfaceTransition.dialogExitAnimation(), customStyle: true, alignment: DialogAlignment.Center,
-        onWillDismiss: (action: DismissDialogAction): void => {
-          closeGuide();
-          action.dismiss();
-        }
-      });
-      this.studyGuideDialog.open();
+          }, dismiss), (): boolean => { closeGuide(); return true; });
     } catch (error) {
       closeGuide();
       hilog.warn(0x4342, '学习页', 'Study guide could not be opened');
@@ -721,9 +728,9 @@ export struct 学习页 {
     this.cardRenderPending = true;
     this.stopStudyTimers();
     this.requestVersion += 1;
-    this.studyGuideDialog?.close();
+    this.studyGuideDialog.close();
     if (this.studyGuideVisible) this.studyGuideClose();
-    this.autoAdvanceDialog?.close();
+    this.autoAdvanceDialog.close();
     this.flipPending = false;
     this.pendingHtml = '';
     this.有音频 = false;
@@ -908,6 +915,20 @@ export struct 学习页 {
     return this.choiceQuestion === null ? 0 : this.choiceQuestion.feedbackSeconds;
   }
 
+  private readonly createAutoAdvanceDialog: (draft: StudyAutoAdvanceDraft, choice: boolean, confirm: (result: StudyAutoAdvanceDraft) => void, finish: () => void, dismiss: NativeDialogDismiss) => CustomDialogController =
+    (draft: StudyAutoAdvanceDraft, choice: boolean, confirm: (result: StudyAutoAdvanceDraft) => void, finish: () => void, dismiss: NativeDialogDismiss): CustomDialogController => {
+    const presentation: NativeDialogPresentation = this.autoAdvanceDialog.presentation();
+    return new CustomDialogController({
+        builder: StudyAutoAdvanceDialog({ draft: draft, choice: choice,
+          registerBack: (back: () => void): void => { this.autoAdvanceDialogBack = back; },
+          onConfirm: confirm,
+          onClose: finish }),
+        width: presentation.width, height: presentation.height, maskColor: presentation.maskColor,
+        autoCancel: presentation.autoCancel, openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation, customStyle: presentation.customStyle, alignment: presentation.alignment,
+        onWillDismiss: dismiss
+      });
+  };
+
   private configureAutoAdvance(): void {
     if (this.autoAdvanceSettingsOpen || this.评分中 || this.当前卡片 === null ||
       (this.阶段 !== 'question' && this.阶段 !== 'answer')) return;
@@ -916,15 +937,17 @@ export struct 学习页 {
     const openedAt: number = Date.now();
     const initialFeedbackSeconds: number = this.choiceAutoAdvanceSeconds();
     let feedbackTimeChanged: boolean = false;
+    let closed: boolean = false;
     const draft: StudyAutoAdvanceDraft = new StudyAutoAdvanceDraft(
       this.autoAdvanceSettings.resolve(this.studyOptions), this.autoAdvanceEnabled, initialFeedbackSeconds);
     this.autoAdvanceSettingsOpen = true;
     this.stopStudyTimers();
     this.clearChoiceAutoAdvance();
     const finish: () => void = (): void => {
-      if (!this.autoAdvanceSettingsOpen) return;
+      if (closed || !this.autoAdvanceSettingsOpen) return;
+      closed = true;
       this.autoAdvanceSettingsOpen = false;
-      this.autoAdvanceDialog = null;
+      this.autoAdvanceDialog.close();
       this.autoAdvanceDialogBack = (): void => {};
       if (!this.isCurrentRequest(version)) return;
       if (choice && this.choiceFeedbackDeadline > 0) {
@@ -935,11 +958,9 @@ export struct 学习页 {
       this.scheduleChoiceAutoAdvance();
     };
     try {
-      this.autoAdvanceDialog = new CustomDialogController({
-        builder: StudyAutoAdvanceDialog({ draft: draft, choice: choice,
-          registerBack: (back: () => void): void => { this.autoAdvanceDialogBack = back; },
-          onConfirm: (result: StudyAutoAdvanceDraft): void => {
-            if (!this.isCurrentRequest(version)) return;
+      this.autoAdvanceDialog.open((dismiss: NativeDialogDismiss): CustomDialogController =>
+        this.createAutoAdvanceDialog(draft, choice, (result: StudyAutoAdvanceDraft): void => {
+            if (closed || !this.isCurrentRequest(version)) return;
             if (choice) {
               feedbackTimeChanged = result.feedbackSeconds !== initialFeedbackSeconds;
               this.choiceFeedbackSecondsOverride = result.feedbackSeconds;
@@ -951,12 +972,7 @@ export struct 学习页 {
               this.autoAdvanceEnabled = result.enabled && result.canEnable();
             }
             this.studyTimer.restartAdvance();
-          },
-          onClose: finish }),
-        autoCancel: false, openAnimation: SurfaceTransition.dialogEnterAnimation(), closeAnimation: SurfaceTransition.dialogExitAnimation(), customStyle: true, alignment: DialogAlignment.Center,
-        onWillDismiss: (_action: DismissDialogAction): void => { this.autoAdvanceDialogBack(); }
-      });
-      this.autoAdvanceDialog.open();
+          }, finish, dismiss), (): boolean => { this.autoAdvanceDialogBack(); return false; });
     } catch (error) {
       console.error(`Auto advance dialog failed: ${error}`);
       finish();

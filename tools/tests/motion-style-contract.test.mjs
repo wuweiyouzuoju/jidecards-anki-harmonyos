@@ -34,12 +34,12 @@ test('small anchored menus share the restrained 150ms transition', () => {
     assert.equal(anchored.exit.combined, undefined, 'closing does not scale or move the anchor');
   }
   assert.match(read('entry/src/main/ets/components/common/AnchoredMenu.ets'),
-    /\.transition\(MenuSurface\.popupTransition\(this\.alignEnd \? '100%' : '0%', '0%'\)\)/);
+    /\.transition\(MenuSurface\.popupTransition\(this\.bubble === undefined \? this\.alignEnd \? '100%' : '0%' :/);
   const cardMenu = read('entry/src/main/ets/components/common/CardActionMenu.ets');
   assert.doesNotMatch(cardMenu, /animateTo\(|TransitionEffect\.opacity/,
     'branch/state changes must not animate measured geometry or replay individual row entrances');
-  assert.match(cardMenu, /\.transition\(MenuSurface\.popupTransition\('100%', this\.placements\(\)\[groupIndex\]\.pointerCenter\)\)/);
-  assert.match(cardMenu, /\.transition\(MenuSurface\.popupTransition\('100%', '0%'\)\)/);
+  assert.match(cardMenu, /\.transition\(MenuSurface\.popupTransition\(this\.groupsOnRight\(\) \? '0%' : '100%', this\.placements\(\)\[groupIndex\]\.pointerCenter\)\)/);
+  assert.match(read('entry/src/main/ets/components/common/MenuBubbleSurface.ets'), /actionMenuBubbleOutline\(/);
   for (const path of ['entry/src/main/ets/components/牌组列表项.ets',
     'entry/src/main/ets/components/home/HomeSummaryHeader.ets', 'entry/src/main/ets/components/牌组详情面板.ets', 'entry/src/main/ets/components/home/HomeDeckDetails.ets']) {
     const source = read(path);
@@ -56,7 +56,7 @@ test('small anchored menus share the restrained 150ms transition', () => {
   ]) {
     const source = read(path);
     assert.doesNotMatch(source, /取全屏转场时长|取全屏转场曲线/, path);
-    assert.match(source, /AnchoredMenu\(\{/, path);
+    assert.match(source, /(?:AnchoredMenu|CardActionMenu)\(\{/, path);
   }
 });
 

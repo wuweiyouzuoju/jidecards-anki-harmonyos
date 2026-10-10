@@ -1,3 +1,4 @@
+import { NativeDialogHost, NativeDialogFactory, NativeDialogDismiss, NativeDialogPresentation } from '../common/NativeDialogHost';
 import { SurfaceTransition } from '../../utils/SurfaceTransition';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { settingsItemText } from '../../utils/SettingsStructureText';
@@ -31,23 +32,28 @@ export struct AboutSettings {
   private readonly QQ群号: string = OFFICIAL_QQ_GROUP;
   // 本应用 bundleName，用于拼接应用市场 DeepLink 跳转本应用详情页（好评回退路径）
   private readonly 本应用包名: string = 'com.jide.kapian';
-  private feedbackDialog: CustomDialogController | null = null;
+  private readonly feedbackDialog: NativeDialogHost = new NativeDialogHost();
 
-  private createFeedbackDialog(): void {
-    this.feedbackDialog?.close();
-    this.feedbackDialog = new CustomDialogController({
+  private readonly createFeedbackDialog: NativeDialogFactory = (dismiss: NativeDialogDismiss): CustomDialogController => {
+    const presentation: NativeDialogPresentation = this.feedbackDialog.presentation();
+    return new CustomDialogController({
+      onWillDismiss: dismiss,
       builder: AboutActionDialog({
+        onClose: this.feedbackDialog.guard((): void => { this.feedbackDialog.close(); }),
         groupNumber: this.QQ群号,
         onCopyGroup: (): void => { this.复制QQ群号到剪贴板(); }
       }),
-      autoCancel: true,
-      alignment: DialogAlignment.Center,
-      openAnimation: SurfaceTransition.dialogEnterAnimation(), closeAnimation: SurfaceTransition.dialogExitAnimation(), customStyle: true
+      width: presentation.width, height: presentation.height, maskColor: presentation.maskColor,
+      autoCancel: presentation.autoCancel,
+      alignment: presentation.alignment,
+      openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation, customStyle: presentation.customStyle
     });
-  }
+  };
+
+  aboutToAppear(): void { this.feedbackDialog.activate(); }
 
   aboutToDisappear(): void {
-    this.feedbackDialog?.close();
+    this.feedbackDialog.dispose();
   }
   private 解析主色(): string {
     return this.动作主色链接 !== '' ? this.动作主色链接 : 设置面板色板_取(this.是否深色).主色;
@@ -156,7 +162,7 @@ export struct AboutSettings {
       }.width('100%').alignItems(HorizontalAlign.Start).padding({ bottom: 12 })
       Divider().color(设置面板色板_取(this.是否深色).分隔线).strokeWidth(1)
       SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'feedback', this.uiLanguage), icon: settingsIcon('feedback'),
-        onAction: (): void => { this.createFeedbackDialog(); this.feedbackDialog?.open(); } })
+        onAction: (): void => { this.feedbackDialog.open(this.createFeedbackDialog); } })
       Divider().color(设置面板色板_取(this.是否深色).分隔线).strokeWidth(1)
       SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'rate', this.uiLanguage),
         hint: $r('app.string.about_rate_summary'), icon: settingsIcon('rate'),

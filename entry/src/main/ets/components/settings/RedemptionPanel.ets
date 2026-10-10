@@ -1,3 +1,4 @@
+import { NativeDialogHost, NativeDialogFactory, NativeDialogDismiss, NativeDialogPresentation } from '../common/NativeDialogHost';
 import { SurfaceTransition } from '../../utils/SurfaceTransition';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { settingsItemText } from '../../utils/SettingsStructureText';
@@ -28,22 +29,24 @@ export struct RedemptionPanel {
   onUseTheme: (theme: 颜色主题) => void = (): void => {};
   @State private fingerprint: string = '';
   @State private expanded: boolean = false;
-  private contentHelp: CustomDialogController | null = null;
+  private readonly contentHelp: NativeDialogHost = new NativeDialogHost();
 
-  private createContentHelp(): void {
-    this.contentHelp?.close();
-    this.contentHelp = new CustomDialogController({
+  private readonly createContentHelp: NativeDialogFactory = (dismiss: NativeDialogDismiss): CustomDialogController => {
+    const presentation: NativeDialogPresentation = this.contentHelp.presentation();
+    return new CustomDialogController({
+      onWillDismiss: dismiss,
       builder: 字段帮助对话框({ 标题: $r('app.string.redemption_contents_title'),
+        onDismiss: this.contentHelp.guard((): void => { this.contentHelp.close(); }),
         内容: (): void => { this.contentInfo(); } }),
-      openAnimation: SurfaceTransition.dialogEnterAnimation(), closeAnimation: SurfaceTransition.dialogExitAnimation(), customStyle: true, autoCancel: true, alignment: DialogAlignment.Center,
-      width: '100%', height: '100%', maskColor: Color.Transparent
+      openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation, customStyle: presentation.customStyle, autoCancel: presentation.autoCancel, alignment: presentation.alignment,
+      width: presentation.width, height: presentation.height, maskColor: presentation.maskColor
     });
-  }
+  };
 
   aboutToDisappear(): void {
     this.active = false;
     this.showCelebration = false;
-    this.contentHelp?.close();
+    this.contentHelp.dispose();
   }
   @State private code: string = '';
   @State private busy: boolean = false;
@@ -55,7 +58,7 @@ export struct RedemptionPanel {
   private active: boolean = false;
   @StorageProp(颜色键.动作主色) private primary: string = '#2F5FD0';
 
-  aboutToAppear(): void { this.active = true; this.loadFingerprint(); }
+  aboutToAppear(): void { this.contentHelp.activate(); this.active = true; this.loadFingerprint(); }
 
   private async loadFingerprint(): Promise<void> {
     this.loadFailed = false;
@@ -131,7 +134,7 @@ export struct RedemptionPanel {
   }
 
   private async redeem(): Promise<void> {
-    if (this.busy || this.code.trim() === '') return;
+    if (!this.active || this.busy || this.code.trim() === '') return;
     this.busy = true;
     this.message = '';
     this.unlocked = false;
@@ -140,6 +143,7 @@ export struct RedemptionPanel {
       const parsed = parseRedemption(this.code);
       const theme = parsed === null ? undefined : themeForContent(parsed.contentId);
       const result: RedemptionResult = await redeemContent(this.code);
+      if (!this.active) return;
       if (theme !== undefined) this.unlockedTheme = theme.id;
       this.unlocked = result === 'success' || result === 'already';
       if (result === 'success') {
@@ -150,8 +154,8 @@ export struct RedemptionPanel {
       else if (result === 'unsupported') this.message = $r('app.string.redemption_unsupported');
       else this.message = $r('app.string.redemption_invalid');
       if (this.unlocked) this.code = '';
-    } catch (error) { this.message = $r('app.string.redemption_storage_failed'); }
-    finally { this.busy = false; }
+    } catch (error) { if (this.active) this.message = $r('app.string.redemption_storage_failed'); }
+    finally { if (this.active) this.busy = false; }
   }
 
   /** 固定四组一行，窄屏也不会留下孤立的尾码。 */
@@ -216,7 +220,7 @@ export struct RedemptionPanel {
       }.width('100%').padding(12).border(SurfaceBorder.options()).borderRadius(12).backgroundColor($r('app.color.surface_page'))
       HelpLabel({ title: $r('app.string.redemption_fingerprint_hint'), textSize: 12,
         textColor: $r('app.color.text_secondary'),
-        onHelp: (): void => { this.createContentHelp(); this.contentHelp?.open(); }
+        onHelp: (): void => { this.contentHelp.open(this.createContentHelp); }
       }).width('100%')
       if (this.loadFailed) {
         Button($r('app.string.redemption_retry'))

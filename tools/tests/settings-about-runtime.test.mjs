@@ -12,8 +12,8 @@ test('About owns its dialogs, delegates rating and retains external-link clipboa
   const about=Object.assign(new About(),{getUIContext:()=>({getHostContext:()=>context}),本应用包名:'com.jide.kapian',
     AnkiWeb网址:'https://ankiweb.net/shared/decks',Anki文档网址:'https://docs.ankiweb.net',
     链接服务实例:{获取帮助页链接:async()=>{throw Error('offline');}},
-    复制AnkiWeb网址到剪贴板:()=>events.push('copy decks'),复制Anki文档网址到剪贴板:url=>events.push(['copy docs',url]),
-    feedbackDialog:{close:()=>events.push('feedback closed')}});
+    复制AnkiWeb网址到剪贴板:()=>events.push('copy decks'),复制Anki文档网址到剪贴板:url=>events.push(['copy docs',url])});
+  about.feedbackDialog.open(() => ({open() {},close:()=>events.push('feedback closed')}));
   about.打开好评弹窗();about.打开AnkiWeb网址();await about.打开Anki官方文档();await settle();about.aboutToDisappear();
   assert.deepEqual(events,['com.jide.kapian','https://ankiweb.net/shared/decks','copy decks','https://docs.ankiweb.net',
     ['copy docs','https://docs.ankiweb.net'],'feedback closed']);

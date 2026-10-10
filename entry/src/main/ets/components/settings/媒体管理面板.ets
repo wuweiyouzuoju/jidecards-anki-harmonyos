@@ -50,7 +50,7 @@ export struct 媒体管理面板 {
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
 
   private handleBackRequest(): void {
-    if (!(this.检查中 || this.处理中)) this.onClose();
+    if (this.visible && !(this.检查中 || this.处理中)) this.onClose();
   }
 
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
@@ -151,11 +151,20 @@ export struct 媒体管理面板 {
   }
   private confirmTagMissing(): void {
     if (!this.visible || this.处理中 || !this.已检查 || this.missingNoteCount === 0) return;
+    const revision: number = this.reportRevision;
+    let settled: boolean = false;
     this.getUIContext().showAlertDialog({ title: this.取本地化文本($r('app.string.media_tag_missing')),
       message: this.取本地化文本($r('app.string.media_tag_missing_confirm')), autoCancel: true,
-      primaryButton: { value: this.取本地化文本($r('app.string.cancel')), action: (): void => {} },
+      cancel: (): void => { settled = true; },
+      primaryButton: { value: this.取本地化文本($r('app.string.cancel')), action: (): void => { settled = true; } },
       secondaryButton: { value: this.取本地化文本($r('app.string.browser_detail_confirm')),
-        action: (): void => { this.maintenance.tagMissing(); } } });
+        action: (): void => {
+          if (settled) return;
+          settled = true;
+          if (this.visible && !this.检查中 && !this.处理中 && this.已检查 && revision === this.reportRevision) {
+            this.maintenance.tagMissing();
+          }
+        } } });
   }
 
   private async 执行检查媒体(): Promise<void> {
@@ -167,22 +176,31 @@ export struct 媒体管理面板 {
   }
 
   private 确认清空回收站(): void {
-    if (this.检查中 || this.处理中 || !this.回收站有内容) {
+    if (!this.visible || this.检查中 || this.处理中 || !this.回收站有内容) {
       return;
     }
+    const revision: number = this.reportRevision;
+    let settled: boolean = false;
     this.getUIContext().showAlertDialog({
       title: this.取本地化文本($r('app.string.media_empty_trash')),
       message: this.取本地化文本($r('app.string.media_confirm_empty_trash')),
       autoCancel: true,
+      cancel: (): void => { settled = true; },
       alignment: DialogAlignment.Center,
       primaryButton: {
         value: this.取本地化文本($r('app.string.cancel')),
-        action: (): void => {}
+        action: (): void => { settled = true; }
       },
       secondaryButton: {
         value: this.取本地化文本($r('app.string.media_empty_trash')),
         fontColor: $r('app.color.error_text'),
-        action: (): void => { this.执行清空回收站(); }
+        action: (): void => {
+          if (settled) return;
+          settled = true;
+          if (this.visible && !this.检查中 && !this.处理中 && this.回收站有内容 && revision === this.reportRevision) {
+            this.执行清空回收站();
+          }
+        }
       }
     });
   }
@@ -199,11 +217,7 @@ export struct 媒体管理面板 {
     Stack() {
       // 磨砂玻璃遮罩层
       DialogBackdrop()
-        .onClick(() => {
-          if (!this.检查中 && !this.处理中) {
-            this.onClose();
-          }
-        })
+        .onClick(() => { this.handleBackRequest(); })
         .transition(SurfaceTransition.backdrop())
 
       Column({ space: 应用尺寸.间距_16 }) {
@@ -214,7 +228,7 @@ export struct 媒体管理面板 {
           actionEnabled: !this.检查中 && !this.处理中,
           closeLabel: $r('app.string.close'),
           closeEnabled: !this.检查中 && !this.处理中,
-          onClose: () => { this.onClose(); },
+          onClose: () => { this.handleBackRequest(); },
           onAction: () => { this.执行检查媒体(); }
         })
 

@@ -1,12 +1,10 @@
-import { SurfaceTransition } from '../utils/SurfaceTransition';
+import { LengthMetrics } from '@kit.ArkUI';
+import { 按下态按钮 } from './common/按下态按钮';
+import { DialogFrame } from './common/DialogFrame';
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { PressFeedback } from '../utils/PressFeedback';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
-import { DialogBackdrop } from './common/DialogBackdrop';
 import { localizedNamedResourceText, resourceText, namedResourceText } from '../utils/UiFeedback';
 import { SelectStyle } from '../utils/SelectStyle';
-import { ThemeTextSpans, themeTextKey } from './common/ThemeText';
-import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
 import { DialogHeader } from './common/DialogHeader';
 // ========================================================
@@ -48,7 +46,6 @@ import { interfaceControlText } from '../utils/AppInterfaceText';
 @Component
 export struct 提醒编辑面板 {
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
-  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
   @Prop @Watch('publishInterface') busy: boolean = false;
   @Prop @Watch('publishInterface') errorMessage: string = '';
@@ -73,19 +70,6 @@ export struct 提醒编辑面板 {
   @State @Watch('publishInterface') private 内容: string = '';
 
   @StorageProp(颜色键.主色按钮背景) private 主色按钮背景: string = '#2F5FD0';
-  @StorageProp(颜色键.主色按钮按下) private 主色按钮按下: string = '#1E4FB8';
-  @State private 已按下确认: boolean = false;
-
-  // 表单滚动区上限（vp）：屏高×88% 减去固定区（标题/错误/删除/按钮行/内边距，编辑模式最坏约 272vp）。
-  // 必须是数字——Scroll 用 constraintSize({ maxHeight: 数字 }) 才有"内容少随内容、超限封顶滚动"语义
-  // （华为官方 FAQ 弹窗动态高度方案）；百分比在高度自适应的父容器里解析不可靠，flexShrink/无约束
-  // 时 Scroll 测量倾向占满父容器给的最大空间，两种写法实测都会把弹窗撑满不自适应。
-  @State private 表单滚动上限: number = 400;
-
-  /** 全屏 Stack onAreaChange：按实际屏高（vp）重算表单滚动上限，横竖屏切换自动适配 */
-  private 重算表单滚动上限(屏高vp: number): void {
-    this.表单滚动上限 = Math.max(200, 屏高vp * 0.88 - 272);
-  }
 
   aboutToAppear(): void {
     this.小时 = this.初始小时;
@@ -156,209 +140,149 @@ export struct 提醒编辑面板 {
 
   /** 点标签把占位符追加到内容末尾，免手打花括号 */
   private 插入占位符(token资源: Resource): void {
+    if (this.busy || !this.interfaceMounted) return;
     this.内容 = this.内容 + this.取本地化文本(token资源);
   }
 
-  build() {
-    Stack() {
-      DialogBackdrop()
-        .onClick(() => {
-          if (!this.busy) {
-            this.onCancel();
-          }
-        })
-        .transition(SurfaceTransition.backdrop())
-
-      Column({ space: 应用尺寸.间距_16 }) {
-        DialogHeader({
-          title: localizedNamedResourceText(this.getUIContext(), this.uiLanguage, reminderEditorTitle(this.是否新建)),
-          actionLabel: this.interfaceLabel('confirm'),
-          actionEnabled: this.interfaceEnabled('confirm'),
-          closeLabel: this.interfaceLabel('cancel'),
-          closeEnabled: this.interfaceEnabled('cancel'),
-          onClose: () => {
-            this.onCancel();
-          },
-          onAction: () => {
-            this.onConfirm(this.小时, this.分钟, this.标题, this.内容);
-          }
-        })
-
-        // 表单主体：高度随内容自适应；超过上限（屏高 88% - 固定区）时封顶并在内部滚动。
-        // constraintSize 必须传数字（见字段声明处注释）。
-        Scroll() {
-          Column({ space: 应用尺寸.间距_16 }) {
-            Row({ space: 应用尺寸.间距_12 }) {
-              Text(this.interfaceLabel('time')).fontSize(应用尺寸.字号_正文)
-                .fontColor($r('app.color.text_primary')).layoutWeight(1)
-              Row() {
-              Select(this.小时选项())
-                .selected(this.小时)
-                .value(this.小时 < 10 ? `0${this.小时}` : `${this.小时}`)
-                .layoutWeight(1)
-                .enabled(!this.busy)
-                .attributeModifier(new SelectStyle())
-                .height(SelectStyle.controlHeight)
-                .padding(SelectStyle.controlPadding)
-                .space(SelectStyle.controlSpace)
-                .font(SelectStyle.controlFont)
-                .optionFont(SelectStyle.optionFont)
-                .selectedOptionFont(SelectStyle.selectedOptionFont)
-                .textModifier(SelectStyle.labelText())
-                .borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
-                .onSelect((index: number): void => {
-                  this.小时 = index;
-                })
-              Text($r('app.string.reminder_edit_time_colon'))
-                .fontSize(应用尺寸.字号_面板标题)
-                .fontColor($r('app.color.text_primary'))
-                .margin({ left: 应用尺寸.间距_8, right: 应用尺寸.间距_8 })
-              Select(this.分钟选项())
-                .selected(this.分钟)
-                .value(this.分钟 < 10 ? `0${this.分钟}` : `${this.分钟}`)
-                .layoutWeight(1)
-                .enabled(!this.busy)
-                .attributeModifier(new SelectStyle())
-                .height(SelectStyle.controlHeight)
-                .padding(SelectStyle.controlPadding)
-                .space(SelectStyle.controlSpace)
-                .font(SelectStyle.controlFont)
-                .optionFont(SelectStyle.optionFont)
-                .selectedOptionFont(SelectStyle.selectedOptionFont)
-                .textModifier(SelectStyle.labelText())
-                .borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
-                .onSelect((index: number): void => {
-                  this.分钟 = index;
-                })
-              }.width('56%').flexShrink(0).alignItems(VerticalAlign.Center)
-            }.width('100%').alignItems(VerticalAlign.Center)
-
-            Text(this.interfaceLabel('title'))
-              .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_secondary'))
-              .width('100%')
-
-            TextInput({ placeholder: $r('app.string.reminder_edit_title_placeholder'), text: this.标题 })
-              .width('100%')
-              .height(应用尺寸.按钮高度)
-              .fontSize(应用尺寸.字号_正文)
-              .fontColor($r('app.color.text_primary'))
-              .placeholderColor($r('app.color.text_tertiary'))
-              .backgroundColor($r('app.color.surface_page'))
-              .border(SurfaceBorder.options())
-              .borderRadius(应用尺寸.圆角_面板)
-              .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
-                .enabled(this.interfaceEnabled('title'))
-              .onChange((value: string) => {
-                this.标题 = value;
-              })
-
-            Text(this.interfaceLabel('content'))
-              .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_secondary'))
-              .width('100%')
-
-            TextArea({ placeholder: $r('app.string.reminder_edit_content_placeholder'), text: this.内容 })
-              .width('100%')
-              .height(80)
-              .fontSize(应用尺寸.字号_正文)
-              .fontColor($r('app.color.text_primary'))
-              .placeholderColor($r('app.color.text_tertiary'))
-              .backgroundColor($r('app.color.surface_page'))
-              .border(SurfaceBorder.options())
-              .borderRadius(应用尺寸.圆角_面板)
-              .padding(应用尺寸.间距_8)
-              .enabled(this.interfaceEnabled('content'))
-              .onChange((value: string) => {
-                this.内容 = value;
-              })
-
-            // 快捷插入标签：点一下把占位符追加到内容末尾
-            Row({ space: 应用尺寸.间距_8 }) {
-                Text() { ForEach([themeTextKey(this.interfaceLabel('insert_new'), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(this.interfaceLabel('insert_new'), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }
-                .fontSize(应用尺寸.字号_正文_小)
-                .fontColor(this.主色按钮背景)
-                .padding({ left: 应用尺寸.间距_12, right: 应用尺寸.间距_12, top: 6, bottom: 6 })
-                .border({ width: 1, color: this.主色按钮背景 })
-                .borderRadius(14)
-                .attributeModifier(new PressFeedback())
-                .onClick((): void => {
-                  this.插入占位符($r('app.string.reminder_edit_token_new'));
-                })
-                Text() { ForEach([themeTextKey(this.interfaceLabel('insert_review'), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(this.interfaceLabel('insert_review'), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }
-                .fontSize(应用尺寸.字号_正文_小)
-                .fontColor(this.主色按钮背景)
-                .padding({ left: 应用尺寸.间距_12, right: 应用尺寸.间距_12, top: 6, bottom: 6 })
-                .border({ width: 1, color: this.主色按钮背景 })
-                .borderRadius(14)
-                .attributeModifier(new PressFeedback())
-                .onClick((): void => {
-                  this.插入占位符($r('app.string.reminder_edit_token_review'));
-                })
-            }
-            .width('100%')
-
-            Text($r('app.string.reminder_edit_placeholder_hint'))
-              .fontSize(11)
-              .fontColor($r('app.color.text_tertiary'))
-              .width('100%')
-          }
-          .width('100%')
-        }
-        .width('100%')
-        .constraintSize({ maxHeight: this.表单滚动上限 })
-        .scrollBar(BarState.Auto)
-        .edgeEffect(EdgeEffect.Spring)
-
-        if (this.errorMessage !== '') {
-          Text(this.errorMessage)
-            .fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.error_text'))
-            .width('100%')
-            .maxLines(3)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-        }
-
-        if (!this.是否新建) {
-          Button(this.interfaceLabel('delete'))
-            .type(ButtonType.Normal)
-            .alignSelf(ItemAlign.End)
-            .height(应用尺寸.按钮高度)
-            .fontSize(应用尺寸.字号_按钮)
-            .fontColor($r('app.color.error_text'))
-            .backgroundColor(Color.Transparent)
-            .borderRadius(应用尺寸.圆角_胶囊)
-            .enabled(this.interfaceEnabled('delete'))
-            .attributeModifier(new PressFeedback())
-            .stateEffect(false)
-            .onClick(() => {
-              this.onDelete();
-            })
-        }
-
-      }
-      .width('88%')
-      // 高度完全自适应：Scroll 已按数字上限封顶（88% 屏高 - 固定区），卡片无需再设
-      // maxHeight 百分比（百分比约束在自适应父容器里解析不可靠，见字段声明处注释）
-      .constraintSize({ maxWidth: 480 })
-      .padding(应用尺寸.面板内边距)
-      .backgroundColor($r('app.color.surface_card'))
-      .borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
-      .onClick(() => {
-        // 阻断点击穿透到遮罩
-      })
-      .transition(SurfaceTransition.dialog())
-    }
-    .width('100%')
-    .height('100%')
-    .alignContent(Alignment.Center)
-    .onAreaChange((_旧区域: Area, 新区域: Area): void => {
-      // Area 尺寸单位为 vp，类型为 Length，按项目惯例转 number 后重算表单滚动上限
-      const 屏高vp: number = typeof 新区域.height === 'number'
-        ? 新区域.height : parseInt(新区域.height as string, 10);
-      if (!Number.isNaN(屏高vp)) {
-        this.重算表单滚动上限(屏高vp);
+  @Builder
+  private panelHeader() {
+    DialogHeader({
+      title: localizedNamedResourceText(this.getUIContext(), this.uiLanguage, reminderEditorTitle(this.是否新建)),
+      actionLabel: this.interfaceLabel('confirm'),
+      actionEnabled: this.interfaceEnabled('confirm'),
+      closeLabel: this.interfaceLabel('cancel'),
+      closeEnabled: this.interfaceEnabled('cancel'),
+      onClose: () => {
+        this.onCancel();
+      },
+      onAction: () => {
+        this.onConfirm(this.小时, this.分钟, this.标题, this.内容);
       }
     })
+  }
+
+  @Builder
+  private panelContent() {
+    Column({ space: 应用尺寸.间距_16 }) {
+      Column({ space: 应用尺寸.间距_8 }) {
+        Text(this.interfaceLabel('time')).fontSize(应用尺寸.字号_正文)
+          .fontColor($r('app.color.text_primary')).width('100%')
+        Row() {
+        Select(this.小时选项())
+          .selected(this.小时)
+          .value(this.小时 < 10 ? `0${this.小时}` : `${this.小时}`)
+          .layoutWeight(1)
+          .enabled(!this.busy)
+          .attributeModifier(new SelectStyle())
+          .height(SelectStyle.controlHeight)
+          .padding(SelectStyle.controlPadding)
+          .space(SelectStyle.controlSpace)
+          .font(SelectStyle.controlFont)
+          .optionFont(SelectStyle.optionFont)
+          .selectedOptionFont(SelectStyle.selectedOptionFont)
+          .textModifier(SelectStyle.labelText())
+          .border(SelectStyle.controlBorder).borderRadius(SelectStyle.controlRadius)
+          .onSelect((index: number): void => {
+            this.小时 = index;
+          })
+        Text($r('app.string.reminder_edit_time_colon'))
+          .fontSize(应用尺寸.字号_面板标题)
+          .fontColor($r('app.color.text_primary'))
+          .margin({ left: 应用尺寸.间距_8, right: 应用尺寸.间距_8 })
+        Select(this.分钟选项())
+          .selected(this.分钟)
+          .value(this.分钟 < 10 ? `0${this.分钟}` : `${this.分钟}`)
+          .layoutWeight(1)
+          .enabled(!this.busy)
+          .attributeModifier(new SelectStyle())
+          .height(SelectStyle.controlHeight)
+          .padding(SelectStyle.controlPadding)
+          .space(SelectStyle.controlSpace)
+          .font(SelectStyle.controlFont)
+          .optionFont(SelectStyle.optionFont)
+          .selectedOptionFont(SelectStyle.selectedOptionFont)
+          .textModifier(SelectStyle.labelText())
+          .border(SelectStyle.controlBorder).borderRadius(SelectStyle.controlRadius)
+          .onSelect((index: number): void => {
+            this.分钟 = index;
+          })
+        }.width('100%').alignItems(VerticalAlign.Center)
+      }.width('100%')
+
+      Text(this.interfaceLabel('title'))
+        .fontSize(应用尺寸.字号_正文_小)
+        .fontColor($r('app.color.text_secondary'))
+        .width('100%')
+
+      TextInput({ placeholder: $r('app.string.reminder_edit_title_placeholder'), text: this.标题 })
+        .width('100%')
+        .height(应用尺寸.按钮高度)
+        .fontSize(应用尺寸.字号_正文)
+        .fontColor($r('app.color.text_primary'))
+        .placeholderColor($r('app.color.text_tertiary'))
+        .backgroundColor($r('app.color.surface_page'))
+        .border(SurfaceBorder.options())
+        .borderRadius(应用尺寸.圆角_面板)
+        .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
+          .enabled(this.interfaceEnabled('title'))
+        .onChange((value: string) => {
+          this.标题 = value;
+        })
+
+      Text(this.interfaceLabel('content'))
+        .fontSize(应用尺寸.字号_正文_小)
+        .fontColor($r('app.color.text_secondary'))
+        .width('100%')
+
+      TextArea({ placeholder: $r('app.string.reminder_edit_content_placeholder'), text: this.内容 })
+        .width('100%')
+        .height(80)
+        .fontSize(应用尺寸.字号_正文)
+        .fontColor($r('app.color.text_primary'))
+        .placeholderColor($r('app.color.text_tertiary'))
+        .backgroundColor($r('app.color.surface_page'))
+        .border(SurfaceBorder.options())
+        .borderRadius(应用尺寸.圆角_面板)
+        .padding(应用尺寸.间距_8)
+        .enabled(this.interfaceEnabled('content'))
+        .onChange((value: string) => {
+          this.内容 = value;
+        })
+
+      // 快捷插入与其他输入遵循同一 busy 条件。
+      Flex({ wrap: FlexWrap.Wrap, space: { main: LengthMetrics.vp(8), cross: LengthMetrics.vp(8) } }) {
+        按下态按钮({ 文案: this.interfaceLabel('insert_new'), themeText: true, 字色: this.主色按钮背景,
+          是否启用: this.interfaceEnabled('insert_new'), preserveInputFocus: true,
+          点击回调: (): void => { this.插入占位符($r('app.string.reminder_edit_token_new')); } })
+        按下态按钮({ 文案: this.interfaceLabel('insert_review'), themeText: true, 字色: this.主色按钮背景,
+          是否启用: this.interfaceEnabled('insert_review'), preserveInputFocus: true,
+          点击回调: (): void => { this.插入占位符($r('app.string.reminder_edit_token_review')); } })
+      }.width('100%')
+
+      Text($r('app.string.reminder_edit_placeholder_hint'))
+        .fontSize(11)
+        .fontColor($r('app.color.text_tertiary'))
+        .width('100%')
+      if (this.errorMessage !== '') {
+        Text(this.errorMessage)
+          .fontSize(应用尺寸.字号_正文_小)
+          .fontColor($r('app.color.error_text'))
+          .width('100%')
+          .maxLines(3)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+      }
+
+      if (!this.是否新建) {
+        按下态按钮({ 文案: this.interfaceLabel('delete'), 图标: $r('app.media.ic_study_delete'),
+          字色: $r('app.color.error_text'), 是否启用: this.interfaceEnabled('delete'),
+          点击回调: (): void => { if (this.interfaceEnabled('delete')) this.onDelete(); } })
+          .alignSelf(ItemAlign.End)
+      }
+    }.width('100%')
+  }
+
+  build() {
+    DialogFrame({ header: () => { this.panelHeader(); }, content: () => { this.panelContent(); },
+      canDismiss: !this.busy, onDismiss: (): void => { this.onCancel(); } })
   }
 }

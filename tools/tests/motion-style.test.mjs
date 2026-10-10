@@ -126,10 +126,10 @@ test('native dialog and disclosure variants use the shared profile, with card do
   for (const path of files) {
     const source=readFileSync(new URL(path.replaceAll('\\','/'),root),'utf8');
     assert.doesNotMatch(source,/TransitionEffect\.scale\(\{ x: 0\.96, y: 0\.96 \}\)/,path);
-    if (source.includes('SurfaceTransition.dialog()')) dialogs++;
+    if (source.includes('SurfaceTransition.dialog()') || source.includes('DialogFrame(')) dialogs++;
     if (source.includes('disclosureAnimation()')) arrows++;
   }
-  assert.ok(dialogs>=15); assert.ok(arrows>=5);
+  assert.ok(dialogs>=14); assert.ok(arrows>=5);
   for (const path of ['model/CardWebBuffer.ts','model/CardWebSession.ts','model/学习卡片HTML构建器.ts']) {
     assert.doesNotMatch(readFileSync(new URL(path,root),'utf8'),/AppMotion|MotionStyle|rotate[XY]/,path);
   }

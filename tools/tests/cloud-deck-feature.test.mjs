@@ -51,6 +51,16 @@ test('cloud catalog cleans temporary downloads and rejects results after feature
   assert.equal(h.events[0],'cleanup');h.feature.aboutToDisappear();pending.resolve({decks:[{id:'late'}]});await work;
   assert.deepEqual(h.feature.云端牌组列表,[]);
 });
+test('exit confirmation is single flight and blocks downloads until it settles',async()=>{
+  const h=harness(),f=h.feature,pending=deferred();let prompts=0;
+  f.getUIContext=()=>({getPromptAction:()=>({showDialog:()=>{prompts++;return pending.promise;}})});
+  f.云端牌组列表=[{id:'a',name:'A',accessType:'public'}];f.云端牌组选中ID列表=['a'];
+  const work=f.跳过云端牌组引导();await f.跳过云端牌组引导();await f.下载选中云端牌组();
+  assert.equal(prompts,1);assert.equal(h.events.includes('prepare'),false);
+  pending.resolve({index:0});await work;assert.equal(f.exitPending,false);
+  await f.下载选中云端牌组();assert.ok(h.events.includes('prepare'));
+});
+
 test('cloud completion cannot close without success, and clipboard uses the displayed group',async()=>{
   const h=harness();await h.feature.完成云端牌组首次引导();assert.deepEqual(h.events,[]);
   await h.feature.复制云端牌组QQ群号();assert.ok(h.events.some(e=>Array.isArray(e)&&e[0]==='copy'&&e[1]==='726837065'));

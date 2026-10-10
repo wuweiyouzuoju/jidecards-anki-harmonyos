@@ -85,3 +85,64 @@ test('CustomDialogController builders must provide the generated custom-dialog c
     assert.ok(customDialogs.has(builder),`${file.path}: ${builder} needs @CustomDialog so setController is generated`);
   }
 });
+
+function dialogLinkFields(source) {
+  return [...source.matchAll(/@CustomDialog\s+(?:export\s+)?struct\s+([$\p{ID_Start}][$\u200c\u200d\p{ID_Continue}]*)\s*\{([\s\S]*?)^\}/gmu)]
+    .map(match => [match[1], [...match[2].matchAll(/@Link\s+([$\p{ID_Start}][$\u200c\u200d\p{ID_Continue}]*)\s*:/gu)].map(field => field[1])]);
+}
+function unsafeDialogLinks(source, fieldsByDialog) {
+  const problems = [];
+  for (const match of source.matchAll(/new CustomDialogController\(\{[\s\S]*?builder:\s*([$\p{ID_Start}][$\u200c\u200d\p{ID_Continue}]*)\s*\(\s*\{/gu)) {
+    const fields = fieldsByDialog.get(match[1]) ?? [];
+    if (fields.length === 0) continue;
+    // The SDK rewrites custom-component references in field initializers and UI builders,
+    // but not inside ordinary methods. Both this.field and $field fail in those methods.
+    const methods = source.matchAll(/^  (?:(?:private|public)\s+)?(?:async\s+)?([$\p{ID_Start}][$\u200c\u200d\p{ID_Continue}]*)\([^\n]*\)\s*(?::[^\n{]+)?\s*\{/gmu);
+    for (const method of methods) {
+      const end = source.indexOf('\n  }', method.index);
+      const isBuilder = /@(?:LocalBuilder|Builder)\s*$/.test(source.slice(0, method.index));
+      if (method.index < match.index && end >= match.index && method[1] !== 'build' && !isBuilder) {
+        problems.push(`${match[1]}: @Link builder inside ordinary method ${method[1]}`);
+      }
+    }
+    // Find the end of the params object, including braces in callback bodies.
+    let index = match.index + match[0].length, depth = 1, quote = '';
+    const start = index;
+    while (index < source.length && depth > 0) {
+      const char = source[index++];
+      if (quote) { if (char === '\\') index++; else if (char === quote) quote = ''; continue; }
+      if (char === "'" || char === '"' || char === '`') quote = char;
+      else if (char === '{') depth++;
+      else if (char === '}') depth--;
+    }
+    const params = source.slice(start, index - 1);
+    for (const field of fields) {
+      const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const value = params.match(new RegExp(`(?:^|[,\\n])\\s*${escaped}\\s*:\\s*([^,\\n}]+)`, 'u'))?.[1].trim();
+      if (!value || !/^(?:this\.\$?|\$)[$\p{ID_Start}][$\u200c\u200d\p{ID_Continue}]*$/u.test(value)) {
+        problems.push(`${match[1]}.${field}: ${value ?? 'missing'}`);
+      }
+    }
+  }
+  return problems;
+}
+
+test('native dialog @Link builders stay in field initializers or UI compiler contexts', () => {
+  const fields = new Map([['ServerDialog', ['input', 'busy', '状态']]]);
+  const builder = values => `new CustomDialogController({ builder: ServerDialog({ ${values} }) })`;
+  const params = 'input: this.input, busy: this.busy, 状态: this.状态';
+  assert.deepEqual(unsafeDialogLinks(`struct Host {\n  private createDialog(): void {\n    ${builder(params)}\n  }\n}`, fields),
+    ['ServerDialog: @Link builder inside ordinary method createDialog']);
+  assert.deepEqual(unsafeDialogLinks(`struct Host {\n  private createDialog(): void {\n    ${builder('input: $input, busy: $busy, 状态: $状态')}\n  }\n}`, fields),
+    ['ServerDialog: @Link builder inside ordinary method createDialog']);
+  assert.deepEqual(unsafeDialogLinks(builder("input: '', busy: false"), fields),
+    ["ServerDialog.input: ''", 'ServerDialog.busy: false', 'ServerDialog.状态: missing']);
+  assert.deepEqual(unsafeDialogLinks(`struct Host {\n  private readonly createDialog: () => void = (): void => {\n    ${builder(params)}\n  };\n}`, fields), []);
+  assert.deepEqual(unsafeDialogLinks(`struct Host {\n  @Builder\n  private content() {\n    ${builder(params)}\n  }\n}`, fields), []);
+  assert.deepEqual(dialogLinkFields('@CustomDialog\nstruct ServerDialog {\n @Link 状态: string;\n @Link input: string;\n}\n'),
+    [['ServerDialog', ['状态', 'input']]]);
+  const root = fileURLToPath(new URL('../../entry/src/main/ets/', import.meta.url));
+  const files = sources(root).map(path => ({ path, source: readFileSync(path, 'utf8') }));
+  const allFields = new Map(files.flatMap(file => dialogLinkFields(file.source)));
+  for (const file of files) assert.deepEqual(unsafeDialogLinks(file.source, allFields), [], file.path);
+});

@@ -89,6 +89,17 @@ test('restore confirmation pins the named backup, guards duplicate writes and pu
   }
 });
 
+test('restore confirms once and never starts from a canceled or departed owner', async () => {
+  for(const cancel of ['primaryButton','cancel','depart']){
+    const h=panel();h.item.restoreBackup();h.item.restoreBackup();assert.equal(h.dialogs.length,1);
+    if(cancel==='depart')h.item.aboutToDisappear();
+    else if(cancel==='cancel')h.dialogs[0].cancel();else h.dialogs[0].primaryButton.action();
+    h.dialogs[0].secondaryButton.action();await new Promise(setImmediate);assert.equal(h.calls.length,0,cancel);
+  }
+  const h=panel();h.item.restoreBackup();h.dialogs[0].secondaryButton.action();await new Promise(setImmediate);
+  h.dialogs[0].secondaryButton.action();await new Promise(setImmediate);assert.equal(h.calls.length,1);
+});
+
 test('committed restore with a failed list refresh keeps success distinct from a rejected restore', async () => {
   for (const fail of ['restore', 'list']) {
     const h = panel();

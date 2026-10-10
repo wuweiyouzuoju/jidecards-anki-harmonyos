@@ -83,7 +83,7 @@ test('settings search stays visible in detail pages and returns to directory for
   assert.match(SETTINGS_PANEL_SOURCE,
     /private settingsSearchField\(\)[\s\S]*?TextInput\([\s\S]*?onSettingsSearchChange/);
   assert.match(SETTINGS_PANEL_SOURCE,
-    /搜索框属于设置面板公共壳[\s\S]*?this\.settingsSearchField\(\)[\s\S]*?\/\/ 内容区[\s\S]*?List\(/);
+    /搜索框属于设置面板公共壳[\s\S]*?this\.settingsSearchField\(\)[\s\S]*?ForEach\(\[this\.activeSection\][\s\S]*?List\(/);
   assert.match(SETTINGS_PANEL_SOURCE,
     /value\.trim\(\) !== '' && this\.activeSection !== ''[\s\S]*?this\.activeSection = ''/);
 });

@@ -40,7 +40,7 @@ test('dialog buffers edits, rejects invalid values, and confirms only valid chan
   editor.initialValue = '20';
   editor.validate = value => validateDeckOptionText(form, 'newPerDay', value);
   editor.onConfirm = value => commits.push(value);
-  editor.controller = { close: () => closes++ };
+  editor.onClose = () => closes++;
   editor.aboutToAppear();
   editor.draft = '-1';
   assert.deepEqual(commits, [], 'typing must not update the parent');
@@ -50,7 +50,7 @@ test('dialog buffers edits, rejects invalid values, and confirms only valid chan
   editor.draft = '30'; editor.confirm();
   assert.deepEqual(commits, ['30']);
   assert.equal(closes, 1);
-  assert.match(source, /onClose:[^\n]*controller\?\.close\(\)/, 'cancel only closes the dialog');
+  assert.match(source, /onClose:[^\n]*this.onClose\(\)/, 'cancel delegates the same close path without confirming');
 });
 
 test('enum selection remains a draft until confirmation and opening again reloads the current value', () => {
@@ -75,7 +75,7 @@ test('both modes use shared field dialogs and complete mode reuses the same vali
   }
   assert.match(source, /showHelp: true/);
   assert.match(source, /defaultValue: this.defaultValue/);
-  assert.match(source, /aboutToDisappear\(\): void \{[\s\S]*?this.helpDialog\?\.close\(\)[\s\S]*?this.dialog\?\.close\(\)/);
+  assert.match(source, /aboutToDisappear\(\): void \{[\s\S]*?this.helpDialog\.dispose\(\)[\s\S]*?this.dialog\.dispose\(\)/);
 });
 
 test('opening help preserves the editor draft, validation error and confirmation boundary', () => {

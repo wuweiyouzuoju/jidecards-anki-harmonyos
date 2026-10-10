@@ -1,10 +1,10 @@
+import { DialogFrame } from './common/DialogFrame';
 import { SurfaceTransition } from '../utils/SurfaceTransition';
 import { IconActionButton } from './common/IconActionButton';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { PressFeedback } from '../utils/PressFeedback';
 import { LabeledActionRow } from './common/LabeledActionRow';
-import { DialogBackdrop } from './common/DialogBackdrop';
 
 import type { 牌组背景动作, 牌组定制结果 } from '../model/DeckCustomization';
 import { DialogHeader } from './common/DialogHeader';
@@ -306,151 +306,143 @@ export struct 牌组定制面板 {
     }
   }
 
-  build() {
-    Stack() {
-      // ---- 底层：磨砂遮罩 + 主面板 ----
-      DialogBackdrop()
-        .onClick(() => { if (!this.busy && !this.裁剪模式) this.onClose(); })
-        .transition(SurfaceTransition.backdrop())
+  @Builder
+  private panelHeader() {
+    DialogHeader({
+      title: $r('app.string.deck_customize_title'),
+      actionLabel: $r('app.string.deck_customize_save'),
+      actionEnabled: this.可提交(),
+      closeLabel: $r('app.string.create_deck_cancel'),
+      closeEnabled: !this.busy,
+      onClose: (): void => { this.onClose(); },
+      onAction: () => { this.提交带像素图(); }
+    })
+  }
 
-      // ---- 主面板 ----
-      // 内容高度随表单收缩，避免短表单被固定面板高度撑出大块空白。
-      Column({ space: 应用尺寸.间距_8 }) {
-        DialogHeader({
-          title: $r('app.string.deck_customize_title'),
-          actionLabel: $r('app.string.deck_customize_save'),
-          actionEnabled: this.可提交(),
-          closeLabel: $r('app.string.create_deck_cancel'),
-          closeEnabled: !this.busy,
-          onClose: (): void => { this.onClose(); },
-          onAction: () => { this.提交带像素图(); }
-        })
+  @Builder
+  private panelContent() {
+    Column({ space: 应用尺寸.间距_8 }) {
 
-        // 空别名恢复真实名称，不写入 Core。
-        Column({ space: 应用尺寸.间距_5 }) {
-          Text(interfaceItemText(this.getUIContext(), 'deck_customize', 'name', this.uiLanguage))
-            .fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_secondary'))
+      // 空别名恢复真实名称，不写入 Core。
+      Column({ space: 应用尺寸.间距_5 }) {
+        Text(interfaceItemText(this.getUIContext(), 'deck_customize', 'name', this.uiLanguage))
+          .fontSize(应用尺寸.字号_正文_小)
+          .fontColor($r('app.color.text_secondary'))
+          .width('100%')
+        TextInput({ text: this.编辑中名称 })
+          .width('100%')
+          .height(应用尺寸.按钮高度)
+          .fontSize(应用尺寸.字号_正文)
+          .backgroundColor($r('app.color.surface_card'))
+          .border(SurfaceBorder.options())
+          .borderRadius(应用尺寸.圆角_面板)
+          .enabled(!this.busy)
+          .onChange((值: string) => { if (!this.busy) { this.编辑中名称 = 值; this.publishInterface(); } })
+        Text($r('app.string.deck_customize_alias_hint')).fontSize(应用尺寸.字号_说明)
+          .fontColor($r('app.color.text_tertiary')).width('100%')
+      }.width('100%')
+
+      // 背景图预览与操作区
+      Column({ space: 应用尺寸.间距_5 }) {
+        LabeledActionRow({ label: $r('app.string.deck_customize_background_label'),
+          actionLabel: this.是否有背景() ? $r('app.string.deck_customize_background_replace') :
+            $r('app.string.deck_customize_background_pick'), tint: this.动作主色, isInteractive: !this.busy,
+          onAction: (): void => { this.选取并裁剪(); } })
+        Text($r('app.string.deck_customize_background_hint'))
+          .fontSize(应用尺寸.字号_说明)
+          .fontColor($r('app.color.text_tertiary'))
+          .width('100%')
+
+        // 预览框：与牌组行实际渲染口径一致（objectFit=Cover + 同宽度 + 同高度）
+        // onAreaChange 测量实际尺寸供 cropper 使用；
+        // 预览框高度跟随当前宽/窄版（与牌组列表项行高一致，
+        // 保证用户在裁剪器看到的选区比例就是牌组行实际显示的比例）
+        Stack() {
+          if (this.背景动作 === 'remove') {
+            // 已标记移除：显示空态可恢复
+            Column({ space: 应用尺寸.间距_5 }) {
+              Text($r('app.string.deck_customize_background_remove'))
+                .fontSize(应用尺寸.字号_正文_小)
+                .fontColor($r('app.color.text_tertiary'))
+            }
             .width('100%')
-          TextInput({ text: this.编辑中名称 })
-            .width('100%')
-            .height(应用尺寸.按钮高度)
-            .fontSize(应用尺寸.字号_正文)
-            .backgroundColor($r('app.color.surface_card'))
-            .border(SurfaceBorder.options())
-            .borderRadius(应用尺寸.圆角_面板)
-            .enabled(!this.busy)
-            .onChange((值: string) => { if (!this.busy) { this.编辑中名称 = 值; this.publishInterface(); } })
-          Text($r('app.string.deck_customize_alias_hint')).fontSize(应用尺寸.字号_说明)
-            .fontColor($r('app.color.text_tertiary')).width('100%')
-        }.width('100%')
-
-        // 背景图预览与操作区
-        Column({ space: 应用尺寸.间距_5 }) {
-          LabeledActionRow({ label: $r('app.string.deck_customize_background_label'),
-            actionLabel: this.是否有背景() ? $r('app.string.deck_customize_background_replace') :
-              $r('app.string.deck_customize_background_pick'), tint: this.动作主色, isInteractive: !this.busy,
-            onAction: (): void => { this.选取并裁剪(); } })
-          Text($r('app.string.deck_customize_background_hint'))
-            .fontSize(应用尺寸.字号_说明)
-            .fontColor($r('app.color.text_tertiary'))
-            .width('100%')
-
-          // 预览框：与牌组行实际渲染口径一致（objectFit=Cover + 同宽度 + 同高度）
-          // onAreaChange 测量实际尺寸供 cropper 使用；
-          // 预览框高度跟随当前宽/窄版（与牌组列表项行高一致，
-          // 保证用户在裁剪器看到的选区比例就是牌组行实际显示的比例）
-          Stack() {
-            if (this.背景动作 === 'remove') {
-              // 已标记移除：显示空态可恢复
-              Column({ space: 应用尺寸.间距_5 }) {
-                Text($r('app.string.deck_customize_background_remove'))
-                  .fontSize(应用尺寸.字号_正文_小)
-                  .fontColor($r('app.color.text_tertiary'))
-              }
+            .height('100%')
+            .justifyContent(FlexAlign.Center)
+            .alignItems(HorizontalAlign.Center)
+            .attributeModifier(new PressFeedback())
+            .onClick(() => { this.撤销移除(); })
+          } else if (this.背景动作 === 'replace' && this.已裁剪像素图 !== null) {
+            // 已裁剪：显示裁剪结果预览（PixelMap）
+            Image(this.已裁剪像素图)
+              .width('100%')
+              .height('100%')
+              .objectFit(ImageFit.Cover)
+              .borderRadius(应用尺寸.圆角_面板)
+            // 右上角 × 删除：markAnchor 锚定元素右上角，position 锚定 Stack 右上角，
+            // translate 推 4px 内边距；避免 position('88%') 在不同预览宽度下距右边漂移
+            IconActionButton({ source: $r('app.media.ic_common_close'), label: $r('app.string.icon_background_remove'),
+              glyphColor: '#FFFFFF', surface: '#CC000000', onAction: (): void => { this.标记移除(); } })
+              .markAnchor({ x: '100%', y: '0%' }).position({ x: '100%', y: 0 }).translate({ x: -4, y: 4 })
+          } else if (this.原像素图 !== null) {
+            // 沿用原背景图（用 PixelMap 渲染，避免沙盒路径白屏）
+            Image(this.原像素图)
+              .width('100%')
+              .height('100%')
+              .objectFit(ImageFit.Cover)
+              .borderRadius(应用尺寸.圆角_面板)
+            IconActionButton({ source: $r('app.media.ic_common_close'), label: $r('app.string.icon_background_remove'),
+              glyphColor: '#FFFFFF', surface: '#CC000000', onAction: (): void => { this.标记移除(); } })
+              .markAnchor({ x: '100%', y: '0%' }).position({ x: '100%', y: 0 }).translate({ x: -4, y: 4 })
+          } else {
+            // 无背景图：空态
+            Column()
               .width('100%')
               .height('100%')
               .justifyContent(FlexAlign.Center)
               .alignItems(HorizontalAlign.Center)
-              .attributeModifier(new PressFeedback())
-              .onClick(() => { this.撤销移除(); })
-            } else if (this.背景动作 === 'replace' && this.已裁剪像素图 !== null) {
-              // 已裁剪：显示裁剪结果预览（PixelMap）
-              Image(this.已裁剪像素图)
-                .width('100%')
-                .height('100%')
-                .objectFit(ImageFit.Cover)
-                .borderRadius(应用尺寸.圆角_面板)
-              // 右上角 × 删除：markAnchor 锚定元素右上角，position 锚定 Stack 右上角，
-              // translate 推 4px 内边距；避免 position('88%') 在不同预览宽度下距右边漂移
-              IconActionButton({ source: $r('app.media.ic_common_close'), label: $r('app.string.icon_background_remove'),
-                glyphColor: '#FFFFFF', surface: '#CC000000', onAction: (): void => { this.标记移除(); } })
-                .markAnchor({ x: '100%', y: '0%' }).position({ x: '100%', y: 0 }).translate({ x: -4, y: 4 })
-            } else if (this.原像素图 !== null) {
-              // 沿用原背景图（用 PixelMap 渲染，避免沙盒路径白屏）
-              Image(this.原像素图)
-                .width('100%')
-                .height('100%')
-                .objectFit(ImageFit.Cover)
-                .borderRadius(应用尺寸.圆角_面板)
-              IconActionButton({ source: $r('app.media.ic_common_close'), label: $r('app.string.icon_background_remove'),
-                glyphColor: '#FFFFFF', surface: '#CC000000', onAction: (): void => { this.标记移除(); } })
-                .markAnchor({ x: '100%', y: '0%' }).position({ x: '100%', y: 0 }).translate({ x: -4, y: 4 })
-            } else {
-              // 无背景图：空态
-              Column()
-                .width('100%')
-                .height('100%')
-                .justifyContent(FlexAlign.Center)
-                .alignItems(HorizontalAlign.Center)
-            }
           }
-          .width('100%')
-          .height(应用尺寸.deckRowHeight(this.narrow))
-          .backgroundColor($r('app.color.surface_page'))
-          .borderRadius(应用尺寸.圆角_面板)
-          .border(SurfaceBorder.options())
-          .onAreaChange((_旧: Area, 新区域: Area) => {
-            // Area.width/height 在 ArkTS 里是 Length 类型（string|number），需转 number
-            const 宽: number = typeof 新区域.width === 'number'
-              ? 新区域.width : parseInt(新区域.width as string, 10);
-            const 高: number = typeof 新区域.height === 'number'
-              ? 新区域.height : parseInt(新区域.height as string, 10);
-            if (!Number.isNaN(宽) && !Number.isNaN(高)) {
-              this.预览宽度 = 宽;
-              this.预览高度 = 高;
-            }
-          })
-
-          // 操作按钮：选择图片 / 替换图片 / 移除背景
-          // 按钮文本与显示用 是否有背景() 统一判断，避免 标记移除 后 deck.backgroundImage
-          // 仍非空导致按钮文本/显示不正确
         }
         .width('100%')
+        .height(应用尺寸.deckRowHeight(this.narrow))
+        .backgroundColor($r('app.color.surface_page'))
+        .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
+        .onAreaChange((_旧: Area, 新区域: Area) => {
+          // Area.width/height 在 ArkTS 里是 Length 类型（string|number），需转 number
+          const 宽: number = typeof 新区域.width === 'number'
+            ? 新区域.width : parseInt(新区域.width as string, 10);
+          const 高: number = typeof 新区域.height === 'number'
+            ? 新区域.height : parseInt(新区域.height as string, 10);
+          if (!Number.isNaN(宽) && !Number.isNaN(高)) {
+            this.预览宽度 = 宽;
+            this.预览高度 = 高;
+          }
+        })
 
-        if (this.errorMessage !== '') {
-          Text(this.errorMessage)
-            .fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.error_text'))
-            .width('100%')
-        }
-        if (this.本地错误 !== '') {
-          Text(this.本地错误)
-            .fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.error_text'))
-            .width('100%')
-        }
-
+        // 操作按钮：选择图片 / 替换图片 / 移除背景
+        // 按钮文本与显示用 是否有背景() 统一判断，避免 标记移除 后 deck.backgroundImage
+        // 仍非空导致按钮文本/显示不正确
       }
-      .width('88%')
-      .constraintSize({ maxWidth: 480, maxHeight: '88%' })
-      .padding(应用尺寸.卡片内边距)
-      .backgroundColor($r('app.color.surface_card'))
-      .borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
-      .onClick(() => {
-        // 阻断点击穿透到遮罩
-      })
-      .transition(SurfaceTransition.dialog())
+      .width('100%')
+
+      if (this.errorMessage !== '') {
+        Text(this.errorMessage)
+          .fontSize(应用尺寸.字号_正文_小)
+          .fontColor($r('app.color.error_text'))
+          .width('100%')
+      }
+      if (this.本地错误 !== '') {
+        Text(this.本地错误)
+          .fontSize(应用尺寸.字号_正文_小)
+          .fontColor($r('app.color.error_text'))
+          .width('100%')
+      }
+    }.width('100%')
+  }
+
+  build() {
+    Stack() {
+      DialogFrame({ header: () => { this.panelHeader(); }, content: () => { this.panelContent(); },
+        canDismiss: !this.busy && !this.裁剪模式, onDismiss: (): void => { this.onClose(); } })
 
       // ---- 顶层：裁剪模式覆盖层（仅 裁剪模式=true 时显示）----
       if (this.裁剪模式) {
@@ -458,6 +450,7 @@ export struct 牌组定制面板 {
           .width('100%')
           .height('100%')
           .backgroundColor('rgba(0,0,0,0.85)')
+          .transition(SurfaceTransition.backdrop())
           .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
         Column({ space: 应用尺寸.间距_12 }) {
           DialogHeader({

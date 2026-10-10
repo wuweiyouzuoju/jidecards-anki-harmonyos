@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { surfaceMotionApi } from './motion-harness.mjs';
+import { nativeDialogHostClass } from './platform-module-harness.mjs';
 
 const root = new URL('../../entry/src/main/ets/', import.meta.url);
 const read = path => readFileSync(new URL(path, root), 'utf8');
@@ -113,7 +114,12 @@ test('same surface effects have one owner across all modal implementations', () 
       assert.doesNotMatch(source, /TransitionEffect\.scale\(\{ x: currentMotionProfile\(\)\.dialogScale/, path);
     }
   }
-  assert.equal(owners, 15);
+  assert.equal(owners, 10, 'ordinary forms delegate to DialogFrame; the crop surface retains its own transition');
+  for (const file of ['components/提醒编辑面板.ets', 'components/browser/查找替换对话框.ets',
+    'components/home/创建过滤牌组面板.ets', 'components/牌组定制面板.ets']) {
+    assert.match(read(file), /DialogFrame\(/, file);
+  }
+  assert.match(read('components/创建牌组面板.ets'), /DialogFrame\(/);
   const home = read('pages/首页.ets');
   assert.match(home, /\.transition\(SurfaceTransition\.pageContent\(true, compact\)\)/);
   assert.match(home, /\.transition\(SurfaceTransition\.pageContent\(false, this\.当前断点 === 'xs' && this\.deckNavigationStarted\)\)\s*\.visibility/);
@@ -131,9 +137,10 @@ test('native CustomDialog windows share parameters and own their window animatio
       let end = start + marker.length, depth = 1;
       while (depth) { if (source[end] === '{') depth++; else if (source[end] === '}') depth--; end++; }
       const options = source.slice(start, end);
-      assert.match(options, /openAnimation: SurfaceTransition\.dialogEnterAnimation\(\)/, path);
-      assert.match(options, /closeAnimation: SurfaceTransition\.dialogExitAnimation\(\)/, path);
-      assert.match(options, /customStyle: true/, path);
+      for (const key of ['openAnimation', 'closeAnimation', 'customStyle', 'width', 'height', 'maskColor', 'alignment', 'autoCancel']) {
+        assert.match(options, new RegExp(key + ': presentation\\.' + key), path);
+      }
+      assert.match(options, /onWillDismiss: dismiss/, path);
       hosts++;
       start = source.indexOf(marker, end);
     }
@@ -162,22 +169,23 @@ test('persistent native-dialog owners create current-style windows on each open'
     ['components/数据迁移面板.ets', 'legacyHelp', 'createLegacyHelp'],
     ['components/settings/同步分组.ets', 'serverDialogController', 'createServerDialog']
   ]) {
-    const source = read(path), start = source.indexOf('  private ' + name + '(');
-    const method = source.slice(start, source.indexOf('\n  }', start) + 4);
+    const source = read(path).replaceAll('\r\n', '\n'), start = source.indexOf('  private readonly ' + name + ':');
+    const method = source.slice(start, source.indexOf('\n  };', start) + 6);
     const builderName = method.match(/builder: ([^({\s]+)\(/)[1];
     let closed = 0;
     const values = { SurfaceTransition: api.SurfaceTransition, Color: { Transparent: 'transparent' },
       DialogAlignment: { Center: 'center' }, $r: key => key, [builderName]: props => props,
-      CustomDialogController: class { constructor(options) { this.options = options; } close() { closed++; } }
+      CustomDialogController: class { constructor(options) { this.options = options; } open() {} close() { closed++; } }
     };
     const Host = new Function(...Object.keys(values),
       stripTypeScriptTypes('class Host {' + method + '}', { mode: 'transform' }) + ';return Host;')(...Object.values(values));
-    const host = new Host(); host[field] = null;
+    const host = new Host(); host[field] = new (nativeDialogHostClass(api))();
     for (const [style, duration] of [['restrained', 250], ['lively', 290], ['restrained', 250]]) {
-      api.setStyle(style); host[name]();
-      assert.equal(host[field].options.openAnimation.duration, duration, path);
-      assert.equal(host[field].options.closeAnimation.duration, duration, path);
-      assert.equal(host[field].options.closeAnimation.curve, 'ease-out', path);
+      api.setStyle(style); host[field].open(host[name]);
+      const options = host[field].current().options;
+      assert.equal(options.openAnimation.duration, duration, path);
+      assert.equal(options.closeAnimation.duration, duration, path);
+      assert.equal(options.closeAnimation.curve, 'ease-out', path);
     }
     assert.equal(closed, 2, path);
   }

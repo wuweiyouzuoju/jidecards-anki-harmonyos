@@ -17,17 +17,17 @@ import { HomeSyncStatusController, homeSyncLabelKey, homeSyncIndicator } from '.
 const deferred = () => { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; }); return { promise, resolve, reject }; };
 const scopes = [DeckPreviewScope.TodayRemaining, DeckPreviewScope.Due, DeckPreviewScope.StudiedToday, DeckPreviewScope.All];
 
-test('home cancels pending preview across background/return, deck reselection and back', async () => {
+test('home cancels pending preview across background/return, deck reselection, long press and back', async () => {
   const source = readFileSync(new URL('../../entry/src/main/ets/pages/首页.ets', import.meta.url), 'utf8');
-  const Page = componentMethods(source, ['打开牌组预览', 'syncForegroundChanged', 'previewDeckChanged', 'homeActionControls', 'publishHomeInterface', 'onBackPress'], {
+  const Page = componentMethods(source, ['打开牌组预览', 'openDeckMenu', 'syncForegroundChanged', 'previewDeckChanged', 'homeActionControls', 'publishHomeInterface', 'onBackPress'], {
     ...appInterfaceDependencies(), isDoubleColumnDeckListStyle, homeSyncLabelKey, homeSyncIndicator, $r: key => key
   });
   Page.prototype.closeHomeActions = new Function(source.match(/private closeHomeActions\(\): void \{([^\n]*)\}/)[1]);
-  for (const reason of ['background', 'deck', 'back']) {
+  for (const reason of ['background', 'deck', 'long_press', 'back']) {
     const pending = deferred(), toasts = [];
     const page = new Page();
     Object.assign(page, {
-      deckLevelMenuId: '',
+      deckMenuId: '', deckMenuBackRequest: 0,
       deckPreviewSession: new DeckPreviewSession({ cardIds: () => pending.promise }),
       syncController: { foregroundChanged() {}, cancel() {} }, backupController: { schedule() {}, stop() {} },
       syncStatusController: new HomeSyncStatusController({ auth: () => null, canRead: () => false,
@@ -35,6 +35,7 @@ test('home cancels pending preview across background/return, deck reselection an
         changed() {}, failed() {}, saveEndpoint() {} }),
       syncForeground: true, transfer: { phase: 'idle' }, homeDisposed: false, 选中的牌组ID: '1',
       选中牌组: () => ({ id: page.选中的牌组ID }), 取能力上下文: () => ({ filesDir: '/test' }),
+      按ID查牌组: id => ({ id }),
       页面栈: { size: () => 0 }, deferForSync: () => false, homeActivityChanged() {},
       牌组数据源: { snapshotDecks: () => [] }, homeActivity: () => ({ collectionBusy: false }),
       显示提示: key => toasts.push(key), 显示卡片预览: false
@@ -47,6 +48,10 @@ test('home cancels pending preview across background/return, deck reselection an
     } else if (reason === 'deck') {
       page.选中的牌组ID = '2'; page.previewDeckChanged();
       page.选中的牌组ID = '1'; page.previewDeckChanged();
+    } else if (reason === 'long_press') {
+      page.openDeckMenu('2', { left: 24, top: 300, width: 360, height: 68 });
+      assert.equal(page.选中的牌组ID, '2');
+      page.previewDeckChanged();
     } else assert.equal(page.onBackPress(), true);
     pending.resolve([111]); await loading;
     assert.equal(page.显示卡片预览, false, reason);

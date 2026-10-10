@@ -149,8 +149,7 @@ export struct AnkiWeb引导对话框 {
       .constraintSize({ maxWidth: 480, maxHeight: '88%' })
       .padding(应用尺寸.间距_16)
       .backgroundColor($r('app.color.surface_card'))
-      .borderRadius(应用尺寸.圆角_卡片)
-      .border(SurfaceBorder.options())
+      .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
       .transition(SurfaceTransition.dialog())
     }
     .width('100%')

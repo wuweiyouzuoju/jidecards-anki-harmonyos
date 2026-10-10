@@ -32,7 +32,6 @@ export struct AgentEditableCard {
         }
         .width(20)
         .height(20)
-        .borderRadius(10)
         .backgroundColor(this.card.已选中
           && this.card.状态 !== 'saved'
           ? this.动作主色 : Color.Transparent)

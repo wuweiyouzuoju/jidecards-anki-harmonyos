@@ -1,3 +1,6 @@
+import { DirectorySelect } from '../common/DirectorySelect';
+import { DirectoryRow, DirectoryView, DirectoryChoice, directoryChoiceRows, directorySpecial } from '../../model/DirectoryTree';
+import { appInterface } from '../../backend/AppInterfaceService';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { noteTypeText } from '../../utils/NoteTypeText';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
@@ -27,10 +30,23 @@ export struct AgentSetupCard {
   onDeckSelected: (id: number) => void = (_id: number): void => {};
   onNotetypeSelected: (id: number) => void = (_id: number): void => {};
 
-  private editDeckOptions(): AgentSelectOption[] {
-    const output: AgentSelectOption[] = [{ value: this.allDecksLabel }];
-    for (const item of this.deckOptions) { output.push({ value: item.name }); }
-    return output;
+  private deckRows(): DirectoryRow[] {
+    const rows: DirectoryRow[] = directoryChoiceRows(this.deckOptions.map((item: AgentSetupChoice): DirectoryChoice =>
+      ({ id: String(item.id), path: item.name })), String(this.setup.deckId));
+    return this.mode === 'create' ? rows : [directorySpecial('0', this.allDecksLabel, this.setup.deckId <= 0 ? 1 : 0)].concat(rows);
+  }
+  private selectDeck(id: string): void {
+    if (this.disabled) return;
+    const value: number = Number(id);
+    if (id === '0' && this.mode !== 'create') this.onDeckSelected(0);
+    else if (this.deckOptions.some((item: AgentSetupChoice): boolean => String(item.id) === id)) this.onDeckSelected(value);
+  }
+  @Builder
+  private deckSelector() {
+    DirectorySelect({ label: $r('app.string.ai_card_target_deck'), rows: this.deckRows(),
+      value: this.mode !== 'create' && this.setup.deckId <= 0 ? this.allDecksLabel : this.setup.deckName,
+      isInteractive: !this.disabled, onSelect: (id: string): void => { this.selectDeck(id); },
+      onViewChanged: (view: DirectoryView | null): void => { appInterface.observeDirectory('agent_target_deck', view); } })
   }
 
   private editNotetypeOptions(): AgentSelectOption[] {
@@ -42,30 +58,7 @@ export struct AgentSetupCard {
   @Builder
   private setupContent(): void {
     if (this.mode === 'create') {
-      Row() {
-        Text($r('app.string.ai_card_target_deck')).layoutWeight(1)
-        Select(this.deckOptions.map((item: AgentSetupChoice): AgentSelectOption => ({ value: item.name })))
-          .selected(this.deckOptions.findIndex((item: AgentSetupChoice): boolean =>
-            item.id === this.setup.deckId))
-          .value(this.setup.deckName)
-          .enabled(!this.disabled)
-          .attributeModifier(new SelectStyle())
-          .height(SelectStyle.controlHeight)
-          .padding(SelectStyle.controlPadding)
-          .space(SelectStyle.controlSpace)
-          .width(SelectStyle.fieldWidth)
-          .constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
-          .font(SelectStyle.controlFont)
-          .optionFont(SelectStyle.optionFont)
-          .selectedOptionFont(SelectStyle.selectedOptionFont)
-          .textModifier(SelectStyle.labelText())
-          .borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
-          .onSelect((index: number): void => {
-            if (index >= 0 && index < this.deckOptions.length) {
-              this.onDeckSelected(this.deckOptions[index].id);
-            }
-          })
-      }.width('100%')
+      this.deckSelector()
       Row() {
         Text($r('app.string.add_note_notetype')).layoutWeight(1)
         Select(this.notetypeOptions.map((item: AgentSetupChoice): AgentSelectOption => ({ value: noteTypeText(this.getUIContext(), item.name) })))
@@ -91,31 +84,7 @@ export struct AgentSetupCard {
           })
       }.width('100%')
     } else {
-      Row() {
-        Text($r('app.string.ai_card_target_deck')).layoutWeight(1)
-        Select(this.editDeckOptions())
-          .selected(this.setup.deckId <= 0 ? 0 : 1 + this.deckOptions.findIndex(
-            (item: AgentSetupChoice): boolean => item.id === this.setup.deckId))
-          .value(this.setup.deckId <= 0 ? this.allDecksLabel : this.setup.deckName)
-          .enabled(!this.disabled)
-          .attributeModifier(new SelectStyle())
-          .height(SelectStyle.controlHeight)
-          .padding(SelectStyle.controlPadding)
-          .space(SelectStyle.controlSpace)
-          .width(SelectStyle.fieldWidth)
-          .constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
-          .font(SelectStyle.controlFont)
-          .optionFont(SelectStyle.optionFont)
-          .selectedOptionFont(SelectStyle.selectedOptionFont)
-          .textModifier(SelectStyle.labelText())
-          .borderRadius(SelectStyle.controlRadius).border(SelectStyle.controlBorder)
-          .onSelect((index: number): void => {
-            if (index === 0) { this.onDeckSelected(0); }
-            else if (index > 0 && index <= this.deckOptions.length) {
-              this.onDeckSelected(this.deckOptions[index - 1].id);
-            }
-          })
-      }.width('100%')
+      this.deckSelector()
       Row() {
         Text($r('app.string.add_note_notetype')).layoutWeight(1)
         Select(this.editNotetypeOptions())

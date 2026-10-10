@@ -28,7 +28,8 @@ test('filtered deck creation belongs to the experimental home add menu, not a de
   assert.match(read(PAGE), /onCreateFilteredDeck: \(\): void => \{\s*this\.显示主页操作 = false;\s*this\.打开创建过滤牌组\(\);/);
   const deckItem = read('entry/src/main/ets/components/牌组列表项.ets');
   assert.doesNotMatch(deckItem, /filtered_deck_title|onCreateFilteredDeck/);
-  assert.match(deckItem, /this\.onCustomStudy\(this\.deck\.id\)/);
+  assert.match(deckItem, /this\.onMenu\(this\.deck\.id, anchor\)/);
+  assert.match(read(PAGE), /case 'custom_study': this\.打开自定义学习\(deckId\)/);
   assert.doesNotMatch(read('entry/src/main/ets/components/home/主页牌组列表.ets'), /onItemCreateFilteredDeck/);
 });
 
@@ -63,7 +64,7 @@ test('create deck panel guards submission and reflects busy/error props', () => 
   assert.match(panel, /deckName\.trim\(\)\.length > 0/);
   assert.match(panel, /actionEnabled: this\.canSubmit\(\)/);
   const header = read('entry/src/main/ets/components/common/DialogHeader.ets');
-  assert.match(header, /\.enabled\(this\.actionEnabled\)/);
+  assert.match(header, /是否启用: this\.actionEnabled/);
   assert.match(panel, /app\.color\.error_text/);
   assert.match(panel, /TextInput\(/);
 });

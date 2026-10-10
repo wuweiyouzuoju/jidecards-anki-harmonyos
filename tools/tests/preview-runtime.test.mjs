@@ -136,8 +136,8 @@ test('both preview hosts dismiss the open menu before leaving preview and releas
     const start = hostSource.indexOf('  onBackPress(): boolean {');
     const method = hostSource.slice(start, hostSource.indexOf('\n  }', start) + 4);
     const Host = new Function(stripTypeScriptTypes(`class Host {${method}}`) + '; return Host;')();
-    const host = Object.assign(new Host(), { deckLevelMenuId: '', [visible]: true, previewBackHandler: handler,
-      transfer: { phase: 'idle' }, batchDialog: 'none', editor: { visible: false, busy: false } });
+    const host = Object.assign(new Host(), { deckMenuId: '', [visible]: true, previewBackHandler: handler,
+      transfer: { phase: 'idle' }, displayDialog: '', inlineEditorId: 0, batchDialog: 'none', editor: { visible: false, busy: false } });
     page.moreMenuOpen = true;
     assert.equal(host.onBackPress(), true);
     assert.equal(page.moreMenuOpen, false);

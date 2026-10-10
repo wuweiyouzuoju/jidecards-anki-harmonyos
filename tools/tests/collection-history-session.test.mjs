@@ -21,10 +21,19 @@ test('history disables unavailable directions, serializes accepted writes and pu
   const gate = deferred(), original = h.backend.apply;
   h.backend.apply = async (...args) => { await gate.promise; await original(...args); };
   const work = h.session.apply(false); await tick();
+  assert.equal(h.states.at(-1).applying,true);
   assert.equal(autoSyncScheduler.canSync(), false); await h.session.apply(false);
   gate.resolve(); await work;
   assert.deepEqual(h.writes, [false]); assert.equal(h.refreshed, 1); assert.equal(h.changed, 1);
   assert.equal(h.states.at(-1).status.redo, 'Delete note');
+  assert.equal(h.states.at(-1).applying,false);
+});
+
+test('history read loading is distinguishable from an accepted apply and expires after disposal',async()=>{
+  const h=harness(),gate=deferred();h.backend.status=()=>gate.promise;
+  const work=h.session.load();await tick();assert.equal(h.states.at(-1).busy,true);
+  assert.equal(h.states.at(-1).applying,false);h.session.dispose();const count=h.states.length;
+  gate.resolve({undo:'late',redo:'',lastStep:4});await work;assert.equal(h.states.length,count);
 });
 test('history waits for collection sync and leaves without starting a new write', async () => {
   const h = harness(); await h.session.load(); syncActivity.reserveCollection();
