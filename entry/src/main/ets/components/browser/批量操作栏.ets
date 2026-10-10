@@ -1,7 +1,7 @@
 import { actionIcon } from '../../utils/ActionIcons';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { CardActionMenu, CardActionMenuEntry } from '../common/CardActionMenu';
-import { actionMenuRows, toggleActionMenuBranch, ActionMenuRow } from '../common/ActionMenuTree';
+import { visibleActionMenuRows, toggleActionMenuBranch, ActionMenuRow } from '../common/ActionMenuTree';
 import { flagMenuChoices } from '../common/FlagMenuChoices';
 import { FlagLabels, CARD_FLAGS, CardFlagDefinition, customFlagLabel } from '../../model/CardMarking';
 import { visibleInterfaceItems, AppInterfaceItem, AppInterfaceControl } from '../../model/AppInterface';
@@ -10,7 +10,7 @@ import { namedResourceText } from '../../utils/UiFeedback';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../../model/ReleaseFeatures';
 
-/** 多选动作锚定“已选 X 项”下方；保留既有回调，公共菜单拥有几何、滚动和按压反馈。 */
+/** 多选动作锚定右上角操作入口；公共菜单拥有几何、滚动和按压反馈。 */
 @Component
 export struct 批量操作栏 {
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
@@ -22,7 +22,6 @@ export struct 批量操作栏 {
   @Prop topOffset: number = 68;
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
   @Prop @Watch('publishInterface') labels: FlagLabels = {};
-  @State @Watch('publishInterface') private primaryObscured: boolean = false;
   @State @Watch('publishInterface') private expandedIds: string[] = ['marking'];
   on改牌组: () => void = (): void => {};
   on设置标志: () => void = (): void => {};
@@ -41,6 +40,14 @@ export struct 批量操作栏 {
   onHelp: () => void = (): void => {};
   onExit: () => void = (): void => {};
   onClose: () => void = (): void => {};
+  onSelectAll: () => void = (): void => {};
+  onClearSelection: () => void = (): void => {};
+  onPreview: () => void = (): void => {};
+  onExport: () => void = (): void => {};
+  onGrade: () => void = (): void => {};
+  private actionEnabled(id: string): boolean {
+    return !this.busy && (this.选中数 > 0 || id === 'select_all' || id === 'exit' || id === 'help');
+  }
   private mounted: boolean = false;
 
   aboutToAppear(): void { this.mounted = true; this.publishInterface(); }
@@ -72,7 +79,7 @@ export struct 批量操作栏 {
   private entries(): CardActionMenuEntry[] { return this.menuItems().map((item: AppInterfaceItem): CardActionMenuEntry => this.menuEntry(item)); }
   private menuEntry(item: AppInterfaceItem, _locale: string = this.uiLanguage): CardActionMenuEntry {
     return { id: item.id, value: namedResourceText(this.getUIContext(), item.titleKey),
-      destructive: item.id === 'delete', enabled: !this.busy && this.选中数 > 0,
+      destructive: item.id === 'delete', enabled: this.actionEnabled(item.id),
       icon: actionIcon(item.id),
       children: item.id === 'marking' ? this.markingItems().map((child: AppInterfaceItem): CardActionMenuEntry => this.menuEntry(child)) :
         item.id === 'flag' ? this.flagEntries() : undefined,
@@ -89,21 +96,22 @@ export struct 批量操作栏 {
   }
   private publishInterface(): void {
     if (!this.mounted) return;
-    if (!this.primaryObscured) this.publishSurface('browser_batch', this.menuItems());
-    else appInterface.leave('browser_batch');
-    if (this.expandedIds.includes('marking')) this.publishSurface('browser_batch_marking', this.markingItems());
+    this.publishSurface('browser_batch', this.menuItems());
+    if (this.expandedIds.includes('marking') && !this.expandedIds.includes('flag')) this.publishSurface('browser_batch_marking', this.markingItems());
     else appInterface.leave('browser_batch_marking');
     if (this.expandedIds.includes('marking') && this.expandedIds.includes('flag')) {
       const items: AppInterfaceControl[] = this.flagEntries().map((item: CardActionMenuEntry, index: number): AppInterfaceControl => ({
         id: String(index), titleKey: customFlagLabel(this.labels, index) ? undefined : CARD_FLAGS[index].labelKey,
         title: typeof item.value === 'string' ? item.value : '', selected: false, enabled: item.enabled !== false }));
-      this.observeSurface('browser_batch_flags', items);
+      const back: AppInterfaceControl = { id: 'back', titleKey: 'menu_back_to_parent',
+        title: namedResourceText(this.getUIContext(), 'menu_back_to_parent'), enabled: !this.busy && this.选中数 > 0, selected: false };
+      this.observeSurface('browser_batch_flags', [back].concat(items));
     } else appInterface.leave('browser_batch_flags');
   }
   private publishSurface(surface: string, definitions: AppInterfaceItem[], _locale: string = this.uiLanguage): void {
     const items: AppInterfaceControl[] = definitions.map((item: AppInterfaceItem): AppInterfaceControl => ({
       id: item.id, titleKey: item.titleKey, title: namedResourceText(this.getUIContext(), item.titleKey),
-      selected: false, enabled: !this.busy && this.选中数 > 0 }));
+      selected: false, enabled: this.actionEnabled(item.id) }));
     this.observeSurface(surface, items);
   }
 
@@ -115,14 +123,19 @@ export struct 批量操作栏 {
       values: [{ id: 'selected_count', value: String(this.选中数) }], controlsComplete: true });
   }
   private selectItem(id: string): void {
-    if (this.busy || this.选中数 === 0) return;
-    const row: ActionMenuRow | undefined = actionMenuRows(this.entries(), this.expandedIds)
+    if (!this.actionEnabled(id)) return;
+    const row: ActionMenuRow | undefined = visibleActionMenuRows(this.entries(), this.expandedIds)
       .find((item: ActionMenuRow): boolean => item.node.id === id);
-    if (row === undefined || !row.enabled || (this.primaryObscured && row.depth === 0)) return;
+    if (row === undefined || !row.enabled) return;
     if (row.node.children !== undefined) { this.toggleBranch(id); return; }
     this.expandedIds = [];
     this.onClose();
     switch (id) {
+      case 'select_all': this.onSelectAll(); break;
+      case 'clear_selection': this.onClearSelection(); break;
+      case 'preview': this.onPreview(); break;
+      case 'export': this.onExport(); break;
+      case 'grade': this.onGrade(); break;
       case 'suspend': this.on挂起(); break;
       case 'reset': this.onReset(); break;
       case 'bury': this.onBury(); break;
@@ -142,7 +155,7 @@ export struct 批量操作栏 {
   }
   build() {
     CardActionMenu({ items: this.entries(), menuWidth: 应用尺寸.cardActionMenuWidth, topOffset: this.topOffset,
-      expandedIds: this.expandedIds, onPrimaryObscured: (obscured: boolean): void => { this.primaryObscured = obscured; },
+      expandedIds: this.expandedIds,
       onToggleBranch: (item: CardActionMenuEntry): void => { this.toggleBranch(item.id ?? ''); },
       onClose: (): void => { this.onClose(); },
       onSelect: (item: CardActionMenuEntry): void => { item.action?.(); } })

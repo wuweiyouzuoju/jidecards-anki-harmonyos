@@ -16,6 +16,20 @@ function harness(){
  dialog.mounted=true;dialog.getUIContext=()=>({});dialog.onClose=()=>events.push('closed');dialog.onChanged=()=>events.push('changed');
  return {dialog,writes,events,update:value=>json=value,get:()=>JSON.parse(json)};
 }
+
+test('a pending read permits dismissal while a pending save protects dismissal',async()=>{
+ const h=harness(); let release;
+ h.dialog.backend.labels=()=>new Promise(r=>release=r);
+ const read=h.dialog.load(); await new Promise(setImmediate);
+ h.dialog.handleBack(); assert.deepEqual(h.events,['closed']); h.dialog.aboutToDisappear();
+ release('{"1":"late"}'); await read;
+ assert.equal(h.dialog.loaded,false); assert.equal(h.dialog.drafts[1],'');
+ const save=harness(); await save.dialog.load(); save.dialog.edited.add(1); save.dialog.drafts[1]='changed';
+ save.dialog.backend.saveLabels=()=>new Promise(r=>release=r);
+ const work=save.dialog.save(); await new Promise(setImmediate); save.dialog.handleBack();
+ assert.deepEqual(save.events,[]); release(); await work;
+ assert.deepEqual(save.events,['changed','closed']); assert.equal(save.dialog.saving,false);
+});
 test('name dialog saves only edited colors against latest collection values, and empty restores default',async()=>{
  const h=harness();await h.dialog.load();
  assert.equal(h.dialog.loaded,true);assert.equal(h.dialog.drafts[1],'old');

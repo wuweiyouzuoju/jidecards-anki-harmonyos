@@ -9,6 +9,7 @@ import { BrowserColumnSorting, SearchNodeCardState, makeCardStateNode, makeParsa
   from '../../entry/src/main/ets/proto/messages/SearchMessages.ts';
 import { browserFilterNode } from '../../entry/src/main/ets/model/BrowserQuickFilter.ts';
 import { ConfigKeyBool } from '../../entry/src/main/ets/proto/messages/ConfigMessages.ts';
+import { browserActiveColumns, defaultBrowserPreferences } from '../../entry/src/main/ets/model/BrowserPreferences.ts';
 
 const source = readFileSync(new URL('../../entry/src/main/ets/pages/浏览页.ets', import.meta.url), 'utf8');
 const names = ['执行搜索', '加载更多', 'sortableColumns', 'sortLabel', 'sortOptions', 'sortIndex', 'selectSort', '切换模式', 'resultCountLabel'];
@@ -18,15 +19,17 @@ const methods = names.map(name => {
   return source.slice(start, source.indexOf('\n  }', start) + 4);
 });
 const Page = new Function('loadBrowserRows', '后端会话', 'BrowserColumnSorting', 'SearchNodeCardState', 'makeCardStateNode',
-  'makeParsableTextNode', 'browserFilterNode', 'ConfigKeyBool', '$r', 'console',
+  'makeParsableTextNode', 'browserFilterNode', 'ConfigKeyBool', 'browserActiveColumns', '$r', 'console',
   stripTypeScriptTypes(`class Page { ${methods.join('\n')} }`, { mode: 'transform' }) + '; return Page;')(
   loadBrowserRows, { 获取实例: () => ({ 确保已打开: async () => {} }) }, BrowserColumnSorting,
-  SearchNodeCardState, makeCardStateNode, makeParsableTextNode, browserFilterNode, ConfigKeyBool, key => key, { info() {} });
+  SearchNodeCardState, makeCardStateNode, makeParsableTextNode, browserFilterNode, ConfigKeyBool, browserActiveColumns, key => key, { info() {} });
 
 function harness(notes = false) {
   const page = new Page();
   const calls = [];
   Object.assign(page, {
+    preferencesLoaded: true, browserPreferences: defaultBrowserPreferences(notes), 选中ID列表: [], focusedRowId: 0, selectionAnchor: 0,
+    persistBrowserPreferences: async patch => calls.push(['preferences', patch]),
     editorSession: { close() {} }, operations: new BrowserOperationController(), 关闭卡片信息() {}, editorVersion: 0, mappingVersion: 0, searchVersion: 0, 浏览模式值: notes ? 'notes' : 'cards', 搜索文本: '',
     sortColumn: '', sortReverse: false, 列定义: [], 行列表: [], 结果ID列表: [],
     suspendedRowIds: new Set(), 取能力上下文: () => ({ filesDir: '/collection' }),

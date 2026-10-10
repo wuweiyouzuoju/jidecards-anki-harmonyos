@@ -27,7 +27,7 @@ export struct BrowserRenameTagDialog {
       onClose: (): void => {
         this.onClose();
       },
-      actionLabel: this.busy ? $r('app.string.browser_tag_rename_running') : $r('app.string.browser_detail_confirm'),
+      showActionLabel: this.busy, actionLabel: this.busy ? $r('app.string.browser_tag_rename_running') : $r('app.string.browser_detail_confirm'),
       actionEnabled: !this.busy && newTagName(this.name) !== '' && newTagName(this.name) !== this.original,
       onAction: (): void => {
         this.onSubmit(this.name);

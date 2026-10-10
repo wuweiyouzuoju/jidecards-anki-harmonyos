@@ -42,7 +42,7 @@ test('card preview keeps its position header and preserves preview while editing
   assert.match(preview,
     /bottom:\s*应用尺寸\.页面内边距_水平\s*\+\s*this\.导航条高度/);
   assert.notEqual(openEditorMethod, '', '打开编辑区For method must exist');
-  assert.doesNotMatch(openEditorMethod, /this\.显示预览\s*=\s*false/);
+  assert.match(openEditorMethod, /this\.openEditPage\(卡片ID, false\)/);
   assert.match(page, /预览刷新版本\s*\+=\s*1/);
 });
 
@@ -198,7 +198,7 @@ test('browser batch forms have separate owners and one mutually exclusive displa
   for (const name of ['BrowserDeckDialog','BrowserDueDialog','BrowserBatchConfirm','BrowserNotetypeFeature'])
     assert.ok(page.includes(name+'({'), name);
   assert.doesNotMatch(page, /@State[^\n]*(?:字段映射|模板映射|到期日输入)/);
-  assert.match(page, /@State private batchDialog:/);
+  assert.match(page, /@State @Watch\('handleBrowserPreferenceBoundary'\) private batchDialog:/);
 });
 
 test('Browser suspend and bury toggles use captured selection and the common completion boundary', () => {
@@ -212,9 +212,9 @@ test('Browser suspend and bury toggles use captured selection and the common com
   // Sibling expansion and deduplication execute directly in browser-operation-model.test.mjs.
 });
 
-test('browser batch bar requires a nonempty selection and dispatches to separate forms', () => {
+test('browser batch menu remains available at zero selections and dispatches writes to separate forms', () => {
   const page=read('entry/src/main/ets/pages/浏览页.ets');
-  assert.match(page, /if\s*\(this\.showBatchMenu\s*&&\s*this\.多选模式值\s*&&\s*this\.选中ID列表\.length\s*>\s*0\)/);
+  assert.match(page, /if\s*\(this\.showBatchMenu\s*&&\s*this\.多选模式值\)/);
   for (const kind of ['deck','delete']) assert.ok(page.includes("this.batchDialog === '"+kind+"'"));
   assert.doesNotMatch(page, /this.batchDialog === 'suspend'/);
 });
@@ -269,7 +269,7 @@ test('Browser multi-select count opens the menu below the top toolbar and back f
   assert.match(page, /多选模式: this\.多选模式值/);
   assert.match(page, /this\.多选模式值 = this\.pageSelectForAgentEdit/);
   assert.match(page,
-    /private 返回\(\): void \{\s*if \(this\.多选模式值\) \{\s*this\.退出多选\(\);\s*return;\s*\}\s*this\.pathStack\.pop\(\);\s*\}/);
+    /private 返回\(\): void \{\s*if \(this\.onBackPress\(\)\) return;[\s\S]*?this\.pathStack\.pop\(\);\s*\}/);
   assert.match(page,
     /onBackPress\(\): boolean \{[\s\S]*?if \(this\.多选模式值\) \{ this\.退出多选\(\); return true; \}[\s\S]*?return false;/);
   assert.match(page, /\.onBackPressed\(\(\): boolean => this\.onBackPress\(\)\)/);
@@ -338,7 +338,7 @@ test('BrowserPage delegates card info loading to its target-owned panel', () => 
   const page = read('entry/src/main/ets/pages/浏览页.ets');
   const panel = read('entry/src/main/ets/components/browser/卡片信息.ets');
   assert.match(page, /cardId: this\.infoCardId/);
-  assert.doesNotMatch(page, /统计服务实例|卡片信息数据|infoVersion/);
+  assert.doesNotMatch(page, /统计服务实例|卡片信息数据/);
   assert.match(panel, /this\.service\.获取卡片统计\(this\.cardId\)/);
 });
 
@@ -454,7 +454,7 @@ test('BrowserPage wires T9 find&replace: imports 查找替换对话框 + FindAnd
 test('BrowserPage has T9 state + methods', () => {
   const page = read('entry/src/main/ets/pages/浏览页.ets');
   // 3 个 @State：显示 / 忙碌 / 错误
-  assert.match(page, /@State\s+private\s+显示查找替换:\s*boolean/);
+  assert.match(page, /@State\s+@Watch\('handleBrowserPreferenceBoundary'\)\s+private\s+显示查找替换:\s*boolean/);
   assert.match(page, /@State\s+private\s+查找替换忙碌:\s*boolean/);
   assert.match(page, /@State\s+private\s+查找替换错误:\s*string/);
   // 2 个方法：执行查找替换 + 解析选中为笔记ID
@@ -493,7 +493,7 @@ test('查找替换对话框 component preserves T9 presentation-only invariants'
   assert.doesNotMatch(panel, /后端会话|搜索服务|笔记服务|卡片服务|\.会话\.调用\s*\(/);
   // 必备 @Prop 与回调签名
   assert.match(panel, /@Prop\s+isDark:\s*boolean/);
-  assert.match(panel, /@Prop\s+busy:\s*boolean/);
+  assert.match(panel, /@Prop\s+@Watch\('publishInterface'\)\s+busy:\s*boolean/);
   assert.match(panel, /(?:@Prop|@State private)\s+errorMessage:\s*string/);
   assert.match(panel, /@Prop\s+有选中笔记:\s*boolean/);
   assert.match(panel, /onCancel:\s*\(\)\s*=>\s*void/);

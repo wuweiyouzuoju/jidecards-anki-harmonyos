@@ -242,7 +242,7 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: '2', titleKey: 'deck_preview_studied', opens: 'preview' },
     { id: '3', titleKey: 'deck_preview_all', opens: 'preview' }
   ] },
-  { id: 'browser', titleKey: 'browser_title', parent: 'home', items: [
+  { id: 'browser', titleKey: 'browser_title', instructionsKey: 'browser_preferences_instructions', parent: 'home', items: [
     { id: 'back', titleKey: 'study_back', iconKey: 'ic_common_arrow_left' },
     { id: 'search', titleKey: 'browser_search_placeholder' },
     { id: 'cards', titleKey: 'browser_mode_cards', opens: 'browser_view' },
@@ -254,21 +254,40 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
   ] },
   { id: 'browser_more', titleKey: 'study_more', parent: 'browser', items: [
     { id: 'filter', titleKey: 'browser_action_sidebar', opens: 'browser_sidebar' },
+    { id: 'select_all', titleKey: 'browser_select_all', opens: 'browser_batch' },
     { id: 'find_replace', titleKey: 'browser_action_find_replace', opens: 'browser_find_replace' },
-    { id: 'save_search', titleKey: 'browser_saved_search_save', opens: 'browser_save_search' },
-    { id: 'flag_names', titleKey: 'card_mark_flag_names' },
+    { id: 'search_tools', titleKey: 'browser_search_tools', opens: 'browser_search_tools' },
+    { id: 'display_settings', titleKey: 'browser_display_settings', opens: 'browser_display_settings' },
     { id: 'history', titleKey: 'collection_history_title', opens: 'collection_history' },
+    { id: 'more_settings', titleKey: 'study_more', opens: 'browser_more_settings' }
+  ] },
+  { id: 'browser_search_tools', titleKey: 'browser_search_tools', parent: 'browser_more', items: [
+    { id: 'search_options', titleKey: 'browser_search_options', opens: 'browser_search_options' },
+    { id: 'recent_searches', titleKey: 'browser_recent_searches', opens: 'browser_recent_searches' },
+    { id: 'save_search', titleKey: 'browser_saved_search_save', opens: 'browser_save_search' },
+  ] },
+  { id: 'browser_display_settings', titleKey: 'browser_display_settings', parent: 'browser_more', items: [
+    { id: 'columns', titleKey: 'browser_display_columns', opens: 'browser_display' },
     { id: 'subtitle_deck', titleKey: 'browser_subtitle_deck' },
     { id: 'subtitle_answer', titleKey: 'browser_subtitle_answer' },
     { id: 'subtitle_due', titleKey: 'browser_subtitle_due' }
   ] },
+  { id: 'browser_more_settings', titleKey: 'study_more', parent: 'browser_more', items: [
+    { id: 'flag_names', titleKey: 'card_mark_flag_names' },
+    { id: 'keyboard', titleKey: 'browser_shortcuts', opens: 'browser_shortcuts' }
+  ] },
   { id: 'browser_batch', titleKey: 'browser_help_batch_title', parent: 'browser', items: [
+    { id: 'select_all', titleKey: 'browser_select_all' },
+    { id: 'clear_selection', titleKey: 'browser_clear_selection' },
+    { id: 'preview', titleKey: 'browser_preview_selection', opens: 'preview' },
+    { id: 'export', titleKey: 'browser_export_selection', opens: 'browser_export' },
+    { id: 'grade', titleKey: 'browser_grade_now', opens: 'browser_grade' },
     { id: 'reset', titleKey: 'browser_reset_title', opens: 'browser_reset' },
     { id: 'suspend', titleKey: 'browser_action_toggle_suspend' },
     { id: 'bury', titleKey: 'browser_action_toggle_bury' },
     { id: 'notetype', titleKey: 'browser_action_change_notetype' },
     { id: 'deck', titleKey: 'browser_action_change_deck' },
-    { id: 'reposition', titleKey: 'browser_action_reposition' },
+    { id: 'reposition', titleKey: 'browser_action_reposition', opens: 'browser_reposition' },
     { id: 'due', titleKey: 'browser_action_set_due' },
     { id: 'tags', titleKey: 'tags_batch_title', opens: 'tag_picker' },
     { id: 'marking', titleKey: 'study_marking_title', opens: 'browser_batch_marking' },
@@ -276,6 +295,41 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'help', titleKey: 'browser_help_batch_title' },
     { id: 'exit', titleKey: 'browser_exit_selection' },
     { id: 'delete', titleKey: 'browser_action_delete' }
+  ] },
+  { id: 'browser_display', titleKey: 'browser_display_columns', parent: 'browser_display_settings', items: [
+    { id: 'columns', titleKey: 'browser_display_columns' }, { id: 'up', titleKey: 'browser_column_up' },
+    { id: 'down', titleKey: 'browser_column_down' }, { id: 'save', titleKey: 'browser_detail_confirm' }, { id: 'close', titleKey: 'browser_detail_cancel' }
+  ] },
+  { id: 'browser_find_replace', titleKey: 'browser_action_find_replace', parent: 'browser_more', items: [
+    { id: 'target', titleKey: 'browser_find_field' }, { id: 'regex', titleKey: 'browser_find_regex' },
+    { id: 'match_case', titleKey: 'browser_find_match_case' }, { id: 'selected', titleKey: 'browser_find_scope_selected' },
+    { id: 'results', titleKey: 'browser_find_scope_all' }, { id: 'execute', titleKey: 'browser_find_execute' },
+    { id: 'close', titleKey: 'browser_find_cancel' }
+  ] },
+  { id: 'browser_search_options', titleKey: 'browser_search_options', parent: 'browser_search_tools', items: [
+    { id: 'ignore_accents', titleKey: 'browser_ignore_accents' },
+    { id: 'builder', titleKey: 'browser_search_builder' }, { id: 'close', titleKey: 'browser_detail_cancel' }
+  ] },
+  { id: 'browser_recent_searches', titleKey: 'browser_recent_searches', parent: 'browser_search_tools', items: [
+    { id: 'recent', titleKey: 'browser_recent_searches' }, { id: 'close', titleKey: 'browser_detail_cancel' }
+  ] },
+  { id: 'browser_shortcuts', titleKey: 'browser_shortcuts', parent: 'browser_more_settings', items: [
+    { id: 'close', titleKey: 'browser_detail_cancel' }
+  ] },
+  { id: 'browser_editor', titleKey: 'note_editor_edit_title', parent: 'browser', items: [
+    { id: 'close', titleKey: 'browser_editor_close' }, { id: 'form', titleKey: 'note_editor_edit_title', opens: 'edit_note_form' }
+  ] },
+  { id: 'browser_grade', titleKey: 'browser_grade_now', parent: 'browser_batch', items: [
+    { id: 'rating', titleKey: 'browser_grade_now' }, { id: 'confirm', titleKey: 'browser_detail_confirm' }, { id: 'close', titleKey: 'browser_detail_cancel' }
+  ] },
+  { id: 'browser_reposition', titleKey: 'browser_action_reposition', parent: 'browser_batch', items: [
+    { id: 'start', titleKey: 'browser_action_reposition_start' }, { id: 'step', titleKey: 'browser_action_reposition_step' },
+    { id: 'random', titleKey: 'browser_action_reposition_random' }, { id: 'shift', titleKey: 'browser_action_reposition_shift' },
+    { id: 'confirm', titleKey: 'browser_detail_confirm' }, { id: 'close', titleKey: 'browser_detail_cancel' }
+  ] },
+  { id: 'browser_export', titleKey: 'browser_export_selection', parent: 'browser_batch', items: [
+    { id: 'format', titleKey: 'browser_export_text' }, { id: 'media', titleKey: 'browser_export_media' },
+    { id: 'scheduling', titleKey: 'browser_export_scheduling' }, { id: 'confirm', titleKey: 'browser_detail_confirm' }, { id: 'close', titleKey: 'browser_detail_cancel' }
   ] },
   { id: 'media_maintenance', titleKey: 'settings_media_management', parent: 'settings', items: [
     { id: 'check', titleKey: 'media_check' }, { id: 'trash_unused', titleKey: 'media_trash_all_unused' },
@@ -740,13 +794,16 @@ export function studyInterfaceMenu(context: StudyInterfaceContext, surfaceId: st
         studyInterfaceMenu(context, item.opens) : undefined }));
 }
 
-export function browserInterfaceMenu(available: boolean, filterActive: boolean, subtitleIndex: number): AppInterfaceMenuItem[] {
-  return visibleInterfaceItems('browser_more', { simple: false, agent: false, cloudDeck: false, themeHasTextures: false })
+export function browserInterfaceMenu(available: boolean, filterActive: boolean, subtitleIndex: number,
+  surface: string = 'browser_more'): AppInterfaceMenuItem[] {
+  return visibleInterfaceItems(surface, { simple: false, agent: false, cloudDeck: false, themeHasTextures: false })
     .map((item: AppInterfaceItem): AppInterfaceMenuItem => ({ id: item.id,
       titleKey: item.id === 'filter' && filterActive ? 'browser_filter_active' : item.titleKey, opens: item.opens,
-      enabled: item.id.startsWith('subtitle_') || (available && (item.id !== 'save_search' || filterActive)),
+      enabled: item.id === 'display_settings' || item.id.startsWith('subtitle_') || (available && (item.id !== 'save_search' || filterActive)),
       selected: item.id === 'subtitle_deck' ? subtitleIndex === 1 : item.id === 'subtitle_answer' ? subtitleIndex === 4 :
-        item.id === 'subtitle_due' && subtitleIndex === 2 }));
+        item.id === 'subtitle_due' && subtitleIndex === 2,
+      children: ['search_tools', 'display_settings', 'more_settings'].includes(item.id) ?
+        browserInterfaceMenu(available, filterActive, subtitleIndex, item.opens) : undefined }));
 }
 
 /** 工具参数从实际共享声明生成，新增已接通界面不再维护第二份 enum。 */

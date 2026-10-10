@@ -16,7 +16,7 @@ export struct BrowserNotetypeFeature {
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
 
   private handleBackRequest(): void {
-    if (!(this.busy || this.state.busy)) this.onClose();
+    if (!this.disposed && !this.busy) this.onClose();
   }
 
   firstId: number = 0;
@@ -27,13 +27,15 @@ export struct BrowserNotetypeFeature {
   onSubmit: (input: 变更笔记类型请求) => void = (_input: 变更笔记类型请求): void => {};
   @State private state: BrowserNotetypeState = initialNotetypeState();
   private session: BrowserNotetypeSession | null = null;
+  private disposed: boolean = false;
   aboutToAppear(): void {
     this.session = new BrowserNotetypeSession(new AnkiBrowserNotetype(),
       (state: BrowserNotetypeState): void => { this.state = state; });
     this.session.load(this.firstId, this.notes);
   }
-  aboutToDisappear(): void { this.session?.dispose(); }
+  aboutToDisappear(): void { this.disposed = true; this.session?.dispose(); }
   private submit(): void {
+    if (this.disposed || this.busy || this.state.busy) return;
     const input = this.session?.request();
     if (input !== null && input !== undefined) this.onSubmit(input);
   }
@@ -56,8 +58,8 @@ export struct BrowserNotetypeFeature {
     DialogHeader({
       title: $r('app.string.browser_action_change_notetype'),
       closeLabel: $r('app.string.browser_detail_cancel'),
-      closeEnabled: !this.busy && !this.state.busy,
-      onClose: (): void => { this.onClose(); },
+      closeEnabled: !this.busy,
+      onClose: (): void => { this.handleBackRequest(); },
       actionLabel: $r('app.string.browser_detail_confirm'),
       actionEnabled: !this.busy && !this.state.busy && this.state.info !== null,
       onAction: (): void => { this.submit(); }
@@ -168,8 +170,8 @@ export struct BrowserNotetypeFeature {
   }
 
   build() {
-    DialogFrame({ maximumWidth: 应用尺寸.dialogWideMaxWidth, canDismiss: !this.busy && !this.state.busy,
+    DialogFrame({ maximumWidth: 应用尺寸.dialogWideMaxWidth, canDismiss: !this.busy,
       header: () => { this.dialogHeader(); }, content: () => { this.dialogContent(); },
-      onDismiss: (): void => { this.onClose(); } })
+      onDismiss: (): void => { this.handleBackRequest(); } })
   }
 }

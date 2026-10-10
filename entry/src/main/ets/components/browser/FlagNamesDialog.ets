@@ -19,6 +19,7 @@ export struct FlagNamesDialog {
   onClose: () => void = (): void => {};
   onChanged: () => void = (): void => {};
   @State private isBusy: boolean = true;
+  @State private saving: boolean = false;
   @State private errorText: string = '';
   @State private drafts: string[] = ['', '', '', '', '', '', '', ''];
   private edited: Set<number> = new Set<number>();
@@ -28,7 +29,7 @@ export struct FlagNamesDialog {
   private operations: BrowserOperationController = new BrowserOperationController();
   aboutToAppear(): void { this.mounted = true; this.load(); }
   aboutToDisappear(): void { this.mounted = false; this.operations.dispose(); }
-  private handleBack(): void { if (!this.isBusy) this.onClose(); }
+  private handleBack(): void { if (this.mounted && !this.saving) this.onClose(); }
   private async load(_locale: string = this.uiLanguage): Promise<void> {
     autoSyncScheduler.beginOperation(this);
     try {
@@ -47,13 +48,14 @@ export struct FlagNamesDialog {
     }
   }
   private async save(_locale: string = this.uiLanguage): Promise<void> {
-    if (this.isBusy || !this.loaded) return;
+    if (!this.mounted || this.isBusy || !this.loaded) return;
     if (this.edited.size === 0) { this.onClose(); return; }
     const input: FlagLabelChange[] = CARD_FLAGS.filter((flag: CardFlagDefinition): boolean => this.edited.has(flag.value))
       .map((flag: CardFlagDefinition): FlagLabelChange => ({ flag: flag.value, name: this.drafts[flag.value] }));
     const context = this.operations.begin('labels', [], 0, 0);
     if (context === null) return;
     this.isBusy = true;
+    this.saving = true;
     this.errorText = '';
     try {
       await this.operations.execute(context, async (): Promise<void> => { await saveCardFlagLabels(this.backend, input); }, {
@@ -62,12 +64,12 @@ export struct FlagNamesDialog {
         failed: (): void => { if (this.mounted) this.errorText = resourceText(this.getUIContext(), $r('app.string.card_mark_save_error')); },
         refreshFailed: (): void => {}
       });
-    } finally { if (this.mounted) this.isBusy = false; }
+    } finally { if (this.mounted) { this.isBusy = false; this.saving = false; } }
   }
   @Builder
   private header() {
     DialogHeader({ title: $r('app.string.card_mark_flag_names'), closeLabel: $r('app.string.browser_detail_cancel'),
-      closeEnabled: !this.isBusy, onClose: (): void => { this.onClose(); },
+      closeEnabled: !this.saving, onClose: (): void => { this.handleBack(); },
       actionLabel: $r('app.string.browser_detail_confirm'), actionEnabled: !this.isBusy && this.loaded && this.errorText === '',
       onAction: (): void => { this.save(); } })
   }
@@ -100,7 +102,7 @@ export struct FlagNamesDialog {
     }
   }
   build() {
-    DialogFrame({ canDismiss: !this.isBusy, header: () => { this.header(); },
-      content: () => { this.content(); }, onDismiss: (): void => { this.onClose(); } })
+    DialogFrame({ canDismiss: !this.saving, header: () => { this.header(); },
+      content: () => { this.content(); }, onDismiss: (): void => { this.handleBack(); } })
   }
 }

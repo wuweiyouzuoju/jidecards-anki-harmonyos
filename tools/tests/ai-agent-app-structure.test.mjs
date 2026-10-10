@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { REVIEW_AUDIO_PREFERENCES } from '../../entry/src/main/ets/model/ReviewAudioPreferences.ts';
 import { readFileSync, readdirSync } from 'node:fs';
-import { APP_INTERFACE_SURFACES, AppInterfaceTracker, visibleInterfaceItems, deckDetailsMoreItems, settingsHeaderItems, settingsHeaderControls } from '../../entry/src/main/ets/model/AppInterface.ts';
+import { APP_INTERFACE_SURFACES, NOTETYPE_MANAGEMENT_ACTIONS, EMPTY_CARDS_ACTIONS, AppInterfaceTracker, visibleInterfaceItems, deckDetailsMoreItems, settingsHeaderItems, settingsHeaderControls } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { appInterfaceSurfaceIds, browserInterfaceMenu, studyInterfaceMenu } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { agentInterfaceControls, agentInterfaceTitle, agentImportLabelKey, reminderEditorControls, reminderEditorTitle } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { stripTypeScriptTypes } from 'node:module';
@@ -17,6 +17,8 @@ import { agentFunctionTools } from '../../entry/src/main/ets/model/agent/AgentTo
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
 import { appInterfaceDependencies, studyInterfaceMethods } from './app-interface-harness.mjs';
 import { loadUiFeedback } from './ui-feedback-harness.mjs';
+import { DIALOG_ACTION_PRESENTATION } from '../../entry/src/main/ets/model/InteractionFeedback.ts';
+import { EXTERNAL_DECK_OPEN_SUPPORT, externalDeckUri } from '../../entry/src/main/ets/model/ExternalDeckOpen.ts';
 
 const read = path => readFileSync(new URL('../../entry/src/main/ets/' + path, import.meta.url),'utf8');
 const strings = locale => new Map(JSON.parse(readFileSync(new URL(`../../entry/src/main/resources/${locale}/element/string.json`, import.meta.url),'utf8')).string.map(x=>[x.name,x.value]));
@@ -25,6 +27,71 @@ const context = {simple:true,agent:true,cloudDeck:false,themeHasTextures:false};
 const localize = key => { assert.ok(zh.has(key), 'missing UI resource: '+key); return zh.get(key); };
 const tools = agentFunctionTools(100,'assistant');
 const structure = (state=context, surface='app', section='') => buildAgentAppStructure(state,surface,section,localize,agentSettingDefinitions(),tools,[]);
+
+test('JIDE reads external APKG opening from the receiving policy without granting file access', () => {
+  for (const labels of [zh, en]) {
+    const result = buildAgentAppStructure(context, 'app', '', key => labels.get(key),
+      agentSettingDefinitions(), tools, []);
+    const support = JSON.parse(JSON.stringify(result)).externalDeckOpen;
+    assert.deepEqual(support, EXTERNAL_DECK_OPEN_SUPPORT);
+    assert.equal(support.requiresImportConfirmation, true);
+    assert.equal(support.opensFilePicker, false);
+    assert.equal(support.acceptsCollectionRestore, false);
+    for (const type of support.fallbackTypes) {
+      assert.equal(externalDeckUri(support.action, 'file://chat/deck.apkg', type), 'file://chat/deck.apkg');
+      assert.equal(externalDeckUri(support.action, 'file://chat/backup.colpkg', type), null);
+    }
+    assert.ok(!result.actions.some(action => action.id === 'open_external_file'));
+  }
+});
+
+test('notetype card actions share their localized names and icons with JIDE without granting writes', () => {
+  for (const labels of [zh, en]) {
+    const result = buildAgentAppStructure({ ...context, simple: false }, 'notetype_management', '',
+      key => labels.get(key), agentSettingDefinitions(), tools, []);
+    assert.deepEqual(result.surfaces[0].items.map(item => [item.id, item.title, item.iconKey]),
+      Object.values(NOTETYPE_MANAGEMENT_ACTIONS).map(item => [item.id, labels.get(item.titleKey), item.iconKey]));
+    assert.equal(result.surfaces[0].items.find(item => item.id === 'copy').title, labels.get('notetype_clone'));
+    assert.equal(result.surfaces[0].items.find(item => item.id === 'add').iconKey, 'ic_home_new');
+    assert.ok(result.surfaces[0].items.every(item => item.writeTool === '' && item.enabled === undefined));
+    assert.equal(SETTINGS_GROUPS.find(group => group.id === 'data').items.find(item => item.id === 'notetypes').opens,
+      'notetype_management');
+  }
+});
+
+test('empty-card actions expose actual names and refresh artwork without inventing live selection or writes', () => {
+  for (const labels of [zh, en]) {
+    const result = buildAgentAppStructure(context, 'empty_cards', '', key => labels.get(key),
+      agentSettingDefinitions(), tools, []);
+    assert.deepEqual(result.surfaces[0].items.map(item => [item.id, item.title, item.iconKey]),
+      Object.values(EMPTY_CARDS_ACTIONS).map(item => [item.id, labels.get(item.titleKey), item.iconKey]));
+    assert.equal(result.surfaces[0].instructions, labels.get('empty_cards_description'));
+    assert.ok(result.surfaces[0].items.every(item => item.writeTool === '' && item.enabled === undefined));
+  }
+});
+
+test('JIDE reads the shared dialog check presentation while retaining semantic action names', () => {
+  for (const labels of [zh, en]) {
+    const result = buildAgentAppStructure(context, 'create_deck', '', key => labels.get(key),
+      agentSettingDefinitions(), tools, []);
+    assert.deepEqual(result.interactionFeedback.dialogActions, DIALOG_ACTION_PRESENTATION);
+    assert.equal(result.interactionFeedback.dialogActions.confirmIconKey, 'ic_common_confirm');
+    assert.equal(result.surfaces[0].items.find(item => item.id === 'confirm').title, labels.get('create_deck_confirm'));
+    assert.ok(result.interactionFeedback.dialogActions.textActionReasons.includes('destructive'));
+    assert.ok(result.interactionFeedback.dialogActions.textActionReasons.includes('busy_status'));
+  }
+});
+
+test('directory observation keeps raw tag names even when they match control IDs', () => {
+  const tracker = new AppInterfaceTracker();
+  tracker.observeDirectory('tag_picker', { query: '', ids: ['search', 'expand'], paths: ['search', 'expand'],
+    expandedIds: [], selections: [0, 1], selectable: [true, true], total: 2, interactive: true,
+    mode: 'multiple', searchable: true, hasBranches: false });
+  const result = buildAgentAppStructure(context, 'directory_tree', '', localize, agentSettingDefinitions(), tools, tracker.snapshot());
+  const serialized = JSON.stringify(result);
+  assert.ok(serialized.includes('"optionLabels":["search","expand"]'));
+  assert.ok(serialized.includes('"titleKey":"directory_search"'));
+});
 
 test('icon controls retain names and current mode in shared UI and JIDE observations', () => {
   const uiIcons = loadPlatformModule('utils/AppInterfaceText.ets', 'interfaceControlIcon', { $r: key => key });
@@ -69,10 +136,18 @@ test('JIDE reads current Core rendering ownership and the same supported TTS par
   assert.deepEqual(editor.tools.filter(tool=>['font_size','heading'].includes(tool.id)).map(tool=>tool.id),['font_size','heading']);
   assert.equal(editor.tools.find(tool=>tool.id==='math').longPressAction,'choose_block_or_chemistry');
   assert.deepEqual(editor.formatMenus.map(menu=>[menu.toolId,menu.options.length]),[['font_size',7],['heading',5],['math',2]]);
+  assert.deepEqual(editor.fontSizeMenu,{placement:'outer_arc_overlay',
+    selection:'current_caret_or_selection_font_size',mixedSelection:'no_selected_size',
+    visualEditing:'selection_live_style_or_caret_typing_style_saved_as_css_keywords'});
+  assert.equal(editor.tools.find(tool=>tool.id==='font_size').editing,'visual_or_source');
+  assert.equal(editor.tools.find(tool=>tool.id==='heading').editing,'visual_paragraph_or_source');
+  assert.deepEqual(editor.formatOptionPicker,{toolIds:['font_size','heading'],placement:'outer_arc_overlay',
+    alignment:'wheel_center_with_trigger_angle_without_resizing_wheel',boundaryAvoidance:'screen_and_keyboard_before_trigger_alignment',
+    triggerHighlight:'current_recognized_selection_or_typing_format',inputFocus:'preserve_current_focus_and_keyboard'});
   assert.equal(editor.toolMenu.defaultVisibility,'visible_and_expanded_without_input_focus');
   assert.equal(editor.toolMenu.visibleCount,7);assert.equal(editor.toolMenu.labels,'below_each_icon');
   assert.equal(editor.toolMenu.target,'first_editable_field_then_last_focused_field');
-  assert.equal(editor.toolMenu.initialSelection,'no_selected_tools');assert.equal(editor.toolMenu.activation,'click_tool_to_apply_rotation_preserves_multiple_selection');
+  assert.equal(editor.toolMenu.initialSelection,'current_formats_without_executing_tools');assert.equal(editor.toolMenu.activation,'click_tool_to_apply_rotation_preserves_multiple_selection');
   assert.equal(editor.toolMenu.rotation,'drag_arc_or_vertical_mouse_wheel');
   assert.equal(editor.toolMenu.geometry,'concentric_common_inner_and_rotating_outer_arcs');assert.equal(editor.toolMenu.labelLines,2);
   assert.deepEqual(editor.toolMenu.commonToolIds,['bold','italic','underline','highlight','break','clear_format']);
@@ -272,23 +347,25 @@ test('live observations copy mutable state, replace changed options and remove c
 test('browser menus expose actual disabled, selected and dynamic options with no second sorting catalog', () => {
   const tracker=new AppInterfaceTracker();
   const More=loadComponentLogic('components/browser/BrowserMoreMenu.ets','BrowserMoreMenu',{
-    appInterface:tracker,browserInterfaceMenu,namedResourceText:(_,key)=>localize(key)});
+    ...appInterfaceDependencies(),appInterface:tracker,browserInterfaceMenu,namedResourceText:(_,key)=>localize(key),
+    localizedNamedResourceText:(_,locale,key)=>localize(key)});
   const more=new More();more.getUIContext=()=>({});const calls=[];
   more.onFilter=()=>calls.push('filter');more.onFindReplace=()=>calls.push('find');more.onSaveSearch=()=>calls.push('save');
   more.onSubtitle=index=>calls.push(index);
   more.available=false;more.filterActive=false;more.aboutToAppear();
   for(const id of ['filter','find_replace','save_search']) more.selectItem(id);
   assert.deepEqual(calls,[]);
-  more.selectItem('subtitle_due');assert.deepEqual(calls.splice(0),[2]);
+  more.selectItem('display_settings');more.selectItem('subtitle_due');assert.deepEqual(calls.splice(0),[2]);
   more.available=true;more.filterActive=true;more.subtitleIndex=4;more.publishInterface();
   const view=buildAgentAppStructure(context,'browser_more','',localize,[],[],tracker.snapshot(),'browser');
   assert.equal(view.foregroundSurface,'browser');
   assert.equal(view.surfaces[0].items.find(x=>x.id==='filter').title,localize('browser_filter_active'));
-  assert.equal(view.surfaces[0].items.find(x=>x.id==='subtitle_answer').selected,true);
+  const display=buildAgentAppStructure(context,'browser_display_settings','',localize,[],[],tracker.snapshot(),'browser');
+  assert.equal(display.surfaces[0].items.find(x=>x.id==='subtitle_answer').selected,true);
   const english=buildAgentAppStructure(context,'browser_more','',key=>en.get(key),[],[],tracker.snapshot(),'browser');
   assert.equal(english.surfaces[0].items.find(x=>x.id==='filter').title,en.get('browser_filter_active'));
-  assert.equal(english.observations[0].optionLabels[0],en.get('browser_filter_active'),'cached observations do not contradict the current resource language');
-  for(const id of ['filter','find_replace','save_search'])more.selectItem(id);
+  assert.equal(english.observations[0].optionLabels[english.observations[0].optionIds.indexOf('filter')],en.get('browser_filter_active'),'cached observations do not contradict the current resource language');
+  for(const id of ['filter','find_replace','search_tools','save_search'])more.selectItem(id);
   assert.deepEqual(calls,['filter','find','save']);more.aboutToDisappear();assert.equal(tracker.snapshot().length,0);
 
   const View=loadComponentLogic('components/browser/BrowserViewMenu.ets','BrowserViewMenu',{
@@ -314,7 +391,7 @@ function pageMethods(file,names,deps) {
   return new Function(...Object.keys(deps),stripTypeScriptTypes('class Page {'+methods.join('\n')+'}',{mode:'transform'})+';return Page;')(...Object.values(deps));
 }
 
-test('study UI preserves actions and JIDE observes expanded left groups and flags without invented Back controls', () => {
+test('study UI preserves actions and JIDE observes replaced groups and the real Back control', () => {
   const tracker=new AppInterfaceTracker();
   const deps=appInterfaceDependencies();
   const Page=pageMethods('pages/学习页.ets',['interfaceMenuItems','更多菜单','flagMenuItems','toggleStudyMenuBranch','studyMenuEntry','studyMenuIcon','executeMenuAction','publishInterface','publishStudyMenu'],{
@@ -341,27 +418,23 @@ test('study UI preserves actions and JIDE observes expanded left groups and flag
   for(const [expanded,surfaces] of [
     [[],['study_more']],
     [['marking','card_actions'],['study_more','study_marking','study_card_actions']],
-    [['marking','card_actions','flag'],['study_more','study_marking','study_card_actions','study_flags']]]) {
+    [['marking','card_actions','flag'],['study_more','study_card_actions','study_flags']]]) {
     page.studyExpandedIds=expanded;page.publishInterface();
     const menus=tracker.snapshot().filter(x=>x.surface!=='study');
     assert.deepEqual(menus.map(x=>x.surface).sort(),surfaces.sort());
     for(const surface of surfaces) {
       const observed=buildAgentAppStructure(context,surface,'',localize,[],[],tracker.snapshot(),'study');
       assert.ok(observed.surfaces[0].items.every(x=>x.visibility==='observed'));
-      assert.ok(!observed.surfaces[0].items.some(x=>x.id==='back'));
+      assert.equal(observed.surfaces[0].items.some(x=>x.id==='back'),surface==='study_flags');
       if(surface==='study_flags') {
-        assert.deepEqual(menus.find(x=>x.surface===surface).optionIds,['0','1','2','3','4','5','6','7']);
+        assert.deepEqual(menus.find(x=>x.surface===surface).optionIds,['back','0','1','2','3','4','5','6','7']);
         const purple=observed.surfaces[0].items.find(x=>x.id==='7');
         assert.equal(purple.title,'Custom purple');assert.equal(purple.selected,true);
       }
     }
   }
-  page.studyPrimaryObscured=true;page.publishInterface();
   assert.deepEqual(tracker.snapshot().filter(x=>x.surface!=='study').map(x=>x.surface).sort(),
-    ['study_card_actions','study_flags','study_marking'],'color overlay removes covered More menu and retains left groups');
-  page.studyPrimaryObscured=false;page.publishInterface();
-  assert.deepEqual(tracker.snapshot().filter(x=>x.surface!=='study').map(x=>x.surface).sort(),
-    ['study_card_actions','study_flags','study_marking','study_more'],'closing colors restores the primary menu');
+    ['study_card_actions','study_flags','study_more'],'colors replace Marking and keep primary actions visible');
   page.评分中=true;page.publishInterface();
   assert.ok(tracker.snapshot().filter(x=>x.surface!=='study').every(x=>x.items.every(item=>!item.enabled)),'all visible actions are disabled consistently while busy');
   let result=buildAgentAppStructure(context,'study_more','',localize,[],[],tracker.snapshot());
@@ -448,7 +521,7 @@ test('JIDE input and header share the actual history, parsing, stop and readines
       for (const batchRunning of [false, true]) for (const canSubmit of [false, true]) {
         const controls = agentInterfaceControls({history,processing,parsing,pendingClarification,batchRunning,canSubmit});
         const byId = id => controls.find(item => item.id === id);
-        assert.deepEqual(controls.map(x => x.id), history ? ['back','new'] : ['back','history','input','import','submit']);
+        assert.deepEqual(controls.map(x => x.id), history ? ['back','memory','new'] : ['back','history','input','import','submit']);
         assert.equal(byId('back').enabled, true);
         assert.equal(byId(history ? 'new' : 'history').enabled, !processing && !parsing && !batchRunning);
         if (!history) {
@@ -553,7 +626,9 @@ test('reminder form shares its mode labels, actual time options, draft metadata 
   assert.equal(current.surfaces[0].items.find(x=>x.id==='confirm').title,en.get('deck_customize_save'));
   assert.equal(current.surfaces[0].items.find(x=>x.id==='delete').visibility,'observed');
   assert.equal(current.surfaces[0].items.find(x=>x.id==='delete').enabled,false);
-  assert.equal(current.surfaces[0].items.find(x=>x.id==='insert_new').enabled,true,'current UI allows token labels while busy');
+  assert.equal(current.surfaces[0].items.find(x=>x.id==='insert_new').enabled,false);
+  assert.equal(current.surfaces[0].items.find(x=>x.id==='insert_review').enabled,false);
+  const accepted=form.内容;form.插入占位符('app.string.reminder_edit_token_new');assert.equal(form.内容,accepted,'busy shortcut cannot change the accepted draft');
   assert.ok(!JSON.stringify(current).includes('PRIVATE_'));
   const source=read('components/提醒编辑面板.ets');
   for(const id of ['time','title','content','insert_new','insert_review','confirm','cancel','delete']) assert.ok(source.includes(`this.interfaceLabel('${id}')`),id);

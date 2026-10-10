@@ -45,7 +45,7 @@ import { 颜色键 } from '../../model/颜色主题';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 统一空态 } from '../common/统一空态';
 import { BrowserRowColor } from '../../proto/messages/SearchMessages';
-import type { BrowserCell } from '../../proto/messages/SearchMessages';
+import type { BrowserCell, BrowserColumn } from '../../proto/messages/SearchMessages';
 
 /**
  * List data source for browser rows.  The page owns the query and mutation
@@ -116,9 +116,17 @@ export struct 卡片表格 {
   @Prop subtitleIndex: number = 1;
   @Prop notesMode: boolean = false;
   @Prop flagLabels: FlagLabels = {};
+  @Prop displayColumns: BrowserColumn[] = [];
+  @Prop tableLayout: boolean = false;
+  @Prop busy: boolean = false;
+  @Prop displayKeys: string[] = [];
+  @Prop activeKeys: string[] = ['question', 'deck', 'cardDue', 'flags', 'answer'];
   /** 从 Agent 改卡入口进入时，首次挂载即显示多选框。 */
   @Prop 多选模式: boolean = false;
   @Prop 选中IDs: number[] = [];
+  @Prop @Watch('scrollToFocusedRow') focusedId: number = 0;
+  onAnchor: (id: number) => void = (_id: number): void => {};
+  onRange: (id: number) => void = (_id: number): void => {};
   onRowClick: (id: number) => void = (): void => {};
   onLongPress: () => void = (): void => {};
   onLoadMore: () => Promise<void> = async (): Promise<void> => {};
@@ -133,6 +141,11 @@ export struct 卡片表格 {
 
   @State private 加载中: boolean = false;
   private readonly 行数据源: 浏览行数据源 = new 浏览行数据源();
+  private readonly listScroller: Scroller = new Scroller();
+  private scrollToFocusedRow(): void {
+    const index: number = this.行列表.findIndex((row: 浏览行数据): boolean => row.id === this.focusedId);
+    if (index >= 0) this.listScroller.scrollToIndex(index, false, ScrollAlign.AUTO);
+  }
 
   aboutToAppear(): void {
     this.同步行数据源();
@@ -141,6 +154,7 @@ export struct 卡片表格 {
 
   private 同步行数据源(): void {
     this.行数据源.replaceAll(this.行列表);
+    this.scrollToFocusedRow();
   }
 
 
@@ -150,7 +164,20 @@ export struct 卡片表格 {
     if (行.cells.length === 0) {
       return `#${行.id}`;
     }
-    return 行.cells[0].text || `#${行.id}`;
+    const index: number = this.displayKeys.length === 0 ? 0 : this.activeKeys.indexOf(this.displayKeys[0]);
+    return 行.cells[index]?.text || `#${行.id}`;
+  }
+  private displayColumnText(row: 浏览行数据, key: string): string {
+    const column: BrowserColumn | undefined = this.displayColumns.find((item: BrowserColumn): boolean => item.key === key);
+    const label: string = column === undefined ? key : this.notesMode ? column.notesModeLabel : column.cardsModeLabel;
+    return `${label}: ${row.cells[this.activeKeys.indexOf(key)]?.text ?? ''}`;
+  }
+  private columnLabel(key: string): string {
+    const column: BrowserColumn | undefined = this.displayColumns.find((item: BrowserColumn): boolean => item.key === key);
+    return column === undefined ? key : this.notesMode ? column.notesModeLabel : column.cardsModeLabel;
+  }
+  private tableWidth(): Length {
+    return this.tableLayout && this.displayKeys.length > 0 ? Math.max(320, this.displayKeys.length * 160 + 180) : '100%';
   }
 
   /** 按选择读取副标题；牌组仅展示末级名称，完整路径仍保留在详情。 */
@@ -170,6 +197,12 @@ export struct 卡片表格 {
   /** 旗标只覆盖左侧色条，四周中性轮廓始终保留。 */
   private rowBorder(row: 浏览行数据): BorderOptions {
     const flagColor: string = this.取行标志色(row);
+    if (row.id === this.focusedId) {
+      const widths: EdgeWidths = { top: 2, right: 2, bottom: 2, left: flagColor === 'transparent' ? 2 : 4 };
+      const colors: EdgeColors = { top: this.actionColor, right: this.actionColor, bottom: this.actionColor,
+        left: flagColor === 'transparent' ? this.actionColor : flagColor };
+      return SurfaceBorder.options(widths, colors);
+    }
     if (flagColor === 'transparent') return SurfaceBorder.options();
     const outline: ResourceColor = SurfaceBorder.color();
     const widths: EdgeWidths = { top: 应用尺寸.卡片边框, right: 应用尺寸.卡片边框,
@@ -185,6 +218,8 @@ export struct 卡片表格 {
 
   /** 点击行：多选模式下切换选中，否则触发 onRowClick。 */
   private 处理行点击(id: number): void {
+    if (this.busy) return;
+    this.onAnchor(id);
     if (this.多选模式) {
       this.设置选中(id, this.选中IDs.indexOf(id) < 0);
     } else {
@@ -194,16 +229,20 @@ export struct 卡片表格 {
 
   /** 长按行：进入多选模式并选中当前行，通知宿主。 */
   private 处理长按(id: number): void {
+    if (this.busy) return;
     if (this.多选模式) {
-      return;
+      this.onRange(id); return;
     }
     this.onMultiSelectChange(true);
+    this.onAnchor(id);
     this.onSelectionChange([id]);
     this.onLongPress();
   }
 
   /** 提交某行选择意图，页面决定并回传最新快照。 */
   private 设置选中(id: number, 选中: boolean): void {
+    if (this.busy) return;
+    this.onAnchor(id);
     const 新集合: Set<number> = new Set<number>(this.选中IDs);
     if (选中) {
       新集合.add(id);
@@ -220,12 +259,28 @@ export struct 卡片表格 {
           标题: $r('app.string.browser_empty')
         })
       } else {
-        List({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout) }) {
+        Scroll() {
+        Column() {
+        if (this.tableLayout && this.displayKeys.length > 0) {
+          Row({ space: 应用尺寸.间距_8 }) {
+            if (this.多选模式) { Blank().width(20) }
+            Row() {
+              ForEach(this.displayKeys, (key: string) => {
+                Text(this.columnLabel(key)).fontSize(应用尺寸.字号_正文_小)
+                  .fontColor($r('app.color.text_secondary')).width(160).maxLines(1)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+              }, (key: string): string => key)
+            }.layoutWeight(1)
+          }.width('100%').padding({ left: 应用尺寸.页面内边距_水平 + 应用尺寸.卡片内边距,
+            right: 应用尺寸.页面内边距_水平 + 应用尺寸.卡片内边距, top: 8, bottom: 8 })
+        }
+        List({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout), scroller: this.listScroller }) {
           LazyForEach(this.行数据源, (行: 浏览行数据) => {
             ListItem() {
               Row({ space: 应用尺寸.间距_8 }) {
                 if (this.多选模式) {
                   Checkbox()
+                    .enabled(!this.busy)
                     .select(this.选中IDs.indexOf(行.id) >= 0)
                     .selectedColor(this.actionColor)
                     .width(20)
@@ -235,6 +290,15 @@ export struct 卡片表格 {
                     })
                 }
 
+                if (this.tableLayout && this.displayKeys.length > 0) {
+                  Row() {
+                    ForEach(this.displayKeys, (key: string) => {
+                      Text(行.cells[this.activeKeys.indexOf(key)]?.text ?? '').width(160)
+                        .fontSize(应用尺寸.字号_正文).fontColor(this.是否挂起行(行) ? $r('app.color.text_secondary') : $r('app.color.text_primary')).maxLines(2)
+                        .textOverflow({ overflow: TextOverflow.Ellipsis })
+                    }, (key: string): string => key)
+                  }.layoutWeight(1)
+                } else {
                 Column({ space: 应用尺寸.间距_2 }) {
                   Text(this.取行主文案(行))
                     .fontSize(应用尺寸.字号_正文)
@@ -244,7 +308,13 @@ export struct 卡片表格 {
                     .textAlign(TextAlign.Start)
                     .width('100%')
 
-                  if (this.取行副文案(行) !== '') {
+                  if (this.displayKeys.length > 0) {
+                    ForEach(this.displayKeys.slice(1), (key: string) => {
+                      Text(this.displayColumnText(行, key)).fontSize(应用尺寸.字号_正文_小)
+                        .fontColor($r('app.color.text_secondary')).maxLines(2)
+                        .textOverflow({ overflow: TextOverflow.Ellipsis }).width('100%')
+                    }, (key: string): string => key)
+                  } else if (this.取行副文案(行) !== '') {
                     Text(this.取行副文案(行))
                       .fontSize(应用尺寸.字号_正文_小)
                       .fontColor($r('app.color.text_secondary'))
@@ -266,6 +336,7 @@ export struct 卡片表格 {
                 }
                 .alignItems(HorizontalAlign.Start)
                 .layoutWeight(1)
+                }
 
                 CardMarkingBadge({ flag: this.notesMode ? 0 : browserRowFlag(行.color),
                   marked: 行.marked === true, labels: this.flagLabels })
@@ -289,7 +360,11 @@ export struct 卡片表格 {
               .border(this.rowBorder(行))
               .borderRadius(应用尺寸.圆角_指标卡)
               .attributeModifier(new PressFeedback())
-              .onClick((): void => this.处理行点击(行.id))
+              .onClick((event: ClickEvent): void => {
+                if (this.busy) return;
+                if (event.getModifierKeyState?.(['Shift'])) this.onRange(行.id);
+                else this.处理行点击(行.id);
+              })
               .gesture(
                 LongPressGesture()
                   .onAction((): void => this.处理长按(行.id))
@@ -299,6 +374,10 @@ export struct 卡片表格 {
           }, (行: 浏览行数据): string => this.行数据源.keyForRow(行))
         }
         .width('100%')
+        .id('browser-result-list')
+        .focusable(true)
+        .defaultFocus(true)
+        .focusOnTouch(true)
         .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平 })
         .layoutWeight(1)
         .edgeEffect(EdgeEffect.Spring)
@@ -312,6 +391,8 @@ export struct 卡片表格 {
             this.加载下一页();
           }
         })
+        }.width(this.tableWidth()).height('100%')
+        }.scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Auto).layoutWeight(1).width('100%')
       }
     }
     .width('100%')

@@ -53,7 +53,6 @@ export struct BrowserFlagDialog {
         Row()
           .width(16)
           .height(16)
-          .borderRadius(8)
           .backgroundColor(this.标志颜色(definition.value))
           .border(SurfaceBorder.options(definition.value === 0 ? 1 : 0)).borderRadius(8)
         Text(this.标志文案(definition.value))

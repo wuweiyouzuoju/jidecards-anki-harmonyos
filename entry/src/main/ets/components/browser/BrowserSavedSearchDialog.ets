@@ -28,7 +28,7 @@ export struct BrowserSavedSearchDialog {
   @Builder
   private dialogHeader() {
     DialogHeader({ title: this.title(), closeLabel: $r('app.string.browser_detail_cancel'),
-      closeEnabled: !this.busy, actionLabel: this.busy ? $r('app.string.browser_saved_search_saving') : $r('app.string.browser_detail_confirm'),
+      closeEnabled: !this.busy, showActionLabel: this.busy, actionLabel: this.busy ? $r('app.string.browser_saved_search_saving') : $r('app.string.browser_detail_confirm'),
       actionEnabled: !this.busy, onClose: (): void => this.onClose(),
       onAction: (): void => this.onSubmit(this.name) })
   }

@@ -1,10 +1,14 @@
-import { SurfaceTransition } from '../../utils/SurfaceTransition';
+import { DialogFrame } from '../common/DialogFrame';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { FormInputStyle } from '../../utils/FormInputStyle';
 import { HelpLabel } from '../common/HelpLabel';
-import { DialogBackdrop } from '../common/DialogBackdrop';
 import { resourceText } from '../../utils/UiFeedback';
+import { SelectStyle } from '../../utils/SelectStyle';
+import { appInterface } from '../../backend/AppInterfaceService';
+import { visibleInterfaceItems, AppInterfaceControl } from '../../model/AppInterface';
+import { namedResourceText } from '../../utils/UiFeedback';
+import { PressFeedback } from '../../utils/PressFeedback';
 
 import { DialogHeader } from '../common/DialogHeader';
 // ========================================================
@@ -13,7 +17,7 @@ import { DialogHeader } from '../common/DialogHeader';
 // @作用
 // 浏览页 T9 查找替换弹层：纯展示层组件，用于在笔记字段或标签中批量替换文本。
 // 父级（浏览页）拥有全部后端调用，本组件仅负责输入收集与校验提示。
-// 复用 浏览编辑区.ets 的弹层骨架（Stack + 遮罩 + 主面板 + 底部按钮）。
+// DialogFrame 统一标题、可滚动表单和键盘安全区；查找替换仍由原会话拥有。
 //
 // @输入
 // isDark: 是否深色主题
@@ -32,9 +36,7 @@ import { DialogHeader } from '../common/DialogHeader';
 // - 查找内容为空时本地拦截，不发 onExecute
 // - 有选中笔记=false 时强制"全部笔记"，仅选中选项禁用
 //
-// @Extension Points
-// - 字段名当前为自由输入（空=所有字段），后续可改为 Select 列出当前笔记类型字段
-// - 标签替换可扩展为 fieldName 固定 "Tags" 的特例
+// 字段目录来自真实作用范围；标签目标单独标识，不能把名为 Tags 的普通字段当作标签。
 //
 // @副作用
 // 仅通过外部回调引发后端写入；本组件不直接落盘。
@@ -47,9 +49,10 @@ import { 颜色键 } from '../../model/颜色主题';
 export struct 查找替换对话框 {
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop isDark: boolean = false;
-  @Prop busy: boolean = false;
+  @Prop @Watch('publishInterface') busy: boolean = false;
   @Prop errorMessage: string = '';
   @Prop 有选中笔记: boolean = false;
+  onLoadFields: (selectedOnly: boolean) => Promise<string[]> = async (_selectedOnly: boolean): Promise<string[]> => [];
   onCancel: () => void = (): void => {};
   onExecute: (
     查找: string,
@@ -57,7 +60,8 @@ export struct 查找替换对话框 {
     字段名: string,
     正则: boolean,
     区分大小写: boolean,
-    仅选中: boolean
+    仅选中: boolean,
+    tags: boolean
   ) => Promise<boolean> =
     async (
       _查找: string,
@@ -65,35 +69,75 @@ export struct 查找替换对话框 {
       _字段名: string,
       _正则: boolean,
       _区分大小写: boolean,
-      _仅选中: boolean
+      _仅选中: boolean,
+      _tags: boolean
     ): Promise<boolean> => false;
   // ⓘ 帮助回调：上抛给父组件（浏览页）统一渲染 字段帮助面板 浮层，与批量操作栏 ⓘ 同模式
   onHelp: () => void = (): void => {};
   // 正则表达式 ⓘ 回调：上抛给父组件显示正则语法说明（browser_find_regex_help）
   onRegexHelp: () => void = (): void => {};
 
-  @State private 查找文本: string = '';
+  @State @Watch('publishInterface') private 查找文本: string = '';
   @State private 替换文本: string = '';
-  @State private 字段名: string = '';
-  @State private 是否正则: boolean = false;
-  @State private 是否区分大小写: boolean = false;
-  @State private 仅选中: boolean = true;
+  @State @Watch('publishInterface') private 字段名: string = '';
+  @State @Watch('publishInterface') private 是否正则: boolean = false;
+  @State @Watch('publishInterface') private 是否区分大小写: boolean = false;
+  @State @Watch('loadFields') private 仅选中: boolean = true;
   @State private 本地错误: string = '';
+  @State private fieldNames: string[] = [];
+  @State @Watch('publishInterface') private targetIndex: number = 0;
+  @State @Watch('publishInterface') private fieldsLoading: boolean = false;
+  @State @Watch('publishInterface') private fieldsError: boolean = false;
+  private fieldsVersion: number = 0;
+  private disposed: boolean = false;
+  private interfaceMounted: boolean = false;
+  aboutToDisappear(): void { this.interfaceMounted = false; this.disposed = true; this.fieldsVersion++; appInterface.leave('browser_find_replace'); }
+  private publishInterface(): void {
+    if (!this.interfaceMounted) return;
+    appInterface.observe({ surface: 'browser_find_replace', sectionId: this.fieldsError ? 'error' : this.fieldsLoading ? 'loading' : 'form',
+      selectedId: this.targetIndex === 0 ? 'all_fields' : this.targetIndex === 1 ? 'tags' : `field:${this.字段名}`,
+      optionIds: ['all_fields', 'tags'].concat(this.fieldNames.map((name: string): string => `field:${name}`)), optionLabels: [], busy: this.busy || this.fieldsLoading,
+      controlsComplete: true, items: visibleInterfaceItems('browser_find_replace', { simple: false, agent: false, cloudDeck: false, themeHasTextures: false })
+        .map((item): AppInterfaceControl => ({ id: item.id, titleKey: item.titleKey, title: namedResourceText(this.getUIContext(), item.titleKey),
+          selected: item.id === 'regex' ? this.是否正则 : item.id === 'match_case' ? this.是否区分大小写 :
+            item.id === 'selected' ? this.仅选中 : item.id === 'results' && !this.仅选中,
+          enabled: !this.busy && (item.id !== 'selected' || this.有选中笔记) &&
+            (item.id !== 'execute' || (!this.fieldsLoading && !this.fieldsError && this.查找文本 !== '')) })),
+      values: [{ id: 'scope', value: this.仅选中 && this.有选中笔记 ? 'selection' : 'search_results' }] });
+  }
+  private async loadFields(): Promise<void> {
+    const version: number = ++this.fieldsVersion;
+    this.fieldsLoading = true; this.fieldsError = false;
+    try {
+      const names: string[] = await this.onLoadFields(this.仅选中 && this.有选中笔记);
+      if (this.disposed || version !== this.fieldsVersion) return;
+      this.fieldNames = names; this.targetIndex = 0; this.字段名 = '';
+    } catch (error) {
+      if (!this.disposed && version === this.fieldsVersion) this.fieldsError = true;
+    } finally { if (!this.disposed && version === this.fieldsVersion) this.fieldsLoading = false; }
+  }
+  private targetOptions(): SelectOption[] {
+    const options: SelectOption[] = [{ value: resourceText(this.getUIContext(), $r('app.string.browser_find_all_fields')) },
+      { value: resourceText(this.getUIContext(), $r('app.string.browser_find_tags')) }];
+    return options.concat(this.fieldNames.map((name: string): SelectOption => ({ value: name })));
+  }
 
   @StorageProp(颜色键.主色按钮背景) private 主色按钮背景: string = '#2F5FD0';
   @StorageProp(颜色键.主色按钮按下) private 主色按钮按下: string = '#1E4FB8';
   @State private 已按下执行: boolean = false;
 
   aboutToAppear(): void {
+    this.interfaceMounted = true;
     // 无选中笔记时强制"全部笔记"范围
     if (!this.有选中笔记) {
       this.仅选中 = false;
     }
+    this.loadFields();
   }
 
   /** 提交：校验查找非空后调 onExecute；失败时草稿保留，由父级 errorMessage 提示。 */
   private async 提交(): Promise<void> {
-    if (this.busy) {
+    if (this.busy || this.fieldsLoading || this.fieldsError) {
       return;
     }
     if (this.查找文本 === '') {
@@ -108,7 +152,8 @@ export struct 查找替换对话框 {
         this.字段名.trim(),
         this.是否正则,
         this.是否区分大小写,
-        this.仅选中 && this.有选中笔记
+        this.仅选中 && this.有选中笔记,
+        this.targetIndex === 1
       );
       if (成功) {
         this.onCancel();
@@ -132,38 +177,31 @@ export struct 查找替换对话框 {
     this.onRegexHelp();
   }
 
-  build() {
-    Stack() {
-      // 遮罩层：点击关闭
-      DialogBackdrop()
-        .onClick((): void => {
-          if (!this.busy) {
-            this.onCancel();
-          }
-        })
-        .transition(SurfaceTransition.backdrop())
+  @Builder
+  private panelHeader() {
+    DialogHeader({
+      title: $r('app.string.browser_find_title'),
+      showHelp: true,
+      helpEnabled: !this.busy,
+      onHelp: (): void => { this.onHelp(); },
+      showActionLabel: true, actionLabel: this.busy
+        ? $r('app.string.browser_find_running')
+        : $r('app.string.browser_find_execute'),
+      actionEnabled: !this.busy && !this.fieldsLoading && !this.fieldsError,
+      closeLabel: $r('app.string.browser_find_cancel'),
+      closeEnabled: !this.busy,
+      onClose: (): void => {
+        this.onCancel();
+      },
+      onAction: (): void => {
+        this.提交();
+      }
+    })
+  }
 
-      // 主面板
-      Column({ space: 应用尺寸.间距_14 }) {
-        // 说明入口紧随标题，复用父组件的字段帮助面板。
-        DialogHeader({
-          title: $r('app.string.browser_find_title'),
-          showHelp: true,
-          helpEnabled: !this.busy,
-          onHelp: (): void => { this.onHelp(); },
-          actionLabel: this.busy
-            ? $r('app.string.browser_find_running')
-            : $r('app.string.browser_find_execute'),
-          actionEnabled: !this.busy,
-          closeLabel: $r('app.string.browser_find_cancel'),
-          closeEnabled: !this.busy,
-          onClose: (): void => {
-            this.onCancel();
-          },
-          onAction: (): void => {
-            this.提交();
-          }
-        })
+  @Builder
+  private panelContent() {
+    Column({ space: 应用尺寸.间距_14 }) {
 
         // 查找内容
         Column({ space: 应用尺寸.间距_5 }) {
@@ -201,12 +239,21 @@ export struct 查找替换对话框 {
             .fontSize(应用尺寸.字号_正文_小)
             .fontColor($r('app.color.text_secondary'))
             .width('100%')
-          TextInput({ placeholder: $r('app.string.browser_find_field_placeholder'), text: this.字段名 })
-            .attributeModifier(new FormInputStyle())
-            .enabled(!this.busy)
-            .onChange((value: string): void => {
-              this.字段名 = value;
+          Select(this.targetOptions()).selected(this.targetIndex).value(this.targetOptions()[this.targetIndex]?.value ?? '')
+            .height(SelectStyle.controlHeight).padding(SelectStyle.controlPadding).space(SelectStyle.controlSpace)
+      .font(SelectStyle.controlFont).border(SelectStyle.controlBorder).borderRadius(SelectStyle.controlRadius)
+      .optionFont(SelectStyle.optionFont).selectedOptionFont(SelectStyle.selectedOptionFont)
+      .textModifier(SelectStyle.labelText()).width('100%').attributeModifier(new SelectStyle())
+            .enabled(!this.busy && !this.fieldsLoading && !this.fieldsError)
+            .onSelect((index: number): void => {
+              this.targetIndex = index; this.字段名 = index >= 2 ? this.fieldNames[index - 2] : '';
             })
+          if (this.fieldsLoading) { Text($r('app.string.browser_loading')).fontColor($r('app.color.text_secondary')) }
+          if (this.fieldsError) {
+            Text($r('app.string.browser_field_names_error')).fontColor($r('app.color.error_text'))
+            Button($r('app.string.common_retry')).attributeModifier(new PressFeedback()).stateEffect(false)
+              .enabled(!this.busy).onClick((): void => { this.loadFields(); })
+          }
         }
         .width('100%')
 
@@ -276,7 +323,7 @@ export struct 查找替换对话框 {
         }
         .width('100%')
 
-        // 错误信息固定底部
+        // 错误信息随表单滚动，键盘打开时仍可访问。
         if (this.errorMessage !== '' || this.本地错误 !== '') {
           Text(this.errorMessage !== '' ? this.errorMessage : this.本地错误)
             .fontSize(应用尺寸.字号_正文_小)
@@ -284,18 +331,11 @@ export struct 查找替换对话框 {
             .width('100%')
             .maxLines(3)
         }
+    }.width('100%')
+  }
 
-      }
-      .width('88%')
-      .constraintSize({ maxWidth: 480, maxHeight: '88%' })
-      .padding(应用尺寸.卡片内边距)
-      .backgroundColor($r('app.color.surface_card'))
-      .borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
-      // 居中浮卡：缩放+淡入过渡（入：opacity(0)+scale(0.96,0.96)，出：opacity(0)）
-      .transition(SurfaceTransition.dialog())
-      .onClick((): void => {})
-    }
-    .width('100%')
-    .height('100%')
+  build() {
+    DialogFrame({ header: () => { this.panelHeader(); }, content: () => { this.panelContent(); },
+      canDismiss: !this.busy, onDismiss: (): void => { this.onCancel(); } })
   }
 }

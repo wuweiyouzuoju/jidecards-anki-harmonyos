@@ -8,6 +8,7 @@ import { SurfaceBorder } from '../../utils/SurfaceBorder';
 export struct 搜索框 {
   @Prop @Watch('同步搜索文本') 搜索文本: string;
   onSearch: (text: string) => void = (text: string): void => {};
+  onFocusChange: (focused: boolean) => void = (_focused: boolean): void => {};
 
   // 本地输入态：TextInput 受控值。用户输入写入本地态，提交时随 onSearch 回传父组件。
   // 父组件外部更新 搜索文本 时通过 @Watch 同步到本地态（如清空搜索串）。
@@ -28,6 +29,9 @@ export struct 搜索框 {
         text: this.当前输入,
         placeholder: $r('app.string.browser_search_placeholder')
       })
+        .id('browser-search-input')
+        .onFocus((): void => { this.onFocusChange(true); })
+        .onBlur((): void => { this.onFocusChange(false); })
         .border(SurfaceBorder.options())
         .layoutWeight(1)
         .height(应用尺寸.searchFieldHeight)
