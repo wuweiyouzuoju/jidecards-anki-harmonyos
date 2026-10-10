@@ -30,10 +30,48 @@
           },
           {
             actions: ['ohos.want.action.viewData'],
+            entities: ['entity.system.default'],
             uris: [
               {
                 scheme: 'file',
                 type: 'com.jide.kapian.apkg',
+                linkFeature: 'FileOpen'
+              },
+              {
+                scheme: 'file',
+                type: 'application/apkg',
+                linkFeature: 'FileOpen'
+              },
+              {
+                scheme: 'file',
+                type: 'application/x-apkg',
+                linkFeature: 'FileOpen'
+              },
+              {
+                // 聊天应用可能将 APKG 标成普通二进制；接收后仍校验文件后缀。
+                scheme: 'file',
+                type: 'general.octet-stream',
+                linkFeature: 'FileOpen'
+              },
+              {
+                scheme: 'file',
+                type: 'application/octet-stream',
+                linkFeature: 'FileOpen'
+              },
+              {
+                // APKG 使用 ZIP 容器，兼容按容器识别类型的文件提供方。
+                scheme: 'file',
+                type: 'general.zip-archive',
+                linkFeature: 'FileOpen'
+              },
+              {
+                scheme: 'file',
+                type: 'application/zip',
+                linkFeature: 'FileOpen'
+              },
+              {
+                scheme: 'file',
+                type: 'application/x-zip-compressed',
                 linkFeature: 'FileOpen'
               }
             ]

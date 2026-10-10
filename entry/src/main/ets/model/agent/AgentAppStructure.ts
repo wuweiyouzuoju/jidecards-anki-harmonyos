@@ -16,6 +16,8 @@ import { CARD_RENDERING_SUPPORT } from '../CardRenderingSupport';
 import type { CardRenderingSupport } from '../CardRenderingSupport';
 import { NOTE_FIELD_EDITING_SUPPORT } from '../NoteFieldEditing';
 import type { NoteFieldEditingSupport } from '../NoteFieldEditing';
+import { EXTERNAL_DECK_OPEN_SUPPORT } from '../ExternalDeckOpen';
+import type { ExternalDeckOpenSupport } from '../ExternalDeckOpen';
 
 export interface AgentNavigationCapability {
   id: string; surface: string; title: string; tool: string; available: boolean; requiresDeck: boolean;
@@ -29,7 +31,7 @@ export interface AgentPageDestination {
 /** 指纹覆盖共同声明与本轮能力；不是持久缓存，也不把用户状态写入长期记忆。 */
 export function agentInterfaceRevision(tools: ProviderFunctionTool[]): string {
   const source: string = JSON.stringify([APP_PAGE_ROUTES, APP_INTERFACE_SURFACES, SETTINGS_ENTRIES,
-    SETTINGS_GROUPS, SETTINGS_HEADER_ITEMS, APP_NAVIGATION_ACTIONS, AGENT_APP_RECOMMENDATIONS, CARD_RENDERING_SUPPORT, NOTE_FIELD_EDITING_SUPPORT, INTERACTION_FEEDBACK_SUPPORT, tools]);
+    SETTINGS_GROUPS, SETTINGS_HEADER_ITEMS, APP_NAVIGATION_ACTIONS, AGENT_APP_RECOMMENDATIONS, CARD_RENDERING_SUPPORT, NOTE_FIELD_EDITING_SUPPORT, INTERACTION_FEEDBACK_SUPPORT, EXTERNAL_DECK_OPEN_SUPPORT, tools]);
   let hash: number = 2166136261;
   for (let index: number = 0; index < source.length; index++) { hash = Math.imul(hash ^ source.charCodeAt(index), 16777619); }
   return (hash >>> 0).toString(16);
@@ -60,6 +62,7 @@ export interface AgentInterfaceSurface {
   id: string; title: string; instructions: string; parent: string; declaredItemCount: number; items: AgentInterfaceItem[];
 }
 export interface AgentAppStructure {
+  externalDeckOpen: ExternalDeckOpenSupport;
   interactionFeedback: InteractionFeedbackSupport;
   cardRendering: CardRenderingSupport;
   noteEditing: NoteFieldEditingSupport;
@@ -150,7 +153,8 @@ export function buildAgentAppStructure(context: AppInterfaceContext, surfaceId: 
           enabled: control.enabled, selected: control.selected, iconKey: control.iconKey,
           settingId: '', readTool: '', writeTool: '', sensitive: false }))) });
   }
-  return { source: 'shared_ui_declarations_and_live_observations', interactionFeedback: INTERACTION_FEEDBACK_SUPPORT, cardRendering: CARD_RENDERING_SUPPORT,
+  return { source: 'shared_ui_declarations_and_live_observations', externalDeckOpen: EXTERNAL_DECK_OPEN_SUPPORT,
+    interactionFeedback: INTERACTION_FEEDBACK_SUPPORT, cardRendering: CARD_RENDERING_SUPPORT,
     noteEditing: NOTE_FIELD_EDITING_SUPPORT,
     settingsHeader: surfaceId === 'app' || surfaceId === 'settings' ? settingsHeaderItems(context.simple).map((item): AgentInterfaceItem => {
       const control = views.find((view): boolean => view.surface === 'settings')?.items?.find((entry): boolean => entry.id === item.id);

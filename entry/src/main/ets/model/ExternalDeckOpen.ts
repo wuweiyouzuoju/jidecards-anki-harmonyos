@@ -2,20 +2,43 @@
 
 export const EXTERNAL_DECK_OPEN_REVISION_KEY: string = 'externalDeckOpenRevision';
 
+export interface ExternalDeckOpenSupport {
+  action: string;
+  scheme: string;
+  entities: string[];
+  extension: string;
+  packageTypes: string[];
+  fallbackTypes: string[];
+  requiresImportConfirmation: boolean;
+  opensFilePicker: boolean;
+  acceptsCollectionRestore: boolean;
+}
+
+/** 系统声明由回归核对；接收校验和 JIDE 能力目录共用此边界。 */
+export const EXTERNAL_DECK_OPEN_SUPPORT: ExternalDeckOpenSupport = {
+  action: 'ohos.want.action.viewData', scheme: 'file', entities: ['entity.system.default'], extension: '.apkg',
+  packageTypes: ['com.jide.kapian.apkg', 'application/apkg', 'application/x-apkg'],
+  // 通用类型只用于让系统列出候选；不能据此把无后缀文件当作 APKG。
+  fallbackTypes: ['general.octet-stream', 'application/octet-stream', 'general.zip-archive',
+    'application/zip', 'application/x-zip-compressed'],
+  requiresImportConfirmation: true, opensFilePicker: false, acceptsCollectionRestore: false
+};
+
 /** 只接收系统交付的 APKG；解码仅用于识别，读取仍使用原始 URI。 */
 export function externalDeckUri(action: string, uri: string, type: string): string | null {
-  if (action !== 'ohos.want.action.viewData' || !uri.startsWith('file://')) return null;
+  if (action !== EXTERNAL_DECK_OPEN_SUPPORT.action ||
+    !uri.toLowerCase().startsWith(EXTERNAL_DECK_OPEN_SUPPORT.scheme + '://')) return null;
   let path: string;
   try {
     path = decodeURIComponent(uri.split('?')[0].split('#')[0]).toLowerCase();
   } catch (_error) {
     return null;
   }
-  if (path.endsWith('.apkg')) return uri;
+  if (path.endsWith(EXTERNAL_DECK_OPEN_SUPPORT.extension)) return uri;
   const name: string = path.substring(path.lastIndexOf('/') + 1);
   // 类型可识别无后缀的授权 URI；明确为其他格式（特别是 colpkg）的文件不能自动导入。
   if (name.length > 0 && name.indexOf('.') < 0 &&
-    (type === 'com.jide.kapian.apkg' || type === 'application/apkg' || type === 'application/x-apkg')) return uri;
+    EXTERNAL_DECK_OPEN_SUPPORT.packageTypes.includes(type.toLowerCase())) return uri;
   return null;
 }
 

@@ -3,8 +3,9 @@ import { HomeWorkCoordinator } from '../../entry/src/main/ets/model/HomeWorkCoor
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import JSON5 from 'json5';
 import { DataTransferSession, initialTransferState } from '../../entry/src/main/ets/model/home/DataTransferSession.ts';
-import { externalDeckUri, ExternalDeckOpenQueue } from '../../entry/src/main/ets/model/ExternalDeckOpen.ts';
+import { externalDeckUri, ExternalDeckOpenQueue, EXTERNAL_DECK_OPEN_SUPPORT } from '../../entry/src/main/ets/model/ExternalDeckOpen.ts';
 import { canPresentHomePrompt } from '../../entry/src/main/ets/model/HomeActivityPolicy.ts';
 
 const action = 'ohos.want.action.viewData';
@@ -13,7 +14,7 @@ const home = read('entry/src/main/ets/pages/首页.ets');
 const settle = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
 
 test('external APKG recognition preserves encoded names and handles uppercase/extensions and opaque typed URIs', () => {
-  for (const uri of ['file://documents/词汇.apkg', 'file://chat/%E8%AF%8D%20%E6%B1%87.APKG',
+  for (const uri of ['file://documents/词汇.apkg', 'FILE://chat/词汇.apkg', 'file://chat/%E8%AF%8D%20%E6%B1%87.APKG',
     'file://chat/deck%2Eapkg?token=read']) assert.equal(externalDeckUri(action, uri, ''), uri);
   for (const type of ['com.jide.kapian.apkg', 'application/apkg', 'application/x-apkg']) {
     assert.equal(externalDeckUri(action, 'file://chat/1234', type), 'file://chat/1234');
@@ -25,6 +26,18 @@ test('external APKG recognition preserves encoded names and handles uppercase/ex
   }
   assert.equal(externalDeckUri('action.system.home', 'file://chat/deck.apkg', ''), null);
   assert.equal(externalDeckUri(action, 'file://chat/1234', 'application/octet-stream'), null);
+});
+
+test('binary and ZIP caller types accept APKG names without accepting opaque or unrelated files', () => {
+  for (const type of EXTERNAL_DECK_OPEN_SUPPORT.fallbackTypes) {
+    for (const uri of ['file://com.tencent.mqq/Download/词汇.apkg',
+      'file://com.tencent.wechat/received/deck.APKG', 'file://docs/storage/Download/deck%2Eapkg?read=1']) {
+      assert.equal(externalDeckUri(action, uri, type), uri);
+    }
+    for (const name of ['1234', '', 'backup.colpkg', 'archive.zip', 'photo.jpg', 'notes.txt', 'deck.apkg.exe']) {
+      assert.equal(externalDeckUri(action, 'file://chat/' + name, type), null);
+    }
+  }
 });
 
 test('queued and running files deduplicate, serialize, and permit intentional reopen after completion', () => {
@@ -103,13 +116,28 @@ test('failed external import releases queue and shows the existing failure panel
 });
 
 test('APKG FileOpen declaration matches registered UTD and both Ability lifecycle entry points', () => {
-  const manifest = read('entry/src/main/module.json5');
+  const manifest = JSON5.parse(read('entry/src/main/module.json5'));
+  const abilityDeclaration = manifest.module.abilities.find(item => item.name === 'EntryAbility');
+  const skills = abilityDeclaration.skills.filter(skill => skill.uris?.some(uri => uri.linkFeature === 'FileOpen'));
+  const fileUris = skills.flatMap(skill => skill.uris);
+  assert.equal(abilityDeclaration.exported, true);
+  assert.equal(abilityDeclaration.launchType, 'singleton');
+  for (const skill of skills) {
+    assert.deepEqual(skill.actions, [EXTERNAL_DECK_OPEN_SUPPORT.action]);
+    assert.deepEqual(skill.entities, EXTERNAL_DECK_OPEN_SUPPORT.entities);
+  }
+  assert.deepEqual(fileUris.map(uri => uri.type), [
+    ...EXTERNAL_DECK_OPEN_SUPPORT.packageTypes, ...EXTERNAL_DECK_OPEN_SUPPORT.fallbackTypes
+  ]);
+  for (const uri of fileUris) {
+    assert.equal(uri.scheme, EXTERNAL_DECK_OPEN_SUPPORT.scheme);
+    assert.equal(uri.linkFeature, 'FileOpen');
+    assert.ok(!['*/*', 'general.file', 'general.object'].includes(uri.type), 'do not claim all file types');
+  }
   const declarations = JSON.parse(read('entry/src/main/resources/rawfile/arkdata/utd/utd.json5')).UniformDataTypeDeclarations;
-  assert.deepEqual(declarations.map(item => item.FilenameExtensions[0]), ['.apkg']);
-  for (const declaration of declarations) assert.ok(manifest.includes(`type: '${declaration.TypeId}'`));
-  assert.match(manifest, /scheme: 'file',[\s\S]*?linkFeature: 'FileOpen'/);
-  assert.match(manifest, /launchType: 'singleton'/);
-  assert.doesNotMatch(manifest, /application\/octet-stream|type: '\*\/\*'/);
+  assert.deepEqual(declarations.map(item => item.FilenameExtensions[0]), [EXTERNAL_DECK_OPEN_SUPPORT.extension]);
+  assert.deepEqual(declarations.flatMap(item => [item.TypeId, ...item.MIMETypes]),
+    EXTERNAL_DECK_OPEN_SUPPORT.packageTypes);
   const ability = read('entry/src/main/ets/entryability/EntryAbility.ets');
   for (const method of ['onCreate', 'onNewWant']) {
     const start = ability.indexOf('  ' + method + '(');
