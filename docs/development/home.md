@@ -170,7 +170,7 @@ EntryAbility 的冷/热启动都通过 `ExternalDeckOpen` 校验原始文件 URI
 
 ## 集合历史入口
 
-首页与浏览菜单的入口及弹窗标题统一显示“回退”，共用 `collection_history_title` 资源与 `AppInterface` 声明，JIDE 从同一资源读取名称；弹窗内继续提供“撤销”和“重做”两个操作。
+首页与浏览菜单的入口及弹窗标题统一显示“操作历史”，共用 `collection_history_title` 资源与 `AppInterface` 声明，JIDE 从同一资源读取名称；弹窗内继续提供“撤销”和“重做”两个操作。帮助中的浏览操作恢复路径为“更多 → 操作历史”，学习页仍可直接使用“更多 → 撤销操作”。
 
 首页与浏览菜单共用 components/CollectionHistoryDialog.ets，业务状态归 CollectionHistorySession。读写纳入 AutoSyncScheduler 操作占用并等待集合释放；关闭后读取不再发布，已接受写入继续广播刷新。应用扩展 service 1003 在 registry mutex 内比较完整 UndoStatus 与预览状态后调用 Core Undo／Redo，不改上游服务编号；1001 已属于牌组预览，不能复用。刷新失败与已提交操作分开，历史按钮须先重读。首页刷新牌组与选择，浏览清理选择和详情并重读搜索、牌组、标签及旗标名称。JIDE 共同目录与实时观察使用 collection_history，不增加 Agent 写入权限。
 
