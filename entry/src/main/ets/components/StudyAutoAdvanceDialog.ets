@@ -1,3 +1,4 @@
+import { DialogFrame } from './common/DialogFrame';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../utils/PressFeedback';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
@@ -60,7 +61,7 @@ export struct StudyAutoAdvanceDialog {
   }
 
   private back(): void {
-    if (this.draft.back()) this.controller?.close();
+    if (this.draft.back()) this.onClose();
     else this.field = StudyAdvanceField.Main;
   }
 
@@ -90,7 +91,7 @@ export struct StudyAutoAdvanceDialog {
     }
     this.draft.enabled = this.isAdvanceEnabled;
     this.onConfirm(this.draft);
-    this.controller?.close();
+    this.onClose();
   }
 
   @Builder
@@ -109,54 +110,57 @@ export struct StudyAutoAdvanceDialog {
     Divider().color(SurfaceBorder.color()).strokeWidth(0.5)
   }
 
-  build() {
+  @Builder
+  private dialogHeader() {
+    DialogHeader({ title: '', closeLabel: $r('app.string.study_back'), closeIcon: $r('app.media.ic_common_arrow_left'),
+      actionLabel: $r('app.string.custom_study_confirm'), showDivider: false,
+      onClose: (): void => { this.back(); }, onAction: (): void => { this.confirm(); } })
+  }
+
+  @Builder
+  private dialogContent() {
+    Text(this.title(this.field)).fontSize(18).fontWeight(FontWeight.Bold)
+      .fontColor($r('app.color.text_primary')).width('100%').textAlign(TextAlign.Center)
+    Text($r('app.string.study_auto_advance_session_only'))
+      .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
     Column() {
-      Column({ space: 应用尺寸.间距_12 }) {
-        Text(this.title(this.field)).fontSize(18).fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.text_primary')).width('100%').textAlign(TextAlign.Center)
-        Text($r('app.string.study_auto_advance_session_only'))
-          .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
-        Scroll() {
-          Column() {
-            if (this.field === StudyAdvanceField.Main) {
-              if (this.choice) {
-                this.setting(StudyAdvanceField.FeedbackTime)
-              } else {
-                Row({ space: 应用尺寸.间距_12 }) {
-                  Text($r('app.string.study_auto_advance_start')).fontSize(应用尺寸.字号_正文)
-                    .fontColor($r('app.color.text_primary')).layoutWeight(1)
-                  ForEach([this.toggleVersion], (_version: number) => {
-                    Toggle({ type: ToggleType.Switch, isOn: this.isAdvanceEnabled })
-                      .onChange((value: boolean): void => { this.changeAdvance(value); })
-                  }, (version: number): string => version.toString())
-                }.width('100%').constraintSize({ minHeight: 52 }).padding({ left: 8, right: 8 })
-                this.setting(StudyAdvanceField.QuestionTime)
-                this.setting(StudyAdvanceField.AnswerTime)
-                this.setting(StudyAdvanceField.QuestionAction)
-                this.setting(StudyAdvanceField.AnswerAction)
-              }
-            } else {
-              ForEach(this.draft.choices(), (value: number) => {
-                Row({ space: 应用尺寸.间距_12 }) {
-                  Text(this.label(this.field, value)).fontSize(应用尺寸.字号_正文)
-                    .fontColor($r('app.color.text_primary')).layoutWeight(1)
-                }
-                .width('100%').constraintSize({ minHeight: 48 }).padding({ left: 8, right: 8 })
-                .borderRadius(应用尺寸.圆角_面板)
-                .backgroundColor(this.selected === value ? $r('app.color.surface_page') : Color.Transparent)
-                .accessibilitySelected(this.selected === value)
-                .attributeModifier(new PressFeedback())
-                .onClick((): void => { this.selected = value; })
-              }, (value: number): string => `${this.field}-${value}`)
-            }
-          }.width('100%')
-        }.width('100%').constraintSize({ maxHeight: '55%' }).scrollBar(BarState.Auto)
-        DialogHeader({ title: '', closeLabel: $r('app.string.study_back'), closeIcon: $r('app.media.ic_common_arrow_left'),
-          actionLabel: $r('app.string.custom_study_confirm'), showDivider: false,
-          onClose: (): void => { this.back(); }, onAction: (): void => { this.confirm(); } })
+      if (this.field === StudyAdvanceField.Main) {
+        if (this.choice) {
+          this.setting(StudyAdvanceField.FeedbackTime)
+        } else {
+          Row({ space: 应用尺寸.间距_12 }) {
+            Text($r('app.string.study_auto_advance_start')).fontSize(应用尺寸.字号_正文)
+              .fontColor($r('app.color.text_primary')).layoutWeight(1)
+            ForEach([this.toggleVersion], (_version: number) => {
+              Toggle({ type: ToggleType.Switch, isOn: this.isAdvanceEnabled })
+                .onChange((value: boolean): void => { this.changeAdvance(value); })
+            }, (version: number): string => version.toString())
+          }.width('100%').constraintSize({ minHeight: 52 }).padding({ left: 8, right: 8 })
+          this.setting(StudyAdvanceField.QuestionTime)
+          this.setting(StudyAdvanceField.AnswerTime)
+          this.setting(StudyAdvanceField.QuestionAction)
+          this.setting(StudyAdvanceField.AnswerAction)
+        }
+      } else {
+        ForEach(this.draft.choices(), (value: number) => {
+          Row({ space: 应用尺寸.间距_12 }) {
+            Text(this.label(this.field, value)).fontSize(应用尺寸.字号_正文)
+              .fontColor($r('app.color.text_primary')).layoutWeight(1)
+          }
+          .width('100%').constraintSize({ minHeight: 48 }).padding({ left: 8, right: 8 })
+          .borderRadius(应用尺寸.圆角_面板)
+          .backgroundColor(this.selected === value ? $r('app.color.surface_page') : Color.Transparent)
+          .accessibilitySelected(this.selected === value)
+          .attributeModifier(new PressFeedback())
+          .onClick((): void => { this.selected = value; })
+        }, (value: number): string => `${this.field}-${value}`)
       }
-      .width('88%').constraintSize({ maxWidth: 480, maxHeight: '85%' })
-      .padding(应用尺寸.卡片内边距).backgroundColor($r('app.color.surface_card')).borderRadius(应用尺寸.圆角_卡片).border(SurfaceBorder.options())
-    }.width('100%').alignItems(HorizontalAlign.Center)
+    }.width('100%')
+  }
+
+  build() {
+    DialogFrame({ nativeHost: true, maximumWidth: 应用尺寸.dialogMaxWidth, actionsAtBottom: true,
+      onDismiss: (): void => { this.back(); },
+      header: () => { this.dialogHeader(); }, content: () => { this.dialogContent(); } })
   }
 }

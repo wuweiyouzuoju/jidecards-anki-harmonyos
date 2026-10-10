@@ -9,6 +9,7 @@ import { StudyAutoAdvanceDraft, StudyAdvanceField as Field } from '../../entry/s
 import { loadUiFeedback } from './ui-feedback-harness.mjs';
 import { appInterfaceDependencies, studyInterfaceMethods } from './app-interface-harness.mjs';
 import { surfaceMotionApi } from './motion-harness.mjs';
+import { nativeDialogHostClass, nativeDialogMembers } from './platform-module-harness.mjs';
 
 const source = readFileSync(new URL('../../entry/src/main/ets/pages/学习页.ets', import.meta.url), 'utf8');
 function methods(source, names) {
@@ -20,8 +21,9 @@ function methods(source, names) {
 }
 const pageMethods = methods(source, ['configureAutoAdvance', 'choiceAutoAdvanceSeconds', 'studyTimerState', '更多菜单']);
 const interfaceDeps = { ...appInterfaceDependencies(), ...surfaceMotionApi() };
+interfaceDeps.NativeDialogHost = nativeDialogHostClass(interfaceDeps);
 const Page = new Function(...Object.keys(interfaceDeps), 'StudyAutoAdvanceDraft', 'CustomDialogController', 'StudyAutoAdvanceDialog', 'DialogAlignment', '$r',
-  stripTypeScriptTypes('class Page {' + pageMethods + studyInterfaceMethods(source) + '}', { mode: 'transform' }) + '\nreturn Page;')(
+  stripTypeScriptTypes('class Page {' + nativeDialogMembers(source) + pageMethods + studyInterfaceMethods(source) + '}', { mode: 'transform' }) + '\nreturn Page;')(
     ...Object.values(interfaceDeps),
     StudyAutoAdvanceDraft, class {
       constructor(options) { this.options = options; }
@@ -45,13 +47,24 @@ function harness(choice = false) {
     stopStudyTimers: () => events.push('stop'), startStudyTimers: () => events.push('start'),
     clearChoiceAutoAdvance: () => events.push('clear-choice'), scheduleChoiceAutoAdvance: () => events.push('schedule-choice')
   });
-  const open = () => { page.configureAutoAdvance(); return page.autoAdvanceDialog.options.builder; };
+  const open = () => { page.configureAutoAdvance(); return page.autoAdvanceDialog.current().options.builder; };
   const confirm = dialog => { dialog.onConfirm(dialog.draft); dialog.onClose(); };
   return { page, events, open, confirm };
 }
 function select(draft, field, value) {
   draft.open(field); draft.selected = value; draft.confirmField();
 }
+
+test('old automatic advance callbacks cannot apply changes or close a reopened window', () => {
+  const h = harness(), old = h.open(); old.onClose();
+  const current = h.open(), window = h.page.autoAdvanceDialog.current();
+  select(old.draft, Field.QuestionTime, 25);
+  old.onConfirm(old.draft); old.onClose();
+  assert.equal(h.page.autoAdvanceDialog.current(), window);
+  assert.equal(h.page.autoAdvanceSettingsOpen, true);
+  assert.equal(h.page.autoAdvanceSettings.questionSeconds, -1);
+  current.onClose(); assert.equal(h.page.autoAdvanceDialog.current(), null);
+});
 
 test('session overrides keep zero as off, preserve per-card defaults and never mutate deck options', () => {
   const base = Object.assign(new StudyOptions(), { secondsToShowQuestion: 1.5, secondsToShowAnswer: 12, answerAction: 3 });
@@ -206,11 +219,11 @@ test('actual dialog labels format real Chinese and English resources through the
 
 test('dialog uses shared app chrome, bottom actions, selected controls and routed system back', () => {
   assert.match(dialogSource, /DialogHeader\(\{ title: '', closeLabel: \$r\('app.string.study_back'\)/);
-  assert.ok(dialogSource.indexOf('DialogHeader({') > dialogSource.indexOf('Scroll()'));
+  assert.match(dialogSource, /DialogFrame\(\{[\s\S]*actionsAtBottom: true/);
   assert.match(dialogSource, /backgroundColor\(this.selected === value/);
   assert.match(dialogSource, /accessibilitySelected\(this.selected === value\)/);
   assert.doesNotMatch(dialogSource, /Radio\(/);
-  assert.match(source, /onWillDismiss:[^\n]*this.autoAdvanceDialogBack\(\)/);
+  assert.match(source, /this.autoAdvanceDialogBack\(\); return false/);
   assert.doesNotMatch(source, /selectAutoAdvanceOption|showActionMenu/);
 });
 
@@ -222,7 +235,7 @@ test('actual dialog handlers route system and button back through the same level
   let closed = 0, applied = 0, systemBack;
   Object.assign(dialog, {
     draft: new StudyAutoAdvanceDraft(new StudyOptions(), false, 5), field: Field.Main,
-    controller: { close: () => closed++ }, onConfirm: () => applied++, registerBack: fn => { systemBack = fn; }
+    onClose: () => closed++, onConfirm: () => applied++, registerBack: fn => { systemBack = fn; }
   });
   dialog.aboutToAppear();
   dialog.open(Field.QuestionTime); dialog.selected = 15;

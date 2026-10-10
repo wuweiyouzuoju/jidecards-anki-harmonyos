@@ -16,6 +16,8 @@ export struct DialogFrame {
   @Prop maximumWidth: number = 应用尺寸.dialogMaxWidth;
   // 卡片预览自行拥有滚动；普通表单继续按内容收缩并由外壳滚动。
   @Prop fillBody: boolean = false;
+  // 自动前进保留底部操作栏，卡片几何、滚动和安全区仍由同一外壳拥有。
+  @Prop actionsAtBottom: boolean = false;
   @Prop canDismiss: boolean = true;
   onDismiss: () => void = (): void => {};
   @BuilderParam header: () => void = this.emptyContent;
@@ -54,9 +56,9 @@ export struct DialogFrame {
         .transition(this.nativeHost ? TransitionEffect.IDENTITY : SurfaceTransition.backdrop())
       Stack() {
         Column({ space: 应用尺寸.间距_12 }) {
-          Column() { this.header() }
-            .width('100%').flexShrink(0)
-            .onAreaChange((_old: Area, area: Area): void => { this.headerHeight = Number(area.height); })
+          if (!this.actionsAtBottom) {
+            this.actionBar()
+          }
           if (this.fillBody) {
             Column() { this.content() }.width('100%').height(this.bodyHeight())
           } else {
@@ -66,6 +68,9 @@ export struct DialogFrame {
             .width('100%')
             .constraintSize({ maxHeight: this.bodyHeight() })
             .scrollBar(BarState.Auto)
+          }
+          if (this.actionsAtBottom) {
+            this.actionBar()
           }
         }
         .width(应用尺寸.dialogWidth)
@@ -85,5 +90,12 @@ export struct DialogFrame {
     .width('100%').height('100%')
     .alignContent(Alignment.Top)
     .onAreaChange((_old: Area, area: Area): void => { this.viewportHeight = Number(area.height); this.viewportTop = Number(area.globalPosition.y); })
+  }
+
+  @Builder
+  private actionBar() {
+    Column() { this.header() }
+      .width('100%').flexShrink(0)
+      .onAreaChange((_old: Area, area: Area): void => { this.headerHeight = Number(area.height); })
   }
 }
