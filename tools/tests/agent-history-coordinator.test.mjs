@@ -22,11 +22,12 @@ test('history save snapshots visible data and accepted writes finish before dele
   const runtime={exportState:()=>({})},message=createAgentMessage(1,'user','original',false),config=setup();
   const first=h.save('first','create',config,[message],[],'title',runtime);await settle();
   const next=h.save('next','create',config,[message],[],'title',runtime);
-  config.fieldNames[0]='changed';message.正文='changed';h.dispose();const removing=h.remove('next');await settle();
+  config.fieldNames[0]='changed';message.正文='changed';const removing=h.remove('next');h.dispose();await settle();
   assert.deepEqual(events,['checkpoint:first','save:first','checkpoint:next']);
   gate.resolve();await Promise.all([first,next]);assert.equal(await removing,false);
   assert.equal(saved[1].setup.fieldNames[0],'Front');assert.equal(saved[1].messages[0].text,'original');
   assert.deepEqual(events.slice(-3),['save:next','remove:next','remove-checkpoint:next']);
+  assert.equal(await h.remove('late'),false);assert.equal(events.some(event=>event.includes('late')),false);
 });
 test('history checkpoint failure never publishes a misleading saved conversation',async()=>{
   let writes=0;const h=new AgentHistoryCoordinator({saveCheckpoint:()=>{throw Error('disk');},save:async()=>writes++});

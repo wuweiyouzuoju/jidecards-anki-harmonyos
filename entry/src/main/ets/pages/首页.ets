@@ -316,13 +316,16 @@ struct 首页 {
     findDeck: (deckId: string): 牌组汇总 => this.按ID查牌组(deckId),
     deferForSync: (action: () => void): boolean => this.deferForSync(action),
     isVisible: (): boolean => !this.homeDisposed && this.syncForeground,
-    onDialogChanged: (open: boolean): void => { this.nativeDialogOpen = open; },
+    onDialogChanged: (open: boolean): void => { if (!this.homeDisposed) this.nativeDialogOpen = open; },
     onStateChanged: (busy: boolean, status: Resource): void => {
+      if (this.homeDisposed) return;
       this.deckDeletionBusy = busy;
       this.deckDeletionStatus = status;
     },
     onDeleted: (deckId: string): Promise<boolean> => this.deckDeleted(deckId),
-    onSettled: (): void => { this.homeActivityChanged(); this.scheduleAutoSyncCheck(); }
+    onSettled: (): void => {
+      if (!this.homeDisposed) { this.homeActivityChanged(); this.scheduleAutoSyncCheck(); }
+    }
   });
   @State @Watch('homeActivityChanged') private autoSyncCollectionBusy: boolean = false;
   @State @Watch('homeActivityChanged') private autoSyncModal: boolean = false;
@@ -773,20 +776,25 @@ struct 首页 {
     if (doubleColumn) this.deckDoubleColumnHintShown = true;
     else this.deckWidthHintShown = true;
     this.nativeDialogOpen = true;
+    let settled: boolean = false;
+    const finish = (accept: boolean): void => {
+      if (settled) return;
+      settled = true; this.finishDeckWidthHint(accept);
+    };
     try {
       this.getUIContext().showAlertDialog({
         title: doubleColumn ? $r('app.string.deck_double_column_hint_title') : $r('app.string.deck_width_hint_title'),
         message: doubleColumn ? $r('app.string.deck_double_column_hint_message') : $r('app.string.deck_width_hint_message'),
         alignment: DialogAlignment.Center,
         autoCancel: false,
-        cancel: (): void => { this.finishDeckWidthHint(false); },
+        cancel: (): void => { finish(false); },
         primaryButton: {
           value: doubleColumn ? $r('app.string.deck_double_column_hint_keep') : $r('app.string.deck_width_hint_keep'),
-          action: (): void => { this.finishDeckWidthHint(false); }
+          action: (): void => { finish(false); }
         },
         secondaryButton: {
           value: doubleColumn ? $r('app.string.deck_double_column_hint_confirm') : $r('app.string.deck_width_hint_confirm'),
-          action: (): void => { this.finishDeckWidthHint(true); }
+          action: (): void => { finish(true); }
         }
       });
       return true;
@@ -1190,10 +1198,11 @@ struct 首页 {
   private fsrsPromptActive: boolean = false;
 
   private async 同步后检查FSRS(fsrsDisabledBySync: boolean, _locale: string = this.uiLanguage): Promise<void> {
-    if (!fsrsDisabledBySync || this.fsrsPromptActive) return;
+    if (this.homeDisposed || !fsrsDisabledBySync || this.fsrsPromptActive) return;
     this.fsrsPromptActive = true;
     try {
       const fsrsEnabled: boolean | null = await 加载FSRS开启状态();
+      if (this.homeDisposed) return;
       if (fsrsEnabled === false) {
         const result: promptAction.ShowDialogSuccessResponse = await this.getUIContext().getPromptAction().showDialog({
           title: resourceText(this.getUIContext(), $r('app.string.sync_fsrs_disabled_title')),
@@ -1209,11 +1218,11 @@ struct 首页 {
             }
           ]
         });
-        if (result.index === 0) {
+        if (!this.homeDisposed && result.index === 0) {
           try {
             await 设置FSRS开启状态(true);
           } catch (error) {
-            showToastSafely(this.getUIContext(), {
+            if (!this.homeDisposed) showToastSafely(this.getUIContext(), {
               message: resourceText(this.getUIContext(), $r('app.string.sync_fsrs_reenable_error'))
             });
           }
@@ -1648,7 +1657,7 @@ struct 首页 {
     const remaining: 牌组汇总[] = this.主页快照数据.decks.filter((deck: 牌组汇总): boolean =>
       deck.id === '1' || (deck.id !== deckId && deck.ancestorIds.indexOf(deckId) < 0));
     const selectionSaved: boolean = await this.reconcileDeckSelection(remaining);
-    await this.加载主页数据();
+    if (!this.homeDisposed) await this.加载主页数据();
     return selectionSaved;
   }
 
@@ -1656,7 +1665,7 @@ struct 首页 {
   private async reconcileDeckSelection(decks: 牌组汇总[]): Promise<boolean> {
     const invalidSelection: boolean = this.选中的牌组ID !== '' &&
       !decks.some((deck: 牌组汇总): boolean => deck.id === this.选中的牌组ID);
-    if (invalidSelection) this.选中的牌组ID = '';
+    if (invalidSelection && !this.homeDisposed) this.选中的牌组ID = '';
     try {
       const saved: string = await 加载上次牌组ID();
       if (invalidSelection || (saved !== '' && !decks.some((deck: 牌组汇总): boolean => deck.id === saved))) {

@@ -7,7 +7,9 @@ import { setCardFlags } from '../../entry/src/main/ets/model/CardMarking.ts';
 import { toggleBrowserCardState } from '../../entry/src/main/ets/model/BrowserCardState.ts';
 import { loadNoteEditor } from '../../entry/src/main/ets/model/NoteEditorLoader.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { resolveBrowserCardIds, resolveBrowserNoteIds, snapshotNotetypeChange } from '../../entry/src/main/ets/model/BrowserSelection.ts';
+import { resolveBrowserCardIds, resolveBrowserNoteIds, resolveBrowserRepresentativeCard, snapshotNotetypeChange } from '../../entry/src/main/ets/model/BrowserSelection.ts';
+import { browserActiveColumns, defaultBrowserPreferences } from '../../entry/src/main/ets/model/BrowserPreferences.ts';
+import { inspectBrowserReposition } from '../../entry/src/main/ets/model/BrowserReposition.ts';
 import { HomeWorkCoordinator } from '../../entry/src/main/ets/model/HomeWorkCoordinator.ts';
 import { HomeStartupSequence } from '../../entry/src/main/ets/model/HomeStartupSequence.ts';
 import test from 'node:test';
@@ -36,7 +38,8 @@ function pageMethods(file, names, dependencies = {}) {
     assert.ok(start >= 0, name);
     return source.slice(start, source.indexOf('\n  }', start) + 4);
   });
-  Object.assign(dependencies, { loadNoteEditor, loadBrowserRows, resolveBrowserCardIds, resolveBrowserNoteIds, snapshotNotetypeChange });
+  Object.assign(dependencies, { loadNoteEditor, loadBrowserRows, resolveBrowserCardIds, resolveBrowserNoteIds, resolveBrowserRepresentativeCard,
+    snapshotNotetypeChange, browserActiveColumns, inspectBrowserReposition });
   return compileWithUiFeedback(...Object.keys(dependencies), stripTypeScriptTypes(`class Page { ${methods.join('\n')} }`,
     { mode: 'transform' }) + '; return Page;')(...Object.values(dependencies));
 }
@@ -47,6 +50,7 @@ test('browser editor return preserves mounted rows and reloads the previous pagi
   const page = new Page();
   const oldRows = [{ id: 1, value: 'old' }];
   Object.assign(page, { operations: { isAlive: () => true }, searchVersion: 0,
+    preferencesLoaded: true, browserPreferences: defaultBrowserPreferences(true), 选中ID列表: [], focusedRowId: 0, selectionAnchor: 0,
     浏览模式值: 'notes', 搜索文本: 'deck:test', quickFilter: 'marked', sortColumn: 'noteCrt', sortReverse: true,
     consumedRowCount: 3, 阶段: 'list', 行列表: oldRows, 取能力上下文: () => ({ filesDir: '/collection' }),
     searchSession: {
@@ -60,7 +64,7 @@ test('browser editor return preserves mounted rows and reloads the previous pagi
   await page.加载更多(); assert.equal(moreCalls, 0, 'scroll cannot race the retained-page reload');
   gate.resolve(); await work;
   assert.deepEqual(queries, [{ filesDir: '/collection', notes: true, text: 'deck:test', filter: 'marked',
-    sortColumn: 'noteCrt', sortReverse: true }]);
+    sortColumn: 'noteCrt', sortReverse: true, activeColumns: browserActiveColumns(defaultBrowserPreferences(), true) }]);
   assert.equal(moreCalls, 1); assert.equal(page.consumedRowCount, 3);
   assert.deepEqual(page.行列表.map(row => row.id), [1, 2, 3]); assert.equal(page.refreshingSearch, false);
 });
@@ -106,7 +110,7 @@ function homeHarness(announcementsEnabled = true) {
   });
   page.牌组数据源 = { snapshotDecks: () => [] };
   Object.assign(page, { announcementController: new HomeAnnouncementController(), homeDisposed: false,
-    syncScheduler: new AutoSyncScheduler(), deckLevelMenuId: '',
+    syncScheduler: new AutoSyncScheduler(), deckMenuId: '',
     syncForeground: true, 页面栈: { size: () => 0 }, 主页允许公告检查: true, 加载状态: 'ready',
     startupSequence: new HomeStartupSequence(), homeWork: new HomeWorkCoordinator(new ExternalDeckOpenQueue(), { schedule: fn => { const id = ++next; timers.set(id, { fn, delay: 0 }); return id; }, cancel: id => timers.delete(id) }), 官方公告延迟检查任务: -1, 主页公告检查已激活: true,
     官方公告服务实例: { 加载公告: () => response.promise }, 显示官方公告: false,
@@ -299,11 +303,12 @@ function browserHarness() {
   const page = new Page();
   page.transfer = initialTransferState();
   Object.assign(page, { operations: new BrowserOperationController(), 浏览模式值: 'cards',
+    persistBrowserPreferences: async () => {},
     选中ID列表: [101, 102], selectionVersion: 0, searchVersion: 1, editorVersion: 0, mappingVersion: 0, infoVersion: 0,
     多选模式值: true, 退出多选信号: 0, 批量忙碌: false, 批量错误: '', mutationBusy: false,
     行列表: [], 结果ID列表: [101, 102], consumedRowCount: 0, suspendedRowIds: new Set(), 阶段: 'list',
     取本地化文案: key => key, 执行搜索: async () => { calls.push('search'); page.searchVersion++; }, sortableColumns: () => [],
-    卡片服务实例: { 获取卡片: async id => ({ noteId: id + 1000, queue: 0 }), 设置牌组: async (ids, deck) => calls.push(['move', ids, deck]) },
+    卡片服务实例: { 获取卡片: async id => ({ noteId: id + 1000, ctype: 0, queue: 0, due: 10, originalDeckId: 0 }), 设置牌组: async (ids, deck) => calls.push(['move', ids, deck]) },
     笔记服务实例: { 获取笔记的卡片: async id => [id + 100], 更新笔记: async () => {} },
     笔记类型服务实例: {}, getUIContext: () => ({ getPromptAction: () => ({ showToast() {} }) })
   });
@@ -472,7 +477,7 @@ test('latest editor request wins and dismissal invalidates in-flight loading', a
 
 test('card info page keeps only its current target and delegates loading to the panel', async () => {
   const { page } = browserHarness();
-  page.打开卡片信息(1); page.打开卡片信息(2);
+  await Promise.all([page.打开卡片信息(1), page.打开卡片信息(2)]);
   assert.equal(page.infoCardId, 2); assert.equal(page.显示卡片信息, true);
   page.关闭卡片信息(); assert.equal(page.infoCardId, 0); assert.equal(page.显示卡片信息, false);
 });

@@ -977,7 +977,7 @@ export struct 浏览页 {
   }
 
   private 打开保存搜索(编辑项: BrowserSavedSearch | null): void {
-    if (this.阶段 !== 'list' || this.operations.isBusy()) return;
+    if (!this.operations.isAlive() || this.阶段 !== 'list' || this.operations.isBusy()) return;
     this.保存搜索编辑项 = 编辑项 === null ? null : { name: 编辑项.name, search: 编辑项.search };
     this.保存搜索初始查询 = 编辑项 === null ? this.当前保存搜索串() : 编辑项.search;
     this.保存搜索错误 = '';
@@ -985,7 +985,7 @@ export struct 浏览页 {
   }
 
   private async 提交保存搜索(name: string): Promise<void> {
-    if (this.保存搜索忙碌 || !this.显示保存搜索) return;
+    if (!this.operations.isAlive() || this.保存搜索忙碌 || !this.显示保存搜索) return;
     const original: BrowserSavedSearch | null = this.保存搜索编辑项;
     const query: string = this.保存搜索初始查询;
     this.保存搜索忙碌 = true;
@@ -995,6 +995,7 @@ export struct 浏览页 {
       const result = original === null ? upsertBrowserSavedSearch(current, name, query) :
         upsertBrowserSavedSearch(current, name, query, original.name);
       if (!result.ok) {
+        if (!this.operations.isAlive()) return;
         if (result.reason === 'duplicate_name') this.保存搜索错误 = this.取本地化文案($r('app.string.browser_saved_search_duplicate'));
         else if (result.reason === 'missing') this.保存搜索错误 = this.取本地化文案($r('app.string.browser_saved_search_missing'));
         else this.保存搜索错误 = this.取本地化文案($r('app.string.browser_saved_search_empty'));
@@ -1006,35 +1007,38 @@ export struct 浏览页 {
       this.显示保存搜索 = false;
       showToastSafely(this.getUIContext(), { message: this.取本地化文案($r('app.string.done')) });
     } catch (error) {
-      this.保存搜索错误 = this.取本地化文案($r('app.string.browser_saved_search_save_error'));
+      if (this.operations.isAlive()) this.保存搜索错误 = this.取本地化文案($r('app.string.browser_saved_search_save_error'));
     } finally {
-      this.保存搜索忙碌 = false;
+      if (this.operations.isAlive()) this.保存搜索忙碌 = false;
     }
   }
 
   private 请求删除保存搜索(item: BrowserSavedSearch): void {
+    if (!this.operations.isAlive() || this.保存搜索忙碌 || this.operations.isBusy()) return;
+    let settled: boolean = false;
     this.getUIContext().showAlertDialog({
       title: $r('app.string.browser_saved_search_delete'),
       message: item.name,
       autoCancel: true,
-      primaryButton: { value: $r('app.string.cancel'), action: (): void => {} },
+      cancel: (): void => { settled = true; },
+      primaryButton: { value: $r('app.string.cancel'), action: (): void => { settled = true; } },
       secondaryButton: { value: $r('app.string.browser_saved_search_delete'), fontColor: $r('app.color.error_text'),
-        action: (): void => { this.删除保存搜索(item); } }
+        action: (): void => { if (settled) return; settled = true; this.删除保存搜索(item); } }
     });
   }
 
   private async 删除保存搜索(item: BrowserSavedSearch): Promise<void> {
-    if (this.保存搜索忙碌 || this.operations.isBusy()) return;
+    if (!this.operations.isAlive() || this.保存搜索忙碌 || this.operations.isBusy()) return;
     this.保存搜索忙碌 = true;
     try {
       const current: BrowserSavedSearch[] = parseBrowserSavedSearches(await this.sidebarBackend.savedSearches());
       const result = removeBrowserSavedSearch(current, item.name);
-      if (!result.ok) { this.侧边栏错误 = this.取本地化文案($r('app.string.browser_saved_search_missing')); return; }
+      if (!result.ok) { if (this.operations.isAlive()) this.侧边栏错误 = this.取本地化文案($r('app.string.browser_saved_search_missing')); return; }
       await this.sidebarBackend.saveSavedSearches(serializeBrowserSavedSearches(result.items));
       if (this.operations.isAlive()) this.已保存搜索列表 = result.items;
     } catch (error) {
-      this.侧边栏错误 = this.取本地化文案($r('app.string.browser_saved_search_save_error'));
-    } finally { this.保存搜索忙碌 = false; }
+      if (this.operations.isAlive()) this.侧边栏错误 = this.取本地化文案($r('app.string.browser_saved_search_save_error'));
+    } finally { if (this.operations.isAlive()) this.保存搜索忙碌 = false; }
   }
 
   /** 侧边栏长按牌组 → 追加 AND deck:"xxx" 到搜索文本。 */
@@ -1125,11 +1129,14 @@ export struct 浏览页 {
   }
 
   private 请求清除未用标签(): void {
-    if (this.operations.isBusy()) return;
+    if (!this.operations.isAlive() || this.operations.isBusy()) return;
+    let settled: boolean = false;
     this.getUIContext().showAlertDialog({ title: this.取本地化文案($r('app.string.settings_clear_unused_tags')),
       message: this.取本地化文案($r('app.string.settings_clear_unused_tags_confirm')),
-      primaryButton: { value: $r('app.string.cancel'), action: (): void => {} },
-      secondaryButton: { value: $r('app.string.browser_detail_confirm'), action: (): void => { this.清除侧栏未用标签(); } } });
+      cancel: (): void => { settled = true; },
+      primaryButton: { value: $r('app.string.cancel'), action: (): void => { settled = true; } },
+      secondaryButton: { value: $r('app.string.browser_detail_confirm'),
+        action: (): void => { if (settled) return; settled = true; this.清除侧栏未用标签(); } } });
   }
 
   private async 清除侧栏未用标签(): Promise<void> {
@@ -1195,19 +1202,21 @@ export struct 浏览页 {
     if (this.operations.isBusy() || !this.operations.isAlive()) return;
     const message: string = this.取本地化文案($r('app.string.browser_tag_delete_confirm'))
       .replace('%s', 标签名);
+    let settled: boolean = false;
     this.getUIContext().showAlertDialog({
       title: this.取本地化文案($r('app.string.browser_tag_delete')),
       message: message,
       autoCancel: true,
+      cancel: (): void => { settled = true; },
       alignment: DialogAlignment.Center,
       primaryButton: {
         value: $r('app.string.cancel'),
-        action: (): void => {}
+        action: (): void => { settled = true; }
       },
       secondaryButton: {
         value: $r('app.string.browser_tag_delete'),
         fontColor: $r('app.color.error_text'),
-        action: (): void => { this.执行删除标签(标签名); }
+        action: (): void => { if (settled) return; settled = true; this.执行删除标签(标签名); }
       }
     });
   }

@@ -23,6 +23,7 @@ export interface HomeDeckDeletionHost {
 export class HomeDeckDeletion {
   private host: HomeDeckDeletionHost;
   private busy: boolean = false;
+  private dialogOpen: boolean = false;
   private status: Resource = $r('app.string.deck_media_checking');
   private readonly 牌组服务实例: 牌组服务 = new 牌组服务();
   private readonly deckMediaCleanup: DeckMediaCleanup = new DeckMediaCleanup({
@@ -41,13 +42,14 @@ export class HomeDeckDeletion {
   }
 
   private showMessage(message: Resource): void {
+    if (!this.host.isVisible()) return;
     try { showToastSafely(this.host.getUIContext(), { message: message }); } catch {
       // 展示宿主可能已消失，已接受的写入仍需完成。
     }
   }
 
   request(deckId: string): void {
-    if (this.busy) return;
+    if (this.busy || this.dialogOpen || !this.host.isVisible()) return;
     if (this.host.deferForSync((): void => { this.request(deckId); })) return;
     const deck: 牌组汇总 = this.host.findDeck(deckId);
     if (deck.id === '') {
@@ -59,25 +61,32 @@ export class HomeDeckDeletion {
     const message: string = resourceText(this.host.getUIContext(),
       $r('app.string.deck_delete_confirm_message'));
     this.host.onDialogChanged(true);
+    this.dialogOpen = true;
+    let settled: boolean = false;
+    const finish = (): boolean => {
+      if (settled) return false;
+      settled = true; this.dialogOpen = false; this.host.onDialogChanged(false); return true;
+    };
+    try {
     this.host.getUIContext().showAlertDialog({
       title: title,
       message: message,
       autoCancel: false,
-      cancel: (): void => { this.host.onDialogChanged(false); },
+      cancel: (): void => { finish(); },
       alignment: DialogAlignment.Center,
       primaryButton: {
         value: $r('app.string.cancel'),
-        action: (): void => { this.host.onDialogChanged(false); }
+        action: (): void => { finish(); }
       },
       secondaryButton: {
         value: $r('app.string.deck_menu_delete'),
         fontColor: $r('app.color.error_text'),
         action: (): void => {
-          this.host.onDialogChanged(false);
-          this.execute(deckId);
+          if (finish() && this.host.isVisible()) this.execute(deckId);
         }
       }
     });
+    } catch (error) { finish(); }
   }
 
   async execute(deckId: string): Promise<void> {
@@ -94,6 +103,7 @@ export class HomeDeckDeletion {
       try {
         count = await this.牌组服务实例.删除牌组([Number(deckId)]);
       } catch (error) {
+        if (!this.host.isVisible()) return;
         const reason: string = error instanceof Error ? error.message : `${error}`;
         const failMsg: string = resourceText(this.host.getUIContext(),
           $r('app.string.deck_delete_failed')).replace('%s', reason);
@@ -101,6 +111,7 @@ export class HomeDeckDeletion {
         return;
       }
       const selectionSaved: boolean = await this.host.onDeleted(deckId);
+      if (!this.host.isVisible()) return;
       let successMsg: string = resourceText(this.host.getUIContext(),
         $r('app.string.deck_delete_success')).replace('%d', count.toString());
       if (!selectionSaved) successMsg += '\n' + resourceText(this.host.getUIContext(),
@@ -133,6 +144,7 @@ export class HomeDeckDeletion {
       if (!confirmed || !this.host.isVisible()) return;
       this.setStatus($r('app.string.deck_media_checking'));
       const removed: number = await this.deckMediaCleanup.cleanup(candidates);
+      if (!this.host.isVisible()) return;
       const message: string = resourceText(this.host.getUIContext(),
         $r('app.string.deck_media_cleaned')).replace('%d', removed.toString());
       showToastSafely(this.host.getUIContext(), { message: message });

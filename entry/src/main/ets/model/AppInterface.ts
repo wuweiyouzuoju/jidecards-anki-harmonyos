@@ -563,8 +563,7 @@ export function reminderEditorControls(creating: boolean, busy: boolean): AppInt
     .map((item): AppInterfaceMenuItem => ({ id: item.id,
       titleKey: item.id === 'confirm' && !creating ? 'deck_customize_save' : item.titleKey,
       condition: item.condition, selected: false,
-      // 占位符标签当前不禁用；观察必须忠实于实际 UI。
-      enabled: item.id.startsWith('insert_') || (item.id !== 'time' && !busy) }));
+      enabled: item.id !== 'time' && !busy }));
 }
 
 export function statsInterfaceSections(fsrs: boolean): AppInterfaceItem[] {

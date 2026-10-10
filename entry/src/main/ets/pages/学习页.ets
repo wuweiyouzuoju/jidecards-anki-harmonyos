@@ -1493,19 +1493,23 @@ export struct 学习页 {
     this.autoAdvanceEnabled = false;
     const cardId: number = this.当前卡片.cardId;
     const version: number = this.requestVersion;
+    let settled: boolean = false;
     this.getUIContext().showAlertDialog({
       title: $r('app.string.study_delete_card_confirm_title'),
       message: $r('app.string.study_delete_card_confirm_message'),
       autoCancel: false,
       alignment: DialogAlignment.Center,
+      cancel: (): void => { settled = true; },
       primaryButton: {
         value: $r('app.string.cancel'),
-        action: (): void => {}
+        action: (): void => { settled = true; }
       },
       secondaryButton: {
         value: $r('app.string.study_delete_card'),
         fontColor: $r('app.color.error_text'),
         action: (): void => {
+          if (settled) return;
+          settled = true;
           if (!this.isCurrentRequest(version) || this.当前卡片?.cardId !== cardId) return;
           this.确认删除当前卡();
         }

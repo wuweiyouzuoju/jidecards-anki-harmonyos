@@ -113,6 +113,7 @@ export class AgentHistoryCoordinator {
   }
 
   async remove(id: string): Promise<boolean> {
+    if (!this.alive) return false;
     await this.saves;
     await this.storage.remove(id);
     this.storage.removeCheckpoint(id);

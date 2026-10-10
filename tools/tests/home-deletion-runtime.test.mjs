@@ -40,7 +40,7 @@ function harness(selected = 'child', saved = selected) {
   const feature = createDeletion({
     getUIContext: () => page.getUIContext(), deferForSync: action => page.deferForSync(action),
     findDeck: id => page.主页快照数据.decks.find(deck => deck.id === id) ?? { id: '' },
-    isVisible: () => false, onDialogChanged: open => { page.nativeDialogOpen = open; },
+    isVisible: () => true, onDialogChanged: open => { page.nativeDialogOpen = open; },
     onStateChanged: (busy, status) => { page.deckDeletionBusy = busy; page.deckDeletionStatus = status; },
     onDeleted: id => page.deckDeleted(id),
     onSettled: () => { page.homeActivityChanged(); page.scheduleAutoSyncCheck(); }
@@ -51,6 +51,7 @@ function harness(selected = 'child', saved = selected) {
 
 test('delete entry defers during sync and requires an explicit destructive confirmation', async () => {
   const { page, feature, events, dialogs } = harness();
+  feature.host.isVisible=()=>true;
   feature.request('missing');
   assert.equal(dialogs.length, 0);
   let deferred;
@@ -73,6 +74,16 @@ test('delete entry defers during sync and requires an explicit destructive confi
   for (let n = 0; n < 30 && page.deckDeletionBusy; n++) await Promise.resolve();
   assert.equal(events.filter(event => event === 'delete committed').length, 1);
   assert.equal(page.deckDeletionBusy, false);
+});
+
+test('deletion confirmations are single flight, one shot and reject departed hosts',async()=>{
+  const h=harness();let visible=true;h.feature.host.isVisible=()=>visible;
+  h.feature.request('parent');h.feature.request('parent');assert.equal(h.dialogs.length,1);
+  h.dialogs[0].primaryButton.action();h.dialogs[0].secondaryButton.action();
+  await new Promise(setImmediate);assert.deepEqual(h.events,[]);
+  h.feature.request('parent');visible=false;h.dialogs[1].secondaryButton.action();
+  await new Promise(setImmediate);assert.deepEqual(h.events,[]);
+  h.feature.request('parent');assert.equal(h.dialogs.length,2);
 });
 
 test('cascade deletion clears selected descendants and persisted selection before refreshing and syncing', async () => {
@@ -136,6 +147,17 @@ test('repeat delete is ignored while a write is pending, and refresh reconciliat
   assert.equal(page.选中的牌组ID, 'other');
   await page.reconcileDeckSelection([]);
   assert.equal(page.选中的牌组ID, '');
+});
+
+test('accepted deletion finishes persistence after departure without refreshing or displaying departed UI',async()=>{
+  const h=harness();let visible=true,release;
+  h.feature.host.isVisible=()=>visible;
+  h.page.牌组服务实例.删除牌组=()=>new Promise(resolve=>{h.events.push('delete committed');release=resolve;});
+  const work=h.page.确认删除牌组('parent');while(!release)await Promise.resolve();
+  visible=false;h.page.homeDisposed=true;release(3);await work;
+  assert.equal(h.preferences.saved,'');assert.equal(h.scheduler.hasPending(),true);
+  assert.equal(h.page.选中的牌组ID,'child');assert.ok(!h.events.includes('refresh'));
+  assert.ok(!h.events.some(event=>event.includes('deck_delete_success')));
 });
 
 test('actual last-deck storage reports flush failure without throwing or claiming persistence succeeded', async () => {

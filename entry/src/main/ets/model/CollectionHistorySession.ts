@@ -10,6 +10,7 @@ export interface CollectionHistoryBackend {
 export class CollectionHistoryState {
   status: UndoStatus | null = null;
   busy: boolean = false;
+  applying: boolean = false;
   error: string = '';
   errorDetail: string = '';
 }
@@ -29,6 +30,7 @@ export class CollectionHistorySession {
   dispose(): void { this.disposed = true; }
   private emit(): void {
     if (!this.disposed) this.publish({ status: this.state.status, busy: this.state.busy,
+      applying: this.state.applying,
       error: this.state.error, errorDetail: this.state.errorDetail });
   }
   async load(): Promise<void> { await this.run(null); }
@@ -40,6 +42,7 @@ export class CollectionHistorySession {
   private async run(redo: boolean | null): Promise<void> {
     if (this.disposed || this.state.busy) return;
     this.state.busy = true; this.state.error = ''; this.state.errorDetail = '';
+    this.state.applying = redo !== null;
     autoSyncScheduler.beginOperation(this); this.emit();
     let committed: boolean = false;
     try {
@@ -66,7 +69,7 @@ export class CollectionHistorySession {
         detail === 'collection_history_changed' ? 'collection_history_changed_error' : 'collection_history_apply_error';
       this.state.errorDetail = detail === 'collection_history_changed' ? '' : detail;
     } finally {
-      this.state.busy = false; this.emit(); autoSyncScheduler.endOperation(this);
+      this.state.busy = false; this.state.applying = false; this.emit(); autoSyncScheduler.endOperation(this);
     }
   }
 }

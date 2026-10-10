@@ -175,19 +175,23 @@ export struct 设置页 {
       }
       const title: string = this.getUIContext().getHostContext()!.resourceManager.getStringSync($r('app.string.hidden_decks_title').id);
       const message: string = `${hiddenIds.length}`;
+      let settled: boolean = false;
       this.getUIContext().showAlertDialog({
         title: title,
         message: message,
         autoCancel: false,
         alignment: DialogAlignment.Center,
+        cancel: (): void => { settled = true; },
         primaryButton: {
           value: $r('app.string.cancel'),
-          action: (): void => {}
+          action: (): void => { settled = true; }
         },
         secondaryButton: {
           value: $r('app.string.hidden_decks_unhide'),
           fontColor: this.actionColor,
           action: (): void => {
+            if (settled) return;
+            settled = true;
             this.确认全部取消隐藏();
           }
         }
@@ -198,6 +202,7 @@ export struct 设置页 {
   }
 
   private async 确认全部取消隐藏(): Promise<void> {
+    if (this.disposed) return;
     try {
       await 取消隐藏全部牌组();
       // 通知首页刷新数据

@@ -250,6 +250,7 @@ export struct AI制卡页 {
   private 本地范围牌组IDs: number[] = [];
   private 本地范围笔记类型IDs: number[] = [];
   private pageDisposed: boolean = false;
+  private draftConfirmationPending: boolean = false;
   private interfaceMounted: boolean = false;
   private readonly history: AgentHistoryCoordinator = new AgentHistoryCoordinator({
     load: loadAgentConversations,
@@ -1554,70 +1555,130 @@ export struct AI制卡页 {
   }
 
   /** 第一次 UI 事件：重读基线并生成 level-1 短时令牌。 */
+  private isCurrentDraft(messageIndex: number, draftIndex: number, draft: ChangeDraft): boolean {
+    const current: ChangeDraft | undefined = this.消息列表[messageIndex]?.变更草稿列表[draftIndex];
+    return !this.pageDisposed && current !== undefined && current.id === draft.id && current.risk === draft.risk &&
+      current.baselineHash === draft.baselineHash && JSON.stringify(current.operations) === JSON.stringify(draft.operations) &&
+      JSON.stringify(current.imageAttachments) === JSON.stringify(draft.imageAttachments);
+  }
+
   private async 准备执行草稿(messageIndex: number, draftIndex: number): Promise<void> {
-    const draft: ChangeDraft = this.消息列表[messageIndex].变更草稿列表[draftIndex];
+    const draft: ChangeDraft | undefined = this.消息列表[messageIndex]?.变更草稿列表[draftIndex];
+    if (this.pageDisposed || this.draftConfirmationPending || draft === undefined || draft.status !== 'pending') return;
+    this.draftConfirmationPending = true;
+    let presented: boolean = false;
     try {
       const prepared: PreparedAgentDraft = await this.agentExecutor.prepare(draft);
+      if (!this.isCurrentDraft(messageIndex, draftIndex, draft)) return;
+      let settled: boolean = false;
+      const finish = (continuing: boolean = false): boolean => {
+        if (settled) return false;
+        settled = true;
+        const current: boolean = this.isCurrentDraft(messageIndex, draftIndex, draft);
+        if (!continuing || !current) this.draftConfirmationPending = false;
+        return current;
+      };
+      const cancel = (): void => {
+        if (finish()) {
+          draft.status = 'pending';
+          this.消息列表[messageIndex].变更草稿列表[draftIndex].status = 'pending';
+        }
+      };
+      draft.status = 'prepared';
+      this.消息列表[messageIndex].变更草稿列表[draftIndex].status = 'prepared';
+      presented = true;
       if (draft.risk === 'high_risk') {
         this.getUIContext().showAlertDialog({
           title: this.取本地化文案($r('app.string.ai_agent_danger_title')),
           message: `${this.取本地化文案($r('app.string.ai_agent_danger_body'))}\n${this.影响范围(draft)}\n${draft.summary}`,
           autoCancel: false,
-          primaryButton: { value: $r('app.string.cancel'), action: (): void => { draft.status = 'pending'; } },
+          cancel: cancel,
+          primaryButton: { value: $r('app.string.cancel'), action: cancel },
           secondaryButton: {
             value: $r('app.string.continue'), fontColor: $r('app.color.error_text'),
-            action: (): void => { this.打开高风险最终确认(messageIndex, draftIndex, prepared); }
+            action: (): void => { if (finish(true)) this.打开高风险最终确认(messageIndex, draftIndex, prepared); }
           }
         });
       } else {
         this.getUIContext().showAlertDialog({
           title: this.取本地化文案($r('app.string.ai_agent_confirm_title')),
           message: `${this.取本地化文案($r('app.string.ai_agent_confirm_body'))}\n${this.影响范围(draft)}`,
-          primaryButton: { value: $r('app.string.cancel'), action: (): void => { draft.status = 'pending'; } },
+          cancel: cancel,
+          primaryButton: { value: $r('app.string.cancel'), action: cancel },
           secondaryButton: {
             value: $r('app.string.settings_confirm'),
-            action: (): void => { this.执行普通草稿(messageIndex, draftIndex, prepared); }
+            action: (): void => { if (finish()) this.执行普通草稿(messageIndex, draftIndex, prepared); }
           }
         });
       }
-    } catch (error) { this.记录草稿错误(messageIndex, error); }
+    } catch (error) {
+      this.draftConfirmationPending = false;
+      if (this.isCurrentDraft(messageIndex, draftIndex, draft)) {
+        if (draft.status === 'prepared') draft.status = 'pending';
+        this.消息列表[messageIndex].变更草稿列表[draftIndex].status = draft.status;
+        this.记录草稿错误(messageIndex, error);
+      }
+    } finally { if (!presented) this.draftConfirmationPending = false; }
   }
 
   /** 第二次、不同的 UI 事件：签发 level-2 令牌后显示永久操作最终确认。 */
   private 打开高风险最终确认(messageIndex: number, draftIndex: number,
     prepared: PreparedAgentDraft): void {
+    if (!this.isCurrentDraft(messageIndex, draftIndex, prepared.draft)) { this.draftConfirmationPending = false; return; }
     try {
       const secondToken: AgentConfirmationToken =
         this.agentExecutor.authorizeHighRisk(prepared, prepared.firstToken);
+      let settled: boolean = false;
+      const finish = (): boolean => {
+        if (settled) return false;
+        settled = true; this.draftConfirmationPending = false;
+        return this.isCurrentDraft(messageIndex, draftIndex, prepared.draft);
+      };
+      const cancel = (): void => {
+        if (finish()) {
+          prepared.draft.status = 'pending';
+          this.消息列表[messageIndex].变更草稿列表[draftIndex].status = 'pending';
+        }
+      };
       this.getUIContext().showAlertDialog({
         title: this.取本地化文案($r('app.string.ai_agent_danger_final_title')),
         message: `${this.取本地化文案($r('app.string.ai_agent_danger_final_body'))}\n${this.影响范围(prepared.draft)}`,
         autoCancel: false,
-        primaryButton: { value: $r('app.string.cancel'), action: (): void => { prepared.draft.status = 'pending'; } },
+        cancel: cancel,
+        primaryButton: { value: $r('app.string.cancel'), action: cancel },
         secondaryButton: {
           value: $r('app.string.settings_confirm'), fontColor: $r('app.color.error_text'),
-          action: (): void => { this.执行高风险草稿(messageIndex, draftIndex, prepared, secondToken); }
+          action: (): void => { if (finish()) this.执行高风险草稿(messageIndex, draftIndex, prepared, secondToken); }
         }
       });
-    } catch (error) { this.记录草稿错误(messageIndex, error); }
+    } catch (error) {
+      this.draftConfirmationPending = false;
+      if (this.isCurrentDraft(messageIndex, draftIndex, prepared.draft)) {
+        prepared.draft.status = 'pending';
+        this.消息列表[messageIndex].变更草稿列表[draftIndex].status = 'pending';
+        this.记录草稿错误(messageIndex, error);
+      }
+    }
   }
 
   private async 执行普通草稿(messageIndex: number, draftIndex: number,
     prepared: PreparedAgentDraft): Promise<void> {
+    if (!this.isCurrentDraft(messageIndex, draftIndex, prepared.draft)) return;
     try {
       const result: AgentDraftExecutionResult =
         await this.agentExecutor.executeOrdinary(prepared, prepared.firstToken);
-      this.记录执行结果(messageIndex, draftIndex, result);
-    } catch (error) { this.记录草稿错误(messageIndex, error); }
+      if (this.isCurrentDraft(messageIndex, draftIndex, prepared.draft)) this.记录执行结果(messageIndex, draftIndex, result);
+    } catch (error) { if (this.isCurrentDraft(messageIndex, draftIndex, prepared.draft)) this.记录草稿错误(messageIndex, error); }
   }
 
   private async 执行高风险草稿(messageIndex: number, draftIndex: number,
     prepared: PreparedAgentDraft, secondToken: AgentConfirmationToken): Promise<void> {
+    if (!this.isCurrentDraft(messageIndex, draftIndex, prepared.draft)) return;
     try {
       const result: AgentDraftExecutionResult =
         await this.agentExecutor.executeHighRisk(prepared, prepared.firstToken, secondToken);
-      this.记录执行结果(messageIndex, draftIndex, result);
-    } catch (error) { this.记录草稿错误(messageIndex, error); }
+      if (this.isCurrentDraft(messageIndex, draftIndex, prepared.draft)) this.记录执行结果(messageIndex, draftIndex, result);
+    } catch (error) { if (this.isCurrentDraft(messageIndex, draftIndex, prepared.draft)) this.记录草稿错误(messageIndex, error); }
   }
 
   private 记录执行结果(messageIndex: number, draftIndex: number,
@@ -1958,13 +2019,18 @@ export struct AI制卡页 {
   }
 
   private 删除历史会话(selected: AgentConversation): void {
+    if (this.pageDisposed) return;
+    let settled: boolean = false;
     this.getUIContext().showAlertDialog({
       title: this.取本地化文案($r('app.string.ai_agent_history_delete_title')),
       message: this.取本地化文案($r('app.string.ai_agent_history_delete_body')),
-      primaryButton: { value: $r('app.string.cancel'), action: (): void => {} },
+      cancel: (): void => { settled = true; },
+      primaryButton: { value: $r('app.string.cancel'), action: (): void => { settled = true; } },
       secondaryButton: {
         value: $r('app.string.settings_confirm'), fontColor: $r('app.color.error_text'),
         action: (): void => {
+          if (settled) return;
+          settled = true;
           this.执行删除历史会话(selected.id);
         }
       }
@@ -1972,8 +2038,10 @@ export struct AI制卡页 {
   }
 
   private async 执行删除历史会话(id: string): Promise<void> {
+    if (this.pageDisposed) return;
     try {
       if (!await this.history.remove(id)) return;
+      if (this.pageDisposed) return;
       this.历史会话列表 = this.历史会话列表.filter((item: AgentConversation): boolean => item.id !== id);
       if (this.conversationId === id) this.开始新会话();
     } catch (error) {
