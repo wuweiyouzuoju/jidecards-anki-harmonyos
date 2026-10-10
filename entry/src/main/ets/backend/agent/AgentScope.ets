@@ -2,6 +2,7 @@
 
 import type { AgentImageCandidate } from '../../model/agent/AgentTypes';
 import { AgentRetrieval } from '../../model/agent/AgentRetrieval';
+import { AgentTaskPlan } from '../../model/agent/AgentTaskPlan';
 
 export class AgentScopeError extends Error {
   readonly code: string;
@@ -15,6 +16,7 @@ export class AgentScopeError extends Error {
 /** 一轮会话可引用的稳定 ID 集合；模型不能凭空构造卡库对象 ID。 */
 export class AgentScope {
   readonly retrieval: AgentRetrieval = new AgentRetrieval();
+  readonly taskPlan: AgentTaskPlan = new AgentTaskPlan();
 
   /** 每轮只刷新操作上下文，保留会话中已发现的只读对象和分页进度。 */
   beginTurn(): void {
@@ -182,6 +184,7 @@ export class AgentScope {
   }
 
   reset(): void {
+    this.taskPlan.clear();
     this.retrieval.clear();
     this.readableCardIds.clear();
     this.readableNoteIds.clear();

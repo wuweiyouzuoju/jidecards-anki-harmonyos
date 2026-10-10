@@ -36,6 +36,8 @@ export interface ProviderTurnRequest {
   instructions: string;
   input: ProviderInputItem[];
   functionTools: ProviderFunctionTool[];
+  /** 宿主目录按需暴露；仅供 Runner 使用，不序列化到提供商请求。 */
+  deferTools?: boolean;
   searchMode: SearchMode;
   /** 用户是否明确要求联网；为 true 时必须观察到真实服务端搜索过程。 */
   requiresWebSearch: boolean;
@@ -47,6 +49,8 @@ export interface ProviderTurnRequest {
   expectedDraftCount: number;
   reasoningEffort: string;
   maxOutputTokens: number;
+  /** 本机序列化字符额度，不等同于服务端 token 窗口。 */
+  contextBudgetChars?: number;
 }
 
 interface ResponsesMessageInput {
@@ -277,7 +281,9 @@ function withinProviderContextBudget(payload: string, request: ProviderTurnReque
   for (const item of request.input) {
     for (const entry of item.images ?? []) { imageChars += entry.imageUrl.length; imageCount++; }
   }
-  return payload.length - imageChars <= MAX_PROVIDER_PAYLOAD_CHARS && imageChars <= 12 * 1024 * 1024 && imageCount <= 8;
+  const requested: number = request.contextBudgetChars ?? MAX_PROVIDER_PAYLOAD_CHARS;
+  const budget: number = Number.isSafeInteger(requested) ? Math.max(1, Math.min(768000, requested)) : MAX_PROVIDER_PAYLOAD_CHARS;
+  return payload.length - imageChars <= budget && imageChars <= 12 * 1024 * 1024 && imageCount <= 8;
 }
 
 /** 与发送共用完整序列化；正文转义、工具定义、指令与图片都计入同一预算。 */

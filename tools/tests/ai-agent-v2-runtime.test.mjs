@@ -62,12 +62,16 @@ export async function readStudyControls() {throw Error('unexpected study control
 export async function saveStudyControls() {throw Error('unexpected study controls write');}
 export async function exportSubset() {throw Error('unexpected subset export');}
 export async function 完成导出() {throw Error('unexpected subset save');}
+export async function loadBrowserPreferences() {throw Error('unexpected browser preference read');}
+export async function loadBrowserIgnoreAccents() {throw Error('unexpected browser search option read');}
+export async function saveBrowserPreferences() {throw Error('unexpected browser preference write');}
+export class AnkiBrowserSearch {async columns(){throw Error('unexpected browser column read');}}
 `;
 const stubUrl = 'data:text/javascript;base64,' + Buffer.from(stub).toString('base64');
 const names = ['AgentTransport','DeepSeekAdapter','OpenAIAdapter','CustomAdapter','AgentWorkspaceStore','WikimediaImageService',
  '牌组服务','笔记类型服务','搜索服务','笔记服务','卡片服务','标签服务','统计服务','AppThemeService','FSRS控制器',
  'CardTextSizeStore','DeckListAppearanceStore','MotionStyleStore','StudyHaptics','LocalPreferenceWrite','牌组顺序存储',
- 'ReviewPreferencesService','StudyControlsService','数据迁移服务','FsrsService','AnkiDeckOptions','FilteredDeckService'];
+ 'ReviewPreferencesService','StudyControlsService','数据迁移服务','FsrsService','AnkiDeckOptions','FilteredDeckService','BrowserPreferencesStore','AnkiBrowserSearch'];
 register('data:text/javascript;base64,' + Buffer.from(`export function resolve(s,c,next) {
  if (${JSON.stringify(names)}.some(n=>s.endsWith('/'+n))) return {url:${JSON.stringify(stubUrl)},shortCircuit:true};
  return next(s,c); }`).toString('base64'), import.meta.url);
@@ -179,7 +183,7 @@ test('JIDE rejects mixed reparent tool batches before proposing or writing',asyn
  fixture.decks=[{deckId:1,name:'English',children:[],totalIncludingChildren:2507}];
 });
 
-function harness(rounds=[],limits,mode='create',documents=null,validate=null) {
+function harness(rounds=[],limits,mode='create',documents=null,validate=null,deferTools=false,catalog=null) {
  const scope=new AgentScope();scope.configureCreateTarget(mode==='assistant'?0:1,mode==='assistant'?0:2);scope.registerReadableDeckIds([1]);scope.registerReadableNotetypeIds([2]);
  const store={state:{lastDeckId:1,deckPreferences:[],memories:[]},async load(){return this.state;},
  async saveSelection(deckId,notetypeId){this.state.lastDeckId=deckId;this.state.deckPreferences=[{deckId,notetypeId}];},
@@ -195,11 +199,132 @@ function harness(rounds=[],limits,mode='create',documents=null,validate=null) {
  for(const e of rounds.shift()??[])observer.onEvent(e);},cancel(){}});
  const session=new AgentSessionController(runner,scope,store,auxiliary);
  const request=(text,instructions)=>({apiKey:'test',baseUrl:'https://example.test',model:'test',instructions,input:[item(text)],
- functionTools:agentFunctionTools(100,mode),searchMode:'off',requiresWebSearch:false,requiresSearchEvidence:false,
+ functionTools:catalog??agentFunctionTools(100,mode),deferTools,searchMode:'off',requiresWebSearch:false,requiresSearchEvidence:false,
  requiresDraft:false,expectedDraftCount:0,reasoningEffort:'',maxOutputTokens:1024});
  const run=(text,resume='',expectedDraftCount=0,instructions='')=>{const value=request(text,instructions);value.expectedDraftCount=expectedDraftCount;return session.run('deepseek',value,{onEvent:e=>events.push(e)},resume);};
  return {scope,store,registry,cards,auxiliary,runner,session,requests,events,run};
 }
+
+test('on-demand ordinary chat sends only core definitions and leaves domain schemas outside the payload',async()=>{
+ const h=harness([[event('text_delta','你好。')]],undefined,'assistant',null,null,true);
+ await h.run('你好');
+ assert.deepEqual(h.requests[0].functionTools.map(tool=>tool.name),['discover_tools','get_app_structure','request_clarification']);
+ const wire=JSON.parse(buildResponsesPayload(h.requests[0]));
+ assert.deepEqual(wire.tools.map(tool=>tool.name),['discover_tools','get_app_structure','request_clarification']);
+ assert.equal(Object.hasOwn(wire,'deferTools'),false);
+ assert.ok(!JSON.stringify(wire.tools).includes('fieldUpdatesJson'));
+});
+
+test('on-demand discovery exposes real schemas in the next request and then executes through the original registry',async()=>{
+ fixture.writes=[];
+ const h=harness([[call('discover','discover_tools',{names:['list_decks']})],
+  [call('decks','list_decks',{query:'English',limit:20})],[event('text_delta','已读取。')]],undefined,'assistant',null,null,true);
+ await h.run('看看 English 牌组');
+ assert.equal(h.requests[0].functionTools.some(tool=>tool.name==='list_decks'),false);
+ const actual=h.requests[1].functionTools.find(tool=>tool.name==='list_decks');
+ assert.deepEqual(actual,agentFunctionTools(100,'assistant').find(tool=>tool.name==='list_decks'));
+ const output=JSON.parse(h.requests[2].input.find(item=>item.kind==='function_call_output'&&item.callId==='decks').output);
+ assert.ok(output.decks.length>0);
+ assert.deepEqual(fixture.writes,[]);
+});
+
+test('discovery cannot authorize an undeclared tool in the same provider batch',async()=>{
+ fixture.writes=[];
+ const h=harness([[call('discover','discover_tools',{names:['list_decks']}),call('too-early','list_decks',{query:'',limit:20})],
+  [call('next-request','list_decks',{query:'',limit:20})],[event('text_delta','完成。')]],undefined,'assistant',null,null,true);
+ await h.run('读取牌组');
+ const early=JSON.parse(h.requests[1].input.find(item=>item.kind==='function_call_output'&&item.callId==='too-early').output);
+ assert.equal(early.tool_error,'tool_not_declared');
+ assert.equal(JSON.parse(h.requests[2].input.find(item=>item.kind==='function_call_output'&&item.callId==='next-request').output).tool_error,undefined);
+ assert.deepEqual(fixture.writes,[]);
+});
+
+test('new turns and restored checkpoints do not inherit old loaded definitions or execute historical calls',async()=>{
+ fixture.writes=[];
+ const old=harness([[call('discover','discover_tools',{names:['list_decks']})],
+  [call('decks','list_decks',{query:'',limit:20})],[event('text_delta','完成。')]],undefined,'assistant',null,null,true);
+ await old.run('读取牌组');
+ const next=harness([[call('stale-call','list_decks',{query:'',limit:20})],
+  [event('text_delta','需要重新加载。')]],undefined,'assistant',null,null,true);
+ next.session.restore(old.session.exportState());await next.run('继续');
+ assert.deepEqual(next.requests[0].functionTools.map(tool=>tool.name),['discover_tools','get_app_structure','request_clarification']);
+ assert.equal(JSON.parse(next.requests[1].input.find(item=>item.kind==='function_call_output'&&item.callId==='stale-call').output).tool_error,'tool_not_declared');
+ assert.deepEqual(fixture.writes,[]);
+});
+
+test('discovering a confirmation action still requires explicit confirmation and resumes without replaying writes',async()=>{
+ fixture.writes=[];
+ const h=harness([[call('discover','discover_tools',{names:['propose_create_deck']})],
+  [call('action','propose_create_deck',{name:'On demand'})],[event('text_delta','已创建。')]],undefined,'assistant',null,null,true);
+ const pending=await h.run('创建 On demand 牌组');
+ assert.equal(pending.status,'awaiting_confirmation');assert.deepEqual(fixture.writes,[]);
+ const result=await h.session.actionExecutor.executeConfirmed(pending.action);
+ assert.deepEqual(fixture.writes,[['deck','On demand']]);
+ await h.run('应用结果',result);
+ assert.deepEqual(h.requests[2].functionTools.map(tool=>tool.name),['discover_tools','get_app_structure','request_clarification']);
+ assert.deepEqual(fixture.writes,[['deck','On demand']]);
+ await assert.rejects(h.session.actionExecutor.executeConfirmed(pending.action),/confirmation_mismatch/);
+ fixture.decks=[{deckId:1,name:'English',children:[],totalIncludingChildren:2507}];
+});
+
+test('discovery cannot load web tools excluded by this turn and does not count as a search',async()=>{
+ const catalog=agentFunctionTools(100,'assistant').filter(tool=>!['web_search','read_webpage'].includes(tool.name));
+ const h=harness([[call('discover','discover_tools',{names:['web_search']})],
+  [event('text_delta','联网未启用。')]],undefined,'assistant',null,null,true,catalog);
+ await h.run('联网搜索');
+ assert.equal(JSON.parse(h.requests[1].input.find(item=>item.kind==='function_call_output'&&item.callId==='discover').output).tool_error,'tool_not_available');
+ assert.ok(h.requests.every(request=>!request.functionTools.some(tool=>tool.name==='web_search')));
+ assert.equal(h.events.some(item=>item.kind==='search_source'),false);
+});
+
+test('on-demand tools preserve edit previews and creation count validation without writing',async()=>{
+ fixture.writes=[];
+ const edit=harness([[call('load-edit','discover_tools',{names:['search_cards','get_note_context','propose_update_notes']})],
+  [call('search','search_cards',{query:'note:Basic',limit:1})],
+  [call('context','get_note_context',{cardIds:[1]})],
+  [call('edit','propose_update_notes',{noteIds:[1],fieldUpdatesJson:JSON.stringify([{noteId:1,fieldOrd:1,after:'Short answer'}]),
+   draftId:'on-demand-edit',reason:'Shorten answer'})]],undefined,'assistant',null,null,true);
+ const edited=await edit.run('把1张卡的答案缩短','',1);
+ assert.equal(edited.status,'completed');assert.equal(edited.drafts.length,1);
+ assert.equal(edited.drafts[0].operations[0].kind,'update_field');
+ assert.equal(edited.drafts[0].operations[0].after,'Short answer');
+ const create=harness([[call('load-create','discover_tools',{names:['create_flashcards']})],
+  [call('cards','create_flashcards',{cards:[{fields:['Q','A']}]})]],undefined,'create',null,null,true);
+ const mismatched=await create.run('制作2张卡','',2);
+ assert.equal(mismatched.status,'paused');assert.equal(mismatched.drafts.length,0);
+ assert.deepEqual(fixture.writes,[]);
+});
+
+test('long projects pass the old round limit, checkpoint paired tool results, and resume their plan without writes',async()=>{
+ fixture.writes=[];
+ const plan={baseRevision:0,objective:'处理完整资料',notes:'从第二章继续，保留已确认约束。',
+  steps:[{id:'read',title:'逐页读取',status:'in_progress'},{id:'draft',title:'生成草稿',status:'pending'}]};
+ const rounds=[[call('plan','update_task_plan',plan)],
+   ...Array.from({length:18},(_,index)=>[call('read-'+index,'get_task_plan',{})]),
+   [call('batch-one','get_task_plan',{}),call('batch-two','get_task_plan',{})], [event('text_delta','计划已保留。')]];
+ const h=harness(rounds,undefined,'assistant');const checkpoints=[];
+ h.session.setCheckpointListener(()=>checkpoints.push(structuredClone(h.session.exportState())));
+ const result=await h.run('先制定计划，再分批处理资料');assert.equal(result.status,'completed');assert.equal(h.requests.length,21);
+ assert.ok(checkpoints.length>=20);const persisted=checkpoints.findLast(x=>x.taskPlan?.revision===1&&x.paused);
+ assert.ok(persisted);assert.equal(persisted.taskPlan.notes,plan.notes);
+ for(const checkpoint of checkpoints) {
+   const answered=new Set(checkpoint.input.filter(x=>x.kind==='function_call_output').map(x=>x.callId));
+   for(const request of checkpoint.input.filter(x=>x.kind==='function_call')) assert.ok(answered.has(request.callId));
+ }
+ assert.deepEqual(fixture.writes,[]);
+ const next=harness([[call('restored','get_task_plan',{})],[event('text_delta','继续剩余步骤。')]],undefined,'assistant');
+ next.session.restore(persisted);assert.equal(next.session.isPaused(),true);
+ await next.run('继续');assert.match(next.requests[0].instructions,/从第二章继续/);
+ assert.equal(next.scope.taskPlan.snapshot().revision,1);assert.deepEqual(fixture.writes,[]);
+ next.session.clear();assert.equal(next.scope.taskPlan.snapshot(),null);
+});
+
+test('checkpoint IO failure stops the runner rather than being reported as a failed application tool',async()=>{
+ const h=harness([[call('plan','get_task_plan',{})]],undefined,'assistant');
+ h.session.setCheckpointListener(()=>{throw Error('disk_full');});
+ await assert.rejects(h.run('继续'),/agent_checkpoint_failed/);assert.equal(h.requests.length,0);
+ assert.equal(h.session.isPaused(),true);assert.equal(h.events.some(x=>x.kind==='tool_failed'),false);
+});
 
 test('real Runner reads advanced Core settings and pauses a JIDE-only write proposal before confirmation',async()=>{
  fixture.writes=[];

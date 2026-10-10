@@ -75,7 +75,7 @@ export class AgentAuxiliaryTools {
   constructor(scope: AgentScope, store: AgentWorkspaceStore) { this.scope = scope; this.store = store; }
 
   register(registry: AgentToolRegistry): void {
-    for (const name of ['configure_create_target', 'search_memory', 'get_deck_order']) {
+    for (const name of ['configure_create_target', 'search_memory', 'get_deck_order', 'get_task_plan', 'update_task_plan']) {
       registry.registerRead(name, new AuxiliaryReadHandler(this, name));
     }
     for (const name of ['propose_create_deck', 'propose_rename_deck', 'propose_reparent_decks', 'propose_reorder_decks', 'propose_create_note_type', 'propose_memory_change', 'propose_analysis']) {
@@ -97,6 +97,11 @@ export class AgentAuxiliaryTools {
 
   /** @throws {Error} 工作区偏好读取或写入失败，由工具执行边界返回失败结果。 */
   async read(name: string, json: string): Promise<string> {
+    if (name === 'get_task_plan') {
+      decodeExtensionArguments(name, json);
+      return JSON.stringify({ plan: this.scope.taskPlan.snapshot() });
+    }
+    if (name === 'update_task_plan') return JSON.stringify({ plan: this.scope.taskPlan.update(json) });
     const args: AgentExtensionArguments = decodeExtensionArguments(name, json);
     if (name === 'get_deck_order') {
       if (args.parentId !== 0) this.scope.assertReadableDeckIds([args.parentId]);

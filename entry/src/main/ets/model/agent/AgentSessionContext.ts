@@ -15,11 +15,16 @@ export const AGENT_IDENTITY_INSTRUCTIONS: string =
 
 /** 从实际声明与本轮额度生成环境信息，不把未挂载能力写成模型可用的工具。 */
 export function buildAgentRuntimeInstructions(tools: ProviderFunctionTool[], providerCalls: number,
-  toolCalls: number, limits: AgentTurnLimits): string {
+  toolCalls: number, limits: AgentTurnLimits, catalog: ProviderFunctionTool[] = tools): string {
   const names: string[] = tools.map((tool: ProviderFunctionTool): string => tool.name);
   return '\n执行环境（应用提供）：\n' +
-    agentInterfaceRuntimeSummary(tools) + '\n' +
+    agentInterfaceRuntimeSummary(catalog) + '\n' +
     `本轮可用工具：${names.join(', ')}。工具参数直接使用各工具声明的 JSON 对象，不加 arguments 外壳。\n` +
+    (names.includes('discover_tools') ?
+      '工具完整定义按需加载。目录、历史或下文提到的工具名不表示本次已声明；未声明的工具先用 discover_tools 按关键词或准确 names 加载，' +
+      '取得下一次请求的真实参数定义后再调用。不要猜参数，不要在发现工具的同一批调用尚未加载的工具。' +
+      '每次用户发送/恢复接续从核心工具开始；同轮仅保留最近使用的12个非核心定义，被移出的需要重新发现。' +
+      '工具发现仅调整定义窗口，不执行操作，也不改变原有确认与权限。\n' : '') +
     (names.includes('search_anki_help') && names.includes('read_anki_help') ?
       '解释 Anki 学习、FSRS、搜索语法或模板时，优先 search_anki_help 查官方手册，再 read_anki_help 读取有关原文，用用户语言解释并引用返回的来源链接。' +
       '这是随应用发布的离线原文快照，每次返回当前 revision；旧会话引用需重新核对，不声称它是联网最新版本。' +
@@ -34,6 +39,10 @@ export function buildAgentRuntimeInstructions(tools: ProviderFunctionTool[], pro
     `可执行工具 ${Math.max(0, limits.maxToolCalls - toolCalls)} 次。` +
     '错误结果是观察信息：先读具体原因，修正后再调用；不要原样重复。额度不足时保留进度，不虚报完成。\n' +
     '完成依据：计算以真实返回结果为准，制卡或改卡以校验通过的草稿为准，保存以应用确认后的执行结果为准。' +
+    (names.includes('update_task_plan') ?
+      '复杂多步骤或需要分批的任务，先 get_task_plan 读取当前计划，再用 update_task_plan 维护目标、步骤与接续笔记。' +
+      '先做一项，完成或受阻后更新计划。把资料位置、用户已确定的约束、未完成工作及真实结果记入 notes；不要把草稿当作已保存。' +
+      '恢复或旧正文离开上下文时读取计划和必要原文，按剩余步骤继续；简单聊天不必创建计划。' : '') +
     '用户明确要求制作时，只在正文列出问答不等于交付草稿。不要把内部思考、工具参数或整批草稿再复制到正文。';
 }
 

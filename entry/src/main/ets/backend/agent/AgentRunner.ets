@@ -24,6 +24,7 @@ import type { ProviderInputImage } from '../../model/agent/ProviderProtocol';
 import { readProviderContinuation, hasProviderReasoningText } from '../../model/agent/ProviderProtocol';
 import type { ResponsesOpaqueOutputInput } from '../../model/agent/ProviderProtocol';
 import { buildAgentRuntimeInstructions } from '../../model/agent/AgentSessionContext';
+import { AgentToolDiscovery, AgentToolDiscoveryError } from '../../model/agent/AgentToolDiscovery';
 import { agentWebResultSources } from '../../model/agent/AgentWeb';
 import {
   DEEPSEEK_PROVIDER,
@@ -57,6 +58,7 @@ import {
 
 export interface AgentRunObserver {
   onEvent(event: AgentEvent): void;
+  onCheckpoint?: (input: ProviderInputItem[]) => void;
 }
 
 export type AgentRunStatus = 'completed' | 'awaiting_clarification' | 'awaiting_confirmation' | 'paused';
@@ -126,13 +128,15 @@ function undeclaredToolDiagnostic(request: ProviderTurnRequest,
   for (const tool of request.functionTools) { declaredNames.push(tool.name); }
   return {
     code: 'tool_not_declared', path: 'name',
-    message: `The tool ${call.name} is not available in this turn. Available tools: ${declaredNames.join(', ')}.`,
+    message: `The tool ${call.name} is not declared in this request. Declared tools: ${declaredNames.join(', ')}. ` +
+      'If discover_tools is declared, load the needed tool and wait for its definition before calling it.',
     receivedKeys: [call.name], allowedKeys: declaredNames, validTemplateJson: '{}'
   };
 }
 
 function diagnosticForError(error: Object, call: AgentToolCall,
   request: ProviderTurnRequest): AgentToolDiagnostic {
+  if (error instanceof AgentToolDiscoveryError) { return error.diagnostic(); }
   let receivedKeys: string[] = [];
   let allowedKeys: string[] = [];
   try {
@@ -239,13 +243,15 @@ function copyRequest(request: ProviderTurnRequest): ProviderTurnRequest {
     instructions: request.instructions,
     input: input,
     functionTools: request.functionTools.slice(),
+    deferTools: request.deferTools,
     searchMode: request.searchMode,
     requiresWebSearch: request.requiresWebSearch,
     requiresSearchEvidence: request.requiresSearchEvidence,
     requiresDraft: request.requiresDraft,
     expectedDraftCount: request.expectedDraftCount,
     reasoningEffort: request.reasoningEffort,
-    maxOutputTokens: request.maxOutputTokens
+    maxOutputTokens: request.maxOutputTokens,
+    contextBudgetChars: request.contextBudgetChars
   };
 }
 
@@ -387,6 +393,10 @@ export class AgentRunner {
   getContinuationInput(): ProviderInputItem[] {
     return this.continuationInput.map((item: ProviderInputItem): ProviderInputItem => copyInput(item));
   }
+  private checkpoint(observer: AgentRunObserver): void {
+    try { observer.onCheckpoint?.(this.getContinuationInput()); }
+    catch (error) { throw new AgentRunnerError('agent_checkpoint_failed'); }
+  }
   private readonly registry: AgentToolRegistry;
   private readonly limits: AgentTurnLimits;
   private activeSession: AgentTransportSession | null = null;
@@ -404,6 +414,8 @@ export class AgentRunner {
     this.cancelled = false;
     this.partialDrafts = [];
     const request: ProviderTurnRequest = copyRequest(originalRequest);
+    const availableTools: ProviderFunctionTool[] = request.functionTools.slice();
+    const discovery: AgentToolDiscovery = new AgentToolDiscovery(availableTools);
     const baseInstructions: string = request.instructions;
     this.continuationInput = request.input;
     const capabilities: ProviderCapabilities = provider === 'deepseek' ?
@@ -451,9 +463,11 @@ export class AgentRunner {
         throw new AgentRunnerError('cancelled');
       }
       providerCalls += 1;
+      if (request.deferTools === true) { request.functionTools = discovery.definitions(); }
       request.instructions = baseInstructions + buildAgentRuntimeInstructions(
-        request.functionTools, providerCalls, toolCalls, this.limits);
+        request.functionTools, providerCalls, toolCalls, this.limits, availableTools);
       fitAgentRequestContext(request);
+      this.checkpoint(observer);
       const collector: RoundCollector = new RoundCollector(observer);
       this.activeSession = this.createSession(provider, request, collector);
       try {
@@ -638,7 +652,10 @@ export class AgentRunner {
             });
             continue;
           }
-          const result: AgentToolResult = await this.registry.execute(call);
+          const result: AgentToolResult = call.name === 'discover_tools' ?
+            { outputJson: discovery.discover(call.argumentsJson), draft: null, clarification: null } :
+            await this.registry.execute(call);
+          discovery.touch(call.name);
           if (this.cancelled) { throw new AgentRunnerError('cancelled'); }
           if (call.name === 'web_search' || call.name === 'read_webpage') {
             const sources: AgentSearchSourceEvent[] = agentWebResultSources(call.name, result.outputJson);
@@ -676,9 +693,10 @@ export class AgentRunner {
             }
             return awaitingClarificationResult(result.clarification, providerCalls, toolCalls);
           }
+          this.checkpoint(observer);
         } catch (error) {
           if (this.cancelled) { throw new AgentRunnerError('cancelled'); }
-          if (error instanceof AgentRunnerError && error.code === 'cancelled') {
+          if (error instanceof AgentRunnerError && (error.code === 'cancelled' || error.code === 'agent_checkpoint_failed')) {
             throw error;
           }
           const diagnostic: AgentToolDiagnostic = diagnosticForError(error as Object, call, request);
@@ -699,7 +717,7 @@ export class AgentRunner {
       if (drafts.length > 0) {
         const createdCount: number = createDraftNoteCount(drafts);
         // 统一对话里的“修改 N 张卡”不能被制卡数量约束误拒绝；已有制卡模式仍严格校验。
-        const editToolsAvailable: boolean = request.functionTools.some((tool: ProviderFunctionTool): boolean =>
+        const editToolsAvailable: boolean = availableTools.some((tool: ProviderFunctionTool): boolean =>
           tool.name === 'propose_update_notes');
         if (request.expectedDraftCount > 0 && (createdCount > 0 || !editToolsAvailable) &&
           createdCount !== request.expectedDraftCount) {

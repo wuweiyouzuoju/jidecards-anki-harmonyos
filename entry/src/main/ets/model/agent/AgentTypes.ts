@@ -146,6 +146,6 @@ export interface AgentTurnLimits {
 }
 
 export const DEFAULT_AGENT_TURN_LIMITS: AgentTurnLimits = {
-  maxProviderCalls: 8,
-  maxToolCalls: 16
+  maxProviderCalls: 32,
+  maxToolCalls: 96
 };

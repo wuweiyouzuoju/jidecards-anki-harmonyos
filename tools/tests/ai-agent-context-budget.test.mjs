@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { agentExecutionBudget } from '../../entry/src/main/ets/model/agent/AgentExecutionBudget.ts';
 import { buildResponsesPayload, providerRequestFitsContext, MAX_PROVIDER_PAYLOAD_CHARS }
   from '../../entry/src/main/ets/model/agent/ProviderProtocol.ts';
 import { fitAgentRequestContext, safeAgentSessionState, restoreAgentSessionState }
@@ -168,7 +169,7 @@ test('actual page keeps validated partial drafts editable after context failure 
     const start=source.search(new RegExp(`  private (?:async )?${name}\\(`));assert.ok(start>=0,name);
     return source.slice(start,source.indexOf('\n  }',start)+4);
   };
-  const dependencies={cloneAgentTimeline,appendAgentTimelineText,appendAgentTimelineReference,agentDraftOperationImages,
+  const dependencies={agentExecutionBudget,cloneAgentTimeline,appendAgentTimelineText,appendAgentTimelineReference,agentDraftOperationImages,
     $r:key=>key,explicitYearClozeRequested:()=>false,explicitWebSearchForbidden:()=>false,loadAgentWebEnabled:async()=>false,
     explicitWebSearchRequested:()=>false,explicitSourceEvidenceRequested:()=>false,inferRequestedCardCount:()=>0,
     页面Agent观察者:class {constructor(callback){this.onEvent=callback;}}};

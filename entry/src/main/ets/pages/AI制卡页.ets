@@ -37,6 +37,8 @@ import { DialogHeader } from '../components/common/DialogHeader';
 import { AgentSessionState } from '../model/agent/AgentSessionState';
 import { AgentHistoryList } from '../components/agent/AgentHistoryList';
 import { AgentMemoryPanel } from '../components/agent/AgentMemoryPanel';
+import { agentExecutionBudget } from '../model/agent/AgentExecutionBudget';
+import { AgentTaskPlanState } from '../model/agent/AgentTaskPlan';
 import { AgentEmptySuggestions } from '../components/agent/AgentEmptySuggestions';
 import { buildAgentAppRecommendations } from '../model/agent/AgentAppRecommendations';
 import type { AgentAppRecommendation } from '../model/agent/AgentAppRecommendations';
@@ -294,6 +296,7 @@ export struct AI制卡页 {
   @State private memoryCloseRequest: number = 0;
   @State private memoryCreateRequest: number = 0;
   @State @Watch('publishInterface') private memoryCanCreate: boolean = false;
+  @State private taskPlanState: AgentTaskPlanState | null = null;
   @State private 历史会话列表: AgentConversation[] = [];
   @State @Watch('publishInterface') private 错误信息: string = '';
   @State @Watch('publishInterface') private 导入文件列表: AgentImportedFile[] = [];
@@ -408,6 +411,10 @@ export struct AI制卡页 {
       this.auxiliaryTools = auxiliary;
       auxiliary.register(registry);
       this.sessionController = new AgentSessionController(this.agentRunner, this.agentScope, this.workspaceStore, auxiliary);
+      this.sessionController.setCheckpointListener((): void => {
+        this.saveSessionCheckpoint();
+        this.保存当前会话历史();
+      });
     }
     await this.加载本地入口上下文();
   }
@@ -788,7 +795,7 @@ export struct AI制卡页 {
       [`${this.pageNoteIds.length}`]);
   }
 
-  /** 每轮声明完整只读工具；可读搜索结果不会自动获得写入权限。 */
+  /** 每轮过滤实际能力目录；Runner 按需加载定义，读取不会自动取得写入权限。 */
   private providerFunctionToolsForTurn(allowWeb: boolean = true): ProviderFunctionTool[] {
     return filterAgentWebTools(agentFunctionTools(this.agentSettings.batchLimit, this.pageMode), allowWeb).filter(
       (tool: ProviderFunctionTool): boolean => (this.documentAccess !== null || !isAgentDocumentTool(tool.name)) &&
@@ -1165,6 +1172,7 @@ export struct AI制卡页 {
         instructions: this.构建Agent指令(),
         input: this.构建Provider输入(),
         functionTools: functionTools,
+        deferTools: true,
         // 由本机工具联网；关闭提供商的重复搜索路径。
         searchMode: 'off',
         // 只分析用户可见要求，不扫描任务配置或本地卡片内容，避免上下文里的“联网”等词误触发。
@@ -1173,12 +1181,17 @@ export struct AI制卡页 {
         requiresDraft: false,
         expectedDraftCount: this.pageMode !== 'edit' ?
           inferRequestedCardCount(intentText, this.agentSettings.batchLimit) : 0,
-        reasoningEffort: 'low', maxOutputTokens: 32768
+        reasoningEffort: 'low',
+        maxOutputTokens: agentExecutionBudget(this.agentSettings.selectedProvider, this.AI配置.model).maxOutputTokens,
+        contextBudgetChars: agentExecutionBudget(this.agentSettings.selectedProvider, this.AI配置.model).contextBudgetChars
       };
       const observer: 页面Agent观察者 = new 页面Agent观察者(
         (event: AgentEvent): void => {
           const index: number = this.currentMessageIndex(conversationId, aiMessage.id);
-          if (index >= 0) this.处理Agent事件(index, event);
+          if (index >= 0) {
+            this.处理Agent事件(index, event);
+            if (event.kind === 'tool_completed') this.taskPlanState = this.agentScope.taskPlan.snapshot();
+          }
         });
       const result: AgentRunResult = await this.sessionController.run(this.agentSettings.selectedProvider, request, observer, resumeOutput);
       if (this.currentMessageIndex(conversationId, aiMessage.id) < 0) return null;
@@ -1868,6 +1881,7 @@ export struct AI制卡页 {
     this.documentAccess?.bind(this.conversationId, this.currentModelSupportsImages(), true);
     this.历史执行结果 = selected.results.slice();
     this.消息列表 = restored.messages;
+    this.taskPlanState = this.agentScope.taskPlan.snapshot();
     if (restored.checkpointFailed) this.错误信息 = this.取本地化文案($r('app.string.ai_agent_checkpoint_failed'));
     this.牌组ID = restored.deckId;
     let validContext: boolean = restored.contextValid;
@@ -1903,6 +1917,7 @@ export struct AI制卡页 {
   private 开始新会话(): void {
     if (this.pageDisposed || this.处理中 || this.文件解析中 || this.cardBatch.isRunning()) return;
     this.memoryVisible = false;
+    this.taskPlanState = null;
     this.history.invalidateRestore();
     this.history.close();
     this.sessionController?.clear();
@@ -2310,6 +2325,7 @@ export struct AI制卡页 {
       case 'propose_create_note_type': return this.取本地化文案($r('app.string.ai_agent_tool_propose_create_note_type'));
       case 'propose_memory_change': return this.取本地化文案($r('app.string.ai_agent_tool_propose_memory_change'));
       case 'propose_analysis': return this.取本地化文案($r('app.string.ai_agent_tool_propose_analysis'));
+      case 'discover_tools': return this.取本地化文案($r('app.string.ai_agent_tool_discover'));
       case 'request_clarification': return this.取本地化文案($r('app.string.ai_agent_tool_name_clarify'));
       case 'get_note_type_capabilities': return this.取本地化文案($r('app.string.ai_agent_tool_name_notetype_capabilities'));
       case 'get_note_context': return this.取本地化文案($r('app.string.ai_agent_tool_name_note_context'));
@@ -2906,6 +2922,16 @@ export struct AI制卡页 {
         } else if (this.显示历史区) {
           this.历史区()
         } else {
+          if (this.taskPlanState !== null) {
+            Column({ space: 应用尺寸.间距_4 }) {
+              Text($r('app.string.agent_task_plan_title')).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
+              Text(this.taskPlanState.objective).fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary')).maxLines(1)
+              Text(this.taskPlanState.steps.find((step): boolean => step.status === 'in_progress' || step.status === 'blocked')?.title ??
+                this.取本地化格式($r('app.string.agent_task_plan_progress'), [
+                  `${this.taskPlanState.steps.filter((step): boolean => step.status === 'completed').length}`, `${this.taskPlanState.steps.length}`]))
+                .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).maxLines(2)
+            }.width('100%').alignItems(HorizontalAlign.Start).padding(应用尺寸.页面内边距_水平)
+          }
           if (this.pageMode === 'assistant' && this.消息列表.length === 0) {
             AgentEmptySuggestions({ isPageVisible: this.isAgentPageVisible,
               loadRecommendations: (): AgentAppRecommendation[] => this.emptyRecommendations() }).layoutWeight(1)

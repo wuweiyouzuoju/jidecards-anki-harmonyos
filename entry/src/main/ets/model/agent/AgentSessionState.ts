@@ -5,6 +5,8 @@ import { readProviderContinuation, providerRequestFitsContext, ProviderProtocolE
 import type { AgentAction } from './AgentAction';
 import type { AgentRetrievalState } from './AgentRetrieval';
 import { sanitizeAgentToolJson } from './AgentToolDiagnostics';
+import { AgentTaskPlan } from './AgentTaskPlan';
+import type { AgentTaskPlanState } from './AgentTaskPlan';
 
 export interface AgentSessionState {
   input: ProviderInputItem[];
@@ -17,6 +19,7 @@ export interface AgentSessionState {
   requireYearCloze?: boolean;
   /** 1 表示检查点完整保留了 Provider 原始思考续接记录。 */
   reasoningReplayVersion?: number;
+  taskPlan?: AgentTaskPlanState | null;
 }
 
 /** 检查点保留完整思考协议与配对；凭据不进入此模型，文件原文及图片仍只存指针。 */
@@ -38,7 +41,7 @@ export function safeAgentSessionState(state: AgentSessionState): AgentSessionSta
     let content: string = item.content;
     const imported: number = content.indexOf('以下是用户主动导入的本地文件内容');
     if (imported >= 0 && !content.slice(imported).includes('"documentId"')) { content = content.slice(0, imported) + '[Imported content omitted; ask user to reattach if needed.]'; }
-    input.push({ kind: item.kind, role: item.role, content: sanitizeAgentToolJson(content, 240000).text,
+    input.push({ kind: item.kind, role: item.role, content: sanitizeAgentToolJson(content, Number.MAX_SAFE_INTEGER).text,
       callId: item.callId, name: item.name, argumentsJson: sanitizeAgentToolJson(item.argumentsJson, Number.MAX_SAFE_INTEGER).text,
       output: documentCalls.has(item.callId) && item.kind === 'function_call_output' ? compactDocumentOutput(item.output) :
         sanitizeAgentToolJson(item.output, Number.MAX_SAFE_INTEGER).text });
@@ -46,7 +49,14 @@ export function safeAgentSessionState(state: AgentSessionState): AgentSessionSta
   return { input: input, readableIds: state.readableIds, retrieval: state.retrieval,
     action: state.action === null ? null : safeAgentAction(state.action),
     waitingCallId: state.waitingCallId, paused: state.paused, expectedDraftCount: state.expectedDraftCount ?? 0,
-    requireYearCloze: state.requireYearCloze === true, reasoningReplayVersion: 1 };
+    requireYearCloze: state.requireYearCloze === true, reasoningReplayVersion: 1,
+    taskPlan: validatedTaskPlan(state.taskPlan ?? null) };
+}
+
+function validatedTaskPlan(value: AgentTaskPlanState | null): AgentTaskPlanState | null {
+  const plan: AgentTaskPlan = new AgentTaskPlan();
+  plan.restore(value);
+  return plan.snapshot();
 }
 
 /** 旧检查点的原始思考已丢失；只作为历史资料提供，不伪造思考或重放旧工具协议。 */

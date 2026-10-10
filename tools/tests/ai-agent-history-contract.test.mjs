@@ -75,7 +75,7 @@ test('history mode has its own toolbar, returns to chat, and marks selection wit
 
   assert.equal(zh.ai_agent_history_title, '历史对话');
   assert.equal(zh.ai_agent_history_new, '新建对话');
-  assert.match(top, /agentInterfaceTitle\(this\.pageMode, this\.显示历史区\)/);
+  assert.match(top, /agentInterfaceTitle\(this\.pageMode, this\.显示历史区, this\.memoryVisible\)/);
   assert.match(top, /if \(this\.显示历史区\)[\s\S]*this\.关闭历史区\(\);[\s\S]*this\.pathStack\.pop\(\)/);
   assert.match(top,
     /IconActionButton\(\{ toolbarStyle: true,[\s\S]*source: \$r\('app\.media\.ic_home_new'\), label: this\.interfaceLabel\('new'\)[\s\S]*isInteractive: this\.interfaceEnabled\('new'\)/);

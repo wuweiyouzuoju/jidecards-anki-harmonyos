@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { deckRenameName } from '../DeckRename';
+import { agentTaskPlanTools, decodeTaskPlanUpdate } from './AgentTaskPlan';
 
 import type { ProviderFunctionTool } from './ProviderProtocol';
 import type { ToolRisk } from './AgentTypes';
@@ -60,6 +61,7 @@ export function agentExtensionTools(): ProviderFunctionTool[] {
   const text: string = '{"type":"string","maxLength":2000}';
   const fields: string = '{"type":"array","minItems":1,"maxItems":20,"items":{"type":"string","minLength":1,"maxLength":80}}';
   return [
+    ...agentTaskPlanTools(),
     extensionTool('configure_create_target', '选择已有牌组与笔记类型作为生成目标；只改变本次设置，不修改卡库。',
       `"deckId":${id},"notetypeId":${id}`, '"deckId","notetypeId"', '{"deckId":1,"notetypeId":1}'),
     extensionTool('propose_create_deck', '提出新建牌组；用户确认后创建并选为生成目标。',
@@ -89,6 +91,7 @@ export function agentExtensionTools(): ProviderFunctionTool[] {
 }
 
 export function extensionToolRisk(name: string): ToolRisk {
+  if (name === 'get_task_plan' || name === 'update_task_plan') return 'read';
   if (name === 'configure_create_target' || name === 'search_memory' || name === 'get_deck_order') { return 'read'; }
   if (name === 'propose_create_deck' || name === 'propose_rename_deck' || name === 'propose_reparent_decks' || name === 'propose_reorder_decks' || name === 'propose_create_note_type' ||
     name === 'propose_memory_change' || name === 'propose_analysis') { return 'write'; }
@@ -127,6 +130,7 @@ export function decodeExtensionArguments(name: string, json: string): AgentExten
     if (Object.keys(schema.properties).indexOf(key) < 0) { throw new Error('invalid_tool_arguments'); }
   }
   for (const key of schema.required) { if (keys.indexOf(key) < 0) { throw new Error('invalid_tool_arguments'); } }
+  if (name === 'update_task_plan') decodeTaskPlanUpdate(json);
   const args: AgentExtensionArguments = {
     style: raw.style === undefined ? undefined : validateAgentCardStyle(raw.style),
     name: boundedString(raw.name, 200), kind: boundedString(raw.kind, 20),

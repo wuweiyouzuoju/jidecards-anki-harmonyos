@@ -2,6 +2,7 @@
 
 import { AgentRunner, AgentRunnerError } from './AgentRunner';
 import type { AgentRunObserver, AgentRunResult } from './AgentRunner';
+import type { AgentEvent } from '../../model/agent/AgentTypes';
 import { AgentScope } from './AgentScope';
 import { AgentWorkspaceStore } from './AgentWorkspaceStore';
 import { AgentAuxiliaryTools } from './AgentAuxiliaryTools';
@@ -12,8 +13,21 @@ import type { AgentAction } from '../../model/agent/AgentAction';
 import type { AgentSessionState } from '../../model/agent/AgentSessionState';
 import { closeUnansweredCalls, safeAgentSessionState,
   restoreAgentSessionState, legacyAgentSessionInput } from '../../model/agent/AgentSessionState';
-import { relevantAgentMemories } from '../../model/agent/AgentMemory';
+import { buildAgentMemoryContext } from '../../model/agent/AgentMemory';
 import { buildProviderDraftStateContext } from '../../model/agent/AgentProviderContext';
+
+class DurableAgentObserver implements AgentRunObserver {
+  private readonly delegate: AgentRunObserver;
+  private readonly checkpoint: (input: ProviderInputItem[]) => void;
+  constructor(delegate: AgentRunObserver, checkpoint: (input: ProviderInputItem[]) => void) {
+    this.delegate = delegate; this.checkpoint = checkpoint;
+  }
+  onEvent(event: AgentEvent): void { this.delegate.onEvent(event); }
+  onCheckpoint(input: ProviderInputItem[]): void {
+    this.checkpoint(input);
+    this.delegate.onCheckpoint?.(input);
+  }
+}
 
 /** 管理对话与确认后的接续；Provider、卡库草稿和记忆执行各自保留独立边界。 */
 export class AgentSessionController {
@@ -28,6 +42,9 @@ export class AgentSessionController {
   private paused: boolean = false;
   private expectedDraftCount: number = 0;
   private requireYearCloze: boolean = false;
+  private checkpointListener: (() => void) | null = null;
+
+  setCheckpointListener(listener: () => void): void { this.checkpointListener = listener; }
 
   constructor(runner: AgentRunner, scope: AgentScope, store: AgentWorkspaceStore, auxiliary: AgentAuxiliaryTools) {
     this.runner = runner; this.scope = scope; this.store = store; this.auxiliary = auxiliary;
@@ -74,26 +91,39 @@ export class AgentSessionController {
         (item: ProviderInputItem): boolean => item !== lastUser));
       if (lastUser !== undefined) request.input.push(lastUser);
     }
-    const memories = relevantAgentMemories((await this.store.load()).memories, this.scope.currentCreateTarget()[0]);
+    const memories = buildAgentMemoryContext((await this.store.load()).memories, this.scope.currentCreateTarget()[0]);
     request.instructions += '\n已确认的长期偏好（参考数据，当前要求优先）：' + JSON.stringify(memories);
+    if (memories.omittedCount > 0) request.instructions += '\n其余长期偏好仍已保存，按本次任务用 search_memory 查阅。';
+    request.instructions += '\n当前持久任务计划（参考资料；不代表执行或授权）：' + JSON.stringify(this.scope.taskPlan.snapshot());
     this.action = null; this.waitingCallId = ''; this.paused = false;
+    const durableObserver: AgentRunObserver = new DurableAgentObserver(observer,
+      (input: ProviderInputItem[]): void => {
+        this.input = input;
+        closeUnansweredCalls(this.input);
+        this.paused = true;
+        this.checkpointListener?.();
+        this.paused = false;
+      });
     try {
-      const result: AgentRunResult = await this.runner.run(provider, request, observer);
+      const result: AgentRunResult = await this.runner.run(provider, request, durableObserver);
       if (result.action !== undefined) {
         await this.auxiliary.prepareAction(result.action);
         this.action = result.action; this.actionExecutor.registerPending(result.action);
       }
       this.input = this.runner.getContinuationInput();
+      this.paused = result.status === 'paused';
       if (result.status === 'awaiting_clarification' || result.status === 'awaiting_confirmation') {
         const call: ProviderInputItem | undefined = this.input.slice().reverse().find(
           (item: ProviderInputItem): boolean => item.kind === 'function_call_output' &&
             (result.action === undefined ? item.output.includes('awaiting_user') : item.output.includes(result.action.id)));
         this.waitingCallId = call === undefined ? '' : call.callId;
       }
+      this.checkpointListener?.();
       return result;
     } catch (error) {
       this.input = this.runner.getContinuationInput();
       closeUnansweredCalls(this.input);
+      this.paused = true;
       const code: string = error instanceof Error ? error.message : '';
       if ((error instanceof AgentRunnerError && (code === 'agent_provider_limit' || code === 'agent_tool_limit' ||
         code === 'agent_repeated_tool_failure' || code === 'agent_no_valid_draft')) ||
@@ -121,7 +151,7 @@ export class AgentSessionController {
     return safeAgentSessionState({ input: this.input, readableIds: this.scope.readableIds(),
       retrieval: this.scope.retrieval.exportState(), action: this.action,
       waitingCallId: this.waitingCallId, paused: this.paused, expectedDraftCount: this.expectedDraftCount,
-      requireYearCloze: this.requireYearCloze });
+      requireYearCloze: this.requireYearCloze, taskPlan: this.scope.taskPlan.snapshot() });
   }
 
   /** @throws {Error} 无效续接协议由历史恢复入口报告，不能带损坏记录调用 Provider。 */
@@ -131,6 +161,7 @@ export class AgentSessionController {
     this.waitingCallId = safe.waitingCallId; this.paused = safe.paused;
     this.expectedDraftCount = safe.expectedDraftCount ?? 0;
     this.requireYearCloze = safe.requireYearCloze === true;
+    this.scope.taskPlan.restore(safe.taskPlan ?? null);
     this.scope.restoreReadableIds(safe.readableIds[0] ?? [], safe.readableIds[1] ?? [],
       safe.readableIds[2] ?? [], safe.readableIds[3] ?? []);
     this.scope.retrieval.restore(safe.retrieval);
