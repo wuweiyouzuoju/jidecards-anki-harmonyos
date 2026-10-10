@@ -35,7 +35,7 @@ export interface NoteCreationBackend {
   initialize(filesDir: string): Promise<NoteCreationInitial>;
   loadType(id: number): Promise<NotetypeView>;
   setFieldSticky(id: number, ord: number, sticky: boolean): Promise<void>;
-  importImage(uri: string): Promise<string>;
+  importImage(uri: string, kind?: string): Promise<string>;
   importAudio(uri: string): Promise<string>;
   saveNote(input: NoteCreationInput, allowDuplicate?: boolean): Promise<void>;
   saveOcclusion(input: OcclusionCreationInput, allowDuplicate?: boolean): Promise<void>;
@@ -194,8 +194,10 @@ export class NoteCreationSession {
     if (this.stickyWrite !== null && !await this.finishStickyWrite()) return;
     await this.commit(async (): Promise<void> => {
       try { frozen.fields = await prepareNoteImageFields(frozen.fields, frozen.images,
-        (uri: string): Promise<string> => this.backend.importImage(uri)); }
-      catch (error) { throw new Error('add_note_image_import_failed'); }
+        (uri: string, kind: string): Promise<string> => this.backend.importImage(uri, kind)); }
+      catch (error) { throw new Error(error instanceof Error &&
+        (error.message === 'note_video_too_large' || error.message === 'note_video_format_unsupported') ?
+        error.message : 'note_visual_import_failed'); }
       try {
         if ((frozen.audios ?? []).length > 0) frozen.fields = await prepareNoteAudioFields(frozen.fields, frozen.audios ?? [],
           (uri: string): Promise<string> => this.backend.importAudio(uri));

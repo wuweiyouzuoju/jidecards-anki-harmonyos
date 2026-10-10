@@ -5,7 +5,7 @@ import { NoteDraftPreviewBackend, NoteDraftPreviewInput, DraftPreviewMedia } fro
 import { prepareNoteImageFields } from '../model/NoteImageDraft';
 import { prepareNoteAudioFields } from '../model/NoteAudioDraft';
 import { assertNoteMediaResolved } from '../model/NoteMediaParts';
-import { readNoteImageData } from './NoteImageImport';
+import { readNoteVisualData } from './NoteVisualImport';
 import { 笔记服务 } from './笔记服务';
 import { 笔记类型服务 } from './笔记类型服务';
 import { 卡片渲染服务 } from './卡片渲染服务';
@@ -37,9 +37,9 @@ export class AnkiNoteDraftPreview implements NoteDraftPreviewBackend {
       this.directory = context.cacheDir + '/note-preview-' + this.token;
       await fs.mkdir(this.directory);
     }
-    const images = await prepareNoteImageFields(input.fields, input.images, async (uri: string): Promise<string> => {
-      const imageData = await readNoteImageData(uri);
-      const name = 'draft-image-' + this.token + '-' + this.filenames.length + '.' + imageData.extension;
+    const images = await prepareNoteImageFields(input.fields, input.images, async (uri: string, kind: string): Promise<string> => {
+      const imageData = await readNoteVisualData(uri, kind);
+      const name = 'draft-' + kind + '-' + this.token + '-' + this.filenames.length + '.' + imageData.extension;
       this.filenames.push(name);
       const file = await fs.open(this.directory + '/' + name, fs.OpenMode.CREATE | fs.OpenMode.WRITE_ONLY);
       try {

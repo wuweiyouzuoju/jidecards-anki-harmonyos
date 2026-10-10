@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { noteImageSourceAttribute } from './NoteMediaParts';
+import { noteVideoHtml } from './NoteVideoMedia';
 
 export interface NoteFieldImage {
   id: number;
@@ -7,6 +8,12 @@ export interface NoteFieldImage {
   uri: string;
   filename: string;
   reference?: string;
+  /** 历史 images 草稿现在承载图片和视频；未标注的旧调用仍为图片。 */
+  kind?: string;
+}
+
+export function noteVisualHtml(filename: string, kind: string): string {
+  return kind === 'video' ? noteVideoHtml(filename) : noteImageHtml(filename);
 }
 
 export function noteImageHtml(filename: string): string {
@@ -25,7 +32,7 @@ export function replaceNoteImageSource(tag: string, filename: string): string {
 
 /** 媒体先落库再引用；保留成功文件名，使后续失败重试不重复导入。 */
 export async function prepareNoteImageFields(fields: string[], images: NoteFieldImage[],
-  importImage: (uri: string) => Promise<string>): Promise<string[]> {
+  importImage: (uri: string, kind: string) => Promise<string>): Promise<string[]> {
   const result: string[] = fields.slice();
   const pending: NoteFieldImage[] = images.slice();
   for (const attachment of pending) {
@@ -37,15 +44,17 @@ export async function prepareNoteImageFields(fields: string[], images: NoteField
   for (const attachment of pending) {
     if (attachment.reference !== undefined && result[attachment.fieldIndex].indexOf(attachment.reference) < 0) continue;
     if (attachment.filename === '') {
-      const filename: string = await importImage(attachment.uri);
+      const filename: string = await importImage(attachment.uri, attachment.kind ?? 'image');
       if (filename === '') { throw new Error('Image import returned no filename'); }
       attachment.filename = filename;
     }
     const index: number = attachment.fieldIndex;
     if (attachment.reference !== undefined) {
-      result[index] = result[index].split(attachment.reference).join(replaceNoteImageSource(attachment.reference, attachment.filename));
+      const replacement: string = attachment.kind === 'video' ? noteVideoHtml(attachment.filename) :
+        replaceNoteImageSource(attachment.reference, attachment.filename);
+      result[index] = result[index].split(attachment.reference).join(replacement);
     } else {
-      result[index] += (result[index] === '' ? '' : '<br>') + noteImageHtml(attachment.filename);
+      result[index] += (result[index] === '' ? '' : '<br>') + noteVisualHtml(attachment.filename, attachment.kind ?? 'image');
     }
   }
   return result;

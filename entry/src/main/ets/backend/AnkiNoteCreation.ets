@@ -6,7 +6,7 @@ import { 搜索服务 } from './搜索服务';
 import { NoteDuplicateWarning } from '../model/NoteDuplicateSession';
 import { EditableNote } from '../proto/messages/NoteMessages';
 import { 图片遮罩服务 } from './图片遮罩服务';
-import { importNoteImage } from './NoteImageImport';
+import { importNoteVisual } from './NoteVisualImport';
 import { importNoteAudio } from './NoteAudioImport';
 import { discardNoteRecordings } from '../utils/NoteAudioRecorder';
 import { NoteCreationBackend, NoteCreationInitial, NoteCreationInput, OcclusionCreationInput } from '../model/NoteCreationSession';
@@ -48,7 +48,7 @@ export class AnkiNoteCreation implements NoteCreationBackend {
     return this.types.setFieldSticky(id, ord, sticky);
   }
   /** @throws {Error} 导入失败交由会话展示，保留草稿供重试。 */
-  importImage(uri: string): Promise<string> { return importNoteImage(uri); }
+  importImage(uri: string, kind: string = 'image'): Promise<string> { return importNoteVisual(uri, kind); }
   /** @throws {Error} 导入失败交由会话展示。 */
   importAudio(uri: string): Promise<string> { return importNoteAudio(uri); }
 

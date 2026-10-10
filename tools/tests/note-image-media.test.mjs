@@ -135,21 +135,22 @@ test('platform conversion and all failure paths release owned resources', async 
 
 function pageHarness(picker, importer = async () => 'image.png') {
   const source = readFileSync(new URL('../../entry/src/main/ets/pages/添加笔记页.ets', import.meta.url), 'utf8');
-  const methods = ['applyFieldMedia', '更新字段', '提交', 'imagesForField'].map(name => {
+  const methods = ['applyFieldMedia', '更新字段', '提交', 'imagesForField', 'cleanupDrawingImages'].map(name => {
     const start = source.search(new RegExp(`^  private (?:async )?${name}\\(`, 'm'));
     assert.ok(start >= 0);
     return source.slice(start, source.indexOf('\n  }', start) + 4);
   });
   const events = [];
   const Page = new Function('从图库选取图片', 'prepareNoteImageFields', 'importNoteImage', 'AppStorage', '$r',
-    '笔记字段校验错误', stripTypeScriptTypes(`class Page { ${methods.join('\n')} }`, { mode: 'transform' }) + '; return Page;')(
-    picker, prepareNoteImageFields, importer, { setOrCreate: () => events.push('tick') }, key => key, class extends Error {});
+    '笔记字段校验错误', 'discardNoteDrawingImages', stripTypeScriptTypes(`class Page { ${methods.join('\n')} }`, { mode: 'transform' }) + '; return Page;')(
+    picker, prepareNoteImageFields, importer, { setOrCreate: () => events.push('tick') }, key => key, class extends Error {}, async () => {});
   const page = Object.assign(new Page(), {
     pageActive: true, imageRequest: 0, nextImageId: 0, fieldImages: [], fieldAudios: [], nextAudioId: 0, pickingFieldImage: false, audioBusy: false,
     draftPreview: null,
     处理中: false, 牌组ID: 7, 已选笔记类型ID: 8, 是否图片遮盖模式: false,
     字段值列表: ['', ''], 错误信息: '',
     getUIContext: () => ({ getHostContext: () => ({}) }),
+    取能力上下文: () => ({cacheDir:'/cache'}),
     提交前校验填空: () => true, 解析标签: () => ['test'], 取本地化文案: key => key,
     pathStack: { pop: () => events.push('pop') },
     笔记服务实例: {
@@ -218,7 +219,7 @@ test('page keeps failed image drafts and completes accepted saves after leaving 
   await failed.pick(0);
   await failed.page.提交();
   assert.equal(failed.page.fieldImages.length, 1);
-  assert.match(failed.page.错误信息, /add_note_image_import_failed/);
+  assert.match(failed.page.错误信息, /note_visual_import_failed/);
   assert.deepEqual(failed.events, []);
   assert.equal(failed.page.处理中, false);
 

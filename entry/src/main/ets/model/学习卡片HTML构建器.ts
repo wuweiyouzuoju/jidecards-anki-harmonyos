@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { isNoteVideoFilename } from './NoteVideoMedia';
 
 // ========================================================
 // @块ID MODEL-STUDY-HTML-001
@@ -156,9 +157,6 @@ export function 原始侧HTML(渲染结果: RenderedCard, 侧面: 卡片正反�
   return 节点流转HTML(节点列表);
 }
 
-/** 视频扩展名正则：匹配 [sound:xxx.mp4] 等视频文件，由 webview <video> 内联播放。
- *  Anki 约定音视频统一走 [sound:] 语法，前端按扩展名分流：视频交 webview，音频交原生 SoundPlayer。 */
-const 视频扩展名正则: RegExp = /\.(mp4|webm|mov|m4v|ogv)$/i;
 
 /** 剥除 Anki [sound:xxx] 标签：音频文件留小标记由原生 SoundPlayer 播放；
  *  视频文件改用 <video> 标签交给 webview 内联播放（playsinline 防止全屏跳转）。 */
@@ -172,14 +170,14 @@ function 剥除音频标签(html: string, rendered: RenderedCard, side: 卡片�
   const video = (filename: string): string => `<video src="${媒体基地址}${encodeURIComponent(filename)}" controls playsinline style="max-width:100%;display:block;margin:8px auto"></video>`;
   const raw: string = html.replace(/\[sound:([^\]]+)\]/g, (_match: string, filename: string): string => {
     const item: number = index++;
-    return 视频扩展名正则.test(filename) ? video(filename) : audioButton(side === 'question' ? 'q' : 'a', item, hide, label);
+    return isNoteVideoFilename(filename) ? video(filename) : audioButton(side === 'question' ? 'q' : 'a', item, hide, label);
   });
   return raw.replace(/\[anki:play:([qa]):(\d+)\]/g, (_match: string, markerSide: string, ordinal: string): string => {
     const position: number = Number(ordinal);
     const tags = markerSide === 'q' ? rendered.questionAudio : rendered.answerAudio;
     const items = tags === undefined ? [] : orderedAvItems(tags);
     const file: string | null | undefined = items[position]?.soundFile;
-    return file !== undefined && file !== null && 视频扩展名正则.test(file) ? video(file) : audioButton(markerSide, position, hide, label);
+    return file !== undefined && file !== null && isNoteVideoFilename(file) ? video(file) : audioButton(markerSide, position, hide, label);
   });
 }
 

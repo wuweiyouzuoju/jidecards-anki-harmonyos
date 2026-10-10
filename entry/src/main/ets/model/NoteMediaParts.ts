@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { decodeNoteTextEntities } from './NoteRichText';
+import { isNoteVideoFilename } from './NoteVideoMedia';
 
 export interface NoteMediaPart {
   start: number;
@@ -37,7 +38,10 @@ export function noteMediaParts(value: string): NoteMediaPart[] {
   while (match !== null) {
     let kind: string = '';
     let filename: string = '';
-    if (match[2] !== undefined) { kind = 'audio'; filename = match[2]; }
+    if (match[2] !== undefined) {
+      filename = match[2];
+      kind = isNoteVideoFilename(decodeNoteTextEntities(filename) ?? filename) ? 'video' : 'audio';
+    }
     else if (new RegExp('^<img\\s', 'i').test(match[0])) {
       const src: NoteImageSourceAttribute | undefined = noteImageSourceAttribute(match[0]);
       if (src !== undefined) { kind = 'image'; filename = src.value; }

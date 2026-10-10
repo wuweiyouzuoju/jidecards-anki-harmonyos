@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { stripTypeScriptTypes } from 'node:module';
 import { noteAudioParts, replaceNoteAudioPart, localNoteAudioPath, noteAudioExtension,
   prepareNoteAudioFields, MAX_NOTE_AUDIO_BYTES } from '../../entry/src/main/ets/model/NoteAudioDraft.ts';
 import { NoteCreationSession } from '../../entry/src/main/ets/model/NoteCreationSession.ts';
 import { expansionRevealDependencies, loadPlatformModule, loadComponentLogic } from './platform-module-harness.mjs';
 import { editorPageHarness } from './editor-page-harness.mjs';
+import { mediaDialogHarness } from './note-media-dialog-harness.mjs';
 
 const turn = () => new Promise(resolve => setImmediate(resolve));
 const deferred = () => { let resolve; const promise = new Promise(r => resolve = r); return { promise, resolve }; };
@@ -222,6 +225,98 @@ function fieldHarness(overrides = {}) {
     onChange: value => events.push(['change', value]) });
   return { field, events, state };
 }
+
+// Use the real dialog-to-audio callbacks; only platform IO and Prop refresh are substituted.
+function managedAudioHarness(overrides = {}, initial = {}) {
+  const audio = fieldHarness(overrides);
+  const h = mediaDialogHarness(async () => [], { kind: 'audio', preview: audio.field.preview, ...initial });
+  const source = readFileSync(new URL('../../entry/src/main/ets/components/editor/NoteMediaDialog.ets', import.meta.url), 'utf8');
+  const params = source.match(/NoteAudioField\((\{[\s\S]*?\})\)/);
+  assert.ok(params, 'audio management must pass callbacks to its audio field');
+  const bindings = new Function(stripTypeScriptTypes(`const params = ${params[1]};`, { mode: 'transform' }) + 'return params;');
+  const refresh = () => Object.assign(audio.field, bindings.call(h.dialog));
+  const close = h.dialog.onRequestClose;
+  h.dialog.onRequestClose = () => { close(); audio.field.aboutToDisappear(); };
+  refresh(); audio.field.aboutToAppear();
+  return { ...audio, ...h, refresh };
+}
+
+test('audio manager unlocks after picker cancel or failure and commits or discards actual audio attachments', async () => {
+  for (const result of ['cancel', 'failure', 'discard', 'commit']) {
+    const gate = deferred(), initialAudio = { ...attachment(7), uri: '/cache/note-audio-old.mp3' };
+    const h = managedAudioHarness({ picker: { AudioSelectOptions: class {}, AudioViewPicker: class {
+      async select() {
+        await gate.promise;
+        if (result === 'failure') throw Error('provider failed');
+        return result === 'cancel' ? [] : ['provider://new.mp3'];
+      }
+    } } }, { initialValue: 'before[sound:old.mp3]after', initialAudios: [initialAudio] });
+    const picking = h.field.pick(); await turn(); h.refresh();
+    assert.equal(h.dialog.working, true);
+    h.dialog.close(false); h.dialog.close(true);
+    assert.equal(h.events.includes('close'), false);
+    gate.resolve(); await picking; h.refresh();
+    assert.equal(h.dialog.working, false);
+    if (result === 'failure') assert.equal(h.field.errorMessage, 'app.string.note_audio_import_failed');
+    h.dialog.close(result === 'commit');
+    assert.equal(h.events.includes('close'), true, result);
+    const applied = h.events.filter(event => event[0] === 'apply');
+    assert.equal(applied.length, result === 'commit' ? 1 : 0);
+    if (result === 'commit') {
+      assert.deepEqual(applied[0][2], []);
+      assert.deepEqual(applied[0][3].map(item => item.uri), [initialAudio.uri, '/cache/note-audio-1-1.mp3']);
+    }
+    assert.deepEqual(h.events.find(event => event[0] === 'cleanup')[1],
+      result === 'discard' ? ['/cache/note-audio-1-1.mp3'] : []);
+    assert.deepEqual(initialAudio, { ...attachment(7), uri: '/cache/note-audio-old.mp3' });
+  }
+});
+
+test('audio manager keeps recording controls available and unlocks after finishing or cancelling resource release', async () => {
+  for (const finish of [false, true]) {
+    const gate = deferred();
+    const h = managedAudioHarness({ NoteAudioRecorder: class {
+      async start() { return true; }
+      async pause() {} async resume() {} failureCode() { return 0; }
+      async finish() { await gate.promise; return '/cache/note-recording-1-1.m4a'; }
+      async cancel() { await gate.promise; }
+    } });
+    await h.field.record(); h.refresh();
+    assert.equal(h.dialog.working, true);
+    assert.equal(h.field.disabled, true, 'parent blocks other actions during recording');
+    await h.field.togglePause(); assert.equal(h.field.paused, true);
+    await h.field.togglePause(); assert.equal(h.field.paused, false);
+    h.dialog.close(false); assert.equal(h.events.includes('close'), false);
+    const completing = finish ? h.field.finishRecording() : h.field.cancelRecording();
+    h.dialog.close(true); assert.equal(h.events.includes('close'), false);
+    gate.resolve(); await completing; h.refresh();
+    assert.equal(h.dialog.working, false);
+    assert.equal(h.field.recording, false);
+    h.dialog.close(true);
+    assert.equal(h.events.includes('close'), true);
+    assert.deepEqual(h.events.find(event => event[0] === 'apply')[3].map(item => item.uri),
+      finish ? ['/cache/note-recording-1-1.m4a'] : []);
+  }
+});
+
+test('audio manager remains dismissible after microphone denial and stops active preview on close', async () => {
+  const denied = managedAudioHarness({ NoteAudioRecorder: class {
+    async start() { throw Error('denied'); } failureCode() { return 201; } async cancel() {}
+  } });
+  await denied.field.record(); denied.refresh();
+  assert.equal(denied.field.errorMessage, 'app.string.note_audio_permission_denied');
+  assert.equal(denied.dialog.working, false);
+  denied.dialog.close(false); assert.equal(denied.events.includes('close'), true);
+  const h = managedAudioHarness({}, { initialValue: '[sound:one.mp3]' });
+  let playing = false;
+  h.field.preview.play = async (_path, changed) => { playing = true; changed(true); };
+  h.field.preview.stop = async () => { playing = false; h.state.stopped++; };
+  await h.field.play('existing-1', 'one.mp3');
+  assert.equal(playing, true); assert.equal(h.dialog.working, false);
+  h.dialog.close(false);
+  assert.equal(h.events.includes('close'), true); assert.equal(playing, false);
+  assert.ok(h.state.stopped > 0);
+});
 
 test('audio field removes only a reference, recording blocks host actions, and cancel adds no attachment', async () => {
   const h = fieldHarness(); h.field.removePart(1); assert.deepEqual(h.events.at(-1), ['change', '文字尾部']);

@@ -21,7 +21,7 @@ function adapter({shortWrite=false}={}) {
   };
   const Adapter=loadPlatformModule('backend/AnkiNoteDraftPreview.ets','AnkiNoteDraftPreview',{
     fs,AppStorage:{get:()=>({cacheDir:'/cache'})},prepareNoteImageFields,prepareNoteAudioFields,assertNoteMediaResolved,
-    readNoteImageData:async uri=>{calls.push(['read',uri]);return {data:Uint8Array.from([1,2,3,4,5]),extension:'png'};},
+    readNoteVisualData:async uri=>{calls.push(['read',uri]);return {data:Uint8Array.from([1,2,3,4,5]),extension:'png'};},
     笔记服务:class{},笔记类型服务:class{},卡片渲染服务:class{},syncActivity:{}
   });
   return {instance:new Adapter(),calls,files,open};

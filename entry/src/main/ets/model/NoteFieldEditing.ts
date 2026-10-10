@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { 文本中的填空编号 } from './填空解析器';
+import { MAX_NOTE_VIDEO_BYTES, NOTE_VIDEO_IMPORT_FORMATS } from './NoteVideoMedia';
 
 export interface FieldEditResult { text: string; start: number; end: number; }
 
@@ -123,7 +124,9 @@ export function noteEditorTool(id: string): NoteEditorTool {
   return tool;
 }
 export const NOTE_FIELD_MEDIA_TOOLS: NoteEditorTool[] = [
-  { id: 'image', titleKey: 'add_note_image_add', iconKey: 'ic_editor_image', editing: 'field_media_dialog' },
+  { id: 'image', titleKey: 'note_visual_add', iconKey: 'ic_editor_image', editing: 'field_media_dialog',
+    mediaKinds: ['image', 'video'], videoFormats: NOTE_VIDEO_IMPORT_FORMATS, maxVideoBytes: MAX_NOTE_VIDEO_BYTES,
+    opens: 'note_visual_manage' },
   { id: 'audio', titleKey: 'note_audio_add', iconKey: 'ic_editor_audio', editing: 'field_media_dialog' }
 ];
 export function noteFieldMediaTool(id: string): NoteEditorTool {

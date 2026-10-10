@@ -43,7 +43,7 @@ function adapterHarness(options={}) {
       async 添加笔记类型旧版(kind){if(kind===options.failKind)throw Error('stock failure');}},
     图片遮罩服务:class{async 添加图片遮罩笔记类型(){events.push('occlusion-type');}
       async 获取图片遮罩字段(id){events.push(['indices',id]);if(options.indexFailure)throw Error('indices');return {遮罩:0,图片:1,标题:2,额外:3};}},
-    prepareNoteImageFields,importNoteImage:async uri=>{events.push(['import',uri]);if(options.importFailure)throw Error('import');return 'permanent.png';}
+    prepareNoteImageFields,importNoteVisual:async uri=>{events.push(['import',uri]);if(options.importFailure)throw Error('import');return 'permanent.png';}
   });return {adapter:new Adapter(),events};
 }
 test('stock restore uses all five Core stock kinds, keeps existing aliases, and tolerates one failed restore',async()=>{

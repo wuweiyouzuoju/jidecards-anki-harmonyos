@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { AvTagsResult, AvItem, TtsItem } from '../proto/messages/CardRenderingMessages';
 import { orderedAvItems } from '../proto/messages/CardRenderingMessages';
+import { isNoteVideoFilename } from './NoteVideoMedia';
 
 /** 原生播放器与行为测试共用的最小队列边界。 */
 export interface AudioQueuePlayer<T> {
@@ -77,8 +78,15 @@ export class CardAudioSession {
       if (!this.isCurrent(version)) return null;
       const selectedItems = (group: AvTagsResult): AvItem[] => {
         const allItems: AvItem[] = orderedAvItems(group);
-        return options.itemIndex === undefined ? allItems : Number.isInteger(options.itemIndex) && options.itemIndex >= 0 ?
+        const selected: AvItem[] = options.itemIndex === undefined ? allItems : Number.isInteger(options.itemIndex) && options.itemIndex >= 0 ?
           allItems.slice(options.itemIndex, options.itemIndex + 1) : [];
+        // 先按 Core 原索引选项再分流；视频由卡面播放器负责，不能重复以音频播放。
+        return selected.filter((item: AvItem): boolean => {
+          if (item.soundFile === null) return true;
+          let filename: string = item.soundFile;
+          try { filename = decodeURIComponent(filename); } catch (error) { /* 字面百分号仍按原名识别。 */ }
+          return !isNoteVideoFilename(filename);
+        });
       };
       const hasAudio: boolean = groups.some((group: AvTagsResult): boolean => selectedItems(group).length > 0);
       onReady(hasAudio);
