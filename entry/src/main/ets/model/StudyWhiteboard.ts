@@ -180,6 +180,15 @@ export class StudyWhiteboard {
     if (this.active !== null) draw(this.active);
   }
 
+  /** 制卡恢复已验证源数据；恢复内容本身不成为可撤销操作。 */
+  restoreStrokes(strokes: WhiteboardStroke[]): void {
+    this.reset();
+    this.strokes = strokes.map((stroke: WhiteboardStroke): WhiteboardStroke => ({ color: stroke.color,
+      width: stroke.width, eraser: stroke.eraser,
+      points: stroke.points.map((point: WhiteboardPoint): WhiteboardPoint => ({ x: point.x, y: point.y })) }));
+    this.pointCount = this.strokes.reduce((count: number, stroke: WhiteboardStroke): number => count + stroke.points.length, 0);
+  }
+
   dispose(): void {
     this.disposed = true;
     this.reset();

@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { compileWithUiFeedback } from './ui-feedback-harness.mjs';
 import { AgentHistoryCoordinator } from '../../entry/src/main/ets/model/agent/AgentHistoryCoordinator.ts';
+import { NativeDialogHost } from './platform-module-harness.mjs';
 
 const read = path => readFileSync(new URL('../../' + path, import.meta.url), 'utf8');
 function methods(path, names, dependencies) {
@@ -31,7 +32,7 @@ test('unreadable sync endpoint blocks login until an explicitly saved endpoint s
   Object.assign(group, { serverLoaded: false, savedServer: '', serverInput: '', 登录中: false, settingsSaving: false,
     用户名输入: 'name', 密码输入: 'password', 取本地化文本: key => key, syncSettingsBusy: () => false,
     同步服务实例: { 同步登录: async (...args) => { calls.push(['login', ...args]); return { hkey: 'key', endpoint: args[2] }; } },
-    serverDialogController: { close() {} }
+    serverDialogController: new NativeDialogHost()
   });
   group.aboutToAppear();
   assert.equal(group.serverLoaded, false);

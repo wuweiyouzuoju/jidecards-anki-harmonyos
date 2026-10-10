@@ -2,6 +2,7 @@
 import { HandwriteComponent, HandwriteController, PenType } from '@kit.Penkit';
 import { BuilderNode, FrameNode, UIContext } from '@kit.ArkUI';
 import { deviceInfo } from '@kit.BasicServicesKit';
+import { image } from '@kit.ImageKit';
 import { StudyPenCanvasParameters } from './StudyPenCanvasParameters';
 import { StudyPenCanvasMount } from './StudyPenCanvasMount';
 
@@ -19,7 +20,7 @@ function studyPenCanvas(parameters: StudyPenCanvasArguments) {
       widthRatio: 1, heightRatio: 1,
       // 全局视图同时变换卡面与笔迹，关闭 SDK 缩放避免两份缩放叠加。
       scaleDisabled: deviceInfo.sdkApiVersion >= 23 ? true : undefined,
-      maxCanvasHeight: deviceInfo.sdkApiVersion >= 23 ? parameters.viewportHeight : undefined,
+      maxCanvasHeight: parameters.fixedCanvas && deviceInfo.sdkApiVersion >= 23 ? parameters.viewportHeight : undefined,
       onInit: (): void => { parameters.onReady(parameters.generation); },
       onScale: (scale: number): void => { parameters.onScale(parameters.generation, scale); } })
   }.width(parameters.viewportWidth).height(parameters.viewportHeight).clip(true)
@@ -34,6 +35,8 @@ class OfficialStudyPenCanvasMount implements StudyPenCanvasMount {
   private node: BuilderNode<[StudyPenCanvasArguments]>;
   private args: StudyPenCanvasArguments;
   private isDisposed: boolean = false;
+  private loadingReject: ((error: Error) => void) | null = null;
+  private loadVersion: number = 0;
 
   constructor(node: BuilderNode<[StudyPenCanvasArguments]>, args: StudyPenCanvasArguments) {
     this.node = node;
@@ -51,9 +54,43 @@ class OfficialStudyPenCanvasMount implements StudyPenCanvasMount {
     this.node.update(this.args);
   }
 
+  /** @throws {Error} 调用编辑器显示 SDK 保存错误并保留草稿。 */
+  async save(path: string): Promise<void> {
+    if (this.isDisposed) throw new Error('Handwriting canvas was closed');
+    await this.args.controller.save(path);
+  }
+
+  /** @throws {Error} 加载失败或销毁由编辑器处理。 */
+  async load(path: string): Promise<void> {
+    if (this.isDisposed || this.loadingReject !== null) throw new Error('Handwriting canvas is unavailable');
+    const version: number = ++this.loadVersion;
+    await new Promise<void>((resolve, reject): void => {
+      const timer: number = setTimeout((): void => {
+        if (version !== this.loadVersion) return;
+        this.loadingReject = null; reject(new Error('Handwriting load timed out'));
+      }, 10000);
+      this.loadingReject = (error: Error): void => { clearTimeout(timer); this.loadingReject = null; reject(error); };
+      this.args.controller.onLoad((error, _path): void => {
+        if (version !== this.loadVersion || this.loadingReject === null) return;
+        clearTimeout(timer); this.loadingReject = null;
+        if (this.isDisposed || (error && error.code !== 0 && error.message !== 'load success')) reject(new Error('Handwriting load failed'));
+        else resolve();
+      });
+      try { this.args.controller.load(path); }
+      catch (error) { this.loadingReject?.(error as Error); }
+    });
+  }
+
+  /** @throws {Error} 编辑器负责显示失败并保留原图片。 */
+  async thumbnail(aspect: number): Promise<image.PixelMap> {
+    if (this.isDisposed) throw new Error('Handwriting canvas was closed');
+    return this.args.controller.getThumbnail({ left: 0, top: 0, right: 1000, bottom: 1000 * aspect });
+  }
+
   dispose(): void {
     if (this.isDisposed) return;
     this.isDisposed = true;
+    this.loadingReject?.(new Error('Handwriting canvas was closed'));
     this.node.dispose();
   }
 }
@@ -63,6 +100,7 @@ export function createStudyPenCanvas(context: UIContext, parameters: StudyPenCan
   width: number, height: number): StudyPenCanvasMount {
   const controller: HandwriteController = new HandwriteController();
   const args: StudyPenCanvasArguments = { generation: parameters.generation,
+    fixedCanvas: parameters.fixedCanvas,
     onReady: parameters.onReady, onLayout: parameters.onLayout,
     onScale: parameters.onScale, controller: controller, viewportWidth: width, viewportHeight: height };
   const node: BuilderNode<[StudyPenCanvasArguments]> = new BuilderNode<[StudyPenCanvasArguments]>(context);

@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { FrameNode, UIContext } from '@kit.ArkUI';
+import { image } from '@kit.ImageKit';
 import { StudyPenCanvasParameters } from './StudyPenCanvasParameters';
 
 /** 启动侧只认识挂载生命周期，不静态引用官方 Controller 或系统 HSP。 */
 export interface StudyPenCanvasMount {
   getFrameNode(): FrameNode | null;
   resize(width: number, height: number): void;
+  save(path: string): Promise<void>;
+  load(path: string): Promise<void>;
+  thumbnail(aspect: number): Promise<image.PixelMap>;
   dispose(): void;
 }
 
