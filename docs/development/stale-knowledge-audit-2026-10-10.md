@@ -28,9 +28,19 @@
 
 - 首轮 `npm run verify -- repo`：3,243 项中 3,240 通过、3 失败，分别为上表的首页源码形状、官网版本和生成清单。
 - 修复后的首页/历史、官网和协议专项：254 项通过。后续完整回归包含这些专项。
-- 首次完整收尾 `npm run verify -- repo`：3,245 项全部通过。继续核查新增章节锚点门禁后，文档契约与 Agent 思考续接、页面观察和展示专项 49 项全部通过；最终仓库结果随后补记。
+- 首次完整收尾 `npm run verify -- repo`：3,245 项全部通过。继续核查新增章节锚点门禁后，文档契约与 Agent 思考续接、页面观察和展示专项 49 项全部通过。
+- 最后一次 `npm run verify -- repo`：3,246 项中 3,244 通过、2 失败；本轮文档、首页、官网及协议检查通过。两项失败来自收尾期间共享工作树新增的按压实现，见下节，不能继续沿用此前全绿结论。
 - `npm run test:cards:browser`：真实 Edge 共 253 个场景通过（显示上下文 17、配色 144、模板 88、翻面 4），无模板脚本错误或额外资源错误。继续核查未修改这些检查的输入，复用该结果；它不代表 ArkWeb 或设备验收。
 
 任务日志保存在仓库外 `D:/Projects/jidecards-stale-audit-*-2026-10-10.log`，便于本机查证；可移植交接以源码、上述入口和命令为准，不要求其他 checkout 拥有这些临时日志。
 
-本轮只修改文档、测试和派生内容，没有重建 Rust/HAP、安装设备、修改真实集合、提交或发布。线上官网本轮读回的源码元数据仍为 2.9.22 / 3003；本地生成完成不等于线上发布成功。
+## 收尾时的共享工作树失败
+
+| 检查 | 实际错误与未就绪依赖 |
+| --- | --- |
+| [按压反馈回归](../../tools/tests/ui-press-feedback.test.mjs) | 加载真实 `PressFeedback.ets` 时发生 `ReferenceError: AttributeUpdater is not defined`；测试仍直接调用已移除的 `applyPressedAttribute`。 |
+| [玻璃按压回归](../../tools/tests/theme-text.test.mjs) | 同样在加载 `PressFeedback.ets` 时失败；后续测试仍依赖旧的直接按压方法。 |
+
+发生于独立检查已通过之后：共享改动将 [PressFeedback](../../entry/src/main/ets/utils/PressFeedback.ets) 改为继承 `@kit.ArkUI.AttributeUpdater` 并通过真实 touch 回调更新属性，[GlassSurface](../../entry/src/main/ets/utils/GlassSurface.ets) 与 [PrimaryGlassSurface](../../entry/src/main/ets/utils/PrimaryGlassSurface.ets) 随之调整；原测试的注入依赖与调用方式尚未配套。由该改动的拥有者补齐平台隔离契约和真实事件回归后再做联合验收，不能只补空类或删除失败断言。本轮按[共享工作树归因规则](coding-agent.md#多-agent-协作)保留其编辑现场，没有代改生产代码或扩大替身来凑绿。
+
+本轮只修改文档、测试和派生内容，没有重建 Rust/HAP、安装设备、修改真实集合或主动提交、发布。其他对话在本轮期间的提交不属于本任务执行。线上官网本轮读回的源码元数据仍为 2.9.22 / 3003；本地生成完成不等于线上发布成功。
