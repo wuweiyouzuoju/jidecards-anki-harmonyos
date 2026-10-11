@@ -46,7 +46,12 @@ function validateItems(items: 提醒项[]): void {
 /** @throws {Error} 失败由领域调用方报告，不以默认值或假成功继续。 */
 export async function 加载学习提醒设置(): Promise<学习提醒设置> {
   const store: preferences.Preferences = await reminderStore();
-  const raw: string = await readLocalPreference(store, 提醒项列表键, '') as string;
+  const raw: string = await readLocalPreference(store, 提醒项列表键, '[]') as string;
+  return { 提醒项列表: parseReminderItems(raw) };
+}
+
+/** @throws {Error} 比较采用同一迁移规则，兼容旧空键和没有单项开关的提醒。 */
+function parseReminderItems(raw: string): 提醒项[] {
   const items: 提醒项[] = raw === '' ? [] : JSON.parse(raw) as 提醒项[];
   if (!Array.isArray(items)) throw new Error('reminder_invalid_settings');
   for (const item of items) {
@@ -55,17 +60,19 @@ export async function 加载学习提醒设置(): Promise<学习提醒设置> {
   }
   validateItems(items);
   for (const item of items) 下一个ID = Math.max(下一个ID, item.唯一ID + 1);
-  return { 提醒项列表: items };
+  return items;
 }
 
 /** 冻结提交内容；落盘、回读确认之后才广播。写入不受页面销毁影响。 */
 /** @throws {Error} 失败由领域调用方报告，不以默认值或假成功继续。 */
-export async function 保存学习提醒设置(items: 提醒项[]): Promise<void> {
+export async function 保存学习提醒设置(items: 提醒项[], expected: string | null = null): Promise<void> {
   validateItems(items);
   const raw: string = JSON.stringify(items);
   const enabled: boolean = items.some((item: 提醒项): boolean => item.开启);
   const store: preferences.Preferences = await reminderStore();
-  await saveLocalPreference(store, 提醒项列表键, raw, '', null,
+  const previous: string = await readLocalPreference(store, 提醒项列表键, '[]') as string;
+  if (expected !== null && JSON.stringify(parseReminderItems(previous)) !== expected) throw new Error('setting_changed_since_proposal');
+  await saveLocalPreference(store, 提醒项列表键, raw, '[]', expected === null ? null : previous,
     (): void => { AppStorage.setOrCreate<boolean>(学习提醒AppStorage键, enabled); });
 }
 
