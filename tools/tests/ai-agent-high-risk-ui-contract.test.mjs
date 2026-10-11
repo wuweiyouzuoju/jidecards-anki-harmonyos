@@ -70,6 +70,7 @@ test('provider selection loads its own key and saving preserves model memories w
     $r: key => ({ id: key }), AppStorage: { get: () => ({ resourceManager: { getStringSync: id => id } }) }
   });
   const component = new Component();
+  component.updateWebState({ready:true,busy:false,dirty:false,webEnabled:false,searchProvider:'doubao'});
   await component.aboutToAppear();
   assert.equal(component.providerIndex(), 1);
   assert.equal(component.modelIndex(), 1);

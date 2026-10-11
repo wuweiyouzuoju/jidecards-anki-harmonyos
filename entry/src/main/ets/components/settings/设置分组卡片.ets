@@ -13,6 +13,7 @@ export struct 设置分组卡片 {
   @Prop 标题: Resource = $r('app.string.settings_about');
   @Prop groupId: string = '';
   @Prop 是否深色: boolean = false;
+  @Prop showHeader: boolean = true;
   @Prop 帮助标题: Resource | null = null;
   @Prop 帮助正文: Resource | null = null;
   打开说明回调: (标题: Resource, 正文: Resource) => void =
@@ -24,13 +25,15 @@ export struct 设置分组卡片 {
 
   build() {
     Column() {
-      Row({ space: 应用尺寸.间距_12 }) {
-        HelpLabel({ title: this.groupId === '' ? this.标题 : settingsGroupText(this.getUIContext(), this.groupId, this.uiLanguage), textSize: 14, textWeight: FontWeight.Medium, minRowHeight: 44,
-        textColor: 设置面板色板_取(this.是否深色).次文字,
-        showHelp: this.帮助标题 !== null && this.帮助正文 !== null,
-        onHelp: (): void => { this.打开说明回调(this.帮助标题 as Resource, this.帮助正文 as Resource); }
-        }).layoutWeight(1)
-      }.width('100%').alignItems(VerticalAlign.Center)
+      if (this.showHeader) {
+        Row({ space: 应用尺寸.间距_12 }) {
+          HelpLabel({ title: this.groupId === '' ? this.标题 : settingsGroupText(this.getUIContext(), this.groupId, this.uiLanguage), textSize: 14, textWeight: FontWeight.Medium, minRowHeight: 44,
+          textColor: 设置面板色板_取(this.是否深色).次文字,
+          showHelp: this.帮助标题 !== null && this.帮助正文 !== null,
+          onHelp: (): void => { this.打开说明回调(this.帮助标题 as Resource, this.帮助正文 as Resource); }
+          }).layoutWeight(1)
+        }.width('100%').alignItems(VerticalAlign.Center)
+      }
 
       this.内容()
     }

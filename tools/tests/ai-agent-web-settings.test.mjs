@@ -141,3 +141,14 @@ test('busy and disposed settings reject late switch and save callbacks', async (
   assert.equal(component.webEnabled, false);
   assert.deepEqual(writes, []);
 });
+
+test('reused web settings report unsaved state without credentials and refresh the host after saving', async () => {
+  const {component,writes}=componentHarness();const states=[];let reloads=0;
+  component.onStateChange=state=>states.push(state);component.onSaved=async()=>{reloads++;};
+  await component.aboutToAppear();assert.equal(states.at(-1).dirty,false);
+  component.secret='PRIVATE_WEB_KEY';component.changeEnabled(true);
+  assert.equal(states.at(-1).dirty,true);assert.ok(!JSON.stringify(states).includes('PRIVATE_WEB_KEY'));
+  component.isLocked=true;await component.save();assert.equal(writes.length,0);
+  component.isLocked=false;await component.save();assert.equal(reloads,1);assert.equal(states.at(-1).dirty,false);
+  assert.equal(states.at(-1).busy,false);
+});
