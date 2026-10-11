@@ -7,7 +7,7 @@
 
 jidecards（中文名“记得闪卡”）是面向 HarmonyOS NEXT 的开源闪卡学习应用，支持鸿蒙手机、平板和电脑。导入 Anki 牌组后，可以离线复习、编辑资料、查看学习统计，并通过 AnkiWeb 同步。原生界面由 ArkTS/ArkUI 实现，集合、模板渲染、调度和同步复用锁定版本的 Anki Rust Core。
 
-**应用市场正式版：2.9.22** · **当前源码版本：2.9.88（versionCode 3069）**
+**应用市场正式版：2.9.22** · **当前源码版本：2.9.98（versionCode 3079）**
 
 每天一点，把知识记牢。用闪卡整理知识，以间隔复习建立自己的学习节奏。
 
@@ -61,7 +61,7 @@ jidecards（中文名“记得闪卡”）是面向 HarmonyOS NEXT 的开源闪�
 - 支持 CSV / TSV / TXT 导入预览、字段映射和重复处理；APKG 导入可配置更新策略，查看进度、取消及结果统计；整库替换提供空间预检和进程中断恢复。详见[数据导入](docs/development/import-data.md)。
 - 支持笔记文本和卡片文本导出，适合整理资料或交给其他工具处理；文本导出不包含媒体文件和复习进度。
 - 提供媒体引用检查、缺失文件检查、媒体回收站、数据库检查，以及标签和笔记维护工具。
-- 选择题 APKG 扩展遵循公开的 [v1 规范](docs/choice-apkg-v1.md)，附带 [制题指南](docs/choice-authoring.md)、[JSON Schema](docs/schemas/choice-source-v1.schema.json) 和[示例牌组](docs/examples/choice-demo.apkg)。
+- 专属选择题制题路线已取消；已有题库的读取与学习兼容保留，[旧格式记录](docs/choice-apkg-v1.md)仅供兼容维护，不代表 JIDE 已接入专属制题能力。
 
 ### HarmonyOS 体验
 
@@ -76,7 +76,7 @@ JIDE 提供统一的自然语言对话入口，也可以从牌组、浏览或学
 | 能力 | 当前范围 |
 | --- | --- |
 | 制卡与改卡 | 生成、编辑字段和标签，选择或新建牌组与笔记类型，预览后确认保存 |
-| 资料阅读 | 导入 PDF、办公文档、电子书、文本和图片；PDF 按页读取、系统 OCR、保存资料笔记并标注卡片页码来源 |
+| 资料阅读 | 导入 PDF、办公文档、电子书、文本、图片和视频；读取已有卡库图片/视频，支持视觉理解、系统 OCR、视频按时间取帧制卡并标注来源（不含声音转写） |
 | 学习与应用 | 读取学习概览、卡片统计、牌组选项与已接通的界面状态；确认修改部分设置、共享模板和卡片外观 |
 | 偏好与计算 | 用户确认保存的长期偏好；本地 JavaScript 纯计算沙箱，不获得文件、网络或卡库权限 |
 | 联网 | 独立开关下搜索与读取公开网页；Wikimedia 图片候选可随草稿确认导入 |
@@ -230,7 +230,7 @@ npm run verify             # 完整测试、双架构构建与签名 HAP
 
 ## 版本与发布
 
-当前源码版本由 [AppScope/app.json5](AppScope/app.json5) 中的 `versionName` 和 `versionCode` 定义。查看[更新记录](CHANGELOG.md)及[2.9.88 源码变更说明](docs/releases/2.9.88.md)；历史说明保留在 [docs/releases/](docs/releases/) 中。商店版本与源码版本分别维护，商店版本只在确认上架后更新。
+当前源码版本由 [AppScope/app.json5](AppScope/app.json5) 中的 `versionName` 和 `versionCode` 定义。查看[更新记录](CHANGELOG.md)及[2.9.98 源码变更说明](docs/releases/2.9.98.md)；历史说明保留在 [docs/releases/](docs/releases/) 中。商店版本与源码版本分别维护，商店版本只在确认上架后更新。
 
 应用市场 2.9.22 的更新内容与下载入口见 [2.9.22 应用市场版说明](docs/releases/appgallery-2.9.22.md)。GitHub 的 `appgallery-v2.9.22` 标签记录当时的版本介绍，自动生成的源码快照对应标签中的 2.9.10 / versionCode 2991，不随 main 的后续更新变化；应用安装请使用应用市场入口。
 
