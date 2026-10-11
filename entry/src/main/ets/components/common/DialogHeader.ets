@@ -5,6 +5,7 @@ import { IconActionButton } from './IconActionButton';
 import { 按下态按钮 } from './按下态按钮';
 import { 颜色键 } from '../../model/颜色主题';
 import { DIALOG_ACTION_PRESENTATION } from '../../model/InteractionFeedback';
+import { 应用尺寸 } from '../../utils/应用尺寸';
 
 /** 固定标题操作栏：图标位于标题两侧，可见文字操作在标题下方；业务校验由调用方传入。 */
 @Component
@@ -37,6 +38,10 @@ export struct DialogHeader {
   private usesTextRow(): boolean {
     return (this.showClose && this.showCloseLabel) || (this.showAction && !this.actionUsesIcon());
   }
+  private titleInset(): number {
+    const hasIcon: boolean = (this.showClose && !this.showCloseLabel) || (this.showAction && this.actionUsesIcon());
+    return hasIcon ? 应用尺寸.按钮高度 + 应用尺寸.间距_16 : 0;
+  }
 
   build() {
     Column({ space: 8 }) {
@@ -47,19 +52,24 @@ export struct DialogHeader {
               IconActionButton({ toolbarStyle: true, source: this.closeIcon, label: this.closeLabel,
                 isInteractive: this.closeEnabled, onAction: this.onClose })
             }
-          }.width('28%').justifyContent(FlexAlign.Start)
+          }.width(应用尺寸.按钮高度).justifyContent(FlexAlign.Start)
           Blank().layoutWeight(1)
           Row() {
             if (this.showAction && this.actionUsesIcon()) {
               IconActionButton({ toolbarStyle: true, source: this.actionIcon || $r('app.media.' + DIALOG_ACTION_PRESENTATION.confirmIconKey),
                 label: this.actionLabel, isInteractive: this.actionEnabled, onAction: this.onAction })
             }
-          }.width('28%').justifyContent(FlexAlign.End)
+          }.width(应用尺寸.按钮高度).justifyContent(FlexAlign.End)
         }.width('100%')
-        HelpLabel({ title: this.title, textSize: 18, textWeight: FontWeight.Bold,
-          highlightLabel: this.highlightLabel, highlightColors: this.highlightColors,
-          centered: true, showHelp: this.showHelp, isHelpEnabled: this.helpEnabled, onHelp: this.onHelp })
-          .width(this.usesTextRow() ? '64%' : '44%')
+        // 完整标题按按钮尺寸对称留边；标题层不截获两侧按钮的点击。
+        Row() {
+          HelpLabel({ title: this.title, textSize: 18, textWeight: FontWeight.Bold,
+            highlightLabel: this.highlightLabel, highlightColors: this.highlightColors,
+            centered: true, limitTitleLines: false, showHelp: this.showHelp,
+            isHelpEnabled: this.helpEnabled, onHelp: this.onHelp })
+            .layoutWeight(1)
+        }.width('100%').padding({ left: this.titleInset(), right: this.titleInset() })
+          .hitTestBehavior(HitTestMode.Transparent)
       }.width('100%').constraintSize({ minHeight: 44 })
       if (this.usesTextRow()) {
         // 需要文字解释的操作独占一行，避免挤在标题两侧而截断。

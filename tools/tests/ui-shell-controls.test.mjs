@@ -67,6 +67,38 @@ test('shared secondary buttons retain ordinary colors and stable selection borde
   assert.equal(clicks, 1);
 });
 
+test('dialog title reserves actual icon geometry symmetrically without truncating its label', () => {
+  const Header = loadComponentLogic('components/common/DialogHeader.ets', 'DialogHeader', {
+    $r: resource, 应用尺寸: dimensions
+  });
+  const Label = loadComponentLogic('components/common/HelpLabel.ets', 'HelpLabel', {
+    $r: resource, FontWeight: { Normal: 'normal' }
+  });
+  const header = new Header();
+  const binding = read('components/common/DialogHeader.ets').match(/HelpLabel\((\{[\s\S]*?\})\)/)[1];
+  const options = new Function('FontWeight', 'return (' + binding + ');').call(header, { Bold: 'bold' });
+  const label = Object.assign(new Label(), options);
+  assert.equal(new Label().limitTitleLines, true, 'ordinary form labels retain their two-line policy');
+  assert.equal(label.limitTitleLines, false, 'the header opts into full title rendering');
+  assert.equal(label.centered, true);
+  for (const showClose of [false, true]) for (const showAction of [false, true]) {
+    for (const showCloseLabel of [false, true]) for (const showActionLabel of [false, true]) {
+      for (const destructive of [false, true]) {
+        Object.assign(header, { showClose, showAction, showCloseLabel, showActionLabel, destructive });
+        const hasIcon = (showClose && !showCloseLabel) || (showAction && !showActionLabel && !destructive);
+        const inset = header.titleInset();
+        assert.equal(inset, hasIcon ? dimensions.按钮高度 + dimensions.间距_16 : 0);
+        for (const viewport of [320, 840]) for (const safeInset of [0, 24]) {
+          const content = viewport - safeInset * 2;
+          const titleWidth = content - inset * 2;
+          assert.ok(titleWidth > 0);
+          assert.equal(safeInset + inset + titleWidth / 2, viewport / 2);
+        }
+      }
+    }
+  }
+});
+
 test('dialog header icon and text actions preserve names, theme, danger and disabled callbacks', () => {
   const Header = loadComponentLogic('components/common/DialogHeader.ets', 'DialogHeader', { $r: resource });
   const Button = loadComponentLogic('components/common/按下态按钮.ets', '按下态按钮', {
@@ -208,7 +240,7 @@ test('primary button callers preserve login readiness, secret validation and sav
   assert.match(developer, /isInteractive: !this.正在启用 && this.开发者密钥.trim\(\) !== ''/);
   assert.match(developer, /onAction:.*this.启用开发者功能\(\)/);
   const agent = read('components/settings/AIAgent设置分组.ets');
-  assert.match(agent, /PrimaryActionButton\(\{[\s\S]*?isInteractive: !this.saving/);
+  assert.match(agent, /PrimaryActionButton\(\{[\s\S]*?isInteractive: this.canEdit\(\)/);
   assert.match(agent, /onAction:.*this.save\(\)/);
   for (const source of [agent, developer]) assert.match(source, /\.type\(InputType.Password\)/);
 });

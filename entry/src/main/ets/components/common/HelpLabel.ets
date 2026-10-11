@@ -14,6 +14,7 @@ export struct HelpLabel {
   @Prop textColor: ResourceColor = $r('app.color.text_primary');
   @Prop textWeight: FontWeight = FontWeight.Normal;
   @Prop centered: boolean = false;
+  @Prop limitTitleLines: boolean = true;
   @Prop showHelp: boolean = true;
   @Prop isHelpEnabled: boolean = true;
   @Prop minRowHeight: number = 0;
@@ -34,7 +35,9 @@ export struct HelpLabel {
         Text() { ForEach([themeTextKey(this.title, this.highlightColors, this.getUIContext(), this.uiLanguage, this.highlightLabel)], (_textKey: string) => { ThemeHighlightedTextSpans(this.title, this.highlightLabel, this.highlightColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }
           .fontSize(this.textSize).fontColor(this.textColor).fontWeight(this.textWeight)
           .textAlign(this.centered ? TextAlign.Center : TextAlign.Start)
-          .maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
+          .maxLines(this.limitTitleLines ? 2 : undefined)
+          .textOverflow({ overflow: this.limitTitleLines ? TextOverflow.Ellipsis : TextOverflow.Clip })
+          .lineBreakStrategy(this.limitTitleLines ? LineBreakStrategy.GREEDY : LineBreakStrategy.BALANCED)
           .onAreaChange((_old: Area, area: Area): void => { this.updateTitleArea(area); })
         if (this.showHelp) {
           Row() {
