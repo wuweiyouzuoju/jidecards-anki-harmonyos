@@ -69,7 +69,7 @@ export function buildAgentTaskProviderText(snapshot: AgentTaskSnapshot): string 
     templateCount: snapshot.templateCount, templatePreviews: snapshot.templatePreviews?.slice()
   };
   const mediaNotice: string = snapshot.omittedMedia ?
-    '\n媒体说明：二进制媒体未发送，不得声称已经看见或听见。' : '';
+    '\n媒体说明：本地上下文中的二进制媒体未发送。已有图片/视频可通过 list_note_media → import_note_media 后读取；读取前不得声称看见，也不得声称听见音频。' : '';
   return `任务配置：${JSON.stringify(configuration)}\n用户要求：${snapshot.userText}` +
     `\n应用内本地上下文（稳定 ID，仅限本轮）：\n${snapshot.localContext}${mediaNotice}`;
 }

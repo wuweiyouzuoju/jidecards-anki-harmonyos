@@ -156,17 +156,20 @@ function compactDocumentOutput(output: string): string {
   try { value = JSON.parse(output) as RetrievalOutputSummary; } catch (error) { }
   return JSON.stringify({ status: 'document_content_omitted', documentId: value.documentId, page: value.page,
     nextOffset: value.nextOffset, nextPage: value.nextPage, method: value.method,
-    instruction: 'Original text and page image are in the conversation document store. Use list_documents/read_document_page or OCR to reread. Saved model notes are interpretations, not original text.' });
+    instruction: 'Original media remain in the conversation document store. Use list_documents/read_document_page, OCR or read_video_frames to reread. Saved model notes are interpretations, not original text.' });
 }
 
-/** 页面图片只留最近两张，旧结果留下可重新读取的文档指针。文字预算由整包预检拥有。 */
+/** 单页图片通常保留最近两张；视频取帧结果保留一个完整批次，避免本次画面立刻被删。 */
 export function compactAgentToolOutputs(input: ProviderInputItem[]): void {
   let retainedImages: number = 0;
+  const newestImages: number = input.slice().reverse().find((item: ProviderInputItem): boolean =>
+    (item.images ?? []).length > 0)?.images?.length ?? 0;
+  const imageLimit: number = Math.max(2, Math.min(4, newestImages));
   for (let index: number = input.length - 1; index >= 0; index--) {
     const item: ProviderInputItem = input[index];
     if ((item.images ?? []).length > 0) {
       retainedImages += item.images?.length ?? 0;
-      if (retainedImages > 2) {
+      if (retainedImages > imageLimit) {
         item.images = undefined;
         if (item.kind === 'function_call_output') item.output = compactDocumentOutput(item.output);
       }

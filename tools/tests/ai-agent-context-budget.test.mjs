@@ -61,7 +61,11 @@ test('all modes fit eight escaped field results by final wire size, preserving o
 
 test('already fitting long text is not discarded by an unrelated raw-character budget', () => {
   const value=request([item('message',{role:'user',content:'task'}),item('function_call',{callId:'c',name:'read_note_field',argumentsJson:'{}'}),
-    item('function_call_output',{callId:'c',output:JSON.stringify({text:'中'.repeat(165000),nextOffset:-1})})]);
+    item('function_call_output',{callId:'c',output:JSON.stringify({text:'',nextOffset:-1})})]);
+  // 工具目录随能力增长；使用真实序列化开销确定仍然可容纳的长正文。
+  const available=MAX_PROVIDER_PAYLOAD_CHARS-buildResponsesPayload(value).length-1024;
+  assert.ok(available>120000);
+  value.input[2].output=JSON.stringify({text:'中'.repeat(available),nextOffset:-1});
   assert.equal(providerRequestFitsContext(value),true);
   const before=JSON.stringify(value);fitAgentRequestContext(value);assert.equal(JSON.stringify(value),before);
 });
