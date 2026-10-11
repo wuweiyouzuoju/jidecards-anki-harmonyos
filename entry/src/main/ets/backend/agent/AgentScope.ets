@@ -17,6 +17,13 @@ export class AgentScopeError extends Error {
 export class AgentScope {
   readonly retrieval: AgentRetrieval = new AgentRetrieval();
   readonly taskPlan: AgentTaskPlan = new AgentTaskPlan();
+  private operationTargets: Map<string, Set<string>> = new Map<string, Set<string>>();
+  registerOperationTargets(domain: string, ids: string[]): void {
+    const set = this.operationTargets.get(domain) ?? new Set<string>(); for (const id of ids) set.add(id); this.operationTargets.set(domain,set);
+  }
+  assertOperationTarget(domain: string, id: string): void {
+    if (!this.operationTargets.get(domain)?.has(id)) throw new AgentScopeError('operation_target_not_discovered');
+  }
 
   /** 每轮只刷新操作上下文，保留会话中已发现的只读对象和分页进度。 */
   beginTurn(): void {
@@ -184,6 +191,7 @@ export class AgentScope {
   }
 
   reset(): void {
+    this.operationTargets.clear();
     this.taskPlan.clear();
     this.retrieval.clear();
     this.readableCardIds.clear();
