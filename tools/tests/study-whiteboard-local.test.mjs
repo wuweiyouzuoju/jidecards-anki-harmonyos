@@ -1,3 +1,5 @@
+import { StudyKeyboardSession, studyChord } from '../../entry/src/main/ets/model/StudyKeyboard.ts';
+import { configuredStudyCommand, defaultStudyControls as keyboardDefaults } from '../../entry/src/main/ets/model/StudyControls.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -542,7 +544,7 @@ test('study keyboard stays inside whiteboard: Ctrl Z undoes ink, Escape closes a
     (resolveStudyKey, key => key, { Down: 0 });
   const page = new Page();
   let resumes = 0, reschedules = 0;
-  Object.assign(page, { timeboxNotice: null, tapZonesGuideVisible: false, studyMenuOpen: false,
+  Object.assign(page, { keyboardSession:new StudyKeyboardSession(),  timeboxNotice: null, tapZonesGuideVisible: false, studyMenuOpen: false,
     手写模式: true, Ctrl按下: false, whiteboardUndoTick: 0, whiteboardRedoTick: 0, whiteboardBackTick: 0,
     whiteboardSession: board(), startStudyTimers() { resumes++; },
     scheduleChoiceAutoAdvance() { reschedules++; } });

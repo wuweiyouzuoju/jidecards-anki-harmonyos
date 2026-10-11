@@ -1,5 +1,8 @@
 import { NativeDialogHost, NativeDialogDismiss, NativeDialogPresentation } from '../components/common/NativeDialogHost';
 import { SurfaceTransition } from '../utils/SurfaceTransition';
+import { agentOperationHosts } from '../model/agent/AgentOperationHost';
+import type { AgentOperationHost } from '../model/agent/AgentOperationHost';
+import type { OperationArguments } from '../model/agent/AgentOperations';
 import { FEEDBACK_ACTIONS, resultUndoStatus } from '../model/InteractionFeedback';
 import { ChangingText } from '../components/common/ChangingText';
 import { ResultNotice } from '../components/common/ResultNotice';
@@ -58,16 +61,16 @@ import { 笔记服务 } from '../backend/笔记服务';
 import { 笔记类型服务 } from '../backend/笔记类型服务';
 import { EditableNote } from '../proto/messages/NoteMessages';
 import { renderStudyAnswer, StudyAnswerNotetype } from '../model/StudyAnswerRenderer';
-import { resolveStudyKey } from '../model/StudyInputPolicy';
 import type { StudyInputCommand } from '../model/StudyInputPolicy';
-import { STUDY_CONTROLS_KEY, validateStudyControls, mappedStudyCommand } from '../model/StudyControls';
+import { STUDY_CONTROLS_KEY, validateStudyControls, mappedStudyCommand, configuredStudyCommand } from '../model/StudyControls';
+import { StudyKeyboardSession } from '../model/StudyKeyboard';
 import type { StudyControls } from '../model/StudyControls';
 import { loadStudyControls, createStudyScreenAwake } from '../backend/StudyControlsService';
 import type { StudyScreenAwakeSession } from '../model/StudyScreenAwakeSession';
 import { buildStudyGestureScript, resolveStudyGesture, StudyGestureState, StudyQuickAnswerMode } from '../model/StudyGestures';
 import { StudyTapZonesGuide } from '../components/StudyTapZonesGuide';
 import { StudyGuideDialog } from '../components/StudyGuideDialog';
-import { studyKeyName } from '../utils/StudyKeyAdapter';
+import { studyKeyName, studyEventChord } from '../utils/StudyKeyAdapter';
 import { CardViewport } from '../components/common/CardViewport';
 import { CardActionMenu, CardActionMenuEntry } from '../components/common/CardActionMenu';
 import { actionMenuRows, visibleActionMenuRows, toggleActionMenuBranch, ActionMenuRow } from '../components/common/ActionMenuTree';
@@ -128,6 +131,8 @@ import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../model/ReleaseFeatures';
 /** 与上游 buildNextLearnMsg 一致：下一张学习卡 >=1 天后到期时，完成页不再提示学习卡 */
 const SECONDS_PER_DAY: number = 86400;
 interface MarkingReadToken { version: number; }
+interface AgentPendingStudy { command: string; expected: string; resolve: (result: string) => void; reject: (error: Error) => void; }
+interface AgentStudyAudioResult { completed: boolean; error: string; }
 
 export interface 学习页参数 {
   deckId?: string;
@@ -176,7 +181,8 @@ export struct 学习页 {
   @State private hasRenderedCard: boolean = false;
   @State private cardRenderPending: boolean = false;
   private readonly cardWeb: CardWebView = new CardWebView(this.网页控制器,
-    (background: string): void => { this.studyCardShown(background); }, (message: string): void => {
+    (background: string, appearanceOnly: boolean): void => { this.studyCardShown(background, appearanceOnly); },
+    (message: string): void => {
       if (!this.isCurrentRequest(this.requestVersion)) return;
       this.audioSession.stop();
       this.stopStudyTimers();
@@ -254,6 +260,7 @@ export struct 学习页 {
     if (this.controllerReady && this.mounted && this.页面已显示 && this.foreground) this.refreshStudyGestureScript();
   }
   private refreshStudyGestureScript(): void {
+    this.webInputFocused = false;
     try {
       this.网页控制器.runJavaScript(buildStudyGestureScript(this.requestVersion, this.interactionVersion,
         this.isStudyGesturesEnabled())).catch((error: Object): void => { console.info(`Study interaction: ${error}`); });
@@ -328,7 +335,7 @@ export struct 学习页 {
   @State @Watch('publishInterface') private gripAvailability: StudyGripAvailability = 'unchecked';
   @State @Watch('publishInterface') private gripSide: StudyToolbarSide = 'right';
   /** 主题模式 + 系统暗黑，用于浮动工具栏底色判断（与 首页.ets 同套机制）。 */
-  @StorageLink('systemDarkMode') private 系统暗黑模式: boolean = false;
+  @StorageLink('systemDarkMode') @Watch('cardThemeChanged') private 系统暗黑模式: boolean = false;
   /** 保留当前界面模式；学习输入偏好不再受模式限制。 */
   @StorageLink(简洁模式AppStorage键) private 简洁模式: boolean = true;
   /** 四象限：题目面单击显示答案，答案面按分区评分。 */
@@ -357,7 +364,7 @@ export struct 学习页 {
   private contentRefreshInFlight: boolean = false;
   /** 本 NavDestination 是否在前台（onShown / onHidden 维护）；隐藏时不向 Web 推数据。 */
   @State private 页面已显示: boolean = false;
-  @StorageLink('themeMode') private 主题模式值: 主题模式 = 'system';
+  @StorageLink('themeMode') @Watch('cardThemeChanged') private 主题模式值: 主题模式 = 'system';
   @StorageProp(颜色键.动作主色) private 动作主色: string = '#2F5FD0';
   @StorageProp(颜色键.动作主色按下) private 动作主色按下色: string = '#1E4FB8';
   // 2.1.4.1 对比度：按钮背景专用档（配 #FFFFFF 文字 ≥ 4.5:1）
@@ -384,6 +391,7 @@ export struct 学习页 {
   @State private navigationOffset: number = 0;
 
   async aboutToAppear(): Promise<void> {
+    agentOperationHosts.register('study',this.agentStudyHost);
     this.studyGuideDialog.activate(); this.autoAdvanceDialog.activate();
     // 与浏览、统计共用转场协议；背景由首页根层持续持有。
     CustomTransition.getInstance().注册NavParam('StudyPage',
@@ -397,6 +405,7 @@ export struct 学习页 {
       }
     );
     this.mounted = true;
+    this.cardThemeChanged();
     this.screenAwake = createStudyScreenAwake();
     this.studySession.activate();
     this.牌组ID = this.pageDeckId === '' ? 0 : parseInt(this.pageDeckId);
@@ -433,7 +442,13 @@ export struct 学习页 {
     return 解析是否深色(this.主题模式值, this.系统暗黑模式);
   }
 
+  private cardThemeChanged(): void {
+    if (this.mounted) this.cardWeb.setTheme(this.是否深色());
+  }
+
   aboutToDisappear(): void {
+    agentOperationHosts.unregister('study',this.agentStudyHost);
+    this.pendingAgentStudy?.reject(new Error('study_session_disposed')); this.pendingAgentStudy = null;
     this.mounted = false;
     this.studyGuideDialog.dispose(); this.autoAdvanceDialog.dispose();
     this.updateScreenAwake();
@@ -627,6 +642,7 @@ export struct 学习页 {
   private async 加载下一张卡(preserveWhiteboardCardId: number = 0): Promise<void> {
     if (!this.mounted) { return; }
     if (!this.页面已显示 || !this.foreground) {
+      this.keyboardSession.reset(); this.answerInputFocused = false; this.webInputFocused = false;
       this.studyMenuOpen = false;
       this.studyExpandedIds = [];
       this.待重渲染当前卡 = true;
@@ -785,10 +801,11 @@ export struct 学习页 {
 
 
   /** 渲染确认只开放计时和交互；等待期间保留 Web 卡面，不插入整块加载画面。 */
-  private studyCardShown(background: string = ''): void {
+  private studyCardShown(background: string = '', appearanceOnly: boolean = false): void {
     if (!this.isCurrentRequest(this.requestVersion)) return;
     if (this.阶段 === 'question' || this.阶段 === 'answer') this.hasRenderedCard = true;
     if (background !== '') this.cardSurfaceBackground = background;
+    if (appearanceOnly) return;
     if (this.cardRenderPending) {
       this.cardRenderPending = false;
       if (this.阶段 === 'question') {
@@ -821,10 +838,13 @@ export struct 学习页 {
   }
 
   /** 原生音频失败不阻断评分；重播会重新解析，允许失败后恢复。 */
-  private async playStudyAudio(autoplay: boolean = true, manual: boolean = false, audioTarget: string = ''): Promise<void> {
+  /** outcome 供已确认的 JIDE 命令读取真实失败；手动播放仍由原界面提示。 */
+  private async playStudyAudio(autoplay: boolean = true, manual: boolean = false, audioTarget: string = '', outcome: AgentStudyAudioResult | null = null): Promise<void> {
     const rendered: RenderedCard | null = this.已渲染;
     if (this.cardRenderPending || !this.isCurrentRequest(this.requestVersion) || !this.controllerReady || rendered === null ||
-      this.editingPageOpen || (this.阶段 !== 'question' && this.阶段 !== 'answer')) { return; }
+      this.editingPageOpen || (this.阶段 !== 'question' && this.阶段 !== 'answer')) {
+      if (outcome !== null) outcome.error = 'study_audio_unavailable'; return;
+    }
     const version: number = this.requestVersion;
     const target: RegExpExecArray | null = /^([qa]):(\d+)$/.exec(audioTarget);
     const question: boolean = target === null ? this.阶段 === 'question' : target[1] === 'q';
@@ -844,7 +864,12 @@ export struct 学习页 {
       if (hasAudio !== null && this.isCurrentRequest(version) && question === (this.阶段 === 'question')) {
         this.有音频 = hasAudio || (!question && !this.studyOptions.skipQuestionWhenReplayingAnswer && this.questionHasAudio);
       }
+      if (outcome !== null) {
+        outcome.completed = hasAudio !== null && this.isCurrentRequest(version) && this.有音频;
+        if (!outcome.completed) outcome.error = 'study_audio_unverified';
+      }
     } catch (error) {
+      if (outcome !== null) { outcome.error = error instanceof Error ? error.message : 'study_audio_failed'; return; }
       if (!this.isCurrentRequest(version)) { return; }
       this.有音频 = true;
       console.info(`Study audio: ${error}`);
@@ -1343,6 +1368,61 @@ export struct 学习页 {
     });
   }
 
+  private readonly agentStudyIdentity: string = 'study-' + Date.now();
+  private pendingAgentStudy: AgentPendingStudy | null = null;
+  private agentStudySnapshot(): string {
+    return JSON.stringify({ available: this.mounted && this.sessionReady && this.当前卡片 !== null,
+      session: this.agentStudyIdentity, generation: this.requestVersion, card: this.当前卡片,
+      phase: this.阶段, audio: this.有音频, blocked: !this.foreground || this.customSchedulingWarning || this.待重渲染当前卡 || this.contentRefreshInFlight || this.choiceQuestion !== null || this.评分中 || this.flipPending ||
+        this.cardRenderPending || this.editingPageOpen || this.studyGuideVisible || this.tapZonesGuideVisible ||
+        this.timeboxNotice !== null || this.recoveryMessage !== '' || !this.controllerReady || this.pendingHtml !== '' });
+  }
+  private readonly agentStudyHost: AgentOperationHost = {
+    snapshot: (): string => this.agentStudySnapshot(),
+    execute: async (_name: string, args: OperationArguments, expected: string): Promise<string> => {
+      if (this.pendingAgentStudy !== null || this.agentStudySnapshot() !== expected) throw new Error('study_session_changed');
+      if (this.页面已显示) {
+        try { return await this.executeAgentStudy(args.operation!,expected); }
+        finally { this.studyActivityChanged(); this.publishInterface(); }
+      }
+      const names = this.pathStack.getAllPathName();
+      if (names[names.length - 1] !== 'AiCardPage') throw new Error('study_page_unavailable');
+      return new Promise<string>((resolve,reject): void => {
+        this.pendingAgentStudy = { command: args.operation!, expected: expected, resolve: resolve, reject: reject };
+        this.pathStack.pop();
+      });
+    }
+  };
+  private async executeAgentStudy(command: string, expected: string): Promise<string> {
+    if (this.agentStudySnapshot() !== expected || !this.mounted || !this.sessionReady || !this.foreground || !this.页面已显示 ||
+      this.customSchedulingWarning || this.待重渲染当前卡 || this.contentRefreshInFlight || !['question','answer'].includes(this.阶段) || this.当前卡片 === null ||
+      this.choiceQuestion !== null || this.评分中 || this.flipPending || this.cardRenderPending || this.editingPageOpen ||
+      this.studyGuideVisible || this.tapZonesGuideVisible || this.timeboxNotice !== null || this.recoveryMessage !== '' ||
+      !this.controllerReady || this.pendingHtml !== '') throw new Error('study_command_unavailable');
+    this.stopStudyTimers();
+    if (command === 'flip') {
+      if (this.阶段 !== 'question') throw new Error('study_question_required');
+      await this.显示答案(); if (String(this.阶段) !== 'answer') throw new Error('study_flip_failed');
+    } else if (command === 'replay') {
+      if (!this.有音频) throw new Error('study_audio_unavailable');
+      const outcome: AgentStudyAudioResult = { completed: false, error: '' };
+      await this.playStudyAudio(true,true,'',outcome);
+      if (!outcome.completed) throw new Error(outcome.error || 'study_audio_unverified');
+    } else {
+      if (this.阶段 !== 'answer') throw new Error('study_answer_required');
+      const rating = ['again','hard','good','easy'].indexOf(command); if (rating < 0) throw new Error('invalid_study_command');
+      await this.评分(rating);
+      if (this.recoveryMessage !== '' || String(this.阶段) === 'error') return '{"status":"partial","instruction":"Inspect the study page; do not repeat the rating."}';
+    }
+    return JSON.stringify({ status: 'completed', command: command, state: JSON.parse(this.agentStudySnapshot()) as Object });
+  }
+  private async resumeAgentStudy(pending: AgentPendingStudy): Promise<void> {
+    this.pendingAgentStudy = null;
+    try { pending.resolve(await this.executeAgentStudy(pending.command,pending.expected)); }
+    catch (error) { pending.reject(error instanceof Error ? error : new Error('study_command_failed')); }
+    finally { this.studyActivityChanged(); this.publishInterface(); }
+  }
+
   /** Agent 入口配置预检（与首页同款）；读取失败按未配置处理。 */
   private async isAIConfigured(): Promise<boolean> {
     try {
@@ -1784,6 +1864,7 @@ export struct 学习页 {
 
   private handleStudyGesture(action: string, nx: number, ny: number, version: number, surface: number): void {
     if (!this.isCurrentRequest(version) || surface !== this.interactionVersion) return;
+    if (action === 'input_focus') { this.webInputFocused = nx === 1; return; }
     const state: StudyGestureState = {
       phase: this.阶段, gestures: this.isStudyGesturesEnabled(), tapZones: this.isTapZonesEnabled(),
       choice: this.choiceQuestion !== null,
@@ -1899,42 +1980,16 @@ export struct 学习页 {
     this.pathStack.pop();
   }
 
-  /** Ctrl 键按下状态（用于检测 Ctrl+Z 撤销）。
-   *  HarmonyOS KeyEvent 没有 ctrlKey 字段，需在 onKeyPreIme 里自行维护。 */
+  /** 手写回退仍跟踪 Ctrl；学习绑定从事件读取完整修饰键状态。 */
   private Ctrl按下: boolean = false;
+  private keyboardSession: StudyKeyboardSession = new StudyKeyboardSession();
+  private answerInputFocused: boolean = false;
+  private webInputFocused: boolean = false;
 
-  // ========================================================
-  // @块ID UI-PAGE-STUDY-010
-  // @名称 处理按键
-  //
-  // @作用
-  // 物理键盘快捷键处理（Anki 桌面端标准键位）。
-  // 挂在根 Stack 的 onKeyPreIme 上（API 12+），输入法消费前拦截，返回 true 表示已消费。
-  //
-  // @输入
-  // event: KeyEvent
-  //
-  // @输出
-  // true 表示已消费；false 让系统默认行为生效
-  //
-  // @业务规则
-  // 键位映射（与 Anki 桌面端一致）：
-  // - Space / Enter：question 阶段=显示答案；answer 阶段=Good 评分
-  // - 1 / 2 / 3 / 4：Again / Hard / Good / Easy 评分（仅 answer 阶段）
-  // - `*`（Shift+8，KEYCODE_STAR）：埋藏当前卡（BURY_USER）
-  // - `@`（Shift+2，KEYCODE_AT）：暂停当前卡（SUSPEND）
-  // - Esc：返回上一页（任意阶段）
-  // - Delete（KEYCODE_FORWARD_DEL）：删除当前卡（弹确认框）
-  // - Ctrl+Z：撤销上一次评分
-  // 只在 KeyType.Down 执行业务（Up 不执行，避免一次按键触发两次）。
-  // Ctrl/Shift 单独按下时只更新状态、不执行业务，并消费事件避免系统处理。
-  // loading/done/error 阶段只允许 Esc，其他键不处理（让系统默认行为生效）。
-  // 各业务方法内部已有 阶段 守卫和 评分中 防重入，重复调用是安全的。
-  //
-  // @副作用
-  // 无（触发其他块副作用）
-  // ========================================================
+  /** 自由绑定采用完整修饰键与卡面匹配；输入框、弹层和手写保留自身操作。 */
   private 处理按键(event: KeyEvent): boolean {
+    const fresh: boolean = this.keyboardSession.update(event.keyCode, event.type === KeyType.Down);
+    if (this.editingPageOpen || this.answerInputFocused || this.webInputFocused) { this.Ctrl按下 = false; return false; }
     if (this.customSchedulingWarning && studyKeyName(event.keyCode) !== 'back') return true;
     // 系统返回由 NavDestination 关闭当前弹层，不能被快捷键屏蔽吞掉。
     if (studyKeyName(event.keyCode) === 'back') return false;
@@ -1971,13 +2026,12 @@ export struct 学习页 {
       }
       return true;
     }
-    const result = resolveStudyKey(studyKeyName(event.keyCode), event.type === KeyType.Down,
-      this.Ctrl按下, this.cardRenderPending || this.recoveryMessage !== '' ? 'loading' : this.阶段, this.editingPageOpen,
-      this.studyGuideVisible || this.autoAdvanceSettingsOpen);
-    this.Ctrl按下 = result.control;
-    const command: StudyInputCommand = event.type !== KeyType.Down || result.control || this.cardRenderPending ||
-      this.editingPageOpen || this.studyGuideVisible || this.autoAdvanceSettingsOpen ? result.command :
-      mappedStudyCommand(this.controls().keys, studyKeyName(event.keyCode), this.阶段, result.command);
+    if (studyKeyName(event.keyCode) === 'control') this.Ctrl按下 = event.type === KeyType.Down;
+    if (event.type !== KeyType.Down) return false;
+    const command: StudyInputCommand = configuredStudyCommand(this.controls(), studyEventChord(event, this.Ctrl按下),
+      this.cardRenderPending || this.recoveryMessage !== '' ? 'loading' : this.阶段,
+      this.editingPageOpen || this.answerInputFocused || this.studyGuideVisible || this.autoAdvanceSettingsOpen || this.评分中);
+    if (!fresh) return command !== 'none';
     switch (command) {
       case 'undo': this.撤销上次(); break;
       case 'back': this.返回(); break;
@@ -1990,6 +2044,16 @@ export struct 学习页 {
       case 'hard': this.评分(RATING_HARD); break;
       case 'good': this.评分(RATING_GOOD); break;
       case 'easy': this.评分(RATING_EASY); break;
+      case 'edit': this.openNoteEditor(); break;
+      case 'mark': this.changeMarking(null); break;
+      case 'flag0': this.changeMarking(0); break;
+      case 'flag1': case 'flag2': case 'flag3': case 'flag4': case 'flag5': case 'flag6': case 'flag7':
+        const flag: number = Number(command.slice(4));
+        this.changeMarking(this.currentMarking?.flag === flag ? 0 : flag); break;
+      case 'menu': this.openStudyMenu(); break;
+      case 'guide': this.showStudyGuide(); break;
+      case 'whiteboard': this.executeMenuAction('handwrite'); break;
+      case 'auto_advance': this.configureAutoAdvance(); break;
     }
     return command !== 'none';
   }
@@ -2285,6 +2349,8 @@ export struct 学习页 {
                 margin: LengthMetrics.vp(0)
               })
               .enterKeyType(EnterKeyType.Done)
+              .onFocus((): void => { this.answerInputFocused = true; })
+              .onBlur((): void => { this.answerInputFocused = false; this.keyboardSession.reset(); })
               .onSubmit((): void => {
                 this.显示答案();
               })
@@ -2522,6 +2588,7 @@ export struct 学习页 {
     .onShown((): void => {
       appInterface.showPage('study');
       this.页面已显示 = true;
+      if (this.pendingAgentStudy !== null) { this.resumeAgentStudy(this.pendingAgentStudy); return; }
       this.returnFromEditor();
       this.studyActivityChanged();
       this.maybeShowStudyGuide();

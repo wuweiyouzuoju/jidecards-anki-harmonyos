@@ -12,8 +12,10 @@ import { buildStudyGestureScript, StudyQuickAnswerMode } from '../../entry/src/m
 import {defaultStudyControls,validateStudyControls} from '../../entry/src/main/ets/model/StudyControls.ts';
 import { resultUndoStatus } from '../../entry/src/main/ets/model/InteractionFeedback.ts';
 import { NativeDialogHost } from './platform-module-harness.mjs';
+import { StudyKeyboardSession } from '../../entry/src/main/ets/model/StudyKeyboard.ts';
 
 export function attachStudySession(page) {
+  page.keyboardSession ??= new StudyKeyboardSession();
   page.studyGuideDialog ??= new NativeDialogHost();
   page.autoAdvanceDialog ??= new NativeDialogHost();
   page.recoveryMessage ??= ''; page.resultMessage ??= ''; page.recoveryAction ??= null; page.resultUndo ??= null;
@@ -24,7 +26,7 @@ export function attachStudySession(page) {
   page.cardRenderPending = false;
   // Onboarding has its own page/gesture tests; these hosts only exercise the study session.
   page.maybeShowTapZonesGuide ??= () => {};
-  page.cardWeb = { reset() {}, attach() {}, setAudioEnabled() {}, show: html => {
+  page.cardWeb = { reset() {}, attach() {}, setAudioEnabled() {}, setTheme() {}, show: html => {
     page.网页控制器.loadData(html);
     page.studyCardShown('');
   } };
@@ -47,7 +49,7 @@ export function attachStudySession(page) {
   page.controlsJson ??= JSON.stringify(defaultStudyControls());
   const source = readFileSync(new URL('../../entry/src/main/ets/pages/学习页.ets', import.meta.url), 'utf8');
   const names = ['startStudyTimers', 'stopStudyTimers', 'studyTimerState', 'applyTimedAction', 'toggleAutoAdvance',
-    'recoverStudy', 'retryStudy', 'showStudyResult', 'resetWhiteboard', 'studyCardShown', 'refreshStudyGestureScript', 'controls', 'isStudyGesturesEnabled'];
+    'recoverStudy', 'retryStudy', 'showStudyResult', 'resetWhiteboard', 'studyCardShown', 'cardThemeChanged', 'refreshStudyGestureScript', 'controls', 'isStudyGesturesEnabled'];
   const methods = names.map(name => {
     let start = source.indexOf('  private ' + name + '(');
     if (start < 0) start = source.indexOf('  private async ' + name + '(');

@@ -1,3 +1,5 @@
+import { StudyKeyboardSession, studyChord } from '../../entry/src/main/ets/model/StudyKeyboard.ts';
+import { configuredStudyCommand, defaultStudyControls as keyboardDefaults } from '../../entry/src/main/ets/model/StudyControls.ts';
 import { resolveStudyKey } from '../../entry/src/main/ets/model/StudyInputPolicy.ts';
 import { resolveStudyGesture, StudyQuickAnswerMode } from '../../entry/src/main/ets/model/StudyGestures.ts';
 import { loadNoteEditor } from '../../entry/src/main/ets/model/NoteEditorLoader.ts';
@@ -29,7 +31,7 @@ function storeHarness() {
   };
   const source = read('entry/src/main/ets/utils/StudyGuideStore.ets')
     .replace(/^import .*;\r?\n/gm, '').replace(/^export /gm, '');
-  const context = vm.createContext({ resolveStudyKey, loadNoteEditor, studyKeyName: key => String(key), KeyType: { Down: 0 },
+  const context = vm.createContext({ configuredStudyCommand, studyEventChord: (event,ctrl)=>studyChord(String(event.keyCode),{ctrl:ctrl??false,shift:false,alt:false}),  resolveStudyKey, loadNoteEditor, studyKeyName: key => String(key), KeyType: { Down: 0 },
     AppStorage: { get: () => ({}) },
     preferences: { getPreferencesSync: () => store }
   });
@@ -41,7 +43,7 @@ function pageHarness(completed = false, failOpen = false) {
   let now = 1000;
   const dialogs = [];
   let saves = 0;
-  const context = vm.createContext({ validateStudyControls,mappedStudyCommand,resolveStudyKey, resolveStudyGesture, StudyQuickAnswerMode, loadNoteEditor, studyKeyName: key => String(key), KeyType: { Down: 0 },
+  const context = vm.createContext({ configuredStudyCommand, studyEventChord: (event,ctrl)=>studyChord(String(event.keyCode),{ctrl:ctrl??false,shift:false,alt:false}),  validateStudyControls,mappedStudyCommand,resolveStudyKey, resolveStudyGesture, StudyQuickAnswerMode, loadNoteEditor, studyKeyName: key => String(key), KeyType: { Down: 0 },
     ...surfaceMotionApi(), NativeDialogHost: nativeDialogHostClass(surfaceMotionApi()), Date: { now: () => now }, $r: key => key, isTapZonesGuideCompleted: () => false,
     DialogAlignment: { Center: 0 },
     StudyGuideDialog: options => options,
@@ -63,7 +65,7 @@ function pageHarness(completed = false, failOpen = false) {
   });
   vm.runInContext(stripTypeScriptTypes(`globalThis.Harness = class { ${nativeDialogMembers(pageSource)}\n${methods.join('\n')} }`), context);
   const page = new context.Harness();
-  Object.assign(page, { controlsJson:JSON.stringify(defaultStudyControls()),quickAnswerMode: StudyQuickAnswerMode.Off, timeboxNotice: null, editor: { visible: false, busy: false },
+  Object.assign(page, { keyboardSession:new StudyKeyboardSession(), controls:()=>keyboardDefaults(),  controlsJson:JSON.stringify(defaultStudyControls()),quickAnswerMode: StudyQuickAnswerMode.Off, timeboxNotice: null, editor: { visible: false, busy: false },
     取文案: key => key,
     studyGuideChecked: false, studyGuideVisible: false, stopStudyTimers() {}, startStudyTimers() {}, controllerReady: true, pendingHtml: '',
     isCurrentRequest: version => page.mounted && page.页面已显示 && page.foreground && version === page.requestVersion,

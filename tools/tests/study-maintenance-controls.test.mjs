@@ -6,6 +6,8 @@ import {stripTypeScriptTypes} from 'node:module';
 import {defaultStudyControls,validateStudyControls,mappedStudyCommand,STUDY_CONTROLS_KEY} from '../../entry/src/main/ets/model/StudyControls.ts';
 import {StudyScreenAwakeSession} from '../../entry/src/main/ets/model/StudyScreenAwakeSession.ts';
 import {resolveStudyKey} from '../../entry/src/main/ets/model/StudyInputPolicy.ts';
+import {configuredStudyCommand} from '../../entry/src/main/ets/model/StudyControls.ts';
+import {StudyKeyboardSession,studyChord} from '../../entry/src/main/ets/model/StudyKeyboard.ts';
 import {loadPlatformModule} from './platform-module-harness.mjs';
 import {localPreferenceApi} from './local-preference-harness.mjs';
 
@@ -52,24 +54,42 @@ const source=readFileSync(new URL('../../entry/src/main/ets/pages/学习页.ets'
 function methods(names) {return names.map(name=>{const start=source.indexOf('  private '+name+'(');assert.notEqual(start,-1);return source.slice(start,source.indexOf('\n  }',start)+4);}).join('\n');}
 test('actual keyboard handler honors mappings, protected keys, modifiers and every blocking phase',()=>{
  const calls=[];
- const Host=new Function('validateStudyControls','mappedStudyCommand','resolveStudyKey','studyKeyName','KeyType',
+ const Host=new Function('validateStudyControls','configuredStudyCommand','studyEventChord','studyKeyName','KeyType',
   'RATING_AGAIN','RATING_HARD','RATING_GOOD','RATING_EASY','BURY_SUSPEND_MODE_BURY_USER','BURY_SUSPEND_MODE_SUSPEND',
   stripTypeScriptTypes('class Host{'+methods(['controls','处理按键'])+'}',{mode:'transform'})+';return Host;')(
-   validateStudyControls,mappedStudyCommand,resolveStudyKey,key=>key,{Down:0,Up:1},0,1,2,3,4,5);
- const page=Object.assign(Object.assign(new Host(), { recoveryMessage: '', resultMessage: '', resultUndo: null }),{阶段:'answer',Ctrl按下:false,timeboxNotice:null,
+   validateStudyControls,configuredStudyCommand,(event,ctrl)=>studyChord(event.keyCode,{ctrl:ctrl??false,shift:!!event.shift,alt:!!event.alt}),key=>key,{Down:0,Up:1},0,1,2,3,4,5);
+ const page=Object.assign(Object.assign(new Host(), { recoveryMessage: '', resultMessage: '', resultUndo: null }),{keyboardSession:new StudyKeyboardSession(),阶段:'answer',Ctrl按下:false,timeboxNotice:null,
   controlsJson:JSON.stringify({...defaultStudyControls(),keys:[{input:'space',command:'easy'}]}),
   评分:n=>calls.push(n),返回:()=>calls.push('back'),请求删除当前卡:()=>calls.push('delete'),撤销上次:()=>calls.push('undo')});
- const key=(keyCode,type=0)=>page.处理按键({keyCode,type});
+ const key=(keyCode,type=0)=>{const result=page.处理按键({keyCode,type});if(type===0&&keyCode!=='control')page.处理按键({keyCode,type:1});return result;};
  key('space');assert.deepEqual(calls,[3]);calls.length=0;
  page.阶段='question';key('space');assert.deepEqual(calls,[]);
  for(const phase of ['loading','done','error']) {page.阶段=phase;key('space');assert.deepEqual(calls,[]);}
  page.阶段='answer';
- for(const field of ['cardRenderPending','editingPageOpen','studyGuideVisible','autoAdvanceSettingsOpen']) {
+ for(const field of ['cardRenderPending','editingPageOpen','answerInputFocused','webInputFocused','studyGuideVisible','autoAdvanceSettingsOpen']) {
   page[field]=true;key('space');assert.deepEqual(calls,[]);page[field]=false;
  }
- key('control');key('space');assert.deepEqual(calls,[2],'Ctrl uses the existing policy');calls.length=0;
+ key('control');key('space');assert.deepEqual(calls,[],'Ctrl+Space must not fall through to grading');calls.length=0;
  key('z');assert.deepEqual(calls,['undo']);calls.length=0;key('control',1);assert.equal(page.Ctrl按下,false);
  key('space',1);assert.deepEqual(calls,[]);key('escape');key('delete');assert.deepEqual(calls,['back','delete']);
+});
+
+test('actual keyboard handler uses separate faces, suppresses held keys across a flip, and toggles flags instead of rating',()=>{
+ const calls=[];
+ const Host=new Function('validateStudyControls','configuredStudyCommand','studyEventChord','studyKeyName','KeyType',
+  'RATING_AGAIN','RATING_HARD','RATING_GOOD','RATING_EASY','BURY_SUSPEND_MODE_BURY_USER','BURY_SUSPEND_MODE_SUSPEND',
+  stripTypeScriptTypes('class Host{'+methods(['controls','处理按键'])+'}',{mode:'transform'})+';return Host;')(
+   validateStudyControls,configuredStudyCommand,(event,ctrl)=>studyChord(event.keyCode,{ctrl:ctrl??false,shift:!!event.shift,alt:!!event.alt}),key=>key,{Down:0,Up:1},0,1,2,3,4,5);
+ const page=Object.assign(new Host(),{keyboardSession:new StudyKeyboardSession(),阶段:'question',Ctrl按下:false,timeboxNotice:null,
+  recoveryMessage:'',controlsJson:JSON.stringify({...defaultStudyControls(),keyboard:{version:1,bindings:[
+    {key:'x',command:'flip',side:'question'},{key:'x',command:'easy',side:'answer'},
+    {key:'ctrl+1',command:'flag1',side:'both'}]}}),
+  currentMarking:{flag:1},changeMarking:flag=>calls.push(['flag',flag]),
+  显示答案:()=>{calls.push('flip');page.阶段='answer';},评分:rating=>calls.push(rating)});
+ const down=keyCode=>page.处理按键({keyCode,type:0}),up=keyCode=>page.处理按键({keyCode,type:1});
+ down('x');down('x');down('x');assert.deepEqual(calls,['flip']);up('x');down('x');assert.deepEqual(calls,['flip',3]);
+ down('control');down('1');assert.deepEqual(calls.at(-1),['flag',0]);up('1');page.currentMarking.flag=0;
+ down('1');assert.deepEqual(calls.at(-1),['flag',1]);up('control');
 });
 
 test('actual lifecycle gate borrows the window only while the study page is mounted, visible and foreground',()=>{
@@ -81,7 +101,7 @@ test('actual lifecycle gate borrows the window only while the study page is moun
  assert.deepEqual(calls,[true,false,false,false,false]);
 });
 
-test('mapping whitelist rejects system navigation and aliases; rating mappings never grade an unseen answer',()=>{
+test('legacy mapping whitelist stays compatible; rating mappings never grade an unseen answer',()=>{
  for(const input of ['escape','back','control','delete','z'])assert.throws(()=>validateStudyControls({...defaultStudyControls(),keys:[{input,command:'easy'}]}),/invalid/);
  const mappings=[{input:'double',command:'easy'}];
  assert.equal(mappedStudyCommand(mappings,'double','question','flip'),'none');

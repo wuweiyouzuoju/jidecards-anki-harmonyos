@@ -1,3 +1,5 @@
+import { StudyKeyboardSession, studyChord } from '../../entry/src/main/ets/model/StudyKeyboard.ts';
+import { configuredStudyCommand, defaultStudyControls as keyboardDefaults } from '../../entry/src/main/ets/model/StudyControls.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -1101,7 +1103,7 @@ test('whiteboard keys cannot grade cards, native undo/redo receive their keys an
     (resolveStudyKey, key => key, { Down: 0 });
   const page = new Page();
   let resumes = 0, reschedules = 0, pops = 0;
-  Object.assign(page, { timeboxNotice: null, tapZonesGuideVisible: false, studyMenuOpen: false, editingPageOpen: false,
+  Object.assign(page, { keyboardSession:new StudyKeyboardSession(),  timeboxNotice: null, tapZonesGuideVisible: false, studyMenuOpen: false, editingPageOpen: false,
     手写模式: true, whiteboardMounted: true, officialWhiteboard: true, Ctrl按下: false, whiteboardBackTick: 0, whiteboardResetTick: 0,
     startStudyTimers() { resumes++; }, scheduleChoiceAutoAdvance() { reschedules++; }, pathStack: {pop() {pops++;}} });
   for (const key of ['space','enter','1','2','3','4','delete','b','s']) assert.equal(page.处理按键({ keyCode: key, type: 0 }), true);

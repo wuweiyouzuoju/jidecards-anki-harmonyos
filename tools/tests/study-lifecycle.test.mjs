@@ -28,10 +28,24 @@ function deferred() {
   const promise = new Promise((a,b) => { resolve = a; reject = b; });
   return {promise, resolve, reject};
 }
+
+test('study theme updates preserve answer timing and do not replay audio or reload the card', async () => {
+  const { page, displayed, sounds } = harness();
+  const themes = [];
+  page.cardWeb.setTheme = value => themes.push(value);
+  page.是否深色 = () => true;
+  const start = page.展示时刻毫秒;
+  page.cardThemeChanged(); page.studyCardShown('#18202b', true);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(themes, [true]); assert.equal(page.cardSurfaceBackground, '#18202b');
+  assert.equal(page.展示时刻毫秒, start); assert.deepEqual(sounds, []); assert.deepEqual(displayed, []);
+  page.mounted = false; page.cardThemeChanged(); assert.deepEqual(themes, [true]);
+});
 function harness() {
   const page = new Page(), displayed = [], sounds = [], events = [], answers = [];
   let id = 'A';
   Object.assign(page, {
+    pendingAgentStudy:null,
     screenAwake:null,mounted:true, sessionReady:true, foreground:true, requestVersion:0, loadingVersion:-1, flipPending:false, controllerReady:true, pendingHtml:'', 媒体目录:'',
     页面已显示:true, 阶段:'question', 评分中:false, studyGuideVisible:false, hasRenderedCard:false,
     choiceQuestion:null, choiceGrade:null, choiceAutoAdvanceTimer:-1, choiceFeedbackDeadline:0, studyMenuOpen:false,

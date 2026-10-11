@@ -1,3 +1,4 @@
+import { localPreferenceApi } from './local-preference-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { motionApi } from './motion-harness.mjs';
 import test from 'node:test';
@@ -210,8 +211,8 @@ test('layout persistence and JIDE use the same modes, smart height is isolated, 
   assert.deepEqual(STUDY_LAYOUT_MODES, ['bottom', 'float', 'smart']);
   assert.equal(studyLayoutIndex('smart'), 2); assert.equal(decodeStudyLayout('bad'), 'bottom');
   const prefs = new Map(), writes = [];
-  const dependencies = { AppStorage: { get: () => ({}) }, decodeStudyLayout,
-    preferences: { getPreferences: async () => ({ get: async (k, d) => prefs.get(k) ?? d,
+  const dependencies = { ...localPreferenceApi({setOrCreate(){}}), AppStorage: { get: () => ({}) }, decodeStudyLayout,
+    preferences: { getPreferences: async () => ({ getSync: (k, d) => prefs.get(k) ?? d, putSync:(k,v)=>{prefs.set(k,v);writes.push(k);}, get: async (k, d) => prefs.get(k) ?? d,
       put: async (k, v) => { prefs.set(k, v); writes.push(k); }, flush: async () => {} }) } };
   const [load, save, loadHeight, saveHeight] = loadPlatformModule('model/学习布局存储.ets',
     '[加载学习布局模式, 保存学习布局模式, loadStudyGripHeight, saveStudyGripHeight]', dependencies);
@@ -219,7 +220,7 @@ test('layout persistence and JIDE use the same modes, smart height is isolated, 
   await saveHeight(123); assert.equal(await loadHeight(), 123); assert.equal(prefs.has('study_main_toolbar_x'), false);
   assert.equal(writes.at(-1), 'study_grip_toolbar_y');
   const definition = agentPreferenceDefinitions().find(x => x.id === 'study_layout');
-  assert.equal(decodeAgentPreference(definition, 'smart'), 'smart'); assert.ok(!agentWritablePreferenceIds().includes('study_layout'));
+  assert.equal(decodeAgentPreference(definition, 'smart'), 'smart'); assert.ok(agentWritablePreferenceIds().includes('study_layout'));
   assert.match(definition.description, /智感握姿/); assert.equal(studyGripHintKey('unsupported'), 'settings_study_grip_unsupported');
   for (const locale of ['base', 'en_US']) {
     const strings = new Map(JSON.parse(readFileSync(new URL(`../../entry/src/main/resources/${locale}/element/string.json`, import.meta.url))).string.map(x => [x.name, x.value]));
@@ -268,6 +269,6 @@ test('real JIDE structure receives smart layout and sensor state from the produc
   assert.equal(values.get('study_layout'), 'smart'); assert.equal(values.get('grip_availability'), 'unsupported'); assert.equal(values.get('grip_side'), 'left');
   const settings = buildAgentAppStructure(context, 'settings', 'scheduler', key => strings.get(key), agentSettingDefinitions(), tools, []);
   const item = settings.sections.flatMap(x => x.cards).flatMap(x => x.items).find(x => x.id === 'study_layout');
-  assert.equal(item.readTool, 'get_settings'); assert.equal(item.writeTool, '');
+  assert.equal(item.readTool, 'get_settings'); assert.equal(item.writeTool, 'propose_set_setting');
   assert.equal(item.title, strings.get('settings_study_layout_row'));
 });

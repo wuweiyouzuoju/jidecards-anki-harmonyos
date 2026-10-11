@@ -7,6 +7,7 @@ import { loadComponentLogic, loadPlatformModule } from './platform-module-harnes
 import { actionMenuRows, visibleActionMenuRows, toggleActionMenuBranch } from '../../entry/src/main/ets/components/common/ActionMenuTree.ts';
 import { ActionMenuPointerSide, actionMenuGroupInset, placeActionMenuGroups, actionMenuBubbleOutline } from '../../entry/src/main/ets/components/common/ActionMenuLayout.ts';
 import { safeMenuGeometry } from '../../entry/src/main/ets/model/WindowSafeLayout.ts';
+import { StudyKeyboardSession } from '../../entry/src/main/ets/model/StudyKeyboard.ts';
 
 const read = path => readFileSync(new URL('../../' + path, import.meta.url), 'utf8');
 const source = read('entry/src/main/ets/pages/学习页.ets');
@@ -30,7 +31,7 @@ function harness() {
     ] },
     { id: 'card_actions', children: [{ id: 'delete', action: () => events.push('delete') }] }
   ];
-  Object.assign(page, { studyMenuOpen: false, studyExpandedIds: [], timeboxNotice: null, Ctrl按下: true,
+  Object.assign(page, { keyboardSession: new StudyKeyboardSession(), studyMenuOpen: false, studyExpandedIds: [], timeboxNotice: null, Ctrl按下: true,
     评分中: false, 更多菜单: () => root, loadFlagLabels: () => events.push('labels'),
     stopStudyTimers: () => events.push('stop'), clearChoiceAutoAdvance: () => events.push('cancel'),
     startStudyTimers: () => events.push('resume'), scheduleChoiceAutoAdvance: () => events.push('schedule') });
@@ -96,7 +97,7 @@ test('menu consumes study shortcuts; Escape closes flags first, then the menu wi
 test('native Back reaches navigation instead of being swallowed by the keyboard interception', () => {
   const keyName=loadPlatformModule('utils/StudyKeyAdapter.ets','studyKeyName',
     {KeyCode:{KEYCODE_BACK:2,KEYCODE_ESCAPE:2070}});
-  assert.equal(keyName(2),'back');assert.equal(keyName(2070),'escape');assert.equal(keyName(99),'');
+  assert.equal(keyName(2),'back');assert.equal(keyName(2070),'escape');assert.equal(keyName(99),'code:99');
   const {page,events}=harness();page.openStudyMenu();page.toggleStudyMenuBranch('flag');events.length=0;
   for(const type of [0,1])assert.equal(page.处理按键({keyCode:keyName(2),type}),false);
   assert.deepEqual(events,[]);assert.ok(page.studyExpandedIds.includes('flag'),'native navigation owns the close');

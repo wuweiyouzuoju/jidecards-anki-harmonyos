@@ -18,7 +18,7 @@ const js = stripTypeScriptTypes(`class Page { ${methods.join('\n')} ${studyInter
 const hook = name => {
   const body = source.match(new RegExp(`\\.${name}\\(\\(\\): void => \\{([\\s\\S]*?)\\n    \\}\\)`))?.[1];
   assert.ok(body);
-  const callback = new Function('appInterface', stripTypeScriptTypes(body));
+  const callback = new Function('appInterface', stripTypeScriptTypes('function handler() {' + body + '\n}') + ';return handler.call(this);');
   return function () { return callback.call(this, interfaceDeps.appInterface); };
 };
 const hidden = hook('onHidden'), shown = hook('onShown');
@@ -35,6 +35,7 @@ function harness(phase = 'question') {
   );
   const page = new Page();
   Object.assign(page, {
+    pendingAgentStudy:null,
     getUIContext: () => ({}),
     screenAwake:null,mounted: true, sessionReady: true, foreground: true, requestVersion: 0, loadingVersion: -1, flipPending: false, controllerReady: true, pendingHtml: '',
     audioSession: { stop: async () => {}, play: async () => false, isPlaying: () => false },

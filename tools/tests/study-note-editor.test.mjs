@@ -1,3 +1,5 @@
+import { StudyKeyboardSession, studyChord } from '../../entry/src/main/ets/model/StudyKeyboard.ts';
+import { configuredStudyCommand, defaultStudyControls as keyboardDefaults } from '../../entry/src/main/ets/model/StudyControls.ts';
 import { resolveStudyKey } from '../../entry/src/main/ets/model/StudyInputPolicy.ts';
 import { appInterfaceDependencies, studyInterfaceMethods } from './app-interface-harness.mjs';
 import { loadNoteEditor } from '../../entry/src/main/ets/model/NoteEditorLoader.ts';
@@ -22,10 +24,10 @@ function harness(phase = 'question') {
   let now = 1000;
   const writes = [], reads = [], toasts = [];
   const note = { id: 42, guid: 'imported-note', notetypeId: 9, mtimeSecs: 3, usn: 4, fields: ['old', '<img src="a.png">'], tags: ['imported'] };
-  const context = vm.createContext({ ...uiFeedback, ...appInterfaceDependencies(), resolveStudyKey, loadNoteEditor, studyKeyName: key => String(key), KeyType: { Down: 0 }, Date: { now: () => now }, $r: key => key, playStudyHaptic: () => {} });
+  const context = vm.createContext({ configuredStudyCommand, studyEventChord: (event,ctrl)=>studyChord(String(event.keyCode),{ctrl:ctrl??false,shift:false,alt:false}),  ...uiFeedback, ...appInterfaceDependencies(), resolveStudyKey, loadNoteEditor, studyKeyName: key => String(key), KeyType: { Down: 0 }, Date: { now: () => now }, $r: key => key, playStudyHaptic: () => {} });
   vm.runInContext(stripTypeScriptTypes(`globalThis.Page = class { ${methods.join('\n')} ${studyInterfaceMethods(source)} }`), context);
   const page = new context.Page();
-  Object.assign(page, {
+  Object.assign(page, { keyboardSession:new StudyKeyboardSession(), controls:()=>keyboardDefaults(),
     mounted: true, sessionReady: true, foreground: true, 页面已显示: true, requestVersion: 0,
     audioSession: { stop: async () => {}, isPlaying: () => false }, playStudyAudio: () => {},
     阶段: phase, 评分中: false, studyGuideVisible: false, noteEditorVisible: false,
