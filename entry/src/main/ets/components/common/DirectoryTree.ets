@@ -35,6 +35,8 @@ export struct DirectoryTree {
   @Prop @Watch('refresh') rows: DirectoryRow[] = [];
   @Prop @Watch('refresh') isInteractive: boolean = true;
   @Prop @Watch('refresh') searchable: boolean = true;
+  @Prop searchPlaceholder: ResourceStr = $r('app.string.directory_search');
+  @Prop emptyLabel: ResourceStr = $r('app.string.directory_empty');
   @Prop @Watch('refresh') query: string = '';
   @Prop @Watch('refresh') localExpansion: boolean = true;
   @Prop @Watch('refresh') revealSelection: boolean = true;
@@ -153,13 +155,13 @@ export struct DirectoryTree {
   build() {
     Column({ space: 应用尺寸.间距_8 }) {
       if (this.searchable) {
-        TextInput({ text: this.searchText, placeholder: $r('app.string.directory_search') })
+        TextInput({ text: this.searchText, placeholder: this.searchPlaceholder })
           .attributeModifier(new FormInputStyle()).enabled(this.isInteractive)
           .cancelButton({ style: CancelButtonStyle.INPUT })
           .onChange((value: string): void => { this.searchText = value; this.refresh(); })
       }
       if (this.visible.length === 0) {
-        Text($r('app.string.directory_empty')).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
+        Text(this.emptyLabel).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
       } else {
         Column() { this.list() }.width('100%').padding(this.framed ? 应用尺寸.间距_5 : 0)
           .backgroundColor(this.framed ? $r('app.color.surface_card') : Color.Transparent)

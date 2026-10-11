@@ -10,6 +10,7 @@ export struct TagTreeList {
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop rows: TagRow[] = [];
   @Prop query: string = '';
+  @Prop searchable: boolean = false;
   @Prop isInteractive: boolean = true;
   @Prop listHeight: number = 260;
   onSelect: (name: string) => void = (_name: string): void => {};
@@ -27,7 +28,8 @@ export struct TagTreeList {
   }
   build() {
     DirectoryTree({ rows: this.directoryRows(), listHeight: this.listHeight, isInteractive: this.isInteractive,
-      searchable: false, query: this.query, localExpansion: false, revealSelection: false, framed: false,
+      searchable: this.searchable, searchPlaceholder: $r('app.string.tags_filter_hint'), emptyLabel: $r('app.string.tags_no_matches'),
+      query: this.query, localExpansion: false, revealSelection: false, framed: false,
       selectionMode: this.rows.some((row: TagRow): boolean => row.selection >= 0) ? 'multiple' : 'none',
       onSelect: this.onSelect, onToggle: this.onToggle, onLongPress: this.onLongPress, onViewChanged: this.onViewChanged })
   }

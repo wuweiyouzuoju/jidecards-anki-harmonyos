@@ -239,3 +239,22 @@ test('all directory choices share the renderer and categorical choices keep thei
   assert.match(read('components/common/DirectorySelectDialog.ets'), /DirectoryTree\([\s\S]*DialogFrame\(/);
   assert.match(read('components/agent/AgentSetupCard.ets'), /Select\(this\.editNotetypeOptions\(\)\)/);
 });
+
+test('browser deck and tag searches use the same tree input and inset while preserving tag domain state', () => {
+  const sidebar=read('components/browser/浏览侧边栏.ets');
+  assert.doesNotMatch(sidebar,/TextInput\(|FormInputStyle/);
+  for (const component of ['DirectoryTree','TagTreeList']) {
+    assert.match(sidebar,new RegExp(`Column\\(\\) \\{\\s*${component}\\([\\s\\S]*?\\}\\.width\\('100%'\\)\\.padding\\(应用尺寸\\.卡片内边距\\)`));
+  }
+  const Tags=loadComponentLogic('components/common/TagTreeList.ets','TagTreeList',deps),tags=new Tags();
+  tags.getUIContext=()=>({}); tags.rows=[
+    {fullName:'Root',name:'Root',level:0,hasChildren:true,collapsed:true,selection:-1},
+    {fullName:'Root::Word',name:'Word',level:1,hasChildren:false,collapsed:false,selection:-1}];
+  const Tree=loadComponentLogic('components/common/DirectoryTree.ets','DirectoryTree',deps),tree=new Tree();
+  tree.rows=tags.directoryRows(); tree.localExpansion=false; tree.revealSelection=false; tree.aboutToAppear();
+  assert.deepEqual(paths(tree.visible),['Root']);
+  tree.searchText='word';tree.refresh();assert.deepEqual(paths(tree.visible),['Root','Root::Word']);
+  assert.equal(tags.rows[0].collapsed,true,'search does not rewrite persisted tag folds');
+  tree.searchText='missing';tree.refresh();assert.deepEqual(tree.visible,[]);
+  tree.searchText='';tree.refresh();assert.deepEqual(paths(tree.visible),['Root']);
+});
