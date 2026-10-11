@@ -1,21 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
-import test from 'node:test';
-import { register } from 'node:module';
-
-// 使用真实历史读写模块，只替换 HarmonyOS Preferences IO。
-const stub = `export const state = { value: '[]' };
-export const common = {};
-export const preferences = { async getPreferences() { return {
- async get() { return state.value; }, async put(_key, value) { state.value = value; }, async flush() {}
-}; } };`;
-const stubUrl = 'data:text/javascript;base64,' + Buffer.from(stub).toString('base64');
-register('data:text/javascript;base64,' + Buffer.from(`export function resolve(s,c,next) {
- if (s === '@kit.AbilityKit' || s === '@kit.ArkData') return {url:${JSON.stringify(stubUrl)},shortCircuit:true};
- return next(s,c); }`).toString('base64'), import.meta.url);
-globalThis.AppStorage = { get: () => ({}) };
-const { state } = await import(stubUrl);
-const { saveAgentConversation, loadAgentConversations } = await import('../../entry/src/main/ets/model/agent/AgentConversationStore.ets');
+import test, { beforeEach } from 'node:test';
+import { AgentHistoryRepository } from '../../entry/src/main/ets/model/agent/AgentHistoryRepository.ts';
+import { safeConversation } from '../../entry/src/main/ets/model/agent/AgentHistoryProjection.ts';
+// 执行真实仓库和安全投影；仅替换平台文件/Preferences IO。
+const state = { value: '[]' }; const files = new Map();
+beforeEach(() => { files.clear(); state.value = '[]'; });
+const repository = new AgentHistoryRepository({
+  async read(name) { return files.get(name) ?? null; },
+  async write(name, text) { files.set(name, text); }, async remove(name) { files.delete(name); },
+  async legacy() { return JSON.parse(state.value); }, async clearLegacy() { state.value = '[]'; },
+  sanitize: safeConversation, async cleanupConversation() {}
+});
+async function saveAgentConversation(value) { await repository.save(value); }
+async function loadAgentConversations() { return Promise.all((await repository.list()).map(item => repository.read(item.id))); }
 
 const message = (id, text, reasoning = '') => ({ id, role: 'assistant', text, reasoning,
   reasoningIsSummary: false, kind: 'normal', clarification: null, expanded: false });

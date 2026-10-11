@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import type { AgentConversation, AgentHistoryResult } from './AgentConversationTypes';
+import type { AgentConversation, AgentConversationSummary, AgentHistoryResult } from './AgentConversationTypes';
 import type { AgentMode } from './AgentTypes';
 import type { AgentAction } from './AgentAction';
 import type { AgentSessionState } from './AgentSessionState';
@@ -8,7 +8,7 @@ import { createAgentMessage, projectAgentHistory, restoreAgentMessages } from '.
 import type { 聊天消息 } from './AgentConversationView';
 
 export interface AgentHistoryStorage {
-  load(): Promise<AgentConversation[]>;
+  load(): Promise<AgentConversationSummary[]>;
   save(conversation: AgentConversation): Promise<void>;
   remove(id: string): Promise<void>;
   saveCheckpoint(id: string, state: AgentSessionState): void;
@@ -46,14 +46,14 @@ export class AgentHistoryCoordinator {
   close(): void { this.visible = false; this.loadGeneration++; }
   dispose(): void { this.alive = false; this.close(); this.invalidateRestore(); }
 
-  async open(mode: AgentMode): Promise<AgentConversation[] | null> {
+  async open(mode: AgentMode): Promise<AgentConversationSummary[] | null> {
     if (!this.alive) return null;
     const generation: number = ++this.loadGeneration;
     this.visible = true;
     try {
-      const all: AgentConversation[] = await this.storage.load();
+      const all: AgentConversationSummary[] = await this.storage.load();
       if (!this.alive || !this.visible || generation !== this.loadGeneration) return null;
-      return all.filter((item: AgentConversation): boolean => mode === 'assistant' || item.mode === mode);
+      return all.filter((item: AgentConversationSummary): boolean => mode === 'assistant' || item.mode === mode);
     } catch (error) {
       if (!this.alive || !this.visible || generation !== this.loadGeneration) return null;
       throw new Error('ai_agent_history_load_failed');

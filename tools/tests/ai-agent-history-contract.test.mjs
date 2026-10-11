@@ -12,15 +12,15 @@ const historyPath = path.join(root,
 
 test('local Agent history is resumable and deletable', () => {
   assert.equal(fs.existsSync(historyPath), true);
-  const source = fs.readFileSync(historyPath, 'utf8') + fs.readFileSync(path.join(root, 'entry/src/main/ets/model/agent/AgentConversationTypes.ts'), 'utf8');
-  assert.match(source, /loadAgentConversations/);
+  const source = fs.readFileSync(historyPath, 'utf8') + fs.readFileSync(path.join(root, 'entry/src/main/ets/model/agent/AgentHistoryProjection.ts'), 'utf8') + fs.readFileSync(path.join(root, 'entry/src/main/ets/backend/agent/AgentHistoryFiles.ets'), 'utf8') + fs.readFileSync(path.join(root, 'entry/src/main/ets/model/agent/AgentConversationTypes.ts'), 'utf8');
+  assert.match(source, /loadAgentConversationSummaries/);
   assert.match(source, /saveAgentConversation/);
   assert.match(source, /deleteAgentConversation/);
   assert.match(source, /preferences\.getPreferences/);
 });
 
 test('history schema keeps visible provider reasoning with reply attribution but no secrets or media', () => {
-  const source = fs.readFileSync(historyPath, 'utf8') + fs.readFileSync(path.join(root, 'entry/src/main/ets/model/agent/AgentConversationTypes.ts'), 'utf8');
+  const source = fs.readFileSync(historyPath, 'utf8') + fs.readFileSync(path.join(root, 'entry/src/main/ets/model/agent/AgentHistoryProjection.ts'), 'utf8') + fs.readFileSync(path.join(root, 'entry/src/main/ets/backend/agent/AgentHistoryFiles.ets'), 'utf8') + fs.readFileSync(path.join(root, 'entry/src/main/ets/model/agent/AgentConversationTypes.ts'), 'utf8');
   assert.match(source, /AgentHistoryAudit/);
   assert.match(source, /AgentHistoryResult/);
   assert.match(source, /SearchSource/);
@@ -55,8 +55,8 @@ test('shared page persists completed turns and renders an in-page clickable hist
   assert.match(page, /saveAgentConversation/);
   assert.match(page, /打开历史会话/);
   assert.match(page, /private 历史区\(\)/);
-  assert.match(page, /ForEach\(this\.conversations/);
-  assert.match(page, /this\.恢复历史会话\(item\)/);
+  assert.match(page, /ForEach\(this\.visible\(\)/);
+  assert.match(page, /this\.loadHistoryConversation\(item\)/);
   assert.match(page, /this\.删除历史会话\(item\)/);
   assert.doesNotMatch(page, /promptAction\.showActionMenu/);
   assert.doesNotMatch(page, /显示历史菜单页/);
@@ -75,7 +75,7 @@ test('history mode has its own toolbar, returns to chat, and marks selection wit
 
   assert.equal(zh.ai_agent_history_title, '历史对话');
   assert.equal(zh.ai_agent_history_new, '新建对话');
-  assert.match(top, /agentInterfaceTitle\(this\.pageMode, this\.显示历史区, this\.memoryVisible\)/);
+  assert.match(top, /agentInterfaceTitle\(this\.pageMode, this\.显示历史区, this\.memoryVisible, this\.settingsVisible\)/);
   assert.match(top, /if \(this\.显示历史区\)[\s\S]*this\.关闭历史区\(\);[\s\S]*this\.pathStack\.pop\(\)/);
   assert.match(top,
     /IconActionButton\(\{ toolbarStyle: true,[\s\S]*source: \$r\('app\.media\.ic_home_new'\), label: this\.interfaceLabel\('new'\)[\s\S]*isInteractive: this\.interfaceEnabled\('new'\)/);
