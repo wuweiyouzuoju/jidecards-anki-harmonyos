@@ -3,6 +3,7 @@ import { NativeDialogHost, NativeDialogFactory, NativeDialogDismiss, NativeDialo
 import { SurfaceTransition } from '../../utils/SurfaceTransition';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { settingsItemText } from '../../utils/SettingsStructureText';
+import { agentOperationHosts } from '../../model/agent/AgentOperationHost';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { PrimaryActionButton } from '../common/PrimaryActionButton';
 import { OFFICIAL_ANKIWEB_SYNC_UI_ENABLED } from '../../model/ReleaseFeatures';
@@ -23,7 +24,7 @@ import type { SyncAuth } from '../../proto/messages/SyncMessages';
 import {
   清除同步凭证,
   loadVisibleSyncAuth,
-  保存同步凭证,
+  saveSyncCredentialsVerified,
   加载媒体同步开关,
   设置媒体同步开关,
   loadCustomSyncServer,
@@ -170,6 +171,7 @@ export struct 同步分组 {
   }
 
   aboutToDisappear(): void {
+    agentOperationHosts.finish('login','{"status":"cancelled"}');
     this.disposed = true;
     this.serverDialogController.dispose();
   }
@@ -341,7 +343,9 @@ export struct 同步分组 {
         username: username,
         endpoint: 凭证.endpoint
       };
-      保存同步凭证(信息);
+      await saveSyncCredentialsVerified(信息);
+      if (loadVisibleSyncAuth() === null) throw new Error('sync_login_save_unverified');
+      agentOperationHosts.finish('login','{"status":"completed","loggedIn":true}');
       if (this.disposed) return;
       this.鉴权凭证 = 凭证;
       this.账号名 = username;

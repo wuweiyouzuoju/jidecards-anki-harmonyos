@@ -20,13 +20,13 @@ function methods(path, names, dependencies) {
 }
 
 test('unreadable sync endpoint blocks login until an explicitly saved endpoint succeeds', async () => {
-  const calls = [];
+  const calls = [];let savedAuth=null;
   const Group = methods('components/settings/同步分组.ets', ['aboutToAppear', '点击登录', 'saveServer'], {
-    $r: key => key, loadVisibleSyncAuth: () => null, 加载媒体同步开关: () => true,
+    agentOperationHosts:{finish(){}},$r: key => key, loadVisibleSyncAuth: () => savedAuth, 加载媒体同步开关: () => true,
     loadCustomSyncServer() { throw Error('disk unavailable'); }, loadAutoSyncEnabled: () => false,
     normalizeSyncServer: value => value,
     saveCustomSyncServer: async value => { calls.push(['save', value]); return value; },
-    保存同步凭证: value => calls.push(['credentials', value])
+    saveSyncCredentialsVerified: async value => {savedAuth=value;calls.push(['credentials', value]);}
   });
   const group = new Group();
   Object.assign(group, { serverLoaded: false, savedServer: '', serverInput: '', 登录中: false, settingsSaving: false,

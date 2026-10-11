@@ -239,7 +239,7 @@ test('restored official UI keeps the default login path and stored accounts avai
   assert.match(source, /if \(!isSyncEndpointVisible\(this.savedServer, OFFICIAL_ANKIWEB_SYNC_UI_ENABLED\)\)/);
   assert.match(source, /if \(OFFICIAL_ANKIWEB_SYNC_UI_ENABLED && this.savedServer === ''\)/);
   const saved = [], calls = [];
-  const Group = componentMethods(source, ['点击登录'], { 保存同步凭证: auth => saved.push(auth) });
+  const Group = componentMethods(source, ['点击登录'], { saveSyncCredentialsVerified: async auth => saved.push(auth),loadVisibleSyncAuth:()=>({}) });
   const group = new Group();
   Object.assign(group, { syncSettingsBusy: () => false, serverLoaded: true, savedServer: '', serverInput: '',
     登录中: false, settingsSaving: false, 用户名输入: 'existing-user', 密码输入: 'transient-password',

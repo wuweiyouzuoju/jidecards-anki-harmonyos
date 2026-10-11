@@ -230,6 +230,18 @@ export function 保存同步凭证(凭证: 同步凭证信息): void {
 // @副作用
 // 只读 preferences，不写入。
 // ========================================================
+/** @throws {Error} 登录完成只在凭证落盘和回读一致后报告；失败不得声称已保存。 */
+export async function saveSyncCredentialsVerified(auth: 同步凭证信息): Promise<void> {
+  const store: preferences.Preferences | null = 打开存储();
+  if (store === null) throw new Error('sync_storage_unavailable');
+  await store.put(HKEY键,auth.hkey);
+  await store.put(端点键,auth.endpoint);
+  await store.put(用户名键,auth.username);
+  await store.flush();
+  if (await store.get(HKEY键,'') !== auth.hkey || await store.get(端点键,'') !== auth.endpoint ||
+    await store.get(用户名键,'') !== auth.username) throw new Error('sync_login_save_unverified');
+}
+
 export function 加载同步凭证(): 同步凭证信息 | null {
   const 存储: preferences.Preferences | null = 打开存储();
   if (存储 === null) {
@@ -311,6 +323,14 @@ export function 清除同步凭证(): void {
   } catch (错误) {
     // 偏好不可用时静默。
   }
+}
+
+/** @throws {Error} 用户确认的注销必须等待落盘，失败不能声称已经注销。 */
+export async function clearSyncCredentialsVerified(): Promise<void> {
+  const store = 打开存储(); if (store === null) throw new Error('sync_storage_unavailable');
+  for (const key of [HKEY键,端点键,用户名键,媒体待同步键]) await store.delete(key);
+  await store.flush();
+  for (const key of [HKEY键,端点键,用户名键,媒体待同步键]) if (await store.has(key)) throw new Error('sync_logout_unverified');
 }
 
 // ========================================================
@@ -416,6 +436,13 @@ export function 设置媒体同步开关(值: boolean): void {
   } catch (错误) {
     // 偏好不可用时仅丢失持久化。
   }
+}
+
+/** @throws {Error} JIDE 与设置共享相同媒体开关键，确认写入等待落盘与回读。 */
+export async function saveMediaSyncEnabled(value: boolean): Promise<void> {
+  const store = 打开存储(); if (store === null) throw new Error('sync_storage_unavailable');
+  await store.put(媒体同步开关键,value ? '1' : '0'); await store.flush();
+  if (await store.get(媒体同步开关键,'') !== (value ? '1' : '0')) throw new Error('media_sync_setting_unverified');
 }
 
 /** 读取媒体同步开关；偏好不可用或未设置时返回 true（保持既有行为）。 */
