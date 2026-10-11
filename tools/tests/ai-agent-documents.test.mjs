@@ -10,6 +10,7 @@ import { providerSupportsImages } from '../../entry/src/main/ets/model/agent/Pro
 import { decodeAgentToolArguments } from '../../entry/src/main/ets/model/agent/AgentToolSchemas.ts';
 import { safeAgentSessionState, compactAgentToolOutputs } from '../../entry/src/main/ets/model/agent/AgentSessionState.ts';
 import { normalizeAgentDocumentText } from '../../entry/src/main/ets/model/agent/AgentDocumentText.ts';
+import { isSupportedAgentVideoFile } from '../../entry/src/main/ets/model/agent/AgentFileImport.ts';
 import { loadPlatformModule } from './platform-module-harness.mjs';
 
 const info = (id='doc',extra={}) => ({id,name:'教材.pdf',extension:'.pdf',byteSize:3,pageCount:140,warningCode:'',...extra});
@@ -83,7 +84,7 @@ function nativeStoreHarness(t) {
   const image={createImagePacker:()=>({async packToData(){return Uint8Array.from([1,2,3]).buffer;},async release(){events.push('packer-release');}})};
   const {AgentDocumentStore,agentPdfPageText}=loadPlatformModule('backend/agent/AgentDocumentStore.ets','{AgentDocumentStore,agentPdfPageText}',
     {fs:nativeFs,pdfService,image,textRecognition,util:{Base64Helper:class {encodeToStringSync(bytes){return Buffer.from(bytes).toString('base64');}}},
-      normalizeAgentDocumentText,UTF8编码:text=>new TextEncoder().encode(text)});
+      normalizeAgentDocumentText,isSupportedAgentVideoFile,UTF8编码:text=>new TextEncoder().encode(text)});
   const store=new AgentDocumentStore({filesDir:root});
   const original=path.join(root,'input.pdf');fs.writeFileSync(original,'PDF');
   const source={fd:fs.openSync(original,'r')};
@@ -137,5 +138,6 @@ test('document source schema accepts real citations and rejects forged parameter
   for(const source of [{documentId:'../x',page:1},{documentId:'doc',page:0},{documentId:'doc',page:1,path:'/x'}]){
     assert.throws(()=>decodeAgentToolArguments('create_flashcards',JSON.stringify({cards:[{fields:['Q'],sources:[source]}]})),/invalid_tool_arguments/);
   }
-  assert.equal(agentDocumentTools().length,4);
+  assert.deepEqual(agentDocumentTools().map(tool=>tool.name),
+    ['list_documents','read_document_page','ocr_document_page','save_document_notes','read_video_frames']);
 });

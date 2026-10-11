@@ -1713,7 +1713,7 @@
     { "name": "ai_agent_file_warning_plain_text", "value": "Detected as plain text · %s KB" },
     { "name": "ai_agent_file_unknown_type", "value": "Unknown" },
     { "name": "ai_agent_file_unsupported", "value": "Cannot parse: %s files are not supported" },
-    { "name": "ai_agent_file_too_large", "value": "Cannot parse: file exceeds 20 MB" },
+    { "name": "ai_agent_file_too_large", "value": "Cannot parse: images/documents are limited to 20 MB; videos to 64 MB" },
     { "name": "ai_agent_file_empty", "value": "Cannot parse: file is empty" },
     { "name": "ai_agent_file_encoding", "value": "Cannot parse: unsupported text encoding" },
     { "name": "ai_agent_file_binary", "value": "Cannot parse: content is not plain text" },

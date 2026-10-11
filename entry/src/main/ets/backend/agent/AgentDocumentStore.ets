@@ -8,6 +8,9 @@ import { util } from '@kit.ArkTS';
 import type { AgentDocumentInfo, AgentDocumentPage, AgentDocumentRepository } from '../../model/agent/AgentDocuments';
 import { normalizeAgentDocumentText } from '../../model/agent/AgentDocumentText';
 import { UTF8编码 } from '../../proto/core/utf8';
+import { AgentVideoReader } from './AgentVideoReader';
+import { AgentVideoInfo } from '../../model/agent/AgentVideo';
+import { isSupportedAgentVideoFile } from '../../model/agent/AgentFileImport';
 
 interface StoredDocument extends AgentDocumentInfo { submitted: boolean; textPages: string[]; }
 
@@ -161,6 +164,7 @@ export class AgentDocumentStore implements AgentDocumentRepository {
   async read(conversationId: string, id: string, pageNumber: number, mode: string): Promise<AgentDocumentPage> {
     const document: StoredDocument = this.manifest(conversationId, id);
     if (!document.submitted) throw new Error('document_not_in_session');
+    if (isSupportedAgentVideoFile(document.name)) throw new Error('document_video_requires_read_video_frames');
     if (!Number.isSafeInteger(pageNumber) || pageNumber < 1 || pageNumber > document.pageCount) throw new Error('document_page_out_of_range');
     const folder: string = this.folder(conversationId, id);
     const cached: AgentDocumentPage | null = this.cachedPage(folder, pageNumber);
@@ -218,6 +222,37 @@ export class AgentDocumentStore implements AgentDocumentRepository {
     // 图片二进制不进入 JSON 或会话历史；需要时从原文件重新渲染。
     if (mode !== 'image' || cached === null) this.writeJson(`${folder}/page-${pageNumber}.json`, saved);
     return result;
+  }
+  /** @throws {Error} 会话范围、视频格式及系统元数据错误真实上抛。 */
+  async readVideoInfo(conversationId: string, id: string): Promise<AgentVideoInfo> {
+    const document: StoredDocument = this.manifest(conversationId, id);
+    if (!document.submitted || !isSupportedAgentVideoFile(document.name)) throw new Error('document_video_unavailable');
+    return new AgentVideoReader().info(`${this.folder(conversationId, id)}/original`);
+  }
+  /** @throws {Error} 系统取帧/OCR/编码失败传播；本服务释放返回的 PixelMap。 */
+  async readVideoFrame(conversationId: string, id: string, seconds: number, mode: string,
+    info: AgentVideoInfo): Promise<AgentDocumentPage> {
+    const document: StoredDocument = this.manifest(conversationId, id);
+    if (!document.submitted || !isSupportedAgentVideoFile(document.name)) throw new Error('document_video_unavailable');
+    if (!Number.isFinite(seconds) || seconds < 0 || seconds >= info.durationSeconds) throw new Error('video_timestamp_out_of_range');
+    const folder: string = this.folder(conversationId, id);
+    const pixelMap: image.PixelMap = await new AgentVideoReader().frame(`${folder}/original`, seconds, info);
+    const result: AgentDocumentPage = { documentId: id, page: 1, text: '', notes: this.cachedPage(folder, 1)?.notes ?? '',
+      method: 'video_frame', warning: '' };
+    try {
+      if (mode === 'image') result.image = { imageUrl: await this.pack(pixelMap) };
+      else {
+        try { result.text = await this.ocr(pixelMap); }
+        catch (error) {
+          if ((error as Error).message !== 'no_extractable_text') throw new Error((error as Error).message);
+          result.warning = 'frame_has_no_detected_text';
+        }
+      }
+      // 视频笔记继续复用资料页1；画面二进制只存在本次 Provider 输入。
+      this.writeJson(`${folder}/page-1.json`, { documentId: id, page: 1, text: result.text,
+        notes: this.cachedPage(folder, 1)?.notes ?? '', method: 'video_frame', warning: result.warning } as AgentDocumentPage);
+      return result;
+    } finally { try { await pixelMap.release(); } catch (error) { } }
   }
   /** @throws {Error} 笔记写入失败交给 Runner，不把模型摘要当原文。 */
   saveNotes(conversationId: string, id: string, page: number, notes: string): void {

@@ -3,6 +3,7 @@
 /** 文件经平台解析或保存为按页资料；Provider 只接收读取工具返回的文本与页面图片。 */
 export const AGENT_IMPORT_MAX_FILES: number = 10;
 export const AGENT_IMPORT_MAX_FILE_BYTES: number = 20 * 1024 * 1024;
+export const AGENT_IMPORT_MAX_VIDEO_BYTES: number = 64 * 1024 * 1024;
 export const AGENT_IMPORT_MAX_TEXT_BYTES: number = 4 * 1024 * 1024;
 export const AGENT_IMPORT_MAX_ARCHIVE_BYTES: number = 48 * 1024 * 1024;
 export const AGENT_IMPORT_MAX_CONTEXT_CHARS: number = 160000;
@@ -59,10 +60,13 @@ export function isSupportedAgentDocumentFile(fileName: string): boolean {
 export function isSupportedAgentImageFile(fileName: string): boolean {
   return SUPPORTED_IMAGE_EXTENSIONS.indexOf(agentFileExtension(fileName)) >= 0;
 }
+export function isSupportedAgentVideoFile(fileName: string): boolean {
+  return ['.mp4', '.mov', '.webm', '.m4v', '.ogv'].includes(agentFileExtension(fileName));
+}
 
 export function isKnownAgentImportFile(fileName: string): boolean {
   return isSupportedAgentTextFile(fileName) || isSupportedAgentDocumentFile(fileName) ||
-    isSupportedAgentImageFile(fileName);
+    isSupportedAgentImageFile(fileName) || isSupportedAgentVideoFile(fileName);
 }
 
 export function successfulAgentImportedFiles(files: AgentImportedFile[]): AgentImportedFile[] {
@@ -90,7 +94,7 @@ export function buildAgentImportedFilesContext(files: AgentImportedFile[]): stri
     const file: AgentImportedFile = accepted[index];
     const content: string = file.documentId === undefined ? file.content :
       JSON.stringify({ documentId: file.documentId, name: file.name, pageCount: file.pageCount, warning: file.warningCode }) +
-      '\n使用 list_documents/read_document_page 按页查阅；需要时调用 ocr_document_page 或请求页面图片。页数不代表已读数量。';
+      '\n图片/文档使用 read_document_page 或 ocr_document_page；视频使用 read_video_frames 按时间读取画面。页数不代表已读数量，采样画面不代表连续视频或声音已读。';
     sections.push(`\n--- 导入文件 ${index + 1}：${file.name} ---\n${content}\n--- 文件结束 ---`);
   }
   return sections.join('\n');

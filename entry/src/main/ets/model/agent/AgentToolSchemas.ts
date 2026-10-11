@@ -370,10 +370,16 @@ function validateCreateNotes(toolName: string, value: RawAgentCreateNote[] | und
       if (!Array.isArray(item.sources) || item.sources.length > 10) throw schemaError(toolName, 'invalid_value', `cards[${noteIndex}].sources`, 'At most 10 document page sources');
       for (const source of item.sources) {
         if (source === null || typeof source !== 'object' || Array.isArray(source) ||
-          Object.keys(source).some((key: string): boolean => key !== 'documentId' && key !== 'page') ||
+          Object.keys(source).some((key: string): boolean => key !== 'documentId' && key !== 'page' && key !== 'timestampSeconds') ||
           typeof source.documentId !== 'string' || !/^[A-Za-z0-9._-]{1,100}$/.test(source.documentId) ||
-          !Number.isSafeInteger(source.page) || source.page < 1) throw schemaError(toolName, 'invalid_value', `cards[${noteIndex}].sources`, 'Each source requires a real documentId and positive page');
-        sources.push({ documentId: source.documentId, page: source.page });
+          !Number.isSafeInteger(source.page) || source.page < 1 ||
+          (source.timestampSeconds !== undefined && (typeof source.timestampSeconds !== 'number' ||
+            !Number.isFinite(source.timestampSeconds) || source.timestampSeconds < 0))) {
+          throw schemaError(toolName, 'invalid_value', `cards[${noteIndex}].sources`, 'Each source requires a real documentId/page and optional video timestampSeconds');
+        }
+        const citation: AgentDocumentSource = { documentId: source.documentId, page: source.page };
+        if (source.timestampSeconds !== undefined) citation.timestampSeconds = source.timestampSeconds;
+        sources.push(citation);
       }
     }
     result.push({ fields: fields, namedFields: namedFields, sources: sources,

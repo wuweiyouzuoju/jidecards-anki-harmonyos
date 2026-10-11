@@ -13,6 +13,7 @@ import {
   AGENT_IMPORT_MAX_ARCHIVE_BYTES,
   AGENT_IMPORT_MAX_CONTEXT_CHARS,
   AGENT_IMPORT_MAX_FILE_BYTES,
+  AGENT_IMPORT_MAX_VIDEO_BYTES,
   AGENT_IMPORT_MAX_OCR_PAGES,
   AGENT_IMPORT_MAX_PDF_PAGES,
   AGENT_IMPORT_MAX_TEXT_BYTES,
@@ -20,6 +21,7 @@ import {
   agentFileExtension,
   isSupportedAgentDocumentFile,
   isSupportedAgentImageFile,
+  isSupportedAgentVideoFile,
   isSupportedAgentTextFile
 } from '../../model/agent/AgentFileImport';
 import {
@@ -542,11 +544,11 @@ async function parseSelectedFile(context: common.UIAbilityContext, uri: string,
     const stat: fs.Stat = fs.statSync(file.fd);
     byteSize = stat.size;
     if (byteSize <= 0) { return failedFile(id, name, extension, byteSize, 'empty_file'); }
-    if (byteSize > AGENT_IMPORT_MAX_FILE_BYTES) {
+    if (byteSize > (isSupportedAgentVideoFile(name) ? AGENT_IMPORT_MAX_VIDEO_BYTES : AGENT_IMPORT_MAX_FILE_BYTES)) {
       return failedFile(id, name, extension, byteSize, 'file_too_large');
     }
     try {
-      if (conversationId.length > 0 && (extension === '.pdf' || isSupportedAgentImageFile(name))) {
+      if (conversationId.length > 0 && (extension === '.pdf' || isSupportedAgentImageFile(name) || isSupportedAgentVideoFile(name))) {
         const document: AgentDocumentInfo = new AgentDocumentStore(context).stage(conversationId, file,
           { id: id, name: name, extension: extension, byteSize: byteSize, pageCount: 1, warningCode: '' });
         return { id: id, name: name, extension: extension, byteSize: byteSize,

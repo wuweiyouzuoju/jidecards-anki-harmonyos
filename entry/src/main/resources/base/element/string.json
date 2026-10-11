@@ -2163,7 +2163,7 @@
     { "name": "ai_agent_file_warning_plain_text", "value": "已按纯文本识别 · %s KB" },
     { "name": "ai_agent_file_unknown_type", "value": "未知" },
     { "name": "ai_agent_file_unsupported", "value": "无法解析：不支持 %s 格式" },
-    { "name": "ai_agent_file_too_large", "value": "无法解析：文件超过 20 MB" },
+    { "name": "ai_agent_file_too_large", "value": "无法解析：图片和文档限 20 MB，视频限 64 MB" },
     { "name": "ai_agent_file_empty", "value": "无法解析：文件内容为空" },
     { "name": "ai_agent_file_encoding", "value": "无法解析：文本编码不受支持" },
     { "name": "ai_agent_file_binary", "value": "无法解析：内容不是纯文本" },
