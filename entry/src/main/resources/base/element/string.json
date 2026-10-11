@@ -3130,6 +3130,46 @@
     {"name":"note_video_format_unsupported","value":"不支持此视频格式，请选择 MP4、MOV 或 WebM。"},
     {"name":"note_video_preview","value":"视频预览"},
     {"name":"note_video_preview_failed","value":"视频无法播放，请检查文件是否存在或手机是否支持其编码。"},
-    {"name":"note_visual_instructions","value":"新增或编辑笔记时，点击字段标题旁原有的图片图标，打开图片和视频管理。新增图片或视频通过系统选择器导入；其下方的新增白板书画打开画布。图片框右上角笔形图标可手写、添加文字并生成新图片；视频只预览、替换和删除。视频支持 MP4、MOV、WebM，单个最大 64 MiB，实际播放取决于设备编码支持。完成只应用到字段草稿，取消不应用；保存笔记后才写入媒体库并沿用媒体同步和导出。图片遮盖源图选择仅接受图片。此界面观察只提供附件类型、数量、忙碌和可用操作，不读取视频内容，也未开放助手自动选取或播放。"}
+    {"name":"note_visual_instructions","value":"新增或编辑笔记时，点击字段标题旁原有的图片图标，打开图片和视频管理。新增图片或视频通过系统选择器导入；其下方的新增白板书画打开画布。图片框右上角笔形图标可手写、添加文字并生成新图片；视频只预览、替换和删除。视频支持 MP4、MOV、WebM，单个最大 64 MiB，实际播放取决于设备编码支持。完成只应用到字段草稿，取消不应用；保存笔记后才写入媒体库并沿用媒体同步和导出。图片遮盖源图选择仅接受图片。此界面观察只提供附件类型、数量、忙碌和可用操作，不读取视频内容，也未开放助手自动选取或播放。"},
+    {
+      "name": "agent_history_search",
+      "value": "搜索历史对话"
+    },
+    {
+      "name": "agent_history_limit",
+      "value": "保存会话上限"
+    },
+    {
+      "name": "agent_history_manage",
+      "value": "历史记录管理"
+    },
+    {
+      "name": "agent_history_clear",
+      "value": "清空历史记录"
+    },
+    {
+      "name": "agent_history_retention_hint",
+      "value": "默认保存最近更新的500个会话。达到上限后淘汰最早更新的会话及其检查点和关联文档。每个会话保留最近200条消息，单条正文最多20000字符；历史只保存在本机。"
+    },
+    {
+      "name": "agent_history_usage",
+      "value": "已保存 %1$s 个会话 · 正文文件 %2$s MB"
+    },
+    {
+      "name": "agent_history_clear_confirm",
+      "value": "清空所有历史会话、检查点和关联文档？此操作无法撤销。"
+    },
+    {
+      "name": "agent_history_reduce_confirm",
+      "value": "将上限降为 %1$s 个会话并删除超出的最早历史及关联数据？此操作无法撤销。"
+    },
+    {
+      "name": "agent_history_tool_search",
+      "value": "搜索历史对话"
+    },
+    {
+      "name": "agent_history_tool_read",
+      "value": "读取历史对话"
+    }
   ]
 }

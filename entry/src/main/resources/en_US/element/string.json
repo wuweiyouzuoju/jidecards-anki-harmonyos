@@ -2680,6 +2680,46 @@
     {"name":"note_video_format_unsupported","value":"Unsupported video format. Select MP4, MOV or WebM."},
     {"name":"note_video_preview","value":"Video preview"},
     {"name":"note_video_preview_failed","value":"Cannot play the video. Check that the file exists and the device supports its codec."},
-    {"name":"note_visual_instructions","value":"When adding or editing a note, click the existing image icon beside a field title to manage images and videos. Add image or video opens the system picker; New whiteboard drawing appears below it. The pen icon at the top right of an image opens handwriting and text editing and creates a new image. Videos support preview, replacement and removal. Supported videos: MP4, MOV and WebM, up to 64 MiB each; playback depends on device codec support. Done applies to the field draft; Cancel discards dialog changes. Saving the note writes media and uses existing media sync and export. Image occlusion source selection only accepts images. Observations provide attachment types, counts, busy state and available actions; they do not read video contents or enable automatic picking or playback."}
+    {"name":"note_visual_instructions","value":"When adding or editing a note, click the existing image icon beside a field title to manage images and videos. Add image or video opens the system picker; New whiteboard drawing appears below it. The pen icon at the top right of an image opens handwriting and text editing and creates a new image. Videos support preview, replacement and removal. Supported videos: MP4, MOV and WebM, up to 64 MiB each; playback depends on device codec support. Done applies to the field draft; Cancel discards dialog changes. Saving the note writes media and uses existing media sync and export. Image occlusion source selection only accepts images. Observations provide attachment types, counts, busy state and available actions; they do not read video contents or enable automatic picking or playback."},
+    {
+      "name": "agent_history_search",
+      "value": "Search conversation history"
+    },
+    {
+      "name": "agent_history_limit",
+      "value": "Conversation retention limit"
+    },
+    {
+      "name": "agent_history_manage",
+      "value": "Manage conversation history"
+    },
+    {
+      "name": "agent_history_clear",
+      "value": "Clear conversation history"
+    },
+    {
+      "name": "agent_history_retention_hint",
+      "value": "Keep the 500 most recently updated conversations by default. At the limit, the oldest updated conversations, checkpoints and linked documents are removed. Each conversation retains the latest 200 messages and up to 20000 characters per text. History stays on this device."
+    },
+    {
+      "name": "agent_history_usage",
+      "value": "%1$s saved conversations · Text files %2$s MB"
+    },
+    {
+      "name": "agent_history_clear_confirm",
+      "value": "Delete all saved conversations, checkpoints and linked documents? This cannot be undone."
+    },
+    {
+      "name": "agent_history_reduce_confirm",
+      "value": "Reduce the limit to %1$s conversations and delete the oldest excess history and linked data? This cannot be undone."
+    },
+    {
+      "name": "agent_history_tool_search",
+      "value": "Search conversation history"
+    },
+    {
+      "name": "agent_history_tool_read",
+      "value": "Read conversation history"
+    }
   ]
 }
