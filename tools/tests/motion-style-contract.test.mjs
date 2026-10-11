@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { loadPlatformModule } from './platform-module-harness.mjs';
-import { motionApi } from './motion-harness.mjs';
+import { motionApi, surfaceMotionApi } from './motion-harness.mjs';
 
 function read(path) {
   return readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
@@ -51,13 +51,31 @@ test('small anchored menus share the restrained 150ms transition', () => {
   for (const path of [
     'entry/src/main/ets/components/settings/模式切换菜单.ets',
     'entry/src/main/ets/components/browser/BrowserMoreMenu.ets',
-    'entry/src/main/ets/components/browser/BrowserViewMenu.ets',
     'entry/src/main/ets/components/common/CardActionMenu.ets',
   ]) {
     const source = read(path);
     assert.doesNotMatch(source, /取全屏转场时长|取全屏转场曲线/, path);
     assert.match(source, /(?:AnchoredMenu|CardActionMenu)\(\{/, path);
   }
+});
+
+test('browser view confirmation delegates both surface transitions to the shared dialog owner', () => {
+  const source = read('entry/src/main/ets/components/browser/BrowserViewMenu.ets');
+  assert.match(source, /DialogFrame\(\{/);
+  assert.doesNotMatch(source, /(?:AnchoredMenu|CardActionMenu)\(\{|\.transition\(|取全屏转场时长|取全屏转场曲线/,
+    'the confirmation dialog must not add a menu or local surface animation');
+  const frame = read('entry/src/main/ets/components/common/DialogFrame.ets');
+  assert.match(frame, /\.transition\(this\.nativeHost \? TransitionEffect\.IDENTITY : SurfaceTransition\.dialog\(\)\)/);
+  assert.match(frame, /\.transition\(this\.nativeHost \? TransitionEffect\.IDENTITY : SurfaceTransition\.backdrop\(\)\)/);
+  const { SurfaceTransition } = surfaceMotionApi();
+  const transition = SurfaceTransition.dialog();
+  assert.equal(transition.enter.kind, 'opacity');
+  assert.equal(transition.enter.combined.kind, 'scale');
+  const backdrop = SurfaceTransition.backdrop();
+  assert.equal(transition.exit.value, backdrop.value);
+  assert.deepEqual(transition.exit.options, backdrop.options);
+  assert.equal(transition.exit.kind, 'opacity');
+  assert.equal(transition.exit.combined, undefined, 'closing preserves the opacity-only dialog contract');
 });
 
 test('dialogs enter gently and leave with opacity only', () => {
