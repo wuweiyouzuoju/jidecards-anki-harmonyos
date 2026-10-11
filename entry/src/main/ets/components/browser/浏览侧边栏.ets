@@ -58,8 +58,7 @@ import { BusinessError } from '@ohos.base';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { AnchoredMenuItem } from '../common/MenuItem';
 import { TagTreeList } from '../common/TagTreeList';
-import { TagRow, flattenTagTree, visibleTagRows } from '../../model/NoteTags';
-import { FormInputStyle } from '../../utils/FormInputStyle';
+import { TagRow, flattenTagTree } from '../../model/NoteTags';
 import { 颜色键 } from '../../model/颜色主题';
 import type { DeckTreeNode } from '../../proto/messages/DeckMessages';
 import type { TagTreeNode } from '../../proto/messages/TagsMessages';
@@ -96,7 +95,6 @@ export struct 浏览侧边栏 {
   onDeleteTag: (tagName: string) => void = (_name: string): void => {};
   onToggleTag: (tagName: string) => void = (_name: string): void => {};
   onClearUnusedTags: () => void = (): void => {};
-  @State private tagQuery: string = '';
   private disposed: boolean = false;
   aboutToDisappear(): void { this.disposed = true; }
   onToggle折叠: (section: 侧边栏分区) => void = (_section: 侧边栏分区): void => {};
@@ -111,9 +109,9 @@ export struct 浏览侧边栏 {
     if (row !== undefined) { if (append) this.onAppendDeck(row.path); else this.onSelectDeck(row.path); }
   }
 
-  /** 扁平化标签树为行数组（尊重 node.collapsed）。 */
+  /** 保留完整标签路径和折叠状态；可见行与搜索交给公共树。 */
   private 扁平化标签树(): TagRow[] {
-    return this.标签树 === null ? [] : visibleTagRows(flattenTagTree(this.标签树), this.tagQuery);
+    return this.标签树 === null ? [] : flattenTagTree(this.标签树);
   }
 
   build() {
@@ -168,11 +166,13 @@ export struct 浏览侧边栏 {
               if (this.牌组树 === null) {
                 this.空提示()
               } else {
-                DirectoryTree({ rows: this.deckRows(), isInteractive: !this.busy, framed: false,
-                  selectionMode: 'none', revealSelection: false,
-                  onSelect: (id: string): void => { this.selectDeck(id); },
-                  onLongPress: (id: string): void => { this.selectDeck(id, true); },
-                  onViewChanged: (view: DirectoryView | null): void => { appInterface.observeDirectory('browser_decks', view); } })
+                Column() {
+                  DirectoryTree({ rows: this.deckRows(), isInteractive: !this.busy, framed: false,
+                    selectionMode: 'none', revealSelection: false,
+                    onSelect: (id: string): void => { this.selectDeck(id); },
+                    onLongPress: (id: string): void => { this.selectDeck(id, true); },
+                    onViewChanged: (view: DirectoryView | null): void => { appInterface.observeDirectory('browser_decks', view); } })
+                }.width('100%').padding(应用尺寸.卡片内边距)
               }
             }
             }.width('100%').backgroundColor($r('app.color.surface_card'))
@@ -187,20 +187,12 @@ export struct 浏览侧边栏 {
               if (this.标签树 === null) {
                 this.空提示()
               } else {
-                Column({ space: 应用尺寸.间距_8 }) {
-                  TextInput({ text: this.tagQuery, placeholder: $r('app.string.tags_filter_hint') })
-                    .attributeModifier(new FormInputStyle()).enabled(!this.busy && !this.tagWriteBusy)
-                    .onChange((value: string): void => { this.tagQuery = value; })
-                  if (this.扁平化标签树().length === 0) {
-                    Text($r('app.string.tags_no_matches')).fontSize(应用尺寸.字号_正文_小)
-                      .fontColor($r('app.color.text_tertiary')).width('100%')
-                  } else {
-                    TagTreeList({ rows: this.扁平化标签树(), query: this.tagQuery, isInteractive: !this.busy && !this.tagWriteBusy,
+                Column() {
+                    TagTreeList({ rows: this.扁平化标签树(), searchable: true, isInteractive: !this.busy && !this.tagWriteBusy,
                       onSelect: (name: string): void => { this.onSelectTag(name); },
                       onToggle: (name: string): void => { this.onToggleTag(name); },
                       onLongPress: (name: string): void => { this.显示标签操作菜单(name); },
                       onViewChanged: (view: DirectoryView | null): void => { appInterface.observeDirectory('browser_tags', view); } })
-                  }
                 }.width('100%').padding(应用尺寸.卡片内边距)
                 AnchoredMenuItem({ label: $r('app.string.settings_clear_unused_tags'),
                   available: !this.busy && !this.tagWriteBusy,

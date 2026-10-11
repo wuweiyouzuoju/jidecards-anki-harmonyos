@@ -195,10 +195,11 @@ test('all manual note editors share tag input and parsing; sidebar uses full pat
     const source=read(path);assert.match(source,/NoteTagsField\(/);assert.match(source,/return parseNoteTags\(this\./);
   }
   const sidebar=read('components/browser/浏览侧边栏.ets');assert.match(sidebar,/TagTreeList\(/);
-  assert.match(sidebar,/Column\(\{ space: 应用尺寸\.间距_8 \}\)[\s\S]*tags_filter_hint[\s\S]*TagTreeList\([\s\S]*\}\.width\('100%'\)\.padding\(应用尺寸\.卡片内边距\)/);
-  assert.match(sidebar,/if \(this\.扁平化标签树\(\)\.length === 0\)[\s\S]*tags_no_matches[\s\S]*else/);
+  assert.match(sidebar,/TagTreeList\(\{ rows: this\.扁平化标签树\(\), searchable: true/);
+  assert.doesNotMatch(sidebar,/TextInput\(|FormInputStyle|tagQuery/);
   assert.doesNotMatch(sidebar.replace(/^\s*\/\/.*$/gm,''),/onCompleteTag|onSelectTag\(行\.name\)/);
   const list=read('components/common/TagTreeList.ets');assert.match(list,/DirectoryTree\(/);
+  assert.match(list,/searchable: this.searchable, searchPlaceholder: \$r\('app.string.tags_filter_hint'\), emptyLabel: \$r\('app.string.tags_no_matches'\)/);
   assert.match(list,/directoryRow\(tag\.fullName, tag\.fullName, tag\.selection\)/);
   assert.match(list,/onSelect: this\.onSelect/);
 });
