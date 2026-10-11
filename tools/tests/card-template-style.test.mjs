@@ -27,18 +27,18 @@ test('bundled jQuery matches the Anki-pinned full distribution and retains its M
   assert.match(readFileSync(new URL('LICENSE.txt', base), 'utf8'), /Permission is hereby granted/);
 });
 
-test('default card colors precede template color pairs on both sides in both modes', () => {
-  const css = '.card { color: black; background: white; } .nightMode { color: white; background: #222; }';
+test('reviewer defaults precede templates so explicit night selectors and field colors can override them', () => {
+  const css = '.card { color: black; background: white; } body.nightMode { color: white; background: #222; }';
   const nodes = [{ text: '<span style="color:black">正文</span>', replacement: null }];
   const card = { css, questionNodes: nodes, answerNodes: nodes, latexSvg: false, isEmpty: false };
   for (const dark of [false, true]) for (const side of ['question', 'answer']) {
     const html = 构建卡片HTML(card, side, dark);
     const background = dark ? '#18202B' : '#FFFFFF';
-    const defaults = `body { color: var(--jide-card-default-text, var(--jide-card-preferred-text)); background: ${background}; }`;
+    const defaults = `body { color: var(--fg, var(--jide-card-default-text, var(--jide-card-preferred-text))); background: ${background}; }`;
     assert.ok(html.includes(defaults));
     assert.ok(html.indexOf(defaults) < html.indexOf(css));
     assert.doesNotMatch(html.slice(html.indexOf(css) + css.length), /background:[^;]*!important/,
-      'never force a dark background behind unchanged black template text');
+      'night mode changes foreground/background together without forcing template overrides');
   }
 });
 

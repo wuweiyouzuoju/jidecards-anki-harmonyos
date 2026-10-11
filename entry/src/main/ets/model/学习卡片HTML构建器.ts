@@ -105,7 +105,6 @@ body {
   word-wrap: break-word;
 }
 img { max-width: 100%; height: auto; }
-a { color: #2E6BE6; }
 hr { opacity: 0.3; }
 .sound-flag { display: inline-flex; align-items: center; justify-content: center; vertical-align: middle;
   font-size: inherit; line-height: 1; box-sizing: border-box;
@@ -115,11 +114,14 @@ hr { opacity: 0.3; }
 .sound-flag:active { opacity: 0.6; }
 mjx-container[jax="SVG"][display="true"] { overflow-x: auto; overflow-y: hidden; max-width: 100%; padding: 2px 0; }
 .latex-missing { display: inline-block; max-width: 100%; overflow-wrap: anywhere; border: 1px dashed currentColor; padding: 4px; }
-#typeans { white-space: pre-wrap; font-family: monospace; display: inline-block; text-align: left; }
-.typeGood { color: #0a7d20; }
-.typeBad { color: #c62828; }
-.typeMissed { color: #888; }
-#typearrow { color: #888; }
+#typeans { white-space: pre-wrap; font-family: monospace; display: inline-block; text-align: left;
+  width: 100%; box-sizing: border-box; line-height: 1.75; }
+.typeGood { background: #afa; color: black; }
+.typeBad { background: #faa; color: black; }
+.typeMissed { background: #ccc; color: black; }
+.nightMode .latex { filter: invert(100%); }
+.drawing { zoom: 50%; }
+.nightMode img.drawing { filter: invert(1) hue-rotate(180deg); }
 `;
 
 /** 节点流 → HTML 片段：text 节点为模板原文，replacement 节点为后端已渲染的字段 HTML */
@@ -268,7 +270,7 @@ const 可折叠字段样式: string = `
   display: block;
   text-align: center;
   padding: 6px;
-  color: #2E6BE6;
+  color: inherit;
   cursor: pointer;
   font-size: 0.85em;
   user-select: none;
@@ -347,7 +349,7 @@ const 可折叠字段脚本: string = `<script>
 // string：完整 HTML 文档字符串
 //
 // @业务规则
-// 默认配色、列表和代码对齐放在模板 CSS 前；正文对齐由模板决定，布局与媒体兜底在后。
+// 默认配色、排版和媒体显示规则放在模板 CSS 前；正文对齐由模板决定，遮罩定位兜底在后。
 // 与 Anki TemplateRenderOutput 一样独立包装模板样式：部分牌组用 </style><script>
 // 在样式字段加载脚本，不能让提前闭合的标签把应用兜底 CSS 暴露成正文。
 // 字段中的 [sound:xxx] 标签剥除为小标记，
@@ -362,17 +364,35 @@ const 可折叠字段脚本: string = `<script>
 // @副作用
 // 无
 // ========================================================
+export function buildCardAppearance(isDark: boolean, cardBackground: string = isDark ? '#18202B' : '#FFFFFF'): string {
+  // 对齐 AnkiDroid 的新版 reviewer：body.nightMode 覆盖标准 .card，模板仍可用
+  // body.nightMode / .card.nightMode 或行内样式覆盖；默认规则全部先于模板。
+  const 默认配色: string = `html { background: ${cardBackground}; color-scheme: ${isDark ? 'dark' : 'light'};
+  --jide-card-light-text: #E6E6E6; --jide-card-dark-text: #1A1A1A;
+  --jide-card-preferred-text: var(${isDark ? '--jide-card-light-text' : '--jide-card-dark-text'});
+  --canvas: ${cardBackground}; }
+body { color: var(--fg, var(--jide-card-default-text, var(--jide-card-preferred-text))); background: ${cardBackground}; }
+body.nightMode { background-color: var(--canvas);
+  color: var(--fg, var(--jide-card-default-text, var(--jide-card-preferred-text))); }`;
+  return `${默认配色}\n${基础样式}\n${templateAlignmentDefaults}\n${可折叠字段样式}`;
+}
+
+/** 缓存的正反面只更新应用外壳；模板正文、脚本和显式配色保持原样。 */
+export function applyCardTheme(html: string, isDark: boolean): string {
+  return html.replace(new RegExp('<style id="jide-card-appearance">[\\s\\S]*?</style>'),
+    (): string => `<style id="jide-card-appearance">${buildCardAppearance(isDark)}</style>`)
+    .replace(new RegExp('<html class="[^"]*" data-bs-theme="[^"]*">'),
+      `<html class="${isDark ? 'night-mode' : ''}" data-bs-theme="${isDark ? 'dark' : 'light'}">`)
+    .replace(new RegExp('<body class="card(?: nightMode night_mode)?">'),
+      `<body class="card${isDark ? ' nightMode night_mode' : ''}">`);
+}
+
 export function 构建卡片HTML(渲染结果: RenderedCard, 侧面: 卡片正反面, isDark: boolean = false,
   cardBackground: string = isDark ? '#18202B' : '#FFFFFF', hideAudioButtons: boolean = false,
   audioLabel: string = 'Play audio'): string {
   const 卡面: string | undefined = 侧面 === 'question' ? 渲染结果.questionHtml : 渲染结果.answerHtml;
   const 正文: string = 剥除音频标签(卡面 ?? 原始侧HTML(渲染结果, 侧面), 渲染结果, 侧面, hideAudioButtons, audioLabel);
-  // 默认字色由 reviewer 按实际底色校正；有效的模板/字段 color 仍按 CSS 层叠优先。
-  const 默认配色: string = `html { background: ${cardBackground};
-  --jide-card-light-text: #E6E6E6; --jide-card-dark-text: #1A1A1A;
-  --jide-card-preferred-text: var(${isDark ? '--jide-card-light-text' : '--jide-card-dark-text'}); }
-body { color: var(--jide-card-default-text, var(--jide-card-preferred-text)); background: ${cardBackground}; }`;
-  const 样式: string = `${基础样式}\n${图片遮罩渲染样式}\n${可折叠字段样式}`;
+  const 样式: string = 图片遮罩渲染样式;
   // 同卡两面共用文档；背面才有公式也必须在题面准备引擎。
   const mathScripts: string = cardMathScripts(渲染结果.questionHtml ?? 原始侧HTML(渲染结果, 'question'),
     渲染结果.answerHtml ?? 原始侧HTML(渲染结果, 'answer'), 渲染结果.css);
@@ -382,7 +402,7 @@ body { color: var(--jide-card-default-text, var(--jide-card-preferred-text)); ba
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://jidecards-render.local/jquery/3.7.1/jquery.min.js"></script>
-<style id="jide-card-appearance">${默认配色}\n${templateAlignmentDefaults}</style>
+<style id="jide-card-appearance">${buildCardAppearance(isDark, cardBackground)}</style>
 ${IMAGE_OCCLUSION_SCRIPT}
 ${mathScripts}
 ${可折叠字段脚本}

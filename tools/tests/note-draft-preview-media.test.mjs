@@ -58,7 +58,7 @@ test('draft Web and sound requests route owned cache files and stop playback whe
     reviewPreferences:{read:async()=>({hideAudioPlayButtons:false})}, $r:key=>key,
     原始侧HTML:(_rendered,side)=>side, resourceText:()=> 'Play audio', buildPreviewInteractionScript:()=>'',
     AppStorage:{get:()=>({filesDir:'/files'})},媒体基地址:'https://anki.local/',
-    CardWebView:class {reset(){resets++;}setAudioEnabled(){}},卡片渲染服务:class{},声音播放器:class{},TTS播放器:class{},
+    CardWebView:class {reset(){resets++;}setAudioEnabled(){}setTheme(){}},卡片渲染服务:class{},声音播放器:class{},TTS播放器:class{},
     CardAudioSession:class {constructor(_sound,_tts,_extract,path){this.path=path;}stop(){stops++;}async release(){releases++;}}
   });
   const preview=new Preview();preview.getUIContext=()=>({});preview.media={fields:[],directory:'/cache/owned',filenames:['draft.png','draft.m4a']};
@@ -77,7 +77,7 @@ test('draft Web and sound requests route owned cache files and stop playback whe
 });
 
 test('draft preview waits for both Web controllers, retains same-card flips and stages a new revision',async()=>{
-  const requests=[],attached=[],audio=[],muted=[];let bridge;
+  const requests=[],attached=[],audio=[],muted=[],themes=[];let bridge;
   const Preview=loadComponentLogic('components/settings/NotetypeTemplatePreview.ets','NotetypeTemplatePreview',{
     APP_FOREGROUND_KEY:'foreground',webview:{WebviewController:class{}},
     reviewPreferences:{read:async()=>({hideAudioPlayButtons:false})}, $r:key=>key,
@@ -87,6 +87,7 @@ test('draft preview waits for both Web controllers, retains same-card flips and 
     CardWebView:class {
       constructor(_controller,shown,_failed,_spare,switched){bridge={shown,switched};}
       attach(slot){attached.push(slot);}reset(){}setAudioEnabled(enabled){muted.push(enabled);}
+      setTheme(dark){themes.push(dark);}
       show(...args){requests.push(args);}controllerAt(slot){return {slot,registerJavaScriptProxy(){}};}
     },
     卡片渲染服务:class{},声音播放器:class{},TTS播放器:class{},
@@ -110,6 +111,12 @@ test('draft preview waits for both Web controllers, retains same-card flips and 
   assert.equal(preview.visibleWebSlot,0);
   bridge.switched(1);bridge.shown('#203040');
   assert.equal(preview.visibleWebSlot,1);assert.equal(preview.controller.slot,1);
+  const played=audio.length,displayed=requests.length;
+  preview.alive=true;preview.isDark=true;preview.cardThemeChanged();
+  assert.deepEqual(themes,[true]);bridge.shown('#18202b',true);
+  assert.equal(preview.cardSurfaceBackground,'#18202b');
+  assert.equal(audio.length,played,'theme changes do not replay draft audio');
+  assert.equal(requests.length,displayed,'theme changes retain the template document');
   preview.foreground=false;preview.stopBackgroundAudio();
   assert.equal(muted.at(-1),false);
 });
