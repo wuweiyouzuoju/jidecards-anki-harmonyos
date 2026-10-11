@@ -207,7 +207,7 @@ export struct AgentMemoryPanel {
         }
         TextInput({ text: this.query, placeholder: this.text($r('app.string.agent_memory_search')) })
           .attributeModifier(new FormInputStyle()).enabled(!this.busy).onChange((value: string): void => { this.query = value; })
-        DirectorySelect({ label: $r('app.string.agent_memory_scope'),
+        DirectorySelect({ label: $r('app.string.agent_memory_scope'), surfaceColor: $r('app.color.surface_card'),
           rows: memoryScopeRows(this.filterChoices(), this.filterScope),
           value: this.filterScope === '' ? this.text($r('app.string.agent_memory_all')) : this.scopeLabel(this.filterScope),
           isInteractive: !this.busy,

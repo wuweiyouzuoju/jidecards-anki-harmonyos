@@ -25,7 +25,6 @@ export interface CardActionMenuEntry extends ActionMenuNode {
   selectionUsesAccent?: boolean;
   destructive?: boolean;
   divider?: boolean;
-  showSelectionMark?: boolean;
   children?: CardActionMenuEntry[];
 }
 
@@ -214,7 +213,6 @@ export struct CardActionMenu {
       available: row.enabled, divider: this.rowItem(row).divider ?? index > 0,
       icon: this.rowItem(row).icon, iconTint: this.rowItem(row).iconTint, labelAlignment: TextAlign.Start,
       selected: this.rowItem(row).selected === true,
-      showSelectionMark: this.rowItem(row).showSelectionMark === true,
       selectionUsesAccent: this.rowItem(row).selectionUsesAccent !== false,
       destructive: this.rowItem(row).destructive === true,
       disclosure: row.node.children !== undefined, expanded: this.expandedIds.includes(row.node.id ?? ''),

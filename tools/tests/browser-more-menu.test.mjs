@@ -63,7 +63,7 @@ test('save requires a current filter; display choices retain exact single select
     menu.subtitleIndex = index;
     const entries = menu.entries().find(e => e.id === 'display_settings').children;
     assert.equal(entries.filter(e => e.selected).length, 1);
-    assert.ok(entries.filter(e => e.id.startsWith('subtitle_')).every(e => e.showSelectionMark));
+    assert.equal(entries.find(e => e.selected).id, { 1: 'subtitle_deck', 4: 'subtitle_answer', 2: 'subtitle_due' }[index]);
   }
   menu.available = false; menu.selectItem('display_settings'); menu.selectItem('subtitle_due');
   assert.deepEqual(calls, [2]);

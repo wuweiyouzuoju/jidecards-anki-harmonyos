@@ -48,7 +48,6 @@ export struct BrowserMoreMenu {
   private menuEntry(item: AppInterfaceMenuItem, divider: boolean = false): CardActionMenuEntry {
     return { id: item.id, value: localizedNamedResourceText(this.getUIContext(), this.uiLanguage, item.titleKey),
       icon: actionIcon(item.id), enabled: item.enabled, selected: item.selected, divider: divider,
-      showSelectionMark: item.id.startsWith('subtitle_'),
       children: item.children?.map((child: AppInterfaceMenuItem, index: number): CardActionMenuEntry =>
         this.menuEntry(child, item.id === 'display_settings' && index === 1)) };
   }

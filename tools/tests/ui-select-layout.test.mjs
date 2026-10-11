@@ -279,16 +279,21 @@ test('shared menu surfaces distinguish dark overlays from cards and retain reada
   }
 });
 
-test('browser uses one segmented frame and opens only the chosen option group', () => {
+test('browser composes three shared triggers under the plain title and uses one selection dialog', () => {
   const page = read('pages/浏览页.ets');
   const controls = page.slice(page.indexOf('private browserControls()'), page.indexOf('private browserContent()'));
   assert.equal((controls.match(/this\.viewChoice\(/g) || []).length, 3);
   assert.match(controls, /'mode'/);
   assert.match(controls, /'filter'/);
   assert.match(controls, /'sort'/);
-  assert.match(controls, /id\('browser-view-selector'\)/);
-  assert.match(controls, /layoutWeight\(7\)/);
-  assert.match(controls, /ChangingText\(\{ value: this\.阶段 === 'loading' \? this\.取本地化文案\(\$r\('app.string.browser_loading'\)\) : this\.resultCountLabel\(\),\s*textSize: 应用尺寸\.字号_正文_小, alignment: TextAlign\.End, fillWidth: true \}\)\s*\.layoutWeight\(3\)/);
+  assert.doesNotMatch(controls, /browser-view-selector|layoutWeight\([37]\)/);
+  assert.match(controls, /ChangingText\([\s\S]*?resultCountLabel\(\),\s*textSize: 应用尺寸\.字号_正文_小, alignment: TextAlign\.Start, fillWidth: true \}\)\.width\('100%'\)/);
+  const title = page.slice(page.indexOf('private 顶部条()'), page.indexOf('private quickFilterOptions('));
+  assert.doesNotMatch(title, /viewChoice/);
+  assert.match(title, /app.string.browser_title/);
+  const trigger = page.slice(page.indexOf('private viewChoice(group:'), page.indexOf('private browserControls()'));
+  assert.match(trigger, /按下态按钮\(\{[\s\S]*disclosure: true/);
+  assert.doesNotMatch(trigger, /\bButton\(|DisclosureChevron\(/);
   assert.doesNotMatch(page, /\bSelect\(/);
   const search = read('components/browser/搜索框.ets');
   assert.match(search, /TextInput\(/);
@@ -296,8 +301,12 @@ test('browser uses one segmented frame and opens only the chosen option group', 
   const menu = read('components/browser/BrowserViewMenu.ets');
   for (const group of ['mode', 'filter', 'sort']) assert.ok(menu.includes("this.group === '" + group + "'"));
   assert.doesNotMatch(menu, /expandedGroup|toggleGroup|disclosure:/);
-  assert.match(menu, /menuWidth: this\.menuWidth/);
-  assert.match(page, /menuWidth: this\.viewMenuWidth/);
+  assert.doesNotMatch(menu, /AnchoredMenu\(/);
+  assert.match(menu, /DialogFrame\([\s\S]*this\.selectionHeader\(\)/);
+  assert.match(menu, /DialogHeader\(\{ title: this.group === 'mode'/);
+  assert.doesNotMatch(menu, /showActionLabel: true/);
+  assert.match(menu, /按下态按钮\(\{ 文案: \$r\('app.string.browser_sort_ascending'\)/);
+  assert.doesNotMatch(page, /recordViewAnchor|placeViewMenu|selected: this.browserFilterActive\(\)/);
   for (const [locale, label] of [['base', '默认'], ['en_US', 'Default']]) {
     const resources = JSON.parse(readFileSync(join(root, '../resources', locale, 'element/string.json'), 'utf8')).string;
     assert.equal(resources.find(item => item.name === 'browser_sort_default').value, label);
