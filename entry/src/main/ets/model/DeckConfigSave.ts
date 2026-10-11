@@ -26,10 +26,11 @@ export function prepareDeckConfigForSave(view: DeckConfigsForUpdateView, origina
   const before: Uint8Array = encodeDeckConfig(original);
   const after: Uint8Array = encodeDeckConfig(draft);
   const changed: boolean = before.length !== after.length || before.some((value: number, index: number): boolean => value !== after[index]);
-  const shared: boolean = deckConfigUseCount(view, original.id) > 1;
+  // A selected preset may belong to another deck before the target is rebound.
+  const shared: boolean = deckConfigUseCount(view, original.id) > (view.currentDeck?.configId === original.id ? 1 : 0);
   if (changed && !applyToSharedDecks && (original.id === 1 || shared)) {
     draft.id = 0;
-    draft.name = view.currentDeck === null ? original.name : view.currentDeck.name;
+    if (draft.name === original.name) draft.name = view.currentDeck === null ? original.name : view.currentDeck.name;
     draft.mtimeSecs = 0;
     draft.usn = 0;
   }

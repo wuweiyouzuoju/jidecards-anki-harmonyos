@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DeckOptionsSession } from '../../entry/src/main/ets/model/home/DeckOptionsSession.ts';
 import { emptyDeckConfigSettings } from '../../entry/src/main/ets/proto/messages/DeckConfigMessages.ts';
+import { copyDeckConfig } from '../../entry/src/main/ets/model/DeckConfigSave.ts';
 
 const deferred = () => { let resolve, reject; const promise = new Promise((a,b) => {resolve=a; reject=b;}); return {promise,resolve,reject}; };
 const flush = () => new Promise(resolve => setImmediate(resolve));
@@ -51,4 +52,50 @@ test('a committed save cannot be repeated when its notification fails',async()=>
   assert.equal(await h.session.save(h.config,false,h.options),false);
   await h.session.load();
   assert.equal(h.states.at(-1).phase,'saved'); assert.equal(h.writes.length,1);
+});
+
+test('rename and switching back retain the persisted baseline and isolate current-deck edits',async()=>{
+  for(const action of ['rename','switch']) {
+    const h=setup();const other=copyDeckConfig(h.config);other.id=2;other.name='Other';
+    h.view.allConfigs.push({config:other,useCount:1});await h.session.load();
+    const draft=copyDeckConfig(h.config);draft.config.newPerDay=13;
+    if(action==='rename') h.session.editPreset('rename','Private',draft,false);
+    else {h.session.editPreset('select','2',draft,false);h.session.editPreset('select','1',h.states.at(-1).config,false);}
+    await h.session.save(h.states.at(-1).config,false,h.options);
+    const current=h.writes[0].configs.at(-1);
+    assert.equal(current.id,0);assert.equal(current.config.newPerDay,13);
+    assert.equal(current.name,action==='rename'?'Private':'Deck');
+    assert.equal(h.config.config.newPerDay,0,'persisted baseline is unchanged');
+  }
+});
+
+test('each staged preset keeps its scope across switches, failed saves and final shared edits',async()=>{
+  for(const scope of [false,true]) {
+    const h=setup();const other=copyDeckConfig(h.config);other.id=2;other.name='Other';
+    h.view.allConfigs.push({config:other,useCount:2});await h.session.load();
+    const draft=copyDeckConfig(h.config);draft.config.newPerDay=13;
+    h.session.editPreset('select','2',draft,scope);
+    h.session.editPreset('select','1',h.states.at(-1).config,true);
+    assert.equal(h.states.at(-1).presetShared,scope);
+    h.session.editPreset('select','2',h.states.at(-1).config,scope);
+    const selected=copyDeckConfig(h.states.at(-1).config);selected.config.reviewsPerDay=40;
+    h.backend.save=async request=>{h.writes.push(request);throw Error('disk full');};
+    assert.equal(await h.session.save(selected,true,h.options),false);
+    h.backend.save=async request=>h.writes.push(request);
+    assert.equal(await h.session.save(selected,true,h.options),true);
+    assert.deepEqual(h.writes[0],h.writes[1]);
+    assert.deepEqual(h.writes[0].configs.map(config=>config.id),[scope?1:0,2]);
+    assert.equal(h.writes[0].configs[0].config.newPerDay,13);
+    assert.equal(h.writes[0].configs.at(-1).config.reviewsPerDay,40);
+    assert.notEqual(h.writes[0].configs[0].name,h.writes[0].configs.at(-1).name);
+  }
+});
+
+test('selecting a preset used by a single other deck still isolates current-deck changes',async()=>{
+  const h=setup();const other=copyDeckConfig(h.config);other.id=2;other.name='Other';
+  h.view.allConfigs.push({config:other,useCount:1});await h.session.load();
+  h.session.editPreset('select','2',h.config,false);
+  const draft=copyDeckConfig(h.states.at(-1).config);draft.config.newPerDay=13;
+  await h.session.save(draft,false,h.options);
+  assert.equal(h.writes[0].configs.at(-1).id,0);
 });

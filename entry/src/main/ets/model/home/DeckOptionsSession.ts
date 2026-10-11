@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { DeckConfig, DeckConfigsForUpdateView, UpdateDeckConfigsInput } from '../../proto/messages/DeckConfigMessages';
-import { buildDeckConfigRequest, copyDeckConfig } from '../DeckConfigSave';
+import { buildDeckConfigRequest, copyDeckConfig, prepareDeckConfigForSave } from '../DeckConfigSave';
 import type { DeckConfigRequestOptions } from '../DeckConfigSave';
 import { applyFsrsParams, fsrsOptimizeInput, fsrsWorkloadInput } from '../FsrsOptions';
 import type { ComputeFsrsParamsInput, ComputeFsrsParamsOutput, SimulateFsrsInput,
@@ -58,6 +58,7 @@ export interface DeckOptionsSnapshot {
   presets?: DeckOptionsPresetEntry[];
   presetKey?: string;
   presetAssignmentsChanged?: boolean;
+  presetShared?: boolean;
 }
 
 /** 一个弹层实例拥有一次编辑会话。已接受写入继续，销毁后不再通知 UI。 */
@@ -71,7 +72,6 @@ export class DeckOptionsSession {
   private completed: boolean = false;
   private loading: boolean = true;
   private view: DeckConfigsForUpdateView | null = null;
-  private original: DeckConfig | null = null;
   private fsrs: DeckOptionsFsrsState = new DeckOptionsFsrsState();
   private optimized: DeckConfig[] = [];
   private presets: DeckOptionsPresets | null = null;
@@ -103,7 +103,6 @@ export class DeckOptionsSession {
       const entry = view.allConfigs.find(item => item.config.id === view.currentDeck?.configId);
       if (entry === undefined || entry.config.config === null) throw new Error('deck config not found');
       this.view = view;
-      this.original = copyDeckConfig(entry.config);
       this.presets = new DeckOptionsPresets(view);
       this.optimized = [];
       this.fsrs = new DeckOptionsFsrsState();
@@ -119,18 +118,29 @@ export class DeckOptionsSession {
   async save(draft: DeckConfig, shared: boolean, options: DeckConfigRequestOptions): Promise<boolean> {
     if (!this.canOperate()) return false;
     // Bulk optimization changes shared parameters. Other current-deck edits still obey the user's scope.
-    const optimizedCurrent = this.optimized.find(config => config.id === this.original!.id);
-    const baseline = optimizedCurrent === undefined ? this.original! : optimizedCurrent;
+    const optimizedCurrent = this.optimized.find(config => config.id === draft.id);
+    const baseline = optimizedCurrent ?? this.presets!.baseline(draft);
     const request: UpdateDeckConfigsInput = buildDeckConfigRequest(this.deckId, this.view!, baseline, draft, shared, options);
     // Current config must stay last: Core uses it to bind targetDeckId.
     request.configs = this.optimized.filter(config => config.id !== request.configs[0].id)
       .map(config => copyDeckConfig(config)).concat(request.configs);
     if (this.presets !== null) {
-      const staged = this.presets.modifiedExceptCurrent();
       const current = request.configs[request.configs.length - 1];
-      const others = request.configs.slice(0, -1).filter(config => !this.presets!.removedIds.includes(config.id))
-        .map(config => staged.find(item => item.id !== 0 && item.id === config.id) ?? config);
-      request.configs = others.concat(staged.filter(config => config.id === 0 || !others.some(item => item.id === config.id)), [current]);
+      const others = request.configs.slice(0, -1).filter(config => !this.presets!.removedIds.includes(config.id));
+      const names = this.view!.allConfigs.filter(entry => !this.presets!.removedIds.includes(entry.config.id))
+        .map(entry => entry.config.name).concat(this.presets.entries.filter(entry => entry.config.id === 0).map(entry => entry.config.name));
+      if (current.id === 0 && draft.id !== 0) current.name = this.privateName(current.name, names);
+      names.push(current.name);
+      for (const staged of this.presets.modifiedExceptCurrent()) {
+        const original = this.optimized.find(config => config.id === staged.id) ?? this.presets.baseline(staged);
+        const saved = prepareDeckConfigForSave(this.view!, original, copyDeckConfig(staged), this.presets.sharedScope(String(staged.id)));
+        if (saved.id === 0 && staged.id !== 0) {
+          saved.name = this.privateName(staged.name, names); names.push(saved.name);
+        }
+        const index = saved.id === 0 ? -1 : others.findIndex(config => config.id === saved.id);
+        if (index === -1) others.push(saved); else others[index] = saved;
+      }
+      request.configs = others.concat([current]);
       request.removedConfigIds = this.presets.removedIds.slice();
     }
     this.saving = true;
@@ -154,24 +164,29 @@ export class DeckOptionsSession {
 
   dispose(): void { this.alive = false; this.version++; }
 
-  editPreset(action: string, value: string, draft: DeckConfig): boolean {
+  editPreset(action: string, value: string, draft: DeckConfig, shared: boolean = false): boolean {
     if (!this.canOperate() || this.presets === null) return false;
     switch (action) {
-      case 'select': this.presets.select(value, draft); break;
-      case 'rename': this.presets.rename(value, draft); break;
-      case 'create': this.presets.add(value, draft, false); break;
-      case 'clone': this.presets.add(value, draft, true); break;
-      case 'remove': this.presets.remove(draft); break;
+      case 'select': this.presets.select(value, draft, shared); break;
+      case 'rename': this.presets.rename(value, draft, shared); break;
+      case 'create': this.presets.add(value, draft, false, shared); break;
+      case 'clone': this.presets.add(value, draft, true, shared); break;
+      case 'remove': this.presets.remove(draft, shared); break;
       default: return false;
     }
-    this.original = copyDeckConfig(this.presets.current().config);
     this.fsrs.workload = null; this.fsrs.evaluation = null; this.fsrs.historyCount = null;
     this.emit('ready', '');
     return true;
   }
 
   private canOperate(): boolean {
-    return this.alive && !this.loading && !this.saving && !this.fsrs.busy && !this.completed && this.view !== null && this.original !== null;
+    return this.alive && !this.loading && !this.saving && !this.fsrs.busy && !this.completed && this.view !== null && this.presets !== null;
+  }
+
+  private privateName(base: string, reserved: string[]): string {
+    let name = base; let suffix = 2;
+    while (reserved.includes(name)) name = base + ' ' + String(suffix++);
+    return name;
   }
 
   /** Pure computation is staged; only save() submits deck configurations. */
@@ -221,7 +236,7 @@ export class DeckOptionsSession {
             if (response.fsrsItems > 0) {
               applyFsrsParams(config.config!, response.params);
               if (all) {
-                const staged = config.id === current.id ? copyDeckConfig(this.original!) : config;
+                const staged = this.presets!.baseline(config);
                 applyFsrsParams(staged.config!, response.params);
                 this.optimized = this.optimized.filter(item => item.id !== config.id).concat([staged]);
                 this.fsrs.batchDraft = true;
@@ -330,8 +345,9 @@ export class DeckOptionsSession {
     fsrs.workload = this.fsrs.workload; fsrs.workloadDays = this.fsrs.workloadDays; fsrs.error = this.fsrs.error;
     fsrs.evaluation = this.fsrs.evaluation; fsrs.historyCount = this.fsrs.historyCount;
     fsrs.evaluationSearch = this.fsrs.evaluationSearch; fsrs.evaluationDate = this.fsrs.evaluationDate;
-    this.publish({ phase: phase, view: this.view, config: this.original, error: error, fsrs: fsrs,
+    this.publish({ phase: phase, view: this.view, config: this.presets === null ? null : copyDeckConfig(this.presets.current().config), error: error, fsrs: fsrs,
       presets: this.presets?.entries.map(entry => ({ key: entry.key, config: copyDeckConfig(entry.config), useCount: entry.useCount })),
-      presetKey: this.presets?.selectedKey, presetAssignmentsChanged: this.presets?.assignmentsChanged });
+      presetKey: this.presets?.selectedKey, presetAssignmentsChanged: this.presets?.assignmentsChanged,
+      presetShared: this.presets?.sharedScope() });
   }
 }

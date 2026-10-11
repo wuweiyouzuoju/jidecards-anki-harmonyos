@@ -13,6 +13,7 @@ export class DeckOptionsPresets {
   private nextKey: number = 1;
   private view: DeckConfigsForUpdateView;
   private originals: DeckConfig[];
+  private scopes: Map<string, boolean> = new Map<string, boolean>();
 
   constructor(view: DeckConfigsForUpdateView) {
     this.view = view;
@@ -27,29 +28,35 @@ export class DeckOptionsPresets {
     if (entry === undefined) throw new Error('deck config not found');
     return entry;
   }
-  stage(draft: DeckConfig): void { this.current().config = copyDeckConfig(draft); }
-  select(key: string, draft: DeckConfig): void {
+  baseline(config: DeckConfig): DeckConfig {
+    return copyDeckConfig(this.originals.find(item => item.id === config.id) ?? config);
+  }
+  sharedScope(key: string = this.selectedKey): boolean { return this.scopes.get(key) ?? false; }
+  stage(draft: DeckConfig, shared: boolean = false): void {
+    this.current().config = copyDeckConfig(draft); this.scopes.set(this.selectedKey, shared);
+  }
+  select(key: string, draft: DeckConfig, shared: boolean = false): void {
     if (!this.entries.some(item => item.key === key)) throw new Error('deck config not found');
-    this.stage(draft);
+    this.stage(draft, shared);
     if (key !== this.selectedKey) this.assignmentsChanged = true;
     this.selectedKey = key;
   }
-  rename(name: string, draft: DeckConfig): void {
+  rename(name: string, draft: DeckConfig, shared: boolean = false): void {
     const unique = this.uniqueName(name, true);
-    this.stage(draft); this.current().config.name = unique;
+    this.stage(draft, shared); this.current().config.name = unique;
   }
-  add(name: string, draft: DeckConfig, clone: boolean): void {
+  add(name: string, draft: DeckConfig, clone: boolean, shared: boolean = false): void {
     const unique = this.uniqueName(name, false);
     const source = clone ? draft : this.view.defaults;
     if (source === null || source.config === null) throw new Error('default deck config unavailable');
     const config = copyDeckConfig(source); config.id = 0; config.name = unique; config.mtimeSecs = 0; config.usn = 0;
-    this.stage(draft);
+    this.stage(draft, shared);
     const key = 'new_' + String(this.nextKey++);
     this.entries.push({ key, config, useCount: 0 }); this.selectedKey = key; this.assignmentsChanged = true;
   }
-  remove(draft: DeckConfig): void {
+  remove(draft: DeckConfig, shared: boolean = false): void {
     if (this.current().config.id === 1) throw new Error('cannot remove default preset');
-    this.stage(draft);
+    this.stage(draft, shared);
     const index = this.entries.findIndex(item => item.key === this.selectedKey);
     const id = this.current().config.id;
     if (id !== 0) this.removedIds.push(id);
