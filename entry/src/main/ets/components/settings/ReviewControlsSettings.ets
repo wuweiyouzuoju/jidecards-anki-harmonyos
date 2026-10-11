@@ -3,6 +3,9 @@ import { FormRowLayout } from '../../utils/FormRowLayout';
 import { settingsItemText } from '../../utils/SettingsStructureText';
 import { SettingsToggleRow } from '../common/SettingsToggleRow';
 import { FormSelectRow } from '../common/FormSelectRow';
+import { SettingsActionRow } from '../common/SettingsActionRow';
+import { StudyKeyboardSettings } from './StudyKeyboardSettings';
+import { NativeDialogHost, NativeDialogDismiss, NativeDialogPresentation } from '../common/NativeDialogHost';
 import { localizedResourceText, resourceText } from '../../utils/UiFeedback';
 import { StudyQuickAnswerMode } from '../../model/StudyGestures';
 import { 颜色键 } from '../../model/颜色主题';
@@ -28,11 +31,30 @@ export struct ReviewControlsSettings {
   @State private hapticsToggle: boolean = true;
   @State private hapticsSaving: boolean = false;
   @State private hapticsSaveFailed: boolean = false;
+  private keyboardDialog: NativeDialogHost = new NativeDialogHost();
+  private keyboardBusy: boolean = false;
+  private readonly createKeyboardDialog: (dismiss: NativeDialogDismiss) => CustomDialogController =
+    (dismiss: NativeDialogDismiss): CustomDialogController => {
+      const presentation: NativeDialogPresentation = this.keyboardDialog.presentation();
+      const isCurrent: () => boolean = this.keyboardDialog.captureCurrent();
+      return new CustomDialogController({ builder: StudyKeyboardSettings({
+        onClose: this.keyboardDialog.guard((): void => { this.keyboardDialog.close(); }),
+        onBusyChange: (busy: boolean): void => { if (isCurrent()) this.keyboardBusy = busy; }
+      }), onWillDismiss: dismiss, autoCancel: presentation.autoCancel, customStyle: presentation.customStyle,
+        alignment: presentation.alignment, width: presentation.width, height: presentation.height,
+        maskColor: presentation.maskColor, openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation });
+  };
 
 
   aboutToAppear(): void {
+    this.keyboardDialog.activate();
     this.hapticsToggle = this.hapticsEnabled;
     this.loadControls();
+  }
+  aboutToDisappear(): void { this.keyboardDialog.dispose(); }
+  private openKeyboard(): void {
+    this.keyboardBusy = false;
+    this.keyboardDialog.open(this.createKeyboardDialog, (): boolean => !this.keyboardBusy);
   }
 
   private async loadControls(): Promise<void> {
@@ -132,6 +154,8 @@ export struct ReviewControlsSettings {
           Text($r('app.string.settings_study_controls_failed')).fontSize(12)
             .fontColor($r('app.color.error_text'))
         }
+        SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'study_keyboard', this.uiLanguage),
+          hint: $r('app.string.study_keyboard_entry_hint'), onAction: (): void => { this.openKeyboard(); } })
       }.width('100%')
     }
   }

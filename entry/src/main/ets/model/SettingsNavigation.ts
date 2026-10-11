@@ -6,6 +6,7 @@ export interface SettingsEntry {
   descriptionKey: string;
   simpleDescriptionKey?: string;
   searchKeys?: string[];
+  fullSearchKeys?: string[];
   fullOnly: boolean;
   agentOnly: boolean;
 }
@@ -13,7 +14,7 @@ export interface SettingsEntry {
 /** 设置目录是界面和 JIDE 的共同入口，具体设置仍由原分组负责读写。 */
 export const SETTINGS_ENTRIES: SettingsEntry[] = [
   { id: 'general', titleKey: 'settings_directory_general', descriptionKey: 'settings_directory_general_hint', fullOnly: false, agentOnly: false },
-  { id: 'scheduler', titleKey: 'settings_directory_review', descriptionKey: 'settings_directory_algorithm_hint', simpleDescriptionKey: 'settings_directory_review_simple_hint', searchKeys: ['settings_rollover', 'settings_learn_ahead', 'settings_timebox', 'settings_quick_answer', 'settings_study_layout', 'settings_study_layout_row', 'settings_study_layout_bottom', 'settings_study_layout_float', 'settings_study_layout_smart'], fullOnly: false, agentOnly: false },
+  { id: 'scheduler', fullSearchKeys:['deck_fsrsParameters_label'], titleKey: 'settings_directory_review', descriptionKey: 'settings_directory_algorithm_hint', simpleDescriptionKey: 'settings_directory_review_simple_hint', searchKeys: ['settings_rollover', 'settings_learn_ahead', 'settings_timebox', 'settings_quick_answer', 'settings_study_haptics', 'settings_study_haptics_search', 'settings_review_shortcuts_search', 'settings_tap_zones_label', 'settings_study_gestures', 'settings_study_layout', 'settings_study_layout_row', 'settings_study_layout_bottom', 'settings_study_layout_float', 'settings_study_layout_smart'], fullOnly: false, agentOnly: false },
   { id: 'sync', titleKey: 'settings_directory_sync', descriptionKey: 'settings_directory_sync_hint', simpleDescriptionKey: 'settings_directory_sync_simple_hint', fullOnly: false, agentOnly: false },
   { id: 'appearance', searchKeys: ['settings_show_remaining', 'settings_show_intervals', 'settings_hide_audio_buttons', 'settings_interrupt_audio', 'motion_style', 'motion_style_restrained', 'motion_style_lively'], titleKey: 'settings_directory_appearance', descriptionKey: 'settings_directory_appearance_hint', simpleDescriptionKey: 'settings_directory_appearance_simple_hint', fullOnly: false, agentOnly: false },
   { id: 'data', titleKey: 'settings_data_management', descriptionKey: 'settings_directory_data_hint', simpleDescriptionKey: 'settings_directory_data_simple_hint', searchKeys: ['hidden_decks_entry', 'hidden_decks_entry_subtitle', 'transfer_import_file', 'transfer_import_file_hint', 'transfer_export_deck', 'backup_hub_title', 'backup_full_restore_hint'], fullOnly: false, agentOnly: false },
@@ -35,7 +36,8 @@ export function filterSettingsEntries(query: string, simple: boolean, agent: boo
   return SETTINGS_ENTRIES.filter((entry: SettingsEntry): boolean => {
     if (!settingsEntryVisible(entry, simple, agent)) return false;
     const descriptionKey: string = simple ? (entry.simpleDescriptionKey ?? entry.descriptionKey) : entry.descriptionKey;
-    const keywords: string = (entry.searchKeys ?? []).map((key: string): string => localize(key)).join(' ');
+    const keys: string[] = (entry.searchKeys ?? []).concat(simple ? [] : (entry.fullSearchKeys ?? []));
+    const keywords: string = keys.map((key: string): string => localize(key)).join(' ');
     const text: string = `${localize(entry.titleKey)} ${localize(descriptionKey)} ${keywords}`.toLocaleLowerCase();
     return terms.every((term: string): boolean => text.includes(term));
   });
