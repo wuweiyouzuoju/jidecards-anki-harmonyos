@@ -48,7 +48,18 @@ export function buildStudyGestureScript(version: number, surface: number, gestur
     if(previous && previous.timer) clearTimeout(previous.timer);
     var cfg={version:${version},surface:${surface},gestures:${gestures},timer:0,last:null};
     window.__jideStudyInput=cfg;
+    function editable(el){
+      return !!el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable ||
+        (el.getAttribute && el.getAttribute('role')==='textbox'));
+    }
+    function inputFocus(el){
+      var c=window.__jideStudyInput;
+      if(window.jideStudyInput) window.jideStudyInput.onAction('input_focus',editable(el)?1:0,0,c.version,c.surface);
+    }
+    if(editable(document.activeElement)) inputFocus(document.activeElement);
     if(previous) return;
+    document.addEventListener('focusin',function(e){inputFocus(e.target);});
+    document.addEventListener('focusout',function(e){inputFocus(e.relatedTarget);});
     function interactive(el){
       while(el){
         if(/^(A|BUTTON|INPUT|TEXTAREA|SELECT|OPTION|CANVAS|AUDIO|VIDEO|IFRAME|SUMMARY|DETAILS)$/.test(el.tagName)

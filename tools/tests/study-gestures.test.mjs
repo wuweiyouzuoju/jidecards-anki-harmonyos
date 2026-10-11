@@ -50,6 +50,14 @@ function dom() {
     tick: ms => { time += ms; for (const [id, task] of [...tasks]) if (task.at <= time) { tasks.delete(id); task.fn(); } } };
 }
 
+test('template input focus is reported with current card identity, independent of text selection or gesture mode',()=>{
+  const d=dom();d.install(7,9,false);d.select('selected text');
+  for(const target of [{tagName:'INPUT'},{tagName:'TEXTAREA'},{tagName:'DIV',isContentEditable:true}]) {
+    d.listeners.focusin({target});assert.deepEqual(d.actions.at(-1),['input_focus',1,0,7,9]);
+  }
+  d.listeners.focusout({relatedTarget:null});assert.deepEqual(d.actions.at(-1),['input_focus',0,0,7,9]);
+});
+
 test('double tap emits only reveal, single tap waits, and updating a side cancels pending taps', () => {
   const d = dom();
   d.click(); d.tick(100); d.click(); d.tick(400);
