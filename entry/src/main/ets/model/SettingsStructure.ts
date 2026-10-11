@@ -11,6 +11,7 @@ export interface SettingsItem {
   /** 状态相关内容保留条件，不把尚未读取的账号/提供商状态当成已显示。 */
   condition?: string;
   sensitive?: boolean;
+  iconKey?: string;
 }
 export interface SettingsGroup {
   id: string;
@@ -28,7 +29,8 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
   ] },
   { id: 'review_controls', sectionId: 'scheduler', titleKey: 'settings_controls_review', items: [
     { id: 'study_haptics', titleKey: 'settings_study_haptics', settingId: 'study_haptics' },
-    { id: 'study_quick_answer', titleKey: 'settings_quick_answer', settingId: 'study_quick_answer' }
+    { id: 'study_quick_answer', titleKey: 'settings_quick_answer', settingId: 'study_quick_answer' },
+    { id: 'study_keyboard', titleKey: 'study_keyboard_title', opens: 'study_keyboard' }
   ] },
   { id: 'global_review', sectionId: 'scheduler', titleKey: 'settings_core_review', fullOnly: true, items: [
     { id: 'rollover', titleKey: 'settings_rollover' },
@@ -101,6 +103,9 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     { id: 'help_browser_info', titleKey: 'glossary_browser_info_label' }
   ] },
   { id: 'ai', sectionId: 'ai', titleKey: 'ai_agent_settings_title', items: [
+    { id: 'history_limit', titleKey: 'agent_history_limit' },
+    { id: 'history_manage', titleKey: 'agent_history_manage', iconKey: 'ic_common_history', opens: 'agent_history_management' },
+    { id: 'history_clear', titleKey: 'agent_history_clear', iconKey: 'ic_study_delete' },
     { id: 'ai_provider', titleKey: 'ai_agent_provider' },
     { id: 'ai_model', titleKey: 'ai_card_model', condition: 'builtin_provider' },
     { id: 'ai_custom_url', titleKey: 'ai_agent_custom_url_hint', condition: 'custom_provider' },

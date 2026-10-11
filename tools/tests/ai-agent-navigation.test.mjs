@@ -316,10 +316,11 @@ test('root deck navigation rejects unavailable targets and open forms before any
 
 test('the actual hidden-page callback cancels navigation and clears foreground ownership', () => {
   const source=read('pages/AI制卡页.ets');const body=source.match(/\.onHidden\(\(\): void => \{([^\n]+)\}\)/)[1];
-  let cancelled=0;const events=[],wheelVisibility=[];const page={isAgentPageVisible:true,
+  let cancelled=0,menuClosed=0;const events=[],wheelVisibility=[];const page={isAgentPageVisible:true,
+    closeMoreMenu:()=>menuClosed++,
     wheelSession:{setVisible:visible=>wheelVisibility.push(visible)},navigationSession:{cancel:()=>cancelled++}};
   new Function('appInterface',body).call(page,{hidePage:id=>events.push(id)});
-  assert.equal(cancelled,1);assert.equal(page.isAgentPageVisible,false);assert.deepEqual(events,['agent']);
+  assert.equal(menuClosed,1);assert.equal(cancelled,1);assert.equal(page.isAgentPageVisible,false);assert.deepEqual(events,['agent']);
   assert.deepEqual(wheelVisibility,[false]);
 });
 

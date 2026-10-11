@@ -25,6 +25,7 @@ export function interfaceIconResource(key: string): ResourceStr {
     case 'ic_common_arrow_left': return $r('app.media.ic_common_arrow_left');
     case 'ic_common_close': return $r('app.media.ic_common_close');
     case 'ic_home_more': return $r('app.media.ic_home_more');
+    case 'ic_home_filtered_deck': return $r('app.media.ic_home_filtered_deck');
     case 'ic_home_new': return $r('app.media.ic_home_new');
     case 'ic_common_history': return $r('app.media.ic_common_history');
     case 'ic_mode_simple': return $r('app.media.ic_mode_simple');

@@ -147,7 +147,7 @@ export function buildAgentAppStructure(context: AppInterfaceContext, surfaceId: 
           visibility: !visibleIds.includes(item.id) || absentControl || (liveMenu && observation !== undefined && !observation.optionIds.includes(item.id)) ? 'hidden' :
             control !== undefined ? 'observed' : (item.condition === undefined ? 'available_in_surface' : 'conditional'),
           condition: item.condition ?? '', enabled: control?.enabled, selected: control?.selected, iconKey: control?.iconKey ?? item.iconKey,
-          settingId: '', readTool: '', writeTool: '', sensitive: false };
+          settingId: '', readTool: '', writeTool: '', sensitive: item.sensitive === true };
       }).concat((observation?.items ?? []).filter((control): boolean => !surface.items.some((item): boolean => item.id === control.id))
         .map((control): AgentInterfaceItem => ({ id: control.id, title: control.title, opens: '', visibility: 'observed', condition: '',
           enabled: control.enabled, selected: control.selected, iconKey: control.iconKey,

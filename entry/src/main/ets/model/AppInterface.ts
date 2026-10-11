@@ -6,6 +6,8 @@ import { FEEDBACK_ACTIONS } from './InteractionFeedback';
 import { CARD_FLAGS } from './CardMarking';
 import { IMPORT_RESULT_ACTIONS } from './ImportResults';
 import { REVIEW_AUDIO_PREFERENCES } from './ReviewAudioPreferences';
+import { STUDY_KEYBOARD_FIELDS } from './StudyKeyboard';
+import { SETTINGS_GROUPS } from './SettingsStructure';
 import { DECK_OPTION_GROUPS } from './DeckOptionsCatalog';
 import type { NoteAudioStatus } from './NoteAudioDraft';
 import { DRAWING_COLORS, DRAWING_TEXT_HANDLES, noteDrawingImageActionKey } from './NoteDrawing';
@@ -28,6 +30,7 @@ export interface AppInterfaceItem {
   fullOnly?: boolean;
   agentOnly?: boolean;
   cloudOnly?: boolean;
+  sensitive?: boolean;
   condition?: string;
 }
 export interface AppInterfaceSurface {
@@ -101,6 +104,8 @@ export const WHITEBOARD_INTERFACE_ITEMS: AppInterfaceItem[] = [
 
 /** 菜单直接遍历这里的条目；标签、顺序和显隐由 UI 与 JIDE 共用。 */
 export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
+  { id: 'study_keyboard', titleKey: 'study_keyboard_title', instructionsKey: 'study_keyboard_help', parent: 'settings',
+    items: STUDY_KEYBOARD_FIELDS },
   { id: 'notetype_editor', titleKey: 'notetype_editor_title', instructionsKey: 'notetype_editor_tokens', parent: 'notetype_management', items: [
     { id: 'fields', titleKey: 'notetype_editor_fields' },
     { id: 'templates', titleKey: 'notetype_editor_templates' },
@@ -272,10 +277,10 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
   { id: 'browser', titleKey: 'browser_title', instructionsKey: 'browser_preferences_instructions', parent: 'home', items: [
     { id: 'back', titleKey: 'study_back', iconKey: 'ic_common_arrow_left' },
     { id: 'search', titleKey: 'browser_search_placeholder' },
-    { id: 'cards', titleKey: 'browser_mode_cards', opens: 'browser_view' },
-    { id: 'notes', titleKey: 'browser_mode_notes', opens: 'browser_view' },
-    { id: 'filter', titleKey: 'browser_action_sidebar', opens: 'browser_view' },
-    { id: 'sort', titleKey: 'browser_sort_default', opens: 'browser_view' },
+    { id: 'mode', titleKey: 'browser_mode_switch', opens: 'browser_view' },
+    { id: 'status', titleKey: 'browser_status_all', opens: 'browser_view' },
+    { id: 'filter', titleKey: 'browser_action_sidebar', iconKey: 'ic_home_filtered_deck', opens: 'browser_sidebar' },
+    { id: 'sort', titleKey: 'browser_sort_title', opens: 'browser_view' },
     { id: 'more', titleKey: 'study_more', iconKey: 'ic_home_more', opens: 'browser_more' },
     { id: 'selection', titleKey: 'browser_selection_actions', iconKey: 'ic_home_more', opens: 'browser_batch' }
   ] },
@@ -393,18 +398,30 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
   { id: 'browser_view', titleKey: 'browser_title', parent: 'browser', items: [] },
   { id: 'agent', titleKey: 'ai_agent_title', parent: 'home', items: [
     { id: 'back', titleKey: 'study_back', iconKey: 'ic_common_arrow_left' },
-    { id: 'history', titleKey: 'ai_agent_history', iconKey: 'ic_common_history', opens: 'agent_history', condition: 'conversation' },
-    { id: 'memory', titleKey: 'agent_memory_title', iconKey: 'ic_agent_memory', opens: 'agent_memory', condition: 'history' },
+    { id: 'more', titleKey: 'study_more', iconKey: 'ic_home_more', opens: 'agent_more', condition: 'conversation' },
     { id: 'new', titleKey: 'ai_agent_history_new', iconKey: 'ic_home_new', condition: 'history' },
     { id: 'memory_create', titleKey: 'ai_agent_memory_create', iconKey: 'ic_home_new', opens: 'agent_memory_editor', condition: 'memory' },
     { id: 'input', titleKey: 'ai_card_input_hint', condition: 'conversation' },
     { id: 'import', titleKey: 'ai_agent_import_files', condition: 'conversation' },
     { id: 'submit', titleKey: 'ai_card_send', condition: 'conversation' }
   ] },
+  { id: 'agent_more', titleKey: 'study_more', parent: 'agent', items: [
+    { id: 'settings', titleKey: 'ai_agent_settings_page_title', iconKey: 'ic_home_settings', opens: 'agent_settings' },
+    { id: 'history', titleKey: 'ai_agent_history', iconKey: 'ic_common_history', opens: 'agent_history' }
+  ] },
   { id: 'agent_history', titleKey: 'ai_agent_history_title', parent: 'agent', items: [
+    { id: 'search', titleKey: 'agent_history_search' },
     { id: 'delete', titleKey: 'ai_agent_history_delete', condition: 'has_conversations' }
   ] },
-  { id: 'agent_memory', titleKey: 'agent_memory_title', parent: 'agent_history', instructionsKey: 'agent_memory_description', items: [
+  { id: 'agent_settings', titleKey: 'ai_agent_settings_page_title', parent: 'agent', items: [
+    { id: 'memory', titleKey: 'agent_memory_title', iconKey: 'ic_agent_memory', opens: 'agent_memory' },
+    ...(SETTINGS_GROUPS.find((group): boolean => group.id === 'ai')?.items ?? [])
+  ] },
+  { id: 'agent_history_management', titleKey: 'agent_history_manage', parent: 'agent_settings', items: [
+    { id: 'search', titleKey: 'agent_history_search' },
+    { id: 'delete', titleKey: 'ai_agent_history_delete', iconKey: 'ic_study_delete' }
+  ] },
+  { id: 'agent_memory', titleKey: 'agent_memory_title', parent: 'agent_settings', instructionsKey: 'agent_memory_description', items: [
     { id: 'search', titleKey: 'agent_memory_search' }, { id: 'filter', titleKey: 'agent_memory_scope' },
     { id: 'create', titleKey: 'ai_agent_memory_create', iconKey: 'ic_home_new', opens: 'agent_memory_editor' },
     { id: 'edit', titleKey: 'ai_agent_memory_update', iconKey: 'ic_study_edit', opens: 'agent_memory_editor' },
@@ -596,6 +613,16 @@ export function browserBackItem(multiSelect: boolean): AppInterfaceItem {
     iconKey: multiSelect ? 'ic_common_close' : 'ic_common_arrow_left' };
 }
 
+/** 浏览顶栏的真实入口同时供 UI 标签、图标和实时认知使用。 */
+export function browserToolbarItems(multiSelect: boolean, filterActive: boolean): AppInterfaceItem[] {
+  const items: AppInterfaceItem[] = APP_INTERFACE_SURFACES.find((surface: AppInterfaceSurface): boolean =>
+    surface.id === 'browser')?.items ?? [];
+  return items.filter((item: AppInterfaceItem): boolean => multiSelect ? item.id !== 'more' : item.id !== 'selection')
+    .map((item: AppInterfaceItem): AppInterfaceItem => item.id === 'back' ? browserBackItem(multiSelect) : {
+      id: item.id, titleKey: item.id === 'filter' && filterActive ? 'browser_filter_active' : item.titleKey,
+      iconKey: item.iconKey, opens: item.opens });
+}
+
 export const SETTINGS_HEADER_ITEMS: AppInterfaceItem[] = [
   { id: 'back', titleKey: 'study_back', iconKey: 'ic_common_arrow_left' },
   { id: 'simple', titleKey: 'settings_simple_mode_simple', iconKey: 'ic_mode_simple' },
@@ -622,14 +649,17 @@ export interface StudyInterfaceContext {
 }
 
 export interface AgentInterfaceContext {
+  settings?: boolean;
+  settingsBusy?: boolean;
   memory?: boolean;
   memoryCanCreate?: boolean;
   history: boolean; processing: boolean; parsing: boolean; batchRunning: boolean;
   pendingClarification: boolean; canSubmit: boolean;
 }
 
-export function agentInterfaceTitle(mode: string, history: boolean, memory: boolean = false): string {
+export function agentInterfaceTitle(mode: string, history: boolean, memory: boolean = false, settings: boolean = false): string {
   if (memory) return 'agent_memory_title';
+  if (settings) return 'ai_agent_settings_page_title';
   return history ? 'ai_agent_history_title' : mode === 'assistant' ? 'ai_agent_title' :
     mode === 'create' ? 'ai_card_title' : 'ai_card_edit';
 }
@@ -649,15 +679,37 @@ export function agentInterfaceControls(context: AgentInterfaceContext): AppInter
   const surface = APP_INTERFACE_SURFACES.find((entry): boolean => entry.id === 'agent');
   return (surface?.items ?? []).filter((item): boolean => item.condition === undefined ||
     (item.condition === 'memory' ? context.memory === true :
-      !context.memory && (item.condition === 'history' ? context.history : !context.history)))
+      !context.memory && !context.settings && (item.condition === 'conversation_or_history' ||
+        (item.condition === 'history' ? context.history : !context.history))))
     .map((item): AppInterfaceMenuItem => ({ id: item.id,
       titleKey: item.id === 'submit' && context.processing ? 'ai_agent_cancel' :
         item.id === 'import' ? agentImportLabelKey(context.parsing) : item.titleKey, opens: item.opens,
       condition: item.condition, selected: false,
-      enabled: item.id === 'back' ? true : item.id === 'memory_create' ? context.memoryCanCreate === true : ['history', 'new', 'memory'].includes(item.id) ?
+      enabled: item.id === 'back' ? !context.settingsBusy : item.id === 'memory_create' ? context.memoryCanCreate === true : ['more', 'new'].includes(item.id) ?
         !context.processing && !context.parsing && !context.batchRunning : item.id === 'input' ?
           !context.pendingClarification : item.id === 'import' ?
             !context.processing && !context.parsing && !context.pendingClarification : context.processing || context.canSubmit }));
+}
+
+/** 表单只发布非敏感状态；密钥和自定义 URL 不进入界面观察。 */
+export interface AgentWebSettingsState {
+  ready: boolean; busy: boolean; dirty: boolean; webEnabled: boolean; searchProvider: string;
+}
+export interface AgentSettingsInterfaceContext {
+  provider: string; ready: boolean; busy: boolean; web: AgentWebSettingsState;
+  historyReady?: boolean;
+}
+export function agentSettingsControls(context: AgentSettingsInterfaceContext): AppInterfaceControl[] {
+  const surface = APP_INTERFACE_SURFACES.find((entry): boolean => entry.id === 'agent_settings');
+  return (surface?.items ?? []).filter((item): boolean => item.condition === undefined ||
+    (item.condition === 'custom_provider' ? context.provider === 'custom' :
+      item.condition === 'builtin_provider' ? context.provider !== 'custom' :
+        item.condition === 'web_enabled' && context.web.webEnabled))
+    .map((item): AppInterfaceControl => ({ id: item.id, title: '', titleKey: item.titleKey, iconKey: item.iconKey,
+      enabled: item.id.startsWith('history_') ? context.historyReady === true && !context.busy && !context.web.busy :
+        item.id === 'memory' ? !context.busy && !context.web.busy : item.id.startsWith('ai_web_') ?
+        context.web.ready && !context.busy && !context.web.busy : context.ready && !context.busy && !context.web.busy,
+      selected: item.id === 'ai_web_enabled' && context.web.webEnabled }));
 }
 
 export function reminderEditorControls(creating: boolean, busy: boolean): AppInterfaceMenuItem[] {

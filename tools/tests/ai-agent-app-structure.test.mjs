@@ -4,7 +4,7 @@ import test from 'node:test';
 import { REVIEW_AUDIO_PREFERENCES } from '../../entry/src/main/ets/model/ReviewAudioPreferences.ts';
 import { readFileSync, readdirSync } from 'node:fs';
 import { APP_INTERFACE_SURFACES, NOTETYPE_MANAGEMENT_ACTIONS, EMPTY_CARDS_ACTIONS, AppInterfaceTracker, visibleInterfaceItems, deckDetailsMoreItems, settingsHeaderItems, settingsHeaderControls } from '../../entry/src/main/ets/model/AppInterface.ts';
-import { appInterfaceSurfaceIds, browserInterfaceMenu, studyInterfaceMenu } from '../../entry/src/main/ets/model/AppInterface.ts';
+import { appInterfaceSurfaceIds, browserInterfaceMenu, browserToolbarItems, studyInterfaceMenu } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { agentInterfaceControls, agentInterfaceTitle, agentImportLabelKey, reminderEditorControls, reminderEditorTitle } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { stripTypeScriptTypes } from 'node:module';
 import { SETTINGS_GROUPS, settingsItem, visibleSettingsGroups } from '../../entry/src/main/ets/model/SettingsStructure.ts';
@@ -113,7 +113,7 @@ test('icon controls retain names and current mode in shared UI and JIDE observat
     snapshot[0].items[1].iconKey = 'changed-copy';
     assert.equal(tracker.snapshot()[0].items[1].iconKey, mode.iconKey, 'observation copies retain isolated icon metadata');
   }
-  for (const [surface, id, icon] of [['reminders', 'create', 'ic_home_new'], ['agent', 'history', 'ic_common_history'],
+  for (const [surface, id, icon] of [['reminders', 'create', 'ic_home_new'], ['agent_more', 'history', 'ic_common_history'],
     ['agent', 'new', 'ic_home_new'], ['study', 'more', 'ic_home_more'], ['stats', 'back', 'ic_common_arrow_left']]) {
     const item = structure(context, surface).surfaces[0].items.find(item => item.id === id);
     assert.equal(item.iconKey, icon);
@@ -245,7 +245,7 @@ test('setting knowledge and the current tool declarations remain separate from p
   assert.equal(items.find(x=>x.id==='deck_list_style').writeTool,'propose_set_setting');
   assert.equal(items.some(x=>x.id==='deck_list_narrow'),false);
   assert.equal(items.find(x=>x.id==='theme_mode').writeTool,'set_theme_mode');
-  assert.equal(items.find(x=>x.id==='theme_motion').writeTool,'');
+  assert.equal(items.find(x=>x.id==='theme_motion').writeTool,'propose_set_setting');
   const limited=buildAgentAppStructure(context,'settings','appearance',localize,agentSettingDefinitions(),[],[]);
   assert.equal(limited.sections[0].cards[0].items.find(x=>x.id==='theme_mode').writeTool,'');
   assert.equal(limited.sections[0].cards[0].items.find(x=>x.id==='theme_mode').readTool,'');
@@ -371,17 +371,73 @@ test('browser menus expose actual disabled, selected and dynamic options with no
   const View=loadComponentLogic('components/browser/BrowserViewMenu.ets','BrowserViewMenu',{
     appInterface:tracker,namedResourceText:(_,key)=>localize(key),resourceText:loadUiFeedback().resourceText});
   const menu=new View();menu.getUIContext=()=>({});menu.group='sort';menu.sortIndex=1;
-  menu.sortOptions=[{value:'Default'},{value:'New plugin column ↑'}];menu.aboutToAppear();
+  menu.sortOptions=[{value:'Default'},{value:'New plugin column'}];menu.aboutToAppear();
   let result=buildAgentAppStructure(context,'browser_view','',localize,[],[],tracker.snapshot());
-  assert.deepEqual(result.surfaces[0].items.map(x=>x.title),['Default','New plugin column ↑']);
+  assert.deepEqual(result.surfaces[0].items.filter(x=>x.id.startsWith('sort-')).map(x=>x.title),['Default','New plugin column']);
   assert.equal(result.surfaces[0].items[1].selected,true);
+  assert.equal(result.surfaces[0].items.find(x=>x.id==='ascending').selected,true);
+  menu.selectDirection(true);
+  result=buildAgentAppStructure(context,'browser_view','',localize,[],[],tracker.snapshot());
+  assert.equal(result.surfaces[0].items.find(x=>x.id==='descending').selected,true);
+  assert.equal(result.surfaces[0].items.find(x=>x.id==='apply').title,localize('browser_detail_confirm'));
   menu.group='filter';menu.filterOptions=[{value:'Only new'}];menu.filterIndex=0;menu.available=false;menu.publishInterface();
   result=buildAgentAppStructure(context,'browser_view','',localize,[],[],tracker.snapshot());
-  assert.deepEqual(result.surfaces[0].items.map(x=>x.title),['Only new']);assert.equal(result.surfaces[0].items[0].enabled,false);
+  assert.deepEqual(result.surfaces[0].items.filter(x=>x.id.startsWith('filter-')).map(x=>x.title),['Only new']);
+  assert.equal(result.surfaces[0].items.find(x=>x.id==='apply').enabled,false);
+  assert.equal(result.surfaces[0].items.find(x=>x.id==='close').enabled,true);
   menu.filterOptions=[{value:{id:7,params:['app.string.browser_mode_cards']}}];
   menu.getUIContext=()=>({getHostContext:()=>({resourceManager:{getStringSync:id=>{assert.equal(id,7);return localize('browser_mode_cards');}}})});
   menu.publishInterface();assert.equal(tracker.snapshot()[0].optionLabels[0],localize('browser_mode_cards'));
   menu.aboutToDisappear();menu.publishInterface();assert.equal(tracker.snapshot().length,0,'late prop updates cannot remount a disposed view');
+});
+
+test('browser toolbar declaration separates sidebar filter from status and exposes one current mode trigger', () => {
+  const uiIcons = loadPlatformModule('utils/AppInterfaceText.ets', 'interfaceControlIcon', { $r: key => key });
+  for (const active of [false,true]) {
+    const items=browserToolbarItems(false,active);
+    assert.deepEqual(items.map(x=>x.id),['back','search','mode','status','filter','sort','more']);
+    assert.equal(items.find(x=>x.id==='filter').opens,'browser_sidebar');
+    assert.equal(items.find(x=>x.id==='filter').titleKey,active?'browser_filter_active':'browser_action_sidebar');
+    assert.equal(items.find(x=>x.id==='status').opens,'browser_view');
+    assert.equal(uiIcons(items,'filter'),'app.media.'+items.find(x=>x.id==='filter').iconKey);
+    for (const item of items) for (const locale of [zh,en]) assert.ok(locale.has(item.titleKey));
+  }
+  const selected=browserToolbarItems(true,false);
+  assert.deepEqual(selected.map(x=>x.id),['back','search','mode','status','filter','sort','selection']);
+  assert.equal(selected[0].titleKey,'browser_exit_selection');
+});
+
+test('browser owner publishes actual trigger labels and blocks controls while selecting, searching or writing', () => {
+  for (const labels of [zh,en]) {
+    const tracker = new AppInterfaceTracker();
+    const Page = pageMethods('pages/浏览页.ets',['publishInterface','browserFilterActive','viewControlsAvailable'], {
+      appInterface:tracker, browserToolbarItems, namedResourceText:(_,key)=>labels.get(key), FEEDBACK_ACTIONS:[]
+    });
+    const page = new Page();
+    const modeLabel=labels.get('browser_mode_notes');
+    const statusLabel=labels.get('browser_filter_suspended');
+    Object.assign(page,{ interfaceMounted:true,阶段:'list',多选模式值:false,mutationBusy:false,批量忙碌:false,
+      refreshingSearch:false,refreshError:'',resultMessage:'',搜索文本:'',quickFilter:'suspended',浏览模式值:'notes',
+      sortColumn:'cardMod',sortReverse:false,subtitleIndex:0,inlineEditorId:0,结果ID列表:[1,2],选中ID列表:[],
+      browserPreferences:{cardsColumns:['question'],notesColumns:['question']},getUIContext:()=>({}),
+      viewChoiceLabel:group=>group==='mode'?modeLabel:statusLabel,sortLabel:()=>labels.get('browser_sort_card_modified')+' ↓' });
+    for (const boundary of ['', 'refreshingSearch','mutationBusy','批量忙碌','多选模式值']) {
+      if (boundary) page[boundary]=true;
+      page.publishInterface();
+      const result=buildAgentAppStructure(context,'browser','',key=>labels.get(key),[],[],tracker.snapshot());
+      const items=result.surfaces[0].items;
+      assert.equal(items.find(x=>x.id==='sort').title,page.sortLabel());
+      assert.equal(items.find(x=>x.id==='status').title,statusLabel);
+      assert.equal(items.find(x=>x.id==='filter').selected,true);
+      for (const id of ['status','filter','sort']) assert.equal(items.find(x=>x.id===id).enabled,boundary==='');
+      assert.equal(items.find(x=>x.id==='mode').visibility,'observed');
+      assert.equal(items.find(x=>x.id==='mode').enabled,boundary==='');
+      assert.equal(items.find(x=>x.id==='mode').title,modeLabel);
+      if (boundary) page[boundary]=false;
+    }
+    page.interfaceMounted=false; tracker.leave('browser'); page.publishInterface();
+    assert.equal(tracker.snapshot().length,0);
+  }
 });
 
 function pageMethods(file,names,deps) {
@@ -521,9 +577,9 @@ test('JIDE input and header share the actual history, parsing, stop and readines
       for (const batchRunning of [false, true]) for (const canSubmit of [false, true]) {
         const controls = agentInterfaceControls({history,processing,parsing,pendingClarification,batchRunning,canSubmit});
         const byId = id => controls.find(item => item.id === id);
-        assert.deepEqual(controls.map(x => x.id), history ? ['back','memory','new'] : ['back','history','input','import','submit']);
+        assert.deepEqual(controls.map(x => x.id), history ? ['back','new'] : ['back','more','input','import','submit']);
         assert.equal(byId('back').enabled, true);
-        assert.equal(byId(history ? 'new' : 'history').enabled, !processing && !parsing && !batchRunning);
+        assert.equal(byId(history ? 'new' : 'more').enabled, !processing && !parsing && !batchRunning);
         if (!history) {
           assert.equal(byId('input').enabled, !pendingClarification);
           assert.equal(byId('import').enabled, !processing && !parsing && !pendingClarification);
@@ -533,8 +589,8 @@ test('JIDE input and header share the actual history, parsing, stop and readines
         }
       }
   const ui = read('pages/AI制卡页.ets');
-  for (const id of ['input','import','submit','history','new']) assert.ok(ui.includes(`this.interfaceEnabled('${id}')`),id);
-  for (const id of ['input','submit','history','new','back']) assert.ok(ui.includes(`this.interfaceLabel('${id}')`),id);
+  for (const id of ['input','import','submit','more','new']) assert.ok(ui.includes(`this.interfaceEnabled('${id}')`),id);
+  for (const id of ['input','submit','more','new','back']) assert.ok(ui.includes(`this.interfaceLabel('${id}')`),id);
   for (const mode of ['assistant','create','edit']) assert.ok(zh.has(agentInterfaceTitle(mode,false)));
   assert.equal(agentInterfaceTitle('assistant',true),'ai_agent_history_title');
 });
@@ -581,7 +637,9 @@ test('history observes actual bounded conversation titles, selection and cleanup
   assert.equal(view.items.find(x=>x.id==='h1').selected,true);
   assert.ok(!JSON.stringify(view).includes('PRIVATE_CHAT'));
   list.conversations=[];list.publishInterface();
-  assert.equal(buildAgentAppStructure(context,'agent_history','',localize,[],[],tracker.snapshot()).surfaces[0].items[0].visibility,'hidden');
+  const empty = buildAgentAppStructure(context,'agent_history','',localize,[],[],tracker.snapshot()).surfaces[0];
+  assert.equal(empty.items.find(item => item.id === 'search').visibility, 'observed');
+  assert.equal(empty.items.find(item => item.id === 'delete').visibility, 'hidden');
   list.aboutToDisappear();list.publishInterface();assert.equal(tracker.snapshot().length,0);
 });
 
