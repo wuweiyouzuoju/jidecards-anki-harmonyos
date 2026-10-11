@@ -106,7 +106,7 @@ export struct 卡片预览页 {
   private readonly desktopPreview: boolean = deviceInfo.deviceType === '2in1' || deviceInfo.deviceType === 'pc';
   @StorageProp(PAGE_SURFACE_KEY) private pageSurface: string = '#F5F7FA';
   @StorageProp('cardTextSizePercent') private cardTextSizePercent: number = 100;
-  @Prop isDark: boolean = false;
+  @Prop @Watch('cardThemeChanged') isDark: boolean = false;
   @Prop 卡片ID列表: number[] = [];
   @Prop 初始索引: number = 0;
   @Prop 媒体目录: string = '';
@@ -129,7 +129,8 @@ export struct 卡片预览页 {
   @State private hasRenderedCard: boolean = false;
   @State private cardRenderPending: boolean = false;
   private readonly cardWeb: CardWebView = new CardWebView(this.网页控制器,
-    (background: string): void => { this.previewCardShown(background); }, (_message: string): void => { this.webFailed(); },
+    (background: string, appearanceOnly: boolean): void => { this.previewCardShown(background, appearanceOnly); },
+    (_message: string): void => { this.webFailed(); },
     this.备用网页控制器, (slot: number): void => {
       if (slot !== this.visibleWebSlot) this.initialFocusPending = true;
       this.visibleWebSlot = slot;
@@ -176,6 +177,7 @@ export struct 卡片预览页 {
 
   aboutToAppear(): void {
     this.mounted = true;
+    this.cardThemeChanged();
     this.onBackHandlerChange((): boolean => this.dismissMoreMenu());
     // 固定本次预览的 ID 顺序；字段编辑后的搜索重排不能把当前卡换成另一张。
     this.previewIds = this.卡片ID列表.slice();
@@ -201,6 +203,10 @@ export struct 卡片预览页 {
     if (!this.moreMenuOpen) return false;
     this.moreMenuOpen = false;
     return true;
+  }
+
+  private cardThemeChanged(): void {
+    if (this.mounted) this.cardWeb.setTheme(this.isDark);
   }
 
   /** 编辑或后台期间停止所有声音；返回后由用户重播，不自动打断其他音频。 */
@@ -510,10 +516,11 @@ export struct 卡片预览页 {
     }
   }
 
-  private previewCardShown(background: string): void {
+  private previewCardShown(background: string, appearanceOnly: boolean = false): void {
     if (!this.mounted) return;
     this.hasRenderedCard = true;
     if (background !== '') this.cardSurfaceBackground = background;
+    if (appearanceOnly) return;
     this.cardRenderPending = false;
     this.playCurrentAudio();
     this.focusPreviewCard();

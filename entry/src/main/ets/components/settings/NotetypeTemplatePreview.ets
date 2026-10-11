@@ -47,7 +47,7 @@ export struct NotetypeTemplatePreview {
   @StorageProp('导航条高度') private navigationBarHeight: number = 0;
   @Prop media: DraftPreviewMedia = { fields: [], directory: '', filenames: [] };
   onSelect: (index: number) => void = (_index: number): void => {};
-  @Prop @Watch('showSide') isDark: boolean = false;
+  @Prop @Watch('cardThemeChanged') isDark: boolean = false;
   @State private answerSide: boolean = false;
   @State private failed: boolean = false;
   @State private audioFailed: boolean = false;
@@ -62,10 +62,11 @@ export struct NotetypeTemplatePreview {
   private spareController: webview.WebviewController = new webview.WebviewController();
   private readonly webSlots: number[] = [0, 1];
   private attachedWebSlots: boolean[] = [false, false];
-  private cardWeb: CardWebView = new CardWebView(this.controller, (background: string): void => {
+  private cardWeb: CardWebView = new CardWebView(this.controller, (background: string, appearanceOnly: boolean): void => {
     if (!this.attached) return;
-    this.hasRendered = true; this.renderPending = false;
     if (background !== '') this.cardSurfaceBackground = background;
+    if (appearanceOnly) return;
+    this.hasRendered = true; this.renderPending = false;
     this.playAudio();
   }, (_message: string): void => { this.failed = true; this.renderPending = false; },
     this.spareController, (slot: number): void => {
@@ -84,6 +85,7 @@ export struct NotetypeTemplatePreview {
 
   aboutToAppear(): void {
     this.alive = true;
+    this.cardThemeChanged();
     this.onReleaseAvailable((): Promise<void> => this.releaseCard());
     reviewPreferences.read().then((value): void => {
       if (!this.alive) return;
@@ -137,6 +139,10 @@ export struct NotetypeTemplatePreview {
     this.answerSide = false;
     this.cardWeb.reset();
     this.showSide();
+  }
+
+  private cardThemeChanged(): void {
+    if (this.alive) this.cardWeb.setTheme(this.isDark);
   }
 
   private loadingChanged(): void {

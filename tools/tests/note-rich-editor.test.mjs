@@ -533,10 +533,16 @@ test('help uses current labels and the common header centers independently of si
   const header=read('entry/src/main/ets/components/common/DialogHeader.ets');
   assert.match(header,/Stack\(\{ alignContent: Alignment.Center \}\)/);
   assert.match(header,/HelpLabel\([\s\S]*?centered: true/);
-  const width=Number(header.match(/HelpLabel\([\s\S]*?\.width\('(\d+)%'\)/)[1])/100;
-  for(const viewport of [320,840])for(const inset of [0,24]) {
-    const content=viewport-2*inset;const start=(content-content*width)/2;
-    assert.equal(inset+start+content*width/2,viewport/2);
+  assert.match(header,/\.width\('100%'\)\.padding\(\{ left: this.titleInset\(\), right: this.titleInset\(\) \}\)/);
+  const dimensions=loadPlatformModule('utils/应用尺寸.ets','应用尺寸',{});
+  const Header=loadComponentLogic('components/common/DialogHeader.ets','DialogHeader',{$r:key=>key,应用尺寸:dimensions});
+  const instance=new Header();
+  for(const showClose of [false,true])for(const showAction of [false,true]) {
+    instance.showClose=showClose;instance.showAction=showAction;
+    for(const viewport of [320,840])for(const inset of [0,24]) {
+      const content=viewport-2*inset;const start=instance.titleInset();
+      assert.equal(inset+start+(content-2*start)/2,viewport/2);
+    }
   }
 });
 

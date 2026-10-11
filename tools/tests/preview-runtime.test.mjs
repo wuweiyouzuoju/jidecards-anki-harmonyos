@@ -30,7 +30,7 @@ test('preview overlay admits child input while keeping loading input blocked', (
 });
 const names = ['aboutToAppear', 'aboutToDisappear', 'updateActivity', 'stopAudio', 'playCurrentAudio',
   '预览刷新版本变化', '取当前卡片ID', '加载当前卡', '应用HTML', 'webFailed', 'installActionBridge', 'onControllerAttached回调',
-  '翻面', '上一张', '下一张', '请求编辑字段', '请求AI改卡', '预览更多菜单', 'focusPreviewCard', 'dismissMoreMenu', 'previewCardShown'];
+  '翻面', '上一张', '下一张', '请求编辑字段', '请求AI改卡', '预览更多菜单', 'focusPreviewCard', 'dismissMoreMenu', 'previewCardShown', 'cardThemeChanged'];
 const methods = names.map(name => {
   const start = source.search(new RegExp(`^  (?:private )?(?:async )?${name}\\(`, 'm'));
   assert.ok(start >= 0, name);
@@ -86,12 +86,26 @@ function harness() {
   page.renderPrefetch = new CardRenderPrefetch(id => service.渲染既有卡片(id));
   page.webSlots = [0, 1]; page.attachedWebSlots = [false, true]; page.visibleWebSlot = 0;
   page.cardRenderPending = false;
-  page.cardWeb = { reset() {}, attach() {}, setAudioEnabled() {}, controllerAt: () => page.网页控制器, isRelevant: () => true, show: html => {
+  page.cardWeb = { reset() {}, attach() {}, setAudioEnabled() {}, setTheme: dark => events.push(['theme', dark]),
+    controllerAt: () => page.网页控制器, isRelevant: () => true, show: html => {
     page.网页控制器.loadData(html);
     page.previewCardShown('');
   } };
   return { page, displayed, sounds, tts, renderedIds, events, service };
 }
+
+test('theme changes update the preview surface without replaying audio or rendering a new card', async () => {
+  const h = harness();
+  await h.page.加载当前卡(); await settle(h.page);
+  const before = [h.displayed.length, h.sounds.length, h.renderedIds.length];
+  h.page.isDark = true; h.page.cardThemeChanged();
+  assert.deepEqual(h.events.at(-1), ['theme', true]);
+  h.page.previewCardShown('#18202b', true); await settle(h.page);
+  assert.equal(h.page.cardSurfaceBackground, '#18202b');
+  assert.deepEqual([h.displayed.length, h.sounds.length, h.renderedIds.length], before);
+  h.page.mounted = false; h.page.isDark = false; h.page.cardThemeChanged();
+  assert.deepEqual(h.events.at(-1), ['theme', true], 'unmounted preview does not update the document');
+});
 
 test('preview retains the dark surface until rendering acknowledges it and blocks early flips', async () => {
   const { page, displayed, sounds } = harness();
