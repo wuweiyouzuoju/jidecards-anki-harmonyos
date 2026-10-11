@@ -15,6 +15,7 @@
 | 学习音频 | `utils/AudioFocusCoordinator.ets`、`声音播放器.ets`、`TTS播放器.ets` | 播放前激活混音会话；所有播放方结束后释放 |
 | Agent 编排 | `backend/agent/` | Provider/Runner/工具/执行器职责分离 |
 | Agent 模型 | `model/agent/` | Schema、策略、草稿、历史、澄清与校验 |
+| JIDE 卡库/应用操作 | `model/agent/AgentOperations.ts`、`backend/agent/AgentOperationTools.ets`、`CoreAgentOperations.ts`、`AppAgentOperations.ets` | 同目录驱动发现/风险/确认；复用原领域服务，UI 流程由显式宿主拥有，见 [接入边界](agent.md#卡库与应用操作接入2026-10-11) |
 | 原生桥 | `native/napi_bridge/` | 只导出 open/run/close，零业务逻辑 |
 | Rust FFI | `native/rsharmony/` | 句柄、缓冲区和 panic 边界 |
 | 桌面卡片 | `formability/`、`widget/` | 2×4 统计服务卡片及 DeepLink |

@@ -1,5 +1,7 @@
 # 模块责任与边界
 
+JIDE 卡库和应用操作的声明、校验、确认指纹归 `model/agent/AgentOperations.ts`，注册与 Scope/分析预算归 `AgentOperationTools.ets`；Core 与平台适配分别归 `CoreAgentOperations.ts`、`AppAgentOperations.ets`。页面经 `AgentOperationHost.ts` 登记原学习、同步、迁移和选图流程，接受写入不依赖 JIDE 页面存活。设置写入分派归 `AgentSettingCommands.ets`，复用原领域保存入口；图表偏好保存队列由 `GraphPreferencesCommands.ts` 供统计与 JIDE 共用。行为和验证入口见 [操作接入](agent.md#卡库与应用操作接入2026-10-11)。
+
 层级选择的展示、搜索和实例折叠由 [DirectoryTree](../../entry/src/main/ets/components/common/DirectoryTree.ets) / [DirectoryTree.ts](../../entry/src/main/ets/model/DirectoryTree.ts) 唯一拥有；表单目录入口组合 DirectorySelect，完整 Core 牌组树适配归 DeckDirectory，记忆 scope 身份适配归 AgentMemoryScopes，标签基线/持久折叠仍归 NoteTags。业务候选、草稿、写入和确认留在原领域。规范与例外见[公共目录树](appearance.md#公共目录树)，直接回归见[ui-directory-tree](../../tools/tests/ui-directory-tree.test.mjs)。
 
 [返回任务索引](../../PROJECT_CONTEXT.md)
@@ -9,6 +11,12 @@
 Core/私有协议的描述、生成、wire 与领域映射职责见 [Core 协议生成](core-protocol.md)。`tools/core-protocol.mjs` 独占协议产物；`proto/messages` 只保留领域契约差异，生成客户端不注册 UI/JIDE 能力。
 
 ## `entry`
+
+学习键盘的动作目录、默认绑定、组合键/卡面匹配、冲突及长按去重归 `model/StudyKeyboard.ts`，旧配置兼容归 `StudyControls.ts`。平台键码与修饰键归 `utils/StudyKeyAdapter.ets`，手动草稿归 `components/settings/StudyKeyboardSettings.ets`，保存继续归 `StudyControlsService.ets` / `LocalPreferenceWrite`。UI 和 JIDE 共用动作/控件声明与实际配置；执行只调用学习页既有操作。入口与验证见[学习操作配置](study-media.md#jide-专用学习操作配置2026-10-04)。
+
+JIDE 已有媒体的引用与文件名规则由 `model/agent/AgentNoteMedia.ts` 拥有，`AgentNoteMediaTools.ets` 负责已发现笔记与卡库媒体快照；会话资料、删除和 OCR/编码归既有 `AgentDocumentStore` / `AgentDocuments`。视频采样参数归 `AgentVideo.ts`，系统元数据/取帧及描述符释放归 `AgentVideoReader.ets`；Provider 和制卡确认复用原入口。行为与验收边界见[已有图片与视频制卡](agent.md#已有图片与视频制卡)。
+
+JIDE 历史索引、独立会话文件契约、留存上限及检索缓存归 `AgentHistoryRepository.ts`；异步文件IO和旧Preferences迁移归 `AgentHistoryFiles.ets`；安全投影归 `AgentHistoryProjection.ts`。UI与只读历史工具共用一个仓库队列，页面历史恢复代次继续归 `AgentHistoryCoordinator`；手动管理归 `AgentHistorySettingsSection`，工具参数/分页及发现ID归 `AgentHistoryToolSession`，不恢复旧写入权限。行为与验证见[历史记录管理与检索](agent.md#历史记录管理与检索2026-10-11)。
 
 JIDE 长期记忆管理的读取代次和手动提交归 `model/agent/AgentMemoryManagement.ts`；平台存储和写入队列归既有 `AgentWorkspaceStore`，管理界面归 `AgentMemoryPanel`。会话任务计划归 `AgentScope.taskPlan` / `AgentTaskPlan.ts`，检查点编排归 `AgentSessionController`，安全保存边界由 Runner 发布；计划不授予写入权限。模型执行预算归 `AgentExecutionBudget.ts`，发送与预检由 `ProviderProtocol` 使用同一预算。入口与行为见[长期记忆管理与长任务](agent.md#长期记忆管理与长任务2026-10-09)。
 
