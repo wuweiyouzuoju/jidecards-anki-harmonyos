@@ -1,3 +1,4 @@
+import { localPreferenceApi } from './local-preference-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -13,10 +14,11 @@ function harness(saved = undefined) {
   const store = {
     getSync: (key, fallback) => disk.has(key) ? disk.get(key) : fallback,
     get: async (key, fallback) => disk.has(key) ? disk.get(key) : fallback,
-    put: async (key, value) => disk.set(key, value), flush: async () => {}
+    putSync: (key, value) => disk.set(key, value), flush: async () => {}
   };
   const api = loadPlatformModule('model/简洁模式存储.ets',
     '({ initializeSimpleMode, 加载简洁模式, 保存简洁模式 })', {
+      ...localPreferenceApi({setOrCreate:(key,value)=>app.set(key,value)}),
       SIMPLE_MODE_KEY, AppStorage: { get: key => app.get(key), setOrCreate: (key, value) => app.set(key, value) },
       preferences: {
         getPreferencesSync: () => { if (unreadable) throw Error('unreadable'); return store; },

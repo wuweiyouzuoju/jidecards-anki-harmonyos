@@ -37,6 +37,7 @@
     {"name":"study_keyboard_whiteboard","value":"打开手写"},
     {"name":"study_keyboard_auto_advance","value":"设置自动前进"},
     {"name":"settings_study_haptics_search","value":"评分振动"},
+    {"name":"settings_local_save_failed","value":"设置保存失败，请重试。"},
     {"name":"filtered_deck_empty","value":"清空筛选牌组"},
     {"name":"filtered_deck_rebuild","value":"重建筛选牌组"},
     {"name":"filtered_deck_emptied","value":"卡片已归还原牌组，可随时重建"},

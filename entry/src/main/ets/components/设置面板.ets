@@ -671,8 +671,9 @@ export struct 设置面板 {
           选择回调: (简洁: boolean): void => {
             this.显示模式菜单 = false;
             if (简洁 !== this.简洁模式) {
-              保存简洁模式(简洁);
-              this.activeSection = '';
+              保存简洁模式(简洁).then((): void => { this.activeSection = ''; }).catch((): void => {
+                showToastSafely(this.getUIContext(), { message: $r('app.string.settings_local_save_failed') });
+              });
             }
           },
           关闭回调: (): void => { this.显示模式菜单 = false; }

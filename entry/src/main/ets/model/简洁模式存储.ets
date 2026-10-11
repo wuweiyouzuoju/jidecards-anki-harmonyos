@@ -29,6 +29,7 @@
 
 import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
+import { saveLocalPreference } from '../utils/LocalPreferenceWrite';
 import { SIMPLE_MODE_KEY } from './AppLayoutState';
 
 const 存储名: string = 'jidecards_settings';
@@ -72,17 +73,11 @@ export async function 加载简洁模式(): Promise<boolean> {
   }
 }
 
-export async function 保存简洁模式(开启: boolean): Promise<void> {
-  AppStorage.setOrCreate<boolean>(简洁模式AppStorage键, 开启);
+/** @throws {Error} 保存失败不广播已应用状态。 */
+export async function 保存简洁模式(开启: boolean, expected: boolean | null = null): Promise<void> {
   const 上下文: common.UIAbilityContext | null = 取上下文();
-  if (上下文 === null) {
-    return;
-  }
-  try {
-    const 存储: preferences.Preferences = await preferences.getPreferences(上下文, 存储名);
-    await 存储.put(简洁模式键, 开启);
-    await 存储.flush();
-  } catch (错误) {
-    // 持久化失败可接受：UI 已切换，下次启动会回退到上次保存的值。
-  }
+  if (上下文 === null) throw new Error('simple_mode_storage_unavailable');
+  const 存储 = await preferences.getPreferences(上下文, 存储名);
+  await saveLocalPreference(存储,简洁模式键,开启,true,expected,
+    (): void => { AppStorage.setOrCreate<boolean>(简洁模式AppStorage键,开启); });
 }

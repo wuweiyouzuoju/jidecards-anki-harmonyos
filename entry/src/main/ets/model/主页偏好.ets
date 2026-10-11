@@ -33,6 +33,7 @@
 
 import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
+import { saveLocalPreference } from '../utils/LocalPreferenceWrite';
 
 const 存储名: string = 'jidecards_settings';
 const 显示今日进度卡键: string = 'home_show_today_summary';
@@ -114,18 +115,11 @@ export async function 加载显示今日进度卡(): Promise<boolean> {
 // 写入 preferences 的 home_show_today_summary 并 flush 落盘；
 // 同步写 AppStorage 的 'homeShowTodaySummary' 键触发首页 @StorageLink 重渲染。
 // ========================================================
-export async function 保存显示今日进度卡(开启: boolean): Promise<void> {
-  // 同步写 AppStorage 让首页 @StorageLink 立即响应（不等 await preferences）。
-  AppStorage.setOrCreate<boolean>(主页今日进度卡AppStorage键, 开启);
+/** @throws {Error} 保存失败不广播已应用状态。 */
+export async function 保存显示今日进度卡(开启: boolean, expected: boolean | null = null): Promise<void> {
   const 上下文: common.UIAbilityContext | null = 取上下文();
-  if (上下文 === null) {
-    return;
-  }
-  try {
-    const 存储: preferences.Preferences = await preferences.getPreferences(上下文, 存储名);
-    await 存储.put(显示今日进度卡键, 开启);
-    await 存储.flush();
-  } catch (错误) {
-    // 持久化失败可接受：UI 已切换，下次启动会回退到上次保存的值。
-  }
+  if (上下文 === null) throw new Error('home_summary_storage_unavailable');
+  const 存储 = await preferences.getPreferences(上下文,存储名);
+  await saveLocalPreference(存储,显示今日进度卡键,开启,true,expected,
+    (): void => { AppStorage.setOrCreate<boolean>(主页今日进度卡AppStorage键,开启); });
 }

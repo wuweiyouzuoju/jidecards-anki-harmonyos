@@ -21,7 +21,11 @@ export struct GeneralSettings {
   private 取本地化文本(资源: Resource, _locale: string = this.uiLanguage): string {
     return resourceText(this.getUIContext(), 资源);
   }
-  private 切换今日进度卡(开启: boolean): void { 保存显示今日进度卡(开启); }
+  private 切换今日进度卡(开启: boolean): void {
+    保存显示今日进度卡(开启).catch((): void => {
+      showToastSafely(this.getUIContext(), { message: $r('app.string.settings_local_save_failed') });
+    });
+  }
   private 语言模式标签(模式: 语言模式): Resource {
     if (模式 === 'en') return $r('app.string.language_english');
     return $r('app.string.language_chinese');
