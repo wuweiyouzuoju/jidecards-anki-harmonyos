@@ -2,6 +2,7 @@
 
 import type { ToolRisk } from './AgentTypes';
 import { extensionToolRisk } from './AgentExtensionTools';
+import { operationDefinition } from './AgentOperations';
 
 export const DEFAULT_BATCH_LIMIT: number = 100;
 export const MAX_BATCH_LIMIT: number = 1000;
@@ -36,14 +37,21 @@ export class SearchExecutionError extends Error {
 }
 
 export function toolRiskOf(toolName: string): ToolRisk {
+  const operation = operationDefinition(toolName);
+  if (operation !== undefined) return operation.risk;
   switch (toolName) {
     case 'discover_tools':
+    case 'search_conversation_history':
+    case 'read_conversation_history':
       return 'read';
     case 'navigate_app':
       return 'navigation';
     case 'set_theme_mode':
       return 'setting_write';
     case 'list_documents':
+    case 'list_note_media':
+    case 'import_note_media':
+    case 'read_video_frames':
     case 'read_document_page':
     case 'ocr_document_page':
     case 'save_document_notes':
