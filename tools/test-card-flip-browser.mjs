@@ -69,7 +69,7 @@ try {
         onUpdateHook.push(function(){window.updateRan=true});
         onShownHook.push(function(){window.shownRan=!!document.querySelector('mjx-container')});
         </script>`, replacement: null }],
-      css: 'body{color:black;background:white;text-align:left}</style><script>window.styleRuns=(window.styleRuns||0)+1;</script>',
+      css: 'body.card{color:black;background:white}body{text-align:left}</style><script>window.styleRuns=(window.styleRuns||0)+1;</script>',
       latexSvg: false, isEmpty: false
     };
     const html = (side, version) => {
@@ -125,9 +125,9 @@ try {
     assert.equal(await page.locator('#score').textContent(), '1/1');
     // A dark deck in either app theme must publish its actual CSS surface across full document loads.
     for (const [index, css, expected] of [
-      [0, '.card {background:#101820;color:white}', '#101820'],
-      [1, 'html {background:#101820} .card {background:transparent;color:white}', '#101820'],
-      [2, 'html {background:#000000} .card {background:rgba(32,48,64,.5);color:white}', '#101820']
+      [0, 'body.card {background:#101820;color:white}', '#101820'],
+      [1, 'html {background:#101820} body.card {background:transparent;color:white}', '#101820'],
+      [2, 'html {background:#000000} body.card {background:rgba(32,48,64,.5);color:white}', '#101820']
     ]) {
       card.css = css;
       session.reset(); session.show(html('question', 7 + index * 2), 3 + index, 'question');

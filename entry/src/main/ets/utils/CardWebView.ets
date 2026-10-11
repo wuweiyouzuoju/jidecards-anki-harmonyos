@@ -20,7 +20,7 @@ export class CardWebView {
   private spareController: webview.WebviewController | null = null;
   private hasDisplayed: boolean = false;
   private audioEnabled: boolean = true;
-  constructor(controller: webview.WebviewController, shown: (background: string) => void,
+  constructor(controller: webview.WebviewController, shown: (background: string, appearanceOnly: boolean) => void,
     failed: (message: string) => void, spareController: webview.WebviewController | null = null,
     switched: (slot: number) => void = (_slot: number): void => {}) {
     this.controller = controller;
@@ -48,7 +48,7 @@ export class CardWebView {
           target.loadData(document, 'text/html', 'UTF-8', 媒体基地址, ' ');
         },
         evaluate: (slot: number, script: string): Promise<string> => this.controllerAt(slot).runJavaScript(script),
-        shown: (slot: number, background: string): void => {
+        shown: (slot: number, background: string, appearanceOnly: boolean): void => {
           this.hasDisplayed = true;
           switched(slot);
           // 冻结旧视图保留其最后一帧；下一次作为备用视图时重新激活。
@@ -57,7 +57,7 @@ export class CardWebView {
             this.controllerAt(1 - slot).onInactive();
             this.controllerAt(slot).setAudioMuted(!this.audioEnabled);
           } catch (error) { console.info(`Card inactive: ${error}`); }
-          shown(background);
+          shown(background, appearanceOnly);
         },
         failed: failed
       };
@@ -68,6 +68,10 @@ export class CardWebView {
     return slot === 1 && this.spareController !== null ? this.spareController : this.controller;
   }
   isRelevant(slot: number): boolean { return this.buffer === null || this.buffer.isRelevant(slot); }
+  setTheme(isDark: boolean): void {
+    if (this.buffer === null) this.session.setTheme(isDark);
+    else this.buffer.setTheme(isDark);
+  }
   setAudioEnabled(enabled: boolean): void {
     this.audioEnabled = enabled;
     const slots: number[] = this.buffer === null ? [0] : [0, 1];

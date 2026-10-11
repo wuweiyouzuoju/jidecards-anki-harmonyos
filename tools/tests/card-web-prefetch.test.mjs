@@ -87,7 +87,7 @@ test('wrong, failed, expired and invalidated candidates fall back to normal rend
 });
 
 function bufferHarness(load = null) {
-  const loads = [], updates = [], shown = [], errors = [];
+  const loads = [], updates = [], themes = [], shown = [], errors = [];
   const buffer = new CardWebBuffer({
     load: async (slot, text, current) => {
       if (load) await load(slot, current);
@@ -96,13 +96,28 @@ function bufferHarness(load = null) {
       loads.push({ slot, id: +id, revision: +revision, text });
     },
     evaluate: async (slot, script) => vm.runInNewContext(script, { window: { __jideCardReviewer: {
-      update: (id, revision, text, side) => updates.push({ slot, id, revision, text, side })
+      update: (id, revision, text, side) => updates.push({ slot, id, revision, text, side }),
+      setTheme: (id, revision, dark) => themes.push({slot, id, revision, dark})
     } } }),
     shown: (slot, background) => shown.push({ slot, background }), failed: message => errors.push(message)
   });
   const done = (entry, error = '') => buffer.session(entry.slot).rendered(entry.id, entry.revision, error, '#102030');
-  return { buffer, loads, updates, shown, errors, done };
+  return { buffer, loads, updates, themes, shown, errors, done };
 }
+
+test('theme updates target the requested card and do not reactivate the frozen spare document', () => {
+  const h = bufferHarness();
+  h.buffer.setTheme(false);
+  h.buffer.show(html('q1'), 1, 'question'); h.done(h.loads[0]);
+  h.buffer.show(html('q2'), 2, 'question');
+  h.buffer.setTheme(true); h.done(h.loads[1]);
+  assert.equal(h.buffer.activeSlot(), 0, 'new card waits for its current theme');
+  assert.deepEqual(h.themes.map(item => [item.slot, item.dark]), [[1, true]]);
+  h.done(h.themes[0]); assert.equal(h.buffer.activeSlot(), 1);
+  h.buffer.setTheme(false);
+  assert.deepEqual(h.themes.map(item => item.slot), [1, 1], 'inactive document receives no frame request');
+  h.done(h.themes[1]);
+});
 
 test('next cards swap only after render completion, while flips preserve the current document', () => {
   const h = bufferHarness();

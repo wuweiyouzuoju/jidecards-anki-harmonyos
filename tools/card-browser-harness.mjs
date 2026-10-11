@@ -15,7 +15,7 @@ export async function launchCardBrowser() {
 export async function createCardBrowserHarness(browser) {
   const context = await browser.newContext();
   const page = await context.newPage();
-  const errors = [], failures = [], backgrounds = [];
+  const errors = [], failures = [], backgrounds = [], appearanceUpdates = [];
   let document = '', shown = 0, navigations = 0;
   await context.route('**/*', route => {
     const url = route.request().url();
@@ -37,26 +37,34 @@ export async function createCardBrowserHarness(browser) {
       page.goto('https://jidecards-media.local/').catch(error => failures.push(error.message));
     },
     evaluate: script => page.evaluate(script),
-    shown: background => { shown++; backgrounds.push(background); },
+    shown: (background, appearanceOnly) => { shown++; backgrounds.push(background); appearanceUpdates.push(appearanceOnly); },
     failed: error => failures.push(error)
   });
   await page.exposeFunction('nativeRendered', (...args) => session.rendered(...args));
   await page.addInitScript(() => {
     window.jideCardRuntime = { onRendered: (...args) => window.nativeRendered(...args) };
   });
+  async function waitShown(expected) {
+    const deadline = Date.now() + 20000;
+    while (shown < expected && !failures.length && !errors.length && Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    assert.deepEqual(failures, [], 'runtime errors must fail the browser check');
+    assert.deepEqual(errors, [], 'template errors must fail the browser check');
+    assert.equal(shown, expected, 'production runtime must acknowledge the completed card');
+  }
   return {
-    page, session, backgrounds, failures,
+    page, session, backgrounds, failures, appearanceUpdates,
     get navigations() { return navigations; },
     async show(html, key, side) {
       const expected = shown + 1;
       session.show(html, key, side);
-      const deadline = Date.now() + 20000;
-      while (shown < expected && !failures.length && !errors.length && Date.now() < deadline) {
-        await new Promise(resolve => setTimeout(resolve, 10));
-      }
-      assert.deepEqual(failures, [], 'runtime errors must fail the browser check');
-      assert.deepEqual(errors, [], 'template errors must fail the browser check');
-      assert.equal(shown, expected, 'production runtime must acknowledge the completed card');
+      await waitShown(expected);
+    },
+    async setTheme(dark) {
+      const expected = shown + 1;
+      session.setTheme(dark);
+      await waitShown(expected);
     },
     close: () => context.close()
   };

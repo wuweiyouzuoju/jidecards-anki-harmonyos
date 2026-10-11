@@ -139,6 +139,23 @@ export const CARD_REVIEWER_RUNTIME: string = String.raw`
         for (var script of Array.from(qa.querySelectorAll('script'))) await replaceScript(script);
         await finish(side, scrollToAnswer, false);
       })().then(function () { report(''); }, report);
+    },
+    setTheme: function (id, version, isDark, stylesheet) {
+      if (id !== documentId) return;
+      revision = version;
+      try {
+        var appearance = document.getElementById('jide-card-appearance');
+        if (!appearance || appearance.tagName !== 'STYLE') throw new Error('Missing card appearance stylesheet');
+        appearance.textContent = stylesheet;
+        document.documentElement.classList.toggle('night-mode', isDark);
+        document.documentElement.setAttribute('data-bs-theme', isDark ? 'dark' : 'light');
+        document.body.classList.toggle('nightMode', isDark);
+        document.body.classList.toggle('night_mode', isDark);
+        document.body.style.removeProperty('--jide-card-default-text');
+        updateDefaultTextColor();
+        // 外观确认保留 DOM、输入焦点、滚动位置和音频；不调用模板的翻面 hooks。
+        report('');
+      } catch (error) { report(error); }
     }
   };
 })();`;

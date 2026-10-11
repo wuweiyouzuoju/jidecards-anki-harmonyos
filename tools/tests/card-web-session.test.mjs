@@ -121,20 +121,47 @@ test('renderer starts unanchored answers at the top and preserves answer anchors
 });
 
 function harness() {
-  const loads = [], updates = [], shown = [], errors = [], backgrounds = [];
+  const loads = [], updates = [], themes = [], shown = [], errors = [], backgrounds = [], appearanceOnly = [];
   const session = new CardWebSession({
     load: text => {
       const [, id, revision] = text.match(/\.start\((\d+),(\d+),/);
       loads.push({ id: +id, revision: +revision, text });
     },
     evaluate: async script => vm.runInNewContext(script, { window: { __jideCardReviewer: {
-      update: (id, revision, text, side, scroll) => updates.push({ id, revision, text, side, scroll })
+      update: (id, revision, text, side, scroll) => updates.push({ id, revision, text, side, scroll }),
+      setTheme: (id, revision, dark, css) => themes.push({id, revision, dark, css})
     } } }),
-    shown: background => { shown.push(true); backgrounds.push(background); }, failed: message => errors.push(message)
+    shown: (background, only) => { shown.push(true); backgrounds.push(background); appearanceOnly.push(only); },
+    failed: message => errors.push(message)
   });
   const done = (item, error = '', background = '') => session.rendered(item.id, item.revision, error, background);
-  return { session, loads, updates, shown, errors, backgrounds, done };
+  return { session, loads, updates, themes, shown, errors, backgrounds, appearanceOnly, done };
 }
+
+test('theme changes serialize after initial rendering and pending flips without publishing obsolete surfaces', () => {
+  const h = harness();
+  h.session.setTheme(false);
+  h.session.show(html('q'), 1, 'question');
+  h.session.setTheme(true);
+  assert.equal(h.themes.length, 0, 'initial scripts finish before a theme change');
+  h.done(h.loads[0]);
+  assert.equal(h.shown.length, 0); assert.equal(h.themes[0].dark, true);
+  h.done(h.themes[0], '', '#18202b');
+  assert.deepEqual(h.appearanceOnly, [false], 'the first content acknowledgement still opens card interaction');
+  h.session.setTheme(false);
+  h.session.show(html('a'), 1, 'answer');
+  h.session.setTheme(true);
+  h.done(h.themes[1]);
+  assert.equal(h.updates[0].side, 'answer');
+  assert.equal(h.themes.length, 2, 'pending flip carries the latest theme');
+  h.done(h.updates[0]);
+  h.session.setTheme(false); h.done(h.themes[2], '', '#ffffff');
+  assert.deepEqual(h.appearanceOnly, [false, false, true]);
+  assert.deepEqual(h.backgrounds, ['#18202b', '', '#ffffff']);
+  h.session.setTheme(true); h.session.reset();
+  h.done(h.themes[3]);
+  assert.equal(h.shown.length, 3, 'invalidated theme acknowledgements are ignored');
+});
 
 test('only the current completed surface publishes a validated opaque background', () => {
   const h = harness();

@@ -40,8 +40,9 @@ try {
     const actual = await page.evaluate(() => ({ version: window.templateVersion, calls: window.templateCalls,
       ajax: typeof $.getScript, color: getComputedStyle(document.body).color,
       background: getComputedStyle(document.body).backgroundColor, padding: getComputedStyle(document.body).padding }));
-    assert.deepEqual(actual, { version: '3.7.1', calls: 1, ajax: 'function', color: 'rgb(18, 52, 86)',
-      background: 'rgb(255, 255, 255)', padding: '20px 16px' });
+    assert.deepEqual(actual, { version: '3.7.1', calls: 1, ajax: 'function',
+      color: dark ? 'rgb(230, 230, 230)' : 'rgb(18, 52, 86)',
+      background: dark ? 'rgb(24, 32, 43)' : 'rgb(255, 255, 255)', padding: '20px 16px' });
     await page.locator('#show').click();
     assert.equal(await page.locator('#content').innerText(), `${side} 答案`);
     passed++;

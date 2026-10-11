@@ -5,7 +5,7 @@ import type { CardWebHost } from './CardWebSession';
 export interface CardWebBufferHost {
   load(slot: number, html: string, isCurrent: () => boolean): Promise<void>;
   evaluate(slot: number, script: string): Promise<string>;
-  shown(slot: number, background: string): void;
+  shown(slot: number, background: string, appearanceOnly: boolean): void;
   failed(message: string): void;
 }
 
@@ -18,6 +18,7 @@ export class CardWebBuffer {
   private requestedSlot: number = 0;
   private requestedKey: number = -1;
   private generation: number = 0;
+  private theme: boolean | null = null;
 
   constructor(host: CardWebBufferHost) {
     this.host = host;
@@ -34,7 +35,7 @@ export class CardWebBuffer {
           });
         },
         evaluate: (script: string): Promise<string> => host.evaluate(index, script),
-        shown: (background: string): void => { this.complete(index, background); },
+        shown: (background: string, appearanceOnly: boolean): void => { this.complete(index, background, appearanceOnly); },
         failed: (message: string): void => { if (this.isRelevant(index)) host.failed(message); }
       };
       this.sessions.push(new CardWebSession(port));
@@ -44,6 +45,11 @@ export class CardWebBuffer {
   session(slot: number): CardWebSession { return this.sessions[slot]; }
   activeSlot(): number { return this.visible; }
   isRelevant(slot: number): boolean { return this.requestedKey !== -1 && slot === this.requestedSlot; }
+
+  setTheme(isDark: boolean): void {
+    this.theme = isDark;
+    if (this.requestedKey !== -1) this.sessions[this.requestedSlot].setTheme(isDark);
+  }
 
   reset(): void {
     this.generation += 1;
@@ -58,15 +64,16 @@ export class CardWebBuffer {
       this.requestedKey = key;
     }
     try {
+      if (this.theme !== null) this.sessions[this.requestedSlot].setTheme(this.theme);
       this.sessions[this.requestedSlot].show(html, key, side, scrollToAnswer);
     } catch (error) { this.host.failed(String(error)); }
   }
 
-  private complete(slot: number, background: string): void {
+  private complete(slot: number, background: string, appearanceOnly: boolean): void {
     if (!this.isRelevant(slot)) return;
     this.visible = slot;
     this.hasShown = true;
-    this.host.shown(slot, background);
+    this.host.shown(slot, background, appearanceOnly);
   }
 }
 
