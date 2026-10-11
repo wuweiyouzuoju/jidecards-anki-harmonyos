@@ -42,3 +42,13 @@ export interface AgentConversation {
   results: AgentHistoryResult[];
 }
 
+/** 列表只读索引；正文按会话读取，不把500份正文常驻页面。 */
+export interface AgentConversationSummary {
+  id: string;
+  mode: AgentMode;
+  title: string;
+  updatedAt: number;
+  messageCount: number;
+  storedBytes: number;
+}
+
