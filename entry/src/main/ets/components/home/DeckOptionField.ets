@@ -57,11 +57,6 @@ export struct DeckOptionEditor {
   @Builder
   private dialogContent() {
     Column({ space: 应用尺寸.间距_12 }) {
-      if (this.defaultValue !== undefined) {
-        按下态按钮({ 文案: $r('app.string.deck_option_restore_default'), 点击回调: (): void => {
-          this.draft = this.defaultValue!; this.error = '';
-        } })
-      }
       if (this.choices.length === 0) {
         if (this.multiline) {
           TextArea({ text: this.draft })
@@ -90,6 +85,11 @@ export struct DeckOptionEditor {
       }
       if (this.error !== '') {
         Text(this.error).fontSize(14).fontColor($r('app.color.error_text')).width('100%')
+      }
+      if (this.defaultValue !== undefined) {
+        按下态按钮({ 文案: $r('app.string.deck_option_restore_default'), 点击回调: (): void => {
+          this.draft = this.defaultValue!; this.error = '';
+        } })
       }
     }.width('100%')
   }

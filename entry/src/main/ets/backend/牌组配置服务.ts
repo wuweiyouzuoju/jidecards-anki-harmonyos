@@ -6,7 +6,7 @@ import { CoreRpc } from '../proto/generated/CoreRpc';
 //
 // @作用
 // 包装后端牌组配置服务的 2 个 RPC：获取牌组配置编辑视图 / 更新牌组配置。
-// 不持有 UI 状态，不做字段映射——三字段建模与未建模字段保真回写见 DeckConfigMessages。
+// 不持有 UI 状态，不做字段映射——完整配置建模与未知字段保真回写见 DeckConfigMessages。
 //
 // @输入
 // 牌组ID / 更新请求（UpdateDeckConfigsInput）
@@ -15,7 +15,7 @@ import { CoreRpc } from '../proto/generated/CoreRpc';
 // Promise<DeckConfigsForUpdateView> / Promise<void>
 //
 // @业务规则
-// 保存语义对齐桌面端 deck-options（third_party/anki/ts/routes/deck-options/lib.ts）：
+// 保存语义以锁定 Core（third_party/anki/rslib/src/deckconfig/update.rs）为准：
 // 当前牌组选中的 config 始终随 configs 回传（最后一项决定牌组使用哪个预设）；
 // currentDeck.limits 与全局 flag（fsrs 等）原样回传，避免静默重置。
 //
@@ -31,7 +31,7 @@ export class 牌组配置服务 {
     /**
      * 拉取指定牌组的选项编辑视图：全部预设（含使用计数）、当前牌组选中项
      * （configId/limits）与全局 flag。编辑面板据此定位 currentDeck.configId
-     * 对应的 DeckConfig，修改三字段（new_per_day / reviews_per_day / learn_steps）。
+     * 对应的完整 DeckConfig，由共同选项目录和草稿拥有者决定编辑字段。
      */
     async 获取牌组配置编辑视图(牌组ID: number): Promise<DeckConfigsForUpdateView> {
         const 请求: Uint8Array = encodeDeckId(牌组ID);

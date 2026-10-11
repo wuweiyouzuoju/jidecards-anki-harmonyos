@@ -107,7 +107,7 @@ test('session saves modified presets with the selected preset last, retains chan
   const {config,view,options}=fixture();const states=[],writes=[];let fail=true;
   const session=new DeckOptionsSession(7,{load:async()=>view,save:async request=>{writes.push(request);if(fail)throw Error('disk full');},committed(){}},s=>states.push(s));
   await session.load();const draft=copyDeckConfig(config);draft.config.newPerDay=11;
-  assert.equal(session.editPreset('select','2',draft),true);
+  assert.equal(session.editPreset('select','2',draft,true),true);
   const selected=copyDeckConfig(states.at(-1).config);selected.config.reviewsPerDay=300;
   assert.equal(await session.save(selected,true,{...options,mode:1}),false);
   assert.deepEqual(writes[0].configs.map(x=>x.id),[1,2]);assert.equal(writes[0].configs[0].config.newPerDay,11);

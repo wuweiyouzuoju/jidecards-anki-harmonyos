@@ -122,10 +122,11 @@ export struct DeckOptionsFeature {
     const draft = this.calculationDraft();
     if (draft === null || this.session === null) return;
     try {
-      if (!this.session.editPreset(action, value, draft.config!)) return;
+      if (!this.session.editPreset(action, value, draft.config!, draft.shared)) return;
       if (this.state.config?.config === null || this.state.config === null) return;
       this.form = 牌组配置表单.从配置创建(this.state.config.config!);
       if (this.options !== null) {
+        this.options.applyToSharedDecks = this.state.presetShared ?? false;
         this.options.sharedDeckCount = this.state.presets?.find((entry): boolean => entry.key === this.state.presetKey)?.useCount ?? 0;
       }
       this.validationError = '';

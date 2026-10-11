@@ -95,7 +95,7 @@
     {"name": "deck_easy_days_future_hint", "value": "调整之后的复习安排，不清空今天的待学卡片。"},
     {"name": "deck_easy_days_no_normal_hint", "value": "没有设置正常日，无法减少一周中的总体复习负担。"},
     {"name": "deck_preset_label", "value": "选项预设"},
-    {"name": "deck_preset_help", "value": "预设是一套可供多个牌组共用的复习设置。\n\n默认只修改当前牌组，必要时自动复制一套独立预设。选择“预设”范围会影响使用它的所有牌组。\n\n选择、创建、复制、改名或删除后，点击保存才生效。"},
+    {"name": "deck_preset_help", "value": "预设是一套可供多个牌组共用的复习设置。\n\n默认只修改当前牌组，必要时自动复制一套独立预设。选择“预设”范围会影响使用它的所有牌组。\n\n切换会保留各预设的草稿和保存范围。离开的牌组范围修改按需另存独立预设，不影响使用原预设的其他牌组。\n\n选择、创建、复制、改名或删除后，点击保存才生效。"},
     {"name": "deck_preset_scope_hint", "value": "当前预设已有 %s 个牌组使用；保存预设修改会影响这些牌组。"},
     {"name": "deck_preset_rename", "value": "预设改名"},
     {"name": "deck_preset_create", "value": "添加预设"},

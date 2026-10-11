@@ -95,7 +95,7 @@
     {"name": "deck_easy_days_future_hint", "value": "Changes future scheduling without clearing today’s due cards."},
     {"name": "deck_easy_days_no_normal_hint", "value": "With no Normal day, weekly review workload cannot be reduced."},
     {"name": "deck_preset_label", "value": "Options preset"},
-    {"name": "deck_preset_help", "value": "A preset is a set of review settings that several decks can share.\n\nBy default, changes affect only this deck and create a separate preset when needed. The Preset scope affects every deck using it.\n\nSelecting, creating, duplicating, renaming or deleting takes effect when you save."},
+    {"name": "deck_preset_help", "value": "A preset is a set of review settings that several decks can share.\n\nBy default, changes affect only this deck and create a separate preset when needed. The Preset scope affects every deck using it.\n\nSwitching keeps each preset's draft and save scope. Deck-scope edits to a preset you leave are saved separately when needed, without changing other decks that use the original preset.\n\nSelecting, creating, duplicating, renaming or deleting takes effect when you save."},
     {"name": "deck_preset_scope_hint", "value": "This preset is currently used by %s decks; saving preset changes affects them."},
     {"name": "deck_preset_rename", "value": "Rename preset"},
     {"name": "deck_preset_create", "value": "Add preset"},
