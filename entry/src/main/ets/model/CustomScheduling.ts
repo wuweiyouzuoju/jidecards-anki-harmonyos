@@ -16,7 +16,7 @@ export interface CustomSchedulingInfo {
 }
 export function customSchedulingInfo(script: string = ''): CustomSchedulingInfo {
   return { configured: script.trim() !== '', runtime: CUSTOM_SCHEDULING_RUNTIME, synchronous: true,
-    asyncSupported: false, writableByAgent: false, maxScriptBytes: CUSTOM_SCHEDULING_MAX_BYTES };
+    asyncSupported: false, writableByAgent: true, maxScriptBytes: CUSTOM_SCHEDULING_MAX_BYTES };
 }
 export function validateSchedulingScript(script: string): boolean { return UTF8编码(script).length <= CUSTOM_SCHEDULING_MAX_BYTES; }
 

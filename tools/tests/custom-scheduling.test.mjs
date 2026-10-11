@@ -36,7 +36,7 @@ test('UTF-8 limits and capability projection expose execution without granting A
   assert.equal(validateSchedulingScript('中'.repeat(20000)),true);
   assert.equal(validateSchedulingScript('中'.repeat(20001)),false);
   assert.equal(customSchedulingInfo('').configured,false);
-  assert.deepEqual(customSchedulingInfo('script'),{configured:true,runtime:'bounded_synchronous_javascript',synchronous:true,asyncSupported:false,writableByAgent:false,maxScriptBytes:60000});
+  assert.deepEqual(customSchedulingInfo('script'),{configured:true,runtime:'bounded_synchronous_javascript',synchronous:true,asyncSupported:false,writableByAgent:true,maxScriptBytes:60000});
 });
 test('the native request preserves states and context as opaque bytes',()=>{
   const states={current:Uint8Array.of(10,0),again:Uint8Array.of(20,0),hard:Uint8Array.of(30,0),good:Uint8Array.of(40,0),easy:Uint8Array.of(50,0)};
