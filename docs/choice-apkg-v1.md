@@ -1,6 +1,8 @@
-# jidecards 选择题 APKG 规范 v1
+# 选择题 APKG v1 历史兼容记录
 
-[返回项目](../README.md) · [Agent 制题指南](choice-authoring.md) · [JSON Schema](schemas/choice-source-v1.schema.json) · [源文件示例](examples/choice-demo.json) · [APKG 示例](examples/choice-demo.apkg)
+[返回项目](../README.md) · [历史工具说明](choice-authoring.md) · [旧 JSON Schema](schemas/choice-source-v1.schema.json) · [旧源文件示例](examples/choice-demo.json) · [旧 APKG 示例](examples/choice-demo.apkg)
+
+状态：2026-10-11 已取消专属选择题制题开发路线。本页只记录既有格式及读取/学习兼容，不再作为新题型或 JIDE 制题计划；已有实现和用户题库保留。取消范围及当前计划见[决策记录](decisions/2026-10-11-jide-history-stats-web-plan.md)。
 
 选择题使用标准 **`.apkg`** 分发，应用不提供 `.jide` 或 JSON 导入入口。UTF-8 JSON 仅是制题工具的源文件。规范、打包器、校验器和示例随仓库一起开源，遵循仓库 [LICENSE](../LICENSE)，无需服务端或 AI API 密钥即可使用工具；自制题目内容的授权由内容提供者决定。
 

@@ -19,7 +19,7 @@
 
 | 项目 | 当前值 | 事实来源 |
 | --- | --- | --- |
-| 应用版本 | 2.9.88 / versionCode 3069 | `AppScope/app.json5` |
+| 应用版本 | 2.9.98 / versionCode 3079 | `AppScope/app.json5` |
 | 最低兼容 SDK | HarmonyOS 6.0.1（API 21） | `build-profile.json5` 的 `compatibleSdkVersion` |
 | 目标 SDK | HarmonyOS 6.1.0（API 23） | `build-profile.json5` 的 `targetSdkVersion` |
 | 编译 SDK | DevEco Studio 当前配套 6.1.0.105（API 23） | 本机 SDK 与 `UPSTREAM.lock` |
@@ -47,7 +47,7 @@ phone、tablet 和 2in1，但声明设备类型不等于已完成所有形态的
 - 笔记音频与草稿预览、类型管理、字段查重、文本导出、CSV 映射及整库中断恢复。
 - FSRS 优化与负担模拟、Core 全局复习偏好、牌组预览，以及隔离 Core 互通回归。
 
-当前版本元数据调整见 [2.9.88 变更说明](releases/2.9.88.md)，此前界面与学习体验更新见 [2.9.22 变更说明](releases/2.9.22.md)，源码整理见 [2.9.9 变更说明](releases/2.9.9.md)；可重复验证及已验收范围按领域文档查询。
+当前版本元数据调整见 [2.9.98 变更说明](releases/2.9.98.md)，此前界面与学习体验更新见 [2.9.22 变更说明](releases/2.9.22.md)，源码整理见 [2.9.9 变更说明](releases/2.9.9.md)；可重复验证及已验收范围按领域文档查询。
 
 以上只表示代码路径存在并受契约测试覆盖，不等于与桌面 Anki 的全部功能、全部
 历史 schema 或所有设备行为完全等价。对外介绍应使用“复用 Anki 26.05 Rust
@@ -101,6 +101,7 @@ Core”或“兼容常用 Anki 数据与学习流程”，不要使用未经差�
    先修改构建配置并完成所有高版本 API 的能力检查，不能只改文档。
 4. 在已有[隔离 Core 互通回归](development/core-interop.md)与[协议/Core 对照](development/core-protocol.md)上扩充固定集合和故障场景；已有主机往返及独立在线记录不替代 Android/HarmonyOS 设备差分，也不支持“完整兼容”的承诺。
 5. 对 tablet/2in1、无障碍、耗电和大集合压力测试保留可追溯的设备与版本信息。
+6. 按 [JIDE 历史、统计与联网开关计划](decisions/2026-10-11-jide-history-stats-web-plan.md)继续增加完整统计数据读取及开启/关闭联网提案；这两项待实现。历史会话只读检索/正文分页读取和默认500会话管理已接入，现存消息/正文限额仍保留。专属选择题制题路线已取消，已有题库兼容保留。历史现已迁移为索引和独立会话文件；无限存储、取消正文截断及历史导出尚未实现。
 
 ## 文档维护规则
 
