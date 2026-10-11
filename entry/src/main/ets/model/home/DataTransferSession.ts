@@ -63,6 +63,21 @@ export class DataTransferSession {
   private externalUri: string = '';
   private selectedUri: string = '';
   private finishExternal: (() => void) | null = null;
+  private agentFinish: ((result: string) => void) | null = null;
+
+  async runForAgent(format: string): Promise<string> {
+    if (!this.alive || this.state.phase !== 'idle' || this.state.visible || this.finishExternal !== null || this.agentFinish !== null) throw new Error('transfer_busy');
+    const result = new Promise<string>((resolve): void => { this.agentFinish = resolve; });
+    if (format === 'collection') await this.open('importPersonalData',0,false);
+    else await this.startImport();
+    this.finishAgentIfClosed(); return result;
+  }
+  private finishAgent(result: string): void { const finish = this.agentFinish; this.agentFinish = null; finish?.(result); }
+  private finishAgentIfClosed(): void {
+    if (this.state.phase !== 'idle') return;
+    if (this.state.error !== '') this.finishAgent(JSON.stringify({status:'failed',error:this.state.error}));
+    else if (this.state.cancelled || !this.state.visible) this.finishAgent('{"status":"cancelled"}');
+  }
 
   resultQuery(category: string, page: number): string | null {
     if (!this.alive || this.state.phase !== 'idle' || this.state.result === null) return null;
@@ -129,6 +144,7 @@ export class DataTransferSession {
   }
   dispose(): void {
     this.alive = false;
+    if (this.state.phase !== 'running' && this.state.phase !== 'refreshing') this.finishAgent('{"status":"cancelled"}');
     if (this.state.phase === 'idle' && this.state.csv !== null) void this.backend.discardCsv();
     if (this.state.phase === 'idle' || this.state.phase === 'picking' || this.state.phase === 'loadingOptions') this.releaseExternal();
   }
@@ -251,6 +267,7 @@ export class DataTransferSession {
       }
       if (committed) {
         this.backend.committed();
+        this.finishAgent(JSON.stringify({status:'completed',committed:true,result:this.state.result}));
         if (!this.alive) return;
         this.state.progress.cancellable = false;
         this.state.phase = 'refreshing'; this.state.stage = intent.kind === 'replacePersonalData' ? 4 : 2; this.emit();
@@ -259,6 +276,7 @@ export class DataTransferSession {
       if (this.alive) { this.state.visible = this.state.result !== null; this.state.replacementStep = 0; this.success(); }
     } catch (error) {
       // 写入已经成功时关闭提交入口；刷新由首页重试，避免用户再次导入/替换。
+      if (committed) this.finishAgent(JSON.stringify({status:'partial',committed:true,error:error instanceof Error ? error.message : String(error)}));
       if (committed) this.state.visible = false;
       if (intent.kind === 'importText') this.state.csv = null;
       if (error instanceof ImportCancelled) this.state.cancelled = true;
@@ -270,6 +288,7 @@ export class DataTransferSession {
   }
   private fail(message: string): void { this.state.error = message; this.emit(); }
   private emit(): void {
+    this.finishAgentIfClosed();
     if (!this.alive) return;
     const s = this.state;
     this.publish({ visible: s.visible, mode: s.mode, deckId: s.deckId, allowDeckSelection: s.allowDeckSelection,

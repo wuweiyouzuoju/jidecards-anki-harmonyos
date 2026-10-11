@@ -1,4 +1,8 @@
 import { SurfaceBorder } from '../utils/SurfaceBorder';
+import { agentOperationHosts } from '../model/agent/AgentOperationHost';
+import type { AgentOperationHost } from '../model/agent/AgentOperationHost';
+import type { OperationArguments } from '../model/agent/AgentOperations';
+import type { SyncSessionSnapshot } from '../model/SyncSession';
 import { EditNotePageParams } from '../model/navigation/PageParams';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { HomeDestinations } from './navigation/HomeDestinations';
@@ -467,6 +471,7 @@ struct 首页 {
 
   aboutToAppear(): void {
     this.restoreHomeDeckExpansion();
+    agentOperationHosts.register('home',this.agentOperationHost);
     this.syncScheduler.setListener((): void => {
       this.syncStatusController.invalidate();
       this.syncStatusController.refresh();
@@ -486,6 +491,8 @@ struct 首页 {
   }
 
   aboutToDisappear(): void {
+    agentOperationHosts.unregister('home',this.agentOperationHost);
+    for (const key of ['sync','login','background']) agentOperationHosts.finish(key,'{"status":"failed","error":"host_disposed"}');
     appInterface.leave('home');
     appInterface.leave('deck_reorder');
     this.deckPreviewSession.dispose();
@@ -1937,6 +1944,26 @@ struct 首页 {
     } else { throw new Error('unknown_navigation_action'); }
   }
 
+  private readonly agentOperationHost: AgentOperationHost = {
+    snapshot: (): string => JSON.stringify({ owner: this.agentHostIdentity, ready: !this.homeDisposed && this.syncForeground,
+      busy: syncActivity.isActive() || this.transfer.visible || this.显示牌组定制 || this.显示牌组选项,
+      stack: this.页面栈.getAllPathName() }),
+    execute: async (name: string, args: OperationArguments, expected: string): Promise<string> => {
+      if (this.agentOperationHost.snapshot() !== expected || this.homeDisposed || !this.syncForeground || syncActivity.isActive() || this.transfer.visible || this.显示牌组定制 || this.显示牌组选项) throw new Error('operation_host_busy');
+      if (this.页面栈.getAllPathName().some((page): boolean => ['AddNotePage','EditNotePage','StudyPage'].includes(page))) throw new Error('operation_would_discard_active_page');
+      if (name === 'propose_sync' && loadVisibleSyncAuth() === null) throw new Error('sync_login_required');
+      this.navigateAgentApp({ action: 'open_home', surface: 'home', deckName: '' });
+      if (name === 'propose_import_data') return this.transferSession.runForAgent(args.format!);
+      if (name === 'propose_sync') return agentOperationHosts.wait('sync',(): void => { this.requestManualSync(); });
+      if (name === 'propose_sync_account') return agentOperationHosts.wait('login',(): void => {
+        this.navigateAgentApp({ action: 'open_settings', surface: 'settings', sectionId: 'sync', deckName: '' });
+      });
+      if (name === 'propose_deck_appearance') return agentOperationHosts.wait('background',(): void => { this.打开牌组定制(String(args.deckId)); });
+      throw new Error('operation_unavailable');
+    }
+  };
+  private readonly agentHostIdentity: string = 'home-' + Date.now();
+
   // 'StudyPage' / 'BrowserPage' / 'StatsPage' / 'AddNotePage' 字符串是 NavPathStack 跨页面寻址协议，保留英文。
   @Builder
   private 页面映射(name: string, param: ESObject) {
@@ -2261,8 +2288,8 @@ struct 首页 {
     if (this.显示牌组定制) {
       DeckCustomizationFeature({ backRequest: this.customizationBackRequest, isDark: this.是否深色(), deck: this.按ID查牌组(this.定制牌组ID),
         onBusy: (busy: boolean): void => { this.定制牌组中 = busy; },
-        onClose: (): void => { this.定制牌组中 = false; this.显示牌组定制 = false; },
-        onSaved: (): Promise<void> => this.deckCustomized() })
+        onClose: (): void => { this.定制牌组中 = false; this.显示牌组定制 = false; agentOperationHosts.finish('background','{"status":"cancelled"}'); },
+        onSaved: async (): Promise<void> => { await this.deckCustomized(); agentOperationHosts.finish('background','{"status":"completed","saved":true}'); } })
     }
 
     // 自定义学习对话框（T2）：长按牌组 → 自定义学习…，成功后刷新主页
@@ -2449,6 +2476,8 @@ struct 首页 {
           账号名: this.同步面板账号名,
           初始鉴权: this.同步面板认证,
           automatic: this.syncAutomatic,
+          onTerminal: (state: SyncSessionSnapshot): void => { agentOperationHosts.finish('sync',JSON.stringify({
+            status: state.错误文案 !== '' ? 'failed' : state.是否请求中止 ? 'cancelled' : 'completed', error: state.错误文案 })); },
           backRequest: this.syncBackRequest,
           detailsRequest: this.syncDetailsRequest,
           statusChanged: (text: string, indicator: string): void => {

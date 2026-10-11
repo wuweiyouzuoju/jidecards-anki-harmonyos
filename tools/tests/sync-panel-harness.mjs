@@ -6,10 +6,11 @@ import { SyncActivity } from '../../entry/src/main/ets/model/SyncSettings.ts';
 import { AutoSyncScheduler } from '../../entry/src/main/ets/model/AutoSyncScheduler.ts';
 import { SyncSession } from '../../entry/src/main/ets/model/SyncSession.ts';
 import { nativeDialogHostClass, nativeDialogMembers } from './platform-module-harness.mjs';
+import { AgentOperationHosts } from '../../entry/src/main/ets/model/agent/AgentOperationHost.ts';
 
 export function componentMethods(source, names, dependencies) {
   source = source.replaceAll('\r\n', '\n');
-  dependencies = { NativeDialogHost: nativeDialogHostClass(dependencies), ...dependencies };
+  dependencies = { agentOperationHosts:new AgentOperationHosts(), NativeDialogHost: nativeDialogHostClass(dependencies), ...dependencies };
   const methods = names.map(name => {
     const start = source.search(new RegExp(`^  (?:private )?(?:readonly )?(?:async )?${name}(?:\\(|\\s*:[^\\n]+)`, 'm'));
     assert.ok(start >= 0, name);

@@ -39,6 +39,7 @@ export struct 同步面板 {
   statusChanged: (text: string, indicator: string) => void = (_text: string, _indicator: string): void => {};
   onYield: (automatic: boolean) => void = (_automatic: boolean): void => {};
   onRetry: () => void = (): void => {};
+  onTerminal: (state: SyncSessionSnapshot) => void = (): void => {};
 
   // @StorageProp 触发颜色主题切换时重 build，让 设置面板色板_取(isDark).主色 即时变化
   @StorageProp(颜色键.动作主色) private 动作主色: string = '#2F5FD0';
@@ -55,7 +56,7 @@ export struct 同步面板 {
     this.session = createSyncSession(this.初始鉴权, this.automatic, {
       text: (key: string): string => namedResourceText(this.getUIContext(), key),
       toast: (message: string): void => { showToastSafely(this.getUIContext(), { message: message, duration: 3000 }); },
-      changed: (state: SyncSessionSnapshot): void => { this.state = state; },
+      changed: (state: SyncSessionSnapshot): void => { this.state = state; if (state.当前阶段 === 'done') this.onTerminal(state); },
       activityChanged: (busy: boolean, modal: boolean): void => { this.状态变化回调(busy, modal); },
       statusChanged: (text: string, indicator: string): void => { this.statusChanged(text, indicator); },
       collectionCompleted: (disabled: boolean): void => { this.同步完成回调(disabled); },

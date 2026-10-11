@@ -482,7 +482,7 @@ test('login uses the saved custom endpoint, blocks unsaved input, and never pers
   class BackendError extends Error {}
   const Group = componentMethods(read('components/settings/同步分组.ets'), ['点击登录', 'syncSettingsBusy'], {
     syncActivity: new SyncActivity(),
-    保存同步凭证: auth => persisted.push(auth), 后端错误: BackendError, 分类同步错误: flow.分类同步错误, $r: value => value
+    saveSyncCredentialsVerified: async auth => persisted.push(auth),loadVisibleSyncAuth:()=>({}), 后端错误: BackendError, 分类同步错误: flow.分类同步错误, $r: value => value
   });
   const group = new Group();
   Object.assign(group, { serverLoaded: true, 登录中: false, settingsSaving: false, serverInput: 'https://new.example/',
