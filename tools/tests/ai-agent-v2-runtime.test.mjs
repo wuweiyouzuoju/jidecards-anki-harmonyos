@@ -16,7 +16,10 @@ import { decodeExtensionArguments } from '../../entry/src/main/ets/model/agent/A
 const stub = `
 export class AgentStreamObserver {} export class AgentTransportError extends Error {} export class AgentTransportSession {}
 export class DeepSeekAdapter {} export class OpenAIAdapter {} export class CustomAdapter {}
-export class AgentWorkspaceStore {} export class WikimediaImageService {} export class WikimediaImageServiceError extends Error {}
+export class AgentWorkspaceStore {} export const agentOperationCoordinator = {};
+export async function readAgentSettingValue() { throw Error("unexpected setting read"); }
+export async function saveAgentSettingValue() { throw Error("unexpected setting write"); }
+export class WikimediaImageService {} export class WikimediaImageServiceError extends Error {}
 export const filteredDeckCommands = {read:async()=>{throw Error("unexpected filtered read");},prepare:async()=>{throw Error("unexpected filtered proposal");},save:async()=>{throw Error("unexpected filtered save");}};
 export class FsrsService {async deckContext(){throw Error('unexpected FSRS context read');}async daily(){throw Error('unexpected FSRS simulation');}}
 export class AnkiDeckOptions {async load(){throw Error('unexpected deck options read');}async save(){throw Error('unexpected deck options write');}committed(){throw Error('unexpected deck options notification');}}
@@ -68,7 +71,7 @@ export async function saveBrowserPreferences() {throw Error('unexpected browser 
 export class AnkiBrowserSearch {async columns(){throw Error('unexpected browser column read');}}
 `;
 const stubUrl = 'data:text/javascript;base64,' + Buffer.from(stub).toString('base64');
-const names = ['AgentTransport','DeepSeekAdapter','OpenAIAdapter','CustomAdapter','AgentWorkspaceStore','WikimediaImageService',
+const names = ['AgentTransport','DeepSeekAdapter','OpenAIAdapter','CustomAdapter','AgentWorkspaceStore','AppAgentOperations','AgentSettingCommands','WikimediaImageService',
  '牌组服务','笔记类型服务','搜索服务','笔记服务','卡片服务','标签服务','统计服务','AppThemeService','FSRS控制器',
  'CardTextSizeStore','DeckListAppearanceStore','MotionStyleStore','StudyHaptics','LocalPreferenceWrite','牌组顺序存储',
  'ReviewPreferencesService','StudyControlsService','数据迁移服务','FsrsService','AnkiDeckOptions','FilteredDeckService','BrowserPreferencesStore','AnkiBrowserSearch'];
@@ -1036,6 +1039,27 @@ test('vision document tool images survive real Runner and Session copies and bec
  const input=h.requests[1].input.find(x=>x.kind==='function_call_output');assert.equal(input.images.length,1);
  const payload=JSON.parse(buildResponsesPayload(h.requests[1]));
  assert.equal(payload.input.find(x=>x.type==='function_call_output').output[1].type,'input_image');
+ assert.ok(!JSON.stringify(h.session.exportState()).includes('base64'));assert.deepEqual(fixture.writes,[]);
+});
+test('a four-frame video batch survives real Runner/Session and creates a timestamp-cited pending draft without saving cards',async()=>{
+ fixture.writes=[];
+ const documents=new AgentDocumentAccess({
+  list:()=>[{id:'video',name:'lesson.mp4',extension:'.mp4',byteSize:100,pageCount:1,warningCode:''}],
+  async read(){throw Error('use_video_tool');},saveNotes(){},
+  async readVideoInfo(){return {durationSeconds:20,width:1280,height:720};},
+  async readVideoFrame(_chat,id,time){return {documentId:id,page:1,text:'',method:'video_frame',notes:'',warning:'',image:{imageUrl:'data:image/jpeg;base64,YWJj'}};}
+ });
+ documents.bind('chat',true);documents.submit(['video']);
+ const h=harness([
+  [call('read','read_video_frames',{documentId:'video'}),event('completed')],
+  [call('cards','create_flashcards',{cards:[{fields:['画面知识点？','答案'],sources:[{documentId:'video',page:1,timestampSeconds:5}]}]}),event('completed')]
+ ],undefined,'create',documents);
+ const result=await h.run('根据这个视频的画面制作一张卡片');
+ const input=h.requests[1].input.find(x=>x.kind==='function_call_output');assert.equal(input.images.length,4);
+ const wire=JSON.parse(buildResponsesPayload(h.requests[1]));
+ assert.equal(wire.input.find(x=>x.type==='function_call_output').output.filter(x=>x.type==='input_image').length,4);
+ assert.equal(result.drafts.length,1);assert.equal(result.drafts[0].status,'pending');
+ assert.match(result.drafts[0].operations[1].after,/lesson.mp4.*5.00s/);
  assert.ok(!JSON.stringify(h.session.exportState()).includes('base64'));assert.deepEqual(fixture.writes,[]);
 });
 test('unread source citation cannot produce a valid draft; agent rereads then corrects it through the same execution chain',async()=>{

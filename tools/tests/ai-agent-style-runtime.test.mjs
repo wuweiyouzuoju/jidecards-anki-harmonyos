@@ -21,10 +21,13 @@ export class 搜索服务 {
  async 搜索卡片(request) { fixture.queries.push(request.search);return Array.from({length:fixture.count},(_,i)=>10000+i); }
 }
 export class 笔记服务 {} export class 卡片服务 {} export class 牌组服务 {}
-export class 媒体服务 {} export class WikimediaImageService {}
+export class 媒体服务 {} export const agentOperationCoordinator = {};
+export async function readAgentSettingValue() { throw Error("unexpected setting read"); }
+export async function saveAgentSettingValue() { throw Error("unexpected setting write"); }
+export class WikimediaImageService {}
 `;
 const stubUrl = 'data:text/javascript;base64,' + Buffer.from(stub).toString('base64');
-const names = ['笔记类型服务','搜索服务','笔记服务','卡片服务','牌组服务','媒体服务','WikimediaImageService'];
+const names = ['笔记类型服务','搜索服务','笔记服务','卡片服务','牌组服务','媒体服务','AppAgentOperations','AgentSettingCommands','WikimediaImageService'];
 register('data:text/javascript;base64,' + Buffer.from(`export function resolve(s,c,next) {
  if(s==='@kit.AbilityKit'||${JSON.stringify(names)}.some(n=>s.endsWith('/'+n)))return {url:${JSON.stringify(stubUrl)},shortCircuit:true};
  return next(s,c);

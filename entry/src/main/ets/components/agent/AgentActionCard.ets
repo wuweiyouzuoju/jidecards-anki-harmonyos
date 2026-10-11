@@ -53,17 +53,20 @@ export struct AgentActionCard {
   private memory(): AgentMemoryChange { return JSON.parse(this.action.payloadJson) as AgentMemoryChange; }
   private analysis(): AnalysisPreview { return JSON.parse(this.action.payloadJson) as AnalysisPreview; }
   private setting(): AgentSettingChange { return JSON.parse(this.action.payloadJson) as AgentSettingChange; }
-  private settingLabel(): Resource {
+  private settingLabel(): ResourceStr {
     const id: string = this.setting().settingId;
     if (id === 'color_theme') { return $r('app.string.appearance_color_theme'); }
     if (id === 'card_text_size') { return $r('app.string.card_text_size'); }
     if (id === 'deck_list_style') { return $r('app.string.deck_width'); }
     if (id === 'motion_style') { return $r('app.string.motion_style'); }
     if (id === 'study_haptics') { return $r('app.string.settings_study_haptics'); }
-    return $r('app.string.settings_fsrs_label');
+    if (id === 'fsrs_enabled') return $r('app.string.settings_fsrs_label');
+    return namedResourceText(this.getUIContext(),'agent_setting_' + id);
   }
   private settingScope(): Resource {
     const change: AgentSettingChange = this.setting();
+    if (change.settingId === 'graph_preferences') return $r('app.string.agent_operation_collection_scope');
+    if (change.settingId === 'language') return $r('app.string.agent_setting_language_restart');
     if (change.settingId === 'color_theme') { return $r('app.string.ai_agent_setting_color_scope'); }
     if (change.settingId === 'fsrs_enabled') {
       return change.after === 'true' && change.before !== change.after ?

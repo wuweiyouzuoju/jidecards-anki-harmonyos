@@ -51,6 +51,7 @@ interface SharedTemplateDraftOutput {
 }
 
 function highRiskDraftOutput(draft: ChangeDraft): string {
+  if (draft.operations[0]?.kind === 'app_operation') return operationDraftOutput(draft);
   if (draft.operations.length !== 1 || !['update_template', 'update_notetype_fields', 'restore_notetype', 'update_notetype_latex'].includes(draft.operations[0].kind)) {
     return JSON.stringify(draft);
   }
@@ -61,6 +62,12 @@ function highRiskDraftOutput(draft: ChangeDraft): string {
     affectedNotetypeIds: draft.affectedNotetypeIds.slice()
   };
   return JSON.stringify(output);
+}
+
+function operationDraftOutput(draft: ChangeDraft): string {
+  return JSON.stringify({ status: 'awaiting_confirmation', draftId: draft.id, risk: draft.risk,
+    summary: draft.summary, affectedCards: draft.affectedCardIds.length, affectedNotes: draft.affectedNoteIds.length,
+    affectedDecks: draft.affectedDeckIds, affectedNotetypes: draft.affectedNotetypeIds });
 }
 
 export class AgentToolRegistryError extends Error {
@@ -198,7 +205,7 @@ export class AgentToolRegistry {
         throw new AgentToolRegistryError('tool_unavailable');
       }
       const draft: ChangeDraft = await handler.propose(call.argumentsJson);
-      return { outputJson: JSON.stringify(draft), draft: draft, clarification: null };
+      return { outputJson: draft.operations[0]?.kind === 'app_operation' ? operationDraftOutput(draft) : JSON.stringify(draft), draft: draft, clarification: null };
     }
     if (risk === 'high_risk' && call.name.startsWith('propose_')) {
       const handler: AgentDraftToolHandler | undefined = this.highRiskDraftHandlers.get(call.name);

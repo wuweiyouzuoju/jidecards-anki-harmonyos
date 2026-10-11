@@ -30,6 +30,9 @@ export class 媒体服务 {
   fixture.trashed.push(names.slice()); if (fixture.trashFails) throw Error('trash_failed');
  }
 }
+export const agentOperationCoordinator = {};
+export async function readAgentSettingValue() { throw Error("unexpected setting read"); }
+export async function saveAgentSettingValue() { throw Error("unexpected setting write"); }
 export class WikimediaImageService {
  async download(_context,candidate) {
   if (fixture.failure==='download' && candidate.candidateId==='2') throw Error('download_failed');
@@ -39,7 +42,7 @@ export class WikimediaImageService {
 }
 `;
 const stubUrl = 'data:text/javascript;base64,' + Buffer.from(stub).toString('base64');
-const names = ['搜索服务', '卡片服务', '牌组服务', '笔记类型服务', '笔记服务', '媒体服务', 'WikimediaImageService'];
+const names = ['搜索服务', '卡片服务', '牌组服务', '笔记类型服务', '笔记服务', '媒体服务', 'AppAgentOperations','AgentSettingCommands','WikimediaImageService'];
 register('data:text/javascript;base64,' + Buffer.from(`export function resolve(s,c,next) {
  if (s==='@kit.AbilityKit' || ${JSON.stringify(names)}.some(n=>s.endsWith('/'+n)))
   return {url:${JSON.stringify(stubUrl)},shortCircuit:true};

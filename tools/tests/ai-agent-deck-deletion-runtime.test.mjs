@@ -25,10 +25,13 @@ export class 搜索服务 {
   return fixture.cards.filter(card=>ids.includes(card.deckId)||ids.includes(card.originalDeckId)).map(card=>card.id);}
 }
 export class 卡片服务 {async 获取卡片(id){const card=fixture.cards.find(card=>card.id===id);if(!card)throw Error('card_not_found');return {...card};}}
-export class 笔记服务 {} export class 笔记类型服务 {} export class 媒体服务 {} export class WikimediaImageService {}
+export class 笔记服务 {} export class 笔记类型服务 {} export class 媒体服务 {} export const agentOperationCoordinator = {};
+export async function readAgentSettingValue() { throw Error("unexpected setting read"); }
+export async function saveAgentSettingValue() { throw Error("unexpected setting write"); }
+export class WikimediaImageService {}
 `;
 const stubUrl='data:text/javascript;base64,'+Buffer.from(stub).toString('base64');
-const names=['牌组服务','搜索服务','卡片服务','笔记服务','笔记类型服务','媒体服务','WikimediaImageService',
+const names=['牌组服务','搜索服务','卡片服务','笔记服务','笔记类型服务','媒体服务','AppAgentOperations','AgentSettingCommands','WikimediaImageService',
  'AgentTransport','DeepSeekAdapter','OpenAIAdapter','CustomAdapter'];
 register('data:text/javascript;base64,'+Buffer.from(`export function resolve(s,c,next){
  if(s==='@kit.AbilityKit'||${JSON.stringify(names)}.some(n=>s.endsWith('/'+n)))return {url:${JSON.stringify(stubUrl)},shortCircuit:true};

@@ -23,6 +23,7 @@ import type { AgentDeckDeletionSnapshot } from '../../model/agent/AgentDeckDelet
 import type { RestoreNotetypeAction } from '../../model/agent/AgentMaintenanceActions';
 import { agentStockRestoreMatches } from '../../model/agent/AgentNotetypeFields';
 import { agentNotetypeLatexMatches } from '../../model/agent/AgentNotetypeLatex';
+import { agentOperationCoordinator } from './AppAgentOperations';
 
 interface TemplateUpdatePayload {
   templates: string;
@@ -56,6 +57,7 @@ export interface AgentDraftItemResult {
   targetId: number;
   succeeded: boolean;
   errorCode: string;
+  resultJson?: string;
 }
 
 export interface AgentDraftExecutionResult {
@@ -188,6 +190,10 @@ export class AgentDraftExecutor {
 
   /** @throws {Error} 树或精确影响变化使确认失效，由 prepare/execute 标记冲突。 */
   private async assertBaseline(draft: ChangeDraft): Promise<void> {
+    if (draft.operations.some((operation): boolean => operation.kind === 'app_operation')) {
+      if (draft.operations.length !== 1) throw new AgentDraftExecutorError('invalid_operation_draft');
+      await agentOperationCoordinator.check(draft); return;
+    }
     if (draft.duplicateSource !== undefined) {
       const source = draft.duplicateSource;
       if (JSON.stringify(await this.notes.获取笔记(source.noteId)) !== source.snapshot ||
@@ -377,8 +383,22 @@ export class AgentDraftExecutor {
     return compensationError.length === 0 ? error : new Error(`${errorCode(error)};${compensationError}`);
   }
 
+  private async executeAppOperation(draft: ChangeDraft): Promise<AgentDraftExecutionResult> {
+    const result = this.emptyResult(draft);
+    try {
+      const output = await agentOperationCoordinator.execute(draft);
+      const state = JSON.parse(output) as Record<string,Object>;
+      const succeeded = state['status'] === 'completed';
+      result.succeeded = succeeded ? 1 : 0; result.failed = succeeded ? 0 : 1;
+      result.items.push({ operation: 'app_operation', targetId: 0, succeeded: succeeded,
+        errorCode: succeeded ? '' : String(state['status']), resultJson: output });
+    } catch (error) { this.appendFailure(result,'app_operation',0,error as Error); }
+    return result;
+  }
+
   private async executeOrdinaryOperations(draft: ChangeDraft): Promise<AgentDraftExecutionResult> {
     const result: AgentDraftExecutionResult = this.emptyResult(draft);
+    if (draft.operations[0]?.kind === 'app_operation') return this.executeAppOperation(draft);
     if (draft.operations.length > 0 && draft.operations[0].kind === 'create_note') {
       const groups: CreateOperationGroup[] = this.groupCreateOperations(draft.operations);
       for (let groupIndex: number = 0; groupIndex < groups.length; groupIndex++) {
@@ -439,6 +459,7 @@ export class AgentDraftExecutor {
 
   private async executeHighRiskOperations(draft: ChangeDraft): Promise<AgentDraftExecutionResult> {
     const result: AgentDraftExecutionResult = this.emptyResult(draft);
+    if (draft.operations[0]?.kind === 'app_operation') return this.executeAppOperation(draft);
     for (const operation of draft.operations) {
       try {
         if (operation.kind === 'delete_note') {

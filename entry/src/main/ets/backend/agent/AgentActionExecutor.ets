@@ -19,10 +19,7 @@ import type { AgentSettingChange } from '../../model/agent/AgentSettingsTools';
 import type { ThemeId } from '../../model/ThemeCatalog';
 import { appThemeColorSession } from '../AppThemeService';
 import { 设置FSRS开启状态 } from '../../model/FSRS控制器';
-import { saveCardTextSize } from '../../utils/CardTextSizeStore';
-import { saveDeckListStyle } from '../../utils/DeckListAppearanceStore';
-import { saveMotionStyle } from '../../utils/MotionStyleStore';
-import { saveStudyHaptics } from '../../utils/StudyHaptics';
+import { saveAgentSettingValue } from './AgentSettingCommands';
 import { LocalPreferenceWriteError } from '../../utils/LocalPreferenceWrite';
 import type { AgentAction } from '../../model/agent/AgentAction';
 import type { AgentExtensionArguments } from '../../model/agent/AgentExtensionTools';
@@ -99,15 +96,7 @@ export class AgentActionExecutor {
           result = JSON.stringify({ status: 'completed', fsrsEnabled: enabled, scope: 'collection',
             saved: true, rescheduled: enabled && change.before !== change.after });
         } else {
-          if (change.settingId === 'card_text_size') {
-            await saveCardTextSize(Number(change.after), Number(change.before));
-          } else if (change.settingId === 'deck_list_style') {
-            await saveDeckListStyle(change.after, change.before);
-          } else if (change.settingId === 'motion_style') {
-            await saveMotionStyle(change.after, change.before);
-          } else if (change.settingId === 'study_haptics') {
-            await saveStudyHaptics(change.after === 'true', change.before === 'true');
-          } else { throw new Error('unsupported_setting_write'); }
+          await saveAgentSettingValue(change.settingId,change.after,change.before);
           result = JSON.stringify({ status: 'completed', settingId: change.settingId,
             value: change.after, scope: 'device', saved: true, applied: true });
         }

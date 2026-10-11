@@ -47,6 +47,7 @@ function uniquePositive(values: number[]): number[] {
 export function buildFailedOperationsRetryDraft(original: ChangeDraft,
   result: RetryExecutionResult, retryId: string): ChangeDraft | null {
   if (result.failed <= 0) { return null; }
+  if (original.operations.some((operation: DraftOperation): boolean => operation.kind === 'app_operation')) return null;
   const targets: Set<number> = failedTargets(result);
   const operations: DraftOperation[] = original.operations.filter(
     (operation: DraftOperation): boolean => operationNeedsRetry(operation, result, targets));
