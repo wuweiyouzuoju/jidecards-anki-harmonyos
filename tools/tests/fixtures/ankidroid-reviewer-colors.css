@@ -1,0 +1,16 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later
+ * Color/media subset of the Anki 26.05 reviewer used by AnkiDroid's modern
+ * previewer/PreviewerHelpers.kt (stdHtml):
+ * https://github.com/ankitects/anki/blob/26.05/ts/reviewer/reviewer.scss
+ * https://github.com/ankitects/anki/blob/26.05/ts/lib/sass/_root-vars.scss
+ * Keep this independent of the production builder: it is the comparison oracle.
+ */
+:root { color-scheme: light; }
+:root.night-mode { color-scheme: dark; }
+body.nightMode { background-color: var(--canvas); color: var(--fg); }
+.typeGood { background: #afa; color: black; }
+.typeBad { background: #faa; color: black; }
+.typeMissed { color: black; background: #ccc; }
+.nightMode .latex { filter: invert(100%); }
+.drawing { zoom: 50%; }
+.nightMode img.drawing { filter: invert(1) hue-rotate(180deg); }
