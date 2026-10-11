@@ -7,6 +7,7 @@ import { 集合服务 } from './集合服务';
 import { 后端会话 } from './后端会话';
 import { 替换集合 } from './数据迁移服务';
 import { syncActivity } from '../model/SyncSettings';
+import { saveLocalPreference } from '../utils/LocalPreferenceWrite';
 
 /** @throws {Error} 备份偏好读取失败，调用方不得据此启动自动备份。 */
 export async function loadAutomaticBackup(context: common.UIAbilityContext): Promise<boolean> {
@@ -15,10 +16,9 @@ export async function loadAutomaticBackup(context: common.UIAbilityContext): Pro
 }
 
 /** @throws {Error} 偏好保存失败，设置页保留旧显示并提示失败。 */
-export async function saveAutomaticBackup(context: common.UIAbilityContext, enabled: boolean): Promise<void> {
+export async function saveAutomaticBackup(context: common.UIAbilityContext, enabled: boolean, expected: boolean | null = null): Promise<void> {
   const store: preferences.Preferences = await preferences.getPreferences(context, 'jidecards_settings');
-  await store.put('automatic_backups', enabled);
-  await store.flush();
+  await saveLocalPreference(store,'automatic_backups',enabled,true,expected);
 }
 
 export class LocalBackups implements BackupBackend {
