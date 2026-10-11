@@ -30,9 +30,13 @@ TTS 是平台例外：锁定 Core 的 `rslib/src/card_rendering/tts/other.rs` �
 
 ## JIDE 专用学习操作配置（2026-10-04）
 
-常亮和键盘/手势映射由 JIDE 的 `get_advanced_settings(study)` / `propose_update_study_controls` 读取和提出修改，不增加手动 UI 入口。`StudyControls.ts` 拥有完整结构与白名单；`StudyControlsService.ets` 复用 `LocalPreferenceWrite` 串行保存、旧值检查、flush/readback 后发布 `studyControls`，不会把存储失败当作保存成功。`gestureMode=inherit` 沿用既有快捷答题模式，其余值覆盖学习时行为。
+常亮和键盘/手势映射由 JIDE 的 `get_advanced_settings(study)` / `propose_update_study_controls` 读取和提出修改。2026-10-11 增加“设置 → 复习 → 学习快捷键”的手动入口，复用 `SettingsActionRow`、`FormSelectRow`、`NativeDialogHost` 与 `DialogFrame/DialogHeader`。`StudyControlsService.ets` 复用 `LocalPreferenceWrite` 串行保存、旧值检查、flush/readback 后发布 `studyControls`，不会把存储失败当作保存成功。`gestureMode=inherit` 沿用既有快捷答题模式，其余值覆盖学习时行为。
 
-学习页实际键盘、手势处理保持页面代次、选择题、渲染、编辑、弹层及手写保护；映射评分仅答案面，翻面仅题目面。网页交互元素、选择和滚动仍走原手势过滤，tap 四象限按原规则；系统返回、Escape、Ctrl 与删除键不可重映射。持久值变化更新实际手势脚本，不另存一份页面配置。
+`StudyKeyboard.ts` 唯一拥有动作目录、默认绑定、键名规范化、冲突校验和按下去重。参考 AnkiDroid 2.25.1 的动作→多个绑定及 CardSide 设计，使用 HarmonyOS 物理键身份和 Ctrl/Shift/Alt 精确匹配。新 `keyboard:{version:1,bindings:[{key,command,side}]}` 是完整配置；空列表禁用，side 为 question/answer/both，同键重叠卡面拒绝。支持字母、数字、F1–12、小键盘、方向/导航/标点键及录制的 `code:N`；键盘布局差异可通过录制处理。旧四字段结构与九键覆盖保留，`effectiveStudyKeyboard` 在内存中迁移，不读取时改写偏好；显式 keyboard 要求旧 keys 为空，避免双重配置。恢复默认只修改草稿，保存后生效。
+
+学习页保持页面代次、选择题、渲染、编辑、弹层及手写保护；评分仅答案面，翻面仅题目面。拼写输入框和模板 input/textarea/select/contenteditable 聚焦时保留原输入；模板焦点经既有 StudyGestures 桥携带卡片/卡面代次，旧回调不能冻结新卡。长按不能跨翻面重复评分，隐藏/后台清理持有键。系统返回和单独修饰键不参与绑定；Escape、Delete、Ctrl+Z 可重绑。网页手势过滤与 tap 四象限保持。浏览列表快捷键独立，未迁移到此学习配置。
+
+默认保留 Space/Enter、1–4、B/S、Delete、Ctrl+Z、Esc、R，并补上小键盘、E 编辑、* 标星、- 今日跳过、@ 暂停、F5 重播、Ctrl+1–7 切换旗标。实际动作共用原学习页方法，不新增调度或独立写入。`STUDY_KEYBOARD_ACTIONS/FIELDS` 同时供设置、AppInterface 与 JIDE 使用；工具读取返回实际 effectiveKeyboard 和支持目录，确认预览显示组合键与卡面。回归入口 `study-keyboard.test.mjs`、`study-maintenance-controls.test.mjs`、`study-gestures.test.mjs`、`ai-agent-maintenance.test.mjs`；Node 和 HAP 不代替实体键盘、录制焦点、深浅色/窄宽屏的设备验收。
 
 `StudyScreenAwakeSession` 串行借用窗口原常亮状态，`createStudyScreenAwake` 通过官方窗口 API 适配；仅 mounted、可见、foreground 的学习页启用，隐藏/后台/离页恢复原值，迟到启用也排队恢复。平台调用失败保留重试状态并记录实际错误，不保证设备支持。回归见 `study-maintenance-controls.test.mjs`、`study-gestures.test.mjs` 及学习生命周期测试，真机屏幕与硬件输入另验。
 
@@ -211,9 +215,15 @@ StudyContentViewport只包裹中间笔迹区域，应用按钮不在手势链内
 
 学习页沿用浏览、统计页的背景链路：`首页.ets` 在 Navigation 外持有唯一 `ThemeBackground`，学习页 NavDestination 透明；顶部条、卡片区外围及答案条订阅 `PAGE_SURFACE_KEY`（本页变量 `页面底色微染值`）。这个键在幻彩主题下是 `#00000000`，普通主题下才是微染底色，不能把它当作固定不透明色，也不能在卡片外边距或底部避让区写死 `surface_page`，否则主题背景只剩顶部可见。卡片本体由 ArkUI 圆角外壳和 `学习卡片HTML构建器.ts` 的 ArkWeb 文档组成，使用 `surface_card` 深浅表面；不要把选中态用的 `主色容器` 铺满正文。
 
-HTML 构建器在模板 CSS 前同时提供默认字色与不透明卡片底色。模板显式设置的字色、底色和 `nightMode` 配色必须成对保留；不能在模板后用 `!important` 强制覆盖背景，否则标准 Anki 黑字白底模板会变成黑字深色底。学习与浏览预览共用此入口；未声明配色时仍使用应用深浅默认表面。CSS 顺序回归见 `tools/tests/card-template-style.test.mjs`，实际浏览器配色与对比度回归见 `tools/test-card-colors-browser.mjs`（Node 参数与 `PLAYWRIGHT_MODULE` 配置同 `tools/test-card-template-browser.mjs`）。
+HTML 构建器对齐 AnkiDroid 新版学习/预览共用的 Anki 26.05 reviewer：`body.nightMode` 同时设置默认字色与不透明底色，优先级高于标准模板的 `.card`，因此默认 Basic、反向、输入答案及 Cloze 在深色模式下不会保持白底。模板可用 `body.nightMode`、`.card.nightMode`、更具体的选择器或行内样式自定义夜间配色；只写 `.nightMode` 的优先级不足以覆盖 reviewer，与上游一致。全部默认排版、拼写结果、媒体和折叠样式置于模板之前，模板原文和字段内联颜色保留，不使用 `!important`。学习、既有卡预览和草稿/模板预览共用此入口。CSS 顺序回归见 `tools/tests/card-template-style.test.mjs`；`tools/test-card-colors-browser.mjs` 以独立的上游样式子集 `tools/tests/fixtures/ankidroid-reviewer-colors.css` 对照真实浏览器计算样式，覆盖两面、深浅、宽窄、默认 Cloze 对比度及模板覆盖（Node 参数与 `PLAYWRIGHT_MODULE` 配置同 `tools/test-card-template-browser.mjs`）。
 
-模板只声明底色、字色缺失或无效时，默认字色通过 `--jide-card-default-text` 提供。`CardReviewerRuntime` 在每次完整加载与翻面的模板脚本、更新/展示 hook 完成后，按 body 与 html 合成的实际底色检查默认字色对比度，低于 4.5 且另一档更清晰时切换深浅默认文字，再确认绘制完成。有效的模板 `color`、字段内联颜色及背景保持 CSS 层叠语义，不因与默认值相同而被改写。导入样本中 `color:#C393939` 为无效七位颜色，浅色 `#E8E3DF` 背景在深色模式下仍需深色默认文字。学习、卡片预览和模板预览共用 CardWebView/同一运行时；`test-card-colors-browser.mjs` 使用生产会话与真实导航，覆盖深浅/宽窄、透明与半透明底色、明确配色和异步脚本生成答案，不再移除脚本后单独验证 CSS。浏览器验证不替代设备 ArkWeb 验收，也不验证卡包的外部联网解密服务。
+传统 LaTeX 媒体 `.nightMode .latex` 使用上游反色规则；`img.drawing` 按上游在夜间反色并保留色相，普通照片不自动反色。MathJax 公式沿用继承字色，不二次反色。拼写比较采用新版 reviewer 的黑字配绿/红/灰背景，替代原先深色底上对比度偏低的固定绿字/红字。根节点的 `color-scheme` 跟随应用模式，链接、模板原生输入控件及滚动条由浏览器主题渲染，模板仍可覆盖。仅对齐卡片显示契约，不冒充 Android 平台或恢复 AnkiDroid 已移除的整卡颜色反转。
+
+当前主题由宿主观察：学习页监听 `themeMode` / `systemDarkMode`，已有卡与草稿/模板预览监听 `isDark`。`CardWebView.setTheme` 经 `CardWebBuffer` 只更新当前请求的 Web，`CardWebSession` 将外观更新与初次加载/翻面串行确认，缓存正反面在发送时由 `applyCardTheme` 采用最新主题。`CardReviewerRuntime.setTheme` 只更新应用样式、根主题属性与两种夜间类，保留 DOM、用户输入、焦点、滚动、音频和脚本状态，不执行翻面 hooks；外观确认通过 `appearanceOnly` 区分，宿主不重播音频或重置计时。首次内容完成前发生主题变化时，最终确认仍按内容完成开放交互。队列/备用 Web 回归在 `card-web-session.test.mjs` / `card-web-prefetch.test.mjs`；真实浏览器切换及缓存翻面在 `test-card-colors-browser.mjs`，页面计时与预览音频在生命周期/预览回归中验证。
+
+2026-10-11 本轮夜间适配验证：相关渲染样式、会话/备用 Web、预览、学习生命周期、输入答案、草稿预览回归与架构/组件字段/文档门禁通过。真实 Edge 的 appearance=17、colors=217、template=88、flip=4 分项通过；`npm run test:cards:browser` 的前三项成功，翻面样例将显式配色与正文对齐分开后用 `node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs tools/test-card-flip-browser.mjs` 单项重跑成功，其余已通过分项输入未变。`npm run build:app -- -SkipRust` 增量签名构建通过，沿用有效的双架构 Core 库，警告门禁 unexpected=0。未安装、启动或执行鸿蒙 ArkWeb 实机视觉验收；浏览器覆盖不等于设备验收。
+
+模板只声明底色、字色缺失或无效时，默认字色通过 `--jide-card-default-text` 提供。`CardReviewerRuntime` 在每次完整加载与翻面的模板脚本、更新/展示 hook 完成后，按 body 与 html 合成的实际底色检查默认字色对比度，低于 4.5 且另一档更清晰时切换深浅默认文字，再确认绘制完成。有效的模板 `color`、字段内联颜色及背景保持 CSS 层叠语义，不因与默认值相同而被改写。导入样本中 `color:#C393939` 为无效七位颜色；浅色 `#E8E3DF` 背景若通过更具体的选择器或模板脚本在深色模式下生效，仍需深色默认文字。学习、卡片预览和模板预览共用 CardWebView/同一运行时；`test-card-colors-browser.mjs` 使用生产会话与真实导航，覆盖深浅/宽窄、透明与半透明底色、明确配色和异步脚本生成答案，不再移除脚本后单独验证 CSS。浏览器验证不替代设备 ArkWeb 验收，也不验证卡包的外部联网解密服务。
 
 学习页注册现有 `CustomTransition` 协议，首页统一先隐藏退出页、再淡入进入页，并冻结/恢复根背景；不在学习页复制背景或用禁用转场掩盖问题。转场运行验证见 `tools/tests/iridescent-rendering.test.mjs`，背景接线见 `tools/tests/study-flow-contract.test.mjs`。设备验收须比较卡片四周、答案按钮四周与顶部背景是否连续，并检查进入、返回、翻面；Node 测试及 HAP 编译不能证明实际视觉效果。
 
@@ -242,7 +252,7 @@ HTML 构建器在模板 CSS 前同时提供默认字色与不透明卡片底色�
 
 预览页移除底部重播音频按钮，和学习页一样从右上角“更多”操作。AI 改卡经 `onEditWithAgent` 传当前卡片 ID；首页与浏览页都进入 AiCardPage 的 edit 模式，配置检查后再次核对预览目标，返回时恢复当前索引并重新加载卡面。未配置时打开 AI 设置，不自动请求模型，不使用浏览页的批量选择或新建模式。回归在 `preview-runtime`。
 
-学习页的首次教学和手动“学习说明”共用 `StudyGuideDialog` 与 `study_guide_*` 分项资源，展开的键盘帮助仍使用 `glossary_shortcuts_help`。快捷键只描述 `StudyKeyAdapter` → `StudyInputPolicy` → 学习页实际处理的动作：Space/Enter、1–4、B、S、Delete、Ctrl+Z、Esc、R，明确普通闪卡与选择题限制。撤销菜单统一显示“撤销操作”。预览独立使用 `PreviewInteraction` 的左右方向键；电脑（deviceType 为 2in1/pc）显示“按左右方向键”，触屏设备保留滑动提示，不把学习评分键当作预览功能。
+学习页的首次教学和手动“学习说明”共用 `StudyGuideDialog` 与 `study_guide_*` 分项资源，展开的键盘帮助仍使用 `glossary_shortcuts_help`。键盘帮助说明默认键位和自由配置入口，实际链路为 `StudyKeyAdapter` → `StudyKeyboard` / `StudyControls.configuredStudyCommand` → 学习页既有操作，并明确普通闪卡与选择题限制。撤销菜单统一显示“撤销操作”。预览独立使用 `PreviewInteraction` 的左右方向键；电脑（deviceType 为 2in1/pc）显示“按左右方向键”，触屏设备保留滑动提示，不把学习评分键当作预览功能。
 
 两页卡片外框共用 `model/CardViewportLayout.ts` 的窗口宽高策略，窗口尺寸变化和旋转会重新计算：竖屏最多 840vp；横屏按窗口宽度的 92% 放宽，下限受 840vp 和实际窗口约束，上限 1600vp。`components/common/CardViewport.ets` 在 `onMeasureSize` 中用本轮父级约束直接测量内容列，并在 `onPlaceChildren` 居中；首帧与旋转使用同一条路径，禁止先渲染默认 840vp 再由 `onAreaChange` 回写状态扩宽。该容器只用于有确定宽高的全屏区域，调用方不要添加内边距或边框。卡片高度使用剩余区域，字体不随外框拉伸，图片沿用 HTML 的等比约束。学习页与预览页统一使用已有的平面卡片样式，沿用牌组详情的圆角、surface_card 底色以及 应用尺寸.卡片边框 / border_subtle 浅边框，不添加外阴影或输入框式深色描边；只读预览不接入评分。牌组模板自身的正文 `max-width` 仍保留，调整外框不会改写导入的模板 CSS。验证见 `card-viewport-layout`、`preview-runtime` 与 `study-guide`。
 
@@ -294,11 +304,11 @@ HTML 构建器在模板 CSS 前同时提供默认字色与不透明卡片底色�
 
 回归入口：`tools/tests/card-web-session.test.mjs` 验证队列、旧回调、错误恢复和适配器；`tools/test-card-flip-browser.mjs` 用真实导航执行生产 HTML、渲染会话与脚本，覆盖学习/预览、深浅色、完整/部分作答、反复翻面、切卡隔离、Storage、外部脚本顺序、公式、遮罩、折叠和预览监听。浏览器命令：`node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs tools/test-card-flip-browser.mjs`，可用 `PLAYWRIGHT_MODULE` 指定 Playwright 模块路径，默认需安装 Edge；`PLAYWRIGHT_BROWSER_CHANNEL=chromium` 可选择已安装的Playwright Chromium。ArkWeb 桥及原问题牌组仍需真机验收；浏览器回归不证明任意第三方模板全部兼容。
 
-学习、浏览预览和未保存模板预览共用 `model/学习卡片HTML构建器.ts`。默认配色与列表/代码对齐、笔记类型 CSS、应用布局/媒体兜底分别包在独立 style 中；不能重新合并，部分 Anki 牌组在 CSS 字段用闭合标签嵌入脚本。`utils/CardAssetResponse.ets`（原 MathAssetResponse）统一映射固定的内置 jQuery 3.7.1/MathJax rawfile；未知内置域请求返回 404，其他域沿原媒体/网络逻辑。jQuery 必须先于模板脚本同步加载。新增内置脚本需同时更新固定映射、许可与浏览器回归；不要修改导入笔记类型原文来规避渲染问题。外部作者脚本依赖与实际验证边界见 docs/FEATURE_STATUS.md。
+学习、浏览预览和未保存模板预览共用 `model/学习卡片HTML构建器.ts`。默认配色、排版与媒体显示规则、笔记类型 CSS、图片遮罩定位兜底分别包在独立 style 中；不能重新合并，部分 Anki 牌组在 CSS 字段用闭合标签嵌入脚本。`utils/CardAssetResponse.ets`（原 MathAssetResponse）统一映射固定的内置 jQuery 3.7.1/MathJax rawfile；未知内置域请求返回 404，其他域沿原媒体/网络逻辑。jQuery 必须先于模板脚本同步加载。新增内置脚本需同时更新固定映射、许可与浏览器回归；不要修改导入笔记类型原文来规避渲染问题。外部作者脚本依赖与实际验证边界见 docs/FEATURE_STATUS.md。
 
 文档显示上下文由构建器唯一生成：`html.night-mode`、`data-bs-theme`、body 的 `card/nightMode/night_mode` 及具名 `jide-card-appearance` 样式。色板只在该样式中定义，运行时读取 CSS 变量，不另维护深浅色常量。翻面在执行模板脚本前更新同一位置的应用样式和文档主题，清除旧的派生默认字色，再替换正文、执行脚本和 hooks；保留模板的 JS 全局状态和应用未拥有的根类名。异步 hook 拒绝必须走现有失败通道，不得确认加载成功。模板异步工作应返回 hook Promise；未登记的任意定时器/外部服务不属于完成确认范围。
 
-此边界对照本机 `D:\Projects\AnkiDroid` 的现代 reviewer/preview 公共 `previewer/PreviewerHelpers.kt`（`stdHtml/bodyClass`）、`CardViewerViewModel.kt`（正反面内容更新）及 `assets/scripts/card.js`（hook Promise）确定；旧 `CardAppearance.kt` 同样提供两种夜间类名。采用公共显示上下文和会话内更新，保持 jidecards 的模板显式配色优先及合成表面兜底，不照搬旧版强制夜间背景规则。尚未提供 AnkiDroid 的全部平台/卡片序号类名。
+此边界对照本机 `D:\Projects\AnkiDroid` 的现代 reviewer/preview 公共 `previewer/PreviewerHelpers.kt`（`stdHtml/bodyClass`）、`CardViewerViewModel.kt`（正反面内容更新）及 `assets/scripts/card.js`（hook Promise）确定；旧 `CardAppearance.kt` 同样提供两种夜间类名。2026-10-11 按其加载的 Anki 26.05 `ts/reviewer/reviewer.scss` 与 `ts/lib/sass/_root-vars.scss` 补齐公共夜间字色/底色、媒体和原生控件主题规则；默认 `.card` 不再优先于夜间 reviewer，显式夜间覆盖仍按 CSS 层叠生效，合成表面兜底保留。独立对照样式及覆盖范围见[卡片文字显示](#卡片文字显示)。尚未提供 AnkiDroid 的全部平台/卡片序号类名，浏览器回归不代替 ArkWeb 实机验收。
 
 统一回归入口为 `npm run test:cards:browser`，包含 appearance/colors/template/flip 四项。`test-card-appearance-browser.mjs` 对比直接加载答案与反复翻面/主题变化的计算样式、脚本可见主题、背景及类名，检查不重新导航且模板状态保留；此前仅替换正文会在这里失败。CI 独立执行同一命令。依赖、浏览器安装及验证范围见[工具入口](../../tools/README.md)和[验证说明](verification.md)。
 
@@ -356,7 +366,7 @@ HTML 构建器在模板 CSS 前同时提供默认字色与不透明卡片底色�
 
 ## 页面剩余职责边界
 
-`StudyInputPolicy.ts` 将键盘事件映射为学习命令，`utils/StudyKeyAdapter.ets` 只映射 Kit 键码。编辑期间不触发学习操作；引导期间也清理松开的 Ctrl。`StudyAnswerRenderer.ts` 使用翻面时的字段/输入快照生成拼写答案，读取失败回退原答案，是否展示仍由学习会话代次决定。纯 HTML 构建器已使用 `.ts`，无需 ArkUI 即可直接测试。编辑生命周期共用 `NoteEditorSession.ts`，内部读取复用 `NoteEditorLoader.ts`；Web 控件装载、焦点和 UI 效果仍由页面负责，音频生命周期属于 `CardAudioSession`，普通计时资源属于 `StudyTimerController`，时长与动作计算仍复用 `StudyTiming`。
+`StudyKeyboard.ts` 与 `StudyControls.ts` 按完整组合键和卡面解析学习命令，`utils/StudyKeyAdapter.ets` 适配 Kit 键码与事件修饰键。输入、编辑和引导期间不触发学习操作；组合键不会落入普通键评分。`StudyAnswerRenderer.ts` 使用翻面时的字段/输入快照生成拼写答案，读取失败回退原答案，是否展示仍由学习会话代次决定。纯 HTML 构建器已使用 `.ts`，无需 ArkUI 即可直接测试。编辑生命周期共用 `NoteEditorSession.ts`，内部读取复用 `NoteEditorLoader.ts`；Web 控件装载、焦点和 UI 效果仍由页面负责，音频生命周期属于 `CardAudioSession`，普通计时资源属于 `StudyTimerController`，时长与动作计算仍复用 `StudyTiming`。
 
 
 学习编辑的图片准备通过 `StudySessionController.saveNote` 的 prepareFields 回调在 commitChange 内运行：先等待集合可用，再导入图片并更新原笔记；文本保存不调用媒体导入。离页后保护持续到整个保存结束，失败不广播写入成功。`study-session-controller.test.mjs` 覆盖集合等待、媒体/笔记失败与离页收尾；`study-note-editor.test.mjs` 覆盖返回请求确认后保留卡面/调度、不保存并排除编辑时间。HTML 工具和草稿入口见 [基础编辑](browser-stats.md#基础字段编辑与草稿保护)。

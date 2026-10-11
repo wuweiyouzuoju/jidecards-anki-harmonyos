@@ -20,7 +20,7 @@
 
 公共入口是 `components/common/HelpLabel.ets`、`HelpButton.ets` 与 `components/字段帮助面板.ets`，索引见 [公共 UI](../../entry/src/main/ets/components/common/README.md)。更改时搜索 `HelpLabel|HelpButton|showHelp:|帮助标题:|字段帮助对话框`，同时扫描旧资源 `field_help_button`、文字 `ⓘ / ℹ / ?` 和 `info_circle` 等替代实现。不能只检查截图所在页。
 
-- 字段、设置分组、统计标题和弹窗标题：标题本身决定排版、居中和行高，帮助绝对定位在文字右侧，垂直居中，不作为 Row 子项占位。标题允许两行并收缩；开关、范围条、选择器留在右侧。
+- 字段、设置分组、统计标题和弹窗标题：标题本身决定排版、居中和行高，帮助绝对定位在文字右侧，垂直居中，不作为 Row 子项占位。普通表单标签默认两行省略；弹窗标题使用完整、均衡换行，具体限宽由[公共弹窗规则](appearance.md#设置弹窗开发入口)维护。开关、范围条、选择器留在右侧。
 - 批量操作原来把孤立帮助塞进第一排按钮，现在使用“批量操作 + 帮助”的标题行，两排操作仍保留。兑换说明同样紧随领取主题提示，并保留原有资格说明、群号和复制功能。
 - 浏览卡片信息是针对一条记录的独立动作，行尾位置是有意保留的语义差异；多选时隐藏。它仍复用 HelpButton，不改变原卡片信息、FSRS 及复习记录内容。术语列表继续使用整行可点击的 DisclosureChevron；不是图标帮助，不强行改成 ⓘ。
 - 原生帮助图标只在 HelpButton 内使用明暗配套 `ic_info` SVG，18vp绘制与布局尺寸；44×44vp触摸/鼠标热区通过 responseRegion 单独扩展，不占据排版体积。按钮仍在正常组件树中保留无障碍和焦点，不用浮层 overlay 的自定义 Builder。保留原生按压反馈、完整无障碍名称、“查看帮助说明”朗读说明及禁用守卫。`monopolizeEvents(true)` 独占点击，避免触发父级设置操作或卡片编辑。
@@ -56,7 +56,7 @@
 
 ## 术语与过时内容维护
 
-界面统一使用“撤销”“同笔记卡片”“筛选牌组”“今日跳过”“可回忆率”；牌组选项的同笔记开关和反馈也不再只写“埋藏”。历史窗口称“操作历史”，浏览操作恢复提示使用已有“更多 → 操作历史”，学习页仍可直接用“更多 → 撤销操作”。SM-2 的 ease 称“易度”，FSRS difficulty 称“难度”，避免把易度升序误写成难度升序；系数帮助须说明调高／调低的效果，不能只列范围。目标记忆保持率是 FSRS 调度目标；实际记忆保留率按合格记录计算；评分通过率把非 Again 评分计为通过，不能当作选择题答对率。保持率示例使用界面百分比，不把底层 0.9 当成输入值。首页与桌面卡片的 `t(中文, 英文)` 文案也属于审计范围，不能只更新 string.json。内部字段和协议键保持稳定。
+界面统一使用“撤销”“同笔记卡片”“筛选牌组”“今日跳过”“可回忆率”；牌组选项的同笔记开关和反馈也不再只写“埋藏”。历史窗口称“回退”，浏览操作恢复提示使用已有“更多 → 回退”，学习页仍可直接用“更多 → 撤销操作”。SM-2 的 ease 称“易度”，FSRS difficulty 称“难度”，避免把易度升序误写成难度升序；系数帮助须说明调高／调低的效果，不能只列范围。目标记忆保持率是 FSRS 调度目标；实际记忆保留率按合格记录计算；评分通过率把非 Again 评分计为通过，不能当作选择题答对率。保持率示例使用界面百分比，不把底层 0.9 当成输入值。首页与桌面卡片的 `t(中文, 英文)` 文案也属于审计范围，不能只更新 string.json。内部字段和协议键保持稳定。
 
 欢迎页采用无硬编码版本号的常驻入门说明；实时公告负责发布消息。直链渠道由发布开关隐藏，其保留说明不得引导到当前不存在的菜单，也不能再宣称应用只能单机使用。备份／许可简介中的数据存储说明需同时承认可选同步。
 
@@ -71,7 +71,7 @@
 | `settings_home_today_summary_hint`、`settings_directory_general_hint` | 首页开关控制整个统计区域；`pages/首页.ets`、`components/home/主页摘要分页.ets` 的 Swiper 内容决定可见卡片。 |
 | `browser_help_find_replace_body`、`browser_find_scope_all` | 范围是提交时的完整搜索结果快照，包含未加载页；空结果不提交。`pages/浏览页.ets`、`model/BrowserSelection.ts`；Core `findreplace.rs` 只替换字段。 |
 | `browser_find_regex_help` | 默认不启用多行模式，逐行锚点需 `(?m)`；Core `search/service/mod.rs`、`findreplace.rs`。 |
-| `browser_help_batch_body` | 明确卡片／笔记模式作用范围、删除和替换的会话撤销限制、模板映射可能删除／新增卡片、完整同步双向选择；浏览已有“更多 → 操作历史”恢复入口。`components/browser/BrowserMoreMenu.ets`、`pages/浏览页.ets`；Core `card/service.rs`、`notetype/notetypechange.rs`。 |
+| `browser_help_batch_body` | 明确卡片／笔记模式作用范围、删除和替换的会话撤销限制、模板映射可能删除／新增卡片、完整同步双向选择；浏览已有“更多 → 回退”恢复入口。`components/browser/BrowserMoreMenu.ets`、`pages/浏览页.ets`；Core `card/service.rs`、`notetype/notetypechange.rs`。 |
 | 同上：到期日／重排位置 | 有 FSRS 记忆状态时不保证保留间隔；随机打乱笔记后按步长分配位置，同笔记卡片共享位置。Core `scheduler/reviews.rs`、`scheduler/new.rs`。 |
 | `browser_help_sidebar_body` | 长按标签先开操作菜单；牌组长按直接追加搜索。`components/browser/浏览侧边栏.ets`。 |
 | `glossary_delete_help`、`glossary_browser_info_help` | 撤销在学习页“更多”；卡片信息中的类型是模板名，不是队列状态。`pages/学习页.ets`、`components/browser/卡片信息.ets`。 |
