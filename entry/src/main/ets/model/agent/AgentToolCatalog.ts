@@ -7,12 +7,15 @@ import { agentExtensionTools } from './AgentExtensionTools';
 import { AGENT_CARD_STYLE_SCHEMA } from './AgentCardStyle';
 import { agentSettingsFunctionTools } from './AgentSettingsTools';
 import { agentDocumentTools } from './AgentDocuments';
+import { agentNoteMediaTools } from './AgentNoteMedia';
 import { agentAppNavigationTools } from './AgentAppNavigation';
 import { agentAnkiHelpTools } from './AgentAnkiHelp';
 import { agentMaintenanceTools } from './AgentMaintenanceTools';
 import { agentFsrsTools } from './AgentFsrsTools';
 import { agentDeckOptionsFunctionTools } from './AgentDeckOptionsTools';
+import { agentOperationDefinitions } from './AgentOperations';
 import { agentToolDiscoveryDefinition } from './AgentToolDiscovery';
+import { agentHistoryTools } from './AgentHistoryToolDefinitions';
 
 function exampleArgumentsFor(name: string): string {
   switch (name) {
@@ -134,9 +137,10 @@ const IMAGE_ATTACHMENT: string =
 /** 当前模式的完整能力目录；Runner 按需发送定义，不存在通用 RPC/数据库/文件权限。 */
 export function agentFunctionTools(batchLimit: number = 100, mode: AgentMode = 'edit'): ProviderFunctionTool[] {
   const createLimit: number = normalizeBatchLimit(batchLimit);
-  const notes: string = `{"type":"array","minItems":1,"maxItems":${createLimit},"items":{"type":"object","properties":{"fields":{"type":"array","items":{"type":"string"}},"sources":{"type":"array","maxItems":10,"items":{"type":"object","properties":{"documentId":{"type":"string","minLength":1,"maxLength":100},"page":{"type":"integer","minimum":1}},"required":["documentId","page"],"additionalProperties":false}},"images":{"type":"array","maxItems":1,"items":${IMAGE_ATTACHMENT}}},"required":[],"additionalProperties":{"type":"string"}}}`;
+  const notes: string = `{"type":"array","minItems":1,"maxItems":${createLimit},"items":{"type":"object","properties":{"fields":{"type":"array","items":{"type":"string"}},"sources":{"type":"array","maxItems":10,"items":{"type":"object","properties":{"documentId":{"type":"string","minLength":1,"maxLength":100},"page":{"type":"integer","minimum":1},"timestampSeconds":{"type":"number","minimum":0}},"required":["documentId","page"],"additionalProperties":false}},"images":{"type":"array","maxItems":1,"items":${IMAGE_ATTACHMENT}}},"required":[],"additionalProperties":{"type":"string"}}}`;
   const tools: ProviderFunctionTool[] = [
     agentToolDiscoveryDefinition(),
+    ...agentHistoryTools(),
     tool('web_search', '使用已配置的搜索服务检索公开网页，返回真实来源。',
       '"query":{"type":"string","minLength":1,"maxLength":100},"limit":{"type":"integer","minimum":1,"maximum":10}', '"query"'),
     tool('read_webpage', '在本机读取公开 HTTPS 网页文本，无需搜索密钥；不运行脚本或登录。长正文按 nextOffset 续读，-1 表示读完。',
@@ -204,10 +208,10 @@ export function agentFunctionTools(batchLimit: number = 100, mode: AgentMode = '
       '"notetypeIds":{"type":"array","items":{"type":"integer","minimum":1},"minItems":1,"maxItems":1},' +
       `"draftId":${TEXT},"reason":${TEXT}`, '"notetypeIds","draftId","reason"')
   ];
-  if (mode === 'assistant') { return tools.concat(agentExtensionTools(), agentSettingsFunctionTools(), agentDocumentTools(), agentAppNavigationTools(), agentAnkiHelpTools(), agentMaintenanceTools(), agentFsrsTools(), agentDeckOptionsFunctionTools()); }
+  if (mode === 'assistant') { return tools.concat(agentExtensionTools(), agentSettingsFunctionTools(), agentDocumentTools(), agentNoteMediaTools(), agentAppNavigationTools(), agentAnkiHelpTools(), agentMaintenanceTools(), agentFsrsTools(), agentDeckOptionsFunctionTools(), agentOperationDefinitions()); }
   if (mode === 'edit') {
     return tools.filter((value: ProviderFunctionTool): boolean => value.name !== 'create_flashcards')
-      .concat(agentExtensionTools(), agentSettingsFunctionTools(), agentDocumentTools(), agentAppNavigationTools(), agentAnkiHelpTools(), agentMaintenanceTools(), agentFsrsTools(), agentDeckOptionsFunctionTools());
+      .concat(agentExtensionTools(), agentSettingsFunctionTools(), agentDocumentTools(), agentNoteMediaTools(), agentAppNavigationTools(), agentAnkiHelpTools(), agentMaintenanceTools(), agentFsrsTools(), agentDeckOptionsFunctionTools(), agentOperationDefinitions());
   }
   const createTools: ProviderFunctionTool[] = [];
   for (const value of tools) {
@@ -216,5 +220,5 @@ export function agentFunctionTools(batchLimit: number = 100, mode: AgentMode = '
       createTools.push(value);
     }
   }
-  return createTools.concat(agentExtensionTools(), agentSettingsFunctionTools(), agentDocumentTools(), agentAppNavigationTools(), agentAnkiHelpTools(), agentMaintenanceTools(), agentFsrsTools(), agentDeckOptionsFunctionTools());
+  return createTools.concat(agentExtensionTools(), agentSettingsFunctionTools(), agentDocumentTools(), agentNoteMediaTools(), agentAppNavigationTools(), agentAnkiHelpTools(), agentMaintenanceTools(), agentFsrsTools(), agentDeckOptionsFunctionTools(), agentOperationDefinitions());
 }

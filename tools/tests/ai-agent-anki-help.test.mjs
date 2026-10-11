@@ -7,6 +7,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { stripTypeScriptTypes } from 'node:module';
 import { AgentAnkiHelp, agentAnkiHelpTools, isAgentAnkiHelpTool } from '../../entry/src/main/ets/model/agent/AgentAnkiHelp.ts';
 import { isAgentDocumentTool } from '../../entry/src/main/ets/model/agent/AgentDocuments.ts';
+import { isAgentNoteMediaTool } from '../../entry/src/main/ets/model/agent/AgentNoteMedia.ts';
 import { filterAgentWebTools } from '../../entry/src/main/ets/model/agent/AgentWeb.ts';
 import { agentFunctionTools } from '../../entry/src/main/ets/model/agent/AgentToolCatalog.ts';
 import { toolRiskOf } from '../../entry/src/main/ets/model/agent/AgentPolicy.ts';
@@ -178,11 +179,12 @@ test('actual page declares help only when mounted and keeps it available with we
   const source=readFileSync(new URL('../../entry/src/main/ets/pages/AI制卡页.ets',import.meta.url),'utf8');
   const start=source.indexOf('  private providerFunctionToolsForTurn(');
   assert.ok(start>=0);const method=source.slice(start,source.indexOf('\n  }',start)+4);
-  const Page=new Function('agentFunctionTools','filterAgentWebTools','isAgentDocumentTool','isAgentAnkiHelpTool',
-    stripTypeScriptTypes('class Page { '+method+' }',{mode:'transform'})+';return Page;')(agentFunctionTools,filterAgentWebTools,isAgentDocumentTool,isAgentAnkiHelpTool);
+  const Page=new Function('agentFunctionTools','filterAgentWebTools','isAgentDocumentTool','isAgentAnkiHelpTool','isAgentNoteMediaTool',
+    stripTypeScriptTypes('class Page { '+method+' }',{mode:'transform'})+';return Page;')(agentFunctionTools,filterAgentWebTools,isAgentDocumentTool,isAgentAnkiHelpTool,isAgentNoteMediaTool);
   const page=new Page();Object.assign(page,{agentSettings:{batchLimit:100},pageMode:'assistant',documentAccess:null,navigationSession:null,ankiHelpTools:null});
   assert.ok(page.providerFunctionToolsForTurn(false).every(t=>!isAgentAnkiHelpTool(t.name)));
   page.ankiHelpTools={};const names=page.providerFunctionToolsForTurn(false).map(t=>t.name);
   assert.ok(names.includes('search_anki_help')&&names.includes('read_anki_help'));
   assert.ok(!names.includes('web_search')&&!names.includes('read_webpage')&&!names.includes('list_documents'));
+  assert.ok(!names.includes('list_note_media')&&!names.includes('import_note_media')&&!names.includes('read_video_frames'));
 });
