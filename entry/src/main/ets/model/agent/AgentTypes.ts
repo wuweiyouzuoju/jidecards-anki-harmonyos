@@ -106,7 +106,7 @@ export interface AgentEvent {
 export type DraftOperationKind =
   'create_note' | 'update_field' | 'update_tags' | 'move_card' |
   'change_note_type' | 'update_template' | 'delete_note' | 'delete_card' |
-  'delete_deck' | 'delete_note_type' | 'update_notetype_fields' | 'restore_notetype' | 'update_notetype_latex';
+  'delete_deck' | 'delete_note_type' | 'update_notetype_fields' | 'restore_notetype' | 'update_notetype_latex' | 'app_operation';
 
 export type ChangeDraftStatus = 'pending' | 'prepared' | 'executing' |
   'partial' | 'completed' | 'conflict' | 'failed';
