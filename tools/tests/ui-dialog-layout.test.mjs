@@ -199,6 +199,41 @@ test('the shared frame dismisses only when the owner allows it', () => {
   frame.canDismiss = true; frame.dismiss(); assert.equal(closes, 1);
 });
 
+function ownerSlotPattern(slot) {
+  // Explicit void and an inferred return type have the same lexical this; method references do not.
+  return new RegExp(`${slot}\\s*:\\s*\\(\\s*\\)\\s*(?::\\s*void\\s*)?=>\\s*\\{\\s*this\\.`, 'u');
+}
+
+test('browser dialog slots retain the parent and read its current state when invoked by the child', () => {
+  const source = read('components/browser/BrowserViewMenu.ets');
+  const start = source.indexOf('  build() {');
+  const build = source.slice(start, source.indexOf('\n  }', start) + 4);
+  assert.ok(start >= 0);
+  // Execute actual slot wiring; Node proves receiver/callback behavior, not ArkUI rendering.
+  for (const code of [build, build.replaceAll('(): void =>', '() =>')]) {
+    let slots;
+    const Host = new Function('DialogFrame', stripTypeScriptTypes(`class Host { ${code} }`,
+      { mode: 'transform' }) + '; return Host;')(options => { slots = options; });
+    const parent = new Host(), calls = [];
+    parent.current = 'mode';
+    for (const [slot, builder] of [['header', 'selectionHeader'], ['content', 'selectionContent']]) {
+      parent[builder] = function () { assert.equal(this, parent); calls.push([slot, this.current]); };
+    }
+    parent.build();
+    const child = { current: 'child', header: slots.header, content: slots.content };
+    child.header(); child.content();
+    parent.current = 'sort';
+    child.header(); child.content();
+    assert.deepEqual(calls, [['header', 'mode'], ['content', 'mode'], ['header', 'sort'], ['content', 'sort']]);
+  }
+  for (const slot of ['header', 'content']) {
+    assert.match(`${slot}: (): void => { this.selectionHeader(); }`, ownerSlotPattern(slot));
+    assert.match(`${slot}: () => { this.selectionHeader(); }`, ownerSlotPattern(slot));
+    assert.doesNotMatch(`${slot}: this.selectionHeader`, ownerSlotPattern(slot));
+    assert.doesNotMatch(`${slot}: function () { this.selectionHeader(); }`, ownerSlotPattern(slot));
+  }
+});
+
 test('shared chrome owns theme, scroll limits and safe areas; slots retain their owner', () => {
   const backdrop = read('components/common/DialogBackdrop.ets');
   assert.match(backdrop, /@StorageProp\('themeMode'\)/);
@@ -214,8 +249,8 @@ test('shared chrome owns theme, scroll limits and safe areas; slots retain their
   for (const path of readdirSync(root, { recursive: true }).filter(p => p.endsWith('.ets'))) {
     const source = read(path.replaceAll('\\', '/'));
     if (source.includes('DialogFrame({')) {
-      assert.match(source, /header: \(\) => \{ this\./, path);
-      assert.match(source, /content: \(\) => \{ this\./, path);
+      assert.match(source, ownerSlotPattern('header'), path);
+      assert.match(source, ownerSlotPattern('content'), path);
       assert.doesNotMatch(source, /header: this\.|content: this\./, path);
     }
     if (source.includes('backgroundBlurStyle(BlurStyle.Thin')) {
