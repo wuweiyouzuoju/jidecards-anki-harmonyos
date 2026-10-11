@@ -369,15 +369,16 @@ test('AI configuration is localized and only lives in the settings group', () =>
 
 test('AI page title uses equal side regions around the screen midpoint', () => {
   const page = read('entry/src/main/ets/pages/AI制卡页.ets') + read('entry/src/main/ets/model/agent/AgentConversationView.ts');
-  const top = page.match(/private 顶部条\(\)[\s\S]*?@Builder\s+private 历史区/)?.[0] ?? '';
+  const top = page.match(/private 顶部条\(\)[\s\S]*?@Builder\s+private settingsPanel/)?.[0] ?? '';
   assert.equal((top.match(/\.width\('35%'\)/g) ?? []).length, 2);
   assert.match(top, /\.width\('30%'\)[\s\S]*\.textAlign\(TextAlign\.Center\)/);
   assert.match(top, /\.justifyContent\(FlexAlign\.End\)/);
-  assert.equal((top.match(/IconActionButton\(\{ toolbarStyle: true/g) ?? []).length, 5,
-    'back, history, memory, new conversation and new memory share the home toolbar button component');
+  assert.equal((top.match(/IconActionButton\(\{ toolbarStyle: true/g) ?? []).length, 4,
+    'back, more, new conversation and new memory share the home toolbar button component');
   const right = top.slice(top.indexOf('Row({ space: 应用尺寸.间距_8 })'));
-  const history = right.slice(right.indexOf('} else if (this.显示历史区)'), right.indexOf('} else {'));
-  assert.ok(history.indexOf("source: $r('app.media.ic_agent_memory')") < history.indexOf("source: $r('app.media.ic_home_new')"));
+  assert.match(right, /source: \$r\('app\.media\.ic_home_more'\)/);
+  assert.doesNotMatch(right.slice(0, right.indexOf('private moreEntries')), /source: \$r\('app\.media\.ic_home_settings'\)/);
+  assert.doesNotMatch(top, /ic_agent_memory/);
   assert.match(top, /if \(this\.memoryVisible\) \{\s*IconActionButton\([\s\S]*?label: this\.interfaceLabel\('memory_create'\)/);
 });
 

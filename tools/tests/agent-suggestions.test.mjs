@@ -132,7 +132,7 @@ test('empty suggestions mount only in an empty assistant conversation and use na
   assert.match(page, /if \(this\.pageMode === 'assistant' && this\.消息列表\.length === 0\) \{\s*AgentEmptySuggestions\(/);
   assert.match(page, /if \(this\.显示历史区\) \{\s*this\.历史区\(\)\s*\} else/);
   assert.match(page, /onShown\(\(\): void => \{ this\.wheelSession\.setVisible\(true\); appInterface.showPage\('agent'\); this\.isAgentPageVisible = true; this\.publishInterface\(\); \}\)/);
-  assert.match(page, /onHidden\(\(\): void => \{ this\.wheelSession\.setVisible\(false\); appInterface.hidePage\('agent'\); this\.isAgentPageVisible = false; this\.navigationSession\?\.cancel\(\); \}\)/);
+  assert.match(page, /onHidden\(\(\): void => \{[^\n]*this\.wheelSession\.setVisible\(false\); appInterface.hidePage\('agent'\); this\.isAgentPageVisible = false; this\.navigationSession\?\.cancel\(\); \}\)/);
   const component = read('entry/src/main/ets/components/agent/AgentEmptySuggestions.ets');
   assert.equal((component.match(/\bText\(/g) ?? []).length, 1);
   assert.match(component, /LongPressGesture\(\{ repeat: false, duration: 500 \}\)/);

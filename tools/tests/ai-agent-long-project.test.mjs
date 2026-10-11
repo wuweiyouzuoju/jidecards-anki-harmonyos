@@ -171,14 +171,16 @@ test('known DeepSeek budgets support long material and checkpoints preserve it w
   assert.throws(()=>buildResponsesPayload(value),/agent_context_limit/);
 });
 
-test('memory entry stays before new conversation and its own toolbar creates a memory only when available',()=>{
+test('settings replace the history memory shortcut and memory toolbar creates only when available',()=>{
   const context={history:true,processing:false,parsing:false,batchRunning:false,pendingClarification:false,canSubmit:false};
-  assert.deepEqual(agentInterfaceControls(context).map(x=>x.id),['back','memory','new']);
+  assert.deepEqual(agentInterfaceControls(context).map(x=>x.id),['back','new']);
   assert.equal(agentInterfaceControls({...context,history:false}).some(x=>x.id==='memory'),false);
   const memoryControls=agentInterfaceControls({...context,memory:true,memoryCanCreate:true});
   assert.deepEqual(memoryControls.map(x=>x.id),['back','memory_create']);
   assert.equal(memoryControls[1].titleKey,'ai_agent_memory_create');assert.equal(memoryControls[1].enabled,true);
   assert.equal(agentInterfaceControls({...context,memory:true,memoryCanCreate:false})[1].enabled,false);
   assert.equal(agentInterfaceTitle('assistant',true,true),'agent_memory_title');
-  assert.equal(agentInterfaceControls({...context,processing:true}).find(x=>x.id==='memory').enabled,false);
+  assert.equal(agentInterfaceControls({...context,history:false,processing:true}).find(x=>x.id==='more').enabled,false);
+  assert.deepEqual(agentInterfaceControls({...context,settings:true}).map(x=>x.id),['back']);
+  assert.equal(agentInterfaceTitle('assistant',true,false,true),'ai_agent_settings_page_title');
 });

@@ -28,6 +28,7 @@ function harness() {
   Object.assign(page, {
     pageDisposed: false, conversationId: 'original', cardBatch: new AgentCardBatch(scheduler, new SyncActivity()),
     interfaceMounted: true, pageMode: 'assistant', 显示历史区: false, 处理中: false, 文件解析中: false,
+    settingsVisible: false, settingsBusy: false, memoryVisible: false,
     导入文件列表: [], 输入草稿: '', 错误信息: '', targetSelectionMessage: -1,
     getUIContext: () => ({}), hasPendingClarification: () => false, canSubmit: () => !page.cardBatch.isRunning(),
     消息列表: [{ id: 1, draftDeckId: 7, draftNotetypeId: 8, 批次保存中: false, 批次结果: '',
@@ -50,10 +51,10 @@ function harness() {
 test('interface observes batch start before the first progress event and completion after accepted writes', async () => {
   const h = harness(), saving = h.page.保存批次(0);
   assert.equal(h.tracker.snapshot()[0].busy, true);
-  assert.equal(h.tracker.snapshot()[0].items.find(x => x.id === 'history').enabled, false);
+  assert.equal(h.tracker.snapshot()[0].items.find(x => x.id === 'more').enabled, false);
   h.gate.resolve(); await saving;
   assert.equal(h.tracker.snapshot()[0].busy, false);
-  assert.equal(h.tracker.snapshot()[0].items.find(x => x.id === 'history').enabled, true);
+  assert.equal(h.tracker.snapshot()[0].items.find(x => x.id === 'more').enabled, true);
   assert.equal(h.writes.length, 2);
 });
 
