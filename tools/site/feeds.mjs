@@ -52,8 +52,7 @@ ${facts}
 - [扩展点](${work.repository}/blob/main/docs/development/extension-points.md)
 - [开发任务契约](${work.repository}/blob/main/docs/development/task-contract.md)
 - [验证命令与范围](${work.repository}/blob/main/docs/development/verification.md)
-- [选择题制卡指南](${work.repository}/blob/main/docs/choice-authoring.md)
-- [APKG 扩展规范](${work.repository}/blob/main/docs/choice-apkg-v1.md)
+- [功能状态与兼容边界](${work.repository}/blob/main/docs/FEATURE_STATUS.md)
 - [JIDE 实现与验证](${work.repository}/blob/main/docs/development/agent.md)
 
 ${work.detailSections.find(item => item.id === 'jide').availability}

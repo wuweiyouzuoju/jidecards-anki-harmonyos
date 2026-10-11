@@ -5,7 +5,7 @@
 项目优先服务 Agent 开发；这里的 Agent 指辅助作者开发仓库的编程 Agent。
 
 - 正式版：2.9.22
-- 源码版本：2.9.88（构建编号 3069）
+- 源码版本：2.9.98（构建编号 3079）
 - 平台：HarmonyOS NEXT
 - 许可证：AGPL-3.0-or-later
 - 作者：[可塑性天赋](https://jidecards.com/about/)
@@ -28,8 +28,7 @@
 - [扩展点](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/main/docs/development/extension-points.md)
 - [开发任务契约](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/main/docs/development/task-contract.md)
 - [验证命令与范围](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/main/docs/development/verification.md)
-- [选择题制卡指南](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/main/docs/choice-authoring.md)
-- [APKG 扩展规范](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/main/docs/choice-apkg-v1.md)
+- [功能状态与兼容边界](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/main/docs/FEATURE_STATUS.md)
 - [JIDE 实现与验证](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/main/docs/development/agent.md)
 
 当前 JIDE 为开发者调试功能，发布配置默认隐藏入口。需解锁并配置模型服务后使用；联网检索另需开启应用端联网并配置搜索凭据。具体能力以当前应用、工具与发布说明为准。
