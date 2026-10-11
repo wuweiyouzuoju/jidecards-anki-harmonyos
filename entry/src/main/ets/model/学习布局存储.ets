@@ -35,6 +35,7 @@
 
 import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
+import { saveLocalPreference } from '../utils/LocalPreferenceWrite';
 import { StudyLayoutMode, decodeStudyLayout } from './StudyLayout';
 
 const 存储名: string = 'jidecards_study_layout';
@@ -168,18 +169,12 @@ export async function 加载学习布局模式(): Promise<学习布局模式> {
 // @副作用
 // 写入 preferences 的 study_layout_mode 并 flush 落盘。
 // ========================================================
-export async function 保存学习布局模式(模式: 学习布局模式): Promise<void> {
+/** @throws {Error} 保存失败不广播已应用状态。 */
+export async function 保存学习布局模式(模式: 学习布局模式, expected: string | null = null): Promise<void> {
   const 上下文: common.UIAbilityContext | null = 取上下文();
-  if (上下文 === null) {
-    return;
-  }
-  try {
-    const 存储: preferences.Preferences = await preferences.getPreferences(上下文, 存储名);
-    await 存储.put(布局模式键, 模式);
-    await 存储.flush();
-  } catch (错误) {
-    // 偏好不可用时仅丢失持久化，不阻塞 UI。
-  }
+  if (上下文 === null) throw new Error('study_layout_storage_unavailable');
+  const 存储 = await preferences.getPreferences(上下文,存储名);
+  await saveLocalPreference(存储,布局模式键,模式,'bottom',expected);
 }
 
 /** 自动换边不覆盖自由拖动 X/Y；智感模式只保存独立高度。
