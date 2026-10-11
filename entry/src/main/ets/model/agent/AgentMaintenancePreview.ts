@@ -9,6 +9,10 @@ import type { 搜索条件 } from '../../proto/messages/DeckMessages';
 import type { AgentAction } from './AgentAction';
 import type { CollectionPreferencesAction, StudyControlsAction, ExportSubsetAction } from './AgentMaintenanceActions';
 import type { StudyCommandMapping } from '../StudyControls';
+import { effectiveStudyKeyboard } from '../StudyControls';
+import type { StudyControls } from '../StudyControls';
+import { STUDY_KEYBOARD_ACTIONS, studyChordLabel } from '../StudyKeyboard';
+import type { StudyKeyBinding } from '../StudyKeyboard';
 import type { FsrsSimulationAction } from './AgentFsrsTools';
 import type { AgentDeckOptionsAction } from './AgentDeckOptionsTools';
 import { agentWritableDeckOptionFields } from './AgentDeckOptionsTools';
@@ -131,7 +135,15 @@ export function maintenancePreviewRows(action: AgentAction, text: (key: string) 
         text('agent_command_' + item.command)).join('\n');
     rows.push({ title: text('agent_controls_keep_screen'), before: boolean(payload.before.keepScreenOn), after: boolean(payload.after.keepScreenOn) });
     rows.push({ title: text('agent_controls_mode'), before: text('agent_gesture_' + payload.before.gestureMode), after: text('agent_gesture_' + payload.after.gestureMode) });
-    rows.push({ title: text('agent_controls_keys'), before: mapped(payload.before.keys), after: mapped(payload.after.keys) });
+    const keyboard = (controls: StudyControls): string => {
+      const bindings: StudyKeyBinding[] = effectiveStudyKeyboard(controls).bindings;
+      if (bindings.length === 0) return text('study_keyboard_empty');
+      return bindings.map((item: StudyKeyBinding): string => {
+        const titleKey: string = STUDY_KEYBOARD_ACTIONS.find((action): boolean => action.id === item.command)?.titleKey ?? '';
+        return studyChordLabel(item.key) + ' · ' + text('study_keyboard_' + item.side) + ' → ' + text(titleKey);
+      }).join('\n');
+    };
+    rows.push({ title: text('agent_controls_keys'), before: keyboard(payload.before), after: keyboard(payload.after) });
     rows.push({ title: text('agent_controls_gestures'), before: mapped(payload.before.gestures), after: mapped(payload.after.gestures) });
   } else if (action.kind === 'export_subset') {
     const payload: ExportSubsetAction = JSON.parse(action.payloadJson) as ExportSubsetAction;

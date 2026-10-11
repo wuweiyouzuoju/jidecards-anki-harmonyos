@@ -1,3 +1,5 @@
+import { effectiveStudyKeyboard } from '../../entry/src/main/ets/model/StudyControls.ts';
+import { STUDY_KEYBOARD_ACTIONS } from '../../entry/src/main/ets/model/StudyKeyboard.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -62,7 +64,7 @@ function fixture() {
     saveBrowserPreferences:async(patch,expected)=>{assert.equal(JSON.stringify(state.browserPreferences),expected);if(state.browserWriteError)throw Error('disk');
       state.browserPreferences=updateBrowserPreferences(state.browserPreferences,patch);state.writes.push('browser');return state.browserPreferences;}};
   const dependencies={...browserDependencies,decodeMaintenanceArguments,collectionPreferenceEdits,agentRestoreStockKind,patchAgentNotetypeFields,patchAgentNotetypeLatex,createAgentAction,
-    validateStudyControls,reviewPreferences,readStudyControls:async()=>structuredClone(state.controls),
+    validateStudyControls,effectiveStudyKeyboard,STUDY_KEYBOARD_ACTIONS,reviewPreferences,readStudyControls:async()=>structuredClone(state.controls),
     笔记服务:Notes,卡片服务:Cards,笔记类型服务:Types,readAgentNotetypeImpact,readAgentExportSnapshot};
   const Registry=loadPlatformModule('backend/agent/AgentToolRegistry.ets','AgentToolRegistry',{
     toolRiskOf,parseAgentToolJsonObject,decodeAgentClarificationRequest,AgentApprovalRequired});
@@ -153,6 +155,28 @@ test('study controls and subset export use confirmation, exact discovered IDs, t
   const cardAction=(await f.call('propose_export_subset',{...args,ids:[71],mode:'cards'})).action;
   f.executor.registerPending(cardAction);f.state.note.fields[1]='changed linked note';
   await assert.rejects(f.executor.executeConfirmed(cardAction),/changed_since_proposal/);assert.equal(f.state.exports.length,1);
+});
+
+test('JIDE reads and confirms the same complete keyboard bindings as manual settings with localized chord/side previews',async()=>{
+  const f=fixture();
+  const read=JSON.parse((await f.call('get_advanced_settings',{group:'study'})).outputJson);
+  assert.ok(read.keyboardActions.some(action=>action.id==='edit'));
+  assert.ok(read.effectiveKeyboard.bindings.some(binding=>binding.key==='ctrl+1'&&binding.command==='flag1'));
+  const keyboard={version:1,bindings:[{key:'ctrl+shift+x',command:'replay',side:'both'},
+    {key:'x',command:'flip',side:'question'},{key:'x',command:'easy',side:'answer'}]};
+  const action=(await f.call('propose_update_study_controls',{controlsJson:JSON.stringify({...defaultStudyControls(),keyboard})})).action;
+  assert.deepEqual(f.state.writes,[]);
+  for(const locale of ['base','en_US']) {
+    const strings=JSON.parse(readFileSync(new URL(`../../entry/src/main/resources/${locale}/element/string.json`,import.meta.url))).string;
+    const text=key=>{const row=strings.find(row=>row.name===key);assert.ok(row,key);return row.value;};
+    const rows=maintenancePreviewRows(action,text),keys=rows.find(row=>row.title===text('agent_controls_keys'));
+    assert.ok(keys.after.includes('Ctrl+Shift+X'));assert.ok(keys.after.includes(text('study_keyboard_answer')));
+  }
+  f.executor.registerPending(action);await f.executor.executeConfirmed(action);
+  assert.deepEqual(f.state.controls.keyboard,keyboard);
+  const empty=(await f.call('propose_update_study_controls',{controlsJson:JSON.stringify({...defaultStudyControls(),keyboard:{version:1,bindings:[]}})})).action;
+  f.executor.registerPending(empty);await f.executor.executeConfirmed(empty);
+  assert.deepEqual(f.state.controls.keyboard.bindings,[]);
 });
 
 test('duplicate notes stay draft-only, copy tags and media references, use new identity and reject a changed source', async () => {

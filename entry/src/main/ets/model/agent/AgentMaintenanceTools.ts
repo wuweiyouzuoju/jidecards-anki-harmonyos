@@ -4,6 +4,7 @@ import type { ReviewPreferenceEdit } from '../../proto/messages/PreferencesMessa
 import { ReviewPreferenceField, validatePreferenceEdit } from '../../proto/messages/PreferencesMessages';
 import { validateNotetypeLatexPatch } from './AgentNotetypeLatex';
 import { REVIEW_AUDIO_PREFERENCES } from '../ReviewAudioPreferences';
+import { STUDY_KEYBOARD_ACTIONS } from '../StudyKeyboard';
 
 const TEXT: string = '{"type":"string","minLength":1,"maxLength":60000}';
 const ID: string = '{"type":"integer","minimum":1}';
@@ -20,17 +21,17 @@ export function agentMaintenanceTools(): ProviderFunctionTool[] {
   const draft: string = `"draftId":${TEXT},"reason":${TEXT}`;
   return [
     tool('get_browser_preferences', '读取浏览器真实模式、排序、副标题、Cards/Notes 各自显示列、最近搜索与 Core 忽略重音选项，返回 Core 列目录。显示列也有手动更多菜单入口。读取不修改浏览模式或激活列。', '', '', '{}'),
-    tool('propose_update_browser_preferences', '提出浏览器偏好修改，确认后与手动界面共用保存队列。changesJson 只允许 mode(cards/notes)、sortColumn(Core 可排序 key 或空串默认)、sortReverse(boolean)、subtitleIndex(1牌组/2到期/4答案)、cardsColumns/notesColumns(有序 Core key 数组最多16项，空数组恢复默认)。省略项保留；先读取 get_browser_preferences。不会修改卡片内容或调度，不能设置任意配置键。忽略重音在此工具中只读，通过手动搜索选项修改。',
+    tool('propose_update_browser_preferences', '提出浏览器偏好修改，确认后与手动界面共用保存队列。changesJson 只允许 mode(cards/notes)、sortColumn(Core 可排序 key 或空串默认)、sortReverse(boolean)、subtitleIndex(1牌组/2到期/4答案)、cardsColumns/notesColumns(有序 Core key 数组最多16项，空数组恢复默认)。省略项保留；先读取 get_browser_preferences。不会修改卡片内容或调度，不能设置任意配置键。忽略重音在此工具中只读，修改使用独立 propose_set_ignore_accents 提案或手动搜索选项。',
       `"changesJson":${TEXT}`, '"changesJson"', '{"changesJson":"{\\"cardsColumns\\":[\\"question\\",\\"answer\\"]}"}'),
     tool('get_filtered_deck', '读取已发现的既有过滤牌组真实配置。返回两个搜索条件、数量、排序、reschedule 与预览延时（秒）；普通牌组会失败。使用本工具后再提出修改。',
       `"deckId":${ID}`, '"deckId"', '{"deckId":1}'),
     tool('propose_update_filtered_deck', '提出既有过滤牌组配置修改，changesJson 只允许 reschedule、searchTerms、previewDelay、previewAgainSecs、previewHardSecs、previewGoodSecs。searchTerms 是1至2个完整 search/limit/order 对象，limit 1至100000，order 0至10，与 Core 排序一致。延时单位秒，0至86400。省略字段保留。确认后由 Core 保存并重新填充，已有卡归还原牌组；空结果仍保留牌组，不删除笔记或复习历史。提交前重查真实配置，过期提案失败。',
       `"deckId":${ID},"changesJson":${TEXT}`, '"deckId","changesJson"', '{"deckId":1,"changesJson":"{\\"reschedule\\":false}"}'),
-    tool('get_advanced_settings', '读取 JIDE 专用高级设置。collection 返回 Core FSRS 负担均衡、带步骤短期调度和历史备份保留策略、隐藏音频按钮和翻面中断音频；study 返回本机常亮与输入映射。不会读取凭证。',
+    tool('get_advanced_settings', '读取 JIDE 高级设置。collection 返回 Core 换日小时 rollover、提前学习秒数 learnAheadSecs、计时分段秒数 timeLimitSecs、显示剩余 showRemaining/间隔 showIntervals，以及 FSRS 负担均衡、短期调度、备份保留和音频偏好；study 返回本机常亮与输入映射。',
       '"group":{"type":"string","enum":["collection","study"]}', '"group"', '{"group":"collection"}'),
-    tool('propose_update_collection_preferences', '提出 Core 全库高级偏好修改。changesJson 为非空对象，只允许 loadBalancer、shortTermWithSteps、hideAudioPlayButtons、interruptAudioWhenAnswering 开关及 backupDaily、backupWeekly、backupMonthly、backupInterval 整数。间隔单位分钟，保留数可为零。省略项保留；不主动重排卡片。',
+    tool('propose_update_collection_preferences', '修改 Core 全库偏好。changesJson 为非空对象，允许 rollover(0–23小时)、learnAheadSecs/timeLimitSecs(非负整秒)、showRemaining/showIntervals/loadBalancer/shortTermWithSteps/hideAudioPlayButtons/interruptAudioWhenAnswering(开关)、backupDaily/backupWeekly/backupMonthly(保留数)/backupInterval(分钟)。省略保留，不主动重排。',
       `"changesJson":${TEXT}`, '"changesJson"', '{"changesJson":"{\\"loadBalancer\\":true}"}'),
-    tool('propose_update_study_controls', '提出本机学习常亮与键盘/手势映射修改。controlsJson 为 get_advanced_settings(study) 返回的完整 controls 对象。keepScreenOn 为开关，gestureMode 为 inherit/off/gestures/tap_zones，keys/gestures 为 input、command 对象数组。keys 仅 space/enter/1/2/3/4/r/b/s，gestures 仅 left/right/double。command 可为 none/flip/again/hard/good/easy/undo/replay/bury/suspend。空映射沿用默认；评分仅答案面，退出/后台恢复常亮。',
+    tool('propose_update_study_controls', '提出本机学习常亮与键盘/手势映射修改，手动入口在设置→复习→学习快捷键。controlsJson 为 get_advanced_settings(study) 返回的完整 controls 对象。keepScreenOn 为开关，gestureMode 为 inherit/off/gestures/tap_zones。自由配置使用 keyboard:{version:1,bindings:[{key:"ctrl+shift+f5",command:"replay",side:"both"}]}，同时 keys 必须为[]。bindings 是完整列表，空列表禁用全部学习快捷键；可绑定字母、数字、F键、方向键、numpad键、标点键名与录制得到的code:N；Ctrl/Shift/Alt精确匹配。同一动作多个键，side为question/answer/both，同键同卡面冲突会拒绝。可用动作：' + STUDY_KEYBOARD_ACTIONS.map((item): string => item.id).join('/') + '。评分仍仅答案面。旧keys只为兼容旧配置；省略keyboard时旧空keys沿用默认。gestures仍为left/right/double及none/flip/again/hard/good/easy/undo/replay/bury/suspend。编辑框、弹窗与手写期间保留原输入保护，系统返回不可重绑。',
       `"controlsJson":${TEXT}`, '"controlsJson"', '{"controlsJson":"{\\"keepScreenOn\\":true,\\"gestureMode\\":\\"inherit\\",\\"keys\\":[],\\"gestures\\":[]}"}'),
     tool('propose_export_subset', '提出导出已发现的笔记或卡片 ID 子集。mode=notes 包含全部兄弟卡；mode=cards 由 Core 处理所选卡及其笔记。format=apkg 或 text，text 按 mode 导出笔记/卡片文本。确认后弹出系统保存位置，取消不会报告保存成功。媒体与调度只适用于 APKG；不临时移动卡片，不接受路径。',
       `"ids":{"type":"array","items":${ID},"minItems":1,"maxItems":1000},"mode":{"type":"string","enum":["notes","cards"]},"format":{"type":"string","enum":["apkg","text"]},"withMedia":{"type":"boolean"},"withScheduling":{"type":"boolean"}`,
@@ -91,6 +92,8 @@ export function decodeMaintenanceArguments(name: string, json: string): Maintena
 export function collectionPreferenceEdits(json: string): ReviewPreferenceEdit[] {
   const raw: Record<string, Object> = JSON.parse(json) as Record<string, Object>;
   const fields: Record<string, ReviewPreferenceField> = { loadBalancer: ReviewPreferenceField.LoadBalancer,
+    rollover: ReviewPreferenceField.Rollover, learnAheadSecs: ReviewPreferenceField.LearnAheadSecs,
+    timeLimitSecs: ReviewPreferenceField.TimeLimitSecs, showRemaining: ReviewPreferenceField.ShowRemaining, showIntervals: ReviewPreferenceField.ShowIntervals,
     shortTermWithSteps: ReviewPreferenceField.ShortTermWithSteps, backupDaily: ReviewPreferenceField.BackupDaily,
     backupWeekly: ReviewPreferenceField.BackupWeekly, backupMonthly: ReviewPreferenceField.BackupMonthly,
     backupInterval: ReviewPreferenceField.BackupInterval };
@@ -101,6 +104,7 @@ export function collectionPreferenceEdits(json: string): ReviewPreferenceEdit[] 
     const field: ReviewPreferenceField = fields[key];
     const value: Object = raw[key];
     const boolean: boolean = field === ReviewPreferenceField.LoadBalancer || field === ReviewPreferenceField.ShortTermWithSteps ||
+      field === ReviewPreferenceField.ShowRemaining || field === ReviewPreferenceField.ShowIntervals ||
       REVIEW_AUDIO_PREFERENCES.some((item): boolean => item.field === field);
     if ((boolean && typeof value !== 'boolean') || (!boolean && typeof value !== 'number')) throw new Error('invalid_preferences_patch');
     const edit: ReviewPreferenceEdit = { field: field, value: boolean ? (value === true ? 1 : 0) : value as number };
