@@ -16,6 +16,7 @@ import { customSchedulingInfo } from '../../model/CustomScheduling';
 import type { CustomSchedulingInfo } from '../../model/CustomScheduling';
 import type { AgentDeckSettings, AgentDeckSettingsView } from '../../model/agent/AgentDeckSettings';
 import { readAgentPreference } from './AgentPreferenceReader';
+import { readAgentSettingValue } from './AgentSettingCommands';
 import type { AgentPreferenceState } from './AgentPreferenceReader';
 import { 当前语言模式 } from '../../model/语言存储';
 import { readSavedStudyQuickAnswerMode } from '../../model/实验性功能存储';
@@ -218,8 +219,7 @@ export class AgentAppSettingsTools {
     } else if (name === 'propose_set_fsrs') {
       change = { settingId: 'fsrs_enabled', before: `${await readFsrsEnabled()}`, after: `${args.enabled}` };
     } else if (name === 'propose_set_setting') {
-      const current: AgentPreferenceState = await readAgentPreference(args.settingId);
-      change = { settingId: args.settingId, before: `${current.value}`, after: args.value };
+      change = { settingId: args.settingId, before: await readAgentSettingValue(args.settingId), after: args.value };
     } else { throw new Error('tool_unavailable'); }
     return createAgentAction('setting_change', JSON.stringify(change));
   }

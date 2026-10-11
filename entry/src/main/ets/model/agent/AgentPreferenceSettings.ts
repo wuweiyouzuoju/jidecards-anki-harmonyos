@@ -6,12 +6,31 @@ export type AgentPreferenceValue = boolean | number | string;
 
 /** 只公开已经共用保存入口的设备偏好；新增项须同时接通执行器与确认预览。 */
 export function agentWritablePreferenceIds(): string[] {
-  return ['card_text_size', 'deck_list_style', 'study_haptics', 'motion_style'];
+  return agentPreferenceDefinitions().filter((item): boolean => item.id !== 'media_sync_pending')
+    .map((item): string => item.id).concat(['language','study_quick_answer','graph_preferences']);
 }
 
 /** @throws {Error} 模型只能提交白名单设置的规范值，不能选择底层存储键。 */
 export function decodeWritablePreference(id: string, value: string): AgentPreferenceValue {
   if (!agentWritablePreferenceIds().includes(id)) { throw new Error('unsupported_setting_write'); }
+  if (id === 'language') {
+    if (!['zh-Hans','en'].includes(value)) throw new Error('invalid_setting_value'); return value;
+  }
+  if (id === 'study_quick_answer') {
+    if (!['0','1','2'].includes(value)) throw new Error('invalid_setting_value'); return Number(value);
+  }
+  if (id === 'graph_preferences') {
+    const graph: Record<string,Object> = JSON.parse(value) as Record<string,Object>;
+    const keys = ['calendarFirstDayOfWeek','cardCountsSeparateInactive','futureDueShowBacklog'];
+    if (graph === null || typeof graph !== 'object' || Array.isArray(graph) || Object.keys(graph).length !== keys.length ||
+      Object.keys(graph).some((key): boolean => !keys.includes(key)) || ![0,1,5,6].includes(graph['calendarFirstDayOfWeek'] as number) ||
+      keys.slice(1).some((key): boolean => typeof graph[key] !== 'boolean')) throw new Error('invalid_setting_value'); return value;
+  }
+  const definition = agentPreferenceDefinitions().find((item): boolean => item.id === id)!;
+  if (definition.allowedValues.length > 0 && definition.encoding !== 'string_boolean') {
+    if (!definition.allowedValues.includes(value)) throw new Error('invalid_setting_value');
+    return typeof definition.defaultValue === 'number' ? Number(value) : value;
+  }
   if (id === 'motion_style') {
     if (!isMotionStyle(value)) { throw new Error('invalid_setting_value'); }
     return value;

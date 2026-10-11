@@ -57,6 +57,7 @@ function fixture() {
     AppStorage: localStorage, preferences: {getPreferences: async () => localStore}
   });
   const themes = new ThemeModeSession({
+    // Settings commands below reuse the same domain writers as the manual UI.
     readSavedMode: async () => state.mode,
     saveMode: async mode => { if (state.failSave) throw Error('disk'); state.writes.push(mode); state.mode = mode; },
     applyMode: async mode => { state.active = mode; }, systemDark: () => true
@@ -78,7 +79,7 @@ function fixture() {
     appThemeSession: themes, appThemeColorSession: colors, THEME_CATALOG, isThemeAvailable, UNLOCKED_CONTENTS_KEY, isThemeId,
     createAgentAction, readFsrsEnabled, agentPreferenceDefinitions, buildAgentDeckSettings, customSchedulingInfo,
     当前语言模式: () => 'en', readSavedStudyQuickAnswerMode: async () => 2,
-    readAgentPreference,
+    readAgentPreference, readAgentSettingValue: async id => String((await readAgentPreference(id)).value),
     统计服务: class { async 获取图表偏好() { return {calendarFirstDayOfWeek:1,cardCountsSeparateInactive:true,browserLinksSupported:false,futureDueShowBacklog:true}; } },
     AppStorage: { get: key => {
       if (key === 'abilityContext') return { resourceManager: { getStringByNameSync: key => {state.resourceReads.push(key);return state.resourceLabels?.get(key) ?? key;} } };
@@ -102,6 +103,10 @@ function fixture() {
   const Executor = loadPlatformModule('backend/agent/AgentActionExecutor.ets', 'AgentActionExecutor', {
     牌组服务: class {}, 笔记类型服务: class {}, AgentActionLedger, decodeSettingChange, appThemeColorSession: colors,
     LocalPreferenceWriteError: localApi.LocalPreferenceWriteError, saveCardTextSize, saveDeckListStyle, saveStudyHaptics, saveMotionStyle,
+    saveAgentSettingValue: loadPlatformModule('backend/agent/AgentSettingCommands.ets','saveAgentSettingValue',{
+      decodeWritablePreference, readAgentPreference,
+      saveCardTextSize,saveDeckListStyle,saveStudyHaptics,saveMotionStyle,AppStorage:localStorage
+    }),
     设置FSRS开启状态: async (enabled, expected) => {
       if (state.fsrs !== expected) throw Error('setting_changed_since_proposal');
       if (state.fsrs !== enabled) state.fsrsWrites.push(enabled);
@@ -296,7 +301,7 @@ test('broad settings catalog has executable reads, exact schemas, no secret keys
     assert.throws(() => decodeSettingsArguments('get_settings', JSON.stringify({ids:[id]})), /invalid_setting_ids/);
   }
   assert.throws(() => decodeSettingsArguments('get_settings', '{"ids":["language","language"]}'), /invalid_setting_ids/);
-  assert.equal(definitions.find(x => x.id === 'sync_media').writable, false);
+  assert.equal(definitions.find(x => x.id === 'sync_media').writable, true);
   for (const id of agentWritablePreferenceIds()) {
     assert.equal(definitions.find(x => x.id === id).writable,true);
     assert.equal(definitions.find(x => x.id === id).writeTool,'propose_set_setting');
@@ -438,7 +443,7 @@ test('manual changes invalidate local proposals and unsupported or malformed set
     assert.equal(f.state.localWrites.length,writes);
   }
   const writes = f.state.localWrites.length;
-  for (const [settingId,value] of [['language','en'],['api_key','secret'],['card_text_size','49'],
+  for (const [settingId,value] of [['language','invalid'],['api_key','secret'],['card_text_size','49'],
     ['card_text_size','201'],['card_text_size','100.5'],['card_text_size','1e2'],
     ['card_text_size','0100'],['study_haptics','1'],['deck_list_style','true'],['motion_style','true'],['motion_style','Lively']]) {
     assert.throws(() => decodeSettingsArguments('propose_set_setting',JSON.stringify({settingId,value})));

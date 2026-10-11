@@ -42,11 +42,11 @@ export function agentSettingDefinitions(): AgentSettingDefinition[] {
       effect: writable ? 'confirmed_persistent' : 'read_only' });
   }
   definitions.push({ id: 'language', description: '应用当前语言：zh-Hans 简体中文，en 英文。',
-    valueType: 'enum', allowedValues: ['zh-Hans', 'en'], scope: 'device', writable: false, writeTool: '', effect: 'read_only' });
+    valueType: 'enum', allowedValues: ['zh-Hans', 'en'], scope: 'device', writable: true, writeTool: 'propose_set_setting', effect: 'confirmed_restart_required' });
   definitions.push({ id: 'study_quick_answer', description: '学习快捷操作模式：0 关闭，1 四象限，2 手势；包含旧开关兼容解析。',
-    valueType: 'enum', allowedValues: ['0', '1', '2'], scope: 'device', writable: false, writeTool: '', effect: 'read_only' });
-  definitions.push({ id: 'graph_preferences', description: '全库统计偏好：周首日、分离暂停/埋藏计数、浏览链接及预测积压。',
-    valueType: 'object', allowedValues: [], scope: 'collection', writable: false, writeTool: '', effect: 'read_only' });
+    valueType: 'enum', allowedValues: ['0', '1', '2'], scope: 'device', writable: true, writeTool: 'propose_set_setting', effect: 'confirmed_persistent' });
+  definitions.push({ id: 'graph_preferences', description: '全库统计偏好：周首日、分离暂停/埋藏计数及预测积压。读取中的 browserLinksSupported 是 Core 的只读能力，不可写入。',
+    valueType: 'object', allowedValues: [], scope: 'collection', writable: true, writeTool: 'propose_set_setting', effect: 'confirmed_collection_write' });
   return definitions;
 }
 
@@ -79,8 +79,8 @@ export function agentSettingsFunctionTools(): ProviderFunctionTool[] {
       parametersJson: '{"type":"object","properties":{"enabled":{"type":"boolean"}},"required":["enabled"],"additionalProperties":false}',
       exampleArgumentsJson: '{"enabled":true}',
       rules: 'Call alone. Collection-wide setting, never deck-specific. Enabling reschedules cards; disabling does not restore previous scheduling. Produces a proposal, never writes before user confirmation. Stale proposals fail. Same-state requests do not reschedule. On unverified write outcome inspect get_settings before proposing again.' },
-    { name: 'propose_set_setting', description: '提出本机卡片文字缩放、牌组样式、动效风格或学习触觉反馈修改；展示前后值，确认后共用设置页保存入口。value 为字符串：card_text_size 使用 50–200 的整数百分比，deck_list_style 使用 single_wide/single_narrow/double_wide/double_narrow，study_haptics 使用 true/false，motion_style 使用 restrained/lively（均无翻卡动画）。',
-      parametersJson: `{"type":"object","properties":{"settingId":{"type":"string","enum":${JSON.stringify(agentWritablePreferenceIds())}},"value":{"type":"string","minLength":1,"maxLength":13}},"required":["settingId","value"],"additionalProperties":false}`,
+    { name: 'propose_set_setting', description: '修改 list_settings 中 writable=true 的简单设置；value 为规范值字符串，开关 true/false，字号50–200，布局bottom/float/smart，语言zh-Hans/en（需重启），统计范围使用列出的整数。graph_preferences 为完整可写 JSON {calendarFirstDayOfWeek:0|1|5|6,cardCountsSeparateInactive:boolean,futureDueShowBacklog:boolean}；browserLinksSupported 只读，禁止提交。确认后共用原保存入口。',
+      parametersJson: `{"type":"object","properties":{"settingId":{"type":"string","enum":${JSON.stringify(agentWritablePreferenceIds())}},"value":{"type":"string","minLength":1,"maxLength":4000}},"required":["settingId","value"],"additionalProperties":false}`,
       exampleArgumentsJson: '{"settingId":"card_text_size","value":"130"}',
       rules: 'Call alone. Creates a proposal, never writes before user confirmation. Use list_settings for supported IDs and actual scope. Values are exact: card_text_size is an integer percentage 50–200; deck_list_style uses single_wide, single_narrow, double_wide or double_narrow; study_haptics uses true or false; motion_style uses restrained or lively. Motion styles change native interface feedback, never add card flip animations or change dynamic background and haptics preferences. Double columns hide new/learning/review counts; narrow styles use compact page spacing. Card scaling does not change template CSS; haptics preference does not guarantee device vibration. Confirmation rechecks the saved value. Stale proposals fail. After an unverified write read get_settings before making a new proposal.' },
     { name: 'get_deck_options', description: '读取真实牌组的学习选项、共享预设使用数量与牌组覆盖限额；不修改配置。',

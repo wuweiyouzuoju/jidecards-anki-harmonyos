@@ -89,10 +89,12 @@ function providerValue(value: string): ProviderId {
   return 'deepseek';
 }
 
-export async function loadAgentSettings(): Promise<AgentSettings> {
+/** @throws {Error} strict 用于设置表单，读取失败时禁止以默认值覆盖已有配置。 */
+export async function loadAgentSettings(strict: boolean = false): Promise<AgentSettings> {
   const defaults: AgentSettings = defaultAgentSettings();
   const store: preferences.Preferences | null = await openStore();
   if (store === null) {
+    if (strict) { throw new Error('agent_settings_unavailable'); }
     return defaults;
   }
   try {
@@ -110,6 +112,7 @@ export async function loadAgentSettings(): Promise<AgentSettings> {
       batchLimit: normalizeBatchLimit(typeof batchValue === 'number' ? batchValue : defaults.batchLimit)
     };
   } catch (error) {
+    if (strict) { throw new Error('agent_settings_unavailable'); }
     return defaults;
   }
 }
