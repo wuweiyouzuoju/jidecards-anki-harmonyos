@@ -5,6 +5,7 @@ import { DeckTreeNode } from '../proto/messages/DeckMessages';
 import { syncActivity } from '../model/SyncSettings';
 import { 后端会话 } from './后端会话';
 import { 统计服务 } from './统计服务';
+import { saveGraphPreferences } from './GraphPreferencesCommands';
 import { 牌组服务 } from './牌组服务';
 import { createStatsWidget, publishStatsWidget } from './StatsWidgetPublisher';
 
@@ -20,7 +21,7 @@ export class AnkiStatsSession implements StatsBackend {
     return this.stats.获取图表统计(request.days, request.search);
   }
   preferences(): Promise<GraphPreferences> { return this.stats.获取图表偏好(); }
-  savePreferences(value: GraphPreferences): Promise<void> { return this.stats.设置图表偏好(value); }
+  savePreferences(value: GraphPreferences): Promise<void> { return saveGraphPreferences(value); }
   async publishWidget(graphs: GraphsView, hours: number, separate: boolean, current: () => boolean): Promise<void> {
     await syncActivity.waitForCollection();
     if (!current()) return;
