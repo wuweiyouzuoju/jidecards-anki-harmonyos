@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
+import { stripTypeScriptTypes } from 'node:module';
 import test from 'node:test';
 import { arkuiClickTargets, clickFeedbackExemption } from '../arkui-click-targets.mjs';
-import { loadPlatformModule } from './platform-module-harness.mjs';
+import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
 import { motionApi } from './motion-harness.mjs';
 
 test('press feedback is visible on any backing and preserves caller opacity and disabled states', () => {
@@ -35,10 +36,11 @@ test('click audit distinguishes nested child styles, strings, comments and event
 });
 
 test('all app button and action-row click targets share one press owner', () => {
-  const root = new URL('../../entry/src/main/ets/', import.meta.url), auditedPaths = new Set();
+  const root = new URL('../../entry/src/main/ets/', import.meta.url), auditedPaths = new Set(), scannedPaths = new Set();
   for (const file of readdirSync(root, { recursive: true }).filter(f => f.endsWith('.ets'))) {
     const path = file.replaceAll('\\', '/');
     const source = readFileSync(new URL(path, root), 'utf8');
+    scannedPaths.add(path);
     for (const target of arkuiClickTargets(source)) {
       if (clickFeedbackExemption(path, target)) continue;
       auditedPaths.add(path);
@@ -56,16 +58,55 @@ test('all app button and action-row click targets share one press owner', () => 
         // menu-slide 直接执行单指、多指、取消及补发点击；按压仍由公共 modifier 绘制。
         pressModifiers = pressModifiers.replace(/\.onTouch\(\(event: TouchEvent\): void => \{ this\.slideTouch\(event\); \}\)/g, '');
       }
-      if (path === 'pages/浏览页.ets') {
-        pressModifiers = pressModifiers.replace(/\.onTouch\(\(event: TouchEvent\): void => \{\s*if \(event\.type === TouchType\.Down\) this\.viewHoldGroup = group;\s*menuHoldTouch\(this\.viewHold, event\);\s*\}\)/g, '');
-      }
       assert.doesNotMatch(pressModifiers, /duration:\s*80|\.onTouch\(/, location);
     }
   }
-  // 共用菜单减少散写点击节点；以真实入口覆盖检查扫描范围，而不固定按钮数量。
-  for (const path of ['pages/浏览页.ets', 'pages/学习页.ets', 'pages/AI制卡页.ets',
+  // 浏览页把点击交给公共按钮；扫描页面仍不可遗漏，公共 owner 的真实点击必须通过审计。
+  assert.ok(scannedPaths.has('pages/浏览页.ets'), 'press scan must include the browser host');
+  for (const path of ['pages/学习页.ets', 'pages/AI制卡页.ets',
     'pages/添加笔记页.ets', 'components/common/MenuItem.ets', 'components/common/按下态按钮.ets',
-    'components/common/PrimaryActionButton.ets']) {
+    'components/common/IconActionButton.ets', 'components/common/PrimaryActionButton.ets']) {
     assert.ok(auditedPaths.has(path), `press audit must include ${path}`);
+  }
+});
+
+test('browser view triggers delegate clicks and disabled guards to the audited common button', () => {
+  const source = readFileSync(new URL('../../entry/src/main/ets/pages/浏览页.ets', import.meta.url), 'utf8')
+    .replaceAll('\r\n', '\n');
+  assert.match(source, /import \{ 按下态按钮 \} from '..\/components\/common\/按下态按钮'/);
+  const start = source.indexOf('  private viewChoice(group:');
+  assert.ok(start >= 0);
+  const builder = source.slice(start, source.indexOf('\n  }', start) + 4);
+  assert.equal(arkuiClickTargets(builder).length, 0, 'the wrapper does not own a second native click target');
+  assert.doesNotMatch(builder, /new (?:PressFeedback|GlassSurface)|\.onTouch\(|\.stateEffect\(/);
+  let options, controlId;
+  const Host = new Function('按下态按钮', '应用尺寸', stripTypeScriptTypes(`class Host { ${builder} }`,
+    { mode: 'transform' }) + '; return Host;')(props => { options = props; return { id(value) { controlId = value; } }; },
+    { 字号_正文: 20 });
+  const Button = loadComponentLogic('components/common/按下态按钮.ets', '按下态按钮', {});
+  const parent = new Host(), clicks = [];
+  parent.viewChoiceLabel = group => `current-${group}`;
+  parent.openViewMenu = group => { clicks.push(group); };
+  parent.viewControlsAvailable = () => parent.available;
+  parent.showViewMenu = true;
+  for (const group of ['mode', 'filter', 'sort']) {
+    parent.viewMenuGroup = group;
+    for (const available of [false, true]) {
+      parent.available = available;
+      parent.viewChoice(group);
+      assert.equal(controlId, `browser-view-${group}`);
+      assert.equal(options.文案, `current-${group}`);
+      assert.equal(options.是否启用, available);
+      assert.equal(options.expanded, true);
+      const before = clicks.length;
+      // Only activation needs execution here; ArkUI/storage-backed visual fields belong to platform rendering.
+      const button = Object.assign(Object.create(Button.prototype), options);
+      button.activate();
+      assert.equal(clicks.length, before + Number(available));
+      if (available) assert.equal(clicks.at(-1), group);
+      button.是否启用 = false;
+      button.activate();
+      assert.equal(clicks.length, before + Number(available), 'a late click still obeys the common disabled guard');
+    }
   }
 });
