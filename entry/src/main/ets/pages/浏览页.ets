@@ -1,15 +1,10 @@
 import { FEEDBACK_ACTIONS, resultUndoStatus } from '../model/InteractionFeedback';
-import { MENU_SLIDE_HOLD_MS } from '../model/InteractionFeedback';
-import { MenuHoldController } from '../model/MenuHoldController';
-import { menuHoldTouch } from '../components/common/MenuHoldGesture';
 import { ChangingText } from '../components/common/ChangingText';
 import { ResultNotice } from '../components/common/ResultNotice';
 import { AnkiCollectionHistoryBackend } from '../backend/CollectionHistoryBackend';
 import type { UndoStatus } from '../proto/messages/CollectionMessages';
-import { PressFeedback } from '../utils/PressFeedback';
-import { DisclosureChevron } from '../components/common/DisclosureChevron';
 import { navigationEnterOffset } from '../utils/AppMotion';
-import { SurfaceBorder } from '../utils/SurfaceBorder';
+import { 按下态按钮 } from '../components/common/按下态按钮';
 import { EditNotePageParams } from '../model/navigation/PageParams';
 import { CollectionHistoryDialog } from '../components/CollectionHistoryDialog';
 import { BrowserResetDialog } from '../components/browser/BrowserResetDialog';
@@ -20,7 +15,7 @@ import { BrowserNotetypeFeature } from '../components/browser/BrowserNotetypeFea
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { WINDOW_SAFE_TOP_KEY } from '../model/WindowSafeLayout';
 import { DialogBackdrop } from '../components/common/DialogBackdrop';
-import { showToastSafely, resourceText, localizedNamedResourceText, namedResourceText } from '../utils/UiFeedback';
+import { showToastSafely, resourceText, namedResourceText } from '../utils/UiFeedback';
 import { loadBrowserSidebar, parseBrowserSavedSearches, removeBrowserSavedSearch, serializeBrowserSavedSearches, upsertBrowserSavedSearch } from '../model/BrowserSidebar';
 import type { BrowserSavedSearch } from '../model/BrowserSidebar';
 import { AnkiBrowserSidebar } from '../backend/AnkiBrowserSidebar';
@@ -38,7 +33,6 @@ import { BrowserSelectionActionsDialog, BrowserExportOptions } from '../componen
 import { exportSubset, 完成导出 } from '../backend/数据迁移服务';
 import { SearchNode, SearchNodeJoiner, SearchNodeFieldSearchMode } from '../proto/messages/SearchMessages';
 import type { 变更笔记类型请求 } from '../proto/messages/NotetypeMessages';
-import { SelectStyle } from '../utils/SelectStyle';
 import { BrowserOperationContext, BrowserOperationController } from '../model/BrowserOperationController';
 import { BrowserCardStateBackend, toggleBrowserCardState } from '../model/BrowserCardState';
 import { autoSyncScheduler } from '../model/AutoSyncScheduler';
@@ -91,7 +85,7 @@ import { 卡片表格, 浏览行数据 } from '../components/browser/卡片表�
 import { 批量操作栏 } from '../components/browser/批量操作栏';
 import { 字段帮助面板 } from '../components/字段帮助面板';
 import { IconActionButton } from '../components/common/IconActionButton';
-import { browserBackItem, AppInterfaceItem, AppInterfaceControl } from '../model/AppInterface';
+import { browserBackItem, browserToolbarItems, AppInterfaceItem, AppInterfaceControl } from '../model/AppInterface';
 import { interfaceControlIcon, interfaceControlText } from '../utils/AppInterfaceText';
 import { 卡片信息 } from '../components/browser/卡片信息';
 import { 查找替换对话框 } from '../components/browser/查找替换对话框';
@@ -120,7 +114,7 @@ interface MarkingReadToken { version: number; }
 
 @Component
 export struct 浏览页 {
-  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
+  @StorageProp('系统语言') @Watch('publishInterface') private uiLanguage: string = 'zh-Hans';
   @State private flagLabels: FlagLabels = {};
   @State private flagNamesOpen: boolean = false;
   @State private flagNamesBackRequest: number = 0;
@@ -166,7 +160,6 @@ export struct 浏览页 {
   @State private showBatchMenu: boolean = false;
   @State private showViewMenu: boolean = false;
   @State private viewMenuGroup: string = 'mode';
-  @State private viewMenuWidth: number = 240;
   @State @Watch('publishInterface') private sortColumn: string = '';
   @State @Watch('publishInterface') private sortReverse: boolean = false;
   private readonly searchSession: BrowserSearchSession = new BrowserSearchSession(new AnkiBrowserSearch());
@@ -276,6 +269,7 @@ export struct 浏览页 {
   @State @Watch('handleBrowserPreferenceBoundary') private 显示预览: boolean = false;
   private previewBackHandler: (() => boolean) | null = null;
   @State private previewCardIds: number[] = [];
+  private previewReadVersion: number = 0;
   @State private 预览初始索引: number = 0;
   @State private 预览媒体目录: string = '';
   @State private 预览刷新版本: number = 0;
@@ -381,7 +375,6 @@ export struct 浏览页 {
    */
 
   aboutToDisappear(): void {
-    this.viewHold.cancel();
     this.interfaceMounted = false;
     appInterface.hidePage('browser');
     appInterface.leave('browser'); appInterface.leave('browser_feedback');
@@ -395,7 +388,15 @@ export struct 浏览页 {
 
   private publishInterface(): void {
     if (!this.interfaceMounted) return;
-    const back: AppInterfaceItem = browserBackItem(this.多选模式值);
+    const controls: AppInterfaceControl[] = browserToolbarItems(this.多选模式值, this.browserFilterActive())
+      .map((item: AppInterfaceItem): AppInterfaceControl => ({ id: item.id,
+        titleKey: ['mode', 'status', 'sort'].includes(item.id) ? undefined : item.titleKey, iconKey: item.iconKey,
+        title: item.id === 'mode' ? this.viewChoiceLabel('mode') : item.id === 'status' ? this.viewChoiceLabel('filter') :
+          item.id === 'sort' ? this.sortLabel() : namedResourceText(this.getUIContext(), item.titleKey),
+        enabled: ['mode', 'status', 'filter', 'sort'].includes(item.id) ? this.viewControlsAvailable() :
+          item.id === 'selection' ? !this.mutationBusy && !this.批量忙碌 : true,
+        selected: item.id === 'filter' ? this.browserFilterActive() : item.id === 'status' ? this.quickFilter !== 'all' :
+          item.id === 'sort' && this.sortColumn !== '' }));
     if (this.refreshError !== '' || this.resultMessage !== '') {
       appInterface.observe({ surface: 'browser_feedback', sectionId: this.refreshError !== '' ? 'recovery' : 'result', selectedId: '',
         optionIds: [], optionLabels: [], busy: this.mutationBusy || this.refreshingSearch, controlsComplete: true,
@@ -406,8 +407,8 @@ export struct 浏览页 {
     } else appInterface.leave('browser_feedback');
     appInterface.observe({ surface: 'browser', sectionId: this.阶段, selectedId: this.浏览模式值,
       optionIds: this.结果ID列表.slice(0, 100).map((id: number): string => String(id)), optionLabels: [],
-      optionsTotal: this.结果ID列表.length, busy: this.mutationBusy || this.阶段 === 'loading',
-      items: [{ id: back.id, title: '', titleKey: back.titleKey, iconKey: back.iconKey, enabled: true, selected: false }],
+      optionsTotal: this.结果ID列表.length, busy: this.mutationBusy || this.批量忙碌 || this.refreshingSearch || this.阶段 === 'loading',
+      controlsComplete: true, items: controls,
       values: [{ id: 'mode', value: this.浏览模式值 }, { id: 'filter', value: this.quickFilter },
         { id: 'refresh_error', value: this.refreshError }, { id: 'result', value: this.resultMessage },
         { id: 'refreshing', value: String(this.refreshingSearch) }, { id: 'selected_count', value: String(this.选中ID列表.length) },
@@ -578,11 +579,6 @@ export struct 浏览页 {
     });
   }
 
-  // 来源只传身份，独立编辑页负责读取、重试与保存。
-  private async 行点击(行ID: number): Promise<void> {
-    this.openEditPage(行ID, this.浏览模式值 === 'notes');
-  }
-
   private openEditPage(id: number, isNote: boolean): void {
     if (!this.operations.isAlive() || this.mutationBusy || this.editingPageOpen) return;
     if (this.browserWidth >= 1000 || this.inlineEditorId > 0) {
@@ -606,23 +602,20 @@ export struct 浏览页 {
     this.执行搜索(true);
   }
 
-  // T5 行点击路由
-  // - Cards 模式单击行不直接进编辑区，先弹预览让用户看正反面
-  // - Notes 模式无卡片预览概念，维持原行为直接进编辑区
+  // 单击与键盘打开统一先预览；编辑由预览内的明确动作进入。
   private 行点击处理(行ID: number): void {
+    if (!this.operations.isAlive() || this.mutationBusy || this.批量忙碌 || this.多选模式值) return;
     this.focusedRowId = 行ID;
-    if (this.browserWidth >= 1000 || this.inlineEditorId > 0) { this.openEditPage(行ID, this.浏览模式值 === 'notes'); return; }
-    if (this.浏览模式值 === 'cards') {
-      this.打开预览(行ID);
-    } else {
-      this.行点击(行ID);
-    }
+    this.打开预览(行ID);
   }
 
   // T5 打开预览
   // - 索引未命中（行ID 不在 结果ID列表）时静默返回（不应发生，兜底）
   // - 媒体目录从 abilityContext.filesDir 拼接（与 学习页 同语义）
-  private 打开预览(行ID: number): void {
+  private async 打开预览(行ID: number): Promise<void> {
+    const version: number = ++this.previewReadVersion;
+    const view: number = this.searchVersion;
+    const mode: string = this.浏览模式值;
     const 索引: number = this.结果ID列表.indexOf(行ID);
     if (索引 < 0) {
       console.info(`BrowserPage: 打开预览失败 行ID=${行ID} 不在结果列表`);
@@ -632,10 +625,20 @@ export struct 浏览页 {
     if (上下文 === null) {
       return;
     }
-    this.previewCardIds = this.结果ID列表.slice();
-    this.预览初始索引 = 索引;
-    this.预览媒体目录 = `${上下文.filesDir}/collection.media`;
-    this.显示预览 = true;
+    try {
+      // 笔记预览只读取当前笔记的真实卡片，避免把 noteId 传给卡片接口或遍历整库。
+      const ids: number[] = mode === 'notes' ? await this.笔记服务实例.获取笔记的卡片(行ID) : this.结果ID列表.slice();
+      if (!this.operations.isAlive() || version !== this.previewReadVersion || view !== this.searchVersion ||
+        mode !== this.浏览模式值 || this.mutationBusy || this.批量忙碌 || this.多选模式值) return;
+      if (ids.length === 0) throw new Error(resourceText(this.getUIContext(), $r('app.string.browser_no_cards')));
+      this.previewCardIds = ids;
+      this.预览初始索引 = mode === 'notes' ? 0 : 索引;
+      this.预览媒体目录 = `${上下文.filesDir}/collection.media`;
+      this.显示预览 = true;
+    } catch (error) {
+      if (this.operations.isAlive() && version === this.previewReadVersion && view === this.searchVersion)
+        this.refreshError = error instanceof Error ? error.message : `${error}`;
+    }
   }
 
   /** T5 预览页「编辑字段」回调：保留预览并在其上方打开编辑区（Cards 模式下 行ID 即 cardId）。 */
@@ -700,11 +703,6 @@ export struct 浏览页 {
     if (saved) { this.预览刷新版本++; this.执行搜索(true); }
     if (next > 0) { this.inlineEditorIsNote = nextIsNote; this.inlineEditorId = next; }
   }
-
-  private viewHoldGroup: string = '';
-  private readonly viewHold: MenuHoldController = new MenuHoldController(
-    (): boolean => this.interfaceMounted && !this.mutationBusy && !this.多选模式值 && this.阶段 === 'list',
-    (): void => { this.openViewMenu(this.viewHoldGroup); }, (): void => { this.showViewMenu = false; });
 
   /** 写入占用一直保持到刷新结束；退出页面后只广播数据变化，不回写旧组件。 */
   private async runBrowserOperation(action: (selection: BrowserOperationContext) => Promise<void>,
@@ -1690,23 +1688,32 @@ export struct 浏览页 {
         BrowserColumnSorting.SORTING_NONE);
   }
 
-  /** 排序列名随模式切换，箭头反映后端默认方向及反转状态。 */
+  private sortDescending(): boolean {
+    const column: BrowserColumn | undefined = this.sortableColumns().find(
+      (item: BrowserColumn): boolean => item.key === this.sortColumn);
+    if (column === undefined) return false;
+    const direction: BrowserColumnSorting = this.浏览模式值 === 'notes' ? column.sortingNotes : column.sortingCards;
+    return (direction === BrowserColumnSorting.SORTING_DESCENDING) !== this.sortReverse;
+  }
+
+  /** 触发按钮用短名称，弹窗仍显示 Core 的完整列名；未知列不改名。 */
   private sortLabel(): string {
     const column: BrowserColumn | undefined = this.sortableColumns().find(
       (item: BrowserColumn): boolean => item.key === this.sortColumn);
     if (column === undefined) { return this.取本地化文案($r('app.string.browser_sort_default')); }
-    const direction: BrowserColumnSorting = this.浏览模式值 === 'notes' ? column.sortingNotes : column.sortingCards;
-    const descending: boolean = (direction === BrowserColumnSorting.SORTING_DESCENDING) !== this.sortReverse;
-    return `${this.浏览模式值 === 'notes' ? column.notesModeLabel : column.cardsModeLabel} ${descending ? '↓' : '↑'}`;
+    let label: string = this.浏览模式值 === 'notes' ? column.notesModeLabel : column.cardsModeLabel;
+    if (column.key === 'cardMod') label = this.取本地化文案($r('app.string.browser_sort_card_modified'));
+    else if (column.key === 'noteMod') label = this.取本地化文案($r('app.string.browser_sort_note_modified'));
+    else if (column.key === 'noteCrt') label = this.取本地化文案($r('app.string.browser_sort_created'));
+    return `${label} ${this.sortDescending() ? '↓' : '↑'}`;
   }
 
-  /** 排序组只列选项值；默认与各列升降序同级，不夹带类别标题。 */
+  /** 字段只列一次；方向由排序弹窗独立选择。 */
   private sortOptions(): SelectOption[] {
     const items: SelectOption[] = [{ value: this.取本地化文案($r('app.string.browser_sort_default')) }];
     for (const column of this.sortableColumns()) {
       const label: string = this.浏览模式值 === 'notes' ? column.notesModeLabel : column.cardsModeLabel;
-      items.push({ value: `${label} ↑` });
-      items.push({ value: `${label} ↓` });
+      items.push({ value: label });
     }
     return items;
   }
@@ -1715,23 +1722,21 @@ export struct 浏览页 {
     const columns: BrowserColumn[] = this.sortableColumns();
     const index: number = columns.findIndex((column: BrowserColumn): boolean => column.key === this.sortColumn);
     if (index < 0) { return 0; }
-    const direction: BrowserColumnSorting = this.浏览模式值 === 'notes' ? columns[index].sortingNotes : columns[index].sortingCards;
-    const descending: boolean = (direction === BrowserColumnSorting.SORTING_DESCENDING) !== this.sortReverse;
-    return 1 + index * 2 + (descending ? 1 : 0);
+    return 1 + index;
   }
 
   /** 把用户选择的升降序转换成 Core 列默认方向的反转标志。 */
-  private selectSort(index: number): void {
-    if (this.mutationBusy || this.批量忙碌) return;
+  private selectSort(index: number, descending: boolean): void {
+    if (!this.viewControlsAvailable() || !Number.isInteger(index) || index < 0) return;
     if (index === 0) {
       this.sortColumn = '';
       this.sortReverse = false;
     } else {
-      const column: BrowserColumn | undefined = this.sortableColumns()[Math.floor((index - 1) / 2)];
+      const column: BrowserColumn | undefined = this.sortableColumns()[index - 1];
       if (column === undefined) { return; }
       const direction: BrowserColumnSorting = this.浏览模式值 === 'notes' ? column.sortingNotes : column.sortingCards;
       this.sortColumn = column.key;
-      this.sortReverse = (direction === BrowserColumnSorting.SORTING_DESCENDING) !== (index % 2 === 0);
+      this.sortReverse = (direction === BrowserColumnSorting.SORTING_DESCENDING) !== descending;
     }
     this.persistBrowserPreferences({ sortColumn: this.sortColumn, sortReverse: this.sortReverse });
     this.执行搜索();
@@ -1740,7 +1745,7 @@ export struct 浏览页 {
   @Builder
   private browserMoreMenu() {
     if (this.showMoreMenu) {
-      BrowserMoreMenu({ filterActive: this.搜索文本.trim() !== '' || this.quickFilter !== 'all', available: !this.mutationBusy && this.阶段 === 'list',
+      BrowserMoreMenu({ filterActive: this.browserFilterActive(), available: !this.mutationBusy && this.阶段 === 'list',
         subtitleIndex: this.subtitleIndex, backRequest: this.moreBackRequest,
         topOffset: 应用尺寸.pageContentTop(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop),
         onClose: (): void => { this.showMoreMenu = false; },
@@ -1750,12 +1755,7 @@ export struct 浏览页 {
           if (this.mutationBusy || this.operations.isBusy()) return;
           this.showMoreMenu = false; this.collectionHistoryOpen = true;
         },
-        onFilter: (): void => {
-          if (this.阶段 !== 'list') return;
-          this.showMoreMenu = false;
-          this.侧边栏错误 = '';
-          this.打开侧边栏();
-        },
+        onFilter: (): void => { this.openBrowserFilter(); },
         onFindReplace: (): void => {
           if (this.阶段 !== 'list' || this.operations.isBusy()) return;
           this.showMoreMenu = false;
@@ -1779,18 +1779,16 @@ export struct 浏览页 {
   @Builder
   private 顶部条() {
     // 多选时标题显示计数，右侧保留明确的手动操作入口。
-    Stack({ alignContent: Alignment.Center }) {
-      ChangingText({ value: this.多选模式值 ? this.取选中计数文案() : this.取本地化文案($r('app.string.browser_title')),
-        textSize: 应用尺寸.字号_标题, tint: $r('app.color.text_primary'), fillWidth: true })
-        .width('44%').hitTestBehavior(HitTestMode.None)
-      Row() {
+    Row({ space: 应用尺寸.间距_8 }) {
       IconActionButton({ toolbarStyle: true,
         source: interfaceControlIcon([browserBackItem(this.多选模式值)], 'back'),
         label: interfaceControlText(this.getUIContext(), [browserBackItem(this.多选模式值)], 'back', this.uiLanguage),
         onAction: (): void => this.返回()
       })
 
-      Blank()
+      ChangingText({ value: this.多选模式值 ? this.取选中计数文案() : this.取本地化文案($r('app.string.browser_title')),
+        textSize: 应用尺寸.字号_标题, tint: $r('app.color.text_primary'), fillWidth: true })
+        .layoutWeight(1).constraintSize({ minWidth: 0 }).hitTestBehavior(HitTestMode.None)
       if (this.多选模式值) {
 
         IconActionButton({ toolbarStyle: true,
@@ -1807,7 +1805,6 @@ export struct 浏览页 {
           onHoldCancel: (): void => { this.showMoreMenu = false; }, onAction: (): void => { this.showMoreMenu = !this.showMoreMenu; }
         })
       }
-      }.width('100%').height('100%').alignItems(VerticalAlign.Center)
     }
     .width('100%')
     .height(应用尺寸.pageToolbarHeight(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop))
@@ -1818,10 +1815,10 @@ export struct 浏览页 {
       bottom: 0
     })
     .backgroundColor(this.页面底色微染值)
-    .alignContent(Alignment.Center)
+    .alignItems(VerticalAlign.Center)
   }
 
-  /** 状态筛选保留原始搜索，由合并选择框的状态区域打开。 */
+  /** 状态筛选保留原始搜索。 */
   private quickFilterOptions(_locale: string = this.uiLanguage): SelectOption[] {
     return BROWSER_QUICK_FILTERS.map((filter: BrowserQuickFilter): SelectOption => ({
       value: (filter.id.startsWith('flag_') ? customFlagLabel(this.flagLabels, Number(filter.id.substring(5))) : '') ||
@@ -1834,63 +1831,59 @@ export struct 浏览页 {
       filter.id === this.quickFilter));
   }
 
-  /** 单一外框中的三个选值区：只打开被点击的那一组，不套第二层分类。 */
+  private viewControlsAvailable(): boolean {
+    return !this.多选模式值 && !this.mutationBusy && !this.批量忙碌 && !this.refreshingSearch && this.阶段 === 'list';
+  }
+
+  private browserFilterActive(): boolean {
+    return this.搜索文本.trim() !== '' || this.quickFilter !== 'all';
+  }
+
+  private openBrowserFilter(): void {
+    if (!this.viewControlsAvailable()) return;
+    this.showMoreMenu = false;
+    this.showViewMenu = false;
+    this.侧边栏错误 = '';
+    this.打开侧边栏();
+  }
+
   private openViewMenu(group: string): void {
-    if (this.多选模式值 || this.阶段 !== 'list') return;
+    if (!this.viewControlsAvailable()) return;
     this.showMoreMenu = false;
     this.viewMenuGroup = group;
     this.showViewMenu = true;
   }
 
   private viewChoiceLabel(group: string): string {
-    if (group === 'mode') return this.取本地化文案(this.浏览模式值 === 'cards' ? $r('app.string.browser_mode_cards') : $r('app.string.browser_mode_notes'));
-    if (group === 'filter') return localizedNamedResourceText(this.getUIContext(), this.uiLanguage, BROWSER_QUICK_FILTERS[this.quickFilterIndex()].labelKey);
+    if (group === 'mode') return this.取本地化文案(this.浏览模式值 === 'cards' ?
+      $r('app.string.browser_mode_cards') : $r('app.string.browser_mode_notes'));
+    if (group === 'filter') {
+      if (this.quickFilter === 'all') return this.取本地化文案($r('app.string.browser_status_all'));
+      return String(this.quickFilterOptions()[this.quickFilterIndex()].value);
+    }
     return this.sortLabel();
   }
 
   @Builder
   private viewChoice(group: string) {
-    Button() {
-      Row({ space: 0 }) {
-        Text(this.viewChoiceLabel(group)).fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary'))
-          .layoutWeight(1).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
-          .textAlign(TextAlign.Center)
-        DisclosureChevron().rotate({ angle: this.showViewMenu && this.viewMenuGroup === group ? 270 : 90 }).flexShrink(0)
-      }.width('100%').height('100%').alignItems(VerticalAlign.Center)
-    }
+    按下态按钮({ 文案: this.viewChoiceLabel(group), singleLine: true, fillWidth: true,
+      字号: 应用尺寸.字号_正文,
+      disclosure: true, expanded: this.showViewMenu && this.viewMenuGroup === group,
+      是否启用: this.viewControlsAvailable(),
+      点击回调: (): void => { this.openViewMenu(group); } })
     .id('browser-view-' + group)
-    .type(ButtonType.Normal).backgroundColor(Color.Transparent)
-    .height(SelectStyle.controlHeight).padding({ left: 4, right: 4 }).borderRadius(0)
-    .layoutWeight(1).enabled(!this.多选模式值 && this.阶段 === 'list')
-    .accessibilityText(this.viewChoiceLabel(group))
-    .attributeModifier(new PressFeedback())
-    .stateEffect(false)
-    .focusOnTouch(false)
-    .onTouch((event: TouchEvent): void => {
-      if (event.type === TouchType.Down) this.viewHoldGroup = group;
-      menuHoldTouch(this.viewHold, event);
-    })
-    .gesture(LongPressGesture({ duration: MENU_SLIDE_HOLD_MS }).onAction((): void => { this.viewHold.hold(); }))
-    .onClick((): void => { if (this.viewHold.consumeClick()) this.openViewMenu(group); })
   }
 
   @Builder
   private browserControls() {
-    Row({ space: 应用尺寸.间距_8 }) {
-      Row() {
-        this.viewChoice('mode')
-        Divider().vertical(true).height(16).strokeWidth(0.5).color(SurfaceBorder.color())
-        this.viewChoice('filter')
-        Divider().vertical(true).height(16).strokeWidth(0.5).color(SurfaceBorder.color())
-        this.viewChoice('sort')
-      }
-      .id('browser-view-selector')
-      .layoutWeight(7).height(SelectStyle.controlHeight)
-      .backgroundColor($r('app.color.surface_card')).border(SelectStyle.controlBorder).borderRadius(SelectStyle.controlRadius).clip(true)
-      .onAreaChange((_oldArea: Area, area: Area): void => { this.viewMenuWidth = Number(area.width); })
+    Column({ space: 应用尺寸.间距_4 }) {
+      Row({ space: 应用尺寸.间距_8 }) {
+        Column() { this.viewChoice('mode') }.layoutWeight(1).constraintSize({ minWidth: 0 })
+        Column() { this.viewChoice('filter') }.layoutWeight(1).constraintSize({ minWidth: 0 })
+        Column() { this.viewChoice('sort') }.layoutWeight(1).constraintSize({ minWidth: 0 })
+      }.width('100%')
       ChangingText({ value: this.阶段 === 'loading' ? this.取本地化文案($r('app.string.browser_loading')) : this.resultCountLabel(),
-        textSize: 应用尺寸.字号_正文_小, alignment: TextAlign.End, fillWidth: true })
-        .layoutWeight(3)
+        textSize: 应用尺寸.字号_正文_小, alignment: TextAlign.Start, fillWidth: true }).width('100%')
     }.width('100%')
       // 首张结果卡由列表的 contentStartOffset 贡献唯一的区块间距。
       .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平, bottom: 0 })
@@ -1901,12 +1894,16 @@ export struct 浏览页 {
     Column() {
       this.顶部条()
 
-      // 搜索独占一行；合并选择框与数量放在下一行。
-      搜索框({
-        搜索文本: this.搜索文本,
-        onFocusChange: (focused: boolean): void => { this.searchFocused = focused; },
-        onSearch: (文本: string): void => { this.提交搜索(文本); }
-      })
+      Row({ space: 应用尺寸.间距_8 }) {
+        搜索框({ 搜索文本: this.搜索文本,
+          onFocusChange: (focused: boolean): void => { this.searchFocused = focused; },
+          onSearch: (文本: string): void => { this.提交搜索(文本); } }).layoutWeight(1)
+        IconActionButton({ toolbarStyle: true,
+          source: interfaceControlIcon(browserToolbarItems(this.多选模式值, this.browserFilterActive()), 'filter'),
+          label: interfaceControlText(this.getUIContext(), browserToolbarItems(this.多选模式值, this.browserFilterActive()), 'filter', this.uiLanguage),
+          isInteractive: this.viewControlsAvailable(),
+          onAction: (): void => { this.openBrowserFilter(); } })
+      }.width('100%')
         .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平,
           top: 应用尺寸.页面内容顶部间距(this.narrowDeckLayout),
           bottom: 应用尺寸.页面分组间距(this.narrowDeckLayout) })
@@ -2235,7 +2232,7 @@ export struct 浏览页 {
           }
         }.width('100%').height('100%')
 
-        // T5 卡片预览弹层：Cards 模式下点击行 → 全屏预览正反面；底部「编辑字段」→ 打开编辑区
+        // 卡片／笔记行均先预览真实卡片；预览内「编辑字段」显式打开原编辑区。
         this.browserInspection()
 
         // T9 查找替换弹层：顶部条按钮触发，支持仅选中笔记或全部笔记两种范围
@@ -2251,25 +2248,27 @@ export struct 浏览页 {
             notes: this.浏览模式值 === 'notes',
             filterIndex: this.quickFilterIndex(),
             sortIndex: this.sortIndex(),
+            sortDescending: this.sortDescending(),
             group: this.viewMenuGroup,
-            menuWidth: this.viewMenuWidth,
             filterOptions: this.quickFilterOptions(),
             sortOptions: this.sortOptions(),
-            available: !this.多选模式值 && this.阶段 === 'list',
-            topOffset: 应用尺寸.pageContentTop(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop) + SelectStyle.controlHeight * 2 + 应用尺寸.间距_8 * 2,
+            available: this.viewControlsAvailable(),
             onClose: (): void => { this.showViewMenu = false; },
             onModeChange: (notes: boolean): void => {
+              if (!this.viewControlsAvailable()) return;
               this.showViewMenu = false;
               this.切换模式(notes ? 'notes' : 'cards');
             },
             onFilterChange: (index: number): void => {
+              if (!this.viewControlsAvailable() || BROWSER_QUICK_FILTERS[index] === undefined) return;
               this.showViewMenu = false;
               this.quickFilter = BROWSER_QUICK_FILTERS[index].id;
               this.执行搜索();
             },
-            onSortChange: (index: number): void => {
+            onSortChange: (index: number, descending: boolean): void => {
+              if (!this.viewControlsAvailable()) return;
               this.showViewMenu = false;
-              this.selectSort(index);
+              this.selectSort(index, descending);
             }
           })
         }

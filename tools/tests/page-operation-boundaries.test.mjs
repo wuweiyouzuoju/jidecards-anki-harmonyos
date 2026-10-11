@@ -294,7 +294,6 @@ function browserHarness() {
     'isBrowserSelectionCurrent', '退出多选', '解析选中为卡片ID', '解析选中笔记的卡片ID', '解析选中为笔记ID',
     '执行批量改牌组', '执行批量删除', '执行批量设置标志', '执行批量挂起', '执行批量搁置', 'cardStateBackend',
     '执行批量设置到期日', '执行批量重新定位', '执行批量更改笔记类型', '执行查找替换',
-    '行点击',
     '打开卡片信息', '关闭卡片信息', '加载更多', '打开改牌组弹层', '切换模式'], {
     autoSyncScheduler: scheduler, AppStorage: { setOrCreate: (...args) => broadcasts.push(args) },
     setCardFlags, toggleBrowserCardState,

@@ -274,7 +274,7 @@ export struct 卡片表格 {
           }.width('100%').padding({ left: 应用尺寸.页面内边距_水平 + 应用尺寸.卡片内边距,
             right: 应用尺寸.页面内边距_水平 + 应用尺寸.卡片内边距, top: 8, bottom: 8 })
         }
-        List({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout), scroller: this.listScroller }) {
+        List({ space: this.narrowDeckLayout ? 应用尺寸.间距_5 : 应用尺寸.间距_8, scroller: this.listScroller }) {
           LazyForEach(this.行数据源, (行: 浏览行数据) => {
             ListItem() {
               Row({ space: 应用尺寸.间距_8 }) {
@@ -302,6 +302,7 @@ export struct 卡片表格 {
                 Column({ space: 应用尺寸.间距_2 }) {
                   Text(this.取行主文案(行))
                     .fontSize(应用尺寸.字号_正文)
+                    .fontWeight(FontWeight.Medium)
                     .fontColor(this.是否挂起行(行) ? $r('app.color.text_secondary') : $r('app.color.text_primary'))
                     .maxLines(2)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -353,8 +354,8 @@ export struct 卡片表格 {
               .padding({
                 left: 应用尺寸.卡片内边距,
                 right: 应用尺寸.卡片内边距,
-                top: 应用尺寸.间距_12,
-                bottom: 应用尺寸.间距_12
+                top: 应用尺寸.间距_8,
+                bottom: 应用尺寸.间距_8
               })
               .backgroundColor($r('app.color.surface_card'))
               .border(this.rowBorder(行))

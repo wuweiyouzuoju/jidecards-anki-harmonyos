@@ -144,10 +144,12 @@ test('browser_* i18n keys exist and align between zh-Hans and en_US', () => {
 // /initialFieldValues/initialTags 六个 @Prop。修改这些字段名会破坏接线。
 // ============================================================
 
-test('browser routes card and note IDs to the dedicated editor without embedding a second editor', () => {
+test('browser previews row clicks and keeps explicit editing in the dedicated editor', () => {
   const page = read('entry/src/main/ets/pages/浏览页.ets');
   assert.match(page, /name: 'EditNotePage', param: params/);
-  assert.match(page, /this.openEditPage\(行ID, this.浏览模式值 === 'notes'\)/);
+  const click=page.slice(page.indexOf('private 行点击处理('),page.indexOf('// T5 打开预览'));
+  assert.match(click,/this\.打开预览\(行ID\)/);
+  assert.doesNotMatch(click,/openEditPage|browserWidth/);
   assert.match(page, /this.openEditPage\(卡片ID, false\)/);
   assert.doesNotMatch(page, /浏览编辑区\(/);
   const editor=read('entry/src/main/ets/pages/EditNotePage.ets');
@@ -598,16 +600,16 @@ test('BrowserPage has T6 sidebar methods', () => {
   assert.match(page, /this\.配置服务实例\.设置配置布尔\s*\(/);
 });
 
-test('BrowserPage more menu owns the T6 sidebar entry', () => {
+test('BrowserPage more menu shares the T6 sidebar entry with the visible filter button', () => {
   const page = read('entry/src/main/ets/pages/浏览页.ets');
   const menu = page.slice(page.indexOf('private browserMoreMenu()'), page.indexOf('private resultCountLabel()'));
   const component = read('entry/src/main/ets/components/browser/BrowserMoreMenu.ets');
-  const topBar = page.slice(page.indexOf('private 顶部条()'), page.indexOf('\n  build()'));
-  assert.match(menu, /filterActive: this\.搜索文本\.trim\(\) !== ''/);
+  const topBar = page.slice(page.indexOf('private 顶部条()'), page.indexOf('private quickFilterOptions('));
+  assert.match(menu, /filterActive: this\.browserFilterActive\(\)/);
   assert.match(component, /browserInterfaceMenu\(this.available, this.filterActive, this.subtitleIndex\)/);
   assert.match(read('entry/src/main/ets/model/AppInterface.ts'), /item.id === 'filter' && filterActive \? 'browser_filter_active' : item.titleKey/);
   assert.match(menu, /available: !this\.mutationBusy && this\.阶段 === 'list'/);
-  assert.match(menu, /this\.打开侧边栏\s*\(/);
+  assert.match(menu, /onFilter: \(\): void => \{ this\.openBrowserFilter\(\); \}/);
   assert.doesNotMatch(topBar, /browser_action_sidebar|browser_filter_active|this\.打开侧边栏/);
   assert.match(topBar, /this\.showMoreMenu = !this\.showMoreMenu/);
 });

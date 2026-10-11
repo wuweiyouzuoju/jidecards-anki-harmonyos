@@ -8,6 +8,7 @@ import { GlassSurface } from '../../utils/GlassSurface';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { localizedResourceText } from '../../utils/UiFeedback';
 import { 颜色键 } from '../../model/颜色主题';
+import { DisclosureChevron } from './DisclosureChevron';
 
 // ========================================================
 // @块ID UI-COMMON-PRESSBTN-001
@@ -57,6 +58,8 @@ export struct 按下态按钮 {
   // 工具栏在等宽侧栏内约束标签，保留完整无障碍名称。
   @Prop singleLine: boolean = false;
   @Prop fillWidth: boolean = false;
+  @Prop disclosure: boolean = false;
+  @Prop expanded: boolean = false;
   // 编辑工具保留输入框的焦点与选区；普通操作继续使用原生焦点行为。
   @Prop preserveInputFocus: boolean = false;
   @Prop autoHeight: boolean = false;
@@ -103,6 +106,9 @@ export struct 按下态按钮 {
             .layoutWeight(this.fillWidth ? 1 : 0).textAlign(TextAlign.Center)
             .maxLines(this.singleLine ? 1 : undefined)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
+        }
+        if (this.disclosure) {
+          DisclosureChevron().rotate({ angle: this.expanded ? 270 : 90 }).flexShrink(0)
         }
       }
       .justifyContent(FlexAlign.Center)

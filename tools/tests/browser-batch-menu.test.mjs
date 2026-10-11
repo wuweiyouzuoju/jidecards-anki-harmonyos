@@ -19,19 +19,23 @@ test('selection count replaces the browser title while Actions stays a manual me
   const source = readFileSync(new URL('../../entry/src/main/ets/pages/浏览页.ets', import.meta.url), 'utf8');
   const start = source.indexOf('  private 取选中计数文案(');
   const countMethod = source.slice(start, source.indexOf('\n  }', start) + 4);
-  const header = source.slice(source.indexOf('  private 顶部条()'), source.indexOf('  private quickFilterOptions()'));
+  const header = source.slice(source.indexOf('  private 顶部条()'), source.indexOf('  private quickFilterOptions('));
   const titleExpression = header.match(/ChangingText\(\{ value: (.+),\r?\n/)?.[1];
   assert.ok(titleExpression);
+  const modeStart = source.indexOf('  private viewChoiceLabel(');
+  const modeMethod = source.slice(modeStart, source.indexOf('\n  }', modeStart) + 4);
   const Page = new Function('$r', stripTypeScriptTypes(
-    `class Page { ${countMethod}\n title() { return ${titleExpression}; } }`, { mode: 'transform' }) + '; return Page;')(key => key);
+    `class Page { ${countMethod}\n ${modeMethod}\n title() { return ${titleExpression}; } }`, { mode: 'transform' }) + '; return Page;')(key => key);
   for (const locale of ['base', 'en_US']) {
     const strings = new Map(JSON.parse(readFileSync(new URL(
       `../../entry/src/main/resources/${locale}/element/string.json`, import.meta.url), 'utf8')).string.map(e => [e.name, e.value]));
     const page = new Page();
     page.取本地化文案 = key => strings.get(key.replace('app.string.', ''));
     page.多选模式值 = false;
+    page.浏览模式值 = 'notes';
     page.选中ID列表 = [1, 2, 3];
     assert.equal(page.title(), strings.get('browser_title'));
+    assert.equal(page.viewChoiceLabel('mode'), strings.get('browser_mode_notes'));
     page.多选模式值 = true;
     for (const count of [0, 3, 1234]) {
       page.选中ID列表 = Array(count).fill(1);
