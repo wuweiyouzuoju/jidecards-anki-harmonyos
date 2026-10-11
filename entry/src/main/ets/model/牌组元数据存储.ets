@@ -63,6 +63,19 @@ function 背景图键(牌组ID: string): string {
   return `${背景图键前缀}${牌组ID}`;
 }
 
+export interface DeckAppearance { alias: string; tone: string; background: string; }
+/** @throws {Error} JIDE 确认必须严格读取，不能把存储故障当成默认外观。 */
+export async function readDeckAppearance(id: string): Promise<DeckAppearance> {
+  const context: common.UIAbilityContext | null = 获取能力上下文();
+  if (context === null) throw new Error('deck_metadata_unavailable');
+  const store = await preferences.getPreferences(context, 存储名);
+  const alias = await readLocalPreference(store, 别名键(id), '');
+  const tone = await readLocalPreference(store, 色调键(id), '');
+  const background = await readLocalPreference(store, 背景图键(id), '');
+  if (typeof alias !== 'string' || typeof tone !== 'string' || typeof background !== 'string') throw new Error('invalid_deck_metadata');
+  return { alias: alias, tone: tone, background: background };
+}
+
 /** 沙盒内单张牌组背景图绝对路径：filesDir/deck_backgrounds/<deckId>_<timestamp>.jpg。
  *  时间戳保证每次保存路径不同 → LazyForEach keyItem 变化 → ListItem 重建 → PixelMap 重载。 */
 function 背景图文件路径(上下文: common.UIAbilityContext, 牌组ID: string): string {
@@ -124,17 +137,17 @@ export async function 加载牌组色调映射(牌组ID列表: string[]): Promis
 
 /** 持久化单张牌组的 tone 选择；tone===None 也持久化（表示用户主动取消色条）。 */
 /** @throws {Error} 失败由领域调用方报告，不以默认值或假成功继续。 */
-export async function 保存牌组色调(牌组ID: string, 色调: 牌组色调): Promise<void> {
+export async function 保存牌组色调(牌组ID: string, 色调: 牌组色调, expected: string | null = null): Promise<void> {
   const 上下文: common.UIAbilityContext | null = 获取能力上下文();
   if (上下文 === null) throw new Error('deck_tone_storage_unavailable');
   const 存储: preferences.Preferences = await preferences.getPreferences(上下文, 存储名);
-  await saveLocalPreference(存储, 色调键(牌组ID), 牌组色调键(色调), '');
+  await saveLocalPreference(存储, 色调键(牌组ID), 牌组色调键(色调), '', expected);
 }
 
 /**
  * 按给定的 牌组ID 列表逐个查询已持久化的别名（用户自定义别名）。
  * 返回 牌组ID → 别名 的 Map；未持久化或读取失败的不出现在 Map 中，调用方继续走后端真实 name。
- * 空串视为未设置（保存牌组别名 落盘空串时会删除键）。
+ * 空串视为未设置（保存牌组别名与其他偏好共用队列，落盘空串）。
  */
 export async function 加载牌组别名映射(牌组ID列表: string[]): Promise<Map<string, string>> {
   const 输出: Map<string, string> = new Map<string, string>();
@@ -172,19 +185,13 @@ export async function 加载牌组别名映射(牌组ID列表: string[]): Promis
  * 导出 apkg/同步到其他设备时仍显示后端原名。
  * @throws {Error} 偏好不可用或写入失败，调用方保留草稿并报告失败。
  */
-export async function 保存牌组别名(牌组ID: string, 名称: string): Promise<void> {
+export async function 保存牌组别名(牌组ID: string, 名称: string, expected: string | null = null): Promise<void> {
   const 上下文: common.UIAbilityContext | null = 获取能力上下文();
   if (上下文 === null) {
     throw new Error('deck_alias_storage_unavailable');
   }
   const 存储: preferences.Preferences = await preferences.getPreferences(上下文, 存储名);
-  const 去除首尾空格: string = 名称.trim();
-  if (去除首尾空格 === '') {
-    await 存储.delete(别名键(牌组ID));
-  } else {
-    await 存储.put(别名键(牌组ID), 去除首尾空格);
-  }
-  await 存储.flush();
+  await saveLocalPreference(存储, 别名键(牌组ID), 名称.trim(), '', expected);
 }
 
 /**
@@ -301,11 +308,12 @@ export async function 保存牌组背景图(牌组ID: string, 像素图: PixelMa
  * 先确认移除路径，再清理旧文件；保存失败时原图仍可重试。
  * @throws {Error} 偏好读写失败由定制面板报告。
  */
-export async function 清除牌组背景图(牌组ID: string): Promise<void> {
+export async function 清除牌组背景图(牌组ID: string, expected: string | null = null): Promise<void> {
   const 上下文: common.UIAbilityContext | null = 获取能力上下文();
   if (上下文 === null) throw new Error('deck_background_storage_unavailable');
   const store: preferences.Preferences = await preferences.getPreferences(上下文, 存储名);
   const previous: string = await readLocalPreference(store, 背景图键(牌组ID), '') as string;
+  if (expected !== null && previous !== expected) throw new Error('setting_changed_since_proposal');
   await saveLocalPreference(store, 背景图键(牌组ID), '', '', previous);
   if (previous !== '') {
     try { await fs.unlink(previous); }

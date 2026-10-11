@@ -1,3 +1,4 @@
+import { localPreferenceApi } from './local-preference-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -146,15 +147,16 @@ test('clearing a local display name writes only preferences and never calls Core
   assert.deepEqual(events,[['2','']]);
 });
 
-test('local alias storage deletes an empty override and propagates unavailable or failed persistence',async()=>{
+test('local alias storage clears an empty override and propagates unavailable or failed persistence',async()=>{
   const values=new Map([['deck_display_name_2','Alias']]);let context={},fail=false;
   const save=loadPlatformModule('model/牌组元数据存储.ets','保存牌组别名',{
+    ...localPreferenceApi({setOrCreate(){}}),
     AppStorage:{get:()=>context},preferences:{getPreferences:async()=>({
-      put:async(key,value)=>values.set(key,value),delete:async key=>values.delete(key),
+      getSync:(key,fallback)=>values.has(key)?values.get(key):fallback,putSync:(key,value)=>values.set(key,value),
       flush:async()=>{if(fail)throw Error('flush failed');}
     })}
   });
-  await save('2','  ');assert.equal(values.has('deck_display_name_2'),false);
+  await save('2','  ');assert.equal(values.get('deck_display_name_2'),'');
   await save('2',' New alias ');assert.equal(values.get('deck_display_name_2'),'New alias');
   fail=true;await assert.rejects(save('2','Retry'),/flush failed/);
   context=undefined;await assert.rejects(save('2','Retry'),/storage_unavailable/);

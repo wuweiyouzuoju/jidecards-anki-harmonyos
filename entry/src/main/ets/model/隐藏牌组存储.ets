@@ -38,6 +38,7 @@
 
 import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
+import { readLocalPreference, saveLocalPreference } from '../utils/LocalPreferenceWrite';
 
 const 存储名: string = 'jidecards_deck_meta';
 const 已隐藏牌组键: string = 'hidden_decks';
@@ -98,6 +99,17 @@ export async function 加载已隐藏牌组ID列表(): Promise<string[]> {
   }
 }
 
+/** @throws {Error} 写入与 JIDE 快照使用严格读取；损坏值不允许覆盖。 */
+export async function readHiddenDeckIds(): Promise<string[]> {
+  const context = 取上下文(); if (context === null) throw new Error('hidden_decks_unavailable');
+  const store = await preferences.getPreferences(context, 存储名);
+  const raw = await readLocalPreference(store, 已隐藏牌组键, '[]');
+  if (typeof raw !== 'string') throw new Error('invalid_hidden_decks');
+  const ids: string[] = JSON.parse(raw) as string[];
+  if (!Array.isArray(ids) || ids.some((id): boolean => typeof id !== 'string' || !/^[1-9][0-9]*$/.test(id))) throw new Error('invalid_hidden_decks');
+  return ids;
+}
+
 // ========================================================
 // @块ID MODEL-HIDDEN-DECK-003
 // @名称 隐藏牌组
@@ -114,16 +126,12 @@ export async function 加载已隐藏牌组ID列表(): Promise<string[]> {
 // @副作用
 // 重写 preferences 的 hidden_decks 键并 flush 落盘。
 // ========================================================
-export async function 隐藏牌组(牌组ID: string): Promise<void> {
+/** @throws {Error} 严格读写失败由调用方报告。 */
+export async function 隐藏牌组(牌组ID: string, expected: string | null = null): Promise<void> {
   if (牌组ID === '') {
     return;
   }
-  const 当前: string[] = await 加载已隐藏牌组ID列表();
-  if (当前.indexOf(牌组ID) >= 0) {
-    return;
-  }
-  当前.push(牌组ID);
-  await 写入已隐藏牌组列表(当前);
+  await changeHiddenDecks((ids: string[]): string[] => ids.includes(牌组ID) ? ids : ids.concat([牌组ID]),expected);
 }
 
 // ========================================================
@@ -142,13 +150,9 @@ export async function 隐藏牌组(牌组ID: string): Promise<void> {
 // @副作用
 // 重写 preferences 的 hidden_decks 键并 flush 落盘。
 // ========================================================
-export async function 取消隐藏牌组(牌组ID: string): Promise<void> {
-  const 当前: string[] = await 加载已隐藏牌组ID列表();
-  const 下一列表: string[] = 当前.filter((id: string): boolean => id !== 牌组ID);
-  if (下一列表.length === 当前.length) {
-    return;
-  }
-  await 写入已隐藏牌组列表(下一列表);
+/** @throws {Error} 严格读写失败由调用方报告。 */
+export async function 取消隐藏牌组(牌组ID: string, expected: string | null = null): Promise<void> {
+  await changeHiddenDecks((ids: string[]): string[] => ids.filter((id: string): boolean => id !== 牌组ID),expected);
 }
 
 // ========================================================
@@ -167,20 +171,27 @@ export async function 取消隐藏牌组(牌组ID: string): Promise<void> {
 // @副作用
 // 重写 preferences 的 hidden_decks 键为空数组并 flush 落盘。
 // ========================================================
+/** @throws {Error} 严格读写失败由调用方报告。 */
 export async function 取消隐藏全部牌组(): Promise<void> {
-  await 写入已隐藏牌组列表([]);
+  await changeHiddenDecks((_ids: string[]): string[] => []);
 }
 
-async function 写入已隐藏牌组列表(牌组ID列表: string[]): Promise<void> {
+let hiddenSaving: Promise<void> = Promise.resolve();
+/** @throws {Error} 手动与 JIDE 读改写串行，旧列表不能覆盖并发保存。 */
+function changeHiddenDecks(change: (ids: string[]) => string[], expected: string | null = null): Promise<void> {
+  const work = hiddenSaving.then(async (): Promise<void> => {
+    const before = await readHiddenDeckIds();
+    if (expected !== null && JSON.stringify(before) !== expected) throw new Error('setting_changed_since_proposal');
+    const after = change(before.slice());
+    if (JSON.stringify(before) !== JSON.stringify(after)) await 写入已隐藏牌组列表(after,JSON.stringify(before));
+  });
+  hiddenSaving = work.catch((): void => {}); return work;
+}
+
+/** @throws {Error} 保存失败不广播已应用状态。 */
+async function 写入已隐藏牌组列表(牌组ID列表: string[], expected: string): Promise<void> {
   const 上下文: common.UIAbilityContext | null = 取上下文();
-  if (上下文 === null) {
-    return;
-  }
-  try {
-    const 存储: preferences.Preferences = await preferences.getPreferences(上下文, 存储名);
-    await 存储.put(已隐藏牌组键, JSON.stringify(牌组ID列表));
-    await 存储.flush();
-  } catch (错误) {
-    // 偏好不可用时仅丢失持久化，不阻塞 UI。
-  }
+  if (上下文 === null) throw new Error('hidden_decks_unavailable');
+  const 存储: preferences.Preferences = await preferences.getPreferences(上下文, 存储名);
+  await saveLocalPreference(存储, 已隐藏牌组键, JSON.stringify(牌组ID列表), '[]', expected);
 }
