@@ -159,6 +159,19 @@ test('batch drafts survive failed save and retry with the same shared parameter 
   assert.deepEqual(h.writes[1],h.writes[0]);assert.deepEqual(h.writes[1].configs.map(c=>c.id),[2,1,0]);
 });
 
+test('batch parameter updates stay shared while renamed and switched-away field edits remain isolated',async()=>{
+  const h=harness();await h.session.load();const draft=copyDeckConfig(h.current);draft.config.newPerDay=24;
+  draft.config.fsrsParams6=await h.session.optimize(draft,h.options,true);
+  h.session.editPreset('rename','Private',draft,false);
+  h.session.editPreset('select','2',h.states.at(-1).config,false);
+  await h.session.save(h.states.at(-1).config,false,h.options);
+  const configs=h.writes[0].configs;
+  assert.deepEqual(configs.map(config=>config.id),[1,0,2]);
+  assert.equal(configs[0].name,'Shared');assert.equal(configs[0].config.newPerDay,10);
+  assert.equal(configs[1].name,'Private');assert.equal(configs[1].config.newPerDay,24);
+  for(const config of configs) assert.deepEqual(fsrsParams(config.config),params.map(Math.fround));
+});
+
 test('collection waits cancel unstarted calculations on exit; active calculations hold occupancy until actual settlement',async()=>{
   const h=harness(); await h.session.load(); const sync={}; h.activity.acquire(sync);
   const work=h.session.optimize(h.current,h.options,true); await flush();
@@ -258,6 +271,20 @@ test('feature applies actual Core generations to the existing form, preserves un
   ui.active=true;const failure=deferred();ui.session={workload:()=>{},simulate:()=>failure.promise,dispose:()=>{}};
   const simulation=ui.simulate(30);ui.aboutToDisappear();failure.reject(Error('late error'));await simulation;
   assert.equal(ui.validationError,'');assert.equal(h.writes.length,0);
+});
+
+test('actual preset callbacks stage and restore each preset scope without dropping edited form fields',async()=>{
+  const h=harness();const Feature=loadComponentLogic('components/home/DeckOptionsFeature.ets','DeckOptionsFeature',{
+    ...appInterfaceDependencies(),DeckOptionsFsrsState,prepareDeckOptionsDraft,牌组配置表单,namedResourceText:(_context,key)=>key});
+  const ui=new Feature();ui.active=true;ui.getUIContext=()=>({});
+  ui.session=new DeckOptionsSession(7,h.backend,state=>{ui.state=state;});await ui.session.load();
+  ui.form=牌组配置表单.从配置创建(h.current.config);ui.options=牌组选项编辑.从视图创建(null,true,true,true,true);
+  ui.form.每日新卡数文本='23';ui.options.applyToSharedDecks=true;
+  ui.editPreset('select','2');assert.equal(ui.options.applyToSharedDecks,false);
+  ui.editPreset('select','1');assert.equal(ui.options.applyToSharedDecks,true);assert.equal(ui.form.每日新卡数文本,'23');
+  ui.options.applyToSharedDecks=false;ui.editPreset('rename','Private');
+  ui.save(ui.form,ui.options);await flush();
+  assert.equal(h.writes[0].configs.at(-1).id,0);assert.equal(h.writes[0].configs.at(-1).name,'Private');
 });
 
 test('system Back reaches computing deck options while saving and other collection operations remain protected',()=>{

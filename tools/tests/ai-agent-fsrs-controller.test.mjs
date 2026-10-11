@@ -4,22 +4,22 @@ import assert from 'node:assert/strict';
 import { loadPlatformModule } from './platform-module-harness.mjs';
 
 function fixture() {
-  const state={enabled:false,writes:[],notifications:0,block:null,failWrite:false,failRead:false,mismatch:false};
+  const state={enabled:false,bound:9,writes:[],notifications:0,block:null,failWrite:false,failRead:false,mismatch:false};
   const config={id:9,name:'shared',config:{other:new Uint8Array([1]),preserved:[new Uint8Array([2])]}};
   const limits={new:0};
-  const adapter=loadPlatformModule('model/FSRS控制器.ets','({设置FSRS开启状态,readFsrsEnabled})',{
+  const adapter=loadPlatformModule('model/FSRS控制器.ets','({设置FSRS开启状态,readFsrsEnabled,确保FSRS已开启一次})',{
     UPDATE_DECK_CONFIGS_MODE_NORMAL:0,
     AppStorage:{get:()=>undefined,setOrCreate:()=>state.notifications++},
     牌组配置服务:class {
       async 获取牌组配置编辑视图(id) {
         assert.equal(id,1); if(state.failRead) throw Error('backend read');
-        return {fsrs:state.enabled,allConfigs:[{config}],currentDeck:{limits},
+        return {fsrs:state.enabled,allConfigs:[{config},{config:{...config,id:10,name:'ZZ last'}}],currentDeck:{limits,configId:state.bound},
           cardStateCustomizer:'keep',applyAllParentLimits:true,newCardsIgnoreReviewLimit:true,fsrsHealthCheck:true};
       }
       async 更新牌组配置(request) {
         state.writes.push(request); if(state.block) await state.block;
         if(state.failWrite) throw Error('backend write');
-        if(!state.mismatch) state.enabled=request.fsrs;
+        if(!state.mismatch) {state.enabled=request.fsrs;state.bound=request.configs.at(-1).id;}
       }
     }, hilog:{error(){}}
   });
@@ -36,14 +36,22 @@ test('real FSRS controller serializes shared mutations and reads, preserves othe
   unblock();await enable;await disable;assert.equal(await read,false);
   assert.deepEqual(state.writes.map(x=>x.fsrsReschedule),[true,false]);
   for(const request of state.writes) {
+    assert.deepEqual(request.configs.map(item=>item.id),[9]);
     assert.strictEqual(request.configs[0],config);assert.strictEqual(request.limits,limits);
     assert.equal(request.cardStateCustomizer,'keep');assert.equal(request.fsrsHealthCheck,true);
     assert.equal(request.applyAllParentLimits,true);assert.deepEqual(request.removedConfigIds,[]);
   }
+  assert.equal(state.bound,9,'global toggle must not rebind Default to the last sorted preset');
   assert.equal(state.notifications,2);
   await adapter.设置FSRS开启状态(false,false);assert.equal(state.writes.length,2);
   await assert.rejects(adapter.设置FSRS开启状态(true,true),/setting_changed_since_proposal/);
   assert.equal(state.writes.length,2);assert.equal(state.notifications,2);
+});
+
+test('first initialization preserves the bound Default preset when several presets exist',async()=>{
+  const {state,adapter}=fixture();await adapter.确保FSRS已开启一次();
+  assert.equal(state.enabled,true);assert.equal(state.bound,9);
+  assert.deepEqual(state.writes[0].configs.map(item=>item.id),[9]);
 });
 
 test('real FSRS controller surfaces failed reads and writes, refreshes after uncertain writes, and allows a later new request', async () => {

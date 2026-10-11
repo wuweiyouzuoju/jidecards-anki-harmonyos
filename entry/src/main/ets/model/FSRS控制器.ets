@@ -27,8 +27,8 @@
 //
 // @业务规则
 // - targetDeckId 用 Default deck (id=1)。Anki 约定 Default deck 不可删除且 id 固定，
-//   fsrs 字段与 targetDeckId 无关，只是后端用 targetDeckId 定位 currentDeck.limits。
-// - configs 数组只回传 view.allConfigs 里的所有 config，原样保真（含 preserved 字节）。
+//   fsrs 是全库开关；targetDeckId 同时定位限额和预设绑定，必须保留原配置。
+// - configs 只回传 Default 当前绑定的预设，原样保真；Core 用最后一项重新绑定 targetDeckId。
 // - fsrsReschedule：view 里没有这个字段；开启 FSRS 时设 true（让卡片按新算法重新调度），
 //   关闭时设 false（无新算法需要应用）。
 //
@@ -116,10 +116,9 @@ async function 标记已初始化(): Promise<void> {
 
 /** 从 view 构造 UpdateDeckConfigsInput，仅覆盖 fsrs/fsrsReschedule，其他字段原样回传。 */
 function 构造请求(视图: DeckConfigsForUpdateView, fsrs开关: boolean, fsrs重调度: boolean): UpdateDeckConfigsInput {
-  const 配置列表: DeckConfig[] = [];
-  for (let i: number = 0; i < 视图.allConfigs.length; i++) {
-    配置列表.push(视图.allConfigs[i].config);
-  }
+  const 当前配置 = 视图.allConfigs.find((项目): boolean => 项目.config.id === 视图.currentDeck?.configId);
+  if (当前配置 === undefined) throw new Error('default deck config not found');
+  const 配置列表: DeckConfig[] = [当前配置.config];
   return {
     targetDeckId: 默认牌组ID,
     configs: 配置列表,
