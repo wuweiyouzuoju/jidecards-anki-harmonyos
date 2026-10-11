@@ -6,7 +6,7 @@
 
 | 用途 | 入口 | 说明 |
 | --- | --- | --- |
-| 选择题制卡 | `npm run choice:validate -- source.json` / `npm run choice:build -- source.json output.apkg` / `npm run choice:inspect -- output.apkg` | Node 24 校验源文件；打包/验包另需 Python，打包依赖 `choice-requirements.txt`；[规范与 Agent 指南](../docs/choice-authoring.md) |
+| 历史选择题兼容工具 | `npm run choice:validate -- source.json` / `npm run choice:build -- source.json output.apkg` / `npm run choice:inspect -- output.apkg` | 专属制题路线已取消；仅保留既有数据维护和回归工具，不代表 JIDE 制题能力。Node 24 校验；打包/验包另需 Python 及 `choice-requirements.txt`；[历史说明](../docs/choice-authoring.md) |
 | 选择题 APKG 集成回归 | `npm run choice:test` | 实际生成并读取 ZIP/SQLite，检验字段、GUID 和损坏输入；需要上述 Python 打包依赖，不等于真机/AnkiWeb 验收 |
 | 选择题 Anki 引擎验收 | `python tools/choice-anki-roundtrip.py` | 独立 Python 环境安装 `anki==26.5`；临时集合验证导入、模板渲染、重复导入和含 Hard/Good 记录的导出再导入，不访问真实账户 |
 | 变更影响计划 | `npm run impact` | 支持 `--kind cosmetic|behavior|compile|integration|release`、`--json`、`--base <ref>` 或 `--paths <路径> ...`；按影响建议局部检查，只读，不执行验证，详见 [验证说明](../docs/development/verification.md) |
@@ -18,6 +18,7 @@
 | 仓库门禁 | `npm run verify -- repo` | Node、文档、架构和资源契约；CI 使用此模式 |
 | 原生门禁 | `npm run verify -- native` | 仓库门禁、Rust 主机测试和环境检查，不构建 HAP |
 | Anki / AnkiDroid 核心互通 | `npm run test:interop` | 锁定 Core 主机、生产 Rust ABI 与恢复行为，创建独立样本与报告；[前提与未验证范围](../docs/development/core-interop.md)，不操作设备或账号 |
+| 复杂设置 Core 审查 | `node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs tools/audit-settings-core.mjs` | Node 24、锁定 Rust/Core 依赖；生产编辑/会话/保存逻辑接真实临时集合，输出 `.local/settings-core-audit/report.json`。退出 1 为已复现问题，2 为执行异常，0 为列出范围通过；不替代 HAP、设备或在线同步，[范围与反例](../docs/development/settings-integration-audit-2026-10-11.md) |
 | 本地代码沙箱 | `powershell -NoProfile -ExecutionPolicy Bypass -File tools/build-agent-sandbox.ps1 -Target all` | 真实引擎测试与双架构 probe；正式构建自动使用 app 目标，[前提与范围](../native/agent-sandbox/README.md) |
 | 沙箱桥接验收 | `powershell -File tools/build-app.ps1 -Test`；`node tools/test-agent-sandbox-app.mjs <connect-key>` | 当前 signed 主包安装后运行测试模块，不访问卡库 |
 | 沙箱第三方许可 | `node tools/generate-agent-sandbox-notices.mjs --check` | 离线校验随包许可；升级后显式 --write 生成并审查 |

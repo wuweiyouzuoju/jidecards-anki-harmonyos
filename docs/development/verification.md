@@ -14,6 +14,7 @@ Node 24.x 与 `package.json` / CI 一致。首次准备或 lockfile 变化后运
 | `npm test` | 全部 Node 行为与静态约束测试 | ArkTS 类型检查、Kit/ArkUI 实际行为 |
 | `npm run test:cards:browser` | 真实浏览器中的生产卡片会话、初次/翻面显示上下文等价、模板脚本/配色、状态和公式；CI 独立门禁 | ArkWeb、HAP、设备、任意第三方联网服务；依赖/浏览器前提见[工具入口](../../tools/README.md) |
 | `npm run test:interop` | 锁定 Core 的隔离 APKG/COLPKG、ID/历史/未知配置、取消及进程恢复；生成样本和报告，见[核心互通](core-interop.md) | Android/HarmonyOS 设备、Anki 桌面 GUI、真实在线同步 |
+| `node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs tools/audit-settings-core.mjs` | 临时集合中的生产牌组选项/预设、限额、FSRS、过滤牌组和图表偏好；0 为列出范围通过、1 为复现问题、2 为执行异常，见[设置审查](settings-integration-audit-2026-10-11.md) | HAP、ArkUI/设备、在线同步；需要锁定 Rust/Core 依赖 |
 | `npm run verify -- repo` | 可移植仓库门禁，CI 使用同一入口 | Rust、HAP、设备 |
 | `npm run doctor` | 本机工具链与版本诊断 | 实际构建、签名可用性 |
 | `npm run verify -- native` | 环境、全部 Node、Rust fmt/clippy 门禁和真实 Core 主机测试 | HAP 与设备 |

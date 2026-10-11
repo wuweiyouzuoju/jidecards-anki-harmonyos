@@ -1,10 +1,12 @@
 # 设置分类与后续接入位置
 
+2026-10-11：完成牌组选项、集合偏好及 AnkiDroid 设置分类的源码/主机/Core 审查，并修复三处 P1（全局 FSRS 改绑、预设基线覆盖、非当前草稿越过范围）和一处 P2（JIDE 图表只读能力写入）。真实 Core 复查通过普通字段、120 种枚举与排序组合、父子/今日限额、过滤牌组高级配置及四处反例。修复与验证边界见[当日设置审查](../../../../../../docs/development/settings-integration-audit-2026-10-11.md)；设备行为和在线同步仍须单独验收。
+
 2026-10-07：外观的卡面显示已补隐藏音频按钮及显示答案时中断音频，两个模式都使用公共设置行和真实 Core 偏好；JIDE 读取/提案同步接通。导入结果可按 Core 返回的笔记 ID 分类、分批跳转浏览页，失败条目不能定位时禁用。模拟器与主机验收记录见[高优先级改进](../../../../../../docs/development/ankidroid-high-priority-2026-10-07.md)。
 
 2026-09-19 核对。以 AnkiDroid 当前源码的分类为参考，沿用 JideCards 的鸿蒙组件与已实现能力；不承诺像素一致或功能全部对齐。本文件与设置组件放在一起，供后续开发定位，未完成项不进入用户设置菜单。
 
-2026-10-04 后续核对：缺失媒体定位/打标，以及 JIDE 专用备份策略、学习常亮、输入映射等已接通，下表已更新。完整剩余项见 [Core 全量接入盘点](../../../../../../docs/development/ankicore-integration-audit-2026-10-04.md)，区分 Core 保存、JIDE 操作与本机实际生效。
+2026-10-04 后续核对：缺失媒体定位/打标，以及 JIDE 专用备份策略、学习常亮、输入映射等已接通，下表已更新。[Core 全量接入盘点](../../../../../../docs/development/ankicore-integration-audit-2026-10-04.md)保留当日快照，不作为当前剩余清单；当前能力沿领域拥有者核对，区分 Core 保存、JIDE 操作与本机实际生效。
 
 参考：[目录定义](https://github.com/ankidroid/Anki-Android/blob/main/AnkiDroid/src/main/res/xml/preference_headers.xml)、[复习偏好](https://github.com/ankidroid/Anki-Android/blob/main/AnkiDroid/src/main/res/xml/preferences_reviewing.xml)、[外观偏好](https://github.com/ankidroid/Anki-Android/blob/main/AnkiDroid/src/main/res/xml/preferences_appearance.xml)、[控制偏好](https://github.com/ankidroid/Anki-Android/blob/main/AnkiDroid/src/main/res/xml/preferences_controls.xml)。菜单维护操作参考[官方手册](https://github.com/ankidroid/ankidroiddocs/blob/main/manual.asc)。
 
@@ -15,7 +17,7 @@
 | 常规 | 语言、首页今日进度 | 相同 | `GeneralSettings.ets`；既有语言存储、主页偏好 |
 | 复习 | 评分振动、学习手势、四象限点击答题、底部/悬浮答题工具栏 | 相同，另有全部牌组的复习设置（新学习日开始时间、允许提前学习、学习休息提醒）及 FSRS 开关与作用范围说明 | `ReviewControlsSettings.ets`、`布局分组.ets`、`ReviewPreferencesSettings.ets`、`调度器分组.ets`、`model/FSRS控制器.ets`；每日上限、学习步骤、目标记忆率等仍在牌组选项，不能复制成全局设置 |
 | 同步 | 账号、自动/立即同步、自定义服务器 | 相同 | `同步分组.ets` |
-| 外观 | 深浅与颜色主题、支持主题的背景动效、卡片字号、剩余卡数/下次复习间隔显示 | 相同 | `外观分组.ets`、`CardTextSizeControl.ets`、`ThemeMotionControl.ets`、`ReviewPreferencesSettings.ets` |
+| 外观 | 深浅与颜色主题、支持主题的背景动效、卡片字号、剩余卡数/下次复习间隔显示、隐藏音频按钮与显示答案时中断音频 | 相同 | `外观分组.ets`、`CardTextSizeControl.ets`、`ThemeMotionControl.ets`、`ReviewPreferencesSettings.ets` |
 | 数据管理 | 导入文件、导出牌组、备份与恢复、媒体管理、隐藏牌组恢复 | 另含数据库检查、笔记类型、空卡、重复笔记、未用标签 | `数据分组.ets`；数据库检查状态和服务调用保留在 `../设置面板.ets`，并入普通列表行 |
 | 学习帮助 | 可用 | 可用 | `术语分组.ets`；新手不必切实验版才能看评分与状态解释 |
 | 高级设置 | 隐藏 | 开发者解锁入口 | `开发者调试分组.ets`；AI 设置仍受独立发布/解锁状态约束 |
@@ -46,13 +48,17 @@ AnkiDroid 的首页溢出菜单把数据库、媒体、空卡放在“检查”�
 
 上游差异依据：[用户手册](https://docs.ankidroid.org/manual.html)说明卡片模板增删和预览；[发布记录](https://docs.ankidroid.org/changelog.html)说明 CSV 导入导出及缺失媒体笔记标记。实现入口分别为 `数据迁移面板.ets`、`笔记类型管理面板.ets`、`笔记类型编辑器.ets`、`媒体管理面板.ets`、`查找重复对话框.ets`、`备份管理面板.ets`。以上按当前源码核对；笔记类型与文本导出的责任和验收边界见 [浏览与编辑](../../../../../../docs/development/browser-stats.md)及[数据迁移](../../../../../../docs/development/import-data.md)，设备效果需独立验收。
 
-## 延后项目与对应开发位置
+## 后续边界与对应开发位置
 
 | 对照项目 | 当前证据与边界 | 后续接入位置及验收重点 |
 | --- | --- | --- |
-| 音频按钮可见性 | Core Preferences 有 `hide_audio_play_buttons`，本轮全局偏好接入未开放该项；需先审计卡面播放按钮与工具栏重播按钮的实际职责 | `pages/学习页.ets`、卡片 HTML 构建器与学习工具栏；不能只隐藏一个布局就声明完成 |
+| 音频按钮可见性与翻面中断 | 已通过真实 Core Preferences、外观设置及 JIDE 接通；学习页消费隐藏按钮与中断音频偏好，卡面单项按钮和整体重播职责分开 | `ReviewPreferencesStore`、`pages/学习页.ets`、卡片 HTML 构建器和 `CardAudioSession`；实际 ArkWeb/平台音频效果仍需设备验收 |
+| 复杂预设保存与全局 FSRS | 已修复：持久化基线独立于草稿，各预设记住保存范围，非当前草稿按范围隔离；全局 FSRS 仅提交默认牌组原预设，开关与初始化保持绑定 | `DeckOptionsSession`、`DeckOptionsPresets`、`DeckConfigSave`、`FSRS控制器.ets`；生产行为回归及当日真实 Core 复查 |
+| 图表偏好 | UI/JIDE 共用三项可写偏好保存与验证；JIDE 拒绝只读 `browserLinksSupported`，底层保存保留 Core 最新能力值 | `AgentPreferenceSettings`、`AgentSettingsTools`、`GraphPreferencesCommands`；真实 Core 写入与回读通过 |
+| 过滤牌组高级配置 | 手动创建提供一组搜索、数量、排序、重排；JIDE 提供双搜索、预览延迟和已有过滤牌组编辑，清空/重建复用 Core | `model/FilteredDeckCommands.ts`、创建过滤牌组面板、JIDE 维护/操作工具；手动入口少不等于整个应用未接高级字段 |
+| 同步高级偏好与自定义 CA | 自定义服务器已接；计费网络、I/O 超时、徽标显示开关及手动强制单向设置尚无完整等价入口。自定义证书仅底层 setter，无完整导入/持久化/重开恢复/移除链 | `同步服务`、`SyncSettings`、`同步分组.ets`；全量冲突选择不等同于手动强制单向偏好，平台证书与网络策略另验 |
 | 屏幕常亮 | 已通过 JIDE 专用工具配置；学习页前台可见时应用，离页/后台恢复窗口状态 | `backend/StudyControlsService.ets`、`model/StudyScreenAwakeSession.ts`、`pages/学习页.ets`；无新增手动设置入口，设备生命周期待验 |
-| 完整手势/硬件键映射 | JIDE 已可配置 space/enter/1–4/r/b/s 与 left/right/double 的规定动作；更广手势、遥控器等尚未接通 | `model/StudyControls.ts`、`model/StudyInputPolicy.ts`、`pages/学习页.ets`；保护网页链接、输入框、手写及滚动，无新增手动映射面板 |
+| 学习键盘与手势映射 | 学习快捷键支持手动录制/输入、任意可识别物理键、Ctrl/Shift/Alt、多个绑定与卡面区分、删除/恢复默认；JIDE 共用配置。left/right/double 手势仍为既有规定动作；浏览快捷键独立 | `model/StudyKeyboard.ts`、`model/StudyControls.ts`、`components/settings/StudyKeyboardSettings.ets`、`pages/学习页.ets`；编辑、模板输入、弹窗、手写及滚动保护，旧配置兼容；设备验收另行完成 |
 | 自动历史备份、保留数量、恢复列表 | 已接入：启动后安全空闲触发 Core 自动备份；数据管理提供开关、立即创建、历史列表与恢复确认。Core 负责间隔和保留，恢复复用整库替换安全副本。 | `components/settings/备份管理面板.ets`、`backend/LocalBackups.ets`、`model/BackupCoordinator.ts`、`backend/集合服务.ts` |
 | 独立无障碍页、自定义字体 | 卡片字号已实现；读屏顺序、按钮标签、大字体布局及自定义字体导入尚未完成系统审计，因此本轮不创建空分类 | `CardTextSizeControl.ets`、通用按钮、卡片 HTML 构建器、各页面；先核对已有读屏能力和资源路径 |
 | 设置内的复习提醒入口 | 已有首页“更多 → 提醒”、提醒列表及编辑页，不属于功能未实现；本轮未复制一套设置 | `pages/学习提醒页.ets`、`pages/设置页.ets`、首页导航；后续可复用现有路由并保持同步安全门禁 |

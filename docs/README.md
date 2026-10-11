@@ -4,7 +4,7 @@
 
 - [项目 README](../README.md)：下载、功能、兼容范围、数据与构建入口。
 - [贡献指南](../CONTRIBUTING.md)：报告问题、开发环境、验证与提交要求。
-- [更新记录](../CHANGELOG.md)与[2.9.88 源码变更说明](releases/2.9.88.md)：源码变化及发布边界。
+- [更新记录](../CHANGELOG.md)与[2.9.98 源码变更说明](releases/2.9.98.md)：源码变化及发布边界。
 - [使用指南](https://jidecards.com/guides/harmonyos-anki/)：导入牌组、同步与复习入门。
 
 ## 当前文档
@@ -25,6 +25,8 @@
 - [易混淆功能状态](FEATURE_STATUS.md)：浏览增强、备份/恢复等能力的接入层次、源码入口与功能盘点边界。
 - [AnkiDroid 对照入口](ANKIDROID_PARITY_AUDIT.md)：领域映射及当前事实来源，避免沿用历史缺口清单。
 - [JIDE 应用内 Agent](development/agent.md)：当前工具、资料/联网/沙箱、运行时边界和验收入口。
+  卡片重置/暂停及其他卡库、应用操作的目录、确认和原流程边界见 [操作接入](development/agent.md#卡库与应用操作接入2026-10-11)。
+- [JIDE 历史、统计与联网开关计划](decisions/2026-10-11-jide-history-stats-web-plan.md)：历史检索/管理已接入；完整统计和联网开关提案待实现，含专属选择题制题路线取消记录。
 - [应用内 Agent 设计](agent-2-design.md)：稳定的会话、提案与确认设计概览。
 - [编程 Agent](development/coding-agent.md)：负责修改本仓库的 Agent-first 规则与开发闭环。
 - [模块责任与边界](development/ownership.md)：按目录定位代码所有者、修改边界和验证入口。
@@ -37,6 +39,7 @@
 
 ## 历史材料
 
+- [2026-10-11 设置接入审查](development/settings-integration-audit-2026-10-11.md)：当日复杂预设、FSRS、限额、过滤牌组和 JIDE 图表偏好的真实 Core 反例与验证记录；当前能力仍归设置及各领域拥有者。
 - [2026-10-10 过期知识与断言检查](development/stale-knowledge-audit-2026-10-10.md)：本轮发现、修复及验证范围，不替代当前领域事实。
 - [3.0.0 未发布草案](releases/3.0.0.md)：历史发布文案草案，不是已发布版本。
 - [源码架构长文](CSDN-记得闪卡项目全解.md)：2026-09-08 的历史源码导读快照，版本和统计数字不代表当前工作树。

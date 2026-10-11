@@ -21,6 +21,19 @@ function read(relativePath) {
   return readFileSync(path.join(root, relativePath), 'utf8');
 }
 
+test('complex settings audit has discoverable evidence, tool prerequisites and current ownership', () => {
+  const audit = 'settings-integration-audit-2026-10-11.md';
+  for (const file of ['docs/README.md','tools/README.md','docs/development/verification.md',
+    'entry/src/main/ets/components/settings/SETTINGS_PARITY.md']) assert.ok(read(file).includes(audit), file);
+  const report = read('docs/development/' + audit);
+  assert.ok(report.includes('SETTINGS_PARITY.md'));
+  assert.ok(report.includes('修复前已复现问题'));
+  assert.ok(report.includes('修复结果'));
+  assert.ok(report.includes('findings 为空'));
+  assert.ok(report.includes('退出 2'));
+  assert.ok(existsSync(path.join(root, 'tools/audit-settings-core.mjs')));
+});
+
 test('AnkiDroid comparison routes capability status to the current domain owners', () => {
   const comparison = read('docs/ANKIDROID_PARITY_AUDIT.md');
   const targets = [...comparison.matchAll(/\[[^\]]*\]\(([^)]+)\)/g)].map(match => match[1].split('#')[0]);
