@@ -32,7 +32,7 @@
 行为验证：`ai-agent-operations.test.mjs` 覆盖 Core 适配与确认执行器；`ai-agent-operation-workflows.test.mjs` 覆盖平台适配、原迁移会话、目标发现/分析预算、提醒持久化、同步凭证和设置分派。主机测试不替代系统选择器、通知权限、联网同步及 ArkUI 真机验收。决策与验证记录见 [操作接入](../decisions/2026-10-11-jide-operation-integration.md)。
 - `execute_code` 已接入本地纯计算：QuickJS-NG + wasmi、独立异步 NAPI、固定资源预算及贯通取消，不获得卡库或工具权限。入口与验收见[沙箱模块](../../native/agent-sandbox/README.md)，当前验证范围见[决策记录](../decisions/2026-09-30-agent-local-sandbox.md)。
 
-浏览普通菜单的搜索工具、显示设置和更多分组由 `AppInterface` 的共同声明生成；`BrowserMoreMenu` 按实际展开状态发布 `browser_search_tools`、`browser_display_settings`、`browser_more_settings`。搜索选项与最近搜索使用独立声明和原弹窗组件。学习/浏览旗标颜色替换标记子面板时，移除隐藏的标记观察、保留主菜单观察，并登记实际“返回上级”控件；名称认识及状态观察不增加未注册的点击权限。回归见 `browser-more-menu.test.mjs`、`ai-agent-app-structure.test.mjs`。
+浏览普通菜单的搜索工具、显示设置和更多分组由 `AppInterface` 的共同声明生成；`BrowserMoreMenu` 按实际展开状态发布 `browser_search_tools`、`browser_display_settings`、`browser_more_settings`。搜索选项与最近搜索使用独立声明和原弹窗组件。学习/浏览旗标颜色朝主菜单方向覆盖时，保留标记及已展开的卡片操作侧面板观察、移除被覆盖的主菜单观察；颜色层只登记实际七色与清除选项，不增加返回控件；名称认识及状态观察不增加未注册的点击权限。回归见 `browser-more-menu.test.mjs`、`ai-agent-app-structure.test.mjs`。
 
 制卡/编辑目标牌组与记忆范围统一使用[公共目录树](appearance.md#公共目录树)，按稳定牌组 ID 或 `deck:id` scope 回传。当前目录的查询、完整路径、选中及可操作状态由真实组件经宿主登记 `directory_tree`，多个目录观察按 owner 独立释放；原静态业务声明与已接通能力保留，观察不授予新的代操作许可。
 
@@ -116,7 +116,7 @@ JIDE 设置直接组合全局设置的 `components/settings/AIAgent设置分组.
 | --- | --- |
 | `get_advanced_settings` | collection 读取真实 Core FSRS 高级偏好和历史备份策略；study 读取本机学习操作配置，不读取凭证 |
 | `propose_update_collection_preferences` | 修改负担均衡、带步骤的短期调度、每日/每周/每月备份保留数与最小间隔，单位为数量/分钟。共用 `ReviewPreferencesStore` 队列，确认时检查旧值，仅修改白名单 wire 字段，保留未知字段；不主动重排卡片 |
-| `propose_update_study_controls` | 常亮、手势模式和键盘完整绑定。与“设置→复习→学习快捷键”共用校验和保存队列；keyboard 支持任意可识别物理键、精确 Ctrl/Shift/Alt、多个绑定及题目/答案面，空 bindings 禁用；旧 keys 兼容默认覆盖。评分只在答案面，系统返回不可重绑；读取同时返回 effectiveKeyboard 与共同动作目录，确认预览含卡面和组合键 |
+| `propose_update_study_controls` | 常亮、旧手势模式、实验版完整手势和键盘完整绑定。gestureConfig 支持四向滑动、双击、四区/九宫格、2/3/4 指与摇动，按卡面绑定同一学习动作目录，未绑定无操作；仅实验版可编辑和生效，简洁版保留已有配置，读工具返回 gestureInputs/gestureActions、gestureEditable/effectiveGestureConfig，确认预览展示布局、手势、卡面与动作。与“设置→复习→学习快捷键”共用校验和保存队列；keyboard 支持任意可识别物理键、精确 Ctrl/Shift/Alt、多个绑定及题目/答案面，空 bindings 禁用；旧 keys 兼容默认覆盖。评分只在答案面，系统返回不可重绑；读取同时返回 effectiveKeyboard 与共同动作目录，确认预览含卡面和组合键 |
 | `propose_export_subset` | 已发现的精确 notes/cards ID 子集导出 APKG/文本，最多1000项；notes 包含兄弟卡，cards 由 Core 决定相关笔记。确认时复查卡片/笔记及关联内容，Core 导出结束后释放集合再打开保存选择器，取消不会报告已保存 |
 | `propose_duplicate_note` | 已发现笔记复制为新增草稿，保留字段、标签和媒体引用；确认时检查来源和类型未变，Core 分配新身份，不复制调度/日志 |
 | `propose_update_notetype_fields` | 修改 sticky、rtl、font、size、description、plainText、collapsed、excludeFromSearch 及排序字段；保留名称、顺序、身份和未知属性，展示跨牌组完整影响数量，高风险双重确认，不改变结构 |

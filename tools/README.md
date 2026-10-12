@@ -51,7 +51,7 @@ JIDE 对话公式浏览器回归：`node --experimental-transform-types --import
 
 JIDE PDF/OCR 原生回归：构建并 `install -r` 当前主 HAP 后，`npm run build:app -- -SkipRust -Test`，再运行 `node tools/test-agent-documents-device.mjs <connect-key>`。设置 `DEVECO_HOME` 指向 DevEco Studio 安装目录。只处理合成资料，无模型调用或卡库写入；边界见 [文件资料与按页制卡](../docs/development/agent.md#文件资料与按页制卡)。
 
-学习手势浏览器回归：`node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs tools/test-study-gestures-browser.mjs`。需要 Playwright 和本机 Edge，可用 `PLAYWRIGHT_MODULE` 指定模块入口。测试生产脚本的真实触摸双击、左右滑动、控件点击、原生纵向滚动与旧卡面事件取消；不替代 ArkWeb 与原生教学层的设备验收。
+学习手势浏览器回归：`node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs tools/test-study-gestures-browser.mjs`。需要 Playwright 和本机 Edge，可用 `PLAYWRIGHT_MODULE` 指定模块入口。测试生产脚本的真实触摸双击、四向滑动、2/3/4 指点击、控件点击、原生纵向滚动与旧卡面事件取消；不替代 ArkWeb 与原生教学层的设备验收。
 
 
 完整协议生成/核对：`node tools/core-protocol.mjs --generate|--check`；真实生产协议联测：`npm run protocol:test-core`。`generate-rpc-index.mjs` 委托统一入口，官方刷新与升级语义差异见 [Core 协议生成](../docs/development/core-protocol.md)。真实 Core 主机测试：`node tools/test-anki-core.mjs`；输入、前提与自托管 HAP 路线见 [验证说明](../docs/development/verification.md)。
