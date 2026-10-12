@@ -108,6 +108,7 @@ export struct StudyKeyboardSettings {
     if (this.busy || !this.loaded) return;
     const next: StudyControls = { keepScreenOn: this.before.keepScreenOn, gestureMode: this.before.gestureMode,
       keys: [], gestures: this.before.gestures, keyboard: { version: 1, bindings: this.bindings } };
+    if (this.before.gestureConfig !== undefined) next.gestureConfig = this.before.gestureConfig;
     this.busy = true; this.errorKey = ''; this.capturing = false;
     try {
       await saveStudyControls(next, this.before);

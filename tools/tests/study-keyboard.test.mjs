@@ -7,6 +7,7 @@ import { defaultStudyKeyboard, normalizeStudyChord, studyChord, validateStudyKey
   studyKeyboardCommand, StudyKeyboardSession, STUDY_KEYBOARD_ACTIONS, studyBindingConflict } from '../../entry/src/main/ets/model/StudyKeyboard.ts';
 import { defaultStudyControls, validateStudyControls, effectiveStudyKeyboard, configuredStudyCommand } from '../../entry/src/main/ets/model/StudyControls.ts';
 import { loadPlatformModule } from './platform-module-harness.mjs';
+import { defaultStudyGestureConfig } from '../../entry/src/main/ets/model/StudyGestureConfig.ts';
 
 test('free bindings accept combinations, multiple keys, arbitrary device codes and distinct card sides', () => {
   const config = validateStudyKeyboard({version:1,bindings:[
@@ -100,6 +101,13 @@ test('recording consumes modifiers without completing and records the next full 
   assert.equal(page.capture({keyCode:'control',type:0,chord:''}),true);assert.equal(page.capturing,true);
   assert.equal(page.capture({keyCode:'x',type:0,chord:'ctrl+shift+x'}),true);assert.equal(page.keyText,'ctrl+shift+x');
   page.capturing=true;assert.equal(page.capture({keyCode:'back',type:0,chord:''}),false);
+});
+
+test('keyboard edits preserve an existing complete gesture configuration',async()=>{
+  const config={...defaultStudyGestureConfig(),enabled:true};let saved;
+  const page=editor({saveStudyControls:async after=>{saved=after;}});
+  page.before={...defaultStudyControls(),gestureConfig:config};await page.save();
+  assert.deepEqual(saved.gestureConfig,config);
 });
 
 test('key adapter recognizes alphabet, number pad, function and device keys and reads event modifiers',()=>{
