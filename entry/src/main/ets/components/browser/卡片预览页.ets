@@ -58,6 +58,7 @@ import type { EditableNote } from '../../proto/messages/NoteMessages';
 import type { RenderedCard, AvTagsResult } from '../../proto/messages/CardRenderingMessages';
 import {
   构建卡片HTML,
+  appendCardScript,
   媒体基地址,
   剥除拼写标记,
   原始侧HTML
@@ -368,8 +369,7 @@ export struct 卡片预览页 {
   private 应用HTML(html: string): void {
     this.cardRenderPending = true;
     const version: number = ++this.documentVersion;
-    const document: string = html.replace('</div></body>',
-      `<script>${buildPreviewInteractionScript(version)}</script></div></body>`);
+    const document: string = appendCardScript(html, buildPreviewInteractionScript(version));
     if (this.控制器已挂载) {
       try {
         this.cardWeb.setAudioEnabled(this.interactionEnabled && this.foreground);

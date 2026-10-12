@@ -5,7 +5,7 @@ import { CardWebView } from '../../utils/CardWebView';
 import { interceptCardAsset } from '../../utils/CardAssetResponse';
 import { interceptMediaRequest } from '../../utils/媒体响应助手';
 import { RenderedCard } from '../../proto/messages/CardRenderingMessages';
-import { 构建卡片HTML, 剥除拼写标记, 媒体基地址, 原始侧HTML } from '../../model/学习卡片HTML构建器';
+import { 构建卡片HTML, 剥除拼写标记, 媒体基地址, 原始侧HTML, appendCardScript } from '../../model/学习卡片HTML构建器';
 import { buildPreviewInteractionScript } from '../../model/PreviewInteraction';
 import { reviewPreferences } from '../../backend/ReviewPreferencesService';
 import { resourceText } from '../../utils/UiFeedback';
@@ -131,7 +131,7 @@ export struct NotetypeTemplatePreview {
       const version: number = ++this.previewVersion;
       const html: string = 剥除拼写标记(构建卡片HTML(this.rendered, this.answerSide ? 'answer' : 'question', this.isDark,
         undefined, this.hideAudioButtons, resourceText(this.getUIContext(), $r('app.string.study_replay_sound'))));
-      this.cardWeb.show(html.replace('</div></body>', `<script>${buildPreviewInteractionScript(version)}</script></div></body>`), this.contentRevision, side);
+      this.cardWeb.show(appendCardScript(html, buildPreviewInteractionScript(version)), this.contentRevision, side);
     } catch (error) { this.failed = true; this.renderPending = false; }
   }
 

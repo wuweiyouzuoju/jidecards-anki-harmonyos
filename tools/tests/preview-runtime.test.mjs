@@ -11,7 +11,7 @@ import { buildPreviewInteractionScript } from '../../entry/src/main/ets/model/Pr
 import { renderPreviewAnswer } from '../../entry/src/main/ets/model/StudyAnswerRenderer.ts';
 import { coreTyping } from './core-rendering-harness.mjs';
 import { readCardMarking, parseFlagLabels } from '../../entry/src/main/ets/model/CardMarking.ts';
-import { 构建卡片HTML, 剥除拼写标记, 原始侧HTML } from '../../entry/src/main/ets/model/学习卡片HTML构建器.ts';
+import { 构建卡片HTML, 剥除拼写标记, 原始侧HTML, appendCardScript } from '../../entry/src/main/ets/model/学习卡片HTML构建器.ts';
 
 const read = path => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 const source = read('entry/src/main/ets/components/browser/卡片预览页.ets');
@@ -36,10 +36,10 @@ const methods = names.map(name => {
   assert.ok(start >= 0, name);
   return source.slice(start, source.indexOf('\n  }', start) + 4);
 });
-const Page = new Function('构建卡片HTML', '剥除拼写标记', '原始侧HTML', '媒体基地址',
+const Page = new Function('构建卡片HTML', '剥除拼写标记', '原始侧HTML', '媒体基地址', 'appendCardScript',
   '解码文件名', 'buildPreviewInteractionScript', 'renderPreviewAnswer', 'readCardMarking', 'parseFlagLabels', '$r', 'actionIcon', 'PreviewActionProxy', 'console', 'reviewPreferences',
   stripTypeScriptTypes(`class Page {${methods.join('\n')}}`, { mode: 'transform' }) + '\nreturn Page;')(
-  构建卡片HTML, 剥除拼写标记, 原始侧HTML, 'https://jidecards-media.local/',
+  构建卡片HTML, 剥除拼写标记, 原始侧HTML, 'https://jidecards-media.local/', appendCardScript,
   name => { try { return decodeURIComponent(name); } catch { return name; } },
   buildPreviewInteractionScript, renderPreviewAnswer, readCardMarking, parseFlagLabels, key => key,
   loadPlatformModule('utils/ActionIcons.ets', 'actionIcon', { $r: key => key }),
