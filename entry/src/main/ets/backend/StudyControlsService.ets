@@ -6,6 +6,8 @@ import { STUDY_CONTROLS_KEY, defaultStudyControls, validateStudyControls } from 
 import type { StudyControls } from '../model/StudyControls';
 import { StudyScreenAwakeSession } from '../model/StudyScreenAwakeSession';
 import { readLocalPreference, saveLocalPreference } from '../utils/LocalPreferenceWrite';
+import { SIMPLE_MODE_KEY } from '../model/AppLayoutState';
+import { assertStudyGestureEdit } from '../model/StudyGestureConfig';
 
 function context(): common.UIAbilityContext {
   const value: common.UIAbilityContext | undefined = AppStorage.get<common.UIAbilityContext>('abilityContext');
@@ -30,9 +32,14 @@ export async function loadStudyControls(): Promise<void> {
 /** @throws {Error} 共用保存队列拒绝陈旧提案，区分未确认保存与已保存但未应用。 */
 export async function saveStudyControls(after: StudyControls, expected: StudyControls): Promise<StudyControls> {
   const next: StudyControls = validateStudyControls(after);
-  const before: string = JSON.stringify(validateStudyControls(expected));
+  const previous: StudyControls = validateStudyControls(expected);
+  assertStudyGestureEdit(previous.gestureConfig, next.gestureConfig, AppStorage.get<boolean>(SIMPLE_MODE_KEY) !== false);
+  const before: string = JSON.stringify(previous);
   const store = await preferences.getPreferences(context(), 'jidecards_preferences');
-  await saveLocalPreference(store, STUDY_CONTROLS_KEY, JSON.stringify(next), JSON.stringify(defaultStudyControls()), before);
+  await saveLocalPreference(store, STUDY_CONTROLS_KEY, JSON.stringify(next), JSON.stringify(defaultStudyControls()), before,
+    (): void => {}, (): void => {
+      assertStudyGestureEdit(previous.gestureConfig, next.gestureConfig, AppStorage.get<boolean>(SIMPLE_MODE_KEY) !== false);
+    });
   return next;
 }
 export function createStudyScreenAwake(): StudyScreenAwakeSession {

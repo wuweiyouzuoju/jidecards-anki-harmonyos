@@ -1,3 +1,5 @@
+import { assertStudyGestureEdit } from '../../entry/src/main/ets/model/StudyGestureConfig.ts';
+import { SIMPLE_MODE_KEY } from '../../entry/src/main/ets/model/AppLayoutState.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -36,7 +38,7 @@ test('real study preference service serializes saves, rejects stale state and re
  const local=localPreferenceApi(AppStorage);
  const prefs={getSync:(_key,fallback)=>saved??fallback,putSync:(_key,value)=>{saved=value;},flush:async()=>{if(failFlush)throw Error('disk');}};
  const api=loadPlatformModule('backend/StudyControlsService.ets','({readStudyControls,loadStudyControls,saveStudyControls})',{
-  AppStorage,preferences:{getPreferences:async()=>prefs},STUDY_CONTROLS_KEY,defaultStudyControls,validateStudyControls,
+  assertStudyGestureEdit,SIMPLE_MODE_KEY,AppStorage,preferences:{getPreferences:async()=>prefs},STUDY_CONTROLS_KEY,defaultStudyControls,validateStudyControls,
   ...local
  });
  const before=await api.readStudyControls(),after={...before,keepScreenOn:true};

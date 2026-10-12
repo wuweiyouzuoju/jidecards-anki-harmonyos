@@ -23,8 +23,10 @@ export function readLocalPreference(store: preferences.Preferences, key: string,
 /** @throws {Error} 过期提案或读写失败交给调用方；已接受的写入不依赖页面生命周期。 */
 export function saveLocalPreference(store: preferences.Preferences, key: string,
   value: preferences.ValueType, fallback: preferences.ValueType,
-  expected: preferences.ValueType | null = null, onApplied: () => void = (): void => {}): Promise<void> {
+  expected: preferences.ValueType | null = null, onApplied: () => void = (): void => {},
+  beforeWrite: () => void = (): void => {}): Promise<void> {
   const work: Promise<void> = saving.then(async (): Promise<void> => {
+    beforeWrite();
     const previous: preferences.ValueType = store.getSync(key, fallback);
     if (typeof previous !== typeof fallback) { throw new Error('invalid_saved_setting:' + key); }
     if (expected !== null && previous !== expected) { throw new Error('setting_changed_since_proposal'); }
