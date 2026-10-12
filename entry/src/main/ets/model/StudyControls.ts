@@ -2,6 +2,8 @@
 import type { StudyInputCommand } from './StudyInputPolicy';
 import { defaultStudyKeyboard, normalizeStudyChord, validateStudyKeyboard, studyKeyboardCommand } from './StudyKeyboard';
 import type { StudyKeyboard, StudyKeyBinding } from './StudyKeyboard';
+import { validateStudyGestureConfig } from './StudyGestureConfig';
+import type { StudyGestureConfig } from './StudyGestureConfig';
 
 export const STUDY_CONTROLS_KEY: string = 'studyControls';
 export interface StudyCommandMapping { input: string; command: StudyInputCommand; }
@@ -11,6 +13,7 @@ export interface StudyControls {
   keys: StudyCommandMapping[];
   gestures: StudyCommandMapping[];
   keyboard?: StudyKeyboard;
+  gestureConfig?: StudyGestureConfig;
 }
 export function defaultStudyControls(): StudyControls {
   return { keepScreenOn: false, gestureMode: 'inherit', keys: [], gestures: [] };
@@ -31,7 +34,7 @@ function mappings(items: StudyCommandMapping[], inputs: string[]): StudyCommandM
 /** 旧 keys 是默认键位的覆盖；新 keyboard 是完整绑定，空数组表示全部禁用。 */
 export function validateStudyControls(value: StudyControls): StudyControls {
   if (value === null || typeof value !== 'object' ||
-    Object.keys(value).some((key: string): boolean => !['keepScreenOn', 'gestureMode', 'keys', 'gestures', 'keyboard'].includes(key)) ||
+    Object.keys(value).some((key: string): boolean => !['keepScreenOn', 'gestureMode', 'keys', 'gestures', 'keyboard', 'gestureConfig'].includes(key)) ||
     typeof value.keepScreenOn !== 'boolean' || !['inherit', 'off', 'gestures', 'tap_zones'].includes(value.gestureMode)) {
     throw new Error('invalid_study_controls');
   }
@@ -41,6 +44,7 @@ export function validateStudyControls(value: StudyControls): StudyControls {
     if (result.keys.length !== 0) throw new Error('ambiguous_study_keyboard');
     result.keyboard = validateStudyKeyboard(value.keyboard);
   }
+  if (value.gestureConfig !== undefined) result.gestureConfig = validateStudyGestureConfig(value.gestureConfig);
   return result;
 }
 export function effectiveStudyKeyboard(controls: StudyControls): StudyKeyboard {
