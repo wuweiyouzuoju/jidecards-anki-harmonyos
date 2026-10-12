@@ -1,3 +1,5 @@
+import { completeStudyGestures, studyGestureCommand, StudyShakeDetector } from '../../entry/src/main/ets/model/StudyGestureConfig.ts';
+import { validateStudyControls } from '../../entry/src/main/ets/model/StudyControls.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
 import { actionMenuRows, visibleActionMenuRows, toggleActionMenuBranch } from '../../entry/src/main/ets/components/common/ActionMenuTree.ts';
@@ -15,7 +17,9 @@ export function appInterfaceDependencies() {
   const flagMenuChoices = loadPlatformModule('components/common/FlagMenuChoices.ets', 'flagMenuChoices', {
     CARD_FLAGS, customFlagLabel, $r: key => key, namedResourceText: (_context, key) => 'app.string.' + key
   });
-  return { agentOperationHosts:new AgentOperationHosts(), appInterface: new AppInterfaceTracker(), FEEDBACK_ACTIONS, resultUndoStatus, OFFICIAL_ANNOUNCEMENTS_ENABLED, visibleInterfaceItems, studyInterfaceMenu, actionMenuRows, visibleActionMenuRows, toggleActionMenuBranch,
+  return { completeStudyGestures, studyGestureCommand, validateStudyControls,
+    StudyShakeSensor: loadPlatformModule('backend/StudyShakeSensor.ets', 'StudyShakeSensor', { StudyShakeDetector, sensor: {SensorId:{ACCELEROMETER:1},on(){},off(){},getSingleSensorSync(){} } }),
+    agentOperationHosts:new AgentOperationHosts(), appInterface: new AppInterfaceTracker(), FEEDBACK_ACTIONS, resultUndoStatus, OFFICIAL_ANNOUNCEMENTS_ENABLED, visibleInterfaceItems, studyInterfaceMenu, actionMenuRows, visibleActionMenuRows, toggleActionMenuBranch,
     $r: key => key, CARD_FLAGS, customFlagLabel, flagMenuChoices,
     actionIcon: loadPlatformModule('utils/ActionIcons.ets', 'actionIcon', { $r: key => key }),
     namedResourceText: (_context, key) => 'app.string.' + key, BURY_SUSPEND_MODE_BURY_USER, BURY_SUSPEND_MODE_SUSPEND };
@@ -30,7 +34,10 @@ export function noteInterfaceDependencies() {
 }
 
 export function studyInterfaceMethods(source) {
-  return ['更多菜单', 'flagMenuItems', 'toggleStudyMenuBranch', 'studyMenuEntry', 'studyMenuIcon', 'interfaceMenuItems', 'executeMenuAction', 'publishInterface', 'publishStudyMenu'].map(name => {
+  const controlsField = source.match(/private controlsJson: string =\r?\n[^\n]+/)[0];
+  const sensorField = source.match(/private shakeSensor: StudyShakeSensor[^\n]+/)[0];
+  const controlsMethod = source.match(/  private controls\(\)[^\n]+/)[0];
+  return controlsField + '\n' + sensorField + '\n' + controlsMethod + '\n' + ['updateShakeSensor', 'studyGestureBlocked', '更多菜单', 'flagMenuItems', 'toggleStudyMenuBranch', 'studyMenuEntry', 'studyMenuIcon', 'interfaceMenuItems', 'executeMenuAction', 'publishInterface', 'publishStudyMenu'].map(name => {
     const start = source.indexOf('  private ' + name + '(');
     assert.ok(start >= 0, name);
     return source.slice(start, source.indexOf('\n  }', start) + 4);

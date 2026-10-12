@@ -444,13 +444,13 @@ function pageMethods(file,names,deps) {
   const source=read(file).replaceAll('\r\n','\n');
   const methods=names.map(name=>{const start=source.indexOf('  private '+name+'(');assert.ok(start>=0,name);
     return source.slice(start,source.indexOf('\n  }',start)+4);});
-  return new Function(...Object.keys(deps),stripTypeScriptTypes('class Page {'+methods.join('\n')+'}',{mode:'transform'})+';return Page;')(...Object.values(deps));
+  return new Function(...Object.keys(deps),stripTypeScriptTypes('class Page {'+(file==='pages/学习页.ets'?studyInterfaceMethods(source):'')+methods.join('\n')+'}',{mode:'transform'})+';return Page;')(...Object.values(deps));
 }
 
-test('study UI preserves actions and JIDE observes replaced groups and the real Back control', () => {
+test('study UI and JIDE keep both side groups while flags cover the main menu', () => {
   const tracker=new AppInterfaceTracker();
   const deps=appInterfaceDependencies();
-  const Page=pageMethods('pages/学习页.ets',['interfaceMenuItems','更多菜单','flagMenuItems','toggleStudyMenuBranch','studyMenuEntry','studyMenuIcon','executeMenuAction','publishInterface','publishStudyMenu'],{
+  const Page=pageMethods('pages/学习页.ets',['openStudyMenu'],{
     ...deps, appInterface:tracker,namedResourceText:(_,key)=>localize(key),
     flagMenuChoices:loadPlatformModule('components/common/FlagMenuChoices.ets','flagMenuChoices',{
       ...deps, customFlagLabel:(labels,flag)=>labels[String(flag)]??'', namedResourceText:(_,key)=>localize(key)}),
@@ -471,28 +471,36 @@ test('study UI preserves actions and JIDE observes replaced groups and the real 
   for(const item of page.更多菜单()) { for(const action of item.children??[item]) action.action(); }
   assert.deepEqual(calls,['edit','agent','undo','mark','flag','audio','bury','suspend','delete','auto_advance','handwrite','guide']);
   assert.equal(page.flagNamesOpen,true);
+  Object.assign(page,{timeboxNotice:null,clearChoiceAutoAdvance:()=>{}});
+  page.openStudyMenu();page.publishInterface();
+  assert.deepEqual(page.studyExpandedIds,['marking','card_actions']);
+  assert.deepEqual(tracker.snapshot().filter(x=>x.surface!=='study').map(x=>x.surface).sort(),
+    ['study_card_actions','study_marking','study_more'],'JIDE sees both groups immediately when the real menu opens');
   for(const [expanded,surfaces] of [
     [[],['study_more']],
     [['marking','card_actions'],['study_more','study_marking','study_card_actions']],
-    [['marking','card_actions','flag'],['study_more','study_card_actions','study_flags']]]) {
+    [['marking','card_actions','flag'],['study_marking','study_card_actions','study_flags']]]) {
     page.studyExpandedIds=expanded;page.publishInterface();
     const menus=tracker.snapshot().filter(x=>x.surface!=='study');
     assert.deepEqual(menus.map(x=>x.surface).sort(),surfaces.sort());
     for(const surface of surfaces) {
       const observed=buildAgentAppStructure(context,surface,'',localize,[],[],tracker.snapshot(),'study');
       assert.ok(observed.surfaces[0].items.every(x=>x.visibility==='observed'));
-      assert.equal(observed.surfaces[0].items.some(x=>x.id==='back'),surface==='study_flags');
+      assert.equal(observed.surfaces[0].items.some(x=>x.id==='back'),false,'flag overlays add no return control');
       if(surface==='study_flags') {
-        assert.deepEqual(menus.find(x=>x.surface===surface).optionIds,['back','0','1','2','3','4','5','6','7']);
+        assert.deepEqual(menus.find(x=>x.surface===surface).optionIds,['0','1','2','3','4','5','6','7']);
         const purple=observed.surfaces[0].items.find(x=>x.id==='7');
         assert.equal(purple.title,'Custom purple');assert.equal(purple.selected,true);
       }
     }
   }
   assert.deepEqual(tracker.snapshot().filter(x=>x.surface!=='study').map(x=>x.surface).sort(),
-    ['study_card_actions','study_flags','study_more'],'colors replace Marking and keep primary actions visible');
+    ['study_card_actions','study_flags','study_marking'],'colors cover the main menu and keep both side groups visible');
   page.评分中=true;page.publishInterface();
   assert.ok(tracker.snapshot().filter(x=>x.surface!=='study').every(x=>x.items.every(item=>!item.enabled)),'all visible actions are disabled consistently while busy');
+  page.studyExpandedIds=['marking','card_actions'];page.publishInterface();
+  assert.deepEqual(tracker.snapshot().filter(x=>x.surface!=='study').map(x=>x.surface).sort(),
+    ['study_card_actions','study_marking','study_more'],'closing colors restores the main observation without closing either group');
   let result=buildAgentAppStructure(context,'study_more','',localize,[],[],tracker.snapshot());
   assert.equal(result.surfaces[0].items.find(x=>x.id==='edit').enabled,false);
   page.阶段='done';page.publishInterface();result=buildAgentAppStructure(context,'study_more','',localize,[],[],tracker.snapshot());
