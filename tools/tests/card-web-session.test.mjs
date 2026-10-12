@@ -17,7 +17,7 @@ test('default text follows the composed surface after hooks and resets on every 
   const document = {
     documentElement: {},
     createElement: () => ({getContext: () => context}),
-    body: { className: 'card nightMode', getBoundingClientRect() {},
+    body: { childNodes: [qa], className: 'card nightMode', getBoundingClientRect() {},
       classList: {contains: name => document.body.className.split(' ').includes(name)},
       style: {setProperty: (name, value) => {assert.equal(name, '--jide-card-default-text'); color = value;}} },
     querySelectorAll: () => [], getElementById: id => id === 'qa' ? qa : null
@@ -57,7 +57,7 @@ test('rejected template hooks report a failed render instead of acknowledging an
     let load, acknowledge;
     const qa = {innerHTML: '', querySelectorAll: () => []};
     const document = {createElement: () => ({getContext: () => null}),
-      body: {className: 'card', getBoundingClientRect() {}}, querySelectorAll: () => [],
+      body: {childNodes: [qa], className: 'card', getBoundingClientRect() {}}, querySelectorAll: () => [],
       getElementById: id => id === 'qa' ? qa : null};
     const window = {scrollTo() {}, addEventListener: (_event, callback) => {load = callback;},
       requestAnimationFrame: callback => setImmediate(callback),
@@ -91,7 +91,7 @@ test('renderer starts unanchored answers at the top and preserves answer anchors
       const qa = { innerHTML: '', querySelectorAll: () => [] };
       const document = {
         createElement: () => ({ getContext: () => null }),
-        body: { className: 'card', scrollHeight: 3200, getBoundingClientRect() {} },
+        body: { childNodes: [qa], className: 'card', scrollHeight: 3200, getBoundingClientRect() {} },
         querySelectorAll: () => [],
         getElementById: id => id === 'qa' ? qa : id === 'answer' && scenario.anchored
           ? { scrollIntoView: options => scrolls.push(['anchor', options.block]) } : null
@@ -182,8 +182,9 @@ test('only the current completed surface publishes a validated opaque background
 test('render acknowledgement waits for two animation frames after asynchronous hooks', async () => {
   const frames = [], acknowledgements = [];
   let load;
+  const qa = {};
   const document = { createElement: () => ({ getContext: () => null }),
-    getElementById: () => ({}), body: { getBoundingClientRect() {} }, querySelectorAll: () => [] };
+    getElementById: id => id === 'qa' ? qa : null, body: { childNodes: [qa], getBoundingClientRect() {} }, querySelectorAll: () => [] };
   const window = { addEventListener: (_event, callback) => { load = callback; }, scrollTo() {},
     requestAnimationFrame: callback => frames.push(callback),
     jideCardRuntime: { onRendered: (...args) => acknowledgements.push(args) } };
@@ -199,8 +200,9 @@ test('elapsed time cannot acknowledge a spare Web before both content frames arr
   const frames = [], timers = [], acknowledgements = [];
   let load, releaseHook, layouts = 0;
   const hook = new Promise(resolve => { releaseHook = resolve; });
-  const document = { createElement: () => ({ getContext: () => null }), getElementById: () => ({}),
-    body: { getBoundingClientRect() { layouts++; } }, querySelectorAll: () => [] };
+  const qa = {};
+  const document = { createElement: () => ({ getContext: () => null }), getElementById: id => id === 'qa' ? qa : null,
+    body: { childNodes: [qa], getBoundingClientRect() { layouts++; } }, querySelectorAll: () => [] };
   const window = { addEventListener: (_event, callback) => { load = callback; }, scrollTo() {},
     requestAnimationFrame: callback => frames.push(callback),
     jideCardRuntime: { onRendered: (...args) => acknowledgements.push(args) } };

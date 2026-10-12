@@ -6,6 +6,7 @@ import { loadPlatformModule, loadComponentLogic } from './platform-module-harnes
 import { prepareNoteImageFields } from '../../entry/src/main/ets/model/NoteImageDraft.ts';
 import { prepareNoteAudioFields } from '../../entry/src/main/ets/model/NoteAudioDraft.ts';
 import { assertNoteMediaResolved } from '../../entry/src/main/ets/model/NoteMediaParts.ts';
+import { appendCardScript } from '../../entry/src/main/ets/model/学习卡片HTML构建器.ts';
 
 function adapter({shortWrite=false}={}) {
   const files=new Map(),open=new Map(),calls=[];let fd=0;
@@ -56,7 +57,7 @@ test('draft Web and sound requests route owned cache files and stop playback whe
   const Preview=loadComponentLogic('components/settings/NotetypeTemplatePreview.ets','NotetypeTemplatePreview',{
     APP_FOREGROUND_KEY:'foreground',webview:{WebviewController:class{}},
     reviewPreferences:{read:async()=>({hideAudioPlayButtons:false})}, $r:key=>key,
-    原始侧HTML:(_rendered,side)=>side, resourceText:()=> 'Play audio', buildPreviewInteractionScript:()=>'',
+    原始侧HTML:(_rendered,side)=>side, resourceText:()=> 'Play audio', buildPreviewInteractionScript:()=>'', appendCardScript,
     AppStorage:{get:()=>({filesDir:'/files'})},媒体基地址:'https://anki.local/',
     CardWebView:class {reset(){resets++;}setAudioEnabled(){}setTheme(){}},卡片渲染服务:class{},声音播放器:class{},TTS播放器:class{},
     CardAudioSession:class {constructor(_sound,_tts,_extract,path){this.path=path;}stop(){stops++;}async release(){releases++;}}
@@ -81,7 +82,7 @@ test('draft preview waits for both Web controllers, retains same-card flips and 
   const Preview=loadComponentLogic('components/settings/NotetypeTemplatePreview.ets','NotetypeTemplatePreview',{
     APP_FOREGROUND_KEY:'foreground',webview:{WebviewController:class{}},
     reviewPreferences:{read:async()=>({hideAudioPlayButtons:false})}, $r:key=>key,
-    原始侧HTML:(_rendered,side)=>side, resourceText:()=> 'Play audio', buildPreviewInteractionScript:()=>'',
+    原始侧HTML:(_rendered,side)=>side, resourceText:()=> 'Play audio', buildPreviewInteractionScript:()=>'', appendCardScript,
     AppStorage:{get:()=>({filesDir:'/files'})},
     构建卡片HTML:(_rendered,side)=>side,剥除拼写标记:value=>value,
     CardWebView:class {

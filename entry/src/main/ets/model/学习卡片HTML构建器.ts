@@ -387,6 +387,13 @@ export function applyCardTheme(html: string, isDark: boolean): string {
       `<body class="card${isDark ? ' nightMode night_mode' : ''}">`);
 }
 
+const CARD_CONTENT_END: string = '<template id="jide-card-content-end"></template>';
+
+/** 预览等宿主脚本属于当前卡面；必须放在边界内，不能被误当作文档运行时缓存。 */
+export function appendCardScript(html: string, script: string): string {
+  return html.replace(CARD_CONTENT_END, (): string => `<script>${script}</script>${CARD_CONTENT_END}`);
+}
+
 export function 构建卡片HTML(渲染结果: RenderedCard, 侧面: 卡片正反面, isDark: boolean = false,
   cardBackground: string = isDark ? '#18202B' : '#FFFFFF', hideAudioButtons: boolean = false,
   audioLabel: string = 'Play audio'): string {
@@ -408,7 +415,7 @@ ${mathScripts}
 ${可折叠字段脚本}
 </head>
 <body class="card${isDark ? ' nightMode night_mode' : ''}"><div id="qa"><style>${渲染结果.css}</style>
-<style>${样式}</style>${正文}</div></body>
+<style>${样式}</style>${正文}${CARD_CONTENT_END}</div></body>
 </html>`;
 }
 

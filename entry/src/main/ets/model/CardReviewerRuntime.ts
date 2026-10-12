@@ -78,7 +78,40 @@ export const CARD_REVIEWER_RUNTIME: string = String.raw`
     document.documentElement.setAttribute('data-bs-theme', parsed.documentElement.getAttribute('data-bs-theme'));
     document.body.style.removeProperty('--jide-card-default-text');
   }
+  function cardContainer(doc) {
+    var qa = doc.getElementById('qa');
+    if (!qa) throw new Error('Missing card content container');
+    var nodes = Array.from(doc.body.childNodes);
+    // Only nodes through the builder's end marker belong to this side. MathJax and other
+    // document runtimes can append persistent caches after it; do not move or delete them.
+    var end = doc.getElementById('jide-card-content-end');
+    if (end && qa.contains(end)) return qa;
+    if (end) {
+      while (end.parentNode && end.parentNode !== doc.body) end = end.parentNode;
+      var index = nodes.indexOf(end);
+      if (index >= 0) nodes = nodes.slice(0, index + 1);
+    }
+    if (nodes.every(function (node) {
+      return node === qa || (node.nodeType === 3 && !node.textContent.trim());
+    })) return qa;
+    // Imported HTML can close #qa early. The marked prefix still belongs to this side.
+    // Move existing nodes to preserve initial script state; valid wrappers remain untouched.
+    var content = doc.createDocumentFragment();
+    function collect(node) {
+      if (node === qa) {
+        while (qa.firstChild) content.appendChild(qa.firstChild);
+      } else if (node.nodeType === 1 && node.contains(qa)) {
+        // A template script may wrap #qa before the parser repairs the trailing HTML.
+        // Retain that ancestor instead of trying to insert it into its own descendant.
+        Array.from(node.childNodes).forEach(collect);
+      } else content.appendChild(node);
+    }
+    nodes.forEach(collect);
+    qa.appendChild(content);
+    return qa;
+  }
   async function finish(side, scrollToAnswer, initial) {
+    cardContainer(document);
     await hooks(window.onUpdateHook);
     if (window.MathJax && MathJax.startup && MathJax.startup.promise) {
       await MathJax.startup.promise;
@@ -126,9 +159,8 @@ export const CARD_REVIEWER_RUNTIME: string = String.raw`
       revision = version;
       (async function () {
         var parsed = new DOMParser().parseFromString(html, 'text/html');
-        var next = parsed.getElementById('qa');
-        var qa = document.getElementById('qa');
-        if (!qa || !next) throw new Error('Missing card content container');
+        var next = cardContainer(parsed);
+        var qa = cardContainer(document);
         document.querySelectorAll('audio,video').forEach(function (media) { media.pause(); });
         if (window.MathJax && MathJax.typesetClear) MathJax.typesetClear([qa]);
         window.onUpdateHook.length = 0;
