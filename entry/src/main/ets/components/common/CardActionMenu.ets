@@ -7,7 +7,7 @@ import { AnchoredMenuItem } from './MenuItem';
 import { MenuSlideScope } from '../../model/MenuSlideSession';
 import { ActionMenuNode, ActionMenuRow, actionMenuRows, visibleActionMenuRows } from './ActionMenuTree';
 import { ActionMenuAnchor, ActionMenuBubble, ActionMenuPointerSide, AnchoredActionMenuPlacement, ActionMenuPanelPlacement, actionMenuGroupInset, placeActionMenuGroups,
-  placeAnchoredActionMenu } from './ActionMenuLayout';
+  placeAnchoredActionMenu, placeActionMenuOverlay } from './ActionMenuLayout';
 import { MenuBubble } from './MenuBubble';
 import { MenuSurface } from './MenuSurface';
 import { cardViewportWidth } from '../../model/CardViewportLayout';
@@ -28,7 +28,7 @@ export interface CardActionMenuEntry extends ActionMenuNode {
   children?: CardActionMenuEntry[];
 }
 
-/** 右侧主菜单与左侧子面板共用滚动；深层列表替换子面板，始终不覆盖主菜单。 */
+/** 两个侧面板保持位置；深层列表朝主菜单方向覆盖，尖角对齐侧面板内的触发行。 */
 @Component
 export struct CardActionMenu {
   private readonly slideScope: MenuSlideScope = new MenuSlideScope();
@@ -61,13 +61,6 @@ export struct CardActionMenu {
   private rowItem(row: ActionMenuRow): CardActionMenuEntry { return row.node as CardActionMenuEntry; }
 
   private selectEntry(row: ActionMenuRow): void {
-    const backGroup: CardActionMenuEntry | undefined = this.sideGroups().find((group: CardActionMenuEntry): boolean =>
-      row.key === `${this.groupBranch(group)?.key}/back`);
-    if (backGroup !== undefined) {
-      const branch: ActionMenuRow | undefined = this.groupBranch(backGroup);
-      if (branch !== undefined && branch.enabled) this.onToggleBranch(this.rowItem(branch));
-      return;
-    }
     const current: ActionMenuRow | undefined = visibleActionMenuRows(this.items, this.expandedIds)
       .find((item: ActionMenuRow): boolean => item.key === row.key);
     if (current === undefined || !current.enabled) return;
@@ -110,11 +103,6 @@ export struct CardActionMenu {
     this.measuredHeights = [...this.measuredHeights.filter((entry: MenuMeasuredHeight): boolean => entry.id !== id), { id: id, height: height }];
   }
 
-  private groupBranch(group: CardActionMenuEntry): ActionMenuRow | undefined {
-    return this.rows().find((row: ActionMenuRow): boolean => row.depth === 1 && row.key.startsWith(`/${group.id}/`) &&
-      row.node.children !== undefined && this.expandedIds.includes(row.node.id ?? ''));
-  }
-
   private groupsOnRight(): boolean {
     if (this.anchor === undefined || this.sideGroups().length === 0) return false;
     const left: number = this.anchor.left + (this.anchor.width + this.primaryWidth()) / 2 - this.totalWidth();
@@ -122,24 +110,18 @@ export struct CardActionMenu {
   }
 
   private groupRows(group: CardActionMenuEntry): ActionMenuRow[] {
-    const branch: ActionMenuRow | undefined = this.groupBranch(group);
-    if (branch === undefined) {
-      return this.rows().filter((row: ActionMenuRow): boolean => row.depth === 1 && row.key.startsWith(`/${group.id}/`));
-    }
-    const back: CardActionMenuEntry = { id: 'back', value: $r('app.string.menu_back_to_parent'),
-      icon: $r('app.media.ic_common_arrow_left'), divider: false };
-    const rows: ActionMenuRow[] = [{ node: back, key: `${branch.key}/back`, depth: 2, enabled: branch.enabled }];
-    return rows.concat(
-      this.rows().filter((row: ActionMenuRow): boolean => row.depth === 2 && row.key.startsWith(`${branch.key}/`)));
+    return this.rows().filter((row: ActionMenuRow): boolean => row.depth === 1 && row.key.startsWith(`/${group.id}/`));
   }
 
-  private groupHeightId(group: CardActionMenuEntry): string {
-    return this.groupBranch(group)?.key ?? group.id ?? '';
+  private popupRows(): ActionMenuRow[] {
+    const branch: ActionMenuRow | undefined = this.nestedBranch();
+    if (branch === undefined) return [];
+    return this.rows().filter((row: ActionMenuRow): boolean => row.depth === 2 && row.key.startsWith(`${branch.key}/`));
   }
 
   private groupHeights(): number[] {
     return this.sideGroups().map((group: CardActionMenuEntry): number =>
-      this.heightOf(this.groupHeightId(group), this.groupRows(group).length * 应用尺寸.menuItemHeight));
+      this.heightOf(group.id ?? '', this.groupRows(group).length * 应用尺寸.menuItemHeight));
   }
 
   private placements(): ActionMenuPanelPlacement[] {
@@ -160,7 +142,7 @@ export struct CardActionMenu {
       this.expandedIds.includes(row.node.id ?? ''));
   }
 
-  private layoutHeight(): number {
+  private baseHeight(): number {
     let height: number = this.items.reduce((sum: number, _item: CardActionMenuEntry, index: number): number =>
       sum + (this.rowHeights[index] ?? 应用尺寸.menuItemHeight), 0);
     const heights: number[] = this.groupHeights();
@@ -168,6 +150,42 @@ export struct CardActionMenu {
       height = Math.max(height, placement.top + heights[index]);
     });
     return height;
+  }
+
+  private popupHeight(): number {
+    return this.heightOf(this.popupHeightId(), this.popupRows().length * 应用尺寸.menuItemHeight);
+  }
+
+  private popupHeightId(): string {
+    return `${this.nestedBranch()?.key ?? ''}/popup`;
+  }
+
+  private popupPlacement(): ActionMenuPanelPlacement | undefined {
+    const branch: ActionMenuRow | undefined = this.nestedBranch();
+    if (branch === undefined) return undefined;
+    const groups: CardActionMenuEntry[] = this.sideGroups();
+    const groupIndex: number = groups.findIndex((group: CardActionMenuEntry): boolean => branch.key.startsWith(`/${group.id}/`));
+    if (groupIndex < 0) return undefined;
+    const rows: ActionMenuRow[] = this.groupRows(groups[groupIndex]);
+    const rowIndex: number = rows.findIndex((row: ActionMenuRow): boolean => row.key === branch.key);
+    const heights: number[] = rows.map((row: ActionMenuRow): number => this.heightOf(row.key, 应用尺寸.menuItemHeight));
+    const triggerCenter: number = this.placements()[groupIndex].top +
+      actionMenuGroupInset(heights, rowIndex, 0, 应用尺寸.menuItemHeight);
+    return placeActionMenuOverlay(triggerCenter, this.popupHeight(), this.baseHeight(),
+      应用尺寸.radiusLg + MenuSurface.pointerSpan / 2 + 0.5);
+  }
+
+  private popupX(): number {
+    return this.groupsOnRight() ? 0 : this.totalWidth() - this.primaryWidth() - MenuSurface.pointerDepth;
+  }
+
+  private popupPointerSide(): ActionMenuPointerSide {
+    return this.groupsOnRight() ? ActionMenuPointerSide.Right : ActionMenuPointerSide.Left;
+  }
+
+  private layoutHeight(): number {
+    const placement: ActionMenuPanelPlacement | undefined = this.popupPlacement();
+    return Math.max(this.baseHeight(), placement === undefined ? 0 : placement.top + this.popupHeight());
   }
 
   private anchoredPlacement(): AnchoredActionMenuPlacement | undefined {
@@ -210,7 +228,8 @@ export struct CardActionMenu {
   @Builder
   private menuRow(row: ActionMenuRow, index: number) {
     AnchoredMenuItem({ label: this.rowItem(row).value, slideScope: this.slideScope, slideLayer: row.depth,
-      available: row.enabled, divider: this.rowItem(row).divider ?? index > 0,
+      available: row.enabled && !(row.depth === 0 && this.nestedBranch() !== undefined),
+      divider: this.rowItem(row).divider ?? index > 0,
       icon: this.rowItem(row).icon, iconTint: this.rowItem(row).iconTint, labelAlignment: TextAlign.Start,
       selected: this.rowItem(row).selected === true,
       selectionUsesAccent: this.rowItem(row).selectionUsesAccent !== false,
@@ -230,12 +249,13 @@ export struct CardActionMenu {
             MenuBubble({ panelWidth: this.groupWidth(), pointerCenter: this.placements()[groupIndex].pointerCenter,
               pointerSide: this.groupsOnRight() ? ActionMenuPointerSide.Left : ActionMenuPointerSide.Right }) {
               ForEach(this.groupRows(group), (row: ActionMenuRow, index: number) => {
-                this.menuRow(row, index)
+                Column() { this.menuRow(row, index) }
+                  .onAreaChange((_old: Area, area: Area): void => { this.recordHeight(row.key, Number(area.height)); })
               }, (row: ActionMenuRow): string => `${row.key}-${row.enabled}-${this.rowItem(row).selected}`)
             }
           }
           .transition(MenuSurface.popupTransition(this.groupsOnRight() ? '0%' : '100%', this.placements()[groupIndex].pointerCenter))
-          .onAreaChange((_old: Area, area: Area): void => { this.recordHeight(this.groupHeightId(group), Number(area.height)); })
+          .onAreaChange((_old: Area, area: Area): void => { this.recordHeight(group.id ?? '', Number(area.height)); })
         }, (group: CardActionMenuEntry): string => group.id ?? '')
       }.width(this.groupWidth() + MenuSurface.pointerDepth)
     }
@@ -249,6 +269,7 @@ export struct CardActionMenu {
           .onAreaChange((_old: Area, area: Area): void => { this.recordRow(index, Number(area.height)); })
       }, (row: ActionMenuRow, index: number): string => `${row.key}-${index}-${row.enabled}-${this.rowItem(row).selected}`)
     }.width(this.primaryWidth()).attributeModifier(new MenuSurface(this.anchor === undefined))
+    .hitTestBehavior(this.nestedBranch() === undefined ? HitTestMode.Default : HitTestMode.None)
   }
 
   build() {
@@ -268,6 +289,18 @@ export struct CardActionMenu {
               this.primaryPanel()
             }
           }.alignItems(VerticalAlign.Top).width(this.totalWidth()).position({ x: 0, y: 0 })
+          if (this.popupPlacement() !== undefined) {
+            Column() {
+              MenuBubble({ panelWidth: this.primaryWidth(), pointerCenter: this.popupPlacement()!.pointerCenter,
+                pointerSide: this.popupPointerSide() }) {
+                ForEach(this.popupRows(), (row: ActionMenuRow, index: number) => {
+                  this.menuRow(row, index)
+                }, (row: ActionMenuRow): string => `${row.key}-${row.enabled}-${this.rowItem(row).selected}`)
+              }
+            }.position({ x: this.popupX(), y: this.popupPlacement()!.top }).zIndex(1)
+            .transition(MenuSurface.popupTransition(this.groupsOnRight() ? '100%' : '0%', this.popupPlacement()!.pointerCenter))
+            .onAreaChange((_old: Area, area: Area): void => { this.recordHeight(this.popupHeightId(), Number(area.height)); })
+          }
         }.width(this.totalWidth()).height(this.layoutHeight())
       }
     }.width('100%').height('100%')
