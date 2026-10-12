@@ -12,6 +12,8 @@ import type { StudyCommandMapping } from '../StudyControls';
 import { effectiveStudyKeyboard } from '../StudyControls';
 import type { StudyControls } from '../StudyControls';
 import { STUDY_KEYBOARD_ACTIONS, studyChordLabel } from '../StudyKeyboard';
+import { STUDY_GESTURE_INPUTS, STUDY_GESTURE_ACTIONS } from '../StudyGestureConfig';
+import type { StudyGestureConfig, StudyGestureBinding } from '../StudyGestureConfig';
 import type { StudyKeyBinding } from '../StudyKeyboard';
 import type { FsrsSimulationAction } from './AgentFsrsTools';
 import type { AgentDeckOptionsAction } from './AgentDeckOptionsTools';
@@ -145,6 +147,16 @@ export function maintenancePreviewRows(action: AgentAction, text: (key: string) 
     };
     rows.push({ title: text('agent_controls_keys'), before: keyboard(payload.before), after: keyboard(payload.after) });
     rows.push({ title: text('agent_controls_gestures'), before: mapped(payload.before.gestures), after: mapped(payload.after.gestures) });
+    const gestures = (config: StudyGestureConfig | undefined): string => {
+      if (config === undefined) return text('study_gesture_no_config');
+      return boolean(config.enabled) + ' · ' + text('study_gesture_' + config.tapLayout) + '\n' +
+        config.bindings.map((binding: StudyGestureBinding): string =>
+          text(STUDY_GESTURE_INPUTS.find((item): boolean => item.id === binding.input)?.titleKey ?? '') +
+          ' [' + (binding.input.startsWith('four_') ? text('study_gesture_four') : binding.input.startsWith('nine_') ? text('study_gesture_nine') : text('study_gesture_input')) +
+          '] · ' + text('study_keyboard_' + binding.side) + ' → ' +
+          text(STUDY_GESTURE_ACTIONS.find((item): boolean => item.id === binding.command)?.titleKey ?? '')).join('\n');
+    };
+    rows.push({ title: text('study_gesture_title'), before: gestures(payload.before.gestureConfig), after: gestures(payload.after.gestureConfig) });
   } else if (action.kind === 'export_subset') {
     const payload: ExportSubsetAction = JSON.parse(action.payloadJson) as ExportSubsetAction;
     rows.push({ title: text(payload.mode === 'notes' ? 'agent_export_notes' : 'agent_export_cards'), before: '', after: String(payload.ids.length) });

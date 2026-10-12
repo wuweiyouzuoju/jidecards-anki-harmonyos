@@ -1,3 +1,5 @@
+import { STUDY_GESTURE_INPUTS, STUDY_GESTURE_ACTIONS, completeStudyGestures, assertStudyGestureEdit, defaultStudyGestureConfig } from '../../entry/src/main/ets/model/StudyGestureConfig.ts';
+import { SIMPLE_MODE_KEY } from '../../entry/src/main/ets/model/AppLayoutState.ts';
 import { effectiveStudyKeyboard } from '../../entry/src/main/ets/model/StudyControls.ts';
 import { STUDY_KEYBOARD_ACTIONS } from '../../entry/src/main/ets/model/StudyKeyboard.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -26,7 +28,7 @@ import { defaultBrowserPreferences, browserPreferencePatch, updateBrowserPrefere
 import { BrowserColumnSorting } from '../../entry/src/main/ets/proto/messages/SearchMessages.ts';
 
 function fixture() {
-  const state = { writes:[], creates:[], exports:[], saved:true, controls:defaultStudyControls(), browserPreferences:defaultBrowserPreferences(),
+  const state = { simple:false, writes:[], creates:[], exports:[], saved:true, controls:defaultStudyControls(), browserPreferences:defaultBrowserPreferences(),
     note:{id:41,guid:'source',notetypeId:7,mtime:1,usn:0,tags:['source-tag'],fields:['Question <img src="existing.png">','Answer']},
     type:JSON.stringify({id:7,name:'Type',type:0,css:'keep',sortf:0,latexPre:'\\documentclass{article}',latexPost:'\\end{document}',latexsvg:true,
       flds:[{name:'Front',ord:0,id:91,rtl:false,font:'Arial',size:20,external:3},{name:'Back',ord:1,id:92}],tmpls:[{ord:0,name:'Card',qfmt:'{{Front}}',afmt:'{{Back}}'}],external:{keep:true}}),
@@ -64,7 +66,7 @@ function fixture() {
     saveBrowserPreferences:async(patch,expected)=>{assert.equal(JSON.stringify(state.browserPreferences),expected);if(state.browserWriteError)throw Error('disk');
       state.browserPreferences=updateBrowserPreferences(state.browserPreferences,patch);state.writes.push('browser');return state.browserPreferences;}};
   const dependencies={...browserDependencies,decodeMaintenanceArguments,collectionPreferenceEdits,agentRestoreStockKind,patchAgentNotetypeFields,patchAgentNotetypeLatex,createAgentAction,
-    validateStudyControls,effectiveStudyKeyboard,STUDY_KEYBOARD_ACTIONS,reviewPreferences,readStudyControls:async()=>structuredClone(state.controls),
+    STUDY_GESTURE_INPUTS,STUDY_GESTURE_ACTIONS,completeStudyGestures,assertStudyGestureEdit,SIMPLE_MODE_KEY,AppStorage:{get:key=>key===SIMPLE_MODE_KEY?state.simple:undefined},validateStudyControls,effectiveStudyKeyboard,STUDY_KEYBOARD_ACTIONS,reviewPreferences,readStudyControls:async()=>structuredClone(state.controls),
     笔记服务:Notes,卡片服务:Cards,笔记类型服务:Types,readAgentNotetypeImpact,readAgentExportSnapshot};
   const Registry=loadPlatformModule('backend/agent/AgentToolRegistry.ets','AgentToolRegistry',{
     toolRiskOf,parseAgentToolJsonObject,decodeAgentClarificationRequest,AgentApprovalRequired});
@@ -74,7 +76,7 @@ function fixture() {
   const call=(name,args)=>registry.execute({id:'call',name,argumentsJson:JSON.stringify(args)});
   const Executor=loadPlatformModule('backend/agent/AgentActionExecutor.ets','AgentActionExecutor',{
     ...browserDependencies,AgentActionLedger,牌组服务:Decks,笔记类型服务:Types,笔记服务:Notes,卡片服务:Cards,collectionPreferenceEdits,reviewPreferences,
-    readAgentExportSnapshot,saveStudyControls:async(after,before)=>{assert.equal(JSON.stringify(state.controls),JSON.stringify(before));state.writes.push('controls');state.controls=structuredClone(after);return after;},
+    readAgentExportSnapshot,saveStudyControls:async(after,before)=>{assertStudyGestureEdit(before.gestureConfig,after.gestureConfig,state.simple);assert.equal(JSON.stringify(state.controls),JSON.stringify(before));state.writes.push('controls');state.controls=structuredClone(after);return after;},
     AppStorage:{get:()=>({filesDir:'/sandbox'})},autoSyncScheduler:{beginOperation(){},endOperation(){}},syncActivity:{waitForCollection:async()=>{}},
     exportSubset:async(...args)=>{state.exports.push(args);return '/sandbox/approved.apkg';},完成导出:async()=>state.saved?'uri':null,
     LocalPreferenceWriteError:class extends Error{}});
@@ -177,6 +179,33 @@ test('JIDE reads and confirms the same complete keyboard bindings as manual sett
   const empty=(await f.call('propose_update_study_controls',{controlsJson:JSON.stringify({...defaultStudyControls(),keyboard:{version:1,bindings:[]}})})).action;
   f.executor.registerPending(empty);await f.executor.executeConfirmed(empty);
   assert.deepEqual(f.state.controls.keyboard.bindings,[]);
+});
+
+test('JIDE full gestures use the shared catalog, localized preview and experimental mode gate',async()=>{
+  const f=fixture();const config={...defaultStudyGestureConfig(),enabled:true,tapLayout:'nine',bindings:[
+    {input:'up',command:'replay',side:'both'},{input:'nine_center',command:'good',side:'answer'}]};
+  const read=JSON.parse((await f.call('get_advanced_settings',{group:'study'})).outputJson);
+  assert.deepEqual(read.gestureInputs,STUDY_GESTURE_INPUTS);assert.deepEqual(read.gestureActions,STUDY_GESTURE_ACTIONS);
+  assert.equal(read.gestureExperimentalOnly,true);assert.equal(read.gestureEditable,true);assert.equal(read.effectiveGestureConfig,null);
+  const after={...defaultStudyControls(),gestureConfig:config};
+  const action=(await f.call('propose_update_study_controls',{controlsJson:JSON.stringify(after)})).action;
+  assert.deepEqual(f.state.writes,[]);
+  for(const locale of ['base','en_US']) {
+    const labels=new Map(JSON.parse(readFileSync(new URL(`../../entry/src/main/resources/${locale}/element/string.json`,import.meta.url))).string.map(item=>[item.name,item.value]));
+    const rows=maintenancePreviewRows(action,key=>{assert.ok(labels.has(key),key);return labels.get(key);});
+    const row=rows.find(item=>item.title===labels.get('study_gesture_title'));
+    for(const key of ['study_gesture_up','study_gesture_nine','study_gesture_center','study_keyboard_answer','rating_good']) assert.ok(row.after.includes(labels.get(key)),key);
+  }
+  f.executor.registerPending(action);await f.executor.executeConfirmed(action);assert.deepEqual(f.state.controls.gestureConfig,config);
+  const staleMode=(await f.call('propose_update_study_controls',{controlsJson:JSON.stringify({...after,gestureConfig:{...config,enabled:false}})})).action;
+  f.executor.registerPending(staleMode);f.state.simple=true;
+  await assert.rejects(f.executor.executeConfirmed(staleMode),/experimental_only/);
+  assert.deepEqual(f.state.controls.gestureConfig,config);
+  const simple=JSON.parse((await f.call('get_advanced_settings',{group:'study'})).outputJson);
+  assert.equal(simple.gestureEditable,false);assert.equal(simple.effectiveGestureConfig,null);assert.deepEqual(simple.controls.gestureConfig,config);
+  await assert.rejects(f.call('propose_update_study_controls',{controlsJson:JSON.stringify({...after,gestureConfig:{...config,enabled:false}})}),/experimental_only/);
+  await assert.rejects(f.call('propose_update_study_controls',{controlsJson:JSON.stringify(defaultStudyControls())}),/experimental_only/);
+  assert.ok((await f.call('propose_update_study_controls',{controlsJson:JSON.stringify({...after,keepScreenOn:true})})).action);
 });
 
 test('duplicate notes stay draft-only, copy tags and media references, use new identity and reject a changed source', async () => {

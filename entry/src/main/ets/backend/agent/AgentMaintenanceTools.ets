@@ -10,6 +10,8 @@ import type { CollectionPreferencesAction, StudyControlsAction, ExportSubsetActi
 import type { ChangeDraft, DraftOperation } from '../../model/agent/AgentTypes';
 import { validateStudyControls, effectiveStudyKeyboard } from '../../model/StudyControls';
 import { STUDY_KEYBOARD_ACTIONS } from '../../model/StudyKeyboard';
+import { STUDY_GESTURE_INPUTS, STUDY_GESTURE_ACTIONS, completeStudyGestures, assertStudyGestureEdit } from '../../model/StudyGestureConfig';
+import { SIMPLE_MODE_KEY } from '../../model/AppLayoutState';
 import type { StudyControls } from '../../model/StudyControls';
 import { reviewPreferences } from '../ReviewPreferencesService';
 import { readStudyControls } from '../StudyControlsService';
@@ -77,6 +79,10 @@ export class AgentMaintenanceTools {
       const controls: StudyControls = await readStudyControls();
       return JSON.stringify({ scope: 'device', controls: controls,
       keyboardActions: STUDY_KEYBOARD_ACTIONS, effectiveKeyboard: effectiveStudyKeyboard(controls),
+      gestureInputs: STUDY_GESTURE_INPUTS, gestureActions: STUDY_GESTURE_ACTIONS,
+      gestureExperimentalOnly: true, gestureEditable: AppStorage.get<boolean>(SIMPLE_MODE_KEY) === false,
+      effectiveGestureConfig: completeStudyGestures(controls.gestureConfig, AppStorage.get<boolean>(SIMPLE_MODE_KEY) !== false) ?? null,
+      gestureFormat: 'gestureConfig:{version:1,enabled:boolean,tapLayout:"four"|"nine",bindings:[{input:"up",command:"replay",side:"both"}]}. Bindings replace the complete list, unbound/none inputs do nothing. four_* and nine_* bindings are stored separately. Ratings only on answer; flip only on question. Choice feedback preserves right-swipe continue. Scroll, editing, dialogs and whiteboard keep their input. Shake needs an available accelerometer and foreground study.',
       keyboardFormat: 'keyboard:{version:1,bindings:[{key:"ctrl+shift+f5",command:"replay",side:"both"}]}; keys must be [] when keyboard is present. Empty bindings disables all study shortcuts. Sides: question/answer/both. Exact Ctrl/Shift/Alt modifiers; raw device keys: code:N. Physical system Back remains owned by navigation.',
       screenAwakeEffect: 'Only the visible foreground study page borrows the window state; device support is not guaranteed.' });
     }
@@ -119,6 +125,7 @@ export class AgentMaintenanceTools {
     if (name === 'propose_update_study_controls') {
       const after: StudyControls = validateStudyControls(JSON.parse(args.controlsJson!) as StudyControls);
       const payload: StudyControlsAction = { before: await readStudyControls(), after: after };
+      assertStudyGestureEdit(payload.before.gestureConfig, after.gestureConfig, AppStorage.get<boolean>(SIMPLE_MODE_KEY) !== false);
       return createAgentAction('study_controls', JSON.stringify(payload));
     }
     if (name !== 'propose_export_subset') throw new Error('tool_unavailable');
