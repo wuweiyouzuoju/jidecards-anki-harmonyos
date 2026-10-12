@@ -1275,27 +1275,26 @@ export struct 学习页 {
       appInterface.leave('study_more'); appInterface.leave('study_marking'); appInterface.leave('study_card_actions'); appInterface.leave('study_flags');
       return;
     }
-    this.publishStudyMenu('study_more', this.interfaceMenuItems());
     const rows: ActionMenuRow[] = actionMenuRows(this.更多菜单(), this.studyExpandedIds);
+    const flagsOpen: boolean = this.studyExpandedIds.includes('flag') && rows.some((row: ActionMenuRow): boolean => row.node.id === 'flag');
+    if (flagsOpen) appInterface.leave('study_more');
+    else this.publishStudyMenu('study_more', this.interfaceMenuItems());
     for (const group of ['marking', 'card_actions']) {
-      if (rows.some((row: ActionMenuRow): boolean => row.node.id === group) && this.studyExpandedIds.includes(group) &&
-        !(group === 'marking' && this.studyExpandedIds.includes('flag'))) {
+      if (rows.some((row: ActionMenuRow): boolean => row.node.id === group) && this.studyExpandedIds.includes(group)) {
         this.publishStudyMenu(group === 'marking' ? 'study_marking' : 'study_card_actions',
           studyInterfaceMenu({ phase: this.阶段, busy: this.评分中 || this.customSchedulingWarning || this.recoveryMessage !== '', hasCard: this.当前卡片 !== null,
             hasAudio: this.有音频, canUndo: this.可撤销, agent: this.Agent入口已启用, marked: this.currentMarking?.marked },
             group === 'marking' ? 'study_marking' : 'study_card_actions'));
       } else appInterface.leave(group === 'marking' ? 'study_marking' : 'study_card_actions');
     }
-    if (this.studyExpandedIds.includes('flag') && rows.some((row: ActionMenuRow): boolean => row.node.id === 'flag')) {
+    if (flagsOpen) {
       const controls: AppInterfaceControl[] = this.flagMenuItems().map((item: CardActionMenuEntry, index: number): AppInterfaceControl => ({
         id: String(index), titleKey: customFlagLabel(this.flagLabels, index) ? undefined : CARD_FLAGS[index].labelKey,
         title: typeof item.value === 'string' ? item.value : '', enabled: item.enabled !== false, selected: item.selected === true }));
-      const back: AppInterfaceControl = { id: 'back', titleKey: 'menu_back_to_parent',
-        title: namedResourceText(this.getUIContext(), 'menu_back_to_parent'), enabled: !this.评分中, selected: false };
       appInterface.observe({ surface: 'study_flags', sectionId: this.阶段, selectedId: String(this.currentMarking?.flag ?? ''),
-        busy: this.评分中, controlsComplete: true, items: [back].concat(controls),
-        optionIds: ['back'].concat(controls.map((item: AppInterfaceControl): string => item.id)),
-        optionLabels: [namedResourceText(this.getUIContext(), 'menu_back_to_parent')].concat(controls.map((item: AppInterfaceControl): string => item.title)) });
+        busy: this.评分中, controlsComplete: true, items: controls,
+        optionIds: controls.map((item: AppInterfaceControl): string => item.id),
+        optionLabels: controls.map((item: AppInterfaceControl): string => item.title) });
     } else appInterface.leave('study_flags');
   }
 
@@ -1310,7 +1309,7 @@ export struct 学习页 {
 
   private openStudyMenu(): void {
     if (this.tapZonesGuideVisible || this.timeboxNotice !== null) return;
-    this.studyExpandedIds = ['marking'];
+    this.studyExpandedIds = ['marking', 'card_actions'];
     this.studyMenuOpen = true;
     this.Ctrl按下 = false;
     this.stopStudyTimers();
@@ -1327,7 +1326,7 @@ export struct 学习页 {
 
   private toggleStudyMenuBranch(id: string): void {
     if (!this.studyMenuOpen || this.评分中) return;
-    const expanded: string[] = toggleActionMenuBranch(this.更多菜单(), this.studyExpandedIds, id);
+    const expanded: string[] = toggleActionMenuBranch(this.更多菜单(), this.studyExpandedIds, id, false);
     const openingFlags: boolean = id === 'flag' && !this.studyExpandedIds.includes('flag') && expanded.includes('flag');
     this.studyExpandedIds = expanded;
     if (openingFlags) this.loadFlagLabels();
