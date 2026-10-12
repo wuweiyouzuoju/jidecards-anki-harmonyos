@@ -6,6 +6,7 @@
 // - 首页.ets 走 确保已打开 → 创建牌组 → 刷新 的完整链路。
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
+import { stripTypeScriptTypes } from 'node:module';
 import test from 'node:test';
 
 function projectUrl(relativePath) {
@@ -28,7 +29,19 @@ test('filtered deck creation belongs to the experimental home add menu, not a de
   assert.match(read(PAGE), /onCreateFilteredDeck: \(\): void => \{\s*this\.显示主页操作 = false;\s*this\.打开创建过滤牌组\(\);/);
   const deckItem = read('entry/src/main/ets/components/牌组列表项.ets');
   assert.doesNotMatch(deckItem, /filtered_deck_title|onCreateFilteredDeck/);
-  assert.match(deckItem, /this\.onMenu\(this\.deck\.id, anchor\)/);
+  const start = deckItem.indexOf('  private openMenu(');
+  assert.ok(start >= 0);
+  const method = deckItem.slice(start, deckItem.indexOf('\n  }', start) + 4);
+  const Row = new Function(stripTypeScriptTypes(`class Row { ${method} }`, { mode: 'transform' }) +
+    '; return Row;')();
+  const row = new Row(), targets = [];
+  Object.assign(row, { deck: { id: '42' }, reorderMode: false, menuOpen: false,
+    onMenu: id => targets.push(id) });
+  row.openMenu();
+  assert.deepEqual(targets, ['42'], 'the centered dialog receives the stable deck target');
+  row.reorderMode = true; row.openMenu();
+  row.reorderMode = false; row.menuOpen = true; row.openMenu();
+  assert.deepEqual(targets, ['42'], 'reordering or an open dialog rejects another long press');
   assert.match(read(PAGE), /case 'custom_study': this\.打开自定义学习\(deckId\)/);
   assert.doesNotMatch(read('entry/src/main/ets/components/home/主页牌组列表.ets'), /onItemCreateFilteredDeck/);
 });
