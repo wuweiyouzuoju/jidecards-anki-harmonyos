@@ -2,9 +2,9 @@
 // Real navigation + production host session/runtime; page.setContent would not prove window lifetime.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { launchCardBrowser } from './card-browser-harness.mjs';
+import { createCardBrowserHarness, launchCardBrowser } from './card-browser-harness.mjs';
 import { CardWebSession } from '../entry/src/main/ets/model/CardWebSession.ts';
-import { 构建卡片HTML } from '../entry/src/main/ets/model/学习卡片HTML构建器.ts';
+import { 构建卡片HTML, appendCardScript } from '../entry/src/main/ets/model/学习卡片HTML构建器.ts';
 import { buildPreviewInteractionScript } from '../entry/src/main/ets/model/PreviewInteraction.ts';
 import { MATH_ASSET_BASE } from '../entry/src/main/ets/model/MathRendering.ts';
 
@@ -74,7 +74,7 @@ try {
     };
     const html = (side, version) => {
       const value = 构建卡片HTML(card, side, dark);
-      return preview ? value.replace('</div></body>', `<script>${buildPreviewInteractionScript(version)}</script></div></body>`) : value;
+      return preview ? appendCardScript(value, buildPreviewInteractionScript(version)) : value;
     };
     async function waitShown(count) {
       await assert.doesNotReject(async () => {
@@ -171,5 +171,83 @@ try {
     passed++;
     await context.close();
   }
-  console.log(JSON.stringify({ passed, scenarios: 'study/preview × light/dark; dark/transparent/translucent deck backgrounds, full/partial answers, repeated flips, next card, scripts, storage, math, collapsible fields, gestures' }));
+  // Extra closing tags in an imported template can put its tail outside #qa after HTML parsing.
+  // Keep a small reproducer of that structure; the user's APKG stays outside the repository.
+  const raw = '{{c1::Alpha::hint}} and {{c1::Beta}}';
+  const wrapQa = `if(!document.getElementById('repaired-frame')){var frame=document.createElement('div');frame.id='repaired-frame';
+    var qa=document.getElementById('qa');qa.parentNode.insertBefore(frame,qa);frame.appendChild(qa);}`;
+  const repairedCard = {
+    questionNodes: [{text: `<div id="div0">${raw}</div><button id="remember" onclick="window.savedChoice='Alpha'">Remember</button>
+      <script>var clozeRegex=/\\{\\{c\\d+::([\\s\\S]*?)\\}\\}/g;
+      document.getElementById('div0').innerHTML=document.getElementById('div0').innerHTML.replace(clozeRegex,'[____]');
+      window.repairedQuestionRuns=(window.repairedQuestionRuns||0)+1;
+      ${wrapQa}
+      </script>`, replacement: null}],
+    answerNodes: [{text: `<script>${wrapQa}</script><div class="section"><div id="div1">${raw}</div></div></div>
+      <p id="tail">Tail \\(x^2\\)</p><button id="toggle-tail" onclick="this.textContent=window.savedChoice||'empty'">Toggle</button>
+      <style>#tail{font-weight:700}</style><script src="repaired-dependency.js"></script><script>
+      var clozeRegex=/\\{\\{c\\d+::([\\s\\S]*?)\\}\\}/g;
+      document.getElementById('div1').innerHTML=document.getElementById('div1').innerHTML.replace(clozeRegex,
+        function(match,content){return '<span class="cloze">'+content.split('::')[0]+'</span>'});
+      window.repairedAnswerRuns=(window.repairedAnswerRuns||0)+1;
+      onShownHook.push(function(){document.getElementById('tail').dataset.ready=String(repairedDependency)});
+      </script>`, replacement: null}],
+    css: '.card{color:black;background:white}.cloze{color:blue}.nightMode .cloze{color:lightblue}',
+    latexSvg: false, isEmpty: false
+  };
+  for (const width of [390, 1280]) for (const preview of [false, true]) for (const dark of [false, true])
+    for (const initialSide of ['question', 'answer']) {
+    const h = await createCardBrowserHarness(browser);
+    try {
+      await h.page.setViewportSize({width, height:800});
+      await h.page.route('**/repaired-dependency.js', async route => {
+        await new Promise(resolve => setTimeout(resolve, 30));
+        return route.fulfill({contentType:'text/javascript',body:'window.repairedDependency=7;'});
+      });
+      const actions = [];
+      await h.page.exposeFunction('repairedAction', (action, version) => actions.push({action, version}));
+      await h.page.addInitScript(() => {window.jidePreview={onAction:(...args)=>window.repairedAction(...args)}});
+      let version = 0;
+      const show = side => {
+        let html = 构建卡片HTML(repairedCard, side, dark);
+        if (preview) html = appendCardScript(html, buildPreviewInteractionScript(++version));
+        return h.show(html, 1, side);
+      };
+      await show(initialSide);
+      if (initialSide === 'question') await h.page.locator('#remember').click();
+      if (initialSide === 'question') await show('answer');
+      await h.page.evaluate(() => {window.repairedMathCache=document.getElementById('MJX-SVG-global-cache')});
+      for (let flip = 0; flip < 3; flip++) {
+        assert.equal(await h.page.locator('#repaired-frame #qa').count(),1,'repair preserves author wrappers on either side');
+        assert.equal(await h.page.locator('#div1').innerText(), 'Alpha and Beta', 'back-side cloze script must execute');
+        assert.equal(await h.page.locator('#tail').getAttribute('data-ready'), '7', 'tail dependencies and hooks finish');
+        assert.equal(await h.page.locator('#qa #tail mjx-container').count(), 1, 'math outside the repaired boundary is typeset');
+        assert.deepEqual(await h.page.evaluate(() => [document.querySelectorAll('#qa').length,
+          document.getElementById('qa').contains(document.getElementById('tail')),
+          document.getElementById('MJX-SVG-global-cache')===window.repairedMathCache,
+          document.querySelectorAll('#qa #MJX-SVG-global-cache').length,
+          getComputedStyle(document.getElementById('tail')).fontWeight]), [1,true,true,0,'700']);
+        assert.equal(h.backgrounds.at(-1), dark ? '#18202b' : '#ffffff', 'stock white CSS respects night mode on every flip');
+        assert.equal(await h.page.evaluate(() => repairedAnswerRuns), flip+1, 'no duplicate execution during normalization');
+        if (preview) {
+          const before = actions.length;
+          await h.page.locator('#tail').click();
+          assert.deepEqual(actions.slice(before), [{action:'flip',version}], 'one current preview listener, including orphan scripts');
+        }
+        await h.page.locator('#toggle-tail').click();
+        assert.equal(await h.page.locator('#toggle-tail').innerText(),
+          initialSide==='answer'&&flip===0 ? 'empty' : 'Alpha', 'template globals survive same-card normalization');
+        await show('question');
+        assert.equal(await h.page.locator('#repaired-frame #qa').count(),1,'valid template wrappers stay intact');
+        assert.equal(await h.page.locator('#tail').count(), 0, 'old orphan content is removed on the next side');
+        await h.page.locator('#remember').click();
+        await show('answer');
+      }
+      assert.equal(h.navigations, 1, 'malformed templates still share one document per card');
+      await h.show(构建卡片HTML(repairedCard, 'answer', dark), 2, 'answer');
+      assert.deepEqual(await h.page.evaluate(() => [repairedAnswerRuns,typeof window.savedChoice]), [1,'undefined']);
+      passed++;
+    } finally {await h.close();}
+  }
+  console.log(JSON.stringify({ passed, scenarios: 'study/preview × light/dark; narrow/wide repaired template bodies, first answer/repeated flips/next card, scripts/styles/math/gestures, stock night colors, full/partial answers and storage' }));
 } finally { await browser.close(); }
