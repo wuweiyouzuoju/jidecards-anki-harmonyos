@@ -350,8 +350,6 @@ export struct 牌组列表项 {
     .backgroundColor(this.selected
       ? (this.visual.selectedColors.length > 0 ? Color.Transparent : this.选中背景色)
       : $r('app.color.surface_card'))
-    .shadow({ radius: this.selected && this.visual.selectedColors.length > 0 ? 8 : 0,
-      color: '#140F2350', offsetY: 2 })
     .border(SurfaceBorder.options(应用尺寸.卡片边框,
       // 排序模式下行描边用 动作主色 高亮，让用户感知「现在可拖」；
       // 选中态用 主色边框色（比 动作主色 浅，避免选中行视觉过重）

@@ -9,7 +9,7 @@ import { DialogHeader } from './common/DialogHeader';
 //
 // @作用
 // 用户首次打开应用时显示，介绍此次更新改动 / 作者的话（含同系列应用跳转 + 评论入口）
-// 样式复刻 jidecube WelcomePanel：磨砂玻璃遮罩 + 白色内容卡 + 圆角阴影
+// 使用公共磨砂遮罩与扁平内容卡，通过圆角和描边区分层级。
 //
 // @输入
 // onClose: 关闭回调（旧入口曾由首页持久化更新弹窗标记；当前首页使用 HomeIntroStore）。

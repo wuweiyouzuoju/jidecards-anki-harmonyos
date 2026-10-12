@@ -490,7 +490,6 @@ struct NoteEditorWheel {
             .backgroundColor($r('app.color.surface_card')).border(SurfaceBorder.options())
             .borderRadius(this.side === 'left' ? { topRight: this.frameRadius(), bottomRight: this.frameRadius() } :
               { topLeft: this.frameRadius(), bottomLeft: this.frameRadius() })
-            .shadow({ radius: 12, color: '#24000000', offsetX: this.side === 'left' ? 2 : -2, offsetY: 2 })
             .hitTestBehavior(HitTestMode.None)
           if (this.wheelTools.length > 0) { this.track(false) }
           ForEach(this.wheelTools, (tool: NoteEditorWheelTool, index: number) => {

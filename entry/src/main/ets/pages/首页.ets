@@ -2414,7 +2414,6 @@ struct 首页 {
         .padding(应用尺寸.卡片内边距)
         .backgroundColor($r('app.color.surface_card'))
         .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
-        .shadow({ radius: 24, color: 'rgba(0,0,0,0.18)', offsetX: 0, offsetY: 4 })
       }
       .width('100%')
       .height('100%')
