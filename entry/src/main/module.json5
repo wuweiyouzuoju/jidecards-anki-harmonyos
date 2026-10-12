@@ -107,6 +107,9 @@
     ],
     requestPermissions: [
       {
+        name: 'ohos.permission.ACCELEROMETER'
+      },
+      {
         name: 'ohos.permission.DETECT_GESTURE'
       },
       {
