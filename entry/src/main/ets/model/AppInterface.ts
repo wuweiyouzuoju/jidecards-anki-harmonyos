@@ -394,7 +394,6 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'flag_names', titleKey: 'card_mark_flag_names' }
   ] },
   { id: 'browser_batch_flags', titleKey: 'browser_action_set_flag', parent: 'browser_batch_marking', items: [
-    { id: 'back', titleKey: 'menu_back_to_parent' },
     ...CARD_FLAGS.map((flag): AppInterfaceItem => ({ id: String(flag.value), titleKey: flag.labelKey }))
   ] },
   // 筛选与排序的选项由浏览页真实列/筛选模型提供，不能在这里另抄一份。
@@ -554,7 +553,6 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'flag_names', titleKey: 'card_mark_flag_names' }
   ] },
   { id: 'study_flags', titleKey: 'browser_action_set_flag', parent: 'study_marking', items: [
-    { id: 'back', titleKey: 'menu_back_to_parent' },
     ...CARD_FLAGS.map((flag): AppInterfaceItem => ({ id: String(flag.value), titleKey: flag.labelKey }))
   ] },
   { id: 'study_card_actions', titleKey: 'study_card_actions_title', parent: 'study_more', items: [

@@ -145,12 +145,13 @@ test('flag popup preserves seven colors, clear, custom names and submits only on
   menu.onFlag=flag=>calls.push(flag); menu.aboutToAppear();
   assert.deepEqual(tracker.snapshot().map(e=>e.surface).sort(),['browser_batch','browser_batch_marking']);
   menu.expandedIds=['marking']; menu.selectItem('flag'); menu.publishInterface();
-  assert.deepEqual(tracker.snapshot().map(e=>e.surface).sort(),['browser_batch','browser_batch_flags']);
-  assert.deepEqual(tracker.snapshot().find(e=>e.surface==='browser_batch_flags').optionIds,['back','0','1','2','3','4','5','6','7']);
+  assert.deepEqual(tracker.snapshot().map(e=>e.surface).sort(),['browser_batch_flags','browser_batch_marking']);
+  assert.deepEqual(tracker.snapshot().find(e=>e.surface==='browser_batch_flags').optionIds,['0','1','2','3','4','5','6','7']);
   const flags=menu.flagEntries(); assert.equal(flags.length,8); assert.equal(flags[7].value,'Custom purple');
   assert.equal(flags[0].iconTint,undefined); assert.equal(flags[0].selectionUsesAccent,false);
-  menu.onMark=()=>assert.fail('replaced marking action must not execute');menu.selectItem('mark');
-  assert.ok(tracker.snapshot().some(e=>e.surface==='browser_batch'),'primary menu remains visible and operable');
+  menu.on删除=()=>assert.fail('covered primary action must not execute');menu.selectItem('delete');
+  assert.ok(tracker.snapshot().some(e=>e.surface==='browser_batch_marking'),'left marking menu stays visible');
+  assert.ok(!tracker.snapshot().some(e=>e.surface==='browser_batch'),'covered primary menu is not published');
   flags[7].action(); assert.deepEqual(calls,['close',7]);
   calls.length=0; menu.busy=true; flags[0].action(); menu.busy=false; menu.expandedIds=[]; flags[0].action();
   menu.expandedIds=['marking','flag']; menu.submitFlag(8); assert.deepEqual(calls,[]);

@@ -96,16 +96,16 @@ export struct 批量操作栏 {
   }
   private publishInterface(): void {
     if (!this.mounted) return;
-    this.publishSurface('browser_batch', this.menuItems());
-    if (this.expandedIds.includes('marking') && !this.expandedIds.includes('flag')) this.publishSurface('browser_batch_marking', this.markingItems());
+    const flagsOpen: boolean = this.expandedIds.includes('marking') && this.expandedIds.includes('flag');
+    if (flagsOpen) appInterface.leave('browser_batch');
+    else this.publishSurface('browser_batch', this.menuItems());
+    if (this.expandedIds.includes('marking')) this.publishSurface('browser_batch_marking', this.markingItems());
     else appInterface.leave('browser_batch_marking');
-    if (this.expandedIds.includes('marking') && this.expandedIds.includes('flag')) {
+    if (flagsOpen) {
       const items: AppInterfaceControl[] = this.flagEntries().map((item: CardActionMenuEntry, index: number): AppInterfaceControl => ({
         id: String(index), titleKey: customFlagLabel(this.labels, index) ? undefined : CARD_FLAGS[index].labelKey,
         title: typeof item.value === 'string' ? item.value : '', selected: false, enabled: item.enabled !== false }));
-      const back: AppInterfaceControl = { id: 'back', titleKey: 'menu_back_to_parent',
-        title: namedResourceText(this.getUIContext(), 'menu_back_to_parent'), enabled: !this.busy && this.选中数 > 0, selected: false };
-      this.observeSurface('browser_batch_flags', [back].concat(items));
+      this.observeSurface('browser_batch_flags', items);
     } else appInterface.leave('browser_batch_flags');
   }
   private publishSurface(surface: string, definitions: AppInterfaceItem[], _locale: string = this.uiLanguage): void {
