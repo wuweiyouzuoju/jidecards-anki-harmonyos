@@ -5,6 +5,7 @@ import { SettingsToggleRow } from '../common/SettingsToggleRow';
 import { FormSelectRow } from '../common/FormSelectRow';
 import { SettingsActionRow } from '../common/SettingsActionRow';
 import { StudyKeyboardSettings } from './StudyKeyboardSettings';
+import { StudyGestureSettings } from './StudyGestureSettings';
 import { NativeDialogHost, NativeDialogDismiss, NativeDialogPresentation } from '../common/NativeDialogHost';
 import { localizedResourceText, resourceText } from '../../utils/UiFeedback';
 import { StudyQuickAnswerMode } from '../../model/StudyGestures';
@@ -33,6 +34,19 @@ export struct ReviewControlsSettings {
   @State private hapticsSaveFailed: boolean = false;
   private keyboardDialog: NativeDialogHost = new NativeDialogHost();
   private keyboardBusy: boolean = false;
+  private gestureDialog: NativeDialogHost = new NativeDialogHost();
+  private gestureBusy: boolean = false;
+  private readonly createGestureDialog: (dismiss: NativeDialogDismiss) => CustomDialogController =
+    (dismiss: NativeDialogDismiss): CustomDialogController => {
+      const presentation: NativeDialogPresentation = this.gestureDialog.presentation();
+      const isCurrent: () => boolean = this.gestureDialog.captureCurrent();
+      return new CustomDialogController({ builder: StudyGestureSettings({
+        onClose: this.gestureDialog.guard((): void => { this.gestureDialog.close(); }),
+        onBusyChange: (busy: boolean): void => { if (isCurrent()) this.gestureBusy = busy; }
+      }), onWillDismiss: dismiss, autoCancel: presentation.autoCancel, customStyle: presentation.customStyle,
+        alignment: presentation.alignment, width: presentation.width, height: presentation.height,
+        maskColor: presentation.maskColor, openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation });
+    };
   private readonly createKeyboardDialog: (dismiss: NativeDialogDismiss) => CustomDialogController =
     (dismiss: NativeDialogDismiss): CustomDialogController => {
       const presentation: NativeDialogPresentation = this.keyboardDialog.presentation();
@@ -48,10 +62,16 @@ export struct ReviewControlsSettings {
 
   aboutToAppear(): void {
     this.keyboardDialog.activate();
+    this.gestureDialog.activate();
     this.hapticsToggle = this.hapticsEnabled;
     this.loadControls();
   }
-  aboutToDisappear(): void { this.keyboardDialog.dispose(); }
+  aboutToDisappear(): void { this.keyboardDialog.dispose(); this.gestureDialog.dispose(); }
+  private openGestures(): void {
+    if (this.简洁模式) return;
+    this.gestureBusy = false;
+    this.gestureDialog.open(this.createGestureDialog, (): boolean => !this.gestureBusy);
+  }
   private openKeyboard(): void {
     this.keyboardBusy = false;
     this.keyboardDialog.open(this.createKeyboardDialog, (): boolean => !this.keyboardBusy);
@@ -156,6 +176,10 @@ export struct ReviewControlsSettings {
         }
         SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'study_keyboard', this.uiLanguage),
           hint: $r('app.string.study_keyboard_entry_hint'), onAction: (): void => { this.openKeyboard(); } })
+        if (!this.简洁模式) {
+          SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'study_gestures', this.uiLanguage),
+            hint: $r('app.string.study_gesture_entry_hint'), onAction: (): void => { this.openGestures(); } })
+        }
       }.width('100%')
     }
   }

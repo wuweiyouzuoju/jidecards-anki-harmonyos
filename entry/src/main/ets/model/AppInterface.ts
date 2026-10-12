@@ -7,6 +7,7 @@ import { CARD_FLAGS } from './CardMarking';
 import { IMPORT_RESULT_ACTIONS } from './ImportResults';
 import { REVIEW_AUDIO_PREFERENCES } from './ReviewAudioPreferences';
 import { STUDY_KEYBOARD_FIELDS } from './StudyKeyboard';
+import { STUDY_GESTURE_FIELDS } from './StudyGestureConfig';
 import { SETTINGS_GROUPS } from './SettingsStructure';
 import { DECK_OPTION_GROUPS } from './DeckOptionsCatalog';
 import type { NoteAudioStatus } from './NoteAudioDraft';
@@ -106,6 +107,8 @@ export const WHITEBOARD_INTERFACE_ITEMS: AppInterfaceItem[] = [
 export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
   { id: 'study_keyboard', titleKey: 'study_keyboard_title', instructionsKey: 'study_keyboard_help', parent: 'settings',
     items: STUDY_KEYBOARD_FIELDS },
+  { id: 'study_gestures', titleKey: 'study_gesture_title', instructionsKey: 'study_gesture_help', parent: 'settings',
+    items: STUDY_GESTURE_FIELDS.map((item): AppInterfaceItem => ({ id: item.id, titleKey: item.titleKey, fullOnly: true })) },
   { id: 'notetype_editor', titleKey: 'notetype_editor_title', instructionsKey: 'notetype_editor_tokens', parent: 'notetype_management', items: [
     { id: 'fields', titleKey: 'notetype_editor_fields' },
     { id: 'templates', titleKey: 'notetype_editor_templates' },

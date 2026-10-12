@@ -3185,6 +3185,126 @@
     {
       "name": "agent_history_tool_read",
       "value": "读取历史对话"
+    },
+    {
+      "name": "study_gesture_title",
+      "value": "完整手势配置（实验版）"
+    },
+    {
+      "name": "study_gesture_entry_hint",
+      "value": "四向滑动、双击、分区点击、多指点击与摇动"
+    },
+    {
+      "name": "study_gesture_help",
+      "value": "开启并保存后，完整配置接管学习手势。可分别设置题目面、答案面或两面；未绑定的手势不操作，评分仅在答案面生效。分区相对卡片区域，四区与九宫格各自保留配置。滑动不接管可滚动区域；输入框、卡片按钮、文本选择、弹窗和白板保留原操作。选择题反馈仍用右滑继续。摇动需设备支持加速度计，多指可能受系统手势影响。切回简洁版后停用，配置保留。"
+    },
+    {
+      "name": "study_gesture_enabled",
+      "value": "启用完整手势"
+    },
+    {
+      "name": "study_gesture_layout",
+      "value": "点击分区"
+    },
+    {
+      "name": "study_gesture_four",
+      "value": "四区"
+    },
+    {
+      "name": "study_gesture_nine",
+      "value": "九宫格"
+    },
+    {
+      "name": "study_gesture_input",
+      "value": "手势"
+    },
+    {
+      "name": "study_gesture_add",
+      "value": "设置此绑定"
+    },
+    {
+      "name": "study_gesture_no_action",
+      "value": "无操作"
+    },
+    {
+      "name": "study_gesture_no_config",
+      "value": "未配置（使用快捷答题设置）"
+    },
+    {
+      "name": "study_gesture_up",
+      "value": "上滑"
+    },
+    {
+      "name": "study_gesture_down",
+      "value": "下滑"
+    },
+    {
+      "name": "study_gesture_left",
+      "value": "左滑"
+    },
+    {
+      "name": "study_gesture_right",
+      "value": "右滑"
+    },
+    {
+      "name": "study_gesture_double",
+      "value": "双击"
+    },
+    {
+      "name": "study_gesture_two_finger",
+      "value": "双指点击"
+    },
+    {
+      "name": "study_gesture_three_finger",
+      "value": "三指点击"
+    },
+    {
+      "name": "study_gesture_four_finger",
+      "value": "四指点击"
+    },
+    {
+      "name": "study_gesture_shake",
+      "value": "摇动"
+    },
+    {
+      "name": "study_gesture_top_left",
+      "value": "左上区"
+    },
+    {
+      "name": "study_gesture_top_right",
+      "value": "右上区"
+    },
+    {
+      "name": "study_gesture_bottom_left",
+      "value": "左下区"
+    },
+    {
+      "name": "study_gesture_bottom_right",
+      "value": "右下区"
+    },
+    {
+      "name": "study_gesture_top",
+      "value": "上中区"
+    },
+    {
+      "name": "study_gesture_middle_left",
+      "value": "左中区"
+    },
+    {
+      "name": "study_gesture_center",
+      "value": "中心区"
+    },
+    {
+      "name": "study_gesture_middle_right",
+      "value": "右中区"
+    },
+    {
+      "name": "study_gesture_bottom",
+      "value": "下中区"
+    },
+    {
+      "name": "study_gesture_shake_unavailable",
+      "value": "本机摇动手势暂不可用，其他已配置手势仍可使用"
     }
   ]
 }

@@ -2735,6 +2735,126 @@
     {
       "name": "agent_history_tool_read",
       "value": "Read conversation history"
+    },
+    {
+      "name": "study_gesture_title",
+      "value": "Full gesture configuration (experimental)"
+    },
+    {
+      "name": "study_gesture_entry_hint",
+      "value": "Swipes, double taps, tap zones, multi-finger taps and shake"
+    },
+    {
+      "name": "study_gesture_help",
+      "value": "Enable and save to use these bindings for study gestures. Bind separately for question, answer or both sides. Unbound gestures do nothing; grading works only on the answer. Zones are relative to the card area; four-zone and nine-zone bindings are stored separately. Swipes yield to scrollable areas. Inputs, card buttons, selection, dialogs and the whiteboard keep their controls. Swipe right still continues choice feedback. Shake requires an accelerometer; system gestures may intercept multi-finger input. Simple mode disables this feature while retaining your configuration."
+    },
+    {
+      "name": "study_gesture_enabled",
+      "value": "Enable full gestures"
+    },
+    {
+      "name": "study_gesture_layout",
+      "value": "Tap zones"
+    },
+    {
+      "name": "study_gesture_four",
+      "value": "Four zones"
+    },
+    {
+      "name": "study_gesture_nine",
+      "value": "Nine zones"
+    },
+    {
+      "name": "study_gesture_input",
+      "value": "Gesture"
+    },
+    {
+      "name": "study_gesture_add",
+      "value": "Set binding"
+    },
+    {
+      "name": "study_gesture_no_action",
+      "value": "No action"
+    },
+    {
+      "name": "study_gesture_no_config",
+      "value": "Not configured (uses quick-answer settings)"
+    },
+    {
+      "name": "study_gesture_up",
+      "value": "Swipe up"
+    },
+    {
+      "name": "study_gesture_down",
+      "value": "Swipe down"
+    },
+    {
+      "name": "study_gesture_left",
+      "value": "Swipe left"
+    },
+    {
+      "name": "study_gesture_right",
+      "value": "Swipe right"
+    },
+    {
+      "name": "study_gesture_double",
+      "value": "Double tap"
+    },
+    {
+      "name": "study_gesture_two_finger",
+      "value": "Two-finger tap"
+    },
+    {
+      "name": "study_gesture_three_finger",
+      "value": "Three-finger tap"
+    },
+    {
+      "name": "study_gesture_four_finger",
+      "value": "Four-finger tap"
+    },
+    {
+      "name": "study_gesture_shake",
+      "value": "Shake"
+    },
+    {
+      "name": "study_gesture_top_left",
+      "value": "Top left"
+    },
+    {
+      "name": "study_gesture_top_right",
+      "value": "Top right"
+    },
+    {
+      "name": "study_gesture_bottom_left",
+      "value": "Bottom left"
+    },
+    {
+      "name": "study_gesture_bottom_right",
+      "value": "Bottom right"
+    },
+    {
+      "name": "study_gesture_top",
+      "value": "Top center"
+    },
+    {
+      "name": "study_gesture_middle_left",
+      "value": "Middle left"
+    },
+    {
+      "name": "study_gesture_center",
+      "value": "Center"
+    },
+    {
+      "name": "study_gesture_middle_right",
+      "value": "Middle right"
+    },
+    {
+      "name": "study_gesture_bottom",
+      "value": "Bottom center"
+    },
+    {
+      "name": "study_gesture_shake_unavailable",
+      "value": "Shake is unavailable on this device. Other configured gestures remain available."
     }
   ]
 }

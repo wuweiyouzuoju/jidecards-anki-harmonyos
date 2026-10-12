@@ -30,7 +30,8 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
   { id: 'review_controls', sectionId: 'scheduler', titleKey: 'settings_controls_review', items: [
     { id: 'study_haptics', titleKey: 'settings_study_haptics', settingId: 'study_haptics' },
     { id: 'study_quick_answer', titleKey: 'settings_quick_answer', settingId: 'study_quick_answer' },
-    { id: 'study_keyboard', titleKey: 'study_keyboard_title', opens: 'study_keyboard' }
+    { id: 'study_keyboard', titleKey: 'study_keyboard_title', opens: 'study_keyboard' },
+    { id: 'study_gestures', titleKey: 'study_gesture_title', opens: 'study_gestures', fullOnly: true }
   ] },
   { id: 'global_review', sectionId: 'scheduler', titleKey: 'settings_core_review', fullOnly: true, items: [
     { id: 'rollover', titleKey: 'settings_rollover' },
