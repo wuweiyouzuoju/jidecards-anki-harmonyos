@@ -4,7 +4,7 @@ import { MenuBubbleSurface } from './MenuBubbleSurface';
 import { ActionMenuPointerSide } from './ActionMenuLayout';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 
-/** 左侧面板的圆角和指向尖角同属一个轮廓；阴影模糊轮廓本身，不投影 Path 的矩形边界。 */
+/** 侧面板的圆角和指向尖角同属一个扁平轮廓，底色与描边由公共表面拥有。 */
 @Component
 export struct MenuBubble {
   @Prop panelWidth: number = 应用尺寸.compactMenuWidth;

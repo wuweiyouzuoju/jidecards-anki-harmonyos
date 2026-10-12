@@ -4,7 +4,7 @@ import { MenuSurface } from './MenuSurface';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 
-/** 主菜单和子面板共用连续轮廓；尖角及阴影不随正文滚动，也不参与点击。 */
+/** 主菜单和子面板共用扁平连续轮廓；尖角不随正文滚动，也不参与点击。 */
 @Component
 export struct MenuBubbleSurface {
   @Prop panelWidth: number = 应用尺寸.compactMenuWidth;
@@ -30,10 +30,6 @@ export struct MenuBubbleSurface {
 
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
-      Path().commands(this.outlineCommands())
-        .width(this.surfaceWidth()).height(this.surfaceHeight())
-        .fill($r('app.color.menu_shadow')).strokeWidth(0).blur(6).translate({ y: 4 })
-        .position({ x: 0, y: 0 })
       Path().commands(this.outlineCommands())
         .width(this.surfaceWidth()).height(this.surfaceHeight())
         .fill($r('app.color.menu_surface')).stroke(SurfaceBorder.color())

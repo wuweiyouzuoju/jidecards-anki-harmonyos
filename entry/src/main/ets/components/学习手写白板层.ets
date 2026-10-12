@@ -480,6 +480,7 @@ export struct 学习手写白板层 {
           .bindPopup(this.opacityOpen, {
             builder: this.opacitySettings, placement: Placement.Bottom,
             popupColor: $r('app.color.menu_surface'), enableArrow: true,
+            shadow: MenuSurface.popupShadow(), backgroundBlurStyle: BlurStyle.NONE,
             arrowWidth: MenuSurface.pointerSpan, arrowHeight: MenuSurface.pointerDepth,
             radius: 应用尺寸.圆角_指标卡, transition: MenuSurface.popupTransition(),
             onStateChange: (event: PopupStateChangeParam): void => {

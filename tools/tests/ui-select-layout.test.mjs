@@ -246,7 +246,7 @@ test('shared menu surfaces distinguish dark overlays from cards and retain reada
   new MenuSurface().applyNormalAttribute(instance);
   assert.equal(attributes.backgroundColor, 'app.color.menu_surface');
   assert.deepEqual(attributes.border, { width: 1, color: 'app.color.surface_border' });
-  assert.equal(attributes.shadow.color, 'app.color.menu_shadow');
+  assert.equal(attributes.shadow.radius, 0, 'flat menus use the shared border without elevation');
   new MenuSurface(false).applyNormalAttribute(instance);
   assert.equal(attributes.backgroundColor, 'transparent');
   assert.equal(attributes.border.width, 0);

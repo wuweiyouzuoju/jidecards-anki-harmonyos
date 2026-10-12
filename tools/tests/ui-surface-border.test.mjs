@@ -63,7 +63,7 @@ test('the real menu surface applies the shared outline and preserves its custom 
     assert.equal(attrs.borderRadius,cornerRadius??16);
     assert.ok(calls.indexOf('border')<calls.indexOf('borderRadius'),'border defaults must not override the explicit radius');
     assert.equal(attrs.backgroundColor,active?'app.color.menu_surface':'transparent');
-    assert.equal(attrs.clip,active);assert.equal(attrs.shadow.radius,active?12:0);
+    assert.equal(attrs.clip,active);assert.equal(attrs.shadow.radius,0,'flat surfaces never add elevation');
   }
 });
 
@@ -115,7 +115,7 @@ test('ordinary outlines, form controls and separators use the common border inst
   assert.match(read('utils/GlassSurface.ets'),/\.border\(this\.outline\)/);
   const deck = read('components/牌组列表项.ets');
   assert.doesNotMatch(deck, /bindPopup\(/, 'deck rows delegate menus to the root shared surface');
-  assert.match(read('components/home/HomeDeckRowMenu.ets'), /CardActionMenu\(\{/);
+  assert.match(read('components/home/HomeDeckRowMenu.ets'), /DialogFrame\(\{/);
   assert.match(read('components/common/CardActionMenu.ets'), /\.attributeModifier\(new MenuSurface\(this\.anchor === undefined\)\)/);
   assert.match(read('components/common/MenuBubbleSurface.ets'), /\.stroke\(SurfaceBorder\.color\(\)\)/);
   assert.match(read('components/home/DeckReparentFeature.ets'),/DialogFrame\(\{/,'hierarchy changes use the shared dialog surface');
