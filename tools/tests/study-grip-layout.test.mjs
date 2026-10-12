@@ -1,4 +1,5 @@
 import { localPreferenceApi } from './local-preference-harness.mjs';
+import { appInterfaceDependencies, studyInterfaceMethods } from './app-interface-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { motionApi } from './motion-harness.mjs';
 import test from 'node:test';
@@ -251,11 +252,9 @@ test('study page selects bottom fallback in a short window and gates sensing for
 
 test('real JIDE structure receives smart layout and sensor state from the production study observer', () => {
   const source = read('pages/学习页.ets'), tracker = new AppInterfaceTracker();
-  const start = source.indexOf('  private publishInterface(');
-  const method = source.slice(start, source.indexOf('\n  }', start) + 4);
-  const Page = new Function('appInterface', 'visibleInterfaceItems', 'namedResourceText',
-    stripTypeScriptTypes(`class Page { ${method} }`, { mode: 'transform' }) + ';return Page;')(
-    tracker, visibleInterfaceItems, (_context, key) => key);
+  const deps = {...appInterfaceDependencies(),appInterface:tracker,namedResourceText:(_context,key)=>key};
+  const Page = new Function(...Object.keys(deps),
+    stripTypeScriptTypes(`class Page { ${studyInterfaceMethods(source)} }`, { mode: 'transform' }) + ';return Page;')(...Object.values(deps));
   const page = Object.assign(new Page(), { recoveryMessage: '', resultMessage: '', resultUndo: null,
     studySession: { hasPendingAnswer: () => false } }); Object.assign(page, { mounted: true, 阶段: 'question', 牌组名: 'Deck', 当前卡片: null,
     currentMarking: null, 学习布局模式值: 'smart', gripAvailability: 'unsupported', gripSide: 'left',

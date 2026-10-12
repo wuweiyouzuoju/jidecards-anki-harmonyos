@@ -1,3 +1,4 @@
+import { completeStudyGestures, studyGestureCommand, studyGestureTapInput } from '../../entry/src/main/ets/model/StudyGestureConfig.ts';
 import { StudyKeyboardSession, studyChord } from '../../entry/src/main/ets/model/StudyKeyboard.ts';
 import { configuredStudyCommand, defaultStudyControls as keyboardDefaults } from '../../entry/src/main/ets/model/StudyControls.ts';
 import { resolveStudyKey } from '../../entry/src/main/ets/model/StudyInputPolicy.ts';
@@ -43,7 +44,7 @@ function pageHarness(completed = false, failOpen = false) {
   let now = 1000;
   const dialogs = [];
   let saves = 0;
-  const context = vm.createContext({ configuredStudyCommand, studyEventChord: (event,ctrl)=>studyChord(String(event.keyCode),{ctrl:ctrl??false,shift:false,alt:false}),  validateStudyControls,mappedStudyCommand,resolveStudyKey, resolveStudyGesture, StudyQuickAnswerMode, loadNoteEditor, studyKeyName: key => String(key), KeyType: { Down: 0 },
+  const context = vm.createContext({ configuredStudyCommand, studyEventChord: (event,ctrl)=>studyChord(String(event.keyCode),{ctrl:ctrl??false,shift:false,alt:false}),  completeStudyGestures,studyGestureCommand,studyGestureTapInput,validateStudyControls,mappedStudyCommand,resolveStudyKey, resolveStudyGesture, StudyQuickAnswerMode, loadNoteEditor, studyKeyName: key => String(key), KeyType: { Down: 0 },
     ...surfaceMotionApi(), NativeDialogHost: nativeDialogHostClass(surfaceMotionApi()), Date: { now: () => now }, $r: key => key, isTapZonesGuideCompleted: () => false,
     DialogAlignment: { Center: 0 },
     StudyGuideDialog: options => options,
@@ -58,7 +59,7 @@ function pageHarness(completed = false, failOpen = false) {
     playStudyHaptic: () => {},
     completeStudyGuide: async () => { saves++; completed = true; }
   });
-  const methods = ['controls','isStudyGesturesEnabled', 'isTapZonesEnabled', 'maybeShowStudyGuide', 'maybeShowTapZonesGuide', 'showStudyGuide', 'invalidateCardWork', '处理按键', 'handleStudyGesture', '评分', 'clearChoiceAutoAdvance', 'scheduleChoiceAutoAdvance', 'choiceAutoAdvanceSeconds'].map(name => {
+  const methods = ['controls','isStudyGesturesEnabled', 'isTapZonesEnabled', 'maybeShowStudyGuide', 'maybeShowTapZonesGuide', 'showStudyGuide', 'invalidateCardWork', '处理按键', 'handleStudyGesture', 'studyGestureBlocked', '评分', 'clearChoiceAutoAdvance', 'scheduleChoiceAutoAdvance', 'choiceAutoAdvanceSeconds'].map(name => {
     const start = pageSource.search(new RegExp(`  private (?:async )?${name}\\(`));
     assert.notEqual(start, -1);
     return pageSource.slice(start, pageSource.indexOf('\n  }', start) + 4);

@@ -68,6 +68,9 @@ import type { StudyControls } from '../model/StudyControls';
 import { loadStudyControls, createStudyScreenAwake } from '../backend/StudyControlsService';
 import type { StudyScreenAwakeSession } from '../model/StudyScreenAwakeSession';
 import { buildStudyGestureScript, resolveStudyGesture, StudyGestureState, StudyQuickAnswerMode } from '../model/StudyGestures';
+import { completeStudyGestures, activeStudyGestureInputs, studyGestureCommand, studyGestureTapInput } from '../model/StudyGestureConfig';
+import type { StudyGestureConfig } from '../model/StudyGestureConfig';
+import { StudyShakeSensor } from '../backend/StudyShakeSensor';
 import { StudyTapZonesGuide } from '../components/StudyTapZonesGuide';
 import { StudyGuideDialog } from '../components/StudyGuideDialog';
 import { studyKeyName, studyEventChord } from '../utils/StudyKeyAdapter';
@@ -153,7 +156,7 @@ export struct 学习页 {
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @State private currentMarking: CardMarkingState | null = null;
   @State private flagLabels: FlagLabels = {};
-  @State private flagNamesOpen: boolean = false;
+  @State @Watch('publishInterface') private flagNamesOpen: boolean = false;
   @State private markingBackRequest: number = 0;
   private markingUndoDepth: number = 0;
   private markingBackend: AnkiCardMarking = new AnkiCardMarking();
@@ -179,7 +182,7 @@ export struct 学习页 {
   @State private visibleWebSlot: number = 0;
   @State private cardSurfaceBackground: string = '';
   @State private hasRenderedCard: boolean = false;
-  @State private cardRenderPending: boolean = false;
+  @State @Watch('updateShakeSensor') private cardRenderPending: boolean = false;
   private readonly cardWeb: CardWebView = new CardWebView(this.网页控制器,
     (background: string, appearanceOnly: boolean): void => { this.studyCardShown(background, appearanceOnly); },
     (message: string): void => {
@@ -199,7 +202,7 @@ export struct 学习页 {
   private sessionReady: boolean = false;
   private requestVersion: number = 0;
   private loadingVersion: number = -1;
-  private flipPending: boolean = false;
+  @State @Watch('updateShakeSensor') private flipPending: boolean = false;
   private controllerReady: boolean = false;
   private pendingHtml: string = '';
   @StorageProp(APP_FOREGROUND_KEY) @Watch('studyActivityChanged') private foreground: boolean = true;
@@ -207,7 +210,7 @@ export struct 学习页 {
   private 已渲染: RenderedCard | null = null;
   @State private studyOptions: StudyOptions = new StudyOptions();
   @State private reviewPreferences: ReviewPreferences = new ReviewPreferences();
-  @State private timeboxNotice: StudyTimeboxNotice | null = null;
+  @State @Watch('publishInterface') private timeboxNotice: StudyTimeboxNotice | null = null;
   private timeboxOpenedAt: number = 0;
   @State private autoAdvanceEnabled: boolean = false;
   private readonly autoAdvanceSettings: StudyAutoAdvanceSettings = new StudyAutoAdvanceSettings();
@@ -223,7 +226,7 @@ export struct 学习页 {
   });
   private choiceAutoAdvanceTimer: number = -1;
   private choiceFeedbackDeadline: number = 0;
-  private autoAdvanceSettingsOpen: boolean = false;
+  @State @Watch('publishInterface') private autoAdvanceSettingsOpen: boolean = false;
   private readonly autoAdvanceDialog: NativeDialogHost = new NativeDialogHost();
   private autoAdvanceDialogBack: () => void = (): void => {};
   @State @Watch('publishInterface') private studyMenuOpen: boolean = false;
@@ -232,45 +235,72 @@ export struct 学习页 {
   private 正面HTML: string = '';
   private 背面HTML: string = '';
   private 展示时刻毫秒: number = 0;
-  @State private customSchedulingWarning: boolean = false;
+  @State @Watch('publishInterface') private customSchedulingWarning: boolean = false;
   @State private customSchedulingScript: string = '';
   @State private customSchedulingError: string = '';
   @State @Watch('publishInterface') private 评分中: boolean = false;
   private 媒体目录: string = '';
   private studyGuideChecked: boolean = false;
-  private studyGuideVisible: boolean = false;
+  @State @Watch('publishInterface') private studyGuideVisible: boolean = false;
   private readonly studyGuideDialog: NativeDialogHost = new NativeDialogHost();
   private studyGuideClose: () => void = (): void => {};
   private interactionVersion: number = 0;
   private tapZonesGuideChecked: boolean = false;
   private tapZonesGuideStarted: number = 0;
-  @State private tapZonesGuideVisible: boolean = false;
+  @State @Watch('publishInterface') private tapZonesGuideVisible: boolean = false;
   @StorageLink(STUDY_QUICK_ANSWER_KEY) private quickAnswerMode: StudyQuickAnswerMode = StudyQuickAnswerMode.Off;
 
   private isStudyGesturesEnabled(): boolean {
+    if (completeStudyGestures(this.controls().gestureConfig, this.简洁模式) !== undefined) return true;
     const mode: string = this.controls().gestureMode;
     return mode === 'inherit' ? this.quickAnswerMode === StudyQuickAnswerMode.Gestures : mode === 'gestures';
   }
   @StorageProp(STUDY_CONTROLS_KEY) @Watch('studyControlsChanged') private controlsJson: string =
     '{"keepScreenOn":false,"gestureMode":"inherit","keys":[],"gestures":[]}';
   private screenAwake: StudyScreenAwakeSession | null = null;
+  private shakeSensor: StudyShakeSensor = new StudyShakeSensor();
+  private shakeAvailability: string = 'off';
+  private shakeFailureNotified: boolean = false;
   private controls(): StudyControls { return validateStudyControls(JSON.parse(this.controlsJson) as StudyControls); }
   private studyControlsChanged(): void {
     this.updateScreenAwake();
+    this.updateShakeSensor();
     if (this.controllerReady && this.mounted && this.页面已显示 && this.foreground) this.refreshStudyGestureScript();
+  }
+  private studyModeChanged(): void { this.studyControlsChanged(); this.publishInterface(); }
+  private updateShakeSensor(): void {
+    const config: StudyGestureConfig | undefined = completeStudyGestures(this.controls().gestureConfig, this.简洁模式);
+    const version: number = this.requestVersion, surface: number = this.interactionVersion;
+    const enabled: boolean = config !== undefined && studyGestureCommand(config, 'shake', this.阶段) !== 'none' &&
+      this.mounted && this.页面已显示 && this.foreground && this.choiceQuestion === null && !this.studyGestureBlocked() &&
+      !this.answerInputFocused && !this.webInputFocused;
+    this.shakeAvailability = this.shakeSensor.update(enabled, (): void => { this.handleStudyGesture('shake', 0, 0, version, surface); });
+    if (enabled && this.shakeAvailability === 'failed' && !this.shakeFailureNotified) {
+      this.shakeFailureNotified = true;
+      showToastSafely(this.getUIContext(), { message: $r('app.string.study_gesture_shake_unavailable') });
+    }
+  }
+  private studyGestureBlocked(): boolean {
+    return this.recoveryMessage !== '' || this.studyGuideVisible || this.tapZonesGuideVisible || this.studyMenuOpen ||
+      this.flagNamesOpen || this.timeboxNotice !== null || this.autoAdvanceSettingsOpen || this.editingPageOpen ||
+      this.手写模式 || this.评分中 || this.customSchedulingWarning || this.cardRenderPending || this.flipPending ||
+      this.contentRefreshInFlight || !this.controllerReady || this.pendingHtml !== '';
   }
   private refreshStudyGestureScript(): void {
     this.webInputFocused = false;
+    this.shakeSensor.clearPending(); this.updateShakeSensor();
+    const config: StudyGestureConfig | undefined = completeStudyGestures(this.controls().gestureConfig, this.简洁模式);
     try {
       this.网页控制器.runJavaScript(buildStudyGestureScript(this.requestVersion, this.interactionVersion,
-        this.isStudyGesturesEnabled())).catch((error: Object): void => { console.info(`Study interaction: ${error}`); });
+        this.isStudyGesturesEnabled(), config === undefined ? undefined : activeStudyGestureInputs(config, this.阶段)))
+        .catch((error: Object): void => { console.info(`Study interaction: ${error}`); });
     } catch (error) { console.info(`Study interaction: ${error}`); }
   }
   private updateScreenAwake(): void {
     if (this.screenAwake !== null) this.screenAwake.update(this.mounted && this.页面已显示 && this.foreground &&
       this.controls().keepScreenOn).catch((error: Error): void => { console.error(`Study screen awake: ${error.message}`); });
   }
-  @State private editingPageOpen: boolean = false;
+  @State @Watch('publishInterface') private editingPageOpen: boolean = false;
   private editStartedAt: number = 0;
   @State private 牌组ID: number = 0;
   @State private 牌组名: string = '';
@@ -336,10 +366,11 @@ export struct 学习页 {
   @State @Watch('publishInterface') private gripSide: StudyToolbarSide = 'right';
   /** 主题模式 + 系统暗黑，用于浮动工具栏底色判断（与 首页.ets 同套机制）。 */
   @StorageLink('systemDarkMode') @Watch('cardThemeChanged') private 系统暗黑模式: boolean = false;
-  /** 保留当前界面模式；学习输入偏好不再受模式限制。 */
-  @StorageLink(简洁模式AppStorage键) private 简洁模式: boolean = true;
+  /** 完整手势仅实验版生效；模式切换保留配置并刷新当前卡面。 */
+  @StorageLink(简洁模式AppStorage键) @Watch('studyModeChanged') private 简洁模式: boolean = true;
   /** 四象限：题目面单击显示答案，答案面按分区评分。 */
   private isTapZonesEnabled(): boolean {
+    if (completeStudyGestures(this.controls().gestureConfig, this.简洁模式) !== undefined) return false;
     const mode: string = this.controls().gestureMode;
     return mode === 'inherit' ? this.quickAnswerMode === StudyQuickAnswerMode.TapZones : mode === 'tap_zones';
   }
@@ -361,7 +392,7 @@ export struct 学习页 {
   @StorageLink('cardContentChangedTick') @Watch('卡片内容变更_回调') private 卡片内容变更信号: number = 0;
   /** 已收到变更信号但尚未重渲染；页面隐藏时先累积，回到前台由 onShown 统一消费。 */
   private 待重渲染当前卡: boolean = false;
-  private contentRefreshInFlight: boolean = false;
+  @State @Watch('updateShakeSensor') private contentRefreshInFlight: boolean = false;
   /** 本 NavDestination 是否在前台（onShown / onHidden 维护）；隐藏时不向 Web 推数据。 */
   @State private 页面已显示: boolean = false;
   @StorageLink('themeMode') @Watch('cardThemeChanged') private 主题模式值: 主题模式 = 'system';
@@ -450,6 +481,7 @@ export struct 学习页 {
     agentOperationHosts.unregister('study',this.agentStudyHost);
     this.pendingAgentStudy?.reject(new Error('study_session_disposed')); this.pendingAgentStudy = null;
     this.mounted = false;
+    this.updateShakeSensor();
     this.studyGuideDialog.dispose(); this.autoAdvanceDialog.dispose();
     this.updateScreenAwake();
     appInterface.leave('study_whiteboard');
@@ -1211,6 +1243,7 @@ export struct 学习页 {
 
   private publishInterface(_locale: string = this.uiLanguage): void {
     if (!this.mounted) return;
+    this.updateShakeSensor();
     const controls: AppInterfaceControl[] = visibleInterfaceItems('study', { simple: this.简洁模式,
       agent: this.Agent入口已启用, cloudDeck: false, themeHasTextures: false })
       .filter((item: AppInterfaceItem): boolean => item.condition === undefined ||
@@ -1233,6 +1266,8 @@ export struct 学习页 {
         { id: 'flag', value: this.currentMarking === null ? '' : String(this.currentMarking?.flag ?? '') },
         { id: 'marked', value: this.currentMarking === null ? '' : String(this.currentMarking?.marked ?? '') },
         { id: 'study_layout', value: this.学习布局模式值 },
+        { id: 'complete_gestures', value: String(completeStudyGestures(this.controls().gestureConfig, this.简洁模式) !== undefined) },
+        { id: 'shake_availability', value: this.shakeAvailability },
         { id: 'grip_availability', value: this.gripAvailability }, { id: 'grip_side', value: this.gripSide },
         { id: 'new', value: String(this.新卡剩余) }, { id: 'learning', value: String(this.学习中剩余) },
         { id: 'review', value: String(this.复习剩余) }] });
@@ -1864,20 +1899,22 @@ export struct 学习页 {
 
   private handleStudyGesture(action: string, nx: number, ny: number, version: number, surface: number): void {
     if (!this.isCurrentRequest(version) || surface !== this.interactionVersion) return;
-    if (action === 'input_focus') { this.webInputFocused = nx === 1; return; }
+    if (action === 'input_focus') { this.webInputFocused = nx === 1; this.updateShakeSensor(); return; }
     const state: StudyGestureState = {
       phase: this.阶段, gestures: this.isStudyGesturesEnabled(), tapZones: this.isTapZonesEnabled(),
       choice: this.choiceQuestion !== null,
-      blocked: this.recoveryMessage !== '' || this.studyGuideVisible || this.tapZonesGuideVisible || this.studyMenuOpen || this.flagNamesOpen || this.timeboxNotice !== null ||
-        this.autoAdvanceSettingsOpen || this.editingPageOpen || this.手写模式 || this.评分中 ||
-        this.cardRenderPending || this.flipPending || this.contentRefreshInFlight || !this.controllerReady || this.pendingHtml !== ''
+      blocked: this.studyGestureBlocked()
     };
     if (action.startsWith('audio:')) {
       if (!state.blocked && /^audio:[qa]:\d+$/.test(action)) this.playStudyAudio(true, true, action.slice(6));
       return;
     }
+    if (this.answerInputFocused || this.webInputFocused) return;
     const fallback = resolveStudyGesture(action, state, nx, ny);
-    const command = state.choice || state.blocked || !state.gestures || action === 'tap' ? fallback :
+    const config: StudyGestureConfig | undefined = completeStudyGestures(this.controls().gestureConfig, this.简洁模式);
+    const command = state.choice || state.blocked ? fallback : config !== undefined ?
+      studyGestureCommand(config, action === 'tap' ? studyGestureTapInput(config.tapLayout, nx, ny) : action, this.阶段) :
+      !state.gestures || action === 'tap' ? fallback :
       mappedStudyCommand(this.controls().gestures, action, this.阶段, fallback === 'continue' ? 'none' : fallback);
     switch (command) {
       case 'flip': this.显示答案(); break;
@@ -1890,6 +1927,18 @@ export struct 学习页 {
       case 'replay': this.playStudyAudio(true, true); break;
       case 'bury': this.埋藏或暂停当前卡(BURY_SUSPEND_MODE_BURY_USER); break;
       case 'suspend': this.埋藏或暂停当前卡(BURY_SUSPEND_MODE_SUSPEND); break;
+      case 'back': this.返回(); break;
+      case 'delete': this.请求删除当前卡(); break;
+      case 'edit': this.openNoteEditor(); break;
+      case 'mark': this.changeMarking(null); break;
+      case 'flag0': this.changeMarking(0); break;
+      case 'flag1': case 'flag2': case 'flag3': case 'flag4': case 'flag5': case 'flag6': case 'flag7':
+        const flag: number = Number(command.slice(4));
+        this.changeMarking(this.currentMarking?.flag === flag ? 0 : flag); break;
+      case 'menu': this.openStudyMenu(); break;
+      case 'guide': this.showStudyGuide(); break;
+      case 'whiteboard': this.executeMenuAction('handwrite'); break;
+      case 'auto_advance': this.configureAutoAdvance(); break;
     }
   }
 
@@ -2349,8 +2398,8 @@ export struct 学习页 {
                 margin: LengthMetrics.vp(0)
               })
               .enterKeyType(EnterKeyType.Done)
-              .onFocus((): void => { this.answerInputFocused = true; })
-              .onBlur((): void => { this.answerInputFocused = false; this.keyboardSession.reset(); })
+              .onFocus((): void => { this.answerInputFocused = true; this.updateShakeSensor(); })
+              .onBlur((): void => { this.answerInputFocused = false; this.keyboardSession.reset(); this.updateShakeSensor(); })
               .onSubmit((): void => {
                 this.显示答案();
               })

@@ -1,3 +1,5 @@
+import { completeStudyGestures, activeStudyGestureInputs, studyGestureCommand, StudyShakeDetector } from '../../entry/src/main/ets/model/StudyGestureConfig.ts';
+import { loadPlatformModule } from './platform-module-harness.mjs';
 import { NoteEditorSession, initialNoteEditorState } from '../../entry/src/main/ets/model/NoteEditorSession.ts';
 import { StudyTimerController } from '../../entry/src/main/ets/model/StudyTimerController.ts';
 import { ReviewPreferences } from '../../entry/src/main/ets/proto/messages/PreferencesMessages.ts';
@@ -15,6 +17,7 @@ import { NativeDialogHost } from './platform-module-harness.mjs';
 import { StudyKeyboardSession } from '../../entry/src/main/ets/model/StudyKeyboard.ts';
 
 export function attachStudySession(page) {
+  page.shakeSensor ??= new (loadPlatformModule('backend/StudyShakeSensor.ets','StudyShakeSensor',{StudyShakeDetector,sensor:{SensorId:{ACCELEROMETER:1},on(){},off(){},getSingleSensorSync(){}}}))();
   page.keyboardSession ??= new StudyKeyboardSession();
   page.studyGuideDialog ??= new NativeDialogHost();
   page.autoAdvanceDialog ??= new NativeDialogHost();
@@ -49,15 +52,15 @@ export function attachStudySession(page) {
   page.controlsJson ??= JSON.stringify(defaultStudyControls());
   const source = readFileSync(new URL('../../entry/src/main/ets/pages/学习页.ets', import.meta.url), 'utf8');
   const names = ['startStudyTimers', 'stopStudyTimers', 'studyTimerState', 'applyTimedAction', 'toggleAutoAdvance',
-    'recoverStudy', 'retryStudy', 'showStudyResult', 'resetWhiteboard', 'studyCardShown', 'cardThemeChanged', 'refreshStudyGestureScript', 'controls', 'isStudyGesturesEnabled'];
+    'recoverStudy', 'retryStudy', 'showStudyResult', 'resetWhiteboard', 'studyCardShown', 'cardThemeChanged', 'refreshStudyGestureScript', 'updateShakeSensor', 'studyGestureBlocked', 'controls', 'isStudyGesturesEnabled'];
   const methods = names.map(name => {
     let start = source.indexOf('  private ' + name + '(');
     if (start < 0) start = source.indexOf('  private async ' + name + '(');
     return source.slice(start, source.indexOf('\n  }', start) + 4);
   });
-  const TimingPage = new Function('StudyAdvanceAction', 'BURY_SUSPEND_MODE_BURY_USER', '$r', 'buildStudyGestureScript', 'StudyQuickAnswerMode', 'validateStudyControls', 'resultUndoStatus',
+  const TimingPage = new Function('completeStudyGestures','activeStudyGestureInputs','studyGestureCommand','showToastSafely','StudyAdvanceAction', 'BURY_SUSPEND_MODE_BURY_USER', '$r', 'buildStudyGestureScript', 'StudyQuickAnswerMode', 'validateStudyControls', 'resultUndoStatus',
     stripTypeScriptTypes('class TimingPage {' + methods.join('\n') + '}', { mode: 'transform' }) + '; return TimingPage;')(
-    StudyAdvanceAction, 2, key => key, buildStudyGestureScript, StudyQuickAnswerMode,validateStudyControls,resultUndoStatus);
+    completeStudyGestures, activeStudyGestureInputs, studyGestureCommand, ()=>{}, StudyAdvanceAction, 2, key => key, buildStudyGestureScript, StudyQuickAnswerMode,validateStudyControls,resultUndoStatus);
   for (const name of names) page[name] = TimingPage.prototype[name];
   page.timerHandles = new Map(); let nextTimer = 0;
   page.studyTimer = new StudyTimerController({ state: () => page.studyTimerState(),
