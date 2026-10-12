@@ -47,6 +47,14 @@ export function actionMenuGroupInset(rowHeights: number[], triggerIndex: number,
 
 export interface ActionMenuPanelPlacement { top: number; pointerCenter: number; }
 
+/** 覆盖层保持原主菜单列宽；只调整自身顶缘，尖角追随侧面板内的实际触发行。 */
+export function placeActionMenuOverlay(triggerCenter: number, height: number, baseHeight: number,
+  clearance: number): ActionMenuPanelPlacement {
+  const top: number = Math.max(0, Math.min(triggerCenter - height / 2, Math.max(0, baseHeight - height)));
+  const edge: number = Math.min(clearance, height / 2);
+  return { top: top, pointerCenter: Math.max(edge, Math.min(height - edge, triggerCenter - top)) };
+}
+
 /** 避让只移动左侧面板。尖角在面板边缘追随原触发行，右侧行距始终不变。 */
 export function placeActionMenuGroups(anchors: number[], heights: number[], clearance: number,
   gap: number = 8): ActionMenuPanelPlacement[] {

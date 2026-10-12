@@ -32,14 +32,12 @@ export function actionMenuRows(root: ActionMenuNode[], expandedIds: string[]): A
   return collectRows(root, expandedIds, '', 0, true);
 }
 
-/** 深层列表替换所属子面板；隐藏的父级行不接收迟到点击，也不发布为当前控件。 */
+/** 深层列表覆盖主菜单；侧面板保持可见，被覆盖的主菜单不接收迟到点击。 */
 export function visibleActionMenuRows(root: ActionMenuNode[], expandedIds: string[]): ActionMenuRow[] {
   const rows: ActionMenuRow[] = actionMenuRows(root, expandedIds);
-  const replaced: string[] = rows.filter((row: ActionMenuRow): boolean => row.depth === 1 &&
-    row.node.children !== undefined && expandedIds.includes(row.node.id ?? ''))
-    .map((row: ActionMenuRow): string => row.key.slice(0, row.key.lastIndexOf('/')));
-  return rows.filter((row: ActionMenuRow): boolean => row.depth !== 1 ||
-    !replaced.includes(row.key.slice(0, row.key.lastIndexOf('/'))));
+  const obscured: boolean = rows.some((row: ActionMenuRow): boolean => row.depth === 1 &&
+    row.node.children !== undefined && expandedIds.includes(row.node.id ?? ''));
+  return obscured ? rows.filter((row: ActionMenuRow): boolean => row.depth > 0) : rows;
 }
 
 function branchIds(node: ActionMenuNode): string[] {
@@ -49,12 +47,13 @@ function branchIds(node: ActionMenuNode): string[] {
 }
 
 /** 只切换当前可见、可用的分支；收起父级同时收起其后代，避免隐藏颜色残留。 */
-export function toggleActionMenuBranch(root: ActionMenuNode[], expandedIds: string[], id: string): string[] {
+export function toggleActionMenuBranch(root: ActionMenuNode[], expandedIds: string[], id: string,
+  exclusiveRoots: boolean = true): string[] {
   const row: ActionMenuRow | undefined = actionMenuRows(root, expandedIds)
     .find((item: ActionMenuRow): boolean => item.node.id === id);
   if (row === undefined || !row.enabled || row.node.children === undefined) return expandedIds.slice();
-  // 同一侧只展开一个根分组，切换分组同时清除旧子级。
-  if (!expandedIds.includes(id)) return row.depth === 0 ? [id] : [...expandedIds, id];
+  // 默认根分组互斥；自动展开多组的宿主可独立切换，保留其他根分组。
+  if (!expandedIds.includes(id)) return row.depth === 0 && exclusiveRoots ? [id] : [...expandedIds, id];
   const closed: string[] = branchIds(row.node);
   return expandedIds.filter((expanded: string): boolean => !closed.includes(expanded));
 }
