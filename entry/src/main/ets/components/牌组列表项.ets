@@ -2,7 +2,6 @@
 import { disclosureAnimation } from '../utils/AppMotion';
 import { PressFeedback } from '../utils/PressFeedback';
 import { DeckRowMenuGesture } from '../utils/DeckRowMenuGesture';
-import { ActionMenuAnchor } from './common/ActionMenuLayout';
 import { DisclosureChevron } from './common/DisclosureChevron';
 import { ActionIcon } from './common/ActionIcon';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
@@ -23,7 +22,7 @@ import { loadDeckBackground, releaseDeckBackground } from '../backend/DeckBackgr
 //
 // @作用
 // 卡组列表行的展示与交互承载：色条 + 名称/描述 + 待学计数，
-// 选中态高亮，长按将牌组 ID 和实时行锚点交给首页公共菜单。
+// 选中态高亮，长按将牌组 ID 交给首页公共弹窗。
 //
 // @输入
 // @Prop deck：牌组汇总数据（保留英文名以兼容 deck-hierarchy-contract 测试断言 deck.depth / deck.hasChildren）。
@@ -83,12 +82,11 @@ export struct 牌组列表项 {
   private disposed: boolean = true;
   private imageGeneration: number = 0;
   private backgroundPath: string = '';
-  private menuAnchor: ActionMenuAnchor = { left: 0, top: 0, width: 0, height: 0 };
   onSelect: (deckId: string) => void = (deckId: string): void => {
   };
   onToggle: (deckId: string) => void = (deckId: string): void => {
   };
-  onMenu: (deckId: string, anchor: ActionMenuAnchor) => void = (): void => {};
+  onMenu: (deckId: string) => void = (): void => {};
   onDoubleTap: (deckId: string) => void = (_deckId: string): void => {};
 
   @StorageProp(颜色键.动作主色) private 动作主色: string = '#2F5FD0';
@@ -118,17 +116,9 @@ export struct 牌组列表项 {
     this.异步加载背景像素图();
   }
 
-  private openMenu(event: GestureEvent): void {
-    if (this.reorderMode || this.menuOpen || this.menuAnchor.width <= 0) return;
-    // 长按回调里的局部/窗口坐标属于同一个行节点；列表滚动不依赖 onAreaChange 重新触发。
-    const finger: FingerInfo | undefined = event.fingerList.find((point: FingerInfo): boolean =>
-      point !== undefined && Number.isFinite(point.globalX) && Number.isFinite(point.globalY) &&
-      Number.isFinite(point.localX) && Number.isFinite(point.localY));
-    const anchor: ActionMenuAnchor = finger === undefined ? this.menuAnchor : {
-      left: finger.globalX - finger.localX, top: finger.globalY - finger.localY,
-      width: this.menuAnchor.width, height: this.menuAnchor.height
-    };
-    this.onMenu(this.deck.id, anchor);
+  private openMenu(): void {
+    if (this.reorderMode || this.menuOpen) return;
+    this.onMenu(this.deck.id);
   }
 
   /** 组件拥有返回图片；旧请求与销毁后的解码结果只释放，不回写。 */
@@ -351,11 +341,7 @@ export struct 牌组列表项 {
     }
     .width('100%')
     .height(应用尺寸.deckRowHeight(this.narrow))
-    .onAreaChange((_old: Area, area: Area): void => {
-      this.menuAnchor = { left: Number(area.globalPosition.x), top: Number(area.globalPosition.y),
-        width: Number(area.width), height: Number(area.height) };
-    })
-    .gestureModifier(new DeckRowMenuGesture(this.reorderMode, (event: GestureEvent): void => { this.openMenu(event); }))
+    .gestureModifier(new DeckRowMenuGesture(this.reorderMode, (): void => { this.openMenu(); }))
     .clip(true)
     .linearGradient({ angle: 110, colors: this.visual.selectedColors.length > 0 && this.selected
       ? themeGradient(this.glassColors)

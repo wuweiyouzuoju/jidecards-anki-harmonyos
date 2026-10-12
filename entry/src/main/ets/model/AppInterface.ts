@@ -264,9 +264,10 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'rename', titleKey: 'deck_rename_title', opens: 'deck_rename' },
     { id: 'customize', titleKey: 'deck_customize', opens: 'deck_customize' },
     ...FILTERED_DECK_ACTIONS.map((item): AppInterfaceItem => ({ id: item.id, titleKey: item.titleKey, condition: 'filtered_deck' })),
-    { id: 'custom_study', titleKey: 'custom_study_menu', opens: 'custom_study', fullOnly: true },
+    { id: 'custom_study', titleKey: 'custom_study_menu', opens: 'custom_study', fullOnly: true, condition: 'normal_deck' },
     { id: 'hide', titleKey: 'deck_menu_hide' },
-    { id: 'delete', titleKey: 'deck_menu_delete' }
+    { id: 'delete', titleKey: 'deck_menu_delete' },
+    { id: 'close', titleKey: 'cancel', iconKey: 'ic_common_close' }
   ] },
   { id: 'deck_tones', titleKey: 'deck_menu_tone_label', parent: 'deck_row_menu', items: [
     ...DECK_TONE_CHOICES.map((choice): AppInterfaceItem => ({ id: String(choice.tone), titleKey: choice.titleKey, iconKey: choice.iconKey }))
@@ -579,7 +580,8 @@ export function deckDetailsMoreItems(agent: boolean, filtered: boolean): AppInte
 
 export function deckRowMenuItems(simple: boolean, filtered: boolean): AppInterfaceItem[] {
   return visibleInterfaceItems('deck_row_menu', { simple, agent: false, cloudDeck: false, themeHasTextures: false })
-    .filter((item: AppInterfaceItem): boolean => item.condition !== 'filtered_deck' || filtered);
+    .filter((item: AppInterfaceItem): boolean => item.id !== 'close' &&
+      (item.condition === 'filtered_deck' ? filtered : item.condition === 'normal_deck' ? !filtered : true));
 }
 
 export interface AppInterfaceObservation {

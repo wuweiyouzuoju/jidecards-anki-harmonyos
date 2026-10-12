@@ -24,7 +24,7 @@ function menuHarness(locale = 'base') {
   });
   const menu = new Menu(), events = [];
   Object.assign(menu, {
-    deckId: '42', tone: 牌组色调.Blue,
+    deckId: '42', deckName: 'Parent::Deck', tone: 牌组色调.Blue,
     getUIContext: () => ({ getHostContext: () => ({ resourceManager: { getStringByNameSync: key => dictionaries[locale][key] } }) }),
     onClose: () => events.push('close'),
     onToneChange: (deckId, tone) => events.push([deckId, tone]),
@@ -34,7 +34,7 @@ function menuHarness(locale = 'base') {
   return { menu, events, tracker };
 }
 
-test('deck tone choices execute the shared flag menu behavior and preserve every persisted value', () => {
+test('deck tone choices retain every persisted value inside the shared dialog', () => {
   const { menu, events } = menuHarness();
   assert.deepEqual(DECK_TONE_CHOICES.map(choice => choice.tone), [牌组色调.Blue, 牌组色调.Purple, 牌组色调.Mint, 牌组色调.Amber, 牌组色调.Red, 牌组色调.None]);
   menu.toggleBranch(menu.menuItems().find(item => item.id === 'tone'));
@@ -43,7 +43,7 @@ test('deck tone choices execute the shared flag menu behavior and preserve every
     const items = menu.toneItems();
     assert.equal(items.filter(item => item.selected).length, 1);
     const item = items.find(item => item.id === String(choice.tone));
-    assert.equal(item.value, dictionaries.base[choice.titleKey]);
+    assert.equal(item.label, dictionaries.base[choice.titleKey]);
     assert.equal(item.iconTint, choice.colorKey ? 'app.color.' + choice.colorKey : undefined);
     assert.equal(item.icon, 'app.media.' + choice.iconKey);
     assert.equal(APP_INTERFACE_SURFACES.find(surface => surface.id === 'deck_tones').items.find(item => item.id === String(choice.tone)).iconKey, choice.iconKey);
@@ -52,11 +52,14 @@ test('deck tone choices execute the shared flag menu behavior and preserve every
   }
   menu.tone = 牌组色调.Black;
   assert.equal(menu.toneItems().some(item => item.selected), false, 'historical black is not mislabeled');
-  assert.equal(menu.toneItems().at(-1).selectionUsesAccent, false);
   const calls = events.length;
   menu.selectItem({ id: '-1' }); menu.selectItem({ id: '99' });
   assert.equal(events.length, calls);
-  assert.match(read('components/home/HomeDeckRowMenu.ets'), /CardActionMenu\(\{/);
+  const source = read('components/home/HomeDeckRowMenu.ets');
+  assert.match(source, /DialogFrame\(\{/);
+  assert.match(source, /DialogHeader\(\{ title: this\.deckName/);
+  assert.match(source, /selectionUsesAccent: choice\.id !== String\(牌组色调\.None\)/);
+  assert.doesNotMatch(source, /CardActionMenu|ActionMenuAnchor|AnchoredMenu\(/);
   assert.doesNotMatch(read('components/牌组列表项.ets'), /bindPopup\(|色条菜单|色条选项列表/);
 });
 
@@ -66,22 +69,38 @@ test('menu and JIDE share localized actions, mode visibility, filtered state and
     menu.simple = simple; menu.filtered = filtered; menu.publishInterface();
     const entries = menu.menuItems();
     assert.deepEqual(entries.map(item => item.id), deckRowMenuItems(simple, filtered).map(item => item.id));
-    assert.equal(entries.some(item => item.id === 'custom_study'), !simple);
+    assert.equal(entries.some(item => item.id === 'custom_study'), !simple && !filtered);
     assert.equal(entries.some(item => item.id === 'empty_filtered'), filtered);
-    assert.equal(entries.find(item => item.id === 'stats').value, dictionaries[locale].deck_menu_stats);
-    assert.equal(entries.find(item => item.id === 'browser').value, dictionaries[locale].browser_title);
+    assert.equal(entries.find(item => item.id === 'stats').label, dictionaries[locale].deck_menu_stats);
+    assert.equal(entries.find(item => item.id === 'browser').label, dictionaries[locale].browser_title);
     for (const item of entries.filter(item => item.id !== 'tone')) {
       menu.selectItem(item); assert.deepEqual(events.slice(-2), ['close', ['42', item.id]]);
     }
     menu.toggleBranch(entries.find(item => item.id === 'tone')); menu.publishInterface();
     const observation = tracker.snapshot().find(item => item.surface === 'deck_tones');
-    assert.equal(tracker.snapshot().find(item => item.surface === 'deck_row_menu').values.find(item => item.id === 'anchor').value, 'deck_row');
-    assert.equal(tracker.snapshot().find(item => item.surface === 'deck_row_menu').values.find(item => item.id === 'pointer').value, 'selected_deck_border');
+    const state = tracker.snapshot().find(item => item.surface === 'deck_row_menu');
+    assert.equal(state.items.some(item => item.id === 'custom_study'), !simple && !filtered);
+    assert.equal(state.values.find(item => item.id === 'presentation').value, 'centered_dialog');
+    assert.equal(state.values.find(item => item.id === 'deck_name').value, menu.deckName);
+    assert.equal(state.items.find(item => item.id === 'close').title, dictionaries[locale].cancel);
+    assert.ok(state.values.every(item => !['anchor', 'pointer'].includes(item.id)));
     assert.equal(observation.selectedId, String(牌组色调.Blue));
     assert.deepEqual(observation.items.map(item => item.title), DECK_TONE_CHOICES.map(choice => dictionaries[locale][choice.titleKey]));
     menu.aboutToDisappear();
     assert.equal(tracker.snapshot().some(item => ['deck_row_menu', 'deck_tones'].includes(item.surface)), false);
   }
+});
+
+test('switching to a filtered deck rejects a stale custom-study menu selection', () => {
+  const { menu, events, tracker } = menuHarness();
+  menu.simple = false;
+  const stale = menu.menuItems().find(item => item.id === 'custom_study');
+  assert.ok(stale);
+  menu.filtered = true; menu.publishInterface();
+  assert.equal(menu.menuItems().some(item => item.id === 'custom_study'), false);
+  assert.equal(tracker.snapshot().find(item => item.surface === 'deck_row_menu').items.some(item => item.id === 'custom_study'), false);
+  menu.selectItem(stale);
+  assert.deepEqual(events, []);
 });
 
 test('busy, closed, removed and invalid entries cannot act; back closes colors before the menu', () => {
@@ -90,12 +109,22 @@ test('busy, closed, removed and invalid entries cannot act; back closes colors b
   assert.deepEqual(menu.expandedIds, []); assert.deepEqual(events, []);
   menu.handleBack(); assert.deepEqual(events, ['close']);
   events.length = 0; menu.busy = true;
-  assert.ok(menu.menuItems().every(item => !item.enabled));
-  assert.ok(menu.toneItems().every(item => !item.enabled));
+  assert.ok(menu.menuItems().every(item => !item.available));
+  assert.ok(menu.toneItems().every(item => !item.available));
   menu.selectItem({ id: 'stats' }); menu.toggleBranch({ id: 'tone' }); assert.deepEqual(events, []);
+  menu.handleBack(); menu.dismiss(); assert.deepEqual(events, [], 'busy protects header, outside and system-back dismissal alike');
   menu.busy = false; menu.selectItem({ id: 'custom_study' }); menu.selectItem({ id: 'empty_filtered' });
   menu.selectItem({ id: 'invalid' }); menu.selectItem({ id: 'tone' }); assert.deepEqual(events, []);
-  menu.aboutToDisappear(); menu.selectItem({ id: 'browser' }); assert.deepEqual(events, []);
+  menu.aboutToDisappear(); menu.selectItem({ id: 'browser' }); menu.dismiss(); assert.deepEqual(events, []);
+});
+
+test('header and outside dismissal close the whole dialog even while colors are expanded', () => {
+  const { menu, events, tracker } = menuHarness();
+  menu.toggleBranch({ id: 'tone' }); menu.publishInterface();
+  menu.busy = true; menu.publishInterface();
+  assert.equal(tracker.snapshot().find(item => item.surface === 'deck_row_menu').items.find(item => item.id === 'close').enabled, false);
+  menu.dismiss(); assert.deepEqual(events, []);
+  menu.busy = false; menu.dismiss(); assert.deepEqual(events, ['close']);
 });
 
 test('closing the overlay cannot clear the accepted action target', () => {
@@ -110,7 +139,7 @@ test('closing the overlay cannot clear the accepted action target', () => {
 
 function homeHarness() {
   const source = read('pages/首页.ets');
-  const methods = ['openDeckMenu', 'closeHomeActions', 'handleDeckMenuAction', '打开浏览页', '打开统计页'].map(name => {
+  const methods = ['openDeckMenu', 'closeHomeActions', 'handleDeckMenuAction', '打开浏览页', '打开统计页', '打开自定义学习'].map(name => {
     const start = source.indexOf('  private ' + name + '(');
     assert.ok(start >= 0, name);
     return source.slice(start, source.indexOf('\n  }', start) + 4);
@@ -131,11 +160,31 @@ function homeHarness() {
   return { home, paths, actions, target };
 }
 
+test('custom study opens only for an existing normal deck, including after sync deferral', () => {
+  const { home, target } = homeHarness();
+  home.显示自定义学习 = false;
+  home.打开自定义学习('deleted');
+  assert.equal(home.显示自定义学习, false);
+  target.filtered = true;
+  home.handleDeckMenuAction(target.id, 'custom_study');
+  assert.equal(home.显示自定义学习, false);
+  target.filtered = false;
+  home.打开自定义学习(target.id);
+  assert.equal(home.显示自定义学习, true);
+  assert.equal(home.自定义学习牌组ID, target.id);
+  assert.equal(home.自定义学习牌组名, target.displayName);
+  home.显示自定义学习 = false;
+  let pending;
+  home.deferForSync = action => { pending = action; return true; };
+  home.打开自定义学习(target.id);
+  target.filtered = true;
+  home.deferForSync = () => false; pending();
+  assert.equal(home.显示自定义学习, false);
+});
+
 test('long pressing selects the target and opens statistics and browser with that deck preselected', () => {
   const { home, paths, actions, target } = homeHarness();
-  const anchor = { left: 30, top: 320, width: 400, height: 68 };
-  home.openDeckMenu(target.id, anchor); assert.equal(home.deckMenuId, '42');
-  assert.deepEqual(home.deckMenuAnchor, anchor);
+  home.openDeckMenu(target.id); assert.equal(home.deckMenuId, '42');
   assert.equal(home.选中的牌组ID, '42');
   home.handleDeckMenuAction(target.id, 'browser'); home.handleDeckMenuAction(target.id, 'stats');
   assert.equal(paths[0].name, 'BrowserPage');
@@ -156,11 +205,10 @@ test('long press moves the row highlight from the previous selection and closing
   assert.ok(selectedExpression);
   const isHighlighted = new Function('deck', 'return ' + selectedExpression);
   const highlightedIds = () => ['999', '42', '43'].filter(id => isHighlighted.call(home, { id }));
-  const anchor = { left: 24, top: 300, width: 360, height: 68 };
   Object.assign(home, { 显示牌组详情: false,
     选择牌组: () => { throw new Error('long press must not open phone details'); } });
   assert.deepEqual(highlightedIds(), ['999']);
-  home.openDeckMenu(target.id, anchor);
+  home.openDeckMenu(target.id);
   assert.deepEqual(highlightedIds(), ['42']);
   assert.equal(home.deckMenuId, '42');
   assert.equal(home.显示牌组详情, false);
@@ -169,13 +217,13 @@ test('long press moves the row highlight from the previous selection and closing
   assert.equal(home.deckMenuId, '');
   assert.deepEqual(highlightedIds(), ['42']);
   home.按ID查牌组 = id => ['42', '43'].includes(id) ? { ...target, id } : { id: '' };
-  home.openDeckMenu('43', anchor);
+  home.openDeckMenu('43');
   assert.deepEqual(highlightedIds(), ['43']);
-  home.openDeckMenu('deleted', anchor);
+  home.openDeckMenu('deleted');
   assert.equal(home.deckMenuId, '43');
   assert.deepEqual(highlightedIds(), ['43']);
   home.closeHomeActions(); home.排序模式中 = true;
-  home.openDeckMenu('42', anchor);
+  home.openDeckMenu('42');
   assert.equal(home.deckMenuId, '');
   assert.deepEqual(highlightedIds(), ['43']);
 });
@@ -206,7 +254,7 @@ test('deck search uses the full hierarchy and escapes quotes, wildcards and back
   assert.equal(deckScopeSearch('a"b*_\\c'), 'deck:"a\\"b\\*\\_\\\\c"');
 });
 
-test('long press forwards the current scrolled row anchor through the list to home', () => {
+test('long press forwards the target through the list without row geometry or finger coordinates', () => {
   const source = read('components/牌组列表项.ets');
   const start = source.indexOf('  private openMenu(');
   const method = source.slice(start, source.indexOf('\n  }', start) + 4);
@@ -222,22 +270,19 @@ test('long press forwards the current scrolled row anchor through the list to ho
   const list = { onItemMenu: boundCallback(read('pages/首页.ets'), 'onItemMenu', home) };
   const onMenu = boundCallback(read('components/home/主页牌组列表.ets'), 'onMenu', list);
   Object.assign(row, { deck: { id: '42' }, reorderMode: false, menuOpen: false,
-    menuAnchor: { left: 24, top: 100, width: 360, height: 68 },
     onMenu: (...args) => { calls.push(args); onMenu(...args); } });
-  const event = { fingerList: [undefined, { globalX: 175, globalY: 478, localX: 151, localY: 28 }] };
-  row.openMenu(event);
-  assert.deepEqual(calls, [['42', { left: 24, top: 450, width: 360, height: 68 }]], 'scrolling must not reuse the old top=100');
+  row.openMenu();
+  assert.deepEqual(calls, [['42']]);
   assert.equal(home.deckMenuId, '42');
   assert.equal(home.选中的牌组ID, '42');
-  assert.deepEqual(home.deckMenuAnchor, calls[0][1], 'every adapter must preserve the row anchor');
-  row.reorderMode = true; row.openMenu(event);
-  row.reorderMode = false; row.menuOpen = true; row.openMenu(event);
+  row.reorderMode = true; row.openMenu();
+  row.reorderMode = false; row.menuOpen = true; row.openMenu();
   assert.equal(calls.length, 1);
-  assert.match(source, /this\.onMenu\(this\.deck\.id, anchor\)/);
-  assert.match(read('components/home/主页牌组列表.ets'), /this\.onItemMenu\(deckId, anchor\)/);
-  assert.match(read('pages/首页.ets'), /this\.openDeckMenu\(deckId, anchor\)/);
-  assert.match(read('pages/首页.ets'), /anchor: actionMenuHostAnchor\(this\.deckMenuAnchor, this\.homeMenuHostLeft, this\.homeMenuHostTop\)/);
-  assert.match(read('components/home/HomeDeckRowMenu.ets'), /anchor: this\.anchor/);
+  assert.match(source, /this\.onMenu\(this\.deck\.id\)/);
+  assert.doesNotMatch(source, /menuAnchor|fingerList/);
+  assert.match(read('components/home/主页牌组列表.ets'), /this\.onItemMenu\(deckId\)/);
+  assert.match(read('pages/首页.ets'), /this\.openDeckMenu\(deckId\)/);
+  assert.match(read('pages/首页.ets'), /deckName: this\.按ID查牌组\(this\.deckMenuId\)\.fullName/);
 });
 
 test('context menu follows the row, opens above bottom rows and converts navigation offsets only once', () => {

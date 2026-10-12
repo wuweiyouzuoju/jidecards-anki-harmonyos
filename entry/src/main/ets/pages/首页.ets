@@ -57,7 +57,6 @@ import { ThemeBackground } from '../components/common/ThemeBackground';
 import { filteredDeckCommands } from '../backend/FilteredDeckService';
 import { HomeDeckDetails } from '../components/home/HomeDeckDetails';
 import { HomeDeckRowMenu } from '../components/home/HomeDeckRowMenu';
-import { ActionMenuAnchor, actionMenuHostAnchor } from '../components/common/ActionMenuLayout';
 import { deckScopeSearch } from '../model/DeckScope';
 
 import { 主页操作面板 } from '../components/主页操作面板';
@@ -273,7 +272,6 @@ struct 首页 {
   @State @Watch('homeActivityChanged') private 显示更多菜单: boolean = false;
   @State @Watch('homeActivityChanged') private homeSearchOpen: boolean = false;
   @State @Watch('homeActivityChanged') private deckMenuId: string = '';
-  @State private deckMenuAnchor: ActionMenuAnchor = { left: 0, top: 0, width: 0, height: 0 };
   @State private deckMenuBackRequest: number = 0;
   @State private homeVisible: boolean = true;
   @StorageProp(AI_AGENT_CHANNELS_APP_STORAGE_KEY) @Watch('homeAgentGateChanged') private homeAgentEnabled: boolean = false;
@@ -1433,10 +1431,9 @@ struct 首页 {
     }
   }
 
-  private openDeckMenu(deckId: string, anchor: ActionMenuAnchor): void {
+  private openDeckMenu(deckId: string): void {
     if (this.排序模式中 || this.按ID查牌组(deckId).id === '') return;
     this.closeHomeActions();
-    this.deckMenuAnchor = anchor;
     this.deckMenuId = deckId;
     // 长按同时选中目标；不走点击入口，避免手机详情覆盖长按菜单。
     this.选中的牌组ID = deckId;
@@ -1644,7 +1641,7 @@ struct 首页 {
   private 打开自定义学习(deckId: string): void {
     if (this.deferForSync((): void => { this.打开自定义学习(deckId); })) return;
     const deck: 牌组汇总 = this.按ID查牌组(deckId);
-    if (deck.id === '') {
+    if (deck.id === '' || deck.filtered === true) {
       return;
     }
     this.自定义学习牌组ID = deckId;
@@ -2044,7 +2041,7 @@ struct 首页 {
                 this.切换牌组展开(deckId);
               },
               menuDeckId: this.deckMenuId,
-              onItemMenu: (deckId: string, anchor: ActionMenuAnchor): void => { this.openDeckMenu(deckId, anchor); },
+              onItemMenu: (deckId: string): void => { this.openDeckMenu(deckId); },
               onItemDoubleTap: (deckId: string): void => {
                 this.递归切换牌组(deckId);
               },
@@ -2185,7 +2182,7 @@ struct 首页 {
     }
     if (this.deckMenuId !== '' && this.按ID查牌组(this.deckMenuId).id !== '') {
       HomeDeckRowMenu({ deckId: this.deckMenuId, tone: this.按ID查牌组(this.deckMenuId).tone,
-        anchor: actionMenuHostAnchor(this.deckMenuAnchor, this.homeMenuHostLeft, this.homeMenuHostTop),
+        deckName: this.按ID查牌组(this.deckMenuId).fullName,
         filtered: this.按ID查牌组(this.deckMenuId).filtered === true, busy: this.filteredDeckBusy,
         backRequest: this.deckMenuBackRequest, onClose: (): void => { this.deckMenuId = ''; },
         onAction: (deckId: string, action: string): void => { this.handleDeckMenuAction(deckId, action); },

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { CardActionMenu, CardActionMenuEntry } from '../common/CardActionMenu';
-import { ActionMenuAnchor } from '../common/ActionMenuLayout';
+import { DialogFrame } from '../common/DialogFrame';
+import { DialogHeader } from '../common/DialogHeader';
+import { AnchoredMenuItem } from '../common/MenuItem';
+import { ActionMenuListItem } from '../common/ActionMenuList';
 import { AppInterfaceControl, AppInterfaceItem, deckRowMenuItems } from '../../model/AppInterface';
 import { appInterface } from '../../backend/AppInterfaceService';
 import { interfaceItemText } from '../../utils/AppInterfaceText';
@@ -8,13 +10,13 @@ import { DECK_TONE_CHOICES, DeckToneChoice, 牌组色调 } from '../../model/Dec
 import { 简洁模式AppStorage键 } from '../../model/简洁模式存储';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 
-/** 与学习/浏览旗标复用同一分组菜单；首页拥有目标和原业务回调。 */
+/** 牌组长按复用公共居中弹窗与动作行；首页拥有目标和原业务回调。 */
 @Component
 export struct HomeDeckRowMenu {
   @StorageProp('系统语言') @Watch('publishInterface') private uiLanguage: string = 'zh-Hans';
   @StorageProp(简洁模式AppStorage键) @Watch('publishInterface') private simple: boolean = true;
   @Prop @Watch('publishInterface') deckId: string = '';
-  @Prop anchor: ActionMenuAnchor = { left: 0, top: 0, width: 0, height: 0 };
+  @Prop @Watch('publishInterface') deckName: string = '';
   @Prop @Watch('publishInterface') tone: 牌组色调 = 牌组色调.Blue;
   @Prop @Watch('publishInterface') filtered: boolean = false;
   @Prop @Watch('publishInterface') busy: boolean = false;
@@ -32,36 +34,39 @@ export struct HomeDeckRowMenu {
   }
 
   private handleBack(): void {
+    if (this.busy || !this.mounted) return;
     if (this.expandedIds.length > 0) this.expandedIds = [];
-    else this.onClose();
+    else this.dismiss();
   }
 
-  private toneItems(): CardActionMenuEntry[] {
-    return DECK_TONE_CHOICES.map((choice: DeckToneChoice): CardActionMenuEntry => ({
+  private dismiss(): void {
+    if (!this.busy && this.mounted) this.onClose();
+  }
+
+  private toneItems(): ActionMenuListItem[] {
+    return DECK_TONE_CHOICES.map((choice: DeckToneChoice): ActionMenuListItem => ({
       id: String(choice.tone),
-      value: interfaceItemText(this.getUIContext(), 'deck_tones', String(choice.tone), this.uiLanguage),
+      label: interfaceItemText(this.getUIContext(), 'deck_tones', String(choice.tone), this.uiLanguage),
       icon: $r('app.media.' + choice.iconKey),
       iconTint: choice.colorKey === '' ? undefined : $r('app.color.' + choice.colorKey),
-      enabled: !this.busy, selected: choice.tone === this.tone,
-      selectionUsesAccent: choice.tone !== 牌组色调.None
+      available: !this.busy, selected: choice.tone === this.tone
     }));
   }
 
-  private menuItems(): CardActionMenuEntry[] {
-    return deckRowMenuItems(this.simple, this.filtered).map((item: AppInterfaceItem): CardActionMenuEntry => ({
+  private menuItems(): ActionMenuListItem[] {
+    return deckRowMenuItems(this.simple, this.filtered).map((item: AppInterfaceItem): ActionMenuListItem => ({
       id: item.id,
-      value: interfaceItemText(this.getUIContext(), 'deck_row_menu', item.id, this.uiLanguage),
-      enabled: !this.busy, destructive: item.id === 'delete',
-      children: item.id === 'tone' ? this.toneItems() : undefined
+      label: interfaceItemText(this.getUIContext(), 'deck_row_menu', item.id, this.uiLanguage),
+      available: !this.busy, destructive: item.id === 'delete'
     }));
   }
 
-  private toggleBranch(item: CardActionMenuEntry): void {
-    if (this.busy || item.id !== 'tone') return;
+  private toggleBranch(item: ActionMenuListItem): void {
+    if (this.busy || !this.mounted || item.id !== 'tone') return;
     this.expandedIds = this.expandedIds.includes('tone') ? [] : ['tone'];
   }
 
-  private selectItem(item: CardActionMenuEntry): void {
+  private selectItem(item: ActionMenuListItem): void {
     if (this.busy || !this.mounted) return;
     if (this.expandedIds.includes('tone')) {
       const choice: DeckToneChoice | undefined = DECK_TONE_CHOICES.find((entry: DeckToneChoice): boolean => String(entry.tone) === item.id);
@@ -84,11 +89,14 @@ export struct HomeDeckRowMenu {
       title: interfaceItemText(this.getUIContext(), 'deck_row_menu', item.id, this.uiLanguage),
       enabled: !this.busy, selected: this.expandedIds.includes(item.id)
     }));
+    items.push({ id: 'close', titleKey: 'cancel',
+      title: interfaceItemText(this.getUIContext(), 'deck_row_menu', 'close', this.uiLanguage),
+      iconKey: 'ic_common_close', enabled: !this.busy, selected: false });
     appInterface.observe({ surface: 'deck_row_menu', sectionId: '', selectedId: this.deckId, busy: this.busy,
       optionIds: items.map((item: AppInterfaceControl): string => item.id),
       optionLabels: items.map((item: AppInterfaceControl): string => item.title), items: items, controlsComplete: true,
       values: [{ id: 'filtered', value: String(this.filtered) }, { id: 'tone', value: String(this.tone) },
-        { id: 'anchor', value: 'deck_row' }, { id: 'pointer', value: 'selected_deck_border' }] });
+        { id: 'presentation', value: 'centered_dialog' }, { id: 'deck_name', value: this.deckName }] });
     if (this.expandedIds.includes('tone')) {
       const tones: AppInterfaceControl[] = DECK_TONE_CHOICES.map((choice: DeckToneChoice): AppInterfaceControl => ({
         id: String(choice.tone), titleKey: choice.titleKey,
@@ -101,10 +109,36 @@ export struct HomeDeckRowMenu {
     } else appInterface.leave('deck_tones');
   }
 
+  @Builder
+  private dialogHeader() {
+    DialogHeader({ title: this.deckName, showAction: false, closeEnabled: !this.busy,
+      closeLabel: interfaceItemText(this.getUIContext(), 'deck_row_menu', 'close', this.uiLanguage),
+      onClose: (): void => { this.dismiss(); } })
+  }
+
+  @Builder
+  private dialogContent() {
+    Column() {
+      ForEach(this.menuItems(), (item: ActionMenuListItem, index: number) => {
+        AnchoredMenuItem({ label: item.label, available: item.available !== false,
+          destructive: item.destructive === true, divider: index > 0,
+          disclosure: item.id === 'tone', expanded: this.expandedIds.includes(item.id),
+          onSelect: (): void => { if (item.id === 'tone') this.toggleBranch(item); else this.selectItem(item); } })
+        if (item.id === 'tone' && this.expandedIds.includes('tone')) {
+          ForEach(this.toneItems(), (choice: ActionMenuListItem) => {
+            AnchoredMenuItem({ label: choice.label, icon: choice.icon, iconTint: choice.iconTint,
+              available: choice.available !== false, selected: choice.selected === true,
+              selectionUsesAccent: choice.id !== String(牌组色调.None),
+              onSelect: (): void => { this.selectItem(choice); } })
+          }, (choice: ActionMenuListItem): string => choice.id)
+        }
+      }, (item: ActionMenuListItem): string => item.id)
+    }.width('100%')
+  }
+
   build() {
-    CardActionMenu({ items: this.menuItems(), expandedIds: this.expandedIds, menuWidth: 应用尺寸.contextMenuWidth, anchor: this.anchor,
-      onClose: (): void => { this.handleBack(); },
-      onToggleBranch: (item: CardActionMenuEntry): void => { this.toggleBranch(item); },
-      onSelect: (item: CardActionMenuEntry): void => { this.selectItem(item); } })
+    DialogFrame({ maximumWidth: 应用尺寸.dialogCompactMaxWidth, canDismiss: !this.busy,
+      onDismiss: (): void => { this.dismiss(); },
+      header: () => { this.dialogHeader(); }, content: () => { this.dialogContent(); } })
   }
 }

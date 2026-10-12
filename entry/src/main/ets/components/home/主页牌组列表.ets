@@ -20,7 +20,7 @@
 // onMove: (from: number, to: number) => void  拖拽排序回调
 // onItemSelect: (deckId: string) => void  点击牌组项回调
 // onItemToggle: (deckId: string) => void  展开/折叠牌组项回调
-// onItemMenu: (deckId: string, anchor: ActionMenuAnchor) => void  长按目标及窗口锚点交给首页
+// onItemMenu: (deckId: string) => void  长按目标交给首页居中弹窗
 // onItemDoubleTap: (deckId: string) => void  递归展开回调
 // onRefresh: () => Promise<void>  下拉刷新完成信号
 // onRetry: () => void  错误态重试回调
@@ -39,7 +39,6 @@
 
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { 牌组列表项 } from '../牌组列表项';
-import { ActionMenuAnchor } from '../common/ActionMenuLayout';
 import { DECK_LIST_NARROW_KEY, DECK_LIST_STYLE_KEY, isDoubleColumnDeckListStyle,
   deckListOverflows, groupDeckListRows, groupedDeckListOverflows, DeckListGroup } from '../../model/DeckListAppearance';
 import { 统一加载态 } from '../common/统一加载态';
@@ -106,7 +105,7 @@ export struct 主页牌组列表 {
   onItemSelect: (deckId: string) => void = (deckId: string): void => {};
   onItemToggle: (deckId: string) => void = (deckId: string): void => {};
   @Prop menuDeckId: string = '';
-  onItemMenu: (deckId: string, anchor: ActionMenuAnchor) => void = (): void => {};
+  onItemMenu: (deckId: string) => void = (): void => {};
   onItemDoubleTap: (deckId: string) => void = (_deckId: string): void => {};
   onRefresh: () => Promise<void> = (): Promise<void> => Promise.resolve();
   onRetry: () => void = (): void => {};
@@ -202,7 +201,7 @@ export struct 主页牌组列表 {
         this.onItemToggle(deckId);
       },
       menuOpen: this.menuDeckId !== '',
-      onMenu: (deckId: string, anchor: ActionMenuAnchor): void => { this.onItemMenu(deckId, anchor); },
+      onMenu: (deckId: string): void => { this.onItemMenu(deckId); },
       onDoubleTap: (deckId: string): void => {
         this.onItemDoubleTap(deckId);
       }

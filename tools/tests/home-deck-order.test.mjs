@@ -231,7 +231,7 @@ test('row uses dynamic menu gestures and list recreates sorting registration on 
   assert.match(row,/\.gestureModifier\(new DeckRowMenuGesture\(this\.reorderMode/);
   assert.doesNotMatch(row,/\.parallelGesture\(|LongPressGesture\(/);
   assert.match(row,/if \(this\.reorderMode \|\| this\.menuOpen\) return/);
-  assert.match(row,/this\.onMenu\(this\.deck\.id, anchor\)/);
+  assert.match(row,/this\.onMenu\(this\.deck\.id\)/);
   assert.match(read('pages/首页.ets'), /if \(this\.排序模式中 \|\| this\.按ID查牌组\(deckId\)\.id === ''\) return/);
   assert.doesNotMatch(row,/onLevelMenu|onLevelChange|levelMenuDeckId|99999999/);
   const list=read('components/home/主页牌组列表.ets');
