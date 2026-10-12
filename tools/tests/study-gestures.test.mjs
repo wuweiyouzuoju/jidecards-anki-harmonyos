@@ -1,3 +1,6 @@
+import { BURY_SUSPEND_MODE_BURY_USER, BURY_SUSPEND_MODE_SUSPEND } from '../../entry/src/main/ets/proto/messages/SchedulerMessages.ts';
+import { STUDY_GESTURE_ACTIONS } from '../../entry/src/main/ets/model/StudyGestureConfig.ts';
+import { completeStudyGestures, activeStudyGestureInputs, studyGestureCommand, studyGestureTapInput, defaultStudyGestureConfig } from '../../entry/src/main/ets/model/StudyGestureConfig.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -38,7 +41,7 @@ function dom() {
   const context = vm.createContext({ window, document: { addEventListener: (name, fn) => { listeners[name] = fn; } },
     Date: { now: () => time }, setTimeout: (fn, ms) => { const id = ++next; tasks.set(id, { fn, at: time + ms }); return id; },
     clearTimeout: id => tasks.delete(id) });
-  const install = (version = 1, surface = 1, gestures = true) => vm.runInContext(buildStudyGestureScript(version, surface, gestures), context);
+  const install = (version = 1, surface = 1, gestures = true, inputs = undefined) => vm.runInContext(buildStudyGestureScript(version, surface, gestures, inputs), context);
   install();
   const plain = { tagName: 'DIV', parentElement: null, getAttribute: () => null, scrollTop: 0, scrollLeft: 0 };
   const point = (x = 200, y = 200) => ({ clientX: x, clientY: y });
@@ -188,7 +191,7 @@ test('settings selection disables duplicate input and restores actual mode after
     StudyQuickAnswerMode, loadStudyQuickAnswerMode: async () => 0,
     saveStudyQuickAnswerMode: () => new Promise((resolve, reject) => { finish = { resolve, reject }; })
   });
-  const host = Object.assign(new Host(), { recoveryMessage: '', resultMessage: '', resultUndo: null });
+  const host = Object.assign(new Host(), { recoveryMessage: '', resultMessage: '', resultUndo: null, 简洁模式: true, updateShakeSensor() {} });
   const saving = host.changeControl(1);
   assert.equal(host.controlsSaving, true); assert.equal(host.selectedMode, 1);
   await host.changeControl(2); assert.equal(host.selectedMode, 1);
@@ -202,7 +205,7 @@ test('settings selection disables duplicate input and restores actual mode after
 
 const pageSource = readFileSync(new URL('../../entry/src/main/ets/pages/学习页.ets', import.meta.url), 'utf8');
 function pageHarness() {
-  const names = ['controls', 'isStudyGesturesEnabled', 'isTapZonesEnabled', 'handleStudyGesture', 'maybeShowTapZonesGuide', 'closeTapZonesGuide'];
+  const names = ['controls', 'isStudyGesturesEnabled', 'isTapZonesEnabled', 'handleStudyGesture', 'studyGestureBlocked', 'maybeShowTapZonesGuide', 'closeTapZonesGuide'];
   const methods = names.map(name => {
     const start = pageSource.indexOf('  private ' + name + '('); assert.notEqual(start, -1);
     return pageSource.slice(start, pageSource.indexOf('\n  }', start) + 4);
@@ -210,10 +213,10 @@ function pageHarness() {
   let now = 1000, completed = false, saved = 0;
   const commands = [], scripts = [];
   const Host = new Function('StudyQuickAnswerMode', 'resolveStudyGesture', 'isTapZonesGuideCompleted', 'completeTapZonesGuide', 'Date',
-    'RATING_AGAIN', 'RATING_HARD', 'RATING_GOOD', 'RATING_EASY', 'validateStudyControls', 'mappedStudyCommand',
+    'completeStudyGestures', 'studyGestureCommand', 'studyGestureTapInput', 'RATING_AGAIN', 'RATING_HARD', 'RATING_GOOD', 'RATING_EASY', 'BURY_SUSPEND_MODE_BURY_USER', 'BURY_SUSPEND_MODE_SUSPEND', 'validateStudyControls', 'mappedStudyCommand',
     stripTypeScriptTypes('class Host {' + methods + '}', { mode: 'transform' }) + ';return Host;')(
-    StudyQuickAnswerMode, resolveStudyGesture, () => completed, async () => { saved++; completed = true; }, { now: () => now }, 0, 1, 2, 3,validateStudyControls,mappedStudyCommand);
-  const page = Object.assign(Object.assign(new Host(), { recoveryMessage: '', resultMessage: '', resultUndo: null }), { timeboxNotice: null, 阶段: 'question', requestVersion: 1, interactionVersion: 1,
+    StudyQuickAnswerMode, resolveStudyGesture, () => completed, async () => { saved++; completed = true; }, { now: () => now }, completeStudyGestures, studyGestureCommand, studyGestureTapInput, 0, 1, 2, 3,BURY_SUSPEND_MODE_BURY_USER,BURY_SUSPEND_MODE_SUSPEND,validateStudyControls,mappedStudyCommand);
+  const page = Object.assign(Object.assign(new Host(), { recoveryMessage: '', resultMessage: '', resultUndo: null, 简洁模式: true, updateShakeSensor() {} }), { timeboxNotice: null, 阶段: 'question', requestVersion: 1, interactionVersion: 1,
     controlsJson:JSON.stringify(defaultStudyControls()),quickAnswerMode: StudyQuickAnswerMode.TapZones, choiceQuestion: null, pendingHtml: '', controllerReady: true,
     展示时刻毫秒: 500, isCurrentRequest: v => v === 1, stopStudyTimers() {}, startStudyTimers() {}, clearChoiceAutoAdvance() {},
     studyCardShown() { scripts.push(this.interactionVersion); }, 显示答案() { commands.push('flip'); },
@@ -277,4 +280,74 @@ test('JIDE gesture overrides apply to the actual page while choice feedback and 
   page.choiceQuestion=null;page.studyMenuOpen=true;page.handleStudyGesture('left',0,0,1,1);assert.deepEqual(commands,[]);
   page.studyMenuOpen=false;page.controlsJson=JSON.stringify({...defaultStudyControls(),gestureMode:'off'});
   assert.equal(page.isStudyGesturesEnabled(),false);assert.equal(page.isTapZonesEnabled(),false);
+});
+
+test('full gestures resolve current face/layout, every study action, disabled mode and all input guards on the real page',()=>{
+  const {page,commands}=pageHarness();page.简洁模式=false;page.阶段='answer';page.quickAnswerMode=0;
+  const config={...defaultStudyGestureConfig(),enabled:true,tapLayout:'nine',bindings:[]};
+  const record=name=>(...args)=>commands.push([name,...args]);
+  Object.assign(page,{返回:record('back'),请求删除当前卡:record('delete'),撤销上次:record('undo'),
+    埋藏或暂停当前卡:record('bury/suspend'),playStudyAudio:record('replay'),openNoteEditor:record('edit'),
+    changeMarking:record('mark/flag'),openStudyMenu:record('menu'),showStudyGuide:record('guide'),
+    executeMenuAction:record('whiteboard'),configureAutoAdvance:record('auto_advance')});
+  for(const {id:command} of STUDY_GESTURE_ACTIONS.slice(1)) {
+    page.阶段=command==='flip'?'question':'answer';
+    config.bindings=[{input:'up',command,side:'both'}];page.controlsJson=JSON.stringify({...defaultStudyControls(),gestureConfig:config});
+    page.handleStudyGesture('up',0,0,1,1);assert.equal(commands.length,1,command);commands.length=0;
+  }
+  page.阶段='answer';config.bindings=[{input:'nine_center',command:'easy',side:'answer'},{input:'up',command:'good',side:'both'}];
+  page.controlsJson=JSON.stringify({...defaultStudyControls(),gestureConfig:config});
+  page.handleStudyGesture('tap',0.5,0.5,1,1);assert.deepEqual(commands,[3]);commands.length=0;
+  page.handleStudyGesture('left',0,0,1,1);assert.deepEqual(commands,[],'full configuration does not inherit old swipe defaults');
+  page.阶段='question';page.handleStudyGesture('up',0,0,1,1);assert.deepEqual(commands,[]);
+  page.阶段='answer';
+  for(const field of ['webInputFocused','answerInputFocused','studyMenuOpen','customSchedulingWarning','手写模式','cardRenderPending','flipPending']) {
+    page[field]=true;page.handleStudyGesture('up',0,0,1,1);assert.deepEqual(commands,[],field);page[field]=false;
+  }
+  page.handleStudyGesture('up',0,0,0,1);page.handleStudyGesture('up',0,0,1,0);assert.deepEqual(commands,[]);
+  page.简洁模式=true;page.handleStudyGesture('up',0,0,1,1);assert.deepEqual(commands,[],'simple mode cannot use experimental bindings');
+  page.简洁模式=false;page.handleStudyGesture('up',0,0,1,1);assert.deepEqual(commands,[2]);
+});
+
+test('full script recognizes vertical swipes but yields to scrolling, edges, selection and old surfaces',()=>{
+  const d=dom();d.install(7,9,false,['up','down']);
+  let prevented=0;
+  d.start();d.listeners.touchmove({touches:[d.point(200,100)],preventDefault(){prevented++;}});d.end(200,100);d.click();
+  d.tick(500);d.start();d.end(200,300);
+  assert.deepEqual(d.actions.map(a=>a[0]),['up','down']);assert.equal(prevented,1);
+  d.tick(500);const scrolling={...d.plain,scrollHeight:1600,clientHeight:800};
+  d.start(200,200,scrolling);d.listeners.touchmove({touches:[d.point(200,100)],preventDefault(){assert.fail('scroll was captured');}});d.end(200,100);
+  d.start(200,5);d.end(200,100);d.select('text');d.start();d.end(200,100);d.select('');
+  d.start();d.install(8,1,false,['up']);d.end(200,100);assert.equal(d.actions.length,2);
+});
+
+test('multi-finger taps wait for all releases, cancel synthetic clicks and reject motion, excess fingers, cancellation and stale input',()=>{
+  for(const count of [2,3,4]) {
+    const d=dom();d.install(1,1,false,['two_finger','three_finger','four_finger']);
+    const points=Array.from({length:count},(_,id)=>({...d.point(160+id*20,200),identifier:id}));
+    d.listeners.touchstart({touches:points.slice(0,1),target:d.plain});
+    d.listeners.touchstart({touches:points,target:d.plain});
+    d.listeners.touchend({touches:points.slice(1),changedTouches:points.slice(0,1)});assert.equal(d.actions.length,0);
+    d.listeners.touchend({touches:[],changedTouches:points.slice(1)});d.click();d.tick(400);
+    assert.deepEqual(d.actions.map(a=>a[0]),[['','','two_finger','three_finger','four_finger'][count]]);
+  }
+  for(const failure of ['move','five','cancel','stale','scroll','long','button','edge']) {
+    const d=dom();d.install(1,1,false,['two_finger','four_finger']);
+    const points=Array.from({length:failure==='five'?5:2},(_,id)=>({...d.point(failure==='edge'?5:160+id*20,200),identifier:id}));
+    d.listeners.touchstart({touches:points,target:failure==='button'?{...d.plain,tagName:'BUTTON'}:d.plain});
+    if(failure==='move') d.listeners.touchmove({touches:points.map(p=>({...p,clientY:220}))});
+    if(failure==='cancel') d.listeners.touchcancel();
+    if(failure==='stale') d.install(2,1,false,['two_finger']);
+    if(failure==='scroll') d.plain.scrollTop=10;
+    if(failure==='long') d.tick(501);
+    d.listeners.touchend({touches:[],changedTouches:points});d.click();d.tick(400);
+    assert.deepEqual(d.actions,[],failure);
+  }
+});
+
+test('full single taps wait only when this face has a double-tap action; cancellations clear pending taps',()=>{
+  const d=dom();d.install(1,1,false,['four_top_left']);d.click(d.plain,80,160);
+  assert.deepEqual(d.actions,[['tap',0.2,0.2,1,1]]);
+  d.install(1,2,false,['double','four_top_left']);d.click(d.plain,80,160);d.start();d.listeners.touchcancel();d.tick(400);
+  assert.equal(d.actions.length,1);
 });

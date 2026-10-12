@@ -9,9 +9,9 @@ const browser = await chromium.launch({ headless: true, channel: 'msedge' });
 try {
   const context = await browser.newContext({ viewport: { width: 400, height: 800 }, hasTouch: true, isMobile: true });
   const page = await context.newPage();
-  const actions = [], errors = [];
+  const actions = [], focus = [], errors = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.exposeFunction('studyAction', (...args) => actions.push(args));
+  await page.exposeFunction('studyAction', (...args) => (args[0] === 'input_focus' ? focus : actions).push(args));
   await page.setContent(`<meta name="viewport" content="width=device-width,initial-scale=1">
     <style>body{margin:0}#card{height:2000px;background:#eee}button{height:50px;width:100px}</style>
     <div id="card"><button id="control">Audio</button><details><summary>Hint</summary>Hidden text</details></div>`);
@@ -27,6 +27,7 @@ try {
   await page.locator('#control').tap(); await page.locator('summary').tap(); await settle();
   assert.deepEqual(actions, [], 'native controls must keep clicks');
   assert.equal(await page.locator('details').evaluate(el => el.open), true);
+  assert.ok(focus.every(args=>args[3]===1&&args[4]===1),'native focus reports stay separate from gesture actions');
 
   const cdp = await context.newCDPSession(page);
   const touch = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type,
@@ -49,8 +50,24 @@ try {
   await page.touchscreen.tap(200, 300);
   await page.evaluate(buildStudyGestureScript(1, 2, true)); await settle();
   assert.deepEqual(actions, [], 'side updates cancel delayed taps');
+  await page.evaluate(buildStudyGestureScript(2, 1, false, ['up','down','two_finger','three_finger','four_finger']));
+  await swipe(200, 650, 200, 200);
+  assert.deepEqual(actions, [], 'full gestures still yield to scrollable documents');
+  assert.ok(await page.evaluate(() => window.scrollY) > 0);
+  await page.locator('#card').evaluate(el => {el.style.height='700px';});
+  await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(600);
+  await swipe(200, 400, 200, 200);await swipe(200, 200, 200, 400);
+  assert.deepEqual(actions.map(a=>a[0]),['up','down']);actions.length=0;
+  for(const count of [2,3,4]) {
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:Array.from({length:count},(_,id)=>({id,x:140+id*30,y:300}))});
+    await page.waitForTimeout(80);
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await settle();
+    assert.equal(actions.at(-1)[0],['','','two_finger','three_finger','four_finger'][count]);
+    await page.waitForTimeout(200);
+  }
+  assert.equal(actions.length,3,'multi-finger taps must not also dispatch a single tap');
   assert.deepEqual(errors, []);
-  console.log('Study gesture browser checks passed: touch double/single, controls, horizontal swipe, native scrolling, stale side');
+  console.log('Study gesture browser checks passed: touch double/single, controls, four swipe directions, native scrolling, 2/3/4-finger taps, stale side');
 } finally {
   await browser.close();
 }
