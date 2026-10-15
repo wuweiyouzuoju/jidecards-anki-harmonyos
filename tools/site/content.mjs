@@ -12,11 +12,11 @@ export async function loadContent(root) {
   const work = data.works[0];
   work.sourceVersion = app.versionName;
   work.sourceVersionCode = app.versionCode;
-  // 正式版由作者指定，源码版本来自应用配置，两项事实不相互推断。
+  // 市场版本由作者确认，当前源码版本读取应用配置；截图保留各自的历史版本。
   if (!work.releaseVersion || !work.releaseVersionSource) throw new Error('Author-confirmed website release is required.');
   if (!work.screenshots.length) throw new Error('Current author-supplied product media is required.');
   for (const item of work.screenshots) {
-    if (item.releaseVersion !== work.releaseVersion) throw new Error(`Outdated product media: ${item.path}`);
+    if (!item.releaseVersion || !item.path.includes(`-${item.releaseVersion}-`)) throw new Error(`Product media version does not match its provenance: ${item.path}`);
     const bytes = await readFile(path.join(hosting, item.path));
     const digest = createHash('sha256').update(bytes).digest('hex');
     if (digest !== item.sha256) throw new Error(`Product media does not match author-supplied bytes: ${item.path}`);

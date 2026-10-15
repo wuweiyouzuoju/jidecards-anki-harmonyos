@@ -4,16 +4,16 @@
 
 项目优先服务 Agent 开发；这里的 Agent 指辅助作者开发仓库的编程 Agent。
 
-- 正式版：2.9.22
-- 源码版本：2.9.98（构建编号 3079）
+- 当前源码版本：2.9.99（构建编号 3080）
+- 华为应用市场版本：2.9.98
 - 平台：HarmonyOS NEXT
 - 许可证：AGPL-3.0-or-later
 - 作者：[可塑性天赋](https://jidecards.com/about/)
 - 下载：[华为应用市场](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare)
 - 源码：[GitHub](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos) · [Gitee](https://gitee.com/wuweiyouzuoju/jidecards-anki-harmonyos) · [GitCode](https://gitcode.com/wuweiyouzuoju/jidecards-anki-harmonyos)
-- 更新日期：2026-10-08
+- 更新日期：2026-10-15
 
-独立开源项目，非 Anki 官方客户端。
+本文按当前源码介绍功能，应用市场实际版本以下载页面为准。独立开源项目，非 Anki 官方客户端。
 
 ## 独立开发声明
 

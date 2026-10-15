@@ -4,7 +4,7 @@
 
 - [项目 README](../README.md)：下载、功能、兼容范围、数据与构建入口。
 - [贡献指南](../CONTRIBUTING.md)：报告问题、开发环境、验证与提交要求。
-- [更新记录](../CHANGELOG.md)与[2.9.98 源码变更说明](releases/2.9.98.md)：源码变化及发布边界。
+- [更新记录](../CHANGELOG.md)与[2.9.99 源码变更说明](releases/2.9.99.md)：源码变化及发布边界。
 - [使用指南](https://jidecards.com/guides/harmonyos-anki/)：导入牌组、同步与复习入门。
 
 ## 当前文档

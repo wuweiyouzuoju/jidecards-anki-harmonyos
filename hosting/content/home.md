@@ -4,16 +4,16 @@
 
 记得闪卡是面向鸿蒙 HarmonyOS NEXT 的原生开源闪卡应用，基于 Anki 内核，用于背单词、记忆知识点与备考。根据记忆情况安排间隔复习，支持导入已有的 Anki 牌组、同步学习进度和备份学习资料。
 
-- 正式版：2.9.22
-- 源码版本：2.9.98（构建编号 3079）
+- 当前源码版本：2.9.99（构建编号 3080）
+- 华为应用市场版本：2.9.98
 - 平台：HarmonyOS NEXT
 - 许可证：AGPL-3.0-or-later
 - 作者：[可塑性天赋](https://jidecards.com/about/)
 - 下载：[华为应用市场](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare)
 - 源码：[GitHub](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos) · [Gitee](https://gitee.com/wuweiyouzuoju/jidecards-anki-harmonyos) · [GitCode](https://gitcode.com/wuweiyouzuoju/jidecards-anki-harmonyos)
-- 更新日期：2026-10-08
+- 更新日期：2026-10-15
 
-独立开源项目，非 Anki 官方客户端。
+本文按当前源码介绍功能，应用市场实际版本以下载页面为准。独立开源项目，非 Anki 官方客户端。
 
 ## 独立开发声明
 
@@ -37,7 +37,7 @@
 
 领取方式见应用内说明。 活动时间以应用内公告为准。
 
-## 2.9.22 更新说明
+## 2.9.99 源码更新说明
 
 1. 新增笔记编辑工具转盘，完善富文本、格式清理、挖空和 HTML 编辑，常用制卡工具更方便使用。
 2. 优化音频与数学公式编辑，完善未保存草稿的卡片预览。

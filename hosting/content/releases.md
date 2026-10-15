@@ -1,4 +1,4 @@
-# 记得闪卡 2.9.22 更新说明
+# 记得闪卡 2.9.99 源码更新说明
 
 原文：https://jidecards.com/releases/
 更新日期：2026-10-07。
@@ -13,16 +13,16 @@
 8. 统一菜单、弹窗、按钮及图标样式，优化设置页面与幻彩主题解锁反馈。
 9. 优化 JIDE 的编辑工具与页面状态同步，完善上下文处理、取消操作和历史记录兼容。
 
-- 正式版：2.9.22
-- 源码版本：2.9.98（构建编号 3079）
+- 当前源码版本：2.9.99（构建编号 3080）
+- 华为应用市场版本：2.9.98
 - 平台：HarmonyOS NEXT
 - 许可证：AGPL-3.0-or-later
 - 作者：[可塑性天赋](https://jidecards.com/about/)
 - 下载：[华为应用市场](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare)
 - 源码：[GitHub](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos) · [Gitee](https://gitee.com/wuweiyouzuoju/jidecards-anki-harmonyos) · [GitCode](https://gitcode.com/wuweiyouzuoju/jidecards-anki-harmonyos)
-- 更新日期：2026-10-08
+- 更新日期：2026-10-15
 
-独立开源项目，非 Anki 官方客户端。
+本文按当前源码介绍功能，应用市场实际版本以下载页面为准。独立开源项目，非 Anki 官方客户端。
 
 ## 独立开发声明
 

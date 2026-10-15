@@ -19,4 +19,4 @@ for (const [file, body] of Object.entries(outputs)) {
   await mkdir(path.dirname(destination), { recursive: true });
   await writeFile(destination, `${body.replace(/[\t ]+$/gm, '').trimEnd()}\n`, 'utf8');
 }
-console.log(`Generated ${Object.keys(outputs).length} public documents for release ${content.work.releaseVersion}.`);
+console.log(`Generated ${Object.keys(outputs).length} public documents for source ${content.work.sourceVersion}.`);

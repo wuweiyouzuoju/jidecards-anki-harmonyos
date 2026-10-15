@@ -6,7 +6,7 @@ Cloudflare Worker：`wispy-glade-db0d`。静态目录：`hosting/`。主域名�
 
 ## 内容与构建
 
-产品、作者、SEO、正式版本、功能、宣传词和图片元数据统一维护在 `hosting/data/works.json`。指南事实来源是 `hosting/data/harmonyos-anki-guide.json`。正式版本由作者确认并记录 `releaseVersionSource`；源码版本由生成器读取 `AppScope/app.json5`，分别输出 `sourceVersion` / `sourceVersionCode`，不能相互推断。作者本次指定官网正式版为 2.9.22。
+产品、作者、SEO、正式版本、功能、宣传词和图片元数据统一维护在 `hosting/data/works.json`。指南事实来源是 `hosting/data/harmonyos-anki-guide.json`。正式版本由作者确认并记录 `releaseVersionSource`；源码版本由生成器读取 `AppScope/app.json5`，分别输出 `sourceVersion` / `sourceVersionCode`，不能相互推断。作者于 2026-10-15 确认华为应用市场版本为 2.9.98，当前源码版本为 2.9.99。官网主展示、源码更新、SoftwareSourceCode 和 Atom 使用应用配置派生的源码版本；下载入口与 SoftwareApplication 使用作者确认的市场版本。2.9.22 宣传图保留独立的历史版本标注和 SHA-256 校验，不要求截图版本等于当前市场版本，不把旧图片改标为当前截图。
 
 `tools/build-site.mjs` 只负责构建编排。修改入口按责任划分：
 

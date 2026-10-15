@@ -39,7 +39,7 @@ test('public pages expose static content and structured data with only an option
 test('release facts stay consistent across human and machine entry points', async () => {
   for (const file of ['index.html', 'works/jidecards/index.html', 'llms.txt', 'llms-full.txt']) {
     const content = await read(file);
-    assert.ok(content.includes(work.releaseVersion), file);
+    assert.ok(content.includes(work.sourceVersion), file);
     assert.ok(content.includes(work.promotion.title), file);
     assert.ok(content.includes(data.author.name), file);
   }
@@ -64,8 +64,13 @@ test('source updates match application metadata and remain separate from marketp
   const graph = JSON.parse(product.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1])['@graph'];
   assert.equal(graph.find(item => item['@type'] === 'SoftwareApplication').softwareVersion, work.releaseVersion);
   assert.equal(graph.find(item => item['@type'] === 'SoftwareSourceCode').version, work.sourceVersion);
-  assert.ok(product.includes(`正式版 ${work.releaseVersion}`));
+  assert.ok(product.includes(`源码 ${work.sourceVersion}`));
   assert.ok(work.releaseVersionSource.includes('作者'));
+  assert.ok(product.includes(`应用市场 ${work.releaseVersion}`));
+  assert.ok(product.includes('历史宣传图'));
+  assert.ok(product.includes(work.screenshots[0].releaseVersion));
+  assert.ok((await read('releases/index.html')).includes(`${work.sourceVersion} 源码更新说明`));
+  assert.ok((await read('releases.xml')).includes(`${work.sourceVersion} 源码更新`));
 });
 
 test('home offers separate entry points while development policy stays on its own page', async () => {
@@ -224,14 +229,14 @@ test('shared navigation and home expose the real application logo with fresh ass
   assert.ok((await read('index.html')).includes(`class="hero-logo" src="data:image/png;base64,${largePreview.toString('base64')}"`));
 });
 
-test('author-supplied current media replace retired screenshots in HTML, metadata and AI text', async () => {
+test('author-supplied media preserve version provenance and original bytes across public formats', async () => {
   const product = await read('works/jidecards/index.html');
   const markdown = await read('content/product.md');
   const full = await read('llms-full.txt');
   for (const item of work.screenshots) {
     const bytes = await readFile(path.join(root, 'hosting', item.path));
     assert.equal(createHash('sha256').update(bytes).digest('hex'), item.sha256);
-    assert.equal(item.releaseVersion, work.releaseVersion);
+    assert.ok(item.path.includes(`-${item.releaseVersion}-`));
     assert.equal(bytes.readUInt32BE(16), item.width);
     assert.equal(bytes.readUInt32BE(20), item.height);
     for (const source of [product, markdown, full]) {
@@ -248,6 +253,8 @@ test('author-supplied current media replace retired screenshots in HTML, metadat
 test('HTML, per-page Markdown, llms and JSON share complete crawlable content', async () => {
   const index = JSON.parse(await read('data/site-index.json'));
   assert.equal(index.releaseVersion, work.releaseVersion);
+  assert.equal(index.sourceVersion, work.sourceVersion);
+  assert.equal(index.sourceVersionCode, work.sourceVersionCode);
   assert.equal(index.contentLanguage, 'zh-CN');
   const llms = await read('llms.txt');
   const full = await read('llms-full.txt');

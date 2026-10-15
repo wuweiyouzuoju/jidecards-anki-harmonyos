@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom"><title>记得闪卡版本更新</title><id>https://jidecards.com/releases.xml</id><link href="https://jidecards.com/releases.xml" rel="self"/><link href="https://jidecards.com/releases/"/><updated>2026-10-07T00:00:00+08:00</updated><author><name>可塑性天赋</name></author><entry><title>记得闪卡 2.9.22</title><id>https://jidecards.com/releases/#release-2-9-22</id><link href="https://jidecards.com/releases/#release-2-9-22"/><updated>2026-10-07T00:00:00+08:00</updated><content type="text">1. 新增笔记编辑工具转盘，完善富文本、格式清理、挖空和 HTML 编辑，常用制卡工具更方便使用。
+<feed xmlns="http://www.w3.org/2005/Atom"><title>记得闪卡版本更新</title><id>https://jidecards.com/releases.xml</id><link href="https://jidecards.com/releases.xml" rel="self"/><link href="https://jidecards.com/releases/"/><updated>2026-10-07T00:00:00+08:00</updated><author><name>可塑性天赋</name></author><entry><title>记得闪卡 2.9.99 源码更新</title><id>https://jidecards.com/releases/#release-2-9-99</id><link href="https://jidecards.com/releases/#release-2-9-99"/><updated>2026-10-07T00:00:00+08:00</updated><content type="text">1. 新增笔记编辑工具转盘，完善富文本、格式清理、挖空和 HTML 编辑，常用制卡工具更方便使用。
 2. 优化音频与数学公式编辑，完善未保存草稿的卡片预览。
 3. 优化首页与牌组详情布局，调整牌组排序、背景设置及菜单操作。
 4. 完善同步状态显示，便于查看账号、同步进度、冲突及错误信息。
