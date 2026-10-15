@@ -1,3 +1,7 @@
+import { KeyboardShortcutHelp } from '../KeyboardShortcutHelp';
+import { TEMPLATE_SHORTCUTS, shortcutCommand } from '../../model/KeyboardShortcuts';
+import { StudyKeyboardSession } from '../../model/StudyKeyboard';
+import { studyEventChord } from '../../utils/StudyKeyAdapter';
 import { IconActionButton } from '../common/IconActionButton';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
@@ -60,11 +64,14 @@ export struct 笔记类型编辑器 {
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
 
   private handleBackRequest(): void {
-    this.requestClose();
+    if (this.keyboardHelpOpen) this.keyboardHelpOpen = false; else this.requestClose();
   }
 
   @Prop isDark: boolean = false;
   @Prop notetypeId: number = 0;
+  @Prop templatesOnly: boolean = false;
+  @State private keyboardHelpOpen: boolean = false;
+  private readonly keyboardSession: StudyKeyboardSession = new StudyKeyboardSession();
   @Prop notetypeName: string = '';
   onClose: () => void = (): void => {};
   onSaved: () => void = (): void => {};
@@ -107,6 +114,7 @@ export struct 笔记类型编辑器 {
   aboutToAppear(): void {
     this.mounted = true;
     this.类型名 = this.notetypeName;
+    this.templatesExpanded = this.templatesOnly;
     this.加载JSON();
   }
 
@@ -481,7 +489,8 @@ export struct 笔记类型编辑器 {
   @Builder
   private dialogHeader() {
     DialogHeader({
-      title: $r('app.string.notetype_editor_title'),
+      title: $r('app.string.notetype_editor_title'), showHelp: true,
+      onHelp: (): void => { this.keyboardHelpOpen = true; },
       showActionLabel: this.保存中, actionLabel: this.保存中 ? $r('app.string.notetype_editor_saving') : $r('app.string.notetype_editor_save'),
       actionEnabled: !this.加载中 && !this.保存中 && !this.previewBusy && this.原始JSON !== '',
       closeLabel: $r('app.string.create_deck_cancel'),
@@ -518,6 +527,7 @@ export struct 笔记类型编辑器 {
       }
 
       if (!this.加载中) {
+        if (!this.templatesOnly) {
         // === 名称区 ===
         Column({ space: 应用尺寸.间距_5 }) {
           Text($r('app.string.notetype_editor_name'))
@@ -558,6 +568,7 @@ export struct 笔记类型编辑器 {
           .width('100%')
         }
 
+        }
         AnchoredMenuItem({
           label: $r('app.string.notetype_editor_templates'),
           labelAlignment: TextAlign.Start,
@@ -712,6 +723,19 @@ export struct 笔记类型编辑器 {
         NoteDraftPreview({ input: this.preview, isDark: this.isDark,
           onClose: (): void => { this.preview = null; } })
       }
-    }.width('100%').height('100%')
+      if (this.keyboardHelpOpen) {
+        KeyboardShortcutHelp({ scope: 'template', shortcuts: TEMPLATE_SHORTCUTS,
+          onClose: (): void => { this.keyboardHelpOpen = false; } })
+      }
+    }.width('100%').height('100%').onKeyPreIme((event: KeyEvent): boolean => {
+      const fresh: boolean = this.keyboardSession.update(event.keyCode, event.type === KeyType.Down);
+      if (event.type !== KeyType.Down) return false;
+      const chord: string = studyEventChord(event);
+      if (this.keyboardHelpOpen) { if (fresh && chord === 'escape') this.keyboardHelpOpen = false; return true; }
+      if (this.preview !== null || this.保存中 || this.加载中 || this.confirmingSave || this.confirmingClose) return false;
+      if (shortcutCommand(TEMPLATE_SHORTCUTS, chord) === 'preview') { if (fresh) this.previewTemplate(); return true; }
+      if (chord === 'escape') { if (fresh) this.requestClose(); return true; }
+      return false;
+    })
   }
 }

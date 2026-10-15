@@ -119,7 +119,8 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'front', titleKey: 'notetype_editor_front_template' },
     { id: 'back', titleKey: 'notetype_editor_back_template' },
     { id: 'tokens', titleKey: 'notetype_editor_tokens' },
-    { id: 'css', titleKey: 'notetype_editor_css' }
+    { id: 'css', titleKey: 'notetype_editor_css' },
+    { id: 'keyboard', titleKey: 'keyboard_shortcuts_title', opens: 'template_shortcuts' }
   ] },
   { id: 'notetype_management', titleKey: 'notetype_mgmt_title', parent: 'settings',
     items: Object.values(NOTETYPE_MANAGEMENT_ACTIONS) },
