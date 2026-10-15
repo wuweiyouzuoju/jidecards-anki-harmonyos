@@ -95,6 +95,8 @@
 
 设置一级目录与操作入口使用图标；二级分组和普通偏好暂不显示装饰图标，调用方省略可选 `icon`，资源映射继续保留。`SettingsActionRow` / `SettingsToggleRow` 的标题与说明显式起始对齐。`HelpLabel` 实际 Row 填满分配宽度，但只由文字决定居中和行高；帮助绝对定位在文字右侧，不作为行内占位项。`HelpLayout` 分开定义18vp绘制尺寸、4vp文字间隔与44vp触摸/鼠标热区；不能把热区尺寸设为实际宽高。长标题居中时对称限宽，开关/选择器几何和卡片边距不变。
 
+`HelpLabel.actionIcon/actionLabel/isActionEnabled/onAction` 支持标题与帮助之间的独立图标动作，复用 IconActionButton；HelpLayout 为两枚图标分配不重叠的44vp热区，默认无动作时沿用原几何。FormSelectRow / DirectorySelect 通过 `labelAction*` 与 `onLabelAction` 转交这一能力；有标签动作的目录控件限于56%，为标题和图标留位，其余目录保持70%。新增页模板动作使用这一入口，白底由页面显式传 `surface_card`。
+
 普通表单组合 `DialogFrame` 与 `DialogHeader`；宽度档位复用 `应用尺寸.dialogCompactMaxWidth / dialogMaxWidth / dialogWideMaxWidth`。标题覆盖层使用透明命中，只有其帮助入口响应，不能挡住下层的关闭/确认按钮；必须实际点击验收。原生自定义弹窗也使用同一外壳并传 `nativeHost=true`；帮助与权益展示通过原薄适配委托公共外壳。自动前进传 `actionsAtBottom=true` 保留底部操作栏。抽屉、全屏预览和图片裁剪按各自语义保留布局。系统返回沿页面 → 功能 → 子面板单向传递，最上层消费；不得通过直接卸载父组件绕过子层的返回逻辑或忙碌守卫。
 
 原生窗口每次通过 `NativeDialogHost.open(fieldFactory, canDismiss)` 创建，组件出现时 `activate()`，退出时 `dispose()`。系统关闭先校验窗口代次，再询问业务是否允许；嵌套返回/媒体取消可自行处理并返回 false。无参数按钮回调用 `guard()` 绑定窗口身份；有参数提交在字段工厂中捕获 `captureCurrent()`，回调先检查身份再关闭或提交，避免旧内容改写下一次窗口。窗口自行关闭后的生命周期用 `release()` 释放引用。公共宿主不拥有业务草稿或持久化任务，不能把程序主动 `close()` 用作忽略忙碌/草稿规则的用户退出入口。

@@ -15,9 +15,19 @@ export struct DirectorySelect {
   @Prop title: ResourceStr = '';
   @Prop showLabel: boolean = true;
   @Prop showHelp: boolean = false;
+  @Prop labelActionIcon: ResourceStr | undefined = undefined;
+  @Prop labelActionLabel: ResourceStr = '';
+  @Prop isLabelActionEnabled: boolean = true;
+  onLabelAction: () => void = (): void => {};
   onHelp: () => void = (): void => {};
   @Prop @Watch('syncRows') rows: DirectoryRow[] = [];
   @Prop value: string = '';
+  @Prop @Watch('openRequested') openRequest: number = 0;
+  private handledRequest: number = 0;
+  private openRequested(): void {
+    if (!this.alive || this.openRequest === this.handledRequest) return;
+    this.handledRequest = this.openRequest; this.open();
+  }
   @Prop @Watch('syncRows') isInteractive: boolean = true;
   @Prop surfaceColor: ResourceColor = $r('app.color.surface_sidebar');
   onSelect: (id: string) => void = (_id: string): void => {};
@@ -43,7 +53,7 @@ export struct DirectorySelect {
       maskColor: presentation.maskColor, openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation
     });
   };
-  aboutToAppear(): void { this.alive = true; this.dialog.activate(); this.syncRows(); }
+  aboutToAppear(): void { this.alive = true; this.dialog.activate(); this.syncRows(); this.openRequested(); }
   aboutToDisappear(): void { this.alive = false; this.close(); this.dialog.dispose(); }
   private syncRows(): void { this.dialogRows = this.rows; this.dialogInteractive = this.isInteractive; }
   private open(): void {
@@ -78,7 +88,8 @@ export struct DirectorySelect {
         DisclosureChevron().rotate({ angle: 90 }).flexShrink(0)
       }.width('100%')
     }.type(ButtonType.Normal).width(fill ? '100%' : this.controlWidth())
-      .constraintSize(fill ? { maxWidth: '100%' } : SelectStyle.directoryFieldConstraint).flexShrink(0)
+      .constraintSize(fill ? { maxWidth: '100%' } : this.labelActionIcon !== undefined ?
+        SelectStyle.fieldConstraint : SelectStyle.directoryFieldConstraint).flexShrink(0)
       .height(SelectStyle.controlHeight).padding(SelectStyle.controlPadding)
       // Button.border 会覆盖默认圆角，显式圆角必须放在边框之后。
       .backgroundColor(this.surfaceColor).border(SelectStyle.controlBorder).borderRadius(SelectStyle.controlRadius)
@@ -89,6 +100,8 @@ export struct DirectorySelect {
   build() {
     if (this.showLabel) {
       FormSelectRow({ label: this.label, showHelp: this.showHelp, onHelp: this.onHelp,
+        labelActionIcon: this.labelActionIcon, labelActionLabel: this.labelActionLabel,
+        isLabelActionEnabled: this.isLabelActionEnabled, onLabelAction: this.onLabelAction,
         isInteractive: this.isInteractive, useCustomControl: true,
         customControl: () => { this.control(); } })
     } else {

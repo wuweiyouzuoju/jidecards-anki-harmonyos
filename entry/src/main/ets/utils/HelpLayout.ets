@@ -10,14 +10,24 @@ export class HelpLayout {
     return { x: -outset, y: -outset, width: HelpLayout.touchSize, height: HelpLayout.touchSize };
   }
 
-  static titleMaxWidth(centered: boolean, showHelp: boolean): string {
-    if (!showHelp) return '100%';
+  static titleMaxWidth(centered: boolean, showHelp: boolean, showAction: boolean = false): string {
+    if (!showHelp && !showAction) return '100%';
     // 居中标题两侧对称限制长文字，帮助仍是绝对定位，不参与居中计算。
-    const reserve: number = (HelpLayout.iconSize + HelpLayout.titleGap) * (centered ? 2 : 1);
+    // 双图标间隔一个完整热区；额外动作同时为最右侧帮助的热区留位。
+    const trailing: number = showAction ? HelpLayout.titleGap + HelpLayout.iconSize +
+      (HelpLayout.touchSize - HelpLayout.iconSize) / 2 + (showHelp ? HelpLayout.touchSize : 0) :
+      HelpLayout.iconSize + HelpLayout.titleGap;
+    const reserve: number = trailing * (centered ? 2 : 1);
     return 'calc(100% - ' + String(reserve) + 'vp)';
   }
 
-  static titleHelpPosition(width: number, height: number): Position {
-    return { x: width + HelpLayout.titleGap, y: (height - HelpLayout.iconSize) / 2 };
+  static titleHelpPosition(width: number, height: number, showAction: boolean = false): Position {
+    return { x: width + HelpLayout.titleGap + (showAction ? HelpLayout.touchSize : 0),
+      y: (height - HelpLayout.iconSize) / 2 };
+  }
+
+  static titleActionPosition(width: number, height: number): Position {
+    return { x: width + HelpLayout.titleGap - (HelpLayout.touchSize - HelpLayout.iconSize) / 2,
+      y: (height - HelpLayout.touchSize) / 2 };
   }
 }

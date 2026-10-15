@@ -79,10 +79,10 @@ test('directory trigger reuses the existing selection row and actual rounded con
   const body = source.slice(start, end), chain = body.slice(body.indexOf('}.type(') + 1);
   const capture = new Function('control', 'SelectStyle', 'ButtonType', 'PressFeedback', 'fill',
     stripTypeScriptTypes('function render() { return control' + chain + '; }', { mode: 'transform' }) + '; return render.call(this);');
-  for (const fill of [false, true]) {
+  for (const fill of [false, true]) for (const labelActionIcon of [undefined, 'template']) {
     const calls = new Map();
     const control = new Proxy({}, { get: (_target, name) => (...args) => { calls.set(name, args); return control; } });
-    const host = { surfaceColor: 'surface', isInteractive: true, rows: [{}], value: '英语::四级', controlWidth: () => 125, open() {} };
+    const host = { surfaceColor: 'surface', labelActionIcon, isInteractive: true, rows: [{}], value: '英语::四级', controlWidth: () => 125, open() {} };
     capture.call(host, control, SelectStyle, { Normal: 'normal' }, class {}, fill);
     assert.equal(calls.get('height')[0], 40);
     assert.equal(calls.get('borderRadius')[0], 16, 'existing 16vp radius stays rounded');
@@ -90,7 +90,7 @@ test('directory trigger reuses the existing selection row and actual rounded con
     assert.deepEqual(calls.get('padding')[0], SelectStyle.controlPadding);
     assert.equal(calls.get('backgroundColor')[0], 'surface');
     assert.equal(calls.get('width')[0], fill ? '100%' : 125);
-    assert.deepEqual(calls.get('constraintSize')[0], { maxWidth: fill ? '100%' : '70%' });
+    assert.deepEqual(calls.get('constraintSize')[0], { maxWidth: fill ? '100%' : labelActionIcon ? '56%' : '70%' });
     assert.equal(calls.get('clip')[0], true);
     assert.equal(calls.get('accessibilityText')[0], '英语::四级');
   }

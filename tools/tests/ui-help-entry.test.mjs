@@ -99,10 +99,37 @@ test('every ArkTS help entry shares the icon, and labelled help cannot float to 
   assert.match(label, /\.width\('100%'\)/);
   assert.doesNotMatch(label, /\.width\(this\.centered \? '100%' : undefined\)/);
   assert.match(label, /justifyContent\(this\.centered \? FlexAlign\.Center : FlexAlign\.Start\)/);
-  assert.match(label, /Stack\(\)\s*\{[\s\S]*?Text\([\s\S]*?HelpButton\([\s\S]*?\.position\(HelpLayout.titleHelpPosition\(this.titleWidth, this.titleHeight\)\)/,
+  assert.match(label, /Stack\(\)\s*\{[\s\S]*?Text\([\s\S]*?HelpButton\([\s\S]*?\.position\(HelpLayout.titleHelpPosition\(this.titleWidth, this.titleHeight, this.actionIcon !== undefined\)\)/,
     'help must leave the normal flow so adding it cannot shift the title or increase row height');
   assert.match(label, /\.onAreaChange\([\s\S]*?this.updateTitleArea\(area\)/);
-  assert.match(label, /maxWidth: HelpLayout.titleMaxWidth\(this.centered, this.showHelp\)/);
+  assert.match(label, /maxWidth: HelpLayout.titleMaxWidth\(this.centered, this.showHelp, this.actionIcon !== undefined\)/);
+});
+
+test('a title action precedes help with separate touch targets and reserves the trailing hit region', () => {
+  const layout = loadPlatformModule('utils/HelpLayout.ets', 'HelpLayout', {});
+  for (const [width, height] of [[60, 20], [120, 40], [240, 56]]) {
+    const action = layout.titleActionPosition(width, height);
+    const help = layout.titleHelpPosition(width, height, true);
+    const hit = layout.hitRegion();
+    assert.equal(action.x + layout.touchSize, help.x + hit.x, 'adjacent hit regions must not overlap');
+    assert.equal(action.y + layout.touchSize / 2, height / 2);
+    assert.equal(help.y + layout.iconSize / 2, height / 2);
+    const rightReserve = help.x + hit.x + hit.width - width;
+    assert.equal(layout.titleMaxWidth(false, true, true), `calc(100% - ${rightReserve}vp)`);
+    assert.equal(layout.titleMaxWidth(true, true, true), `calc(100% - ${rightReserve * 2}vp)`);
+  }
+  assert.equal(layout.titleMaxWidth(false, false, true), 'calc(100% - 35vp)');
+});
+
+test('template icon and keyboard opening obey the same current note-type guard', () => {
+  for (const enabled of [false, true]) for (const typeId of [0, 7]) {
+    const page = method('pages/添加笔记页.ets', 'openTemplates', {
+      interfaceEnabled: id => { assert.equal(id, 'templates'); return enabled; },
+      已选笔记类型ID: typeId, templatesOpen: false
+    });
+    page.openTemplates();
+    assert.equal(page.templatesOpen, enabled && typeId > 0);
+  }
 });
 
 test('help icon geometry, accessibility, press effect and click isolation have one owner', () => {

@@ -11,6 +11,10 @@ export struct FormSelectRow {
   @Prop label: ResourceStr = '';
   @Prop icon: ResourceStr | undefined = undefined;
   @Prop showHelp: boolean = false;
+  @Prop labelActionIcon: ResourceStr | undefined = undefined;
+  @Prop labelActionLabel: ResourceStr = '';
+  @Prop isLabelActionEnabled: boolean = true;
+  onLabelAction: () => void = (): void => {};
   @Prop showValuePreview: boolean = false;
   @BuilderParam valuePreview: () => void = this.emptyValuePreview;
   @Prop useCustomControl: boolean = false;
@@ -35,8 +39,10 @@ export struct FormSelectRow {
   build() {
     Row({ space: FormRowLayout.gap }) {
       if (this.icon !== undefined) { ActionIcon({ source: this.icon }).flexShrink(0) }
-      if (this.showHelp) {
-        HelpLabel({ title: this.label, textSize: 应用尺寸.字号_正文, onHelp: this.onHelp })
+      if (this.showHelp || this.labelActionIcon !== undefined) {
+        HelpLabel({ title: this.label, textSize: 应用尺寸.字号_正文, showHelp: this.showHelp, onHelp: this.onHelp,
+          actionIcon: this.labelActionIcon, actionLabel: this.labelActionLabel,
+          isActionEnabled: this.isLabelActionEnabled, onAction: this.onLabelAction })
           .layoutWeight(1).constraintSize({ minWidth: 0 })
       } else {
         Text(this.label).fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary'))
