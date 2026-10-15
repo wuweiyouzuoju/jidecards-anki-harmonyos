@@ -9479,6 +9479,32 @@
         }
       }
     },
+    "PeerProgress": {
+      "id": 1005,
+      "methods": {
+        "export": 0,
+        "merge": 1,
+        "receive": 2
+      },
+      "owner": "native/rsharmony/src/peer_progress.rs",
+      "contracts": {
+        "export": {
+          "input": "anki.generic.String",
+          "output": "anki.generic.String",
+          "meaning": "本机文件 token；Core 导出同源学习状态及复习历史"
+        },
+        "merge": {
+          "input": "anki.generic.String",
+          "output": "anki.generic.String",
+          "meaning": "本机文件 token；Core 单事务合并，保留云基线并标为待上传"
+        },
+        "receive": {
+          "input": "anki.generic.String",
+          "output": "anki.generic.String",
+          "meaning": "本机文件 token；在自有目录排他创建接收文件"
+        }
+      }
+    },
     "CustomScheduling": {
       "id": 1004,
       "methods": {

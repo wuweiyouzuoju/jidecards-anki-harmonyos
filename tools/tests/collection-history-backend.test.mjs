@@ -11,7 +11,7 @@ const spec = JSON.parse(readFileSync(new URL('../protocol/private-rpc.json', imp
 const nativeService = file => spec[{'collection_history.rs':'CollectionHistory','deck_preview.rs':'DeckPreview'}[file]].id;
 test('application native services never shadow another private or upstream service', () => {
   const ids=Object.values(spec).map(service=>service.id);
-  assert.equal(new Set(ids).size,5);
+  assert.equal(new Set(ids).size,ids.length, 'private service IDs must remain unique as services are added');
   const core=JSON.parse(readFileSync(new URL('../core-protocol-schema.json',import.meta.url)));
   assert.ok(ids.every(id=>!core.services.some(service=>service.id===id)));
 });

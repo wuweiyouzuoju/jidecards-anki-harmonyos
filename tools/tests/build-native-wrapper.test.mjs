@@ -32,6 +32,9 @@ test('native wrapper applies a pristine patch, tolerates repeated builds, and re
     writeFileSync(join(root, 'third_party/anki/marking.txt'), 'before\n');
     writeFileSync(join(root, 'tools/patches/anki-marking-sync-conflicts.patch'),
       'diff --git a/marking.txt b/marking.txt\n--- a/marking.txt\n+++ b/marking.txt\n@@ -1 +1 @@\n-before\n+after\n');
+    writeFileSync(join(root, 'third_party/anki/progress.txt'), 'before\n');
+    writeFileSync(join(root, 'tools/patches/anki-peer-progress.patch'),
+      'diff --git a/progress.txt b/progress.txt\n--- a/progress.txt\n+++ b/progress.txt\n@@ -1 +1 @@\n-before\n+after\n');
     writeFileSync(join(root, 'bin/cargo.cmd'), `@echo off\r\necho %*>>"${calls}"\r\nexit /b 0\r\n`);
     const env = { ...process.env };
     for (const key of Object.keys(env)) {
@@ -47,6 +50,7 @@ test('native wrapper applies a pristine patch, tolerates repeated builds, and re
       assert.equal(readFileSync(join(root, 'third_party/anki/preview.txt'), 'utf8').replaceAll('\r\n', '\n'), 'after\n');
       assert.equal(readFileSync(join(root, 'third_party/anki/fsrs.txt'), 'utf8').replaceAll('\r\n', '\n'), 'after\n');
       assert.equal(readFileSync(join(root, 'third_party/anki/marking.txt'), 'utf8').replaceAll('\r\n', '\n'), 'after\n');
+      assert.equal(readFileSync(join(root, 'third_party/anki/progress.txt'), 'utf8').replaceAll('\r\n', '\n'), 'after\n');
     }
     const beforeConflict = readFileSync(calls, 'utf8');
     assert.equal(beforeConflict.trim().split(/\r?\n/).length, 6, 'both invocations reach fmt, clippy, test');

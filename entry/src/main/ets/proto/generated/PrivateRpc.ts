@@ -32,6 +32,14 @@ export class CollectionHistoryRpc {
   undo(input: Uint8Array = new Uint8Array(0)): Promise<Uint8Array> { return this.transport.调用(1003, 0, input); }
   redo(input: Uint8Array = new Uint8Array(0)): Promise<Uint8Array> { return this.transport.调用(1003, 1, input); }
 }
+export class PeerProgressRpc {
+  static readonly SERVICE: number = 1005;
+  private transport: CoreTransport;
+  constructor(transport: CoreTransport) { this.transport = transport; }
+  export(input: Uint8Array = new Uint8Array(0)): Promise<Uint8Array> { return this.transport.调用(1005, 0, input); }
+  merge(input: Uint8Array = new Uint8Array(0)): Promise<Uint8Array> { return this.transport.调用(1005, 1, input); }
+  receive(input: Uint8Array = new Uint8Array(0)): Promise<Uint8Array> { return this.transport.调用(1005, 2, input); }
+}
 export class CustomSchedulingRpc {
   static readonly SERVICE: number = 1004;
   private transport: CoreTransport;

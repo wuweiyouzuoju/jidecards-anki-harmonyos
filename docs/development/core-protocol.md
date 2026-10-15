@@ -46,7 +46,7 @@ node tools/core-protocol.mjs --diff <旧schema.json> <新schema.json>
 
 refresh 核对 origin、提交、完整 Git 状态和源文件指纹，导出全部 proto 及私有 proto 后再次检查官方状态、原生 helper、本地私有输入和锁文件。先预检全部映射，再替换审查快照。记录完整官方提交、origin、protoc 版本、描述 SHA-256 和私有定义指纹。拒绝本机未提交修改及陈旧缓存充当官方基线，命令拒绝多余参数，不能把被忽略的缓存路径误认为已核对。日后升级先保留旧 schema、核对授权与 Core 补丁，再在新锁定 checkout 上刷新；diff 输出接口、编号、字段类型、默认值、presence、optional、oneof、packed、重复/映射及枚举变化。本任务保持 26.05/e64c6b1。
 
-`generate-rpc-index.mjs` 是兼容命令，委托全部生成；`verify-rpc-index.mjs <显式backend.rs>` 仅额外比较指定 Rust 产物。Rust 文本不是协议事实的首选来源，旧 `--generate backend.rs` 已拒绝。导入日志、牌组预览、FSRS 负担模拟和标记同步四个已跟踪 Core 补丁仍由原构建入口维护。
+`generate-rpc-index.mjs` 是兼容命令，委托全部生成；`verify-rpc-index.mjs <显式backend.rs>` 仅额外比较指定 Rust 产物。Rust 文本不是协议事实的首选来源，旧 `--generate backend.rs` 已拒绝。导入日志、牌组预览、FSRS 负担模拟、标记同步与设备学习记录合并的已跟踪 Core 补丁由原构建入口维护。设备合并私有服务 `PeerProgress` 的领域入口和验收边界见[同步](sync-data.md#个人设备学习记录合并)。
 
 ## 值、字节与领域差异
 

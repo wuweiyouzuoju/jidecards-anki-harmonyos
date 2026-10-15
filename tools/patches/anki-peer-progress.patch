@@ -1,0 +1,414 @@
+diff --git a/rslib/src/backend/mod.rs b/rslib/src/backend/mod.rs
+--- a/rslib/src/backend/mod.rs
++++ b/rslib/src/backend/mod.rs
+@@ -17,3 +17,4 @@
+ mod import_export;
++mod peer_progress;
+ mod ops;
+ mod sync;
+diff --git a/rslib/src/backend/peer_progress.rs b/rslib/src/backend/peer_progress.rs
+new file mode 100644
+--- /dev/null
++++ b/rslib/src/backend/peer_progress.rs
+@@ -0,0 +1,401 @@
++// Copyright: Ankitects Pty Ltd and contributors
++// License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
++//! Application-local review merge. Cloud USNs and last-sync timestamps stay owned by Anki sync.
++use std::collections::HashSet;
++use std::fs::{File, OpenOptions};
++use std::io::{BufRead, BufReader, BufWriter, Read, Write};
++use std::path::PathBuf;
++
++use prost::Message;
++use serde::{Deserialize, Serialize};
++
++use super::Backend;
++use crate::config::BoolKey;
++use crate::prelude::*;
++use crate::revlog::RevlogEntry;
++use crate::sync::collection::chunks::CardEntry;
++
++const MAX_BYTES: u64 = 512 * 1024 * 1024;
++const MAX_LINE: u64 = 512 * 1024;
++
++#[derive(Serialize, Deserialize)]
++#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
++enum Row {
++    Header {
++        version: u32,
++        creation: i64,
++        schema: i64,
++        cards: u64,
++        utc_offset: Option<i32>,
++        fsrs: bool,
++        scheduler: u32,
++        rollover: Option<u8>,
++    },
++    Card {
++        guid: String,
++        notetype: i64,
++        latest_review: i64,
++        card: CardEntry,
++    },
++    Review {
++        review: RevlogEntry,
++    },
++    End {
++        cards: u64,
++        reviews: u64,
++    },
++}
++
++#[derive(Default, Serialize)]
++struct Summary {
++    cards: u64,
++    reviews: u64,
++    added_reviews: u64,
++    updated_cards: u64,
++    bytes: u64,
++}
++
++impl Backend {
++    /// The name is locally generated; remote data never selects a filesystem path.
++    pub fn peer_progress_file(
++        &self,
++        name: &str,
++        method: u32,
++    ) -> std::result::Result<String, Vec<u8>> {
++        self.with_col(|col| {
++            require!(
++                name.len() == 32 && name.bytes().all(|b| b.is_ascii_hexdigit()),
++                "device_progress_invalid"
++            );
++            let folder = col.col_path.parent().unwrap().join(".device-progress");
++            std::fs::create_dir_all(&folder)?;
++            let path = folder.join(format!("{name}.jsonl"));
++            require!(!col.server, "device_progress_invalid");
++            let result = match method {
++                0 => export_file(col, path)?,
++                1 => merge_file(col, path)?,
++                2 => {
++                    OpenOptions::new().write(true).create_new(true).open(path)?;
++                    Summary::default()
++                }
++                _ => invalid_input!("device_progress_invalid"),
++            };
++            Ok(serde_json::to_string(&result)?)
++        })
++        .map_err(|err| err.into_protobuf(&self.tr).encode_to_vec())
++    }
++}
++
++fn write_row(writer: &mut BufWriter<File>, row: &Row) -> Result<()> {
++    let bytes = serde_json::to_vec(row)?;
++    require!(
++        bytes.len() as u64 + 1 <= MAX_LINE,
++        "device_progress_too_large"
++    );
++    writer.write_all(&bytes)?;
++    writer.write_all(b"\n")?;
++    Ok(())
++}
++
++fn export_file(col: &mut Collection, path: PathBuf) -> Result<Summary> {
++    let mut writer = BufWriter::new(
++        OpenOptions::new()
++            .write(true)
++            .create_new(true)
++            .open(&path)?,
++    );
++    let result = (|| {
++        let count: u64 = col
++            .storage
++            .db()
++            .query_row("select count(*) from cards", [], |r| r.get(0))?;
++        write_row(
++            &mut writer,
++            &Row::Header {
++                version: 1,
++                creation: col.storage.creation_stamp()?.0,
++                schema: col.storage.get_collection_timestamps()?.schema_change.0,
++                cards: count,
++                utc_offset: col.get_creation_utc_offset(),
++                fsrs: col.get_config_bool(BoolKey::Fsrs),
++                scheduler: col.scheduler_version() as u32,
++                rollover: col.get_v2_rollover(),
++            },
++        )?;
++        let mut summary = Summary::default();
++        let mut cursor = 0_i64;
++        loop {
++            let ids = col
++                .storage
++                .db()
++                .prepare("select id from cards where id > ? order by id limit 128")?
++                .query_map([cursor], |r| r.get::<_, i64>(0))?
++                .collect::<std::result::Result<Vec<_>, _>>()?;
++            if ids.is_empty() {
++                break;
++            }
++            for id in ids {
++                let card = col.storage.get_card(CardId(id))?.or_not_found(id)?;
++                require!(card.original_deck_id.0 == 0, "device_progress_filtered");
++                let note = col
++                    .storage
++                    .get_note(card.note_id)?
++                    .or_not_found(card.note_id)?;
++                let latest_review: i64 = col.storage.db().query_row(
++                    "select coalesce(max(id),0) from revlog where cid=?",
++                    [id],
++                    |r| r.get(0),
++                )?;
++                let mut entry: CardEntry = card.into();
++                entry.usn = Usn(0);
++                write_row(
++                    &mut writer,
++                    &Row::Card {
++                        guid: note.guid,
++                        notetype: note.notetype_id.0,
++                        latest_review,
++                        card: entry,
++                    },
++                )?;
++                summary.cards += 1;
++                cursor = id;
++            }
++        }
++        cursor = 0;
++        loop {
++            let ids = col.storage.db().prepare("select id from revlog where id > ? and cid in (select id from cards) order by id limit 512")?
++                .query_map([cursor], |r| r.get::<_, i64>(0))?.collect::<std::result::Result<Vec<_>, _>>()?;
++            if ids.is_empty() {
++                break;
++            }
++            for id in ids {
++                let mut review = col
++                    .storage
++                    .get_revlog_entry(RevlogId(id))?
++                    .or_not_found(id)?;
++                review.usn = Usn(0);
++                write_row(&mut writer, &Row::Review { review })?;
++                summary.reviews += 1;
++                cursor = id;
++            }
++        }
++        write_row(
++            &mut writer,
++            &Row::End {
++                cards: summary.cards,
++                reviews: summary.reviews,
++            },
++        )?;
++        writer.flush()?;
++        writer.get_ref().sync_all()?;
++        summary.bytes = writer.get_ref().metadata()?.len();
++        require!(summary.bytes <= MAX_BYTES, "device_progress_too_large");
++        Ok(summary)
++    })();
++    if result.is_err() {
++        drop(writer);
++        let _ = std::fs::remove_file(path);
++    }
++    result
++}
++
++fn read_row(reader: &mut BufReader<File>) -> Result<Option<Row>> {
++    let mut bytes = Vec::new();
++    let len = (&mut *reader)
++        .take(MAX_LINE + 1)
++        .read_until(b'\n', &mut bytes)?;
++    if len == 0 {
++        return Ok(None);
++    }
++    require!(
++        len as u64 <= MAX_LINE && bytes.last() == Some(&b'\n'),
++        "device_progress_invalid"
++    );
++    Ok(Some(serde_json::from_slice(&bytes)?))
++}
++
++fn state_key(card: &Card) -> Result<Vec<u8>> {
++    let mut entry: CardEntry = card.clone().into();
++    entry.usn = Usn(0);
++    entry.mtime = TimestampSecs(0);
++    // Progress sync leaves local card placement and marking to their existing owners.
++    entry.did = DeckId(0);
++    entry.flags = 0;
++    Ok(serde_json::to_vec(&entry)?)
++}
++
++fn merge_card(
++    col: &mut Collection,
++    incoming: CardEntry,
++    guid: String,
++    notetype: i64,
++    latest_review: i64,
++) -> Result<bool> {
++    let mut local = col
++        .storage
++        .get_card(incoming.id)?
++        .or_not_found(incoming.id)?;
++    let note = col
++        .storage
++        .get_note(local.note_id)?
++        .or_not_found(local.note_id)?;
++    require!(
++        local.note_id == incoming.nid
++            && local.template_idx == incoming.ord
++            && note.guid == guid
++            && note.notetype_id.0 == notetype,
++        "device_progress_mismatch"
++    );
++    require!(
++        local.original_deck_id.0 == 0 && incoming.odid.0 == 0,
++        "device_progress_filtered"
++    );
++    require!(
++        incoming.mtime.0 >= 0 && incoming.id.0 > 0 && latest_review >= 0,
++        "device_progress_invalid"
++    );
++    let mut remote: Card = incoming.into();
++    remote.deck_id = local.deck_id;
++    remote.flags = local.flags;
++    let local_key = state_key(&local)?;
++    let remote_key = state_key(&remote)?;
++    if local_key == remote_key {
++        if remote.mtime > local.mtime {
++            local.mtime = remote.mtime;
++            local.usn = Usn(-1);
++            col.storage.add_or_update_card(&local)?;
++            return Ok(true);
++        }
++        return Ok(false);
++    }
++    let local_latest: i64 = col.storage.db().query_row(
++        "select coalesce(max(id),0) from revlog where cid=?",
++        [local.id.0],
++        |r| r.get(0),
++    )?;
++    // Review IDs retain millisecond answer order even after an earlier merge advanced mtime.
++    // With the same history, use Anki's mtime precedence and a stable exact-tie choice.
++    let newer = latest_review > local_latest
++        || (latest_review == local_latest
++            && (remote.mtime > local.mtime
++                || (remote.mtime == local.mtime && remote_key > local_key)));
++    let same_second = remote.mtime == local.mtime;
++    if !newer && !same_second {
++        return Ok(false);
++    }
++    let previous_mtime = local.mtime;
++    if !newer {
++        remote = local;
++    }
++    if same_second || remote.mtime <= previous_mtime {
++        remote.mtime.0 = previous_mtime
++            .0
++            .checked_add(1)
++            .or_invalid("device_progress_invalid")?;
++    }
++    remote.usn = Usn(-1);
++    col.storage.add_or_update_card(&remote)?;
++    Ok(true)
++}
++
++fn merge_file(col: &mut Collection, path: PathBuf) -> Result<Summary> {
++    let file = File::open(path)?;
++    let size = file.metadata()?.len();
++    require!(size > 0 && size <= MAX_BYTES, "device_progress_too_large");
++    let mut reader = BufReader::new(file);
++    let Some(Row::Header {
++        version,
++        creation,
++        schema,
++        cards,
++        utc_offset,
++        fsrs,
++        scheduler,
++        rollover,
++    }) = read_row(&mut reader)?
++    else {
++        invalid_input!("device_progress_invalid");
++    };
++    let local_count: u64 = col
++        .storage
++        .db()
++        .query_row("select count(*) from cards", [], |r| r.get(0))?;
++    require!(
++        version == 1
++            && creation == col.storage.creation_stamp()?.0
++            && schema == col.storage.get_collection_timestamps()?.schema_change.0
++            && cards == local_count
++            && utc_offset == col.get_creation_utc_offset()
++            && fsrs == col.get_config_bool(BoolKey::Fsrs)
++            && scheduler == col.scheduler_version() as u32
++            && rollover.unwrap_or(4) == col.get_v2_rollover().unwrap_or(4),
++        "device_progress_mismatch"
++    );
++    // Core owns the lock, transaction, queue invalidation and rollback. No client-side SQL.
++    col.transact_no_undo(|col| {
++        let mut summary = Summary {
++            bytes: size,
++            ..Default::default()
++        };
++        let mut card_ids = HashSet::new();
++        let mut last_card = 0;
++        let mut last_review = 0;
++        let mut in_reviews = false;
++        while let Some(row) = read_row(&mut reader)? {
++            match row {
++                Row::Card {
++                    guid,
++                    notetype,
++                    latest_review,
++                    card,
++                } => {
++                    require!(
++                        !in_reviews && card.id.0 > last_card,
++                        "device_progress_invalid"
++                    );
++                    last_card = card.id.0;
++                    card_ids.insert(card.id);
++                    if merge_card(col, card, guid, notetype, latest_review)? {
++                        summary.updated_cards += 1;
++                    }
++                    summary.cards += 1;
++                }
++                Row::Review { mut review } => {
++                    in_reviews = true;
++                    require!(
++                        review.id.0 > last_review
++                            && card_ids.contains(&review.cid)
++                            && review.button_chosen <= 4,
++                        "device_progress_invalid"
++                    );
++                    last_review = review.id.0;
++                    if let Some(mut existing) = col.storage.get_revlog_entry(review.id)? {
++                        existing.usn = Usn(0);
++                        review.usn = Usn(0);
++                        require!(existing == review, "device_progress_record_conflict");
++                    } else {
++                        review.usn = Usn(-1);
++                        col.storage.add_revlog_entry(&review, false)?;
++                        summary.added_reviews += 1;
++                    }
++                    summary.reviews += 1;
++                }
++                Row::End {
++                    cards: end_cards,
++                    reviews,
++                } => {
++                    require!(
++                        end_cards == cards
++                            && end_cards == summary.cards
++                            && reviews == summary.reviews
++                            && read_row(&mut reader)?.is_none(),
++                        "device_progress_invalid"
++                    );
++                    return Ok(summary);
++                }
++                Row::Header { .. } => invalid_input!("device_progress_invalid"),
++            }
++        }
++        invalid_input!("device_progress_invalid")
++    })
++}

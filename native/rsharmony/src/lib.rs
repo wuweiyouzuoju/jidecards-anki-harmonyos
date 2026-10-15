@@ -11,6 +11,7 @@ pub mod custom_scheduling;
 pub mod deck_preview;
 mod media_snapshot;
 pub mod note_duplicates;
+pub mod peer_progress;
 mod private_rpc_ids;
 mod protocol_generated;
 #[cfg(test)]
@@ -332,6 +333,9 @@ impl RawBackend for AnkiBackend {
         }
         if service == note_duplicates::SERVICE {
             return note_duplicates::call(&self.0, method, input);
+        }
+        if service == peer_progress::SERVICE {
+            return peer_progress::call(&self.0, method, input);
         }
         self.0
             .run_service_method(service, method, input)

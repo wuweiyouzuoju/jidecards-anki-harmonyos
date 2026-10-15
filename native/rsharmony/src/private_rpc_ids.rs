@@ -31,6 +31,14 @@ pub const COLLECTION_HISTORY_UNDO: u32 = 0;
 #[allow(dead_code)]
 pub const COLLECTION_HISTORY_REDO: u32 = 1;
 #[allow(dead_code)]
+pub const PEER_PROGRESS: u32 = 1005;
+#[allow(dead_code)]
+pub const PEER_PROGRESS_EXPORT: u32 = 0;
+#[allow(dead_code)]
+pub const PEER_PROGRESS_MERGE: u32 = 1;
+#[allow(dead_code)]
+pub const PEER_PROGRESS_RECEIVE: u32 = 2;
+#[allow(dead_code)]
 pub const CUSTOM_SCHEDULING: u32 = 1004;
 #[allow(dead_code)]
 pub const CUSTOM_SCHEDULING_INPUT: u32 = 0;
