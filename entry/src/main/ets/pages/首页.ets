@@ -1,3 +1,9 @@
+import { HOME_SHORTCUTS, shortcutCommand } from '../model/KeyboardShortcuts';
+import { WindowPoint } from '../model/WindowSafeLayout';
+import { KeyboardShortcutHelp } from '../components/KeyboardShortcutHelp';
+import { StudyKeyboardSession } from '../model/StudyKeyboard';
+import { studyEventChord } from '../utils/StudyKeyAdapter';
+import { backupCoordinator } from '../model/BackupCoordinator';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { agentOperationHosts } from '../model/agent/AgentOperationHost';
 import type { AgentOperationHost } from '../model/agent/AgentOperationHost';
@@ -271,6 +277,7 @@ struct 首页 {
   @State @Watch('homeActivityChanged') private 显示更多菜单: boolean = false;
   @State @Watch('homeActivityChanged') private homeSearchOpen: boolean = false;
   @State @Watch('homeActivityChanged') private deckMenuId: string = '';
+  @State private deckMenuPoint: WindowPoint | undefined = undefined;
   @State private deckMenuBackRequest: number = 0;
   @State private homeVisible: boolean = true;
   @StorageProp(AI_AGENT_CHANNELS_APP_STORAGE_KEY) @Watch('homeAgentGateChanged') private homeAgentEnabled: boolean = false;
@@ -673,7 +680,7 @@ struct 首页 {
     return !externalDeckOpens.hasPending() && canPresentHomePrompt(this.homeActivity());
   }
 
-  private closeHomeActions(): void { this.显示更多菜单 = false; this.显示主页操作 = false; this.deckMenuId = ''; }
+  private closeHomeActions(): void { this.显示更多菜单 = false; this.显示主页操作 = false; this.deckMenuId = ''; this.deckMenuPoint = undefined; }
   private homeAgentGateChanged(): void { this.publishHomeInterface(); }
   private homeActionControls(): AppInterfaceControl[] {
     const controls: AppInterfaceControl[] = [];
@@ -852,6 +859,10 @@ struct 首页 {
   /** 创建入口先等待集合，避免表单持有同步前的牌组快照。 */
   private openCreateDeck(parentId: string): void {
     if (this.deferForSync((): void => { this.openCreateDeck(parentId); })) return;
+    if (parentId !== '') {
+      const parent: 牌组汇总 = this.按ID查牌组(parentId);
+      if (parent.id === '' || parent.filtered) return;
+    }
     this.创建父牌组ID = parentId;
     this.显示创建牌组 = true;
   }
@@ -1427,9 +1438,10 @@ struct 首页 {
     }
   }
 
-  private openDeckMenu(deckId: string): void {
+  private openDeckMenu(deckId: string, point?: WindowPoint): void {
     if (this.排序模式中 || this.按ID查牌组(deckId).id === '') return;
     this.closeHomeActions();
+    this.deckMenuPoint = point === undefined ? undefined : { x: point.x, y: point.y };
     this.deckMenuId = deckId;
     // 长按同时选中目标；不走点击入口，避免手机详情覆盖长按菜单。
     this.选中的牌组ID = deckId;
@@ -1438,10 +1450,14 @@ struct 首页 {
   private handleDeckMenuAction(deckId: string, action: string): void {
     if (this.按ID查牌组(deckId).id === '') return;
     switch (action) {
+      case 'add_note': this.打开添加笔记(deckId); break;
       case 'stats': this.打开统计页(deckId); break;
       case 'browser': this.打开浏览页(deckId); break;
       case 'reorder': this.进入排序模式(); break;
       case 'rename': this.openDeckRename(deckId); break;
+      case 'create_child': this.openCreateDeck(deckId); break;
+      case 'options': this.打开牌组选项(deckId); break;
+      case 'export': this.openDeckExport(deckId); break;
       case 'customize': this.打开牌组定制(deckId); break;
       case 'custom_study': this.打开自定义学习(deckId); break;
       case 'hide': this.隐藏牌组(deckId); break;
@@ -1768,16 +1784,15 @@ struct 首页 {
   }
 
   // 进入建卡页
-  // 仅当前选中牌组有效时入栈。
+  // 显式目标跨同步等待保持；未选牌组时允许在建卡页选择。
   // 'AddNotePage' 字符串是 NavPathStack 跨页面寻址协议，保留英文。
-  private 打开添加笔记(): void {
-    if (this.deferForSync((): void => { this.打开添加笔记(); })) return;
-    if (!this.已选中牌组()) {
-      return;
-    }
+  private 打开添加笔记(deckId: string = this.选中的牌组ID): void {
+    if (this.deferForSync((): void => { this.打开添加笔记(deckId); })) return;
+    const deck: 牌组汇总 = this.按ID查牌组(deckId);
+    if (deckId !== '' && deck.id === '') return;
     const params: 添加笔记页参数 = {
-      deckId: this.选中的牌组ID,
-      deckName: 牌组显示名(this.选中牌组()),
+      deckId: deck.id,
+      deckName: deck.id === '' ? '' : 牌组显示名(deck),
       deckOptions: this.添加笔记的牌组选项()
     };
     this.暂停主页官方公告检查();
@@ -2055,7 +2070,7 @@ struct 首页 {
                 this.切换牌组展开(deckId);
               },
               menuDeckId: this.deckMenuId,
-              onItemMenu: (deckId: string): void => { this.openDeckMenu(deckId); },
+              onItemMenu: (deckId: string, point?: WindowPoint): void => { this.openDeckMenu(deckId, point); },
               onItemDoubleTap: (deckId: string): void => {
                 this.递归切换牌组(deckId);
               },
@@ -2195,10 +2210,10 @@ struct 首页 {
       }
     }
     if (this.deckMenuId !== '' && this.按ID查牌组(this.deckMenuId).id !== '') {
-      HomeDeckRowMenu({ deckId: this.deckMenuId, tone: this.按ID查牌组(this.deckMenuId).tone,
+      HomeDeckRowMenu({ deckId: this.deckMenuId, point: this.deckMenuPoint, tone: this.按ID查牌组(this.deckMenuId).tone,
         deckName: this.按ID查牌组(this.deckMenuId).fullName,
         filtered: this.按ID查牌组(this.deckMenuId).filtered === true, busy: this.filteredDeckBusy,
-        backRequest: this.deckMenuBackRequest, onClose: (): void => { this.deckMenuId = ''; },
+        backRequest: this.deckMenuBackRequest, onClose: (): void => { this.deckMenuId = ''; this.deckMenuPoint = undefined; },
         onAction: (deckId: string, action: string): void => { this.handleDeckMenuAction(deckId, action); },
         onToneChange: (deckId: string, tone: 牌组色调): void => { this.更改牌组色调(deckId, tone); } })
     }
@@ -2231,7 +2246,7 @@ struct 首页 {
       onCreateChild: (): void => { this.openCreateDeck(this.选中的牌组ID); },
       onMoveDeck: (): void => { this.openDeckMove(); },
       onRenameDeck: (): void => { this.openDeckRename(this.选中的牌组ID); },
-      onExport: (): void => { this.打开数据迁移('exportDeck', Number(this.选中的牌组ID), false); },
+      onExport: (): void => { this.openDeckExport(this.选中的牌组ID); },
       onOptions: (): void => { this.打开牌组选项(); } })
       .transition(SurfaceTransition.pageContent(true, compact))
   }

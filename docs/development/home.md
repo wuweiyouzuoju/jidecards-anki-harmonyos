@@ -9,8 +9,8 @@
 - 首页新建牌组菜单不再提供 AI 制卡/改卡。统计卡旁的独立 JIDE 图标通过 `onAgent` → `openAgent` 打开空白对话入口，配置预检和开发者开关保持在既有责任入口；按需目标选择、改卡搜索与确认见[应用内 Agent](agent.md#统一-ai-对话入口)。
 - 平板等直接展示的牌组详情将制卡、JIDE、预览放在滚动卡片外、上方的同一行纯图标操作，制卡贴左上角、预览贴右上角，默认隐藏的 JIDE 在启用后紧邻左侧制卡按钮，按钮显隐不改变两端位置；常规按钮为44vp正方形且无额外外缘留白；右侧动作行从与左侧相同的 GridRow 上沿开始，高度复用左栏实测的 HomeHeaderLayout.actionsHeight，窄分栏同步收缩；动作行到卡片只贡献一次公共内容间距，因此两栏卡片上沿对齐。排序时左栏使用叉号退出与文字完成的独立工具栏，右侧动作行同时收起，两边卡片仅保留相同的内容顶部间距；JIDE 从真实详情观察值 header_actions_position 区分 above_card、hidden、toolbar_right。下方牌组名称独占整行并自然换行；手机详情将制卡、JIDE、预览三个图标直接排在顶栏右上角，左侧保留返回；共用主页 `IconActionButton.toolbarStyle`，JIDE 仍按原入口开关显隐。点击预览后显示 `DeckPreviewScopeMenu` 的四种范围，内容直接复用 `ActionMenuList` 的居中文字、行高、分隔线与按压反馈。`HomeDeckDetails` 为手机和宽屏持有唯一的无尖角 `AnchoredMenu`；手机点击预览图标后直接在工具栏下方展开范围，手机与宽屏菜单右缘均贴齐预览按钮和详情卡片。工具栏通过 `onAreaChange` 发布窗口坐标与实际宽度，宿主仅转换一次本地坐标，避免右侧分栏重复叠加横向偏移；菜单宽度不超过实测内容宽度。预览范围显示时退出被遮住的 `deck_actions` 观察；选择范围或退出时关闭菜单。系统返回先关闭菜单，再退出详情。取卡读取独立集合快照，范围与数据边界见 [只读预览](study-media.md#卡片只读预览)。入口名称为 JIDE，仍进入标题为“JIDE 制卡”的页面。`HomeDeckDetails.onCreateWithAI` 转发到首页既有 `打开AI制卡`，使用当前牌组参数并保留同步等待、配置预检和开发者入口开关；验证见 `ui-shell-deck-actions.test.mjs`、`deck-preview-session.test.mjs`，长标签与长名称的设备观感单独验收。
 - 快速反馈：`npm test -- home`；完整验收见 [验证说明](verification.md)。
-- 牌组行长按通过 `onMenu` → `onItemMenu` 只把稳定牌组 ID 交给首页 `deckMenuId`；根层 `HomeDeckRowMenu` 复用 `DialogFrame` / `DialogHeader` 显示居中列表弹窗，标题为 Core 完整牌组名。列表行不测量菜单锚点，弹窗不跟随行位置或绘制尖角。外框独占卡片内边距、安全区、窗口/键盘避让和正文限高滚动；正文 Column 无附加间距，动作与色调候选均复用 `AnchoredMenuItem` 的行高、内边距、分隔线和按压反馈。色调在原条目下展开，五色/无色条候选与历史枚举值继续来自 `DeckTone.ts`，无色条保留圆环斜杠图标与非强调文字。系统返回先收起颜色再关闭弹窗；标题关闭和遮罩直接关闭整个弹窗，忙碌与销毁守卫覆盖全部退出入口。UI/JIDE 共用 `deck_row_menu` / `deck_tones` 的条目、显隐、忙碌和当前色调，关闭控件也登记在共同目录；观察值 `presentation=centered_dialog`、`deck_name` 对应实际呈现与标题，关闭移除观察。首页把弹窗计入公告/自动同步占用，目标删除后清理弹窗。
-- 长按打开菜单时同步首页 `选中的牌组ID`，列表只高亮本次长按的目标，关闭菜单后保留该选择；不调用普通点击的 `选择牌组`，避免手机详情覆盖菜单。详情和 JIDE 首页 `selectedId` 沿既有选择 watcher 使用同一真实状态；排序模式或失效目标不改变选择。菜单的“查看统计”“浏览”仍携带冻结的长按牌组 ID；查询使用全名及子牌组范围，别名只用于显示。`DeckScope.ts` 转义引号、反斜杠与 Anki 通配符。浏览的 `initialSearch` 直接消费该范围，同步等待保留目标；统计的 `deckId/deckName` 在任何 await 前初始化选择，禁止复用全库快照，牌组列表加载后按 ID 校准索引，用户切换不被迟到列表覆盖，目标缺失不静默扩大到全库。原全库入口及返回刷新保持。回归：`home-deck-menu.test.mjs`、`deck-tone-selection.test.mjs`、`stats-entry-runtime.test.mjs`；真实手机/平板主题、滚动与返回观感仍需设备验收。
+- 牌组行长按与鼠标右键共用 `onMenu` → `onItemMenu` → 首页 `openDeckMenu`，传稳定牌组 ID；右键另传窗口 vp 坐标。根层 `HomeDeckRowMenu` 的长按展示继续复用 `DialogFrame` / `DialogHeader` 居中列表弹窗，以 Core 完整牌组名作标题；右键复用公共 `CardActionMenu` 在指针处显示同一份动作目录。宿主实测自身原点，只在此把窗口坐标转换一次，边缘避让与限高交给公共菜单。列表行不测量锚点。动作和色调均复用公共菜单行，五色/无色条与持久枚举来自 `DeckTone.ts`。Esc/系统返回先收起色调再关闭；遮罩与标题关闭直接关闭全部，忙碌与销毁守卫一致。UI/JIDE 共用 `deck_row_menu` / `deck_tones`、真实显隐、目标、忙碌与色调；`presentation` 区分 `centered_dialog` / `pointer_context_menu`，`triggers=long_press,right_click`，关闭移除观察。首页把菜单计入公告/自动同步占用，目标删除后清理菜单。
+- 长按/右键打开菜单同步首页 `选中的牌组ID`，列表高亮本次目标，关闭后保留选择；不调用普通点击的 `选择牌组`，避免手机详情覆盖菜单。排序模式或失效目标不改变选择。统计、浏览、添加卡片、新建子牌组、牌组选项与导出均携带冻结的目标 ID，同步等待后重验目标，不读取后来改变的选择。新建子牌组与牌组选项只接受普通牌组；首页 D 新建顶层牌组时清除上一次父牌组。添加/选项/导出沿原页面和数据迁移入口，不另造业务流程。浏览查询使用 Core 全名及子牌组范围，别名只显示；`DeckScope.ts` 转义引号、反斜杠及通配符。统计在 await 前初始化目标，缺失不扩大到全库。回归：`home-deck-menu.test.mjs`、`deck-tone-selection.test.mjs`、`stats-entry-runtime.test.mjs`；设备外观和实际鼠标事件仍需单独验收。
 - 首页常驻同步按钮由 `HomeSummaryHeader` 展示，空闲账号/Core 状态由 `HomeSyncStatusController` 读取；未登录或需要全量同步显示感叹号，普通待同步显示圆点，实际任务进度/冲突优先。登录、同步和方向确认沿用原入口，JIDE 读取相同实时标记与名称；责任、竞态和验证见[同步按钮状态](sync-data.md#同步任务与页面可用性)。
 - JIDE 的 `open_deck_details` / `open_deck_options` 复用首页选择和原选项功能；详情宽窄布局、选择记忆与表单手动保存沿用原责任链。清栈动作保护下层新增/编辑输入，已有选项表单或首页尚无目标快照时拒绝切换；共同规则、动态认知与回归见[自动页面操作](agent.md#自动页面操作)。
 - 首页“更多”和“新建牌组”共用 [ActionMenuList](../../entry/src/main/ets/components/common/ActionMenuList.ets) 的平面条目渲染和当前列表选择校验，正文放入首页根层的公共无尖角 `AnchoredMenu`，复用 `MenuSurface` 的表面与动效；分隔线由列表提供，尺寸、图文间距和 `menu_icon_fill` 默认浅填色由 `AnchoredMenuItem` 提供。两处宿主的 `menuEntries` 只映射完整文案与图标，`menuIcon` 分别位于 `components/home/主页更多面板.ets` 和 `components/主页操作面板.ets`；条目、顺序、显隐和业务回调仍来自既有入口。浏览、速览复用 `ic_home_browser`、`ic_study_guide`；其余 `ic_home_*.svg` 沿用 24×24、2.5 单位描边、圆角端点及转角的简笔风格，新建牌组图形延续学习页卡片叠层并加号。`base/media` 描边为 `#000000`，同名 `dark/media` 只将描边改为 `#E7ECF3`，保持几何一致。回归 `ui-shell-action-menu-list.test.mjs` 覆盖中英文文案、全部显隐组合、图标资源、原回调及禁用/移除后的迟到点击；实际主题、宽窄屏与大字体布局仍需设备验收。
@@ -20,21 +20,24 @@
 
 2026-10-06 本项验证：新回归在旧菜单传参下捕捉到标题栏导致的 36vp 重复偏移；修正后首页几何、菜单装配、详情动作、JIDE 共同声明/观察、ArkTS 字段和文档共 104 项定向检查通过。`npm run build:app -- -SkipRust -ArtifactDirectory D:\Projects\jidecards-home-menu-fix-2026-10-06` 增量签名 HAP 通过，新增警告为 0。未安装设备，桌面/平板最终外观尚未设备验收。
 
-## 牌组长按与 AnkiDroid 的对齐范围（2026-10-12）
+## 牌组上下文操作与 AnkiDroid 的对齐范围（2026-10-15）
 
-对照本机 `D:/Projects/AnkiDroid/AnkiDroid/src/main/java/com/ichi2/anki/dialogs/DeckPickerContextMenu.kt` 与 `contextmenu/DeckPickerMenuContentProvider.kt`；这是该源码快照的比较，不声明覆盖所有 AnkiDroid 版本或整应用功能。长按已改为牌组名标题的居中列表弹窗，视觉外壳沿用本应用公共组件，保留本应用已有条目。
+对照本机 `D:/Projects/AnkiDroid/AnkiDroid/src/main/java/com/ichi2/anki/` 的 `dialogs/DeckPickerContextMenu.kt`、`contextmenu/DeckPickerMenuContentProvider.kt`、`widgets/DeckAdapter.kt`，并核对官方 main 的 [DeckAdapter.kt](https://github.com/ankidroid/Anki-Android/blob/main/AnkiDroid/src/main/java/com/ichi2/anki/widgets/DeckAdapter.kt)。AnkiDroid 的 `ACTION_BUTTON_PRESS + BUTTON_SECONDARY` 经 `onDeckRightClick`、`requestDeckPickerContextMenuForRightClick` 传目标与坐标；长按和右键复用动作提供者。jidecards 对应入口为 `牌组列表项.handleMouse`、`首页.openDeckMenu`、`HomeDeckRowMenu`。`MouseContextInput` 统一只处理右键按下，不重复处理移动/抬起；输入失效、菜单已开、排序时拦截。以下是明确源码与现有入口的比较，不声明整应用功能已完整对齐。
 
-| AnkiDroid 长按操作 | jidecards 当前情况 |
+| AnkiDroid 上下文操作 | jidecards 当前情况 |
 | --- | --- |
-| 浏览、改名、删除 | 已有长按入口，继续调用原领域流程 |
+| 浏览、改名、删除 | 长按/右键共用入口，继续调用原领域流程 |
 | 自定义学习 | 仅普通牌组显示，筛选牌组隐藏，与 AnkiDroid 的牌组类型限制一致；简洁模式仍按原规则隐藏 |
 | 重建、清空筛选牌组 | 筛选牌组已有长按入口，共用 `FilteredDeckCommands` |
-| 添加卡片、新建子牌组、牌组选项、导出牌组 | 已有其他 UI 入口，但长按菜单未提供。添加在详情操作栏，后三项在详情更多；筛选牌组的选项编辑范围也与 AnkiDroid 不同 |
+| 添加卡片、导出牌组 | 已接入同一长按/右键菜单，复用添加页及导出流程 |
+| 新建子牌组、牌组选项 | 普通牌组已接入同一菜单，复用创建流程及选项页；筛选牌组专用选项编辑范围仍与 AnkiDroid 不同 |
 | 取消埋藏 | 学习完成页已有按牌组恢复与调度器入口，长按菜单尚无按埋藏状态显示的入口 |
 | 创建牌组桌面快捷方式、编辑牌组说明 | 未找到对应的原生 UI 操作；本机别名/背景定制不等于 Core 说明编辑 |
 | 安排牌组学习提醒 | 有全局本机提醒页，未绑定牌组；AnkiDroid 的入口受新提醒功能开关控制，不等价于全局提醒 |
 
-本应用长按另保留统计、色调、拖动排序、本机定制和隐藏。上述差异未在本次弹窗迁移中补齐，因此不能报告功能完整对齐。入口声明为 `AppInterface.deckRowMenuItems`，分发为 `首页.handleDeckMenuAction`；回归 `home-deck-menu.test.mjs`、`deck-tone-selection.test.mjs`、`ui-dialog-layout.test.mjs`、`ai-agent-app-structure.test.mjs`。Node 逻辑/接线与 HAP 编译分别验证，深浅色、手机/平板、大字体及真实触控仍须单独设备验收。
+本应用另保留统计、色调、拖动排序、本机定制和隐藏。取消埋藏的菜单入口、桌面快捷方式、Core 说明编辑及按牌组提醒仍存在上述差异，不能报告功能完整对齐。入口声明为 `AppInterface.deckRowMenuItems`，分发为 `首页.handleDeckMenuAction`；回归 `home-deck-menu.test.mjs`、`deck-tone-selection.test.mjs`、`ui-dialog-layout.test.mjs`、`ai-agent-app-structure.test.mjs`。操作指引在首页更多的快捷键帮助及共同 `deck_context_instructions`，浏览指引在浏览更多的快捷键帮助。Node 行为/接线与 HAP 编译分别验证，深浅色、手机/平板、大字体及真实鼠标/触控仍须单独设备验收。
+
+2026-10-15 右键补齐验证：home/browser/ui/repo 与 JIDE 结构、导航、页面观察的测试并集1602项，首轮1601通过；页面观察用例未接入编辑器既有属性操作类，改为复用真实 `noteInterfaceDependencies` 后，该文件11项全部通过，其余1591项结果复用。新增直接行为用例覆盖右键按下/抬起/移动、排序/忙碌/离页、失效目标、坐标换算、同步等待后的固定目标、普通/筛选牌组菜单、Esc 分层关闭与完整搜索结果扩选。命令由 `tools/test-suites.mjs` 的 `selectTests` 合并上述四组并追加三个 `ai-agent` 文件，Node 参数沿 `tools/test.mjs`；证据位于忽略目录 `.local/context-input-20261015/` 的 `regression-final.log`、`agent-page-awareness-final.log`、`focused-final.log`。`npm run build:app -- -SkipRust -ArtifactDirectory D:\Projects\jidecards\.local\context-input-20261015\artifact` 增量签名 HAP 通过，unexpected=0；未安装或重启设备，最终实体鼠标/键盘与窗口外观未验收。
 
 ## 牌组真实改名与本机显示名称
 

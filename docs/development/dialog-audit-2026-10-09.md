@@ -1,6 +1,6 @@
 # 2026-10-09 弹窗逻辑检查
 
-牌组长按入口于 2026-10-12 改为复用 DialogFrame 的居中弹窗；下方清单保留检查当日快照，当前入口与对齐范围见[首页](home.md#牌组长按与-ankidroid-的对齐范围2026-10-12)。
+牌组长按入口于 2026-10-12 改为复用 DialogFrame 的居中弹窗；下方清单保留检查当日快照，当前入口与对齐范围见[首页](home.md#牌组上下文操作与-ankidroid-的对齐范围2026-10-15)。
 
 范围：当前工作区 `entry/src/main/ets` 的原生 CustomDialog、DialogFrame、独立 DialogBackdrop、系统确认框/操作菜单、bindSheet、bindPopup，以及公共 AnchoredMenu / CardActionMenu 的调用方。文件清单由源码入口扫描生成，见末尾；入口次数不是独立产品弹窗数量，同一组件可能多处组合。
 

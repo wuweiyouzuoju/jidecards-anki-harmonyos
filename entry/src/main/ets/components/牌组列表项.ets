@@ -2,6 +2,8 @@
 import { disclosureAnimation } from '../utils/AppMotion';
 import { PressFeedback } from '../utils/PressFeedback';
 import { DeckRowMenuGesture } from '../utils/DeckRowMenuGesture';
+import { mouseContextPoint } from '../utils/MouseContextInput';
+import { WindowPoint } from '../model/WindowSafeLayout';
 import { DisclosureChevron } from './common/DisclosureChevron';
 import { ActionIcon } from './common/ActionIcon';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
@@ -22,7 +24,7 @@ import { loadDeckBackground, releaseDeckBackground } from '../backend/DeckBackgr
 //
 // @作用
 // 卡组列表行的展示与交互承载：色条 + 名称/描述 + 待学计数，
-// 选中态高亮，长按将牌组 ID 交给首页公共弹窗。
+// 选中态高亮，长按/右键将牌组 ID 交给首页公共菜单。
 //
 // @输入
 // @Prop deck：牌组汇总数据（保留英文名以兼容 deck-hierarchy-contract 测试断言 deck.depth / deck.hasChildren）。
@@ -86,7 +88,7 @@ export struct 牌组列表项 {
   };
   onToggle: (deckId: string) => void = (deckId: string): void => {
   };
-  onMenu: (deckId: string) => void = (): void => {};
+  onMenu: (deckId: string, point?: WindowPoint) => void = (): void => {};
   onDoubleTap: (deckId: string) => void = (_deckId: string): void => {};
 
   @StorageProp(颜色键.动作主色) private 动作主色: string = '#2F5FD0';
@@ -116,9 +118,16 @@ export struct 牌组列表项 {
     this.异步加载背景像素图();
   }
 
-  private openMenu(): void {
+  private openMenu(point?: WindowPoint): void {
     if (this.reorderMode || this.menuOpen) return;
-    this.onMenu(this.deck.id);
+    this.上次点击时间 = 0;
+    if (point === undefined) this.onMenu(this.deck.id);
+    else this.onMenu(this.deck.id, point);
+  }
+
+  private handleMouse(event: MouseEvent): void {
+    const point: WindowPoint | undefined = mouseContextPoint(event, !this.disposed && !this.reorderMode && !this.menuOpen);
+    if (point !== undefined) this.openMenu(point);
   }
 
   /** 组件拥有返回图片；旧请求与销毁后的解码结果只释放，不回写。 */
@@ -342,6 +351,7 @@ export struct 牌组列表项 {
     .width('100%')
     .height(应用尺寸.deckRowHeight(this.narrow))
     .gestureModifier(new DeckRowMenuGesture(this.reorderMode, (): void => { this.openMenu(); }))
+    .onMouse((event: MouseEvent): void => { this.handleMouse(event); })
     .clip(true)
     .linearGradient({ angle: 110, colors: this.visual.selectedColors.length > 0 && this.selected
       ? themeGradient(this.glassColors)

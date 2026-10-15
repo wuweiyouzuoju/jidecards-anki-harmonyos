@@ -9,14 +9,20 @@ import { interfaceItemText } from '../../utils/AppInterfaceText';
 import { DECK_TONE_CHOICES, DeckToneChoice, 牌组色调 } from '../../model/DeckTone';
 import { 简洁模式AppStorage键 } from '../../model/简洁模式存储';
 import { 应用尺寸 } from '../../utils/应用尺寸';
+import { CardActionMenu, CardActionMenuEntry } from '../common/CardActionMenu';
+import { ActionMenuAnchor, actionMenuHostAnchor } from '../common/ActionMenuLayout';
+import { WindowPoint } from '../../model/WindowSafeLayout';
 
-/** 牌组长按复用公共居中弹窗与动作行；首页拥有目标和原业务回调。 */
+/** 右键复用公共上下文菜单，长按复用居中弹窗；两者共用动作目录与首页业务回调。 */
 @Component
 export struct HomeDeckRowMenu {
   @StorageProp('系统语言') @Watch('publishInterface') private uiLanguage: string = 'zh-Hans';
   @StorageProp(简洁模式AppStorage键) @Watch('publishInterface') private simple: boolean = true;
   @Prop @Watch('publishInterface') deckId: string = '';
   @Prop @Watch('publishInterface') deckName: string = '';
+  @Prop @Watch('publishInterface') point: WindowPoint | undefined = undefined;
+  @State private hostLeft: number = 0;
+  @State private hostTop: number = 0;
   @Prop @Watch('publishInterface') tone: 牌组色调 = 牌组色调.Blue;
   @Prop @Watch('publishInterface') filtered: boolean = false;
   @Prop @Watch('publishInterface') busy: boolean = false;
@@ -61,6 +67,24 @@ export struct HomeDeckRowMenu {
     }));
   }
 
+  private contextAnchor(): ActionMenuAnchor {
+    const anchor: ActionMenuAnchor = { left: this.point?.x ?? 0, top: this.point?.y ?? 0, width: 0, height: 0 };
+    return actionMenuHostAnchor(anchor, this.hostLeft, this.hostTop);
+  }
+
+  private contextEntries(): CardActionMenuEntry[] {
+    return this.menuItems().map((item: ActionMenuListItem): CardActionMenuEntry => ({
+      id: item.id, value: item.label, enabled: item.available !== false, destructive: item.destructive,
+      children: item.id === 'tone' ? this.toneItems().map((choice: ActionMenuListItem): CardActionMenuEntry => ({
+        id: choice.id, value: choice.label, icon: choice.icon, iconTint: choice.iconTint,
+        enabled: choice.available !== false, selected: choice.selected,
+        selectionUsesAccent: choice.id !== String(牌组色调.None), action: (): void => { this.selectItem(choice); }
+      })) : undefined,
+      action: (): void => { this.selectItem(item); }
+    }));
+  }
+
+
   private toggleBranch(item: ActionMenuListItem): void {
     if (this.busy || !this.mounted || item.id !== 'tone') return;
     this.expandedIds = this.expandedIds.includes('tone') ? [] : ['tone'];
@@ -96,7 +120,8 @@ export struct HomeDeckRowMenu {
       optionIds: items.map((item: AppInterfaceControl): string => item.id),
       optionLabels: items.map((item: AppInterfaceControl): string => item.title), items: items, controlsComplete: true,
       values: [{ id: 'filtered', value: String(this.filtered) }, { id: 'tone', value: String(this.tone) },
-        { id: 'presentation', value: 'centered_dialog' }, { id: 'deck_name', value: this.deckName }] });
+        { id: 'presentation', value: this.point === undefined ? 'centered_dialog' : 'pointer_context_menu' },
+        { id: 'triggers', value: 'long_press,right_click' }, { id: 'deck_name', value: this.deckName }] });
     if (this.expandedIds.includes('tone')) {
       const tones: AppInterfaceControl[] = DECK_TONE_CHOICES.map((choice: DeckToneChoice): AppInterfaceControl => ({
         id: String(choice.tone), titleKey: choice.titleKey,
@@ -137,8 +162,19 @@ export struct HomeDeckRowMenu {
   }
 
   build() {
-    DialogFrame({ maximumWidth: 应用尺寸.dialogCompactMaxWidth, canDismiss: !this.busy,
-      onDismiss: (): void => { this.dismiss(); },
-      header: () => { this.dialogHeader(); }, content: () => { this.dialogContent(); } })
+    Stack() {
+      if (this.point !== undefined) {
+        CardActionMenu({ items: this.contextEntries(), anchor: this.contextAnchor(), expandedIds: this.expandedIds,
+          menuWidth: 应用尺寸.cardActionMenuWidth,
+          onToggleBranch: (item: CardActionMenuEntry): void => { this.toggleBranch({ id: item.id ?? '', label: item.value }); },
+          onSelect: (item: CardActionMenuEntry): void => { item.action?.(); }, onClose: (): void => { this.dismiss(); } })
+      } else {
+        DialogFrame({ maximumWidth: 应用尺寸.dialogCompactMaxWidth, canDismiss: !this.busy,
+          onDismiss: (): void => { this.dismiss(); },
+          header: () => { this.dialogHeader(); }, content: () => { this.dialogContent(); } })
+      }
+    }.width('100%').height('100%').onAreaChange((_old: Area, area: Area): void => {
+      this.hostLeft = Number(area.globalPosition.x); this.hostTop = Number(area.globalPosition.y);
+    })
   }
 }

@@ -16,7 +16,7 @@ function method(name) {
 const compile = source => stripTypeScriptTypes(source, { mode: 'transform' });
 
 test('destination renderer preserves route defaults, explicit parameters, snapshots and the host stack', () => {
-  const components = ['EditNotePage', 'NoteDraftPreviewPage', '学习页', '浏览页', '统计页', '添加笔记页', 'AI制卡页', '学习提醒页', '设置页'];
+  const components = ['DeckOptionsPage', 'EditNotePage', 'NoteDraftPreviewPage', '学习页', '浏览页', '统计页', '添加笔记页', 'AI制卡页', '学习提醒页', '设置页'];
   const calls = [];
   const source = read('pages/navigation/HomeDestinations.ets')
     .replace(/^import[^;]+;\s*/gm, '').replace(/^@Builder\s*/gm, '').replace(/^export /gm, '');
@@ -56,6 +56,12 @@ test('destination renderer preserves route defaults, explicit parameters, snapsh
     calls.at(-1).props.onManualSync();
   }
   assert.equal(synced, 3);
+  let deckBusy=false;
+  render('DeckOptionsPage',{deckId:7,deckName:'Target'},{...context,onDeckOptionsBusy:busy=>{deckBusy=busy;}});
+  assert.equal(calls.at(-1).name,'DeckOptionsPage');
+  assert.equal(calls.at(-1).props.deckId,7);assert.equal(calls.at(-1).props.deckName,'Target');
+  assert.equal(calls.at(-1).props.pathStack,context.pathStack);
+  calls.at(-1).props.onBusy(true);assert.equal(deckBusy,true);
   for (const route of APP_PAGE_ROUTES) {
     const beforeRoute = calls.length;
     render(route.name, {}, context);
@@ -87,7 +93,7 @@ test('home binds its live navigation host and both detail layouts to the same ac
     打开牌组预览: () => events.push('preview'), 打开添加笔记: () => events.push('add'),
     打开AI制卡: () => events.push('ai-create'),
     openDeckRename: id => events.push(['rename', id]),
-    openCreateDeck: id => events.push(['child', id]), 打开数据迁移: (...args) => events.push(args),
+    openCreateDeck: id => events.push(['child', id]), openDeckExport: id => events.push(['export', id]),
     打开牌组选项: () => events.push('options'), homeActionAnchor: { width: 360 }, 显示今日进度卡: true });
   const params = {};
   page.页面映射('SettingsPage', params);
@@ -112,7 +118,7 @@ test('home binds its live navigation host and both detail layouts to the same ac
     assert.equal(page.deckDetailsBackHandler, null);
     page.选中的牌组ID = '42';
     for (const action of ['onStudy', 'onPreview', 'onAddNote', 'onCreateWithAI', 'onCreateChild', 'onRenameDeck', 'onExport', 'onOptions', 'onBack']) details[action]();
-    assert.deepEqual(events.splice(0), ['study', 'preview', 'add', 'ai-create', ['child', '42'], ['rename', '42'], ['exportDeck', 42, false], 'options', 'refresh']);
+    assert.deepEqual(events.splice(0), ['study', 'preview', 'add', 'ai-create', ['child', '42'], ['rename', '42'], ['export', '42'], 'options', 'refresh']);
     assert.equal(page.显示牌组详情, false);
     page.historyRefreshToken++;
   }

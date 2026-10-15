@@ -161,8 +161,8 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'create', titleKey: 'create_deck', opens: 'home_create' },
     { id: 'today', titleKey: 'settings_home_today_summary', condition: 'home_today_summary' },
     { id: 'decks', titleKey: 'home_interface_decks', opens: 'deck_details' },
-    { id: 'deck_menu', titleKey: 'deck_more', opens: 'deck_row_menu', condition: 'deck_long_press' },
-    { id: 'reorder', titleKey: 'deck_menu_reorder', opens: 'deck_reorder', condition: 'deck_long_press' }
+    { id: 'deck_menu', titleKey: 'deck_more', opens: 'deck_row_menu', condition: 'deck_context_menu' },
+    { id: 'reorder', titleKey: 'deck_menu_reorder', opens: 'deck_reorder', condition: 'deck_context_menu' }
   ] },
   { id: 'deck_reorder', titleKey: 'deck_menu_reorder', instructionsKey: 'deck_reorder_instructions', parent: 'home', items: [
     { id: 'exit', titleKey: 'deck_reorder_exit', iconKey: 'ic_common_close' },
@@ -266,12 +266,16 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'confirm', titleKey: 'deck_customize_save' },
     { id: 'cancel', titleKey: 'cancel' }
   ] },
-  { id: 'deck_row_menu', titleKey: 'deck_more', parent: 'home', items: [
+  { id: 'deck_row_menu', instructionsKey: 'deck_context_instructions', titleKey: 'deck_more', parent: 'home', items: [
+    { id: 'add_note', titleKey: 'deck_add_card', opens: 'add_note' },
     { id: 'stats', titleKey: 'deck_menu_stats', opens: 'stats' },
     { id: 'browser', titleKey: 'browser_title', opens: 'browser' },
     { id: 'tone', titleKey: 'deck_menu_tone_label', opens: 'deck_tones' },
     { id: 'reorder', titleKey: 'deck_menu_reorder', opens: 'deck_reorder' },
     { id: 'rename', titleKey: 'deck_rename_title', opens: 'deck_rename' },
+    { id: 'create_child', titleKey: 'deck_create_subdeck', opens: 'create_deck', condition: 'normal_deck' },
+    { id: 'options', titleKey: 'deck_options_title', opens: 'deck_options', condition: 'normal_deck' },
+    { id: 'export', titleKey: 'deck_export_this', opens: 'export' },
     { id: 'customize', titleKey: 'deck_customize', opens: 'deck_customize' },
     ...FILTERED_DECK_ACTIONS.map((item): AppInterfaceItem => ({ id: item.id, titleKey: item.titleKey, condition: 'filtered_deck' })),
     { id: 'custom_study', titleKey: 'custom_study_menu', opens: 'custom_study', fullOnly: true, condition: 'normal_deck' },
