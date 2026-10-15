@@ -1,3 +1,13 @@
+import { KeyboardShortcutHelp } from '../components/KeyboardShortcutHelp';
+import { EDITOR_SHORTCUTS, FIELD_SHORTCUTS, editorShortcutCommand } from '../model/KeyboardShortcuts';
+import { StudyKeyboardSession } from '../model/StudyKeyboard';
+import { studyEventChord } from '../utils/StudyKeyAdapter';
+import { DirectorySelect } from '../components/common/DirectorySelect';
+import { DirectoryRow, DirectoryView, DirectoryChoice, directoryChoiceRows, directoryRow } from '../model/DirectoryTree';
+import { 牌组服务 } from '../backend/牌组服务';
+import { DeckTreeNode } from '../proto/messages/DeckMessages';
+import { 笔记类型编辑器 } from '../components/settings/笔记类型编辑器';
+import { 添加笔记页参数, 添加笔记牌组选项, 添加笔记笔记类型选项 } from '../model/navigation/PageParams';
 import { PressFeedback } from '../utils/PressFeedback';
 import { navigationEnterOffset } from '../utils/AppMotion';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
@@ -26,7 +36,7 @@ import { NoteTypeCatalog } from '../model/NoteTypeCatalog';
 import { noteTypeText, noteFieldText } from '../utils/NoteTypeText';
 import { appInterface } from '../backend/AppInterfaceService';
 import { addNoteInterfaceControls, noteAudioInterfaceObservation, AppInterfaceMenuItem, AppInterfaceControl } from '../model/AppInterface';
-import { interfaceControlText } from '../utils/AppInterfaceText';
+import { interfaceControlText, interfaceControlIcon } from '../utils/AppInterfaceText';
 import { noteFieldDisplayKey, noteTypeDisplayKey } from '../model/NoteTypePresentation';
 import { AnkiNoteCreation } from '../backend/AnkiNoteCreation';
 import { showToastSafely, namedResourceText } from '../utils/UiFeedback';
@@ -58,29 +68,7 @@ import { 颜色键 } from '../model/颜色主题';
 import { CustomTransition } from '../utils/自定义转场';
 import type { NotetypeNameId, NotetypeView, NotetypeField } from '../proto/messages/NotetypeMessages';
 
-/** 建卡目标牌组候选（通过 Navigation param 传入） */
-export interface 添加笔记牌组选项 {
-  id: number;
-  name: string;
-}
-
-/** 笔记类型下拉候选 */
-export interface 添加笔记笔记类型选项 {
-  id: number;
-  name: string;
-}
-
-/** Select 组件所需选项结构 */
-interface 添加笔记下拉选项 {
-  value: string;
-}
-
-/** Navigation 入栈参数（与 学习页参数 同风格） */
-export interface 添加笔记页参数 {
-  deckId?: string;
-  deckName?: string;
-  deckOptions?: 添加笔记牌组选项[];
-}
+interface 添加笔记下拉选项 { value: string; }
 
 @Component
 export struct 添加笔记页 {
@@ -124,6 +112,16 @@ export struct 添加笔记页 {
   private readonly creationSession: NoteCreationSession = new NoteCreationSession(new AnkiNoteCreation(),
     (state: NoteCreationState): void => { this.applyCreationState(state); });
   private displayedType: NotetypeView | null = null;
+  private refreshingTypeDraft: boolean = false;
+  @State @Watch('publishInterface') private keyboardHelpOpen: boolean = false;
+  @State @Watch('publishInterface') private templatesOpen: boolean = false;
+  @State private templateBackRequest: number = 0;
+  @State private deckOpenRequest: number = 0;
+  @State private typeOpenRequest: number = 0;
+  @State private tagsFocusRequest: number = 0;
+  @State private fieldFocusRequest: number = 0;
+  @State private focusedField: number = -1;
+  private readonly keyboardSession: StudyKeyboardSession = new StudyKeyboardSession();
   @State private duplicateSearch: string = '';
   // 名称只用于展示与帮助，编辑能力由 Core 结构提供。
   @State private 笔记类型名: string = '';
@@ -198,7 +196,7 @@ export struct 添加笔记页 {
 
   aboutToDisappear(): void {
     this.pageActive = false;
-    appInterface.hidePage('add_note'); appInterface.leave('add_note'); appInterface.leave('add_note_types');
+    appInterface.hidePage('add_note'); appInterface.leave('add_note'); appInterface.leave('add_note_types'); appInterface.leave('add_note_decks');
     appInterface.leave('note_audio_manage');
     this.tagsReveal.cancel();
     this.audioPreview.dispose().catch((): void => {});
@@ -215,6 +213,8 @@ export struct 添加笔记页 {
    * Invariants: 图片遮盖编辑器优先于帮助浮层（编辑器更靠上层）。
    */
   onBackPress(): boolean {
+    if (this.keyboardHelpOpen) { this.keyboardHelpOpen = false; return true; }
+    if (this.templatesOpen) { this.templateBackRequest++; return true; }
     if (this.draftPreview !== null) return true;
     if (this.duplicateSearch) { this.creationSession.cancelDuplicate(); return true; }
     if (this.图片遮盖_显示编辑器) { this.masksBackRequest++; return true; }
@@ -267,20 +267,24 @@ export struct 添加笔记页 {
       this.optionalReverseIndex = state.view?.optionalReverseFieldOrd ?? -1;
       this.originalStockKind = state.view?.originalStockKind ?? 0;
       this.字段名列表 = state.view === null ? [] : state.view.fieldNames.slice();
+      if (!this.refreshingTypeDraft) {
       this.字段值列表 = this.字段名列表.map((_name: string): string => '');
       this.cleanupDrawingImages(this.fieldImages); this.fieldImages = [];
       discardNoteRecordings(this.fieldAudios).catch((): void => {});
       this.fieldAudios = [];
       this.audioPreview.stop().catch((): void => {});
       this.occlusionImage = undefined;
+      }
       this.fieldEditorVersion++;
       this.clozeFieldOrds = state.view?.clozeFieldOrds ?? [];
       this.imageOcclusionFields = state.view?.imageOcclusionFields ?? [];
       this.是否图片遮盖模式 = this.imageOcclusionFields.length === 4;
       this.笔记类型帮助 = this.笔记类型帮助文案(this.笔记类型名);
+      if (!this.refreshingTypeDraft) {
       this.图片遮盖_源图Uri = ''; this.图片遮盖_遮罩列表 = [];
       this.图片遮盖_标题 = ''; this.图片遮盖_额外 = ''; this.图片遮盖_显示编辑器 = false;
       this.captureDraftBaseline();
+      }
     }
     this.displayedType = state.view;
     if (state.completion !== null && state.completion !== undefined) {
@@ -317,8 +321,59 @@ export struct 添加笔记页 {
     const context = this.取能力上下文();
     if (context === null) { this.错误信息 = this.取本地化文案($r('app.string.add_note_notetype_load_failed')); return; }
     await this.creationSession.initialize(context.filesDir);
+    try {
+      const tree: DeckTreeNode = await new 牌组服务().获取牌组树();
+      if (!this.pageActive) return;
+      const options: 添加笔记牌组选项[] = []; this.collectDeckOptions(tree, '', options);
+      this.牌组选项 = options;
+      if (!options.some((item: 添加笔记牌组选项): boolean => item.id === this.牌组ID)) this.牌组ID = options[0]?.id ?? 0;
+      this.牌组名 = options.find((item: 添加笔记牌组选项): boolean => item.id === this.牌组ID)?.name ?? '';
+    } catch (error) { if (this.pageActive) this.错误信息 = this.取本地化文案($r('app.string.browser_action_deck_error')); }
   }
 
+  private collectDeckOptions(node: DeckTreeNode, parent: string, options: 添加笔记牌组选项[]): void {
+    const path: string = parent === '' ? node.name : parent + '::' + node.name;
+    if (node.deckId > 0 && !node.filtered) options.push({ id: node.deckId, name: path });
+    for (const child of node.children) this.collectDeckOptions(child, node.deckId === 0 ? '' : path, options);
+  }
+  private deckRows(): DirectoryRow[] {
+    return directoryChoiceRows(this.牌组选项.map((item: 添加笔记牌组选项): DirectoryChoice => ({ id: String(item.id), path: item.name })), String(this.牌组ID));
+  }
+  private typeRows(): DirectoryRow[] {
+    return this.笔记类型选项.map((item: 添加笔记笔记类型选项): DirectoryRow => {
+      const row: DirectoryRow = directoryRow(String(item.id), this.displayTypeName(item.name), item.id === this.已选笔记类型ID ? 1 : 0);
+      row.level = 0; return row;
+    });
+  }
+  private handleEditorKey(event: KeyEvent): boolean {
+    const fresh: boolean = this.keyboardSession.update(event.keyCode, event.type === KeyType.Down);
+    if (event.type !== KeyType.Down) return false;
+    const chord: string = studyEventChord(event);
+    if (this.keyboardHelpOpen) { if (fresh && chord === 'escape') this.keyboardHelpOpen = false; return true; }
+    if (this.templatesOpen) return false;
+    const blocked: boolean = !this.pageActive || this.处理中 || this.pickingFieldImage || this.audioBusy || this.confirmingDiscard ||
+      this.显示帮助 || this.图片遮盖_显示编辑器 || this.duplicateSearch !== '' || this.draftPreview !== null;
+    const command: string = editorShortcutCommand(chord, blocked);
+    if (command === '') return false;
+    if (!fresh) return true;
+    if (command === 'save') this.提交(false);
+    else if (command === 'deck') this.deckOpenRequest++;
+    else if (command === 'notetype') this.typeOpenRequest++;
+    else if (command === 'templates') this.openTemplates();
+    else if (command === 'preview') this.openDraftPreview();
+    else if (command === 'tags') { this.高级已展开 = true; this.tagsReveal.request(true); this.tagsFocusRequest++; }
+    else if (command.startsWith('field_')) { this.focusedField = Number(command.slice(6)); this.fieldFocusRequest++; }
+    return true;
+  }
+  private openTemplates(): void {
+    if (this.interfaceEnabled('templates') && this.已选笔记类型ID > 0) this.templatesOpen = true;
+  }
+  private async refreshTemplates(): Promise<void> {
+    this.templatesOpen = false;
+    this.refreshingTypeDraft = true;
+    try { await this.creationSession.loadType(this.已选笔记类型ID, true); }
+    finally { this.refreshingTypeDraft = false; }
+  }
   private async 加载笔记类型(notetypeId: number): Promise<void> {
     if (this.draftPreview !== null) return;
     if (notetypeId === this.已选笔记类型ID || this.处理中 || this.pickingFieldImage || this.audioBusy || this.confirmingDiscard || !this.pageActive) return;
@@ -507,7 +562,7 @@ export struct 添加笔记页 {
   private interfaceControls(): AppInterfaceMenuItem[] {
     return addNoteInterfaceControls({ tagsExpanded: this.高级已展开,
       occlusion: this.是否图片遮盖模式, hasSource: this.图片遮盖_源图Uri !== '', busy: this.处理中,
-      blocked: this.处理中 || this.pickingFieldImage || this.audioBusy || this.confirmingDiscard,
+      blocked: this.处理中 || this.pickingFieldImage || this.audioBusy || this.confirmingDiscard || this.templatesOpen || this.keyboardHelpOpen,
       saveEnabled: this.保存按钮可用() && !this.confirmingDiscard, hasTypes: this.笔记类型选项.length > 0 });
   }
 
@@ -550,7 +605,7 @@ export struct 添加笔记页 {
   private publishInterface(_locale: string = this.uiLanguage): void {
     if (!this.pageActive) return;
     const controls: AppInterfaceControl[] = this.interfaceControls().map((item): AppInterfaceControl =>
-      ({ id: item.id, title: namedResourceText(this.getUIContext(), item.titleKey), titleKey: item.titleKey,
+      ({ id: item.id, title: namedResourceText(this.getUIContext(), item.titleKey), titleKey: item.titleKey, iconKey: item.iconKey,
         enabled: item.enabled, selected: item.selected }));
     const fieldIds: string[] = [];
     const labels: string[] = [];
@@ -577,6 +632,7 @@ export struct 添加笔记页 {
       busy: this.处理中 || this.pickingFieldImage || this.audioBusy || this.confirmingDiscard,
       items: controls, controlsComplete: true,
       values: [{ id: 'save_feedback', value: this.saveFeedback }, { id: 'stock_kind', value: String(this.originalStockKind) },
+        { id: 'templates_location', value: 'notetype_before_help' },
         { id: 'cloze_fields', value: this.clozeFieldOrds.join(',') }, { id: 'reverse_field', value: String(this.optionalReverseIndex) },
         { id: 'image_count', value: String(this.fieldImages.filter((item: NoteFieldImage): boolean => item.kind !== 'video').length) },
         { id: 'video_count', value: String(this.fieldImages.filter((item: NoteFieldImage): boolean => item.kind === 'video').length) }, { id: 'audio_count', value: String(this.fieldAudios.length) },
@@ -616,7 +672,7 @@ export struct 添加笔记页 {
   private 标签字段块() {
     Column({ space: 应用尺寸.间距_5 }) {
       this.带帮助的标签($r('app.string.add_note_tags'), (): Resource => $r('app.string.add_note_tags_help'))
-      NoteTagsField({ text: this.标签, scroller: this.tagsReveal.scroller,
+      NoteTagsField({ text: this.标签, focusRequest: this.tagsFocusRequest, scroller: this.tagsReveal.scroller,
         isInteractive: !this.处理中 && !this.pickingFieldImage && !this.audioBusy && !this.confirmingDiscard,
         onChange: (value: string): void => { this.updateTags(value); } })
       Text($r('app.string.add_note_duplicate_policy'))
@@ -664,7 +720,8 @@ export struct 添加笔记页 {
 
   @Builder
   private 顶部条() {
-    NoteEditorHeader({ title: $r('app.string.add_note_title'),
+    NoteEditorHeader({ title: $r('app.string.add_note_title'), showKeyboardHelp: true,
+      onKeyboardHelp: (): void => { this.keyboardHelpOpen = true; },
       actionLabel: $r('app.string.note_draft_preview'),
       actionEnabled: !this.处理中 && !this.pickingFieldImage && !this.audioBusy && !this.confirmingDiscard && this.已选笔记类型ID > 0,
       closeEnabled: this.interfaceEnabled('back'),
@@ -679,34 +736,26 @@ export struct 添加笔记页 {
         // 两种保存操作固定在滚动区外，长字段与键盘不改变保存语义。
         Scroll(this.tagsReveal.scroller) {
           Column({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout) }) {
-            // 帮助紧随字段标签，弹层内容在点击时读取当前类型；选择框靠右。
-            Row() {
-              HelpLabel({ title: this.interfaceLabel('type'), textSize: 应用尺寸.字号_按钮,
-                textColor: $r('app.color.text_secondary'), isHelpEnabled: !this.处理中,
-                onHelp: (): void => { this.打开帮助($r('app.string.add_note_notetype'), this.笔记类型帮助); }
-              }).layoutWeight(1)
-              ForEach([this.typeSelectorVersion], (_version: number) => {
-              Select(this.笔记类型下拉选项())
-                .selected(this.已选笔记类型索引())
-                .value(this.已选笔记类型名())
-                .enabled(this.interfaceEnabled('type'))
-                .attributeModifier(new SelectStyle($r('app.color.surface_card')))
-                .height(SelectStyle.controlHeight)
-                .padding(SelectStyle.controlPadding)
-                .space(SelectStyle.controlSpace)
-                .width(SelectStyle.fieldWidth)
-                .constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
-                .font(SelectStyle.controlFont)
-                .optionFont(SelectStyle.optionFont)
-                .selectedOptionFont(SelectStyle.selectedOptionFont)
-                .textModifier(SelectStyle.labelText())
-                .border(SelectStyle.controlBorder).borderRadius(SelectStyle.controlRadius)
-                .onSelect((索引: number): void => {
-                  this.加载笔记类型(this.笔记类型选项[索引].id);
-                })
-              }, (version: number): string => version.toString())
-            }
-            .width('100%')
+            // 配置区只保留两行；模板归属类型标签，点击与键盘共用同一守卫。
+            Column({ space: 13 }) {
+              DirectorySelect({ label: $r('app.string.add_note_deck'), value: this.牌组名,
+                surfaceColor: $r('app.color.surface_card'),
+                rows: this.deckRows(), openRequest: this.deckOpenRequest, isInteractive: this.interfaceEnabled('deck'),
+                showHelp: true, onHelp: (): void => { this.打开帮助($r('app.string.add_note_deck'), $r('app.string.add_note_deck_help')); },
+                onViewChanged: (view: DirectoryView | null): void => { appInterface.observeDirectory('add_note_decks', view); },
+                onSelect: (id: string): void => {
+                  this.牌组ID = Number(id); this.牌组名 = this.牌组选项.find((item): boolean => item.id === Number(id))?.name ?? '';
+                } })
+              DirectorySelect({ label: this.interfaceLabel('type'), value: this.已选笔记类型名(),
+                surfaceColor: $r('app.color.surface_card'),
+                rows: this.typeRows(), openRequest: this.typeOpenRequest, isInteractive: this.interfaceEnabled('type'),
+                labelActionIcon: interfaceControlIcon(this.interfaceControls(), 'templates'),
+                labelActionLabel: this.interfaceLabel('templates'),
+                isLabelActionEnabled: this.interfaceEnabled('templates') && this.已选笔记类型ID > 0,
+                onLabelAction: (): void => { this.openTemplates(); },
+                showHelp: true, onHelp: (): void => { this.打开帮助($r('app.string.add_note_notetype'), this.笔记类型帮助); },
+                onSelect: (id: string): void => { this.加载笔记类型(Number(id)); } })
+            }.width('100%')
 
             // 遮盖使用专属布局；普通字段支持文字与独立图片附件。
             if (this.是否图片遮盖模式) {
@@ -752,6 +801,7 @@ export struct 添加笔记页 {
                 onChange: (sticky: boolean): void => { this.changeFieldSticky(this.imageOcclusionFields[0], sticky); } })
               if (this.图片遮盖_标题字段索引() >= 0) {
                 NoteFieldCard({ fieldName: this.字段名列表[this.图片遮盖_标题字段索引()], fieldIndex: this.图片遮盖_标题字段索引(),
+                  focusRequest: this.focusedField === this.图片遮盖_标题字段索引() ? this.fieldFocusRequest : 0,
                   originalStockKind: this.originalStockKind, value: this.图片遮盖_标题,
                   fieldConfig: this.fieldConfigs[this.图片遮盖_标题字段索引()] ?? null, mediaEditable: false,
                   disabled: !this.interfaceEnabled('back'), isDark: this.是否深色(), accent: this.动作主色,
@@ -761,6 +811,7 @@ export struct 添加笔记页 {
               }
               if (this.图片遮盖_额外字段索引() >= 0) {
                 NoteFieldCard({ fieldName: this.字段名列表[this.图片遮盖_额外字段索引()], fieldIndex: this.图片遮盖_额外字段索引(),
+                  focusRequest: this.focusedField === this.图片遮盖_额外字段索引() ? this.fieldFocusRequest : 0,
                   originalStockKind: this.originalStockKind, value: this.图片遮盖_额外,
                   fieldConfig: this.fieldConfigs[this.图片遮盖_额外字段索引()] ?? null, mediaEditable: false,
                   disabled: !this.interfaceEnabled('back'), isDark: this.是否深色(), accent: this.动作主色,
@@ -773,7 +824,7 @@ export struct 添加笔记页 {
               this.高级设置折叠区()
             } else {
               ForEach(this.字段名列表, (字段名: string, 索引: number) => {
-                NoteFieldCard({ fieldName: 字段名, fieldIndex: 索引, originalStockKind: this.originalStockKind, value: this.字段值列表[索引],
+                NoteFieldCard({ fieldName: 字段名, fieldIndex: 索引, focusRequest: this.focusedField === 索引 ? this.fieldFocusRequest : 0, originalStockKind: this.originalStockKind, value: this.字段值列表[索引],
                   fieldConfig: this.fieldConfigs[索引] ?? null,
                   stickyEditable: true, stickyInteractive: !this.stickySaving, sticky: this.fieldSticky[索引] ?? false,
                   onStickyChange: (sticky: boolean): void => { this.changeFieldSticky(索引, sticky); },
@@ -853,6 +904,15 @@ export struct 添加笔记页 {
         })
       }
 
+      if (this.templatesOpen) {
+        笔记类型编辑器({ notetypeId: this.已选笔记类型ID, notetypeName: this.笔记类型名,
+          templatesOnly: true, backRequest: this.templateBackRequest, isDark: this.是否深色(),
+          onClose: (): void => { this.templatesOpen = false; }, onSaved: (): void => { this.refreshTemplates(); } })
+      }
+      if (this.keyboardHelpOpen) {
+        KeyboardShortcutHelp({ scope: 'editor', shortcuts: EDITOR_SHORTCUTS.concat(FIELD_SHORTCUTS),
+          onClose: (): void => { this.keyboardHelpOpen = false; } })
+      }
       if (this.duplicateSearch !== '') {
         NoteDuplicateDialog({ onCancel: (): void => { this.creationSession.cancelDuplicate(); },
           onContinue: (): void => { this.creationSession.confirmDuplicate(); },
@@ -895,8 +955,9 @@ export struct 添加笔记页 {
     .backgroundColor(Color.Transparent)
     .opacity(this.转场透明度)
     .translate({ x: this.navigationOffset })
+    .onKeyPreIme((event: KeyEvent): boolean => this.handleEditorKey(event))
     .onShown((): void => { this.restoreEditorAfterPreview(); this.wheelSession.setVisible(true); appInterface.showPage('add_note'); this.publishInterface(); })
-    .onHidden((): void => { this.wheelSession.setVisible(false); appInterface.hidePage('add_note'); this.audioPreview.stop().catch((): void => {}); })
+    .onHidden((): void => { this.keyboardSession.reset(); this.wheelSession.setVisible(false); appInterface.hidePage('add_note'); this.audioPreview.stop().catch((): void => {}); })
     .onBackPressed((): boolean => this.onBackPress())
   }
 

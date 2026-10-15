@@ -5,6 +5,7 @@ import { NoteDraftPreviewInput } from '../NoteDraftPreview';
 export interface 设置页参数 {
   openAiSettings?: boolean;
   sectionId?: string;
+  initialActionId?: string;
 }
 
 export interface 浏览页参数 {
@@ -23,3 +24,12 @@ export interface EditNotePageParams {
 export interface NoteDraftPreviewPageParams {
   input: NoteDraftPreviewInput;
 }
+
+export interface DeckOptionsPageParams {
+  deckId: number;
+  deckName: string;
+}
+
+export interface 添加笔记牌组选项 { id: number; name: string; }
+export interface 添加笔记笔记类型选项 { id: number; name: string; }
+export interface 添加笔记页参数 { deckId?: string; deckName?: string; deckOptions?: 添加笔记牌组选项[]; }

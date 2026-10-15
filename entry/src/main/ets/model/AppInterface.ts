@@ -471,13 +471,17 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
   { id: 'add_note', titleKey: 'add_note_title', instructionsKey: 'note_editor_format_action', parent: 'deck_details', items: [
     { id: 'back', titleKey: 'study_back', iconKey: 'ic_common_arrow_left' }, { id: 'save', titleKey: 'add_note_save_continue' },
     { id: 'save_return', titleKey: 'add_note_save_return' },
+    { id: 'keyboard', titleKey: 'keyboard_shortcuts_title', opens: 'editor_shortcuts' },
+    { id: 'deck', titleKey: 'add_note_deck', opens: 'add_note_decks' },
     { id: 'type', titleKey: 'add_note_notetype', opens: 'add_note_types' },
+    { id: 'templates', titleKey: 'notetype_editor_templates', iconKey: 'ic_settings_layout', opens: 'notetype_editor' },
     { id: 'tags_entry', titleKey: 'add_note_tags' },
     { id: 'tags', titleKey: 'add_note_tags', opens: 'tag_picker', condition: 'tags_expanded' },
     { id: 'image', titleKey: 'add_note_image_occlusion_pick_image', condition: 'image_occlusion' },
     { id: 'masks', titleKey: 'add_note_image_occlusion_edit_masks', condition: 'image_source' }
   ] },
   { id: 'add_note_types', titleKey: 'add_note_notetype', parent: 'add_note', items: [] },
+  { id: 'add_note_decks', titleKey: 'add_note_deck', parent: 'add_note', items: [] },
   { id: 'edit_note', titleKey: 'note_editor_edit_title', parent: 'browser', items: [
     { id: 'back', titleKey: 'study_back', iconKey: 'ic_common_arrow_left', condition: 'no_form' },
     { id: 'save', titleKey: 'browser_detail_save', condition: 'no_form' },
@@ -750,7 +754,7 @@ export function addNoteInterfaceControls(context: AddNoteInterfaceContext): AppI
         'add_note_image_occlusion_change_image' : item.titleKey,
       opens: item.opens, condition: item.condition, selected: item.id === 'tags_entry' && context.tagsExpanded,
       enabled: item.id === 'save' || item.id === 'save_return' ? context.saveEnabled && !context.blocked :
-        !context.blocked && (item.id !== 'type' || context.hasTypes) }));
+        !context.blocked && (!['type', 'templates'].includes(item.id) || context.hasTypes) }));
 }
 
 export interface NoteVisualStatus { working: boolean; hasError: boolean; kinds: string[]; }
