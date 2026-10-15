@@ -27,3 +27,10 @@ entry/src/main/resources/rawfile/agent-sandbox-notices.txt -text
 
 # Unified patches use a leading space for unchanged blank context lines.
 tools/patches/*.patch whitespace=-blank-at-eol
+
+# Immutable differential fixtures retain the exact bytes recorded in their manifest.
+tools/tests/fixtures/protocol-legacy/** -text whitespace=cr-at-eol
+
+# Published asset hashes must be identical on Windows and Linux checkouts.
+hosting/styles.css text eol=lf
+hosting/assets/site-media.mjs text eol=lf
