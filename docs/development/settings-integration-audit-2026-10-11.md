@@ -25,7 +25,7 @@
 
 ### P1：全局 FSRS 开关会改变默认牌组使用的预设
 
-位置：[FSRS控制器.ets](../../entry/src/main/ets/model/FSRS控制器.ets#L118)。`构造请求()`直接按 `view.allConfigs` 顺序回传全部预设。Core 返回的列表按名称排序，而 [update.rs](../../third_party/anki/rslib/src/deckconfig/update.rs#L34) 明确以请求最后一个配置绑定 `targetDeckId`。
+位置：[FSRS控制器.ets](../../entry/src/main/ets/model/FSRS控制器.ets#L118)。`构造请求()`直接按 `view.allConfigs` 顺序回传全部预设。Core 返回的列表按名称排序，而 [update.rs](https://github.com/ankitects/anki/blob/e64c6b1/rslib/src/deckconfig/update.rs#L34) 明确以请求最后一个配置绑定 `targetDeckId`。
 
 复现：保留默认牌组使用预设 1，另建名称排序靠后的预设，其新卡上限为 23；通过生产 `设置FSRS开启状态()`切换全局算法。真实 Core 回读显示默认牌组改用后者，新卡上限从 37 变成 23，FSRS 开关回读仍成功。首次初始化同样调用该请求工厂，已有多个预设的集合也可能触发。后续修复需只提交默认牌组原配置或保证原配置最后，并验证开、关及初始化都保持绑定、限额和其他配置。
 
@@ -45,7 +45,7 @@
 
 位置：[AgentPreferenceSettings.ts](../../entry/src/main/ets/model/agent/AgentPreferenceSettings.ts#L22)、[AgentSettingsTools.ts](../../entry/src/main/ets/model/agent/AgentSettingsTools.ts#L82)、[GraphPreferencesCommands.ts](../../entry/src/main/ets/backend/GraphPreferencesCommands.ts#L12)。工具允许完整 JSON 中的 `browserLinksSupported=false`，写后验证又比较全部四项。
 
-[Core 图表实现](../../third_party/anki/rslib/src/stats/graphs/mod.rs#L86)恒定返回 `browser_links_supported=true`，setter 只保存周首日、分离暂停计数与预测积压。真实 Core 复现中，这三项已改变，但生产入口抛出 `graph_preferences_save_unverified`。普通统计 UI 保留读取的能力值，未触发此反例。后续应从可写契约排除该能力位，或在写前明确校验/归一化；同步修正 JIDE 声明、提案与回读，不能只放宽写后验证。
+[Core 图表实现](https://github.com/ankitects/anki/blob/e64c6b1/rslib/src/stats/graphs/mod.rs#L86)恒定返回 `browser_links_supported=true`，setter 只保存周首日、分离暂停计数与预测积压。真实 Core 复现中，这三项已改变，但生产入口抛出 `graph_preferences_save_unverified`。普通统计 UI 保留读取的能力值，未触发此反例。后续应从可写契约排除该能力位，或在写前明确校验/归一化；同步修正 JIDE 声明、提案与回读，不能只放宽写后验证。
 
 ## 复杂配置的执行结果
 

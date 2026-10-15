@@ -25,7 +25,7 @@ test('deck detail preview loads the selected native snapshot and mounts the exis
   assert.match(home, /onEditWithAgent: \(cardId: number\): void => \{ this\.关闭预览并进入AI改卡\(cardId\); \}/);
   assert.match(browser, /onEditWithAgent: \(cardId: number\): void => \{ this\.打开预览AI改卡\(cardId\); \}/);
   assert.doesNotMatch(preview, /@Prop 初始面/, 'preview always starts on the question, like Anki');
-  assert.match(preview, /构建卡片HTML\(rendered, 'answer', this\.isDark, undefined,\s*this\.audioPreferences\.hideAudioPlayButtons, this\.取本地化文案\(\$r\('app\.string\.study_replay_sound'\)\)\)/);
+  assert.match(preview, /构建卡片HTML\(rendered, 'answer', this\.isDark, undefined,\s*this\.audioPreferences\.hideAudioPlayButtons, this\.取本地化文案\(\$r\('app\.string\.study_replay_sound'\)\), this\.取本地化文案\(\$r\('app\.string\.card_script_load_error'\)\)\)/);
   assert.match(preview, /预览更多菜单/);
   assert.match(preview, /app\.string\.study_edit_note/);
   assert.match(preview, /app\.string\.ai_card_edit/);

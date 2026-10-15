@@ -61,13 +61,15 @@ HAP 构建后运行 `node --experimental-transform-types --import ./tools/tests/
 
 公共 UI 另有 `tools/tests/common-boundary.test.mjs`：扫描 common 的字面量直接依赖，禁止新增业务/平台 IO 依赖，逐条保留既有迁移例外并拒绝失效例外；公开 `.ets` 必须在 common README 有文件链接，内部实现可标 `@internal`。用 `npm test -- repo` 或单独执行该测试；环境与完整测试一致，不依赖设备。它不分析计算型导入、传递平台能力或渲染效果，完整依赖和编译仍由 architecture/HAP 验证。
 
+CI 在无本地 `tmp/` 和 `third_party/` 的干净检出上运行。测试临时文件使用系统临时目录，外部依赖文档使用锁定提交的公开链接；不可变协议对照快照由 `.gitattributes` 保留原始字节，官网缓存摘要的 CSS 与脚本统一使用 LF。修复跨平台差异时保留快照清单和行为断言，不通过刷新历史哈希或跳过完整检查消除失败。
+
 ## RPC 协议门禁
 
 统一入口为 [Core 协议生成](core-protocol.md)。`node tools/core-protocol.mjs --check` 重新用官方 `anki_proto_gen::get_services` 导出锁定描述快照，核对源归档指纹、schema 和全部 ArkTS/Rust/C++ 产物。生成使用 `--generate`；导入官方描述使用 `--refresh <独立官方锁定checkout>`，要求 origin、HEAD 与锁文件一致且工作树完全干净。日常源码归档无需 Git，不能借用父仓库 HEAD。
 
 `tools/rpc-index-methods.json` 只绑定领域别名与语义方法名；`rpc-index-baseline.json` 来自官方 helper 分派信息。`node tools/verify-rpc-index.mjs` 核对完整生成及既有索引；传入显式 `backend.rs` 只作额外对照，不从构建缓存提取协议事实。旧 `--generate backend.rs` 已拒绝，不能拿旧缓存或本机改稿刷新官方基线。
 
-升级前保存旧 schema，审查 `core-protocol.mjs --diff <旧schema> <新schema>` 的接口、字段、类型、默认、optional/oneof/枚举差异，再执行领域旧／新对照、真实 Core 和完整门禁。源指纹与生成检查不代表本次编译过 Core；ArkTS/HAP、远端 CI、设备及在线行为是独立证据。本任务保持原锁定版本及四项 Core 补丁。
+升级前保存旧 schema，审查 `core-protocol.mjs --diff <旧schema> <新schema>` 的接口、字段、类型、默认、optional/oneof/枚举差异，再执行领域旧／新对照、真实 Core 和完整门禁。源指纹与生成检查不代表本次编译过 Core；ArkTS/HAP、远端 CI、设备及在线行为是独立证据。保留原锁定版本及构建入口列出的全部已跟踪 Core 补丁。
 
 ## HAP 警告门禁
 

@@ -264,7 +264,7 @@ test('real deck options header observes validation, computation, nested overlays
   form.showHelp=false;form.简洁模式=false;form.errorMessage='PRIVATE_ERROR';form.publishInterface();
   view=result(tracker,'deck_options_form',key=>en.get(key));assert.equal(view.observations[0].sectionId,'full');
   assert.equal(item('save_scope').visibility,'observed');
-  assert.equal(view.surfaces[0].items.find(x=>x.id==='save_scope').title,en.get('deck_scope_label'));
+  assert.equal(view.surfaces[0].items.find(x=>x.id==='save_scope').title,en.get('deck_save_scope_label'));
   form.options.sharedDeckCount=3;form.changeSaveScope('preset');
   assert.equal(form.options.applyToSharedDecks,true);
   assert.equal(result(tracker,'deck_options_form').observations[0].values.find(x=>x.id==='save_scope').value,'preset');

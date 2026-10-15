@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, cpSync, mkdtempSync, rmSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
+import { tmpdir } from 'node:os';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { stripTypeScriptTypes } from 'node:module';
 import { AgentAnkiHelp, agentAnkiHelpTools, isAgentAnkiHelpTool } from '../../entry/src/main/ets/model/agent/AgentAnkiHelp.ts';
@@ -29,12 +30,17 @@ function fixture() {
 const search = (f,args={}) => f.call('search_anki_help',args);
 const read = (f,args) => f.call('read_anki_help',args);
 
-test('offline corpus retains original English sources, licensed attribution and reproducible section ranges',()=>{
+test('offline corpus retains original English sources, licensed attribution and reproducible section ranges',t=>{
   assert.equal(originalIndex.topics.length,27);
   assert.equal(originalIndex.repository,'https://github.com/ankitects/anki');
   assert.equal(originalIndex.language,'en');assert.equal(originalIndex.licenseId,'CC-BY-SA-4.0');
   const protectedPaths=['LICENSE.txt','NOTICE.txt','index.json',...originalIndex.topics.map(t=>`topics/${t.id}.mdx`)].map(path=>'entry/src/main/resources/rawfile/anki-manual/'+path);
-  const attributes=execFileSync('git',['check-attr','text','--',...protectedPaths],{encoding:'utf8'}).trim().split('\n');
+  // Isolate Git's attribute parser so source exports need no parent repository.
+  const temporaryParent=resolve(tmpdir());const attributeRepo=mkdtempSync(temporaryParent+sep+'anki-manual-attributes-');
+  t.after(()=>{if(!resolve(attributeRepo).startsWith(temporaryParent+sep))throw Error('Invalid attribute cleanup path');rmSync(attributeRepo,{recursive:true});});
+  execFileSync('git',['init','-q',attributeRepo]);
+  const attributes=execFileSync('git',['-C',attributeRepo,'-c','core.attributesFile='+resolve('.gitattributes'),
+    'check-attr','text','--',...protectedPaths],{encoding:'utf8'}).trim().split('\n');
   assert.equal(attributes.length,protectedPaths.length);assert.ok(attributes.every(line=>line.trimEnd().endsWith(': text: unset')));
   for(const topic of originalIndex.topics) {
     assert.match(topic.sourceUrl,new RegExp(originalIndex.revision));
@@ -59,7 +65,7 @@ test('vendor command verifies offline and reports invalid invocation with a nonz
 });
 
 test('offline integrity checks reject changed original bytes, corrupted section indexes and altered license text',()=>{
-  const parent=resolve('tmp');const target=mkdtempSync(parent+sep+'anki-manual-check-');
+  const parent=resolve(tmpdir());const target=mkdtempSync(parent+sep+'anki-manual-check-');
   try {
     cpSync(manualDirectory,target,{recursive:true});
     const chapter=target+'/topics/studying.mdx';const original=readFileSync(chapter);
