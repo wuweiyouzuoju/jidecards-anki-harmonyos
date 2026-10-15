@@ -8,6 +8,7 @@ import * as coreMessages from '../../entry/src/main/ets/proto/generated/CoreMess
 import { MenuHoldController } from '../../entry/src/main/ets/model/MenuHoldController.ts';
 import { MenuSlideScope, menuSlideSession } from '../../entry/src/main/ets/model/MenuSlideSession.ts';
 import { keyboardViewportHeight } from '../../entry/src/main/ets/model/WindowSafeLayout.ts';
+import { KeyboardPressSession } from '../../entry/src/main/ets/model/KeyboardInput.ts';
 import { AgentTaskPlan } from '../../entry/src/main/ets/model/agent/AgentTaskPlan.ts';
 
 // 直接执行公共窗口管理器；只在调用方替换平台窗口。
@@ -37,7 +38,7 @@ export function nativeDialogMembers(source, excluded = []) {
 
 function localeDependencies(dependencies) {
   return {
-    MenuHoldController, MenuSlideScope, menuSlideSession, keyboardViewportHeight, AgentTaskPlan,
+    MenuHoldController, MenuSlideScope, menuSlideSession, keyboardViewportHeight, AgentTaskPlan, KeyboardPressSession, StudyKeyboardSession: KeyboardPressSession,
     NativeDialogHost: nativeDialogHostClass(dependencies),
     Scroller: class { currentOffset() { return {xOffset:0,yOffset:0}; } scrollBy() {} scrollToIndex() {} },
     CoreRpc, ...privateRpc, ...coreMessages,

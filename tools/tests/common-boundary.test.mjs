@@ -5,9 +5,9 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { posix } from 'node:path';
 
 const root = new URL('../../entry/src/main/ets/components/common/', import.meta.url);
-const sharedModels = new Set(['AppLayoutState', 'AppLifecycleState', 'ThemeCatalog', 'ThemeBackgroundMotion',
+const sharedModels = new Set(['KeyboardInput', 'AppLayoutState', 'AppLifecycleState', 'ThemeCatalog', 'ThemeBackgroundMotion',
   '颜色主题', '主题设置', 'CardViewportLayout', 'WindowSafeLayout', 'MenuHoldController', 'MenuSlideSession', 'InteractionFeedback', 'DirectoryTree'].map(name => 'model/' + name));
-const sharedUtils = new Set(['应用尺寸', 'UiFeedback', 'PressFeedback', 'SurfaceBorder', '转场时长',
+const sharedUtils = new Set(['KeyboardKeyAdapter', 'MouseContextInput', '应用尺寸', 'UiFeedback', 'PressFeedback', 'SurfaceBorder', '转场时长',
   'FormInputStyle', 'FormRowLayout', 'FormTextAreaStyle', 'GlassSurface', 'SelectStyle', 'ImageSurfaceStyle', 'ExpansionReveal', 'HelpLayout', 'AppMotion', 'SurfaceTransition']
   .map(name => 'utils/' + name));
 

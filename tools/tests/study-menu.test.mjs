@@ -131,7 +131,7 @@ test('menu consumes study shortcuts; Escape closes flags first, then the menu wi
 });
 
 test('native Back reaches navigation instead of being swallowed by the keyboard interception', () => {
-  const keyName=loadPlatformModule('utils/StudyKeyAdapter.ets','studyKeyName',
+  const keyName=loadPlatformModule('utils/KeyboardKeyAdapter.ets','keyboardKeyName',
     {KeyCode:{KEYCODE_BACK:2,KEYCODE_ESCAPE:2070}});
   assert.equal(keyName(2),'back');assert.equal(keyName(2070),'escape');assert.equal(keyName(99),'code:99');
   const {page,events}=harness();page.openStudyMenu();page.toggleStudyMenuBranch('flag');events.length=0;
