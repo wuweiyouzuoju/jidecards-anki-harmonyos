@@ -91,7 +91,7 @@ import {
 } from '../proto/messages/SchedulerMessages';
 import type { StudyCard } from '../proto/messages/SchedulerMessages';
 import { 构建卡片HTML, 提取拼写标记, 媒体基地址, 原始侧HTML, 剥除拼写标记 } from '../model/学习卡片HTML构建器';
-import { CardWebView } from '../utils/CardWebView';
+import { CardWebView, CardWebAttributes } from '../utils/CardWebView';
 import { interceptMediaRequest } from '../utils/媒体响应助手';
 import { 声音播放器 } from '../utils/声音播放器';
 import { TTS播放器 } from '../utils/TTS播放器';
@@ -749,10 +749,10 @@ export struct 学习页 {
         this.拼写填空 = marker.cloze;
         this.拼写卡片序号 = card.templateIdx;
       }
-      this.正面HTML = 剥除拼写标记(构建卡片HTML(rendered, 'question', this.是否深色(), undefined, this.reviewPreferences.hideAudioPlayButtons, this.取文案($r('app.string.study_replay_sound'))));
+      this.正面HTML = 剥除拼写标记(构建卡片HTML(rendered, 'question', this.是否深色(), undefined, this.reviewPreferences.hideAudioPlayButtons, this.取文案($r('app.string.study_replay_sound')), this.取文案($r('app.string.card_script_load_error'))));
       this.背面HTML = this.拼写字段名 !== ''
-        ? 构建卡片HTML(rendered, 'answer', this.是否深色(), undefined, this.reviewPreferences.hideAudioPlayButtons, this.取文案($r('app.string.study_replay_sound')))
-        : 剥除拼写标记(构建卡片HTML(rendered, 'answer', this.是否深色(), undefined, this.reviewPreferences.hideAudioPlayButtons, this.取文案($r('app.string.study_replay_sound'))));
+        ? 构建卡片HTML(rendered, 'answer', this.是否深色(), undefined, this.reviewPreferences.hideAudioPlayButtons, this.取文案($r('app.string.study_replay_sound')), this.取文案($r('app.string.card_script_load_error')))
+        : 剥除拼写标记(构建卡片HTML(rendered, 'answer', this.是否深色(), undefined, this.reviewPreferences.hideAudioPlayButtons, this.取文案($r('app.string.study_replay_sound')), this.取文案($r('app.string.card_script_load_error'))));
       if (this.choiceQuestion !== null) {
         this.正面HTML = hideJideChoiceStaticOptions(this.正面HTML);
         this.背面HTML = hideJideChoiceStaticOptions(this.背面HTML);
@@ -1212,9 +1212,9 @@ export struct 学习页 {
       const snapshot: StudyMarkingSnapshot | null = await this.studySession.refreshMarking(card.cardId, current);
       if (snapshot === null || !current()) return;
       const rendered: RenderedCard = snapshot.rendered;
-      let front: string = 剥除拼写标记(构建卡片HTML(rendered, 'question', this.是否深色(), undefined, this.reviewPreferences.hideAudioPlayButtons, this.取文案($r('app.string.study_replay_sound'))));
-      let back: string = this.拼写字段名 !== '' ? 构建卡片HTML(rendered, 'answer', this.是否深色(), undefined, this.reviewPreferences.hideAudioPlayButtons, this.取文案($r('app.string.study_replay_sound'))) :
-        剥除拼写标记(构建卡片HTML(rendered, 'answer', this.是否深色(), undefined, this.reviewPreferences.hideAudioPlayButtons, this.取文案($r('app.string.study_replay_sound'))));
+      let front: string = 剥除拼写标记(构建卡片HTML(rendered, 'question', this.是否深色(), undefined, this.reviewPreferences.hideAudioPlayButtons, this.取文案($r('app.string.study_replay_sound')), this.取文案($r('app.string.card_script_load_error'))));
+      let back: string = this.拼写字段名 !== '' ? 构建卡片HTML(rendered, 'answer', this.是否深色(), undefined, this.reviewPreferences.hideAudioPlayButtons, this.取文案($r('app.string.study_replay_sound')), this.取文案($r('app.string.card_script_load_error'))) :
+        剥除拼写标记(构建卡片HTML(rendered, 'answer', this.是否深色(), undefined, this.reviewPreferences.hideAudioPlayButtons, this.取文案($r('app.string.study_replay_sound')), this.取文案($r('app.string.card_script_load_error'))));
       if (this.choiceQuestion !== null) { front = hideJideChoiceStaticOptions(front); back = hideJideChoiceStaticOptions(back); }
       const changed: boolean = front !== this.正面HTML || back !== this.背面HTML;
       let html: string = this.阶段 === 'question' ? front : back;
@@ -2196,9 +2196,9 @@ export struct 学习页 {
         .javaScriptAccess(true)
         .fileAccess(true)
         .domStorageAccess(true)
-        // focusable(false)：Web 不抢键盘焦点，让根 Stack 的 onKeyPreIme 稳定接管所有物理键盘事件。
-        // 卡片 HTML 的触摸/点击交互不受影响（ArkWeb 内部走 onTouch，不依赖组件焦点）。
-        .focusable(false)
+        .attributeModifier(new CardWebAttributes())
+        // 作者授权表单需要网页焦点；input_focus 桥让根快捷键在输入期间保留原始按键。
+        .focusable(true)
         // 同一代理接收手势与四象限，携带原文档/卡面代次。
         .onControllerAttached(() => {
           const proxy: StudyGestureProxy = new StudyGestureProxy();
@@ -2612,7 +2612,7 @@ export struct 学习页 {
       })
       // focusable(true) + defaultFocus(true)：让根 Stack 默认获焦，确保 onKeyPreIme 稳定触发。
       //   按钮获焦时键盘事件会冒泡到根 Stack（ArkUI 事件冒泡机制），仍能触发。
-      // Web 已 focusable(false)，不会抢焦点；浮动工具栏按钮如被触摸获焦，事件冒泡到根 Stack 处理。
+      // 网页表单可按需获焦；事件冒泡到根 Stack 后仍由 webInputFocused 保护输入。
       .focusable(true)
       .defaultFocus(true)
       .onKeyPreIme((event: KeyEvent): boolean => {

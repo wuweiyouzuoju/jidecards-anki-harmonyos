@@ -4,8 +4,53 @@
 export const CARD_REVIEWER_RUNTIME: string = String.raw`
 (function () {
   var documentId = 0, revision = 0;
+  var scriptFailures = [], rendering = true;
   window.onUpdateHook = [];
   window.onShownHook = [];
+  function clearScriptDiagnostics() {
+    var notice = document.getElementById('jide-card-script-errors');
+    if (notice) notice.remove();
+  }
+  function scriptSource(source) {
+    // 授权 URL 可能携带用户 ID；诊断只保留源和路径。
+    try { var url = new URL(source, document.baseURI); return url.origin + url.pathname; }
+    catch (error) { return String(source || 'inline script').split(/[?#]/)[0]; }
+  }
+  function showScriptDiagnostics(failEmpty) {
+    clearScriptDiagnostics();
+    if (!scriptFailures.length || !document.body) return;
+    var label = document.querySelector('meta[name="jide-card-script-error"]');
+    var message = label ? label.content : 'Card script failed';
+    var sources = scriptFailures.join('\n');
+    var hasContent = !!document.body.innerText.trim() || Array.from(document.body.querySelectorAll(
+      'img,svg,canvas,video,audio,input,textarea,select,button,iframe,object,embed')).some(function (element) {
+        return element.getClientRects().length && getComputedStyle(element).visibility !== 'hidden';
+      });
+    if (failEmpty && !hasContent) throw new Error(message + '\n' + sources);
+    var notice = document.createElement('details');
+    notice.id = 'jide-card-script-errors';
+    notice.setAttribute('role', 'alert');
+    notice.style.cssText = 'margin:12px 0;padding:8px;border:1px solid currentColor;border-radius:8px;' +
+      'font:14px/1.5 sans-serif;text-align:start;color:CanvasText;background:Canvas;overflow-wrap:anywhere';
+    var summary = document.createElement('summary');
+    summary.textContent = message;
+    var detail = document.createElement('pre');
+    detail.style.cssText = 'white-space:pre-wrap;font:inherit';
+    detail.textContent = sources;
+    notice.appendChild(summary); notice.appendChild(detail);
+    document.body.appendChild(notice);
+  }
+  function recordScriptFailure(source) {
+    var value = scriptSource(source);
+    if (scriptFailures.indexOf(value) >= 0) return;
+    scriptFailures.push(value);
+    // 作者脚本可能在 load 之后异步请求授权；失败仍应可见，不能留下无解释的空卡。
+    if (!rendering) showScriptDiagnostics(false);
+  }
+  window.addEventListener('error', function (event) {
+    if (event.target && event.target.tagName === 'SCRIPT') recordScriptFailure(event.target.src);
+    else if (event.filename) recordScriptFailure(event.filename);
+  }, true);
   function surfaceBackground() {
     // Composite transparent body colors over the HTML fallback; emit an ArkUI-compatible opaque color.
     var canvas = document.createElement('canvas');
@@ -50,14 +95,21 @@ export const CARD_REVIEWER_RUNTIME: string = String.raw`
   }
   function report(error) {
     if (error) {
+      rendering = false;
       window.jideCardRuntime.onRendered(documentId, revision, String(error), '');
       return;
     }
-    var id = documentId, version = revision;
+    var id = documentId, version = revision, failureCount = scriptFailures.length;
     // 布局完成不等于绘制完成；不能用固定延时提前确认隐藏视图。
     document.body.getBoundingClientRect();
     window.requestAnimationFrame(function () {
       window.requestAnimationFrame(function () {
+        if (scriptFailures.length !== failureCount) {
+          // 绘制等待期间的新错误也必须先展示，再确认新的两帧。
+          try { showScriptDiagnostics(true); report(''); } catch (error) { report(error); }
+          return;
+        }
+        rendering = false;
         window.jideCardRuntime.onRendered(id, version, '', surfaceBackground());
       });
     });
@@ -120,6 +172,7 @@ export const CARD_REVIEWER_RUNTIME: string = String.raw`
     if (window.anki && anki.imageOcclusion) anki.imageOcclusion.setup();
     if (window.ankiSetupCollapsible) window.ankiSetupCollapsible();
     await hooks(window.onShownHook);
+    showScriptDiagnostics(true);
     updateDefaultTextColor();
     if (side === 'question') window.scrollTo(0, 0);
     if (side === 'answer' && scrollToAnswer) {
@@ -136,9 +189,10 @@ export const CARD_REVIEWER_RUNTIME: string = String.raw`
     if (executable && (script.src || script.type === 'module')) {
       // Preserve dependency order; do not report the card ready before external scripts finish.
       await new Promise(function (resolve, reject) {
-        var timeout = setTimeout(function () { reject(new Error('Card script timed out: ' + script.src)); }, 15000);
+        var timeout = setTimeout(function () { reject(new Error('Card script timed out: ' + scriptSource(script.src))); }, 15000);
         script.onload = function () { clearTimeout(timeout); resolve(); };
-        script.onerror = function () { clearTimeout(timeout); reject(new Error('Card script failed: ' + script.src)); };
+        // 对齐 Anki reviewer：缺失可选依赖不能挡住后面的作者脚本，失败仍单独展示。
+        script.onerror = function () { clearTimeout(timeout); recordScriptFailure(script.src); resolve(); };
         script.async = false;
         oldScript.replaceWith(script);
       });
@@ -150,6 +204,7 @@ export const CARD_REVIEWER_RUNTIME: string = String.raw`
     start: function (id, version, side, scrollToAnswer) {
       documentId = id;
       revision = version;
+      rendering = true;
       window.addEventListener('load', function () {
         finish(side, scrollToAnswer, true).then(function () { report(''); }, report);
       }, {once: true});
@@ -157,6 +212,9 @@ export const CARD_REVIEWER_RUNTIME: string = String.raw`
     update: function (id, version, html, side, scrollToAnswer) {
       if (id !== documentId) return;
       revision = version;
+      rendering = true;
+      scriptFailures = [];
+      clearScriptDiagnostics();
       (async function () {
         var parsed = new DOMParser().parseFromString(html, 'text/html');
         var next = cardContainer(parsed);

@@ -62,6 +62,7 @@ FSRS 负担均衡/带步骤短期调度、历史备份每日/每周/每月保留
 - 模板样式与应用默认/兜底样式分别包装，兼容样式字段中的 `</style><script>`，防止应用 CSS 变成正文。保留既有配色层叠顺序，不删除模板脚本。
 - 学习和预览都通过 `utils/CardAssetResponse.ets` 加载 HAP 内置 jQuery 3.7.1（与 Anki 锁定版本一致）和 MathJax；jQuery 在模板脚本前同步加载，不依赖 CDN。保留第三方完整发行文件和许可。
 - 验证边界：当前 Node 测试结果以本次 `npm test` 输出为准；另有 31 项真实浏览器历史回归记录。用户提供的 `blank.apkg` 曾抽样三张，明暗主题正反面共 12 种组合可显示题目、四个选项、答案解析，选择/对比答案无脚本报错。该牌组须从作者服务获取脚本，离线时题目仍为空；不是纯离线牌组。未验证全部卡片、全部第三方牌组或鸿蒙真机，不代表支持所有 Anki 插件/API。
+- 作者 HTTP 脚本与嵌套授权请求、缺失可选依赖后的继续执行及脚本失败反馈由共享卡片宿主支持；JIDE 读取同一 Web 兼容声明。授权仍由作者服务验证。行为、回归和设备边界见[作者脚本与授权表单](development/study-media.md#作者脚本授权表单与网络兼容2026-10-15)。
 - 回归入口：`tools/tests/card-template-style.test.mjs`、`tools/test-card-template-browser.mjs`、`tools/tests/math-rendering.test.mjs`。上游依据：[模板样式包装](https://github.com/ankitects/anki/blob/main/pylib/anki/template.py)、[reviewer 的 jQuery 导出](https://github.com/ankitects/anki/blob/main/ts/reviewer/index.ts)。
 
 ## 备份与恢复

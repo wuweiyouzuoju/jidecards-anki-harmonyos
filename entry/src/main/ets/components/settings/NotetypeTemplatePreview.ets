@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { webview } from '@kit.ArkWeb';
 import { common } from '@kit.AbilityKit';
-import { CardWebView } from '../../utils/CardWebView';
+import { CardWebView, CardWebAttributes } from '../../utils/CardWebView';
 import { interceptCardAsset } from '../../utils/CardAssetResponse';
 import { interceptMediaRequest } from '../../utils/媒体响应助手';
 import { RenderedCard } from '../../proto/messages/CardRenderingMessages';
@@ -130,7 +130,7 @@ export struct NotetypeTemplatePreview {
       const side: string = this.answerSide ? 'answer' : 'question';
       const version: number = ++this.previewVersion;
       const html: string = 剥除拼写标记(构建卡片HTML(this.rendered, this.answerSide ? 'answer' : 'question', this.isDark,
-        undefined, this.hideAudioButtons, resourceText(this.getUIContext(), $r('app.string.study_replay_sound'))));
+        undefined, this.hideAudioButtons, resourceText(this.getUIContext(), $r('app.string.study_replay_sound')), resourceText(this.getUIContext(), $r('app.string.card_script_load_error'))));
       this.cardWeb.show(appendCardScript(html, buildPreviewInteractionScript(version)), this.contentRevision, side);
     } catch (error) { this.failed = true; this.renderPending = false; }
   }
@@ -214,6 +214,7 @@ export struct NotetypeTemplatePreview {
       ForEach(this.webSlots, (slot: number) => {
       Web({ src: '', controller: this.cardWeb.controllerAt(slot) })
         .javaScriptAccess(true).fileAccess(true).domStorageAccess(true).zoomAccess(true)
+        .attributeModifier(new CardWebAttributes())
         .backgroundColor(this.cardSurfaceBackground || $r('app.color.surface_card'))
         .onControllerAttached((): void => { this.attach(slot); })
         .onInterceptRequest((event: OnInterceptRequestEvent): WebResourceResponse | null =>

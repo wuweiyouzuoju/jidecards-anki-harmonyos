@@ -44,7 +44,7 @@ import { resourceText } from '../../utils/UiFeedback';
 // ========================================================
 
 import { webview } from '@kit.ArkWeb';
-import { CardWebView } from '../../utils/CardWebView';
+import { CardWebView, CardWebAttributes } from '../../utils/CardWebView';
 import { CardRenderPrefetch } from '../../model/CardRenderPrefetch';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { interceptCardAsset } from '../../utils/CardAssetResponse';
@@ -335,7 +335,7 @@ export struct 卡片预览页 {
       const rendered: RenderedCard = await this.renderPrefetch.read(卡片ID);
       if (!this.mounted || version !== this.loadVersion) return;
       const answerHtml: string = await renderPreviewAnswer(构建卡片HTML(rendered, 'answer', this.isDark, undefined,
-        this.audioPreferences.hideAudioPlayButtons, this.取本地化文案($r('app.string.study_replay_sound'))),
+        this.audioPreferences.hideAudioPlayButtons, this.取本地化文案($r('app.string.study_replay_sound')), this.取本地化文案($r('app.string.card_script_load_error'))),
         rendered, 卡片ID, {
           card: (id: number): Promise<Card> => this.卡片服务实例.获取卡片(id),
           note: (id: number): Promise<EditableNote> => this.笔记服务实例.获取笔记(id),
@@ -349,7 +349,7 @@ export struct 卡片预览页 {
       this.已渲染 = rendered;
       this.currentMarking = marking; this.flagLabels = labels;
       this.正面HTML = 剥除拼写标记(构建卡片HTML(this.已渲染, 'question', this.isDark, undefined,
-        this.audioPreferences.hideAudioPlayButtons, this.取本地化文案($r('app.string.study_replay_sound'))));
+        this.audioPreferences.hideAudioPlayButtons, this.取本地化文案($r('app.string.study_replay_sound')), this.取本地化文案($r('app.string.card_script_load_error'))));
       this.背面HTML = answerHtml;
       this.应用HTML(this.当前面 === 'question' ? this.正面HTML : this.背面HTML);
     } catch (错误) {
@@ -657,6 +657,7 @@ export struct 卡片预览页 {
         .javaScriptAccess(true)
         .fileAccess(true)
         .domStorageAccess(true)
+        .attributeModifier(new CardWebAttributes())
         .zoomAccess(true)
         .focusable(true)
         // 进入预览即接收方向键，无需先点卡片；Web 内表单仍自行处理编辑按键。

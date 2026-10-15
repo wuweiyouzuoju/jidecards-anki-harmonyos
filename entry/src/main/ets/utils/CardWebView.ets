@@ -3,6 +3,15 @@ import { webview } from '@kit.ArkWeb';
 import { CardWebSession, CardWebHost } from '../model/CardWebSession';
 import { CardWebBuffer, CardWebBufferHost, CARD_SESSION_STORAGE_SNAPSHOT, carryCardSessionStorage } from '../model/CardWebBuffer';
 import { 媒体基地址 } from '../model/学习卡片HTML构建器';
+import { CARD_RENDERING_SUPPORT } from '../model/CardRenderingSupport';
+
+/** 学习与所有卡片预览共用；保留作者 HTTP 脚本、嵌套授权请求和视频播放条件。 */
+export class CardWebAttributes implements AttributeModifier<WebAttribute> {
+  applyNormalAttribute(instance: WebAttribute): void {
+    instance.mixedMode(CARD_RENDERING_SUPPORT.web.allowHttpResources ? MixedMode.All : MixedMode.None)
+      .mediaPlayGestureAccess(CARD_RENDERING_SUPPORT.web.mediaPlaybackRequiresGesture);
+  }
+}
 
 class CardRenderProxy {
   private session: CardWebSession;

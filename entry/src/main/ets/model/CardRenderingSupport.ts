@@ -14,13 +14,24 @@ export interface CardRenderingSupport {
   mediaPaths: string;
   answerComparison: string;
   clozeTyping: string;
+  web: CardWebSupport;
   tts: CardTtsSupport;
+}
+
+export interface CardWebSupport {
+  allowHttpResources: boolean;
+  mediaPlaybackRequiresGesture: boolean;
+  scriptFailures: string;
+  authorization: string;
 }
 
 /** 播放器和 JIDE 共用兼容边界；已安装音色由 CoreSpeechKit 实时查询。 */
 export const CARD_RENDERING_SUPPORT: CardRenderingSupport = {
   avOrder: 'core-tag-order; adjacent same-kind items may be batched',
   mediaPaths: 'anki-core', answerComparison: 'anki-core', clozeTyping: 'anki-core',
+  web: { allowHttpResources: true, mediaPlaybackRequiresGesture: false,
+    scriptFailures: 'continue remaining scripts; report failures; fail empty cards',
+    authorization: 'provided and validated by the template author; requires author service availability' },
   tts: { backend: 'HarmonyOS CoreSpeechKit', voicePrefix: 'HarmonyOS_', minimumSpeed: 0.5,
     maximumSpeed: 2, otherArguments: ['volume', 'pitch'], voiceAvailability: 'device-installed voices only' }
 };

@@ -284,6 +284,18 @@ HTML 构建器对齐 AnkiDroid 新版学习/预览共用的 Anki 26.05 reviewer�
 牌组选项默认仅修改当前牌组。`model/DeckConfigSave.ts` 复制完整 protobuf 配置后比较实际修改；共享预设或默认预设（ID 1）有修改时，通过 ID 0 交由 Anki 原子创建并仅绑定当前牌组，独立预设继续复用原 ID。未修改、仅改牌组限额或全局开关不创建副本；取消和保存失败不污染原预设。完整模式的预设管理提供“仅此牌组／预设”作用范围，每次打开默认“仅此牌组”；简洁模式沿用单牌组默认。全局 FSRS、新卡忽略复习上限、父级限额与健康检查仍影响所有牌组，与保存范围无关。父子牌组学习时的限额聚合保持 Anki 语义。未来调整保存范围在该模型集中处理；行为测试见 `deck-config-save.test.mjs`。
 
 
+## 作者脚本、授权表单与网络兼容（2026-10-15）
+
+学习、既有卡预览、草稿/模板预览统一应用 `utils/CardWebView.ets` 的 `CardWebAttributes`。保留原 HTTPS 媒体基地址和同源存储，卡片 Web 显式使用 `MixedMode.All` 支持作者的 HTTP 脚本、嵌套公共脚本、JSONP 授权请求及媒体；有声视频使用 `mediaPlayGestureAccess(false)`，实际前后台与双槽静音仍由原 CardWebView 会话控制。此兼容策略仅应用于卡片宿主，不改变其他 Web 页面、导入模板、作者服务器返回值或原生权限。HTTP 资源仍由作者网络服务提供，不在应用内重写成假定可用的 HTTPS 链接，也不绕过作者授权。策略与边界同时进入 `CardRenderingSupport.web`，JIDE 的 `get_app_structure.cardRendering` 和软件指纹读取同一声明。
+
+对照本地 AnkiDroid 新版的 `AnkiServer.baseUrl()`、`network_security_config.xml` 与 `CardViewerFragment.setupWebView`：其卡片使用 HTTP 本地页面，允许明文请求和有声媒体自动播放。Jidecards 继续使用 HTTPS 地址，因此通过卡片专用 Web 属性提供同等的 HTTP 资源加载条件；没有全局关闭证书校验。学习 Web 允许焦点以支持作者 ID 输入，原 `StudyGestures` 的 input_focus 桥与根快捷键守卫继续保护网页输入；原生软键盘及实体键盘仍需设备验收。
+
+`CardReviewerRuntime` 捕获 script 资源失败和脚本错误；首次加载与翻面共用诊断。外部脚本明确加载失败后继续执行后续脚本，对齐 [Anki 26.05 的 replaceScript](https://github.com/ankitects/anki/blob/26.05/ts/reviewer/index.ts)；缺少可选的轮播库不能挡住后面的作者授权脚本。失败后已有可见正文、媒体或表单时保留卡面，显示可展开的本地化提示；没有可显示内容时经原加载失败通道恢复，不把空白确认成成功。load 之后的异步作者请求失败也显示提示。诊断只显示脚本源和路径，剥除 query/hash，避免显示授权 URL 中的用户 ID；资源仍按原 URL 请求。翻面清除上一面的诊断，成功重读移除提示，15 秒脚本加载超时与已登记 Hook 拒绝仍走原失败通道，不将超时或 Hook 失败改成成功。
+
+授权表单由作者脚本生成，其是否出现、有效 ID 和授权状态仍由作者服务决定。无网络、服务不可用、作者脚本自身错误或缺少账号支持不会被本次兼容配置修复。真实用户 APKG 和远程作者脚本只在本机隔离诊断中使用，不纳入仓库。
+
+直接回归：`card-web-session.test.mjs` 执行真实 Web 属性适配器并检查三个宿主共同接线；`test-card-authorization-browser.mjs` 使用合成作者协议、本地拦截的未授权响应、生产 HTML 与运行时，覆盖 HTTP/嵌套请求、输入提交、缺失可选脚本后的继续执行、sessionStorage 迁移、空卡失败、迟到失败、查询参数脱敏和成功恢复，以及三个宿主语义、深浅色、宽窄视口。浏览器使用与 MixedMode.All 对应的 Chromium 启动参数，仅用于卡片兼容场景，其他回归保持浏览器默认限制；这证明运行时与协议行为，不代替 ArkWeb 实机属性、软键盘、作者真实授权和付费媒体验收。统一命令见下节。
+
 ## 卡片模板脚本与样式
 
 学习与预览的 Web 生命周期统一由 `utils/CardWebView.ets` → `model/CardWebBuffer.ts` / `model/CardWebSession.ts` → `model/CardReviewerRuntime.ts` 管理。页面只提供当前加载代次、HTML 和正反面；只有适配器调用 ArkWeb `loadData`。学习、既有卡预览及草稿/模板预览固定挂载两个 Web，新文档在备用视图完成脚本、公式及布局后等待两次动画帧，再切换可见槽；当前视图保留完整旧帧，备用槽不参与输入。适配器激活准备中的视图并将其静音，切换后冻结、静音旧视图；仅前台且允许当前预览播放时恢复新视图声音，迟到完成不能在后台解除静音；不会提前在候选卡中运行模板或播放媒体。同一次卡片加载的正反面仍共用 document/window，翻面替换 `#qa`，依次重新执行模板脚本并等待外部脚本，保留模板自己的全局作答状态和同源 Web Storage。跨槽加载前读取当前 sessionStorage，在新文档首个脚本中同步并清除已删除项；localStorage 保持原同源行为。模板 CSS 和通过 CSS 字段嵌入的脚本也放在 `#qa`，按每面执行；jQuery、MathJax 和应用内置脚本只在文档首次加载。每面重新处理公式、遮罩、折叠字段及 onUpdateHook/onShownHook；预览的文档监听只安装一次，动作使用当前卡面版本。

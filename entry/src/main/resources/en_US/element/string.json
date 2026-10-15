@@ -2387,6 +2387,7 @@
     {"name":"card_mark_flag_note_scope","value":"In Notes mode, the flag is applied to all cards of the selected notes."},
     {"name":"card_mark_flag_names","value":"Flag names"},
     {"name":"card_mark_flag_names_help","value":"Names sync with the Anki collection. Leave a name blank to restore its default."},
+    {"name":"card_script_load_error","value":"Some card scripts failed to load or run. Check the network or contact the deck author."},
     {"name":"card_mark_load_error","value":"Could not read markings or flag names. Please retry."},
     {"name":"card_mark_save_error","value":"Could not save or refresh markings. Reload and retry."},
     {"name":"card_mark_retry","value":"Retry"},

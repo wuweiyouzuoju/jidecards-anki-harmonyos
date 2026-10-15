@@ -2837,6 +2837,7 @@
     {"name":"card_mark_flag_note_scope","value":"笔记模式下会设置所选笔记的全部卡片。"},
     {"name":"card_mark_flag_names","value":"旗标名称"},
     {"name":"card_mark_flag_names_help","value":"名称会随 Anki 集合同步；留空恢复默认名称。"},
+    {"name":"card_script_load_error","value":"部分卡片脚本加载或执行失败，请检查网络或联系牌组作者。"},
     {"name":"card_mark_load_error","value":"读取标记或旗标名称失败，请重试。"},
     {"name":"card_mark_save_error","value":"保存或刷新标记失败，请重新读取后重试。"},
     {"name":"card_mark_retry","value":"重试"},

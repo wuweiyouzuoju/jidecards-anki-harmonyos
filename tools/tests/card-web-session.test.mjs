@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { CardWebSession } from '../../entry/src/main/ets/model/CardWebSession.ts';
 import { CARD_REVIEWER_RUNTIME } from '../../entry/src/main/ets/model/CardReviewerRuntime.ts';
 import { loadPlatformModule } from './platform-module-harness.mjs';
+import { CARD_RENDERING_SUPPORT } from '../../entry/src/main/ets/model/CardRenderingSupport.ts';
 
 const html = side => `<html><head></head><body><div id="qa">${side}</div></body></html>`;
 
@@ -322,4 +323,45 @@ test('study and preview use the shared renderer instead of reloading on flips', 
     assert.match(text, /this\.cardWeb\.reset\(/);
     assert.doesNotMatch(text, /this\.网页控制器\.loadData\(/);
   }
+});
+
+test('all card hosts apply the same HTTP and autoplay compatibility declared to JIDE', () => {
+  const Attributes = loadPlatformModule('utils/CardWebView.ets', 'CardWebAttributes', {
+    CARD_RENDERING_SUPPORT, MixedMode: {All: 'allow', None: 'deny'}
+  });
+  const actual = {};
+  const web = {mixedMode(value) { actual.mixed = value; return this; },
+    mediaPlayGestureAccess(value) { actual.gesture = value; return this; }};
+  new Attributes().applyNormalAttribute(web);
+  assert.deepEqual(actual, {mixed: 'allow', gesture: false});
+  for (const path of ['pages/学习页.ets', 'components/browser/卡片预览页.ets',
+    'components/settings/NotetypeTemplatePreview.ets']) {
+    const source = readFileSync(new URL('../../entry/src/main/ets/' + path, import.meta.url), 'utf8');
+    assert.match(source, /\.attributeModifier\(new CardWebAttributes\(\)\)/, path);
+    assert.doesNotMatch(source, /\.mixedMode\(|\.mediaPlayGestureAccess\(/, 'policy belongs to the shared modifier');
+    assert.match(source, /app\.string\.card_script_load_error/, 'all hosts supply localized diagnostics');
+  }
+});
+
+test('a script failure between the two paint frames cannot acknowledge an empty card', async () => {
+  const frames=[], acknowledgements=[], events={};
+  const qa={};
+  const document={baseURI:'https://jidecards-media.local/',
+    createElement:()=>({getContext:()=>null}),getElementById:id=>id==='qa'?qa:null,
+    querySelector:()=>({content:'Localized script error'}),
+    body:{childNodes:[qa],innerText:'',getBoundingClientRect(){},querySelectorAll:()=>[]}};
+  const window={addEventListener:(name,callback)=>{events[name]=callback;},scrollTo(){},
+    requestAnimationFrame:callback=>frames.push(callback),
+    jideCardRuntime:{onRendered:(...args)=>acknowledgements.push(args)}};
+  vm.runInNewContext(CARD_REVIEWER_RUNTIME,{window,document,URL,setTimeout,clearTimeout});
+  window.__jideCardReviewer.start(3,5,'question',false);events.load();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(frames.length,1);
+  frames.shift()();
+  events.error({target:{tagName:'SCRIPT',src:'http://author.invalid/identify.js?user_id=secret'}});
+  frames.shift()();
+  assert.equal(acknowledgements.length,1);
+  assert.match(acknowledgements[0][2],/Localized script error.*\nhttp:\/\/author\.invalid\/identify\.js/);
+  assert.doesNotMatch(acknowledgements[0][2],/secret/);
+  assert.equal(frames.length,0,'the error is reported rather than publishing a successful frame');
 });
