@@ -86,6 +86,22 @@ export class NoteEditorSession {
     }
   }
 
+  /** 属性变更后刷新基线，保留表单实例及未提交草稿；读取失败仍保留旧快照供重试。 */
+  async refresh(current: () => boolean): Promise<NoteEditorState | null> {
+    const before: NoteEditorState = this.state;
+    if (this.disposed || before.busy || before.note === null || !current()) return null;
+    const version: number = ++this.version;
+    const valid = (): boolean => !this.disposed && this.version === version && current();
+    try {
+      const snapshot = await loadNoteEditor(before.note.id, true, this.backend, valid);
+      if (snapshot === null || !valid()) return null;
+      this.publish({ visible: true, busy: false, note: snapshot.note, originalStockKind: snapshot.originalStockKind,
+        fieldNames: snapshot.fieldNames, fieldConfigs: snapshot.fieldConfigs, clozeFieldOrds: snapshot.clozeFieldOrds,
+        optionalReverseFieldOrd: snapshot.optionalReverseFieldOrd, imageOcclusionFields: snapshot.imageOcclusionFields, error: '' });
+      return this.state;
+    } catch (error) { return null; }
+  }
+
   close(): void {
     this.version++;
     if (!this.disposed) this.publish(initialNoteEditorState());

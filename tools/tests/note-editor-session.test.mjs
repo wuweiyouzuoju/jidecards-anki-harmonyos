@@ -78,3 +78,13 @@ test('close/reopen and dispose do not revoke accepted writes or publish old comp
     if(!dispose) assert.equal(h.state.note.id,2);
   }
 });
+
+
+test('property refresh replaces the save baseline, preserves the old snapshot on read failure and ignores late completion',async()=>{
+ const h=harness();await h.session.open(1,true,()=>true);
+ const changed={...note(1),notetypeId:2,mtimeSecs:9,fields:['back','front']};h.backend.note=async()=>changed;
+ const refreshed=await h.session.refresh(()=>true);assert.equal(refreshed.note.notetypeId,2);assert.equal(h.state.visible,true);
+ h.backend.note=async()=>{throw Error('read failed');};assert.equal(await h.session.refresh(()=>true),null);assert.equal(h.state.note.mtimeSecs,9);
+ const gate=deferred();h.backend.note=()=>gate.promise;const pending=h.session.refresh(()=>true);h.session.close();gate.resolve(changed);
+ assert.equal(await pending,null);assert.deepEqual(h.state,initialNoteEditorState());
+});

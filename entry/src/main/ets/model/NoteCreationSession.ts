@@ -135,7 +135,7 @@ export class NoteCreationSession {
     }
   }
 
-  async loadType(id: number): Promise<void> {
+  async loadType(id: number, preserveDraft: boolean = false): Promise<void> {
     if (this.stickyWrite !== null && !await this.finishStickyWrite()) return;
     if (this.saving || this.saved || this.duplicateWrite !== null || this.lifecycle.accept() === null) return;
     const generation: number = ++this.generation;
@@ -145,7 +145,7 @@ export class NoteCreationSession {
       const view: NotetypeView = await this.backend.loadType(id);
       if (generation !== this.generation) return;
       this.view = view;
-      this.occlusionImage = null;
+      if (!preserveDraft) this.occlusionImage = null;
       this.reading = false;
       this.emit(false);
     } catch (error) {
