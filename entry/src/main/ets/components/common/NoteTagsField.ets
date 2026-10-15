@@ -11,6 +11,15 @@ import { ExpansionReveal } from '../../utils/ExpansionReveal';
 @Component
 export struct NoteTagsField {
   @Prop text: string = '';
+  @Prop @Watch('focusRequested') focusRequest: number = 0;
+  private inputId: string = 'note-tags-' + String(Date.now()) + '-' + String(Math.random());
+  private laidOut: boolean = false;
+  private handledFocus: number = 0;
+  private focusRequested(): void {
+    if (!this.laidOut || !this.isInteractive || this.focusRequest === this.handledFocus) return;
+    this.handledFocus = this.focusRequest;
+    try { this.getUIContext().getFocusController().requestFocus(this.inputId); } catch (error) { /* 控件已离开焦点树。 */ }
+  }
   @Prop isInteractive: boolean = true;
   onChange: (text: string) => void = (_text: string): void => {};
   scroller: Scroller = new Scroller();
@@ -30,7 +39,8 @@ export struct NoteTagsField {
   build() {
     Column({ space: 应用尺寸.间距_8 }) {
       TextInput({ text: this.text, placeholder: $r('app.string.add_note_tags_placeholder') })
-        .attributeModifier(new FormInputStyle()).enabled(this.isInteractive)
+        .id(this.inputId).attributeModifier(new FormInputStyle()).enabled(this.isInteractive)
+        .onAreaChange((): void => { this.laidOut = true; this.focusRequested(); })
         .onChange((value: string): void => { if (this.isInteractive) this.onChange(value); })
       AnchoredMenuItem({ label: $r('app.string.tags_choose'), labelAlignment: TextAlign.Start,
         disclosure: true, expanded: this.expanded,

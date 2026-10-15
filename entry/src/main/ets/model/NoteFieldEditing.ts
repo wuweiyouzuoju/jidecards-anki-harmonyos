@@ -193,3 +193,21 @@ export const NOTE_FIELD_EDITING_SUPPORT: NoteFieldEditingSupport = {
     rotation: 'drag_arc_or_vertical_mouse_wheel', grip: 'holdingHandChanged_left_right_when_available',
     manualPosition: 'drag_handle_vertically_and_long_press_to_switch_side' }
 };
+
+/** 编辑工具和上下文指引共用默认键位。 */
+export interface NoteFieldShortcut { command: string; keys: string; titleKey: string; }
+export const NOTE_FIELD_SHORTCUTS: NoteFieldShortcut[] = [
+  { command: 'bold', keys: 'Ctrl+B', titleKey: 'note_editor_bold' },
+  { command: 'italic', keys: 'Ctrl+I', titleKey: 'note_editor_italic' },
+  { command: 'underline', keys: 'Ctrl+U', titleKey: 'note_editor_underline' },
+  { command: 'rule', keys: 'Ctrl+R', titleKey: 'keyboard_insert_rule' },
+  { command: 'heading', keys: 'Ctrl+H', titleKey: 'note_editor_heading' },
+  { command: 'font_size', keys: 'Ctrl+F', titleKey: 'note_editor_font_size' },
+  { command: 'math', keys: 'Ctrl+M', titleKey: 'note_editor_math' },
+  { command: 'cloze_next', keys: 'Ctrl+Shift+C', titleKey: 'note_editor_cloze_next' },
+  { command: 'cloze_same', keys: 'Ctrl+Alt+Shift+C', titleKey: 'note_editor_cloze_same' }
+];
+export function noteFieldShortcut(chord: string): string {
+  return NOTE_FIELD_SHORTCUTS.find((item: NoteFieldShortcut): boolean =>
+    item.keys.toLowerCase().replace('ctrl+alt+shift+', 'ctrl+shift+alt+') === chord)?.command ?? '';
+}

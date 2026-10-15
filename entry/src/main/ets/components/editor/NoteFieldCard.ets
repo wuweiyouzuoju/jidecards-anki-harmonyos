@@ -33,6 +33,9 @@ export struct NoteFieldCard {
   @Prop allFields: string[] = [];
   @Prop images: NoteFieldImage[] = [];
   @Prop fieldIndex: number = 0;
+  @Prop @Watch('focusRequested') focusRequest: number = 0;
+  private focusRequested(): void { if (this.focusRequest > 0 && !this.disabled) this.collapsed = false; }
+  private firstTextPart(): number { return noteMediaParts(this.value).findIndex((part: NoteMediaPart): boolean => part.kind === 'text'); }
   @Prop audios: NoteFieldAudio[] = [];
   audioPreview: NoteAudioPreview = new NoteAudioPreview();
   onRemoveAudio: (id: number) => void = (_id: number): void => {};
@@ -56,7 +59,7 @@ export struct NoteFieldCard {
   private managerVersion: number = 0;
   private managerActive: boolean = false;
 
-  aboutToAppear(): void { this.disposed = false; this.mediaDialog.activate(); this.loadFieldConfig(); }
+  aboutToAppear(): void { this.disposed = false; this.mediaDialog.activate(); this.loadFieldConfig(); this.focusRequested(); }
   private loadFieldConfig(): void { this.collapsed = this.fieldConfig?.collapsed === true; }
 
   aboutToDisappear(): void {
@@ -203,6 +206,7 @@ export struct NoteFieldCard {
             } else if (this.part(index)?.kind === 'text' &&
               (this.part(index)?.text !== '' || index === 0 || index === noteMediaParts(this.value).length - 1)) {
               NoteFieldEditor({ value: this.part(index)?.text ?? '',
+                focusRequest: index === this.firstTextPart() ? this.focusRequest : 0,
                 fieldName: noteFieldText(this.getUIContext(), this.fieldName, this.originalStockKind), disabled: this.disabled,
                 fieldConfig: this.fieldConfig,
                 clozeEnabled: this.clozeEnabled, allFields: this.allFields,

@@ -9,7 +9,7 @@ import { nextClozeNumber, wrapFieldSelection } from '../../entry/src/main/ets/mo
 import { noteEditorWheelTools, NoteEditorWheelSession } from '../../entry/src/main/ets/model/NoteEditorWheel.ts';
 import { NoteEditorSession } from '../../entry/src/main/ets/model/NoteEditorSession.ts';
 import { NOTE_FIELD_EDITING_SUPPORT, noteEditorTool, noteFieldExpansionTool,
-  noteEditorFormatOptions } from '../../entry/src/main/ets/model/NoteFieldEditing.ts';
+  noteEditorFormatOptions, noteFieldShortcut } from '../../entry/src/main/ets/model/NoteFieldEditing.ts';
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
 import { surfaceMotionApi } from './motion-harness.mjs';
 
@@ -60,7 +60,7 @@ function editor(html='',fieldConfig=null,wheelSession=null,uniqueId=123) {
   const Editor=loadComponentLogic('components/common/NoteFieldEditor.ets','NoteFieldEditor',{
     ...surfaceMotionApi(),
     ...rich, ...htmlTools, nextClozeNumber,wrapFieldSelection,NOTE_FIELD_EDITING_SUPPORT,noteEditorTool,
-    noteEditorFormatOptions,NoteEditorFormatDialog:options=>options,NoteLinkDialog: options=>options,
+    noteEditorFormatOptions,noteFieldShortcut,KeyType:{Down:0,Up:1},keyboardEventChord:event=>event.chord,NoteEditorFormatDialog:options=>options,NoteLinkDialog: options=>options,
     NoteEditorWheelSession,NoteEditorWheelParams:WheelParams,ComponentContent:Content,wrapBuilder:builder=>builder,buildNoteEditorWheel(){},
     setTimeout:(callback,delay)=>{timers.set(++timerId,{callback,delay});return timerId;},clearTimeout:id=>timers.delete(id),
     TextAreaController:class {caretPosition(value){sourceCarets.push(value);}},RichEditorController:class {constructor(){return controller;}},
@@ -845,4 +845,20 @@ test('inserting a link at a heading caret keeps the paragraph and the active fon
  assert.equal(h.instance.value,'<h2>甲<span style="font-size:large"><a href="#x">链接</a></span>乙</h2>');
  assert.equal(h.instance.sourceMode,false);assert.equal(h.controller.getSpans().find(span=>span.value==='链接').textStyle.fontSize,19.2);
  assert.equal(rich.serializeNoteRichText(h.instance.richRuns()),h.instance.value);
+});
+
+
+test('field jump activates the requested owner before focus and Ctrl+B suppresses repeats', () => {
+ const session=new NoteEditorWheelSession(),first=editor('first',null,session,501),second=editor('second',null,session,502);
+ assert.equal(first.instance.wheelActive,true);assert.equal(second.instance.wheelActive,false);
+ second.instance.inputLaidOut=true;second.instance.focusRequest=1;second.instance.focusRequested();
+ assert.equal(first.instance.wheelActive,false);assert.equal(second.instance.wheelActive,true);
+ for(const {callback} of [...second.timers.values()])callback();
+ assert.ok(second.focusRequests.includes('note-editor-502-visual'));
+ second.instance.fieldFocused=true;
+ const key={keyCode:10,type:0,chord:'ctrl+b'};
+ assert.equal(second.instance.handleFieldShortcut(key),true);assert.equal(second.instance.typingFormat,1);
+ second.instance.handleFieldShortcut(key);assert.equal(second.instance.typingFormat,1);
+ second.instance.handleFieldShortcut({...key,type:1});second.instance.handleFieldShortcut(key);assert.equal(second.instance.typingFormat,0);
+ second.instance.disabled=true;assert.equal(second.instance.handleFieldShortcut({...key,keyCode:11}),false);
 });

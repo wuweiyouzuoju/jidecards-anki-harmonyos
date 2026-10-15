@@ -6,7 +6,7 @@ import { ComponentContent } from '@kit.ArkUI';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { FieldEditResult, wrapFieldSelection, nextClozeNumber, NoteFieldEditingOptions,
   NOTE_FIELD_EDITING_SUPPORT, noteFieldExpansionTool, noteEditorTool, noteFieldModeTool,
-  noteEditorFormatOptions, NoteEditorFormatOption } from '../../model/NoteFieldEditing';
+  noteEditorFormatOptions, NoteEditorFormatOption, noteFieldShortcut } from '../../model/NoteFieldEditing';
 import { 按下态按钮 } from './按下态按钮';
 import { IconActionButton } from './IconActionButton';
 import { NoteTextRun, parseNoteRichText, parseNoteVisualText, serializeNoteRichText, selectionHasFormat, richResultIsBold,
@@ -25,6 +25,8 @@ import { APP_FOREGROUND_KEY } from '../../model/AppLifecycleState';
 import { hasNoteEditingHint, completeNoteEditingHint } from '../../utils/NoteEditingHints';
 import { showToastSafely, resourceText, namedResourceText } from '../../utils/UiFeedback';
 import { 字段帮助对话框 } from '../字段帮助面板';
+import { keyboardEventChord } from '../../utils/KeyboardKeyAdapter';
+import { KeyboardPressSession } from '../../model/KeyboardInput';
 export type { NoteFieldEditingOptions } from '../../model/NoteFieldEditing';
 export { noteFieldMediaTool } from '../../model/NoteFieldEditing';
 
@@ -42,6 +44,7 @@ interface NoteEditorOptionSelection {
 /** 三个笔记入口共用；可视编辑仅接管可保真理解的文字 HTML，复杂内容保留源码。 */
 @Component
 export struct NoteFieldEditor {
+  private keyboardSession: KeyboardPressSession = new KeyboardPressSession();
   @Consume(NOTE_EDITOR_WHEEL_SESSION_KEY) private wheelSession: NoteEditorWheelSession = new NoteEditorWheelSession();
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('receiveValue') value: string = '';
@@ -78,6 +81,13 @@ export struct NoteFieldEditor {
   private wheelContent: ComponentContent<NoteEditorWheelParams> | null = null;
   private wheelVisible: boolean = false;
   private wheelRemoval: number = -1;
+  @Prop @Watch('focusRequested') focusRequest: number = 0;
+  private focusHandled: number = 0;
+  private inputLaidOut: boolean = false;
+  private focusRequested(): void {
+    if (!this.inputLaidOut || this.focusRequest === this.focusHandled || this.disabled || !this.foreground) return;
+    this.focusHandled = this.focusRequest; this.wheelSession.activate(this.inputKey); this.focusInput(this.sourceMode);
+  }
   private fieldFocused: boolean = false;
   private wheelActive: boolean = false;
   private lastWheelTool: string = '';
@@ -571,7 +581,7 @@ export struct NoteFieldEditor {
     if (this.wheelActive) { this.showWheel(); this.focusInput(this.sourceMode, this.selectionStart); }
   }
 
-  private openFormatOptions(key: string): void {
+  private openFormatOptions(key: string, inline: boolean = true): void {
     if (this.disabled || this.disposed || !this.foreground || !this.wheelActive || this.formatDialog.current() !== null ||
       (!this.sourceMode && !this.ready) || noteEditorFormatOptions(key).length === 0) return;
     // 外圈只选择格式；取消旧输入焦点任务，保持用户当前键盘状态和选区。
@@ -585,7 +595,7 @@ export struct NoteFieldEditor {
     const snapshot: string = this.value;
     const runs: NoteTextRun[] = source ? [] : this.richRuns();
     const version: number = ++this.formatVersion;
-    if (key === 'font_size' || key === 'heading') {
+    if (inline && (key === 'font_size' || key === 'heading')) {
       this.optionSelection = { toolId: key, source: source, snapshot: snapshot, runs: runs, start: start, end: end,
         version: version, selectedId: key === 'heading' ?
           source ? sourceNoteHeading(snapshot, start, end) : end > start ? noteRichHeading(runs, start, end) : this.typingHeading :
@@ -726,7 +736,7 @@ export struct NoteFieldEditor {
     this.updateWheel();
   }
   private fieldFocus(): void { this.fieldFocused = true; this.wheelSession.activate(this.inputKey); }
-  private fieldBlur(): void { this.fieldFocused = false; }
+  private fieldBlur(): void { this.fieldFocused = false; this.keyboardSession.reset(); }
   private showWheel(): void {
     if (!this.wheelActive || this.disposed || this.disabled || !this.foreground || this.hintDialog.current() !== null ||
       this.linkDialog.current() !== null || this.formatDialog.current() !== null) return;
@@ -760,8 +770,8 @@ export struct NoteFieldEditor {
     this.wheelSession.setAvailable(this.inputKey, !this.disabled && this.foreground);
     if (this.disabled || !this.foreground) { this.hideWheel(true); this.closeFormat(); }
   }
-  private executeWheel(key: string, longPress: boolean = false): void {
-    if (this.disposed || this.disabled || !this.foreground || !this.wheelVisible) return;
+  private executeWheel(key: string, longPress: boolean = false, keyboard: boolean = false): void {
+    if (this.disposed || this.disabled || !this.foreground || (!keyboard && !this.wheelVisible)) return;
     if ((key === 'cloze_next' || key === 'cloze_same') && !this.clozeEnabled) return;
     if (longPress && noteEditorTool(key).longPressAction === undefined) return;
     const inlineOptions: boolean = NOTE_FIELD_EDITING_SUPPORT.formatOptionPicker.toolIds.indexOf(key) >= 0;
@@ -779,7 +789,7 @@ export struct NoteFieldEditor {
           if (longPress) this.openFormatOptions(key); else this.wrap('\\(', '\\)');
           break;
         case 'font_size':
-        case 'heading': this.openFormatOptions(key); break;
+        case 'heading': this.openFormatOptions(key, !keyboard); break;
         case 'cloze_next': this.cloze(false); break;
         case 'cloze_same': this.cloze(true); break;
         case 'bullet_list': this.list(false); break;
@@ -792,7 +802,20 @@ export struct NoteFieldEditor {
       }
       this.updateWheel();
     };
-    this.activateTool(key, $r('app.string.' + noteEditorTool(key).titleKey), action);
+    if (keyboard) action(); else this.activateTool(key, $r('app.string.' + noteEditorTool(key).titleKey), action);
+  }
+
+  private handleFieldShortcut(event: KeyEvent): boolean {
+    const fresh: boolean = this.keyboardSession.update(event.keyCode, event.type === KeyType.Down);
+    if (event.type !== KeyType.Down || !this.fieldFocused || this.disabled || this.disposed || !this.foreground ||
+      this.hintDialog.current() !== null || this.linkDialog.current() !== null || this.formatDialog.current() !== null) return false;
+    const command: string = noteFieldShortcut(keyboardEventChord(event));
+    if (command === '') return false;
+    if (fresh) {
+      if (command === 'rule') this.wrap('<hr>', '');
+      else this.executeWheel(command, false, true);
+    }
+    return true;
   }
 
   build() {
@@ -809,6 +832,7 @@ export struct NoteFieldEditor {
         if (this.sourceMode) {
           TextArea({ text: this.value, placeholder: this.placeholderText(), controller: this.controller })
             .id(this.inputKey + '-source')
+            .onAreaChange((): void => { this.inputLaidOut = true; this.focusRequested(); })
             .width('100%').height(noteEditorHeight(this.expanded)).fontSize(this.editingFontSize())
             .fontFamily(this.fieldConfig?.fontName || 'HarmonyOS Sans')
             .direction(this.fieldConfig?.rtl === true ? Direction.Rtl : Direction.Ltr)
@@ -835,7 +859,7 @@ export struct NoteFieldEditor {
             .defaultFocus(this.sourceToolFocus)
             .onFocus((): void => { this.fieldFocus(); }).onBlur((): void => { this.fieldBlur(); })
             .onTouch((event: TouchEvent): void => { if (this.fieldFocused && event.type === TouchType.Down) this.showWheel(); })
-            .onReady((): void => { this.richReady(); })
+            .onReady((): void => { this.richReady(); this.inputLaidOut = true; this.focusRequested(); })
             .onSelectionChange((range: RichEditorRange): void => { this.richSelectionChanged(range); })
             .onWillChange((change: RichEditorChangeValue): boolean => change.replacedImageSpans.length === 0 && change.replacedSymbolSpans.length === 0)
             .onDidChange((before: TextRange, after: TextRange): void => { this.richChanged(before, after); })
@@ -850,6 +874,6 @@ export struct NoteFieldEditor {
         Text($r('app.string.note_editor_source_hint'))
           .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
       }
-    }.width('100%')
+    }.width('100%').onKeyPreIme((event: KeyEvent): boolean => this.handleFieldShortcut(event))
   }
 }
