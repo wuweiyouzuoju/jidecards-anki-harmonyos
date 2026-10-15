@@ -284,10 +284,11 @@ test('loading deck options offers close/retry without a no-op primary action', (
   assert.match(source, /DialogFrame\(/);
   let closes = 0;
   const panel = instance('components/home/DeckOptionsFeature.ets', ['handleBackRequest'], {
-    form: null, options: null, onClose() { closes++; }
+    form: null, options: null, panelBackRequest: 0, requestClose() { closes++; }
   });
   panel.handleBackRequest(); assert.equal(closes, 1);
   panel.form = {}; panel.options = {}; panel.handleBackRequest(); assert.equal(closes, 1);
+  assert.equal(panel.panelBackRequest, 1);
 });
 
 test('type and mapping selections reject changes while loading or submitting', () => {

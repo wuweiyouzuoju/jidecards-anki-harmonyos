@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../../utils/PressFeedback';
+import { disclosureAnimation } from '../../utils/AppMotion';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { ActionIcon } from './ActionIcon';
 import { DisclosureChevron } from './DisclosureChevron';
@@ -14,6 +15,8 @@ export struct SettingsActionRow {
   @Prop trailingIcon: ResourceStr | undefined = undefined;
   @Prop isInteractive: boolean = true;
   @Prop showDisclosure: boolean = true;
+  // 未传表示普通导航；展开行共用原箭头槽位及行边距。
+  @Prop expanded: boolean | undefined = undefined;
   @Prop showHelp: boolean = false;
   onHelp: () => void = (): void => {};
   onAction: () => void = (): void => {};
@@ -22,6 +25,8 @@ export struct SettingsActionRow {
   private activate(): void {
     if (this.isInteractive) this.onAction();
   }
+
+  private disclosureAngle(): number { return this.expanded === true ? 90 : 0; }
 
   @Builder
   private defaultHint(): void {
@@ -45,6 +50,8 @@ export struct SettingsActionRow {
       }.alignItems(HorizontalAlign.Start).layoutWeight(1)
       if (this.trailingIcon === undefined && this.showDisclosure) {
         DisclosureChevron({ tint: $r('app.color.text_secondary') })
+          .rotate({ angle: this.disclosureAngle(), centerX: '50%', centerY: '50%' })
+          .animation(disclosureAnimation())
       } else if (this.trailingIcon !== undefined) {
         ActionIcon({ source: this.trailingIcon, glyphSize: 24 })
       }

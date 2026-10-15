@@ -122,6 +122,13 @@ test('icon recoloring preserves alpha and uses the requested RGB independent of 
 test('setting action rows reject disabled late clicks and leave host values unchanged', () => {
   const Row = loadComponentLogic('components/common/SettingsActionRow.ets', 'SettingsActionRow', {});
   const row = new Row();
+  assert.equal(row.disclosureAngle(), 0, 'ordinary navigation keeps its right-facing arrow');
+  const menuAngle = read('components/common/MenuItem.ets').match(/\.rotate\(\{ angle: (.*?), centerX:/)[1];
+  for (const expanded of [false, true]) {
+    row.expanded = expanded;
+    assert.equal(row.disclosureAngle(), new Function('return ' + menuAngle).call({ expanded }),
+      'setting expansion must follow the existing menu row direction');
+  }
   const events = [];
   row.title = '标题'.repeat(80); row.hint = 'Long help '.repeat(80); row.icon = 'icon';
   row.onAction = () => events.push('action');

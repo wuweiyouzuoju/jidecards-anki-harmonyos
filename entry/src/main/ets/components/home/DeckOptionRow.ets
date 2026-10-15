@@ -10,6 +10,7 @@ export struct DeckOptionRow {
   @Prop summary: ResourceStr = '';
   @Prop error: string = '';
   @Prop busy: boolean = false;
+  @Prop isExpanded: boolean = false;
   onOpen: () => void = (): void => {};
 
   private open(): void {
@@ -24,7 +25,7 @@ export struct DeckOptionRow {
           Text(this.summary).fontSize(14).fontColor($r('app.color.text_secondary'))
             .constraintSize({ maxWidth: '38%' }).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
         }
-        DisclosureChevron({ tint: $r('app.color.text_secondary') })
+        DisclosureChevron({ tint: $r('app.color.text_secondary') }).rotate({ angle: this.isExpanded ? 90 : 0 })
       }
       .width('100%').constraintSize({ minHeight: 48 }).padding({ left: 10, right: 10, top: 6, bottom: 6 })
       .attributeModifier(new PressFeedback())

@@ -1,6 +1,6 @@
 # 公共 UI 代码索引
 
-`DialogHeader.actionIcon` 允许新建等明确动作复用已有图标；未指定时仍用共享确认勾号。普通图标保持标题两侧的44vp热区；可见文字操作单独排在标题下方，复用可换行、按内容增高的按下态按钮。名称、危险色和忙碌守卫仍由原调用方提供。笔记类型管理的加号通过此入口提供，卡片底部动作沿用按下态按钮。
+`DialogHeader.actionIcon` 允许新建等明确动作复用已有图标；未指定时仍用共享确认勾号。普通图标保持标题两侧的44vp热区；`DialogHeader.isPageToolbar` 供独立牌组选项页复用标题动作，将弹窗底部8vp留白与48vp最小高度切换为页面44vp顶栏，首块内容间距由页面独占；可见文字操作单独排在标题下方，复用可换行、按内容增高的按下态按钮。名称、危险色和忙碌守卫仍由原调用方提供。笔记类型管理的加号通过此入口提供，卡片底部动作沿用按下态按钮。
 
 `按下态按钮.preserveInputFocus` 用于编辑器令牌等辅助输入动作，点击时保留原输入框焦点；默认关闭。`autoHeight` 默认关闭，普通按钮保持44vp；文字标题操作开启后以44vp为最小高度并随换行增高。填满按钮的文字占扣除图标后的剩余宽度，内边距由组件独占。`disclosure/expanded` 复用 `DisclosureChevron` 表达可展开入口及当前展开状态，浏览页模式、状态和排序沿用此入口；持续选中仍走已有 `selectable/selected` 的描边和字色。
 
@@ -16,7 +16,7 @@
 
 导入结果类别复用 `DataActionRow` → [SettingsActionRow.ets](SettingsActionRow.ets)。`showDisclosure=false` 可隐藏没有目标的尾部箭头；`isInteractive` 仍独占点击与禁用守卫，不能用箭头显隐代替操作校验。新增音频设置复用 `SettingsToggleRow`，筛选牌组维护沿用现有详情按钮与 `GlassSurface`、列表的公共菜单行。
 
-`SettingsActionRow` 的尾部默认使用共用箭头；录音、暂停等直接执行的动作可传 `trailingIcon`，由公共 `ActionIcon` 在相同24vp槽位显示图标，完整行仍拥有点击、按压与禁用守卫。音频录制主行显示当前状态：空闲麦克风、录制中麦克风带声波、暂停后为斜杠麦克风；独立的暂停/继续行显示暂停/播放图标。音频附件右上角的删除复用 `IconActionButton` 的44vp热区；传 `cornerAligned` 将图标靠右上并在热区内留4vp，默认仍居中，不以文字大小缩小点击范围。
+`SettingsActionRow` 的尾部默认使用共用箭头；传 `expanded` 时复用同一行和箭头槽位表达展开/收起：与 `AnchoredMenuItem` 一致，收起向右、展开向下，中心为 50%/50%，动效复用 `disclosureAnimation`。未传时保持普通导航方向，标题与正文操作行使用相同水平边距。录音、暂停等直接执行的动作可传 `trailingIcon`，由公共 `ActionIcon` 在相同24vp槽位显示图标，完整行仍拥有点击、按压与禁用守卫。音频录制主行显示当前状态：空闲麦克风、录制中麦克风带声波、暂停后为斜杠麦克风；独立的暂停/继续行显示暂停/播放图标。音频附件右上角的删除复用 `IconActionButton` 的44vp热区；传 `cornerAligned` 将图标靠右上并在热区内留4vp，默认仍居中，不以文字大小缩小点击范围。
 
 菜单图标与文字的对齐责任在 [MenuItem.ets](MenuItem.ets)：同一 Row 按 `labelAlignment` 成组居中或靠左，图文间隔8vp，不另叠图标或用文字 padding 补槽。首页平面菜单默认整组居中；卡片动作菜单显式整组靠左。箭头完整24vp及8vp间隔由公共行右侧预留，居中行对称预留。菜单宽度与10vp左右留白共用 [应用尺寸.ets](../../utils/应用尺寸.ets)，固定宽度各档已统一收紧8vp，44vp点击行高保留。`AnchoredMenu` 的左右边缘与同一限宽工具栏的按钮外缘对齐，不额外叠加外边距。回归：`ui-select-layout.test.mjs`、`ui-shell-contract.test.mjs`。
 
@@ -66,7 +66,7 @@
 | 详情/展开箭头（`>` / `›` / `⌃` / `⌄`） | [DisclosureChevron.ets](DisclosureChevron.ets) | `tools/tests/ui-disclosure-contract.test.mjs`：扫描所有 ArkTS，禁止独立文字箭头；检查居中几何 |
 | 菜单项、展开行 | [MenuItem.ets](MenuItem.ets)：菜单默认图文成组居中，表单展开行和 CardActionMenu 通过 `labelAlignment: TextAlign.Start` 成组左对齐；选中项复用 [SelectStyle.ets](../../utils/SelectStyle.ets) 的选中底色和圆角，不显示勾或预留勾号槽位；有箭头时预留完整24vp及8vp间隔，居中行对称预留；`selectionUsesAccent: false` 保留选中底色并使用明暗主题的黑白文字和中性图标填色（如无旗标）；笔记类型字段、模板、CSS 共用，箭头状态和行高统一 | `ui-select-layout.test.mjs` |
 | 平面动作菜单列表 | [ActionMenuList.ets](ActionMenuList.ets)：首页“更多”和“新建牌组”共用；条目只传唯一 ID、完整文案、图标及可用/选中/危险态。复用 MenuItem 的行高、图文间距和主题填色，统一分隔线及当前列表选择校验；宿主保留显隐、锚点和业务操作 | `ui-shell-action-menu-list.test.mjs` 执行禁用/移除后的迟到点击、中英文完整文案、全部首页显隐组合和回调；HAP/设备验证布局 |
-| 滚动正文末尾的展开内容显露 | [ExpansionReveal.ets](../../utils/ExpansionReveal.ets)：宿主持有展开状态，点击请求、展开内容的 `onAreaChange` 消费一次滚动；收起和离页取消；标签与牌组“更多”共用。`NoteTagsField.scroller` 接收宿主表单滚动器，内层“选择标签”复用独立控制器，不能与外层展开请求混用；聊天自动跟随保留独立语义 | `ui-shell-expansion.test.mjs` 执行真实控制器、宿主切换方法及布局回调；实际滚动范围/键盘须设备验收 |
+| 滚动正文末尾的展开内容显露 | [ExpansionReveal.ets](../../utils/ExpansionReveal.ets)：宿主持有展开状态，点击请求、展开内容的 `onAreaChange` 消费一次滚动；收起和离页取消；标签、牌组“更多”和设置页设备直连共用。滚动在布局回调内直接开始，不经过定时器、异步发现或数据任务。`NoteTagsField.scroller` 接收宿主表单滚动器，内层“选择标签”复用独立控制器，不能与外层展开请求混用；聊天自动跟随保留独立语义 | `ui-shell-expansion.test.mjs` 执行真实控制器、宿主切换方法及布局回调；实际滚动范围/键盘须设备验收 |
 | 原生下拉框与长名称省略 | [SelectStyle.ets](../../utils/SelectStyle.ets)：共享尺寸、统一按钮/普通项/选中项字号、行内最大宽度和单行尾部省略；三类 font、几何、公共 controlBorder 及只负责省略的 textModifier 由调用点直接声明，完整名称和选值不变 | `ui-select-layout.test.mjs` 全调用扫描；长短选项切换、标签/ⓘ 避让须设备验收 |
 | 牌组选项字段与预设操作行 | [DeckOptionRow.ets](../home/DeckOptionRow.ets)，字段编辑器由 DeckOptionField 管理；完整选项按共同目录内联分组，单项恢复默认复用按下态按钮 | `deck-option-dialog.test.mjs`、`deck-options-parity.test.mjs`，检查共享控件和简洁模式显隐 |
 | 按钮按压反馈 | [GlassSurface.ets](../../utils/GlassSurface.ets)、[PrimaryGlassSurface.ets](../../utils/PrimaryGlassSurface.ets)：原生多态色层、稳定底色/边框，不经触摸状态重建文字；普通按钮与操作行同用 [PressFeedback.ets](../../utils/PressFeedback.ets)，统一单次变淡反馈 | `ui-press-feedback.test.mjs` 全仓点击入口审计，以及 `theme-text.test.mjs`、`button-press-state-contract.test.mjs`、`motion-style-contract.test.mjs`；快点/取消/禁用须设备验收 |

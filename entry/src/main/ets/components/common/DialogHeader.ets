@@ -29,6 +29,8 @@ export struct DialogHeader {
   @Prop helpEnabled: boolean = true;
   @Prop destructive: boolean = false;
   @Prop showDivider: boolean = true;
+  // 页面复用标题操作时，顶栏到首卡的留白由页面内容区独占。
+  @Prop isPageToolbar: boolean = false;
   onHelp: () => void = (): void => {};
   onAction: () => void = (): void => {};
   onClose: () => void = (): void => {};
@@ -88,8 +90,8 @@ export struct DialogHeader {
       }
     }
     .width('100%')
-    .constraintSize({ minHeight: 48 })
-    .padding({ bottom: 8 })
+    .constraintSize({ minHeight: this.isPageToolbar ? 应用尺寸.按钮高度 : 48 })
+    .padding({ bottom: this.isPageToolbar ? 0 : 8 })
     .border(SurfaceBorder.options({ bottom: this.showDivider ? 0.5 : 0 }))
   }
 }
