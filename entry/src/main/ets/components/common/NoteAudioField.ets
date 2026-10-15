@@ -27,6 +27,14 @@ export struct NoteAudioField {
   @Prop @Watch('publishStatus') audios: NoteFieldAudio[] = [];
   @Prop mediaOnly: boolean = false;
   @Prop controlsVisible: boolean = true;
+  @Prop captureOnly: boolean = false;
+  @Prop @Watch('recordRequested') recordRequest: number = 0;
+  private handledRecord: number = 0;
+  private recordRequested(): void {
+    if (this.recordRequest === this.handledRecord) return;
+    this.handledRecord = this.recordRequest;
+    if (this.recording) this.finishRecording(); else this.record();
+  }
   @Prop @Watch('publishStatus') removalsVisible: boolean = true;
   @Prop @Watch('publishStatus') replacementsVisible: boolean = false;
   onReplace: (partIndex: number, id: number, uri: string, label: string, temporary: boolean) => void =
@@ -274,9 +282,11 @@ export struct NoteAudioField {
           trailingIcon: $r('app.media.ic_common_close'),
           isInteractive: !this.working, onAction: (): void => { this.cancelRecording(); } })
       } else {
-        SettingsActionRow({ title: $r('app.string.note_audio_add'),
-          isInteractive: !this.disabled && !this.working, onAction: (): void => { this.pick(); } })
-        Divider().strokeWidth(1).color(SurfaceBorder.color())
+        if (!this.captureOnly) {
+          SettingsActionRow({ title: $r('app.string.note_audio_add'),
+            isInteractive: !this.disabled && !this.working, onAction: (): void => { this.pick(); } })
+          Divider().strokeWidth(1).color(SurfaceBorder.color())
+        }
         SettingsActionRow({ title: $r('app.string.note_audio_record'),
           trailingIcon: $r('app.media.ic_audio_record_on'),
           isInteractive: !this.disabled && !this.working, onAction: (): void => { this.record(); } })

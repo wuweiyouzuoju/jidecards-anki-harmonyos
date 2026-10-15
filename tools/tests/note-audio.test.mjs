@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
+import { noteInterfaceDependencies } from './app-interface-harness.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
@@ -414,6 +415,7 @@ test('missing audio errors are visible and background cancels microphone capture
 
 test('audio recording and picker busy flags block the real form save and close paths', async () => {
   const Form = loadComponentLogic('components/browser/浏览编辑区.ets', '浏览编辑区', {
+    ...noteInterfaceDependencies(),
     ...expansionRevealDependencies(),
     NoteAudioPreview: class { async dispose() {} }, discardNoteRecordings: async () => {},
     confirmNoteDiscard: async () => assert.fail('must not prompt while microphone is active'),

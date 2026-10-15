@@ -559,6 +559,10 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'handwrite', titleKey: 'study_handwrite', opens: 'study_whiteboard', condition: 'has_card_phase' },
     { id: 'guide', titleKey: 'study_guide_title' }
   ] },
+  { id: 'study_voice', titleKey: 'keyboard_voice_title', instructionsKey: 'keyboard_voice_hint', parent: 'study', items: [
+    { id: 'record', titleKey: 'note_audio_record' }, { id: 'replay', titleKey: 'note_audio_play' },
+    { id: 'save', titleKey: 'keyboard_voice_save' }, { id: 'close', titleKey: 'done' }
+  ] },
   { id: 'study_whiteboard', titleKey: 'study_handwrite', instructionsKey: 'study_whiteboard_instructions',
     parent: 'study_more', items: WHITEBOARD_INTERFACE_ITEMS },
   { id: 'study_marking', titleKey: 'study_marking_title', parent: 'study_more', items: [
