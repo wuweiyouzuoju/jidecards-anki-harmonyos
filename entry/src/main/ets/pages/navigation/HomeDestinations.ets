@@ -1,20 +1,23 @@
 import { EditNotePage } from '../EditNotePage';
 import { NoteDraftPreviewPage } from '../NoteDraftPreviewPage';
+import { DeckOptionsPage } from '../DeckOptionsPage';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { 学习页, 学习页参数 } from '../学习页';
 import { 浏览页 } from '../浏览页';
 import { 统计页, 统计页参数 } from '../统计页';
-import { 添加笔记页, 添加笔记页参数 } from '../添加笔记页';
+import { 添加笔记页 } from '../添加笔记页';
+import { 添加笔记页参数 } from '../../model/navigation/PageParams';
 import { AI制卡页, AI制卡页参数 } from '../AI制卡页';
 import { 学习提醒页 } from '../学习提醒页';
 import { 设置页 } from '../设置页';
-import { 设置页参数, 浏览页参数, EditNotePageParams, NoteDraftPreviewPageParams } from '../../model/navigation/PageParams';
+import { 设置页参数, 浏览页参数, EditNotePageParams, NoteDraftPreviewPageParams, DeckOptionsPageParams } from '../../model/navigation/PageParams';
 import { appPageName, AppNavigationRequest } from '../../model/navigation/AppNavigation';
 
 export interface HomeDestinationContext {
   pathStack: NavPathStack;
   onManualSync: () => void;
   onNavigateApp?: (request: AppNavigationRequest) => void;
+  onDeckOptionsBusy?: (busy: boolean) => void;
 }
 
 /** 只映射参数并渲染目的地，导航时机及返回效果由首页宿主持有。 */
@@ -40,6 +43,10 @@ export function HomeDestinations(name: string, param: ESObject, context: HomeDes
       isNote: (param as EditNotePageParams).isNote, pathStack: context.pathStack })
   } else if (name === appPageName('note_draft_preview')) {
     NoteDraftPreviewPage({ input: (param as NoteDraftPreviewPageParams).input, pathStack: context.pathStack })
+  } else if (name === appPageName('deck_options')) {
+    DeckOptionsPage({ deckId: (param as DeckOptionsPageParams).deckId,
+      deckName: (param as DeckOptionsPageParams).deckName, pathStack: context.pathStack,
+      onBusy: (busy: boolean): void => { context.onDeckOptionsBusy?.(busy); } })
   } else if (name === appPageName('stats')) {
     统计页({
       pathStack: context.pathStack,
@@ -72,6 +79,7 @@ export function HomeDestinations(name: string, param: ESObject, context: HomeDes
     设置页({
       openAiSettings: (param as 设置页参数).openAiSettings ?? false,
       initialSectionId: (param as 设置页参数).sectionId ?? '',
+      initialActionId: (param as 设置页参数).initialActionId ?? '',
       onManualSync: (): void => { context.onManualSync(); },
       pathStack: context.pathStack
     })

@@ -287,20 +287,21 @@ test('actual preset callbacks stage and restore each preset scope without droppi
   assert.equal(h.writes[0].configs.at(-1).id,0);assert.equal(h.writes[0].configs.at(-1).name,'Private');
 });
 
-test('system Back reaches computing deck options while saving and other collection operations remain protected',()=>{
+test('deck page Back reaches computing options while accepted saving remains protected',()=>{
   const method=(path,start)=>{const source=readFileSync(new URL('../../entry/src/main/ets/'+path,import.meta.url),'utf8');
     const offset=source.indexOf(start);assert.ok(offset>=0);return source.slice(offset,source.indexOf('\n  }',offset)+4);};
   const compile=body=>new Function(stripTypeScriptTypes('class Owner {'+body+'}',{mode:'transform'})+';return Owner;')();
-  const Home=compile(method('pages/首页.ets','  onBackPress(): boolean'));
   const Panel=compile(method('components/牌组选项面板.ets','  private handleBackRequest(): void'));
+  const Feature=compile(method('components/home/DeckOptionsFeature.ets','  private handleBackRequest(): void'));
   for(const computing of [true,false]){
-    const home=new Home();Object.assign(home,{deckMenuId:'',transfer:{phase:'idle',visible:false},deckOptionsBusy:true,
-      显示牌组选项:true,deckOptionsBackRequest:0,syncController:{cancel:()=>{}}});
+    let closes=0;
+    const feature=new Feature();Object.assign(feature,{form:{},options:{},showDiscard:false,panelBackRequest:0});
     const panel=new Panel();Object.assign(panel,{busy:true,computing,showHelp:false,showAdvanced:false,
-      onCancel:()=>{home.显示牌组选项=false;home.deckOptionsBusy=false;}});
-    assert.equal(home.onBackPress(),true);assert.equal(home.deckOptionsBackRequest,1);
-    panel.handleBackRequest();assert.equal(home.显示牌组选项,!computing);
+      onCancel:()=>{closes++;}});
+    feature.handleBackRequest();assert.equal(feature.panelBackRequest,1);
+    panel.handleBackRequest();assert.equal(closes,computing?1:0);
   }
-  const home=new Home();Object.assign(home,{deckMenuId:'',transfer:{phase:'saving'},显示牌组选项:true,deckOptionsBackRequest:0});
-  assert.equal(home.onBackPress(),true);assert.equal(home.deckOptionsBackRequest,0);
+  const page=readFileSync(new URL('../../entry/src/main/ets/pages/DeckOptionsPage.ets',import.meta.url),'utf8');
+  const back=page.match(/\.onBackPressed\(\(\): boolean => \{([^}]+)\}/)[1];
+  const owner={backRequest:0};assert.equal(new Function(back).call(owner),true);assert.equal(owner.backRequest,1);
 });

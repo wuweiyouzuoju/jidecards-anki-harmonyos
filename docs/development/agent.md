@@ -154,7 +154,7 @@ JIDE 页发布当前模式、历史/对话分区、发送/停止、文件解析�
 
 统计页遍历 `STATS_INTERFACE_SECTIONS`，显隐和难度标题由 `statsInterfaceSections` 决定；`stats_sections` 描述实际分区，`stats_<分区ID>` 由原图表组件发布真实范围选项、选中项和空数据状态，重载时保留的图表明确禁用。新增/编辑笔记发布真实字段、类型选项和保存/返回状态；字段显示复用 `NoteTypePresentation` / `NoteTypeText`，图片遮盖只列实际标题/额外输入。候选最多100项，正文、草稿和媒体 URI 不进入观察。表单与加载页分别拥有 `edit_note_form` / `edit_note`，不覆盖彼此状态。
 
-牌组选项由 `DeckOptionsFeature` 发布 `deck_options` 的加载/错误/表单入口、目标和预设 ID、提交/FSRS 占用；`牌组选项面板` 发布 `deck_options_form` 的标题栏、预设操作、简洁模式和真实校验/忙碌状态。完整模式的 `deck_options_group_<id>` 从 `DeckOptionsCatalog.ts` 共用字段名称、调度器显隐及分组，真实组件发布上限范围等状态。观察不含牌组/预设名称、字段草稿或错误正文，也不将打开表单标记为已有未保存改动。FSRS 工具仍由自己的组件发布状态；帮助正文与未登记编辑器控件保留 `controlsComplete=false`。结构认知和 Core 字段修改是两条明确接通的能力，不能推断任意按钮可点击。
+牌组选项由 `DeckOptionsFeature` 发布 `deck_options` 的加载/错误/表单入口、目标和预设 ID、提交/FSRS 占用；`牌组选项面板` 发布 `deck_options_form` 的标题栏、预设操作、简洁模式和真实校验/忙碌状态；`presentation=page` 及 `preset_management_expanded` 对应独立全屏页与真实展开状态，管理动作只在展开后发布。`deck_options_discard` 发布真实放弃确认的取消/放弃控件。完整模式的 `deck_options_group_<id>` 从 `DeckOptionsCatalog.ts` 共用字段名称、调度器显隐及分组，真实组件发布上限范围等状态。观察不含牌组/预设名称、字段草稿或错误正文，也不将打开表单标记为已有未保存改动。FSRS 工具仍由自己的组件发布状态；帮助正文与未登记编辑器控件保留 `controlsComplete=false`。结构认知和 Core 字段修改是两条明确接通的能力，不能推断任意按钮可点击。
 
 `titleKey` 支持页面/表单实际标题随模式变化；`controlsComplete` 只表示发布者已列全该界面的当前**声明控件**，据此将未出现的声明项标记隐藏，不声称已发现嵌套消息卡等未登记区域。部分观察不允许推断未列条目隐藏。同步指示器、媒体管理与制卡书画已有各自的真实状态发布；未登记的弹层与内部控件仍需各自 UI 状态拥有者接入，静态目录条目不等于实时观察，不维护另一份手写功能说明。
 
@@ -182,7 +182,7 @@ JIDE 页发布当前模式、历史/对话分区、发送/停止、文件解析�
 
 打开编辑需要 `search_notes` 等已发现的 `noteId`，只把 ID 交给原 `EditNotePage`；用户手动修改和保存继续由原页面拥有。卡片预览需要已发现的 `cardId`，通过 `cid:<ID>` 和 `initialPreviewCardId` 进入原浏览预览，不复制预览页面、不调用复习评分；初始搜索失败、目标不在结果、模式改变、读取过期或页面销毁时不会自动打开预览。返回首页复用根 Navigation 清栈与首页刷新；下层存在编辑/新增表单时拒绝清栈，保留用户输入。
 
-牌组详情复用首页 `选择牌组`，展开父级路径并保留原选择记忆；手机打开原详情层，宽屏选择已有详情区域。牌组选项接着打开原 `DeckOptionsFeature`，只导航，不改配置或保存。根宿主在副作用前核对首页快照目标和已有选项表单/占用，目标尚未进入首页快照或已有选项表单时拒绝切换。所有 `resetsStack=true` 动作通过共同的 `appNavigationStackBlockReason` 保护下层编辑/新增表单，Session 与首页使用同一规则。异步读取前后均重查模式和栈，避免读取期间条件改变后仍排队/执行。
+牌组详情复用首页 `选择牌组`，展开父级路径并保留原选择记忆；手机打开原详情层，宽屏选择已有详情区域。牌组选项清栈后进入共同目录登记的独立 `DeckOptionsPage`，由原 `DeckOptionsFeature` 持有表单和退出保护，只导航，不改配置或保存。根宿主在副作用前核对首页快照目标和已有选项表单/占用，目标尚未进入首页快照或已有选项表单时拒绝切换。所有 `resetsStack=true` 动作通过共同的 `appNavigationStackBlockReason` 保护下层编辑/新增/牌组选项表单，Session 与首页使用同一规则。异步读取前后均重查模式和栈，避免读取期间条件改变后仍排队/执行。
 
 `AgentAppNavigationSession` 独占当前 JIDE 页的一次性导航队列与读取代次；Registry 用独立的 `navigation` 类别注册，不能伪装成只读、卡库草稿或确认动作。只根据当前新用户消息的导航/开始学习意图接受请求；介绍用法、历史/附件、取消和自动恢复接续不能独立触发导航。一轮只接受一个目的地，`queued/completed=false` 表示排队而非已进入页面。成功回复保存历史后，页面才执行队列；模型失败、预算暂停、等待确认/澄清、取消、被遮住或离页会丢弃请求。
 

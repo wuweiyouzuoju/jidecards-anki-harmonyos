@@ -74,7 +74,7 @@ import { 是否已确认官方公告, 标记已确认官方公告 } from '../mod
 import { DeckCustomizationFeature } from '../components/home/DeckCustomizationFeature';
 import { DeckReparentFeature } from '../components/home/DeckReparentFeature';
 import { DeckRenameFeature } from '../components/home/DeckRenameFeature';
-import { 添加笔记页参数, 添加笔记牌组选项 } from './添加笔记页';
+import { 添加笔记页参数, 添加笔记牌组选项 } from 'model/navigation/PageParams';
 import { AI制卡页参数 } from './AI制卡页';
 import type { 数据迁移模式, 导出牌组选项 } from '../model/DataTransferIntent';
 import { 同步面板 } from '../components/同步面板';
@@ -92,7 +92,7 @@ import { PAGE_COMPACT_LAYOUT_KEY } from '../model/AppLayoutState';
 import { DECK_WIDTH_HINT_HANDLED_KEY, DECK_DOUBLE_COLUMN_HINT_HANDLED_KEY, DECK_LIST_STYLE_KEY,
   isDoubleColumnDeckListStyle } from '../model/DeckListAppearance';
 import { saveDeckListStyle, completeDeckWidthHint } from '../utils/DeckListAppearanceStore';
-import { DeckOptionsFeature } from '../components/home/DeckOptionsFeature';
+import { DeckOptionsPageParams } from '../model/navigation/PageParams';
 import { DataTransferFeature } from '../components/home/DataTransferFeature';
 import { CreateDeckFeature } from '../components/home/CreateDeckFeature';
 import { 自定义学习对话框 } from '../components/home/自定义学习对话框';
@@ -149,7 +149,6 @@ struct 首页 {
   private readonly homeCreateSlideScope: MenuSlideScope = new MenuSlideScope();
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @State private customizationBackRequest: number = 0;
-  @State private deckOptionsBackRequest: number = 0;
   @State private customStudyBackRequest: number = 0;
   @State private filteredDeckBackRequest: number = 0;
   @StorageProp(PAGE_COMPACT_LAYOUT_KEY) @Watch('homeActivityChanged') private narrowDeckLayout: boolean = false;
@@ -343,10 +342,8 @@ struct 首页 {
   // 筛选牌组从首页新建菜单创建，搜索范围不绑定当前选中的牌组。
   @State @Watch('homeActivityChanged') private 显示过滤牌组面板: boolean = false;
   @State @Watch('homeActivityChanged') private deckOptionsBusy: boolean = false;
-  // 牌组选项：在根 Stack 中挂载以实现平板下的全局磨砂覆盖（与 创建牌组面板 同款）
+  // 独立牌组选项页的占用事实；草稿和返回守卫留在目的地。
   @State @Watch('homeActivityChanged') private 显示牌组选项: boolean = false;
-  @State private 牌组选项牌组ID: number = 0;
-  @State private 牌组选项牌组名: string = '';
   /** 下拉刷新状态：与 Refresh 组件双向绑定；加载主页数据 完成后置回 false 收起指示器。 */
   @State @Watch('homeActivityChanged') private 刷新中: boolean = false;
   // 拖动模式只调整同级顺序；层级调整由牌组详情的更多入口负责。
@@ -1037,7 +1034,6 @@ struct 首页 {
     if (this.显示牌组定制) { this.customizationBackRequest++; return true; }
     if (this.显示自定义学习) { this.customStudyBackRequest++; return true; }
     if (this.显示过滤牌组面板) { this.filteredDeckBackRequest++; return true; }
-    if (this.显示牌组选项) { this.deckOptionsBackRequest++; return true; }
     if (this.显示创建牌组) { this.显示创建牌组 = false; return true; }
     if (this.显示云端牌组弹窗) {
       this.cloudBackRequest++;
@@ -1876,15 +1872,33 @@ struct 首页 {
     }
   }
 
-  private 打开牌组选项(): void {
-    if (this.deferForSync((): void => { this.打开牌组选项(); })) return;
+  private 打开牌组选项(targetId: string = this.选中的牌组ID): void {
+    if (this.deferForSync((): void => { this.打开牌组选项(targetId); })) return;
     if (this.deckOptionsBusy || this.显示牌组选项) return;
-    const deck: 牌组汇总 = this.选中牌组();
+    const deck: 牌组汇总 = this.按ID查牌组(targetId);
     const deckId: number = Number(deck.id);
-    if (!Number.isFinite(deckId) || deckId <= 0) return;
-    this.牌组选项牌组ID = deckId;
-    this.牌组选项牌组名 = 牌组显示名(deck);
+    if (!Number.isFinite(deckId) || deckId <= 0 || deck.filtered) return;
+    this.pushDeckOptionsPage(deckId, 牌组显示名(deck));
+  }
+
+  private pushDeckOptionsPage(deckId: number, deckName: string): void {
+    this.stopAutoSyncTimer();
+    this.暂停主页官方公告检查();
     this.显示牌组选项 = true;
+    const params: DeckOptionsPageParams = { deckId: deckId, deckName: deckName };
+    this.页面栈.pushPath({ name: appPageName('deck_options'), param: params,
+      onPop: (): void => {
+        this.deckOptionsBusy = false;
+        this.显示牌组选项 = false;
+        this.返回主页后刷新();
+      } });
+  }
+
+  private openDeckExport(deckId: string): void {
+    if (this.deferForSync((): void => { this.openDeckExport(deckId); })) return;
+    const deck: 牌组汇总 = this.按ID查牌组(deckId);
+    if (deck.id === '') return;
+    this.打开数据迁移('exportDeck', Number(deck.id), false);
   }
 
   // 页面映射
@@ -1931,13 +1945,12 @@ struct 首页 {
       this.页面栈.pushPath({ name: appPageName('browser'), param: params, onPop: onPop });
     } else if (request.action === 'open_deck_details' || request.action === 'open_deck_options') {
       this.选择牌组(String(request.deckId));
-      if (request.action === 'open_deck_options') {
-        this.牌组选项牌组ID = request.deckId ?? 0;
-        this.牌组选项牌组名 = request.deckName;
-        this.显示牌组选项 = true;
-      }
       this.页面栈.clear();
-      this.返回主页后刷新();
+      if (request.action === 'open_deck_options') {
+        this.pushDeckOptionsPage(request.deckId ?? 0, request.deckName);
+      } else {
+        this.返回主页后刷新();
+      }
     } else { throw new Error('unknown_navigation_action'); }
   }
 
@@ -1966,6 +1979,7 @@ struct 首页 {
   private 页面映射(name: string, param: ESObject) {
     HomeDestinations(name, param, { pathStack: this.页面栈,
       onManualSync: (): void => { this.requestManualSync(); },
+      onDeckOptionsBusy: (busy: boolean): void => { this.deckOptionsBusy = busy; },
       onNavigateApp: (request: AppNavigationRequest): void => { this.navigateAgentApp(request); } })
   }
 
@@ -2271,16 +2285,6 @@ struct 首页 {
         this.页面栈.pushPath({ name: 'BrowserPage', param: params });
       },
       deckOptions: this.导出牌组选项列表(), isDark: this.是否深色() })
-
-    if (this.显示牌组选项) {
-      DeckOptionsFeature({ backRequest: this.deckOptionsBackRequest,
-        deckId: this.牌组选项牌组ID,
-        deckName: this.牌组选项牌组名,
-        isDark: this.是否深色(),
-        onBusy: (busy: boolean): void => { this.deckOptionsBusy = busy; },
-        onClose: (): void => { this.deckOptionsBusy = false; this.显示牌组选项 = false; }
-      })
-    }
 
     if (this.显示牌组定制) {
       DeckCustomizationFeature({ backRequest: this.customizationBackRequest, isDark: this.是否深色(), deck: this.按ID查牌组(this.定制牌组ID),

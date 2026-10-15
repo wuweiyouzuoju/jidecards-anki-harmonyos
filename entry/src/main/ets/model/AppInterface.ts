@@ -208,12 +208,12 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
   ] },
   { id: 'deck_actions', titleKey: 'deck_more', parent: 'deck_details', items: [] },
   { id: 'deck_options', titleKey: 'deck_options_title', parent: 'deck_details', items: [
-    { id: 'close', titleKey: 'create_deck_cancel' },
+    { id: 'close', titleKey: 'study_back', iconKey: 'ic_common_arrow_left' },
       { id: 'retry', titleKey: 'common_retry', condition: 'error' },
     { id: 'form', titleKey: 'deck_options_title', opens: 'deck_options_form', condition: 'ready' }
   ] },
   { id: 'deck_options_form', titleKey: 'deck_options_title', parent: 'deck_options', items: [
-    { id: 'cancel', titleKey: 'create_deck_cancel', iconKey: 'ic_common_close' },
+    { id: 'cancel', titleKey: 'study_back', iconKey: 'ic_common_arrow_left' },
     { id: 'save', titleKey: 'deck_options_save' },
       { id: 'help', titleKey: 'field_help_button' },
     { id: 'newPerDay', titleKey: 'deck_newPerDay_label', condition: 'simple_mode' },
@@ -229,6 +229,10 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'save_mode', titleKey: 'deck_save_mode_label', fullOnly: true },
     ...DECK_OPTION_GROUPS.map((group): AppInterfaceItem => ({ id: group.id, titleKey: group.titleKey,
       opens: 'deck_options_group_' + group.id, fullOnly: true }))
+  ] },
+  { id: 'deck_options_discard', titleKey: 'note_editor_discard_title', parent: 'deck_options', items: [
+    { id: 'cancel', titleKey: 'cancel' },
+    { id: 'discard', titleKey: 'note_editor_discard' }
   ] },
   ...DECK_OPTION_GROUPS.map((group): AppInterfaceSurface => ({ id: 'deck_options_group_' + group.id, titleKey: group.titleKey,
     parent: 'deck_options_form', items: group.fields.map((field): AppInterfaceItem => ({ id: field.key,

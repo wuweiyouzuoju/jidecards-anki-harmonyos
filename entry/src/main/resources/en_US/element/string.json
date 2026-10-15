@@ -329,7 +329,7 @@
     {"name":"ai_agent_navigation_deck_missing","value":"The target deck no longer exists. Please select a deck again."},
     {"name":"ai_agent_navigation_study_active","value":"A study session is already open. Return to it or end it first."},
     {"name":"ai_agent_navigation_unavailable","value":"Navigation is unavailable in the current page state. Resolve pending items and try again."},
-    {"name":"ai_agent_navigation_unsaved","value":"A note editor or add-note form is still open. Close it before returning home."},
+    {"name":"ai_agent_navigation_unsaved","value":"An editing page is still open. Save or discard your changes before returning home."},
     {"name":"browser_action_toggle_suspend","value":"Suspend / Unsuspend"},
     {"name":"browser_action_toggle_bury","value":"Bury / Unbury"},
     {"name":"browser_action_bury_error","value":"Failed to change buried state"},

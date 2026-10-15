@@ -253,7 +253,7 @@ test('the real browser initial search opens preview only for its current success
 
 function homeNavigation() {
   const source=read('pages/首页.ets');
-  const methods=['navigateAgentApp','选择牌组','按ID查牌组','选中牌组'].map(name=>{
+  const methods=['navigateAgentApp','pushDeckOptionsPage','选择牌组','按ID查牌组','选中牌组'].map(name=>{
     const start=source.indexOf('  private '+name+'(');return source.slice(start,source.indexOf('\n  }',start)+4);
   }).join('\n');
   const state={calls:[],names:['AiCardPage'],busy:false,expanded:[],remembered:[],cancelled:0,stopped:0};
@@ -275,10 +275,15 @@ test('real root navigation opens every declared destination with real deck/searc
     const path=f.state.calls.at(-1);
     if(action.id==='open_home') { assert.deepEqual(path,{home:true});assert.equal(f.page.显示牌组详情,false);assert.equal(f.state.refreshed,true);continue; }
     if(action.id==='open_deck_details'||action.id==='open_deck_options') {
-      assert.deepEqual(path,{home:true});assert.equal(f.page.选中的牌组ID,'4');assert.equal(f.page.显示牌组详情,true);
+      assert.equal(f.page.选中的牌组ID,'4');assert.equal(f.page.显示牌组详情,true);
       assert.equal(f.state.expanded.at(-1),'4');assert.equal(f.state.remembered.at(-1),'4');
       assert.equal(f.page.显示牌组选项,action.id==='open_deck_options');
-      if(action.id==='open_deck_options'){assert.equal(f.page.牌组选项牌组ID,4);assert.equal(f.page.牌组选项牌组名,'英语::四级');}
+      if(action.id==='open_deck_options') {
+        assert.equal(f.state.calls.at(-2).home,true);
+        assert.equal(path.name,appPageName('deck_options'));
+        assert.deepEqual(path.param,{deckId:4,deckName:'英语::四级'});
+        path.onPop();assert.equal(f.page.显示牌组选项,false);assert.equal(f.page.deckOptionsBusy,false);
+      } else assert.deepEqual(path,{home:true});
       continue;
     }
     assert.equal(path.name,appPageName(action.surface));assert.equal(typeof path.onPop,'function');
@@ -291,7 +296,7 @@ test('real root navigation opens every declared destination with real deck/searc
   }
   const before=f.state.calls.length;f.state.names=['StudyPage','AiCardPage'];
   assert.throws(()=>f.page.navigateAgentApp({action:'start_study',deckId:4}),/study_active/);
-  for(const form of ['EditNotePage','AddNotePage']) {
+  for(const form of ['EditNotePage','AddNotePage','DeckOptionsPage']) {
     f.state.names=[form,'AiCardPage'];
     for(const action of APP_NAVIGATION_ACTIONS.filter(x=>x.resetsStack))assert.throws(()=>f.page.navigateAgentApp({action:action.id,deckId:4}),/unsaved_page/);
   }

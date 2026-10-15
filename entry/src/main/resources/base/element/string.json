@@ -329,7 +329,7 @@
     {"name":"ai_agent_navigation_deck_missing","value":"目标牌组已不存在，请重新选择牌组。"},
     {"name":"ai_agent_navigation_study_active","value":"已有学习会话，请先返回学习页或结束该会话。"},
     {"name":"ai_agent_navigation_unavailable","value":"当前页面状态不允许跳转，请处理待确认内容后重试。"},
-    {"name":"ai_agent_navigation_unsaved","value":"笔记编辑或新增表单仍在打开，请先关闭表单再返回首页。"},
+    {"name":"ai_agent_navigation_unsaved","value":"编辑页面仍在打开，请先保存或放弃修改，再返回首页。"},
     {"name":"browser_action_toggle_suspend","value":"暂停／取消暂停"},
     {"name":"browser_action_toggle_bury","value":"今日跳过／取消跳过"},
     {"name":"browser_action_bury_error","value":"切换今日跳过状态失败"},

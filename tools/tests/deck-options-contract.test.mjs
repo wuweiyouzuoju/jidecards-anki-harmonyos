@@ -36,9 +36,11 @@ test('every editable Anki DeckConfig field has a form or panel binding', () => {
   assert.match(form, /other.*preserved/, 'opaque Anki bytes remain preserved, not edited as text');
 });
 
-test('home mounts the deck feature without owning editable drafts or persistence', () => {
+test('home routes to the independent deck page without owning editable drafts or persistence', () => {
   const home=read('entry/src/main/ets/pages/首页.ets');
-  assert.match(home,/DeckOptionsFeature\(\{/);
+  assert.doesNotMatch(home,/DeckOptionsFeature\(\{/);
+  assert.match(read('entry/src/main/ets/pages/DeckOptionsPage.ets'),/DeckOptionsFeature\(\{/);
+  assert.match(read('entry/src/main/ets/pages/navigation/HomeDestinations.ets'),/DeckOptionsPage\(\{/);
   assert.doesNotMatch(home,/编辑表单|编辑视图|牌组配置服务实例/);
   const feature=read('entry/src/main/ets/components/home/DeckOptionsFeature.ets');
   assert.match(feature,/prepareDeckOptionsDraft/);

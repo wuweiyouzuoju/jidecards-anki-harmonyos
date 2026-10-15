@@ -24,8 +24,8 @@ test('home wires the Anki deck tree, action menu, and selected-deck flows', () =
   assert.match(detail, /添加卡片/);
   assert.match(detail, /创建子牌组/);
   assert.match(detail, /导出牌组/);
-  // B12 重构：牌组选项校验错误流上移到 首页.ets（牌组详情面板 仅上抛回调）
-  assert.match(index, /DeckOptionsFeature\(\{/);
+  // 首页只导航，目的地的功能组件持有牌组选项草稿与校验。
+  assert.match(read('entry/src/main/ets/pages/DeckOptionsPage.ets'), /DeckOptionsFeature\(\{/);
   assert.doesNotMatch(index, /牌组配置表单|牌组配置服务实例/);
 });
 

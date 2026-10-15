@@ -10,6 +10,7 @@ export const APP_PAGE_ROUTES: AppPageRoute[] = [
   { surface: 'browser', name: 'BrowserPage', titleKey: 'browser_title' },
   { surface: 'edit_note', name: 'EditNotePage', titleKey: 'note_editor_edit_title' },
   { surface: 'note_draft_preview', name: 'NoteDraftPreviewPage', titleKey: 'deck_preview' },
+  { surface: 'deck_options', name: 'DeckOptionsPage', titleKey: 'deck_options_title' },
   { surface: 'stats', name: 'StatsPage', titleKey: 'stats_page_title' },
   { surface: 'add_note', name: 'AddNotePage', titleKey: 'add_note_title' },
   { surface: 'agent', name: 'AiCardPage', titleKey: 'ai_agent_title' },
@@ -52,7 +53,8 @@ export function appNavigationStackBlockReason(actionId: string, names: string[])
   if (action === undefined) return 'unknown_navigation_action';
   if (actionId === 'start_study' && names.includes(appPageName('study'))) return 'navigation_study_active';
   if (action.resetsStack === true && names.some((name: string): boolean =>
-    name === appPageName('edit_note') || name === appPageName('add_note'))) return 'navigation_unsaved_page';
+    name === appPageName('edit_note') || name === appPageName('add_note') ||
+    name === appPageName('deck_options'))) return 'navigation_unsaved_page';
   return '';
 }
 
