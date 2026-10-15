@@ -557,6 +557,7 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'audio', titleKey: 'study_replay_sound' },
     { id: 'card_actions', titleKey: 'study_card_actions_title', opens: 'study_card_actions' },
     { id: 'handwrite', titleKey: 'study_handwrite', opens: 'study_whiteboard', condition: 'has_card_phase' },
+    { id: 'keyboard', titleKey: 'keyboard_shortcuts_title', opens: 'study_shortcuts' },
     { id: 'guide', titleKey: 'study_guide_title' }
   ] },
   { id: 'study_voice', titleKey: 'keyboard_voice_title', instructionsKey: 'keyboard_voice_hint', parent: 'study', items: [

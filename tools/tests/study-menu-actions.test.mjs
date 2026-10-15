@@ -55,7 +55,7 @@ test('menu catalog declares both child levels and every study entry has a distin
   assert.deepEqual(Array.from(actions.children, item => item.value),
     ['study_bury', 'study_suspend', 'study_delete_card', 'study_auto_advance_title'].map(key => 'app.string.' + key));
   const entries = menu.flatMap(item => [item, ...(item.children ?? [])]);
-  assert.ok(entries.every(item => item.icon?.startsWith('app.media.ic_study_')));
+  assert.ok(entries.every(item => item.icon?.startsWith('app.media.ic_study_') || item.icon === 'app.media.ic_settings_keyboard'));
   assert.equal(new Set(entries.map(item => item.icon)).size, entries.length);
   assert.equal(menu[0].icon, 'app.media.ic_study_edit');
   page.currentMarking.marked = true;

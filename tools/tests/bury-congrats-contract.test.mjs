@@ -80,13 +80,13 @@ test('study page bury/suspend entries use upstream reviewer semantics and refetc
   assert.match(page, /this\.埋藏或暂停当前卡\(BURY_SUSPEND_MODE_SUSPEND\)/,
     'suspend maps to SUSPEND');
 
-  const body = page.match(/埋藏或暂停当前卡\(mode: number\): Promise<void> \{[\s\S]*?\n  \}/);
+  const body = page.match(/埋藏或暂停当前卡\(mode: number, wholeNote: boolean = false\): Promise<void> \{[\s\S]*?\n  \}/);
   assert.notEqual(body, null);
   assert.match(body[0], /if \(this\.recoveryMessage !== '' \|\| this\.评分中 \|\| this\.当前卡片 === null\)/,
     'bury/suspend reuses reentrancy guard');
   assert.match(body[0], /await this\.studySession\.buryCard\(cardId, mode\);\s*await this\.showStudyResult\(mode, before\);\s*await this\.加载下一张卡\(\);/,
     'card leaves today queue, next card fetched immediately');
-  assert.match(body[0], /this\.recoverStudy\(error as Object, .*this\.埋藏或暂停当前卡\(mode\)/,
+  assert.match(body[0], /this\.recoverStudy\(error as Object, .*this\.埋藏或暂停当前卡\(mode, wholeNote\)/,
     'bury/suspend failure keeps the current card behind recovery');
 });
 

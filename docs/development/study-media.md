@@ -32,11 +32,15 @@ TTS 是平台例外：锁定 Core 的 `rslib/src/card_rendering/tts/other.rs` �
 
 常亮和键盘/手势映射由 JIDE 的 `get_advanced_settings(study)` / `propose_update_study_controls` 读取和提出修改。2026-10-11 增加“设置 → 复习 → 学习快捷键”的手动入口，复用 `SettingsActionRow`、`FormSelectRow`、`NativeDialogHost` 与 `DialogFrame/DialogHeader`。`StudyControlsService.ets` 复用 `LocalPreferenceWrite` 串行保存、旧值检查、flush/readback 后发布 `studyControls`，不会把存储失败当作保存成功。`gestureMode=inherit` 沿用既有快捷答题模式，其余值覆盖学习时行为。
 
-`StudyKeyboard.ts` 唯一拥有动作目录、默认绑定、键名规范化、冲突校验和按下去重。参考 AnkiDroid 2.25.1 的动作→多个绑定及 CardSide 设计，使用 HarmonyOS 物理键身份和 Ctrl/Shift/Alt 精确匹配。新 `keyboard:{version:1,bindings:[{key,command,side}]}` 是完整配置；空列表禁用，side 为 question/answer/both，同键重叠卡面拒绝。支持字母、数字、F1–12、小键盘、方向/导航/标点键及录制的 `code:N`；键盘布局差异可通过录制处理。旧四字段结构与九键覆盖保留，`effectiveStudyKeyboard` 在内存中迁移，不读取时改写偏好；显式 keyboard 要求旧 keys 为空，避免双重配置。恢复默认只修改草稿，保存后生效。
+`StudyKeyboard.ts` 拥有学习动作目录、默认绑定和冲突校验；页面无关的键名规范化及按下去重归 `KeyboardInput.ts`，平台 KeyEvent 由 `KeyboardKeyAdapter.ets` 转换，学习兼容入口仍为 `StudyKeyAdapter.ets`。2026-10-15 按 AnkiDroid main 的 [ViewerCommand.kt](https://github.com/ankidroid/Anki-Android/blob/main/AnkiDroid/src/main/java/com/ichi2/anki/cardviewer/ViewerCommand.kt) 核对默认键位，Ctrl/Shift/Alt 精确匹配，`*`、`@`、`!`、`-`、`=` 优先按实际字符识别。新 `keyboard:{version:1,bindings:[{key,command,side}]}` 是完整配置；空列表禁用，side 为 question/answer/both，同键重叠卡面拒绝。支持字母、数字、F1–12、小键盘、方向/导航/标点键及录制的 `code:N`；键盘布局差异可通过录制处理。旧四字段结构与九键覆盖保留，`effectiveStudyKeyboard` 在内存中迁移，不读取时改写偏好；显式 keyboard 要求旧 keys 为空，避免双重配置。恢复默认只修改草稿，保存后生效。
 
 学习页保持页面代次、选择题、渲染、编辑、弹层及手写保护；评分仅答案面，翻面仅题目面。拼写输入框和模板 input/textarea/select/contenteditable 聚焦时保留原输入；模板焦点经既有 StudyGestures 桥携带卡片/卡面代次，旧回调不能冻结新卡。长按不能跨翻面重复评分，隐藏/后台清理持有键。系统返回和单独修饰键不参与绑定；Escape、Delete、Ctrl+Z 可重绑。网页手势过滤与 tap 四象限保持。浏览列表快捷键独立，未迁移到此学习配置。
 
-默认保留 Space/Enter、1–4、B/S、Delete、Ctrl+Z、Esc、R，并补上小键盘、E 编辑、* 标星、- 今日跳过、@ 暂停、F5 重播、Ctrl+1–7 切换旗标。实际动作共用原学习页方法，不新增调度或独立写入。`STUDY_KEYBOARD_ACTIONS/FIELDS` 同时供设置、AppInterface 与 JIDE 使用；工具读取返回实际 effectiveKeyboard 和支持目录，确认预览显示组合键与卡面。回归入口 `study-keyboard.test.mjs`、`study-maintenance-controls.test.mjs`、`study-gestures.test.mjs`、`ai-agent-maintenance.test.mjs`；Node 和 HAP 不代替实体键盘、录制焦点、深浅色/窄宽屏的设备验收。
+默认 Space/Enter/小键盘 Enter 在题目面翻面、答案面选“良好”，1–4/小键盘1–4只在答案面评分；Ctrl+Z 撤销、Ctrl+Shift+Z 重做、Esc 返回、E 编辑、A 新增，* 标记、- 埋藏当前卡、= 埋藏整条笔记、@ 暂停当前卡、! 暂停整条笔记，R/F5 重播、Ctrl+1–7/小键盘切换旗标、Shift+A 切换自动前进、H/G 显示下一条/全部提示、Ctrl+Alt+I 查看本次学习上一张已评分卡的信息。B/S/Delete 没有默认绑定，已有自定义仍保留。整条笔记操作调用 Core 的 noteIds 批量接口；重做仍走集合历史及原集合占用保护，不自行恢复调度状态。更多菜单“键盘快捷键”和首次学习说明共用 `studyShortcutRows(effectiveStudyKeyboard(...).bindings)`，按命令/卡面合并别名，显示当前自定义配置；`[Q]`/`[A]` 标识卡面。空 keyboard 不回退默认。
+
+V 回放本次学习录音，Shift+V 开始/结束录音，Shift+S 用系统文件选择器保存；`StudyVoiceDialog` 复用 `NoteAudioField(captureOnly=true)`、`NoteAudioPreview` 和现有文件复制入口。录音归学习页持有，替换与退出清理临时文件，保存副本不删除当前录音。新弹窗继承触发按键的持有状态，避免长按启动后立即结束录音。录音、信息和说明弹层均暂停自动前进/反馈倒计时并阻断底层输入；关闭恢复。提示经 `StudyHints.studyHintScript` 点击 Core 渲染的 hint 链接，保留模板原行为。
+
+`STUDY_KEYBOARD_ACTIONS/FIELDS` 同时被设置、AppInterface 和 JIDE 使用；后者读取真实 effectiveKeyboard，支持目录、确认预览显示组合键与卡面。回归入口 `keyboard-alignment.test.mjs`、`study-keyboard.test.mjs`、`study-maintenance-controls.test.mjs`、`study-session-controller.test.mjs`、`study-gestures.test.mjs`。Node 与 HAP 不代替实体键盘、录音权限/保存选择器、深浅色/窄宽屏设备验收。
 
 `StudyScreenAwakeSession` 串行借用窗口原常亮状态，`createStudyScreenAwake` 通过官方窗口 API 适配；仅 mounted、可见、foreground 的学习页启用，隐藏/后台/离页恢复原值，迟到启用也排队恢复。平台调用失败保留重试状态并记录实际错误，不保证设备支持。回归见 `study-maintenance-controls.test.mjs`、`study-gestures.test.mjs` 及学习生命周期测试，真机屏幕与硬件输入另验。
 

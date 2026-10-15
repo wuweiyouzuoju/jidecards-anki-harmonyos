@@ -4,7 +4,7 @@
 // - 集合服务 只经 后端会话 走 后端集合(3) 的 7/8/9 方法索引；
 // - UndoStatus/OpChangesAfterUndo 解码器字段符合 collection.proto；
 // - StudyPage 撤销按钮真实接线 撤销()，撤销后重新取卡，失败走 errorDetail；
-// - 首页/浏览提供集合重做；学习页保持仅撤销。
+// - 首页、浏览和学习页共用 Core 撤销/重做。
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -111,18 +111,19 @@ test('study page undo button is wired to undo then refetch', () => {
   assert.match(page, /canUndo: this\.可撤销/, 'undo menu availability follows 可撤销 through shared model');
   assert.match(page, /this\.撤销上次\(\);/, 'menu item taps into undo handler');
 
-  assert.match(page, /if \(this\.评分中 \|\| !this\.可撤销\)/, 'undo reuses reentrancy guard');
+  assert.match(page, /if \(this\.评分中 \|\| \(!redo && !this\.可撤销\)\)/, 'undo reuses reentrancy guard');
   assert.match(page, /await this\.studySession\.undo\(\);\s*await this\.加载下一张卡\(\);/,
     'undone card returns to queue front, refetch required');
-  const undoBody = page.match(/撤销上次\(\): Promise<void> \{[\s\S]*?\n  \}/);
+  const undoBody = page.match(/撤销上次\(redo: boolean = false\): Promise<void> \{[\s\S]*?\n  \}/);
   assert.notEqual(undoBody, null);
   assert.match(undoBody[0], /this\.recoverStudy\(error as Object, .*this\.加载下一张卡\(\)/,
     'undo failure retains the card and retries a read instead of repeating the write');
 });
 
-test('study keeps undo-only and undo strings are resourced', () => {
+test('study uses session redo and shared undo strings', () => {
   const page = read(STUDY_PAGE);
-  assert.doesNotMatch(page, /集合服务实例\.重做\(/, 'redo must not be exposed in study UI');
+  assert.doesNotMatch(page, /集合服务实例\.重做\(/, 'UI delegates collection writes');
+  assert.match(page, /await this\.studySession\.redo\(\)/);
 
   const strings = read(STRINGS);
   assert.match(strings, /"name": "study_undo"/);

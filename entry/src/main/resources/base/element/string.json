@@ -35,7 +35,7 @@
     {"name":"study_keyboard_flag7","value":"切换紫色旗标"},
     {"name":"study_keyboard_guide","value":"学习说明"},
     {"name":"study_keyboard_whiteboard","value":"打开手写"},
-    {"name":"study_keyboard_auto_advance","value":"设置自动前进"},
+    {"name":"study_keyboard_auto_advance","value":"切换自动前进"},
     {"name":"settings_study_haptics_search","value":"评分振动"},
     {"name":"agent_operation_tool_get_operation_result","value":"读取操作结果"},
     {"name":"agent_operation_result_paging","value":"完整结果可通过读取操作结果工具按草稿 ID 分页查看。"},

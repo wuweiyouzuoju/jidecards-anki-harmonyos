@@ -289,7 +289,8 @@ test('full gestures resolve current face/layout, every study action, disabled mo
   Object.assign(page,{返回:record('back'),请求删除当前卡:record('delete'),撤销上次:record('undo'),
     埋藏或暂停当前卡:record('bury/suspend'),playStudyAudio:record('replay'),openNoteEditor:record('edit'),
     changeMarking:record('mark/flag'),openStudyMenu:record('menu'),showStudyGuide:record('guide'),
-    executeMenuAction:record('whiteboard'),configureAutoAdvance:record('auto_advance')});
+    executeMenuAction:record('whiteboard'),configureAutoAdvance:record('auto_advance'),openAddNote:record('add'),revealHints:record('hint'),
+    openPreviousInfo:record('previous_info'),openVoice:record('voice')});
   for(const {id:command} of STUDY_GESTURE_ACTIONS.slice(1)) {
     page.阶段=command==='flip'?'question':'answer';
     config.bindings=[{input:'up',command,side:'both'}];page.controlsJson=JSON.stringify({...defaultStudyControls(),gestureConfig:config});

@@ -1,3 +1,12 @@
+import { 添加笔记页参数 } from '../model/navigation/PageParams';
+import { studyHintScript } from '../model/StudyHints';
+import { 卡片信息 } from '../components/browser/卡片信息';
+import { StudyVoiceDialog } from '../components/StudyVoiceDialog';
+import { NoteFieldAudio } from '../model/NoteAudioDraft';
+import { discardNoteRecordings } from '../utils/NoteAudioRecorder';
+import { KeyboardShortcutHelp } from '../components/KeyboardShortcutHelp';
+import { KeyboardShortcut, studyShortcutRows } from '../model/KeyboardShortcuts';
+import { effectiveStudyKeyboard } from '../model/StudyControls';
 import { NativeDialogHost, NativeDialogDismiss, NativeDialogPresentation } from '../components/common/NativeDialogHost';
 import { SurfaceTransition } from '../utils/SurfaceTransition';
 import { agentOperationHosts } from '../model/agent/AgentOperationHost';
@@ -159,6 +168,13 @@ export struct 学习页 {
   @State @Watch('publishInterface') private flagNamesOpen: boolean = false;
   @State private markingBackRequest: number = 0;
   private markingUndoDepth: number = 0;
+  private previousCardId: number = 0;
+  @State private infoCardId: number = 0;
+  @State private voiceOpen: boolean = false;
+  @State private voiceTriggerCode: number = -1;
+  @State private voiceAction: string = '';
+  @State private voiceAudios: NoteFieldAudio[] = [];
+  @State private voiceBack: number = 0;
   private markingBackend: AnkiCardMarking = new AnkiCardMarking();
   @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
@@ -230,6 +246,7 @@ export struct 学习页 {
   private readonly autoAdvanceDialog: NativeDialogHost = new NativeDialogHost();
   private autoAdvanceDialogBack: () => void = (): void => {};
   @State @Watch('publishInterface') private studyMenuOpen: boolean = false;
+  @State @Watch('publishInterface') private keyboardHelpOpen: boolean = false;
   @State @Watch('publishInterface') private studyExpandedIds: string[] = ['marking', 'card_actions'];
   private questionHasAudio: boolean = false;
   private 正面HTML: string = '';
@@ -281,7 +298,7 @@ export struct 学习页 {
     }
   }
   private studyGestureBlocked(): boolean {
-    return this.recoveryMessage !== '' || this.studyGuideVisible || this.tapZonesGuideVisible || this.studyMenuOpen ||
+    return this.recoveryMessage !== '' || this.voiceOpen || this.infoCardId > 0 || this.keyboardHelpOpen || this.studyGuideVisible || this.tapZonesGuideVisible || this.studyMenuOpen ||
       this.flagNamesOpen || this.timeboxNotice !== null || this.autoAdvanceSettingsOpen || this.editingPageOpen ||
       this.手写模式 || this.评分中 || this.customSchedulingWarning || this.cardRenderPending || this.flipPending ||
       this.contentRefreshInFlight || !this.controllerReady || this.pendingHtml !== '';
@@ -483,6 +500,7 @@ export struct 学习页 {
     this.mounted = false;
     this.updateShakeSensor();
     this.studyGuideDialog.dispose(); this.autoAdvanceDialog.dispose();
+    discardNoteRecordings(this.voiceAudios).catch((): void => {});
     this.updateScreenAwake();
     appInterface.leave('study_whiteboard');
     appInterface.hidePage('study');
@@ -525,7 +543,7 @@ export struct 学习页 {
     (closeGuide: () => void, confirm: () => void, dismiss: NativeDialogDismiss): CustomDialogController => {
     const presentation: NativeDialogPresentation = this.studyGuideDialog.presentation();
     return new CustomDialogController({
-        builder: StudyGuideDialog({
+        builder: StudyGuideDialog({ shortcuts: this.keyboardShortcuts(),
           onClose: closeGuide,
           onConfirm: confirm
         }),
@@ -554,7 +572,7 @@ export struct 学习页 {
 
   /** 初次与手动重看共用教学；阅读期间不计入当前卡答题时长。 */
   private showStudyGuide(): void {
-    if (this.studyGuideVisible || this.tapZonesGuideVisible || !this.页面已显示 || this.阶段 === 'loading' || this.评分中) {
+    if (this.voiceOpen || this.infoCardId > 0 || this.keyboardHelpOpen || this.studyGuideVisible || this.tapZonesGuideVisible || !this.页面已显示 || this.阶段 === 'loading' || this.评分中) {
       return;
     }
     this.studyGuideVisible = true;
@@ -927,7 +945,7 @@ export struct 学习页 {
 
   private maybeShowTimebox(): void {
     if (this.cardRenderPending || !this.mounted || !this.页面已显示 || !this.foreground || this.评分中 || this.editingPageOpen ||
-      this.studyMenuOpen || this.studyGuideVisible || this.tapZonesGuideVisible || this.autoAdvanceSettingsOpen ||
+      this.studyMenuOpen || this.voiceOpen || this.infoCardId > 0 || this.keyboardHelpOpen || this.studyGuideVisible || this.tapZonesGuideVisible || this.autoAdvanceSettingsOpen ||
       this.手写模式 || this.timeboxNotice !== null || this.阶段 === 'loading' || this.阶段 === 'error') return;
     const notice: StudyTimeboxNotice | null = this.studySession.pendingTimebox();
     if (notice === null) return;
@@ -1054,7 +1072,7 @@ export struct 学习页 {
   private studyTimerState(): StudyTimerState {
     return { version: this.requestVersion,
       active: this.recoveryMessage === '' && this.isCurrentRequest(this.requestVersion) && this.controllerReady && !this.studyMenuOpen && !this.flagNamesOpen && !this.autoAdvanceSettingsOpen && this.timeboxNotice === null &&
-        !this.cardRenderPending && !this.editingPageOpen && !this.studyGuideVisible && !this.tapZonesGuideVisible && !this.手写模式 && !this.评分中 &&
+        !this.cardRenderPending && !this.editingPageOpen && !this.keyboardHelpOpen && !this.voiceOpen && !(this.infoCardId > 0) && !this.studyGuideVisible && !this.tapZonesGuideVisible && !this.手写模式 && !this.评分中 &&
         (this.阶段 === 'question' || this.阶段 === 'answer'),
       advance: this.autoAdvanceEnabled,
       blocked: this.choiceQuestion !== null || this.评分中 || this.flipPending,
@@ -1095,11 +1113,11 @@ export struct 学习页 {
   // @副作用
   // 调后端 撤销
   // ========================================================
-  private async 撤销上次(): Promise<void> {
-    if (this.markingUndoDepth > 0 && !this.评分中 && this.可撤销) {
+  private async 撤销上次(redo: boolean = false): Promise<void> {
+    if (!redo && this.markingUndoDepth > 0 && !this.评分中 && this.可撤销) {
       await this.changeMarking(null, true); return;
     }
-    if (this.评分中 || !this.可撤销) {
+    if (this.评分中 || (!redo && !this.可撤销)) {
       return;
     }
     if (!this.isCurrentRequest(this.requestVersion)) { return; }
@@ -1107,7 +1125,7 @@ export struct 学习页 {
     this.stopStudyTimers(); this.audioSession.stop();
     const version: number = this.requestVersion;
     try {
-      await this.studySession.undo();
+      if (redo) await this.studySession.redo(); else await this.studySession.undo();
       await this.加载下一张卡();
     } catch (error) {
       if (!this.isCurrentRequest(version)) { return; }
@@ -1167,6 +1185,7 @@ export struct 学习页 {
     else if (id === 'agent') this.打开AI改卡();
     else if (id === 'handwrite') { this.whiteboardMounted = true; this.手写模式 = true; this.stopStudyTimers(); }
     else if (id === 'auto_advance') this.configureAutoAdvance();
+    else if (id === 'keyboard') { this.keyboardHelpOpen = true; this.stopStudyTimers(); }
   }
 
   private async loadFlagLabels(): Promise<void> {
@@ -1408,7 +1427,7 @@ export struct 学习页 {
     return JSON.stringify({ available: this.mounted && this.sessionReady && this.当前卡片 !== null,
       session: this.agentStudyIdentity, generation: this.requestVersion, card: this.当前卡片,
       phase: this.阶段, audio: this.有音频, blocked: !this.foreground || this.customSchedulingWarning || this.待重渲染当前卡 || this.contentRefreshInFlight || this.choiceQuestion !== null || this.评分中 || this.flipPending ||
-        this.cardRenderPending || this.editingPageOpen || this.studyGuideVisible || this.tapZonesGuideVisible ||
+        this.cardRenderPending || this.editingPageOpen || this.voiceOpen || this.infoCardId > 0 || this.keyboardHelpOpen || this.studyGuideVisible || this.tapZonesGuideVisible ||
         this.timeboxNotice !== null || this.recoveryMessage !== '' || !this.controllerReady || this.pendingHtml !== '' });
   }
   private readonly agentStudyHost: AgentOperationHost = {
@@ -1431,7 +1450,7 @@ export struct 学习页 {
     if (this.agentStudySnapshot() !== expected || !this.mounted || !this.sessionReady || !this.foreground || !this.页面已显示 ||
       this.customSchedulingWarning || this.待重渲染当前卡 || this.contentRefreshInFlight || !['question','answer'].includes(this.阶段) || this.当前卡片 === null ||
       this.choiceQuestion !== null || this.评分中 || this.flipPending || this.cardRenderPending || this.editingPageOpen ||
-      this.studyGuideVisible || this.tapZonesGuideVisible || this.timeboxNotice !== null || this.recoveryMessage !== '' ||
+      this.voiceOpen || this.infoCardId > 0 || this.keyboardHelpOpen || this.studyGuideVisible || this.tapZonesGuideVisible || this.timeboxNotice !== null || this.recoveryMessage !== '' ||
       !this.controllerReady || this.pendingHtml !== '') throw new Error('study_command_unavailable');
     this.stopStudyTimers();
     if (command === 'flip') {
@@ -1541,7 +1560,7 @@ export struct 学习页 {
   // @副作用
   // 调后端 埋藏或暂停卡片
   // ========================================================
-  private async 埋藏或暂停当前卡(mode: number): Promise<void> {
+  private async 埋藏或暂停当前卡(mode: number, wholeNote: boolean = false): Promise<void> {
     if (this.recoveryMessage !== '' || this.评分中 || this.当前卡片 === null) {
       return;
     }
@@ -1556,12 +1575,13 @@ export struct 学习页 {
       const cardId: number = this.当前卡片.cardId;
       let before: UndoStatus | null = null;
       try { before = await this.studySession.historyStatus(); } catch (_error) { /* 操作仍可执行，未核实历史时不提供撤销。 */ }
-      await this.studySession.buryCard(cardId, mode);
+      if (wholeNote) await this.studySession.buryNote(this.当前卡片.noteId, mode);
+      else await this.studySession.buryCard(cardId, mode);
       await this.showStudyResult(mode, before);
       await this.加载下一张卡();
     } catch (error) {
       if (!this.isCurrentRequest(version)) { return; }
-      this.recoverStudy(error as Object, (): Promise<void> => this.埋藏或暂停当前卡(mode));
+      this.recoverStudy(error as Object, (): Promise<void> => this.埋藏或暂停当前卡(mode, wholeNote));
     } finally {
       if (this.mounted) {
         this.评分中 = false;
@@ -1708,7 +1728,7 @@ export struct 学习页 {
   /** 翻面只提交当前请求结果；拼写请求期间切卡会使本次结果失效。 */
   private async 显示答案(): Promise<void> {
     if (this.timeboxNotice !== null || this.recoveryMessage !== '') return;
-    if (this.cardRenderPending || this.editingPageOpen || this.studyGuideVisible || this.tapZonesGuideVisible || this.flipPending ||
+    if (this.cardRenderPending || this.editingPageOpen || this.voiceOpen || this.infoCardId > 0 || this.keyboardHelpOpen || this.studyGuideVisible || this.tapZonesGuideVisible || this.flipPending ||
       (this.评分中 && !this.contentRefreshInFlight)) { return; }
     if (this.choiceQuestion !== null) return;
     if (!this.isCurrentRequest(this.requestVersion) || !this.controllerReady || this.pendingHtml !== '' ||
@@ -1757,6 +1777,7 @@ export struct 学习页 {
     playStudyHaptic();
     try {
       await this.studySession.answer(card, grade.correct ? RATING_GOOD : RATING_HARD, Date.now(), this.展示时刻毫秒);
+      this.previousCardId = card.cardId;
       if (!this.isCurrentRequest(version) || this.当前卡片 !== card) return;
       this.choiceGrade = grade;
       this.阶段 = 'answer';
@@ -1923,6 +1944,13 @@ export struct 学习页 {
       case 'easy': this.评分(RATING_EASY); break;
       case 'continue': this.继续选择题反馈(); break;
       case 'undo': this.撤销上次(); break;
+      case 'redo': this.撤销上次(true); break;
+      case 'add': this.openAddNote(); break;
+      case 'hint': case 'all_hints': this.revealHints(command === 'all_hints'); break;
+      case 'previous_info': this.openPreviousInfo(); break;
+      case 'voice_record': case 'voice_replay': case 'voice_save': this.openVoice(command); break;
+      case 'bury_note': this.埋藏或暂停当前卡(BURY_SUSPEND_MODE_BURY_USER, true); break;
+      case 'suspend_note': this.埋藏或暂停当前卡(BURY_SUSPEND_MODE_SUSPEND, true); break;
       case 'replay': this.playStudyAudio(true, true); break;
       case 'bury': this.埋藏或暂停当前卡(BURY_SUSPEND_MODE_BURY_USER); break;
       case 'suspend': this.埋藏或暂停当前卡(BURY_SUSPEND_MODE_SUSPEND); break;
@@ -1962,7 +1990,7 @@ export struct 学习页 {
   // ========================================================
   private async 评分(rating: number): Promise<void> {
     if (this.timeboxNotice !== null || this.recoveryMessage !== '') return;
-    if (this.studyGuideVisible || this.tapZonesGuideVisible) { return; }
+    if (this.voiceOpen || this.infoCardId > 0 || this.keyboardHelpOpen || this.studyGuideVisible || this.tapZonesGuideVisible) { return; }
     if (this.choiceQuestion !== null) { return; }
     if (this.cardRenderPending || this.评分中 || this.阶段 !== 'answer' || this.当前卡片 === null) {
       return;
@@ -1973,7 +2001,9 @@ export struct 学习页 {
     this.stopStudyTimers(); this.audioSession.stop();
     const version: number = this.requestVersion;
     try {
+      const ratedCardId: number = this.当前卡片.cardId;
       await this.studySession.answer(this.当前卡片, rating, Date.now(), this.展示时刻毫秒);
+      this.previousCardId = ratedCardId;
       await this.加载下一张卡();
     } catch (error) {
       if (!this.isCurrentRequest(version)) { return; }
@@ -2019,6 +2049,9 @@ export struct 学习页 {
   }
 
   private 返回(): void {
+    if (this.voiceOpen) { this.voiceBack++; return; }
+    if (this.infoCardId > 0) { this.closePreviousInfo(); return; }
+    if (this.keyboardHelpOpen) { this.closeKeyboardHelp(); return; }
     if (this.timeboxNotice !== null) { this.closeTimebox(); return; }
     if (this.tapZonesGuideVisible) { this.closeTapZonesGuide(false); return; }
     if (this.手写模式) { this.closeWhiteboard(); return; }
@@ -2056,6 +2089,15 @@ export struct 学习页 {
       if (event.type === KeyType.Down && studyKeyName(event.keyCode) === 'escape') this.closeTapZonesGuide(false);
       return true;
     }
+    if (this.voiceOpen) return false;
+    if (this.infoCardId > 0) {
+      if (event.type === KeyType.Down && studyKeyName(event.keyCode) === 'escape') this.closePreviousInfo();
+      return true;
+    }
+    if (this.keyboardHelpOpen) {
+      if (event.type === KeyType.Down && studyKeyName(event.keyCode) === 'escape') this.closeKeyboardHelp();
+      return true;
+    }
     if (this.studyMenuOpen) {
       this.Ctrl按下 = false;
       if (event.type === KeyType.Down && studyKeyName(event.keyCode) === 'escape') this.backStudyMenu();
@@ -2082,6 +2124,13 @@ export struct 学习页 {
     if (!fresh) return command !== 'none';
     switch (command) {
       case 'undo': this.撤销上次(); break;
+      case 'redo': this.撤销上次(true); break;
+      case 'add': this.openAddNote(); break;
+      case 'hint': case 'all_hints': this.revealHints(command === 'all_hints'); break;
+      case 'previous_info': this.openPreviousInfo(); break;
+      case 'voice_record': case 'voice_replay': case 'voice_save': this.openVoice(command, event.keyCode); break;
+      case 'bury_note': this.埋藏或暂停当前卡(BURY_SUSPEND_MODE_BURY_USER, true); break;
+      case 'suspend_note': this.埋藏或暂停当前卡(BURY_SUSPEND_MODE_SUSPEND, true); break;
       case 'back': this.返回(); break;
       case 'delete': this.请求删除当前卡(); break;
       case 'bury': this.埋藏或暂停当前卡(BURY_SUSPEND_MODE_BURY_USER); break;
@@ -2101,10 +2150,42 @@ export struct 学习页 {
       case 'menu': this.openStudyMenu(); break;
       case 'guide': this.showStudyGuide(); break;
       case 'whiteboard': this.executeMenuAction('handwrite'); break;
-      case 'auto_advance': this.configureAutoAdvance(); break;
+      case 'auto_advance': this.toggleAutoAdvance(); break;
     }
     return command !== 'none';
   }
+
+  private openAddNote(): void {
+    if (this.当前卡片 === null || this.评分中 || this.editingPageOpen) return;
+    this.editStartedAt = Date.now(); this.editingPageOpen = true; this.评分中 = true;
+    this.stopStudyTimers(); this.clearChoiceAutoAdvance(); this.audioSession.stop();
+    const params: 添加笔记页参数 = { deckId: this.pageDeckId, deckName: this.pageDeckName };
+    this.pathStack.pushPath({ name: 'AddNotePage', param: params });
+  }
+  private revealHints(all: boolean): void {
+    if (!this.controllerReady || this.pendingHtml !== '' || this.cardRenderPending) return;
+    this.网页控制器.runJavaScript(studyHintScript(all)).catch((): void => {});
+  }
+  private openPreviousInfo(): void {
+    if (this.previousCardId <= 0) return;
+    this.stopStudyTimers(); this.clearChoiceAutoAdvance(); this.infoCardId = this.previousCardId;
+  }
+  private closePreviousInfo(): void { this.infoCardId = 0; this.startStudyTimers(); this.scheduleChoiceAutoAdvance(); }
+  private openVoice(action: string, triggerCode: number = -1): void {
+    this.stopStudyTimers(); this.clearChoiceAutoAdvance(); this.audioSession.stop();
+    this.voiceAction = action; this.voiceTriggerCode = triggerCode; this.voiceOpen = true;
+  }
+  private replaceVoice(uri: string = '', label: string = ''): void {
+    const previous: NoteFieldAudio[] = this.voiceAudios;
+    this.voiceAudios = uri === '' ? [] : [{ id: 1, fieldIndex: 0, uri: uri, filename: '', temporary: true, label: label }];
+    discardNoteRecordings(previous).catch((): void => {});
+  }
+  private closeVoice(): void { this.voiceOpen = false; this.startStudyTimers(); this.scheduleChoiceAutoAdvance(); }
+
+  private keyboardShortcuts(): KeyboardShortcut[] {
+    return studyShortcutRows(effectiveStudyKeyboard(this.controls()).bindings);
+  }
+  private closeKeyboardHelp(): void { this.keyboardHelpOpen = false; this.startStudyTimers(); }
 
   @Builder
   private 顶部条() {
@@ -2516,7 +2597,7 @@ export struct 学习页 {
 
   private isStudyGripActive(): boolean {
     return this.页面已显示 && this.foreground && !this.评分中 && !this.editingPageOpen && !this.手写模式 &&
-      !this.studyMenuOpen && !this.flagNamesOpen && !this.studyGuideVisible && !this.tapZonesGuideVisible &&
+      !this.studyMenuOpen && !this.flagNamesOpen && !this.keyboardHelpOpen && !this.voiceOpen && !(this.infoCardId > 0) && !this.studyGuideVisible && !this.tapZonesGuideVisible &&
       !this.autoAdvanceSettingsOpen && this.timeboxNotice === null && this.choiceQuestion === null;
   }
 
@@ -2575,7 +2656,18 @@ export struct 学习页 {
             .visibility(this.手写模式 ? Visibility.Visible : Visibility.None)
         }
 
-        if (this.studyMenuOpen) {
+        if (this.infoCardId > 0) {
+          卡片信息({ cardId: this.infoCardId, isDark: this.是否深色(), onClose: (): void => { this.closePreviousInfo(); } })
+        }
+        if (this.voiceOpen) {
+          StudyVoiceDialog({ audios: this.voiceAudios, initialAction: this.voiceAction, initialKeyCode: this.voiceTriggerCode, backRequest: this.voiceBack,
+            onAdd: (uri: string, label: string): void => { this.replaceVoice(uri, label); },
+            onRemove: (): void => { this.replaceVoice(); }, onClose: (): void => { this.closeVoice(); } })
+        }
+        if (this.keyboardHelpOpen) {
+        KeyboardShortcutHelp({ scope: 'study', shortcuts: this.keyboardShortcuts(), onClose: (): void => { this.closeKeyboardHelp(); } })
+      }
+      if (this.studyMenuOpen) {
           CardActionMenu({ items: this.更多菜单(), menuWidth: 应用尺寸.cardActionMenuWidth,
             expandedIds: this.studyExpandedIds,
             onToggleBranch: (item: CardActionMenuEntry): void => { this.toggleStudyMenuBranch(item.id ?? ''); },

@@ -35,7 +35,7 @@
     {"name":"study_keyboard_flag7","value":"Toggle purple flag"},
     {"name":"study_keyboard_guide","value":"Study guide"},
     {"name":"study_keyboard_whiteboard","value":"Open whiteboard"},
-    {"name":"study_keyboard_auto_advance","value":"Configure auto advance"},
+    {"name":"study_keyboard_auto_advance","value":"Toggle auto advance"},
     {"name":"settings_study_haptics_search","value":"grading vibration"},
     {"name":"agent_operation_tool_get_operation_result","value":"Read operation result"},
     {"name":"agent_operation_result_paging","value":"Read the full result by draft ID with the operation result tool."},

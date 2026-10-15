@@ -3,7 +3,7 @@ import { normalizeKeyboardChord } from './KeyboardInput';
 export { normalizeKeyboardChord as normalizeStudyChord, keyboardChord as studyChord, KeyboardPressSession as StudyKeyboardSession } from './KeyboardInput';
 export type StudyInputCommand = 'none' | 'consume' | 'undo' | 'back' | 'delete' | 'bury' | 'suspend' | 'replay' | 'flip' | 'again' | 'hard' | 'good' | 'easy' |
   'edit' | 'mark' | 'flag0' | 'flag1' | 'flag2' | 'flag3' | 'flag4' | 'flag5' | 'flag6' | 'flag7' |
-  'menu' | 'guide' | 'whiteboard' | 'auto_advance';
+  'menu' | 'guide' | 'whiteboard' | 'auto_advance' | 'redo' | 'bury_note' | 'suspend_note' | 'add' | 'hint' | 'all_hints' | 'previous_info' | 'voice_replay' | 'voice_record' | 'voice_save';
 
 export type StudyKeySide = 'question' | 'answer' | 'both';
 export interface StudyKeyBinding { key: string; command: StudyInputCommand; side: StudyKeySide; }
@@ -20,10 +20,16 @@ export const STUDY_KEYBOARD_FIELDS: StudyKeyboardField[] = [
 ];
 /** 设置、运行时与 JIDE 共用动作目录；只声明已经接通的学习操作。 */
 export const STUDY_KEYBOARD_ACTIONS: StudyKeyboardAction[] = [
+  { id: 'add', titleKey: 'add_note_title' }, { id: 'hint', titleKey: 'keyboard_hint' },
+  { id: 'all_hints', titleKey: 'keyboard_all_hints' }, { id: 'previous_info', titleKey: 'keyboard_previous_info' },
+  { id: 'voice_replay', titleKey: 'keyboard_voice_replay' }, { id: 'voice_record', titleKey: 'note_audio_record' },
+  { id: 'voice_save', titleKey: 'keyboard_voice_save' },
   { id: 'flip', titleKey: 'study_show_answer' },
   { id: 'again', titleKey: 'rating_again' }, { id: 'hard', titleKey: 'rating_hard' },
   { id: 'good', titleKey: 'rating_good' }, { id: 'easy', titleKey: 'rating_easy' },
   { id: 'undo', titleKey: 'study_undo' }, { id: 'replay', titleKey: 'study_replay_sound' },
+  { id: 'redo', titleKey: 'collection_history_redo' },
+  { id: 'bury_note', titleKey: 'keyboard_bury_note' }, { id: 'suspend_note', titleKey: 'keyboard_suspend_note' },
   { id: 'edit', titleKey: 'study_edit_note' }, { id: 'mark', titleKey: 'card_mark_mark' },
   { id: 'bury', titleKey: 'study_bury' }, { id: 'suspend', titleKey: 'study_suspend' },
   { id: 'delete', titleKey: 'study_delete_card' }, { id: 'back', titleKey: 'study_back' },
@@ -38,6 +44,7 @@ export const STUDY_KEYBOARD_ACTIONS: StudyKeyboardAction[] = [
 ];
 export function studyChordLabel(key: string): string {
   return key.split('+').map((part: string): string => part === 'ctrl' ? 'Ctrl' : part === 'alt' ? 'Alt' :
+    part === 'minus' ? '-' : part === 'equals' ? '=' : part === 'star' ? '*' : part === 'at' ? '@' : part === 'exclamation' ? '!' :
     part === 'shift' ? 'Shift' : part === 'space' ? 'Space' : part === 'escape' ? 'Esc' :
       part.length === 1 ? part.toUpperCase() : part.charAt(0).toUpperCase() + part.slice(1)).join('+');
 }
@@ -52,12 +59,20 @@ export function defaultStudyKeyboard(): StudyKeyboard {
       { key: 'numpad' + String(index + 1), command: ratings[index], side: 'answer' });
   }
   bindings.push({ key: 'ctrl+z', command: 'undo', side: 'both' },
-    { key: 'escape', command: 'back', side: 'both' }, { key: 'delete', command: 'delete', side: 'both' },
+    { key: 'ctrl+shift+z', command: 'redo', side: 'both' },
+    { key: 'escape', command: 'back', side: 'both' },
     { key: 'e', command: 'edit', side: 'both' }, { key: 'shift+8', command: 'mark', side: 'both' },
     { key: 'star', command: 'mark', side: 'both' }, { key: 'minus', command: 'bury', side: 'both' },
-    { key: 'b', command: 'bury', side: 'both' }, { key: 's', command: 'suspend', side: 'both' },
+    { key: 'equals', command: 'bury_note', side: 'both' },
+    { key: 'shift+1', command: 'suspend_note', side: 'both' },
+    { key: 'exclamation', command: 'suspend_note', side: 'both' },
     { key: 'shift+2', command: 'suspend', side: 'both' }, { key: 'at', command: 'suspend', side: 'both' },
-    { key: 'r', command: 'replay', side: 'both' }, { key: 'f5', command: 'replay', side: 'both' });
+    { key: 'r', command: 'replay', side: 'both' }, { key: 'f5', command: 'replay', side: 'both' },
+    { key: 'shift+a', command: 'auto_advance', side: 'both' },
+    { key: 'a', command: 'add', side: 'both' }, { key: 'h', command: 'hint', side: 'both' },
+    { key: 'g', command: 'all_hints', side: 'both' }, { key: 'ctrl+alt+i', command: 'previous_info', side: 'both' },
+    { key: 'v', command: 'voice_replay', side: 'both' }, { key: 'shift+v', command: 'voice_record', side: 'both' },
+    { key: 'shift+s', command: 'voice_save', side: 'both' });
   for (let flag: number = 1; flag <= 7; flag++) {
     const command: StudyInputCommand = ('flag' + flag) as StudyInputCommand;
     bindings.push({ key: 'ctrl+' + flag, command: command, side: 'both' },
@@ -87,7 +102,7 @@ export function studyKeyboardCommand(bindings: StudyKeyBinding[], chord: string,
   const item: StudyKeyBinding | undefined = bindings.find((binding: StudyKeyBinding): boolean =>
     binding.key === chord && (binding.side === 'both' || binding.side === phase));
   if (item === undefined) return 'none';
-  if (phase !== 'question' && phase !== 'answer') return ['back', 'undo'].includes(item.command) ? item.command : 'none';
+  if (phase !== 'question' && phase !== 'answer') return ['back', 'undo', 'redo'].includes(item.command) ? item.command : 'none';
   if (item.command === 'flip' && phase !== 'question') return 'none';
   if (['again', 'hard', 'good', 'easy'].includes(item.command) && phase !== 'answer') return 'none';
   return item.command;

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { KeyboardShortcut } from '../model/KeyboardShortcuts';
+import { KeyboardShortcutList } from './KeyboardShortcutList';
 import { DialogFrame } from './common/DialogFrame';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { DialogHeader } from './common/DialogHeader';
@@ -15,6 +17,7 @@ export struct StudyGuideDialog {
   onConfirm: () => void = (): void => {};
   onClose: () => void = (): void => {};
   @State private shortcutsExpanded: boolean = false;
+  @Prop shortcuts: KeyboardShortcut[] = [];
 
   aboutToDisappear(): void { this.onClose(); }
 
@@ -66,7 +69,7 @@ export struct StudyGuideDialog {
   }
 
   @Builder
-  private shortcuts() {
+  private shortcutsContent() {
     Button({ type: ButtonType.Normal }) {
       Row({ space: 8 }) {
         Text($r('app.string.study_guide_shortcuts_title')).fontSize(15).fontWeight(FontWeight.Medium)
@@ -80,7 +83,7 @@ export struct StudyGuideDialog {
       .onClick((): void => { this.shortcutsExpanded = !this.shortcutsExpanded; })
     if (this.shortcutsExpanded) {
       Column({ space: 16 }) {
-        this.explanation($r('app.string.glossary_shortcuts_label'), $r('app.string.glossary_shortcuts_help'))
+        KeyboardShortcutList({ shortcuts: this.shortcuts, hint: $r('app.string.keyboard_study_scope_hint') })
         this.explanation($r('app.string.settings_study_gestures'), $r('app.string.study_gestures_help'))
         this.explanation($r('app.string.settings_tap_zones_label'), $r('app.string.settings_tap_zones_hint'))
       }.width('100%')
@@ -115,7 +118,7 @@ export struct StudyGuideDialog {
         this.explanation($r('app.string.study_auto_advance_title'), $r('app.string.study_guide_auto_advance'))
         this.explanation($r('app.string.study_guide_choice_title'), $r('app.string.study_guide_choice'))
       }.width('100%')
-      Column({ space: 8 }) { this.shortcuts() }.width('100%')
+      Column({ space: 8 }) { this.shortcutsContent() }.width('100%')
         .border(SurfaceBorder.options({ top: 0.5 }))
     }.width('100%')
   }

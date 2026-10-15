@@ -27,13 +27,13 @@ test('free bindings accept combinations, multiple keys, arbitrary device codes a
 test('defaults match exact modifiers and protect unseen answers and blocked scopes', () => {
   const controls = defaultStudyControls();
   for(const [key,command] of [['space','good'],['enter','good'],['1','again'],['2','hard'],['3','good'],['4','easy'],
-    ['numpad1','again'],['numpadenter','good'],['f5','replay'],['shift+8','mark'],['star','mark'],['shift+2','suspend'],['minus','bury'],['ctrl+1','flag1']]) {
+    ['numpad1','again'],['numpadenter','good'],['f5','replay'],['shift+8','mark'],['star','mark'],['shift+2','suspend'],['minus','bury'],['equals','bury_note'],['shift+1','suspend_note'],['ctrl+shift+z','redo'],['ctrl+1','flag1']]) {
     assert.equal(configuredStudyCommand(controls,key,'answer',false),command);
     assert.equal(configuredStudyCommand(controls,key,'answer',true),'none');
   }
   assert.equal(configuredStudyCommand(controls,'space','question',false),'flip');
   assert.equal(configuredStudyCommand(controls,'1','question',false),'none');
-  for(const key of ['ctrl+space','shift+1','alt+3','ctrl+shift+z']) assert.equal(configuredStudyCommand(controls,key,'answer',false),'none');
+  for(const key of ['ctrl+space','alt+3']) assert.equal(configuredStudyCommand(controls,key,'answer',false),'none');
   assert.equal(configuredStudyCommand(controls,'ctrl+z','done',false),'undo');
   assert.equal(configuredStudyCommand(controls,'escape','loading',false),'back');
   assert.equal(configuredStudyCommand(controls,'x','loading',false),'none');
@@ -115,7 +115,7 @@ test('key adapter recognizes alphabet, number pad, function and device keys and 
     KEYCODE_NUMPAD_0:2103,KEYCODE_NUMPAD_9:2112,KEYCODE_BACK:2,KEYCODE_CTRL_LEFT:2072,KEYCODE_CTRL_RIGHT:2073,
     KEYCODE_SHIFT_LEFT:2047,KEYCODE_SHIFT_RIGHT:2048,KEYCODE_ALT_LEFT:2045,KEYCODE_ALT_RIGHT:2046,
     KEYCODE_META_LEFT:2076,KEYCODE_META_RIGHT:2077,KEYCODE_SPACE:2050,KEYCODE_ENTER:2054};
-  const adapter=loadPlatformModule('utils/StudyKeyAdapter.ets','({studyKeyName,studyEventChord})',{KeyCode,studyChord});
+  const adapter=loadPlatformModule('utils/KeyboardKeyAdapter.ets','({studyKeyName:keyboardKeyName,studyEventChord:keyboardEventChord})',{KeyCode,keyboardChord:studyChord});
   assert.equal(adapter.studyKeyName(2040),'x');assert.equal(adapter.studyKeyName(2100),'f11');
   assert.equal(adapter.studyKeyName(2112),'numpad9');assert.equal(adapter.studyKeyName(2401),'code:2401');
   assert.equal(adapter.studyEventChord({keyCode:2040,getModifierKeyState:keys=>['Ctrl','Shift'].includes(keys[0])}),'ctrl+shift+x');

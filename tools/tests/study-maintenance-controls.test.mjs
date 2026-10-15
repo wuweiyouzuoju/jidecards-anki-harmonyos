@@ -73,7 +73,9 @@ test('actual keyboard handler honors mappings, protected keys, modifiers and eve
  }
  key('control');key('space');assert.deepEqual(calls,[],'Ctrl+Space must not fall through to grading');calls.length=0;
  key('z');assert.deepEqual(calls,['undo']);calls.length=0;key('control',1);assert.equal(page.Ctrl按下,false);
- key('space',1);assert.deepEqual(calls,[]);key('escape');key('delete');assert.deepEqual(calls,['back','delete']);
+ key('space',1);assert.deepEqual(calls,[]);key('escape');key('delete');assert.deepEqual(calls,['back'],'Delete has no AnkiDroid default');
+ page.controlsJson=JSON.stringify({...defaultStudyControls(),keyboard:{version:1,bindings:[{key:'delete',command:'delete',side:'both'}]}});
+ key('delete');assert.deepEqual(calls,['back','delete'],'explicit deletion binding remains available');
 });
 
 test('actual keyboard handler uses separate faces, suppresses held keys across a flip, and toggles flags instead of rating',()=>{

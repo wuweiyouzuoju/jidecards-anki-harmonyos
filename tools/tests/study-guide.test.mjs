@@ -67,7 +67,7 @@ function pageHarness(completed = false, failOpen = false) {
   vm.runInContext(stripTypeScriptTypes(`globalThis.Harness = class { ${nativeDialogMembers(pageSource)}\n${methods.join('\n')} }`), context);
   const page = new context.Harness();
   Object.assign(page, { keyboardSession:new StudyKeyboardSession(), controls:()=>keyboardDefaults(),  controlsJson:JSON.stringify(defaultStudyControls()),quickAnswerMode: StudyQuickAnswerMode.Off, timeboxNotice: null, editor: { visible: false, busy: false },
-    取文案: key => key,
+    取文案: key => key, keyboardShortcuts: () => [],
     studyGuideChecked: false, studyGuideVisible: false, stopStudyTimers() {}, startStudyTimers() {}, controllerReady: true, pendingHtml: '',
     isCurrentRequest: version => page.mounted && page.页面已显示 && page.foreground && version === page.requestVersion,
     requestVersion: 1, interactionVersion: 1, mounted: true, foreground: true,
@@ -237,10 +237,10 @@ test('structured study guide includes the shared keyboard and quick answer help 
     const strings = new Map(JSON.parse(read(`entry/src/main/resources/${locale}/element/string.json`)).string.map(item => [item.name, item.value]));
     const contentKeys = [...guideSource.matchAll(/\$r\('app\.string\.([^']+)'\)/g)].map(match => match[1]);
     for (const key of contentKeys) assert.ok(strings.get(key), `${locale}: missing ${key}`);
-    for (const key of ['glossary_shortcuts_help', 'study_gestures_help', 'settings_tap_zones_hint']) {
+    for (const key of ['study_gestures_help', 'settings_tap_zones_hint']) {
       assert.ok(contentKeys.includes(key), `reuse ${key}`);
     }
-    for (const key of ['Enter', 'Ctrl+Z', 'Delete', 'Esc']) assert.ok(strings.get('glossary_shortcuts_help').includes(key));
+    assert.match(guideSource, /KeyboardShortcutList\(\{ shortcuts: this.shortcuts, hint:/, 'guide renders current configured bindings');
     if (locale === 'base') assert.equal(strings.get('study_undo'), '撤销操作');
   }
 });

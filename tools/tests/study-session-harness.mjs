@@ -17,6 +17,7 @@ import { NativeDialogHost } from './platform-module-harness.mjs';
 import { StudyKeyboardSession } from '../../entry/src/main/ets/model/StudyKeyboard.ts';
 
 export function attachStudySession(page) {
+  page.voiceAudios ??= []; page.voiceOpen ??= false; page.infoCardId ??= 0; page.keyboardHelpOpen ??= false;
   page.shakeSensor ??= new (loadPlatformModule('backend/StudyShakeSensor.ets','StudyShakeSensor',{StudyShakeDetector,sensor:{SensorId:{ACCELEROMETER:1},on(){},off(){},getSingleSensorSync(){}}}))();
   page.keyboardSession ??= new StudyKeyboardSession();
   page.studyGuideDialog ??= new NativeDialogHost();
