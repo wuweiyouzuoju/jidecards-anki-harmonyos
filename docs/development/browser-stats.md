@@ -34,7 +34,7 @@ UI 和 JIDE 共用 `browserToolbarItems`，实际观察发布当前模式、状�
 
 更多菜单主层提供筛选、全选搜索结果、查找替换、搜索工具、显示设置、回退和更多七项，复用 `CardActionMenu` 的图文左对齐及互斥子面板。搜索工具包含搜索选项、最近搜索、保存当前搜索；显示设置包含显示列及三种副标题单选，选中项由公共 `AnchoredMenuItem` 复用 `SelectStyle.selectedOptionSurface` 和圆角填色，不另显示勾或预留勾号槽位；更多包含旗标名称和键盘快捷键。分隔线只区分功能组。“搜索选项”保留忽略重音和辅助构建；“最近搜索”复用 `BrowserDisplayDialog(kind=recent)`，单独显示原持久化历史和空状态，不改变搜索数据或提交语义。目录由 `AppInterface.browser_more` 及三个子面板声明产生，宿主发布真实展开状态；系统返回先收起子面板，再关闭主菜单。多选菜单保留清空选择、预览所选、导出所选与立即评分。全选和 Shift 区间选择依据完整搜索 ID 顺序，覆盖未加载分页；空选择仍可执行全选，写入时禁用选择与快捷键。Notes 信息和所选预览先解析真实代表卡片；空笔记显示错误，不将 noteId 传给卡片接口。Cards 删除所选卡片、Notes 展开所属卡片，以及查找替换“全部”限于当前搜索结果的语义保持。
 
-`BrowserKeyboard.ts` 共用快捷键声明与精确修饰键匹配；`BrowserKeyAdapter.ets` 转换平台 KeyCode。Ctrl+A 全选，Ctrl+F 搜索，Ctrl+Alt+T 切换模式，方向键移动，Shift+方向键/点击扩展范围，Space 切换选择，Enter 打开，E 编辑，Delete 删除确认，Ctrl+Z/Ctrl+Shift+Z 撤销/重做，其它操作见应用内完整列表。输入、弹层、隐藏页面各自拥有输入；文本 Ctrl+A 不触发批量选择。编辑表单支持 Ctrl+S 保存和 Escape 请求关闭。
+`BrowserKeyboard.ts` 共用快捷键声明与精确修饰键匹配；`BrowserKeyAdapter.ets` 转换平台 KeyCode。Ctrl+A 全选，Ctrl+F 搜索，Ctrl+Alt+T 切换模式，方向键移动，Shift+方向键/点击扩展范围，Space 切换选择，Enter 打开，E 编辑，Delete 删除确认，Ctrl+Z/Ctrl+Shift+Z 撤销/重做，其它操作见应用内完整列表。输入、弹层、隐藏页面各自拥有输入；文本 Ctrl+A 不触发批量选择。编辑表单支持 Ctrl+Enter 保存（保留 Ctrl+S）和 Escape 请求关闭；完整对齐范围见下方“电脑键盘与上下文指引”。
 
 `BrowserPreferences.ts` 校验模式、排序、副标题、Cards/Notes 独立有序列及最多30项最近搜索；`BrowserPreferencesStore.ets` 在集合配置 `jideBrowserPreferences` 中合并局部修改并读回核实。手动与 JIDE 共用串行队列，确认提案保存前核对旧快照。通知刷新已挂载浏览页，草稿打开期间延后应用。默认排序读 Core `sortType/sortBackwards`；忽略重音使用真实 Core 布尔配置。每次搜索/分页在共享读取队列恢复模式与激活列；不能以缓存目录替代集合重开后的激活。整批行读取失败保留游标，单行缺失保留既有容错。
 
@@ -390,3 +390,16 @@ UI 复用 DialogFrame、DialogHeader、SelectStyle、FormInputStyle。内边距�
 NotetypeMessages 解码 Field.config，NoteEditorLoader/NoteEditorSession 复制并贯通到独立编辑页；新增页从 NoteCreationSession 的真实类型视图读取。NoteFieldCard/NoteFieldEditor 共用 NoteFieldEditingOptions，公共组件不直接依赖 Core 协议。RTL 使用组件方向及 TextAlign.Start，避免调用目标 SDK 不存在的 Left/Right 或 API23 段落方向属性；字体仅使用本机已安装名称，字号限制与 JIDE 共用 NOTE_FIELD_EDITING_SUPPORT。
 
 description 作输入提示；plainText 是 Anki 的默认 HTML 源码模式，保留 HTML 和格式；collapsed 决定字段初始折叠，并用公共 DisclosureChevron 展开。图片遮罩标题/补充字段复用相同字段卡片，关闭其新增媒体入口；图像、遮罩和可选反向开关保持原专用语义。改变编辑外观不改写字段 HTML，加载失败或保存失败不会清空配置/草稿。设备原生 RTL、字体回退、折叠和输入法尚未验收。
+
+
+## 电脑键盘与上下文指引（2026-10-15）
+
+鼠标依据 AnkiDroid `BrowserMultiColumnAdapter` → `CardBrowserViewModel.handleRightClick` 核对：列表首次右键进入多选；已有选择时扩选锚点与当前行之间的完整搜索结果，包含未加载的行，锚点不移动。jidecards 的 `卡片表格.handleRowMouse` 复用现有长按及 `onRange`，刷新/写入忙碌时拦截；右键不打开行预览或批量菜单。共用目录树把右键映射到既有长按回调，因此侧栏牌组追加完整路径搜索条件、标签显示原操作菜单。说明位于浏览更多 → 更多 → 键盘快捷键，并同步共同界面指引；文本输入框保留系统右键编辑菜单。行为回归为 `browser-selection-view.test.mjs`、`browser-sidebar-decks.test.mjs`、`ui-directory-tree.test.mjs`，实际鼠标事件与主题外观仍需设备验收。
+
+按 AnkiDroid main 的 [CardBrowserFragment.kt](https://github.com/ankidroid/Anki-Android/blob/main/AnkiDroid/src/main/java/com/ichi2/anki/browser/CardBrowserFragment.kt)、[NoteEditorFragment.kt](https://github.com/ankidroid/Anki-Android/blob/main/AnkiDroid/src/main/java/com/ichi2/anki/NoteEditorFragment.kt) 与 [Toolbar.kt](https://github.com/ankidroid/Anki-Android/blob/main/AnkiDroid/src/main/java/com/ichi2/anki/noteeditor/Toolbar.kt) 核对。浏览 E 编辑，Ctrl+E 新增；Ctrl+Shift+A 标签、Ctrl+D 换牌组、Ctrl+K 标记、Ctrl+J 暂停、Ctrl+Shift+J 埋藏、Ctrl+Alt+R 到期日、Ctrl+Alt+N 重置、Ctrl+Shift+S 重新定位、Ctrl+Shift+M 换类型、Ctrl+Shift+P 预览、Ctrl+Shift+I 信息、Ctrl+Shift+G 立即评分、Ctrl+Shift+E 导出、Ctrl+O 排序、Ctrl+S 保存搜索、Ctrl+Alt+S 已保存搜索、Ctrl+T 标签筛选、Ctrl+M 已标记、Alt+S 已暂停、Ctrl+Alt+T 卡片/笔记模式。保留已有 Ctrl+F 搜索、方向键/Shift 扩选、Space 选择、Enter 打开、F5 刷新、Ctrl+Shift+Z 重做及 Ctrl+0 清旗标；Ctrl+0–7 同时支持小键盘。说明位于浏览更多菜单 → 更多 → 键盘快捷键，和执行端共用 `BROWSER_SHORTCUTS`。
+
+新增和编辑共用 `EDITOR_SHORTCUTS`：Ctrl+Enter 保存、Ctrl+D 牌组、Ctrl+L 模板、Ctrl+N 笔记类型、Ctrl+Shift+T 标签、Ctrl+P 草稿预览、Ctrl+Shift+1…0 跳到前十个字段；保留 Ctrl+S 保存。牌组/类型选择复用 `DirectorySelect` 或原浏览弹窗；标签在布局就绪后直接请求焦点，字段先展开、激活所属编辑器再请求焦点，无秒级延迟。字段编辑工具与说明共用 `NoteFieldEditing.NOTE_FIELD_SHORTCUTS`：Ctrl+B/I/U 格式、Ctrl+R 水平线、Ctrl+H 标题、Ctrl+F 字号、Ctrl+M 行内公式、Ctrl+Shift+C 新挖空、Ctrl+Alt+Shift+C 复用挖空编号。标题/字号打开既有格式弹窗，按键去重并尊重文字焦点/忙态/原生弹窗。AnkiDroid 的 Ctrl+数字自定义 HTML 工具依赖用户配置按钮，jidecards 暂无此配置，不分配这些空动作。模板编辑器支持 Ctrl+P，且有自身标题旁的说明入口。
+
+编辑页的 i 复用 `NoteEditorHeader` 中的 `HelpLabel`，放在标题旁。说明复用字段帮助弹窗和 `KeyboardShortcutList`；不会把其它页面的按键混入本页。`AppInterface` 同步登记说明、牌组/类型/模板入口与属性忙态。`NoteEditorProperties` 负责现有笔记的属性写入，沿 `BrowserOperationController` 等待集合可用、核对笔记基线，再调用 Core；换牌组作用于该笔记所有卡片。`NoteEditorSession.refresh` 只刷新保存基线，不重建表单；换类型按 Core newFields 映射未提交字段及附件，刷新失败保留草稿、禁止继续保存并提供重试。模板入口 `templatesOnly` 不允许修改字段结构，保存后保留新增/编辑草稿和临时媒体。
+
+验证入口 `keyboard-alignment`、`note-rich-editor`、`note-editor-session`、`browser-editor-component`、`note-audio` 与受影响 home/study/browser/ui/media/repo 测试并集；新增组件/平台类型须增量签名 HAP。最终真机或模拟器的实体键盘焦点、中文输入法、窗口大小、主题、弹窗与录音流程仍需设备验收；本次不安装或重启用户设备。

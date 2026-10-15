@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { KeyCode } from '@kit.InputKit';
 export function browserKeyName(code: number): string {
+  if (code >= KeyCode.KEYCODE_NUMPAD_0 && code <= KeyCode.KEYCODE_NUMPAD_7) return String(code - KeyCode.KEYCODE_NUMPAD_0);
+  if (code === KeyCode.KEYCODE_NUMPAD_ENTER) return 'enter';
   switch (code) {
     case KeyCode.KEYCODE_A: return 'a';
     case KeyCode.KEYCODE_B: return 'b';

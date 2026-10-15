@@ -3,6 +3,7 @@ import { DialogFrame } from '../common/DialogFrame';
 import { DialogHeader } from '../common/DialogHeader';
 import { BrowserColumn } from '../../proto/messages/SearchMessages';
 import { BROWSER_SHORTCUTS, BrowserShortcut } from '../../model/BrowserKeyboard';
+import { KeyboardShortcutList } from '../KeyboardShortcutList';
 import { resourceText, namedResourceText } from '../../utils/UiFeedback';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { SelectStyle } from '../../utils/SelectStyle';
@@ -155,12 +156,7 @@ export struct BrowserDisplayDialog {
     else if (this.kind === 'recent') { this.recentContent() }
     else {
       Text($r('app.string.browser_shortcuts_hint')).fontColor($r('app.color.text_secondary')).width('100%')
-      ForEach(BROWSER_SHORTCUTS, (shortcut: BrowserShortcut) => {
-        Row({ space: 12 }) {
-          Text(namedResourceText(this.getUIContext(), shortcut.titleKey)).layoutWeight(1)
-          Text(shortcut.keys)
-        }.width('100%')
-      }, (shortcut: BrowserShortcut): string => shortcut.command)
+      KeyboardShortcutList({ shortcuts: BROWSER_SHORTCUTS })
     }
     if (this.error !== '') { Text(this.error).fontColor($r('app.color.error_text')).width('100%') }
   }

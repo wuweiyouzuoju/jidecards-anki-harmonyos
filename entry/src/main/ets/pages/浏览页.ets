@@ -1,3 +1,4 @@
+import { 添加笔记页参数 } from 'model/navigation/PageParams';
 import { FEEDBACK_ACTIONS, resultUndoStatus } from '../model/InteractionFeedback';
 import { ChangingText } from '../components/common/ChangingText';
 import { ResultNotice } from '../components/common/ResultNotice';
@@ -1147,6 +1148,14 @@ export struct 浏览页 {
     if (command === 'mode') { this.切换模式(this.浏览模式值 === 'cards' ? 'notes' : 'cards'); return; }
     if (command === 'sort') { this.openViewMenu('sort'); return; }
     if (command === 'filter') { this.打开侧边栏(); return; }
+    if (command === 'saved_searches' || command === 'search_tags') { this.打开侧边栏(command === 'search_tags' ? 'tags' : 'saved_searches'); return; }
+    if (command === 'search_marked' || command === 'search_suspended') {
+      this.提交搜索(command === 'search_marked' ? 'tag:re:^marked$' : 'is:suspended'); return;
+    }
+    if (command === 'add') {
+      const params: 添加笔记页参数 = { deckId: this.pageDeckId || '1', deckName: '', deckOptions: [] };
+      this.pathStack.pushPath({ name: 'AddNotePage', param: params, onPop: (): void => { this.执行搜索(true); } }); return;
+    }
     if (command === 'save_search') { this.打开保存搜索(null); return; }
     if (command === 'refresh') { this.执行搜索(true); return; }
     if (command === 'undo' || command === 'redo') { this.applyBrowserHistory(command === 'redo'); return; }
@@ -1169,6 +1178,7 @@ export struct 浏览页 {
     else if (command === 'mark') this.执行批量标星(true);
     else if (command === 'tags') this.打开批量标签();
     else if (command === 'deck') this.打开改牌组弹层();
+    else if (command === 'notetype') this.打开更改笔记类型弹层();
     else if (command === 'due') this.打开设置到期日弹层();
     else if (command === 'reposition') this.打开重新定位弹层();
     else if (command === 'reset') { this.resetSelection = this.captureBrowserSelection(); this.batchDialog = 'reset'; }
@@ -1267,7 +1277,7 @@ export struct 浏览页 {
   // - 已保存搜索 JSON 格式：[{ name, search }, ...]，空串或非数组视为无已保存搜索
 
   /** 打开侧边栏：并行加载牌组树（若 null）+ 标签树 + 已保存搜索 + 分区折叠状态。失败收集到错误条。 */
-  private async 打开侧边栏(): Promise<void> {
+  private async 打开侧边栏(section: string = ''): Promise<void> {
     if (!this.operations.isAlive()) return;
     const version: number = ++this.sidebarVersion;
     this.显示侧边栏 = true;
@@ -1281,6 +1291,9 @@ export struct 浏览页 {
     this.侧边栏牌组折叠 = snapshot.collapsed[0];
     this.侧边栏标签折叠 = snapshot.collapsed[1];
     this.侧边栏已保存搜索折叠 = snapshot.collapsed[2];
+    if (section !== '') {
+      this.侧边栏牌组折叠 = true; this.侧边栏标签折叠 = section !== 'tags'; this.侧边栏已保存搜索折叠 = section !== 'saved_searches';
+    }
     if (snapshot.errors.length > 0) {
       this.侧边栏错误 = `${this.取本地化文案($r('app.string.browser_sidebar_load_error'))}：${snapshot.errors.join('、')}`;
     }
