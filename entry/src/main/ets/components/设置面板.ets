@@ -107,6 +107,7 @@ export struct 设置面板 {
   @State private settingsQuery: string = '';
   @Prop openAiSettings: boolean = false;
   @Prop initialSectionId: string = '';
+  @Prop initialActionId: string = '';
   @Prop 当前主题模式: 主题模式 = 'system';
   @Prop 是否深色: boolean = false;
   @Prop 当前颜色主题: 颜色主题 = 'aurora';
@@ -155,7 +156,7 @@ export struct 设置面板 {
   // 避免在子分组卡片内嵌套 字段帮助面板 导致其被压在分组卡片内呈现为「新界面」。
   @State private 显示说明浮层: boolean = false;
   @State private 说明标题: Resource = $r('app.string.settings_fsrs_label');
-  @State private 说明正文: Resource = $r('app.string.settings_fsrs_help');
+  @State private 说明正文: ResourceStr = $r('app.string.settings_fsrs_help');
   // 媒体管理面板：从数据管理分组入口打开，挂在根 Stack 顶层
   @State private 显示媒体管理: boolean = false;
   @State private 显示备份管理: boolean = false;
@@ -207,6 +208,11 @@ export struct 设置面板 {
     if (!this.openAiSettings && this.initialSectionId !== '' &&
       this.directoryEntries().some((entry: SettingsEntry): boolean => entry.id === this.initialSectionId)) {
       this.openSection(this.initialSectionId);
+      if (this.initialActionId === 'restore') this.显示备份管理 = true;
+      else if (this.initialActionId === 'notetypes') this.显示笔记类型管理 = true;
+      else if (this.initialActionId === 'media') this.显示媒体管理 = true;
+      else if (this.initialActionId === 'check_database') this.checkDatabaseFromKeyboard();
+      else if (this.initialActionId === 'export_collection') this.创建完整备份回调();
     }
     this.previousSection = this.activeSection;
     this.sectionNavigationReady = true;
@@ -312,6 +318,18 @@ export struct 设置面板 {
 
   private 取本地化文本(资源: Resource, _locale: string = this.uiLanguage): string {
     return resourceText(this.getUIContext(), 资源);
+  }
+
+  /** 键盘可从任意模式进入，结果复用说明弹窗，不依赖完整模式的设置行。 */
+  private async checkDatabaseFromKeyboard(): Promise<void> {
+    showToastSafely(this.getUIContext(), { message: $r('app.string.check_db_running') });
+    await this.执行数据库检查();
+    if (this.disposed) return;
+    this.说明标题 = $r('app.string.check_db_title');
+    this.说明正文 = this.maintenance.error !== '' ? this.maintenance.error : this.maintenance.problems.length === 0 ?
+      resourceText(this.getUIContext(), $r('app.string.check_db_passed')) :
+      resourceText(this.getUIContext(), $r('app.string.check_db_problems'), this.maintenance.problems.length) + '\n' + this.maintenance.problems.join('\n');
+    this.显示说明浮层 = true;
   }
 
   private async 执行数据库检查(): Promise<void> {

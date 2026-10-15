@@ -10,7 +10,7 @@ const List = loadComponentLogic('components/common/ActionMenuList.ets', 'ActionM
 const menus = [
   { path: 'components/home/主页更多面板.ets', name: '主页更多面板', surface: 'home_more',
     callbacks: { history:'onHistory', settings: '设置回调',
-      stats: '统计回调', reminders: '提醒回调', intro: 'onIntro' } },
+      stats: '统计回调', reminders: '提醒回调', intro: 'onIntro', keyboard: 'onKeyboard' } },
   { path: 'components/主页操作面板.ets', name: '主页操作面板', surface: 'home_create',
     callbacks: { create_deck: '创建牌组回调', import: '导入牌组回调', cloud_deck: '获取直链牌组回调',
       filtered_deck: 'onCreateFilteredDeck' } }
@@ -56,7 +56,7 @@ test('both home menus retain registry order, full localized labels, icons and ca
           assert.deepEqual(list.items.map(entry => entry.label), declarations.map(entry => strings.get(entry.titleKey)));
           for (const entry of list.items) {
             covered.add(entry.id);
-            assert.match(entry.icon, /^app\.media\.ic_(home|study)_/);
+            assert.match(entry.icon, /^app\.media\.ic_(?:home|study)_|^app\.media\.ic_settings_keyboard$/);
             const name = entry.icon.slice('app.media.'.length);
             for (const theme of ['base', 'dark']) {
               assert.ok(existsSync(new URL(`../../entry/src/main/resources/${theme}/media/${name}.svg`, import.meta.url)));

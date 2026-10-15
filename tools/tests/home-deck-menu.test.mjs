@@ -7,9 +7,12 @@ import { loadComponentLogic, loadPlatformModule } from './platform-module-harnes
 import { uiFeedback } from './ui-feedback-harness.mjs';
 import { AppInterfaceTracker, APP_INTERFACE_SURFACES, deckRowMenuItems } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { DECK_TONE_CHOICES, 牌组色调 } from '../../entry/src/main/ets/model/DeckTone.ts';
+import { 牌组显示名 } from '../../entry/src/main/ets/model/主页模型.ets';
 import { deckScopeSearch } from '../../entry/src/main/ets/model/DeckScope.ts';
 import { ActionMenuPointerSide, actionMenuBubbleOutline, actionMenuHostAnchor, placeAnchoredActionMenu, actionMenuGroupInset, placeActionMenuGroups } from '../../entry/src/main/ets/components/common/ActionMenuLayout.ts';
 import { actionMenuRows, visibleActionMenuRows } from '../../entry/src/main/ets/components/common/ActionMenuTree.ts';
+import { HOME_SHORTCUTS, shortcutCommand } from '../../entry/src/main/ets/model/KeyboardShortcuts.ts';
+import { KeyboardPressSession } from '../../entry/src/main/ets/model/KeyboardInput.ts';
 import { safeMenuGeometry, keyboardViewportHeight } from '../../entry/src/main/ets/model/WindowSafeLayout.ts';
 
 const read = path => readFileSync(new URL('../../entry/src/main/ets/' + path, import.meta.url), 'utf8');
@@ -18,7 +21,7 @@ const dictionaries = Object.fromEntries(['base', 'en_US'].map(locale => [locale,
 function menuHarness(locale = 'base') {
   const tracker = new AppInterfaceTracker();
   const Menu = loadComponentLogic('components/home/HomeDeckRowMenu.ets', 'HomeDeckRowMenu', {
-    DECK_TONE_CHOICES, 牌组色调, deckRowMenuItems, appInterface: tracker,
+    DECK_TONE_CHOICES, 牌组色调, deckRowMenuItems, appInterface: tracker, actionMenuHostAnchor,
     interfaceItemText: loadPlatformModule('utils/AppInterfaceText.ets', 'interfaceItemText', { APP_INTERFACE_SURFACES, ...uiFeedback }),
     $r: id => id
   });
@@ -59,7 +62,8 @@ test('deck tone choices retain every persisted value inside the shared dialog', 
   assert.match(source, /DialogFrame\(\{/);
   assert.match(source, /DialogHeader\(\{ title: this\.deckName/);
   assert.match(source, /selectionUsesAccent: choice\.id !== String\(牌组色调\.None\)/);
-  assert.doesNotMatch(source, /CardActionMenu|ActionMenuAnchor|AnchoredMenu\(/);
+  assert.match(source, /if \(this\.point !== undefined\) \{[\s\S]*CardActionMenu\(/);
+  assert.doesNotMatch(source, /AnchoredMenu\(/);
   assert.doesNotMatch(read('components/牌组列表项.ets'), /bindPopup\(|色条菜单|色条选项列表/);
 });
 
@@ -139,18 +143,20 @@ test('closing the overlay cannot clear the accepted action target', () => {
 
 function homeHarness() {
   const source = read('pages/首页.ets');
-  const methods = ['openDeckMenu', 'closeHomeActions', 'handleDeckMenuAction', '打开浏览页', '打开统计页', '打开自定义学习'].map(name => {
+  const methods = ['openDeckMenu', 'closeHomeActions', 'handleDeckMenuAction', '打开浏览页', '打开统计页', '打开自定义学习', '打开添加笔记', '打开牌组选项', 'openCreateDeck', 'openDeckExport'].map(name => {
     const start = source.indexOf('  private ' + name + '(');
     assert.ok(start >= 0, name);
     return source.slice(start, source.indexOf('\n  }', start) + 4);
   });
-  const Home = new Function('deckScopeSearch', stripTypeScriptTypes('class Home { ' + methods.join('\n') + ' }', { mode: 'transform' }) + '; return Home;')(deckScopeSearch);
+  const Home = new Function('deckScopeSearch', '牌组显示名', stripTypeScriptTypes('class Home { ' + methods.join('\n') + ' }', { mode: 'transform' }) + '; return Home;')(deckScopeSearch, deck => 牌组显示名(deck, 'zh-Hans'));
   const home = new Home(), paths = [], actions = [];
   const target = { id: '42', fullName: 'Parent::Deck "quoted" *_', displayName: 'Alias' };
   Object.assign(home, {
     排序模式中: false, deckMenuId: '', 选中的牌组ID: '999',
     按ID查牌组: id => id === target.id ? target : { id: '' },
-    deferForSync: () => false,
+    deferForSync: () => false, 添加笔记的牌组选项: () => [{id:42,name:target.fullName}],
+    打开数据迁移: (...args) => actions.push(['export', ...args]),
+    pushDeckOptionsPage: (id,name) => actions.push(['options',id,name]),
     暂停主页官方公告检查() {}, syncController: { cancel() {} },
     statsSnapshot: { graphs: { allDecks: true }, days: 365 },
     页面栈: { pushPath: path => paths.push(path) }, 返回主页后刷新: () => actions.push('refresh')
@@ -278,10 +284,12 @@ test('long press forwards the target through the list without row geometry or fi
   row.reorderMode = true; row.openMenu();
   row.reorderMode = false; row.menuOpen = true; row.openMenu();
   assert.equal(calls.length, 1);
+  row.menuOpen = false; row.openMenu({x:250,y:400});
+  assert.deepEqual(calls[1], ['42',{x:250,y:400}]); assert.deepEqual(home.deckMenuPoint,{x:250,y:400});
   assert.match(source, /this\.onMenu\(this\.deck\.id\)/);
   assert.doesNotMatch(source, /menuAnchor|fingerList/);
-  assert.match(read('components/home/主页牌组列表.ets'), /this\.onItemMenu\(deckId\)/);
-  assert.match(read('pages/首页.ets'), /this\.openDeckMenu\(deckId\)/);
+  assert.match(read('components/home/主页牌组列表.ets'), /this\.onItemMenu\(deckId, point\)/);
+  assert.match(read('pages/首页.ets'), /this\.openDeckMenu\(deckId, point\)/);
   assert.match(read('pages/首页.ets'), /deckName: this\.按ID查牌组\(this\.deckMenuId\)\.fullName/);
 });
 
@@ -378,4 +386,88 @@ test('pointer follows the selected column when colors open near either screen ed
   assert.equal(shell.scrollMaxHeight(), 180, 'arrow stays outside the scrolling viewport');
   assert.match(read('components/common/AnchoredMenu.ets'), /MenuBubbleSurface\(\{/);
   assert.match(read('components/common/MenuBubble.ets'), /MenuBubbleSurface\(\{/);
+});
+
+
+test('right click uses the same current actions and guarded tone choices at a window pointer anchor', () => {
+ const {menu,events,tracker}=menuHarness();menu.point={x:360,y:720};menu.hostLeft=40;menu.hostTop=64;
+ assert.deepEqual(menu.contextAnchor(),{left:320,top:656,width:0,height:0});
+ const entries=menu.contextEntries();assert.deepEqual(entries.map(item=>item.id),menu.menuItems().map(item=>item.id));
+ assert.deepEqual(entries.map(item=>item.value),menu.menuItems().map(item=>item.label));
+ menu.publishInterface();const observed=tracker.snapshot().find(view=>view.surface==='deck_row_menu');
+ assert.equal(observed.values.find(value=>value.id==='presentation').value,'pointer_context_menu');
+ assert.equal(observed.values.find(value=>value.id==='triggers').value,'long_press,right_click');
+ const tones=entries.find(item=>item.id==='tone');menu.toggleBranch({id:'tone'});tones.children.find(item=>item.id===String(牌组色调.Mint)).action();
+ assert.deepEqual(events,['close',['42',牌组色调.Mint]]);
+ events.length=0;menu.busy=true;entries.find(item=>item.id==='rename').action();assert.deepEqual(events,[]);
+ assert.ok(menu.contextEntries().every(item=>item.enabled===false));
+ menu.busy=false;menu.point=undefined;menu.publishInterface();
+ assert.equal(tracker.snapshot().find(view=>view.surface==='deck_row_menu').values.find(value=>value.id==='presentation').value,'centered_dialog');
+});
+
+test('mouse dispatch opens only for right press, keeps the exact deck and does not open phone details',()=>{
+ const MouseButton={Left:1,Right:2,Middle:4},MouseAction={Press:1,Release:2,Move:3};
+ const mouseContextPoint=loadPlatformModule('utils/MouseContextInput.ets','mouseContextPoint',{MouseButton,MouseAction});
+ const source=read('components/牌组列表项.ets');
+ const methods=['openMenu','handleMouse'].map(name=>{const start=source.indexOf('  private '+name+'(');return source.slice(start,source.indexOf('\n  }',start)+4);});
+ const Row=new Function('mouseContextPoint',stripTypeScriptTypes('class Row{'+methods.join('\n')+'}')+';return Row;')(mouseContextPoint);
+ const {home}=homeHarness(),calls=[],row=Object.assign(new Row(),{deck:{id:'42'},disposed:false,reorderMode:false,menuOpen:false,
+  onMenu:(id,point)=>{calls.push([id,point]);home.openDeckMenu(id,point);}});
+ let stopped=0;const event={button:2,action:1,windowX:340,windowY:580,stopPropagation:()=>stopped++};
+ for(const button of [1,4])row.handleMouse({...event,button});assert.deepEqual(calls,[]);assert.equal(stopped,0);
+ row.handleMouse(event);row.handleMouse({...event,action:2});row.handleMouse({...event,action:3});
+ assert.deepEqual(calls,[['42',{x:340,y:580}]]);assert.equal(stopped,3);assert.equal(home.选中的牌组ID,'42');
+ assert.deepEqual(home.deckMenuPoint,{x:340,y:580});assert.equal(home.显示牌组详情,undefined);
+ row.reorderMode=true;row.handleMouse(event);row.reorderMode=false;row.menuOpen=true;row.handleMouse(event);
+ row.menuOpen=false;row.disposed=true;row.handleMouse(event);row.disposed=false;row.handleMouse({...event,windowX:NaN});assert.equal(calls.length,1);
+ home.closeHomeActions();assert.equal(home.deckMenuPoint,undefined);home.openDeckMenu('42');assert.equal(home.deckMenuPoint,undefined);
+});
+
+
+test('context menu exposes existing add, subdeck, options and export flows with deck type restrictions',()=>{
+ for(const simple of [false,true]) for(const filtered of [false,true]) {
+  const {menu,events}=menuHarness();menu.simple=simple;menu.filtered=filtered;
+  const ids=menu.menuItems().map(item=>item.id);
+  for(const id of ['add_note','export'])assert.ok(ids.includes(id),id);
+  for(const id of ['create_child','options'])assert.equal(ids.includes(id),!filtered,id);
+  for(const id of ['add_note','create_child','options','export'])menu.selectItem({id});
+  assert.deepEqual(events.filter(Array.isArray), (filtered?['add_note','export']:['add_note','create_child','options','export']).map(id=>['42',id]));
+ }
+});
+
+test('context menu operations retain the right-clicked target across sync and reject deleted or filtered targets',()=>{
+ for(const action of ['add_note','create_child','options','export']) {
+  const {home,paths,actions,target}=homeHarness();let pending;
+  home.deferForSync=callback=>{pending=callback;return true;};
+  home.handleDeckMenuAction('42',action);assert.equal(typeof pending,'function',action);
+  home.选中的牌组ID='999';home.deferForSync=()=>false;pending();
+  if(action==='add_note')assert.deepEqual(paths[0].param,{deckId:'42',deckName:'Alias',deckOptions:[{id:42,name:target.fullName}]});
+  if(action==='create_child'){assert.equal(home.创建父牌组ID,'42');assert.equal(home.显示创建牌组,true);}
+  if(action==='options')assert.deepEqual(actions.at(-1),['options',42,'Alias']);
+  if(action==='export')assert.deepEqual(actions.at(-1),['export','exportDeck',42,false]);
+  const deleted=homeHarness();let resume;deleted.home.deferForSync=callback=>{resume=callback;return true;};
+  deleted.home.handleDeckMenuAction('42',action);deleted.home.按ID查牌组=()=>({id:''});deleted.home.deferForSync=()=>false;resume();
+  assert.deepEqual(deleted.paths,[]);assert.deepEqual(deleted.actions,[]);assert.ok(!deleted.home.显示创建牌组&&!deleted.home.显示牌组选项);
+ }
+ for(const action of ['create_child','options']) {
+  const {home,target}=homeHarness();target.filtered=true;home.handleDeckMenuAction('42',action);
+  assert.ok(!home.显示创建牌组&&!home.显示牌组选项);
+ }
+});
+
+test('Escape closes deck menu levels once per press, and D clears the previous subdeck parent',()=>{
+ const source=read('pages/首页.ets'),start=source.indexOf('  private handleHomeKey(');
+ const method=source.slice(start,source.indexOf('\n  }',start)+4);
+ const Host=new Function('shortcutCommand','HOME_SHORTCUTS','studyEventChord','KeyType',stripTypeScriptTypes('class Host{'+method+'}')+';return Host;')(
+  shortcutCommand,HOME_SHORTCUTS,event=>event.chord,{Down:0});
+ const {home}=homeHarness(),{menu,events}=menuHarness();
+ Object.assign(home,{homeKeys:new KeyboardPressSession(),页面栈:{size:()=>0},deckMenuId:'42',deckMenuBackRequest:0});
+ const key={keyCode:1,type:0,chord:'escape'};
+ assert.equal(Host.prototype.handleHomeKey.call(home,key),true);assert.equal(home.deckMenuBackRequest,1);
+ Host.prototype.handleHomeKey.call(home,key);assert.equal(home.deckMenuBackRequest,1);
+ menu.toggleBranch({id:'tone'});menu.handleBack();assert.deepEqual(menu.expandedIds,[]);assert.deepEqual(events,[]);
+ Host.prototype.handleHomeKey.call(home,{...key,type:1});Host.prototype.handleHomeKey.call(home,key);assert.equal(home.deckMenuBackRequest,2);
+ menu.handleBack();assert.deepEqual(events,['close']);events.length=0;menu.busy=true;menu.handleBack();assert.deepEqual(events,[]);
+ home.deckMenuId='';home.创建父牌组ID='42';home.homeActivity=()=>({foreground:true,collectionReady:true});
+ Host.prototype.handleHomeKey.call(home,{keyCode:2,type:0,chord:'d'});assert.equal(home.创建父牌组ID,'');assert.equal(home.显示创建牌组,true);
 });

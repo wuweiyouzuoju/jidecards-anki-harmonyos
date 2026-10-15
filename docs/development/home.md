@@ -198,3 +198,10 @@ EntryAbility 的冷/热启动都通过 `ExternalDeckOpen` 校验原始文件 URI
 误用 1001 时，历史状态仍可经标准 service 3/method 7 读取，但执行请求会被牌组预览拒绝为 `Invalid deck preview request`，历史状态不变；重复刷新不修复路由。上述原生回归同时验证这条失败路径。旧界面把执行错误归入读取错误，因而“操作历史可能已变化或读取失败”不能作为历史确实变化的证据。
 
 错误区分历史读取失败、原生返回 `collection_history_changed`、撤销/重做执行失败与已提交后的刷新失败，显示实际错误详情；失败状态和详情由同一会话发布给 JIDE。执行失败清除旧状态，重读前不允许再次提交；已完成操作的刷新失败不提示重新执行。回归见 `collection-history-session.test.mjs` 与 `maintenance-ui-cognition.test.mjs`。
+
+
+## 电脑键盘操作（2026-10-15）
+
+`model/KeyboardShortcuts.ts.HOME_SHORTCUTS` 是首页运行时和更多菜单“键盘快捷键”的共同声明，默认依据 AnkiDroid [DeckPicker.kt](https://github.com/ankidroid/Anki-Android/blob/main/AnkiDroid/src/main/java/com/ichi2/anki/DeckPicker.kt)：A 新增、B 浏览、Y 同步、S 学习当前牌组、T 统计、/ 搜索、D 新建牌组、F 过滤牌组、P 设置、C 检查数据库、M 媒体管理、Ctrl+E 导出集合、Ctrl+Shift+I 导入、Ctrl+Shift+N 笔记类型、Ctrl+B 备份恢复管理、Ctrl+Shift+B 创建本地历史备份。R 改名及 Delete/Shift+Delete 仅在宽屏选中牌组时生效；两种删除键均沿现有确认。新增页可从无选中牌组的首页进入，类型和普通牌组选项由 Core 读取，排除过滤牌组。
+
+快捷键复用原页面操作；有导航子页面、弹层、集合未就绪或操作忙碌时不执行首页命令。备份复用 `BackupCoordinator` 并显示真实结果，设置内的目标操作经 `设置页参数.initialActionId` 传递，不旁路集合保护。键盘发起的数据库检查用现有说明弹窗展示结果，简洁模式也可查看成功、问题及错误。说明复用 `KeyboardShortcutHelp`、字段帮助弹窗及 `KeyboardShortcutList`；JIDE 共享菜单声明和实际说明观察。回归 `keyboard-alignment`、`ui-shell-contract`、`ui-shell-action-menu-list`，并按影响运行 home/study/browser/ui 的相关检查；原生焦点、键盘与最终排版须设备验收。

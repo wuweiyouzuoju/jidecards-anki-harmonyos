@@ -174,7 +174,8 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'history', titleKey: 'collection_history_title', opens: 'collection_history' },
     { id: 'stats', titleKey: 'stats_page_title', opens: 'stats' },
     { id: 'reminders', titleKey: 'reminder_list_title', opens: 'reminders' },
-    { id: 'intro', titleKey: 'home_intro_menu_title', opens: 'intro' }
+    { id: 'intro', titleKey: 'home_intro_menu_title', opens: 'intro' },
+    { id: 'keyboard', titleKey: 'keyboard_shortcuts_title', opens: 'home_shortcuts' }
   ] },
   { id: 'home_search', titleKey: 'home_search_title', instructionsKey: 'home_search_instructions', parent: 'home', items: [
     { id: 'query', titleKey: 'home_search_placeholder' },

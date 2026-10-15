@@ -54,6 +54,7 @@ export struct 设置页 {
   pathStack?: NavPathStack;
   openAiSettings: boolean = false;
   initialSectionId: string = '';
+  initialActionId: string = '';
   onManualSync: () => void = (): void => {};
   private readonly 牌组服务实例: 牌组服务 = new 牌组服务();
 
@@ -233,7 +234,7 @@ export struct 设置页 {
           backRequest: this.settingsBackRequest,
           activeSection: this.activeSection,
           openAiSettings: this.openAiSettings,
-          initialSectionId: this.initialSectionId,
+          initialSectionId: this.initialSectionId, initialActionId: this.initialActionId,
           当前主题模式: this.主题模式值,
           是否深色: this.是否深色(),
           当前颜色主题: this.颜色主题值,

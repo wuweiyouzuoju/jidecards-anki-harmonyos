@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
+import { stripTypeScriptTypes } from 'node:module';
 import { 应用尺寸 } from '../../entry/src/main/ets/utils/应用尺寸.ets';
 import { settingsHeaderItems } from '../../entry/src/main/ets/model/AppInterface.ts';
 
@@ -196,10 +197,21 @@ test('home menus use measured button bounds and the public anchored menu without
   }
 });
 
-test('regular settings entry always supplies a non-AI navigation parameter', () => {
-  const home = (read('entry/src/main/ets/pages/首页.ets') + read('entry/src/main/ets/backend/HomeDataRepository.ets'));
-  assert.match(home,
-    /private openSettings\(\):[\s\S]*?const params:\s*设置页参数\s*=\s*\{\s*openAiSettings:\s*false\s*\}[\s\S]*?name:\s*'SettingsPage',[\s\S]*?param:\s*params/);
+test('regular settings entry supplies non-AI navigation parameters and preserves keyboard destinations', () => {
+  const home = read('entry/src/main/ets/pages/首页.ets');
+  const start = home.indexOf('  private openSettings(');
+  const method = home.slice(start, home.indexOf('\n  }', start) + 4);
+  const Host = new Function(stripTypeScriptTypes('class Host {' + method + '}') + ';return Host;')();
+  const paths = [], events = [], host = Object.assign(new Host(), {
+    syncController: {cancel: () => events.push('cancel')}, 暂停主页官方公告检查: () => events.push('pause'),
+    返回主页后刷新: () => events.push('refresh'), 页面栈: {pushPath: value => paths.push(value)}
+  });
+  host.openSettings(); host.openSettings('data', 'check_database');
+  assert.deepEqual(paths.map(path => ({name: path.name, param: path.param})), [
+    {name: 'SettingsPage', param: {openAiSettings: false, sectionId: '', initialActionId: ''}},
+    {name: 'SettingsPage', param: {openAiSettings: false, sectionId: 'data', initialActionId: 'check_database'}}
+  ]);
+  paths[1].onPop(); assert.deepEqual(events, ['cancel','pause','cancel','pause','refresh']);
 });
 
 test('home shell keeps adaptive breakpoints and a virtualized deck list', () => {

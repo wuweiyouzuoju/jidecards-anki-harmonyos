@@ -275,6 +275,8 @@ struct 首页 {
   @State @Watch('homeActivityChanged') private collectionHistoryBusy: boolean = false;
   @State private collectionHistoryBackRequest: number = 0;
   @State @Watch('homeActivityChanged') private 显示更多菜单: boolean = false;
+  @State @Watch('homeActivityChanged') private keyboardHelpOpen: boolean = false;
+  private homeKeys: StudyKeyboardSession = new StudyKeyboardSession();
   @State @Watch('homeActivityChanged') private homeSearchOpen: boolean = false;
   @State @Watch('homeActivityChanged') private deckMenuId: string = '';
   @State private deckMenuPoint: WindowPoint | undefined = undefined;
@@ -666,7 +668,7 @@ struct 首页 {
       collectionReady: 后端会话.获取实例().是否就绪() && this.加载状态 !== 'loading' && this.加载状态 !== 'error',
       collectionBusy: this.collectionHistoryBusy || this.autoSyncCollectionBusy || this.syncController.isRefreshing() || this.刷新中 || this.deckDeletionBusy ||
         (this.transfer.phase !== 'idle') || this.创建牌组中 || this.deckMoveBusy || this.deckRenameBusy || this.filteredDeckBusy || this.deckReorderBusy || this.deckOptionsBusy || this.云端牌组忙碌,
-      dialogOpen: this.deckMenuId !== '' || this.collectionHistoryOpen || this.显示官方公告 || this.显示欢迎弹窗 || this.showIridescentGift || this.显示云端牌组弹窗 || this.transfer.visible ||
+      dialogOpen: this.keyboardHelpOpen || this.deckMenuId !== '' || this.collectionHistoryOpen || this.显示官方公告 || this.显示欢迎弹窗 || this.showIridescentGift || this.显示云端牌组弹窗 || this.transfer.visible ||
         this.显示牌组定制 || this.显示自定义学习 || this.显示过滤牌组面板 || this.显示牌组选项 ||
         this.显示创建牌组 || this.movingDeckId > 0 || this.renamingDeckId > 0 || this.显示主页操作 || this.显示更多菜单 || this.homeSearchOpen || this.显示节流奖励 ||
         this.显示卡片预览 || this.deckPreviewMenuOpen || this.autoSyncModal || this.fsrsPromptActive || this.nativeDialogOpen,
@@ -868,10 +870,10 @@ struct 首页 {
   }
 
   /** 先进入设置；依赖集合的分组在设置内部保护，独立内容不等待网络。 */
-  private openSettings(): void {
+  private openSettings(sectionId: string = '', initialActionId: string = ''): void {
     this.syncController.cancel();
     this.暂停主页官方公告检查();
-    const params: 设置页参数 = { openAiSettings: false };
+    const params: 设置页参数 = { openAiSettings: false, sectionId: sectionId, initialActionId: initialActionId };
     this.页面栈.pushPath({ name: 'SettingsPage', param: params,
       onPop: (): void => { this.返回主页后刷新(); } });
   }
@@ -1050,6 +1052,7 @@ struct 首页 {
       this.cloudBackRequest++;
       return true;
     }
+    if (this.keyboardHelpOpen) { this.keyboardHelpOpen = false; return true; }
     if (this.deckMenuId !== '') { this.deckMenuBackRequest++; return true; }
     if (this.homeSearchOpen) { this.homeSearchOpen = false; return true; }
     if (this.显示主页操作) { this.显示主页操作 = false; return true; }
@@ -1990,6 +1993,46 @@ struct 首页 {
   private readonly agentHostIdentity: string = 'home-' + Date.now();
 
   // 'StudyPage' / 'BrowserPage' / 'StatsPage' / 'AddNotePage' 字符串是 NavPathStack 跨页面寻址协议，保留英文。
+  private handleHomeKey(event: KeyEvent): boolean {
+    const fresh: boolean = this.homeKeys.update(event.keyCode, event.type === KeyType.Down);
+    if (event.type !== KeyType.Down || this.页面栈.size() !== 0) return false;
+    const chord: string = studyEventChord(event);
+    if (this.deckMenuId !== '' && chord === 'escape') {
+      if (fresh) this.deckMenuBackRequest++;
+      return true;
+    }
+    const activity: HomeActivityState = this.homeActivity();
+    const command: string = shortcutCommand(HOME_SHORTCUTS, chord,
+      !activity.foreground || !activity.collectionReady || activity.collectionBusy || activity.dialogOpen || activity.interactionBusy);
+    if (command === '') return false;
+    if (!fresh) return true;
+    if (command === 'add') this.打开添加笔记();
+    else if (command === 'browse') this.打开浏览页();
+    else if (command === 'sync') this.startSyncFromMenu();
+    else if (command === 'study') this.开始学习();
+    else if (command === 'stats') this.打开统计页();
+    else if (command === 'search') this.homeSearchOpen = true;
+    else if (command === 'create_deck') this.openCreateDeck('');
+    else if (command === 'filtered') this.打开创建过滤牌组();
+    else if (command === 'settings') this.openSettings();
+    else if (command === 'import') this.从选择器导入牌组();
+    else if (command === 'export') this.openSettings('data', 'export_collection');
+    else if (command === 'notetypes' || command === 'media' || command === 'check_database' || command === 'restore') this.openSettings('data', command);
+    else if (command === 'backup') {
+      const context = this.getUIContext().getHostContext();
+      if (context !== undefined) backupCoordinator.create(new LocalBackups(context.filesDir)).then((created: boolean): void => {
+        if (this.页面栈.size() === 0 && this.homeActivity().foreground) showToastSafely(this.getUIContext(), {
+          message: resourceText(this.getUIContext(), created ? $r('app.string.backup_management_created') : $r('app.string.backup_management_not_needed')) });
+      }).catch((error: Error): void => {
+        if (this.页面栈.size() === 0 && this.homeActivity().foreground) showToastSafely(this.getUIContext(), {
+          message: resourceText(this.getUIContext(), $r('app.string.backup_management_error'), error.message) });
+      });
+    } else if ((command === 'rename' || command === 'delete') && this.当前断点 !== 'xs' && this.已选中牌组()) {
+      this.handleDeckMenuAction(this.选中的牌组ID, command);
+    }
+    return true;
+  }
+
   @Builder
   private 页面映射(name: string, param: ESObject) {
     HomeDestinations(name, param, { pathStack: this.页面栈,
@@ -2151,6 +2194,7 @@ struct 首页 {
   @Builder
   private homeMoreMenu() {
       主页更多面板({ slideScope: this.homeMoreSlideScope,
+        onKeyboard: (): void => { this.显示更多菜单 = false; this.keyboardHelpOpen = true; },
         historyAvailable: this.homeActivity().collectionReady && !this.homeActivity().collectionBusy,
         onHistory: (): void => {
           if (this.homeActivity().collectionBusy || !this.homeActivity().collectionReady) return;
@@ -2266,6 +2310,9 @@ struct 首页 {
 
   @Builder
   private homeFeatures() {
+    if (this.keyboardHelpOpen) {
+      KeyboardShortcutHelp({ scope: 'home', shortcuts: HOME_SHORTCUTS, onClose: (): void => { this.keyboardHelpOpen = false; } })
+    }
     if (this.collectionHistoryOpen) {
       CollectionHistoryDialog({ backRequest: this.collectionHistoryBackRequest,
         onBusy: (busy: boolean): void => { this.collectionHistoryBusy = busy; },
@@ -2515,6 +2562,8 @@ struct 首页 {
       }
     }
     .width('100%').height('100%')
+    .onKeyPreIme((event: KeyEvent): boolean => this.handleHomeKey(event))
+    .focusable(true).defaultFocus(true)
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
   }
 }
