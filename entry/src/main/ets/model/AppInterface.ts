@@ -490,7 +490,11 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
   ] },
   { id: 'edit_note_form', titleKey: 'note_editor_edit_title', instructionsKey: 'note_editor_format_action', parent: 'edit_note', items: [
     { id: 'back', titleKey: 'study_back', iconKey: 'ic_common_arrow_left' }, { id: 'save', titleKey: 'browser_detail_save' },
-    { id: 'tags', titleKey: 'browser_detail_tags', opens: 'tag_picker' }
+    { id: 'tags', titleKey: 'browser_detail_tags', opens: 'tag_picker' },
+    { id: 'deck', titleKey: 'add_note_deck' },
+    { id: 'notetype', titleKey: 'add_note_notetype' },
+    { id: 'templates', titleKey: 'notetype_editor_templates', opens: 'notetype_editor' },
+    { id: 'keyboard', titleKey: 'keyboard_shortcuts_title', opens: 'editor_shortcuts' }
   ] },
   { id: 'note_visual_manage', titleKey: 'note_visual_manage', instructionsKey: 'note_visual_instructions', parent: '', items: [
     { id: 'close', titleKey: 'cancel' }, { id: 'apply', titleKey: 'done' },

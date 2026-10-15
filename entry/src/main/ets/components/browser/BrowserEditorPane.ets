@@ -81,6 +81,7 @@ export struct BrowserEditorPane {
           errorMessage: this.editor.error === '' ? '' : resourceText(this.getUIContext(), $r('app.string.browser_detail_save_error')),
           onCancel: (): void => { this.onClose(); }, onCloseCancelled: (): void => { this.onCloseCancelled(); },
           onPreview: (input: NoteDraftPreviewInput, onReturn: () => void): boolean => this.openPreview(input, onReturn),
+          onReload: (): Promise<NoteEditorState | null> => this.session.refresh((): boolean => this.active),
           onSave: (fields: string[], tags: string[], images: NoteFieldImage[], audios: NoteFieldAudio[]): Promise<boolean> => this.save(fields, tags, images, audios) })
       } else {
         NoteEditorHeader({ title: $r('app.string.note_editor_edit_title'), actionEnabled: false,

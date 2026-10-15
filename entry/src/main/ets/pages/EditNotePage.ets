@@ -131,6 +131,7 @@ export struct EditNotePage {
           note: this.editor.note, initialFieldValues: this.editor.note.fields, initialTags: this.editor.note.tags.join(' '),
           onCancel: (): void => { if (this.active) this.pathStack.pop(); },
           onPreview: (input: NoteDraftPreviewInput, onReturn: () => void): boolean => this.openPreview(input, onReturn),
+          onReload: (): Promise<NoteEditorState | null> => this.session.refresh((): boolean => this.active),
           onSave: (fields: string[], tags: string[], images: NoteFieldImage[], audios: NoteFieldAudio[]): Promise<boolean> =>
             this.save(fields, tags, images, audios) })
       } else {
