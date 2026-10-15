@@ -31,6 +31,8 @@ export interface StudySessionBackend {
   historyStatus?(): Promise<UndoStatus>;
   undoExpected?(status: UndoStatus): Promise<void>;
   undo(): Promise<void>;
+  redo?(): Promise<void>;
+  buryNote?(noteId: number, mode: number): Promise<void>;
   congrats(): Promise<CongratsInfo>;
   choiceQuestion?(noteId: number): Promise<JideChoiceQuestion | null>;
   marking?(cardId: number): Promise<CardMarkingState>;
@@ -295,6 +297,20 @@ export class StudySessionController {
 
   undo(): Promise<void> {
     return this.commitChange((): Promise<void> => this.backend.undo());
+  }
+
+  redo(): Promise<void> {
+    return this.commitChange(async (): Promise<void> => {
+      if (this.backend.redo === undefined) throw new Error('Redo unavailable');
+      await this.backend.redo();
+    });
+  }
+
+  buryNote(noteId: number, mode: number): Promise<void> {
+    return this.commitChange(async (): Promise<void> => {
+      if (this.backend.buryNote === undefined) throw new Error('Note bury unavailable');
+      await this.backend.buryNote(noteId, mode);
+    });
   }
 
   setCardFlag(cardId: number, flag: number): Promise<void> {

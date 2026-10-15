@@ -60,6 +60,11 @@ export class AnkiStudySessionBackend implements StudySessionBackend {
 
   async updateNote(note: EditableNote): Promise<void> { await this.notes.更新笔记([note], false); }
   async buryCard(cardId: number, mode: number): Promise<void> { await this.scheduler.埋藏或暂停卡片(cardId, mode); }
+  async buryNote(noteId: number, mode: number): Promise<void> { await this.scheduler.批量埋藏或暂停笔记([noteId], mode); }
+  async redo(): Promise<void> {
+    const status: UndoStatus = await this.collection.获取撤销状态();
+    if (status.redo !== '') await new AnkiCollectionHistoryBackend().apply(true, status);
+  }
   async removeCard(cardId: number): Promise<void> { await this.cards.删除卡片([cardId]); }
   async unburyDeck(deckId: number): Promise<void> { await this.scheduler.按牌组恢复埋藏(deckId, UNBURY_MODE_ALL); }
   async canUndo(): Promise<boolean> { return (await this.collection.获取撤销状态()).undo.length > 0; }

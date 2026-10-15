@@ -387,3 +387,12 @@ test('note media preparation waits for collection and retains ownership through 
     assert.equal(scheduler.canSync(), true); assert.equal(scheduler.hasPending(), failure === 'none');
   }
 });
+
+
+test('note bury and redo use collection ownership, survive disposal once accepted, and notify sync only on success',async()=>{
+ const h=harness(),gate=deferred();h.backend.buryNote=async(id,mode)=>{h.calls.push(['note',id,mode]);await gate.promise;};
+ const pending=h.session.buryNote(123,2);await turn();assert.deepEqual(h.calls,[['note',123,2]]);assert.equal(h.scheduler.canSync(),false);
+ h.session.dispose();gate.resolve();await pending;assert.equal(h.scheduler.canSync(),true);assert.equal(h.scheduler.hasPending(),true);
+ const redo=harness();redo.backend.redo=async()=>{redo.calls.push('redo');};await redo.session.redo();assert.deepEqual(redo.calls,['redo']);
+ redo.backend.redo=async()=>{throw Error('stale undo');};await assert.rejects(redo.session.redo(),/stale undo/);assert.equal(redo.scheduler.canSync(),false,'active study continues owning sync');
+});
