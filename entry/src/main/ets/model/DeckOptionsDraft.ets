@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { DeckConfig } from '../proto/messages/DeckConfigMessages';
+import { encodeDeckConfig } from '../proto/messages/DeckConfigMessages';
+import type { DeckOptionsPresetEntry } from './DeckOptionsPresets';
 import { copyDeckConfig } from './DeckConfigSave';
 import type { DeckConfigRequestOptions } from './DeckConfigSave';
 import { 牌组配置表单 } from './牌组配置表单';
@@ -22,4 +24,13 @@ export function prepareDeckOptionsDraft(original: DeckConfig, form: 牌组配置
       errorKey: issues.length > 0 ? issues[0].消息键 : 'deck_learn_steps_validation_error' };
   }
   return { config: draft, options: options.转换为请求字段(), shared: options.applyToSharedDecks, errorKey: '' };
+}
+
+/** 比较实际可保存内容，恢复原值后可直接退出；无效草稿仍须确认放弃。 */
+export function deckOptionsDraftFingerprint(draft: DeckOptionsDraft, presets: DeckOptionsPresetEntry[],
+  presetKey: string, batchDraft: boolean): string {
+  if (draft.config === null || draft.options === null) return '';
+  return JSON.stringify(draft.options) + '|' + String(draft.shared) + '|' + presetKey + '|' + String(batchDraft) + '|' +
+    Array.from(encodeDeckConfig(draft.config)).join(',') + '|' + presets.map((entry: DeckOptionsPresetEntry): string =>
+      entry.key + ':' + Array.from(encodeDeckConfig(entry.config)).join(',')).join('|');
 }

@@ -1,5 +1,7 @@
 {
   "color": [
+    { "name": "device_link_qr_foreground", "value": "#000000" },
+    { "name": "device_link_qr_background", "value": "#FFFFFF" },
     { "name": "study_again_background", "value": "#FFCDD2" },
     { "name": "study_again_text", "value": "#B71C1C" },
     { "name": "study_hard_background", "value": "#FFE0B2" },

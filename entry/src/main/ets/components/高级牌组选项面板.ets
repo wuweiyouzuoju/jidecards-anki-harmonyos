@@ -17,6 +17,10 @@ import { appInterface } from '../backend/AppInterfaceService';
 import type { AppInterfaceControl, AppInterfaceValue } from '../model/AppInterface';
 import { namedResourceText } from '../utils/UiFeedback';
 import { 应用尺寸 } from '../utils/应用尺寸';
+import { 设置分组卡片 } from './settings/设置分组卡片';
+import { PAGE_COMPACT_LAYOUT_KEY } from '../model/AppLayoutState';
+import { SettingsToggleRow } from './common/SettingsToggleRow';
+import { SurfaceBorder } from '../utils/SurfaceBorder';
 
 /** 完整模式内嵌所有官方分组；与简洁模式共用同一草稿和唯一保存入口。 */
 @Component
@@ -25,6 +29,8 @@ export struct 高级牌组选项面板 {
   @ObjectLink @Watch('publishInterface') form: 牌组配置表单;
   @ObjectLink @Watch('publishInterface') options: 牌组选项编辑;
   @Prop @Watch('publishInterface') busy: boolean = false;
+  @Prop isDark: boolean = false;
+  @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrow: boolean = false;
   @Prop defaultValues: DeckOptionDefaultValue[] = [];
   @Prop customScheduling: string = '';
   @Prop fsrsState: DeckOptionsFsrsState = new DeckOptionsFsrsState();
@@ -32,6 +38,7 @@ export struct 高级牌组选项面板 {
   onOptimize: (all: boolean, retry: boolean) => void = (): void => {};
   onSimulate: (days: number) => void = (): void => {};
   onEvaluate: () => void = (): void => {};
+  onHelp: (title: string, body: string) => void = (): void => {};
   @State @Watch('publishInterface') private newScope: number = 0;
   @State @Watch('publishInterface') private reviewScope: number = 0;
   @State @Watch('publishInterface') private retentionScope: number = 0;
@@ -173,7 +180,14 @@ export struct 高级牌组选项面板 {
         onChange: (value: string): void => { if (field.key === 'newPerDay') this.newScope = Number(value);
           else if (field.key === 'reviewsPerDay') this.reviewScope = Number(value); else this.retentionScope = Number(value); } })
     }
-    if (field.kind === 'week') {
+    if (field.kind === 'boolean' || field.kind === 'global') {
+      SettingsToggleRow({ title: this.text(field.titleKey), isOn: this.booleanValue(field.key),
+        isInteractive: !this.busy, isHelpEnabled: !this.busy, isDark: this.isDark, showHelp: true,
+        onHelp: (): void => { this.onHelp(this.text(field.titleKey), this.text(field.helpKey)); },
+        onChange: (value: boolean): void => { this.change(field, String(value)); } })
+        .padding({ left: 10, right: 10 })
+      Divider().color(SurfaceBorder.color()).strokeWidth(0.5)
+    } else if (field.kind === 'week') {
       ForEach([0, 1, 2, 3, 4, 5, 6], (day: number) => {
         DeckOptionField({ title: this.text('deck_weekday_' + String(day)), help: this.text(field.helpKey), value: this.dayValue(day),
           choices: this.dayChoices(), busy: this.busy, defaultValue: '1', onChange: (value: string): void => { this.changeDay(day, value); } })
@@ -192,21 +206,28 @@ export struct 高级牌组选项面板 {
       }
     }
   }
+  @Builder
+  private groupContent(group: DeckOptionGroup) {
+    Column() {
+      Text(this.text(group.titleKey)).fontSize(应用尺寸.字号_正文).fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.text_primary')).width('100%')
+        .padding({ top: 应用尺寸.间距_12, bottom: 应用尺寸.间距_12 })
+      ForEach(this.fields(group), (field: DeckOptionDefinition) => { this.option(field) }, (field: DeckOptionDefinition): string => field.key)
+      if (group.id === 'fsrs' && this.options.是否启用FSRS) {
+        if (this.presetAssignmentsChanged) {
+          Text(this.text('deck_preset_save_before_optimize')).fontSize(14).fontColor($r('app.color.text_secondary')).width('100%')
+        }
+        FsrsTools({ state: this.fsrsState, busy: this.busy || this.presetAssignmentsChanged, onOptimize: this.onOptimize, onSimulate: this.onSimulate,
+          onEvaluate: this.onEvaluate, onRetention: (value: string): void => { if (!this.busy) this.form.目标保留率文本 = value; } })
+      }
+    }.width('100%')
+  }
+
   build() {
-    Column({ space: 应用尺寸.间距_12 * 2 }) {
+    Column({ space: 应用尺寸.页面分组间距(this.narrow) }) {
       ForEach(DECK_OPTION_GROUPS, (group: DeckOptionGroup) => {
-        Column({ space: 应用尺寸.间距_12 }) {
-          Text(this.text(group.titleKey)).fontSize(应用尺寸.字号_正文).fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.text_primary')).width('100%')
-          ForEach(this.fields(group), (field: DeckOptionDefinition) => { this.option(field) }, (field: DeckOptionDefinition): string => field.key)
-          if (group.id === 'fsrs' && this.options.是否启用FSRS) {
-            if (this.presetAssignmentsChanged) {
-              Text(this.text('deck_preset_save_before_optimize')).fontSize(14).fontColor($r('app.color.text_secondary')).width('100%')
-            }
-            FsrsTools({ state: this.fsrsState, busy: this.busy || this.presetAssignmentsChanged, onOptimize: this.onOptimize, onSimulate: this.onSimulate,
-              onEvaluate: this.onEvaluate, onRetention: (value: string): void => { if (!this.busy) this.form.目标保留率文本 = value; } })
-          }
-        }.width('100%')
+        设置分组卡片({ showHeader: false, 是否深色: this.isDark,
+          内容: () => { this.groupContent(group); } })
       }, (group: DeckOptionGroup): string => group.id)
     }.width('100%')
   }

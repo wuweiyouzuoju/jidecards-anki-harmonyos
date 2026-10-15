@@ -1,8 +1,8 @@
-import { SurfaceTransition } from '../utils/SurfaceTransition';
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { SurfaceBorder } from '../utils/SurfaceBorder';
-import { DialogBackdrop } from './common/DialogBackdrop';
 import { DeckOptionRow } from './home/DeckOptionRow';
+import { 设置分组卡片 } from './settings/设置分组卡片';
+import { PAGE_COMPACT_LAYOUT_KEY } from '../model/AppLayoutState';
+import { WINDOW_SAFE_TOP_KEY, WINDOW_SAFE_BOTTOM_KEY, WINDOW_SAFE_LEFT_KEY, WINDOW_SAFE_RIGHT_KEY } from '../model/WindowSafeLayout';
 import { localizedNamedResourceText, namedResourceText, resourceText } from '../utils/UiFeedback';
 import { DeckOptionField, DeckOptionChoice } from './home/DeckOptionField';
 import { validateDeckOptionText } from '../model/DeckOptionValidation';
@@ -10,8 +10,6 @@ import { FsrsTools } from './home/FsrsTools';
 import type { DeckOptionsPresetEntry } from '../model/DeckOptionsPresets';
 import type { DeckConfigSettings } from '../proto/messages/DeckConfigMessages';
 import { DeckOptionsFsrsState } from '../model/home/DeckOptionsSession';
-import { ThemeTextSpans, themeTextKey } from './common/ThemeText';
-import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
 import { DialogHeader } from './common/DialogHeader';
 import { appInterface } from '../backend/AppInterfaceService';
@@ -22,7 +20,7 @@ import type { AppInterfaceControl } from '../model/AppInterface';
 // @名称 牌组选项面板
 //
 // @作用
-// 牌组选项弹层：简洁模式保留常用四项，完整模式显示 Anki 26.05 的全部分组。
+// 独立牌组选项页：简洁模式保留常用四项，完整模式显示 Anki 26.05 的全部分组。
 // form/options 为共享草稿，字段确认不直接写入 Core，主面板统一保存。
 //
 // @输入
@@ -68,7 +66,6 @@ export struct 牌组选项面板 {
     if (!this.busy || this.computing) this.onCancel();
   }
 
-  @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
   @Prop deckName: string = '';
   @ObjectLink @Watch('formChanged') form: 牌组配置表单;
@@ -94,6 +91,13 @@ export struct 牌组选项面板 {
   @State private helpTitle: ResourceStr = $r('app.string.deck_learn_steps');
   @State private helpBody: ResourceStr = $r('app.string.deck_learn_steps_help');
   @State @Watch('publishInterface') private submitError: string = '';
+  @State @Watch('publishInterface') private showPresetManagement: boolean = false;
+  @StorageProp('状态栏高度') private statusBarHeight: number = 0;
+  @StorageProp(WINDOW_SAFE_TOP_KEY) private safeTop: number = 0;
+  @StorageProp(WINDOW_SAFE_BOTTOM_KEY) private safeBottom: number = 0;
+  @StorageProp(WINDOW_SAFE_LEFT_KEY) private safeLeft: number = 0;
+  @StorageProp(WINDOW_SAFE_RIGHT_KEY) private safeRight: number = 0;
+  @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrow: boolean = false;
   // 简洁模式保留常用 4 项；完整模式按 Anki 的分组、字段与显隐展示。
   @StorageLink(简洁模式AppStorage键) @Watch('publishInterface') private 简洁模式: boolean = true;
   @StorageProp(颜色键.动作主色) private 动作主色: string = '#2F5FD0';
@@ -123,13 +127,14 @@ export struct 牌组选项面板 {
     return visibleInterfaceItems('deck_options_form',
       { simple: this.简洁模式, agent: false, cloudDeck: false, themeHasTextures: false })
       .filter((item): boolean => item.condition !== 'simple_mode' || this.简洁模式)
+      .filter((item): boolean => !['rename_preset', 'create_preset', 'clone_preset', 'remove_preset'].includes(item.id) || this.showPresetManagement)
       .map((item): AppInterfaceControl => {
         const key: string = item.id === 'save' && (this.busy || this.computing) ?
           (this.computing ? 'deck_fsrs_computing' : 'deck_options_saving') : item.titleKey;
         return { id: item.id, titleKey: key, title: namedResourceText(this.getUIContext(), key),
           enabled: !this.showHelp && (item.id === 'remove_preset' && this.defaultPresetSelected() ? false : item.id === 'save' ? this.canSubmit() :
             item.id === 'cancel' ? !this.busy || this.computing : !this.busy),
-          selected: false };
+          selected: item.id === 'manage_presets' && this.showPresetManagement };
       });
   }
 
@@ -145,6 +150,8 @@ export struct 牌组选项面板 {
       values: [{ id: 'simple_mode', value: String(this.简洁模式) },
         { id: 'has_error', value: String(this.errorMessage !== '' || this.submitError !== '') },
         { id: 'save_behavior', value: 'manual' },
+        { id: 'presentation', value: 'page' },
+        { id: 'preset_management_expanded', value: String(this.showPresetManagement) },
         { id: 'save_scope', value: this.options.applyToSharedDecks ? 'preset' : 'deck' },
         { id: 'preset_use_count', value: String(this.options.sharedDeckCount) },
         { id: 'nested_overlay_open', value: String(this.showHelp) }] });
@@ -216,6 +223,7 @@ export struct 牌组选项面板 {
   // 通过外部回调引发后端写入。
   // ========================================================
   private submit(): void {
+    if (this.busy || this.showHelp) return;
     const 问题列表: 校验问题[] = this.form.校验().concat(this.options.校验());
     if (问题列表.length > 0) {
       this.submitError = this.字段错误文本(问题列表[0]);
@@ -395,17 +403,14 @@ export struct 牌组选项面板 {
   }
 
   @Builder
-  private modeSectionTitle(title: Resource) {
-    Text() {
-      ForEach([themeTextKey(title, this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(title, this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey)
-    }.fontSize(应用尺寸.字号_正文_小).fontWeight(FontWeight.Medium)
-      .fontColor($r('app.color.text_secondary')).width('100%')
+  private commonOptions() {
+    设置分组卡片({ 标题: $r('app.string.settings_simple_mode_simple'), 是否深色: this.isDark,
+      内容: () => { this.commonFields(); } })
   }
 
   @Builder
-  private commonOptions() {
-    Column({ space: 应用尺寸.间距_12 }) {
-      this.modeSectionTitle($r('app.string.settings_simple_mode_simple'))
+  private commonFields() {
+    Column() {
       this.labeledInput($r('app.string.deck_newPerDay_label'), this.form.每日新卡数文本, (value: string) => { if (this.form !== null) this.form.每日新卡数文本 = value; }, $r('app.string.deck_newPerDay_help'))
       this.labeledInput($r('app.string.deck_reviewsPerDay_label'), this.form.每日复习数文本, (value: string) => { if (this.form !== null) this.form.每日复习数文本 = value; }, $r('app.string.deck_reviewsPerDay_help'))
       this.labeledInput($r('app.string.deck_learnSteps_label'), this.form.学习步骤文本, (value: string) => { if (this.form !== null) this.form.学习步骤文本 = value; }, $r('app.string.deck_learnSteps_help'))
@@ -431,63 +436,81 @@ export struct 牌组选项面板 {
     this.options.applyToSharedDecks = value === 'preset';
     this.publishInterface();
   }
+  private togglePresetManagement(): void {
+    if (this.busy || this.showHelp) return;
+    this.showPresetManagement = !this.showPresetManagement;
+  }
   @Builder
   private presetOptions() {
-    Column({ space: 应用尺寸.间距_12 }) {
+    Column() {
       DeckOptionField({ title: $r('app.string.deck_preset_label'), help: $r('app.string.deck_preset_help'), value: this.presetKey,
         choices: this.presetChoices(), busy: this.busy, onChange: (value: string): void => this.onPreset('select', value) })
       DeckOptionField({ title: this.interfaceLabel('save_scope'), help: $r('app.string.deck_apply_shared_help'),
         value: this.options.applyToSharedDecks ? 'preset' : 'deck', busy: this.busy,
-        choices: [{ label: $r('app.string.deck_scope_deck'), value: 'deck' }, { label: $r('app.string.deck_scope_preset'), value: 'preset' }],
+        choices: [{ label: $r('app.string.deck_scope_deck'), value: 'deck' }, { label: $r('app.string.deck_save_scope_preset'), value: 'preset' }],
         onChange: (value: string): void => this.changeSaveScope(value) })
-      Text(this.options.applyToSharedDecks ? $r('app.string.deck_preset_scope_hint', this.options.sharedDeckCount) :
-        $r('app.string.deck_save_scope_current')).fontSize(14).fontColor($r('app.color.text_secondary')).width('100%')
-      DeckOptionField({ title: $r('app.string.deck_preset_rename'), help: $r('app.string.deck_preset_help'), value: this.presetName(),
-        busy: this.busy, validate: (value: string): string => this.validatePresetName(value), onChange: (value: string): void => this.onPreset('rename', value) })
-      DeckOptionField({ title: $r('app.string.deck_preset_create'), help: $r('app.string.deck_preset_help'), value: '',
-        busy: this.busy, validate: (value: string): string => this.validatePresetName(value), onChange: (value: string): void => this.onPreset('create', value) })
-      DeckOptionField({ title: $r('app.string.deck_preset_clone'), help: $r('app.string.deck_preset_help'), value: '',
-        busy: this.busy, validate: (value: string): string => this.validatePresetName(value), onChange: (value: string): void => this.onPreset('clone', value) })
-      DeckOptionField({ title: $r('app.string.deck_preset_remove'), help: $r('app.string.deck_preset_remove_help'), value: 'keep',
-        choices: [{ label: $r('app.string.cancel'), value: 'keep' }, { label: $r('app.string.deck_preset_remove_confirm'), value: 'remove' }],
-        busy: this.busy || this.defaultPresetSelected(), onChange: (value: string): void => { if (value === 'remove') this.onPreset('remove', ''); } })
+      DeckOptionRow({ title: this.interfaceLabel('manage_presets'), busy: this.busy, isExpanded: this.showPresetManagement,
+        onOpen: (): void => { this.togglePresetManagement(); } })
+      if (this.showPresetManagement) {
+        DeckOptionField({ title: $r('app.string.deck_preset_rename'), help: $r('app.string.deck_preset_help'), value: this.presetName(),
+          busy: this.busy, validate: (value: string): string => this.validatePresetName(value), onChange: (value: string): void => this.onPreset('rename', value) })
+        DeckOptionField({ title: $r('app.string.deck_preset_create'), help: $r('app.string.deck_preset_help'), value: '',
+          busy: this.busy, validate: (value: string): string => this.validatePresetName(value), onChange: (value: string): void => this.onPreset('create', value) })
+        DeckOptionField({ title: $r('app.string.deck_preset_clone'), help: $r('app.string.deck_preset_help'), value: '',
+          busy: this.busy, validate: (value: string): string => this.validatePresetName(value), onChange: (value: string): void => this.onPreset('clone', value) })
+        DeckOptionField({ title: $r('app.string.deck_preset_remove'), help: $r('app.string.deck_preset_remove_help'), value: 'keep',
+          choices: [{ label: $r('app.string.cancel'), value: 'keep' }, { label: $r('app.string.deck_preset_remove_confirm'), value: 'remove' }],
+          busy: this.busy || this.defaultPresetSelected(), onChange: (value: string): void => { if (value === 'remove') this.onPreset('remove', ''); } })
+      }
       DeckOptionField({ title: $r('app.string.deck_save_mode_label'), help: $r('app.string.deck_save_mode_help'), value: String(this.options.保存模式), busy: this.busy,
         choices: this.saveChoices(), onChange: (value: string): void => { this.options.保存模式 = Number(value); } })
     }.width('100%')
   }
   @Builder
   private experimentalOptions() {
-    Column({ space: 应用尺寸.间距_12 * 2 }) {
-      this.modeSectionTitle($r('app.string.settings_simple_mode_full'))
-      this.presetOptions()
+    Column({ space: 应用尺寸.页面分组间距(this.narrow) }) {
+      设置分组卡片({ 标题: $r('app.string.deck_preset_label'), 是否深色: this.isDark,
+        内容: () => { this.presetOptions(); } })
       高级牌组选项面板({ form: this.form, options: this.options, busy: this.busy, defaultValues: this.defaultValues,
+        isDark: this.isDark,
         customScheduling: this.customScheduling, fsrsState: this.fsrsState, presetAssignmentsChanged: this.presetAssignmentsChanged,
+        onHelp: (title: string, body: string): void => { this.openHelp(title, body); },
         onOptimize: this.onOptimize, onSimulate: this.onSimulate, onEvaluate: this.onEvaluate })
     }.width('100%')
   }
 
   build() {
     Stack() {
-      DialogBackdrop()
-        .onClick(() => { if (!this.busy || this.computing) this.onCancel(); })
-        .transition(SurfaceTransition.backdrop())
-
-      Column({ space: 应用尺寸.间距_12 }) {
-        DialogHeader({
-          title: $r('app.string.deck_options_title'),
-          actionLabel: this.interfaceLabel('save'),
-          actionEnabled: this.canSubmit(),
-          closeLabel: this.interfaceLabel('cancel'),
-          closeEnabled: !this.busy || this.computing,
-          showHelp: true,
-          helpEnabled: !this.busy,
-          onClose: () => this.onCancel(),
-          onHelp: () => this.openScopeHelp(),
-          onAction: () => this.submit()
-        })
+      Column() {
+        Column() {
+          DialogHeader({
+            title: $r('app.string.deck_options_title'),
+            isPageToolbar: true, showDivider: false,
+            actionLabel: this.interfaceLabel('save'),
+            actionEnabled: this.canSubmit(),
+            closeLabel: this.interfaceLabel('cancel'),
+            closeIcon: $r('app.media.ic_common_arrow_left'),
+            closeEnabled: !this.busy || this.computing,
+            showHelp: true,
+            helpEnabled: !this.busy,
+            onClose: () => this.handleBackRequest(),
+            onHelp: () => this.openScopeHelp(),
+            onAction: () => this.submit()
+          })
+        }.width('100%').padding({ left: this.safeLeft + 应用尺寸.页面内边距_水平,
+          right: this.safeRight + 应用尺寸.页面内边距_水平,
+          top: 应用尺寸.pageToolbarTop(this.statusBarHeight, this.narrow, this.safeTop) })
         Scroll() {
-          // 区域之间只由此处贡献 24vp；区域内的选项间距保持 12vp。
-          Column({ space: 应用尺寸.间距_12 * 2 }) {
+          Column({ space: 应用尺寸.页面分组间距(this.narrow) }) {
+            Column({ space: 应用尺寸.间距_8 }) {
+              Text(this.deckName).fontSize(应用尺寸.字号_卡片标题).fontWeight(FontWeight.Medium)
+                .fontColor($r('app.color.text_primary')).width('100%')
+              if (this.简洁模式) {
+                Text($r('app.string.deck_save_scope_summary', this.resolveText(this.options.applyToSharedDecks ?
+                  $r('app.string.deck_save_scope_preset') : $r('app.string.deck_scope_deck'))))
+                  .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_secondary')).width('100%')
+              }
+            }.width('100%').padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
             if (this.form !== null) {
               if (this.简洁模式) {
                 this.commonOptions()
@@ -495,22 +518,19 @@ export struct 牌组选项面板 {
                 this.experimentalOptions()
               }
             }
-          }.width('100%')
-        }.constraintSize({ maxHeight: '60%' }).width('100%').scrollBar(BarState.Auto).edgeEffect(EdgeEffect.Spring)
+          }.width('100%').constraintSize({ maxWidth: 应用尺寸.内容最大宽度 })
+            .padding({ top: 应用尺寸.页面内容顶部间距(this.narrow),
+              bottom: (this.errorMessage === '' && this.submitError === '' ? this.safeBottom : 0) + 应用尺寸.页面底部间距(this.narrow) })
+        }.layoutWeight(1).width('100%').padding({ left: this.safeLeft + 应用尺寸.页面内边距_水平,
+          right: this.safeRight + 应用尺寸.页面内边距_水平 }).scrollBar(BarState.Auto).edgeEffect(EdgeEffect.Spring)
 
-        if (this.errorMessage !== '' || this.submitError !== '') Text(this.errorMessage !== '' ? this.errorMessage : this.submitError).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.error_text')).width('100%')
-
-      }
-      .width('88%')
-      .constraintSize({ maxWidth: 480, maxHeight: '88%' })
-      .padding(应用尺寸.卡片内边距)
-      .backgroundColor($r('app.color.surface_card'))
-      .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
-      .onClick(() => {
-        // 阻断点击穿透到遮罩
-      })
-      // 过渡仅动 opacity/translate/scale 合成属性，不触发布局（思路参考：华为官方 TransitionEffect 示例）
-      .transition(SurfaceTransition.dialog())
+        if (this.errorMessage !== '' || this.submitError !== '') {
+          Text(this.errorMessage !== '' ? this.errorMessage : this.submitError).fontSize(应用尺寸.字号_正文)
+            .fontColor($r('app.color.error_text')).width('100%')
+            .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平,
+              top: 应用尺寸.间距_8, bottom: this.safeBottom + 应用尺寸.页面底部间距(this.narrow) })
+        }
+      }.width('100%').height('100%')
 
       if (this.showHelp) 字段帮助面板({ 标题: this.helpTitle, 正文: this.helpBody, onClose: () => { this.showHelp = false; } })
     }

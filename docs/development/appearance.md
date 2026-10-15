@@ -167,7 +167,7 @@
 
 ⓘ 帮助统一通过 `HelpLabel` 紧随其解释的标题，开关和选择器在右侧；`HelpButton` 的18vp绘制/布局尺寸与44×44vp触摸、鼠标热区通过 `HelpLayout` 分开定义，热区不得增加标题占位体积。不能用 `Blank` 或标题 `layoutWeight` 把帮助推到整行末尾，也不能把文字和帮助整组居中；HelpLabel 仅标题收缩/居中，按钮绝对定位于文字右侧。浏览卡片的“查看卡片信息”是独立记录动作，保留行尾位置但共用按钮。说明弹窗复用 `字段帮助面板`，规范、覆盖入口及设备验收见 [应用内帮助](in-app-help.md#帮助入口与弹窗规范)。
 
-牌组选项的四个常用字段、实验版“高级设置”入口和高级页分类入口共用 `components/home/DeckOptionRow.ets` 的整行外观：15fp标题、48vp最小行高、相同内边距、右箭头及分隔线，透明行背景。导航入口不伪造当前值；`DeckOptionField` 继续独立负责编辑弹窗、校验与草稿更新，主面板统一保存。简洁版仍隐藏高级入口。此前高级入口单独使用13fp、44vp灰底圆角按钮，箭头复用检查未覆盖整行差异；`deck-option-dialog.test.mjs` 现在检查这三个入口共用行组件，禁止入口局部覆盖外观。
+牌组选项的简洁版四项、完整模式数值/枚举字段及“管理预设”共用 `components/home/DeckOptionRow.ets`：15fp标题、48vp最小行高、统一内边距、右箭头及分隔线；管理预设展开时旋转同一箭头。布尔项复用 `SettingsToggleRow` 的48vp行高和帮助，左右各10vp对齐字段行；外层卡片仍独占16vp内边距。`DeckOptionField` 独立负责单项编辑、校验与草稿更新，主页面统一保存。完整模式直接显示各分组卡片，简洁版只显示四项。顶栏复用 `DialogHeader.isPageToolbar`，移除弹窗内部的底部留白；按钮下缘到首块内容的12vp/8vp仅由内容顶部 padding 贡献一次，水平外缘为系统安全区+12vp，底部为安全区+12vp/8vp，超宽内容上限沿用公共尺寸。普通弹窗默认几何不变。回归 `deck-option-dialog.test.mjs`、`deck-options-page.test.mjs` 与 `ui-shell-controls.test.mjs`；设备视觉验收独立记录。
 
 新增设置弹窗先复用 `DialogHeader`、`应用尺寸`、`surface_card` 和主题颜色。存在二级界面时，先明确返回目标、待选值、确认写入点和取消语义，不能把连续系统菜单当作等价实现。参考 `StudyAutoAdvanceDialog.ets` 与 [学习与媒体](study-media.md#弹窗操作)：主界面展示名称/当前值/箭头，二级展示选中态；自动前进按用户要求把左返回、右确定放底部。新增交互需有直接行为回归和实际 HAP 构建，未做真机视觉验收应明确记录。
 
