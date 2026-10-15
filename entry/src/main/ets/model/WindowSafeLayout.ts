@@ -6,6 +6,9 @@ export const WINDOW_SAFE_RIGHT_KEY: string = 'windowSafeRight';
 export const WINDOW_HEIGHT_KEY: string = 'windowHeightVp';
 export const WINDOW_KEYBOARD_TOP_KEY: string = 'windowKeyboardTopVp';
 
+/** 当前应用窗口坐标，单位 vp；仅在实际菜单宿主边界转换为局部坐标。 */
+export interface WindowPoint { x: number; y: number; }
+
 export function keyboardViewportHeight(height: number, top: number, keyboardTop: number): number {
   return keyboardTop <= 0 ? height : Math.min(height, Math.max(0, keyboardTop - top));
 }

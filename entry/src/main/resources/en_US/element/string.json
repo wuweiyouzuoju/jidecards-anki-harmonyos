@@ -2640,7 +2640,7 @@
     {"name":"browser_search_negate","value":"Exclude this condition"},
     {"name":"browser_search_apply","value":"Apply search condition"},
     {"name":"browser_shortcuts","value":"Keyboard shortcuts"},
-    {"name":"browser_shortcuts_hint","value":"Shortcuts apply to the browser list. Inputs and editors retain their own shortcuts. Shift-click or long-press during selection selects a range. Arrow keys move, Shift+arrows extend, Space toggles the current item. Ctrl+0–7 sets a flag."},
+    {"name":"browser_shortcuts_hint","value":"Shortcuts apply to the browser list. Inputs and editors retain their own shortcuts. Right-click or long-press enters selection; during selection, right-click, long-press or Shift-click extends a range. Arrows move, Shift+arrows extend, Space toggles the current item. Ctrl+0–7 sets a flag."},
     {"name":"browser_edit_fields","value":"Edit fields"},
     {"name":"browser_card_info_title","value":"Card details"},
     {"name":"browser_reposition_scope","value":"Eligible: %d; unsupported: %d; current positions: %d–%d"},
@@ -2649,7 +2649,7 @@
     {"name":"browser_find_all_fields","value":"All fields"},
     {"name":"browser_field_names_error","value":"Could not load field names. Retry."},
     {"name":"browser_editor_close","value":"Close editor"},
-    {"name":"browser_preferences_instructions","value":"Cards or notes, status and sort share one row below search. All three use a selection dialog: confirm with the top-right check button or close to discard the draft. Sort fields appear once with separate direction controls. The filter button opens the deck, tag and saved-search sidebar; deck and tag searches use the same tree input. Clicking a row opens preview first: Cards previews current search results, while Notes previews all cards of the current note. Edit from the preview. The More menu selects all results, configures display columns, and opens search options or shortcut help. Cards and notes save separate column lists. Mode, sort, subtitle and recent searches persist. Wide windows support explicitly opening an editor beside the list. Selection actions include preview, export, grade now and maintenance; deletion and grading require confirmation. Select all includes unloaded rows. Ctrl+A inside inputs and editors selects text."},
+    {"name":"browser_preferences_instructions","value":"Cards or notes, status and sort share one row below search. All three use a selection dialog: confirm with the top-right check button or close to discard the draft. Sort fields appear once with separate direction controls. The filter button opens the deck, tag and saved-search sidebar; deck and tag searches use the same tree input. Clicking a row opens preview first: Cards previews current search results, while Notes previews all cards of the current note. Edit from the preview. The More menu selects all results, configures display columns, and opens search options or shortcut help. Cards and notes save separate column lists. Mode, sort, subtitle and recent searches persist. Wide windows support explicitly opening an editor beside the list. Selection actions include preview, export, grade now and maintenance; deletion and grading require confirmation. Select all includes unloaded rows. Ctrl+A inside inputs and editors selects text. Right-click or long-press a row to enter selection; during selection it extends a continuous range, including unloaded rows. In the sidebar, right-click a deck to append its search condition or a tag to open its actions."},
     {"name":"browser_sort_direction","value":"Descending order"},
     {"name":"browser_preferences_hint","value":"Saved in this collection. Changes browser display without changing notes, cards or scheduling."},
     {"name":"directory_title","value":"Directory selection"},
@@ -2661,7 +2661,7 @@
     {"name":"directory_open_error","value":"Could not open the directory picker. Try again."},
     {"name":"directory_expand","value":"Expand or collapse directories"},
     {"name":"directory_select","value":"Select a directory"},
-    {"name":"directory_instructions","value":"Decks and tags share a directory tree. Search full paths and expand or collapse branches. Depending on the context, select one or multiple entries, or cycle through any, include and exclude. Expansion is separate from selection; selecting a parent does not select children. Only selectable entries can be submitted."}
+    {"name":"directory_instructions","value":"Decks and tags share a directory tree. Search full paths and expand or collapse branches. Depending on the context, select one or multiple entries, or cycle through any, include and exclude. Expansion is separate from selection; selecting a parent does not select children. Only selectable entries can be submitted. Rows with a long-press action also support right-click; this does not also select or expand the row."}
   ,
     {"name":"note_drawing_new","value":"New whiteboard drawing"},
     {"name":"note_drawing_draft_hint","value":"Write, draw, or add text; Done creates an image."},

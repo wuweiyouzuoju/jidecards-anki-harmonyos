@@ -9,13 +9,15 @@ import { memoryScopeRows } from '../../entry/src/main/ets/model/agent/AgentMemor
 import { AppInterfaceTracker } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { emptyCsvMetadata } from '../../entry/src/main/ets/proto/messages/CsvImportMessages.ts';
 import { copyCsvMetadata } from '../../entry/src/main/ets/model/CsvImport.ts';
-import { loadComponentLogic } from './platform-module-harness.mjs';
+import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
 
 const read = path => readFileSync(new URL('../../entry/src/main/ets/' + path, import.meta.url), 'utf8');
 const choices = [{ id: '3', path: '英语::四级::核心词' }, { id: '2', path: '英语::四级' },
   { id: '5', path: '其他::四级' }, { id: '6', path: '四级' }];
 const paths = rows => rows.map(row => row.path);
-const deps = { ...directory, $r: key => key, resourceText: (_context, resource) => resource };
+const MouseButton = { Left: 1, Right: 2 }, MouseAction = { Press: 1, Release: 2, Move: 3 };
+const mouseContextPoint = loadPlatformModule('utils/MouseContextInput.ets', 'mouseContextPoint', { MouseButton, MouseAction });
+const deps = { ...directory, mouseContextPoint, $r: key => key, resourceText: (_context, resource) => resource };
 function methods(path, names, dependencies = deps) {
   const source = read(path).replaceAll('\r\n', '\n');
   const body = names.map(name => {
@@ -89,6 +91,30 @@ test('shared list handles empty, large, disabled, filtered and released interact
   tree.rows = []; tree.refresh(); assert.equal(tree.data.totalCount(), 0);
   tree.aboutToDisappear(); tree.isInteractive = true; tree.select('3'); tree.toggle('2');
   assert.equal(views.at(-1), null); assert.equal(selected.length, 2);
+});
+
+test('directory secondary press reuses the live long-press target without selection or expansion', () => {
+  const Tree = loadComponentLogic('components/common/DirectoryTree.ets', 'DirectoryTree', deps);
+  const tree = new Tree(), held = [], selected = [], toggled = [];
+  Object.assign(tree, { rows: directory.directoryChoiceRows(choices), onLongPress: id => held.push(id),
+    onSelect: id => selected.push(id), onToggle: id => toggled.push(id) });
+  let stopped = 0;
+  const event = (button = MouseButton.Right, action = MouseAction.Press) => ({ button, action,
+    windowX: 120, windowY: 240, stopPropagation() { stopped++; } });
+  tree.aboutToAppear();
+  tree.handleRowMouse('3', event());
+  assert.deepEqual(held, ['3']);
+  assert.equal(tree.visible.find(row => row.id === '3').path, '英语::四级::核心词');
+  tree.handleRowMouse('3', event(MouseButton.Right, MouseAction.Release));
+  tree.handleRowMouse('3', event(MouseButton.Left));
+  tree.handleRowMouse('directory-parent:英语', event());
+  tree.isInteractive = false; tree.handleRowMouse('3', event());
+  tree.isInteractive = true; tree.rows = directory.directoryChoiceRows(choices.slice(1)); tree.refresh();
+  tree.handleRowMouse('3', event());
+  tree.aboutToDisappear(); tree.handleRowMouse('2', event());
+  assert.deepEqual(held, ['3']); assert.equal(stopped, 6);
+  assert.deepEqual(selected, []); assert.deepEqual(toggled, []);
+  assert.match(read('components/common/DirectoryTree.ets'), /\.onMouse\([^\n]+this\.handleRowMouse\(row\.id, event\)/);
 });
 
 test('native directory selector rejects old callbacks, removed choices, busy state and system-dismissed windows', () => {

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../../utils/PressFeedback';
+import { mouseContextPoint } from '../../utils/MouseContextInput';
 import { currentMotionProfile, motionAnimation } from '../../utils/AppMotion';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { HelpButton } from '../common/HelpButton';
@@ -239,6 +240,11 @@ export struct 卡片表格 {
     this.onLongPress();
   }
 
+  /** 与 AnkiDroid 浏览行一致：首次右键进入多选，已有多选则延伸完整结果区间。 */
+  private handleRowMouse(id: number, event: MouseEvent): void {
+    if (mouseContextPoint(event, !this.busy) !== undefined) this.处理长按(id);
+  }
+
   /** 提交某行选择意图，页面决定并回传最新快照。 */
   private 设置选中(id: number, 选中: boolean): void {
     if (this.busy) return;
@@ -361,6 +367,7 @@ export struct 卡片表格 {
               .border(this.rowBorder(行))
               .borderRadius(应用尺寸.圆角_指标卡)
               .attributeModifier(new PressFeedback())
+              .onMouse((event: MouseEvent): void => { this.handleRowMouse(行.id, event); })
               .onClick((event: ClickEvent): void => {
                 if (this.busy) return;
                 if (event.getModifierKeyState?.(['Shift'])) this.onRange(行.id);

@@ -53,6 +53,8 @@
 
 ## 公共目录树
 
+目录行的鼠标右键按下复用既有 `onLongPress`，由 `MouseContextInput` 过滤移动、抬起及非右键，再通过与长按相同的存活、交互状态和当前可选行校验。只有宿主提供上下文操作时才产生业务效果；右键不调用选择或折叠。浏览侧栏牌组追加搜索、标签操作菜单仍归原宿主。首页牌组属于独立学习导航，长按使用公共居中弹窗、右键使用公共 `CardActionMenu` 定位，动作声明与守卫相同，见[首页对齐范围](home.md#牌组上下文操作与-ankidroid-的对齐范围2026-10-15)。
+
 层级候选统一由 [DirectoryTree.ets](../../entry/src/main/ets/components/common/DirectoryTree.ets) 渲染，表单入口由 [DirectorySelect.ets](../../entry/src/main/ets/components/common/DirectorySelect.ets) 打开同一组件。纯 [DirectoryTree.ts](../../entry/src/main/ets/model/DirectoryTree.ts) 拥有展示契约、缺失祖先补全、搜索与实例内折叠；目录数据、候选限制、选择基线、草稿和写入仍归原领域。稳定 ID 与完整 `::` 路径分开，末级同名不混淆；缺失祖先仅可展开，不能作为实际写入候选。全部、顶层、全局及文件指定是独立固定选项，不参与祖先推导。
 
 搜索忽略大小写，命中子项保留并临时展开祖先；搜索期间展开按钮禁用，清空恢复原折叠。选择器展开状态属于实例，刷新不重置手动折叠，新单选可展开所选祖先；不持久化到首页。Core 树适配 `DeckDirectory` 必须提供完整子树，由组件决定可见行；不先按折叠过滤。标签 `TagTreeList` 只适配 `NoteTags`，继续由标签领域拥有三态基线和持久折叠，展示委托公共树。单选用背景和字重表示选中，去掉旁边的勾；多选保留原生复选框/混合减号；自定义学习按单标签循环不限、包含、排除，父标签选择不级联子标签。

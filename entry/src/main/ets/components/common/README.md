@@ -6,6 +6,8 @@
 
 `DirectoryTree.searchPlaceholder/emptyLabel` 允许领域适配提供搜索与空状态文案，默认仍为目录文案；搜索几何、输入行为和过滤由树独占。`TagTreeList.searchable` 默认关闭，浏览筛选侧栏开启后与牌组目录共用同一个树内搜索框；宿主分区正文各贡献一次16vp边距，不再在标签外层复制输入框。标签编辑等原外部查询入口保留默认行为。
 
+`DirectoryTree` 右键按下与长按共用 `onLongPress`，复用 `MouseContextInput` 过滤鼠标移动/抬起。存活、交互状态、当前可见且可选的行由同一守卫检查；不另触发选择、折叠或写入。未提供长按回调的宿主没有额外操作。`ui-directory-tree.test.mjs` 执行完整路径、忙碌、删除和离页后的回调回归。
+
 目录触发入口固定保留右侧 `DisclosureChevron`，文字占剩余空间并省略；内部内容与按钮共用限宽和内边距。圆角必须在 Button.border 之后设置。模拟器布局与交互验收见[公共目录树](../../../../../../docs/development/appearance.md#公共目录树)。
 
 层级候选唯一渲染入口是 [DirectoryTree.ets](DirectoryTree.ets)，表单中的目录选择用 [DirectorySelect.ets](DirectorySelect.ets) 打开同一棵树；内部窗口 [DirectorySelectDialog.ets](DirectorySelectDialog.ets) 只组合 DialogFrame 与目录。目录入口通过 [FormSelectRow.ets](FormSelectRow.ets) 的 `useCustomControl/customControl` 复用已有标签与帮助布局，触发控件和树内单选背景共用 SelectStyle 的字体、16vp圆角、1vp轮廓和选中色；不将单选变成复选框。搜索、临时展开、缩进、44vp 行、虚拟列表和选中状态由公共入口拥有，宿主传稳定 ID、完整路径、真实候选及回调。纯展示契约和折叠策略见 [DirectoryTree.ts](../../model/DirectoryTree.ts)，领域候选/草稿/写入留在原功能。标签薄适配 `TagTreeList` 不再渲染另一套列表。调用检查与行为回归见 `ui-directory-tree.test.mjs` 和 `ui-select-layout.test.mjs`；边距、模式和合理差异见[公共目录树](../../../../../../docs/development/appearance.md#公共目录树)。

@@ -353,7 +353,7 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
   { id: 'browser_recent_searches', titleKey: 'browser_recent_searches', parent: 'browser_search_tools', items: [
     { id: 'recent', titleKey: 'browser_recent_searches' }, { id: 'close', titleKey: 'browser_detail_cancel' }
   ] },
-  { id: 'browser_shortcuts', titleKey: 'browser_shortcuts', parent: 'browser_more_settings', items: [
+  { id: 'browser_shortcuts', titleKey: 'browser_shortcuts', instructionsKey: 'browser_shortcuts_hint', parent: 'browser_more_settings', items: [
     { id: 'close', titleKey: 'browser_detail_cancel' }
   ] },
   { id: 'browser_editor', titleKey: 'note_editor_edit_title', parent: 'browser', items: [

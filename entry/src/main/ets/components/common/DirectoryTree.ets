@@ -6,6 +6,7 @@ import { PressFeedback } from '../../utils/PressFeedback';
 import { FormInputStyle } from '../../utils/FormInputStyle';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { SelectStyle } from '../../utils/SelectStyle';
+import { mouseContextPoint } from '../../utils/MouseContextInput';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { resourceText } from '../../utils/UiFeedback';
 import { 颜色键 } from '../../model/颜色主题';
@@ -86,6 +87,9 @@ export struct DirectoryTree {
   private longPress(id: string): void {
     if (this.alive && directorySelectionAllowed(this.visible, id, this.isInteractive)) this.onLongPress(id);
   }
+  private handleRowMouse(id: string, event: MouseEvent): void {
+    if (mouseContextPoint(event, this.alive && this.isInteractive) !== undefined) this.longPress(id);
+  }
   private accessibleLabel(row: DirectoryRow, _locale: string = this.uiLanguage): string {
     if (row.stateLabel !== '') return `${row.path}, ${row.stateLabel}`;
     if (this.selectionMode === 'none' || row.selection < 0) return row.path;
@@ -145,6 +149,7 @@ export struct DirectoryTree {
               .borderRadius(SelectStyle.controlRadius).attributeModifier(new PressFeedback()).stateEffect(false)
               .enabled(this.isInteractive && row.selectable).accessibilityText(this.accessibleLabel(row))
               .onClick((): void => { this.select(row.id); })
+              .onMouse((event: MouseEvent): void => { this.handleRowMouse(row.id, event); })
               .gesture(LongPressGesture({ repeat: false, duration: 500 }).onAction((): void => { this.longPress(row.id); }))
           }.width('100%').padding({ left: Math.min(row.level, 6) * 应用尺寸.间距_12 })
         }
