@@ -2,12 +2,13 @@
 
 [![CI](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/actions/workflows/ci.yml/badge.svg)](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/actions/workflows/ci.yml)
 [![License: AGPL-3.0-or-later](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](LICENSE)
-[![AppGallery 2.9.22](https://img.shields.io/badge/AppGallery-2.9.22-6750a4.svg)](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare)
+[![Source 2.9.98](https://img.shields.io/badge/source-2.9.98-6750a4.svg)](AppScope/app.json5)
+[![AppGallery](https://img.shields.io/badge/download-AppGallery-0a59f7.svg)](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare)
 [![HarmonyOS NEXT](https://img.shields.io/badge/platform-HarmonyOS%20NEXT-0a59f7.svg)](https://www.harmonyos.com/)
 
 jidecards（中文名“记得闪卡”）是面向 HarmonyOS NEXT 的开源闪卡学习应用，支持鸿蒙手机、平板和电脑。导入 Anki 牌组后，可以离线复习、编辑资料、查看学习统计，并通过 AnkiWeb 同步。原生界面由 ArkTS/ArkUI 实现，集合、模板渲染、调度和同步复用锁定版本的 Anki Rust Core。
 
-**应用市场正式版：2.9.22** · **当前源码版本：2.9.98（versionCode 3079）**
+**当前源码版本：2.9.98（versionCode 3079）**
 
 每天一点，把知识记牢。用闪卡整理知识，以间隔复习建立自己的学习节奏。
 
@@ -38,7 +39,7 @@ jidecards（中文名“记得闪卡”）是面向 HarmonyOS NEXT 的开源闪�
 
 ## 项目特点
 
-以下介绍当前 `main` 的源码能力；应用市场版的功能与截图以[2.9.22 应用市场版说明](docs/releases/appgallery-2.9.22.md)为准。
+以下介绍当前 `main` 的源码能力；应用市场实际上架版本以下载页面为准。
 
 ### 复习与调度
 
@@ -99,7 +100,7 @@ JIDE 提供统一的自然语言对话入口，也可以从牌组、浏览或学
 
 ## 应用截图
 
-以下七张为 **2.9.22 应用市场版**最新宣传图，覆盖首页、学习、编辑、浏览、学习操作、统计和提醒。点击图片可查看原图；其中 JIDE 入口需通过开发者调试开启。
+以下七张为 **2.9.22 版本的历史宣传图**，用于展示首页、学习、编辑、浏览、学习操作、统计和提醒的界面示例；当前界面以最新构建为准。点击图片可查看原图；其中 JIDE 入口需通过开发者调试开启。
 
 <p align="center">
   <a href="screenshots/promo-2.9.22/home.png"><img src="screenshots/promo-2.9.22/home.png" width="320" alt="记得闪卡 2.9.22：每天一点，把知识记牢；首页牌组与今日任务" /></a>
@@ -247,7 +248,7 @@ npm run verify             # 完整测试、双架构构建与签名 HAP
 
 当前源码版本由 [AppScope/app.json5](AppScope/app.json5) 中的 `versionName` 和 `versionCode` 定义。查看[更新记录](CHANGELOG.md)及[2.9.98 源码变更说明](docs/releases/2.9.98.md)；历史说明保留在 [docs/releases/](docs/releases/) 中。商店版本与源码版本分别维护，商店版本只在确认上架后更新。
 
-应用市场 2.9.22 的更新内容与下载入口见 [2.9.22 应用市场版说明](docs/releases/appgallery-2.9.22.md)。GitHub 的 `appgallery-v2.9.22` 标签记录当时的版本介绍，自动生成的源码快照对应标签中的 2.9.10 / versionCode 2991，不随 main 的后续更新变化；应用安装请使用应用市场入口。
+历史应用市场 2.9.22 的更新内容见 [2.9.22 应用市场版说明](docs/releases/appgallery-2.9.22.md)。GitHub 的 `appgallery-v2.9.22` 标签记录当时的版本介绍，自动生成的源码快照对应标签中的 2.9.10 / versionCode 2991，不随 main 的后续更新变化；应用安装请使用应用市场入口。
 
 发布前的构建、测试和设备验收要求见[开发状态与发布门禁](docs/DEVELOPMENT_PLAN.md)。CI 检查结果不代替实体设备验收；源码中的能力以当前发布开关为准。
 
