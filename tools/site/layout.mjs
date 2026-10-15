@@ -101,7 +101,7 @@ export function createLayout(content) {
   </nav></header>
   <main id="content" class="shell ${className}">${trail.length ? `<nav class="breadcrumb" aria-label="面包屑"><a href="/">首页</a><span aria-hidden="true">/</span><span>${esc(breadcrumbTitle)}</span></nav>` : ''}${body}</main>
   <footer class="footer"><div class="shell"><div class="footer-grid">
-    <div class="footer-brand"><a class="brand" href="/">${logo('brand-logo', 38)}<span><strong>记得闪卡</strong><small>${esc(work.brand.headline.join(''))}</small></span></a><p>${esc(work.platform)} 原生开源闪卡应用。</p><p>源码 ${esc(work.sourceVersion)} · ${esc(work.license)}</p></div>
+    <div class="footer-brand"><a class="brand" href="/">${logo('brand-logo', 38)}<span><strong>记得闪卡</strong><small>${esc(work.brand.headline.join(''))}</small></span></a><p>${esc(work.platform)} 原生开源闪卡应用。</p><p>源码 ${esc(work.sourceVersion)} · 应用市场 ${esc(work.releaseVersion)} · ${esc(work.license)}</p></div>
     <nav aria-label="产品与文档"><h2>产品与文档</h2><a href="/works/jidecards/#download">免费下载</a><a href="/works/jidecards/">功能介绍</a><a href="${guide.pathname}">使用指南</a><a href="/releases/">更新说明</a></nav>
     <nav aria-label="开源项目"><h2>开源项目</h2>${repoLinks}<a href="/developers/">开发文档</a><a href="${esc(repo)}/issues">问题反馈 ${arrow}</a></nav>
     <nav aria-label="机器可读资料"><h2>机器可读资料</h2><a href="/llms.txt">llms.txt · 索引</a><a href="/llms-full.txt">llms-full.txt · 完整资料</a><a href="/data/site-index.json">页面与内容 JSON</a><a href="/data/works.json">产品数据 JSON</a><a href="/sitemap.xml">网站地图</a></nav>

@@ -12,7 +12,7 @@ Cloudflare Worker：`wispy-glade-db0d`。静态目录：`hosting/`。主域名�
 
 | 入口 | 责任 |
 | --- | --- |
-| `tools/site/content.mjs` | 读取事实、派生源码版本、检查素材版本与 SHA-256、生成样式、Logo 和图片脚本缓存键 |
+| `tools/site/content.mjs` | 读取事实、派生源码版本、检查素材历史版本与 SHA-256、生成样式、Logo 和图片脚本缓存键 |
 | `tools/site/layout.mjs` | 共享导航、页脚、下载入口、页面元数据、JSON-LD |
 | `tools/site/pages.mjs` | 首页、功能、指南、开发、更新、关于与 404 页面 |
 | `tools/site/feeds.mjs` | 逐页 Markdown、llms、页面索引、sitemap、robots、Atom |
@@ -25,7 +25,7 @@ Cloudflare Worker：`wispy-glade-db0d`。静态目录：`hosting/`。主域名�
 
 ## 图片与 Logo
 
-当前采用作者提供的七张新版宣传图：主视觉、卡片学习、卡片编辑、卡片浏览、学习操作、复习统计、学习提醒。原始 PNG 字节存入 `hosting/assets/jidecards-2.9.22-*.png`；`screenshots` 记录公开路径、来源说明、版本、宽高和 SHA-256。每张图片提供正文说明、alt、figcaption 和完整原图链接，文字事实同时进入 Markdown、产品 JSON 和完整文本。
+当前保留作者提供的七张 2.9.22 历史宣传图：主视觉、卡片学习、卡片编辑、卡片浏览、学习操作、复习统计、学习提醒。原始 PNG 字节存入 `hosting/assets/jidecards-2.9.22-*.png`；`screenshots` 记录公开路径、来源说明、版本、宽高和 SHA-256。每张图片提供正文说明、alt、figcaption 和完整原图链接，文字事实同时进入 Markdown、产品 JSON 和完整文本。
 
 替换图片时检查实际内容，复制作者提供的原始字节，然后更新所有元数据；生成器发现版本或摘要不匹配即失败。过时 `assets/app-*.png` 已加入 `.assetsignore`，不再进入线上资产清单。
 
@@ -44,9 +44,9 @@ python -c 'from PIL import Image; from pathlib import Path; icon = Image.open("A
 | 页面 | 作用 |
 | --- | --- |
 | `/` | 品牌、下载、核心功能、学习用途、更新与开源入口 |
-| `/works/jidecards/` | 完整功能、七张新版图、下载、版本和能力边界 |
+| `/works/jidecards/` | 完整功能、历史宣传图、下载、版本和能力边界 |
 | `/guides/harmonyos-anki/` | 安装、迁移、制卡、FSRS、同步、统计与备份的完整指南 |
-| `/releases/` | 当前版本的全部编号更新说明 |
+| `/releases/` | 当前源码版本的全部编号更新说明 |
 | `/developers/` | 编程 Agent 的源码、责任和验证入口 |
 | `/about/` | 项目、作者与反馈 |
 
