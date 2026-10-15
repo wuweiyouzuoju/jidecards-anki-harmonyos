@@ -5,10 +5,10 @@ import { pathToFileURL } from 'node:url';
 import { CardWebSession } from '../entry/src/main/ets/model/CardWebSession.ts';
 import { MATH_ASSET_BASE } from '../entry/src/main/ets/model/MathRendering.ts';
 
-export async function launchCardBrowser() {
+export async function launchCardBrowser(options = {}) {
   const { chromium } = await import(process.env.PLAYWRIGHT_MODULE
     ? pathToFileURL(process.env.PLAYWRIGHT_MODULE).href : 'playwright');
-  return chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_BROWSER_CHANNEL || 'msedge' });
+  return chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_BROWSER_CHANNEL || 'msedge', ...options });
 }
 
 // Real navigation, production session/runtime and bundled assets. No template scripts are stripped.

@@ -340,7 +340,7 @@ HTML 构建器对齐 AnkiDroid 新版学习/预览共用的 Anki 26.05 reviewer�
 
 此边界对照本机 `D:\Projects\AnkiDroid` 的现代 reviewer/preview 公共 `previewer/PreviewerHelpers.kt`（`stdHtml/bodyClass`）、`CardViewerViewModel.kt`（正反面内容更新）及 `assets/scripts/card.js`（hook Promise）确定；旧 `CardAppearance.kt` 同样提供两种夜间类名。2026-10-11 按其加载的 Anki 26.05 `ts/reviewer/reviewer.scss` 与 `ts/lib/sass/_root-vars.scss` 补齐公共夜间字色/底色、媒体和原生控件主题规则；默认 `.card` 不再优先于夜间 reviewer，显式夜间覆盖仍按 CSS 层叠生效，合成表面兜底保留。独立对照样式及覆盖范围见[卡片文字显示](#卡片文字显示)。尚未提供 AnkiDroid 的全部平台/卡片序号类名，浏览器回归不代替 ArkWeb 实机验收。
 
-统一回归入口为 `npm run test:cards:browser`，包含 appearance/colors/template/flip 四项。`test-card-appearance-browser.mjs` 对比直接加载答案与反复翻面/主题变化的计算样式、脚本可见主题、背景及类名，检查不重新导航且模板状态保留；此前仅替换正文会在这里失败。CI 独立执行同一命令。依赖、浏览器安装及验证范围见[工具入口](../../tools/README.md)和[验证说明](verification.md)。
+统一回归入口为 `npm run test:cards:browser`，包含 appearance/colors/template/flip/authorization 五项。`test-card-appearance-browser.mjs` 对比直接加载答案与反复翻面/主题变化的计算样式、脚本可见主题、背景及类名，检查不重新导航且模板状态保留；此前仅替换正文会在这里失败。CI 独立执行同一命令。依赖、浏览器安装及验证范围见[工具入口](../../tools/README.md)和[验证说明](verification.md)。
 
 卡片默认公式识别由 `rawfile/mathjax/card-math.js` 统一拥有，对齐 Anki/AnkiDroid，仅识别 `\(...\)` 和 `\[...\]`，关闭公式之外的转义、环境和引用自动处理。美元符号写法作为普通正文保留，避免 `grep` 的 `^$`、Shell 变量/PID 和金额误入公式；没有新增兼容开关。`test-math-rendering-browser.mjs` 在真实公式与普通文字混合的正反面及深浅主题中验证原文完整、无错误公式，并继续验证数学、化学、MathML 和自定义宏。学习、浏览/首页及草稿/模板预览沿用共享构建器；JIDE 对话由独立的 `AgentMath.ts` 解析受保护的文本片段，其美元符号公式规则保持独立。
 

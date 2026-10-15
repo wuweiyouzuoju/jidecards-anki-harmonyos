@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-for (const script of ['appearance', 'colors', 'template', 'flip']) {
+for (const script of ['appearance', 'colors', 'template', 'flip', 'authorization']) {
   console.log(`Card browser regression: ${script}`);
   const result = spawnSync(process.execPath, ['--experimental-transform-types',
     '--import', './tools/tests/register-ts-hook.mjs', `tools/test-card-${script}-browser.mjs`],
