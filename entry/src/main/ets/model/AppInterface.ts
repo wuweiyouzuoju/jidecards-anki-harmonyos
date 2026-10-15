@@ -105,6 +105,10 @@ export const WHITEBOARD_INTERFACE_ITEMS: AppInterfaceItem[] = [
 
 /** 菜单直接遍历这里的条目；标签、顺序和显隐由 UI 与 JIDE 共用。 */
 export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
+  ...['home', 'study', 'editor', 'template'].map((scope: string): AppInterfaceSurface => ({
+    id: scope + '_shortcuts', titleKey: 'keyboard_shortcuts_title', instructionsKey: 'keyboard_scope_hint',
+    parent: scope === 'editor' ? 'edit_note_form' : scope === 'template' ? 'notetype_editor' : scope,
+    items: [{ id: 'close', titleKey: 'done' }] })),
   { id: 'study_keyboard', titleKey: 'study_keyboard_title', instructionsKey: 'study_keyboard_help', parent: 'settings',
     items: STUDY_KEYBOARD_FIELDS },
   { id: 'study_gestures', titleKey: 'study_gesture_title', instructionsKey: 'study_gesture_help', parent: 'settings',

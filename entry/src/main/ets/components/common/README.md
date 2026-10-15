@@ -122,3 +122,6 @@
 [ActionStatus.ets](ActionStatus.ets) 固定20vp结果槽由请求拥有者发布忙碌、成功和失败；[ChangingText.ets](ChangingText.ets) 只过渡真实短状态文字，不用于卡片翻面。默认按内容宽度布局并保留实测宽度；调用方通过 `width` 或 `layoutWeight` 分配文字槽时，传 `fillWidth: true`，让实际 Stack 填满该槽再按 `alignment` 对齐。填充模式不缓存分配宽度为最小宽度，窗口缩窄时随槽一起收缩；学习页剩余计数保持按内容居中。`interaction-feedback.test.mjs` 执行真实根节点样式和测量回调，并扫描全部同类调用；设备视觉验收另行完成。
 
 [MenuHoldGesture.ets](MenuHoldGesture.ets) 只将 ArkUI 触摸事件交给 `MenuHoldController`，公共菜单命中由 `MenuSlideSession` 拥有。布局不同的普通菜单入口复用同一指针生命周期；排序/轮盘按其原语义处理。[当前行为、来源和验证](../../../../../../docs/development/interaction-feedback.md)。
+
+
+键盘输入的页面无关契约在 [KeyboardInput.ts](../../model/KeyboardInput.ts)，平台转换在 [KeyboardKeyAdapter.ets](../../utils/KeyboardKeyAdapter.ets)。公共字段编辑器只消费这些通用输入及原字段工具声明；页面命令表和说明列表在 [KeyboardShortcuts.ts](../../model/KeyboardShortcuts.ts)、[KeyboardShortcutHelp.ets](../KeyboardShortcutHelp.ets)、[KeyboardShortcutList.ets](../KeyboardShortcutList.ets)，不引入 common 的业务依赖。`DirectorySelect.openRequest` 让键盘复用同一个选择弹窗；`NoteTagsField.focusRequest`、`NoteFieldCard/NoteFieldEditor.focusRequest` 在布局就绪后转交真实焦点，字段展开和焦点拥有者保持一致。编辑顶栏标题旁 i 复用 HelpLabel，左右区域各28%、中间自适应，不用覆盖整个标题的空白层。行为回归见 `keyboard-alignment`、`note-rich-editor`、`ui-shell-contract`；原生焦点和布局仍须设备验收。

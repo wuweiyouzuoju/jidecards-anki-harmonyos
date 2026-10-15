@@ -1447,7 +1447,7 @@
     { "name": "glossary_fuzz_label", "value": "复习日期随机微调" },
     { "name": "glossary_fuzz_help", "value": "应用会在允许范围内稍微提前或推迟复习，避免很多卡在同一天到期。\n\n当日学习也可能增加等待，最多为原时间的 25%，不超过 5 分钟；按钮不显示这部分额外等待。当前无法关闭此功能。" },
     { "name": "glossary_shortcuts_label", "value": "键盘快捷键" },
-    { "name": "glossary_shortcuts_help", "value": "jidecards 学习页默认键盘快捷键（普通闪卡）：\n\n· 空格／Enter：问题面显示答案；答案面评为良好。\n· 1／2／3／4（含小键盘）：答案面评为忘记／困难／良好／简单。\n· E：编辑笔记；*（通常为 Shift+8）：切换星标。\n· Ctrl+1～7（含小键盘）：切换相应旗标。\n· -／B：今日跳过。\n· @（通常为 Shift+2）／S：暂停此卡。\n· Delete：删除当前卡，需确认。\n· Ctrl+Z：撤销当前可撤销操作。\n· Esc：返回。\n· R／F5：重放音频；在答案面会遵循“重放答案时跳过问题音频”选项，未开启时也会播放问题音频。\n\n选择题通过选择和提交自动判题，不能用普通翻面或 1～4 评分快捷键作答。\n\n在设置 → 复习 → 学习快捷键中，可录制或输入按键，添加多个绑定、区分卡面、删除绑定或恢复默认。Ctrl／Shift／Alt 精确匹配；长按只执行一次。输入框、编辑页、弹窗与手写保留各自操作。浏览列表快捷键独立。" },
+    { "name": "glossary_shortcuts_help", "value": "首页、浏览和学习页的更多菜单均有“键盘快捷键”；编辑页可点击标题旁的 i 查看本页操作。学习页显示当前自定义绑定。" },
     { "name": "glossary_browser_info_label", "value": "卡片信息（浏览页）" },
     { "name": "glossary_browser_info_help", "value": "点浏览列表右侧的 i，查看牌组、到期日、间隔、复习历史和记忆信息。\n\n“卡片类型”指使用的模板。这里只查看信息；修改内容请打开条目编辑。" },
     { "name": "glossary_lapse_label", "value": "遗忘（Lapse）" },
@@ -3305,6 +3305,26 @@
     {
       "name": "study_gesture_shake_unavailable",
       "value": "本机摇动手势暂不可用，其他已配置手势仍可使用"
-    }
+    },
+    {"name": "keyboard_shortcuts_title", "value": "键盘快捷键"},
+    {"name": "keyboard_scope_hint", "value": "快捷键仅在当前界面生效；弹窗和文字输入优先处理各自按键。"},
+    {"name": "keyboard_select_field", "value": "跳到第 1–10 个字段"},
+    {"name": "keyboard_insert_rule", "value": "插入水平线"},
+    {"name": "keyboard_bury_note", "value": "埋藏整条笔记"},
+    {"name": "keyboard_suspend_note", "value": "暂停整条笔记"},
+    {"name": "keyboard_search_marked", "value": "搜索已标记卡片"},
+    {"name": "keyboard_search_suspended", "value": "搜索已暂停卡片"},
+    {"name": "keyboard_voice_save", "value": "保存录音"},
+    {"name": "keyboard_voice_saved", "value": "录音已保存"},
+    {"name": "keyboard_voice_title", "value": "学习录音"},
+    {"name": "keyboard_voice_hint", "value": "录音保留到退出本次学习；需要保留时请选择保存录音。Shift+V 开始或结束录音，V 回放，Shift+S 保存。"},
+    {"name": "keyboard_hint", "value": "显示下一条提示"},
+    {"name": "keyboard_all_hints", "value": "显示全部提示"},
+    {"name": "keyboard_previous_info", "value": "上一张卡片信息"},
+    {"name": "keyboard_voice_replay", "value": "回放学习录音"},
+    {"name": "keyboard_voice_save_failed", "value": "录音保存失败，请重试"},
+    {"name": "keyboard_home_scope_hint", "value": "快捷键仅在首页生效。R、Delete 和 Shift+Delete 仅在宽屏选中牌组时生效；删除仍需确认。右键牌组打开该牌组的操作菜单；长按也可打开。"},
+    {"name": "keyboard_study_scope_hint", "value": "以下显示当前生效的绑定，[Q] 表示题目面，[A] 表示答案面。弹窗和文字输入优先；可在设置的学习键盘中修改绑定。"},
+    {"name": "deck_context_instructions", "value": "右键牌组在点击位置打开操作菜单；长按打开同一组操作。右键或长按会选中目标牌组；Esc 先收起色调，再关闭菜单；点击空白关闭。"}
   ]
 }

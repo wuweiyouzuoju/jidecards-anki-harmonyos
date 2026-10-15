@@ -997,7 +997,7 @@
     { "name": "glossary_fuzz_label", "value": "Small random changes to review dates" },
     { "name": "glossary_fuzz_help", "value": "The app moves reviews slightly earlier or later within allowed limits to avoid many cards becoming due together.\n\nSame-day learning can add up to 25% to the wait, capped at 5 minutes. Buttons do not show this extra delay. This feature cannot currently be disabled." },
     { "name": "glossary_shortcuts_label", "value": "Keyboard Shortcuts" },
-    { "name": "glossary_shortcuts_help", "value": "Default jidecards study keyboard shortcuts (regular flashcards):\n\n• Space / Enter: show the answer on the question side; rate Good on the answer side.\n• 1 / 2 / 3 / 4 (including the number pad): rate Again / Hard / Good / Easy on the answer side.\n• E: edit note; * (usually Shift+8): toggle mark.\n• Ctrl+1–7 (including the number pad): toggle flags.\n• - / B: skip today.\n• @ (usually Shift+2) / S: suspend the card.\n• Delete: delete the current card with confirmation.\n• Ctrl+Z: undo the available action.\n• Esc: go back.\n• R / F5: replay audio. On the answer side, the Skip question when replaying answer option applies; with it off, question audio is included.\n\nChoice cards require selecting and submitting an answer for automatic grading; regular flip and 1–4 rating shortcuts do not answer them.\n\nSettings → Review → Study shortcuts lets you record or type keys, add multiple bindings, choose card sides, remove bindings or restore defaults. Ctrl / Shift / Alt must match exactly. Holding a key executes once. Inputs, editors, dialogs and the whiteboard retain their own keyboard behavior. Browser list shortcuts are separate." },
+    { "name": "glossary_shortcuts_help", "value": "Open Keyboard shortcuts in the home, browser or study More menu. In editors, use the i beside the title. Study help shows your current bindings." },
     { "name": "glossary_lapse_label", "value": "Lapse" },
     { "name": "glossary_lapse_help", "value": "Rating a review card Again causes a lapse and adds 1 to its lapse count. Reaching the leech threshold triggers the configured leech action.\n\nWith fixed relearning steps, the card follows those delays. SM-2 then uses the lapse multiplier, minimum lapse interval and other constraints. FSRS calculates from memory state instead of those two legacy options, and may schedule short-term relearning even with empty steps." },
     { "name": "glossary_browser_info_label", "value": "Card Info (Browser)" },
@@ -2855,6 +2855,26 @@
     {
       "name": "study_gesture_shake_unavailable",
       "value": "Shake is unavailable on this device. Other configured gestures remain available."
-    }
+    },
+    {"name": "keyboard_shortcuts_title", "value": "Keyboard shortcuts"},
+    {"name": "keyboard_scope_hint", "value": "Shortcuts apply to the current screen. Dialogs and text inputs handle their own keys first."},
+    {"name": "keyboard_select_field", "value": "Focus fields 1–10"},
+    {"name": "keyboard_insert_rule", "value": "Insert horizontal rule"},
+    {"name": "keyboard_bury_note", "value": "Bury note"},
+    {"name": "keyboard_suspend_note", "value": "Suspend note"},
+    {"name": "keyboard_search_marked", "value": "Search marked cards"},
+    {"name": "keyboard_search_suspended", "value": "Search suspended cards"},
+    {"name": "keyboard_voice_save", "value": "Save recording"},
+    {"name": "keyboard_voice_saved", "value": "Recording saved"},
+    {"name": "keyboard_voice_title", "value": "Study recording"},
+    {"name": "keyboard_voice_hint", "value": "Recordings last until this study session ends. Use Save recording to keep a copy. Shift+V starts or stops recording, V replays, and Shift+S saves."},
+    {"name": "keyboard_hint", "value": "Show next hint"},
+    {"name": "keyboard_all_hints", "value": "Show all hints"},
+    {"name": "keyboard_previous_info", "value": "Previous card information"},
+    {"name": "keyboard_voice_replay", "value": "Replay study recording"},
+    {"name": "keyboard_voice_save_failed", "value": "Unable to save recording. Try again."},
+    {"name": "keyboard_home_scope_hint", "value": "Shortcuts apply on the home screen. R, Delete and Shift+Delete require a selected deck in a wide layout; deletion requires confirmation. Right-click a deck to open its actions; long-press also opens them."},
+    {"name": "keyboard_study_scope_hint", "value": "These are your current bindings. [Q] means question side, [A] answer side. Dialogs and text inputs take priority. Customize bindings in Study keyboard settings."},
+    {"name": "deck_context_instructions", "value": "Right-click a deck to open its actions at the pointer; long-press opens the same actions. Both select the target deck. Esc closes colors, then the menu; click outside to dismiss."}
   ]
 }
