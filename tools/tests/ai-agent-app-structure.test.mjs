@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { REVIEW_AUDIO_PREFERENCES } from '../../entry/src/main/ets/model/ReviewAudioPreferences.ts';
 import { readFileSync, readdirSync } from 'node:fs';
-import { APP_INTERFACE_SURFACES, NOTETYPE_MANAGEMENT_ACTIONS, EMPTY_CARDS_ACTIONS, AppInterfaceTracker, visibleInterfaceItems, deckDetailsMoreItems, settingsHeaderItems, settingsHeaderControls } from '../../entry/src/main/ets/model/AppInterface.ts';
+import { APP_INTERFACE_SURFACES, NOTETYPE_MANAGEMENT_ACTIONS, EMPTY_CARDS_ACTIONS, AppInterfaceTracker, visibleInterfaceItems, deckDetailsMoreItems, settingsHeaderItems, settingsHeaderControls, addNoteInterfaceControls } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { appInterfaceSurfaceIds, browserInterfaceMenu, browserToolbarItems, studyInterfaceMenu } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { agentInterfaceControls, agentInterfaceTitle, agentImportLabelKey, reminderEditorControls, reminderEditorTitle } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { stripTypeScriptTypes } from 'node:module';
@@ -93,6 +93,42 @@ test('directory observation keeps raw tag names even when they match control IDs
   assert.ok(serialized.includes('"titleKey":"directory_search"'));
 });
 
+test('the add-note template icon retains its localized action and editor destination in JIDE', () => {
+  const uiIcon = loadPlatformModule('utils/AppInterfaceText.ets', 'interfaceControlIcon', { $r: key => key });
+  const items = APP_INTERFACE_SURFACES.find(surface => surface.id === 'add_note').items;
+  for (const labels of [zh, en]) {
+    const result = buildAgentAppStructure(context, 'add_note', '', key => labels.get(key),
+      agentSettingDefinitions(), tools, []);
+    const template = result.surfaces[0].items.find(item => item.id === 'templates');
+    assert.equal(template.title, labels.get('notetype_editor_templates'));
+    assert.equal(template.opens, 'notetype_editor');
+    assert.equal(uiIcon(items, 'templates'), 'app.media.' + template.iconKey);
+    assert.equal(template.iconKey, 'ic_settings_layout');
+    assert.equal(template.writeTool, '');
+  }
+  const tracker = new AppInterfaceTracker();
+  const Page = pageMethods('pages/添加笔记页.ets', ['publishInterface'], {
+    appInterface: tracker, namedResourceText: (_context, key) => localize(key)
+  });
+  for (const blocked of [false, true]) {
+    const controls = addNoteInterfaceControls({ tagsExpanded: false, occlusion: false, hasSource: false,
+      busy: false, blocked, saveEnabled: false, hasTypes: true });
+    const page = Object.assign(new Page(), { pageActive: true, 是否图片遮盖模式: false,
+      字段名列表: [], 笔记类型选项: [], 已选笔记类型ID: 7, fieldImages: [], fieldAudios: [],
+      clozeFieldOrds: [], 图片遮盖_遮罩列表: [], 图片遮盖_源图Uri: '', 图片遮盖_显示编辑器: false,
+      错误信息: '', saveFeedback: 'idle', originalStockKind: '', optionalReverseIndex: -1,
+      interfaceControls: () => controls, interfaceEnabled: id => controls.find(item => item.id === id)?.enabled ?? false,
+      getUIContext: () => ({}) });
+    page.publishInterface();
+    const result = buildAgentAppStructure(context, 'add_note', '', localize, agentSettingDefinitions(), tools, tracker.snapshot());
+    const view = result.observations.find(item => item.surface === 'add_note');
+    assert.equal(view.values.find(item => item.id === 'templates_location').value, 'notetype_before_help');
+    const template = result.surfaces[0].items.find(item => item.id === 'templates');
+    assert.equal(template.enabled, !blocked);
+    assert.equal(template.iconKey, 'ic_settings_layout');
+  }
+});
+
 test('icon controls retain names and current mode in shared UI and JIDE observations', () => {
   const uiIcons = loadPlatformModule('utils/AppInterfaceText.ets', 'interfaceControlIcon', { $r: key => key });
   for (const labels of [zh, en]) for (const simple of [true, false]) for (const menuOpen of [false, true]) {
@@ -126,6 +162,9 @@ test('JIDE reads current Core rendering ownership and the same supported TTS par
   assert.equal(support.mediaPaths,'anki-core');
   assert.equal(support.answerComparison,'anki-core');
   assert.equal(support.clozeTyping,'anki-core');
+  assert.deepEqual(support.web, {allowHttpResources:true,mediaPlaybackRequiresGesture:false,
+    scriptFailures:'continue remaining scripts; report failures; fail empty cards',
+    authorization:'provided and validated by the template author; requires author service availability'});
   assert.equal(support.tts.backend,'HarmonyOS CoreSpeechKit');
   assert.equal(support.tts.voicePrefix,'HarmonyOS_');
   assert.deepEqual([support.tts.minimumSpeed,support.tts.maximumSpeed],[0.5,2]);
@@ -264,7 +303,7 @@ test('setting knowledge and the current tool declarations remain separate from p
 
 test('real menu components enumerate the same options as JIDE and dispatch every callback exactly once', () => {
   for(const [file,name,surface,callbacks] of [
-    ['components/home/主页更多面板.ets','主页更多面板','home_more',{history:'onHistory',settings:'设置回调',stats:'统计回调',reminders:'提醒回调',intro:'onIntro'}],
+    ['components/home/主页更多面板.ets','主页更多面板','home_more',{history:'onHistory',settings:'设置回调',stats:'统计回调',reminders:'提醒回调',intro:'onIntro',keyboard:'onKeyboard'}],
     ['components/主页操作面板.ets','主页操作面板','home_create',{create_deck:'创建牌组回调',filtered_deck:'onCreateFilteredDeck',import:'导入牌组回调',cloud_deck:'获取直链牌组回调'}]
   ]) {
     const tracker=new AppInterfaceTracker();
@@ -464,12 +503,13 @@ test('study UI and JIDE keep both side groups while flags cover the main menu', 
     撤销上次:()=>calls.push('undo'),埋藏或暂停当前卡:mode=>calls.push(mode===0?'bury':'suspend'),请求删除当前卡:()=>calls.push('delete'),
     changeMarking:()=>calls.push('mark'),loadFlagLabels:()=>calls.push('flag'),
     打开AI改卡:()=>calls.push('agent'),stopStudyTimers:()=>calls.push('handwrite'),configureAutoAdvance:()=>calls.push('auto_advance')});
-  const ids=['edit','agent','undo','marking','audio','card_actions','handwrite','guide'];
+  const ids=['edit','agent','undo','marking','audio','card_actions','handwrite','keyboard','guide'];
   assert.deepEqual(page.interfaceMenuItems().map(x=>x.id),ids);
   assert.equal(page.更多菜单()[0].value,localize('study_edit_note'));
   page.有音频=true;page.可撤销=true;
   for(const item of page.更多菜单()) { for(const action of item.children??[item]) action.action(); }
-  assert.deepEqual(calls,['edit','agent','undo','mark','flag','audio','bury','suspend','delete','auto_advance','handwrite','guide']);
+  assert.deepEqual(calls,['edit','agent','undo','mark','flag','audio','bury','suspend','delete','auto_advance','handwrite','handwrite','guide']);
+  assert.equal(page.keyboardHelpOpen,true,'keyboard menu opens its contextual guide and pauses timers');page.keyboardHelpOpen=false;
   assert.equal(page.flagNamesOpen,true);
   Object.assign(page,{timeboxNotice:null,clearChoiceAutoAdvance:()=>{}});
   page.openStudyMenu();page.publishInterface();

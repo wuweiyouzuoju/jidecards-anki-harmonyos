@@ -114,7 +114,9 @@ test('same surface effects have one owner across all modal implementations', () 
       assert.doesNotMatch(source, /TransitionEffect\.scale\(\{ x: currentMotionProfile\(\)\.dialogScale/, path);
     }
   }
-  assert.equal(owners, 10, 'ordinary forms delegate to DialogFrame; the crop surface retains its own transition');
+  assert.equal(owners, 9, 'deck options now use page navigation; ordinary forms and the crop surface retain their own transition');
+  assert.doesNotMatch(read('components/牌组选项面板.ets'), /SurfaceTransition\.(?:dialog|backdrop)/);
+  assert.match(read('pages/DeckOptionsPage.ets'), /注册NavParam\('DeckOptionsPage'/);
   for (const file of ['components/提醒编辑面板.ets', 'components/browser/查找替换对话框.ets',
     'components/home/创建过滤牌组面板.ets', 'components/牌组定制面板.ets']) {
     assert.match(read(file), /DialogFrame\(/, file);

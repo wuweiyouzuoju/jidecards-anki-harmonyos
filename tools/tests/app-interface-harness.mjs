@@ -1,3 +1,5 @@
+import { BrowserOperationController } from '../../entry/src/main/ets/model/BrowserOperationController.ts';
+import { assertNoteEditorUnchanged } from '../../entry/src/main/ets/model/NoteEditorConflict.ts';
 import { completeStudyGestures, studyGestureCommand, StudyShakeDetector } from '../../entry/src/main/ets/model/StudyGestureConfig.ts';
 import { validateStudyControls } from '../../entry/src/main/ets/model/StudyControls.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -17,7 +19,7 @@ export function appInterfaceDependencies() {
   const flagMenuChoices = loadPlatformModule('components/common/FlagMenuChoices.ets', 'flagMenuChoices', {
     CARD_FLAGS, customFlagLabel, $r: key => key, namedResourceText: (_context, key) => 'app.string.' + key
   });
-  return { completeStudyGestures, studyGestureCommand, validateStudyControls,
+  return { discardNoteRecordings: async () => {}, completeStudyGestures, studyGestureCommand, validateStudyControls,
     StudyShakeSensor: loadPlatformModule('backend/StudyShakeSensor.ets', 'StudyShakeSensor', { StudyShakeDetector, sensor: {SensorId:{ACCELEROMETER:1},on(){},off(){},getSingleSensorSync(){} } }),
     agentOperationHosts:new AgentOperationHosts(), appInterface: new AppInterfaceTracker(), FEEDBACK_ACTIONS, resultUndoStatus, OFFICIAL_ANNOUNCEMENTS_ENABLED, visibleInterfaceItems, studyInterfaceMenu, actionMenuRows, visibleActionMenuRows, toggleActionMenuBranch,
     $r: key => key, CARD_FLAGS, customFlagLabel, flagMenuChoices,
@@ -28,7 +30,10 @@ export function appInterfaceDependencies() {
 /** 编辑生命周期回归仍执行真实观察方法；只替换平台资源解析。 */
 export function noteInterfaceDependencies() {
   const deps = appInterfaceDependencies();
-  return { ...deps, ...expansionRevealDependencies(), noteEditInterfaceControls, noteFieldDisplayKey,
+  const NoteEditorProperties = loadPlatformModule('backend/NoteEditorProperties.ts','NoteEditorProperties', {
+    BrowserOperationController, assertNoteEditorUnchanged, 笔记服务: class {}, 卡片服务: class {}, 笔记类型服务: class {}, 牌组服务: class {}
+  });
+  return { ...deps, ...expansionRevealDependencies(), NoteEditorProperties, noteEditInterfaceControls, noteFieldDisplayKey,
     interfaceItemText: loadPlatformModule('utils/AppInterfaceText.ets', 'interfaceItemText', { APP_INTERFACE_SURFACES, ...deps }),
     noteFieldText: loadPlatformModule('utils/NoteTypeText.ets', 'noteFieldText', { noteFieldDisplayKey, ...deps }) };
 }

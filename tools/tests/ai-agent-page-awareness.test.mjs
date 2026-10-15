@@ -8,12 +8,14 @@ import { APP_INTERFACE_SURFACES, STATS_INTERFACE_SECTIONS, AppInterfaceTracker, 
 import { noteFieldDisplayKey, noteTypeDisplayKey } from '../../entry/src/main/ets/model/NoteTypePresentation.ts';
 import { buildAgentAppStructure } from '../../entry/src/main/ets/model/agent/AgentAppStructure.ts';
 import { expansionRevealDependencies, loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
+import { noteInterfaceDependencies } from './app-interface-harness.mjs';
 import { DeckOptionsSession, DeckOptionsFsrsState } from '../../entry/src/main/ets/model/home/DeckOptionsSession.ts';
 import { 牌组配置表单 } from '../../entry/src/main/ets/model/牌组配置表单.ets';
 import { 牌组选项编辑 } from '../../entry/src/main/ets/model/牌组选项编辑.ets';
 import { emptyDeckConfigSettings } from '../../entry/src/main/ets/proto/messages/DeckConfigMessages.ts';
 import { deckConfigUseCount } from '../../entry/src/main/ets/model/DeckConfigSave.ts';
 import { deckOptionDefaultValues } from '../../entry/src/main/ets/model/DeckOptionsDefaults.ts';
+import { prepareDeckOptionsDraft, deckOptionsDraftFingerprint } from '../../entry/src/main/ets/model/DeckOptionsDraft.ets';
 
 const read = path => readFileSync(new URL('../../entry/src/main/ets/' + path, import.meta.url),'utf8');
 const strings = locale => new Map(JSON.parse(readFileSync(new URL(`../../entry/src/main/resources/${locale}/element/string.json`,import.meta.url),'utf8')).string.map(x=>[x.name,x.value]));
@@ -137,7 +139,7 @@ test('real editor form observes bounded field labels, busy guards and cleanup wi
   const tracker=new AppInterfaceTracker();
   let drawingCleanup;
   const Form=loadComponentLogic('components/browser/浏览编辑区.ets','浏览编辑区',
-    {...dependencies(tracker),...expansionRevealDependencies(),NoteAudioPreview:class{async dispose(){}},discardNoteRecordings:async()=>{},
+    {...noteInterfaceDependencies(),...dependencies(tracker),NoteAudioPreview:class{async dispose(){}},discardNoteRecordings:async()=>{},
       discardNoteDrawingImages:async(images,cacheDir)=>{drawingCleanup={images,cacheDir};}});
   const form=new Form();Object.assign(form,{getUIContext:()=>({getHostContext:()=>({cacheDir:'TEST_CACHE'})}),fieldNames:['Front','CUSTOM_FIELD'],originalStockKind:1,
     initialFieldValues:['PRIVATE_BODY','PRIVATE_BODY'],initialTags:'PRIVATE_TAGS',optionalReverseFieldOrd:1,clozeFieldOrds:[0]});
@@ -206,6 +208,7 @@ test('real deck options feature publishes loading, error/retry and loaded form f
     }
     const Feature=loadComponentLogic('components/home/DeckOptionsFeature.ets','DeckOptionsFeature',{
       ...dependencies(tracker),DeckOptionsSession:Session,DeckOptionsFsrsState,牌组配置表单,牌组选项编辑,deckConfigUseCount,deckOptionDefaultValues,
+      prepareDeckOptionsDraft,deckOptionsDraftFingerprint,
       AnkiDeckOptions:class{load(...args){return backend.load(...args);}save(){return backend.save();}committed(){}}
     });
     const feature=new Feature();Object.assign(feature,{deckId:12,deckName:'PRIVATE_DECK',getUIContext:()=>({})});
