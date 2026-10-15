@@ -22,6 +22,8 @@ Backend service index 和方法 index 均由官方 helper 提供。集合方法�
 
 清单自动盘点描述文件、消息、枚举、方法和每个旧导出函数，给出旧入口、新来源、调用者、成功 oracle 输入及直接测试。`inlineMigrations` 包含 Service 内原有手写编码；`nativeMigrations` 包含原生字段投影和调度 Schema；`contractMigrations` 单列集合开关、进度取消与关闭集合后导入。后者保留原会话状态门控和独立取消通道，使用同一生成索引，不能绕到要求 ready 的普通 RPC 通道。没有 wrapper 调用但有这些明确契约引用的接口不能误标为未接入。调用者扫描是源码定位线索，不是运行时可达性、平台支持或授权证明。辅助的空请求、校验和领域排序函数也盘点，允许没有具体消息来源。
 
+目录扫描统一按完整路径的 UTF-16 码元顺序排序，不依赖操作系统返回顺序或区域设置；[清单顺序回归](../../tools/tests/protocol-inventory.test.mjs) 反转目录枚举后比较完整产物，保证 Windows 与 Linux 的生成结果一致。
+
 ## 可重复命令
 
 日常源码归档保留 `third_party/anki`，无需其 `.git`，也不借用父仓库 HEAD：

@@ -6,8 +6,9 @@ import { methodNames } from '../verify-rpc-index.mjs';
 const root = new URL('../../', import.meta.url);
 const read = file => readFileSync(new URL(file, root), 'utf8');
 function walk(directory) {
+  // Directory enumeration differs across platforms; generated reports use code-unit path order.
   return readdirSync(new URL(directory, root), {withFileTypes:true}).flatMap(entry => entry.isDirectory()
-    ? walk(directory+'/'+entry.name) : /\.(ts|ets|mjs)$/.test(entry.name) ? [directory+'/'+entry.name] : []);
+    ? walk(directory+'/'+entry.name) : /\.(ts|ets|mjs)$/.test(entry.name) ? [directory+'/'+entry.name] : []).sort();
 }
 const className = name => name.replace(/^anki\./,'').split(/[._]/).map(part => part[0].toUpperCase()+part.slice(1)).join('');
 export function inventory(schema) {
