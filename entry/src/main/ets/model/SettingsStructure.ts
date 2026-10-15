@@ -59,6 +59,17 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     { id: 'sync_logout', titleKey: 'sync_logout', condition: 'logged_in' },
     { id: 'sync_custom_server', titleKey: 'sync_custom_server_entry' }
   ] },
+  { id: 'device_link', sectionId: 'sync', titleKey: 'device_link_title', items: [
+    { id: 'device_link_toggle', titleKey: 'device_link_title' },
+    { id: 'device_link_show_code', titleKey: 'device_link_show_code', opens: 'device_pairing_code' },
+    { id: 'device_link_scan', titleKey: 'device_link_scan' },
+    { id: 'device_link_devices', titleKey: 'device_link_devices' },
+    { id: 'device_link_connect', titleKey: 'device_progress_start' },
+    { id: 'device_progress_allow', titleKey: 'device_progress_allow' },
+    { id: 'device_progress_all', titleKey: 'device_progress_all' },
+    { id: 'device_progress_cancel', titleKey: 'device_progress_cancel' },
+    { id: 'device_link_forget', titleKey: 'device_link_forget' }
+  ] },
   { id: 'appearance', sectionId: 'appearance', titleKey: 'settings_appearance_display', items: [
     { id: 'theme_mode', titleKey: 'appearance_theme', settingId: 'theme_mode' },
     { id: 'color_theme', titleKey: 'appearance_color_theme', settingId: 'color_theme' },

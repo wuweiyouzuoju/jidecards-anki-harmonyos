@@ -28,6 +28,7 @@ export function settingsIcon(id: string): Resource {
       return $r('app.media.ic_settings_advanced');
     case 'sync':
     case 'auto_sync':
+    case 'device_link':
       return $r('app.media.ic_home_sync');
     case 'ai':
       return $r('app.media.ic_study_agent');

@@ -36,6 +36,7 @@ import { 布局分组 } from './settings/布局分组';
 import { 数据分组 } from './settings/数据分组';
 import { 模式切换菜单 } from './settings/模式切换菜单';
 import { 同步分组 } from './settings/同步分组';
+import { DeviceLinkSettings } from './settings/DeviceLinkSettings';
 import { 术语分组 } from './settings/术语分组';
 import { 媒体管理面板 } from './settings/媒体管理面板';
 import { 备份管理面板 } from './settings/备份管理面板';
@@ -568,6 +569,9 @@ export struct 设置面板 {
                   }
                 })
               }
+            }
+            else if (group.id === 'device_link') {
+              ListItem() { DeviceLinkSettings({ 是否深色: this.是否深色, scroller: this.内容滚动器 }) }
             }
             else if (group.id === 'ai') {
               ListItem() {
