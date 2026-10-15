@@ -16,8 +16,10 @@ const settle = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(
 test('external APKG recognition preserves encoded names and handles uppercase/extensions and opaque typed URIs', () => {
   for (const uri of ['file://documents/词汇.apkg', 'FILE://chat/词汇.apkg', 'file://chat/%E8%AF%8D%20%E6%B1%87.APKG',
     'file://chat/deck%2Eapkg?token=read']) assert.equal(externalDeckUri(action, uri, ''), uri);
-  for (const type of ['com.jide.kapian.apkg', 'application/apkg', 'application/x-apkg']) {
+  for (const type of ['com.jide.kapian.apkg', 'application/apkg', 'application/x-apkg', 'application/vnd.anki']) {
     assert.equal(externalDeckUri(action, 'file://chat/1234', type), 'file://chat/1234');
+    assert.equal(externalDeckUri(action, 'file://chat/backup.colpkg', type), null);
+    assert.equal(externalDeckUri(action, 'file://chat/archive.zip', type), null);
   }
   for (const uri of ['https://site/deck.apkg', 'jidecards://stats', '/data/deck.apkg',
     'file://chat/backup.colpkg', 'file://chat/deck.zip', 'file://chat/deck.jide', 'file://chat/deck.json',

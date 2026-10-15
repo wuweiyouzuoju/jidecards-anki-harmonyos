@@ -23,6 +23,7 @@
 | 沙箱桥接验收 | `powershell -File tools/build-app.ps1 -Test`；`node tools/test-agent-sandbox-app.mjs <connect-key>` | 当前 signed 主包安装后运行测试模块，不访问卡库 |
 | 沙箱第三方许可 | `node tools/generate-agent-sandbox-notices.mjs --check` | 离线校验随包许可；升级后显式 --write 生成并审查 |
 | 沙箱设备验收 | `node tools/test-agent-sandbox-device.mjs <connect-key> 20` | 自动识别架构、构建并执行独立测试与多样本 probe，保存 JSON；不安装应用、不访问卡库 |
+| APKG 系统候选验收 | `node tools/test-external-deck-open-device.mjs <connect-key> [report-directory]` | Node 24、hdc、已安装当前签名主包；逐一验证 APKG UTD/MIME、二进制/ZIP 和后缀推断的真实系统候选。只打开后关闭候选面板，不选应用、不读文件、不导入；失败非零。不能替代原生 QQ/微信或卓易通交付与授权验收，见[系统打开入口](../docs/development/home.md#apkg-系统打开入口) |
 | Agent 在线评测 | `node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs tools/test-agent-live.mjs --run` | 显式发送合成任务，需 `DEEPSEEK_API_KEY`，产生 API 费用；不读写用户卡库，环境变量与验收范围见[应用内 Agent](../docs/development/agent.md#执行环境与错误恢复) |
 | RPC 映射门禁 | `node tools/verify-rpc-index.mjs` | 锁定协议输入指纹与逐项语义映射；生成/升级步骤见 [验证说明](../docs/development/verification.md#rpc-协议门禁) |
 | 集成/发布完整验证 | `npm run verify` | 环境、仓库、Rust 主机测试和签名 HAP；分阶段失败即停，普通任务按影响选择相关检查 |

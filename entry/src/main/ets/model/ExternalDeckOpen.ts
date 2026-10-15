@@ -17,7 +17,7 @@ export interface ExternalDeckOpenSupport {
 /** 系统声明由回归核对；接收校验和 JIDE 能力目录共用此边界。 */
 export const EXTERNAL_DECK_OPEN_SUPPORT: ExternalDeckOpenSupport = {
   action: 'ohos.want.action.viewData', scheme: 'file', entities: ['entity.system.default'], extension: '.apkg',
-  packageTypes: ['com.jide.kapian.apkg', 'application/apkg', 'application/x-apkg'],
+  packageTypes: ['com.jide.kapian.apkg', 'application/apkg', 'application/x-apkg', 'application/vnd.anki'],
   // 通用类型只用于让系统列出候选；不能据此把无后缀文件当作 APKG。
   fallbackTypes: ['general.octet-stream', 'application/octet-stream', 'general.zip-archive',
     'application/zip', 'application/x-zip-compressed'],

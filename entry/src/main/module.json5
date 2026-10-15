@@ -48,6 +48,12 @@
                 linkFeature: 'FileOpen'
               },
               {
+                // 与 AnkiDroid 的专用 Anki 包 MIME 保持兼容。
+                scheme: 'file',
+                type: 'application/vnd.anki',
+                linkFeature: 'FileOpen'
+              },
+              {
                 // 聊天应用可能将 APKG 标成普通二进制；接收后仍校验文件后缀。
                 scheme: 'file',
                 type: 'general.octet-stream',

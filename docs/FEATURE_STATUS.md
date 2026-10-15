@@ -159,7 +159,7 @@ FSRS 负担均衡/带步骤短期调度、历史备份每日/每周/每月保留
 
 ## APKG 外部打开
 
-- 已接入系统 FileOpen、自定义 APKG UTD、EntryAbility 冷/热启动接收；默认打开类别、APKG MIME 与二进制/ZIP 类型兜底覆盖不同文件提供方的声明方式，实际接收仍校验 APKG。首页先展示导入选项，确认后用授权 URI 导入，无需再次选文件；JIDE 从同一声明读取能力边界。与本地选择器共用暂存、Anki Core、进度/取消、结果统计及牌组刷新。声明与真机验收范围见[系统打开入口](development/home.md#apkg-系统打开入口)，CSV/TSV 映射与整库中断恢复见[数据导入](development/import-data.md)。
+- 已接入系统 FileOpen、自定义 APKG UTD、EntryAbility 冷/热启动接收；默认打开类别、APKG MIME（含 `application/vnd.anki`）与二进制/ZIP 类型兜底适配不同文件提供方的声明方式，实际接收仍校验 APKG。首页先展示导入选项，确认后用授权 URI 导入，无需再次选文件；JIDE 从同一声明读取能力边界。与本地选择器共用暂存、Anki Core、进度/取消、结果统计及牌组刷新。声明、真实系统候选验证工具及 QQ/卓易通验收边界见[系统打开入口](development/home.md#apkg-系统打开入口)，CSV/TSV 映射与整库中断恢复见[数据导入](development/import-data.md)。
 - 学习、编辑、同步或弹层占用时等待首页空闲；排队/导入中的同一 URI 去重，不自动导入 COLPKG。
 - 发送应用必须交付文件 URI 及读取授权。当前设备为模拟器，华为真机上文件管理/聊天应用“其他应用打开”的候选列表及授权读取仍待实测。
 - 验证结果：2026-10-10 的类型兼容修复通过 108 项相关 Node 检查、增量签名 HAP 构建及最终包内 FileOpen/UTD 声明核对；未重建 Rust，也未执行真机 QQ/微信候选与授权读取。历史模拟器覆盖安装与启动成功不等同于本次真机端到端验收；后续按[分级验证](development/verification.md#按变更路径选择验证)选择检查，不沿用历史测试总数。

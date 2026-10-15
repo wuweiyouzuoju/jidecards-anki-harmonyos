@@ -143,11 +143,13 @@ HomeSummaryHeader 不再区分手机双侧与详情分栏外缘布局，也不�
 
 ## APKG 系统打开入口
 
-`module.json5` 注册 `FileOpen`、默认打开类别及 APKG 的 UTD/MIME；`resources/rawfile/arkdata/utd/utd.json5` 将 `.apkg` 和专用 MIME 映射到自定义 UTD。为兼容聊天应用按二进制或 ZIP 容器传出文件的情况，声明同时包含 `ExternalDeckOpen.EXTERNAL_DECK_OPEN_SUPPORT.fallbackTypes`；这些类型只增加候选匹配，接收时仍要求 `.apkg` 文件名，无后缀 URI 仅接受 APKG 专用类型。不能注册 `*/*`、`general.file` 或 `general.object`；二进制/ZIP 兜底可能使应用也出现在其他二进制/ZIP 文件的候选中，这类文件不进入导入队列。
+`module.json5` 注册 `FileOpen`、默认打开类别及 APKG 的 UTD/MIME；`resources/rawfile/arkdata/utd/utd.json5` 将 `.apkg` 和专用 MIME（包括 AnkiDroid 同样接收的 `application/vnd.anki`）映射到自定义 UTD。为兼容聊天应用按二进制或 ZIP 容器传出文件的情况，声明同时包含 `ExternalDeckOpen.EXTERNAL_DECK_OPEN_SUPPORT.fallbackTypes`；这些类型只增加候选匹配，接收时仍要求 `.apkg` 文件名，无后缀 URI 仅接受 APKG 专用类型。不能注册 `*/*`、`general.file` 或 `general.object`；二进制/ZIP 兜底可能使应用也出现在其他二进制/ZIP 文件的候选中，这类文件不进入导入队列。
 
 EntryAbility 的冷/热启动都通过 `ExternalDeckOpen` 校验原始文件 URI 并排队，AppStorage 只广播修订号。首页空闲且集合就绪后，系统入口与文件选择器共用 `importDeckUri`，通过 `importUri(uri, true)` 展示导入选项；用户确认后直接读取授权 URI，不再弹选择器。学习、编辑、弹层和同步占用期间保留请求；待处理时启动提示与自动同步让路。只接收 APKG，不允许 COLPKG 整库替换。同 URI 在排队、确认和导入期间去重，关闭或完成后允许主动重新打开。
 
-`get_app_structure.externalDeckOpen` 与接收校验共用能力声明，标明确认、文件选择器及整库替换边界。`tools/tests/external-deck-open.test.mjs` 核对真实 manifest、UTD 和共享声明，并直接验证文件识别、占用与队列；这些回归不模拟 QQ/微信的真实候选查询。真机验收需覆盖原生 QQ、微信、系统文件管理的 `.apkg` 候选及读取授权，分别检查冷/热启动、确认/关闭和占用后继续；本次未连接手机，不将声明/构建通过记作上述端到端通过。系统规则参考 [OpenHarmony 文件处理应用接入](https://github.com/openharmony/docs/blob/master/zh-cn/application-dev/application-models/file-processing-apps-startup.md)与[隐式 Want 匹配](https://github.com/openharmony/docs/blob/master/zh-cn/application-dev/application-models/explicit-implicit-want-mappings.md)。
+`get_app_structure.externalDeckOpen` 与接收校验共用能力声明，标明确认、文件选择器及整库替换边界。`tools/tests/external-deck-open.test.mjs` 核对真实 manifest、UTD 和共享声明，并直接验证文件识别、占用与队列。系统候选验收使用 `node tools/test-external-deck-open-device.mjs <connect-key> [report-directory]`：当前签名主包先用 `install -r` 覆盖安装，工具向真实系统解析器发送各声明类型及无类型的合成 `.apkg` URI，强制打开候选面板并检查应用名称，随后返回，不选择候选、不读取文件、不导入卡库。2026-10-15 在 OpenHarmony 6.1 模拟器已复现旧 2.9.98 对 `application/vnd.anki` 无候选，补齐后10种查询全部列出记得闪卡；这证明原来的类型枚举遗漏已修复，不能证明 QQ 实际使用该 MIME。本次用户已确认问题发生在鸿蒙原生 QQ，实际调用参数尚未取得。
+
+手机端仍需区分原生 QQ 与卓易通内安卓版 QQ，不能将 Android 容器的应用候选等同于原生系统候选。真机验收覆盖原生 QQ、微信、系统文件管理的 `.apkg` 候选及读取授权，分别检查冷/热启动、确认/关闭和占用后继续；模拟器解析器通过不等于真实 QQ 端到端通过。系统规则参考 [OpenHarmony 文件处理应用接入](https://github.com/openharmony/docs/blob/master/zh-cn/application-dev/application-models/file-processing-apps-startup.md)与[隐式 Want 匹配](https://github.com/openharmony/docs/blob/master/zh-cn/application-dev/application-models/explicit-implicit-want-mappings.md)。
 
 ## 数据与牌组修改入口
 

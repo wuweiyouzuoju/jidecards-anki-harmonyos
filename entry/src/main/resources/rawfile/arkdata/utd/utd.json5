@@ -4,7 +4,7 @@
       "TypeId": "com.jide.kapian.apkg",
       "BelongingToTypes": ["general.archive", "general.file"],
       "FilenameExtensions": [".apkg"],
-      "MIMETypes": ["application/apkg", "application/x-apkg"],
+      "MIMETypes": ["application/apkg", "application/x-apkg", "application/vnd.anki"],
       "Description": "Anki Deck Package",
       "ReferenceURL": ""
     }
