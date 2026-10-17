@@ -5,6 +5,7 @@ export const CARD_REVIEWER_RUNTIME: string = String.raw`
 (function () {
   var documentId = 0, revision = 0;
   var scriptFailures = [], rendering = true;
+  var textColorPatches = [], contrastObserver = null, contrastFrame = 0;
   window.onUpdateHook = [];
   window.onShownHook = [];
   function clearScriptDiagnostics() {
@@ -90,8 +91,136 @@ export const CARD_REVIEWER_RUNTIME: string = String.raw`
       return (Math.max(text, surface) + 0.05) / (Math.min(text, surface) + 0.05);
     }
     if (contrast(preferred) < 4.5 && contrast(alternate) > contrast(preferred)) preferred = alternate;
-    // Only the application fallback consumes this variable; explicit template/field colors keep priority.
+    // Only the application fallback consumes this variable; descendant contrast is checked separately.
     document.body.style.setProperty('--jide-card-default-text', preferred);
+  }
+  function restoreTextColors() {
+    if (contrastObserver) contrastObserver.disconnect();
+    textColorPatches.forEach(function (patch) {
+      var currentStyle = patch.element.getAttribute('style');
+      var style = patch.element.style;
+      // A template may have changed its own color since the last pass; keep that newer value.
+      if (style.getPropertyValue('color') !== patch.applied || style.getPropertyPriority('color') !== 'important') return;
+      if (currentStyle === patch.appliedStyle) {
+        if (patch.originalStyle === null) patch.element.removeAttribute('style');
+        else patch.element.setAttribute('style', patch.originalStyle);
+      } else {
+        if (patch.value) style.setProperty('color', patch.value, patch.priority);
+        else style.removeProperty('color');
+        if (patch.originalStyle === null && !style.length) patch.element.removeAttribute('style');
+      }
+    });
+    textColorPatches = [];
+  }
+  function observeTextColors() {
+    if (typeof MutationObserver === 'undefined') return;
+    if (!contrastObserver) contrastObserver = new MutationObserver(function () {
+      if (contrastFrame) return;
+      // Late decrypted answers, revealed hints and template color changes also need a pass.
+      contrastFrame = window.requestAnimationFrame(function () {
+        contrastFrame = 0;
+        updateTextContrast();
+      });
+    });
+    contrastObserver.observe(document.documentElement, {subtree: true, childList: true, characterData: true,
+      attributes: true, attributeFilter: ['style', 'class', 'color', 'bgcolor', 'hidden', 'open']});
+  }
+  function updateTextContrast() {
+    restoreTextColors();
+    if (!document.body.classList || !document.body.classList.contains('nightMode')) return;
+    // Only builder-owned documents opt into this extension; independent upstream fixtures keep their own colors.
+    if (!document.getElementById('jide-card-appearance')) return;
+    // Author scripts can append an asynchronous answer outside #qa after the side is acknowledged.
+    var root = document.body;
+    if (!root.querySelectorAll) return;
+    var canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 1;
+    var context = canvas.getContext('2d');
+    if (!context) return;
+    var colors = new Map(), surfaces = new Map(), styles = new Map();
+    function styleOf(element) {
+      if (!styles.has(element)) styles.set(element, getComputedStyle(element));
+      return styles.get(element);
+    }
+    function rgba(value) {
+      if (!colors.has(value)) {
+        context.clearRect(0, 0, 1, 1);
+        context.fillStyle = value;
+        context.fillRect(0, 0, 1, 1);
+        colors.set(value, Array.from(context.getImageData(0, 0, 1, 1).data));
+      }
+      return colors.get(value);
+    }
+    function surfaceOf(element) {
+      if (!element) return [255, 255, 255];
+      if (surfaces.has(element)) return surfaces.get(element);
+      var style = styleOf(element), parent = surfaceOf(element.parentElement);
+      // Do not guess text colors over pictures/gradients or change intentionally faded content.
+      var surface = null;
+      if (parent && style.backgroundImage === 'none' && style.opacity === '1' && style.filter === 'none' &&
+          style.mixBlendMode === 'normal') {
+        var paint = rgba(style.backgroundColor), alpha = paint[3] / 255;
+        surface = paint.slice(0, 3).map(function (channel, index) { return channel * alpha + parent[index] * (1 - alpha); });
+      }
+      surfaces.set(element, surface);
+      return surface;
+    }
+    function brightness(rgb) {
+      var channels = rgb.map(function (channel) {
+        var value = channel / 255;
+        return value <= 0.04045 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
+      });
+      return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+    }
+    function contrast(rgb, background) {
+      var fg = brightness(rgb), bg = brightness(background);
+      return (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05);
+    }
+    var plans = [];
+    [root].concat(Array.from(root.querySelectorAll('*'))).forEach(function (element) {
+      if (element.namespaceURI !== 'http://www.w3.org/1999/xhtml' ||
+          /^(SCRIPT|STYLE|TEMPLATE|NOSCRIPT)$/.test(element.tagName) ||
+          !Array.from(element.childNodes).some(function (node) { return node.nodeType === 3 && node.textContent.trim(); })) return;
+      var style = styleOf(element);
+      if (style.visibility !== 'visible' || !element.getClientRects().length) return;
+      var background = surfaceOf(element), foreground = rgba(style.color);
+      if (!background || foreground[3] === 0 || style.webkitTextFillColor !== style.color) return;
+      var rgb = foreground.slice(0, 3), alpha = foreground[3] / 255, color = style.color;
+      function textContrast(paint) {
+        return contrast(paint.map(function (channel, index) {
+          return channel * alpha + background[index] * (1 - alpha);
+        }), background);
+      }
+      if (textContrast(rgb) < 4.5) {
+        // Blend toward the readable pole just enough; colored emphasis retains its channel ordering.
+        var pole = textContrast([255, 255, 255]) > textContrast([0, 0, 0]) ? 255 : 0;
+        // Very faint authored text cannot meet the threshold without changing its opacity.
+        if (textContrast([pole, pole, pole]) < 4.5) return;
+        var low = 0, high = 1;
+        for (var i = 0; i < 12; i++) {
+          var amount = (low + high) / 2;
+          var mixed = rgb.map(function (channel) { return Math.round(channel + (pole - channel) * amount); });
+          if (textContrast(mixed) >= 4.5) high = amount;
+          else low = amount;
+        }
+        rgb = rgb.map(function (channel) { return Math.round(channel + (pole - channel) * high); });
+        color = alpha === 1 ? 'rgb(' + rgb.join(', ') + ')' : 'rgba(' + rgb.join(', ') + ', ' + alpha + ')';
+      }
+      plans.push({element: element, color: color});
+    });
+    // Measure before writing. A repaired parent must not turn inherited dark text on a light block white.
+    plans.forEach(function (plan) {
+      if (getComputedStyle(plan.element).color === plan.color) return;
+      var element = plan.element, originalStyle = element.getAttribute('style'), style = element.style;
+      var patch = {element: element, value: style.getPropertyValue('color'), priority: style.getPropertyPriority('color'),
+        originalStyle: originalStyle, applied: '', appliedStyle: ''};
+      style.setProperty('color', plan.color, 'important');
+      patch.applied = style.getPropertyValue('color');
+      // Synchronize the CSSOM attribute before later removing it (including Chromium's lazy style serialization).
+      patch.appliedStyle = element.getAttribute('style');
+      textColorPatches.push(patch);
+    });
+    observeTextColors();
   }
   function report(error) {
     if (error) {
@@ -174,6 +303,7 @@ export const CARD_REVIEWER_RUNTIME: string = String.raw`
     await hooks(window.onShownHook);
     showScriptDiagnostics(true);
     updateDefaultTextColor();
+    updateTextContrast();
     if (side === 'question') window.scrollTo(0, 0);
     if (side === 'answer' && scrollToAnswer) {
       var anchor = document.getElementById('answer');
@@ -223,6 +353,7 @@ export const CARD_REVIEWER_RUNTIME: string = String.raw`
         if (window.MathJax && MathJax.typesetClear) MathJax.typesetClear([qa]);
         window.onUpdateHook.length = 0;
         window.onShownHook.length = 0;
+        restoreTextColors();
         updateAppearance(parsed);
         document.body.className = parsed.body.className;
         qa.innerHTML = next.innerHTML;
@@ -234,6 +365,7 @@ export const CARD_REVIEWER_RUNTIME: string = String.raw`
       if (id !== documentId) return;
       revision = version;
       try {
+        restoreTextColors();
         var appearance = document.getElementById('jide-card-appearance');
         if (!appearance || appearance.tagName !== 'STYLE') throw new Error('Missing card appearance stylesheet');
         appearance.textContent = stylesheet;
@@ -243,6 +375,7 @@ export const CARD_REVIEWER_RUNTIME: string = String.raw`
         document.body.classList.toggle('night_mode', isDark);
         document.body.style.removeProperty('--jide-card-default-text');
         updateDefaultTextColor();
+        updateTextContrast();
         // 外观确认保留 DOM、输入焦点、滚动位置和音频；不调用模板的翻面 hooks。
         report('');
       } catch (error) { report(error); }

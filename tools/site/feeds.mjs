@@ -10,6 +10,8 @@ export function renderFeeds(content) {
 - 许可证：${work.license}
 - 作者：[${data.author.name}](${data.author.url})
 - 下载：[华为应用市场](${work.marketplace.url})
+- 签名 HAP 开发包：[${work.sourcePackage.fileName}](${work.sourcePackage.downloadUrl}) · [SHA-256 校验](${work.sourcePackage.checksumsUrl}) · [构建说明](${work.sourcePackage.releaseUrl})
+- 开发包安装：${work.sourcePackage.installNote}
 - 源码：${repositories.map(item => `[${item.name}](${item.url})`).join(' · ')}
 - 更新日期：${data.updatedAt}
 

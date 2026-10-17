@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import vm from 'node:vm';
 import { normalizeSyncServer } from '../entry/src/main/ets/model/SyncSettings.ts';
+import { AgentOperationHosts } from '../entry/src/main/ets/model/agent/AgentOperationHost.ts';
 
 /** Execute fresh compiler output. Platform substitutes enforce the @Link subscription contract;
  * this checks construction, rendering and form callbacks, not ArkUI scheduling/layout or bytecode.
@@ -15,7 +16,7 @@ export async function checkSyncServerCompiled(source) {
   assert.match(source, /export class 同步分组 extends ViewPU/, 'Pass fresh CompileArkTS 同步分组.ts output.');
   assert.match(source, /class 自定义服务器弹窗 extends ViewPU/, 'Compiled server dialog is missing.');
   const seen = { dialogs: [], saves: [], texts: [], credentials: [], automatic: [] };
-  let nextId = 0, failSave = false, pendingSave = null;
+  let nextId = 0, failSave = false, pendingSave = null, visibleAuth = null;
   class Property {
     constructor(value) { this.value = value; this.deleted = false; this.subscribers = new Set(); }
     get() { assert.equal(this.deleted, false, 'reading a deleted state'); return this.value; }
@@ -102,13 +103,18 @@ export async function checkSyncServerCompiled(source) {
     SurfaceBorder: { options: () => ({}) }, HorizontalAlign: { Center: 'center' },
     DialogAlignment: { Center: 'center' }, SurfaceTransition: { dialogEnterAnimation: () => ({}), dialogExitAnimation: () => ({}) },
     resourceText: () => 'localized-error', syncActivity: { isActive: () => false }, normalizeSyncServer,
+    agentOperationHosts: new AgentOperationHosts(),
     saveCustomSyncServer: async value => {
       seen.saves.push(value);
       if (pendingSave) await pendingSave;
       if (failSave) throw new Error('disk full');
       return normalizeSyncServer(value);
     },
-    保存同步凭证: value => { seen.credentials.push(value); },
+    saveSyncCredentialsVerified: async value => {
+      seen.credentials.push(value);
+      visibleAuth = { ...value };
+    },
+    loadVisibleSyncAuth: () => visibleAuth,
     saveAutoSyncEnabled: async value => {
       seen.automatic.push(value);
       if (pendingSave) await pendingSave;

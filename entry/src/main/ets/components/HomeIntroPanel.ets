@@ -6,9 +6,8 @@ import { 应用尺寸 } from '../utils/应用尺寸';
 import { common } from '@kit.AbilityKit';
 import { pasteboard } from '@kit.BasicServicesKit';
 import { OFFICIAL_QQ_GROUP } from '../model/OfficialCommunity';
-import { IridescentThemePreview } from './common/IridescentThemePreview';
 
-/** 六个内容区共用标题、内边距和底色，正文不再自行叠加水平留白。 */
+/** 五个内容区共用标题、内边距和底色，正文不再自行叠加水平留白。 */
 @Component
 struct HomeIntroSection {
   @Prop title: Resource = $r('app.string.home_intro_title');
@@ -42,7 +41,7 @@ export struct HomeIntroPanel {
   private readonly groupNumber: string = OFFICIAL_QQ_GROUP;
   private readonly decksUrl: string = 'https://ankiweb.net/shared/decks/';
 
-  /** 两处群号共用复制动作，只写入群号本身。 */
+  /** 获取渠道中的群号复制动作，只写入群号本身。 */
   private async copyGroup(): Promise<void> {
     try {
       await pasteboard.getSystemPasteboard().setData(
@@ -106,34 +105,6 @@ export struct HomeIntroPanel {
   }
 
   @Builder
-  private themeSection() {
-    Column({ space: 应用尺寸.间距_12 }) {
-      Text() {
-        Span($r('app.string.home_intro_theme_body'))
-        Span($r('app.string.home_intro_theme_group_prefix'))
-        Span(this.groupNumber)
-          .fontColor($r('app.color.home_intro_link')).fontWeight(FontWeight.Medium)
-          .onClick((): void => { this.copyGroup(); })
-        Span($r('app.string.home_intro_theme_group_suffix'))
-      }
-      .fontSize(应用尺寸.字号_正文)
-      .lineHeight(22)
-      .fontColor($r('app.color.text_secondary'))
-      .textAlign(TextAlign.Start)
-      .width('100%')
-      Column({ space: 应用尺寸.间距_8 }) {
-        IridescentThemePreview()
-        Text($r('app.string.home_intro_theme_preview'))
-          .fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_secondary'))
-          .textAlign(TextAlign.Center).width('100%')
-      }
-      .width('100%').alignItems(HorizontalAlign.Center)
-    }
-    .width('100%').alignItems(HorizontalAlign.Start)
-  }
-
-  @Builder
   private paragraph(body: Resource) {
     Text(body).fontSize(应用尺寸.字号_正文).lineHeight(22)
       .fontColor($r('app.color.text_secondary')).textAlign(TextAlign.Start)
@@ -162,8 +133,6 @@ export struct HomeIntroPanel {
         content: () => { this.sourcesSection(); } })
       this.section($r('app.string.home_intro_agent_title'), $r('app.string.home_intro_agent_body'))
       this.section($r('app.string.home_intro_apkg_title'), $r('app.string.home_intro_apkg_body'))
-      HomeIntroSection({ title: $r('app.string.home_intro_theme_title'),
-        content: () => { this.themeSection(); } })
     }
     .width('100%')
   }

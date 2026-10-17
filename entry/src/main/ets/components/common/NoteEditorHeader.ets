@@ -14,8 +14,6 @@ export struct NoteEditorHeader {
   @Prop actionEnabled: boolean = true;
   @Prop showAction: boolean = true;
   @Prop closeEnabled: boolean = true;
-  @Prop showKeyboardHelp: boolean = false;
-  onKeyboardHelp: () => void = (): void => {};
   @Prop accent: ResourceColor = $r('app.color.text_primary');
   onBack: () => void = (): void => {};
   onSave: () => void = (): void => {};
@@ -30,7 +28,7 @@ export struct NoteEditorHeader {
           isInteractive: this.closeEnabled, onAction: this.onBack })
       }.width('28%').justifyContent(FlexAlign.Start)
       HelpLabel({ title: this.title, textSize: 应用尺寸.字号_标题, textWeight: FontWeight.Medium,
-        centered: true, showHelp: this.showKeyboardHelp, onHelp: this.onKeyboardHelp }).layoutWeight(1)
+        centered: true, showHelp: false }).layoutWeight(1)
       Row() {
         if (this.showAction) {
           按下态按钮({ 文案: this.actionLabel, 字色: this.accent,

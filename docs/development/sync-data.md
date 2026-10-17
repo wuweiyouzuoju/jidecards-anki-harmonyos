@@ -2,11 +2,46 @@
 
 ## 同一网络设备配对（2026-10-14）
 
+设备直连标记为实验功能，不保证功能有效。入口标题与展开说明分别复用中英文资源 `device_link_title`、`device_link_hint`；`SettingsStructure` 与 `AppInterface` 使用相同资源，JIDE 同步获得实验性质和有效性边界。
+
 设置 → 同步 → 设备直连由 `components/settings/DeviceLinkSettings.ets` 展示，两端需处于同一 Wi-Fi／热点并打开该页面。`backend/device-link/DeviceLinkService.ets` 拥有 TCP 监听、mDNS 发现、五分钟一次性二维码和认证往返；离开页面释放监听和发现，迟到结果不得更新已离开的界面。`model/device-link/DevicePairing.ts` 校验稳定设备 ID、邀请和持久记录，`LanWire.ts` 处理有界 TCP 分帧及本次连接的挑战证明。
 
 `DevicePairingStore.ets` 独占身份和配对密钥的串行持久化。设备地址仅来自当前发现和再次解析，不作为信任身份持久保存；重启后使用原身份和密钥重新发现并验证对方。二维码密钥只用于本次配对；认证后服务端生成另一把持久密钥，经认证通道发给接收端并由两端保存，旧二维码不能充当重连凭证。后续连接通过保存的密钥证明新的挑战。`LanCrypto.ets` 使用平台 AES256/GCM，认证通过前不发布解密内容。配对记录只发布设备 ID／名称／在线状态给 UI/JIDE，密钥和二维码内容不进入 JIDE 观察。
 
-当前已接通扫描、持久配对、取消配对、个人设备授权、双端学习记录合并和多台个人设备补拉。**牌组、媒体传输及 DFS 尚未接通**；设备身份认证成功与两端学习记录合并成功分别报告。现有 AnkiWeb 端点、凭证与媒体任务继续使用原入口，设备合并不轮换云端端点或清除云端待同步状态。
+当前已接通扫描、持久配对、取消配对、个人设备授权、双端学习记录合并、多台个人设备补拉，以及下文的全部卡库与媒体同步扩展。DFS 尚未接通；设备身份认证与数据提交分别报告。现有 AnkiWeb 端点、凭证与媒体任务继续使用原入口，普通设备合并不轮换云端端点或清除云端待同步状态。
+
+### 全部卡库与媒体同步扩展（2026-10-16）
+
+用户要求只扩展，不修改 Anki 上游源码及现有补丁。本实现位于 `native/rsharmony/src/peer_collection.rs` 与 `peer_collection/`，调用锁定 Core 的公开集合构造器、同步服务端序列化/合并函数和 `MediaManager`；未修改调度器或 FSRS。参考的是[开源 Anki 同步服务器接口](https://docs.ankiweb.net/manual/sync-server)，AnkiWeb 在线服务本身[没有公开源码](https://forums.ankiweb.net/t/ankis-growing-up/68610/56)。扩展在本机取得集合独占租约，暂时关闭 Backend 集合，完成扩展事务后重新打开，包括失败路径。此过程会清除当前撤销历史，授权说明明确告知。
+
+新私有服务 `PeerCollection` 的输入由 `tools/protocol/private-rpc.json` 定义，通过生成客户端调用。`model/device-link/CollectionSync.ts` 独占协议顺序，`DeviceCollectionStore.ets` 管理租约、临时文件和流式 SHA256，`DeviceLinkService` 沿用已配对的认证加密通道。当前卡库协议为 v2，包含提交确认后的媒体基线；认证回复声明精确版本，旧版本在导出卡库前明确拒绝，两端均需更新。必须在两端分别开启“允许同步卡库和媒体”；旧个人学习记录权限不会自动授予卡库写入权限，修改任一授权也不清除另一授权。
+
+同步全部牌组、笔记、笔记类型/模板、预设、卡片状态、旗标、标签、集合配置和复习记录。普通合并要求创建身份和结构时间一致；不可合并的结构变化或不同来源卡库会停止，接收设备可明确确认“使用另一台设备的卡库”，先保存 `.device-collection/backups/<token>.anki2`，并通过公开 Core 备份接口创建标准归档，可在现有“本地备份”入口恢复，然后在本机事务中替换。网络协议没有要求远端覆盖本机的模式。替换会重置本机云同步基线，下一次 AnkiWeb 同步可能要求选择方向。媒体仍按独立版本合并，不随卡库替换删除对端未列出的文件。
+
+扩展的逻辑版本、内容摘要与删除记录单独保存在 `.device-collection/collection-state.json` 和 `media-state.json`，不把 Anki 云端 USN 当作设备确认。普通合并保留云端基线，并将接收的数据标为待同步。复习历史按 ID 合并，同 ID 异内容拒绝；卡片先按修改时间保留较晚的手动暂停/旗标/重排，同秒冲突再按毫秒复习记录和稳定版本排序。删除记录在云端清理 graves 后继续保留，普通合并中删除优先于旧设备的并发修改，避免第三台旧设备将内容带回。检测到本机重新出现已确认删除的身份时，只推进扩展侧的恢复代次，不改 Core 的结构时间；双方恢复代次不一致须明确选择全量方向，防止恢复内容被旧墓碑再次删除。并发修改仍存在选择一个版本的边界，不承诺文本逐字段合并或推断异常设备时钟下的真实先后。
+
+每次传完整卡库元数据；媒体根据 SHA256 差异请求并分块传送，包括同名更新和删除。[官方媒体规则](https://docs.ankiweb.net/manual/syncing#media)要求先完成同步再传播删除：本扩展只为已确认成功传输的文件保存可传播的删除基线，单次导出或中断的首轮同步不构成基线。单个媒体上限 100 MiB、单次媒体包 4 GiB、元数据 64 MiB、对象 250000 项、媒体/标签各 100000 项；网络头先检查相应上限再创建接收文件。文件名拒绝路径和跨平台保留字符，不跟随媒体符号链接。接收后先校验并缓存全部需要的媒体，再启动卡库写入。卡库事务提交前刷盘 `collection-commit.json`，同时记录事务前后修改戳、版本表及媒体提交意图；恢复按修改戳判断 SQLite 已提交或已回滚。日志未恢复时禁止后续普通集合调用越过它；集合打开、另一次设备任务和云同步也重放媒体日志。替换同名媒体前把旧内容保存到 `media-backups/`。备份、缓存与删除版本目前保留，尚无自动整理入口；大库扫描耗时和磁盘占用需要设备验收，不承诺硬件损坏下恢复。
+
+取消或断连不撤销另一端已提交的事务，失败不会显示双端成功，可重新发起同步；当前没有网络断点续传。清理仅限本任务临时包，不删除备份/恢复日志。三台设备需逐对同步传播内容，当前“与所有在线个人设备合并”仍仅用于旧学习记录同步。媒体、卡库和旧进度同步共用集合互斥；JIDE 使用共享设置目录及组件发布的授权、结果、覆盖确认状态，不获得新增写入权限，也不读取码值、密钥或同步包。
+
+验证入口：`native/rsharmony/tests/peer_collection.rs` 使用真实 Core 卡库与本地标准同步服务器，覆盖内容、旗标、同秒复习、待上传数据、删除传播、结构拒绝/备份替换、损坏媒体回滚和日志恢复；`device-link-runtime.test.mjs` 使用生产编排与真实 TCP/AES-GCM，覆盖独立双端授权、分块同步、接收端替换、校验失败及重试；`device-link-progress-store.test.mjs` 同时验证新文件适配层的短读短写、生成 RPC、租约及自有包清理。完整验证结果见本轮交付。以上不证明真实 HarmonyOS 两机 mDNS、热点、扫码、大库性能或真实 AnkiWeb 账号行为，实验性质保留。
+
+本轮审计发现并修复以下边界，回归保存在上述入口，避免依赖对话记忆：
+
+| 问题 | 扩展层处理与复现入口 |
+| --- | --- |
+| 未完成首轮同步就删除媒体会删掉对端完整文件 | 双端提交确认后才保存删除基线；`audit_unconfirmed_media_deletion_preserves_the_other_devices_complete_file` |
+| 较晚的暂停/旗标被较早的远端答题覆盖 | 修改时间先于同秒回答排序；`audit_later_manual_suspend_and_flag_survive_an_earlier_remote_review` |
+| 同一卡片 ID 指向不同笔记/模板时静默覆盖 | 写入前拒绝身份冲突；`audit_card_id_collision_with_a_different_note_is_rejected_before_writes` |
+| SQLite 已提交但版本表写入失败时丢失媒体恢复意图 | 卡库与媒体意图共用持久提交日志；`audit_committed_collection_recovers_its_media_after_a_ledger_disk_failure`，以及 `lib.rs` 的 `pending_peer_recovery_blocks_normal_rpc_and_failed_open_leaves_core_closed` |
+| 删除与并发复习冲突、恢复后旧删除重放 | 删除优先、级联卡片引用检查，恢复代次要求明确方向；`audit_delete_and_concurrent_review_do_not_resurrect_or_block_the_collection`、`audit_restoring_deleted_identities_requires_direction_and_explicit_replace_converges` |
+| 过滤牌组原牌组缺失、损坏清单、旧媒体检查快照 | 正常过滤状态原样保留，缺失引用须先清空过滤牌组或检查卡库；卡库写入前校验清单结构与必需对象；内部关闭/重开使旧媒体检查 token 失效；`audit_filtered_state_is_preserved_and_missing_original_decks_are_rejected`、`audit_malformed_metadata_is_rejected_before_collection_writes` |
+
+前四项在修复前已通过回归复现失败，修复后通过。集合配置接收后通过 `notifyFsrsStateChanged()` 通知原有拥有者重读，避免已挂载设置与统计页显示旧开关；不改变 FSRS 或调度计算。ArkTS 规则扫描中的三条 `import type` 提示均位于允许该语法的纯 `.ts` 文件，属于误报，实际编译结果单独验收。
+
+2026-10-16 卡库/媒体审计验收：`npm run verify` 完整通过，包含全仓 3452 项 Node 检查、全部真实 Core 主机测试（其中卡库/媒体 16 项）、sandbox、RPC 索引、协议/Core 对照、双架构 Rust 及 clean 签名 HAP。另行执行启用 `anki-core` 的 clippy 且以警告为错误，通过；HAP 精确警告检查未接受项为 0。相对实施前快照，472 个上游源码/协议文件内容一致，现有 `tools/patches` 和 `UPSTREAM.lock` 无改动。日志、源码指纹、规则扫描及签名包保存在 `.local/peer-sync-audit-20261016/`，包的大小与 SHA256 见 `artifact/acceptance.json`。本轮未安装设备，真实两机网络/后台/页面外观、大库性能及真实 AnkiWeb 账号仍未验收；本地标准服务器测试不能替代这些范围。
+
+本轮验证记录：`CARGO_BUILD_JOBS=2 npm run verify` 的环境、全仓、Rust 主机、sandbox、RPC、协议/Core 对照及双架构 clean 签名包门禁通过；启用 `anki-core` 的 clippy 零警告通过。之后的界面失败刷新补充通过 `npm run verify -- repo`、设备网络/文件适配回归及 `npm run build:app -- -SkipRust -Clean -ArtifactDirectory .local/device-full-20261016/artifact`；此步只改平台源码，复用本轮已构建的双架构原生库。标准服务器专项还验证媒体上传、同名更新、删除、云端确认后的三端直连不会复活已删文件。Anki 上游源码和协议的开始/结束摘要比对无变化，现有核心补丁无修改。产物与日志保存在上述本机目录；未安装设备，未访问真实 AnkiWeb 账号。
 
 直接回归：`device-pairing.test.mjs`、`device-link-runtime.test.mjs`（进入 `npm test -- sync`）；后者执行生产平台适配源码，以 Node TCP 和真实 AES/GCM 替代 Kit 验证两端配对、重启后新端口重连、身份撤销、篡改和持久身份竞争。它不证明 HarmonyOS 的 mDNS、扫码、权限、热点路由或两机行为；这些仍需设备验收。新设置与 JIDE 共用 `SettingsStructure` / `AppInterface` 声明，当前状态由组件发布，不新增 JIDE 写入权限。
 
@@ -18,7 +53,7 @@
 
 用户明确要求个人设备直连同步合并学习记录，并继续保留 AnkiWeb；不能用仅传 APKG 或复制文件代替此目标。[Anki 官方冲突说明](https://docs.ankiweb.net/manual/syncing#conflicts)说明正常增量同步可保留两端复习历史，同一卡片在两端复习时保留双方历史并使用最近回答的状态。锁定 Core 的 `sync/collection/chunks.rs` 分别执行 `merge_revlog` 与 `merge_cards`；前者调用按记录 ID 插入的 `storage/revlog/add.sql`，后者按待同步状态和记录修改时间选择卡片状态。因此“保留双方复习历史”与“确定唯一当前调度状态”是两个需要同时验证的行为，不自行累加间隔或在前端重写调度。
 
-`model/device-link/ProgressSync.ts` 拥有传输顺序、64 KiB 二进制块、长度和 SHA256 校验、两端提交确认；认证加密沿用 `TrustedLanConnection`，远端不提供本机路径。`DeviceProgressStore.ets` 取得 `SyncActivity` 集合租约并登记 `AutoSyncScheduler` 操作，经过生成的 `PeerProgressRpc` 调用原生私有服务。临时文件在本机 `.device-progress/` 中生成；Core 排他创建文件，任务仅清理自己成功创建的 token。网络取消或页面离开不打断已进入 Core 的事务，真实调用及文件清理完成后才释放占用。
+`model/device-link/ProgressSync.ts` 拥有传输顺序、64 KiB 二进制块、长度和 SHA256 校验、两端提交确认；认证加密沿用 `TrustedLanConnection`，远端不提供本机路径。`DeviceProgressStore.ets` 取得 `SyncActivity` 集合租约并登记 `AutoSyncScheduler` 操作，经过生成的 `PeerProgressRpc` 调用原生私有服务。临时文件在本机 `.device-progress/` 中生成；Core 排他创建文件，任务仅清理自己成功创建的 token。取消状态归 `DeviceLinkService`，通过 `isCancelled` 查询传给两端编排，在文件校验完成后、接受 Core 合并前再次检查，防止校验期间取消后又启动新写入。网络取消或页面离开不打断已进入 Core 的事务，真实调用及文件清理完成后才释放占用。两端提交是各自的事务，连接中断不能回滚另一端已提交的数据，重试仍依靠记录身份去重。
 
 `native/rsharmony/src/peer_progress.rs` 校验私有 RPC 方法并转发已跟踪的 `tools/patches/anki-peer-progress.patch`。Core 在自己的锁内导出有界 JSONL 快照，并用单事务合并：同记录 ID 同内容去重，同 ID 不同内容拒绝并回滚；新复习记录及更新卡片使用 `usn=-1`，集合的云端 USN、last-sync 和 schema-change 不变。卡片状态采用 Core 已算出的快照，不重新调度；以毫秒复习 ID 选择最近回答，同一历史再按修改时间及稳定状态比较解决精确相等的冲突。合并版本需要推进时仅提高卡片修改时间，保证待上传状态能被常规同步接收。牌组位置及旗标仍保留接收端值，不混入学习记录同步。
 
@@ -35,6 +70,12 @@
 - 三台及更多个人设备在补拉完成后复习记录与当前状态收敛；每台分别报告待处理、失败或完成。
 
 直接验证入口：`native/rsharmony/tests/peer_progress.rs` 使用临时真实 Core 卡库验证离线双方历史、同秒三端状态、重复/重开去重、损坏/身份/同 ID 内容冲突回滚及 FSRS 状态与本地标准同步服务器交替收敛；没有访问真实 AnkiWeb 账号。`device-link-runtime.test.mjs` 执行生产网络适配与真实 Node TCP/AES-GCM，覆盖个人授权、分块传输、三端补拉和哈希失败；`device-link-progress-store.test.mjs` 执行生产文件适配和生成 RPC，验证真实临时文件的短读短写、哈希、租约及自有文件清理。这些主机测试均已通过，不证明 HarmonyOS mDNS、扫码、热点、页面切换或真实账户行为。
+
+### 2026-10-16 直连复核
+
+按上述要求复核配对/持久身份、双端个人授权、传输校验、事务占用、取消/离页、三端补拉、失败去重和云同步兼容性。修复离页期间发现解析返回后仍可连接、主动连接未纳入宿主清理、接收端取消误报普通失败，以及校验期间取消后仍开始 Core 合并的问题。主动与被动连接均由 `DeviceLinkService.channels` 拥有，正常关闭移除主动连接；停止先使异步代次失效，随后关闭网络并把在线状态清零。认证期间和持久状态读取的迟到结果也检查代次。`device-link-runtime.test.mjs` 新增真实 TCP/AES 回归，覆盖迟到发现、离页关闭主动连接、已接受事务完成及双端校验期间取消；测试已在修复前复现对应故障。
+
+`cargo test -p jidecards_core --features anki-core --test peer_progress` 的四项真实 Core 回归全部通过，覆盖双方历史与状态、三端同秒答题、重开去重、损坏/身份/历史冲突回滚和与本地标准云同步服务器交替同步。设备配对/网络/文件适配、牌组菜单及 JIDE 观察专项通过；按 home/sync 选择器去重并复用已通过专项后，关联的707项检查通过（含文档、ArkTS 组件与资源约束），复现入口仍为 `npm test -- home`、`npm test -- sync` 及 `ai-agent-app-structure.test.mjs`。`npm run build:app -- -SkipRust -ArtifactDirectory .local/device-link-audit-20261016/artifact` 增量签名构建通过，未接受警告为0；本轮未修改原生输入，复用现有双架构原生库。证据保存于 `.local/device-link-audit-20261016/`。该复核针对旧学习记录功能，之后的卡库和媒体扩展见上文。APKG 分发和 DFS 未实现；本轮未安装设备，真实两机 mDNS/扫码/热点、后台、性能及真实 AnkiWeb 账户没有本轮设备验收证据。
 
 2026-10-14 集成验证：`npm run verify` 的环境、全仓 3403 项 Node 测试、Rust fmt/clippy 与全部 Core 主机测试（含四项学习记录回归）、sandbox、RPC 索引和 30 项协议/Core 对照通过；双架构 Rust 与 clean HAP 编译成功。初次 HAP 警告门禁指出清理函数缺少异常声明，修正后按实际 ArkTS 变化补跑增量签名 HAP，未接受警告为 0；追加取消配对和多设备取消回归后，最终设备连接/存储/配对及 JIDE 结构 43 项检查通过。原生输入未再变化，复用已通过阶段，未重新执行整条 `verify`。最终包及构建/警告报告保存于 `.local/device-link-20261014/progress-artifact/`，日志在同级 `progress-verify.log`、`progress-hap-final.log`、`progress-final-tests.log`。未安装设备，真实两机、热点、页面尺寸与主题外观及真实 AnkiWeb 账户仍未验收。
 

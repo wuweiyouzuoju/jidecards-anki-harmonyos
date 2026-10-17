@@ -78,13 +78,16 @@ async function receiveFile(connection: ProgressConnection, store: ProgressStore)
 
 /** 本地先导出，远端合并后回传双方并集；成功须两端都实际提交。重试由 Core 按 ID 去重。
  * @throws {Error} 连接、落盘或 Core 合并失败由任务宿主显示。 */
-export async function mergeProgressClient(connection: ProgressConnection, store: ProgressStore): Promise<ProgressSyncResult> {
+export async function mergeProgressClient(connection: ProgressConnection, store: ProgressStore,
+  isCancelled: () => boolean = (): boolean => false): Promise<ProgressSyncResult> {
   await store.acquire();
   try {
     await connection.send(PROGRESS_REQUEST);
     message(await connection.read(), 'ready');
     await sendFile(connection, store, await store.exportFile());
     const token = await receiveFile(connection, store);
+    // 文件校验可以晚于网络取消完成；只有取消前已进入 Core 的事务继续执行。
+    if (isCancelled()) throw new Error('device_progress_cancelled');
     const result = await store.merge(token);
     const committed: ProgressMessage = { kind: 'done', addedReviews: result.addedReviews, updatedCards: result.updatedCards };
     await connection.send(JSON.stringify(committed));
@@ -98,12 +101,15 @@ export async function mergeProgressClient(connection: ProgressConnection, store:
 
 /** 已配对不自动授权学习记录写入；调用方须先核对该设备的个人同步授权。
  * @throws {Error} 错误回传给发起端，已接受的事务完成后释放租约。 */
-export async function mergeProgressServer(connection: ProgressConnection, store: ProgressStore): Promise<ProgressMergeResult> {
+export async function mergeProgressServer(connection: ProgressConnection, store: ProgressStore,
+  isCancelled: () => boolean = (): boolean => false): Promise<ProgressMergeResult> {
   let acquired: boolean = false;
   try {
     await store.acquire(); acquired = true;
     const ready: ProgressMessage = { kind: 'ready' }; await connection.send(JSON.stringify(ready));
-    const result = await store.merge(await receiveFile(connection, store));
+    const token = await receiveFile(connection, store);
+    if (isCancelled()) throw new Error('device_progress_cancelled');
+    const result = await store.merge(token);
     await sendFile(connection, store, await store.exportFile());
     message(await connection.read(), 'done');
     await store.release(); acquired = false;

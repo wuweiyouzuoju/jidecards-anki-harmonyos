@@ -6,7 +6,7 @@ Cloudflare Worker：`wispy-glade-db0d`。静态目录：`hosting/`。主域名�
 
 ## 内容与构建
 
-产品、作者、SEO、正式版本、功能、宣传词和图片元数据统一维护在 `hosting/data/works.json`。指南事实来源是 `hosting/data/harmonyos-anki-guide.json`。正式版本由作者确认并记录 `releaseVersionSource`；源码版本由生成器读取 `AppScope/app.json5`，分别输出 `sourceVersion` / `sourceVersionCode`，不能相互推断。作者于 2026-10-15 确认华为应用市场版本为 2.9.98，当前源码版本为 2.9.99。官网主展示、源码更新、SoftwareSourceCode 和 Atom 使用应用配置派生的源码版本；下载入口与 SoftwareApplication 使用作者确认的市场版本。2.9.22 宣传图保留独立的历史版本标注和 SHA-256 校验，不要求截图版本等于当前市场版本，不把旧图片改标为当前截图。
+产品、作者、SEO、正式版本、功能、宣传词和图片元数据统一维护在 `hosting/data/works.json`。指南事实来源是 `hosting/data/harmonyos-anki-guide.json`。正式版本由作者确认并记录 `releaseVersionSource`；源码版本由生成器读取 `AppScope/app.json5`，分别输出 `sourceVersion` / `sourceVersionCode`，不能相互推断。作者于 2026-10-15 确认华为应用市场版本为 2.9.98，源码版本以 `AppScope/app.json5` 为准。官网主展示、源码更新、SoftwareSourceCode 和 Atom 使用应用配置派生的源码版本；下载入口与 SoftwareApplication 使用作者确认的市场版本。2.9.22 宣传图保留独立的历史版本标注和 SHA-256 校验，不要求截图版本等于当前市场版本，不把旧图片改标为当前截图。
 
 `tools/build-site.mjs` 只负责构建编排。修改入口按责任划分：
 
@@ -21,7 +21,9 @@ Cloudflare Worker：`wispy-glade-db0d`。静态目录：`hosting/`。主域名�
 
 执行 `node tools/build-site.mjs` 同时更新所有输出，避免逐页手改 HTML。样式、Logo 和图片脚本地址使用内容摘要缓存键。应用的 `announcement.json` 和 `cloud-decks.json` 独立维护，网站重构不改变其协议。
 
-源码主仓库和镜像统一维护 `repository` / `repositoryMirrors`，生成器同步导航、正文、结构化数据和文本链接。官网可单独发布，不把尚未推送的本地发布文档作为远端已存在的链接。
+源码主仓库和镜像统一维护 `repository` / `repositoryMirrors`，生成器同步导航、正文、结构化数据和文本链接。`sourcePackage` 记录对应源码版本的 GitHub Release、签名 HAP 与校验文件地址；生成器校验标签和文件名与应用版本一致，HTML 和机器可读入口同时展示开发包与签名/设备授权限制。精确 SHA-256、字节数及构建证据随 Release 附件发布；HAP 不进入源码 Git 历史。官网下载仍优先指向作者确认版本的应用市场页面。
+
+官网可单独发布，不把尚未推送的本地发布文档或未上传的 Release 附件作为远端已存在的链接。发布新 HAP 时先验证源码并保存安装包，提交推送对应源码，再创建该提交的 Release、上传并核对附件，最后发布网站。
 
 ## 图片与 Logo
 

@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { common } from '@kit.AbilityKit';
 import { scanBarcode, scanCore } from '@kit.ScanKit';
-import { DeviceLinkService, DeviceLinkSnapshot, DevicePeerView, DeviceProgressView } from '../../backend/device-link/DeviceLinkService';
+import { DeviceLinkService, DeviceLinkSnapshot, DevicePeerView, DeviceProgressView, DeviceCollectionView } from '../../backend/device-link/DeviceLinkService';
 import { DeviceProgressStore } from '../../backend/device-link/DeviceProgressStore';
+import { DeviceCollectionStore } from '../../backend/device-link/DeviceCollectionStore';
+import { CollectionStore } from '../../model/device-link/CollectionSync';
 import { ProgressStore } from '../../model/device-link/ProgressSync';
 import { appInterface } from '../../backend/AppInterfaceService';
 import { AppInterfaceControl, visibleInterfaceItems } from '../../model/AppInterface';
@@ -26,6 +28,7 @@ export struct DeviceLinkSettings {
   @State private busy: boolean = false;
   @State private error: string = '';
   @State private confirmingForget: boolean = false;
+  @State private confirmingPull: boolean = false;
   @State private expanded: boolean = false;
   @State private codeVisible: boolean = false;
   private reveal: ExpansionReveal | null = null;
@@ -45,12 +48,15 @@ export struct DeviceLinkSettings {
   private unsubscribe: (() => void) | null = null;
   private disposed: boolean = false;
   private invitationTimer: number = -1;
+  private lifecycle: number = 0;
 
   aboutToAppear(): void {
+    this.lifecycle++;
     this.disposed = false;
     this.codeDialog.activate(); this.reveal = new ExpansionReveal(this.scroller);
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
-    this.service = new DeviceLinkService(context, (): ProgressStore => new DeviceProgressStore(context));
+    this.service = new DeviceLinkService(context, (): ProgressStore => new DeviceProgressStore(context),
+      (own: string): CollectionStore => new DeviceCollectionStore(context, own));
     this.unsubscribe = this.service.subscribe((snapshot: DeviceLinkSnapshot): void => {
       this.updateSnapshot(snapshot);
     });
@@ -58,6 +64,7 @@ export struct DeviceLinkSettings {
   }
 
   aboutToDisappear(): void {
+    this.lifecycle++;
     this.disposed = true; this.unsubscribe?.(); this.unsubscribe = null;
     this.codeDialog.dispose(); this.reveal?.cancel();
     if (this.invitationTimer >= 0) clearTimeout(this.invitationTimer);
@@ -74,7 +81,7 @@ export struct DeviceLinkSettings {
   }
 
   private toggleExpanded(): void {
-    if (this.disposed || this.confirmingForget || this.codeVisible) return;
+    if (this.disposed || this.confirmingForget || this.confirmingPull || this.codeVisible) return;
     this.expanded = !this.expanded; this.reveal?.request(this.expanded); this.publishInterface();
   }
 
@@ -88,22 +95,29 @@ export struct DeviceLinkSettings {
         if (item.id === 'device_link_toggle') return true;
         if (item.id === 'device_progress_cancel') return this.snapshot.progressBusy;
         if (!this.expanded) return false;
+        if (item.id === 'device_collection_start') return this.snapshot.peers.some((peer: DevicePeerView): boolean => peer.allowCollection === true);
+        if (item.id === 'device_collection_pull') return (this.snapshot.collection ?? []).some((item: DeviceCollectionView): boolean => item.error === 'device_collection_full_required');
+        if (item.id === 'device_collection_allow') return this.snapshot.peers.length > 0;
         if (item.id === 'device_link_connect') return personal.length > 0;
         if (item.id === 'device_progress_allow' || item.id === 'device_link_forget') return this.snapshot.peers.length > 0;
         return true;
       })
       .map((item): AppInterfaceControl => ({ id: item.id, title: '', titleKey: item.titleKey,
-        enabled: item.id === 'device_link_toggle' ? !this.confirmingForget && !this.codeVisible : item.id === 'device_progress_cancel' || (idle && item.id !== 'device_link_devices' &&
+        enabled: item.id === 'device_link_toggle' ? !this.confirmingForget && !this.confirmingPull && !this.codeVisible : item.id === 'device_progress_cancel' || (idle && item.id !== 'device_link_devices' &&
+          ((item.id !== 'device_collection_start' && item.id !== 'device_collection_pull') || this.snapshot.peers.some((peer: DevicePeerView): boolean => peer.allowCollection === true && peer.online)) &&
           ((item.id !== 'device_link_connect' && item.id !== 'device_progress_all') || personal.some((peer: DevicePeerView): boolean => peer.online))),
-        selected: item.id === 'device_link_toggle' ? this.expanded : item.id === 'device_progress_allow' && this.snapshot.peers.length > 0 && personal.length === this.snapshot.peers.length }));
+        selected: item.id === 'device_link_toggle' ? this.expanded : item.id === 'device_collection_allow' ? this.snapshot.peers.length > 0 && this.snapshot.peers.every((peer: DevicePeerView): boolean => peer.allowCollection === true) : item.id === 'device_progress_allow' && this.snapshot.peers.length > 0 && personal.length === this.snapshot.peers.length }));
     for (const peer of this.expanded ? this.snapshot.peers : []) {
       items.push({ id: peer.id + ':personal', title: peer.name, titleKey: 'device_progress_allow', enabled: idle, selected: peer.allowProgress });
       if (peer.allowProgress) items.push({ id: peer.id + ':merge', title: peer.name, titleKey: 'device_progress_start', enabled: idle && peer.online, selected: false });
+      items.push({ id: peer.id + ':collection_allow', title: peer.name, titleKey: 'device_collection_allow', enabled: idle, selected: peer.allowCollection === true });
+      if (peer.allowCollection) items.push({ id: peer.id + ':collection', title: peer.name, titleKey: 'device_collection_start', enabled: idle && peer.online, selected: false });
+      if (peer.allowCollection && this.needsFull(peer.id)) items.push({ id: peer.id + ':pull', title: peer.name, titleKey: 'device_collection_pull', enabled: idle && peer.online, selected: false });
       items.push({ id: peer.id + ':forget', title: peer.name, titleKey: 'device_link_forget', enabled: idle, selected: false });
     }
     appInterface.observe({ surface: 'device_link', sectionId: 'sync', selectedId: this.snapshot.connectedId,
       optionIds: this.snapshot.peers.map((peer: DevicePeerView): string => peer.id),
-      optionLabels: this.snapshot.peers.map((peer: DevicePeerView): string => peer.name), busy: this.busy || this.snapshot.progressBusy || this.confirmingForget,
+      optionLabels: this.snapshot.peers.map((peer: DevicePeerView): string => peer.name), busy: this.busy || this.snapshot.progressBusy || this.confirmingForget || this.confirmingPull,
       items: items, controlsComplete: items.length <= 100,
       values: [{ id: 'ready', value: this.snapshot.ready ? 'true' : 'false' },
         { id: 'paired_count', value: String(this.snapshot.peers.length) },
@@ -112,6 +126,9 @@ export struct DeviceLinkSettings {
         { id: 'personal_device_ids', value: JSON.stringify(this.snapshot.peers.filter((peer: DevicePeerView): boolean => peer.allowProgress)
           .map((peer: DevicePeerView): string => peer.id)) },
         { id: 'progress_results', value: JSON.stringify(this.snapshot.progress) },
+        { id: 'collection_device_ids', value: JSON.stringify(this.snapshot.peers.filter((peer: DevicePeerView): boolean => peer.allowCollection === true).map((peer: DevicePeerView): string => peer.id)) },
+        { id: 'collection_results', value: JSON.stringify(this.snapshot.collection ?? []) },
+        { id: 'confirming_pull', value: String(this.confirmingPull) },
         { id: 'expanded', value: String(this.expanded) }, { id: 'code_visible', value: String(this.codeVisible) },
         { id: 'confirming_unpair', value: String(this.confirmingForget) }, { id: 'error', value: this.error }] });
     if (this.codeVisible) {
@@ -121,7 +138,7 @@ export struct DeviceLinkSettings {
   }
 
   private canAct(): boolean {
-    return !this.busy && !this.snapshot.progressBusy && !this.confirmingForget && !this.codeVisible;
+    return !this.busy && !this.snapshot.progressBusy && !this.confirmingForget && !this.confirmingPull && !this.codeVisible;
   }
 
   private run(action: () => Promise<void>): void {
@@ -133,7 +150,10 @@ export struct DeviceLinkSettings {
         'device_link_storage_invalid', 'device_link_save_failed', 'device_link_connect_failed', 'device_link_start_failed',
         'device_progress_busy', 'device_progress_not_allowed', 'device_progress_mismatch', 'device_progress_filtered',
         'device_progress_record_conflict', 'device_progress_too_large', 'device_progress_invalid', 'device_progress_failed',
-        'device_progress_cancelled', 'device_progress_some_failed', 'device_progress_not_converged'];
+        'device_progress_cancelled', 'device_progress_some_failed', 'device_progress_not_converged',
+        'device_collection_busy', 'device_collection_not_allowed', 'device_collection_full_required', 'device_collection_filtered', 'device_collection_record_conflict',
+        'device_collection_recovery', 'device_collection_too_large', 'device_collection_invalid', 'device_collection_failed',
+        'device_collection_cancelled', 'device_collection_unsupported'];
       this.error = namedResourceText(this.getUIContext(), keys.includes(error.message) ? error.message : 'device_link_error');
     }).finally((): void => {
       if (this.disposed) return;
@@ -147,6 +167,39 @@ export struct DeviceLinkSettings {
     if (result.phase === 'done') return namedResourceText(this.getUIContext(), 'device_progress_result', result.addedReviews, result.updatedCards);
     const key = result.phase === 'running' ? 'device_progress_working' : result.error;
     return namedResourceText(this.getUIContext(), key);
+  }
+
+  private needsFull(id: string): boolean {
+    return (this.snapshot.collection ?? []).some((item: DeviceCollectionView): boolean => item.id === id && item.error === 'device_collection_full_required');
+  }
+
+  private collectionText(id: string): string {
+    const result = this.snapshot.collection?.find((item: DeviceCollectionView): boolean => item.id === id);
+    if (result === undefined) return '';
+    if (result.phase === 'done') return namedResourceText(this.getUIContext(), 'device_collection_result',
+      result.updatedObjects, result.addedReviews, result.updatedMedia, result.deletedMedia);
+    return namedResourceText(this.getUIContext(), result.phase === 'running' ? 'device_collection_working' : result.error);
+  }
+
+  private pullCollection(peer: DevicePeerView): void {
+    if (this.disposed || !this.canAct()) return;
+    this.confirmingPull = true; this.publishInterface();
+    const lifecycle = this.lifecycle;
+    let settled: boolean = false;
+    const finish = (): boolean => {
+      if (settled || this.disposed || lifecycle !== this.lifecycle) return false; settled = true;
+      if (!this.disposed) { this.confirmingPull = false; this.publishInterface(); } return true;
+    };
+    try {
+      this.getUIContext().showAlertDialog({ title: $r('app.string.device_collection_pull'),
+        message: namedResourceText(this.getUIContext(), 'device_collection_pull_confirm', peer.name), autoCancel: false,
+        cancel: (): void => { finish(); },
+        primaryButton: { value: $r('app.string.cancel'), action: (): void => { finish(); } },
+        secondaryButton: { value: $r('app.string.device_collection_pull'), action: (): void => {
+          if (finish()) this.run(async (): Promise<void> => { await this.service!.syncCollection(peer.id, 'pull'); });
+        } }
+      });
+    } catch (error) { finish(); if (!this.disposed) this.error = namedResourceText(this.getUIContext(), 'device_link_error'); }
   }
 
   private cancelProgress(): void {
@@ -259,6 +312,23 @@ export struct DeviceLinkSettings {
             Text(this.progressText(peer.id)).fontSize(应用尺寸.字号_正文_小)
               .fontColor($r('app.color.text_secondary')).width('100%')
           }
+          SettingsToggleRow({ title: settingsItemText(this.getUIContext(), 'device_collection_allow', this.uiLanguage),
+            hint: $r('app.string.device_collection_allow_hint'), isOn: peer.allowCollection === true, isDark: this.是否深色,
+            isInteractive: this.canAct(), onChange: (value: boolean): void => {
+              this.run(async (): Promise<void> => { await this.service!.allowCollection(peer.id, value); });
+            } })
+          if (peer.allowCollection) {
+            SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'device_collection_start', this.uiLanguage),
+              icon: settingsIcon('device_link'), showDisclosure: false, isInteractive: this.canAct() && peer.online,
+              onAction: (): void => { this.run(async (): Promise<void> => { await this.service!.syncCollection(peer.id); }); } })
+            if (this.needsFull(peer.id)) {
+              SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'device_collection_pull', this.uiLanguage),
+                showDisclosure: false, isInteractive: this.canAct() && peer.online, onAction: (): void => { this.pullCollection(peer); } })
+            }
+          }
+          if (this.collectionText(peer.id) !== '') {
+            Text(this.collectionText(peer.id)).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+          }
           SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'device_link_forget', this.uiLanguage),
             showDisclosure: false, isInteractive: this.canAct(),
             onAction: (): void => { this.forgetDevice(peer); } })
@@ -275,11 +345,12 @@ export struct DeviceLinkSettings {
   private groupContent() {
     Column({ space: 应用尺寸.间距_8 }) {
       SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'device_link_toggle', this.uiLanguage),
-        expanded: this.expanded, isInteractive: !this.confirmingForget && !this.codeVisible,
+        expanded: this.expanded, isInteractive: !this.confirmingForget && !this.confirmingPull && !this.codeVisible,
         onAction: (): void => { this.toggleExpanded(); } })
       if (this.expanded) { this.content() }
       if (this.snapshot.progressBusy) {
-        Text($r('app.string.device_progress_working')).fontSize(应用尺寸.字号_正文_小)
+        Text((this.snapshot.collection ?? []).some((item: DeviceCollectionView): boolean => item.phase === 'running') ?
+          $r('app.string.device_collection_working') : $r('app.string.device_progress_working')).fontSize(应用尺寸.字号_正文_小)
           .fontColor($r('app.color.text_secondary')).width('100%')
         SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'device_progress_cancel', this.uiLanguage),
           showDisclosure: false, onAction: (): void => { this.cancelProgress(); } })

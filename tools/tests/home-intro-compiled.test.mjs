@@ -12,10 +12,10 @@ class HomeIntroSection extends ViewPU {
 }
 export class HomeIntroPanel extends ViewPU {
   initialRender() {
-    for (let index = 0; index < 6; index++) {
+    for (let index = 0; index < 5; index++) {
       ViewPU.create(new HomeIntroSection(this, { content: () => { this.paragraph('body'); } }));
     }
-    for (let index = 0; index < 10; index++) Text.create('other text');
+    for (let index = 0; index < 8; index++) Text.create('other text');
   }
   paragraph(body: Resource) {
     this.observeComponentCreation2(() => { Text.create(body); Text.fontSize(16); }, Text);
@@ -24,7 +24,7 @@ export class HomeIntroPanel extends ViewPU {
 }`;
 
 test('compiled introduction checker executes callback dispatch and native Text creation', () => {
-  assert.deepEqual(checkHomeIntroCompiled(compiled), { sections: 6, textNodes: 16 });
+  assert.deepEqual(checkHomeIntroCompiled(compiled), { sections: 5, textNodes: 13 });
 });
 
 test('compiled introduction checker rejects the original untransformed inline Text chain', () => {
@@ -34,6 +34,6 @@ test('compiled introduction checker rejects the original untransformed inline Te
 
 test('compiled introduction checker rejects skipped content and uncompiled source', () => {
   assert.throws(() => checkHomeIntroCompiled(compiled.replace("this.paragraph('body');", '')), /Text nodes must render/);
-  assert.throws(() => checkHomeIntroCompiled(compiled.replace('index < 6', 'index < 5')), /six introduction sections/);
+  assert.throws(() => checkHomeIntroCompiled(compiled.replace('index < 5', 'index < 4')), /five introduction sections/);
   assert.throws(() => checkHomeIntroCompiled('@Component export struct HomeIntroPanel {}'), /fresh CompileArkTS/);
 });

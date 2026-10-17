@@ -2799,9 +2799,13 @@ dependencies = [
  "prost",
  "reqwest",
  "rusqlite",
+ "serde",
  "serde_json",
+ "sha2 0.10.9",
  "tempfile",
  "tokio",
+ "unic-ucd-category",
+ "unicode-normalization",
 ]
 
 [[package]]

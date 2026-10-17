@@ -1,26 +1,27 @@
-# 记得闪卡 2.9.99 源码更新说明
+# 记得闪卡 3.0.20 源码更新说明
 
 原文：https://jidecards.com/releases/
-更新日期：2026-10-15。
+更新日期：2026-10-17。
 
-1. 设备直连已接入扫码配对、个人设备授权及同源卡库的复习历史和学习状态合并，支持向多台个人设备补拉记录；保留 AnkiWeb，牌组与媒体传输尚未接通。
-2. 首页、浏览、学习、编辑和模板界面提供本页快捷键说明；学习页显示当前生效的自定义绑定，补齐撤销与重做、整条笔记埋藏和暂停等操作。
-3. 学习页新增显示提示、查看上一张卡片信息、录制和回放学习录音，录音可选择保存，未保存录音随本次学习结束清理。
-4. 牌组右键菜单在指针位置打开，长按使用同一组操作；补齐添加卡片、新建子牌组、牌组选项和导出入口，并保留显式操作目标。浏览列表和目录树复用原选择及上下文操作。
-5. 新增与编辑笔记支持保存、牌组、类型、模板、标签、字段跳转和格式快捷键；修改属性或模板后保留未提交草稿，并提供当前页面说明。
-6. 牌组选项改为独立页面，提供离开前的草稿保护、预设管理和修改范围选择，明确标注影响所有牌组的设置。
-7. 完善卡片作者 HTTP 脚本、嵌套请求和授权表单兼容，保留有内容的卡面并提示脚本失败；缺少可选依赖时继续执行后续脚本，授权仍由作者服务验证。
-8. 系统文件打开入口兼容 Anki 专用 MIME application/vnd.anki，确认导入选项后读取获授权的 APKG 文件。
-9. 同步维护 JIDE 的页面、菜单、设置与快捷键认知，以及 README、官网 HTML、Markdown、JSON、完整文本和更新订阅。
+1. 设备直连扩展为两类独立授权：同源卡库的学习记录合并，以及全部卡库与媒体同步。复用扫码配对和加密通道，双方均需明确授权；仍为实验功能，真实两机和真实 AnkiWeb 账号尚未验收。
+2. 卡库直连支持牌组、笔记、模板、预设、卡片状态、标签及复习记录，媒体按内容差异分块传输。来源或结构不兼容时停止普通合并，由接收设备确认使用另一端卡库，并先创建可恢复备份；中断后可重新同步，尚无断点续传。
+3. 快捷键与鼠标说明统一放在“设置 → 学习帮助 → 键盘快捷键”，按页面展示操作、焦点限制和当前学习绑定；移除各页面重复的帮助入口。
+4. 优化深色模式下卡片正文的对比度，覆盖固定黑字、嵌套浅色块及脚本追加内容；学习与预览共用处理，切回浅色时恢复作者样式。图片或渐变背景等复杂配色仍需按具体卡片验收。
+5. 完善牌组右键与长按菜单、指针位置、离开牌组选项后的生命周期，以及笔记编辑和模板更新时的草稿保护。
+6. 移除幻彩主题限时领赠、解锁庆祝和相关宣传入口，保留既有主题权益与兑换状态；首页入门介绍和 JIDE 功能认知同步更新。
+7. 修复设备发现、主动连接、取消与离页期间的迟到回调；卡库提交与媒体恢复日志、删除传播和云同步边界由扩展层维护，不修改 Anki 调度与 FSRS。
+8. README、版本记录、官网指南、HTML、Markdown、JSON、完整文本及更新订阅同步至 3.0.20，提供对应签名 HAP 开发包与 SHA-256 校验文件。
 
-- 当前源码版本：2.9.99（构建编号 3080）
+- 当前源码版本：3.0.20（构建编号 3081）
 - 华为应用市场版本：2.9.98
 - 平台：HarmonyOS NEXT
 - 许可证：AGPL-3.0-or-later
 - 作者：[可塑性天赋](https://jidecards.com/about/)
 - 下载：[华为应用市场](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare)
+- 签名 HAP 开发包：[jidecards-v3.0.20-signed.hap](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v3.0.20/jidecards-v3.0.20-signed.hap) · [SHA-256 校验](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v3.0.20/SHA256SUMS.txt) · [构建说明](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/tag/v3.0.20)
+- 开发包安装：签名开发包，安装受包内签名与设备授权限制；普通用户建议从华为应用市场安装。
 - 源码：[GitHub](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos) · [Gitee](https://gitee.com/wuweiyouzuoju/jidecards-anki-harmonyos) · [GitCode](https://gitcode.com/wuweiyouzuoju/jidecards-anki-harmonyos)
-- 更新日期：2026-10-15
+- 更新日期：2026-10-17
 
 本文按当前源码介绍功能，应用市场实际版本以下载页面为准。独立开源项目，非 Anki 官方客户端。
 

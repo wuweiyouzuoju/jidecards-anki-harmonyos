@@ -1,5 +1,4 @@
-import { KeyboardShortcutHelp } from '../components/KeyboardShortcutHelp';
-import { EDITOR_SHORTCUTS, FIELD_SHORTCUTS, editorShortcutCommand } from '../model/KeyboardShortcuts';
+import { editorShortcutCommand } from '../model/KeyboardShortcuts';
 import { StudyKeyboardSession } from '../model/StudyKeyboard';
 import { studyEventChord } from '../utils/StudyKeyAdapter';
 import { DirectorySelect } from '../components/common/DirectorySelect';
@@ -113,7 +112,6 @@ export struct 添加笔记页 {
     (state: NoteCreationState): void => { this.applyCreationState(state); });
   private displayedType: NotetypeView | null = null;
   private refreshingTypeDraft: boolean = false;
-  @State @Watch('publishInterface') private keyboardHelpOpen: boolean = false;
   @State @Watch('publishInterface') private templatesOpen: boolean = false;
   @State private templateBackRequest: number = 0;
   @State private deckOpenRequest: number = 0;
@@ -213,7 +211,6 @@ export struct 添加笔记页 {
    * Invariants: 图片遮盖编辑器优先于帮助浮层（编辑器更靠上层）。
    */
   onBackPress(): boolean {
-    if (this.keyboardHelpOpen) { this.keyboardHelpOpen = false; return true; }
     if (this.templatesOpen) { this.templateBackRequest++; return true; }
     if (this.draftPreview !== null) return true;
     if (this.duplicateSearch) { this.creationSession.cancelDuplicate(); return true; }
@@ -349,7 +346,6 @@ export struct 添加笔记页 {
     const fresh: boolean = this.keyboardSession.update(event.keyCode, event.type === KeyType.Down);
     if (event.type !== KeyType.Down) return false;
     const chord: string = studyEventChord(event);
-    if (this.keyboardHelpOpen) { if (fresh && chord === 'escape') this.keyboardHelpOpen = false; return true; }
     if (this.templatesOpen) return false;
     const blocked: boolean = !this.pageActive || this.处理中 || this.pickingFieldImage || this.audioBusy || this.confirmingDiscard ||
       this.显示帮助 || this.图片遮盖_显示编辑器 || this.duplicateSearch !== '' || this.draftPreview !== null;
@@ -562,7 +558,7 @@ export struct 添加笔记页 {
   private interfaceControls(): AppInterfaceMenuItem[] {
     return addNoteInterfaceControls({ tagsExpanded: this.高级已展开,
       occlusion: this.是否图片遮盖模式, hasSource: this.图片遮盖_源图Uri !== '', busy: this.处理中,
-      blocked: this.处理中 || this.pickingFieldImage || this.audioBusy || this.confirmingDiscard || this.templatesOpen || this.keyboardHelpOpen,
+      blocked: this.处理中 || this.pickingFieldImage || this.audioBusy || this.confirmingDiscard || this.templatesOpen,
       saveEnabled: this.保存按钮可用() && !this.confirmingDiscard, hasTypes: this.笔记类型选项.length > 0 });
   }
 
@@ -720,8 +716,7 @@ export struct 添加笔记页 {
 
   @Builder
   private 顶部条() {
-    NoteEditorHeader({ title: $r('app.string.add_note_title'), showKeyboardHelp: true,
-      onKeyboardHelp: (): void => { this.keyboardHelpOpen = true; },
+    NoteEditorHeader({ title: $r('app.string.add_note_title'),
       actionLabel: $r('app.string.note_draft_preview'),
       actionEnabled: !this.处理中 && !this.pickingFieldImage && !this.audioBusy && !this.confirmingDiscard && this.已选笔记类型ID > 0,
       closeEnabled: this.interfaceEnabled('back'),
@@ -908,10 +903,6 @@ export struct 添加笔记页 {
         笔记类型编辑器({ notetypeId: this.已选笔记类型ID, notetypeName: this.笔记类型名,
           templatesOnly: true, backRequest: this.templateBackRequest, isDark: this.是否深色(),
           onClose: (): void => { this.templatesOpen = false; }, onSaved: (): void => { this.refreshTemplates(); } })
-      }
-      if (this.keyboardHelpOpen) {
-        KeyboardShortcutHelp({ scope: 'editor', shortcuts: EDITOR_SHORTCUTS.concat(FIELD_SHORTCUTS),
-          onClose: (): void => { this.keyboardHelpOpen = false; } })
       }
       if (this.duplicateSearch !== '') {
         NoteDuplicateDialog({ onCancel: (): void => { this.creationSession.cancelDuplicate(); },

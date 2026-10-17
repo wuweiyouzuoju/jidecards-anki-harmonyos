@@ -152,7 +152,7 @@ function homeHarness() {
   const home = new Home(), paths = [], actions = [];
   const target = { id: '42', fullName: 'Parent::Deck "quoted" *_', displayName: 'Alias' };
   Object.assign(home, {
-    排序模式中: false, deckMenuId: '', 选中的牌组ID: '999',
+    排序模式中: false, deckMenuId: '', 选中的牌组ID: '999', 当前断点: 'md',
     按ID查牌组: id => id === target.id ? target : { id: '' },
     deferForSync: () => false, 添加笔记的牌组选项: () => [{id:42,name:target.fullName}],
     打开数据迁移: (...args) => actions.push(['export', ...args]),
@@ -205,7 +205,7 @@ test('long pressing selects the target and opens statistics and browser with tha
   home.排序模式中 = true; home.deckMenuId = ''; home.openDeckMenu(target.id); assert.equal(home.deckMenuId, '');
 });
 
-test('long press moves the row highlight from the previous selection and closing preserves the new selection', () => {
+test('wide layouts retain the selected details deck when the row menu closes', () => {
   const { home, paths, target } = homeHarness();
   const selectedExpression = read('components/home/主页牌组列表.ets').match(/selected: ([^,\r\n]+),/)?.[1];
   assert.ok(selectedExpression);
@@ -232,6 +232,57 @@ test('long press moves the row highlight from the previous selection and closing
   home.openDeckMenu('42');
   assert.equal(home.deckMenuId, '');
   assert.deepEqual(highlightedIds(), ['43']);
+});
+
+function highlightedDecks(home) {
+  const binding = read('pages/首页.ets').match(/选中的牌组ID: ([^,\r\n]+),/)?.[1];
+  const selected = read('components/home/主页牌组列表.ets').match(/selected: ([^,\r\n]+),/)?.[1];
+  assert.ok(binding); assert.ok(selected);
+  const list = { 选中的牌组ID: new Function('return ' + binding).call(home) };
+  const rowSelected = new Function('deck', 'return ' + selected);
+  return ['999', '42', '43'].filter(id => rowSelected.call(list, { id }));
+}
+
+test('narrow layouts hide the menu highlight on dismissal while preserving the selected deck', () => {
+  for (const point of [undefined, { x: 120, y: 240 }]) {
+    for (const exit of ['dismiss', 'handleBack', 'closeHomeActions']) {
+      const { home, target } = homeHarness();
+      const { menu, tracker } = menuHarness();
+      home.当前断点 = 'xs';
+      home.openDeckMenu(target.id, point);
+      menu.point = point;
+      const callback = read('pages/首页.ets').match(/backRequest: this\.deckMenuBackRequest, onClose: (\(\): void => \{[^}]*\})/)?.[1];
+      assert.ok(callback);
+      menu.onClose = new Function(stripTypeScriptTypes('const callback = ' + callback + ';', { mode: 'transform' }) + 'return callback;').call(home);
+      assert.equal(home.选中的牌组ID, target.id);
+      assert.deepEqual(highlightedDecks(home), [target.id]);
+      if (exit === 'closeHomeActions') home.closeHomeActions();
+      else menu[exit]();
+      assert.equal(home.deckMenuId, '');
+      assert.equal(home.deckMenuPoint, undefined);
+      assert.equal(home.选中的牌组ID, target.id);
+      assert.deepEqual(highlightedDecks(home), []);
+      home.当前断点 = 'md';
+      assert.deepEqual(highlightedDecks(home), [target.id], 'wide details retain their visual selection');
+      menu.aboutToDisappear();
+      assert.equal(tracker.snapshot().some(view => view.surface === 'deck_row_menu'), false);
+    }
+  }
+});
+
+test('narrow menu keeps its highlight while colors collapse and hides it after accepting an action', () => {
+  const { home, paths, target } = homeHarness();
+  const { menu } = menuHarness();
+  home.当前断点 = 'xs'; home.openDeckMenu(target.id);
+  menu.onClose = () => home.closeHomeActions();
+  menu.onAction = (id, action) => home.handleDeckMenuAction(id, action);
+  menu.toggleBranch({ id: 'tone' }); menu.handleBack();
+  assert.equal(home.选中的牌组ID, target.id);
+  assert.deepEqual(highlightedDecks(home), [target.id]);
+  menu.selectItem(menu.menuItems().find(item => item.id === 'browser'));
+  assert.equal(home.选中的牌组ID, target.id);
+  assert.deepEqual(highlightedDecks(home), []);
+  assert.equal(paths[0].param.deckId, target.id);
 });
 
 test('browser sync deferral retains the requested deck rather than the current selection', () => {

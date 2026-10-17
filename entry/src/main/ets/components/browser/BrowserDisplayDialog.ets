@@ -2,8 +2,6 @@
 import { DialogFrame } from '../common/DialogFrame';
 import { DialogHeader } from '../common/DialogHeader';
 import { BrowserColumn } from '../../proto/messages/SearchMessages';
-import { BROWSER_SHORTCUTS, BrowserShortcut } from '../../model/BrowserKeyboard';
-import { KeyboardShortcutList } from '../KeyboardShortcutList';
 import { resourceText, namedResourceText } from '../../utils/UiFeedback';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { SelectStyle } from '../../utils/SelectStyle';
@@ -39,7 +37,7 @@ export struct BrowserDisplayDialog {
   aboutToAppear(): void { this.mounted = true; this.draftColumns = this.selectedColumns.slice(); this.publishInterface(); }
   aboutToDisappear(): void { this.mounted = false; appInterface.leave(this.surfaceId()); }
   private surfaceId(): string {
-    return this.kind === 'columns' ? 'browser_display' : this.kind === 'keyboard' ? 'browser_shortcuts' :
+    return this.kind === 'columns' ? 'browser_display' :
       this.kind === 'recent' ? 'browser_recent_searches' : 'browser_search_options';
   }
   private publishInterface(): void {
@@ -77,7 +75,7 @@ export struct BrowserDisplayDialog {
   @Builder
   private headerContent() {
     DialogHeader({ title: this.kind === 'columns' ? $r('app.string.browser_display_columns') :
-      this.kind === 'keyboard' ? $r('app.string.browser_shortcuts') : this.kind === 'recent' ?
+      this.kind === 'recent' ?
         $r('app.string.browser_recent_searches') : $r('app.string.browser_search_options'),
       closeLabel: $r('app.string.browser_detail_cancel'), closeEnabled: !this.busy,
       onClose: (): void => { this.onClose(); },
@@ -154,10 +152,6 @@ export struct BrowserDisplayDialog {
     if (this.kind === 'columns') { this.columnsContent() }
     else if (this.kind === 'search') { this.searchContent() }
     else if (this.kind === 'recent') { this.recentContent() }
-    else {
-      Text($r('app.string.browser_shortcuts_hint')).fontColor($r('app.color.text_secondary')).width('100%')
-      KeyboardShortcutList({ shortcuts: BROWSER_SHORTCUTS })
-    }
     if (this.error !== '') { Text(this.error).fontColor($r('app.color.error_text')).width('100%') }
   }
   build() {

@@ -166,8 +166,6 @@ test('persistent native-dialog owners create current-style windows on each open'
   const api = surfaceMotionApi();
   for (const [path, field, name] of [
     ['components/settings/AboutSettings.ets', 'feedbackDialog', 'createFeedbackDialog'],
-    ['components/settings/RedemptionPanel.ets', 'contentHelp', 'createContentHelp'],
-    ['components/settings/外观分组.ets', 'giftDialog', 'createGiftDialog'],
     ['components/数据迁移面板.ets', 'legacyHelp', 'createLegacyHelp'],
     ['components/settings/同步分组.ets', 'serverDialogController', 'createServerDialog']
   ]) {

@@ -137,7 +137,7 @@
 
 ## 设置弹窗开发入口
 
-开屏与锁定主题共用的幻彩领赠弹窗，标题资源在主题名称前明确换行：“获赠隐藏主题色”与“【幻彩】”各占一行。保留原 DialogHeader 的居中标题和原有间距，右侧“我已了解”按普通已读语义使用共用勾号按钮，完整名称继续供读屏使用，不另加操作行。主题名称仍复用渐变文字渲染；最终换行须用户真机确认。
+3.0.20 已移除幻彩领赠弹窗及锁定选项的弹窗入口；主题选择继续保留锁定标记和原生 Select 的选值恢复，不额外展示领赠内容。
 
 普通表单使用 `DialogFrame`：88% 窗口宽、480vp 常规上限，420vp 简短表单、560vp 类型映射；卡片与正文随可用高度限高，标题操作栏固定，正文滚动。`DialogBackdrop` 直接订阅应用主题和系统深色，调用方不再复制磨砂参数。`DialogHeader` 关闭在左、主操作在右；标题相对整个内容区居中，使用独立 Stack 中央层。有顶栏图标时，标题实际 Row 两侧各留 `应用尺寸.按钮高度 + 间距_16`，按真实按钮尺寸和间隔避让，只有一侧图标时仍对称留边；无顶栏图标时不留空槽。可见文字操作独占标题下一行，不挤入两侧。HelpLabel 的实际 Row width=100%，只由文字决定居中，帮助绝对定位在文字右侧4vp，触摸热区不作为占位框。弹窗传 `limitTitleLines: false`，完整标题自然换行并撑高头部；普通表单标签默认保持两行省略。不能在各业务弹窗缩字号、截断标题或手工偏移补偿。父级 DialogFrame 负责对称外边距并按实测头部高度收缩正文，窄/宽屏与安全区变化仍以内容区中点对齐。普通确认、保存、创建/添加、完成与说明已读默认使用右侧简笔勾号，复用 `IconActionButton.toolbarStyle`，与左侧叉号共用44vp按钮、18vp图标、卡片底色/圆角/边框、主题描边与按压/禁用守卫；完整 `actionLabel` 仍是读屏名称。危险操作自动保留文字；继续引导、切换预览面、下载/迁移、检查/查找、打开新建子弹窗、重复笔记继续保存等需要说明结果的操作显式 `showActionLabel: true`，已有保存中/处理中等状态按真实忙碌字段临时保留文字。判定由宿主语义决定，不比较翻译字符串。无主操作时显式 `showAction: false`，非显示列的浏览辅助弹窗和加载/失败的草稿预览也隐藏主操作。UI 图标与 JIDE 呈现认知共用 `InteractionFeedback.DIALOG_ACTION_PRESENTATION`，`get_app_structure.interactionFeedback.dialogActions` 每次读取当前规则。Builder 插槽通过箭头函数调用父组件方法，避免把草稿和回调的 `this` 绑定到外壳。
 
@@ -198,19 +198,19 @@ EntryAbility 的配置更新及返回前台通过 `refreshThemeColors()` 使用�
 
 ## 专属内容与幻彩
 
-领赠说明中的“【幻彩】”（英文 Iridescent）通过 `ThemeHighlightedTextSpans` 单独取幻彩目录的深浅 `ActionColors`，与幻彩主题“新建牌组”使用同一首尾两色和逐字插值；普通主题下也可展示此预告色。标题由 DialogHeader/HelpLabel 的可选高亮参数接线，默认资源/颜色处理不变。正文与群号不染色。CustomDialogController 使用专用 `IridescentGiftDialog` 包装普通 `IridescentGiftPanel`，避免普通组件在控制器初始化时被当作函数调用。
+幻彩主题仍由 `ThemeCatalog` 与验签权益决定是否可用。3.0.20 移除启动赠送提醒、锁定主题领赠说明、速览中的幻彩介绍/预览、兑换页的幻彩帮助与成功庆祝内容；相关专用组件、提示文案和启动阶段同步删除。
 
-速览及两种领赠说明共用 `components/common/IridescentThemePreview.ets`，只引用已有 `iridescent_preview.png` 实际截图；260vp 限宽、原始比例和无障碍说明保持一致，位于可滚动正文，群号复制入口先于预览显示。
 
-2.9.9 的主题列表展示完整 `ThemeCatalog`，未解锁的幻彩标注“🔒”，点击复用 `components/IridescentGiftPanel.ets` 的领赠说明，且不调用主题切换；通过选择器修订号恢复原生 Select 的真实选中值。已验签权益恢复或兑换成功后正常选用。`model/OfficialCommunity.ts` 是群号的唯一来源。行为回归：`tools/tests/theme-iridescent-gift.test.mjs`。说明复用 `DialogFrame` 的居中限宽、固定操作栏和正文滚动，未新增父层内外边距或安全区贡献。
+
+主题列表展示完整 `ThemeCatalog`，未解锁的幻彩保留“🔒”；点击后不写主题也不弹窗，通过选择器修订号恢复真实选中值。已验签权益恢复或兑换成功后正常选用，行为回归见 `theme-iridescent-gift.test.mjs`。
 
 导航内容统一采用“退出页立即隐藏、进入页淡入”，避免幻彩透明页面的文字和按钮交叉叠加。`utils/HomeNavigationTransition.ets` 是唯一转场编排入口，由首页注册；首页 NavBar 通过独立 `homeTransitionOpacity` 接入同一规则，透明度只作用于内容 Stack，不能放到 Navigation 或根背景上。普通主题也沿用这一节奏。背景冻结/恢复机制保留；`tools/tests/iridescent-rendering.test.mjs` 执行实际转场实现与宿主回调，覆盖首页往返、二级页面 push/pop/replace、缺少 UIContext 和背景生命周期。Node 验证不代替设备上的连续切页观感验收。
 
 安装指纹和离线兑换入口位于“设置 → 应用指纹与兑换”独立分类，简洁版与实验版均可访问，由 `components/settings/RedemptionPanel.ets` 直接展示识别码、复制及主题兑换入口；底层指纹协议不变。`model/Redemption.ts` 固定 JCR1 单内容签名协议；`utils/RedemptionStore.ets` 负责随机指纹落盘、Ed25519 验签、凭证持久化与权益派生。客户端按既有公钥验签，主题与权益映射统一由 `ThemeCatalog.ts` 提供；公开回归不依赖本机发行环境。
 
-首次成功兑换幻彩并落盘后，当前兑换浮层切换为 [IridescentUnlockCelebration](../../entry/src/main/ets/components/settings/IridescentUnlockCelebration.ets)：彩雾与星形徽章淡入、光环和纸屑散开，显示“恭喜！幻彩已解锁”及原有“立即使用”动作。重复兑换、错误和落盘失败不触发庆祝；离页后的迟到结果不显示礼物。动效一次提交560ms显露及1400ms散开目标，不循环、无定时器，关闭动态效果或进入后台时直接显示静态最终画面。立即使用仍通过已有 `onUseTheme` 与主题设置入口，权益继续由原验签存储发布，设置共同目录和 JIDE 的可读/可操作边界保持一致。回归入口：`theme-unlock-celebration.test.mjs`、`redemption.test.mjs` 与设置结构检查；最终纸屑、窄屏/大字体浮层和关闭交互需设备验收。
+兑换成功与重复兑换统一显示普通结果及原有“使用主题”操作，不再切换为幻彩礼物界面；错误和落盘失败保留输入。忙碌时禁止关闭，离页后的迟到结果仍完成已接受的权益持久化，但不写已销毁的 UI。权益与主题切换入口沿用原实现，回归见 `redemption-panel.test.mjs`、`redemption.test.mjs`。
 
-幻彩只在有效权益下实际应用；ⓘ 与锁定选项明示其赠送给所有 3.0.0 之前用户，并复用官方 QQ 群号。`ThemeCatalog.ts` 统一主题种子色、装饰、背景与权益映射，新增主题只登记配置和中英文名称（专属主题另外更新赠送说明）。`ThemeBackground.ets` 在 `Navigation` 外仅创建一次，三张透明纹理每 6 秒向系统合成动画提交平移/缩放/透明度目标，不使用逐帧 ArkTS 更新或运行时色相滤镜；切页不重建、不改变亮度；首页通过 transitionActive 在导航转场期间冻结当前构图，先隐藏退出页再淡入进入页，避免透明 NavDestination 与彩雾根层合成出旧页面残影；onTransitionEnd 解除暂停，转场代次阻止旧结束事件提前恢复。前后台与根可见性控制暂停，轮次号阻止旧完成回调复活动画。页面订阅 `PAGE_SURFACE_KEY`，导航容器透明。`ThemeBackgroundMotion.ts` 提供运动目标，`ThemeVisuals.ets` 转换渐变，牌组色条由长按菜单中的原生 Select 选择六色或无色条；None 在包括幻彩在内的所有主题下保持透明占位，刷新沿用已保存选择，不自动补渐变色条，不改变学习计数语义色。`ThemeText.ets` 的共享 Span 构建器统一主题强调文字，订阅 `THEME_TEXT_COLORS_KEY`，保留普通/禁用/危险文字语义。`GlassSurface.ets` 统一轻操作和评分按钮按下态，与选中牌组共用加厚的深浅玻璃配色；以半透明材料呈现已有柔化背景，不使用实时 backdropBlur。开始学习和两种显示答案通过 PrimaryGlassSurface 共用不透明 surface_card 底色（浅色为白，深色随卡片外观），默认不叠加渐变，边框复用 SurfaceBorder；仅按下时叠加主题反馈，文字按当前主题着色；文字节点key包含色值，新建牌组组件内直接绘制Span。导航透明度使用 EaseOut，背景请求 30fps（15–30fps 范围），导航独立请求 60fps；首页与设置的按钮到首卡距离共用页面分组间距，宽版12vp、窄版8vp。
+幻彩只在有效权益下实际应用，主题列表保留锁定标记。`ThemeCatalog.ts` 统一主题种子色、装饰、背景与权益映射，新增主题只登记配置和中英文名称。`ThemeBackground.ets` 在 `Navigation` 外仅创建一次，三张透明纹理每 6 秒向系统合成动画提交平移/缩放/透明度目标，不使用逐帧 ArkTS 更新或运行时色相滤镜；切页不重建、不改变亮度；首页通过 transitionActive 在导航转场期间冻结当前构图，先隐藏退出页再淡入进入页，避免透明 NavDestination 与彩雾根层合成出旧页面残影；onTransitionEnd 解除暂停，转场代次阻止旧结束事件提前恢复。前后台与根可见性控制暂停，轮次号阻止旧完成回调复活动画。页面订阅 `PAGE_SURFACE_KEY`，导航容器透明。`ThemeBackgroundMotion.ts` 提供运动目标，`ThemeVisuals.ets` 转换渐变，牌组色条由长按菜单中的原生 Select 选择六色或无色条；None 在包括幻彩在内的所有主题下保持透明占位，刷新沿用已保存选择，不自动补渐变色条，不改变学习计数语义色。`ThemeText.ets` 的共享 Span 构建器统一主题强调文字，订阅 `THEME_TEXT_COLORS_KEY`，保留普通/禁用/危险文字语义。`GlassSurface.ets` 统一轻操作和评分按钮按下态，与选中牌组共用加厚的深浅玻璃配色；以半透明材料呈现已有柔化背景，不使用实时 backdropBlur。开始学习和两种显示答案通过 PrimaryGlassSurface 共用不透明 surface_card 底色（浅色为白，深色随卡片外观），默认不叠加渐变，边框复用 SurfaceBorder；仅按下时叠加主题反馈，文字按当前主题着色；文字节点key包含色值，新建牌组组件内直接绘制Span。导航透明度使用 EaseOut，背景请求 30fps（15–30fps 范围），导航独立请求 60fps；首页与设置的按钮到首卡距离共用页面分组间距，宽版12vp、窄版8vp。
 
 页面间距要求为 **a=b=c=d**：系统时间文字下缘→顶部按钮上缘、按钮下缘→今日进度上缘、今日进度下缘→首个牌组上缘、牌组之间。四段共用 `应用尺寸.页面分组间距(narrow)`，宽版12vp、窄版8vp。`pageToolbarTop` / `pageToolbarHeight` 决定顶栏，顶栏在44vp按钮下缘结束（底padding为0），`页面内容顶部间距` 只贡献一次b。首页、设置、统计、浏览、学习、预览、添加笔记、提醒与Agent页面使用同一几何入口；内部表单/聊天/闪卡HTML保留各自布局。菜单调用方传入 `pageContentTop` 最终坐标；`AnchoredMenu` 不再二次扣除窄版偏移。浏览页的搜索、筛选和首张结果卡也必须按同一 `页面分组间距` 排列，筛选容器不能再叠加私有底边距；结果卡之间沿用同一值。
 

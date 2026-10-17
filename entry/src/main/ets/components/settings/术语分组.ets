@@ -37,6 +37,7 @@ export struct 术语分组 {
   @Prop 是否深色: boolean = false;
   // 术语行上抛：由父组件 SettingsPanel 统一渲染 FieldHelpPanel 浮层，避免嵌在分组卡片内
   打开说明回调: (标题: Resource, 正文: Resource) => void = (_标题: Resource, _正文: Resource): void => {};
+  onKeyboardHelp: () => void = (): void => {};
   // B12-Y5 2026-07-29 修复 Bug 1：术语分组没有任何 @StorageLink 颜色键，
   // 主题切换时只靠 @Prop 是否深色 传播，若传播滞后则用旧色板（文字偏暗）。
   // @StorageProp('themeMode') 让主题模式切换直接触发重 build，色板由 解析同步是否深色 同步读取。
@@ -147,6 +148,11 @@ export struct 术语分组 {
     return resourceText(this.getUIContext(), 资源);
   }
 
+  private openEntry(entry: 术语条目): void {
+    if (entry.目录ID === 'help_shortcuts') this.onKeyboardHelp();
+    else this.打开说明回调(entry.帮助标题资源, entry.帮助正文资源);
+  }
+
   // ========================================================
   // @块ID UI-GLOSSARY-002
   // @名称 单条术语行
@@ -167,7 +173,7 @@ export struct 术语分组 {
   private 术语行(条目: 术语条目) {
     SettingsActionRow({ title: settingsItemText(this.getUIContext(), 条目.目录ID, this.uiLanguage),
       icon: settingsIcon(条目.目录ID),
-      onAction: (): void => { this.打开说明回调(条目.帮助标题资源, 条目.帮助正文资源); } })
+      onAction: (): void => { this.openEntry(条目); } })
   }
 
   build() {

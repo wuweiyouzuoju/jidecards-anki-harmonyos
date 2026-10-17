@@ -1,5 +1,4 @@
-import { KeyboardShortcutHelp } from '../KeyboardShortcutHelp';
-import { EDITOR_SHORTCUTS, FIELD_SHORTCUTS, editorShortcutCommand } from '../../model/KeyboardShortcuts';
+import { editorShortcutCommand } from '../../model/KeyboardShortcuts';
 import { StudyKeyboardSession } from '../../model/StudyKeyboard';
 import { studyEventChord } from '../../utils/StudyKeyAdapter';
 import { BrowserDeckDialog } from './BrowserDeckDialog';
@@ -81,7 +80,6 @@ export struct 浏览编辑区 {
   @Prop initialTags: string = '';
   @Prop note: EditableNote | null = null;
   @State private preview: NoteDraftPreviewInput | null = null;
-  @State @Watch('publishInterface') private keyboardHelpOpen: boolean = false;
   @State @Watch('publishInterface') private propertyMode: string = '';
   @State @Watch('publishInterface') private propertyBusy: boolean = false;
   @State private propertyBack: number = 0;
@@ -137,7 +135,7 @@ export struct 浏览编辑区 {
   }
 
   private interfaceControls(): AppInterfaceMenuItem[] {
-    return noteEditInterfaceControls(this.busy, this.busy || this.audioBusy || this.confirmingClose || this.propertyBusy || this.pendingMapping !== null || this.propertyMode !== '' || this.keyboardHelpOpen, this.fieldNames.length);
+    return noteEditInterfaceControls(this.busy, this.busy || this.audioBusy || this.confirmingClose || this.propertyBusy || this.pendingMapping !== null || this.propertyMode !== '', this.fieldNames.length);
   }
   private publishAudioStatus(status: NoteAudioStatus | null): void {
     if (status === null || this.disposed || !this.interfaceMounted) appInterface.leave('note_audio_manage');
@@ -212,7 +210,6 @@ export struct 浏览编辑区 {
   }
 
   private async requestClose(): Promise<void> {
-    if (this.keyboardHelpOpen) { this.keyboardHelpOpen = false; return; }
     if (this.propertyMode !== '') { if (this.propertyMode === 'templates') this.propertyBack++; else if (!this.propertyBusy) this.propertyMode = ''; return; }
     if (this.preview !== null) return;
     if (this.busy || this.audioBusy || this.confirmingClose || this.disposed) return;
@@ -231,7 +228,6 @@ export struct 浏览编辑区 {
     const fresh: boolean = this.keyboardSession.update(event.keyCode, event.type === KeyType.Down);
     if (event.type !== KeyType.Down) return false;
     const chord: string = studyEventChord(event);
-    if (this.keyboardHelpOpen) { if (fresh && chord === 'escape') this.keyboardHelpOpen = false; return true; }
     if (this.propertyMode !== '') return false;
     const command: string = editorShortcutCommand(chord, this.disposed || this.busy || this.audioBusy ||
       this.confirmingClose || this.showingMasks || this.preview !== null || this.propertyBusy || this.pendingMapping !== null);
@@ -343,8 +339,7 @@ export struct 浏览编辑区 {
           onCancel: (): void => { this.showingMasks = false; },
           onConfirm: (masks: 遮罩描述[]): void => { this.confirmMasks(masks); } })
       } else {
-      NoteEditorHeader({ title: $r('app.string.note_editor_edit_title'), showKeyboardHelp: true,
-        onKeyboardHelp: (): void => { this.keyboardHelpOpen = true; },
+      NoteEditorHeader({ title: $r('app.string.note_editor_edit_title'),
         actionLabel: $r('app.string.note_draft_preview'),
         actionEnabled: !this.busy && !this.audioBusy && !this.confirmingClose && this.note !== null,
         closeEnabled: this.interfaceEnabled('back'),
@@ -371,7 +366,7 @@ export struct 浏览编辑区 {
           ForEach(this.fieldNames, (name: string, index: number) => {
             NoteFieldCard({ fieldName: name, fieldIndex: index, focusRequest: this.focusedField === index ? this.fieldFocusRequest : 0, originalStockKind: this.originalStockKind, value: this.fieldValues[index] ?? '',
               fieldConfig: this.fieldConfigs[index] ?? null,
-              disabled: this.busy || this.audioBusy || this.confirmingClose || this.propertyBusy || this.pendingMapping !== null || this.propertyMode !== '' || this.keyboardHelpOpen,
+              disabled: this.busy || this.audioBusy || this.confirmingClose || this.propertyBusy || this.pendingMapping !== null || this.propertyMode !== '',
               reverseToggle: index === this.optionalReverseFieldOrd, editing: true,
               isDark: this.isDark, accent: this.主色按钮背景,
               clozeEnabled: this.clozeFieldOrds.indexOf(index) >= 0, allFields: this.fieldValues,
@@ -431,10 +426,6 @@ export struct 浏览编辑区 {
       if (this.propertyMode === 'templates' && this.note !== null) {
         笔记类型编辑器({ notetypeId: this.note.notetypeId, templatesOnly: true, backRequest: this.propertyBack, isDark: this.isDark,
           onClose: (): void => { this.propertyMode = ''; }, onSaved: (): void => { this.propertyMode = ''; this.reloadProperties(); } })
-      }
-      if (this.keyboardHelpOpen) {
-        KeyboardShortcutHelp({ scope: 'editor', shortcuts: EDITOR_SHORTCUTS.concat(FIELD_SHORTCUTS),
-          onClose: (): void => { this.keyboardHelpOpen = false; } })
       }
     }.width('100%').height('100%')
       .onKeyPreIme((event: KeyEvent): boolean => this.handleEditorKey(event))

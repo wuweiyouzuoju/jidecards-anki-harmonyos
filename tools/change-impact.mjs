@@ -44,6 +44,8 @@ export const PATH_RULES = [
     reads: [doc('sync-data')], suites: ['sync'], mode: 'focused' },
   { id: 'study', match: /^entry\/src\/main\/ets\/.*(?:Study|Audio|Media|Preview|Render|学习|音频|媒体|预览)/i,
     reads: [doc('study-media')], suites: ['study', 'media'], mode: 'focused' },
+  { id: 'card-web', match: /^(?:entry\/src\/main\/ets\/model\/(?:CardReviewerRuntime|CardWebSession|CardWebBuffer|学习卡片HTML构建器)\.ts$|tools\/(?:card-browser-harness|test-card-(?:browser|appearance-browser|colors-browser|template-browser|flip-browser|authorization-browser))\.mjs$|tools\/tests\/fixtures\/ankidroid-reviewer-colors\.css$)/,
+    reads: [doc('study-media')], suites: ['media'], mode: 'focused' },
   { id: 'browser', match: /^entry\/src\/main\/ets\/.*(?:Browser|Stats|Search|浏览|统计|搜索)/i,
     reads: [doc('browser-stats')], suites: ['browser', 'ui'], mode: 'focused' },
   { id: 'ui', match: /^entry\/src\/main\/(?:resources\/|ets\/(?:components\/common\/|.*(?:Theme|Color|Layout|Settings|主题|颜色|设置)))/i,
@@ -104,6 +106,7 @@ export function planChanges(paths, { kind = 'auto' } = {}) {
   const focusedCommands = changeKind === 'cosmetic' && mode === 'focused' ? [] :
     [...suites].sort().map(suite => `npm test -- ${suite}`);
   const commands = [...focusedCommands];
+  if (changeKind !== 'cosmetic' && matches.some(item => item.rules.includes('card-web'))) commands.push('npm run test:cards:browser');
   if (matches.some(item => item.rules.includes('docs')) && !focusedCommands.includes('npm test -- tooling')) commands.push(documentationCheck);
   if (files.some(file => /^entry\/src\/main\/resources\/[^/]+\/element\/string\.json$/.test(file)) &&
       !focusedCommands.includes('npm test -- ui')) commands.push(resourceCheck);

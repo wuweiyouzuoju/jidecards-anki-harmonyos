@@ -503,13 +503,12 @@ test('study UI and JIDE keep both side groups while flags cover the main menu', 
     撤销上次:()=>calls.push('undo'),埋藏或暂停当前卡:mode=>calls.push(mode===0?'bury':'suspend'),请求删除当前卡:()=>calls.push('delete'),
     changeMarking:()=>calls.push('mark'),loadFlagLabels:()=>calls.push('flag'),
     打开AI改卡:()=>calls.push('agent'),stopStudyTimers:()=>calls.push('handwrite'),configureAutoAdvance:()=>calls.push('auto_advance')});
-  const ids=['edit','agent','undo','marking','audio','card_actions','handwrite','keyboard','guide'];
+  const ids=['edit','agent','undo','marking','audio','card_actions','handwrite','guide'];
   assert.deepEqual(page.interfaceMenuItems().map(x=>x.id),ids);
   assert.equal(page.更多菜单()[0].value,localize('study_edit_note'));
   page.有音频=true;page.可撤销=true;
   for(const item of page.更多菜单()) { for(const action of item.children??[item]) action.action(); }
-  assert.deepEqual(calls,['edit','agent','undo','mark','flag','audio','bury','suspend','delete','auto_advance','handwrite','handwrite','guide']);
-  assert.equal(page.keyboardHelpOpen,true,'keyboard menu opens its contextual guide and pauses timers');page.keyboardHelpOpen=false;
+  assert.deepEqual(calls,['edit','agent','undo','mark','flag','audio','bury','suspend','delete','auto_advance','handwrite','guide']);
   assert.equal(page.flagNamesOpen,true);
   Object.assign(page,{timeboxNotice:null,clearChoiceAutoAdvance:()=>{}});
   page.openStudyMenu();page.publishInterface();
@@ -579,7 +578,7 @@ test('home selection refreshes knowledge without waking unrelated collection wor
   const tracker=new AppInterfaceTracker();
   const Page=pageMethods('pages/首页.ets',['previewDeckChanged','homeActionControls','publishHomeInterface'],{appInterface:tracker,OFFICIAL_ANNOUNCEMENTS_ENABLED,isDoubleColumnDeckListStyle,homeSyncIndicator,homeSyncLabelKey});
   const page=Object.assign(new Page(), { recoveryMessage: '', resultMessage: '', resultUndo: null });let invalidations=0;
-  Object.assign(page,{homeDisposed:false,加载状态:'ready',当前断点:'xs',deckListStyle:'single_wide',显示今日进度卡:true,homeAgentEnabled:true,syncAccountState:'normal',syncIndicator:'hidden',syncStatusText:'',选中的牌组ID:'d2',牌组数据源:{snapshotDecks:()=>[{id:'d1',name:'Visible'}]},
+  Object.assign(page,{homeDisposed:false,加载状态:'ready',当前断点:'xs',deckMenuId:'',deckListStyle:'single_wide',显示今日进度卡:true,homeAgentEnabled:true,syncAccountState:'normal',syncIndicator:'hidden',syncStatusText:'',选中的牌组ID:'d2',牌组数据源:{snapshotDecks:()=>[{id:'d1',name:'Visible'}]},
     homeActivity:()=>({collectionBusy:false}),deckPreviewSession:{invalidate:()=>invalidations++},
     homeActivityChanged:()=>assert.fail('read-only interface publication must not wake startup/sync/import work')});
   page.previewDeckChanged();assert.equal(invalidations,1);
@@ -587,6 +586,11 @@ test('home selection refreshes knowledge without waking unrelated collection wor
   assert.deepEqual(visibleInterfaceItems('home',context).slice(0,6).map(item=>item.id),['more','agent','search','browser','sync','create']);
   assert.ok(!visibleInterfaceItems('home_more',context).some(item=>item.id==='sync'||item.id==='browser'));
   assert.equal(tracker.snapshot()[0].selectedId,'d2');assert.deepEqual(tracker.snapshot()[0].optionIds,['d1']);
+  const highlightedId=()=>tracker.snapshot()[0].values.find(value=>value.id==='deck_list_highlighted_id').value;
+  assert.equal(highlightedId(),'');
+  page.deckMenuId='d2';page.publishHomeInterface();assert.equal(highlightedId(),'d2');
+  page.deckMenuId='';page.publishHomeInterface();assert.equal(highlightedId(),'');
+  assert.equal(tracker.snapshot()[0].selectedId,'d2','visual dismissal retains the logical deck selection');
   const structure=buildAgentAppStructure(context,'home','',localize,[],[],tracker.snapshot());
   assert.equal(structure.observations.find(v=>v.surface==='home').values.find(v=>v.id==='official_announcements_enabled').value,'false');
   for (const style of ['single_wide','single_narrow','double_wide','double_narrow']) {
@@ -606,6 +610,7 @@ test('home selection refreshes knowledge without waking unrelated collection wor
   for(const breakpoint of ['sm','md']) {
     page.当前断点=breakpoint;page.publishHomeInterface();
     assert.equal(tracker.snapshot()[0].values.find(value=>value.id==='home_action_position').value,'above_summary');
+    assert.equal(highlightedId(),'d2');
   }
   page.homeDisposed=true;page.previewDeckChanged();assert.equal(tracker.snapshot()[0].selectedId,'d2');
 });

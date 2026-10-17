@@ -27,6 +27,15 @@
       "merge":{"input":"anki.generic.String","output":"anki.generic.String","meaning":"本机文件 token；Core 单事务合并，保留云基线并标为待上传"},
       "receive":{"input":"anki.generic.String","output":"anki.generic.String","meaning":"本机文件 token；在自有目录排他创建接收文件"}
     }},
+  "PeerCollection": {"id":1006,"methods":{"capture":0,"apply":1,"receive":2,"plan":3,"pack":4,"confirm":5},"owner":"native/rsharmony/src/peer_collection.rs",
+    "contracts":{
+      "capture":{"input":"anki.generic.String","output":"anki.generic.String","meaning":"本机文件 token 和设备身份；通过公开 Core 同步接口导出完整集合及独立媒体版本"},
+      "apply":{"input":"anki.generic.String","output":"anki.generic.String","meaning":"本机元数据/媒体文件 token；扩展层事务合并或已确认整库替换，保留云待同步状态"},
+      "receive":{"input":"anki.generic.String","output":"anki.generic.String","meaning":"在直连自有目录排他创建接收文件"},
+      "plan":{"input":"anki.generic.String","output":"anki.generic.String","meaning":"校验双方快照；导出缺失媒体请求清单"},
+      "pack":{"input":"anki.generic.String","output":"anki.generic.String","meaning":"只打包当前快照中已声明且哈希匹配的媒体文件"},
+      "confirm":{"input":"anki.generic.String","output":"anki.generic.String","meaning":"双端提交确认后记录本机快照的媒体基线；未确认文件的缺失不传播删除"}
+    }},
   "CustomScheduling": {"id":1004,"methods":{"input":0,"patch":1},"owner":"native/rsharmony/src/custom_scheduling.rs",
     "contracts":{
       "input":{"input":"jide.CustomSchedulingRequest","output":"anki.generic.String","meaning":"状态与上下文转为受限 JSON；seed 为十进制字符串"},

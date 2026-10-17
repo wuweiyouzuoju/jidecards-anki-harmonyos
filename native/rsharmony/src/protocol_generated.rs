@@ -17,6 +17,17 @@ pub struct BackendBackendError {
 
 #[allow(dead_code)]
 #[derive(Clone, PartialEq, prost::Message)]
+pub struct CollectionOpenCollectionRequest {
+    #[prost(string, tag = "1")]
+    pub collection_path: String,
+    #[prost(string, tag = "2")]
+    pub media_folder_path: String,
+    #[prost(string, tag = "3")]
+    pub media_db_path: String,
+}
+
+#[allow(dead_code)]
+#[derive(Clone, PartialEq, prost::Message)]
 pub struct MediaCheckMediaResponse {
     #[prost(string, repeated, tag = "1")]
     pub unused: Vec<String>,

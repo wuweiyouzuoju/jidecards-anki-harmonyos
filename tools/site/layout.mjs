@@ -22,7 +22,8 @@ export function createLayout(content) {
   const repoLinks = repositories.map(item => `<a href="${esc(item.url)}">${esc(item.name)} ${arrow}</a>`).join('');
   const sourceLink = (file, label) => `<a href="${esc(repo)}/blob/main/${esc(file)}">${esc(label)} ${arrow}</a>`;
   const logo = (className, size, alt = '记得闪卡 Logo') => `<img class="${className}" src="${size <= 38 ? content.logoSmallPreview : content.logoPreview}" data-full-src="${work.brand.logo}?v=${assets.logo}" alt="${esc(alt)}" width="${size}" height="${size}" loading="lazy" decoding="async" fetchpriority="low">`;
-  const download = `<div class="actions"><a class="button" href="${esc(work.marketplace.url)}">免费下载 ${arrow}</a><a class="button secondary" href="${esc(repo)}">查看源码 ${arrow}</a></div><p class="download-meta">源码 ${esc(work.sourceVersion)} · 应用市场 ${esc(work.releaseVersion)} · ${esc(work.platform)} · 华为应用市场搜索「记得闪卡」，下载版本以市场页面为准</p>`;
+  const sourcePackage = work.sourcePackage;
+  const download = `<div class="actions"><a class="button" href="${esc(work.marketplace.url)}">免费下载 ${arrow}</a><a class="button secondary" href="${esc(repo)}">查看源码 ${arrow}</a></div><p class="download-meta">源码 ${esc(work.sourceVersion)} · 应用市场 ${esc(work.releaseVersion)} · ${esc(work.platform)} · 华为应用市场搜索「记得闪卡」，下载版本以市场页面为准</p><p class="download-meta"><a href="${esc(sourcePackage.downloadUrl)}">${esc(work.sourceVersion)} 签名 HAP 开发包 ${arrow}</a> · <a href="${esc(sourcePackage.checksumsUrl)}">SHA-256 校验</a> · <a href="${esc(sourcePackage.releaseUrl)}">构建说明</a><br>${esc(sourcePackage.installNote)}</p>`;
   const application = {
     '@type': 'SoftwareApplication', '@id': `${origin}/#app`, name: work.name, alternateName: work.alternateName,
     url: work.url, operatingSystem: work.platform, applicationCategory: 'EducationalApplication',

@@ -52,7 +52,7 @@ const cases = [
   { name: 'translucent body', css: 'html{background:black}body.card{background:rgba(32,48,64,.5)}',
     light: '#E6E6E6', dark: '#E6E6E6', background: null, surface: '#101820', translucent: true },
   { name: 'explicit foreground matching the default', css: 'body.card{color:#E6E6E6;background:#E8E3DF}',
-    light: '#E6E6E6', dark: '#E6E6E6', background: '#E8E3DF', preserveLowContrast: true }
+    light: '#E6E6E6', dark: '#E6E6E6', background: '#E8E3DF', correctDarkForeground: true }
 ];
 const failures = [];
 let passed = 0;
@@ -83,9 +83,16 @@ try {
         });
         const name = `${item.name} / ${dark ? 'dark' : 'light'} / ${side}`;
         try {
-          assert.equal(actual.text, dark ? item.dark : item.light, name);
+          if (!(dark && item.correctDarkForeground)) assert.equal(actual.text, dark ? item.dark : item.light, name);
           assert.equal(actual.content, side, 'await asynchronous answer hook');
-          assert.equal(actual.emphasis, '#D05030', 'preserve explicit field colors');
+          const fieldBackground = (dark && item.darkBackground) || item.background || item.surface;
+          if (!dark || 对比度('#D05030', fieldBackground) >= 4.5) {
+            assert.equal(actual.emphasis, '#D05030', 'preserve readable explicit field colors');
+          } else {
+            assert.ok(对比度(actual.emphasis, fieldBackground) >= 4.5, 'repair unreadable field emphasis');
+            const channels = actual.emphasis.match(/\w\w/g).map(value => parseInt(value, 16));
+            assert.ok(channels[0] > channels[1] && channels[1] > channels[2], 'emphasis retains its warm hue');
+          }
           assert.ok(actual.bodyHeight >= actual.viewportHeight, `${name}: body background fills the card`);
           const expectedBackground = (dark && item.darkBackground) || item.background;
           let background = harness.backgrounds.at(-1).toUpperCase();
@@ -98,13 +105,114 @@ try {
             assert.equal(actual.background, item.translucent ? 'rgba(32, 48, 64, 0.5)' : 'rgba(0, 0, 0, 0)', name);
             assert.equal(background, item.surface, 'runtime reports the composed surface');
           }
-          if (!item.preserveLowContrast) assert.ok(对比度(actual.text, background) >= 4.5, `${name}: text contrast`);
+          if (dark || !item.correctDarkForeground) assert.ok(对比度(actual.text, background) >= 4.5, `${name}: text contrast`);
           passed++;
         } catch (error) {
           failures.push(`${name}: ${error.message}`);
         }
       }
     }
+  }
+  // Imported fields may keep a light-mode foreground even when the reviewer changes the body.
+  // Exercise the rendered descendants, not just body.color or an upstream CSS subset.
+  const fixedFields = {
+    css: '.card{color:black;background:white}.fixed-css{color:#222!important}',
+    questionNodes: [{text: fixedFieldHtml('question'), replacement: null}],
+    answerNodes: [{text: fixedFieldHtml('answer'), replacement: null}]
+  };
+  function fixedFieldHtml(side) {
+    return `<div id="fixed-parent" style="color:#222">${side}` +
+      '<font id="fixed-font" color="#000000">Legacy font</font>' +
+      '<span id="fixed-inline" style="color:rgb(20,20,20)!important">Inline</span>' +
+      '<span id="fixed-css" class="fixed-css">Stylesheet</span>' +
+      '<span id="light-block" style="background:white"><span id="light-text">Light block</span></span>' +
+      '<span id="translucent-text" style="background:rgba(255,255,255,.9)">Translucent block</span>' +
+      '<mark id="fixed-mark">Highlight</mark>' +
+      '<span id="readable-accent" style="color:#F5AE70">Accent</span>' +
+      '<span id="alpha-text" style="color:rgba(0,0,0,.87)">Alpha text</span>' +
+      '<span id="transparent-text" style="color:transparent">Concealed</span>' +
+      '<span id="hidden-text" style="color:#111;visibility:hidden">Hidden</span></div>';
+  }
+  for (const width of [390, 1280]) {
+    const fieldHarness = await createCardBrowserHarness(browser);
+    try {
+      await fieldHarness.page.setViewportSize({width, height:800});
+      const fieldKey = ++key;
+      await fieldHarness.show(构建卡片HTML(fixedFields, 'question', false), fieldKey, 'question');
+      const originalStyles = await fieldHarness.page.locator('#qa').evaluate(qa => qa.innerHTML);
+      for (const dark of [true, false, true]) {
+        await fieldHarness.setTheme(dark);
+        const actual = await fieldHarness.page.evaluate(() => Object.fromEntries([
+          'fixed-parent', 'fixed-font', 'fixed-inline', 'fixed-css', 'light-text', 'translucent-text', 'fixed-mark',
+          'readable-accent', 'transparent-text', 'hidden-text'
+        ].map(id => [id, getComputedStyle(document.getElementById(id)).color])));
+        const hex = rgb => '#' + rgb.match(/\d+/g).slice(0,3)
+          .map(value => Number(value).toString(16).padStart(2,'0')).join('');
+        for (const id of ['fixed-parent', 'fixed-font', 'fixed-inline', 'fixed-css']) {
+          assert.ok(对比度(hex(actual[id]), dark ? '#18202B' : '#FFFFFF') >= 4.5,
+            `fixed field remains readable: ${id}, width=${width}, dark=${dark}`);
+        }
+        assert.equal(actual['light-text'], 'rgb(34, 34, 34)', 'local light background keeps its dark foreground');
+        assert.equal(actual['translucent-text'], 'rgb(34, 34, 34)', 'translucent light block keeps dark text');
+        assert.equal(actual['fixed-mark'], 'rgb(0, 0, 0)', 'highlight keeps black text');
+        assert.equal(actual['readable-accent'], 'rgb(245, 174, 112)', 'readable accent is unchanged');
+        assert.equal(actual['transparent-text'], 'rgba(0, 0, 0, 0)', 'concealed text stays concealed');
+        assert.equal(actual['hidden-text'], 'rgb(17, 17, 17)', 'hidden text is untouched');
+        if (!dark) assert.equal(await fieldHarness.page.locator('#qa').evaluate(qa => qa.innerHTML), originalStyles,
+          'leaving night mode restores original inline values, priorities and absent style attributes');
+        passed++;
+      }
+      await fieldHarness.show(构建卡片HTML(fixedFields, 'answer', true), fieldKey, 'answer');
+      assert.ok(await fieldHarness.page.locator('#fixed-parent').innerText().then(text => text.includes('answer')));
+      await fieldHarness.page.evaluate(() => {
+        // Model a decrypted answer arriving after the renderer has already acknowledged the side.
+        setTimeout(() => {
+          const late = document.createElement('span');
+          late.id = 'late-answer'; late.style.color = 'black'; late.textContent = 'Late answer';
+          document.body.appendChild(late);
+        }, 0);
+      });
+      await fieldHarness.page.waitForFunction(() => {
+        const late = document.getElementById('late-answer');
+        return late && getComputedStyle(late).color !== 'rgb(0, 0, 0)';
+      });
+      const lateColor = await fieldHarness.page.locator('#late-answer').evaluate(element => getComputedStyle(element).color);
+      const hex = rgb => '#' + rgb.match(/\d+/g).slice(0,3)
+        .map(value => Number(value).toString(16).padStart(2,'0')).join('');
+      assert.ok(对比度(hex(lateColor), '#18202B') >= 4.5, 'late answer text also meets night contrast');
+      await fieldHarness.page.evaluate(() => {
+        const details = document.createElement('details');
+        details.id = 'late-details';
+        details.innerHTML = '<summary>More</summary><span id="revealed-text" style="color:black">Revealed answer</span>';
+        document.body.appendChild(details);
+      });
+      await fieldHarness.page.locator('#late-details summary').click();
+      await fieldHarness.page.waitForFunction(() =>
+        getComputedStyle(document.getElementById('revealed-text')).color !== 'rgb(0, 0, 0)');
+      const revealedColor = await fieldHarness.page.locator('#revealed-text').evaluate(element => getComputedStyle(element).color);
+      assert.ok(对比度(hex(revealedColor), '#18202B') >= 4.5, 'native details reveal also gets readable text');
+      const alphaColor = await fieldHarness.page.locator('#alpha-text').evaluate(element => getComputedStyle(element).color);
+      const [red, green, blue, alpha] = alphaColor.match(/[\d.]+/g).map(Number);
+      const composite = '#' + [red, green, blue].map((channel,index) =>
+        Math.round(channel * alpha + [24,32,43][index] * (1-alpha)).toString(16).padStart(2,'0')).join('');
+      assert.ok(alpha > .86 && alpha < .88, 'fixed translucent text retains its alpha');
+      assert.ok(对比度(composite, '#18202B') >= 4.5, 'translucent foreground is checked after composition');
+      await fieldHarness.page.evaluate(() => {
+        // Template edits during a repair must survive both a new pass and leaving night mode.
+        const late = document.getElementById('late-answer');
+        late.style.color = '#F5AE70'; late.style.fontWeight = '700';
+        document.getElementById('fixed-inline').style.backgroundColor = 'white';
+      });
+      await fieldHarness.page.waitForFunction(() =>
+        getComputedStyle(document.getElementById('fixed-inline')).color === 'rgb(20, 20, 20)');
+      await fieldHarness.setTheme(false);
+      assert.deepEqual(await fieldHarness.page.locator('#late-answer').evaluate(element =>
+        [getComputedStyle(element).color, element.style.fontWeight]), ['rgb(245, 174, 112)', '700']);
+      assert.deepEqual(await fieldHarness.page.locator('#fixed-inline').evaluate(element =>
+        [element.style.color, element.style.getPropertyPriority('color'), element.style.backgroundColor]),
+      ['rgb(20, 20, 20)', 'important', 'white']);
+      passed++;
+    } finally { await fieldHarness.close(); }
   }
   // Compare against the upstream reviewer subset, including the CSS cascade, rather than
   // assuming that keeping every light-mode template color in night mode is compatible.
@@ -154,7 +262,19 @@ try {
     await harness.show(reference, ++key, 'question');
     const expected = await snapshot();
     for (const result of actual) {
-      assert.deepEqual(result, expected, `AnkiDroid reviewer parity: ${item.name}, width=${width}, dark=${dark}`);
+      if (dark && item.name === 'template elements override defaults') {
+        const hex = rgb => '#' + rgb.match(/\d+/g).slice(0, 3)
+          .map(value => Number(value).toString(16).padStart(2, '0')).join('');
+        assert.ok(对比度(hex(expected.elements.link.color), hex(expected.background)) < 4.5,
+          'upstream retains this unreadable author link color');
+        assert.ok(对比度(hex(result.elements.link.color), hex(result.background)) >= 4.5,
+          'jidecards deliberately repairs unreadable night text beyond upstream defaults');
+        assert.deepEqual({...result, elements: {...result.elements,
+          link: {...result.elements.link, color: expected.elements.link.color}}}, expected,
+          'all other reviewer colors and media still match upstream');
+      } else {
+        assert.deepEqual(result, expected, `AnkiDroid reviewer parity: ${item.name}, width=${width}, dark=${dark}`);
+      }
       passed++;
     }
     if (item.name === 'stock cloze') {

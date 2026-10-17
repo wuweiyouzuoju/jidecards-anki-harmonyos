@@ -31,13 +31,13 @@ Node 24.x 与 `package.json` / CI 一致。首次准备或 lockfile 变化后运
 
 首次入门的回归入口为 [check-home-intro-compiled.mjs](../../tools/check-home-intro-compiled.mjs)。HAP 构建后，从仓库根运行 `node tools/check-home-intro-compiled.mjs entry/build/default/cache/default/default@CompileArkTS/esmodule/release/entry/src/main/ets/components/HomeIntroPanel.ts`（debug 包相应替换目录）。需要 Node 24 和本次构建留下的 CompileArkTS 产物；不接受 `.ets` 源码，不依赖旧的入门已读记录。
 
-工具执行真实编译后的 `HomeIntroPanel` / `HomeIntroSection` 及其 BuilderParam 回调，只替换外部组件与平台边界；原始声明式 `Text()` 返回 `undefined`，未转换的 `.fontSize` 链会直接失败。六个分组或 16 个 Text 节点缺失、执行异常、产物不存在均非零退出，成功输出文件路径、SHA-256 与渲染计数。工具自身反例在 `home-intro-compiled.test.mjs`，进入 home 测试；它不验证字节码执行、布局、重渲染、原生库或真机兼容性，也不能单独认证上架包。
+工具执行真实编译后的 `HomeIntroPanel` / `HomeIntroSection` 及其 BuilderParam 回调，只替换外部组件与平台边界；原始声明式 `Text()` 返回 `undefined`，未转换的 `.fontSize` 链会直接失败。移除幻彩宣传后应渲染五个分组和 13 个 Text 节点；分组或节点缺失、执行异常、产物不存在均非零退出，成功输出文件路径、SHA-256 与渲染计数。工具自身反例在 `home-intro-compiled.test.mjs`，进入 home 测试；它不验证字节码执行、布局、重渲染、原生库或真机兼容性，也不能单独认证上架包。
 
 ### 同步服务器编译产物检查
 
 HAP 构建后运行 `node tools/check-sync-server-compiled.mjs entry/build/default/cache/default/default@CompileArkTS/esmodule/release/entry/src/main/ets/components/settings/同步分组.ts`，debug 包替换目录。需要 Node 24 和本次 CompileArkTS 输出，不接受 `.ets` 源码；产物不存在、绑定不是父状态引用或运行异常均非零退出，成功输出路径、SHA-256 与覆盖计数。
 
-工具执行编译后的分组/弹窗构造、渲染与真实业务方法。平台替身严格执行状态 get/set/订阅与销毁契约，旧产物传字符串时会在 `addSubscriber` 立即失败；五个字段须连接父状态，输入和错误须到达表单。覆盖地址校验、持久化失败、保存中禁用与关闭守卫、取消/重开、已登录保护，以及销毁后的地址保存、登录、自动同步确认/写入和原生关闭回调。自身反例在 `sync-server-compiled.test.mjs`，进入 sync 测试；全应用构造位置扫描在 `arkts-component-fields.test.mjs`。替身不模拟 ArkUI 的观察调度、动画、布局、网络或真实存储，工具也不执行字节码；设备上的手机/平板完整操作仍需独立验收。
+工具执行编译后的分组/弹窗构造、渲染与真实业务方法。平台替身严格执行状态 get/set/订阅与销毁契约，旧产物传字符串时会在 `addSubscriber` 立即失败；五个字段须连接父状态，输入和错误须到达表单。覆盖地址校验、持久化失败、保存中禁用与关闭守卫、取消/重开、已登录保护，以及销毁后的地址保存、登录、自动同步确认/写入和原生关闭回调。验证环境为每次检查创建真实 `AgentOperationHosts`，凭证平台替身使用当前 `saveSyncCredentialsVerified` / `loadVisibleSyncAuth` 契约，避免沿用已不再调用的旧保存函数。自身反例在 `sync-server-compiled.test.mjs`，进入 sync 测试；全应用构造位置扫描在 `arkts-component-fields.test.mjs`。替身不模拟 ArkUI 的观察调度、动画、布局、网络或真实存储，工具也不执行字节码；设备上的手机/平板完整操作仍需独立验收。
 
 原生弹窗统一后，工具同时执行当前 `NativeDialogHost` 源逻辑；DialogFrame 平台替身只转发编译后的 header/content 插槽，确保真实表单仍渲染和接线，不证明公共外壳布局。`native-dialog-host.test.mjs` 进入 ui 筛选，独立执行公共窗口生命周期、失败与迟到回调，并扫描字段工厂、公共配置和布局。动效档位变更仍执行 `motion-style-surfaces.test.mjs`；这些检查均需配合本次 HAP 和设备验收。
 
@@ -132,6 +132,8 @@ Node 24 测试使用内置 TypeScript 转换，运行时可能输出 `Experiment
 - `--kind behavior` 选择相关领域测试；`--kind compile` 额外建议一次增量 HAP；`--kind integration` / `release` 选择完整 verify。默认 `auto` 将仅文档、字符串/颜色和常用图片资源识别为 cosmetic，其余按 behavior 路由；脚本不读取正文推断语义，页面内的小样式需主动指定 kind。选项必须放在 `--paths` 前。
 
 计划合并相关领域；`requiredCommands` 是所选范围，`changeKind` 和 `validationMode` 说明性质与级别，普通 entry 不再强制完整构建。构建/依赖、协议与 FFI 输入保守建议完整 verify；原生普通路径建议主机检查。未知路径列入 `unknownPaths`，要求明确所有权、调用关系并选择检查，不仅因未归类就自动全量。没有适合的现成命令不等于无需检查。领域推荐来自路径命名和测试筛选，不是传递依赖分析。
+
+卡片文档的 `CardReviewerRuntime`、`CardWebSession`、`CardWebBuffer`、HTML 构建器及其浏览器工具/上游配色样本由 `card-web` 规则补充选择 media 回归和 `npm run test:cards:browser`；行为变更不能仅因路径未含 Study/Render 而遗漏真实浏览器检查。显式 cosmetic 分类仍由开发者审查实际影响后选择，不自动运行浏览器。
 
 退出码 0 只说明计划成功生成，`verificationStatus` 始终为 `not-run`；Git、参数错误返回非零。实际通过与否由 `verify` 的退出码及任务报告证明。设备范围、责任归属和长期决策的语义完整性仍需审查，工具不会声称已自动检查。
 

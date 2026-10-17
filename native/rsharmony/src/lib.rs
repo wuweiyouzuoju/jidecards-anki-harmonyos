@@ -11,6 +11,7 @@ pub mod custom_scheduling;
 pub mod deck_preview;
 mod media_snapshot;
 pub mod note_duplicates;
+pub mod peer_collection;
 pub mod peer_progress;
 mod private_rpc_ids;
 mod protocol_generated;
@@ -78,6 +79,10 @@ pub trait RawBackend: Send + 'static {
     fn sync_aborter(&self) -> Option<SyncAbort> {
         None
     }
+    #[cfg(feature = "anki-core")]
+    fn recover_peer(&self) -> Result<(), BackendFailure> {
+        Ok(())
+    }
 
     fn run_method_raw(
         &mut self,
@@ -96,6 +101,8 @@ struct BackendEntry {
 struct BackendState {
     raw: Box<dyn RawBackend>,
     media: media_snapshot::MediaSnapshot,
+    #[cfg(feature = "anki-core")]
+    collection_root: Option<std::path::PathBuf>,
 }
 
 impl BackendState {
@@ -105,6 +112,15 @@ impl BackendState {
         method: u32,
         input: &[u8],
     ) -> Result<Vec<u8>, BackendFailure> {
+        #[cfg(feature = "anki-core")]
+        if self
+            .collection_root
+            .as_ref()
+            .is_some_and(|root| peer_collection::has_pending(root))
+        {
+            // No later edit/import/cloud task may overtake a durable peer commit awaiting recovery.
+            self.raw.recover_peer()?;
+        }
         if service == custom_scheduling::SERVICE {
             return custom_scheduling::call(method, input);
         }
@@ -114,12 +130,30 @@ impl BackendState {
         if service == collection_history::SERVICE {
             return collection_history::call(self.raw.as_mut(), method, input);
         }
-        if service == COLLECTION_SERVICE
-            && (method == OPEN_COLLECTION || method == CLOSE_COLLECTION)
+        if (service == COLLECTION_SERVICE
+            && (method == OPEN_COLLECTION || method == CLOSE_COLLECTION))
+            || (service == peer_collection::SERVICE && (method == 0 || method == 1))
         {
             self.media.clear();
         }
-        self.raw.run_method_raw(service, method, input)
+        let result = self.raw.run_method_raw(service, method, input);
+        #[cfg(feature = "anki-core")]
+        if result.is_ok() && service == COLLECTION_SERVICE {
+            if method == OPEN_COLLECTION {
+                use prost::Message;
+                self.collection_root =
+                    protocol_generated::CollectionOpenCollectionRequest::decode(input)
+                        .ok()
+                        .and_then(|request| {
+                            std::path::Path::new(&request.collection_path)
+                                .parent()
+                                .map(|path| path.to_path_buf())
+                        });
+            } else if method == CLOSE_COLLECTION {
+                self.collection_root = None;
+            }
+        }
+        result
     }
 }
 
@@ -158,6 +192,8 @@ impl BackendRegistry {
                         backend: Mutex::new(BackendState {
                             raw: Box::new(backend),
                             media: media_snapshot::MediaSnapshot::default(),
+                            #[cfg(feature = "anki-core")]
+                            collection_root: None,
                         }),
                         sync_abort,
                     }),
@@ -305,6 +341,9 @@ pub fn init_anki_backend(init: &[u8]) -> Result<anki::backend::Backend, String> 
 
 #[cfg(feature = "anki-core")]
 impl RawBackend for AnkiBackend {
+    fn recover_peer(&self) -> Result<(), BackendFailure> {
+        peer_collection::recover(&self.0)
+    }
     fn progress_control(&self) -> Option<ProgressControl> {
         let backend = self.0.clone();
         Some(Arc::new(move |method| {
@@ -328,6 +367,12 @@ impl RawBackend for AnkiBackend {
         method: u32,
         input: &[u8],
     ) -> Result<Vec<u8>, BackendFailure> {
+        if service == peer_collection::SERVICE {
+            return peer_collection::call(&self.0, method, input);
+        }
+        if service == SYNC_SERVICE {
+            peer_collection::recover(&self.0)?;
+        }
         if service == deck_preview::SERVICE {
             return deck_preview::call(&self.0, method, input);
         }
@@ -337,9 +382,20 @@ impl RawBackend for AnkiBackend {
         if service == peer_progress::SERVICE {
             return peer_progress::call(&self.0, method, input);
         }
-        self.0
+        let result = self
+            .0
             .run_service_method(service, method, input)
-            .map_err(BackendFailure::Backend)
+            .map_err(BackendFailure::Backend);
+        if result.is_ok() && service == COLLECTION_SERVICE && method == OPEN_COLLECTION {
+            if let Err(error) = peer_collection::recover(&self.0) {
+                // A failed open must leave the platform session's closed state accurate.
+                let _ = self
+                    .0
+                    .run_service_method(COLLECTION_SERVICE, CLOSE_COLLECTION, &[]);
+                return Err(error);
+            }
+        }
+        result
     }
 }
 
@@ -643,6 +699,55 @@ mod ffi_tests {
         assert_ne!(handle, 0);
         assert_eq!(anki_backend_close(handle), STATUS_OK);
         unsafe { anki_buffer_free(error) };
+    }
+
+    #[cfg(feature = "anki-core")]
+    #[test]
+    fn pending_peer_recovery_blocks_normal_rpc_and_failed_open_leaves_core_closed() {
+        use prost::Message;
+        let directory = tempfile::tempdir().unwrap();
+        let root = directory.path();
+        let registry = BackendRegistry::new();
+        let handle = registry.insert(AnkiBackend(init_anki_backend(&[]).unwrap()));
+        let open = protocol_generated::CollectionOpenCollectionRequest {
+            collection_path: root.join("collection.anki2").to_string_lossy().into(),
+            media_folder_path: root.join("collection.media").to_string_lossy().into(),
+            media_db_path: root.join("collection.mdb").to_string_lossy().into(),
+        }
+        .encode_to_vec();
+        registry
+            .call(handle, COLLECTION_SERVICE, OPEN_COLLECTION, &open)
+            .unwrap();
+        let folder = root.join(".device-collection");
+        std::fs::create_dir(&folder).unwrap();
+        let journal = folder.join("collection-commit.json");
+        std::fs::write(&journal, b"{}").unwrap();
+        assert!(matches!(
+            registry.call(handle, COLLECTION_SERVICE, rpc_ids::GET_UNDO_STATUS, &[]),
+            Err(BackendFailure::Backend(_))
+        ));
+        std::fs::remove_file(&journal).unwrap();
+        registry
+            .call(handle, COLLECTION_SERVICE, rpc_ids::GET_UNDO_STATUS, &[])
+            .unwrap();
+        registry
+            .call(handle, COLLECTION_SERVICE, CLOSE_COLLECTION, &[])
+            .unwrap();
+        std::fs::write(&journal, b"{}").unwrap();
+        assert!(registry
+            .call(handle, COLLECTION_SERVICE, OPEN_COLLECTION, &open)
+            .is_err());
+        std::fs::remove_file(&journal).unwrap();
+        assert!(registry
+            .call(handle, COLLECTION_SERVICE, rpc_ids::GET_UNDO_STATUS, &[])
+            .is_err());
+        registry
+            .call(handle, COLLECTION_SERVICE, OPEN_COLLECTION, &open)
+            .unwrap();
+        registry
+            .call(handle, COLLECTION_SERVICE, CLOSE_COLLECTION, &[])
+            .unwrap();
+        registry.close(handle);
     }
 
     #[cfg(feature = "anki-core")]

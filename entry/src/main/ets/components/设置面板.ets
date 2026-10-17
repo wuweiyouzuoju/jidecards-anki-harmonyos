@@ -49,6 +49,7 @@ import { 开发者调试分组 } from './settings/开发者调试分组';
 import { 设置分组卡片 } from './settings/设置分组卡片';
 import { 简洁模式AppStorage键, 加载简洁模式, 保存简洁模式 } from '../model/简洁模式存储';
 import { 字段帮助面板 } from './字段帮助面板';
+import { KeyboardShortcutHelp } from './KeyboardShortcutHelp';
 import { SurfaceTransition } from '../utils/SurfaceTransition';
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { 按下态按钮 } from './common/按下态按钮';
@@ -88,6 +89,7 @@ export struct 设置面板 {
   @State private backupBackRequest: number = 0;
 
   private handleBackRequest(): void {
+    if (this.keyboardHelpOpen) { this.keyboardHelpOpen = false; return; }
     if (this.显示笔记类型编辑器) { this.notetypeEditorBackRequest++; return; }
     if (this.显示笔记类型管理) { this.notetypeManagerBackRequest++; return; }
     if (this.显示查找重复) { this.duplicatesBackRequest++; return; }
@@ -156,6 +158,7 @@ export struct 设置面板 {
   // 子分组（FSRS / 语音朗读）ⓘ 按钮上抛的说明请求：统一在本面板根 Stack 浮层显示，
   // 避免在子分组卡片内嵌套 字段帮助面板 导致其被压在分组卡片内呈现为「新界面」。
   @State private 显示说明浮层: boolean = false;
+  @State private keyboardHelpOpen: boolean = false;
   @State private 说明标题: Resource = $r('app.string.settings_fsrs_label');
   @State private 说明正文: ResourceStr = $r('app.string.settings_fsrs_help');
   // 媒体管理面板：从数据管理分组入口打开，挂在根 Stack 顶层
@@ -584,6 +587,7 @@ export struct 设置面板 {
               ListItem() {
                 术语分组({
                   是否深色: this.是否深色,
+                  onKeyboardHelp: (): void => { this.keyboardHelpOpen = true; },
                   打开说明回调: (标题: Resource, 正文: Resource): void => {
                     this.说明标题 = 标题;
                     this.说明正文 = 正文;
@@ -648,7 +652,6 @@ export struct 设置面板 {
             else if (group.id === 'redemption') {
               ListItem() {
                 RedemptionPanel({
-                  developerGroup: OFFICIAL_QQ_GROUP,
                   onUseTheme: (theme: 颜色主题): void => { this.颜色主题切换回调(theme); }
                 })
               }
@@ -682,6 +685,10 @@ export struct 设置面板 {
           正文: this.说明正文,
           onClose: (): void => { this.显示说明浮层 = false; }
         })
+      }
+
+      if (this.keyboardHelpOpen) {
+        KeyboardShortcutHelp({ onClose: (): void => { this.keyboardHelpOpen = false; } })
       }
 
       // 右上角模式切换菜单：顶栏「当前模式」按钮触发，挂在根 Stack 顶层

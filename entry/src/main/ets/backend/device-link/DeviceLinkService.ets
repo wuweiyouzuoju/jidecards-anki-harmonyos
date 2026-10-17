@@ -10,11 +10,14 @@ import { DEVICE_LINK_VERSION, DEVICE_LINK_SERVICE, DeviceIdentity, PairedDevice,
 import { LinkChallenge, LinkProof, LinkProofReply, verifyLinkProof, verifyLinkReply } from '../../model/device-link/LanWire';
 import { ProgressConnection, ProgressStore, ProgressMergeResult, PROGRESS_REQUEST,
   mergeProgressClient, mergeProgressServer, progressError } from '../../model/device-link/ProgressSync';
+import { CollectionStore, CollectionResult, CollectionMode, COLLECTION_REQUEST, COLLECTION_PROTOCOL_VERSION, syncCollectionClient,
+  syncCollectionServer, collectionError } from '../../model/device-link/CollectionSync';
 
-export interface DevicePeerView { id: string; name: string; online: boolean; allowProgress: boolean; }
+export interface DevicePeerView { id: string; name: string; online: boolean; allowProgress: boolean; allowCollection?: boolean; }
+export interface DeviceCollectionView extends CollectionResult { id: string; phase: string; error: string; }
 export interface DeviceProgressView { id: string; phase: string; error: string; addedReviews: number; updatedCards: number; }
 export interface DeviceLinkSnapshot { ready: boolean; peers: DevicePeerView[]; invitation: string; connectedId: string;
-  progressBusy: boolean; progress: DeviceProgressView[]; }
+  progressBusy: boolean; progress: DeviceProgressView[]; collection?: DeviceCollectionView[]; }
 interface FoundService { peer: DiscoveredDevice; service: mdns.LocalServiceInfo; }
 interface AuthenticationResult { connection: TrustedLanConnection; key: string; }
 interface ProgressFailure { kind: string; error: string; }
@@ -22,6 +25,7 @@ interface ProgressFailure { kind: string; error: string; }
 /** 认证会话有独立的双向顺序号；配对密钥不进入发现信息或普通状态快照。 */
 export class TrustedLanConnection implements ProgressConnection {
   peerId: string;
+  supportsCollection: boolean;
   private ownId: string;
   private channel: LanChannel;
   private crypto: LanCrypto;
@@ -30,8 +34,12 @@ export class TrustedLanConnection implements ProgressConnection {
   private received: number = 0;
   private encoder: util.TextEncoder = new util.TextEncoder();
   private decoder: util.TextDecoder = util.TextDecoder.create('utf-8', { fatal: true });
-  constructor(channel: LanChannel, crypto: LanCrypto, ownId: string, peerId: string, context: string) {
+  private onClose: () => void;
+  constructor(channel: LanChannel, crypto: LanCrypto, ownId: string, peerId: string, context: string,
+    onClose: () => void = (): void => {}, supportsCollection: boolean = false) {
     this.channel = channel; this.crypto = crypto; this.ownId = ownId; this.peerId = peerId; this.context = context;
+    this.onClose = onClose;
+    this.supportsCollection = supportsCollection;
   }
   /** @throws {Error} 传输或认证加密失败。 */
   async send(text: string): Promise<void> {
@@ -55,7 +63,7 @@ export class TrustedLanConnection implements ProgressConnection {
     this.received++;
     return bytes;
   }
-  async close(): Promise<void> { await this.channel.close(); }
+  async close(): Promise<void> { try { await this.channel.close(); } finally { this.onClose(); } }
 }
 
 /** 设备连接宿主，页面只订阅状态和提交动作。 */
@@ -76,6 +84,8 @@ export class DeviceLinkService {
   private starting: Promise<void> | null = null;
   private channels: LanChannel[] = [];
   private progressFactory: (() => ProgressStore) | null;
+  private collectionFactory: ((own: string) => CollectionStore) | null;
+  private collection: DeviceCollectionView[] = [];
   private progress: DeviceProgressView[] = [];
   private progressBusy: boolean = false;
   private activeProgress: TrustedLanConnection | null = null;
@@ -83,8 +93,10 @@ export class DeviceLinkService {
   private encoder: util.TextEncoder = new util.TextEncoder();
   private decoder: util.TextDecoder = util.TextDecoder.create('utf-8', { fatal: true });
 
-  constructor(context: common.UIAbilityContext, progressFactory: (() => ProgressStore) | null = null) {
+  constructor(context: common.UIAbilityContext, progressFactory: (() => ProgressStore) | null = null,
+    collectionFactory: ((own: string) => CollectionStore) | null = null) {
     this.context = context; this.store = new DevicePairingStore(context); this.progressFactory = progressFactory;
+    this.collectionFactory = collectionFactory;
   }
 
   subscribe(observer: (snapshot: DeviceLinkSnapshot) => void): () => void {
@@ -94,11 +106,14 @@ export class DeviceLinkService {
 
   snapshot(): DeviceLinkSnapshot {
     return { ready: this.advertised !== null, peers: this.peers.map((peer: DevicePeerView): DevicePeerView =>
-      ({ id: peer.id, name: peer.name, online: peer.online, allowProgress: peer.allowProgress })),
+      ({ id: peer.id, name: peer.name, online: peer.online, allowProgress: peer.allowProgress, allowCollection: peer.allowCollection })),
       invitation: this.invitation === null || this.invitation.expiresAt <= Date.now() ? '' : invitationText(this.invitation),
       connectedId: this.connectedId, progressBusy: this.progressBusy,
       progress: this.progress.map((item: DeviceProgressView): DeviceProgressView => ({ id: item.id, phase: item.phase,
-        error: item.error, addedReviews: item.addedReviews, updatedCards: item.updatedCards })) };
+        error: item.error, addedReviews: item.addedReviews, updatedCards: item.updatedCards })),
+      collection: this.collection.map((item: DeviceCollectionView): DeviceCollectionView => ({ id: item.id, phase: item.phase,
+        error: item.error, updatedObjects: item.updatedObjects, addedReviews: item.addedReviews,
+        updatedMedia: item.updatedMedia, deletedMedia: item.deletedMedia })) };
   }
 
   private publish(): void { const state = this.snapshot(); for (const observer of this.observers) observer(state); }
@@ -123,7 +138,7 @@ export class DeviceLinkService {
     server.on('connect', (connection: socket.TCPSocketConnection): void => {
       if (generation !== this.generation || this.channels.length >= 8) { connection.close().catch((): void => {}); return; }
       const channel = LanChannel.accepted(connection); this.channels.push(channel);
-      this.accept(channel).catch((): void => {}).finally((): void => {
+      this.accept(channel, generation).catch((): void => {}).finally((): void => {
         this.channels = this.channels.filter((item: LanChannel): boolean => item !== channel);
         channel.close().catch((): void => {});
       });
@@ -170,10 +185,12 @@ export class DeviceLinkService {
 
   /** @throws {Error} 配对存储失败不得发布空的替代记录。 */
   private async refreshPeers(): Promise<void> {
+    const generation = this.generation;
     const state = await this.store.read();
+    if (generation !== this.generation) return;
     this.peers = state.devices.map((peer: PairedDevice): DevicePeerView =>
       ({ id: peer.id, name: peer.name, online: this.found.some((item: FoundService): boolean => item.peer.id === peer.id),
-        allowProgress: peer.allowProgress === true }));
+        allowProgress: peer.allowProgress === true, allowCollection: peer.allowCollection === true }));
     this.publish();
   }
 
@@ -195,6 +212,41 @@ export class DeviceLinkService {
   async allowProgress(id: string, allowed: boolean): Promise<void> {
     if (this.progressBusy) throw new Error('device_progress_busy');
     await this.store.allowProgress(id, allowed); await this.refreshPeers();
+  }
+
+  /** @throws {Error} 卡库授权须持久化成功再发布。 */
+  async allowCollection(id: string, allowed: boolean): Promise<void> {
+    if (this.progressBusy) throw new Error('device_collection_busy');
+    await this.store.allowCollection(id, allowed); await this.refreshPeers();
+  }
+
+  private collectionState(id: string, phase: string, error: string = '', result: CollectionResult | null = null): void {
+    this.collection = this.collection.filter((item: DeviceCollectionView): boolean => item.id !== id);
+    this.collection.push({ id, phase, error, updatedObjects: result?.updatedObjects ?? 0, addedReviews: result?.addedReviews ?? 0,
+      updatedMedia: result?.updatedMedia ?? 0, deletedMedia: result?.deletedMedia ?? 0 }); this.publish();
+  }
+
+  /** @throws {Error} 双端授权、能力、传输或提交失败须保留实际任务结果。 */
+  async syncCollection(id: string, mode: CollectionMode = 'merge'): Promise<void> {
+    if (this.progressBusy) throw new Error('device_collection_busy');
+    const state = await this.store.read();
+    if (state.devices.find((peer: PairedDevice): boolean => peer.id === id)?.allowCollection !== true || this.collectionFactory === null) {
+      throw new Error('device_collection_not_allowed');
+    }
+    // Recheck after the asynchronous preferences read, before reserving the task slot.
+    if (this.progressBusy) throw new Error('device_collection_busy');
+    this.progressBusy = true; this.batchCancelled = false; this.collectionState(id, 'running');
+    let connection: TrustedLanConnection | null = null;
+    try {
+      connection = await this.connect(id); this.activeProgress = connection;
+      if (!connection.supportsCollection) throw new Error('device_collection_unsupported');
+      if (this.batchCancelled) throw new Error('device_collection_cancelled');
+      const result = await syncCollectionClient(connection, this.collectionFactory(state.identity.id), mode, (): boolean => this.batchCancelled);
+      this.connectedId = id; this.collectionState(id, 'done', '', result);
+    } catch (error) {
+      const key = this.batchCancelled ? 'device_collection_cancelled' : collectionError(error instanceof Error ? error : new Error(''));
+      this.collectionState(id, 'failed', key); throw new Error(key);
+    } finally { await connection?.close(); this.activeProgress = null; this.progressBusy = false; this.publish(); }
   }
 
   private progressState(id: string, phase: string, error: string = '', result: ProgressMergeResult | null = null): void {
@@ -256,7 +308,7 @@ export class DeviceLinkService {
     try {
       connection = await this.connect(id); this.activeProgress = connection;
       if (this.batchCancelled) throw new Error('device_progress_cancelled');
-      const result = await mergeProgressClient(connection, this.progressFactory());
+      const result = await mergeProgressClient(connection, this.progressFactory(), (): boolean => this.batchCancelled);
       const total: ProgressMergeResult = { addedReviews: result.addedReviews + (previous?.addedReviews ?? 0),
         updatedCards: result.updatedCards + (previous?.updatedCards ?? 0) };
       this.connectedId = id; this.progressState(id, 'done', '', total);
@@ -271,9 +323,11 @@ export class DeviceLinkService {
   private async findPeer(id: string): Promise<DiscoveredDevice> {
     const generation = this.generation;
     for (let attempt = 0; attempt < 20; attempt++) {
+      if (generation !== this.generation) throw new Error('device_link_cancelled');
       const item = this.found.find((entry: FoundService): boolean => entry.peer.id === id);
       if (item !== undefined) {
         const service = await mdns.resolveLocalService(this.context, item.service);
+        if (generation !== this.generation) throw new Error('device_link_cancelled');
         if (service.host !== undefined) {
           const current = discoveryDevice(service.serviceName, service.host.address, service.port);
           if (current !== null && current.id === id) return current;
@@ -322,10 +376,15 @@ export class DeviceLinkService {
   /** @throws {Error} 任何证明失败都会关闭连接。 */
   private async authenticate(peer: DeviceLinkCredential, pairing: boolean): Promise<AuthenticationResult> {
     if (this.identity === null) throw new Error('device_link_start_failed');
+    const generation = this.generation;
     const own = this.identity;
     const found = await this.findPeer(peer.id);
     const channel = await LanChannel.connect(found.address, found.port);
+    // 主动和被动连接由同一宿主释放，认证尚未完成也不能越过页面生命周期。
+    this.channels.push(channel);
+    const release = (): void => { this.channels = this.channels.filter((item: LanChannel): boolean => item !== channel); };
     try {
+      if (generation !== this.generation) throw new Error('device_link_cancelled');
       const challenge = JSON.parse(await channel.read()) as LinkChallenge;
       if (challenge.version !== DEVICE_LINK_VERSION || challenge.id !== peer.id ||
         typeof challenge.challenge !== 'string' || challenge.challenge.length !== 64) throw new Error('device_link_auth_failed');
@@ -339,14 +398,18 @@ export class DeviceLinkService {
       const replyBytes = await crypto.open(replyEnvelope, 'reply:' + own.id + ':' + challenge.challenge);
       const reply = JSON.parse(this.decoder.decodeToString(replyBytes, { stream: false })) as LinkProofReply;
       verifyLinkReply(reply, peer.id, own.id, challenge.challenge, nonce);
+      if (generation !== this.generation) throw new Error('device_link_cancelled');
       if (pairing && !isPairingKey(reply.key ?? '')) throw new Error('device_link_auth_failed');
-      return { connection: new TrustedLanConnection(channel, crypto, own.id, peer.id, challenge.challenge + ':' + nonce),
+      return { connection: new TrustedLanConnection(channel, crypto, own.id, peer.id, challenge.challenge + ':' + nonce, release, reply.collectionVersion === COLLECTION_PROTOCOL_VERSION),
         key: pairing ? reply.key! : peer.key };
-    } catch (error) { await channel.close(); throw new Error('device_link_auth_failed'); }
+    } catch (error) {
+      release(); await channel.close();
+      throw new Error(generation !== this.generation ? 'device_link_cancelled' : 'device_link_auth_failed');
+    }
   }
 
   /** @throws {Error} 未获配对授权或密钥验证失败时拒绝会话。 */
-  private async accept(channel: LanChannel): Promise<void> {
+  private async accept(channel: LanChannel, generation: number): Promise<void> {
     if (this.identity === null) throw new Error('device_link_start_failed');
     const own = this.identity;
     const challenge = await linkRandom(32);
@@ -362,6 +425,7 @@ export class DeviceLinkService {
     const bytes = await crypto.open(envelope, 'proof:' + own.id + ':' + challenge);
     const proof = JSON.parse(this.decoder.decodeToString(bytes, { stream: false })) as LinkProof;
     verifyLinkProof(proof, own.id, challenge);
+    if (generation !== this.generation) throw new Error('device_link_cancelled');
     if (proof.id !== envelope.id || proof.pairing !== envelope.pairing) throw new Error('device_link_auth_failed');
     let persistentKey: string = '';
     if (proof.pairing) {
@@ -374,14 +438,22 @@ export class DeviceLinkService {
       catch (error) { this.invitationUsed = false; throw error instanceof Error ? error : new Error('device_link_save_failed'); }
       this.invitation = null; await this.refreshPeers();
     }
-    const reply: LinkProofReply = { id: own.id, recipient: proof.id, challenge, nonce: proof.nonce, key: persistentKey };
+    const reply: LinkProofReply = { id: own.id, recipient: proof.id, challenge, nonce: proof.nonce, key: persistentKey,
+      collectionVersion: this.collectionFactory === null ? 0 : COLLECTION_PROTOCOL_VERSION };
     await channel.send(JSON.stringify(await crypto.seal(this.encoder.encodeInto(JSON.stringify(reply)),
       'reply:' + proof.id + ':' + challenge, own.id, false)));
     const connection = new TrustedLanConnection(channel, crypto, own.id, proof.id, challenge + ':' + proof.nonce);
     const request = await connection.read();
     if (request === 'ping') { await connection.send('pong'); return; }
-    if (request !== PROGRESS_REQUEST) throw new Error('device_link_request_invalid');
+    if (request === COLLECTION_REQUEST) {
+      await this.acceptCollection(connection, proof.id, own.id, generation); return;
+    }
+    if (request !== PROGRESS_REQUEST) {
+      const unsupported: ProgressFailure = { kind: 'error', error: 'device_collection_unsupported' };
+      await connection.send(JSON.stringify(unsupported)); return;
+    }
     const current = await this.store.read();
+    if (generation !== this.generation) throw new Error('device_link_cancelled');
     const allowed = current.devices.find((item: PairedDevice): boolean => item.id === proof.id)?.allowProgress === true;
     if (!allowed || this.progressFactory === null || this.progressBusy) {
       const failure: ProgressFailure = { kind: 'error', error: allowed ? 'device_progress_busy' : 'device_progress_not_allowed' };
@@ -391,17 +463,39 @@ export class DeviceLinkService {
     this.progressBusy = true; this.activeProgress = connection; this.batchCancelled = false;
     this.progressState(proof.id, 'running');
     try {
-      const result = await mergeProgressServer(connection, this.progressFactory());
+      const result = await mergeProgressServer(connection, this.progressFactory(), (): boolean => this.batchCancelled);
       this.progressState(proof.id, 'done', '', result);
     } catch (error) {
-      this.progressState(proof.id, 'failed', progressError(error instanceof Error ? error : new Error('device_progress_failed')));
+      this.progressState(proof.id, 'failed', this.batchCancelled ? 'device_progress_cancelled' :
+        progressError(error instanceof Error ? error : new Error('device_progress_failed')));
+    } finally { this.activeProgress = null; this.progressBusy = false; this.publish(); }
+  }
+
+  /** @throws {Error} 未授权、已离页或发送失败时结束认证会话。 */
+  private async acceptCollection(connection: TrustedLanConnection, id: string, own: string, generation: number): Promise<void> {
+    const current = await this.store.read();
+    if (generation !== this.generation) throw new Error('device_link_cancelled');
+    const allowed = current.devices.find((peer: PairedDevice): boolean => peer.id === id)?.allowCollection === true;
+    if (!allowed || this.collectionFactory === null || this.progressBusy) {
+      const failure: ProgressFailure = { kind: 'error', error: allowed ? 'device_collection_busy' : 'device_collection_not_allowed' };
+      await connection.send(JSON.stringify(failure)); return;
+    }
+    this.progressBusy = true; this.activeProgress = connection; this.batchCancelled = false; this.collectionState(id, 'running');
+    try {
+      const result = await syncCollectionServer(connection, this.collectionFactory(own), (): boolean => this.batchCancelled);
+      this.collectionState(id, 'done', '', result);
+    } catch (error) {
+      this.collectionState(id, 'failed', this.batchCancelled ? 'device_collection_cancelled' : collectionError(error instanceof Error ? error : new Error('')));
     } finally { this.activeProgress = null; this.progressBusy = false; this.publish(); }
   }
 
   /** @throws {Error} 等待网络取消后关闭发现和监听；调用者持有清理错误边界。 */
   async stop(): Promise<void> {
+    this.generation++;
     await this.cancelProgress();
-    this.generation++; this.invitation = null; this.invitationUsed = false; this.connectedId = ''; this.found = [];
+    this.invitation = null; this.invitationUsed = false; this.connectedId = ''; this.found = [];
+    this.peers = this.peers.map((peer: DevicePeerView): DevicePeerView =>
+      ({ id: peer.id, name: peer.name, online: false, allowProgress: peer.allowProgress, allowCollection: peer.allowCollection }));
     const discovery = this.discovery; this.discovery = null;
     if (discovery !== null) { try { discovery.stopSearchingMDNS(); } catch (error) {} }
     const advertised = this.advertised; this.advertised = null;

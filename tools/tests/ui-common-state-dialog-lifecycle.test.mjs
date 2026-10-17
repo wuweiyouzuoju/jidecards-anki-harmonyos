@@ -152,14 +152,14 @@ test('notetype mapping read loading can close while accepted changes remain prot
   assert.deepEqual(events,['close']);
 });
 
-test('accepted redemption persists without mutating the departed sheet or showing a celebration',async()=>{
+test('accepted redemption persists without mutating the departed sheet',async()=>{
   const gate=deferred();let writes=0;
   const Panel=loadComponentLogic('components/settings/RedemptionPanel.ets','RedemptionPanel',{
     颜色键:{动作主色:'primary'},parseRedemption:()=>null,redeemContent:()=>{writes++;return gate.promise;},$r:key=>key
   });
   const item=new Panel();Object.assign(item,{active:true,expanded:true,code:'accepted'});
   const work=item.redeem();item.aboutToDisappear();gate.resolve('success');await work;
-  assert.equal(writes,1);assert.equal(item.unlocked,false);assert.equal(item.showCelebration,false);assert.equal(item.message,'');
+  assert.equal(writes,1);assert.equal(item.unlocked,false);assert.equal(item.message,'');
   await item.redeem();assert.equal(writes,1);
 });
 

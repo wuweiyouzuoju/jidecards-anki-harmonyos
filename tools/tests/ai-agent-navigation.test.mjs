@@ -319,6 +319,7 @@ test('root deck navigation rejects unavailable targets and open forms before any
   assert.equal(wide.page.选中的牌组ID,'4');assert.equal(wide.page.显示牌组详情,false);assert.deepEqual(wide.state.calls,[{home:true}]);
 });
 
+
 test('the actual hidden-page callback cancels navigation and clears foreground ownership', () => {
   const source=read('pages/AI制卡页.ets');const body=source.match(/\.onHidden\(\(\): void => \{([^\n]+)\}\)/)[1];
   let cancelled=0,menuClosed=0;const events=[],wheelVisibility=[];const page={isAgentPageVisible:true,

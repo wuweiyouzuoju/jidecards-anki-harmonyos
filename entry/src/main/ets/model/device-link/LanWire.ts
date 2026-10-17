@@ -46,7 +46,7 @@ export function lanFrame(bytes: Uint8Array): Uint8Array {
 
 export interface LinkChallenge { version: number; id: string; challenge: string; }
 export interface LinkProof { id: string; name: string; recipient: string; challenge: string; nonce: string; pairing: boolean; }
-export interface LinkProofReply { id: string; recipient: string; nonce: string; challenge: string; key?: string; }
+export interface LinkProofReply { id: string; recipient: string; nonce: string; challenge: string; key?: string; collectionVersion?: number; }
 
 export function verifyLinkProof(proof: LinkProof, recipient: string, challenge: string): void {
   if (proof === null || !/^[a-f0-9]{32}$/.test(proof.id) || proof.id === recipient ||

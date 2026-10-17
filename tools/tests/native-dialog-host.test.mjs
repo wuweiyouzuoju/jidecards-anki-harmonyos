@@ -128,7 +128,7 @@ test('native content uses the common frame directly or the existing help/gift ad
     for (const match of source.matchAll(/@CustomDialog\s+(?:export\s+)?struct\s+(\w+|[^\s{]+)\s*\{([\s\S]*?)^\}/gm)) {
       assert.doesNotMatch(match[2], /this\.controller\??\.(?:close|open)\(/,
         `${path}: factory builders do not receive an injected controller; use the window owner's callback`);
-      assert.match(match[2], /(?:DialogFrame|字段帮助面板|IridescentGiftPanel)\(\{ nativeHost: true/, `${path}: ${match[1]}`);
+      assert.match(match[2], /(?:DialogFrame|字段帮助面板)\(\{ nativeHost: true/, `${path}: ${match[1]}`);
       assert.doesNotMatch(match[2], /\.constraintSize\(\{ maxWidth: 480, maxHeight: '[\d]+%'/, path);
     }
   }

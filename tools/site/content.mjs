@@ -12,6 +12,10 @@ export async function loadContent(root) {
   const work = data.works[0];
   work.sourceVersion = app.versionName;
   work.sourceVersionCode = app.versionCode;
+  if (work.sourcePackage?.tag !== `v${app.versionName}` ||
+    work.sourcePackage.fileName !== `jidecards-v${app.versionName}-signed.hap`) {
+    throw new Error('Source HAP metadata must match the current application version.');
+  }
   // 市场版本由作者确认，当前源码版本读取应用配置；截图保留各自的历史版本。
   if (!work.releaseVersion || !work.releaseVersionSource) throw new Error('Author-confirmed website release is required.');
   if (!work.screenshots.length) throw new Error('Current author-supplied product media is required.');

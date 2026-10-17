@@ -1,6 +1,5 @@
 import { HOME_SHORTCUTS, shortcutCommand } from '../model/KeyboardShortcuts';
 import { WindowPoint } from '../model/WindowSafeLayout';
-import { KeyboardShortcutHelp } from '../components/KeyboardShortcutHelp';
 import { StudyKeyboardSession } from '../model/StudyKeyboard';
 import { studyEventChord } from '../utils/StudyKeyAdapter';
 import { backupCoordinator } from '../model/BackupCoordinator';
@@ -31,8 +30,6 @@ import type { DeckDropTarget } from '../model/DeckReorder';
 import type { AppInterfaceControl } from '../model/AppInterface';
 import { HomeWorkCoordinator, HomeWorkHost } from '../model/HomeWorkCoordinator';
 import { HomeStartupSequence, HomeStartupHost } from '../model/HomeStartupSequence';
-import { IridescentGiftPanel } from '../components/IridescentGiftPanel';
-import { isIridescentGiftNoticeCompleted, completeIridescentGiftNotice } from '../utils/IridescentGiftStore';
 import { CLOUD_DECK_CHANNEL_ENABLED, AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../model/ReleaseFeatures';
 import { HomeSummaryHeader } from '../components/home/HomeSummaryHeader';
 import { HomeActionAnchor, homeHeaderGeometry } from '../model/HomeHeaderLayout';
@@ -208,7 +205,7 @@ struct 首页 {
   @State @Watch('homeActivityChanged') private nativeDialogOpen: boolean = false;
   @StorageLink('systemDarkMode') private 系统暗黑模式: boolean = false;
   // 笔记添加广播：添加笔记页保存成功后写 noteAddedTick = Date.now()，
-  // 这里 @Watch 监听变化触发 加载主页数据，绕开 NavPathStack.onPop 偶发不触发的问题，
+  // 这里 @Watch 监听变化触发 加载主页数据；NavPathStack.pop 未传 result 时不触发 onPop，
   // 让 牌组详情面板 的统计计数（总卡数/新卡/学习中/待复习）立即刷新。
   // 与 打开添加笔记 的 onPop 回调并存：两者都触发时 加载主页数据 多跑一次（幂等，无副作用）。
   @StorageLink('noteAddedTick') @Watch('笔记添加广播_回调') private 笔记添加标记: number = 0;
@@ -275,7 +272,6 @@ struct 首页 {
   @State @Watch('homeActivityChanged') private collectionHistoryBusy: boolean = false;
   @State private collectionHistoryBackRequest: number = 0;
   @State @Watch('homeActivityChanged') private 显示更多菜单: boolean = false;
-  @State @Watch('homeActivityChanged') private keyboardHelpOpen: boolean = false;
   private homeKeys: StudyKeyboardSession = new StudyKeyboardSession();
   @State @Watch('homeActivityChanged') private homeSearchOpen: boolean = false;
   @State @Watch('homeActivityChanged') private deckMenuId: string = '';
@@ -363,7 +359,6 @@ struct 首页 {
   private 上次牌组已恢复: boolean = false;
   // 入门弹窗与启动序列共用展示槽位，由独立本机修订标记控制一次展示。
   @State @Watch('homeActivityChanged') private 显示欢迎弹窗: boolean = false;
-  @State @Watch('homeActivityChanged') private showIridescentGift: boolean = false;
   @State @Watch('homeActivityChanged') private 云端牌组忙碌: boolean = false;
   @State private cloudBackRequest: number = 0;
   private 打开云端牌组弹窗(从菜单打开: boolean): void {
@@ -668,7 +663,7 @@ struct 首页 {
       collectionReady: 后端会话.获取实例().是否就绪() && this.加载状态 !== 'loading' && this.加载状态 !== 'error',
       collectionBusy: this.collectionHistoryBusy || this.autoSyncCollectionBusy || this.syncController.isRefreshing() || this.刷新中 || this.deckDeletionBusy ||
         (this.transfer.phase !== 'idle') || this.创建牌组中 || this.deckMoveBusy || this.deckRenameBusy || this.filteredDeckBusy || this.deckReorderBusy || this.deckOptionsBusy || this.云端牌组忙碌,
-      dialogOpen: this.keyboardHelpOpen || this.deckMenuId !== '' || this.collectionHistoryOpen || this.显示官方公告 || this.显示欢迎弹窗 || this.showIridescentGift || this.显示云端牌组弹窗 || this.transfer.visible ||
+      dialogOpen: this.deckMenuId !== '' || this.collectionHistoryOpen || this.显示官方公告 || this.显示欢迎弹窗 || this.显示云端牌组弹窗 || this.transfer.visible ||
         this.显示牌组定制 || this.显示自定义学习 || this.显示过滤牌组面板 || this.显示牌组选项 ||
         this.显示创建牌组 || this.movingDeckId > 0 || this.renamingDeckId > 0 || this.显示主页操作 || this.显示更多菜单 || this.homeSearchOpen || this.显示节流奖励 ||
         this.显示卡片预览 || this.deckPreviewMenuOpen || this.autoSyncModal || this.fsrsPromptActive || this.nativeDialogOpen,
@@ -714,6 +709,7 @@ struct 首页 {
       items: this.homeActionControls(), controlsComplete: true,
       values: [{ id: 'official_announcements_enabled', value: String(OFFICIAL_ANNOUNCEMENTS_ENABLED) },
         { id: 'deck_list_style', value: this.deckListStyle },
+        { id: 'deck_list_highlighted_id', value: this.当前断点 === 'xs' ? this.deckMenuId : this.选中的牌组ID },
         { id: 'deck_list_grouping', value: 'top_level_subtree' },
         { id: 'deck_list_columns', value: isDoubleColumnDeckListStyle(this.deckListStyle) &&
           !this.排序模式中 && this.加载状态 === 'ready' ? '2' : '1' },
@@ -846,15 +842,8 @@ struct 首页 {
       cloudCompleted: async (): Promise<boolean> =>
         !CLOUD_DECK_CHANNEL_ENABLED || await 是否已完成云端牌组引导(),
       introCompleted: (): Promise<boolean> => isHomeIntroCompleted(),
-      giftCompleted: async (): Promise<boolean> => {
-        try { return await isIridescentGiftNoticeCompleted(); } catch (error) {
-          if (!this.homeDisposed) this.显示提示($r('app.string.iridescent_gift_load_failed'));
-          return true;
-        }
-      },
       showCloud: (): void => this.打开云端牌组弹窗(false),
-      showIntro: (): void => { this.显示欢迎弹窗 = true; },
-      showGift: (): void => { this.showIridescentGift = true; }
+      showIntro: (): void => { this.显示欢迎弹窗 = true; }
     };
   }
 
@@ -996,14 +985,7 @@ struct 首页 {
   private closeHomeIntro(): void {
     this.显示欢迎弹窗 = false;
     completeHomeIntro().catch((): void => { this.显示提示($r('app.string.home_intro_save_failed')); });
-    this.startupSequence.gift(this.startupHost()).then((): void => { this.homeActivityChanged(); });
-  }
-
-  private closeIridescentGift(): void {
-    this.showIridescentGift = false;
-    completeIridescentGiftNotice().catch((): void => {
-      if (!this.homeDisposed) this.显示提示($r('app.string.iridescent_gift_save_failed'));
-    });
+    this.homeActivityChanged();
   }
 
   /** 页面每次可见都刷新（含从复习页返回），保证今日计数与队列状态同步。 */
@@ -1052,14 +1034,12 @@ struct 首页 {
       this.cloudBackRequest++;
       return true;
     }
-    if (this.keyboardHelpOpen) { this.keyboardHelpOpen = false; return true; }
     if (this.deckMenuId !== '') { this.deckMenuBackRequest++; return true; }
     if (this.homeSearchOpen) { this.homeSearchOpen = false; return true; }
     if (this.显示主页操作) { this.显示主页操作 = false; return true; }
     if (this.collectionHistoryOpen) { this.collectionHistoryBackRequest++; return true; }
     if (this.显示更多菜单) { this.显示更多菜单 = false; return true; }
     if (this.显示节流奖励) { this.显示节流奖励 = false; return true; }
-    if (this.showIridescentGift) { this.closeIridescentGift(); return true; }
     if (this.显示欢迎弹窗) { this.closeHomeIntro(); return true; }
     if (this.deckDetailsBackHandler?.()) return true;
     if (this.预览加载中) {
@@ -2097,7 +2077,7 @@ struct 首页 {
               牌组数据源: this.牌组数据源,
               牌组列表滚动器: this.牌组列表滚动器,
               展开的牌组ID集合: this.展开的牌组ID集合,
-              选中的牌组ID: this.选中的牌组ID,
+              选中的牌组ID: this.当前断点 === 'xs' ? this.deckMenuId : this.选中的牌组ID,
               排序模式中: this.排序模式中,
               reorderBusy: this.deckReorderBusy,
               加载状态: this.加载状态,
@@ -2153,6 +2133,7 @@ struct 首页 {
       .onBreakpointChange((breakpoint: string) => {
         if (this.当前断点 !== breakpoint) this.closeHomeActions();
         this.当前断点 = breakpoint;
+        this.publishHomeInterface();
         // 旋转/首屏 breakpoint 确定后若尚未恢复且变到宽屏，触发一次上次牌组恢复
         if (!this.上次牌组已恢复 && breakpoint !== 'xs') {
           this.尝试恢复上次牌组();
@@ -2194,7 +2175,6 @@ struct 首页 {
   @Builder
   private homeMoreMenu() {
       主页更多面板({ slideScope: this.homeMoreSlideScope,
-        onKeyboard: (): void => { this.显示更多菜单 = false; this.keyboardHelpOpen = true; },
         historyAvailable: this.homeActivity().collectionReady && !this.homeActivity().collectionBusy,
         onHistory: (): void => {
           if (this.homeActivity().collectionBusy || !this.homeActivity().collectionReady) return;
@@ -2310,9 +2290,6 @@ struct 首页 {
 
   @Builder
   private homeFeatures() {
-    if (this.keyboardHelpOpen) {
-      KeyboardShortcutHelp({ scope: 'home', shortcuts: HOME_SHORTCUTS, onClose: (): void => { this.keyboardHelpOpen = false; } })
-    }
     if (this.collectionHistoryOpen) {
       CollectionHistoryDialog({ backRequest: this.collectionHistoryBackRequest,
         onBusy: (busy: boolean): void => { this.collectionHistoryBusy = busy; },
@@ -2439,9 +2416,6 @@ struct 首页 {
       })
     }
 
-    if (this.showIridescentGift) {
-      IridescentGiftPanel({ announcement: true, onClose: (): void => { this.closeIridescentGift(); } })
-    }
 
     if (this.deckDeletionBusy) {
       Column({ space: 12 }) {

@@ -11,6 +11,7 @@ import { AppInterfaceTracker, visibleInterfaceItems } from '../../entry/src/main
 import * as pairing from '../../entry/src/main/ets/model/device-link/DevicePairing.ts';
 import * as wire from '../../entry/src/main/ets/model/device-link/LanWire.ts';
 import * as progress from '../../entry/src/main/ets/model/device-link/ProgressSync.ts';
+import * as collection from '../../entry/src/main/ets/model/device-link/CollectionSync.ts';
 
 class SettingsScroller { edges=[]; scrollEdge(edge) { this.edges.push(edge); } }
 const ExpansionReveal=loadPlatformModule('utils/ExpansionReveal.ets','ExpansionReveal',{
@@ -128,14 +129,14 @@ function runtime() {
       };
     }
   };
-  const dependencies = { ...pairing, ...wire, ...progress, util, cryptoFramework, preferences, socket, mdns,
+  const dependencies = { ...pairing, ...wire, ...progress, ...collection, util, cryptoFramework, preferences, socket, mdns,
     deviceInfo: { marketName: 'Test device', deviceType: 'phone' } };
   const { LanCrypto, linkRandom } = loadPlatformModule('backend/device-link/LanCrypto.ets', '{ LanCrypto, linkRandom }', dependencies);
   const DevicePairingStore = loadPlatformModule('backend/device-link/DevicePairingStore.ets', 'DevicePairingStore', dependencies);
   const LanChannel = loadPlatformModule('backend/device-link/LanChannel.ets', 'LanChannel', dependencies);
   const { DeviceLinkService } = loadPlatformModule('backend/device-link/DeviceLinkService.ets', '{ DeviceLinkService }',
     { ...dependencies, LanCrypto, linkRandom, DevicePairingStore, LanChannel });
-  return { DeviceLinkService, DevicePairingStore, LanCrypto, stores };
+  return { DeviceLinkService, DevicePairingStore, LanCrypto, stores, mdns };
 }
 
 test('production pairing performs authenticated TCP exchange and reconnects after both services restart', async () => {
@@ -183,6 +184,41 @@ test('production cipher authenticates content, recipient context and fresh IVs b
   assert.deepEqual(await cipher.open(first, 'recipient:1'), text);
   await assert.rejects(cipher.open(first, 'other-recipient'));
   await assert.rejects(cipher.open({ ...first, tag: '0'.repeat(32) }, 'recipient:1'));
+});
+
+test('stopping during discovery resolution rejects the late connection and clears online state', async () => {
+  const { DeviceLinkService, mdns } = runtime();
+  const a = new DeviceLinkService({ id: 'late-a' }), b = new DeviceLinkService({ id: 'late-b' });
+  const gate = Promise.withResolvers(), resolving = Promise.withResolvers();
+  try {
+    await Promise.all([a.start(), b.start()]);
+    await a.createInvitation(); await b.pair(a.snapshot().invitation);
+    const peerId = a.snapshot().peers[0].id;
+    const resolve = mdns.resolveLocalService;
+    mdns.resolveLocalService = async (context, service) => {
+      const result = await resolve(context, service);
+      if (context.id === 'late-a') { resolving.resolve(); await gate.promise; }
+      return result;
+    };
+    const rejected = assert.rejects(a.checkConnection(peerId), /device_link_cancelled/);
+    await resolving.promise; await a.stop(); gate.resolve(); await rejected;
+    assert.equal(a.snapshot().ready, false);
+    assert.equal(a.snapshot().connectedId, '');
+    assert.equal(a.snapshot().peers.some(peer => peer.online), false);
+  } finally { gate.resolve(); await Promise.all([a.stop(), b.stop()]); }
+});
+
+test('the service closes authenticated outgoing channels when its page stops', async () => {
+  const { DeviceLinkService } = runtime();
+  const a = new DeviceLinkService({ id: 'outgoing-a' }), b = new DeviceLinkService({ id: 'outgoing-b' });
+  let connection;
+  try {
+    await Promise.all([a.start(), b.start()]);
+    await a.createInvitation(); await b.pair(a.snapshot().invitation);
+    connection = await a.connect(a.snapshot().peers[0].id);
+    await a.stop();
+    await assert.rejects(connection.send('ping'), /device_link_connect_failed/);
+  } finally { await connection?.close(); await Promise.all([a.stop(), b.stop()]); }
 });
 
 test('parallel initial reads use one persistent identity instead of creating competing device IDs', async () => {
@@ -325,6 +361,123 @@ function memoryProgress(records, rejectHash = false) {
   }};
 }
 
+function memoryCollection(records) {
+  const state={records:[...records],active:false,applies:[],confirmations:0,failHash:false,files:0};
+  const factory=()=>{
+    const files=new Map();let serial=0;
+    const hash=data=>createHash('sha256').update(data).digest('hex');
+    const file=value=>{const token=String(++serial),data=Buffer.from(JSON.stringify(value));files.set(token,{data,offset:0});state.files++;return {token,bytes:data.length,hash:hash(data)};};
+    return {
+      async acquire(){assert.equal(state.active,false);state.active=true;},
+      async release(){state.files-=files.size;files.clear();state.active=false;},
+      async capture(){return file({records:state.records,padding:'媒体📘'.repeat(20000)});},
+      async confirm(local){assert.ok(files.has(local));state.confirmations++;},
+      async plan(remote,local,mode){assert.ok(files.has(remote)&&files.has(local));assert.ok(['merge','pull'].includes(mode));return file({wanted:[]});},
+      async pack(wanted,local){assert.ok(files.has(wanted)&&files.has(local));return file({files:[]});},
+      async apply(remote,payload,mode){
+        assert.ok(files.has(payload));state.applies.push(mode);
+        const incoming=JSON.parse(files.get(remote).data).records,before=state.records.length;
+        if(mode==='replace')state.records=incoming;
+        else if(mode!=='media')state.records=[...new Set([...state.records,...incoming])].sort();
+        return {updatedObjects:0,addedReviews:Math.max(0,state.records.length-before),updatedMedia:0,deletedMedia:0};
+      },
+      async receiveFile(){return file({}).token;},
+      async read(token,length){const f=files.get(token),data=f.data.subarray(f.offset,f.offset+length);f.offset+=data.length;return new Uint8Array(data);},
+      async write(token,data){const f=files.get(token);if(f.offset===0){f.data=Buffer.alloc(0);f.offset=-1;}f.data=Buffer.concat([f.data,Buffer.from(data)]);},
+      async verify(token,descriptor){const data=files.get(token).data;if(state.failHash||data.length!==descriptor.bytes||hash(data)!==descriptor.hash)throw new Error('device_collection_invalid');}
+    };
+  };
+  return {state,factory};
+}
+
+test('collection sync uses independent bilateral permission, chunked authenticated TCP, merge and receiver-only replacement',async()=>{
+  const {DeviceLinkService}=runtime(),left=memoryCollection(['a']),right=memoryCollection(['b']);
+  const a=new DeviceLinkService({id:'collection-a'},null,left.factory),b=new DeviceLinkService({id:'collection-b'},null,right.factory);
+  try{
+    await a.start();await b.start();await a.createInvitation();await b.pair(a.snapshot().invitation);
+    const aid=b.snapshot().peers[0].id,bid=a.snapshot().peers[0].id;
+    await a.allowProgress(bid,true);await b.allowProgress(aid,true);
+    await assert.rejects(a.syncCollection(bid),/not_allowed/);
+    await a.allowCollection(bid,true);await assert.rejects(a.syncCollection(bid),/not_allowed/);
+    await b.allowCollection(aid,true);await a.allowProgress(bid,false);
+    assert.equal(a.snapshot().peers[0].allowCollection,true,'changing progress permission retains collection permission');
+    await a.syncCollection(bid);
+    assert.deepEqual(left.state.records,['a','b']);assert.deepEqual(right.state.records,['a','b']);
+    assert.deepEqual(left.state.applies,['final']);assert.deepEqual(right.state.applies,['merge']);
+    assert.equal(right.state.confirmations,1,'media baseline is acknowledged only after the receiving endpoint commits');
+    left.state.records=['discard'];right.state.records=['keep'];
+    await a.syncCollection(bid,'pull');
+    assert.deepEqual(left.state.records,['keep']);assert.deepEqual(right.state.records,['keep']);
+    assert.equal(right.state.applies.at(-1),'media');assert.equal(left.state.applies.at(-1),'replace');
+    right.state.failHash=true;const count=right.state.applies.length;
+    await assert.rejects(a.syncCollection(bid),/invalid/);assert.equal(right.state.applies.length,count);
+    assert.equal(left.state.active||right.state.active,false);assert.equal(left.state.files+right.state.files,0);
+    right.state.failHash=false;await a.syncCollection(bid);
+    assert.equal(a.snapshot().collection[0].phase,'done');
+    const connection=await a.connect(bid);
+    await connection.send(collection.COLLECTION_REQUEST);assert.equal(JSON.parse(await connection.read()).kind,'ready');
+    await connection.send(JSON.stringify({kind:'mode',mode:'push'}));
+    assert.equal(JSON.parse(await connection.read()).error,'device_collection_invalid');
+    await connection.close();
+    const large=await a.connect(bid);
+    await large.send(collection.COLLECTION_REQUEST);await large.read();await large.send(JSON.stringify({kind:'mode',mode:'merge'}));
+    await large.send(JSON.stringify({kind:'file',bytes:collection.COLLECTION_METADATA_MAX_BYTES+1,hash:'a'.repeat(64)}));
+    assert.equal(JSON.parse(await large.read()).error,'device_collection_too_large');await large.close();
+    b.collectionFactory=null;
+    await assert.rejects(a.syncCollection(bid),/device_collection_unsupported/);
+    assert.equal(left.state.files,0,'unsupported peers are rejected before collection export');
+  }finally{await a.stop();await b.stop();}
+});
+
+test('collection replacement requires local confirmation and ignores cancelled, repeated and departed dialog callbacks',async()=>{
+  const appInterface=new AppInterfaceTracker(),dialogs=[],calls=[];
+  const Settings=settingsClass({appInterface,$r:key=>key,namedResourceText:(_ui,key,...args)=>key+args.join(' ')});
+  const page=new Settings();page.expanded=true;
+  page.getUIContext=()=>({showAlertDialog:options=>dialogs.push(options)});
+  page.service={syncCollection:async(id,mode)=>calls.push({id,mode}),stop:async()=>{}};
+  const peer={id:'b'.repeat(32),name:'Other',online:true,allowProgress:false,allowCollection:true};
+  page.snapshot={...page.snapshot,peers:[peer],collection:[{id:peer.id,phase:'failed',error:'device_collection_full_required'}]};
+  assert.equal(page.needsFull(peer.id),true);
+  page.pullCollection(peer);assert.equal(page.confirmingPull,true);
+  dialogs[0].primaryButton.action();dialogs[0].secondaryButton.action();assert.deepEqual(calls,[]);
+  page.pullCollection(peer);dialogs[1].secondaryButton.action();dialogs[1].secondaryButton.action();
+  await new Promise(resolve=>setImmediate(resolve));assert.deepEqual(calls,[{id:peer.id,mode:'pull'}]);
+  page.pullCollection(peer);page.aboutToDisappear();dialogs[2].secondaryButton.action();
+  assert.equal(calls.length,1);
+});
+
+test('collection cancellation during payload verification keeps the lease and prevents a new apply on either endpoint', async () => {
+  for (const receiver of [true, false]) {
+    const {DeviceLinkService}=runtime(),left=memoryCollection(['a']),right=memoryCollection(['b']);
+    const verifying=Promise.withResolvers(),resume=Promise.withResolvers(),settled=Promise.withResolvers();
+    const data=receiver?right:left;
+    const factory=()=>{
+      const store=data.factory(),verify=store.verify;
+      let received=0;
+      store.verify=async(...args)=>{
+        // Each endpoint receives metadata/requests first; its second file is the payload preceding apply.
+        if(++received===2){verifying.resolve();await resume.promise;}
+        return verify(...args);
+      };
+      return store;
+    };
+    const a=new DeviceLinkService({id:'collection-cancel-a'},null,receiver?left.factory:factory);
+    const b=new DeviceLinkService({id:'collection-cancel-b'},null,receiver?factory:right.factory);
+    const cancelled=receiver?b:a;
+    cancelled.subscribe(snapshot=>{if(snapshot.collection.some(item=>item.phase==='failed')&&!snapshot.progressBusy)settled.resolve();});
+    try{
+      await a.start();await b.start();await a.createInvitation();await b.pair(a.snapshot().invitation);
+      await a.allowCollection(a.snapshot().peers[0].id,true);await b.allowCollection(b.snapshot().peers[0].id,true);
+      const rejected=assert.rejects(a.syncCollection(a.snapshot().peers[0].id));
+      await verifying.promise;await cancelled.cancelProgress();
+      assert.equal(data.state.active,true,'verification retains the collection lease until IO settles');
+      resume.resolve();await rejected;await settled.promise;
+      assert.equal(data.state.applies.length,0);assert.equal(data.state.confirmations,0);
+      assert.equal(data.state.active,false);assert.equal(data.state.files,0);
+    }finally{resume.resolve();await a.stop();await b.stop();}
+  }
+});
+
 test('paired TCP progress needs personal authorization, merges binary chunks, retries and converges across three devices',async()=>{
   const {DeviceLinkService}=runtime();
   const data=[memoryProgress(['a']),memoryProgress(['b']),memoryProgress(['c'])];
@@ -383,4 +536,60 @@ test('cancelling the last bulk peer reports cancellation and releases the collec
     assert.deepEqual(left.state.records,['a']);assert.deepEqual(right.state.records,['b']);
     assert.equal(left.state.files,0);assert.equal(left.state.active,false);
   } finally {finishExport();await Promise.all([a.stop(),b.stop()]);}
+});
+
+test('receiver cancellation waits for an accepted merge and reports the receiving task as cancelled', async () => {
+  const { DeviceLinkService } = runtime();
+  const left = memoryProgress(['a']), right = memoryProgress(['b']);
+  const merging = Promise.withResolvers(), finishMerge = Promise.withResolvers();
+  const factory = () => {
+    const store = right.factory(), merge = store.merge;
+    store.merge = async token => { merging.resolve(); await finishMerge.promise; return merge(token); };
+    return store;
+  };
+  const a = new DeviceLinkService({ id: 'receiver-a' }, left.factory);
+  const b = new DeviceLinkService({ id: 'receiver-b' }, factory);
+  const settled = Promise.withResolvers();
+  b.subscribe(snapshot => { if (snapshot.progress.some(item => item.phase === 'failed') && !snapshot.progressBusy) settled.resolve(snapshot); });
+  try {
+    await Promise.all([a.start(), b.start()]); await a.createInvitation(); await b.pair(a.snapshot().invitation);
+    await a.allowProgress(a.snapshot().peers[0].id, true); await b.allowProgress(b.snapshot().peers[0].id, true);
+    const rejected = assert.rejects(a.mergeProgress(a.snapshot().peers[0].id));
+    await merging.promise; await b.cancelProgress();
+    assert.equal(right.state.active, true, 'the accepted write keeps its collection lease');
+    assert.equal(b.snapshot().progressBusy, true);
+    finishMerge.resolve(); await rejected;
+    const result = await settled.promise;
+    assert.equal(result.progress[0].error, 'device_progress_cancelled');
+    assert.deepEqual(right.state.records, ['a', 'b'], 'cancelling the network does not roll back an accepted transaction');
+    assert.equal(right.state.active, false); assert.equal(right.state.files, 0);
+  } finally { finishMerge.resolve(); await Promise.all([a.stop(), b.stop()]); }
+});
+
+test('cancelling during file verification must not start a new Core merge on either endpoint', async () => {
+  for (const receiver of [true, false]) {
+    const { DeviceLinkService } = runtime();
+    const left = memoryProgress(['a']), right = memoryProgress(['b']);
+    const verifying = Promise.withResolvers(), finishVerify = Promise.withResolvers(), settled = Promise.withResolvers();
+    const data = receiver ? right : left;
+    const factory = () => {
+      const store = data.factory(), verify = store.verify;
+      store.verify = async (...args) => { verifying.resolve(); await finishVerify.promise; return verify(...args); };
+      return store;
+    };
+    const a = new DeviceLinkService({ id: 'verify-a' }, receiver ? left.factory : factory);
+    const b = new DeviceLinkService({ id: 'verify-b' }, receiver ? factory : right.factory);
+    const cancelled = receiver ? b : a;
+    cancelled.subscribe(snapshot => { if (snapshot.progress.some(item => item.phase === 'failed') && !snapshot.progressBusy) settled.resolve(); });
+    try {
+      await Promise.all([a.start(), b.start()]); await a.createInvitation(); await b.pair(a.snapshot().invitation);
+      await a.allowProgress(a.snapshot().peers[0].id, true); await b.allowProgress(b.snapshot().peers[0].id, true);
+      const rejected = assert.rejects(a.mergeProgress(a.snapshot().peers[0].id));
+      await verifying.promise; await cancelled.cancelProgress(); finishVerify.resolve();
+      await rejected; await settled.promise;
+      assert.equal(data.state.merges, 0, 'verification completion after cancellation cannot accept a new write');
+      assert.deepEqual(data.state.records, receiver ? ['b'] : ['a']);
+      assert.equal(data.state.active, false); assert.equal(data.state.files, 0);
+    } finally { finishVerify.resolve(); await Promise.all([a.stop(), b.stop()]); }
+  }
 });

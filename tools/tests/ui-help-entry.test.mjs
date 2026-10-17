@@ -265,8 +265,7 @@ test('plain and rich help share fixed Done, scrollable content and a single back
   assert.match(panel, /字段帮助面板\([\s\S]*?this.onDismiss\(\)/);
   for (const [file, hostName, factoryName] of [
     ['components/数据迁移面板.ets', 'legacyHelp', 'createLegacyHelp'],
-    ['components/home/DeckOptionField.ets', 'helpDialog', 'createHelpDialog'],
-    ['components/settings/RedemptionPanel.ets', 'contentHelp', 'createContentHelp']
+    ['components/home/DeckOptionField.ets', 'helpDialog', 'createHelpDialog']
   ]) {
     const owner = nativeHelpOwner(file, [], { title: 'Title', help: 'Help' });
     const host = owner[hostName], expected = host.presentation();
@@ -286,8 +285,7 @@ test('plain and rich help share fixed Done, scrollable content and a single back
 test('help completion closes each native window instead of only dropping its reference', () => {
   for (const [file, hostName, factoryName] of [
     ['components/数据迁移面板.ets', 'legacyHelp', 'createLegacyHelp'],
-    ['components/home/DeckOptionField.ets', 'helpDialog', 'createHelpDialog'],
-    ['components/settings/RedemptionPanel.ets', 'contentHelp', 'createContentHelp']
+    ['components/home/DeckOptionField.ets', 'helpDialog', 'createHelpDialog']
   ]) {
     const events = [], owner = nativeHelpOwner(file, [], {}, events), host = owner[hostName];
     host.open(owner[factoryName]); host.current().options.builder.onDismiss();

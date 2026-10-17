@@ -2,19 +2,21 @@
 
 [![CI](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/actions/workflows/ci.yml/badge.svg)](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/actions/workflows/ci.yml)
 [![License: AGPL-3.0-or-later](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](LICENSE)
-[![Source 2.9.99](https://img.shields.io/badge/source-2.9.99-6750a4.svg)](AppScope/app.json5)
+[![Source 3.0.20](https://img.shields.io/badge/source-3.0.20-6750a4.svg)](AppScope/app.json5)
 [![AppGallery 2.9.98](https://img.shields.io/badge/AppGallery-2.9.98-0a59f7.svg)](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare)
 [![HarmonyOS NEXT](https://img.shields.io/badge/platform-HarmonyOS%20NEXT-0a59f7.svg)](https://www.harmonyos.com/)
 
 jidecards（中文名“记得闪卡”）是面向 HarmonyOS NEXT 的开源闪卡学习应用，支持鸿蒙手机、平板和电脑。导入 Anki 牌组后，可以离线复习、编辑资料、查看学习统计，并通过 AnkiWeb 同步。原生界面由 ArkTS/ArkUI 实现，集合、模板渲染、调度和同步复用锁定版本的 Anki Rust Core。
 
-**当前源码版本：2.9.99（versionCode 3080）** · **华为应用市场版本：2.9.98**
+**当前源码版本：3.0.20（versionCode 3081）** · **华为应用市场版本：2.9.98**
 
 每天一点，把知识记牢。用闪卡整理知识，以间隔复习建立自己的学习节奏。
 
 应用可在[华为应用市场](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare)搜索“记得闪卡”下载安装。仓库构建版本的唯一事实来源是 [AppScope/app.json5](AppScope/app.json5)；商店实际上架版本以 AppGallery 页面为准。
 
 官网：[jidecards.com](https://jidecards.com/) · [下载与功能](https://jidecards.com/works/jidecards/) · [鸿蒙 Anki 使用指南](https://jidecards.com/guides/harmonyos-anki/)
+
+源码构建：[3.0.20 签名 HAP 开发包](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v3.0.20/jidecards-v3.0.20-signed.hap) · [SHA-256 校验](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v3.0.20/SHA256SUMS.txt) · [构建与安装说明](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/tag/v3.0.20)
 
 开发入口：[贡献指南](CONTRIBUTING.md) · [更新记录](CHANGELOG.md) · [文档导航](docs/README.md) · [问题反馈](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/issues)
 
@@ -41,6 +43,8 @@ jidecards（中文名“记得闪卡”）是面向 HarmonyOS NEXT 的开源闪�
 
 以下介绍当前 `main` 的源码能力；应用市场实际上架版本以下载页面为准。
 
+3.0.20 新增实验性卡库与媒体直连同步，集中快捷键帮助，改善深色卡片正文对比度，并移除幻彩限时领赠宣传。完整变化与验收范围见 [3.0.20 源码变更说明](docs/releases/3.0.20.md)。
+
 ### 复习与调度
 
 - 复用 Anki 26.05 Rust Core，提供兼容的集合、模板渲染和调度基础。
@@ -48,6 +52,7 @@ jidecards（中文名“记得闪卡”）是面向 HarmonyOS NEXT 的开源闪�
 - 提供 FSRS 参数优化、复习负担模拟，以及日切时间、提前学习窗口、时间盒等全局复习偏好；调度仍由 Anki Core 执行。
 - 支持普通问答、完形填空、拼写输入、图片遮罩，以及卡片中的图片、音频、MathJax、mhchem 和 MathML。
 - 使用原生音频播放器和 HarmonyOS CoreSpeechKit TTS；学习页和卡片预览共享渲染与媒体生命周期。
+- 深色模式改善固定字色和脚本追加正文的对比度，切回浅色恢复作者原有样式；复杂背景和特效仍需针对原卡验收。
 - 学习页可显示卡片提示、查看上一张卡片信息，并录制、回放和保存本次学习录音；未保存的录音在退出本次学习时清理。详见[学习与媒体](docs/development/study-media.md)。
 
 ### 牌组、浏览与统计
@@ -62,7 +67,7 @@ jidecards（中文名“记得闪卡”）是面向 HarmonyOS NEXT 的开源闪�
 ### 同步、导入与维护
 
 - 支持 AnkiWeb 集合与媒体同步、自定义同步端点、自动同步及全量上传/下载；自定义 CA 证书尚无用户配置入口，见[同步边界](docs/development/sync-data.md#自定义同步端点与证书边界)。
-- 已接入“设置 → 同步 → 设备直连”：同一 Wi-Fi 或热点下扫码配对，双方授权为个人设备后，可合并同源卡库的复习历史与学习状态，并向多台个人设备补拉记录。牌组和媒体传输尚未接通；真实两机与 AnkiWeb 账号验收范围见[设备配对与学习记录合并](docs/development/sync-data.md)。
+- 已接入“设置 → 同步 → 设备直连”（实验功能）：同一 Wi-Fi 或热点下扫码配对，可分别授权学习记录同步或全部卡库和媒体同步。卡库来源/结构不一致时由接收设备明确确认替换并先备份；真实两机与 AnkiWeb 账号尚未验收，范围和限制见[设备直连](docs/development/sync-data.md)。
 - 支持 `.apkg` 牌组导入与导出、`.colpkg` 集合备份与恢复，并可选择媒体和调度信息；提供自动历史备份和恢复列表，历史备份不包含媒体。
 - 已接入系统文件打开入口接收 `.apkg`，确认导入选项后读取授权文件，兼容 Anki 专用 MIME `application/vnd.anki`。文件提供方与设备验收范围见[APKG 系统打开入口](docs/development/home.md#apkg-系统打开入口)。
 - 支持 CSV / TSV / TXT 导入预览、字段映射和重复处理；APKG 导入可配置更新策略，查看进度、取消及结果统计；整库替换提供空间预检和进程中断恢复。详见[数据导入](docs/development/import-data.md)。
@@ -78,7 +83,7 @@ jidecards（中文名“记得闪卡”）是面向 HarmonyOS NEXT 的开源闪�
 
 ### 键盘与鼠标
 
-- 首页、浏览和学习页的更多菜单提供本页快捷键说明，编辑页与模板编辑器在标题旁提供说明入口；学习页显示当前生效的自定义绑定。
+- 快捷键与鼠标说明统一位于“设置 → 学习帮助 → 键盘快捷键”，按首页、浏览、学习、编辑和模板界面分组；学习部分显示当前生效的自定义绑定。
 - 新增和编辑笔记支持 Ctrl+Enter 保存、Ctrl+D 选择牌组、Ctrl+L 打开模板、Ctrl+N 选择笔记类型、Ctrl+Shift+T 编辑标签，以及字段跳转和常用格式快捷键。操作范围与焦点规则见[浏览与编辑](docs/development/browser-stats.md)。
 - 鼠标右键可在指针位置打开牌组操作菜单、进入或扩展浏览列表多选，以及调用目录树已有的长按操作；文字输入保留原生按键和右键菜单。
 
@@ -137,6 +142,10 @@ JIDE 提供统一的自然语言对话入口，也可以从牌组、浏览或学
 
 从[华为应用市场](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare)安装“记得闪卡”，导入已有 `.apkg` 牌组后即可开始学习。首次使用建议先保留默认设置，熟悉评分和复习节奏后再调整 FSRS、提醒、主题或牌组选项。
 
+### 签名 HAP 开发包
+
+[GitHub Release](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/tag/v3.0.20) 提供与源码版本对应的签名 HAP、`SHA256SUMS.txt` 和构建说明。该包为 debug 开发构建，包含 arm64-v8a 与 x86_64 原生库；安装受包内签名及设备授权限制，不等同于应用市场安装包。开发设备仅覆盖安装：`hdc -t <connect-key> install -r <signed-hap>`，保留已有数据与签名身份。
+
 ### 兼容范围
 
 - 支持搭载 HarmonyOS NEXT 的手机、平板和电脑（含 2-in-1 设备），最低兼容 API 21。
@@ -149,7 +158,7 @@ JIDE 提供统一的自然语言对话入口，也可以从牌组、浏览或学
 
 卡库、媒体、备份和 JIDE 会话保存在应用本地。同步按用户配置连接 AnkiWeb 或自定义服务器；公告读取和其他在线功能见对应设置及实现。
 
-启用设备直连时，配对信息保存在本机，学习记录通过同一网络在已配对且双方授权的个人设备之间传输；设备直连与 AnkiWeb 同步共存。
+启用设备直连时，配对信息保存在本机，学习记录、卡库与媒体按各自授权通过同一网络在已配对的个人设备之间传输；设备直连与 AnkiWeb 同步共存。
 
 使用 JIDE 时，发送的消息以及工具提供给模型的卡片字段、资料片段或图片会交给所选模型服务。联网检索会把查询交给所选搜索服务。请按资料内容选择服务和发送范围；模型、搜索及同步凭证不应出现在问题报告或示例牌组中。JIDE 的发布开关、资料限制和确认机制见[应用内 Agent 说明](docs/development/agent.md)。
 
@@ -246,7 +255,7 @@ npm run verify             # 完整测试、双架构构建与签名 HAP
 
 ## 版本与发布
 
-当前源码版本由 [AppScope/app.json5](AppScope/app.json5) 中的 `versionName` 和 `versionCode` 定义。查看[更新记录](CHANGELOG.md)及[2.9.99 源码变更说明](docs/releases/2.9.99.md)；历史说明保留在 [docs/releases/](docs/releases/) 中。华为应用市场版本由作者确认，当前为 2.9.98；商店版本与源码版本分别维护。
+当前源码版本由 [AppScope/app.json5](AppScope/app.json5) 中的 `versionName` 和 `versionCode` 定义。查看[更新记录](CHANGELOG.md)及[3.0.20 源码变更说明](docs/releases/3.0.20.md)；历史说明保留在 [docs/releases/](docs/releases/) 中。华为应用市场版本由作者确认，当前为 2.9.98；商店版本与源码版本分别维护。
 
 历史应用市场 2.9.22 的更新内容见 [2.9.22 应用市场版说明](docs/releases/appgallery-2.9.22.md)。GitHub 的 `appgallery-v2.9.22` 标签记录当时的版本介绍，自动生成的源码快照对应标签中的 2.9.10 / versionCode 2991，不随 main 的后续更新变化；应用安装请使用应用市场入口。
 

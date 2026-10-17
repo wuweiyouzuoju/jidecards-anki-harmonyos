@@ -40,6 +40,17 @@ export class PeerProgressRpc {
   merge(input: Uint8Array = new Uint8Array(0)): Promise<Uint8Array> { return this.transport.调用(1005, 1, input); }
   receive(input: Uint8Array = new Uint8Array(0)): Promise<Uint8Array> { return this.transport.调用(1005, 2, input); }
 }
+export class PeerCollectionRpc {
+  static readonly SERVICE: number = 1006;
+  private transport: CoreTransport;
+  constructor(transport: CoreTransport) { this.transport = transport; }
+  capture(input: Uint8Array = new Uint8Array(0)): Promise<Uint8Array> { return this.transport.调用(1006, 0, input); }
+  apply(input: Uint8Array = new Uint8Array(0)): Promise<Uint8Array> { return this.transport.调用(1006, 1, input); }
+  receive(input: Uint8Array = new Uint8Array(0)): Promise<Uint8Array> { return this.transport.调用(1006, 2, input); }
+  plan(input: Uint8Array = new Uint8Array(0)): Promise<Uint8Array> { return this.transport.调用(1006, 3, input); }
+  pack(input: Uint8Array = new Uint8Array(0)): Promise<Uint8Array> { return this.transport.调用(1006, 4, input); }
+  confirm(input: Uint8Array = new Uint8Array(0)): Promise<Uint8Array> { return this.transport.调用(1006, 5, input); }
+}
 export class CustomSchedulingRpc {
   static readonly SERVICE: number = 1004;
   private transport: CoreTransport;

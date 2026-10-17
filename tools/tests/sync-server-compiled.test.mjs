@@ -13,6 +13,7 @@ export class 同步分组 extends ViewPU {
     ${fields.map(name => `this.__${name} = new ObservedPropertySimplePU('', this, '${name}');`).join('\n')}
   }
   openServerDialog() {
+    agentOperationHosts.finish('login', '{"status":"cancelled"}');
     this.serverDialogController = new CustomDialogController({ builder: () => {
       ViewPU.create(new 自定义服务器弹窗(this, {
         ${fields.map(name => `${name}: ${name === field ? value : `this.__${name}`}`).join(',\n')}

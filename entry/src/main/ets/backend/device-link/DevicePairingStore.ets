@@ -54,7 +54,18 @@ export class DevicePairingStore {
       const peer = state.devices.find((item: PairedDevice): boolean => item.id === id);
       if (peer === undefined) throw new Error('device_link_not_paired');
       return rememberDevice(state, { id: peer.id, name: peer.name, key: peer.key, pairedAt: peer.pairedAt,
-        allowProgress: allowed });
+        allowProgress: allowed, allowCollection: peer.allowCollection });
+    });
+  }
+
+  /** 卡库与媒体写入单独授权，不继承学习记录权限。
+   * @throws {Error} 串行持久化失败由授权动作显示。 */
+  allowCollection(id: string, allowed: boolean): Promise<void> {
+    return this.change((state: DevicePairingState): DevicePairingState => {
+      const peer = state.devices.find((item: PairedDevice): boolean => item.id === id);
+      if (peer === undefined) throw new Error('device_link_not_paired');
+      return rememberDevice(state, { id: peer.id, name: peer.name, key: peer.key, pairedAt: peer.pairedAt,
+        allowProgress: peer.allowProgress, allowCollection: allowed });
     });
   }
 

@@ -37,9 +37,8 @@ test('real startup sequence presents unread introduction and skips it only after
   let shown = 0;
   const host = {
     canPresent: () => true, checkAnnouncement: async () => false, activateAnnouncementChecks() {},
-    cloudCompleted: async () => true, introCompleted: api.isHomeIntroCompleted, giftCompleted: async () => true,
-    showCloud: () => assert.fail('cloud already completed'), showIntro: () => { shown++; },
-    showGift: () => assert.fail('gift already completed')
+    cloudCompleted: async () => true, introCompleted: api.isHomeIntroCompleted,
+    showCloud: () => assert.fail('cloud already completed'), showIntro: () => { shown++; }
   };
   await new HomeStartupSequence().start(host);
   assert.equal(shown, 1);

@@ -93,7 +93,6 @@ function homeHarness(announcementsEnabled = true) {
     CLOUD_DECK_CHANNEL_ENABLED: false, OFFICIAL_ANNOUNCEMENTS_ENABLED: announcementsEnabled,
     appInterface: interfaceTracker, isDoubleColumnDeckListStyle, homeSyncIndicator, homeSyncLabelKey,
     isHomeIntroCompleted: async () => false, completeHomeIntro: async () => events.push('welcome-persist'),
-    isIridescentGiftNoticeCompleted: async () => true,
     官方公告检查延迟毫秒: () => 600000,
     externalDeckOpens: new ExternalDeckOpenQueue(),
     AppStorage: { get() {}, setOrCreate() {} },
@@ -134,7 +133,7 @@ function homeHarness(announcementsEnabled = true) {
 }
 
 test('home startup wake waits for the active preference read instead of continually scheduling itself', async () => {
-  for (const stage of ['cloud', 'intro', 'gift']) {
+  for (const stage of ['cloud', 'intro']) {
     const { page, timers, tick } = homeHarness(false);
     const gate = deferred();
     let reads = 0;
@@ -142,7 +141,7 @@ test('home startup wake waits for the active preference read instead of continua
     host[stage + 'Completed'] = () => { reads++; return gate.promise; };
     page.startupHost = () => host;
     const pending = stage === 'cloud' ? page.startupSequence.continue(host) :
-      stage === 'intro' ? page.startupSequence.welcome(host) : page.startupSequence.gift(host);
+      page.startupSequence.welcome(host);
     page.homeActivityChanged();
     tick(); await settle();
     assert.equal(reads, 1);

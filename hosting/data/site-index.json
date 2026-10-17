@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-15",
+  "updatedAt": "2026-10-17",
   "origin": "https://jidecards.com",
   "releaseVersion": "2.9.98",
-  "sourceVersion": "2.9.99",
-  "sourceVersionCode": 3080,
+  "sourceVersion": "3.0.20",
+  "sourceVersionCode": 3081,
   "contentLanguage": "zh-CN",
   "product": "https://jidecards.com/data/works.json",
   "llms": "https://jidecards.com/llms.txt",
@@ -14,38 +14,38 @@
     {
       "path": "/",
       "title": "记得闪卡 JideCards",
-      "description": "记得闪卡是面向鸿蒙 HarmonyOS NEXT 的原生开源闪卡应用，基于 Anki 内核，用于背单词、记忆知识点与备考。支持 FSRS 间隔复习、AnkiWeb 同步与 APKG 导入导出；当前源码还接入个人设备直连学习记录合并、键盘与鼠标操作。",
+      "description": "记得闪卡是面向鸿蒙 HarmonyOS NEXT 的原生开源闪卡应用，基于 Anki 内核，用于背单词、记忆知识点与备考。支持 FSRS 间隔复习、AnkiWeb 同步与 APKG 导入导出；当前源码还提供实验性个人设备直连卡库与媒体同步，以及键盘、鼠标操作。",
       "markdown": "/content/home.md",
       "url": "https://jidecards.com/",
       "markdownUrl": "https://jidecards.com/content/home.md",
-      "updatedAt": "2026-10-15"
+      "updatedAt": "2026-10-17"
     },
     {
       "path": "/works/jidecards/",
       "title": "记得闪卡功能与下载",
-      "description": "记得闪卡是面向鸿蒙 HarmonyOS NEXT 的原生开源闪卡应用，基于 Anki 内核，用于背单词、记忆知识点与备考。支持 FSRS 间隔复习、AnkiWeb 同步与 APKG 导入导出；当前源码还接入个人设备直连学习记录合并、键盘与鼠标操作。",
+      "description": "记得闪卡是面向鸿蒙 HarmonyOS NEXT 的原生开源闪卡应用，基于 Anki 内核，用于背单词、记忆知识点与备考。支持 FSRS 间隔复习、AnkiWeb 同步与 APKG 导入导出；当前源码还提供实验性个人设备直连卡库与媒体同步，以及键盘、鼠标操作。",
       "markdown": "/content/product.md",
       "url": "https://jidecards.com/works/jidecards/",
       "markdownUrl": "https://jidecards.com/content/product.md",
-      "updatedAt": "2026-10-15"
+      "updatedAt": "2026-10-17"
     },
     {
       "path": "/guides/harmonyos-anki/",
       "title": "鸿蒙 HarmonyOS NEXT 使用 Anki 完整指南：闪卡、背单词、APKG、FSRS 与同步",
       "description": "用记得闪卡 JideCards 在鸿蒙 HarmonyOS NEXT 上学习已有 Anki 牌组：APKG 导入、FSRS 评分、AnkiWeb 同步、个人设备直连、键盘与鼠标操作，以及备份和常见问题。",
       "markdown": "/content/harmonyos-anki-guide.md",
-      "updatedAt": "2026-10-15",
+      "updatedAt": "2026-10-17",
       "url": "https://jidecards.com/guides/harmonyos-anki/",
       "markdownUrl": "https://jidecards.com/content/harmonyos-anki-guide.md"
     },
     {
       "path": "/releases/",
-      "title": "2.9.99 源码更新说明",
+      "title": "3.0.20 源码更新说明",
       "description": "当前版本的完整编号更新说明。",
       "markdown": "/content/releases.md",
       "url": "https://jidecards.com/releases/",
       "markdownUrl": "https://jidecards.com/content/releases.md",
-      "updatedAt": "2026-10-15"
+      "updatedAt": "2026-10-17"
     },
     {
       "path": "/developers/",
@@ -54,7 +54,7 @@
       "markdown": "/content/developers.md",
       "url": "https://jidecards.com/developers/",
       "markdownUrl": "https://jidecards.com/content/developers.md",
-      "updatedAt": "2026-10-15"
+      "updatedAt": "2026-10-17"
     },
     {
       "path": "/about/",
@@ -63,7 +63,7 @@
       "markdown": "/content/about.md",
       "url": "https://jidecards.com/about/",
       "markdownUrl": "https://jidecards.com/content/about.md",
-      "updatedAt": "2026-10-15"
+      "updatedAt": "2026-10-17"
     }
   ]
 }

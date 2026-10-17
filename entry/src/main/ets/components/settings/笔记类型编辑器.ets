@@ -1,4 +1,3 @@
-import { KeyboardShortcutHelp } from '../KeyboardShortcutHelp';
 import { TEMPLATE_SHORTCUTS, shortcutCommand } from '../../model/KeyboardShortcuts';
 import { StudyKeyboardSession } from '../../model/StudyKeyboard';
 import { studyEventChord } from '../../utils/StudyKeyAdapter';
@@ -64,13 +63,12 @@ export struct 笔记类型编辑器 {
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
 
   private handleBackRequest(): void {
-    if (this.keyboardHelpOpen) this.keyboardHelpOpen = false; else this.requestClose();
+    this.requestClose();
   }
 
   @Prop isDark: boolean = false;
   @Prop notetypeId: number = 0;
   @Prop templatesOnly: boolean = false;
-  @State private keyboardHelpOpen: boolean = false;
   private readonly keyboardSession: StudyKeyboardSession = new StudyKeyboardSession();
   @Prop notetypeName: string = '';
   onClose: () => void = (): void => {};
@@ -489,8 +487,7 @@ export struct 笔记类型编辑器 {
   @Builder
   private dialogHeader() {
     DialogHeader({
-      title: $r('app.string.notetype_editor_title'), showHelp: true,
-      onHelp: (): void => { this.keyboardHelpOpen = true; },
+      title: $r('app.string.notetype_editor_title'),
       showActionLabel: this.保存中, actionLabel: this.保存中 ? $r('app.string.notetype_editor_saving') : $r('app.string.notetype_editor_save'),
       actionEnabled: !this.加载中 && !this.保存中 && !this.previewBusy && this.原始JSON !== '',
       closeLabel: $r('app.string.create_deck_cancel'),
@@ -723,15 +720,10 @@ export struct 笔记类型编辑器 {
         NoteDraftPreview({ input: this.preview, isDark: this.isDark,
           onClose: (): void => { this.preview = null; } })
       }
-      if (this.keyboardHelpOpen) {
-        KeyboardShortcutHelp({ scope: 'template', shortcuts: TEMPLATE_SHORTCUTS,
-          onClose: (): void => { this.keyboardHelpOpen = false; } })
-      }
     }.width('100%').height('100%').onKeyPreIme((event: KeyEvent): boolean => {
       const fresh: boolean = this.keyboardSession.update(event.keyCode, event.type === KeyType.Down);
       if (event.type !== KeyType.Down) return false;
       const chord: string = studyEventChord(event);
-      if (this.keyboardHelpOpen) { if (fresh && chord === 'escape') this.keyboardHelpOpen = false; return true; }
       if (this.preview !== null || this.保存中 || this.加载中 || this.confirmingSave || this.confirmingClose) return false;
       if (shortcutCommand(TEMPLATE_SHORTCUTS, chord) === 'preview') { if (fresh) this.previewTemplate(); return true; }
       if (chord === 'escape') { if (fresh) this.requestClose(); return true; }

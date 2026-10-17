@@ -1,10 +1,27 @@
 import { STUDY_KEYBOARD_ACTIONS, studyChordLabel } from './StudyKeyboard';
 import type { StudyKeyBinding } from './StudyKeyboard';
 import { NOTE_FIELD_SHORTCUTS } from './NoteFieldEditing';
+import { BROWSER_SHORTCUTS } from './BrowserKeyboard';
+import type { BrowserShortcut } from './BrowserKeyboard';
+import { defaultStudyControls, effectiveStudyKeyboard, validateStudyControls } from './StudyControls';
+import type { StudyControls } from './StudyControls';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /** 默认键位与页面指引共用；具体操作仍由原页面/会话执行。 */
 export const FIELD_SHORTCUTS = NOTE_FIELD_SHORTCUTS;
 export interface KeyboardShortcut { command: string; keys: string; titleKey: string; }
+export interface KeyboardHelpTopic {
+  id: string;
+  titleKey: string;
+  hintKey: string;
+}
+export interface KeyboardHelpSection extends KeyboardHelpTopic { shortcuts: KeyboardShortcut[]; }
+export const KEYBOARD_HELP_SECTIONS: KeyboardHelpTopic[] = [
+  { id: 'home', titleKey: 'keyboard_help_home', hintKey: 'keyboard_home_scope_hint' },
+  { id: 'study', titleKey: 'keyboard_help_study', hintKey: 'keyboard_study_scope_hint' },
+  { id: 'browser', titleKey: 'keyboard_help_browser', hintKey: 'browser_shortcuts_hint' },
+  { id: 'editor', titleKey: 'keyboard_help_editor', hintKey: 'keyboard_scope_hint' },
+  { id: 'template', titleKey: 'keyboard_help_template', hintKey: 'keyboard_scope_hint' }
+];
 export const HOME_SHORTCUTS: KeyboardShortcut[] = [
   { command: 'add', keys: 'A', titleKey: 'add_note_title' },
   { command: 'browse', keys: 'B', titleKey: 'browser_title' },
@@ -68,4 +85,20 @@ export function studyShortcutRows(bindings: StudyKeyBinding[]): KeyboardShortcut
       titleKey: STUDY_KEYBOARD_ACTIONS.find((action): boolean => action.id === binding.command)?.titleKey ?? 'keyboard_shortcuts_title' });
   }
   return rows;
+}
+
+/** 学习帮助复用执行端声明；学习页一组读取当前生效配置，空绑定仍保持为空。 */
+export function keyboardHelpSections(controlsJson: string): KeyboardHelpSection[] {
+  let controls: StudyControls = defaultStudyControls();
+  try { controls = validateStudyControls(JSON.parse(controlsJson) as StudyControls); } catch (_) {}
+  return KEYBOARD_HELP_SECTIONS.map((section: KeyboardHelpTopic): KeyboardHelpSection => {
+    let shortcuts: KeyboardShortcut[] = [];
+    if (section.id === 'home') shortcuts = HOME_SHORTCUTS;
+    else if (section.id === 'study') shortcuts = studyShortcutRows(effectiveStudyKeyboard(controls).bindings);
+    else if (section.id === 'browser') shortcuts = BROWSER_SHORTCUTS.map((item: BrowserShortcut): KeyboardShortcut =>
+      ({ command: item.command, keys: item.keys, titleKey: item.titleKey }));
+    else if (section.id === 'editor') shortcuts = EDITOR_SHORTCUTS.concat(FIELD_SHORTCUTS);
+    else if (section.id === 'template') shortcuts = TEMPLATE_SHORTCUTS;
+    return { id: section.id, titleKey: section.titleKey, hintKey: section.hintKey, shortcuts };
+  });
 }

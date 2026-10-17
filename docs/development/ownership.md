@@ -10,6 +10,8 @@ JIDE 卡库和应用操作的声明、校验、确认指纹归 `model/agent/Agen
 
 Core/私有协议的描述、生成、wire 与领域映射职责见 [Core 协议生成](core-protocol.md)。`tools/core-protocol.mjs` 独占协议产物；`proto/messages` 只保留领域契约差异，生成客户端不注册 UI/JIDE 能力。
 
+设备卡库/媒体直连的协议顺序归 [CollectionSync.ts](../../entry/src/main/ets/model/device-link/CollectionSync.ts)，租约及文件 IO 归 [DeviceCollectionStore.ets](../../entry/src/main/ets/backend/device-link/DeviceCollectionStore.ets)，认证、授权与任务状态归既有 DeviceLinkService。原生扩展 [peer_collection.rs](../../native/rsharmony/src/peer_collection.rs) 及子模块复用公开 Core API，独占设备版本、合并事务和媒体恢复，不改上游 Anki/FSRS/调度器。边界、限制、备份和验证入口见[同步扩展](sync-data.md#全部卡库与媒体同步扩展2026-10-16)。
+
 ## `entry`
 
 学习键盘的动作目录、默认绑定、组合键/卡面匹配、冲突及长按去重归 `model/StudyKeyboard.ts`，旧配置兼容归 `StudyControls.ts`。平台键码与修饰键归 `utils/StudyKeyAdapter.ets`，手动草稿归 `components/settings/StudyKeyboardSettings.ets`，保存继续归 `StudyControlsService.ets` / `LocalPreferenceWrite`。UI 和 JIDE 共用动作/控件声明与实际配置；执行只调用学习页既有操作。入口与验证见[学习操作配置](study-media.md#jide-专用学习操作配置2026-10-04)。
@@ -84,7 +86,7 @@ Anki 官方教程的选章与检索别名归 `tools/anki-manual-topics.json`，�
 | 媒体检查、报告续读与清理 | [MediaMaintenanceSession](../../entry/src/main/ets/model/settings/MediaMaintenanceSession.ts)；原生快照随 backend/面板释放，已接受写入独立完成 | [media-maintenance-session](../../tools/tests/media-maintenance-session.test.mjs)、Rust media_snapshot 测试 |
 | 浏览查询结果、游标与分页占用 | [BrowserSearchSession](../../entry/src/main/ets/model/BrowserSearchSession.ts)；新查询使旧分页失效 | [browser-search-pagination](../../tools/tests/browser-search-pagination.test.mjs) |
 | 公告节流与延迟任务 | [HomeAnnouncementController](../../entry/src/main/ets/model/HomeAnnouncementController.ts)；暂停/销毁失效旧 timer | [home-announcement-scheduling](../../tools/tests/home-announcement-scheduling.test.mjs) |
-| 幻彩赠送提醒与锁定入口 | HomeStartupSequence 持有启动优先级/待展示状态，IridescentGiftStore 读取验签权益及保存确认，IridescentGiftPanel 共用领赠与复制；外观分组只在可用时发起主题切换 | [theme-iridescent-gift](../../tools/tests/theme-iridescent-gift.test.mjs)、[home-work-coordinator](../../tools/tests/home-work-coordinator.test.mjs) |
+| 幻彩主题与兑换结果 | ThemeCatalog 与 RedemptionStore 拥有主题权益，外观分组只在可用时切换；启动和锁定入口不再弹领赠说明，RedemptionPanel 保留普通兑换结果与使用主题动作 | [theme-iridescent-gift](../../tools/tests/theme-iridescent-gift.test.mjs)、[redemption-panel](../../tools/tests/redemption-panel.test.mjs) |
 | 迁移文件描述符与目录树 IO | [DataTransferFiles](../../entry/src/main/ets/backend/DataTransferFiles.ts)；每次复制独占描述符并 await 完成/释放 | [data-transfer-files](../../tools/tests/data-transfer-files.test.mjs) |
 | 设置中的数据库检查和标签清理 | [CollectionMaintenanceSession](../../entry/src/main/ets/model/settings/CollectionMaintenanceSession.ts)；操作独立完成，面板挂载时订阅快照 | [settings-maintenance](../../tools/tests/settings-maintenance.test.mjs) |
 | 牌组选项草稿、加载和提交 | DeckOptionsPage → DeckOptionsFeature / [DeckOptionsSession](../../entry/src/main/ets/model/home/DeckOptionsSession.ts)；功能组件拥有草稿与退出确认，表单随页面销毁，已接受提交继续 | [deck-options-session](../../tools/tests/deck-options-session.test.mjs)、[deck-config-save](../../tools/tests/deck-config-save.test.mjs) |

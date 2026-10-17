@@ -7,7 +7,7 @@ export const PAIRING_LIFETIME: number = 5 * 60 * 1000;
 
 export interface DeviceIdentity { id: string; name: string; }
 export interface DeviceLinkCredential extends DeviceIdentity { key: string; }
-export interface PairedDevice extends DeviceLinkCredential { pairedAt: number; allowProgress?: boolean; }
+export interface PairedDevice extends DeviceLinkCredential { pairedAt: number; allowProgress?: boolean; allowCollection?: boolean; }
 export interface PairingInvitation extends DeviceLinkCredential { version: number; expiresAt: number; }
 export interface DiscoveredDevice extends DeviceIdentity { address: string; port: number; }
 export interface DevicePairingState { version: number; identity: DeviceIdentity; devices: PairedDevice[]; }
@@ -51,7 +51,8 @@ export function parsePairingState(input: string): DevicePairingState {
   for (const peer of value.devices) {
     if (!validDeviceIdentity(peer) || !isPairingKey(peer.key) || !Number.isSafeInteger(peer.pairedAt) ||
       peer.pairedAt < 0 || peer.id === value.identity.id || ids.includes(peer.id) ||
-      (peer.allowProgress !== undefined && typeof peer.allowProgress !== 'boolean')) {
+      (peer.allowProgress !== undefined && typeof peer.allowProgress !== 'boolean') ||
+      (peer.allowCollection !== undefined && typeof peer.allowCollection !== 'boolean')) {
       throw new Error('device_link_storage_invalid');
     }
     ids.push(peer.id);

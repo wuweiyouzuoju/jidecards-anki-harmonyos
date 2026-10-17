@@ -39,9 +39,8 @@ export function checkHomeIntroCompiled(source) {
     initialRender() { this.params.header(); this.params.content(); }
   }
   class DialogHeader { initialRender() {} }
-  class IridescentThemePreview { initialRender() {} }
   const context = vm.createContext({
-    ViewPU, SynchedPropertyObjectOneWayPU: Property, DialogFrame, DialogHeader, IridescentThemePreview,
+    ViewPU, SynchedPropertyObjectOneWayPU: Property, DialogFrame, DialogHeader,
     Text: nativeElement('Text'), Column: nativeElement('Column'), Span: nativeElement('Span'),
     应用尺寸: { 间距_12: 12, 间距_8: 8, 字号_正文: 16, 字号_正文_小: 14, 字号_按钮: 16, 圆角_面板: 12 },
     OFFICIAL_QQ_GROUP: 'group', FontWeight: { Bold: 'bold', Medium: 'medium' },
@@ -54,9 +53,9 @@ export function checkHomeIntroCompiled(source) {
   vm.runInContext(stripTypeScriptTypes(body, { mode: 'transform' }) +
     '\nViewPU.create(new HomeIntroPanel(undefined, {}));', context, { timeout: 1000 });
   const sections = seen.components.filter(name => name === 'HomeIntroSection').length;
-  assert.equal(sections, 6, 'all six introduction sections must render');
-  // Six headings, four paragraphs, four source blocks, a theme block and its preview caption.
-  assert.equal(seen.texts.length, 16, 'all introduction Text nodes must render');
+  assert.equal(sections, 5, 'all five introduction sections must render');
+  // Five headings, four paragraphs and four source blocks remain after retiring the theme promotion.
+  assert.equal(seen.texts.length, 13, 'all introduction Text nodes must render');
   return { sections, textNodes: seen.texts.length };
 }
 

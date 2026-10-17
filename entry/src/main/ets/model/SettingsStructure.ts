@@ -66,6 +66,9 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     { id: 'device_link_devices', titleKey: 'device_link_devices' },
     { id: 'device_link_connect', titleKey: 'device_progress_start' },
     { id: 'device_progress_allow', titleKey: 'device_progress_allow' },
+    { id: 'device_collection_allow', titleKey: 'device_collection_allow' },
+    { id: 'device_collection_start', titleKey: 'device_collection_start' },
+    { id: 'device_collection_pull', titleKey: 'device_collection_pull' },
     { id: 'device_progress_all', titleKey: 'device_progress_all' },
     { id: 'device_progress_cancel', titleKey: 'device_progress_cancel' },
     { id: 'device_link_forget', titleKey: 'device_link_forget' }
@@ -108,7 +111,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     { id: 'help_graduate', titleKey: 'glossary_graduating_interval_label' },
     { id: 'help_fsrs', titleKey: 'glossary_fsrs_retention_label' },
     { id: 'help_fuzz', titleKey: 'glossary_fuzz_label' },
-    { id: 'help_shortcuts', titleKey: 'glossary_shortcuts_label' },
+    { id: 'help_shortcuts', titleKey: 'glossary_shortcuts_label', opens: 'keyboard_shortcuts' },
     { id: 'help_sidebar', titleKey: 'browser_action_sidebar' },
     { id: 'help_find_replace', titleKey: 'browser_action_find_replace' },
     { id: 'help_batch', titleKey: 'browser_help_batch_title' },

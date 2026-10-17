@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { KEYBOARD_HELP_SECTIONS } from './KeyboardShortcuts';
 import type { DirectoryView } from './DirectoryTree';
 import { FILTERED_DECK_ACTIONS } from './FilteredDeckCommands';
 import { DECK_TONE_CHOICES } from './DeckTone';
@@ -105,10 +106,9 @@ export const WHITEBOARD_INTERFACE_ITEMS: AppInterfaceItem[] = [
 
 /** 菜单直接遍历这里的条目；标签、顺序和显隐由 UI 与 JIDE 共用。 */
 export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
-  ...['home', 'study', 'editor', 'template'].map((scope: string): AppInterfaceSurface => ({
-    id: scope + '_shortcuts', titleKey: 'keyboard_shortcuts_title', instructionsKey: 'keyboard_scope_hint',
-    parent: scope === 'editor' ? 'edit_note_form' : scope === 'template' ? 'notetype_editor' : scope,
-    items: [{ id: 'close', titleKey: 'done' }] })),
+  { id: 'keyboard_shortcuts', titleKey: 'glossary_shortcuts_label', instructionsKey: 'glossary_shortcuts_help',
+    parent: 'settings', items: KEYBOARD_HELP_SECTIONS.map((section): AppInterfaceItem => ({ id: section.id, titleKey: section.titleKey }))
+      .concat([{ id: 'retry', titleKey: 'common_retry', condition: 'study_bindings_load_failed' }, { id: 'close', titleKey: 'done' }]) },
   { id: 'device_link', titleKey: 'device_link_title', instructionsKey: 'device_link_hint', parent: 'settings',
     items: SETTINGS_GROUPS.find((group): boolean => group.id === 'device_link')?.items ?? [] },
   { id: 'device_pairing_code', titleKey: 'device_link_code_title', instructionsKey: 'device_link_code_hint', parent: 'device_link',
@@ -124,7 +124,6 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'back', titleKey: 'notetype_editor_back_template' },
     { id: 'tokens', titleKey: 'notetype_editor_tokens' },
     { id: 'css', titleKey: 'notetype_editor_css' },
-    { id: 'keyboard', titleKey: 'keyboard_shortcuts_title', opens: 'template_shortcuts' }
   ] },
   { id: 'notetype_management', titleKey: 'notetype_mgmt_title', parent: 'settings',
     items: Object.values(NOTETYPE_MANAGEMENT_ACTIONS) },
@@ -179,7 +178,6 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'stats', titleKey: 'stats_page_title', opens: 'stats' },
     { id: 'reminders', titleKey: 'reminder_list_title', opens: 'reminders' },
     { id: 'intro', titleKey: 'home_intro_menu_title', opens: 'intro' },
-    { id: 'keyboard', titleKey: 'keyboard_shortcuts_title', opens: 'home_shortcuts' }
   ] },
   { id: 'home_search', titleKey: 'home_search_title', instructionsKey: 'home_search_instructions', parent: 'home', items: [
     { id: 'query', titleKey: 'home_search_placeholder' },
@@ -329,7 +327,6 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
   ] },
   { id: 'browser_more_settings', titleKey: 'study_more', parent: 'browser_more', items: [
     { id: 'flag_names', titleKey: 'card_mark_flag_names' },
-    { id: 'keyboard', titleKey: 'browser_shortcuts', opens: 'browser_shortcuts' }
   ] },
   { id: 'browser_batch', titleKey: 'browser_help_batch_title', parent: 'browser', items: [
     { id: 'select_all', titleKey: 'browser_select_all' },
@@ -367,9 +364,6 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
   ] },
   { id: 'browser_recent_searches', titleKey: 'browser_recent_searches', parent: 'browser_search_tools', items: [
     { id: 'recent', titleKey: 'browser_recent_searches' }, { id: 'close', titleKey: 'browser_detail_cancel' }
-  ] },
-  { id: 'browser_shortcuts', titleKey: 'browser_shortcuts', instructionsKey: 'browser_shortcuts_hint', parent: 'browser_more_settings', items: [
-    { id: 'close', titleKey: 'browser_detail_cancel' }
   ] },
   { id: 'browser_editor', titleKey: 'note_editor_edit_title', parent: 'browser', items: [
     { id: 'close', titleKey: 'browser_editor_close' }, { id: 'form', titleKey: 'note_editor_edit_title', opens: 'edit_note_form' }
@@ -485,7 +479,6 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
   { id: 'add_note', titleKey: 'add_note_title', instructionsKey: 'note_editor_format_action', parent: 'deck_details', items: [
     { id: 'back', titleKey: 'study_back', iconKey: 'ic_common_arrow_left' }, { id: 'save', titleKey: 'add_note_save_continue' },
     { id: 'save_return', titleKey: 'add_note_save_return' },
-    { id: 'keyboard', titleKey: 'keyboard_shortcuts_title', opens: 'editor_shortcuts' },
     { id: 'deck', titleKey: 'add_note_deck', opens: 'add_note_decks' },
     { id: 'type', titleKey: 'add_note_notetype', opens: 'add_note_types' },
     { id: 'templates', titleKey: 'notetype_editor_templates', iconKey: 'ic_settings_layout', opens: 'notetype_editor' },
@@ -508,7 +501,6 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'deck', titleKey: 'add_note_deck' },
     { id: 'notetype', titleKey: 'add_note_notetype' },
     { id: 'templates', titleKey: 'notetype_editor_templates', opens: 'notetype_editor' },
-    { id: 'keyboard', titleKey: 'keyboard_shortcuts_title', opens: 'editor_shortcuts' }
   ] },
   { id: 'note_visual_manage', titleKey: 'note_visual_manage', instructionsKey: 'note_visual_instructions', parent: '', items: [
     { id: 'close', titleKey: 'cancel' }, { id: 'apply', titleKey: 'done' },
@@ -571,7 +563,6 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'audio', titleKey: 'study_replay_sound' },
     { id: 'card_actions', titleKey: 'study_card_actions_title', opens: 'study_card_actions' },
     { id: 'handwrite', titleKey: 'study_handwrite', opens: 'study_whiteboard', condition: 'has_card_phase' },
-    { id: 'keyboard', titleKey: 'keyboard_shortcuts_title', opens: 'study_shortcuts' },
     { id: 'guide', titleKey: 'study_guide_title' }
   ] },
   { id: 'study_voice', titleKey: 'keyboard_voice_title', instructionsKey: 'keyboard_voice_hint', parent: 'study', items: [

@@ -24,7 +24,7 @@
 | 浏览侧栏原生菜单与保存搜索删除确认的迟到事件仍可触发操作 | 菜单结果重查宿主存活与当前忙碌；保存搜索确认一次性消费、删除入口检查页面存活 | `浏览侧边栏.ets`、`浏览页.ets`；`browser-sidebar-decks`、`ui-common-state-dialog-lifecycle` |
 | AI 普通/高风险二次确认在离开页面或草稿替换后仍可执行 | 基线读取后、每级确认及执行前重查页面、草稿 ID、风险、基线和操作/附件快照；取消/确认一次性消费，迟到结果不写新草稿 | `AI制卡页.ets`；`ui-common-state-dialog-lifecycle`、现有 Agent 执行器回归 |
 | AI 草稿基线读取期间可连续进入准备流程并叠加确认 | 在第一次 await 前占用确认流程，贯穿高风险两级确认；取消或创建窗口失败恢复 pending，失败后可重新尝试 | `AI制卡页.ets`；`ui-common-state-dialog-lifecycle` |
-| 兑换完成后写已销毁的 sheet 状态 | 权益持久化继续；active 失效后不再写解锁、提示、庆祝或 busy 等 UI 状态 | `RedemptionPanel.ets`；`theme-unlock-celebration`、`ui-common-state-dialog-lifecycle` |
+| 兑换完成后写已销毁的 sheet 状态 | 权益持久化继续；active 失效后不再写解锁、提示、庆祝或 busy 等 UI 状态 | `RedemptionPanel.ets`；`redemption-panel`、`ui-common-state-dialog-lifecycle` |
 | 同步后 FSRS 提示在首页销毁后仍能出现/写设置 | 读取结果和用户确认返回时重新检查首页存活，已接受写入的失败提示也受存活保护 | `首页.ets`；`fsrs-state` |
 | 取消隐藏牌组与注销确认缺少宿主/账户校验 | 取消与确认只消费一次；执行时检查宿主，注销额外绑定打开确认时的鉴权对象，不能注销后来切换的账户 | `设置页.ets`、`同步分组.ets`；`ui-common-state-dialog-lifecycle` |
 | 媒体、标签清理和历史删除取消后旧确认仍有效 | 媒体标记缺失/清空回收站、设置及浏览器清理标签、删除标签/历史会话统一一次性消费；媒体额外绑定报告快照并重查忙碌，首页布局建议也只消费一次 | `媒体管理面板.ets`、`设置面板.ets`、`浏览页.ets`、`AI制卡页.ets`、`首页.ets`；`ui-common-state-dialog-lifecycle` |
@@ -92,8 +92,8 @@ Node 行为检查统一使用 `node --experimental-transform-types --import ./to
 | [components/CollectionHistoryDialog.ets](../../entry/src/main/ets/components/CollectionHistoryDialog.ets) | 公共外壳 1 |
 | [components/CustomSchedulingWarning.ets](../../entry/src/main/ets/components/CustomSchedulingWarning.ets) | 公共外壳 1 |
 | [components/HomeIntroPanel.ets](../../entry/src/main/ets/components/HomeIntroPanel.ets) | 公共外壳 1 |
-| [components/IridescentGiftDialog.ets](../../entry/src/main/ets/components/IridescentGiftDialog.ets) | 原生内容 1 |
-| [components/IridescentGiftPanel.ets](../../entry/src/main/ets/components/IridescentGiftPanel.ets) | 公共外壳 1 |
+| `components/IridescentGiftDialog.ets`（3.0.20 已移除） | 原审计：原生内容 1 |
+| `components/IridescentGiftPanel.ets`（3.0.20 已移除） | 原审计：公共外壳 1 |
 | [components/StudyAutoAdvanceDialog.ets](../../entry/src/main/ets/components/StudyAutoAdvanceDialog.ets) | 原生内容 1；公共外壳 1 |
 | [components/StudyGuideDialog.ets](../../entry/src/main/ets/components/StudyGuideDialog.ets) | 原生内容 1；公共外壳 1 |
 | [components/StudyLocalWhiteboard.ets](../../entry/src/main/ets/components/StudyLocalWhiteboard.ets) | Popup 2 |

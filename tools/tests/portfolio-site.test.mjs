@@ -73,6 +73,29 @@ test('source updates match application metadata and remain separate from marketp
   assert.ok((await read('releases.xml')).includes(`${work.sourceVersion} 源码更新`));
 });
 
+test('source HAP links match the application version across public download entry points', async () => {
+  const { app } = JSON5.parse(await readFile(path.join(root, 'AppScope/app.json5'), 'utf8'));
+  const sourcePackage = work.sourcePackage;
+  assert.equal(sourcePackage.tag, `v${app.versionName}`);
+  assert.equal(sourcePackage.fileName, `jidecards-v${app.versionName}-signed.hap`);
+  assert.equal(sourcePackage.releaseUrl, `${work.repository}/releases/tag/${sourcePackage.tag}`);
+  assert.equal(sourcePackage.downloadUrl, `${work.repository}/releases/download/${sourcePackage.tag}/${sourcePackage.fileName}`);
+  assert.equal(sourcePackage.checksumsUrl, `${work.repository}/releases/download/${sourcePackage.tag}/SHA256SUMS.txt`);
+  for (const file of ['index.html', 'works/jidecards/index.html', 'guides/harmonyos-anki/index.html',
+    'releases/index.html', 'llms.txt', 'llms-full.txt', 'content/home.md', 'content/product.md',
+    'content/developers.md', 'content/about.md', 'content/releases.md']) {
+    const text = await read(file);
+    assert.ok(text.includes(sourcePackage.downloadUrl), file);
+    assert.ok(text.includes(sourcePackage.checksumsUrl), file);
+    assert.ok(text.includes(sourcePackage.installNote), file);
+    assert.ok(!text.includes('牌组和媒体传输尚未接通'), file);
+    assert.ok(!text.includes('幻彩限时主题色'), file);
+  }
+  const readme = await readFile(path.join(root, 'README.md'), 'utf8');
+  assert.ok(readme.includes(sourcePackage.downloadUrl));
+  assert.ok(readme.includes(sourcePackage.checksumsUrl));
+});
+
 test('home offers separate entry points while development policy stays on its own page', async () => {
   const home = await read('index.html');
   for (const destination of [work.marketplace.url, work.repository, '/works/jidecards/', '/developers/', '/about/']) {

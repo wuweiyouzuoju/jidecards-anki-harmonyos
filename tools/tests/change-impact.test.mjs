@@ -85,6 +85,19 @@ test('impact covers build configuration, RPC, runtime Agent and source tests', (
   assert.ok(planChanges(['tools/tests/sync-automatic.test.mjs']).focusedCommands.includes('npm test -- sync'));
 });
 
+test('card document changes select media behavior and real browser validation', () => {
+  for (const file of ['entry/src/main/ets/model/CardReviewerRuntime.ts',
+    'entry/src/main/ets/model/CardWebSession.ts', 'entry/src/main/ets/model/CardWebBuffer.ts',
+    'entry/src/main/ets/model/学习卡片HTML构建器.ts', 'tools/test-card-colors-browser.mjs',
+    'tools/card-browser-harness.mjs', 'tools/tests/fixtures/ankidroid-reviewer-colors.css']) {
+    const plan = planChanges([file]);
+    assert.ok(plan.reads.includes('docs/development/study-media.md'), file);
+    assert.ok(plan.requiredCommands.includes('npm test -- media'), file);
+    assert.ok(plan.requiredCommands.includes('npm run test:cards:browser'), file);
+    assert.equal(planChanges([file], {kind:'cosmetic'}).requiredCommands.includes('npm run test:cards:browser'), false);
+  }
+});
+
 test('cosmetic edits retain resource checks without automatically testing or building the app', () => {
   const plan = planChanges(['entry/src/main/resources/base/element/string.json',
     'entry/src/main/resources/en_US/element/string.json', 'entry/src/main/resources/base/media/ic_study_flag.svg']);

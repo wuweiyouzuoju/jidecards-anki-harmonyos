@@ -19,7 +19,7 @@ function harness(locale = 'base') {
   return { menu, tracker, dependencies, strings };
 }
 
-test('seven main entries retain all previous actions through one mutually exclusive child panel', () => {
+test('seven main entries retain browser actions while shortcut help lives in learning help', () => {
   for (const locale of ['base', 'en_US']) {
     const { menu, tracker, strings } = harness(locale), calls = [];
     const root = menu.entries();
@@ -47,7 +47,8 @@ test('seven main entries retain all previous actions through one mutually exclus
     for (const id of ['columns', 'subtitle_deck', 'subtitle_answer', 'subtitle_due']) menu.selectItem(id);
     menu.selectItem('more_settings');
     for (const id of ['flag_names', 'keyboard']) menu.selectItem(id);
-    assert.deepEqual(calls, ['filter','select_all','find_replace','history','search','recent','save_search','columns',1,4,2,'flag_names','keyboard']);
+    assert.deepEqual(calls, ['filter','select_all','find_replace','history','search','recent','save_search','columns',1,4,2,'flag_names']);
+    assert.ok(menu.entries().find(item=>item.id==='more_settings').children.every(item=>item.id!=='keyboard'));
     let closed = 0; menu.onClose = () => closed++;
     menu.handleBackRequest(); assert.deepEqual(menu.expandedIds, []); assert.equal(closed, 0);
     menu.handleBackRequest(); assert.equal(closed, 1);

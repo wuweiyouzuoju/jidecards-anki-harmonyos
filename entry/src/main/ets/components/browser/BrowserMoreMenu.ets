@@ -90,7 +90,6 @@ export struct BrowserMoreMenu {
     else if (id === 'columns') this.onDisplay('columns');
     else if (id === 'search_options') this.onDisplay('search');
     else if (id === 'recent_searches') this.onDisplay('recent');
-    else if (id === 'keyboard') this.onDisplay('keyboard');
     else if (id === 'history') this.onHistory();
     else if (id === 'filter') this.onFilter();
     else if (id === 'find_replace') this.onFindReplace();

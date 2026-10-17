@@ -40,9 +40,10 @@ export struct DeckOptionsPage {
   build() {
     NavDestination() {
       Column() {
+        // pop 必须带 result 才触发首页 onPop，释放入口占用并刷新。
         DeckOptionsFeature({ deckId: this.deckId, deckName: this.deckName,
           isDark: 解析是否深色(this.theme, this.systemDark), backRequest: this.backRequest,
-          onBusy: this.onBusy, onClose: (): void => { this.pathStack.pop(); } })
+          onBusy: this.onBusy, onClose: (): void => { this.pathStack.pop({}); } })
       }.width('100%').height('100%').backgroundColor(this.surface)
     }.hideTitleBar(true).backgroundColor(Color.Transparent).opacity(this.opacityValue)
       .translate({ x: this.navigationOffset })

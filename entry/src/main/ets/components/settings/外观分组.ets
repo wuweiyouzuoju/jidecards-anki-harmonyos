@@ -1,5 +1,3 @@
-import { NativeDialogHost, NativeDialogFactory, NativeDialogDismiss, NativeDialogPresentation } from '../common/NativeDialogHost';
-import { SurfaceTransition } from '../../utils/SurfaceTransition';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { isSettingsItemVisible } from '../../model/SettingsStructure';
 import { settingsItemText } from '../../utils/SettingsStructureText';
@@ -10,7 +8,6 @@ import { FormRowLayout } from '../../utils/FormRowLayout';
 import { 主题模式 } from '../../model/主题设置';
 import { 设置分组卡片 } from './设置分组卡片';
 import { UNLOCKED_CONTENTS_KEY, THEME_CATALOG, ThemeDefinition, isThemeAvailable, themeDefinition } from '../../model/ThemeCatalog';
-import { IridescentGiftDialog } from '../IridescentGiftDialog';
 import { ThemeMotionControl } from './ThemeMotionControl';
 import { MotionStyleControl } from './MotionStyleControl';
 import { CardTextSizeControl } from './CardTextSizeControl';
@@ -45,20 +42,6 @@ export struct 外观分组 {
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(UNLOCKED_CONTENTS_KEY) private unlockedContents: string[] = [];
   @State private themeSelectionRevision: number = 0;
-  private readonly giftDialog: NativeDialogHost = new NativeDialogHost();
-
-  private readonly createGiftDialog: NativeDialogFactory = (dismiss: NativeDialogDismiss): CustomDialogController => {
-    const presentation: NativeDialogPresentation = this.giftDialog.presentation();
-    return new CustomDialogController({
-      onWillDismiss: dismiss,
-      builder: IridescentGiftDialog({ onClose: this.giftDialog.guard((): void => { this.giftDialog.close(); }) }),
-      openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation, customStyle: presentation.customStyle, autoCancel: presentation.autoCancel, alignment: presentation.alignment,
-      width: presentation.width, height: presentation.height, maskColor: presentation.maskColor
-    });
-  };
-
-  aboutToAppear(): void { this.giftDialog.activate(); }
-  aboutToDisappear(): void { this.giftDialog.dispose(); }
   @Prop 是否深色: boolean = false;
   @Prop 简洁模式: boolean = true;
   @Prop 当前主题模式: 主题模式 = 'system';
@@ -115,8 +98,6 @@ export struct 外观分组 {
     if (isThemeAvailable(theme, this.unlockedContents)) {
       if (theme === this.当前颜色主题) return;
       this.颜色主题切换回调(theme);
-    } else {
-      this.giftDialog.open(this.createGiftDialog);
     }
     // 原生 Select 已先更新内部选中值；重建使锁定项恢复为实际主题。
     this.themeSelectionRevision += 1;
