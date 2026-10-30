@@ -2,7 +2,7 @@
 
 > 记得闪卡是面向鸿蒙 HarmonyOS NEXT 的原生开源闪卡应用，基于 Anki 内核，用于背单词、记忆知识点与备考。支持 FSRS 间隔复习、AnkiWeb 同步与 APKG 导入导出；当前源码还提供实验性个人设备直连卡库与媒体同步，以及键盘、鼠标操作。
 
-- 当前源码版本：3.0.20（构建编号 3081）
+- 当前源码版本：3.5.4（构建编号 3085）
 - 华为应用市场版本：2.9.98
 - 平台：HarmonyOS NEXT
 - 许可证：AGPL-3.0-or-later
@@ -11,7 +11,7 @@
 - 签名 HAP 开发包：[jidecards-v3.0.20-signed.hap](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v3.0.20/jidecards-v3.0.20-signed.hap) · [SHA-256 校验](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v3.0.20/SHA256SUMS.txt) · [构建说明](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/tag/v3.0.20)
 - 开发包安装：签名开发包，安装受包内签名与设备授权限制；普通用户建议从华为应用市场安装。
 - 源码：[GitHub](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos) · [Gitee](https://gitee.com/wuweiyouzuoju/jidecards-anki-harmonyos) · [GitCode](https://gitcode.com/wuweiyouzuoju/jidecards-anki-harmonyos)
-- 更新日期：2026-10-17
+- 更新日期：2026-10-27
 
 本文按当前源码介绍功能，应用市场实际版本以下载页面为准。独立开源项目，非 Anki 官方客户端。
 
@@ -24,7 +24,7 @@
 - [记得闪卡 JideCards](https://jidecards.com/content/home.md): 记得闪卡是面向鸿蒙 HarmonyOS NEXT 的原生开源闪卡应用，基于 Anki 内核，用于背单词、记忆知识点与备考。支持 FSRS 间隔复习、AnkiWeb 同步与 APKG 导入导出；当前源码还提供实验性个人设备直连卡库与媒体同步，以及键盘、鼠标操作。
 - [记得闪卡功能与下载](https://jidecards.com/content/product.md): 记得闪卡是面向鸿蒙 HarmonyOS NEXT 的原生开源闪卡应用，基于 Anki 内核，用于背单词、记忆知识点与备考。支持 FSRS 间隔复习、AnkiWeb 同步与 APKG 导入导出；当前源码还提供实验性个人设备直连卡库与媒体同步，以及键盘、鼠标操作。
 - [鸿蒙 HarmonyOS NEXT 使用 Anki 完整指南：闪卡、背单词、APKG、FSRS 与同步](https://jidecards.com/content/harmonyos-anki-guide.md): 用记得闪卡 JideCards 在鸿蒙 HarmonyOS NEXT 上学习已有 Anki 牌组：APKG 导入、FSRS 评分、AnkiWeb 同步、个人设备直连、键盘与鼠标操作，以及备份和常见问题。
-- [3.0.20 源码更新说明](https://jidecards.com/content/releases.md): 当前版本的完整编号更新说明。
+- [3.5.4 源码更新说明](https://jidecards.com/content/releases.md): 当前版本的完整编号更新说明。
 - [开发文档](https://jidecards.com/content/developers.md): 源码、模块责任、构建与验证入口。
 - [关于项目与作者](https://jidecards.com/content/about.md): 可塑性天赋，记得闪卡独立开发者。
 

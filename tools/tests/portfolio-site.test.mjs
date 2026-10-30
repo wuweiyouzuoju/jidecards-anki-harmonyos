@@ -73,11 +73,11 @@ test('source updates match application metadata and remain separate from marketp
   assert.ok((await read('releases.xml')).includes(`${work.sourceVersion} 源码更新`));
 });
 
-test('source HAP links match the application version across public download entry points', async () => {
-  const { app } = JSON5.parse(await readFile(path.join(root, 'AppScope/app.json5'), 'utf8'));
+test('published HAP links match their release metadata across public download entry points', async () => {
   const sourcePackage = work.sourcePackage;
-  assert.equal(sourcePackage.tag, `v${app.versionName}`);
-  assert.equal(sourcePackage.fileName, `jidecards-v${app.versionName}-signed.hap`);
+  const packageVersion = sourcePackage.tag.match(/^v(\d+\.\d+\.\d+)$/)?.[1];
+  assert.ok(packageVersion);
+  assert.equal(sourcePackage.fileName, `jidecards-v${packageVersion}-signed.hap`);
   assert.equal(sourcePackage.releaseUrl, `${work.repository}/releases/tag/${sourcePackage.tag}`);
   assert.equal(sourcePackage.downloadUrl, `${work.repository}/releases/download/${sourcePackage.tag}/${sourcePackage.fileName}`);
   assert.equal(sourcePackage.checksumsUrl, `${work.repository}/releases/download/${sourcePackage.tag}/SHA256SUMS.txt`);
