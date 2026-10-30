@@ -210,10 +210,10 @@ export struct NoteFieldCard {
       IconActionButton({ source: $r('app.media.' + (this.sticky ?
           NOTE_FIELD_STICKY_CONTROL.selectedIconKey : NOTE_FIELD_STICKY_CONTROL.iconKey)),
         label: $r('app.string.' + NOTE_FIELD_STICKY_CONTROL.titleKey),
-        glyphColor: this.sticky ? this.accent : '', iconFill: this.sticky ? this.accent : Color.Transparent,
-        controlSize: 32, controlGlyphSize: 18, isInteractive: !this.disabled && this.stickyInteractive,
+        glyphColor: this.accent, iconFill: this.sticky ? this.accent : Color.Transparent,
+        controlSize: 应用尺寸.按钮高度, controlGlyphSize: 20, isInteractive: !this.disabled && this.stickyInteractive,
         onAction: (): void => { this.toggleSticky(); } })
-        .opacity(this.sticky ? 1 : 0.55)
+        .opacity(this.sticky ? 1 : 0.75)
         .id('note-field-sticky-' + this.fieldIndex)
         .accessibilityChecked(this.sticky)
         .accessibilityDescription($r('app.string.note_field_sticky_hint'))
