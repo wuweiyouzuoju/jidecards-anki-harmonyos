@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/actions/workflows/ci.yml/badge.svg)](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/actions/workflows/ci.yml)
 [![License: AGPL-3.0-or-later](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](LICENSE)
-[![Source 3.5.4](https://img.shields.io/badge/source-3.5.4-6750a4.svg)](AppScope/app.json5)
+[![Source 3.5.19](https://img.shields.io/badge/source-3.5.19-6750a4.svg)](AppScope/app.json5)
 [![AppGallery 2.9.98](https://img.shields.io/badge/AppGallery-2.9.98-0a59f7.svg)](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare)
 [![HarmonyOS NEXT](https://img.shields.io/badge/platform-HarmonyOS%20NEXT-0a59f7.svg)](https://www.harmonyos.com/)
 
@@ -43,7 +43,15 @@ jidecards（中文名“记得闪卡”）是面向 HarmonyOS NEXT 的开源闪�
 
 以下介绍当前 `main` 的源码能力；应用市场实际上架版本以下载页面为准。
 
-3.5.4 优化统计图表的内存占用，保留双端卡片引用与制卡体验改进，详情见[3.5.4 更新说明](docs/releases/3.5.4.md)。
+当前源码 3.5.19 包含大范围原生界面与交互调整：公共弹窗与材质、传统浏览、多语言、双端笔记引用及字段编辑。调度与集合仍由锁定的 Anki Core 执行，详情见[3.5.19 源码更新说明](docs/releases/3.5.19.md)。
+
+### 本轮界面与使用体验
+
+- 原生菜单、弹窗、选择器与按压反馈统一到公共组件，支持玻璃和扁平材质；首页摘要、牌组详情及学习答题区一并调整。
+- 浏览页提供传统多列表格模式，卡片与笔记各自保存列配置；支持列替换、增减和重排。
+- 新建和编辑笔记可插入正文卡片引用，学习与预览时打开目标；[Anki 电脑端配套插件](desktop/anki-note-links/README.md)需单独安装。字段编辑轮盘、富文本、绘图和草稿预览同步改进。
+- 提供 12 种语言与地区选项：简体中文、香港与台湾繁体中文、英式与美式英语、意大利语、日语、越南语、韩语、俄语、德语和法语；日期与数字采用对应地区格式。
+- JIDE 的功能目录与界面状态同步更新；助手仍为默认隐藏的开发者调试功能。
 
 ### 复习与调度
 
@@ -255,7 +263,7 @@ npm run verify             # 完整测试、双架构构建与签名 HAP
 
 ## 版本与发布
 
-当前源码版本由 [AppScope/app.json5](AppScope/app.json5) 中的 `versionName` 和 `versionCode` 定义。查看[更新记录](CHANGELOG.md)及[3.5.4 更新说明](docs/releases/3.5.4.md)；历史说明保留在 [docs/releases/](docs/releases/) 中。华为应用市场版本由作者确认，当前为 2.9.98；商店版本与源码版本分别维护。
+当前源码版本由 [AppScope/app.json5](AppScope/app.json5) 中的 `versionName` 和 `versionCode` 定义。查看[更新记录](CHANGELOG.md)及[3.5.19 更新说明](docs/releases/3.5.19.md)；历史说明保留在 [docs/releases/](docs/releases/) 中。华为应用市场版本由作者确认，当前为 2.9.98；商店版本与源码版本分别维护。
 
 历史应用市场 2.9.22 的更新内容见 [2.9.22 应用市场版说明](docs/releases/appgallery-2.9.22.md)。GitHub 的 `appgallery-v2.9.22` 标签记录当时的版本介绍，自动生成的源码快照对应标签中的 2.9.10 / versionCode 2991，不随 main 的后续更新变化；应用安装请使用应用市场入口。
 
