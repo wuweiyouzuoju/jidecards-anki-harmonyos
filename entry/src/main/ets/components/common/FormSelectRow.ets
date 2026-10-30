@@ -1,3 +1,4 @@
+import { SurfaceSelect } from './SurfaceSelect';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { SelectStyle } from '../../utils/SelectStyle';
 import { FormRowLayout } from '../../utils/FormRowLayout';
@@ -5,9 +6,10 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 import { ActionIcon } from './ActionIcon';
 import { HelpLabel } from './HelpLabel';
 
-/** 标签与帮助的统一选择行；默认原生枚举，层级选择可提供同样限宽的控件。 */
+/** 标签与帮助的统一选择行；默认公共枚举，层级选择可提供同样限宽的控件。 */
 @Component
 export struct FormSelectRow {
+  @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @Prop label: ResourceStr = '';
   @Prop icon: ResourceStr | undefined = undefined;
   @Prop showHelp: boolean = false;
@@ -52,13 +54,10 @@ export struct FormSelectRow {
       if (this.useCustomControl) {
         this.customControl()
       } else {
-        Select(this.options).selected(this.selectedIndex).value(this.value)
-        .width(SelectStyle.fieldWidth).constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
-        .enabled(this.isInteractive).attributeModifier(new SelectStyle(this.surfaceColor))
-        .height(SelectStyle.controlHeight).padding(SelectStyle.controlPadding).space(SelectStyle.controlSpace)
-        .font(SelectStyle.controlFont).optionFont(SelectStyle.optionFont).selectedOptionFont(SelectStyle.selectedOptionFont)
-        .textModifier(SelectStyle.labelText()).border(SelectStyle.controlBorder).borderRadius(SelectStyle.controlRadius)
-        .onSelect((index: number): void => { this.select(index); })
+        SurfaceSelect({label:this.label, options:this.options, selectedIndex:this.selectedIndex, value:this.value,
+          isInteractive:this.isInteractive, onSelect:(index:number): void => { this.select(index); }})
+          .constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
+
       }
     }.width('100%').constraintSize({ minHeight: FormRowLayout.controlHeight }).alignItems(VerticalAlign.Center)
   }

@@ -1,3 +1,5 @@
+import { popupAppearance } from '../../entry/src/main/ets/components/common/PopupAppearance.ts';
+import { materialHarness } from './surface-material-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -9,6 +11,33 @@ import { loadComponentLogic, loadPlatformModule } from './platform-module-harnes
 
 const root = fileURLToPath(new URL('../../entry/src/main/ets/', import.meta.url));
 const read = path => readFileSync(join(root, path), 'utf8');
+
+test('restored custom batch limits remain the selected option instead of highlighting 1000', () => {
+  const path = 'components/settings/AIAgent设置分组.ets';
+  const Settings = loadComponentLogic(path, 'AIAgent设置分组', {
+    DEEPSEEK_PROVIDER: { defaultModel: 'deepseek-chat' }, OPENAI_PROVIDER: { defaultModel: 'gpt-4' }
+  });
+  // Execute the actual row properties, including its callback, rather than duplicating the index formula.
+  const binding = read(path).match(/FormSelectRow\(\{ label: settingsItemText\(this\.getUIContext\(\), 'ai_batch_limit'[\s\S]*?\}\s*\}\)/)[0];
+  const props = binding.slice(binding.indexOf('{'), binding.lastIndexOf(')'));
+  const getProps = new Function('settingsItemText', stripTypeScriptTypes('const props = ' + props + ';', { mode: 'transform' }) + 'return props;');
+  for (const saved of [1, 37, 100, 250, 500, 999, 1000]) {
+    const settings = new Settings();
+    settings.getUIContext = () => ({});
+    settings.batchLimit = saved;
+    settings.ready = true; settings.loading = false; settings.webState.busy = false;
+    const row = getProps.call(settings, () => 'batch limit');
+    assert.equal(row.value, String(saved));
+    assert.equal(row.options[row.selectedIndex]?.value, row.value, 'restored ' + saved);
+    assert.deepEqual(row.options.map(option => Number(option.value)), [...new Set([100, 250, 500, 1000, saved])].sort((a, b) => a - b));
+    for (const invalid of [-1, row.options.length, 0.5, NaN, Infinity]) row.onSelect(invalid);
+    assert.equal(settings.batchLimit, saved);
+    const target = row.options.findIndex(option => option.value === '500');
+    row.onSelect(target); assert.equal(settings.batchLimit, 500);
+    settings.loading = true; row.onSelect(0); assert.equal(settings.batchLimit, 500, 'late disabled callback is ignored');
+  }
+});
+
 function files(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
     const path = join(dir, entry.name);
@@ -38,12 +67,17 @@ test('button, menu and selected item share a font size with one owner for each f
     应用尺寸: { 间距_12: 12, 间距_8: 8, 间距_4: 4 }
   });
   const SelectStyle = loadPlatformModule('utils/SelectStyle.ets', 'SelectStyle', {
+    ...materialHarness(),
     TextModifier, FontWeight: { Normal: 400, Medium: 500 }, TextOverflow: { Ellipsis: 'ellipsis' },
     应用尺寸: { 字号_正文: 14, radiusLg: 16, 圆角_指标卡: 99 }, $r: key => key, SurfaceBorder, FormRowLayout
   });
   assert.equal(SelectStyle.controlFont.size, 14);
   assert.equal(SelectStyle.controlRadius, 16);
   assert.equal(SelectStyle.controlHeight, FormRowLayout.controlHeight);
+  for (const scale of [1, 2, 3.2]) {
+    assert.equal(SelectStyle.controlHeightFor({ px2vp: px => px / 2, fp2px: fp => fp * 2 * scale }),
+      Math.max(FormRowLayout.controlHeight, Math.ceil(14 * scale) + 16));
+  }
   assert.equal(FormRowLayout.rowGap, 8);
   assert.equal(FormRowLayout.hintGap, 4);
   assert.equal(SelectStyle.fieldConstraint, FormRowLayout.trailingConstraint);
@@ -55,7 +89,7 @@ test('button, menu and selected item share a font size with one owner for each f
     [['maxLines', 1], ['textOverflow', { overflow: 'ellipsis' }]]);
   const calls = [];
   const instance = new Proxy({}, { get: (_target, name) => (...args) => { calls.push([name, ...args]); return instance; } });
-  const style = new SelectStyle('surface');
+  const style = new SelectStyle('flat','surface');
   style.applyNormalAttribute(instance);
   style.applyNormalAttribute(instance);
   assert.equal(calls.some(([name]) => /font$|fontSize|fontWeight|controlSize/i.test(name)), false,
@@ -64,38 +98,22 @@ test('button, menu and selected item share a font size with one owner for each f
   assert.equal(calls.find(([name]) => name === 'selectedOptionBgColor')[1], SelectStyle.selectedOptionSurface);
 });
 
-test('directory trigger reuses the existing selection row and actual rounded control geometry', () => {
+test('directory and settings selectors delegate the value trigger to the same unboxed control', () => {
   const source = read('components/common/DirectorySelect.ets');
-  assert.match(source, /FormSelectRow\(\{[\s\S]*useCustomControl: true,[\s\S]*customControl: \(\) => \{ this\.control\(\); \}/);
-  assert.doesNotMatch(source, /HelpLabel\(|Text\(this\.label\)|Row\(\{ space: FormRowLayout/);
-  assert.match(source, /Text\(this\.value\)\.fontSize\(SelectStyle\.controlFont\.size\)\.fontWeight\(SelectStyle\.controlFont\.weight\)/);
-  const SelectStyle = loadPlatformModule('utils/SelectStyle.ets', 'SelectStyle', {
-    TextModifier: class {}, FontWeight: { Normal: 400, Medium: 500 },
-    应用尺寸: { 字号_正文: 14, radiusLg: 16 }, $r: key => key,
-    SurfaceBorder: { options: () => ({ width: 1, color: 'outline' }) },
-    FormRowLayout: { controlHeight: 40, trailingConstraint: { maxWidth: '56%' }, directoryConstraint: { maxWidth: '70%' } }
-  });
-  const start = source.indexOf('  private control('), end = source.indexOf('\n  }', start);
-  const body = source.slice(start, end), chain = body.slice(body.indexOf('}.type(') + 1);
-  const capture = new Function('control', 'SelectStyle', 'ButtonType', 'PressFeedback', 'fill',
-    stripTypeScriptTypes('function render() { return control' + chain + '; }', { mode: 'transform' }) + '; return render.call(this);');
-  for (const fill of [false, true]) for (const labelActionIcon of [undefined, 'template']) {
-    const calls = new Map();
-    const control = new Proxy({}, { get: (_target, name) => (...args) => { calls.set(name, args); return control; } });
-    const host = { surfaceColor: 'surface', labelActionIcon, isInteractive: true, rows: [{}], value: '英语::四级', controlWidth: () => 125, open() {} };
-    capture.call(host, control, SelectStyle, { Normal: 'normal' }, class {}, fill);
-    assert.equal(calls.get('height')[0], 40);
-    assert.equal(calls.get('borderRadius')[0], 16, 'existing 16vp radius stays rounded');
-    assert.deepEqual(calls.get('border')[0], { width: 1, color: 'outline' });
-    assert.deepEqual(calls.get('padding')[0], SelectStyle.controlPadding);
-    assert.equal(calls.get('backgroundColor')[0], 'surface');
-    assert.equal(calls.get('width')[0], fill ? '100%' : 125);
-    assert.deepEqual(calls.get('constraintSize')[0], { maxWidth: fill ? '100%' : labelActionIcon ? '56%' : '70%' });
-    assert.equal(calls.get('clip')[0], true);
-    assert.equal(calls.get('accessibilityText')[0], '英语::四级');
-  }
+  assert.match(source, /FormSelectRow\(\{[\s\S]*useCustomControl: true/);
+  assert.match(source, /SelectionValueButton\(\{ value: this.value, label: this.label/);
+  assert.match(read('components/common/SurfaceSelect.ets'), /SelectionValueButton\(\{ value: this.valueText\(\), label: this.label/);
+  const Trigger=loadComponentLogic('components/common/SelectionValueButton.ets','SelectionValueButton',{SelectStyle:{}});
+  const button=new Trigger();let opens=0;button.onAction=()=>opens++;
+  button.activate();assert.equal(opens,1);button.isInteractive=false;button.activate();assert.equal(opens,1);
+  const trigger=read('components/common/SelectionValueButton.ets');
+  assert.match(trigger,/backgroundColor\(Color.Transparent\).border\(\{ width: 0 \}\).borderRadius\(0\)/);
+  assert.match(trigger,/textOverflow\(\{ overflow: TextOverflow.Ellipsis \}\)/);
+  assert.doesNotMatch(trigger,/shadow\(|backgroundBlurStyle|SeriesVisual/);
+  const SelectStyle = {selectedOptionFont:{weight:500},optionFont:{weight:400}};
   const Tree = read('components/common/DirectoryTree.ets');
-  assert.match(Tree, /backgroundColor\(this\.selectionMode === 'single'[\s\S]*SelectStyle\.selectedOptionSurface[\s\S]*\.borderRadius\(SelectStyle\.controlRadius\)/);
+  assert.match(Tree, /backgroundColor\(Color.Transparent\)/);
+  assert.match(Tree, /row.selection === 1 \? this.accent/);
   const font = Tree.slice(Tree.indexOf('Text(row.name)')).match(/\.fontWeight\(([^)]+)\)/)[1];
   for (const selection of [0, 1, 2]) {
     assert.equal(new Function('row', 'SelectStyle', 'return ' + font).call({ selectionMode: 'single' },
@@ -103,44 +121,22 @@ test('directory trigger reuses the existing selection row and actual rounded con
   }
 });
 
-// Native Select can restore system geometry after a selection. Every caller must
-// declare geometry directly and reserve width independently of the current label.
-// Device bounds before/after selection are the rendering acceptance check.
-test('all native selects reserve layout space and directly reapply geometry', () => {
-  const auditedPaths = new Set();
+// 所有枚举委托共同入口，防止新页面重新散写平台选择框。
+test('all enum controls use the shared selector while hierarchy selectors retain directories', () => {
+  let shared = 0;
   for (const path of files(root)) {
     const source = readFileSync(path, 'utf8');
-    for (const match of source.matchAll(/\bSelect\(/g)) {
-      const end = source.indexOf('.onSelect(', match.index);
-      assert.ok(end > match.index, `missing selection handler: ${path}`);
-      const control = source.slice(match.index, end);
-      assert.doesNotMatch(control.slice(7), /\bSelect\(/, `ambiguous Select boundary: ${path}`);
-      for (const property of ['height', 'padding', 'space', 'font', 'borderRadius']) {
-        assert.match(control, new RegExp(`\\.${property}\\(SelectStyle\\.control`), `${path}: ${property}`);
-      }
-      assert.match(control, /\.optionFont\(SelectStyle\.optionFont\)/, `missing menu font: ${path}`);
-      assert.match(control, /\.selectedOptionFont\(SelectStyle\.selectedOptionFont\)/, `missing selected menu font: ${path}`);
-      for (const property of ['font', 'optionFont', 'selectedOptionFont']) {
-        assert.equal((control.match(new RegExp(`\\.${property}\\(`, 'g')) || []).length, 1,
-          `duplicate font owner for ${property}: ${path}`);
-      }
-      assert.match(control, /\.(width|layoutWeight)\(/, `content-dependent width: ${path}`);
-      assert.match(control, /\.textModifier\(SelectStyle\.labelText\(\)\)/, `missing shared ellipsis: ${path}`);
-      assert.match(control, /\.border\(SelectStyle\.controlBorder\)/, `missing shared outline: ${path}`);
-      if (control.includes('.width(SelectStyle.fieldWidth)')) {
-        assert.match(control, /\.constraintSize\(SelectStyle\.fieldConstraint\)/, `unbounded field width: ${path}`);
-      }
-      auditedPaths.add(path.replaceAll('\\', '/'));
-    }
+    assert.doesNotMatch(source, /\bSelect\s*\(/, `native selector bypasses shared layout: ${path}`);
+    shared += (source.match(/SurfaceSelect\(/g) ?? []).length;
   }
-  // 共享表单减少原生节点；核对真实责任入口，不再要求散写节点数量。
-  for (const owner of ['components/common/FormSelectRow.ets']) {
-    assert.ok([...auditedPaths].some(path => path.endsWith(owner)), `Select audit must include ${owner}`);
-  }
+  assert.ok(shared >= 16);
+  assert.match(read('components/common/SurfaceSelect.ets'), /SelectionOptions\(/);
+  assert.match(read('components/common/SurfaceSelect.ets'), /radius:12/);
+  assert.match(read('components/common/SelectionDialog.ets'), /SelectionOptions\(/);
+  assert.match(read('components/common/DirectorySelect.ets'), /SelectionValueButton\(/);
   const appearance = read('components/settings/外观分组.ets');
   assert.equal((appearance.match(/FormSelectRow\(/g) ?? []).length, 2);
   assert.match(appearance, /showValuePreview: true,\s*valuePreview: \(\): void => \{ this\.themeSwatch\(\); \}/);
-  assert.doesNotMatch(appearance, /\bSelect\(|new SelectStyle|\.height\(48\)/);
 });
 
 test('browser subtitle choices share aligned theme selection and dismissal', () => {
@@ -148,7 +144,7 @@ test('browser subtitle choices share aligned theme selection and dismissal', () 
   const item = read('components/common/MenuItem.ets');
   const page = read('pages/浏览页.ets');
   assert.doesNotMatch(menu, /[✓✔]/);
-  assert.match(item, /@Prop labelAlignment: TextAlign = TextAlign\.Center/);
+  assert.match(item, /@Prop labelAlignment: TextAlign = TextAlign\.Start/);
   assert.match(item, /\.textAlign\(this\.labelAlignment\)/);
   assert.match(item, /this\.usesAccent\(\) \? this\.accent/);
   assert.match(item, /themeLabelGlyphs\(this\.label, this\.accentColors/);
@@ -169,7 +165,7 @@ test('menu rows retain optional centering while card menus align left with arrow
   });
   const item = new MenuItem();
   item.icon = 'flag';
-  assert.equal(item.hasCenteredIcon(), true, 'ordinary menus center the icon and label together');
+  assert.equal(item.hasCenteredIcon(), false, 'ordinary menus align left like enum choices');
   item.labelAlignment = 'start';
   assert.equal(item.hasCenteredIcon(), false, 'card and form rows start the icon and label together');
   assert.deepEqual(item.iconRowPadding(), { left: dimensions.menuHorizontalPadding, right: dimensions.menuHorizontalPadding });
@@ -179,15 +175,10 @@ test('menu rows retain optional centering while card menus align left with arrow
   for (const disclosure of [false, true]) {
     item.disclosure = disclosure;
     const padding = item.iconRowPadding();
-    const inset = padding.left;
-    assert.equal(inset, disclosure ? dimensions.menuHorizontalPadding + 24 + dimensions.间距_8 : dimensions.menuHorizontalPadding);
-    assert.equal(padding.right, inset, 'symmetric arrow clearance keeps the whole group centered');
-    for (const width of [112, 176]) {
-      for (const safeArea of [0, 24]) {
-        const contentCenter = safeArea + inset + (width - 2 * inset) / 2;
-        assert.equal(contentCenter, safeArea + width / 2);
-      }
-    }
+    assert.equal(padding.left, dimensions.menuHorizontalPadding);
+    assert.equal(padding.right, dimensions.menuHorizontalPadding, 'centered icon-label groups keep symmetric insets regardless of disclosure');
+    const labelWidth = dimensions.cardActionGroupWidth - padding.left - padding.right - 24 - dimensions.间距_8;
+    assert.ok(labelWidth >= 4 * dimensions.字号_正文, 'flag branches fit the complete four-character title beside the icon and disclosure');
   }
   item.icon = undefined;
   assert.equal(item.hasCenteredIcon(), false);
@@ -199,7 +190,7 @@ test('menu rows retain optional centering while card menus align left with arrow
   const menu = read('components/common/CardActionMenu.ets');
   const rows = [...menu.matchAll(/AnchoredMenuItem\(\{([\s\S]*?)onSelect:/g)];
   assert.equal(rows.length, 1, 'one renderer serves every menu level');
-  assert.ok(rows.every(row => row[1].includes('labelAlignment: TextAlign.Start')), 'root, marking and color rows align left');
+  assert.ok(rows.every(row => row[1].includes('labelAlignment: TextAlign.Center')), 'root, marking and color rows center their icon-label groups');
   item.labelAlignment = 'start'; item.icon = 'flag'; item.disclosure = true;
   const padding = item.iconRowPadding();
   assert.equal(padding.left, dimensions.menuHorizontalPadding);
@@ -238,14 +229,16 @@ test('shared menu surfaces distinguish dark overlays from cards and retain reada
   const SurfaceBorder = loadPlatformModule('utils/SurfaceBorder.ets', 'SurfaceBorder', {
     应用尺寸: { 卡片边框: 1 }, $r: key => key
   });
+  const PopupSurface=loadPlatformModule('components/common/PopupSurface.ets','PopupSurface',{popupAppearance,SurfaceBorder,AppStorage:{get:()=>undefined},Color:{Transparent:'transparent'},BlurStyle:{NONE:'none'}});
   const MenuSurface = loadPlatformModule('components/common/MenuSurface.ets', 'MenuSurface', {
+    ...materialHarness(), PopupSurface,
     应用尺寸: { 圆角_指标卡: 16, 卡片边框: 1 }, $r: key => key, Color: { Transparent: 'transparent' }, SurfaceBorder
   });
   const attributes = {};
   const instance = new Proxy({}, { get: (_target, name) => value => { attributes[name] = value; return instance; } });
   new MenuSurface().applyNormalAttribute(instance);
-  assert.equal(attributes.backgroundColor, 'app.color.menu_surface');
-  assert.deepEqual(attributes.border, { width: 1, color: 'app.color.surface_border' });
+  assert.equal(attributes.backgroundColor, popupAppearance('flat',false).fill);
+  assert.deepEqual(attributes.border, SurfaceBorder.options());
   assert.equal(attributes.shadow.radius, 0, 'flat menus use the shared border without elevation');
   new MenuSurface(false).applyNormalAttribute(instance);
   assert.equal(attributes.backgroundColor, 'transparent');
@@ -272,7 +265,7 @@ test('shared menu surfaces distinguish dark overlays from cards and retain reada
   assert.doesNotMatch(read('components/home/DeckPreviewScopeMenu.ets'), /new MenuSurface\(|\.border\(|\.shadow\(/,
     'the native popup owns the preview outline including its arrow');
   assert.match(read('components/home/HomeDeckDetails.ets'), /AnchoredMenu\(\{[\s\S]*this\.previewScopes\(\)/);
-  assert.match(read('components/common/AnchoredMenu.ets'), /new MenuSurface\(this\.surfaceVisible && this\.bubble === undefined, this\.cornerRadius\)/);
+  assert.match(read('components/common/AnchoredMenu.ets'), /surfaceVisible: this\.surfaceVisible/);
   assert.match(read('components/common/AnchoredMenu.ets'), /surfaceVisible: boolean = true/);
   for (const path of ['components/home/HomeDeckDetails.ets', 'components/牌组详情面板.ets']) {
     assert.doesNotMatch(read(path), /bindPopup\(/, 'preview menus share the verified menu surface');
@@ -283,6 +276,7 @@ test('browser composes three shared triggers under the plain title and uses one 
   const page = read('pages/浏览页.ets');
   const controls = page.slice(page.indexOf('private browserControls()'), page.indexOf('private browserContent()'));
   assert.equal((controls.match(/this\.viewChoice\(/g) || []).length, 3);
+  assert.doesNotMatch(controls, /browserWidth [<>]=? 600/);
   assert.match(controls, /'mode'/);
   assert.match(controls, /'filter'/);
   assert.match(controls, /'sort'/);
@@ -328,10 +322,52 @@ test('sidebar sections share menu disclosure styling and keep expanded contents 
   }
   assert.doesNotMatch(header,/\.translate\(/,'expansion must rotate around the fixed center without moving the chevron');
   const card=read('components/common/CardActionMenu.ets');
-  const angle=card.match(/disclosureAngle: ([^,\n]+),/)?.[1];assert.ok(angle);
-  for(const expandedIds of [[],['flag']])
-    assert.equal(new Function('row','return '+angle).call({expandedIds},{depth:1,node:{id:'flag'}}),undefined,
-      'flag expansion inherits the public row rotation instead of forcing a fixed angle');
+  const angle=card.match(/disclosureAngle: ([\s\S]*?),\n\s*onSelect:/)?.[1];assert.ok(angle);
+  for(const right of [false,true]) for(const expandedIds of [[],['flag']])
+    assert.equal(new Function('row','return '+angle).call({expandedIds,groupsOnRight:()=>right},{depth:1,node:{id:'flag'}}),expandedIds.includes('flag')?(right?180:0):90,
+      'lateral flags animate from folded-down toward their actual overlay');
   assert.equal((sidebar.match(/margin\(\{ bottom: 应用尺寸\.页面分组间距\(this\.narrowDeckLayout\) \}\)/g) || []).length, 3);
   assert.doesNotMatch(sidebar, /折叠图标|分区标题\(/);
+});
+
+
+test('study more uses the measured toolbar edge without applying a second wide-screen inset',()=>{
+ const Menu=loadComponentLogic('components/common/CardActionMenu.ets','CardActionMenu',{应用尺寸:{compactMenuWidth:168}});
+ const menu=new Menu();menu.totalWidth=()=>320;menu.viewportWidth=1000;menu.viewportLeft=40;menu.safeLeft=0;
+ assert.equal(menu.toolbarLeft(),undefined);
+ menu.toolbarRight=970;assert.equal(menu.toolbarLeft()+320+menu.viewportLeft,970);
+ menu.safeRight=60;assert.equal(menu.toolbarLeft()+320+menu.viewportLeft,970);
+ menu.toolbarRight=1200;assert.equal(menu.toolbarLeft()+320,1000);
+ menu.toolbarRight=20;assert.equal(menu.toolbarLeft(),0);
+ const study=read('pages/学习页.ets');
+ assert.match(study,/studyMoreRight = Number\(area.globalPosition.x\) \+ Number\(area.width\)/);
+ assert.match(study,/toolbarRight: this.studyMoreRight/);
+});
+
+
+test('selector arrow follows actual popup placement and closes perpendicular to that direction', () => {
+  const {selectionPopupAngle, selectionClosedAngle} = loadPlatformModule('components/common/SelectionMenuLayout.ts',
+    '({selectionPopupAngle, selectionClosedAngle})', {});
+  const trigger={left:200,top:300,width:80,height:44};
+  for (const [popup,angle] of [
+    [{left:120,top:350,width:160,height:140},90],
+    [{left:120,top:150,width:160,height:140},-90],
+    [{left:290,top:260,width:160,height:140},0],
+    [{left:30,top:260,width:160,height:140},180]]) {
+    assert.equal(selectionPopupAngle(trigger,popup),angle);
+    assert.equal(selectionClosedAngle(angle),Math.abs(angle)===90?0:90);
+  }
+});
+
+
+test('ordinary selector measures its value width before laying out the two-line trigger',()=>{
+ const Select=loadComponentLogic('components/common/SurfaceSelect.ets','SurfaceSelect',{
+  SelectStyle:{controlFont:{size:15,weight:500},controlPadding:{left:12,right:0},controlSpace:8},
+  WINDOW_HEIGHT_KEY:'h',WINDOW_SAFE_TOP_KEY:'t',WINDOW_SAFE_BOTTOM_KEY:'b'
+ });
+ const select=new Select();let measured='';
+ select.getUIContext=()=>({px2vp:px=>px/2,getMeasureUtils:()=>({measureText:({textContent})=>{measured=textContent;return textContent.length*20;}})});
+ for(const value of ['蓝','4000 Essential English Words v2::Book 1']) {
+  select.value=value;assert.equal(select.valueWidth(),value.length*10+44);assert.equal(measured,value);
+ }
 });

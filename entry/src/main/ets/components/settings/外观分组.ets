@@ -1,3 +1,4 @@
+import { SurfaceMaterialControl } from './SurfaceMaterialControl';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { isSettingsItemVisible } from '../../model/SettingsStructure';
 import { settingsItemText } from '../../utils/SettingsStructureText';
@@ -156,6 +157,7 @@ export struct 外观分组 {
           if (isSettingsItemVisible('theme_motion', this.简洁模式, themeDefinition(this.当前颜色主题).backgroundTextures.length > 0)) {
             ThemeMotionControl({ isDark: this.是否深色 })
           }
+          SurfaceMaterialControl()
           MotionStyleControl()
           DeckWidthControl()
           CardTextSizeControl()

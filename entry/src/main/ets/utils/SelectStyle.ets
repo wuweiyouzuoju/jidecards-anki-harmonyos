@@ -1,5 +1,6 @@
+import { usesGlassMaterial, darkMaterial, translucentGlassFill, themedGlassFill } from './GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { TextModifier } from '@kit.ArkUI';
+import { TextModifier, UIContext } from '@kit.ArkUI';
 import { 应用尺寸 } from './应用尺寸';
 import { SurfaceBorder } from './SurfaceBorder';
 import { FormRowLayout } from './FormRowLayout';
@@ -19,7 +20,12 @@ export class SelectStyle implements AttributeModifier<SelectAttribute> {
   static readonly controlRadius: number = 应用尺寸.radiusLg;
   static readonly controlBorder: BorderOptions = SurfaceBorder.options();
   static readonly controlHeight: number = FormRowLayout.controlHeight;
-  static readonly controlPadding: Padding = { left: 12, right: 12, top: 0, bottom: 0 };
+  /** 保留原最小高度，跟随实际 fp 缩放留出上下内边距。 */
+  static controlHeightFor(context: UIContext): number {
+    return Math.max(SelectStyle.controlHeight, Math.ceil(context.px2vp(context.fp2px(应用尺寸.字号_正文))) + 16);
+  }
+  // 尾部外边距由表单/设置卡片拥有，避免选择箭头比动作行额外缩进。
+  static readonly controlPadding: Padding = { left: 12, right: 0, top: 0, bottom: 0 };
   static readonly controlSpace: number = 8;
   // Select 按当前选项内容测量，避免短标签占满行并留下大块空白。
   static readonly fieldWidth: string = 'auto';
@@ -35,10 +41,12 @@ export class SelectStyle implements AttributeModifier<SelectAttribute> {
       .textOverflow({ overflow: TextOverflow.Ellipsis });
   }
 
+  private material: string;
   private surfaceColor: ResourceColor;
 
   /** 页面独立控件传入卡片底色，卡片内部沿用默认的内嵌底色。 */
-  constructor(surfaceColor: ResourceColor = $r('app.color.surface_sidebar')) {
+  constructor(material: string, surfaceColor: ResourceColor = $r('app.color.surface_sidebar')) {
+    this.material = material;
     this.surfaceColor = surfaceColor;
   }
 
@@ -46,10 +54,12 @@ export class SelectStyle implements AttributeModifier<SelectAttribute> {
     // 不调用会同时重置字体和圆角的 controlSize；这里只保留配色。
     instance
       .fontColor($r('app.color.text_primary'))
-      .backgroundColor(this.surfaceColor)
+      .backgroundColor(usesGlassMaterial(this.material) ? translucentGlassFill(this.surfaceColor) : (darkMaterial() ? '#000000' : '#FFFFFF'))
+      .menuBackgroundColor(usesGlassMaterial(this.material) ? themedGlassFill(darkMaterial() ? '#D915171B' : '#CFFFFFFF', darkMaterial()) : (darkMaterial() ? '#000000' : '#FFFFFF'))
+      .menuBackgroundBlurStyle(usesGlassMaterial(this.material) ? BlurStyle.COMPONENT_THIN : BlurStyle.NONE)
       .clip(true)
       .optionFontColor($r('app.color.text_primary'))
-      .optionBgColor($r('app.color.surface_card'))
+      .optionBgColor(usesGlassMaterial(this.material) ? Color.Transparent : (darkMaterial() ? '#000000' : '#FFFFFF'))
       .selectedOptionFontColor(SelectStyle.selectedOptionColor)
       .selectedOptionBgColor(SelectStyle.selectedOptionSurface);
   }
