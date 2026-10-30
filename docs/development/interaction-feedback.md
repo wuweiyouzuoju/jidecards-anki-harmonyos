@@ -15,7 +15,7 @@
 | 5 键盘与弹层衔接 | `EntryAbility` 的主窗口拥有键盘上缘；`WindowSafeLayout.keyboardViewportHeight` 根据宿主窗口原点裁切，已缩小的窗口不再重复减键盘高度。`DialogFrame/AnchoredMenu` 使用公共状态。`NoteFieldEditor.focusInput` 带代次/前台/禁用守卫恢复源模式和可视模式选区或光标，轮盘手势在键盘变化、隐藏、销毁时取消复位。 | 坐标裁切与选区、光标、旧焦点回调直接回归已通过；软键盘实际事件时序待设备体验。 |
 | 6 普通动作菜单单指划选 | `MenuHoldController/MenuHoldGesture` 与 `MenuSlideSession` 共享生命周期；宿主显式向外壳和条目传递同一作用域，不依赖 Builder 边界的隐式注入，按住200ms展开，滑过实时可用的实测目标高亮，松手选择；移出/取消/第二指/卸载均不执行。子菜单停留220ms只展开，松手叶项才执行；菜单滚动边缘只滚动。首页更多/创建、牌组预览窄宽入口、学习/浏览/预览更多、浏览模式/筛选/排序、设置模式均接入。删除仍先确认；牌组排序拖动和编辑轮盘不采用滑动执行语义。 | 点击保留、补发点击抑制、取消、禁用、层级、滚动目标与实际行 Builder 传递直接回归通过。竖屏模拟器确认首页更多按住划到设置松手进入、移出松手关闭不执行；其余菜单及真机完整时序待体验。 |
 | 7 数字与文字变化 | `ChangingText` 接入学习剩余、浏览选中与结果数量；120/180ms 局部淡入淡出，灵动档附4vp位移。最大实测宽度保留到卸载；快速更新完成当前过渡后合并到最新值，旧完成回调不会更新卸载组件。 | 快速更新与卸载直接回归已通过；大字体/长翻译实际布局待设备体验。 |
-| 8 半圆编辑轮盘 | `NoteEditorWheel` 使用既有档位开合/移动/吸附；旋转及纵向移动取消回到开始位置，滚轮取消恢复开始位置；多指、键盘变化、后台与隐藏统一释放。按压描边与持续格式选中独立；粗体/斜体/下划线/荧光保持多选，旋转/松手只定位，点击与长按沿原工具入口。字号在外围第三圈展开，读取当前字号并高亮，折叠/切字段关闭，选区/草稿变化拒绝旧回调；唯一入口与几何见[字段编辑](browser-stats.md#基础字段编辑与草稿保护)。 | 轮盘直接行为回归覆盖取消复位、字号圈选中/旧回调和窄屏/键盘圆环边界；触摸、切边和软键盘体验待设备验收。 |
+| 8 字段编辑工具 | `NoteFieldEditor` 沿用屏幕侧边浮动轮盘，不在字段中增加工具面板；字号与标题选项沿原外弧展开。轮盘旋转/纵向移动/滚轮取消均恢复开始位置；多指、键盘变化、后台与隐藏统一释放。粗体/斜体/下划线/荧光保持多选，旋转/松手只定位，点击与长按沿原工具入口；选区/草稿变化拒绝旧回调。共同声明与几何见[字段编辑](browser-stats.md#基础字段编辑与草稿保护)。 | 直接行为回归覆盖取消、格式选项与旧回调；真实地区、字体和限宽检查见[本地化](localization.md)，触摸、握姿与软键盘另做实际操作。 |
 
 ## 一手源码参考
 
@@ -30,6 +30,10 @@
 | [RecyclerItemsEnterAnimator.java](https://github.com/DrKLO/Telegram/blob/master/TMessagesProj/src/main/java/org/telegram/ui/Components/RecyclerItemsEnterAnimator.java)、[RecyclerListView.java](https://github.com/DrKLO/Telegram/blob/master/TMessagesProj/src/main/java/org/telegram/ui/Components/RecyclerListView.java) | 稳定列表身份、只反馈变化项、取消旧交互 |
 | [AnimatedTextView.java](https://github.com/DrKLO/Telegram/blob/master/TMessagesProj/src/main/java/org/telegram/ui/Components/AnimatedTextView.java) | 短状态局部过渡和快速更新合并，保持布局 |
 | [ContainedViewLayoutTransition.swift](https://github.com/TelegramMessenger/Telegram-iOS/blob/master/submodules/Display/Source/ContainedViewLayoutTransition.swift) | 显示状态连续过渡，取消后由实际状态收敛 |
+
+## 系列视觉与动作（2026-10-29）
+
+橄榄油入口和产品形变已移除；学习页显示答案/评分、浏览多选、首页导航和编辑轮盘沿各自原回调执行。系列玻璃表面及按钮层级见[界面](./appearance.md#系列玻璃表面2026-10-29修正)，普通页面转场仍由SurfaceTransition负责。
 
 ## JIDE 与维护边界
 
@@ -56,3 +60,13 @@
 本次受影响检查为 UI 453项、首页424项、JIDE603项，以及原生弹窗调用方107项直接回归，均通过；不是重新执行全部 Node 测试。最终增量签名 HAP通过，accepted warnings=162、unexpected=0，身份校验通过；产物为仓库旁 `jidecards-surface-motion-2026-10-08/entry-default-signed.hap`，对同一模拟器只做覆盖安装。竖屏、灵动档位实际捕捉到设置分组进入/返回、手机牌组详情进入/列表返回、原生“意见反馈”弹窗打开/系统返回关闭的中间淡化帧及最终状态。采样截图只证明效果发生，不用于声称时长或帧率达标；未执行反馈发送、复制群号、学习评分、账号同步或集合写入。
 
 宽屏常驻侧栏、深色、大字体、软键盘与连续快速跨页仍未逐一完成完整设备验收；两档参数及取消/接管由直接回归覆盖，不能代替这些显示与事件时序。公开责任与差异见[外观规范](appearance.md#视觉与交互一致性)，新增同类界面应接入现有入口及 `motion-style-surfaces.test.mjs`。
+
+## 预览菜单与引用键盘适配（2026-10-29）
+
+预览顶栏右侧按钮组从首帧用8vp间距；异步标记只在有星标/旗标时插入，不再借空标记的margin撑开按钮。预览更多长按后原地12vp内松手保留菜单，划出、系统取消、多指继续取消，划到可用项仍执行一次；其他入口保持原语义。菜单通过稳定ID重查当前可用动作，编辑依赖已读卡片而不等待Web渲染完成。共同支持声明仍由InteractionFeedback直接进入JIDE目录和revision。
+
+所有NativeDialogHost全窗口字段工厂显式传入presentation().keyboardAvoidMode（NONE），避免平台默认键盘避让再次移动/缩小整层磨砂遮罩；DialogFrame仍独占内容区keyboardViewportHeight与系统安全区。native-dialog-host回归审计所有构造入口，preview-runtime与menu-slide直接验证编辑守卫、原地松手、滑出取消和划选。构建与Node回归不能替代真机输入法及完整深浅色/宽窄布局验收。
+
+字段编辑器的放大/收起按钮使用独立36vp底部操作行；TextArea与RichEditor保留完整112/336vp视口，36vp操作行位于输入框边界外，滚动正文不与按钮叠层。正文高度、焦点、正文编辑及展开行为保持原语义。
+
+文字框使用insetSurface，框外底部操作行不绘制背景；玻璃模式由外层字段卡片提供表面。放大按钮本身使用透明底，避免独立surface_card形成白带或白块。

@@ -72,7 +72,7 @@ JIDE 偏好值域复用同一模式声明，`get_settings` 可读 `smart` 及能
 
 目录由 `model/AppInterface.ts` 的 `study_more`、`study_marking`、`study_card_actions`、`study_flags` 拥有，页面映射实时标签、图标和业务回调。学习页拥有 `studyExpandedIds`，以 `toggleActionMenuBranch(..., false)` 保留其他根分组；公共 `ActionMenuTree` 计算当前可见行，收起父级同时收起后代，禁用状态沿父级传播。`CardActionMenu` 保留紧凑主菜单与两个侧面板，按主菜单实测行高定位尖角并避让相邻面板，公共 Scroll 对超长菜单限高。返回/Escape 或点击外部先收起颜色，再关闭菜单。组标题不提交动作或恢复学习计时，选择当前可用叶子后先关闭菜单、建立动作阻塞状态，再恢复计时。组件及宿主重查当前树，通过 `visibleActionMenuRows` 排除被覆盖的主菜单行，保留侧面板内真实可见动作；隐藏、禁用或过期的条目不能执行。
 
-`AnchoredMenu` 拥有锚点、外部点击与整组菜单的限高滚动；主菜单使用扁平 `MenuSurface`。侧面板的 `MenuBubbleSurface` 同样无阴影，连续轮廓坐标显式由 vp 转 px。预览以空展开状态复用紧凑平面菜单；浏览多选使用相同树与自动展开的标记侧面板，选择及确认语义保留。行对齐和间距由 `MenuItem` 拥有，不新增外层 padding/margin；`CardActionMenu.popupPlacement` 将覆盖层尖角对齐侧面板内实测设置旗标行，尖角朝向随实际左右关系调整；覆盖层与触发行使用独立测量键，不能用颜色层高度污染触发行高；宽/窄密度和系统安全区继续由原菜单定位入口计算。清除旗标传入 `selectionUsesAccent: false`，保留真实选中状态；表面使用 `menu_surface` 明暗资源，边框委托 `SurfaceBorder`。JIDE 在菜单打开后立即观察两个分组的实际可用动作，包括动态旗标名称和选中态；颜色层打开时保留两个侧面板观察，释放被覆盖的主菜单观察；颜色观察只登记原有七色与清除选项，不增加返回控件。颜色关闭后恢复主菜单观察，分组收起、菜单关闭或离页释放相应观察。直接回归见 `study-menu-actions.test.mjs`、`study-menu.test.mjs`、`browser-batch-menu.test.mjs`、`ai-agent-app-structure.test.mjs`；实际外观和滚动须设备验收。
+`AnchoredMenu` 拥有锚点、外部点击与整组菜单的限高滚动；主菜单使用扁平 `MenuSurface`。侧面板的 `GlassBubblePanel` 同样无阴影，连续轮廓坐标显式由 vp 转 px。预览以空展开状态复用紧凑平面菜单；浏览多选使用相同树与自动展开的标记侧面板，选择及确认语义保留。行对齐和间距由 `MenuItem` 拥有，不新增外层 padding/margin；`CardActionMenu.popupPlacement` 将覆盖层尖角对齐侧面板内实测设置旗标行，尖角朝向随实际左右关系调整；覆盖层与触发行使用独立测量键，不能用颜色层高度污染触发行高；宽/窄密度和系统安全区继续由原菜单定位入口计算。清除旗标传入 `selectionUsesAccent: false`，保留真实选中状态；表面使用 `menu_surface` 明暗资源，边框委托 `SurfaceBorder`。JIDE 在菜单打开后立即观察两个分组的实际可用动作，包括动态旗标名称和选中态；颜色层打开时保留两个侧面板观察，释放被覆盖的主菜单观察；颜色观察只登记原有七色与清除选项，不增加返回控件。颜色关闭后恢复主菜单观察，分组收起、菜单关闭或离页释放相应观察。直接回归见 `study-menu-actions.test.mjs`、`study-menu.test.mjs`、`browser-batch-menu.test.mjs`、`ai-agent-app-structure.test.mjs`；实际外观和滚动须设备验收。
 
 标记写入经 StudySessionController 保护集合与同步，提交后针对原 cardId 回读并重渲染模板引用的 CardFlag／Tags。此路径不取下一张、不切换正反面、不清空拼写输入或选择题状态、不重启音频和计时起点；无 HTML 变化时不替换卡面。连续标记撤销保留当前卡；切卡、编辑、名称写入清除这段撤销提示，实际历史仍由 Core 拥有。弹层期间暂停自动推进并屏蔽学习键盘及手势，返回先关闭弹层；写入失败隐藏未知标记，再次点击标星入口先重读。
 
@@ -304,6 +304,10 @@ jidecards 当前保留自己的卡片色板：`buildCardAppearance` 默认浅色
 
 `CardReviewerRuntime` 捕获 script 资源失败和脚本错误；首次加载与翻面共用诊断。外部脚本明确加载失败后继续执行后续脚本，对齐 [Anki 26.05 的 replaceScript](https://github.com/ankitects/anki/blob/26.05/ts/reviewer/index.ts)；缺少可选的轮播库不能挡住后面的作者授权脚本。失败后已有可见正文、媒体或表单时保留卡面，显示可展开的本地化提示；没有可显示内容时经原加载失败通道恢复，不把空白确认成成功。load 之后的异步作者请求失败也显示提示。诊断只显示脚本源和路径，剥除 query/hash，避免显示授权 URL 中的用户 ID；资源仍按原 URL 请求。翻面清除上一面的诊断，成功重读移除提示，15 秒脚本加载超时与已登记 Hook 拒绝仍走原失败通道，不将超时或 Hook 失败改成成功。
 
+`CardReviewerRuntime` 在卡片有内容时显示默认折叠的简短脚本提示，点击原生 HTML `summary` 展开资源加载或脚本执行诊断；空卡仍走原失败通道。错误记录保留异常消息、行列号与可用调用栈，以完整记录去重，同一来源的不同异常分别保留；新错误不折叠已展开详情。内嵌脚本、本地媒体、内置资源用可理解的本地化名称，外部脚本保留源与路径；地址、异常消息和栈中的 URL 均去除用户信息、查询及片段。跨域浏览器未提供的错误细节不能补造，也不能仅凭异常断言整个卡片失效。`CardWebView.cardScriptDiagnosticLabels` 唯一读取各宿主共用的中英文文案，经 HTML 元数据传入运行时；JIDE 的 `CardRenderingSupport.web.scriptFailures` 同步说明诊断能力，不提供读取卡面脚本或代点详情的权限。
+
+诊断只拥有卡片正文后的 top margin 12px，summary 的上下 padding 各6px；折叠时无外框与详情正文高度，展开正文仅 top margin 4px，长栈限制40vh并滚动。应用原生卡片、安全区和预览边距不在此叠加；窄/宽、深/浅共用同一 Web 入口。`tools/test-card-authorization-browser.mjs` 覆盖默认折叠、真实点击展开、同源不同异常、错误位置/消息、URL脱敏和翻面清理；`card-web-session.test.mjs` 保留绘制等待期间空卡失败验证。原截图未提供牌组或异常日志，本次没有确定其原始脚本故障，也未验证原牌组在 ArkWeb 的显示与交互。
+
 授权表单由作者脚本生成，其是否出现、有效 ID 和授权状态仍由作者服务决定。无网络、服务不可用、作者脚本自身错误或缺少账号支持不会被本次兼容配置修复。真实用户 APKG 和远程作者脚本只在本机隔离诊断中使用，不纳入仓库。
 
 直接回归：`card-web-session.test.mjs` 执行真实 Web 属性适配器并检查三个宿主共同接线；`test-card-authorization-browser.mjs` 使用合成作者协议、本地拦截的未授权响应、生产 HTML 与运行时，覆盖 HTTP/嵌套请求、输入提交、缺失可选脚本后的继续执行、sessionStorage 迁移、空卡失败、迟到失败、查询参数脱敏和成功恢复，以及三个宿主语义、深浅色、宽窄视口。浏览器使用与 MixedMode.All 对应的 Chromium 启动参数，仅用于卡片兼容场景，其他回归保持浏览器默认限制；这证明运行时与协议行为，不代替 ArkWeb 实机属性、软键盘、作者真实授权和付费媒体验收。统一命令见下节。
@@ -318,7 +322,7 @@ jidecards 当前保留自己的卡片色板：`buildCardAppearance` 默认浅色
 
 滚动定位由 `CardReviewerRuntime` 统一处理：题目面回到顶部；学习页显示答案时，有 `id="answer"` 则定位到答案起点，没有则回到顶部，避免长答案被跳过。只读预览不请求答案定位，翻面保留当前滚动位置。`card-web-session.test.mjs` 执行生产脚本，覆盖首次加载与同卡翻面的滚动行为。
 
-完成信号由 JS 桥带文档/卡面版本回传，不能把 `runJavaScript` 返回当作页面内异步脚本已执行完毕。首次加载未结束的翻面请求排队，连续更新串行处理最新一面；旧文档回调不能确认新卡，当前脚本资源失败进入页面错误态，不通过重新 loadData 隐式丢掉作答状态。资源超时为 15 秒。
+完成信号由 JS 桥带文档/卡面版本回传，不能把 `runJavaScript` 返回当作页面内异步脚本已执行完毕。首次加载未结束的翻面请求排队，连续更新串行处理最新一面；旧文档回调不能确认新卡，无正文的脚本失败进入页面错误态，有正文时保留卡面并显示可展开诊断，不通过重新 loadData 隐式丢掉作答状态。资源超时为 15 秒。
 
 切卡时的原生 Web 底色与加载占位由当前页面的 `cardSurfaceBackground` 拥有，沿用最近一次真实渲染完成的模板背景，不回退为浅色 `surface_card`。`CardReviewerRuntime` 在脚本、公式和布局完成，且两次动画帧完成后读取实际 html/body 配色，使用 1px Canvas 合成透明度并回传不透明 RGB；`CardWebSession` 先检查文档/卡面版本，再校验颜色格式，旧回调不能改变新卡底色。首次卡片尚未取得颜色时使用原应用表面；背景图片和渐变保留在模板内，原生占位只跟随其基础背景色，不复制图片。
 
@@ -335,6 +339,20 @@ jidecards 当前保留自己的卡片色板：`buildCardAppearance` 默认浅色
 之前的速度对照为浏览器4倍CPU降速、同进程普通卡完整引擎/省略引擎每组6次、去掉首轮后的中位数245ms/106ms，仅测网页导航至渲染确认，不含Core查询、ArkUI页面进入与设备合成；记录为 `.local/card-render-profile-20261006.mjs`、`.local/card-render-speed-comparison-20261006.log`。它反映正常动画帧路径的省略引擎收益，不是鸿蒙实机测速，也不证明固定延时可以安全换帧。没有安装或启动设备，实际首卡/连续切卡速度和视觉效果仍待用户真机验收。
 
 对应回归在 `card-web-prefetch.test.mjs`、`card-web-session.test.mjs`、`study-session-controller.test.mjs`、`study-lifecycle.test.mjs` 与 `preview-runtime.test.mjs` 直接执行候选命中/失效、实际队首原始字节、双槽显示、会话缓存、安全迁移、渲染确认及页面等待行为；`ui-loading-feedback.test.mjs` 覆盖首次/连续加载的底层可见性、透明遮罩、延迟圈与旧输入阻挡。`test-card-flip-browser.mjs` 使用真实 CSS、Canvas、导航、模板脚本和公式验证深浅应用主题下的深色、透明及半透明卡片背景。它们不替代原牌组在 ArkWeb 上的连续切卡视觉验收；设备由用户操作。
+
+2026-10-21 间歇性遮挡点击排查：用户反馈 3.0.20 连学数页后点击失效、切后台再回来恢复。提供的真实牌组使用行内 `onclick` 和每面重新初始化的数组，不属于重复注册 document 监听；不能据合成监听累积案例清理作者全局状态。后台恢复会经 `studyActivityChanged` 失效旧请求、重读当前卡，恢复本身不能证明进程重启、缓存损坏或预取导致故障。
+
+修改前，真实牌组经本机隔离 Core 渲染后，生产单 Web 连续 37 张、双 Web 深浅色 74 组浏览器检查通过。原始同步渲染回调的 ArkWeb 隔离探针完成 37 张题面、浅色 12 张正背面往返及深色 37 张正背面往返的连续真实点击。较早一次深色测试在第 5 张展开后未收到遮回；加入命中诊断后的 6 张及保持点击节奏的 37 张复查均通过，尚不能将单次失败与原反馈的持续卡死等同，也未据此改代理回调时序或关闭预取。探针使用 3.0.28 的生产适配器和渲染器，不执行正式学习评分/队列，原生探针未传入原字体和图片，不能代替 3.0.20 故障设备的完整学习页验收。真实包、隔离集合、探针和日志仅保留在本机 `.local/card-interaction-investigation/`，不进入公开 fixtures。
+
+用户随后补充失灵时卡片也无法滚动，因此优先检查整个触摸通道。已修复可确认的恢复缺口：`CardWebView` 每次 show 最多等待 `CardRenderingSupport.web.renderAcknowledgementTimeoutMs`（60 秒），超时废弃当前/备用会话并经原失败通道恢复，绝不把超时当作绘制完成；成功、失败、离页 reset 均取消旧期限，迟到定时器、Storage 迁移和旧文档确认不得影响新请求。学习与两个预览宿主通过 `setActive` 提供可见/前台事实：后台及隐藏暂停期限，回来后仍待确认则重新计时，不能把后台停止绘制误判为故障。学习页补接主文档错误、`onRenderExited` 和 `onRenderProcessNotResponding`；只处理当前槽且前台有效的事件，失效旧请求并清除候选准备，再通过原有错误/重试入口重新读取真实队首，不评分、不自动循环重载。普通媒体缺失不触发整卡错误。错误沿既有本地化资源展示；60 秒值同时进入 JIDE 的共同兼容声明及软件指纹。
+
+对照本机 `D:\Projects\AnkiDroid` 的旧版 `AbstractFlashcardViewer` / `cardviewer/OnRenderProcessGoneDelegate` 与新版 `workarounds/SafeWebViewLayout` / `previewer/CardViewerFragment`：两套均明确处理渲染进程退出；旧版销毁并重建当前 WebView、限制同卡崩溃循环，新版替换失效 WebView 后重新安装 client、设置和内容，不可见/离页时保护恢复生命周期。新版 `CardViewerViewModel` 在同一页面通过 `_showQuestion` / `_showAnswer` 更新正文。其单 Web 生命周期没有 jidecards 双槽逐卡冻结的等价流程；本轮 60 秒确认期限是 jidecards 针对自己的桥接/透明等待层增加的失败保护，不是上游模板语义，也不取消双帧确认。HarmonyOS 的异常恢复按 ArkWeb 官方生命周期指导通过重新加载文档完成，不照搬 Android 的 destroy API。
+
+故障恢复使用 `CardWebView.reset(true)` 放弃从失效文档导出 sessionStorage；否则重试仍会先等待不响应的旧 Web，不能独立加载新文档。渲染超时/失败、学习页及预览的渲染退出路径均采用这一语义；普通换卡、后台与离页的 reset 保留原有 Storage 迁移。`card-web-prefetch.test.mjs` 直接验证故障后的重试不再向旧 Web 发出 Storage 请求。
+
+仍未证明原反馈的触发根因。继续定位需关联失效时 `cardRenderPending`、请求/文档/卡面代次、当前槽、进程退出/不响应、脚本异常及 DOM 触摸事件；恢复缺口修复不能冒充原设备根因复现。原生探针最初空白来自误拦截 `loadData` 的 data 主文档，修正探针后通过，该测试设置问题不属于产品故障证据。行为回归在 `card-web-session.test.mjs`、`card-web-prefetch.test.mjs` 与 `study-lifecycle.test.mjs`，覆盖超时只失败、取消与迟到确认隔离、延迟备用加载取消和原地重试；JIDE 声明由 `ai-agent-app-structure.test.mjs` 直接读取验证。
+
+本轮相关行为/结构回归、学习偏好回归及文档契约通过，x64 正式模块增量签名构建通过（unexpected=0）。最终实现的 ArkWeb 隔离故障注入令模板 onShownHook Promise 始终不结束，约 60 秒收到指定失败而非成功确认；正常深色正背面往返与遮挡点击抽查通过。证据保存在 `.local/card-interaction-investigation/recovery-regression.log`、`recovery-fix-build.log`、`native-probe-timeout.log` 和 `native-probe-dark.log`。实验源和原卡数据已移回本机诊断目录，不保留特定牌组探针到正式测试模块；仅覆盖安装过模拟器的隔离测试模块，没有更新正式应用模块或写入正式集合。
 
 2026-10-06 候选预加载与双槽切换验收：生产模型/适配器/学习/预览/草稿、布局、加载反馈与架构/文档专项195项通过；`npm test -- study` 398/398通过。进一步执行 `npm test -- browser`（492/496）、`npm test -- media`（285/287）及 `npm test -- ui`（417/421），剩余失败位于现有浏览器菜单/预览标题、媒体编辑器按钮、首页转场、AI隐藏回调旧harness、菜单密度/外观及主题文字契约，未据此宣称全领域通过。各命令记录在 `.local/card-prefetch-{regression,study,browser,media,ui}-20261006.log`。`npm run build:app -- -SkipRust -ArtifactDirectory .local/card-prefetch-fix-20261006` 最终增量签名构建通过，警告门禁 unexpected=0，构建记录为 `.local/card-prefetch-build-20261006.log`，包与报告保存在该产物目录；首次新增双槽的异常处理警告已在最终源码修正，未加入警告基线。沿用现有双架构 Core 库和默认签名配置，没有安装或启动设备。旧帧到新帧的 ArkWeb 合成、连续快切、大图/公式、模板脚本、前后台及内存表现仍需真实设备验收，Node与HAP通过不证明零闪帧。
 
@@ -450,3 +468,26 @@ jidecards 当前保留自己的卡片色板：`buildCardAppearance` 默认浅色
 打标提交成功后重检失败保留 taggedCount，单独提示重新检查；原快照已失效，不能把成功写入误报成可直接重试的失败。媒体面板的 JIDE 实时观察只发布当前渲染控件，并与各按钮实际启用条件一致。
 
 手写宿主和原版回退的关闭手写入口、笔刷设置关闭入口共用 `IconActionButton.toolbarStyle` 的叉号；撤销、重做和清空也沿用同一按钮外观。透明度继续显示完整“透明度”文字与纸张百分比，不改为图标，不影响笔迹与工具栏透明度。`WHITEBOARD_INTERFACE_ITEMS` 和实际观察保留完整名称、图标资源及启用状态；原关闭、持久化、系统返回和输入冻结策略保持。自定义调度脚本警告的退出学习同样由公共标题栏显示叉号，继续学习仍需明确确认。
+
+## 双端笔记引用
+
+学习与只读预览共用 GUID 引用桥；显示、编辑、返回栈与验证见 [笔记引用](note-links.md)。
+
+学习更多菜单在宽屏以顶部更多按钮实测的窗口右缘定位。CardActionMenu接收toolbarRight并在宿主边界转换一次，不再对已经限宽的工具栏重复居中/扣除安全区留白；手机与列表上下文锚点仍保留原规则。
+
+3.5.17/3098验收：66项菜单、视口、JIDE认知和文档回归通过，签名HAP通过；两台模拟器覆盖安装，宽屏2584×1828实看学习更多，主菜单右缘从2322px移至2436px，与更多按钮右缘2436px一致。正文限宽、菜单宽度/子组、材质及纵向间距未变。
+
+菜单箭头方向由CardActionMenu按实际左右布局提供：展开的根分组指向侧面板，旗标等侧向分支收起向下，展开时经公共disclosureAnimation旋向覆盖主菜单的子面板；左右镜像时两级一起反转。正文折叠、标签和侧边栏仍沿用右/下展开语义，不混用侧向弹层规则。回归见study-menu.test.mjs的双向/展开状态矩阵。
+
+2026-10-30箭头修正验收：61项菜单/划选/展开/选择器/浏览批量与文档回归通过，签名HAP构建通过，手机与SettingsWide覆盖安装。手机实看旗标展开后指向右侧覆盖层；自动回归同时覆盖左右镜像、根/子分支及展开/收起状态。额外设置组件回归中的主题AppStorage替身缺失仍是独立测试问题，未以它宣称全量通过。
+
+旗标箭头动效补验：收起90°向下，展开经既有disclosureAnimation旋向真实覆盖层（右0°/左180°），关闭反向旋回。手机连续截图已观察到向下、中间斜向、最终向右三个状态；行身份不因expanded变化重建。61项相关回归及签名HAP通过，手机与宽屏均覆盖安装。
+
+2026-10-30显示答案点击修复：StudyAnswerActionBar不再通过按值Builder参数冻结首次加载阶段的enabled。原生Button直接读取当前stage/busy，点击时再次检查当前状态；四档评分使用同一实时守卫，保留原评分值与业务回调。60项学习动作/生命周期/内容刷新/组件字段回归及签名HAP通过，手机与宽屏覆盖安装。手机实点“显示答案”后已显示真实背面正文和四个可点击评分按钮，未为验收提交评分。
+
+显示答案与四档评分按钮保留原有18vp圆角：原生Button先应用GlassSurface，再设置圆角与裁剪，避免材质边框更新重置轮廓。实时启用守卫及业务回调保持；签名构建通过，手机实看显示答案和四档评分轮廓，显示答案可正常点击。
+
+白板书画工具区采用两行紧凑布局：首行书画/文字分段及条件颜色，次行图片与编辑工具；新画布尺寸作为带标签的独立轻选择行。新增书画入口移除笔图标，图片缩略图右上角的编辑笔保留。原版笔迹显示橡皮和无边框撤销/重做图标，华为完整笔刷可用时这些应用工具不重复显示，原生工具区仍由PenKit拥有；文字模式使用应用颜色、输入/放置/删除及变换。紧凑样式复用按下态按钮compact，44vp点击区保持，选中仅轻色层，无独立胶囊和阴影。
+本轮白板工具验收：书画/媒体/原生引擎与组件字段40项、最终书画/公共控件/文档66项通过（组有重叠）；签名HAP通过，手机与SettingsWide覆盖安装。API23实看无笔入口、回退工具行及文字模式；未导入图片、绘制或完成提交。华为引擎真实设备本轮不可用，初始化/同步布局、既有笔迹禁止静默回退与官方/回退可用项由note-drawing回归验证，不声称原生工具栏实机外观已验收。
+
+白板添加/替换图片入口复用 IconActionButton 与 ic_editor_image，沿用动态无障碍名称和原可用性/导入回调。
