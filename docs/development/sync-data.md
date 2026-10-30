@@ -2,6 +2,16 @@
 
 ## 同一网络设备配对（2026-10-14）
 
+### 同步入口与界面（2026-10-20）
+
+首页同步按钮在已保存任一配对设备时先打开 `HomeSyncChoiceDialog`，选择云同步或设备直连；没有配对设备时沿用云同步，已有云同步任务直接打开详情。`DevicePairingStore.hasPairedDevices()` 串行只读偏好，不创建身份或启动发现。选择直连通过设置参数 `initialActionId=device_link` 进入同步分组并展开直连区域，再选择设备和范围。读取中和选择弹窗占用 `homeActivity.dialogOpen`，阻止自动同步/启动提示抢占；重复点击、返回、后台、导航和离页使旧读取失效，选择只生效一次。云同步和设置页的手动同步继续复用原 `HomeSyncController`。
+
+直连页先列全部卡库与媒体，再列仅学习进度，两者保持独立授权；全部同步已包含学习进度。连接条件、授权范围与清除撤销历史等细节放在标题旁的公共 `i` 帮助入口，复用设置宿主的说明浮层；主界面仅保留操作名称、简短范围和在线/忙碌/结果。使用 `SettingsActionRow`、`SettingsToggleRow`、公共分隔线与尺寸，无自定义帮助几何。每台设备内部由一个 Column 提供8vp组间距，公共开关/动作行拥有自身行内边距，左右沿用分组卡片16vp内边距；首页选择弹窗由 `DialogFrame` 拥有420vp上限、内边距、限高滚动和安全区。
+
+当前没有同步前的双端内容比较；直连动作仅在离线、操作忙碌或确认/二维码等互斥状态下禁用，不能把灰色理解为内容相同。同步返回的计数属于本机，全部为零时显示“本机无需更新”，保留重试以检查远端后续修改，不推断双方同步前一致。声明与实时认知分别由 `AppInterface.HOME_SYNC_CHOICES`、`SettingsStructure`、首页和 `DeviceLinkSettings.publishInterface()` 提供，不新增 JIDE 设备写入能力。
+
+回归入口：`sync-automatic.test.mjs`（分流、取消、重复和迟到读取）、`device-link-runtime.test.mjs`（只读配对查询、真实TCP、结果及禁用状态）、`ai-agent-app-structure.test.mjs`（选择弹窗当前控件/名称）、`i18n-contract.test.mjs` 与公共帮助/弹窗/UI检查。Node与HAP不代表真实HarmonyOS两机发现、最终布局和在线同步已验收。
+
 设备直连标记为实验功能，不保证功能有效。入口标题与展开说明分别复用中英文资源 `device_link_title`、`device_link_hint`；`SettingsStructure` 与 `AppInterface` 使用相同资源，JIDE 同步获得实验性质和有效性边界。
 
 设置 → 同步 → 设备直连由 `components/settings/DeviceLinkSettings.ets` 展示，两端需处于同一 Wi-Fi／热点并打开该页面。`backend/device-link/DeviceLinkService.ets` 拥有 TCP 监听、mDNS 发现、五分钟一次性二维码和认证往返；离开页面释放监听和发现，迟到结果不得更新已离开的界面。`model/device-link/DevicePairing.ts` 校验稳定设备 ID、邀请和持久记录，`LanWire.ts` 处理有界 TCP 分帧及本次连接的挑战证明。
@@ -104,7 +114,7 @@
 
 首页常驻同步按钮的空闲标记对照本机 `D:/Projects/AnkiDroid/AnkiDroid/src/main/java/com/ichi2/anki/DeckPicker.kt` 的 `updateSyncIconFromState` 和 `deckpicker/DeckPickerViewModel.kt` 的 `fetchSyncIconState`：未登录与 Core `FULL_SYNC` 显示红色圆圈感叹号，`NORMAL_SYNC` 显示提示圆点，`NO_CHANGES` 无标记。`model/HomeSyncStatusController.ts` 独占检查代次和合并请求，调用既有 `同步服务.同步状态检查`；状态读取可联网，但不提交同步，不受自动同步开关控制。仅在前台首页、集合可用且无操作/弹窗/同步任务时读取，失败按 AnkiDroid 回到普通图标并记录诊断。账号/服务器变化、导航、后台、任务启动及销毁后的旧结果不得发布或保存重定向端点；返回首页、集合变更和任务关闭重新检查。实际任务的旋转圈、冲突/错误感叹号及排队文案优先于空闲标记。
 
-`HomeSummaryHeader` 将标记叠在原 `IconActionButton` 内，原按钮独占点击区域，标记不处理点击、不增加父级间距，也不参与外缘尺寸；宽窄按钮仍由 `HomeHeaderLayout` 缩放，安全区仍只由首页外层贡献。朗读名称与 `AppInterface` 同用 `homeSyncLabelKey`；首页发布真实 `sync_account_state`、`sync_indicator`、`sync_status` 给 JIDE。未登录点击走原设置登录入口，需要全量同步点击走原同步会话及方向确认，已有任务点击打开详情。直接回归：`tools/tests/home-sync-status.test.mjs`；真实联网和设备外观需单独验收。
+`HomeSummaryHeader` 将标记叠在原 `IconActionButton` 内，原按钮独占点击区域，标记不处理点击、不增加父级间距，也不参与外缘尺寸；宽窄按钮仍由 `HomeHeaderLayout` 缩放，安全区仍只由首页外层贡献。朗读名称与 `AppInterface` 同用 `homeSyncLabelKey`；首页发布真实 `sync_account_state`、`sync_indicator`、`sync_status` 给 JIDE。已配对设备时先选择同步方式；选择云同步且未登录时走原设置登录入口，需要全量同步时走原同步会话及方向确认，已有任务点击打开详情。直接回归：`tools/tests/home-sync-status.test.mjs`；真实联网和设备外观需单独验收。
 
 2026-10-06 验证：状态/竞态和 JIDE 读取用例、同步领域回归通过；首页唯一失败为 `home-composition.test.mjs` 的详情栏测试未装配 `detailHeaderActionHeight`，使用修改前首页源码仍复现。最终界面契约检查另有 `ui-shell-contract.test.mjs` 因共享工作区设置页按钮改动仍匹配旧返回文案而失败，本任务没有修改该入口或削弱断言。中间构建遇到同期设置/JIDE 的类型和图标资源错误；待这些输入就绪后，最终增量签名 HAP 复核通过，unexpected=0，含首页可见性守卫。记录和最终包在 `.local/home-sync-badge-2026-10-06/final-artifact/`，相关测试日志在上级目录。本次未安装设备，未验证真实联网和最终外观。
 
@@ -173,7 +183,7 @@ FSRS 的全局开关、牌组高级选项中的“启用 FSRS”和统计页状�
 
 自定义服务器入口为 AnkiWeb 云同步卡片内、登录表单下方的一行小字，展开分组后点击打开居中弹窗（手机窗口宽度 < 600vp 时 bindSheet 只能底部弹出，故用 `CustomDialogController`）；取消丢弃地址草稿，保存失败在弹窗内显示。同步设置支持 AnkiWeb（服务器地址留空）与兼容 Anki 26.05 的自建服务器。`model/SyncSettings.ts` 校验 HTTP(S) 基础 URL、保留反向代理子路径并补齐末尾斜杠，也提供手动/自动共用的进程内互斥。`同步凭证存储.ets` 分开保存用户配置地址和服务端重定向端点；注销保留用户配置，切换服务器清除旧 hkey、重定向和待同步媒体标志，密码不落盘。
 
-自动同步在新安装及旧版升级后均默认关闭。`同步凭证存储.ets` 固定使用 `auto_sync_enabled_v2`，不再读取旧 `auto_sync_enabled`，因此旧版明确开启的用户也须在新版重新确认；之后的开关选择跨启动保留，不随每次启动重置。无偏好或读取失败时不自动连接，凭证、服务器和媒体偏好不受影响。设置中每次从关闭切到开启，先提示首页短暂卡顿、点开牌组等待和媒体流量等影响，确认后才持久化；取消、离页或保存失败不启用。首页常驻“同步”按钮和设置页“立即同步”统一交给 HomeSyncController.requestManual()，已有任务只打开详情，不重复联网；首页未登录时打开设置并提示登录。手动与自动共用根 Navigation 外的同步宿主；设置页手动请求进入 AutoSyncScheduler 后返回首页，常驻同步按钮的点击区与图标尺寸由 HomeHeaderLayout 提供，实际集合/媒体传输（syncIndicator=syncing）时按钮固定槽位显示旋转圈，成功显示勾号，失败显示叉号。冲突和失败保留可点击的红色圆圈感叹号，避免未结束的任务没有可见处理入口；排队、为学习让路、中止和完成不显示传输旋转圈；同步按钮仍常驻，任务关闭后恢复空闲标记。同步中的圆圈和红色圆圈感叹号均可打开任务详情，完整进度文案保留为无障碍标签。冲突/错误仍保存在同步宿主中，通过“设置 → 同步”手动入口重新打开当前任务详情；不因收起详情销毁任务或自动选择覆盖方向。自动正常传输不弹详情，成功立即收起。手动同步在集合及已启用的媒体同步全部成功后，通过 `notifySyncResult()` 立即显示完成 Toast 并关闭任务；用户打开过的自动任务详情也在完成时提示。取消保留完成态的 3 秒延时，避免下一次点击手动同步只打开上一次结果；自动静默任务仍不打扰，失败/冲突保留处理入口。回归由 `sync-settings.test.mjs` 覆盖旧开关失效与重新开启持久化，`sync-automatic.test.mjs` 覆盖完成反馈和媒体收尾。启动、回前台、返回首页与学习完成时排队，空闲 3 秒检查，活动学习/编辑/导入/后台不启动新任务。开始学习取消待执行检查；已运行的增量同步经 SyncActivity.requestStudyPriority 让路，原生 AbortSync 单独转发、不等待普通调用锁或 NAPI 工作线程；普通 RPC 仍串行。取消句柄注册竞态由任务独占期间重试解决，回滚/提交完成且取消调用落定后释放集合，手动待同步意图不受自动开关影响。集合提交与取消竞争时保留成功结果及已启动媒体；媒体不锁学习。冲突保留在任务详情中，不占集合，用户确认方向前重新检查最新方向、端点与 USN；已明确启动的全量替换不可被学习自动打断。FSRS 提醒等待空闲首页。EntryAbility.onBackground 只为当前任务申请短时收尾，不保证后台常驻或杀进程后完成。扩展触发时机复用调度器，调整让路协议复用 SyncActivity；不要另建同步流程。
+自动同步在新安装及旧版升级后均默认关闭。`同步凭证存储.ets` 固定使用 `auto_sync_enabled_v2`，不再读取旧 `auto_sync_enabled`，因此旧版明确开启的用户也须在新版重新确认；之后的开关选择跨启动保留，不随每次启动重置。无偏好或读取失败时不自动连接，凭证、服务器和媒体偏好不受影响。设置中每次从关闭切到开启，先提示首页短暂卡顿、点开牌组等待和媒体流量等影响，确认后才持久化；取消、离页或保存失败不启用。云同步场景下，首页常驻“同步”按钮和设置页“立即同步”统一交给 HomeSyncController.requestManual()，已有任务只打开详情，不重复联网；选择云同步且未登录时打开同步设置并提示登录；已配对设备的首页分流见上文。手动与自动共用根 Navigation 外的同步宿主；设置页手动请求进入 AutoSyncScheduler 后返回首页，常驻同步按钮的点击区与图标尺寸由 HomeHeaderLayout 提供，实际集合/媒体传输（syncIndicator=syncing）时按钮固定槽位显示旋转圈，成功显示勾号，失败显示叉号。冲突和失败保留可点击的红色圆圈感叹号，避免未结束的任务没有可见处理入口；排队、为学习让路、中止和完成不显示传输旋转圈；同步按钮仍常驻，任务关闭后恢复空闲标记。同步中的圆圈和红色圆圈感叹号均可打开任务详情，完整进度文案保留为无障碍标签。冲突/错误仍保存在同步宿主中，通过“设置 → 同步”手动入口重新打开当前任务详情；不因收起详情销毁任务或自动选择覆盖方向。自动正常传输不弹详情，成功立即收起。手动同步在集合及已启用的媒体同步全部成功后，通过 `notifySyncResult()` 立即显示完成 Toast 并关闭任务；用户打开过的自动任务详情也在完成时提示。取消保留完成态的 3 秒延时，避免下一次点击手动同步只打开上一次结果；自动静默任务仍不打扰，失败/冲突保留处理入口。回归由 `sync-settings.test.mjs` 覆盖旧开关失效与重新开启持久化，`sync-automatic.test.mjs` 覆盖完成反馈和媒体收尾。启动、回前台、返回首页与学习完成时排队，空闲 3 秒检查，活动学习/编辑/导入/后台不启动新任务。开始学习取消待执行检查；已运行的增量同步经 SyncActivity.requestStudyPriority 让路，原生 AbortSync 单独转发、不等待普通调用锁或 NAPI 工作线程；普通 RPC 仍串行。取消句柄注册竞态由任务独占期间重试解决，回滚/提交完成且取消调用落定后释放集合，手动待同步意图不受自动开关影响。集合提交与取消竞争时保留成功结果及已启动媒体；媒体不锁学习。冲突保留在任务详情中，不占集合，用户确认方向前重新检查最新方向、端点与 USN；已明确启动的全量替换不可被学习自动打断。FSRS 提醒等待空闲首页。EntryAbility.onBackground 只为当前任务申请短时收尾，不保证后台常驻或杀进程后完成。扩展触发时机复用调度器，调整让路协议复用 SyncActivity；不要另建同步流程。
 
 学习页沿用固定底部只显示答案或四档评分的布局，今日跳过与暂停此卡位于更多菜单；浮动布局同样只显示答案或四档评分，工具栏可拖动并保存吸附位置。两种布局的评分名称固定为“忘记／困难／良好／简单”，下方单独展示 Anki 返回的预计复习间隔。首张卡片就绪且页面可见时展示一次学习说明，确认通过 `utils/StudyGuideStore.ets` 写入本机偏好，所有牌组共用；空牌组不消耗首次机会，更多菜单可重看。教学与设置术语详解保持相同定义，阅读时间不计入当前卡答题时长。
 
@@ -215,3 +225,7 @@ Agent：页面 -> SessionController -> Runner -> Provider/工具/Scope -> Change
 `model/ReleaseFeatures.ets` 的 `OFFICIAL_ANKIWEB_SYNC_UI_ENABLED = true` 已恢复官方账号表单、注册链接、默认官方服务器提示，以及首页手动/自动同步对原有官方账号的访问。自定义服务器入口继续可用；自动同步仍遵守用户已有开关，不因恢复界面自动开启。
 该代码常量不提供用户设置或调试解锁路径。若以后设为 `false`，`SyncSettings.isSyncEndpointVisible` 与 `loadVisibleSyncAuth` 会统一隐藏空地址及显式官方域名对应的界面和账号访问；原始凭证、默认端点协议、服务器保存与同步执行代码不变，不清除账号或偏好。
 `tools/tests/sync-settings.test.mjs` 覆盖当前恢复状态、关闭/恢复开关、显式官方域名、原有默认地址登录与凭证保留。云牌组、AI、赞赏入口及共享牌组网站、文档、开源署名均不属于此开关范围。
+
+## 笔记引用数据
+
+完整关系保存在笔记字段中，复用现有集合同步；协议、迁移和同笔记离线冲突边界见 [笔记引用](note-links.md)。
