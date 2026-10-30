@@ -26,8 +26,8 @@ export class SeriesVisual {
     };
   }
 
-  static control(material: string, dark: boolean, action: string, radius: number, visible: boolean): SharedSurface {
-    return new ProductControl(dark, material, radius, SeriesVisual.palette(dark, action), visible);
+  static control(material: string, dark: boolean, action: string, radius: number, visible: boolean, fill: ResourceColor | undefined = undefined): SharedSurface {
+    return new ProductControl(dark, material, radius, SeriesVisual.palette(dark, action), visible, fill);
   }
 
   /** 同层级表面只保留一档轻投影；内嵌、深色和扁平表面显式清除。 */
@@ -122,8 +122,10 @@ class ProductControl extends SharedSurface {
   private controlOutline: BorderOptions;
   private controlRadius: number;
   private controlShadow: ShadowOptions;
-  constructor(dark: boolean, material: string, radius: number, palette: VisualPalette, active: boolean) {
+  private controlFill: ResourceColor | undefined;
+  constructor(dark: boolean, material: string, radius: number, palette: VisualPalette, active: boolean, fill: ResourceColor | undefined = undefined) {
     super(dark, material, false, radius, palette, true, 'control');
+    this.controlFill = fill;
     this.controlShadow = SeriesVisual.shadow(material, dark);
     this.controlOutline = SurfaceBorder.materialOptions(material, dark);
     this.active = active;
@@ -135,6 +137,7 @@ class ProductControl extends SharedSurface {
     if (this.active) {
       super.applyNormalAttribute(instance);
       instance.shadow(this.controlShadow);
+      if (this.controlFill !== undefined) instance.backgroundColor(this.controlFill);
       if (this.lightGlass) instance.border(this.controlOutline).borderRadius(this.controlRadius);
       if (this.controlDarkFlat) instance.border(SurfaceBorder.options()).borderRadius(this.controlRadius);
     }

@@ -9,12 +9,12 @@ import { themePressGradient } from './ThemeVisuals';
 export class GlassSurface extends PressFeedback {
   private colors: string[];
   private background: ResourceColor;
-  private outline: BorderOptions;
+  private outline: BorderOptions | undefined;
 
   private material: string;
 
   constructor(material: string, colors: string[], background: ResourceColor = $r('app.color.surface_card'),
-    outline: BorderOptions = SurfaceBorder.options()) {
+    outline: BorderOptions | undefined = undefined) {
     super();
     this.material = material;
     this.colors = colors;
@@ -45,10 +45,11 @@ export class GlassSurface extends PressFeedback {
       return;
     }
 
+
     instance.backgroundColor(translucentGlassFill(this.background))
       .backgroundBlurStyle(BlurStyle.NONE).backdropBlur(24)
       .linearGradient({ angle: 110, colors: darkMaterial() ? [['#04FFFFFF',0],['#00FFFFFF',1]] : themePressGradient(this.colors, pressed) })
       .shadow(SeriesVisual.shadow(this.material, darkMaterial()))
-      .border(this.outline);
+      .border(this.outline ?? (darkMaterial() ? SurfaceBorder.materialOptions(this.material, true) : SurfaceBorder.options()));
   }
 }

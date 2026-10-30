@@ -41,10 +41,11 @@ export class PrimaryGlassSurface extends PressFeedback {
       return;
     }
 
+
     instance.backgroundColor(translucentGlassFill($r('app.color.surface_card')))
       .backgroundBlurStyle(BlurStyle.NONE).backdropBlur(24)
       .linearGradient({ angle: 110, colors: darkMaterial() ? [['#04FFFFFF',0],['#00FFFFFF',1]] : themePressGradient(this.style.pressedColors, pressed) })
       .shadow(SeriesVisual.shadow(this.material, darkMaterial()))
-      .border(SurfaceBorder.options());
+      .border(darkMaterial() ? SurfaceBorder.materialOptions(this.material, true) : SurfaceBorder.options());
   }
 }

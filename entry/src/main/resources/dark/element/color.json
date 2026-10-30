@@ -140,5 +140,5 @@
     {"name": "browser_row_marked", "value": "#343C24"},
     {"name": "browser_row_suspended", "value": "#4B4828"},
     {"name": "browser_row_buried", "value": "#26394D"}
-]
+  ]
 }

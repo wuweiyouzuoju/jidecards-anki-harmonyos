@@ -13,6 +13,22 @@ import { safeDialogMaxHeight, WINDOW_SAFE_TOP_KEY, WINDOW_SAFE_BOTTOM_KEY,
 @Component
 export struct DialogFrame {
   @Prop nativeHost: boolean = false;
+  @Prop opaque: boolean = false;
+  @Prop materialOverride: string = '';
+  @Prop surfaceRole: string = 'dialog';
+  @Prop showPreparation: boolean = false;
+  onPrepared: () => void = (): void => {};
+  @State private prepared: boolean = false;
+  @State private waitingVisible: boolean = false;
+  private waitingTimer: number = -1;
+
+  aboutToAppear(): void {
+    if (this.showPreparation) this.waitingTimer = setTimeout((): void => {
+      if (!this.prepared) this.waitingVisible = true;
+    }, 150);
+  }
+  aboutToDisappear(): void { clearTimeout(this.waitingTimer); }
+
   @Prop refractionSource: string = '';
   @Prop maximumWidth: number = 应用尺寸.dialogMaxWidth;
   // 卡片预览自行拥有滚动；普通表单继续按内容收缩并由外壳滚动。
@@ -66,7 +82,8 @@ export struct DialogFrame {
         } }).onClick((): void => { this.dismiss(); })
         .transition(this.nativeHost ? TransitionEffect.IDENTITY : SurfaceTransition.backdrop())
       Stack() {
-        GlassPanel({ source: this.refractionSource, radius: 应用尺寸.圆角_卡片, panelWidth: this.surfaceWidth,
+        GlassPanel({
+          onPrepared: (): void => { this.prepared = true; this.waitingVisible = false; clearTimeout(this.waitingTimer); this.onPrepared(); }, role: this.surfaceRole, source: this.refractionSource, materialOverride: this.materialOverride, opaque: this.opaque, radius: 应用尺寸.圆角_卡片, panelWidth: this.surfaceWidth,
           maximumWidth: this.surfaceMaximumWidth || this.maximumWidth, maximumHeight: this.frameMaxHeight() }) {
         Column({ space: 应用尺寸.间距_12 }) {
           if (!this.actionsAtBottom) {
@@ -100,6 +117,13 @@ export struct DialogFrame {
         .padding({ top: this.safeTop + 应用尺寸.间距_8, bottom: (this.keyboardTop > 0 ? 0 : this.safeBottom) + 应用尺寸.间距_8,
           left: this.safeLeft + 应用尺寸.间距_8, right: this.safeRight + 应用尺寸.间距_8 })
         .hitTestBehavior(HitTestMode.Transparent)
+      if (this.showPreparation && this.waitingVisible) {
+        Column({ space: 12 }) {
+          LoadingProgress().width(32).height(32).color($r('app.color.text_secondary'))
+          Text($r('app.string.common_loading')).fontSize(14).fontColor($r('app.color.text_primary'))
+        }.width('100%').height('100%').justifyContent(FlexAlign.Center)
+          .hitTestBehavior(HitTestMode.None).accessibilityText($r('app.string.common_loading'))
+      }
     }
     .width('100%').height('100%')
     .alignContent(Alignment.Top)

@@ -366,7 +366,8 @@ export struct 牌组列表项 {
     // 选中不跳过材质，覆盖层位于背景图之上、文字之下。
     .attributeModifier(new SeriesDeckSurface(this.surfaceMaterial, this.themeMode === 'dark' || (this.themeMode !== 'light' && this.systemDark),
       this.动作主色, this.pageTint, 应用尺寸.圆角_牌组行))
-    .border(SurfaceBorder.options(应用尺寸.卡片边框, this.reorderMode ? this.动作主色 : SurfaceBorder.color()))
+    .border(this.reorderMode ? SurfaceBorder.options(应用尺寸.卡片边框, this.动作主色) :
+      SurfaceBorder.materialOptions(this.surfaceMaterial, this.themeMode === 'dark' || (this.themeMode !== 'light' && this.systemDark)))
     .borderRadius(应用尺寸.圆角_牌组行)
   }
 }

@@ -18,6 +18,9 @@ export struct PrimaryActionButton {
   @Prop label: ResourceStr = '';
   @Prop isInteractive: boolean = true;
   @Prop tint: ResourceColor | undefined = undefined;
+  @Prop foreground: ResourceColor = '#FFFFFF';
+  @Prop glassSurface: boolean = false;
+  @Prop glassAccent: string = '#2F5FD0';
   @Prop feedback: string = '';
   onAction: () => void = (): void => {};
 
@@ -30,8 +33,8 @@ export struct PrimaryActionButton {
   build() {
     Button() {
       Row({ space: 8 }) {
-        if (hasActionStatus(this.feedback)) { ActionStatus({ phase: this.feedback, tint: '#FFFFFF' }) }
-        Text(this.label).fontSize(应用尺寸.字号_按钮).fontColor('#FFFFFF')
+        if (hasActionStatus(this.feedback)) { ActionStatus({ phase: this.feedback, tint: this.foreground }) }
+        Text(this.label).fontSize(应用尺寸.字号_按钮).fontColor(this.foreground)
           .layoutWeight(1).textAlign(TextAlign.Center).constraintSize({ minWidth: 0 })
       }.width('100%').justifyContent(FlexAlign.Center)
     }
@@ -39,10 +42,12 @@ export struct PrimaryActionButton {
       .constraintSize({ minHeight: 应用尺寸.行动按钮高度 })
       .padding({ left: 16, right: 16, top: 8, bottom: 8 })
       .fontSize(应用尺寸.字号_按钮)
-      .fontColor('#FFFFFF')
+      .fontColor(this.foreground)
+      .attributeModifier(SeriesVisual.control('glass', SeriesVisual.isDark(this.materialTheme, this.materialSystemDark),
+        this.glassAccent, 应用尺寸.圆角_行动按钮, this.glassSurface, this.resolvedTint()))
       .backgroundColor(this.resolvedTint())
       .borderRadius(应用尺寸.圆角_行动按钮)
-      .shadow(SeriesVisual.shadow(this.surfaceMaterial, SeriesVisual.isDark(this.materialTheme, this.materialSystemDark)))
+      .shadow(SeriesVisual.shadow(this.glassSurface ? 'glass' : this.surfaceMaterial, SeriesVisual.isDark(this.materialTheme, this.materialSystemDark)))
       .enabled(this.isInteractive)
       .opacity(this.isInteractive ? 1 : 0.6)
       .attributeModifier(new PressFeedback(this.isInteractive ? 1 : 0.6))

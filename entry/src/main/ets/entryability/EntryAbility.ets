@@ -1,3 +1,4 @@
+import { initializeEditorWheelPreferences } from '../utils/EditorWheelPreferencesStore';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { WINDOW_KEYBOARD_TOP_KEY } from '../model/WindowSafeLayout';
 
@@ -80,6 +81,7 @@ export default class EntryAbility extends UIAbility {
     initializeDeckListAppearance();
     initializeSurfaceMaterial();
     initializeMotionStyle();
+    initializeEditorWheelPreferences();
     initializeStudyHaptics();
     AppStorage.setOrCreate<boolean>(AI_AGENT_CHANNELS_APP_STORAGE_KEY, false);
     initializeAiAgentChannels().catch((_error: Object): void => {

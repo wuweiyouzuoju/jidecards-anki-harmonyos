@@ -1,3 +1,4 @@
+import { darkMaterial } from '../../utils/GlassMaterial';
 import { PressFeedback } from '../../utils/PressFeedback';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
@@ -78,6 +79,7 @@ export struct 按下态按钮 {
     return this.selectable && this.selected ? this.resolvedSelectionColor() : this.字色;
   }
   private buttonBorder(): BorderOptions {
+    if (!this.compact && !this.selectable && this.surfaceMaterial === 'glass' && darkMaterial()) return SurfaceBorder.materialOptions('glass', true);
     return SurfaceBorder.options(this.compact ? 0 : this.selectable ? 2 : 应用尺寸.卡片边框,
       this.selectable && this.selected ? this.resolvedSelectionColor() : SurfaceBorder.color());
   }
