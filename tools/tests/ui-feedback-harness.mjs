@@ -13,6 +13,6 @@ export const uiFeedback = loadUiFeedback();
 
 // Extracted page methods use the real shared helper, not a duplicated fallback implementation.
 export function compileWithUiFeedback(...parameters) {
-  const compiled = new Function(...Object.keys(uiFeedback), ...parameters);
-  return function (...args) { return compiled.call(this, ...Object.values(uiFeedback), ...args); };
+  const compiled = new Function('DialogButtonDirection', ...Object.keys(uiFeedback), ...parameters);
+  return function (...args) { return compiled.call(this, { AUTO: 'auto' }, ...Object.values(uiFeedback), ...args); };
 }

@@ -38,16 +38,13 @@ test('settings detail content stays visible without accordion state', () => {
   assert.match(shell, /this\.内容\(\)/);
 });
 
-test('study actions use isolated native press surfaces without touch-driven component rebuilds', () => {
-  const page = read('entry/src/main/ets/pages/学习页.ets');
-  const buttonUrl = new URL('../../entry/src/main/ets/components/StudyActionButton.ets', import.meta.url);
-  assert.ok(existsSync(buttonUrl), 'isolated StudyActionButton component must exist');
-  const button = read('entry/src/main/ets/components/StudyActionButton.ets');
-  assert.doesNotMatch(page, /按下评分|BURY_RATING_TAG|SUSPEND_RATING_TAG/);
-  assert.equal((page.match(/StudyActionButton\(\{/g) ?? []).length, 4);
-  assert.doesNotMatch(button, /@State|onTouch\(|\.animation\(/);
-  assert.match(button, /new GlassSurface\(this.glassColors, this.fillColor\)/);
-  assert.match(button, /\.stateEffect\(false\)/);
+test('学习页动作组只映射真实阶段和原回调，不引入形变或延迟',()=>{
+ const page=read('entry/src/main/ets/pages/学习页.ets'),group=read('entry/src/main/ets/components/StudyAnswerActionBar.ets');
+ assert.equal((page.match(/StudyAnswerActionBar\(\{/g)||[]).length,1);
+ assert.equal((group.match(/this.rate\(RATING_/g)||[]).length,4);
+ assert.match(page,/显示答案回调: \(\): void => \{ this\.显示答案\(\); \}/);
+ assert.match(page,/评分回调: \(rating: number\): void => \{ this\.评分\(rating\); \}/);
+ assert.doesNotMatch(group,/OliveOil|setTimeout|animateTo/);
 });
 
 test('help buttons use the shared press feedback as the sole feedback owner', () => {
@@ -77,21 +74,20 @@ test('help buttons use the shared press feedback as the sole feedback owner', ()
 // The surface behavior itself is executed in theme-text.test.mjs; these checks audit every caller.
 test('all custom press surfaces use one native feedback owner', () => {
   for (const file of ['components/common/按下态按钮.ets', 'components/StudyActionButton.ets',
-    'components/开始学习按钮.ets', 'components/学习浮动工具栏.ets', 'components/牌组详情面板.ets']) {
+    'components/学习浮动工具栏.ets']) {
     const source = read('entry/src/main/ets/' + file);
     assert.doesNotMatch(source, /duration: 80/, file);
-    const surfaces = [...source.matchAll(/\.attributeModifier\(new (?:Primary)?GlassSurface\([^\n]+\)\)([\s\S]*?)\.onClick/g)];
+    const surfaces = [...source.matchAll(/\.attributeModifier\(new (?:(?:Primary)?GlassSurface|StudyRatingSurface)\([^\n]+\)\)([\s\S]*?)\.onClick/g)];
     assert.ok(surfaces.length > 0, file);
-    // Deck 'More' is a clickable Row; its following ForEach owns all three native Buttons.
-    const buttons = file.endsWith('牌组详情面板.ets') ? surfaces.slice(1) : surfaces;
-    if (file.endsWith('牌组详情面板.ets')) {
-      assert.equal(surfaces.length, 2);
-      assert.match(source, /ForEach\(this.moreItems\(\), \(item: AppInterfaceItem\) => \{\s*Button/);
-      assert.doesNotMatch(surfaces[0][1], /stateEffect/);
-    }
+    const buttons = surfaces;
     for (const surface of buttons) {
       assert.doesNotMatch(surface[1], /onTouch\(/, file);
       assert.match(surface[1], /\.stateEffect\(false\)/, file);
     }
   }
+  const start = read('entry/src/main/ets/components/开始学习按钮.ets');
+  assert.match(start, /SeriesVisual.control\(/, 'start study keeps shared material and border');
+  assert.match(start, /onClick\(\(\): void => \{ if \(this.isAvailable\) this\.开始学习回调\(\); \}/);
+  assert.match(start, /enabled\(this\.isAvailable\)/);
 });
+

@@ -1,3 +1,4 @@
+import { glassFillHarness } from './glass-material-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -105,7 +106,7 @@ test('dialog header icon and text actions preserve names, theme, danger and disa
     应用尺寸: dimensions, $r: resource, GLASS_HIGHLIGHT_COLORS: []
   });
   const IconButton = loadComponentLogic('components/common/IconActionButton.ets', 'IconActionButton', {
-    应用尺寸: dimensions, $r: resource, Color: { Transparent: 'transparent' }
+    应用尺寸: dimensions, $r: resource, Color: { Transparent: 'transparent' }, translucentGlassFill: glassFillHarness()
   });
   // 执行生产渲染传入的配置，再执行公共按钮的真实禁用守卫。
   const bindings = [...read('components/common/DialogHeader.ets').matchAll(/按下态按钮\((\{[\s\S]*?\})\)/g)]
@@ -155,7 +156,7 @@ test('dialog header icon and text actions preserve names, theme, danger and disa
         assert.equal(button.toolbarStyle, true);
         assert.equal(button.controlSize, dimensions.按钮高度);
         assert.equal(button.resolvedGlyphColor(), themeColor);
-        assert.equal(button.resolvedSurface(), 'app.color.surface_card');
+        assert.equal(button.resolvedSurface(), glassFillHarness()('app.color.surface_card'));
       }
       const previous = [actions, closes];
       action.activate(); close.activate();
@@ -178,7 +179,7 @@ test('form input style applies real geometry/resources while leaving input behav
     应用尺寸: dimensions, $r: key => `${theme}:${key}`
   });
   const Style = loadPlatformModule('utils/FormInputStyle.ets', 'FormInputStyle', {
-    应用尺寸: dimensions, $r: key => `${theme}:${key}`, SurfaceBorder
+    应用尺寸: dimensions, $r: key => `${theme}:${key}`, SurfaceBorder, insetMaterialFill: color => color
   });
   for (const padding of [undefined, dimensions.卡片内边距]) {
     const attributes = { type: 'password', text: 'draft', inputFilter: 'filter', enabled: false, onSubmit: 'handler' };

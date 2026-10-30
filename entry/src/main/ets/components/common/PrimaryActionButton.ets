@@ -1,3 +1,4 @@
+import { SeriesVisual } from '../../utils/SeriesVisual';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../../utils/PressFeedback';
 import { 应用尺寸 } from '../../utils/应用尺寸';
@@ -9,6 +10,9 @@ import { hasActionStatus } from '../../model/InteractionFeedback';
 /** 主操作按钮统一几何与反馈；宿主决定可用状态、忙碌文案及业务动作。 */
 @Component
 export struct PrimaryActionButton {
+  @StorageProp('themeMode') private materialTheme: string = 'system';
+  @StorageProp('systemDarkMode') private materialSystemDark: boolean = false;
+  @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(颜色键.主色按钮背景) private primaryBackground: string = '#2F5FD0';
   @Prop label: ResourceStr = '';
@@ -27,15 +31,18 @@ export struct PrimaryActionButton {
     Button() {
       Row({ space: 8 }) {
         if (hasActionStatus(this.feedback)) { ActionStatus({ phase: this.feedback, tint: '#FFFFFF' }) }
-        Text(this.label).fontSize(应用尺寸.字号_按钮).fontColor('#FFFFFF').maxLines(1)
-      }.justifyContent(FlexAlign.Center)
+        Text(this.label).fontSize(应用尺寸.字号_按钮).fontColor('#FFFFFF')
+          .layoutWeight(1).textAlign(TextAlign.Center).constraintSize({ minWidth: 0 })
+      }.width('100%').justifyContent(FlexAlign.Center)
     }
       .width('100%')
-      .height(应用尺寸.按钮高度)
+      .constraintSize({ minHeight: 应用尺寸.行动按钮高度 })
+      .padding({ left: 16, right: 16, top: 8, bottom: 8 })
       .fontSize(应用尺寸.字号_按钮)
       .fontColor('#FFFFFF')
       .backgroundColor(this.resolvedTint())
-      .borderRadius(应用尺寸.圆角_胶囊)
+      .borderRadius(应用尺寸.圆角_行动按钮)
+      .shadow(SeriesVisual.shadow(this.surfaceMaterial, SeriesVisual.isDark(this.materialTheme, this.materialSystemDark)))
       .enabled(this.isInteractive)
       .opacity(this.isInteractive ? 1 : 0.6)
       .attributeModifier(new PressFeedback(this.isInteractive ? 1 : 0.6))

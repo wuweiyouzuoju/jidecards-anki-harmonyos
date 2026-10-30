@@ -1,3 +1,4 @@
+import { PressFeedback } from '../../utils/PressFeedback';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 import { ActionStatus } from './ActionStatus';
@@ -40,6 +41,7 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 
 @Component
 export struct 按下态按钮 {
+  @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @Prop feedback: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(GLASS_COLORS_KEY) private glassColors: string[] = GLASS_HIGHLIGHT_COLORS;
@@ -63,6 +65,8 @@ export struct 按下态按钮 {
   // 编辑工具保留输入框的焦点与选区；普通操作继续使用原生焦点行为。
   @Prop preserveInputFocus: boolean = false;
   @Prop autoHeight: boolean = false;
+  /** 密集工具栏使用轻色层而非独立胶囊和投影，仍保留44vp点击高度。 */
+  @Prop compact: boolean = false;
   点击回调: () => void = (): void => {};
 
   private activate(): void {
@@ -74,7 +78,7 @@ export struct 按下态按钮 {
     return this.selectable && this.selected ? this.resolvedSelectionColor() : this.字色;
   }
   private buttonBorder(): BorderOptions {
-    return SurfaceBorder.options(this.selectable ? 2 : 应用尺寸.卡片边框,
+    return SurfaceBorder.options(this.compact ? 0 : this.selectable ? 2 : 应用尺寸.卡片边框,
       this.selectable && this.selected ? this.resolvedSelectionColor() : SurfaceBorder.color());
   }
 
@@ -96,14 +100,16 @@ export struct 按下态按钮 {
             }, (glyph: ThemeLabelGlyph, index: number): string => `${index}-${glyph.letter}-${glyph.color}`)
           }
             .fontSize(this.字号)
-            .layoutWeight(this.fillWidth ? 1 : 0).textAlign(TextAlign.Center)
+            .layoutWeight(this.fillWidth ? 1 : 0)
+            .flexShrink(1).constraintSize({ minWidth: 0 }).textAlign(TextAlign.Center)
             .maxLines(this.singleLine ? 1 : undefined)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
         } else {
           Text(this.文案)
             .fontSize(this.字号)
             .fontColor(this.labelColor())
-            .layoutWeight(this.fillWidth ? 1 : 0).textAlign(TextAlign.Center)
+            .layoutWeight(this.fillWidth ? 1 : 0)
+            .flexShrink(1).constraintSize({ minWidth: 0 }).textAlign(TextAlign.Center)
             .maxLines(this.singleLine ? 1 : undefined)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
@@ -112,17 +118,20 @@ export struct 按下态按钮 {
         }
       }
       .justifyContent(FlexAlign.Center)
-      .constraintSize({ maxWidth: this.singleLine || this.fillWidth ? '100%' : undefined })
+      .width(this.fillWidth ? '100%' : undefined)
+      .constraintSize({ maxWidth: '100%' })
     }
-    .height(this.autoHeight ? undefined : 应用尺寸.按钮高度)
+    .height(undefined)
     .width(this.fillWidth ? '100%' : undefined)
-    .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
-    .constraintSize({ minWidth: 0, minHeight: 应用尺寸.按钮高度, maxWidth: this.singleLine || this.fillWidth ? '100%' : undefined })
+    .padding({ left: this.compact ? 8 : 应用尺寸.卡片内边距, right: this.compact ? 8 : 应用尺寸.卡片内边距, top: 8, bottom: 8 })
+    .constraintSize({ minWidth: 0, minHeight: 应用尺寸.按钮高度, maxWidth: '100%' })
     .accessibilityText(typeof this.文案 === 'string' ? this.文案 : localizedResourceText(this.getUIContext(), this.uiLanguage, this.文案))
     .fontColor(this.labelColor())
-    .attributeModifier(new GlassSurface(this.glassColors, $r('app.color.surface_card'), this.buttonBorder()))
+    .backgroundColor(this.compact && this.selected ? `#1A${this.actionColor.slice(-6)}` : Color.Transparent)
+    .border(this.buttonBorder())
+    .attributeModifier(this.compact ? new PressFeedback() : new GlassSurface(this.surfaceMaterial, this.glassColors, $r('app.color.surface_card'), this.buttonBorder()))
     .stateEffect(false)
-    .borderRadius(应用尺寸.圆角_胶囊)
+    .borderRadius(this.compact ? 8 : 应用尺寸.圆角_胶囊)
     .enabled(this.是否启用)
     .focusOnTouch(!this.preserveInputFocus)
     .onClick(() => { this.activate(); })

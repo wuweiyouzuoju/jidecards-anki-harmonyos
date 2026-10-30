@@ -38,16 +38,18 @@ export interface InteractionFeedbackSupport {
   cardFlipAnimation: boolean;
   pageMotion: string;
   dialogMotion: string;
+  selectionMenu: string;
   dialogActions: DialogActionPresentation;
   execution: string;
 }
 export const INTERACTION_FEEDBACK_SUPPORT: InteractionFeedbackSupport = {
-  resultActions: FEEDBACK_ACTIONS, menuInput: 'manual_hold_slide_release_or_click',
+  resultActions: FEEDBACK_ACTIONS, menuInput: 'manual_hold_slide_release_or_click; preview_release_at_trigger_keeps_menu_open',
   holdMillis: MENU_SLIDE_HOLD_MS, branchDwellMillis: MENU_SLIDE_BRANCH_MS,
   ratingRecovery: 'probe_core_step_and_card_before_resubmission',
   undoProtection: 'core_expected_history_step', cardFlipAnimation: false,
   pageMotion: 'shared_navigation_and_local_sections; fade_in_only_with_optional_direction_offset; preview_overlay_fades',
-  dialogMotion: 'shared_surface_transition; inline_scale_and_fade_in_then_fade_out; native_window_owns_platform_geometry; one_owner_per_surface',
+  dialogMotion: 'shared_surface_transition; inline_scale_and_fade_in_then_fade_out; native_window_owns_platform_geometry; full_window_keyboard_avoid_none; frame_owns_keyboard_viewport; one_owner_per_surface',
+  selectionMenu: 'content_sized_left_aligned_rows; selected_theme_text_medium_weight; no_checkmark_or_selection_fill; viewport_limited_scroll; all_enum_controls_use_shared_options; deck_tone_secondary_dialog; popup_body_limited_transparency; default_page_backdrop_frosted; glass_page_backdrop_clear; glass_menu_neutral_limited_transparency; home_more_labels_centered_button_anchored; home_menus_content_measured_width; study_more_button_measured_right_edge',
   dialogActions: DIALOG_ACTION_PRESENTATION,
   execution: 'feedback_buttons_are_manual_ui_callbacks; existing_agent_domain_tools_keep_their_confirmation_rules'
 };
