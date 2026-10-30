@@ -9,7 +9,7 @@ else()
 endif()
 set(SANDBOX_ARCHIVE "${CMAKE_CURRENT_SOURCE_DIR}/target/${SANDBOX_TARGET}/release/libjidecards_agent_sandbox.a")
 if(NOT EXISTS "${SANDBOX_ARCHIVE}")
-    message(FATAL_ERROR "Missing sandbox archive; run tools/build-agent-sandbox.ps1 -Target app")
+    message(FATAL_ERROR "Missing sandbox archive; from the project root run: npm run build:app -- --release")
 endif()
 add_library(agent_sandbox SHARED napi.cpp)
 set_target_properties(agent_sandbox PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON

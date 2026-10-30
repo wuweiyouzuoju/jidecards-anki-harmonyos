@@ -24,8 +24,13 @@ set(RSHARMONY_ARCHIVE
     "${WORKSPACE_ROOT}/target/${RUST_TARGET}/${RUST_PROFILE}/libjidecards_core.a")
 
 if(NOT EXISTS "${RSHARMONY_ARCHIVE}")
+    if(RUST_PROFILE STREQUAL "release")
+        set(RUST_BUILD_COMMAND "npm run build:app -- --release")
+    else()
+        set(RUST_BUILD_COMMAND "npm run build:app")
+    endif()
     message(FATAL_ERROR
-        "Missing ${RSHARMONY_ARCHIVE}; run tools/build-native.ps1 first")
+        "Missing ${RSHARMONY_ARCHIVE}; from the project root run: ${RUST_BUILD_COMMAND}")
 endif()
 
 add_library(jidecards_core STATIC IMPORTED GLOBAL)
