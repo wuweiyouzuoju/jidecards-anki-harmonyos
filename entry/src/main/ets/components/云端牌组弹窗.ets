@@ -1,5 +1,7 @@
-import { SurfaceTransition } from '../utils/SurfaceTransition';
+import { insetMaterialFill } from '../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { GlassPanel } from './common/GlassPanel';
+import { SurfaceTransition } from '../utils/SurfaceTransition';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { PressFeedback } from '../utils/PressFeedback';
 import { DialogBackdrop } from './common/DialogBackdrop';
@@ -19,6 +21,8 @@ import { 云端牌组目录项, 格式化云端牌组大小 } from '../model/云
  */
 @Component
 export struct 云端牌组弹窗 {
+  @State private surfaceWidth: string = '90%';
+  @State private surfaceMaximumWidth: number = 560;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
@@ -92,7 +96,7 @@ export struct 云端牌组弹窗 {
           .fontColor($r('app.color.text_tertiary'))
           .padding({ left: 应用尺寸.间距_8, right: 应用尺寸.间距_8,
             top: 应用尺寸.间距_4, bottom: 应用尺寸.间距_4 })
-          .backgroundColor($r('app.color.surface_page'))
+          .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
           .borderRadius(应用尺寸.圆角_胶囊)
       }
 
@@ -147,7 +151,7 @@ export struct 云端牌组弹窗 {
     }
     .width('100%')
     .padding(应用尺寸.间距_8)
-    .backgroundColor(this.已选中(deck.id) ? this.选中背景色 : $r('app.color.surface_page'))
+    .backgroundColor(this.已选中(deck.id) ? this.选中背景色 : insetMaterialFill($r('app.color.surface_page')))
     .border(SurfaceBorder.options(应用尺寸.卡片边框,
       this.已选中(deck.id) ? this.动作主色 : SurfaceBorder.color()))
     .borderRadius(应用尺寸.圆角_面板)
@@ -161,10 +165,14 @@ export struct 云端牌组弹窗 {
 
   build() {
     Stack() {
-      DialogBackdrop()
+      DialogBackdrop({ widthPercent: 90, maximumWidth: 560,
+          onSize: (width: string, maximumWidth: number): void => {
+            this.surfaceWidth = width; this.surfaceMaximumWidth = maximumWidth;
+          } })
         .transition(SurfaceTransition.backdrop())
 
-      Column({ space: 应用尺寸.间距_12 }) {
+      GlassPanel({ radius: 应用尺寸.圆角_卡片, panelWidth: this.surfaceWidth, maximumWidth: this.surfaceMaximumWidth, maximumHeight: '72%' }) {
+Column({ space: 应用尺寸.间距_12 }) {
         DialogHeader({
           title: $r('app.string.cloud_deck_title'),
           showActionLabel: true, actionLabel: $r('app.string.cloud_deck_download', this.selectedIds.length),
@@ -220,7 +228,7 @@ export struct 云端牌组弹窗 {
             }
               .type(ButtonType.Normal)
               .fontColor(this.动作主色)
-              .backgroundColor($r('app.color.surface_page'))
+              .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
               .border(SurfaceBorder.options())
               .borderRadius(应用尺寸.圆角_面板)
               .attributeModifier(new PressFeedback())
@@ -270,13 +278,13 @@ export struct 云端牌组弹窗 {
         }
 
       }
-      .width('90%')
-      .constraintSize({ maxWidth: 560, maxHeight: '72%' })
+      .width('100%')
+       
       .padding(应用尺寸.间距_16)
-      .backgroundColor($r('app.color.surface_card'))
-      .border(SurfaceBorder.options())
-      .borderRadius(应用尺寸.圆角_卡片)
-      .transition(SurfaceTransition.dialog())
+      
+      
+      }
+      
     }
     .width('100%')
     .height('100%')
