@@ -1,7 +1,8 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { SurfaceSelect } from '../common/SurfaceSelect';
 import { DirectorySelect } from '../common/DirectorySelect';
 import { DirectoryRow, DirectoryView, DirectoryChoice, directoryChoiceRows, directorySpecial } from '../../model/DirectoryTree';
 import { appInterface } from '../../backend/AppInterfaceService';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { noteTypeText } from '../../utils/NoteTypeText';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { SelectStyle } from '../../utils/SelectStyle';
@@ -19,6 +20,7 @@ interface AgentSelectOption { value: string; }
 
 @Component
 export struct AgentSetupCard {
+  @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @Prop mode: AgentMode = 'create';
   @Prop setup: AgentTaskSetup;
   @Prop deckOptions: AgentSetupChoice[] = [];
@@ -61,54 +63,32 @@ export struct AgentSetupCard {
       this.deckSelector()
       Row() {
         Text($r('app.string.add_note_notetype')).layoutWeight(1)
-        Select(this.notetypeOptions.map((item: AgentSetupChoice): AgentSelectOption => ({ value: noteTypeText(this.getUIContext(), item.name) })))
-          .selected(this.notetypeOptions.findIndex((item: AgentSetupChoice): boolean =>
-            item.id === this.setup.notetypeId))
-          .value(noteTypeText(this.getUIContext(), this.setup.notetypeName))
-          .enabled(!this.disabled)
-          .attributeModifier(new SelectStyle())
-          .height(SelectStyle.controlHeight)
-          .padding(SelectStyle.controlPadding)
-          .space(SelectStyle.controlSpace)
-          .width(SelectStyle.fieldWidth)
-          .constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
-          .font(SelectStyle.controlFont)
-          .optionFont(SelectStyle.optionFont)
-          .selectedOptionFont(SelectStyle.selectedOptionFont)
-          .textModifier(SelectStyle.labelText())
-          .border(SelectStyle.controlBorder).borderRadius(SelectStyle.controlRadius)
-          .onSelect((index: number): void => {
+        SurfaceSelect({ options: this.notetypeOptions.map((item: AgentSetupChoice): AgentSelectOption => ({ value: noteTypeText(this.getUIContext(), item.name) })),
+          selectedIndex: this.notetypeOptions.findIndex((item: AgentSetupChoice): boolean =>
+            item.id === this.setup.notetypeId),
+          value: noteTypeText(this.getUIContext(), this.setup.notetypeName),
+          isInteractive: !this.disabled,
+          onSelect: (index: number): void => {
             if (index >= 0 && index < this.notetypeOptions.length) {
               this.onNotetypeSelected(this.notetypeOptions[index].id);
             }
-          })
+          } }).constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
       }.width('100%')
     } else {
       this.deckSelector()
       Row() {
         Text($r('app.string.add_note_notetype')).layoutWeight(1)
-        Select(this.editNotetypeOptions())
-          .selected(this.setup.notetypeId <= 0 ? 0 : 1 + this.notetypeOptions.findIndex(
-            (item: AgentSetupChoice): boolean => item.id === this.setup.notetypeId))
-          .value(this.setup.notetypeId <= 0 ? this.allNotetypesLabel : noteTypeText(this.getUIContext(), this.setup.notetypeName))
-          .enabled(!this.disabled)
-          .attributeModifier(new SelectStyle())
-          .height(SelectStyle.controlHeight)
-          .padding(SelectStyle.controlPadding)
-          .space(SelectStyle.controlSpace)
-          .width(SelectStyle.fieldWidth)
-          .constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
-          .font(SelectStyle.controlFont)
-          .optionFont(SelectStyle.optionFont)
-          .selectedOptionFont(SelectStyle.selectedOptionFont)
-          .textModifier(SelectStyle.labelText())
-          .border(SelectStyle.controlBorder).borderRadius(SelectStyle.controlRadius)
-          .onSelect((index: number): void => {
+        SurfaceSelect({ options: this.editNotetypeOptions(),
+          selectedIndex: this.setup.notetypeId <= 0 ? 0 : 1 + this.notetypeOptions.findIndex(
+            (item: AgentSetupChoice): boolean => item.id === this.setup.notetypeId),
+          value: this.setup.notetypeId <= 0 ? this.allNotetypesLabel : noteTypeText(this.getUIContext(), this.setup.notetypeName),
+          isInteractive: !this.disabled,
+          onSelect: (index: number): void => {
             if (index === 0) { this.onNotetypeSelected(0); }
             else if (index > 0 && index <= this.notetypeOptions.length) {
               this.onNotetypeSelected(this.notetypeOptions[index - 1].id);
             }
-          })
+          } }).constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
       }.width('100%')
       Text(this.editContext)
         .fontSize(应用尺寸.字号_正文_小)

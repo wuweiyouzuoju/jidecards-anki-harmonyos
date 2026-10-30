@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appLocaleName } from '../../model/AppLocales';
 import { PrimaryActionButton } from '../common/PrimaryActionButton';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { 按下态按钮 } from '../common/按下态按钮';
@@ -75,6 +76,7 @@ export struct AgentActionCard {
     return $r('app.string.ai_agent_setting_device_scope');
   }
   private settingValue(value: string, _locale: string = this.uiLanguage): string {
+    if (this.setting().settingId === 'language') return appLocaleName(value);
     if (this.setting().settingId === 'motion_style') {
       return namedResourceText(this.getUIContext(), 'motion_style_' + value);
     }
