@@ -42,7 +42,7 @@ test('auxiliary action rows prevent late disabled clicks and leave label, tint a
 });
 
 // These contracts protect layout ownership, not native pixel measurements.
-test('labels receive remaining row width and controls remain bounded with a gap and single line overflow', () => {
+test('labels receive remaining row width and controls remain bounded with a gap and bounded value overflow', () => {
   for (const path of ['components/common/FormSelectRow.ets', 'components/common/LabeledActionRow.ets']) {
     const source = read(path);
     assert.match(source, /Row\(\{ space: FormRowLayout\.gap \}\)/);
@@ -50,7 +50,8 @@ test('labels receive remaining row width and controls remain bounded with a gap 
     const constraint = path.endsWith('FormSelectRow.ets') ? 'SelectStyle.fieldConstraint' : 'FormRowLayout.trailingConstraint';
     assert.ok(source.includes(`.constraintSize(${constraint}).flexShrink(0)`));
   }
-  assert.match(read('components/common/FormSelectRow.ets'), /textModifier\(SelectStyle\.labelText\(\)\)/);
+  assert.match(read('components/common/SurfaceSelect.ets'), /SelectionValueButton\(/);
+  assert.match(read('components/common/SelectionValueButton.ets'), /maxLines\(this\.valueMaxLines\).textOverflow\(/);
   assert.match(read('components/common/LabeledActionRow.ets'), /singleLine: true/);
 });
 

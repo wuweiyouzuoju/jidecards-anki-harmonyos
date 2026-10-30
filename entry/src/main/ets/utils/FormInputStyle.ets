@@ -1,3 +1,4 @@
+import { insetMaterialFill } from './GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { 应用尺寸 } from './应用尺寸';
 import { SurfaceBorder } from './SurfaceBorder';
@@ -17,7 +18,7 @@ export class FormInputStyle implements AttributeModifier<TextInputAttribute> {
       .fontSize(应用尺寸.字号_正文)
       .fontColor($r('app.color.text_primary'))
       .placeholderColor($r('app.color.text_tertiary'))
-      .backgroundColor($r('app.color.surface_card'))
+      .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
       .border(SurfaceBorder.options())
       .borderRadius(应用尺寸.圆角_面板)
       .padding({ left: this.horizontalPadding, right: this.horizontalPadding });

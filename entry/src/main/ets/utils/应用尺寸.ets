@@ -40,12 +40,12 @@ export class 应用尺寸 {
   static readonly 字号_说明: number = 11; // 日历格数字、辅助提示
   static readonly 字号_正文_小: number = 12; // 指标标签、卡组分项计数、月份副标题
   static readonly 字号_正文_中: number = 13; // 次级说明文字
-  static readonly 字号_正文: number = 14; // 描述、详情指标标签、空态提示
-  static readonly 字号_按钮: number = 15; // 顶部工具栏按钮
+  static readonly 字号_正文: number = 15; // 描述、详情指标标签、空态提示
+  static readonly 字号_按钮: number = 16; // 顶部工具栏按钮
   static readonly 字号_强调: number = 16; // 待学数量
-  static readonly 字号_标题: number = 17; // 卡组名、空态标题、开始学习
-  static readonly 字号_卡片标题: number = 18; // 卡片内标题、详情指标数值
-  static readonly 字号_摘要标题: number = 19; // 今日进度标题
+  static readonly 字号_标题: number = 18; // 卡组名、空态标题、开始学习
+  static readonly 字号_卡片标题: number = 19; // 卡片内标题、详情指标数值
+  static readonly 字号_摘要标题: number = 20; // 今日进度标题
   static readonly 字号_分区标题: number = 20; // 分区标题
   static readonly 字号_指标: number = 21; // 今日指标数值
   static readonly 字号_牌组标题: number = 25; // 详情页卡组名
@@ -54,14 +54,14 @@ export class 应用尺寸 {
   static readonly 字号_主视觉: number = 42; // 记忆状态百分比
 
   // ---- 圆角 ----
-  static readonly radiusLg: number = 16; // 通用大圆角；业务 alias 可独立调整。
+  static readonly radiusLg: number = 18; // 通用大圆角；业务 alias 可独立调整。
   static readonly 圆角_色条: number = 3; // 卡组色条
   static readonly 圆角_进度条: number = 4; // 进度条
   static readonly 圆角_单元格: number = 6; // 日历格
   static readonly 圆角_牌组行: number = 15; // 卡组行
   static readonly 圆角_指标卡: number = 应用尺寸.radiusLg; // 详情指标卡
-  static readonly 圆角_卡片: number = 18; // 摘要卡
-  static readonly 圆角_面板: number = 12; // 弹层面板
+  static readonly 圆角_卡片: number = 22; // 摘要卡
+  static readonly 圆角_面板: number = 18; // 弹层面板
   static readonly 面板内边距: number = 20; // 居中浮卡内边距（纵向呼吸感）
   static readonly 父牌组候选项缩进: number = 16; // 父牌组候选行每层缩进（整张选择卡向右偏移）
   static readonly 圆角_胶囊: number = 22; // 工具栏按钮
@@ -80,7 +80,7 @@ export class 应用尺寸 {
   static readonly 滑动器高度: number = 272;
 
   // ---- 页面骨架 ----
-  static readonly 页面内边距_水平: number = 12;
+  static readonly 页面内边距_水平: number = 16;
   static readonly 工具栏高度: number = 60;
   // 非页面顶栏（如全屏编辑器）的内部留白，不参与 a/b/c/d。
   static readonly toolbarVerticalInset: number = 8;

@@ -1,3 +1,5 @@
+import { popupAppearance } from '../../entry/src/main/ets/components/common/PopupAppearance.ts';
+import { materialHarness } from './surface-material-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -51,18 +53,21 @@ test('menu, panel and button outlines share defaults while explicit state colors
 });
 
 test('the real menu surface applies the shared outline and preserves its custom radius', () => {
+  const PopupSurface=loadPlatformModule('components/common/PopupSurface.ets','PopupSurface',{popupAppearance,SurfaceBorder,Color:{Transparent:'transparent'},BlurStyle:{NONE:'none'}});
   const MenuSurface=loadPlatformModule('components/common/MenuSurface.ets','MenuSurface',{
+    ...materialHarness(), PopupSurface,
     应用尺寸:{卡片边框:1,radiusLg:16},SurfaceBorder,$r:key=>key,Color:{Transparent:'transparent'}
   });
   for(const active of [true,false]) for(const cornerRadius of [undefined,18]) {
     const attrs={},calls=[];
-    const instance=Object.fromEntries(['backgroundColor','border','borderRadius','shadow','clip'].map(name=>
+    const instance=Object.fromEntries(['backgroundColor','border','borderRadius','shadow','clip','backgroundBlurStyle','backdropBlur','linearGradient'].map(name=>
       [name,value=>{calls.push(name);attrs[name]=value;return instance;}]));
     new MenuSurface(active,cornerRadius).applyNormalAttribute(instance);
-    assert.deepEqual(attrs.border,SurfaceBorder.options(active?1:0));
+    assert.equal(attrs.border.width,active?1:0);
     assert.equal(attrs.borderRadius,cornerRadius??16);
     assert.ok(calls.indexOf('border')<calls.indexOf('borderRadius'),'border defaults must not override the explicit radius');
-    assert.equal(attrs.backgroundColor,active?'app.color.menu_surface':'transparent');
+    assert.equal(attrs.backgroundColor,active?popupAppearance('flat',false).fill:'transparent');
+    assert.equal(attrs.backdropBlur,0);
     assert.equal(attrs.clip,active);assert.equal(attrs.shadow.radius,0,'flat surfaces never add elevation');
   }
 });
@@ -104,11 +109,15 @@ test('ordinary outlines, form controls and separators use the common border inst
       file + ': neutral outlines and separators must use SurfaceBorder');
   }
   for (const file of ['components/牌组详情面板.ets', 'components/DeckStudyHistoryCard.ets',
-    'components/common/IconActionButton.ets', 'components/common/DialogFrame.ets',
+    'components/common/IconActionButton.ets', 'components/common/PopupSurface.ets',
     'components/common/MenuSurface.ets', 'utils/PrimaryGlassSurface.ets', 'utils/FormInputStyle.ets',
-    'utils/FormTextAreaStyle.ets', 'utils/ImageSurfaceStyle.ets', 'components/settings/设置分组卡片.ets']) {
+    'utils/FormTextAreaStyle.ets', 'utils/ImageSurfaceStyle.ets']) {
     assert.match(read(file), /\.border\(SurfaceBorder\.options\(/, file);
   }
+  assert.match(read('components/settings/设置分组卡片.ets'), /SeriesVisual.settingsSurface\(/);
+  assert.doesNotMatch(read('components/settings/设置分组卡片.ets'), /backgroundColor\(设置面板色板_取/);
+  assert.match(read('components/common/DialogFrame.ets'), /attributeModifier\(new PopupSurface\(/);
+  assert.doesNotMatch(read('components/common/DialogFrame.ets'), /backgroundColor\(\$r\('app.color.surface_card'\)/);
   assert.match(read('components/home/HomeDeckDetails.ets'), /IconActionButton\(\{ toolbarStyle: true/,
     'detail toolbar delegates its homepage outline to the public icon button');
   assert.match(read('utils/GlassSurface.ets'),/outline: BorderOptions = SurfaceBorder\.options\(\)/);
@@ -117,6 +126,6 @@ test('ordinary outlines, form controls and separators use the common border inst
   assert.doesNotMatch(deck, /bindPopup\(/, 'deck rows delegate menus to the root shared surface');
   assert.match(read('components/home/HomeDeckRowMenu.ets'), /DialogFrame\(\{/);
   assert.match(read('components/common/CardActionMenu.ets'), /\.attributeModifier\(new MenuSurface\(this\.anchor === undefined\)\)/);
-  assert.match(read('components/common/MenuBubbleSurface.ets'), /\.stroke\(SurfaceBorder\.color\(\)\)/);
+  assert.match(read('components/common/GlassBubblePanel.ets'), /\.stroke\(SurfaceBorder\.color\(\)\)/);
   assert.match(read('components/home/DeckReparentFeature.ets'),/DialogFrame\(\{/,'hierarchy changes use the shared dialog surface');
 });
