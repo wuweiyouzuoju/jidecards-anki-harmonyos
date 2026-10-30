@@ -2,6 +2,7 @@
 import { noteTypeText } from '../../utils/NoteTypeText';
 import { showToastSafely, resourceText } from '../../utils/UiFeedback';
 import { IconActionButton } from '../common/IconActionButton';
+import { SeriesVisual } from '../../utils/SeriesVisual';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { NOTETYPE_MANAGEMENT_ACTIONS } from '../../model/AppInterface';
 
@@ -49,6 +50,8 @@ import type { NotetypeNameId } from '../../proto/messages/NotetypeMessages';
 
 @Component
 export struct 笔记类型管理面板 {
+  @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
+  @StorageProp(颜色键.动作主色) private materialAccent: string = '#2F5FD0';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
 
@@ -202,9 +205,7 @@ export struct 笔记类型管理面板 {
     .width('100%')
     .alignItems(HorizontalAlign.Start)
     .padding(应用尺寸.间距_12)
-    .backgroundColor($r('app.color.surface_card'))
-    .border(SurfaceBorder.options())
-    .borderRadius(应用尺寸.圆角_卡片)
+    .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, this.isDark, this.materialAccent, '', 应用尺寸.圆角_卡片))
   }
 
   private openCreate(sourceId: number = 0, sourceName: string = ''): void {

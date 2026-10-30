@@ -1,8 +1,9 @@
+import { insetMaterialFill } from '../../utils/GlassMaterial';
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { TEMPLATE_SHORTCUTS, shortcutCommand } from '../../model/KeyboardShortcuts';
 import { StudyKeyboardSession } from '../../model/StudyKeyboard';
 import { studyEventChord } from '../../utils/StudyKeyAdapter';
 import { IconActionButton } from '../common/IconActionButton';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { LengthMetrics } from '@kit.ArkUI';
 import { NoteDraftPreview } from '../common/NoteDraftPreview';
@@ -385,18 +386,22 @@ export struct 笔记类型编辑器 {
     const template: 模板项 = this.模板列表[index];
     let settled: boolean = false;
     this.getUIContext().showAlertDialog({ title: this.取本地化文本($r('app.string.notetype_remove_template')),
-      message: this.取本地化文本($r('app.string.notetype_remove_template_hint')),
-      cancel: (): void => { settled = true; },
-      primaryButton: { value: this.取本地化文本($r('app.string.cancel')), action: (): void => { settled = true; } },
-      secondaryButton: { value: this.取本地化文本($r('app.string.notetype_mgmt_delete')), action: (): void => {
-        if (settled) return;
-        settled = true;
-        if (!this.mounted || this.保存中 || this.confirmingSave || this.confirmingClose || this.preview !== null ||
-          this.模板列表.length <= 1 || this.模板列表[index] !== template || index !== this.当前模板索引) return;
-        this.模板列表.splice(index, 1); this.模板列表 = this.模板列表.slice();
-        this.当前模板索引 = Math.min(index, this.模板列表.length - 1);
-        this.resetTemplateSelection();
-      } } });
+        message: this.取本地化文本($r('app.string.notetype_remove_template_hint')),
+        cancel: (): void => { settled = true; }, buttons: [
+            { value: this.取本地化文本($r('app.string.cancel')), action: (): void => { settled = true; } },
+            { value: this.取本地化文本($r('app.string.notetype_mgmt_delete')), action: (): void => {
+                    if (settled)
+                        return;
+                    settled = true;
+                    if (!this.mounted || this.保存中 || this.confirmingSave || this.confirmingClose || this.preview !== null ||
+                        this.模板列表.length <= 1 || this.模板列表[index] !== template || index !== this.当前模板索引)
+                        return;
+                    this.模板列表.splice(index, 1);
+                    this.模板列表 = this.模板列表.slice();
+                    this.当前模板索引 = Math.min(index, this.模板列表.length - 1);
+                    this.resetTemplateSelection();
+                } }
+        ], buttonDirection: DialogButtonDirection.AUTO });
   }
 
   private async previewTemplate(): Promise<void> {
@@ -459,7 +464,7 @@ export struct 笔记类型编辑器 {
       TextInput({ text: this.fieldName(字段.draftId) })
         .fontSize(应用尺寸.字号_正文_小)
         .height(应用尺寸.按钮高度)
-        .backgroundColor($r('app.color.surface_card'))
+        .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
         .border(SurfaceBorder.options())
         .borderRadius(应用尺寸.圆角_面板)
         .layoutWeight(1)
@@ -534,7 +539,7 @@ export struct 笔记类型编辑器 {
           TextInput({ text: this.类型名 })
             .height(应用尺寸.按钮高度)
             .fontSize(应用尺寸.字号_正文)
-            .backgroundColor($r('app.color.surface_card'))
+            .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
             .border(SurfaceBorder.options())
             .borderRadius(应用尺寸.圆角_面板)
             .onChange((值: string) => { this.类型名 = 值; })
@@ -612,7 +617,7 @@ export struct 笔记类型编辑器 {
             TextInput({ text: this.当前模板().name })
               .height(应用尺寸.按钮高度)
               .fontSize(应用尺寸.字号_正文_小)
-              .backgroundColor($r('app.color.surface_card'))
+              .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
               .border(SurfaceBorder.options())
               .borderRadius(应用尺寸.圆角_面板)
               .onChange((值: string) => { this.更新模板名(值); })

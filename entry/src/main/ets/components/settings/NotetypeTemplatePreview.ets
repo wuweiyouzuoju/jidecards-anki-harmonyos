@@ -1,7 +1,8 @@
+import { GlassSource } from '../common/GlassSource';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { webview } from '@kit.ArkWeb';
 import { common } from '@kit.AbilityKit';
-import { CardWebView, CardWebAttributes } from '../../utils/CardWebView';
+import { CardWebView, CardWebAttributes, cardScriptDiagnosticLabels } from '../../utils/CardWebView';
 import { interceptCardAsset } from '../../utils/CardAssetResponse';
 import { interceptMediaRequest } from '../../utils/媒体响应助手';
 import { RenderedCard } from '../../proto/messages/CardRenderingMessages';
@@ -17,7 +18,7 @@ import { NoteEditorHeader } from '../common/NoteEditorHeader';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { DraftPreviewMedia, DraftPreviewOption } from '../../model/NoteDraftPreview';
 import { FormSelectRow } from '../common/FormSelectRow';
-import { LabeledActionRow } from '../common/LabeledActionRow';
+import { IconActionButton } from '../common/IconActionButton';
 import { CardAudioSession } from '../../model/CardAudioSession';
 import { 声音播放器 } from '../../utils/声音播放器';
 import { TTS播放器 } from '../../utils/TTS播放器';
@@ -25,6 +26,11 @@ import { 卡片渲染服务 } from '../../backend/卡片渲染服务';
 import { APP_FOREGROUND_KEY } from '../../model/AppLifecycleState';
 import { PAGE_COMPACT_LAYOUT_KEY } from '../../model/AppLayoutState';
 import { DelayedLoadingIndicator } from '../common/DelayedLoadingIndicator';
+import { noteLinkBridgeScript } from '../../model/NoteLinkBridge';
+import { NoteLinksProxy } from '../../model/NoteLinksProxy';
+import { noteLinksService } from '../../backend/NoteLinksService';
+import { 卡片预览页 } from '../browser/卡片预览页';
+import { 颜色键 } from '../../model/颜色主题';
 
 class TemplateAudioProxy {
   dispatch: (action: string, version: number) => void = (_action: string, _version: number): void => {};
@@ -48,6 +54,12 @@ export struct NotetypeTemplatePreview {
   @Prop media: DraftPreviewMedia = { fields: [], directory: '', filenames: [] };
   onSelect: (index: number) => void = (_index: number): void => {};
   @Prop @Watch('cardThemeChanged') isDark: boolean = false;
+  @StorageProp(颜色键.主色容器) @Watch('referenceThemeChanged') private referenceSurface: string = '#E8EEFC';
+  @StorageProp(颜色键.主色文字) @Watch('referenceThemeChanged') private referenceText: string = '#183B8F';
+  private referenceThemeChanged(): void {
+    if (this.alive && this.attached) this.controller.runJavaScript(noteLinkBridgeScript(this.previewVersion,
+      undefined, { surface: this.referenceSurface, text: this.referenceText })).catch((error: Object): void => { console.info(`Note reference theme: ${error}`); });
+  }
   @State private answerSide: boolean = false;
   @State private failed: boolean = false;
   @State private audioFailed: boolean = false;
@@ -57,6 +69,10 @@ export struct NotetypeTemplatePreview {
   @State private cardSurfaceBackground: string = '';
   @StorageProp(APP_FOREGROUND_KEY) @Watch('stopBackgroundAudio') private foreground: boolean = true;
   onClose: () => void = (): void => {};
+  onBackHandlerChange: (handler: (() => boolean) | null) => void = (_handler: (() => boolean) | null): void => {};
+  @State private linkedIds: number[] = [];
+  @State private referenceError: string = '';
+  private linkedBack: (() => boolean) | null = null;
   onReleaseAvailable: (release: () => Promise<void>) => void = (_release: () => Promise<void>): void => {};
   private controller: webview.WebviewController = new webview.WebviewController();
   private spareController: webview.WebviewController = new webview.WebviewController();
@@ -85,6 +101,7 @@ export struct NotetypeTemplatePreview {
 
   aboutToAppear(): void {
     this.alive = true;
+    this.onBackHandlerChange((): boolean => this.referenceBack());
     this.cardThemeChanged();
     this.onReleaseAvailable((): Promise<void> => this.releaseCard());
     reviewPreferences.read().then((value): void => {
@@ -93,7 +110,22 @@ export struct NotetypeTemplatePreview {
       this.showSide();
     }).catch((error: Error): void => { console.info(`Preview preferences: ${error.message}`); });
   }
-  aboutToDisappear(): void { this.releaseCard().catch((error: Error): void => { console.info(error.message); }); }
+  aboutToDisappear(): void { this.onBackHandlerChange(null); this.releaseCard().catch((error: Error): void => { console.info(error.message); }); }
+  private referenceBack(): boolean {
+    if (this.linkedIds.length === 0) return false;
+    if (!this.linkedBack?.()) this.linkedIds = [];
+    return true;
+  }
+  private requestClose(): void { if (!this.referenceBack()) this.onClose(); }
+  private async openReference(guid: string, version: number): Promise<void> {
+    if (!this.alive || !this.foreground || !this.isVisible || this.linkedIds.length > 0 || version !== this.previewVersion) return;
+    try {
+      const ids: number[] = await noteLinksService.preview(guid);
+      if (!this.alive || !this.foreground || !this.isVisible || version !== this.previewVersion) return;
+      if (ids.length === 0) { this.referenceError = resourceText(this.getUIContext(), $r('app.string.note_links_missing')); return; }
+      this.audio.stop(); this.cardWeb.setAudioEnabled(false); this.linkedIds = ids;
+    } catch (_error) { if (this.alive && version === this.previewVersion) this.referenceError = resourceText(this.getUIContext(), $r('app.string.note_links_error')); }
+  }
   private releaseCard(): Promise<void> {
     this.cardWeb.setAudioEnabled(false);
     this.alive = false; this.previewVersion++;
@@ -102,15 +134,17 @@ export struct NotetypeTemplatePreview {
   }
 
   private stopBackgroundAudio(): void {
+    this.cardWeb.setActive(this.foreground && this.isVisible);
     this.cardWeb.setAudioEnabled(this.foreground && this.isVisible && !this.loading);
     if (!this.foreground) this.audio.stop();
   }
   private stopHiddenAudio(): void {
+    this.cardWeb.setActive(this.foreground && this.isVisible);
     this.cardWeb.setAudioEnabled(this.foreground && this.isVisible && !this.loading);
     if (!this.isVisible) this.audio.stop();
   }
   private async playAudio(audioTarget: string = ''): Promise<void> {
-    if (!this.attached || !this.foreground || !this.isVisible || this.loading || this.renderPending || this.loadError !== '') return;
+    if (!this.attached || !this.foreground || !this.isVisible || this.linkedIds.length > 0 || this.loading || this.renderPending || this.loadError !== '') return;
     this.audioFailed = false;
     const target: RegExpExecArray | null = /^([qa]):(\d+)$/.exec(audioTarget);
     const question: boolean = target === null ? !this.answerSide : target[1] === 'q';
@@ -122,6 +156,7 @@ export struct NotetypeTemplatePreview {
 
   private showSide(): void {
     if (!this.attached || this.loading || this.loadError !== '') return;
+    this.cardWeb.setActive(this.foreground && this.isVisible);
     try {
       this.cardWeb.setAudioEnabled(this.foreground && this.isVisible);
       this.failed = false;
@@ -130,8 +165,9 @@ export struct NotetypeTemplatePreview {
       const side: string = this.answerSide ? 'answer' : 'question';
       const version: number = ++this.previewVersion;
       const html: string = 剥除拼写标记(构建卡片HTML(this.rendered, this.answerSide ? 'answer' : 'question', this.isDark,
-        undefined, this.hideAudioButtons, resourceText(this.getUIContext(), $r('app.string.study_replay_sound')), resourceText(this.getUIContext(), $r('app.string.card_script_load_error'))));
-      this.cardWeb.show(appendCardScript(html, buildPreviewInteractionScript(version)), this.contentRevision, side);
+        undefined, this.hideAudioButtons, resourceText(this.getUIContext(), $r('app.string.study_replay_sound')), resourceText(this.getUIContext(), $r('app.string.card_script_load_error')), cardScriptDiagnosticLabels(this.getUIContext())));
+      this.cardWeb.show(appendCardScript(appendCardScript(html, buildPreviewInteractionScript(version)),
+        noteLinkBridgeScript(version, undefined, { surface: this.referenceSurface, text: this.referenceText })), this.contentRevision, side);
     } catch (error) { this.failed = true; this.renderPending = false; }
   }
 
@@ -151,7 +187,7 @@ export struct NotetypeTemplatePreview {
   }
 
   private toggleSide(): void {
-    if (!this.attached || this.loading || this.renderPending || this.failed || this.loadError !== '') return;
+    if (!this.attached || this.linkedIds.length > 0 || this.loading || this.renderPending || this.failed || this.loadError !== '') return;
     this.answerSide = !this.answerSide;
     this.showSide();
   }
@@ -164,7 +200,12 @@ export struct NotetypeTemplatePreview {
       proxy.dispatch = (action: string, version: number): void => {
         if (version === this.previewVersion && /^audio:[qa]:\d+$/.test(action)) this.playAudio(action.slice(6));
       };
-      for (const index of this.webSlots) this.cardWeb.controllerAt(index).registerJavaScriptProxy(proxy, 'jidePreview', ['onAction']);
+      const references: NoteLinksProxy = new NoteLinksProxy();
+      references.dispatch = (guid: string, _action: string, version: number): void => { this.openReference(guid, version); };
+      for (const index of this.webSlots) {
+        this.cardWeb.controllerAt(index).registerJavaScriptProxy(proxy, 'jidePreview', ['onAction']);
+        this.cardWeb.controllerAt(index).registerJavaScriptProxy(references, 'jideNoteLinks', ['onLink']);
+      }
       this.cardWeb.attach(0); this.cardWeb.attach(1); this.attached = true; this.showSide();
     }
     catch (error) { this.failed = true; }
@@ -172,7 +213,7 @@ export struct NotetypeTemplatePreview {
 
   private renderExited(): void {
     this.failed = true; this.attached = false;
-    this.audio.stop(); this.cardWeb.reset();
+    this.audio.stop(); this.cardWeb.reset(true);
   }
 
   private mediaDirectory(): string {
@@ -183,8 +224,8 @@ export struct NotetypeTemplatePreview {
   @Builder
   private header() {
     DialogHeader({ title: this.sample ? $r('app.string.notetype_template_preview') : $r('app.string.note_draft_preview'), closeLabel: $r('app.string.close'),
-      showActionLabel: true, actionLabel: this.answerSide ? $r('app.string.notetype_preview_question') : $r('app.string.notetype_preview_answer'),
-      onClose: this.onClose, onAction: (): void => { this.toggleSide(); } })
+      actionIcon: $r('app.media.ic_card_flip'), actionLabel: this.answerSide ? $r('app.string.notetype_preview_question') : $r('app.string.notetype_preview_answer'),
+      onClose: (): void => { this.requestClose(); }, onAction: (): void => { this.toggleSide(); } })
   }
 
   @Builder
@@ -200,12 +241,16 @@ export struct NotetypeTemplatePreview {
               surfaceColor: $r('app.color.surface_card'), isInteractive: !this.loading && !this.renderPending,
               onSelect: this.onSelect })
           }
-          LabeledActionRow({ label: this.sample ? $r('app.string.notetype_preview_hint') : $r('app.string.note_preview_hint'),
-            actionLabel: $r('app.string.study_replay_sound'), textColor: $r('app.color.text_secondary'),
-            onAction: (): void => { this.playAudio(); } })
+          Row({ space: 应用尺寸.间距_8 }) {
+            Text(this.sample ? $r('app.string.notetype_preview_hint') : $r('app.string.note_preview_hint'))
+              .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_secondary')).layoutWeight(1)
+            IconActionButton({ source: $r('app.media.ic_audio_replay'), label: $r('app.string.study_replay_sound'),
+              onAction: (): void => { this.playAudio(); } })
+          }.width('100%').alignItems(VerticalAlign.Center)
           if (this.failed || this.loadError !== '') {
             Text(this.loadError === '' ? $r('app.string.browser_preview_load_error') : this.loadError).fontColor($r('app.color.error_text'))
           }
+          if (this.referenceError !== '') { Text(this.referenceError).fontColor($r('app.color.error_text')) }
           if (this.rendered.isEmpty) { Text($r('app.string.note_preview_empty')).fontColor($r('app.color.text_secondary')) }
           if (this.audioFailed) { Text($r('app.string.browser_preview_audio_error')).fontColor($r('app.color.error_text')) }
         }.width('100%')
@@ -248,18 +293,28 @@ export struct NotetypeTemplatePreview {
   }
 
   build() {
+    Stack() {
     if (this.fullScreen) {
+      // 选择器原生Popup挂在正文内，展开期间复用打开前的真实帧，避免递归采样。
+      GlassSource({ sourceEnabled: this.isVisible && this.linkedIds.length === 0, freezeDuringPanels: true }) {
       Column() {
         NoteEditorHeader({ title: this.sample ? $r('app.string.notetype_template_preview') : $r('app.string.note_draft_preview'),
-          actionLabel: this.answerSide ? $r('app.string.notetype_preview_question') : $r('app.string.notetype_preview_answer'),
-          onBack: this.onClose, onSave: (): void => { this.toggleSide(); } })
+          actionIcon: $r('app.media.ic_card_flip'), actionLabel: this.answerSide ? $r('app.string.notetype_preview_question') : $r('app.string.notetype_preview_answer'),
+          onBack: (): void => { this.requestClose(); }, onSave: (): void => { this.toggleSide(); } })
         Column() { this.content() }.width('100%').layoutWeight(1)
           .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平,
             top: 应用尺寸.页面内容顶部间距(this.narrow), bottom: 应用尺寸.间距_8 + this.navigationBarHeight })
       }.width('100%').height('100%')
+      }
     } else {
       DialogFrame({ maximumWidth: 应用尺寸.dialogWideMaxWidth, fillBody: true,
-        header: () => { this.header(); }, content: () => { this.content(); }, onDismiss: this.onClose })
+        header: () => { this.header(); }, content: () => { this.content(); }, onDismiss: (): void => { this.requestClose(); } })
     }
+    if (this.linkedIds.length > 0) {
+      卡片预览页({ 卡片ID列表: this.linkedIds, 媒体目录: this.mediaDirectory(), isDark: this.isDark, linksReadOnly: true,
+        onClose: (): void => { this.linkedIds = []; this.linkedBack = null; this.cardWeb.setAudioEnabled(this.foreground && this.isVisible); },
+        onBackHandlerChange: (handler: (() => boolean) | null): void => { this.linkedBack = handler; } })
+    }
+    }.width('100%').height('100%')
   }
 }
