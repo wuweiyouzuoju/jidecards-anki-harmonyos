@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { AnchoredMenu } from '../common/AnchoredMenu';
-import { AnchoredMenuItem } from '../common/MenuItem';
+import { SelectionOptions } from '../common/SelectionOptions';
 import { MenuSlideScope } from '../../model/MenuSlideSession';
 
 
@@ -24,7 +24,7 @@ import { MenuSlideScope } from '../../model/MenuSlideSession';
 // @Invariants
 // - 与 主页操作面板/主页更多面板 同布局/同过渡：150ms 淡入 + 0.98 轻缩放，禁止位移
 // - 锚定 TopEnd（右上角），与触发按钮（顶栏右侧）对齐
-// - 条目为居中文字（用户裁定 2026-08-29 去掉 ✓ 标记），当前项仅文字高亮主色
+// - 条目与普通枚举共用居中选择行，当前项仅主题色文字和字重，不绘制选择标记
 //
 // @副作用
 // 无。选择与关闭事件通过回调上抛，由 设置面板 落库并关闭菜单。
@@ -36,15 +36,16 @@ export struct 模式切换菜单 {
   @Prop 当前简洁模式: boolean = true;
   @Prop 主色: ResourceColor = $r('app.color.action_primary');
   @Prop 顶部偏移: number = 68;
+  @Prop toolbarRight: number | undefined = undefined;
   选择回调: (简洁: boolean) => void = (_简洁: boolean): void => {};
   关闭回调: () => void = (): void => {};
 
   build() {
-    AnchoredMenu({ topOffset: this.顶部偏移, slideScope: this.slideScope, onClose: (): void => { this.关闭回调(); } }) {
-      AnchoredMenuItem({ label: $r('app.string.settings_simple_mode_simple'), selected: this.当前简洁模式, slideScope: this.slideScope,
-        onSelect: (): void => { this.选择回调(true); } })
-      AnchoredMenuItem({ label: $r('app.string.settings_simple_mode_full'), selected: !this.当前简洁模式, divider: true, slideScope: this.slideScope,
-        onSelect: (): void => { this.选择回调(false); } })
+    AnchoredMenu({ anchorRight: this.toolbarRight, topOffset: this.顶部偏移, slideScope: this.slideScope, onClose: (): void => { this.关闭回调(); } }) {
+      SelectionOptions({ items: [
+        { id: 'simple', label: $r('app.string.settings_simple_mode_simple'), selected: this.当前简洁模式 },
+        { id: 'full', label: $r('app.string.settings_simple_mode_full'), selected: !this.当前简洁模式 }
+      ], onSelect: (id: string): void => { this.选择回调(id === 'simple'); } })
     }
   }
 }
