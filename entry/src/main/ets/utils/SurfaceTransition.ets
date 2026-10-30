@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { currentMotionProfile, navigationEnterOffset } from './AppMotion';
+import { currentMotionProfile, navigationEnterOffset, materialPopupAnimation } from './AppMotion';
 import { 取全屏转场时长, 取全屏转场曲线 } from './转场时长';
 
 /** 界面转场的唯一效果入口；宿主只选择页面、覆盖预览或弹窗语义。 */
@@ -29,7 +29,7 @@ export class SurfaceTransition {
   }
 
   static dialogEnterAnimation(): AnimateParam {
-    return { duration: 取全屏转场时长(), curve: 取全屏转场曲线() };
+    return materialPopupAnimation(取全屏转场时长());
   }
 
   static dialogExitAnimation(): AnimateParam {
