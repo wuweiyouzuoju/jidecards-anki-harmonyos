@@ -1,3 +1,5 @@
+import { noteLinkBridgeScript } from '../../entry/src/main/ets/model/NoteLinkBridge.ts';
+import { NoteLinksProxy } from '../../entry/src/main/ets/model/NoteLinksProxy.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
@@ -10,15 +12,18 @@ import { MenuSlideScope, menuSlideSession } from '../../entry/src/main/ets/model
 import { keyboardViewportHeight } from '../../entry/src/main/ets/model/WindowSafeLayout.ts';
 import { KeyboardPressSession } from '../../entry/src/main/ets/model/KeyboardInput.ts';
 import { AgentTaskPlan } from '../../entry/src/main/ets/model/agent/AgentTaskPlan.ts';
+import * as appLocales from '../../entry/src/main/ets/model/AppLocales.ts';
+import { SUMMARY_LABEL_KEYS } from '../../entry/src/main/ets/model/SummaryLabels.ts';
+import * as localeFormatting from '../../entry/src/main/ets/utils/LocaleFormatting.ts';
 
 // 直接执行公共窗口管理器；只在调用方替换平台窗口。
 export function nativeDialogHostClass(dependencies = {}) {
   const source = readFileSync(new URL('../../entry/src/main/ets/components/common/NativeDialogHost.ets', import.meta.url), 'utf8')
     .replace(/^import[^;]+;\s*/gm, '').replace(/^export /gm, '');
-  return new Function('SurfaceTransition', 'Color', 'DialogAlignment',
+  return new Function('SurfaceTransition', 'Color', 'DialogAlignment', 'KeyboardAvoidMode',
     stripTypeScriptTypes(source, { mode: 'transform' }) + ';return NativeDialogHost;')(
     dependencies.SurfaceTransition, dependencies.Color ?? { Transparent: 'transparent' },
-    dependencies.DialogAlignment ?? { Center: 'center' });
+    dependencies.DialogAlignment ?? { Center: 'center' }, dependencies.KeyboardAvoidMode ?? { NONE: 'none' });
 }
 export const NativeDialogHost = nativeDialogHostClass();
 
@@ -38,6 +43,7 @@ export function nativeDialogMembers(source, excluded = []) {
 
 function localeDependencies(dependencies) {
   return {
+    noteLinkBridgeScript, NoteLinksProxy, ...appLocales, ...localeFormatting, SUMMARY_LABEL_KEYS, DialogButtonDirection: { AUTO: 'auto' },
     MenuHoldController, MenuSlideScope, menuSlideSession, keyboardViewportHeight, AgentTaskPlan, KeyboardPressSession, StudyKeyboardSession: KeyboardPressSession,
     NativeDialogHost: nativeDialogHostClass(dependencies),
     Scroller: class { currentOffset() { return {xOffset:0,yOffset:0}; } scrollBy() {} scrollToIndex() {} },
@@ -72,7 +78,7 @@ export function loadComponentLogic(path, exportName, dependencies) {
   source = source.replace(/^import[^;]+;\s*/gm, '').replace(/^export type[^;]+;\s*/gm, '');
   source = source.replace(/^export\s*\{[^}]+\}\s*from[^;]+;\s*/gm, '');
   source = source.replace(/^@Builder\nexport function[\s\S]*?^}\n/gm, '');
-  source = source.replace(/^  @Builder\n[^\n]+\{\}\n/gm, '');
+  source = source.replace(/^  @Builder\n[^\n]+\{[^\n]*\}\n/gm, '');
   source = source.replace(/^  @Builder\n[\s\S]*?^  }\n/gm, '');
   const build = source.indexOf('  build() {');
   if (build < 0) throw new Error('Component has no render boundary: ' + path);

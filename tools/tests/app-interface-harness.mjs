@@ -1,3 +1,4 @@
+import * as noteReferencesApi from '../../entry/src/main/ets/model/NoteReferences.ts';
 import { BrowserOperationController } from '../../entry/src/main/ets/model/BrowserOperationController.ts';
 import { assertNoteEditorUnchanged } from '../../entry/src/main/ets/model/NoteEditorConflict.ts';
 import { completeStudyGestures, studyGestureCommand, StudyShakeDetector } from '../../entry/src/main/ets/model/StudyGestureConfig.ts';
@@ -5,7 +6,7 @@ import { validateStudyControls } from '../../entry/src/main/ets/model/StudyContr
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
 import { actionMenuRows, visibleActionMenuRows, toggleActionMenuBranch } from '../../entry/src/main/ets/components/common/ActionMenuTree.ts';
-import { APP_INTERFACE_SURFACES, AppInterfaceTracker, visibleInterfaceItems, studyInterfaceMenu, noteEditInterfaceControls } from '../../entry/src/main/ets/model/AppInterface.ts';
+import { HOME_SYNC_CHOICES, APP_INTERFACE_SURFACES, AppInterfaceTracker, visibleInterfaceItems, studyInterfaceMenu, noteEditInterfaceControls } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { noteFieldDisplayKey } from '../../entry/src/main/ets/model/NoteTypePresentation.ts';
 import { expansionRevealDependencies, loadPlatformModule } from './platform-module-harness.mjs';
 import { BURY_SUSPEND_MODE_BURY_USER, BURY_SUSPEND_MODE_SUSPEND } from '../../entry/src/main/ets/proto/messages/SchedulerMessages.ts';
@@ -13,13 +14,15 @@ import { CARD_FLAGS, customFlagLabel } from '../../entry/src/main/ets/model/Card
 import { OFFICIAL_ANNOUNCEMENTS_ENABLED } from '../../entry/src/main/ets/model/官方公告配置.ts';
 import { FEEDBACK_ACTIONS, resultUndoStatus } from '../../entry/src/main/ets/model/InteractionFeedback.ts';
 import { AgentOperationHosts } from '../../entry/src/main/ets/model/agent/AgentOperationHost.ts';
+import { noteLinkEditorFields, restoreNoteLinkEditorFields } from '../../entry/src/main/ets/model/NoteLinkEditor.ts';
+import { NOTE_LINK_SUPPORT } from '../../entry/src/main/ets/model/NoteLinks.ts';
 
 /** 较早的学习生命周期测试仍执行生产方法；补入实际界面观察依赖。标签替身只服务这些键值断言。 */
 export function appInterfaceDependencies() {
   const flagMenuChoices = loadPlatformModule('components/common/FlagMenuChoices.ets', 'flagMenuChoices', {
     CARD_FLAGS, customFlagLabel, $r: key => key, namedResourceText: (_context, key) => 'app.string.' + key
   });
-  return { discardNoteRecordings: async () => {}, completeStudyGestures, studyGestureCommand, validateStudyControls,
+  return { HOME_SYNC_CHOICES, discardNoteRecordings: async () => {}, completeStudyGestures, studyGestureCommand, validateStudyControls,
     StudyShakeSensor: loadPlatformModule('backend/StudyShakeSensor.ets', 'StudyShakeSensor', { StudyShakeDetector, sensor: {SensorId:{ACCELEROMETER:1},on(){},off(){},getSingleSensorSync(){} } }),
     agentOperationHosts:new AgentOperationHosts(), appInterface: new AppInterfaceTracker(), FEEDBACK_ACTIONS, resultUndoStatus, OFFICIAL_ANNOUNCEMENTS_ENABLED, visibleInterfaceItems, studyInterfaceMenu, actionMenuRows, visibleActionMenuRows, toggleActionMenuBranch,
     $r: key => key, CARD_FLAGS, customFlagLabel, flagMenuChoices,
@@ -34,6 +37,7 @@ export function noteInterfaceDependencies() {
     BrowserOperationController, assertNoteEditorUnchanged, 笔记服务: class {}, 卡片服务: class {}, 笔记类型服务: class {}, 牌组服务: class {}
   });
   return { ...deps, ...expansionRevealDependencies(), NoteEditorProperties, noteEditInterfaceControls, noteFieldDisplayKey,
+    noteLinkEditorFields, restoreNoteLinkEditorFields, NOTE_LINK_SUPPORT, ...noteReferencesApi,
     interfaceItemText: loadPlatformModule('utils/AppInterfaceText.ets', 'interfaceItemText', { APP_INTERFACE_SURFACES, ...deps }),
     noteFieldText: loadPlatformModule('utils/NoteTypeText.ets', 'noteFieldText', { noteFieldDisplayKey, ...deps }) };
 }

@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { compileWithUiFeedback } from './ui-feedback-harness.mjs';
 import { AgentHistoryCoordinator } from '../../entry/src/main/ets/model/agent/AgentHistoryCoordinator.ts';
-import { NativeDialogHost } from './platform-module-harness.mjs';
+import { NativeDialogHost, loadPlatformModule } from './platform-module-harness.mjs';
 
 const read = path => readFileSync(new URL('../../' + path, import.meta.url), 'utf8');
 function methods(path, names, dependencies) {
@@ -125,14 +125,20 @@ test('late notetype capabilities cannot overwrite a newer choice or a new conver
 });
 
 test('language failure is displayed and redundant language changes remain no-ops', () => {
-  const toasts = [];
+  const toasts = [], writes = [];
+  const store = loadPlatformModule('model/语言存储.ets', '{当前语言模式,设置语言模式}', {
+    i18n: { System: { getAppPreferredLanguage: () => 'en', setAppPreferredLanguage(value) {
+      writes.push(value); throw Error('platform unavailable');
+    } } }
+  });
   const Page = methods('components/settings/GeneralSettings.ets', ['选择语言'], {
-    $r: key => key, 当前语言模式: () => 'en', 设置语言模式() { throw Error('platform unavailable'); }
+    $r: key => key, ...store
   });
   const page = new Page();
   page.getUIContext = () => ({ getPromptAction: () => ({ showToast: options => toasts.push(options.message) }) });
   page.选择语言('en'); assert.deepEqual(toasts, []);
   page.选择语言('zh-Hans'); assert.deepEqual(toasts, ['app.string.settings_language_save_failed']);
+  assert.deepEqual(writes, ['zh-Hans'], 'the real store owns duplicate suppression for every caller');
 });
 
 test('application labels have one owner per locale and the form explicitly binds its storage', () => {
