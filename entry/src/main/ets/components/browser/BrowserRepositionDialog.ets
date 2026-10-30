@@ -1,3 +1,4 @@
+import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { DialogFrame } from '../common/DialogFrame';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
@@ -94,7 +95,7 @@ export struct BrowserRepositionDialog {
         .height(应用尺寸.按钮高度)
         .fontSize(应用尺寸.字号_正文)
         .fontColor($r('app.color.text_primary'))
-        .backgroundColor($r('app.color.surface_page'))
+        .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
         .borderRadius(应用尺寸.圆角_面板)
         .enabled(!(this.busy || this.loading))
         .type(InputType.Number)
@@ -116,7 +117,7 @@ export struct BrowserRepositionDialog {
         .height(应用尺寸.按钮高度)
         .fontSize(应用尺寸.字号_正文)
         .fontColor($r('app.color.text_primary'))
-        .backgroundColor($r('app.color.surface_page'))
+        .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
         .borderRadius(应用尺寸.圆角_面板)
         .enabled(!(this.busy || this.loading))
         .type(InputType.Number)

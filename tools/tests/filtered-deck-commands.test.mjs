@@ -7,7 +7,7 @@ import { AutoSyncScheduler } from '../../entry/src/main/ets/model/AutoSyncSchedu
 import { SyncActivity } from '../../entry/src/main/ets/model/SyncSettings.ts';
 import { maintenancePreviewRows } from '../../entry/src/main/ets/model/agent/AgentMaintenancePreview.ts';
 import { createAgentAction } from '../../entry/src/main/ets/model/agent/AgentAction.ts';
-import { APP_INTERFACE_SURFACES, deckDetailsMoreItems } from '../../entry/src/main/ets/model/AppInterface.ts';
+import { APP_INTERFACE_SURFACES, deckRowMenuItems } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { loadPlatformModule, loadComponentLogic } from './platform-module-harness.mjs';
 import { readFileSync } from 'node:fs';
 import { FILTERED_DECK_ORDERS, filteredDeckOrderTitleKey } from '../../entry/src/main/ets/model/FilteredDeckOptions.ts';
@@ -64,7 +64,7 @@ test('manual filtered form and JIDE translate the same complete Core order catal
   assert.notDeepEqual(form.orderOptions(),original);assert.equal(form.排序值,过滤牌组排序.随机);
 });
 test('the shared details menu excludes normal preset options from filtered decks',()=>{
-  const regular=deckDetailsMoreItems(true,false).map(item=>item.id),filtered=deckDetailsMoreItems(true,true).map(item=>item.id);
+  const regular=deckRowMenuItems(false,false).map(item=>item.id),filtered=deckRowMenuItems(false,true).map(item=>item.id);
   assert.ok(regular.includes('options'));assert.ok(!filtered.includes('options'));
   for(const action of FILTERED_DECK_ACTIONS){assert.ok(filtered.includes(action.id));assert.ok(!regular.includes(action.id));}
   for(const id of ['rename','move','export']){assert.ok(regular.includes(id));assert.ok(filtered.includes(id));}
@@ -99,7 +99,7 @@ test('read-only proposals, stale recheck, accepted payload freezing and shared c
   assert.equal(f.scheduler.canSync(),true);assert.equal(f.scheduler.hasPending(),true);
 });
 test('both deck menus declare the same actual maintenance labels for JIDE',()=>{
-  for(const id of ['deck_details_more','deck_row_menu'])for(const action of FILTERED_DECK_ACTIONS){
+  for(const id of ['deck_row_menu'])for(const action of FILTERED_DECK_ACTIONS){
     const item=APP_INTERFACE_SURFACES.find(x=>x.id===id).items.find(x=>x.id===action.id);assert.equal(item.titleKey,action.titleKey);assert.equal(item.condition,'filtered_deck');}
 });
 test('scheduler rebuild decodes actual Core card count',async()=>{

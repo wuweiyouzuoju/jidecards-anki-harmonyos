@@ -1,3 +1,4 @@
+import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { CARD_FLAGS, CardFlagDefinition, FlagLabels, FlagLabelChange, parseFlagLabels,
   customFlagLabel, saveCardFlagLabels } from '../../model/CardMarking';
@@ -94,7 +95,7 @@ export struct FlagNamesDialog {
       Text(this.errorText).fontColor($r('app.color.error_text')).fontSize(应用尺寸.字号_正文_小)
       Button($r('app.string.card_mark_retry')).enabled(!this.isBusy)
         .height(应用尺寸.按钮高度).fontSize(应用尺寸.字号_正文)
-        .fontColor($r('app.color.text_primary')).backgroundColor($r('app.color.surface_card'))
+        .fontColor($r('app.color.text_primary')).backgroundColor(insetMaterialFill($r('app.color.surface_card')))
         .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_胶囊)
         .attributeModifier(new PressFeedback()).stateEffect(false).onClick((): void => {
         this.errorText = ''; if (this.loaded) this.save(); else { this.isBusy = true; this.load(); }

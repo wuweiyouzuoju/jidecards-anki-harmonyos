@@ -1,3 +1,4 @@
+import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../../utils/PressFeedback';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
@@ -68,7 +69,7 @@ export struct BrowserFlagDialog {
       .height(应用尺寸.按钮高度)
       .padding({ left: 应用尺寸.间距_16, right: 应用尺寸.间距_16 })
       .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_胶囊)
-      .backgroundColor($r('app.color.surface_page'))
+      .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
       .enabled(!this.busy)
       .attributeModifier(new PressFeedback())
       .onClick((): void => { this.onSubmit(definition.value); })

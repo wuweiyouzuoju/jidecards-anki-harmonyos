@@ -1,5 +1,6 @@
-import { DialogFrame } from '../common/DialogFrame';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SurfaceSelect } from '../common/SurfaceSelect';
+import { DialogFrame } from '../common/DialogFrame';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { FormInputStyle } from '../../utils/FormInputStyle';
 import { HelpLabel } from '../common/HelpLabel';
@@ -47,6 +48,7 @@ import { 颜色键 } from '../../model/颜色主题';
 
 @Component
 export struct 查找替换对话框 {
+  @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop isDark: boolean = false;
   @Prop @Watch('publishInterface') busy: boolean = false;
@@ -239,15 +241,13 @@ export struct 查找替换对话框 {
             .fontSize(应用尺寸.字号_正文_小)
             .fontColor($r('app.color.text_secondary'))
             .width('100%')
-          Select(this.targetOptions()).selected(this.targetIndex).value(this.targetOptions()[this.targetIndex]?.value ?? '')
-            .height(SelectStyle.controlHeight).padding(SelectStyle.controlPadding).space(SelectStyle.controlSpace)
-      .font(SelectStyle.controlFont).border(SelectStyle.controlBorder).borderRadius(SelectStyle.controlRadius)
-      .optionFont(SelectStyle.optionFont).selectedOptionFont(SelectStyle.selectedOptionFont)
-      .textModifier(SelectStyle.labelText()).width('100%').attributeModifier(new SelectStyle())
-            .enabled(!this.busy && !this.fieldsLoading && !this.fieldsError)
-            .onSelect((index: number): void => {
+          SurfaceSelect({ options: this.targetOptions(),
+            selectedIndex: this.targetIndex,
+            value: this.targetOptions()[this.targetIndex]?.value ?? '',
+            isInteractive: !this.busy && !this.fieldsLoading && !this.fieldsError,
+            onSelect: (index: number): void => {
               this.targetIndex = index; this.字段名 = index >= 2 ? this.fieldNames[index - 2] : '';
-            })
+            } }).width('100%')
           if (this.fieldsLoading) { Text($r('app.string.browser_loading')).fontColor($r('app.color.text_secondary')) }
           if (this.fieldsError) {
             Text($r('app.string.browser_field_names_error')).fontColor($r('app.color.error_text'))
