@@ -157,7 +157,7 @@
 
 
 [GlassSource.ets](GlassSource.ets) 只包页面正文和真实底色，按可见性、材质与前后台预热并释放源；同一窗口由可见正文登记采样源，宽屏内嵌编辑器沿用完整浏览正文。弹窗和遮罩在源外。
-[GlassPanel.ets](GlassPanel.ets) 统一消费系列 SharedGlassBackdrop，拥有首次纹理准备、250ms锁定降级及唯一展开；宿主提供宽度/限高，正文决定收缩高度。玻璃位于零布局尺寸的绝对层，禁止纹理反向参与面板测量，防止边框尺寸反馈持续撑大。原生窗口本身不另做进入动画。
+[GlassPanel.ets](GlassPanel.ets) 统一消费系列 SharedGlassBackdrop，拥有首次纹理准备、真实纹理就绪后唯一展开，无超时材质降级；宿主提供宽度/限高，正文决定收缩高度。玻璃位于零布局尺寸的绝对层，禁止纹理反向参与面板测量，防止边框尺寸反馈持续撑大。原生窗口本身不另做进入动画。
 [GlassBubblePanel.ets](GlassBubblePanel.ets) 与 [MenuBubble.ets](MenuBubble.ets) 共用宿主的M/L/Q/C轮廓作裁剪、描边和公共HAR光学距离场，覆盖四个箭头方向。覆盖、系统例外及实测入口见[弹窗玻璃接入](../../../../../../docs/development/dialog-glass.md)。
 
 弹窗内层表单/目录通过GlassMaterial.insetMaterialFill透出外壳共享玻璃，FormInputStyle和DirectoryTree统一拥有该规则；内层不注册采样或独立入场。侧筛选及裁剪外壳也委托GlassPanel，显式全高只用于有界面板。具体内容例外与验收见[弹窗玻璃](../../../../../../docs/development/dialog-glass.md)。

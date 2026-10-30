@@ -12,7 +12,7 @@
 | 嵌套模块 | `SeriesVisual.insetSurface` | 玻璃只画轮廓，不再叠底色、高光或阴影；扁平恢复实底 |
 | 主题染色 | `model/GlassTheme.ts` | alpha不变，浅/深色混入当前主题主色10%/12%；灰色仍中性；幻彩纹理由原背景拥有 |
 | 搜索框 | `utils/SearchFieldSurface.ets`、`common/LiveSearchField.ets` | 背景浅40%/深50%，边框委托materialOptions；不得独立用白色边框削弱轮廓 |
-| 弹层 | `common/GlassPanel.ets`、`PopupSurface.ets`、`PopupAppearance.ts` | 保留本体有限透明与原有弱反光；采样、失败降级与动画仍由GlassPanel拥有，不借模块样式绕过生命周期 |
+| 弹层 | `common/GlassPanel.ets`、`PopupSurface.ets`、`PopupAppearance.ts` | 保留本体有限透明与原有弱反光；采样、准备等待与动画仍由GlassPanel拥有，不借模块样式绕过生命周期 |
 | 列表分隔线 | `SurfaceBorder.separatorWidth`、资源surface_border | 1vp，布局高度同为1vp，flexShrink(0)；每个ForEach条目只有一个布局根，线与该条目同属根；只在相邻条目之间绘制 |
 | 编辑框操作行 | `common/NoteFieldEditor.ets` | 输入视口完整112/336vp；放大按钮行在输入框边界外，不叠加到正文，不绘制独立白底 |
 
@@ -37,3 +37,13 @@ AnchoredMenu的contentLeft/contentMaxWidth描述可定位区域，不能把该�
 详情开始学习按钮与显示答案使用相同52vp高度、18vp圆角、16fp中等字体和左右4vp内边距，宿主操作区共用应用尺寸的上下安全间距。开始学习保留独立可用性守卫，表面走SeriesVisual.control，边框与上方模块同源；不使用26vp胶囊轮廓。
 
 四项评分玻璃单独由StudyRatingSurface绘制：忘记/困难/良好/简单保留红橙绿蓝语义底色和文字，浅色62%/深色80%色层，1vp柔白边缘，无方向性高光，浅色轻阴影。底部横排与浮动竖排共用；两行文字仍显示Core提供的间隔，点击、禁用与评分回调不变。它是语义轮廓例外，不能被全局主题染色替代；扁平及显示答案保持原材质。
+
+## 深浅色玻璃机制
+
+浅色、显式深色及跟随系统深色均接通既有GlassPanel→GlassBackdrop→系列SharedGlassBackdrop的采样、模糊和折射实现。背后文字形成光学变化属于材质表现，不能据此关闭整条路径。只对递归采入自身、失效源或明确的采样错误做边界修复；同类视觉统一调整参数与轮廓，不降级为透明色块。牌组行最终边框共用materialOptions，重排态保留强调边框。
+
+深色普通按钮与工具栏按钮共用24%透光底层和0.8vp/#22FFFFFF轮廓，GlassSurface默认轮廓委托materialOptions。显式选中/错误轮廓仍由调用方提供。保留现有24vp模糊及弱高光，GlassPanel采样/折射不做深色关闭。内容模块仍68%，不能为视觉统一取消按钮与内容层级。浅色按钮保留原14%底层。
+
+2026-10-30深色宽屏现场验收：SettingsWide（2584×1828）已安装重启；截图检查首页摘要/牌组行/右侧详情、工具按钮、设置模块和搜索，以及更多、新建、外观主题选择、详情预览菜单。确认菜单仍有背景采样光斑、模糊和折射，位置分别跟随左/右触发；未关闭光学实现。统一普通按钮24%底层及公共细边框；选中牌组保留强调底色。未在本轮逐页验收所有业务弹窗和评分页面，不以公共组件通过代替全覆盖声明。构建与41项聚焦回归通过。
+
+玻璃加载不再设置250ms/1200ms材质切换期限。GlassPanel等真实纹理绘制就绪后才展开，加载提示由DialogFrame既有入口显示；关闭后忽略迟到通知。不能以超时完成准备、清掉纹理或切换成另一种底色。同组主菜单和子面板适用同一规则。
