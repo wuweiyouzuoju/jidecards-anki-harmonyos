@@ -1,9 +1,10 @@
+import { browserDisplayKeys } from '../../entry/src/main/ets/model/BrowserPreferences.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { REVIEW_AUDIO_PREFERENCES } from '../../entry/src/main/ets/model/ReviewAudioPreferences.ts';
 import { readFileSync, readdirSync } from 'node:fs';
-import { APP_INTERFACE_SURFACES, NOTETYPE_MANAGEMENT_ACTIONS, EMPTY_CARDS_ACTIONS, AppInterfaceTracker, visibleInterfaceItems, deckDetailsMoreItems, settingsHeaderItems, settingsHeaderControls, addNoteInterfaceControls } from '../../entry/src/main/ets/model/AppInterface.ts';
+import { APP_INTERFACE_SURFACES, HOME_SYNC_CHOICES, NOTETYPE_MANAGEMENT_ACTIONS, EMPTY_CARDS_ACTIONS, AppInterfaceTracker, visibleInterfaceItems, deckRowMenuItems, settingsHeaderItems, settingsHeaderControls, addNoteInterfaceControls } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { appInterfaceSurfaceIds, browserInterfaceMenu, browserToolbarItems, studyInterfaceMenu } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { agentInterfaceControls, agentInterfaceTitle, agentImportLabelKey, reminderEditorControls, reminderEditorTitle } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { stripTypeScriptTypes } from 'node:module';
@@ -27,6 +28,16 @@ const context = {simple:true,agent:true,cloudDeck:false,themeHasTextures:false};
 const localize = key => { assert.ok(zh.has(key), 'missing UI resource: '+key); return zh.get(key); };
 const tools = agentFunctionTools(100,'assistant');
 const structure = (state=context, surface='app', section='') => buildAgentAppStructure(state,surface,section,localize,agentSettingDefinitions(),tools,[]);
+
+test('JIDE web cognition includes DeepSeek shared credentials and the actual enabled provider',()=>{
+  const result=buildAgentAppStructure(context,'app','',localize,agentSettingDefinitions(),tools,[],'agent','agent',[],'deepseek');
+  assert.equal(result.webAccess.available,true);
+  assert.equal(result.webAccess.provider,'deepseek');
+  assert.equal(result.webAccess.providers.find(p=>p.id==='deepseek').credential,'saved DeepSeek model API key');
+  const disabled=buildAgentAppStructure(context,'app','',localize,agentSettingDefinitions(),tools.filter(t=>!['web_search','read_webpage'].includes(t.name)),[],'agent','agent',[],'deepseek');
+  assert.equal(disabled.webAccess.available,false);
+  assert.equal(disabled.webAccess.provider,'');
+});
 
 test('JIDE reads external APKG opening from the receiving policy without granting file access', () => {
   for (const labels of [zh, en]) {
@@ -113,6 +124,7 @@ test('the add-note template icon retains its localized action and editor destina
   for (const blocked of [false, true]) {
     const controls = addNoteInterfaceControls({ tagsExpanded: false, occlusion: false, hasSource: false,
       busy: false, blocked, saveEnabled: false, hasTypes: true });
+    assert.equal(uiIcon(controls, 'templates'), 'app.media.ic_settings_layout', 'the actual UI control projection must preserve the icon');
     const page = Object.assign(new Page(), { pageActive: true, 是否图片遮盖模式: false,
       字段名列表: [], 笔记类型选项: [], 已选笔记类型ID: 7, fieldImages: [], fieldAudios: [],
       clozeFieldOrds: [], 图片遮盖_遮罩列表: [], 图片遮盖_源图Uri: '', 图片遮盖_显示编辑器: false,
@@ -162,8 +174,8 @@ test('JIDE reads current Core rendering ownership and the same supported TTS par
   assert.equal(support.mediaPaths,'anki-core');
   assert.equal(support.answerComparison,'anki-core');
   assert.equal(support.clozeTyping,'anki-core');
-  assert.deepEqual(support.web, {allowHttpResources:true,mediaPlaybackRequiresGesture:false,
-    scriptFailures:'continue remaining scripts; report failures; fail empty cards',
+  assert.deepEqual(support.web, {allowHttpResources:true,mediaPlaybackRequiresGesture:false,renderAcknowledgementTimeoutMs:60000,
+    scriptFailures:'continue remaining scripts; collapsed localized diagnostics with error messages, locations and stacks; fail empty cards',
     authorization:'provided and validated by the template author; requires author service availability'});
   assert.equal(support.tts.backend,'HarmonyOS CoreSpeechKit');
   assert.equal(support.tts.voicePrefix,'HarmonyOS_');
@@ -172,6 +184,10 @@ test('JIDE reads current Core rendering ownership and the same supported TTS par
   assert.equal(support.tts.voiceAvailability,'device-installed voices only');
   assert.equal(support.avOrder,'core-tag-order; adjacent same-kind items may be batched');
   const editor=structure().noteEditing;
+  assert.equal(editor.stickyControl.iconKey,'ic_editor_pin');
+  assert.equal(editor.stickyControl.selectedIconKey,'ic_editor_pin_filled');
+  assert.match(editor.formPresentation,/visible_tag_card/);
+  assert.equal(structure(context,'add_note').surfaces[0].items.find(item=>item.id==='preview').iconKey,'ic_common_preview');
   assert.deepEqual(editor.tools.filter(tool=>['font_size','heading'].includes(tool.id)).map(tool=>tool.id),['font_size','heading']);
   assert.equal(editor.tools.find(tool=>tool.id==='math').longPressAction,'choose_block_or_chemistry');
   assert.deepEqual(editor.formatMenus.map(menu=>[menu.toolId,menu.options.length]),[['font_size',7],['heading',5],['math',2]]);
@@ -195,7 +211,8 @@ test('JIDE reads current Core rendering ownership and the same supported TTS par
   assert.equal(editor.toolMenu.neutralControl,undefined);assert.equal(editor.toolMenu.mouseNotchesPerTool,2);
   assert.equal(editor.toolMenu.formatSelection,'independent_multiple_format_toggles');
   assert.equal(editor.toolMenu.foldingSelection,'collapse_preserves_formats_reopen_resets_formats');
-  assert.equal(editor.modeControlPlacement,'above_each_editable_field');
+  assert.equal(editor.modeControlPlacement,'note_field_header_compact_current_mode_toggle; other_rich_inputs_keep_local_mode_controls');
+  assert.equal(editor.modeControlWideMinWidth,480); assert.equal(editor.modeControlRailWidth,96);
   assert.equal(editor.expandControlPlacement,'inside_bottom_right_of_each_input');
   assert.deepEqual(editor.modeTools.map(tool=>[tool.id,zh.get(tool.titleKey),tool.editing]),[
     ['visual','可视编辑','visual_mode_preserving_html'],['source_edit','源码编辑','source_mode_preserving_html']]);
@@ -450,7 +467,7 @@ test('browser owner publishes actual trigger labels and blocks controls while se
   for (const labels of [zh,en]) {
     const tracker = new AppInterfaceTracker();
     const Page = pageMethods('pages/浏览页.ets',['publishInterface','browserFilterActive','viewControlsAvailable'], {
-      appInterface:tracker, browserToolbarItems, namedResourceText:(_,key)=>labels.get(key), FEEDBACK_ACTIONS:[]
+      appInterface:tracker, browserToolbarItems, browserDisplayKeys, namedResourceText:(_,key)=>labels.get(key), FEEDBACK_ACTIONS:[]
     });
     const page = new Page();
     const modeLabel=labels.get('browser_mode_notes');
@@ -460,7 +477,7 @@ test('browser owner publishes actual trigger labels and blocks controls while se
       sortColumn:'cardMod',sortReverse:false,subtitleIndex:0,inlineEditorId:0,结果ID列表:[1,2],选中ID列表:[],
       browserPreferences:{cardsColumns:['question'],notesColumns:['question']},getUIContext:()=>({}),
       viewChoiceLabel:group=>group==='mode'?modeLabel:statusLabel,sortLabel:()=>labels.get('browser_sort_card_modified')+' ↓' });
-    for (const boundary of ['', 'refreshingSearch','mutationBusy','批量忙碌','多选模式值']) {
+    for (const boundary of ['', 'displayBusy','refreshingSearch','mutationBusy','批量忙碌','多选模式值']) {
       if (boundary) page[boundary]=true;
       page.publishInterface();
       const result=buildAgentAppStructure(context,'browser','',key=>labels.get(key),[],[],tracker.snapshot());
@@ -499,16 +516,16 @@ test('study UI and JIDE keep both side groups while flags cover the main menu', 
   Object.assign(page,{getUIContext:()=>({}),mounted:true,页面已显示:true,studyMenuOpen:true,studyExpandedIds:['marking','card_actions'],flagLabels:{'7':'Custom purple'},阶段:'question',评分中:false,
     当前卡片:{cardId:42},currentMarking:{flag:7,marked:false},有音频:false,可撤销:false,Agent入口已启用:true,简洁模式:true,choiceQuestion:null,
     牌组名:'Deck',新卡剩余:1,学习中剩余:2,复习剩余:3,
-    openNoteEditor:()=>calls.push('edit'),playStudyAudio:()=>calls.push('audio'),showStudyGuide:()=>calls.push('guide'),
+    openNoteEditor:()=>calls.push('edit'),openNoteLinks:()=>calls.push('links'),playStudyAudio:()=>calls.push('audio'),showStudyGuide:()=>calls.push('guide'),
     撤销上次:()=>calls.push('undo'),埋藏或暂停当前卡:mode=>calls.push(mode===0?'bury':'suspend'),请求删除当前卡:()=>calls.push('delete'),
     changeMarking:()=>calls.push('mark'),loadFlagLabels:()=>calls.push('flag'),
     打开AI改卡:()=>calls.push('agent'),stopStudyTimers:()=>calls.push('handwrite'),configureAutoAdvance:()=>calls.push('auto_advance')});
-  const ids=['edit','agent','undo','marking','audio','card_actions','handwrite','guide'];
+  const ids=['edit','links','agent','undo','marking','audio','card_actions','handwrite','guide'];
   assert.deepEqual(page.interfaceMenuItems().map(x=>x.id),ids);
   assert.equal(page.更多菜单()[0].value,localize('study_edit_note'));
   page.有音频=true;page.可撤销=true;
   for(const item of page.更多菜单()) { for(const action of item.children??[item]) action.action(); }
-  assert.deepEqual(calls,['edit','agent','undo','mark','flag','audio','bury','suspend','delete','auto_advance','handwrite','guide']);
+  assert.deepEqual(calls,['edit','links','agent','undo','mark','flag','audio','bury','suspend','delete','auto_advance','handwrite','guide']);
   assert.equal(page.flagNamesOpen,true);
   Object.assign(page,{timeboxNotice:null,clearChoiceAutoAdvance:()=>{}});
   page.openStudyMenu();page.publishInterface();
@@ -552,11 +569,11 @@ test('study UI and JIDE keep both side groups while flags cover the main menu', 
   assert.equal(buildAgentAppStructure(context,'browser','',localize,[],[],tracker.snapshot()).observations.length,0);
 });
 
-test('deck detail observations follow the real snapshot, expansion and loading state', () => {
+test('deck detail observations follow the real snapshot and point to the shared row menu', () => {
   const tracker=new AppInterfaceTracker();
   const Details=loadComponentLogic('components/牌组详情面板.ets','牌组详情面板',{
     应用尺寸:loadPlatformModule('utils/应用尺寸.ets','应用尺寸',{}),
-    appInterface:tracker,visibleInterfaceItems,deckDetailsMoreItems,
+    appInterface:tracker,visibleInterfaceItems,deckRowMenuItems,
     interfaceItemText:(_,surface,id)=>localize(APP_INTERFACE_SURFACES.find(x=>x.id===surface).items.find(x=>x.id===id).titleKey),
     牌组显示名:deck=>deck.name,ExpansionReveal:class {cancel(){} request(){}},
     DECK_LIST_NARROW_KEY:'narrow',THEME_TEXT_COLORS_KEY:'text',GLASS_COLORS_KEY:'glass',GLASS_HIGHLIGHT_COLORS:[],
@@ -565,18 +582,17 @@ test('deck detail observations follow the real snapshot, expansion and loading s
     主页快照数据:{decks:[{id:'d',name:'Actual deck',description:'About',totalCards:9,newCount:1,learningCount:2,reviewCount:3}]},
     创建子牌组:()=>calls.push('create'),打开牌组选项:()=>calls.push('options'),导出牌组:()=>calls.push('export')});
   page.aboutToAppear();assert.equal(tracker.snapshot()[0].values.find(x=>x.id==='name').value,'Actual deck');
-  page.显示更多=true;page.牌组选项加载中=true;page.publishInterface();
-  const result=buildAgentAppStructure(context,'deck_details_more','',localize,[],[],tracker.snapshot());
-  assert.equal(result.surfaces[0].items.find(x=>x.id==='options').enabled,false);
-  page.selectMoreItem('options');assert.deepEqual(calls,[]);page.牌组选项加载中=false;
-  for(const id of ['create_child','options','export'])page.selectMoreItem(id);assert.deepEqual(calls,['create','options','export']);
+  const more=APP_INTERFACE_SURFACES.find(x=>x.id==='deck_details').items.find(x=>x.id==='more');
+  assert.equal(more.opens,'deck_row_menu');
+  assert.ok(deckRowMenuItems(false,false).some(x=>x.id==='move'));
+  assert.equal(APP_INTERFACE_SURFACES.some(x=>x.id==='deck_details_more'),false);
   page.选中牌组Id='missing';page.publishInterface();assert.equal(tracker.snapshot().length,0);
   page.aboutToDisappear();assert.equal(tracker.snapshot().length,0);
 });
 
 test('home selection refreshes knowledge without waking unrelated collection work', () => {
   const tracker=new AppInterfaceTracker();
-  const Page=pageMethods('pages/首页.ets',['previewDeckChanged','homeActionControls','publishHomeInterface'],{appInterface:tracker,OFFICIAL_ANNOUNCEMENTS_ENABLED,isDoubleColumnDeckListStyle,homeSyncIndicator,homeSyncLabelKey});
+  const Page=pageMethods('pages/首页.ets',['previewDeckChanged','homeActionControls','publishHomeInterface'],{appInterface:tracker,HOME_SYNC_CHOICES,OFFICIAL_ANNOUNCEMENTS_ENABLED,isDoubleColumnDeckListStyle,homeSyncIndicator,homeSyncLabelKey});
   const page=Object.assign(new Page(), { recoveryMessage: '', resultMessage: '', resultUndo: null });let invalidations=0;
   Object.assign(page,{homeDisposed:false,加载状态:'ready',当前断点:'xs',deckMenuId:'',deckListStyle:'single_wide',显示今日进度卡:true,homeAgentEnabled:true,syncAccountState:'normal',syncIndicator:'hidden',syncStatusText:'',选中的牌组ID:'d2',牌组数据源:{snapshotDecks:()=>[{id:'d1',name:'Visible'}]},
     homeActivity:()=>({collectionBusy:false}),deckPreviewSession:{invalidate:()=>invalidations++},
@@ -604,6 +620,7 @@ test('home selection refreshes knowledge without waking unrelated collection wor
     assert.equal(values.has('home_grip_availability'),false);
     assert.equal(values.get('deck_list_style'),style);
     assert.equal(values.get('deck_list_grouping'),'top_level_subtree');
+    assert.equal(values.get('deck_list_placement'),style.startsWith('double')?'shortest_column':'source_order');
     assert.equal(values.get('deck_list_columns'),style.startsWith('double')?'2':'1');
     assert.equal(values.get('deck_study_counts_visible'),String(!style.startsWith('double')));
   }
@@ -612,6 +629,17 @@ test('home selection refreshes knowledge without waking unrelated collection wor
     assert.equal(tracker.snapshot()[0].values.find(value=>value.id==='home_action_position').value,'above_summary');
     assert.equal(highlightedId(),'d2');
   }
+  page.syncChoiceVisible = true; page.publishHomeInterface();
+  const choice = tracker.snapshot().find(view => view.surface === 'home_sync_choice');
+  assert.deepEqual(choice.items.map(item => item.id), ['cloud', 'device', 'close']);
+  assert.equal(page.homeActionControls().find(item => item.id === 'sync').selected, true);
+  for (const labels of [zh, en]) {
+    const result = buildAgentAppStructure(context, 'home_sync_choice', '', key => labels.get(key), agentSettingDefinitions(), tools, tracker.snapshot());
+    const surface = result.surfaces.find(item => item.id === 'home_sync_choice');
+    assert.deepEqual(surface.items.slice(0, 2).map(item => item.title), HOME_SYNC_CHOICES.map(item => labels.get(item.titleKey)));
+  }
+  page.syncChoiceVisible = false; page.publishHomeInterface();
+  assert.equal(tracker.snapshot().some(view => view.surface === 'home_sync_choice'), false);
   page.homeDisposed=true;page.previewDeckChanged();assert.equal(tracker.snapshot()[0].selectedId,'d2');
 });
 

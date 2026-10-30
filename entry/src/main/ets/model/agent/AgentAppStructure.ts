@@ -1,3 +1,4 @@
+import { NOTE_LINK_SUPPORT } from '../NoteLinks';
 import { INTERACTION_FEEDBACK_SUPPORT } from '../InteractionFeedback';
 import type { InteractionFeedbackSupport } from '../InteractionFeedback';
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -14,6 +15,8 @@ import type { AgentAppRecommendation } from './AgentAppRecommendations';
 import type { AgentNavigationReadiness } from './AgentAppNavigation';
 import { CARD_RENDERING_SUPPORT } from '../CardRenderingSupport';
 import type { CardRenderingSupport } from '../CardRenderingSupport';
+import { AGENT_SEARCH_PROVIDERS } from './AgentSearchProvider';
+import type { AgentSearchProviderInfo } from './AgentSearchProvider';
 import { NOTE_FIELD_EDITING_SUPPORT } from '../NoteFieldEditing';
 import type { NoteFieldEditingSupport } from '../NoteFieldEditing';
 import { EXTERNAL_DECK_OPEN_SUPPORT } from '../ExternalDeckOpen';
@@ -31,7 +34,7 @@ export interface AgentPageDestination {
 /** 指纹覆盖共同声明与本轮能力；不是持久缓存，也不把用户状态写入长期记忆。 */
 export function agentInterfaceRevision(tools: ProviderFunctionTool[]): string {
   const source: string = JSON.stringify([APP_PAGE_ROUTES, APP_INTERFACE_SURFACES, SETTINGS_ENTRIES,
-    SETTINGS_GROUPS, SETTINGS_HEADER_ITEMS, APP_NAVIGATION_ACTIONS, AGENT_APP_RECOMMENDATIONS, CARD_RENDERING_SUPPORT, NOTE_FIELD_EDITING_SUPPORT, INTERACTION_FEEDBACK_SUPPORT, EXTERNAL_DECK_OPEN_SUPPORT, tools]);
+    SETTINGS_GROUPS, SETTINGS_HEADER_ITEMS, APP_NAVIGATION_ACTIONS, AGENT_APP_RECOMMENDATIONS, CARD_RENDERING_SUPPORT, NOTE_LINK_SUPPORT, AGENT_SEARCH_PROVIDERS, NOTE_FIELD_EDITING_SUPPORT, INTERACTION_FEEDBACK_SUPPORT, EXTERNAL_DECK_OPEN_SUPPORT, tools]);
   let hash: number = 2166136261;
   for (let index: number = 0; index < source.length; index++) { hash = Math.imul(hash ^ source.charCodeAt(index), 16777619); }
   return (hash >>> 0).toString(16);
@@ -62,9 +65,11 @@ export interface AgentInterfaceSurface {
   id: string; title: string; instructions: string; parent: string; declaredItemCount: number; items: AgentInterfaceItem[];
 }
 export interface AgentAppStructure {
+  webAccess: AgentWebAccessInfo;
   externalDeckOpen: ExternalDeckOpenSupport;
   interactionFeedback: InteractionFeedbackSupport;
   cardRendering: CardRenderingSupport;
+  noteLinks: Object;
   noteEditing: NoteFieldEditingSupport;
   revision: string; destinations: AgentPageDestination[]; actions: AgentNavigationCapability[];
   source: string; coverage: string[]; limitation: string; simpleMode: boolean;
@@ -76,6 +81,12 @@ export interface AgentAppStructure {
   recommendations: AgentInterfaceRecommendation[];
   observationDetailsIncluded: boolean;
 }
+export interface AgentWebAccessInfo {
+  available: boolean;
+  provider: string;
+  providers: AgentSearchProviderInfo[];
+  execution: string;
+}
 export interface AgentInterfaceRecommendation extends AgentAppRecommendation { prompt: string; reason: string; }
 export interface AgentInterfaceTool { name: string; description: string; }
 
@@ -83,7 +94,8 @@ export interface AgentInterfaceTool { name: string; description: string; }
 export function buildAgentAppStructure(context: AppInterfaceContext, surfaceId: string, sectionId: string,
   localize: (key: string) => string, settings: AgentSettingDefinition[], tools: ProviderFunctionTool[],
   observations: AppInterfaceObservation[], foregroundSurface: string = '',
-  contextSurface: string = foregroundSurface, navigationReadiness: AgentNavigationReadiness[] = []): AgentAppStructure {
+  contextSurface: string = foregroundSurface, navigationReadiness: AgentNavigationReadiness[] = [],
+  webProvider: string = ''): AgentAppStructure {
   const sourceSurface: string = foregroundSurface === 'agent' ? contextSurface : foregroundSurface;
   const views: AppInterfaceObservation[] = observations.map((view: AppInterfaceObservation): AppInterfaceObservation => {
     const declaration = APP_INTERFACE_SURFACES.find((surface): boolean => surface.id === view.surface);
@@ -154,7 +166,12 @@ export function buildAgentAppStructure(context: AppInterfaceContext, surfaceId: 
           settingId: '', readTool: '', writeTool: '', sensitive: false }))) });
   }
   return { source: 'shared_ui_declarations_and_live_observations', externalDeckOpen: EXTERNAL_DECK_OPEN_SUPPORT,
-    interactionFeedback: INTERACTION_FEEDBACK_SUPPORT, cardRendering: CARD_RENDERING_SUPPORT,
+    interactionFeedback: INTERACTION_FEEDBACK_SUPPORT, cardRendering: CARD_RENDERING_SUPPORT, noteLinks: NOTE_LINK_SUPPORT,
+    webAccess: { available: names.includes('web_search'), provider: names.includes('web_search') ? webProvider : '',
+      providers: AGENT_SEARCH_PROVIDERS,
+      execution: 'Use declared web_search/read_webpage tools; DeepSeek uses Search/Fetch with its saved model key. ' +
+        'Chat requests do not automatically search. Availability follows the app web switch and this turn; ' +
+        'tool success supplies evidence, not links in generated text. Fetch is separately billed by DeepSeek.' },
     noteEditing: NOTE_FIELD_EDITING_SUPPORT,
     settingsHeader: surfaceId === 'app' || surfaceId === 'settings' ? settingsHeaderItems(context.simple).map((item): AgentInterfaceItem => {
       const control = views.find((view): boolean => view.surface === 'settings')?.items?.find((entry): boolean => entry.id === item.id);

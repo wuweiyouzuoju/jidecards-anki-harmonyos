@@ -1,3 +1,5 @@
+import { HOME_INTRO_ACTIONS } from './HomeIntro';
+import type { HomeIntroAction } from './HomeIntro';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { KEYBOARD_HELP_SECTIONS } from './KeyboardShortcuts';
 import type { DirectoryView } from './DirectoryTree';
@@ -12,7 +14,8 @@ import { STUDY_GESTURE_FIELDS } from './StudyGestureConfig';
 import { SETTINGS_GROUPS } from './SettingsStructure';
 import { DECK_OPTION_GROUPS } from './DeckOptionsCatalog';
 import type { NoteAudioStatus } from './NoteAudioDraft';
-import { DRAWING_COLORS, DRAWING_TEXT_HANDLES, noteDrawingImageActionKey } from './NoteDrawing';
+import { DRAWING_COLORS, DRAWING_TEXT_HANDLES, DRAWING_TEXT_RESIZE_MODE, DRAWING_COLOR_PLACEMENT,
+  noteDrawingImageActionKey } from './NoteDrawing';
 import { NOTE_EDITOR_TOOLS, NOTE_EDITOR_COMMON_TOOL_IDS, NOTE_FIELD_EDITING_SUPPORT,
   NOTE_EDITOR_FORMAT_MENUS, noteEditorFormatOptions } from './NoteFieldEditing';
 import { noteEditorWheelTools, noteEditorWheelCommonTools, noteEditorWheelOuterTools, NOTE_EDITOR_WHEEL_VISIBLE_COUNT } from './NoteEditorWheel';
@@ -105,7 +108,14 @@ export const WHITEBOARD_INTERFACE_ITEMS: AppInterfaceItem[] = [
 ];
 
 /** 菜单直接遍历这里的条目；标签、顺序和显隐由 UI 与 JIDE 共用。 */
+export const HOME_SYNC_CHOICES: AppInterfaceItem[] = [
+  { id: 'cloud', titleKey: 'sync_choice_cloud', opens: 'sync' },
+  { id: 'device', titleKey: 'sync_choice_device', opens: 'device_link' }
+];
+
 export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
+  { id: 'home_sync_choice', titleKey: 'sync_choice_title', instructionsKey: 'sync_choice_hint', parent: 'home',
+    items: HOME_SYNC_CHOICES.concat([{ id: 'close', titleKey: 'close' }]) },
   { id: 'keyboard_shortcuts', titleKey: 'glossary_shortcuts_label', instructionsKey: 'glossary_shortcuts_help',
     parent: 'settings', items: KEYBOARD_HELP_SECTIONS.map((section): AppInterfaceItem => ({ id: section.id, titleKey: section.titleKey }))
       .concat([{ id: 'retry', titleKey: 'common_retry', condition: 'study_bindings_load_failed' }, { id: 'close', titleKey: 'done' }]) },
@@ -146,15 +156,14 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     ]) },
   { id: 'note_editor_wheel', titleKey: 'note_editor_wheel_title', instructionsKey: 'note_editor_wheel_instructions',
     parent: 'edit_note_form', items: NOTE_EDITOR_TOOLS.map((tool): AppInterfaceItem => ({ id: tool.id,
-      titleKey: tool.titleKey, iconKey: tool.iconKey,
-      fullOnly: NOTE_EDITOR_COMMON_TOOL_IDS.indexOf(tool.id) < 0 })).concat([
+      titleKey: tool.titleKey, iconKey: tool.iconKey, opens: tool.opens })).concat([
       { id: 'position', titleKey: 'note_editor_wheel_move_hint', iconKey: 'ic_editor_wheel' }
     ]) },
   { id: 'note_editor_format_options', titleKey: 'note_editor_format_options',
     instructionsKey: 'note_editor_format_options_instructions', parent: 'note_editor_wheel',
     items: NOTE_EDITOR_FORMAT_MENUS.flatMap((menu): AppInterfaceItem[] =>
       menu.options.map((option): AppInterfaceItem => ({ id: menu.toolId + '_' + option.id,
-        titleKey: option.titleKey, fullOnly: true, condition: menu.toolId }))) },
+        titleKey: option.titleKey, condition: menu.toolId }))) },
   { id: 'home', titleKey: 'home_interface_title', instructionsKey: 'home_actions_instructions', parent: '', items: [
     { id: 'more', titleKey: 'study_more', iconKey: 'ic_home_more', opens: 'home_more' },
     { id: 'agent', titleKey: 'ai_agent_title', opens: 'agent', agentOnly: true },
@@ -166,6 +175,12 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'decks', titleKey: 'home_interface_decks', opens: 'deck_details' },
     { id: 'deck_menu', titleKey: 'deck_more', opens: 'deck_row_menu', condition: 'deck_context_menu' },
     { id: 'reorder', titleKey: 'deck_menu_reorder', opens: 'deck_reorder', condition: 'deck_context_menu' }
+  ] },
+  { id: 'glass_suggestion', titleKey: 'glass_suggestion_title', parent: 'home', items: [
+    { id: 'keep', titleKey: 'glass_suggestion_keep' }, { id: 'confirm', titleKey: 'glass_suggestion_confirm' }
+  ] },
+  { id: 'deck_layout_suggestion', titleKey: 'deck_width_hint_title', parent: 'home', items: [
+    { id: 'keep', titleKey: 'deck_width_hint_keep' }, { id: 'confirm', titleKey: 'deck_width_hint_confirm' }
   ] },
   { id: 'deck_reorder', titleKey: 'deck_menu_reorder', instructionsKey: 'deck_reorder_instructions', parent: 'home', items: [
     { id: 'exit', titleKey: 'deck_reorder_exit', iconKey: 'ic_common_close' },
@@ -179,6 +194,8 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'reminders', titleKey: 'reminder_list_title', opens: 'reminders' },
     { id: 'intro', titleKey: 'home_intro_menu_title', opens: 'intro' },
   ] },
+  { id: 'intro', titleKey: 'home_intro_title', parent: 'home_more', items: HOME_INTRO_ACTIONS.map((action: HomeIntroAction): AppInterfaceItem =>
+    ({ id: action.id, titleKey: action.titleKey })) },
   { id: 'home_search', titleKey: 'home_search_title', instructionsKey: 'home_search_instructions', parent: 'home', items: [
     { id: 'query', titleKey: 'home_search_placeholder' },
     { id: 'results', titleKey: 'home_interface_decks', opens: 'deck_details' },
@@ -206,7 +223,7 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'new', titleKey: 'new_cards' },
     { id: 'learning', titleKey: 'learning_cards' },
     { id: 'review', titleKey: 'review_cards' },
-    { id: 'more', titleKey: 'deck_more', iconKey: 'ic_home_more', opens: 'deck_details_more' },
+    { id: 'more', titleKey: 'deck_more', iconKey: 'ic_home_more', opens: 'deck_row_menu' },
     { id: 'study', titleKey: 'start_study', opens: 'study' }
   ] },
   { id: 'deck_actions', titleKey: 'deck_more', parent: 'deck_details', items: [] },
@@ -241,21 +258,13 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
   ...DECK_OPTION_GROUPS.map((group): AppInterfaceSurface => ({ id: 'deck_options_group_' + group.id, titleKey: group.titleKey,
     parent: 'deck_options_form', items: group.fields.map((field): AppInterfaceItem => ({ id: field.key,
       titleKey: field.titleKey, fullOnly: true, condition: field.scheduler === '' ? undefined : field.scheduler })) })),
-  { id: 'deck_details_more', titleKey: 'deck_more', parent: 'deck_details', items: [
-    { id: 'create_child', titleKey: 'deck_create_subdeck', opens: 'create_deck' },
-    { id: 'rename', titleKey: 'deck_rename_title', opens: 'deck_rename' },
-    { id: 'move', titleKey: 'deck_move_title', opens: 'deck_move' },
-    { id: 'options', titleKey: 'deck_options_title', opens: 'deck_options', condition: 'normal_deck' },
-    { id: 'export', titleKey: 'deck_export_this', opens: 'export' },
-    ...FILTERED_DECK_ACTIONS.map((item): AppInterfaceItem => ({ id: item.id, titleKey: item.titleKey, condition: 'filtered_deck' }))
-  ] },
-  { id: 'deck_move', titleKey: 'deck_move_title', parent: 'deck_details_more', items: [
+  { id: 'deck_move', titleKey: 'deck_move_title', parent: 'deck_row_menu', items: [
     { id: 'parent', titleKey: 'deck_move_parent' },
     { id: 'confirm', titleKey: 'deck_move_confirm' },
     { id: 'cancel', titleKey: 'cancel' },
     { id: 'reload', titleKey: 'deck_move_reload' }
   ] },
-  { id: 'deck_rename', titleKey: 'deck_rename_title', instructionsKey: 'deck_rename_hint', parent: 'deck_details_more', items: [
+  { id: 'deck_rename', titleKey: 'deck_rename_title', instructionsKey: 'deck_rename_hint', parent: 'deck_row_menu', items: [
     { id: 'name', titleKey: 'deck_rename_name' },
     { id: 'confirm', titleKey: 'deck_rename_confirm' },
     { id: 'cancel', titleKey: 'cancel' },
@@ -275,6 +284,7 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'browser', titleKey: 'browser_title', opens: 'browser' },
     { id: 'tone', titleKey: 'deck_menu_tone_label', opens: 'deck_tones' },
     { id: 'reorder', titleKey: 'deck_menu_reorder', opens: 'deck_reorder' },
+    { id: 'move', titleKey: 'deck_move_title', opens: 'deck_move' },
     { id: 'rename', titleKey: 'deck_rename_title', opens: 'deck_rename' },
     { id: 'create_child', titleKey: 'deck_create_subdeck', opens: 'create_deck', condition: 'normal_deck' },
     { id: 'options', titleKey: 'deck_options_title', opens: 'deck_options', condition: 'normal_deck' },
@@ -312,7 +322,8 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'search_tools', titleKey: 'browser_search_tools', opens: 'browser_search_tools' },
     { id: 'display_settings', titleKey: 'browser_display_settings', opens: 'browser_display_settings' },
     { id: 'history', titleKey: 'collection_history_title', opens: 'collection_history' },
-    { id: 'more_settings', titleKey: 'study_more', opens: 'browser_more_settings' }
+    { id: 'more_settings', titleKey: 'study_more', opens: 'browser_more_settings' },
+    { id: 'traditional', titleKey: 'browser_traditional_mode', iconKey: 'ic_settings_layout' }
   ] },
   { id: 'browser_search_tools', titleKey: 'browser_search_tools', parent: 'browser_more', items: [
     { id: 'search_options', titleKey: 'browser_search_options', opens: 'browser_search_options' },
@@ -348,9 +359,12 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'exit', titleKey: 'browser_exit_selection' },
     { id: 'delete', titleKey: 'browser_action_delete' }
   ] },
+  { id: 'browser_column_replace', titleKey: 'browser_replace_column', parent: 'browser', items: [
+    { id: 'column', titleKey: 'browser_replace_column' }, { id: 'close', titleKey: 'browser_detail_cancel' }
+  ] },
   { id: 'browser_display', titleKey: 'browser_display_columns', parent: 'browser_display_settings', items: [
-    { id: 'columns', titleKey: 'browser_display_columns' }, { id: 'up', titleKey: 'browser_column_up' },
-    { id: 'down', titleKey: 'browser_column_down' }, { id: 'save', titleKey: 'browser_detail_confirm' }, { id: 'close', titleKey: 'browser_detail_cancel' }
+    { id: 'columns', titleKey: 'browser_display_columns' }, { id: 'up', titleKey: 'browser_column_up', iconKey: 'ic_common_arrow_up' },
+    { id: 'down', titleKey: 'browser_column_down', iconKey: 'ic_common_arrow_down' }, { id: 'save', titleKey: 'browser_detail_confirm' }, { id: 'close', titleKey: 'browser_detail_cancel' }
   ] },
   { id: 'browser_find_replace', titleKey: 'browser_action_find_replace', parent: 'browser_more', items: [
     { id: 'target', titleKey: 'browser_find_field' }, { id: 'regex', titleKey: 'browser_find_regex' },
@@ -482,8 +496,9 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'deck', titleKey: 'add_note_deck', opens: 'add_note_decks' },
     { id: 'type', titleKey: 'add_note_notetype', opens: 'add_note_types' },
     { id: 'templates', titleKey: 'notetype_editor_templates', iconKey: 'ic_settings_layout', opens: 'notetype_editor' },
-    { id: 'tags_entry', titleKey: 'add_note_tags' },
-    { id: 'tags', titleKey: 'add_note_tags', opens: 'tag_picker', condition: 'tags_expanded' },
+    { id: 'links', titleKey: 'note_links_title', iconKey: 'ic_study_link', opens: 'note_links_draft' },
+    { id: 'preview', titleKey: 'note_draft_preview', iconKey: 'ic_common_preview', opens: 'note_draft_preview' },
+    { id: 'tags', titleKey: 'add_note_tags', opens: 'tag_picker' },
     { id: 'image', titleKey: 'add_note_image_occlusion_pick_image', condition: 'image_occlusion' },
     { id: 'masks', titleKey: 'add_note_image_occlusion_edit_masks', condition: 'image_source' }
   ] },
@@ -497,15 +512,17 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
   ] },
   { id: 'edit_note_form', titleKey: 'note_editor_edit_title', instructionsKey: 'note_editor_format_action', parent: 'edit_note', items: [
     { id: 'back', titleKey: 'study_back', iconKey: 'ic_common_arrow_left' }, { id: 'save', titleKey: 'browser_detail_save' },
+    { id: 'preview', titleKey: 'note_draft_preview', iconKey: 'ic_common_preview', opens: 'note_draft_preview' },
     { id: 'tags', titleKey: 'browser_detail_tags', opens: 'tag_picker' },
     { id: 'deck', titleKey: 'add_note_deck' },
     { id: 'notetype', titleKey: 'add_note_notetype' },
     { id: 'templates', titleKey: 'notetype_editor_templates', opens: 'notetype_editor' },
+    { id: 'links', titleKey: 'note_links_title', iconKey: 'ic_study_link', opens: 'note_links_draft' },
   ] },
   { id: 'note_visual_manage', titleKey: 'note_visual_manage', instructionsKey: 'note_visual_instructions', parent: '', items: [
     { id: 'close', titleKey: 'cancel' }, { id: 'apply', titleKey: 'done' },
     { id: 'add', titleKey: 'note_visual_add', iconKey: 'ic_editor_image' },
-    { id: 'drawing', titleKey: 'note_drawing_new', iconKey: 'ic_study_edit', opens: 'note_drawing_editor' }
+    { id: 'drawing', titleKey: 'note_drawing_new', opens: 'note_drawing_editor' }
   ] },
   { id: 'note_drawing_editor', titleKey: 'note_drawing_title', instructionsKey: 'note_drawing_instructions', parent: 'note_visual_manage', items: [
     { id: 'close', titleKey: 'cancel' }, { id: 'apply', titleKey: 'done' },
@@ -555,8 +572,19 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
   { id: 'custom_scheduling_warning', titleKey: 'custom_scheduling_title', instructionsKey: 'custom_scheduling_hint', parent: 'study', items: [
     { id: 'exit', titleKey: 'custom_scheduling_exit', iconKey: 'ic_common_close' }, { id: 'continue', titleKey: 'custom_scheduling_continue' }
   ] },
+  { id: 'note_links', titleKey: 'note_links_title', parent: 'study', items: [
+    { id: 'search', titleKey: 'note_links_search' }, { id: 'save', titleKey: 'note_links_save' },
+    { id: 'close', titleKey: 'done' }
+  ] },
+  { id: 'note_links_draft', titleKey: 'note_links_title', instructionsKey: 'note_reference_hint', parent: 'edit_note_form', items: [
+    { id: 'close', titleKey: 'done' }, { id: 'search', titleKey: 'note_reference_search' }
+  ] },
+  { id: 'note_reference_picker', titleKey: 'note_reference_title', instructionsKey: 'note_reference_hint', parent: 'note_editor_wheel', items: [
+    { id: 'close', titleKey: 'cancel' }, { id: 'search', titleKey: 'note_reference_search' }, { id: 'confirm', titleKey: 'browser_detail_confirm' }
+  ] },
   { id: 'study_more', titleKey: 'study_more', parent: 'study', items: [
     { id: 'edit', titleKey: 'study_edit_note', opens: 'edit_note' },
+    { id: 'links', titleKey: 'note_links_title', iconKey: 'ic_study_link', opens: 'note_links' },
     { id: 'agent', titleKey: 'ai_card_edit', opens: 'agent', agentOnly: true, condition: 'has_card_phase' },
     { id: 'undo', titleKey: 'study_undo' },
     { id: 'marking', titleKey: 'study_marking_title', opens: 'study_marking' },
@@ -592,13 +620,6 @@ export function visibleInterfaceItems(surfaceId: string, context: AppInterfaceCo
   if (surface === undefined) return [];
   return surface.items.filter((item: AppInterfaceItem): boolean =>
     !(item.fullOnly && context.simple) && !(item.agentOnly && !context.agent) && !(item.cloudOnly && !context.cloudDeck));
-}
-
-/** 普通牌组预设不适用于筛选牌组；筛选配置使用 JIDE 提案，菜单提供维护操作。 */
-export function deckDetailsMoreItems(agent: boolean, filtered: boolean): AppInterfaceItem[] {
-  return visibleInterfaceItems('deck_details_more', { simple: false, agent, cloudDeck: false, themeHasTextures: false })
-    .filter((item: AppInterfaceItem): boolean => item.condition === 'filtered_deck' ? filtered :
-      item.condition === 'normal_deck' ? !filtered : true);
 }
 
 export function deckRowMenuItems(simple: boolean, filtered: boolean): AppInterfaceItem[] {
@@ -766,7 +787,7 @@ export function addNoteInterfaceControls(context: AddNoteInterfaceContext): AppI
     .map((item): AppInterfaceMenuItem => ({ id: item.id, titleKey:
       (item.id === 'save' || item.id === 'save_return') && context.busy ? 'add_note_saving' : item.id === 'image' && context.hasSource ?
         'add_note_image_occlusion_change_image' : item.titleKey,
-      opens: item.opens, condition: item.condition, selected: item.id === 'tags_entry' && context.tagsExpanded,
+      iconKey: item.iconKey, opens: item.opens, condition: item.condition, selected: item.id === 'tags_entry' && context.tagsExpanded,
       enabled: item.id === 'save' || item.id === 'save_return' ? context.saveEnabled && !context.blocked :
         !context.blocked && (!['type', 'templates'].includes(item.id) || context.hasTypes) }));
 }
@@ -801,6 +822,7 @@ export interface NoteDrawingStatus {
   width?: number; height?: number;
   failed?: boolean;
   textTransforming?: boolean;
+  textStretchX?: number; textStretchY?: number;
   colorLabels?: string[];
   hasBackground?: boolean;
 }
@@ -832,6 +854,12 @@ export function noteDrawingInterfaceObservation(status: NoteDrawingStatus): AppI
       { id: 'text_resize_handles', value: status.textMode && status.selectedText ?
         DRAWING_TEXT_HANDLES.map((handle): string => handle.id).join(',') : '' },
       { id: 'text_selection_bounds', value: 'glyph' },
+      { id: 'text_resize_mode', value: DRAWING_TEXT_RESIZE_MODE },
+      { id: 'text_resize_handle_modes', value: DRAWING_TEXT_HANDLES.map((handle): string => `${handle.id}:${handle.mode}`).join(',') },
+      { id: 'text_stretch_x', value: String(status.textStretchX ?? 1) },
+      { id: 'text_stretch_y', value: String(status.textStretchY ?? 1) },
+      { id: 'text_resize_handle_style', value: 'square_on_frame' },
+      { id: 'color_placement', value: DRAWING_COLOR_PLACEMENT },
       { id: 'text_transforming', value: String(status.textTransforming === true) },
       { id: 'content_access', value: 'not_exposed' }] };
 }
@@ -887,21 +915,21 @@ export function noteEditorWheelObservation(state: NoteEditorWheelState, selected
       { id: 'source', value: String(state.source) }, { id: 'target_field', value: state.fieldName ?? '' },
       { id: 'input_expanded', value: String(state.expanded) },
       { id: 'cloze_enabled', value: String(state.cloze) },
-      { id: 'visible_tools', value: collapsed ? '0' : String(noteEditorWheelCommonTools(state).length +
-        Math.min(NOTE_EDITOR_WHEEL_VISIBLE_COUNT, noteEditorWheelOuterTools(state).length)) },
+      { id: 'visible_tools', value: collapsed ? '0' : String(noteEditorWheelTools(state).length) },
       { id: 'inner_tools', value: noteEditorWheelCommonTools(state).map((tool): string => tool.id).join(',') },
       { id: 'centered_outer_tool', value: centeredId }, { id: 'activation', value: 'click_only_rotation_preserves_multiple_selection' },
       { id: 'math_long_press', value: 'choose_block_or_chemistry' },
       { id: 'folding_selection', value: 'collapse_preserves_formats_reopen_resets_formats' },
       { id: 'one_shot_feedback', value: NOTE_FIELD_EDITING_SUPPORT.toolMenu.oneShotFeedback },
       { id: 'one_shot_flash_ms', value: String(NOTE_FIELD_EDITING_SUPPORT.toolMenu.oneShotFlashMs) },
-      { id: 'labels', value: 'below_each_icon' }] };
+      { id: 'labels', value: NOTE_FIELD_EDITING_SUPPORT.toolMenu.labels },
+      { id: 'layout', value: NOTE_FIELD_EDITING_SUPPORT.toolMenu.layout }] };
 }
 
 export function noteEditInterfaceControls(busy: boolean, blocked: boolean, fieldCount: number): AppInterfaceMenuItem[] {
   return visibleInterfaceItems('edit_note_form', { simple: false, agent: false, cloudDeck: false, themeHasTextures: false })
     .map((item): AppInterfaceMenuItem => ({ id: item.id,
-      titleKey: item.id === 'save' && busy ? 'browser_detail_saving' : item.titleKey,
+      titleKey: item.id === 'save' && busy ? 'browser_detail_saving' : item.titleKey, iconKey: item.iconKey, opens: item.opens,
       enabled: !blocked && (item.id !== 'save' || fieldCount > 0), selected: false }));
 }
 
@@ -922,15 +950,15 @@ export function studyInterfaceMenu(context: StudyInterfaceContext, surfaceId: st
 }
 
 export function browserInterfaceMenu(available: boolean, filterActive: boolean, subtitleIndex: number,
-  surface: string = 'browser_more'): AppInterfaceMenuItem[] {
+  surface: string = 'browser_more', traditionalMode: boolean = false): AppInterfaceMenuItem[] {
   return visibleInterfaceItems(surface, { simple: false, agent: false, cloudDeck: false, themeHasTextures: false })
     .map((item: AppInterfaceItem): AppInterfaceMenuItem => ({ id: item.id,
       titleKey: item.id === 'filter' && filterActive ? 'browser_filter_active' : item.titleKey, opens: item.opens,
       enabled: item.id === 'display_settings' || item.id.startsWith('subtitle_') || (available && (item.id !== 'save_search' || filterActive)),
-      selected: item.id === 'subtitle_deck' ? subtitleIndex === 1 : item.id === 'subtitle_answer' ? subtitleIndex === 4 :
+      selected: item.id === 'traditional' ? traditionalMode : item.id === 'subtitle_deck' ? subtitleIndex === 1 : item.id === 'subtitle_answer' ? subtitleIndex === 4 :
         item.id === 'subtitle_due' && subtitleIndex === 2,
       children: ['search_tools', 'display_settings', 'more_settings'].includes(item.id) ?
-        browserInterfaceMenu(available, filterActive, subtitleIndex, item.opens) : undefined }));
+        browserInterfaceMenu(available, filterActive, subtitleIndex, item.opens, traditionalMode) : undefined }));
 }
 
 /** 工具参数从实际共享声明生成，新增已接通界面不再维护第二份 enum。 */

@@ -1,3 +1,4 @@
+import { NOTE_FIELD_STICKY_CONTROL } from '../../entry/src/main/ets/model/NoteFieldEditing.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -101,7 +102,7 @@ test('chart component observes actual range labels, selection, empty data and an
 
 test('add-note observation exposes tags in both modes and follows field/type and image-occlusion state without draft bodies',()=>{
   const tracker=new AppInterfaceTracker();
-  const Page=methods('pages/添加笔记页.ets',['interfaceControls','interfaceEnabled','publishInterface','displayTypeName','保存按钮可用','图片遮盖_标题字段索引','图片遮盖_额外字段索引'],dependencies(tracker));
+  const Page=methods('pages/添加笔记页.ets',['interfaceControls','interfaceEnabled','publishInterface','displayTypeName','保存按钮可用','图片遮盖_标题字段索引','图片遮盖_额外字段索引'],{...dependencies(tracker),NOTE_FIELD_STICKY_CONTROL});
   const page=new Page();Object.assign(page,{pageActive:true,isSimpleMode:true,高级已展开:true,是否图片遮盖模式:false,
     图片遮盖_源图Uri:'',图片遮盖_遮罩列表:[],图片遮盖_显示编辑器:false,处理中:false,pickingFieldImage:false,audioBusy:false,confirmingDiscard:false,
     笔记类型选项:[{id:1,name:'Basic'},{id:2,name:'CUSTOM_TYPE'}],字段名列表:['Front','Back','CUSTOM_FIELD'],已选笔记类型ID:1,

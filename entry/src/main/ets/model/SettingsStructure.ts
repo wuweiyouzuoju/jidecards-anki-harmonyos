@@ -61,12 +61,15 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
   ] },
   { id: 'device_link', sectionId: 'sync', titleKey: 'device_link_title', items: [
     { id: 'device_link_toggle', titleKey: 'device_link_title' },
+    { id: 'device_link_help', titleKey: 'field_help_button' },
     { id: 'device_link_show_code', titleKey: 'device_link_show_code', opens: 'device_pairing_code' },
     { id: 'device_link_scan', titleKey: 'device_link_scan' },
     { id: 'device_link_devices', titleKey: 'device_link_devices' },
     { id: 'device_link_connect', titleKey: 'device_progress_start' },
     { id: 'device_progress_allow', titleKey: 'device_progress_allow' },
+    { id: 'device_progress_help', titleKey: 'field_help_button' },
     { id: 'device_collection_allow', titleKey: 'device_collection_allow' },
+    { id: 'device_collection_help', titleKey: 'field_help_button' },
     { id: 'device_collection_start', titleKey: 'device_collection_start' },
     { id: 'device_collection_pull', titleKey: 'device_collection_pull' },
     { id: 'device_progress_all', titleKey: 'device_progress_all' },
@@ -77,6 +80,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     { id: 'theme_mode', titleKey: 'appearance_theme', settingId: 'theme_mode' },
     { id: 'color_theme', titleKey: 'appearance_color_theme', settingId: 'color_theme' },
     { id: 'theme_motion', titleKey: 'iridescent_motion', settingId: 'theme_motion', condition: 'theme_has_textures' },
+    { id: 'surface_material', titleKey: 'surface_material', settingId: 'surface_material' },
     { id: 'motion_style', titleKey: 'motion_style', settingId: 'motion_style' },
     { id: 'deck_list_style', titleKey: 'deck_width', settingId: 'deck_list_style' },
     { id: 'card_text_size', titleKey: 'card_text_size', settingId: 'card_text_size' }
