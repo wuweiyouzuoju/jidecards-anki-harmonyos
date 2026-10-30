@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { localeDate } from '../../utils/LocaleFormatting';
 import { localizedResourceText } from '../../utils/UiFeedback';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
@@ -9,7 +10,7 @@ import { PAGE_COMPACT_LAYOUT_KEY } from '../../model/AppLayoutState';
 import type { AgentConversationSummary } from '../../model/agent/AgentConversationTypes';
 import { agentHistoryRepository } from '../../backend/agent/AgentHistoryFiles';
 import { AgentHistoryMatch } from '../../model/agent/AgentHistoryRepository';
-import { FormInputStyle } from '../../utils/FormInputStyle';
+import { LiveSearchField } from '../common/LiveSearchField';
 import { IconActionButton } from '../common/IconActionButton';
 import { appInterface } from '../../backend/AppInterfaceService';
 import { AppInterfaceControl } from '../../model/AppInterface';
@@ -29,7 +30,6 @@ export struct AgentHistoryList {
   @State private searching: boolean = false;
   @State private searchError: boolean = false;
   private searchGeneration: number = 0;
-  private searchTimer: number = -1;
   @Prop @Watch('publishInterface') conversationId: string = '';
   private interfaceMounted: boolean = false;
   @StorageProp(颜色键.选中背景) private 选中背景色: string = '#E8EEFC';
@@ -38,17 +38,20 @@ export struct AgentHistoryList {
   onDelete: (item: AgentConversationSummary) => void = (): void => {};
   aboutToAppear(): void { this.interfaceMounted = true; this.publishInterface(); }
   aboutToDisappear(): void {
-    this.interfaceMounted = false; this.searchGeneration++; clearTimeout(this.searchTimer);
+    this.interfaceMounted = false; this.searchGeneration++;
     appInterface.leave(this.management ? 'agent_history_management' : 'agent_history');
   }
   private visible(): AgentConversationSummary[] { return this.query.trim() === '' ? this.conversations : this.matches; }
   private refreshSearch(): void {
-    this.searchGeneration++; clearTimeout(this.searchTimer); this.matches = []; this.searchError = false;
-    if (this.query.trim() === '') { this.searching = false; this.publishInterface(); return; }
-    this.searching = true;
-    this.searchTimer = setTimeout((): void => { this.search(); }, 250);
+    this.queryChanged(this.query);
+    if (this.query.trim() !== '' && this.interfaceMounted) this.search();
+  }
+  private queryChanged(value: string): void {
+    this.query = value; this.searchGeneration++; this.matches = []; this.searchError = false;
+    this.searching = value.trim() !== ''; this.publishInterface();
   }
   private async search(): Promise<void> {
+    if (!this.interfaceMounted || !this.isInteractive || this.query.trim() === '') return;
     const generation: number = ++this.searchGeneration;
     try {
       // 500份正文逐个扫描，不把全文常驻UI；UI展示全部匹配的轻量索引。
@@ -87,19 +90,14 @@ export struct AgentHistoryList {
       optionIds: conversations.map((item): string => item.id), optionLabels: conversations.map((item): string => item.title.slice(0, 160)),
       optionsTotal: this.visible().length, busy: this.searching || !this.isInteractive, items: controls, controlsComplete: this.visible().length <= 100 });
   }
-  private 两位数(value: number): string {
-    return value < 10 ? `0${value}` : `${value}`;
-  }
-  private 格式化历史时间(value: number): string {
-    const time: Date = new Date(value);
-    return `${time.getFullYear()}-${this.两位数(time.getMonth() + 1)}-${this.两位数(time.getDate())} ` +
-      `${this.两位数(time.getHours())}:${this.两位数(time.getMinutes())}`;
+  private 格式化历史时间(value: number, _locale: string = this.uiLanguage): string {
+    return localeDate(value, _locale);
   }
   build() {
     Column({ space: 应用尺寸.间距_10 }) {
-      TextInput({ text: this.query, placeholder: localizedResourceText(this.getUIContext(), this.uiLanguage, $r('app.string.agent_history_search')) })
-        .attributeModifier(new FormInputStyle()).maxLength(200).enabled(this.isInteractive)
-        .onChange((value: string): void => { this.query = value; this.refreshSearch(); })
+      LiveSearchField({ value: this.query, placeholder: localizedResourceText(this.getUIContext(), this.uiLanguage, $r('app.string.agent_history_search')),
+        isEnabled: this.isInteractive, debounceMs: 200,
+        onChange: (value: string): void => { this.queryChanged(value); }, onSearch: (): void => { this.search(); } })
       if (this.errorText !== '' || this.searchError) {
         Text(this.errorText || $r('app.string.ai_agent_history_load_failed')).fontColor($r('app.color.error_text')).width('100%')
       }

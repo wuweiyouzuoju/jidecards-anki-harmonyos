@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { localeDate } from '../../utils/LocaleFormatting';
 import { AgentMemoryManager } from '../../model/agent/AgentMemoryManagement';
 import type { AgentMemoryRepository } from '../../model/agent/AgentMemoryManagement';
 import type { AgentMemory } from '../../model/agent/AgentMemory';
@@ -10,7 +11,7 @@ import { MemoryScopeChoice, memoryScopeRows } from '../../model/agent/AgentMemor
 import { DirectoryView } from '../../model/DirectoryTree';
 import { DirectorySelect } from '../common/DirectorySelect';
 import { 按下态按钮 } from '../common/按下态按钮';
-import { FormInputStyle } from '../../utils/FormInputStyle';
+import { LiveSearchField } from '../common/LiveSearchField';
 import { FormRowLayout } from '../../utils/FormRowLayout';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { 应用尺寸 } from '../../utils/应用尺寸';
@@ -56,7 +57,7 @@ export struct AgentMemoryPanel {
         onClose: this.editorDialog.guard((): void => { this.requestClose(); }) }),
       onWillDismiss: dismiss, autoCancel: presentation.autoCancel, customStyle: presentation.customStyle,
       alignment: presentation.alignment, width: presentation.width, height: presentation.height,
-      maskColor: presentation.maskColor, openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation
+      keyboardAvoidMode: presentation.keyboardAvoidMode, maskColor: presentation.maskColor, openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation
     });
   };
 
@@ -205,8 +206,8 @@ export struct AgentMemoryPanel {
           按下态按钮({ 文案: $r('app.string.common_retry'), 是否启用: !this.busy,
             点击回调: (): void => { this.reload(); } })
         }
-        TextInput({ text: this.query, placeholder: this.text($r('app.string.agent_memory_search')) })
-          .attributeModifier(new FormInputStyle()).enabled(!this.busy).onChange((value: string): void => { this.query = value; })
+        LiveSearchField({ value: this.query, placeholder: this.text($r('app.string.agent_memory_search')), isEnabled: !this.busy,
+          maximumLength: undefined, debounceMs: 0, onChange: (value: string): void => { this.query = value; } })
         DirectorySelect({ label: $r('app.string.agent_memory_scope'), surfaceColor: $r('app.color.surface_card'),
           rows: memoryScopeRows(this.filterChoices(), this.filterScope),
           value: this.filterScope === '' ? this.text($r('app.string.agent_memory_all')) : this.scopeLabel(this.filterScope),
@@ -237,7 +238,7 @@ export struct AgentMemoryPanel {
                 onAction: (): void => { this.remove(memory); } })
             }.width('100%')
             Text(memory.text).fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary')).width('100%')
-            Text(this.scopeLabel(memory.scope) + ' · ' + new Date(memory.updatedAt).toLocaleString())
+            Text(this.scopeLabel(memory.scope) + ' · ' + localeDate(memory.updatedAt, this.uiLanguage))
               .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
           }.width('100%').padding(应用尺寸.间距_10).backgroundColor($r('app.color.surface_card'))
             .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
