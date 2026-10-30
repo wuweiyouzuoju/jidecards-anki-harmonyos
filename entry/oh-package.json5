@@ -8,7 +8,8 @@
   "dependencies": {
     "libagent_sandbox.so": "file:./src/main/cpp/types/libagent_sandbox",
     "libjidecards.so": "file:./src/main/cpp/types/libjidecards",
-    "@ibestservices/ibest-ui": "^2.2.7"
+    "@ibestservices/ibest-ui": "^2.2.7",
+    "jide_foundation": "file:../../记得系列基础/.local/packages/jide_foundation.har"
   },
   "devDependencies": {},
   "dynamicDependencies": {}
