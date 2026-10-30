@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import test from 'node:test';
+import { APP_LOCALES, appLocaleName, resolveAppLocale } from '../../entry/src/main/ets/model/AppLocales.ts';
 import { stripTypeScriptTypes } from 'node:module';
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
 import { uiFeedback } from './ui-feedback-harness.mjs';
@@ -16,12 +17,74 @@ const resources = Object.fromEntries(['zh-Hans', 'en'].map(locale => [locale, ne
   .string.map(item => [item.name, item.value]))]));
 const $r = name => ({ id: name.slice('app.string.'.length), params: [name] });
 
+test('reopening language settings displays the persisted choice even when the UI locale cache is older', () => {
+  let preferred = 'en-US', preferenceReads = 0;
+  const General = loadComponentLogic('components/settings/GeneralSettings.ets', 'GeneralSettings', {
+    当前语言模式: () => { preferenceReads++; return preferred; }
+  });
+  // 执行生产组件传给共享选择行的真实 value 表达式。
+  const expression = read('components/settings/GeneralSettings.ets').match(/^\s+value:\s*(.+),\s*$/m)[1];
+  const displayValue = new Function('appLocaleName', 'return ' + expression);
+  for (const stored of APP_LOCALES) {
+    preferred = stored.locale;
+    for (const previous of APP_LOCALES) {
+      const reopened = new General();
+      reopened.uiLanguage = previous.locale;
+      const options = reopened.语言选项();
+      preferenceReads = 0;
+      assert.equal(displayValue.call(reopened, appLocaleName), options[reopened.语言索引()].value,
+        `${stored.locale}, stale UI cache ${previous.locale}`);
+      assert.ok(preferenceReads <= 2, 'the system preference is read per binding, not once per option');
+    }
+  }
+});
+
+test('language persistence ignores repeated and legacy-alias callbacks and survives a fresh store instance', () => {
+  let preferred = 'en-US', failed = false;
+  const requests = [];
+  const dependencies = { i18n: { System: {
+    getAppPreferredLanguage: () => preferred,
+    setAppPreferredLanguage: value => { if (failed) throw Error('write failed'); requests.push(value); preferred = value; }
+  } } };
+  const store = () => loadPlatformModule('model/语言存储.ets', '{当前语言模式,设置语言模式}', dependencies);
+  let language = store();
+  for (const option of APP_LOCALES) {
+    language.设置语言模式(option.locale);
+    const writes = requests.length;
+    for (let repeat = 0; repeat < 10; repeat++) language.设置语言模式(option.locale);
+    language = store();
+    assert.equal(language.当前语言模式(), option.locale);
+    language.设置语言模式(option.locale.replaceAll('-', '_'));
+    assert.equal(requests.length, writes, option.locale);
+  }
+  language.设置语言模式('en-US'); const writes = requests.length;
+  language.设置语言模式('en'); assert.equal(requests.length, writes);
+  failed = true; assert.throws(() => language.设置语言模式('zh-HK'), /write failed/);
+  assert.equal(language.当前语言模式(), 'en-US');
+});
+
+test('language selection reports a system preference read failure without throwing from the native callback', () => {
+  const failedRead = () => { throw Error('preference read failed'); };
+  const store = loadPlatformModule('model/语言存储.ets', '{当前语言模式,设置语言模式}', {
+    i18n: { System: { getAppPreferredLanguage: failedRead } }
+  });
+  const notices = [];
+  const General = loadComponentLogic('components/settings/GeneralSettings.ets', 'GeneralSettings', {
+    ...store, $r: key => key, showToastSafely: (_context, notice) => notices.push(notice)
+  });
+  const general = new General(); general.uiLanguage = 'ja-JP'; general.getUIContext = () => ({});
+  assert.equal(general.语言显示名(), appLocaleName('ja-JP'));
+  assert.equal(general.语言选项()[general.语言索引()].value, general.语言显示名());
+  assert.doesNotThrow(() => general.选择语言('en-US'));
+  assert.deepEqual(notices, [{ message: 'app.string.settings_language_save_failed' }]);
+});
+
 test('language and width selectors recalculate real translations while preserving their current state', () => {
   let locale = 'zh-Hans', reads = 0;
   const context = { getHostContext: () => ({ resourceManager: {
     getStringSync: key => resources[locale].get(key), getStringByNameSync: key => resources[locale].get(key)
   } }) };
-  const dependencies = { ...uiFeedback, $r, DECK_LIST_STYLES, deckListStyleTitleKey, 当前语言模式: () => locale };
+  const dependencies = { ...uiFeedback, $r, DECK_LIST_STYLES, deckListStyleTitleKey, 当前语言模式: () => resolveAppLocale(locale) };
   const General = loadComponentLogic('components/settings/GeneralSettings.ets', 'GeneralSettings', dependencies);
   const Width = loadComponentLogic('components/settings/DeckWidthControl.ets', 'DeckWidthControl', dependencies);
   const general = new General(), width = new Width();
@@ -38,14 +101,16 @@ test('language and width selectors recalculate real translations while preservin
   assert.equal(itemText(context, 'language', locale), resources[locale].get('settings_language'));
   locale = 'en';
   const en = [general.语言选项(), width.options()];
-  assert.equal(general.语言索引(), 1);
+  assert.equal(general.语言索引(), APP_LOCALES.findIndex(option=>option.locale==='en-US'));
   assert.equal(itemText(context, 'language', locale), resources[locale].get('settings_language'));
   assert.equal(general.取本地化文本($r('app.string.language_english')), resources.en.get('language_english'));
-  assert.deepEqual(en[0].map(item => item.value), ['language_chinese', 'language_english'].map(key => resources.en.get(key)));
+  assert.deepEqual(en[0].map(item => item.value), APP_LOCALES.map(option => option.nativeName));
+  assert.deepEqual(en[0].slice(0,3).map(item=>item.value),
+    ['简体中文','繁體中文（中國香港）','繁體中文（中國台灣）']);
   assert.deepEqual(en[1].map(item => item.value), DECK_LIST_STYLES.map(style => resources.en.get(deckListStyleTitleKey(style))));
   assert.equal(en[1].length, 4);
   assert.notDeepEqual(zh, en);
-  assert.ok(reads >= 5, 'actual helpers read the observed language on every evaluation');
+  assert.ok(reads >= 3, 'localized labels still read the language; language options are stable native names');
   assert.equal(width.style, 'double_narrow'); assert.equal(width.saveFailed, true, 'locale refresh keeps local state');
 });
 
@@ -118,10 +183,16 @@ test('default deck localization preserves actual user names and display override
   const source = read('model/主页模型.ets');
   const start = source.indexOf('export function 牌组显示名(');
   const code = source.slice(start, source.indexOf('\n}\n', start) + 2).replace('export ', '');
-  const displayName = new Function('AppStorage', stripTypeScriptTypes(code) + '; return 牌组显示名;')({ get: () => 'zh-Hans' });
+  let currentName='默认牌组';
+  const displayName = new Function('AppStorage', stripTypeScriptTypes(code) + '; return 牌组显示名;')({
+    get: () => ({resourceManager:{getStringByNameSync:key=>{assert.equal(key,'default_deck_name');return currentName;}}})
+  });
   const deck = { id: '1', displayName: '', name: 'Default' };
   assert.equal(displayName(deck, 'zh-Hans'), '默认牌组');
-  assert.equal(displayName(deck, 'en'), 'Default');
+  currentName='Default';assert.equal(displayName(deck, 'en'), 'Default');
+  for(const name of ['Mazzo predefinito','デフォルト','Bộ thẻ mặc định','預設牌組','標準stapel']){
+    currentName=name;assert.equal(displayName(deck,'it-IT'),name);
+  }
   deck.displayName = 'Custom'; assert.equal(displayName(deck, 'zh-Hans'), 'Custom');
   deck.id = '2'; deck.displayName = ''; deck.name = 'My deck';
   assert.equal(displayName(deck, 'en'), 'My deck');
