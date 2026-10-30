@@ -1,0 +1,6 @@
+{
+  "package": "jide_note_links",
+  "name": "双链引用 · JideCards 互通版",
+  "conflicts": ["mnemonic_links"],
+  "mod": 1792598400
+}

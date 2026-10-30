@@ -1,0 +1,13 @@
+{
+  "show_links": "answer",
+  "show_float_buttons": true,
+  "float_position": "bottom-right",
+  "links_title": "关联卡片",
+  "rename_links_title": true,
+  "mirror_links_field": "关联",
+  "mirror_max_items": 30,
+  "auto_mirror": true,
+  "title_length": 0,
+  "accent": "#2f7cf6",
+  "accent_soft": "#eaf1fe"
+}
