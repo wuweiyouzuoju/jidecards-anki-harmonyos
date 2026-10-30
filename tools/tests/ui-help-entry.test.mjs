@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
-import { loadPlatformModule, nativeDialogHostClass, nativeDialogMembers } from './platform-module-harness.mjs';
+import { loadComponentLogic, loadPlatformModule, nativeDialogHostClass, nativeDialogMembers } from './platform-module-harness.mjs';
 import { surfaceMotionApi } from './motion-harness.mjs';
 
 const root = new URL('../../entry/src/main/ets/', import.meta.url);
@@ -99,9 +99,7 @@ test('every ArkTS help entry shares the icon, and labelled help cannot float to 
   assert.match(label, /\.width\('100%'\)/);
   assert.doesNotMatch(label, /\.width\(this\.centered \? '100%' : undefined\)/);
   assert.match(label, /justifyContent\(this\.centered \? FlexAlign\.Center : FlexAlign\.Start\)/);
-  assert.match(label, /Stack\(\)\s*\{[\s\S]*?Text\([\s\S]*?HelpButton\([\s\S]*?\.position\(HelpLayout.titleHelpPosition\(this.titleWidth, this.titleHeight, this.actionIcon !== undefined\)\)/,
-    'help must leave the normal flow so adding it cannot shift the title or increase row height');
-  assert.match(label, /\.onAreaChange\([\s\S]*?this.updateTitleArea\(area\)/);
+  assert.match(label, /HelpTitleLayout\(\{ showAction: this.actionIcon !== undefined, showHelp: this.showHelp/);
   assert.match(label, /maxWidth: HelpLayout.titleMaxWidth\(this.centered, this.showHelp, this.actionIcon !== undefined\)/);
 });
 
@@ -178,13 +176,17 @@ test('disabled help never invokes the owner; enabled clicks invoke it exactly on
   button.isHelpEnabled = false; button.activate(); assert.equal(calls, 1);
 });
 
-test('help follows the actual measured title after text width, wrapping or font size changes',()=>{
-  const layout=loadPlatformModule('utils/HelpLayout.ets','HelpLayout',{});
-  const label=method('components/common/HelpLabel.ets','updateTitleArea',{titleWidth:0,titleHeight:0});
-  for(const [width,height] of [[72,22],[144,48],[90,24]]) {
-    label.updateTitleArea({width:String(width),height:String(height)});
-    assert.equal(label.titleWidth,width);assert.equal(label.titleHeight,height);
-    assert.deepEqual(layout.titleHelpPosition(label.titleWidth,label.titleHeight),{x:width+4,y:(height-18)/2});
+test('title measurement excludes icon touch areas and places text, action and help on one centerline',()=>{
+  const HelpLayout=loadPlatformModule('utils/HelpLayout.ets','HelpLayout',{});
+  const Layout=loadComponentLogic('components/common/HelpTitleLayout.ets','HelpTitleLayout',{HelpLayout});
+  for(const [width,height] of [[72,22],[144,48],[90,24]]) for(const showAction of [false,true]) for(const showHelp of [false,true]){
+    const layout=new Layout();Object.assign(layout,{showAction,showHelp});const children=[],placed=[];
+    const child=(w,h)=>({measureResult:{width:w,height:h},measure(){return this.measureResult;},layout(position){placed.push(position);}});
+    children.push(child(width,height));if(showAction)children.push(child(44,44));if(showHelp)children.push(child(18,18));
+    const measured=layout.onMeasureSize({},children,{maxWidth:200,maxHeight:200});assert.deepEqual(measured,{width,height});
+    layout.onPlaceChildren({},children,{});assert.deepEqual(placed[0],{x:0,y:0});let index=1;
+    if(showAction)assert.equal(placed[index++].y+22,height/2);
+    if(showHelp)assert.equal(placed[index].y+9,height/2);
   }
 });
 
@@ -192,7 +194,7 @@ test('note help reads the current resource and Back preserves all draft fields',
   const draft = ['front', 'back'];
   let exitRequests = 0;
   const page = method('pages/添加笔记页.ets', '打开帮助', {
-    fieldValues: draft, draftPreview: null, requestExit: () => { exitRequests++; }
+    fieldValues: draft, draftPreview: null, linkedIds: [], linksOpen: false, requestExit: () => { exitRequests++; }
   });
   page.打开帮助('type A', 'help A');
   page.打开帮助('type B', 'help B');
