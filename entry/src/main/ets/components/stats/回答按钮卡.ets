@@ -6,11 +6,13 @@
 // Invariants: build 单根 Column；按钮数组长度不足 4 时按 0 处理。
 
 import type { Buttons, ButtonCounts } from '../../proto/messages/StatsMessages';
+import { localePercent } from '../../utils/LocaleFormatting';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 取按钮色 } from '../../model/统计色板';
 
 @Component
 export struct 回答按钮卡 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('更新缓存') 按钮数据: Buttons | null = null;
   @Prop 是否显示全部: boolean = false;
   @Prop @Watch('更新缓存') 范围索引: number = 2;
@@ -141,7 +143,7 @@ export struct 回答按钮卡 {
               // 各类正确率（Anki 手册：percentage of correct reviews for each type of card）
               if (this.取组正确率(this.组缓存[0], 类别) >= 0) {
                 Text($r('app.string.stats_buttons_correct_rate',
-                  `${this.取组正确率(this.组缓存[0], 类别).toFixed(0)}%`))
+                  localePercent(this.取组正确率(this.组缓存[0], 类别) / 100, this.uiLanguage)))
                   .fontSize(应用尺寸.字号_说明_小)
                   .fontColor($r('app.color.text_tertiary'))
               }
