@@ -1,12 +1,17 @@
-import { actionIcon } from '../../utils/ActionIcons';
+import { GlassSource } from '../common/GlassSource';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { NoteLinksPanel } from '../links/NoteLinksPanel';
+import { noteLinksService } from '../../backend/NoteLinksService';
+import { noteLinkBridgeScript } from '../../model/NoteLinkBridge';
+import { NoteLinksProxy } from '../../model/NoteLinksProxy';
+import { actionIcon } from '../../utils/ActionIcons';
 import { WINDOW_SAFE_TOP_KEY } from '../../model/WindowSafeLayout';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { CardMarkingBadge } from '../common/CardMarkingBadge';
 import { AnkiCardMarking } from '../../backend/AnkiCardMarking';
 import { CardMarkingState, FlagLabels, parseFlagLabels, readCardMarking } from '../../model/CardMarking';
-import { resourceText } from '../../utils/UiFeedback';
+import { resourceText, showToastSafely } from '../../utils/UiFeedback';
 
 // ========================================================
 // @块ID UI-BROWSER-PREVIEW-001
@@ -44,7 +49,7 @@ import { resourceText } from '../../utils/UiFeedback';
 // ========================================================
 
 import { webview } from '@kit.ArkWeb';
-import { CardWebView, CardWebAttributes } from '../../utils/CardWebView';
+import { CardWebView, CardWebAttributes, cardScriptDiagnosticLabels } from '../../utils/CardWebView';
 import { CardRenderPrefetch } from '../../model/CardRenderPrefetch';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { interceptCardAsset } from '../../utils/CardAssetResponse';
@@ -84,6 +89,8 @@ import { PAGE_SURFACE_KEY } from '../../model/ThemeCatalog';
 import { PAGE_COMPACT_LAYOUT_KEY } from '../../model/AppLayoutState';
 import { ThemeBackground } from '../common/ThemeBackground';
 
+interface LinkedPreviewReturn { ids: number[]; index: number; side: string; panel: boolean; scroll: number; }
+
 /** 仅向预览转发显示操作，文档版本由组件校验。 */
 class PreviewActionProxy {
   dispatch: (action: string, version: number) => void = (): void => {};
@@ -109,6 +116,7 @@ export struct 卡片预览页 {
   @StorageProp('cardTextSizePercent') private cardTextSizePercent: number = 100;
   @Prop @Watch('cardThemeChanged') isDark: boolean = false;
   @Prop 卡片ID列表: number[] = [];
+  @Prop linksReadOnly: boolean = false;
   @Prop 初始索引: number = 0;
   @Prop 媒体目录: string = '';
   @Prop @Watch('预览刷新版本变化') 刷新版本: number = 0;
@@ -169,17 +177,69 @@ export struct 卡片预览页 {
   @State private 控制器已挂载: boolean = false;
 
   @StorageProp(颜色键.主色按钮背景) private 主色按钮背景: string = '#2F5FD0';
-  @StorageProp(颜色键.主色容器) private 主色容器色: string = '#E8EEFC';
+  @StorageProp(颜色键.主色容器) @Watch('referenceThemeChanged') private 主色容器色: string = '#E8EEFC';
+  @StorageProp(颜色键.主色文字) @Watch('referenceThemeChanged') private referenceText: string = '#183B8F';
+  private referenceThemeChanged(): void {
+    if (this.mounted && this.控制器已挂载) this.网页控制器.runJavaScript(noteLinkBridgeScript(this.documentVersion,
+      undefined, { surface: this.主色容器色, text: this.referenceText })).catch((error: Object): void => { console.info(`Note reference theme: ${error}`); });
+  }
   // 状态栏高度（沉浸式全屏下，预览层全屏铺开，顶部条需让出状态栏区域，与主页顶栏同一水平面）
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
   @StorageProp(WINDOW_SAFE_TOP_KEY) private toolbarSafeTop: number = 0;
   // 手势导航条高度（底部固定操作区需整体抬高，避免按钮落入系统手势区域）
   @StorageProp('导航条高度') private 导航条高度: number = 0;
 
+  @State private noteLinksOpen: boolean = false;
+  @State private noteLinksNoteId: number = 0;
+  @State private noteLinksBack: number = 0;
+  private linkedReturns: LinkedPreviewReturn[] = [];
+  private currentLinkScroll: number = 0;
+  private noteLinksChanged: boolean = false;
+  private currentLinkMirror: string = '';
+  private linkedReturnScroll: number = 0;
+  private linkedReturnSide: string = '';
+  private async openNoteLinks(): Promise<void> {
+    if (!this.mounted || !this.interactionEnabled || !this.foreground || this.忙碌 || this.cardRenderPending) return;
+    const version: number = this.loadVersion;
+    try {
+      const card = await new 卡片服务().获取卡片(this.取当前卡片ID());
+      if (!this.mounted || version !== this.loadVersion) return;
+      this.currentLinkScroll = Number(await this.cardWeb.controllerAt(this.visibleWebSlot).runJavaScript('String(window.scrollY)')) || 0;
+      if (!this.mounted || version !== this.loadVersion || !this.foreground || !this.interactionEnabled) return;
+      this.noteLinksNoteId = card.noteId; this.noteLinksChanged = false; this.noteLinksOpen = true; this.stopAudio();
+    } catch (error) { console.info(`NoteLinks: ${error}`); }
+  }
+  private pushLinkedPreview(ids: number[]): void {
+    if (ids.length === 0 || this.linkedReturns.length >= 32) return;
+    this.linkedReturns.push({ ids: this.previewIds.slice(), index: this.当前索引值, side: this.当前面, panel: this.noteLinksOpen, scroll: this.currentLinkScroll });
+    this.linkedReturnSide = 'answer';
+    this.previewIds = ids.slice(); this.当前索引值 = 0; this.当前面 = 'answer'; this.noteLinksOpen = false;
+    this.加载当前卡();
+  }
+  private async followNoteLink(guid: string, version: number): Promise<void> {
+    if (!this.mounted || !this.foreground || !this.interactionEnabled || this.noteLinksOpen || version !== this.documentVersion) return;
+    try {
+      const ids = await noteLinksService.preview(guid);
+      this.currentLinkScroll = Number(await this.cardWeb.controllerAt(this.visibleWebSlot).runJavaScript('String(window.scrollY)')) || 0;
+      if (this.mounted && version === this.documentVersion && this.foreground && this.interactionEnabled) {
+        if (ids.length > 0) this.pushLinkedPreview(ids);
+        else showToastSafely(this.getUIContext(), { message: $r('app.string.note_links_missing') });
+      }
+    } catch (error) { if (this.mounted && version === this.documentVersion) showToastSafely(this.getUIContext(), { message: $r('app.string.note_links_error') }); }
+  }
+  private backNoteLink(): boolean {
+    if (this.noteLinksOpen) { this.noteLinksBack++; return true; }
+    const prior: LinkedPreviewReturn | undefined = this.linkedReturns.pop();
+    if (prior === undefined) return false;
+    this.linkedReturnSide = prior.side; this.linkedReturnScroll = prior.scroll; this.noteLinksOpen = prior.panel;
+    this.previewIds = prior.ids; this.当前索引值 = prior.index; this.当前面 = prior.side === 'question' ? 'question' : 'answer';
+    this.加载当前卡(); return true;
+  }
+
   aboutToAppear(): void {
     this.mounted = true;
     this.cardThemeChanged();
-    this.onBackHandlerChange((): boolean => this.dismissMoreMenu());
+    this.onBackHandlerChange((): boolean => this.dismissMoreMenu() || this.backNoteLink());
     // 固定本次预览的 ID 顺序；字段编辑后的搜索重排不能把当前卡换成另一张。
     this.previewIds = this.卡片ID列表.slice();
     this.当前索引值 = Math.max(0, Math.min(this.初始索引, this.previewIds.length - 1));
@@ -212,6 +272,7 @@ export struct 卡片预览页 {
 
   /** 编辑或后台期间停止所有声音；返回后由用户重播，不自动打断其他音频。 */
   private updateActivity(): void {
+    this.cardWeb.setActive(this.mounted && this.interactionEnabled && this.foreground);
     this.cardWeb.setAudioEnabled(this.mounted && this.interactionEnabled && this.foreground);
     if (!this.interactionEnabled || !this.foreground) this.moreMenuOpen = false;
     if (!this.interactionEnabled || !this.foreground) {
@@ -234,6 +295,7 @@ export struct 卡片预览页 {
 
   /** 音频失败只影响重播入口，卡片仍可浏览。 */
   private async playCurrentAudio(autoplay: boolean = true, audioTarget: string = ''): Promise<void> {
+    if (this.noteLinksOpen) return;
     const rendered: RenderedCard | null = this.已渲染;
     if (rendered === null || !this.mounted || this.错误详情 !== '') return;
     if (!this.interactionEnabled || !this.foreground) {
@@ -318,8 +380,8 @@ export struct 卡片预览页 {
     }
     this.忙碌 = true;
     this.错误详情 = '';
-    this.当前面 = 'question';
-    this.onPositionChanged(this.当前索引值);
+    this.当前面 = this.linkedReturnSide === 'answer' ? 'answer' : 'question'; this.linkedReturnSide = '';
+    if (this.linkedReturns.length === 0) this.onPositionChanged(this.当前索引值);
     this.正面HTML = '';
     this.背面HTML = '';
     this.已渲染 = null;
@@ -335,7 +397,7 @@ export struct 卡片预览页 {
       const rendered: RenderedCard = await this.renderPrefetch.read(卡片ID);
       if (!this.mounted || version !== this.loadVersion) return;
       const answerHtml: string = await renderPreviewAnswer(构建卡片HTML(rendered, 'answer', this.isDark, undefined,
-        this.audioPreferences.hideAudioPlayButtons, this.取本地化文案($r('app.string.study_replay_sound')), this.取本地化文案($r('app.string.card_script_load_error'))),
+        this.audioPreferences.hideAudioPlayButtons, this.取本地化文案($r('app.string.study_replay_sound')), this.取本地化文案($r('app.string.card_script_load_error')), cardScriptDiagnosticLabels(this.getUIContext())),
         rendered, 卡片ID, {
           card: (id: number): Promise<Card> => this.卡片服务实例.获取卡片(id),
           note: (id: number): Promise<EditableNote> => this.笔记服务实例.获取笔记(id),
@@ -346,10 +408,15 @@ export struct 卡片预览页 {
             this.卡片渲染服务实例.extractClozeForTyping(text, ordinal)
         });
       if (!this.mounted || version !== this.loadVersion) return;
+      let linkMirror: string = '';
+      try { linkMirror = await noteLinksService.mirror((await this.卡片服务实例.获取卡片(卡片ID)).noteId); }
+      catch (error) { console.info(`NoteLinks preview mirror: ${error}`); }
+      if (!this.mounted || version !== this.loadVersion) return;
+      this.currentLinkMirror = linkMirror;
       this.已渲染 = rendered;
       this.currentMarking = marking; this.flagLabels = labels;
       this.正面HTML = 剥除拼写标记(构建卡片HTML(this.已渲染, 'question', this.isDark, undefined,
-        this.audioPreferences.hideAudioPlayButtons, this.取本地化文案($r('app.string.study_replay_sound')), this.取本地化文案($r('app.string.card_script_load_error'))));
+        this.audioPreferences.hideAudioPlayButtons, this.取本地化文案($r('app.string.study_replay_sound')), this.取本地化文案($r('app.string.card_script_load_error')), cardScriptDiagnosticLabels(this.getUIContext())));
       this.背面HTML = answerHtml;
       this.应用HTML(this.当前面 === 'question' ? this.正面HTML : this.背面HTML);
     } catch (错误) {
@@ -367,9 +434,12 @@ export struct 卡片预览页 {
    * Web 未 attach 的白屏时序坑（PROJECT_CONTEXT.md「Web 组件 attach 时序」）。
    */
   private 应用HTML(html: string): void {
+    this.cardWeb.setActive(this.mounted && this.interactionEnabled && this.foreground);
     this.cardRenderPending = true;
     const version: number = ++this.documentVersion;
-    const document: string = appendCardScript(html, buildPreviewInteractionScript(version));
+    const document: string = appendCardScript(appendCardScript(html, buildPreviewInteractionScript(version)),
+      noteLinkBridgeScript(version, this.当前面 === 'answer' ? this.currentLinkMirror : undefined,
+        { surface: this.主色容器色, text: this.referenceText }));
     if (this.控制器已挂载) {
       try {
         this.cardWeb.setAudioEnabled(this.interactionEnabled && this.foreground);
@@ -388,7 +458,7 @@ export struct 卡片预览页 {
   /** 仅主文档/渲染进程失败进入可恢复错误态；缺失的单个媒体不遮挡整张卡。 */
   private webFailed(): void {
     if (!this.mounted) return;
-    this.cardWeb.reset();
+    this.cardWeb.reset(true);
     this.loadVersion += 1;
     this.documentVersion += 1;
     this.忙碌 = false;
@@ -403,7 +473,7 @@ export struct 卡片预览页 {
     if (this.bridgeReady) return;
     const proxy: PreviewActionProxy = new PreviewActionProxy();
     proxy.dispatch = (action: string, version: number): void => {
-      if (version !== this.documentVersion || !this.mounted || !this.interactionEnabled || !this.foreground) return;
+      if (this.noteLinksOpen || version !== this.documentVersion || !this.mounted || !this.interactionEnabled || !this.foreground) return;
       if (action === 'flip') this.翻面();
       if (action === 'previous') this.上一张();
       if (action === 'next') this.下一张();
@@ -412,6 +482,9 @@ export struct 卡片预览页 {
     };
     for (const slot of this.webSlots) {
       this.cardWeb.controllerAt(slot).registerJavaScriptProxy(proxy, 'jidePreview', ['onAction']);
+      const links: NoteLinksProxy = new NoteLinksProxy();
+      links.dispatch = (guid: string, _action: string, version: number): void => { this.followNoteLink(guid, version); };
+      this.cardWeb.controllerAt(slot).registerJavaScriptProxy(links, 'jideNoteLinks', ['onLink']);
     }
     this.bridgeReady = true;
   }
@@ -447,12 +520,13 @@ export struct 卡片预览页 {
    * 答案 → 题目只由 上一张 负责，与 Anki Previewer._on_prev/_on_next 的按键语义一致。
    */
   private 翻面(): void {
+    if (this.noteLinksOpen) return;
     if (!this.interactionEnabled || !this.foreground || this.忙碌 || this.cardRenderPending
       || this.错误详情 !== '' || this.当前面 === 'answer') {
       return;
     }
     this.当前面 = 'answer';
-    this.onPositionChanged(this.当前索引值);
+    if (this.linkedReturns.length === 0) this.onPositionChanged(this.当前索引值);
     this.应用HTML(this.背面HTML);
   }
 
@@ -461,12 +535,13 @@ export struct 卡片预览页 {
    * 加载中或错误态直接切卡，保留“坏卡/慢卡可跳过”的既有行为。
    */
   private 上一张(): void {
+    if (this.noteLinksOpen) return;
     if (!this.interactionEnabled) {
       return;
     }
     if (!this.忙碌 && !this.cardRenderPending && this.错误详情 === '' && this.当前面 === 'answer') {
       this.当前面 = 'question';
-      this.onPositionChanged(this.当前索引值);
+      if (this.linkedReturns.length === 0) this.onPositionChanged(this.当前索引值);
       this.应用HTML(this.正面HTML);
       return;
     }
@@ -482,6 +557,7 @@ export struct 卡片预览页 {
    * 加载中或错误态直接切卡，保留“坏卡/慢卡可跳过”的既有行为。
    */
   private 下一张(): void {
+    if (this.noteLinksOpen) return;
     if (!this.interactionEnabled) {
       return;
     }
@@ -499,7 +575,7 @@ export struct 卡片预览页 {
   /** 编辑字段：经 onEditField 回调上抛当前卡片ID，由父级打开 浏览编辑区。 */
   private 请求编辑字段(): void {
     const 卡片ID: number = this.取当前卡片ID();
-    if (卡片ID === 0 || this.忙碌 || this.cardRenderPending || !this.interactionEnabled || this.错误详情 !== '') {
+    if (卡片ID === 0 || this.忙碌 || !this.interactionEnabled || this.错误详情 !== '') {
       return;
     }
     this.stopAudio();
@@ -517,6 +593,10 @@ export struct 卡片预览页 {
   }
 
   private previewCardShown(background: string, appearanceOnly: boolean = false): void {
+    if (this.linkedReturnScroll > 0) {
+      const scroll: number = this.linkedReturnScroll; this.linkedReturnScroll = 0;
+      this.cardWeb.controllerAt(this.visibleWebSlot).runJavaScript('window.scrollTo(0,' + scroll + ')').catch((): void => {});
+    }
     if (!this.mounted) return;
     this.hasRenderedCard = true;
     if (background !== '') this.cardSurfaceBackground = background;
@@ -577,18 +657,18 @@ export struct 卡片预览页 {
   }
 
   /** 与学习页共用右上角操作位置；预览不提供评分或撤销学习动作。 */
-  private 预览更多菜单(): MenuElement[] {
-    const canManageCard: boolean = !this.忙碌 && this.interactionEnabled && this.错误详情 === '' &&
+  private 预览更多菜单(): CardActionMenuEntry[] {
+    const canManageCard: boolean = !this.忙碌 && this.interactionEnabled && this.foreground && this.错误详情 === '' &&
       this.取当前卡片ID() !== 0;
-    const items: MenuElement[] = [
+    const items: CardActionMenuEntry[] = [
       {
-        value: this.取本地化文案($r('app.string.study_edit_note')),
+        id: 'edit', value: this.取本地化文案($r('app.string.study_edit_note')),
         icon: actionIcon('edit'),
         action: (): void => { this.请求编辑字段(); },
         enabled: canManageCard
       },
       {
-        value: this.取本地化文案($r('app.string.study_replay_sound')),
+        id: 'replay', value: this.取本地化文案($r('app.string.study_replay_sound')),
         icon: actionIcon('audio'),
         action: (): void => { this.playCurrentAudio(); },
         enabled: canManageCard && (this.hasAudio || this.audioError !== '')
@@ -596,13 +676,20 @@ export struct 卡片预览页 {
     ];
     if (this.agentEnabled) {
       items.push({
-        value: this.取本地化文案($r('app.string.ai_card_edit')),
+        id: 'agent', value: this.取本地化文案($r('app.string.ai_card_edit')),
         icon: actionIcon('agent'),
         action: (): void => { this.请求AI改卡(); },
         enabled: canManageCard
       });
     }
     return items;
+  }
+
+  private selectPreviewAction(id: string): void {
+    const current: CardActionMenuEntry | undefined = this.预览更多菜单().find((item: CardActionMenuEntry): boolean => item.id === id);
+    if (current === undefined || current.enabled === false) return;
+    this.moreMenuOpen = false;
+    current.action?.();
   }
 
   @Builder
@@ -618,18 +705,22 @@ export struct 卡片预览页 {
       Row() {
         IconActionButton({ toolbarStyle: true,
           source: $r('app.media.ic_common_close'), label: $r('app.string.browser_preview_close'),
-          onAction: (): void => { this.onClose(); }
+          onAction: (): void => { if (!this.backNoteLink()) this.onClose(); }
         })
         Blank()
-        if (this.currentMarking !== null) {
-          CardMarkingBadge({ flag: this.currentMarking.flag, marked: this.currentMarking.marked, labels: this.flagLabels })
-            .margin({ right: 应用尺寸.间距_8 }).hitTestBehavior(HitTestMode.None)
-        }
-        IconActionButton({ toolbarStyle: true,
-          source: $r('app.media.ic_home_more'), label: $r('app.string.study_more'),
-          slideMenu: true, onHoldOpen: (): void => { this.moreMenuOpen = true; },
-          onHoldCancel: (): void => { this.moreMenuOpen = false; }, onAction: (): void => { this.moreMenuOpen = true; }
-        })
+        Row({ space: 应用尺寸.间距_8 }) {
+          IconActionButton({ toolbarStyle: true, source: $r('app.media.ic_study_link'), label: $r('app.string.note_links_title'),
+            onAction: (): void => { this.openNoteLinks(); } })
+          if (this.currentMarking !== null && (this.currentMarking.marked || this.currentMarking.flag > 0)) {
+            CardMarkingBadge({ flag: this.currentMarking.flag, marked: this.currentMarking.marked, labels: this.flagLabels })
+              .hitTestBehavior(HitTestMode.None)
+          }
+          IconActionButton({ toolbarStyle: true,
+            source: $r('app.media.ic_home_more'), label: $r('app.string.study_more'),
+            slideMenu: true, keepMenuOnHoldRelease: true, onHoldOpen: (): void => { this.moreMenuOpen = true; },
+            onHoldCancel: (): void => { this.moreMenuOpen = false; }, onAction: (): void => { this.moreMenuOpen = true; }
+          })
+        }.alignItems(VerticalAlign.Center)
       }
       .width('100%')
       .height('100%')
@@ -774,16 +865,26 @@ export struct 卡片预览页 {
       ThemeBackground()
 
       // 主面板：全屏卡片预览（OPACITY 转场，禁止左右平移）
-      CardViewport({ content: () => { this.cardViewportContent(); } })
+      GlassSource({ freezeDuringPanels: true }) {
+CardViewport({ content: () => { this.cardViewportContent(); } })
       .width('100%')
       .height('100%')
       .backgroundColor(this.pageSurface)
+      }
+      if (this.noteLinksOpen) {
+        NoteLinksPanel({ noteId: this.noteLinksNoteId, readOnly: this.linksReadOnly, backRequest: this.noteLinksBack, onClose: (): void => {
+            this.noteLinksOpen = false;
+            if (this.noteLinksChanged) {
+              this.linkedReturnSide = this.当前面; this.linkedReturnScroll = this.currentLinkScroll; this.加载当前卡();
+            }
+          }, onChanged: (): void => { this.noteLinksChanged = true; },
+          onPreview: (ids: number[]): void => { this.pushLinkedPreview(ids); } })
+      }
       if (this.moreMenuOpen) {
         CardActionMenu({ items: this.预览更多菜单(),
           onClose: (): void => { this.dismissMoreMenu(); },
           onSelect: (item: CardActionMenuEntry): void => {
-            this.moreMenuOpen = false;
-            item.action?.();
+            this.selectPreviewAction(item.id ?? '');
           } })
       }
     }
