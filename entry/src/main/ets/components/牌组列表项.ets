@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SeriesDeckSurface } from '../utils/SeriesVisual';
+import { LengthMetrics } from '@kit.ArkUI';
 import { disclosureAnimation } from '../utils/AppMotion';
 import { PressFeedback } from '../utils/PressFeedback';
 import { DeckRowMenuGesture } from '../utils/DeckRowMenuGesture';
@@ -9,9 +11,6 @@ import { ActionIcon } from './common/ActionIcon';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
 import { resourceText } from '../utils/UiFeedback';
-import { ThemeDefinition, themeDefinition, THEME_VISUALS_KEY } from '../model/ThemeCatalog';
-import { themeGradient } from '../utils/ThemeVisuals';
-import { GLASS_COLORS_KEY, GLASS_HIGHLIGHT_COLORS } from '../model/ThemeCatalog';
 
 import { 牌组汇总, 牌组色调, 牌组显示名 } from '../model/主页模型';
 import { 应用尺寸 } from '../utils/应用尺寸';
@@ -28,7 +27,7 @@ import { loadDeckBackground, releaseDeckBackground } from '../backend/DeckBackgr
 //
 // @输入
 // @Prop deck：牌组汇总数据（保留英文名以兼容 deck-hierarchy-contract 测试断言 deck.depth / deck.hasChildren）。
-// @Prop selected：是否已选中（高亮描边）。
+// @Prop selected：是否已选中（叠加淡主题色）。
 // @Prop expanded：是否已展开子牌组（保留英文名以兼容测试断言）。
 // @Prop reorderMode：是否处于排序模式（显示 ≡ 手柄、禁用选牌与长按菜单）。
 // 父组件传入的回调 onSelect / onToggle / onMenu / onDoubleTap。
@@ -51,10 +50,13 @@ import { loadDeckBackground, releaseDeckBackground } from '../backend/DeckBackgr
 
 @Component
 export struct 牌组列表项 {
+  @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
+  @StorageProp('themeMode') private themeMode: string = 'system';
+  @StorageProp('systemDarkMode') private systemDark: boolean = false;
+  @StorageProp(颜色键.页面底色微染) private pageTint: string = '';
+
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(DECK_LIST_NARROW_KEY) private narrow: boolean = false;
-  @StorageProp(GLASS_COLORS_KEY) private glassColors: string[] = GLASS_HIGHLIGHT_COLORS;
-  @StorageProp(THEME_VISUALS_KEY) private visual: ThemeDefinition = themeDefinition('aurora');
   // 注：deck / expanded / onToggle 保留英文名以兼容 deck-hierarchy-contract.test.mjs 阶段 6 前的断言。
   @Prop @Watch('backgroundChanged') deck: 牌组汇总 = {
     id: '', name: '', fullName: '', depth: 0, parentId: '', hasChildren: false, ancestorIds: [],
@@ -72,6 +74,10 @@ export struct 牌组列表项 {
   @Prop reorderMode: boolean = false;
   @Prop menuOpen: boolean = false;
   @State private textColumnWidth: number = 0;
+  private fontScale(): number {
+    const context: UIContext = this.getUIContext();
+    return Math.max(1, context.px2vp(context.fp2px(1)));
+  }
   // 沙盒背景图异步加载的 PixelMap。
   // 必须用 PixelMap 而不是直接传文件路径给 Image——ArkUI Image 对沙盒绝对路径解析不稳定，
   // 标准方式是 fileIo.openSync → image.createImageSource → createPixelMap → Image(pixelMap)。
@@ -92,8 +98,6 @@ export struct 牌组列表项 {
   onDoubleTap: (deckId: string) => void = (_deckId: string): void => {};
 
   @StorageProp(颜色键.动作主色) private 动作主色: string = '#2F5FD0';
-  @StorageProp(颜色键.选中背景) private 选中背景色: string = '#E8EEFC';
-  @StorageProp(颜色键.主色边框) private 主色边框色: string = '#B8CEFA';
   @StorageProp(颜色键.新卡计数色) private 新卡计数色: string = '#3974D9';
   @StorageProp(颜色键.学习中计数色) private 学习中计数色: string = '#B56A22';
   @StorageProp(颜色键.复习中计数色) private 复习中计数色: string = '#7056C8';
@@ -207,11 +211,15 @@ export struct 牌组列表项 {
   // 排序模式：onClick 不触发选牌，移除菜单长按识别器，由 ListItem 接管拖动。
   // 双击检测：两次 onClick 间隔 < 300ms 且 hasChildren → onDoubleTap（递归展开）。
   // 色条 tone===None 时不渲染色块，但保留 Column 占位维持行内对齐。
-  // 排序模式下行描边用 动作主色 高亮，选中态用 主色边框色（更浅避免视觉过重）。
+  // 排序模式保留动作色描边；普通选中只叠加淡主题色，保持原边框。
   //
   // @副作用
   // 无。仅上抛回调。
   // ========================================================
+  private selectionTint(): string {
+    return /^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(this.动作主色) ? `#1A${this.动作主色.slice(-6)}` : '#00000000';
+  }
+
   private expansionLabel(_locale: string = this.uiLanguage): string {
     const label: Resource = this.expanded ? $r('app.string.deck_collapse') : $r('app.string.deck_expand');
     return resourceText(this.getUIContext(), label, 牌组显示名(this.deck, this.uiLanguage));
@@ -310,7 +318,7 @@ export struct 牌组列表项 {
         })
         if (!this.hideStudyCounts) {
           Column({ space: 应用尺寸.间距_5 }) {
-            Row({ space: this.narrow ? 应用尺寸.间距_6 : 应用尺寸.间距_8 }) {
+            Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.End, space: { main: LengthMetrics.vp(6), cross: LengthMetrics.vp(4) } }) {
               Text($r('app.string.deck_new_short', this.deck.newCount))
                 .fontSize(this.narrow ? 应用尺寸.字号_说明 : 应用尺寸.字号_正文_小)
                 .fontColor(this.新卡计数色)
@@ -323,9 +331,11 @@ export struct 牌组列表项 {
             }
           }
           .alignItems(HorizontalAlign.End)
+          .constraintSize({ maxWidth: '45%' }).flexShrink(1)
         }
       }
-      .width('100%')
+      .width('100%').height('100%')
+      .backgroundColor(this.selected ? this.selectionTint() : Color.Transparent)
       .padding({
         left: (this.narrow ? 应用尺寸.间距_12 : 应用尺寸.间距_14) + this.deck.depth * 应用尺寸.间距_16,
         right: this.narrow ? 应用尺寸.间距_12 : 应用尺寸.间距_14,
@@ -349,23 +359,14 @@ export struct 牌组列表项 {
       })
     }
     .width('100%')
-    .height(应用尺寸.deckRowHeight(this.narrow))
+    .height(应用尺寸.deckRowHeight(this.narrow) * this.fontScale())
     .gestureModifier(new DeckRowMenuGesture(this.reorderMode, (): void => { this.openMenu(); }))
     .onMouse((event: MouseEvent): void => { this.handleMouse(event); })
     .clip(true)
-    .linearGradient({ angle: 110, colors: this.visual.selectedColors.length > 0 && this.selected
-      ? themeGradient(this.glassColors)
-      : [[Color.Transparent, 0], [Color.Transparent, 1]] })
-    // 背景已经是柔化彩雾，透明底与高光形成玻璃感，无需列表逐项实时模糊。
-    .backgroundColor(this.selected
-      ? (this.visual.selectedColors.length > 0 ? Color.Transparent : this.选中背景色)
-      : $r('app.color.surface_card'))
-    .border(SurfaceBorder.options(应用尺寸.卡片边框,
-      // 排序模式下行描边用 动作主色 高亮，让用户感知「现在可拖」；
-      // 选中态用 主色边框色（比 动作主色 浅，避免选中行视觉过重）
-      this.reorderMode
-        ? this.动作主色 : (this.selected ?
-          (this.visual.selectedColors.length > 0 ? '#80FFFFFF' : this.主色边框色) : SurfaceBorder.color())
-    )).borderRadius(应用尺寸.圆角_牌组行)
+    // 选中不跳过材质，覆盖层位于背景图之上、文字之下。
+    .attributeModifier(new SeriesDeckSurface(this.surfaceMaterial, this.themeMode === 'dark' || (this.themeMode !== 'light' && this.systemDark),
+      this.动作主色, this.pageTint, 应用尺寸.圆角_牌组行))
+    .border(SurfaceBorder.options(应用尺寸.卡片边框, this.reorderMode ? this.动作主色 : SurfaceBorder.color()))
+    .borderRadius(应用尺寸.圆角_牌组行)
   }
 }

@@ -236,7 +236,8 @@ test('row uses dynamic menu gestures and list recreates sorting registration on 
   assert.doesNotMatch(row,/onLevelMenu|onLevelChange|levelMenuDeckId|99999999/);
   const list=read('components/home/主页牌组列表.ets');
   // onMove 在 LazyForEach 创建时注册：单列进入排序也必须切换分支，不能仅改回调表达式。
-  assert.match(list,/if \(this\.排序模式中\) \{\s*this\.flatDeckRows\(true\)\s*\} else if \(this\.columnCount\(\) === 2\)/);
+  assert.match(list,/if \(this\.columnCount\(\) === 2\) \{\s*this\.doubleDeckRows\(\)\s*\} else \{/);
+  assert.match(list,/if \(this\.排序模式中\) \{\s*this\.flatDeckRows\(true\)\s*\} else \{/);
   assert.match(list,/this\.flatDeckRows\(false\)/);
   assert.match(list,/\.onMove\(sortingEnabled \?/);
   assert.match(list,/\.enabled\(!this\.reorderBusy\)/);

@@ -92,7 +92,7 @@ test('narrow rows keep symmetric padding, fit the expand target and share crop h
   assert.deepEqual(motionApi().disclosureAnimation(), {duration:150, curve:'ease-out'});
   for (const path of ['components/牌组列表项.ets', 'components/牌组定制面板.ets']) {
     assert.match(read(path), /@StorageProp\(DECK_LIST_NARROW_KEY\)/);
-    assert.match(read(path), /\.height\(应用尺寸\.deckRowHeight\(this\.narrow\)\)/);
+    assert.match(read(path), /\.height\(应用尺寸\.deckRowHeight\(this\.narrow\)(?: \* this\.fontScale\(\))?\)/);
   }
   const list = read('components/home/主页牌组列表.ets');
   assert.match(list, /@StorageProp\(DECK_LIST_NARROW_KEY\)/);
@@ -139,7 +139,7 @@ test('deck style selector exposes four localized options and saves each actual v
     assert.equal(control.style, 'double_narrow');
   }
   const list = read('components/home/主页牌组列表.ets');
-  assert.match(list, /\.lanes\(this\.columnCount\(\), 应用尺寸\.页面分组间距\(this\.narrow\)\)/);
+  assert.match(list, /\.columnsTemplate\('1fr 1fr'\)/);
   assert.match(list, /hideStudyCounts: isDoubleColumnDeckListStyle\(this\.style\)/);
   assert.match(read('components/牌组列表项.ets'), /if \(!this\.hideStudyCounts\) \{[\s\S]*deck_new_short[\s\S]*deck_learning_short[\s\S]*deck_review_short/);
 });
@@ -147,6 +147,8 @@ test('deck style selector exposes four localized options and saves each actual v
 
 test('single and double columns share row height and still fit two name lines plus description', () => {
   const source = read('components/牌组列表项.ets');
+  assert.doesNotMatch(source,/\.lineHeight\([^\n]*this\.fontScale\(/,
+    'numeric lineHeight uses fp and already follows system scaling; applying fontScale again clips the second line');
   const Row = loadComponentLogic('components/牌组列表项.ets', '牌组列表项', {
     应用尺寸, FontWeight: { Medium: 'medium' }, 牌组显示名: deck => deck.displayName
   });
@@ -174,7 +176,7 @@ test('single and double columns share row height and still fit two name lines pl
                 return wraps ? 250 : 150;
               }
             }) }),
-            compactText: Row.prototype.compactText
+            compactText: Row.prototype.compactText, fontScale: ()=>1
           };
           const compact = narrow && wraps && hasDescription;
           assert.equal(props.compactText(), compact);
@@ -187,8 +189,8 @@ test('single and double columns share row height and still fit two name lines pl
           const rowExpression = source.match(/\.height\((应用尺寸\.deckRowHeight\([^\n]+)\)/)[1];
           const rowHeight = new Function('应用尺寸', `return ${rowExpression};`).call(props, 应用尺寸);
           assert.equal(nameLines, 2, 'long names can wrap in every deck style');
-          assert.equal(nameFont, narrow ? (compact ? 14 : 16) : 17);
-          assert.equal(descriptionFont, narrow ? (compact ? 11 : 12) : 13);
+          assert.equal(nameFont, narrow ? (compact ? 应用尺寸.字号_正文 : 应用尺寸.字号_强调) : 应用尺寸.字号_标题);
+          assert.equal(descriptionFont, narrow ? (compact ? 应用尺寸.字号_说明 : 应用尺寸.字号_正文_小) : 应用尺寸.字号_正文_中);
           assert.ok(nameLine >= nameFont);
           assert.ok(descriptionLine >= descriptionFont);
           const actualNameLines = wraps ? 2 : 1;

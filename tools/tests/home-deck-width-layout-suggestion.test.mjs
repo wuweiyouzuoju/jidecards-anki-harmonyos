@@ -8,6 +8,7 @@ const { deckListOverflows, DECK_LIST_NARROW_KEY, DECK_WIDTH_HINT_HANDLED_KEY, DE
 import { localPreferenceApi } from './local-preference-harness.mjs';
 import { 应用尺寸 } from '../../entry/src/main/ets/utils/应用尺寸.ets';
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
+import { AppInterfaceTracker } from '../../entry/src/main/ets/model/AppInterface.ts';
 
 test('overflow uses visible row count and measured viewport, including a clipped last row', () => {
   assert.equal(deckListOverflows(0, 92, 12, 300), false);
@@ -33,6 +34,8 @@ test('list reports insert, collapse, resize and density changes, and releases it
     ...appearance, 应用尺寸, 牌组列表数据源: Source, Scroller: class {}
   });
   const list = new List();
+  let fontScale=1;
+  list.getUIContext=()=>({fp2px:value=>value*fontScale*3,px2vp:value=>value/3});
   const events = [];
   list.onOverflowChange = value => events.push(value);
   list.aboutToAppear();
@@ -57,20 +60,27 @@ function homeHarness() {
     return source.slice(start, source.indexOf('\n  }', start) + 4);
   }).join('\n');
   const events = [];
+  const interfaceTracker = new AppInterfaceTracker();
   let save = async () => { events.push('save-narrow'); };
   let complete = async () => { events.push('handled'); };
-  const Home = new Function('$r', 'saveDeckListStyle', 'completeDeckWidthHint', 'isDoubleColumnDeckListStyle', 'showToastSafely', 'DialogAlignment',
+  const Home = new Function('$r', 'saveDeckListStyle', 'completeDeckWidthHint', 'isDoubleColumnDeckListStyle', 'showToastSafely', 'DialogAlignment', 'deckLayoutSuggestion', 'resourceText', 'appInterface',
     stripTypeScriptTypes(`class Home { ${methods} }`) + '; return Home;')(
       key => key, async value => { assert.equal(value, home.deckWidthHintTarget); await save(); }, () => complete(), appearance.isDoubleColumnDeckListStyle,
-      (_ui, message) => events.push(message.message), { Center: 'center' });
+      (_ui, message) => events.push(message.message), { Center: 'center' }, appearance.deckLayoutSuggestion, (_ui, resource) => resource, interfaceTracker);
   const home = new Home();
   Object.assign(home, { autoSyncStartupReady: true, 加载状态: 'ready', deckListOverflow: true,
     deckListStyle: 'single_wide', deckDoubleColumnHintHandled: false, deckDoubleColumnHintShown: false,
     narrowDeckLayout: false, deckWidthHintHandled: false, deckWidthHintShown: false,
     deckWidthHintSaving: false, homeDisposed: false, nativeDialogOpen: false,
-    getUIContext: () => ({ showAlertDialog: dialog => { home.dialog = dialog; } }),
+    getUIContext: () => ({}),
+    deckWidthDialog: { close() {}, open(_factory, cancel) {
+      const double = home.deckWidthHintTarget === 'double_narrow';
+      const prefix = double ? 'deck_double_column_hint_' : 'deck_width_hint_';
+      home.dialog = { title: 'app.string.' + prefix + 'title', message: 'app.string.' + prefix + 'message', cancel, primaryButton: { value: 'app.string.' + prefix + 'keep', action: () => home.finishDeckWidthHint(false) },
+        secondaryButton: { value: 'app.string.' + prefix + 'confirm', action: () => home.finishDeckWidthHint(true) } };
+    } },
     显示提示: message => events.push(message) });
-  return { home, events, failSave: () => { save = async () => { throw Error('disk'); }; },
+  return { home, events, interfaceTracker, failSave: () => { save = async () => { throw Error('disk'); }; },
     failRecord: () => { complete = async () => { throw Error('disk'); }; },
     setSave: fn => { save = fn; } };
 }
@@ -110,6 +120,37 @@ test('confirm saves immediately; keep-wide and Back only remember the response',
   kept.home.dialog.primaryButton.action();
   await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual(kept.events, ['handled']);
+});
+
+test('long-action window binds shared full labels to the original choices and publishes actual JIDE state', async () => {
+  const source = readFileSync(new URL('../../entry/src/main/ets/pages/首页.ets', import.meta.url), 'utf8');
+  const start = source.indexOf('  private readonly createDeckWidthDialog:');
+  const field = source.slice(start, source.indexOf('\n  };', start) + 6);
+  const Host = new Function('$r', 'TextActionDialog', 'CustomDialogController', 'deckLayoutSuggestion',
+    stripTypeScriptTypes(`class Host { ${field} }`, { mode: 'transform' }) + '; return Host;')(
+      key => key, props => props, class { constructor(config) { this.config = config; } }, appearance.deckLayoutSuggestion);
+  for (const target of ['single_narrow', 'double_narrow']) {
+    const host = new Host(), choices = [];
+    Object.assign(host, { deckWidthHintTarget: target, deckWidthDialog: { guard: callback => callback, presentation: () => ({}) },
+      finishDeckWidthHint: value => choices.push(value) });
+    const dialog = host.createDeckWidthDialog(() => {}).config.builder;
+    const expected = appearance.deckLayoutSuggestion(target);
+    assert.equal(dialog.confirmLabel, 'app.string.' + expected.confirmKey);
+    assert.equal(dialog.cancelLabel, 'app.string.' + expected.keepKey);
+    dialog.onConfirm(); dialog.onCancel(); assert.deepEqual(choices, [true, false]);
+    const { home, interfaceTracker } = homeHarness();
+    home.deckListStyle = target === 'double_narrow' ? 'single_narrow' : 'single_wide';
+    assert.equal(home.presentDeckWidthHint(), true);
+    const observed = interfaceTracker.snapshot().find(item => item.surface === 'deck_layout_suggestion');
+    assert.equal(observed.titleKey, expected.titleKey); assert.equal(observed.selectedId, target);
+    assert.deepEqual(observed.optionIds, ['keep', 'confirm']);
+    assert.equal(observed.values[0].value, 'vertical_wrapping_full_labels');
+    await home.finishDeckWidthHint(false); assert.equal(interfaceTracker.snapshot().length, 0);
+  }
+  const component = readFileSync(new URL('../../entry/src/main/ets/components/common/TextActionDialog.ets', import.meta.url), 'utf8');
+  assert.match(component, /actionsAtBottom: true/);
+  assert.match(component, /PrimaryActionButton\(/); assert.match(component, /fillWidth: true/);
+  assert.doesNotMatch(component, /maxLines\(|textOverflow\(|minFontSize\(/);
 });
 
 test('save failures are visible and duplicate clicks cannot write twice', async () => {
@@ -210,8 +251,8 @@ test('double columns keep a top level deck and all visible descendants as one in
   ]);
   assert.deepEqual(groups.flatMap(group => roots.slice(group.start,group.start+group.count)), roots);
   const height = 应用尺寸.deckRowHeight(true);
-  assert.equal(appearance.groupedDeckListOverflows([4,2,1,2],height,8,400), false);
-  assert.equal(appearance.groupedDeckListOverflows([4,2,1,2],height,8,399), true);
+  assert.equal(appearance.groupedDeckListOverflows([4,2,1,2],height,8,332), false);
+  assert.equal(appearance.groupedDeckListOverflows([4,2,1,2],height,8,331), true);
   assert.equal(appearance.groupedDeckListOverflows([8],height,8,500), true, 'one large tree stays in one column');
   assert.equal(appearance.groupedDeckListOverflows([],height,8,500), false);
   assert.equal(appearance.groupedDeckListOverflows([3,1],height,8,0), false);
@@ -232,6 +273,8 @@ test('real grouped data source preserves complete subtrees through expansion, co
   });
   const list = new List();
   list.style = 'double_narrow'; list.narrow = true; list.加载状态 = 'ready'; list.viewportHeight = 263;
+  let fontScale=1;
+  list.getUIContext=()=>({fp2px:value=>value*fontScale*3,px2vp:value=>value/3});
   const events = []; list.onOverflowChange = overflow => events.push(overflow); list.aboutToAppear();
   const row = (id,ancestorIds=[]) => ({id,ancestorIds});
   const a = [row('A'),row('A1',['A']),row('A11',['A','A1']),row('A2',['A'])];
@@ -242,6 +285,8 @@ test('real grouped data source preserves complete subtrees through expansion, co
   assert.equal(events.at(-1),true,'group A is taller than the viewport, cannot split it');
   list.viewportHeight = 264; list.reportOverflow();
   assert.equal(events.at(-1),false,'four 60vp rows and three 8vp gaps fit exactly');
+  fontScale=2;list.reportOverflow();assert.equal(events.at(-1),true,'large font rows use their actual increased height');
+  fontScale=1;list.reportOverflow();assert.equal(events.at(-1),false);
   list.viewportHeight = 263; list.reportOverflow();
   assert.equal(events.at(-1),true,'one vp less must overflow');
   list.牌组数据源.replaceDecks([a[0],...b]);
@@ -253,4 +298,22 @@ test('real grouped data source preserves complete subtrees through expansion, co
   list.排序模式中 = true; assert.equal(list.columnCount(),1,'per-deck drag uses the original flat indices');
   list.排序模式中 = false; assert.equal(list.columnCount(),2,'chosen style returns after sorting');
   list.aboutToDisappear(); assert.equal(list.牌组数据源.listeners.size,0);
+});
+
+test('double columns fill the shorter side after a tall subtree and newly appended roots',()=>{
+ const height=60,gap=8;
+ assert.deepEqual(appearance.groupedDeckColumnHeights([6,1,1,1],height,gap),[400,196]);
+ assert.deepEqual(appearance.groupedDeckColumnHeights([6,1,1,1,1],height,gap),[400,264],
+  'a newly created top-level deck goes right while the left subtree is taller');
+ assert.deepEqual(appearance.groupedDeckColumnHeights([1,3,4],height,gap),[332,196],
+  'the next root starts directly below the short first root, not below the taller adjacent tree');
+ assert.deepEqual(appearance.groupedDeckColumnHeights([1,1,1,1],height,gap),[128,128],
+  'equal heights choose the left side deterministically');
+ assert.deepEqual(appearance.groupedDeckColumnHeights([],height,gap),[0,0]);
+ assert.equal(appearance.groupedDeckListOverflows([6,1,1,1,1],height,gap,400),false);
+ const source=readFileSync(new URL('../../entry/src/main/ets/components/home/主页牌组列表.ets',import.meta.url),'utf8');
+ assert.match(source,/WaterFlow\(\{ scroller: this\.牌组列表滚动器 \}\)/);
+ assert.match(source,/FlowItem\(\)[\s\S]*ForEach\(group\.decks/);
+ assert.match(source,/\.columnsTemplate\('1fr 1fr'\)/);
+ assert.doesNotMatch(source,/\.lanes\(/,'paired list rows would reintroduce tall blank space');
 });

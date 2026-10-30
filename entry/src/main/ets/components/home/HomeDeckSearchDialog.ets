@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { DialogFrame } from '../common/DialogFrame';
-import { DialogHeader } from '../common/DialogHeader';
+import { DialogSearchHeader } from '../common/DialogSearchHeader';
 import { 统一加载态 } from '../common/统一加载态';
 import { 按下态按钮 } from '../common/按下态按钮';
-import { FormInputStyle } from '../../utils/FormInputStyle';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { searchHomeDecks } from '../../model/HomeDeckSearch';
@@ -45,14 +44,9 @@ export struct HomeDeckSearchDialog {
 
   @Builder
   private header() {
-    Column() {
-      DialogHeader({ title: $r('app.string.home_search_title'), closeLabel: $r('app.string.close'), showAction: false,
-        onClose: this.onClose })
-      TextInput({ text: this.query, placeholder: $r('app.string.home_search_placeholder') })
-        .attributeModifier(new FormInputStyle()).defaultFocus(true).maxLength(200)
-        .cancelButton({ style: CancelButtonStyle.INPUT })
-        .onChange((value: string): void => { this.query = value; })
-    }.width('100%')
+    DialogSearchHeader({ title: $r('app.string.home_search_title'), closeLabel: $r('app.string.close'),
+      onClose: this.onClose, query: this.query, placeholder: $r('app.string.home_search_placeholder'), focusSearch: true,
+      debounceMs: 0, onChange: (value: string): void => { this.query = value; } })
   }
 
   @Builder

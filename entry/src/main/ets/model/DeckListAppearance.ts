@@ -9,6 +9,15 @@ export const DECK_DOUBLE_COLUMN_HINT_HANDLED_KEY: string = 'deckDoubleColumnHint
 export const DECK_LIST_STYLE_KEY: string = 'deckListStyle';
 export const DECK_LIST_STYLES: string[] = ['single_wide', 'single_narrow', 'double_wide', 'double_narrow'];
 
+export interface DeckLayoutSuggestion { target: string; titleKey: string; messageKey: string; keepKey: string; confirmKey: string; }
+/** 实际确认框和 JIDE 共用名称与目标，不从翻译后的文字推断动作。 */
+export function deckLayoutSuggestion(target: string): DeckLayoutSuggestion {
+  if (target !== 'single_narrow' && target !== 'double_narrow') throw new Error('Invalid deck layout suggestion');
+  const prefix: string = target === 'double_narrow' ? 'deck_double_column_hint_' : 'deck_width_hint_';
+  return { target: target, titleKey: prefix + 'title', messageKey: prefix + 'message',
+    keepKey: prefix + 'keep', confirmKey: prefix + 'confirm' };
+}
+
 export function isDeckListStyle(style: string): boolean {
   return DECK_LIST_STYLES.includes(style);
 }
@@ -46,17 +55,22 @@ export function groupDeckListRows(rootIds: string[]): DeckListGroup[] {
   return groups;
 }
 
-/** 每对整组同排，排高取较高的一组；不能把后代摊到另一列来估算高度。 */
+/** 与 WaterFlow 一致：完整顶级子树依次进入较短列，同高时从左列开始。 */
+export function groupedDeckColumnHeights(groupCounts: number[], rowHeight: number, gap: number): number[] {
+  const heights: number[] = [0, 0];
+  for (const count of groupCounts) {
+    if (count <= 0) { continue; }
+    const column: number = heights[0] <= heights[1] ? 0 : 1;
+    heights[column] += (heights[column] > 0 ? gap : 0) + count * rowHeight + Math.max(0, count - 1) * gap;
+  }
+  return heights;
+}
+
+/** 溢出按最终较高列计算，不能把后代摊到另一列，也不保留旧的成对空白。 */
 export function groupedDeckListOverflows(groupCounts: number[], rowHeight: number, gap: number,
   viewportHeight: number): boolean {
   if (viewportHeight <= 0 || groupCounts.length === 0) { return false; }
-  let height: number = 0;
-  for (let index: number = 0; index < groupCounts.length; index += 2) {
-    const count: number = Math.max(groupCounts[index], groupCounts[index + 1] ?? 0);
-    height += count * rowHeight + Math.max(0, count - 1) * gap;
-    if (index > 0) { height += gap; }
-  }
-  return height > viewportHeight + 0.5;
+  return Math.max(...groupedDeckColumnHeights(groupCounts, rowHeight, gap)) > viewportHeight + 0.5;
 }
 
 /** 使用实际列表视口和已展开的固定高度行；恰好放下时不提示。 */

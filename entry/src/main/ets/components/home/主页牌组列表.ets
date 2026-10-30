@@ -106,6 +106,7 @@ export struct 主页牌组列表 {
   onItemSelect: (deckId: string) => void = (deckId: string): void => {};
   onItemToggle: (deckId: string) => void = (deckId: string): void => {};
   @Prop menuDeckId: string = '';
+  @Prop liftedDeckId: string = '';
   onItemMenu: (deckId: string, point?: WindowPoint) => void = (): void => {};
   onItemDoubleTap: (deckId: string) => void = (_deckId: string): void => {};
   onRefresh: () => Promise<void> = (): Promise<void> => Promise.resolve();
@@ -132,7 +133,8 @@ export struct 主页牌组列表 {
   }
 
   private reportOverflow(): void {
-    const rowHeight: number = 应用尺寸.deckRowHeight(this.narrow);
+    const context: UIContext = this.getUIContext();
+    const rowHeight: number = 应用尺寸.deckRowHeight(this.narrow) * Math.max(1, context.px2vp(context.fp2px(1)));
     const gap: number = 应用尺寸.页面分组间距(this.narrow);
     const overflow: boolean = this.columnCount() === 2 ? groupedDeckListOverflows(
       this.groupSource.groupCounts(), rowHeight, gap, this.viewportHeight) : deckListOverflows(
@@ -188,8 +190,36 @@ export struct 主页牌组列表 {
   }
 
   @Builder
+  private doubleDeckRows() {
+    WaterFlow({ scroller: this.牌组列表滚动器 }) {
+      LazyForEach(this.groupSource, (group: HomeDeckGroup) => {
+        FlowItem() {
+          Column({ space: 应用尺寸.页面分组间距(this.narrow) }) {
+            ForEach(group.decks, (deck: 牌组汇总) => {
+              this.deckItem(deck)
+            }, (deck: 牌组汇总): string => this.deckKey(deck))
+          }.width('100%').alignItems(HorizontalAlign.Start)
+        }.width('100%').id('home-deck-group-' + group.rootId)
+      }, (group: HomeDeckGroup): string => group.rootId + ':' +
+        group.decks.map((deck: 牌组汇总): string => this.deckKey(deck)).join('|'))
+    }
+    .columnsTemplate('1fr 1fr')
+    .columnsGap(应用尺寸.页面分组间距(this.narrow))
+    .rowsGap(应用尺寸.页面分组间距(this.narrow))
+    .width('100%').layoutWeight(1)
+    .id('home-deck-list-ready')
+    .enabled(!this.reorderBusy)
+    .scrollBar(BarState.Auto).edgeEffect(EdgeEffect.Spring)
+    .onAreaChange((_old: Area, area: Area): void => {
+      this.viewportHeight = Number(area.height);
+      this.reportOverflow();
+    })
+  }
+
+  @Builder
   private deckItem(deck: 牌组汇总) {
     牌组列表项({
+
       deck: deck,
       hideStudyCounts: isDoubleColumnDeckListStyle(this.style),
       selected: deck.id === this.选中的牌组ID,
@@ -206,7 +236,7 @@ export struct 主页牌组列表 {
       onDoubleTap: (deckId: string): void => {
         this.onItemDoubleTap(deckId);
       }
-    })
+    }).id('home-deck-row-' + deck.id).opacity(this.liftedDeckId === deck.id ? 0 : 1)
   }
 
   build() {
@@ -214,23 +244,13 @@ export struct 主页牌组列表 {
       // 排序模式的退出/完成入口在顶部工具栏（主页顶部工具栏 排序模式分支），此处不再渲染操作行。
       // 指示器等待刷新 Promise 落定，成功、失败或跳过都收起。
       Refresh({ refreshing: $$this.刷新指示器开关 }) {
+        if (this.columnCount() === 2) {
+          this.doubleDeckRows()
+        } else {
         List({ scroller: this.牌组列表滚动器, space: 应用尺寸.页面分组间距(this.narrow) }) {
           // LazyForEach 的 onMove 在创建时注册；单列进入/退出排序也必须换分支重建。
           if (this.排序模式中) {
             this.flatDeckRows(true)
-          } else if (this.columnCount() === 2) {
-            LazyForEach(this.groupSource, (group: HomeDeckGroup) => {
-              ListItem() {
-                Column({ space: 应用尺寸.页面分组间距(this.narrow) }) {
-                  ForEach(group.decks, (deck: 牌组汇总) => {
-                    this.deckItem(deck)
-                  }, (deck: 牌组汇总): string => this.deckKey(deck))
-                }
-                .width('100%')
-                .alignItems(HorizontalAlign.Start)
-              }
-            }, (group: HomeDeckGroup): string => group.rootId + ':' +
-              group.decks.map((deck: 牌组汇总): string => this.deckKey(deck)).join('|'))
           } else {
             this.flatDeckRows(false)
           }
@@ -281,7 +301,7 @@ export struct 主页牌组列表 {
         }
         .width('100%')
         .enabled(!this.reorderBusy)
-        .lanes(this.columnCount(), 应用尺寸.页面分组间距(this.narrow))
+        .id(this.加载状态 === 'ready' || this.加载状态 === 'empty' ? 'home-deck-list-ready' : 'home-deck-list-loading')
         .layoutWeight(1)
         .scrollBar(BarState.Auto)
         .edgeEffect(EdgeEffect.Spring)
@@ -289,6 +309,7 @@ export struct 主页牌组列表 {
           this.viewportHeight = Number(area.height);
           this.reportOverflow();
         })
+        }
       }
       .pullToRefresh(!this.排序模式中 && !this.reorderBusy)
       .onRefreshing(() => {
