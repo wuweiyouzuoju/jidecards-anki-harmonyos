@@ -11,7 +11,7 @@
 | 页面模块 | `utils/SeriesVisual.ets` | 普通玻璃浅色65%、深色68%底层，普通模块比按钮更实；无大面积斜向反光；浅色仅低强度阴影，深色无阴影 |
 | 嵌套模块 | `SeriesVisual.insetSurface` | 玻璃只画轮廓，不再叠底色、高光或阴影；扁平恢复实底 |
 | 主题染色 | `model/GlassTheme.ts` | alpha不变，浅/深色混入当前主题主色10%/12%；灰色仍中性；幻彩纹理由原背景拥有 |
-| 搜索框 | `utils/SearchFieldSurface.ets`、`common/LiveSearchField.ets` | 背景浅40%/深50%，边框委托materialOptions；不得独立用白色边框削弱轮廓 |
+| 搜索框 | `utils/SearchFieldSurface.ets`、`common/LiveSearchField.ets` | 背景浅40%/深50%，边框委托materialOptions；不得独立用白色边框削弱轮廓；TextInput宿主不再重复设置背景/边框/圆角，避免输入刷新时静态白底覆盖modifier |
 | 弹层 | `common/GlassPanel.ets`、`PopupSurface.ets`、`PopupAppearance.ts` | 保留本体有限透明与原有弱反光；采样、准备等待与动画仍由GlassPanel拥有，不借模块样式绕过生命周期 |
 | 列表分隔线 | `SurfaceBorder.separatorWidth`、资源surface_border | 1vp，布局高度同为1vp，flexShrink(0)；每个ForEach条目只有一个布局根，线与该条目同属根；只在相邻条目之间绘制 |
 | 编辑框操作行 | `common/NoteFieldEditor.ets` | 输入视口完整112/336vp；放大按钮行在输入框边界外，不叠加到正文，不绘制独立白底 |
