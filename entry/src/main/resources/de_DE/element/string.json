@@ -2889,6 +2889,14 @@
     {"name": "glass_suggestion_keep", "value": "Aktuelle beibehalten"},
     {"name": "redemption_gift_received", "value": "Dein Geschenk ist da"},
     {"name": "redemption_iridescent_unlocked_title", "value": "Schillerndes Thema freigeschaltet!"},
-    {"name": "redemption_iridescent_unlocked_body", "value": "Danke für deine Unterstützung.\nBring Farbe in jede Wiederholung.\n\nDein Thema ist bereit. Tippe unten, um es zu verwenden."}
+    {"name": "redemption_iridescent_unlocked_body", "value": "Danke für deine Unterstützung.\nBring Farbe in jede Wiederholung.\n\nDein Thema ist bereit. Tippe unten, um es zu verwenden."},
+    {"name": "settings_directory_editor", "value": "Editing"},
+    {"name": "settings_directory_editor_hint", "value": "Editor, keyboard and editing wheel"},
+    {"name": "settings_editor_wheel", "value": "Editing wheel"},
+    {"name": "editor_wheel_on_entry", "value": "Open wheel when entering the editor"},
+    {"name": "editor_wheel_on_entry_hint", "value": "When off, use the wheel button below a field to open it manually."},
+    {"name": "editor_wheel_on_keyboard", "value": "Open wheel when the keyboard appears"},
+    {"name": "editor_wheel_on_keyboard_hint", "value": "Open or close the wheel when the keyboard appears. Manual toggling remains available."},
+    {"name": "editor_wheel_save_failed", "value": "Could not save editing settings. Try again."}
   ]
 }

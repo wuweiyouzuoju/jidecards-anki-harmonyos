@@ -2889,6 +2889,14 @@
     {"name": "glass_suggestion_keep", "value": "Giữ hiện tại"},
     {"name": "redemption_gift_received", "value": "Quà của bạn đã đến"},
     {"name": "redemption_iridescent_unlocked_title", "value": "Đã mở khóa chủ đề Óng ánh!"},
-    {"name": "redemption_iridescent_unlocked_body", "value": "Cảm ơn bạn đã ủng hộ Jidecards.\nThêm sắc màu cho mỗi lần ôn tập.\n\nChủ đề đã sẵn sàng. Nhấn bên dưới để dùng."}
+    {"name": "redemption_iridescent_unlocked_body", "value": "Cảm ơn bạn đã ủng hộ Jidecards.\nThêm sắc màu cho mỗi lần ôn tập.\n\nChủ đề đã sẵn sàng. Nhấn bên dưới để dùng."},
+    {"name": "settings_directory_editor", "value": "Editing"},
+    {"name": "settings_directory_editor_hint", "value": "Editor, keyboard and editing wheel"},
+    {"name": "settings_editor_wheel", "value": "Editing wheel"},
+    {"name": "editor_wheel_on_entry", "value": "Open wheel when entering the editor"},
+    {"name": "editor_wheel_on_entry_hint", "value": "When off, use the wheel button below a field to open it manually."},
+    {"name": "editor_wheel_on_keyboard", "value": "Open wheel when the keyboard appears"},
+    {"name": "editor_wheel_on_keyboard_hint", "value": "Open or close the wheel when the keyboard appears. Manual toggling remains available."},
+    {"name": "editor_wheel_save_failed", "value": "Could not save editing settings. Try again."}
   ]
 }

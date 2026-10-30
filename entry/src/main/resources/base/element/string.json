@@ -2889,6 +2889,14 @@
     {"name": "glass_suggestion_keep", "value": "保持当前"},
     {"name": "redemption_gift_received", "value": "礼物已送达"},
     {"name": "redemption_iridescent_unlocked_title", "value": "恭喜！幻彩已解锁"},
-    {"name": "redemption_iridescent_unlocked_body", "value": "感谢你一路支持记得闪卡。\n为每一次复习，添一点新的色彩。\n\n你的幻彩主题已就绪，轻触下方即可换上。"}
+    {"name": "redemption_iridescent_unlocked_body", "value": "感谢你一路支持记得闪卡。\n为每一次复习，添一点新的色彩。\n\n你的幻彩主题已就绪，轻触下方即可换上。"},
+    {"name": "settings_directory_editor", "value": "编辑"},
+    {"name": "settings_directory_editor_hint", "value": "编辑界面、键盘与编辑轮盘"},
+    {"name": "settings_editor_wheel", "value": "编辑轮盘"},
+    {"name": "editor_wheel_on_entry", "value": "进入编辑页时打开轮盘"},
+    {"name": "editor_wheel_on_entry_hint", "value": "关闭后进入页面不自动打开，可用字段下方的轮盘按钮手动打开。"},
+    {"name": "editor_wheel_on_keyboard", "value": "键盘展开时打开轮盘"},
+    {"name": "editor_wheel_on_keyboard_hint", "value": "键盘展开时按此开关打开或收起轮盘，之后仍可手动切换。"},
+    {"name": "editor_wheel_save_failed", "value": "编辑设置保存失败，请重试"}
   ]
 }

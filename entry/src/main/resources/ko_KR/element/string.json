@@ -2889,6 +2889,14 @@
     {"name": "glass_suggestion_keep", "value": "현재 설정 유지"},
     {"name": "redemption_gift_received", "value": "선물이 도착했어요"},
     {"name": "redemption_iridescent_unlocked_title", "value": "무지개 테마가 해제되었어요!"},
-    {"name": "redemption_iridescent_unlocked_body", "value": "Jidecards를 응원해 주셔서 감사합니다.\n복습에 새로운 색을 더해 보세요.\n\n아래 버튼을 눌러 테마를 사용하세요."}
+    {"name": "redemption_iridescent_unlocked_body", "value": "Jidecards를 응원해 주셔서 감사합니다.\n복습에 새로운 색을 더해 보세요.\n\n아래 버튼을 눌러 테마를 사용하세요."},
+    {"name": "settings_directory_editor", "value": "Editing"},
+    {"name": "settings_directory_editor_hint", "value": "Editor, keyboard and editing wheel"},
+    {"name": "settings_editor_wheel", "value": "Editing wheel"},
+    {"name": "editor_wheel_on_entry", "value": "Open wheel when entering the editor"},
+    {"name": "editor_wheel_on_entry_hint", "value": "When off, use the wheel button below a field to open it manually."},
+    {"name": "editor_wheel_on_keyboard", "value": "Open wheel when the keyboard appears"},
+    {"name": "editor_wheel_on_keyboard_hint", "value": "Open or close the wheel when the keyboard appears. Manual toggling remains available."},
+    {"name": "editor_wheel_save_failed", "value": "Could not save editing settings. Try again."}
   ]
 }
