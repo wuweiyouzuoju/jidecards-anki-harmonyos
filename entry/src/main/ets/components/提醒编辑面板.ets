@@ -1,7 +1,9 @@
+import { insetMaterialFill } from '../utils/GlassMaterial';
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { SurfaceSelect } from './common/SurfaceSelect';
 import { LengthMetrics } from '@kit.ArkUI';
 import { 按下态按钮 } from './common/按下态按钮';
 import { DialogFrame } from './common/DialogFrame';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { localizedNamedResourceText, resourceText, namedResourceText } from '../utils/UiFeedback';
 import { SelectStyle } from '../utils/SelectStyle';
@@ -45,6 +47,7 @@ import { interfaceControlText } from '../utils/AppInterfaceText';
 
 @Component
 export struct 提醒编辑面板 {
+  @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop isDark: boolean = false;
   @Prop @Watch('publishInterface') busy: boolean = false;
@@ -168,44 +171,24 @@ export struct 提醒编辑面板 {
         Text(this.interfaceLabel('time')).fontSize(应用尺寸.字号_正文)
           .fontColor($r('app.color.text_primary')).width('100%')
         Row() {
-        Select(this.小时选项())
-          .selected(this.小时)
-          .value(this.小时 < 10 ? `0${this.小时}` : `${this.小时}`)
-          .layoutWeight(1)
-          .enabled(!this.busy)
-          .attributeModifier(new SelectStyle())
-          .height(SelectStyle.controlHeight)
-          .padding(SelectStyle.controlPadding)
-          .space(SelectStyle.controlSpace)
-          .font(SelectStyle.controlFont)
-          .optionFont(SelectStyle.optionFont)
-          .selectedOptionFont(SelectStyle.selectedOptionFont)
-          .textModifier(SelectStyle.labelText())
-          .border(SelectStyle.controlBorder).borderRadius(SelectStyle.controlRadius)
-          .onSelect((index: number): void => {
+        SurfaceSelect({ options: this.小时选项(),
+          selectedIndex: this.小时,
+          value: this.小时 < 10 ? `0${this.小时}` : `${this.小时}`,
+          isInteractive: !this.busy,
+          onSelect: (index: number): void => {
             this.小时 = index;
-          })
+          } }).layoutWeight(1)
         Text($r('app.string.reminder_edit_time_colon'))
           .fontSize(应用尺寸.字号_面板标题)
           .fontColor($r('app.color.text_primary'))
           .margin({ left: 应用尺寸.间距_8, right: 应用尺寸.间距_8 })
-        Select(this.分钟选项())
-          .selected(this.分钟)
-          .value(this.分钟 < 10 ? `0${this.分钟}` : `${this.分钟}`)
-          .layoutWeight(1)
-          .enabled(!this.busy)
-          .attributeModifier(new SelectStyle())
-          .height(SelectStyle.controlHeight)
-          .padding(SelectStyle.controlPadding)
-          .space(SelectStyle.controlSpace)
-          .font(SelectStyle.controlFont)
-          .optionFont(SelectStyle.optionFont)
-          .selectedOptionFont(SelectStyle.selectedOptionFont)
-          .textModifier(SelectStyle.labelText())
-          .border(SelectStyle.controlBorder).borderRadius(SelectStyle.controlRadius)
-          .onSelect((index: number): void => {
+        SurfaceSelect({ options: this.分钟选项(),
+          selectedIndex: this.分钟,
+          value: this.分钟 < 10 ? `0${this.分钟}` : `${this.分钟}`,
+          isInteractive: !this.busy,
+          onSelect: (index: number): void => {
             this.分钟 = index;
-          })
+          } }).layoutWeight(1)
         }.width('100%').alignItems(VerticalAlign.Center)
       }.width('100%')
 
@@ -220,7 +203,7 @@ export struct 提醒编辑面板 {
         .fontSize(应用尺寸.字号_正文)
         .fontColor($r('app.color.text_primary'))
         .placeholderColor($r('app.color.text_tertiary'))
-        .backgroundColor($r('app.color.surface_page'))
+        .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
         .border(SurfaceBorder.options())
         .borderRadius(应用尺寸.圆角_面板)
         .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
@@ -240,7 +223,7 @@ export struct 提醒编辑面板 {
         .fontSize(应用尺寸.字号_正文)
         .fontColor($r('app.color.text_primary'))
         .placeholderColor($r('app.color.text_tertiary'))
-        .backgroundColor($r('app.color.surface_page'))
+        .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
         .border(SurfaceBorder.options())
         .borderRadius(应用尺寸.圆角_面板)
         .padding(应用尺寸.间距_8)
