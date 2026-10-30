@@ -1,3 +1,4 @@
+import { NoteLinksProxy } from '../../entry/src/main/ets/model/NoteLinksProxy.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -55,11 +56,11 @@ test('failed image writes close descriptors and retain partial owned files for d
 test('draft Web and sound requests route owned cache files and stop playback when hidden or exited',async()=>{
   let stops=0,resets=0,releases=0,registered;
   const Preview=loadComponentLogic('components/settings/NotetypeTemplatePreview.ets','NotetypeTemplatePreview',{
-    APP_FOREGROUND_KEY:'foreground',webview:{WebviewController:class{}},
+    NoteLinksProxy,noteLinkBridgeScript:()=>'',APP_FOREGROUND_KEY:'foreground',webview:{WebviewController:class{}},
     reviewPreferences:{read:async()=>({hideAudioPlayButtons:false})}, $r:key=>key,
-    原始侧HTML:(_rendered,side)=>side, resourceText:()=> 'Play audio', buildPreviewInteractionScript:()=>'', appendCardScript,
+    cardScriptDiagnosticLabels:()=>undefined, 原始侧HTML:(_rendered,side)=>side, resourceText:()=> 'Play audio', buildPreviewInteractionScript:()=>'', appendCardScript,
     AppStorage:{get:()=>({filesDir:'/files'})},媒体基地址:'https://anki.local/',
-    CardWebView:class {reset(){resets++;}setAudioEnabled(){}setTheme(){}},卡片渲染服务:class{},声音播放器:class{},TTS播放器:class{},
+    CardWebView:class {reset(){resets++;}setActive(){}setAudioEnabled(){}setTheme(){}},卡片渲染服务:class{},声音播放器:class{},TTS播放器:class{},
     CardAudioSession:class {constructor(_sound,_tts,_extract,path){this.path=path;}stop(){stops++;}async release(){releases++;}}
   });
   const preview=new Preview();preview.getUIContext=()=>({});preview.media={fields:[],directory:'/cache/owned',filenames:['draft.png','draft.m4a']};
@@ -80,14 +81,14 @@ test('draft Web and sound requests route owned cache files and stop playback whe
 test('draft preview waits for both Web controllers, retains same-card flips and stages a new revision',async()=>{
   const requests=[],attached=[],audio=[],muted=[],themes=[];let bridge;
   const Preview=loadComponentLogic('components/settings/NotetypeTemplatePreview.ets','NotetypeTemplatePreview',{
-    APP_FOREGROUND_KEY:'foreground',webview:{WebviewController:class{}},
+    NoteLinksProxy,noteLinkBridgeScript:()=>'',APP_FOREGROUND_KEY:'foreground',webview:{WebviewController:class{}},
     reviewPreferences:{read:async()=>({hideAudioPlayButtons:false})}, $r:key=>key,
-    原始侧HTML:(_rendered,side)=>side, resourceText:()=> 'Play audio', buildPreviewInteractionScript:()=>'', appendCardScript,
+    cardScriptDiagnosticLabels:()=>undefined, 原始侧HTML:(_rendered,side)=>side, resourceText:()=> 'Play audio', buildPreviewInteractionScript:()=>'', appendCardScript,
     AppStorage:{get:()=>({filesDir:'/files'})},
     构建卡片HTML:(_rendered,side)=>side,剥除拼写标记:value=>value,
     CardWebView:class {
       constructor(_controller,shown,_failed,_spare,switched){bridge={shown,switched};}
-      attach(slot){attached.push(slot);}reset(){}setAudioEnabled(enabled){muted.push(enabled);}
+      attach(slot){attached.push(slot);}reset(){}setActive(){}setAudioEnabled(enabled){muted.push(enabled);}
       setTheme(dark){themes.push(dark);}
       show(...args){requests.push(args);}controllerAt(slot){return {slot,registerJavaScriptProxy(){}};}
     },

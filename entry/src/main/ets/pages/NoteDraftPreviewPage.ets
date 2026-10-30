@@ -17,6 +17,7 @@ export struct NoteDraftPreviewPage {
   @State private visible: boolean = true;
   @State private opacityValue: number = 1;
   @State private navigationOffset: number = 0;
+  private previewBack: (() => boolean) | null = null;
 
   aboutToAppear(): void {
     CustomTransition.getInstance().注册NavParam('NoteDraftPreviewPage',
@@ -32,13 +33,14 @@ export struct NoteDraftPreviewPage {
   aboutToDisappear(): void {
     CustomTransition.getInstance().注销NavParam('NoteDraftPreviewPage');
   }
-  private close(): void { this.pathStack.pop(); }
+  private close(): void { if (!this.previewBack?.()) this.pathStack.pop(); }
 
   build() {
     NavDestination() {
       Column() {
         NoteDraftPreview({ input: this.input, isDark: 解析是否深色(this.theme, this.systemDark),
-          fullScreen: true, isVisible: this.visible, onClose: (): void => { this.close(); } })
+          fullScreen: true, isVisible: this.visible, onClose: (): void => { this.close(); },
+          onBackHandlerChange: (handler: (() => boolean) | null): void => { this.previewBack = handler; } })
       }.width('100%').height('100%').backgroundColor(this.surface)
     }.hideTitleBar(true).backgroundColor(Color.Transparent).opacity(this.opacityValue)
       .translate({ x: this.navigationOffset })
