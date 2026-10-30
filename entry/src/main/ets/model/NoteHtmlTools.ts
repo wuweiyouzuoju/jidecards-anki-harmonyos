@@ -210,14 +210,15 @@ export function sourceNoteClearFormat(value: string, start: number, end: number)
 }
 
 export function richNoteLink(runs: NoteTextRun[], start: number, end: number, url: string, label: string,
-  typing?: NoteTextRun): string {
+  typing?: NoteTextRun, replaceLabel: boolean = false): string {
   const length: number = runs.reduce((total: number, run: NoteTextRun): number => total + run.text.length, 0);
   const heading: string = typing?.heading ?? noteRichCaretHeading(runs, start);
   const insertion: NoteTextRun = { text: label, format: typing?.format ?? (heading === '' ? 0 : FORMAT_BOLD) };
   const size: string = typing?.fontSize ?? noteRichCaretFontSize(runs, start);
   if (heading !== '') insertion.heading = heading;
   if (size !== '') insertion.fontSize = size;
-  const selected: NoteTextRun[] = end > start ? sliceNoteRichText(runs, start, end) : [insertion];
+  const range: NoteTextRun[] = sliceNoteRichText(runs, start, end);
+  const selected: NoteTextRun[] = end > start && (!replaceLabel || range.map((run): string => run.text).join('') === label) ? range : [insertion];
   const linked: NoteTextRun[] = selected.map((run: NoteTextRun): NoteTextRun => {
     const copy: NoteTextRun = { text: run.text, format: run.format, url: noteLinkUrl(url) };
     if (run.fontSize !== undefined) copy.fontSize = run.fontSize;
@@ -228,7 +229,7 @@ export function richNoteLink(runs: NoteTextRun[], start: number, end: number, ur
   return serializeNoteRichText(sliceNoteRichText(runs, 0, start).concat(linked, sliceNoteRichText(runs, end, length)));
 }
 
-export function sourceNoteLink(value: string, start: number, end: number, url: string, label: string): FieldEditResult | null {
+export function sourceNoteLink(value: string, start: number, end: number, url: string, label: string, replaceLabel: boolean = false): FieldEditResult | null {
   if (noteLinkUrl(url) === '' || !sourceSelectionComplete(value, start, end)) return null;
   const prefix: string = value.slice(0, start).toLowerCase();
   if (prefix.lastIndexOf('<a ') > prefix.lastIndexOf('</a>')) return null;
@@ -236,7 +237,7 @@ export function sourceNoteLink(value: string, start: number, end: number, url: s
   // 不嵌套已有链接，也不包裹不完整的格式标签。
   const runs: NoteTextRun[] | null = parseNoteRichText(selected);
   if (runs === null || runs.some((run: NoteTextRun): boolean => run.url !== undefined)) return null;
-  const contents: string = selected === '' ? encodeNoteText(label) : selected;
+  const contents: string = selected === '' || replaceLabel && runs.map((run): string => run.text).join('') !== label ? encodeNoteText(label) : selected;
   const link: string = `<a href="${encodeNoteText(noteLinkUrl(url)).replace(new RegExp('"', 'g'), '&quot;')}">${contents}</a>`;
   return { text: value.slice(0, start) + link + value.slice(end), start: start + link.length, end: start + link.length };
 }

@@ -7,6 +7,7 @@ export const FORMAT_UNDERLINE: number = 4;
 export const FORMAT_HIGHLIGHT: number = 8;
 export const FORMAT_SUPERSCRIPT: number = 16;
 export const FORMAT_SUBSCRIPT: number = 32;
+export const NOTE_REFERENCE_PREFIX: string = '#jide-note:';
 export interface NoteTextRun { text: string; format: number; url?: string; fontSize?: string; heading?: string; blockBreak?: boolean; }
 
 export function noteHeadingScale(id: string): number {

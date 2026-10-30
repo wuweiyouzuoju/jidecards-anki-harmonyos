@@ -60,7 +60,11 @@ export interface NoteFieldEditingSupport {
     triggerHighlight: string; inputFocus: string };
   mediaTools: NoteEditorTool[];
   modeTools: NoteEditorTool[];
+  stickyControl: { titleKey: string; iconKey: string; selectedIconKey: string; placement: string };
+  formPresentation: string;
   modeControlPlacement: string;
+  modeControlWideMinWidth: number;
+  modeControlRailWidth: number;
   expandControlPlacement: string;
   expandTool: NoteEditorTool;
   collapseTool: NoteEditorTool;
@@ -123,6 +127,7 @@ export const NOTE_EDITOR_TOOLS: NoteEditorTool[] = [
   { id: 'bullet_list', titleKey: 'note_editor_bullet_list', iconKey: 'ic_editor_bullet_list', editing: 'html_source_then_card_preview' },
   { id: 'numbered_list', titleKey: 'note_editor_numbered_list', iconKey: 'ic_editor_numbered_list', editing: 'html_source_then_card_preview' },
   { id: 'link', titleKey: 'note_editor_link', iconKey: 'ic_editor_link', editing: 'selection_or_label_link_dialog' },
+  { id: 'note_reference', titleKey: 'note_reference_title', iconKey: 'ic_editor_note_reference', editing: 'selection_or_caret_note_reference', opens: 'note_reference_picker' },
   { id: 'clear_format', titleKey: 'note_editor_clear_format', iconKey: 'ic_editor_clear_format', editing: 'selection_or_typing_format' },
   { id: 'font_size', titleKey: 'note_editor_font_size', iconKey: 'ic_editor_font_size', editing: 'visual_or_source' },
   { id: 'heading', titleKey: 'note_editor_heading', iconKey: 'ic_editor_heading', editing: 'visual_paragraph_or_source' }
@@ -162,6 +167,11 @@ export function noteFieldModeTool(id: string): NoteEditorTool {
   if (tool === undefined) throw new Error(`Unknown note field mode tool: ${id}`);
   return tool;
 }
+/** 新增页字段固定与JIDE观察共用名称和图标，两个编辑模式共享Core字段状态。 */
+export const NOTE_FIELD_STICKY_CONTROL = {
+  titleKey: 'note_field_sticky', iconKey: 'ic_editor_pin', selectedIconKey: 'ic_editor_pin_filled',
+  placement: 'field_header_before_media; shared_visual_and_source; adding_only'
+};
 export const NOTE_FIELD_EDITING_SUPPORT: NoteFieldEditingSupport = {
   fieldOptions: ['rtl', 'font', 'size', 'description', 'plainText', 'collapsed'],
   minimumFontSize: 5, maximumFontSize: 300, plainTextMeaning: 'default_html_source_preserving_formatting',
@@ -176,7 +186,11 @@ export const NOTE_FIELD_EDITING_SUPPORT: NoteFieldEditingSupport = {
     visualEditing: 'selection_live_style_or_caret_typing_style_saved_as_css_keywords' },
   mediaTools: NOTE_FIELD_MEDIA_TOOLS,
   modeTools: NOTE_FIELD_MODE_TOOLS,
-  modeControlPlacement: 'above_each_editable_field',
+  stickyControl: NOTE_FIELD_STICKY_CONTROL,
+  formPresentation: 'grouped_deck_and_notetype_shared_plain_selection_value_with_settings; draft_preview_icon; preview_flip_card_icon_both_sides_and_replay_audio_icon; visible_tag_card_with_removable_chips_and_existing_picker; reference_navigation_card; original_draft_and_save_guards',
+  modeControlPlacement: 'note_field_header_compact_current_mode_toggle; other_rich_inputs_keep_local_mode_controls',
+  modeControlWideMinWidth: 480,
+  modeControlRailWidth: 96,
   expandControlPlacement: 'inside_bottom_right_of_each_input',
   expandTool: NOTE_FIELD_EXPAND_TOOL,
   collapseTool: NOTE_FIELD_COLLAPSE_TOOL,
