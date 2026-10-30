@@ -190,7 +190,7 @@ export struct NoteMediaDialog {
         compactLabel: true, textColor: $r('app.color.text_secondary'), isInteractive: !this.working,
         onAction: (): void => { this.pickImage(); } })
       LabeledActionRow({ label: $r('app.string.note_drawing_draft_hint'), actionLabel: $r('app.string.note_drawing_new'),
-        actionIcon: $r('app.media.ic_study_edit'), compactLabel: true,
+        compactLabel: true,
         textColor: $r('app.color.text_secondary'), isInteractive: !this.working,
         onAction: (): void => { this.editDrawing(); } })
     }

@@ -39,6 +39,7 @@ export struct EditNotePage {
   @StorageLink('systemDarkMode') private systemDark: boolean = false;
   @StorageProp(PAGE_SURFACE_KEY) private surface: string = '#F5F7FA';
   private active: boolean = false;
+  private linksVisible: boolean = false;
   private readonly writer: AnkiNoteUpdate = new AnkiNoteUpdate();
   private readonly operations: BrowserOperationController = new BrowserOperationController();
   private readonly session: NoteEditorSession = new NoteEditorSession(new AnkiNoteEditor(),
@@ -132,11 +133,12 @@ export struct EditNotePage {
           onCancel: (): void => { if (this.active) this.pathStack.pop(); },
           onPreview: (input: NoteDraftPreviewInput, onReturn: () => void): boolean => this.openPreview(input, onReturn),
           onReload: (): Promise<NoteEditorState | null> => this.session.refresh((): boolean => this.active),
+          onLinksVisibility: (visible: boolean): void => { this.linksVisible = visible; this.wheelSession.setVisible(!visible); },
           onSave: (fields: string[], tags: string[], images: NoteFieldImage[], audios: NoteFieldAudio[]): Promise<boolean> =>
             this.save(fields, tags, images, audios) })
       } else {
         Column({ space: 14 }) {
-          NoteEditorHeader({ title: $r('app.string.note_editor_edit_title'), actionLabel: $r('app.string.note_draft_preview'),
+          NoteEditorHeader({ title: $r('app.string.note_editor_edit_title'), actionLabel: $r('app.string.note_draft_preview'), actionIcon: $r('app.media.ic_common_preview'),
             actionEnabled: false, onBack: (): void => { this.requestBack(); } })
           if (this.editor.busy) { LoadingProgress().width(40).height(40) }
           else {
@@ -149,7 +151,7 @@ export struct EditNotePage {
       }
     }.hideTitleBar(true).backgroundColor(Color.Transparent).opacity(this.opacityValue)
       .translate({ x: this.navigationOffset })
-      .onShown((): void => { this.restoreEditorAfterPreview(); this.wheelSession.setVisible(true); appInterface.showPage('edit_note'); this.publishInterface(); })
+      .onShown((): void => { this.restoreEditorAfterPreview(); this.wheelSession.setVisible(!this.linksVisible); appInterface.showPage('edit_note'); this.publishInterface(); })
       .onHidden((): void => { this.wheelSession.setVisible(false); appInterface.hidePage('edit_note'); })
       .onBackPressed((): boolean => { this.requestBack(); return true; })
   }

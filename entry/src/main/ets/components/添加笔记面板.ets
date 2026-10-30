@@ -1,7 +1,10 @@
+import { insetMaterialFill } from '../utils/GlassMaterial';
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { GlassPanel } from './common/GlassPanel';
+import { SurfaceSelect } from './common/SurfaceSelect';
 import { DirectorySelect } from './common/DirectorySelect';
 import { DirectoryRow, DirectoryView, DirectoryChoice, directoryChoiceRows } from '../model/DirectoryTree';
 import { appInterface } from '../backend/AppInterfaceService';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { parseNoteTags } from '../model/NoteFieldEditing';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { NoteTagsField } from './common/NoteTagsField';
@@ -69,6 +72,8 @@ interface 添加笔记下拉选项 {
 
 @Component
 export struct 添加笔记面板 {
+  @State private surfaceWidth: string = '88%';
+  @State private surfaceMaximumWidth: number = 520;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop originalStockKind: number = 0;
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
@@ -331,14 +336,18 @@ export struct 添加笔记面板 {
 
   build() {
     Stack() {
-      DialogBackdrop()
+      DialogBackdrop({ widthPercent: 88, maximumWidth: 520,
+          onSize: (width: string, maximumWidth: number): void => {
+            this.surfaceWidth = width; this.surfaceMaximumWidth = maximumWidth;
+          } })
         .onClick(() => {
           if (!this.busy) {
             this.onCancel();
           }
         })
 
-      Column({ space: 应用尺寸.间距_14 }) {
+      GlassPanel({ radius: 应用尺寸.圆角_卡片, panelWidth: this.surfaceWidth, maximumWidth: this.surfaceMaximumWidth, maximumHeight: '88%' }) {
+Column({ space: 应用尺寸.间距_14 }) {
         // B12-Y2 2026-07-22：内容用 Scroll 包裹，fieldName 多或高级设置展开时可滚动，按钮固定底部
         // 避免 TextArea 越出面板边界、按钮 Row 被挤出面板外显示成"下面多出一个框"
         DialogHeader({
@@ -370,25 +379,15 @@ export struct 添加笔记面板 {
               Column() {
               this.带帮助的标签($r('app.string.add_note_notetype'), $r('app.string.add_note_notetype_help'))
               }.layoutWeight(1)
-            Select(this.笔记类型下拉选项())
-              .selected(this.选中笔记类型索引())
-              .value(this.选中笔记类型名())
-              .width(SelectStyle.fieldWidth).constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
-              .enabled(!this.busy && this.notetypeOptions.length > 0)
-              .attributeModifier(new SelectStyle())
-              .height(SelectStyle.controlHeight)
-              .padding(SelectStyle.controlPadding)
-              .space(SelectStyle.controlSpace)
-              .font(SelectStyle.controlFont)
-              .optionFont(SelectStyle.optionFont)
-              .selectedOptionFont(SelectStyle.selectedOptionFont)
-              .textModifier(SelectStyle.labelText())
-              .border(SelectStyle.controlBorder).borderRadius(SelectStyle.controlRadius)
-              .onSelect((index: number): void => {
+            SurfaceSelect({ options: this.笔记类型下拉选项(),
+              selectedIndex: this.选中笔记类型索引(),
+              value: this.选中笔记类型名(),
+              isInteractive: !this.busy && this.notetypeOptions.length > 0,
+              onSelect: (index: number): void => {
                 if (!this.busy && Number.isInteger(index) && index >= 0 && index < this.notetypeOptions.length) {
                   this.onSelectNotetype(this.notetypeOptions[index].id);
                 }
-              })
+              } }).constraintSize(SelectStyle.fieldConstraint).flexShrink(0)
             }.width('100%').alignItems(VerticalAlign.Center)
 
             ForEach(this.fieldNames, (字段名: string, index: number) => {
@@ -404,7 +403,7 @@ export struct 添加笔记面板 {
                   .fontSize(应用尺寸.字号_正文)
                   .fontColor($r('app.color.text_primary'))
                   .placeholderColor($r('app.color.text_tertiary'))
-                  .backgroundColor($r('app.color.surface_card'))
+                  .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
                   .border(SurfaceBorder.options())
                   .borderRadius(应用尺寸.圆角_面板)
                   .padding(应用尺寸.间距_10)
@@ -424,7 +423,7 @@ export struct 添加笔记面板 {
               .flexShrink(0)
               .fontSize(应用尺寸.字号_按钮)
               .fontColor(this.动作主色)
-              .backgroundColor($r('app.color.surface_page'))
+              .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
               .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
               .enabled(!this.busy)
               .attributeModifier(new PressFeedback())
@@ -468,12 +467,13 @@ export struct 添加笔记面板 {
         }
 
       }
-      .width('88%')
+      .width('100%')
       // B12-Y2 2026-07-22：maxHeight 88% + Scroll 让内容可滚动，按钮固定底部
-      .constraintSize({ maxWidth: 520, maxHeight: '88%' })
+       
       .padding(应用尺寸.卡片内边距)
-      .backgroundColor($r('app.color.surface_card'))
-      .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
+      
+      
+      }
       .onClick(() => {
       })
 

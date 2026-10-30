@@ -1,3 +1,11 @@
+import { GlassSource } from '../components/common/GlassSource';
+import { EditorSectionCard } from '../components/common/EditorSectionCard';
+import { NOTE_FIELD_STICKY_CONTROL } from '../model/NoteFieldEditing';
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { NoteLinksDraftPanel } from '../components/links/NoteLinksDraftPanel';
+import { 卡片预览页 } from '../components/browser/卡片预览页';
+import { SettingsActionRow } from '../components/common/SettingsActionRow';
+import { noteReferences } from '../model/NoteReferences';
 import { editorShortcutCommand } from '../model/KeyboardShortcuts';
 import { StudyKeyboardSession } from '../model/StudyKeyboard';
 import { studyEventChord } from '../utils/StudyKeyAdapter';
@@ -6,7 +14,7 @@ import { DirectoryRow, DirectoryView, DirectoryChoice, directoryChoiceRows, dire
 import { 牌组服务 } from '../backend/牌组服务';
 import { DeckTreeNode } from '../proto/messages/DeckMessages';
 import { 笔记类型编辑器 } from '../components/settings/笔记类型编辑器';
-import { 添加笔记页参数, 添加笔记牌组选项, 添加笔记笔记类型选项 } from '../model/navigation/PageParams';
+import { 添加笔记牌组选项, 添加笔记笔记类型选项 } from '../model/navigation/PageParams';
 import { PressFeedback } from '../utils/PressFeedback';
 import { navigationEnterOffset } from '../utils/AppMotion';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
@@ -27,7 +35,6 @@ import { discardNoteDrawingImages } from '../backend/NoteDrawingStore';
 import { NoteEditorHeader } from '../components/common/NoteEditorHeader';
 import { NoteDraftPreviewInput } from '../model/NoteDraftPreview';
 import { confirmNoteDiscard } from '../utils/ConfirmNoteDiscard';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { NoteCreationSession, NoteCreationState } from '../model/NoteCreationSession';
 import { NoteDuplicateDialog } from '../components/common/NoteDuplicateDialog';
 import { 浏览页参数, NoteDraftPreviewPageParams } from '../model/navigation/PageParams';
@@ -41,7 +48,6 @@ import { AnkiNoteCreation } from '../backend/AnkiNoteCreation';
 import { showToastSafely, namedResourceText } from '../utils/UiFeedback';
 import { HelpLabel } from '../components/common/HelpLabel';
 import { SelectStyle } from '../utils/SelectStyle';
-import { ThemeTextSpans } from '../components/common/ThemeText';
 import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
 import { PAGE_COMPACT_LAYOUT_KEY } from '../model/AppLayoutState';
@@ -125,7 +131,7 @@ export struct 添加笔记页 {
   @State private 笔记类型名: string = '';
   @State private 笔记类型帮助: Resource = $r('app.string.add_note_notetype_help');
   @State private 标签: string = '';
-  @State @Watch('publishInterface') private 高级已展开: boolean = false;
+  @State @Watch('publishInterface') private 高级已展开: boolean = true;
   private tagsReveal: ExpansionReveal = new ExpansionReveal();
   @State @Watch('publishInterface') private 错误信息: string = '';
   @State @Watch('publishInterface') private 处理中: boolean = false;
@@ -134,6 +140,10 @@ export struct 添加笔记页 {
   @State private 帮助正文: Resource = $r('app.string.add_note_deck_help');
   @State @Watch('publishInterface') private confirmingDiscard: boolean = false;
   @State private typeSelectorVersion: number = 0;
+  @State @Watch('publishInterface') private linksOpen: boolean = false;
+  @State private linksBack: number = 0;
+  @State private linkedIds: number[] = [];
+  private linkedBack: (() => boolean) | null = null;
   @State private draftPreview: NoteDraftPreviewInput | null = null;
   @State private clozeFieldOrds: number[] = [];
   @State private optionalReverseIndex: number = -1;
@@ -211,6 +221,8 @@ export struct 添加笔记页 {
    * Invariants: 图片遮盖编辑器优先于帮助浮层（编辑器更靠上层）。
    */
   onBackPress(): boolean {
+    if (this.linkedIds.length > 0) { this.linkedBack?.(); return true; }
+    if (this.linksOpen) { this.linksBack++; return true; }
     if (this.templatesOpen) { this.templateBackRequest++; return true; }
     if (this.draftPreview !== null) return true;
     if (this.duplicateSearch) { this.creationSession.cancelDuplicate(); return true; }
@@ -346,7 +358,7 @@ export struct 添加笔记页 {
     const fresh: boolean = this.keyboardSession.update(event.keyCode, event.type === KeyType.Down);
     if (event.type !== KeyType.Down) return false;
     const chord: string = studyEventChord(event);
-    if (this.templatesOpen) return false;
+    if (this.templatesOpen || this.linksOpen) return false;
     const blocked: boolean = !this.pageActive || this.处理中 || this.pickingFieldImage || this.audioBusy || this.confirmingDiscard ||
       this.显示帮助 || this.图片遮盖_显示编辑器 || this.duplicateSearch !== '' || this.draftPreview !== null;
     const command: string = editorShortcutCommand(chord, blocked);
@@ -371,7 +383,7 @@ export struct 添加笔记页 {
     finally { this.refreshingTypeDraft = false; }
   }
   private async 加载笔记类型(notetypeId: number): Promise<void> {
-    if (this.draftPreview !== null) return;
+    if (this.draftPreview !== null || this.linksOpen) return;
     if (notetypeId === this.已选笔记类型ID || this.处理中 || this.pickingFieldImage || this.audioBusy || this.confirmingDiscard || !this.pageActive) return;
     if (this.hasDraft()) {
       this.confirmingDiscard = true;
@@ -450,7 +462,7 @@ export struct 添加笔记页 {
   }
 
   private async 提交(exitAfterSave: boolean = false): Promise<void> {
-    if (this.draftPreview !== null) return;
+    if (this.draftPreview !== null || this.linksOpen) return;
     if (!this.pageActive || this.处理中 || this.pickingFieldImage || this.audioBusy || this.confirmingDiscard || this.牌组ID <= 0 || this.已选笔记类型ID === 0) return;
     if (this.是否图片遮盖模式) { await this.图片遮盖_提交(exitAfterSave); return; }
     if (!this.提交前校验填空()) {
@@ -558,7 +570,7 @@ export struct 添加笔记页 {
   private interfaceControls(): AppInterfaceMenuItem[] {
     return addNoteInterfaceControls({ tagsExpanded: this.高级已展开,
       occlusion: this.是否图片遮盖模式, hasSource: this.图片遮盖_源图Uri !== '', busy: this.处理中,
-      blocked: this.处理中 || this.pickingFieldImage || this.audioBusy || this.confirmingDiscard || this.templatesOpen,
+      blocked: this.处理中 || this.pickingFieldImage || this.audioBusy || this.confirmingDiscard || this.templatesOpen || this.linksOpen,
       saveEnabled: this.保存按钮可用() && !this.confirmingDiscard, hasTypes: this.笔记类型选项.length > 0 });
   }
 
@@ -614,7 +626,9 @@ export struct 添加笔记页 {
       controls.push({ id: 'field-' + index, title: title, titleKey: key === '' ? undefined : key,
         enabled: this.interfaceEnabled('back'), selected: false });
       controls.push({ id: 'sticky-' + index, title: namedResourceText(this.getUIContext(), 'note_field_sticky'),
-        titleKey: 'note_field_sticky', enabled: this.interfaceEnabled('back'), selected: this.fieldSticky[index] ?? false });
+        titleKey: NOTE_FIELD_STICKY_CONTROL.titleKey,
+        iconKey: this.fieldSticky[index] ? NOTE_FIELD_STICKY_CONTROL.selectedIconKey : NOTE_FIELD_STICKY_CONTROL.iconKey,
+        enabled: this.interfaceEnabled('back') && !this.stickySaving, selected: this.fieldSticky[index] ?? false });
     }
     if (this.是否图片遮盖模式) {
       controls.push({ id: 'sticky-source', title: namedResourceText(this.getUIContext(), 'note_source_image_sticky'),
@@ -662,11 +676,40 @@ export struct 添加笔记页 {
     }).width('100%')
   }
 
-  // 标签字段块：ImageOcclusion 模式与其他笔记类型共用，统一放在「高级设置」折叠区里。
+  // 标签卡在所有笔记类型直接可见，草稿与选择器仍由原宿主拥有。
   // 抽 @Builder 消除两个分支的 Tags 代码重复（BUG-004 修复）。
+  private referenceFields(): string[] {
+    const fields: string[] = this.字段值列表.slice();
+    if (this.是否图片遮盖模式) {
+      fields[this.图片遮盖_标题字段索引()] = this.图片遮盖_标题;
+      fields[this.图片遮盖_额外字段索引()] = this.图片遮盖_额外;
+    }
+    return fields;
+  }
+  private applyReferenceFields(fields: string[]): void {
+    if (!this.pageActive || this.处理中) return;
+    this.字段值列表 = fields;
+    if (this.是否图片遮盖模式) {
+      this.图片遮盖_标题 = fields[this.图片遮盖_标题字段索引()] ?? '';
+      this.图片遮盖_额外 = fields[this.图片遮盖_额外字段索引()] ?? '';
+    }
+  }
+  private referenceMediaDirectory(): string { return this.取能力上下文()?.filesDir + '/collection.media'; }
+  @Builder
+  private referenceEntry() {
+    EditorSectionCard() {
+    SettingsActionRow({ icon: $r('app.media.ic_study_link'), title: this.interfaceLabel('links') + ' · ' + new Set<string>(noteReferences(this.referenceFields()).map((ref): string => ref.guid)).size,
+      isInteractive: this.interfaceEnabled('links'),
+      onAction: (): void => {
+        if (this.interfaceEnabled('links')) { this.linksOpen = true; this.wheelSession.setVisible(false); }
+      } })
+    }
+  }
+
   @Builder
   private 标签字段块() {
-    Column({ space: 应用尺寸.间距_5 }) {
+    Column() {
+    EditorSectionCard() {
       this.带帮助的标签($r('app.string.add_note_tags'), (): Resource => $r('app.string.add_note_tags_help'))
       NoteTagsField({ text: this.标签, focusRequest: this.tagsFocusRequest, scroller: this.tagsReveal.scroller,
         isInteractive: !this.处理中 && !this.pickingFieldImage && !this.audioBusy && !this.confirmingDiscard,
@@ -676,48 +719,17 @@ export struct 添加笔记页 {
         .fontColor($r('app.color.text_tertiary'))
         .width('100%')
     }
-    .width('100%')
+    }.width('100%')
     .onAreaChange((_oldArea: Area, newArea: Area): void => {
       this.tagsReveal.revealAfterLayout(this.高级已展开, Number(newArea.height));
     })
   }
 
-  private toggleTags(): void {
-    if (this.处理中 || this.pickingFieldImage || this.audioBusy || this.confirmingDiscard) { return; }
-    this.高级已展开 = !this.高级已展开;
-    this.tagsReveal.request(this.高级已展开);
-  }
-
-  // 高级设置按钮 + 折叠区：ImageOcclusion 模式与其他笔记类型共用。
-  // 抽 @Builder 消除两个分支的高级设置代码重复（BUG-004 修复）。
-  @Builder
-  private 高级设置折叠区() {
-    Button() {
-      Text(this.interfaceLabel('tags_entry'))
-        .fontSize(应用尺寸.字号_正文)
-        .fontColor($r('app.color.text_secondary'))
-    }
-      .height(应用尺寸.紧凑控件高度)
-      .flexShrink(0)
-      .padding({ left: 应用尺寸.间距_12, right: 应用尺寸.间距_12 })
-      .backgroundColor(Color.Transparent)
-      .borderRadius(应用尺寸.圆角_面板)
-      .enabled(!this.处理中 && !this.pickingFieldImage && !this.audioBusy && !this.confirmingDiscard)
-      .attributeModifier(new PressFeedback())
-      .stateEffect(false)
-      .onClick((): void => {
-        this.toggleTags();
-      })
-
-    if (this.高级已展开) {
-      this.标签字段块()
-    }
-  }
 
   @Builder
   private 顶部条() {
     NoteEditorHeader({ title: $r('app.string.add_note_title'),
-      actionLabel: $r('app.string.note_draft_preview'),
+      actionLabel: $r('app.string.note_draft_preview'), actionIcon: $r('app.media.ic_common_preview'),
       actionEnabled: !this.处理中 && !this.pickingFieldImage && !this.audioBusy && !this.confirmingDiscard && this.已选笔记类型ID > 0,
       closeEnabled: this.interfaceEnabled('back'),
       onBack: (): void => { this.requestExit(); }, onSave: (): void => { this.openDraftPreview(); } })
@@ -726,13 +738,14 @@ export struct 添加笔记页 {
   build() {
     NavDestination() {
       Stack() {
-      Column() {
+      GlassSource() {
+Column() {
         this.顶部条()
         // 两种保存操作固定在滚动区外，长字段与键盘不改变保存语义。
         Scroll(this.tagsReveal.scroller) {
           Column({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout) }) {
             // 配置区只保留两行；模板归属类型标签，点击与键盘共用同一守卫。
-            Column({ space: 13 }) {
+            EditorSectionCard() {
               DirectorySelect({ label: $r('app.string.add_note_deck'), value: this.牌组名,
                 surfaceColor: $r('app.color.surface_card'),
                 rows: this.deckRows(), openRequest: this.deckOpenRequest, isInteractive: this.interfaceEnabled('deck'),
@@ -741,6 +754,7 @@ export struct 添加笔记页 {
                 onSelect: (id: string): void => {
                   this.牌组ID = Number(id); this.牌组名 = this.牌组选项.find((item): boolean => item.id === Number(id))?.name ?? '';
                 } })
+              Divider().color(SurfaceBorder.color()).strokeWidth(0.5)
               DirectorySelect({ label: this.interfaceLabel('type'), value: this.已选笔记类型名(),
                 surfaceColor: $r('app.color.surface_card'),
                 rows: this.typeRows(), openRequest: this.typeOpenRequest, isInteractive: this.interfaceEnabled('type'),
@@ -750,7 +764,7 @@ export struct 添加笔记页 {
                 onLabelAction: (): void => { this.openTemplates(); },
                 showHelp: true, onHelp: (): void => { this.打开帮助($r('app.string.add_note_notetype'), this.笔记类型帮助); },
                 onSelect: (id: string): void => { this.加载笔记类型(Number(id)); } })
-            }.width('100%')
+            }
 
             // 遮盖使用专属布局；普通字段支持文字与独立图片附件。
             if (this.是否图片遮盖模式) {
@@ -816,7 +830,8 @@ export struct 添加笔记页 {
               }
 
               // ④ Tags 折叠在「高级设置」里，与其他笔记类型保持一致（BUG-004 修复）
-              this.高级设置折叠区()
+              this.标签字段块()
+              this.referenceEntry()
             } else {
               ForEach(this.字段名列表, (字段名: string, 索引: number) => {
                 NoteFieldCard({ fieldName: 字段名, fieldIndex: 索引, focusRequest: this.focusedField === 索引 ? this.fieldFocusRequest : 0, originalStockKind: this.originalStockKind, value: this.字段值列表[索引],
@@ -846,7 +861,8 @@ export struct 添加笔记页 {
                   } })
               }, (字段名: string, 索引: number): string => `${this.fieldEditorVersion}-${this.已选笔记类型ID}-${索引}-${字段名}`)
 
-              this.高级设置折叠区()
+              this.标签字段块()
+              this.referenceEntry()
             }
           }
           .width('100%')
@@ -888,6 +904,8 @@ export struct 添加笔记页 {
       .width('100%')
       .height('100%')
       .backgroundColor(this.pageSurface)
+      }
+      
 
       if (this.显示帮助) {
         字段帮助面板({
@@ -899,6 +917,17 @@ export struct 添加笔记页 {
         })
       }
 
+      if (this.linksOpen && this.linkedIds.length === 0) {
+        NoteLinksDraftPanel({ fields: this.referenceFields(), backRequest: this.linksBack,
+          onClose: (): void => { if (this.pageActive) { this.linksOpen = false; this.wheelSession.setVisible(true); } },
+          onChange: (fields: string[]): void => { this.applyReferenceFields(fields); },
+          onPreview: (ids: number[]): void => { if (this.pageActive && this.linksOpen) this.linkedIds = ids; } })
+      }
+      if (this.linkedIds.length > 0) {
+        卡片预览页({ 卡片ID列表: this.linkedIds, 媒体目录: this.referenceMediaDirectory(), isDark: this.是否深色(), linksReadOnly: true,
+          onClose: (): void => { this.linkedIds = []; this.linkedBack = null; },
+          onBackHandlerChange: (handler: (() => boolean) | null): void => { this.linkedBack = handler; } })
+      }
       if (this.templatesOpen) {
         笔记类型编辑器({ notetypeId: this.已选笔记类型ID, notetypeName: this.笔记类型名,
           templatesOnly: true, backRequest: this.templateBackRequest, isDark: this.是否深色(),
@@ -985,7 +1014,7 @@ export struct 添加笔记页 {
   }
 
   private async requestExit(): Promise<void> {
-    if (this.draftPreview !== null) return;
+    if (this.draftPreview !== null || this.linksOpen) return;
     if (!this.pageActive || this.处理中 || this.pickingFieldImage || this.audioBusy || this.confirmingDiscard) return;
     if (!this.hasDraft()) { this.pathStack.pop(); return; }
     this.confirmingDiscard = true;
