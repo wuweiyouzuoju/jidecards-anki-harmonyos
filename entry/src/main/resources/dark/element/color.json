@@ -136,6 +136,9 @@
     {"name": "surface_border", "value": "#77869A"},
     {"name": "menu_shadow", "value": "#66000000"},
     {"name": "surface_image", "value": "#2C3745"},
-    {"name": "border_image", "value": "#718298"}
-  ]
+    {"name": "border_image", "value": "#718298"},
+    {"name": "browser_row_marked", "value": "#343C24"},
+    {"name": "browser_row_suspended", "value": "#4B4828"},
+    {"name": "browser_row_buried", "value": "#26394D"}
+]
 }
