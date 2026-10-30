@@ -191,9 +191,9 @@ test('initial notetype reads permit dismissal and template confirmations are one
   }
   const h=editor(),dialogs=[];h.instance.getUIContext=()=>({showAlertDialog:options=>dialogs.push(options)});
   h.instance.removeTemplate();h.instance.removeTemplate();
-  dialogs[0].secondaryButton.action();dialogs[0].secondaryButton.action();dialogs[1].secondaryButton.action();
+  dialogs[0].buttons[1].action();dialogs[0].buttons[1].action();dialogs[1].buttons[1].action();
   assert.equal(h.instance.模板列表.length,2,'late confirmations must not remove the replacement at the same index');
-  h.instance.removeTemplate();dialogs[2].primaryButton.action();dialogs[2].secondaryButton.action();
+  h.instance.removeTemplate();dialogs[2].buttons[0].action();dialogs[2].buttons[1].action();
   assert.equal(h.instance.模板列表.length,2);
 });
 
