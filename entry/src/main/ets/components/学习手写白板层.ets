@@ -1,4 +1,7 @@
+import { GlassBubblePanel } from './common/GlassBubblePanel';
+import { ActionMenuPointerSide } from './common/ActionMenuLayout';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { popupAppearance } from './common/PopupAppearance';
 import { LengthMetrics } from '@kit.ArkUI';
 import { WINDOW_SAFE_TOP_KEY } from '../model/WindowSafeLayout';
 import { 应用尺寸 } from '../utils/应用尺寸';
@@ -23,6 +26,7 @@ import { 颜色键 } from '../model/颜色主题';
 /** 官方套件不可用即回退原版；收起保留当前卡画布，换题清空。 */
 @Component
 export struct 学习手写白板层 {
+  @StorageProp('surface_material') private popupMaterial: string = 'flat';
   @StorageProp(颜色键.动作主色) private actionColor: string = '#2F5FD0';
   @Prop 是否深色: boolean = false;
   @Prop @Watch('inputConditionsChanged') isVisible: boolean = false;
@@ -444,6 +448,11 @@ export struct 学习手写白板层 {
 
   @Builder
   private opacitySettings() {
+    GlassBubblePanel({ panelWidth: Math.max(0, Math.min(260, this.toolbarContentWidth - 2 * 应用尺寸.页面内边距_水平)), pointerCenter: (Math.max(0, Math.min(260, this.toolbarContentWidth - 2 * 应用尺寸.页面内边距_水平))) / 2,
+      pointerSide: ActionMenuPointerSide.Top, content: (): void => { this.opacitySettingsContent(); } })
+  }
+  @Builder
+  private opacitySettingsContent() {
     Column({ space: 应用尺寸.间距_8 }) {
       Row() {
         Text(this.label('opacity')).fontSize(应用尺寸.字号_正文).layoutWeight(1)
@@ -479,10 +488,10 @@ export struct 学习手写白板层 {
           点击回调: (): void => { this.toggleOpacity(); } })
           .bindPopup(this.opacityOpen, {
             builder: this.opacitySettings, placement: Placement.Bottom,
-            popupColor: $r('app.color.menu_surface'), enableArrow: true,
+            popupColor: Color.Transparent, enableArrow: false,
             shadow: MenuSurface.popupShadow(), backgroundBlurStyle: BlurStyle.NONE,
             arrowWidth: MenuSurface.pointerSpan, arrowHeight: MenuSurface.pointerDepth,
-            radius: 应用尺寸.圆角_指标卡, transition: MenuSurface.popupTransition(),
+            radius: 应用尺寸.圆角_指标卡, transition: TransitionEffect.IDENTITY,
             onStateChange: (event: PopupStateChangeParam): void => {
               if (!event.isVisible) { this.opacityOpen = false; this.publishInterface(); }
             }

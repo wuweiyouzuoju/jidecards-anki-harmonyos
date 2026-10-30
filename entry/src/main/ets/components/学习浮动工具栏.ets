@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { currentMotionProfile, motionAnimation } from '../utils/AppMotion';
-import { GlassSurface } from '../utils/GlassSurface';
+import { StudyRatingSurface } from '../utils/StudyRatingSurface';
 import { GesturePointer, gesturePointer } from '../model/GesturePointer';
 import { GLASS_COLORS_KEY, GLASS_HIGHLIGHT_COLORS } from '../model/ThemeCatalog';
 //
@@ -73,6 +73,7 @@ import { PRIMARY_GLASS_KEY, PrimaryGlassStyle, themePrimaryGlass } from '../mode
 
 @Component
 export struct 学习浮动工具栏 {
+  @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @StorageProp(GLASS_COLORS_KEY) private glassColors: string[] = GLASS_HIGHLIGHT_COLORS;
@@ -452,7 +453,7 @@ export struct 学习浮动工具栏 {
     .width('100%')
     .height('100%')
     .padding({ left: 4, right: 4 })
-    .attributeModifier(new PrimaryGlassSurface(this.primaryGlass))
+    .attributeModifier(new PrimaryGlassSurface(this.surfaceMaterial, this.primaryGlass))
     .stateEffect(false)
     .borderRadius(应用尺寸.圆角_面板)
     .onClick(() => {
@@ -483,7 +484,7 @@ export struct 学习浮动工具栏 {
     .width('100%')
     .padding({ left: 4, right: 4 })
     .layoutWeight(1)
-    .attributeModifier(new GlassSurface(this.glassColors, 底色))
+    .attributeModifier(new StudyRatingSurface(this.surfaceMaterial, this.glassColors, 底色))
     .stateEffect(false)
     .borderRadius(应用尺寸.圆角_面板)
     .onClick(() => {
@@ -528,6 +529,7 @@ export struct 学习浮动工具栏 {
   // @副作用
   // 无（仅渲染）。
   // ========================================================
+
 
   build() {
     if (!this.位置已加载 || (this.当前阶段 !== 'question' && this.当前阶段 !== 'answer')) {

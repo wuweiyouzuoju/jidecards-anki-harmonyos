@@ -23,10 +23,12 @@ function studyPenCanvas(parameters: StudyPenCanvasArguments) {
       maxCanvasHeight: parameters.fixedCanvas && deviceInfo.sdkApiVersion >= 23 ? parameters.viewportHeight : undefined,
       onInit: (): void => { parameters.onReady(parameters.generation); },
       onScale: (scale: number): void => { parameters.onScale(parameters.generation, scale); } })
+      // 固定画幅必须把尺寸传给实际套件节点，不能只裁切外层 Stack 的默认尺寸内容。
+      .width(parameters.viewportWidth).height(parameters.viewportHeight)
+      .onAreaChange((_oldArea: Area, area: Area): void => {
+        parameters.onLayout(parameters.generation, Number(area.width), Number(area.height));
+      })
   }.width(parameters.viewportWidth).height(parameters.viewportHeight).clip(true)
-  .onAreaChange((_oldArea: Area, area: Area): void => {
-    parameters.onLayout(parameters.generation, Number(area.width), Number(area.height));
-  })
 }
 
 const studyPenCanvasBuilder: WrappedBuilder<[StudyPenCanvasArguments]> = wrapBuilder(studyPenCanvas);
