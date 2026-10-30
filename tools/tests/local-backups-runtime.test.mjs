@@ -76,7 +76,7 @@ test('restore confirmation pins the named backup, guards duplicate writes and pu
     h.item.restoreBackup(); assert.ok(h.dialogs[0].message.includes(name));
     h.item.selectBackup(h.item.backups[1]);
     let release; h.item.backend.restore = () => new Promise(resolve => {release = resolve;});
-    h.dialogs[0].secondaryButton.action(); await new Promise(resolve => setImmediate(resolve));
+    h.dialogs[0].buttons[1].action(); await new Promise(resolve => setImmediate(resolve));
     assert.equal(h.view().busy, true);
     assert.ok(h.view().items.every(item => !item.enabled));
     await h.item.executeRestore(h.item.backups[1]); assert.equal(h.calls.length, 1);
@@ -93,11 +93,11 @@ test('restore confirms once and never starts from a canceled or departed owner',
   for(const cancel of ['primaryButton','cancel','depart']){
     const h=panel();h.item.restoreBackup();h.item.restoreBackup();assert.equal(h.dialogs.length,1);
     if(cancel==='depart')h.item.aboutToDisappear();
-    else if(cancel==='cancel')h.dialogs[0].cancel();else h.dialogs[0].primaryButton.action();
-    h.dialogs[0].secondaryButton.action();await new Promise(setImmediate);assert.equal(h.calls.length,0,cancel);
+    else if(cancel==='cancel')h.dialogs[0].cancel();else h.dialogs[0].buttons[0].action();
+    h.dialogs[0].buttons[1].action();await new Promise(setImmediate);assert.equal(h.calls.length,0,cancel);
   }
-  const h=panel();h.item.restoreBackup();h.dialogs[0].secondaryButton.action();await new Promise(setImmediate);
-  h.dialogs[0].secondaryButton.action();await new Promise(setImmediate);assert.equal(h.calls.length,1);
+  const h=panel();h.item.restoreBackup();h.dialogs[0].buttons[1].action();await new Promise(setImmediate);
+  h.dialogs[0].buttons[1].action();await new Promise(setImmediate);assert.equal(h.calls.length,1);
 });
 
 test('committed restore with a failed list refresh keeps success distinct from a rejected restore', async () => {

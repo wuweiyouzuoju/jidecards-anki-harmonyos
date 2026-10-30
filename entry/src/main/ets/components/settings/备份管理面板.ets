@@ -107,15 +107,19 @@ export struct 备份管理面板 {
     };
     try {
     this.getUIContext().showAlertDialog({
-      title: $r('app.string.backup_management_restore_confirm_title'),
-      message: resourceText(this.getUIContext(), $r('app.string.backup_management_restore_confirm'), name),
-      autoCancel: false,
-      cancel: (): void => { finish(); },
-      primaryButton: { value: $r('app.string.cancel'), action: (): void => { finish(); } },
-      secondaryButton: {
-        value: $r('app.string.backup_management_restore'),
-        action: (): void => { if (finish()) this.executeRestore(name); }
-      }
+        title: $r('app.string.backup_management_restore_confirm_title'),
+        message: resourceText(this.getUIContext(), $r('app.string.backup_management_restore_confirm'), name),
+        autoCancel: false,
+        cancel: (): void => { finish(); },
+        buttons: [
+            { value: $r('app.string.cancel'), action: (): void => { finish(); } },
+            {
+                value: $r('app.string.backup_management_restore'),
+                action: (): void => { if (finish())
+                    this.executeRestore(name); }
+            }
+        ],
+        buttonDirection: DialogButtonDirection.AUTO
     });
     } catch (error) { finish(); this.showError(error as Object); }
   }
