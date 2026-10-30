@@ -178,24 +178,28 @@ export struct 设置页 {
       const message: string = `${hiddenIds.length}`;
       let settled: boolean = false;
       this.getUIContext().showAlertDialog({
-        title: title,
-        message: message,
-        autoCancel: false,
-        alignment: DialogAlignment.Center,
-        cancel: (): void => { settled = true; },
-        primaryButton: {
-          value: $r('app.string.cancel'),
-          action: (): void => { settled = true; }
-        },
-        secondaryButton: {
-          value: $r('app.string.hidden_decks_unhide'),
-          fontColor: this.actionColor,
-          action: (): void => {
-            if (settled) return;
-            settled = true;
-            this.确认全部取消隐藏();
-          }
-        }
+          title: title,
+          message: message,
+          autoCancel: false,
+          alignment: DialogAlignment.Center,
+          cancel: (): void => { settled = true; },
+          buttons: [
+              {
+                  value: $r('app.string.cancel'),
+                  action: (): void => { settled = true; }
+              },
+              {
+                  value: $r('app.string.hidden_decks_unhide'),
+                  fontColor: this.actionColor,
+                  action: (): void => {
+                      if (settled)
+                          return;
+                      settled = true;
+                      this.确认全部取消隐藏();
+                  }
+              }
+          ],
+          buttonDirection: DialogButtonDirection.AUTO
       });
     } catch (error) {
       if (!this.disposed) this.显示提示($r('app.string.sync_wait_load_failed'));

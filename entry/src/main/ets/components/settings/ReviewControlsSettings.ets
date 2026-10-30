@@ -45,7 +45,7 @@ export struct ReviewControlsSettings {
         onBusyChange: (busy: boolean): void => { if (isCurrent()) this.gestureBusy = busy; }
       }), onWillDismiss: dismiss, autoCancel: presentation.autoCancel, customStyle: presentation.customStyle,
         alignment: presentation.alignment, width: presentation.width, height: presentation.height,
-        maskColor: presentation.maskColor, openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation });
+        keyboardAvoidMode: presentation.keyboardAvoidMode, maskColor: presentation.maskColor, openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation });
     };
   private readonly createKeyboardDialog: (dismiss: NativeDialogDismiss) => CustomDialogController =
     (dismiss: NativeDialogDismiss): CustomDialogController => {
@@ -56,7 +56,7 @@ export struct ReviewControlsSettings {
         onBusyChange: (busy: boolean): void => { if (isCurrent()) this.keyboardBusy = busy; }
       }), onWillDismiss: dismiss, autoCancel: presentation.autoCancel, customStyle: presentation.customStyle,
         alignment: presentation.alignment, width: presentation.width, height: presentation.height,
-        maskColor: presentation.maskColor, openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation });
+        keyboardAvoidMode: presentation.keyboardAvoidMode, maskColor: presentation.maskColor, openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation });
   };
 
 

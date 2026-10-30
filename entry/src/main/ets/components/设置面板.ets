@@ -1,10 +1,12 @@
+import { GlassSource } from './common/GlassSource';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { LiveSearchField } from './common/LiveSearchField';
 import { WINDOW_SAFE_TOP_KEY } from '../model/WindowSafeLayout';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
+import { SeriesVisual } from '../utils/SeriesVisual';
 import { SettingsActionRow } from './common/SettingsActionRow';
 import { settingsIcon } from '../utils/SettingsIcons';
 import { showToastSafely, resourceText, namedResourceText } from '../utils/UiFeedback';
-import { ThemeTextSpans } from './common/ThemeText';
 import { SettingsGroup, visibleSettingsGroups } from '../model/SettingsStructure';
 import { appInterface } from '../backend/AppInterfaceService';
 import { settingsHeaderControls, settingsHeaderItems } from '../model/AppInterface';
@@ -12,12 +14,10 @@ import { interfaceControlIcon, interfaceControlText } from '../utils/AppInterfac
 import { IconActionButton } from './common/IconActionButton';
 import { SettingsEntry, filterSettingsEntries, SETTINGS_ENTRIES } from '../model/SettingsNavigation';
 import { syncActivity } from '../model/SyncSettings';
-import { OFFICIAL_QQ_GROUP } from '../model/OfficialCommunity';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
 import { PAGE_COMPACT_LAYOUT_KEY } from '../model/AppLayoutState';
 
 import { common } from '@kit.AbilityKit';
-import { hilog } from '@kit.PerformanceAnalysisKit';
 import { 主题模式 } from '../model/主题设置';
 import { 颜色主题, 颜色键 } from '../model/颜色主题';
 import { 集合服务 } from '../backend/集合服务';
@@ -79,6 +79,7 @@ import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../model/ReleaseFeatures';
 // ========================================================
 @Component
 export struct 设置面板 {
+  @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
   @State private notetypeEditorBackRequest: number = 0;
@@ -121,6 +122,7 @@ export struct 设置面板 {
   @StorageProp(PAGE_SURFACE_KEY) private 页面底色微染值: string = '#F5F7FA';
   @StorageProp(颜色键.主色容器) private 主色容器色: string = '#E8EEFC';
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
+  @State private modeButtonRight: number | undefined = undefined;
   @StorageProp(WINDOW_SAFE_TOP_KEY) private toolbarSafeTop: number = 0;
   // 手势导航条高度（列表滚到底时最后分组需完整滚出导航条区域）
   @StorageProp('导航条高度') private 导航条高度: number = 0;
@@ -291,32 +293,32 @@ export struct 设置面板 {
 
   @Builder
   private settingsSearchField(): void {
-    TextInput({ text: this.settingsQuery, placeholder: $r('app.string.settings_search_placeholder') })
-      .border(SurfaceBorder.options())
-      .width('100%')
-      .height(应用尺寸.searchFieldHeight)
-      .fontSize(应用尺寸.字号_正文)
-      .backgroundColor($r('app.color.surface_card'))
-      .borderRadius(应用尺寸.searchFieldRadius)
-      .onChange((value: string): void => { this.onSettingsSearchChange(value); })
+    LiveSearchField({ value: this.settingsQuery, placeholder: $r('app.string.settings_search_placeholder'),
+      maximumLength: undefined, debounceMs: 0, onChange: (value: string): void => { this.onSettingsSearchChange(value); } })
   }
 
   @Builder
   private settingsDirectory() {
     Column() {
       Column() {
-        ForEach(this.directoryEntries(), (entry: SettingsEntry) => {
+        ForEach(this.directoryEntries(), (entry: SettingsEntry, index: number) => {
+          Column() {
           SettingsActionRow({ title: this.sectionText(entry.titleKey), icon: settingsIcon(entry.id),
             hint: this.sectionText(this.简洁模式 ? (entry.simpleDescriptionKey ?? entry.descriptionKey) : entry.descriptionKey),
             onAction: (): void => { this.openSection(entry.id); } })
             .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
-          Divider().color(SurfaceBorder.color()).margin({ left: 16, right: 16 })
+          if (index < this.directoryEntries().length - 1) {
+            Divider().color(SurfaceBorder.color()).strokeWidth(SurfaceBorder.separatorWidth)
+              .height(SurfaceBorder.separatorWidth).flexShrink(0).margin({ left: 16, right: 16 })
+          }
+          }.width('100%').flexShrink(0)
         }, (entry: SettingsEntry): string => entry.id)
         if (this.directoryEntries().length === 0) {
           Text($r('app.string.settings_search_empty')).fontSize(应用尺寸.字号_正文)
             .fontColor($r('app.color.text_secondary')).padding(20)
         }
-      }.width('100%').backgroundColor($r('app.color.surface_card')).border(SurfaceBorder.options()).borderRadius(16).clip(true)
+      }.width('100%')
+        .attributeModifier(SeriesVisual.settingsSurface(this.surfaceMaterial, this.是否深色, this.动作主色链接, this.页面底色微染值, 应用尺寸.圆角_卡片)).clip(true)
     }.width('100%')
   }
 
@@ -361,20 +363,24 @@ export struct 设置面板 {
     }
     let settled: boolean = false;
     this.getUIContext().showAlertDialog({
-      title: this.取本地化文本($r('app.string.settings_clear_unused_tags')),
-      message: this.取本地化文本($r('app.string.settings_clear_unused_tags_confirm')),
-      autoCancel: true,
-      cancel: (): void => { settled = true; },
-      alignment: DialogAlignment.Center,
-      primaryButton: {
-        value: $r('app.string.cancel'),
-        action: (): void => { settled = true; }
-      },
-      secondaryButton: {
-        value: $r('app.string.settings_clear_unused_tags'),
-        fontColor: $r('app.color.error_text'),
-        action: (): void => { if (settled) return; settled = true; this.执行清除未用标签(); }
-      }
+        title: this.取本地化文本($r('app.string.settings_clear_unused_tags')),
+        message: this.取本地化文本($r('app.string.settings_clear_unused_tags_confirm')),
+        autoCancel: true,
+        cancel: (): void => { settled = true; },
+        alignment: DialogAlignment.Center,
+        buttons: [
+            {
+                value: $r('app.string.cancel'),
+                action: (): void => { settled = true; }
+            },
+            {
+                value: $r('app.string.settings_clear_unused_tags'),
+                fontColor: $r('app.color.error_text'),
+                action: (): void => { if (settled)
+                    return; settled = true; this.执行清除未用标签(); }
+            }
+        ],
+        buttonDirection: DialogButtonDirection.AUTO
     });
   }
 
@@ -431,9 +437,11 @@ export struct 设置面板 {
   // @副作用
   // 无（构建器只负责渲染；副作用由用户交互触发对应回调）。
   // ========================================================
+
   build() {
     Stack() {
-      Column() {
+      GlassSource() {
+Column() {
         // 返回先退回目录，模式切换入口保留在右侧。
         Stack({ alignContent: Alignment.Center }) {
           Text(this.pageTitle())
@@ -454,6 +462,8 @@ export struct 设置面板 {
               slideMenu: true, onHoldOpen: (): void => { this.显示模式菜单 = true; },
               onHoldCancel: (): void => { this.显示模式菜单 = false; },
               onAction: (): void => { this.显示模式菜单 = true; }
+            }).onAreaChange((_old: Area, area: Area): void => {
+              this.modeButtonRight = Number(area.globalPosition.x) + Number(area.width);
             })
           }
           .width('100%')
@@ -574,7 +584,11 @@ export struct 设置面板 {
               }
             }
             else if (group.id === 'device_link') {
-              ListItem() { DeviceLinkSettings({ 是否深色: this.是否深色, scroller: this.内容滚动器 }) }
+              ListItem() { DeviceLinkSettings({ 是否深色: this.是否深色, scroller: this.内容滚动器,
+                initiallyExpanded: this.initialActionId === 'device_link',
+                打开说明回调: (标题: Resource, 正文: Resource): void => {
+                  this.说明标题 = 标题; this.说明正文 = 正文; this.显示说明浮层 = true;
+                } }) }
             }
             else if (group.id === 'ai') {
               ListItem() {
@@ -676,6 +690,8 @@ export struct 设置面板 {
       .width('100%')
       .height('100%')
       .backgroundColor(this.页面底色微染值)
+      }
+      
 
       // FSRS 子分组 ⓘ 上抛的说明浮层：放在根 Stack 顶层，
       // 与 高级牌组选项面板 的 字段帮助面板 渲染位置一致。
@@ -693,7 +709,7 @@ export struct 设置面板 {
 
       // 右上角模式切换菜单：顶栏「当前模式」按钮触发，挂在根 Stack 顶层
       if (this.显示模式菜单) {
-        模式切换菜单({
+        模式切换菜单({ toolbarRight: this.modeButtonRight,
           当前简洁模式: this.简洁模式,
           主色: this.解析主色(),
           顶部偏移: 应用尺寸.pageContentTop(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop),

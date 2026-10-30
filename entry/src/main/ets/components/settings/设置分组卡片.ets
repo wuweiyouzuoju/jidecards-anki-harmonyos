@@ -5,14 +5,19 @@ import { HelpLabel } from '../common/HelpLabel';
 import { 设置面板色板_取 } from '../../utils/设置面板配色';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
+import { SeriesVisual } from '../../utils/SeriesVisual';
+import { 颜色键 } from '../../model/颜色主题';
 import { settingsGroupText } from '../../utils/SettingsStructureText';
 
 @Component
 export struct 设置分组卡片 {
+  @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop 标题: Resource = $r('app.string.settings_about');
   @Prop groupId: string = '';
   @Prop 是否深色: boolean = false;
+  @StorageProp(颜色键.动作主色) private actionColor: string = '#2F5FD0';
+  @StorageProp(颜色键.页面底色微染) private pageTint: string = '';
   @Prop showHeader: boolean = true;
   @Prop 帮助标题: Resource | null = null;
   @Prop 帮助正文: Resource | null = null;
@@ -39,8 +44,6 @@ export struct 设置分组卡片 {
     }
     .width('100%')
     .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距, top: 8, bottom: 8 })
-    .backgroundColor(设置面板色板_取(this.是否深色).背景)
-    .border(SurfaceBorder.options())
-    .borderRadius(16)
+    .attributeModifier(SeriesVisual.settingsSurface(this.surfaceMaterial, this.是否深色, this.actionColor, this.pageTint, 应用尺寸.圆角_卡片))
   }
 }

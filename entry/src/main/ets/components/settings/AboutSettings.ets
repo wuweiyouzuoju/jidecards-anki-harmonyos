@@ -1,6 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { NativeDialogHost, NativeDialogFactory, NativeDialogDismiss, NativeDialogPresentation } from '../common/NativeDialogHost';
 import { SurfaceTransition } from '../../utils/SurfaceTransition';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { settingsItemText } from '../../utils/SettingsStructureText';
 import { OFFICIAL_QQ_GROUP } from '../../model/OfficialCommunity';
 import { common } from '@kit.AbilityKit';
@@ -43,7 +43,7 @@ export struct AboutSettings {
         groupNumber: this.QQ群号,
         onCopyGroup: (): void => { this.复制QQ群号到剪贴板(); }
       }),
-      width: presentation.width, height: presentation.height, maskColor: presentation.maskColor,
+      width: presentation.width, height: presentation.height, keyboardAvoidMode: presentation.keyboardAvoidMode, maskColor: presentation.maskColor,
       autoCancel: presentation.autoCancel,
       alignment: presentation.alignment,
       openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation, customStyle: presentation.customStyle
