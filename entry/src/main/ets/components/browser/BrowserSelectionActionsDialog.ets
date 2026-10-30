@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SurfaceSelect } from '../common/SurfaceSelect';
 import { DialogFrame } from '../common/DialogFrame';
 import { DialogHeader } from '../common/DialogHeader';
 import { resourceText, namedResourceText } from '../../utils/UiFeedback';
@@ -9,6 +10,7 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 export interface BrowserExportOptions { format: string; media: boolean; scheduling: boolean; }
 @Component
 export struct BrowserSelectionActionsDialog {
+  @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @Prop @Watch('handleBack') backRequest: number = 0;
   @Prop action: string = 'grade';
   @Prop @Watch('publishInterface') busy: boolean = false;
@@ -59,19 +61,17 @@ export struct BrowserSelectionActionsDialog {
       .fontColor($r('app.color.text_secondary')).width('100%')
     if (this.action === 'grade') {
       Text($r('app.string.browser_grade_hint')).fontColor($r('app.color.text_secondary')).width('100%')
-      Select(this.options()).selected(this.rating).value(this.options()[this.rating].value)
-        .height(SelectStyle.controlHeight).padding(SelectStyle.controlPadding).space(SelectStyle.controlSpace)
-      .font(SelectStyle.controlFont).border(SelectStyle.controlBorder).borderRadius(SelectStyle.controlRadius)
-      .optionFont(SelectStyle.optionFont).selectedOptionFont(SelectStyle.selectedOptionFont)
-      .textModifier(SelectStyle.labelText()).width('100%').attributeModifier(new SelectStyle())
-        .enabled(!this.busy).onSelect((index: number): void => { this.rating = index; })
+      SurfaceSelect({ options: this.options(),
+        selectedIndex: this.rating,
+        value: this.options()[this.rating].value,
+        isInteractive: !this.busy,
+        onSelect: (index: number): void => { this.rating = index; } }).width('100%')
     } else {
-      Select(this.options()).selected(this.format === 'apkg' ? 0 : 1).value(this.options()[this.format === 'apkg' ? 0 : 1].value)
-        .height(SelectStyle.controlHeight).padding(SelectStyle.controlPadding).space(SelectStyle.controlSpace)
-      .font(SelectStyle.controlFont).border(SelectStyle.controlBorder).borderRadius(SelectStyle.controlRadius)
-      .optionFont(SelectStyle.optionFont).selectedOptionFont(SelectStyle.selectedOptionFont)
-      .textModifier(SelectStyle.labelText()).width('100%').attributeModifier(new SelectStyle())
-        .enabled(!this.busy).onSelect((index: number): void => { this.format = index === 0 ? 'apkg' : 'text'; })
+      SurfaceSelect({ options: this.options(),
+        selectedIndex: this.format === 'apkg' ? 0 : 1,
+        value: this.options()[this.format === 'apkg' ? 0 : 1].value,
+        isInteractive: !this.busy,
+        onSelect: (index: number): void => { this.format = index === 0 ? 'apkg' : 'text'; } }).width('100%')
       if (this.format === 'apkg') {
         Row() {
           Text($r('app.string.browser_export_media')).layoutWeight(1)
