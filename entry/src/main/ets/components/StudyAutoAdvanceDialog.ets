@@ -1,5 +1,6 @@
-import { DialogFrame } from './common/DialogFrame';
+import { insetMaterialFill } from '../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { DialogFrame } from './common/DialogFrame';
 import { PressFeedback } from '../utils/PressFeedback';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { DisclosureChevron } from './common/DisclosureChevron';
@@ -149,7 +150,7 @@ export struct StudyAutoAdvanceDialog {
           }
           .width('100%').constraintSize({ minHeight: 48 }).padding({ left: 8, right: 8 })
           .borderRadius(应用尺寸.圆角_面板)
-          .backgroundColor(this.selected === value ? $r('app.color.surface_page') : Color.Transparent)
+          .backgroundColor(this.selected === value ? insetMaterialFill($r('app.color.surface_page')) : Color.Transparent)
           .accessibilitySelected(this.selected === value)
           .attributeModifier(new PressFeedback())
           .onClick((): void => { this.selected = value; })

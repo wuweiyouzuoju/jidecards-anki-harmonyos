@@ -44,7 +44,7 @@ function harness() {
     当前卡片:card,可撤销:true,牌组ID:1,contentRefreshInFlight:false,消费待重渲染(){},maybeShowStudyGuide(){},
     choiceSelectedIds:[],choiceGrade:null,背面HTML:'answer',applyStudyHtml(){this.startStudyTimers();},
     publishInterface(){},网页控制器:{runJavaScript:async()=>{}},choiceAutoAdvanceSeconds:()=>5,
-    cardWeb:{setAudioEnabled:enabled=>nativeAudioAllowed.push(enabled)},
+    cardWeb:{setActive(){},setAudioEnabled:enabled=>nativeAudioAllowed.push(enabled)},
     studySession:controller,studyOptions:new StudyOptions(),autoAdvanceSettings:new StudyAutoAdvanceSettings(),
     autoAdvanceEnabled:false,reviewPreferences:prefs,按钮文案:['1m','5m','1d','4d'],
     isCurrentRequest:()=>page.mounted&&page.页面已显示&&page.foreground,
