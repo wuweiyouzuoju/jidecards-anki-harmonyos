@@ -1,8 +1,10 @@
+import { NativeDialogHost, NativeDialogFactory, NativeDialogDismiss, NativeDialogPresentation } from '../common/NativeDialogHost';
+import { RedemptionDialog } from './RedemptionDialog';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { settingsItemText } from '../../utils/SettingsStructureText';
+import { SeriesVisual } from '../../utils/SeriesVisual';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { PressFeedback } from '../../utils/PressFeedback';
-import { LabeledActionRow } from '../common/LabeledActionRow';
 import { DisclosureChevron } from '../common/DisclosureChevron';
 import { showToastSafely, resourceText, namedResourceText } from '../../utils/UiFeedback';
 import { ThemeTextSpans, themeTextKey } from '../common/ThemeText';
@@ -12,30 +14,58 @@ import { ThemeId, themeForContent } from '../../model/ThemeCatalog';
 import { displayFingerprint, parseRedemption } from '../../model/Redemption';
 import { getApplicationFingerprint, redeemContent, RedemptionResult } from '../../utils/RedemptionStore';
 import { 应用尺寸 } from '../../utils/应用尺寸';
-import { DialogHeader } from '../common/DialogHeader';
 import { 颜色主题, 颜色键 } from '../../model/颜色主题';
 
 /** 两种模式共用的独立兑换分类，直接展示识别码与主题兑换入口。 */
 @Component
 export struct RedemptionPanel {
+  @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
+  @StorageProp('themeMode') private materialMode: string = 'system';
+  @StorageProp('systemDarkMode') private materialSystemDark: boolean = false;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   onUseTheme: (theme: 颜色主题) => void = (): void => {};
   @State private fingerprint: string = '';
   @State private expanded: boolean = false;
   aboutToDisappear(): void {
-    this.active = false;
+    this.active = false; this.showCelebration = false; this.dialog.dispose();
   }
   @State private code: string = '';
   @State private busy: boolean = false;
   @State private loadFailed: boolean = false;
   @State private message: ResourceStr = '';
+  @State private showCelebration: boolean = false;
   @State private unlocked: boolean = false;
   @State private unlockedTheme: ThemeId = 'aurora';
+  private readonly dialog: NativeDialogHost = new NativeDialogHost();
+  private readonly createDialog: NativeDialogFactory = (dismiss: NativeDialogDismiss): CustomDialogController => {
+    const presentation: NativeDialogPresentation = this.dialog.presentation();
+    return new CustomDialogController({
+      builder: RedemptionDialog({ busy: this.busy, code: this.code, message: this.message,
+        unlocked: this.unlocked, unlockedTheme: this.unlockedTheme, showCelebration: this.showCelebration,
+        onClose: this.dialog.guard((): void => { this.closeRedemption(); }),
+        onSubmit: this.dialog.guard((): void => { this.redeem(); }),
+        onUse: this.dialog.guard((): void => { this.useUnlockedTheme(); }) }),
+      onWillDismiss: dismiss, autoCancel: presentation.autoCancel, customStyle: presentation.customStyle,
+      alignment: presentation.alignment, width: presentation.width, height: presentation.height,
+      keyboardAvoidMode: presentation.keyboardAvoidMode, maskColor: presentation.maskColor,
+      openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation
+    });
+  };
+  private openRedemption(): void {
+    if (!this.active || this.busy || this.fingerprint === '') return;
+    this.expanded = true; this.message = ''; this.unlocked = false; this.showCelebration = false; this.code = '';
+    try { this.dialog.open(this.createDialog, (): boolean => {
+      if (this.busy) return false;
+      this.expanded = false; this.code = ''; return true;
+    }); } catch (error) {
+      this.expanded = false; showToastSafely(this.getUIContext(), { message: $r('app.string.directory_open_error') });
+    }
+  }
   private active: boolean = false;
   @StorageProp(颜色键.动作主色) private primary: string = '#2F5FD0';
 
-  aboutToAppear(): void { this.active = true; this.loadFingerprint(); }
+  aboutToAppear(): void { this.active = true; this.dialog.activate(); this.loadFingerprint(); }
 
   private async loadFingerprint(): Promise<void> {
     this.loadFailed = false;
@@ -59,8 +89,8 @@ export struct RedemptionPanel {
 
   private closeRedemption(): void {
     if (this.busy) return;
-    this.expanded = false;
-    this.code = '';
+    this.dialog.close(); this.expanded = false;
+    this.code = ''; this.showCelebration = false;
   }
 
   private useUnlockedTheme(): void {
@@ -69,17 +99,12 @@ export struct RedemptionPanel {
     this.closeRedemption();
   }
 
-  private dismissRedemption(action: DismissSheetAction): void {
-    if (this.busy) return;
-    this.closeRedemption();
-    action.dismiss();
-  }
-
   private async redeem(): Promise<void> {
     if (!this.active || this.busy || this.code.trim() === '') return;
     this.busy = true;
     this.message = '';
     this.unlocked = false;
+    this.showCelebration = false;
     try {
       const parsed = parseRedemption(this.code);
       const theme = parsed === null ? undefined : themeForContent(parsed.contentId);
@@ -89,6 +114,7 @@ export struct RedemptionPanel {
       this.unlocked = result === 'success' || result === 'already';
       if (result === 'success') {
         this.message = this.resultMessage($r('app.string.redemption_success'));
+        this.showCelebration = theme?.id === 'iridescent' && this.expanded;
       } else if (result === 'already') this.message = this.resultMessage($r('app.string.redemption_already'));
       else if (result === 'wrong_installation') this.message = $r('app.string.redemption_wrong_installation');
       else if (result === 'unsupported') this.message = $r('app.string.redemption_unsupported');
@@ -101,34 +127,6 @@ export struct RedemptionPanel {
   /** 固定四组一行，窄屏也不会留下孤立的尾码。 */
   private fingerprintLine(start: number): string {
     return this.fingerprint.split('-').slice(start, start + 4).join('  ');
-  }
-
-  @Builder
-  private redemptionForm() {
-    Column({ space: 16 }) {
-      DialogHeader({
-        title: settingsItemText(this.getUIContext(), 'redemption', this.uiLanguage), showActionLabel: true, actionLabel: $r('app.string.redemption_submit'),
-        actionEnabled: !this.busy && this.code.trim() !== '', closeEnabled: !this.busy,
-        onClose: (): void => { this.closeRedemption(); },
-        onAction: (): void => { this.redeem(); }
-      })
-      Text($r('app.string.redemption_form_hint'))
-        .fontSize(13).fontColor($r('app.color.text_secondary')).width('100%')
-      TextArea({ text: this.code, placeholder: $r('app.string.redemption_placeholder') })
-        .border(SurfaceBorder.options())
-        .height(108).maxLength(1024).enabled(!this.busy).fontSize(14)
-        .fontColor($r('app.color.text_primary')).placeholderColor($r('app.color.text_tertiary'))
-        .backgroundColor($r('app.color.surface_page')).borderRadius(14).padding(14)
-        .onChange((value: string): void => { this.code = value; this.message = ''; this.unlocked = false; })
-      if (this.message !== '' && !this.unlocked) {
-        Text(this.message).fontSize(13).fontColor($r('app.color.text_secondary')).width('100%')
-      }
-      if (this.unlocked) {
-        LabeledActionRow({ label: this.message, actionLabel: $r('app.string.redemption_use_theme'), tint: this.primary,
-          textColor: $r('app.color.text_secondary'), isInteractive: !this.busy,
-          onAction: (): void => { this.useUnlockedTheme(); } })
-      }
-    }.padding({ left: 20, right: 20, top: 8, bottom: 28 }).width('100%')
   }
 
   @Builder
@@ -151,7 +149,8 @@ export struct RedemptionPanel {
           .fontSize(14).fontFamily('monospace').fontColor($r('app.color.text_secondary')).width('100%')
         Text(this.fingerprintLine(5))
           .fontSize(14).fontFamily('monospace').fontColor($r('app.color.text_secondary')).width('100%')
-      }.width('100%').padding(12).border(SurfaceBorder.options()).borderRadius(12).backgroundColor($r('app.color.surface_page'))
+      }.width('100%').padding(12).border(SurfaceBorder.options()).borderRadius(12)
+        .attributeModifier(SeriesVisual.insetSurface(this.surfaceMaterial, SeriesVisual.isDark(this.materialMode, this.materialSystemDark), this.primary, '', 12))
       Text($r('app.string.redemption_fingerprint_hint'))
         .fontSize(12).fontColor($r('app.color.text_secondary')).width('100%')
       if (this.loadFailed) {
@@ -172,19 +171,11 @@ export struct RedemptionPanel {
         .enabled(this.fingerprint !== '')
         .attributeModifier(new PressFeedback())
         .stateEffect(false)
-        .onClick((): void => {
-          this.expanded = true; this.message = ''; this.unlocked = false; this.code = '';
-        })
-        .bindSheet($$this.expanded, this.redemptionForm(), {
-          height: SheetSize.FIT_CONTENT, preferType: SheetType.CENTER, width: 应用尺寸.dialogMaxWidth,
-          showClose: false, dragBar: false,
-          onWillDismiss: (action: DismissSheetAction): void => { this.dismissRedemption(action); },
-          onWillSpringBackWhenDismiss: (action: SpringBackAction): void => { if (this.busy) action.springBack(); },
-          backgroundColor: $r('app.color.surface_card')
-        })
+        .onClick((): void => { this.openRedemption(); })
 
     }
-    .padding(16).width('100%').border(SurfaceBorder.options()).borderRadius(20).backgroundColor($r('app.color.surface_card'))
+    .padding(16).width('100%').border(SurfaceBorder.options()).borderRadius(20)
+    .attributeModifier(SeriesVisual.settingsSurface(this.surfaceMaterial, SeriesVisual.isDark(this.materialMode, this.materialSystemDark), this.primary, '', 20))
   }
   build() {
     this.redemptionDetails()
