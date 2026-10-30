@@ -2,38 +2,39 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { checkHomeIntroCompiled } from '../check-home-intro-compiled.mjs';
+import { HOME_INTRO_PAGES } from '../../entry/src/main/ets/model/HomeIntro.ts';
 
-// Minimal compiler-shaped fixture tests the checker itself; real output is passed separately after HAP build.
-const compiled = `
-import { DialogFrame } from 'platform';
+// Compiler-shaped fixture tests the checker; fresh real output is checked after compilation.
+const compiled=`
 class HomeIntroSection extends ViewPU {
-  constructor(parent, params) { super(parent); this.content = params.content; }
-  initialRender() { this.content(); }
+  constructor(parent,params){super(parent);this.title=params.title;this.content=params.content;}
+  initialRender(){Text.create(this.title);this.content();}
 }
 export class HomeIntroPanel extends ViewPU {
-  initialRender() {
-    for (let index = 0; index < 5; index++) {
-      ViewPU.create(new HomeIntroSection(this, { content: () => { this.paragraph('body'); } }));
+  pageIndex=0;
+  initialRender(){
+    const page=HOME_INTRO_PAGES[this.pageIndex];
+    for(const block of page.blocks){
+      ViewPU.create(new HomeIntroSection(this,{title:block.titleKey,content:()=>{this.paragraph(block.bodyKey);}}));
     }
-    for (let index = 0; index < 8; index++) Text.create('other text');
+    if(page.id==='sources'){
+      ViewPU.create(new HomeIntroSection(this,{title:'sources',content:()=>{for(let i=0;i<4;i++)Text.create('source');}}));
+    }
   }
-  paragraph(body: Resource) {
-    this.observeComponentCreation2(() => { Text.create(body); Text.fontSize(16); }, Text);
-    Text.pop();
-  }
+  paragraph(body: ResourceStr){this.observeComponentCreation2(()=>{Text.create(body);Text.fontSize(16);},Text);Text.pop();}
 }`;
 
-test('compiled introduction checker executes callback dispatch and native Text creation', () => {
-  assert.deepEqual(checkHomeIntroCompiled(compiled), { sections: 5, textNodes: 13 });
+test('compiled checker executes all paginated introduction content and native Text creation',()=>{
+  const result=checkHomeIntroCompiled(compiled);
+  assert.deepEqual(result.pages.map(page=>page.id),HOME_INTRO_PAGES.map(page=>page.id));
+  assert.equal(result.pages.find(page=>page.id==='science').sections,4);
+  assert.equal(result.pages.some(page=>page.id==='study'),false,'the in-study guide page must not return');
 });
-
-test('compiled introduction checker rejects the original untransformed inline Text chain', () => {
-  const broken = compiled.replace('this.paragraph(\'body\');', "Text('body').fontSize(16);");
-  assert.throws(() => checkHomeIntroCompiled(broken), /undefined.*fontSize|fontSize.*undefined/);
+test('compiled checker rejects untransformed inline Text chains',()=>{
+  assert.throws(()=>checkHomeIntroCompiled(compiled.replace('this.paragraph(block.bodyKey);','Text(block.bodyKey).fontSize(16);')),/undefined.*fontSize|fontSize.*undefined/);
 });
-
-test('compiled introduction checker rejects skipped content and uncompiled source', () => {
-  assert.throws(() => checkHomeIntroCompiled(compiled.replace("this.paragraph('body');", '')), /Text nodes must render/);
-  assert.throws(() => checkHomeIntroCompiled(compiled.replace('index < 5', 'index < 4')), /five introduction sections/);
-  assert.throws(() => checkHomeIntroCompiled('@Component export struct HomeIntroPanel {}'), /fresh CompileArkTS/);
+test('compiled checker rejects missing later pages, missing bodies and uncompiled source',()=>{
+  assert.throws(()=>checkHomeIntroCompiled(compiled.replace('const page=HOME_INTRO_PAGES[this.pageIndex];','const page=HOME_INTRO_PAGES[0];')),/sections must render|must render/);
+  assert.throws(()=>checkHomeIntroCompiled(compiled.replace('this.paragraph(block.bodyKey);','')),/body .* must render/);
+  assert.throws(()=>checkHomeIntroCompiled('@Component export struct HomeIntroPanel {}'),/fresh CompileArkTS/);
 });
