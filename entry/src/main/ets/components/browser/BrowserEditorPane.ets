@@ -30,22 +30,28 @@ export struct BrowserEditorPane {
   onCloseCancelled: () => void = (): void => {};
   onSaved: () => void = (): void => {};
   private active: boolean = false;
+  private linksVisible: boolean = false;
   private readonly writer: AnkiNoteUpdate = new AnkiNoteUpdate();
   private readonly operations: BrowserOperationController = new BrowserOperationController();
   private readonly session: NoteEditorSession = new NoteEditorSession(new AnkiNoteEditor(), (state: NoteEditorState): void => {
-    this.editor = state; this.onBusy(state.busy); this.publishInterface();
+    this.editor = state; this.onBusy(state.busy || this.linksVisible); this.publishInterface();
   });
   aboutToAppear(): void { this.active = true; this.setVisible(); this.load(); }
   aboutToDisappear(): void {
     this.active = false; this.wheelSession.setVisible(false); this.session.dispose(); this.operations.dispose();
     appInterface.leave('browser_editor');
   }
-  private setVisible(): void { this.wheelSession.setVisible(this.active && this.visible); }
+  private setVisible(): void { this.wheelSession.setVisible(this.active && this.visible && !this.linksVisible); }
+  private setLinksVisible(visible: boolean): void {
+    if (!this.active) return;
+    this.linksVisible = visible; this.setVisible(); this.onBusy(this.editor.busy || visible); this.publishInterface();
+  }
+  private cancel(): void { this.onClose(); }
   private publishInterface(): void {
     if (!this.active) return;
     appInterface.observe({ surface: 'browser_editor', sectionId: this.editor.note === null ? this.editor.error === '' ? 'loading' : 'error' : 'form',
-      selectedId: String(this.targetId), optionIds: [], optionLabels: [], busy: this.editor.busy, controlsComplete: true,
-      items: [{ id: 'close', titleKey: 'browser_editor_close', title: '', selected: false, enabled: !this.editor.busy },
+      selectedId: String(this.targetId), optionIds: [], optionLabels: [], busy: this.editor.busy || this.linksVisible, controlsComplete: true,
+      items: [{ id: 'close', titleKey: 'browser_editor_close', title: '', selected: false, enabled: !this.editor.busy && !this.linksVisible },
         { id: 'form', titleKey: 'note_editor_edit_title', title: '', selected: false, enabled: this.editor.note !== null }],
       values: [{ id: 'target_kind', value: this.isNote ? 'note' : 'card' }, { id: 'visible', value: String(this.visible) }] });
   }
@@ -73,15 +79,16 @@ export struct BrowserEditorPane {
   build() {
     Column() {
       if (this.editor.note !== null) {
-        浏览编辑区({ isDark: this.isDark, busy: this.editor.busy, originalStockKind: this.editor.originalStockKind,
+        浏览编辑区({ ownGlassSource: false, isDark: this.isDark, busy: this.editor.busy, originalStockKind: this.editor.originalStockKind,
           fieldNames: this.editor.fieldNames, fieldConfigs: this.editor.fieldConfigs, clozeFieldOrds: this.editor.clozeFieldOrds,
           optionalReverseFieldOrd: this.editor.optionalReverseFieldOrd, imageOcclusionFields: this.editor.imageOcclusionFields ?? [],
           note: this.editor.note, initialFieldValues: this.editor.note.fields, initialTags: this.editor.note.tags.join(' '),
           backRequest: this.backRequest, previewReturnRequest: this.previewReturn,
           errorMessage: this.editor.error === '' ? '' : resourceText(this.getUIContext(), $r('app.string.browser_detail_save_error')),
-          onCancel: (): void => { this.onClose(); }, onCloseCancelled: (): void => { this.onCloseCancelled(); },
+          onCancel: (): void => { this.cancel(); }, onCloseCancelled: (): void => { this.onCloseCancelled(); },
           onPreview: (input: NoteDraftPreviewInput, onReturn: () => void): boolean => this.openPreview(input, onReturn),
           onReload: (): Promise<NoteEditorState | null> => this.session.refresh((): boolean => this.active),
+          onLinksVisibility: (visible: boolean): void => { this.setLinksVisible(visible); },
           onSave: (fields: string[], tags: string[], images: NoteFieldImage[], audios: NoteFieldAudio[]): Promise<boolean> => this.save(fields, tags, images, audios) })
       } else {
         NoteEditorHeader({ title: $r('app.string.note_editor_edit_title'), actionEnabled: false,

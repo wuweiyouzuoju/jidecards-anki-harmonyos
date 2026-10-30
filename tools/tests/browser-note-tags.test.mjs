@@ -203,3 +203,16 @@ test('all manual note editors share tag input and parsing; sidebar uses full pat
   assert.match(list,/directoryRow\(tag\.fullName, tag\.fullName, tag\.selection\)/);
   assert.match(list,/onSelect: this\.onSelect/);
 });
+
+
+test('tag chips publish unfinished input, deduplicate on commit and preserve the parent-owned draft',()=>{
+  const Field=loadComponentLogic('components/common/NoteTagsField.ets','NoteTagsField',{Scroller:class{},parseNoteTags});
+  const field=new Field(),changes=[];Object.assign(field,{text:'Keep',onChange:value=>changes.push(value)});field.syncText();
+  field.changeInput('new');assert.equal(changes.at(-1),'Keep new');
+  field.text=changes.at(-1);field.syncText();assert.equal(field.input,'new','parent echo must not interrupt typing');
+  field.commitInput();assert.deepEqual(field.tags,['Keep','new']);assert.equal(field.input,'');
+  field.changeInput('KEEP ');assert.deepEqual(field.tags,['Keep','new']);
+  field.removeTag('Keep');assert.equal(changes.at(-1),'new');
+  field.isInteractive=false;field.removeTag('new');field.changeInput('blocked');field.commitInput();assert.equal(changes.at(-1),'new');
+  field.text='';field.syncText();assert.deepEqual(field.tags,[]);assert.equal(field.input,'');
+});

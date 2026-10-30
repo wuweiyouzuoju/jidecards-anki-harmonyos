@@ -1,3 +1,7 @@
+import { GlassSource } from '../common/GlassSource';
+import { SurfaceBorder } from '../../utils/SurfaceBorder';
+import { EditorSectionCard } from '../common/EditorSectionCard';
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { editorShortcutCommand } from '../../model/KeyboardShortcuts';
 import { StudyKeyboardSession } from '../../model/StudyKeyboard';
 import { studyEventChord } from '../../utils/StudyKeyAdapter';
@@ -10,7 +14,6 @@ import { NoteEditorState } from '../../model/NoteEditorSession';
 import { DeckTreeNode } from '../../proto/messages/DeckMessages';
 import { 变更笔记类型请求 } from '../../proto/messages/NotetypeMessages';
 import { mapEditorFields, mapEditorImages, mapEditorAudios } from '../../model/NoteEditorDraftMapping';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { NoteTagsField } from '../common/NoteTagsField';
 import { ExpansionReveal } from '../../utils/ExpansionReveal';
 import { common } from '@kit.AbilityKit';
@@ -39,7 +42,13 @@ import { noteEditInterfaceControls, noteAudioInterfaceObservation, AppInterfaceM
 import { interfaceControlText } from '../../utils/AppInterfaceText';
 import { noteFieldText } from '../../utils/NoteTypeText';
 import { noteFieldDisplayKey } from '../../model/NoteTypePresentation';
-import { browserKeyName } from '../../utils/BrowserKeyAdapter';
+import { NoteLinksDraftPanel } from '../links/NoteLinksDraftPanel';
+import { noteReferences, noteReferenceData, stageNoteReferenceFields, prepareNoteReferenceFields } from '../../model/NoteReferences';
+import { 卡片预览页 } from './卡片预览页';
+import { SettingsActionRow } from '../common/SettingsActionRow';
+import { noteLinksService, NoteLinksSnapshot } from '../../backend/NoteLinksService';
+import { NOTE_LINK_SUPPORT } from '../../model/NoteLinks';
+import { noteLinkEditorFields, restoreNoteLinkEditorFields } from '../../model/NoteLinkEditor';
 
 
 
@@ -49,6 +58,7 @@ import { 颜色键 } from '../../model/颜色主题';
 
 @Component
 export struct 浏览编辑区 {
+  @Prop ownGlassSource: boolean = true;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(PAGE_SURFACE_KEY) private pageSurface: string = '#F5F7FA';
   @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrow: boolean = false;
@@ -88,9 +98,16 @@ export struct 浏览编辑区 {
   @State private fieldFocusRequest: number = 0;
   @State private focusedField: number = -1;
   @State @Watch('publishInterface') private pendingMapping: number[] | null = null;
+  @State @Watch('publishInterface') private linkDraftTargets: string[] | null = null;
+  @State @Watch('publishInterface') private linkCount: number = -1;
+  @State private linkedPreviewIds: number[] = [];
+  private linkedPreviewBack: (() => boolean) | null = null;
+  private linksBaseline: EditableNote | null = null;
+  private linkCountGeneration: number = 0;
   private readonly properties: NoteEditorProperties = new NoteEditorProperties();
   private readonly keyboardSession: StudyKeyboardSession = new StudyKeyboardSession();
   onReload: () => Promise<NoteEditorState | null> = async (): Promise<NoteEditorState | null> => null;
+  onLinksVisibility: (visible: boolean) => void = (_visible: boolean): void => {};
 
   onPreview: (input: NoteDraftPreviewInput, onReturn: () => void) => boolean =
     (_input: NoteDraftPreviewInput, _onReturn: () => void): boolean => false;
@@ -111,15 +128,18 @@ export struct 浏览编辑区 {
 
   aboutToAppear(): void {
     // 从父级传入的初始值拷贝到内部状态（仅初始化，后续编辑不影响 initialFieldValues）
-    this.fieldValues = this.initialFieldValues.slice();
+    this.fieldValues = noteLinkEditorFields(this.initialFieldValues);
+    this.linksBaseline = this.note;
     this.tags = this.initialTags;
     this.interfaceMounted = true;
     this.publishInterface();
+    this.loadLinkCount();
   }
 
   aboutToDisappear(): void {
     this.tagsReveal.cancel(); this.properties.dispose(); this.keyboardSession.reset();
     this.disposed = true;
+    this.linkCountGeneration++;
     this.interfaceMounted = false;
     appInterface.leave('edit_note_form');
     appInterface.leave('note_audio_manage');
@@ -135,7 +155,8 @@ export struct 浏览编辑区 {
   }
 
   private interfaceControls(): AppInterfaceMenuItem[] {
-    return noteEditInterfaceControls(this.busy, this.busy || this.audioBusy || this.confirmingClose || this.propertyBusy || this.pendingMapping !== null || this.propertyMode !== '', this.fieldNames.length);
+    const controls: AppInterfaceMenuItem[] = noteEditInterfaceControls(this.busy, this.busy || this.audioBusy || this.confirmingClose || this.propertyBusy || this.pendingMapping !== null || this.propertyMode !== '', this.fieldNames.length);
+    return controls;
   }
   private publishAudioStatus(status: NoteAudioStatus | null): void {
     if (status === null || this.disposed || !this.interfaceMounted) appInterface.leave('note_audio_manage');
@@ -148,21 +169,24 @@ export struct 浏览编辑区 {
   private publishInterface(_locale: string = this.uiLanguage): void {
     if (!this.interfaceMounted || this.disposed) return;
     const controls: AppInterfaceControl[] = this.interfaceControls().map((item): AppInterfaceControl =>
-      ({ id: item.id, title: namedResourceText(this.getUIContext(), item.titleKey), titleKey: item.titleKey,
+      ({ id: item.id, title: namedResourceText(this.getUIContext(), item.titleKey), titleKey: item.titleKey, iconKey: item.iconKey,
         enabled: item.enabled, selected: false }));
-    const names: string[] = this.fieldNames.slice(0, 100);
+    const indices: number[] = this.fieldNames.map((_name, index): number => index).filter((index: number): boolean => this.fieldVisible(index));
+    const visible: number[] = indices.slice(0, 100);
     const labels: string[] = [];
-    for (let index: number = 0; index < names.length; index++) {
-      const key: string = noteFieldDisplayKey(names[index], this.originalStockKind);
-      const title: string = noteFieldText(this.getUIContext(), names[index], this.originalStockKind).slice(0, 160);
+    for (const index of visible) {
+      const key: string = noteFieldDisplayKey(this.fieldNames[index], this.originalStockKind);
+      const title: string = noteFieldText(this.getUIContext(), this.fieldNames[index], this.originalStockKind).slice(0, 160);
       labels.push(title);
       controls.push({ id: 'field-' + index, title: title, titleKey: key === '' ? undefined : key,
         enabled: this.interfaceEnabled('tags'), selected: index === this.optionalReverseFieldOrd && (this.fieldValues[index] ?? '').trim().length > 0 });
     }
     appInterface.observe({ surface: 'edit_note_form', sectionId: '', selectedId: '',
-      optionIds: names.map((_name, index): string => 'field-' + index), optionLabels: labels, optionsTotal: this.fieldNames.length,
-      busy: this.busy || this.audioBusy || this.confirmingClose || this.propertyBusy || this.pendingMapping !== null, items: controls, controlsComplete: true,
-      values: [{ id: 'property_panel', value: this.propertyMode }, { id: 'mapping_refresh_pending', value: String(this.pendingMapping !== null) }, { id: 'stock_kind', value: String(this.originalStockKind) }, { id: 'cloze_fields', value: this.clozeFieldOrds.join(',') },
+      optionIds: visible.map((index: number): string => 'field-' + index), optionLabels: labels, optionsTotal: indices.length,
+      busy: this.busy || this.audioBusy || this.confirmingClose || this.propertyBusy || this.pendingMapping !== null || this.propertyMode !== '', items: controls, controlsComplete: true,
+      values: [{ id: 'property_panel', value: this.propertyMode }, { id: 'mapping_refresh_pending', value: String(this.pendingMapping !== null) },
+        { id: 'links_draft_changed', value: String(this.linkDraftTargets !== null) }, { id: 'link_count', value: String(this.draftLinkCount()) },
+        { id: 'stock_kind', value: String(this.originalStockKind) }, { id: 'cloze_fields', value: this.clozeFieldOrds.join(',') },
         { id: 'reverse_field', value: String(this.optionalReverseFieldOrd) }, { id: 'image_count', value: String(this.images.filter((item: NoteFieldImage): boolean => item.kind !== 'video').length) },
         { id: 'video_count', value: String(this.images.filter((item: NoteFieldImage): boolean => item.kind === 'video').length) },
         { id: 'audio_count', value: String(this.audios.length) }, { id: 'tags_length', value: String(this.tags.length) },
@@ -201,7 +225,7 @@ export struct 浏览编辑区 {
     const savingImages: NoteFieldImage[] = this.images.slice();
     try {
       // 保存后的导航由页面唯一持有，不能再触发取消回调导致二次 pop。
-      const saved: boolean = await this.onSave(this.fieldValues.slice(), this.解析标签(), savingImages, this.audios.slice());
+      const saved: boolean = await this.onSave(this.fieldsWithLinks(), this.解析标签(), savingImages, this.audios.slice());
       if (saved || this.disposed) this.cleanupDrawingImages(savingImages);
     } catch (_错误) {
       // 父级通过 errorMessage 提供本地化错误文案；草稿保留
@@ -210,11 +234,12 @@ export struct 浏览编辑区 {
   }
 
   private async requestClose(): Promise<void> {
-    if (this.propertyMode !== '') { if (this.propertyMode === 'templates') this.propertyBack++; else if (!this.propertyBusy) this.propertyMode = ''; return; }
+    if (this.linkedPreviewIds.length > 0) { this.linkedPreviewBack?.(); return; }
+    if (this.propertyMode !== '') { if (this.propertyMode === 'templates' || this.propertyMode === 'links') this.propertyBack++; else if (!this.propertyBusy) this.propertyMode = ''; return; }
     if (this.preview !== null) return;
-    if (this.busy || this.audioBusy || this.confirmingClose || this.disposed) return;
+    if (this.busy || this.audioBusy || this.confirmingClose || this.propertyBusy || this.disposed) return;
     if (this.showingMasks) { this.masksBackRequest++; return; }
-    if (this.images.length === 0 && this.audios.length === 0 && !noteDraftChanged(this.fieldValues, this.initialFieldValues, this.tags, this.initialTags)) {
+    if (this.images.length === 0 && this.audios.length === 0 && this.linkDraftTargets === null && !noteDraftChanged(this.fieldValues, noteLinkEditorFields(this.initialFieldValues), this.tags, this.initialTags)) {
       this.onCancel(); return;
     }
     this.confirmingClose = true;
@@ -228,7 +253,10 @@ export struct 浏览编辑区 {
     const fresh: boolean = this.keyboardSession.update(event.keyCode, event.type === KeyType.Down);
     if (event.type !== KeyType.Down) return false;
     const chord: string = studyEventChord(event);
-    if (this.propertyMode !== '') return false;
+    if (this.propertyMode !== '') {
+      if (fresh && chord === 'escape') { this.requestClose(); return true; }
+      return false;
+    }
     const command: string = editorShortcutCommand(chord, this.disposed || this.busy || this.audioBusy ||
       this.confirmingClose || this.showingMasks || this.preview !== null || this.propertyBusy || this.pendingMapping !== null);
     if (command === '') {
@@ -239,21 +267,86 @@ export struct 浏览编辑区 {
     if (command === 'save') this.提交();
     else if (command === 'preview') this.openPreview();
     else if (command === 'tags') this.tagsFocusRequest++;
-    else if (command.startsWith('field_')) { this.focusedField = Number(command.slice(6)); this.fieldFocusRequest++; }
+    else if (command.startsWith('field_')) {
+      const index: number = Number(command.slice(6));
+      if (this.fieldVisible(index)) { this.focusedField = index; this.fieldFocusRequest++; }
+    }
     else this.openProperty(command);
     return true;
   }
   private async openProperty(mode: string): Promise<void> {
     if (this.note === null || this.disposed || this.busy || this.audioBusy || this.confirmingClose ||
-      this.preview !== null || this.propertyBusy || this.propertyMode !== '' || this.pendingMapping !== null) return;
+      this.showingMasks || this.preview !== null || this.propertyBusy || this.propertyMode !== '' || this.pendingMapping !== null) return;
     this.audioPreview.stop().catch((): void => {});
+    if (mode === 'links') {
+      try { this.fieldsWithLinks(); }
+      catch (_error) { this.本地错误 = resourceText(this.getUIContext(), $r('app.string.note_links_migrate')); return; }
+    }
     if (mode === 'deck') {
       this.propertyBusy = true;
       try { const tree = await this.properties.decks(); if (!this.disposed) this.deckTree = tree; }
       catch (error) { if (!this.disposed) this.本地错误 = resourceText(this.getUIContext(), $r('app.string.browser_action_deck_error')); return; }
       finally { if (!this.disposed) this.propertyBusy = false; }
     }
-    if (!this.disposed) this.propertyMode = mode;
+    if (!this.disposed) {
+      this.propertyMode = mode;
+      if (mode === 'links') this.onLinksVisibility(true);
+    }
+  }
+  private fieldsWithLinks(): string[] {
+    const fields: string[] = restoreNoteLinkEditorFields(this.linksBaseline?.fields ?? this.note?.fields ?? this.initialFieldValues, this.fieldValues);
+    if (this.note === null) return fields;
+    return this.linkDraftTargets !== null ? stageNoteReferenceFields(fields, this.note.guid, this.linkDraftTargets) :
+      prepareNoteReferenceFields(fields, this.note.guid, this.note.fields);
+  }
+  private fieldVisible(index: number): boolean {
+    const baseline: string[] = this.linksBaseline?.fields ?? this.initialFieldValues;
+    return this.fieldNames[index] !== NOTE_LINK_SUPPORT.field || !(baseline[index] ?? '').includes('<!--jide-links:') ||
+      (noteLinkEditorFields(baseline)[index] ?? '').trim() !== '';
+  }
+  private async loadLinkCount(): Promise<void> {
+    if (this.note === null || this.note.id <= 0 || this.disposed) return;
+    const generation: number = ++this.linkCountGeneration;
+    try {
+      const snapshot: NoteLinksSnapshot = await noteLinksService.load(this.note.id);
+      if (!this.disposed && generation === this.linkCountGeneration) this.updateLinkCount(snapshot);
+    } catch (_error) { if (!this.disposed && generation === this.linkCountGeneration) this.linkCount = -1; }
+  }
+  private updateLinkCount(snapshot: NoteLinksSnapshot): void {
+    this.linkCountGeneration++;
+    this.linkCount = snapshot.view.outgoing.length + snapshot.view.incoming.length;
+  }
+  private closeLinks(): void {
+    if (this.disposed) return;
+    this.propertyMode = ''; this.onLinksVisibility(false);
+  }
+  private updateLinkDraft(fields: string[]): void {
+    if (this.disposed || this.note === null) return;
+    const inline: string[] = noteReferences(fields).map((ref): string => ref.guid);
+    this.linkDraftTargets = noteReferenceData(fields, this.note.guid).targets.filter((guid: string): boolean => !inline.includes(guid));
+    this.fieldValues = noteLinkEditorFields(fields);
+  }
+  private draftLinkCount(): number {
+    if (this.note === null) return 0;
+    try {
+      const old = noteReferenceData(this.note.fields, this.note.guid);
+      const oldInline: string[] = noteReferences(this.note.fields).map((ref): string => ref.guid);
+      const explicit: string[] = this.linkDraftTargets ?? old.targets.filter((guid: string): boolean => !oldInline.includes(guid));
+      const outgoing: number = new Set<string>(explicit.concat(noteReferences(this.fieldValues).map((ref): string => ref.guid))).size;
+      return outgoing + Math.max(0, this.linkCount - old.targets.length);
+    } catch (_error) { return Math.max(0, this.linkCount); }
+  }
+  private openLinkedPreview(ids: number[]): void {
+    if (this.disposed || this.propertyMode !== 'links' || ids.length === 0 || this.linkedPreviewIds.length > 0) return;
+    this.linkedPreviewIds = ids.slice();
+  }
+  private closeLinkedPreview(): void {
+    if (this.disposed) return;
+    this.linkedPreviewIds = []; this.linkedPreviewBack = null;
+  }
+  private linkedMediaDirectory(): string {
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    return context.filesDir + '/collection.media';
   }
   private async moveDeck(id: number): Promise<void> {
     if (this.note === null || this.propertyBusy || this.busy || this.disposed) return;
@@ -282,6 +375,7 @@ export struct 浏览编辑区 {
     if (this.disposed) return;
     this.propertyBusy = false;
     if (state === null) { this.本地错误 = resourceText(this.getUIContext(), $r('app.string.browser_detail_load_error')); return; }
+    this.linksBaseline = state.note;
     if (this.pendingMapping !== null) {
       const mapping: number[] = this.pendingMapping;
       this.fieldValues = mapEditorFields(this.fieldValues, mapping);
@@ -296,10 +390,10 @@ export struct 浏览编辑区 {
   }
 
   private openPreview(_locale: string = this.uiLanguage): void {
-    if (this.disposed || this.preview !== null || this.showingMasks || this.busy || this.audioBusy || this.confirmingClose || this.note === null) return;
+    if (this.disposed || this.preview !== null || this.showingMasks || this.busy || this.audioBusy || this.confirmingClose || this.propertyMode !== '' || this.propertyBusy || this.pendingMapping !== null || this.note === null) return;
     this.audioPreview.stop().catch((): void => {});
     const input: NoteDraftPreviewInput = { notetypeId: this.note.notetypeId, note: this.note,
-      fields: this.fieldValues.slice(), tags: this.解析标签(), images: this.images.slice(), audios: this.audios.slice() };
+      fields: this.fieldsWithLinks(), tags: this.解析标签(), images: this.images.slice(), audios: this.audios.slice() };
     this.preview = JSON.parse(JSON.stringify(input)) as NoteDraftPreviewInput;
     if (!this.onPreview(this.preview, (): void => { if (!this.disposed) this.preview = null; })) {
       this.preview = null;
@@ -311,7 +405,7 @@ export struct 浏览编辑区 {
   }
 
   private openMasks(_locale: string = this.uiLanguage): void {
-    if (this.busy || this.audioBusy || this.confirmingClose || this.imageOcclusionFields.length !== 4) return;
+    if (this.busy || this.audioBusy || this.confirmingClose || this.propertyMode !== '' || this.propertyBusy || this.imageOcclusionFields.length !== 4) return;
     const imageField: number = this.imageOcclusionFields[1];
     const image: NoteMediaPart | undefined = noteMediaParts(this.fieldValues[imageField] ?? '')
       .find((part: NoteMediaPart): boolean => part.kind === 'image');
@@ -333,40 +427,45 @@ export struct 浏览编辑区 {
 
   build() {
     Stack() {
-    Column() {
+    GlassSource({ sourceEnabled: this.ownGlassSource }) {
+Column() {
       if (this.showingMasks) {
         图片遮罩编辑器({ 源图Uri: this.maskImageSource, initialMasks: this.maskDraft, 是否深色: this.isDark, backRequest: this.masksBackRequest,
           onCancel: (): void => { this.showingMasks = false; },
           onConfirm: (masks: 遮罩描述[]): void => { this.confirmMasks(masks); } })
       } else {
       NoteEditorHeader({ title: $r('app.string.note_editor_edit_title'),
-        actionLabel: $r('app.string.note_draft_preview'),
-        actionEnabled: !this.busy && !this.audioBusy && !this.confirmingClose && this.note !== null,
+        actionLabel: $r('app.string.note_draft_preview'), actionIcon: $r('app.media.ic_common_preview'),
+        actionEnabled: this.interfaceEnabled('save') && this.note !== null,
         closeEnabled: this.interfaceEnabled('back'),
         onBack: (): void => { this.requestClose(); }, onSave: (): void => { this.openPreview(); } })
       Scroll(this.tagsReveal.scroller) {
         Column({ space: 应用尺寸.页面分组间距(this.narrow) }) {
-          Row({ space: 应用尺寸.间距_8 }) {
+          EditorSectionCard() {
             AnchoredMenuItem({ label: $r('app.string.add_note_deck'), disclosure: true,
-              available: this.interfaceEnabled('deck'), onSelect: (): void => { this.openProperty('deck'); } }).layoutWeight(1)
+              available: this.interfaceEnabled('deck'), onSelect: (): void => { this.openProperty('deck'); } })
+            Divider().color(SurfaceBorder.color()).strokeWidth(0.5)
             AnchoredMenuItem({ label: $r('app.string.add_note_notetype'), disclosure: true,
-              available: this.interfaceEnabled('notetype'), onSelect: (): void => { this.openProperty('notetype'); } }).layoutWeight(1)
+              available: this.interfaceEnabled('notetype'), onSelect: (): void => { this.openProperty('notetype'); } })
             AnchoredMenuItem({ label: $r('app.string.notetype_editor_templates'), disclosure: true,
-              available: this.interfaceEnabled('templates'), onSelect: (): void => { this.openProperty('templates'); } }).layoutWeight(1)
-          }.width('100%')
+              available: this.interfaceEnabled('templates'), onSelect: (): void => { this.openProperty('templates'); } })
+          }
           if (this.pendingMapping !== null) {
-            Button($r('app.string.common_retry')).attributeModifier(new PressFeedback()).stateEffect(false).onClick((): void => { this.reloadProperties(); })
+            Button($r('app.string.common_retry')).attributeModifier(new PressFeedback()).stateEffect(false)
+              .enabled(!this.propertyBusy)
+              .onClick((): void => { this.reloadProperties(); })
           }
 
           if (this.imageOcclusionFields.length === 4) {
             Button($r('app.string.add_note_image_occlusion_edit_masks')).attributeModifier(new PressFeedback())
-              .stateEffect(false).enabled(!this.busy && !this.audioBusy && !this.confirmingClose)
+              .stateEffect(false).enabled(this.interfaceEnabled('save'))
               .onClick((): void => { this.openMasks(); })
           }
           ForEach(this.fieldNames, (name: string, index: number) => {
+            if (this.fieldVisible(index)) {
             NoteFieldCard({ fieldName: name, fieldIndex: index, focusRequest: this.focusedField === index ? this.fieldFocusRequest : 0, originalStockKind: this.originalStockKind, value: this.fieldValues[index] ?? '',
-              fieldConfig: this.fieldConfigs[index] ?? null,
-              disabled: this.busy || this.audioBusy || this.confirmingClose || this.propertyBusy || this.pendingMapping !== null || this.propertyMode !== '',
+              fieldConfig: this.fieldConfigs[index] ?? null, referenceSourceGuid: this.note?.guid ?? '',
+              disabled: !this.interfaceEnabled('tags'),
               reverseToggle: index === this.optionalReverseFieldOrd, editing: true,
               isDark: this.isDark, accent: this.主色按钮背景,
               clozeEnabled: this.clozeFieldOrds.indexOf(index) >= 0, allFields: this.fieldValues,
@@ -388,13 +487,19 @@ export struct 浏览编辑区 {
                 this.cleanupDrawingImages(this.images.filter((image: NoteFieldImage): boolean => image.id === id));
                 this.images = this.images.filter((image: NoteFieldImage): boolean => image.id !== id);
               } })
+            }
           }, (name: string, index: number): string => `${index}-${name}`)
-          Column({ space: 应用尺寸.间距_8 }) {
+          EditorSectionCard() {
             Text(this.interfaceLabel('tags')).fontSize(应用尺寸.字号_正文_小)
               .fontColor($r('app.color.text_secondary')).width('100%')
             NoteTagsField({ text: this.tags, focusRequest: this.tagsFocusRequest, scroller: this.tagsReveal.scroller, isInteractive: this.interfaceEnabled('tags'),
               onChange: (value: string): void => { this.tags = value; } })
-          }.width('100%')
+          }
+          EditorSectionCard() {
+          SettingsActionRow({ icon: $r('app.media.ic_study_link'), title: this.interfaceLabel('links') + ' · ' + this.draftLinkCount(),
+            isInteractive: this.interfaceEnabled('links') && this.note !== null,
+            onAction: (): void => { this.openProperty('links'); } })
+          }
         }.width('100%')
       }.width('100%').layoutWeight(1).scrollBar(BarState.Auto).edgeEffect(EdgeEffect.Spring)
         .align(Alignment.TopStart)
@@ -414,6 +519,8 @@ export struct 浏览编辑区 {
         bottom: 应用尺寸.操作区底部间距(this.narrow, this.navigationBarHeight) })
       }
     }.width('100%').height('100%').backgroundColor(this.pageSurface)
+      }
+      
       if (this.propertyMode === 'deck') {
         BrowserDeckDialog({ 牌组树: this.deckTree, busy: this.propertyBusy, isDark: this.isDark,
           onClose: (): void => { if (!this.propertyBusy) this.propertyMode = ''; }, onSubmit: (id: number): void => { this.moveDeck(id); } })
@@ -426,6 +533,16 @@ export struct 浏览编辑区 {
       if (this.propertyMode === 'templates' && this.note !== null) {
         笔记类型编辑器({ notetypeId: this.note.notetypeId, templatesOnly: true, backRequest: this.propertyBack, isDark: this.isDark,
           onClose: (): void => { this.propertyMode = ''; }, onSaved: (): void => { this.propertyMode = ''; this.reloadProperties(); } })
+      }
+      if (this.propertyMode === 'links' && this.note !== null && this.linkedPreviewIds.length === 0) {
+        NoteLinksDraftPanel({ noteId: this.note.id, sourceGuid: this.note.guid, fields: this.fieldsWithLinks(), backRequest: this.propertyBack,
+          onClose: (): void => { this.closeLinks(); }, onChange: (fields: string[]): void => { this.updateLinkDraft(fields); },
+          onPreview: (ids: number[]): void => { this.openLinkedPreview(ids); } })
+      }
+      if (this.linkedPreviewIds.length > 0) {
+        卡片预览页({ 卡片ID列表: this.linkedPreviewIds, 媒体目录: this.linkedMediaDirectory(), isDark: this.isDark, linksReadOnly: true,
+          onClose: (): void => { this.closeLinkedPreview(); },
+          onBackHandlerChange: (handler: (() => boolean) | null): void => { this.linkedPreviewBack = handler; } })
       }
     }.width('100%').height('100%')
       .onKeyPreIme((event: KeyEvent): boolean => this.handleEditorKey(event))
