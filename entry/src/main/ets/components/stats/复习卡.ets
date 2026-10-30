@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { localeNumber, localePercent } from '../../utils/LocaleFormatting';
 
 // 复习卡：渲染 GraphsResponse.reviews.count（次数）或 reviews.time（用时）为
 // 5 系列堆叠柱状图（对齐 Anki ReviewsGraph，含 showTime「时间」复选框）。
@@ -328,7 +329,7 @@ export struct 复习卡 {
               .fontColor($r('app.color.text_secondary'))
             Blank()
             Text($r('app.string.stats_reviews_days_of_total', this.取学习天数(),
-              this.取期间天数(), `${(this.取学习天数() / this.取期间天数() * 100).toFixed(0)}%`))
+              this.取期间天数(), localePercent(this.取学习天数() / this.取期间天数(), this.uiLanguage)))
               .fontSize(应用尺寸.字号_正文_小)
               .fontColor($r('app.color.text_primary'))
           }
@@ -376,8 +377,8 @@ export struct 复习卡 {
                   .fontColor($r('app.color.text_secondary'))
                 Blank()
                 Text($r('app.string.stats_average_answer_time',
-                  `${this.取平均答题秒().toFixed(1)}`,
-                  `${this.取每分钟卡数().toFixed(1)}`))
+                  localeNumber(this.取平均答题秒(), this.uiLanguage, 1),
+                  localeNumber(this.取每分钟卡数(), this.uiLanguage, 1)))
                   .fontSize(应用尺寸.字号_正文_小)
                   .fontColor($r('app.color.text_primary'))
               }

@@ -9,6 +9,7 @@
 // Invariants: build 单根 Column；仅 FSRS 有意义（无 memory_state 卡片时 average 为 0）。
 
 import type { RetrievabilitySummary } from '../../proto/messages/StatsMessages';
+import { localePercent } from '../../utils/LocaleFormatting';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 取可提取性柱色 } from '../../model/统计色板';
 import { 加权分位, 取轴域 } from '../../model/统计分箱';
@@ -17,6 +18,7 @@ import { 纵轴刻度, 纵轴宽 } from './图表轴';
 
 @Component
 export struct 记忆率卡 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('更新缓存') 记忆率数据: RetrievabilitySummary | null = null;
   @Prop @Watch('更新缓存') 范围索引: number = 0;
   @State private 柱缓存: number[] = [];
@@ -175,7 +177,7 @@ export struct 记忆率卡 {
               .fontColor($r('app.color.text_secondary'))
             Blank()
             Text($r('app.string.stats_retrievability_average_value',
-              `${(this.记忆率数据 as RetrievabilitySummary).average.toFixed(0)}%`))
+              localePercent((this.记忆率数据 as RetrievabilitySummary).average / 100, this.uiLanguage)))
               .fontSize(应用尺寸.字号_正文_小)
               .fontColor($r('app.color.text_primary'))
           }

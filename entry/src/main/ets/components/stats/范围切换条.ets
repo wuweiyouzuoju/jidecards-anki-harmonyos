@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SurfaceSelect } from '../common/SurfaceSelect';
 import { SelectStyle } from '../../utils/SelectStyle';
 
 // 范围切换条：Anki 统计图表卡内的范围单选（如 1月/3月/1年/全部）。
-// 原生选择框；当前索引由父组件持有（@Prop），
+// 公共枚举选择入口；当前索引由父组件持有（@Prop），
 // 切换时回调 onRangeChange 供父组件按需持久化。
 // Invariants: 纯展示层；标签集由父组件传入（@Prop Resource 数组），不持有业务语义。
 
 @Component
 export struct 范围切换条 {
+  @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop 当前索引: number = 0;
   @Prop 标签集: Resource[] = [];
@@ -22,20 +24,9 @@ export struct 范围切换条 {
   }
 
   build() {
-    Select(this.options())
-      .selected(this.当前索引)
-      .value(this.options()[this.当前索引]?.value ?? '')
-      .menuAlign(MenuAlignType.END)
-      .attributeModifier(new SelectStyle(this.surfaceColor))
-      .height(SelectStyle.controlHeight)
-      .padding(SelectStyle.controlPadding)
-      .space(SelectStyle.controlSpace)
-      .width(SelectStyle.rangeWidth)
-      .font(SelectStyle.controlFont)
-      .optionFont(SelectStyle.optionFont)
-      .selectedOptionFont(SelectStyle.selectedOptionFont)
-      .textModifier(SelectStyle.labelText())
-      .border(SelectStyle.controlBorder).borderRadius(SelectStyle.controlRadius)
-      .onSelect((index: number): void => { this.onRangeChange(index); })
+    SurfaceSelect({ options: this.options(),
+      selectedIndex: this.当前索引,
+      value: this.options()[this.当前索引]?.value ?? '',
+      onSelect: (index: number): void => { this.onRangeChange(index); } })
   }
 }

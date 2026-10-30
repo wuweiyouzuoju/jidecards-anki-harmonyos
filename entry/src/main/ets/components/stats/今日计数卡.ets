@@ -6,6 +6,7 @@
 // Invariants: 摘要始终可见；详细答题统计按需展开，缺失字段不当作零。
 
 import { common } from '@kit.AbilityKit';
+import { localeNumber, localePercent } from '../../utils/LocaleFormatting';
 import { resourceText } from '../../utils/UiFeedback';
 import { dueOverview } from '../../model/StatsOverview';
 import type { FutureDue, TodayCounts } from '../../proto/messages/StatsMessages';
@@ -58,7 +59,7 @@ export struct 今日计数卡 {
     if (数据.answerCount <= 0) {
       return '0';
     }
-    return (数据.answerMillis / 1000 / 数据.answerCount).toFixed(1);
+    return localeNumber(数据.answerMillis / 1000 / 数据.answerCount, this.uiLanguage, 1);
   }
 
   /** 重来次数 = 已答 - 正确（Anki againCount） */
@@ -70,14 +71,14 @@ export struct 今日计数卡 {
     if (数据.answerCount <= 0) {
       return '0%';
     }
-    return `${(this.取重来次数(数据) / 数据.answerCount * 100).toFixed(2)}%`;
+    return localePercent(this.取重来次数(数据) / 数据.answerCount, this.uiLanguage, 2);
   }
 
   private 取成熟正确率(数据: TodayCounts): string {
     if (数据.matureCount <= 0) {
       return '0%';
     }
-    return `${(数据.matureCorrect / 数据.matureCount * 100).toFixed(2)}%`;
+    return localePercent(数据.matureCorrect / 数据.matureCount, this.uiLanguage, 2);
   }
 
   /** 缺失数据保留未知态，不能显示为零。 */

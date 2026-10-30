@@ -1,5 +1,5 @@
-import { IconActionButton } from '../common/IconActionButton';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { IconActionButton } from '../common/IconActionButton';
 import { PressFeedback } from '../../utils/PressFeedback';
 
 // 日历卡：渲染 GraphsResponse.reviews.count 为年历热力图（对齐 Anki CalendarGraph）。

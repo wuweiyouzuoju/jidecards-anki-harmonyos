@@ -8,6 +8,7 @@
 // Invariants: build 单根 Column；全部时间行仅在统计天数=全部（days=0）时显示（Anki revlogRange 语义）。
 
 import type { TrueRetention, TrueRetentionStats } from '../../proto/messages/StatsMessages';
+import { localePercent } from '../../utils/LocaleFormatting';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 色保留率_年轻, 色保留率_成熟 } from '../../model/统计色板';
@@ -22,6 +23,7 @@ interface 保留率行 {
 
 @Component
 export struct 真实保留率卡 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop 保留率数据: TrueRetentionStats | null = null;
   /** 统计天数=0（全部）时显示"全部时间"行 */
   @Prop 是否显示全部: boolean = false;
@@ -31,7 +33,7 @@ export struct 真实保留率卡 {
   private 取率(通过: number, 未通过: number): string {
     const 总: number = 通过 + 未通过;
     if (总 === 0) return '—';
-    return `${(通过 / 总 * 100).toFixed(1)}%`;
+    return localePercent(通过 / 总, this.uiLanguage, 1);
   }
 
   private 取总计通过(数据: TrueRetention): number {

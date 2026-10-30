@@ -5,6 +5,8 @@
 // 对齐目标：Anki 26.05 ts/routes/graphs/*（FutureDue/Added/Hour/Intervals/Difficulty 等）。
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
+import { stripTypeScriptTypes } from 'node:module';
 
 import { 协议写入器 } from '../../entry/src/main/ets/proto/core/ProtoWriter.ts';
 import { decodeGraphsResponse, encodeGraphsRequest } from '../../entry/src/main/ets/proto/messages/StatsMessages.ts';
@@ -18,7 +20,7 @@ import {
 } from '../../entry/src/main/ets/model/统计色板.ets';
 import {
   取刻度, 取美观域, 按刻度分箱, 取轴域,
-  加权分位, 展开为序列, 取序列分位, 取最小键, 取最大键
+  加权分位, 取分布分位, 取最小键, 取最大键
 } from '../../entry/src/main/ets/model/统计分箱.ets';
 
 // ── 统计色板：d3 色带锚点与关键取值 ──
@@ -186,15 +188,49 @@ test('weighted quantile matches Anki easeQuantile semantics', () => {
   assert.equal(加权分位(new Map(), 0.5), 0);
 });
 
-test('expand-to-array and sequence quantile match d3 quantile', () => {
-  const 数据 = new Map([[1, 2], [5, 1], [9, 1]]); // [1,1,5,9]
-  const 序列 = 展开为序列(数据);
-  assert.deepEqual(序列, [1, 1, 5, 9]);
-  // d3 quantile: (n-1)p 线性插值 → 0.5 → 位置 1.5 → (1+5)/2 = 3
-  assert.equal(取序列分位(序列, 0.5), 3);
-  // 0.95 → 位置 2.85 → 5 + (9-4)×0.85 = 8.4（浮点容差）
-  assert.ok(Math.abs(取序列分位(序列, 0.95) - 8.4) < 1e-9);
-  assert.equal(取序列分位([], 0.5), 0);
+test('bucket quantile preserves d3 interpolation without expanding card counts', () => {
+  const data = new Map([[1, 2], [5, 1], [9, 1]]);
+  assert.equal(取分布分位(data, 0.5), 3);
+  assert.ok(Math.abs(取分布分位(data, 0.95) - 8.4) < 1e-9);
+  assert.equal(取分布分位(new Map(), 0.5), 0);
+  assert.equal(取分布分位(new Map([[4, 1]]), 0.95), 4);
+  assert.equal(取分布分位(new Map([[4, 0]]), 0.5), 0);
+  for (let mask = 1; mask < 256; mask++) {
+    const buckets = new Map([9, 1, 5, 20].map((key, i) => [key, (mask >> (i * 2)) & 3]));
+    const expanded = [...buckets].flatMap(([key, count]) => Array(count).fill(key)).sort((a, b) => a - b);
+    for (const p of [0, 0.1, 0.25, 0.5, 0.95, 1]) {
+      const position = (expanded.length - 1) * p, lower = Math.floor(position);
+      const expected = expanded[lower] + ((expanded[Math.ceil(position)] - expanded[lower]) * (position - lower));
+      assert.equal(取分布分位(buckets, p), expected);
+    }
+  }
+});
+
+test('interval and stability charts handle uint32 card counts with bounded memory', () => {
+  for (const [name, field, median] of [['间隔分布卡', '间隔数据', '取中位间隔'], ['稳定度分布卡', '稳定度数据', '取中位稳定度']]) {
+    const source = readFileSync(new URL(`../../entry/src/main/ets/components/stats/${name}.ets`, import.meta.url), 'utf8');
+    const names = ['取显示上限', '更新缓存', median];
+    const methods = names.map(name => {
+      const start = source.indexOf(`  private ${name}(`) >= 0 ? source.indexOf(`  private ${name}(`) : source.indexOf(`  ${name}(`);
+      assert.ok(start >= 0, name);
+      return source.slice(start, source.indexOf('\n  }', start) + 4);
+    });
+    const js = stripTypeScriptTypes(`class Chart { ${methods.join('\n')} }`, { mode: 'transform' });
+    const Chart = new Function('取分布分位', '取最大键', js + '; return Chart;')(取分布分位, 取最大键);
+    const chart = new Chart();
+    chart[field] = { intervals: new Map([[1, 0xffffffff], [100, 0xffffffff]]) };
+    for (const [range, upper] of [[0, 30], [1, 50.5], [2, 100], [3, 100]]) {
+      chart.范围索引 = range;
+      chart.更新缓存();
+      assert.equal(chart.显示上限, upper);
+      assert.ok(chart.柱缓存.length <= 71);
+      assert.equal(chart.柱缓存.reduce((a, b) => a + b, 0), upper < 100 ? 0xffffffff : 2 * 0xffffffff);
+      assert.equal(chart[median](), 51);
+    }
+    chart[field] = null; chart.更新缓存();
+    assert.deepEqual(chart.柱缓存, []);
+    assert.equal(chart[median](), 0);
+  }
 });
 
 test('min/max key helpers with fallback', () => {

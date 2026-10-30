@@ -1,6 +1,7 @@
+import { GlassSource } from '../components/common/GlassSource';
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { DirectorySelect } from '../components/common/DirectorySelect';
 import { DirectoryRow, DirectoryView, DirectoryChoice, directoryChoiceRows, directorySpecial } from '../model/DirectoryTree';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { navigationEnterOffset } from '../utils/AppMotion';
 import { WINDOW_SAFE_TOP_KEY } from '../model/WindowSafeLayout';
 import { appInterface } from '../backend/AppInterfaceService';
@@ -532,7 +533,7 @@ export struct 统计页 {
       top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop),
       bottom: 0
     })
-    .backgroundColor(this.页面底色微染值)
+    .backgroundColor(Color.Transparent)
   }
 
   @Builder
@@ -829,7 +830,7 @@ export struct 统计页 {
     }
     .width('100%')
     .layoutWeight(1)
-    .backgroundColor(this.页面底色微染值)
+    .backgroundColor(Color.Transparent)
     .scrollBar(BarState.Auto)
     .edgeEffect(EdgeEffect.Spring)
   }
@@ -837,7 +838,8 @@ export struct 统计页 {
   build() {
     NavDestination() {
       Stack() {
-        Column() {
+        GlassSource() {
+Column() {
           this.顶部条()
 
           if (this.阶段 === 'loading' && this.图表数据 === null) {
@@ -867,7 +869,9 @@ export struct 统计页 {
         }
         .width('100%')
         .height('100%')
-        .backgroundColor(this.页面底色微染值)
+        .backgroundColor(Color.Transparent)
+      }
+      
 
         // 页面级字段帮助浮层：所有子组件（统计图表分区）的 ⓘ
         // 按钮均通过 onHelp 回调上抛，由本页 Stack 顶层统一渲染。

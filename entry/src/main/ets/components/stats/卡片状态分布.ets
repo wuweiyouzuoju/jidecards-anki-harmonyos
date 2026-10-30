@@ -11,6 +11,7 @@
 // Invariants: separateInactive=true 时用 excludingInactive（暂停/埋藏单独计数）。
 
 import type { CardCounts, CardCountsBreakdown } from '../../proto/messages/StatsMessages';
+import { localeNumber } from '../../utils/LocaleFormatting';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 颜色键 } from '../../model/颜色主题';
@@ -29,6 +30,7 @@ interface 卡片状态项 {
 
 @Component
 export struct 卡片状态分布 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('数据已变') 卡片计数: CardCounts | null = null;
   @Prop @Watch('数据已变') 分离暂停: boolean = false;
   /** 渲染哨兵：@Prop 变化经 @Watch 递增，驱动本组件重新渲染
@@ -59,7 +61,7 @@ export struct 卡片状态分布 {
     if (总数 <= 0) {
       return '0';
     }
-    return (数值 / 总数 * 100).toFixed(2);
+    return localeNumber(数值 / 总数 * 100, this.uiLanguage, 2);
   }
 
   /** 表格行顺序与 Anki 扇区顺序一致，恒显 7 行（Anki 官方 CardCounts 表格含

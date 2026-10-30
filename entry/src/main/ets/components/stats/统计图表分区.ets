@@ -10,6 +10,8 @@ import { SelectStyle } from '../../utils/SelectStyle';
 // 由统计页页面级 Stack 统一弹字段帮助面板（确保遮罩全屏 + 浮层居中屏幕）。
 
 import { 应用尺寸 } from '../../utils/应用尺寸';
+import { SeriesVisual } from '../../utils/SeriesVisual';
+import { 颜色键 } from '../../model/颜色主题';
 import { 范围切换条 } from './范围切换条';
 import { appInterface } from '../../backend/AppInterfaceService';
 import { AppInterfaceControl } from '../../model/AppInterface';
@@ -17,7 +19,12 @@ import { localizedNamedResourceText, resourceText, namedResourceText } from '../
 
 @Component
 export struct 统计图表分区 {
+  @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
+  @StorageProp('themeMode') private themeMode: string = 'system';
+  @StorageProp('systemDarkMode') private systemDark: boolean = false;
+  @StorageProp(颜色键.动作主色) private actionColor: string = '#2F5FD0';
+  @StorageProp(颜色键.页面底色微染) private pageTint: string = '';
   @Prop 标题: ResourceStr = $r('app.string.stats_no_data');
   @Prop @Watch('publishInterface') interfaceTitleKey: string = '';
   @Prop interfaceId: string = '';
@@ -102,5 +109,7 @@ export struct 统计图表分区 {
     .backgroundColor($r('app.color.surface_card'))
     .border(SurfaceBorder.options())
     .borderRadius(应用尺寸.圆角_指标卡)
+    .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, this.themeMode === 'dark' ||
+      (this.themeMode !== 'light' && this.systemDark), this.actionColor, this.pageTint, 应用尺寸.圆角_卡片))
   }
 }
