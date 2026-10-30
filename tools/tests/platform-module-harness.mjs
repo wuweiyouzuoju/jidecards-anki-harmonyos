@@ -83,7 +83,7 @@ export function loadComponentLogic(path, exportName, dependencies) {
   const build = source.indexOf('  build() {');
   if (build < 0) throw new Error('Component has no render boundary: ' + path);
   source = source.slice(0, build) + source.slice(source.indexOf('\n  }', build) + 4);
-  source = source.replace(/@(CustomDialog|Component|BuilderParam|ObjectLink|Prop|State|Provide|Consume|StorageProp|StorageLink|Watch)(?:\([^\n]*?\))?\s*/g, '')
+  source = source.replace(/@(CustomDialog|Component|BuilderParam|ObjectLink|Link|Prop|State|Provide|Consume|StorageProp|StorageLink|Watch)(?:\([^\n]*?\))?\s*/g, '')
     .replace(new RegExp('(?:export )?struct ' + exportName), 'class ' + exportName).replace(/^export /gm, '');
   return new Function(...Object.keys(dependencies), stripTypeScriptTypes(source, {mode:'transform'}) + ';return ' + exportName + ';')(...Object.values(dependencies));
 }
