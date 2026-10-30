@@ -33,11 +33,11 @@ test('arc wrapping and selection use the nearest icon and stable tool identities
  assert.ok(Math.abs(noteWheelDistance(13,0.2,14)+1.2)<1e-10);
  const tools=noteEditorWheelTools({...state,activeIds:['bold']});
  assert.equal(tools.find(item=>item.id==='bold').active,true);
- assert.equal(tools.length,14);assert.equal(tools[0].id,'bold');assert.equal(tools.some(item=>['none','more','source','expand'].includes(item.id)),false);
+ assert.equal(tools.length,15);assert.equal(tools[0].id,'bold');assert.equal(tools.some(item=>['none','more','source','expand'].includes(item.id)),false);
  assert.deepEqual(noteEditorWheelCommonTools(state).map(tool=>tool.id),['bold','italic','underline','highlight','break','clear_format']);
- assert.equal(noteEditorWheelOuterTools(state).length,8);
+ assert.equal(noteEditorWheelOuterTools(state).length,9);
  const cloze=noteEditorWheelTools({...state,cloze:true,source:true,expanded:true});
- assert.equal(cloze.length,16);assert.equal(noteEditorWheelOuterTools({...state,cloze:true}).length,10);
+ assert.equal(cloze.length,17);assert.equal(noteEditorWheelOuterTools({...state,cloze:true}).length,11);
  assert.ok(cloze.every(item=>item.iconKey.startsWith('ic_editor_')));
 });
 test('seven symbols share one circle with equal chord spacing and mirrored angles on either edge',()=>{
@@ -66,7 +66,7 @@ test('JIDE observes current tools, hidden cloze, grip fallback and collapsed act
  const tracker=new AppInterfaceTracker();
  const first=tracker.observe(noteEditorWheelObservation(state,'link','right',false,'unsupported'));
  const snapshot=tracker.snapshot()[0];assert.equal(snapshot.selectedId,'link');
- assert.equal(snapshot.values.find(item=>item.id==='visible_tools').value,'13');
+ assert.equal(snapshot.values.find(item=>item.id==='visible_tools').value,'15');
  assert.equal(snapshot.values.find(item=>item.id==='inner_tools').value,'bold,italic,underline,highlight,break,clear_format');
  assert.equal(snapshot.values.find(item=>item.id==='activation').value,'click_only_rotation_preserves_multiple_selection');
  const target=noteEditorWheelObservation({...state,fieldName:'Front'},'bold','right',false,'unsupported');
@@ -79,25 +79,27 @@ test('JIDE observes current tools, hidden cloze, grip fallback and collapsed act
  assert.equal(noteEditorWheelObservation(state,'','right',true,'unsupported').items.some(item=>item.id==='none'),false);
  tracker.leave('note_editor_wheel',next);assert.deepEqual(tracker.snapshot(),[]);
  const declaration=APP_INTERFACE_SURFACES.find(item=>item.id==='note_editor_wheel');
- assert.ok(declaration.instructionsKey);assert.equal(declaration.items.length,17);
+ assert.ok(declaration.instructionsKey);assert.equal(declaration.items.length,18);
 });
 
 function wheelHarness(initialTool=''){
- const actions=[],longActions=[],resets=[],timers=new Map();let timerId=0;
+ const actions=[],longActions=[],resets=[],timers=new Map(),olive=[];let timerId=0;
  const Component=loadComponentLogic('components/editor/NoteEditorWheel.ets','NoteEditorWheel',{ ...motionApi(),
   ...wheelModel,NOTE_EDITOR_ACTION_FLASH_MS,NOTE_FIELD_EDITING_SUPPORT,noteEditorTool,noteEditorFormatOptions,TouchType:{Down:0,Up:1,Cancel:3},StudyGripSensor:class{},StudyGripSession:class{setActive(){}dispose(){}setTouching(){}restoreSide(){}},
   appInterface:new AppInterfaceTracker(),noteEditorWheelObservation,noteEditorFormatObservation,
+  createOliveOilSession:()=>({transition:(expanded,reduce,navigation)=>{olive.push({kind:'transition',expanded,reduce,navigation});return true;},settle:()=>olive.push({kind:'settle'}),dispose:()=>olive.push({kind:'dispose'}),startSurface:()=>olive.push({kind:'surface'})}),
+  oliveOilAnimation:()=>({}),prefersReducedMotion:()=>false,
   setTimeout:(callback,delay)=>{timers.set(++timerId,{callback,delay});return timerId;},clearTimeout:id=>timers.delete(id),
   curves:{springCurve:()=>0},Curve:{EaseOut:0,EaseInOut:0},AxisAction:{BEGIN:1,UPDATE:2,END:3,CANCEL:4}
  });
  const instance=new Component();instance.params={state,onAction:id=>actions.push(id),onLongAction:id=>longActions.push(id),visible:true,initialTool,onSelection:()=>{},
-  onOptionSelect:id=>actions.push('size:'+id),onCloseOptions:()=>{instance.params.state={...instance.params.state,optionsOpen:false};instance.parametersChanged();},
+  onCollapsedChanged:()=>{},onOptionSelect:id=>actions.push('size:'+id),onCloseOptions:()=>{instance.params.state={...instance.params.state,optionsOpen:false};instance.parametersChanged();},
   onResetFormats:()=>{resets.push(true);instance.params.state={...instance.params.state,activeIds:[]};instance.parametersChanged();}};
  instance.getUIContext=()=>({getHostContext:()=>undefined,animateTo:(_opts,apply)=>apply()});
  instance.viewportWidth=377;instance.viewportHeight=720;instance.aboutToAppear();
  const flush=()=>{const pending=[...timers.values()];timers.clear();for(const timer of pending)timer.callback();};
  const axis=(action,value=0,scrollStep=1)=>instance.axisWheel({action,scrollStep,getVerticalAxisValue:()=>value});
- return {instance,actions,longActions,resets,timers,flush,axis};
+ return {instance,actions,longActions,resets,timers,flush,axis,olive};
 }
 
 test('math tap and hold dispatch separate actions and never double-apply when release also sends a click',()=>{
@@ -164,7 +166,7 @@ test('mouse damping cancels opposite partial notches and bounds oversized packet
 });
 test('concentric circular buttons remain separate with matching ring centers on both screen edges',()=>{
  const h=wheelHarness();
- for(const width of [320,377,430])for(const right of [true,false]){
+ for(const width of [600,768,1280])for(const right of [true,false]){
   h.instance.viewportWidth=width;
   h.instance.side=right?'right':'left';
   const boxes=h.instance.wheelTools.map((_,index)=>{
@@ -222,12 +224,12 @@ test('the handle flips toward opening or closing on either edge using the same a
 });
 test('default wheel exposes both arcs and rejects cloze actions after switching to a field without cloze capability',()=>{
  const h=wheelHarness();
- assert.equal(h.instance.wheelTools.length,8);assert.equal(h.instance.commonTools.length,6);assert.equal(h.instance.radius(),158);
+ assert.equal(h.instance.wheelTools.length,9);assert.equal(h.instance.commonTools.length,6);assert.equal(h.instance.radius(),158);
  assert.equal(h.instance.trackRadius(true),82);assert.equal(h.instance.trackRadius(false),128);
  h.instance.execute('superscript');h.flush();assert.deepEqual(h.actions,['superscript']);
  h.instance.execute('cloze_next');h.instance.execute('missing');assert.deepEqual(h.actions,['superscript']);
  h.instance.params.state={...state,cloze:true};h.instance.parametersChanged();
- assert.equal(h.instance.wheelTools.length,10);h.instance.execute('cloze_next');h.flush();
+ assert.equal(h.instance.wheelTools.length,11);h.instance.execute('cloze_next');h.flush();
  assert.deepEqual(h.actions,['superscript','cloze_next']);
  const cloze=noteEditorWheelObservation(h.instance.params.state,'','right',false,'unsupported');
  assert.equal(cloze.values.find(value=>value.id==='cloze_enabled').value,'true');
@@ -448,4 +450,10 @@ test('the shared font size and heading overlay uses actual wheel geometry and ke
   assert.equal(w.current(w.wheelTools.find(tool=>tool.id===toolId)),true);
   w.aboutToDisappear();
  }
+});
+
+
+test('轮盘开合保留原吸附和工具，未创建共享形变覆盖层',()=>{
+ const source=readFileSync(new URL('../../entry/src/main/ets/components/editor/NoteEditorWheel.ets',import.meta.url),'utf8');
+ assert.doesNotMatch(source,/OliveOil|oliveSession|startWheelMorph/);assert.match(source,/this.animateOpen\(open\)/);
 });

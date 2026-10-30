@@ -3,6 +3,8 @@ import { currentMotionProfile, motionAnimation } from '../../utils/AppMotion';
 import { ActionIcon } from '../common/ActionIcon';
 import { DisclosureChevron } from '../common/DisclosureChevron';
 import { PressFeedback } from '../../utils/PressFeedback';
+import { EditorWheelSurface } from '../../utils/EditorWheelSurface';
+import { SeriesVisual } from '../../utils/SeriesVisual';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { curves, window } from '@kit.ArkUI';
 import { namedResourceText } from '../../utils/UiFeedback';
@@ -58,6 +60,17 @@ export function buildNoteEditorWheel(params: NoteEditorWheelParams) {
 /** 表单当前字段拥有默认展开浮层；浮层只负责选择、布局和单一握姿订阅。 */
 @Component
 struct NoteEditorWheel {
+  @StorageProp('theme_color_action_primary') private glassAccent: string = '';
+  @StorageProp('surface_material') private wheelMaterial: string = 'flat';
+  @StorageProp('themeMode') private wheelTheme: string = 'system';
+  @StorageProp('systemDarkMode') private wheelSystemDark: boolean = false;
+  private wheelDark(): boolean { return SeriesVisual.isDark(this.wheelTheme, this.wheelSystemDark); }
+  private wheelBorder(): ResourceColor {
+    return this.wheelMaterial === 'glass' ? (this.wheelDark() ? '#80AAB6C8' : '#CCFFFFFF') : SurfaceBorder.color();
+  }
+  private idleFill(): ResourceColor {
+    return this.wheelMaterial === 'glass' ? (this.wheelDark() ? '#18000000' : '#20FFFFFF') : $r('app.color.surface_sidebar');
+  }
   private longPressedTool: string = '';
   @State private pressedId: string = '';
   @State private rotating: boolean = false;
@@ -79,6 +92,8 @@ struct NoteEditorWheel {
   @State private centerY: number = 0;
   @State private arcPosition: number = 0;
   @State private openProgress: number = 0;
+  @State private optionsVisible: boolean = false;
+
   @State private wheelTools: NoteEditorWheelTool[] = [];
   @State private commonTools: NoteEditorWheelTool[] = [];
   @State private keyboardTop: number = 0;
@@ -114,7 +129,10 @@ struct NoteEditorWheel {
     }
   });
 
-  aboutToAppear(): void { this.mounted = true; this.parametersChanged(); this.subscribeKeyboard(); }
+  aboutToAppear(): void {
+    this.mounted = true;
+    this.parametersChanged(); this.subscribeKeyboard();
+  }
   aboutToDisappear(): void {
     this.cancelManipulation(); this.mounted = false; this.grip.dispose(); this.clearActionFlash();
     if (this.revealTimer >= 0) clearTimeout(this.revealTimer);
@@ -139,9 +157,14 @@ struct NoteEditorWheel {
     this.wheelTools = tools;
     if (changed) this.arcPosition = Math.max(0, selected) + this.alignmentOffset();
     this.activityChanged();
+    this.syncFormatArc();
     if (!this.params.visible) this.animateOpen(false);
     else if (this.viewportHeight > 0) this.animateOpen(!this.collapsed);
   }
+  private syncFormatArc(): void {
+    this.optionsVisible = this.params.state.optionsOpen === true && !this.collapsed && this.params.visible;
+  }
+
   private activityChanged(): void {
     const active: boolean = this.mounted && this.foreground && this.params.visible;
     this.grip.setActive(active);
@@ -194,6 +217,9 @@ struct NoteEditorWheel {
   }
   private iconVisible(index: number): boolean { return Math.abs(this.distance(index)) < NOTE_EDITOR_WHEEL_VISIBLE_COUNT / 2; }
   private iconOpacity(index: number): number { return Math.min(1, Math.max(0, (3.5 - Math.abs(this.distance(index))) * 2)); }
+  private toolOpacity(index: number, common: boolean): number {
+    return common ? 1 : this.iconOpacity(index);
+  }
   private itemHeight(common: boolean = false): number {
     return this.circleSize(common);
   }
@@ -245,7 +271,9 @@ struct NoteEditorWheel {
     this.collapsed = !this.collapsed;
     if (this.collapsed) this.params.onCloseOptions();
     if (!this.collapsed) { this.selectedId = ''; this.params.onResetFormats(); }
-    this.animateOpen(!this.collapsed); this.publish();
+    const open: boolean = !this.collapsed;
+    this.animateOpen(open);
+    this.publish();
   }
   private select(index: number): void {
     if (!this.mounted || !this.foreground || !this.params.visible || this.collapsed) return;
@@ -410,8 +438,10 @@ struct NoteEditorWheel {
           .fontColor(this.params.state.optionId === option.id ? '#FFFFFF' : this.accent)
           .textAlign(TextAlign.Center).maxLines(2)
       }.width(this.optionPosition(index).size).height(this.optionPosition(index).size).padding(0).type(ButtonType.Circle)
-        .backgroundColor(this.params.state.optionId === option.id ? this.accent : $r('app.color.surface_sidebar'))
-        .border({ width: 1, color: this.params.state.optionId === option.id ? this.accent : SurfaceBorder.color() })
+        .backgroundColor(this.params.state.optionId === option.id ? this.accent : this.idleFill())
+        .border({ width: 1,
+          color: this.params.state.optionId === option.id ? this.accent : this.wheelBorder() })
+        .enabled(this.params.state.optionsOpen === true)
         .focusOnTouch(false).focusable(false).attributeModifier(new PressFeedback()).stateEffect(false)
         .hitTestBehavior(HitTestMode.BLOCK_HIERARCHY)
         .position({ x: this.optionPosition(index).x - this.optionPosition(index).size / 2,
@@ -419,6 +449,7 @@ struct NoteEditorWheel {
         .accessibilityText(this.optionTitle(option))
         .accessibilityDescription(this.params.state.optionId === option.id ? $r('app.string.note_editor_format_on') :
           $r('app.string.note_editor_wheel_select'))
+
         .onTouch((event: TouchEvent): void => { this.toolTouch('format_option_' + option.id, event); })
         .onClick((): void => { this.selectFormatOption(option.id); })
     }, (option: NoteEditorFormatOption): string => (this.params.state.optionToolId ?? '') + '_' + option.id)
@@ -428,8 +459,7 @@ struct NoteEditorWheel {
   private toolButton(tool: NoteEditorWheelTool, index: number, common: boolean) {
     Button() {
       Stack() {
-        Circle().width(this.circleSize(common)).height(this.circleSize(common)).fill(this.current(tool) ?
-          this.accent : $r('app.color.surface_sidebar'))
+        Circle().width(this.circleSize(common)).height(this.circleSize(common)).fill(this.current(tool) ? this.accent : this.idleFill())
           .stroke(this.pressedId === tool.id ? this.accent : Color.Transparent).strokeWidth(2)
         Column({ space: this.contentScale() }) {
           ActionIcon({ source: $r('app.media.' + tool.iconKey),
@@ -444,7 +474,7 @@ struct NoteEditorWheel {
       }.width(this.itemWidth(common)).height(this.itemHeight(common)).hitTestBehavior(HitTestMode.None)
     }.width(this.itemWidth(common)).height(this.itemHeight(common)).padding(0).type(ButtonType.Circle).backgroundColor(Color.Transparent)
       .focusOnTouch(false).focusable(false).attributeModifier(new PressFeedback()).stateEffect(false)
-      .position({ x: this.x(index, common), y: this.iconY(index, common) }).opacity(common ? 1 : this.iconOpacity(index))
+      .position({ x: this.x(index, common), y: this.iconY(index, common) }).opacity(this.toolOpacity(index, common))
       .visibility(common || this.iconVisible(index) ? Visibility.Visible : Visibility.Hidden)
       .accessibilityText(this.title(tool))
       .accessibilityDescription(tool.longPressAction !== undefined ? $r('app.string.note_editor_math_press_hint') :
@@ -461,14 +491,15 @@ struct NoteEditorWheel {
       DisclosureChevron({ tint: this.accent })
         .rotate({ angle: noteWheelHandleAngle(this.openProgress, this.side === 'right') })
     }.width(28).height(48).padding(0).type(ButtonType.Normal)
-      .backgroundColor($r('app.color.surface_sidebar'))
-      .border({ width: 1, color: this.moving || this.edgeContact ? this.accent : SurfaceBorder.color() })
+      .attributeModifier(new EditorWheelSurface(this.wheelMaterial, this.wheelDark(), $r('app.color.surface_sidebar'), this.glassAccent))
+      .border({ width: 1, color: this.moving || this.edgeContact ? this.accent : this.wheelBorder() })
       .borderRadius(12)
       .scale({ x: this.moving ? 1.04 : 1, y: this.moving ? 1.04 : 1 })
       .animation(motionAnimation(currentMotionProfile().statusMs))
       .focusOnTouch(false).focusable(false).attributeModifier(new PressFeedback()).stateEffect(false)
       .accessibilityText(this.collapsed ? $r('app.string.note_editor_wheel_open') : $r('app.string.note_editor_wheel_close'))
       .accessibilityDescription($r('app.string.note_editor_wheel_move_hint'))
+
       .onClick((): void => { this.toggleOpen(); })
       .gesture(GestureGroup(GestureMode.Exclusive,
         LongPressGesture().onAction((): void => { this.switchSide(); }),
@@ -487,7 +518,8 @@ struct NoteEditorWheel {
       if (this.viewportWidth >= 160 && this.usableHeight() >= 176 && this.foreground) {
         Stack({ alignContent: Alignment.TopStart }) {
           Column().width(this.frameRadius()).height(this.frameRadius() * 2)
-            .backgroundColor($r('app.color.surface_card')).border(SurfaceBorder.options())
+            .attributeModifier(new EditorWheelSurface(this.wheelMaterial, this.wheelDark(), $r('app.color.surface_card'), this.glassAccent))
+            .border(SurfaceBorder.options(1, this.wheelBorder()))
             .borderRadius(this.side === 'left' ? { topRight: this.frameRadius(), bottomRight: this.frameRadius() } :
               { topLeft: this.frameRadius(), bottomLeft: this.frameRadius() })
             .hitTestBehavior(HitTestMode.None)
@@ -518,7 +550,7 @@ struct NoteEditorWheel {
           .opacity(this.params.visible ? 1 : this.openProgress)
           .hitTestBehavior(this.params.visible ? HitTestMode.BLOCK_HIERARCHY : HitTestMode.None)
           .onTouch((event: TouchEvent): void => { this.handleTouch(event); })
-        if (this.params.visible && !this.collapsed && this.params.state.optionsOpen === true) { this.optionArc() }
+        if (this.params.visible && !this.collapsed && this.optionsVisible) { this.optionArc() }
       }
     }.width('100%').height('100%').focusable(false).hitTestBehavior(HitTestMode.Transparent)
       .onAreaChange((_old: Area, area: Area): void => {

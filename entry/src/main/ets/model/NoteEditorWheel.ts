@@ -15,6 +15,7 @@ export interface NoteEditorWheelState {
   optionsOpen?: boolean;
   optionToolId?: string;
   optionId?: string;
+  referencesEnabled?: boolean;
 }
 export interface NoteEditorWheelTool extends NoteEditorTool { active: boolean; }
 export function noteWheelToolIsToggle(id: string, source: boolean): boolean {
@@ -28,7 +29,7 @@ export function noteWheelToolHighlighted(id: string, activeIds: string[], select
 }
 export function noteEditorWheelTools(state: NoteEditorWheelState): NoteEditorWheelTool[] {
   return NOTE_EDITOR_TOOLS.filter((tool: NoteEditorTool): boolean =>
-    (state.cloze || tool.editing !== 'cloze_only'))
+    (state.cloze || tool.editing !== 'cloze_only') && (state.referencesEnabled !== false || tool.id !== 'note_reference'))
     .map((tool: NoteEditorTool): NoteEditorWheelTool => ({ id: tool.id, iconKey: tool.iconKey, editing: tool.editing,
       titleKey: tool.titleKey, longPressAction: tool.longPressAction,
       active: state.activeIds.indexOf(tool.id) >= 0 }));
