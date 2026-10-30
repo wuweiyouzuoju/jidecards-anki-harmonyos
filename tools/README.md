@@ -28,7 +28,7 @@
 | RPC 映射门禁 | `node tools/verify-rpc-index.mjs` | 锁定协议输入指纹与逐项语义映射；生成/升级步骤见 [验证说明](../docs/development/verification.md#rpc-协议门禁) |
 | 集成/发布完整验证 | `npm run verify` | 环境、仓库、Rust 主机测试和签名 HAP；分阶段失败即停，普通任务按影响选择相关检查 |
 | 工具链诊断 | `doctor.mjs` | 检查本机 DevEco、Node、Rust |
-| 构建 | `build-app.ps1`、`build-native.ps1` | 其他 clang/zig cmd 是构建适配器 |
+| 构建 | `npm run build:app` | Windows 委托原 PowerShell；Mac 入口、参数和验收边界见 [Mac 构建](../docs/development/mac-build.md) |
 | HAP 警告 | `npm run build:app -- -Clean` | 精确依赖/SDK 基线，项目新警告失败；[范围与维护](../docs/development/verification.md#hap-警告门禁) |
 | 本机签名 | `check-signing.mjs`、`signing-config.ts` | [配置和构建注入](../docs/development/signing.md)，不输出材料值 |
 | HAP 检查 | `inspect-hap.ps1` | 检查已有产物 |
@@ -58,3 +58,6 @@ JIDE PDF/OCR 原生回归：构建并 `install -r` 当前主 HAP 后，`npm run 
 完整协议生成/核对：`node tools/core-protocol.mjs --generate|--check`；真实生产协议联测：`npm run protocol:test-core`。`generate-rpc-index.mjs` 委托统一入口，官方刷新与升级语义差异见 [Core 协议生成](../docs/development/core-protocol.md)。真实 Core 主机测试：`node tools/test-anki-core.mjs`；输入、前提与自托管 HAP 路线见 [验证说明](../docs/development/verification.md)。
 
 按钮反馈审计：`arkui-click-targets.mjs` 提供 ArkUI 点击目标与修饰链解析，`tests/ui-press-feedback.test.mjs` 检查全应用可操作节点统一接入 PressFeedback / GlassSurface / PrimaryGlassSurface，遮罩、事件屏障、Span 文内链接和桌面卡片按明确例外处理。该检查不是设备触摸测试。
+
+
+地区文案、格式、长名称和大字体验收见[地区语言与长文案布局](../docs/development/localization.md)。设备入口为 `node tools/test-locales-device.mjs <connect-key> all`；保留数据覆盖安装，输出矩阵与截图，不以构建通过代替显示验收。双端笔记引用的协议、电脑离屏测试、浏览器排版与打包入口见 [note-links.md](../docs/development/note-links.md)。

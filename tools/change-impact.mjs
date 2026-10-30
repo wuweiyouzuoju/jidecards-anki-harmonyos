@@ -16,6 +16,7 @@ const documentationCheck = 'node --test tools/tests/documentation-contract.test.
 const resourceCheck = 'node --test tools/tests/i18n-contract.test.mjs';
 const cosmeticPath = /^(docs\/|\.agents\/|[^/]+\.md$|entry\/src\/main\/resources\/[^/]+\/(?:element\/(?:string|color)\.json$|media\/[^/]+\.(?:svg|png|jpe?g|webp)$))/i;
 export const PATH_RULES = [
+  { id: 'note-links', match: /^(?:desktop\/anki-note-links\/|entry\/src\/main\/ets\/(?:components\/links\/|model\/NoteLink|backend\/NoteLinks))/, reads: [doc('note-links')], suites: ['browser', 'study', 'agent'], mode: 'focused', device: true },
   { id: 'docs', match: /^(docs\/|\.agents\/)|\.md$/i,
     reads: [rule('docs')], suites: [], mode: 'focused' },
   { id: 'tools', match: /^(tools\/|\.github\/|package(?:-lock)?\.json$|\.git(?:ignore|attributes)$)/,
