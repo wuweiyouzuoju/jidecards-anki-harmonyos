@@ -3,7 +3,8 @@ import { isSettingsItemVisible } from '../../model/SettingsStructure';
 import { settingsItemText } from '../../utils/SettingsStructureText';
 import { DataActionRow } from './DataActionRow';
 import { settingsIcon } from '../../utils/SettingsIcons';
-import { SurfaceBorder } from '../../utils/SurfaceBorder';
+import { SeriesVisual } from '../../utils/SeriesVisual';
+import { 颜色键 } from '../../model/颜色主题';
 
 import { 设置面板色板_取 } from '../../utils/设置面板配色';
 import { 应用尺寸 } from '../../utils/应用尺寸';
@@ -11,6 +12,9 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 // 数据操作按任务分流；备份入口汇集整库文件和自动历史备份。
 @Component
 export struct 数据分组 {
+  @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
+  @StorageProp(颜色键.动作主色) private actionColor: string = '#2F5FD0';
+  @StorageProp(颜色键.页面底色微染) private pageTint: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop 是否深色: boolean = false;
   点击导入回调: () => void = (): void => {};
@@ -93,7 +97,6 @@ export struct 数据分组 {
     }
     .width('100%')
     .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距, top: 8, bottom: 8 })
-    .backgroundColor(设置面板色板_取(this.是否深色).背景)
-    .border(SurfaceBorder.options()).borderRadius(16)
+    .attributeModifier(SeriesVisual.settingsSurface(this.surfaceMaterial, this.是否深色, this.actionColor, this.pageTint, 应用尺寸.圆角_卡片))
   }
 }

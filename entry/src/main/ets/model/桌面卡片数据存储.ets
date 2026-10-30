@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SUMMARY_LABEL_KEYS } from './SummaryLabels';
 
 // ========================================================
 // @块ID MODEL-WIDGET-DATA-001
@@ -123,8 +124,9 @@ export interface 桌面卡片数据 {
   未来到期: [number, number][];
   // 元信息
   更新时间: number;         // 毫秒时间戳
-  // 系统语言（卡片沙箱不支持 i18n API，主进程注入）：'zh' 或 'en'
+  // BCP 47 应用语言；卡片沙箱使用宿主注入的文字。
   语言: string;
+  localizedStrings?: Record<string, string>;
   // 主题色（卡片沙箱无法访问 AppStorage，主进程序列化传入）
   主题色: 主题色载体;
 }
@@ -391,6 +393,8 @@ function 读取主题色(): 主题色载体 {
 export async function 保存卡片数据(数据: 桌面卡片数据): Promise<void> {
   const context: common.UIAbilityContext | null = 取上下文();
   if (context === null) throw new Error('widget_storage_unavailable');
+  数据.localizedStrings = localizedWidgetLabels(context);
+  数据.语言 = 读取系统语言();
   const path: string = `${context.getApplicationContext().filesDir}/${数据文件名}`;
   const temporary: string = path + '.tmp';
   try {
@@ -407,6 +411,15 @@ export async function 保存卡片数据(数据: 桌面卡片数据): Promise<vo
     throw new Error(error instanceof Error ? error.message : String(error));
   }
   await 推送到所有卡片(数据);
+}
+
+/** 首帧空态和已保存统计共用资源入口。
+ * @throws {Error} 缺失资源交给宿主报告，不能把半份文字快照标记为成功。
+ */
+export function localizedWidgetLabels(context: common.Context): Record<string, string> {
+  const labels: Record<string, string> = {};
+  for (const key of SUMMARY_LABEL_KEYS) labels[key] = context.resourceManager.getStringByNameSync(key);
+  return labels;
 }
 
 // ========================================================

@@ -1,5 +1,7 @@
-import { SurfaceTransition } from '../../utils/SurfaceTransition';
+import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { GlassPanel } from '../common/GlassPanel';
+import { SurfaceTransition } from '../../utils/SurfaceTransition';
 import type { AppInterfaceControl } from '../../model/AppInterface';
 import { appInterface } from '../../backend/AppInterfaceService';
 import { DataActionRow } from './DataActionRow';
@@ -46,6 +48,8 @@ import { MediaMaintenanceSession, MediaMaintenanceState } from '../../model/sett
 
 @Component
 export struct 媒体管理面板 {
+  @State private surfaceWidth: string = '88%';
+  @State private surfaceMaximumWidth: number = 480;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
 
@@ -154,17 +158,19 @@ export struct 媒体管理面板 {
     const revision: number = this.reportRevision;
     let settled: boolean = false;
     this.getUIContext().showAlertDialog({ title: this.取本地化文本($r('app.string.media_tag_missing')),
-      message: this.取本地化文本($r('app.string.media_tag_missing_confirm')), autoCancel: true,
-      cancel: (): void => { settled = true; },
-      primaryButton: { value: this.取本地化文本($r('app.string.cancel')), action: (): void => { settled = true; } },
-      secondaryButton: { value: this.取本地化文本($r('app.string.browser_detail_confirm')),
-        action: (): void => {
-          if (settled) return;
-          settled = true;
-          if (this.visible && !this.检查中 && !this.处理中 && this.已检查 && revision === this.reportRevision) {
-            this.maintenance.tagMissing();
-          }
-        } } });
+        message: this.取本地化文本($r('app.string.media_tag_missing_confirm')), autoCancel: true,
+        cancel: (): void => { settled = true; }, buttons: [
+            { value: this.取本地化文本($r('app.string.cancel')), action: (): void => { settled = true; } },
+            { value: this.取本地化文本($r('app.string.browser_detail_confirm')),
+                action: (): void => {
+                    if (settled)
+                        return;
+                    settled = true;
+                    if (this.visible && !this.检查中 && !this.处理中 && this.已检查 && revision === this.reportRevision) {
+                        this.maintenance.tagMissing();
+                    }
+                } }
+        ], buttonDirection: DialogButtonDirection.AUTO });
   }
 
   private async 执行检查媒体(): Promise<void> {
@@ -182,26 +188,30 @@ export struct 媒体管理面板 {
     const revision: number = this.reportRevision;
     let settled: boolean = false;
     this.getUIContext().showAlertDialog({
-      title: this.取本地化文本($r('app.string.media_empty_trash')),
-      message: this.取本地化文本($r('app.string.media_confirm_empty_trash')),
-      autoCancel: true,
-      cancel: (): void => { settled = true; },
-      alignment: DialogAlignment.Center,
-      primaryButton: {
-        value: this.取本地化文本($r('app.string.cancel')),
-        action: (): void => { settled = true; }
-      },
-      secondaryButton: {
-        value: this.取本地化文本($r('app.string.media_empty_trash')),
-        fontColor: $r('app.color.error_text'),
-        action: (): void => {
-          if (settled) return;
-          settled = true;
-          if (this.visible && !this.检查中 && !this.处理中 && this.回收站有内容 && revision === this.reportRevision) {
-            this.执行清空回收站();
-          }
-        }
-      }
+        title: this.取本地化文本($r('app.string.media_empty_trash')),
+        message: this.取本地化文本($r('app.string.media_confirm_empty_trash')),
+        autoCancel: true,
+        cancel: (): void => { settled = true; },
+        alignment: DialogAlignment.Center,
+        buttons: [
+            {
+                value: this.取本地化文本($r('app.string.cancel')),
+                action: (): void => { settled = true; }
+            },
+            {
+                value: this.取本地化文本($r('app.string.media_empty_trash')),
+                fontColor: $r('app.color.error_text'),
+                action: (): void => {
+                    if (settled)
+                        return;
+                    settled = true;
+                    if (this.visible && !this.检查中 && !this.处理中 && this.回收站有内容 && revision === this.reportRevision) {
+                        this.执行清空回收站();
+                    }
+                }
+            }
+        ],
+        buttonDirection: DialogButtonDirection.AUTO
     });
   }
 
@@ -216,11 +226,15 @@ export struct 媒体管理面板 {
   build() {
     Stack() {
       // 磨砂玻璃遮罩层
-      DialogBackdrop()
+      DialogBackdrop({ widthPercent: 88, maximumWidth: 480,
+          onSize: (width: string, maximumWidth: number): void => {
+            this.surfaceWidth = width; this.surfaceMaximumWidth = maximumWidth;
+          } })
         .onClick(() => { this.handleBackRequest(); })
         .transition(SurfaceTransition.backdrop())
 
-      Column({ space: 应用尺寸.间距_16 }) {
+      GlassPanel({ radius: 应用尺寸.圆角_卡片, panelWidth: this.surfaceWidth, maximumWidth: this.surfaceMaximumWidth, maximumHeight: '88%' }) {
+Column({ space: 应用尺寸.间距_16 }) {
         // 固定标题操作栏
         DialogHeader({
           title: $r('app.string.settings_media_management'),
@@ -314,7 +328,7 @@ export struct 媒体管理面板 {
                   .fontSize(14)
                   .fontColor(this.未使用总数 > 0 && !this.处理中 ?
                     $r('app.color.error_text') : $r('app.color.text_secondary'))
-                  .backgroundColor($r('app.color.surface_card'))
+                  .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
                   .border(SurfaceBorder.options(0.5))
                   .borderRadius(10)
                   .enabled(this.未使用总数 > 0 && !this.检查中 && !this.处理中)
@@ -327,7 +341,7 @@ export struct 媒体管理面板 {
               .width('100%')
               .alignItems(HorizontalAlign.Start)
               .padding(12)
-              .backgroundColor($r('app.color.surface_page'))
+              .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
               .border(SurfaceBorder.options()).borderRadius(12)
 
               // 缺失媒体区
@@ -354,7 +368,7 @@ export struct 媒体管理面板 {
               .width('100%')
               .alignItems(HorizontalAlign.Start)
               .padding(12)
-              .backgroundColor($r('app.color.surface_page'))
+              .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
               .border(SurfaceBorder.options()).borderRadius(12)
 
               // 连续滚动按需追加报告块；分页仅存在于传输边界。
@@ -374,7 +388,7 @@ export struct 媒体管理面板 {
               }
               .width('100%')
               .padding(12)
-              .backgroundColor($r('app.color.surface_page'))
+              .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
               .border(SurfaceBorder.options()).borderRadius(12)
 
               // 回收站状态
@@ -400,7 +414,7 @@ export struct 媒体管理面板 {
                     .fontSize(14)
                     .fontColor(this.回收站有内容 && !this.处理中 ?
                       this.dialogActionColor : $r('app.color.text_secondary'))
-                    .backgroundColor($r('app.color.surface_card'))
+                    .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
                     .border(SurfaceBorder.options(0.5))
                     .borderRadius(10)
                     .enabled(this.回收站有内容 && !this.检查中 && !this.处理中)
@@ -416,7 +430,7 @@ export struct 媒体管理面板 {
                     .fontSize(14)
                     .fontColor(this.回收站有内容 && !this.处理中 ?
                       $r('app.color.error_text') : $r('app.color.text_secondary'))
-                    .backgroundColor($r('app.color.surface_card'))
+                    .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
                     .border(SurfaceBorder.options(0.5))
                     .borderRadius(10)
                     .enabled(this.回收站有内容 && !this.检查中 && !this.处理中)
@@ -429,7 +443,7 @@ export struct 媒体管理面板 {
               }
               .width('100%')
               .padding(12)
-              .backgroundColor($r('app.color.surface_page'))
+              .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
               .border(SurfaceBorder.options()).borderRadius(12)
             }
             .width('100%')
@@ -458,13 +472,14 @@ export struct 媒体管理面板 {
           }
         }
       }
-      .width('88%')
-      .constraintSize({ maxWidth: 480, maxHeight: '88%' })
+      .width('100%')
+       
       .padding(应用尺寸.面板内边距)
-      .backgroundColor($r('app.color.surface_card'))
-      .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
+      
+      
       .onClick(() => {})
-      .transition(SurfaceTransition.dialog())
+      }
+      
     }
     .width('100%')
     .height('100%')

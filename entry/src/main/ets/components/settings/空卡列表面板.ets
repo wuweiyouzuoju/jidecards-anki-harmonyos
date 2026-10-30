@@ -151,20 +151,24 @@ export struct 空卡列表面板 {
     };
     try {
     this.getUIContext().showAlertDialog({
-      title: this.取本地化文本($r('app.string.empty_cards_delete')),
-      message: this.取本地化带参文本($r('app.string.empty_cards_confirm_delete'), [选中数]),
-      autoCancel: true,
-      alignment: DialogAlignment.Center,
-      cancel: (): void => { finish(); },
-      primaryButton: {
-        value: this.取本地化文本($r('app.string.cancel')),
-        action: (): void => { finish(); }
-      },
-      secondaryButton: {
-        value: this.取本地化文本($r('app.string.empty_cards_delete')),
-        fontColor: $r('app.color.error_text'),
-        action: (): void => { if (finish()) this.执行删除(ids); }
-      }
+        title: this.取本地化文本($r('app.string.empty_cards_delete')),
+        message: this.取本地化带参文本($r('app.string.empty_cards_confirm_delete'), [选中数]),
+        autoCancel: true,
+        alignment: DialogAlignment.Center,
+        cancel: (): void => { finish(); },
+        buttons: [
+            {
+                value: this.取本地化文本($r('app.string.cancel')),
+                action: (): void => { finish(); }
+            },
+            {
+                value: this.取本地化文本($r('app.string.empty_cards_delete')),
+                fontColor: $r('app.color.error_text'),
+                action: (): void => { if (finish())
+                    this.执行删除(ids); }
+            }
+        ],
+        buttonDirection: DialogButtonDirection.AUTO
     });
     } catch (error) { finish(); }
   }

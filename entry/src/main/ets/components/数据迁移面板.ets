@@ -1,9 +1,10 @@
+import { insetMaterialFill } from '../utils/GlassMaterial';
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { DirectorySelect } from './common/DirectorySelect';
 import { DirectoryRow, DirectoryView, DirectoryChoice, directoryChoiceRows } from '../model/DirectoryTree';
 import { appInterface } from '../backend/AppInterfaceService';
 import { NativeDialogHost, NativeDialogFactory, NativeDialogDismiss, NativeDialogPresentation } from './common/NativeDialogHost';
 import { SurfaceTransition } from '../utils/SurfaceTransition';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { HelpLabel } from './common/HelpLabel';
 import { 字段帮助对话框 } from './字段帮助面板';
@@ -192,7 +193,7 @@ export struct 数据迁移面板 {
       builder: 字段帮助对话框({ 标题: $r('app.string.transfer_legacy'), 正文: $r('app.string.transfer_legacy_help'),
         onDismiss: this.legacyHelp.guard((): void => { this.legacyHelp.close(); }) }),
       openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation, customStyle: presentation.customStyle, autoCancel: presentation.autoCancel, alignment: presentation.alignment,
-      width: presentation.width, height: presentation.height, maskColor: presentation.maskColor
+      width: presentation.width, height: presentation.height, keyboardAvoidMode: presentation.keyboardAvoidMode, maskColor: presentation.maskColor
     });
   };
 
@@ -431,7 +432,7 @@ export struct 数据迁移面板 {
         }
         .width('100%')
         .padding(应用尺寸.间距_12)
-        .backgroundColor($r('app.color.surface_page'))
+        .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
         .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
       }
 
