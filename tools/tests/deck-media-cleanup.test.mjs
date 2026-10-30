@@ -77,8 +77,8 @@ test('actual home flow waits for separate confirmation and cancellation keeps me
     assert.equal(dialogs.length, 1);
     assert.deepEqual(state.trashed, []);
     assert.match(dialogs[0].message, /1$/);
-    if (confirm) dialogs[0].secondaryButton.action();
-    else dialogs[0].primaryButton.action();
+    if (confirm) dialogs[0].buttons[1].action();
+    else dialogs[0].buttons[0].action();
     await pending;
     assert.deepEqual(state.trashed, confirm ? ['removed.jpg'] : []);
     assert.equal(state.checks, confirm ? 2 : 1);
@@ -98,7 +98,7 @@ test('failed baseline, backgrounding, and failed final check never clear media o
     for (let n = 0; n < 30 && dialogs.length === 0; n++) await Promise.resolve();
     if (mode === 'background') page.syncForeground = false;
     else state.fail = true;
-    dialogs[0].secondaryButton.action();
+    dialogs[0].buttons[1].action();
     await pending;
     assert.deepEqual(state.trashed, []);
     assert.ok(messages.every(message => !message.includes('deck_delete_failed')));

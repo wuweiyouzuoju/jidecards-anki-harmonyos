@@ -69,22 +69,26 @@ export class HomeDeckDeletion {
     };
     try {
     this.host.getUIContext().showAlertDialog({
-      title: title,
-      message: message,
-      autoCancel: false,
-      cancel: (): void => { finish(); },
-      alignment: DialogAlignment.Center,
-      primaryButton: {
-        value: $r('app.string.cancel'),
-        action: (): void => { finish(); }
-      },
-      secondaryButton: {
-        value: $r('app.string.deck_menu_delete'),
-        fontColor: $r('app.color.error_text'),
-        action: (): void => {
-          if (finish() && this.host.isVisible()) this.execute(deckId);
-        }
-      }
+        title: title,
+        message: message,
+        autoCancel: false,
+        cancel: (): void => { finish(); },
+        alignment: DialogAlignment.Center,
+        buttons: [
+            {
+                value: $r('app.string.cancel'),
+                action: (): void => { finish(); }
+            },
+            {
+                value: $r('app.string.deck_menu_delete'),
+                fontColor: $r('app.color.error_text'),
+                action: (): void => {
+                    if (finish() && this.host.isVisible())
+                        this.execute(deckId);
+                }
+            }
+        ],
+        buttonDirection: DialogButtonDirection.AUTO
     });
     } catch (error) { finish(); }
   }
@@ -158,20 +162,23 @@ export class HomeDeckDeletion {
       $r('app.string.deck_media_confirm_message')).replace('%d', count.toString());
     return new Promise<boolean>((resolve): void => {
       this.host.getUIContext().showAlertDialog({
-        title: $r('app.string.deck_media_confirm_title'),
-        message: message,
-        autoCancel: false,
-        alignment: DialogAlignment.Center,
-        cancel: (): void => { resolve(false); },
-        primaryButton: {
-          value: $r('app.string.deck_media_keep'),
-          action: (): void => { resolve(false); }
-        },
-        secondaryButton: {
-          value: $r('app.string.deck_media_remove'),
-          fontColor: $r('app.color.error_text'),
-          action: (): void => { resolve(true); }
-        }
+          title: $r('app.string.deck_media_confirm_title'),
+          message: message,
+          autoCancel: false,
+          alignment: DialogAlignment.Center,
+          cancel: (): void => { resolve(false); },
+          buttons: [
+              {
+                  value: $r('app.string.deck_media_keep'),
+                  action: (): void => { resolve(false); }
+              },
+              {
+                  value: $r('app.string.deck_media_remove'),
+                  fontColor: $r('app.color.error_text'),
+                  action: (): void => { resolve(true); }
+              }
+          ],
+          buttonDirection: DialogButtonDirection.AUTO
       });
     });
   }

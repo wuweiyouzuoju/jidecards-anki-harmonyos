@@ -61,7 +61,7 @@ test('delete entry defers during sync and requires an explicit destructive confi
   page.deferForSync = () => false;
   deferred();
   assert.equal(page.nativeDialogOpen, true);
-  dialogs.at(-1).primaryButton.action();
+  dialogs.at(-1).buttons[0].action();
   assert.equal(page.nativeDialogOpen, false);
   assert.deepEqual(events, []);
   feature.request('parent');
@@ -69,7 +69,7 @@ test('delete entry defers during sync and requires an explicit destructive confi
   assert.equal(page.nativeDialogOpen, false);
   assert.deepEqual(events, []);
   feature.request('parent');
-  dialogs.at(-1).secondaryButton.action();
+  dialogs.at(-1).buttons[1].action();
   assert.equal(page.nativeDialogOpen, false);
   for (let n = 0; n < 30 && page.deckDeletionBusy; n++) await Promise.resolve();
   assert.equal(events.filter(event => event === 'delete committed').length, 1);
@@ -79,9 +79,9 @@ test('delete entry defers during sync and requires an explicit destructive confi
 test('deletion confirmations are single flight, one shot and reject departed hosts',async()=>{
   const h=harness();let visible=true;h.feature.host.isVisible=()=>visible;
   h.feature.request('parent');h.feature.request('parent');assert.equal(h.dialogs.length,1);
-  h.dialogs[0].primaryButton.action();h.dialogs[0].secondaryButton.action();
+  h.dialogs[0].buttons[0].action();h.dialogs[0].buttons[1].action();
   await new Promise(setImmediate);assert.deepEqual(h.events,[]);
-  h.feature.request('parent');visible=false;h.dialogs[1].secondaryButton.action();
+  h.feature.request('parent');visible=false;h.dialogs[1].buttons[1].action();
   await new Promise(setImmediate);assert.deepEqual(h.events,[]);
   h.feature.request('parent');assert.equal(h.dialogs.length,2);
 });
