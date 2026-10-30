@@ -1,8 +1,9 @@
-import { WINDOW_KEYBOARD_TOP_KEY } from '../model/WindowSafeLayout';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { WINDOW_KEYBOARD_TOP_KEY } from '../model/WindowSafeLayout';
 
 import { APP_FOREGROUND_KEY } from '../model/AppLifecycleState';
 import { setStudyPenKitContext, clearStudyPenKitContext } from '../backend/StudyPenKitContext';
+import { resolveAppLocale } from '../model/AppLocales';
 import {
   AbilityConstant,
   common,
@@ -23,6 +24,7 @@ import { 刷新学习提醒 } from '../model/学习提醒服务';
 import { AI_AGENT_CHANNELS_APP_STORAGE_KEY, initializeAiAgentChannels } from '../model/ReleaseFeatures';
 import { initializeCardTextSize } from '../utils/CardTextSizeStore';
 import { initializeDeckListAppearance } from '../utils/DeckListAppearanceStore';
+import { initializeSurfaceMaterial } from '../utils/SurfaceMaterialStore';
 import { initializeMotionStyle } from '../utils/MotionStyleStore';
 import { initializeStudyHaptics } from '../utils/StudyHaptics';
 import { initializeSimpleMode } from '../model/简洁模式存储';
@@ -76,6 +78,7 @@ export default class EntryAbility extends UIAbility {
     initializeSimpleMode();
     initializeCardTextSize();
     initializeDeckListAppearance();
+    initializeSurfaceMaterial();
     initializeMotionStyle();
     initializeStudyHaptics();
     AppStorage.setOrCreate<boolean>(AI_AGENT_CHANNELS_APP_STORAGE_KEY, false);
@@ -86,7 +89,7 @@ export default class EntryAbility extends UIAbility {
     // 存系统语言供纯函数层做本地化（如默认牌组名）
     try {
       const 语言: string = i18n.System.getAppPreferredLanguage();
-      AppStorage.setOrCreate<string>('系统语言', 语言.startsWith('en') ? 'en' : 'zh-Hans');
+      AppStorage.setOrCreate<string>('系统语言', resolveAppLocale(语言));
     } catch (_e) {
       AppStorage.setOrCreate<string>('系统语言', 'zh-Hans');
     }
@@ -134,7 +137,7 @@ export default class EntryAbility extends UIAbility {
     // 应用语言优先，不能让主题通知中的系统 language 覆盖应用偏好。
     try {
       const 语言: string = i18n.System.getAppPreferredLanguage();
-      AppStorage.setOrCreate<string>('系统语言', 语言.startsWith('en') ? 'en' : 'zh-Hans');
+      AppStorage.setOrCreate<string>('系统语言', resolveAppLocale(语言));
     } catch (_e) {
       // 读取失败保留旧值，不阻塞其他配置更新流程
     }
