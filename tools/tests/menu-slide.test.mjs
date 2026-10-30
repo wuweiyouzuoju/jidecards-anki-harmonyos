@@ -55,7 +55,7 @@ test('reactive wrappers share the mounted scope identity for selection and detac
 test('real flat and nested row builders pass the owning scope explicitly across builder boundaries',()=>{
   const read=path=>readFileSync(new URL('../../entry/src/main/ets/'+path,import.meta.url),'utf8');
   const scope=new MenuSlideScope(),selected=[];
-  const list=loadComponentLogic('components/common/ActionMenuList.ets','ActionMenuList');
+  const list=loadComponentLogic('components/common/ActionMenuList.ets','ActionMenuList',{TextAlign:{Center:0,Start:1}});
   const host=Object.assign(new list(),{slideScope:scope,items:[{id:'leaf',label:'Leaf'}],onSelect:id=>selected.push(id)});
   const options=read('components/common/ActionMenuList.ets').match(/AnchoredMenuItem\((\{[\s\S]*?\})\)/)[1];
   const props=new Function('item','index',stripTypeScriptTypes('const props='+options+';', {mode:'transform'})+'return props;').call(host,host.items[0],0);
@@ -64,7 +64,7 @@ test('real flat and nested row builders pass the owning scope explicitly across 
   const source=read('components/common/CardActionMenu.ets'),start=source.indexOf('  private menuRow(');
   const method=source.slice(start,source.indexOf('\n  }',start)+4);let rowProps;
   const Rows=new Function('AnchoredMenuItem','TextAlign',stripTypeScriptTypes('class Rows {'+method+'};', {mode:'transform'})+'return Rows;')(props=>rowProps=props,{Start:0});
-  const rows=Object.assign(new Rows(),{slideScope:scope,expandedIds:[],rowItem:()=>({value:'Leaf'}),selectEntry:row=>selected.push(row.node.id)});
+  const rows=Object.assign(new Rows(),{slideScope:scope,expandedIds:[],rowItem:()=>({value:'Leaf'}),groupsOnRight:()=>false,selectEntry:row=>selected.push(row.node.id)});
   rows.menuRow({depth:1,enabled:true,node:{id:'child'}},0);
   assert.equal(rowProps.slideScope,scope);assert.equal(rowProps.slideLayer,1);rowProps.onSelect();assert.deepEqual(selected,['leaf','child']);
 });
@@ -82,4 +82,18 @@ test('toolbar preserves ordinary click, suppresses post-hold click and cancels a
   touch(0);touch(2,[]);button.activate();assert.equal(clicks,1);
   touch(0);button.holdOpen();assert.equal(opens,1);touch(2,[]);button.activate();assert.equal(clicks,1);assert.equal(closes,1);
   touch(0);button.holdOpen();touch(1,[{},{}]);button.activate();assert.equal(clicks,1);assert.equal(closes,2);assert.equal(interval,null);
+});
+
+test('preview hold can keep the menu open at the trigger while sliding away still cancels or selects',()=>{
+  for(const [x,y,expected] of [[20,20,0],[28,24,0],[100,20,1]]) {
+    const session=new MenuSlideSession();let closes=0;
+    const hold=new MenuHoldController(()=>true,()=>{},()=>closes++,session,{now:()=>0,repeat:()=>1,stop:()=>{}});
+    hold.down(1,20,20);hold.hold();hold.up(1,x,y,true);
+    assert.equal(closes,expected);assert.equal(session.isActive(),false);assert.equal(hold.consumeClick(),false);
+  }
+  const h=harness();let opens=0;
+  h.session.register(h.target(80));
+  const hold=new MenuHoldController(()=>true,()=>opens++,()=>{},h.session,{now:()=>0,repeat:()=>1,stop:()=>{}});
+  hold.down(1,20,20);hold.hold();hold.up(1,50,100,true);
+  assert.equal(opens,1);assert.ok(h.events.some(e=>e[0]==='select'));
 });

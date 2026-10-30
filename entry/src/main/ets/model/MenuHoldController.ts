@@ -12,6 +12,8 @@ export class MenuHoldController {
   private pointer: number = -1;
   private x: number = 0;
   private y: number = 0;
+  private originX: number = 0;
+  private originY: number = 0;
   private timer: number = -1;
   private suppressed: boolean = false;
   constructor(private readonly enabled: () => boolean, private readonly open: () => void,
@@ -22,7 +24,7 @@ export class MenuHoldController {
     }) {}
   down(id: number, x: number, y: number): void {
     this.cancel();
-    this.suppressed = false; this.pointer = id; this.x = x; this.y = y;
+    this.suppressed = false; this.pointer = id; this.x = x; this.y = y; this.originX = x; this.originY = y;
   }
   hold(): void {
     if (!this.enabled() || this.pointer < 0 || this.timer >= 0) return;
@@ -36,12 +38,14 @@ export class MenuHoldController {
     this.x = x; this.y = y;
     if (this.timer >= 0) this.session.move(x, y, this.clock.now());
   }
-  up(id: number, x: number, y: number): void {
+  up(id: number, x: number, y: number, keepMenuOnHoldRelease: boolean = false): void {
     if (id !== this.pointer) return;
     this.move(id, x, y);
     if (this.timer >= 0) {
       this.clock.stop(this.timer); this.timer = -1;
-      if (this.enabled()) this.session.finish(); else this.session.cancel();
+      // 原地松手可留住预览菜单；划离入口仍沿原取消和选择规则。
+      if (this.enabled()) this.session.finish(keepMenuOnHoldRelease &&
+        Math.hypot(x - this.originX, y - this.originY) <= 12); else this.session.cancel();
     }
     this.pointer = -1;
   }

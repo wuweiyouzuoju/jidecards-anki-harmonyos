@@ -79,12 +79,12 @@ export class MenuSlideSession {
       this.entered = target; target.enter();
     }
   }
-  finish(): void {
+  finish(keepOpenIfUnselected: boolean = false): void {
     if (!this.active) return;
     const target: MenuSlideTarget | null = this.hovered;
     const usable: boolean = target !== null && target.available() && !this.edgeScrolling;
     this.active = false; this.setHovered(null, 0);
-    if (usable && target !== null) target.select(); else this.onCancel();
+    if (usable && target !== null) target.select(); else if (!keepOpenIfUnselected) this.onCancel();
   }
   cancel(): void {
     const active: boolean = this.active;
