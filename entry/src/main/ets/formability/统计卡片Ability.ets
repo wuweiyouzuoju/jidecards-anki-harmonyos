@@ -28,9 +28,9 @@
 // ========================================================
 
 import { FormExtensionAbility, formBindingData, formProvider } from '@kit.FormKit';
-import { Want } from '@kit.AbilityKit';
+import { Want, common } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
-import { 加载卡片数据, 保存formId带上下文, 桌面卡片数据 } from '../model/桌面卡片数据存储';
+import { 加载卡片数据, 保存formId带上下文, 桌面卡片数据, localizedWidgetLabels } from '../model/桌面卡片数据存储';
 
 const 日志域: string = 'StatsFormAbility';
 const 卡片绑定键: string = 'statsCardData';
@@ -44,10 +44,12 @@ interface 卡片绑定载体 {
 // 空态对象：仅含 hasData=false 标志，卡片 UI 显示"暂无数据"
 interface 卡片空态标志 {
   hasData: boolean;
+  localizedStrings: Record<string, string>;
 }
 
-function 构造空态JSON(): string {
-  const 空态: 卡片空态标志 = { hasData: false };
+/** @throws {Error} 首帧资源读取失败由平台生命周期报告，不返回缺少文字的成功快照。 */
+function 构造空态JSON(context: common.Context): string {
+  const 空态: 卡片空态标志 = { hasData: false, localizedStrings: localizedWidgetLabels(context) };
   return JSON.stringify(空态);
 }
 
@@ -57,6 +59,7 @@ export default class 统计卡片Ability extends FormExtensionAbility {
   // @作用 用户添加卡片到桌面时同步返回初始数据，渲染首帧
   //       同时把 formId 写入 filesDir，供主进程主动推送
   // ========================================================
+  /** @throws {Error} 首帧资源读取或绑定失败交给平台报告。 */
   onAddForm(want: Want): formBindingData.FormBindingData {
     hilog.info(0x0000, 日志域, 'onAddForm: 添加统计卡片');
     // 提取 formId 并保存（供主进程主动推送）
@@ -67,7 +70,7 @@ export default class 统计卡片Ability extends FormExtensionAbility {
       this.推送卡片数据(formId).catch((): void => {});
     }
     // 同步返回空数据占位，异步更新实际数据
-    const 空数据: 卡片绑定载体 = { 'statsCardData': 构造空态JSON() };
+    const 空数据: 卡片绑定载体 = { 'statsCardData': 构造空态JSON(this.context) };
     return formBindingData.createFormBindingData(空数据);
   }
 
@@ -114,12 +117,13 @@ export default class 统计卡片Ability extends FormExtensionAbility {
       const 数据: 桌面卡片数据 | null = await 加载卡片数据(this.context);
       if (数据 === null) {
         // 无数据：推送空态
-        const 空态: 卡片绑定载体 = { 'statsCardData': 构造空态JSON() };
+        const 空态: 卡片绑定载体 = { 'statsCardData': 构造空态JSON(this.context) };
         await formProvider.updateForm(formId, formBindingData.createFormBindingData(空态));
         return;
       }
       // 有数据：整对象 JSON.stringify 塞到单键 'statsCardData'
       // 卡片 UI 用 @LocalStorageProp('statsCardData') 接字符串后 JSON.parse
+      数据.localizedStrings = localizedWidgetLabels(this.context);
       const 绑定数据: 卡片绑定载体 = { 'statsCardData': JSON.stringify(数据) };
       await formProvider.updateForm(formId, formBindingData.createFormBindingData(绑定数据));
     } catch (错误) {

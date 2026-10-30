@@ -91,7 +91,8 @@ interface 卡片数据 {
   未来到期: [number, number][];
   更新时间: number;
   主题色: 主题色;
-  语言: string; // 'zh-Hans' 或 'en'
+  语言: string;
+  localizedStrings?: Record<string, string>;
 }
 
 function 空卡片状态(): 卡片状态数据 {
@@ -157,9 +158,9 @@ struct 统计卡片 {
     this.数据更新();
   }
 
-  // 本地化文案：数据中语言为 en 时返回英，否则返回中
-  private t(中: string, 英: string): string {
-    return this.数据.语言.startsWith('en') ? 英 : 中;
+  // 主进程按应用语言注入文字，卡片沙箱不另做中英回退。
+  private t(key: string): string {
+    return this.数据.localizedStrings?.[key] ?? '';
   }
 
   // ========================================================
@@ -183,6 +184,7 @@ struct 统计卡片 {
         if (!标志) {
           // 空态
           this.数据 = 空卡片数据();
+          this.数据.localizedStrings = obj.localizedStrings as Record<string, string>;
           return;
         }
       }
@@ -216,6 +218,7 @@ struct 统计卡片 {
         未来到期: obj.未来到期 as [number, number][] ?? [],
         更新时间: obj.更新时间 as number ?? 0,
         主题色: 主题,
+        localizedStrings: obj.localizedStrings as Record<string, string>,
         语言: (obj.语言 as string) ?? 'zh-Hans'
       };
     } catch (e) {
@@ -244,7 +247,7 @@ struct 统计卡片 {
     const 时: number = 日期.getHours();
     const 分: number = 日期.getMinutes();
     const 补零: (n: number) => string = (n: number): string => n < 10 ? `0${n}` : `${n}`;
-    return `${this.t('更新于', 'Updated')} ${补零(时)}:${补零(分)}`;
+    return `${this.t('summary_updated')} ${补零(时)}:${补零(分)}`;
   }
 
   // ========================================================
@@ -256,11 +259,11 @@ struct 统计卡片 {
       // 标题行：左 Column(标题 + "X 已完成 · Y 待学") + 右 Text("Z 牌组")
       Row() {
         Column({ space: 2 }) {
-          Text(this.t('今日进度', 'Today'))
+          Text(this.t('summary_today_27'))
             .fontSize(应用尺寸.字号_摘要标题)
             .fontWeight(FontWeight.Bold)
             .fontColor(this.数据.主题色.文字主)
-          Text(`${this.数据.今日完成数} ${this.t('已完成', 'done')} · ${this.数据.待学数} ${this.t('待学', 'to do')}`)
+          Text(`${this.数据.今日完成数} ${this.t('summary_done')} · ${this.数据.待学数} ${this.t('summary_to_do')}`)
             .fontSize(应用尺寸.字号_正文_中)
             .fontColor(this.数据.主题色.文字次)
         }
@@ -268,7 +271,7 @@ struct 统计卡片 {
         .layoutWeight(1)
 
         if (this.数据.牌组数 > 0) {
-          Text(`${this.数据.牌组数} ${this.t('牌组', 'decks')}`)
+          Text(`${this.数据.牌组数} ${this.t('summary_decks')}`)
             .fontSize(应用尺寸.字号_正文_中)
             .fontColor(this.数据.主题色.文字次)
         }
@@ -290,14 +293,14 @@ struct 统计卡片 {
             .borderRadius(2)
 
           Row({ space: 6 }) {
-            this.计数格(this.t('已完成', 'Done'), this.数据.今日完成数, this.数据.主题色.主色按钮背景, 应用尺寸.字号_指标, 应用尺寸.字号_正文_小)
-            this.计数格(this.t('待学', 'To Do'), this.数据.待学数, '#B56A22', 应用尺寸.字号_指标, 应用尺寸.字号_正文_小)
+            this.计数格(this.t('summary_done_31'), this.数据.今日完成数, this.数据.主题色.主色按钮背景, 应用尺寸.字号_指标, 应用尺寸.字号_正文_小)
+            this.计数格(this.t('summary_to_do_32'), this.数据.待学数, '#B56A22', 应用尺寸.字号_指标, 应用尺寸.字号_正文_小)
             Column({ space: 1 }) {
               Text(this.答对率显示())
                 .fontSize(应用尺寸.字号_指标)
                 .fontWeight(FontWeight.Bold)
                 .fontColor(this.数据.主题色.主色文字)
-              Text(this.t('今日评分通过率', 'Rating pass rate'))
+              Text(this.t('summary_rating_pass_rate'))
                 .fontSize(应用尺寸.字号_正文_小)
                 .fontColor(this.数据.主题色.文字次)
             }
@@ -311,7 +314,7 @@ struct 统计卡片 {
         .justifyContent(FlexAlign.Center)
       } else {
         Column() {
-          Text(this.t('暂无数据', 'No data'))
+          Text(this.t('summary_no_data'))
             .fontSize(11)
             .fontColor(this.数据.主题色.文字次)
         }
@@ -348,7 +351,7 @@ struct 统计卡片 {
   记忆率页() {
     Column({ space: 4 }) {
       Row() {
-        Text(this.t('可回忆率', 'Retrievability'))
+        Text(this.t('summary_retrievability'))
           .fontSize(13)
           .fontWeight(FontWeight.Medium)
           .fontColor(this.数据.主题色.文字主)
@@ -371,7 +374,7 @@ struct 统计卡片 {
                 .fontSize(22)
                 .fontWeight(FontWeight.Bold)
                 .fontColor(this.数据.主题色.文字主)
-              Text(this.t('平均可回忆率', 'Avg retrievability'))
+              Text(this.t('summary_avg_retrievability'))
                 .fontSize(10)
                 .fontColor(this.数据.主题色.文字次)
             }
@@ -385,10 +388,10 @@ struct 统计卡片 {
         .alignItems(HorizontalAlign.Center)
       } else if (this.数据.hasData && !this.数据.fsrs已启用) {
         Column() {
-          Text(this.t('未启用 FSRS', 'FSRS not enabled'))
+          Text(this.t('summary_fsrs_not_enabled'))
             .fontSize(15)
             .fontColor(this.数据.主题色.文字主)
-          Text(this.t('在牌组设置→高级设置中开启 FSRS', 'Enable FSRS in Deck settings > Advanced'))
+          Text(this.t('summary_enable_fsrs_in_deck_settings_advanced'))
             .fontSize(11)
             .fontColor(this.数据.主题色.文字次)
             .margin({ top: 3 })
@@ -398,7 +401,7 @@ struct 统计卡片 {
         .justifyContent(FlexAlign.Center)
       } else {
         Column() {
-          Text(this.t('暂无数据', 'No data'))
+          Text(this.t('summary_no_data'))
             .fontSize(13)
             .fontColor(this.数据.主题色.文字次)
         }
@@ -418,7 +421,7 @@ struct 统计卡片 {
   今日计数页() {
     Column({ space: 4 }) {
       Row() {
-        Text(this.t('今日', 'Today'))
+        Text(this.t('summary_today'))
           .fontSize(13)
           .fontWeight(FontWeight.Medium)
           .fontColor(this.数据.主题色.文字主)
@@ -432,20 +435,20 @@ struct 统计卡片 {
       if (this.数据.hasData) {
         Column({ space: 4 }) {
           Row({ space: 6 }) {
-            this.计数格(this.t('答题', 'Answered'), this.数据.今日答题数, this.数据.主题色.主色按钮背景)
-            this.计数格(this.t('评分通过', 'Passed'), this.数据.今日正确数, '#238463')
+            this.计数格(this.t('summary_answered'), this.数据.今日答题数, this.数据.主题色.主色按钮背景)
+            this.计数格(this.t('summary_passed'), this.数据.今日正确数, '#238463')
           }
           .width('100%')
 
           Row({ space: 6 }) {
-            this.计数格(this.t('学习', 'Learning'), this.数据.今日新学数, this.数据.主题色.主色文字)
-            this.计数格(this.t('复习', 'Review'), this.数据.今日复习数, this.数据.主题色.主色容器)
-            this.计数格(this.t('重学', 'Relearn'), this.数据.今日重学数, '#B34C00')
+            this.计数格(this.t('summary_learning'), this.数据.今日新学数, this.数据.主题色.主色文字)
+            this.计数格(this.t('summary_review'), this.数据.今日复习数, this.数据.主题色.主色容器)
+            this.计数格(this.t('summary_relearn'), this.数据.今日重学数, '#B34C00')
           }
           .width('100%')
 
           if (this.数据.今日答题数 > 0) {
-            Text(`${this.t('评分通过率', 'Rating pass rate')} ${Math.round(this.数据.今日正确数 / this.数据.今日答题数 * 100)}%`)
+            Text(`${this.t('summary_rating_pass_rate_38')} ${Math.round(this.数据.今日正确数 / this.数据.今日答题数 * 100)}%`)
               .fontSize(11)
               .fontColor(this.数据.主题色.文字主)
               .width('100%')
@@ -457,7 +460,7 @@ struct 统计卡片 {
         .justifyContent(FlexAlign.Center)
       } else {
         Column() {
-          Text(this.t('暂无数据', 'No data'))
+          Text(this.t('summary_no_data'))
             .fontSize(13)
             .fontColor(this.数据.主题色.文字次)
         }
@@ -492,7 +495,7 @@ struct 统计卡片 {
   卡片状态页() {
     Column({ space: 4 }) {
       Row() {
-        Text(this.t('卡片数量', 'Card States'))
+        Text(this.t('summary_card_states'))
           .fontSize(13)
           .fontWeight(FontWeight.Medium)
           .fontColor(this.数据.主题色.文字主)
@@ -507,22 +510,22 @@ struct 统计卡片 {
         Column({ space: 4 }) {
           // 系列色对齐 Anki schemeBlues/Oranges/Reds/Greens（与统计页卡片数量图、首页摘要卡一致）
           Row({ space: 4 }) {
-            this.状态格(this.t('未学习', 'New'), this.数据.卡片状态.新卡, 色卡片_新卡)
-            this.状态格(this.t('学习中', 'Learn'), this.数据.卡片状态.学习中, 色卡片_学习中)
-            this.状态格(this.t('重学中', 'Relearn'), this.数据.卡片状态.重学中, 色卡片_重学中)
-            this.状态格(this.t('欠熟练', 'Young'), this.数据.卡片状态.年轻, 色卡片_年轻)
+            this.状态格(this.t('summary_new'), this.数据.卡片状态.新卡, 色卡片_新卡)
+            this.状态格(this.t('summary_learn'), this.数据.卡片状态.学习中, 色卡片_学习中)
+            this.状态格(this.t('summary_relearn_13'), this.数据.卡片状态.重学中, 色卡片_重学中)
+            this.状态格(this.t('summary_young'), this.数据.卡片状态.年轻, 色卡片_年轻)
           }
           .width('100%')
 
           Row({ space: 4 }) {
-            this.状态格(this.t('已熟练', 'Mature'), this.数据.卡片状态.成熟, 色卡片_成熟)
-            this.状态格(this.t('已暂停', 'Suspended'), this.数据.卡片状态.暂停, 色卡片_已暂停)
-            this.状态格(this.t('今日跳过', 'Buried for today'), this.数据.卡片状态.埋藏, 色卡片_已埋藏)
+            this.状态格(this.t('summary_mature'), this.数据.卡片状态.成熟, 色卡片_成熟)
+            this.状态格(this.t('summary_suspended'), this.数据.卡片状态.暂停, 色卡片_已暂停)
+            this.状态格(this.t('summary_buried_for_today'), this.数据.卡片状态.埋藏, 色卡片_已埋藏)
           }
           .width('100%')
 
           // 总计
-          Text(`${this.t('总计', 'Total')} ${this.卡片总数()} ${this.t('张', 'cards')}`)
+          Text(`${this.t('summary_total')} ${this.卡片总数()} ${this.t('summary_cards')}`)
             .fontSize(11)
             .fontColor(this.数据.主题色.文字主)
             .width('100%')
@@ -533,7 +536,7 @@ struct 统计卡片 {
         .justifyContent(FlexAlign.Center)
       } else {
         Column() {
-          Text(this.t('暂无数据', 'No data'))
+          Text(this.t('summary_no_data'))
             .fontSize(13)
             .fontColor(this.数据.主题色.文字次)
         }
@@ -571,10 +574,10 @@ struct 统计卡片 {
   // ========================================================
   private 小时分布窗口标签(): string {
     switch (this.数据.小时分布窗口) {
-      case 1: return this.t('逐小时分析（近3月）', 'Hourly (3M)');
-    case 2: return this.t('逐小时分析（近1年）', 'Hourly (1Y)');
-    case 3: return this.t('逐小时分析（全部）', 'Hourly (All)');
-    default: return this.t('逐小时分析（近1月）', 'Hourly (1M)');
+      case 1: return this.t('summary_hourly_3m');
+    case 2: return this.t('summary_hourly_1y');
+    case 3: return this.t('summary_hourly_all');
+    default: return this.t('summary_hourly_1m');
     }
   }
 
@@ -602,7 +605,7 @@ struct 统计卡片 {
         .justifyContent(FlexAlign.End)
       } else {
         Column() {
-          Text(this.t('暂无数据', 'No data'))
+          Text(this.t('summary_no_data'))
             .fontSize(13)
             .fontColor(this.数据.主题色.文字次)
         }
@@ -687,7 +690,7 @@ struct 统计卡片 {
   难度分布页() {
     Column({ space: 4 }) {
       Row() {
-        Text(this.t('卡片易度 / 难度', 'Card ease / difficulty'))
+        Text(this.t('summary_card_ease_difficulty'))
           .fontSize(13)
           .fontWeight(FontWeight.Medium)
           .fontColor(this.数据.主题色.文字主)
@@ -700,7 +703,7 @@ struct 统计卡片 {
 
       if (this.数据.hasData && this.数据.难度分布.桶.length > 0) {
         Column({ space: 2 }) {
-          Text(`${this.t('平均值', 'Average')} ${this.数据.难度分布.平均.toFixed(0)}%`)
+          Text(`${this.t('summary_average')} ${this.数据.难度分布.平均.toFixed(0)}%`)
             .fontSize(11)
             .fontColor(this.数据.主题色.文字主)
             .width('100%')
@@ -713,7 +716,7 @@ struct 统计卡片 {
         .justifyContent(FlexAlign.End)
       } else if (this.数据.hasData) {
         Column() {
-          Text(this.t('暂无易度或难度数据', 'No ease or difficulty data'))
+          Text(this.t('summary_no_ease_or_difficulty_data'))
             .fontSize(13)
             .fontColor(this.数据.主题色.文字次)
         }
@@ -721,7 +724,7 @@ struct 统计卡片 {
         .justifyContent(FlexAlign.Center)
       } else {
         Column() {
-          Text(this.t('暂无数据', 'No data'))
+          Text(this.t('summary_no_data'))
             .fontSize(13)
             .fontColor(this.数据.主题色.文字次)
         }
@@ -834,7 +837,7 @@ struct 统计卡片 {
   间隔分布页() {
     Column({ space: 4 }) {
       Row() {
-        Text(this.t('复习间隔', 'Review Intervals'))
+        Text(this.t('summary_review_intervals'))
           .fontSize(13)
           .fontWeight(FontWeight.Medium)
           .fontColor(this.数据.主题色.文字主)
@@ -866,7 +869,7 @@ struct 统计卡片 {
         .justifyContent(FlexAlign.End)
       } else if (this.数据.hasData) {
         Column() {
-          Text(this.t('暂无间隔数据', 'No interval data'))
+          Text(this.t('summary_no_interval_data'))
             .fontSize(13)
             .fontColor(this.数据.主题色.文字次)
         }
@@ -874,7 +877,7 @@ struct 统计卡片 {
         .justifyContent(FlexAlign.Center)
       } else {
         Column() {
-          Text(this.t('暂无数据', 'No data'))
+          Text(this.t('summary_no_data'))
             .fontSize(13)
             .fontColor(this.数据.主题色.文字次)
         }
@@ -927,7 +930,7 @@ struct 统计卡片 {
   预测页() {
     Column({ space: 4 }) {
       Row() {
-        Text(this.t('预测', 'Future Due'))
+        Text(this.t('summary_future_due'))
           .fontSize(13)
           .fontWeight(FontWeight.Medium)
           .fontColor(this.数据.主题色.文字主)
@@ -947,7 +950,7 @@ struct 统计卡片 {
         .justifyContent(FlexAlign.End)
       } else {
         Column() {
-          Text(this.t('暂无数据', 'No data'))
+          Text(this.t('summary_no_data'))
             .fontSize(13)
             .fontColor(this.数据.主题色.文字次)
         }
@@ -992,7 +995,7 @@ struct 统计卡片 {
 
       // 天数刻度：独立成行，今/+15/+29，不与柱子混排
       Row() {
-        Text(this.t('今', 'Now'))
+        Text(this.t('summary_now'))
           .fontSize(9)
           .fontColor(this.数据.主题色.文字次)
           .layoutWeight(1)
