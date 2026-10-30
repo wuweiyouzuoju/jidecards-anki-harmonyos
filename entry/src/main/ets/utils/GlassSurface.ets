@@ -1,4 +1,6 @@
+import { SeriesVisual } from './SeriesVisual';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { translucentGlassFill, usesGlassMaterial, darkMaterial } from './GlassMaterial';
 import { PressFeedback } from './PressFeedback';
 import { SurfaceBorder } from './SurfaceBorder';
 import { themePressGradient } from './ThemeVisuals';
@@ -9,9 +11,12 @@ export class GlassSurface extends PressFeedback {
   private background: ResourceColor;
   private outline: BorderOptions;
 
-  constructor(colors: string[], background: ResourceColor = $r('app.color.surface_card'),
+  private material: string;
+
+  constructor(material: string, colors: string[], background: ResourceColor = $r('app.color.surface_card'),
     outline: BorderOptions = SurfaceBorder.options()) {
     super();
+    this.material = material;
     this.colors = colors;
     this.background = background;
     this.outline = outline;
@@ -33,8 +38,17 @@ export class GlassSurface extends PressFeedback {
   }
 
   private applySurface(instance: CommonAttribute, pressed: boolean): void {
-    instance.backgroundColor(this.background)
-      .linearGradient({ angle: 110, colors: themePressGradient(this.colors, pressed) })
+    if (!usesGlassMaterial(this.material)) {
+      instance.backgroundColor(darkMaterial() ? '#000000' : '#FFFFFF').backgroundBlurStyle(BlurStyle.NONE).backdropBlur(0)
+        .linearGradient({angle:0,colors:[[Color.Transparent,0],[Color.Transparent,1]]})
+        .shadow({radius:0,color:Color.Transparent,offsetX:0,offsetY:0}).border(SurfaceBorder.options());
+      return;
+    }
+
+    instance.backgroundColor(translucentGlassFill(this.background))
+      .backgroundBlurStyle(BlurStyle.NONE).backdropBlur(24)
+      .linearGradient({ angle: 110, colors: darkMaterial() ? [['#04FFFFFF',0],['#00FFFFFF',1]] : themePressGradient(this.colors, pressed) })
+      .shadow(SeriesVisual.shadow(this.material, darkMaterial()))
       .border(this.outline);
   }
 }
