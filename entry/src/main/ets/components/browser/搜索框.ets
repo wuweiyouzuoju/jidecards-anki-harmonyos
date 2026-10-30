@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SearchFieldSurface } from '../../utils/SearchFieldSurface';
+import { SeriesVisual } from '../../utils/SeriesVisual';
 
 /** 搜索输入独占一行；仅持有未提交的本地输入，模式选择由浏览页负责。 */
 import { 应用尺寸 } from '../../utils/应用尺寸';
@@ -6,6 +8,9 @@ import { SurfaceBorder } from '../../utils/SurfaceBorder';
 
 @Component
 export struct 搜索框 {
+  @StorageProp('surface_material') private searchMaterial: string = 'flat';
+  @StorageProp('themeMode') private searchTheme: string = 'system';
+  @StorageProp('systemDarkMode') private searchSystemDark: boolean = false;
   @Prop @Watch('同步搜索文本') 搜索文本: string;
   onSearch: (text: string) => void = (text: string): void => {};
   onFocusChange: (focused: boolean) => void = (_focused: boolean): void => {};
@@ -38,7 +43,8 @@ export struct 搜索框 {
         .fontSize(应用尺寸.字号_正文)
         .backgroundColor($r('app.color.surface_card'))
         .borderRadius(应用尺寸.searchFieldRadius)
-        .onChange((value: string): void => {
+        .attributeModifier(new SearchFieldSurface(this.searchMaterial, SeriesVisual.isDark(this.searchTheme, this.searchSystemDark), 应用尺寸.searchFieldRadius))
+      .onChange((value: string): void => {
           this.当前输入 = value;
         })
         .onSubmit((): void => {

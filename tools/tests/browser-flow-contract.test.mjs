@@ -144,12 +144,13 @@ test('browser_* i18n keys exist and align between zh-Hans and en_US', () => {
 // /initialFieldValues/initialTags 六个 @Prop。修改这些字段名会破坏接线。
 // ============================================================
 
-test('browser previews row clicks and keeps explicit editing in the dedicated editor', () => {
+test('browser keeps editing in the dedicated editor and exposes both row routes', () => {
   const page = read('entry/src/main/ets/pages/浏览页.ets');
   assert.match(page, /name: 'EditNotePage', param: params/);
   const click=page.slice(page.indexOf('private 行点击处理('),page.indexOf('// T5 打开预览'));
   assert.match(click,/this\.打开预览\(行ID\)/);
-  assert.doesNotMatch(click,/openEditPage|browserWidth/);
+  // Both routes are executed by browser-traditional.test.mjs; width alone never changes the mode.
+  assert.doesNotMatch(click,/browserWidth/);
   assert.match(page, /this.openEditPage\(卡片ID, false\)/);
   assert.doesNotMatch(page, /浏览编辑区\(/);
   const editor=read('entry/src/main/ets/pages/EditNotePage.ets');
@@ -174,8 +175,8 @@ test('浏览编辑区 component preserves T7 presentation-only invariants', () =
   assert.match(panel, /@Prop\s+initialTags:\s*string/);
   assert.match(panel, /onCancel:\s*\(\)\s*=>\s*void/);
   assert.match(panel, /onSave:\s*\(fields:\s*string\[\],\s*tags:\s*string\[\],\s*images:\s*NoteFieldImage\[\],\s*audios:\s*NoteFieldAudio\[\]\)\s*=>\s*Promise<boolean>/);
-  // 草稿保留：aboutToAppear 从 initialFieldValues/initialTags 拷贝到内部状态
-  assert.match(panel, /this\.fieldValues\s*=\s*this\.initialFieldValues\.slice/);
+  // 正文副本剥离隐藏协议，保存时恢复；实际无损/取消/冲突行为见 note-links-editor。
+  assert.match(panel, /this\.fieldValues\s*=\s*noteLinkEditorFields\(this\.initialFieldValues\)/);
   assert.match(panel, /this\.tags\s*=\s*this\.initialTags/);
 });
 
@@ -606,9 +607,9 @@ test('BrowserPage more menu shares the T6 sidebar entry with the visible filter 
   const component = read('entry/src/main/ets/components/browser/BrowserMoreMenu.ets');
   const topBar = page.slice(page.indexOf('private 顶部条()'), page.indexOf('private quickFilterOptions('));
   assert.match(menu, /filterActive: this\.browserFilterActive\(\)/);
-  assert.match(component, /browserInterfaceMenu\(this.available, this.filterActive, this.subtitleIndex\)/);
+  assert.match(component, /browserInterfaceMenu\(this.available, this.filterActive, this.subtitleIndex, 'browser_more', this.traditionalMode\)/);
   assert.match(read('entry/src/main/ets/model/AppInterface.ts'), /item.id === 'filter' && filterActive \? 'browser_filter_active' : item.titleKey/);
-  assert.match(menu, /available: !this\.mutationBusy && this\.阶段 === 'list'/);
+  assert.match(menu, /available: this\.viewControlsAvailable\(\)/);
   assert.match(menu, /onFilter: \(\): void => \{ this\.openBrowserFilter\(\); \}/);
   assert.doesNotMatch(topBar, /browser_action_sidebar|browser_filter_active|this\.打开侧边栏/);
   assert.match(topBar, /this\.showMoreMenu = !this\.showMoreMenu/);

@@ -1,5 +1,7 @@
-import { IconActionButton } from '../common/IconActionButton';
+import { GlassPanel } from '../common/GlassPanel';
+import { SurfaceTransition } from '../../utils/SurfaceTransition';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { IconActionButton } from '../common/IconActionButton';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { PAGE_COMPACT_LAYOUT_KEY } from '../../model/AppLayoutState';
@@ -12,7 +14,7 @@ import { appInterface } from '../../backend/AppInterfaceService';
 // @名称 浏览侧边栏
 //
 // @作用
-// 浏览页 T6 侧边栏：抽屉式（左侧滑入），树形展示牌组 + 标签 + 已保存搜索三区。
+// 浏览页 T6 侧边栏：左侧面板（共用玻璃准备与轻缩放淡入），树形展示牌组 + 标签 + 已保存搜索三区。
 // 点击完整标签路径搜索；长按管理标签，展开箭头与搜索点击分别处理。
 // 纯展示层组件，父级（浏览页）拥有全部后端调用与状态管理。
 //
@@ -71,6 +73,7 @@ type 侧边栏分区 = 'decks' | 'tags' | 'saved_searches';
 
 @Component
 export struct 浏览侧边栏 {
+  @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
   @Prop isDark: boolean = false;
   @Prop busy: boolean = false;
@@ -114,20 +117,8 @@ export struct 浏览侧边栏 {
     return this.标签树 === null ? [] : flattenTagTree(this.标签树);
   }
 
-  build() {
-    Stack({ alignContent: Alignment.Start }) {
-      // 遮罩层：点击关闭
-      Column()
-        .width('100%')
-        .height('100%')
-        .backgroundColor(this.isDark ? 'rgba(0,0,0,0.40)' : 'rgba(0,0,0,0.15)')
-        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-        .onClick((): void => {
-          if (!this.busy) {
-            this.onClose();
-          }
-        })
-
+  @Builder
+  private panelContent() {
       // 侧边栏主面板（左侧 80% 宽度）
       Column() {
         // 头部：标题 + 关闭按钮
@@ -175,7 +166,7 @@ export struct 浏览侧边栏 {
                 }.width('100%').padding(应用尺寸.卡片内边距)
               }
             }
-            }.width('100%').backgroundColor($r('app.color.surface_card'))
+            }.width('100%').backgroundColor(this.surfaceMaterial === 'glass' ? Color.Transparent : $r('app.color.surface_card'))
               .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_指标卡).clip(true)
               .margin({ bottom: 应用尺寸.页面分组间距(this.narrowDeckLayout) })
 
@@ -199,7 +190,7 @@ export struct 浏览侧边栏 {
                   onSelect: (): void => { this.onClearUnusedTags(); } })
               }
             }
-            }.width('100%').backgroundColor($r('app.color.surface_card'))
+            }.width('100%').backgroundColor(this.surfaceMaterial === 'glass' ? Color.Transparent : $r('app.color.surface_card'))
               .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_指标卡).clip(true)
               .margin({ bottom: 应用尺寸.页面分组间距(this.narrowDeckLayout) })
 
@@ -216,7 +207,7 @@ export struct 浏览侧边栏 {
                 }, (项: 已保存搜索项, 索引: number): string => `${索引}-${项.name}`)
               }
             }
-            }.width('100%').backgroundColor($r('app.color.surface_card'))
+            }.width('100%').backgroundColor(this.surfaceMaterial === 'glass' ? Color.Transparent : $r('app.color.surface_card'))
               .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_指标卡).clip(true)
               .margin({ bottom: 应用尺寸.页面分组间距(this.narrowDeckLayout) })
 
@@ -231,13 +222,28 @@ export struct 浏览侧边栏 {
         .edgeEffect(EdgeEffect.Spring)
         .align(Alignment.TopStart)
       }
-      .width('80%')
-      .height('100%')
-      .backgroundColor($r('app.color.surface_page'))
-      .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-    }
-    .width('100%')
-    .height('100%')
+      .width('100%').height('100%')
+  }
+
+  build() {
+    Stack({ alignContent: Alignment.Start }) {
+      // 遮罩层：点击关闭
+      Column()
+        .width('100%')
+        .height('100%')
+        .backgroundColor(this.isDark ? 'rgba(0,0,0,0.40)' : 'rgba(0,0,0,0.15)')
+        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+        .onClick((): void => {
+          if (!this.busy) {
+            this.onClose();
+          }
+        })
+
+        .transition(SurfaceTransition.backdrop())
+      GlassPanel({ panelWidth: '80%', panelHeight: '100%', radius: 0, role: 'dialog',
+        menuMotion: true, centerX: '0%', centerY: '0%',
+        content: (): void => { this.panelContent(); } })
+    }.width('100%').height('100%')
   }
 
   /** 空提示行（树未加载或无数据时显示）。 */

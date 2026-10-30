@@ -1,3 +1,5 @@
+import { GlassSource } from '../components/common/GlassSource';
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { 添加笔记页参数 } from 'model/navigation/PageParams';
 import { FEEDBACK_ACTIONS, resultUndoStatus } from '../model/InteractionFeedback';
 import { ChangingText } from '../components/common/ChangingText';
@@ -13,7 +15,6 @@ import type { ScheduleCardsAsNewOptions } from '../proto/messages/SchedulerMessa
 import { BrowserMoreMenu } from '../components/browser/BrowserMoreMenu';
 import { appInterface } from '../backend/AppInterfaceService';
 import { BrowserNotetypeFeature } from '../components/browser/BrowserNotetypeFeature';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { WINDOW_SAFE_TOP_KEY } from '../model/WindowSafeLayout';
 import { DialogBackdrop } from '../components/common/DialogBackdrop';
 import { showToastSafely, resourceText, namedResourceText } from '../utils/UiFeedback';
@@ -25,7 +26,7 @@ import { AnkiBrowserSearch } from '../backend/AnkiBrowserSearch';
 import { resolveBrowserCardIds, resolveBrowserNoteIds, resolveBrowserRepresentativeCard, selectBrowserRange } from '../model/BrowserSelection';
 import { browserKeyCommand } from '../model/BrowserKeyboard';
 import { browserKeyName } from '../utils/BrowserKeyAdapter';
-import { BrowserPreferences, BrowserPreferencePatch, browserActiveColumns, defaultBrowserPreferences } from '../model/BrowserPreferences';
+import { BrowserPreferences, BrowserPreferencePatch, browserActiveColumns, browserDisplayKeys, replaceBrowserColumn, defaultBrowserPreferences } from '../model/BrowserPreferences';
 import { loadBrowserPreferences, saveBrowserPreferences, loadBrowserIgnoreAccents, saveBrowserIgnoreAccents } from '../backend/BrowserPreferencesStore';
 import { BrowserDisplayDialog } from '../components/browser/BrowserDisplayDialog';
 import { BrowserEditorPane } from '../components/browser/BrowserEditorPane';
@@ -84,6 +85,7 @@ import { 搜索框 } from '../components/browser/搜索框';
 import { BrowserViewMenu } from '../components/browser/BrowserViewMenu';
 import { 卡片表格, 浏览行数据 } from '../components/browser/卡片表格';
 import { 批量操作栏 } from '../components/browser/批量操作栏';
+import { BrowserSelectionAccessory } from '../components/browser/BrowserSelectionAccessory';
 import { 字段帮助面板 } from '../components/字段帮助面板';
 import { IconActionButton } from '../components/common/IconActionButton';
 import { browserBackItem, browserToolbarItems, AppInterfaceItem, AppInterfaceControl } from '../model/AppInterface';
@@ -174,6 +176,7 @@ export struct 浏览页 {
   private selectionAnchor: number = 0;
   private searchFocused: boolean = false;
   private infoVersion: number = 0;
+  @State private replacementColumn: string = '';
   @State private browserPreferences: BrowserPreferences = defaultBrowserPreferences();
   @State @Watch('handleBrowserPreferenceBoundary') private displayDialog: string = '';
   @State @Watch('handleBrowserPreferenceBoundary') private displayBusy: boolean = false;
@@ -408,14 +411,15 @@ export struct 浏览页 {
     } else appInterface.leave('browser_feedback');
     appInterface.observe({ surface: 'browser', sectionId: this.阶段, selectedId: this.浏览模式值,
       optionIds: this.结果ID列表.slice(0, 100).map((id: number): string => String(id)), optionLabels: [],
-      optionsTotal: this.结果ID列表.length, busy: this.mutationBusy || this.批量忙碌 || this.refreshingSearch || this.阶段 === 'loading',
+      optionsTotal: this.结果ID列表.length, busy: this.displayBusy || this.mutationBusy || this.批量忙碌 || this.refreshingSearch || this.阶段 === 'loading',
       controlsComplete: true, items: controls,
       values: [{ id: 'mode', value: this.浏览模式值 }, { id: 'filter', value: this.quickFilter },
         { id: 'refresh_error', value: this.refreshError }, { id: 'result', value: this.resultMessage },
         { id: 'refreshing', value: String(this.refreshingSearch) }, { id: 'selected_count', value: String(this.选中ID列表.length) },
         { id: 'sort_column', value: this.sortColumn }, { id: 'sort_reverse', value: String(this.sortReverse) },
+        { id: 'traditional_mode', value: String(this.browserPreferences.traditionalMode === true) },
         { id: 'subtitle', value: String(this.subtitleIndex) },
-        { id: 'columns', value: (this.浏览模式值 === 'notes' ? this.browserPreferences.notesColumns : this.browserPreferences.cardsColumns).join(',') },
+        { id: 'columns', value: browserDisplayKeys(this.browserPreferences, this.浏览模式值 === 'notes').join(',') },
         { id: 'editor_target', value: String(this.inlineEditorId) }] });
   }
 
@@ -603,11 +607,12 @@ export struct 浏览页 {
     this.执行搜索(true);
   }
 
-  // 单击与键盘打开统一先预览；编辑由预览内的明确动作进入。
+  // 传统模式点击行直接编辑；现有模式继续先预览。
   private 行点击处理(行ID: number): void {
     if (!this.operations.isAlive() || this.mutationBusy || this.批量忙碌 || this.多选模式值) return;
     this.focusedRowId = 行ID;
-    this.打开预览(行ID);
+    if (this.browserPreferences.traditionalMode) this.openEditPage(行ID, this.浏览模式值 === 'notes');
+    else this.打开预览(行ID);
   }
 
   // T5 打开预览
@@ -976,7 +981,7 @@ export struct 浏览页 {
     this.setBrowserSelection(selectBrowserRange(this.结果ID列表, this.选中ID列表, this.selectionAnchor, id));
   }
   private keyboardBlocked(): boolean {
-    return this.displayDialog !== '' || this.editingPageOpen || this.显示预览 || this.显示卡片信息 || this.显示查找替换 ||
+    return this.displayBusy || this.displayDialog !== '' || this.editingPageOpen || this.显示预览 || this.显示卡片信息 || this.显示查找替换 ||
       this.显示侧边栏 || this.显示保存搜索 || this.显示标签重命名 || this.flagNamesOpen ||
       this.collectionHistoryOpen || this.显示说明浮层 || this.batchDialog !== 'none';
   }
@@ -1031,10 +1036,32 @@ export struct 浏览页 {
       if (this.operations.isAlive()) this.browserPreferences = preferences;
     } catch (error) { if (this.operations.isAlive()) this.refreshError = error instanceof Error ? error.message : `${error}`; }
   }
+  private async toggleTraditionalMode(): Promise<void> {
+    if (!this.viewControlsAvailable() || this.displayBusy || this.keyboardBlocked()) return;
+    this.displayBusy = true;
+    try {
+      const preferences: BrowserPreferences = await saveBrowserPreferences({ traditionalMode: !this.browserPreferences.traditionalMode });
+      if (!this.operations.isAlive()) return;
+      this.browserPreferences = preferences;
+      await this.执行搜索(true);
+    } catch (error) { if (this.operations.isAlive()) this.refreshError = error instanceof Error ? error.message : `${error}`; }
+    finally { if (this.operations.isAlive()) { this.displayBusy = false; this.publishInterface(); } }
+  }
+  private openColumnOptions(key: string, manage: boolean): void {
+    if (!this.viewControlsAvailable() || this.displayBusy) return;
+    this.replacementColumn = key; this.displayError = ''; this.displayDialog = manage ? 'columns' : 'replace';
+  }
+  private replaceDisplayColumn(key: string): void {
+    if (this.displayBusy || !this.viewControlsAvailable()) return;
+    try { this.saveDisplayColumns(replaceBrowserColumn(browserDisplayKeys(this.browserPreferences, this.浏览模式值 === 'notes'), this.replacementColumn, key)); }
+    catch (error) { this.displayError = error instanceof Error ? error.message : `${error}`; }
+  }
   private async saveDisplayColumns(keys: string[]): Promise<void> {
-    if (this.displayBusy || keys.length > 16) return;
+    if (!this.viewControlsAvailable() || this.displayBusy || keys.length > (this.browserPreferences.traditionalMode ? 64 : 16) || (this.browserPreferences.traditionalMode && keys.length === 0)) return;
     const mode: string = this.浏览模式值;
-    const patch: BrowserPreferencePatch = mode === 'notes' ? { notesColumns: keys.slice() } : { cardsColumns: keys.slice() };
+    const patch: BrowserPreferencePatch = this.browserPreferences.traditionalMode ?
+      (mode === 'notes' ? { traditionalNotesColumns: keys.slice() } : { traditionalCardsColumns: keys.slice() }) :
+      (mode === 'notes' ? { notesColumns: keys.slice() } : { cardsColumns: keys.slice() });
     this.displayBusy = true; this.displayError = '';
     try {
       const preferences: BrowserPreferences = await saveBrowserPreferences(patch);
@@ -1392,13 +1419,17 @@ export struct 浏览页 {
     if (!this.operations.isAlive() || this.保存搜索忙碌 || this.operations.isBusy()) return;
     let settled: boolean = false;
     this.getUIContext().showAlertDialog({
-      title: $r('app.string.browser_saved_search_delete'),
-      message: item.name,
-      autoCancel: true,
-      cancel: (): void => { settled = true; },
-      primaryButton: { value: $r('app.string.cancel'), action: (): void => { settled = true; } },
-      secondaryButton: { value: $r('app.string.browser_saved_search_delete'), fontColor: $r('app.color.error_text'),
-        action: (): void => { if (settled) return; settled = true; this.删除保存搜索(item); } }
+        title: $r('app.string.browser_saved_search_delete'),
+        message: item.name,
+        autoCancel: true,
+        cancel: (): void => { settled = true; },
+        buttons: [
+            { value: $r('app.string.cancel'), action: (): void => { settled = true; } },
+            { value: $r('app.string.browser_saved_search_delete'), fontColor: $r('app.color.error_text'),
+                action: (): void => { if (settled)
+                    return; settled = true; this.删除保存搜索(item); } }
+        ],
+        buttonDirection: DialogButtonDirection.AUTO
     });
   }
 
@@ -1507,11 +1538,13 @@ export struct 浏览页 {
     if (!this.operations.isAlive() || this.operations.isBusy()) return;
     let settled: boolean = false;
     this.getUIContext().showAlertDialog({ title: this.取本地化文案($r('app.string.settings_clear_unused_tags')),
-      message: this.取本地化文案($r('app.string.settings_clear_unused_tags_confirm')),
-      cancel: (): void => { settled = true; },
-      primaryButton: { value: $r('app.string.cancel'), action: (): void => { settled = true; } },
-      secondaryButton: { value: $r('app.string.browser_detail_confirm'),
-        action: (): void => { if (settled) return; settled = true; this.清除侧栏未用标签(); } } });
+        message: this.取本地化文案($r('app.string.settings_clear_unused_tags_confirm')),
+        cancel: (): void => { settled = true; }, buttons: [
+            { value: $r('app.string.cancel'), action: (): void => { settled = true; } },
+            { value: $r('app.string.browser_detail_confirm'),
+                action: (): void => { if (settled)
+                    return; settled = true; this.清除侧栏未用标签(); } }
+        ], buttonDirection: DialogButtonDirection.AUTO });
   }
 
   private async 清除侧栏未用标签(): Promise<void> {
@@ -1579,20 +1612,24 @@ export struct 浏览页 {
       .replace('%s', 标签名);
     let settled: boolean = false;
     this.getUIContext().showAlertDialog({
-      title: this.取本地化文案($r('app.string.browser_tag_delete')),
-      message: message,
-      autoCancel: true,
-      cancel: (): void => { settled = true; },
-      alignment: DialogAlignment.Center,
-      primaryButton: {
-        value: $r('app.string.cancel'),
-        action: (): void => { settled = true; }
-      },
-      secondaryButton: {
-        value: $r('app.string.browser_tag_delete'),
-        fontColor: $r('app.color.error_text'),
-        action: (): void => { if (settled) return; settled = true; this.执行删除标签(标签名); }
-      }
+        title: this.取本地化文案($r('app.string.browser_tag_delete')),
+        message: message,
+        autoCancel: true,
+        cancel: (): void => { settled = true; },
+        alignment: DialogAlignment.Center,
+        buttons: [
+            {
+                value: $r('app.string.cancel'),
+                action: (): void => { settled = true; }
+            },
+            {
+                value: $r('app.string.browser_tag_delete'),
+                fontColor: $r('app.color.error_text'),
+                action: (): void => { if (settled)
+                    return; settled = true; this.执行删除标签(标签名); }
+            }
+        ],
+        buttonDirection: DialogButtonDirection.AUTO
     });
   }
 
@@ -1758,7 +1795,9 @@ export struct 浏览页 {
   @Builder
   private browserMoreMenu() {
     if (this.showMoreMenu) {
-      BrowserMoreMenu({ filterActive: this.browserFilterActive(), available: !this.mutationBusy && this.阶段 === 'list',
+      BrowserMoreMenu({ filterActive: this.browserFilterActive(), available: this.viewControlsAvailable(),
+        traditionalMode: this.browserPreferences.traditionalMode === true,
+        onTraditional: (): void => { this.showMoreMenu = false; this.toggleTraditionalMode(); },
         subtitleIndex: this.subtitleIndex, backRequest: this.moreBackRequest,
         topOffset: 应用尺寸.pageContentTop(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop),
         onClose: (): void => { this.showMoreMenu = false; },
@@ -1827,7 +1866,7 @@ export struct 浏览页 {
       top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop),
       bottom: 0
     })
-    .backgroundColor(this.页面底色微染值)
+    .backgroundColor(Color.Transparent)
     .alignItems(VerticalAlign.Center)
   }
 
@@ -1845,7 +1884,7 @@ export struct 浏览页 {
   }
 
   private viewControlsAvailable(): boolean {
-    return !this.多选模式值 && !this.mutationBusy && !this.批量忙碌 && !this.refreshingSearch && this.阶段 === 'list';
+    return !this.displayBusy && !this.多选模式值 && !this.mutationBusy && !this.批量忙碌 && !this.refreshingSearch && this.阶段 === 'list';
   }
 
   private browserFilterActive(): boolean {
@@ -1911,11 +1950,15 @@ export struct 浏览页 {
         搜索框({ 搜索文本: this.搜索文本,
           onFocusChange: (focused: boolean): void => { this.searchFocused = focused; },
           onSearch: (文本: string): void => { this.提交搜索(文本); } }).layoutWeight(1)
-        IconActionButton({ toolbarStyle: true,
-          source: interfaceControlIcon(browserToolbarItems(this.多选模式值, this.browserFilterActive()), 'filter'),
-          label: interfaceControlText(this.getUIContext(), browserToolbarItems(this.多选模式值, this.browserFilterActive()), 'filter', this.uiLanguage),
-          isInteractive: this.viewControlsAvailable(),
-          onAction: (): void => { this.openBrowserFilter(); } })
+        BrowserSelectionAccessory({
+          selecting: this.多选模式值,
+          count: this.选中ID列表.length,
+          filterEnabled: this.viewControlsAvailable(),
+          filterIcon: interfaceControlIcon(browserToolbarItems(this.多选模式值, this.browserFilterActive()), 'filter'),
+          filterLabel: interfaceControlText(this.getUIContext(), browserToolbarItems(this.多选模式值, this.browserFilterActive()), 'filter', this.uiLanguage),
+          selectionLabel: this.取选中计数文案(),
+          onFilter: (): void => { this.openBrowserFilter(); }
+        })
       }.width('100%')
         .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平,
           top: 应用尺寸.页面内容顶部间距(this.narrowDeckLayout),
@@ -1950,11 +1993,14 @@ export struct 浏览页 {
           subtitleIndex: this.subtitleIndex,
           notesMode: this.浏览模式值 === 'notes',
           flagLabels: this.flagLabels,
-          tableLayout: this.browserWidth >= 1000,
-          busy: this.mutationBusy || this.批量忙碌 || this.refreshingSearch,
+          tableLayout: this.browserPreferences.traditionalMode === true || this.browserWidth >= 1000,
+          traditionalLayout: this.browserPreferences.traditionalMode === true,
+          onColumnClick: (key: string): void => { this.openColumnOptions(key, false); },
+          onColumnManage: (key: string): void => { this.openColumnOptions(key, true); },
+          busy: this.displayBusy || this.mutationBusy || this.批量忙碌 || this.refreshingSearch,
           displayColumns: this.列定义.filter((column: BrowserColumn): boolean =>
-            (this.浏览模式值 === 'notes' ? this.browserPreferences.notesColumns : this.browserPreferences.cardsColumns).includes(column.key)),
-          displayKeys: this.浏览模式值 === 'notes' ? this.browserPreferences.notesColumns : this.browserPreferences.cardsColumns,
+            browserDisplayKeys(this.browserPreferences, this.浏览模式值 === 'notes').includes(column.key)),
+          displayKeys: browserDisplayKeys(this.browserPreferences, this.浏览模式值 === 'notes'),
           activeKeys: browserActiveColumns(this.browserPreferences, this.浏览模式值 === 'notes'),
           结果总数: this.结果ID列表.length,
           已加载行数: this.consumedRowCount,
@@ -1986,7 +2032,7 @@ export struct 浏览页 {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(this.页面底色微染值)
+    .backgroundColor(Color.Transparent)
   }
 
   @Builder
@@ -2113,7 +2159,9 @@ export struct 浏览页 {
       BrowserDisplayDialog({ kind: this.displayDialog, busy: this.displayBusy || this.mutationBusy, error: this.displayError,
         backRequest: this.displayBackRequest, columns: this.列定义.filter((column: BrowserColumn): boolean =>
           (this.浏览模式值 === 'notes' ? column.notesModeLabel : column.cardsModeLabel) !== ''), notes: this.浏览模式值 === 'notes',
-        selectedColumns: this.浏览模式值 === 'notes' ? this.browserPreferences.notesColumns : this.browserPreferences.cardsColumns,
+        selectedColumns: browserDisplayKeys(this.browserPreferences, this.浏览模式值 === 'notes'),
+        minimumColumns: this.browserPreferences.traditionalMode ? 1 : 0, replacementColumn: this.replacementColumn,
+        onReplaceColumn: (key: string): void => { this.replaceDisplayColumn(key); },
         recentSearches: this.browserPreferences.recentSearches, ignoreAccents: this.ignoreAccents,
         onClose: (): void => { this.displayDialog = ''; }, onColumns: (keys: string[]): void => { this.saveDisplayColumns(keys); },
         onRecent: (text: string): void => { this.displayDialog = ''; this.提交搜索(text); },
@@ -2228,7 +2276,8 @@ export struct 浏览页 {
   build() {
     NavDestination() {
       Stack() {
-        Row() {
+        GlassSource({ freezeDuringPanels: true }) {
+Row() {
           Column() { this.browserContent() }
             .width(this.inlineEditorId > 0 && this.browserWidth >= 1000 ? '46%' : '100%')
             .visibility(this.inlineEditorId > 0 && this.browserWidth < 1000 ? Visibility.None : Visibility.Visible)
@@ -2244,6 +2293,8 @@ export struct 浏览页 {
             }, (id: number): string => `${this.inlineEditorIsNote ? 'note' : 'card'}:${id}`)
           }
         }.width('100%').height('100%')
+      }
+      
 
         // 卡片／笔记行均先预览真实卡片；预览内「编辑字段」显式打开原编辑区。
         this.browserInspection()
