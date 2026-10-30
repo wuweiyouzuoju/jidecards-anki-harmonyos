@@ -63,10 +63,11 @@ test('restored and newly redeemed entitlement removes the lock and applies Iride
   assert.deepEqual(applied, ['iridescent', 'forest']);
 });
 
-test('retired Iridescent popup copy is absent in both languages and the overview', () => {
+test('retired onboarding copy remains absent while restored redemption celebration has localized results', () => {
   for (const locale of ['base','en_US']) {
     const labels=JSON.parse(read(`entry/src/main/resources/${locale}/element/string.json`)).string;
-    assert.deepEqual(labels.filter(item => /^(iridescent_gift_|home_intro_theme_|redemption_contents_|redemption_gift_received$|redemption_contact_developer$|redemption_iridescent_unlocked_)/.test(item.name)), []);
+    for (const key of ['redemption_gift_received','redemption_iridescent_unlocked_title','redemption_iridescent_unlocked_body']) assert.ok(labels.find(item=>item.name===key)?.value);
+    assert.deepEqual(labels.filter(item => /^(iridescent_gift_|home_intro_theme_|redemption_contents_|redemption_contact_developer$)/.test(item.name)), []);
   }
   assert.doesNotMatch(read('entry/src/main/ets/components/HomeIntroPanel.ets'), /home_intro_theme_|IridescentThemePreview/);
 });

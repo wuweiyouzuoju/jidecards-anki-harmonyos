@@ -68,12 +68,14 @@ export struct AppearanceReveal {
   @Builder
   private giftArtwork() {
     Stack() {
+      if (this.gift) {
       Image($rawfile('themes/iridescent_cloud_0.png')).width(180).height(160)
         .translate({ x: -30, y: -12 }).opacity(this.revealed ? 0.45 : 0)
         .scale({ x: this.revealed ? 1 : 0.6, y: this.revealed ? 1 : 0.6 })
       Image($rawfile('themes/iridescent_cloud_2.png')).width(180).height(160)
         .translate({ x: 34, y: 12 }).opacity(this.revealed ? 0.45 : 0)
         .scale({ x: this.revealed ? 1 : 0.6, y: this.revealed ? 1 : 0.6 })
+      }
       Circle().width(140).height(140).fill(Color.Transparent).stroke(this.colors[1]).strokeWidth(1)
         .scale({ x: this.burst ? 1.35 : 0.65, y: this.burst ? 1.35 : 0.65 })
         .opacity(this.burst ? 0 : 0.4)
