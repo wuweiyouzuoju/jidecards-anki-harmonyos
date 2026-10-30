@@ -1,7 +1,7 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { DirectorySelect } from '../common/DirectorySelect';
 import { DirectoryRow, DirectoryView, DirectoryChoice, directoryChoiceRows, directorySpecial } from '../../model/DirectoryTree';
 import { appInterface } from '../../backend/AppInterfaceService';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { CsvMetadata, emptyCsvMetadata } from '../../proto/messages/CsvImportMessages';
 import { CsvImportPreview, CsvNotetype, copyCsvMetadata } from '../../model/CsvImport';
 import { 导出牌组选项 } from '../../model/DataTransferIntent';
