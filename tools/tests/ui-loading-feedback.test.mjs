@@ -5,33 +5,21 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { loadComponentLogic } from './platform-module-harness.mjs';
 
-test('fixed answer footer keeps its button during loading, completion and errors without allowing activation', () => {
+test('fixed answer footer keeps one 52vp action slot for loading, completion and errors', () => {
   const read = path => readFileSync(new URL('../../entry/src/main/ets/' + path, import.meta.url), 'utf8');
   const page = read('pages/学习页.ets');
   const footer = page.slice(page.indexOf('  private 答案条()'), page.indexOf('  private cardViewportContent()'));
-  const condition = footer.match(/if \(([\s\S]*?)\) \{\s*开始学习按钮/)[1];
-  const shouldShow = new Function(`return (${condition});`);
-  const availability = footer.match(/isAvailable: ([^,\n]+)/)[1];
-  const isAvailable = new Function(`return (${availability});`);
-  for (const phase of ['loading', 'done', 'error', 'question', 'answer']) {
-    for (const choiceQuestion of [null, { choices: [] }]) {
-      const state = { 阶段: phase, choiceQuestion };
-      const visible = shouldShow.call(state);
-      assert.equal(visible, ['loading', 'done', 'error'].includes(phase) || (phase === 'question' && choiceQuestion === null));
-      if (visible) assert.equal(isAvailable.call(state), phase === 'question');
-    }
+  assert.match(footer, /if \(this\.choiceQuestion === null\) \{\s*StudyAnswerActionBar\(/);
+  assert.match(footer, /stage: this\.阶段/);
+  const group = read('components/StudyAnswerActionBar.ets');
+  assert.match(group, /\.height\(应用尺寸\.行动按钮高度\)/);
+  assert.match(group, /private showAnswerEnabled\(\): boolean \{ return this\.stage === 'question' && !this\.busy; \}/);
+  assert.match(group, /\.enabled\(enabled\)/);
+  assert.match(group, /\$r\('app\.string\.study_show_answer'\)/);
+  for (const label of ['rating_again', 'rating_hard', 'rating_good', 'rating_easy']) {
+    assert.match(group, new RegExp(`app\\.string\\.${label}`), label);
   }
-  const button = read('components/开始学习按钮.ets');
-  assert.match(button, /\.height\(应用尺寸\.行动按钮高度\)/);
-  assert.match(button, /\.enabled\(this\.isAvailable\)/);
-  assert.match(button, /\.grayscale\(this\.isAvailable \? 0 : 1\)/);
-  assert.match(button, /Span\(this\.文案\)\.fontColor\(\$r\('app.color.text_secondary'\)\)/);
-  const activate = new Function(button.match(/\.onClick\(\(\) => \{([\s\S]*?)\n    \}\)/)[1]);
-  let calls = 0;
-  const instance = { isAvailable: false, 开始学习回调: () => { calls++; } };
-  activate.call(instance); assert.equal(calls, 0);
-  instance.isAvailable = true;
-  activate.call(instance); assert.equal(calls, 1);
+  assert.doesNotMatch(group, /session|setTimeout|animateTo/, 'loading and answer states do not wait for an animation');
 });
 
 test('short loading unmount cancels feedback; slow loading shows it', () => {

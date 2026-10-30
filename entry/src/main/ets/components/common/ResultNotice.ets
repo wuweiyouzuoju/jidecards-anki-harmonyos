@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { 按下态按钮 } from './按下态按钮';
+import { SeriesVisual } from '../../utils/SeriesVisual';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { currentMotionProfile, motionAnimation } from '../../utils/AppMotion';
 import { 应用尺寸 } from '../../utils/应用尺寸';
@@ -7,6 +8,10 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 /** 宿主拥有结果、有效撤销步号及重试；提示条只提供就近的可见反馈。 */
 @Component
 export struct ResultNotice {
+  @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
+  @StorageProp('themeMode') private materialMode: string = 'system';
+  @StorageProp('systemDarkMode') private materialSystemDark: boolean = false;
+  @StorageProp('theme_color_action_primary') private materialAccent: string = '#2F5FD0';
   @Prop @Watch('restart') message: ResourceStr = '';
   @Prop @Watch('restart') duration: number = 0;
   @Prop actionLabel: ResourceStr = '';
@@ -36,6 +41,7 @@ export struct ResultNotice {
     }.width('100%').padding(应用尺寸.间距_12)
       .backgroundColor($r('app.color.surface_card')).border(SurfaceBorder.options())
       .borderRadius(应用尺寸.圆角_卡片)
+      .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, SeriesVisual.isDark(this.materialMode, this.materialSystemDark), this.materialAccent, '', 应用尺寸.圆角_卡片))
       .transition(TransitionEffect.OPACITY.animation(motionAnimation(currentMotionProfile().menuEnterMs)))
   }
 }
