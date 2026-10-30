@@ -31,9 +31,10 @@ test('automatic lifecycle and manual settings requests share the root task host'
 // 执行真实组件方法，用可控时钟/后端代替 HarmonyOS；不复制同步实现。
 
 function homeHarness() {
-  const state = { enabled: true, ready: true, auth: { hkey: 'test-key', endpoint: 'http://lan:8080/', username: 'u' }, timers: new Map(), seq: 0, navigation: [], toasts: 0 };
+  const state = { enabled: true, ready: true, devices: [], auth: { hkey: 'test-key', endpoint: 'http://lan:8080/', username: 'u' }, timers: new Map(), seq: 0, navigation: [], toasts: 0 };
   const gate = new SyncActivity();
-  const Page = componentMethods(read('pages/首页.ets'), ['closeHomeActions', 'requestManualSync', 'startSyncFromMenu', 'updatePendingSyncStatus', 'homeActivity', 'requestAutoSync', 'scheduleAutoSyncCheck', 'isAutoSyncLocationSafe', 'stopAutoSyncTimer', 'tryAutoSync', 'syncForegroundChanged', 'onPageHide', 'onBackPress', 'deferForSync', 'flushSyncAction', 'autoSyncCollectionFinished', 'autoSyncStateChanged', '选择牌组', '开始学习', 'openCreateDeck', 'openSettings', 'openReminders', 'syncYielded', 'presentPendingSyncWarning'], {
+  const Page = componentMethods(read('pages/首页.ets'), ['closeHomeActions', 'requestManualSync', 'startSyncFromMenu', 'startCloudSync', 'chooseSyncTarget', 'closeSyncChoice', 'updatePendingSyncStatus', 'homeActivity', 'requestAutoSync', 'scheduleAutoSyncCheck', 'isAutoSyncLocationSafe', 'stopAutoSyncTimer', 'tryAutoSync', 'syncForegroundChanged', 'onPageHide', 'onBackPress', 'deferForSync', 'flushSyncAction', 'autoSyncCollectionFinished', 'autoSyncStateChanged', '选择牌组', '开始学习', 'openCreateDeck', 'openSettings', 'openReminders', 'syncYielded', 'presentPendingSyncWarning'], {
+    DevicePairingStore: class { async hasPairedDevices() { return state.readPairings ? state.readPairings() : state.devices.length > 0; } },
     decideHomeSync, canStartHomeAutoSync, externalDeckOpens: { hasPending: () => state.externalDeckPending === true },
     AppStorage: { get() {}, setOrCreate() {} },
     loadAutoSyncEnabled: () => state.enabled, loadVisibleSyncAuth: () => state.auth,
@@ -71,7 +72,8 @@ function homeHarness() {
   });
   Object.assign(page, { startupSequence: new HomeStartupSequence(), announcementController: new HomeAnnouncementController(), homeActivityChanged() {}, homeDisposed: false, syncForeground: true, autoSyncStartupReady: true, syncScheduler: new AutoSyncScheduler(), autoSyncTimer: -1,
     页面栈: { size: () => 0, pushPath: path => state.navigation.push(path) }, 加载状态: 'ready', 显示同步面板: false,
-    autoSyncCollectionBusy: false, autoSyncModal: false, deckMenuId: '',
+    autoSyncCollectionBusy: false, autoSyncModal: false, deckMenuId: '', homeVisible: true,
+    syncChoiceVisible: false, syncChoiceChecking: false, syncChoiceGeneration: 0,
     syncDetailsRequest: 0, getUIContext: () => ({ getHostContext: () => ({ resourceManager: { getStringSync: key => key } }) }),
     显示提示: () => { state.toasts++; }, 已选中牌组: () => true, 选中牌组: () => ({ id: 'deck', name: 'deck' }), 展开牌组路径() {}, 当前断点: 'xs',
     加载主页数据: async () => {}, 同步后检查FSRS: async () => {}, 暂停主页官方公告检查() {} });
@@ -86,12 +88,12 @@ function homeHarness() {
   return { page, state, tick, gate };
 }
 
-test('home menu starts the shared manual sync even when automatic sync is disabled', () => {
+test('home menu starts the shared manual sync even when automatic sync is disabled', async () => {
   const { page, state, tick } = homeHarness();
   state.enabled = false;
   page.页面栈.pop = () => {};
   page.显示更多菜单 = true;
-  page.startSyncFromMenu();
+  await page.startSyncFromMenu();
   assert.equal(page.显示更多菜单, false);
   assert.equal(page.syncScheduler.isManualPending(), true);
   tick();
@@ -101,20 +103,73 @@ test('home menu starts the shared manual sync even when automatic sync is disabl
   assert.equal(page.同步面板账号名, state.auth.username);
 });
 
-test('home menu opens settings for login and reopens an existing task without a new request', () => {
+test('home menu opens settings for login and reopens an existing task without a new request', async () => {
   const { page, state } = homeHarness();
   state.auth = null;
   page.显示更多菜单 = true;
-  page.startSyncFromMenu();
+  await page.startSyncFromMenu();
   assert.equal(page.显示更多菜单, false);
   assert.equal(state.navigation[0].name, 'SettingsPage');
   assert.equal(state.toasts, 1);
   assert.equal(page.syncScheduler.hasPending(), false);
   page.页面栈.pop = () => {};
   page.显示同步面板 = true;
-  page.startSyncFromMenu();
+  await page.startSyncFromMenu();
   assert.equal(page.syncDetailsRequest, 1);
   assert.equal(page.syncScheduler.hasPending(), false);
+});
+
+test('paired devices offer cloud or device sync before any request, including without a cloud account', async () => {
+  for (const target of ['cloud', 'device']) {
+    const { page, state } = homeHarness();
+    state.devices = [{ id: 'paired-device' }];
+    state.auth = null;
+    await page.startSyncFromMenu();
+    assert.equal(page.syncChoiceVisible, true);
+    assert.equal(state.toasts, 0);
+    assert.deepEqual(state.navigation, []);
+    assert.equal(page.homeActivity().dialogOpen, true, 'choice blocks background automatic sync');
+    page.chooseSyncTarget(target); page.chooseSyncTarget(target);
+    assert.equal(page.syncChoiceVisible, false);
+    assert.equal(state.navigation.length, 1, 'a selection can only execute once');
+    assert.equal(state.navigation[0].param.sectionId, 'sync');
+    assert.equal(state.navigation[0].param.initialActionId, target === 'device' ? 'device_link' : '');
+    assert.equal(state.toasts, target === 'cloud' ? 1 : 0);
+    assert.equal(page.syncScheduler.hasPending(), false);
+  }
+  const { page, state } = homeHarness();
+  state.devices = [{}]; await page.startSyncFromMenu();
+  page.页面栈.pop = () => {};
+  page.chooseSyncTarget('cloud');
+  assert.equal(page.syncScheduler.isManualPending(), true, 'cloud selection uses the original scheduler');
+});
+
+test('sync choice cancels pending reads on Back, navigation and background; repeated clicks do not reread', async () => {
+  for (const leave of [page => page.onBackPress(), page => page.onPageHide(), page => { page.homeVisible = false; page.closeSyncChoice(); }]) {
+    const { page, state } = homeHarness(), pending = Promise.withResolvers();
+    let reads = 0;
+    state.readPairings = () => { reads++; return pending.promise; };
+    const request = page.startSyncFromMenu();
+    await page.startSyncFromMenu();
+    assert.equal(reads, 1);
+    assert.equal(page.homeActivity().dialogOpen, true);
+    leave(page); pending.resolve(true); await request;
+    assert.equal(page.syncChoiceVisible, false);
+    assert.equal(page.syncChoiceChecking, false);
+    assert.equal(page.syncScheduler.hasPending(), false);
+    assert.deepEqual(state.navigation, []);
+  }
+});
+
+test('a failed pairing read keeps synchronization explicit and an existing task opens directly', async () => {
+  const { page, state } = homeHarness();
+  state.readPairings = async () => { throw new Error('storage'); };
+  await page.startSyncFromMenu();
+  assert.equal(state.toasts, 1); assert.equal(page.syncChoiceChecking, false);
+  assert.equal(page.syncScheduler.hasPending(), false); assert.equal(page.syncChoiceVisible, false);
+  page.显示同步面板 = true;
+  await page.startSyncFromMenu();
+  assert.equal(page.syncDetailsRequest, 1); assert.equal(state.toasts, 1);
 });
 
 test('manual request survives settings pop before navigation finishes', () => {

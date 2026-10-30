@@ -1,7 +1,7 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { DialogFrame } from '../common/DialogFrame';
 import { NativeDialogHost, NativeDialogFactory, NativeDialogDismiss, NativeDialogPresentation } from '../common/NativeDialogHost';
 import { SurfaceTransition } from '../../utils/SurfaceTransition';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { settingsItemText } from '../../utils/SettingsStructureText';
 import { agentOperationHosts } from '../../model/agent/AgentOperationHost';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
@@ -131,7 +131,7 @@ export struct 同步分组 {
         onSave: this.serverDialogController.guard((): void => { this.saveServer(); }),
         onClose: this.serverDialogController.guard((): void => { this.closeServerDialog(); })
       }),
-      width: presentation.width, height: presentation.height, maskColor: presentation.maskColor,
+      width: presentation.width, height: presentation.height, keyboardAvoidMode: presentation.keyboardAvoidMode, maskColor: presentation.maskColor,
       autoCancel: presentation.autoCancel,
       alignment: presentation.alignment,
       openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation, customStyle: presentation.customStyle,
@@ -245,13 +245,16 @@ export struct 同步分组 {
       if (enabled) {
         const confirmed: boolean = await new Promise<boolean>((resolve: (value: boolean) => void): void => {
           this.getUIContext().showAlertDialog({
-            title: $r('app.string.sync_auto_confirm_title'),
-            message: $r('app.string.sync_auto_confirm_message'),
-            alignment: DialogAlignment.Center,
-            autoCancel: false,
-            primaryButton: { value: $r('app.string.cancel'), action: (): void => { resolve(false); } },
-            secondaryButton: { value: $r('app.string.sync_auto_confirm_enable'), action: (): void => { resolve(true); } },
-            cancel: (): void => { resolve(false); }
+              title: $r('app.string.sync_auto_confirm_title'),
+              message: $r('app.string.sync_auto_confirm_message'),
+              alignment: DialogAlignment.Center,
+              autoCancel: false,
+              buttons: [
+                  { value: $r('app.string.cancel'), action: (): void => { resolve(false); } },
+                  { value: $r('app.string.sync_auto_confirm_enable'), action: (): void => { resolve(true); } }
+              ],
+              buttonDirection: DialogButtonDirection.AUTO,
+              cancel: (): void => { resolve(false); }
           });
         });
         if (!confirmed || this.disposed) {
@@ -378,24 +381,28 @@ export struct 同步分组 {
     const auth: SyncAuth | null = this.鉴权凭证;
     let settled: boolean = false;
     this.getUIContext().showAlertDialog({
-      title: this.取本地化文本($r('app.string.sync_logout')),
-      message: this.取本地化文本($r('app.string.sync_logout_confirm_message')),
-      autoCancel: false,
-      alignment: DialogAlignment.Center,
-      cancel: (): void => { settled = true; },
-      primaryButton: {
-        value: $r('app.string.cancel'),
-        action: (): void => { settled = true; }
-      },
-      secondaryButton: {
-        value: $r('app.string.sync_logout'),
-        fontColor: $r('app.color.error_text'),
-        action: (): void => {
-          if (settled || auth !== this.鉴权凭证) return;
-          settled = true;
-          this.确认注销();
-        }
-      }
+        title: this.取本地化文本($r('app.string.sync_logout')),
+        message: this.取本地化文本($r('app.string.sync_logout_confirm_message')),
+        autoCancel: false,
+        alignment: DialogAlignment.Center,
+        cancel: (): void => { settled = true; },
+        buttons: [
+            {
+                value: $r('app.string.cancel'),
+                action: (): void => { settled = true; }
+            },
+            {
+                value: $r('app.string.sync_logout'),
+                fontColor: $r('app.color.error_text'),
+                action: (): void => {
+                    if (settled || auth !== this.鉴权凭证)
+                        return;
+                    settled = true;
+                    this.确认注销();
+                }
+            }
+        ],
+        buttonDirection: DialogButtonDirection.AUTO
     });
   }
 

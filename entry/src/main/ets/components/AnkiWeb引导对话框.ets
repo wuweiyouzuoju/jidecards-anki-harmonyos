@@ -1,6 +1,6 @@
-import { SurfaceTransition } from '../utils/SurfaceTransition';
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { SurfaceBorder } from '../utils/SurfaceBorder';
+import { GlassPanel } from './common/GlassPanel';
+import { SurfaceTransition } from '../utils/SurfaceTransition';
 import { PressFeedback } from '../utils/PressFeedback';
 import { DialogBackdrop } from './common/DialogBackdrop';
 import { ThemeTextSpans, themeTextKey } from './common/ThemeText';
@@ -51,6 +51,8 @@ import { 颜色键 } from '../model/颜色主题';
 
 @Component
 export struct AnkiWeb引导对话框 {
+  @State private surfaceWidth: string = '88%';
+  @State private surfaceMaximumWidth: number = 480;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   isDark: boolean = false;
@@ -86,13 +88,17 @@ export struct AnkiWeb引导对话框 {
   build() {
     Stack() {
       // 遮罩 + 磨砂（与创建牌组面板等弹窗一致）
-      DialogBackdrop()
+      DialogBackdrop({ widthPercent: 88, maximumWidth: 480,
+          onSize: (width: string, maximumWidth: number): void => {
+            this.surfaceWidth = width; this.surfaceMaximumWidth = maximumWidth;
+          } })
         .onClick(() => {
           // 点遮罩不关闭：强制用户点「我已了解」确认
         })
         .transition(SurfaceTransition.backdrop())
 
-      Column({ space: 应用尺寸.间距_12 }) {
+      GlassPanel({ radius: 应用尺寸.圆角_卡片, panelWidth: this.surfaceWidth, maximumWidth: this.surfaceMaximumWidth, maximumHeight: '88%' }) {
+Column({ space: 应用尺寸.间距_12 }) {
         DialogHeader({
           title: $r('app.string.ankiweb_guide_title'),
           actionLabel: $r('app.string.ankiweb_guide_button_ok'),
@@ -145,12 +151,13 @@ export struct AnkiWeb引导对话框 {
         .width('100%')
         .margin({ top: 应用尺寸.间距_8 })
       }
-      .width('88%')
-      .constraintSize({ maxWidth: 480, maxHeight: '88%' })
+      .width('100%')
+       
       .padding(应用尺寸.间距_16)
-      .backgroundColor($r('app.color.surface_card'))
-      .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
-      .transition(SurfaceTransition.dialog())
+      
+      
+      }
+      
     }
     .width('100%')
     .height('100%')

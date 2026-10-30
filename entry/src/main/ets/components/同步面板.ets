@@ -1,7 +1,8 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { GlassPanel } from './common/GlassPanel';
 import { SurfaceTransition } from '../utils/SurfaceTransition';
 import { ActionStatus } from './common/ActionStatus';
 import { hasActionStatus } from '../model/InteractionFeedback';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../utils/PressFeedback';
 import { DialogBackdrop } from './common/DialogBackdrop';
 import { showToastSafely, resourceText, namedResourceText } from '../utils/UiFeedback';
@@ -22,6 +23,8 @@ import { createSyncSession } from '../backend/AnkiSyncSession';
 /** 只展示同步快照并转交用户意图；任务和租约由 SyncSession 持有。 */
 @Component
 export struct 同步面板 {
+  @State private surfaceWidth: string = '88%';
+  @State private surfaceMaximumWidth: number = 480;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @StorageProp(颜色键.动作主色) private dialogActionColor: string = '#2F5FD0';
@@ -205,13 +208,17 @@ export struct 同步面板 {
   private syncDialog() {
     Stack() {
       // 磨砂玻璃遮罩：canClose=false 时不响应点击
-      DialogBackdrop()
+      DialogBackdrop({ widthPercent: 88, maximumWidth: 480,
+          onSize: (width: string, maximumWidth: number): void => {
+            this.surfaceWidth = width; this.surfaceMaximumWidth = maximumWidth;
+          } })
         .onClick((): void => {
           this.dismissPresentation();
         })
         .transition(SurfaceTransition.backdrop())
 
-      Column({ space: 应用尺寸.间距_12 }) {
+      GlassPanel({ radius: 应用尺寸.圆角_卡片, panelWidth: this.surfaceWidth, maximumWidth: this.surfaceMaximumWidth, maximumHeight: '88%' }) {
+Column({ space: 应用尺寸.间距_12 }) {
         this.头部行()
 
         if (this.账号名 !== '') {
@@ -231,12 +238,13 @@ export struct 同步面板 {
           this.完成内容()
         }
       }
-      .width('88%')
-      .constraintSize({ maxWidth: 480, maxHeight: '88%' })
+      .width('100%')
+       
       .padding(20)
-      .backgroundColor(this.取色板().背景)
-      .borderRadius(应用尺寸.圆角_卡片)
-      .transition(SurfaceTransition.dialog())
+      
+      
+      }
+      
     }
     .width('100%')
     .height('100%')

@@ -188,7 +188,7 @@ test('automatic sync opt-in is saved only after the warning is confirmed', async
   assert.deepEqual(state.saves, []);
   await group.changeAutoSync(true);
   assert.equal(state.dialogs.length, 1, 'repeated input does not duplicate confirmation');
-  state.dialogs[0].secondaryButton.action();
+  state.dialogs[0].buttons[1].action();
   await enabling;
   assert.deepEqual(state.saves, [true]);
   assert.equal(group.autoSyncEnabled, true);
@@ -202,11 +202,11 @@ test('cancel, dismissal and leaving settings cannot enable automatic sync', asyn
   for (const action of ['cancel-button', 'dismiss', 'leave']) {
     const { group, state } = autoSyncSettingHarness();
     const enabling = group.changeAutoSync(true);
-    if (action === 'cancel-button') state.dialogs[0].primaryButton.action();
+    if (action === 'cancel-button') state.dialogs[0].buttons[0].action();
     if (action === 'dismiss') state.dialogs[0].cancel();
     if (action === 'leave') {
       group.aboutToDisappear();
-      state.dialogs[0].secondaryButton.action();
+      state.dialogs[0].buttons[1].action();
     }
     await enabling;
     assert.deepEqual(state.saves, [], action);
@@ -223,7 +223,7 @@ test('failed opt-in rolls back the switch and reports a retryable error', async 
   const { group, state } = autoSyncSettingHarness();
   state.fail = true;
   const enabling = group.changeAutoSync(true);
-  state.dialogs[0].secondaryButton.action();
+  state.dialogs[0].buttons[1].action();
   await enabling;
   assert.equal(group.autoSyncEnabled, false);
   assert.equal(group.错误文本, 'app.string.sync_settings_save_failed');
