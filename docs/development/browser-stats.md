@@ -14,17 +14,40 @@
 
 统计/笔记界面认知入口见 [软件界面认知](agent.md#软件界面认知)。统计页直接遍历共用分区定义，原图表组件发布范围/空数据/禁用状态；新增页、编辑加载页与编辑表单各自发布实际状态，不触碰查询、草稿或写入会话。新增回归为 `ai-agent-page-awareness.test.mjs`，编辑与统计原生命周期回归仍保留。
 
+新建及已有笔记编辑页在标签下方提供关联管理，字段半圆外圈提供“引用卡片”；引用与正文一起暂存和保存，无需电脑准备或先保存新笔记。正文锚点、逐处文字、隐藏关系数据、冲突及返回边界由[双端笔记引用](note-links.md)维护。
+
 - 代码路径以下均相对 `entry/src/main/ets/`。
 - 责任链：BrowserOperationController 管理操作快照、写入等待、同步占用及完成；页面负责搜索代次和 UI；统计口径来自 Core。
 - 快速反馈：`npm test -- browser / npm test -- ui`；完整验收见 [验证说明](verification.md)。
 
+## 统计图表的内存边界
+
+间隔与稳定度的范围及中位数统一由 `model/统计分箱.ets` 的 `取分布分位` 从计数桶计算，保留展开序列后 `(n-1)×p` 的线性插值口径。禁止按卡片计数重复展开数组；临时内存只随桶数增长，直方图仍按原范围聚合。`stats-align-contract.test.mjs` 覆盖小分布与展开参考的一致性，以及两种图表在 uint32 大计数下的范围、柱数、总计和中位数。
+
+这是针对大集合首屏计算内存风险的修复；没有用户崩溃堆栈时，不能据此认定某次统计页闪退的根因。设备日志与实际版本仍需分别核对。
+
 ## 浏览列表
 
-浏览页顶部保持“浏览”，多选时替换为选中数。卡片／笔记、状态、排序在搜索下方同一行等宽排列，三个入口均复用 `按下态按钮` 打开 `BrowserViewMenu` 的公共 `DialogFrame/DialogHeader`；选中项沿用公共菜单底色，右上角确认复用公共勾号按钮。模式、状态与排序先暂存草稿，确认才调用原页面回调，返回／关闭放弃草稿。搜索旁的 `IconActionButton` 与更多菜单共用筛选侧栏入口，使用普通工具按钮底色，不额外加筛选选中底色。模式／状态／排序入口也使用相同的普通按钮表面，当前值由文字表示。
+### 传统模式（2026-10-26）
+
+浏览右上角更多菜单最下方的“传统模式”项在现有卡片外观与 AnkiDroid 式多列表格间切换，选中态表示传统模式。偏好由 `BrowserPreferences` / `BrowserPreferencesStore` 的原串行队列保存；旧配置迁移默认保留现有外观。`traditionalCardsColumns`、`traditionalNotesColumns` 与原 `cardsColumns`、`notesColumns` 分开保存；切换外观不覆盖另一套列，卡片／笔记切换也保留各自列顺序。传统卡片默认 `noteFld/template/cardDue/deck`，传统笔记默认 `noteFld/note/template/noteTags`，来自上游 `BrowserConfig.kt`，不是 ViewModel 加载前的正反面临时两列。
+
+传统模式在手机与宽窗口都采用等宽列、固定标题和无卡间空隙的连续行；每列正文最多三行，单元格左右各8vp，行上下各12vp，表格不再叠加页面水平边距和卡片内边距。多选时标题和正文都保留20vp复选框位与8vp间隔。普通外观的页面边距、卡间距及宽屏横向表格继续由原实现拥有。Core 行颜色映射为整行主题底色，选中／键盘焦点优先使用主题选中底色；传统模式不另占标记徽章和信息按钮的列宽。
+
+点击列标题替换该位置的内容，候选仅来自当前 Cards/Notes 可用 Core 列且排除其它已使用列。长按标题打开原显示列管理，可增加、删除、上移／下移，至少保留一列；关闭放弃草稿，确认才保存并重新读取结果。更多 → 显示设置 → 显示列同样管理当前外观的列。标题不会被误用作排序入口，排序仍走原排序选择器及 Core 完整结果排序。列替换与最近搜索候选共用按下态按钮，列重排复用笔记类型编辑器同款公共上下箭头，复选框／开关跟随当前动作主色。传统模式点击或 Enter 打开行直接编辑，宽窗口复用并排编辑；原外观点击仍先预览。多选、长按／右键范围选择、完整结果全选、预览所选、卡片信息、标签／牌组／旗标／标星／暂停／埋藏／到期／重置／重新定位／换类型／评分／导出／删除及撤销继续调用原拥有者，不另实现一套写入链。选择态、搜索中和写入中禁用外观切换与列变更；保存失败保留当前外观／草稿并显示错误。
+
+对照固定为 AnkiDroid `6b2dfdc6f382b2ed31bc8f60bdc72115726d53dd`：`CardBrowserFragment` 的标题单击／长按、`ColumnSelectionDialogFragment` 的未使用列候选、`BrowserColumnSelectionFragment` 的增减和顺序、`CardBrowserViewModel.onTap/handleRowLongPress/handleRightClick`、`BrowserMultiColumnAdapter` 的等权单元格与三行正文、`BrowserColumnCollection` / `libanki/BrowserConfig.kt` 的独立配置。路径、SHA256 和默认列快照在 `tools/tests/fixtures/ankidroid-browser-columns.json`，上游链接见 [本轮对照记录](browser-traditional-mode-2026-10-26.md)。列重排复用鸿蒙公共上移／下移按钮，上游 Android 使用拖动；字体、主题、原生菜单外壳沿用本项目，不声称 Android 像素一致。
+
+虚拟列表的数据源继续以业务 ID 发出局部通知；`卡片表格.renderedRowKey` 同时包含行内容和当前列上下文，防止 LazyForEach 复用旧 `cells` 快照，造成切换外观后新列空白。直接回归覆盖内容、激活列、列顺序及外观变化，设备已验证往返切换和替换／重排列后即时刷新。
+
+UI 与 JIDE 共用 `AppInterface.browser_more.traditional`；页面发布真实开关、当前可见列和禁用状态，替换窗发布 `browser_column_replace` 及真实候选。`get_browser_preferences` 读取同一配置；传统开关和两套列配置经既有提案、预览、确认及保存队列修改，不开放任意配置键。直接回归 `browser-traditional` 与 `ai-agent-maintenance`，认知回归 `ai-agent-app-structure`；HAP 和设备验收范围见本轮对照记录及[2026-10-27 模拟器验收](browser-traditional-device-2026-10-27.md)。
+
+
+浏览页顶部保持“浏览”，多选时替换为选中数。卡片／笔记、状态、排序位于搜索下方：内容区达到600vp时同一行等宽排列，窄屏的模式与状态各半行，排序独占下一行，避免完整字段名与升降方向挤出箭头，三个入口均复用 `按下态按钮` 打开 `BrowserViewMenu` 的公共 `DialogFrame/DialogHeader`；选中项沿用公共菜单底色，右上角确认复用公共勾号按钮。模式、状态与排序先暂存草稿，确认才调用原页面回调，返回／关闭放弃草稿。搜索旁的 `IconActionButton` 与更多菜单共用筛选侧栏入口，使用普通工具按钮底色，不额外加筛选选中底色。模式／状态／排序入口也使用相同的普通按钮表面，当前值由文字表示。
 
 排序每个完整字段只列一次，升／降序复用现有选择按钮；确认后一次映射到 Core 默认方向与反转值、保存偏好并搜索，默认排序禁用方向选择。写入／搜索期间拒绝迟到选择。搜索与三选项行由页面统一贡献左右12vp边距，选项间8vp，按钮内边距和箭头由公共组件拥有；结果数独占下方小字，首张结果卡仍由列表独占区块间距。手机结果保留两行主内容、独立副标题及44vp信息入口，纵向内边距8vp、卡间窄屏5vp／宽屏8vp；显示列与1000vp宽屏表格规则不变。
 
-卡片与笔记在窄／宽窗口中点击或键盘打开均先预览，显式编辑从预览内进入原编辑器。Cards 预览当前搜索结果，Notes 只读取当前笔记的全部真实卡片，不把 noteId 当成 cardId，也不为一次点击遍历全部笔记；空笔记显示错误。笔记卡片读取核对请求代次、搜索代次、模式、集合生命周期和忙碌状态，迟到结果不打开旧预览。原有并排编辑和草稿放弃边界留给显式编辑入口。
+现有外观下，卡片与笔记在窄／宽窗口中点击或键盘打开均先预览，显式编辑从预览内进入原编辑器。Cards 预览当前搜索结果，Notes 只读取当前笔记的全部真实卡片，不把 noteId 当成 cardId，也不为一次点击遍历全部笔记；空笔记显示错误。笔记卡片读取核对请求代次、搜索代次、模式、集合生命周期和忙碌状态，迟到结果不打开旧预览。原有并排编辑和草稿放弃边界留给显式编辑入口。
 
 筛选侧栏的牌组与标签都由 `DirectoryTree` 拥有搜索输入、查询过滤、空状态和树列表；`TagTreeList.searchable` 仅开启同一个入口并提供标签占位／空状态文案，默认关闭以兼容已有外部查询调用。两个分区正文各只贡献一次16vp边距，公共树贡献搜索与列表间8vp；搜索不写入持久化折叠状态，标签操作仍通过完整路径上抛。
 
@@ -32,7 +55,7 @@ UI 和 JIDE 共用 `browserToolbarItems`，实际观察发布当前模式、状�
 
 2026-10-11 三选项弹窗、预览入口和侧栏搜索统一后，`npm test -- browser` 608项全部通过；使用 `node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs --test` 运行 documentation-contract、ui-directory-tree、common-boundary、ui-settings-components、ui-select-layout、ai-agent-app-structure、ui-shell-controls、ui-shell-contract 和 arkts-component-fields 九个测试文件，113项全部通过。`npm run build:app -- -SkipRust` 增量签名 HAP 构建成功，警告门禁 accepted=268、unexpected=0，复用已有双架构原生库。最终包未覆盖安装，以保留用户正在操作的模拟器现场；最终三选项弹窗、预览入口、侧栏留白及主题颜色仍需设备验收，之前版本的截图不作为本版验收证据。
 
-更多菜单主层提供筛选、全选搜索结果、查找替换、搜索工具、显示设置、回退和更多七项，复用 `CardActionMenu` 的图文左对齐及互斥子面板。搜索工具包含搜索选项、最近搜索、保存当前搜索；显示设置包含显示列及三种副标题单选，选中项由公共 `AnchoredMenuItem` 复用 `SelectStyle.selectedOptionSurface` 和圆角填色，不另显示勾或预留勾号槽位；更多包含旗标名称；键盘及鼠标指引统一放在设置的学习帮助。分隔线只区分功能组。“搜索选项”保留忽略重音和辅助构建；“最近搜索”复用 `BrowserDisplayDialog(kind=recent)`，单独显示原持久化历史和空状态，不改变搜索数据或提交语义。目录由 `AppInterface.browser_more` 及三个子面板声明产生，宿主发布真实展开状态；系统返回先收起子面板，再关闭主菜单。多选菜单保留清空选择、预览所选、导出所选与立即评分。全选和 Shift 区间选择依据完整搜索 ID 顺序，覆盖未加载分页；空选择仍可执行全选，写入时禁用选择与快捷键。Notes 信息和所选预览先解析真实代表卡片；空笔记显示错误，不将 noteId 传给卡片接口。Cards 删除所选卡片、Notes 展开所属卡片，以及查找替换“全部”限于当前搜索结果的语义保持。
+更多菜单主层提供筛选、全选搜索结果、查找替换、搜索工具、显示设置、回退、更多及最下方的传统模式八项，复用 `CardActionMenu` 的图文左对齐及互斥子面板。搜索工具包含搜索选项、最近搜索、保存当前搜索；显示设置包含显示列及三种副标题单选，选中项由公共 `AnchoredMenuItem` 复用 `SelectStyle.selectedOptionSurface` 和圆角填色，不另显示勾或预留勾号槽位；更多包含旗标名称；键盘及鼠标指引统一放在设置的学习帮助。分隔线只区分功能组。“搜索选项”保留忽略重音和辅助构建；“最近搜索”复用 `BrowserDisplayDialog(kind=recent)`，单独显示原持久化历史和空状态，不改变搜索数据或提交语义。目录由 `AppInterface.browser_more` 及三个子面板声明产生，宿主发布真实展开状态；系统返回先收起子面板，再关闭主菜单。多选菜单保留清空选择、预览所选、导出所选与立即评分。全选和 Shift 区间选择依据完整搜索 ID 顺序，覆盖未加载分页；空选择仍可执行全选，写入时禁用选择与快捷键。Notes 信息和所选预览先解析真实代表卡片；空笔记显示错误，不将 noteId 传给卡片接口。Cards 删除所选卡片、Notes 展开所属卡片，以及查找替换“全部”限于当前搜索结果的语义保持。
 
 `BrowserKeyboard.ts` 共用快捷键声明与精确修饰键匹配；`BrowserKeyAdapter.ets` 转换平台 KeyCode。Ctrl+A 全选，Ctrl+F 搜索，Ctrl+Alt+T 切换模式，方向键移动，Shift+方向键/点击扩展范围，Space 切换选择，Enter 打开，E 编辑，Delete 删除确认，Ctrl+Z/Ctrl+Shift+Z 撤销/重做，其它操作见应用内完整列表。输入、弹层、隐藏页面各自拥有输入；文本 Ctrl+A 不触发批量选择。编辑表单支持 Ctrl+Enter 保存（保留 Ctrl+S）和 Escape 请求关闭；完整对齐范围见下方“电脑键盘与上下文指引”。
 
@@ -182,19 +205,26 @@ UI 和 JIDE 共用 `browserToolbarItems`，实际观察发布当前模式、状�
 
 ## 基础字段编辑与草稿保护
 
+`NoteFieldEditor` 的可视编辑／源码编辑切换按字段自身可用宽度适配：宽字段在输入区右侧竖排，上方可视、下方源码；窄字段在输入区上方横排。`NoteFieldLayout` 在 onMeasureSize 直接读取父布局约束并测量两个按钮、输入栏和可选源码说明，再由 onPlaceChildren 同帧定位；不通过初值为0的宽度状态和布局后的回调切换方向，避免宽屏进入编辑页先闪出顶部按钮。断点与侧栏宽度由 `NOTE_FIELD_EDITING_SUPPORT.modeControlWideMinWidth/modeControlRailWidth` 同时供 UI 和 JIDE 软件结构读取，位置声明为 `right_vertical_on_wide_fields_above_horizontal_on_narrow_fields`，不按机型或设备朝向猜测。新增页、独立编辑页、浏览／学习及 Agent 草稿的所有调用共用这一入口；原生测量只更改同一子节点的约束与位置，不重建输入框、草稿、选区或模式。布局容器独占间距：宽布局输入栏与右侧按钮间8vp，按钮顶底边分别对齐输入栏；窄布局两按钮间8vp、按钮行与输入栏间5vp；源码说明另在输入栏下方5vp，不计入按钮对齐高度。页面安全区和字段卡片内边距仍归原宿主。原生测量与连续窗口变化回归见 `note-field-layout.test.mjs`，编辑状态保护见 `note-rich-editor.test.mjs`。
+
+2026-10-20 按用户指定恢复原边缘轮盘，移除未授权的字段下方工具面板与第二行预览顶栏。HelpLabel 的动作改由原生绝对定位容器承载，标题不再被44vp动作控件撑高；`addNoteInterfaceControls` 保留声明中的 iconKey，避免模板动作有热区却无图像。宽屏模拟器实际检查三字段在可视／源码两种模式下的输入容器与上下按钮边界，差值均为0px；窄窗口确认顶部横排，未保存笔记。证据为 `.local/editor-ui-native-result.json`、`editor-ui-wide-final.jpeg`、`editor-ui-narrow.png`。相关179项回归、图标投影30项、文档17项及增量签名HAP通过；这不代表全部硬件、主题、字体和键盘组合均已设备验收。
+
+
+验证入口：`node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs --test tools/tests/note-rich-editor.test.mjs tools/tests/ai-agent-app-structure.test.mjs tools/tests/ui-feedback.test.mjs tools/tests/arkts-component-fields.test.mjs tools/tests/common-boundary.test.mjs tools/tests/documentation-contract.test.mjs`。2026-10-19 本轮 116 项通过，JIDE 结构直接读取共同位置声明及断点；签名增量构建通过。额外执行本次编译 `NoteFieldEditor.ts` 的 28 种宽度／编辑模式／禁用组合，核对实际 Flex 方向、右侧宽度与间隔、按钮顺序和回调、输入 ID；该平台替身不证明原生布局、软键盘时序或所有设备视觉。证据为 `.local/note-mode-layout-tests.log`、`note-mode-layout-compiled-result.json`；固定构建产物位于 `.local/note-mode-layout-20261019/`。本轮未安装设备，手机横竖屏、平板／电脑、分屏、大字体及深浅主题仍需实机验收。
+
 简洁版与实验版均显示全部编辑工具，包括 `font_size` 与 `heading`。字号七档与标题 H1～H5 复用原轮盘外侧的局部弧形选项层，与原轮盘同圆心，选项按钮完整位于轮盘外缘之外，原轮盘不扩圈、不缩放。弧段中间项优先对齐对应入口的方向；屏幕和键盘边界优先，必要时沿同心圆调整弧段角度，不将弧形平移进轮盘内部。固定选项不绘制穿过按钮的轨道线。模型 `noteWheelOptionArcPosition` 持有弧形几何，轮盘宿主提供原轮盘半径、圆心、入口角度和可用窗口；当前字号或标题选项与入口按真实选区/后续输入格式高亮，选择层收起后入口保持高亮；默认继承字号不点亮字号入口，混合或无法识别的选区不误选，再点入口、折叠或转动轮盘收起。可视字号直接修改选中文字并保留 UTF-16 选区，无选区时控制后续输入；标题作用于选区所在整段；无选区时修改光标当前段，空段落控制后续输入，不改其他段。标题操作同时同步后续输入的字号与粗体，避免新文字回落为旧正文样式。`NoteRichText` 持有字号关键字、标题段和段落边界，显式 medium 与模板继承不混淆；原生输入、粘贴、删除使用 SDK onDidChange 的前后范围同步语义，标题换行/合并重新规范段落，源码/可视往返及重新打开保持样式。可视字号以字段编辑字号缩放，标题显示标准相对大小，最终卡片排版仍由模板 CSS 决定。仅接管七档字号 span 与无额外属性的 H1～H5，未知样式和媒体仍保留源码。`sourceNoteFontSize/sourceNoteHeading` 读取源码当前格式，`sourceNoteSetFontSize/sourceNoteSetHeading` 保留其他 CSS、属性、链接及媒体；标题段内修改替换整段标签，避免嵌套标题。公式长按仍使用 `NoteEditorFormatDialog`，单按仍插入行内标记。UI 与 JIDE 共用 `NoteFieldEditing.NOTE_EDITOR_FORMAT_MENUS/formatOptionPicker/fontSizeMenu`；覆盖层向 `note_editor_format_options` 发布当前字段、模式、`outer_arc_overlay` 位置和真实选中值。`NoteFieldEditor` 独占选区快照、代次和草稿应用，选区/内容变化、取消、字段切换、禁用、隐藏及销毁均使旧选择失效。回归入口为 `note-html-tools`、`note-rich-editor`、`note-editor-wheel` 和 `ai-agent-app-structure`；Node 行为与 HAP 编译不替代设备上的弧形外观、触摸、键盘和选区验收。
 
 字号与标题外圈保持当前输入焦点及键盘状态：打开、切换、再次点击收起和选择选项均不主动请求输入框焦点；打开时取消尚未执行的旧焦点恢复，避免键盘弹起后的原生选区通知立即关闭外圈。源码选项应用也不走普通内容工具的焦点恢复；其他内容工具继续按原策略恢复输入。浮层原生根布局保留 `HitTestMode.Transparent`，半圆操作区、把手及外圈选项分别使用 `HitTestMode.BLOCK_HIERARCHY`，使外围空白可操作、命中工具的触摸不再传到页面下方同坐标控件；仅设置 `focusOnTouch(false)` 无法阻止下方按钮获焦并关闭软键盘。`NOTE_FIELD_EDITING_SUPPORT.formatOptionPicker` 同时声明这两个入口与焦点契约，UI 路由和 JIDE 结构共用；`note-rich-editor` 直接回归覆盖可视/源码、有/无焦点、待执行焦点任务、重复切换及首次帮助返回。此回归不模拟系统失焦与软键盘事件时序，设备交互仍需单独验收。2026-10-10 已在模拟器覆盖安装签名 HAP，使用空白动态公式卡验证可视与源码模式反复打开/收起字号、可视字号应用、标题切换及手动收起键盘后打开外圈；原生 UI 树确认原输入焦点和键盘窗口按预期保持、下方按钮未获焦，且外围“可视编辑/源码编辑”仍能切换。未覆盖实体手机或握姿传感器。
 
 2026-10-06 字段文字工具完整替换为屏幕边缘的半圆菜单。公共 `NoteFieldEditor` 继续拥有 HTML、选区与动作；表单挂载即用 OverlayManager 默认展开 `components/editor/NoteEditorWheel.ets`，新增、已有笔记、音频相邻文本与 Agent 草稿共用。添加、编辑和 Agent 页面通过 Provide/Consume 持有各自 `NoteEditorWheelSession`，默认首个可编辑字段，焦点切换转交唯一浮层；失焦或收起键盘不隐藏，页面 onHidden 暂停、onShown 恢复，无模块级可变 UI 状态。长字段展开仍只调整112vp / 336vp高度，不改草稿、格式或选区；上下标、列表、链接、清除格式直接在圆弧中选择，无“更多格式”二级工具栏。
 
-可视编辑的加粗、斜体、下划线、荧光、字号和普通文字清除格式统一经 `applySelectionStyle` 更新，再用 SDK `setSelection` 保留原 UTF-16 选区；隐藏系统选择菜单，不把选区收成末尾光标。样式更新期间忽略临时选区通知并只发布最终草稿，用户可连续调整同一段文字或再次点击荧光去掉底色，持续输入格式不变。用户重新点光标后按新位置处理，禁用/离页后不恢复旧选区。换行、公式、挖空、上下标、列表及链接仍有各自的内容/选区策略，不强行套用纯样式更新。新增与编辑表单的 `AppInterface.instructionsKey` 复用工具按钮的 `note_editor_format_action` 资源，JIDE 读取同一份操作说明。回归：`note-rich-editor` 的连续操作、代理对、临时回调与销毁保护；原生选择高亮、手柄和键盘仍需设备验收。
+可视编辑的加粗、斜体、下划线、荧光、字号和普通文字清除格式统一经 `applySelectionStyle` 更新，再用 SDK `setSelection` 保留原 UTF-16 选区；隐藏系统选择菜单，不把选区收成末尾光标。样式更新期间忽略临时选区通知并只发布最终草稿，用户可连续调整同一段文字或再次点击荧光去掉底色，持续输入格式不变。用户重新点光标后按新位置处理，禁用/离页后不恢复旧选区。换行、公式、挖空、上下标、列表、网址链接及正文卡片引用仍有各自的内容/选区策略，不强行套用纯样式更新。新增与编辑表单的 `AppInterface.instructionsKey` 复用工具按钮的 `note_editor_format_action` 资源，JIDE 读取同一份操作说明。回归：`note-rich-editor` 的连续操作、代理对、临时回调与销毁保护；原生选择高亮、手柄和键盘仍需设备验收。
 
 `NoteRichText.ts` 解析无额外属性的标准链接、H1～H5、七档字号 span 和 sup/sub；可视接管边界由 `parseNoteVisualText` 统一决定。链接经 SDK `urlStyle` 保留地址。RichEditor Span 模式没有上下标基线偏移，`fontFeature` 依赖字体，不能保证排版；含 sup/sub 的字段保留源码。可视点击上下标经 `NoteHtmlTools.richNoteScript` 保留选区内外的原样式/链接并插入标准标签，切到源码；空选区的光标位于标签内部；模式切换后通过字段组件的唯一输入 id 恢复焦点，再定位目标光标，离页/禁用/新编辑代次拒绝迟到的焦点恢复。未知属性、列表、表格等也使用源码，未修改内容不重写。列表对选区或光标所在行生成 ul/ol/li 后切到源码，排版仍使用既有 Core 卡片预览链。源码工具拒绝半个标签、实体、代理对及无法理解的片段，保留未知 HTML 和共享媒体。
 
 链接弹窗复用 `DialogFrame` / `DialogHeader` / `FormInputStyle`，由 `@CustomDialog NoteLinkDialog` 提供原生控制器契约；不能改成普通 `@Component`，否则打开时调用生成的 `setController` 会失败。冻结打开时的草稿与选区；确认前仅持有地址副本，取消不修改，离页/禁用/原草稿变化后忽略回调。可视清除格式移除选区内的文字格式、字号和链接；标题是段落属性，清除时将受影响标题段恢复为正文。无选区时重置后续输入开关；源码清除要求选中完整基础格式片段，保留文字、实体和换行。纯模型回归为 `note-html-tools.test.mjs`，原生控制器、展开状态与弹窗生命周期回归在 `note-rich-editor.test.mjs`；`arkts-component-fields.test.mjs` 全仓检查 CustomDialogController 的组件 builder 声明。实际中文输入、选择范围、键盘、窄宽屏/深浅色仍需设备验收；构建和测试结果以本次交付为准。
 
-半圆内圈固定粗体、斜体、下划线、荧光、换行、清除格式六项；两种应用模式均显示可旋转外圈，按实际工具数量布局并最多同时显示七项；填空工具仅按当前字段的 Core 填空能力显示。按钮布局及边界共用圆心，上下和左右镜像；仅可旋转的工具外圈绘制轨道线，固定内圈与字号/标题选项不绘制穿过按钮的连线。图标和下方两行名称同在圆形按钮内，内圈按钮42vp、图标16vp、名称8vp；外圈按钮46vp、图标18vp、名称9vp。两种模式有外圈时默认外框半径均为158vp，内圈按钮圆心半径82vp、外圈轨道128vp，按钮到外边界7vp；小窗口按同一比例缩放。普通手机宽320/377/430vp验证圆形按钮互不覆盖、名称保留在按钮内。删除空按钮及其保留空间，手柄28×48vp直接靠边。每框上方保留可视编辑／源码编辑，输入框内部右下角32vp展开／收起按钮切换112/336vp高度，保留草稿和输入状态；内向/外向箭头跟随状态。图片/音频符号24vp。共同声明及动态观察同步 JIDE。
+半圆内圈固定粗体、斜体、下划线、荧光、换行、清除格式六项；两种应用模式均显示可旋转外圈，按实际工具数量布局并最多同时显示七项；“引用卡片”通过共同声明进入外圈、打开只读目标选择器，行为与保存边界见[双端笔记引用](note-links.md)；填空工具仅按当前字段的 Core 填空能力显示。按钮布局及边界共用圆心，上下和左右镜像；仅可旋转的工具外圈绘制轨道线，固定内圈与字号/标题选项不绘制穿过按钮的连线。图标和下方两行名称同在圆形按钮内，内圈按钮42vp、图标16vp、名称8vp；外圈按钮46vp、图标18vp、名称9vp。两种模式有外圈时默认外框半径均为158vp，内圈按钮圆心半径82vp、外圈轨道128vp，按钮到外边界7vp；小窗口按同一比例缩放。普通手机宽320/377/430vp验证圆形按钮互不覆盖、名称保留在按钮内。删除空按钮及其保留空间，手柄28×48vp直接靠边。每框上方保留可视编辑／源码编辑，输入框内部右下角32vp展开／收起按钮切换112/336vp高度，保留草稿和输入状态；内向/外向箭头跟随状态。图片/音频符号24vp。共同声明及动态观察同步 JIDE。
 
 新增、浏览和学习共用 `components/common/NoteFieldEditor.ets`。`NoteRichText.ts` 负责文字/基础 HTML 往返，原生 RichEditor 显示加粗、斜体、下划线、荧光、字号和标题；字号与基础文字格式在无选区时控制持续输入，有选区时只改选区；标题作用于整段，空段落控制后续输入。`NoteFieldEditing.ts` 仍处理源码选区和挖空编号。字段卡片分离标准 img/sound 引用作媒体预览，其余未知标签/属性保留源码模式，未修改的 HTML 不重写；公式、挖空保留标记，学习时渲染。首次学习和交互规范见 [应用内帮助](in-app-help.md#编辑工具首次学习与当前界面文案)。`笔记类型服务.获取编辑笔记类型` 读取 Core kind、originalStockKind、clozeFieldOrds 和 IO 字段索引，改名不影响功能；标准可选反向模板由 `NoteTypePresentation.ts` 检查，按真实字段引用找开关序号并通过 NoteEditorSession 传给三个编辑入口；定制模板保留文本字段。友好类型名只用于展示，不改用户数据库。
 
@@ -288,11 +318,15 @@ JIDE 与图标共用 `NOTE_FIELD_MEDIA_TOOLS` 的名称、图标、两类媒体�
 
 “图片和视频”管理保留原“新增图片或视频”，在其下增加“新增白板书画”。两行共用 `LabeledActionRow`，左侧以小正文和次要文字色说明导入限制、草稿生效及书画生成图片；右侧按钮文字沿用 `text_primary`，与已有辅助动作的浅色黑字、深色白字一致。白板新增保留笔形图标。图片预览右上角复用 `IconActionButton` 的 `ic_study_edit`，视频不显示书画入口。`NoteDrawingEditor` 在同一窗口切换编辑内容，支持空白画布尺寸、导入底图、手写及可选择、拖动、修改和删除的文字。手写优先复用 `StudyPenCanvasHost` 华为套件；不可用或新画布初始化失败时使用 `StudyWhiteboard`。已有华为笔迹加载失败时保留原图并报错，不用平面缩略图冒充可编辑笔迹。返回先取消书画，回到媒体草稿；编辑器完成只生成新图片，媒体完成才移交字段，保存笔记才导入 Core。
 
-文字颜色复用公共 `FormSelectRow`，原版笔刷颜色也使用同一选择行；华为内部笔刷工具仍由套件拥有。图片按钮有图片时显示“替换图片”，无图片时显示“添加图片”，UI 与 JIDE 共用 `noteDrawingImageActionKey`；替换只更换底图，保留笔迹和文字。文字取消字号选择框，点击显示按逐行实际字形边界合并的选中框，拖动框移动，拖四边/四角八个手柄或双指捏合等比缩放；点击空白处取消选择，再次点击可放置新文字。文字块点击与拖动共用同一节点，按压外观由公共 `PressFeedback` 负责。变换期间只更新显示偏移/比例，结束才提交归一化坐标和源字号，取消保留原文档与选择；窗口尺寸变化取消预览。字号沿用文档 8～256 的范围，框与手柄不进入合成图。预览与导出共用 `paintNoteDrawingText` 的字体、基线和行距，`measureNoteDrawingText` 按源像素测量多行字形边界；屏幕按源文档比例换算 vp。可见框每侧仅留 2vp，44vp 最小点击区通过 responseRegion 独立扩展；八个手柄拥有 24vp 独立热区，圆点 12vp，按框宽高向外留出 12vp，小字时相邻手柄中心至少相隔 24vp；靠边时整组移入画布，避免逐个夹紧造成热区重叠。缩放固定对边/对角，角点采用归一化变化更大的轴，长文字的纯竖向拖动和高文字的纯横向拖动均直接生效；靠边时先约束原点，预览与提交保持一致。`ui-press-feedback.test.mjs` 扫描公共按压入口，`note-drawing.test.mjs` 直接验证选择、颜色复用、移动/缩放提交及取消、手势切换、边界与忙碌守卫、缩放后保存再编辑。
+文字颜色选择紧接“书画 / 文字”按钮右侧，原版笔刷使用同一入口，外观复用公共 `SelectStyle`；窄窗由工具 Flex 换行，颜色不再独占整行。华为内部笔刷工具仍归套件。图片按钮有图片时显示“替换图片”，无图片时显示“添加图片”，UI 与 JIDE 共用 `noteDrawingImageActionKey`；替换只更换底图，保留笔迹和文字。点击文字显示按逐行实际字形边界合并的矩形框，拖框移动；左右边中点只拉伸宽度，上下边中点只拉伸高度，均改变宽高比；四角和双指保持当前宽高比缩放。点击空白处取消选择，再次点击可放置新文字。不提供字号选择框。文字对象使用 Tap/Pan/Pinch，不套按钮按压缩放，避免框与 Canvas 文字分离。变换期间只更新预览，结束才提交归一化坐标、源字号与轴向比例；取消、窗口尺寸变化保留源文档。字号保持 8～256，框点不进入 PNG。
 
-`model/NoteDrawing.ts` 拥有文档与 PNG 私有辅助块 `jiDe`；`backend/NoteDrawingStore.ets` 负责平台图片编解码、SDK 不透明保存文件与独占缓存；`utils/NoteDrawingRendering.ets` 合成底图、笔迹及文字。可编辑源随 PNG 一起保存，普通卡面显示合成图，现有 PNG 导入保留源字节，避免未被字段引用的旁文件。外部工具重编码 PNG 可能丢弃辅助块，之后只能作为普通底图编辑。文档源最多32MiB，输入文件最多64MiB，导入底图长边最多2048像素。书画缓存只在本次 `note-drawing-*` 命名空间清理，取消、替换、删除、提交成功和离页遵循媒体/宿主草稿所有权，保存中的 IO 完成后才释放资源。
+`measureNoteDrawingText` 按源像素测量，预览/导出共用 `paintNoteDrawingText`；实际字形、行距和选框都使用相同的横纵比例，不仅改变框的宽高。选框每侧 2vp，方形框点 10vp，中心严格贴在框边；24vp 热区按相邻点中线收窄，不把框点推出选框或靠边重排。文字位置为框点保留5vp内缘。`resizeTextTouch` 从 Down 起按触点 ID 和稳定的窗口坐标计算累计位移。`DRAWING_TEXT_HANDLES.mode` 共同声明 width/height/proportional：边点沿单轴计算倍率，角点将位移投影到等比轨迹，排除固定4vp框留白，不按较大轴切换比例。到画布边缘限制被修改轴的倍率，固定锚点不移动，触点退回后立即恢复。`note-drawing.test.mjs` 检查实际文字轴向变换、未拉伸轴保持、连续反向轨迹、松手不跳变、掌触取消隔离与边界。
 
-`note_drawing_editor` 发布实际引擎、准备/忙碌/错误、文字数量、选择与变换状态、公共颜色选择框选项、字形选框模式、实际八方向手柄及宿主工具可用性；字号仅作为状态值，不再声明不存在的字号控件。不发布图片路径、正文、笔迹、SDK 文件或内容识别结果。SDK 内部工具和画布直接拖动、缩放没有 Agent 执行接口，`controlsComplete=false`。直接回归 `tools/tests/note-drawing.test.mjs` 已纳入 media 筛选，覆盖源往返、原始 PNG 媒体导入、草稿替换/取消、文字坐标、保存失败和迟到回调；平台替身不证明华为实际保存/加载/缩略图、图片解码、触摸、系统返回及宽窄屏布局，设备验收仍需单独执行。
+本地 Canvas、文字层和华为实际 `HandwriteComponent` 节点显式使用同一实测画幅宽高；套件布局就绪从实际节点的 `onAreaChange` 发布，不能拿外层裁切框的尺寸当作内部画布已就绪。本地 Canvas 尺寸变化后重绘原笔迹。回归覆盖横/竖/方画幅、不同窗口与画幅四角的落笔映射及华为挂载尺寸更新；这些主机验证不证明系统 HSP 内部绘制面或真实笔感已验收，仍需设备覆盖全画幅与连续触屏操作。
+
+`model/NoteDrawing.ts` 拥有文档与 PNG 私有辅助块 `jiDe`；`backend/NoteDrawingStore.ets` 负责平台图片编解码、SDK 不透明保存文件与独占缓存；`utils/NoteDrawingRendering.ets` 合成底图、笔迹及文字。文字的可选 `scaleX` / `scaleY` 保存轴向拉伸，旧源缺省为1，范围1/32～32；字号与比例独立，角点/双指不会重置已拉伸的宽高比。可编辑源随 PNG 一起保存，普通卡面显示合成图，现有 PNG 导入保留源字节。回归直接执行旧源读取、非法比例拒绝、横纵拉伸后等比缩放、PNG往返再编辑及预览/导出坐标一致。旧版本编辑器不认识新增轴向比例，再编辑新图时不能保证拉伸保真；新版本读取旧图保持原样。外部工具重编码 PNG 可能丢弃辅助块，之后只能作为普通底图编辑。文档源最多32MiB，输入文件最多64MiB，导入底图长边最多2048像素。书画缓存只在本次 `note-drawing-*` 命名空间清理，取消、替换、删除、提交成功和离页遵循媒体/宿主草稿所有权，保存中的 IO 完成后才释放资源。
+
+`note_drawing_editor` 发布实际引擎、准备/忙碌/错误、文字数量、选择与变换状态、颜色选项及其工具条位置、字形选框、贴框方形框点、每个框点的拉伸/等比模式及选中文字已提交的横纵比例；模式声明来自 `NoteDrawing.ts`。字号仅作为状态值。不发布图片路径、正文、笔迹、SDK 文件或内容识别结果。SDK 内部工具和画布直接拖动、缩放没有 Agent 执行接口，`controlsComplete=false`。直接回归 `tools/tests/note-drawing.test.mjs` 已纳入 media 筛选；可执行命令为 `node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs --test tools/tests/note-drawing.test.mjs tools/tests/study-whiteboard.test.mjs`。平台替身不证明华为实际保存/加载/缩略图、图片解码、触摸、系统返回及宽窄屏布局，设备验收仍需单独执行。
 
 早期验收完成过仓库、原生与签名 HAP 检查，但未做该弹层的设备交互；该结果不能证明关闭可用，也不作为当前工作树的验证证据。
 
@@ -403,3 +437,21 @@ description 作输入提示；plainText 是 Anki 的默认 HTML 源码模式，�
 新增、编辑与字段工具说明统一放在设置 → 学习帮助 → 键盘快捷键 → 新增与编辑，复用字段帮助弹窗和 `KeyboardShortcutList`；移除本轮新增的编辑标题旁快捷键入口。`AppInterface` 同步登记学习帮助说明、牌组/类型/模板入口与属性忙态。`NoteEditorProperties` 负责现有笔记的属性写入，沿 `BrowserOperationController` 等待集合可用、核对笔记基线，再调用 Core；换牌组作用于该笔记所有卡片。`NoteEditorSession.refresh` 只刷新保存基线，不重建表单；换类型按 Core newFields 映射未提交字段及附件，刷新失败保留草稿、禁止继续保存并提供重试。模板入口 `templatesOnly` 不允许修改字段结构，保存后保留新增/编辑草稿和临时媒体。
 
 验证入口 `keyboard-alignment`、`note-rich-editor`、`note-editor-session`、`browser-editor-component`、`note-audio` 与受影响 home/study/browser/ui/media/repo 测试并集；新增组件/平台类型须增量签名 HAP。最终真机或模拟器的实体键盘焦点、中文输入法、窗口大小、主题、弹窗与录音流程仍需设备验收；本次不安装或重启用户设备。
+
+## 字段固定图钉（2026-10-29）
+
+新增编辑器NoteFieldCard将整行“固定字段”开关改为标题旁的32vp图钉，位于媒体按钮之前；空心灰色为未固定、实心主题色为固定，与iOS NoteComposerView一致。图钉在可视/源码模式共用Core字段sticky快照；点击仍经NoteCreationSession.setFieldSticky持久化，成功后才发布，禁用/保存中/销毁后的事件不写入。既有笔记编辑与iOS一致不新增类型固定写入入口；图片遮盖的源图和遮罩专用开关保持原语义，普通标题/额外字段复用图钉。
+
+NOTE_FIELD_STICKY_CONTROL向UI与JIDE提供名称、两态图标及位置，add_note观察保留实际selected并在stickySaving时禁用；不增加助手写入工具。标题行保留原卡片16vp内边距，图钉32vp、媒体按钮44vp不叠外层margin，可视/源码切换不重置固定状态。直接回归为note-continuation.test.mjs，设备视觉与Core保留行为另行记录。
+
+编辑器表层分组对照iOS：EditorSectionCard统一牌组/笔记类型、常显标签与关联入口的内边距和主题表面；新增页两项选择同卡、细线分隔，原DirectorySelect及模板/帮助入口保留。已有笔记不伪造未读取的牌组/类型名称，原移动/转换/模板动作同卡排列。NoteEditorHeader显式actionIcon切换预览草稿为眼睛按钮，翻面等其他文字操作不变。标签块使用NoteTagsField可删除标签块、输入和添加按钮，既有层级TagPicker仍可用；未确认的输入立即回写原宿主草稿，父级回声不打断输入，提交按原parseNoteTags去重，不复制iOS业务。关联入口保留实际数量、原NoteLinksDraftPanel及引用原子保存/冲突保护。共同能力说明与AppInterface同步常显标签及预览/关联图标。
+
+字段模式按钮现在位于NoteFieldCard标题行，显示当前“可视编辑/源码编辑”，点击统一请求该字段各文本段转换。NoteFieldEditor仍拥有实际转换和复杂HTML拒绝逻辑，并回报真实模式；只有首文本段恢复焦点，其他段不会抢焦点。非笔记富文本输入保留原本地模式控件。牌组/笔记类型及设置枚举通过SelectionValueButton共用透明无框的当前值+箭头入口；DirectorySelect与SurfaceSelect继续分别拥有目录窗口与枚举菜单，主题材质只作用于所属卡片和弹层，不再叠一层选择框。
+
+本轮验收：247项相关Node回归通过，devecocli增量签名HAP构建通过；iPhone 18 Pro独立测试库的testNoteEditorSurfaceAndContinuation通过，仅用作表层视觉参考。Palace_Performance（127.0.0.1:5555）覆盖安装，实际确认图钉两态、标题行模式切换至源码、标签输入与添加为块、关联卡片打开原草稿面板、设置选择入口打开原菜单。居中修正后笔记类型标题与问答题值的文字边界均为558–611px；设置外观主题与跟随系统均为664–717px。保留Core保存和草稿语义，未执行真实账号同步。宽屏、全部语言/大字体及所有笔记类型组合未逐项设备验收。
+
+2026-10-30：浏览页卡片/笔记、状态、排序三个入口在所有宽度下平分同一行，长名称保留完整读屏与单行省略，不再把窄屏排序移到第二行。BrowserViewMenu排序方向行与标题分隔线保留12vp间隔，升降序按钮之间12vp；字段选择、方向草稿及确认提交保持原语义。
+
+草稿与模板预览的弹窗及全屏入口统一使用 ic_card_flip 翻转卡片图标，随当前面保留对应正/背面无障碍标签；重播音频使用 ic_audio_replay 图标。点击仍由原 toggleSide/playAudio 处理。
+
+浏览筛选侧面板玻璃接入：浏览侧边栏以GlassPanel承载原80%宽、全高内容，明确panelHeight使滚动区有界；普通弹窗仍按固有高度测量。玻璃层和正文复用公共准备/250ms锁定降级与弹出动效，原遮罩只淡入淡出；分组在玻璃档透明以透出同一采样，扁平档保留原卡片底色。牌组、标签、已保存搜索的树、加载/错误/折叠、关闭和选择回调保持。
