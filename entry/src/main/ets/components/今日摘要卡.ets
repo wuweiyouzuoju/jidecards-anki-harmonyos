@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SeriesVisual } from '../utils/SeriesVisual';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
+import { LengthMetrics } from '@kit.ArkUI';
 import { ThemeDefinition, themeDefinition, THEME_VISUALS_KEY } from '../model/ThemeCatalog';
 import { themeProgressGradient } from '../utils/ThemeVisuals';
-import { homeSummaryGeometry, HomeSummaryGeometry } from '../model/HomeHeaderLayout';
+import { homeSummaryGeometry, homeSummaryStacksMetrics, HomeSummaryGeometry } from '../model/HomeHeaderLayout';
 
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { 颜色键 } from '../model/颜色主题';
@@ -33,6 +35,12 @@ import { 颜色键 } from '../model/颜色主题';
 // ========================================================
 @Component
 export struct 今日摘要卡 {
+  @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
+  @StorageProp('themeMode') private themeMode: string = 'system';
+  @StorageProp('systemDarkMode') private systemDark: boolean = false;
+  @StorageProp(颜色键.页面底色微染) private pageTint: string = '';
+
+  @State private contentWidth: number = 0;
   @Prop indicatorSpace: number = 0;
   @Prop cardHeight: number = 150;
   @Prop compactCard: boolean = false;
@@ -104,23 +112,35 @@ export struct 今日摘要卡 {
   // @副作用
   // 无。
   // ========================================================
-  private pageGeometry(): HomeSummaryGeometry { return homeSummaryGeometry(this.cardHeight, this.compactCard, this.indicatorSpace); }
+  private pageGeometry(): HomeSummaryGeometry {
+    const context: UIContext = this.getUIContext();
+    return homeSummaryGeometry(this.cardHeight, this.compactCard, this.indicatorSpace, context.px2vp(context.fp2px(1)));
+  }
+
+  private stackedMetrics(): boolean {
+    const context: UIContext = this.getUIContext();
+    return homeSummaryStacksMetrics(this.contentWidth, context.px2vp(context.fp2px(1)));
+  }
 
   build() {
     Column({ space: 应用尺寸.间距_8 }) {
-      Row() {
+      Flex({ direction: this.stackedMetrics() ? FlexDirection.Column : FlexDirection.Row,
+        alignItems: this.stackedMetrics() ? ItemAlign.Start : ItemAlign.Center }) {
         Text($r('app.string.today_progress'))
           .fontSize(this.compactCard ? 应用尺寸.字号_强调 : 应用尺寸.字号_摘要标题)
-          .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+          .wordBreak(WordBreak.BREAK_WORD)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.text_primary'))
-          .layoutWeight(1)
+          .layoutWeight(this.stackedMetrics() ? 0 : 1)
+          .width(this.stackedMetrics() ? '100%' : undefined)
         Text($r('app.string.deck_count_summary', this.牌组数))
           .fontSize(this.compactCard ? 应用尺寸.字号_正文_小 : 应用尺寸.字号_正文_中)
-          .maxLines(1).flexShrink(0).margin({ left: 应用尺寸.间距_4 })
+          .width(this.stackedMetrics() ? '100%' : undefined)
+          .textAlign(this.stackedMetrics() ? TextAlign.Start : TextAlign.End)
+          .flexShrink(0).margin({ left: this.stackedMetrics() ? 0 : 应用尺寸.间距_4 })
           .fontColor($r('app.color.text_secondary'))
       }
-      .width('100%').height(this.pageGeometry().titleHeight)
+      .width('100%').constraintSize({ minHeight: this.pageGeometry().titleHeight })
 
       Column({ space: 应用尺寸.间距_8 }) {
         if (this.是否空态()) {
@@ -136,68 +156,75 @@ export struct 今日摘要卡 {
             .backgroundColor(this.主色容器色)
             .borderRadius(应用尺寸.圆角_进度条)
 
-          Row({ space: 应用尺寸.间距_10 }) {
-            Column({ space: 应用尺寸.间距_3 }) {
+          Scroll() {
+          Flex({ direction: this.stackedMetrics() ? FlexDirection.Column : FlexDirection.Row,
+            alignItems: ItemAlign.Center, space: { main: LengthMetrics.vp(应用尺寸.间距_10) } }) {
+            Flex({ direction: this.stackedMetrics() ? FlexDirection.Row : FlexDirection.Column,
+              alignItems: ItemAlign.Center, justifyContent: FlexAlign.Center,
+              space: { main: LengthMetrics.vp(应用尺寸.间距_3) } }) {
               Text(this.已完成数.toString())
                 .fontSize(应用尺寸.字号_指标)
                 .minFontSize(应用尺寸.字号_正文).maxFontSize(应用尺寸.字号_指标).maxLines(1)
                 .fontWeight(FontWeight.Bold)
                 .fontColor(this.新卡计数色)
-                .width('100%').textAlign(TextAlign.Center)
+                .width(this.stackedMetrics() ? '28%' : '100%').textAlign(this.stackedMetrics() ? TextAlign.Start : TextAlign.Center)
             Text($r('app.string.completed_today'))
-              .fontSize(应用尺寸.字号_正文_小).minFontSize(10).maxFontSize(应用尺寸.字号_正文_小)
-              .height(18).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+              .fontSize(应用尺寸.字号_正文_小).wordBreak(WordBreak.NORMAL)
                 .fontColor($r('app.color.text_secondary'))
-                .width('100%').textAlign(TextAlign.Center)
+                .width(this.stackedMetrics() ? '72%' : '100%').textAlign(this.stackedMetrics() ? TextAlign.Start : TextAlign.Center)
             }
-            .alignItems(HorizontalAlign.Center)
-            .layoutWeight(1)
+            .width(this.stackedMetrics() ? '100%' : undefined)
+            .layoutWeight(this.stackedMetrics() ? 0 : 1).flexShrink(0)
 
-            Column({ space: 应用尺寸.间距_3 }) {
+            Flex({ direction: this.stackedMetrics() ? FlexDirection.Row : FlexDirection.Column,
+              alignItems: ItemAlign.Center, justifyContent: FlexAlign.Center,
+              space: { main: LengthMetrics.vp(应用尺寸.间距_3) } }) {
               Text(this.待学数.toString())
                 .fontSize(应用尺寸.字号_指标)
                 .minFontSize(应用尺寸.字号_正文).maxFontSize(应用尺寸.字号_指标).maxLines(1)
                 .fontWeight(FontWeight.Bold)
                 .fontColor(this.学习中计数色)
-                .width('100%').textAlign(TextAlign.Center)
+                .width(this.stackedMetrics() ? '28%' : '100%').textAlign(this.stackedMetrics() ? TextAlign.Start : TextAlign.Center)
             Text($r('app.string.pending_today'))
-              .fontSize(应用尺寸.字号_正文_小).minFontSize(10).maxFontSize(应用尺寸.字号_正文_小)
-              .height(18).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+              .fontSize(应用尺寸.字号_正文_小).wordBreak(WordBreak.NORMAL)
                 .fontColor($r('app.color.text_secondary'))
-                .width('100%').textAlign(TextAlign.Center)
+                .width(this.stackedMetrics() ? '72%' : '100%').textAlign(this.stackedMetrics() ? TextAlign.Start : TextAlign.Center)
             }
-            .alignItems(HorizontalAlign.Center)
-            .layoutWeight(1)
+            .width(this.stackedMetrics() ? '100%' : undefined)
+            .layoutWeight(this.stackedMetrics() ? 0 : 1).flexShrink(0)
 
-            Column({ space: 应用尺寸.间距_3 }) {
+            Flex({ direction: this.stackedMetrics() ? FlexDirection.Row : FlexDirection.Column,
+              alignItems: ItemAlign.Center, justifyContent: FlexAlign.Center,
+              space: { main: LengthMetrics.vp(应用尺寸.间距_3) } }) {
               Text(this.今日答对率 >= 0 ? `${Math.round(this.今日答对率 * 100)}%` : '-')
                 .fontSize(应用尺寸.字号_指标)
                 .minFontSize(应用尺寸.字号_正文).maxFontSize(应用尺寸.字号_指标).maxLines(1)
                 .fontWeight(FontWeight.Bold)
                 .fontColor(this.复习中计数色)
-                .width('100%').textAlign(TextAlign.Center)
+                .width(this.stackedMetrics() ? '28%' : '100%').textAlign(this.stackedMetrics() ? TextAlign.Start : TextAlign.Center)
             Text($r('app.string.today_pass_rate_short'))
-              .fontSize(应用尺寸.字号_正文_小).minFontSize(10).maxFontSize(应用尺寸.字号_正文_小)
-              .height(18).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+              .fontSize(应用尺寸.字号_正文_小).wordBreak(WordBreak.NORMAL)
                 .fontColor($r('app.color.text_secondary'))
-                .width('100%').textAlign(TextAlign.Center)
+                .width(this.stackedMetrics() ? '72%' : '100%').textAlign(this.stackedMetrics() ? TextAlign.Start : TextAlign.Center)
                 .accessibilityText($r('app.string.today_recall_rate'))
             }
-            .alignItems(HorizontalAlign.Center)
-            .layoutWeight(1)
+            .width(this.stackedMetrics() ? '100%' : undefined)
+            .layoutWeight(this.stackedMetrics() ? 0 : 1).flexShrink(0)
           }
           .width('100%')
-          .layoutWeight(1)
-          .alignItems(VerticalAlign.Center)
+          }.width('100%').layoutWeight(1).scrollBar(BarState.Auto)
         }
-      }.width('100%').height(this.pageGeometry().bodyHeight).justifyContent(FlexAlign.Center)
+      }.width('100%').layoutWeight(1).justifyContent(FlexAlign.Center)
     }
     .width('100%')
     .height(this.cardHeight)
+    .onAreaChange((_old: Area, area: Area): void => { this.contentWidth = Number(area.width); })
     .padding({ top: this.pageGeometry().topPadding, bottom: this.pageGeometry().padding,
       left: this.pageGeometry().padding, right: this.pageGeometry().padding })
     .backgroundColor($r('app.color.surface_card'))
     .border(SurfaceBorder.options())
     .borderRadius(应用尺寸.圆角_卡片)
+    .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, SeriesVisual.isDark(this.themeMode, this.systemDark),
+      this.动作主色, this.pageTint))
   }
 }

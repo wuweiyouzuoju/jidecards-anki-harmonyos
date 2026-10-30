@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { homeHeaderGeometry, homeSummaryGeometry } from '../../entry/src/main/ets/model/HomeHeaderLayout.ts';
+import { homeHeaderGeometry, homeSummaryGeometry, homeSummaryStacksMetrics } from '../../entry/src/main/ets/model/HomeHeaderLayout.ts';
 import { safePopupContentHeight, safeMenuGeometry, windowSafeInsets, safeDialogMaxHeight } from '../../entry/src/main/ets/model/WindowSafeLayout.ts';
 import { searchHomeDecks } from '../../entry/src/main/ets/model/HomeDeckSearch.ts';
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
@@ -45,6 +45,24 @@ test('all summary pages reserve dots, a common title and centered body without o
     assert.equal(g.chartHeight+4+16,g.bodyHeight, 'bars and ticks use the same body baseline');
     assert.ok(g.bodyHeight>=90, 'two count rows fit inside the body');
   }
+});
+
+test('summary geometry follows actual font scale while keeping toolbar controls and dots stable',()=>{
+ for(const scale of [1,1.5,2,3.2]) {
+  const header=homeHeaderGeometry(600,12,true,44,scale);
+  const page=homeSummaryGeometry(header.summaryHeight,false,10,scale);
+  assert.equal(header.summaryHeight,168*scale);assert.equal(header.controlHeight,44);
+  assert.equal(page.titleHeight,24*scale);assert.ok(page.bodyHeight>=90*scale);
+  assert.equal(page.topPadding-page.padding,10);
+  assert.equal(page.topPadding+page.titleHeight+8+page.bodyHeight+page.padding,header.summaryHeight);
+ }
+ const source=readFileSync(new URL('../../entry/src/main/ets/components/今日摘要卡.ets',import.meta.url),'utf8');
+ for(const width of [320,360,480,600,768])for(const scale of [1,2,3.2]) {
+  assert.equal(homeSummaryStacksMetrics(width,scale),scale>1 && width/scale<360);
+ }
+ assert.match(source,/FlexDirection\.Column : FlexDirection\.Row/);
+ assert.match(source,/\? '72%' : '100%'/);
+ assert.doesNotMatch(source,/height\(18\)|TextOverflow\.Ellipsis/,'summary labels remain complete at large fonts');
 });
 
 test('cutout edges include the rectangle origin and safe menus stay below the camera and above navigation', () => {
@@ -120,7 +138,8 @@ function homeHeader() {
     homeHeaderGeometry,
     空主页快照: {}, 应用尺寸: dimensions
   });
-  const header = new Header(); header.narrowDeckLayout = true; return header;
+  const header = new Header(); header.narrowDeckLayout = true;
+  header.getUIContext=()=>({fp2px:value=>value*3,px2vp:value=>value/3});return header;
 }
 
 test('the real header publishes one measured menu region below the buttons and closes menus only when it changes', () => {
@@ -178,7 +197,7 @@ test('both home menus retain the button gap when their host has a title bar or n
   }).join('\n');
   const Host=new Function(stripTypeScriptTypes(`class Host { ${methods} }`,{mode:'transform'})+';return Host;')();
   const menuInputs=[...page.matchAll(/topOffset: ([^,\n]+), contentLeft: ([^,\n]+)/g)];
-  assert.equal(menuInputs.length,2,'More and Create share the measured host');
+  assert.equal(menuInputs.length,2,'both menus retain the original measured button anchors');
   const evaluate=(expression,host)=>new Function('return '+expression).call(host);
   for(const narrow of [false,true]) for(const width of [240,768]) for(const inset of [0,24])
     for(const origin of [{x:0,y:0},{x:0,y:36},{x:140,y:80}]) {
@@ -245,4 +264,12 @@ test('home uses grouped small icon buttons and public menus while summary pages 
   assert.doesNotMatch(read('components/common/IconActionButton.ets'), /\bText\(/);
   assert.equal((read('components/home/主页摘要分页.ets').match(/\.height\(this.cardHeight\)/g) ?? []).length, 7);
   assert.match(read('components/今日摘要卡.ets'), /\.height\(this.cardHeight\)/);
+});
+
+test('首页和牌组详情只使用普通导航，没有顶部按钮组形变覆盖层',()=>{
+ const read=p=>readFileSync(new URL('../../entry/src/main/ets/'+p,import.meta.url),'utf8');
+ for(const path of ['pages/首页.ets','components/home/HomeSummaryHeader.ets','components/home/HomeDeckDetails.ets']){
+  assert.doesNotMatch(read(path),/OliveOil|toolbarMorph|contentMorph|morphRectToPx/);
+ }
+ assert.match(read('pages/首页.ets'),/this.显示牌组详情 = false; this.加载主页数据\(\);/);
 });

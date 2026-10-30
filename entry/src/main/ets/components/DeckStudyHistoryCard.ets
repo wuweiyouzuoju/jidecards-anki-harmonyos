@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SeriesVisual } from '../utils/SeriesVisual';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { PressFeedback } from '../utils/PressFeedback';
 import { 统计服务 } from '../backend/统计服务';
@@ -9,10 +10,17 @@ import { 颜色键 } from '../model/颜色主题';
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { PAGE_COMPACT_LAYOUT_KEY } from '../model/AppLayoutState';
 import { themeGradient } from '../utils/ThemeVisuals';
+import { resourceText } from '../utils/UiFeedback';
+import { localeNumber } from '../utils/LocaleFormatting';
 
 /** 同牌组同一天刷新保留已展示图表；切换范围隐藏旧值，迟到结果丢弃。 */
 @Component
 export struct DeckStudyHistoryCard {
+  @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
+  @StorageProp('themeMode') private themeMode: string = 'system';
+  @StorageProp('systemDarkMode') private systemDark: boolean = false;
+  @StorageProp(颜色键.页面底色微染) private pageTint: string = '';
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
   @Prop @Watch('reload') search: string = '';
   @Prop @Watch('reload') refreshToken: number = 0;
@@ -29,6 +37,25 @@ export struct DeckStudyHistoryCard {
   private dayKey: string = '';
   private loadedSearch: string = '';
   private timer: number = -1;
+
+  private dayLabel(day: DeckStudyDay, _locale: string = this.uiLanguage): string {
+    return resourceText(this.getUIContext(), day.daysAgo === 0 ? $r('app.string.deck_history_today') :
+      $r('app.string.deck_history_days_ago', day.daysAgo));
+  }
+
+  private dayColumnWidth(): number {
+    const context = this.getUIContext();
+    let width: number = 32;
+    for (const day of this.history.days) {
+      const measured = context.getMeasureUtils().measureText({ textContent: this.dayLabel(day), fontSize: 10 });
+      width = Math.max(width, context.px2vp(measured) + 8);
+    }
+    return Math.ceil(width);
+  }
+
+  private axisWidth(): number {
+    return this.dayColumnWidth() * this.history.days.length + 8 * Math.max(0, this.history.days.length - 1);
+  }
 
   aboutToAppear(): void {
     this.active = true;
@@ -110,10 +137,11 @@ export struct DeckStudyHistoryCard {
           .stateEffect(false)
           .onClick((): void => { this.reload(); })
       } else {
+        Scroll() {
         Row({ space: 8 }) {
           ForEach(this.history.days, (day: DeckStudyDay) => {
             Column({ space: 6 }) {
-              Text(day.count.toString())
+              Text(localeNumber(day.count, this.uiLanguage))
                 .fontSize(12)
                 .fontColor($r('app.color.text_secondary'))
                 .maxLines(1)
@@ -129,15 +157,16 @@ export struct DeckStudyHistoryCard {
               }
               .height(72)
               .width('100%')
-              Text(day.daysAgo === 0 ? $r('app.string.deck_history_today') :
-                $r('app.string.deck_history_days_ago', day.daysAgo))
+              Text(this.dayLabel(day))
                 .fontSize(10)
                 .fontColor($r('app.color.text_secondary'))
+                .maxLines(1).wordBreak(WordBreak.NORMAL)
             }
-            .layoutWeight(1)
+            .layoutWeight(1).constraintSize({ minWidth: this.dayColumnWidth() })
           }, (day: DeckStudyDay): string => `${day.daysAgo}-${day.count}-${this.history.maxCount}`)
         }
-        .width('100%')
+        .width('100%').constraintSize({ minWidth: this.axisWidth() }).padding({ bottom: 12 })
+        }.width('100%').scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Auto)
         Row({ space: 12 }) {
           Column({ space: 4 }) {
             Text($r('app.string.deck_history_active_days', this.history.activeDays))
@@ -172,9 +201,10 @@ export struct DeckStudyHistoryCard {
     }
     .width('100%')
     .padding(应用尺寸.卡片内边距)
-    .backgroundColor($r('app.color.surface_card'))
     .border(SurfaceBorder.options())
-    .borderRadius(应用尺寸.圆角_指标卡)
+    .borderRadius(应用尺寸.圆角_卡片)
+    .attributeModifier(SeriesVisual.insetSurface(this.surfaceMaterial, SeriesVisual.isDark(this.themeMode, this.systemDark),
+      this.accent, this.pageTint, 应用尺寸.圆角_卡片))
     .onVisibleAreaChange([0], (visible: boolean): void => { this.setVisible(visible); })
   }
 }

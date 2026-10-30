@@ -66,6 +66,21 @@ test('day rollover follows local study day across midnight and month/year bounda
 });
 
 const source = readFileSync(new URL('../../entry/src/main/ets/components/DeckStudyHistoryCard.ets', import.meta.url), 'utf8');
+test('history axis reserves actual localized label widths at large font scales and can scroll instead of splitting Today', () => {
+  const methods = source.slice(source.indexOf('  private dayLabel('), source.indexOf('  aboutToAppear('));
+  const Axis = new Function('$r', 'resourceText', stripTypeScriptTypes(`class Axis { ${methods} }`, { mode: 'transform' }) + '; return Axis;')(
+    (key, value) => ({ key, value }), (context, resource) => resource.value === undefined ? context.today : context.ago.replace('%d', resource.value));
+  for (const [today, ago] of [['Today', '%dd ago'], ['Aujourd’hui', 'Il y a %dj'], ['Сегодня', '%d дн. назад']]) for (const scale of [1, 2, 3.2]) {
+    const axis = new Axis(); axis.history = { days: Array.from({length:7}, (_, daysAgo) => ({ daysAgo })) };
+    const measure = text => text.length * 6 * scale;
+    axis.getUIContext = () => ({ today, ago, px2vp: value => value / 2,
+      getMeasureUtils: () => ({ measureText: ({textContent}) => measure(textContent) * 2 }) });
+    for (const day of axis.history.days) assert.ok(axis.dayColumnWidth() >= measure(axis.dayLabel(day)) + 8);
+    assert.equal(axis.axisWidth(), axis.dayColumnWidth() * 7 + 48);
+  }
+  assert.match(source, /scrollable\(ScrollDirection\.Horizontal\)/);
+  assert.match(source, /Text\(this\.dayLabel\(day\)\)[\s\S]*?\.maxLines\(1\)\.wordBreak\(WordBreak\.NORMAL\)/);
+});
 const methods = source.slice(source.indexOf('  aboutToAppear()'), source.indexOf('  build()'));
 const js = stripTypeScriptTypes(`class HistoryHarness { ${methods} }`, { mode: 'transform' });
 function harness(fetch) {

@@ -35,7 +35,9 @@ export struct HomeSummaryHeader {
   private menuAnchor: HomeActionAnchor = { left: 0, top: 0, width: 0 };
 
   private geometry(): HomeHeaderGeometry {
-    return homeHeaderGeometry(this.contentWidth, 应用尺寸.页面分组间距(this.narrowDeckLayout), this.showSummary, 应用尺寸.按钮高度);
+    const context: UIContext = this.getUIContext();
+    return homeHeaderGeometry(this.contentWidth, 应用尺寸.页面分组间距(this.narrowDeckLayout), this.showSummary,
+      应用尺寸.按钮高度, context.px2vp(context.fp2px(1)));
   }
   private closeMenus(): void { this.onMenusClose(); }
   private layoutChanged(): void {
@@ -137,6 +139,7 @@ export struct HomeSummaryHeader {
         this.syncButton()
         this.createButton()
       }.width(this.geometry().trailingWidth).height(this.geometry().actionsHeight).flexShrink(0)
+
     }.width('100%').height(this.geometry().actionsHeight).flexShrink(0)
   }
 
