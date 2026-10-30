@@ -92,7 +92,7 @@ test('home binds its live navigation host and both detail layouts to the same ac
     加载主页数据: () => events.push('refresh'), 开始学习: () => events.push('study'),
     打开牌组预览: () => events.push('preview'), 打开添加笔记: () => events.push('add'),
     打开AI制卡: () => events.push('ai-create'),
-    openDeckRename: id => events.push(['rename', id]),
+    openDeckRename: id => events.push(['rename', id]), openDeckMenu: id => events.push(['menu',id]),
     openCreateDeck: id => events.push(['child', id]), openDeckExport: id => events.push(['export', id]),
     打开牌组选项: () => events.push('options'), homeActionAnchor: { width: 360 }, 显示今日进度卡: true });
   const params = {};
@@ -117,8 +117,8 @@ test('home binds its live navigation host and both detail layouts to the same ac
     details.onBackHandlerChange(null);
     assert.equal(page.deckDetailsBackHandler, null);
     page.选中的牌组ID = '42';
-    for (const action of ['onStudy', 'onPreview', 'onAddNote', 'onCreateWithAI', 'onCreateChild', 'onRenameDeck', 'onExport', 'onOptions', 'onBack']) details[action]();
-    assert.deepEqual(events.splice(0), ['study', 'preview', 'add', 'ai-create', ['child', '42'], ['rename', '42'], ['export', '42'], 'options', 'refresh']);
+    for (const action of ['onStudy', 'onPreview', 'onAddNote', 'onCreateWithAI', 'onMore', 'onBack']) details[action]();
+    assert.deepEqual(events.splice(0), ['study', 'preview', 'add', 'ai-create', ['menu', '42'], 'refresh']);
     assert.equal(page.显示牌组详情, false);
     page.historyRefreshToken++;
   }

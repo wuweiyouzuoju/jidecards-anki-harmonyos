@@ -1,23 +1,31 @@
+import { GlassSuggestionDialog } from '../components/home/GlassSuggestionDialog';
+import { GLASS_SUGGESTION_PENDING_KEY } from '../model/SurfaceMaterial';
+import { completeGlassSuggestion } from '../utils/SurfaceMaterialStore';
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { GlassSource } from '../components/common/GlassSource';
+import { GlassPanel } from '../components/common/GlassPanel';
+import { ActionMenuAnchor } from '../components/common/ActionMenuLayout';
+import { GLASS_HOME_SOURCE, glassSourceVisibility } from '../utils/GlassBackdrop';
 import { HOME_SHORTCUTS, shortcutCommand } from '../model/KeyboardShortcuts';
 import { WindowPoint } from '../model/WindowSafeLayout';
 import { StudyKeyboardSession } from '../model/StudyKeyboard';
 import { studyEventChord } from '../utils/StudyKeyAdapter';
 import { backupCoordinator } from '../model/BackupCoordinator';
-import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { agentOperationHosts } from '../model/agent/AgentOperationHost';
 import type { AgentOperationHost } from '../model/agent/AgentOperationHost';
 import type { OperationArguments } from '../model/agent/AgentOperations';
 import type { SyncSessionSnapshot } from '../model/SyncSession';
 import { EditNotePageParams } from '../model/navigation/PageParams';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { HomeDestinations } from './navigation/HomeDestinations';
 import { appPageName, browserNavigationQuery, appNavigationStackBlockReason, AppNavigationRequest } from '../model/navigation/AppNavigation';
 import { HomeNavigationTransition } from '../utils/HomeNavigationTransition';
 import { SurfaceTransition } from '../utils/SurfaceTransition';
 import { HomeDeckDeletion } from '../components/home/HomeDeckDeletion';
 import { DialogHeader } from '../components/common/DialogHeader';
+import { TextActionDialog } from '../components/common/TextActionDialog';
+import { NativeDialogHost, NativeDialogFactory, NativeDialogDismiss, NativeDialogPresentation } from '../components/common/NativeDialogHost';
 import { DialogBackdrop } from '../components/common/DialogBackdrop';
-import { showToastSafely, resourceText } from '../utils/UiFeedback';
+import { showToastSafely, resourceText, localizedNamedResourceText } from '../utils/UiFeedback';
 import { DataTransferSession, DataTransferState, initialTransferState } from '../model/home/DataTransferSession';
 import { AnkiDataTransfer } from '../backend/AnkiDataTransfer';
 import { reconcileHomeExpansion, HomeDeckExpansion } from '../model/HomeDeckExpansion';
@@ -32,6 +40,9 @@ import { HomeWorkCoordinator, HomeWorkHost } from '../model/HomeWorkCoordinator'
 import { HomeStartupSequence, HomeStartupHost } from '../model/HomeStartupSequence';
 import { CLOUD_DECK_CHANNEL_ENABLED, AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../model/ReleaseFeatures';
 import { HomeSummaryHeader } from '../components/home/HomeSummaryHeader';
+import { HomeSyncChoiceDialog } from '../components/home/HomeSyncChoiceDialog';
+import { DevicePairingStore } from '../backend/device-link/DevicePairingStore';
+import { HOME_SYNC_CHOICES, visibleInterfaceItems } from '../model/AppInterface';
 import { HomeActionAnchor, homeHeaderGeometry } from '../model/HomeHeaderLayout';
 import { 简洁模式AppStorage键 } from '../model/简洁模式存储';
 import { AnchoredMenu } from '../components/common/AnchoredMenu';
@@ -93,7 +104,7 @@ import { 设置页参数, 浏览页参数 } from '../model/navigation/PageParams
 import { 主页牌组列表 } from '../components/home/主页牌组列表';
 import { PAGE_COMPACT_LAYOUT_KEY } from '../model/AppLayoutState';
 import { DECK_WIDTH_HINT_HANDLED_KEY, DECK_DOUBLE_COLUMN_HINT_HANDLED_KEY, DECK_LIST_STYLE_KEY,
-  isDoubleColumnDeckListStyle } from '../model/DeckListAppearance';
+  isDoubleColumnDeckListStyle, deckLayoutSuggestion } from '../model/DeckListAppearance';
 import { saveDeckListStyle, completeDeckWidthHint } from '../utils/DeckListAppearanceStore';
 import { DeckOptionsPageParams } from '../model/navigation/PageParams';
 import { DataTransferFeature } from '../components/home/DataTransferFeature';
@@ -138,6 +149,7 @@ import {
 } from '../model/云端牌组引导存储';
 import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时长';
 import { 当前语言模式 } from '../model/语言存储';
+import { announcementLocale } from '../model/AppLocales';
 import {
   AgentSettings,
   isAgentProviderConfigured,
@@ -148,6 +160,11 @@ import { loadAgentSecret } from '../backend/agent/AgentSecretStore';
 @Entry
 @Component
 struct 首页 {
+  @State private surfaceWidth: string = '88%';
+  @State private surfaceMaximumWidth: number = 应用尺寸.dialogCompactMaxWidth;
+  @State @Watch('homeActivityChanged') private syncChoiceVisible: boolean = false;
+  @State @Watch('homeActivityChanged') private syncChoiceChecking: boolean = false;
+  private syncChoiceGeneration: number = 0;
   private readonly homeMoreSlideScope: MenuSlideScope = new MenuSlideScope();
   private readonly homeCreateSlideScope: MenuSlideScope = new MenuSlideScope();
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
@@ -162,6 +179,36 @@ struct 首页 {
   private deckWidthHintShown: boolean = false;
   private deckDoubleColumnHintShown: boolean = false;
   private deckWidthHintTarget: string = 'single_narrow';
+  @StorageProp(GLASS_SUGGESTION_PENDING_KEY) private glassSuggestionPending: boolean = false;
+  private glassSuggestionShown: boolean = false;
+  @State private glassSuggestionSaving: boolean = false;
+  private readonly glassSuggestionDialog: NativeDialogHost = new NativeDialogHost();
+  private readonly createGlassSuggestionDialog: NativeDialogFactory = (dismiss: NativeDialogDismiss): CustomDialogController => {
+    const presentation: NativeDialogPresentation = this.glassSuggestionDialog.presentation();
+    return new CustomDialogController({
+      builder: GlassSuggestionDialog({ busy: this.glassSuggestionSaving,
+        onKeep: this.glassSuggestionDialog.guard((): void => { this.finishGlassSuggestion(false); }),
+        onConfirm: this.glassSuggestionDialog.guard((): void => { this.finishGlassSuggestion(true); }) }),
+      onWillDismiss: dismiss, autoCancel: presentation.autoCancel, customStyle: presentation.customStyle,
+      alignment: presentation.alignment, width: presentation.width, height: presentation.height,
+      keyboardAvoidMode: presentation.keyboardAvoidMode, maskColor: presentation.maskColor, openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation
+    });
+  };
+  private readonly deckWidthDialog: NativeDialogHost = new NativeDialogHost();
+  private readonly createDeckWidthDialog: NativeDialogFactory = (dismiss: NativeDialogDismiss): CustomDialogController => {
+    const suggestion = deckLayoutSuggestion(this.deckWidthHintTarget);
+    const presentation: NativeDialogPresentation = this.deckWidthDialog.presentation();
+    return new CustomDialogController({
+      builder: TextActionDialog({
+        title: $r('app.string.' + suggestion.titleKey), message: $r('app.string.' + suggestion.messageKey),
+        cancelLabel: $r('app.string.' + suggestion.keepKey), confirmLabel: $r('app.string.' + suggestion.confirmKey),
+        onCancel: this.deckWidthDialog.guard((): void => { this.finishDeckWidthHint(false); }),
+        onConfirm: this.deckWidthDialog.guard((): void => { this.finishDeckWidthHint(true); }) }),
+      onWillDismiss: dismiss, autoCancel: presentation.autoCancel, customStyle: presentation.customStyle,
+      alignment: presentation.alignment, width: presentation.width, height: presentation.height,
+      keyboardAvoidMode: presentation.keyboardAvoidMode, maskColor: presentation.maskColor, openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation
+    });
+  };
   private deckWidthHintSaving: boolean = false;
   @State @Watch('homeActivityChanged') private transfer: DataTransferState = initialTransferState();
   private readonly transferSession: DataTransferSession = new DataTransferSession(new AnkiDataTransfer(),
@@ -275,6 +322,8 @@ struct 首页 {
   private homeKeys: StudyKeyboardSession = new StudyKeyboardSession();
   @State @Watch('homeActivityChanged') private homeSearchOpen: boolean = false;
   @State @Watch('homeActivityChanged') private deckMenuId: string = '';
+  @State private deckMenuFromDetails: boolean = false;
+  @State private deckLiftAnchor: ActionMenuAnchor = { left: 16, top: 180, width: 320, height: 64 };
   @State private deckMenuPoint: WindowPoint | undefined = undefined;
   @State private deckMenuBackRequest: number = 0;
   @State private homeVisible: boolean = true;
@@ -470,6 +519,8 @@ struct 首页 {
 
   aboutToAppear(): void {
     this.restoreHomeDeckExpansion();
+    this.deckWidthDialog.activate();
+    this.glassSuggestionDialog.activate();
     agentOperationHosts.register('home',this.agentOperationHost);
     this.syncScheduler.setListener((): void => {
       this.syncStatusController.invalidate();
@@ -490,10 +541,16 @@ struct 首页 {
   }
 
   aboutToDisappear(): void {
+    glassSourceVisibility(this.getUIContext(), GLASS_HOME_SOURCE, false);
+    this.closeSyncChoice();
+    appInterface.leave('home_sync_choice');
+    this.deckWidthDialog.dispose();
+    this.glassSuggestionDialog.dispose();
     agentOperationHosts.unregister('home',this.agentOperationHost);
     for (const key of ['sync','login','background']) agentOperationHosts.finish(key,'{"status":"failed","error":"host_disposed"}');
     appInterface.leave('home');
     appInterface.leave('deck_reorder');
+    appInterface.leave('deck_layout_suggestion');
     this.deckPreviewSession.dispose();
     this.transferSession.dispose();
     this.homeDisposed = true;
@@ -543,6 +600,7 @@ struct 首页 {
     if (this.syncForeground) this.backupController.schedule();
     else {
       this.closeHomeActions();
+      this.closeSyncChoice();
       this.homeSearchOpen = false;
       this.deckPreviewSession.invalidate();
       this.backupController.stop();
@@ -610,10 +668,42 @@ struct 首页 {
     this.syncController.requestManual();
   }
 
-  private startSyncFromMenu(): void {
+  private async startSyncFromMenu(): Promise<void> {
     this.显示更多菜单 = false;
+    if (this.homeDisposed || !this.homeVisible || !this.syncForeground || this.syncChoiceChecking || this.syncChoiceVisible) return;
+    if (this.显示同步面板) { this.syncDetailsRequest++; return; }
+    const generation: number = ++this.syncChoiceGeneration;
+    this.syncChoiceChecking = true;
+    try {
+      const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+      const paired: boolean = await new DevicePairingStore(context).hasPairedDevices();
+      if (generation !== this.syncChoiceGeneration || this.homeDisposed || !this.homeVisible || !this.syncForeground) return;
+      if (this.显示同步面板) { this.syncDetailsRequest++; return; }
+      if (paired) this.syncChoiceVisible = true;
+      else this.startCloudSync();
+    } catch (error) {
+      if (generation === this.syncChoiceGeneration && !this.homeDisposed) this.显示提示($r('app.string.device_link_error'));
+    } finally {
+      if (generation === this.syncChoiceGeneration) this.syncChoiceChecking = false;
+    }
+  }
+
+  private closeSyncChoice(): void {
+    this.syncChoiceGeneration++;
+    this.syncChoiceVisible = false;
+    this.syncChoiceChecking = false;
+  }
+
+  private chooseSyncTarget(target: string): void {
+    if (!this.syncChoiceVisible || this.homeDisposed || !this.homeVisible || !this.syncForeground) return;
+    this.closeSyncChoice();
+    if (target === 'cloud') this.startCloudSync();
+    else if (target === 'device') this.openSettings('sync', 'device_link');
+  }
+
+  private startCloudSync(): void {
     if (!this.显示同步面板 && loadVisibleSyncAuth() === null) {
-      this.openSettings();
+      this.openSettings('sync');
       this.显示提示($r('app.string.sync_login_required'));
       return;
     }
@@ -666,7 +756,8 @@ struct 首页 {
       dialogOpen: this.deckMenuId !== '' || this.collectionHistoryOpen || this.显示官方公告 || this.显示欢迎弹窗 || this.显示云端牌组弹窗 || this.transfer.visible ||
         this.显示牌组定制 || this.显示自定义学习 || this.显示过滤牌组面板 || this.显示牌组选项 ||
         this.显示创建牌组 || this.movingDeckId > 0 || this.renamingDeckId > 0 || this.显示主页操作 || this.显示更多菜单 || this.homeSearchOpen || this.显示节流奖励 ||
-        this.显示卡片预览 || this.deckPreviewMenuOpen || this.autoSyncModal || this.fsrsPromptActive || this.nativeDialogOpen,
+        this.显示卡片预览 || this.deckPreviewMenuOpen || this.autoSyncModal || this.fsrsPromptActive || this.nativeDialogOpen ||
+        this.syncChoiceVisible || this.syncChoiceChecking,
       interactionBusy: this.排序模式中 || this.预览加载中 || this.定制牌组中,
       startupChecking: this.announcementController.isChecking() || this.announcementController.hasPending() ||
         this.startupSequence.hasPending()
@@ -687,7 +778,7 @@ struct 首页 {
       controls.push({ id: 'search', title: '', titleKey: 'home_search_title', enabled: true, selected: this.homeSearchOpen });
       controls.push({ id: 'browser', title: '', titleKey: 'browser_title', enabled: true, selected: false });
       controls.push({ id: 'sync', title: '', titleKey: homeSyncLabelKey(this.syncAccountState, this.syncIndicator),
-        enabled: true, selected: this.显示同步面板 });
+        enabled: !this.syncChoiceChecking, selected: this.显示同步面板 || this.syncChoiceVisible });
       controls.push({ id: 'create', title: '', titleKey: 'create_deck', enabled: true, selected: this.显示主页操作 });
     }
     if (this.显示今日进度卡) controls.push({ id: 'today', title: '', titleKey: 'settings_home_today_summary', enabled: true, selected: false });
@@ -701,6 +792,12 @@ struct 首页 {
 
   private publishHomeInterface(): void {
     if (this.homeDisposed) return;
+    if (this.syncChoiceVisible) {
+      appInterface.observe({ surface: 'home_sync_choice', sectionId: 'sync', selectedId: '', optionIds: [], optionLabels: [],
+        busy: false, controlsComplete: true,
+        items: HOME_SYNC_CHOICES.map((item): AppInterfaceControl => ({ id: item.id, title: '', titleKey: item.titleKey,
+          enabled: true, selected: false })).concat([{ id: 'close', title: '', titleKey: 'close', enabled: true, selected: false }]) });
+    } else appInterface.leave('home_sync_choice');
     const visibleDecks: 牌组汇总[] = this.牌组数据源.snapshotDecks();
     appInterface.observe({ surface: 'home', sectionId: '', selectedId: this.选中的牌组ID,
       optionIds: visibleDecks.slice(0, 100).map((deck: 牌组汇总): string => deck.id),
@@ -711,6 +808,7 @@ struct 首页 {
         { id: 'deck_list_style', value: this.deckListStyle },
         { id: 'deck_list_highlighted_id', value: this.当前断点 === 'xs' ? this.deckMenuId : this.选中的牌组ID },
         { id: 'deck_list_grouping', value: 'top_level_subtree' },
+        { id: 'deck_list_placement', value: isDoubleColumnDeckListStyle(this.deckListStyle) && !this.排序模式中 ? 'shortest_column' : 'source_order' },
         { id: 'deck_list_columns', value: isDoubleColumnDeckListStyle(this.deckListStyle) &&
           !this.排序模式中 && this.加载状态 === 'ready' ? '2' : '1' },
         { id: 'deck_study_counts_visible', value: String(!isDoubleColumnDeckListStyle(this.deckListStyle)) },
@@ -766,10 +864,57 @@ struct 首页 {
           });
         } else this.请求主页官方公告检查();
       },
-      presentLayoutSuggestion: (): boolean => this.presentDeckWidthHint(),
+      presentLayoutSuggestion: (): boolean => this.presentGlassSuggestion() || this.presentDeckWidthHint(),
       scheduleSync: (): void => this.scheduleAutoSyncCheck()
     };
     this.homeWork.wake(host);
+  }
+
+  private presentGlassSuggestion(): boolean {
+    if (!this.autoSyncStartupReady || this.加载状态 !== 'ready' || !this.glassSuggestionPending || this.glassSuggestionShown) return false;
+    this.glassSuggestionShown = true;
+    this.nativeDialogOpen = true;
+    try {
+      this.glassSuggestionDialog.open(this.createGlassSuggestionDialog, (): boolean => {
+        this.finishGlassSuggestion(false); return false;
+      });
+      this.publishGlassSuggestion();
+      return true;
+    } catch (error) {
+      this.nativeDialogOpen = false;
+      appInterface.leave('glass_suggestion');
+      this.显示提示($r('app.string.surface_material_save_failed'));
+      return false;
+    }
+  }
+
+  private publishGlassSuggestion(): void {
+      appInterface.observe({ surface: 'glass_suggestion', titleKey: 'glass_suggestion_title', sectionId: 'home',
+        selectedId: '', optionIds: ['keep', 'confirm'],
+        optionLabels: [resourceText(this.getUIContext(), $r('app.string.glass_suggestion_keep')),
+          resourceText(this.getUIContext(), $r('app.string.glass_suggestion_confirm'))],
+        busy: this.glassSuggestionSaving, controlsComplete: true,
+        items: [{ id: 'keep', title: '', titleKey: 'glass_suggestion_keep', enabled: !this.glassSuggestionSaving, selected: false },
+          { id: 'confirm', title: '', titleKey: 'glass_suggestion_confirm', enabled: !this.glassSuggestionSaving, selected: false }] });
+  }
+
+  private async finishGlassSuggestion(useGlass: boolean): Promise<void> {
+    if (this.glassSuggestionSaving || !this.nativeDialogOpen || this.homeDisposed) return;
+    this.glassSuggestionSaving = true;
+    this.publishGlassSuggestion();
+    try {
+      await completeGlassSuggestion(useGlass);
+      this.glassSuggestionDialog.close();
+      appInterface.leave('glass_suggestion');
+      if (!this.homeDisposed) this.nativeDialogOpen = false;
+    } catch (error) {
+      if (!this.homeDisposed) this.显示提示($r('app.string.surface_material_save_failed'));
+    } finally {
+      if (!this.homeDisposed) {
+        this.glassSuggestionSaving = false;
+        if (this.glassSuggestionDialog.current() !== null) this.publishGlassSuggestion();
+      }
+    }
   }
 
   /** 两级建议共用弹窗与协调器，各自记住回复；确认使用展示时的目标。 */
@@ -783,30 +928,22 @@ struct 首页 {
     if (doubleColumn) this.deckDoubleColumnHintShown = true;
     else this.deckWidthHintShown = true;
     this.nativeDialogOpen = true;
-    let settled: boolean = false;
-    const finish = (accept: boolean): void => {
-      if (settled) return;
-      settled = true; this.finishDeckWidthHint(accept);
-    };
     try {
-      this.getUIContext().showAlertDialog({
-        title: doubleColumn ? $r('app.string.deck_double_column_hint_title') : $r('app.string.deck_width_hint_title'),
-        message: doubleColumn ? $r('app.string.deck_double_column_hint_message') : $r('app.string.deck_width_hint_message'),
-        alignment: DialogAlignment.Center,
-        autoCancel: false,
-        cancel: (): void => { finish(false); },
-        primaryButton: {
-          value: doubleColumn ? $r('app.string.deck_double_column_hint_keep') : $r('app.string.deck_width_hint_keep'),
-          action: (): void => { finish(false); }
-        },
-        secondaryButton: {
-          value: doubleColumn ? $r('app.string.deck_double_column_hint_confirm') : $r('app.string.deck_width_hint_confirm'),
-          action: (): void => { finish(true); }
-        }
+      this.deckWidthDialog.open(this.createDeckWidthDialog, (): boolean => {
+        this.finishDeckWidthHint(false); return true;
       });
+      const suggestion = deckLayoutSuggestion(this.deckWidthHintTarget);
+      appInterface.observe({ surface: 'deck_layout_suggestion', titleKey: suggestion.titleKey, sectionId: 'home',
+        selectedId: suggestion.target, optionIds: ['keep', 'confirm'],
+        optionLabels: [resourceText(this.getUIContext(), $r('app.string.' + suggestion.keepKey)),
+          resourceText(this.getUIContext(), $r('app.string.' + suggestion.confirmKey))], busy: false, controlsComplete: true,
+        items: [{ id: 'keep', title: '', titleKey: suggestion.keepKey, enabled: true, selected: false },
+          { id: 'confirm', title: '', titleKey: suggestion.confirmKey, enabled: true, selected: false }],
+        values: [{ id: 'action_layout', value: 'vertical_wrapping_full_labels' }] });
       return true;
     } catch (error) {
       this.nativeDialogOpen = false;
+      appInterface.leave('deck_layout_suggestion');
       showToastSafely(this.getUIContext(), { message: $r('app.string.deck_width_hint_open_failed') });
       return false;
     }
@@ -814,6 +951,8 @@ struct 首页 {
 
   private async finishDeckWidthHint(useSuggestedStyle: boolean): Promise<void> {
     if (this.deckWidthHintSaving || !this.nativeDialogOpen || this.homeDisposed) return;
+    this.deckWidthDialog.close();
+    appInterface.leave('deck_layout_suggestion');
     this.deckWidthHintSaving = true;
     try {
       if (useSuggestedStyle) {
@@ -887,7 +1026,7 @@ struct 首页 {
       const found: boolean = await this.announcementController.check(async (): Promise<官方公告展示项 | null> => {
         const info: bundleManager.BundleInfo = await bundleManager.getBundleInfoForSelf(
           bundleManager.BundleFlag.GET_BUNDLE_INFO_WITH_APPLICATION);
-        return this.官方公告服务实例.加载公告(info.versionName, 当前语言模式(), Date.now());
+        return this.官方公告服务实例.加载公告(info.versionName, announcementLocale(当前语言模式()), Date.now());
       }, 是否已确认官方公告);
       if (found) this.尝试展示待展示官方公告();
       return found;
@@ -995,6 +1134,7 @@ struct 首页 {
 
   /** 进入后台：取消尚未执行的公告延迟检查，返回前台由 onPageShow 重新协调。 */
   onPageHide(): void {
+    this.closeSyncChoice();
     this.暂停主页官方公告检查();
     this.syncStatusController.invalidate();
     this.deckPreviewSession.invalidate();
@@ -1008,6 +1148,7 @@ struct 首页 {
    * Extension Points: 新增弹窗时在此链中按层级插入对应 @State 判断。
    */
   onBackPress(): boolean {
+    if (this.syncChoiceVisible || this.syncChoiceChecking) { this.closeSyncChoice(); return true; }
     if (this.deckReorderBusy) return true;
     if (this.排序模式中) { this.退出排序模式(); return true; }
     // Open deck options owns Back: computing can leave; accepted saving stays protected inside the panel.
@@ -1421,9 +1562,22 @@ struct 首页 {
     }
   }
 
-  private openDeckMenu(deckId: string, point?: WindowPoint): void {
+  private openDeckMenu(deckId: string, point?: WindowPoint, fromDetails: boolean = false): void {
     if (this.排序模式中 || this.按ID查牌组(deckId).id === '') return;
     this.closeHomeActions();
+    const row = this.getUIContext().getFrameNodeById((fromDetails ? 'home-deck-details-' : 'home-deck-row-') + deckId);
+    if (row !== null) {
+      const position = row.getPositionToWindow();
+      const size = row.getMeasuredSize();
+      this.deckLiftAnchor = { left: position.x, top: position.y,
+        width: this.getUIContext().px2vp(size.width), height: fromDetails ? 64 : this.getUIContext().px2vp(size.height) };
+      if (fromDetails) {
+        const listRow = this.getUIContext().getFrameNodeById('home-deck-row-' + deckId);
+        if (listRow !== null) this.deckLiftAnchor = { left: this.deckLiftAnchor.left, top: this.deckLiftAnchor.top,
+          width: this.deckLiftAnchor.width, height: this.getUIContext().px2vp(listRow.getMeasuredSize().height) };
+      }
+    }
+    this.deckMenuFromDetails = fromDetails;
     this.deckMenuPoint = point === undefined ? undefined : { x: point.x, y: point.y };
     this.deckMenuId = deckId;
     // 长按同时选中目标；不走点击入口，避免手机详情覆盖长按菜单。
@@ -1436,8 +1590,9 @@ struct 首页 {
       case 'add_note': this.打开添加笔记(deckId); break;
       case 'stats': this.打开统计页(deckId); break;
       case 'browser': this.打开浏览页(deckId); break;
-      case 'reorder': this.进入排序模式(); break;
+      case 'reorder': this.显示牌组详情 = false; this.进入排序模式(); break;
       case 'rename': this.openDeckRename(deckId); break;
+      case 'move': this.openDeckMove(); break;
       case 'create_child': this.openCreateDeck(deckId); break;
       case 'options': this.打开牌组选项(deckId); break;
       case 'export': this.openDeckExport(deckId); break;
@@ -2054,6 +2209,7 @@ struct 首页 {
           // 由 首页.ets 保留对数据状态的控制权（业务契约要求）。
           Column({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout) }) {
             HomeSummaryHeader({ showSummary: this.显示今日进度卡, actionsVisible: !this.排序模式中,
+
               agentEnabled: this.homeAgentEnabled,
               actionColor: this.动作主色,
               homeSnapshot: this.主页快照数据, graphsSnapshot: this.图表快照,
@@ -2071,8 +2227,10 @@ struct 首页 {
               },
               onBrowser: (): void => { this.closeHomeActions(); this.打开浏览页(); },
               onMenusClose: (): void => { this.closeHomeActions(); },
-              onMenuAnchor: (anchor: HomeActionAnchor): void => { this.homeActionAnchor = anchor; } })
+              onMenuAnchor: (anchor: HomeActionAnchor): void => { this.homeActionAnchor = anchor; },
+              })
             主页牌组列表({
+
               onOverflowChange: (overflow: boolean): void => { this.deckListOverflow = overflow; },
               牌组数据源: this.牌组数据源,
               牌组列表滚动器: this.牌组列表滚动器,
@@ -2092,7 +2250,7 @@ struct 首页 {
               onItemToggle: (deckId: string): void => {
                 this.切换牌组展开(deckId);
               },
-              menuDeckId: this.deckMenuId,
+              menuDeckId: this.deckMenuId, liftedDeckId: this.deckMenuPoint === undefined && !this.deckMenuFromDetails ? this.deckMenuId : '',
               onItemMenu: (deckId: string, point?: WindowPoint): void => { this.openDeckMenu(deckId, point); },
               onItemDoubleTap: (deckId: string): void => {
                 this.递归切换牌组(deckId);
@@ -2119,7 +2277,7 @@ struct 首页 {
             // 列表视口与右侧开始学习按钮共用底部外缘，安全区只贡献一次。
             bottom: 应用尺寸.操作区底部间距(this.narrowDeckLayout, this.navigationBottomInset)
           })
-          .backgroundColor(this.页面底色微染值)
+          .backgroundColor(Color.Transparent)
         }
         if (this.当前断点 !== 'xs') {
           GridCol({ span: { xs: 0, sm: 3, md: 4 } }) {
@@ -2143,7 +2301,7 @@ struct 首页 {
     .width('100%')
     .constraintSize({ maxWidth: 应用尺寸.内容最大宽度 })
     .height('100%')
-    .backgroundColor(this.页面底色微染值)
+    .backgroundColor(Color.Transparent)
     // 幻彩背景透明，详情打开时底层列表不能参与绘制/命中；Hidden 保留滚动位置与断点测量。
     .transition(SurfaceTransition.pageContent(false, this.当前断点 === 'xs' && this.deckNavigationStarted))
     .visibility(this.当前断点 === 'xs' && this.显示牌组详情 ? Visibility.Hidden : Visibility.Visible)
@@ -2214,10 +2372,23 @@ struct 首页 {
       top: Math.max(0, this.homeActionAnchor.top - this.homeMenuHostTop), width: this.homeActionAnchor.width };
   }
 
+  private homeMenuWidth(surface: string): number {
+    const items = visibleInterfaceItems(surface, { simple: surface === 'home_create' ? this.homeSimpleMode : false,
+      agent: false, cloudDeck: CLOUD_DECK_CHANNEL_ENABLED && !this.云端牌组配额已用尽, themeHasTextures: false });
+    const ui = this.getUIContext();
+    let widest: number = 0;
+    for (const item of items) {
+      const text: string = localizedNamedResourceText(ui, this.uiLanguage, item.titleKey);
+      widest = Math.max(widest, ui.px2vp(ui.getMeasureUtils().measureText({ textContent: text, fontSize: 应用尺寸.字号_正文 })));
+    }
+    // 文案 + 18vp图标 + 行内8vp间隔 + 左右10vp边距 + 8vp测量余量。
+    return Math.min(this.homeActionAnchor.width, Math.max(104, Math.ceil(widest + 54)));
+  }
+
   @Builder
   private homeMenus() {
     if (this.显示更多菜单 && this.homeActionAnchor.width > 0) {
-      AnchoredMenu({ menuWidth: Math.min(应用尺寸.compactMenuWidth, this.homeActionAnchor.width), slideScope: this.homeMoreSlideScope,
+      AnchoredMenu({ refractionSource: GLASS_HOME_SOURCE, menuWidth: this.homeMenuWidth('home_more'), slideScope: this.homeMoreSlideScope,
         topOffset: this.homeMenuAnchor().top, contentLeft: this.homeMenuAnchor().left,
         contentMaxWidth: this.homeActionAnchor.width, alignEnd: false, cornerRadius: 应用尺寸.圆角_卡片,
         onClose: (): void => { this.closeHomeActions(); } }) {
@@ -2225,8 +2396,7 @@ struct 首页 {
       }
     }
     if (this.显示主页操作 && this.homeActionAnchor.width > 0) {
-      AnchoredMenu({ menuWidth: Math.min(!this.homeSimpleMode || CLOUD_DECK_CHANNEL_ENABLED && !this.云端牌组配额已用尽 ?
-          应用尺寸.extendedMenuWidth : 应用尺寸.compactMenuWidth, this.homeActionAnchor.width), slideScope: this.homeCreateSlideScope,
+      AnchoredMenu({ refractionSource: GLASS_HOME_SOURCE, menuWidth: this.homeMenuWidth('home_create'), slideScope: this.homeCreateSlideScope,
         topOffset: this.homeMenuAnchor().top, contentLeft: this.homeMenuAnchor().left,
         contentMaxWidth: this.homeActionAnchor.width, alignEnd: true, cornerRadius: 应用尺寸.圆角_卡片,
         onClose: (): void => { this.closeHomeActions(); } }) {
@@ -2234,7 +2404,7 @@ struct 首页 {
       }
     }
     if (this.deckMenuId !== '' && this.按ID查牌组(this.deckMenuId).id !== '') {
-      HomeDeckRowMenu({ deckId: this.deckMenuId, point: this.deckMenuPoint, tone: this.按ID查牌组(this.deckMenuId).tone,
+      HomeDeckRowMenu({ refractionSource: GLASS_HOME_SOURCE, deck: this.按ID查牌组(this.deckMenuId), liftAnchor: this.deckLiftAnchor, deckId: this.deckMenuId, point: this.deckMenuPoint, tone: this.按ID查牌组(this.deckMenuId).tone,
         deckName: this.按ID查牌组(this.deckMenuId).fullName,
         filtered: this.按ID查牌组(this.deckMenuId).filtered === true, busy: this.filteredDeckBusy,
         backRequest: this.deckMenuBackRequest, onClose: (): void => { this.deckMenuId = ''; this.deckMenuPoint = undefined; },
@@ -2255,7 +2425,8 @@ struct 首页 {
   @Builder
   private deckDetails(compact: boolean) {
     HomeDeckDetails({ compact: compact, isDark: this.是否深色(), optionsBusy: this.deckOptionsBusy,
-      filteredBusy: this.filteredDeckBusy, onFilteredAction: (action: string): void => { this.maintainFilteredDeck(this.选中的牌组ID, action); },
+
+      filteredBusy: this.filteredDeckBusy,
       headerActionHeight: this.detailHeaderActionHeight(),
       historyRefreshToken: this.historyRefreshToken,
       onBackHandlerChange: (handler: (() => boolean) | null): void => { this.deckDetailsBackHandler = handler; },
@@ -2267,11 +2438,7 @@ struct 首页 {
       onPreview: (scope: DeckPreviewScope): void => { this.打开牌组预览(scope); },
       onAddNote: (): void => { this.打开添加笔记(); },
       onCreateWithAI: (): void => { this.打开AI制卡(); },
-      onCreateChild: (): void => { this.openCreateDeck(this.选中的牌组ID); },
-      onMoveDeck: (): void => { this.openDeckMove(); },
-      onRenameDeck: (): void => { this.openDeckRename(this.选中的牌组ID); },
-      onExport: (): void => { this.openDeckExport(this.选中的牌组ID); },
-      onOptions: (): void => { this.打开牌组选项(); } })
+      onMore: (): void => { this.openDeckMenu(this.选中的牌组ID, undefined, true); } })
       .transition(SurfaceTransition.pageContent(true, compact))
   }
 
@@ -2412,7 +2579,8 @@ struct 首页 {
 
     if (this.显示欢迎弹窗) {
       HomeIntroPanel({
-        onClose: (): void => { this.closeHomeIntro(); }
+        onClose: (): void => { this.closeHomeIntro(); },
+        onDismiss: (): void => { this.closeHomeIntro(); }
       })
     }
 
@@ -2433,10 +2601,14 @@ struct 首页 {
 
     if (this.显示节流奖励) {
       Stack() {
-        DialogBackdrop()
+        DialogBackdrop({ maximumWidth: 应用尺寸.dialogCompactMaxWidth,
+          onSize: (width: string, maximumWidth: number): void => {
+            this.surfaceWidth = width; this.surfaceMaximumWidth = maximumWidth;
+          } })
         .onClick(() => { this.显示节流奖励 = false; })
 
-        Column() {
+        GlassPanel({ radius: 应用尺寸.圆角_卡片, panelWidth: this.surfaceWidth, maximumWidth: this.surfaceMaximumWidth }) {
+Column() {
           DialogHeader({ showClose: false, actionLabel: $r('app.string.easter_egg_got_it'),
             onAction: (): void => { this.显示节流奖励 = false; } })
 
@@ -2449,11 +2621,12 @@ struct 首页 {
             .padding({ top: 24, bottom: 32 })
 
         }
-        .width('88%')
-        .constraintSize({ maxWidth: 应用尺寸.dialogCompactMaxWidth })
+        .width('100%')
+         
         .padding(应用尺寸.卡片内边距)
-        .backgroundColor($r('app.color.surface_card'))
-        .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
+        
+      
+      }
       }
       .width('100%')
       .height('100%')
@@ -2467,15 +2640,21 @@ struct 首页 {
       ThemeBackground({ transitionActive: this.backgroundTransitionActive })
     Navigation(this.页面栈) {
       Stack() {
+        GlassSource({ sourceId: GLASS_HOME_SOURCE, freezeDuringPanels: true }) {
+        ThemeBackground({ transitionActive: this.backgroundTransitionActive })
         this.homeLayout()
 
-        this.homeMenus()
 
         // 窄屏详情显隐（方案 C 2026-07-25）：显示牌组详情=true 时 牌组详情面板 盖住列表。
         // 牌组详情面板 在根 Stack 内，作为 @Entry 后代，@Consume 能找到 @Provide。
         // B12-Y3 2026-07-28：详情面板必须在 3 个协调器弹窗之前渲染，否则弹窗被详情面板遮挡，
         // 用户点「创建子牌组/牌组选项/导出」后弹窗藏在详情面板背后，返回后才看到。
         this.compactDeckDetails()
+        }
+
+        this.homeMenus()
+
+
 
         // 功能弹层在窄屏详情之后绘制，保持可见和可交互。
         // B12-Y3 2026-07-28：弹层渲染在窄屏详情面板之后，确保弹窗能盖住详情面板。
@@ -2487,7 +2666,7 @@ struct 首页 {
       }
       .width('100%')
       .height('100%')
-      .backgroundColor(this.页面底色微染值)
+      .backgroundColor(Color.Transparent)
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
       .onAreaChange((_old: Area, area: Area): void => { this.homeMenuHostChanged(area); })
       .opacity(this.homeTransitionOpacity)
@@ -2498,13 +2677,17 @@ struct 首页 {
     .navDestination(this.页面映射)
     .onNavBarStateChange((visible: boolean): void => {
       this.homeVisible = visible;
-      if (!visible) { this.closeHomeActions(); this.homeSearchOpen = false; }
+      if (!visible) { this.closeHomeActions(); this.homeSearchOpen = false; this.closeSyncChoice(); }
       if (visible) appInterface.showPage('home');
       else appInterface.hidePage('home');
     })
     // 用箭头函数包裹，避免方法引用丢失 this 绑定后 transition 回调内 this 为 undefined（BUG：从二级页面 push 三级页面时崩溃 "Cannot read property getUIContext of undefined"）。
     .customNavContentTransition((from: NavContentInfo, to: NavContentInfo, op: NavigationOperation): NavigationAnimatedTransition | undefined => this.navigationTransition.create(from, to, op))
     .backgroundColor(Color.Transparent)
+      if (this.syncChoiceVisible) {
+        HomeSyncChoiceDialog({ onChoose: (target: string): void => { this.chooseSyncTarget(target); },
+          onClose: (): void => { this.closeSyncChoice(); } })
+      }
       // 根宿主跨导航保留，收起详情/进入学习不销毁媒体轮询。
       if (this.显示同步面板) {
         同步面板({

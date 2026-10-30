@@ -57,8 +57,7 @@ export class HomeDataRepository {
       const snapshot: 主页快照 =
         构建主页快照(tree, null, new Date(), toneOverrides, displayNameOverrides,
           orderOverrides, backgroundImageOverrides);
-      // 默认牌组（id=1）名跟随系统语言：数据库里存的是 "Default"，
-      // 中文环境下显示"默认牌组"，英文环境显示"Default"。用户自定义别名优先。
+      // 默认牌组（id=1）使用当前地区资源；用户自定义别名优先。
       const 默认牌组本地化名: string = defaultDeckName;
       for (const deck of snapshot.decks) {
         if (deck.id === '1' && deck.displayName === '') {

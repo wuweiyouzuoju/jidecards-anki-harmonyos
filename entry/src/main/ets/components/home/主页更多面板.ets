@@ -56,6 +56,7 @@ export struct 主页更多面板 {
     appInterface.observe({ surface: 'home_more', sectionId: '', selectedId: '',
       optionIds: items.map((item: AppInterfaceItem): string => item.id),
       optionLabels: items.map((item: AppInterfaceItem): string => namedResourceText(this.getUIContext(), item.titleKey)), busy: false,
+      values: [{ id: 'presentation', value: 'button_anchored_popup' }, { id: 'label_alignment', value: 'center' }],
       items: items.map((item: AppInterfaceItem): AppInterfaceControl => ({ id: item.id, title: '', titleKey: item.titleKey,
         enabled: item.id !== 'history' || this.historyAvailable, selected: false })) });
   }
@@ -63,6 +64,6 @@ export struct 主页更多面板 {
   aboutToDisappear(): void { appInterface.leave('home_more'); }
 
   build() {
-    ActionMenuList({ items: this.menuEntries(), slideScope: this.slideScope, onSelect: (id: string): void => { this.selectItem(id); } })
+    ActionMenuList({ labelAlignment: TextAlign.Center, items: this.menuEntries(), slideScope: this.slideScope, onSelect: (id: string): void => { this.selectItem(id); } })
   }
 }

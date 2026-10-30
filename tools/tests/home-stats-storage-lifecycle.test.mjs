@@ -9,7 +9,7 @@ const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve
 const settle=async()=>{for(let i=0;i<5;i++)await new Promise(setImmediate);};
 const item=(id=1)=>({唯一ID:id,小时:6,分钟:30,标题:'',内容:'',开启:true});
 function storageHarness() {
-  const state={context:{filesDir:'/data',getApplicationContext:()=>({filesDir:'/shared'})},broadcasts:[],values:new Map(),readError:false,flushError:false};
+  const state={context:{filesDir:'/data',resourceManager:{getStringByNameSync:key=>key},getApplicationContext:()=>({filesDir:'/shared'})},broadcasts:[],values:new Map(),readError:false,flushError:false};
   const AppStorage={get:()=>state.context,setOrCreate:(...args)=>state.broadcasts.push(args)};
   const store={getSync:(key,fallback)=>{if(state.readError)throw Error('read');return state.values.get(key)??fallback;},
     putSync:(key,value)=>state.values.set(key,value),flush:async()=>{if(state.flushError)throw Error('flush');}};
@@ -63,7 +63,7 @@ function textHarness(locale='base') {
 function serviceHarness(items=[item()],locale='base') {
   const events=[],state={items,readError:false,treeError:false,permission:true,failPublish:0,tree:{children:[{newCount:2,learnCount:3,reviewCount:4}]}};
   const service=loadPlatformModule('model/学习提醒服务.ets','刷新学习提醒',{
-    ...textHarness(locale),AppStorage:{get:()=>({filesDir:'/data'})},
+    ...textHarness(locale),AppStorage:{get:key=>key==='系统语言'?(locale==='base'?'zh-Hans':locale.replace('_','-')):({filesDir:'/data'})},
     加载学习提醒设置:async()=>{events.push('read');if(state.readError)throw Error('read');return {提醒项列表:state.items};},
     保存提醒ID列表:async ids=>events.push(['ids',ids]),
     notificationManager:{isNotificationEnabled:async()=>state.permission,requestEnableNotification:async()=>{},SlotType:{SERVICE_INFORMATION:1}},

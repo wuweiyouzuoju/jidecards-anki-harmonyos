@@ -1,7 +1,7 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { EditNotePage } from '../EditNotePage';
 import { NoteDraftPreviewPage } from '../NoteDraftPreviewPage';
 import { DeckOptionsPage } from '../DeckOptionsPage';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { 学习页, 学习页参数 } from '../学习页';
 import { 浏览页 } from '../浏览页';
 import { 统计页, 统计页参数 } from '../统计页';

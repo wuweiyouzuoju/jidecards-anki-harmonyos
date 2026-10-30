@@ -60,6 +60,6 @@ export struct 主页操作面板 {
   aboutToDisappear(): void { appInterface.leave('home_create'); }
 
   build() {
-    ActionMenuList({ items: this.menuEntries(), slideScope: this.slideScope, onSelect: (id: string): void => { this.selectItem(id); } })
+    ActionMenuList({ labelAlignment: TextAlign.Center, items: this.menuEntries(), slideScope: this.slideScope, onSelect: (id: string): void => { this.selectItem(id); } })
   }
 }
