@@ -139,6 +139,22 @@ function runtime() {
   return { DeviceLinkService, DevicePairingStore, LanCrypto, stores, mdns };
 }
 
+test('home pairing query is read-only and follows serialized pairing and unpairing writes', async () => {
+  const { DevicePairingStore, stores } = runtime(), context = { id: 'home-pairings' };
+  const store = new DevicePairingStore(context);
+  assert.equal(await store.hasPairedDevices(), false);
+  assert.equal(stores.get(context.id).has('pairings_v1'), false, 'opening cloud sync must not create a device identity');
+  const peer = { id: 'b'.repeat(32), name: 'Tablet', key: 'a'.repeat(64), pairedAt: Date.now() };
+  const saved = store.remember(peer);
+  assert.equal(await store.hasPairedDevices(), true); await saved;
+  const removed = store.forget(peer.id);
+  assert.equal(await store.hasPairedDevices(), false); await removed;
+  stores.get(context.id).set('pairings_v1', '{invalid');
+  await assert.rejects(store.hasPairedDevices(), SyntaxError);
+  stores.get(context.id).set('pairings_v1', '{"version":0}');
+  await assert.rejects(store.hasPairedDevices(), /device_link_storage_invalid/);
+});
+
 test('production pairing performs authenticated TCP exchange and reconnects after both services restart', async () => {
   const { DeviceLinkService, DevicePairingStore } = runtime();
   const aContext = { id: 'a' }, bContext = { id: 'b' };
@@ -236,7 +252,7 @@ test('actual settings publisher exposes pairing state without QR secrets and rem
     invitation: 'private-invitation-key', connectedId: 'a'.repeat(32), progressBusy:false,
     progress:[{id:'a'.repeat(32),phase:'done',error:'',addedReviews:1,updatedCards:1}] };
   page.publishInterface();
-  assert.deepEqual(appInterface.snapshot()[0].items.map(item=>item.id),['device_link_toggle']);
+  assert.deepEqual(appInterface.snapshot()[0].items.map(item=>item.id),['device_link_toggle', 'device_link_help']);
   page.toggleExpanded();
   const view = appInterface.snapshot()[0];
   assert.equal(view.surface, 'device_link');
@@ -256,6 +272,33 @@ test('actual settings publisher exposes pairing state without QR secrets and rem
   assert.deepEqual(appInterface.snapshot(), []);
 });
 
+test('zero local changes are reported without claiming both devices were already equal or blocking a retry', () => {
+  const appInterface = new AppInterfaceTracker();
+  const Settings = settingsClass({ appInterface, $r: key => key, namedResourceText: (_ui, key, ...args) => [key, ...args].join(':') });
+  const page = new Settings(); page.expanded = true;
+  page.getUIContext = () => ({});
+  const peer = { id: 'a'.repeat(32), name: 'Tablet', online: true, allowProgress: true, allowCollection: true };
+  page.snapshot = { ready: true, peers: [peer], invitation: '', connectedId: '', progressBusy: false,
+    progress: [{ id: peer.id, phase: 'done', error: '', addedReviews: 0, updatedCards: 0 }],
+    collection: [{ id: peer.id, phase: 'done', error: '', updatedObjects: 0, addedReviews: 0, updatedMedia: 0, deletedMedia: 0 }] };
+  assert.equal(page.progressText(peer.id), 'device_sync_local_unchanged');
+  assert.equal(page.collectionText(peer.id), 'device_sync_local_unchanged');
+  page.publishInterface();
+  assert.equal(appInterface.snapshot()[0].items.find(item => item.id === peer.id + ':collection').enabled, true);
+  assert.equal(appInterface.snapshot()[0].items.find(item => item.id === peer.id + ':merge').enabled, true);
+  assert.equal(page.syncHint(peer, true), 'app.string.device_collection_scope_hint');
+  assert.equal(page.syncHint(peer, false), 'app.string.device_progress_scope_hint');
+  peer.online = false;
+  assert.equal(page.syncHint(peer, true), 'app.string.device_link_offline');
+  page.snapshot.progressBusy = true;
+  assert.equal(page.syncHint(peer, true), 'app.string.device_link_working');
+  page.snapshot.progressBusy = false;
+  page.snapshot.collection[0].updatedMedia = 1;
+  assert.match(page.collectionText(peer.id), /^device_collection_result:/);
+  page.snapshot.progress[0].updatedCards = 1;
+  assert.match(page.progressText(peer.id), /^device_progress_result:/);
+});
+
 test('unpair confirmation preserves pairing on cancel and ignores repeated or departed callbacks', async () => {
   const dialogs = [], forgotten = [];
   const Settings = settingsClass({
@@ -269,16 +312,32 @@ test('unpair confirmation preserves pairing on cancel and ignores repeated or de
   page.forgetDevice(peer); page.forgetDevice(peer);
   assert.equal(dialogs.length, 1);
   assert.match(dialogs[0].message, /Tablet/);
-  dialogs[0].primaryButton.action(); dialogs[0].secondaryButton.action();
+  dialogs[0].buttons[0].action(); dialogs[0].buttons[1].action();
   assert.deepEqual(forgotten, []);
   page.forgetDevice(peer);
-  dialogs[1].secondaryButton.action(); dialogs[1].secondaryButton.action();
+  dialogs[1].buttons[1].action(); dialogs[1].buttons[1].action();
   await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual(forgotten, [peer.id]);
   page.forgetDevice(peer); page.aboutToDisappear();
-  dialogs[2].secondaryButton.action();
+  dialogs[2].buttons[1].action();
   await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual(forgotten, [peer.id]);
+});
+
+test('entering Device link from Home expands and reveals the section after its first layout', async () => {
+  const appInterface = new AppInterfaceTracker();
+  const Settings = settingsClass({ appInterface, DeviceLinkService: class {
+    subscribe() { return () => {}; } async start() {} async stop() {}
+  } });
+  const page = new Settings(); page.initiallyExpanded = true;
+  page.getUIContext = () => ({ getHostContext: () => ({}) });
+  page.aboutToAppear();
+  assert.equal(page.expanded, true);
+  page.reveal.revealAfterLayout(page.expanded, 600);
+  page.reveal.revealAfterLayout(page.expanded, 700);
+  assert.deepEqual(page.scroller.edges, ['bottom'], 'direct entry is revealed once without repeat scrolling');
+  await new Promise(resolve => setImmediate(resolve));
+  page.aboutToDisappear();
 });
 
 test('device section reuses the containing scroller, reveals after layout once, and preserves state on collapse',()=>{
@@ -293,7 +352,7 @@ test('device section reuses the containing scroller, reveals after layout once, 
   layout({}, {height:300});layout({}, {height:500}); assert.deepEqual(page.scroller.edges,['bottom']);
   page.snapshot.progressBusy=true;page.toggleExpanded();
   assert.equal(page.expanded,false);assert.equal(page.snapshot.peers[0].allowProgress,true);
-  assert.deepEqual(appInterface.snapshot()[0].items.map(item=>item.id),['device_link_toggle','device_progress_cancel']);
+  assert.deepEqual(appInterface.snapshot()[0].items.map(item=>item.id),['device_link_toggle','device_link_help','device_progress_cancel']);
   page.toggleExpanded();page.toggleExpanded();layout({}, {height:300});
   assert.deepEqual(page.scroller.edges,['bottom'],'collapse cancels a pending reveal');
   page.toggleExpanded();page.aboutToDisappear();layout({}, {height:300});
@@ -439,10 +498,10 @@ test('collection replacement requires local confirmation and ignores cancelled, 
   page.snapshot={...page.snapshot,peers:[peer],collection:[{id:peer.id,phase:'failed',error:'device_collection_full_required'}]};
   assert.equal(page.needsFull(peer.id),true);
   page.pullCollection(peer);assert.equal(page.confirmingPull,true);
-  dialogs[0].primaryButton.action();dialogs[0].secondaryButton.action();assert.deepEqual(calls,[]);
-  page.pullCollection(peer);dialogs[1].secondaryButton.action();dialogs[1].secondaryButton.action();
+  dialogs[0].buttons[0].action();dialogs[0].buttons[1].action();assert.deepEqual(calls,[]);
+  page.pullCollection(peer);dialogs[1].buttons[1].action();dialogs[1].buttons[1].action();
   await new Promise(resolve=>setImmediate(resolve));assert.deepEqual(calls,[{id:peer.id,mode:'pull'}]);
-  page.pullCollection(peer);page.aboutToDisappear();dialogs[2].secondaryButton.action();
+  page.pullCollection(peer);page.aboutToDisappear();dialogs[2].buttons[1].action();
   assert.equal(calls.length,1);
 });
 

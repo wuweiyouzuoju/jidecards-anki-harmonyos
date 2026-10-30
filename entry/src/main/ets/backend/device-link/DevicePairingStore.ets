@@ -12,6 +12,19 @@ export class DevicePairingStore {
   private static tail: Promise<void> = Promise.resolve();
   constructor(context: common.UIAbilityContext) { this.context = context; }
 
+  /** 首页只判断是否需要选择入口，不创建直连身份，也不启动网络发现。
+   * @throws {Error} 已保存配对损坏或偏好读取失败由入口显示。 */
+  async hasPairedDevices(): Promise<boolean> {
+    const task = DevicePairingStore.tail.then(async (): Promise<boolean> => {
+      const store = await preferences.getPreferences(this.context, { name: 'jidecards_device_link' });
+      const saved = await store.get('pairings_v1', '');
+      if (typeof saved !== 'string') throw new Error('device_link_storage_invalid');
+      return saved !== '' && parsePairingState(saved).devices.length > 0;
+    });
+    DevicePairingStore.tail = task.then((): void => {}, (): void => {});
+    return task;
+  }
+
   /** @throws 存储失败或损坏需显示错误，禁止悄悄生成另一个设备身份。 */
   async read(): Promise<DevicePairingState> {
     const task = DevicePairingStore.tail.then(async (): Promise<DevicePairingState> => this.readCurrent());
