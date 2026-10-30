@@ -7,10 +7,11 @@ import { loadComponentLogic, loadPlatformModule } from './platform-module-harnes
 import { uiFeedback } from './ui-feedback-harness.mjs';
 import { AppInterfaceTracker, APP_INTERFACE_SURFACES, deckRowMenuItems } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { DECK_TONE_CHOICES, 牌组色调 } from '../../entry/src/main/ets/model/DeckTone.ts';
-import { 牌组显示名 } from '../../entry/src/main/ets/model/主页模型.ets';
+import { 牌组显示名, 空牌组汇总 } from '../../entry/src/main/ets/model/主页模型.ets';
 import { deckScopeSearch } from '../../entry/src/main/ets/model/DeckScope.ts';
 import { ActionMenuPointerSide, actionMenuBubbleOutline, actionMenuHostAnchor, placeAnchoredActionMenu, actionMenuGroupInset, placeActionMenuGroups } from '../../entry/src/main/ets/components/common/ActionMenuLayout.ts';
 import { actionMenuRows, visibleActionMenuRows } from '../../entry/src/main/ets/components/common/ActionMenuTree.ts';
+import { deckMenuPlacement } from '../../entry/src/main/ets/model/DeckMenuPresentation.ts';
 import { HOME_SHORTCUTS, shortcutCommand } from '../../entry/src/main/ets/model/KeyboardShortcuts.ts';
 import { KeyboardPressSession } from '../../entry/src/main/ets/model/KeyboardInput.ts';
 import { safeMenuGeometry, keyboardViewportHeight } from '../../entry/src/main/ets/model/WindowSafeLayout.ts';
@@ -21,8 +22,13 @@ const dictionaries = Object.fromEntries(['base', 'en_US'].map(locale => [locale,
 function menuHarness(locale = 'base') {
   const tracker = new AppInterfaceTracker();
   const Menu = loadComponentLogic('components/home/HomeDeckRowMenu.ets', 'HomeDeckRowMenu', {
-    DECK_TONE_CHOICES, 牌组色调, deckRowMenuItems, appInterface: tracker, actionMenuHostAnchor,
+    deviceInfo: {apiAvailable:()=>true}, deckMenuPlacement, WINDOW_SAFE_TOP_KEY: 'top', WINDOW_SAFE_BOTTOM_KEY: 'bottom', WINDOW_SAFE_LEFT_KEY: 'left', WINDOW_SAFE_RIGHT_KEY: 'right',
+    DECK_TONE_CHOICES, 牌组色调, 空牌组汇总, deckRowMenuItems, appInterface: tracker, actionMenuHostAnchor,
     interfaceItemText: loadPlatformModule('utils/AppInterfaceText.ets', 'interfaceItemText', { APP_INTERFACE_SURFACES, ...uiFeedback }),
+    ...uiFeedback,
+    SurfaceTransition: { dialogEnterAnimation: () => ({}), dialogExitAnimation: () => ({}) },
+    SelectionDialog: props => props,
+    CustomDialogController: class { constructor(options) { this.options = options; } open() {} close() { this.closed = true; } },
     $r: id => id
   });
   const menu = new Menu(), events = [];
@@ -40,8 +46,8 @@ function menuHarness(locale = 'base') {
 test('deck tone choices retain every persisted value inside the shared dialog', () => {
   const { menu, events } = menuHarness();
   assert.deepEqual(DECK_TONE_CHOICES.map(choice => choice.tone), [牌组色调.Blue, 牌组色调.Purple, 牌组色调.Mint, 牌组色调.Amber, 牌组色调.Red, 牌组色调.None]);
-  menu.toggleBranch(menu.menuItems().find(item => item.id === 'tone'));
   for (const choice of DECK_TONE_CHOICES) {
+    menu.toggleBranch({id:'tone'});
     menu.tone = choice.tone;
     const items = menu.toneItems();
     assert.equal(items.filter(item => item.selected).length, 1);
@@ -59,11 +65,13 @@ test('deck tone choices retain every persisted value inside the shared dialog', 
   menu.selectItem({ id: '-1' }); menu.selectItem({ id: '99' });
   assert.equal(events.length, calls);
   const source = read('components/home/HomeDeckRowMenu.ets');
-  assert.match(source, /DialogFrame\(\{/);
-  assert.match(source, /DialogHeader\(\{ title: this\.deckName/);
-  assert.match(source, /selectionUsesAccent: choice\.id !== String\(牌组色调\.None\)/);
+  assert.match(source, /牌组列表项\(\{ deck: this\.deck/);
+  assert.doesNotMatch(source, /DialogHeader\(/);
+
+  assert.match(source, /SelectionDialog\(/);
+  assert.doesNotMatch(source, /children:.*toneItems|ForEach\(this.toneItems/);
   assert.match(source, /if \(this\.point !== undefined\) \{[\s\S]*CardActionMenu\(/);
-  assert.doesNotMatch(source, /AnchoredMenu\(/);
+  assert.match(source, /AnchoredMenu\(/);
   assert.doesNotMatch(read('components/牌组列表项.ets'), /bindPopup\(|色条菜单|色条选项列表/);
 });
 
@@ -84,7 +92,7 @@ test('menu and JIDE share localized actions, mode visibility, filtered state and
     const observation = tracker.snapshot().find(item => item.surface === 'deck_tones');
     const state = tracker.snapshot().find(item => item.surface === 'deck_row_menu');
     assert.equal(state.items.some(item => item.id === 'custom_study'), !simple && !filtered);
-    assert.equal(state.values.find(item => item.id === 'presentation').value, 'centered_dialog');
+    assert.equal(state.values.find(item => item.id === 'presentation').value, 'lifted_deck_context_menu');
     assert.equal(state.values.find(item => item.id === 'deck_name').value, menu.deckName);
     assert.equal(state.items.find(item => item.id === 'close').title, dictionaries[locale].cancel);
     assert.ok(state.values.every(item => !['anchor', 'pointer'].includes(item.id)));
@@ -152,6 +160,7 @@ function homeHarness() {
   const home = new Home(), paths = [], actions = [];
   const target = { id: '42', fullName: 'Parent::Deck "quoted" *_', displayName: 'Alias' };
   Object.assign(home, {
+    getUIContext: () => ({getFrameNodeById: () => null}),
     排序模式中: false, deckMenuId: '', 选中的牌组ID: '999', 当前断点: 'md',
     按ID查牌组: id => id === target.id ? target : { id: '' },
     deferForSync: () => false, 添加笔记的牌组选项: () => [{id:42,name:target.fullName}],
@@ -435,8 +444,8 @@ test('pointer follows the selected column when colors open near either screen ed
   });
   const shell = new Shell(); Object.assign(shell, { viewportHeight: 800, viewportTop: 0, topOffset: 430, maxHeight: 180 });
   assert.equal(shell.scrollMaxHeight(), 180, 'arrow stays outside the scrolling viewport');
-  assert.match(read('components/common/AnchoredMenu.ets'), /MenuBubbleSurface\(\{/);
-  assert.match(read('components/common/MenuBubble.ets'), /MenuBubbleSurface\(\{/);
+  assert.match(read('components/common/AnchoredMenu.ets'), /GlassBubblePanel\(\{/);
+  assert.match(read('components/common/MenuBubble.ets'), /GlassBubblePanel\(\{/);
 });
 
 
@@ -447,13 +456,14 @@ test('right click uses the same current actions and guarded tone choices at a wi
  assert.deepEqual(entries.map(item=>item.value),menu.menuItems().map(item=>item.label));
  menu.publishInterface();const observed=tracker.snapshot().find(view=>view.surface==='deck_row_menu');
  assert.equal(observed.values.find(value=>value.id==='presentation').value,'pointer_context_menu');
- assert.equal(observed.values.find(value=>value.id==='triggers').value,'long_press,right_click');
- const tones=entries.find(item=>item.id==='tone');menu.toggleBranch({id:'tone'});tones.children.find(item=>item.id===String(牌组色调.Mint)).action();
+ assert.equal(observed.values.find(value=>value.id==='triggers').value,'long_press,right_click,details_more');
+ const tones=entries.find(item=>item.id==='tone');assert.equal(tones.children,undefined);tones.action();
+ assert.notEqual(menu.toneDialog.current(),null);menu.selectItem(menu.toneItems().find(item=>item.id===String(牌组色调.Mint)));
  assert.deepEqual(events,['close',['42',牌组色调.Mint]]);
  events.length=0;menu.busy=true;entries.find(item=>item.id==='rename').action();assert.deepEqual(events,[]);
  assert.ok(menu.contextEntries().every(item=>item.enabled===false));
  menu.busy=false;menu.point=undefined;menu.publishInterface();
- assert.equal(tracker.snapshot().find(view=>view.surface==='deck_row_menu').values.find(value=>value.id==='presentation').value,'centered_dialog');
+ assert.equal(tracker.snapshot().find(view=>view.surface==='deck_row_menu').values.find(value=>value.id==='presentation').value,'lifted_deck_context_menu');
 });
 
 test('mouse dispatch opens only for right press, keeps the exact deck and does not open phone details',()=>{
@@ -521,4 +531,78 @@ test('Escape closes deck menu levels once per press, and D clears the previous s
  menu.handleBack();assert.deepEqual(events,['close']);events.length=0;menu.busy=true;menu.handleBack();assert.deepEqual(events,[]);
  home.deckMenuId='';home.创建父牌组ID='42';home.homeActivity=()=>({foreground:true,collectionReady:true});
  Host.prototype.handleHomeKey.call(home,{keyCode:2,type:0,chord:'d'});assert.equal(home.创建父牌组ID,'');assert.equal(home.显示创建牌组,true);
+});
+
+
+test('detail more keeps the selected deck and routes move/reorder through existing actions', () => {
+ const {home,target}=homeHarness();
+ home.显示牌组详情=true;home.openDeckMenu(target.id);
+ assert.equal(home.显示牌组详情,true);assert.equal(home.deckMenuId,target.id);
+ assert.equal(home.deckMenuPoint,undefined);
+ let moved=0,reordered=0;
+ home.openDeckMove=()=>{moved++;assert.equal(home.选中的牌组ID,target.id);};
+ home.进入排序模式=()=>{reordered++;assert.equal(home.显示牌组详情,false);};
+ home.handleDeckMenuAction(target.id,'move');assert.equal(moved,1);
+ home.handleDeckMenuAction('missing','move');assert.equal(moved,1);
+ home.handleDeckMenuAction(target.id,'reorder');assert.equal(reordered,1);
+ const source=read('pages/首页.ets'),build=source.slice(source.indexOf('  build() {'));
+ assert.ok(build.indexOf('this.homeMenus()')>build.indexOf('this.compactDeckDetails()'),
+   'shared popup must render above phone details');
+});
+
+test('secondary tone dialog cancels to parent, guards stale callbacks and preserves its original deck', () => {
+ const {menu,events,tracker}=menuHarness();
+ menu.selectItem({id:'tone'});const first=menu.toneDialog.current();
+ assert.ok(first);menu.publishInterface();
+ assert.equal(tracker.snapshot().find(x=>x.surface==='deck_row_menu').values.find(x=>x.id==='tone_presentation').value,'secondary_dialog');
+ first.options.builder.onClose();assert.equal(first.closed,true);assert.deepEqual(events,[]);
+ menu.selectItem({id:'tone'});const second=menu.toneDialog.current();
+ first.options.builder.onSelect(String(牌组色调.Red));assert.deepEqual(events,[]);assert.equal(menu.toneDialog.current(),second);
+ menu.busy=true;second.options.builder.onSelect(String(牌组色调.Red));assert.deepEqual(events,[]);
+ menu.busy=false;menu.deckId='99';second.options.builder.onSelect(String(牌组色调.Red));assert.deepEqual(events,[]);
+ menu.deckId='42';second.options.builder.onSelect(String(牌组色调.Red));assert.deepEqual(events,['close',['42',牌组色调.Red]]);
+ assert.equal(second.closed,true);assert.equal(menu.toneDialog.current(),null);
+});
+
+test('lifted deck remains above its menu and fits the viewport width',()=>{
+ const {menu}=menuHarness();
+ menu.viewportWidth=420;menu.viewportHeight=860;menu.hostTop=48;menu.previewHeight=64;
+ menu.liftAnchor={left:16,top:700,width:388,height:64};
+ assert.ok(menu.previewTop()<=menu.liftAnchor.top-menu.hostTop);
+ assert.ok(menu.menuTop()>=menu.previewTop()+menu.previewHeight+12);
+ assert.ok(menu.panelWidth()<menu.previewWidth());
+ assert.ok(menu.previewLeft()>=16);
+});
+
+test('wide previews retain their source column and short windows keep the menu scrollable',()=>{
+ for(const anchor of [{left:24,top:400,width:380,height:64},{left:610,top:120,width:420,height:64}]) {
+  const bounds={left:16,top:24,width:1044,height:640};
+  const placement=deckMenuPlacement(anchor,bounds,64);
+  assert.ok(Math.abs(placement.preview.left-anchor.left)<1);
+  assert.ok(placement.menu.left>=bounds.left);
+  assert.ok(placement.menu.left+placement.menu.width<=bounds.left+bounds.width);
+  assert.ok(placement.menu.top+placement.menu.height<=bounds.top+bounds.height);
+ }
+ const short=deckMenuPlacement({left:5,top:270,width:420,height:64},{left:16,top:24,width:328,height:260},64);
+ assert.ok(short.preview.left>=16);assert.ok(short.preview.width<=328);
+ assert.ok(short.menu.height>=48 && short.menu.top+short.menu.height<=284);
+});
+
+test('deck rises only by the amount required to fit the measured full menu',()=>{
+ const bounds={left:16,top:24,width:388,height:860},anchor={left:16,top:500,width:388,height:64};
+ const full=deckMenuPlacement(anchor,bounds,64,440);
+ assert.equal(full.preview.top,368);assert.equal(full.menu.top+440,884);
+ const short=deckMenuPlacement({...anchor,top:100},bounds,64,200);
+ assert.equal(short.preview.top,100);
+ const wide=deckMenuPlacement({left:20,top:200,width:700,height:80},{left:16,top:16,width:1100,height:700},80,400);
+ assert.equal(wide.preview.width,700);
+});
+
+test('lift geometry preserves narrow, wide, short and tall source rows',()=>{
+ for(const width of [160,280,700]) for(const height of [48,64,96,160]) {
+  const result=deckMenuPlacement({left:20,top:500,width,height},{left:16,top:24,width:1100,height:860},height,440);
+  assert.equal(result.preview.width,width);assert.equal(result.preview.height,height);
+  assert.ok(result.preview.top>=24);
+  assert.ok(result.menu.top+Math.min(440,result.menu.height)<=884);
+ }
 });

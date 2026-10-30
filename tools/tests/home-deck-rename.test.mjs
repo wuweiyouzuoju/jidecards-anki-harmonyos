@@ -135,7 +135,7 @@ test('JIDE reads shared rename labels, actual draft state and the real proposal 
     assert.ok(structure.tools.some(x=>x.name==='propose_rename_deck'));
     assert.equal(structure.observations[0].values.find(x=>x.id==='local_display_name').value,'My alias');
   }
-  for(const surface of ['deck_details_more','deck_row_menu'])assert.ok(APP_INTERFACE_SURFACES.find(x=>x.id===surface).items.some(x=>x.id==='rename'&&x.opens==='deck_rename'));
+  for(const surface of ['deck_row_menu'])assert.ok(APP_INTERFACE_SURFACES.find(x=>x.id===surface).items.some(x=>x.id==='rename'&&x.opens==='deck_rename'));
   assert.ok(APP_INTERFACE_SURFACES.find(x=>x.id==='deck_customize').instructionsKey);
 });
 

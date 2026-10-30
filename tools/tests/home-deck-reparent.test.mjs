@@ -106,7 +106,7 @@ function componentHarness() {
 }
 
 test('real move panel exposes shared menu and live selection, excludes descendants and guards busy/back/double submission', async () => {
-  assert.ok(visibleInterfaceItems('deck_details_more', {simple: false, agent: true, cloudDeck: false, themeHasTextures: false}).some(x => x.id === 'move' && x.opens === 'deck_move'));
+  assert.ok(visibleInterfaceItems('deck_row_menu', {simple: false, agent: true, cloudDeck: false, themeHasTextures: false}).some(x => x.id === 'move' && x.opens === 'deck_move'));
   assert.ok(APP_INTERFACE_SURFACES.some(x => x.id === 'deck_move'));
   const h = componentHarness(); await h.feature.load(); assert.deepEqual(h.feature.candidateIds(), [0, 1, 4]);
   h.feature.select(2); assert.equal(h.feature.plan.changes[0].after, 'D::B');
