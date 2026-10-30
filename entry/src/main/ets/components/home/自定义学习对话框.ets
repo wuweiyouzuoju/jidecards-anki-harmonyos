@@ -1,6 +1,6 @@
-import { SurfaceTransition } from '../../utils/SurfaceTransition';
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { SurfaceBorder } from '../../utils/SurfaceBorder';
+import { GlassPanel } from '../common/GlassPanel';
+import { SurfaceTransition } from '../../utils/SurfaceTransition';
 import { FormInputStyle } from '../../utils/FormInputStyle';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { DialogBackdrop } from '../common/DialogBackdrop';
@@ -34,6 +34,8 @@ interface 预设选项 {
 
 @Component
 export struct 自定义学习对话框 {
+  @State private surfaceWidth: string = '88%';
+  @State private surfaceMaximumWidth: number = 480;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
 
@@ -341,10 +343,14 @@ export struct 自定义学习对话框 {
 
   build() {
     Stack() {
-      DialogBackdrop()
+      DialogBackdrop({ widthPercent: 88, maximumWidth: 480,
+          onSize: (width: string, maximumWidth: number): void => {
+            this.surfaceWidth = width; this.surfaceMaximumWidth = maximumWidth;
+          } })
         .onClick(() => { this.handleBackRequest(); })
         .transition(SurfaceTransition.backdrop())
-      Column({ space: 应用尺寸.间距_16 }) {
+      GlassPanel({ radius: 应用尺寸.圆角_卡片, panelWidth: this.surfaceWidth, maximumWidth: this.surfaceMaximumWidth, maximumHeight: '88%' }) {
+Column({ space: 应用尺寸.间距_16 }) {
         DialogHeader({
           title: $r('app.string.custom_study_title'),
           showActionLabel: this.处理中, actionLabel: this.处理中 ? $r('app.string.custom_study_running') : $r('app.string.custom_study_confirm'),
@@ -383,12 +389,13 @@ export struct 自定义学习对话框 {
         .width('100%').flexShrink(1).align(Alignment.TopStart)
         .scrollBar(BarState.Auto).edgeEffect(EdgeEffect.Spring)
       }
-      .width('88%').constraintSize({ maxWidth: 480, maxHeight: '88%' })
+      .width('100%') 
       .padding(应用尺寸.面板内边距)
-      .backgroundColor($r('app.color.surface_card'))
-      .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
+      
+      
       .onClick(() => {})
-      .transition(SurfaceTransition.dialog())
+      }
+      
     }.width('100%').height('100%')
   }
 }

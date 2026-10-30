@@ -1,7 +1,9 @@
+import { GlassPanel } from './common/GlassPanel';
+import { insetMaterialFill } from '../utils/GlassMaterial';
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { DialogFrame } from './common/DialogFrame';
 import { SurfaceTransition } from '../utils/SurfaceTransition';
 import { IconActionButton } from './common/IconActionButton';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { PressFeedback } from '../utils/PressFeedback';
 import { LabeledActionRow } from './common/LabeledActionRow';
@@ -333,7 +335,7 @@ export struct 牌组定制面板 {
           .width('100%')
           .height(应用尺寸.按钮高度)
           .fontSize(应用尺寸.字号_正文)
-          .backgroundColor($r('app.color.surface_card'))
+          .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
           .border(SurfaceBorder.options())
           .borderRadius(应用尺寸.圆角_面板)
           .enabled(!this.busy)
@@ -439,19 +441,8 @@ export struct 牌组定制面板 {
     }.width('100%')
   }
 
-  build() {
-    Stack() {
-      DialogFrame({ header: () => { this.panelHeader(); }, content: () => { this.panelContent(); },
-        canDismiss: !this.busy && !this.裁剪模式, onDismiss: (): void => { this.onClose(); } })
-
-      // ---- 顶层：裁剪模式覆盖层（仅 裁剪模式=true 时显示）----
-      if (this.裁剪模式) {
-        Column()
-          .width('100%')
-          .height('100%')
-          .backgroundColor('rgba(0,0,0,0.85)')
-          .transition(SurfaceTransition.backdrop())
-          .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+  @Builder
+  private cropContent() {
         Column({ space: 应用尺寸.间距_12 }) {
           DialogHeader({
             title: $r('app.string.deck_customize_background_crop_title'),
@@ -490,13 +481,24 @@ export struct 牌组定制面板 {
           }
 
         }
-        .width('92%')
-        .height('88%')
-        .constraintSize({ maxWidth: 560 })
-        .padding(应用尺寸.卡片内边距)
-        .backgroundColor($r('app.color.surface_card'))
-        .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
-        .transition(SurfaceTransition.dialog())
+        .width('100%').height('100%').padding(应用尺寸.卡片内边距)
+  }
+
+  build() {
+    Stack() {
+      DialogFrame({ header: () => { this.panelHeader(); }, content: () => { this.panelContent(); },
+        canDismiss: !this.busy && !this.裁剪模式, onDismiss: (): void => { this.onClose(); } })
+
+      // ---- 顶层：裁剪模式覆盖层（仅 裁剪模式=true 时显示）----
+      if (this.裁剪模式) {
+        Column()
+          .width('100%')
+          .height('100%')
+          .backgroundColor('rgba(0,0,0,0.85)')
+          .transition(SurfaceTransition.backdrop())
+          .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+        GlassPanel({ panelWidth: '92%', panelHeight: '88%', maximumWidth: 560, radius: 应用尺寸.圆角_卡片,
+          content: (): void => { this.cropContent(); } })
       }
     }
     .width('100%')

@@ -1,6 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { DirectoryTree } from './common/DirectoryTree';
 import { DirectoryRow, DirectoryView, DirectoryChoice, directoryChoiceRows, directorySpecial } from '../model/DirectoryTree';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { interfaceItemText } from '../utils/AppInterfaceText';
 import { appInterface } from '../backend/AppInterfaceService';
 import { FormInputStyle } from '../utils/FormInputStyle';

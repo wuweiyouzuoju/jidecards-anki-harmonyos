@@ -1,5 +1,5 @@
-import { DialogFrame } from '../common/DialogFrame';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { DialogFrame } from '../common/DialogFrame';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { FormInputStyle } from '../../utils/FormInputStyle';
 import { showToastSafely, resourceText, localizedNamedResourceText } from '../../utils/UiFeedback';

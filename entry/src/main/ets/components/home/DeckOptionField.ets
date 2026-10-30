@@ -1,7 +1,8 @@
+import { insetMaterialFill } from '../../utils/GlassMaterial';
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { DialogFrame } from '../common/DialogFrame';
 import { NativeDialogHost, NativeDialogFactory, NativeDialogDismiss, NativeDialogPresentation } from '../common/NativeDialogHost';
 import { SurfaceTransition } from '../../utils/SurfaceTransition';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../../utils/PressFeedback';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { 字段帮助对话框 } from '../字段帮助面板';
@@ -61,13 +62,13 @@ export struct DeckOptionEditor {
         if (this.multiline) {
           TextArea({ text: this.draft })
             .width('100%').height(200).fontSize(应用尺寸.字号_正文)
-            .backgroundColor($r('app.color.surface_card'))
+            .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
             .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
             .onChange((value: string): void => { this.draft = value; this.error = ''; })
         } else {
           TextInput({ text: this.draft })
             .width('100%').height(应用尺寸.按钮高度).fontSize(应用尺寸.字号_正文)
-            .backgroundColor($r('app.color.surface_card'))
+            .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
             .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
             .onChange((value: string): void => { this.draft = value; this.error = ''; })
         }
@@ -77,7 +78,7 @@ export struct DeckOptionEditor {
             Text(choice.label).fontSize(15).fontColor($r('app.color.text_primary')).layoutWeight(1)
           }
           .width('100%').constraintSize({ minHeight: 48 }).padding({ left: 8, right: 8 })
-          .backgroundColor(this.draft === choice.value ? $r('app.color.surface_page') : Color.Transparent)
+          .backgroundColor(this.draft === choice.value ? insetMaterialFill($r('app.color.surface_page')) : Color.Transparent)
           .borderRadius(10)
           .attributeModifier(new PressFeedback())
           .onClick((): void => { this.draft = choice.value; this.error = ''; })
@@ -125,7 +126,7 @@ export struct DeckOptionField {
       builder: 字段帮助对话框({ 标题: this.title, 正文: this.help,
         onDismiss: this.helpDialog.guard((): void => { this.helpDialog.close(); }) }),
       openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation, customStyle: presentation.customStyle, autoCancel: presentation.autoCancel, alignment: presentation.alignment,
-      width: presentation.width, height: presentation.height, maskColor: presentation.maskColor
+      width: presentation.width, height: presentation.height, keyboardAvoidMode: presentation.keyboardAvoidMode, maskColor: presentation.maskColor
     });
   };
   private openHelp(): void { this.helpDialog.open(this.createHelpDialog); }
@@ -152,7 +153,7 @@ export struct DeckOptionField {
           this.onChange(value);
           this.displayValue = value;
         } }),
-      width: presentation.width, height: presentation.height, maskColor: presentation.maskColor,
+      width: presentation.width, height: presentation.height, keyboardAvoidMode: presentation.keyboardAvoidMode, maskColor: presentation.maskColor,
       autoCancel: presentation.autoCancel, openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation, customStyle: presentation.customStyle, alignment: presentation.alignment
     });
   };

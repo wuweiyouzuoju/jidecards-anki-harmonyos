@@ -1,3 +1,4 @@
+import { GlassSource } from './common/GlassSource';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { DeckOptionRow } from './home/DeckOptionRow';
 import { 设置分组卡片 } from './settings/设置分组卡片';
@@ -481,7 +482,8 @@ export struct 牌组选项面板 {
 
   build() {
     Stack() {
-      Column() {
+      GlassSource() {
+Column() {
         Column() {
           DialogHeader({
             title: $r('app.string.deck_options_title'),
@@ -531,6 +533,7 @@ export struct 牌组选项面板 {
               top: 应用尺寸.间距_8, bottom: this.safeBottom + 应用尺寸.页面底部间距(this.narrow) })
         }
       }.width('100%').height('100%')
+      }
 
       if (this.showHelp) 字段帮助面板({ 标题: this.helpTitle, 正文: this.helpBody, onClose: () => { this.showHelp = false; } })
     }
