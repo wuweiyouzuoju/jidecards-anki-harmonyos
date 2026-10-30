@@ -28,6 +28,7 @@ export struct DialogHeader {
   @Prop showHelp: boolean = false;
   @Prop helpEnabled: boolean = true;
   @Prop destructive: boolean = false;
+  @Prop actionTextColor: ResourceColor | undefined = undefined;
   @Prop showDivider: boolean = true;
   // 页面复用标题操作时，顶栏到首卡的留白由页面内容区独占。
   @Prop isPageToolbar: boolean = false;
@@ -82,8 +83,8 @@ export struct DialogHeader {
               .layoutWeight(1)
           }
           if (this.showAction && !this.actionUsesIcon()) {
-            按下态按钮({ 文案: this.actionLabel, 字色: this.destructive ? $r('app.color.error_text') : this.actionColor,
-              themeText: !this.destructive, 是否启用: this.actionEnabled, singleLine: false, fillWidth: true, autoHeight: true, 点击回调: this.onAction })
+            按下态按钮({ 文案: this.actionLabel, 字色: this.actionTextColor ?? (this.destructive ? $r('app.color.error_text') : this.actionColor),
+              themeText: !this.destructive && this.actionTextColor === undefined, 是否启用: this.actionEnabled, singleLine: false, fillWidth: true, autoHeight: true, 点击回调: this.onAction })
               .layoutWeight(1)
           }
         }.width('100%')

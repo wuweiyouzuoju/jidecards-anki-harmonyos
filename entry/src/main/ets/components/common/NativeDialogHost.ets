@@ -11,6 +11,7 @@ export interface NativeDialogPresentation {
   width: Dimension;
   height: Dimension;
   maskColor: ResourceColor;
+  keyboardAvoidMode: KeyboardAvoidMode;
   openAnimation: AnimateParam;
   closeAnimation: AnimateParam;
 }
@@ -39,8 +40,8 @@ export class NativeDialogHost {
   /** 外壳提供遮罩和关闭策略；原生窗口只承载全窗口内容及一次动效。 */
   presentation(): NativeDialogPresentation {
     return { autoCancel: false, customStyle: true, alignment: DialogAlignment.Center,
-      width: '100%', height: '100%', maskColor: Color.Transparent,
-      openAnimation: SurfaceTransition.dialogEnterAnimation(), closeAnimation: SurfaceTransition.dialogExitAnimation() };
+      width: '100%', height: '100%', maskColor: Color.Transparent, keyboardAvoidMode: KeyboardAvoidMode.NONE,
+      openAnimation: { duration: 0 }, closeAnimation: SurfaceTransition.dialogExitAnimation() };
   }
 
   open(create: NativeDialogFactory, canDismiss: () => boolean = (): boolean => true): void {

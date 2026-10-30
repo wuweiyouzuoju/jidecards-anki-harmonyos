@@ -1,3 +1,4 @@
+import { materialHarness } from './surface-material-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -55,12 +56,13 @@ test('form geometry and menu radius are independent of metric-card aliases', () 
   assert.deepEqual(layout.trailingConstraint, { maxWidth: '56%' });
   assert.equal(sizes.noteMediaPreviewHeight, 204);
   const Surface = loadPlatformModule('components/common/MenuSurface.ets', 'MenuSurface', {
+    ...materialHarness(),
     应用尺寸: sizes, SurfaceBorder: { options: width => ({ width }) }, $r: resource, Color: { Transparent: 'transparent' }
   });
   const values = {}, attributes = {};
-  for (const key of ['backgroundColor', 'borderRadius', 'border', 'shadow', 'clip']) {
+  for (const key of ['backgroundColor', 'borderRadius', 'border', 'shadow', 'clip','backgroundBlurStyle','backdropBlur','linearGradient']) {
     attributes[key] = value => { values[key] = value; return attributes; };
   }
   new Surface().applyNormalAttribute(attributes);
-  assert.equal(values.borderRadius, 16);
+  assert.equal(values.borderRadius, dimensions.radiusLg);
 });

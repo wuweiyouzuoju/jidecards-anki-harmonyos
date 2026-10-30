@@ -1,10 +1,10 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { GlassPanel } from './GlassPanel';
 import { WINDOW_KEYBOARD_TOP_KEY, keyboardViewportHeight } from '../../model/WindowSafeLayout';
 import { motionAnimation } from '../../utils/AppMotion';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { currentMotionProfile } from '../../utils/AppMotion';
 import { DialogBackdrop } from './DialogBackdrop';
 import { 应用尺寸 } from '../../utils/应用尺寸';
-import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { SurfaceTransition } from '../../utils/SurfaceTransition';
 import { safeDialogMaxHeight, WINDOW_SAFE_TOP_KEY, WINDOW_SAFE_BOTTOM_KEY,
   WINDOW_SAFE_LEFT_KEY, WINDOW_SAFE_RIGHT_KEY } from '../../model/WindowSafeLayout';
@@ -13,6 +13,7 @@ import { safeDialogMaxHeight, WINDOW_SAFE_TOP_KEY, WINDOW_SAFE_BOTTOM_KEY,
 @Component
 export struct DialogFrame {
   @Prop nativeHost: boolean = false;
+  @Prop refractionSource: string = '';
   @Prop maximumWidth: number = 应用尺寸.dialogMaxWidth;
   // 卡片预览自行拥有滚动；普通表单继续按内容收缩并由外壳滚动。
   @Prop fillBody: boolean = false;
@@ -22,10 +23,16 @@ export struct DialogFrame {
   onDismiss: () => void = (): void => {};
   @BuilderParam header: () => void = this.emptyContent;
   @BuilderParam content: () => void = this.emptyContent;
+  @Prop showFooter: boolean = false;
+  @BuilderParam footer: () => void = this.emptyContent;
+  @State private surfaceWidth: string = 应用尺寸.dialogWidth;
+  @State private surfaceMaximumWidth: number = 0;
+  @State private footerHeight: number = 0;
   @State private viewportTop: number = 0;
   @StorageProp(WINDOW_KEYBOARD_TOP_KEY) private keyboardTop: number = 0;
   @State private viewportHeight: number = 600;
   @State private headerHeight: number = 56;
+  @StorageProp('themeMode') private themeMode: string = 'system';
   @StorageProp(WINDOW_SAFE_TOP_KEY) private safeTop: number = 0;
   @StorageProp(WINDOW_SAFE_BOTTOM_KEY) private safeBottom: number = 0;
   @StorageProp(WINDOW_SAFE_LEFT_KEY) private safeLeft: number = 0;
@@ -40,7 +47,8 @@ export struct DialogFrame {
 
   private bodyHeight(): number {
     return Math.max(0, this.frameMaxHeight() -
-      this.headerHeight - 应用尺寸.卡片内边距 * 2 - 应用尺寸.间距_12);
+      this.headerHeight - 应用尺寸.卡片内边距 * 2 - 应用尺寸.间距_12 -
+      (this.showFooter ? this.footerHeight + 应用尺寸.间距_12 : 0));
   }
 
   private usableHeight(): number { return keyboardViewportHeight(this.viewportHeight, this.viewportTop, this.keyboardTop); }
@@ -52,9 +60,14 @@ export struct DialogFrame {
 
   build() {
     Stack() {
-      DialogBackdrop().onClick((): void => { this.dismiss(); })
+      DialogBackdrop({ maximumWidth: this.maximumWidth,
+        onSize: (width: string, maximumWidth: number): void => {
+          this.surfaceWidth = width; this.surfaceMaximumWidth = maximumWidth;
+        } }).onClick((): void => { this.dismiss(); })
         .transition(this.nativeHost ? TransitionEffect.IDENTITY : SurfaceTransition.backdrop())
       Stack() {
+        GlassPanel({ source: this.refractionSource, radius: 应用尺寸.圆角_卡片, panelWidth: this.surfaceWidth,
+          maximumWidth: this.surfaceMaximumWidth || this.maximumWidth, maximumHeight: this.frameMaxHeight() }) {
         Column({ space: 应用尺寸.间距_12 }) {
           if (!this.actionsAtBottom) {
             this.actionBar()
@@ -72,15 +85,16 @@ export struct DialogFrame {
           if (this.actionsAtBottom) {
             this.actionBar()
           }
+          if (this.showFooter) {
+            Column() { this.footer() }.width('100%').flexShrink(0)
+              .onAreaChange((_old: Area, area: Area): void => { this.footerHeight = Number(area.height); })
+          }
         }
-        .width(应用尺寸.dialogWidth)
-        .constraintSize({ maxWidth: this.maximumWidth, maxHeight: this.frameMaxHeight() })
         .padding(应用尺寸.卡片内边距)
-        .backgroundColor($r('app.color.surface_card'))
-        .border(SurfaceBorder.options())
-        .borderRadius(应用尺寸.圆角_卡片)
+        .width('100%')
         .onClick((): void => {})
-        .transition(this.nativeHost ? TransitionEffect.IDENTITY : SurfaceTransition.dialog())
+        }
+        
       }.width('100%').height(this.usableHeight()).alignContent(Alignment.Center)
         .animation(motionAnimation(currentMotionProfile().textMs))
         .padding({ top: this.safeTop + 应用尺寸.间距_8, bottom: (this.keyboardTop > 0 ? 0 : this.safeBottom) + 应用尺寸.间距_8,

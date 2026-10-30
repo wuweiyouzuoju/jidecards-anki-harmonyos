@@ -179,15 +179,16 @@ test('Back cancels cropping without closing or discarding the deck customization
 });
 
 test('native redemption dismissal retains in-flight input and clears it after the operation', () => {
-  let dismisses = 0;
-  const panel = instance('components/settings/RedemptionPanel.ets', ['closeRedemption', 'dismissRedemption'], {
-    expanded: true, busy: true, code: 'draft'
+  let dismisses = 0, guard;
+  const panel = instance('components/settings/RedemptionPanel.ets', ['openRedemption', 'closeRedemption'], {
+    active: true, fingerprint: 'fingerprint', expanded: false, busy: false, code: '',
+    dialog: { open(_factory, canDismiss) { guard = canDismiss; }, close() { dismisses++; } }
   });
-  const action = { dismiss() { dismisses++; } };
-  panel.closeRedemption(); panel.dismissRedemption(action);
+  panel.openRedemption(); panel.code = 'draft'; panel.busy = true;
+  panel.closeRedemption(); assert.equal(guard(), false);
   assert.equal(panel.expanded, true); assert.equal(panel.code, 'draft'); assert.equal(dismisses, 0);
-  panel.busy = false; panel.dismissRedemption(action);
-  assert.equal(panel.expanded, false); assert.equal(panel.code, ''); assert.equal(dismisses, 1);
+  panel.busy = false; assert.equal(guard(), true);
+  assert.equal(panel.expanded, false); assert.equal(panel.code, '');
 });
 
 test('the shared frame dismisses only when the owner allows it', () => {
@@ -238,7 +239,8 @@ test('shared chrome owns theme, scroll limits and safe areas; slots retain their
   const backdrop = read('components/common/DialogBackdrop.ets');
   assert.match(backdrop, /@StorageProp\('themeMode'\)/);
   assert.match(backdrop, /@StorageProp\('systemDarkMode'\)/);
-  assert.match(backdrop, /backgroundBlurStyle\(BlurStyle.Thin/);
+  assert.match(backdrop, /backgroundBlurStyle\(BlurStyle.NONE/);
+  assert.match(backdrop, /backdropBlur\(8\)/);
   assert.match(backdrop, /expandSafeArea/);
   const frame = read('components/common/DialogFrame.ets');
   assert.match(frame, /Scroll\(\)[\s\S]*maxHeight: this.bodyHeight\(\)/);
@@ -276,6 +278,18 @@ test('preview fill mode and ordinary form scrolling share the available height a
   assert.match(source,/fillBody: true/);
   assert.match(source,/Web\([\s\S]*\.layoutWeight\(1\)/);
   assert.doesNotMatch(source,/\.height\(300\)/);
+});
+
+test('fixed reference footer reserves measured height without changing ordinary dialogs or keyboard insets',()=>{
+  const dimensions=loadPlatformModule('utils/应用尺寸.ets','应用尺寸',{});
+  const Frame=loadComponentLogic('components/common/DialogFrame.ets','DialogFrame',{应用尺寸:dimensions,safeDialogMaxHeight});
+  const frame=new Frame();frame.headerHeight=104;frame.footerHeight=72;frame.safeTop=24;frame.safeBottom=12;
+  for(const [viewport,keyboardTop] of [[800,0],[400,0],[800,340],[240,0]]) {
+    frame.viewportHeight=viewport;frame.keyboardTop=keyboardTop;
+    frame.showFooter=false;const ordinary=frame.bodyHeight();frame.showFooter=true;
+    assert.equal(frame.bodyHeight(),Math.max(0,ordinary-72-dimensions.间距_12));
+    frame.showFooter=false;assert.equal(frame.bodyHeight(),ordinary);
+  }
 });
 
 test('loading deck options offers close/retry without a no-op primary action', () => {

@@ -28,8 +28,8 @@ function emptyCards(){
 test('empty-card confirmation freezes IDs, commits once and actually refreshes the remaining report',async()=>{
   const h=emptyCards();await h.item.执行检查();h.item.选中状态=[true,false];
   h.item.确认删除();h.item.确认删除();assert.equal(h.dialogs.length,1);
-  h.item.选中状态=[false,true];h.dialogs[0].secondaryButton.action();await settle();
-  h.dialogs[0].secondaryButton.action();await settle();
+  h.item.选中状态=[false,true];h.dialogs[0].buttons[1].action();await settle();
+  h.dialogs[0].buttons[1].action();await settle();
   assert.deepEqual(h.deletes,[[11,12]]);assert.equal(h.reads,2);
   assert.deepEqual(h.item.笔记列表,[]);assert.equal(h.item.处理中,false);assert.deepEqual(h.events,['committed']);
 });
@@ -42,7 +42,7 @@ test('empty-card reads can close and late confirmations cannot start deletion af
   for(const cancel of [true,false]){
     const next=emptyCards();await next.item.执行检查();next.item.选中状态=[true,false];next.item.确认删除();
     if(cancel)next.dialogs[0].cancel();else next.item.aboutToDisappear();
-    next.dialogs[0].secondaryButton.action();await settle();assert.deepEqual(next.deletes,[]);
+    next.dialogs[0].buttons[1].action();await settle();assert.deepEqual(next.deletes,[]);
   }
 });
 
@@ -102,12 +102,12 @@ test('AI confirmations reject departed pages, replaced drafts and repeated or ca
     if(mode==='depart')h.page.pageDisposed=true;
     if(mode==='replace')h.page.消息列表=[{变更草稿列表:[{id:'new'}]}];
     if(mode==='edit')h.page.消息列表=[{变更草稿列表:[{...h.draft,operations:[{after:'new'}]}]}];
-    if(mode==='cancel')h.dialogs[0].primaryButton.action();
-    h.dialogs[0].secondaryButton.action();await settle();h.dialogs[0].secondaryButton.action();await settle();
+    if(mode==='cancel')h.dialogs[0].buttons[0].action();
+    h.dialogs[0].buttons[1].action();await settle();h.dialogs[0].buttons[1].action();await settle();
     assert.equal(h.events.filter(event=>event==='write').length,mode==='repeat'?1:0,mode);
   }
-  const h=draftConfirmation('high_risk');await h.page.准备执行草稿(0,0);h.dialogs[0].secondaryButton.action();
-  assert.equal(h.dialogs.length,2);h.page.pageDisposed=true;h.dialogs[1].secondaryButton.action();await settle();
+  const h=draftConfirmation('high_risk');await h.page.准备执行草稿(0,0);h.dialogs[0].buttons[1].action();
+  assert.equal(h.dialogs.length,2);h.page.pageDisposed=true;h.dialogs[1].buttons[1].action();await settle();
   assert.deepEqual(h.events,['authorize']);
 });
 
@@ -122,9 +122,9 @@ test('AI preparation and both confirmation levels hold one slot; cloned drafts c
   const prepare=h.page.agentExecutor.prepare;h.page.agentExecutor.prepare=async draft=>{prepares++;await gate.promise;return prepare(draft);};
   const first=h.page.准备执行草稿(0,0);await h.page.准备执行草稿(0,0);assert.equal(prepares,1);
   gate.resolve();await first;assert.equal(h.dialogs.length,1);
-  h.dialogs[0].secondaryButton.action();h.dialogs[0].secondaryButton.action();
+  h.dialogs[0].buttons[1].action();h.dialogs[0].buttons[1].action();
   assert.equal(h.dialogs.length,2);assert.equal(h.page.draftConfirmationPending,true);
-  h.page.消息列表=[{变更草稿列表:[{...h.draft}]}];h.dialogs[1].primaryButton.action();
+  h.page.消息列表=[{变更草稿列表:[{...h.draft}]}];h.dialogs[1].buttons[0].action();
   assert.equal(h.page.draftConfirmationPending,false);assert.equal(h.page.消息列表[0].变更草稿列表[0].status,'pending');
   await h.page.准备执行草稿(0,0);assert.equal(h.dialogs.length,3);
   const failure=draftConfirmation();failure.page.getUIContext=()=>({showAlertDialog(){throw Error('window');}});
@@ -173,7 +173,7 @@ test('saved-search deletion rejects departed, canceled and repeated confirmation
       sidebarBackend:{savedSearches:async()=>'{"saved":"is:due"}',saveSavedSearches:async json=>writes.push(json)}});
     page.请求删除保存搜索({name:'saved',search:'is:due'});
     if(mode==='depart')page.operations.dispose();if(mode==='cancel')dialogs[0].cancel();
-    dialogs[0].secondaryButton.action();await settle();dialogs[0].secondaryButton.action();await settle();
+    dialogs[0].buttons[1].action();await settle();dialogs[0].buttons[1].action();await settle();
     assert.equal(writes.length,mode==='live'?1:0,mode);
   }
 });
@@ -191,7 +191,7 @@ test('unhide-all and logout confirmations reject departed owners or a replaced a
       syncSettingsBusy:()=>false,取本地化文本:key=>key,确认注销:()=>actions.push('logout'),
       getUIContext:()=>({showAlertDialog:options=>dialogs.push(options)})});
     group.点击注销();if(mode==='cancel')dialogs[0].cancel();if(mode==='replace')group.鉴权凭证={hkey:'new'};
-    dialogs[0].secondaryButton.action();dialogs[0].secondaryButton.action();assert.equal(actions.length,mode==='live'?1:0,mode);
+    dialogs[0].buttons[1].action();dialogs[0].buttons[1].action();assert.equal(actions.length,mode==='live'?1:0,mode);
   }
 });
 
@@ -208,8 +208,8 @@ test('media confirmations consume once and reject canceled, departed, busy or re
       panel[method]();assert.equal(dialogs.length,1);
       if(mode==='cancel')dialogs[0].cancel();if(mode==='depart')panel.visible=false;
       if(mode==='busy')panel.处理中=true;if(mode==='replace')panel.reportRevision=12;
-      dialogs[0].secondaryButton.action();panel.处理中=false;
-      dialogs[0].secondaryButton.action();assert.equal(actions.length,mode==='live'?1:0,`${method}:${mode}`);
+      dialogs[0].buttons[1].action();panel.处理中=false;
+      dialogs[0].buttons[1].action();assert.equal(actions.length,mode==='live'?1:0,`${method}:${mode}`);
     }
   }
   const panel=new Panel();let closes=0;Object.assign(panel,{visible:true,检查中:false,处理中:false,onClose:()=>closes++});
@@ -227,8 +227,8 @@ test('remaining destructive system confirmations cannot accept twice or accept a
       const page=new Page(),dialogs=[],actions=[];Object.assign(page,{disposed:false,pageDisposed:false,
         maintenance:{clearingTags:false},operations:new BrowserOperationController(),取本地化文本:key=>key,取本地化文案:key=>key,
         getUIContext:()=>({showAlertDialog:options=>dialogs.push(options)}),[execute]:()=>actions.push('accepted')});
-      page[method](method==='删除历史会话'?{id:'one'}:'one');if(cancel)dialogs[0].primaryButton.action();
-      dialogs[0].secondaryButton.action();dialogs[0].secondaryButton.action();
+      page[method](method==='删除历史会话'?{id:'one'}:'one');if(cancel)dialogs[0].buttons[0].action();
+      dialogs[0].buttons[1].action();dialogs[0].buttons[1].action();
       assert.equal(actions.length,cancel?0:1,`${path}:${method}:${cancel}`);
     }
   }
@@ -240,7 +240,7 @@ test('accepted history deletion finishes storage without resetting a departed co
   const page=new Page();Object.assign(page,{pageDisposed:false,conversationId:'one',历史会话列表:[{id:'one'}],
     history:{remove:id=>{actions.push(id);return gate.promise;}},开始新会话:()=>actions.push('reset'),取本地化文案:key=>key,
     getUIContext:()=>({showAlertDialog:options=>dialogs.push(options)})});
-  page.删除历史会话({id:'one'});dialogs[0].secondaryButton.action();page.pageDisposed=true;
+  page.删除历史会话({id:'one'});dialogs[0].buttons[1].action();page.pageDisposed=true;
   gate.resolve(true);await settle();assert.deepEqual(actions,['one']);assert.deepEqual(page.历史会话列表,[{id:'one'}]);
   await page.执行删除历史会话('one');assert.deepEqual(actions,['one']);
 });
