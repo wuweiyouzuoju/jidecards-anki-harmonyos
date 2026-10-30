@@ -81,7 +81,7 @@ test('localized settings search respects simple and developer gates', () => {
 
 test('settings search stays visible in detail pages and returns to directory for new queries', () => {
   assert.match(SETTINGS_PANEL_SOURCE,
-    /private settingsSearchField\(\)[\s\S]*?TextInput\([\s\S]*?onSettingsSearchChange/);
+    /private settingsSearchField\(\)[\s\S]*?LiveSearchField\([\s\S]*?onSettingsSearchChange/);
   assert.match(SETTINGS_PANEL_SOURCE,
     /搜索框属于设置面板公共壳[\s\S]*?this\.settingsSearchField\(\)[\s\S]*?ForEach\(\[this\.activeSection\][\s\S]*?List\(/);
   assert.match(SETTINGS_PANEL_SOURCE,

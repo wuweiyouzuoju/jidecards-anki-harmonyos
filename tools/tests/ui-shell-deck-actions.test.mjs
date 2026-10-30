@@ -25,7 +25,7 @@ test('detail icon actions share public square buttons above the full-width deck 
   const action = detail.slice(detail.indexOf('  private creationAction('), detail.indexOf('\n  }', detail.indexOf('  private creationAction(')));
   const height = action.match(/controlSize: (this\.headerActionHeight)/)[1];
   const evaluate = expression => new Function('应用尺寸', 'return ' + expression).call({headerActionHeight:dimensions.按钮高度},dimensions);
-  assert.equal((header.match(/this\.creationAction\(/g) ?? []).length, 3);
+  assert.equal((header.match(/this\.creationAction\(/g) ?? []).length, 4);
   assert.equal(evaluate(height), 44);
   assert.match(title, /width\('100%'\)/); assert.match(title, /wordBreak\(WordBreak.BREAK_ALL\)/);
   assert.doesNotMatch(title, /\.height\(|maxLines\(/, 'long deck names retain natural wrapping');
@@ -84,12 +84,12 @@ test('direct detail actions release the preview menu and preserve back, layout a
   page.compact = true; page.aboutToAppear();
   const back = registrations.at(-1);
   assert.equal(back(), false);
-  for (const name of ['onAddNote', 'onCreateWithAI', 'onPreview']) {
+  for (const name of ['onAddNote', 'onCreateWithAI', 'onPreview', 'onMore']) {
     page[name] = () => { assert.equal(page.previewMenuOpen, false); actions.push(name); };
     page.openPreviewMenu(); assert.equal(page.previewMenuOpen, true);
     page.selectAction(page[name]); assert.equal(back(), false);
   }
-  assert.deepEqual(actions, ['onAddNote', 'onCreateWithAI', 'onPreview']);
+  assert.deepEqual(actions, ['onAddNote', 'onCreateWithAI', 'onPreview', 'onMore']);
   page.openPreviewMenu(); assert.equal(back(), true); assert.equal(back(), false);
   page.openPreviewMenu(); page.closePreviewMenu(); assert.equal(back(), false);
   page.openPreviewMenu(); page.compact = false; page.compactChanged();
@@ -115,15 +115,15 @@ test('compact and wide Preview reuse one arrowless public surface and public men
   assert.match(homeMenu, /ActionMenuList\(/);
   const header=read('components/home/HomeSummaryHeader.ets');
   assert.doesNotMatch(header, /bindPopup|enableArrow/);
-  assert.match(read('pages/首页.ets'), /AnchoredMenu\(\{ menuWidth: Math.min\(应用尺寸.compactMenuWidth/);
+  assert.match(read('pages/首页.ets'), /AnchoredMenu\(\{ refractionSource: GLASS_HOME_SOURCE, menuWidth: this.homeMenuWidth\('home_more'\)/);
   assert.match(shell, /alignEnd: true/);
   assert.match(shell, /onClose:.*this.closePreviewMenu\(\)/);
   assert.doesNotMatch(shell, /bindPopup|enableArrow|autoCancel:/);
-  assert.doesNotMatch(shell, /AnchoredMenuItem|actionsMenuOpen|toggleActionsMenu|ic_home_more/);
+  assert.doesNotMatch(shell, /AnchoredMenuItem|actionsMenuOpen|toggleActionsMenu/);
   const toolbar = shell.slice(shell.indexOf('if (this.compact) {'), shell.indexOf('牌组详情面板({'));
   assert.match(toolbar, /Blank\(\)[\s\S]*Row\(\{ space: 应用尺寸.页面分组间距/);
   assert.match(toolbar, /'deck_details', 'add_note'[\s\S]*if \(this.agentEnabled\)[\s\S]*'deck_details', 'agent'[\s\S]*'deck_details', 'preview'/);
-  assert.equal((toolbar.match(/IconActionButton\(\{ toolbarStyle: true/g) ?? []).length, 4,
+  assert.equal((toolbar.match(/IconActionButton\(\{ toolbarStyle: true/g) ?? []).length, 5,
     'back is on the left, the three public action icons are grouped on the right');
   assert.match(toolbar, /isInteractive: this.deckId !== '' && !this.previewBusy/);
   const wide = read('components/牌组详情面板.ets');
@@ -185,8 +185,8 @@ test('wide detail toolbar and card edges follow the measured left header, includ
   assert.match(read('components/home/HomeDeckDetails.ets'),/@Prop @Watch\('closePreviewMenu'\) headerActionHeight/,
     'resizing or hiding the measured action row releases its popup anchors');
   assert.match(page,/headerActionHeight: this.detailHeaderActionHeight\(\)/);
-  assert.ok(detail.indexOf('this.headerActions()')<detail.indexOf('Scroll(this.moreReveal.scroller)'));
-  assert.doesNotMatch(detail.slice(detail.indexOf('Scroll(this.moreReveal.scroller)')),/this.creationAction\(/,
+  assert.ok(detail.indexOf('this.headerActions()')<detail.indexOf('Scroll()'));
+  assert.doesNotMatch(detail.slice(detail.indexOf('Scroll()')),/this.creationAction\(/,
     'card scrolling owns no second toolbar or toolbar padding');
   for(const narrow of [false,true]) for(const width of [160,240,328,480,600]) for(const summary of [false,true]) for(const reorder of [false,true]) {
     const host=new Host();Object.assign(host,{排序模式中:reorder,homeActionAnchor:{width},narrowDeckLayout:narrow,显示今日进度卡:summary});
@@ -214,18 +214,18 @@ test('the real detail publisher reports the wide left group and compact right gr
   const layout=()=>observations.at(-1).values.find(value=>value.id==='header_actions_layout').value;
   assert.equal(position(),'above_card');
   assert.equal(style(),'icons');
-  assert.equal(layout(),'add_note:left,preview:right');
+  assert.equal(layout(),'add_note:left,preview:right_group,more:right');
   detail.Agent入口已启用=true;detail.publishInterface();
-  assert.equal(layout(),'add_note:left,agent:after_add_note,preview:right');
+  assert.equal(layout(),'add_note:left,agent:after_add_note,preview:right_group,more:right');
   detail.Agent入口已启用=false;detail.publishInterface();
-  assert.equal(layout(),'add_note:left,preview:right');
+  assert.equal(layout(),'add_note:left,preview:right_group,more:right');
   detail.headerActionHeight=0;detail.publishInterface();assert.equal(position(),'hidden');
   assert.equal(layout(),'hidden');
   detail.showHeaderActions=false;detail.publishInterface();assert.equal(position(),'toolbar_right');
   assert.equal(style(),'icons');
-  assert.equal(layout(),'add_note:right_group,preview:right_group');
+  assert.equal(layout(),'add_note:right_group,preview:right_group,more:right_group');
   detail.Agent入口已启用=true;detail.publishInterface();
-  assert.equal(layout(),'add_note:right_group,agent:right_group,preview:right_group');
+  assert.equal(layout(),'add_note:right_group,agent:right_group,preview:right_group,more:right_group');
 });
 
 test('detail AI route carries the current deck and retains configuration and sync preflight', async () => {

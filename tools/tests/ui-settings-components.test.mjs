@@ -1,3 +1,4 @@
+import { glassFillHarness } from './glass-material-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,7 +16,7 @@ const settingsIcon = loadPlatformModule('utils/SettingsIcons.ets', 'settingsIcon
 
 test('icon buttons reject disabled late clicks without changing host state', () => {
   const Button = loadComponentLogic('components/common/IconActionButton.ets', 'IconActionButton', {
-    Color: { Transparent: 'transparent' }, 应用尺寸: {按钮高度: 44}
+    Color: { Transparent: 'transparent' }, translucentGlassFill: glassFillHarness(), 应用尺寸: {按钮高度: 44}
   });
   const button = new Button();
   const events = [];
@@ -29,7 +30,7 @@ test('icon buttons reject disabled late clicks without changing host state', () 
 
 test('direct navigation keeps simple strokes while menus retain theme fills', () => {
   const Button = loadComponentLogic('components/common/IconActionButton.ets', 'IconActionButton', {
-    $r: key => key, Color: { Transparent: 'transparent' }, 应用尺寸: { 按钮高度: 44 }
+    $r: key => key, Color: { Transparent: 'transparent' }, translucentGlassFill: glassFillHarness(), 应用尺寸: { 按钮高度: 44 }
   });
   const button = new Button();
   button.surface = 'custom-image-overlay'; button.glyphColor = '#FFFFFF';
@@ -39,7 +40,7 @@ test('direct navigation keeps simple strokes while menus retain theme fills', ()
   assert.equal(button.resolvedIconFill(), 'custom-fill');
   assert.equal(button.usesSquareSurface(), false);
   button.toolbarStyle = true;
-  assert.equal(button.resolvedSurface(), 'app.color.surface_card');
+  assert.equal(button.resolvedSurface(), glassFillHarness()('app.color.surface_card'));
   assert.equal(button.usesSquareSurface(), true);
   for (const menuFill of ['light-gray', 'dark-gray', 'selected-fill']) {
     button.iconFill = menuFill;

@@ -43,7 +43,7 @@ test('collapse and teardown cancel a pending reveal before late layout arrives',
 test('nested tag picker expansion shares the form scroller but owns its reveal request', () => {
   const { Reveal, reveal, scrolls } = harness();
   const Field = loadComponentLogic('components/common/NoteTagsField.ets', 'NoteTagsField', {
-    Scroller: class {}, ExpansionReveal: Reveal
+    Scroller: class {}, ExpansionReveal: Reveal, parseNoteTags: value=>value.split(/\s+/)
   });
   const field = new Field();
   field.scroller = reveal.scroller;
@@ -95,11 +95,9 @@ function method(source, name) {
   return Host.prototype[name];
 }
 
-test('tags and deck More connect their real toggles and post-layout callbacks to the same scroller', () => {
+test('tags connect their real toggles and post-layout callbacks to the same scroller', () => {
   for (const [file, owner, expanded, toggle] of [
-    ['pages/添加笔记页.ets', 'tagsReveal', '高级已展开', 'toggleTags'],
-    ['components/添加笔记面板.ets', 'tagsReveal', '高级已展开', 'toggleTags'],
-    ['components/牌组详情面板.ets', 'moreReveal', '显示更多', 'toggleMore']
+    ['components/添加笔记面板.ets', 'tagsReveal', '高级已展开', 'toggleTags']
   ]) {
     const source = read(file), { reveal, scrolls } = harness();
     assert.match(source, new RegExp(`Scroll\\(this\\.${owner}\\.scroller\\)`));
@@ -131,4 +129,13 @@ test('tags and deck More connect their real toggles and post-layout callbacks to
       assert.match(source, /DisclosureChevron\(\)/);
     }
   }
+});
+
+
+test('add note exposes its tag card without a collapse toggle while retaining keyboard reveal',()=>{
+  const source=read('pages/添加笔记页.ets');
+  assert.doesNotMatch(source,/private toggleTags|高级设置折叠区/);
+  assert.match(source,/private 高级已展开: boolean = true/);
+  assert.match(source,/this\.标签字段块\(\)/);
+  assert.match(source,/tagsFocusRequest\+\+/);
 });

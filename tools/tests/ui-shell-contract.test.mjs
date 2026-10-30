@@ -72,7 +72,11 @@ test('note creation and editing share home gaps with one card padding owner', ()
   const cardContainer = card.slice(card.lastIndexOf("    }.width('100%')"));
   assert.doesNotMatch(cardContainer, /\.margin\(|\.offset\(/, 'field cards must not add an external gap');
   const header = read('entry/src/main/ets/components/common/NoteEditorHeader.ets');
-  const height = header.match(/\.height\((应用尺寸\.pageToolbarHeight[^\n]+)\)/)[1];
+  const height = header.match(/minHeight: (应用尺寸\.pageToolbarHeight\([^\n]+?\))/)[1];
+  assert.match(header, /HelpLabel\(\{[\s\S]*?centered: true/);
+  assert.match(header, /是否启用: this.actionEnabled/);
+  assert.doesNotMatch(header, /singleLine: true|\.height\(/,
+    'translated labels retain natural height within the established header row');
   for (const [file, density] of [
     ['pages/添加笔记页.ets', 'narrowDeckLayout'], ['components/browser/浏览编辑区.ets', 'narrow']
   ]) {
@@ -142,11 +146,11 @@ test('study answer input shares the action pill silhouette without a second inse
   const input = inputArea.slice(inputArea.indexOf('TextInput('), inputArea.indexOf('.enterKeyType('));
   const wrapper = inputArea.slice(inputArea.indexOf("        .width('100%')\n        .padding({"),
     inputArea.indexOf("    .width('100%')\n    .layoutWeight(1)"));
+  assert.match(input, /(?:\.height\(应用尺寸\.行动按钮高度\)|\.constraintSize\(\{ minHeight: 应用尺寸\.行动按钮高度 \}\))/);
+  assert.match(input, /\.borderRadius\(应用尺寸\.圆角_行动按钮\)/);
   const action = read('entry/src/main/ets/components/开始学习按钮.ets');
-  for (const source of [input, action]) {
-    assert.match(source, /\.height\(应用尺寸\.行动按钮高度\)/);
-    assert.match(source, /\.borderRadius\(应用尺寸\.圆角_行动按钮\)/);
-  }
+  assert.match(action, /height\(应用尺寸.行动按钮高度\)/, 'start study matches the answer button height');
+  assert.match(action, /enabled\(this\.isAvailable\)/);
   assert.match(input, /backgroundColor\(\$r\('app.color.surface_card'\)\)/);
   assert.doesNotMatch(input, /border_input|圆角_面板/);
   assert.equal((input.match(/\.border\(\{ width: 0 \}\)/g) || []).length, 3,
@@ -468,7 +472,7 @@ test('primary pages share one shell gutter and common visual primitives', () => 
     'settings back inherits the same theme stroke as the home buttons');
   assert.doesNotMatch(settingsPage, /private 顶部条\(\)/,
     'settings must not keep an unused second toolbar implementation');
-  assert.match(settingsCard, /borderRadius\(16\)/,
+  assert.match(settingsCard, /settingsSurface\([\s\S]*应用尺寸.圆角_卡片\)/,
     'settings group cards must use the same page-card radius');
   assert.match(reminders, /统一空态\(\{[\s\S]*?reminder_list_empty[\s\S]*?reminder_list_empty_hint/,
     'reminders must use the common empty-state component');
@@ -476,7 +480,7 @@ test('primary pages share one shell gutter and common visual primitives', () => 
   assert.doesNotMatch(appearance, /new SelectStyle\(\)/);
   assert.equal((appearance.match(/FormSelectRow\(\{/g) ?? []).length, 2);
   assert.match(read('entry/src/main/ets/components/settings/GeneralSettings.ets'), /FormSelectRow\(\{/);
-  assert.match(read('entry/src/main/ets/components/common/FormSelectRow.ets'), /new SelectStyle\(/);
+  assert.match(read('entry/src/main/ets/components/common/FormSelectRow.ets'), /(?:new SelectStyle|SurfaceSelect)\(/);
   assert.equal((agentSettings.match(/FormSelectRow\(\{/g) ?? []).length, 3,
     'all Agent settings selects must match the other settings selects');
   assert.equal((syncSettings.match(/borderRadius\(应用尺寸\.圆角_面板\)/g) ?? []).length >= 2, true,
@@ -724,8 +728,8 @@ test('graph preferences are in-chart controls without a modal (Anki autoSavingPr
   assert.doesNotMatch(statsPage, /显示统计范围菜单|统计范围切换菜单/);
   assert.match(statsPage, /on天数切换\(index === 1 \? 0 : 365\)/);
   const rangeMenu = read('entry/src/main/ets/components/stats/范围切换条.ets');
-  assert.match(rangeMenu, /Select\(this\.options\(\)\)/);
-  assert.match(rangeMenu, /MenuAlignType\.END/);
+  assert.match(rangeMenu, /SurfaceSelect\(\{ options: this\.options\(\)/);
+  assert.match(read('entry/src/main/ets/components/common/SurfaceSelect.ets'), /Placement.BottomRight/);
   assert.match(statsPage, /stats_history_range_year/);
   assert.match(statsPage, /stats_history_range_all/);
   // 图内偏好控件：即时写偏好（更新偏好 + 设置图表偏好）
@@ -753,10 +757,10 @@ test('forecast shows a full month of thin bars in stats page, home card and widg
   // 标题与统计页统一为 Anki 官方名称（Future Due → 未来到期预测）
   assert.match(widget, /未来到期预测/);
   assert.match(summary, /未来到期预测/);
-  assert.match(widget, /Text\(.*'今'.*\)[\s\S]{0,200}TextAlign\.Start/);
+  assert.match(widget, /Text\(this\.t\('summary_now'\)\)[\s\S]{0,200}TextAlign\.Start/);
   assert.match(widget, /Text\('\+29'\)[\s\S]{0,200}TextAlign\.End/);
   // 首页摘要卡已本地化：今 → this.t('今', 'Today')，+29 仍为字面量
-  assert.match(summary, /Text\(this\.t\('今',\s*'Today'\)\)/);
+  assert.match(summary, /Text\(this\.t\('summary_today_\d+'\)\)/);
   assert.match(summary, /Text\('\+29'\)/);
   // 统计页预测卡：范围切换 + 绿色渐变（对齐 Anki FutureDue），图内积压复选框
   assert.doesNotMatch(card, /PanGesture|偏移X|柱子宽度/);
@@ -788,7 +792,6 @@ test('home UI uses shared dimension tokens instead of magic numbers', () => {
     'entry/src/main/ets/components/今日摘要卡.ets',
     'entry/src/main/ets/components/牌组列表项.ets',
     'entry/src/main/ets/components/牌组详情面板.ets',
-    'entry/src/main/ets/components/开始学习按钮.ets',
     'entry/src/main/ets/components/许可证面板.ets'
   ];
   for (const file of files) {

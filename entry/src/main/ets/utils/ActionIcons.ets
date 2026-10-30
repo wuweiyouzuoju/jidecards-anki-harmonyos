@@ -11,6 +11,7 @@ export function actionIcon(id: string): Resource | undefined {
     case 'recent_searches':
     case 'history': return $r('app.media.ic_common_history');
     case 'save_search': return $r('app.media.ic_settings_backup');
+    case 'traditional':
     case 'display_settings':
     case 'columns': return $r('app.media.ic_settings_layout');
     case 'more_settings': return $r('app.media.ic_settings_general');
@@ -21,6 +22,7 @@ export function actionIcon(id: string): Resource | undefined {
     case 'export': return $r('app.media.ic_settings_export');
     case 'grade': return $r('app.media.ic_settings_rate');
     case 'edit': return $r('app.media.ic_study_edit');
+    case 'links': return $r('app.media.ic_study_link');
     case 'agent': return $r('app.media.ic_study_agent');
     case 'undo': return $r('app.media.ic_study_undo');
     case 'marking': return $r('app.media.ic_study_marking');
