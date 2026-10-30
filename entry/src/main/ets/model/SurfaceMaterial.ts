@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-export const DEFAULT_SURFACE_MATERIAL: string = 'glass';
+export const DEFAULT_SURFACE_MATERIAL: string = 'flat';
 export const GLASS_SUGGESTION_HANDLED_KEY: string = 'glass_suggestion_handled_v1';
 export const GLASS_SUGGESTION_PENDING_KEY: string = 'glass_suggestion_pending';
 export const SURFACE_MATERIAL_KEY: string = 'surface_material';

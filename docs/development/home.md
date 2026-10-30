@@ -230,3 +230,5 @@ EntryAbility 的冷/热启动都通过 `ExternalDeckOpen` 校验原始文件 URI
 首页摘要与宽屏详情模块使用SeriesVisual同一玻璃参数，详情内部计数及学习记录通过insetSurface保留轮廓、避免重复叠色。选中牌组仍由选中态拥有语义色。
 
 玻璃材质一次推荐由 SurfaceMaterialStore 持有资格与回复存储，首页仅借用 HomeWorkCoordinator 的空闲提示槽展示，不新增版本通知或重走新手引导；原有引导状态不改。详情见[界面材质与动效](appearance.md)。
+
+首页速览使用不透明阅读表面（DialogFrame.opaque），避免首页文字透入长文；浅深色与采样跳过由公共弹窗实现负责，分页与退出不变。

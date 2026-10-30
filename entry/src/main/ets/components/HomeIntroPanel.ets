@@ -222,7 +222,7 @@ export struct HomeIntroPanel {
   }
 
   build() {
-    DialogFrame({ maximumWidth: 560, canDismiss: false, fillBody: true, showFooter: true,
+    DialogFrame({ opaque: true, maximumWidth: 560, canDismiss: false, fillBody: true, showFooter: true,
       header: () => { this.headerContent(); }, content: () => { this.bodyContent(); },
       footer: () => { this.footerContent(); } })
   }

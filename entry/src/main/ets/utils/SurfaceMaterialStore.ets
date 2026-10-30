@@ -12,17 +12,16 @@ function surfacePreferences(): preferences.Preferences {
   return preferences.getPreferencesSync(context, { name: 'jidecards_settings' });
 }
 
-/** 首屏前恢复；空偏好为新安装，已有偏好保留旧默认。首次判定立即落盘，避免下次启动重新分类。 */
+/** 新旧安装统一默认扁平，已有选择不覆盖；未回复者在首页空闲时确认玻璃材质。 */
 export function initializeSurfaceMaterial(): void {
   let style: string = DEFAULT_SURFACE_MATERIAL;
   let pending: boolean = false;
   try {
     const store: preferences.Preferences = surfacePreferences();
-    const existing: boolean = Object.keys(store.getAllSync()).length > 0;
-    const saved: preferences.ValueType = store.getSync(SURFACE_MATERIAL_KEY, existing ? 'flat' : DEFAULT_SURFACE_MATERIAL);
+    const saved: preferences.ValueType = store.getSync(SURFACE_MATERIAL_KEY, DEFAULT_SURFACE_MATERIAL);
     if (typeof saved !== 'string' || !isSurfaceMaterial(saved)) { throw new Error('invalid_saved_setting:surface_material'); }
     style = saved;
-    pending = existing && style === 'flat' && store.getSync(GLASS_SUGGESTION_HANDLED_KEY, false) !== true;
+    pending = style === 'flat' && store.getSync(GLASS_SUGGESTION_HANDLED_KEY, false) !== true;
     const needsMaterial: boolean = !store.hasSync(SURFACE_MATERIAL_KEY);
     const skipSuggestion: boolean = style === 'glass' && !store.hasSync(GLASS_SUGGESTION_HANDLED_KEY);
     if (needsMaterial) store.putSync(SURFACE_MATERIAL_KEY, style);

@@ -34,17 +34,17 @@ test('existing flat preference is preserved, accepted saves broadcast only after
  await assert.rejects(settings.saveSurfaceMaterial('flat','flat'),/setting_changed/);
  store.flush=async()=>{throw Error('disk');};await assert.rejects(settings.saveSurfaceMaterial('flat','glass'),/disk/);
  assert.equal(api.storage.get(model.SURFACE_MATERIAL_KEY),'glass');
- assert.equal(agentPreferenceDefinitions().find(x=>x.id==='surface_material').defaultValue,'glass');
+ assert.equal(agentPreferenceDefinitions().find(x=>x.id==='surface_material').defaultValue,'flat');
  assert.equal(decodeWritablePreference('surface_material','glass'),'glass');assert.throws(()=>decodeWritablePreference('surface_material','oil'));
 });
-test('fresh install defaults to glass; legacy flat gets one recommendation and replies survive restart',async()=>{
+test('fresh and existing installs default to flat, receive a recommendation, and remember the reply',async()=>{
  for(const initial of [[],[['simple_mode',true]],[[model.SURFACE_MATERIAL_KEY,'flat']],[[model.SURFACE_MATERIAL_KEY,'glass']]]) {
   const api=materialHarness(),values=new Map(initial),store={getAllSync:()=>Object.fromEntries(values),hasSync:k=>values.has(k),getSync:(k,d)=>values.get(k)??d,putSync:(k,v)=>values.set(k,v),flushSync(){},flush:async()=>{}};
   const settings=loadPlatformModule('utils/SurfaceMaterialStore.ets','({initializeSurfaceMaterial,completeGlassSuggestion})',{
    ...model,...api,...localPreferenceApi(api.AppStorage),preferences:{getPreferencesSync:()=>store},hilog:{warn(){}},
   });
   api.storage.set('abilityContext',{});settings.initializeSurfaceMaterial();
-  const expected=initial.length && initial[0][1]!=='glass'?'flat':'glass';
+  const expected=initial[0]?.[1]==='glass'?'glass':'flat';
   assert.equal(api.storage.get(model.SURFACE_MATERIAL_KEY),expected);
   assert.equal(values.get(model.SURFACE_MATERIAL_KEY),expected);
   assert.equal(api.storage.get(model.GLASS_SUGGESTION_PENDING_KEY),expected==='flat');
@@ -122,8 +122,8 @@ test('all popup surfaces switch frost to clear glass without retaining blur or o
   new Popup('flat',dark,12).applyNormalAttribute(node);assert.equal(state.backdropBlur,0);assert.equal(state.backgroundBlurStyle,'none');
   new Popup('glass',dark,12).applyNormalAttribute(node);assert.equal(state.backdropBlur,0);assert.equal(state.backgroundBlurStyle,'none');assert.equal(state.backgroundColor,clear.fill);
   assert.equal(state.borderRadius,12);assert.equal(state.shadow.radius,0);
-  assert.ok(state.linearGradient.colors.some(x=>x[0]==='#00FFFFFF'));
-  assert.ok(state.linearGradient.colors.every(x=>parseInt(x[0].slice(1,3),16)<=(dark?48:112)));
+  assert.ok(state.linearGradient.colors.some(x=>x[0]==='#00FFFFFF'||x[0]==='transparent'));
+  assert.ok(state.linearGradient.colors.every(x=>x[0]==='transparent'||parseInt(x[0].slice(1,3),16)<=(dark?48:112)));
  }
  for(const file of ['DialogFrame','SurfaceSelect','MenuSurface']) {
   const source=readFileSync(new URL(`../../entry/src/main/ets/components/common/${file}.ets`,import.meta.url),'utf8');
@@ -366,5 +366,34 @@ test('appearance reveal reuses the original two animations once and settles redu
   view.getUIContext=()=>({animateTo:(options,apply)=>{animations.push(options.duration);apply();}});
   view.revealGift();view.revealGift();assert.equal(view.revealed,true);assert.equal(view.burst,true);
   assert.deepEqual(animations,reduced?[]:[560,1400]);
+ }
+});
+
+test('glass recommendation tracks the actual action and suppresses repeat or switched clicks while saving',()=>{
+ const Dialog=loadComponentLogic('components/home/GlassSuggestionDialog.ets','GlassSuggestionDialog',{});
+ for(const choice of [true,false]) {
+  const view=new Dialog(),actions=[];view.busy=false;
+  view.onConfirm=()=>{actions.push('glass');view.busy=true;};
+  view.onKeep=()=>{actions.push('keep');view.busy=true;};
+  view.choose(choice);view.choose(!choice);view.choose(choice);
+  assert.deepEqual(actions,[choice?'glass':'keep']);assert.equal(view.requestedGlass,choice);
+  view.busy=false;view.choose(!choice);
+  assert.deepEqual(actions,[choice?'glass':'keep',choice?'keep':'glass']);
+ }
+});
+
+test('opaque reading surfaces use fully opaque light and dark fills in every material',()=>{
+ for(const dark of [false,true]) for(const material of ['flat','glass']) {
+  assert.equal(popupAppearance(material,dark,'dialog',true).fill,dark?'#18202B':'#FFFFFF');
+ }
+});
+
+test('preview retains the ordinary fallback opacity and the glass button keeps its supplied blue fill',()=>{
+ for(const dark of [false,true]) {
+  assert.deepEqual(popupAppearance('glass',dark,'preview'),popupAppearance('glass',dark,'dialog'));
+  const api=materialHarness('flat',dark),state={},node=new Proxy({}, {get:(_,name)=>(...args)=>{state[name]=args[0];return node;}});
+  api.SeriesVisual.control('glass',dark,'#2F5FD0',18,true,'#B3B8D9FF').applyNormalAttribute(node);
+  assert.equal(state.backgroundColor,'#B3B8D9FF');assert.equal(state.borderRadius,18);
+  assert.ok(state.border.width>0);
  }
 });
