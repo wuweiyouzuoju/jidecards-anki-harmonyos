@@ -62,6 +62,7 @@ function fixture() {
     loadBrowserPreferences:async()=>structuredClone(state.browserPreferences),loadBrowserIgnoreAccents:async()=>true,
     AnkiBrowserSearch:class {async columns(){return {columns:[{key:'question',cardsModeLabel:'Question',notesModeLabel:'Question',sortingCards:1,sortingNotes:1},
       {key:'answer',cardsModeLabel:'Answer',notesModeLabel:'Answer',sortingCards:0,sortingNotes:0},
+      ...['noteFld','template','deck','note','noteTags'].map(key=>({key,cardsModeLabel:key,notesModeLabel:key,sortingCards:1,sortingNotes:1})),
       {key:'cardDue',cardsModeLabel:'Due',notesModeLabel:'',sortingCards:1,sortingNotes:0}]};}},
     saveBrowserPreferences:async(patch,expected)=>{assert.equal(JSON.stringify(state.browserPreferences),expected);if(state.browserWriteError)throw Error('disk');
       state.browserPreferences=updateBrowserPreferences(state.browserPreferences,patch);state.writes.push('browser');return state.browserPreferences;}};
@@ -124,7 +125,7 @@ test('advanced settings read the current Core state and proposals are read-only;
 
 test('browser preferences use the live Core catalog, preserve omitted settings and require exact confirmation against current values', async () => {
   const f=fixture();const live=JSON.parse((await f.call('get_browser_preferences',{})).outputJson);
-  assert.equal(live.scope,'collection');assert.equal(live.ignoreAccents,true);assert.equal(live.columns.length,3);
+  assert.equal(live.scope,'collection');assert.equal(live.ignoreAccents,true);assert.equal(live.columns.length,8);
   const args={changesJson:JSON.stringify({mode:'notes',notesColumns:['answer','question'],sortColumn:'question'})};
   const action=(await f.call('propose_update_browser_preferences',args)).action;
   assert.equal(action.kind,'browser_preferences');assert.deepEqual(f.state.writes,[]);
@@ -340,4 +341,15 @@ test('confirmation previews resolve current Chinese/English labels and do not sh
     assert.equal(agentNotetypeLayout(changed)[0],'Front, Back');text('agent_restore_structure_warning');text('agent_restore_layout');
     assert.equal(JSON.stringify(maintenancePreviewRows(exportAction,text)).includes('Question'),false);
   }
+});
+
+test('traditional browser proposals preview both independent column sets and save only after confirmation',async()=>{
+  const f=fixture();const action=(await f.call('propose_update_browser_preferences',{changesJson:JSON.stringify({traditionalMode:true,traditionalCardsColumns:['answer','question'],traditionalNotesColumns:['noteTags']})})).action;
+  assert.deepEqual(f.state.writes,[]);
+  const rows=maintenancePreviewRows(action,key=>key);
+  assert.ok(rows.some(row=>row.title==='browser_traditional_mode'&&row.before!==row.after));
+  assert.ok(rows.some(row=>row.title==='browser_traditional_mode · browser_mode_notes'&&row.after==='noteTags'));
+  f.executor.registerPending(action);await f.executor.executeConfirmed(action);
+  assert.equal(f.state.browserPreferences.traditionalMode,true);assert.deepEqual(f.state.browserPreferences.traditionalCardsColumns,['answer','question']);assert.deepEqual(f.state.browserPreferences.cardsColumns,[]);
+  for(const patch of [{traditionalNotesColumns:['cardDue']},{traditionalCardsColumns:['unknown']},{traditionalNotesColumns:[]}])await assert.rejects(f.call('propose_update_browser_preferences',{changesJson:JSON.stringify(patch)}));
 });

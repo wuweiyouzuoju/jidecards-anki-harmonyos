@@ -20,8 +20,8 @@ function tool(name: string, description: string, properties: string, required: s
 export function agentMaintenanceTools(): ProviderFunctionTool[] {
   const draft: string = `"draftId":${TEXT},"reason":${TEXT}`;
   return [
-    tool('get_browser_preferences', '读取浏览器真实模式、排序、副标题、Cards/Notes 各自显示列、最近搜索与 Core 忽略重音选项，返回 Core 列目录。显示列也有手动更多菜单入口。读取不修改浏览模式或激活列。', '', '', '{}'),
-    tool('propose_update_browser_preferences', '提出浏览器偏好修改，确认后与手动界面共用保存队列。changesJson 只允许 mode(cards/notes)、sortColumn(Core 可排序 key 或空串默认)、sortReverse(boolean)、subtitleIndex(1牌组/2到期/4答案)、cardsColumns/notesColumns(有序 Core key 数组最多16项，空数组恢复默认)。省略项保留；先读取 get_browser_preferences。不会修改卡片内容或调度，不能设置任意配置键。忽略重音在此工具中只读，修改使用独立 propose_set_ignore_accents 提案或手动搜索选项。',
+    tool('get_browser_preferences', '读取浏览器真实模式、排序、副标题、传统模式开关、两种外观的 Cards/Notes 各自显示列、最近搜索与 Core 忽略重音选项，返回 Core 列目录。显示列也有手动更多菜单入口。读取不修改浏览模式或激活列。', '', '', '{}'),
+    tool('propose_update_browser_preferences', '提出浏览器偏好修改，确认后与手动界面共用保存队列。changesJson 只允许 mode(cards/notes)、sortColumn(Core 可排序 key 或空串默认)、sortReverse(boolean)、subtitleIndex(1牌组/2到期/4答案)、cardsColumns/notesColumns(有序 Core key 数组最多16项，空数组恢复默认)。另允许 traditionalMode(boolean)、traditionalCardsColumns/traditionalNotesColumns(有序 Core key 数组，1至64项且必须来自当前 Core 列目录)，传统模式手机也并排多列且点击行直接编辑。两种外观独立保留列配置。省略项保留；先读取 get_browser_preferences。不会修改卡片内容或调度，不能设置任意配置键。忽略重音在此工具中只读，修改使用独立 propose_set_ignore_accents 提案或手动搜索选项。',
       `"changesJson":${TEXT}`, '"changesJson"', '{"changesJson":"{\\"cardsColumns\\":[\\"question\\",\\"answer\\"]}"}'),
     tool('get_filtered_deck', '读取已发现的既有过滤牌组真实配置。返回两个搜索条件、数量、排序、reschedule 与预览延时（秒）；普通牌组会失败。使用本工具后再提出修改。',
       `"deckId":${ID}`, '"deckId"', '{"deckId":1}'),

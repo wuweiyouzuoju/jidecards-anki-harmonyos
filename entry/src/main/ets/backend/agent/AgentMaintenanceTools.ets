@@ -69,7 +69,7 @@ export class AgentMaintenanceTools {
     const args: MaintenanceArguments = decodeMaintenanceArguments(name, json);
     if (name === 'get_browser_preferences') return JSON.stringify({ scope: 'collection', preferences: await loadBrowserPreferences(),
       ignoreAccents: await loadBrowserIgnoreAccents(), columns: (await new AnkiBrowserSearch().columns()).columns,
-      manualEntry: 'browser_more', writableFields: ['mode', 'sortColumn', 'sortReverse', 'subtitleIndex', 'cardsColumns', 'notesColumns'] });
+      manualEntry: 'browser_more', writableFields: ['mode', 'sortColumn', 'sortReverse', 'subtitleIndex', 'cardsColumns', 'notesColumns', 'traditionalMode', 'traditionalCardsColumns', 'traditionalNotesColumns'] });
     if (name === 'get_filtered_deck') {
       this.scope.assertReadableDeckIds([args.deckId!]);
       const deck = await filteredDeckCommands.read(args.deckId!);
@@ -104,9 +104,9 @@ export class AgentMaintenanceTools {
       const after = updateBrowserPreferences(before, patch);
       const columns: BrowserColumn[] = (await new AnkiBrowserSearch().columns()).columns;
       const known: Set<string> = new Set<string>(columns.map((column: BrowserColumn): string => column.key));
-      if (after.cardsColumns.concat(after.notesColumns).some((key: string): boolean => !known.has(key)) ||
-        after.notesColumns.some((key: string): boolean => !columns.some((column: BrowserColumn): boolean => column.key === key && column.notesModeLabel !== '')) ||
-        after.cardsColumns.some((key: string): boolean => !columns.some((column: BrowserColumn): boolean => column.key === key && column.cardsModeLabel !== '')) ||
+      if (after.cardsColumns.concat(after.notesColumns, after.traditionalCardsColumns ?? [], after.traditionalNotesColumns ?? []).some((key: string): boolean => !known.has(key)) ||
+        after.notesColumns.concat(after.traditionalNotesColumns ?? []).some((key: string): boolean => !columns.some((column: BrowserColumn): boolean => column.key === key && column.notesModeLabel !== '')) ||
+        after.cardsColumns.concat(after.traditionalCardsColumns ?? []).some((key: string): boolean => !columns.some((column: BrowserColumn): boolean => column.key === key && column.cardsModeLabel !== '')) ||
         (after.sortColumn !== '' && !columns.some((column: BrowserColumn): boolean => column.key === after.sortColumn &&
           (after.mode === 'notes' ? column.sortingNotes : column.sortingCards) !== BrowserColumnSorting.SORTING_NONE)))
         throw new Error('Invalid browser column');

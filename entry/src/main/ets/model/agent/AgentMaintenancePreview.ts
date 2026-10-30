@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { filteredDeckPatch } from '../FilteredDeckCommands';
-import { updateBrowserPreferences } from '../BrowserPreferences';
+import { updateBrowserPreferences, browserTraditionalColumns } from '../BrowserPreferences';
 import type { BrowserPreferencesAction } from './AgentMaintenanceActions';
 import type { FilteredDeckProposal } from '../FilteredDeckCommands';
 import { filteredDeckOrderTitleKey } from '../FilteredDeckOptions';
@@ -80,6 +80,9 @@ export function maintenancePreviewRows(action: AgentAction, text: (key: string) 
       return column === undefined ? key : notes ? column.notesModeLabel : column.cardsModeLabel;
     };
     const columns = (keys: string[], notes: boolean): string => keys.length === 0 ? text('browser_sort_default') : keys.map((key: string): string => columnLabel(key, notes)).join(' → ');
+    rows.push({ title: text('browser_traditional_mode'), before: boolean(payload.before.traditionalMode === true), after: boolean(after.traditionalMode === true) });
+    rows.push({ title: text('browser_traditional_mode') + ' · ' + text('browser_mode_cards'), before: columns(browserTraditionalColumns(payload.before, false), false), after: columns(browserTraditionalColumns(after, false), false) });
+    rows.push({ title: text('browser_traditional_mode') + ' · ' + text('browser_mode_notes'), before: columns(browserTraditionalColumns(payload.before, true), true), after: columns(browserTraditionalColumns(after, true), true) });
     rows.push({ title: text('browser_title'), before: text(payload.before.mode === 'notes' ? 'browser_mode_notes' : 'browser_mode_cards'), after: text(after.mode === 'notes' ? 'browser_mode_notes' : 'browser_mode_cards') });
     rows.push({ title: text('browser_sort_default'), before: payload.before.sortColumn === '' ? text('browser_sort_default') : columnLabel(payload.before.sortColumn, payload.before.mode === 'notes'),
       after: after.sortColumn === '' ? text('browser_sort_default') : columnLabel(after.sortColumn, after.mode === 'notes') });
