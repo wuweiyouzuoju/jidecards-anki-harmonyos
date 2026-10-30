@@ -121,7 +121,7 @@ test('study keeps default cards opaque without replacing template backgrounds wh
     'template foreground/background pairs must override the application defaults together');
   assert.doesNotMatch(html, /background: #E8EEFC !important/);
   const page = read(STUDY_PAGE);
-  assert.match(page, /构建卡片HTML\(rendered, 'question', this\.是否深色\(\), undefined,\s*this\.reviewPreferences\.hideAudioPlayButtons, this\.取文案\(\$r\('app\.string\.study_replay_sound'\)\), this\.取文案\(\$r\('app\.string\.card_script_load_error'\)\)\)/);
+  assert.match(page, /构建卡片HTML\(rendered, 'question', this\.是否深色\(\), undefined,\s*this\.reviewPreferences\.hideAudioPlayButtons, this\.取文案\(\$r\('app\.string\.study_replay_sound'\)\), this\.取文案\(\$r\('app\.string\.card_script_load_error'\)\), cardScriptDiagnosticLabels\(this\.getUIContext\(\)\)\)/);
   assert.match(page, /Web\(\{ src: '', controller: this\.cardWeb\.controllerAt\(slot\) \}\)\s*\.backgroundColor\(this\.cardSurfaceBackground \|\| \$r\('app\.color\.surface_card'\)\)/);
   assert.match(page, /\.backgroundColor\(this\.页面底色微染值\)/);
   const cardArea = page.slice(page.indexOf('private 卡片区()'), page.indexOf('private 答案条()'));
@@ -327,7 +327,7 @@ test('study strings are resourced', () => {
   const page = read(STUDY_PAGE);
   assert.doesNotMatch(page, /\.fontSize\(\d/, 'page must use dimension tokens');
   assert.match(page, /应用尺寸/);
-  assert.match(page, /app\.string\.study_show_answer/);
+  assert.match(read('entry/src/main/ets/components/StudyAnswerActionBar.ets'), /app\.string\.study_show_answer/);
   assert.match(page, /app\.string\.study_finish_title/);
   assert.match(page, /app\.string\.study_load_error/);
 });

@@ -1,3 +1,4 @@
+import { noteLinkBridgeScript } from '../../entry/src/main/ets/model/NoteLinkBridge.ts';
 import { completeStudyGestures, activeStudyGestureInputs, studyGestureCommand, StudyShakeDetector } from '../../entry/src/main/ets/model/StudyGestureConfig.ts';
 import { loadPlatformModule } from './platform-module-harness.mjs';
 import { NoteEditorSession, initialNoteEditorState } from '../../entry/src/main/ets/model/NoteEditorSession.ts';
@@ -30,7 +31,9 @@ export function attachStudySession(page) {
   page.cardRenderPending = false;
   // Onboarding has its own page/gesture tests; these hosts only exercise the study session.
   page.maybeShowTapZonesGuide ??= () => {};
-  page.cardWeb = { reset() {}, attach() {}, setAudioEnabled() {}, setTheme() {}, show: html => {
+  // Reference graph/render behavior is covered by note-links and the real browser probe.
+  page.refreshNoteLinkMirror ??= async () => {};
+  page.cardWeb = { reset() {}, attach() {}, setActive() {}, setAudioEnabled() {}, setTheme() {}, show: html => {
     page.网页控制器.loadData(html);
     page.studyCardShown('');
   } };
@@ -59,9 +62,9 @@ export function attachStudySession(page) {
     if (start < 0) start = source.indexOf('  private async ' + name + '(');
     return source.slice(start, source.indexOf('\n  }', start) + 4);
   });
-  const TimingPage = new Function('completeStudyGestures','activeStudyGestureInputs','studyGestureCommand','showToastSafely','StudyAdvanceAction', 'BURY_SUSPEND_MODE_BURY_USER', '$r', 'buildStudyGestureScript', 'StudyQuickAnswerMode', 'validateStudyControls', 'resultUndoStatus',
+  const TimingPage = new Function('noteLinkBridgeScript','completeStudyGestures','activeStudyGestureInputs','studyGestureCommand','showToastSafely','StudyAdvanceAction', 'BURY_SUSPEND_MODE_BURY_USER', '$r', 'buildStudyGestureScript', 'StudyQuickAnswerMode', 'validateStudyControls', 'resultUndoStatus',
     stripTypeScriptTypes('class TimingPage {' + methods.join('\n') + '}', { mode: 'transform' }) + '; return TimingPage;')(
-    completeStudyGestures, activeStudyGestureInputs, studyGestureCommand, ()=>{}, StudyAdvanceAction, 2, key => key, buildStudyGestureScript, StudyQuickAnswerMode,validateStudyControls,resultUndoStatus);
+    noteLinkBridgeScript, completeStudyGestures, activeStudyGestureInputs, studyGestureCommand, ()=>{}, StudyAdvanceAction, 2, key => key, buildStudyGestureScript, StudyQuickAnswerMode,validateStudyControls,resultUndoStatus);
   for (const name of names) page[name] = TimingPage.prototype[name];
   page.timerHandles = new Map(); let nextTimer = 0;
   page.studyTimer = new StudyTimerController({ state: () => page.studyTimerState(),

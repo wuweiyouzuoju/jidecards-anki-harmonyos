@@ -200,7 +200,7 @@ test('bubble outline converts all coordinates at the actual density and keeps a 
       assert.ok(Math.abs(value-unit[index]*density)<1e-7,`coordinate ${index}: ${width}x${height}vp @ ${density}`);
     });
   }
-  const bubble=read('entry/src/main/ets/components/common/MenuBubbleSurface.ets');
+  const bubble=read('entry/src/main/ets/components/common/GlassBubblePanel.ets');
   assert.match(bubble,/vp2px\(1\)/);assert.doesNotMatch(bubble,/\.shadow\(/,'Path bounding-box shadows caused the rectangular ghost');
 });
 
@@ -258,7 +258,7 @@ test('all card menu callers share one viewport-limited surface and one row rende
   const menu = read('entry/src/main/ets/components/common/CardActionMenu.ets');
   assert.equal((menu.match(/AnchoredMenu\(\{/g) ?? []).length, 1);
   assert.equal((menu.match(/AnchoredMenuItem\(\{/g) ?? []).length, 1);
-  assert.match(menu, /contentMaxWidth: this\.anchor === undefined \? this\.contentWidth : this\.totalWidth\(\)/);
+  assert.match(menu, /contentMaxWidth: this\.anchor === undefined && this\.toolbarRight === undefined \? this\.contentWidth : this\.totalWidth\(\)/);
   assert.match(menu, /this.contentWidth = cardViewportWidth\(Number\(area.width\), Number\(area.height\)\)/);
   assert.doesNotMatch(menu, /popupOpen|rowGap|collapsedGroupIds/);
   assert.match(menu, /placeActionMenuGroups\(/);
@@ -269,6 +269,15 @@ test('all card menu callers share one viewport-limited surface and one row rende
     WINDOW_SAFE_LEFT_KEY: '', WINDOW_SAFE_RIGHT_KEY: '', safeMenuGeometry
   });
   const mounted = new Menu();
+  for (const viewportLeft of [0, 40]) for (const safeRight of [0, 60]) {
+    Object.assign(mounted, { viewportLeft, viewportWidth: 1000, safeRight, anchorRight: 970 + viewportLeft });
+    assert.equal(mounted.panelLeft() + mounted.menuWidth + viewportLeft, mounted.anchorRight,
+      'measured button edge is converted once without subtracting safe-area padding again');
+  }
+  mounted.anchorRight = 1200; assert.equal(mounted.panelLeft(), 680);
+  mounted.anchorRight = 20; assert.equal(mounted.panelLeft(), 0);
+  mounted.contentLeft = 80; assert.equal(mounted.panelLeft(), 80, 'explicit row placement retains priority');
+
   for (const compact of [false, true]) for (const safeTop of [0, 36]) for (const safeBottom of [0, 24]) {
     Object.assign(mounted, { viewportHeight: 640, topOffset: 20, narrowDeckLayout: compact, safeTop, safeBottom });
     const geometry = mounted.menuGeometry(), gap = compact ? 8 : 12;
@@ -280,4 +289,31 @@ test('all card menu callers share one viewport-limited surface and one row rende
   assert.match(shell, /Scroll\(this\.scroller\)/);
   assert.match(shell, /maxHeight: this\.scrollMaxHeight\(\)/);
   assert.match(shell, /top: this\.menuGeometry\(\)\.top/);
+});
+
+
+test('branch chevrons follow the real panel side for flags and mirrored context menus', () => {
+  const source=read('entry/src/main/ets/components/common/CardActionMenu.ets');
+  const start=source.indexOf('  private menuRow(');
+  const method=source.slice(start,source.indexOf('\n  }',start)+4);
+  let props;
+  const Rows=new Function('AnchoredMenuItem','TextAlign',stripTypeScriptTypes('class Rows {'+method+'}',{mode:'transform'})+';return Rows;')(
+    value=>props=value,{Center:'center'});
+  for(const right of [false,true]) for(const expanded of [false,true]) {
+    const host=Object.assign(new Rows(),{slideScope:{},expandedIds:expanded?['marking','flag']:[],
+      groupsOnRight:()=>right,nestedBranch:()=>undefined,rowItem:()=>({value:'branch'}),selectEntry:()=>{}});
+    host.menuRow({depth:1,enabled:true,node:{id:'flag',children:[]}},0);
+    assert.equal(props.disclosureAngle,expanded?(right?180:0):90,'flags rotate from folded-down toward the primary column');
+    host.menuRow({depth:0,enabled:true,node:{id:'marking',children:[]}},0);
+    assert.equal(props.disclosureAngle,expanded?(right?0:180):90,'expanded root points at its side group');
+  }
+});
+
+
+test('region-anchored menus retain the full positioning region for left/right alignment',()=>{
+ const shell=read('entry/src/main/ets/components/common/AnchoredMenu.ets');
+ assert.match(shell,/width\(this.contentLeft !== undefined \? this.contentMaxWidth : this.panelLeft\(\) !== undefined \? this.menuWidth : '100%'\)/);
+ const home=read('entry/src/main/ets/pages/首页.ets');
+ assert.match(home,/contentMaxWidth: this.homeActionAnchor.width, alignEnd: false/);
+ assert.match(home,/contentMaxWidth: this.homeActionAnchor.width, alignEnd: true/);
 });

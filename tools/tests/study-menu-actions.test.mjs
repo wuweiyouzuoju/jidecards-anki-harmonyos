@@ -89,6 +89,10 @@ test('flag popup has all seven colors and clear, keeps custom labels and dispatc
 test('fixed bottom bar contains only show-answer and the four ratings', () => {
   const bar = source.slice(source.indexOf('  private 答案条()'), source.indexOf('\n  build()'));
   assert.doesNotMatch(bar, /study_bury|study_suspend|埋藏或暂停当前卡/);
-  assert.match(bar, /study_show_answer/);
-  assert.equal((bar.match(/StudyActionButton\(/g) ?? []).length, 4);
+  assert.equal((bar.match(/StudyAnswerActionBar\(/g) ?? []).length, 1);
+  const group = readFileSync(new URL('../../entry/src/main/ets/components/StudyAnswerActionBar.ets', import.meta.url), 'utf8');
+  assert.match(group, /app\.string\.study_show_answer/);
+  for (const rating of ['again', 'hard', 'good', 'easy']) {
+    assert.match(group, new RegExp(`app\\.string\\.rating_${rating}`));
+  }
 });

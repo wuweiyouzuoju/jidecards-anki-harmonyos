@@ -26,8 +26,8 @@ const hidden = hook('onHidden'), shown = hook('onShown');
 function harness(phase = 'question') {
   const store = { front: 'old-front', back: 'old-back', css: 'old-css', id: 7, empty: false, renders: 0 };
   const displayed = [];
-  const Page = new Function(...Object.keys(interfaceDeps), '构建卡片HTML', '剥除拼写标记', '提取拼写标记', '原始侧HTML', '媒体基地址', js + '\nreturn Page;')(
-    ...Object.values(interfaceDeps),
+  const Page = new Function('cardScriptDiagnosticLabels', ...Object.keys(interfaceDeps), '构建卡片HTML', '剥除拼写标记', '提取拼写标记', '原始侧HTML', '媒体基地址', js + '\nreturn Page;')(
+    () => undefined, ...Object.values(interfaceDeps),
     (rendered, side) => rendered.css + ':' + (side === 'question' ? rendered.questionNodes : rendered.answerNodes).join(''),
     html => html.replace(/\[\[type:[^\]]+\]\]/g, ''),
     nodes => nodes.some(text => text.includes('[[type:')) ? { fieldName: 'Updated', combining: true, cloze: false } : null,

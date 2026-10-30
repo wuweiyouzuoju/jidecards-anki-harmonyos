@@ -1,6 +1,7 @@
 import { compileWithUiFeedback } from './ui-feedback-harness.mjs';
 import { appInterfaceDependencies, studyInterfaceMethods } from './app-interface-harness.mjs';
 import { attachStudySession } from './study-session-harness.mjs';
+import { loadPlatformModule } from './platform-module-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import fs from 'node:fs';
 import test from 'node:test';
@@ -10,19 +11,19 @@ import { stripTypeScriptTypes } from 'node:module';
 
 // Execute unchanged production methods with controllable backend/player delays.
 const source = fs.readFileSync(new URL('../../entry/src/main/ets/pages/学习页.ets', import.meta.url), 'utf8');
-const names = ['请求删除当前卡', '确认删除当前卡', '加载下一张卡', '显示答案', '埋藏或暂停当前卡', '评分', 'invalidateCardWork', 'isCurrentRequest', 'studyActivityChanged', 'updateScreenAwake', 'applyStudyHtml', 'playStudyAudio', 'studyWebAttached', 'aboutToDisappear', '消费待重渲染', '刷新编辑后当前卡', '撤销上次', '加载完成页信息', 'clearChoiceAutoAdvance', 'scheduleChoiceAutoAdvance', 'choiceAutoAdvanceSeconds'];
+const names = ['请求删除当前卡', '确认删除当前卡', '加载下一张卡', '显示答案', '埋藏或暂停当前卡', '评分', 'invalidateCardWork', 'isCurrentRequest', 'studyActivityChanged', 'updateScreenAwake', 'applyStudyHtml', 'playStudyAudio', 'studyWebAttached', 'studyWebFailed', 'studyWebUnavailable', 'aboutToDisappear', '消费待重渲染', '刷新编辑后当前卡', '撤销上次', '加载完成页信息', 'clearChoiceAutoAdvance', 'scheduleChoiceAutoAdvance', 'choiceAutoAdvanceSeconds'];
 const methods = names.map(name => {
   const start = source.search(new RegExp(`  (?:private )?(?:async )?${name}\\(`));
   assert.ok(start >= 0);
   return source.slice(start, source.indexOf('\n  }', start) + 4);
 });
 const interfaceDeps = appInterfaceDependencies();
-const Page = compileWithUiFeedback(...Object.keys(interfaceDeps), 'DialogAlignment', 'playStudyHaptic', '构建卡片HTML', '剥除拼写标记', '提取拼写标记', '原始侧HTML', '媒体基地址', 'CustomTransition', '刷新桌面卡片数据', 'AppStorage', 'SECONDS_PER_DAY', '$r', 'console',
+const Page = compileWithUiFeedback('CARD_WEB_RENDER_TIMEOUT', 'cardScriptDiagnosticLabels', ...Object.keys(interfaceDeps), 'DialogAlignment', 'playStudyHaptic', '构建卡片HTML', '剥除拼写标记', '提取拼写标记', '原始侧HTML', '媒体基地址', 'CustomTransition', '刷新桌面卡片数据', 'AppStorage', 'SECONDS_PER_DAY', '$r', 'console',
   stripTypeScriptTypes(`class Page { ${methods.join('\n')} ${studyInterfaceMethods(source)} }`, {mode:'transform'}) + '; return Page;')(
-  ...Object.values(interfaceDeps),
+  loadPlatformModule('utils/CardWebView.ets', 'CARD_WEB_RENDER_TIMEOUT', {}), () => undefined, ...Object.values(interfaceDeps),
   { Center: 0 }, () => {}, (card, side) => `${card.id}-${side}`, html => html, () => null,
   (card, side) => `${card.id}-${side}`, 'media://',
-  {getInstance:()=>({注销NavParam(){}})}, async()=>{}, {setOrCreate(){}}, 86400, key=>key, {info(){}});
+  {getInstance:()=>({注销NavParam(){}})}, async()=>{}, {setOrCreate(){}}, 86400, key=>key, {info(){},warn(){}});
 function deferred() {
   let resolve, reject;
   const promise = new Promise((a,b) => { resolve = a; reject = b; });
@@ -71,6 +72,44 @@ function harness() {
   attachStudySession(page);
   return {page, displayed, sounds, events, answers};
 }
+
+test('study render loss removes the pending input blocker, invalidates old work and offers a real retry', async () => {
+  const {page, answers, displayed} = harness();
+  page.hasRenderedCard = true; page.cardRenderPending = true;
+  const version = page.requestVersion;
+  let resets = 0, clears = 0, discarded = false;
+  page.cardWeb.reset = value => {resets++; discarded = value;};
+  page.studySession.clearPreparedCard = () => {clears++;};
+  page.studyWebFailed('card_render_timeout');
+  assert.equal(page.requestVersion, version + 1);
+  assert.equal(page.cardRenderPending, false);
+  assert.equal(page.recoveryMessage, 'app.string.study_load_error');
+  assert.equal(page.阶段, 'question');
+  assert.equal(resets, 1); assert.equal(clears, 1);
+  assert.equal(discarded, true, 'recovery must load independently of the failed Web');
+  assert.deepEqual(answers, [], 'a failed renderer must not answer or advance a card');
+  page.studyCardShown('#ffffff');
+  assert.equal(page.recoveryMessage, 'app.string.study_load_error', 'a late callback cannot dismiss recovery');
+  await page.retryStudy();
+  assert.deepEqual(displayed, ['A-question']);
+  assert.equal(page.recoveryMessage, '');
+});
+
+test('study ignores renderer events from the spare slot and from a hidden page', () => {
+  const {page} = harness();
+  page.cardWeb.isRelevant = slot => slot === 1;
+  const version = page.requestVersion;
+  page.studyWebUnavailable(0); assert.equal(page.requestVersion, version);
+  page.foreground = false;
+  page.studyWebUnavailable(1); assert.equal(page.requestVersion, version);
+  assert.equal(page.recoveryMessage, '');
+  page.foreground = true;
+  page.studyWebUnavailable(1); assert.equal(page.requestVersion, version + 1);
+  assert.equal(page.recoveryMessage, 'app.string.study_load_error');
+  for (const [event, reason] of [['onRenderExited', 'render_exited'], ['onRenderProcessNotResponding', 'not_responding']]) {
+    assert.match(source, new RegExp(`\\.${event}\\(\\(\\): void => \\{ this\\.studyWebUnavailable\\(slot, '${reason}'\\); \\}\\)`));
+  }
+});
 
 test('whiteboard survives answer reveal, resets only after an accepted next question and stays enabled', async () => {
   const { page } = harness();
@@ -387,7 +426,7 @@ test('delete confirmation cannot delete a different card after queue or request 
     page.请求删除当前卡();
     if (invalidate === 'card') page.当前卡片 = { cardId: 'B' };
     else page.requestVersion++;
-    dialog.secondaryButton.action(); await new Promise(resolve => setImmediate(resolve));
+    dialog.buttons[1].action(); await new Promise(resolve => setImmediate(resolve));
     assert.equal(deleted, 0);
   }
 });

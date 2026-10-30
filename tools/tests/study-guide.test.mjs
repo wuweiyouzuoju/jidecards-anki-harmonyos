@@ -261,10 +261,12 @@ test('both languages explain exclusive quick answer modes and their actual actio
 test('both review layouts preserve rating identity while displaying backend intervals separately', () => {
   const toolbar = read('entry/src/main/ets/components/学习浮动工具栏.ets');
   const button = read('entry/src/main/ets/components/StudyActionButton.ets');
+  const group = read('entry/src/main/ets/components/StudyAnswerActionBar.ets');
   for (const rating of ['again', 'hard', 'good', 'easy']) {
-    assert.match(pageSource, new RegExp(`label: \\$r\\('app.string.rating_${rating}'\\),\\s+subtitle: this.按钮文案位\\(RATING_${rating.toUpperCase()}\\)`));
+    assert.match(group, new RegExp(`app\\.string\\.rating_${rating}`));
     assert.match(toolbar, new RegExp(`竖版评分按钮\\(RATING_${rating.toUpperCase()}, \\$r\\('app.string.rating_${rating}'\\)`));
   }
+  assert.equal((group.match(/this\.subtitle\(/g) ?? []).length, 4, 'each rating keeps its backend interval subtitle');
   assert.match(button, /Text\(this.label\)[\s\S]*Text\(this.subtitle\)/);
   assert.match(toolbar, /Text\(标签\)[\s\S]*Text\(this.取评分按钮文案\(评分\)\)/);
   assert.doesNotMatch(pageSource + toolbar, /兜底文案/);

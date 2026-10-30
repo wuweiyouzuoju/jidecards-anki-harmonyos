@@ -10,9 +10,9 @@ import { 构建卡片HTML, 剥除拼写标记 } from '../../entry/src/main/ets/m
 import { hideJideChoiceStaticOptions } from '../../entry/src/main/ets/model/JideChoice.ts';
 const source=readFileSync(new URL('../../entry/src/main/ets/pages/学习页.ets',import.meta.url),'utf8');
 const methods=['changeMarking','closeMarkingDialog'].map(name=>{const start=source.search(new RegExp('^  private (?:async )?'+name+'\\(','m'));assert.ok(start>=0);return source.slice(start,source.indexOf('\n  }',start)+4);});
-const Page=new Function('resourceText','构建卡片HTML','剥除拼写标记','hideJideChoiceStaticOptions','AppStorage','showToastSafely','$r',
+const Page=new Function('cardScriptDiagnosticLabels','resourceText','构建卡片HTML','剥除拼写标记','hideJideChoiceStaticOptions','AppStorage','showToastSafely','$r',
  stripTypeScriptTypes('class Page {'+methods.join('\n')+'}',{mode:'transform'})+';return Page;')(
- (_ui,key)=>key,构建卡片HTML,剥除拼写标记,hideJideChoiceStaticOptions,{setOrCreate(){}},(_,value)=>{_.errors.push(value.message);},key=>key);
+ ()=>undefined,(_ui,key)=>key,构建卡片HTML,剥除拼写标记,hideJideChoiceStaticOptions,{setOrCreate(){}},(_,value)=>{_.errors.push(value.message);},key=>key);
 const rendered=flag=>({css:'',questionNodes:[{text:'front '+flag}],answerNodes:[{text:'back '+flag}],latexSvg:false,isEmpty:false});
 const deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {resolve,promise};};
 function harness(phase='answer'){
