@@ -9,6 +9,13 @@ import { applyLocalSigning, parseLocalSigning } from './tools/signing-config';
 // 本机与 CI 使用同一入口；缺省允许无签名构建，显式配置缺失则立即失败。
 hvigor.getRootNode().afterNodeEvaluate(node => {
   const context = node.getContext(OhosPluginId.OHOS_APP_PLUGIN) as OhosAppContext;
+  if (process.env.HARMONY_UNSIGNED === '1') {
+    const profile = context.getBuildProfileOpt();
+    profile.app.signingConfigs = [];
+    profile.app.products?.forEach(product => { delete product.signingConfig; });
+    context.setBuildProfileOpt(profile);
+    return;
+  }
   const configured = process.env.JIDECARDS_SIGNING_CONFIG;
   const path = resolve(context.getProjectPath(), configured || '.local/signing.json');
   if (!existsSync(path)) {
