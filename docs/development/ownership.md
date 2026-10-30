@@ -143,7 +143,7 @@ Anki 官方教程的选章与检索别名归 `tools/anki-manual-topics.json`，�
 | `tools/change-impact.mjs` | 变更路径收集与最低验证计划 | 只读、不代替依赖分析，不宣称验证已执行 |
 | `.github/workflows/` | CI 调用稳定验证入口 | 不复制只在 CI 可运行的隐藏逻辑 |
 
-制卡书画的文档、坐标、文字缩放边界及 PNG 可编辑源归 `model/NoteDrawing.ts`，文件/图片平台 IO 与独占缓存归 `backend/NoteDrawingStore.ets`，字形测量、预览/导出共用文字绘制及栅格合成归 `utils/NoteDrawingRendering.ets`；`components/editor/NoteDrawingEditor.ets` 拥有本次编辑、文字输入、测量选中框与移动/缩放预览、平台画布生命周期，颜色选择复用公共 `FormSelectRow`。媒体草稿移交仍归 `NoteMediaSession` 与 `NoteMediaDialog`，最后保存归新增/编辑原宿主。官方保存/加载/缩略图通过已有 `StudyPenCanvasHost` / `StudyPenCanvasMount` 调用，既有学习白板不承担制卡草稿。详见[制卡图片书画](browser-stats.md#制卡图片书画2026-10-09)。
+制卡书画的文档、坐标、框点模式、文字轴向比例/缩放边界及 PNG 可编辑源归 `model/NoteDrawing.ts`，文件/图片平台 IO 与独占缓存归 `backend/NoteDrawingStore.ets`，字形测量、预览/导出共用文字绘制及栅格合成归 `utils/NoteDrawingRendering.ets`；`components/editor/NoteDrawingEditor.ets` 拥有本次编辑、文字输入、测量选中框与移动/拉伸/缩放预览、平台画布生命周期，颜色控件在模式按钮右侧复用公共 `SelectStyle`。媒体草稿移交仍归 `NoteMediaSession` 与 `NoteMediaDialog`，最后保存归新增/编辑原宿主。官方保存/加载/缩略图通过已有 `StudyPenCanvasHost` / `StudyPenCanvasMount` 调用，既有学习白板不承担制卡草稿。详见[制卡图片书画](browser-stats.md#制卡图片书画2026-10-09)。
 
 ## `docs` 与规则
 
@@ -155,3 +155,5 @@ Anki 官方教程的选章与检索别名归 `tools/anki-manual-topics.json`，�
 | `docs/superpowers/`、发布记录 | 历史背景和归档材料 | 不发出当前执行指令 |
 
 首页首行布局归 `HomeSummaryHeader` / `HomeHeaderLayout`，统计数据和菜单状态归首页；更多/新建组件仅提供 ActionMenuList 正文，原生尖角锚点归首行。搜索筛选归纯模型 `HomeDeckSearch`，输入和实际候选观察归 `HomeDeckSearchDialog`，选择复用首页。握姿复用 StudyGripSession 和可指定能力键的 StudyGripSensor，不修改学习偏好或导航契约；见[首页](home.md)。
+
+笔记引用的电脑/鸿蒙协议、字段持久化、卡面桥与 UI 所有者见 [双端笔记引用](note-links.md)。

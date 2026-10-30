@@ -7,7 +7,7 @@
 ## 基线事实
 
 - jidecards 版本来自 `AppScope/app.json5`，Anki 版本来自 `UPSTREAM.lock`。
-- 本地 AnkiDroid 参考目录为相邻 `../AnkiDroid`；版本来自其 `AnkiDroid/build.gradle`，backend 来自 `gradle/libs.versions.toml`。源码归档没有 Git 历史时记录文件哈希，不推测提交或最新发行版。
+- 本地 AnkiDroid 参考目录优先检查相邻 `../AnkiDroid`，不能假定每台主机都存在；存在时版本来自其 `AnkiDroid/build.gradle`，backend 来自 `gradle/libs.versions.toml`。本机当前没有该目录；2026-10-26 浏览传统模式从官方仓库固定提交读取，对照路径、哈希和行为见[本轮记录](development/browser-traditional-mode-2026-10-26.md)。源码归档没有 Git 历史时记录文件哈希，不推测提交或最新发行版。
 - 共享 Anki 版本不等于桥接、渲染或设备行为完全相同。生成 RPC、真实业务接入、可见入口和实际验收是不同层次。
 
 ## 领域与当前事实来源

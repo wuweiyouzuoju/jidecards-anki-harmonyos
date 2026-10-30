@@ -15,6 +15,8 @@ AnkiDroid 的源码定位与验证范围见 [对照入口](ANKIDROID_PARITY_AUDI
 
 ## 浏览增强与鸿蒙 PC 操作
 
+- 右上角更多菜单最下方的“传统模式”已接入：手机等宽多列、点标题换列、长按管理列和顺序、点击行直接编辑；两种外观及 Cards/Notes 各自保存列配置。固定 AnkiDroid 提交的源码对照、原生外观差异与设备待验范围见[本轮记录](development/browser-traditional-mode-2026-10-26.md)。
+
 - 已有普通界面入口：完整搜索结果全选、清空及 Shift 区间选择，Cards/Notes 各自显示列与排序/副标题偏好、最近搜索、忽略重音、所选预览与导出、立即评分，以及宽屏并排编辑。它们不依赖解锁 JIDE；JIDE 偏好提案复用同一保存入口。
 - 当前行为、责任与验证统一见[浏览列表](development/browser-stats.md#浏览列表)。源码入口为 `BrowserSearchSession`、`BrowserPreferences` / `BrowserPreferencesStore`、`BrowserKeyboard` 与 `BrowserEditorPane`；信息/预览先解析代表卡片，搜索与分页恢复集合模式和激活列，整批读取失败不消耗游标。
 - 回归入口为 `browser-desktop`、`browser-desktop-ui`、`browser-search-pagination` 和 `protocol:test-core`。源码接通、主机回归与 HAP 构建不等于鸿蒙 PC 的焦点、输入法、宽度切换、横向滚动和保存器交互已验收；设备边界保留在所属领域文档，不把待验状态写成功能缺失。

@@ -38,7 +38,7 @@
 | 修改应用内 Agent 历史 | `model/agent/AgentHistoryCoordinator.ts`、`AgentConversationView.ts`、现有历史/CheckpointStore | 恢复只交既有 runtime 校验，不恢复写入令牌、不重放动作 |
 | 更新 JIDE 的 Anki 官方教程 | `tools/anki-manual-topics.json`、`tools/vendor-anki-manual.mjs`、`model/agent/AgentAnkiHelp.ts` | 从官方 Git 已提交版本生成，保留原文、来源与 CC BY-SA；两个离线只读工具按需读取，见 [官方教程](agent.md#anki-官方教程按需读取) |
 | 修改导入导出 | `backend/数据迁移服务.ts`、`backend/后端会话.ts` | collection 生命周期和失败恢复优先 |
-| 修改主题/语言 | `model/主题设置.ets`、`model/语言存储.ets`、资源目录 | ThemeMode/ColorTheme 正交；语言切换需重启 |
+| 修改主题/语言 | `model/主题设置.ets`、`model/语言存储.ets`、`model/AppLocales.ts`、资源目录 | ThemeMode/ColorTheme 正交；语言配置通知就地刷新，见[地区语言](localization.md) |
 | 修改动画 | `utils/转场时长.ets`、`utils/HomeNavigationTransition.ets`、相关组件 | 导航/全屏层 200–300ms 淡入淡出；小菜单与展开 150ms；按钮按压由原生多态表面或系统反馈单独负责，不叠加整按钮动画；禁止横向飞入 |
 | 修改学习音频 | `utils/AudioFocusCoordinator.ets`、`声音播放器.ets`、`TTS播放器.ets` | 跨应用混音由 AudioSession 管理；`SHARE_MODE` 只管应用内多流 |
 | 修改应用内 Agent | `pages/AI制卡页.ets`、`backend/agent/`、`model/agent/` | 不绕过 Scope、确认及 DraftExecutor / ActionExecutor；见 [执行边界](agent.md) |

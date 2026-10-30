@@ -2,13 +2,13 @@
 
 [![CI](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/actions/workflows/ci.yml/badge.svg)](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/actions/workflows/ci.yml)
 [![License: AGPL-3.0-or-later](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](LICENSE)
-[![Source 3.0.20](https://img.shields.io/badge/source-3.0.20-6750a4.svg)](AppScope/app.json5)
+[![Source 3.5.4](https://img.shields.io/badge/source-3.5.4-6750a4.svg)](AppScope/app.json5)
 [![AppGallery 2.9.98](https://img.shields.io/badge/AppGallery-2.9.98-0a59f7.svg)](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare)
 [![HarmonyOS NEXT](https://img.shields.io/badge/platform-HarmonyOS%20NEXT-0a59f7.svg)](https://www.harmonyos.com/)
 
 jidecards（中文名“记得闪卡”）是面向 HarmonyOS NEXT 的开源闪卡学习应用，支持鸿蒙手机、平板和电脑。导入 Anki 牌组后，可以离线复习、编辑资料、查看学习统计，并通过 AnkiWeb 同步。原生界面由 ArkTS/ArkUI 实现，集合、模板渲染、调度和同步复用锁定版本的 Anki Rust Core。
 
-**当前源码版本：3.0.20（versionCode 3081）** · **华为应用市场版本：2.9.98**
+**当前源码版本：3.5.19（versionCode 3100）** · **华为应用市场版本：2.9.98**
 
 每天一点，把知识记牢。用闪卡整理知识，以间隔复习建立自己的学习节奏。
 
@@ -16,7 +16,7 @@ jidecards（中文名“记得闪卡”）是面向 HarmonyOS NEXT 的开源闪�
 
 官网：[jidecards.com](https://jidecards.com/) · [下载与功能](https://jidecards.com/works/jidecards/) · [鸿蒙 Anki 使用指南](https://jidecards.com/guides/harmonyos-anki/)
 
-源码构建：[3.0.20 签名 HAP 开发包](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v3.0.20/jidecards-v3.0.20-signed.hap) · [SHA-256 校验](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v3.0.20/SHA256SUMS.txt) · [构建与安装说明](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/tag/v3.0.20)
+已发布的源码构建：[3.0.20 签名 HAP 开发包](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v3.0.20/jidecards-v3.0.20-signed.hap) · [SHA-256 校验](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v3.0.20/SHA256SUMS.txt) · [构建与安装说明](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/tag/v3.0.20)。该已发布包与当前源码版本分别维护。
 
 开发入口：[贡献指南](CONTRIBUTING.md) · [更新记录](CHANGELOG.md) · [文档导航](docs/README.md) · [问题反馈](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/issues)
 
@@ -43,7 +43,7 @@ jidecards（中文名“记得闪卡”）是面向 HarmonyOS NEXT 的开源闪�
 
 以下介绍当前 `main` 的源码能力；应用市场实际上架版本以下载页面为准。
 
-3.0.20 新增实验性卡库与媒体直连同步，集中快捷键帮助，改善深色卡片正文对比度，并移除幻彩限时领赠宣传。完整变化与验收范围见 [3.0.20 源码变更说明](docs/releases/3.0.20.md)。
+3.5.4 优化统计图表的内存占用，保留双端卡片引用与制卡体验改进，详情见[3.5.4 更新说明](docs/releases/3.5.4.md)。
 
 ### 复习与调度
 
@@ -144,7 +144,7 @@ JIDE 提供统一的自然语言对话入口，也可以从牌组、浏览或学
 
 ### 签名 HAP 开发包
 
-[GitHub Release](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/tag/v3.0.20) 提供与源码版本对应的签名 HAP、`SHA256SUMS.txt` 和构建说明。该包为 debug 开发构建，包含 arm64-v8a 与 x86_64 原生库；安装受包内签名及设备授权限制，不等同于应用市场安装包。开发设备仅覆盖安装：`hdc -t <connect-key> install -r <signed-hap>`，保留已有数据与签名身份。
+[GitHub Release v3.0.20](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/tag/v3.0.20) 提供该历史源码版本的签名 HAP、`SHA256SUMS.txt` 和构建说明。该包为 debug 开发构建，包含 arm64-v8a 与 x86_64 原生库；安装受包内签名及设备授权限制，不等同于应用市场安装包。开发设备仅覆盖安装：`hdc -t <connect-key> install -r <signed-hap>`，保留已有数据与签名身份。
 
 ### 兼容范围
 
@@ -255,7 +255,7 @@ npm run verify             # 完整测试、双架构构建与签名 HAP
 
 ## 版本与发布
 
-当前源码版本由 [AppScope/app.json5](AppScope/app.json5) 中的 `versionName` 和 `versionCode` 定义。查看[更新记录](CHANGELOG.md)及[3.0.20 源码变更说明](docs/releases/3.0.20.md)；历史说明保留在 [docs/releases/](docs/releases/) 中。华为应用市场版本由作者确认，当前为 2.9.98；商店版本与源码版本分别维护。
+当前源码版本由 [AppScope/app.json5](AppScope/app.json5) 中的 `versionName` 和 `versionCode` 定义。查看[更新记录](CHANGELOG.md)及[3.5.4 更新说明](docs/releases/3.5.4.md)；历史说明保留在 [docs/releases/](docs/releases/) 中。华为应用市场版本由作者确认，当前为 2.9.98；商店版本与源码版本分别维护。
 
 历史应用市场 2.9.22 的更新内容见 [2.9.22 应用市场版说明](docs/releases/appgallery-2.9.22.md)。GitHub 的 `appgallery-v2.9.22` 标签记录当时的版本介绍，自动生成的源码快照对应标签中的 2.9.10 / versionCode 2991，不随 main 的后续更新变化；应用安装请使用应用市场入口。
 

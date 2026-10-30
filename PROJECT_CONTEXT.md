@@ -31,8 +31,10 @@ HarmonyOS 本地闪卡客户端：ArkUI → 领域 Service → protobuf → C++ 
 - Rust 捕获 panic，C++ 纯转发；取消同步不等于回滚完成，集合占用在真实调用结束后才释放。
 - 已接受的写入不随页面销毁取消；迟到读取不能覆盖新页面/新选择。
 - 应用内 Agent 的 Scope、草稿确认和写入执行器不可绕过。
-- 字符串走资源，base/en_US key 对齐；原生布局复用公共尺寸和主题。
+- 字符串走资源，所有 `AppLocales` 目录与 base key 对齐；地区格式、切换与验收见[本地化](docs/development/localization.md)，原生布局复用公共尺寸和主题。
 - 真机只覆盖安装，禁止卸载清数据；保留包名、现有签名身份与用户集合。
+
+当前原生材质、边框和分隔线入口：[原生表面规范](docs/development/material-standard.md)。
 
 ## 任务路由
 
@@ -56,6 +58,8 @@ HarmonyOS 本地闪卡客户端：ArkUI → 领域 Service → protobuf → C++ 
 | 应用内 Agent 本地代码沙箱 | [本地沙箱方案与接手入口](docs/decisions/2026-09-30-agent-local-sandbox.md) | [模块入口](native/agent-sandbox/README.md)：execute_code、异步 NAPI、真实引擎测试、双架构 probe 与测试包 |
 | 工具链、测试、源码导出 | [验证](docs/development/verification.md) | `tools/README.md`；`npm test -- tooling` |
 | 新增能力 | [扩展点](docs/development/extension-points.md) | 按表查调用链；功能盘点先读 [FEATURE_STATUS](docs/FEATURE_STATUS.md) |
+
+电脑与鸿蒙的笔记引用入口见 [双端笔记引用](docs/development/note-links.md)，电脑源码在 `desktop/anki-note-links/`。
 
 ## 验证与交付
 
