@@ -12,9 +12,10 @@ export async function loadContent(root) {
   const work = data.works[0];
   work.sourceVersion = app.versionName;
   work.sourceVersionCode = app.versionCode;
-  if (work.sourcePackage?.tag !== `v${app.versionName}` ||
-    work.sourcePackage.fileName !== `jidecards-v${app.versionName}-signed.hap`) {
-    throw new Error('Source HAP metadata must match the current application version.');
+  const packageVersion = work.sourcePackage?.tag?.match(/^v(\d+\.\d+\.\d+)$/)?.[1];
+  // 已发布下载包有独立事实来源；源码升版不能编造尚未发布的下载链接。
+  if (!packageVersion || work.sourcePackage.fileName !== `jidecards-v${packageVersion}-signed.hap`) {
+    throw new Error('Published HAP filename must match its own release tag.');
   }
   // 市场版本由作者确认，当前源码版本读取应用配置；截图保留各自的历史版本。
   if (!work.releaseVersion || !work.releaseVersionSource) throw new Error('Author-confirmed website release is required.');
