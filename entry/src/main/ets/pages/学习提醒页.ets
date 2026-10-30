@@ -1,3 +1,4 @@
+import { GlassSource } from '../components/common/GlassSource';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { navigationEnterOffset } from '../utils/AppMotion';
 import { WINDOW_SAFE_TOP_KEY } from '../model/WindowSafeLayout';
@@ -15,6 +16,7 @@ import { 颜色键 } from '../model/颜色主题';
 import { 解析是否深色, 主题模式 } from '../model/主题设置';
 import { 提醒编辑面板 } from '../components/提醒编辑面板';
 import { 应用尺寸 } from '../utils/应用尺寸';
+import { SeriesVisual } from '../utils/SeriesVisual';
 import { IconActionButton } from '../components/common/IconActionButton';
 import { 统一空态 } from '../components/common/统一空态';
 import { 按下态按钮 } from '../components/common/按下态按钮';
@@ -41,6 +43,7 @@ import { namedResourceText } from '../utils/UiFeedback';
 
 @Component
 export struct 学习提醒页 {
+  @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
   @State private 转场透明度: number = 1;
@@ -368,7 +371,7 @@ export struct 学习提醒页 {
       top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop),
       bottom: 0
     })
-    .backgroundColor(this.页面底色微染值)
+    .backgroundColor(Color.Transparent)
     .alignContent(Alignment.Center)
   }
 
@@ -427,6 +430,7 @@ export struct 学习提醒页 {
     .backgroundColor($r('app.color.surface_card'))
     .border(SurfaceBorder.options())
     .borderRadius(应用尺寸.圆角_卡片)
+    .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, this.是否深色, this.动作主色))
   }
 
   @Builder
@@ -441,7 +445,8 @@ export struct 学习提醒页 {
     NavDestination() {
       Stack() {
         // 下层：主内容
-        Column() {
+        GlassSource() {
+Column() {
           this.顶部条()
 
           if (!this.已加载 && this.错误信息 !== '') {
@@ -484,7 +489,9 @@ export struct 学习提醒页 {
         }
         .width('100%')
         .height('100%')
-        .backgroundColor(this.页面底色微染值)
+        .backgroundColor(Color.Transparent)
+      }
+      
 
         // 顶层：新建/编辑提醒磨砂弹层（与创建牌组面板同款风格）
         if (this.显示编辑面板) {

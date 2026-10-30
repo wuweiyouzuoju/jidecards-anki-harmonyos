@@ -3,6 +3,7 @@
 import { reminderAgentManager } from '@kit.BackgroundTasksKit';
 import { notificationManager } from '@kit.NotificationKit';
 import { reminderText, reminderTitle, reminderContent } from '../utils/StudyReminderText';
+import { localeNumber } from '../utils/LocaleFormatting';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { 加载学习提醒设置, 保存提醒ID列表, 是否已引导通知设置, 标记已引导通知设置, 提醒项 } from './学习提醒存储';
 import { 牌组服务 } from '../backend/牌组服务';
@@ -57,7 +58,8 @@ async function 发布单个提醒(
   待复习数: number
 ): Promise<number> {
   const 标题: string = reminderTitle(项.标题);
-  const 内容: string = reminderContent(项.内容, String(待学数), String(待复习数));
+  const language: string = AppStorage.get<string>('系统语言') ?? 'zh-Hans';
+  const 内容: string = reminderContent(项.内容, localeNumber(待学数, language), localeNumber(待复习数, language));
   const 提醒请求: reminderAgentManager.ReminderRequestAlarm = {
     reminderType: reminderAgentManager.ReminderType.REMINDER_TYPE_ALARM,
     hour: 项.小时,
