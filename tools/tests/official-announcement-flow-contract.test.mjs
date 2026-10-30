@@ -61,7 +61,7 @@ test('announcement modal is native, themed, scrollable and non-dismissible', () 
   assert.match(source, /official_announcement_details/);
   assert.match(source, /onAcknowledge/);
   assert.match(source, /onOpenDetails/);
-  assert.match(source, /DialogBackdrop\(\)/);
+  assert.match(source, /DialogBackdrop\(\{ widthPercent: 88, maximumWidth: 480,/);
   assert.match(source, /\.transition\(SurfaceTransition\.dialog\(\)\)/);
   assert.match(source, /\.transition\(SurfaceTransition\.backdrop\(\)\)/);
   assert.match(source, /edgeEffect\(EdgeEffect\.Spring\)/);
@@ -109,7 +109,10 @@ test('home delegates announcement scheduling to its owner without polling', () =
 test('every real home return enters the shared refresh and announcement path', () => {
   const source = read('../../entry/src/main/ets/pages/首页.ets');
   assert.match(source, /onPageShow\(\): void \{\s*this\.返回主页后刷新\(\);/);
-  assert.match(source, /onPageHide\(\): void \{\s*(?:this\.deckPreviewSession\.invalidate\(\);\s*)?this\.暂停主页官方公告检查\(\);/);
+  const hide = source.match(/onPageHide\(\): void \{([^]*?)\n  \}/)?.[1] ?? '';
+  for (const call of ['closeSyncChoice', '暂停主页官方公告检查', 'deckPreviewSession.invalidate', 'stopAutoSyncTimer']) {
+    assert.ok(hide.includes(`this.${call}();`), `${call} runs when the home page hides`);
+  }
   assert.match(source, /name: 'StudyPage'[\s\S]*?onPop:[\s\S]*?返回主页后刷新/);
   assert.match(source, /name: 'StatsPage'[\s\S]*?onPop:[\s\S]*?返回主页后刷新/);
   assert.match(source, /name: 'SettingsPage'[\s\S]*?onPop:[\s\S]*?返回主页后刷新/);

@@ -1,6 +1,6 @@
-import { SurfaceTransition } from '../utils/SurfaceTransition';
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { SurfaceBorder } from '../utils/SurfaceBorder';
+import { GlassPanel } from './common/GlassPanel';
+import { SurfaceTransition } from '../utils/SurfaceTransition';
 import { PressFeedback } from '../utils/PressFeedback';
 import { DialogBackdrop } from './common/DialogBackdrop';
 import { resourceText } from '../utils/UiFeedback';
@@ -15,6 +15,8 @@ import { 应用尺寸 } from '../utils/应用尺寸';
 /** 官方启动公告弹窗：纯展示层；确认与详情动作经回调上抛，返回键与遮罩点击不关闭。 */
 @Component
 export struct 官方公告弹窗 {
+  @State private surfaceWidth: string = '88%';
+  @State private surfaceMaximumWidth: number = 480;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop announcement: 官方公告展示项;
@@ -35,11 +37,15 @@ export struct 官方公告弹窗 {
 
   build() {
     Stack() {
-      DialogBackdrop()
+      DialogBackdrop({ widthPercent: 88, maximumWidth: 480,
+          onSize: (width: string, maximumWidth: number): void => {
+            this.surfaceWidth = width; this.surfaceMaximumWidth = maximumWidth;
+          } })
         .onClick((): void => {})
         .transition(SurfaceTransition.backdrop())
 
-      Column({ space: 应用尺寸.间距_12 }) {
+      GlassPanel({ radius: 应用尺寸.圆角_卡片, panelWidth: this.surfaceWidth, maximumWidth: this.surfaceMaximumWidth, maximumHeight: '80%' }) {
+Column({ space: 应用尺寸.间距_12 }) {
         DialogHeader({
           title: this.announcement.title,
           actionLabel: $r('app.string.official_announcement_acknowledge'),
@@ -83,12 +89,13 @@ export struct 官方公告弹窗 {
         }
         .width('100%')
       }
-      .width('88%')
-      .constraintSize({ maxWidth: 480, maxHeight: '80%' })
+      .width('100%')
+       
       .padding(应用尺寸.间距_16)
-      .backgroundColor($r('app.color.surface_card'))
-      .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
-      .transition(SurfaceTransition.dialog())
+      
+      
+      }
+      
     }
     .width('100%')
     .height('100%')

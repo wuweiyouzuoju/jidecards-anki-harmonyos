@@ -1,6 +1,6 @@
-import { SurfaceTransition } from '../utils/SurfaceTransition';
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { SurfaceBorder } from '../utils/SurfaceBorder';
+import { GlassPanel } from './common/GlassPanel';
+import { SurfaceTransition } from '../utils/SurfaceTransition';
 import { OFFICIAL_QQ_GROUP } from '../model/OfficialCommunity';
 import { DialogBackdrop } from './common/DialogBackdrop';
 import { DialogHeader } from './common/DialogHeader';
@@ -40,6 +40,8 @@ interface 更新条目 {
 
 @Component
 export struct 欢迎弹窗 {
+  @State private surfaceWidth: string = '88%';
+  @State private surfaceMaximumWidth: number = 480;
   @StorageProp(颜色键.动作主色) private 动作主色: string = '#2F5FD0';
   onClose: () => void = () => {};
   @Prop 是否深色: boolean = false;
@@ -68,12 +70,16 @@ export struct 欢迎弹窗 {
   build() {
     Stack() {
       // 遮罩 + 磨砂玻璃（点击空白处关闭）
-      DialogBackdrop()
+      DialogBackdrop({ widthPercent: 88, maximumWidth: 480,
+          onSize: (width: string, maximumWidth: number): void => {
+            this.surfaceWidth = width; this.surfaceMaximumWidth = maximumWidth;
+          } })
         .transition(SurfaceTransition.backdrop())
         .onClick(() => this.onClose())
 
       // 内容卡（居中，最大宽度 380）
-      Column() {
+      GlassPanel({ radius: 应用尺寸.圆角_卡片, panelWidth: this.surfaceWidth, maximumWidth: this.surfaceMaximumWidth }) {
+Column() {
         // 标题栏：标题居中 + × 右上角
         DialogHeader({
           title: $r('app.string.welcome_title'),
@@ -193,13 +199,14 @@ export struct 欢迎弹窗 {
         // 底部「开始体验」按钮
 
       }
-      .width('88%')
+      .width('100%')
       // 高度完全自适应：Scroll 已按数字上限封顶（88% 屏高 - 固定区），卡片不再设
       // maxHeight 百分比（layoutWeight(1)+'88%' 组合会让弹窗永远撑满屏高 88% 不收缩）
-      .constraintSize({ maxWidth: 480 })
-      .backgroundColor($r('app.color.surface_page'))
-      .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
-      .transition(SurfaceTransition.dialog())
+       
+      
+      
+      }
+      
     }
     .width('100%')
     .height('100%')
