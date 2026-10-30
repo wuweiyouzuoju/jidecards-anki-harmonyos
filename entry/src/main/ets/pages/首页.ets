@@ -5,7 +5,7 @@ import { completeGlassSuggestion } from '../utils/SurfaceMaterialStore';
 import { GlassSource } from '../components/common/GlassSource';
 import { GlassPanel } from '../components/common/GlassPanel';
 import { ActionMenuAnchor } from '../components/common/ActionMenuLayout';
-import { GLASS_HOME_SOURCE, glassSourceVisibility } from '../utils/GlassBackdrop';
+import { GLASS_HOME_SOURCE, GLASS_BACKGROUND_SOURCE, glassSourceVisibility } from '../utils/GlassBackdrop';
 import { HOME_SHORTCUTS, shortcutCommand } from '../model/KeyboardShortcuts';
 import { WindowPoint } from '../model/WindowSafeLayout';
 import { StudyKeyboardSession } from '../model/StudyKeyboard';
@@ -181,12 +181,14 @@ struct 首页 {
   private deckWidthHintTarget: string = 'single_narrow';
   @StorageProp(GLASS_SUGGESTION_PENDING_KEY) private glassSuggestionPending: boolean = false;
   private glassSuggestionShown: boolean = false;
+  private glassSuggestionReady: boolean = false;
   @State private glassSuggestionSaving: boolean = false;
   private readonly glassSuggestionDialog: NativeDialogHost = new NativeDialogHost();
   private readonly createGlassSuggestionDialog: NativeDialogFactory = (dismiss: NativeDialogDismiss): CustomDialogController => {
     const presentation: NativeDialogPresentation = this.glassSuggestionDialog.presentation();
     return new CustomDialogController({
       builder: GlassSuggestionDialog({ busy: this.glassSuggestionSaving,
+        onReady: this.glassSuggestionDialog.guard((): void => { this.glassSuggestionReady = true; }),
         onKeep: this.glassSuggestionDialog.guard((): void => { this.finishGlassSuggestion(false); }),
         onConfirm: this.glassSuggestionDialog.guard((): void => { this.finishGlassSuggestion(true); }) }),
       onWillDismiss: dismiss, autoCancel: presentation.autoCancel, customStyle: presentation.customStyle,
@@ -873,6 +875,7 @@ struct 首页 {
   private presentGlassSuggestion(): boolean {
     if (!this.autoSyncStartupReady || this.加载状态 !== 'ready' || !this.glassSuggestionPending || this.glassSuggestionShown) return false;
     this.glassSuggestionShown = true;
+    this.glassSuggestionReady = false;
     this.nativeDialogOpen = true;
     try {
       this.glassSuggestionDialog.open(this.createGlassSuggestionDialog, (): boolean => {
@@ -900,6 +903,12 @@ struct 首页 {
 
   private async finishGlassSuggestion(useGlass: boolean): Promise<void> {
     if (this.glassSuggestionSaving || !this.nativeDialogOpen || this.homeDisposed) return;
+    if (!this.glassSuggestionReady) {
+      this.glassSuggestionDialog.close();
+      appInterface.leave('glass_suggestion');
+      this.nativeDialogOpen = false;
+      return;
+    }
     this.glassSuggestionSaving = true;
     this.publishGlassSuggestion();
     try {
@@ -2637,11 +2646,10 @@ Column() {
 
   build() {
     Stack() {
-      ThemeBackground({ transitionActive: this.backgroundTransitionActive })
+      ThemeBackground({ transitionActive: this.backgroundTransitionActive }).id(GLASS_BACKGROUND_SOURCE)
     Navigation(this.页面栈) {
       Stack() {
-        GlassSource({ sourceId: GLASS_HOME_SOURCE, freezeDuringPanels: true }) {
-        ThemeBackground({ transitionActive: this.backgroundTransitionActive })
+        GlassSource({ sourceId: GLASS_HOME_SOURCE, freezeDuringPanels: true, previewWarm: this.glassSuggestionPending }) {
         this.homeLayout()
 
 

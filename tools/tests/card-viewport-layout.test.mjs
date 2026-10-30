@@ -124,10 +124,10 @@ test('viewport measures the final child width on the first layout and immediatel
   }
 });
 
-test('full-screen preview owns an opaque background and consumes background taps without blocking children', () => {
+test('full-screen preview covers its host using the shared background and consumes background taps without blocking children', () => {
   const source = readFileSync(new URL('../../entry/src/main/ets/components/browser/卡片预览页.ets', import.meta.url), 'utf8');
   const build = source.slice(source.indexOf('\n  build()'));
-  assert.match(build, /Stack\(\)\s*\{\s*\/\/[^\n]*\n\s*ThemeBackground\(\)/);
+  assert.match(build, /Stack\(\)\s*\{\s*\/\/[^\n]*\n\s*CapturedThemeBackground\(\)/);
   const rootAttributes = build.slice(build.lastIndexOf(".backgroundColor($r('app.color.surface_page'))"));
   assert.match(rootAttributes, /hitTestBehavior\(HitTestMode.Default\)/,
     'Default admits descendants; Block disables every button and the Web');

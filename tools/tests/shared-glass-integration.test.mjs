@@ -7,6 +7,7 @@ import { actionMenuBubbleOutline, ActionMenuPointerSide } from '../../entry/src/
 function panel({api=23, source='body'}={}) {
   const timers=new Map(); let next=0, entries=0, prepared=0;
   const Panel=loadComponentLogic('components/common/GlassPanel.ets','GlassPanel',{
+    hilog:{info(){},warn(){}},
     supportsGlassBackdrop:()=>api>=23, currentGlassSource:()=>source, retainGlassPanel:()=>{}, releaseGlassPanel:()=>{},
     currentMotionProfile:()=>({menuScale:.94,dialogScale:.98}),
     materialPopupAnimation:()=>({duration:150}), SurfaceTransition:{dialogEnterAnimation:()=>({duration:250})},
@@ -20,11 +21,11 @@ function panel({api=23, source='body'}={}) {
 test('texture readiness opens foreground and glass once; timeout is cancelled',()=>{
   const h=panel();h.p.aboutToAppear();assert.equal(h.p.panelOpacity,.01);
   h.p.finish();h.p.finish();assert.equal(h.entries(),1);assert.equal(h.prepared(),1);
-  assert.equal(h.timers.size,0);assert.equal(h.p.failed,false);assert.equal(h.p.panelOpacity,1);
+  assert.equal(h.timers.size,0);assert.equal(h.p.panelOpacity,1);
 });
-test('timeout locks fallback and late texture readiness never adds an entry or swaps material',()=>{
-  const h=panel();h.p.aboutToAppear();[...h.timers.values()][0]();
-  assert.equal(h.p.failed,true);h.p.finish();assert.equal(h.entries(),1);assert.equal(h.prepared(),1);
+test('slow glass stays loading without switching material and accepts eventual readiness',()=>{
+ const h=panel();h.p.aboutToAppear();assert.equal(h.timers.size,0);assert.equal(h.entries(),0);assert.equal(h.p.panelOpacity,.01);
+ h.p.finish();h.p.finish();assert.equal(h.entries(),1);assert.equal(h.prepared(),1);
 });
 test('departure cancels pending preparation and rejects late readiness',()=>{
   const h=panel();h.p.aboutToAppear();h.p.aboutToDisappear();h.p.finish();
@@ -90,7 +91,7 @@ test('home source freezes while the embedded deck preview menu retains its panel
  const {readFileSync}=await import('node:fs');
  const {loadPlatformSource}=await import('./platform-module-harness.mjs');
  const read=path=>readFileSync(new URL('../../entry/src/main/ets/'+path,import.meta.url),'utf8');
- assert.match(read('pages/首页.ets'),/GlassSource\(\{ sourceId: GLASS_HOME_SOURCE, freezeDuringPanels: true \}\)/);
+ assert.match(read('pages/首页.ets'),/GlassSource\(\{ sourceId: GLASS_HOME_SOURCE, freezeDuringPanels: true, previewWarm: this\.glassSuggestionPending \}\)/);
  const code=read('utils/GlassBackdrop.ets');
  const api=loadPlatformSource(code.slice(code.indexOf('const frozenSources:')),
   '({setGlassSourceFreeze,retainGlassPanel,releaseGlassPanel,sourceCaptureAllowed})',{captureAllowed:()=>true});
@@ -114,4 +115,56 @@ test('all app custom dialog and popup hosts retain shared glass ownership', asyn
     assert.doesNotMatch(source,/\.transition\(SurfaceTransition\.dialog\(\)\)/,
       `standalone dialog animation bypasses GlassPanel preparation: ${path}`);
   }
+});
+
+test('opaque reading dialog opens immediately without waiting for a glass texture',()=>{
+  const h=panel();h.p.opaque=true;h.p.aboutToAppear();
+  assert.equal(h.p.usesGlass(),false);assert.equal(h.p.panelOpacity,1);
+  assert.equal(h.timers.size,0);assert.equal(h.prepared(),1);
+  h.p.aboutToDisappear();h.p.finish();assert.equal(h.entries(),0);
+});
+
+
+test('glass sampling remains enabled in explicit and system dark modes',()=>{
+ for(const [mode,systemDark] of [['light',false],['dark',false],['system',true]]) {
+  const h=panel();h.p.mode=mode;h.p.systemDark=systemDark;h.p.aboutToAppear();
+  assert.equal(h.p.usesGlass(),true);assert.equal(h.p.panelOpacity,.01);assert.equal(h.timers.size,0);
+  h.p.finish();assert.equal(h.p.panelOpacity,1);assert.equal(h.prepared(),1);
+ }
+});
+
+test('native glass preview in flat mode permits capture only while its own preview owner is retained',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const {loadPlatformSource}=await import('./platform-module-harness.mjs');
+ const source=readFileSync(new URL('../../entry/src/main/ets/utils/GlassBackdrop.ets',import.meta.url),'utf8');
+ const api=loadPlatformSource(source.slice(source.indexOf('const frozenSources:')),
+  '({setGlassSourceFreeze,retainGlassPanel,releaseGlassPanel,sourceCaptureAllowed})',{captureAllowed:preview=>preview});
+ api.setGlassSourceFreeze('home',true);
+ assert.equal(api.sourceCaptureAllowed('home'),false);
+ api.retainGlassPanel('home',true);
+ assert.equal(api.sourceCaptureAllowed('home'),true);
+ assert.equal(api.sourceCaptureAllowed('other'),false);
+ api.releaseGlassPanel('home',true);
+ assert.equal(api.sourceCaptureAllowed('home'),false);
+});
+test('explicit glass preview prepares glass without changing the saved flat material',()=>{
+ const h=panel();h.p.material='flat';h.p.materialOverride='glass';h.p.source='home';h.p.aboutToAppear();
+ assert.equal(h.p.usesGlass(),true);h.p.finish();assert.equal(h.p.material,'flat');h.p.aboutToDisappear();
+});
+
+test('flat-mode preview prewarms visible home content and stops warming when hidden or dismissed',()=>{
+ const calls=[];
+ const Source=loadComponentLogic('components/common/GlassSource.ets','GlassSource',{
+  glassSourceVisibility:(...args)=>calls.push(args),setGlassSourceFreeze(){}
+ });
+ const source=new Source();source.getUIContext=()=> 'ui';source.sourceId='home';
+ source.material='flat';source.foreground=true;source.visible=true;source.sourceEnabled=true;
+ source.previewWarm=true;source.sync();assert.deepEqual(calls.at(-1),['ui','home',true,true]);
+ source.previewWarm=false;source.sync();assert.deepEqual(calls.at(-1),['ui','home',false,false]);
+ source.previewWarm=true;source.aboutToDisappear();assert.deepEqual(calls.at(-1),['ui','home',false,true]);
+});
+
+test('recommendation waits for real texture without a failure deadline',()=>{
+ const h=panel();h.p.aboutToAppear();assert.equal(h.entries(),0);assert.equal(h.timers.size,0);
+ h.p.finish();h.p.finish();assert.equal(h.entries(),1);assert.equal(h.prepared(),1);
 });

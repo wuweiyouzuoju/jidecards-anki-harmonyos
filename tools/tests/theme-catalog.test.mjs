@@ -46,7 +46,8 @@ test('start study and show-answer actions share the series translucent action su
   assert.match(start, /SeriesVisual.control\(/, 'start study uses the shared themed control');
   assert.doesNotMatch(start, /PrimaryGlassSurface/);
   const group = read('entry/src/main/ets/components/StudyAnswerActionBar.ets');
-  assert.match(group, /new GlassSurface/);
+  assert.match(group, /new StudyRatingSurface/);
+  assert.match(read('entry/src/main/ets/utils/StudyRatingSurface.ets'), /class StudyRatingSurface extends GlassSurface/);
   assert.doesNotMatch(group, /OliveOil/);
   const floating = read('entry/src/main/ets/components/学习浮动工具栏.ets');
   for (const path of ['components/学习浮动工具栏.ets']) {
@@ -112,8 +113,9 @@ test('theme selection and redemption use the same entitlement mapping', () => {
 
 test('navigation owns one persistent background outside route content', () => {
   const home = read('entry/src/main/ets/pages/首页.ets');
-  assert.match(home, /build\(\)\s*\{\s*Stack\(\)\s*\{\s*ThemeBackground\(\{ transitionActive: this\.backgroundTransitionActive \}\)\s*Navigation\(this\.页面栈\)/);
+  assert.match(home, /build\(\)\s*\{\s*Stack\(\)\s*\{\s*ThemeBackground\(\{ transitionActive: this\.backgroundTransitionActive \}\)\.id\(GLASS_BACKGROUND_SOURCE\)\s*Navigation\(this\.页面栈\)/);
   assert.equal(home.match(/ThemeBackground\(/g).length, 1);
+  assert.doesNotMatch(read('entry/src/main/ets/components/common/GlassSource.ets'), /ThemeBackground|SharedPageBackground/);
   const visibility = home.slice(home.indexOf('.onNavBarStateChange('), home.indexOf('// 用箭头函数包裹'));
   assert.match(visibility, /appInterface.showPage\('home'\)/);
   assert.doesNotMatch(visibility, /ThemeBackground|页面底色|opacity/, 'visibility reports semantic state without changing persistent background rendering');

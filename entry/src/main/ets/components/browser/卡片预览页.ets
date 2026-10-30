@@ -87,7 +87,7 @@ import { CardActionMenu, CardActionMenuEntry } from '../common/CardActionMenu';
 import { studyKeyName } from '../../utils/StudyKeyAdapter';
 import { PAGE_SURFACE_KEY } from '../../model/ThemeCatalog';
 import { PAGE_COMPACT_LAYOUT_KEY } from '../../model/AppLayoutState';
-import { ThemeBackground } from '../common/ThemeBackground';
+import { CapturedThemeBackground } from '../common/CapturedThemeBackground';
 
 interface LinkedPreviewReturn { ids: number[]; index: number; side: string; panel: boolean; scroll: number; }
 
@@ -861,8 +861,8 @@ export struct 卡片预览页 {
 
   build() {
     Stack() {
-      // 预览覆盖在已有页面上，必须独立绘制主题背景，不能透出宿主控件。
-      ThemeBackground()
+      // 只显示导航根背景的真实帧，覆盖宿主控件，不另建彩雾动画。
+      CapturedThemeBackground()
 
       // 主面板：全屏卡片预览（OPACITY 转场，禁止左右平移）
       GlassSource({ freezeDuringPanels: true }) {
