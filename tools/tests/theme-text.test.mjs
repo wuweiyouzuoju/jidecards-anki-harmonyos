@@ -1,3 +1,5 @@
+import { materialHarness } from './surface-material-harness.mjs';
+import { glassFillHarness } from './glass-material-harness.mjs';
 import { loadPlatformModule } from './platform-module-harness.mjs';
 import { compileWithUiFeedback } from './ui-feedback-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -246,7 +248,8 @@ test('glass deck selection exposes the existing background without opacity on it
   const deck = read('components/牌组列表项.ets');
   assert.match(deck, /this.visual.selectedColors.length > 0 \? Color.Transparent : this.选中背景色/);
   assert.match(deck, /this.visual.selectedColors.length > 0 \? '#80FFFFFF' : this.主色边框色/);
-  assert.doesNotMatch(deck, /backdropBlur|backgroundBlurStyle|\.opacity\(/);
+  assert.doesNotMatch(deck, /backdropBlur|backgroundBlurStyle/);
+  assert.doesNotMatch(deck,/\.opacity\(/,'glass must not reduce text opacity');
   for (const color of themeDefinition('iridescent').selectedColors) {
     assert.equal(color.length, 9);
     assert.ok(parseInt(color.slice(1, 3), 16) >= 128 && parseInt(color.slice(1, 3), 16) < 230, 'glass is substantial but still translucent');
@@ -255,21 +258,22 @@ test('glass deck selection exposes the existing background without opacity on it
 });
 
 test('glass presses preserve the backing and geometry, reset on release/disable, and isolate siblings', () => {
-  const deps = { Color: { Transparent: 'transparent' }, $r: name => name, 应用尺寸: { 卡片边框: 1 } };
+  const deps = { ...materialHarness('glass'), Color: { Transparent: 'transparent' }, $r: name => name, 应用尺寸: { 卡片边框: 1 },
+    BlurStyle: { NONE: 'none' }, AdaptiveColor: { DEFAULT: 'default' } };
   const themePressGradient = loadPlatformModule('utils/ThemeVisuals.ets', 'themePressGradient', deps);
   const PressFeedback = loadPlatformModule('utils/PressFeedback.ets', 'PressFeedback', motionApi());
   const SurfaceBorder = loadPlatformModule('utils/SurfaceBorder.ets', 'SurfaceBorder', deps);
-  const GlassSurface = loadPlatformModule('utils/GlassSurface.ets', 'GlassSurface', { ...deps, themePressGradient, PressFeedback, SurfaceBorder });
-  const PrimaryGlassSurface = loadPlatformModule('utils/PrimaryGlassSurface.ets', 'PrimaryGlassSurface', { ...deps, themePressGradient, PressFeedback, SurfaceBorder });
+  const GlassSurface = loadPlatformModule('utils/GlassSurface.ets', 'GlassSurface', { ...deps, themePressGradient, PressFeedback, SurfaceBorder, translucentGlassFill: glassFillHarness() });
+  const PrimaryGlassSurface = loadPlatformModule('utils/PrimaryGlassSurface.ets', 'PrimaryGlassSurface', { ...deps, themePressGradient, PressFeedback, SurfaceBorder, translucentGlassFill: glassFillHarness() });
   const target = () => {
     const state = {}, node = {};
-    for (const key of ['backgroundColor', 'linearGradient', 'border', 'opacity', 'scale']) {
+    for (const key of ['backgroundColor', 'linearGradient', 'border', 'opacity', 'scale', 'backgroundBlurStyle', 'backdropBlur', 'shadow']) {
       node[key] = value => { state[key] = structuredClone(value); return node; };
     }
     return { state, node };
   };
   for (const colors of [GLASS_HIGHLIGHT_COLORS, GLASS_DARK_COLORS, ['#FFCC00'], [], themeDefinition('iridescent').selectedColors]) {
-    for (const surface of [new GlassSurface(colors), new GlassSurface(colors, '#E9F7EE'), new PrimaryGlassSurface({ pressedColors: colors })]) {
+    for (const surface of [new GlassSurface('glass', colors), new GlassSurface('glass', colors, '#E9F7EE'), new PrimaryGlassSurface('glass', { pressedColors: colors })]) {
       const a = target(), b = target();
       surface.applyNormalAttribute(a.node); surface.applyNormalAttribute(b.node);
       const normal = structuredClone(a.state);
@@ -292,14 +296,15 @@ test('glass presses preserve the backing and geometry, reset on release/disable,
     }
   }
   const outline=SurfaceBorder.options(2,'#00ACC1');
-  const choice=new GlassSurface(GLASS_HIGHLIGHT_COLORS,'app.color.surface_card',outline);
+  const choice=new GlassSurface('glass',GLASS_HIGHLIGHT_COLORS,'app.color.surface_card',outline);
   const selected=target();
   for(const method of ['applyNormalAttribute','applyPressedAttribute','applyDisabledAttribute']) {
     choice[method](selected.node);
     assert.deepEqual(selected.state.border,outline,'pressing or disabling keeps the selected outline');
-    assert.equal(selected.state.backgroundColor,'app.color.surface_card');
+    assert.equal(selected.state.backgroundColor,glassFillHarness()('app.color.surface_card'));
+    assert.equal(selected.state.backdropBlur,24);
   }
   for (const path of ['utils/GlassSurface.ets', 'utils/PrimaryGlassSurface.ets']) {
-    assert.doesNotMatch(read(path), /backdropBlur|setTimeout|animateTo|\.animation\(/);
+    assert.doesNotMatch(read(path), /setTimeout|animateTo|\.animation\(/);
   }
 });

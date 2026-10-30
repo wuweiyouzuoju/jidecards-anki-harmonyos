@@ -6,6 +6,8 @@ import {
 import { APP_FOREGROUND_KEY } from '../../model/AppLifecycleState';
 import { THEME_MOTION_KEY } from '../../model/ThemeCatalog';
 import { 颜色键 } from '../../model/颜色主题';
+import { SharedPageBackground, VisualPalette } from 'jide_foundation';
+import { SeriesVisual } from '../../utils/SeriesVisual';
 
 /**
  * 透明彩雾纹理由系统合成平移、缩放和淡化，ArkTS 每轮只提交一次目标。
@@ -19,6 +21,9 @@ export struct ThemeBackground {
   @StorageProp(THEME_MOTION_KEY) @Watch('updatePlayback') private motion: boolean = true;
   @StorageProp(APP_FOREGROUND_KEY) @Watch('updatePlayback') private foreground: boolean = false;
   @StorageProp(颜色键.页面底色微染) private baseColor: string = '#e9eef7';
+  @StorageProp(颜色键.动作主色) private actionColor: string = '#2F5FD0';
+  @StorageProp('themeMode') private themeMode: string = 'system';
+  @StorageProp('systemDarkMode') private systemDark: boolean = false;
   @State private poses: ThemeBackgroundPose[] = initialThemeBackgroundPoses();
   private fromPoses: ThemeBackgroundPose[] = initialThemeBackgroundPoses();
   private toPoses: ThemeBackgroundPose[] = initialThemeBackgroundPoses();
@@ -74,8 +79,14 @@ export struct ThemeBackground {
     this.generation++;
   }
 
+  private seriesPalette(): VisualPalette {
+    return SeriesVisual.palette(SeriesVisual.isDark(this.themeMode, this.systemDark), this.actionColor, this.baseColor);
+  }
+
   build() {
     Stack() {
+      SharedPageBackground({ isDark: SeriesVisual.isDark(this.themeMode, this.systemDark), palette: this.seriesPalette() })
+        .width('100%').height('100%')
       ForEach(this.visual.backgroundTextures, (texture: string, index: number) => {
         Image($rawfile(texture))
           .width('130%').height('130%').objectFit(ImageFit.Fill).draggable(false)

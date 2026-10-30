@@ -34,19 +34,26 @@ test('primary action text stays readable on the solid surface and pressed feedba
   }
 });
 
-test('start study and both show-answer layouts share an opaque surface and the common outline', () => {
+test('start study and show-answer actions share the series translucent action surface', () => {
   const surface = read('entry/src/main/ets/utils/PrimaryGlassSurface.ets');
-  assert.match(surface, /backgroundColor\(\$r\('app.color.surface_card'\)\)/);
+  assert.match(surface, /backgroundColor\(translucentGlassFill\(\$r\('app.color.surface_card'\)\)\)/);
   assert.match(surface, /themePressGradient\(this.style.pressedColors, pressed\)/);
   assert.match(surface, /\.border\(SurfaceBorder\.options\(\)\)/);
   const study = read('entry/src/main/ets/pages/学习页.ets');
-  assert.match(study, /开始学习按钮\(\{\s*文案: \$r\('app.string.study_show_answer'\),\s*isAvailable: this\.阶段 === 'question',\s*开始学习回调: \(\): void => \{ this\.显示答案\(\); \}/);
+  assert.match(study, /StudyAnswerActionBar\(\{[\s\S]*?显示答案回调: \(\): void => \{ this\.显示答案\(\); \}/);
   assert.doesNotMatch(study, /显示答案按下|PrimaryGlassSurface/);
-  for (const path of ['components/学习浮动工具栏.ets', 'components/开始学习按钮.ets']) {
+  const start = read('entry/src/main/ets/components/开始学习按钮.ets');
+  assert.match(start, /SeriesVisual.control\(/, 'start study uses the shared themed control');
+  assert.doesNotMatch(start, /PrimaryGlassSurface/);
+  const group = read('entry/src/main/ets/components/StudyAnswerActionBar.ets');
+  assert.match(group, /new GlassSurface/);
+  assert.doesNotMatch(group, /OliveOil/);
+  const floating = read('entry/src/main/ets/components/学习浮动工具栏.ets');
+  for (const path of ['components/学习浮动工具栏.ets']) {
     const source = read('entry/src/main/ets/' + path);
     assert.match(source, /@StorageProp\(PRIMARY_GLASS_KEY\)/, path);
     assert.match(source, /attributeModifier\(new PrimaryGlassSurface\(/, path);
-    assert.match(source, /new PrimaryGlassSurface\([^\n]*this.primaryGlass\)\)/, path);
+    assert.match(source, /new PrimaryGlassSurface\([^\n]*this\.primaryGlass\)\)/, path);
   }
   const theme = themeDefinition('iridescent');
   assert.ok(new Set(themePrimaryGlass(theme, false).colors).size >= 3);

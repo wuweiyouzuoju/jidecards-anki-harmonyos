@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import * as catalog from '../../entry/src/main/ets/model/ThemeCatalog.ts';
 import * as colors from '../../entry/src/main/ets/model/颜色主题.ets';
+import { resolveAppLocale } from '../../entry/src/main/ets/model/AppLocales.ts';
 
 const read = path => readFileSync(new URL('../../entry/src/main/ets/' + path, import.meta.url), 'utf8');
 const abilitySource = read('entryability/EntryAbility.ets');
@@ -35,7 +36,7 @@ function harness(mode = 'system', systemDark = false) {
   const applyColors = new Function(...Object.keys(dependencies), managerJs + '\nreturn 应用颜色主题;')(...Object.values(dependencies));
   const resources = { ColorMode: { DARK: 0, LIGHT: 1 }, getSysResourceManager: () => systemResources };
   const readSystemDarkMode = new Function('resourceManager', controllerJs + '\nreturn readSystemDarkMode;')(resources);
-  const abilityDependencies = { ...dependencies, 应用颜色主题: applyColors, readSystemDarkMode,
+  const abilityDependencies = { ...dependencies, 应用颜色主题: applyColors, readSystemDarkMode, resolveAppLocale,
     ConfigurationConstant: { ColorMode: { COLOR_MODE_DARK: 0, COLOR_MODE_LIGHT: 1, COLOR_MODE_NOT_SET: -1 } },
     i18n: { System: { getAppPreferredLanguage: () => reads.language ?? 'zh-Hans' } },
     刷新桌面卡片数据: async () => {}, hilog: { error() {} }, DOMAIN: 0, APP_FOREGROUND_KEY: 'appForeground' };
@@ -74,7 +75,7 @@ test('language and unspecified-color events do not reset the known system color 
     for (const colorMode of [undefined, -1]) {
       ability.onConfigurationUpdate({ colorMode, language: 'en-US' });
       assert.equal(store.get('systemDarkMode'), true);
-      assert.equal(store.get('系统语言'), 'en');
+      assert.equal(store.get('系统语言'), 'en-US');
       assertPalette(store, bars, mode !== 'light');
     }
   }
