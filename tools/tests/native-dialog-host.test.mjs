@@ -92,7 +92,8 @@ test('one native presentation owns geometry, mask policy and current motion para
     motion.setStyle(style); const options = host.presentation();
     assert.equal(options.width, '100%'); assert.equal(options.height, '100%');
     assert.equal(options.maskColor, 'transparent'); assert.equal(options.autoCancel, false);
-    assert.equal(options.customStyle, true); assert.equal(options.openAnimation.duration, duration);
+    assert.equal(options.keyboardAvoidMode, 'none');
+    assert.equal(options.customStyle, true); assert.equal(options.openAnimation.duration, 0, 'content owns preparation and entry');
     assert.equal(options.closeAnimation.duration, duration);
   }
 });
@@ -110,9 +111,18 @@ test('all native factories retain a compiler field context and consume the commo
       const factory = source.slice(start, end + 6);
       assert.ok(end > constructor.index, `${path}: native creation must remain a field factory`);
       assert.doesNotMatch(factory, /\n  private [^r]/, path);
-      assert.match(factory, /NativeDialogPresentation = this\.\w+\.presentation\(\)/, path);
-      assert.match(factory, /onWillDismiss: dismiss/, path);
-      for (const key of ['autoCancel','customStyle','alignment','width','height','maskColor','openAnimation','closeAnimation']) {
+      if (path.replaceAll('\\','/') === 'components/editor/NoteFieldCard.ets' && factory.includes('createReferencePicker:')) {
+        // This business factory consumes the common field editor's frozen window request.
+        assert.match(factory, /NativeDialogPresentation = request\.presentation/, path);
+        assert.match(factory, /onWillDismiss: request\.dismiss/, path);
+        const owner = readFileSync(new URL('components/common/NoteFieldEditor.ets', root), 'utf8');
+        assert.match(owner, /NativeDialogPresentation = this\.referenceDialog\.presentation\(\)/);
+        assert.match(owner, /this\.createReferencePicker\(\{ selectedText: label, presentation: presentation, dismiss: dismiss/);
+      } else {
+        assert.match(factory, /NativeDialogPresentation = this\.\w+\.presentation\(\)/, path);
+        assert.match(factory, /onWillDismiss: dismiss/, path);
+      }
+      for (const key of ['autoCancel','customStyle','alignment','width','height','maskColor','openAnimation','closeAnimation','keyboardAvoidMode']) {
         assert.match(factory, new RegExp(key + ': presentation\\.' + key), path);
       }
       factories++;
