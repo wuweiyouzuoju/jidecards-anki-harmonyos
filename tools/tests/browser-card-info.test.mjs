@@ -3,13 +3,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
+import { loadPlatformModule } from './platform-module-harness.mjs';
+const dimensions = loadPlatformModule('utils/应用尺寸.ets', '应用尺寸', {});
 const source=readFileSync(new URL('../../entry/src/main/ets/components/browser/卡片信息.ets',import.meta.url),'utf8');
 const code=(source.slice(0,source.indexOf('  build() {'))+'\n}')
   .replace(/^import[^;]+;\s*/gm,'').replace(/@(Component|Prop|State|StorageProp|Watch)(?:\([^\n]*?\))?\s*/g,'')
   .replace('export struct 卡片信息','class CardInfo');
 function panel(read) {
-  const Panel=new Function('统计服务','颜色键','$r','resourceText',
-    stripTypeScriptTypes(code,{mode:'transform'})+';return CardInfo;')(class{获取卡片统计(id){return read(id);}}, {},key=>key,(_ui,key)=>key);
+  const Panel=new Function('统计服务','颜色键','应用尺寸','$r','resourceText',
+    stripTypeScriptTypes(code,{mode:'transform'})+';return CardInfo;')(class{获取卡片统计(id){return read(id);}}, {},dimensions,key=>key,(_ui,key)=>key);
   const instance=new Panel();instance.getUIContext=()=>({});return instance;
 }
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};

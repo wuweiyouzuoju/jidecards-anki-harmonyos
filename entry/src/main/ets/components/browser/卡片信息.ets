@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { GlassPanel } from '../common/GlassPanel';
 import { noteTypeText } from '../../utils/NoteTypeText';
+import { localeDate, localeNumber } from '../../utils/LocaleFormatting';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { DialogBackdrop } from '../common/DialogBackdrop';
 
@@ -15,6 +17,8 @@ import { ReviewKind } from '../../proto/messages/StatsMessages';
 
 @Component
 export struct 卡片信息 {
+  @State private surfaceWidth: string = '88%';
+  @State private surfaceMaximumWidth: number = 应用尺寸.dialogMaxWidth;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop isDark: boolean = false;
   @Prop @Watch('load') cardId: number = 0;
@@ -47,26 +51,17 @@ export struct 卡片信息 {
   @StorageProp(颜色键.主色按钮背景) private 主色按钮背景: string = '#2F5FD0';
 
   /** Unix 时间戳（秒）转本地可读日期串。 */
-  private 格式化时间(时间戳: number): string {
-    if (时间戳 <= 0) {
-      return '—';
-    }
-    const 日期 = new Date(时间戳 * 1000);
-    const 年 = 日期.getFullYear();
-    const 月 = (日期.getMonth() + 1).toString().padStart(2, '0');
-    const 日 = 日期.getDate().toString().padStart(2, '0');
-    const 时 = 日期.getHours().toString().padStart(2, '0');
-    const 分 = 日期.getMinutes().toString().padStart(2, '0');
-    return `${年}-${月}-${日} ${时}:${分}`;
+  private 格式化时间(时间戳: number, _locale: string = this.uiLanguage): string {
+    return localeDate(时间戳 * 1000, _locale);
   }
 
   /** 秒数转可读用时（如 "1.2s" / "12s" / "2m 30s"）。 */
   private 格式化用时(秒: number): string {
     if (秒 < 1) {
-      return `${(秒 * 1000).toFixed(0)}ms`;
+      return `${localeNumber(秒 * 1000, this.uiLanguage)}ms`;
     }
     if (秒 < 60) {
-      return `${秒.toFixed(1)}s`;
+      return `${localeNumber(秒, this.uiLanguage, 1)}s`;
     }
     const 分 = Math.floor(秒 / 60);
     const 余秒 = Math.floor(秒 % 60);
@@ -82,14 +77,14 @@ export struct 卡片信息 {
       return resourceText(this.getUIContext(), $r('app.string.browser_info_interval_days'), 天);
     }
     if (天 < 365) {
-      return resourceText(this.getUIContext(), $r('app.string.browser_info_interval_months'), (天 / 30).toFixed(1));
+      return resourceText(this.getUIContext(), $r('app.string.browser_info_interval_months'), localeNumber(天 / 30, _locale, 1));
     }
-    return resourceText(this.getUIContext(), $r('app.string.browser_info_interval_years'), (天 / 365).toFixed(1));
+    return resourceText(this.getUIContext(), $r('app.string.browser_info_interval_years'), localeNumber(天 / 365, _locale, 1));
   }
 
   /** ease per mill → 百分比（如 2500 → 250%）。 */
   private 格式化难度(perMill: number): string {
-    return `${(perMill / 10).toFixed(0)}%`;
+    return `${localeNumber(perMill / 10, this.uiLanguage)}%`;
   }
 
   /** ReviewKind → 本地化文案。 */
@@ -155,13 +150,17 @@ export struct 卡片信息 {
   build() {
     Stack() {
       // 遮罩层：点击关闭
-      DialogBackdrop()
+      DialogBackdrop({ widthPercent: 88, maximumWidth: 应用尺寸.dialogMaxWidth,
+          onSize: (width: string, maximumWidth: number): void => {
+            this.surfaceWidth = width; this.surfaceMaximumWidth = maximumWidth;
+          } })
         .onClick((): void => {
           this.onClose();
         })
 
       // 主面板
-      Column({ space: 应用尺寸.间距_14 }) {
+      GlassPanel({ radius: 应用尺寸.圆角_卡片, panelWidth: this.surfaceWidth, maximumWidth: this.surfaceMaximumWidth, maximumHeight: 应用尺寸.dialogMaxHeight }) {
+Column({ space: 应用尺寸.间距_14 }) {
         DialogHeader({
           title: $r('app.string.browser_info_title'),
           closeLabel: $r('app.string.browser_info_close'),
@@ -213,7 +212,7 @@ export struct 卡片信息 {
                 this.信息行($r('app.string.browser_info_deck'), this.stats.deck)
                 if (this.stats.fsrsRetrievability !== undefined) {
                   this.信息行($r('app.string.browser_info_retrievability'),
-                    `${(this.stats.fsrsRetrievability * 100).toFixed(1)}%`)
+                    `${localeNumber(this.stats.fsrsRetrievability * 100, this.uiLanguage, 1)}%`)
                 }
               }
               .width('100%')
@@ -294,12 +293,13 @@ export struct 卡片信息 {
         // 关闭按钮
 
       }
-      .width(应用尺寸.dialogWidth)
-      .constraintSize({ maxWidth: 应用尺寸.dialogMaxWidth, maxHeight: 应用尺寸.dialogMaxHeight })
+      .width('100%')
+       
       .alignItems(HorizontalAlign.Start)
       .padding(应用尺寸.卡片内边距)
-      .backgroundColor($r('app.color.surface_card'))
-      .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
+      
+      
+      }
     }
     .width('100%')
     .height('100%')
