@@ -97,8 +97,10 @@ class AgentWebReadTool implements AgentReadToolHandler {
   async execute(json: string): Promise<string> {
     this.access.begin();
     if (!await loadAgentWebEnabled()) { throw new Error('web_search_disabled'); }
-    if (this.name !== 'web_search') { return this.access.read(json); }
     const provider: AgentSearchProvider = await loadAgentSearchProvider();
+    if (this.name !== 'web_search') {
+      return this.access.read(json, provider === 'deepseek' ? await loadAgentSearchSecret(provider) : '', provider);
+    }
     return this.access.search(json, await loadAgentSearchSecret(provider), provider);
   }
 }

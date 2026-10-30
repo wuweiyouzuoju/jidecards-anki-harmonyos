@@ -15,6 +15,46 @@ function harness(responses) {
   return {access:new AgentWebAccess(http),http,calls};
 }
 
+test('DeepSeek Search uses its official JSON endpoint and returns summary sources, not credentials',async()=>{
+  const {access,calls}=harness([response(JSON.stringify({results:[
+    {url:'https://example.com/a',title:'Official',summary:'Long summary',snippet:'Short'},
+    {url:'https://example.com/b',title:'Fallback',snippet:'Short'},
+    {url:'https://localhost/private',title:'Reject'}]}))]);
+  const output=JSON.parse(await access.search('{"query":"DeepSeek search","limit":3}','model-key','deepseek'));
+  assert.equal(calls[0].url,'https://api.deepseek.com/v1/tools/search');
+  assert.equal(calls[0].method,'POST');
+  assert.equal(calls[0].headers.Authorization,'Bearer model-key');
+  assert.deepEqual(JSON.parse(calls[0].body),{query:'DeepSeek search',count:3,need_content:false});
+  assert.equal(output.provider,'deepseek');
+  assert.deepEqual(output.results,[{url:'https://example.com/a',title:'Official',description:'Long summary'},
+    {url:'https://example.com/b',title:'Fallback',description:'Short'}]);
+  assert.ok(!JSON.stringify(output).includes('model-key'));
+  for(const body of ['{}','{"results":null}','{"error":{},"results":[]}']) {
+    await assert.rejects(()=>harness([response(body)]).access.search('{"query":"x"}','key','deepseek'),/web_search_response_invalid/);
+  }
+  const empty=await harness([response('{"results":[]}')]).access.search('{"query":"x"}','key','deepseek');
+  assert.deepEqual(JSON.parse(empty).results,[]);
+});
+
+test('DeepSeek Fetch paginates Markdown and sends its key only to the official endpoint',async()=>{
+  const {access,calls}=harness([response(JSON.stringify({title:'Article',content:'# Heading\n\n'+'x'.repeat(13000)}))]);
+  const output=JSON.parse(await access.read('{"url":"https://example.com/article","offset":10,"length":20}','model-key','deepseek'));
+  assert.equal(calls[0].url,'https://api.deepseek.com/v1/tools/fetch');
+  assert.equal(calls[0].headers.Authorization,'Bearer model-key');
+  assert.deepEqual(JSON.parse(calls[0].body),{url:'https://example.com/article'});
+  assert.equal(output.text.length,20);assert.equal(output.nextOffset,30);
+  assert.equal(output.url,'https://example.com/article');
+  const untitled=JSON.parse(await harness([response('{"title":"","content":"Body"}')]).access.read(
+    '{"url":"https://example.com"}','key','deepseek'));
+  assert.equal(untitled.title,untitled.url);
+  for(const value of [response('{}'),response('{"title":"","content":""}'),response('',{status:402})]) {
+    await assert.rejects(()=>harness([value]).access.read('{"url":"https://example.com"}','key','deepseek'),/web_/);
+  }
+  const missing=harness([]);
+  await assert.rejects(()=>missing.access.read('{"url":"https://example.com"}','','deepseek'),/web_search_key_missing/);
+  assert.equal(missing.calls.length,0);
+});
+
 test('local search uses the fixed endpoint and returns bounded real sources without credentials', async()=>{
   const {access,calls}=harness([response(JSON.stringify({web:{results:[
     {url:'https://example.com/fact',title:'<b>Fact</b>',description:'Content &amp; detail'},
@@ -157,6 +197,21 @@ test('real Registry uses selected Doubao POST with separate credentials and neve
   state.responses=[{chunks:[new Uint8Array(Buffer.from('正文'))]}];
   await registry.execute({id:'read',name:'read_webpage',argumentsJson:'{"url":"https://example.com"}'});
   assert.equal(state.calls[1].method,'GET');assert.equal(state.calls[1].headers.Authorization,undefined);
+});
+
+test('real Registry routes DeepSeek Search and Fetch and still checks the web switch before IO',async()=>{
+  const registry=new AgentToolRegistry();new AgentWebTools().register(registry);
+  state.calls=[];state.enabled=true;state.provider='deepseek';
+  state.responses=[{chunks:[new Uint8Array(Buffer.from('{"results":[]}'))]}];
+  const search=await registry.execute({id:'ds-search',name:'web_search',argumentsJson:'{"query":"最新资料"}'});
+  assert.equal(JSON.parse(search.outputJson).provider,'deepseek');
+  assert.equal(state.calls[0].url,'https://api.deepseek.com/v1/tools/search');
+  state.responses=[{chunks:[new Uint8Array(Buffer.from('{"title":"Title","content":"# Article"}'))]}];
+  await registry.execute({id:'ds-fetch',name:'read_webpage',argumentsJson:'{"url":"https://example.com"}'});
+  assert.equal(state.calls[1].url,'https://api.deepseek.com/v1/tools/fetch');
+  state.enabled=false;
+  await assert.rejects(()=>registry.execute({id:'disabled',name:'web_search',argumentsJson:'{"query":"x"}'}),/web_search_disabled/);
+  assert.equal(state.calls.length,2);state.enabled=true;state.provider='doubao';
 });
 test('resolved local, reserved and IPv6 private addresses are excluded',()=>{
   for(const ip of ['127.0.0.1','10.0.0.1','192.168.1.1','172.16.0.1','169.254.169.254','100.64.0.1','0.0.0.0','224.0.0.1','::1','fc00::1','fe80::1','::ffff:192.168.1.1','2001:db8::1']) assert.equal(isAgentPublicIp(ip),false,ip);

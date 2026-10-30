@@ -33,3 +33,13 @@ test('search credential IO failures are observable and a failed removal cannot r
   state.removeError=0;assert.equal(await loadAgentSearchSecret(),'keep');
   state.queryError=24000002;assert.equal(await loadAgentSearchSecret(),'');state.queryError=0;
 });
+
+test('DeepSeek search reuses the current model alias and cannot overwrite it',async()=>{
+  await saveAgentSecret('deepseek','shared-model-key');
+  assert.equal(await loadAgentSearchSecret('deepseek'),'shared-model-key');
+  await assert.rejects(()=>saveAgentSearchSecret('','deepseek'),/web_search_key_managed_by_provider/);
+  assert.equal(await loadAgentSecret('deepseek'),'shared-model-key');
+  assert.ok(!state.values.has('jidecards.ai.provider.web.deepseek'));
+  await saveAgentSecret('deepseek','updated-model-key');
+  assert.equal(await loadAgentSearchSecret('deepseek'),'updated-model-key');
+});

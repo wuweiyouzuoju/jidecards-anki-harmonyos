@@ -20,7 +20,7 @@ export interface AgentWebResult {
   totalLength: number;
 }
 export interface AgentWebSearchItem { url: string; title: string; description: string; }
-export interface AgentWebSearchResult { status: 'completed'; query: string; results: AgentWebSearchItem[]; }
+export interface AgentWebSearchResult { status: 'completed'; provider: AgentSearchProvider; query: string; results: AgentWebSearchItem[]; }
 interface WebArguments { url?: string; query?: string; limit?: number; offset?: number; length?: number; }
 interface BraveResponse { web?: BraveResults; }
 interface BraveResults { results?: AgentWebSearchItem[]; }
@@ -30,6 +30,11 @@ interface DoubaoMetadata { Error?: Object; }
 interface DoubaoSearchResponse { Result?: DoubaoSearchResult; ResponseMetadata?: DoubaoMetadata; }
 interface DoubaoSearchFilter { NeedUrl: boolean; }
 interface DoubaoSearchRequest { Query: string; SearchType: string; Count: number; Filter: DoubaoSearchFilter; ContentFormats: string; }
+interface DeepSeekSearchItem { url?: string; title?: string; summary?: string; snippet?: string; }
+interface DeepSeekSearchResponse { results?: DeepSeekSearchItem[]; error?: Object; }
+interface DeepSeekSearchRequest { query: string; count: number; need_content: boolean; }
+interface DeepSeekFetchRequest { url: string; }
+interface DeepSeekFetchResponse { title?: string; content?: string; error?: Object; }
 interface WebSourceOutput { status?: string; results?: AgentWebSearchItem[]; url?: string; title?: string; }
 
 export function filterAgentWebTools(tools: ProviderFunctionTool[], allowWeb: boolean): ProviderFunctionTool[] {
@@ -120,7 +125,12 @@ export class AgentWebAccess {
     const limit: number = boundedInteger(args.limit, 5, 10, 1);
     if (apiKey.trim().length === 0) { throw new Error('web_search_key_missing'); }
     let response: AgentWebResponse;
-    if (provider === 'doubao') {
+    if (provider === 'deepseek') {
+      const request: DeepSeekSearchRequest = { query: args.query.trim(), count: limit, need_content: false };
+      response = await this.http.post('https://api.deepseek.com/v1/tools/search',
+        { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey.trim()}` },
+        JSON.stringify(request));
+    } else if (provider === 'doubao') {
       const request: DoubaoSearchRequest = { Query: args.query.trim(), SearchType: 'web', Count: limit,
         Filter: { NeedUrl: true }, ContentFormats: 'text' };
       response = await this.http.post('https://open.feedcoopapi.com/search_api/web_search',
@@ -134,7 +144,17 @@ export class AgentWebAccess {
     this.checkCancellation();
     successful(response);
     let items: AgentWebSearchItem[] = [];
-    if (provider === 'doubao') {
+    if (provider === 'deepseek') {
+      const raw: DeepSeekSearchResponse = JSON.parse(response.body) as DeepSeekSearchResponse;
+      if (raw === null || typeof raw !== 'object' || raw.error !== undefined || !Array.isArray(raw.results)) {
+        throw new Error('web_search_response_invalid');
+      }
+      for (const item of raw.results) {
+        if (item === null || typeof item.url !== 'string' || typeof item.title !== 'string') continue;
+        items.push({ url: item.url, title: item.title, description: typeof item.summary === 'string' && item.summary.trim() !== '' ?
+          item.summary : (typeof item.snippet === 'string' ? item.snippet : '') });
+      }
+    } else if (provider === 'doubao') {
       const raw: DoubaoSearchResponse = JSON.parse(response.body) as DoubaoSearchResponse;
       if (raw === null || typeof raw !== 'object' ||
         (raw.ResponseMetadata?.Error !== undefined && raw.ResponseMetadata?.Error !== null) ||
@@ -167,17 +187,36 @@ export class AgentWebAccess {
         description: typeof item.description === 'string' ? agentMarkupToPlainText(item.description).slice(0, 2000) : '' });
       if (results.length >= limit) { break; }
     }
-    const output: AgentWebSearchResult = { status: 'completed', query: args.query.trim(), results: results };
+    const output: AgentWebSearchResult = { status: 'completed', provider: provider, query: args.query.trim(), results: results };
     return JSON.stringify(output);
   }
 
-  async read(argumentsJson: string): Promise<string> {
+  async read(argumentsJson: string, apiKey: string = '', provider: AgentSearchProvider = 'doubao'): Promise<string> {
     this.checkCancellation();
     const args: WebArguments = argumentsOf(argumentsJson, ['url', 'offset', 'length']);
     if (typeof args.url !== 'string') { throw new Error('web_arguments_invalid'); }
     let url: string = validateAgentWebUrl(args.url);
     const offset: number = boundedInteger(args.offset, 0, AGENT_WEB_BODY_LIMIT, 0);
     const length: number = boundedInteger(args.length, 12000, 24000, 1);
+    if (provider === 'deepseek') {
+      if (apiKey.trim().length === 0) throw new Error('web_search_key_missing');
+      const request: DeepSeekFetchRequest = { url: url };
+      const response: AgentWebResponse = await this.http.post('https://api.deepseek.com/v1/tools/fetch',
+        { 'Accept': 'application/json', 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey.trim()}` },
+        JSON.stringify(request));
+      this.checkCancellation();
+      successful(response);
+      const page: DeepSeekFetchResponse = JSON.parse(response.body) as DeepSeekFetchResponse;
+      if (page === null || typeof page !== 'object' || page.error !== undefined || typeof page.title !== 'string' ||
+        typeof page.content !== 'string') throw new Error('web_result_invalid');
+      const text: string = page.content.trim();
+      if (text.length === 0) throw new Error('web_content_empty');
+      const title: string = agentMarkupToPlainText(page.title).trim();
+      const output: AgentWebResult = { status: 'completed', url: url, title: title === '' ? url : title.slice(0, 300),
+        text: text.slice(offset, offset + length), totalLength: text.length,
+        nextOffset: offset + length < text.length ? offset + length : -1 };
+      return JSON.stringify(output);
+    }
     for (let redirects: number = 0; redirects <= 4; redirects++) {
       const response: AgentWebResponse = await this.http.get(url, { 'Accept': 'text/html, text/plain, application/xhtml+xml' });
       this.checkCancellation();

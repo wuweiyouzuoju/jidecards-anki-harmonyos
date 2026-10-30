@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
 import { readFileSync } from 'node:fs';
-import { normalizeAgentSearchProvider, agentSearchPurchaseUrl } from '../../entry/src/main/ets/model/agent/AgentSearchProvider.ts';
+import { normalizeAgentSearchProvider, agentSearchPurchaseUrl, AGENT_SEARCH_PROVIDERS } from '../../entry/src/main/ets/model/agent/AgentSearchProvider.ts';
 
 function settingsHarness() {
   const values = new Map();
@@ -24,7 +24,7 @@ function settingsHarness() {
 test('app web access is off by default and requires a saved key even for an old enabled preference', async () => {
   const { settings, state, values } = settingsHarness();
   state.key = 'saved-key';
-  assert.equal(await settings.loadAgentSearchProvider(),'doubao');
+  assert.equal(await settings.loadAgentSearchProvider(),'deepseek');
   assert.equal(await settings.loadAgentWebEnabled(), false, 'a key alone cannot opt in');
   values.set('ai_agent_web_enabled', true);
   state.key = '  ';
@@ -42,7 +42,7 @@ test('app web access is off by default and requires a saved key even for an old 
 
 test('selected service alone determines readiness; an old Brave key cannot enable default Doubao',async()=>{
   const { settings,state,values }=settingsHarness();
-  values.set('ai_agent_web_enabled',true);state.keys.set('brave','old-brave-key');
+  values.set('ai_agent_web_enabled',true);values.set('ai_agent_search_provider','doubao');state.keys.set('brave','old-brave-key');
   assert.equal(await settings.loadAgentSearchProvider(),'doubao');
   assert.equal(await settings.loadAgentWebEnabled(),false);
   await settings.saveAgentSearchProvider('brave');
@@ -50,6 +50,30 @@ test('selected service alone determines readiness; an old Brave key cannot enabl
   await settings.saveAgentSearchProvider('doubao');
   assert.equal(await settings.loadAgentWebEnabled(),false);
   assert.equal(state.keys.get('brave'),'old-brave-key');
+});
+
+test('DeepSeek uses the saved model credential without editing it in the search form',async()=>{
+  const { component,writes }=componentHarness();
+  await component.aboutToAppear();
+  await component.switchProvider(2);
+  assert.equal(component.searchProvider,'deepseek');
+  component.secret='saved-model-key';component.changeEnabled(true);
+  await component.save();
+  assert.deepEqual(writes,[['provider','deepseek'],['enabled',true]]);
+  assert.equal(component.providerLabel(),'DeepSeek Search');
+  assert.equal(agentSearchPurchaseUrl('deepseek'),'https://platform.deepseek.com');
+});
+
+test('new search configurations default to DeepSeek, retain explicit providers and keep the switch required',async()=>{
+  const {settings,state,values}=settingsHarness();
+  state.keys.set('deepseek','model-key');
+  assert.equal(await settings.loadAgentSearchProvider(),'deepseek');
+  assert.equal(await settings.loadAgentWebEnabled(),false);
+  values.set('ai_agent_web_enabled',true);
+  assert.equal(await settings.loadAgentWebEnabled(),true);
+  await settings.saveAgentSearchProvider('doubao');
+  assert.equal(await settings.loadAgentSearchProvider(),'doubao');
+  assert.equal(await settings.loadAgentWebEnabled(),false);
 });
 
 test('credential storage failures remain visible when enabled and do not prevent turning web access off', async () => {
@@ -72,7 +96,7 @@ function componentHarness() {
     loadAgentSearchSecret: async provider => provider === 'brave' ? 'brave-key' : '',
     saveAgentSearchSecret: async (key,provider) => writes.push(['key', key,provider]),
     saveAgentSearchProvider: async provider => writes.push(['provider',provider]),
-    saveAgentWebEnabled: async value => writes.push(['enabled', value]), agentSearchPurchaseUrl,
+    saveAgentWebEnabled: async value => writes.push(['enabled', value]), agentSearchPurchaseUrl, AGENT_SEARCH_PROVIDERS,
     pasteboard:{MIMETYPE_TEXT_PLAIN:'text',createData:(_,url)=>url,getSystemPasteboard:()=>({setData:async url=>writes.push(['copy',url])})}
   });
   const component = new Component();
