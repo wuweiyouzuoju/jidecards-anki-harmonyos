@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SurfaceSelect } from '../common/SurfaceSelect';
 import { noteTypeText } from '../../utils/NoteTypeText';
 import { DialogFrame } from '../common/DialogFrame';
 import { DialogHeader } from '../common/DialogHeader';
@@ -12,6 +13,7 @@ import { AnkiBrowserNotetype } from '../../backend/AnkiBrowserNotetype';
 
 @Component
 export struct BrowserNotetypeFeature {
+  @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
 
@@ -101,28 +103,18 @@ export struct BrowserNotetypeFeature {
               .fontSize(应用尺寸.字号_正文_小)
               .fontColor($r('app.color.text_primary'))
               .layoutWeight(1)
-            Select(this.构建映射选项列表(this.state.info!.oldFieldNames))
-              .selected(this.state.fields[索引] === -1 ? 0 : this.state.fields[索引] + 1)
-              .value(this.state.fields[索引] === -1 ?
+            SurfaceSelect({ options: this.构建映射选项列表(this.state.info!.oldFieldNames),
+              selectedIndex: this.state.fields[索引] === -1 ? 0 : this.state.fields[索引] + 1,
+              value: this.state.fields[索引] === -1 ?
                 localizedResourceText(this.getUIContext(), this.uiLanguage, $r('app.string.browser_action_change_notetype_no_map')) :
-                this.state.info!.oldFieldNames[this.state.fields[索引]])
-              .width('50%')
-              .attributeModifier(new SelectStyle())
-              .height(SelectStyle.controlHeight)
-              .padding(SelectStyle.controlPadding)
-              .space(SelectStyle.controlSpace)
-              .font(SelectStyle.controlFont)
-              .optionFont(SelectStyle.optionFont)
-              .selectedOptionFont(SelectStyle.selectedOptionFont)
-              .textModifier(SelectStyle.labelText())
-              .border(SelectStyle.controlBorder).borderRadius(SelectStyle.controlRadius)
-              .enabled(!this.busy && !this.state.busy)
-              .onSelect((选索引: number): void => {
+                this.state.info!.oldFieldNames[this.state.fields[索引]],
+              isInteractive: !this.busy && !this.state.busy,
+              onSelect: (选索引: number): void => {
                 if (this.busy || this.state.busy) return;
                 // 选索引 0=不映射(-1)，1..N=旧字段 ord
                 const 新值: number = 选索引 === 0 ? -1 : 选索引 - 1;
                 this.session?.setField(索引, 新值);
-              })
+              } })
           }
           .width('100%')
         }, (字段名: string, 索引: number): string => `${字段名}-${索引}`)
@@ -140,27 +132,17 @@ export struct BrowserNotetypeFeature {
                 .fontSize(应用尺寸.字号_正文_小)
                 .fontColor($r('app.color.text_primary'))
                 .layoutWeight(1)
-              Select(this.构建映射选项列表(this.state.info!.oldTemplateNames))
-                .selected(this.state.templates[索引] === -1 ? 0 : this.state.templates[索引] + 1)
-                .value(this.state.templates[索引] === -1 ?
+              SurfaceSelect({ options: this.构建映射选项列表(this.state.info!.oldTemplateNames),
+                selectedIndex: this.state.templates[索引] === -1 ? 0 : this.state.templates[索引] + 1,
+                value: this.state.templates[索引] === -1 ?
                   localizedResourceText(this.getUIContext(), this.uiLanguage, $r('app.string.browser_action_change_notetype_no_map')) :
-                  this.state.info!.oldTemplateNames[this.state.templates[索引]])
-                .width('50%')
-                .attributeModifier(new SelectStyle())
-                .height(SelectStyle.controlHeight)
-                .padding(SelectStyle.controlPadding)
-                .space(SelectStyle.controlSpace)
-                .font(SelectStyle.controlFont)
-                .optionFont(SelectStyle.optionFont)
-                .selectedOptionFont(SelectStyle.selectedOptionFont)
-                .textModifier(SelectStyle.labelText())
-                .border(SelectStyle.controlBorder).borderRadius(SelectStyle.controlRadius)
-                .enabled(!this.busy && !this.state.busy)
-                .onSelect((选索引: number): void => {
+                  this.state.info!.oldTemplateNames[this.state.templates[索引]],
+                isInteractive: !this.busy && !this.state.busy,
+                onSelect: (选索引: number): void => {
                   if (this.busy || this.state.busy) return;
                   const 新值: number = 选索引 === 0 ? -1 : 选索引 - 1;
                   this.session?.setTemplate(索引, 新值);
-                })
+                } })
             }
             .width('100%')
           }, (模板名: string, 索引: number): string => `${模板名}-${索引}`)
