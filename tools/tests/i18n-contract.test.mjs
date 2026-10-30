@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
+import { APP_LOCALES, resolveAppLocale } from '../../entry/src/main/ets/model/AppLocales.ts';
 
 const root = process.cwd();
 const read = (relativePath) => readFileSync(join(root, relativePath), 'utf8');
@@ -14,28 +15,51 @@ function resourceKeys(relativePath) {
 
 function etsFiles(relativeDirectory) {
   const directory = join(root, relativeDirectory);
-  return readdirSync(directory)
+  return readdirSync(directory, { recursive: true })
     .filter((entry) => entry.endsWith('.ets'))
     .map((entry) => join(relativeDirectory, entry));
 }
 
-test('Chinese and English resources expose identical keys', () => {
-  const english = 'entry/src/main/resources/en_US/element/string.json';
-  assert.equal(existsSync(join(root, english)), true, 'English resources must exist');
-  assert.deepEqual(resourceKeys(english), resourceKeys('entry/src/main/resources/base/element/string.json'));
+test('every selectable locale has a complete catalog with identical unique keys and nonempty values', () => {
+  const expected=resourceKeys('entry/src/main/resources/base/element/string.json');
+  for(const locale of APP_LOCALES){
+    const file=`entry/src/main/resources/${locale.resourceDirectory}/element/string.json`;
+    assert.ok(existsSync(join(root,file)),locale.locale+' catalog missing');
+    const entries=JSON.parse(read(file)).string;
+    assert.equal(new Set(entries.map(item=>item.name)).size,entries.length,locale.locale+' duplicate key');
+    assert.deepEqual(resourceKeys(file),expected,locale.locale+' incomplete catalog');
+    for(const item of entries)assert.ok(typeof item.value==='string'&&item.value.trim().length>0,locale.locale+'/'+item.name+' is empty');
+    assert.equal(resolveAppLocale(locale.locale),locale.locale);
+  }
 });
 
 test('localized strings preserve placeholder arguments and have unique keys', () => {
   const base = JSON.parse(read('entry/src/main/resources/base/element/string.json')).string;
-  const english = JSON.parse(read('entry/src/main/resources/en_US/element/string.json')).string;
-  const byKey = new Map(english.map(item => [item.name, item.value]));
-  for (const entries of [base, english]) {
-    assert.equal(new Set(entries.map(item => item.name)).size, entries.length, 'duplicate resource key');
-  }
   const argumentsOf = value => [...value.matchAll(/%(?:(\d+)\$)?([ds])/g)]
     .map((match, index) => `${match[1] ?? index + 1}:${match[2]}`).sort();
-  for (const item of base) {
-    assert.deepEqual(argumentsOf(item.value), argumentsOf(byKey.get(item.name)), item.name);
+  for(const locale of APP_LOCALES){
+    const entries=JSON.parse(read(`entry/src/main/resources/${locale.resourceDirectory}/element/string.json`)).string;
+    const byKey=new Map(entries.map(item=>[item.name,item.value]));
+    for (const item of base) {
+      assert.deepEqual(argumentsOf(item.value), argumentsOf(byKey.get(item.name)), locale.locale+'/'+item.name);
+    }
+  }
+});
+
+test('translations preserve technical markup, links and HTML heading symbols', () => {
+  const english=JSON.parse(read('entry/src/main/resources/en_US/element/string.json')).string;
+  const urls=value=>(value.match(/https?:\/\/[A-Za-z0-9._~:/?#@!$&*+,;=%-]+/g)??[])
+    .map(url=>url.replace(/[.,;:!?]+$/,'')).filter(url=>/^https?:\/\/[A-Za-z0-9.-]+\.[A-Za-z]{2,}/.test(url)).sort();
+  const tags=value=>(value.match(/<\/?[A-Za-z][^<>]*>/g)??[]).sort();
+  for(const locale of APP_LOCALES){
+    const values=new Map(JSON.parse(read(`entry/src/main/resources/${locale.resourceDirectory}/element/string.json`)).string.map(item=>[item.name,item.value]));
+    for(const item of english){
+      assert.deepEqual(urls(values.get(item.name)),urls(item.value),locale.locale+'/'+item.name+' URL');
+      assert.deepEqual(tags(values.get(item.name)),tags(item.value),locale.locale+'/'+item.name+' HTML');
+    }
+    for(let level=1;level<=5;level++)assert.equal(values.get(`note_editor_heading_${level}_short`),'H'+level,locale.locale);
+    const scope=JSON.parse(read(`AppScope/resources/${locale.resourceDirectory}/element/string.json`)).string;
+    assert.equal(scope.length,1);assert.equal(scope[0].name,'app_name');assert.ok(scope[0].value.trim().length>0);
   }
 });
 
@@ -88,16 +112,16 @@ test('language store uses the HarmonyOS preferred-language API', () => {
   const relativePath = 'entry/src/main/ets/model/语言存储.ets';
   assert.equal(existsSync(join(root, relativePath)), true, '语言存储 must exist');
   const source = read(relativePath);
-  assert.match(source, /export type 语言模式 = 'zh-Hans' \| 'en'/);
+  assert.match(source, /export type 语言模式 = AppLocale \| 'en'/);
   assert.match(source, /i18n\.System\.getAppPreferredLanguage/);
   assert.match(source, /i18n\.System\.setAppPreferredLanguage/);
   assert.doesNotMatch(source, /'system'/);
 });
 
 test('pages and components do not embed translated copy in Text, Button, or placeholders', () => {
-  const rawCopy = /(?<![A-Za-z])(?:Text|Button)\(\s*(['"])(?![›▼✓⌄⌃×⚠≡]\1)[\s\S]*?\1\s*\)|placeholder:\s*(['"])[\s\S]*?\2/;
+  const rawCopy = /\b(?:Text|Button)\(\s*(['"])([^'"\r\n]*)\1\s*\)|placeholder:\s*(['"])([^'"\r\n]*)\3/g;
   const violations = [...etsFiles('entry/src/main/ets/components'), ...etsFiles('entry/src/main/ets/pages')]
-    .filter((relativePath) => rawCopy.test(read(relativePath)));
+    .filter((relativePath) => [...read(relativePath).matchAll(rawCopy)].some(match=>/\p{L}/u.test(match[2]??match[4])));
   assert.deepEqual(violations, [], `resourceize user-facing literals: ${violations.join(', ')}`);
 });
 
