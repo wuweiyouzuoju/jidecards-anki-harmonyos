@@ -1,3 +1,5 @@
+import { noteLinkBridgeScript } from '../../entry/src/main/ets/model/NoteLinkBridge.ts';
+import { NoteLinksProxy } from '../../entry/src/main/ets/model/NoteLinksProxy.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -30,16 +32,16 @@ test('preview overlay admits child input while keeping loading input blocked', (
 });
 const names = ['aboutToAppear', 'aboutToDisappear', 'updateActivity', 'stopAudio', 'playCurrentAudio',
   '预览刷新版本变化', '取当前卡片ID', '加载当前卡', '应用HTML', 'webFailed', 'installActionBridge', 'onControllerAttached回调',
-  '翻面', '上一张', '下一张', '请求编辑字段', '请求AI改卡', '预览更多菜单', 'focusPreviewCard', 'dismissMoreMenu', 'previewCardShown', 'cardThemeChanged'];
+  '翻面', '上一张', '下一张', '请求编辑字段', '请求AI改卡', 'selectPreviewAction', '预览更多菜单', 'focusPreviewCard', 'dismissMoreMenu', 'backNoteLink', 'pushLinkedPreview', 'previewCardShown', 'cardThemeChanged'];
 const methods = names.map(name => {
   const start = source.search(new RegExp(`^  (?:private )?(?:async )?${name}\\(`, 'm'));
   assert.ok(start >= 0, name);
   return source.slice(start, source.indexOf('\n  }', start) + 4);
 });
-const Page = new Function('构建卡片HTML', '剥除拼写标记', '原始侧HTML', '媒体基地址', 'appendCardScript',
+const Page = new Function('noteLinkBridgeScript', 'NoteLinksProxy', '构建卡片HTML', '剥除拼写标记', '原始侧HTML', '媒体基地址', 'appendCardScript', 'cardScriptDiagnosticLabels',
   '解码文件名', 'buildPreviewInteractionScript', 'renderPreviewAnswer', 'readCardMarking', 'parseFlagLabels', '$r', 'actionIcon', 'PreviewActionProxy', 'console', 'reviewPreferences',
   stripTypeScriptTypes(`class Page {${methods.join('\n')}}`, { mode: 'transform' }) + '\nreturn Page;')(
-  构建卡片HTML, 剥除拼写标记, 原始侧HTML, 'https://jidecards-media.local/', appendCardScript,
+  noteLinkBridgeScript, NoteLinksProxy, 构建卡片HTML, 剥除拼写标记, 原始侧HTML, 'https://jidecards-media.local/', appendCardScript, () => undefined,
   name => { try { return decodeURIComponent(name); } catch { return name; } },
   buildPreviewInteractionScript, renderPreviewAnswer, readCardMarking, parseFlagLabels, key => key,
   loadPlatformModule('utils/ActionIcons.ets', 'actionIcon', { $r: key => key }),
@@ -61,7 +63,8 @@ function harness() {
       ttsItems: [{ text: question ? 'front speech' : 'back speech', language: 'en_US' }] })
   };
   Object.assign(page, {
-    mounted: true, loadVersion: 0, documentVersion: 0, bridgeReady: false, audioRefreshPending: false, hasRenderedCard: false,
+    getUIContext: () => ({}),
+    noteLinksOpen: false, linkedReturns: [], mounted: true, loadVersion: 0, documentVersion: 0, bridgeReady: false, audioRefreshPending: false, hasRenderedCard: false,
     markingBackend: { card: async id => ({ id, noteId: id + 100, flags: id === 11 ? 7 : 0 }),
       note: async () => ({ tags: ['marked', 'marked::child'] }), labels: async () => '{"7":"Check"}' },
     previewIds: [11, 22, 33], 卡片ID列表: [11, 22, 33], 当前索引值: 0, 初始索引: 0,
@@ -80,13 +83,13 @@ function harness() {
       assert.ok(key in target, `unexpected service call: ${String(key)}`); return target[key];
     } }),
     网页控制器: { loadData: html => displayed.push(html), runJavaScript: async script => events.push(script),
-      registerJavaScriptProxy: proxy => { page.proxy = proxy; } }
+      registerJavaScriptProxy: (proxy, name) => { if (name === 'jidePreview') page.proxy = proxy; else page.linkProxy = proxy; } }
   });
   page.audioSession = new CardAudioSession(page.soundPlayer, page.ttsPlayer, (raw, question) => service.extractAudioTags(raw, question));
   page.renderPrefetch = new CardRenderPrefetch(id => service.渲染既有卡片(id));
   page.webSlots = [0, 1]; page.attachedWebSlots = [false, true]; page.visibleWebSlot = 0;
   page.cardRenderPending = false;
-  page.cardWeb = { reset() {}, attach() {}, setAudioEnabled() {}, setTheme: dark => events.push(['theme', dark]),
+  page.cardWeb = { reset() {}, attach() {}, setActive() {}, setAudioEnabled() {}, setTheme: dark => events.push(['theme', dark]),
     controllerAt: () => page.网页控制器, isRelevant: () => true, show: html => {
     page.网页控制器.loadData(html);
     page.previewCardShown('');
@@ -673,4 +676,41 @@ test('preview wiring stays read-only, handles web errors, and preserves home/edi
   const activity = home.match(/private homeActivity[\s\S]*?\n  }/)[0];
   assert.match(activity, /this\.显示卡片预览/);
   assert.match(activity, /this\.预览加载中/);
+});
+
+
+test('linked preview restores the source IDs, side and scroll without publishing nested positions', async () => {
+  const {page,events}=harness();await page.加载当前卡();await settle(page);
+  page.当前面='answer';page.currentLinkScroll=240;page.noteLinksOpen=true;
+  const positions=events.filter(e=>Array.isArray(e)&&e[0]==='position').length;
+  page.pushLinkedPreview([99,100]);await settle(page);
+  assert.deepEqual(page.previewIds,[99,100]);assert.equal(page.当前面,'answer');assert.equal(page.noteLinksOpen,false);
+  assert.equal(events.filter(e=>Array.isArray(e)&&e[0]==='position').length,positions);
+  assert.equal(page.backNoteLink(),true);await settle(page);
+  assert.deepEqual(page.previewIds,[11,22,33]);assert.equal(page.当前索引值,0);assert.equal(page.当前面,'answer');
+  assert.equal(page.noteLinksOpen,true);assert.ok(events.some(e=>typeof e==='string'&&e.includes('window.scrollTo(0,240)')));
+  page.noteLinksOpen=false;assert.equal(page.backNoteLink(),false);
+});
+test('linked panel blocks underlying preview flip and paging', async () => {
+  const {page}=harness();await page.加载当前卡();await settle(page);page.noteLinksOpen=true;
+  await page.翻面();page.下一张();page.上一张();await settle(page);
+  assert.equal(page.当前索引值,0);assert.equal(page.当前面,'question');
+});
+
+test('editing uses the loaded card even while its Web rendering is pending',()=>{
+  const {page}=harness();const edited=[];
+  Object.assign(page,{cardRenderPending:true,忙碌:false,onEditField:id=>edited.push(id)});
+  const edit=page.预览更多菜单().find(item=>item.id==='edit');
+  assert.equal(edit.enabled,true);edit.action();assert.deepEqual(edited,[11]);
+  page.忙碌=true;assert.equal(page.预览更多菜单().find(item=>item.id==='edit').enabled,false);
+  page.请求编辑字段();assert.deepEqual(edited,[11]);
+});
+
+test('preview selection rechecks live IDs rather than copied menu callbacks',()=>{
+  const {page}=harness();const edited=[];
+  Object.assign(page,{moreMenuOpen:true,onEditField:id=>edited.push(id)});
+  page.selectPreviewAction('edit');assert.deepEqual(edited,[11]);assert.equal(page.moreMenuOpen,false);
+  page.moreMenuOpen=true;page.忙碌=true;page.selectPreviewAction('edit');
+  assert.deepEqual(edited,[11]);assert.equal(page.moreMenuOpen,true);
+  page.selectPreviewAction('missing');assert.equal(page.moreMenuOpen,true);
 });

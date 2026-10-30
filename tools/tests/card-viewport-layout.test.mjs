@@ -61,10 +61,12 @@ test('both whiteboard engines keep header and review button edges aligned with t
           const inset = (width - contentWidth) / 2;
           assert.equal(inset + header.left, inset + footer.left);
           assert.equal(inset + header.right, inset + footer.right);
-          assert.equal(inset + header.left, inset + 12, 'exactly one horizontal page padding');
-          assert.equal(contentWidth - footer.left - footer.right, contentWidth - 24, 'show-answer width');
+          assert.equal(inset + header.left, inset + 应用尺寸.页面内边距_水平, 'exactly one horizontal page padding');
+          assert.equal(contentWidth - footer.left - footer.right,
+            contentWidth - 2 * 应用尺寸.页面内边距_水平, 'show-answer width');
           assert.equal((contentWidth - footer.left - footer.right - 3 * 应用尺寸.间距_8) / 4,
-            (contentWidth - 48) / 4, 'four equally sized rating buttons share the same bounds');
+            (contentWidth - 2 * 应用尺寸.页面内边距_水平 - 3 * 应用尺寸.间距_8) / 4,
+            'four equally sized rating buttons share the same bounds');
           assert.equal(header.top, 应用尺寸.pageToolbarTop(statusBar, narrow, statusBar));
           assert.equal(footer.bottom, 应用尺寸.操作区底部间距(narrow, statusBar));
         }

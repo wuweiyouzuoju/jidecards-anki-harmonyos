@@ -279,7 +279,7 @@ test('ArkWeb adapter installs its bridge before loading and shares the media ori
   let proxy, shown = 0;
   const backgrounds = [];
   const View = loadPlatformModule('utils/CardWebView.ets', 'CardWebView', {
-    CardWebSession, 媒体基地址: 'https://jidecards-media.local/'
+    CardWebSession, CARD_RENDERING_SUPPORT, 媒体基地址: 'https://jidecards-media.local/'
   });
   const view = new View({
     registerJavaScriptProxy: (p, name, methods) => {
@@ -295,6 +295,42 @@ test('ArkWeb adapter installs its bridge before loading and shares the media ori
   assert.deepEqual(backgrounds, ['#101820']);
   view.show(html('a'), 1, 'answer');
   assert.equal(loads.length, 1); assert.equal(scripts.length, 1);
+  view.reset();
+});
+
+test('a lost render acknowledgement fails without publishing and invalidates late callbacks on retry', () => {
+  const timers = [], cancelled = [], loads = [], errors = [], shown = [];
+  let proxy;
+  const View = loadPlatformModule('utils/CardWebView.ets', 'CardWebView', {
+    CardWebSession, CARD_RENDERING_SUPPORT, 媒体基地址: 'media://',
+    setTimeout: (work, delay) => { timers.push({work, delay}); return timers.length; },
+    clearTimeout: id => cancelled.push(id)
+  });
+  const view = new View({registerJavaScriptProxy: value => {proxy = value;},
+    loadData: value => loads.push(value), runJavaScript: async () => ''},
+    (...args) => shown.push(args), value => errors.push(value));
+  const ack = text => {
+    const [, id, revision] = text.match(/\.start\((\d+),(\d+),/);
+    proxy.onRendered(+id, +revision, '', '#102030');
+  };
+  view.attach(); view.show(html('question'), 1, 'question');
+  assert.equal(timers[0].delay, 60000);
+  assert.deepEqual(shown, [], 'waiting for the deadline must not acknowledge a frame');
+  timers[0].work();
+  assert.deepEqual(errors, ['card_render_timeout']);
+  ack(loads[0]); assert.deepEqual(shown, [], 'late frames from the failed document cannot reopen interaction');
+  view.show(html('retry'), 1, 'question');
+  timers[0].work(); assert.equal(errors.length, 1, 'a dispatched but cancelled timeout cannot fail a retry');
+  ack(loads[1]); assert.equal(shown.length, 1);
+  timers[1].work(); assert.equal(errors.length, 1, 'success cancels the deadline');
+  view.show(html('answer'), 1, 'answer');
+  view.setActive(false); timers[2].work();
+  assert.equal(errors.length, 1, 'a hidden Web cannot time out while the compositor is suspended');
+  view.setActive(true);
+  assert.equal(timers.length, 4, 'foreground starts a fresh deadline for the still pending side');
+  view.reset(); timers[3].work();
+  assert.equal(errors.length, 1, 'background/disposal cancellation cannot report a timeout');
+  assert.ok(cancelled.includes(1) && cancelled.includes(2) && cancelled.includes(3) && cancelled.includes(4));
 });
 
 test('sync and async evaluation failures are reported and a failed initial load can be retried', async () => {
@@ -348,7 +384,7 @@ test('a script failure between the two paint frames cannot acknowledge an empty 
   const qa={};
   const document={baseURI:'https://jidecards-media.local/',
     createElement:()=>({getContext:()=>null}),getElementById:id=>id==='qa'?qa:null,
-    querySelector:()=>({content:'Localized script error'}),
+    querySelector:selector=>selector.includes('diagnostics')?null:({content:'Localized script error'}),
     body:{childNodes:[qa],innerText:'',getBoundingClientRect(){},querySelectorAll:()=>[]}};
   const window={addEventListener:(name,callback)=>{events[name]=callback;},scrollTo(){},
     requestAnimationFrame:callback=>frames.push(callback),
@@ -361,7 +397,7 @@ test('a script failure between the two paint frames cannot acknowledge an empty 
   events.error({target:{tagName:'SCRIPT',src:'http://author.invalid/identify.js?user_id=secret'}});
   frames.shift()();
   assert.equal(acknowledgements.length,1);
-  assert.match(acknowledgements[0][2],/Localized script error.*\nhttp:\/\/author\.invalid\/identify\.js/);
+  assert.match(acknowledgements[0][2],/Localized script error[\s\S]*\nhttp:\/\/author\.invalid\/identify\.js/);
   assert.doesNotMatch(acknowledgements[0][2],/secret/);
   assert.equal(frames.length,0,'the error is reported rather than publishing a successful frame');
 });

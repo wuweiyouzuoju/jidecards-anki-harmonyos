@@ -389,6 +389,19 @@ export function applyCardTheme(html: string, isDark: boolean): string {
 
 const CARD_CONTENT_END: string = '<template id="jide-card-content-end"></template>';
 
+export interface CardScriptDiagnosticLabels {
+  load: string;
+  runtime: string;
+  inline: string;
+  local: string;
+  builtin: string;
+}
+
+const DEFAULT_SCRIPT_DIAGNOSTICS: CardScriptDiagnosticLabels = {
+  load: 'Resource failed to load', runtime: 'Script execution failed', inline: 'Card inline script',
+  local: 'Local card resource', builtin: 'Built-in card resource'
+};
+
 /** 预览等宿主脚本属于当前卡面；必须放在边界内，不能被误当作文档运行时缓存。 */
 export function appendCardScript(html: string, script: string): string {
   return html.replace(CARD_CONTENT_END, (): string => `<script>${script}</script>${CARD_CONTENT_END}`);
@@ -396,7 +409,8 @@ export function appendCardScript(html: string, script: string): string {
 
 export function 构建卡片HTML(渲染结果: RenderedCard, 侧面: 卡片正反面, isDark: boolean = false,
   cardBackground: string = isDark ? '#18202B' : '#FFFFFF', hideAudioButtons: boolean = false,
-  audioLabel: string = 'Play audio', scriptErrorLabel: string = 'Some card scripts failed to load or run. Check the network or contact the deck author.'): string {
+  audioLabel: string = 'Play audio', scriptErrorLabel: string = 'Card script issue · Details',
+  diagnosticLabels: CardScriptDiagnosticLabels = DEFAULT_SCRIPT_DIAGNOSTICS): string {
   const 卡面: string | undefined = 侧面 === 'question' ? 渲染结果.questionHtml : 渲染结果.answerHtml;
   const 正文: string = 剥除音频标签(卡面 ?? 原始侧HTML(渲染结果, 侧面), 渲染结果, 侧面, hideAudioButtons, audioLabel);
   const 样式: string = 图片遮罩渲染样式;
@@ -405,12 +419,15 @@ export function 构建卡片HTML(渲染结果: RenderedCard, 侧面: 卡片正�
     渲染结果.answerHtml ?? 原始侧HTML(渲染结果, 'answer'), 渲染结果.css);
   const scriptLabel: string = scriptErrorLabel.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
     .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const diagnostics: string = JSON.stringify(diagnosticLabels).replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;').replace(/>/g, '&gt;');
   return `<!DOCTYPE html>
 <html class="${isDark ? 'night-mode' : ''}" data-bs-theme="${isDark ? 'dark' : 'light'}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="jide-card-script-error" content="${scriptLabel}">
+<meta name="jide-card-script-diagnostics" content="${diagnostics}">
 <script src="https://jidecards-render.local/jquery/3.7.1/jquery.min.js"></script>
 <style id="jide-card-appearance">${buildCardAppearance(isDark, cardBackground)}</style>
 ${IMAGE_OCCLUSION_SCRIPT}

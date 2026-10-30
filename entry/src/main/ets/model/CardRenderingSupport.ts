@@ -21,6 +21,7 @@ export interface CardRenderingSupport {
 export interface CardWebSupport {
   allowHttpResources: boolean;
   mediaPlaybackRequiresGesture: boolean;
+  renderAcknowledgementTimeoutMs: number;
   scriptFailures: string;
   authorization: string;
 }
@@ -29,8 +30,8 @@ export interface CardWebSupport {
 export const CARD_RENDERING_SUPPORT: CardRenderingSupport = {
   avOrder: 'core-tag-order; adjacent same-kind items may be batched',
   mediaPaths: 'anki-core', answerComparison: 'anki-core', clozeTyping: 'anki-core',
-  web: { allowHttpResources: true, mediaPlaybackRequiresGesture: false,
-    scriptFailures: 'continue remaining scripts; report failures; fail empty cards',
+  web: { allowHttpResources: true, mediaPlaybackRequiresGesture: false, renderAcknowledgementTimeoutMs: 60000,
+    scriptFailures: 'continue remaining scripts; collapsed localized diagnostics with error messages, locations and stacks; fail empty cards',
     authorization: 'provided and validated by the template author; requires author service availability' },
   tts: { backend: 'HarmonyOS CoreSpeechKit', voicePrefix: 'HarmonyOS_', minimumSpeed: 0.5,
     maximumSpeed: 2, otherArguments: ['volume', 'pitch'], voiceAvailability: 'device-installed voices only' }

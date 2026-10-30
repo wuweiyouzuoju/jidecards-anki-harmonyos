@@ -5,6 +5,7 @@ import vm from 'node:vm';
 import { CardRenderPrefetch } from '../../entry/src/main/ets/model/CardRenderPrefetch.ts';
 import { CardWebSession } from '../../entry/src/main/ets/model/CardWebSession.ts';
 import { CardWebBuffer, CARD_SESSION_STORAGE_SNAPSHOT, carryCardSessionStorage } from '../../entry/src/main/ets/model/CardWebBuffer.ts';
+import { CARD_RENDERING_SUPPORT } from '../../entry/src/main/ets/model/CardRenderingSupport.ts';
 import { loadPlatformModule } from './platform-module-harness.mjs';
 import { encodeGetQueuedCardsRequest, decodeQueuedCards, decodeSchedulingStates } from '../../entry/src/main/ets/proto/messages/SchedulerMessages.ts';
 import { CUSTOM_SCHEDULING_SERVICE, encodeCustomScheduling } from '../../entry/src/main/ets/proto/messages/CustomSchedulingMessages.ts';
@@ -188,7 +189,7 @@ test('buffered ArkWeb adapter mutes the staging view, carries storage and activa
     setAudioMuted: muted => events.push([slot, 'mute', muted])
   }));
   const View = loadPlatformModule('utils/CardWebView.ets', 'CardWebView', {
-    CardWebSession, CardWebBuffer, CARD_SESSION_STORAGE_SNAPSHOT, carryCardSessionStorage,
+    CardWebSession, CardWebBuffer, CARD_SESSION_STORAGE_SNAPSHOT, carryCardSessionStorage, CARD_RENDERING_SUPPORT,
     媒体基地址: 'https://jidecards-media.local/'
   });
   const switches = [];
@@ -213,4 +214,32 @@ test('buffered ArkWeb adapter mutes the staging view, carries storage and activa
   assert.deepEqual(events.at(-1), [0, 'mute', true], 'late rendering while hidden cannot unmute HTML media');
   view.setAudioEnabled(true);
   assert.ok(events.slice(-2).some(event => event[0] === 0 && event[1] === 'mute' && event[2] === false));
+});
+
+test('a staging deadline retains the visible card and cancels a late storage/load before retry', async () => {
+  const timers = [], loads = [], proxies = [], shown = [], errors = [], gate = deferred();
+  let snapshots = 0;
+  const View = loadPlatformModule('utils/CardWebView.ets', 'CardWebView', {
+    CardWebSession, CardWebBuffer, CARD_SESSION_STORAGE_SNAPSHOT, carryCardSessionStorage, CARD_RENDERING_SUPPORT,
+    媒体基地址: 'media://', setTimeout: work => {timers.push(work); return timers.length;}, clearTimeout() {}
+  });
+  const controllers = [0, 1].map(slot => ({loadData: text => loads.push({slot, text}),
+    runJavaScript: () => {snapshots++; return gate.promise;}, registerJavaScriptProxy: proxy => {proxies[slot] = proxy;},
+    onActive() {}, onInactive() {}, setAudioMuted() {}}));
+  const view = new View(controllers[0], () => {}, value => errors.push(value), controllers[1], slot => shown.push(slot));
+  const ack = entry => {
+    const [, id, revision] = entry.text.match(/\.start\((\d+),(\d+),/);
+    proxies[entry.slot].onRendered(+id, +revision, '', '#102030');
+  };
+  view.attach(0); view.attach(1);
+  view.show(html('first'), 1, 'question'); ack(loads[0]);
+  view.show(html('staging'), 2, 'question'); timers[1]();
+  assert.deepEqual(shown, [0]); assert.deepEqual(errors, ['card_render_timeout']);
+  gate.resolve('[]'); await turn();
+  assert.equal(loads.length, 1, 'an abandoned staging continuation must not overwrite a Web');
+  ack(loads[0]); assert.deepEqual(shown, [0]);
+  view.show(html('retry'), 2, 'question'); await turn(); ack(loads[1]);
+  assert.equal(snapshots, 1, 'failure recovery must not ask a dead Web for sessionStorage again');
+  assert.deepEqual(shown, [0, 1]);
+  timers[1](); timers[2](); assert.equal(errors.length, 1);
 });

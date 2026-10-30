@@ -12,17 +12,46 @@ export const CARD_REVIEWER_RUNTIME: string = String.raw`
     var notice = document.getElementById('jide-card-script-errors');
     if (notice) notice.remove();
   }
+  function diagnosticLabels() {
+    var meta = document.querySelector('meta[name="jide-card-script-diagnostics"]');
+    return meta ? JSON.parse(meta.content) : {load: 'Resource failed to load', runtime: 'Script execution failed',
+      inline: 'Card inline script', local: 'Local card resource', builtin: 'Built-in card resource'};
+  }
   function scriptSource(source) {
-    // 授权 URL 可能携带用户 ID；诊断只保留源和路径。
-    try { var url = new URL(source, document.baseURI); return url.origin + url.pathname; }
-    catch (error) { return String(source || 'inline script').split(/[?#]/)[0]; }
+    var labels = diagnosticLabels();
+    if (!source) return labels.inline;
+    // 授权 URL 可能携带用户 ID；消息和调用栈也须使用同一脱敏入口。
+    try {
+      var url = new URL(source, document.baseURI);
+      if (url.hostname === 'jidecards-media.local') {
+        return url.pathname === '/' ? labels.inline : labels.local + ': ' + url.pathname.slice(1);
+      }
+      if (url.hostname === 'jidecards-render.local') return labels.builtin + ': ' + url.pathname.slice(1);
+      return url.origin + url.pathname;
+    } catch (error) { return String(source).split(/[?#]/)[0]; }
+  }
+  function diagnosticText(value) {
+    return String(value || '').replace(/https?:\/\/[^\s<>"')]+/g, function (url) {
+      // 保留 URL 后的调用栈行列号，移除查询参数、片段及凭据。
+      var position = url.match(/:\d+(?::\d+)?$/);
+      return scriptSource(position ? url.slice(0, -position[0].length) : url) + (position ? position[0] : '');
+    }).slice(0, 4000);
+  }
+  function failureText(failure) {
+    var labels = diagnosticLabels();
+    var location = failure.source + (failure.line > 0 ? ':' + failure.line : '') +
+      (failure.column > 0 ? ':' + failure.column : '');
+    return (failure.kind === 'load' ? labels.load : labels.runtime) + '\n' + location +
+      (failure.message ? '\n' + failure.message : '') + (failure.stack ? '\n' + failure.stack : '');
   }
   function showScriptDiagnostics(failEmpty) {
+    var previous = document.getElementById('jide-card-script-errors');
+    var expanded = previous && previous.open;
     clearScriptDiagnostics();
     if (!scriptFailures.length || !document.body) return;
     var label = document.querySelector('meta[name="jide-card-script-error"]');
     var message = label ? label.content : 'Card script failed';
-    var sources = scriptFailures.join('\n');
+    var sources = scriptFailures.map(failureText).join('\n\n');
     var hasContent = !!document.body.innerText.trim() || Array.from(document.body.querySelectorAll(
       'img,svg,canvas,video,audio,input,textarea,select,button,iframe,object,embed')).some(function (element) {
         return element.getClientRects().length && getComputedStyle(element).visibility !== 'hidden';
@@ -30,27 +59,31 @@ export const CARD_REVIEWER_RUNTIME: string = String.raw`
     if (failEmpty && !hasContent) throw new Error(message + '\n' + sources);
     var notice = document.createElement('details');
     notice.id = 'jide-card-script-errors';
+    notice.open = !!expanded;
     notice.setAttribute('role', 'alert');
-    notice.style.cssText = 'margin:12px 0;padding:8px;border:1px solid currentColor;border-radius:8px;' +
-      'font:14px/1.5 sans-serif;text-align:start;color:CanvasText;background:Canvas;overflow-wrap:anywhere';
+    notice.style.cssText = 'margin:12px 0 0;padding:0;border:0;' +
+      'font:12px/1.5 sans-serif;text-align:start;color:CanvasText;background:Canvas;overflow-wrap:anywhere';
     var summary = document.createElement('summary');
     summary.textContent = message;
+    summary.style.cssText = 'cursor:pointer;padding:6px 0';
     var detail = document.createElement('pre');
-    detail.style.cssText = 'white-space:pre-wrap;font:inherit';
+    detail.style.cssText = 'white-space:pre-wrap;font:12px/1.5 monospace;margin:4px 0 0;max-height:40vh;overflow:auto';
     detail.textContent = sources;
     notice.appendChild(summary); notice.appendChild(detail);
     document.body.appendChild(notice);
   }
-  function recordScriptFailure(source) {
-    var value = scriptSource(source);
-    if (scriptFailures.indexOf(value) >= 0) return;
-    scriptFailures.push(value);
+  function recordScriptFailure(source, kind, message, line, column, stack) {
+    var failure = {source: scriptSource(source), kind: kind || 'load', message: diagnosticText(message),
+      line: line || 0, column: column || 0, stack: diagnosticText(stack)};
+    if (scriptFailures.some(function (item) { return JSON.stringify(item) === JSON.stringify(failure); })) return;
+    scriptFailures.push(failure);
     // 作者脚本可能在 load 之后异步请求授权；失败仍应可见，不能留下无解释的空卡。
     if (!rendering) showScriptDiagnostics(false);
   }
   window.addEventListener('error', function (event) {
     if (event.target && event.target.tagName === 'SCRIPT') recordScriptFailure(event.target.src);
-    else if (event.filename) recordScriptFailure(event.filename);
+    else if (event.filename || event.message) recordScriptFailure(event.filename, 'runtime', event.message,
+      event.lineno, event.colno, event.error && event.error.stack);
   }, true);
   function surfaceBackground() {
     // Composite transparent body colors over the HTML fallback; emit an ArkUI-compatible opaque color.
