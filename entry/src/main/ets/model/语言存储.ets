@@ -1,96 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-
-// ========================================================
-// @块ID MODEL-LANGUAGE-001
-// @名称 应用语言模式存储
-//
-// @作用
-// 读取/设置应用首选语言（中文简体 / 英文）。基于 HarmonyOS @kit.LocalizationKit
-// 的 i18n.System API，读写的是系统级应用语言偏好。
-//
-// @输入
-// 无（读取）；mode: 语言模式（设置）
-//
-// @输出
-// 当前语言模式(): 语言模式
-// 设置语言模式(mode): void
-//
-// @业务规则
-// 仅识别 'en' 与 'zh-Hans' 两种值：以 'en' 开头判定英文，其余一律回退中文简体。
-// 这两个字符串值是 HarmonyOS 系统语言代码，保留英文，不可中文化。
-//
-// @副作用
-// 设置语言模式 会调用 i18n.System.setAppPreferredLanguage，
-// 可能触发系统级应用语言重载。
-//
-// @注意
-// 修改这里可能影响整个应用的语言切换行为。
-// ========================================================
-
 import { i18n } from '@kit.LocalizationKit';
+import { AppLocale, resolveAppLocale } from './AppLocales';
 
-// ========================================================
-// @块ID MODEL-LANGUAGE-002
-// @名称 语言模式
-//
-// @作用
-// 应用支持的语言模式类型。
-//
-// @输入
-// 无（类型定义）
-//
-// @输出
-// 字符串字面量联合类型：'zh-Hans' | 'en'
-//
-// @业务规则
-// 'zh-Hans' / 'en' 是 HarmonyOS 系统语言代码，保留英文。
-//
-// @副作用
-// 无
-// ========================================================
-export type 语言模式 = 'zh-Hans' | 'en';
+export type 语言模式 = AppLocale | 'en';
 
-// ========================================================
-// @块ID MODEL-LANGUAGE-003
-// @名称 当前语言模式
-//
-// @作用
-// 读取系统当前应用首选语言，归一化为 'zh-Hans' 或 'en'。
-//
-// @输入
-// 无
-//
-// @输出
-// 语言模式：以 'en' 开头返回 'en'，否则返回 'zh-Hans'
-//
-// @副作用
-// 无
-// ========================================================
-export function 当前语言模式(): 语言模式 {
-  const 语言: string = i18n.System.getAppPreferredLanguage();
-  if (语言.startsWith('en')) {
-    return 'en';
-  }
-  return 'zh-Hans';
+/** 系统拥有持久化；保留地区身份，旧 en 偏好按 en-US 显示。 */
+export function 当前语言模式(): AppLocale {
+  return resolveAppLocale(i18n.System.getAppPreferredLanguage());
 }
 
-// ========================================================
-// @块ID MODEL-LANGUAGE-004
-// @名称 设置语言模式
-//
-// @作用
-// 设置应用首选语言（持久化由系统负责）。
-//
-// @输入
-// mode: 语言模式（'zh-Hans' 或 'en'）
-//
-// @输出
-// void
-//
-// @副作用
-// 调用 i18n.System.setAppPreferredLanguage，可能触发系统级应用语言重载。
-// ========================================================
-/** @throws {Error} 系统语言设置失败，调用方显示错误且不宣称切换完成。 */
+/** @throws {Error} 系统设置失败时由调用方显示失败；配置通知负责刷新 UI。 */
 export function 设置语言模式(模式: 语言模式): void {
-  i18n.System.setAppPreferredLanguage(模式);
+  const locale: AppLocale = resolveAppLocale(模式);
+  if (当前语言模式() === locale) return;
+  i18n.System.setAppPreferredLanguage(locale);
 }
