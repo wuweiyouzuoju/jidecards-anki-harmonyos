@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { AnchoredMenuItem } from '../common/MenuItem';
+import { SelectionOptions } from '../common/SelectionOptions';
+import { ActionMenuListItem } from '../common/ActionMenuList';
 import { AppInterfaceControl } from '../../model/AppInterface';
 import { appInterface } from '../../backend/AppInterfaceService';
 import { resourceText, namedResourceText } from '../../utils/UiFeedback';
@@ -111,7 +112,7 @@ export struct BrowserViewMenu {
 
   @Builder
   private selectionHeader() {
-    Column() {
+    Column({ space: 应用尺寸.间距_12 }) {
       DialogHeader({ title: this.group === 'mode' ? $r('app.string.browser_mode_switch') :
         this.group === 'filter' ? $r('app.string.browser_status_title') : $r('app.string.browser_sort_title'),
         actionLabel: $r('app.string.browser_detail_confirm'),
@@ -119,7 +120,7 @@ export struct BrowserViewMenu {
         actionEnabled: this.available && this.selectedIndex() >= 0 && this.selectedIndex() < this.options().length,
         onClose: (): void => { this.onClose(); }, onAction: (): void => { this.applySelection(); } })
       if (this.group === 'sort') {
-        Row({ space: 应用尺寸.间距_8 }) {
+        Row({ space: 应用尺寸.间距_12 }) {
           按下态按钮({ 文案: $r('app.string.browser_sort_ascending'), selectable: true,
             selected: this.draftSortIndex > 0 && !this.draftDescending, fillWidth: true,
             是否启用: this.available && this.draftSortIndex > 0,
@@ -135,13 +136,9 @@ export struct BrowserViewMenu {
 
   @Builder
   private selectionContent() {
-    Column() {
-      ForEach(this.options(), (option: SelectOption, index: number) => {
-        AnchoredMenuItem({ label: option.value, selected: this.selectedIndex() === index, available: this.available,
-          divider: index > 0, labelAlignment: this.group === 'sort' ? TextAlign.Start : TextAlign.Center,
-          onSelect: (): void => { this.selectOption(index); } })
-      }, (option: SelectOption, index: number): string => index + '-' + option.value)
-    }.width('100%')
+    SelectionOptions({ items: this.options().map((option: SelectOption, index: number): ActionMenuListItem => ({
+      id: String(index), label: option.value, selected: this.selectedIndex() === index, available: this.available
+    })), isInteractive: this.available, onSelect: (id: string): void => { this.selectOption(Number(id)); } })
   }
 
   build() {

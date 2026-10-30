@@ -63,7 +63,7 @@ export class 浏览行数据源 implements IDataSource {
     return this.keyForRow(this.rows[index]);
   }
   keyForRow(row: 浏览行数据): string {
-    // ID 在一次搜索结果中唯一；显示颜色/挂起状态变化应更新同一行，而不是重建节点。
+    // 数据源以业务 ID 定位局部通知；LazyForEach 的渲染键另包含可变快照。
     return `${row.id}`;
   }
   replaceAll(rows: 浏览行数据[]): void {
@@ -118,6 +118,9 @@ export struct 卡片表格 {
   @Prop notesMode: boolean = false;
   @Prop flagLabels: FlagLabels = {};
   @Prop displayColumns: BrowserColumn[] = [];
+  @Prop traditionalLayout: boolean = false;
+  onColumnClick: (key: string) => void = (_key: string): void => {};
+  onColumnManage: (key: string) => void = (_key: string): void => {};
   @Prop tableLayout: boolean = false;
   @Prop busy: boolean = false;
   @Prop displayKeys: string[] = [];
@@ -177,8 +180,12 @@ export struct 卡片表格 {
     const column: BrowserColumn | undefined = this.displayColumns.find((item: BrowserColumn): boolean => item.key === key);
     return column === undefined ? key : this.notesMode ? column.notesModeLabel : column.cardsModeLabel;
   }
+  private renderedRowKey(row: 浏览行数据): string {
+    // LazyForEach 的构建参数是快照；仅用 ID 会让新激活列继续读取旧 cells。
+    return `${row.id}:${JSON.stringify(row)}:${this.notesMode}:${this.traditionalLayout}:${this.tableLayout}:${this.activeKeys.join(',')}:${this.displayKeys.join(',')}`;
+  }
   private tableWidth(): Length {
-    return this.tableLayout && this.displayKeys.length > 0 ? Math.max(320, this.displayKeys.length * 160 + 180) : '100%';
+    return !this.traditionalLayout && this.tableLayout && this.displayKeys.length > 0 ? Math.max(320, this.displayKeys.length * 160 + 180) : '100%';
   }
 
   /** 按选择读取副标题；牌组仅展示末级名称，完整路径仍保留在详情。 */
@@ -197,6 +204,7 @@ export struct 卡片表格 {
 
   /** 旗标只覆盖左侧色条，四周中性轮廓始终保留。 */
   private rowBorder(row: 浏览行数据): BorderOptions {
+    if (this.traditionalLayout) return SurfaceBorder.options({ bottom: 0.5 });
     const flagColor: string = this.取行标志色(row);
     if (row.id === this.focusedId) {
       const widths: EdgeWidths = { top: 2, right: 2, bottom: 2, left: flagColor === 'transparent' ? 2 : 4 };
@@ -210,6 +218,17 @@ export struct 卡片表格 {
       bottom: 应用尺寸.卡片边框, left: 4 };
     const colors: EdgeColors = { top: outline, right: outline, bottom: outline, left: flagColor };
     return SurfaceBorder.options(widths, colors);
+  }
+
+  private rowBackground(row: 浏览行数据): ResourceColor {
+    if (!this.traditionalLayout) return $r('app.color.surface_card');
+    if (row.id === this.focusedId || this.选中IDs.includes(row.id)) return $r('app.color.surface_selected');
+    const flag: string = this.取行标志色(row);
+    if (flag !== 'transparent') return `#33${flag.substring(1)}`;
+    if (row.color === BrowserRowColor.COLOR_MARKED) return $r('app.color.browser_row_marked');
+    if (row.color === BrowserRowColor.COLOR_SUSPENDED) return $r('app.color.browser_row_suspended');
+    if (row.color === BrowserRowColor.COLOR_BURIED) return $r('app.color.browser_row_buried');
+    return $r('app.color.surface_card');
   }
 
   /** 暂停状态独立于旗标颜色，用于弱化行背景。 */
@@ -273,14 +292,18 @@ export struct 卡片表格 {
             Row() {
               ForEach(this.displayKeys, (key: string) => {
                 Text(this.columnLabel(key)).fontSize(应用尺寸.字号_正文_小)
-                  .fontColor($r('app.color.text_secondary')).width(160).maxLines(1)
+                  .fontColor($r('app.color.text_secondary')).width(this.traditionalLayout ? undefined : 160)
+                  .layoutWeight(this.traditionalLayout ? 1 : 0).constraintSize({ minHeight: this.traditionalLayout ? 44 : 0 }).padding(this.traditionalLayout ? { left: 8, right: 8 } : 0).maxLines(1)
+                  .focusable(this.traditionalLayout).enabled(!this.busy).attributeModifier(new PressFeedback())
+                  .onClick((): void => { if (this.traditionalLayout && !this.busy) this.onColumnClick(key); })
+                  .gesture(LongPressGesture().onAction((): void => { if (this.traditionalLayout && !this.busy) this.onColumnManage(key); }))
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
               }, (key: string): string => key)
             }.layoutWeight(1)
-          }.width('100%').padding({ left: 应用尺寸.页面内边距_水平 + 应用尺寸.卡片内边距,
-            right: 应用尺寸.页面内边距_水平 + 应用尺寸.卡片内边距, top: 8, bottom: 8 })
+          }.width('100%').padding({ left: this.traditionalLayout ? 0 : 应用尺寸.页面内边距_水平 + 应用尺寸.卡片内边距,
+            right: this.traditionalLayout ? 0 : 应用尺寸.页面内边距_水平 + 应用尺寸.卡片内边距, top: 8, bottom: 8 })
         }
-        List({ space: this.narrowDeckLayout ? 应用尺寸.间距_5 : 应用尺寸.间距_8, scroller: this.listScroller }) {
+        List({ space: this.traditionalLayout ? 0 : this.narrowDeckLayout ? 应用尺寸.间距_5 : 应用尺寸.间距_8, scroller: this.listScroller }) {
           LazyForEach(this.行数据源, (行: 浏览行数据) => {
             ListItem() {
               Row({ space: 应用尺寸.间距_8 }) {
@@ -299,8 +322,9 @@ export struct 卡片表格 {
                 if (this.tableLayout && this.displayKeys.length > 0) {
                   Row() {
                     ForEach(this.displayKeys, (key: string) => {
-                      Text(行.cells[this.activeKeys.indexOf(key)]?.text ?? '').width(160)
-                        .fontSize(应用尺寸.字号_正文).fontColor(this.是否挂起行(行) ? $r('app.color.text_secondary') : $r('app.color.text_primary')).maxLines(2)
+                      Text(行.cells[this.activeKeys.indexOf(key)]?.text ?? '').width(this.traditionalLayout ? undefined : 160)
+                        .layoutWeight(this.traditionalLayout ? 1 : 0).padding(this.traditionalLayout ? { left: 8, right: 8 } : 0)
+                        .fontSize(应用尺寸.字号_正文).fontColor(this.是否挂起行(行) ? $r('app.color.text_secondary') : $r('app.color.text_primary')).maxLines(this.traditionalLayout ? 3 : 2)
                         .textOverflow({ overflow: TextOverflow.Ellipsis })
                     }, (key: string): string => key)
                   }.layoutWeight(1)
@@ -345,6 +369,7 @@ export struct 卡片表格 {
                 .layoutWeight(1)
                 }
 
+                if (!this.traditionalLayout) {
                 CardMarkingBadge({ flag: this.notesMode ? 0 : browserRowFlag(行.color),
                   marked: 行.marked === true, labels: this.flagLabels })
 
@@ -355,17 +380,18 @@ export struct 卡片表格 {
                     onHelp: (): void => { this.onInfoClick(行.id); }
                   })
                 }
+                }
               }
               .width('100%')
               .padding({
-                left: 应用尺寸.卡片内边距,
-                right: 应用尺寸.卡片内边距,
-                top: 应用尺寸.间距_8,
-                bottom: 应用尺寸.间距_8
+                left: this.traditionalLayout ? 0 : 应用尺寸.卡片内边距,
+                right: this.traditionalLayout ? 0 : 应用尺寸.卡片内边距,
+                top: this.traditionalLayout ? 12 : 应用尺寸.间距_8,
+                bottom: this.traditionalLayout ? 12 : 应用尺寸.间距_8
               })
-              .backgroundColor($r('app.color.surface_card'))
+              .backgroundColor(this.rowBackground(行))
               .border(this.rowBorder(行))
-              .borderRadius(应用尺寸.圆角_指标卡)
+              .borderRadius(this.traditionalLayout ? 0 : 应用尺寸.圆角_指标卡)
               .attributeModifier(new PressFeedback())
               .onMouse((event: MouseEvent): void => { this.handleRowMouse(行.id, event); })
               .onClick((event: ClickEvent): void => {
@@ -379,14 +405,14 @@ export struct 卡片表格 {
               )
             }
             .transition(TransitionEffect.OPACITY.animation(motionAnimation(currentMotionProfile().listChangeMs)))
-          }, (行: 浏览行数据): string => this.行数据源.keyForRow(行))
+          }, (行: 浏览行数据): string => this.renderedRowKey(行))
         }
         .width('100%')
         .id('browser-result-list')
         .focusable(true)
         .defaultFocus(true)
         .focusOnTouch(true)
-        .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平 })
+        .padding({ left: this.traditionalLayout ? 0 : 应用尺寸.页面内边距_水平, right: this.traditionalLayout ? 0 : 应用尺寸.页面内边距_水平 })
         .layoutWeight(1)
         .edgeEffect(EdgeEffect.Spring)
         .maintainVisibleContentPosition(true)

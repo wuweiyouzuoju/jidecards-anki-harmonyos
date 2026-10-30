@@ -1,0 +1,49 @@
+{
+  "commit": "6b2dfdc6f382b2ed31bc8f60bdc72115726d53dd",
+  "files": [
+    {
+      "path": "AnkiDroid/src/main/java/com/ichi2/anki/browser/CardBrowserFragment.kt",
+      "sha256": "4cfa3493028b1d7afd961032fb9f3565b06dcd791faa35ed2b088483e1f851de"
+    },
+    {
+      "path": "AnkiDroid/src/main/java/com/ichi2/anki/browser/CardBrowserViewModel.kt",
+      "sha256": "716a5adb35fac8691d1a0991bf5b7daa824306f4af266af7bf1eed7e500cabdb"
+    },
+    {
+      "path": "AnkiDroid/src/main/java/com/ichi2/anki/browser/BrowserMultiColumnAdapter.kt",
+      "sha256": "3eba0902972810e9f9d0f7bfea69a324c4bce707e4c1ca0349ade1137fd0ca20"
+    },
+    {
+      "path": "AnkiDroid/src/main/java/com/ichi2/anki/browser/BrowserColumnCollection.kt",
+      "sha256": "2fb8b42fa4ea04e7e02a59db95628703b2d30bcecb547fe518e1997966b3174e"
+    },
+    {
+      "path": "AnkiDroid/src/main/java/com/ichi2/anki/browser/BrowserColumnSelectionFragment.kt",
+      "sha256": "64e10f9264784259cedaf3a49df7278411dd7f24dbf1195bde39a71b3f74775b"
+    },
+    {
+      "path": "AnkiDroid/src/main/java/com/ichi2/anki/browser/ColumnSelectionDialogFragment.kt",
+      "sha256": "333b9b08858b0d100a9a17364e509c192b7216c8bfec2d3a24c08754b5fcdc41"
+    },
+    {
+      "path": "AnkiDroid/src/main/res/layout/view_browser_column_heading.xml",
+      "sha256": "77dfe99ab61897c202a325e13ae98acdb0e5bf294030f437adc910adf473ec7c"
+    },
+    {
+      "path": "libanki/src/main/java/com/ichi2/anki/libanki/BrowserConfig.kt",
+      "sha256": "51526573daf59eda6bcd90c52e0f2e0d3d1e395686fbbe99e3ba89593580f5a7"
+    }
+  ],
+  "cardsDefault": [
+    "noteFld",
+    "template",
+    "cardDue",
+    "deck"
+  ],
+  "notesDefault": [
+    "noteFld",
+    "note",
+    "template",
+    "noteTags"
+  ]
+}
