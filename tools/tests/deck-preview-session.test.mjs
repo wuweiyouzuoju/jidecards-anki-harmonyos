@@ -19,7 +19,7 @@ const scopes = [DeckPreviewScope.TodayRemaining, DeckPreviewScope.Due, DeckPrevi
 
 test('home cancels pending preview across background/return, deck reselection, long press and back', async () => {
   const source = readFileSync(new URL('../../entry/src/main/ets/pages/首页.ets', import.meta.url), 'utf8');
-  const Page = componentMethods(source, ['打开牌组预览', 'openDeckMenu', 'syncForegroundChanged', 'previewDeckChanged', 'homeActionControls', 'publishHomeInterface', 'onBackPress'], {
+  const Page = componentMethods(source, ['打开牌组预览', 'openDeckMenu', 'syncForegroundChanged', 'closeSyncChoice', 'previewDeckChanged', 'homeActionControls', 'publishHomeInterface', 'onBackPress'], {
     ...appInterfaceDependencies(), isDoubleColumnDeckListStyle, homeSyncLabelKey, homeSyncIndicator, $r: key => key
   });
   Page.prototype.closeHomeActions = new Function(source.match(/private closeHomeActions\(\): void \{([^\n]*)\}/)[1]);
@@ -27,7 +27,7 @@ test('home cancels pending preview across background/return, deck reselection, l
     const pending = deferred(), toasts = [];
     const page = new Page();
     Object.assign(page, {
-      deckMenuId: '', deckMenuBackRequest: 0,
+      deckMenuId: '', deckMenuBackRequest: 0, syncChoiceGeneration: 0, syncChoiceVisible: reason === 'background', syncChoiceChecking: reason === 'background',
       deckPreviewSession: new DeckPreviewSession({ cardIds: () => pending.promise }),
       syncController: { foregroundChanged() {}, cancel() {} }, backupController: { schedule() {}, stop() {} },
       syncStatusController: new HomeSyncStatusController({ auth: () => null, canRead: () => false,
@@ -44,6 +44,9 @@ test('home cancels pending preview across background/return, deck reselection, l
     assert.equal(page.预览加载中, true);
     if (reason === 'background') {
       page.syncForeground = false; page.syncForegroundChanged();
+      assert.equal(page.syncChoiceVisible, false);
+      assert.equal(page.syncChoiceChecking, false);
+      assert.equal(page.syncChoiceGeneration, 1);
       page.syncForeground = true; page.syncForegroundChanged();
     } else if (reason === 'deck') {
       page.选中的牌组ID = '2'; page.previewDeckChanged();
@@ -142,10 +145,10 @@ test('menu anchors subtract the detail origin once and align the right edge afte
   assert.deepEqual(page.menuAnchor(), { left: 12, top: 52, width: 276 });
   page.detailsAreaChanged({ globalPosition: { x: 0, y: 0 }, width: 360, height: 800 });
   page.compactAnchorChanged({ globalPosition: { x: 0, y: 0 }, width: 360, height: 76 });
-  assert.deepEqual(page.menuAnchor(), { left: 12, top: 88, width: 336 }, 'public content gap is added once');
+  assert.deepEqual(page.menuAnchor(), { left: 16, top: 88, width: 328 }, 'public content gap is added once');
   page.narrowDeckLayout = true;
   page.compactAnchorChanged({ globalPosition: { x: 0, y: 0 }, width: 280, height: 70 });
-  assert.deepEqual(page.menuAnchor(), { left: 12, top: 78, width: 256 });
+  assert.deepEqual(page.menuAnchor(), { left: 16, top: 78, width: 248 });
 });
 
 test('scope list shares actual choices with JIDE and rejects invalid or stale choices', () => {

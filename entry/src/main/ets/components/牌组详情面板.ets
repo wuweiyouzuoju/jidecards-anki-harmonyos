@@ -1,18 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { disclosureAnimation } from '../utils/AppMotion';
-import { FILTERED_DECK_ACTIONS } from '../model/FilteredDeckCommands';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { HomeActionAnchor } from '../model/HomeHeaderLayout';
-import { PressFeedback } from '../utils/PressFeedback';
-import { AppInterfaceItem, AppInterfaceControl, deckDetailsMoreItems } from '../model/AppInterface';
 import { appInterface } from '../backend/AppInterfaceService';
 import { interfaceItemText } from '../utils/AppInterfaceText';
-import { ExpansionReveal } from '../utils/ExpansionReveal';
-import { DisclosureChevron } from './common/DisclosureChevron';
 import { IconActionButton } from './common/IconActionButton';
 import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../model/ReleaseFeatures';
-import { GlassSurface } from '../utils/GlassSurface';
-import { GLASS_COLORS_KEY, GLASS_HIGHLIGHT_COLORS } from '../model/ThemeCatalog';
 import { DeckStudyHistoryCard } from './DeckStudyHistoryCard';
 import { deckHistorySearch } from '../model/DeckStudyHistory';
 import { PAGE_COMPACT_LAYOUT_KEY } from '../model/AppLayoutState';
@@ -21,6 +13,7 @@ import { 牌组汇总, 主页快照, 牌组显示名 } from '../model/主页模�
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { 开始学习按钮 } from './开始学习按钮';
 import { 颜色键 } from '../model/颜色主题';
+import { SeriesVisual } from '../utils/SeriesVisual';
 
 // ========================================================
 // @块ID UI-DECK-DETAIL-001
@@ -29,12 +22,12 @@ import { 颜色键 } from '../model/颜色主题';
 // @作用
 // 宽屏详情 pane：选中卡组的名称、描述、三类计数、牌组选项入口与开始学习按钮。
 // 牌组设置由首页推入独立 DeckOptionsPage；
-// pane 仅在点击「牌组设置」时通过回调上抛。
+// 更多通过宿主复用首页牌组操作弹窗。
 //
 // @输入
 // @Prop 是否深色 / 牌组选项加载中 / 牌组选项错误；
 // @Consume('selectedDeckId') / @Consume('snapshot')（@Provide 来自 Index.ets，key 字符串保留以维持链路）；
-// 父组件回调 onStart / onAddCard / onCreateSubdeck / onExportDeck / onOpenDeckOptions。
+// 父组件持有学习、制卡、预览、JIDE 与共享牌组菜单回调。
 //
 // @输出
 // 渲染宽屏详情面板；通过回调上抛用户操作。
@@ -46,7 +39,7 @@ import { 颜色键 } from '../model/颜色主题';
 // - @Watch 回调中 @State 赋值不触发 build() 重新执行
 // - build() 中模板字符串引用 @Consume 不可靠
 // 最终方案：ForEach(this.snapshot.decks) + if (deck.id === this.selectedDeckId) 直接渲染。
-// 按钮按压由公共 GlassSurface 处理，不写入面板状态。
+// 图标按钮按压由公共 IconActionButton 处理，不写入面板状态。
 //
 // @副作用
 // 无。仅渲染与上抛回调。
@@ -56,9 +49,9 @@ import { 颜色键 } from '../model/颜色主题';
 // ========================================================
 @Component
 export struct 牌组详情面板 {
+  @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
-  @StorageProp(GLASS_COLORS_KEY) private glassColors: string[] = GLASS_HIGHLIGHT_COLORS;
   @StorageLink(AI_AGENT_CHANNELS_APP_STORAGE_KEY) @Watch('publishInterface') private Agent入口已启用: boolean = false;
   @Prop historyRefreshToken: number = 0;
   @Prop @Watch('publishInterface') showHeaderActions: boolean = true;
@@ -67,7 +60,6 @@ export struct 牌组详情面板 {
   onPreviewHold: () => void = (): void => {};
   onPreviewCancel: () => void = (): void => {};
   @Prop @Watch('publishInterface') filteredBusy: boolean = false;
-  onFilteredAction: (id: string) => void = (): void => {};
   onActionAnchorChange: (anchor: HomeActionAnchor) => void = (_anchor: HomeActionAnchor): void => {};
   @StorageProp('导航条高度') private navigationBottomInset: number = 0;
   @Prop 是否深色: boolean = false;
@@ -81,44 +73,28 @@ export struct 牌组详情面板 {
   添加卡片: () => void = (): void => {
   };
   onCreateWithAI: () => void = (): void => {};
-  onMoveDeck: () => void = (): void => {};
-  onRenameDeck: () => void = (): void => {};
-  创建子牌组: () => void = (): void => {
-  };
-  导出牌组: () => void = (): void => {
-  };
-  打开牌组选项: () => void = (): void => {
-  };
+  onMore: () => void = (): void => {};
   预览: () => void = (): void => {
   };
 
-  @State @Watch('publishInterface') private 显示更多: boolean = false;
   private interfaceMounted: boolean = false;
-  private moreReveal: ExpansionReveal = new ExpansionReveal();
   @StorageProp(颜色键.新卡计数色) private 新卡计数色: string = '#3974D9';
   @StorageProp(颜色键.学习中计数色) private 学习中计数色: string = '#B56A22';
   @StorageProp(颜色键.复习中计数色) private 复习中计数色: string = '#7056C8';
   @StorageProp(颜色键.动作主色) private 动作主色: string = '#2F5FD0';
-  // 更多及其子按钮共用按下状态。
+  @StorageProp(颜色键.页面底色微染) private 页面底色微染: string = '';
 
   aboutToAppear(): void { this.interfaceMounted = true; this.publishInterface(); }
 
   aboutToDisappear(): void {
     this.interfaceMounted = false;
     appInterface.leave('deck_details');
-    appInterface.leave('deck_details_more');
-    this.moreReveal.cancel();
-  }
-
-  private moreItems(): AppInterfaceItem[] {
-    return deckDetailsMoreItems(this.Agent入口已启用,
-      this.主页快照数据.decks.some((deck: 牌组汇总): boolean => deck.id === this.选中牌组Id && deck.filtered === true));
   }
 
   private publishInterface(): void {
     if (!this.interfaceMounted) return;
     const deck: 牌组汇总 | undefined = this.主页快照数据.decks.find((entry: 牌组汇总): boolean => entry.id === this.选中牌组Id);
-    if (deck === undefined) { appInterface.leave('deck_details'); appInterface.leave('deck_details_more'); return; }
+    if (deck === undefined) { appInterface.leave('deck_details'); return; }
     appInterface.observe({ surface: 'deck_details', sectionId: this.showHeaderActions ? 'wide' : 'compact',
       selectedId: deck.id, optionIds: [], optionLabels: [], busy: this.牌组选项加载中,
       values: [{ id: 'name', value: 牌组显示名(deck) }, { id: 'core_name', value: deck.fullName }, { id: 'filtered', value: String(deck.filtered === true) },
@@ -126,43 +102,11 @@ export struct 牌组详情面板 {
           (this.headerActionHeight > 0 ? 'above_card' : 'hidden') : 'toolbar_right' },
         { id: 'header_actions_style', value: 'icons' },
         { id: 'header_actions_layout', value: this.showHeaderActions ? (this.headerActionHeight > 0 ?
-          (this.Agent入口已启用 ? 'add_note:left,agent:after_add_note,preview:right' : 'add_note:left,preview:right') : 'hidden') :
-          (this.Agent入口已启用 ? 'add_note:right_group,agent:right_group,preview:right_group' : 'add_note:right_group,preview:right_group') },
+          (this.Agent入口已启用 ? 'add_note:left,agent:after_add_note,preview:right_group,more:right' : 'add_note:left,preview:right_group,more:right') : 'hidden') :
+          (this.Agent入口已启用 ? 'add_note:right_group,agent:right_group,preview:right_group,more:right_group' : 'add_note:right_group,preview:right_group,more:right_group') },
         { id: 'local_display_name', value: deck.displayName }, { id: 'description', value: deck.description },
         { id: 'total', value: String(deck.totalCards) }, { id: 'new', value: String(deck.newCount) },
         { id: 'learning', value: String(deck.learningCount) }, { id: 'review', value: String(deck.reviewCount) }] });
-    if (!this.显示更多) { appInterface.leave('deck_details_more'); return; }
-    const items: AppInterfaceItem[] = this.moreItems();
-    appInterface.observe({ surface: 'deck_details_more', sectionId: '', selectedId: deck.id,
-      optionIds: items.map((item: AppInterfaceItem): string => item.id),
-      optionLabels: items.map((item: AppInterfaceItem): string => interfaceItemText(this.getUIContext(), 'deck_details_more', item.id, this.uiLanguage)),
-      busy: this.牌组选项加载中 || this.filteredBusy,
-      items: items.map((item: AppInterfaceItem): AppInterfaceControl => ({ id: item.id,
-        titleKey: item.titleKey,
-        title: interfaceItemText(this.getUIContext(), 'deck_details_more', item.id, this.uiLanguage),
-        enabled: !this.filteredBusy && (item.id !== 'options' || !this.牌组选项加载中), selected: false })) });
-  }
-
-  private selectMoreItem(id: string): void {
-    if (this.filteredBusy || !this.moreItems().some((item: AppInterfaceItem): boolean => item.id === id) ||
-      (id === 'options' && this.牌组选项加载中)) return;
-    this.closeMore();
-    if (id === 'create_child') this.创建子牌组();
-    else if (id === 'move') this.onMoveDeck();
-    else if (id === 'rename') this.onRenameDeck();
-    else if (id === 'options') this.打开牌组选项();
-    else if (id === 'export') this.导出牌组();
-    else if (FILTERED_DECK_ACTIONS.some((item): boolean => item.id === id)) this.onFilteredAction(id);
-  }
-
-  private toggleMore(): void {
-    this.显示更多 = !this.显示更多;
-    this.moreReveal.request(this.显示更多);
-  }
-
-  private closeMore(): void {
-    this.显示更多 = false;
-    this.moreReveal.cancel();
   }
 
   @Builder
@@ -177,7 +121,7 @@ export struct 牌组详情面板 {
 
   @Builder
   private headerActions() {
-    // 制卡和 JIDE 共用左侧工具组，预览始终贴齐卡片右缘。
+    // 制卡和 JIDE 共用左侧工具组，预览与更多位于右侧，更多贴齐右缘。
     Row() {
       ForEach(this.主页快照数据.decks, (deck: 牌组汇总) => {
         if (deck.id === this.选中牌组Id) {
@@ -190,9 +134,13 @@ export struct 牌组详情面板 {
             }
           }
           Blank()
+          Row({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout) }) {
           this.creationAction($r('app.media.ic_common_preview'),
             interfaceItemText(this.getUIContext(), 'deck_details', 'preview', this.uiLanguage),
             (): void => { this.预览(); }, !this.previewBusy, true)
+          this.creationAction($r('app.media.ic_home_more'),
+            interfaceItemText(this.getUIContext(), 'deck_details', 'more', this.uiLanguage), (): void => { this.onMore(); })
+          }
         }
       }, (deck: 牌组汇总): string => deck.id)
     }
@@ -226,17 +174,18 @@ export struct 牌组详情面板 {
   // 直接在 build() 中用 ForEach + if 从 @Consume snapshot 渲染。
   // ForEach 建立 @Consume 主页快照数据 响应式依赖，
   // if (deck.id === this.选中牌组Id) 建立 @Consume 选中牌组Id 依赖。
-  // B12-Y2 2026-07-23：Scroll 包裹，"更多"展开后内容超出时可滚动，开始学习按钮 不被推出边界。
+  // 详情内容独立滚动，开始学习按钮固定在底部。
   //
   // @副作用
   // 无。仅上抛回调。
   // ========================================================
+
   build() {
     Stack() {
       Column() {
       if (this.showHeaderActions && this.headerActionHeight > 0) { this.headerActions() }
-      // B12-Y2 2026-07-23：Scroll 包裹，"更多"展开后内容超出时可滚动，开始学习按钮 不被推出边界
-      Scroll(this.moreReveal.scroller) {
+      // 详情内容独立滚动，开始学习按钮固定在底部。
+      Scroll() {
       Column({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout) }) {
         // 第 6 次修复：完全绕过 @State/@Watch/@Builder 间接响应链，
         // 直接在 build() 中用 ForEach + if 从 @Consume 主页快照数据 渲染。
@@ -262,8 +211,9 @@ export struct 牌组详情面板 {
                 Text(interfaceItemText(this.getUIContext(), 'deck_details', 'total', this.uiLanguage))
                   .fontSize(应用尺寸.字号_正文)
                   .fontColor($r('app.color.text_secondary'))
-                Blank()
+                  .layoutWeight(1).wordBreak(WordBreak.NORMAL).margin({ right: 8 })
                 Text(deck.totalCards.toString())
+                  .flexShrink(0)
                   .fontSize(应用尺寸.字号_卡片标题)
                   .fontWeight(FontWeight.Bold)
                   .fontColor($r('app.color.text_primary'))
@@ -273,8 +223,9 @@ export struct 牌组详情面板 {
                 Text(interfaceItemText(this.getUIContext(), 'deck_details', 'new', this.uiLanguage))
                   .fontSize(应用尺寸.字号_正文)
                   .fontColor($r('app.color.text_secondary'))
-                Blank()
+                  .layoutWeight(1).wordBreak(WordBreak.NORMAL).margin({ right: 8 })
                 Text(deck.newCount.toString())
+                  .flexShrink(0)
                   .fontSize(应用尺寸.字号_卡片标题)
                   .fontWeight(FontWeight.Bold)
                   .fontColor(this.新卡计数色)
@@ -284,8 +235,9 @@ export struct 牌组详情面板 {
                 Text(interfaceItemText(this.getUIContext(), 'deck_details', 'learning', this.uiLanguage))
                   .fontSize(应用尺寸.字号_正文)
                   .fontColor($r('app.color.text_secondary'))
-                Blank()
+                  .layoutWeight(1).wordBreak(WordBreak.NORMAL).margin({ right: 8 })
                 Text(deck.learningCount.toString())
+                  .flexShrink(0)
                   .fontSize(应用尺寸.字号_卡片标题)
                   .fontWeight(FontWeight.Bold)
                   .fontColor(this.学习中计数色)
@@ -295,8 +247,9 @@ export struct 牌组详情面板 {
                 Text(interfaceItemText(this.getUIContext(), 'deck_details', 'review', this.uiLanguage))
                   .fontSize(应用尺寸.字号_正文)
                   .fontColor($r('app.color.text_secondary'))
-                Blank()
+                  .layoutWeight(1).wordBreak(WordBreak.NORMAL).margin({ right: 8 })
                 Text(deck.reviewCount.toString())
+                  .flexShrink(0)
                   .fontSize(应用尺寸.字号_卡片标题)
                   .fontWeight(FontWeight.Bold)
                   .fontColor(this.复习中计数色)
@@ -305,59 +258,14 @@ export struct 牌组详情面板 {
             }
             .width('100%')
             .padding(应用尺寸.卡片内边距)
-            .backgroundColor($r('app.color.surface_card'))
             .border(SurfaceBorder.options())
             .borderRadius(应用尺寸.圆角_指标卡)
+            .attributeModifier(SeriesVisual.insetSurface(this.surfaceMaterial, this.是否深色, this.动作主色, this.页面底色微染, 应用尺寸.圆角_卡片))
 
             DeckStudyHistoryCard({
               search: deckHistorySearch(deck.id, this.主页快照数据.decks),
               refreshToken: this.historyRefreshToken
             })
-
-            Row() {
-              DisclosureChevron()
-                .rotate({ angle: this.显示更多 ? 90 : 0 })
-                .animation(disclosureAnimation())
-              Text(interfaceItemText(this.getUIContext(), 'deck_details', 'more', this.uiLanguage))
-                .fontSize(应用尺寸.字号_按钮)
-                .fontColor($r('app.color.text_primary'))
-                .layoutWeight(1)
-                .textAlign(TextAlign.Center)
-              Blank()
-                .width(24)
-            }
-            .width('100%')
-            .height(应用尺寸.按钮高度)
-            .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
-            .attributeModifier(new GlassSurface(this.glassColors))
-            .borderRadius(应用尺寸.圆角_胶囊)
-            .onClick((): void => {
-              this.toggleMore();
-            })
-
-            if (this.显示更多) {
-              Column({ space: 应用尺寸.间距_8 }) {
-                ForEach(this.moreItems(), (item: AppInterfaceItem) => {
-                Button(item.id === 'options' && this.牌组选项加载中 ? $r('app.string.deck_options_loading') :
-                  interfaceItemText(this.getUIContext(), 'deck_details_more', item.id, this.uiLanguage))
-                  .width('100%')
-                  .height(应用尺寸.按钮高度)
-                  .fontSize(应用尺寸.字号_按钮)
-                  .fontColor($r('app.color.text_primary'))
-                  .attributeModifier(new GlassSurface(this.glassColors))
-                  .stateEffect(false)
-                  .borderRadius(应用尺寸.圆角_胶囊)
-                  .onClick((): void => {
-                    this.selectMoreItem(item.id);
-                  })
-                  .enabled(item.id !== 'options' || !this.牌组选项加载中)
-                }, (item: AppInterfaceItem): string => item.id)
-              }
-              .width('100%')
-              .onAreaChange((_oldArea: Area, newArea: Area): void => {
-                this.moreReveal.revealAfterLayout(this.显示更多, Number(newArea.height));
-              })
-            }
 
             if (this.牌组选项错误 !== '') {
               Text(this.牌组选项错误)
@@ -372,7 +280,7 @@ export struct 牌组详情面板 {
         }, (deck: 牌组汇总) => `${deck.id}_${deck.totalCards}_${deck.newCount}_${deck.learningCount}_${deck.reviewCount}_${deck.displayName}`)
       }
       .alignItems(HorizontalAlign.Start)
-      .width('100%')
+        .width('100%')
       .padding({
         left: 应用尺寸.卡片内边距,
         right: 应用尺寸.卡片内边距,
@@ -385,9 +293,9 @@ export struct 牌组详情面板 {
       .align(Alignment.Top)
       .scrollBar(BarState.Off)
       .edgeEffect(EdgeEffect.Spring)
-      .backgroundColor($r('app.color.surface_card'))
       .border(SurfaceBorder.options())
       .borderRadius(应用尺寸.圆角_卡片)
+      .attributeModifier(SeriesVisual.clearSurface(this.surfaceMaterial, this.是否深色, this.动作主色, this.页面底色微染))
       .clip(true)
       // 操作区自己贡献唯一的区块间距，避免卡片 margin 与按钮 padding 叠加。
       .margin({ bottom: 0 })
@@ -395,6 +303,7 @@ export struct 牌组详情面板 {
         if (deck.id === this.选中牌组Id) {
           Row() {
             开始学习按钮({
+
               开始学习回调: (): void => { this.开始学习(); }
             })
           }

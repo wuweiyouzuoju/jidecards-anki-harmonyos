@@ -26,7 +26,6 @@ export struct HomeDeckDetails {
   @Prop isDark: boolean = false;
   @Prop optionsBusy: boolean = false;
   @Prop filteredBusy: boolean = false;
-  onFilteredAction: (id: string) => void = (): void => {};
   @Prop historyRefreshToken: number = 0;
   @Prop @Watch('closePreviewMenu') deckId: string = '';
   @Prop @Watch('publishInterface') previewBusy: boolean = false;
@@ -47,11 +46,7 @@ export struct HomeDeckDetails {
   onMenuStateChange: (open: boolean) => void = (_open: boolean): void => {};
   onAddNote: () => void = (): void => {};
   onCreateWithAI: () => void = (): void => {};
-  onCreateChild: () => void = (): void => {};
-  onMoveDeck: () => void = (): void => {};
-  onRenameDeck: () => void = (): void => {};
-  onExport: () => void = (): void => {};
-  onOptions: () => void = (): void => {};
+  onMore: () => void = (): void => {};
 
   aboutToAppear(): void {
     this.interfaceMounted = true;
@@ -69,7 +64,7 @@ export struct HomeDeckDetails {
     if (!this.interfaceMounted) return;
     if (!this.compact || !this.foreground || this.previewMenuOpen) { appInterface.leave('deck_actions'); return; }
     const items: AppInterfaceItem[] = visibleInterfaceItems('deck_details', { simple: false, agent: this.agentEnabled,
-      cloudDeck: false, themeHasTextures: false }).filter((item: AppInterfaceItem): boolean => ['add_note', 'agent', 'preview'].includes(item.id));
+      cloudDeck: false, themeHasTextures: false }).filter((item: AppInterfaceItem): boolean => ['add_note', 'agent', 'preview', 'more'].includes(item.id));
     appInterface.observe({ surface: 'deck_actions', sectionId: 'toolbar_right', selectedId: this.deckId, busy: this.previewBusy,
       optionIds: items.map((item: AppInterfaceItem): string => item.id),
       optionLabels: items.map((item: AppInterfaceItem): string => interfaceItemText(this.getUIContext(), 'deck_details', item.id, this.uiLanguage)),
@@ -165,7 +160,11 @@ export struct HomeDeckDetails {
                 label: interfaceItemText(this.getUIContext(), 'deck_details', 'preview', this.uiLanguage),
                 isInteractive: this.deckId !== '' && !this.previewBusy, slideMenu: true, onHoldOpen: (): void => { this.openPreviewMenu(); },
                 onHoldCancel: (): void => { this.previewMenuOpen = false; }, onAction: (): void => { this.openPreviewMenu(); } })
+              IconActionButton({ toolbarStyle: true, source: $r('app.media.ic_home_more'),
+                label: interfaceItemText(this.getUIContext(), 'deck_details', 'more', this.uiLanguage),
+                isInteractive: this.deckId !== '', onAction: (): void => { this.selectAction(this.onMore); } })
             }
+
           }
           .width('100%')
           .height(应用尺寸.pageToolbarHeight(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop))
@@ -175,11 +174,12 @@ export struct HomeDeckDetails {
             top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop),
             bottom: 0
           })
-          .backgroundColor(this.页面底色微染值)
+          .backgroundColor(Color.Transparent)
           .onAreaChange((_old: Area, area: Area): void => { this.compactAnchorChanged(area); })
         }
 
       牌组详情面板({
+
           historyRefreshToken: this.historyRefreshToken,
           showHeaderActions: !this.compact,
           headerActionHeight: this.headerActionHeight,
@@ -197,24 +197,13 @@ export struct HomeDeckDetails {
             this.onAddNote();
           },
           onCreateWithAI: (): void => { this.onCreateWithAI(); },
-          onMoveDeck: (): void => { this.onMoveDeck(); },
-          onRenameDeck: (): void => { this.onRenameDeck(); },
-          filteredBusy: this.filteredBusy, onFilteredAction: (id: string): void => { this.onFilteredAction(id); },
-          创建子牌组: (): void => {
-            this.onCreateChild();
-          },
-          导出牌组: (): void => {
-            this.onExport();
-          },
-          打开牌组选项: (): void => {
-            this.onOptions();
-          }
+          onMore: (): void => { this.selectAction(this.onMore); }
         })
-        .layoutWeight(1)
+        .id('home-deck-details-' + this.deckId).layoutWeight(1)
       }
       .width('100%')
       .height('100%')
-      .backgroundColor(this.compact ? this.页面底色微染值 : Color.Transparent)
+      .backgroundColor(Color.Transparent)
       if (this.previewMenuOpen && this.actionAnchor.width > 0) {
         AnchoredMenu({ menuWidth: Math.min(应用尺寸.compactMenuWidth, this.actionAnchor.width), alignEnd: true, slideScope: this.previewSlideScope,
           contentLeft: this.menuAnchor().left, contentMaxWidth: this.actionAnchor.width,
