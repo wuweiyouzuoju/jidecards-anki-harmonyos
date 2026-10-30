@@ -1,4 +1,9 @@
 {
+  "NoteLinks": {"id":1007,"methods":{"graph":0,"resolve":1},"owner":"native/rsharmony/src/note_links.rs",
+    "contracts":{
+      "graph":{"input":"anki.generic.String","output":"anki.generic.String","meaning":"只读笔记引用元数据；关系由笔记字段同步，HTML不是事实来源"},
+      "resolve":{"input":"anki.generic.String","output":"anki.generic.String","meaning":"最多200个GUID；参数绑定查询本机笔记及卡片，仅读取"}
+    }},
   "MediaSnapshot": {
     "id":1000,"methods":{"check":0,"report":1,"unused":2,"trash":3,"end":4,"missingNotes":5,"tagMissing":6},
     "owner":"native/rsharmony/src/media_snapshot.rs",

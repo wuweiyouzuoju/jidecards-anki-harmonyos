@@ -2750,7 +2750,9 @@
         "entry/src/main/ets/backend/标签服务.ts",
         "entry/src/main/ets/backend/笔记服务.ts",
         "entry/src/main/ets/backend/笔记类型服务.ts",
+        "entry/src/main/ets/components/links/NoteLinksDraftPanel.ets",
         "entry/src/main/ets/model/NoteHtmlTools.ts",
+        "entry/src/main/ets/model/NoteReferences.ts",
         "entry/src/main/ets/model/NoteRichText.ts",
         "entry/src/main/ets/proto/messages/CardRenderingMessages.ts",
         "entry/src/main/ets/proto/messages/NotetypeMessages.ts",
@@ -2785,7 +2787,9 @@
       "callers": [
         "entry/src/main/ets/backend/笔记服务.ts",
         "entry/src/main/ets/backend/笔记类型服务.ts",
+        "entry/src/main/ets/model/NoteLinks.ts",
         "entry/src/main/ets/model/NoteMediaParts.ts",
+        "entry/src/main/ets/model/NoteReferences.ts",
         "entry/src/main/ets/model/NoteRichText.ts",
         "entry/src/main/ets/model/agent/AgentNoteMedia.ts",
         "entry/src/main/ets/proto/messages/NotetypeMessages.ts"
@@ -9384,6 +9388,26 @@
     }
   ],
   "privateRpc": {
+    "NoteLinks": {
+      "id": 1007,
+      "methods": {
+        "graph": 0,
+        "resolve": 1
+      },
+      "owner": "native/rsharmony/src/note_links.rs",
+      "contracts": {
+        "graph": {
+          "input": "anki.generic.String",
+          "output": "anki.generic.String",
+          "meaning": "只读笔记引用元数据；关系由笔记字段同步，HTML不是事实来源"
+        },
+        "resolve": {
+          "input": "anki.generic.String",
+          "output": "anki.generic.String",
+          "meaning": "最多200个GUID；参数绑定查询本机笔记及卡片，仅读取"
+        }
+      }
+    },
     "MediaSnapshot": {
       "id": 1000,
       "methods": {

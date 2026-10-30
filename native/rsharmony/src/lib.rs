@@ -11,6 +11,7 @@ pub mod custom_scheduling;
 pub mod deck_preview;
 mod media_snapshot;
 pub mod note_duplicates;
+pub mod note_links;
 pub mod peer_collection;
 pub mod peer_progress;
 mod private_rpc_ids;
@@ -378,6 +379,9 @@ impl RawBackend for AnkiBackend {
         }
         if service == note_duplicates::SERVICE {
             return note_duplicates::call(&self.0, method, input);
+        }
+        if service == note_links::SERVICE {
+            return note_links::call(&self.0, method, input);
         }
         if service == peer_progress::SERVICE {
             return peer_progress::call(&self.0, method, input);
