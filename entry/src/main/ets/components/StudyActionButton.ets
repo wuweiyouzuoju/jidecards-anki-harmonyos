@@ -10,6 +10,7 @@ import { 应用尺寸 } from '../utils/应用尺寸';
  */
 @Component
 export struct StudyActionButton {
+  @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp(GLASS_COLORS_KEY) private glassColors: string[] = GLASS_HIGHLIGHT_COLORS;
   @Prop label: ResourceStr;
   @Prop subtitle: string = '';
@@ -44,7 +45,7 @@ export struct StudyActionButton {
       .fontSize(this.labelFontSize)
       .fontColor(this.labelColor)
       // 公共多态表面拥有按压反馈，不叠加 Button 默认效果。
-      .attributeModifier(new GlassSurface(this.glassColors, this.fillColor))
+      .attributeModifier(new GlassSurface(this.surfaceMaterial, this.glassColors, this.fillColor))
       .stateEffect(false)
       .borderRadius(应用尺寸.圆角_面板)
       .onClick((): void => {
