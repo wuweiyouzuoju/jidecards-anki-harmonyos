@@ -2,13 +2,13 @@
 
 [![CI](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/actions/workflows/ci.yml/badge.svg)](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/actions/workflows/ci.yml)
 [![License: AGPL-3.0-or-later](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](LICENSE)
-[![Source 3.8.0](https://img.shields.io/badge/source-3.8.0-6750a4.svg)](AppScope/app.json5)
+[![Source 3.8.1](https://img.shields.io/badge/source-3.8.1-6750a4.svg)](AppScope/app.json5)
 [![AppGallery 2.9.98](https://img.shields.io/badge/AppGallery-2.9.98-0a59f7.svg)](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare)
 [![HarmonyOS NEXT](https://img.shields.io/badge/platform-HarmonyOS%20NEXT-0a59f7.svg)](https://www.harmonyos.com/)
 
 jidecards（中文名“记得闪卡”）是面向 HarmonyOS NEXT 的开源闪卡学习应用，支持鸿蒙手机、平板和电脑。导入 Anki 牌组后，可以离线复习、编辑资料、查看学习统计，并通过 AnkiWeb 同步。原生界面由 ArkTS/ArkUI 实现，集合、模板渲染、调度和同步复用锁定版本的 Anki Rust Core。
 
-**当前源码版本：3.8.0（versionCode 3101）** · **华为应用市场版本：2.9.98**
+**当前源码版本：3.8.1（versionCode 3102）** · **华为应用市场版本：2.9.98**
 
 每天一点，把知识记牢。用闪卡整理知识，以间隔复习建立自己的学习节奏。
 
@@ -39,11 +39,13 @@ jidecards（中文名“记得闪卡”）是面向 HarmonyOS NEXT 的开源闪�
 - [版本与发布](#版本与发布)
 - [许可证与第三方声明](#许可证与第三方声明)
 
+当前源码 3.8.1 修复搜索框材质覆盖并改善固定字段图标，见[3.8.1 更新说明](docs/releases/3.8.1.md)。
+
 ## 项目特点
 
 以下介绍当前 `main` 的源码能力；应用市场实际上架版本以下载页面为准。
 
-当前源码 3.8.0 相对 3.5.4 重整原生界面与材质，完善动效、牌组布局、字段与绘图编辑，新增轮盘自动展开设置并改善地区语言体验。双端引用与传统浏览为此前已有能力。调度与集合仍由锁定的 Anki Core 执行，详情见[3.8.0 更新说明](docs/releases/3.8.0.md)。
+3.8.0 相对 3.5.4 重整原生界面与材质，完善动效、牌组布局、字段与绘图编辑，新增轮盘自动展开设置并改善地区语言体验。双端引用与传统浏览为此前已有能力。调度与集合仍由锁定的 Anki Core 执行，详情见[3.8.0 更新说明](docs/releases/3.8.0.md)。
 
 ### 本轮界面与使用体验
 
