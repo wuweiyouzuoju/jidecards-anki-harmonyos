@@ -23,6 +23,10 @@ export interface SettingsGroup {
 
 /** 分组顺序、标题和项名称共用；设置面板从此处选择实际渲染的卡片。 */
 export const SETTINGS_GROUPS: SettingsGroup[] = [
+  { id: 'editor_wheel', sectionId: 'editor', titleKey: 'settings_editor_wheel', items: [
+    { id: 'editor_wheel_on_entry', titleKey: 'editor_wheel_on_entry', settingId: 'editor_wheel_on_entry' },
+    { id: 'editor_wheel_on_keyboard', titleKey: 'editor_wheel_on_keyboard', settingId: 'editor_wheel_on_keyboard' }
+  ] },
   { id: 'general_display', sectionId: 'general', titleKey: 'settings_general_display', items: [
     { id: 'language', titleKey: 'settings_language', settingId: 'language' },
     { id: 'home_today_summary', titleKey: 'settings_home_today_summary', settingId: 'home_today_summary' }

@@ -3,6 +3,8 @@
 /** 设置的语义图标入口；同义动作复用首页/学习已有资源。 */
 export function settingsIcon(id: string): Resource {
   switch (id) {
+    case 'editor':
+    case 'editor_wheel': return $r('app.media.ic_study_edit');
     case 'home_today_summary':
       return $r('app.media.ic_home_stats');
     case 'general':

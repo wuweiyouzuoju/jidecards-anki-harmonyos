@@ -57,6 +57,10 @@ interface NoteEditorOptionSelection {
 /** 三个笔记入口共用；可视编辑仅接管可保真理解的文字 HTML，复杂内容保留源码。 */
 @Component
 export struct NoteFieldEditor {
+  @StorageProp('editor_wheel_on_entry') private wheelOnEntry: boolean = true;
+  @StorageProp('editor_wheel_on_keyboard') private wheelOnKeyboard: boolean = true;
+  @StorageProp('windowKeyboardTopVp') @Watch('keyboardVisibilityChanged') private wheelKeyboardTop: number = 0;
+  private keyboardWasVisible: boolean = false;
   private keyboardSession: KeyboardPressSession = new KeyboardPressSession();
   @Consume(NOTE_EDITOR_WHEEL_SESSION_KEY) private wheelSession: NoteEditorWheelSession = new NoteEditorWheelSession();
   @StorageProp('surface_material') private fieldMaterial: string = 'flat';
@@ -133,7 +137,10 @@ export struct NoteFieldEditor {
     this.reportMode();
     this.wheelSession.register(this.inputKey, !this.disabled && this.foreground, (active: boolean): void => {
       this.wheelActive = active;
-      if (active) this.showWheel(); else { this.hideWheel(true); this.closeFormat(); }
+      if (active) {
+        if (this.fieldFocused && this.wheelKeyboardTop > 0 ? this.wheelOnKeyboard : this.wheelOnEntry) this.showWheel();
+        else this.hideWheel(true);
+      } else { this.hideWheel(true); this.closeFormat(); }
     });
   }
   aboutToDisappear(): void {
@@ -837,6 +844,19 @@ export struct NoteFieldEditor {
     this.updateWheel();
   }
   private fieldFocus(): void { this.fieldFocused = true; this.wheelSession.activate(this.inputKey); }
+  private keyboardVisibilityChanged(): void {
+    const visible: boolean = this.wheelKeyboardTop > 0;
+    const opened: boolean = visible && !this.keyboardWasVisible;
+    this.keyboardWasVisible = visible;
+    if (!opened || !this.fieldFocused || !this.wheelActive) return;
+    if (this.wheelOnKeyboard) this.showWheel(); else this.hideWheel();
+  }
+  private toggleWheelManually(): void {
+    if (this.disabled || this.disposed || !this.foreground) return;
+    const closing: boolean = this.wheelVisible;
+    this.wheelSession.activate(this.inputKey);
+    if (closing) this.hideWheel(); else this.showWheel();
+  }
   private fieldBlur(): void { this.fieldFocused = false; this.keyboardSession.reset(); }
   private showWheel(): void {
     if (!this.wheelActive || this.disposed || this.disabled || !this.foreground || this.hintDialog.current() !== null ||
@@ -949,7 +969,7 @@ export struct NoteFieldEditor {
             top: 应用尺寸.间距_10, bottom: 应用尺寸.间距_10 }).enabled(!this.disabled)
           .defaultFocus(this.sourceToolFocus)
           .onFocus((): void => { this.fieldFocus(); }).onBlur((): void => { this.fieldBlur(); })
-          .onTouch((event: TouchEvent): void => { if (this.fieldFocused && event.type === TouchType.Down) this.showWheel(); })
+          .onTouch((event: TouchEvent): void => { if (this.fieldFocused && this.wheelOnKeyboard && event.type === TouchType.Down) this.showWheel(); })
           .onChange((text: string): void => { this.sourceChanged(text); })
           .onTextSelectionChange((start: number, end: number): void => { this.sourceSelectionChanged(start, end); })
       } else {
@@ -962,7 +982,7 @@ export struct NoteFieldEditor {
             top: 应用尺寸.间距_10, bottom: 应用尺寸.间距_10 }).enabled(!this.disabled)
           .defaultFocus(this.sourceToolFocus)
           .onFocus((): void => { this.fieldFocus(); }).onBlur((): void => { this.fieldBlur(); })
-          .onTouch((event: TouchEvent): void => { if (this.fieldFocused && event.type === TouchType.Down) this.showWheel(); })
+          .onTouch((event: TouchEvent): void => { if (this.fieldFocused && this.wheelOnKeyboard && event.type === TouchType.Down) this.showWheel(); })
           .onReady((): void => { this.richReady(); this.inputLaidOut = true; this.focusRequested(); })
           .onSelectionChange((range: RichEditorRange): void => { this.richSelectionChanged(range); })
           .onWillChange((change: RichEditorChangeValue): boolean => change.replacedImageSpans.length === 0 && change.replacedSymbolSpans.length === 0)
@@ -973,6 +993,11 @@ export struct NoteFieldEditor {
         .clip(true)
       // 操作行放在输入框边界外，不缩短或覆盖正文视口。
       Row() {
+      IconActionButton({ source: $r('app.media.ic_editor_wheel'),
+        label: this.wheelVisible ? $r('app.string.note_editor_wheel_close') : $r('app.string.note_editor_wheel_open'),
+        controlSize: 32, controlGlyphSize: 18, surface: Color.Transparent, isInteractive: !this.disabled,
+        onAction: (): void => { this.toggleWheelManually(); } })
+        .focusOnTouch(false).focusable(false)
       Blank()
       IconActionButton({ source: $r('app.media.' + noteFieldExpansionTool(this.expanded).iconKey),
         label: $r('app.string.' + noteFieldExpansionTool(this.expanded).titleKey),

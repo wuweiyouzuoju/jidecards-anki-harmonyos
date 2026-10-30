@@ -57,7 +57,7 @@ test('selected format checks only intersecting runs and handles mixed text and S
   for(const weight of [5,6,7,8,9,11,600,700]) assert.equal(rich.richResultIsBold(weight),true);
 });
 
-function editor(html='',fieldConfig=null,wheelSession=null,uniqueId=123) {
+function editor(html='',fieldConfig=null,wheelSession=null,uniqueId=123,wheelPreferences={}) {
   const changes=[], seen=new Set(), dialogs=[], patches=[], typing=[], selections=[];
   let spans=[], caret=0;
   const overlay=[],focusRequests=[],sourceCarets=[], timers=new Map(); let timerId=0;
@@ -98,6 +98,7 @@ function editor(html='',fieldConfig=null,wheelSession=null,uniqueId=123) {
     dialogs.push(dialog);return dialog;
   };
   if(wheelSession!==null)instance.wheelSession=wheelSession;
+  Object.assign(instance,wheelPreferences);
   instance.aboutToAppear();instance.ready=!instance.sourceMode;
   if(instance.ready)instance.loadRich(rich.parseNoteRichText(html));
   return {instance,controller,changes,seen,dialogs,patches,typing,selections,overlay,timers,focusRequests,sourceCarets,set spans(value){spans=value;}};
@@ -932,4 +933,19 @@ test('header mode requests keep the original conversion guard and do not steal f
  const complex=editor('<table>kept</table>');Object.assign(complex.instance,{modeControlInHeader:true,modeRequest:1,requestedSourceMode:false});
  complex.instance.headerModeRequested();assert.equal(complex.instance.sourceMode,true);assert.deepEqual(complex.changes,[]);
  h.instance.disabled=true;h.instance.requestedSourceMode=true;h.instance.headerModeRequested();assert.equal(h.instance.sourceMode,false);
+});
+
+
+test('editor wheel entry and keyboard preferences are independent and manual toggling always works',()=>{
+ for(const wheelOnEntry of [false,true]) for(const wheelOnKeyboard of [false,true]) {
+  const h=editor('draft',null,null,123,{wheelOnEntry,wheelOnKeyboard});
+  assert.equal(h.instance.wheelVisible,wheelOnEntry);
+  h.instance.fieldFocus();h.instance.wheelKeyboardTop=400;h.instance.keyboardVisibilityChanged();
+  assert.equal(h.instance.wheelVisible,wheelOnKeyboard);
+  h.instance.toggleWheelManually();assert.equal(h.instance.wheelVisible,!wheelOnKeyboard);
+  h.instance.toggleWheelManually();assert.equal(h.instance.wheelVisible,wheelOnKeyboard);
+  assert.equal(h.instance.value,'draft');assert.deepEqual(h.changes,[]);
+  h.instance.aboutToDisappear();h.instance.wheelKeyboardTop=0;h.instance.keyboardVisibilityChanged();
+  h.instance.wheelKeyboardTop=400;h.instance.keyboardVisibilityChanged();assert.equal(h.instance.wheelVisible,false);
+ }
 });

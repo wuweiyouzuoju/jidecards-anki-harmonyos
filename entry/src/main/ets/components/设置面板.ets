@@ -1,3 +1,4 @@
+import { EditorSettings } from './settings/EditorSettings';
 import { GlassSource } from './common/GlassSource';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { LiveSearchField } from './common/LiveSearchField';
@@ -510,6 +511,9 @@ Column() {
                   }
                 })
               }
+            }
+            else if (group.id === 'editor_wheel') {
+              ListItem() { EditorSettings({ isDark: this.是否深色 }) }
             }
             else if (group.id === 'review_controls') {
               ListItem() {

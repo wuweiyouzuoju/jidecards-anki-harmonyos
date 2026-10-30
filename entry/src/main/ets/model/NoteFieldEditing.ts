@@ -187,7 +187,7 @@ export const NOTE_FIELD_EDITING_SUPPORT: NoteFieldEditingSupport = {
   mediaTools: NOTE_FIELD_MEDIA_TOOLS,
   modeTools: NOTE_FIELD_MODE_TOOLS,
   stickyControl: NOTE_FIELD_STICKY_CONTROL,
-  formPresentation: 'grouped_deck_and_notetype_shared_plain_selection_value_with_settings; draft_preview_icon; preview_flip_card_icon_both_sides_and_replay_audio_icon; visible_tag_card_with_removable_chips_and_existing_picker; reference_navigation_card; original_draft_and_save_guards',
+  formPresentation: 'editor_settings_entry_and_keyboard_wheel_selectors; field_footer_manual_wheel_toggle; grouped_deck_and_notetype_shared_plain_selection_value_with_settings; draft_preview_icon; preview_flip_card_icon_both_sides_and_replay_audio_icon; visible_tag_card_with_removable_chips_and_existing_picker; reference_navigation_card; original_draft_and_save_guards',
   modeControlPlacement: 'note_field_header_compact_current_mode_toggle; other_rich_inputs_keep_local_mode_controls',
   modeControlWideMinWidth: 480,
   modeControlRailWidth: 96,
