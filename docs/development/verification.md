@@ -31,7 +31,7 @@ Node 24.x 与 `package.json` / CI 一致。首次准备或 lockfile 变化后运
 
 首次入门的回归入口为 [check-home-intro-compiled.mjs](../../tools/check-home-intro-compiled.mjs)。HAP 构建后，从仓库根运行 `node tools/check-home-intro-compiled.mjs entry/build/default/cache/default/default@CompileArkTS/esmodule/release/entry/src/main/ets/components/HomeIntroPanel.ts`（debug 包相应替换目录）。需要 Node 24 和本次构建留下的 CompileArkTS 产物；不接受 `.ets` 源码，不依赖旧的入门已读记录。
 
-工具执行真实编译后的 `HomeIntroPanel` / `HomeIntroSection` 及其 BuilderParam 回调，只替换外部组件与平台边界；原始声明式 `Text()` 返回 `undefined`，未转换的 `.fontSize` 链会直接失败。移除幻彩宣传后应渲染五个分组和 13 个 Text 节点；分组或节点缺失、执行异常、产物不存在均非零退出，成功输出文件路径、SHA-256 与渲染计数。工具自身反例在 `home-intro-compiled.test.mjs`，进入 home 测试；它不验证字节码执行、布局、重渲染、原生库或真机兼容性，也不能单独认证上架包。
+工具执行真实编译后的 `HomeIntroPanel` / `HomeIntroSection` 及其 BuilderParam 回调，只替换外部组件与平台边界；原始声明式 `Text()` 返回 `undefined`，未转换的 `.fontSize` 链会直接失败。分页引导按 `HomeIntro.ts` 的目录逐页核对标题、正文与来源分组；任一页内容缺失、执行异常、产物不存在均非零退出，成功输出文件路径、SHA-256 与渲染计数。工具自身反例在 `home-intro-compiled.test.mjs`，进入 home 测试；它不验证字节码执行、布局、重渲染、原生库或真机兼容性，也不能单独认证上架包。
 
 ### 同步服务器编译产物检查
 
@@ -172,3 +172,6 @@ Node 24 测试使用内置 TypeScript 转换，运行时可能输出 `Experiment
 - `.github/workflows/hap.yml` 每周和手动运行 `npm run verify`，需要带 `jidecards-deveco` 标签的 Windows 自托管 runner。Runner 必须预置锁定 SDK、Rust/Anki 及本机签名配置。`clean: false` 保留这些不受版本控制的本机依赖。工作流只运行可信默认分支，不接入 PR 的签名主机执行；配置文件存在不代表 runner 已注册或定时任务已运行。
 
 `npm test -- ui` 按文件名自动包含所有 `ui-*.test.mjs`，避免新增 UI 门禁遗漏；tooling.test 直接验证发现结果。圆角属性顺序门禁为 `ui-surface-border.test.mjs`，扫描器入口是 `tools/arkui-border-order.mjs`，覆盖连续属性链中的多行参数和中间属性；这是源码级检查，设备外观与键盘操作仍单独验收。
+
+
+地区文案、格式、长名称和大字体验收见[地区语言与长文案布局](localization.md)。设备入口为 `node tools/test-locales-device.mjs <connect-key> all`；保留数据覆盖安装，输出矩阵与截图，不以构建通过代替显示验收。

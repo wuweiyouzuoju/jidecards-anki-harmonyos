@@ -39,3 +39,7 @@
 该透明层方案随后被用户明确否定：错误地更换了默认华为笔并移动整个卡面。已撤掉手动模式切换/复位和卡面变换，恢复“更多 → 手写”默认接入华为组件；原版只用于真实失败回退，答案操作容器明确靠底部排列。`D:\Projects\jidecards-penkit-2026-10-06\native-pen-restore\ceshi-artifact\entry-default-signed.hap` 用现有 ceshi 配置构建、SDK 校验并覆盖安装到同一平板，返回 `install bundle successfully`；SHA256 为 `DE2C3E52199304A308A88E836698ED6F444C0AAFF942CB2DD33968CEF32397A2`。前后身份和版本保持不变，回执和审查记录在同级目录。该次安装操作未启动或操作应用，回执只证明安装成功；后续用户确认已经可以在原卡片上直接批注，当前功能与验收范围统一见[手写白板](study-media.md#手写白板)，不能把历史未运行验收的记录当作功能不存在的证据。
 
 `tools/signing-config.ts` 是 Node/Hvigor 的 TypeScript 模块，字段遍历使用 `keyof SigningMaterial` 保持索引类型明确。修改此模块后，还须使用当前 DevEco 自带的 Node/Hvigor 执行 IDE 同步（`--sync -p product=default --analyze=normal --parallel --incremental --daemon`），验证构建脚本类型检查；Node 行为测试不会代替这项检查。
+
+## Mac 编译验收
+
+Mac 使用 `npm run build:app -- --unsigned` 显式生成无签名 HAP；默认仍要求本机签名文件。该选项仅修改当前构建进程的配置，不更换证书或改写原材料。入口与警告门禁见 [Mac 构建](mac-build.md)。旧机器加密密码在 Mac 不能解密时，需要以原证书的真实密码重新配置，不能用电脑登录密码代替。
