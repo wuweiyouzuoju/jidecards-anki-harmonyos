@@ -1,11 +1,10 @@
+import { SelectionValueButton } from './SelectionValueButton';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { DirectoryRow, DirectoryView, directorySelectionAllowed } from '../../model/DirectoryTree';
 import { DirectorySelectDialog } from './DirectorySelectDialog';
-import { DisclosureChevron } from './DisclosureChevron';
 import { FormSelectRow } from './FormSelectRow';
 import { NativeDialogHost, NativeDialogFactory, NativeDialogDismiss, NativeDialogPresentation } from './NativeDialogHost';
 import { SelectStyle } from '../../utils/SelectStyle';
-import { PressFeedback } from '../../utils/PressFeedback';
 import { showToastSafely } from '../../utils/UiFeedback';
 
 /** 下拉外观的目录入口；窗口、搜索和列表共用公共实现，业务仍按稳定 ID 选择。 */
@@ -50,7 +49,7 @@ export struct DirectorySelect {
         } }),
       onWillDismiss: dismiss, autoCancel: presentation.autoCancel, customStyle: presentation.customStyle,
       alignment: presentation.alignment, width: presentation.width, height: presentation.height,
-      maskColor: presentation.maskColor, openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation
+      keyboardAvoidMode: presentation.keyboardAvoidMode, maskColor: presentation.maskColor, openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation
     });
   };
   aboutToAppear(): void { this.alive = true; this.dialog.activate(); this.syncRows(); this.openRequested(); }
@@ -80,22 +79,9 @@ export struct DirectorySelect {
   }
   @Builder
   private control(fill: boolean = false) {
-    Button() {
-      Row({ space: SelectStyle.controlSpace }) {
-        Text(this.value).fontSize(SelectStyle.controlFont.size).fontWeight(SelectStyle.controlFont.weight)
-          .fontColor($r('app.color.text_primary')).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-          .constraintSize({ minWidth: 0 }).layoutWeight(1)
-        DisclosureChevron().rotate({ angle: 90 }).flexShrink(0)
-      }.width('100%')
-    }.type(ButtonType.Normal).width(fill ? '100%' : this.controlWidth())
-      .constraintSize(fill ? { maxWidth: '100%' } : this.labelActionIcon !== undefined ?
-        SelectStyle.fieldConstraint : SelectStyle.directoryFieldConstraint).flexShrink(0)
-      .height(SelectStyle.controlHeight).padding(SelectStyle.controlPadding)
-      // Button.border 会覆盖默认圆角，显式圆角必须放在边框之后。
-      .backgroundColor(this.surfaceColor).border(SelectStyle.controlBorder).borderRadius(SelectStyle.controlRadius)
-      .clip(true)
-      .attributeModifier(new PressFeedback()).stateEffect(false).enabled(this.isInteractive && this.rows.length > 0)
-      .accessibilityText(this.value).onClick((): void => { this.open(); })
+    SelectionValueButton({ value: this.value, label: this.label, controlWidth: fill ? '100%' : this.controlWidth(), valueMaxLines: 2,
+      controlMaxWidth: fill ? '100%' : this.labelActionIcon !== undefined ? '56%' : '70%',
+      isInteractive: this.isInteractive && this.rows.length > 0, onAction: (): void => { this.open(); } })
   }
   build() {
     if (this.showLabel) {

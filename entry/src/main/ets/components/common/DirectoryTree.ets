@@ -1,9 +1,10 @@
+import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { DirectoryRow, DirectoryView, DirectoryExpansion, directoryListHeight,
   directoryRowKey, directorySelectionAllowed, visibleDirectoryRows } from '../../model/DirectoryTree';
 import { DisclosureChevron } from './DisclosureChevron';
 import { PressFeedback } from '../../utils/PressFeedback';
-import { FormInputStyle } from '../../utils/FormInputStyle';
+import { LiveSearchField } from './LiveSearchField';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { SelectStyle } from '../../utils/SelectStyle';
 import { mouseContextPoint } from '../../utils/MouseContextInput';
@@ -31,6 +32,7 @@ class DirectoryRowsDataSource implements IDataSource {
 /** 目录唯一渲染入口；不拥有领域选择、存储或写入。外壳内边距只在此贡献一次。 */
 @Component
 export struct DirectoryTree {
+  @StorageProp('surface_material') private material: string = 'flat';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(颜色键.动作主色) private accent: string = '#2F5FD0';
   @Prop @Watch('refresh') rows: DirectoryRow[] = [];
@@ -131,7 +133,7 @@ export struct DirectoryTree {
                 Text(row.name).fontSize(SelectStyle.optionFont.size)
                   .fontWeight(this.selectionMode === 'single' && row.selection === 1 ?
                     SelectStyle.selectedOptionFont.weight : SelectStyle.optionFont.weight)
-                  .fontColor(SelectStyle.selectedOptionColor)
+                  .fontColor(this.selectionMode === 'single' && row.selection === 1 ? this.accent : $r('app.color.text_primary'))
                   .layoutWeight(1).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
                 if (this.selectionMode === 'filter' && row.selectable) {
                   Text(row.selection === 1 ? $r('app.string.custom_study_tags_include') :
@@ -141,11 +143,10 @@ export struct DirectoryTree {
                 if (row.detail !== '') {
                   Text(row.detail).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_tertiary'))
                 }
-              }.width('100%')
+              }.width('100%').padding({ left: 应用尺寸.间距_12, right: 应用尺寸.间距_12 })
             }.layoutWeight(1).height(44)
-              .padding({ left: 应用尺寸.间距_12, right: 应用尺寸.间距_12 })
-              .backgroundColor(this.selectionMode === 'single' && row.selection === 1 ?
-                SelectStyle.selectedOptionSurface : Color.Transparent)
+              .padding(0)
+              .backgroundColor(Color.Transparent)
               .borderRadius(SelectStyle.controlRadius).attributeModifier(new PressFeedback()).stateEffect(false)
               .enabled(this.isInteractive && row.selectable).accessibilityText(this.accessibleLabel(row))
               .onClick((): void => { this.select(row.id); })
@@ -160,16 +161,14 @@ export struct DirectoryTree {
   build() {
     Column({ space: 应用尺寸.间距_8 }) {
       if (this.searchable) {
-        TextInput({ text: this.searchText, placeholder: this.searchPlaceholder })
-          .attributeModifier(new FormInputStyle()).enabled(this.isInteractive)
-          .cancelButton({ style: CancelButtonStyle.INPUT })
-          .onChange((value: string): void => { this.searchText = value; this.refresh(); })
+        LiveSearchField({ value: this.searchText, placeholder: this.searchPlaceholder, isEnabled: this.isInteractive,
+          maximumLength: undefined, debounceMs: 0, onChange: (value: string): void => { this.searchText = value; this.refresh(); } })
       }
       if (this.visible.length === 0) {
         Text(this.emptyLabel).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
       } else {
         Column() { this.list() }.width('100%').padding(this.framed ? 应用尺寸.间距_5 : 0)
-          .backgroundColor(this.framed ? $r('app.color.surface_card') : Color.Transparent)
+          .backgroundColor(this.framed ? insetMaterialFill($r('app.color.surface_card'), this.material) : Color.Transparent)
           .border(this.framed ? SurfaceBorder.options() : { width: 0 }).borderRadius(应用尺寸.圆角_面板)
       }
     }.width('100%').alignItems(HorizontalAlign.Start)

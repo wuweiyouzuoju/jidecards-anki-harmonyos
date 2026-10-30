@@ -263,7 +263,7 @@ test('all directory choices share the renderer and categorical choices keep thei
   assert.doesNotMatch(read('components/home/自定义学习对话框.ets'), /ForEach\(this\.默认值\.tags/);
   assert.match(read('components/common/DirectoryTree.ets'), /LazyForEach/);
   assert.match(read('components/common/DirectorySelectDialog.ets'), /DirectoryTree\([\s\S]*DialogFrame\(/);
-  assert.match(read('components/agent/AgentSetupCard.ets'), /Select\(this\.editNotetypeOptions\(\)\)/);
+  assert.match(read('components/agent/AgentSetupCard.ets'), /SurfaceSelect\(\{ options: this\.editNotetypeOptions\(\)/);
 });
 
 test('browser deck and tag searches use the same tree input and inset while preserving tag domain state', () => {
