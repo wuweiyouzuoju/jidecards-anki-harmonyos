@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { GlassPanel } from './GlassPanel';
+import { GlassBubblePanel } from './GlassBubblePanel';
 import { WINDOW_SAFE_TOP_KEY, WINDOW_SAFE_BOTTOM_KEY, WINDOW_SAFE_LEFT_KEY, WINDOW_SAFE_RIGHT_KEY,
   WINDOW_KEYBOARD_TOP_KEY, keyboardViewportHeight, safeMenuGeometry } from '../../model/WindowSafeLayout';
 import { PAGE_COMPACT_LAYOUT_KEY } from '../../model/AppLayoutState';
@@ -35,6 +37,7 @@ export struct CardActionMenu {
   @Prop items: CardActionMenuEntry[] = [];
   @Prop expandedIds: string[] = [];
   @Prop menuWidth: number = 应用尺寸.compactMenuWidth;
+  @Prop toolbarRight: number | undefined = undefined;
   @Prop topOffset: number | undefined = undefined;
   /** 列表等上下文菜单传宿主局部行矩形；省略时继续使用工具栏定位。 */
   @Prop anchor: ActionMenuAnchor | undefined = undefined;
@@ -52,6 +55,7 @@ export struct CardActionMenu {
   @StorageProp(WINDOW_SAFE_LEFT_KEY) private safeLeft: number = 0;
   @StorageProp(WINDOW_SAFE_RIGHT_KEY) private safeRight: number = 0;
   @StorageProp(WINDOW_KEYBOARD_TOP_KEY) private keyboardTop: number = 0;
+  onPrimaryArea: (area: Area) => void = (_area: Area): void => {};
   onClose: () => void = (): void => {};
   onToggleBranch: (item: CardActionMenuEntry) => void = (_item: CardActionMenuEntry): void => {};
   onSelect: (item: CardActionMenuEntry) => void = (item: CardActionMenuEntry): void => { item.action?.(); };
@@ -207,6 +211,13 @@ export struct CardActionMenu {
       pointerSide: placement.pointerSide, pointerCenter: placement.pointerCenter };
   }
 
+  /** 工具栏已做内容限宽；按真实按钮右缘定位，不能再扣一遍宽屏留白。 */
+  private toolbarLeft(): number | undefined {
+    if (this.toolbarRight === undefined) return undefined;
+    return Math.max(Math.max(0, this.safeLeft - this.viewportLeft),
+      Math.min(this.viewportWidth - this.totalWidth(), this.toolbarRight - this.viewportLeft - this.totalWidth()));
+  }
+
   private menuTop(): number {
     return this.anchoredPlacement()?.top ?? this.topOffset ??
       应用尺寸.pageContentTop(this.statusBarHeight, this.narrowDeckLayout, this.toolbarSafeTop);
@@ -230,12 +241,14 @@ export struct CardActionMenu {
     AnchoredMenuItem({ label: this.rowItem(row).value, slideScope: this.slideScope, slideLayer: row.depth,
       available: row.enabled && !(row.depth === 0 && this.nestedBranch() !== undefined),
       divider: this.rowItem(row).divider ?? index > 0,
-      icon: this.rowItem(row).icon, iconTint: this.rowItem(row).iconTint, labelAlignment: TextAlign.Start,
+      icon: this.rowItem(row).icon, iconTint: this.rowItem(row).iconTint, labelAlignment: TextAlign.Center,
       selected: this.rowItem(row).selected === true,
       selectionUsesAccent: this.rowItem(row).selectionUsesAccent !== false,
       destructive: this.rowItem(row).destructive === true,
       disclosure: row.node.children !== undefined, expanded: this.expandedIds.includes(row.node.id ?? ''),
-      disclosureAngle: row.depth > 0 ? undefined : this.expandedIds.includes(row.node.id ?? '') ? 180 : 90,
+      // 收起向下，展开旋向实际子面板；根分组和覆盖层的方向相反。
+      disclosureAngle: this.expandedIds.includes(row.node.id ?? '') ?
+        (row.depth > 0 ? (this.groupsOnRight() ? 180 : 0) : (this.groupsOnRight() ? 0 : 180)) : 90,
       onSelect: (): void => { this.selectEntry(row); } })
   }
 
@@ -254,7 +267,7 @@ export struct CardActionMenu {
               }, (row: ActionMenuRow): string => `${row.key}-${row.enabled}-${this.rowItem(row).selected}`)
             }
           }
-          .transition(MenuSurface.popupTransition(this.groupsOnRight() ? '0%' : '100%', this.placements()[groupIndex].pointerCenter))
+          
           .onAreaChange((_old: Area, area: Area): void => { this.recordHeight(group.id ?? '', Number(area.height)); })
         }, (group: CardActionMenuEntry): string => group.id ?? '')
       }.width(this.groupWidth() + MenuSurface.pointerDepth)
@@ -263,20 +276,31 @@ export struct CardActionMenu {
 
   @Builder
   private primaryPanel() {
+    if (this.anchor !== undefined && this.anchoredPlacement() !== undefined) {
+      GlassBubblePanel({ panelWidth: this.primaryWidth(), pointerCenter: this.anchoredPlacement()!.pointerCenter,
+        pointerSide: this.anchoredPlacement()!.pointerSide, content: (): void => { this.primaryRows(); } })
+    } else {
+      GlassPanel({ role: 'menu', panelWidth: this.primaryWidth(), content: (): void => { this.primaryRows(); } })
+    }
+  }
+
+  @Builder
+  private primaryRows() {
     Column() {
       ForEach(this.rows().filter((row: ActionMenuRow): boolean => row.depth === 0), (row: ActionMenuRow, index: number) => {
         Column() { this.menuRow(row, index) }
           .onAreaChange((_old: Area, area: Area): void => { this.recordRow(index, Number(area.height)); })
       }, (row: ActionMenuRow, index: number): string => `${row.key}-${index}-${row.enabled}-${this.rowItem(row).selected}`)
-    }.width(this.primaryWidth()).attributeModifier(new MenuSurface(this.anchor === undefined))
+    }.width(this.primaryWidth())
+    .onAreaChange((_old: Area, area: Area): void => { this.onPrimaryArea(area); })
     .hitTestBehavior(this.nestedBranch() === undefined ? HitTestMode.Default : HitTestMode.None)
   }
 
   build() {
     Stack() {
       AnchoredMenu({ menuWidth: this.totalWidth(), alignEnd: true, surfaceVisible: false, slideScope: this.slideScope,
-        contentMaxWidth: this.anchor === undefined ? this.contentWidth : this.totalWidth(),
-        contentLeft: this.anchoredPlacement()?.left, topOffset: this.menuTop(),
+        contentMaxWidth: this.anchor === undefined && this.toolbarRight === undefined ? this.contentWidth : this.totalWidth(),
+        contentLeft: this.anchoredPlacement()?.left ?? this.toolbarLeft(), topOffset: this.menuTop(),
         bubble: this.menuBubble(), maxHeight: this.anchoredPlacement()?.height,
         onClose: (): void => { this.dismissTop(); } }) {
         Stack({ alignContent: Alignment.TopStart }) {
@@ -298,7 +322,7 @@ export struct CardActionMenu {
                 }, (row: ActionMenuRow): string => `${row.key}-${row.enabled}-${this.rowItem(row).selected}`)
               }
             }.position({ x: this.popupX(), y: this.popupPlacement()!.top }).zIndex(1)
-            .transition(MenuSurface.popupTransition(this.groupsOnRight() ? '100%' : '0%', this.popupPlacement()!.pointerCenter))
+            
             .onAreaChange((_old: Area, area: Area): void => { this.recordHeight(this.popupHeightId(), Number(area.height)); })
           }
         }.width(this.totalWidth()).height(this.layoutHeight())

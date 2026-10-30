@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { GlassPanel } from './GlassPanel';
+import { GlassBubblePanel } from './GlassBubblePanel';
 import { WINDOW_KEYBOARD_TOP_KEY, keyboardViewportHeight } from '../../model/WindowSafeLayout';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { PAGE_COMPACT_LAYOUT_KEY } from '../../model/AppLayoutState';
 import { MenuSurface } from './MenuSurface';
 import { ActionMenuBubble, ActionMenuPointerSide } from './ActionMenuLayout';
-import { MenuBubbleSurface } from './MenuBubbleSurface';
 import { MenuSlideScope, menuSlideSession } from '../../model/MenuSlideSession';
 import { safeMenuGeometry, SafeMenuGeometry, WINDOW_SAFE_TOP_KEY, WINDOW_SAFE_BOTTOM_KEY,
   WINDOW_SAFE_LEFT_KEY, WINDOW_SAFE_RIGHT_KEY } from '../../model/WindowSafeLayout';
@@ -26,8 +27,16 @@ export struct AnchoredMenu {
   @Prop contentMaxWidth: Length = '100%';
   /** 实测内容区域在宿主内的左缘；已包含安全区和页面内边距，不能重复叠加。 */
   @Prop contentLeft: number | undefined = undefined;
+  /** 触发按钮实测窗口右缘；存在时只转换一次宿主坐标，不再扣安全区。 */
+  @Prop anchorRight: number | undefined = undefined;
+  @State private viewportLeft: number = 0;
+  @State private viewportWidth: number = 0;
   @Prop cornerRadius: number = 应用尺寸.radiusLg;
   @Prop surfaceVisible: boolean = true;
+  @Prop refractionSource: string = '';
+  @Prop materialRole: string = 'menu';
+  onPanelArea: (area: Area) => void = (_area: Area): void => {};
+  onPrepared: () => void = (): void => {};
   /** 行锚点菜单的主面板轮廓独立于 Scroll；保持尖角固定在所选行边框。 */
   @Prop bubble: ActionMenuBubble | undefined = undefined;
   @Prop maxHeight: number | undefined = undefined;
@@ -55,23 +64,13 @@ export struct AnchoredMenu {
     return Math.min(this.menuGeometry().maxHeight, this.maxHeight ?? this.menuGeometry().maxHeight);
   }
 
-  build() {
-    Stack({ alignContent: this.contentLeft === undefined ? Alignment.Top : Alignment.TopStart }) {
-      Column()
-        .width('100%').height('100%')
-        .backgroundColor(Color.Transparent)
-        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-        .onClick((): void => { this.onClose(); })
-      // 定位容器与宿主工具栏同宽；外部点击承接层仍覆盖整个窗口。
-      Stack({ alignContent: this.alignEnd ? Alignment.TopEnd : Alignment.TopStart }) {
-        if (this.bubble !== undefined && this.renderedHeight > 0) {
-          MenuBubbleSurface({ panelWidth: this.bubble.width, panelHeight: this.renderedHeight,
-            pointerCenter: this.bubble.pointerCenter, pointerSide: this.bubble.pointerSide })
-            .position({ x: this.bubble.left, y: this.menuGeometry().top -
-              (this.bubble.pointerSide === ActionMenuPointerSide.Top ? MenuSurface.pointerDepth : 0) })
-            .transition(MenuSurface.popupTransition(this.bubble.pointerCenter,
-              this.bubble.pointerSide === ActionMenuPointerSide.Bottom ? '100%' : '0%'))
-        }
+  private panelLeft(): number | undefined {
+    if (this.contentLeft !== undefined || this.anchorRight === undefined) return this.contentLeft;
+    return Math.max(0, Math.min(this.viewportWidth - this.menuWidth, this.anchorRight - this.viewportLeft - this.menuWidth));
+  }
+
+  @Builder
+  private menuContent() {
         Scroll(this.scroller) {
           Column() {
             this.content()
@@ -82,26 +81,48 @@ export struct AnchoredMenu {
         .width(this.menuWidth)
         .onDidScroll((): void => { this.slideScope.offset = this.scroller.currentOffset().yOffset; })
         .onAreaChange((_old: Area, area: Area): void => {
-          this.renderedHeight = Number(area.height);
+          this.renderedHeight = Number(area.height); this.onPanelArea(area);
           this.slideScope.clip = { left: Number(area.globalPosition.x), top: Number(area.globalPosition.y),
             width: Number(area.width), height: Number(area.height) };
         })
-        .attributeModifier(new MenuSurface(this.surfaceVisible && this.bubble === undefined, this.cornerRadius))
-        .clip(this.bubble !== undefined || this.surfaceVisible)
-        .margin({ top: this.menuGeometry().top,
-          left: this.contentLeft !== undefined ? 0 : this.alignEnd ? this.safeLeft : this.safeLeft + 应用尺寸.页面内边距_水平,
-          right: this.contentLeft !== undefined ? 0 : this.alignEnd ? this.safeRight + 应用尺寸.页面内边距_水平 : this.safeRight })
+
+  }
+
+  build() {
+    Stack({ alignContent: this.panelLeft() === undefined ? Alignment.Top : Alignment.TopStart }) {
+      Column()
+        .width('100%').height('100%')
+        .backgroundColor(Color.Transparent)
+        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+        .onClick((): void => { this.onClose(); })
+      // 定位容器与宿主工具栏同宽；外部点击承接层仍覆盖整个窗口。
+      Stack({ alignContent: this.alignEnd ? Alignment.TopEnd : Alignment.TopStart }) {
+        Stack({ alignContent: Alignment.TopStart }) {
+          if (this.bubble !== undefined && this.surfaceVisible) {
+            GlassBubblePanel({ source: this.refractionSource, panelWidth: this.bubble.width,
+              pointerCenter: this.bubble.pointerCenter, pointerSide: this.bubble.pointerSide,
+              onPrepared: this.onPrepared, content: (): void => { this.menuContent(); } })
+          } else {
+            GlassPanel({ source: this.refractionSource, role: this.materialRole, radius: this.cornerRadius,
+              panelWidth: this.menuWidth, menuMotion: true, centerX: this.alignEnd ? '100%' : '0%', centerY: '0%',
+              surfaceVisible: this.surfaceVisible, onPrepared: this.onPrepared,
+              content: (): void => { this.menuContent(); } })
+          }
+        }
+        .margin({ top: this.menuGeometry().top - (this.bubble?.pointerSide === ActionMenuPointerSide.Top ? MenuSurface.pointerDepth : 0),
+          left: this.panelLeft() !== undefined ? 0 : this.alignEnd ? this.safeLeft : this.safeLeft + 应用尺寸.页面内边距_水平,
+          right: this.panelLeft() !== undefined ? 0 : this.alignEnd ? this.safeRight + 应用尺寸.页面内边距_水平 : this.safeRight })
         .onClick((): void => {})
-        .transition(MenuSurface.popupTransition(this.bubble === undefined ? this.alignEnd ? '100%' : '0%' :
-          this.bubble.left + this.bubble.pointerCenter, this.bubble?.pointerSide === ActionMenuPointerSide.Bottom ? '100%' : '0%'))
       }
-      .width('100%')
+      .width(this.contentLeft !== undefined ? this.contentMaxWidth : this.panelLeft() !== undefined ? this.menuWidth : '100%')
       .constraintSize({ maxWidth: this.contentMaxWidth })
-      .margin({ left: this.contentLeft ?? 0 })
+      .margin({ left: this.panelLeft() ?? 0 })
       .hitTestBehavior(HitTestMode.Transparent)
     }
     .width('100%').height('100%')
     .onAreaChange((_old: Area, area: Area): void => {
+      this.viewportLeft = Number(area.globalPosition.x);
+      this.viewportWidth = Number(area.width);
       this.viewportHeight = Number(area.height);
       this.viewportTop = Number(area.globalPosition.y);
     })

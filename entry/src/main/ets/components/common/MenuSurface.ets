@@ -1,9 +1,10 @@
+import { PopupSurface } from './PopupSurface';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
-import { currentMotionProfile, motionAnimation } from '../../utils/AppMotion';
+import { currentMotionProfile, motionAnimation, materialPopupAnimation } from '../../utils/AppMotion';
 
-/** 所有锚点菜单共用扁平表面；仅用底色与公共描边区分层级。 */
+/** 所有锚点菜单共用弹窗材质，圆角和公共描边区分层级。 */
 export class MenuSurface implements AttributeModifier<CommonAttribute> {
   static readonly pointerSpan: number = 20;
   static readonly pointerDepth: number = 6;
@@ -18,7 +19,7 @@ export class MenuSurface implements AttributeModifier<CommonAttribute> {
     return TransitionEffect.asymmetric(
       TransitionEffect.opacity(0).combine(
         TransitionEffect.scale({ x: profile.menuScale, y: profile.menuScale, centerX: centerX, centerY: centerY }))
-        .animation(motionAnimation(profile.menuEnterMs)),
+        .animation(materialPopupAnimation(profile.menuEnterMs)),
       TransitionEffect.opacity(0).animation({ duration: profile.menuExitMs, curve: Curve.EaseOut })
     );
   }
@@ -32,10 +33,20 @@ export class MenuSurface implements AttributeModifier<CommonAttribute> {
   }
 
   applyNormalAttribute(instance: CommonAttribute): void {
+    if (!this.active) {
+      instance.backgroundColor(Color.Transparent).backgroundBlurStyle(BlurStyle.NONE).backdropBlur(0)
+        .linearGradient({angle:0,colors:[[Color.Transparent,0],[Color.Transparent,1]]})
+        .border({width:0,color:Color.Transparent}).borderRadius(this.cornerRadius)
+        .shadow({radius:0,color:Color.Transparent,offsetX:0,offsetY:0}).clip(false);
+      return;
+    }
     instance.backgroundColor(this.active ? $r('app.color.menu_surface') : Color.Transparent)
       .border(SurfaceBorder.options(this.active ? 应用尺寸.卡片边框 : 0))
       .borderRadius(this.cornerRadius)
       .shadow(MenuSurface.popupShadow())
       .clip(this.active);
+    const mode: string = AppStorage.get<string>('themeMode') ?? 'system';
+    new PopupSurface(AppStorage.get<string>('surface_material') ?? 'flat', mode === 'dark' ||
+      (mode !== 'light' && (AppStorage.get<boolean>('systemDarkMode') ?? false)), this.cornerRadius, 'menu').applyNormalAttribute(instance);
   }
 }

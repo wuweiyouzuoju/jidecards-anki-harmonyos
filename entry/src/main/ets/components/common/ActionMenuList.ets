@@ -17,6 +17,7 @@ export interface ActionMenuListItem {
 export struct ActionMenuList {
   slideScope: MenuSlideScope = new MenuSlideScope();
   @Prop items: ActionMenuListItem[] = [];
+  @Prop labelAlignment: TextAlign = TextAlign.Center;
   onSelect: (id: string) => void = (_id: string): void => {};
 
   private selectEntry(id: string): void {
@@ -29,7 +30,7 @@ export struct ActionMenuList {
   build() {
     Column() {
       ForEach(this.items, (item: ActionMenuListItem, index: number) => {
-        AnchoredMenuItem({ label: item.label, icon: item.icon, iconTint: item.iconTint, slideScope: this.slideScope,
+        AnchoredMenuItem({ label: item.label, labelAlignment: this.labelAlignment, icon: item.icon, iconTint: item.iconTint, slideScope: this.slideScope,
           available: item.available !== false, selected: item.selected === true, divider: index > 0,
           destructive: item.destructive === true,
           onSelect: (): void => { this.selectEntry(item.id); } })

@@ -36,7 +36,7 @@ export struct AnchoredMenuItem {
   aboutToDisappear(): void { if (this.slideTarget !== null) menuSlideSession.remove(this.slideTarget); this.slideTarget = null; }
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop label: ResourceStr = '';
-  @Prop labelAlignment: TextAlign = TextAlign.Center;
+  @Prop labelAlignment: TextAlign = TextAlign.Start;
   @Prop selected: boolean = false;
   @Prop selectionUsesAccent: boolean = true;
   @Prop available: boolean = true;
@@ -64,8 +64,9 @@ export struct AnchoredMenuItem {
   }
 
   private iconRowPadding(): Padding {
-    const right: number = this.trailingInset();
-    return { left: this.hasCenteredIcon() ? right : 应用尺寸.menuHorizontalPadding, right: right };
+    // 居中图文不为贴边箭头让出单侧空槽，避免整组标题偏移。
+    const right: number = this.hasCenteredIcon() ? 应用尺寸.menuHorizontalPadding : this.trailingInset();
+    return { left: 应用尺寸.menuHorizontalPadding, right: right };
   }
 
   private labelPadding(): Padding {
@@ -117,13 +118,12 @@ export struct AnchoredMenuItem {
           DisclosureChevron({ tint: $r('app.color.text_secondary') })
             .rotate({ angle: this.disclosureAngle ?? (this.expanded ? 90 : 0), centerX: '50%', centerY: '50%' })
             .animation(disclosureAnimation())
-            .margin({ right: 应用尺寸.menuHorizontalPadding })
+            .margin({ right: this.hasCenteredIcon() ? 0 : 应用尺寸.menuHorizontalPadding })
             .hitTestBehavior(HitTestMode.None)
         }
       }
       .width('100%')
-      .backgroundColor(this.selected ? SelectStyle.selectedOptionSurface :
-        this.slideHighlighted ? $r('app.color.surface_sidebar') : Color.Transparent)
+      .backgroundColor(this.slideHighlighted ? $r('app.color.surface_sidebar') : Color.Transparent)
       .borderRadius(SelectStyle.controlRadius)
       .attributeModifier(new PressFeedback())
       .enabled(this.available)

@@ -6,7 +6,7 @@ import { loadComponentLogic } from './platform-module-harness.mjs';
 import { visibleInterfaceItems } from '../../entry/src/main/ets/model/AppInterface.ts';
 
 const source = path => readFileSync(new URL('../../entry/src/main/ets/' + path, import.meta.url), 'utf8');
-const List = loadComponentLogic('components/common/ActionMenuList.ets', 'ActionMenuList', {});
+const List = loadComponentLogic('components/common/ActionMenuList.ets', 'ActionMenuList', {TextAlign:{Start:'start',Center:'center'}});
 const menus = [
   { path: 'components/home/主页更多面板.ets', name: '主页更多面板', surface: 'home_more',
     callbacks: { history:'onHistory', settings: '设置回调',
@@ -82,7 +82,15 @@ test('home lists delegate row geometry and theme tint to the existing public men
   assert.doesNotMatch(shared, /Image\(|\.padding\(|\.margin\(|\.fontSize\(|\.fillColor\(/);
   for (const menu of menus) {
     const host = source(menu.path);
-    assert.match(host, /ActionMenuList\(\{ items: this\.menuEntries\(\), slideScope: this\.slideScope, onSelect:/);
+    assert.match(host, /ActionMenuList\(\{ (?:labelAlignment: TextAlign.Center, )?items: this\.menuEntries\(\), slideScope: this\.slideScope, onSelect:/);
     assert.doesNotMatch(host, /AnchoredMenuItem\(|ForEach\(/);
   }
+});
+
+test('home More and Create center their icon-label group without changing menu positions',()=>{
+ for(const menu of menus) assert.match(source(menu.path),/labelAlignment: TextAlign.Center/);
+ const page=source('pages/首页.ets');const home=page.slice(page.indexOf('private homeMenus()'));
+ assert.doesNotMatch(home,/centered: true/);
+ assert.match(home,/contentMaxWidth: this.homeActionAnchor.width, alignEnd: false/);
+ assert.match(home,/contentMaxWidth: this.homeActionAnchor.width, alignEnd: true/);
 });
