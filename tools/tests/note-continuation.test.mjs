@@ -7,7 +7,7 @@ import { updateNotetypeFieldSticky } from '../../entry/src/main/ets/model/Notety
 import { NoteCreationSession } from '../../entry/src/main/ets/model/NoteCreationSession.ts';
 import { addNoteInterfaceControls } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { creationPageHarness, creationType, deferredCreation } from './note-creation-harness.mjs';
-import { loadPlatformModule } from './platform-module-harness.mjs';
+import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
 import { prepareNoteImageFields } from '../../entry/src/main/ets/model/NoteImageDraft.ts';
 import { NoteDuplicateWarning } from '../../entry/src/main/ets/model/NoteDuplicateSession.ts';
 import { 生成Occlusions字符串 } from '../../entry/src/main/ets/model/图片遮罩模型.ts';
@@ -284,4 +284,17 @@ test('switching type after continuation uses a new editor generation even when f
   const previous=h.page.fieldEditorVersion;
   await h.page.加载笔记类型(2); assert.equal(h.page.已选笔记类型ID,2);
   assert.equal(h.page.fieldEditorVersion,previous+1); assert.deepEqual(h.page.字段值列表,['','']);
+});
+
+
+test('field header pin toggles the current sticky state and rejects saving, disabled and disposed clicks',()=>{
+  const Field=loadComponentLogic('components/editor/NoteFieldCard.ets','NoteFieldCard',{NoteAudioPreview:class{}});
+  const field=new Field(),changes=[];
+  Object.assign(field,{stickyEditable:true,stickyInteractive:true,disabled:false,disposed:false,sticky:false,onStickyChange:value=>changes.push(value)});
+  field.toggleSticky();assert.deepEqual(changes,[true]);assert.equal(field.sticky,false,'only the persistence owner publishes the saved value');
+  field.sticky=true;field.toggleSticky();assert.deepEqual(changes,[true,false]);
+  for(const state of [{stickyInteractive:false},{disabled:true},{disposed:true},{stickyEditable:false}]){
+    Object.assign(field,{stickyEditable:true,stickyInteractive:true,disabled:false,disposed:false},state);
+    field.toggleSticky();assert.deepEqual(changes,[true,false]);
+  }
 });

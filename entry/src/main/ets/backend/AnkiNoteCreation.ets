@@ -14,6 +14,7 @@ import { NoteTypeCatalog, standardNoteTypes } from '../model/NoteTypeCatalog';
 import { prepareNoteImageFields, NoteFieldImage } from '../model/NoteImageDraft';
 import { NotetypeNameId, NotetypeView } from '../proto/messages/NotetypeMessages';
 import { hilog } from '@kit.PerformanceAnalysisKit';
+import { noteLinksService } from './NoteLinksService';
 
 /** 新增笔记的 Service 与永久媒体边界；已有类型和 Core 建卡协议保持不变。 */
 export class AnkiNoteCreation implements NoteCreationBackend {
@@ -79,6 +80,8 @@ export class AnkiNoteCreation implements NoteCreationBackend {
   }
 
   private async addManualNote(note: EditableNote, deckId: number, allowDuplicate: boolean): Promise<void> {
+    if (note.fields.some((field: string): boolean => field.includes('#jide-note:') || field.includes('<!--jide-links:')))
+      await noteLinksService.prepareNote(note);
     if (allowDuplicate) { await this.notes.添加笔记允许重复(note, deckId); return; }
     try { await this.notes.添加笔记(note, deckId); }
     catch (error) {

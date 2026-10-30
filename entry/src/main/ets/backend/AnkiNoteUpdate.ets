@@ -8,6 +8,7 @@ import { prepareNoteImageFields, NoteFieldImage } from '../model/NoteImageDraft'
 import { EditableNote } from '../proto/messages/NoteMessages';
 import { assertNoteMediaResolved } from '../model/NoteMediaParts';
 import { assertNoteEditorUnchanged } from '../model/NoteEditorConflict';
+import { noteLinksService } from './NoteLinksService';
 
 export class AnkiNoteUpdate {
   private notes: 笔记服务 = new 笔记服务();
@@ -17,8 +18,10 @@ export class AnkiNoteUpdate {
     note.fields = await prepareNoteImageFields(note.fields, images, importNoteVisual);
     if (audios.length > 0) note.fields = await prepareNoteAudioFields(note.fields, audios, importNoteAudio);
     assertNoteMediaResolved(note.fields);
+    if (note.fields.some((field: string): boolean => field.includes('#jide-note:') || field.includes('<!--jide-links:')))
+      await noteLinksService.prepareNote(note, before);
     // 媒体导入有异步等待，落盘前再次核对，防止等待期间其它入口修改同一笔记。
-    if (before !== undefined && (images.length > 0 || audios.length > 0))
+    if (before !== undefined)
       assertNoteEditorUnchanged(before, await this.notes.获取笔记(note.id));
     await this.notes.更新笔记([note], false);
     if (audios.length > 0) await discardNoteRecordings(audios);
