@@ -118,9 +118,11 @@ function fixture() {
 }
 
 test('the registered app interface tool reads fresh UI mode, observations and actual turn tool capabilities without writes', async () => {
-  const f=fixture();f.tools.setInterfaceTools(agentFunctionTools(100,'assistant'));
+  const f=fixture();f.tools.setInterfaceTools(agentFunctionTools(100,'assistant'),'deepseek');
   f.views.observe({surface:'home_more',sectionId:'',selectedId:'',optionIds:['settings'],optionLabels:['Settings'],busy:false});
   let view=JSON.parse((await f.call('get_app_structure',{surface:'settings',sectionId:'scheduler'})).outputJson);
+  assert.equal(view.webAccess.provider,'deepseek');assert.equal(view.webAccess.available,true);
+  assert.equal(view.webAccess.providers.find(provider=>provider.id==='deepseek').credential,'saved DeepSeek model API key');
   assert.equal(view.sections[0].cardCount,2); assert.deepEqual(view.observations,[]);
   f.views.showPage('agent');
   const current=JSON.parse((await f.call('get_app_structure',{surface:'home_more'})).outputJson);
@@ -134,6 +136,7 @@ test('the registered app interface tool reads fresh UI mode, observations and ac
   assert.equal(view.sections[0].cards.find(x=>x.id==='algorithm').items.find(x=>x.id==='fsrs_enabled').writeTool,'propose_set_fsrs');
   f.tools.setInterfaceTools([]);
   view=JSON.parse((await f.call('get_app_structure',{surface:'settings',sectionId:'scheduler'})).outputJson);
+  assert.equal(view.webAccess.available,false);assert.equal(view.webAccess.provider,'');
   assert.equal(view.sections[0].cards.find(x=>x.id==='algorithm').items.find(x=>x.id==='fsrs_enabled').writeTool,'');
   assert.deepEqual(f.state.writes,[]);assert.deepEqual(f.state.localWrites,[]);assert.deepEqual(f.state.fsrsWrites,[]);
   await assert.rejects(f.call('get_app_structure',{surface:'unknown'}),/invalid_tool_arguments/);
@@ -281,7 +284,7 @@ test('page binds authorization to fresh raw user intent and exposes undo without
 test('broad settings catalog has executable reads, exact schemas, no secret keys and no synthetic write support', async () => {
   const f = fixture();
   const definitions = agentSettingDefinitions();
-  assert.equal(definitions.length, 21);
+  assert.equal(definitions.length, 22);
   assert.equal(new Set(definitions.map(x => x.id)).size, definitions.length);
   const ids = definitions.map(x => x.id);
   const schema = JSON.parse(agentSettingsFunctionTools().find(x => x.name === 'get_settings').parametersJson);

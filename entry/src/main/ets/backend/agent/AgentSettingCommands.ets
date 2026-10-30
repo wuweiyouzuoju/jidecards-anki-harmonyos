@@ -1,3 +1,4 @@
+import { saveSurfaceMaterial } from '../../utils/SurfaceMaterialStore';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { common } from '@kit.AbilityKit';
 import { readAgentPreference } from './AgentPreferenceReader';
@@ -38,6 +39,7 @@ export function saveAgentSettingValue(id: string, after: string, before: string)
     switch (id) {
       case 'card_text_size': await saveCardTextSize(Number(after),Number(before)); break;
       case 'deck_list_style': await saveDeckListStyle(after,before); break;
+      case 'surface_material': await saveSurfaceMaterial(after,before); break;
       case 'motion_style': await saveMotionStyle(after,before); break;
       case 'study_haptics': await saveStudyHaptics(after === 'true',before === 'true'); break;
       case 'simple_mode': await 保存简洁模式(after === 'true',before === 'true'); break;

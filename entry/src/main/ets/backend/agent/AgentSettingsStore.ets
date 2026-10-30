@@ -138,7 +138,7 @@ export async function loadAgentWebEnabled(): Promise<boolean> {
   const store: preferences.Preferences | null = await openStore();
   if (store === null) { throw new Error('agent_settings_unavailable'); }
   if (await store.get(WEB_ENABLED_KEY, false) !== true) { return false; }
-  const provider: AgentSearchProvider = normalizeAgentSearchProvider(stringValue(await store.get(SEARCH_PROVIDER_KEY, 'doubao'), 'doubao'));
+  const provider: AgentSearchProvider = normalizeAgentSearchProvider(stringValue(await store.get(SEARCH_PROVIDER_KEY, 'deepseek'), 'deepseek'));
   return (await loadAgentSearchSecret(provider)).trim().length > 0;
 }
 
@@ -157,7 +157,7 @@ export async function saveAgentWebEnabled(value: boolean): Promise<void> {
 export async function loadAgentSearchProvider(): Promise<AgentSearchProvider> {
   const store: preferences.Preferences | null = await openStore();
   if (store === null) { throw new Error('agent_settings_unavailable'); }
-  return normalizeAgentSearchProvider(stringValue(await store.get(SEARCH_PROVIDER_KEY, 'doubao'), 'doubao'));
+  return normalizeAgentSearchProvider(stringValue(await store.get(SEARCH_PROVIDER_KEY, 'deepseek'), 'deepseek'));
 }
 
 /** @throws {Error} 搜索服务配置保存失败。 */

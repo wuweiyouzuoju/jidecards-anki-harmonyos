@@ -73,9 +73,11 @@ export async function saveAgentSecret(providerId: ProviderId, secret: string): P
 export async function removeAgentSecret(providerId: ProviderId): Promise<void> { await removeSecret(providerId); }
 /** @throws {Error} 搜索凭据读取失败。 */
 export async function loadAgentSearchSecret(provider: AgentSearchProvider = 'doubao'): Promise<string> {
-  return loadSecret(`web.${provider}`, true);
+  return loadSecret(provider === 'deepseek' ? 'deepseek' : `web.${provider}`, true);
 }
 /** @throws {Error} 搜索密钥保存失败，不能报告成功。 */
 export async function saveAgentSearchSecret(secret: string, provider: AgentSearchProvider = 'doubao'): Promise<void> {
+  // 联网表单不能覆盖或清除模型密钥；DeepSeek 凭据由模型设置唯一管理。
+  if (provider === 'deepseek') throw new Error('web_search_key_managed_by_provider');
   await saveSecret(`web.${provider}`, secret, true);
 }

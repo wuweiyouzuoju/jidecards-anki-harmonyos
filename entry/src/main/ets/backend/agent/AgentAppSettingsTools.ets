@@ -96,9 +96,12 @@ export class AgentAppSettingsTools {
   private readonly onThemeChange: (change: ThemeModeChange) => void;
   private allowedMode: AppThemeMode | null = null;
   private interfaceTools: ProviderFunctionTool[] = [];
+  private webProvider: string = '';
   private navigationReadiness: () => AgentNavigationReadiness[] = (): AgentNavigationReadiness[] => [];
 
-  setInterfaceTools(tools: ProviderFunctionTool[]): void { this.interfaceTools = tools.slice(); }
+  setInterfaceTools(tools: ProviderFunctionTool[], webProvider: string = ''): void {
+    this.interfaceTools = tools.slice(); this.webProvider = webProvider;
+  }
   setNavigationReadiness(read: () => AgentNavigationReadiness[]): void { this.navigationReadiness = read; }
 
   constructor(scope: AgentScope, onThemeChange: (change: ThemeModeChange) => void,
@@ -137,7 +140,7 @@ export class AgentAppSettingsTools {
         args.surface, args.sectionId, (key: string): string => context.resourceManager.getStringByNameSync(key),
         agentSettingDefinitions(), this.interfaceTools, appInterface.snapshot(),
         AppStorage.get<boolean>(APP_FOREGROUND_KEY) === false ? '' : appInterface.currentPage(),
-        appInterface.currentContextPage(), this.navigationReadiness()));
+        appInterface.currentContextPage(), this.navigationReadiness(), this.webProvider));
     }
     if (name === 'list_settings') { return JSON.stringify({ settings: agentSettingDefinitions() }); }
     if (name === 'list_theme_colors') {
