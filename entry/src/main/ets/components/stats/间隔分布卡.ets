@@ -8,7 +8,7 @@
 import type { Intervals } from '../../proto/messages/StatsMessages';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 取间隔柱色 } from '../../model/统计色板';
-import { 展开为序列, 取序列分位, 取轴域 } from '../../model/统计分箱';
+import { 取分布分位, 取最大键, 取轴域 } from '../../model/统计分箱';
 import type { 轴域 } from '../../model/统计分箱';
 import { 纵轴刻度, 纵轴宽 } from './图表轴';
 
@@ -25,25 +25,15 @@ export struct 间隔分布卡 {
     this.更新缓存();
   }
 
-  /** 展开为序列（每间隔重复卡数次），供分位数与中位数计算 */
-  private 取序列(): number[] {
-    if (this.间隔数据 === null || this.间隔数据.intervals === null) {
-      return [];
-    }
-    return 展开为序列(this.间隔数据.intervals);
-  }
-
-  /** 范围 → 显示上限：1个月=min(最大,30)；50%/95% = 分位；全部 = 最大 */
   private 取显示上限(): number {
-    const 序列: number[] = this.取序列();
-    if (序列.length === 0) {
-      return 0;
-    }
-    const 最大: number = 序列[序列.length - 1];
+    if (this.间隔数据 === null || this.间隔数据.intervals === null) return 0;
+    const 数据: Map<number, number> = this.间隔数据.intervals;
+    const 最大: number = 取最大键(数据, 0);
+    if (最大 <= 0) return 0;
     switch (this.范围索引) {
       case 0: return Math.min(最大, 30);
-      case 1: return Math.max(1, 取序列分位(序列, 0.5));
-      case 2: return Math.max(1, 取序列分位(序列, 0.95));
+      case 1: return Math.max(1, 取分布分位(数据, 0.5));
+      case 2: return Math.max(1, 取分布分位(数据, 0.95));
       default: return 最大;
     }
   }
@@ -97,7 +87,8 @@ export struct 间隔分布卡 {
 
   /** 中位间隔（Anki Median interval = quantile 0.5，四舍五入） */
   private 取中位间隔(): number {
-    return Math.round(取序列分位(this.取序列(), 0.5));
+    if (this.间隔数据 === null || this.间隔数据.intervals === null) return 0;
+    return Math.round(取分布分位(this.间隔数据.intervals, 0.5));
   }
 
   private 数据为空(): boolean {

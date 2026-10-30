@@ -20,6 +20,7 @@
 // ========================================================
 
 import { 应用尺寸 } from '../../utils/应用尺寸';
+import { localeMonthDay, localeNumber, localeCompact } from '../../utils/LocaleFormatting';
 import type { 轴域 } from '../../model/统计分箱';
 
 /** 纵轴宽度：柱区左侧让出的刻度列宽度 */
@@ -30,6 +31,7 @@ export const 右轴宽: number = 30;
 
 @Component
 export struct 纵轴刻度 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   /** 绑定刻度（取轴域 产出，等差、端点 0 与上限）：与柱高归一化的上限必须同源，
    *  否则刻度位置与柱高错位 */
   @Prop 刻度: number[] = [1, 0];
@@ -48,26 +50,18 @@ export struct 纵轴刻度 {
    *  四舍五入会把 0.2/0.4 都显示成 "0"，刻度值失真。 */
   private 缩写次数(值: number): string {
     if (值 % 1 !== 0 && 值 < 10) {
-      return 值.toFixed(1);
+      return localeNumber(值, this.uiLanguage, 1);
     }
-    if (值 >= 1000000) {
-      const 兆: number = 值 / 1000000;
-      return `${兆 % 1 === 0 ? 兆 : 兆.toFixed(1)}M`;
-    }
-    if (值 >= 1000) {
-      const 千: number = 值 / 1000;
-      return `${千 % 1 === 0 ? 千 : 千.toFixed(1)}k`;
-    }
-    return `${Math.round(值)}`;
+    return localeCompact(值, this.uiLanguage);
   }
 
   /** 分钟缩写：<60 → Xm；≥60 → Xh（1 位小数） */
   private 缩写分钟(值: number): string {
     if (值 < 60) {
-      return `${Math.round(值)}m`;
+      return `${localeNumber(值, this.uiLanguage)}m`;
     }
     const 时: number = 值 / 60;
-    return `${时 % 1 === 0 ? 时 : 时.toFixed(1)}h`;
+    return `${localeNumber(时, this.uiLanguage, 时 % 1 === 0 ? 0 : 1)}h`;
   }
 
   build() {
@@ -111,6 +105,7 @@ export struct 右轴百分比 {
 
 @Component
 export struct 横轴日期条 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   /** 左端刻度相对今天的天数（过去为负，未来为正） */
   @Prop 左端偏移天: number = -30;
   /** 右端刻度相对今天的天数 */
@@ -122,7 +117,7 @@ export struct 横轴日期条 {
   private 取日期(偏移天: number): string {
     const 日期: Date = new Date();
     日期.setDate(日期.getDate() + 偏移天);
-    return `${日期.getMonth() + 1}/${日期.getDate()}`;
+    return localeMonthDay(日期, this.uiLanguage);
   }
 
   build() {

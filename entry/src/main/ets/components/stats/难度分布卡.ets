@@ -9,6 +9,7 @@
 // Invariants: build 单根 Column；FSRS 优先取 difficulty，SM-2 取 eases。
 
 import type { Eases } from '../../proto/messages/StatsMessages';
+import { localePercent } from '../../utils/LocaleFormatting';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 取难度柱色, 取红黄绿 } from '../../model/统计色板';
 import { 加权分位, 取轴域 } from '../../model/统计分箱';
@@ -23,6 +24,7 @@ interface 难度柱 {
 
 @Component
 export struct 难度分布卡 {
+  @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('更新缓存') 难度数据: Eases | null = null;
   @Prop @Watch('更新缓存') FSRS难度: Eases | null = null;
   @Prop @Watch('更新缓存') 是否FSRS: boolean = false;
@@ -206,7 +208,7 @@ export struct 难度分布卡 {
                 .fontColor($r('app.color.text_secondary'))
               Blank()
               // % 放入参数而非资源模式，避免资源格式化歧义出现双 %%
-              Text($r('app.string.stats_ease_average', `${(this.取数据() as Eases).average.toFixed(0)}%`))
+              Text($r('app.string.stats_ease_average', localePercent((this.取数据() as Eases).average / 100, this.uiLanguage)))
                 .fontSize(应用尺寸.字号_正文_小)
                 .fontColor($r('app.color.text_primary'))
             }

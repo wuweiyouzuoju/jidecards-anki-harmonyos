@@ -6,7 +6,7 @@
 // @意图
 // 复刻 Anki 26.05 统计图表依赖的 d3-scale 核心数值算法：
 // ticks（美观刻度 1/2/5×10^k）、nice（域端点取整）、按刻度分箱、
-// 加权分位数与序列分位数。供预测/复习/间隔/难度/新增等直方图使用。
+// 加权分位数与计数分布分位数。供预测/复习/间隔/难度/新增等直方图使用。
 //
 // @Invariants
 // - 纯函数无副作用，不 import 任何 HarmonyOS Kit（node test runner 可直接加载）
@@ -178,37 +178,34 @@ export function 加权分位(数据: Map<number, number>, 分位: number): numbe
   return 键列表[键列表.length - 1];
 }
 
-/** 把 Map<值, 次数> 展开为升序序列（每个值重复次数次），用于序列分位数。 */
-export function 展开为序列(数据: Map<number, number>): number[] {
+/** 在计数桶上求 (n-1)×分位的线性插值；与展开后 d3 quantile 等价，内存只随桶数增长。 */
+export function 取分布分位(数据: Map<number, number>, 分位: number): number {
   const 键列表: number[] = [];
-  数据.forEach((次数: number, 键: number) => {
-    if (次数 > 0) {
+  let 总量: number = 0;
+  数据.forEach((次数: number, 键: number): void => {
+    if (Number.isFinite(键) && Number.isSafeInteger(次数) && 次数 > 0) {
       键列表.push(键);
+      总量 += 次数;
     }
   });
-  键列表.sort((a: number, b: number) => a - b);
-  const 序列: number[] = [];
-  for (let i = 0; i < 键列表.length; i++) {
-    const 次数: number = 数据.get(键列表[i]) as number;
-    for (let j = 0; j < 次数; j++) {
-      序列.push(键列表[i]);
+  if (总量 === 0 || !Number.isFinite(分位)) return 0;
+  键列表.sort((a: number, b: number): number => a - b);
+  const 位置: number = (总量 - 1) * Math.min(1, Math.max(0, 分位));
+  const 下标: number = Math.floor(位置);
+  let 累计: number = 0;
+  let 下值: number = 0;
+  let 已取下值: boolean = false;
+  for (let i: number = 0; i < 键列表.length; i++) {
+    累计 += 数据.get(键列表[i]) as number;
+    if (!已取下值 && 累计 > 下标) {
+      下值 = 键列表[i];
+      已取下值 = true;
+    }
+    if (累计 > Math.ceil(位置)) {
+      return 下值 + (键列表[i] - 下值) * (位置 - 下标);
     }
   }
-  return 序列;
-}
-
-/** d3 quantile：升序序列的 (n-1)×分位 线性插值 */
-export function 取序列分位(序列: number[], 分位: number): number {
-  if (序列.length === 0) {
-    return 0;
-  }
-  if (序列.length === 1) {
-    return 序列[0];
-  }
-  const 位置: number = (序列.length - 1) * 分位;
-  const 下标: number = Math.floor(位置);
-  const 余数: number = 位置 - 下标;
-  return 序列[下标] + (序列[下标 + 1] - 序列[下标]) * 余数;
+  return 键列表[键列表.length - 1];
 }
 
 /** Map 键的最小值（空 Map 返回 兜底值） */
