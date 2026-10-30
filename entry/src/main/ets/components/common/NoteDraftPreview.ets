@@ -16,6 +16,7 @@ export struct NoteDraftPreview {
   @Prop fullScreen: boolean = false;
   @Prop isVisible: boolean = true;
   onClose: () => void = (): void => {};
+  onBackHandlerChange: (handler: (() => boolean) | null) => void = (_handler: (() => boolean) | null): void => {};
   @State private state: DraftPreviewState = initialDraftPreviewState();
   private releaseCard: () => Promise<void> = (): Promise<void> => Promise.resolve();
   private session: NoteDraftPreviewSession = new NoteDraftPreviewSession(new AnkiNoteDraftPreview(),
@@ -45,7 +46,7 @@ export struct NoteDraftPreview {
         loading: this.state.busy, loadError: this.state.error,
         isDark: this.isDark, options: this.state.options,
         selected: this.state.selected, media: this.state.media, sample: this.input.sample ?? false,
-        fullScreen: this.fullScreen, isVisible: this.isVisible,
+        fullScreen: this.fullScreen, isVisible: this.isVisible, onBackHandlerChange: this.onBackHandlerChange,
         onReleaseAvailable: (release: () => Promise<void>): void => { this.releaseCard = release; },
         onSelect: (index: number): void => { this.session.select(index); }, onClose: this.onClose })
     } else if (this.fullScreen) {

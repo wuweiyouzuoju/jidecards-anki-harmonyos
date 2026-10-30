@@ -1,11 +1,11 @@
-import { DirectoryView } from '../../model/DirectoryTree';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { DirectoryView } from '../../model/DirectoryTree';
 import { 标签服务 } from '../../backend/标签服务';
 import { TagTreeNode } from '../../proto/messages/TagsMessages';
 import { TagSelection, TagSelectionChange, TagRow, applyTagSelection, newTagName } from '../../model/NoteTags';
 import { TagTreeList } from './TagTreeList';
 import { AnchoredMenuItem } from './MenuItem';
-import { FormInputStyle } from '../../utils/FormInputStyle';
+import { LiveSearchField } from './LiveSearchField';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { localizedResourceText, namedResourceText } from '../../utils/UiFeedback';
@@ -97,9 +97,9 @@ export struct TagPicker {
 
   build() {
     Column({ space: 应用尺寸.间距_8 }) {
-      TextInput({ text: this.query, placeholder: localizedResourceText(this.getUIContext(), this.uiLanguage, $r('app.string.tags_search_hint')) })
-        .attributeModifier(new FormInputStyle()).enabled(this.isInteractive && !this.loading)
-        .onChange((value: string): void => { this.query = value; this.refresh(); })
+      LiveSearchField({ value: this.query, placeholder: localizedResourceText(this.getUIContext(), this.uiLanguage, $r('app.string.tags_search_hint')),
+        isEnabled: this.isInteractive && !this.loading, maximumLength: undefined, debounceMs: 0,
+        onChange: (value: string): void => { this.query = value; this.refresh(); } })
       if (this.loading) {
         Text($r('app.string.tags_loading')).fontColor($r('app.color.text_secondary'))
       } else if (this.failed) {
