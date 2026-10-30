@@ -19,11 +19,11 @@ function harness(locale = 'base') {
   return { menu, tracker, dependencies, strings };
 }
 
-test('seven main entries retain browser actions while shortcut help lives in learning help', () => {
+test('main entries retain browser actions while shortcut help lives in learning help', () => {
   for (const locale of ['base', 'en_US']) {
     const { menu, tracker, strings } = harness(locale), calls = [];
     const root = menu.entries();
-    assert.deepEqual(root.map(e => e.id), ['filter', 'select_all', 'find_replace', 'search_tools', 'display_settings', 'history', 'more_settings']);
+    assert.deepEqual(root.map(e => e.id), ['filter', 'select_all', 'find_replace', 'search_tools', 'display_settings', 'history', 'more_settings', 'traditional']);
     const callbacks = { filter:'onFilter', select_all:'onSelectAll', find_replace:'onFindReplace', history:'onHistory',
       save_search:'onSaveSearch', flag_names:'onFlagNames' };
     for (const [id, callback] of Object.entries(callbacks)) menu[callback] = () => calls.push(id);
@@ -82,4 +82,12 @@ test('search options and recent queries use distinct real dialog contents and JI
   view = tracker.snapshot()[0]; assert.equal(view.surface, 'browser_recent_searches');
   assert.deepEqual(view.optionIds, ['0','1']); assert.deepEqual(view.optionLabels, dialog.recentSearches);
   dialog.aboutToDisappear(); assert.equal(tracker.snapshot().length, 0);
+});
+
+test('traditional mode is the last main menu row and uses the real selected and disabled state',()=>{
+ const {menu,tracker}=harness();let toggles=0;menu.onTraditional=()=>toggles++;
+ menu.aboutToAppear();assert.equal(menu.entries().at(-1).id,'traditional');assert.equal(menu.entries().at(-1).selected,false);
+ menu.selectItem('traditional');assert.equal(toggles,1);menu.traditionalMode=true;menu.publishInterface();
+ assert.equal(menu.entries().at(-1).selected,true);assert.equal(tracker.snapshot().find(v=>v.surface==='browser_more').items.at(-1).selected,true);
+ menu.available=false;menu.selectItem('traditional');assert.equal(toggles,1);menu.aboutToDisappear();
 });

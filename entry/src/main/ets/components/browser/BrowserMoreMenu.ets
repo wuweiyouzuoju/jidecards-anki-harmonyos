@@ -13,6 +13,8 @@ export struct BrowserMoreMenu {
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('publishInterface') filterActive: boolean = false;
   @Prop @Watch('publishInterface') available: boolean = true;
+  @Prop @Watch('publishInterface') traditionalMode: boolean = false;
+  onTraditional: () => void = (): void => {};
   @Prop @Watch('publishInterface') subtitleIndex: number = 1;
   @Prop topOffset: number = 68;
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
@@ -37,12 +39,12 @@ export struct BrowserMoreMenu {
   }
 
   private menuItems(): AppInterfaceMenuItem[] {
-    return browserInterfaceMenu(this.available, this.filterActive, this.subtitleIndex);
+    return browserInterfaceMenu(this.available, this.filterActive, this.subtitleIndex, 'browser_more', this.traditionalMode);
   }
 
   private entries(): CardActionMenuEntry[] {
     return this.menuItems().map((item: AppInterfaceMenuItem, index: number): CardActionMenuEntry =>
-      this.menuEntry(item, index === 3 || index === 5));
+      this.menuEntry(item, index === 3 || index === 5 || item.id === 'traditional'));
   }
 
   private menuEntry(item: AppInterfaceMenuItem, divider: boolean = false): CardActionMenuEntry {
@@ -86,7 +88,8 @@ export struct BrowserMoreMenu {
       .find((entry: ActionMenuRow): boolean => entry.node.id === id);
     if (row === undefined || !row.enabled) return;
     if (row.node.children !== undefined) { this.toggleBranch(id); return; }
-    if (id === 'select_all') this.onSelectAll();
+    if (id === 'traditional') this.onTraditional();
+    else if (id === 'select_all') this.onSelectAll();
     else if (id === 'columns') this.onDisplay('columns');
     else if (id === 'search_options') this.onDisplay('search');
     else if (id === 'recent_searches') this.onDisplay('recent');
