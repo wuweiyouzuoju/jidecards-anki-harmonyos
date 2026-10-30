@@ -1,0 +1,225 @@
+/* 助记与双链引用 —— 卡片端样式（内联进卡片，不依赖外部文件） */
+
+a[href^="#jide-note:"] {
+  background: var(--jide-reference-surface, #eaf1fe);
+  color: var(--jide-reference-text, #214b88);
+  text-decoration: none !important;
+  border-radius: .2em;
+  padding: 0 .08em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.nightMode a[href^="#jide-note:"], .night_mode a[href^="#jide-note:"], .night-mode a[href^="#jide-note:"] {
+  --jide-reference-surface: #1e2a3f;
+  --jide-reference-text: #b7d1ff;
+}
+
+#ml-root {
+  --ml-accent: #2f7cf6;
+  --ml-accent-soft: #eaf1fe;
+  --ml-fg: #24292f;
+  --ml-muted: #6b7280;
+  --ml-bd: #e3e8ef;
+  --ml-bg: #fbfcfe;
+  --ml-card: #ffffff;
+  font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--ml-fg);
+  text-align: left;
+}
+
+body.nightMode #ml-root,
+body.night_mode #ml-root,
+body.night-mode #ml-root,
+.nightMode #ml-root,
+.night_mode #ml-root {
+  --ml-accent: #6aa4ff;
+  --ml-accent-soft: #1e2a3f;
+  --ml-fg: #e6e8eb;
+  --ml-muted: #9aa4b2;
+  --ml-bd: #38414d;
+  --ml-bg: #23272e;
+  --ml-card: #2b3038;
+}
+
+/* ---------------------------------------------------------------- 内容块 */
+
+#ml-root .ml-block {
+  /* 2026-10-21：去掉 max-width:720px + auto 居中 —— 用户要求「全宽」。
+     与字段镜像（mirror.py 的 _BOX，已去掉 520px 上限）保持一致。 */
+  margin: 14px 0 0;
+  background: var(--ml-bg);
+  border: 1px solid var(--ml-bd);
+  border-left: 3px solid var(--ml-accent);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+#ml-root .ml-block-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ml-accent);
+  background: var(--ml-accent-soft);
+  cursor: pointer;
+  user-select: none;
+}
+
+#ml-root .ml-block-head .ml-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--ml-accent);
+  color: #fff;
+}
+
+#ml-root .ml-block-head .ml-arrow {
+  margin-left: auto;
+  font-size: 11px;
+  opacity: 0.75;
+  transition: transform 0.18s;
+}
+
+#ml-root .ml-block.ml-collapsed .ml-arrow {
+  transform: rotate(-90deg);
+}
+
+#ml-root .ml-block.ml-collapsed .ml-block-body {
+  display: none;
+}
+
+#ml-root .ml-block-body {
+  padding: 12px 14px;
+}
+
+/* ---------------------------------------------------------------- 关联列表 */
+
+#ml-root .ml-link-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#ml-root .ml-link-list li + li {
+  margin-top: 6px;
+}
+
+#ml-root .ml-link-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: var(--ml-card);
+  border: 1px solid var(--ml-bd);
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.15s;
+}
+
+#ml-root .ml-link-item:hover {
+  border-color: var(--ml-accent);
+  transform: translateX(2px);
+}
+
+#ml-root .ml-link-item .ml-dir {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 5px;
+  margin-top: 2px;
+}
+
+#ml-root .ml-link-item .ml-dir.out {
+  background: var(--ml-accent-soft);
+  color: var(--ml-accent);
+}
+
+#ml-root .ml-link-item .ml-dir.in {
+  background: #fff3e0;
+  color: #b26a00;
+}
+
+body.nightMode #ml-root .ml-link-item .ml-dir.in,
+body.night_mode #ml-root .ml-link-item .ml-dir.in,
+body.night-mode #ml-root .ml-link-item .ml-dir.in {
+  background: #3a2f1c;
+  color: #e8b463;
+}
+
+#ml-root .ml-link-item .ml-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+#ml-root .ml-empty {
+  color: var(--ml-muted);
+  font-size: 13px;
+  padding: 2px 0;
+}
+
+/* ---------------------------------------------------------------- 悬浮按钮 */
+
+#ml-float {
+  position: fixed;
+  z-index: 2147483000;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+#ml-float.ml-br { right: 16px; bottom: 12px; }
+#ml-float.ml-bl { left: 16px; bottom: 12px; }
+#ml-float.ml-tr { right: 16px; top: 12px; }
+#ml-float.ml-tl { left: 16px; top: 12px; }
+
+#ml-float .ml-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--ml-bd);
+  border-radius: 999px;
+  background: var(--ml-card);
+  color: var(--ml-fg);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.13);
+  opacity: 0.9;
+  transition: opacity 0.15s, transform 0.15s, border-color 0.15s;
+}
+
+#ml-float .ml-btn:hover {
+  opacity: 1;
+  transform: translateY(-1px);
+  border-color: var(--ml-accent);
+}
+
+#ml-float .ml-btn.has {
+  border-color: var(--ml-accent);
+  color: var(--ml-accent);
+  font-weight: 600;
+}
+
+#ml-float .ml-btn .ml-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ml-accent);
+  display: none;
+}
+
+#ml-float .ml-btn.has .ml-dot {
+  display: inline-block;
+}
