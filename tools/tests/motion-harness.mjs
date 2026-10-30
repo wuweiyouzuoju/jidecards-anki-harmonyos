@@ -5,11 +5,11 @@ import { loadPlatformModule } from './platform-module-harness.mjs';
 /** 平台曲线只记录参数；动效选择始终运行实际公共实现。 */
 export function motionApi(initial = 'restrained') {
   let style = initial;
-  const AppStorage = { get: () => style };
+  const AppStorage = { get: key => key === 'surface_material' ? 'flat' : style };
   const curves = { springCurve: (...args) => ({ spring: args }) };
   const Curve = { EaseOut: 'ease-out' };
   const api = loadPlatformModule('utils/AppMotion.ets',
-    '({currentMotionProfile, motionAnimation, disclosureAnimation, navigationEnterOffset})',
+    '({currentMotionProfile, motionAnimation, materialPopupAnimation, disclosureAnimation, navigationEnterOffset})',
     { ...model, AppStorage, curves, Curve });
   return { ...api, curves, Curve, ...model, setStyle: value => { style = value; } };
 }

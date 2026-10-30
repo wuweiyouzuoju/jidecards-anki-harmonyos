@@ -28,3 +28,4 @@ export async function saveMotionStyle(style: string, expected: string | null = n
   if (!isMotionStyle(style)) { throw new Error('invalid_setting_value'); }
   await saveLocalPreference(motionPreferences(), MOTION_STYLE_KEY, style, 'restrained', expected);
 }
+

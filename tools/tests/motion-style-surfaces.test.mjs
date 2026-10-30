@@ -108,13 +108,13 @@ test('same surface effects have one owner across all modal implementations', () 
     if (source.includes('SurfaceTransition.dialog()')) {
       owners++;
       assert.match(source, /SurfaceTransition\.backdrop\(\)/, path);
-      assert.doesNotMatch(source, /TransitionEffect\.scale|TransitionEffect\.asymmetric/, path);
+      if (path.replaceAll('\\','/') !== 'components/common/GlassPanel.ets') assert.doesNotMatch(source, /TransitionEffect\.scale|TransitionEffect\.asymmetric/, path);
     }
     if (path.replaceAll('\\', '/') !== 'utils/SurfaceTransition.ets') {
       assert.doesNotMatch(source, /TransitionEffect\.scale\(\{ x: currentMotionProfile\(\)\.dialogScale/, path);
     }
   }
-  assert.equal(owners, 9, 'deck options now use page navigation; ordinary forms and the crop surface retain their own transition');
+  assert.equal(owners, 2, 'GlassPanel and the existing image crop surface own their own panel transitions');
   assert.doesNotMatch(read('components/牌组选项面板.ets'), /SurfaceTransition\.(?:dialog|backdrop)/);
   assert.match(read('pages/DeckOptionsPage.ets'), /注册NavParam\('DeckOptionsPage'/);
   for (const file of ['components/提醒编辑面板.ets', 'components/browser/查找替换对话框.ets',
@@ -142,7 +142,9 @@ test('native CustomDialog windows share parameters and own their window animatio
       for (const key of ['openAnimation', 'closeAnimation', 'customStyle', 'width', 'height', 'maskColor', 'alignment', 'autoCancel']) {
         assert.match(options, new RegExp(key + ': presentation\\.' + key), path);
       }
-      assert.match(options, /onWillDismiss: dismiss/, path);
+      if (path.replaceAll('\\','/') === 'components/editor/NoteFieldCard.ets' && options.includes('NoteReferencePicker')) {
+        assert.match(options, /onWillDismiss: request\.dismiss/, path);
+      } else assert.match(options, /onWillDismiss: dismiss/, path);
       hosts++;
       start = source.indexOf(marker, end);
     }
@@ -151,7 +153,8 @@ test('native CustomDialog windows share parameters and own their window animatio
   const api = surfaceMotionApi();
   const frame = read('components/common/DialogFrame.ets');
   const expressions = [...frame.matchAll(/\.transition\((this\.nativeHost[^\n]+)\)/g)].map(match => match[1]);
-  assert.equal(expressions.length, 2);
+  assert.equal(expressions.length, 1);
+  assert.match(frame, /GlassPanel\(/);
   for (const nativeHost of [true, false]) {
     for (const expression of expressions) {
       const effect = new Function('SurfaceTransition', 'TransitionEffect', 'return ' + expression)
@@ -183,7 +186,7 @@ test('persistent native-dialog owners create current-style windows on each open'
     for (const [style, duration] of [['restrained', 250], ['lively', 290], ['restrained', 250]]) {
       api.setStyle(style); host[field].open(host[name]);
       const options = host[field].current().options;
-      assert.equal(options.openAnimation.duration, duration, path);
+      assert.equal(options.openAnimation.duration, 0, path + ': content owns the entrance');
       assert.equal(options.closeAnimation.duration, duration, path);
       assert.equal(options.closeAnimation.curve, 'ease-out', path);
     }
