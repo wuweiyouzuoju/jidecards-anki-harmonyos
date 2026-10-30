@@ -10,8 +10,8 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 import { loadAgentWebEnabled, saveAgentWebEnabled, loadAgentSearchProvider, saveAgentSearchProvider } from '../../backend/agent/AgentSettingsStore';
 import { loadAgentSearchSecret, saveAgentSearchSecret } from '../../backend/agent/AgentSecretStore';
 import { localizedResourceText, resourceText } from '../../utils/UiFeedback';
-import { agentSearchPurchaseUrl } from '../../model/agent/AgentSearchProvider';
-import type { AgentSearchProvider } from '../../model/agent/AgentSearchProvider';
+import { agentSearchPurchaseUrl, AGENT_SEARCH_PROVIDERS } from '../../model/agent/AgentSearchProvider';
+import type { AgentSearchProvider, AgentSearchProviderInfo } from '../../model/agent/AgentSearchProvider';
 import { common } from '@kit.AbilityKit';
 import { pasteboard } from '@kit.BasicServicesKit';
 import { AgentWebSettingsState } from '../../model/AppInterface';
@@ -26,7 +26,7 @@ export struct AgentWebSettingsSection {
   onSaved: () => Promise<void> = async (): Promise<void> => {};
   @State @Watch('publishState') private webEnabled: boolean = false;
   @State @Watch('publishState') private secret: string = '';
-  @State @Watch('publishState') private searchProvider: AgentSearchProvider = 'doubao';
+  @State @Watch('publishState') private searchProvider: AgentSearchProvider = 'deepseek';
   @State @Watch('publishState') private providerLoading: boolean = false;
   @State @Watch('publishState') private ready: boolean = false;
   @State @Watch('publishState') private saving: boolean = false;
@@ -76,13 +76,15 @@ export struct AgentWebSettingsSection {
   }
 
   private providerLabel(_locale: string = this.uiLanguage): string {
+    if (this.searchProvider === 'deepseek') return 'DeepSeek Search';
     return this.searchProvider === 'doubao' ?
       resourceText(this.getUIContext(), $r('app.string.ai_web_provider_doubao')) : 'Brave Search';
   }
 
   private async switchProvider(index: number, _locale: string = this.uiLanguage): Promise<void> {
     if (!this.canEdit()) { return; }
-    const provider: AgentSearchProvider = index === 1 ? 'brave' : 'doubao';
+    const provider: AgentSearchProvider | undefined = AGENT_SEARCH_PROVIDERS[index]?.id;
+    if (provider === undefined) return;
     if (provider === this.searchProvider) { return; }
     const generation: number = ++this.generation;
     this.searchProvider = provider;
@@ -138,7 +140,7 @@ export struct AgentWebSettingsSection {
     this.saving = true;
     this.publishState();
     try {
-      await saveAgentSearchSecret(secret, provider);
+      if (provider !== 'deepseek') await saveAgentSearchSecret(secret, provider);
       await saveAgentSearchProvider(provider);
       await saveAgentWebEnabled(enabled);
       if (!this.disposed && generation === this.generation) {
@@ -159,20 +161,23 @@ export struct AgentWebSettingsSection {
         isOn: this.webEnabled, isInteractive: this.canEdit(), isDark: this.isDark, tint: this.tint,
         onChange: (value: boolean): void => { this.changeEnabled(value); } })
       if (this.webEnabled) {
-        FormSelectRow({ label: settingsItemText(this.getUIContext(), 'ai_web_provider', this.uiLanguage), options: [{ value: localizedResourceText(this.getUIContext(), this.uiLanguage, $r('app.string.ai_web_provider_doubao')) }, { value: 'Brave Search' }],
-          selectedIndex: this.searchProvider === 'doubao' ? 0 : 1, value: this.providerLabel(),
+        FormSelectRow({ label: settingsItemText(this.getUIContext(), 'ai_web_provider', this.uiLanguage), options: AGENT_SEARCH_PROVIDERS.map((provider: AgentSearchProviderInfo): SelectOption =>
+          ({ value: provider.id === 'doubao' ? localizedResourceText(this.getUIContext(), this.uiLanguage, $r('app.string.ai_web_provider_doubao')) : provider.name })),
+          selectedIndex: AGENT_SEARCH_PROVIDERS.findIndex((provider: AgentSearchProviderInfo): boolean => provider.id === this.searchProvider), value: this.providerLabel(),
           isInteractive: this.canEdit(),
           onSelect: (index: number): void => { this.switchProvider(index); } })
-        LabeledActionRow({ label: this.searchProvider === 'doubao' ? $r('app.string.ai_web_doubao_hint') :
+        LabeledActionRow({ label: this.searchProvider === 'deepseek' ? $r('app.string.ai_web_deepseek_hint') : this.searchProvider === 'doubao' ? $r('app.string.ai_web_doubao_hint') :
           $r('app.string.ai_web_purchase_hint'), actionLabel: settingsItemText(this.getUIContext(), 'ai_web_purchase', this.uiLanguage),
           tint: this.tint, textColor: $r('app.color.text_secondary'),
           isInteractive: this.canEdit(),
           onAction: (): void => { this.openPurchase(); } })
-        TextInput({ placeholder: settingsItemText(this.getUIContext(), 'ai_web_key', this.uiLanguage), text: this.secret })
+        if (this.searchProvider !== 'deepseek') {
+          TextInput({ placeholder: settingsItemText(this.getUIContext(), 'ai_web_key', this.uiLanguage), text: this.secret })
           .type(InputType.Password)
           .attributeModifier(new FormInputStyle())
           .enabled(this.canEdit())
           .onChange((value: string): void => { this.secret = value; })
+        }
       }
       PrimaryActionButton({ label: this.saving ? $r('app.string.ai_card_generating') : settingsItemText(this.getUIContext(), 'ai_web_save', this.uiLanguage),
         tint: this.tint, isInteractive: this.canEdit(),

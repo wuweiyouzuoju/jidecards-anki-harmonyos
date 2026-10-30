@@ -173,6 +173,23 @@ export struct AIAgent设置分组 {
   private modelOptions(): SelectItem[] {
     return DEEPSEEK_PROVIDER.models.map((value: string): SelectItem => ({ value: value }));
   }
+  private batchLimits(): number[] {
+    const limits: number[] = [100, 250, 500, 1000];
+    // 存储支持 1–1000 的整数；保留已保存的非预设值，不能把它高亮成 1000。
+    if (limits.indexOf(this.batchLimit) < 0) {
+      limits.push(this.batchLimit);
+      limits.sort((left: number, right: number): number => left - right);
+    }
+    return limits;
+  }
+  private batchOptions(): SelectItem[] {
+    return this.batchLimits().map((value: number): SelectItem => ({ value: String(value) }));
+  }
+  private selectBatchLimit(index: number): void {
+    const limits: number[] = this.batchLimits();
+    if (!this.canEdit() || !Number.isInteger(index) || index < 0 || index >= limits.length) return;
+    this.batchLimit = limits[index];
+  }
   private async switchProvider(index: number): Promise<void> {
     if (!this.canEdit()) return;
     const provider: ProviderId = index === 0 ? 'deepseek' : 'custom';
@@ -256,11 +273,11 @@ export struct AIAgent设置分组 {
             .attributeModifier(new FormInputStyle())
             .enabled(this.canEdit())
             .onChange((value: string): void => { this.secret = value; })
-          FormSelectRow({ label: settingsItemText(this.getUIContext(), 'ai_batch_limit', this.uiLanguage), options: [{ value: '100' }, { value: '250' }, { value: '500' }, { value: '1000' }],
-            selectedIndex: this.batchLimit === 100 ? 0 : (this.batchLimit === 250 ? 1 : (this.batchLimit === 500 ? 2 : 3)),
+          FormSelectRow({ label: settingsItemText(this.getUIContext(), 'ai_batch_limit', this.uiLanguage), options: this.batchOptions(),
+            selectedIndex: this.batchLimits().indexOf(this.batchLimit),
             value: this.batchLimit.toString(),
             isInteractive: this.canEdit(),
-            onSelect: (index: number): void => { this.batchLimit = [100, 250, 500, 1000][index]; } })
+            onSelect: (index: number): void => { this.selectBatchLimit(index); } })
           PrimaryActionButton({ label: this.saving ? $r('app.string.ai_card_generating') : settingsItemText(this.getUIContext(), 'ai_save', this.uiLanguage),
             tint: this.解析主色按钮背景(), isInteractive: this.canEdit(),
             onAction: (): void => { this.save(); } })

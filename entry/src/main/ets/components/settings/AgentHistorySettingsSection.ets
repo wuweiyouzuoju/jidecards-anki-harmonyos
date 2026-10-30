@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { localeNumber } from '../../utils/LocaleFormatting';
 import { agentHistoryRepository } from '../../backend/agent/AgentHistoryFiles';
 import { AgentHistoryInfo, AGENT_HISTORY_DEFAULT_LIMIT, AGENT_HISTORY_LIMITS } from '../../model/agent/AgentHistoryRepository';
 import { AgentConversationSummary } from '../../model/agent/AgentConversationTypes';
@@ -109,7 +110,7 @@ export struct AgentHistorySettingsSection {
         Text($r('app.string.agent_history_retention_hint')).fontSize(应用尺寸.字号_正文_小)
           .fontColor($r('app.color.text_secondary')).width('100%')
         if (this.ready) {
-          Text(this.text($r('app.string.agent_history_usage'), String(this.count), (this.storedBytes / 1024 / 1024).toFixed(2)))
+          Text(this.text($r('app.string.agent_history_usage'), localeNumber(this.count, this.uiLanguage), localeNumber(this.storedBytes / 1024 / 1024, this.uiLanguage, 2)))
             .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
         }
         SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'history_manage', this.uiLanguage), icon: $r('app.media.ic_common_history'),
