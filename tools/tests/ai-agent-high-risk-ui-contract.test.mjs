@@ -32,11 +32,11 @@ test('provider settings use dropdowns, remember provider/models and keep keys in
     assert.match(settings, new RegExp(`FormSelectRow\\(\\{ label: settingsItemText\\([^\\n]*'${key}'`));
   }
   const select = read('entry/src/main/ets/components/common/FormSelectRow.ets');
-  assert.match(select, /Select\(this\.options\)\.selected\(this\.selectedIndex\)\.value\(this\.value\)/);
-  assert.match(select, /\.onSelect\([\s\S]*?this\.select\(index\)/);
+  assert.match(select, /SurfaceSelect\(\{label:this.label, options:this.options, selectedIndex:this.selectedIndex, value:this.value/);
+  assert.match(select, /onSelect:[\s\S]*?this\.select\(index\)/);
   assert.match(settings, /onSelect:[^\n]*this\.switchProvider\(index\)/);
   assert.match(settings, /onSelect:[^\n]*this\.deepseekModel = DEEPSEEK_PROVIDER\.models\[index\]/);
-  assert.match(settings, /onSelect:[^\n]*this\.batchLimit = \[100, 250, 500, 1000\]\[index\]/);
+  assert.match(settings, /onSelect:[^\n]*this\.selectBatchLimit\(index\)/);
   assert.match(settings, /DeepSeek/);
   // OpenAI 选项按产品要求在 UI 上隐藏（2026-09-02）；存档层仍保留 openai 模型记忆。
   assert.doesNotMatch(settings, /'OpenAI'/);

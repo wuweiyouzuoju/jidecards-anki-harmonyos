@@ -143,7 +143,7 @@ export function agentFunctionTools(batchLimit: number = 100, mode: AgentMode = '
     ...agentHistoryTools(),
     tool('web_search', '使用已配置的搜索服务检索公开网页，返回真实来源。',
       '"query":{"type":"string","minLength":1,"maxLength":100},"limit":{"type":"integer","minimum":1,"maximum":10}', '"query"'),
-    tool('read_webpage', '在本机读取公开 HTTPS 网页文本，无需搜索密钥；不运行脚本或登录。长正文按 nextOffset 续读，-1 表示读完。',
+    tool('read_webpage', '读取公开 HTTPS 网页文本，不运行脚本或登录。DeepSeek 搜索配置使用同一密钥调用 Fetch；其他搜索配置在设备直接读取。长正文按 nextOffset 续读，-1 表示读完。',
       '"url":{"type":"string","minLength":1,"maxLength":2048},"offset":{"type":"integer","minimum":0,"maximum":2097152},"length":{"type":"integer","minimum":1,"maximum":24000}', '"url"'),
     tool('execute_code', '在本地隔离沙箱中执行 JavaScript 纯计算，清洗、去重或生成结构化候选；不读写卡库。',
       '"source":{"type":"string","minLength":1,"maxLength":65500},"inputJson":{"type":"string","minLength":1,"maxLength":131072}',

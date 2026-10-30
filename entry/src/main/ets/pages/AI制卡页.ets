@@ -1,5 +1,6 @@
-import { ActionStatus } from '../components/common/ActionStatus';
+import { GlassSource } from '../components/common/GlassSource';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ActionStatus } from '../components/common/ActionStatus';
 import { navigationEnterOffset } from '../utils/AppMotion';
 import { WINDOW_SAFE_TOP_KEY } from '../model/WindowSafeLayout';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
@@ -116,7 +117,7 @@ import { AgentToolRegistry } from '../backend/agent/AgentToolRegistry';
 import { AgentCodeTool } from '../backend/agent/AgentCodeTool';
 import { AgentWebTools } from '../backend/agent/AgentWebTools';
 import { filterAgentWebTools } from '../model/agent/AgentWeb';
-import { loadAgentWebEnabled } from '../backend/agent/AgentSettingsStore';
+import { loadAgentWebEnabled, loadAgentSearchProvider } from '../backend/agent/AgentSettingsStore';
 import { CardAgentTools } from '../backend/agent/CardAgentTools';
 import { HighRiskAgentTools } from '../backend/agent/HighRiskAgentTools';
 import {
@@ -153,6 +154,7 @@ import {
 } from '../backend/agent/AgentSettingsStore';
 import { loadAgentSecret } from '../backend/agent/AgentSecretStore';
 import { 应用尺寸 } from '../utils/应用尺寸';
+import { SeriesVisual } from '../utils/SeriesVisual';
 import { 颜色键 } from '../model/颜色主题';
 import { CustomTransition } from '../utils/自定义转场';
 import { IconActionButton } from '../components/common/IconActionButton';
@@ -222,6 +224,7 @@ class 页面Agent观察者 implements AgentRunObserver {
 
 @Component
 export struct AI制卡页 {
+  @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @Provide(NOTE_EDITOR_WHEEL_SESSION_KEY) private wheelSession: NoteEditorWheelSession = new NoteEditorWheelSession();
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
@@ -1206,7 +1209,7 @@ export struct AI制卡页 {
       if (this.pageDisposed || turnVersion !== this.agentTurnVersion ||
         this.currentMessageIndex(conversationId, aiMessage.id) < 0 || !this.处理中) { return null; }
       const functionTools: ProviderFunctionTool[] = this.providerFunctionToolsForTurn(allowWeb);
-      this.appSettingsTools?.setInterfaceTools(functionTools);
+      this.appSettingsTools?.setInterfaceTools(functionTools, allowWeb ? await loadAgentSearchProvider() : '');
       const request: ProviderTurnRequest = {
         apiKey: this.AI配置.apiKey,
         baseUrl: this.AI配置.baseUrl,
@@ -1650,26 +1653,34 @@ export struct AI制卡页 {
       presented = true;
       if (draft.risk === 'high_risk') {
         this.getUIContext().showAlertDialog({
-          title: this.取本地化文案($r('app.string.ai_agent_danger_title')),
-          message: `${this.取本地化文案($r('app.string.ai_agent_danger_body'))}\n${this.影响范围(draft)}\n${draft.summary}`,
-          autoCancel: false,
-          cancel: cancel,
-          primaryButton: { value: $r('app.string.cancel'), action: cancel },
-          secondaryButton: {
-            value: $r('app.string.continue'), fontColor: $r('app.color.error_text'),
-            action: (): void => { if (finish(true)) this.打开高风险最终确认(messageIndex, draftIndex, prepared); }
-          }
+            title: this.取本地化文案($r('app.string.ai_agent_danger_title')),
+            message: `${this.取本地化文案($r('app.string.ai_agent_danger_body'))}\n${this.影响范围(draft)}\n${draft.summary}`,
+            autoCancel: false,
+            cancel: cancel,
+            buttons: [
+                { value: $r('app.string.cancel'), action: cancel },
+                {
+                    value: $r('app.string.continue'), fontColor: $r('app.color.error_text'),
+                    action: (): void => { if (finish(true))
+                        this.打开高风险最终确认(messageIndex, draftIndex, prepared); }
+                }
+            ],
+            buttonDirection: DialogButtonDirection.AUTO
         });
       } else {
         this.getUIContext().showAlertDialog({
-          title: this.取本地化文案($r('app.string.ai_agent_confirm_title')),
-          message: `${this.取本地化文案($r('app.string.ai_agent_confirm_body'))}\n${this.影响范围(draft)}`,
-          cancel: cancel,
-          primaryButton: { value: $r('app.string.cancel'), action: cancel },
-          secondaryButton: {
-            value: $r('app.string.settings_confirm'),
-            action: (): void => { if (finish()) this.执行普通草稿(messageIndex, draftIndex, prepared); }
-          }
+            title: this.取本地化文案($r('app.string.ai_agent_confirm_title')),
+            message: `${this.取本地化文案($r('app.string.ai_agent_confirm_body'))}\n${this.影响范围(draft)}`,
+            cancel: cancel,
+            buttons: [
+                { value: $r('app.string.cancel'), action: cancel },
+                {
+                    value: $r('app.string.settings_confirm'),
+                    action: (): void => { if (finish())
+                        this.执行普通草稿(messageIndex, draftIndex, prepared); }
+                }
+            ],
+            buttonDirection: DialogButtonDirection.AUTO
         });
       }
     } catch (error) {
@@ -1702,15 +1713,19 @@ export struct AI制卡页 {
         }
       };
       this.getUIContext().showAlertDialog({
-        title: this.取本地化文案($r('app.string.ai_agent_danger_final_title')),
-        message: `${this.取本地化文案($r('app.string.ai_agent_danger_final_body'))}\n${this.影响范围(prepared.draft)}`,
-        autoCancel: false,
-        cancel: cancel,
-        primaryButton: { value: $r('app.string.cancel'), action: cancel },
-        secondaryButton: {
-          value: $r('app.string.settings_confirm'), fontColor: $r('app.color.error_text'),
-          action: (): void => { if (finish()) this.执行高风险草稿(messageIndex, draftIndex, prepared, secondToken); }
-        }
+          title: this.取本地化文案($r('app.string.ai_agent_danger_final_title')),
+          message: `${this.取本地化文案($r('app.string.ai_agent_danger_final_body'))}\n${this.影响范围(prepared.draft)}`,
+          autoCancel: false,
+          cancel: cancel,
+          buttons: [
+              { value: $r('app.string.cancel'), action: cancel },
+              {
+                  value: $r('app.string.settings_confirm'), fontColor: $r('app.color.error_text'),
+                  action: (): void => { if (finish())
+                      this.执行高风险草稿(messageIndex, draftIndex, prepared, secondToken); }
+              }
+          ],
+          buttonDirection: DialogButtonDirection.AUTO
       });
     } catch (error) {
       this.draftConfirmationPending = false;
@@ -2111,18 +2126,22 @@ export struct AI制卡页 {
     if (this.pageDisposed) return;
     let settled: boolean = false;
     this.getUIContext().showAlertDialog({
-      title: this.取本地化文案($r('app.string.ai_agent_history_delete_title')),
-      message: this.取本地化文案($r('app.string.ai_agent_history_delete_body')),
-      cancel: (): void => { settled = true; },
-      primaryButton: { value: $r('app.string.cancel'), action: (): void => { settled = true; } },
-      secondaryButton: {
-        value: $r('app.string.settings_confirm'), fontColor: $r('app.color.error_text'),
-        action: (): void => {
-          if (settled) return;
-          settled = true;
-          this.执行删除历史会话(selected.id);
-        }
-      }
+        title: this.取本地化文案($r('app.string.ai_agent_history_delete_title')),
+        message: this.取本地化文案($r('app.string.ai_agent_history_delete_body')),
+        cancel: (): void => { settled = true; },
+        buttons: [
+            { value: $r('app.string.cancel'), action: (): void => { settled = true; } },
+            {
+                value: $r('app.string.settings_confirm'), fontColor: $r('app.color.error_text'),
+                action: (): void => {
+                    if (settled)
+                        return;
+                    settled = true;
+                    this.执行删除历史会话(selected.id);
+                }
+            }
+        ],
+        buttonDirection: DialogButtonDirection.AUTO
     });
   }
 
@@ -2208,7 +2227,7 @@ export struct AI制卡页 {
       top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop),
       bottom: 0
     })
-    .backgroundColor(this.页面底色微染值)
+    .backgroundColor(Color.Transparent)
   }
 
   private closeMoreMenu(): void {
@@ -2409,6 +2428,7 @@ export struct AI制卡页 {
     .width('100%').padding(应用尺寸.间距_10)
     .border(SurfaceBorder.options())
     .borderRadius(应用尺寸.圆角_卡片)
+    .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, this.seriesDark(), this.动作主色))
   }
 
   private notetypeRestoreLayout(operation: DraftOperation): string {
@@ -2981,6 +3001,7 @@ export struct AI制卡页 {
               .padding({ left: 应用尺寸.间距_12, right: 应用尺寸.间距_12, top: 4, bottom: 4 })
               .backgroundColor($r('app.color.surface_card'))
               .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
+              .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, this.seriesDark(), this.动作主色))
             }, (file: AgentImportedFile): string => file.id)
           }
           .width('100%')
@@ -3071,10 +3092,13 @@ export struct AI制卡页 {
     })
   }
 
+  private seriesDark(): boolean { return 解析是否深色(this.settingsThemeMode, this.systemDarkMode); }
+
   build() {
     NavDestination() {
       Stack() {
-      Column() {
+      GlassSource() {
+Column() {
         this.顶部条()
         if (this.settingsVisible) {
           this.settingsPanel()
@@ -3113,7 +3137,9 @@ export struct AI制卡页 {
       }
       .width('100%')
       .height('100%')
-      .backgroundColor(this.页面底色微染值)
+      .backgroundColor(Color.Transparent)
+      }
+      
       if (this.targetSelectionMessage >= 0) { this.createTargetDialog() }
       if (this.moreVisible && this.menuContentWidth > 0) { this.moreMenu() }
       }.width('100%').height('100%').onAreaChange((_old: Area, area: Area): void => {

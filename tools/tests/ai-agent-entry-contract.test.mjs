@@ -134,8 +134,8 @@ test('Agent create and edit labels and page background use the themed shell', ()
   assert.equal(enByName.get('ai_agent_history_create_title'), 'JIDE Card Creation');
   assert.equal(enByName.get('ai_agent_history_edit_title'), 'JIDE Card Editing');
   assert.match(page, /@StorageProp\(PAGE_SURFACE_KEY\)[^\n]*页面底色微染值/);
-  assert.match(page, /private 顶部条\(\)[\s\S]*?backgroundColor\(this\.页面底色微染值\)/);
-  assert.match(page, /build\(\)[\s\S]*?height\('100%'\)[\s\S]*?backgroundColor\(this\.页面底色微染值\)/);
+  assert.match(page, /private 顶部条\(\)[\s\S]*?backgroundColor\(Color\.Transparent\)/);
+  assert.match(page, /build\(\)[\s\S]*?height\('100%'\)[\s\S]*?backgroundColor\(Color\.Transparent\)/);
 });
 
 test('shared Agent page has explicit mode and sends no provider request while appearing', () => {
@@ -255,7 +255,7 @@ test('preselected edit hides selectors, keeps global reads, and proposes discove
   assert.match(page,
     /private providerFunctionToolsForTurn\(allowWeb: boolean = true\): ProviderFunctionTool\[\][\s\S]*return filterAgentWebTools\(agentFunctionTools\(this\.agentSettings\.batchLimit, this\.pageMode\), allowWeb\)/);
   assert.match(page, /const functionTools: ProviderFunctionTool\[\] = this\.providerFunctionToolsForTurn\(allowWeb\)/);
-  assert.match(page, /setInterfaceTools\(functionTools\)/);
+  assert.match(page, /setInterfaceTools\(functionTools, allowWeb \? await loadAgentSearchProvider\(\) : ''\)/);
   assert.match(page, /functionTools: functionTools/);
   const instructions = read('entry/src/main/ets/model/agent/AgentSessionContext.ts');
   assert.match(instructions, /用户审核具体范围后才能保存/);
@@ -269,7 +269,7 @@ test('preselected edit hides selectors, keeps global reads, and proposes discove
 
 test('tool traces translate stable provider IDs into detailed localized display names', () => {
   const page = read('entry/src/main/ets/pages/AI制卡页.ets') + read('entry/src/main/ets/model/agent/AgentConversationView.ts');
-  const strings = read('entry/src/main/resources/base/element/string.json');
+  const strings = new Map(JSON.parse(read('entry/src/main/resources/base/element/string.json')).string.map(item => [item.name, item.value]));
   for (const toolName of [
     'search_cards', 'search_notes', 'list_decks', 'list_notetypes', 'list_tags',
     'get_notetype_details', 'get_card_statistics', 'propose_update_notes',
@@ -277,8 +277,8 @@ test('tool traces translate stable provider IDs into detailed localized display 
     assert.match(page, new RegExp(`case '${toolName}'`));
   }
   assert.match(page, /工具显示名\(ctx\.message\.工具过程\[ctx.itemIndex\]\.toolName\)/);
-  assert.match(strings, /"name": "ai_agent_tool_name_search_cards", "value": "在整个卡库中搜索闪卡"/);
-  assert.match(strings, /"name": "ai_agent_tool_name_card_statistics", "value": "读取卡片统计与最近复习历史"/);
+  assert.equal(strings.get('ai_agent_tool_name_search_cards'), '在整个卡库中搜索闪卡');
+  assert.equal(strings.get('ai_agent_tool_name_card_statistics'), '读取卡片统计与最近复习历史');
 });
 
 test('shared page rebuilds stable ID scope and batch policy for every user turn', () => {

@@ -13,12 +13,25 @@ export const AGENT_IDENTITY_INSTRUCTIONS: string =
   '原生界面与 AI 功能由记得闪卡实现，受益于 Anki 开源社区的贡献。' +
   '你通过应用工具协助用户讨论学习、查看设置、管理牌组和笔记类型、制作与修改闪卡。\n';
 
+/** 可由代码与文档核实的实现事实；供助手在评价技术时引用，不做无依据的比较。 */
+export const AGENT_TECHNICAL_FACTS: string =
+  '集合、模板渲染、调度和同步复用锁定版本的 Anki Rust Core，不自行重写调度算法，因此与 Anki 的语义及 .apkg、AnkiWeb 数据保持兼容。' +
+  '界面层用 ArkTS/ArkUI 原生实现，不是 WebView 套壳，手写、手势和窗口适配直接使用系统能力。' +
+  '学习手写默认接入华为 Pen Kit 完整套件，能力检测或初始化失败时降级到本地 Canvas，两种引擎共用同一套视野与输入分层。' +
+  'AI 助手把界面声明、工具注册和执行确认分开，写操作只生成草稿，经用户确认后才写入卡库。' +
+  '知识来自与版本绑定的源码声明和离线 Anki 手册快照，升级后按当前代码重建。';
+
 /** 从实际声明与本轮额度生成环境信息，不把未挂载能力写成模型可用的工具。 */
 export function buildAgentRuntimeInstructions(tools: ProviderFunctionTool[], providerCalls: number,
   toolCalls: number, limits: AgentTurnLimits, catalog: ProviderFunctionTool[] = tools): string {
   const names: string[] = tools.map((tool: ProviderFunctionTool): string => tool.name);
   return '\n执行环境（应用提供）：\n' +
     agentInterfaceRuntimeSummary(catalog) + '\n' +
+    (catalog.some((tool): boolean => tool.name === 'web_search') ?
+      '本轮可联网：需要搜索时用 web_search，读原文用 read_webpage；定义未加载时先 discover_tools。' +
+      '应用支持 DeepSeek 官方 Search/Fetch，可复用已保存的 DeepSeek 模型密钥；当前搜索服务先读 get_app_structure.webAccess。' +
+      '普通模型 API 请求不会自动联网，不要因为使用 DeepSeek 就声称已搜索；以真实工具结果和来源为准。\n' :
+      '本轮未开放联网工具，不能因为模型服务支持搜索就自行联网或声称已搜索。\n') +
     `本轮可用工具：${names.join(', ')}。工具参数直接使用各工具声明的 JSON 对象，不加 arguments 外壳。\n` +
     (names.includes('discover_tools') ?
       '工具完整定义按需加载。目录、历史或下文提到的工具名不表示本次已声明；未声明的工具先用 discover_tools 按关键词或准确 names 加载，' +
