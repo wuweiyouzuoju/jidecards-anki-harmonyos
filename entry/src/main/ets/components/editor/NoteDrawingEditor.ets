@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SurfaceSelect } from '../common/SurfaceSelect';
 import { common } from '@kit.AbilityKit';
 import { image } from '@kit.ImageKit';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
-import { LengthMetrics, LengthMetricsUnit } from '@kit.ArkUI';
+import { LengthMetricsUnit } from '@kit.ArkUI';
 import { StudyPenCanvasHost } from '../StudyPenCanvasHost';
 import { studyPenKitAvailability } from '../../backend/StudyPenKitAvailability';
 import { loadNoteDrawing, drawingBaseImage, createDrawingWorkspace, restoreDrawingInk, snapshotDrawingInk,
   saveNoteDrawing, disposeDrawingWorkspace, discardNoteDrawingImages } from '../../backend/NoteDrawingStore';
 import { NoteDrawingDocument, DrawingText, DrawingTextBounds, DrawingTextHandle, emptyNoteDrawing, DRAWING_COLORS,
-  DRAWING_COLOR_KEYS, DRAWING_TEXT_HANDLES, drawingTextResizeScale, scaledDrawingTextSize, noteDrawingImageActionKey } from '../../model/NoteDrawing';
+  DRAWING_COLOR_KEYS, DRAWING_TEXT_HANDLES, DRAWING_TEXT_FRAME_PADDING, DRAWING_TEXT_HANDLE_SIZE,
+  DRAWING_TEXT_HANDLE_HIT_SIZE, drawingTextResizeScale, scaledDrawingTextSize, scaledDrawingTextStretch,
+  noteDrawingImageActionKey } from '../../model/NoteDrawing';
 import { StudyWhiteboard, WhiteboardStroke } from '../../model/StudyWhiteboard';
 import { NoteFieldImage } from '../../model/NoteImageDraft';
 import { noteDrawingInterfaceObservation } from '../../model/AppInterface';
@@ -19,15 +22,14 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 import { DialogFrame } from '../common/DialogFrame';
 import { DialogHeader } from '../common/DialogHeader';
 import { IconActionButton } from '../common/IconActionButton';
-import { FormSelectRow } from '../common/FormSelectRow';
 import { 按下态按钮 } from '../common/按下态按钮';
 import { ImageSurfaceStyle } from '../../utils/ImageSurfaceStyle';
-import { PressFeedback } from '../../utils/PressFeedback';
 import { SelectStyle } from '../../utils/SelectStyle';
 
 /** 制卡草稿独占底图、文字和笔迹；完成生成新图片，不覆盖图库或共享媒体。 */
 @Component
 export struct NoteDrawingEditor {
+  @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   source: string = '';
   onApply: (uri: string) => void = (_uri: string): void => {};
   onCancel: () => void = (): void => {};
@@ -55,6 +57,8 @@ export struct NoteDrawingEditor {
   @State private textDragX: number = 0;
   @State private textDragY: number = 0;
   @State private textScale: number = 1;
+  @State private textStretchX: number = 1;
+  @State private textStretchY: number = 1;
   @State private textDragging: boolean = false;
   private document: NoteDrawingDocument = emptyNoteDrawing();
   private local: StudyWhiteboard = new StudyWhiteboard();
@@ -75,10 +79,15 @@ export struct NoteDrawingEditor {
   private textTransform: string = '';
   private resizeWidth: number = 1;
   private resizeHeight: number = 1;
+  private resizeOffsetX: number = 0;
+  private resizeOffsetY: number = 0;
   private resizeSize: number = 36;
   private resizeHandle: DrawingTextHandle = DRAWING_TEXT_HANDLES[7];
   private resizeAnchorX: number = 0;
   private resizeAnchorY: number = 0;
+  private resizePointer: number = -1;
+  private resizeTouchX: number = 0;
+  private resizeTouchY: number = 0;
   private canvasMounted: boolean = false;
   private observationVersion: number = 0;
   private pendingOperations: number = 0;
@@ -114,6 +123,7 @@ export struct NoteDrawingEditor {
   private publish(): void {
     if (this.disposed) return;
     this.redrawTexts();
+    const selected: DrawingText | undefined = this.texts.find((entry: DrawingText): boolean => entry.id === this.selectedText);
     this.observationVersion = appInterface.observe(noteDrawingInterfaceObservation({ working: this.working,
       ready: this.ready, official: this.official, textMode: this.textMode, textCount: this.texts.length,
       selectedText: this.selectedText >= 0, hasError: this.errorMessage !== '', failed: this.failed,
@@ -121,6 +131,7 @@ export struct NoteDrawingEditor {
       newCanvas: this.source === '' && this.document.base === '', eraser: this.eraser, color: this.color, size: this.textSize,
       width: this.document.width, height: this.document.height, textTransforming: this.textDragging, colorLabels: this.colorLabels(),
       hasBackground: this.document.base !== '',
+      textStretchX: selected?.scaleX ?? 1, textStretchY: selected?.scaleY ?? 1,
       canAddText: this.textValue.trim() !== '' && this.texts.length < 100 }));
   }
 
@@ -221,7 +232,8 @@ export struct NoteDrawingEditor {
         const selected: boolean = this.selectedText === entry.id;
         paintNoteDrawingText(this.textCanvas, entry,
           entry.x * this.canvasWidth + (selected ? this.textDragX : 0),
-          entry.y * this.canvasHeight + (selected ? this.textDragY : 0), this.textFontSize(entry), 'vp');
+          entry.y * this.canvasHeight + (selected ? this.textDragY : 0), this.textFontSize(entry), 'vp',
+          selected ? this.textStretchX : 1, selected ? this.textStretchY : 1);
       }
     } catch (error) { this.showFailure(); }
   }
@@ -299,9 +311,12 @@ export struct NoteDrawingEditor {
       measured = measureNoteDrawingText(this.textMeasure, entry); this.textMeasurements.set(key, measured);
     }
     const scale: number = this.textFontSize(entry) / entry.size;
+    const horizontal: number = scale * (entry.scaleX ?? 1) * (this.selectedText === entry.id ? this.textStretchX : 1);
+    const vertical: number = scale * (entry.scaleY ?? 1) * (this.selectedText === entry.id ? this.textStretchY : 1);
     // 选框只增加每侧2vp；点击热区另算，不把44vp最小点击尺寸混进可见边框。
-    return { x: measured.x * scale - 2, y: measured.y * scale - 2,
-      width: measured.width * scale + 4, height: measured.height * scale + 4 };
+    const padding: number = DRAWING_TEXT_FRAME_PADDING;
+    return { x: measured.x * horizontal - padding, y: measured.y * vertical - padding,
+      width: measured.width * horizontal + padding * 2, height: measured.height * vertical + padding * 2 };
   }
 
   private textBoxWidth(entry: DrawingText): number { return this.textBounds(entry).width; }
@@ -314,28 +329,28 @@ export struct NoteDrawingEditor {
   }
 
   private textHandleX(entry: DrawingText, handle: DrawingTextHandle): number {
-    return this.textHandleAxis(this.textBoxX(entry), this.textBoxWidth(entry), this.canvasWidth, handle.x);
+    return this.textBoxX(entry) + this.textBoxWidth(entry) * handle.x - DRAWING_TEXT_HANDLE_HIT_SIZE / 2;
   }
 
   private textHandleY(entry: DrawingText, handle: DrawingTextHandle): number {
-    return this.textHandleAxis(this.textBoxY(entry), this.textBoxHeight(entry), this.canvasHeight, handle.y);
+    return this.textBoxY(entry) + this.textBoxHeight(entry) * handle.y - DRAWING_TEXT_HANDLE_HIT_SIZE / 2;
   }
 
-  private textHandleAxis(start: number, length: number, available: number, ratio: number): number {
-    // 小字也为八个手柄留出不重叠的热区；靠边时移动整组，不能逐个夹紧到同一点。
-    const radius: number = Math.min(Math.max(24, length / 2 + 12), Math.max(0, (available - 24) / 2));
-    const center: number = Math.max(radius + 12, Math.min(available - radius - 12, start + length / 2));
-    return Math.max(0, center + (ratio - 0.5) * radius * 2 - 12);
+  private textHandleHitLength(length: number): number {
+    // 小字热区在相邻框点的中线截止；可见框点始终贴框，不为热区挪动框点。
+    return Math.min(DRAWING_TEXT_HANDLE_HIT_SIZE, Math.max(1, length / 2));
   }
   private textOriginX(entry: DrawingText, x: number): number {
     const bounds: DrawingTextBounds = this.textBounds(entry);
-    const minimum: number = Math.max(0, -bounds.x / this.canvasWidth);
-    return Math.max(minimum, Math.min(1 - (bounds.x + bounds.width) / this.canvasWidth, x));
+    const inset: number = DRAWING_TEXT_HANDLE_SIZE / 2;
+    const minimum: number = Math.max(0, (inset - bounds.x) / this.canvasWidth);
+    return Math.max(minimum, Math.min(1 - (inset + bounds.x + bounds.width) / this.canvasWidth, x));
   }
   private textOriginY(entry: DrawingText, y: number): number {
     const bounds: DrawingTextBounds = this.textBounds(entry);
-    const minimum: number = Math.max(0, -bounds.y / this.canvasHeight);
-    return Math.max(minimum, Math.min(1 - (bounds.y + bounds.height) / this.canvasHeight, y));
+    const inset: number = DRAWING_TEXT_HANDLE_SIZE / 2;
+    const minimum: number = Math.max(0, (inset - bounds.y) / this.canvasHeight);
+    return Math.max(minimum, Math.min(1 - (inset + bounds.y + bounds.height) / this.canvasHeight, y));
   }
 
   private tapTextCanvas(event: GestureEvent): void {
@@ -392,6 +407,7 @@ export struct NoteDrawingEditor {
     this.resetTextTransform(); this.selectText(entry);
     this.resizeWidth = Math.max(1, this.textBoxWidth(entry));
     this.resizeHeight = Math.max(1, this.textBoxHeight(entry));
+    this.resizeOffsetX = this.textBounds(entry).x; this.resizeOffsetY = this.textBounds(entry).y;
     this.resizeHandle = handle;
     this.resizeAnchorX = this.textBoxX(entry) + this.resizeWidth * (1 - handle.x);
     this.resizeAnchorY = this.textBoxY(entry) + this.resizeHeight * (1 - handle.y);
@@ -400,20 +416,90 @@ export struct NoteDrawingEditor {
 
   private resizeText(entry: DrawingText, x: number, y: number): void {
     if (this.textTransform !== 'resize' || !Number.isFinite(x) || !Number.isFinite(y)) return;
-    this.scaleText(entry, drawingTextResizeScale(this.resizeWidth, this.resizeHeight, this.resizeHandle, x, y));
+    const scale: number = drawingTextResizeScale(this.resizeWidth, this.resizeHeight, this.resizeHandle, x, y);
+    if (this.resizeHandle.mode === 'proportional') this.scaleText(entry, scale);
+    else this.stretchText(entry, scale);
+  }
+
+  private resizeTextTouch(entry: DrawingText, handle: DrawingTextHandle, event: TouchEvent): void {
+    const point: TouchObject | undefined = event.changedTouches.find((touch: TouchObject): boolean =>
+      touch !== undefined && Number.isFinite(touch.id) && Number.isFinite(touch.windowX) &&
+        Number.isFinite(touch.windowY) && (this.resizePointer < 0 || touch.id === this.resizePointer));
+    if (event.type === TouchType.Down) {
+      if (point === undefined || this.textDragging || !this.canEditText()) return;
+      this.startTextResize(entry, false, handle);
+      if (this.textTransform !== 'resize') return;
+      this.resizePointer = point.id; this.resizeTouchX = point.windowX; this.resizeTouchY = point.windowY;
+    } else {
+      if (this.resizePointer < 0 || this.selectedText !== entry.id || this.resizeHandle.id !== handle.id) return;
+      if (event.type === TouchType.Cancel) {
+        if (event.changedTouches.length === 0 || point !== undefined) this.finishTextResize(entry, false);
+      } else if (point !== undefined) {
+        // 移动的是手柄节点，必须使用稳定的窗口坐标，而不是节点每帧变化的局部坐标。
+        this.resizeText(entry, point.windowX - this.resizeTouchX, point.windowY - this.resizeTouchY);
+        if (event.type === TouchType.Up) this.finishTextResize(entry, true);
+      }
+    }
+  }
+
+  private textResizeLimit(): number {
+    const inset: number = DRAWING_TEXT_HANDLE_SIZE / 2;
+    const width: number = this.resizeHandle.x === 0.5 ?
+      2 * Math.min(this.resizeAnchorX - inset, this.canvasWidth - inset - this.resizeAnchorX) :
+      this.resizeHandle.x === 0 ? this.resizeAnchorX - inset : this.canvasWidth - inset - this.resizeAnchorX;
+    const height: number = this.resizeHandle.y === 0.5 ?
+      2 * Math.min(this.resizeAnchorY - inset, this.canvasHeight - inset - this.resizeAnchorY) :
+      this.resizeHandle.y === 0 ? this.resizeAnchorY - inset : this.canvasHeight - inset - this.resizeAnchorY;
+    const padding: number = DRAWING_TEXT_FRAME_PADDING * 2;
+    const horizontal: number = Math.min((width - padding) / Math.max(1, this.resizeWidth - padding),
+      this.textOriginScaleLimit(this.resizeAnchorX, this.resizeOffsetX, this.resizeWidth,
+        this.resizeHandle.x, this.canvasWidth));
+    const vertical: number = Math.min((height - padding) / Math.max(1, this.resizeHeight - padding),
+      this.textOriginScaleLimit(this.resizeAnchorY, this.resizeOffsetY, this.resizeHeight,
+        this.resizeHandle.y, this.canvasHeight));
+    // 边点只约束被拉伸的轴；正常放大到边缘就停，不再挪动固定锚点。
+    return Math.max(1, this.resizeHandle.mode === 'width' ? horizontal :
+      this.resizeHandle.mode === 'height' ? vertical : Math.min(horizontal, vertical));
+  }
+
+  private textOriginScaleLimit(anchor: number, offset: number, length: number, handle: number, available: number): number {
+    const padding: number = DRAWING_TEXT_FRAME_PADDING;
+    const start: number = anchor + padding * (handle * 2 - 1);
+    const axis: number = offset + padding + (length - padding * 2) * (1 - handle);
+    // PNG 源坐标必须在0～1；字形的正/负 bearing 不能把固定选框内的文字原点推出文档。
+    return axis > 0 ? start / axis : axis < 0 ? (available - start) / -axis : Infinity;
   }
 
   private scaleText(entry: DrawingText, scale: number): void {
     if (!this.canEditText() || !this.textDragging || this.textTransform === 'move' || this.selectedText !== entry.id ||
       !Number.isFinite(scale) || scale <= 0) return;
-    this.textScale = scaledDrawingTextSize(this.resizeSize, scale) / this.resizeSize;
+    const bounded: number = this.textTransform === 'resize' ? Math.min(scale, this.textResizeLimit()) : scale;
+    this.textScale = scaledDrawingTextSize(this.resizeSize, bounded) / this.resizeSize;
+    this.updateTextResizePosition(entry);
+  }
+
+  private stretchText(entry: DrawingText, scale: number): void {
+    if (!this.canEditText() || this.textTransform !== 'resize' || this.selectedText !== entry.id ||
+      !Number.isFinite(scale) || scale <= 0) return;
+    const bounded: number = Math.min(scale, this.textResizeLimit());
+    if (this.resizeHandle.mode === 'width') {
+      const initial: number = entry.scaleX ?? 1;
+      this.textStretchX = scaledDrawingTextStretch(initial, bounded) / initial;
+    } else if (this.resizeHandle.mode === 'height') {
+      const initial: number = entry.scaleY ?? 1;
+      this.textStretchY = scaledDrawingTextStretch(initial, bounded) / initial;
+    }
+    this.updateTextResizePosition(entry);
+  }
+
+  private updateTextResizePosition(entry: DrawingText): void {
     const bounds: DrawingTextBounds = this.textBounds(entry);
     const x: number = this.textTransform === 'pinch' ? entry.x :
       (this.resizeAnchorX - bounds.x - bounds.width * (1 - this.resizeHandle.x)) / this.canvasWidth;
     const y: number = this.textTransform === 'pinch' ? entry.y :
       (this.resizeAnchorY - bounds.y - bounds.height * (1 - this.resizeHandle.y)) / this.canvasHeight;
-    this.textDragX = (this.textOriginX(entry, x) - entry.x) * this.canvasWidth;
-    this.textDragY = (this.textOriginY(entry, y) - entry.y) * this.canvasHeight;
+    this.textDragX = ((this.textTransform === 'resize' ? x : this.textOriginX(entry, x)) - entry.x) * this.canvasWidth;
+    this.textDragY = ((this.textTransform === 'resize' ? y : this.textOriginY(entry, y)) - entry.y) * this.canvasHeight;
     this.redrawTexts();
   }
 
@@ -421,8 +507,14 @@ export struct NoteDrawingEditor {
     if ((this.textTransform !== 'resize' && this.textTransform !== 'pinch') || this.selectedText !== entry.id) return;
     if (commit && this.canEditText() && this.texts.includes(entry)) {
       // 先以预览尺寸约束原点，再提交字号；选择框不进入 PNG。
-      entry.x += this.textDragX / this.canvasWidth; entry.y += this.textDragY / this.canvasHeight;
+      entry.x = Math.max(0, Math.min(1, entry.x + this.textDragX / this.canvasWidth));
+      entry.y = Math.max(0, Math.min(1, entry.y + this.textDragY / this.canvasHeight));
       entry.size = this.textSize = scaledDrawingTextSize(this.resizeSize, this.textScale);
+      if (this.textTransform === 'resize' && this.resizeHandle.mode === 'width') {
+        entry.scaleX = scaledDrawingTextStretch(entry.scaleX ?? 1, this.textStretchX);
+      } else if (this.textTransform === 'resize' && this.resizeHandle.mode === 'height') {
+        entry.scaleY = scaledDrawingTextStretch(entry.scaleY ?? 1, this.textStretchY);
+      }
       this.texts = this.texts.slice();
     }
     this.resetTextTransform(); this.publish();
@@ -430,6 +522,8 @@ export struct NoteDrawingEditor {
 
   private resetTextTransform(): void {
     this.textDragX = 0; this.textDragY = 0; this.textScale = 1; this.textDragging = false; this.textTransform = '';
+    this.textStretchX = 1; this.textStretchY = 1;
+    this.resizePointer = -1;
   }
 
   private cancel(): void { if (!this.working && !this.disposed) this.onCancel(); }
@@ -495,59 +589,77 @@ export struct NoteDrawingEditor {
   }
 
   @Builder
+  private colorPicker() {
+    Row({ space: 6 }) {
+      this.colorPreview()
+      SurfaceSelect({ options: this.colorLabels().map((label: string): SelectOption => ({ value: label })),
+        selectedIndex: DRAWING_COLORS.indexOf(this.color),
+        value: this.colorName(),
+        isInteractive: this.ready && !this.working && !this.failed && !this.textDragging,
+        label: $r('app.string.note_drawing_color'),
+        onSelect: (index: number): void => { this.selectColor(index); } })
+    }
+  }
+
+  @Builder
   private tools() {
-    Flex({ wrap: FlexWrap.Wrap, space: { main: LengthMetrics.vp(8), cross: LengthMetrics.vp(8) } }) {
-      按下态按钮({ 文案: $r('app.string.note_drawing_ink'), selectable: true, selected: !this.textMode,
-        是否启用: this.ready && !this.working && !this.failed && !this.textDragging,
-        点击回调: (): void => { this.textMode = false; this.selectedText = -1; this.publish(); } })
-      按下态按钮({ 文案: $r('app.string.note_drawing_text'), selectable: true, selected: this.textMode,
-        是否启用: this.ready && !this.working && !this.failed && !this.textDragging,
-        点击回调: (): void => { this.textMode = true; this.selectedText = -1; this.publish(); } })
-      按下态按钮({ 文案: localizedNamedResourceText(this.getUIContext(), this.uiLanguage, noteDrawingImageActionKey(this.document.base !== '')),
-        是否启用: this.ready && !this.working && !this.failed && !this.textDragging,
-        点击回调: (): void => { this.importImage(); } })
+    Row({ space: 4 }) {
+      Row() {
+        按下态按钮({ 文案: $r('app.string.note_drawing_ink'), compact: true, 字号: 14, selectable: true, selected: !this.textMode,
+          是否启用: this.ready && !this.working && !this.failed && !this.textDragging,
+          点击回调: (): void => { this.textMode = false; this.selectedText = -1; this.publish(); } })
+        按下态按钮({ 文案: $r('app.string.note_drawing_text'), compact: true, 字号: 14, selectable: true, selected: this.textMode,
+          是否启用: this.ready && !this.working && !this.failed && !this.textDragging,
+          点击回调: (): void => { this.textMode = true; this.selectedText = -1; this.publish(); } })
+      }.border({ width: 0.5, color: $r('app.color.surface_border') }).borderRadius(8)
+      Blank()
+      // 华为画笔自带颜色和编辑工具；文字颜色与原版回退才由应用提供。
+      if (this.textMode || !this.official) { this.colorPicker() }
+    }.width('100%').alignItems(VerticalAlign.Center)
+    Row({ space: 4 }) {
+      IconActionButton({ source: $r('app.media.ic_editor_image'),
+        label: localizedNamedResourceText(this.getUIContext(), this.uiLanguage, noteDrawingImageActionKey(this.document.base !== '')),
+        isInteractive: this.ready && !this.working && !this.failed && !this.textDragging,
+        onAction: (): void => { this.importImage(); } })
+      Blank()
       if (!this.official && !this.textMode) {
-        按下态按钮({ 文案: $r('app.string.study_whiteboard_eraser'), selectable: true, selected: this.eraser, 是否启用: !this.working && this.ready && !this.failed,
+        按下态按钮({ 文案: $r('app.string.study_whiteboard_eraser'), compact: true, 字号: 14, selectable: true, selected: this.eraser,
+          是否启用: !this.working && this.ready && !this.failed,
           点击回调: (): void => { this.eraser = !this.eraser; this.publish(); } })
-        按下态按钮({ 文案: $r('app.string.note_drawing_undo'), 是否启用: this.ready && !this.working && !this.failed && this.undoAvailable,
-          点击回调: (): void => { this.local.undo(); this.redraw(); this.publish(); } })
-        按下态按钮({ 文案: $r('app.string.note_drawing_redo'), 是否启用: this.ready && !this.working && !this.failed && this.redoAvailable,
-          点击回调: (): void => { this.local.redo(); this.redraw(); this.publish(); } })
+        IconActionButton({ source: $r('app.media.ic_study_undo'), label: $r('app.string.note_drawing_undo'),
+          isInteractive: this.ready && !this.working && !this.failed && this.undoAvailable,
+          onAction: (): void => { this.local.undo(); this.redraw(); this.publish(); } })
+        IconActionButton({ source: $r('app.media.ic_whiteboard_redo'), label: $r('app.string.note_drawing_redo'),
+          isInteractive: this.ready && !this.working && !this.failed && this.redoAvailable,
+          onAction: (): void => { this.local.redo(); this.redraw(); this.publish(); } })
       }
-    }.width('100%')
+    }.width('100%').alignItems(VerticalAlign.Center)
     if (this.textMode) {
       TextArea({ text: this.textValue, placeholder: resourceText(this.getUIContext(), $r('app.string.note_drawing_text_hint')) })
         .height(64).maxLength(2000).enabled(this.canEditText() && !this.textDragging).onChange((value: string): void => { this.textChanged(value); })
       Row({ space: 8 }) {
-        按下态按钮({ 文案: $r('app.string.note_drawing_add_text'), 是否启用: this.canEditText() && !this.textDragging && this.textValue.trim() !== '' && this.texts.length < 100,
+        按下态按钮({ 文案: $r('app.string.note_drawing_add_text'), compact: true, 字号: 14, 是否启用: this.canEditText() && !this.textDragging && this.textValue.trim() !== '' && this.texts.length < 100,
           点击回调: (): void => { this.placeText(this.canvasWidth * 0.1, this.canvasHeight * 0.1); } })
         IconActionButton({ source: $r('app.media.ic_common_close'), label: $r('app.string.note_drawing_delete_text'),
-          toolbarStyle: true, isInteractive: this.canEditText() && !this.textDragging && this.selectedText >= 0,
+          isInteractive: this.canEditText() && !this.textDragging && this.selectedText >= 0,
           onAction: (): void => { this.texts = this.texts.filter((text: DrawingText): boolean => text.id !== this.selectedText);
             this.selectedText = -1; this.publish(); } })
       }.width('100%')
       Text($r('app.string.note_drawing_transform_hint')).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
     }
-    if (this.textMode || !this.official) {
-      FormSelectRow({ label: $r('app.string.note_drawing_color'),
-        options: this.colorLabels().map((label: string): SelectOption => ({ value: label })),
-        selectedIndex: DRAWING_COLORS.indexOf(this.color), value: this.colorName(), showValuePreview: true,
-        valuePreview: () => { this.colorPreview(); },
-        isInteractive: this.ready && !this.working && !this.failed && !this.textDragging,
-        onSelect: (index: number): void => { this.selectColor(index); } })
-    }
     if (this.source === '' && this.document.base === '') {
-      Select([{ value: '1200 × 900' }, { value: '900 × 1200' }, { value: '1200 × 1200' }])
-        .width(200).height(SelectStyle.controlHeight).padding(SelectStyle.controlPadding)
-        .space(SelectStyle.controlSpace).font(SelectStyle.controlFont).optionFont(SelectStyle.optionFont)
-        .selectedOptionFont(SelectStyle.selectedOptionFont)
-        .border(SelectStyle.controlBorder).borderRadius(SelectStyle.controlRadius).textModifier(SelectStyle.labelText()).attributeModifier(new SelectStyle())
-        .selected(this.document.width === 900 ? 1 : this.document.height === 1200 ? 2 : 0)
-        .value(`${this.document.width} × ${this.document.height}`).enabled(this.ready && !this.working && !this.failed && !this.textDragging)
-        .accessibilityText($r('app.string.note_drawing_canvas_size'))
-        .onSelect((index: number): void => {
+      Row({ space: 8 }) {
+      Text($r('app.string.note_drawing_canvas_size')).fontSize(12).fontColor($r('app.color.text_secondary'))
+      Blank()
+      SurfaceSelect({ options: [{ value: '1200 × 900' }, { value: '900 × 1200' }, { value: '1200 × 1200' }],
+        selectedIndex: this.document.width === 900 ? 1 : this.document.height === 1200 ? 2 : 0,
+        value: `${this.document.width} × ${this.document.height}`,
+        isInteractive: this.ready && !this.working && !this.failed && !this.textDragging,
+        label: $r('app.string.note_drawing_canvas_size'),
+        onSelect: (index: number): void => {
           this.document.width = index === 1 ? 900 : 1200; this.document.height = index === 0 ? 900 : 1200; this.fitCanvas();
-        })
+        } })
+      }.width('100%').alignItems(VerticalAlign.Center)
     }
   }
 
@@ -568,13 +680,15 @@ export struct NoteDrawingEditor {
         Stack({ alignContent: Alignment.TopStart }) {
           if (this.baseImage !== null) { Image(this.baseImage).width('100%').height('100%').objectFit(ImageFit.Fill) }
           if (this.official && this.host !== null) {
-            Stack() { ContentSlot(this.host.getContent()) }.width('100%').height('100%')
+            Stack() { ContentSlot(this.host.getContent()) }.width(this.canvasWidth).height(this.canvasHeight)
               .hitTestBehavior(this.textMode || this.working ? HitTestMode.None : HitTestMode.Default)
           } else {
-            Canvas(this.canvas).width('100%').height('100%').onReady((): void => { this.canvasMounted = true; this.redraw(); })
+            Canvas(this.canvas).width(this.canvasWidth).height(this.canvasHeight)
+              .onReady((): void => { this.canvasMounted = true; this.redraw(); })
+              .onAreaChange((): void => { this.redraw(); })
               .onTouch((event: TouchEvent): void => { this.touch(event); })
           }
-          Canvas(this.textCanvas).width('100%').height('100%').hitTestBehavior(HitTestMode.None)
+          Canvas(this.textCanvas).width(this.canvasWidth).height(this.canvasHeight).hitTestBehavior(HitTestMode.None)
             .onReady((): void => { this.textCanvasMounted = true; this.redrawTexts(); })
             .onAreaChange((): void => { this.redrawTexts(); })
           if (this.textMode) {
@@ -584,7 +698,8 @@ export struct NoteDrawingEditor {
           ForEach(this.texts, (entry: DrawingText) => {
             Stack({ alignContent: Alignment.TopStart }) {
               if (this.textMode && this.selectedText === entry.id) {
-                Stack().width('100%').height('100%').border({ width: 1, color: $r('app.color.action_primary') })
+                Rect().width(this.textBoxWidth(entry)).height(this.textBoxHeight(entry))
+                  .fill(Color.Transparent).stroke($r('app.color.action_primary')).strokeWidth(1)
                   .hitTestBehavior(HitTestMode.None)
               }
             }.width(this.textBoxWidth(entry)).height(this.textBoxHeight(entry))
@@ -594,9 +709,8 @@ export struct NoteDrawingEditor {
                 width: Math.max(44, this.textBoxWidth(entry)), height: Math.max(44, this.textBoxHeight(entry)) })
               .zIndex(this.selectedText === entry.id ? 1 : 0)
               .hitTestBehavior(this.canEditText() ? HitTestMode.Default : HitTestMode.None)
-              .attributeModifier(new PressFeedback())
-              .onClick((): void => { this.selectText(entry); })
               .gesture(GestureGroup(GestureMode.Parallel,
+                TapGesture().onAction((): void => { this.selectText(entry); }),
                 PanGesture({ fingers: 1, direction: PanDirection.All }).onActionStart((): void => { this.startTextMove(entry); })
                   .onActionUpdate((event: GestureEvent): void => { this.moveText(entry, event.offsetX, event.offsetY); })
                   .onActionEnd((event: GestureEvent): void => { this.moveText(entry, event.offsetX, event.offsetY); this.finishTextMove(entry, true); })
@@ -607,25 +721,23 @@ export struct NoteDrawingEditor {
                   .onActionCancel((): void => { this.finishTextResize(entry, false); })
               ))
             if (this.textMode && this.selectedText === entry.id) {
-              // 手柄在框外独立命中，不用最小触摸尺寸撑大文字框。
+              // 方形框点中心与选框边缘重合；触摸序列按窗口坐标和按下时的快照连续计算。
               ForEach(DRAWING_TEXT_HANDLES, (handle: DrawingTextHandle) => {
                 Stack() {
-                  Circle().width(12).height(12).fill($r('app.color.action_primary'))
-                    .stroke($r('app.color.action_on_primary')).strokeWidth(1)
-                }.width(24).height(24).zIndex(2)
+                  Rect().width(DRAWING_TEXT_HANDLE_SIZE).height(DRAWING_TEXT_HANDLE_SIZE)
+                    .fill($r('app.color.action_on_primary')).stroke($r('app.color.action_primary')).strokeWidth(2)
+                    .hitTestBehavior(HitTestMode.None)
+                }.width(DRAWING_TEXT_HANDLE_HIT_SIZE).height(DRAWING_TEXT_HANDLE_HIT_SIZE).zIndex(2)
                   .position({ x: this.textHandleX(entry, handle), y: this.textHandleY(entry, handle) })
+                  .responseRegion({ x: (DRAWING_TEXT_HANDLE_HIT_SIZE - this.textHandleHitLength(this.textBoxWidth(entry))) / 2,
+                    y: (DRAWING_TEXT_HANDLE_HIT_SIZE - this.textHandleHitLength(this.textBoxHeight(entry))) / 2,
+                    width: this.textHandleHitLength(this.textBoxWidth(entry)), height: this.textHandleHitLength(this.textBoxHeight(entry)) })
                   .accessibilityText($r('app.string.note_drawing_resize_text'))
                   .hitTestBehavior(this.canEditText() ? HitTestMode.Default : HitTestMode.None)
-                  .gesture(PanGesture({ fingers: 1, direction: PanDirection.All, distance: 1 })
-                    .onActionStart((): void => { this.startTextResize(entry, false, handle); })
-                    .onActionUpdate((event: GestureEvent): void => { this.resizeText(entry, event.offsetX, event.offsetY); })
-                    .onActionEnd((event: GestureEvent): void => {
-                      this.resizeText(entry, event.offsetX, event.offsetY); this.finishTextResize(entry, true);
-                    })
-                    .onActionCancel((): void => { this.finishTextResize(entry, false); }))
+                  .onTouch((event: TouchEvent): void => { this.resizeTextTouch(entry, handle, event); })
               }, (handle: DrawingTextHandle): string => handle.id)
             }
-          }, (entry: DrawingText): string => `${entry.id}-${entry.text}-${entry.x}-${entry.y}-${entry.color}-${entry.size}`)
+          }, (entry: DrawingText): string => `${entry.id}-${entry.text}-${entry.x}-${entry.y}-${entry.color}-${entry.size}-${entry.scaleX ?? 1}-${entry.scaleY ?? 1}`)
         }.width(this.canvasWidth).height(this.canvasHeight).backgroundColor(this.document.background).clip(true)
       }.width('100%').layoutWeight(1).attributeModifier(new ImageSurfaceStyle())
         .onAreaChange((_old: Area, area: Area): void => { this.frameWidth = Number(area.width); this.frameHeight = Number(area.height); this.fitCanvas(); })

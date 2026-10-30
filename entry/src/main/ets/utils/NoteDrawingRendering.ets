@@ -29,12 +29,23 @@ export function measureNoteDrawingText(context: OffscreenCanvasRenderingContext2
 }
 
 export function paintNoteDrawingText(context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
-  entry: DrawingText, x: number, y: number, size: number, unit: string = 'px'): void {
+  entry: DrawingText, x: number, y: number, size: number, unit: string = 'px',
+  previewScaleX: number = 1, previewScaleY: number = 1): void {
   context.fillStyle = entry.color; context.font = `${size}${unit} sans-serif`;
   context.textBaseline = 'top'; context.textAlign = 'left';
+  const scaleX: number = (entry.scaleX ?? 1) * previewScaleX;
+  const scaleY: number = (entry.scaleY ?? 1) * previewScaleY;
+  const stretched: boolean = scaleX !== 1 || scaleY !== 1;
   const lines: string[] = entry.text.split('\n');
-  for (let index: number = 0; index < lines.length; index++) {
-    context.fillText(lines[index], x, y + index * size * 1.2);
+  if (stretched) {
+    context.save(); context.translate(x, y); context.scale(scaleX, scaleY);
+  }
+  try {
+    for (let index: number = 0; index < lines.length; index++) {
+      context.fillText(lines[index], stretched ? 0 : x, (stretched ? 0 : y) + index * size * 1.2);
+    }
+  } finally {
+    if (stretched) context.restore();
   }
 }
 

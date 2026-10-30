@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { WhiteboardStroke } from './StudyWhiteboard';
 
-export interface DrawingText { id: number; text: string; x: number; y: number; size: number; color: string; }
+/** 旧源未记录轴向比例时按1读取；边点拉伸独立于角点/双指调整的字号。 */
+export interface DrawingText {
+  id: number; text: string; x: number; y: number; size: number; color: string;
+  scaleX?: number; scaleY?: number;
+}
 export interface DrawingFile { name: string; data: string; }
 /** 可编辑源嵌入 PNG 私有辅助块，随普通 Anki 图片同步，不产生悬空的旁文件。 */
 export interface NoteDrawingDocument {
@@ -20,28 +24,45 @@ export const DRAWING_COLORS: string[] = ['#202632', '#D83B46', '#2768D8', '#1680
 export const DRAWING_COLOR_KEYS: string[] = ['note_drawing_black', 'study_whiteboard_red', 'study_whiteboard_blue', 'study_whiteboard_green'];
 export const DRAWING_TEXT_MIN_SIZE: number = 8;
 export const DRAWING_TEXT_MAX_SIZE: number = 256;
+export const DRAWING_TEXT_MIN_SCALE: number = 1 / 32;
+export const DRAWING_TEXT_MAX_SCALE: number = 32;
+export const DRAWING_TEXT_FRAME_PADDING: number = 2;
+export const DRAWING_TEXT_HANDLE_SIZE: number = 10;
+export const DRAWING_TEXT_HANDLE_HIT_SIZE: number = 24;
+export const DRAWING_TEXT_RESIZE_MODE: string = 'edges_stretch_corners_proportional';
+export const DRAWING_COLOR_PLACEMENT: string = 'after_mode_tools';
 
 export interface DrawingTextBounds { x: number; y: number; width: number; height: number; }
-export interface DrawingTextHandle { id: string; x: number; y: number; }
+export interface DrawingTextHandle { id: string; x: number; y: number; mode: string; }
 export const DRAWING_TEXT_HANDLES: DrawingTextHandle[] = [
-  { id: 'top_left', x: 0, y: 0 }, { id: 'top', x: 0.5, y: 0 }, { id: 'top_right', x: 1, y: 0 },
-  { id: 'left', x: 0, y: 0.5 }, { id: 'right', x: 1, y: 0.5 },
-  { id: 'bottom_left', x: 0, y: 1 }, { id: 'bottom', x: 0.5, y: 1 }, { id: 'bottom_right', x: 1, y: 1 }
+  { id: 'top_left', x: 0, y: 0, mode: 'proportional' }, { id: 'top', x: 0.5, y: 0, mode: 'height' },
+  { id: 'top_right', x: 1, y: 0, mode: 'proportional' },
+  { id: 'left', x: 0, y: 0.5, mode: 'width' }, { id: 'right', x: 1, y: 0.5, mode: 'width' },
+  { id: 'bottom_left', x: 0, y: 1, mode: 'proportional' }, { id: 'bottom', x: 0.5, y: 1, mode: 'height' },
+  { id: 'bottom_right', x: 1, y: 1, mode: 'proportional' }
 ];
 
-/** 四边沿对应轴缩放；角点采用变化更大的轴，避免长文字吞掉竖向拖动。 */
+/** 边点沿对应轴计算拉伸比，角点投影到等比轨迹；固定框留白不参与比例计算。 */
 export function drawingTextResizeScale(width: number, height: number, handle: DrawingTextHandle,
   x: number, y: number): number {
   if (!Number.isFinite(x) || !Number.isFinite(y)) return 1;
-  const horizontal: number = handle.x === 0.5 ? 0 : x * (handle.x === 0 ? -1 : 1) / Math.max(1, width);
-  const vertical: number = handle.y === 0.5 ? 0 : y * (handle.y === 0 ? -1 : 1) / Math.max(1, height);
-  return Math.max(0.001, 1 + (Math.abs(horizontal) >= Math.abs(vertical) ? horizontal : vertical));
+  const horizontal: number = handle.x === 0.5 ? 0 :
+    (width - DRAWING_TEXT_FRAME_PADDING * 2) * (handle.x === 0 ? -1 : 1);
+  const vertical: number = handle.y === 0.5 ? 0 :
+    (height - DRAWING_TEXT_FRAME_PADDING * 2) * (handle.y === 0 ? -1 : 1);
+  const lengthSquared: number = horizontal * horizontal + vertical * vertical;
+  return lengthSquared > 0 ? Math.max(0.001, 1 + (x * horizontal + y * vertical) / lengthSquared) : 1;
 }
 
 /** 手柄与双指缩放共用源文档字号边界，不在手势期间修改文档。 */
 export function scaledDrawingTextSize(size: number, scale: number): number {
   if (!Number.isFinite(scale) || scale <= 0) return size;
   return Math.max(DRAWING_TEXT_MIN_SIZE, Math.min(DRAWING_TEXT_MAX_SIZE, size * scale));
+}
+
+export function scaledDrawingTextStretch(stretch: number, scale: number): number {
+  if (!Number.isFinite(scale) || scale <= 0) return stretch;
+  return Math.max(DRAWING_TEXT_MIN_SCALE, Math.min(DRAWING_TEXT_MAX_SCALE, stretch * scale));
 }
 
 /** UI 与 JIDE 共用实际图片动作名称。 */
@@ -94,7 +115,10 @@ export function validateNoteDrawing(document: NoteDrawingDocument): void {
     if (text === null || !Number.isInteger(text.id) || text.id < 1 || ids.has(text.id) || typeof text.text !== 'string' ||
       text.text.length > 2000 || !Number.isFinite(text.x) || !Number.isFinite(text.y) ||
       text.x < 0 || text.x > 1 || text.y < 0 || text.y > 1 || !Number.isFinite(text.size) ||
-      text.size < DRAWING_TEXT_MIN_SIZE || text.size > DRAWING_TEXT_MAX_SIZE || !new RegExp('^#[0-9A-Fa-f]{6}$').test(text.color)) {
+      text.size < DRAWING_TEXT_MIN_SIZE || text.size > DRAWING_TEXT_MAX_SIZE ||
+      (text.scaleX !== undefined && (!Number.isFinite(text.scaleX) || text.scaleX < DRAWING_TEXT_MIN_SCALE || text.scaleX > DRAWING_TEXT_MAX_SCALE)) ||
+      (text.scaleY !== undefined && (!Number.isFinite(text.scaleY) || text.scaleY < DRAWING_TEXT_MIN_SCALE || text.scaleY > DRAWING_TEXT_MAX_SCALE)) ||
+      !new RegExp('^#[0-9A-Fa-f]{6}$').test(text.color)) {
       throw new Error('Invalid drawing text');
     }
     ids.add(text.id);

@@ -5,7 +5,9 @@ import { readFileSync } from 'node:fs';
 import { crc32, inflateSync } from 'node:zlib';
 import { emptyNoteDrawing, validateNoteDrawing, drawingMetadata, embedDrawingMetadata,
   validDrawingFileName, DRAWING_COLORS, DRAWING_COLOR_KEYS, DRAWING_TEXT_HANDLES, drawingTextResizeScale,
-  scaledDrawingTextSize, noteDrawingImageActionKey } from '../../entry/src/main/ets/model/NoteDrawing.ts';
+  DRAWING_TEXT_FRAME_PADDING, DRAWING_TEXT_HANDLE_SIZE, DRAWING_TEXT_HANDLE_HIT_SIZE,
+  DRAWING_TEXT_RESIZE_MODE, DRAWING_COLOR_PLACEMENT,
+  scaledDrawingTextSize, scaledDrawingTextStretch, noteDrawingImageActionKey } from '../../entry/src/main/ets/model/NoteDrawing.ts';
 import { StudyWhiteboard } from '../../entry/src/main/ets/model/StudyWhiteboard.ts';
 import { NoteMediaSession } from '../../entry/src/main/ets/model/NoteMediaSession.ts';
 import { noteDrawingInterfaceObservation } from '../../entry/src/main/ets/model/AppInterface.ts';
@@ -95,8 +97,15 @@ const textRendering=loadPlatformModule('utils/NoteDrawingRendering.ets','({measu
 // 仅替换字体引擎；选框合并、绘制和所有变换仍执行真实实现。
 class DrawingCanvas {
   drawn=[];
-  clearRect(){this.drawn=[];}
-  fillText(...args){this.drawn.push([this.font,...args]);}
+  painted=[];transform=[0,0,1,1];stack=[];
+  clearRect(){this.drawn=[];this.painted=[];}
+  save(){this.stack.push(this.transform.slice());}
+  restore(){this.transform=this.stack.pop();}
+  translate(x,y){this.transform[0]+=x*this.transform[2];this.transform[1]+=y*this.transform[3];}
+  scale(x,y){this.transform[2]*=x;this.transform[3]*=y;}
+  fillText(...args){this.drawn.push([this.font,...args]);this.painted.push({text:args[0],font:this.font,
+    x:this.transform[0]+args[1]*this.transform[2],y:this.transform[1]+args[2]*this.transform[3],
+    scaleX:this.transform[2],scaleY:this.transform[3]});}
   measureText(text){
     const size=parseFloat(this.font);
     const width=[...text].reduce((sum,char)=>sum+(/[\u4e00-\u9fff]/.test(char)?1:.6),0)*size;
@@ -109,7 +118,8 @@ function drawingEditor(overrides={}) {
   const events=[], doc=emptyNoteDrawing();
   const Editor=loadComponentLogic('components/editor/NoteDrawingEditor.ets','NoteDrawingEditor',{
     emptyNoteDrawing,DRAWING_COLORS,DRAWING_COLOR_KEYS,DRAWING_TEXT_HANDLES,drawingTextResizeScale,
-    scaledDrawingTextSize,noteDrawingImageActionKey,StudyWhiteboard,CanvasRenderingContext2D:DrawingCanvas,
+    DRAWING_TEXT_FRAME_PADDING,DRAWING_TEXT_HANDLE_SIZE,DRAWING_TEXT_HANDLE_HIT_SIZE,
+    scaledDrawingTextSize,scaledDrawingTextStretch,noteDrawingImageActionKey,StudyWhiteboard,CanvasRenderingContext2D:DrawingCanvas,
     OffscreenCanvasRenderingContext2D:DrawingCanvas,RenderingContextSettings:class{},LengthMetricsUnit:{PX:'px'},...textRendering,
     appInterface:{observe:observation=>{events.push(['observe',observation]);return 1;},leave:()=>{}},
     noteDrawingInterfaceObservation,resourceText:(_ctx,key)=>key,$r:key=>key,
@@ -150,7 +160,8 @@ test('text placement, selection, editing, continuous dragging and cancellation p
   assert.equal(editor.textDragX,0);assert.equal(editor.textDragY,0);assert.equal(editor.textDragging,false);
   assert.equal(editor.selectedText,entry.id);
   editor.startTextMove(entry);editor.moveText(entry,9999,-9999);editor.finishTextMove(entry,true);
-  assert.equal(editor.textBoxX(entry)+editor.textBoxWidth(entry),editor.canvasWidth);assert.equal(entry.y,0);
+  assert.equal(editor.textBoxX(entry)+editor.textBoxWidth(entry),editor.canvasWidth-5);
+  assert.ok(Math.abs(editor.textBoxY(entry)-5)<1e-8);
   editor.working=true;editor.cancel();assert.equal(events.includes('cancel'),false);
   editor.working=false;editor.cancel();assert.equal(events.includes('cancel'),true);
 });
@@ -168,7 +179,9 @@ test('color selector edits the selected text, rejects invalid or busy choices an
   const view=events.filter(e=>e[0]==='observe').at(-1)[1];assert.equal(view.items.some(i=>i.id==='text_size'),false);
   assert.equal(view.items.some(i=>i.id==='color'),true);assert.deepEqual(view.optionIds,DRAWING_COLORS);
   const source=readFileSync(new URL('../../entry/src/main/ets/components/editor/NoteDrawingEditor.ets',import.meta.url),'utf8');
-  assert.match(source,/FormSelectRow\(\{ label: \$r\('app.string.note_drawing_color'\)/);
+  const mode=source.indexOf("文案: $r('app.string.note_drawing_text')");
+  const color=source.indexOf('this.colorPicker()',mode);
+  assert.ok(color>mode&&color<source.indexOf('noteDrawingImageActionKey',mode),'color follows the mode buttons before image import');
   assert.doesNotMatch(source,/DRAWING_SIZES|note_drawing_text_size/);
 });
 
@@ -176,10 +189,10 @@ test('measured selection fits multiline text and moves the complete box inside t
   const {editor}=drawingEditor();editor.textMode=true;editor.canvasWidth=600;editor.canvasHeight=450;
   editor.textSize=120;editor.textChanged('汉字\nAB');editor.placeText(590,440);const entry=editor.texts[0];
   assert.deepEqual(editor.textBounds(entry),{x:-2,y:7,width:124,height:121});
-  assert.equal(entry.x,1-122/600);assert.equal(entry.y,1-128/450);
+  assert.equal(entry.x,1-127/600);assert.equal(entry.y,1-133/450);
   editor.startTextMove(entry);editor.moveText(entry,NaN,10);assert.equal(editor.textDragY,0);
   editor.moveText(entry,-9999,9999);editor.finishTextMove(entry,true);
-  assert.ok(Math.abs(editor.textBoxX(entry))<1e-10);assert.equal(entry.y,1-128/450);
+  assert.ok(Math.abs(editor.textBoxX(entry)-5)<1e-10);assert.equal(entry.y,1-133/450);
   const original={x:entry.x,y:entry.y};editor.startTextMove(entry);editor.moveText(entry,100,-100);
   editor.frameWidth=300;editor.frameHeight=225;editor.fitCanvas();editor.finishTextMove(entry,true);
   assert.deepEqual({x:entry.x,y:entry.y},original);assert.equal(editor.textDragging,false);assert.equal(editor.textDragX,0);
@@ -202,7 +215,7 @@ test('selection unions glyph ink on each line, including bearings and blank-line
   assert.ok(box.width<44&&box.height<44,'touch size must not enlarge the visible frame');
 });
 
-test('all eight handles resize in their direction and preserve the opposite edge or corner',()=>{
+test('edge handles stretch one axis while corners preserve proportions and the opposite anchor',()=>{
   assert.equal(DRAWING_TEXT_HANDLES.length,8);
   for(const handle of DRAWING_TEXT_HANDLES){
     const {editor}=drawingEditor();editor.textMode=true;editor.canvasWidth=1200;editor.canvasHeight=900;
@@ -211,47 +224,179 @@ test('all eight handles resize in their direction and preserve the opposite edge
     const anchorX=editor.textBoxX(entry)+editor.textBoxWidth(entry)*(1-handle.x);
     const anchorY=editor.textBoxY(entry)+editor.textBoxHeight(entry)*(1-handle.y);
     editor.startTextResize(entry,false,handle);
-    editor.resizeText(entry,(handle.x-.5)*2*editor.resizeWidth,(handle.y-.5)*2*editor.resizeHeight);
-    assert.equal(editor.textScale,2,handle.id);assert.deepEqual(entry,original,'preview does not mutate source');
+    editor.resizeText(entry,(handle.x-.5)*2*(editor.resizeWidth-4),(handle.y-.5)*2*(editor.resizeHeight-4));
+    assert.equal(editor.textScale,handle.mode==='proportional'?2:1,handle.id);
+    assert.equal(editor.textStretchX,handle.mode==='width'?2:1,handle.id);
+    assert.equal(editor.textStretchY,handle.mode==='height'?2:1,handle.id);
+    assert.deepEqual(entry,original,'preview does not mutate source');
     assert.ok(Math.abs(editor.textBoxX(entry)+editor.textBoxWidth(entry)*(1-handle.x)-anchorX)<1e-8,handle.id);
     assert.ok(Math.abs(editor.textBoxY(entry)+editor.textBoxHeight(entry)*(1-handle.y)-anchorY)<1e-8,handle.id);
-    editor.finishTextResize(entry,true);assert.equal(entry.size,120,handle.id);
+    editor.finishTextResize(entry,true);assert.equal(entry.size,handle.mode==='proportional'?120:60,handle.id);
+    assert.equal(entry.scaleX,handle.mode==='width'?2:undefined);assert.equal(entry.scaleY,handle.mode==='height'?2:undefined);
     const saved=structuredClone(entry);editor.startTextResize(entry,false,handle);
-    editor.resizeText(entry,-(handle.x-.5)*editor.resizeWidth,-(handle.y-.5)*editor.resizeHeight);
-    assert.equal(editor.textScale,.5,handle.id);editor.finishTextResize(entry,false);assert.deepEqual(entry,saved);
+    editor.resizeText(entry,-(handle.x-.5)*(editor.resizeWidth-4),-(handle.y-.5)*(editor.resizeHeight-4));
+    assert.equal(editor.textScale,handle.mode==='proportional'?.5:1,handle.id);
+    assert.equal(editor.textStretchX,handle.mode==='width'?.5:1,handle.id);
+    assert.equal(editor.textStretchY,handle.mode==='height'?.5:1,handle.id);
+    editor.finishTextResize(entry,false);assert.deepEqual(entry,saved);
   }
 });
 
-test('vertical corner drags respond fully on wide text and side handles ignore the other axis',()=>{
-  const rightBottom=DRAWING_TEXT_HANDLES.find(h=>h.id==='bottom_right');
-  assert.equal(drawingTextResizeScale(1000,20,rightBottom,0,20),2);
-  assert.equal(drawingTextResizeScale(20,1000,rightBottom,20,0),2);
-  const top=DRAWING_TEXT_HANDLES.find(h=>h.id==='top'),left=DRAWING_TEXT_HANDLES.find(h=>h.id==='left');
-  assert.equal(drawingTextResizeScale(1000,20,top,9999,-20),2);
-  assert.equal(drawingTextResizeScale(20,1000,left,-20,9999),2);
-  assert.equal(drawingTextResizeScale(1000,20,top,9999,0),1);
-  const {editor}=drawingEditor();editor.textMode=true;editor.textSize=60;editor.textChanged('Wide text '.repeat(4));
-  editor.placeText(20,60);const entry=editor.texts[0];editor.startTextResize(entry,false,rightBottom);
-  editor.resizeText(entry,0,editor.resizeHeight);assert.equal(editor.textScale,2);
-  editor.finishTextResize(entry,true);assert.equal(entry.size,120);
+test('edge dragging changes the text glyph transform and only its width or height by the pointer distance',()=>{
+  for(const handle of DRAWING_TEXT_HANDLES.filter(h=>h.mode!=='proportional')){
+    const {editor}=drawingEditor();editor.textMode=true;editor.textCanvasMounted=true;
+    editor.textChanged('Ag\n文字');editor.placeText(160,100);const entry=editor.texts[0];
+    const original={x:editor.textBoxX(entry),y:editor.textBoxY(entry),w:editor.textBoxWidth(entry),h:editor.textBoxHeight(entry)};
+    const painting=structuredClone(editor.textCanvas.painted);
+    editor.startTextResize(entry,false,handle);
+    editor.resizeText(entry,handle.mode==='width'?(handle.x===0?-30:30):9999,
+      handle.mode==='height'?(handle.y===0?-12:12):9999);
+    const preview={x:editor.textBoxX(entry),y:editor.textBoxY(entry),w:editor.textBoxWidth(entry),h:editor.textBoxHeight(entry)};
+    const changed=editor.textCanvas.painted;
+    if(handle.mode==='width'){
+      assert.ok(Math.abs(preview.w-original.w-30)<1e-8);assert.equal(preview.h,original.h);assert.equal(preview.y,original.y);
+      assert.ok(changed[0].scaleX>1);assert.equal(changed[0].scaleY,1);
+      assert.equal(changed[1].y-changed[0].y,painting[1].y-painting[0].y,'horizontal stretch retains line spacing');
+    }else{
+      assert.ok(Math.abs(preview.h-original.h-12)<1e-8);assert.equal(preview.w,original.w);assert.equal(preview.x,original.x);
+      assert.ok(changed[0].scaleY>1);assert.equal(changed[0].scaleX,1);
+      assert.ok(changed[1].y-changed[0].y>painting[1].y-painting[0].y,'vertical stretch changes glyphs and line spacing');
+    }
+    editor.finishTextResize(entry,true);
+    assert.ok(Math.abs(editor.textBoxWidth(entry)-preview.w)<1e-8);
+    assert.ok(Math.abs(editor.textBoxHeight(entry)-preview.h)<1e-8);
+    assert.equal(entry.size,36,'stretching does not change the base font size');
+  }
 });
 
-test('eight resize touch regions stay distinct and inside wide or narrow canvases, including their edges',()=>{
+test('stretch source validation accepts old images and rejects invalid optional axis ratios',()=>{
+  const doc=emptyNoteDrawing();doc.texts=[{id:1,text:'old',size:36,x:.2,y:.2,color:'#202632'}];
+  validateNoteDrawing(doc);
+  for(const key of ['scaleX','scaleY']){
+    for(const value of [0,-1,Infinity,NaN,null,'2',.001,100]){
+      assert.throws(()=>validateNoteDrawing({...doc,texts:[{...doc.texts[0],[key]:value}]}),/Invalid drawing text/);
+    }
+    for(const value of [1/32,.75,1,2,32])validateNoteDrawing({...doc,texts:[{...doc.texts[0],[key]:value}]});
+  }
+});
+
+test('proportional resizing projects continuously without switching axes and side handles follow their axis',()=>{
+  const rightBottom=DRAWING_TEXT_HANDLES.find(h=>h.id==='bottom_right');
+  assert.equal(drawingTextResizeScale(1000,20,rightBottom,996,16),2);
+  assert.equal(drawingTextResizeScale(20,1000,rightBottom,16,996),2);
+  const top=DRAWING_TEXT_HANDLES.find(h=>h.id==='top'),left=DRAWING_TEXT_HANDLES.find(h=>h.id==='left');
+  assert.equal(drawingTextResizeScale(1000,20,top,9999,-16),2);
+  assert.equal(drawingTextResizeScale(20,1000,left,-16,9999),2);
+  assert.equal(drawingTextResizeScale(1000,20,top,9999,0),1);
+  // 旧的“变化更大的轴”会在这两个几乎相同的触点间从放大跳到缩小。
+  const before=drawingTextResizeScale(204,44,rightBottom,100,-19.99);
+  const after=drawingTextResizeScale(204,44,rightBottom,100,-20.01);
+  assert.ok(Math.abs(after-before)<.001);assert.ok(before>1&&after>1);
+  assert.equal(drawingTextResizeScale(204,44,rightBottom,NaN,0),1);
+});
+
+test('square handle centers stay on the frame and their hit regions do not detach or overlap',()=>{
   for(const [width,height] of [[400,300],[240,120],[800,600]]){
     for(const size of [8,36,120]){
       for(const [x,y] of [[0,0],[width,height],[width/2,height/2],[0,height],[width,0]]){
         const {editor}=drawingEditor();editor.textMode=true;editor.canvasWidth=width;editor.canvasHeight=height;
         editor.textSize=size;editor.textChanged('汉');editor.placeText(x,y);const entry=editor.texts[0];
-        const positions=DRAWING_TEXT_HANDLES.map(handle=>({x:editor.textHandleX(entry,handle),y:editor.textHandleY(entry,handle)}));
+        const positions=DRAWING_TEXT_HANDLES.map(handle=>({x:editor.textHandleX(entry,handle)+12,y:editor.textHandleY(entry,handle)+12}));
+        const hitWidth=editor.textHandleHitLength(editor.textBoxWidth(entry));
+        const hitHeight=editor.textHandleHitLength(editor.textBoxHeight(entry));
         for(let i=0;i<positions.length;i++){
-          const current=positions[i];assert.ok(current.x>=0&&current.x+24<=width+1e-8);
-          assert.ok(current.y>=0&&current.y+24<=height+1e-8);
+          const current=positions[i],handle=DRAWING_TEXT_HANDLES[i];
+          assert.equal(current.x,editor.textBoxX(entry)+editor.textBoxWidth(entry)*handle.x);
+          assert.equal(current.y,editor.textBoxY(entry)+editor.textBoxHeight(entry)*handle.y);
+          assert.ok(current.x>=5-1e-8&&current.x+5<=width+1e-8);
+          assert.ok(current.y>=5-1e-8&&current.y+5<=height+1e-8);
           for(const other of positions.slice(i+1)){
-            assert.ok(Math.abs(current.x-other.x)>=24-1e-8||Math.abs(current.y-other.y)>=24-1e-8,
+            assert.ok(Math.abs(current.x-other.x)>=hitWidth-1e-8||Math.abs(current.y-other.y)>=hitHeight-1e-8,
               `overlapping handles at ${width}x${height}, font ${size}, origin ${x},${y}`);
           }
         }
       }
+    }
+  }
+});
+
+test('every handle follows a continuous window-coordinate trajectory through growth, reversal and release',()=>{
+  for(const handle of DRAWING_TEXT_HANDLES){
+    const {editor}=drawingEditor();editor.textMode=true;editor.canvasWidth=1200;editor.canvasHeight=900;
+    editor.textSize=80;editor.textChanged('字Ag');editor.placeText(450,350);
+    const entry=editor.texts[0],original=structuredClone(entry);
+    const startX=editor.textHandleX(entry,handle)+12,startY=editor.textHandleY(entry,handle)+12;
+    const axisX=(handle.x-.5)*2*(editor.textBoxWidth(entry)-4);
+    const axisY=(handle.y-.5)*2*(editor.textBoxHeight(entry)-4);
+    const touch=(type,delta,id=71)=>editor.resizeTextTouch(entry,handle,{type,
+      changedTouches:[undefined,{id,windowX:1000+axisX*delta,windowY:800+axisY*delta,
+        x:3,y:4}]}); // 局部坐标随框点一起移动，保持不变，不能拿来当位移。
+    touch(0,0);assert.equal(editor.textScale,1);assert.equal(editor.resizePointer,71);
+    for(const delta of [.01,.05,.15,.3,.5,.65,.6,.4,.2,0,-.1,-.25,.1,.3]){
+      touch(2,delta);
+      const factor=handle.mode==='width'?editor.textStretchX:handle.mode==='height'?editor.textStretchY:editor.textScale;
+      assert.ok(Math.abs(factor-(1+delta))<1e-10,handle.id);
+      assert.ok(Math.abs(editor.textHandleX(entry,handle)+12-startX-axisX*delta)<1e-8,handle.id);
+      assert.ok(Math.abs(editor.textHandleY(entry,handle)+12-startY-axisY*delta)<1e-8,handle.id);
+      assert.deepEqual(entry,original,'preview retains source until release');
+    }
+    touch(3,.3,99);assert.equal(editor.resizePointer,71,'palm cancellation does not end this pointer');
+    touch(1,.4);assert.equal(editor.textDragging,false);
+    assert.ok(Math.abs(entry.size-(handle.mode==='proportional'?112:80))<1e-8);
+    assert.ok(Math.abs(editor.textHandleX(entry,handle)+12-startX-axisX*.4)<1e-8,'release does not snap');
+    assert.ok(Math.abs(editor.textHandleY(entry,handle)+12-startY-axisY*.4)<1e-8,'release does not snap');
+    const saved=structuredClone(entry);touch(0,0);touch(2,.1);touch(3,.1);assert.deepEqual(entry,saved);
+  }
+});
+
+test('resizing stops at canvas bounds without moving the opposite anchor and resumes when dragged back',()=>{
+  for(const handle of DRAWING_TEXT_HANDLES){
+    const {editor}=drawingEditor();editor.textMode=true;editor.canvasWidth=400;editor.canvasHeight=300;
+    editor.textSize=80;editor.textChanged('文字');editor.placeText(180,130);
+    const entry=editor.texts[0];editor.startTextResize(entry,false,handle);
+    const anchorX=editor.resizeAnchorX,anchorY=editor.resizeAnchorY;
+    editor.resizeText(entry,(handle.x-.5)*1e5,(handle.y-.5)*1e5);
+    assert.ok(Math.abs(editor.textBoxX(entry)+editor.textBoxWidth(entry)*(1-handle.x)-anchorX)<1e-8);
+    assert.ok(Math.abs(editor.textBoxY(entry)+editor.textBoxHeight(entry)*(1-handle.y)-anchorY)<1e-8);
+    assert.ok(editor.textBoxX(entry)>=5-1e-8&&editor.textBoxX(entry)+editor.textBoxWidth(entry)<=395+1e-8);
+    assert.ok(editor.textBoxY(entry)>=5-1e-8&&editor.textBoxY(entry)+editor.textBoxHeight(entry)<=295+1e-8);
+    editor.resizeText(entry,0,0);assert.equal(editor.textScale,1);editor.finishTextResize(entry,true);
+    assert.equal(entry.size,80);
+  }
+});
+
+test('edge resizing retains valid editable source origins with glyph bearings and no release jump',()=>{
+  for(const handle of DRAWING_TEXT_HANDLES){
+    for(const [x,y] of [[0,0],[0,900],[1200,0],[1200,900]]){
+      const {editor,doc}=drawingEditor();editor.textMode=true;editor.canvasWidth=1200;editor.canvasHeight=900;
+      editor.textSize=36;editor.textChanged('字Ag');editor.placeText(x,y);const entry=editor.texts[0];
+      editor.startTextResize(entry,false,handle);
+      editor.resizeText(entry,(handle.x-.5)*1e5,(handle.y-.5)*1e5);
+      const preview={x:editor.textBoxX(entry),y:editor.textBoxY(entry),width:editor.textBoxWidth(entry),height:editor.textBoxHeight(entry)};
+      editor.finishTextResize(entry,true);doc.texts=editor.texts.slice();validateNoteDrawing(doc);
+      assert.ok(Math.abs(editor.textBoxX(entry)-preview.x)<1e-8);
+      assert.ok(Math.abs(editor.textBoxY(entry)-preview.y)<1e-8);
+      assert.ok(Math.abs(editor.textBoxWidth(entry)-preview.width)<1e-8);
+      assert.ok(Math.abs(editor.textBoxHeight(entry)-preview.height)<1e-8);
+    }
+  }
+});
+
+test('portrait, landscape and square drawing areas map all corners and resize the official surface together',()=>{
+  for(const [width,height] of [[1200,900],[900,1200],[1200,1200]]){
+    for(const [frameWidth,frameHeight] of [[320,240],[900,480],[200,100]]){
+      const {editor,doc}=drawingEditor();doc.width=width;doc.height=height;
+      editor.frameWidth=frameWidth;editor.frameHeight=frameHeight;
+      const viewports=[];editor.host={setViewport(_context,w,h){viewports.push([w,h]);}};editor.fitCanvas();
+      assert.ok(Math.abs(editor.canvasWidth/editor.canvasHeight-width/height)<1e-10);
+      assert.deepEqual(viewports.at(-1),[editor.canvasWidth,editor.canvasHeight]);
+      for(const [x,y] of [[.01,.01],[.99,.01],[.01,.99],[.99,.99]]){
+        editor.touch({type:0,sourceTool:2,changedTouches:[{id:9,x:x*editor.canvasWidth,y:y*editor.canvasHeight}]});
+        editor.touch({type:1,sourceTool:2,changedTouches:[{id:9,x:x*editor.canvasWidth,y:y*editor.canvasHeight}]});
+      }
+      const strokes=[];editor.local.visitStrokes(stroke=>strokes.push(stroke));
+      assert.equal(strokes.length,4);assert.ok(Math.abs(strokes[3].points[0].x-.99)<1e-10);
+      assert.ok(Math.abs(strokes[3].points[0].y-.99)<1e-10);
     }
   }
 });
@@ -283,7 +428,7 @@ test('blank-canvas taps use valid local finger coordinates and ignore empty or m
 test('corner resizing previews proportional text size and commits only on completion; cancel and busy retain source',()=>{
   const {editor}=drawingEditor();editor.textMode=true;editor.textChanged('Hello\n汉字');editor.placeText(40,30);
   const entry=editor.texts[0];editor.startTextResize(entry,false);
-  editor.resizeText(entry,editor.resizeWidth,editor.resizeHeight);assert.equal(editor.textScale,2);
+  editor.resizeText(entry,editor.resizeWidth-4,editor.resizeHeight-4);assert.equal(editor.textScale,2);
   assert.equal(entry.size,36);assert.equal(editor.textFontSize(entry),24);
   editor.finishTextResize(entry,true);assert.equal(entry.size,72);assert.equal(editor.textSize,72);assert.equal(editor.textScale,1);
   const saved=structuredClone(entry);editor.startTextResize(entry,false);editor.resizeText(entry,100,100);
@@ -327,6 +472,45 @@ test('resized text saves and reopens with editable source; selection and gesture
   reopened.editor.aboutToDisappear();
 });
 
+test('stretched text keeps its aspect ratio through corner/pinch resizing, PNG export and reopening',async()=>{
+  const h=drawingEditor();h.editor.textMode=true;h.editor.textCanvasMounted=true;
+  h.editor.textChanged('Ag\n字');h.editor.placeText(100,100);const entry=h.editor.texts[0];
+  h.editor.startTextResize(entry,false,DRAWING_TEXT_HANDLES.find(h=>h.id==='right'));
+  h.editor.resizeText(entry,(h.editor.resizeWidth-4)*.5,999);h.editor.finishTextResize(entry,true);
+  h.editor.startTextResize(entry,false,DRAWING_TEXT_HANDLES.find(h=>h.id==='top'));
+  h.editor.resizeText(entry,999,(h.editor.resizeHeight-4)*.25);h.editor.finishTextResize(entry,true);
+  assert.equal(entry.scaleX,1.5);assert.equal(entry.scaleY,.75);assert.equal(entry.size,36);
+  const aspect=(h.editor.textBoxWidth(entry)-4)/(h.editor.textBoxHeight(entry)-4);
+  h.editor.startTextResize(entry,false);
+  h.editor.resizeText(entry,(h.editor.resizeWidth-4)*.25,(h.editor.resizeHeight-4)*.25);
+  h.editor.finishTextResize(entry,true);assert.equal(entry.size,45);
+  h.editor.startTextResize(entry,true);h.editor.scaleText(entry,1.6);h.editor.finishTextResize(entry,true);
+  assert.equal(entry.size,72);assert.equal(entry.scaleX,1.5);assert.equal(entry.scaleY,.75);
+  assert.ok(Math.abs((h.editor.textBoxWidth(entry)-4)/(h.editor.textBoxHeight(entry)-4)-aspect)<1e-8);
+  await h.editor.save();const doc=h.events.find(e=>e[0]==='render')[1];validateNoteDrawing(doc);
+  const observation=h.events.filter(e=>e[0]==='observe').at(-1)[1];
+  assert.equal(observation.values.find(v=>v.id==='text_stretch_x').value,'1.5');
+  assert.equal(observation.values.find(v=>v.id==='text_stretch_y').value,'0.75');
+  const restored=JSON.parse(new TextDecoder().decode(drawingMetadata(embedDrawingMetadata(png,bytes(JSON.stringify(doc))))));
+  const reopened=drawingEditor({loadNoteDrawing:async()=>restored,drawingBaseImage:async()=>null,
+    studyPenKitAvailability:()=>({available:false}),createDrawingWorkspace:async()=>'/cache/note-drawing-work-stretch',
+    restoreDrawingInk:async()=>{}});
+  await reopened.editor.initialize();reopened.editor.textCanvasMounted=true;reopened.editor.publish();
+  assert.deepEqual(restored.texts[0],entry);
+  assert.deepEqual(reopened.editor.textCanvas.painted,h.editor.textCanvas.painted);
+  const render=loadPlatformModule('utils/NoteDrawingRendering.ets','renderNoteDrawing',{
+    OffscreenCanvasRenderingContext2D:class extends DrawingCanvas{fillRect(){}getPixelMap(){return {painted:this.painted};}},
+    RenderingContextSettings:class{},LengthMetricsUnit:{PX:'px'}});
+  const pixels=render(restored,null,null),preview=reopened.editor.textCanvas.painted;
+  for(let i=0;i<pixels.painted.length;i++){
+    assert.equal(pixels.painted[i].scaleX,1.5);assert.equal(pixels.painted[i].scaleY,.75);
+    assert.ok(Math.abs(pixels.painted[i].x-preview[i].x*3)<1e-8);
+    assert.ok(Math.abs(pixels.painted[i].y-preview[i].y*3)<1e-8);
+  }
+  assert.doesNotMatch(JSON.stringify(restored),/textStretch|textDrag|resize|selectedText/);
+  reopened.editor.aboutToDisappear();
+});
+
 test('local save composes text and strokes, retains draft on failure and cleans a late saved image', async()=>{
   const h=drawingEditor();h.editor.textMode=true;h.editor.textChanged('note');h.editor.placeText(40,30);await h.editor.save();
   assert.equal(h.events.find(e=>e[0]==='render')[1].texts[0].text,'note');assert.equal(h.doc.engine,'local_canvas');assert.equal(h.editor.working,false);
@@ -346,6 +530,11 @@ test('JIDE observes drawing controls and state without text, source paths, image
   assert.equal(status.values.find(v=>v.id==='text_transform').value,'move_resize');
   assert.equal(status.values.find(v=>v.id==='text_resize_handles').value,DRAWING_TEXT_HANDLES.map(h=>h.id).join(','));
   assert.equal(status.values.find(v=>v.id==='text_selection_bounds').value,'glyph');
+  assert.equal(status.values.find(v=>v.id==='text_resize_mode').value,DRAWING_TEXT_RESIZE_MODE);
+  assert.equal(status.values.find(v=>v.id==='text_resize_handle_modes').value,
+    DRAWING_TEXT_HANDLES.map(h=>`${h.id}:${h.mode}`).join(','));
+  assert.equal(status.values.find(v=>v.id==='text_resize_handle_style').value,'square_on_frame');
+  assert.equal(status.values.find(v=>v.id==='color_placement').value,DRAWING_COLOR_PLACEMENT);
   const dragging=noteDrawingInterfaceObservation({working:false,ready:true,official:false,textMode:true,textCount:1,
     selectedText:true,hasError:false,canUndo:false,canRedo:false,textTransforming:true});
   assert.equal(dragging.items.filter(i=>i.id!=='close').every(i=>!i.enabled),true);
