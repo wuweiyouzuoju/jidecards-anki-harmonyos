@@ -66,6 +66,7 @@ export interface NoteFieldEditingSupport {
   modeControlWideMinWidth: number;
   modeControlRailWidth: number;
   expandControlPlacement: string;
+  expandPresentation: string;
   expandTool: NoteEditorTool;
   collapseTool: NoteEditorTool;
   toolMenu: { layout: string; geometry: string; outerVisibility: string; defaultVisibility: string; initialSelection: string;
@@ -192,6 +193,7 @@ export const NOTE_FIELD_EDITING_SUPPORT: NoteFieldEditingSupport = {
   modeControlWideMinWidth: 480,
   modeControlRailWidth: 96,
   expandControlPlacement: 'inside_bottom_right_of_each_input',
+  expandPresentation: 'single_current_field_large_dialog_shared_draft_close_preserves_input',
   expandTool: NOTE_FIELD_EXPAND_TOOL,
   collapseTool: NOTE_FIELD_COLLAPSE_TOOL,
   toolMenu: { layout: 'screen_edge_semicircle', geometry: 'concentric_common_inner_and_rotating_outer_arcs',

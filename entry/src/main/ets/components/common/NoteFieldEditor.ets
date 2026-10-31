@@ -21,6 +21,7 @@ import { FORMAT_SUPERSCRIPT, FORMAT_SUBSCRIPT, noteLinkUrl, NOTE_REFERENCE_PREFI
 import { noteEditorHeight, richNoteList, sourceNoteList, sourceNoteClearFormat, richNoteLink,
   sourceNoteLink, richNoteScript, richNoteWrap, sourceNoteWrap, sourceNoteFontSize, sourceNoteSetFontSize,
   sourceNoteHeading, sourceNoteSetHeading } from '../../model/NoteHtmlTools';
+import { NoteFieldExpandedDialog } from './NoteFieldExpandedDialog';
 import { NoteLinkDialog } from './NoteLinkDialog';
 import { buildNoteEditorWheel, NoteEditorWheelParams, NoteEditorFormatDialog } from '../editor/NoteEditorWheel';
 import { NoteEditorWheelState, NoteEditorWheelSession, NOTE_EDITOR_WHEEL_SESSION_KEY } from '../../model/NoteEditorWheel';
@@ -105,6 +106,8 @@ export struct NoteFieldEditor {
   private applying: boolean = false;
   private lastSnapshot: string = '';
   private selectionVersion: number = 0;
+  private readonly expandedDialog: NativeDialogHost = new NativeDialogHost();
+  private expansionTimer: number = -1;
   private readonly hintDialog: NativeDialogHost = new NativeDialogHost();
   private hintSaving: boolean = false;
   private hintedAction: (() => void) | null = null;
@@ -124,6 +127,11 @@ export struct NoteFieldEditor {
     if (!this.inputLaidOut || this.focusRequest === this.focusHandled || this.disabled || !this.foreground) return;
     this.focusHandled = this.focusRequest; this.wheelSession.activate(this.inputKey); this.focusInput(this.sourceMode);
   }
+  private inputReady(): void {
+    const firstLayout: boolean = !this.inputLaidOut;
+    this.inputLaidOut = true; this.focusRequested();
+    if (firstLayout && this.expanded) this.focusInput(this.sourceMode);
+  }
   private fieldFocused: boolean = false;
   private wheelActive: boolean = false;
   private lastWheelTool: string = '';
@@ -131,6 +139,7 @@ export struct NoteFieldEditor {
 
   aboutToAppear(): void {
     this.disposed = false;
+    this.expandedDialog.activate();
     this.hintDialog.activate(); this.linkDialog.activate(); this.referenceDialog.activate(); this.formatDialog.activate();
     this.inputKey = 'note-editor-' + this.getUniqueId();
     this.sourceMode = this.fieldConfig?.plainText === true || parseNoteVisualText(this.value) === null;
@@ -144,6 +153,7 @@ export struct NoteFieldEditor {
     });
   }
   aboutToDisappear(): void {
+    clearTimeout(this.expansionTimer); this.expandedDialog.dispose();
     this.disposed = true; this.selectionVersion++; this.ready = false; this.hideWheel(true);
     this.wheelSession.remove(this.inputKey);
     this.hintDialog.dispose();
@@ -455,13 +465,38 @@ export struct NoteFieldEditor {
     this.updateWheel();
   }
 
-  private toggleExpanded(): void {
-    if (!this.disabled && !this.disposed) this.expanded = !this.expanded;
+  private readonly createExpandedDialog: (dismiss: NativeDialogDismiss) => CustomDialogController =
+    (dismiss: NativeDialogDismiss): CustomDialogController => {
+    const presentation: NativeDialogPresentation = this.expandedDialog.presentation();
+    return new CustomDialogController({ builder: NoteFieldExpandedDialog({ fieldName: this.fieldName,
+      content: (): void => { this.expandedContent(); },
+      onClose: this.expandedDialog.guard((): void => { this.closeExpanded(); }) }), onWillDismiss: dismiss,
+      openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation,
+      customStyle: presentation.customStyle, autoCancel: presentation.autoCancel, alignment: presentation.alignment,
+      width: presentation.width, height: presentation.height, keyboardAvoidMode: presentation.keyboardAvoidMode,
+      maskColor: presentation.maskColor });
+  };
+
+  private closeExpanded(): void {
+    clearTimeout(this.expansionTimer);
+    this.hideWheel(true); this.closeFormat();
+    this.expandedDialog.close();
+    this.ready = false; this.inputLaidOut = false; this.selectionVersion++;
+    this.expanded = false; this.updateWheel();
   }
+
   private requestExpanded(): void {
     if (this.disabled || this.disposed || !this.foreground) return;
+    if (this.expanded) { this.closeExpanded(); return; }
+    this.closeOptions(); this.hideWheel(true);
     this.wheelSession.activate(this.inputKey);
-    this.toggleExpanded(); this.updateWheel();
+    this.ready = false; this.inputLaidOut = false; this.selectionVersion++;
+    this.expanded = true; this.updateWheel();
+    // 先卸载页内输入节点，再把同一字段和控制器交给弹窗，避免重复挂载。
+    this.expansionTimer = setTimeout((): void => {
+      if (this.disposed || this.disabled || !this.foreground || !this.expanded) return;
+      this.expandedDialog.open(this.createExpandedDialog, (): boolean => { this.closeExpanded(); return true; });
+    }, 0);
   }
 
   private selectedRange(): RichEditorRange {
@@ -889,7 +924,7 @@ export struct NoteFieldEditor {
   }
   private editingAvailabilityChanged(): void {
     this.wheelSession.setAvailable(this.inputKey, !this.disabled && this.foreground);
-    if (this.disabled || !this.foreground) { this.hideWheel(true); this.closeFormat(); }
+    if (this.disabled || !this.foreground) { if (this.expanded) this.closeExpanded(); this.hideWheel(true); this.closeFormat(); }
   }
   private executeWheel(key: string, longPress: boolean = false, keyboard: boolean = false): void {
     if (this.disposed || this.disabled || !this.foreground || (!keyboard && !this.wheelVisible)) return;
@@ -958,8 +993,8 @@ export struct NoteFieldEditor {
       if (this.sourceMode) {
         TextArea({ text: this.value, placeholder: this.placeholderText(), controller: this.controller })
           .id(this.inputKey + '-source')
-          .onAreaChange((): void => { this.inputLaidOut = true; this.focusRequested(); })
-          .width('100%').height(noteEditorHeight(this.expanded)).fontSize(this.editingFontSize())
+          .onAreaChange((): void => { this.inputReady(); })
+          .width('100%').height(this.expanded ? '100%' : noteEditorHeight(false)).fontSize(this.editingFontSize())
           .fontFamily(this.fieldConfig?.fontName || 'HarmonyOS Sans')
           .direction(this.fieldConfig?.rtl === true ? Direction.Rtl : Direction.Ltr)
           .textAlign(TextAlign.Start)
@@ -976,19 +1011,19 @@ export struct NoteFieldEditor {
         RichEditor({ controller: this.richController })
           .id(this.inputKey + '-visual')
           .direction(this.fieldConfig?.rtl === true ? Direction.Rtl : Direction.Ltr)
-          .width('100%').height(noteEditorHeight(this.expanded)).placeholder(this.placeholderText(), { fontColor: $r('app.color.text_tertiary') })
+          .width('100%').height(this.expanded ? '100%' : noteEditorHeight(false)).placeholder(this.placeholderText(), { fontColor: $r('app.color.text_tertiary') })
           .backgroundColor(Color.Transparent)
           .borderRadius(应用尺寸.圆角_面板).padding({ left: 应用尺寸.间距_10, right: 应用尺寸.间距_10,
             top: 应用尺寸.间距_10, bottom: 应用尺寸.间距_10 }).enabled(!this.disabled)
           .defaultFocus(this.sourceToolFocus)
           .onFocus((): void => { this.fieldFocus(); }).onBlur((): void => { this.fieldBlur(); })
           .onTouch((event: TouchEvent): void => { if (this.fieldFocused && this.wheelOnKeyboard && event.type === TouchType.Down) this.showWheel(); })
-          .onReady((): void => { this.richReady(); this.inputLaidOut = true; this.focusRequested(); })
+          .onReady((): void => { this.richReady(); this.inputReady(); })
           .onSelectionChange((range: RichEditorRange): void => { this.richSelectionChanged(range); })
           .onWillChange((change: RichEditorChangeValue): boolean => change.replacedImageSpans.length === 0 && change.replacedSymbolSpans.length === 0)
           .onDidChange((before: TextRange, after: TextRange): void => { this.richChanged(before, after); })
       }
-      }.width('100%').height(noteEditorHeight(this.expanded))
+      }.width('100%').height(this.expanded ? undefined : noteEditorHeight(false)).layoutWeight(this.expanded ? 1 : 0)
         .attributeModifier(SeriesVisual.insetSurface(this.fieldMaterial, SeriesVisual.isDark(this.fieldMode, this.fieldSystemDark), this.fieldAccent, '', 应用尺寸.圆角_面板))
         .clip(true)
       // 操作行放在输入框边界外，不缩短或覆盖正文视口。
@@ -1005,15 +1040,34 @@ export struct NoteFieldEditor {
         onAction: (): void => { this.requestExpanded(); } })
         .focusOnTouch(false).focusable(false)
       }.width('100%').height(36).padding({ right: 4, bottom: 4 }).alignItems(VerticalAlign.Center)
-    }.width('100%')
-    if (this.sourceMode) {
+    }.width('100%').height(this.expanded ? '100%' : undefined)
+    if (this.sourceMode && !this.expanded) {
       Text($r('app.string.note_editor_source_hint'))
         .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
     }
   }
 
+  @Builder
+  private expandedContent() {
+    Column({ space: 应用尺寸.间距_8 }) {
+      Row({ space: 应用尺寸.间距_8 }) {
+        按下态按钮({ 文案: $r('app.string.' + noteFieldModeTool('visual').titleKey),
+          是否启用: !this.disabled, selectable: true, selected: !this.sourceMode, fillWidth: true,
+          点击回调: (): void => { this.requestMode(false); } })
+        按下态按钮({ 文案: $r('app.string.' + noteFieldModeTool('source_edit').titleKey),
+          是否启用: !this.disabled, selectable: true, selected: this.sourceMode, fillWidth: true,
+          点击回调: (): void => { this.requestMode(true); } })
+      }.width('100%')
+      Column() { this.inputContent() }.width('100%').layoutWeight(1)
+    }.width('100%').height('100%')
+      .onKeyPreIme((event: KeyEvent): boolean => this.handleFieldShortcut(event))
+  }
+
   build() {
-    if (this.modeControlInHeader) {
+    if (this.expanded) {
+      // 弹窗编辑同一草稿；页内保留原高度，其他字段不跟随展开。
+      Column().width('100%').height(noteEditorHeight(false))
+    } else if (this.modeControlInHeader) {
       Column({ space: 应用尺寸.间距_5 }) { this.inputContent() }.width('100%')
         .onKeyPreIme((event: KeyEvent): boolean => this.handleFieldShortcut(event))
     } else {

@@ -81,7 +81,7 @@ function editor(html='',fieldConfig=null,wheelSession=null,uniqueId=123,wheelPre
   const Editor=loadComponentLogic('components/common/NoteFieldEditor.ets','NoteFieldEditor',{
     ...surfaceMotionApi(),
     ...rich, ...htmlTools, nextClozeNumber,wrapFieldSelection,NOTE_FIELD_EDITING_SUPPORT,noteEditorTool,
-    noteEditorFormatOptions,noteFieldShortcut,KeyType:{Down:0,Up:1},keyboardEventChord:event=>event.chord,NoteEditorFormatDialog:options=>options,NoteLinkDialog: options=>options,
+    noteEditorFormatOptions,noteFieldShortcut,KeyType:{Down:0,Up:1},keyboardEventChord:event=>event.chord,NoteEditorFormatDialog:options=>options,NoteLinkDialog: options=>options,NoteFieldExpandedDialog: options=>options,
     NoteEditorWheelSession,NoteEditorWheelParams:WheelParams,ComponentContent:Content,wrapBuilder:builder=>builder,buildNoteEditorWheel(){},
     setTimeout:(callback,delay)=>{timers.set(++timerId,{callback,delay});return timerId;},clearTimeout:id=>timers.delete(id),
     TextAreaController:class {caretPosition(value){sourceCarets.push(value);}},RichEditorController:class {constructor(){return controller;}},
@@ -948,4 +948,26 @@ test('editor wheel entry and keyboard preferences are independent and manual tog
   h.instance.aboutToDisappear();h.instance.wheelKeyboardTop=0;h.instance.keyboardVisibilityChanged();
   h.instance.wheelKeyboardTop=400;h.instance.keyboardVisibilityChanged();assert.equal(h.instance.wheelVisible,false);
  }
+});
+
+
+test('expanded field uses one native dialog, edits the same draft and rejects late opening after close', () => {
+  const h = editor('<b>原稿😀</b>');
+  h.instance.requestExpanded();
+  assert.equal(h.instance.expanded, true);
+  for (const timer of [...h.timers.values()]) if (timer.delay === 0) timer.callback();
+  assert.equal(h.dialogs.length, 1);
+  assert.equal(h.instance.expandedDialog.current(), h.dialogs[0]);
+  h.instance.sourceMode = true;
+  h.instance.sourceChanged('<b>新内容😀</b>');
+  h.dialogs[0].options.builder.onClose();
+  assert.equal(h.instance.expanded, false);
+  assert.equal(h.instance.value, '<b>新内容😀</b>');
+  assert.deepEqual(h.changes, ['<b>新内容😀</b>']);
+  h.instance.requestExpanded();
+  const pending = [...h.timers.values()].filter(timer => timer.delay === 0).at(-1);
+  h.instance.closeExpanded(); pending.callback();
+  assert.equal(h.dialogs.length, 1);
+  assert.equal(NOTE_FIELD_EDITING_SUPPORT.expandPresentation,
+    'single_current_field_large_dialog_shared_draft_close_preserves_input');
 });

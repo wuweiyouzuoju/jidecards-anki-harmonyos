@@ -1,3 +1,4 @@
+import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { NativeDialogHost, NativeDialogDismiss, NativeDialogPresentation } from '../common/NativeDialogHost';
 import { SurfaceTransition } from '../../utils/SurfaceTransition';
@@ -197,7 +198,7 @@ export struct NoteFieldCard {
           (this.images.find((item: NoteFieldImage): boolean => item.id === id)?.kind ?? 'image'), disabled: this.disabled })
       Button($r('app.string.note_visual_remove')).height(应用尺寸.紧凑控件高度)
         .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
-        .backgroundColor($r('app.color.surface_card')).border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
+        .backgroundColor(insetMaterialFill($r('app.color.surface_card'))).border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
         .margin(应用尺寸.间距_5).enabled(!this.disabled)
         .attributeModifier(new PressFeedback()).stateEffect(false)
         .onClick((): void => { this.removeImage(index, id); })
