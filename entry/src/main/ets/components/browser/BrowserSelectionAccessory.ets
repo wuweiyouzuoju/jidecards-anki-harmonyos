@@ -13,11 +13,11 @@ export struct BrowserSelectionAccessory {
   @Prop filterLabel: ResourceStr = $r('app.string.browser_sidebar_title');
   @Prop selectionLabel: string = '';
   onFilter: () => void = (): void => {};
-  private badgeText(): string { return this.count > 99 ? '99+' : String(this.count); }
+  private badgeText(): string { return String(this.count); }
   build() {
     if (this.selecting) {
       Row() { Text(this.badgeText()).fontSize(应用尺寸.字号_正文).fontWeight(FontWeight.Bold).fontColor(this.accentText).maxLines(1) }
-        .width(92).height(应用尺寸.按钮高度).justifyContent(FlexAlign.Center).backgroundColor(this.selectedFill)
+        .constraintSize({ minWidth: 92 }).padding({ left: 12, right: 12 }).height(应用尺寸.按钮高度).justifyContent(FlexAlign.Center).backgroundColor(this.selectedFill)
         .border({width:应用尺寸.卡片边框,color:this.accentText}).borderRadius(22)
         .hitTestBehavior(HitTestMode.None).accessibilityText(this.selectionLabel)
     } else {
