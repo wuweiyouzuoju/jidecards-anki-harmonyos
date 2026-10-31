@@ -61,76 +61,82 @@ test('failed persistence rolls back the in-memory marker so the introduction is 
   assert.equal(await api.isHomeIntroCompleted(), true);
 });
 
-test('reassurance appears only at the end and the overview remains in the first-start flow', async () => {
-  const { HOME_INTRO_PAGES } = await import('../../entry/src/main/ets/model/HomeIntro.ts');
-  const reassurancePages = HOME_INTRO_PAGES.filter(page =>
-    page.blocks.some(block => block.titleKey === 'home_intro_simple_start_title'));
-  assert.deepEqual(reassurancePages.map(page => page.id), ['daily']);
-  assert.equal(reassurancePages[0].blocks.at(-1).bodyKey, 'home_intro_finish_body');
-  assert.match(homePage, /introCompleted:\s*\(\): Promise<boolean> => isHomeIntroCompleted\(\)/);
-  assert.match(homePage, /showIntro:\s*\(\): void => \{ this\.显示欢迎弹窗 = true; \}/);
-});
 
-test('the rating walkthrough stays in the first-study guide instead of the introduction', async () => {
-  const { HOME_INTRO_PAGES } = await import('../../entry/src/main/ets/model/HomeIntro.ts');
-  assert.deepEqual(HOME_INTRO_PAGES.map(page => page.id),
-    ['start', 'science', 'app', 'sources', 'import', 'create', 'daily']);
-  assert.equal(HOME_INTRO_PAGES.some(page => page.titleKey === 'study_guide_title'), false);
-  for (const key of ['study_guide_title', 'study_guide_flow', 'rating_again', 'study_guide_undo'])
-    assert.ok(studyGuide.includes(key), `${key} remains in the first-study guide`);
-});
-
-test('introduction paragraphs stay in a Builder method compiled into native Text operations', () => {
-  assert.match(panel, /@Builder\s+private paragraph\(body: ResourceStr\)\s*\{\s*Text\(body\)\.fontSize/);
-  assert.match(panel, /HomeIntroSection\(\{ title, content: \(\) => \{ this\.paragraph\(body\); \} \}\)/);
-});
-
-
-test('pagination exposes the actual page and actions to JIDE and finish and later have distinct UI callbacks', async () => {
-  const { HOME_INTRO_PAGES, HOME_INTRO_ACTIONS, homeIntroPageIndex, homeIntroActionVisible } = await import('../../entry/src/main/ets/model/HomeIntro.ts');
-  const methods = ['currentPage', 'onPageChanged', 'selectAction', 'publishInterface'].map(name => {
-    const start = panel.indexOf(`  private ${name}(`);
-    return panel.slice(start, panel.indexOf('\n  }', start) + 4);
-  });
-  // currentPage has a compact body; extract it separately.
-  methods[0] = panel.match(/  private currentPage\(\): HomeIntroPage \{[^\n]+/)[0];
-  const observed = [], scrolls = []; let completed = 0, dismissed = 0;
-  const js = stripTypeScriptTypes(`class Panel { ${methods.join('\n')} }`, { mode: 'transform' });
-  const Panel = new Function('HOME_INTRO_PAGES','HOME_INTRO_ACTIONS','homeIntroPageIndex','homeIntroActionVisible','appInterface',
-    js + '; return Panel;')(HOME_INTRO_PAGES, HOME_INTRO_ACTIONS, homeIntroPageIndex, homeIntroActionVisible,
-      {observe:value=>observed.push(value)});
-  const instance = new Panel();
-  Object.assign(instance, {pageIndex:0,isActive:true,text:key=>key,onClose:()=>completed++,onDismiss:()=>dismissed++,
-    bodyScroller:{scrollTo:value=>scrolls.push(value)},copyGroup(){},openDecksWebsite(){}});
-  instance.selectAction('previous'); assert.equal(instance.pageIndex,0);
-  instance.selectAction('finish'); assert.equal(completed,0);
-  for (let i=0;i<HOME_INTRO_PAGES.length;i++) {
-    instance.onPageChanged();
-    const view=observed.at(-1);
-    assert.equal(view.sectionId,HOME_INTRO_PAGES[i].id);
-    assert.equal(view.values.find(item=>item.id==='page').value,String(i+1));
-    assert.deepEqual(view.items.map(item=>item.id), HOME_INTRO_ACTIONS.filter(item=>homeIntroActionVisible(item.id,i)).map(item=>item.id));
-    assert.equal(scrolls.at(-1).yOffset,0);
-    if(i<HOME_INTRO_PAGES.length-1)instance.selectAction('next');
+function method(name) {
+  const start=panel.search(new RegExp('  private (?:async )?'+name+'\\('));
+  assert.ok(start>=0,name);
+  return panel.slice(start,panel.indexOf('\n  }',start)+4);
+}
+async function panelHarness() {
+  const model=await import('../../entry/src/main/ets/model/HomeIntro.ts');
+  const saved=[], materials=[], views=[], failures=[];
+  const state={fail:false};
+  const methods=['currentPage','movePage','selectAction','chooseExperience','chooseMaterial','publishInterface'].map(method).join('\n');
+  const names=['homeIntroPageIndex','homeIntroActionVisible','HOME_INTRO_PAGES','HOME_INTRO_ACTIONS'];
+  const Panel=new Function(...names,'保存简洁模式','completeGlassSuggestion','showToastSafely','$r','appInterface',
+    stripTypeScriptTypes(`class Panel { ${methods} }`,{mode:'transform'})+';return Panel;')(
+      ...names.map(name=>model[name]),async value=>{saved.push(value);if(state.fail)throw Error('disk');},
+      async value=>{materials.push(value);if(state.fail)throw Error('disk');},(_ctx,value)=>failures.push(value),key=>key,{observe:value=>views.push(value)});
+  const instance=new Panel();
+  Object.assign(instance,{pageIndex:0,isActive:true,savingMode:false,experienced:false,selectedStart:'',pendingAnswer:'',
+    text:key=>key,getUIContext:()=>({}),onStart(action){this.started=action;},onClose(){this.closed=true;},onDismiss(){this.dismissed=true;}});
+  return {instance,saved,materials,views,failures,state,model};
+}
+test('all choices finish before the selected real action starts',async()=>{
+  for(const used of [false,true])for(const action of used?['start_sync','start_import','start_create']:['start_import','start_create']) {
+    const {instance,saved,materials}=await panelHarness();
+    await instance.chooseExperience(used);assert.deepEqual(saved,[!used]);
+    instance.selectAction(action);assert.equal(instance.pageIndex,2);assert.equal(instance.started,undefined);
+    assert.equal(instance.selectedStart,action);
+    await instance.chooseMaterial(false);assert.deepEqual(materials,[false]);assert.equal(instance.started,action);
   }
-  instance.selectAction('next'); assert.equal(instance.pageIndex,HOME_INTRO_PAGES.length-1);
-  instance.selectAction('previous'); assert.equal(instance.pageIndex,HOME_INTRO_PAGES.length-2);
-  instance.selectAction('later'); assert.equal(dismissed,1); assert.equal(completed,0);
-  instance.selectAction('next'); instance.selectAction('finish'); assert.equal(completed,1);
-  instance.isActive=false; instance.selectAction('finish'); assert.equal(completed,1);
-  assert.equal(homeIntroPageIndex(NaN),0); assert.equal(homeIntroPageIndex(999),HOME_INTRO_PAGES.length-1);
-  assert.match(homePage,/if \(this\.显示欢迎弹窗\) \{ this\.closeHomeIntro\(\);/);
+});
+test('save failure stays retryable, hidden sync is rejected, and returning preserves the selected route',async()=>{
+  const {instance,state,views}=await panelHarness();
+  state.fail=true;await instance.chooseExperience(true);assert.equal(instance.pageIndex,0);assert.equal(instance.savingMode,false);
+  assert.equal(views[0].busy,true);assert.ok(views[0].items.every(x=>!x.enabled));
+  state.fail=false;await instance.chooseExperience(false);
+  instance.selectAction('start_sync');assert.equal(instance.pageIndex,1);
+  instance.selectAction('start_create');assert.equal(instance.pageIndex,2);
+  state.fail=true;await instance.chooseMaterial(true);assert.equal(instance.started,undefined);assert.equal(instance.pageIndex,2);
+  state.fail=false;instance.selectAction('previous');assert.equal(instance.pageIndex,1);assert.equal(instance.selectedStart,'start_create');
+  instance.selectAction('start_import');await instance.chooseMaterial(true);assert.equal(instance.started,'start_import');
+  instance.isActive=false;instance.started='';await instance.chooseMaterial(false);assert.equal(instance.started,'');
+});
+test('closing the integrated introduction suppresses a second glass recommendation without changing material',async()=>{
+  const start=homePage.indexOf('  private closeHomeIntro(startAction:');
+  const body=homePage.slice(start,homePage.indexOf('\n  }',start)+4);
+  const calls=[];const {api}=storeHarness([]);
+  const Home=new Function('completeHomeIntro','completeGlassSuggestion',stripTypeScriptTypes(`class Home { ${body} }`,{mode:'transform'})+';return Home;')(
+    api.completeHomeIntro,async value=>calls.push(value));
+  const instance=new Home();instance.homeActivityChanged=()=>{};instance.显示提示=()=>assert.fail('unexpected failure');
+  instance.closeHomeIntro();await new Promise(setImmediate);
+  assert.equal(instance.glassSuggestionShown,true);assert.deepEqual(calls,[false]);assert.equal(await api.isHomeIntroCompleted(),true);
 });
 
-test('home remembers both finish and read-later choices, while pagination never writes', async () => {
-  const start=homePage.indexOf('  private closeHomeIntro(): void {');
-  const method=homePage.slice(start,homePage.indexOf('\n  }',start)+4);
-  const {api}=storeHarness([]);
-  const Home=new Function('completeHomeIntro',stripTypeScriptTypes(`class Home { ${method} }`,{mode:'transform'})+';return Home;')(api.completeHomeIntro);
-  const home=new Home(); home.显示欢迎弹窗=true; home.homeActivityChanged=()=>{};
-  home.显示提示=()=>assert.fail('persistence should succeed');
-  home.closeHomeIntro(); await new Promise(setImmediate);
-  assert.equal(home.显示欢迎弹窗,false);
-  assert.equal(await api.isHomeIntroCompleted(),true);
-  assert.match(homePage,/onDismiss: \(\): void => \{ this\.closeHomeIntro\(\); \}/);
+test('closing holds the intro slot until persistence finishes and ignores duplicate closes',async()=>{
+  const start=homePage.indexOf('  private closeHomeIntro(startAction:');
+  const body=homePage.slice(start,homePage.indexOf('\n  }',start)+4);
+  let resolveWrite;let writes=0;
+  const pending=new Promise(resolve=>{resolveWrite=resolve;});
+  const Home=new Function('completeHomeIntro','completeGlassSuggestion',stripTypeScriptTypes(`class Home { ${body} }`,{mode:'transform'})+';return Home;')(
+    async()=>{writes++;await pending;},async()=>{});
+  const instance=new Home();instance.显示欢迎弹窗=true;instance.homeActivityChanged=()=>{};instance.显示提示=()=>assert.fail('unexpected failure');
+  instance.closeHomeIntro();instance.closeHomeIntro();await new Promise(setImmediate);
+  assert.equal(instance.显示欢迎弹窗,true);assert.equal(writes,1);
+  resolveWrite();await new Promise(setImmediate);assert.equal(instance.显示欢迎弹窗,false);assert.equal(instance.homeIntroClosing,false);
+});
+
+test('home launches the selected domain only after completion has persisted',async()=>{
+  const start=homePage.indexOf('  private closeHomeIntro(startAction:');
+  const body=homePage.slice(start,homePage.indexOf('\n  }',start)+4);
+  for(const action of ['start_import','start_create','start_sync']) {
+    let finish;const gate=new Promise(resolve=>finish=resolve);const launched=[];
+    const Home=new Function('completeHomeIntro','completeGlassSuggestion',stripTypeScriptTypes(`class Home { ${body} }`,{mode:'transform'})+';return Home;')(
+      ()=>gate,async()=>{});
+    const instance=new Home();Object.assign(instance,{显示欢迎弹窗:true,homeActivityChanged(){},显示提示(){assert.fail('save failed');},
+      从选择器导入牌组(){launched.push('start_import');},openCreateDeck(){launched.push('start_create');},startSyncFromMenu(){launched.push('start_sync');}});
+    instance.closeHomeIntro(action);await new Promise(setImmediate);assert.deepEqual(launched,[]);assert.equal(instance.显示欢迎弹窗,true);
+    finish();await new Promise(setImmediate);assert.deepEqual(launched,[action]);assert.equal(instance.显示欢迎弹窗,false);
+  }
 });

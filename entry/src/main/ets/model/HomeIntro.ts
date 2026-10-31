@@ -1,53 +1,38 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 export interface HomeIntroBlock { titleKey: string; bodyKey: string; }
 export interface HomeIntroPage { id: string; titleKey: string; blocks: HomeIntroBlock[]; }
-
-/** UI 与 JIDE 共用入门目录；只介绍已有能力，不创建牌组或修改学习设置。 */
-export const HOME_INTRO_PAGES: HomeIntroPage[] = [
-  { id: 'start', titleKey: 'home_intro_flashcards_title', blocks: [
-    { titleKey: 'home_intro_flashcards_title', bodyKey: 'home_intro_flashcards_body' },
-    { titleKey: 'home_intro_uses_title', bodyKey: 'home_intro_uses_body' }] },
-  { id: 'science', titleKey: 'home_intro_science_title', blocks: [
-    { titleKey: 'home_intro_history_title', bodyKey: 'home_intro_history_body' },
-    { titleKey: 'home_intro_recall_title', bodyKey: 'home_intro_recall_body' },
-    { titleKey: 'home_intro_spacing_title', bodyKey: 'home_intro_spacing_body' },
-    { titleKey: 'home_intro_research_title', bodyKey: 'home_intro_research_body' }] },
-  { id: 'app', titleKey: 'home_intro_app_title', blocks: [
-    { titleKey: 'home_intro_app_title', bodyKey: 'home_intro_app_body' },
-    { titleKey: 'home_intro_fsrs_title', bodyKey: 'home_intro_fsrs_body' },
-    { titleKey: 'home_intro_custom_title', bodyKey: 'home_intro_custom_body' }] },
-  { id: 'sources', titleKey: 'home_intro_sources_title', blocks: [
-    { titleKey: 'ankiweb_guide_title', bodyKey: 'ankiweb_guide_message' }] },
-  { id: 'import', titleKey: 'home_intro_apkg_title', blocks: [
-    { titleKey: 'home_intro_apkg_title', bodyKey: 'home_intro_apkg_body' },
-    { titleKey: 'home_intro_sync_title', bodyKey: 'home_intro_sync_body' }] },
-  { id: 'create', titleKey: 'home_intro_manual_title', blocks: [
-    { titleKey: 'home_intro_manual_title', bodyKey: 'home_intro_manual_body' },
-    { titleKey: 'home_intro_agent_title', bodyKey: 'home_intro_agent_body' }] },
-  { id: 'daily', titleKey: 'home_intro_daily_title', blocks: [
-    { titleKey: 'home_intro_daily_title', bodyKey: 'home_intro_daily_body' },
-    { titleKey: 'home_intro_simple_start_title', bodyKey: 'home_intro_finish_body' }] }
-];
-
 export interface HomeIntroAction { id: string; titleKey: string; }
-export const HOME_INTRO_ACTIONS: HomeIntroAction[] = [
-  { id: 'previous', titleKey: 'home_intro_previous' },
-  { id: 'next', titleKey: 'home_intro_next' },
-  { id: 'finish', titleKey: 'welcome_section1_title' },
-  { id: 'later', titleKey: 'home_intro_later' },
-  { id: 'copy_group', titleKey: 'about_qq_group_title' },
-  { id: 'open_decks', titleKey: 'ankiweb_guide_button_open' }
-];
 
+/** 问题、真实可见操作及结果文案同时供 UI 与 JIDE 使用。 */
+export const HOME_INTRO_PAGES: HomeIntroPage[] = [
+  { id: 'experience', titleKey: 'home_intro_experience_title', blocks: [
+    { titleKey: 'home_intro_experience_title', bodyKey: 'intro_experience_hint' }] },
+  { id: 'start', titleKey: 'intro_start_title', blocks: [
+    { titleKey: 'intro_start_title', bodyKey: 'intro_start_hint' }] },
+  { id: 'appearance', titleKey: 'intro_appearance_title', blocks: [
+    { titleKey: 'intro_appearance_title', bodyKey: 'intro_appearance_hint' }] }
+
+];
+export const HOME_INTRO_ACTIONS: HomeIntroAction[] = [
+  { id: 'used_anki', titleKey: 'intro_answer_used' },
+  { id: 'new_anki', titleKey: 'intro_answer_new' },
+  { id: 'start_import', titleKey: 'intro_start_import' },
+  { id: 'start_create', titleKey: 'intro_start_create' },
+  { id: 'start_sync', titleKey: 'intro_start_sync' },
+  { id: 'glass', titleKey: 'glass_suggestion_confirm' },
+  { id: 'keep_material', titleKey: 'glass_suggestion_keep' },
+  { id: 'previous', titleKey: 'home_intro_previous' },
+  { id: 'later', titleKey: 'home_intro_later' }
+];
 export function homeIntroPageIndex(index: number): number {
   return Number.isFinite(index) ? Math.max(0, Math.min(HOME_INTRO_PAGES.length - 1, Math.floor(index))) : 0;
 }
-
-export function homeIntroActionVisible(id: string, index: number): boolean {
+export function homeIntroActionVisible(id: string, index: number, experienced: boolean = false): boolean {
   const page: number = homeIntroPageIndex(index);
   if (id === 'previous') return page > 0;
-  if (id === 'next') return page < HOME_INTRO_PAGES.length - 1;
-  if (id === 'finish') return page === HOME_INTRO_PAGES.length - 1;
-  if (id === 'copy_group' || id === 'open_decks') return HOME_INTRO_PAGES[page].id === 'sources';
+  if (id === 'used_anki' || id === 'new_anki') return page === 0;
+  if (id === 'glass' || id === 'keep_material') return page === 2;
+  if (id === 'start_import' || id === 'start_create') return page === 1;
+  if (id === 'start_sync') return page === 1 && experienced;
   return id === 'later';
 }

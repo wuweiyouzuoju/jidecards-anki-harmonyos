@@ -32,7 +32,7 @@ export function checkHomeIntroCompiled(source) {
     const element = () => undefined;
     for (const attribute of ['fontSize','fontWeight','fontColor','textAlign','width','height','alignItems',
       'padding','backgroundColor','borderRadius','lineHeight','copyOption','onClick','pop','scrollBar',
-      'layoutWeight','accessibilityLevel','align']) element[attribute] = () => {};
+      'layoutWeight','accessibilityLevel','align','transition','animation','height','flexShrink','fillColor','enabled','attributeModifier','border','margin','createWithChild','clip','maxLines','constraintSize','clipShape']) element[attribute] = () => {};
     element.create = value => { if (name === 'Text') seen.texts.push(value); };
     return element;
   }
@@ -43,13 +43,19 @@ export function checkHomeIntroCompiled(source) {
   class EmptyComponent { initialRender() {} }
   class Scroller { scrollTo() {} }
   const context = vm.createContext({
+    RectShape:class {radius(){return this;}},
+    Context:{animation(){}},
     ViewPU, ObservedPropertySimplePU: Property, SynchedPropertySimpleOneWayPU: Property,
-    SynchedPropertyObjectOneWayPU: Property, DialogFrame, DialogHeader: EmptyComponent, 按下态按钮: EmptyComponent, Scroller,
-    Text:nativeElement('Text'), Column:nativeElement('Column'), Span:nativeElement('Span'),
+    SynchedPropertyObjectOneWayPU: Property, DialogFrame, DialogHeader: EmptyComponent, 按下态按钮: EmptyComponent, AppearanceReveal: EmptyComponent, ActionStatus: EmptyComponent, PrimaryActionButton: EmptyComponent, PressFeedback: class {}, Scroller,
+    Button:nativeElement('Button'), Image:nativeElement('Image'), Text:nativeElement('Text'), Column:nativeElement('Column'), Span:nativeElement('Span'),
     Row:nativeElement('Row'), Scroll:nativeElement('Scroll'), ForEach:nativeElement('ForEach'), If:nativeElement('If'),
     __Common__:nativeElement('__Common__'),
     HOME_INTRO_PAGES, HOME_INTRO_ACTIONS, homeIntroPageIndex, homeIntroActionVisible,
     namedResourceText:(_context,key)=>key, resourceText:()=> 'page', 颜色键:{动作主色:'primary'},
+    prefersReducedMotion:()=>false, GLASS_HOME_SOURCE:"home",
+    Color:{Transparent:0}, ButtonType:{Normal:0}, VerticalAlign:{Top:0},
+    insetMaterialFill: value=>value,
+    SurfaceTransition:{pageContent(){return {};}}, motionAnimation:()=>({}), currentMotionProfile:()=>({disclosureMs:150}),
     appInterface:{observe(){},leave(){}},
     应用尺寸:{间距_16:16,间距_12:12,间距_8:8,字号_正文:16,字号_正文_小:14,字号_按钮:16,字号_标题:17,圆角_面板:12},
     OFFICIAL_QQ_GROUP:'group', FontWeight:{Bold:'bold',Medium:'medium'}, BarState:{Auto:'auto'},
@@ -61,15 +67,13 @@ export function checkHomeIntroCompiled(source) {
   const pages=[];
   for (let index=0;index<HOME_INTRO_PAGES.length;index++) {
     const start=seen.texts.length, sectionStart=seen.components.length;
-    vm.runInContext(`{ const panel=new HomeIntroPanel(undefined, {}); panel.pageIndex=${index}; panel.initialRender(); }`,context,{timeout:1000});
+    vm.runInContext(`{ const panel=new HomeIntroPanel(undefined, {}); panel.pageIndex=${index}; panel.experienced=false; panel.initialRender(); }`,context,{timeout:1000});
     const page=HOME_INTRO_PAGES[index], texts=seen.texts.slice(start);
     const sections=seen.components.slice(sectionStart).filter(name=>name==='HomeIntroSection').length;
-    assert.equal(sections,page.blocks.length+(page.id==='sources'?1:0),`${page.id}: all introduction sections must render`);
     for (const block of page.blocks) {
       assert.ok(texts.includes(block.titleKey),`${page.id}: title ${block.titleKey} must render`);
       assert.ok(texts.includes(block.bodyKey),`${page.id}: body ${block.bodyKey} must render`);
     }
-    if(page.id==='sources') assert.ok(texts.length>=page.blocks.length*2+5,'source Text nodes must render');
     pages.push({id:page.id,sections,textNodes:texts.length});
   }
   return { pages };

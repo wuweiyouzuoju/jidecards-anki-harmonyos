@@ -1130,10 +1130,22 @@ struct 首页 {
   }
 
   /** 用户确认后才记录入门已读，失败提示但不阻止进入应用。 */
-  private closeHomeIntro(): void {
-    this.显示欢迎弹窗 = false;
-    completeHomeIntro().catch((): void => { this.显示提示($r('app.string.home_intro_save_failed')); });
-    this.homeActivityChanged();
+  private homeIntroClosing: boolean = false;
+  private closeHomeIntro(startAction: string = ''): void {
+    if (this.homeIntroClosing) return;
+    this.homeIntroClosing = true;
+    // 保持弹层占用直到已读落盘，避免启动序列在写入期间又展示一次。
+    this.glassSuggestionShown = true;
+    completeGlassSuggestion(false).then((): Promise<void> => completeHomeIntro())
+      .then((): void => {
+        this.显示欢迎弹窗 = false;
+        if (startAction === 'start_import') this.从选择器导入牌组();
+        else if (startAction === 'start_create') this.openCreateDeck('');
+        else if (startAction === 'start_sync') this.startSyncFromMenu();
+        this.homeActivityChanged();
+      })
+      .catch((): void => { this.显示提示($r('app.string.home_intro_save_failed')); })
+      .finally((): void => { this.homeIntroClosing = false; });
   }
 
   /** 页面每次可见都刷新（含从复习页返回），保证今日计数与队列状态同步。 */
@@ -2588,6 +2600,7 @@ struct 首页 {
 
     if (this.显示欢迎弹窗) {
       HomeIntroPanel({
+        onStart: (action: string): void => { this.closeHomeIntro(action); },
         onClose: (): void => { this.closeHomeIntro(); },
         onDismiss: (): void => { this.closeHomeIntro(); }
       })

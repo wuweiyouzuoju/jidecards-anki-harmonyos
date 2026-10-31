@@ -17,9 +17,7 @@ export class HomeIntroPanel extends ViewPU {
     for(const block of page.blocks){
       ViewPU.create(new HomeIntroSection(this,{title:block.titleKey,content:()=>{this.paragraph(block.bodyKey);}}));
     }
-    if(page.id==='sources'){
-      ViewPU.create(new HomeIntroSection(this,{title:'sources',content:()=>{for(let i=0;i<4;i++)Text.create('source');}}));
-    }
+
   }
   paragraph(body: ResourceStr){this.observeComponentCreation2(()=>{Text.create(body);Text.fontSize(16);},Text);Text.pop();}
 }`;
@@ -27,7 +25,7 @@ export class HomeIntroPanel extends ViewPU {
 test('compiled checker executes all paginated introduction content and native Text creation',()=>{
   const result=checkHomeIntroCompiled(compiled);
   assert.deepEqual(result.pages.map(page=>page.id),HOME_INTRO_PAGES.map(page=>page.id));
-  assert.equal(result.pages.find(page=>page.id==='science').sections,4);
+  assert.equal(result.pages.length,3);
   assert.equal(result.pages.some(page=>page.id==='study'),false,'the in-study guide page must not return');
 });
 test('compiled checker rejects untransformed inline Text chains',()=>{
