@@ -1,4 +1,6 @@
+import { rememberPopupTrigger } from '../utils/PopupTrigger';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { AppInterfaceControl } from '../model/AppInterface';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { HomeActionAnchor } from '../model/HomeHeaderLayout';
 import { appInterface } from '../backend/AppInterfaceService';
@@ -13,6 +15,10 @@ import { 牌组汇总, 主页快照, 牌组显示名 } from '../model/主页模�
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { 开始学习按钮 } from './开始学习按钮';
 import { 颜色键 } from '../model/颜色主题';
+import { DisclosureChevron } from './common/DisclosureChevron';
+import { PressFeedback } from '../utils/PressFeedback';
+import { namedResourceText } from '../utils/UiFeedback';
+import { deckDetailShortcuts, DeckDetailShortcut } from '../model/DeckDetailShortcut';
 import { SeriesVisual } from '../utils/SeriesVisual';
 
 // ========================================================
@@ -74,6 +80,13 @@ export struct 牌组详情面板 {
   };
   onCreateWithAI: () => void = (): void => {};
   onMore: () => void = (): void => {};
+  private shortcutAreas: Map<string, Area> = new Map<string, Area>();
+  private activateShortcut(id: string): void {
+    const area: Area | undefined = this.shortcutAreas.get(id);
+    if (area !== undefined) rememberPopupTrigger(area);
+    this.onShortcut(id);
+  }
+  onShortcut: (id: string) => void = (_id: string): void => {};
   预览: () => void = (): void => {
   };
 
@@ -97,6 +110,9 @@ export struct 牌组详情面板 {
     if (deck === undefined) { appInterface.leave('deck_details'); return; }
     appInterface.observe({ surface: 'deck_details', sectionId: this.showHeaderActions ? 'wide' : 'compact',
       selectedId: deck.id, optionIds: [], optionLabels: [], busy: this.牌组选项加载中,
+      items: deckDetailShortcuts(deck.filtered === true).map((item: DeckDetailShortcut): AppInterfaceControl => ({ id: item.id,
+        titleKey: item.titleKey, title: namedResourceText(this.getUIContext(), item.titleKey) + ' · ' + namedResourceText(this.getUIContext(), item.instructionsKey),
+        enabled: true, selected: false, opens: item.opens })),
       values: [{ id: 'name', value: 牌组显示名(deck) }, { id: 'core_name', value: deck.fullName }, { id: 'filtered', value: String(deck.filtered === true) },
         { id: 'header_actions_position', value: this.showHeaderActions ?
           (this.headerActionHeight > 0 ? 'above_card' : 'hidden') : 'toolbar_right' },
@@ -107,6 +123,24 @@ export struct 牌组详情面板 {
         { id: 'local_display_name', value: deck.displayName }, { id: 'description', value: deck.description },
         { id: 'total', value: String(deck.totalCards) }, { id: 'new', value: String(deck.newCount) },
         { id: 'learning', value: String(deck.learningCount) }, { id: 'review', value: String(deck.reviewCount) }] });
+  }
+
+  @Builder
+  private countShortcut(id: string, count: number, tint: ResourceColor, filtered: boolean) {
+    Button({ type: ButtonType.Normal }) {
+      Row({ space: 8 }) {
+        Column({ space: 4 }) {
+          Text(interfaceItemText(this.getUIContext(), 'deck_details', id, this.uiLanguage))
+            .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_secondary')).width('100%')
+        }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+        Text(count.toString()).fontSize(应用尺寸.字号_卡片标题).fontWeight(FontWeight.Bold)
+          .fontColor(tint).flexShrink(0)
+        DisclosureChevron({ tint: $r('app.color.text_tertiary') }).flexShrink(0)
+      }.width('100%').constraintSize({ minHeight: 44 })
+    }.width('100%').padding({ top: 4, bottom: 4 }).backgroundColor(Color.Transparent)
+      .attributeModifier(new PressFeedback(1, 0.4, true)).stateEffect(false)
+      .onAreaChange((_old: Area, area: Area): void => { this.shortcutAreas.set(id, area); })
+      .onClick((): void => { this.activateShortcut(id); })
   }
 
   @Builder
@@ -194,12 +228,21 @@ export struct 牌组详情面板 {
         // 直接用 deck.totalCards 等渲染，不经过 @State 中转。
         ForEach(this.主页快照数据.decks, (deck: 牌组汇总) => {
           if (deck.id === this.选中牌组Id) {
-            Text(牌组显示名(deck, this.uiLanguage))
-              .fontSize(应用尺寸.字号_牌组标题)
-              .fontWeight(FontWeight.Bold)
-              .fontColor($r('app.color.text_primary'))
-              .width('100%')
-              .wordBreak(WordBreak.BREAK_ALL)
+            Button({ type: ButtonType.Normal }) {
+              Row({ space: 8 }) {
+                Column({ space: 4 }) {
+                  Text(牌组显示名(deck, this.uiLanguage))
+                    .fontSize(应用尺寸.字号_牌组标题).fontWeight(FontWeight.Bold)
+                    .fontColor($r('app.color.text_primary')).width('100%').wordBreak(WordBreak.BREAK_ALL)
+                }.layoutWeight(1).alignItems(HorizontalAlign.Start)
+                DisclosureChevron({ tint: $r('app.color.text_tertiary') }).flexShrink(0)
+              }.width('100%')
+            }.width('100%').padding(应用尺寸.卡片内边距)
+              .attributeModifier(SeriesVisual.clearSurface(this.surfaceMaterial, this.是否深色,
+                this.动作主色, this.页面底色微染, 应用尺寸.圆角_卡片))
+              .attributeModifier(new PressFeedback(1, 0.4, true)).stateEffect(false)
+              .onAreaChange((_old: Area, area: Area): void => { this.shortcutAreas.set('name', area); })
+              .onClick((): void => { this.activateShortcut('name'); })
             if (deck.description !== '') {
               Text(deck.description)
                 .fontSize(应用尺寸.字号_正文)
@@ -207,60 +250,16 @@ export struct 牌组详情面板 {
                 .width('100%')
             }
             Column({ space: 应用尺寸.间距_15 }) {
-              Row() {
-                Text(interfaceItemText(this.getUIContext(), 'deck_details', 'total', this.uiLanguage))
-                  .fontSize(应用尺寸.字号_正文)
-                  .fontColor($r('app.color.text_secondary'))
-                  .layoutWeight(1).wordBreak(WordBreak.NORMAL).margin({ right: 8 })
-                Text(deck.totalCards.toString())
-                  .flexShrink(0)
-                  .fontSize(应用尺寸.字号_卡片标题)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor($r('app.color.text_primary'))
-              }
-              .width('100%')
-              Row() {
-                Text(interfaceItemText(this.getUIContext(), 'deck_details', 'new', this.uiLanguage))
-                  .fontSize(应用尺寸.字号_正文)
-                  .fontColor($r('app.color.text_secondary'))
-                  .layoutWeight(1).wordBreak(WordBreak.NORMAL).margin({ right: 8 })
-                Text(deck.newCount.toString())
-                  .flexShrink(0)
-                  .fontSize(应用尺寸.字号_卡片标题)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor(this.新卡计数色)
-              }
-              .width('100%')
-              Row() {
-                Text(interfaceItemText(this.getUIContext(), 'deck_details', 'learning', this.uiLanguage))
-                  .fontSize(应用尺寸.字号_正文)
-                  .fontColor($r('app.color.text_secondary'))
-                  .layoutWeight(1).wordBreak(WordBreak.NORMAL).margin({ right: 8 })
-                Text(deck.learningCount.toString())
-                  .flexShrink(0)
-                  .fontSize(应用尺寸.字号_卡片标题)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor(this.学习中计数色)
-              }
-              .width('100%')
-              Row() {
-                Text(interfaceItemText(this.getUIContext(), 'deck_details', 'review', this.uiLanguage))
-                  .fontSize(应用尺寸.字号_正文)
-                  .fontColor($r('app.color.text_secondary'))
-                  .layoutWeight(1).wordBreak(WordBreak.NORMAL).margin({ right: 8 })
-                Text(deck.reviewCount.toString())
-                  .flexShrink(0)
-                  .fontSize(应用尺寸.字号_卡片标题)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor(this.复习中计数色)
-              }
-              .width('100%')
+              this.countShortcut('total', deck.totalCards, $r('app.color.text_primary'), deck.filtered === true)
+              this.countShortcut('new', deck.newCount, this.新卡计数色, deck.filtered === true)
+              this.countShortcut('learning', deck.learningCount, this.学习中计数色, deck.filtered === true)
+              this.countShortcut('review', deck.reviewCount, this.复习中计数色, deck.filtered === true)
             }
             .width('100%')
             .padding(应用尺寸.卡片内边距)
             .border(SurfaceBorder.options())
             .borderRadius(应用尺寸.圆角_指标卡)
-            .attributeModifier(SeriesVisual.insetSurface(this.surfaceMaterial, this.是否深色, this.动作主色, this.页面底色微染, 应用尺寸.圆角_卡片))
+            .attributeModifier(SeriesVisual.clearSurface(this.surfaceMaterial, this.是否深色, this.动作主色, this.页面底色微染, 应用尺寸.圆角_卡片))
 
             DeckStudyHistoryCard({
               search: deckHistorySearch(deck.id, this.主页快照数据.decks),
@@ -277,14 +276,14 @@ export struct 牌组详情面板 {
             }
 
           }
-        }, (deck: 牌组汇总) => `${deck.id}_${deck.totalCards}_${deck.newCount}_${deck.learningCount}_${deck.reviewCount}_${deck.displayName}`)
+        }, (deck: 牌组汇总) => `${deck.id}_${deck.totalCards}_${deck.newCount}_${deck.learningCount}_${deck.reviewCount}_${deck.displayName}_${deck.fullName}_${deck.name}_${deck.description}_${deck.filtered}`)
       }
       .alignItems(HorizontalAlign.Start)
         .width('100%')
       .padding({
-        left: 应用尺寸.卡片内边距,
-        right: 应用尺寸.卡片内边距,
-        top: 应用尺寸.卡片内边距,
+        left: 0,
+        right: 0,
+        top: 0,
         bottom: 应用尺寸.页面底部间距(this.narrowDeckLayout)
       })
       }
@@ -293,9 +292,8 @@ export struct 牌组详情面板 {
       .align(Alignment.Top)
       .scrollBar(BarState.Off)
       .edgeEffect(EdgeEffect.Spring)
-      .border(SurfaceBorder.options())
-      .borderRadius(应用尺寸.圆角_卡片)
-      .attributeModifier(SeriesVisual.clearSurface(this.surfaceMaterial, this.是否深色, this.动作主色, this.页面底色微染))
+      // 滚动视口不绘制整栏底色，独立内容卡与左侧模块共用同一材质。
+      .backgroundColor(Color.Transparent)
       .clip(true)
       // 操作区自己贡献唯一的区块间距，避免卡片 margin 与按钮 padding 叠加。
       .margin({ bottom: 0 })

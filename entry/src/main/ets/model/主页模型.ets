@@ -160,7 +160,31 @@ export class 牌组列表数据源 implements IDataSource {
   replaceAll(新牌组: 牌组汇总[]): void {
     this.牌组列表 = 新牌组;
     for (let 索引: number = 0; 索引 < this.监听器列表.length; 索引++) {
-      this.监听器列表[索引].onDataReloaded();
+      const listener: DataChangeListener = this.监听器列表[索引];
+      // 同一懒加载实例不能混用 onDatasetChange 与旧式通知，包括初次加载及排序。
+      if (listener.onDatasetChange !== undefined) listener.onDatasetChange([{ type: DataOperationType.RELOAD }]);
+      else listener.onDataReloaded();
+    }
+  }
+
+  /** 展开/收起只改变连续可见区间，保留其余行及控制器；真实内容刷新仍用 replaceAll。 */
+  replaceVisible(next: 牌组汇总[]): void {
+    const old: 牌组汇总[] = this.牌组列表;
+    let start: number = 0;
+    while (start < old.length && start < next.length && old[start] === next[start]) start++;
+    let tail: number = 0;
+    while (tail < old.length - start && tail < next.length - start &&
+      old[old.length - 1 - tail] === next[next.length - 1 - tail]) tail++;
+    const removed: number = old.length - start - tail;
+    const added: number = next.length - start - tail;
+    if (removed === 0 && added === 0) return;
+    this.牌组列表 = next;
+    const operations: DataOperation[] = [];
+    if (removed > 0) operations.push({ type: DataOperationType.DELETE, index: start, count: removed });
+    if (added > 0) operations.push({ type: DataOperationType.ADD, index: start, count: added });
+    for (const listener of this.监听器列表) {
+      if (listener.onDatasetChange !== undefined) listener.onDatasetChange(operations);
+      else listener.onDataReloaded();
     }
   }
 
@@ -179,7 +203,10 @@ export class 牌组列表数据源 implements IDataSource {
     this.牌组列表.splice(起点, 1);
     this.牌组列表.splice(终点, 0, 移动项);
     for (let 索引: number = 0; 索引 < this.监听器列表.length; 索引++) {
-      this.监听器列表[索引].onDataReloaded();
+      const listener: DataChangeListener = this.监听器列表[索引];
+      // 同一懒加载实例不能混用 onDatasetChange 与旧式通知，包括初次加载及排序。
+      if (listener.onDatasetChange !== undefined) listener.onDatasetChange([{ type: DataOperationType.RELOAD }]);
+      else listener.onDataReloaded();
     }
   }
 

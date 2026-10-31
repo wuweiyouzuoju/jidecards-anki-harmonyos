@@ -211,7 +211,7 @@ export struct 牌组列表项 {
   // 排序模式：onClick 不触发选牌，移除菜单长按识别器，由 ListItem 接管拖动。
   // 双击检测：两次 onClick 间隔 < 300ms 且 hasChildren → onDoubleTap（递归展开）。
   // 色条 tone===None 时不渲染色块，但保留 Column 占位维持行内对齐。
-  // 排序模式保留动作色描边；普通选中只叠加淡主题色，保持原边框。
+  // 排序模式保留动作色描边；普通选中只叠加淡主题色，不画常规边框。
   //
   // @副作用
   // 无。仅上抛回调。
@@ -367,7 +367,7 @@ export struct 牌组列表项 {
     .attributeModifier(new SeriesDeckSurface(this.surfaceMaterial, this.themeMode === 'dark' || (this.themeMode !== 'light' && this.systemDark),
       this.动作主色, this.pageTint, 应用尺寸.圆角_牌组行))
     .border(this.reorderMode ? SurfaceBorder.options(应用尺寸.卡片边框, this.动作主色) :
-      SurfaceBorder.materialOptions(this.surfaceMaterial, this.themeMode === 'dark' || (this.themeMode !== 'light' && this.systemDark)))
+      SurfaceBorder.contentOptions(this.surfaceMaterial, this.themeMode === 'dark' || (this.themeMode !== 'light' && this.systemDark)))
     .borderRadius(应用尺寸.圆角_牌组行)
   }
 }

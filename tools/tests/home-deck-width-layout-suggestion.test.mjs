@@ -317,3 +317,15 @@ test('double columns fill the shorter side after a tall subtree and newly append
  assert.match(source,/\.columnsTemplate\('1fr 1fr'\)/);
  assert.doesNotMatch(source,/\.lanes\(/,'paired list rows would reintroduce tall blank space');
 });
+
+test('home edge fade is limited to overflowing ready lists in glass mode', () => {
+ const List=loadComponentLogic('components/home/主页牌组列表.ets','主页牌组列表',{
+  ...appearance,应用尺寸,牌组列表数据源:class {},Scroller:class {}
+ });
+ const list=new List();
+ for(const material of ['flat','glass']) for(const state of ['ready','loading','empty','error'])
+  for(const overflow of [false,true]) {
+   Object.assign(list,{surfaceMaterial:material,加载状态:state,contentOverflows:overflow});
+   assert.equal(list.edgeFadeEnabled(),material==='glass'&&state==='ready'&&overflow);
+  }
+});

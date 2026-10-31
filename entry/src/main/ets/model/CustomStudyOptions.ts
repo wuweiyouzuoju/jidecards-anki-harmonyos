@@ -15,8 +15,7 @@ export function customStudyValueValid(preset: number, text: string): boolean {
   return preset !== 自定义学习预设.提前复习天数 || value <= 99999;
 }
 
-export function customStudyInitialValue(preset: number, defaults: 自定义学习默认值 | null): number {
-  if (preset === 自定义学习预设.新卡上限增量) { return defaults === null ? 0 : defaults.extendNew; }
-  if (preset === 自定义学习预设.复习上限增量) { return defaults === null ? 0 : defaults.extendReview; }
-  return preset === 自定义学习预设.按状态或标签 ? 100 : 1;
+/** 所有预设首次输入统一20；记忆值由本机偏好拥有，不用Core建议值覆盖。 */
+export function customStudyInitialValue(_preset: number, _defaults: 自定义学习默认值 | null): number {
+  return 20;
 }

@@ -100,7 +100,7 @@ export function buildAgentAppStructure(context: AppInterfaceContext, surfaceId: 
   const views: AppInterfaceObservation[] = observations.map((view: AppInterfaceObservation): AppInterfaceObservation => {
     const declaration = APP_INTERFACE_SURFACES.find((surface): boolean => surface.id === view.surface);
     const controls: AppInterfaceControl[] | undefined = view.items?.map((item: AppInterfaceControl): AppInterfaceControl =>
-      ({ id: item.id, title: item.titleKey === undefined ? item.title : localize(item.titleKey), titleKey: item.titleKey, iconKey: item.iconKey,
+      ({ id: item.id, title: item.titleKey === undefined ? item.title : localize(item.titleKey), titleKey: item.titleKey, iconKey: item.iconKey, opens: item.opens,
         enabled: item.enabled, selected: item.selected }));
     return { surface: view.surface, titleKey: view.titleKey, controlsComplete: view.controlsComplete,
       sectionId: view.sectionId, selectedId: view.selectedId, optionIds: view.optionIds,
@@ -155,7 +155,7 @@ export function buildAgentAppStructure(context: AppInterfaceContext, surfaceId: 
         const liveMenu: boolean = ['home_create', 'study_more'].includes(surface.id) && observation !== undefined;
         const absentControl: boolean = control === undefined && (observation?.controlsComplete === true ||
           (surface.id === 'study' && item.condition !== undefined && observation?.items !== undefined));
-        return { id: item.id, title: control?.title ?? localize(item.titleKey), opens: item.opens ?? '',
+        return { id: item.id, title: control?.title ?? localize(item.titleKey), opens: control?.opens ?? item.opens ?? '',
           visibility: !visibleIds.includes(item.id) || absentControl || (liveMenu && observation !== undefined && !observation.optionIds.includes(item.id)) ? 'hidden' :
             control !== undefined ? 'observed' : (item.condition === undefined ? 'available_in_surface' : 'conditional'),
           condition: item.condition ?? '', enabled: control?.enabled, selected: control?.selected, iconKey: control?.iconKey ?? item.iconKey,

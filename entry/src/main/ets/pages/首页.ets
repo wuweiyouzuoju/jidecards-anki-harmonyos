@@ -1,3 +1,7 @@
+import { insetMaterialFill } from '../utils/GlassMaterial';
+import { deckDetailShortcut, DeckDetailShortcut } from '../model/DeckDetailShortcut';
+import { 自定义学习预设 } from '../proto/messages/SchedulerMessages';
+import { GlassFusionRect } from 'jide_foundation';
 import { GlassSuggestionDialog } from '../components/home/GlassSuggestionDialog';
 import { GLASS_SUGGESTION_PENDING_KEY } from '../model/SurfaceMaterial';
 import { completeGlassSuggestion } from '../utils/SurfaceMaterialStore';
@@ -5,7 +9,7 @@ import { completeGlassSuggestion } from '../utils/SurfaceMaterialStore';
 import { GlassSource } from '../components/common/GlassSource';
 import { GlassPanel } from '../components/common/GlassPanel';
 import { ActionMenuAnchor } from '../components/common/ActionMenuLayout';
-import { GLASS_HOME_SOURCE, GLASS_BACKGROUND_SOURCE, glassSourceVisibility } from '../utils/GlassBackdrop';
+import { GLASS_HOME_SOURCE, GLASS_BACKGROUND_SOURCE, glassSourceVisibility, setGlassSourceScrolling, settleGlassSourceLayout } from '../utils/GlassBackdrop';
 import { HOME_SHORTCUTS, shortcutCommand } from '../model/KeyboardShortcuts';
 import { WindowPoint } from '../model/WindowSafeLayout';
 import { StudyKeyboardSession } from '../model/StudyKeyboard';
@@ -170,6 +174,7 @@ struct 首页 {
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @State private customizationBackRequest: number = 0;
   @State private customStudyBackRequest: number = 0;
+  @State private customStudyInitialPreset: number = 自定义学习预设.新卡上限增量;
   @State private filteredDeckBackRequest: number = 0;
   @StorageProp(PAGE_COMPACT_LAYOUT_KEY) @Watch('homeActivityChanged') private narrowDeckLayout: boolean = false;
   @StorageProp(DECK_LIST_STYLE_KEY) @Watch('homeActivityChanged') private deckListStyle: string = 'single_wide';
@@ -313,6 +318,10 @@ struct 首页 {
   @State private deckRenameBackRequest: number = 0;
   @State @Watch('homeActivityChanged') private 显示主页操作: boolean = false;
   // 公共菜单使用顶部按钮行的实测窗口锚点，详情分栏时仍对齐列表面板。
+  @State private homeMoreCloseRequest: number = 0;
+  @State private homeCreateCloseRequest: number = 0;
+  @State private homeMoreFusionAnchor: GlassFusionRect | undefined = undefined;
+  @State private homeCreateFusionAnchor: GlassFusionRect | undefined = undefined;
   @State private homeActionAnchor: HomeActionAnchor = { left: 0, top: 0, width: 0 };
   @State private homeMenuHostLeft: number = 0;
   @State private homeMenuHostTop: number = 0;
@@ -543,6 +552,7 @@ struct 首页 {
   }
 
   aboutToDisappear(): void {
+    setGlassSourceScrolling(GLASS_HOME_SOURCE, false);
     glassSourceVisibility(this.getUIContext(), GLASS_HOME_SOURCE, false);
     this.closeSyncChoice();
     appInterface.leave('home_sync_choice');
@@ -1198,9 +1208,9 @@ struct 首页 {
     }
     if (this.deckMenuId !== '') { this.deckMenuBackRequest++; return true; }
     if (this.homeSearchOpen) { this.homeSearchOpen = false; return true; }
-    if (this.显示主页操作) { this.显示主页操作 = false; return true; }
+    if (this.显示主页操作) { this.homeCreateCloseRequest++; return true; }
     if (this.collectionHistoryOpen) { this.collectionHistoryBackRequest++; return true; }
-    if (this.显示更多菜单) { this.显示更多菜单 = false; return true; }
+    if (this.显示更多菜单) { this.homeMoreCloseRequest++; return true; }
     if (this.显示节流奖励) { this.显示节流奖励 = false; return true; }
     if (this.显示欢迎弹窗) { this.closeHomeIntro(); return true; }
     if (this.deckDetailsBackHandler?.()) return true;
@@ -1626,13 +1636,13 @@ struct 首页 {
   }
 
   /** 打开全库或指定牌组浏览。浏览页可改卡/删卡/改到期，pop 回主页必须刷新。 */
-  private 打开浏览页(deckId: string = ''): void {
-    if (this.deferForSync((): void => { this.打开浏览页(deckId); })) return;
+  private 打开浏览页(deckId: string = '', query: string = ''): void {
+    if (this.deferForSync((): void => { this.打开浏览页(deckId, query); })) return;
     let params: 浏览页参数 = {};
     if (deckId !== '') {
       const deck: 牌组汇总 = this.按ID查牌组(deckId);
       if (deck.id === '') return;
-      params = { deckId: deck.id, initialSearch: deckScopeSearch(deck.fullName) };
+      params = { deckId: deck.id, initialSearch: deckScopeSearch(deck.fullName) + (query === '' ? '' : ' ' + query) };
     }
     this.暂停主页官方公告检查();
     this.页面栈.pushPath({
@@ -1726,10 +1736,11 @@ struct 首页 {
   }
 
   private 切换牌组展开(deckId: string): void {
+    settleGlassSourceLayout(GLASS_HOME_SOURCE);
     const next: Set<string> = new Set<string>(this.展开的牌组ID集合);
     if (next.has(deckId)) next.delete(deckId); else next.add(deckId);
     this.展开的牌组ID集合 = next;
-    this.牌组数据源.replaceAll(可见牌组行(this.主页快照数据.decks, this.展开的牌组ID集合, this.隐藏的牌组ID集合));
+    this.牌组数据源.replaceVisible(可见牌组行(this.主页快照数据.decks, this.展开的牌组ID集合, this.隐藏的牌组ID集合));
   }
 
   // 递归切换牌组
@@ -1738,6 +1749,7 @@ struct 首页 {
   // 通过 ancestorIds 包含 deckId 来判定子孙关系。
   private 递归切换牌组(deckId: string): void {
     const isExpanded: boolean = this.展开的牌组ID集合.has(deckId);
+    settleGlassSourceLayout(GLASS_HOME_SOURCE);
     const next: Set<string> = new Set<string>(this.展开的牌组ID集合);
     for (const deck of this.主页快照数据.decks) {
       // 匹配本牌组（deckId）或其子孙（ancestorIds 含 deckId）
@@ -1752,7 +1764,7 @@ struct 首页 {
       }
     }
     this.展开的牌组ID集合 = next;
-    this.牌组数据源.replaceAll(可见牌组行(this.主页快照数据.decks, this.展开的牌组ID集合, this.隐藏的牌组ID集合));
+    this.牌组数据源.replaceVisible(可见牌组行(this.主页快照数据.decks, this.展开的牌组ID集合, this.隐藏的牌组ID集合));
   }
 
   /** 长按牌组色条切换 tone：先持久化、再就地替换当前 主页快照数据 中对应行的 tone 并刷新列表，避免重拉后端数据。 */
@@ -1809,14 +1821,15 @@ struct 首页 {
   }
 
   /** 长按牌组 → 自定义学习：对该牌组临时调增新卡/复习上限或按条件抽取卡片。 */
-  private 打开自定义学习(deckId: string): void {
-    if (this.deferForSync((): void => { this.打开自定义学习(deckId); })) return;
+  private 打开自定义学习(deckId: string, preset: number = 自定义学习预设.新卡上限增量): void {
+    if (this.deferForSync((): void => { this.打开自定义学习(deckId, preset); })) return;
     const deck: 牌组汇总 = this.按ID查牌组(deckId);
     if (deck.id === '' || deck.filtered === true) {
       return;
     }
+    this.customStudyInitialPreset = preset;
     this.自定义学习牌组ID = deckId;
-    this.自定义学习牌组名 = deck.displayName;
+    this.自定义学习牌组名 = 牌组显示名(deck);
     this.显示自定义学习 = true;
   }
 
@@ -2237,8 +2250,8 @@ struct 首页 {
               syncIndicator: this.syncIndicator, syncStatusText: this.syncStatusText, syncAccountState: this.syncAccountState,
               onMoreHold: (): void => { this.closeHomeActions(); this.显示更多菜单 = true; },
               onCreateHold: (): void => { this.closeHomeActions(); this.显示主页操作 = true; },
-              onMore: (): void => { const open: boolean = !this.显示更多菜单; this.closeHomeActions(); this.显示更多菜单 = open; },
-              onCreate: (): void => { const open: boolean = !this.显示主页操作; this.closeHomeActions(); this.显示主页操作 = open; },
+              onMore: (): void => { if(this.显示更多菜单) this.homeMoreCloseRequest++; else {this.closeHomeActions();this.显示更多菜单=true;} },
+              onCreate: (): void => { if(this.显示主页操作) this.homeCreateCloseRequest++; else {this.closeHomeActions();this.显示主页操作=true;} },
               onAgent: (): void => { if (this.homeAgentEnabled) { this.closeHomeActions(); this.openAgent(); } },
               onSearch: (): void => { this.closeHomeActions(); this.homeSearchOpen = true; },
               onSync: (): void => {
@@ -2248,9 +2261,12 @@ struct 首页 {
               },
               onBrowser: (): void => { this.closeHomeActions(); this.打开浏览页(); },
               onMenusClose: (): void => { this.closeHomeActions(); },
+              onMoreAnchor: (rect: GlassFusionRect): void=>{this.homeMoreFusionAnchor=rect;},
+              onCreateAnchor: (rect: GlassFusionRect): void=>{this.homeCreateFusionAnchor=rect;},
               onMenuAnchor: (anchor: HomeActionAnchor): void => { this.homeActionAnchor = anchor; },
               })
             主页牌组列表({
+              onScrollActivity: (scrolling: boolean): void => { setGlassSourceScrolling(GLASS_HOME_SOURCE, scrolling); },
 
               onOverflowChange: (overflow: boolean): void => { this.deckListOverflow = overflow; },
               牌组数据源: this.牌组数据源,
@@ -2409,7 +2425,7 @@ struct 首页 {
   @Builder
   private homeMenus() {
     if (this.显示更多菜单 && this.homeActionAnchor.width > 0) {
-      AnchoredMenu({ refractionSource: GLASS_HOME_SOURCE, menuWidth: this.homeMenuWidth('home_more'), slideScope: this.homeMoreSlideScope,
+      AnchoredMenu({ fusionAnchor:this.homeMoreFusionAnchor, closeRequest:this.homeMoreCloseRequest, refractionSource: GLASS_HOME_SOURCE, menuWidth: this.homeMenuWidth('home_more'), slideScope: this.homeMoreSlideScope,
         topOffset: this.homeMenuAnchor().top, contentLeft: this.homeMenuAnchor().left,
         contentMaxWidth: this.homeActionAnchor.width, alignEnd: false, cornerRadius: 应用尺寸.圆角_卡片,
         onClose: (): void => { this.closeHomeActions(); } }) {
@@ -2417,7 +2433,7 @@ struct 首页 {
       }
     }
     if (this.显示主页操作 && this.homeActionAnchor.width > 0) {
-      AnchoredMenu({ refractionSource: GLASS_HOME_SOURCE, menuWidth: this.homeMenuWidth('home_create'), slideScope: this.homeCreateSlideScope,
+      AnchoredMenu({ fusionAnchor:this.homeCreateFusionAnchor, closeRequest:this.homeCreateCloseRequest, refractionSource: GLASS_HOME_SOURCE, menuWidth: this.homeMenuWidth('home_create'), slideScope: this.homeCreateSlideScope,
         topOffset: this.homeMenuAnchor().top, contentLeft: this.homeMenuAnchor().left,
         contentMaxWidth: this.homeActionAnchor.width, alignEnd: true, cornerRadius: 应用尺寸.圆角_卡片,
         onClose: (): void => { this.closeHomeActions(); } }) {
@@ -2425,7 +2441,7 @@ struct 首页 {
       }
     }
     if (this.deckMenuId !== '' && this.按ID查牌组(this.deckMenuId).id !== '') {
-      HomeDeckRowMenu({ refractionSource: GLASS_HOME_SOURCE, deck: this.按ID查牌组(this.deckMenuId), liftAnchor: this.deckLiftAnchor, deckId: this.deckMenuId, point: this.deckMenuPoint, tone: this.按ID查牌组(this.deckMenuId).tone,
+      HomeDeckRowMenu({ centered: this.deckMenuFromDetails, refractionSource: GLASS_HOME_SOURCE, deck: this.按ID查牌组(this.deckMenuId), liftAnchor: this.deckLiftAnchor, deckId: this.deckMenuId, point: this.deckMenuPoint, tone: this.按ID查牌组(this.deckMenuId).tone,
         deckName: this.按ID查牌组(this.deckMenuId).fullName,
         filtered: this.按ID查牌组(this.deckMenuId).filtered === true, busy: this.filteredDeckBusy,
         backRequest: this.deckMenuBackRequest, onClose: (): void => { this.deckMenuId = ''; this.deckMenuPoint = undefined; },
@@ -2443,6 +2459,16 @@ struct 首页 {
     }
   }
 
+  private openDeckDetailShortcut(id: string): void {
+    const deck: 牌组汇总 = this.按ID查牌组(this.选中的牌组ID);
+    if (deck.id === '') return;
+    const shortcut: DeckDetailShortcut | undefined = deckDetailShortcut(id, deck.filtered === true);
+    if (shortcut === undefined) return;
+    if (shortcut.opens === 'deck_rename') this.openDeckRename(deck.id);
+    else if (shortcut.opens === 'custom_study') this.打开自定义学习(deck.id, shortcut.preset);
+    else this.打开浏览页(deck.id, shortcut.query);
+  }
+
   @Builder
   private deckDetails(compact: boolean) {
     HomeDeckDetails({ compact: compact, isDark: this.是否深色(), optionsBusy: this.deckOptionsBusy,
@@ -2455,6 +2481,7 @@ struct 首页 {
       previewBusy: this.预览加载中,
       onMenuStateChange: (open: boolean): void => { this.deckPreviewMenuOpen = open; },
       onBack: (): void => { this.显示牌组详情 = false; this.加载主页数据(); },
+      onShortcut: (id: string): void => { this.openDeckDetailShortcut(id); },
       onStudy: (): void => { this.开始学习(); },
       onPreview: (scope: DeckPreviewScope): void => { this.打开牌组预览(scope); },
       onAddNote: (): void => { this.打开添加笔记(); },
@@ -2522,7 +2549,7 @@ struct 首页 {
 
     // 自定义学习对话框（T2）：长按牌组 → 自定义学习…，成功后刷新主页
     if (this.显示自定义学习) {
-      自定义学习对话框({ backRequest: this.customStudyBackRequest,
+      自定义学习对话框({ initialPreset: this.customStudyInitialPreset, backRequest: this.customStudyBackRequest,
         isDark: this.是否深色(),
         deckId: this.自定义学习牌组ID,
         deckName: this.自定义学习牌组名,
@@ -2617,7 +2644,7 @@ struct 首页 {
       .width('100%')
       .height('100%')
       .justifyContent(FlexAlign.Center)
-      .backgroundColor($r('app.color.surface_page'))
+      .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
       .onClick((): void => {})
     }
 

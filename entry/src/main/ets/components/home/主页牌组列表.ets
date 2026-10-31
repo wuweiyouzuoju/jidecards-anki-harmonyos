@@ -37,6 +37,8 @@
 // 无。
 // ========================================================
 
+import { LengthMetrics } from '@kit.ArkUI';
+import { SURFACE_MATERIAL_KEY } from '../../model/SurfaceMaterial';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { 牌组列表项 } from '../牌组列表项';
 import { DECK_LIST_NARROW_KEY, DECK_LIST_STYLE_KEY, isDoubleColumnDeckListStyle,
@@ -102,6 +104,7 @@ export struct 主页牌组列表 {
   @State private 刷新指示器开关: boolean = false;
 
   // 牌组列表项 的所有回调转调外部回调
+  onScrollActivity: (scrolling: boolean) => void = (_scrolling: boolean): void => {};
   onMove: (from: number, to: number) => void = (from: number, to: number): void => {};
   onItemSelect: (deckId: string) => void = (deckId: string): void => {};
   onItemToggle: (deckId: string) => void = (deckId: string): void => {};
@@ -112,7 +115,13 @@ export struct 主页牌组列表 {
   onRefresh: () => Promise<void> = (): Promise<void> => Promise.resolve();
   onRetry: () => void = (): void => {};
   onOverflowChange: (overflow: boolean) => void = (_overflow: boolean): void => {};
+  @StorageProp(SURFACE_MATERIAL_KEY) private surfaceMaterial: string = 'flat';
   private viewportHeight: number = 0;
+  @State private contentOverflows: boolean = false;
+
+  private edgeFadeEnabled(): boolean {
+    return this.surfaceMaterial === 'glass' && this.加载状态 === 'ready' && this.contentOverflows;
+  }
   private readonly groupSource: HomeDeckGroupSource = new HomeDeckGroupSource();
   private readonly overflowListener: DataChangeListener = {
     onDataReloaded: (): void => { this.refreshDeckGroups(); },
@@ -139,7 +148,8 @@ export struct 主页牌组列表 {
     const overflow: boolean = this.columnCount() === 2 ? groupedDeckListOverflows(
       this.groupSource.groupCounts(), rowHeight, gap, this.viewportHeight) : deckListOverflows(
         this.牌组数据源.totalCount(), rowHeight, gap, this.viewportHeight);
-    this.onOverflowChange(this.加载状态 === 'ready' && overflow);
+    this.contentOverflows = this.加载状态 === 'ready' && overflow;
+    this.onOverflowChange(this.contentOverflows);
   }
 
   private columnCount(): number {
@@ -155,6 +165,7 @@ export struct 主页牌组列表 {
   aboutToDisappear(): void {
     this.牌组数据源.unregisterDataChangeListener(this.overflowListener);
     this.onOverflowChange(false);
+    this.onScrollActivity(false);
   }
 
   private async refreshDecks(): Promise<void> {
@@ -210,6 +221,9 @@ export struct 主页牌组列表 {
     .id('home-deck-list-ready')
     .enabled(!this.reorderBusy)
     .scrollBar(BarState.Auto).edgeEffect(EdgeEffect.Spring)
+    .fadingEdge(this.edgeFadeEnabled(), { fadingEdgeLength: LengthMetrics.vp(24) })
+    .onScrollStart((): void => { this.onScrollActivity(true); })
+    .onScrollStop((): void => { this.onScrollActivity(false); })
     .onAreaChange((_old: Area, area: Area): void => {
       this.viewportHeight = Number(area.height);
       this.reportOverflow();
@@ -305,6 +319,9 @@ export struct 主页牌组列表 {
         .layoutWeight(1)
         .scrollBar(BarState.Auto)
         .edgeEffect(EdgeEffect.Spring)
+        .fadingEdge(this.edgeFadeEnabled(), { fadingEdgeLength: LengthMetrics.vp(24) })
+        .onScrollStart((): void => { this.onScrollActivity(true); })
+        .onScrollStop((): void => { this.onScrollActivity(false); })
         .onAreaChange((_old: Area, area: Area): void => {
           this.viewportHeight = Number(area.height);
           this.reportOverflow();

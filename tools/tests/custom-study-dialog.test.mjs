@@ -14,13 +14,13 @@ const logic = (source.slice(0, source.indexOf('  @Builder')) + '\n}')
 const defaults = { tags: [{ name: 'alpha', include: true, exclude: false }, { name: 'beta', include: false, exclude: true }],
   extendNew: 12, extendReview: 34, availableNew: 5, availableNewInChildren: 7, availableReview: 8, availableReviewInChildren: 0 };
 function harness() {
-  const calls = [], toasts = [], preferences = new Map(), commits=[];
+  const calls = [], toasts = [], preferences = new Map(), commits=[], views=[];
   const scheduler = { 获取自定义学习默认值: async () => defaults,
     自定义学习: async (...args) => { calls.push(args); },
     customStudyByStateOrTags: async (...args) => { calls.push(args); } };
   const store = { read: (key, fallback) => preferences.get(key) ?? fallback,
     save: async (key, value) => { preferences.set(key, value); } };
-  const dependencies = { customStudyInitialValue, customStudyValueValid, isCustomStudyLimit,
+  const dependencies = { appInterface:{observe:view=>views.push(view),leave:id=>views.push({leave:id})}, customStudyInitialValue, customStudyValueValid, isCustomStudyLimit,
     CustomStudyCardKind, 自定义学习预设, $r: key => key, THEME_TEXT_COLORS_KEY: '',
     颜色键: { 主色按钮背景: '' }, 调度器服务: class { constructor() { return scheduler; } },
     CustomStudyPreferences: class { constructor() { return store; } },
@@ -33,7 +33,7 @@ function harness() {
   dialog.getUIContext = () => ({});
   dialog.onSuccess = () => { calls.push('success'); };
   dialog.onClose = () => { calls.push('close'); };
-  return { dialog, scheduler, store, calls, toasts, preferences, commits };
+  return { dialog, scheduler, store, calls, toasts, preferences, commits, views };
 }
 
 test('accepted custom study commits after disposal without toasts or parent callbacks',async()=>{
@@ -48,10 +48,10 @@ test('custom study loads deck defaults and remembers day/count values without me
   const h = harness();
   h.preferences.set(4, 7);
   await h.dialog.加载默认值();
-  assert.equal(h.dialog.输入值, '12');
-  h.dialog.切换预设(3); assert.equal(h.dialog.输入值, '34');
+  assert.equal(h.dialog.输入值, '20');
+  h.dialog.切换预设(3); assert.equal(h.dialog.输入值, '20');
   h.dialog.切换预设(4); assert.equal(h.dialog.输入值, '7');
-  h.dialog.切换预设(7); assert.equal(h.dialog.输入值, '100');
+  h.dialog.切换预设(7); assert.equal(h.dialog.输入值, '20');
   assert.match(h.dialog.availableCount(true), /available_new 5 .*child_count 7/);
 });
 
@@ -81,7 +81,7 @@ test('custom study accepts negative limit deltas and rejects decimal/zero input'
   assert.deepEqual(h.calls, []);
   h.dialog.输入值 = '-3'; await h.dialog.执行提交();
   assert.deepEqual(h.calls[0], [123, 2, -3]);
-  assert.equal(h.preferences.size, 0);
+  assert.equal(h.preferences.get(2), -3);
 });
 
 test('zero defaults or available count do not block a positive new-card extension', async () => {
@@ -89,8 +89,8 @@ test('zero defaults or available count do not block a positive new-card extensio
     const h = harness();
     h.scheduler.获取自定义学习默认值 = async () => ({ ...defaults, extendNew: 0, availableNew });
     await h.dialog.加载默认值();
-    assert.equal(h.dialog.输入值, '0');
-    assert.equal(h.dialog.可提交(), false);
+    assert.equal(h.dialog.输入值, '20');
+    assert.equal(h.dialog.可提交(), true);
     h.dialog.输入值 = '10';
     assert.equal(h.dialog.可提交(), true);
     await h.dialog.执行提交();
@@ -104,7 +104,7 @@ test('custom study preference failure does not report the accepted creation as f
   h.store.save = async () => { throw Error('disk full'); };
   await h.dialog.执行提交();
   assert.equal(h.dialog.错误信息, '');
-  assert.deepEqual(h.calls, [[123, 5, 1], 'success', 'close']);
+  assert.deepEqual(h.calls, [[123, 5, 20], 'success', 'close']);
   assert.deepEqual(h.toasts, ['app.string.custom_study_preferences_error']);
 });
 
@@ -117,4 +117,27 @@ test('custom study ignores defaults arriving after the dialog closes and exposes
   await failed.dialog.加载默认值();
   assert.match(failed.dialog.错误信息, /preferences unavailable/);
   assert.equal(failed.dialog.可提交(), false);
+});
+
+
+test('detail shortcut selects the review preset before defaults arrive and publishes real form state', async()=>{
+  const h=harness();h.dialog.mounted=false;h.dialog.initialPreset=自定义学习预设.复习上限增量;
+  h.dialog.aboutToAppear();assert.equal(h.dialog.选中预设,自定义学习预设.复习上限增量);
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(h.dialog.输入值,'20');h.dialog.publishInterface();
+  const view=h.views.at(-1);assert.equal(view.surface,'custom_study');assert.equal(view.selectedId,'123');
+  assert.equal(view.items.find(x=>x.id==='preset_'+自定义学习预设.复习上限增量).selected,true);
+  assert.equal(view.items.find(x=>x.id==='confirm').enabled,true);
+  h.dialog.处理中=true;h.dialog.publishInterface();
+  assert.ok(h.views.at(-1).items.every(x=>x.enabled===false));
+  h.dialog.aboutToDisappear();assert.equal(h.views.at(-2).leave,'custom_study');
+});
+
+test('all presets retain independent successful values and JIDE observes the real remembered input',async()=>{
+ const h=harness();h.preferences.set(2,-8);h.preferences.set(3,42);await h.dialog.加载默认值();
+ assert.equal(h.dialog.输入值,'-8');h.dialog.切换预设(3);assert.equal(h.dialog.输入值,'42');
+ h.dialog.publishInterface();assert.equal(h.views.at(-1).values.find(value=>value.id==='value').value,'42');
+ for(const preset of [4,5,6,7]){h.dialog.切换预设(preset);assert.equal(h.dialog.输入值,'20');}
+ h.dialog.切换预设(3);h.dialog.输入值='31';await h.dialog.执行提交();assert.equal(h.preferences.get(3),31);
+ h.dialog.mounted=true;await h.dialog.加载默认值();assert.equal(h.dialog.输入值,'31');
 });

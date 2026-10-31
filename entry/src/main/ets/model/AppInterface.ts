@@ -1,3 +1,4 @@
+import { deckDetailShortcuts } from './DeckDetailShortcut';
 import { HOME_INTRO_ACTIONS } from './HomeIntro';
 import type { HomeIntroAction } from './HomeIntro';
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -219,14 +220,16 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'add_note', titleKey: 'deck_add_card', iconKey: 'ic_study_edit', opens: 'add_note' },
     { id: 'agent', titleKey: 'ai_agent_title', iconKey: 'ic_study_agent', opens: 'agent', agentOnly: true },
     { id: 'preview', titleKey: 'deck_preview', iconKey: 'ic_common_preview', opens: 'deck_preview_scope' },
-    { id: 'total', titleKey: 'deck_total_cards' },
-    { id: 'new', titleKey: 'new_cards' },
-    { id: 'learning', titleKey: 'learning_cards' },
-    { id: 'review', titleKey: 'review_cards' },
+    ...deckDetailShortcuts(false),
     { id: 'more', titleKey: 'deck_more', iconKey: 'ic_home_more', opens: 'deck_row_menu' },
     { id: 'study', titleKey: 'start_study', opens: 'study' }
   ] },
   { id: 'deck_actions', titleKey: 'deck_more', parent: 'deck_details', items: [] },
+  { id: 'custom_study', titleKey: 'custom_study_title', parent: 'deck_details', items: [
+    { id: 'value', titleKey: 'custom_study_value_label' },
+    { id: 'confirm', titleKey: 'custom_study_confirm' },
+    { id: 'cancel', titleKey: 'cancel' }
+  ] },
   { id: 'deck_options', titleKey: 'deck_options_title', parent: 'deck_details', items: [
     { id: 'close', titleKey: 'study_back', iconKey: 'ic_common_arrow_left' },
       { id: 'retry', titleKey: 'common_retry', condition: 'error' },
@@ -649,6 +652,8 @@ export interface AppInterfaceControl {
   title: string;
   titleKey?: string;
   iconKey?: string;
+  /** 当前控件的实际目的地，可覆盖静态声明（例如筛选牌组只可浏览）。 */
+  opens?: string;
   enabled: boolean;
   selected: boolean;
 }
@@ -914,6 +919,7 @@ export function noteEditorWheelObservation(state: NoteEditorWheelState, selected
     values: [{ id: 'side', value: side }, { id: 'grip_availability', value: grip },
       { id: 'source', value: String(state.source) }, { id: 'target_field', value: state.fieldName ?? '' },
       { id: 'input_expanded', value: String(state.expanded) },
+      { id: 'input_expansion_presentation', value: NOTE_FIELD_EDITING_SUPPORT.expandPresentation },
       { id: 'cloze_enabled', value: String(state.cloze) },
       { id: 'visible_tools', value: collapsed ? '0' : String(noteEditorWheelTools(state).length) },
       { id: 'inner_tools', value: noteEditorWheelCommonTools(state).map((tool): string => tool.id).join(',') },
@@ -1013,7 +1019,7 @@ export class AppInterfaceTracker {
       selectedId: view.selectedId, optionIds: view.optionIds.slice(), optionLabels: view.optionLabels.slice(),
       optionsTotal: view.optionsTotal ?? view.optionIds.length, busy: view.busy, controlsComplete: view.controlsComplete,
       items: view.items?.map((item: AppInterfaceControl): AppInterfaceControl => ({ id: item.id, title: item.title, titleKey: item.titleKey,
-        iconKey: item.iconKey, enabled: item.enabled, selected: item.selected })),
+        iconKey: item.iconKey, opens: item.opens, enabled: item.enabled, selected: item.selected })),
       values: view.values?.map((value: AppInterfaceValue): AppInterfaceValue => ({ id: value.id, value: value.value })) });
     return version;
   }
@@ -1028,7 +1034,7 @@ export class AppInterfaceTracker {
       ({ surface: view.surface, titleKey: view.titleKey, sectionId: view.sectionId, selectedId: view.selectedId,
         optionIds: view.optionIds.slice(), optionLabels: view.optionLabels.slice(), optionsTotal: view.optionsTotal, busy: view.busy, controlsComplete: view.controlsComplete,
         items: view.items?.map((item: AppInterfaceControl): AppInterfaceControl => ({ id: item.id, title: item.title, titleKey: item.titleKey,
-          iconKey: item.iconKey, enabled: item.enabled, selected: item.selected })),
+          iconKey: item.iconKey, opens: item.opens, enabled: item.enabled, selected: item.selected })),
         values: view.values?.map((value: AppInterfaceValue): AppInterfaceValue => ({ id: value.id, value: value.value })) }));
   }
 }

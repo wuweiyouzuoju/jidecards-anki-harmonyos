@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { GlassFusionRect } from 'jide_foundation';
 import { IconActionButton } from '../common/IconActionButton';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { homeHeaderGeometry, HomeHeaderGeometry, HomeActionAnchor } from '../../model/HomeHeaderLayout';
@@ -30,6 +31,8 @@ export struct HomeSummaryHeader {
   onSync: () => void = (): void => {};
   onBrowser: () => void = (): void => {};
   onMenusClose: () => void = (): void => {};
+  onMoreAnchor: (rect: GlassFusionRect) => void = (): void => {};
+  onCreateAnchor: (rect: GlassFusionRect) => void = (): void => {};
   onMenuAnchor: (anchor: HomeActionAnchor) => void = (): void => {};
   @State private contentWidth: number = 0;
   private menuAnchor: HomeActionAnchor = { left: 0, top: 0, width: 0 };
@@ -90,6 +93,8 @@ export struct HomeSummaryHeader {
       IconActionButton({ toolbarStyle: true, source: $r('app.media.ic_home_more'), label: $r('app.string.study_more'),
         controlSize: this.geometry().controlHeight, controlWidth: this.geometry().controlWidth, controlGlyphSize: this.geometry().controlGlyphSize,
         slideMenu: true, onHoldOpen: this.onMoreHold, onHoldCancel: this.onMenusClose, onAction: this.onMore })
+        .onAreaChange((_old: Area, area: Area): void=>{this.onMoreAnchor({x:Number(area.globalPosition.x),y:Number(area.globalPosition.y),
+          width:Number(area.width),height:Number(area.height),radius:Math.min(应用尺寸.圆角_卡片,Number(area.width)/2,Number(area.height)/2)});})
   }
 
   @Builder
@@ -97,6 +102,8 @@ export struct HomeSummaryHeader {
       IconActionButton({ toolbarStyle: true, source: $r('app.media.ic_home_new'), label: $r('app.string.create_deck'),
         controlSize: this.geometry().controlHeight, controlWidth: this.geometry().controlWidth, controlGlyphSize: this.geometry().controlGlyphSize,
         slideMenu: true, onHoldOpen: this.onCreateHold, onHoldCancel: this.onMenusClose, onAction: this.onCreate })
+        .onAreaChange((_old: Area, area: Area): void=>{this.onCreateAnchor({x:Number(area.globalPosition.x),y:Number(area.globalPosition.y),
+          width:Number(area.width),height:Number(area.height),radius:Math.min(应用尺寸.圆角_卡片,Number(area.width)/2,Number(area.height)/2)});})
   }
 
   @Builder

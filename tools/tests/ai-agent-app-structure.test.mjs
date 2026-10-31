@@ -1,3 +1,4 @@
+import { deckDetailShortcut, deckDetailShortcuts } from '../../entry/src/main/ets/model/DeckDetailShortcut.ts';
 import { browserDisplayKeys } from '../../entry/src/main/ets/model/BrowserPreferences.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
@@ -573,7 +574,8 @@ test('deck detail observations follow the real snapshot and point to the shared 
   const tracker=new AppInterfaceTracker();
   const Details=loadComponentLogic('components/牌组详情面板.ets','牌组详情面板',{
     应用尺寸:loadPlatformModule('utils/应用尺寸.ets','应用尺寸',{}),
-    appInterface:tracker,visibleInterfaceItems,deckRowMenuItems,
+    appInterface:tracker,visibleInterfaceItems,deckRowMenuItems,deckDetailShortcut,deckDetailShortcuts,
+    namedResourceText:(_,key)=>localize(key),
     interfaceItemText:(_,surface,id)=>localize(APP_INTERFACE_SURFACES.find(x=>x.id===surface).items.find(x=>x.id===id).titleKey),
     牌组显示名:deck=>deck.name,ExpansionReveal:class {cancel(){} request(){}},
     DECK_LIST_NARROW_KEY:'narrow',THEME_TEXT_COLORS_KEY:'text',GLASS_COLORS_KEY:'glass',GLASS_HIGHLIGHT_COLORS:[],
@@ -582,6 +584,12 @@ test('deck detail observations follow the real snapshot and point to the shared 
     主页快照数据:{decks:[{id:'d',name:'Actual deck',description:'About',totalCards:9,newCount:1,learningCount:2,reviewCount:3}]},
     创建子牌组:()=>calls.push('create'),打开牌组选项:()=>calls.push('options'),导出牌组:()=>calls.push('export')});
   page.aboutToAppear();assert.equal(tracker.snapshot()[0].values.find(x=>x.id==='name').value,'Actual deck');
+  let details=buildAgentAppStructure(context,'deck_details','',localize,agentSettingDefinitions(),tools,tracker.snapshot());
+  assert.equal(details.surfaces.find(x=>x.id==='deck_details').items.find(x=>x.id==='new').opens,'custom_study');
+  page.主页快照数据.decks[0].filtered=true;page.publishInterface();
+  details=buildAgentAppStructure(context,'deck_details','',localize,agentSettingDefinitions(),tools,tracker.snapshot());
+  assert.equal(details.surfaces.find(x=>x.id==='deck_details').items.find(x=>x.id==='new').opens,'browser');
+  assert.equal(details.surfaces.find(x=>x.id==='deck_details').items.find(x=>x.id==='name').opens,'deck_rename');
   const more=APP_INTERFACE_SURFACES.find(x=>x.id==='deck_details').items.find(x=>x.id==='more');
   assert.equal(more.opens,'deck_row_menu');
   assert.ok(deckRowMenuItems(false,false).some(x=>x.id==='move'));

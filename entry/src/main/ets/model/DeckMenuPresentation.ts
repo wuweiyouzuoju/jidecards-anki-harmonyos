@@ -16,3 +16,15 @@ export function deckMenuPlacement(anchor: DeckMenuRect, bounds: DeckMenuRect, pr
   return { preview: { left, top, width, height }, menu: { left: menuLeft, top: menuTop, width: menuWidth,
     height: Math.max(48, bounds.top + bounds.height - menuTop) } };
 }
+
+/** 详情更多把牌组预览与菜单作为一组，在整个安全窗口居中。 */
+export function centeredDeckMenuPlacement(bounds: DeckMenuRect, menuHeight: number, previewHeight: number = 64, previewWidth: number = 360): DeckMenuPlacement {
+  const gap = 12;
+  const height = Math.min(Math.max(32, previewHeight), Math.max(32, bounds.height - gap - 48));
+  const menuSize = Math.min(Math.max(48, menuHeight), Math.max(48, bounds.height - height - gap));
+  const width = Math.min(previewWidth, 360, bounds.width);
+  const menuWidth = Math.min(280, bounds.width);
+  const top = bounds.top + (bounds.height - height - gap - menuSize) / 2;
+  return { preview: { left: bounds.left + (bounds.width - width) / 2, top, width, height },
+    menu: { left: bounds.left + (bounds.width - menuWidth) / 2, top: top + height + gap, width: menuWidth, height: menuSize } };
+}

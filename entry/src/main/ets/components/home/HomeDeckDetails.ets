@@ -47,6 +47,7 @@ export struct HomeDeckDetails {
   onAddNote: () => void = (): void => {};
   onCreateWithAI: () => void = (): void => {};
   onMore: () => void = (): void => {};
+  onShortcut: (id: string) => void = (_id: string): void => {};
 
   aboutToAppear(): void {
     this.interfaceMounted = true;
@@ -180,6 +181,7 @@ export struct HomeDeckDetails {
 
       牌组详情面板({
 
+          onShortcut: (id: string): void => { this.selectAction((): void => { this.onShortcut(id); }); },
           historyRefreshToken: this.historyRefreshToken,
           showHeaderActions: !this.compact,
           headerActionHeight: this.headerActionHeight,

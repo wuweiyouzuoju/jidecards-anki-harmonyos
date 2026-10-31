@@ -21,6 +21,7 @@ import { customStudyInitialValue, customStudyValueValid, isCustomStudyLimit } fr
 import { CustomStudyPreferences } from '../../backend/CustomStudyPreferences';
 import { DirectoryTree } from '../common/DirectoryTree';
 import { DirectoryRow, DirectoryView, DirectoryChoice, directoryChoiceRows } from '../../model/DirectoryTree';
+import { AppInterfaceControl } from '../../model/AppInterface';
 import { appInterface } from '../../backend/AppInterfaceService';
 import { FormSelectRow } from '../common/FormSelectRow';
 
@@ -47,16 +48,17 @@ export struct 自定义学习对话框 {
   @Prop isDark: boolean = false;
   @Prop deckId: string = '';
   @Prop deckName: string = '';
+  @Prop initialPreset: number = 自定义学习预设.新卡上限增量;
   onClose: () => void = (): void => {};
   onSuccess: () => void = (): void => {};
 
   @StorageProp(颜色键.主色按钮背景) private 主色按钮背景: string = '#2F5FD0';
-  @State private 选中预设: number = 0;
-  @State private 输入值: string = '';
-  @State private 处理中: boolean = false;
+  @State @Watch('publishInterface') private 选中预设: number = 0;
+  @State @Watch('publishInterface') private 输入值: string = '';
+  @State @Watch('publishInterface') private 处理中: boolean = false;
   @State private 错误信息: string = '';
   @State private 默认值: 自定义学习默认值 | null = null;
-  @State private 加载默认值中: boolean = false;
+  @State @Watch('publishInterface') private 加载默认值中: boolean = false;
 
   @State private cardKindIndex: number = 0;
   @State private includedTags: string[] = [];
@@ -112,13 +114,30 @@ export struct 自定义学习对话框 {
   ];
 
   aboutToAppear(): void {
-    this.选中预设 = 自定义学习预设.新卡上限增量;
+    this.选中预设 = this.预设列表.some((preset: 预设选项): boolean => preset.字段号 === this.initialPreset) ?
+      this.initialPreset : 自定义学习预设.新卡上限增量;
     this.mounted = true;
-    this.输入值 = '0';
+    this.输入值 = customStudyInitialValue(this.选中预设, null).toString();
     this.加载默认值();
+    this.publishInterface();
   }
 
-  aboutToDisappear(): void { this.mounted = false; }
+  aboutToDisappear(): void { this.mounted = false; appInterface.leave('custom_study'); appInterface.leave('custom_study_tags'); }
+
+  private publishInterface(): void {
+    if (!this.mounted) return;
+    const interactive: boolean = !this.处理中 && !this.加载默认值中 && this.默认值 !== null;
+    const controls: AppInterfaceControl[] = this.预设列表.map((preset: 预设选项): AppInterfaceControl => ({
+      id: 'preset_' + preset.字段号, title: resourceText(this.getUIContext(), preset.标题资源),
+      enabled: interactive, selected: this.选中预设 === preset.字段号 }));
+    controls.push({ id: 'value', title: '', titleKey: this.当前预设().是天数 ? 'custom_study_days_label' :
+      (isCustomStudyLimit(this.选中预设) ? 'custom_study_value_label' : 'custom_study_cards_label'), enabled: interactive, selected: false });
+    controls.push({ id: 'confirm', title: '', titleKey: 'custom_study_confirm', enabled: this.可提交(), selected: false });
+    controls.push({ id: 'cancel', title: '', titleKey: 'cancel', enabled: !this.处理中, selected: false });
+    appInterface.observe({ surface: 'custom_study', sectionId: '', selectedId: this.deckId,
+      optionIds: [], optionLabels: [], busy: this.处理中 || this.加载默认值中, items: controls,
+      values: [{ id: 'preset', value: String(this.选中预设) }, { id: 'value', value: this.输入值 }] });
+  }
 
   private 取本地化文本(资源: Resource, _locale: string = this.uiLanguage): string {
     return resourceText(this.getUIContext(), 资源);
@@ -135,10 +154,8 @@ export struct 自定义学习对话框 {
       const defaults = await this.调度器.获取自定义学习默认值(Number(this.deckId));
       if (!this.mounted) { return; }
       for (const preset of this.预设列表) {
-        if (!isCustomStudyLimit(preset.字段号)) {
-          const fallback = customStudyInitialValue(preset.字段号, defaults);
-          this.rememberedValues.set(preset.字段号, this.preferences.read(preset.字段号, fallback));
-        }
+        const fallback = customStudyInitialValue(preset.字段号, defaults);
+        this.rememberedValues.set(preset.字段号, this.preferences.read(preset.字段号, fallback));
       }
       this.默认值 = defaults;
       this.includedTags = defaults.tags.filter(tag => tag.include).map(tag => tag.name);
@@ -169,6 +186,7 @@ export struct 自定义学习对话框 {
     if (this.处理中 || this.加载默认值中 || this.默认值 === null) {
       return;
     }
+    if (customStudyValueValid(this.选中预设, this.输入值)) this.rememberedValues.set(this.选中预设, Number(this.输入值));
     this.选中预设 = 字段号;
     this.输入值 = this.initialValue(字段号).toString();
     this.错误信息 = '';
@@ -238,10 +256,8 @@ export struct 自定义学习对话框 {
       }
       // 创建成功后偏好失败只提示，不把已成功操作变成可重复提交的错误。
       let message: Resource = $r('app.string.custom_study_success');
-      if (!isCustomStudyLimit(预设.字段号)) {
-        try { await this.preferences.save(预设.字段号, 值); } catch (error) {
-          message = $r('app.string.custom_study_preferences_error');
-        }
+      try { await this.preferences.save(预设.字段号, 值); } catch (error) {
+        message = $r('app.string.custom_study_preferences_error');
       }
       AppStorage.setOrCreate<number>('需要刷新主页', Date.now());
       if (!this.mounted) return;
@@ -347,7 +363,7 @@ export struct 自定义学习对话框 {
           onSize: (width: string, maximumWidth: number): void => {
             this.surfaceWidth = width; this.surfaceMaximumWidth = maximumWidth;
           } })
-        .onClick(() => { this.handleBackRequest(); })
+        .onClick((event: ClickEvent): void => { this.handleBackRequest(); })
         .transition(SurfaceTransition.backdrop())
       GlassPanel({ radius: 应用尺寸.圆角_卡片, panelWidth: this.surfaceWidth, maximumWidth: this.surfaceMaximumWidth, maximumHeight: '88%' }) {
 Column({ space: 应用尺寸.间距_16 }) {
@@ -396,6 +412,6 @@ Column({ space: 应用尺寸.间距_16 }) {
       .onClick(() => {})
       }
       
-    }.width('100%').height('100%')
+    }.width('100%').height('100%').onClick((): void => { this.handleBackRequest(); })
   }
 }

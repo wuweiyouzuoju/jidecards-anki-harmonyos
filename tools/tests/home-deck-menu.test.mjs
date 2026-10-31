@@ -1,3 +1,4 @@
+import { 自定义学习预设 } from '../../entry/src/main/ets/proto/messages/SchedulerMessages.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,7 +12,7 @@ import { 牌组显示名, 空牌组汇总 } from '../../entry/src/main/ets/model
 import { deckScopeSearch } from '../../entry/src/main/ets/model/DeckScope.ts';
 import { ActionMenuPointerSide, actionMenuBubbleOutline, actionMenuHostAnchor, placeAnchoredActionMenu, actionMenuGroupInset, placeActionMenuGroups } from '../../entry/src/main/ets/components/common/ActionMenuLayout.ts';
 import { actionMenuRows, visibleActionMenuRows } from '../../entry/src/main/ets/components/common/ActionMenuTree.ts';
-import { deckMenuPlacement } from '../../entry/src/main/ets/model/DeckMenuPresentation.ts';
+import { deckMenuPlacement, centeredDeckMenuPlacement } from '../../entry/src/main/ets/model/DeckMenuPresentation.ts';
 import { HOME_SHORTCUTS, shortcutCommand } from '../../entry/src/main/ets/model/KeyboardShortcuts.ts';
 import { KeyboardPressSession } from '../../entry/src/main/ets/model/KeyboardInput.ts';
 import { safeMenuGeometry, keyboardViewportHeight } from '../../entry/src/main/ets/model/WindowSafeLayout.ts';
@@ -22,7 +23,7 @@ const dictionaries = Object.fromEntries(['base', 'en_US'].map(locale => [locale,
 function menuHarness(locale = 'base') {
   const tracker = new AppInterfaceTracker();
   const Menu = loadComponentLogic('components/home/HomeDeckRowMenu.ets', 'HomeDeckRowMenu', {
-    deviceInfo: {apiAvailable:()=>true}, deckMenuPlacement, WINDOW_SAFE_TOP_KEY: 'top', WINDOW_SAFE_BOTTOM_KEY: 'bottom', WINDOW_SAFE_LEFT_KEY: 'left', WINDOW_SAFE_RIGHT_KEY: 'right',
+    deviceInfo: {apiAvailable:()=>true}, deckMenuPlacement, centeredDeckMenuPlacement, WINDOW_SAFE_TOP_KEY: 'top', WINDOW_SAFE_BOTTOM_KEY: 'bottom', WINDOW_SAFE_LEFT_KEY: 'left', WINDOW_SAFE_RIGHT_KEY: 'right',
     DECK_TONE_CHOICES, 牌组色调, 空牌组汇总, deckRowMenuItems, appInterface: tracker, actionMenuHostAnchor,
     interfaceItemText: loadPlatformModule('utils/AppInterfaceText.ets', 'interfaceItemText', { APP_INTERFACE_SURFACES, ...uiFeedback }),
     ...uiFeedback,
@@ -156,7 +157,7 @@ function homeHarness() {
     assert.ok(start >= 0, name);
     return source.slice(start, source.indexOf('\n  }', start) + 4);
   });
-  const Home = new Function('deckScopeSearch', '牌组显示名', stripTypeScriptTypes('class Home { ' + methods.join('\n') + ' }', { mode: 'transform' }) + '; return Home;')(deckScopeSearch, deck => 牌组显示名(deck, 'zh-Hans'));
+  const Home = new Function('deckScopeSearch', '牌组显示名', '自定义学习预设', stripTypeScriptTypes('class Home { ' + methods.join('\n') + ' }', { mode: 'transform' }) + '; return Home;')(deckScopeSearch, deck => 牌组显示名(deck, 'zh-Hans'), 自定义学习预设);
   const home = new Home(), paths = [], actions = [];
   const target = { id: '42', fullName: 'Parent::Deck "quoted" *_', displayName: 'Alias' };
   Object.assign(home, {
@@ -605,4 +606,16 @@ test('lift geometry preserves narrow, wide, short and tall source rows',()=>{
   assert.ok(result.preview.top>=24);
   assert.ok(result.menu.top+Math.min(440,result.menu.height)<=884);
  }
+});
+
+test('details more menu centers within safe phone and wide window with a row preview', () => {
+  for (const bounds of [{left:16,top:40,width:388,height:760},{left:16,top:40,width:1168,height:1000}]) {
+    const p = centeredDeckMenuPlacement(bounds, 617);
+    assert.equal(p.menu.left + p.menu.width / 2, bounds.left + bounds.width / 2);
+    assert.equal((p.preview.top + p.menu.top + p.menu.height) / 2, bounds.top + bounds.height / 2);
+    assert.equal(p.preview.height, 64);
+    assert.equal(p.preview.left + p.preview.width / 2, bounds.left + bounds.width / 2);
+    assert.ok(p.menu.top >= bounds.top);
+    assert.ok(p.menu.top + p.menu.height <= bounds.top + bounds.height);
+  }
 });
