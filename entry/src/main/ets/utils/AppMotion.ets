@@ -25,5 +25,5 @@ export function navigationEnterOffset(isPush: boolean): number {
 /** 材质弹层的轻回弹；只在玻璃模式改变开合曲线，不更改页面或数据时序。 */
 export function materialPopupAnimation(duration: number): AnimateParam {
   if ((AppStorage.get<string>('surface_material') ?? 'flat') !== 'glass') return motionAnimation(duration);
-  return {duration: Math.max(duration, 240), curve: curves.interpolatingSpring(0, 1, 320, 34)};
+  return {duration: duration, curve: curves.interpolatingSpring(0, 1, 320, 34)};
 }

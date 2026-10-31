@@ -12,10 +12,12 @@ export class GlassSurface extends PressFeedback {
   private outline: BorderOptions | undefined;
 
   private material: string;
+  private stableAnchor: boolean;
 
   constructor(material: string, colors: string[], background: ResourceColor = $r('app.color.surface_card'),
-    outline: BorderOptions | undefined = undefined) {
-    super();
+    outline: BorderOptions | undefined = undefined, stableAnchor: boolean = false) {
+    super(1, 0.4, stableAnchor);
+    this.stableAnchor = stableAnchor;
     this.material = material;
     this.colors = colors;
     this.background = background;
@@ -29,7 +31,7 @@ export class GlassSurface extends PressFeedback {
 
   applyPressedAttribute(instance: CommonAttribute): void {
     super.applyPressedAttribute(instance);
-    this.applySurface(instance, true);
+    this.applySurface(instance, !this.stableAnchor);
   }
 
   applyDisabledAttribute(instance: CommonAttribute): void {

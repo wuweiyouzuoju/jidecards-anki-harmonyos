@@ -447,13 +447,13 @@ export struct 学习浮动工具栏 {
         .textOverflow({ overflow: TextOverflow.Ellipsis })
         .textAlign(TextAlign.Center)
         .fontSize(应用尺寸.字号_按钮)
-        .fontWeight(FontWeight.Medium)
+        .fontWeight(600)
         .fontColor(this.动作主色)
     }
     .width('100%')
     .height('100%')
     .padding({ left: 4, right: 4 })
-    .attributeModifier(new PrimaryGlassSurface(this.surfaceMaterial, this.primaryGlass))
+    .attributeModifier(new PrimaryGlassSurface(this.surfaceMaterial, this.primaryGlass, this.动作主色, this.是否深色))
     .stateEffect(false)
     .borderRadius(应用尺寸.圆角_面板)
     .onClick(() => {
@@ -484,7 +484,7 @@ export struct 学习浮动工具栏 {
     .width('100%')
     .padding({ left: 4, right: 4 })
     .layoutWeight(1)
-    .attributeModifier(new StudyRatingSurface(this.surfaceMaterial, this.glassColors, 底色))
+    .attributeModifier(new StudyRatingSurface(this.surfaceMaterial, this.glassColors, 底色, true, this.动作主色, this.是否深色))
     .stateEffect(false)
     .borderRadius(应用尺寸.圆角_面板)
     .onClick(() => {

@@ -9,6 +9,8 @@ import { RATING_AGAIN, RATING_EASY, RATING_GOOD, RATING_HARD } from '../proto/me
 /** 学习动作只跟随原阶段显示，不拥有评分或显示答案时序。 */
 @Component
 export struct StudyAnswerActionBar {
+  @StorageProp('themeMode') private themeMode: string = 'system';
+  @StorageProp('systemDarkMode') private systemDark: boolean = false;
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp(颜色键.动作主色) private actionColor: string = '#2F5FD0';
   @Prop stage: string = 'question';
@@ -32,7 +34,7 @@ export struct StudyAnswerActionBar {
     fill: ResourceColor, wide: boolean, action: () => void) {
     Button({ type: ButtonType.Normal, stateEffect: false }) {
       Column({ space: 2 }) {
-        Text(label).fontSize(应用尺寸.字号_按钮).fontWeight(FontWeight.Medium)
+        Text(label).fontSize(应用尺寸.字号_按钮).fontWeight(wide ? 600 : FontWeight.Medium)
           .fontColor(textColor).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
         if (subtitle.length > 0) {
           Text(subtitle).fontSize(12).fontColor(textColor).maxLines(1)
@@ -49,7 +51,8 @@ export struct StudyAnswerActionBar {
     .border(SurfaceBorder.options(应用尺寸.卡片边框))
     // 读取宿主的实时阶段；按值Builder参数会固定首次loading时的禁用值。
     .enabled(this.actionEnabled(wide))
-    .attributeModifier(new StudyRatingSurface(this.surfaceMaterial, GLASS_HIGHLIGHT_COLORS, fill, !wide))
+    .attributeModifier(new StudyRatingSurface(this.surfaceMaterial, GLASS_HIGHLIGHT_COLORS, fill, !wide, this.actionColor,
+      this.themeMode === 'dark' || (this.themeMode !== 'light' && this.systemDark)))
     // 原生Button的材质边框更新后恢复既有轮廓，与其他学习按钮顺序一致。
     .borderRadius(应用尺寸.圆角_面板)
     .clip(true)

@@ -16,6 +16,11 @@ import * as appLocales from '../../entry/src/main/ets/model/AppLocales.ts';
 import { SUMMARY_LABEL_KEYS } from '../../entry/src/main/ets/model/SummaryLabels.ts';
 import * as localeFormatting from '../../entry/src/main/ets/utils/LocaleFormatting.ts';
 
+// 系列按压核心直接执行；产品只注入当前动效偏好。
+const sharedPressSource = readFileSync(new URL('../../../记得系列基础/src/harmony/shared/PressFeedback.ets', import.meta.url), 'utf8')
+  .replace(/^export /gm, '');
+const SharedPressFeedback = new Function(stripTypeScriptTypes(sharedPressSource, { mode: 'transform' }) + ';return SharedPressFeedback;')();
+
 // 直接执行公共窗口管理器；只在调用方替换平台窗口。
 export function nativeDialogHostClass(dependencies = {}) {
   const source = readFileSync(new URL('../../entry/src/main/ets/components/common/NativeDialogHost.ets', import.meta.url), 'utf8')
@@ -43,7 +48,7 @@ export function nativeDialogMembers(source, excluded = []) {
 
 function localeDependencies(dependencies) {
   return {
-    noteLinkBridgeScript, NoteLinksProxy, ...appLocales, ...localeFormatting, SUMMARY_LABEL_KEYS, DialogButtonDirection: { AUTO: 'auto' },
+    SharedPressFeedback, noteLinkBridgeScript, NoteLinksProxy, ...appLocales, ...localeFormatting, SUMMARY_LABEL_KEYS, DialogButtonDirection: { AUTO: 'auto' },
     MenuHoldController, MenuSlideScope, menuSlideSession, keyboardViewportHeight, AgentTaskPlan, KeyboardPressSession, StudyKeyboardSession: KeyboardPressSession,
     NativeDialogHost: nativeDialogHostClass(dependencies),
     Scroller: class { currentOffset() { return {xOffset:0,yOffset:0}; } scrollBy() {} scrollToIndex() {} },

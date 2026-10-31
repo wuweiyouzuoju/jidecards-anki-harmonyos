@@ -42,7 +42,11 @@ export function clickFeedbackExemption(file, target) {
   if (target.kind === 'DialogBackdrop') return 'dismiss-only scrim';
   const handler = target.handler.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '');
   if (/=>\s*\{\s*\}\s*\)$/.test(handler)) return 'event barrier without an action';
-  if (target.kind === 'Column' && /this\.onClose\(\)/.test(handler) &&
+  if (target.kind === 'Column' && /this\.(?:onClose|backgroundClicked)\(/.test(handler) &&
       ['components/common/AnchoredMenu.ets', 'components/browser/浏览侧边栏.ets'].includes(file)) return 'dismiss-only scrim';
+  if (target.kind === 'Stack' && [
+    'components/common/DialogFrame.ets', 'components/common/AnchoredMenu.ets',
+    'components/home/HomeDeckRowMenu.ets', 'components/home/自定义学习对话框.ets'
+  ].includes(file) && /this\.(?:dismiss|backgroundClicked|handleBackRequest)\(/.test(handler)) return 'dismiss-only overlay root';
   return '';
 }

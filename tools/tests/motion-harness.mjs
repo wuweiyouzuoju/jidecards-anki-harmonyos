@@ -6,7 +6,8 @@ import { loadPlatformModule } from './platform-module-harness.mjs';
 export function motionApi(initial = 'restrained') {
   let style = initial;
   const AppStorage = { get: key => key === 'surface_material' ? 'flat' : style };
-  const curves = { springCurve: (...args) => ({ spring: args }) };
+  const curves = { springCurve: (...args) => ({ spring: args }),
+    interpolatingSpring: (...args) => ({ spring: args }), cubicBezierCurve: (...args) => ({ bezier: args }) };
   const Curve = { EaseOut: 'ease-out' };
   const api = loadPlatformModule('utils/AppMotion.ets',
     '({currentMotionProfile, motionAnimation, materialPopupAnimation, disclosureAnimation, navigationEnterOffset})',

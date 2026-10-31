@@ -2,6 +2,7 @@ import { SeriesVisual } from './SeriesVisual';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { ColorMetrics } from '@kit.ArkUI';
 import { GlassSurface } from './GlassSurface';
+import { 应用尺寸 } from './应用尺寸';
 import { darkMaterial } from './GlassMaterial';
 
 /** 四项评分保留红橙绿蓝语义色，不混入当前主题主色；扁平沿用原表面。 */
@@ -9,9 +10,11 @@ export class StudyRatingSurface extends GlassSurface {
   private ratingMaterial: string;
   private semanticFill: ResourceColor;
   private isRating: boolean;
-  constructor(material: string, colors: string[], fill: ResourceColor, isRating: boolean = true) {
+  private actionColor: string;
+  private isDark: boolean;
+  constructor(material: string, colors: string[], fill: ResourceColor, isRating: boolean = true, actionColor: string = '#2F5FD0', isDark: boolean = darkMaterial()) {
     super(material, colors, fill);
-    this.ratingMaterial = material; this.semanticFill = fill; this.isRating = isRating;
+    this.ratingMaterial = material; this.semanticFill = fill; this.isRating = isRating; this.actionColor = actionColor; this.isDark = isDark;
   }
   applyNormalAttribute(instance: CommonAttribute): void {
     super.applyNormalAttribute(instance); this.applyRating(instance, false);
@@ -20,8 +23,13 @@ export class StudyRatingSurface extends GlassSurface {
     super.applyPressedAttribute(instance); this.applyRating(instance, true);
   }
   private applyRating(instance: CommonAttribute, pressed: boolean): void {
-    if (this.ratingMaterial !== 'glass' || !this.isRating) return;
-    const dark: boolean = darkMaterial();
+    if (!this.isRating) {
+      SeriesVisual.primaryAction(this.ratingMaterial, this.isDark, this.actionColor,
+        应用尺寸.圆角_面板).applyNormalAttribute(instance);
+      return;
+    }
+    if (this.ratingMaterial !== 'glass') return;
+    const dark: boolean = this.isDark;
     const color: ColorMetrics = ColorMetrics.resourceColor(this.semanticFill);
     const alpha: number = dark ? 0.8 : 0.62;
     instance.backgroundColor(`rgba(${color.red},${color.green},${color.blue},${alpha})`)

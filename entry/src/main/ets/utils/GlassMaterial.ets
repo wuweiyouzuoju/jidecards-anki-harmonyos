@@ -7,7 +7,7 @@ export function translucentGlassFill(color: ResourceColor): ResourceColor {
   const hex: string = '#' + [resolved.red, resolved.green, resolved.blue].map((value: number): string =>
     value.toString(16).padStart(2, '0')).join('');
   const tinted: ColorMetrics = ColorMetrics.resourceColor(themedGlassFill(hex, darkMaterial()));
-  return `rgba(${tinted.red},${tinted.green},${tinted.blue},${resolved.alpha / 255 * (darkMaterial() ? 0.24 : 0.14)})`;
+  return `rgba(${tinted.red},${tinted.green},${tinted.blue},${resolved.alpha / 255 * (darkMaterial() ? 0.35 : 0.32)})`;
 }
 
 export function usesGlassMaterial(material: string = AppStorage.get<string>('surface_material') ?? 'flat'): boolean {

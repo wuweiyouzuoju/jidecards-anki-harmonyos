@@ -12,8 +12,8 @@ function harness(material,dark) {
   ...api,...theme,PressFeedback,$r:key=>key,translucentGlassFill:color=>color
  });
  const ColorMetrics={resourceColor(color){const rgb=parseInt(color.slice(-6),16);return {red:rgb>>>16,green:(rgb>>>8)&255,blue:rgb&255};}};
- const Rating=loadPlatformModule('utils/StudyRatingSurface.ets','StudyRatingSurface',{...api,GlassSurface,ColorMetrics});
- return {Rating,GlassSurface};
+ const Rating=loadPlatformModule('utils/StudyRatingSurface.ets','StudyRatingSurface',{...api,GlassSurface,ColorMetrics,应用尺寸:{圆角_面板:18}});
+ return {Rating,GlassSurface,api};
 }
 function paint(surface,pressed=false){
  const state={};const node=new Proxy({}, {get:(_,name)=>(...args)=>{state[name]=args[0];return node;}});
@@ -36,11 +36,28 @@ test('four glass ratings preserve separate semantic fills, white edges and stabl
   assert.equal(backgrounds.size,4);
  }
 });
-test('flat ratings and show-answer retain the existing generic material behavior',()=>{
+test('show-answer and start use toolbar material while flat ratings retain semantic behavior',()=>{
  for(const material of ['flat','glass']) for(const dark of [false,true]) {
-  const {Rating,GlassSurface}=harness(material,dark);
+  const {Rating,GlassSurface,api}=harness(material,dark);
   const expected=paint(new GlassSurface(material,[],'#C8E6C9'));
-  assert.deepEqual(paint(new Rating(material,[],'#C8E6C9',false)),expected);
+  const actual=paint(new Rating(material,[],'#C8E6C9',false));
+  delete actual.opacity;delete actual.scale;
+  assert.deepEqual(actual,paint(api.SeriesVisual.primaryAction(material,dark,'#2F5FD0',18)));
   if(material==='flat') assert.deepEqual(paint(new Rating(material,[],'#C8E6C9')),expected);
+ }
+});
+
+test('primary study surfaces repaint from explicit theme inputs without a press or global storage read',()=>{
+ for(const material of ['flat','glass']) for(const dark of [false,true]) {
+  const {Rating,api}=harness(material,dark);
+  api.storage.set('theme_color_action_primary','#FF0000');
+  const backgrounds=[];
+  for(const accent of ['#336699','#AA4477']) {
+   const actual=paint(new Rating(material,[],'#FFFFFF',false,accent,dark));
+   delete actual.opacity;delete actual.scale;
+   assert.deepEqual(actual,paint(api.SeriesVisual.primaryAction(material,dark,accent,18)));
+   backgrounds.push(actual.backgroundColor);
+  }
+  if(material==='glass')assert.notEqual(backgrounds[0],backgrounds[1]);
  }
 });

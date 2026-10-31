@@ -53,7 +53,7 @@ test('menu, panel and button outlines share defaults while explicit state colors
 });
 
 test('the real menu surface applies the shared outline and preserves its custom radius', () => {
-  const PopupSurface=loadPlatformModule('components/common/PopupSurface.ets','PopupSurface',{popupAppearance,SurfaceBorder,Color:{Transparent:'transparent'},BlurStyle:{NONE:'none'}});
+  const PopupSurface=loadPlatformModule('components/common/PopupSurface.ets','PopupSurface',{popupAppearance,SurfaceBorder,AppStorage:{get:()=>undefined},themedGlassFill:fill=>fill,Color:{Transparent:'transparent'},BlurStyle:{NONE:'none'}});
   const MenuSurface=loadPlatformModule('components/common/MenuSurface.ets','MenuSurface',{
     ...materialHarness(), PopupSurface,
     应用尺寸:{卡片边框:1,radiusLg:16},SurfaceBorder,$r:key=>key,Color:{Transparent:'transparent'}
@@ -110,22 +110,26 @@ test('ordinary outlines, form controls and separators use the common border inst
   }
   for (const file of ['components/牌组详情面板.ets', 'components/DeckStudyHistoryCard.ets',
     'components/common/IconActionButton.ets', 'components/common/PopupSurface.ets',
-    'components/common/MenuSurface.ets', 'utils/PrimaryGlassSurface.ets', 'utils/FormInputStyle.ets',
+    'components/common/MenuSurface.ets', 'utils/FormInputStyle.ets',
     'utils/FormTextAreaStyle.ets', 'utils/ImageSurfaceStyle.ets']) {
-    assert.match(read(file), /\.border\(SurfaceBorder\.options\(/, file);
+    assert.match(read(file), /\.border\(SurfaceBorder\.(?:options|materialOptions|contentOptions)\(/, file);
   }
   assert.match(read('components/settings/设置分组卡片.ets'), /SeriesVisual.settingsSurface\(/);
   assert.doesNotMatch(read('components/settings/设置分组卡片.ets'), /backgroundColor\(设置面板色板_取/);
-  assert.match(read('components/common/DialogFrame.ets'), /attributeModifier\(new PopupSurface\(/);
+  assert.match(read('components/common/DialogFrame.ets'), /GlassPanel\(/);
+  assert.match(read('components/common/GlassPanel.ets'), /attributeModifier\(new PopupSurface\(/);
   assert.doesNotMatch(read('components/common/DialogFrame.ets'), /backgroundColor\(\$r\('app.color.surface_card'\)/);
   assert.match(read('components/home/HomeDeckDetails.ets'), /IconActionButton\(\{ toolbarStyle: true/,
     'detail toolbar delegates its homepage outline to the public icon button');
-  assert.match(read('utils/GlassSurface.ets'),/outline: BorderOptions = SurfaceBorder\.options\(\)/);
-  assert.match(read('utils/GlassSurface.ets'),/\.border\(this\.outline\)/);
+  assert.match(read('utils/GlassSurface.ets'),/outline: BorderOptions \| undefined = undefined/);
+  assert.match(read('utils/GlassSurface.ets'),/\.border\(this\.outline \?\?/);
   const deck = read('components/牌组列表项.ets');
   assert.doesNotMatch(deck, /bindPopup\(/, 'deck rows delegate menus to the root shared surface');
-  assert.match(read('components/home/HomeDeckRowMenu.ets'), /DialogFrame\(\{/);
-  assert.match(read('components/common/CardActionMenu.ets'), /\.attributeModifier\(new MenuSurface\(this\.anchor === undefined\)\)/);
-  assert.match(read('components/common/GlassBubblePanel.ets'), /\.stroke\(SurfaceBorder\.color\(\)\)/);
+  assert.match(read('components/home/HomeDeckRowMenu.ets'), /AnchoredMenu\(\{/);
+  assert.match(read('components/common/CardActionMenu.ets'), /AnchoredMenu\(\{/);
+  assert.match(read('components/common/GlassBubblePanel.ets'), /GlassPanel\(\{[\s\S]*contourPath: this.contourCommands\(\)/);
+  assert.match(read('utils/PrimaryGlassSurface.ets'), /SeriesVisual.primaryAction\(/);
+  assert.match(read('utils/SeriesVisual.ets'), /SurfaceBorder.contentOptions\(/);
+  assert.match(deck, /SurfaceBorder.contentOptions\(/);
   assert.match(read('components/home/DeckReparentFeature.ets'),/DialogFrame\(\{/,'hierarchy changes use the shared dialog surface');
 });

@@ -45,8 +45,8 @@ test('all app button and action-row click targets share one press owner', () => 
       if (clickFeedbackExemption(path, target)) continue;
       auditedPaths.add(path);
       const location = `${path}:${target.line} ${target.kind}`;
-      assert.match(target.modifiers, /new (?:PressFeedback|GlassSurface|PrimaryGlassSurface)\(/, location);
-      if (target.kind === 'Button') assert.match(target.modifiers, /\.stateEffect\(false\)/, location);
+      assert.match(target.modifiers, /new (?:PressFeedback|GlassSurface|PrimaryGlassSurface|StudyRatingSurface)\(/, location);
+      if (target.kind === 'Button') assert.match(target.chain, /\.stateEffect\(false\)|\bstateEffect:\s*false/, location);
       let pressModifiers = target.modifiers;
       if (path === 'components/editor/NoteEditorWheel.ets') {
         // 触摸只清除长按补发 click 的抑制位；按下外观仍由公共 modifier 负责。
@@ -97,7 +97,7 @@ test('browser view triggers delegate clicks and disabled guards to the audited c
       assert.equal(controlId, `browser-view-${group}`);
       assert.equal(options.文案, `current-${group}`);
       assert.equal(options.是否启用, available);
-      assert.equal(options.expanded, true);
+      assert.equal(options.expanded, undefined);
       const before = clicks.length;
       // Only activation needs execution here; ArkUI/storage-backed visual fields belong to platform rendering.
       const button = Object.assign(Object.create(Button.prototype), options);

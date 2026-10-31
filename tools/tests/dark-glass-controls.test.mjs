@@ -17,8 +17,8 @@ test('dark standard controls share opacity and outline without disabling their g
  const primary=paint(new Primary('glass',{pressedColors:[]}));
  const toolbar=paint(api.SeriesVisual.control('glass',true,'',18,true));
  assert.deepEqual(ordinary.border,toolbar.border);assert.deepEqual(primary.border,toolbar.border);
- assert.ok(ordinary.backgroundColor.endsWith(',0.24)'));
- assert.equal(ordinary.backgroundColor,primary.backgroundColor);
+ assert.ok(ordinary.backgroundColor.endsWith(',0.35)'));
+ assert.equal(primary.backgroundColor,paint(api.SeriesVisual.primaryAction('glass',true,'#2F5FD0',18)).backgroundColor);
  assert.equal(ordinary.backdropBlur,24);assert.equal(primary.backdropBlur,24);assert.equal(toolbar.backdropBlur,24);
  const explicit={width:2,color:'#FF0000'};
  assert.deepEqual(paint(new Surface('glass',[],'#18202B',explicit)).border,explicit);

@@ -9,7 +9,7 @@ export function materialHarness(material='flat',dark=false) {
  const AppStorage={get:key=>storage.get(key),setOrCreate:(key,value)=>storage.set(key,value)};
  const deps={tintGlassFill,...visual,AppStorage,Color:{Transparent:'transparent'},BlurStyle:{NONE:'none'}};
  const SharedSurface=loadPlatformSource(readFileSync(new URL('../../../记得系列基础/src/harmony/shared/Surface.ets',import.meta.url),'utf8'),'SharedSurface',deps);
- const SurfaceBorder=loadPlatformModule('utils/SurfaceBorder.ets','SurfaceBorder',{应用尺寸:{卡片边框:1},$r:()=>dark?'#77869A':'#CFD7E3'});
+ const SurfaceBorder=loadPlatformModule('utils/SurfaceBorder.ets','SurfaceBorder',{Color:{Transparent:'transparent'},应用尺寸:{卡片边框:1},$r:()=>dark?'#77869A':'#CFD7E3'});
  const SeriesVisual=loadPlatformModule('utils/SeriesVisual.ets','SeriesVisual',{...deps,SharedSurface,SurfaceBorder});
  const api=loadPlatformModule('utils/GlassMaterial.ets','({usesGlassMaterial,darkMaterial})',deps);
  return {...deps,...api,SharedSurface,SeriesVisual,SurfaceBorder,storage};
