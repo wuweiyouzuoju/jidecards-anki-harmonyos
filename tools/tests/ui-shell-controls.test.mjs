@@ -19,12 +19,15 @@ test('primary actions and switches block disabled callbacks without owning busin
   for (const themeColor of ['#733BCD', '#14B8A6']) {
     button.primaryBackground = themeColor;
     assert.equal(button.resolvedTint(), themeColor, 'default primary action follows the current theme');
+    row.actionColor = themeColor; assert.equal(row.resolvedTint(),themeColor,'shared switches immediately follow the current theme');
   }
   button.tint = '#C2410C';
   button.primaryBackground = '#733BCD';
   assert.equal(button.resolvedTint(), '#C2410C', 'explicit action color remains owned by the host');
   button.tint = undefined;
   assert.equal(button.resolvedTint(), '#733BCD', 'removing the override restores the current theme');
+  row.tint = '#C2410C'; assert.equal(row.resolvedTint(),'#C2410C');
+  row.tint = undefined; assert.equal(row.resolvedTint(),'#14B8A6');
   let actions = 0; const changes = [];
   button.onAction = () => actions++;
   row.onChange = value => changes.push(value);
@@ -258,7 +261,7 @@ test('settings switches share geometry; help, hint and host failure states remai
   assert.match(row, /this.hint === '' \? 0 : 应用尺寸.间距_12/g);
   assert.match(row, /if \(this.hint !== ''\)/);
   assert.match(row, /HelpLabel\(\{[\s\S]*?isHelpEnabled: this.isHelpEnabled, onHelp: this.onHelp/);
-  assert.doesNotMatch(row.replace(/@StorageProp\('系统语言'\)[^;]*;/, ''), /@State|@Storage|margin\(|offset\(/);
+  assert.doesNotMatch(row.replace(/@StorageProp\('系统语言'\)[^;]*;/, '').replace(/@StorageProp\(颜色键\.动作主色\)[^;]*;/, ''), /@State|@Storage|margin\(|offset\(/);
   const scheduler = read('components/settings/调度器分组.ets');
   assert.match(scheduler, /if \(this.是否启用FSRS === null\)[\s\S]*settings_fsrs_loading[\s\S]*else \{\s*SettingsToggleRow/);
   assert.match(read('components/settings/外观分组.ets'), /ThemeMotionControl\(\{ isDark: this.是否深色 \}\)/);

@@ -1,3 +1,4 @@
+import { 颜色键 } from '../../model/颜色主题';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { HelpLabel } from './HelpLabel';
@@ -7,6 +8,7 @@ import { localizedResourceText } from '../../utils/UiFeedback';
 /** 标题和说明共享剩余宽度，开关保留独立槽位；长说明自然换行，不挤入开关。 */
 @Component
 export struct SettingsToggleRow {
+  @StorageProp(颜色键.动作主色) private actionColor: string = '#2F5FD0';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop title: ResourceStr = '';
   @Prop icon: ResourceStr | undefined = undefined;
@@ -16,11 +18,13 @@ export struct SettingsToggleRow {
   @Prop isDark: boolean = false;
   @Prop textColor: ResourceColor = $r('app.color.text_primary');
   @Prop hintColor: ResourceColor = $r('app.color.text_secondary');
-  @Prop tint: ResourceColor = $r('app.color.text_primary');
+  @Prop tint: ResourceColor | undefined = undefined;
   @Prop showHelp: boolean = false;
   @Prop isHelpEnabled: boolean = true;
   onHelp: () => void = (): void => {};
   onChange: (value: boolean) => void = (_value: boolean): void => {};
+
+  private resolvedTint(): ResourceColor { return this.tint ?? this.actionColor; }
 
   private change(value: boolean): void {
     if (this.isInteractive) this.onChange(value);
@@ -55,7 +59,7 @@ export struct SettingsToggleRow {
         .width(40)
         .height(24)
         .flexShrink(0)
-        .selectedColor(this.tint)
+        .selectedColor(this.resolvedTint())
         .enabled(this.isInteractive)
         .accessibilityText(typeof this.title === 'string' ? this.title : localizedResourceText(this.getUIContext(), this.uiLanguage, this.title))
         .onChange((value: boolean): void => { this.change(value); })
