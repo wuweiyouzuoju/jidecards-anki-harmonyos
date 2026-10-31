@@ -479,3 +479,5 @@ JIDE 目标澄清的“选择”、目标弹窗的“新建笔记类型”、主
 回归见 `ai-agent-maintenance.test.mjs`：无写入提案、空串/false、两次确认、过期类型、影响变化、重复执行、失败回读、中英文差异和失败重试范围。真实 Core 往返用 `native/rsharmony/tests/notetype_text_export.rs` 验证配置、身份、未知属性及卡片调度；本轮主机执行结果见 [实施验收](../decisions/2026-10-04-ankicore-ui-routing.md#实施验收)。
 
 回归：`ai-agent-fsrs-tools.test.mjs`、`deck-options-fsrs.test.mjs`、`deck-options-fsrs-protocol.test.mjs`、`ai-agent-app-structure.test.mjs`；真实 Core 见 `native/rsharmony/tests/fsrs.rs`，设备验收独立记录。
+
+牌组详情快捷入口与实时认知：名称直达真实deck_rename，计数按DeckDetailShortcut共同声明进入牌组浏览或自定义学习。详情控件观察携带实际opens，AgentAppStructure优先采用观察值，因此筛选牌组的新卡/复习计数呈现browser；普通牌组呈现custom_study。自定义学习发布真实deckId、preset、value和忙碌/确认/取消状态，初始预设由入口传入且不自动提交。名称、提示和可用性同步不授予任意点击/写入能力，真实修改仍使用原有受确认领域命令。

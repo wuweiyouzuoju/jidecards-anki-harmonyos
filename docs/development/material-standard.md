@@ -1,49 +1,37 @@
 # 原生表面、轮廓与分隔线规范
 
-这是当前材质规则的唯一规范入口。[主题与原生界面](appearance.md)负责主题、布局与其他组件规则，其中按版本记录的材质参数只作历史验收记录；新增或调整材质以本页和以下代码为准。
+这是当前材质规则的唯一规范入口。交互和关闭契约见[弹窗玻璃接入](dialog-glass.md)，[历史材质记录](material-standard-history-2026-10-31.md)只保留过程证据。
 
 ## 规则与实现入口
 
 | 职责 | 唯一入口 | 当前规则 |
 | --- | --- | --- |
-| 材质偏好 | `model/SurfaceMaterial.ts`、`utils/SurfaceMaterialStore.ets` | 默认扁平，玻璃为可选外观；保存失败不广播 |
-| 外轮廓 | `utils/SurfaceBorder.ets` 的 `materialOptions` | 玻璃浅色1vp/#506B7C96，深色0.8vp/#22FFFFFF；搜索、模块、工具按钮、菜单与对话框为同一等级。扁平使用资源轮廓；浅色内容卡片保留原#E5E5E5 |
-| 页面模块 | `utils/SeriesVisual.ets` | 普通玻璃浅色65%、深色68%底层，普通模块比按钮更实；无大面积斜向反光；浅色仅低强度阴影，深色无阴影 |
-| 嵌套模块 | `SeriesVisual.insetSurface` | 玻璃只画轮廓，不再叠底色、高光或阴影；扁平恢复实底 |
-| 主题染色 | `model/GlassTheme.ts` | alpha不变，浅/深色混入当前主题主色10%/12%；灰色仍中性；幻彩纹理由原背景拥有 |
-| 搜索框 | `utils/SearchFieldSurface.ets`、`common/LiveSearchField.ets` | 背景浅40%/深50%，边框委托materialOptions；不得独立用白色边框削弱轮廓；TextInput宿主不再重复设置背景/边框/圆角，避免输入刷新时静态白底覆盖modifier |
-| 弹层 | `common/GlassPanel.ets`、`PopupSurface.ets`、`PopupAppearance.ts` | 保留本体有限透明与原有弱反光；采样、准备等待与动画仍由GlassPanel拥有，不借模块样式绕过生命周期 |
-| 列表分隔线 | `SurfaceBorder.separatorWidth`、资源surface_border | 1vp，布局高度同为1vp，flexShrink(0)；每个ForEach条目只有一个布局根，线与该条目同属根；只在相邻条目之间绘制 |
-| 编辑框操作行 | `common/NoteFieldEditor.ets` | 输入视口完整112/336vp；放大按钮行在输入框边界外，不叠加到正文，不绘制独立白底 |
-
-边框必须先设置，再恢复最终圆角。不得对整个模块降低opacity；文字和图标保留完整不透明度。语义色（选中、错误、评分、旗标）仍由原领域拥有。扁平不添加玻璃反光、模糊或阴影；材质不改变主题、动态背景或幻彩权限。
+| 材质偏好 | SurfaceMaterial / SurfaceMaterialStore | 默认扁平，玻璃为可选外观；保存失败不广播 |
+| 页面模块 | SeriesVisual.ProductSurface | 中性底色不染主题；玻璃浅32%白、深35%炭灰；扁平浅白/深#1C1C1E；浅色无边框，深色模块统一公共轮廓；浅色轻阴影，深色无阴影 |
+| 嵌套模块 | SeriesVisual.insetSurface | 不重复绘制轮廓、高光或阴影；玻璃底色透明，扁平恢复实底 |
+| 深色轮廓 | SurfaceBorder.materialOptions / contentOptions | 玻璃0.8vp/#22FFFFFF；扁平使用surface_border资源。牌组列表、牌组标题、计数、历史、设置模块共用contentOptions；排序状态保留原主题强调边。切回浅色或内嵌状态显式清除旧轮廓 |
+| 设置开关 | SettingsToggleRow | 未指定tint时跟随响应式动作主色；显式tint可覆盖，不能默认使用文字色代替主题色 |
+| 操作按钮 | SeriesVisual.control / primaryAction | 浅色玻璃柔白0.9vp边；深色玻璃公共轮廓；动作文字保持不透明，不改变禁用守卫 |
+| 开始学习、显示答案 | StudyRatingSurface非评分分支、PrimaryGlassSurface | 同一SeriesVisual.primaryAction；显式传主题主色与明暗，不能在modifier内部临时读AppStorage等到按压才刷新 |
+| 四档评分 | StudyRatingSurface评分分支 | 保留红橙绿蓝语义色与独立评分边，不跟随主题色改变语义 |
+| 搜索框 | SearchFieldSurface / LiveSearchField | 保留原轮廓和透明度；TextInput不重复设置背景、边框与圆角 |
+| 弹层 | GlassPanel / AnchoredMenu / PopupSurface / SharedGlassFusion | 深色也使用同一0.8vp/#22FFFFFF描边；融合层沿真实边界线段描边，产品传入公共参数；浅色关闭该附加线；材质不改变业务布局 |
+| 分隔线 | SurfaceBorder.separatorWidth | 固定1vp、flexShrink(0)，每条记录只拥有一条相邻分隔线 |
 
 ## 接入和检查
 
-新页面复用上表入口，禁止复制轮廓颜色、临时白底或另一份透明度。UI宿主显式订阅材质、明暗和主题主色并传入modifier，确保打开界面时切换主题也会更新。Web卡片、媒体预览和编辑正文的内容背景不视为普通模块。
+主题色、明暗和材质必须由UI宿主显式订阅并传入modifier；不能只改变文字颜色、让背景保留上次构造的参数。开始学习与横排显示答案共享52vp高度、18vp圆角和主操作表面；浮动显示答案使用同一主操作映射。深色轮廓由公共表面拥有，禁止在单个标题或页面临时叠加另一条线。
 
-聚焦验证：`surface-material.test.mjs`覆盖材质切换、主题染色、搜索与模块边框一致性；`ui-surface-border.test.mjs`覆盖轮廓顺序；设置目录在手机/宽屏、浅/深色、扁平/玻璃及大字体下检查相邻分隔线。修改组件后构建增量HAP。测试和构建通过不能替代实际截图观感检查。
+修改材质运行surface-material、study-rating-glass、dark-glass-controls；可机械识别的轮廓检查见ui-surface-border。新增组件或平台参数后补增量HAP。测试、构建与设备观察分别报告，不把它们相互替代。
 
 ## 玻璃采样边界
 
-GlassSource只采正文，GlassPanel应作为采样源外的兄弟节点。若业务组件必须内嵌弹层（首页牌组详情预览菜单、浏览页内嵌编辑器），对应GlassSource必须传freezeDuringPanels=true。GlassPanel按源引用计数，首个弹层出现即停采，沿用打开前的帧，最后一个关闭才恢复；其他源不受影响。基础库对异步截图及模糊完成均再次检查许可，拒绝迟到的递归帧。不得用更浅填色或缩短动画掩盖采样反馈。回归入口shared-glass-integration.test.mjs。
+GlassSource只采正文；嵌套业务弹层的源使用freezeDuringPanels。首个弹层冻结原帧，最后一个关闭恢复；异步迟到帧仍检查许可。真实背景在根级唯一拥有，不能复制彩雾动画填充弹窗。采样和光学归系列基础HAR，产品不复制实现。
 
 ## 锚点菜单定位
 
-AnchoredMenu的contentLeft/contentMaxWidth描述可定位区域，不能把该区域缩为menuWidth后继续套alignEnd。左触发（首页更多）对齐区域左缘；右触发（新建、详情预览、JIDE更多）对齐区域右缘。anchorRight是窗口坐标的独立精确右缘入口；行上下文菜单传完整最终面板区域，不再偏移。图文居中只影响条目，不改变弹窗所在侧。手机与宽屏分别检查左/右触发，不能只验宽屏。
-
-普通枚举选择弹窗按内容自然增高，不设置320vp固定上限或屏幕比例上限。SelectionMenuLayout只扣窗口安全区及32vp边距作为最后安全上限，原生Popup负责上下避让；长列表超出可用屏幕时才滚动，8个颜色主题包括末项幻彩不应因人为高度阈值被隐藏。
-
-详情开始学习按钮与显示答案使用相同52vp高度、18vp圆角、16fp中等字体和左右4vp内边距，宿主操作区共用应用尺寸的上下安全间距。开始学习保留独立可用性守卫，表面走SeriesVisual.control，边框与上方模块同源；不使用26vp胶囊轮廓。
-
-四项评分玻璃单独由StudyRatingSurface绘制：忘记/困难/良好/简单保留红橙绿蓝语义底色和文字，浅色62%/深色80%色层，1vp柔白边缘，无方向性高光，浅色轻阴影。底部横排与浮动竖排共用；两行文字仍显示Core提供的间隔，点击、禁用与评分回调不变。它是语义轮廓例外，不能被全局主题染色替代；扁平及显示答案保持原材质。
+由AnchoredMenu拥有按钮锚点、宿主坐标、安全区、限高和融合。居中选择框保持居中；玻璃模式不能改变扁平模式布局。具体入口、关闭流程与当前验收见[弹窗玻璃接入](dialog-glass.md)。
 
 ## 深浅色玻璃机制
 
-浅色、显式深色及跟随系统深色均接通既有GlassPanel→GlassBackdrop→系列SharedGlassBackdrop的采样、模糊和折射实现。背后文字形成光学变化属于材质表现，不能据此关闭整条路径。只对递归采入自身、失效源或明确的采样错误做边界修复；同类视觉统一调整参数与轮廓，不降级为透明色块。牌组行最终边框共用materialOptions，重排态保留强调边框。
-
-深色普通按钮与工具栏按钮共用24%透光底层和0.8vp/#22FFFFFF轮廓，GlassSurface默认轮廓委托materialOptions。显式选中/错误轮廓仍由调用方提供。保留现有24vp模糊及弱高光，GlassPanel采样/折射不做深色关闭。内容模块仍68%，不能为视觉统一取消按钮与内容层级。浅色按钮保留原14%底层。
-
-2026-10-30深色宽屏现场验收：SettingsWide（2584×1828）已安装重启；截图检查首页摘要/牌组行/右侧详情、工具按钮、设置模块和搜索，以及更多、新建、外观主题选择、详情预览菜单。确认菜单仍有背景采样光斑、模糊和折射，位置分别跟随左/右触发；未关闭光学实现。统一普通按钮24%底层及公共细边框；选中牌组保留强调底色。未在本轮逐页验收所有业务弹窗和评分页面，不以公共组件通过代替全覆盖声明。构建与41项聚焦回归通过。
-
-玻璃加载不再设置250ms/1200ms材质切换期限。GlassPanel等真实纹理绘制就绪后才展开，加载提示由DialogFrame既有入口显示；关闭后忽略迟到通知。不能以超时完成准备、清掉纹理或切换成另一种底色。同组主菜单和子面板适用同一规则。
+明暗使用相同采样和折射；差异为色层、轮廓和阴影。内容浅色无边框，深色统一轻轮廓；内嵌模块不重复叠加。系统减少动态效果只改变动画，不改变提交或取消语义。

@@ -216,7 +216,7 @@ UI 和 JIDE 共用 `browserToolbarItems`，实际观察发布当前模式、状�
 
 字号与标题外圈保持当前输入焦点及键盘状态：打开、切换、再次点击收起和选择选项均不主动请求输入框焦点；打开时取消尚未执行的旧焦点恢复，避免键盘弹起后的原生选区通知立即关闭外圈。源码选项应用也不走普通内容工具的焦点恢复；其他内容工具继续按原策略恢复输入。浮层原生根布局保留 `HitTestMode.Transparent`，半圆操作区、把手及外圈选项分别使用 `HitTestMode.BLOCK_HIERARCHY`，使外围空白可操作、命中工具的触摸不再传到页面下方同坐标控件；仅设置 `focusOnTouch(false)` 无法阻止下方按钮获焦并关闭软键盘。`NOTE_FIELD_EDITING_SUPPORT.formatOptionPicker` 同时声明这两个入口与焦点契约，UI 路由和 JIDE 结构共用；`note-rich-editor` 直接回归覆盖可视/源码、有/无焦点、待执行焦点任务、重复切换及首次帮助返回。此回归不模拟系统失焦与软键盘事件时序，设备交互仍需单独验收。2026-10-10 已在模拟器覆盖安装签名 HAP，使用空白动态公式卡验证可视与源码模式反复打开/收起字号、可视字号应用、标题切换及手动收起键盘后打开外圈；原生 UI 树确认原输入焦点和键盘窗口按预期保持、下方按钮未获焦，且外围“可视编辑/源码编辑”仍能切换。未覆盖实体手机或握姿传感器。
 
-2026-10-06 字段文字工具完整替换为屏幕边缘的半圆菜单。公共 `NoteFieldEditor` 继续拥有 HTML、选区与动作；表单挂载即用 OverlayManager 默认展开 `components/editor/NoteEditorWheel.ets`，新增、已有笔记、音频相邻文本与 Agent 草稿共用。添加、编辑和 Agent 页面通过 Provide/Consume 持有各自 `NoteEditorWheelSession`，默认首个可编辑字段，焦点切换转交唯一浮层；失焦或收起键盘不隐藏，页面 onHidden 暂停、onShown 恢复，无模块级可变 UI 状态。长字段展开仍只调整112vp / 336vp高度，不改草稿、格式或选区；上下标、列表、链接、清除格式直接在圆弧中选择，无“更多格式”二级工具栏。
+2026-10-06 字段文字工具完整替换为屏幕边缘的半圆菜单。公共 `NoteFieldEditor` 继续拥有 HTML、选区与动作；表单挂载即用 OverlayManager 默认展开 `components/editor/NoteEditorWheel.ets`，新增、已有笔记、音频相邻文本与 Agent 草稿共用。添加、编辑和 Agent 页面通过 Provide/Consume 持有各自 `NoteEditorWheelSession`，默认首个可编辑字段，焦点切换转交唯一浮层；失焦或收起键盘不隐藏，页面 onHidden 暂停、onShown 恢复，无模块级可变 UI 状态。长字段展开使用当前字段的独立大弹窗，详见下方当前展开规则；上下标、列表、链接、清除格式直接在圆弧中选择，无“更多格式”二级工具栏。
 
 可视编辑的加粗、斜体、下划线、荧光、字号和普通文字清除格式统一经 `applySelectionStyle` 更新，再用 SDK `setSelection` 保留原 UTF-16 选区；隐藏系统选择菜单，不把选区收成末尾光标。样式更新期间忽略临时选区通知并只发布最终草稿，用户可连续调整同一段文字或再次点击荧光去掉底色，持续输入格式不变。用户重新点光标后按新位置处理，禁用/离页后不恢复旧选区。换行、公式、挖空、上下标、列表、网址链接及正文卡片引用仍有各自的内容/选区策略，不强行套用纯样式更新。新增与编辑表单的 `AppInterface.instructionsKey` 复用工具按钮的 `note_editor_format_action` 资源，JIDE 读取同一份操作说明。回归：`note-rich-editor` 的连续操作、代理对、临时回调与销毁保护；原生选择高亮、手柄和键盘仍需设备验收。
 
@@ -455,3 +455,9 @@ NOTE_FIELD_STICKY_CONTROL向UI与JIDE提供名称、两态图标及位置，add_
 草稿与模板预览的弹窗及全屏入口统一使用 ic_card_flip 翻转卡片图标，随当前面保留对应正/背面无障碍标签；重播音频使用 ic_audio_replay 图标。点击仍由原 toggleSide/playAudio 处理。
 
 浏览筛选侧面板玻璃接入：浏览侧边栏以GlassPanel承载原80%宽、全高内容，明确panelHeight使滚动区有界；普通弹窗仍按固有高度测量。玻璃层和正文复用公共准备/250ms锁定降级与弹出动效，原遮罩只淡入淡出；分组在玻璃档透明以透出同一采样，扁平档保留原卡片底色。牌组、标签、已保存搜索的树、加载/错误/折叠、关闭和选择回调保持。
+
+## 当前字段展开规则
+
+NoteFieldEditor 的展开入口打开 NoteFieldExpandedDialog，只承载当前字段；页内输入先卸载并保留112vp占位，其他字段保持原布局。弹窗复用同一字段值、模式、RichEditor/TextArea控制器和更新回调，关闭、遮罩与返回保留实时草稿，不提交整张笔记。输入节点就绪后恢复焦点；离页、禁用或进入后台关闭弹窗并拒绝迟到打开。DialogFrame独占安全区、键盘避让、16vp内边距和12vp标题间隔，正文填满剩余高度，输入框取工具行之外的可用空间；最大宽960vp，窄屏沿用公共弹窗宽度。NoteFieldEditing.expandPresentation与AppInterface的input_expansion_presentation同步向JIDE说明交互，input_expanded仍发布真实状态。回归note-rich-editor覆盖单窗口、共享草稿、关闭保留与迟到打开；真实输入法、富文本切换和键盘避让需设备验收。
+
+浏览搜索栏右侧的主题色多选计数由 `BrowserSelectionAccessory` 展示，直接读取页面拥有的选中 ID 数量，显示完整数字，不在 99 处封顶。徽标保留92vp最小宽度并随位数增长，搜索框消费剩余空间；读屏及 JIDE 的 `selected_count` 同样使用完整计数。回归：`browser-selection-accessory.test.mjs`。

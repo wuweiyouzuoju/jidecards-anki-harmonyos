@@ -9,6 +9,9 @@
 
 ## 当前文档
 
+- [弹窗玻璃与关闭契约](development/dialog-glass.md)：居中框、按钮菜单、公共责任、用户验证与待复验项。
+- [原生表面规范](development/material-standard.md)：当前材质、深色描边及主题实时刷新规则。
+
 - [电脑与鸿蒙的笔记引用](development/note-links.md)：共享协议、旧插件迁移、原生界面和可复现验证。
 
 - [Agent 任务入口](../PROJECT_CONTEXT.md)：按任务读取模块约束与验证入口。

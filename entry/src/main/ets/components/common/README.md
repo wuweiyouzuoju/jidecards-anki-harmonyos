@@ -18,7 +18,7 @@
 
 界面动效参数共用 [MotionStyle.ts](../../model/MotionStyle.ts) / [AppMotion.ets](../../utils/AppMotion.ets)：菜单表面、弹窗、箭头和 PressFeedback 消费克制/灵动档位；按压由属性修改器即时反馈，不在 modifier 内调用不受支持的 animation。设置保存与 JIDE 接线、导航和卡片内容边界见[界面动效](../../../../../../docs/development/appearance.md#视觉与交互一致性)。
 
-页面栈、设置分组及手机牌组详情的前进/返回共用 [SurfaceTransition.ets](../../utils/SurfaceTransition.ets)；覆盖预览只淡入淡出，常驻宽屏侧栏选项变化不当作导航。普通弹窗与蒙层也由此入口合成，宿主不另包转场；CustomDialogController 使用公共动画参数并每次打开时取当前档位，内部 DialogFrame 传 nativeHost=true 禁用重复效果，由平台拥有窗口几何。详情见上述规范，检查入口为 `motion-style-surfaces.test.mjs`。
+页面栈、设置分组及手机牌组详情的前进/返回共用 [SurfaceTransition.ets](../../utils/SurfaceTransition.ets)；覆盖预览只淡入淡出，常驻宽屏侧栏选项变化不当作导航。普通弹窗与蒙层也由此入口合成，宿主不另包转场；玻璃进入由GlassPanel在纹理就绪后驱动，菜单按锚点展开、居中弹窗轻聚合、筛选侧栏按侧边进入。CustomDialogController每次打开时取当前参数，原生窗口进入为0、关闭由平台管理；DialogFrame传nativeHost=true避免重复蒙层转场。详情见上述规范，检查入口为 `motion-style-surfaces.test.mjs`。
 
 导入结果类别复用 `DataActionRow` → [SettingsActionRow.ets](SettingsActionRow.ets)。`showDisclosure=false` 可隐藏没有目标的尾部箭头；`isInteractive` 仍独占点击与禁用守卫，不能用箭头显隐代替操作校验。新增音频设置复用 `SettingsToggleRow`，筛选牌组维护沿用现有详情按钮与 `GlassSurface`、列表的公共菜单行。
 
@@ -81,7 +81,7 @@
 | 菜单承接层与定位 | [AnchoredMenu.ets](AnchoredMenu.ets)，通过 [MenuSurface.ets](MenuSurface.ets) 与 `menu_surface` 明暗资源统一扁平底色和圆角，普通菜单及带尖角菜单均不绘制阴影；边框委托 SurfaceBorder，深色弹窗与卡片底色区分。首页、学习页、牌组预览、牌组长按/色条菜单及浏览多选共用；宿主传入最终窗口锚点，公共 Scroll 按实际可用高度限高，超长内容自动滚动。首页更多/新建直接复用无尖角 AnchoredMenu：`contentLeft`/`contentMaxWidth` 传入已包含安全区和页面间距的实测窗口边界，避免横向重复间距；可传 `cornerRadius` 与统计卡统一，其他宿主保留原默认值。原生手写 Popup 同样使用 `menu_surface`，显式传 `MenuSurface.popupShadow()` 与 `backgroundBlurStyle: BlurStyle.NONE` 关闭系统投影和磨砂；预览范围弹窗关闭箭头 | `ui-select-layout.test.mjs`、`browser-batch-menu.test.mjs`、`ui-surface-border.test.mjs`；设备验收实际外观、短屏和大字体滚动 |
 | 菜单树与左侧布局 | [ActionMenuTree.ts](ActionMenuTree.ts) 按稳定 ID 展开可见行，传播父级禁用状态，收起分组同时清除后代展开状态；[ActionMenuLayout.ts](ActionMenuLayout.ts) 根据实测行高计算触发行中心与左侧面板避让，右侧行距不变。[MenuBubble.ets](MenuBubble.ets) 与 AnchoredMenu 的主菜单轮廓复用 [GlassBubblePanel.ets](GlassBubblePanel.ets)：上下/左右尖角和圆角同属连续路径，坐标按当前密度转换为 px，仅绘制底色与公共描边，不叠加模糊投影。主菜单轮廓在 Scroll 外，使用实测可见高度，正文滚动不移动尖角 | `study-menu.test.mjs` 执行树、收起、禁用、延迟点击、避让和密度回归；`motion-style-contract.test.mjs` 验证动画 |
 | 原生容器、表单与分隔线轮廓 | [SurfaceBorder.ets](../../utils/SurfaceBorder.ets)：`options()` 共用1vp线宽和 `surface_border` 明暗资源；菜单、统计/摘要卡片、详情外框、设置分组、输入框、下拉框、字段卡片、普通弹窗及 GlassSurface / PrimaryGlassSurface 按钮使用同一入口，分隔线共用 `color()` 并保留原线宽。只设置线宽/颜色，保留调用方底色、圆角和按压反馈；选中/排序状态可传原状态色，浏览旗标通过每边宽度/颜色保留左侧色条和其余中性轮廓。ImageSurfaceStyle 复用参数但保留适合图片灰底的 border_image；卡面内填空保留既有语义 | `ui-surface-border.test.mjs` 执行公共参数、深色轮廓对比度与全仓旧轮廓散写扫描；表单/下拉框和按压行为分别由 `ui-shell-controls.test.mjs`、`ui-select-layout.test.mjs`、`theme-text.test.mjs` 验证 |
-| 学习/预览/浏览动作菜单 | [CardActionMenu.ets](CardActionMenu.ets) 使用紧凑主菜单加侧面板。学习打开菜单时自动同时展开标记与卡片操作两个侧边子菜单，浏览多选保留自动展开的标记侧面板；不把子菜单内容并入主菜单。浏览普通菜单的设置分组仍按需打开侧面板，预览使用无分组平面菜单。宿主拥有 `expandedIds`、`onToggleBranch` 和业务动作，可由 `onSelect` 按稳定 ID 分发，因此条目 `action` 可选；组件拥有实测行高、尖角锚点和滚动。默认对齐工具栏；上下文菜单传宿主局部 `anchor` 行矩形，由 [ActionMenuLayout.ts](ActionMenuLayout.ts) 对齐行中心、上下避让并限制整组边界；尖角朝向所选行边框，短屏按较大一侧限高，左侧不足时子面板向右展开。不能复用工具栏默认位置。牌组长按由 `HomeDeckRowMenu` 组合公共 DialogFrame / DialogHeader 与 AnchoredMenuItem 显示居中弹窗，几何和操作范围见[首页](../../../../../../docs/development/home.md#牌组上下文操作与-ankidroid-的对齐范围2026-10-15)。侧面板根分组默认互斥，学习通过 `toggleActionMenuBranch(..., false)` 独立切换并保留其他已展开分组；旗标复用 [FlagMenuChoices.ets](FlagMenuChoices.ets)，点击后朝主菜单方向覆盖，只显示原有颜色与清除选项，两个侧面板保持原内容、位置和展开状态。覆盖层尖角朝向实际触发行，并按实测行高对齐；覆盖层高度独立记录，不污染源行测量。`visibleActionMenuRows` 拒绝被覆盖主菜单行的迟到点击，宿主移除主菜单观察，保留侧面板并只发布实际颜色与清除选项。普通浏览菜单使用同一组件承载搜索、显示和其他设置分组，可传条目 `divider`，副标题通过 `selected` 复用公共选中底色；预览保留平面菜单。整组共用 AnchoredMenu 的外部点击、安全区与限高滚动 | `study-menu.test.mjs`、`study-menu-actions.test.mjs`、`home-deck-menu.test.mjs`、`browser-batch-menu.test.mjs`、`browser-more-menu.test.mjs`、`ai-agent-app-structure.test.mjs`；禁止回退原生 bindMenu |
+| 学习/预览/浏览动作菜单 | [CardActionMenu.ets](CardActionMenu.ets) 使用紧凑主菜单加侧面板。学习打开菜单时自动同时展开标记与卡片操作两个侧边子菜单，浏览多选保留自动展开的标记侧面板；不把子菜单内容并入主菜单。浏览普通菜单的设置分组仍按需打开侧面板，预览使用无分组平面菜单。宿主拥有 `expandedIds`、`onToggleBranch` 和业务动作，可由 `onSelect` 按稳定 ID 分发，因此条目 `action` 可选；组件拥有实测行高、尖角锚点和滚动。默认对齐工具栏；上下文菜单传宿主局部 `anchor` 行矩形，由 [ActionMenuLayout.ts](ActionMenuLayout.ts) 对齐行中心、上下避让并限制整组边界；尖角朝向所选行边框，短屏按较大一侧限高，左侧不足时子面板向右展开。不能复用工具栏默认位置。牌组长按由 `HomeDeckRowMenu` 组合公共 DialogFrame / DialogHeader 与 AnchoredMenuItem 显示居中弹窗，几何和操作范围见[首页](../../../../../../docs/development/home.md#牌组上下文操作与-ankidroid-的对齐范围2026-10-15)。侧面板根分组默认互斥，学习通过 `toggleActionMenuBranch(..., false)` 独立切换并保留其他已展开分组；旗标复用 [FlagMenuChoices.ets](FlagMenuChoices.ets)，点击后朝主菜单方向覆盖，只显示原有颜色与清除选项，两个侧面板保持原内容、位置和展开状态。覆盖层尖角朝向实际触发行，并按实测行高对齐；覆盖层高度独立记录，不污染源行测量。`visibleActionMenuRows` 拒绝被覆盖主菜单行的迟到点击，宿主移除主菜单观察，保留侧面板并只发布实际颜色与清除选项。普通浏览菜单使用同一组件承载搜索、显示和其他设置分组，可传条目 `divider`，副标题通过 `selected` 复用公共选中底色；预览保留平面菜单。整组共用 AnchoredMenu 的外部点击与安全区；首次打开即预留完整分支定位宽度，主列、侧列固定槽位，各面板独立限高滚动，并列侧菜单共享高度预算，滚动偏移参与下一级锚点。根因及设备证据见[稳定菜单定位决策](../../../../../../docs/decisions/2026-10-31-stable-cascade-menu-geometry.md) | `study-menu.test.mjs`、`study-menu-actions.test.mjs`、`home-deck-menu.test.mjs`、`browser-batch-menu.test.mjs`、`browser-more-menu.test.mjs`、`ai-agent-app-structure.test.mjs`；禁止回退原生 bindMenu |
 | 笔记音频字段 | [NoteAudioField.ets](NoteAudioField.ets)；标准 sound 引用试听/删除，管理弹层复用 AudioViewPicker 和短录音；宿主拥有草稿和唯一试听队列 | `note-audio.test.mjs`；见 [音频编辑](../../../../../../docs/development/browser-stats.md#笔记音频编辑2026-10-01) |
 | 学习/预览内容宽度 | [CardViewport.ets](CardViewport.ets) | `card-viewport-layout.test.mjs` |
 | 笔记草稿独立预览 / 类型模板样例 | [NoteDraftPreview.ets](NoteDraftPreview.ets) 持有同一 Core 会话，组合 [NotetypeTemplatePreview.ets](../settings/NotetypeTemplatePreview.ets)；新增/编辑通过导航页使用全屏外壳，类型样例保留弹窗 | `note-draft-preview.test.mjs`、`note-draft-preview-media.test.mjs`；[责任和间距](../../../../../../docs/development/browser-stats.md#未保存笔记草稿预览2026-10-02) |
@@ -94,7 +94,7 @@
 | 普通弹窗外壳 | [DialogFrame.ets](DialogFrame.ets)：固定操作栏、限宽卡片，默认正文按内容收缩并限高滚动；卡片预览显式 `fillBody=true` 使用剩余高度并自己管理正文滚动；业务组件拥有草稿与忙碌状态 | `ui-dialog-layout.test.mjs`；插槽用箭头函数调用所属组件的 Builder，保留状态所有者 |
 | 原生弹窗窗口 | [NativeDialogHost.ets](NativeDialogHost.ets)：统一全窗口配置、当前动效、替换/关闭/销毁和旧关闭回调隔离；原生构建器保留为组件字段工厂 | `native-dialog-host.test.mjs`、`motion-style-surfaces.test.mjs`、真实同步编译产物检查；布局和系统事件另做设备验收 |
 | 磨砂弹窗遮罩 | [DialogBackdrop.ets](DialogBackdrop.ets)：订阅应用主题与系统深浅色、覆盖安全区；关闭策略由调用方决定 | `ui-dialog-layout.test.mjs` 全入口扫描；不要逐窗复制磨砂配置或依赖漏传的主题属性 |
-| 设置与表单开关行 | [SettingsToggleRow.ets](SettingsToggleRow.ets)：可选说明与 HelpLabel，标题/说明共享剩余宽度，右侧开关不压缩，间隔16vp；确认值、持久化和错误归宿主 | `ui-shell-controls.test.mjs` 执行禁用回调、扫描设置开关及公共几何；`npm test -- sync`、`study-haptics.test.mjs`、`fsrs-state.test.mjs` 验证业务；HAP/设备验证换行与主题 |
+| 设置与表单开关行 | [SettingsToggleRow.ets](SettingsToggleRow.ets)：可选说明与 HelpLabel，标题/说明共享剩余宽度，右侧开关不压缩，间隔16vp；未指定tint时响应式跟随当前主题主色，显式tint保留语义覆盖；确认值、持久化和错误归宿主 | `ui-shell-controls.test.mjs` 执行禁用回调、扫描设置开关及公共几何；`npm test -- sync`、`study-haptics.test.mjs`、`fsrs-state.test.mjs` 验证业务；HAP/设备验证换行与主题 |
 
 笔记图片预览与遮罩画布共用 [ImageSurfaceStyle.ets](../../utils/ImageSurfaceStyle.ets) 的深浅灰底、边框、圆角与裁切；普通预览统一由 `NoteImagePreview` 提供，交互画布保留自己的 Image/Canvas。外观样式不拥有图片尺寸、内外边距或手势，避免改变遮罩命中。验证：`ui-shell-controls.test.mjs`；[设备验收边界](../../../../../../docs/development/study-media.md#图片遮罩)。
 
@@ -157,9 +157,21 @@
 
 
 [GlassSource.ets](GlassSource.ets) 只包页面正文和真实底色，按可见性、材质与前后台预热并释放源；同一窗口由可见正文登记采样源，宽屏内嵌编辑器沿用完整浏览正文。弹窗和遮罩在源外。
-[GlassPanel.ets](GlassPanel.ets) 统一消费系列 SharedGlassBackdrop，拥有首次纹理准备、真实纹理就绪后唯一展开，无超时材质降级；宿主提供宽度/限高，正文决定收缩高度。玻璃位于零布局尺寸的绝对层，禁止纹理反向参与面板测量，防止边框尺寸反馈持续撑大。原生窗口本身不另做进入动画。
+[GlassPanel.ets](GlassPanel.ets) 统一消费系列 SharedGlassBackdrop，拥有首次纹理准备、真实纹理就绪后唯一展开；融合准备失败由同一壳恢复常规材质；宿主提供宽度/限高，正文决定收缩高度。融合纹理的负向偏移由独立原生 Stack 持有，不能直接挂在 SharedGlassFusion 的 NodeContainer 根节点上（其渲染帧会覆盖定位，导致远处按钮唤出的表单底板下移）。玻璃位于零布局尺寸的绝对层，禁止纹理反向参与面板测量，防止边框尺寸反馈持续撑大。原生窗口本身不另做进入动画。
 [GlassBubblePanel.ets](GlassBubblePanel.ets) 与 [MenuBubble.ets](MenuBubble.ets) 共用宿主的M/L/Q/C轮廓作裁剪、描边和公共HAR光学距离场，覆盖四个箭头方向。覆盖、系统例外及实测入口见[弹窗玻璃接入](../../../../../../docs/development/dialog-glass.md)。
 
 弹窗内层表单/目录通过GlassMaterial.insetMaterialFill透出外壳共享玻璃，FormInputStyle和DirectoryTree统一拥有该规则；内层不注册采样或独立入场。侧筛选及裁剪外壳也委托GlassPanel，显式全高只用于有界面板。具体内容例外与验收见[弹窗玻璃](../../../../../../docs/development/dialog-glass.md)。
 
 选择值控件SelectionValueButton统一最多两行、超出省略；SurfaceSelect与DirectorySelect先给出实测内容宽度，原生按钮内部限宽，避免auto尺寸依赖导致当前值消失。公共投影统一见SeriesVisual.shadow，同层级表面不再散写不同半径和偏移。
+
+
+公共弹层动效：按钮点击通过PopupTrigger交接一次实测Area，800ms过期；按钮菜单使用真实按钮源做SharedGlassFusion；居中选择框按下文契约保留居中静态玻璃。SurfaceSelect与SelectionDialog显式传入按钮矩形，无点击源的程序弹窗仍走常规过渡。展开统一SurfaceTransition.popupEnterMs=200，正文在融合结束时显现，不随弹窗高度或距离延长。
+
+- [AppearanceReveal.ets](AppearanceReveal.ets)：材质推荐和幻彩解锁共用结果动效，尊重前后台与减少动态效果。
+- [CapturedThemeBackground.ets](CapturedThemeBackground.ets)：全屏预览消费唯一根背景原始帧，不另起主题动画。
+- [NoteFieldExpandedDialog.ets](NoteFieldExpandedDialog.ets)：字段展开原生窗口，借DialogFrame承载原编辑器，不复制草稿。
+
+
+居中选择框使用 DialogFrame(buttonFusion=false)，只替换材质，保留扁平模式的居中几何与提交操作；该参数传给 GlassPanel，丢弃按钮起点并用 source=target 的静态轻玻璃。浏览三个选择按钮保持向下箭头。按钮旁菜单继续用 AnchoredMenu；不能因玻璃模式把居中选择框改成锚点菜单。
+
+主题表面实时更新：StudyRatingSurface和PrimaryGlassSurface由调用方传入响应式主题色、明暗与材质，不在绘制时读取AppStorage。深色模块与牌组行共用SurfaceBorder.contentOptions；浅色和内嵌状态显式清掉旧线，排序强调仍由牌组行拥有。当前参数与验证见[原生表面规范](../../../../../../docs/development/material-standard.md)。

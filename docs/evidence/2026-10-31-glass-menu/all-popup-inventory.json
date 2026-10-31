@@ -1,0 +1,503 @@
+{
+  "scope": "Source host coverage; not a count of visually accepted business flows.",
+  "hosts": {
+    "DialogFrame(": {
+      "files": 63,
+      "occurrences": 64,
+      "entries": [
+        {
+          "file": "entry/src/main/ets/components/CollectionHistoryDialog.ets",
+          "line": 65
+        },
+        {
+          "file": "entry/src/main/ets/components/CustomSchedulingWarning.ets",
+          "line": 40
+        },
+        {
+          "file": "entry/src/main/ets/components/HomeIntroPanel.ets",
+          "line": 176
+        },
+        {
+          "file": "entry/src/main/ets/components/StudyAutoAdvanceDialog.ets",
+          "line": 163
+        },
+        {
+          "file": "entry/src/main/ets/components/StudyGuideDialog.ets",
+          "line": 127
+        },
+        {
+          "file": "entry/src/main/ets/components/StudyVoiceDialog.ets",
+          "line": 97
+        },
+        {
+          "file": "entry/src/main/ets/components/agent/AgentMemoryEditorDialog.ets",
+          "line": 61
+        },
+        {
+          "file": "entry/src/main/ets/components/browser/BrowserBatchConfirm.ets",
+          "line": 46
+        },
+        {
+          "file": "entry/src/main/ets/components/browser/BrowserDeckDialog.ets",
+          "line": 36
+        },
+        {
+          "file": "entry/src/main/ets/components/browser/BrowserDisplayDialog.ets",
+          "line": 182
+        },
+        {
+          "file": "entry/src/main/ets/components/browser/BrowserDueDialog.ets",
+          "line": 56
+        },
+        {
+          "file": "entry/src/main/ets/components/browser/BrowserFlagDialog.ets",
+          "line": 80
+        },
+        {
+          "file": "entry/src/main/ets/components/browser/BrowserNotetypeFeature.ets",
+          "line": 155
+        },
+        {
+          "file": "entry/src/main/ets/components/browser/BrowserRenameTagDialog.ets",
+          "line": 75
+        },
+        {
+          "file": "entry/src/main/ets/components/browser/BrowserRepositionDialog.ets",
+          "line": 155
+        },
+        {
+          "file": "entry/src/main/ets/components/browser/BrowserResetDialog.ets",
+          "line": 75
+        },
+        {
+          "file": "entry/src/main/ets/components/browser/BrowserSavedSearchDialog.ets",
+          "line": 49
+        },
+        {
+          "file": "entry/src/main/ets/components/browser/BrowserSelectionActionsDialog.ets",
+          "line": 89
+        },
+        {
+          "file": "entry/src/main/ets/components/browser/BrowserTagsDialog.ets",
+          "line": 37
+        },
+        {
+          "file": "entry/src/main/ets/components/browser/BrowserViewMenu.ets",
+          "line": 145
+        },
+        {
+          "file": "entry/src/main/ets/components/browser/FlagNamesDialog.ets",
+          "line": 106
+        },
+        {
+          "file": "entry/src/main/ets/components/browser/查找替换对话框.ets",
+          "line": 338
+        },
+        {
+          "file": "entry/src/main/ets/components/common/DirectorySelectDialog.ets",
+          "line": 28
+        },
+        {
+          "file": "entry/src/main/ets/components/common/NoteDraftPreview.ets",
+          "line": 59
+        },
+        {
+          "file": "entry/src/main/ets/components/common/NoteDuplicateDialog.ets",
+          "line": 26
+        },
+        {
+          "file": "entry/src/main/ets/components/common/NoteFieldExpandedDialog.ets",
+          "line": 20
+        },
+        {
+          "file": "entry/src/main/ets/components/common/NoteLinkDialog.ets",
+          "line": 56
+        },
+        {
+          "file": "entry/src/main/ets/components/common/SelectionDialog.ets",
+          "line": 41
+        },
+        {
+          "file": "entry/src/main/ets/components/common/TextActionDialog.ets",
+          "line": 35
+        },
+        {
+          "file": "entry/src/main/ets/components/editor/NoteDrawingEditor.ets",
+          "line": 754
+        },
+        {
+          "file": "entry/src/main/ets/components/editor/NoteEditorFormatDialog.ets",
+          "line": 47
+        },
+        {
+          "file": "entry/src/main/ets/components/editor/NoteMediaDialog.ets",
+          "line": 238
+        },
+        {
+          "file": "entry/src/main/ets/components/home/DeckOptionField.ets",
+          "line": 46
+        },
+        {
+          "file": "entry/src/main/ets/components/home/DeckOptionsFeature.ets",
+          "line": 251
+        },
+        {
+          "file": "entry/src/main/ets/components/home/DeckRenameFeature.ets",
+          "line": 154
+        },
+        {
+          "file": "entry/src/main/ets/components/home/DeckReparentFeature.ets",
+          "line": 179
+        },
+        {
+          "file": "entry/src/main/ets/components/home/GlassSuggestionDialog.ets",
+          "line": 52
+        },
+        {
+          "file": "entry/src/main/ets/components/home/HomeDeckSearchDialog.ets",
+          "line": 82
+        },
+        {
+          "file": "entry/src/main/ets/components/home/HomeSyncChoiceDialog.ets",
+          "line": 31
+        },
+        {
+          "file": "entry/src/main/ets/components/home/创建过滤牌组面板.ets",
+          "line": 204
+        },
+        {
+          "file": "entry/src/main/ets/components/links/NoteLinksDraftPanel.ets",
+          "line": 152
+        },
+        {
+          "file": "entry/src/main/ets/components/links/NoteLinksPanel.ets",
+          "line": 146
+        },
+        {
+          "file": "entry/src/main/ets/components/links/NoteReferencePicker.ets",
+          "line": 123
+        },
+        {
+          "file": "entry/src/main/ets/components/settings/AboutActionDialog.ets",
+          "line": 58
+        },
+        {
+          "file": "entry/src/main/ets/components/settings/DevicePairingDialog.ets",
+          "line": 31
+        },
+        {
+          "file": "entry/src/main/ets/components/settings/NotetypeTemplatePreview.ets",
+          "line": 310
+        },
+        {
+          "file": "entry/src/main/ets/components/settings/RedemptionDialog.ets",
+          "line": 70
+        },
+        {
+          "file": "entry/src/main/ets/components/settings/StudyGestureSettings.ets",
+          "line": 187
+        },
+        {
+          "file": "entry/src/main/ets/components/settings/StudyKeyboardSettings.ets",
+          "line": 191
+        },
+        {
+          "file": "entry/src/main/ets/components/settings/同步分组.ets",
+          "line": 745
+        },
+        {
+          "file": "entry/src/main/ets/components/settings/备份管理面板.ets",
+          "line": 229
+        },
+        {
+          "file": "entry/src/main/ets/components/settings/查找重复对话框.ets",
+          "line": 164
+        },
+        {
+          "file": "entry/src/main/ets/components/settings/空卡列表面板.ets",
+          "line": 342
+        },
+        {
+          "file": "entry/src/main/ets/components/settings/笔记类型管理面板.ets",
+          "line": 313
+        },
+        {
+          "file": "entry/src/main/ets/components/settings/笔记类型管理面板.ets",
+          "line": 318
+        },
+        {
+          "file": "entry/src/main/ets/components/settings/笔记类型编辑器.ets",
+          "line": 718
+        },
+        {
+          "file": "entry/src/main/ets/components/创建牌组面板.ets",
+          "line": 302
+        },
+        {
+          "file": "entry/src/main/ets/components/字段帮助面板.ets",
+          "line": 33
+        },
+        {
+          "file": "entry/src/main/ets/components/提醒编辑面板.ets",
+          "line": 268
+        },
+        {
+          "file": "entry/src/main/ets/components/数据迁移面板.ets",
+          "line": 455
+        },
+        {
+          "file": "entry/src/main/ets/components/牌组定制面板.ets",
+          "line": 489
+        },
+        {
+          "file": "entry/src/main/ets/components/许可证面板.ets",
+          "line": 103
+        },
+        {
+          "file": "entry/src/main/ets/pages/AI制卡页.ets",
+          "line": 3191
+        },
+        {
+          "file": "entry/src/main/ets/pages/学习页.ets",
+          "line": 2746
+        }
+      ]
+    },
+    "GlassPanel(": {
+      "files": 19,
+      "occurrences": 21,
+      "entries": [
+        {
+          "file": "entry/src/main/ets/components/AnkiWeb引导对话框.ets",
+          "line": 100
+        },
+        {
+          "file": "entry/src/main/ets/components/browser/卡片信息.ets",
+          "line": 162
+        },
+        {
+          "file": "entry/src/main/ets/components/browser/浏览侧边栏.ets",
+          "line": 243
+        },
+        {
+          "file": "entry/src/main/ets/components/common/AnchoredMenu.ets",
+          "line": 166
+        },
+        {
+          "file": "entry/src/main/ets/components/common/CardActionMenu.ets",
+          "line": 346
+        },
+        {
+          "file": "entry/src/main/ets/components/common/DialogFrame.ets",
+          "line": 85
+        },
+        {
+          "file": "entry/src/main/ets/components/common/GlassBubblePanel.ets",
+          "line": 52
+        },
+        {
+          "file": "entry/src/main/ets/components/common/GlassPanel.ets",
+          "line": 82
+        },
+        {
+          "file": "entry/src/main/ets/components/common/GlassPanel.ets",
+          "line": 89
+        },
+        {
+          "file": "entry/src/main/ets/components/common/SurfaceSelect.ets",
+          "line": 85
+        },
+        {
+          "file": "entry/src/main/ets/components/home/自定义学习对话框.ets",
+          "line": 371
+        },
+        {
+          "file": "entry/src/main/ets/components/settings/媒体管理面板.ets",
+          "line": 236
+        },
+        {
+          "file": "entry/src/main/ets/components/云端牌组弹窗.ets",
+          "line": 174
+        },
+        {
+          "file": "entry/src/main/ets/components/同步面板.ets",
+          "line": 220
+        },
+        {
+          "file": "entry/src/main/ets/components/官方公告弹窗.ets",
+          "line": 47
+        },
+        {
+          "file": "entry/src/main/ets/components/欢迎弹窗.ets",
+          "line": 81
+        },
+        {
+          "file": "entry/src/main/ets/components/添加笔记面板.ets",
+          "line": 349
+        },
+        {
+          "file": "entry/src/main/ets/components/牌组定制面板.ets",
+          "line": 500
+        },
+        {
+          "file": "entry/src/main/ets/pages/首页.ets",
+          "line": 2658
+        },
+        {
+          "file": "entry/src/main/ets/utils/GlassBackdrop.ets",
+          "line": 75
+        },
+        {
+          "file": "entry/src/main/ets/utils/GlassBackdrop.ets",
+          "line": 79
+        }
+      ]
+    },
+    "AnchoredMenu(": {
+      "files": 7,
+      "occurrences": 8,
+      "entries": [
+        {
+          "file": "entry/src/main/ets/components/common/CardActionMenu.ets",
+          "line": 371
+        },
+        {
+          "file": "entry/src/main/ets/components/common/SelectionDialog.ets",
+          "line": 33
+        },
+        {
+          "file": "entry/src/main/ets/components/home/HomeDeckDetails.ets",
+          "line": 210
+        },
+        {
+          "file": "entry/src/main/ets/components/home/HomeDeckRowMenu.ets",
+          "line": 268
+        },
+        {
+          "file": "entry/src/main/ets/components/settings/模式切换菜单.ets",
+          "line": 44
+        },
+        {
+          "file": "entry/src/main/ets/pages/AI制卡页.ets",
+          "line": 2257
+        },
+        {
+          "file": "entry/src/main/ets/pages/首页.ets",
+          "line": 2427
+        },
+        {
+          "file": "entry/src/main/ets/pages/首页.ets",
+          "line": 2435
+        }
+      ]
+    },
+    "@CustomDialog": {
+      "files": 20,
+      "occurrences": 20,
+      "entries": [
+        {
+          "file": "entry/src/main/ets/components/StudyAutoAdvanceDialog.ets",
+          "line": 13
+        },
+        {
+          "file": "entry/src/main/ets/components/StudyGuideDialog.ets",
+          "line": 13
+        },
+        {
+          "file": "entry/src/main/ets/components/agent/AgentMemoryEditorDialog.ets",
+          "line": 15
+        },
+        {
+          "file": "entry/src/main/ets/components/common/DirectorySelectDialog.ets",
+          "line": 9
+        },
+        {
+          "file": "entry/src/main/ets/components/common/NoteFieldExpandedDialog.ets",
+          "line": 6
+        },
+        {
+          "file": "entry/src/main/ets/components/common/NoteLinkDialog.ets",
+          "line": 9
+        },
+        {
+          "file": "entry/src/main/ets/components/common/SelectionDialog.ets",
+          "line": 11
+        },
+        {
+          "file": "entry/src/main/ets/components/common/TextActionDialog.ets",
+          "line": 8
+        },
+        {
+          "file": "entry/src/main/ets/components/editor/NoteEditorFormatDialog.ets",
+          "line": 12
+        },
+        {
+          "file": "entry/src/main/ets/components/editor/NoteMediaDialog.ets",
+          "line": 27
+        },
+        {
+          "file": "entry/src/main/ets/components/home/DeckOptionField.ets",
+          "line": 20
+        },
+        {
+          "file": "entry/src/main/ets/components/home/GlassSuggestionDialog.ets",
+          "line": 11
+        },
+        {
+          "file": "entry/src/main/ets/components/links/NoteReferencePicker.ets",
+          "line": 17
+        },
+        {
+          "file": "entry/src/main/ets/components/settings/AboutActionDialog.ets",
+          "line": 8
+        },
+        {
+          "file": "entry/src/main/ets/components/settings/DevicePairingDialog.ets",
+          "line": 7
+        },
+        {
+          "file": "entry/src/main/ets/components/settings/RedemptionDialog.ets",
+          "line": 13
+        },
+        {
+          "file": "entry/src/main/ets/components/settings/StudyGestureSettings.ets",
+          "line": 23
+        },
+        {
+          "file": "entry/src/main/ets/components/settings/StudyKeyboardSettings.ets",
+          "line": 22
+        },
+        {
+          "file": "entry/src/main/ets/components/settings/同步分组.ets",
+          "line": 707
+        },
+        {
+          "file": "entry/src/main/ets/components/字段帮助面板.ets",
+          "line": 42
+        }
+      ]
+    },
+    ".bindPopup(": {
+      "files": 3,
+      "occurrences": 4,
+      "entries": [
+        {
+          "file": "entry/src/main/ets/components/StudyLocalWhiteboard.ets",
+          "line": 492
+        },
+        {
+          "file": "entry/src/main/ets/components/StudyLocalWhiteboard.ets",
+          "line": 508
+        },
+        {
+          "file": "entry/src/main/ets/components/common/SurfaceSelect.ets",
+          "line": 104
+        },
+        {
+          "file": "entry/src/main/ets/components/学习手写白板层.ets",
+          "line": 489
+        }
+      ]
+    }
+  }
+}
