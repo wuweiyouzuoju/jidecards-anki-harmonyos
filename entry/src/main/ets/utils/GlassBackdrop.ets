@@ -56,6 +56,17 @@ export function supportsGlassBackdrop(): boolean { return deviceInfo.apiAvailabl
 
 // 原生Popup或内嵌编辑器可在正文子树内挂载弹层；沿用打开前的真实帧，避免递归采入自身。
 const frozenSources: Set<string> = new Set<string>();
+const layoutSources: Map<string, number> = new Map<string, number>();
+export function settleGlassSourceLayout(source: string, duration: number = 300): void {
+  const previous: number | undefined = layoutSources.get(source);
+  if (previous !== undefined) clearTimeout(previous);
+  layoutSources.set(source, setTimeout((): void => { layoutSources.delete(source); }, duration));
+}
+const scrollingSources: Set<string> = new Set<string>();
+/** 滚动期沿用已完成帧，让截图/合成/模糊退出手势与惯性滚动的关键路径。 */
+export function setGlassSourceScrolling(source: string, scrolling: boolean): void {
+  if (scrolling) scrollingSources.add(source); else scrollingSources.delete(source);
+}
 const sourcePanels: Map<string, number> = new Map<string, number>();
 const previewPanels: Map<string, number> = new Map<string, number>();
 export function setGlassSourceFreeze(source: string, freeze: boolean): void {
@@ -73,8 +84,8 @@ export function releaseGlassPanel(source: string, preview: boolean = false): voi
   const count: number = sourcePanels.get(source) ?? 0;
   if (count <= 1) sourcePanels.delete(source); else sourcePanels.set(source, count - 1);
 }
-function sourceCaptureAllowed(source: string): boolean {
+export function sourceCaptureAllowed(source: string): boolean {
   // 显式预览来自原生窗口，正文源不包含该窗口；扁平模式没有预热帧，允许首次真实采集。
   const preview: boolean = (previewPanels.get(source) ?? 0) > 0;
-  return captureAllowed(preview) && (preview || !(frozenSources.has(source) && (sourcePanels.get(source) ?? 0) > 0));
+  return !layoutSources.has(source) && !scrollingSources.has(source) && captureAllowed(preview) && (preview || !(frozenSources.has(source) && (sourcePanels.get(source) ?? 0) > 0));
 }

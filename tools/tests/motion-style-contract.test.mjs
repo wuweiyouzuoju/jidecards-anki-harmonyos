@@ -33,12 +33,14 @@ test('small anchored menus share the restrained 150ms transition', () => {
     assert.deepEqual(anchored.enter.combined.value, { x: 0.98, y: 0.98, centerX: x, centerY: y });
     assert.equal(anchored.exit.combined, undefined, 'closing does not scale or move the anchor');
   }
-  assert.match(read('entry/src/main/ets/components/common/AnchoredMenu.ets'),
-    /\.transition\(MenuSurface\.popupTransition\(this\.bubble === undefined \? this\.alignEnd \? '100%' : '0%' :/);
+  const anchored = read('entry/src/main/ets/components/common/AnchoredMenu.ets');
+  assert.match(anchored, /GlassPanel\(/);
+  assert.match(anchored, /menuMotion: true, centerX: this\.alignEnd \? '100%' : '0%', centerY: '0%'/);
   const cardMenu = read('entry/src/main/ets/components/common/CardActionMenu.ets');
   assert.doesNotMatch(cardMenu, /animateTo\(|TransitionEffect\.opacity/,
-    'branch/state changes must not animate measured geometry or replay individual row entrances');
-  assert.match(cardMenu, /\.transition\(MenuSurface\.popupTransition\(this\.groupsOnRight\(\) \? '0%' : '100%', this\.placements\(\)\[groupIndex\]\.pointerCenter\)\)/);
+    'branch/state changes must not replay row entrances');
+  assert.match(cardMenu, /MenuBubble\(/);
+  assert.match(read('entry/src/main/ets/components/common/MenuBubble.ets'), /GlassBubblePanel\(/);
   assert.match(read('entry/src/main/ets/components/common/GlassBubblePanel.ets'), /actionMenuBubbleOutline\(/);
   for (const path of ['entry/src/main/ets/components/牌组列表项.ets',
     'entry/src/main/ets/components/home/HomeSummaryHeader.ets', 'entry/src/main/ets/components/牌组详情面板.ets', 'entry/src/main/ets/components/home/HomeDeckDetails.ets']) {
@@ -59,32 +61,22 @@ test('small anchored menus share the restrained 150ms transition', () => {
   }
 });
 
-test('browser view confirmation delegates both surface transitions to the shared dialog owner', () => {
-  const source = read('entry/src/main/ets/components/browser/BrowserViewMenu.ets');
-  assert.match(source, /DialogFrame\(\{/);
-  assert.doesNotMatch(source, /(?:AnchoredMenu|CardActionMenu)\(\{|\.transition\(|取全屏转场时长|取全屏转场曲线/,
-    'the confirmation dialog must not add a menu or local surface animation');
-  const frame = read('entry/src/main/ets/components/common/DialogFrame.ets');
-  assert.match(frame, /\.transition\(this\.nativeHost \? TransitionEffect\.IDENTITY : SurfaceTransition\.dialog\(\)\)/);
-  assert.match(frame, /\.transition\(this\.nativeHost \? TransitionEffect\.IDENTITY : SurfaceTransition\.backdrop\(\)\)/);
-  const { SurfaceTransition } = surfaceMotionApi();
-  const transition = SurfaceTransition.dialog();
-  assert.equal(transition.enter.kind, 'opacity');
-  assert.equal(transition.enter.combined.kind, 'scale');
-  const backdrop = SurfaceTransition.backdrop();
-  assert.equal(transition.exit.value, backdrop.value);
-  assert.deepEqual(transition.exit.options, backdrop.options);
-  assert.equal(transition.exit.kind, 'opacity');
-  assert.equal(transition.exit.combined, undefined, 'closing preserves the opacity-only dialog contract');
+test('browser selectors retain centered flat geometry and only replace their material', () => {
+ const source=read('entry/src/main/ets/components/browser/BrowserViewMenu.ets');
+ assert.match(source,/DialogFrame\(\{ buttonFusion: false/);
+ assert.doesNotMatch(source,/AnchoredMenu\(|\.transition\(/);
+ const page=read('entry/src/main/ets/pages/浏览页.ets');
+ const controls=page.slice(page.indexOf('private viewChoice(group:'),page.indexOf('private browserControls()'));
+ assert.match(controls,/disclosure: true/);assert.doesNotMatch(controls,/expanded:/);
 });
 
-test('dialogs enter gently and leave with opacity only', () => {
+test('legacy dialogs delegate material-aware panel motion and preserve their backdrop', () => {
   for (const path of [
     'entry/src/main/ets/components/AnkiWeb引导对话框.ets',
     'entry/src/main/ets/components/云端牌组弹窗.ets',
   ]) {
     const source = read(path);
-    assert.match(source, /\.transition\(SurfaceTransition\.dialog\(\)\)/, path);
+    assert.match(source, /GlassPanel\(/, path);
     assert.match(source, /\.transition\(SurfaceTransition\.backdrop\(\)\)/, path);
     assert.doesNotMatch(source, /TransitionEffect\.scale|TransitionEffect\.asymmetric/, path);
   }

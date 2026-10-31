@@ -1,3 +1,4 @@
+import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../../utils/PressFeedback';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
@@ -95,7 +96,7 @@ export struct AgentEditableCard {
     }
     .width('100%')
     .padding(应用尺寸.间距_10)
-    .backgroundColor($r('app.color.surface_page'))
+    .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
     .border(SurfaceBorder.options())
     .borderRadius(应用尺寸.圆角_面板)
   }

@@ -37,7 +37,7 @@ function dependencies(file, source) {
       : specifier);
 }
 function isShared(dependency) {
-  return dependency.startsWith('components/common/') || dependency === '@kit.ArkUI' || dependency === 'jide_foundation' ||
+  return dependency.startsWith('components/common/') || dependency === '@kit.ArkUI' || dependency === '@kit.PerformanceAnalysisKit' || dependency === 'jide_foundation' ||
     sharedModels.has(dependency) || sharedUtils.has(dependency);
 }
 function boundaryErrors(sources) {

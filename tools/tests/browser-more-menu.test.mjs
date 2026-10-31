@@ -51,7 +51,8 @@ test('main entries retain browser actions while shortcut help lives in learning 
     assert.ok(menu.entries().find(item=>item.id==='more_settings').children.every(item=>item.id!=='keyboard'));
     let closed = 0; menu.onClose = () => closed++;
     menu.handleBackRequest(); assert.deepEqual(menu.expandedIds, []); assert.equal(closed, 0);
-    menu.handleBackRequest(); assert.equal(closed, 1);
+    menu.handleBackRequest(); assert.equal(menu.menuCloseRequest, 1); assert.equal(closed, 0);
+    menu.onClose(); assert.equal(closed, 1);
     menu.aboutToDisappear(); assert.equal(tracker.snapshot().length, 0);
   }
 });

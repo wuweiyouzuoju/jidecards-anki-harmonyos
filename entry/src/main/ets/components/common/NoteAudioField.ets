@@ -1,3 +1,4 @@
+import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { common } from '@kit.AbilityKit';
 import { picker } from '@kit.CoreFileKit';
@@ -260,7 +261,7 @@ export struct NoteAudioField {
           .margin({ right: 应用尺寸.间距_4, top: 应用尺寸.间距_4 })
       }
     }.width('100%')
-      .backgroundColor($r('app.color.surface_sidebar'))
+      .backgroundColor(insetMaterialFill($r('app.color.surface_sidebar')))
       .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
   }
 

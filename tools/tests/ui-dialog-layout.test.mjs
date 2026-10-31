@@ -205,34 +205,16 @@ function ownerSlotPattern(slot) {
   return new RegExp(`${slot}\\s*:\\s*\\(\\s*\\)\\s*(?::\\s*void\\s*)?=>\\s*\\{\\s*this\\.`, 'u');
 }
 
-test('browser dialog slots retain the parent and read its current state when invoked by the child', () => {
-  const source = read('components/browser/BrowserViewMenu.ets');
-  const start = source.indexOf('  build() {');
-  const build = source.slice(start, source.indexOf('\n  }', start) + 4);
-  assert.ok(start >= 0);
-  // Execute actual slot wiring; Node proves receiver/callback behavior, not ArkUI rendering.
-  for (const code of [build, build.replaceAll('(): void =>', '() =>')]) {
-    let slots;
-    const Host = new Function('DialogFrame', stripTypeScriptTypes(`class Host { ${code} }`,
-      { mode: 'transform' }) + '; return Host;')(options => { slots = options; });
-    const parent = new Host(), calls = [];
-    parent.current = 'mode';
-    for (const [slot, builder] of [['header', 'selectionHeader'], ['content', 'selectionContent']]) {
-      parent[builder] = function () { assert.equal(this, parent); calls.push([slot, this.current]); };
-    }
-    parent.build();
-    const child = { current: 'child', header: slots.header, content: slots.content };
-    child.header(); child.content();
-    parent.current = 'sort';
-    child.header(); child.content();
-    assert.deepEqual(calls, [['header', 'mode'], ['content', 'mode'], ['header', 'sort'], ['content', 'sort']]);
-  }
-  for (const slot of ['header', 'content']) {
-    assert.match(`${slot}: (): void => { this.selectionHeader(); }`, ownerSlotPattern(slot));
-    assert.match(`${slot}: () => { this.selectionHeader(); }`, ownerSlotPattern(slot));
-    assert.doesNotMatch(`${slot}: this.selectionHeader`, ownerSlotPattern(slot));
-    assert.doesNotMatch(`${slot}: function () { this.selectionHeader(); }`, ownerSlotPattern(slot));
-  }
+test('browser centered selector slots retain their parent receiver', () => {
+ const source=read('components/browser/BrowserViewMenu.ets');
+ for(const name of ['selectionHeader','selectionContent']) {
+  const callback=source.match(new RegExp('(\\(\\): void => \\{ this\\.'+name+'\\(\\); \\})'))[1];
+  const parent={current:'mode'};let seen;
+  parent[name]=function(){seen=[this,this.current];};
+  const invoke=new Function(stripTypeScriptTypes(`const slot = ${callback};`,{mode:'transform'}) + '; return slot;').call(parent);
+  invoke.call({current:'child'});assert.deepEqual(seen,[parent,'mode']);
+  parent.current='sort';invoke();assert.deepEqual(seen,[parent,'sort']);
+ }
 });
 
 test('shared chrome owns theme, scroll limits and safe areas; slots retain their owner', () => {

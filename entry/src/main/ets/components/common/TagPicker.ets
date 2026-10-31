@@ -1,3 +1,4 @@
+import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { DirectoryView } from '../../model/DirectoryTree';
 import { 标签服务 } from '../../backend/标签服务';
@@ -120,7 +121,7 @@ export struct TagPicker {
               onToggle: (name: string): void => { this.selection?.toggleCollapsed(name); this.refresh(); },
               onViewChanged: (view: DirectoryView | null): void => { appInterface.observeDirectory('tag_picker', view); } })
           }.width('100%').padding(应用尺寸.间距_5)
-            .backgroundColor($r('app.color.surface_card'))
+            .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
             .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
         }
         if (this.canAdd()) {

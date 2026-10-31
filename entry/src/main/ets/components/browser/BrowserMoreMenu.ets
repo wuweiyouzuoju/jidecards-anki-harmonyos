@@ -18,6 +18,7 @@ export struct BrowserMoreMenu {
   @Prop @Watch('publishInterface') subtitleIndex: number = 1;
   @Prop topOffset: number = 68;
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
+  @State private menuCloseRequest: number = 0;
   @State @Watch('publishInterface') private expandedIds: string[] = [];
   onClose: () => void = (): void => {};
   onSelectAll: () => void = (): void => {};
@@ -56,7 +57,7 @@ export struct BrowserMoreMenu {
 
   private handleBackRequest(): void {
     if (this.expandedIds.length > 0) this.expandedIds = [];
-    else this.onClose();
+    else this.menuCloseRequest++;
   }
 
   private toggleBranch(id: string): void {
@@ -104,7 +105,7 @@ export struct BrowserMoreMenu {
   }
 
   build() {
-    CardActionMenu({ items: this.entries(), menuWidth: 应用尺寸.cardActionMenuWidth, topOffset: this.topOffset,
+    CardActionMenu({ items: this.entries(), menuWidth: 应用尺寸.cardActionMenuWidth, topOffset: this.topOffset, closeRequest: this.menuCloseRequest,
       expandedIds: this.expandedIds,
       onToggleBranch: (item: CardActionMenuEntry): void => { this.toggleBranch(item.id ?? ''); },
       onClose: (): void => { this.onClose(); },

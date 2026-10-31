@@ -1,3 +1,4 @@
+import { rememberPopupTrigger } from '../../utils/PopupTrigger';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../../utils/PressFeedback';
 import { disclosureAnimation } from '../../utils/AppMotion';
@@ -22,8 +23,13 @@ export struct SettingsActionRow {
   onAction: () => void = (): void => {};
   @BuilderParam hintContent: () => void = this.defaultHint;
 
+  private triggerArea: Area | undefined = undefined;
+
   private activate(): void {
-    if (this.isInteractive) this.onAction();
+    if (this.isInteractive) {
+      if (this.triggerArea !== undefined) rememberPopupTrigger(this.triggerArea);
+      this.onAction();
+    }
   }
 
   private disclosureAngle(): number { return this.expanded === true ? 90 : 0; }
@@ -58,7 +64,8 @@ export struct SettingsActionRow {
     }.width('100%').constraintSize({ minHeight: this.hint === '' ? 48 : 58 })
     .padding({ top: this.hint === '' ? 0 : 应用尺寸.间距_8,
       bottom: this.hint === '' ? 0 : 应用尺寸.间距_8 })
-    .attributeModifier(new PressFeedback()).enabled(this.isInteractive)
+    .attributeModifier(new PressFeedback(1, 0.4, true)).enabled(this.isInteractive)
+    .onAreaChange((_old: Area, area: Area): void => { this.triggerArea = area; })
     .onClick((): void => { this.activate(); })
   }
 }

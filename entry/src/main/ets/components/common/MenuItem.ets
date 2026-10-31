@@ -1,3 +1,4 @@
+import { rememberPopupTrigger } from '../../utils/PopupTrigger';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { disclosureAnimation } from '../../utils/AppMotion';
 import { PressFeedback } from '../../utils/PressFeedback';
@@ -18,13 +19,20 @@ export struct AnchoredMenuItem {
   @Prop slideLayer: number = 0;
   @State private slideHighlighted: boolean = false;
   private slideTarget: MenuSlideTarget | null = null;
+  private triggerArea: Area | undefined = undefined;
+  private activate(): void {
+    if (!this.available) return;
+    if (this.triggerArea !== undefined) rememberPopupTrigger(this.triggerArea);
+    this.onSelect();
+  }
   private slideArea(area: Area): void {
+    this.triggerArea = area;
     if (this.slideTarget === null) {
       this.slideTarget = { scope: this.slideScope, rect: { left: 0, top: 0, width: 0, height: 0 },
         offset: 0, layer: this.slideLayer, available: (): boolean => this.available,
         highlight: (active: boolean): void => { this.slideHighlighted = active; },
-        select: (): void => { if (this.available && (!this.disclosure || !this.expanded)) this.onSelect(); },
-        enter: (): void => { if (this.available && this.disclosure && !this.expanded) this.onSelect(); }, branch: this.disclosure };
+        select: (): void => { if (this.available && (!this.disclosure || !this.expanded)) this.activate(); },
+        enter: (): void => { if (this.available && this.disclosure && !this.expanded) this.activate(); }, branch: this.disclosure };
       menuSlideSession.register(this.slideTarget);
     }
     this.slideTarget.rect = { left: Number(area.globalPosition.x), top: Number(area.globalPosition.y),
@@ -127,7 +135,7 @@ export struct AnchoredMenuItem {
       .borderRadius(SelectStyle.controlRadius)
       .attributeModifier(new PressFeedback())
       .enabled(this.available)
-      .onClick((): void => { if (this.available) this.onSelect(); })
+      .onClick((): void => { if (this.available) this.activate(); })
       .onAreaChange((_old: Area, area: Area): void => { this.slideArea(area); })
     }.width('100%')
   }

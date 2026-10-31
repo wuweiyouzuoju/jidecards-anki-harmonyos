@@ -12,6 +12,7 @@ import { safeDialogMaxHeight, WINDOW_SAFE_TOP_KEY, WINDOW_SAFE_BOTTOM_KEY,
 /** 常规弹窗固定操作栏、正文按内容收缩并限高滚动；不拥有草稿或业务任务。 */
 @Component
 export struct DialogFrame {
+  @Prop buttonFusion: boolean = true;
   @Prop nativeHost: boolean = false;
   @Prop opaque: boolean = false;
   @Prop materialOverride: string = '';
@@ -79,10 +80,10 @@ export struct DialogFrame {
       DialogBackdrop({ maximumWidth: this.maximumWidth,
         onSize: (width: string, maximumWidth: number): void => {
           this.surfaceWidth = width; this.surfaceMaximumWidth = maximumWidth;
-        } }).onClick((): void => { this.dismiss(); })
+        } }).onClick((event: ClickEvent): void => { this.dismiss(); })
         .transition(this.nativeHost ? TransitionEffect.IDENTITY : SurfaceTransition.backdrop())
       Stack() {
-        GlassPanel({
+        GlassPanel({ buttonFusion: this.buttonFusion,
           onPrepared: (): void => { this.prepared = true; this.waitingVisible = false; clearTimeout(this.waitingTimer); this.onPrepared(); }, role: this.surfaceRole, source: this.refractionSource, materialOverride: this.materialOverride, opaque: this.opaque, radius: 应用尺寸.圆角_卡片, panelWidth: this.surfaceWidth,
           maximumWidth: this.surfaceMaximumWidth || this.maximumWidth, maximumHeight: this.frameMaxHeight() }) {
         Column({ space: 应用尺寸.间距_12 }) {
@@ -126,6 +127,7 @@ export struct DialogFrame {
       }
     }
     .width('100%').height('100%')
+    .onClick((): void => { this.dismiss(); })
     .alignContent(Alignment.Top)
     .onAreaChange((_old: Area, area: Area): void => { this.viewportHeight = Number(area.height); this.viewportTop = Number(area.globalPosition.y); })
   }

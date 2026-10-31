@@ -57,7 +57,7 @@ export function placeActionMenuOverlay(triggerCenter: number, height: number, ba
 
 /** 避让只移动左侧面板。尖角在面板边缘追随原触发行，右侧行距始终不变。 */
 export function placeActionMenuGroups(anchors: number[], heights: number[], clearance: number,
-  gap: number = 8): ActionMenuPanelPlacement[] {
+  gap: number = 8, maxHeight: number = Number.POSITIVE_INFINITY): ActionMenuPanelPlacement[] {
   const tops: number[] = [];
   anchors.forEach((anchor: number, index: number): void => {
     const ideal: number = Math.max(0, anchor - heights[index] / 2);
@@ -73,7 +73,14 @@ export function placeActionMenuGroups(anchors: number[], heights: number[], clea
     }
     tops.push(top);
   });
-  return tops.map((top: number, index: number): ActionMenuPanelPlacement => {
+  // 从底部逐个回推，保留面板间距；整体平移后分别钳到零会让靠底的多个面板重叠。
+  const last: number = tops.length - 1;
+  for (let index: number = last; index >= 0; index--) {
+    const bottom: number = index === last ? maxHeight : tops[index + 1] - gap;
+    tops[index] = Math.max(0, Math.min(tops[index], bottom - heights[index]));
+  }
+  return tops.map((position: number, index: number): ActionMenuPanelPlacement => {
+    const top: number = position;
     const edge: number = Math.min(clearance, heights[index] / 2);
     return { top: top, pointerCenter: Math.max(edge, Math.min(heights[index] - edge, anchors[index] - top)) };
   });

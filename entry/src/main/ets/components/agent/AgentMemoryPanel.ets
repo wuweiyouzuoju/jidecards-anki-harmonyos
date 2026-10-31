@@ -1,3 +1,4 @@
+import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { localeDate } from '../../utils/LocaleFormatting';
 import { AgentMemoryManager } from '../../model/agent/AgentMemoryManagement';
@@ -240,7 +241,7 @@ export struct AgentMemoryPanel {
             Text(memory.text).fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary')).width('100%')
             Text(this.scopeLabel(memory.scope) + ' · ' + localeDate(memory.updatedAt, this.uiLanguage))
               .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
-          }.width('100%').padding(应用尺寸.间距_10).backgroundColor($r('app.color.surface_card'))
+          }.width('100%').padding(应用尺寸.间距_10).backgroundColor(insetMaterialFill($r('app.color.surface_card')))
             .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
         }, (memory: AgentMemory): string => memory.id)
       }.width('100%').alignItems(HorizontalAlign.Start)

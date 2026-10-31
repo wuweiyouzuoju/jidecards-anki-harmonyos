@@ -1,3 +1,4 @@
+import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../../utils/PressFeedback';
 import { mouseContextPoint } from '../../utils/MouseContextInput';
@@ -360,7 +361,7 @@ export struct 卡片表格 {
                       .fontSize(应用尺寸.字号_正文_小)
                       .fontColor($r('app.color.text_primary'))
                       .padding({ left: 6, right: 6, top: 2, bottom: 2 })
-                      .backgroundColor($r('app.color.surface_card'))
+                      .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
                       .border(SurfaceBorder.options(0.5))
                       .borderRadius(4)
                   }

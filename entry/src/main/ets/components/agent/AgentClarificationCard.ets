@@ -1,3 +1,4 @@
+import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../../utils/PressFeedback';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
@@ -129,7 +130,7 @@ export struct AgentClarificationCard {
     }
     .width('100%').alignItems(HorizontalAlign.Start)
     .padding(应用尺寸.卡片内边距)
-    .backgroundColor($r('app.color.surface_card'))
+    .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
     .border(SurfaceBorder.options())
     .borderRadius(应用尺寸.圆角_面板)
   }

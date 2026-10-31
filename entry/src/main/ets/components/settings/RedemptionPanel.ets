@@ -1,3 +1,4 @@
+import { rememberPopupTrigger } from '../../utils/PopupTrigger';
 import { NativeDialogHost, NativeDialogFactory, NativeDialogDismiss, NativeDialogPresentation } from '../common/NativeDialogHost';
 import { RedemptionDialog } from './RedemptionDialog';
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -52,6 +53,7 @@ export struct RedemptionPanel {
       openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation
     });
   };
+  private redemptionArea: Area | undefined = undefined;
   private openRedemption(): void {
     if (!this.active || this.busy || this.fingerprint === '') return;
     this.expanded = true; this.message = ''; this.unlocked = false; this.showCelebration = false; this.code = '';
@@ -140,7 +142,7 @@ export struct RedemptionPanel {
           Text() { ForEach([themeTextKey(settingsItemText(this.getUIContext(), 'fingerprint_copy', this.uiLanguage), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(settingsItemText(this.getUIContext(), 'fingerprint_copy', this.uiLanguage), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }.fontColor(this.primary)
         }
           .fontColor(this.primary).backgroundColor(Color.Transparent)
-          .enabled(this.fingerprint !== '').attributeModifier(new PressFeedback())
+          .enabled(this.fingerprint !== '').attributeModifier(new PressFeedback(1, 0.4, true))
           .stateEffect(false)
           .onClick((): void => { this.copyFingerprint(); })
       }.width('100%')
@@ -155,7 +157,7 @@ export struct RedemptionPanel {
         .fontSize(12).fontColor($r('app.color.text_secondary')).width('100%')
       if (this.loadFailed) {
         Button($r('app.string.redemption_retry'))
-          .attributeModifier(new PressFeedback())
+          .attributeModifier(new PressFeedback(1, 0.4, true))
           .stateEffect(false)
           .onClick((): void => { this.loadFingerprint(); })
       }
@@ -169,9 +171,13 @@ export struct RedemptionPanel {
       }
         .width('100%').height(44).backgroundColor(Color.Transparent).borderRadius(12)
         .enabled(this.fingerprint !== '')
-        .attributeModifier(new PressFeedback())
+        .attributeModifier(new PressFeedback(1, 0.4, true))
         .stateEffect(false)
-        .onClick((): void => { this.openRedemption(); })
+        .onAreaChange((_old: Area, area: Area): void => { this.redemptionArea = area; })
+        .onClick((): void => {
+          if (this.redemptionArea !== undefined) rememberPopupTrigger(this.redemptionArea);
+          this.openRedemption();
+        })
 
     }
     .padding(16).width('100%').border(SurfaceBorder.options()).borderRadius(20)

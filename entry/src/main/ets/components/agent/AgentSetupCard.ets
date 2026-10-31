@@ -1,3 +1,4 @@
+import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { SurfaceSelect } from '../common/SurfaceSelect';
 import { DirectorySelect } from '../common/DirectorySelect';
@@ -102,7 +103,7 @@ export struct AgentSetupCard {
       this.setupContent()
     }
     .alignItems(HorizontalAlign.Start)
-    .backgroundColor($r('app.color.surface_card'))
+    .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
     .border(SurfaceBorder.options())
     .borderRadius(应用尺寸.圆角_面板)
     .padding(应用尺寸.卡片内边距)

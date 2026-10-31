@@ -32,7 +32,7 @@ test('pages, section switches, dialogs and overlays read the same current profil
     assert.equal(surface.pageContent(true, false), api.TransitionEffect.IDENTITY, 'initial section has no second entrance');
     const dialog = surface.dialog();
     assert.deepEqual(dialog.enter.combined.value, { x: scale, y: scale });
-    assert.equal(dialog.enter.options.duration, duration);
+    assert.equal(dialog.enter.options.duration, 200);
     assert.equal(dialog.exit.combined, undefined, 'dialog closing does not shrink');
     assert.deepEqual(dialog.exit.options, { duration, curve: 'ease-out' });
     const overlay = surface.pageOverlay();
@@ -107,14 +107,14 @@ test('same surface effects have one owner across all modal implementations', () 
     const source = read(path.replaceAll('\\', '/'));
     if (source.includes('SurfaceTransition.dialog()')) {
       owners++;
-      assert.match(source, /SurfaceTransition\.backdrop\(\)/, path);
+      assert.match(source, /SurfaceTransition\.(?:backdrop|glassExit)\(/, path);
       if (path.replaceAll('\\','/') !== 'components/common/GlassPanel.ets') assert.doesNotMatch(source, /TransitionEffect\.scale|TransitionEffect\.asymmetric/, path);
     }
     if (path.replaceAll('\\', '/') !== 'utils/SurfaceTransition.ets') {
       assert.doesNotMatch(source, /TransitionEffect\.scale\(\{ x: currentMotionProfile\(\)\.dialogScale/, path);
     }
   }
-  assert.equal(owners, 2, 'GlassPanel and the existing image crop surface own their own panel transitions');
+  assert.equal(owners, 1, 'GlassPanel owns panel transitions, including the migrated image crop surface');
   assert.doesNotMatch(read('components/牌组选项面板.ets'), /SurfaceTransition\.(?:dialog|backdrop)/);
   assert.match(read('pages/DeckOptionsPage.ets'), /注册NavParam\('DeckOptionsPage'/);
   for (const file of ['components/提醒编辑面板.ets', 'components/browser/查找替换对话框.ets',

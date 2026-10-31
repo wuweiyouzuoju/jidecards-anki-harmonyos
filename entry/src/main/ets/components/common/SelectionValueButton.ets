@@ -1,3 +1,4 @@
+import { rememberPopupTrigger } from '../../utils/PopupTrigger';
 import { disclosureAnimation } from '../../utils/AppMotion';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { SelectStyle } from '../../utils/SelectStyle';
@@ -17,7 +18,12 @@ export struct SelectionValueButton {
   @Prop valueMaxLines: number = 2;
   @Prop isInteractive: boolean = true;
   onAction: () => void = (): void => {};
-  private activate(): void { if (this.isInteractive) this.onAction(); }
+  private triggerArea: Area | undefined = undefined;
+
+  private activate(): void { if (this.isInteractive) {
+      if (this.triggerArea !== undefined) rememberPopupTrigger(this.triggerArea);
+      this.onAction();
+    } }
   build() {
     Button() {
       Row({ space: SelectStyle.controlSpace }) {
@@ -33,8 +39,9 @@ export struct SelectionValueButton {
       .padding({ left: SelectStyle.controlPadding.left, right: SelectStyle.controlPadding.right,
         top: this.valueMaxLines > 1 ? 8 : 0, bottom: this.valueMaxLines > 1 ? 8 : 0 })
       .backgroundColor(Color.Transparent).border({ width: 0 }).borderRadius(0)
-      .enabled(this.isInteractive).attributeModifier(new PressFeedback()).stateEffect(false)
+      .enabled(this.isInteractive).attributeModifier(new PressFeedback(1, 0.4, true)).stateEffect(false)
       .accessibilityText(typeof this.label === 'string' ? this.label : localizedResourceText(this.getUIContext(), this.language, this.label))
-      .accessibilityDescription(this.value).onClick((): void => { this.activate(); })
+      .accessibilityDescription(this.value).onAreaChange((_old: Area, area: Area): void => { this.triggerArea = area; })
+    .onClick((): void => { this.activate(); })
   }
 }

@@ -406,7 +406,7 @@ export struct 牌组定制面板 {
         }
         .width('100%')
         .height(应用尺寸.deckRowHeight(this.narrow))
-        .backgroundColor($r('app.color.surface_page'))
+        .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
         .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
         .onAreaChange((_旧: Area, 新区域: Area) => {
           // Area.width/height 在 ArkTS 里是 Length 类型（string|number），需转 number

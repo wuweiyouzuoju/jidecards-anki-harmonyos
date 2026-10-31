@@ -1,3 +1,4 @@
+import { insetMaterialFill } from '../utils/GlassMaterial';
 import { GlassSource } from '../components/common/GlassSource';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { ActionStatus } from '../components/common/ActionStatus';
@@ -3044,7 +3045,7 @@ export struct AI制卡页 {
             .constraintSize({ minWidth: 0 })
             .fontSize(应用尺寸.字号_按钮)
             .fontColor(this.动作主色)
-            .backgroundColor($r('app.color.surface_card'))
+            .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
             .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_胶囊)
             .enabled(this.interfaceEnabled('import'))
             .attributeModifier(new PressFeedback())

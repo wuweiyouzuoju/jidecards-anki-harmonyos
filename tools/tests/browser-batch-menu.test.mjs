@@ -118,6 +118,8 @@ test('Back closes the popup before exiting selection; explicit exit clears the m
   assert.equal(page.batchBackRequest,1); menu.handleBackRequest();
   assert.deepEqual(menu.expandedIds,['marking']); assert.equal(page.showBatchMenu,true);
   assert.equal(page.onBackPress(),true); menu.handleBackRequest();
+  assert.equal(menu.menuCloseRequest,1); assert.equal(page.showBatchMenu,true);
+  menu.onClose();
   assert.equal(page.showBatchMenu,false); assert.deepEqual(page.选中ID列表,[1,2]); assert.equal(page.多选模式值,true);
   assert.equal(page.onBackPress(),true);
   assert.equal(page.多选模式值,false); assert.deepEqual(page.选中ID列表,[]);

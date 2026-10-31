@@ -30,7 +30,7 @@ export struct SelectionDialog {
   build() {
     if (this.anchor !== undefined) {
       Stack() {
-        AnchoredMenu({ menuWidth: this.anchor.width, contentLeft: this.anchor.left - this.hostLeft,
+        AnchoredMenu({ fusionAnchor: { x: this.anchor.left, y: this.anchor.top, width: this.anchor.width, height: this.anchor.height, radius: 12 }, menuWidth: this.anchor.width, contentLeft: this.anchor.left - this.hostLeft,
           topOffset: this.anchor.top - this.hostTop, alignEnd: false,
           content: (): void => { this.content(); }, onClose: this.onClose })
       }.width('100%').height('100%')
@@ -38,7 +38,7 @@ export struct SelectionDialog {
           this.hostLeft = Number(area.globalPosition.x); this.hostTop = Number(area.globalPosition.y);
         })
     } else {
-    DialogFrame({ nativeHost: true, maximumWidth: 应用尺寸.dialogCompactMaxWidth, canDismiss: this.isInteractive,
+    DialogFrame({ nativeHost: true, buttonFusion: false, maximumWidth: 应用尺寸.dialogCompactMaxWidth, canDismiss: this.isInteractive,
       header: () => { this.header(); }, content: () => { this.content(); }, onDismiss: this.onClose })
     }
   }

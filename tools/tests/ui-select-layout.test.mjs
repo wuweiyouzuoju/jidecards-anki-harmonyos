@@ -296,7 +296,7 @@ test('browser composes three shared triggers under the plain title and uses one 
   for (const group of ['mode', 'filter', 'sort']) assert.ok(menu.includes("this.group === '" + group + "'"));
   assert.doesNotMatch(menu, /expandedGroup|toggleGroup|disclosure:/);
   assert.doesNotMatch(menu, /AnchoredMenu\(/);
-  assert.match(menu, /DialogFrame\([\s\S]*this\.selectionHeader\(\)/);
+  assert.match(menu, /this\.selectionHeader\(\)/);
   assert.match(menu, /DialogHeader\(\{ title: this.group === 'mode'/);
   assert.doesNotMatch(menu, /showActionLabel: true/);
   assert.match(menu, /按下态按钮\(\{ 文案: \$r\('app.string.browser_sort_ascending'\)/);

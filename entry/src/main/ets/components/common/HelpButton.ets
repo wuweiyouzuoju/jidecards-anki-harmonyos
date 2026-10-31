@@ -1,3 +1,4 @@
+import { rememberPopupTrigger } from '../../utils/PopupTrigger';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../../utils/PressFeedback';
 import { resourceText } from '../../utils/UiFeedback';
@@ -11,8 +12,12 @@ export struct HelpButton {
   @Prop isHelpEnabled: boolean = true;
   onHelp: () => void = (): void => {};
 
+  private triggerArea: Area | undefined = undefined;
   private activate(): void {
-    if (this.isHelpEnabled) this.onHelp();
+    if (this.isHelpEnabled) {
+      if (this.triggerArea !== undefined) rememberPopupTrigger(this.triggerArea);
+      this.onHelp();
+    }
   }
 
   private accessibilityLabel(_locale: string = this.uiLanguage): string {
@@ -33,11 +38,12 @@ export struct HelpButton {
     .borderRadius(HelpLayout.iconSize / 2)
     .backgroundColor(Color.Transparent)
     .enabled(this.isHelpEnabled)
-    .attributeModifier(new PressFeedback())
+    .attributeModifier(new PressFeedback(1, 0.4, true))
     .stateEffect(false)
     .accessibilityText(this.accessibilityLabel())
     .accessibilityDescription($r('app.string.help_accessibility_description'))
     .monopolizeEvents(true)
+    .onAreaChange((_old: Area, area: Area): void => { this.triggerArea = area; })
     .onClick((): void => { this.activate(); })
   }
 }

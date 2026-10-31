@@ -22,6 +22,7 @@ export struct 批量操作栏 {
   @Prop topOffset: number = 68;
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
   @Prop @Watch('publishInterface') labels: FlagLabels = {};
+  @State private menuCloseRequest: number = 0;
   @State @Watch('publishInterface') private expandedIds: string[] = ['marking'];
   on改牌组: () => void = (): void => {};
   on设置标志: () => void = (): void => {};
@@ -58,7 +59,7 @@ export struct 批量操作栏 {
 
   private handleBackRequest(): void {
     if (this.expandedIds.includes('flag')) this.expandedIds = this.expandedIds.filter((id: string): boolean => id !== 'flag');
-    else this.onClose();
+    else this.menuCloseRequest++;
   }
   private markingItems(): AppInterfaceItem[] {
     return visibleInterfaceItems('browser_batch_marking', { simple: false, agent: false, cloudDeck: false, themeHasTextures: false });
@@ -154,7 +155,7 @@ export struct 批量操作栏 {
     }
   }
   build() {
-    CardActionMenu({ items: this.entries(), menuWidth: 应用尺寸.cardActionMenuWidth, topOffset: this.topOffset,
+    CardActionMenu({ items: this.entries(), menuWidth: 应用尺寸.cardActionMenuWidth, topOffset: this.topOffset, closeRequest: this.menuCloseRequest,
       expandedIds: this.expandedIds,
       onToggleBranch: (item: CardActionMenuEntry): void => { this.toggleBranch(item.id ?? ''); },
       onClose: (): void => { this.onClose(); },

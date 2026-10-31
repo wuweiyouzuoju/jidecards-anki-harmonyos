@@ -1,3 +1,4 @@
+import { rememberPopupTrigger } from '../../utils/PopupTrigger';
 import { SeriesVisual } from '../../utils/SeriesVisual';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../../utils/PressFeedback';
@@ -24,8 +25,13 @@ export struct PrimaryActionButton {
   @Prop feedback: string = '';
   onAction: () => void = (): void => {};
 
+  private triggerArea: Area | undefined = undefined;
+
   private activate(): void {
-    if (this.isInteractive) this.onAction();
+    if (this.isInteractive) {
+      if (this.triggerArea !== undefined) rememberPopupTrigger(this.triggerArea);
+      this.onAction();
+    }
   }
 
   private resolvedTint(): ResourceColor { return this.tint ?? this.primaryBackground; }
@@ -50,9 +56,10 @@ export struct PrimaryActionButton {
       .shadow(SeriesVisual.shadow(this.glassSurface ? 'glass' : this.surfaceMaterial, SeriesVisual.isDark(this.materialTheme, this.materialSystemDark)))
       .enabled(this.isInteractive)
       .opacity(this.isInteractive ? 1 : 0.6)
-      .attributeModifier(new PressFeedback(this.isInteractive ? 1 : 0.6))
+      .attributeModifier(new PressFeedback(this.isInteractive ? 1 : 0.6, 0.6, true))
       .stateEffect(false)
       .accessibilityText(typeof this.label === 'string' ? this.label : localizedResourceText(this.getUIContext(), this.uiLanguage, this.label))
-      .onClick((): void => { this.activate(); })
+      .onAreaChange((_old: Area, area: Area): void => { this.triggerArea = area; })
+    .onClick((): void => { this.activate(); })
   }
 }

@@ -1,3 +1,4 @@
+import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { disclosureAnimation } from '../../utils/AppMotion';
 import { PressFeedback } from '../../utils/PressFeedback';
@@ -60,7 +61,7 @@ export struct AgentDisclosureCard {
     }
     .width('100%')
     .alignItems(HorizontalAlign.Start)
-    .backgroundColor($r('app.color.surface_card'))
+    .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
     .border(SurfaceBorder.options())
     .borderRadius(应用尺寸.圆角_面板)
     .clip(true)

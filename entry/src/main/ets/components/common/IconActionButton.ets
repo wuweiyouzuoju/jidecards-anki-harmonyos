@@ -1,3 +1,4 @@
+import { rememberPopupTrigger } from '../../utils/PopupTrigger';
 import { SeriesVisual } from '../../utils/SeriesVisual';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { translucentGlassFill } from '../../utils/GlassMaterial';
@@ -43,7 +44,7 @@ export struct IconActionButton {
   onHoldOpen: () => void = (): void => {};
   onHoldCancel: () => void = (): void => {};
   private readonly hold: MenuHoldController = new MenuHoldController(
-    (): boolean => this.isInteractive, (): void => { this.onHoldOpen(); }, (): void => { this.onHoldCancel(); });
+    (): boolean => this.isInteractive, (): void => { if (this.triggerArea !== undefined) rememberPopupTrigger(this.triggerArea); this.onHoldOpen(); }, (): void => { this.onHoldCancel(); });
 
   aboutToDisappear(): void { this.stopSlide(); }
   private stopSlide(): void {
@@ -56,8 +57,13 @@ export struct IconActionButton {
     if (this.slideMenu) menuHoldTouch(this.hold, event, this.keepMenuOnHoldRelease);
   }
 
+  private triggerArea: Area | undefined = undefined;
+
   private activate(): void {
-    if (this.hold.consumeClick()) this.onAction();
+    if (this.hold.consumeClick()) {
+      if (this.triggerArea !== undefined) rememberPopupTrigger(this.triggerArea);
+      this.onAction();
+    }
   }
 
   private usesSquareSurface(): boolean { return this.toolbarStyle || this.squareSurface; }
@@ -92,7 +98,8 @@ export struct IconActionButton {
     .accessibilityLevel(this.contentVisible ? 'auto' : 'no')
     .focusOnTouch(!this.slideMenu)
     .enabled(this.isInteractive)
-    .attributeModifier(new PressFeedback()).stateEffect(false)
+    .attributeModifier(new PressFeedback(1, 0.4, true)).stateEffect(false)
+    .onAreaChange((_old: Area, area: Area): void => { this.triggerArea = area; })
     .onClick((): void => { this.activate(); })
     .onTouch((event: TouchEvent): void => { this.slideTouch(event); })
     .gesture(LongPressGesture({ duration: MENU_SLIDE_HOLD_MS }).onAction((): void => { this.holdOpen(); }))

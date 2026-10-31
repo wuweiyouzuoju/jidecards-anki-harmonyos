@@ -241,7 +241,7 @@ export struct 浏览侧边栏 {
 
         .transition(SurfaceTransition.backdrop())
       GlassPanel({ panelWidth: '80%', panelHeight: '100%', radius: 0, role: 'dialog',
-        menuMotion: true, centerX: '0%', centerY: '0%',
+        drawerMotion: true, centerX: '0%', centerY: '50%',
         content: (): void => { this.panelContent(); } })
     }.width('100%').height('100%')
   }

@@ -1,3 +1,4 @@
+import { rememberPopupTrigger } from '../../utils/PopupTrigger';
 import { darkMaterial } from '../../utils/GlassMaterial';
 import { PressFeedback } from '../../utils/PressFeedback';
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -70,8 +71,13 @@ export struct 按下态按钮 {
   @Prop compact: boolean = false;
   点击回调: () => void = (): void => {};
 
+  private triggerArea: Area | undefined = undefined;
+
   private activate(): void {
-    if (this.是否启用) this.点击回调();
+    if (this.是否启用) {
+      if (this.triggerArea !== undefined) rememberPopupTrigger(this.triggerArea);
+      this.点击回调();
+    }
   }
 
   private resolvedSelectionColor(): ResourceColor { return this.selectionColor ?? this.actionColor; }
@@ -131,11 +137,12 @@ export struct 按下态按钮 {
     .fontColor(this.labelColor())
     .backgroundColor(this.compact && this.selected ? `#1A${this.actionColor.slice(-6)}` : Color.Transparent)
     .border(this.buttonBorder())
-    .attributeModifier(this.compact ? new PressFeedback() : new GlassSurface(this.surfaceMaterial, this.glassColors, $r('app.color.surface_card'), this.buttonBorder()))
+    .attributeModifier(this.compact ? new PressFeedback(1, 0.4, true) : new GlassSurface(this.surfaceMaterial, this.glassColors, $r('app.color.surface_card'), this.buttonBorder(), true))
     .stateEffect(false)
     .borderRadius(this.compact ? 8 : 应用尺寸.圆角_胶囊)
     .enabled(this.是否启用)
     .focusOnTouch(!this.preserveInputFocus)
+    .onAreaChange((_old: Area, area: Area): void => { this.triggerArea = area; })
     .onClick(() => { this.activate(); })
   }
 }

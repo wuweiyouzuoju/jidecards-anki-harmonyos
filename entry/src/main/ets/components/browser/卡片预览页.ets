@@ -1,3 +1,4 @@
+import { insetMaterialFill } from '../../utils/GlassMaterial';
 import { GlassSource } from '../common/GlassSource';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { NoteLinksPanel } from '../links/NoteLinksPanel';
@@ -806,7 +807,7 @@ export struct 卡片预览页 {
     }
     .width('100%')
     .layoutWeight(1)
-    .backgroundColor($r('app.color.surface_card'))
+    .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
     .clip(true)
     .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
     }
@@ -890,7 +891,7 @@ CardViewport({ content: () => { this.cardViewportContent(); } })
     }
     .width('100%')
     .height('100%')
-    .backgroundColor($r('app.color.surface_page'))
+    .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
     // Block 会连同关闭、更多和 Web 一起屏蔽；此处只隔离宿主页面。
     .hitTestBehavior(HitTestMode.Default)
     .onClick((): void => {})

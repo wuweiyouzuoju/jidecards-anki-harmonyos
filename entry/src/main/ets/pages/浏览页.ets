@@ -1,3 +1,4 @@
+import { insetMaterialFill } from '../utils/GlassMaterial';
 import { GlassSource } from '../components/common/GlassSource';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { 添加笔记页参数 } from 'model/navigation/PageParams';
@@ -1920,7 +1921,7 @@ export struct 浏览页 {
   private viewChoice(group: string) {
     按下态按钮({ 文案: this.viewChoiceLabel(group), singleLine: true, fillWidth: true,
       字号: 应用尺寸.字号_正文,
-      disclosure: true, expanded: this.showViewMenu && this.viewMenuGroup === group,
+      disclosure: true,
       是否启用: this.viewControlsAvailable(),
       点击回调: (): void => { this.openViewMenu(group); } })
     .id('browser-view-' + group)
@@ -2024,7 +2025,7 @@ export struct 浏览页 {
         Text(this.批量错误)
           .fontSize(应用尺寸.字号_正文_小)
           .fontColor($r('app.color.error_text'))
-          .backgroundColor($r('app.color.surface_card'))
+          .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
           .padding({ left: 应用尺寸.间距_16, right: 应用尺寸.间距_16,
             top: 应用尺寸.间距_8, bottom: 应用尺寸.间距_8 })
           .width('100%')

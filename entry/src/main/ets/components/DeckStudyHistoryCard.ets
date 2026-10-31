@@ -203,7 +203,7 @@ export struct DeckStudyHistoryCard {
     .padding(应用尺寸.卡片内边距)
     .border(SurfaceBorder.options())
     .borderRadius(应用尺寸.圆角_卡片)
-    .attributeModifier(SeriesVisual.insetSurface(this.surfaceMaterial, SeriesVisual.isDark(this.themeMode, this.systemDark),
+    .attributeModifier(SeriesVisual.clearSurface(this.surfaceMaterial, SeriesVisual.isDark(this.themeMode, this.systemDark),
       this.accent, this.pageTint, 应用尺寸.圆角_卡片))
     .onVisibleAreaChange([0], (visible: boolean): void => { this.setVisible(visible); })
   }

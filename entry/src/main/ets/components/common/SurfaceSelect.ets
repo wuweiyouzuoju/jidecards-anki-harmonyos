@@ -1,3 +1,4 @@
+import { GlassFusionRect } from 'jide_foundation';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { GlassPanel } from './GlassPanel';
 import { SelectionValueButton } from './SelectionValueButton';
@@ -21,6 +22,8 @@ export struct SurfaceSelect {
   @StorageProp(WINDOW_SAFE_BOTTOM_KEY) private safeBottom: number = 0;
   private triggerRect: SelectionRect = { left: 0, top: 0, width: 0, height: 0 };
   @State private popupAngle: number = 90;
+  @State private motionCenterX: string = '50%';
+  @State private motionCenterY: string = '0%';
   @State private triggerWidth: number = 0;
   @State private popupWidth: number = 180;
   @Prop options: SelectOption[] = [];
@@ -71,12 +74,20 @@ export struct SurfaceSelect {
   }
   private popupArea(area: Area): void {
     if (!this.menuOpen) return;
+    this.motionCenterX = `${Math.max(0, Math.min(100,
+      (this.triggerRect.left + this.triggerRect.width / 2 - Number(area.globalPosition.x)) / Math.max(1, Number(area.width)) * 100))}%`;
+    this.motionCenterY = `${Math.max(0, Math.min(100,
+      (this.triggerRect.top + this.triggerRect.height / 2 - Number(area.globalPosition.y)) / Math.max(1, Number(area.height)) * 100))}%`;
     this.popupAngle = selectionPopupAngle(this.triggerRect, { left: Number(area.globalPosition.x),
       top: Number(area.globalPosition.y), width: Number(area.width), height: Number(area.height) });
   }
+  private buttonOrigin(): GlassFusionRect {
+    return { x: this.triggerRect.left, y: this.triggerRect.top, width: this.triggerRect.width,
+      height: this.triggerRect.height, radius: 12 };
+  }
   @Builder
   private choices() {
-    GlassPanel({ radius: 12, role: 'menu', content: (): void => { this.choiceContent(); } })
+    GlassPanel({ fusionAnchor: this.buttonOrigin(), radius: 12, role: 'menu', centerX: this.motionCenterX, centerY: this.motionCenterY, content: (): void => { this.choiceContent(); } })
       .onAreaChange((_old: Area, area: Area): void => { this.popupArea(area); })
   }
   @Builder

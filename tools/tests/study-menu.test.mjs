@@ -6,7 +6,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
 import { actionMenuRows, visibleActionMenuRows, toggleActionMenuBranch } from '../../entry/src/main/ets/components/common/ActionMenuTree.ts';
 import { ActionMenuPointerSide, actionMenuGroupInset, placeActionMenuGroups, placeActionMenuOverlay, actionMenuBubbleOutline } from '../../entry/src/main/ets/components/common/ActionMenuLayout.ts';
-import { safeMenuGeometry } from '../../entry/src/main/ets/model/WindowSafeLayout.ts';
+import { safeMenuGeometry, keyboardViewportHeight } from '../../entry/src/main/ets/model/WindowSafeLayout.ts';
 import { StudyKeyboardSession } from '../../entry/src/main/ets/model/StudyKeyboard.ts';
 
 const read = path => readFileSync(new URL('../../' + path, import.meta.url), 'utf8');
@@ -70,11 +70,11 @@ test('opening automatically expands both side groups; independent collapse and f
 });
 
 test('automatic expansion keeps both side panels when flags cover the primary menu', () => {
-  const Menu=loadComponentLogic('components/common/CardActionMenu.ets','CardActionMenu',{
-    应用尺寸:{compactMenuWidth:168,menuItemHeight:44,cardActionGroupWidth:136,radiusLg:16},PAGE_COMPACT_LAYOUT_KEY:'compact',
+  const Menu=loadComponentLogic('components/common/CardActionMenu.ets','CardActionMenu',{ Scroller: class {},
+    应用尺寸:{compactMenuWidth:168,menuItemHeight:44,cardActionGroupWidth:136,radiusLg:16, pageContentTop:()=>0, 页面底部间距:()=>12},PAGE_COMPACT_LAYOUT_KEY:'compact', safeMenuGeometry, keyboardViewportHeight,
     actionMenuRows,visibleActionMenuRows,actionMenuGroupInset,placeActionMenuGroups,placeActionMenuOverlay,ActionMenuPointerSide,$r:key=>key,MenuSurface:{pointerSpan:20,pointerDepth:6}
   });
-  const menu=new Menu(),{root}=harness(),events=[];
+  const menu=new Menu(); menu.viewportHeight=1600; const {root}=harness(),events=[];
   Object.assign(menu,{items:root,expandedIds:['marking','card_actions'],menuWidth:168,contentWidth:360,
     onToggleBranch:item=>{menu.expandedIds=toggleActionMenuBranch(root,menu.expandedIds,item.id,false);},onSelect:item=>events.push(item.id)});
   assert.deepEqual(menu.rows().filter(row=>row.depth===0).map(row=>row.node.id),['edit','marking','card_actions']);
@@ -142,11 +142,11 @@ test('native Back reaches navigation instead of being swallowed by the keyboard 
 });
 
 test('shared menu rejects stale/disabled rows and keeps flat preview callbacks', () => {
-  const Menu=loadComponentLogic('components/common/CardActionMenu.ets','CardActionMenu',{
-    应用尺寸:{compactMenuWidth:112,menuItemHeight:44,cardActionGroupWidth:136,radiusLg:16},PAGE_COMPACT_LAYOUT_KEY:'compact',actionMenuRows,visibleActionMenuRows,actionMenuGroupInset,placeActionMenuGroups,placeActionMenuOverlay,ActionMenuPointerSide,
+  const Menu=loadComponentLogic('components/common/CardActionMenu.ets','CardActionMenu',{ Scroller: class {},
+    应用尺寸:{compactMenuWidth:112,menuItemHeight:44,cardActionGroupWidth:136,radiusLg:16,pageContentTop:()=>0,页面底部间距:()=>12},PAGE_COMPACT_LAYOUT_KEY:'compact', safeMenuGeometry, keyboardViewportHeight,actionMenuRows,visibleActionMenuRows,actionMenuGroupInset,placeActionMenuGroups,placeActionMenuOverlay,ActionMenuPointerSide,
     actionIcon:id=>id,$r:key=>key,MenuSurface:{pointerSpan:20,pointerDepth:6},Curve:{EaseOut:'easeOut'}
   });
-  const menu=new Menu(),{root}=harness(),events=[];menu.items=root;menu.expandedIds=['marking','card_actions'];
+  const menu=new Menu(); menu.viewportHeight=1600; const {root}=harness(),events=[];menu.items=root;menu.expandedIds=['marking','card_actions'];
   menu.getUIContext=()=>{throw new Error('branch changes must not animate the entire measured menu layout');};
   menu.onToggleBranch=item=>{menu.expandedIds=toggleActionMenuBranch(menu.items,menu.expandedIds,item.id);};
   menu.onSelect=item=>events.push(item.id);
@@ -163,15 +163,15 @@ test('left panels use measured first-group anchoring without adding root gaps or
   assert.equal(actionMenuGroupInset([],3,132,44),88);
   assert.equal(actionMenuGroupInset([60,48,44,64],3,180,44),94);
   assert.equal(actionMenuGroupInset([],3,484,44),0,'expanded flags move the left column upward, never stretch the right menu');
-  const Menu=loadComponentLogic('components/common/CardActionMenu.ets','CardActionMenu',{
-    应用尺寸:{compactMenuWidth:112,menuItemHeight:44,cardActionGroupWidth:136,radiusLg:16},PAGE_COMPACT_LAYOUT_KEY:'compact',actionMenuRows,visibleActionMenuRows,actionMenuGroupInset,placeActionMenuGroups,placeActionMenuOverlay,ActionMenuPointerSide,
+  const Menu=loadComponentLogic('components/common/CardActionMenu.ets','CardActionMenu',{ Scroller: class {},
+    应用尺寸:{compactMenuWidth:112,menuItemHeight:44,cardActionGroupWidth:136,radiusLg:16,pageContentTop:()=>0,页面底部间距:()=>12},PAGE_COMPACT_LAYOUT_KEY:'compact', safeMenuGeometry, keyboardViewportHeight,actionMenuRows,visibleActionMenuRows,actionMenuGroupInset,placeActionMenuGroups,placeActionMenuOverlay,ActionMenuPointerSide,
     actionIcon:id=>id,$r:key=>key,MenuSurface:{pointerSpan:20,pointerDepth:6}
   });
-  const menu=new Menu(),{root}=harness();menu.items=root;menu.menuWidth=168;menu.contentWidth=360;menu.expandedIds=['marking','card_actions'];
+  const menu=new Menu(); menu.viewportHeight=1600; const {root}=harness();menu.items=root;menu.menuWidth=168;menu.contentWidth=360;menu.expandedIds=['marking','card_actions'];
   for(const width of [180,280,360,840]) { menu.contentWidth=width;assert.ok(menu.totalWidth()<=width-24); }
   menu.contentWidth=360;assert.equal(menu.sideGroups().length,2);
   menu.recordRow(0,60);assert.equal(menu.rowHeights[0],60);
-  menu.expandedIds=[];assert.equal(menu.totalWidth(),168);assert.equal(menu.sideGroups().length,0);
+  menu.expandedIds=[];assert.equal(menu.totalWidth(),316,'collapsed side groups keep the positioning footprint stable');assert.equal(menu.sideGroups().length,0);
   menu.rowHeights=[60,44,44,200,200];assert.equal(menu.layoutHeight(),148,'hidden root entries do not reserve stale height');
 });
 
@@ -205,12 +205,12 @@ test('bubble outline converts all coordinates at the actual density and keeps a 
 });
 
 test('flags cover the primary column, point at the measured trigger and preserve both side panel positions', () => {
-  const Menu=loadComponentLogic('components/common/CardActionMenu.ets','CardActionMenu',{
-    应用尺寸:{compactMenuWidth:168,menuItemHeight:44,cardActionGroupWidth:136,radiusLg:16},PAGE_COMPACT_LAYOUT_KEY:'compact',
+  const Menu=loadComponentLogic('components/common/CardActionMenu.ets','CardActionMenu',{ Scroller: class {},
+    应用尺寸:{compactMenuWidth:168,menuItemHeight:44,cardActionGroupWidth:136,radiusLg:16, pageContentTop:()=>0, 页面底部间距:()=>12},PAGE_COMPACT_LAYOUT_KEY:'compact', safeMenuGeometry, keyboardViewportHeight,
     actionMenuRows,visibleActionMenuRows,actionMenuGroupInset,placeActionMenuGroups,placeActionMenuOverlay,ActionMenuPointerSide,
     $r:key=>key,MenuSurface:{pointerSpan:20,pointerDepth:6}
   });
-  const menu=new Menu(),{root}=harness(),events=[];menu.items=root;
+  const menu=new Menu(); menu.viewportHeight=1600; const {root}=harness(),events=[];menu.items=root;
   menu.onSelect=item=>events.push(item.id);
   menu.onToggleBranch=item=>{menu.expandedIds=toggleActionMenuBranch(menu.items,menu.expandedIds,item.id,false);};
   for(const width of [180,360,840]) for(const onRight of [false,true]) {
@@ -239,6 +239,10 @@ test('flags cover the primary column, point at the measured trigger and preserve
     assert.deepEqual(menu.placements(),before.placements,'measuring the overlay must not resize the left groups');
     const measured=menu.popupPlacement();assert.equal(measured.top+measured.pointerCenter,target);
     assert.ok(menu.layoutHeight()>=measured.top+396);
+    menu.groupScrollOffsets=[{id:'marking',offset:20}];
+    const scrolled=menu.popupPlacement();
+    assert.equal(scrolled.top+scrolled.pointerCenter,target-20,'third layer follows the scrolled side row');
+    menu.groupScrollOffsets=[];
     menu.dismissTop();assert.deepEqual(menu.expandedIds,['marking','card_actions']);
     assert.equal(menu.popupRows().length,0);
     menu.selectEntry(markRows[1]);menu.dismissTop();assert.deepEqual(menu.expandedIds,['marking','card_actions']);
@@ -301,7 +305,7 @@ test('branch chevrons follow the real panel side for flags and mirrored context 
     value=>props=value,{Center:'center'});
   for(const right of [false,true]) for(const expanded of [false,true]) {
     const host=Object.assign(new Rows(),{slideScope:{},expandedIds:expanded?['marking','flag']:[],
-      groupsOnRight:()=>right,nestedBranch:()=>undefined,rowItem:()=>({value:'branch'}),selectEntry:()=>{}});
+      rowEnabled:row=>row.enabled,groupsOnRight:()=>right,nestedBranch:()=>undefined,rowItem:()=>({value:'branch'}),selectEntry:()=>{}});
     host.menuRow({depth:1,enabled:true,node:{id:'flag',children:[]}},0);
     assert.equal(props.disclosureAngle,expanded?(right?180:0):90,'flags rotate from folded-down toward the primary column');
     host.menuRow({depth:0,enabled:true,node:{id:'marking',children:[]}},0);
@@ -316,4 +320,64 @@ test('region-anchored menus retain the full positioning region for left/right al
  const home=read('entry/src/main/ets/pages/首页.ets');
  assert.match(home,/contentMaxWidth: this.homeActionAnchor.width, alignEnd: false/);
  assert.match(home,/contentMaxWidth: this.homeActionAnchor.width, alignEnd: true/);
+});
+
+
+test('long batch menus bound each glass panel and move marking into the visible viewport', () => {
+  const Menu = loadComponentLogic('components/common/CardActionMenu.ets', 'CardActionMenu', { Scroller: class {},
+    应用尺寸: { compactMenuWidth: 168, menuItemHeight: 44, cardActionGroupWidth: 136, radiusLg: 16,
+      pageContentTop: () => 68, 页面底部间距: () => 12 },
+    MenuSurface: { pointerSpan: 20, pointerDepth: 6 },
+    actionMenuRows, visibleActionMenuRows, actionMenuGroupInset, placeActionMenuGroups, placeActionMenuOverlay,
+    safeMenuGeometry, keyboardViewportHeight
+  });
+  for (const viewportHeight of [480, 768, 1080]) {
+    const menu = new Menu(); menu.viewportHeight = viewportHeight; menu.topOffset = 68;
+    menu.items = Array.from({ length: 17 }, (_, index) => ({ id: 'row-' + index }));
+    menu.items[13].children = [{ id: 'mark' }, { id: 'unmark' }, { id: 'flag' }, { id: 'names' }];
+    menu.expandedIds = ['row-13'];
+    menu.rowHeights = menu.items.map(() => 52);
+    const limit = menu.availableMenuHeight();
+    assert.ok(menu.baseHeight() <= limit);
+    assert.ok(menu.layoutHeight() <= limit);
+    const placement = menu.placements()[0];
+    assert.ok(placement.top >= 0);
+    assert.ok(placement.top + menu.groupHeights()[0] <= limit);
+  }
+});
+
+test('side panel anchors follow scrolling and simultaneous long groups share the viewport', () => {
+ const Menu=loadComponentLogic('components/common/CardActionMenu.ets','CardActionMenu',{
+  Scroller:class {},应用尺寸:{compactMenuWidth:168,menuItemHeight:44,cardActionGroupWidth:136,radiusLg:16,
+    pageContentTop:()=>0,页面底部间距:()=>12},
+  safeMenuGeometry,keyboardViewportHeight,actionMenuRows,visibleActionMenuRows,actionMenuGroupInset,
+  placeActionMenuGroups,placeActionMenuOverlay,MenuSurface:{pointerSpan:20,pointerDepth:6}
+ });
+ const menu=new Menu();menu.viewportHeight=340;menu.topOffset=0;
+ menu.items=[{id:'a',children:Array.from({length:12},(_,n)=>({id:'a'+n}))},
+   {id:'b',children:Array.from({length:12},(_,n)=>({id:'b'+n}))}];
+ menu.expandedIds=['a','b'];
+ const limit=menu.availableMenuHeight(), heights=menu.groupHeights(),positions=menu.placements();
+ assert.ok(heights[0]+heights[1]+8<=limit);
+ assert.ok(positions[0].top+heights[0]+8<=positions[1].top);
+ assert.ok(positions[1].top+heights[1]<=limit);
+ menu.expandedIds=['b'];menu.rowHeights=[44,44];
+ const before=menu.placements()[0];
+ menu.primaryScrollOffset=20;
+ const after=menu.placements()[0];
+ assert.ok(after.top+after.pointerCenter<before.top+before.pointerCenter);
+});
+
+
+test('bottom avoidance preserves gaps when several triggers are below the viewport', () => {
+ for (const anchors of [[900,1000],[44,900],[900,1000,1200]]) {
+  const limit=320,gap=8,height=(limit-gap*(anchors.length-1))/anchors.length;
+  const heights=anchors.map(()=>height);
+  const panels=placeActionMenuGroups(anchors,heights,26.5,gap,limit);
+  panels.forEach((panel,index)=>{
+   assert.ok(panel.top>=0);
+   assert.ok(panel.top+height<=limit+1e-9);
+   if(index>0) assert.ok(panels[index-1].top+height+gap<=panel.top+1e-9);
+  });
+ }
 });

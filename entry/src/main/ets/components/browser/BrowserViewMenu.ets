@@ -142,7 +142,7 @@ export struct BrowserViewMenu {
   }
 
   build() {
-    DialogFrame({ onDismiss: (): void => { this.onClose(); }, header: (): void => { this.selectionHeader(); },
+    DialogFrame({ buttonFusion: false, onDismiss: (): void => { this.onClose(); }, header: (): void => { this.selectionHeader(); },
       content: (): void => { this.selectionContent(); } })
   }
 }

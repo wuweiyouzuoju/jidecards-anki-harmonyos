@@ -1,3 +1,4 @@
+import { insetMaterialFill } from '../utils/GlassMaterial';
 import { GlassSource } from '../components/common/GlassSource';
 import { EditorSectionCard } from '../components/common/EditorSectionCard';
 import { NOTE_FIELD_STICKY_CONTROL } from '../model/NoteFieldEditing';
@@ -773,7 +774,7 @@ Column() {
                   .height(应用尺寸.紧凑控件高度)
                   .fontSize(应用尺寸.字号_正文)
                   .fontColor(this.动作主色)
-                  .backgroundColor($r('app.color.surface_card'))
+                  .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
                   .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
                   .enabled(!this.处理中 && !this.pickingFieldImage && !this.audioBusy && !this.confirmingDiscard)
                   .attributeModifier(new PressFeedback())
@@ -784,7 +785,7 @@ Column() {
                     .height(应用尺寸.紧凑控件高度)
                     .fontSize(应用尺寸.字号_正文)
                     .fontColor(this.动作主色)
-                    .backgroundColor($r('app.color.surface_card'))
+                    .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
                     .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
                     .enabled(!this.处理中 && !this.pickingFieldImage && !this.audioBusy && !this.confirmingDiscard)
                     .attributeModifier(new PressFeedback())
@@ -959,7 +960,7 @@ Column() {
         }
         .width('100%')
         .height('100%')
-        .backgroundColor($r('app.color.surface_page'))
+        .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
         .padding({
           left: 应用尺寸.页面内边距_水平,
           right: 应用尺寸.页面内边距_水平,
