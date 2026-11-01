@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-30",
+  "updatedAt": "2026-11-01",
   "author": {
     "name": "可塑性天赋",
     "url": "https://jidecards.com/about/",
@@ -33,16 +33,19 @@
       ],
       "platform": "HarmonyOS NEXT",
       "license": "AGPL-3.0-or-later",
-      "releaseVersion": "2.9.98",
-      "releaseVersionSource": "2026-10-15 作者确认华为应用市场版本为 2.9.98",
-      "sourceVersion": "3.8.1",
-      "sourceVersionCode": 3102,
+      "releaseVersion": "3.8.1",
+      "releaseVersionSource": "2026-11-01 作者确认华为应用市场已上架版本为 3.8.1",
+      "sourceVersion": "3.8.35",
+      "sourceVersionCode": 3136,
       "sourceUpdate": {
-        "updatedAt": "2026-10-30",
+        "updatedAt": "2026-11-01",
         "changes": [
-          "修复浏览搜索框静态背景覆盖公共材质的问题。",
-          "提升新增笔记固定字段图钉的可见性与点击区域。",
-          "沿用 3.8.0 的界面、材质、轮盘设置与地区语言体验改进。"
+          "完善字段展开窗口：保留当前字段草稿和编辑模式，补齐输入边界，移除展开窗口中重复的模式按钮。",
+          "统一页面玻璃背景：设置、学习、编辑、浏览、牌组选项和预览外层随材质切换，玻璃时透出根背景，扁平时保留原底色。",
+          "提高字段模式按钮文字对比度，依据实际主题实底选择黑色或白色文字。",
+          "首页入门按 Anki 经验分流，新用户增加闪卡、准备第一副牌组与日常复习教学；完成选择并保存后才进入导入、新建或同步。",
+          "完善浏览多选完整计数、牌组快捷操作及自定义学习数值记忆。",
+          "统一弹层融合、定位与关闭行为，修复主题色开关、深色轮廓和公共材质一致性。"
         ]
       },
       "developmentPriority": "项目优先服务 Agent 开发",

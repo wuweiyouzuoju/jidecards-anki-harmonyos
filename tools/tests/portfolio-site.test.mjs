@@ -405,3 +405,15 @@ test('older browsers defer source assignment until after the first painted frame
 test('pages without deferred media do not schedule image work', () => {
   assert.deepEqual(mediaHarness({ count: 0 }).frames, []);
 });
+
+test('README source badge and marketplace facts match their configuration owners', async () => {
+  const { app } = JSON5.parse(await readFile(path.join(root, 'AppScope/app.json5'), 'utf8'));
+  const readme = await readFile(path.join(root, 'README.md'), 'utf8');
+  assert.ok(readme.includes(`source-${app.versionName}-`));
+  assert.ok(readme.includes(`当前源码版本：${app.versionName}（versionCode ${app.versionCode}）`));
+  assert.ok(readme.includes(`AppGallery-${work.releaseVersion}-`));
+  assert.ok(readme.includes(`华为应用市场版本：${work.releaseVersion}`));
+  const note = await readFile(path.join(root, `docs/releases/${app.versionName}.md`), 'utf8');
+  assert.ok(note.includes(work.releaseVersion));
+  assert.ok(note.includes(String(app.versionCode)));
+});

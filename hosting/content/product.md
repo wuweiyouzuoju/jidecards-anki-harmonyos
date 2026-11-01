@@ -4,8 +4,8 @@
 
 记得闪卡是面向鸿蒙 HarmonyOS NEXT 的原生开源闪卡应用，基于 Anki 内核，用于背单词、记忆知识点与备考。支持 FSRS 间隔复习、AnkiWeb 同步与 APKG 导入导出；当前源码还提供实验性个人设备直连卡库与媒体同步，以及键盘、鼠标操作。
 
-- 当前源码版本：3.8.1（构建编号 3102）
-- 华为应用市场版本：2.9.98
+- 当前源码版本：3.8.35（构建编号 3136）
+- 华为应用市场版本：3.8.1
 - 平台：HarmonyOS NEXT
 - 许可证：AGPL-3.0-or-later
 - 作者：[可塑性天赋](https://jidecards.com/about/)
@@ -13,7 +13,7 @@
 - 签名 HAP 开发包：[jidecards-v3.0.20-signed.hap](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v3.0.20/jidecards-v3.0.20-signed.hap) · [SHA-256 校验](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v3.0.20/SHA256SUMS.txt) · [构建说明](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/tag/v3.0.20)
 - 开发包安装：签名开发包，安装受包内签名与设备授权限制；普通用户建议从华为应用市场安装。
 - 源码：[GitHub](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos) · [Gitee](https://gitee.com/wuweiyouzuoju/jidecards-anki-harmonyos) · [GitCode](https://gitcode.com/wuweiyouzuoju/jidecards-anki-harmonyos)
-- 更新日期：2026-10-30
+- 更新日期：2026-11-01
 
 本文按当前源码介绍功能，应用市场实际版本以下载页面为准。独立开源项目，非 Anki 官方客户端。
 
@@ -206,8 +206,11 @@ APKG 用于牌组交换，COLPKG 用于完整集合的备份与恢复。恢复�
 
 实验性设备直连分别提供同源卡库的学习记录合并，以及整套卡库与媒体同步，均需双方独立授权。来源或结构不兼容时，接收设备须确认替换并先备份；保留 AnkiWeb，真实两机与账号行为仍待设备验收。
 
-## 3.8.1 源码更新说明
+## 3.8.35 源码更新说明
 
-1. 修复浏览搜索框静态背景覆盖公共材质的问题。
-2. 提升新增笔记固定字段图钉的可见性与点击区域。
-3. 沿用 3.8.0 的界面、材质、轮盘设置与地区语言体验改进。
+1. 完善字段展开窗口：保留当前字段草稿和编辑模式，补齐输入边界，移除展开窗口中重复的模式按钮。
+2. 统一页面玻璃背景：设置、学习、编辑、浏览、牌组选项和预览外层随材质切换，玻璃时透出根背景，扁平时保留原底色。
+3. 提高字段模式按钮文字对比度，依据实际主题实底选择黑色或白色文字。
+4. 首页入门按 Anki 经验分流，新用户增加闪卡、准备第一副牌组与日常复习教学；完成选择并保存后才进入导入、新建或同步。
+5. 完善浏览多选完整计数、牌组快捷操作及自定义学习数值记忆。
+6. 统一弹层融合、定位与关闭行为，修复主题色开关、深色轮廓和公共材质一致性。
